@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>결제 기획 안건</title>
+<style>
+  :root {
+    --bg:#F1F3F5; --surface:#FFFFFF; --surface-2:#E8EBEF;
+    --ink:#16181D; --ink-2:#3B4048; --muted:#676D77;
+    --line:#D6DBE1; --line-2:#BFC6CE;
+    --accent:#1F5F7A; --accent-soft:#DCEAF1;
+    --pass:#2E7350; --pass-soft:#DFEDE5;
+    --fail:#A33A38; --fail-soft:#F6E2E1;
+    --gate:#6A579E; --gate-soft:#EAE4F5;
+    --warn:#8A6412; --warn-soft:#F4EBD6;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI","Malgun Gothic",sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+      --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+      --line:#2B3038; --line-2:#3C434D;
+      --accent:#74B4D0; --accent-soft:#17303C;
+      --pass:#5FB98A; --pass-soft:#17301F;
+      --fail:#E0817D; --fail-soft:#3A2321;
+      --gate:#A794D8; --gate-soft:#272040;
+      --warn:#D2A64F; --warn-soft:#33290F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+    --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+    --line:#2B3038; --line-2:#3C434D;
+    --accent:#74B4D0; --accent-soft:#17303C;
+    --pass:#5FB98A; --pass-soft:#17301F;
+    --fail:#E0817D; --fail-soft:#3A2321;
+    --gate:#A794D8; --gate-soft:#272040;
+    --warn:#D2A64F; --warn-soft:#33290F;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:0 20px 110px;background:var(--bg);color:var(--ink);
+    font-family:var(--sans);font-size:16px;line-height:1.82;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto}
+  header.page{padding:56px 0 20px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 14px;font-weight:600}
+  h1{font-size:clamp(27px,5vw,40px);font-weight:800;letter-spacing:-.028em;line-height:1.22;
+    margin:0 0 18px;text-wrap:balance}
+  .standfirst{font-size:17.5px;color:var(--ink-2);margin:0 0 14px;max-width:60ch}
+  .asof{font-family:var(--mono);font-size:12px;color:var(--muted);margin:0}
+  header.page::after{content:"";display:block;height:3px;background:var(--ink);margin-top:26px;opacity:.9}
+  section{margin:58px 0 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .sec-num{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);
+    border:1.5px solid var(--accent);border-radius:3px;padding:0 7px;line-height:1.7}
+  h2{font-size:23px;font-weight:800;letter-spacing:-.018em;margin:0;text-wrap:balance}
+  .sec-lede{color:var(--muted);font-size:15px;margin:0 0 24px;max-width:62ch}
+  p{margin:0 0 16px;max-width:64ch}
+  h3{font-size:17px;font-weight:750;margin:28px 0 10px;letter-spacing:-.01em}
+  h3:first-child{margin-top:0}
+  ul.plain{margin:0 0 16px;padding-left:22px;max-width:64ch}
+  ul.plain li{margin-bottom:8px}
+  strong,b{font-weight:750}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    padding:24px 26px 20px;margin:0 0 18px}
+  .card.fail{border-left:3px solid var(--fail)}
+  .card.pass{border-left:3px solid var(--pass)}
+  .card.note{border-left:3px solid var(--accent)}
+  .card.warn{border-left:3px solid var(--warn)}
+  .card.gate{border-left:3px solid var(--gate)}
+  .card > :last-child{margin-bottom:0}
+  .card-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:16px}
+  .card-head h3{flex:1 1 240px;margin:0}
+  .chip{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.03em;
+    border-radius:3px;padding:2px 8px;white-space:nowrap}
+  .c-pass{background:var(--pass-soft);color:var(--pass)}
+  .c-fail{background:var(--fail-soft);color:var(--fail)}
+  .c-warn{background:var(--warn-soft);color:var(--warn)}
+  .c-acc{background:var(--accent-soft);color:var(--accent)}
+  .c-gate{background:var(--gate-soft);color:var(--gate)}
+  blockquote{margin:14px 0;padding:14px 18px;background:var(--surface-2);
+    border-left:3px solid var(--line-2);border-radius:0 7px 7px 0;font-size:15px}
+  blockquote p{margin:0 0 8px}
+  blockquote p:last-child{margin:0}
+  code{font-family:var(--mono);font-size:.87em;background:var(--surface-2);padding:1px 6px;border-radius:3px}
+  .tbl{overflow-x:auto;margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:500px}
+  th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:700;
+    padding:10px 12px;border-bottom:2px solid var(--line-2);vertical-align:bottom}
+  td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  .say{color:var(--muted);font-size:12.5px;display:block;margin-top:4px;line-height:1.55}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);
+    border-radius:10px;overflow:hidden;margin:16px 0}
+  @media (max-width:640px){.split{grid-template-columns:1fr}}
+  .split > div{padding:18px 20px}
+  .split .yes{background:var(--pass-soft);border-right:1px solid var(--line)}
+  .split .no{background:var(--fail-soft)}
+  .split h4{margin:0 0 10px;font-size:14.5px;font-weight:800}
+  .split .yes h4{color:var(--pass)}
+  .split .no h4{color:var(--fail)}
+  .split ul{margin:0;padding-left:20px;font-size:14px;line-height:1.7}
+  .split li{margin-bottom:7px}
+  .banner{border:2px solid var(--ink);border-radius:10px;padding:22px 26px;margin:26px 0;
+    background:var(--surface)}
+  .banner h3{margin:0 0 10px;font-size:18px}
+  .banner p:last-child{margin-bottom:0}
+  footer{margin-top:66px;padding-top:20px;border-top:2px solid var(--ink);font-size:13.5px;color:var(--muted)}
+  footer b{color:var(--ink)}
+  a{color:var(--accent)}
+  a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <p class="eyebrow">결제 도입 준비 · 기획 논의 안건 · 2026-09-01</p>
+  <h1>결제를 붙이기 전에 기획이 정해야 하는 다섯 안건</h1>
+  <p class="standfirst">가격 정책 v4 시트와 결제 준비 체크리스트를 대조해서, 개발자 혼자 정하면 사고가 나는 항목만 추렸습니다. 안건마다 같은 형식입니다 — <b>무엇을 정하나 · 왜 결제 전인가 · 선택지 · 미루면 생기는 일.</b></p>
+  <p class="asof">결론 먼저 — 제일 큰 안건은 가격도 법률도 아니고, <b>주 타겟(국내 제작사·대행사)과 결제 통로(해외 결제 대행)가 부딪친다는 사실</b>입니다.</p>
+</header>
+
+<!-- 1 -->
+<section>
+  <div class="sec-head"><span class="sec-num">1</span><h2>이 문서가 다루는 것과 다루지 않는 것</h2></div>
+  <p>v4 시트는 요금제 사다리·Take 경제·소멸시효까지 이미 확정했습니다. <b>이 문서는 그 결정을 다시 열자는 게 아닙니다.</b> 결제 버튼을 실제로 켜는 순간 처음으로 물어야 하는 질문들 — 돈이 어느 통로로 들어오고, 어떤 법이 걸리고, 어떤 문서를 게시해야 하는지 — 만 다룹니다.</p>
+  <p>용어 하나만 미리 풀어둡니다. <b>MoR</b>(Merchant of Record) — 우리 대신 판매자 지위를 맡아서 각국 부가세 신고, 영수증 발행, 카드 분쟁 응대를 처리해 주는 결제 대행 사업자입니다. Paddle, Lemon Squeezy, Polar 같은 회사들이고, 지금 결제를 이 방식으로 붙이려는 상태입니다.</p>
+</section>
+
+<!-- 2 -->
+<section>
+  <div class="sec-head"><span class="sec-num">2</span><h2>안건 ① 주 타겟과 결제 통로가 부딪친다</h2></div>
+  <p class="sec-lede">다른 안건을 전부 미뤄도 이건 먼저 정해야 합니다. 나머지 설계가 이 결정의 함수입니다.</p>
+
+  <div class="card fail">
+    <div class="card-head"><h3>충돌 지점</h3><span class="chip c-fail">v4 스스로 적어둔 모순</span></div>
+    <p>v4 시트가 꼽은 타겟 1~4순위는 <b>광고대행사 AE, 웹툰·애니 제작사, 제작사 PD, 방송사</b> — 전부 국내입니다. 그리고 경쟁사 시트에 구조적 해자를 이렇게 적었습니다:</p>
+    <blockquote><p>"구조적 해자: 한국어 UI · 한국 영화계 워크플로우 · <b>국내 법인 계약 · 원화 세금계산서</b> · 바우처/조달 SKU. Higgsfield는 전부 없다."</p></blockquote>
+    <p>그런데 MoR은 이 해자를 하나도 실행 못 합니다. 결제는 달러, 판매자는 해외 법인, <b>한국 세금계산서 발행 불가.</b> 스튜디오 티어(연 $19,000~) 정책 4번이 "세금계산서·바우처 SKU·SLA 포함"인데, 이 상품은 MoR 체크아웃으로는 존재할 수 없습니다.</p>
+    <p style="margin-bottom:0">개인 카드로 시작하는 S 티어($15~110)는 MoR과 잘 맞습니다. 충돌은 위로 올라갈수록 — 법인 결제가 필요한 P와 스튜디오에서 — 커집니다.</p>
+  </div>
+
+  <h3>선택지</h3>
+  <div class="tbl">
+    <table>
+      <thead><tr><th style="width:26%">경로</th><th>내용</th><th>대가</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>㉮ 이원화</b><span class="say">추천 검토안</span></td>
+          <td>S·P 티어는 MoR 셀프서브 결제. 스튜디오·국내 법인은 계약서 + 세금계산서 + 계좌이체의 수동 영업 경로.</td>
+          <td>법인 매출이 우리 직접 매출이 되므로 그 부분의 세무·계약 실무는 우리 몫. 초기 건수가 적으면 감당 가능.</td>
+        </tr>
+        <tr>
+          <td><b>㉯ MoR 단독</b></td>
+          <td>일단 전부 MoR로. 스튜디오 영업은 뒤로 미룬다.</td>
+          <td>붙이는 건 제일 빠름. 대신 v4가 승산 높다고 본 국내 B2B(웹툰 제작사·방송사)에 견적서를 못 내밈.</td>
+        </tr>
+        <tr>
+          <td><b>㉰ 국내 PG 병행</b></td>
+          <td>토스페이먼츠 같은 국내 결제 대행을 같이 붙인다.</td>
+          <td>통신판매업 신고, PG 심사, 부가세 신고가 전부 우리 몫이 됨. 1인 운영에 지금 얹기엔 무겁다.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><b>미루면 생기는 일</b> — MoR 단독으로 구현을 끝낸 뒤에 스튜디오 계약 건이 들어오면, 결제·권한 부여 경로를 그때 다시 뚫어야 합니다. 처음부터 "수동으로 플랜을 부여하는 관리자 경로"를 설계에 넣어두면 ㉮가 공짜에 가깝습니다. 이 판단이 필요해서 결제 전 안건입니다.</p>
+</section>
+
+<!-- 3 -->
+<section>
+  <div class="sec-head"><span class="sec-num">3</span><h2>안건 ② 전문가 확인이 필요한 법률·세무 3건</h2></div>
+  <p class="sec-lede">여기 있는 건 우리가 정하는 게 아니라 변호사·세무사에게 물어야 합니다. 기획 몫은 질문지를 만드는 것.</p>
+
+  <div class="card warn">
+    <div class="card-head"><h3>1. 유상 충전 Take = 선불전자지급수단인가</h3><span class="chip c-warn">v4 잔여과제 #3 · 미완</span></div>
+    <p>v4 소멸시효 시트가 스스로 표시해 둔 리스크입니다. 유상으로 충전한 Take는 국내법상 선불전자지급수단(돈을 미리 받고 나중에 쓰게 하는 수단 — 상품권과 같은 규제 카테고리)에 해당할 소지가 있고, 그 경우 12개월 소멸 정책이 흔들립니다.</p>
+    <blockquote><p>"리스크 성격이 과징금이 아니라 <b>'소급 환급 부채'</b> — 소멸 처리한 잔액을 되돌려야 할 수 있어 규모가 누적됨."</p></blockquote>
+    <p style="margin-bottom:0">변호사에게 가져갈 핵심 질문: <b>판매자가 MoR(해외 법인)일 때도 한국 전자금융거래법이 우리에게 적용되는가.</b> 적용 안 되면 이 리스크는 상당 부분 접힙니다. 구독 포함분과 무료 지급분은 리스크 없음(v4 확인).</p>
+  </div>
+
+  <div class="card warn">
+    <div class="card-head"><h3>2. 환불 규칙과 Take 부분 소진</h3><span class="chip c-warn">환불 정책 문서와 세트</span></div>
+    <p>MoR의 환불 단위는 결제 건(팩 하나, 구독 한 달)인데, 우리 Take는 그 안에서 일부만 소진됐을 수 있습니다. "50 Take 중 30개 쓴 사람이 환불을 요구하면?"의 답이 환불 정책 문서에 적혀 있어야 하고, 환불 웹훅이 왔을 때 잔여 Take를 회수하는 규칙(다 썼으면 음수 잔액 + 생성 차단)이 그 정책의 코드 번역입니다.</p>
+    <p style="margin-bottom:0">EU 소비자의 14일 청약 철회권은 "디지털 콘텐츠 즉시 제공 동의" 체크로 처리하는 게 관행이고 MoR 체크아웃이 대부분 커버합니다 — 벤더 선정 때 설정 항목으로 확인.</p>
+  </div>
+
+  <div class="card warn">
+    <div class="card-head"><h3>3. 우리 몫의 세무</h3><span class="chip c-warn">세무사 1회 상담</span></div>
+    <p style="margin-bottom:0">소비자 부가세는 MoR 몫이지만, MoR이 보내주는 정산금은 우리 매출입니다. 외화획득 용역으로 영세율이 되는지, 통신판매업 신고가 필요한지(판매자가 MoR이라 불필요하다는 해석이 일반적이나 확정 아님)를 상담 한 번으로 묶어서 확인. 안건 ①에서 ㉮를 고르면 국내 법인 직접 매출분의 세금계산서 실무도 같은 자리에서.</p>
+  </div>
+</section>
+
+<!-- 4 -->
+<section>
+  <div class="sec-head"><span class="sec-num">4</span><h2>안건 ③ 가격 정책의 미결 5건 — 구현에 숫자가 필요하다</h2></div>
+  <p class="sec-lede">v4가 "판단 필요"로 남겨둔 항목 중, 결제·권한 코드를 짜는 순간 빈칸이 드러나는 것들입니다.</p>
+
+  <div class="tbl">
+    <table>
+      <thead><tr><th style="width:24%">안건</th><th>지금 상태</th><th>정해야 하는 것</th><th style="width:20%">미루면</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>반출 전용 수요</b><span class="say">v4 #25</span></td>
+          <td>분량은 S급인데 Export만 필요한 사용자가 P-10($199)을 사면 분량 1/4만 쓰고 마진 73%.</td>
+          <td>S 티어용 Export 애드온을 만들 것인가, 의도적으로 P로 밀어올릴 것인가.</td>
+          <td>과잉 지불 → 이탈. v4가 직접 "이탈 위험"으로 분류.</td>
+        </tr>
+        <tr>
+          <td><b>Account 초과 단가</b><span class="say">v4 #12</span></td>
+          <td>P 티어(3~8석) 초과 시 "차단 대신 계정당 과금"이 정책인데 단가가 없음. 후보 $79~158.</td>
+          <td>숫자 하나.</td>
+          <td>초과 청구 로직을 구현할 수 없음 — 결제 코드의 직접 빈칸.</td>
+        </tr>
+        <tr>
+          <td><b>자동 충전 기본값</b><span class="say">v4 Take 운영 규칙</span></td>
+          <td>"기본 OFF · 월 상한 설정 필수"까지만 확정.</td>
+          <td>상한 기본값, 상한 도달 시 처리(중단 알림 방식), 결제 실패 시 재시도.</td>
+          <td>충전 UI를 완성할 수 없음.</td>
+        </tr>
+        <tr>
+          <td><b>무료 지급 Take 유효기간</b><span class="say">v4 소멸시효</span></td>
+          <td>"지급일 + 1~3개월"로 폭이 있음.</td>
+          <td>숫자 하나.</td>
+          <td>소멸 알림(30/7/1일 전)을 짤 수 없음.</td>
+        </tr>
+        <tr>
+          <td><b>P 티어 Take/분 불균일</b><span class="say">v4 #20</span></td>
+          <td>분당 포함 Take가 7.5/4.4/6.0/4.1/5.9 — P-15·P-25 구매자가 상대적으로 불리.</td>
+          <td>고칠 것인가 감수할 것인가. 단조 정렬 시 마진 26~28%로 하락하는 트레이드오프.</td>
+          <td>급하지 않음. 단, 가격 페이지 게시 전에는 결론 필요.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 5 -->
+<section>
+  <div class="sec-head"><span class="sec-num">5</span><h2>안건 ④ 게시해야 하는 문서 4종 — 심사가 요구한다</h2></div>
+  <p class="sec-lede">MoR 입점에는 심사가 있고, 심사는 사이트에 실제로 게시된 문서를 봅니다. 코드보다 이 문서들이 먼저 필요한 이유입니다.</p>
+
+  <div class="card gate">
+    <div class="card-head"><h3>이용약관 — 생성물의 권리가 핵심 조항</h3><span class="chip c-gate">기획 판단 필요</span></div>
+    <p>일반 조항은 템플릿으로 되지만 세 가지는 우리가 정해야 합니다. <b>① 생성물의 상업적 사용 범위</b>(고객이 클라이언트 납품에 쓸 수 있는가 — 타겟이 제작사라 반드시 물어봄), <b>② 고객이 업로드한 자료의 권리와 책임</b>(웹툰 원작, 클라이언트 시안이 올라오는 서비스), <b>③ 고객 데이터의 모델 학습 사용 여부.</b></p>
+    <p style="margin-bottom:0">③은 영업 카드이기도 합니다 — Higgsfield는 "학습 미사용 + 법적 면책"을 Enterprise 전용으로 팝니다. 우리가 전 티어 기본으로 걸면 B2B 심사에서 차별점이 됩니다.</p>
+  </div>
+
+  <div class="card gate">
+    <div class="card-head"><h3>환불 정책</h3><span class="chip c-gate">안건 ②-2와 세트</span></div>
+    <p style="margin-bottom:0">Take 사용 전/후 환불 기준, 구독 중도 해지 처리, 소멸시효 고지(구독분 월말 소멸·충전분 12개월)를 한 페이지로. v4 소멸시효 표가 사실상 초안입니다.</p>
+  </div>
+
+  <div class="card gate">
+    <div class="card-head"><h3>개인정보처리방침 — 데이터가 지나가는 곳 전부</h3><span class="chip c-gate">B2B 보안 심사 대비</span></div>
+    <p style="margin-bottom:0">프롬프트·업로드 이미지·생성물이 지나가는 외부 처리자 목록을 고지해야 합니다: Supabase(저장), Vercel(호스팅), Anthropic·Google(대화·기획), fal(생성), MoR(결제). 제작사·방송사가 도입 심사할 때 이 목록부터 요구합니다.</p>
+  </div>
+
+  <div class="card gate">
+    <div class="card-head"><h3>가격 페이지 실물화</h3><span class="chip c-gate">현재 "베타 후 공개" 상태</span></div>
+    <p>MoR 심사는 실제 가격이 게시된 페이지를 요구합니다. 그리고 v4 퍼널 검증이 짚은 유일한 이탈 사유가 여기 걸립니다:</p>
+    <blockquote><p>"이감독 $60 → $139. <b>가격이 아니라 예고 없음이 문제</b>(과제 #2 = 전환율 항목)."</p></blockquote>
+    <p style="margin-bottom:0">가격 페이지에 "표시가는 재생성 없이 채울 때"임을 정직하게 쓰고, 제품 안에서는 생성 전 Take 소모량 표시(#2)로 받는 구조 — 페이지 문구와 제품 UI가 세트라서 기획 안건입니다.</p>
+  </div>
+</section>
+
+<!-- 6 -->
+<section>
+  <div class="sec-head"><span class="sec-num">6</span><h2>안건 ⑤ 원가 전제 실측 3건 — 재는 건 개발, 판정선은 기획</h2></div>
+  <p class="sec-lede">v4 최상 우선순위 5건 중 3건은 측정 과제입니다. 측정은 개발이 하지만, "얼마가 나오면 정책을 바꾼다"는 판정선이 없으면 숫자를 재도 행동이 없습니다.</p>
+
+  <div class="tbl">
+    <table>
+      <thead><tr><th style="width:26%">측정</th><th>왜 정책 전제인가</th><th>기획이 미리 정할 판정선</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>영상 재생성 배수 R</b><span class="say">v4 #24 · 기준값 2</span></td>
+          <td>"경쟁사 240회 생성할 것을 우리는 120회"가 총비용 우위 2.42~3.59배의 근거이자 제품 약속.</td>
+          <td>실측 R이 얼마를 넘으면 광고 문구·가격표를 내리는가.</td>
+        </tr>
+        <tr>
+          <td><b>이미지 재생성 배수 Ri</b><span class="say">v4 #27 · 무과금의 조건</span></td>
+          <td>이미지는 무제한 무과금이 확정 정책인데, Ri=2만 돼도 적자(S-5 −4.0% · P-10 −11.4%).</td>
+          <td>Ri가 얼마를 넘으면 무엇을 하는가 — 공정 사용 조항 발동인가, 정책 수정인가. 약관의 공정 사용 문구(안건 ④)와 세트.</td>
+        </tr>
+        <tr>
+          <td><b>이미지 해상도 고정</b><span class="say">v4 #28 · 가장 시급</span></td>
+          <td>1K 운용이 원가 모델의 전제. 2K면 P-10 마진 1.9%, 4K면 전 티어 적자.</td>
+          <td>고해상도 요청 기능을 아예 안 만들 것인가, 프리미엄 과금 축으로 열 것인가.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 7 -->
+<section>
+  <div class="sec-head"><span class="sec-num">7</span><h2>정직 분할 — 이미 정해진 것과 이 문서가 모르는 것</h2></div>
+  <div class="split">
+    <div class="yes">
+      <h4>정해져 있다 — 되묻지 않는다 (v4 의사결정로그)</h4>
+      <ul>
+        <li>요금제 사다리 S-1 $15 ~ P-30 $1,299, 스튜디오 연간</li>
+        <li>Take = 영상 전용, 이미지는 무제한 무과금</li>
+        <li>드래프트 $0.55 / 파이널 $2.75 이원 단가</li>
+        <li>소멸시효 구조: 구독분 월말 · 충전분 12개월</li>
+        <li>에셋 무제한, 삭제·재생성 무제한, Import 전 티어 개방</li>
+        <li>연간 보너스 = 포함 Take 1개월분</li>
+      </ul>
+    </div>
+    <div class="no">
+      <h4>모른다 — 이 문서에 답이 없다</h4>
+      <ul>
+        <li>MoR별 한국 카드 승인률 — 실측 없음, 벤더 선정 때 확인</li>
+        <li>선불전자지급수단 해당 여부 — 법률 판단 전</li>
+        <li>Higgsfield 공식 크레딧 단가(v4 #7) — 2차 출처뿐</li>
+        <li>국내 법인의 수동 결제 수요가 실제로 몇 건일지</li>
+        <li>MoR 각사의 수수료·정산 조건 비교 — 별도 조사 필요</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 8 -->
+<section>
+  <div class="sec-head"><span class="sec-num">8</span><h2>결론</h2></div>
+  <ul class="plain">
+    <li><b>1.</b> 안건 ①(결제 통로)이 나머지 전부에 앞선다. S·P는 MoR로 팔 수 있지만 스튜디오 티어는 MoR로 존재할 수 없다 — 이원화 여부를 먼저 정해야 관리자 경로 설계가 결정된다.</li>
+    <li><b>2.</b> 법률·세무 3건은 외부 전문가 몫이고, 기획 몫은 질문지다. 핵심 질문은 "판매자가 해외 MoR일 때 한국 전자금융거래법이 우리에게 닿는가".</li>
+    <li><b>3.</b> 가격 미결 5건 중 결제 구현을 직접 막는 것은 Account 초과 단가, 자동 충전 상한, 무료 Take 유효기간 — 셋 다 숫자 하나짜리 결정이다.</li>
+    <li><b>4.</b> 문서 4종은 MoR 심사 제출물이라 코드보다 먼저 필요하다. 약관의 생성물 권리·학습 미사용 조항은 비용이 아니라 영업 카드다.</li>
+    <li><b>5.</b> 실측 3건은 개발이 재고 기획이 판정선을 정한다. 판정선 없는 측정은 행동으로 이어지지 않는다.</li>
+  </ul>
+</section>
+
+<footer>
+  <p><b>근거로 쓴 것</b> — <code>~/Downloads/ref/tale_pricing_usd_v4.xlsx</code> (v4.0 · 2026-08-24, 660줄 전체), <code>specs/payments-readiness.md</code> (2026-09-01). 인용 수치는 전부 v4 시트의 값 그대로이며 재계산하지 않았습니다.</p>
+  <p><b>이 문서가 하지 않는 것</b> — 법률·세무 자문이 아닙니다(전문가에게 가져갈 질문만 정리). MoR 벤더를 고르지 않았습니다(수수료·정산 비교는 별도 조사). v4에서 확정된 가격·정책을 재론하지 않습니다. 결제 시스템의 기술 설계는 <code>specs/payments-readiness.md</code> 2장에 있습니다.</p>
+</footer>
+
+</div>
+</body>
+</html>

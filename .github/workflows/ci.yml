@@ -1,0 +1,22 @@
+# 배포 전 자동 차단 신호등 — phase-1 (.claude/docs/2026-09-01/phase-1-dev-environment.md 1-5)
+# vitest.setup.ts 가 env 스텁을 제공하므로 시크릿 없이 돈다 (2026-09-01 로컬 검증: 1702 passed).
+name: ci
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
