@@ -1,6 +1,6 @@
 # fal 다중 키 풀 — 동시성·할당 정책
 
-상태: **설계 확정 대기 (오너 확인 1건) · 단계 0은 착수 가능** · 연결: phase-1 (1-7 FAL 계정), phase-2 (게이트), phase-3 (유료 풀 격리 시점)
+상태: **✅ 단계 0+1 구현·배포 완료 (2026-09-01, main `86ceadb`)** — production은 FAL_KEYS 2키(prod-2000: 34 + legacy-1000: 28 = 합산 상한 62), preview/dev·local은 legacy 10. 잡별 제출 키 기록(`generation_jobs.fal_key_id`)·least-loaded 디스패치·키별 합산 세마포어 가동 중. 마이그레이션은 dev→live 순으로 적용됨(이력 `20260901150000`).
 
 ## 현재 구조 (코드 실측)
 
