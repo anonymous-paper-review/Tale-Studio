@@ -135,6 +135,24 @@ export function imageModelSupportsReference(key: ImageModelKey): boolean {
   return IMAGE_MODELS[key].editEndpoint != null
 }
 
+// ── 시트 지오메트리 계약 경로(#sheet-model-guard 2026-09-01) ──
+// 러프/실사 시트 repaint(스트립·그리드)는 **정확한 픽셀 캔버스**(예: 2880×1280)를 요구한다 —
+// finalize 가 반환 치수를 계약 검증하므로, aspect_ratio 방식 모델(nano-banana 등 고정 ~1024²)이
+// 들어오면 전 잡이 '계약 위반(요청 2880x1280, 반환 1024x1024)'으로 죽는다(실측 3e0169eb 18/18).
+// 자격 = image_size 를 실제로 존중 + edit(레퍼런스) 지원. gpt-image-2 는 canvas 표기가 legacy
+// aspect_ratio 지만 image_size 를 수락하는 검증된 시트 경로다(완료 239건 실측).
+export const DEFAULT_SHEET_IMAGE_MODEL: ImageModelKey = 'gpt-image-2'
+const SHEET_CAPABLE: ReadonlySet<ImageModelKey> = new Set(['gpt-image-2', 'seedream-4'])
+
+export function imageModelSupportsSheetCanvas(key: ImageModelKey): boolean {
+  return SHEET_CAPABLE.has(key)
+}
+
+/** 시트 계약 경로용 모델 강제 — 부적합 선택(기본 모델 포함)은 검증된 시트 모델로 대체한다. */
+export function resolveSheetImageModel(requested: ImageModelKey | null | undefined): ImageModelKey {
+  return requested && imageModelSupportsSheetCanvas(requested) ? requested : DEFAULT_SHEET_IMAGE_MODEL
+}
+
 /**
  * 선택 모델 + reference 유무 → 실제 fal 엔드포인트 결정.
  *   reference 가 필요한데 editEndpoint 가 없으면 순수 T2I 로 폴백한다(reference 는 라우트가 버린다).

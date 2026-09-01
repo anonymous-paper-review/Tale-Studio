@@ -26,7 +26,7 @@ import { aspectRatioFromFormat, parseProjectFormat } from '@/types/project'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
 import { isChatTraceId } from '@/lib/chat-trace'
-import { isImageModelKey, normalizeImageModelKey, resolveImageEndpoint } from '@/lib/image-models'
+import { isImageModelKey, normalizeImageModelKey, resolveImageEndpoint, resolveSheetImageModel } from '@/lib/image-models'
 import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
 
 export const runtime = 'nodejs'
@@ -216,8 +216,12 @@ export async function POST(req: Request) {
     // 명시 모델이 있으면 reference 유무로 t2i/edit 갈래를 고른다(#registry-merge).
     //   예전엔 t2i 엔드포인트를 그대로 넘겼는데, resolveImageModel 은 명시 모델을 그대로
     //   존중하므로 레퍼런스가 있어도 edit 갈래로 안 가 참조가 무시됐다.
-    const requestedImageModel = requestedModelKey
-      ? resolveImageEndpoint(requestedModelKey, !!finalOpts.reference_image_urls?.length).endpoint
+    // #sheet-model-guard(2026-09-01): 스트립 repaint 는 정확한 캔버스 계약 — 샷별 선택이
+    //   시트 부적합 모델(nano-banana 등)이면 검증된 시트 모델로 강제한다. 비스트립 단일
+    //   생성은 사용자의 선택 그대로.
+    const effectiveModelKey = stripFrames ? resolveSheetImageModel(requestedModelKey) : requestedModelKey
+    const requestedImageModel = effectiveModelKey
+      ? resolveImageEndpoint(effectiveModelKey, !!finalOpts.reference_image_urls?.length).endpoint
       : null
     const { request_id, model, fal_request } = await falImageSubmit({
       ...finalOpts,

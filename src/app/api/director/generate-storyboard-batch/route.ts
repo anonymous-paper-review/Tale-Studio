@@ -13,7 +13,7 @@ import { createGenerationJob } from '@/lib/generation-jobs'
 import { falImageSubmit } from '@/lib/writer/llm/fal'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { resolveStyleAnchor } from '@/lib/style-anchor'
-import { DEFAULT_IMAGE_MODEL, resolveImageEndpoint } from '@/lib/image-models'
+import { resolveImageEndpoint, resolveSheetImageModel } from '@/lib/image-models'
 import {
   composeRoughReferenceGrid,
   buildRealGridPrompt,
@@ -269,7 +269,8 @@ export async function POST(req: NextRequest) {
 
       // 이 배치 경로는 모델 선택 UI 가 없다 — 기본 모델의 edit 갈래로 고정(#owner-default 2026-08-31).
       const { request_id, model } = await falImageSubmit({
-        model: resolveImageEndpoint(DEFAULT_IMAGE_MODEL, true).endpoint,
+        // #sheet-model-guard: 그리드는 시트 계약 경로 — 기본 모델이 무엇이든 시트 가능 모델로 강제.
+        model: resolveImageEndpoint(resolveSheetImageModel(null), true).endpoint,
         prompt,
         reference_image_urls: referenceImageUrls,
         // 포맷 파생 캔버스 — finalize 방향 가드가 snapshot.image_size 로 같은 계약을 검사한다.

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
+import { resolveSheetImageModel,
   DEFAULT_IMAGE_MODEL,
   IMAGE_MODELS,
   IMAGE_MODEL_ORDER,
@@ -79,5 +79,20 @@ describe('image-models 레지스트리', () => {
       endpoint: 'fal-ai/flux-2/klein/9b',
       isEdit: false,
     })
+  })
+})
+
+describe('시트 지오메트리 계약 경로 (#sheet-model-guard 2026-09-01)', () => {
+  it('시트 부적합 모델(기본 nano-banana 포함)은 검증된 시트 모델로 강제된다', () => {
+    // 실측 3e0169eb: nano-banana 가 2880×1280 요청에 1024² 를 반환해 그리드 18/18 전멸.
+    expect(resolveSheetImageModel(null)).toBe('gpt-image-2')
+    expect(resolveSheetImageModel('nano-banana')).toBe('gpt-image-2')
+    expect(resolveSheetImageModel('grok-imagine')).toBe('gpt-image-2')
+    expect(resolveSheetImageModel('flux-2-klein')).toBe('gpt-image-2') // edit 미지원 — 시트 repaint 불가
+  })
+
+  it('시트 가능 모델의 선택은 존중된다', () => {
+    expect(resolveSheetImageModel('gpt-image-2')).toBe('gpt-image-2')
+    expect(resolveSheetImageModel('seedream-4')).toBe('seedream-4')
   })
 })
