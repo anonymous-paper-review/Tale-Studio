@@ -15,7 +15,7 @@ import {
   speechSecondsForText,
   REALLOC_MAX_SHOT_SECONDS,
 } from '@/lib/writer/pipeline/util/duration_reallocation'
-import { detectLadderJumpIssues } from '@/lib/writer/pipeline/stages/c_application_2'
+import { detectEmotionChainIssues, detectLadderJumpIssues } from '@/lib/writer/pipeline/stages/c_application_2'
 import type { ShotSequenceItem, ShotDialogue } from '@/lib/writer/types/pipeline'
 
 function makeShot(overrides: {
@@ -151,5 +151,26 @@ describe('detectLadderJumpIssues — 급전환 검출', () => {
       makeShot({ id: 'shot_3', dur: 4, type: 'MS' }),
     ]
     expect(detectLadderJumpIssues(shots)).toHaveLength(0)
+  })
+})
+
+describe('detectEmotionChainIssues — 감정 연쇄 단절 검출 (#story-2)', () => {
+  const arc = (id: string, from: string, to: string, scene = 'scene_1') => ({
+    ...makeShot({ id, dur: 4, scene }),
+    emotion_arc: { from, to },
+  })
+
+  it('같은 씬에서 to→from 이 끊기면 WARNING, 이어지면 무경고', () => {
+    const broken = detectEmotionChainIssues([arc('s1', 'warmth', 'warmth'), arc('s2', 'dread', 'dread')])
+    expect(broken).toHaveLength(1)
+    expect(broken[0].location).toBe('s1→s2')
+    expect(broken[0].category).toBe('continuity')
+    const chained = detectEmotionChainIssues([arc('s1', 'warmth', 'unease'), arc('s2', 'unease', 'dread')])
+    expect(chained).toHaveLength(0)
+  })
+
+  it('씬 경계와 arc 미출력(분할 자식·구 산출)은 건너뛴다', () => {
+    expect(detectEmotionChainIssues([arc('s1', 'a', 'b'), arc('s2', 'c', 'd', 'scene_2')])).toHaveLength(0)
+    expect(detectEmotionChainIssues([arc('s1', 'a', 'b'), makeShot({ id: 's2', dur: 4 })])).toHaveLength(0)
   })
 })

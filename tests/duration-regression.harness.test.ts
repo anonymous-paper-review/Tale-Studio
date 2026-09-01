@@ -72,6 +72,10 @@ describe('duration/characters 프롬프트 개정 회귀 (env 게이트)', () =>
           long_take: newDesignShots.filter((d) => /^\s*LONG TAKE/i.test(d.intent.duration_justification ?? '')).length,
           samples: newDesignShots.slice(0, 4).map((d) => `${d.intent.duration_seconds}s ← ${d.intent.duration_justification}`),
         },
+        emotion_arcs: newDesignShots.map((d) => {
+          const arc = (d.intent as { emotion_arc?: { from: string; to: string } }).emotion_arc
+          return `${d.intent.shot_id}: ${arc ? `${arc.from}→${arc.to}` : '(미출력)'}`
+        }),
         blocking_coverage: {
           old_avg: Math.round((oldDesign.reduce((a, d) => a + (d.static_spec.character_blocking?.length ?? 0), 0) / Math.max(1, oldDesign.length)) * 100) / 100,
           new_avg: Math.round((newDesignShots.reduce((a, d) => a + (d.static_spec.character_blocking?.length ?? 0), 0) / Math.max(1, newDesignShots.length)) * 100) / 100,

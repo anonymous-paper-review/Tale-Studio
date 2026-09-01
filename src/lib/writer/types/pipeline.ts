@@ -671,6 +671,9 @@ export interface ShotIntent {
   duration_seconds: number;          // 보통 5~15초 (action_budget 기반)
   duration_justification: string;    // 왜 이 길이인가
   audience_focus: string;            // 관객 시선이 머무는 지점
+  // #story-2(2026-09-01 오너 확정): 이 샷의 감정 아치 — 한두 단어(영어). 연쇄 검출기
+  //   (detectEmotionChainIssues)가 같은 씬 인접 샷의 to→from 이음을 검사한다.
+  emotion_arc?: { from: string; to: string };
   shot_position_in_scene:
     | 'opening' | 'developing' | 'climax' | 'resolution' | 'transition';
 
@@ -868,6 +871,8 @@ export interface ShotSequenceItem {
   // #duration-surgery(2026-08-31): 의도적 롱테이크 태그 — 재배분 감액 면제. v4 가
   //   duration_justification "LONG TAKE — …" 마커로 선언하면 c_application 이 매핑한다.
   pacing_intent?: 'long_take';
+  // #story-2: 샷별 감정 아치(intent.emotion_arc 운반) — 분할 자식은 미설정(연쇄 검사 skip).
+  emotion_arc?: { from: string; to: string };
 }
 
 export interface ShotSequence {

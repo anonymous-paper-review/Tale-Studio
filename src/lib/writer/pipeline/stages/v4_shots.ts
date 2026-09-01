@@ -454,6 +454,19 @@ V4는 3분할:
   V4b (Static): Image 생성기 입력. 첫 프레임의 모든 정적 요소.
   V4c (Dynamic): Video 생성기 입력. 샷 길이(${SHOT_SECONDS_RANGE}) 안의 동적 변화. 압축 필수.
 
+[샷 사슬의 감정·상태 연속성 (#story-2/3/4 2026-09-01 오너 확정)]
+- 각 샷 intent.emotion_arc 에 그 샷의 감정 아치를 적어라: { "from": "...", "to": "..." } —
+  한두 단어의 영어(예: warmth, unease, dread). 감정 변화가 없는 샷은 from=to.
+- **한 샷의 전이는 인접 한 걸음까지만** (#story-3): warmth→fading smile 은 되고
+  warmth→dread 는 안 된다. 극단 전이가 필요하면 샷을 나눠 각 샷이 한 걸음씩 맡는다.
+  (실측: '반가움→공포'를 8초 한 샷에 요구해 후반 표정이 급락 붕괴.)
+- **연쇄** (#story-2): 같은 씬에서 다음 샷의 from 은 직전 샷의 to 에서 출발한다.
+  건너뛰면 발전 비트가 생략된 것이다 — 중간 비트 샷을 넣어라.
+  (실측: 플래시백이 만남 샷→이별 샷으로 직행, 관계 발전 비트 0.)
+- **서사 상태 연속** (#story-4): 직전 샷이 확정한 서사 상태(이별했다·떠났다·죽었다)를
+  역행하는 구도·배치 금지 — 상태를 바꾸려면 그 변화 자체가 이 샷의 액션이어야 한다.
+  (실측: 이별 확정 직후 샷에서 두 사람이 나란히 동행하는 구도로 회귀.)
+
 [비시각 연출의 시각 번역 (#story-5 2026-08-31 오너 확정)]
 씬 텍스트의 소리·시간감 연출("소음이 사라진다", "시간이 멈춘 듯", "심장 소리만 들린다")은
 이미지·영상 생성기가 실행할 수 없다 — 반드시 카메라 문법으로 번역해서 spec 에 써라:
@@ -572,6 +585,7 @@ ${compactMode ? `씬 길이(${scene.estimated_seconds}초)와 액션 수에 따�
         "dramatic_purpose": "...",
         "duration_seconds": 4,
         "duration_justification": "base 1.2 + medium 2.0 + camera 0.5 = 3.7 → 4s",
+        "emotion_arc": { "from": "calm", "to": "unease" },
         "audience_focus": "...",
         "shot_position_in_scene": "opening" | "developing" | "climax" | "resolution" | "transition"
       },

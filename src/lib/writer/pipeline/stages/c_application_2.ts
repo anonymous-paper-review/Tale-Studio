@@ -248,7 +248,9 @@ ${JSON.stringify(assembledShots, null, 2)}
   // #p2-pacing T3: 사이즈 급전환 결정론 검출 — report 전용(constraint 없음 → check_notes 미부착,
   //   생성 프롬프트를 오염시키지 않는다). 사람 채널(Phase 3)과 후속 튜닝의 계측 소스.
   const ladderIssues = detectLadderJumpIssues(finalShots);
-  const allIssues = [...sceneBudgetIssues, ...semanticRemapped, ...assetNorm.issues, ...ladderIssues];
+  // #story-2: 감정 연쇄 단절 결정론 검출 — ladder 와 같은 report 전용 채널.
+  const emotionIssues = detectEmotionChainIssues(finalShots);
+  const allIssues = [...sceneBudgetIssues, ...semanticRemapped, ...assetNorm.issues, ...ladderIssues, ...emotionIssues];
   const hasCritical = allIssues.some((i) => i.severity === 'CRITICAL');
 
   const report: ShotCheckReport = {
@@ -422,6 +424,31 @@ const SIZE_LADDER: Record<string, number> = {
  *   인서트 문법(급접근 CU/ECU 후 즉시 원 사이즈 복귀)은 면제 — 동기 있는 점프이기 때문.
  *   constraint 를 달지 않아 report 전용이다 (급전환은 설계 사실이라 생성 프롬프트로 못 고친다).
  */
+// #story-2(2026-09-01 오너 확정, 실측 S2S7→S2S8): 같은 씬 인접 샷의 감정 이음 검사 —
+//   직전 샷의 to 와 다음 샷의 from 이 끊기면 발전 비트 생략(만남→이별 점프)의 신호다.
+//   ladder 와 동일하게 report 전용(constraint 없음) — 프롬프트를 오염시키지 않는 계측 채널.
+export function detectEmotionChainIssues(shots: ShotSequenceItem[]): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const norm = (x: string | undefined) => (x ?? '').trim().toLowerCase();
+  for (let i = 1; i < shots.length; i += 1) {
+    const prev = shots[i - 1];
+    const cur = shots[i];
+    if (prev.S?.scene_id !== cur.S?.scene_id) continue; // 씬 경계는 정상 단절
+    const a = prev.emotion_arc;
+    const b = cur.emotion_arc;
+    if (!a?.to || !b?.from) continue; // 미출력(분할 자식·구 산출)은 skip
+    if (norm(a.to) === norm(b.from)) continue;
+    issues.push({
+      category: 'continuity',
+      severity: 'WARNING',
+      location: `${prev.shot_id}→${cur.shot_id}`,
+      message: `감정 연쇄 단절 (${a.from}→${a.to} 다음이 ${b.from}→${b.to}) — 사이의 발전 비트가 생략됐을 수 있다.`,
+      suggestion: '중간 감정 비트 샷 추가 또는 다음 샷의 from 을 직전 샷의 to 에서 출발시키기',
+    });
+  }
+  return issues;
+}
+
 export function detectLadderJumpIssues(shots: ShotSequenceItem[]): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const rung = (s: ShotSequenceItem | undefined) =>
@@ -539,6 +566,8 @@ function buildShotSequenceItemFromDesign(
   return {
     shot_id: design.intent.shot_id,
     duration_seconds: design.intent.duration_seconds,
+    // #story-2: 샷별 감정 아치 운반 — 미출력(구 산출·legacy)이면 그대로 없음(검출기 skip).
+    ...(design.intent.emotion_arc ? { emotion_arc: design.intent.emotion_arc } : {}),
     // #p2-wiring: 러프보드 rich spec 조인용 provenance + persist 가 운반할 static_spec 원본.
     design_ref: design.intent.shot_id,
     static_spec: st,
