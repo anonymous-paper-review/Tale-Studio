@@ -18,7 +18,7 @@
 
 | 사례 | 왜 | 보강 |
 |---|---|---|
-| 브라우저 JS 에러·hydration | 클라 이벤트는 일부(cache_*)만 best-effort. Sentry 없음 | 결제 라이브 전 Sentry (readiness 1장 기존 항목 — 지금은 미룸) |
+| 브라우저 JS 에러·hydration | ~~Sentry 없음~~ → ✅ 해소(2026-09-02, `ae9d13a`): @sentry/nextjs 클라/서버/edge 배선, 로컬 실측으로 envelope 전송 확인. ⚠ 잔여: 소스맵 업로드 미배선(SENTRY_AUTH_TOKEN 필요) — 프로덕션 클라 스택은 압축된 채 들어옴 | 완료(소스맵만 잔여) |
 | 라우트 500 예외(관문 이전) | ~~Vercel 로그에만~~ → ✅ 해소(2026-09-02, `098cf05`): `instrumentation.onRequestError` → `server_errors` 테이블 | 완료 |
 | **enforce 402 거절 (미래)** | ~~무흔적~~ → ✅ 해소(같은 커밋): `generation_submit_rejected_takes` 이벤트 | 완료 |
 | 웹훅 유실 | 유실은 정의상 무흔적 | phase-3 3-7 일일 대사 + 3-8 실패 알림 (기존 계획) |
