@@ -433,11 +433,12 @@ async function generateL4ForScene(
     : `[일반 모드 — V3 디시플린 준수]
 - **static 은 기본값이 아니다** (#static-bias 2026-09-02 실측: 샷의 54~68% 가 static): 샷마다 "카메라가
   움직일 동기가 있는가"를 먼저 묻고, 시선 리빌·인물 이동·공간 드러내기·긴장 축적은 동기다. 데쿠파주
-  camera_intent=motivated_move 는 반드시 실제 무브 타입으로 옮긴다.
+  camera_intent=motivated_move 는 실제 무브 타입으로 옮긴다 — 아래 V3 표는 마운팅의 **기본값**이고 리빌
+  동기가 있으면 표의 예외가 우선한다.
 - lens_mm은 반드시 V3.lens_vocabulary 안에서 선택
 - camera_motion.type은 V3.camera_mounting + camera_energy에 부합
-  · tripod + static → 'static'만
-  · handheld + breathing → 'static' or 'handheld_drift'만
+  · tripod + static → 'static' 기본 — 단 시선 리빌·공간 드러내기는 pan/tilt/zoom_out 허용(#static-bias)
+  · handheld + breathing → 'static'·'handheld_drift' 기본 — 리빌 시 pan/tilt/zoom_out 허용(#static-bias)
   · gimbal + kinetic → 'tracking', 'dolly_in/out' 허용
 - color_temp_kelvin은 V3.lighting_arc.start_K~end_K 사이에서 진행
 - key_fill_ratio는 V3.lighting_arc.dominant_ratio 기준
