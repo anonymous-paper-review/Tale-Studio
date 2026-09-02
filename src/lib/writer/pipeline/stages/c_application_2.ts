@@ -5,6 +5,7 @@
 //   continuity)는 소비처 0. 제거로 콜 1개·60~160s 절감. 근거: research/experiments/validators/2026-07-21_shotcheck-deterministic/result.md)
 // Step 2: Claude로 액션 스코프 + 일관성 검증 (실패 시 split)
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
+import { SHOT_PHYSICS } from '@/lib/writer/pipeline/physics';
 import type {
   ShotCheckReport,
   WorldVisual,
@@ -77,9 +78,10 @@ export async function runShotCheck(
 
 검증 항목:
 1. 각 샷의 motion_prompt가 duration_seconds에 들어맞는가?
-   - 동사 1~2개 이내
-   - 순차 표현("그리고", "그 다음에") 없음
-   - 1 주요 + 0~1 보조 액션
+   - 동사 1~${SHOT_PHYSICS.verbsPerShotMax}개 이내 (3개 이상만 결함)
+   - 같은 인물의 2동사 순차("눈을 뜬 뒤 몸을 일으킨다")는 **허용** — 단 duration ≥ 5s 여야 한다(#coverage-first).
+     duration < 5s 에 2동사면 결함. 서로 다른 인물의 동시 동작은 종전대로 1 주요 + 0~1 보조.
+   - 몸의 전이(깨어남·일어섬·입장)가 결과 상태만 있고 과정 동사가 없으면 결함(생략)
 2. composition_prompt와 motion_prompt가 일관되는가?
 3. 연속성: 인접 샷의 실제 내용(composition/motion 프롬프트 속 의상·소품·조명·공간 묘사)이 서로 모순되는가?
    같은 씬 인접 샷에서 배경/공간 앵커(지형지물·구조물)가 이동 설명 없이 통째로 사라지는 것도 모순이다 —
@@ -110,7 +112,10 @@ INFO: 미세 개선
 CRITICAL/WARNING 이슈는 실제 결함이면 찾되, visual 이슈에만 constraint를 붙인다. INFO는 constraint를 생략한다.
 
 split 권장 시 new_shots 배열로 분할안 제시 (각각 1 주요 액션). 각 new_shot 에는 S 블록을
-반드시 포함하고, S.character_action 에는 그 반쪽이 담는 구체 행동을 써라 (부모 문장 복사 금지).${outputLanguageClause(outputLocale)}`;
+반드시 포함하고, S.character_action 에는 그 반쪽이 담는 구체 행동을 써라 (부모 문장 복사 금지).
+**분할은 커버리지 문법이다** (#coverage-first 2026-09-02): 한 제스처를 시간으로 반 토막 내지 마라
+(칼을 꽂는 3초 + 손을 내미는 4초 ❌ — 이어지는 한 동작이다). 나눌 땐 행동 샷 + 반응/리빌 샷,
+또는 서로 다른 행동 단위(주체·대상이 다른)로 나눈다.${outputLanguageClause(outputLocale)}`;
 // #output-diet 2026-08-10 (기각): new_shots 를 델타 전용으로 좁히는 실험을 했으나 벽시계 -2.2%
 //   (기준 ≥30%)로 기각했다. 근거 — 실측상 shots_to_split 은 출력의 23~24% 뿐이고(나머지 76%는
 //   semantic_issues), 모델은 이미 C/V/assets/continuity 를 안 내고 있었다(사실상 델타 상태).
@@ -153,7 +158,7 @@ ${JSON.stringify(assembledShots, null, 2)}
     const valRaw = await generateJson<unknown>(valUser, cAxisConfig, {
       systemInstruction: valSystem,
       temperature: 0.3,
-      maxTokens: 16000,
+      maxTokens: 32000, // #coverage-first 리뷰 M5: 샷 수 증가로 16K 초과 시 파싱 실패 → 침묵 통과되던 것
     });
     await logger.saveLlmCall('shotCheck_validate', {
       prompt: valUser,
@@ -171,6 +176,14 @@ ${JSON.stringify(assembledShots, null, 2)}
       provider: cAxisConfig.provider,
     });
     console.error('[C2_validate] 검증 실패, 분할 없이 진행:', msg);
+    // #coverage-first 리뷰 M5: 침묵 통과를 사람에게 보이게 — 점검이 생략됐다는 사실 자체가 결함이다.
+    sceneBudgetIssues.push({
+      category: 'action_budget',
+      severity: 'WARNING',
+      location: 'shotCheck',
+      message: `shotCheck 검증 응답을 파싱하지 못해 분할·점검 없이 진행됨 (${msg.slice(0, 80)})`,
+      suggestion: '파이프라인 재실행 또는 샷 수 축소',
+    });
     // ★ 흡수 배지: 이 실패가 state 에 흔적을 남기게 한다. 감사 실측에서 이 경로의 실패가
     //   콘솔에만 남고 state 흔적 0 이었다 — fan-out 과 무관한 위생이라 롤백에서 보존한다.
     await logger.markStage('shotCheck', 'failed', { absorbed: true });
@@ -250,7 +263,9 @@ ${JSON.stringify(assembledShots, null, 2)}
   const ladderIssues = detectLadderJumpIssues(finalShots);
   // #story-2: 감정 연쇄 단절 결정론 검출 — ladder 와 같은 report 전용 채널.
   const emotionIssues = detectEmotionChainIssues(finalShots);
-  const allIssues = [...sceneBudgetIssues, ...semanticRemapped, ...assetNorm.issues, ...ladderIssues, ...emotionIssues];
+  // #coverage-first: 다인 비트 반응 부재·시선 비트 리빌 부재 결정론 검출 — report 전용.
+  const coverageIssues = detectCoverageGapIssues(finalShots, scenes, characters);
+  const allIssues = [...sceneBudgetIssues, ...semanticRemapped, ...assetNorm.issues, ...ladderIssues, ...emotionIssues, ...coverageIssues];
   const hasCritical = allIssues.some((i) => i.severity === 'CRITICAL');
 
   const report: ShotCheckReport = {
@@ -294,6 +309,9 @@ export function buildSplitChildren(
       original.S.character_action;
     return {
       ...ns,
+      // #coverage-first: 분할 자식은 부모 비트를 공유한다 — 검출기 입력(source_beats/shot_function) 상속.
+      ...(original.source_beats ? { source_beats: original.source_beats } : {}),
+      ...(original.shot_function ? { shot_function: original.shot_function } : {}),
       // #output-diet 2026-08-10: new_shots 는 이제 *델타*다 (부모와 달라지는 필드만).
       //   블록 단위 치환(ns.X ?? original.X)이면 부분 S 가 와서 scene_id 가 사라진다 —
       //   델타 병합으로 받는다. 통짜 블록이 와도 스프레드가 전부 덮으므로 구 응답과 호환.
@@ -424,6 +442,86 @@ const SIZE_LADDER: Record<string, number> = {
  *   인서트 문법(급접근 CU/ECU 후 즉시 원 사이즈 복귀)은 면제 — 동기 있는 점프이기 때문.
  *   constraint 를 달지 않아 report 전용이다 (급전환은 설계 사실이라 생성 프롬프트로 못 고친다).
  */
+// #coverage-first(2026-09-02 오너 확정, 실측 a497ac05 Shot2→3): 커버리지 결함 결정론 검출.
+//   비트가 커버돼도 연결 조직이 없으면 영상이 끊긴다 — ① 두 명 이상이 관여하는 비트에 반응 샷이
+//   없음 ② 시선·발견 비트가 정지 카메라 단독 샷이고 리빌/POV 가 뒤따르지 않음. ladder/emotion 과
+//   같은 report 전용 채널. 비트 텍스트의 인물 수는 씬 캐스트 slug 매칭으로 센다.
+// 시선 어휘 — '눈을 뜬다'는 상태 전이(규칙 ③)라 여기서 뺀다(리뷰 §3).
+const GAZE_VERB_RE = /살핀다|살피|둘러본다|둘러보|바라본다|바라보|응시|발견|알아챈다|알아차|쳐다|looks?\b|scans?\b|gazes?\b|notices?\b|sees?\b|spots?\b/i;
+const COVERAGE_FOLLOWUPS = new Set(['reaction', 'reveal', 'pov']);
+const OBJECT_GAZE_FOLLOWUPS = new Set(['reaction', 'reveal', 'pov', 'insert', 'detail']);
+/** 비트 텍스트에 등장하는 캐스트 — slug(char_2)와 이름(소녀·노인) 둘 다 매칭한다(리뷰 §3: 산문은 이름을 쓴다). */
+function agentsInBeat(beat: string, cast: string[], characters: Characters | null | undefined): string[] {
+  const nameById = new Map<string, string[]>();
+  for (const c of characters?.characters ?? []) {
+    const names = [c.name, (c as { name_native?: string }).name_native].filter((n): n is string => typeof n === 'string' && n.trim().length >= 2);
+    if (names.length) nameById.set(c.id, names);
+  }
+  const escape = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const hit: string[] = [];
+  for (const id of [...cast].sort((a, b) => b.length - a.length)) {
+    const bySlug = new RegExp(`(^|[^A-Za-z0-9_])${escape(id)}(?![A-Za-z0-9_])`).test(beat);
+    const byName = (nameById.get(id) ?? []).some((n) => beat.includes(n));
+    if (bySlug || byName) hit.push(id);
+  }
+  return hit;
+}
+export function detectCoverageGapIssues(
+  shots: ShotSequenceItem[],
+  scenes: Scenes,
+  characters?: Characters | null,
+): ValidationIssue[] {
+  const issues: ValidationIssue[] = [];
+  const sceneById = new Map(scenes.scenes.map((sc) => [sc.scene_id, sc]));
+  for (const [sceneId, scene] of sceneById) {
+    const sceneShots = shots.filter((s) => s.S?.scene_id === sceneId);
+    if (!sceneShots.length) continue;
+    const cast = (scene.characters_in_scene ?? []).filter((c): c is string => typeof c === 'string' && !!c);
+    (scene.scene_actions ?? []).forEach((beat, idx) => {
+      const covering = sceneShots
+        .map((s, pos) => ({ s, pos }))
+        .filter(({ s }) => (s.source_beats ?? []).includes(idx));
+      if (!covering.length) return; // 미커버/미운반(구 산출·분할 자식)은 여기서 판단하지 않는다
+      const lastPos = Math.max(...covering.map((c) => c.pos));
+      const next = sceneShots[lastPos + 1];
+      // 커버리지는 '뒤따르는 것'이다: 비트를 담은 첫 샷 자신의 라벨(실측: 정지 카메라 WS 에
+      //   'reveal' 라벨만 붙은 사례)은 커버리지가 아니다. 같은 비트의 둘째 샷 이후나 다음 샷이
+      //   reaction/reveal/pov 여야 한다.
+      const fnOf = (s: ShotSequenceItem | undefined) => s?.shot_function ?? '';
+      const trailing = [...covering.slice(1).map((c) => c.s), ...(next ? [next] : [])];
+      const hasFollowup = trailing.some((s) => COVERAGE_FOLLOWUPS.has(fnOf(s)));
+      const agents = agentsInBeat(beat, cast, characters);
+      // 시선 대상이 인물(다인 비트)이면 reveal/pov/반응, 사물이면 insert/detail 도 리빌로 인정(리뷰 §3).
+      const gazeFollowups = agents.length >= 2 ? COVERAGE_FOLLOWUPS : OBJECT_GAZE_FOLLOWUPS;
+      const hasRevealFollowup = trailing.some((s) => gazeFollowups.has(fnOf(s)));
+      const loc = covering.map((c) => c.s.shot_id).join('+');
+      const allStatic = covering.every((c) => (c.s.V?.camera?.movement ?? 'static') === 'static');
+      // 비트당 경고는 하나 — 시선 비트는 리빌 요건(무브 또는 reveal/pov 후속)만 본다: 리빌이
+      //   곧 그 비트의 커버리지다. 시선이 아닌 다인 비트만 반응 샷을 요구한다.
+      if (GAZE_VERB_RE.test(beat)) {
+        if (allStatic && !hasRevealFollowup) {
+          issues.push({
+            category: 'cinematography',
+            severity: 'WARNING',
+            location: loc,
+            message: `시선·발견 비트[${idx}]가 정지 카메라 단독 샷이다 — 무엇을 보는지 드러나지 않는다.`,
+            suggestion: '시선을 따라가는 팬/줌아웃(motivated_move) 또는 다음 샷을 reveal/pov 로 추가',
+          });
+        }
+      } else if (agents.length >= 2 && !hasFollowup) {
+        issues.push({
+          category: 'cinematography',
+          severity: 'WARNING',
+          location: loc,
+          message: `다인 비트[${idx}]에 반응 샷이 없다 (${agents.join(', ')} 관여) — 행동만 있고 받는 이가 없어 관계가 끊긴다.`,
+          suggestion: '행동 샷 뒤에 reaction(CU/MCU 2~3s) 추가',
+        });
+      }
+    });
+  }
+  return issues;
+}
+
 // #story-2(2026-09-01 오너 확정, 실측 S2S7→S2S8): 같은 씬 인접 샷의 감정 이음 검사 —
 //   직전 샷의 to 와 다음 샷의 from 이 끊기면 발전 비트 생략(만남→이별 점프)의 신호다.
 //   ladder 와 동일하게 report 전용(constraint 없음) — 프롬프트를 오염시키지 않는 계측 채널.
@@ -568,6 +666,9 @@ function buildShotSequenceItemFromDesign(
     duration_seconds: design.intent.duration_seconds,
     // #story-2: 샷별 감정 아치 운반 — 미출력(구 산출·legacy)이면 그대로 없음(검출기 skip).
     ...(design.intent.emotion_arc ? { emotion_arc: design.intent.emotion_arc } : {}),
+    // #coverage-first: 데쿠파주 출처 운반(검출기 입력).
+    ...(design.intent.source_beats ? { source_beats: design.intent.source_beats } : {}),
+    ...(design.intent.shot_function ? { shot_function: design.intent.shot_function } : {}),
     // #p2-wiring: 러프보드 rich spec 조인용 provenance + persist 가 운반할 static_spec 원본.
     design_ref: design.intent.shot_id,
     static_spec: st,

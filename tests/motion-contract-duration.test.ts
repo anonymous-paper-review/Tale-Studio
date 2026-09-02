@@ -64,3 +64,53 @@ describe('G1 — 긴 샷이 동작을 늘여 슬로우모션이 되지 않는다
     expect(x).toBe(y)
   })
 })
+
+describe('#coverage-first — 같은 인물의 연속 동사는 순서가 계약이다', () => {
+  it('같은 character_id 의 2동사는 then 으로 이어지고 순서 문장이 붙는다', () => {
+    const text = compileMotionContract(
+      {
+        character_motion: [
+          { verb: 'opens eyes', magnitude: 'small', character_id: 'char' },
+          { verb: 'pushes himself up', magnitude: 'medium', character_id: 'char' },
+        ],
+        camera_motion: { type: 'static' },
+      } as never,
+      6,
+    ).text
+    expect(text).toContain('then the same subject: "pushes himself up"')
+    expect(text).toContain('strictly in the order given')
+  })
+
+  it('다른 인물의 동사는 병렬 나열 그대로다', () => {
+    const text = compileMotionContract(
+      {
+        character_motion: [
+          { verb: 'draws sword', magnitude: 'medium', character_id: 'a' },
+          { verb: 'steps back', magnitude: 'small', character_id: 'b' },
+        ],
+        camera_motion: { type: 'static' },
+      } as never,
+      5,
+    ).text
+    expect(text).toContain('subject 2: "steps back"')
+    expect(text).not.toContain('strictly in the order given')
+  })
+})
+
+describe('#coverage-first 리뷰 M2 — 연쇄 중간 동사에는 여파 문장이 붙지 않는다', () => {
+  it('긴 샷의 small 첫 동사라도 뒤에 같은 인물 동사가 이어지면 aftermath tail 이 없다', () => {
+    const text = compileMotionContract(
+      {
+        character_motion: [
+          { verb: 'opens eyes', magnitude: 'small', character_id: 'char' },
+          { verb: 'pushes himself up', magnitude: 'medium', character_id: 'char' },
+        ],
+        camera_motion: { type: 'static' },
+      } as never,
+      7,
+    ).text
+    const first = text.indexOf('"opens eyes"')
+    const second = text.indexOf('then the same subject')
+    expect(text.slice(first, second)).not.toContain('aftermath')
+  })
+})

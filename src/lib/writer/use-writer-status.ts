@@ -24,6 +24,8 @@ export interface WriterStatus {
     total_ms: number | null
     stages?: Record<string, number>  // stage key → ms
   } | null
+  // #coverage-first: shotCheck 결정론 연출 점검(완주 시). 구버전 응답엔 없을 수 있다.
+  directing_issues?: Array<{ severity: string; location: string; message: string; suggestion: string | null }>
   // 예상 총 소요시간(ms) — 과거 완료 run 실측 기반(#c4). 기록 없으면 null(UI 숨김).
   eta_total_ms?: number | null
   eta_based_on_runs?: number

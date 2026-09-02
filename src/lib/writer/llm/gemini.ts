@@ -41,6 +41,8 @@ export function resetGeminiCallCount() {
 }
 
 export interface GeminiCallOptions {
+  /** 출력 토큰 상한 — 미지정 시 32768 (SDK 기본 8192 는 v4 샷 묶음 JSON 을 잘랐다, #coverage-first 실측). */
+  maxTokens?: number;
   modelName?: string;
   systemInstruction?: string;
   expectJson?: boolean;
@@ -80,6 +82,9 @@ export async function geminiGenerate(
     generationConfig: {
       temperature: opts.temperature ?? 0.7,
       responseMimeType: mime,
+      // #coverage-first(2026-09-02): 출력 상한 명시 — 미지정 시 API 기본(8192)이 v4 5~8샷 묶음의
+      //   JSON(20K+자)을 잘라 파싱 실패로 스테이지를 죽였다(회귀 실측). 3.x flash 는 64K 까지 지원.
+      maxOutputTokens: opts.maxTokens ?? 32768,
     },
     safetySettings: SAFETY_SETTINGS,
     // #p4-websearch: googleSearch 그라운딩 (SDK 타입에 미등재 계열 — 런타임 계약은 API 소관).

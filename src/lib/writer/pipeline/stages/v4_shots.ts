@@ -49,7 +49,10 @@ export interface RunShotDesignResult extends ShotDesignProgress {
 // 씬 하나의 데쿠파주 샷이 이 수를 넘으면 청크로 나눠 LLM을 여러 번 호출한다(#B).
 //   긴 러닝타임(예: 600s → 씬당 15~20샷)에서 호출당 출력(JSON)이 커져 생기는
 //   응답 잘림·초장시간 호출을 출력 크기 상한으로 방어한다.
-const SHOT_CHUNK_SIZE = 8;
+// #coverage-first(2026-09-02): 8 → 5. 커버리지 샷(반응·리빌)으로 씬당 샷이 늘자 8샷 묶음의 v4 출력이
+//   모델 출력 한도를 넘어 JSON 이 잘렸다(회귀 실측: 23.6K자 truncation → 파싱 실패). 묶음을 줄여
+//   호출당 출력을 ~15K자 아래로 유지한다(호출 수는 늘지만 병렬이라 벽시계 영향 작음).
+export const SHOT_CHUNK_SIZE = 5;
 
 // 씬 단위 동시성(#parallel-shotdesign 2026-07-21). 씬끼리는 상류 산출물(plan·decoupage)만 읽고
 //   서로의 출력을 참조하지 않는 data-parallel 작업이라, 순차 실행이 유일 병목인 shotDesign의
@@ -518,7 +521,16 @@ ${disciplineSection}
 - duration_justification 에는 위 규칙의 **산수를 그대로 적어라** (예: "base 1.2 + medium 2.0 = 3.2 → 4s"). 산수 없는 정성 서술 금지.
 
 V4c (Dynamic) 작성 규칙 (가장 중요):
-- character_motion.verb: 동사 1~${SHOT_PHYSICS.verbsPerShotMax}개 이내, 순차 표현 금지
+- character_motion.verb: 동사 1~${SHOT_PHYSICS.verbsPerShotMax}개 이내. **같은 인물의 2동사는 순차 허용**
+  (#coverage-first 2026-09-02): 자연스러운 몸의 연쇄(눈을 뜬다 → 몸을 일으킨다)는 순서대로 적고
+  duration 이 그 합을 담아야 한다(루브릭). 3동사 이상은 분할. 짧은 샷(≤3s)은 1동사.
+- **몸의 전이를 생략하지 마라**: 비트가 "깨어난다/일어선다/들어온다/돌아선다"를 담으면 그 전 과정
+  (눈 뜸 → 몸 일으킴 → 둘러봄)이 character_motion 에 있어야 한다. 결과 상태만 적은 정지 샷은
+  생략이다(실측: '눈을 뜨며 주위를 살핀다' 비트가 opens eyes(small) 하나·정지 카메라로 나가
+  수장이 일어나 대치 중인 둘을 보는 흐름이 통째로 사라졌다).
+- **시선의 대상이 프레임 밖이면 리빌이다**: gaze_arc 로 시선을 적고 camera_motion 을 pan/tilt/
+  zoom_out 으로 그 대상을 드러내라(데쿠파주 camera_intent=motivated_move 를 따른다). 정지
+  카메라로 두려면 그 대상을 담는 다음 샷이 있어야 한다.
 - 카메라 큰 무브 + 캐릭터 큰 액션 + 환경 변화 동시 금지
 - motion_prompt (최종 출력): ${MOTION_PROMPT_CHARS}, 동사 1~${SHOT_PHYSICS.verbsPerShotMax}개
 
@@ -632,8 +644,10 @@ ${compactMode ? `씬 길이(${scene.estimated_seconds}초)와 액션 수에 따�
           "magnitude": ${CAMERA_MAGNITUDE_ENUM_TEXT}
         },
         "character_motion": [
-          { "character_id": "...", "verb": "고개를 든다", "magnitude": ${CHARACTER_MAGNITUDE_ENUM_TEXT} }
+          { "character_id": "char", "verb": "opens eyes", "magnitude": "small" },
+          { "character_id": "char", "verb": "pushes himself up to sitting and turns toward the voices", "magnitude": "medium" }
         ],
+        "_character_motion_note": "같은 character_id 의 2동사 = 순차 연쇄(순서대로). magnitude ∈ ${CHARACTER_MAGNITUDE_ENUM_TEXT}. character_id 를 반드시 채워라 — 비면 순서 계약이 붙지 않는다.",
         "gaze_arc": [
           { "character_id": "...", "from": "down", "to": "toward_camera" }
         ],

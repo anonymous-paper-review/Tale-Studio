@@ -76,8 +76,10 @@ export function renderBudgetBlock(b: SceneBudget): string {
   (이 프로젝트는 대표 샷 스토리보드로 제작된다 — estimated_seconds는 씬 비중대로 총합을 배분하며, 액션 수보다 클 수 있다.)`;
   }
   return `${head}
-- 씬당 scene_actions ${b.actionsPerSceneMin}~${b.actionsPerSceneMax}개, 씬의 estimated_seconds ≈ 액션 수 × ${SHOT_PHYSICS.shotSecondsMin}~${SHOT_PHYSICS.shotSecondsMax}초.
-- 시간이 남으면 씬이나 액션을 늘리고, 모자라면 줄여라 — **estimated_seconds를 액션 없이 부풀리지 마라.**`;
+- 씬당 scene_actions 권장 ${b.actionsPerSceneMin}~${b.actionsPerSceneMax}개 — 씬의 비중을 나누는 **가이드**다. 씬의 estimated_seconds ≈ 액션 수 × ${SHOT_PHYSICS.shotSecondsMin}~${SHOT_PHYSICS.shotSecondsMax}초.
+- 시간이 남으면 씬이나 액션을 늘려라. **시간이 모자라다고 비트(가시적 행동 단위)를 지우거나 뭉개지 마라** —
+  몸의 전이·시선의 대상·반응 같은 연결 비트가 빠지면 영상이 이어지지 않는다. 시간은 하류(샷 분해·
+  재배분)가 비트당 초를 줄여 맞춘다. 단 estimated_seconds를 액션 없이 부풀리지는 마라.`;
 }
 
 export interface BudgetViolation {

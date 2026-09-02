@@ -246,6 +246,10 @@ export async function GET(
       available: Record<string, never>;
       timeline: Array<{ stage: string; ms: number; seconds: number; attempts: number; ended_at: string }>;
       assets?: WriterStatusAssets;
+      // #coverage-first(2026-09-02 오너): shotCheck 의 결정론 연출 점검(커버리지·감정 연쇄·급전환)을
+      //   영상 생성 전에 사람에게 보여준다 — "영상 만들고 나서야 안다"의 조기 캐치 채널.
+      directing_issues?: Array<{ severity: string; location: string; message: string; suggestion: string | null }>;
+      directing_issue_count?: number;
     } = {
       projectId,
       engine: row?.engine ?? 'v1',
@@ -274,6 +278,13 @@ export async function GET(
 
     if (new URL(req.url).searchParams.get('assets') === '1') {
       body.assets = await computeAssets(projectId, body.pipeline_completed);
+    }
+    if (body.pipeline_completed && Array.isArray(row?.shot_issues)) {
+      const all = row.shot_issues
+        .filter((i) => (i.category === 'cinematography' || i.category === 'continuity') && (i.severity === 'WARNING' || i.severity === 'CRITICAL'))
+        .map((i) => ({ severity: String(i.severity), location: String(i.location ?? ''), message: String(i.message ?? ''), suggestion: i.suggestion ? String(i.suggestion) : null }));
+      body.directing_issue_count = all.length;
+      body.directing_issues = all.slice(0, 40);
     }
 
     return NextResponse.json(body);

@@ -141,8 +141,20 @@ const LONG_SHOT_SECONDS = 7
 function subjectClauses(dyn: ShotDynamicSpec, durationSeconds: number): string[] {
   const out: string[] = []
   const isLong = durationSeconds >= LONG_SHOT_SECONDS
-  ;characterMotions(dyn.character_motion).forEach((m, i) => {
+  // #coverage-first(2026-09-02): 같은 인물의 연속 동사는 **순서**가 계약이다(눈을 뜬다 → 몸을
+  //   일으킨다). 옛 문안은 subject 1/2 를 병렬 나열해 모델이 동시에 하거나 하나만 골랐다.
+  const motions = characterMotions(dyn.character_motion)
+  let chained = false
+  let subjectNo = 0
+  motions.forEach((m, i) => {
     if (!m?.verb?.trim()) return
+    const prev = motions[i - 1]
+    const next = motions[i + 1]
+    const sameSubject =
+      i > 0 && !!prev?.character_id && prev.character_id === m.character_id
+    // 연쇄 중간 동사에는 '남은 시간을 여파로 채워라'를 붙이지 않는다 — 뒤 동사가 이어진다(리뷰 M2).
+    const chainContinues = !!m.character_id && !!next?.verb?.trim() && next.character_id === m.character_id
+    if (!sameSubject) subjectNo += 1
     // 교정기 경유(#motion-vocab): 옛 코드는 어휘 밖 값을 else 로 흘려 최소값으로 떨궜다.
     //   그래서 인물 magnitude `moderate`(카메라 어휘와 혼동) 가 "micro" 로 뒤집혀 나갔다(실측).
     //   normalizeCharacterMagnitude 는 moderate→medium 으로 맞바꿔 받고, 미상은 medium 으로 둔다.
@@ -158,11 +170,13 @@ function subjectClauses(dyn: ShotDynamicSpec, durationSeconds: number): string[]
     // 긴 샷에서 작은 동작 하나만 지시하면 남는 시간이 정지 화면이 된다 — 그 시간을 채울
     //   후속 여파를 함께 요구한다. 새 동작을 지어내라는 게 아니라 같은 동작의 뒤끝이다.
     const tail =
-      isLong && (mag === 'small' || mag === 'micro')
+      isLong && !chainContinues && (mag === 'small' || mag === 'micro')
         ? ' — then let its aftermath carry the remaining time (weight settling, breath, cloth and hair still moving); never freeze after it lands'
         : ''
-    out.push(`subject ${i + 1}: "${w(m.verb)}" — ${scale}${tail}`)
+    if (sameSubject) chained = true
+    out.push(`${sameSubject ? 'then the same subject: ' : `subject ${subjectNo}: `}"${w(m.verb)}" — ${scale}${tail}`)
   })
+  if (chained) out.push('movements of the same subject happen strictly in the order given, one after another, never at once')
   ;(dyn.gaze_arc ?? []).forEach((g) => {
     if (g && g.from !== g.to) out.push(`gaze turns from ${w(g.from)} to ${w(g.to)}`)
   })

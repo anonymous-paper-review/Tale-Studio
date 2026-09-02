@@ -23,6 +23,7 @@
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import { computeSceneBudget, renderBudgetBlock, validateSceneBudget, type SceneBudget } from '@/lib/writer/pipeline/budget';
 import { SHOT_PHYSICS } from '@/lib/writer/pipeline/physics';
+import { VISUAL_BEAT_DOCTRINE } from '@/lib/writer/pipeline/visual-doctrine';
 import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
 import { normalizeSceneLocations, uncoveredActs } from '@/lib/writer/pipeline/stages/s3_scenes';
 import type { Genre, NarrativeStructure, Characters, Scenes, PipelineInput, BackgroundContract, StoryScene, NewCharacter } from '@/lib/writer/types/pipeline';
@@ -103,8 +104,9 @@ act 커버리지 (필수):
 - 가능하면 각 act.proportion 비율로 씬을 분배한다.
 
 scene_actions:
-- 씬에서 일어나는 주요 액션을 텍스트로. 한 액션 = 한 샷(${SHOT_PHYSICS.shotSecondsMin}~${SHOT_PHYSICS.shotSecondsMax}초)에 들어가도록 분리해서 작성.
-- 씬당 액션 수는 위 시간 예산을 따른다.
+- 씬에서 일어나는 행동을 **카메라가 한 번에 볼 수 있는 가시적 행동 단위**로 분리해 쓴다 (한 단위 ≈ 한 샷 ${SHOT_PHYSICS.shotSecondsMin}~${SHOT_PHYSICS.shotSecondsMax}초).
+- 씬당 액션 수는 위 시간 예산을 가이드로 따르되, 아래 시각적 서술 원칙이 요구하는 연결 비트(몸의 전이·시선의 대상·반응)를 예산 때문에 지우지 마라.
+${VISUAL_BEAT_DOCTRINE}
 
 서사 시점 (필수, time_of_day와 다른 축):
 - narrative_time은 프로젝트의 고정된 "이야기 현재" 기준 present | past | future 중 하나다.

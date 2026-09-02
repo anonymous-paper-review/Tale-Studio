@@ -151,7 +151,10 @@ export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: st
   // 대사는 계약 바로 뒤(#g7) — 앞 토큰 가중을 받되 모션 계약을 밀어내지 않는 자리.
   //   대사가 있으면 캡을 늘린다: 계약(~400자) + 대사(~200자)가 장면 묘사에 밀려 잘리면
   //   립싱크 지시가 통째로 사라진다.
-  const cap = contract.text ? (dialogue ? 1200 : 950) : dialogue ? 750 : 500
+  // #coverage-first(2026-09-02 리뷰 M3): 순차 계약(then·순서 문장·gaze)이 계약문을 ~1000자까지 키워
+  //   옛 캡(950)에서 ban 절과 장면 묘사문(prompt — 리빌 대상을 나르는 유일한 채널)이 통째로 잘렸다.
+  //   계약 경로 캡 +450.
+  const cap = contract.text ? (dialogue ? 1650 : 1400) : dialogue ? 750 : 500
   let fullPrompt = [contract.text, dialogue, prompt, movementFragment, gearFragment, cameraText]
     .filter(Boolean)
     .join('. ')

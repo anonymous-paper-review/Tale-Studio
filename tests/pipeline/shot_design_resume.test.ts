@@ -10,7 +10,7 @@ vi.mock('@/lib/writer/llm/dispatch', () => ({
   describeAxisConfig: () => 'stub-model',
 }))
 
-import { parseL4Shots, runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots'
+import { SHOT_CHUNK_SIZE, parseL4Shots, runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots'
 import type { PipelineLogger } from '@/lib/writer/logger'
 
 // 로거는 no-op 스텁 (인터페이스에서 쓰는 메서드만)
@@ -145,11 +145,12 @@ describe('runShotDesign — 씬 단위 이어달리기(#A)', () => {
 })
 
 describe('runShotDesign — 샷 청크 분할(#B)', () => {
-  it('씬의 데쿠파주 샷이 8개를 넘으면 청크(8개 단위)로 나눠 호출하고 병합한다', async () => {
-    const inputs = makeInputs(1, 17) // 17샷 → 8+8+1 = 3청크
+  it('씬의 데쿠파주 샷이 청크 크기를 넘으면 청크 단위로 나눠 호출하고 병합한다', async () => {
+    // #coverage-first: 청크 8→5 (커버리지 샷 증가로 출력 잘림 방지). 17샷 → 5+5+5+2 = 4청크
+    const inputs = makeInputs(1, 17)
     const res = await run(inputs)
     expect(res.done).toBe(true)
-    expect(generateJsonMock).toHaveBeenCalledTimes(3)
+    expect(generateJsonMock).toHaveBeenCalledTimes(Math.ceil(17 / SHOT_CHUNK_SIZE))
     expect(res.shots).toHaveLength(17)
     // shot_id는 청크 내 index → 데쿠파주 shot_id 매핑이 보존된다
     expect(res.shots.map((s) => s.intent.shot_id)).toEqual(
@@ -157,15 +158,15 @@ describe('runShotDesign — 샷 청크 분할(#B)', () => {
     )
     // 청크 안내 문구가 프롬프트에 병기된다
     const prompts = generateJsonMock.mock.calls.map((c) => String(c[0]))
-    expect(prompts[0]).toContain('1~8번째 묶음')
-    expect(prompts[2]).toContain('17~17번째 묶음')
+    expect(prompts[0]).toContain(`1~${SHOT_CHUNK_SIZE}번째 묶음`)
+    expect(prompts[prompts.length - 1]).toContain('16~17번째 묶음')
   })
 
-  it('8개 이하 씬은 단일 호출(기존 동작 보존)', async () => {
-    const inputs = makeInputs(1, 8)
+  it('청크 크기 이하 씬은 단일 호출(기존 동작 보존)', async () => {
+    const inputs = makeInputs(1, SHOT_CHUNK_SIZE)
     const res = await run(inputs)
     expect(generateJsonMock).toHaveBeenCalledTimes(1)
-    expect(res.shots).toHaveLength(8)
+    expect(res.shots).toHaveLength(SHOT_CHUNK_SIZE)
   })
 })
 

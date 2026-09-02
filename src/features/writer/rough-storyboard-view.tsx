@@ -916,6 +916,30 @@ export function RoughStoryboardView() {
     <div className="flex min-h-0 flex-1 flex-col">
       <WriterHeader description={headerDescription} actions={storyboardActions} />
 
+      {/* #coverage-first(2026-09-02 오너): 연출 점검 — 영상으로 넘어가기 전에 커버리지 결함
+          (반응 없는 다인 비트·리빌 없는 시선 비트·감정 연쇄 단절·급전환)을 보여준다.
+          위치 표기는 파이프라인 샷 순번(오너의 "Shot2~3" 셈법과 동일). 메시지는 점검기 산출 데이터. */}
+      {status?.directing_issues && status.directing_issues.length > 0 && (
+        <details className="mx-6 mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+          <summary className="cursor-pointer font-medium">
+            {t('Directing check: {count} issues to review before video', { count: status.directing_issues.length })}
+          </summary>
+          <ul className="mt-2 space-y-1.5 text-xs text-muted-foreground">
+            {status.directing_issues.map((issue, i) => (
+              <li key={`${issue.location}-${i}`} className="flex gap-2">
+                <span className="shrink-0 font-mono text-foreground">
+                  {issue.location.replace(/shot_(\d+)/g, 'Shot $1').replace(/scene_(\d+)/g, 'Scene $1')}
+                </span>
+                <span>
+                  {issue.message}
+                  {issue.suggestion ? ` — ${issue.suggestion}` : ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+
       <ScrollArea className="min-h-0 flex-1">
         <div
           ref={boardRef}

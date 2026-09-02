@@ -252,7 +252,7 @@ async function llmGenerateTI2V(
 원칙:
 - ${MOTION_PROMPT_CHARS}
 - 동사 1~${SHOT_PHYSICS.verbsPerShotMax}개 이내
-- 순차 표현("그 다음에", "그리고") 금지
+- 같은 인물의 2동사 순차는 허용(then 으로 순서 명시, duration ≥5s) — 3동사 이상·다인 동시 다중 액션은 금지(#coverage-first)
 - 단일 동작 + 카메라 움직임 정도까지만
 - 첫 프레임을 부정하지 말 것 (예: 첫 프레임에 앉아 있는데 "걸어간다" 안 됨)
 - 출력 언어: 영어(English) 고정 (2026-07-22 제품 오너 판정 E11) — 이 프롬프트는 번역 없이 그대로

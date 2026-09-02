@@ -9,7 +9,7 @@ export const SHOT_PHYSICS = {
   shotSecondsMax: 8,
   /** 예외(긴 침묵 등)에만 허용되는 절대 상한. */
   shotSecondsHardMax: 10,
-  /** 클립당 캐릭터 액션 예산 — 동사 수 상한 (순차 표현 금지와 짝). */
+  /** 클립당 캐릭터 액션 예산 — 동사 수 상한. 같은 인물의 2동사 순차는 허용(#coverage-first 2026-09-02, duration ≥5s). */
   verbsPerShotMax: 2,
   /** TI2V 모션 프롬프트 자수 대역 (압축 필수). */
   motionPromptCharsMin: 50,

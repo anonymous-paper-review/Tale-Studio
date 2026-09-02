@@ -9,6 +9,7 @@
 // 출력 DecoupagePlan은 V4 입력으로 사용됨 (V4가 각 샷에 3분할 spec을 붙임).
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import { DURATION_RUBRIC, SHOT_SECONDS_RANGE, SHOT_SECONDS_HARD_MAX } from '@/lib/writer/pipeline/physics';
+import { COVERAGE_GRAMMAR, VISUAL_BEAT_DOCTRINE } from '@/lib/writer/pipeline/visual-doctrine';
 import { REPRESENTATIVE_DEPTHS, REPRESENTATIVE_SHOT_CAP } from '@/lib/writer/pipeline/budget';
 import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
 import type {
@@ -80,6 +81,10 @@ const CAMERA_CONTRACT_RELAXED_V3 = `== 카메라 규율 ==
     질주·추격·진입·퇴장·낙하·비산·군중·차량·파도·공간 리빌·긴장감 있는 돌리 인을 포함한다.
     그 동기를 camera_move_motivation에 **카메라가 왜 움직여야 하는지**로 적는다.
 - 단 한 걸음·몸 돌림·손 뻗기·급한 행동은 전체 사건이 고정 프레임 안에 있으면 static이다.
+- **예외(리빌)**: 시선·고개 돌림의 대상이 프레임 밖(다른 인물·공간)이면 그것은 리빌이다 —
+  **기본은** 시선을 따라가는 팬·틸트·줌아웃(motivated_move, 동기="X의 시선을 따라 Y를 드러낸다").
+  대상이 다른 공간일 때만 static 으로 두고 다음 샷을 reveal/pov 로 added 하라(#coverage-first).
+  (실측: '눈을 뜨며 주위를 살핀다' → static → 두 수장 마스터 샷 점프 = 관객이 시선의 연결을 잃는다.)
 - 감정이 강하거나 인물이 서두른다는 이유만으로 push-in하지 마라.
 - motion 비트와 static 비트를 한 샷에 합칠 때 static 비트는 이동의 추가 근거가 아니다.
   두 비트의 카메라 처리가 다르면 가능하면 split하라.
@@ -115,6 +120,8 @@ export function buildSystemInstruction(outputLocale?: AppLocale): string {
 - merged: 여러 비트를 한 롱테이크로. source_beats=[i,j,...]. 긴장/몰입/실시간감이 필요할 때.
 - split: 한 비트를 여러 샷으로. 여러 출력 샷이 같은 source_beats=[i]를 공유. 커버리지/리듬/강조에.
 
+${COVERAGE_GRAMMAR}
+
 == 리듬 저작 (가장 중요 — "뇌가 아픈" 영상의 해독제) ==
 - 모든 샷이 같은 길이·에너지면 안 된다. rhythm_role을 다양하게: establish(느림) → develop(중간) → punctuate(짧고 강함) → breath(정적 쉼).
 - 감정 곡선에 컷 템포를 맞춘다: 긴장 고조 = accelerate(점점 짧은 컷), 여운/몰입 = sustain(긴 테이크).
@@ -129,6 +136,8 @@ ${cameraContract}
 - 각 샷 intended_duration_seconds는 ${SHOT_SECONDS_RANGE} (짧고 스냅있게). 1개 주요 액션이 들어맞는 길이. 긴 침묵 등 예외만 최대 ${SHOT_SECONDS_HARD_MAX}.
 - ${DURATION_RUBRIC}
 - 한 샷에 액션을 몰아넣지 마라. 액션이 크거나 여러 개면 split으로 나눠라.
+
+${VISUAL_BEAT_DOCTRINE}
 
 == 사건 접지 (#story-1 2026-08-31 오너 확정) ==
 주요 사건(첫 만남·충돌·발견·죽음 같은 전환점)을 아무 맥락 없이 터뜨리지 마라 — 그 직전에
@@ -171,10 +180,12 @@ function buildUserPrompt(
   const planHint = plan
     ? `[sceneCinematography 비주얼 플랜 — 협상 규칙 (단순 힌트 아님)]
 coverage_pattern=${plan.coverage_pattern}, shot_count_target=${plan.shot_count_target}, rhythm_profile=${plan.rhythm_profile}, cut_pace=${plan.cut_pace}, avg_shot_seconds=${plan.avg_shot_seconds}, lens=${plan.lens_vocabulary.join('/')}mm, energy=${plan.camera_energy}
-- shot_count_target ±1 을 상한으로 삼아라. 초과가 필요하면 먼저 인접 샷 병합(merge)으로 되돌리고,
-  그래도 초과라면 해당 샷 dramatic_purpose 에 초과 사유를 명시하라.
+- shot_count_target ±1 은 **비트 샷**(derived/merged/split)의 상한이다. **커버리지 샷**(added:
+  reaction/reveal/pov/insert/cutaway, 각 2~3s)은 이 상한 밖이며 위 커버리지 문법이 요구하면 반드시
+  추가한다 — 커버리지를 넣으려고 비트 샷을 병합하지 마라(#coverage-first 2026-09-02).
 - avg_shot_seconds 는 시청자의 인지 예산이다. intended_duration_seconds 합이 estimated_seconds 를
-  넘는 것은 허용된다(하류가 씬 길이를 증액한다) — 샷 수를 늘리려고 개별 샷을 짧게 압착하지 마라.`
+  넘는 것은 허용된다(하류가 씬 길이를 증액한다) — 샷 수를 늘리려고 **비트 샷**을 짧게 압착하지 마라.
+  (커버리지 샷은 단일 목적이라 짧아도 인지 부하가 아니다.)`
     : `[sceneCinematography 미제공 — Compact Mode. 데쿠파주를 자체 판단으로 저작]`;
 
   // 사이즈 사다리 규칙 — cine 플랜 유무와 무관한 일반 연출 문법 (급전환 45% 실측의 상류 방어).
@@ -188,7 +199,7 @@ POV 같은 명시적 동기 없이 금지 — 사이즈는 점진적으로 이�
 
 [샷 예산 — 대표 스토리보드 모드 (장편 정책)]
 이 프로젝트는 대표 샷 스토리보드로 제작된다 (전역 정책 상한 ~${REPRESENTATIVE_SHOT_CAP}샷). 이 씬은 **최대 ~${shotBudgetHint}샷**.
-모든 비트 커버 원칙은 유지하되 added(설정/반응/인서트)를 아껴 예산 안에서 리듬을 저작하라.`
+모든 비트 커버 원칙과 커버리지 문법(반응·리빌)은 대표 모드에서도 의무다 — 대표 모드의 절약은 **비트 샷**(비트를 대표 액션으로 압축)에서 하고, 커버리지 샷을 빼서 절약하지 마라(#coverage-first).`
     : '';
 
   return `[씬 정보]
@@ -231,7 +242,7 @@ ${JSON.stringify(worldVisual.locations.filter((loc) => loc.id === scene.location
       "shot_function": "establishing" | "master" | "action" | "reaction" | "insert" | "cutaway" | "detail" | "pov" | "reveal" | "transition",
       "source_beats": [0],
       "added_rationale": "operation=added일 때만",
-      "beat_summary": "이 샷이 담는 내용 (영어)",
+      "beat_summary": "이 샷이 담는 내용 (영어) — 아래 시각적 서술 원칙대로 가시적 행동·시선의 대상·몸의 전이를 명시",
       "beat_summary_native": "beat_summary와 같은 내용을 씬 텍스트(scene_actions)와 같은 언어로 — 연출 용어 없이 이야기 문장으로",
       "shot_size": "EWS" | "WS" | "FS" | "MFS" | "MS" | "MCU" | "CU" | "ECU" | "OTS" | "2S" | "POV",
       "intended_duration_seconds": 4,

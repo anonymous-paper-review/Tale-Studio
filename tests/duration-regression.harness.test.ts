@@ -72,6 +72,11 @@ describe('duration/characters 프롬프트 개정 회귀 (env 게이트)', () =>
           long_take: newDesignShots.filter((d) => /^\s*LONG TAKE/i.test(d.intent.duration_justification ?? '')).length,
           samples: newDesignShots.slice(0, 4).map((d) => `${d.intent.duration_seconds}s ← ${d.intent.duration_justification}`),
         },
+        v4_shot_detail: newDesignShots.map((d) => {
+          const dyn = d.dynamic_spec as { camera_motion?: { type?: string }; character_motion?: Array<{ verb: string; magnitude?: string; character_id?: string }>; gaze_arc?: Array<{ from: string; to: string }> }
+          const it = d.intent as { shot_id: string; duration_seconds: number; shot_function?: string; operation?: string; source_beats?: number[] }
+          return `${it.shot_id} [${it.operation ?? '?'}/${it.shot_function ?? '?'}] beats=${JSON.stringify(it.source_beats ?? [])} ${it.duration_seconds}s cam=${dyn.camera_motion?.type ?? '?'} motion=[${(dyn.character_motion ?? []).map((m) => `${m.character_id ?? ''}:${m.verb}(${m.magnitude ?? ''})`).join('; ')}] gaze=${JSON.stringify(dyn.gaze_arc ?? [])}`
+        }),
         emotion_arcs: newDesignShots.map((d) => {
           const arc = (d.intent as { emotion_arc?: { from: string; to: string } }).emotion_arc
           return `${d.intent.shot_id}: ${arc ? `${arc.from}→${arc.to}` : '(미출력)'}`

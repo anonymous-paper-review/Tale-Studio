@@ -873,6 +873,10 @@ export interface ShotSequenceItem {
   pacing_intent?: 'long_take';
   // #story-2: 샷별 감정 아치(intent.emotion_arc 운반) — 분할 자식은 미설정(연쇄 검사 skip).
   emotion_arc?: { from: string; to: string };
+  // #coverage-first(2026-09-02): 데쿠파주 출처(intent 의 source_beats/shot_function 운반) —
+  //   커버리지 결함 검출기(detectCoverageGapIssues)의 입력. 분할 자식·구 산출은 미설정.
+  source_beats?: number[];
+  shot_function?: ShotFunction;
 }
 
 export interface ShotSequence {

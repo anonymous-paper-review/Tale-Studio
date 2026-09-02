@@ -26,7 +26,7 @@ vi.mock('@/lib/writer/llm/dispatch', () => ({
   describeAxisConfig: () => 'stub-model',
 }))
 
-import { runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots'
+import { SHOT_CHUNK_SIZE, runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots'
 import type { PipelineLogger } from '@/lib/writer/logger'
 
 const logger = {
@@ -37,7 +37,7 @@ const logger = {
 } as unknown as PipelineLogger
 const axis = { provider: 'gemini', model: 'stub' } as never
 
-const SHOT_CHUNK_SIZE = 8 // v4_shots.ts와 동일해야 함(청크 경계·콜 수 재현).
+// #coverage-first: 청크 크기는 v4 의 단일 진실을 따른다(8→5 전환에 테스트가 갈라지지 않게).
 const TIME_SCALE = 120 // 실 duration_ms를 1/120로 축소(≈350s → ≈2.9s). 비율은 불변.
 const REAL_RUN = '2beb605c-3892-4fc2-b493-b76b5b071286'
 const CONCURRENCIES = [1, 2, 4, 8]

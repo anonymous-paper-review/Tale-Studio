@@ -57,12 +57,14 @@ export function analyzeSceneActionBudget(scene: StoryScene): ActionAnalysis {
   const needsSplit = recommendedShots.length > 1;
 
   if (actions.length >= 4) {
+    // #coverage-first(2026-09-02): 옛 문구("5초 한 샷에 다 못 담음")는 씬=한 샷 전제의 유령이라
+    //   전 씬에 경고를 냈다(감사 D10). 비트 수는 결함이 아니라 비트 샷 하한의 근거다 — INFO.
     issues.push({
       category: 'action_budget',
-      severity: 'WARNING',
+      severity: 'INFO',
       location: scene.scene_id,
-      message: `씬 액션이 ${actions.length}개. 5초 한 샷에 다 못 담음.`,
-      suggestion: `${recommendedShots.length}개 샷으로 자동 분할.`,
+      message: `비트 ${actions.length}개 — 비트 샷 최소 ${recommendedShots.length}개 + 커버리지 샷(반응·리빌)이 기준이다.`,
+      suggestion: `데쿠파주 shot_count_target 은 비트 샷 상한이며 커버리지 샷은 예산 밖.`,
     });
   }
 

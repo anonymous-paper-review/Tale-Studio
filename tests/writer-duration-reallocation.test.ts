@@ -15,7 +15,7 @@ import {
   speechSecondsForText,
   REALLOC_MAX_SHOT_SECONDS,
 } from '@/lib/writer/pipeline/util/duration_reallocation'
-import { detectEmotionChainIssues, detectLadderJumpIssues } from '@/lib/writer/pipeline/stages/c_application_2'
+import { detectCoverageGapIssues, detectEmotionChainIssues, detectLadderJumpIssues } from '@/lib/writer/pipeline/stages/c_application_2'
 import type { ShotSequenceItem, ShotDialogue } from '@/lib/writer/types/pipeline'
 
 function makeShot(overrides: {
@@ -172,5 +172,55 @@ describe('detectEmotionChainIssues — 감정 연쇄 단절 검출 (#story-2)', 
   it('씬 경계와 arc 미출력(분할 자식·구 산출)은 건너뛴다', () => {
     expect(detectEmotionChainIssues([arc('s1', 'a', 'b'), arc('s2', 'c', 'd', 'scene_2')])).toHaveLength(0)
     expect(detectEmotionChainIssues([arc('s1', 'a', 'b'), makeShot({ id: 's2', dur: 4 })])).toHaveLength(0)
+  })
+})
+
+describe('detectCoverageGapIssues — 커버리지 결함 검출 (#coverage-first)', () => {
+  // 실제 산문 shape(리뷰 §3): 파이프라인은 slug 가 아니라 이름(소녀·노인)으로 쓴다 — 이름 매칭이 진짜 경로.
+  const scenes = {
+    scenes: [
+      {
+        scene_id: 'scene_1',
+        characters_in_scene: ['pawnbroker', 'girl'],
+        scene_actions: [
+          '소녀가 고개를 들어 노인을 쳐다본다.',
+          '소녀가 당황하며 뒷걸음질하자 노인이 희미하게 미소 짓는다.',
+        ],
+      },
+    ],
+  } as never as import('@/lib/writer/types/pipeline').Scenes
+  const characters = {
+    characters: [
+      { id: 'pawnbroker', name: '노인' },
+      { id: 'girl', name: '소녀' },
+    ],
+  } as never as import('@/lib/writer/types/pipeline').Characters
+  const shot = (id: string, beats: number[], fn: string, movement = 'static') => ({
+    ...makeShot({ id, dur: 5 }),
+    V: { camera: { type: 'MS', angle: 'eye_level', movement }, lighting: { key_fill_ratio: '', color_temp: '' }, composition: '', mood: '' },
+    source_beats: beats,
+    shot_function: fn,
+  }) as never as import('@/lib/writer/types/pipeline').ShotSequenceItem
+
+  it('실측 재현: 시선 비트 정지 단독 샷 + 반응 없는 다인 비트 → 경고 2건', () => {
+    const issues = detectCoverageGapIssues([shot('s2', [0], 'reveal'), shot('s3', [1], 'master')], scenes, characters)
+    // s2: '살핀다' 정지 카메라, 다음 샷(s3)이 reveal/pov 가 아님 → 시선 리빌 부재
+    // s3: char_2·char_3 다인 비트인데 반응 샷 없음
+    expect(issues.map((i) => i.location)).toEqual(['s2', 's3'])
+    expect(issues[0].message).toContain('시선')
+    expect(issues[1].message).toContain('다인')
+  })
+
+  it('시선을 따라가는 카메라 무브 또는 뒤따르는 reveal/reaction 샷이 있으면 무경고', () => {
+    const ok = detectCoverageGapIssues(
+      [shot('s2', [0], 'reveal', 'pan'), shot('s3', [1], 'master'), shot('s4', [1], 'reaction')],
+      scenes,
+      characters,
+    )
+    expect(ok).toHaveLength(0)
+  })
+
+  it('source_beats 미운반(구 산출·분할 자식)은 판단하지 않는다', () => {
+    expect(detectCoverageGapIssues([makeShot({ id: 's1', dur: 5 })], scenes, characters)).toHaveLength(0)
   })
 })

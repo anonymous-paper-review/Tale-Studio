@@ -413,6 +413,8 @@ export const KO: Record<string, string> = {
   'Generate {count} missing panels': '누락 패널 {count}개 생성',
   'Complex stages like shot design and validation can take 1-2 minutes.': '샷 설계·검증 같은 복잡한 단계는 1~2분 걸릴 수 있어요.',
   'No scenes or shots generated yet': '아직 생성된 씬·샷이 없어요',
+  // #coverage-first — 러프보드 연출 점검 배너
+  'Directing check: {count} issues to review before video': '연출 점검: 영상으로 넘어가기 전에 확인할 항목 {count}건',
   'Scenes and shots are generated once the story is handed off from Producer.': 'Producer에서 스토리를 핸드오프하면 씬·샷이 생성됩니다.',
   Retry: '다시 시도',
   'Generate panel': '패널 생성',
