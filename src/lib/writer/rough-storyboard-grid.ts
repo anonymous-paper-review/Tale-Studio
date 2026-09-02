@@ -387,12 +387,43 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
     cam && cam.type && cam.type !== 'static'
       ? `camera ${words(cam.type)}${cam.direction && cam.direction !== 'none' ? ` ${words(cam.direction)}` : ''}${cam.speed ? `, ${words(cam.speed)}` : ''}`
       : null
+  // #figure-index(2026-09-02, 실측 겨울_4 sh_01_25·28·29): 동작·시선의 "figure N" 은 그 인물이 START 에서
+  //   받은 번호(blocking 순서)로 매긴다. 옛 코드는 동작 목록의 인덱스로 번호를 매겨, 수인의 두 번째 동작
+  //   "steps forward showing palms" 가 figure 2(용족)에게 붙었고(28), "raises upper body" 도 용족에게 붙었으며(25),
+  //   인물이 하나뿐인 29 에는 유령 figure 2 가 생겼다.
+  //   blocking 이 없는 폴백 셀은 characterNames 순서(id → 이름은 characterNameById)로 번호를 잇는다.
+  //   인물이 하나뿐인 셀은 id 가 안 맞아도 그 하나에 붙인다(모호하지 않다). 그 외 어디에도 없는 인물은
+  //   START 계약상 화면 밖이라 동작·시선을 싣지 않는다 — 없는 사람을 가리키는 화살표가 된다.
+  const figureIndexOf = (characterId: string | undefined): number => {
+    if (characterId) {
+      if (blocking.length) {
+        const bi = blocking.findIndex((b) => b.character_id === characterId)
+        if (bi >= 0) return bi
+      } else {
+        const ni = input.characterNames.indexOf(input.characterNameById?.get(characterId) ?? characterId)
+        if (ni >= 0) return ni
+      }
+    }
+    return figureCount === 1 ? 0 : -1
+  }
+  const figLabel = (characterId: string | undefined): string | null => {
+    const i = figureIndexOf(characterId)
+    return i >= 0 ? `figure ${i + 1}` : null
+  }
   const charMoves = (dyn?.character_motion ?? [])
-    .map((m, i) => `figure ${i + 1}: ${stripColor(words(m.verb))}${m.magnitude ? ` (${m.magnitude})` : ''}`)
-    .filter((v) => v.trim().length > 0)
+    .map((m) => {
+      const fig = figLabel(m.character_id)
+      const verb = stripColor(words(m.verb)).trim()
+      return fig && verb ? `${fig}: ${verb}${m.magnitude ? ` (${m.magnitude})` : ''}` : ''
+    })
+    .filter((v) => v.length > 0)
   const gazeMoves = (dyn?.gaze_arc ?? [])
     .filter((g) => g.from !== g.to)
-    .map((g) => `blank head turns ${words(g.from)} → ${words(g.to)}`)
+    .map((g) => {
+      const fig = figLabel(g.character_id)
+      return fig ? `${fig}: blank head turns ${words(g.from)} → ${words(g.to)}` : ''
+    })
+    .filter((v) => v.length > 0)
   // #v2-cell-dedup: rich dynamicSpec 이 없으면 previz 카메라 자유서술이 MOTION 재료 —
   //   이게 없으면 V2 샷 전부가 'static hold' 로 균질화된다.
   const pvzCam = !dyn && pvz?.camera ? `camera: ${stripColor(pvz.camera)}` : null

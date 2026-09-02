@@ -107,12 +107,8 @@ export interface FalImageResult {
 export const DEFAULT_IMAGE_MODEL = 'openai/gpt-image-2';
 /** Consumed by src/lib/style-anchor.ts for Rule M model normalization. */
 export const DEFAULT_EDIT_IMAGE_MODEL = 'openai/gpt-image-2/edit';
-// 러프 스토리보드(previz 스케치) 전용 — 비용/속도 우선 경량 모델 (2026-06-12 사용자 결정).
-//   흑백 연필 스케치 + 목각 인형 수준이라 소형 모델로 충분.
-//   2026-06-18: 4b → 9b 격상 (4b 가 monochrome/featureless 지시 위반·구도 결함 심함, 일관성 개선 목적).
-//   2026-07-13: /lora → base 전환 — LoRA 미사용인데 /lora 엔드포인트 요금($0.015/MP)만 내고 있었음.
-//     base 는 동일 가중치 $0.006/MP. klein 은 negative_prompt/CFG 미지원(증류 모델, 스키마 확인).
-export const ROUGH_STORYBOARD_IMAGE_MODEL = 'fal-ai/flux-2/klein/9b';
+// 러프 스토리보드(previz)는 그리드 시트 전환(#rough-grid 2026-07-22) 이후 DEFAULT_EDIT_IMAGE_MODEL 로 만든다.
+//   옛 소형 모델 상수(fal-ai/flux-2/klein/9b, 2026-06-12~)는 참조가 없어 제거했다(2026-09-02).
 
 // flux 계열 입력 스키마 모델인지 (aspect_ratio 대신 image_size preset 사용)
 function isFluxFamilyModel(model: string): boolean {
