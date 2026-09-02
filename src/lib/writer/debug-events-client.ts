@@ -7,6 +7,9 @@ export const WRITER_CLIENT_OBSERVABILITY_EVENTS = [
   'auto_submit_blocked',
   'cache_read',
   'cache_invalidated',
+  // #B(2026-09-02 observability-audit): writer→artist 백필(autoGenerateBaseImages) 클라 실패를
+  //   무흔적으로 삼키지 않게 — 서버 route_failed 이벤트와 이름(어휘)만 공유한다.
+  'route_failed',
 ] as const
 
 export type WriterClientObservabilityEvent =

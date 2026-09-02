@@ -24,6 +24,7 @@ import {
 } from '@/lib/artist/world-prompt'
 import { submitWorldShotJob } from '@/lib/artist/world-submit'
 import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events'
+import { checkGenerationCapacity } from '@/lib/generation-quota'
 
 const DRAFT_MODEL = 'openai/gpt-image-2'
 
@@ -388,6 +389,44 @@ function zeroDraftResult(): DraftTriggerResult {
   return { submitted: 0, skipped: 0, failed: 0 }
 }
 
+/**
+ * 서버 초안 트리거 진입 전 용량 사전 점검(#B, 2026-09-02 관문 복원 범위 확장) — 이 트리거는
+ *   자율 잡이라(사람이 안 누른다) 429 관측이 없으면 다른 생성이 슬롯을 다 쓴 상태에서도
+ *   조용히 실패한다. 막힌 상태면 제출 전역을 스킵하고 asset_trigger_blocked(reason:'quota')
+ *   이벤트로 기록한다.
+ *   회복 경로는 기존 그대로: artist 탭 진입(autoGenerateBaseImages 자동) + 재시도(retry-drafts 버튼) —
+ *   이 트리거가 이번엔 채우지 못한 빈칸 생성은 그 경로가 다음 번에 다시 도달해 자율적으로 채운다(멱등).
+ */
+async function checkAssetDraftCapacity(
+  projectId: string,
+  workspaceId: string,
+): Promise<boolean> {
+  try {
+    const { data: workspace, error } = await supabaseAdmin
+      .from('workspaces')
+      .select('owner_id')
+      .eq('id', workspaceId)
+      .maybeSingle()
+    if (error) throw error
+    const ownerId = workspace?.owner_id as string | undefined
+    if (!ownerId) return true // 사용자를 식별할 수 없으면 fail-open(관측 없어도 생성은 허용)
+    const quota = await checkGenerationCapacity(ownerId, 'image')
+    if (!quota.ok) {
+      await recordWriterObservabilityEvent(projectId, 'asset_trigger_blocked', {
+        source: 'writer_v2_design',
+        reason: 'quota',
+        scope: quota.scope,
+        queued: quota.queued,
+        limit: quota.limit,
+      })
+      return false
+    }
+    return true
+  } catch {
+    return true // 조회 진단 실패는 fail-open — 진단 장애가 파이프라인을 막으면 안 된다.
+  }
+}
+
 export async function triggerAssetDrafts(
   projectId: string,
 ): Promise<AssetDraftTriggerResult> {
@@ -395,10 +434,11 @@ export async function triggerAssetDrafts(
   await recordWriterObservabilityEvent(projectId, 'asset_trigger_started', {
     source: 'writer_v2_design',
   })
+  let workspaceId: string | null = null
   try {
     const { data: project, error } = await supabaseAdmin
       .from('projects')
-      .select('design_tokens')
+      .select('design_tokens, workspace_id')
       .eq('id', projectId)
       .maybeSingle()
 
@@ -411,6 +451,7 @@ export async function triggerAssetDrafts(
       })
       return { skipped_no_look: true, characters: zero(), worlds: zero() }
     }
+    workspaceId = (project.workspace_id as string | undefined) ?? null
   } catch (e) {
     console.warn(
       '[v2design-trigger] design_tokens absent — skipping (stalled path)',
@@ -421,6 +462,12 @@ export async function triggerAssetDrafts(
       reason: 'design_tokens_lookup_failed',
     })
     return { skipped_no_look: true, characters: zero(), worlds: zero() }
+  }
+
+  // #B(2026-09-02): design_tokens 확인 직후, 제출 전에 1회 용량 사전 체크. 막히면 제출 전체
+  //   스킵하고 정상 반환(파이프라인 비차단 유지) — 중간 초과는 수용(개별 submit 단위 재검사 없음).
+  if (workspaceId && !(await checkAssetDraftCapacity(projectId, workspaceId))) {
+    return { characters: zero(), worlds: zero() }
   }
 
   const [characters, worlds] = await Promise.all([

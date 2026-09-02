@@ -11,6 +11,7 @@
 //   건너뛴다. 판정은 generation-quota.ts 의 admin 면제와 같은 축(src/lib/admin.ts) 재사용.
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { isAdminEmail } from '@/lib/admin'
+import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events'
 
 export type TakeBillingMode = 'off' | 'shadow' | 'enforce'
 
@@ -58,6 +59,8 @@ export async function holdTakesForVideoJob(input: {
   userId: string
   jobId: string
   amount: number
+  /** #D(2026-09-02 observability-audit): insufficient 거절 이벤트 기록용(writer_observability_events 대상 프로젝트). */
+  projectId: string
 }): Promise<HoldResult> {
   const mode = takeBillingMode()
   if (mode === 'off') {
@@ -74,6 +77,14 @@ export async function holdTakesForVideoJob(input: {
   })
   if (error) throw error
   const result = data as { ok: boolean; balance: number; held: number; insufficient: boolean }
+  if (result.insufficient) {
+    // #D: 이 402 거절 이벤트 자신이 유일한 기록 기회다 — 이미 제출된 잡이 failed 로 종결되기 전에 사유를 남긴다.
+    void recordWriterObservabilityEvent(input.projectId, 'generation_submit_rejected_takes', {
+      required: input.amount,
+      balance: result.balance,
+      jobId: input.jobId,
+    })
+  }
   return { ok: result.ok, insufficient: result.insufficient, held: result.held, balance: result.balance, skipped: null }
 }
 

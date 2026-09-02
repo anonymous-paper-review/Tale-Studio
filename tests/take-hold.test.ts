@@ -2,11 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Take hold 서버 래퍼(#payments-phase-2 #gen-quota-atomic-gate) — mode off/admin 스킵,
 //   shadow 는 enforce=false 로 RPC 호출, enforce insufficient 전파를 고정한다.
-const mocks = vi.hoisted(() => ({ rpc: vi.fn(), getUserById: vi.fn() }))
+const mocks = vi.hoisted(() => ({ rpc: vi.fn(), getUserById: vi.fn(), recordWriterObservabilityEvent: vi.fn() }))
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: { rpc: mocks.rpc, auth: { admin: { getUserById: mocks.getUserById } } },
 }))
 vi.mock('@/lib/admin', () => ({ isAdminEmail: (email: string | null | undefined) => email === 'admin@tale.studio' }))
+vi.mock('@/lib/writer/debug-events', () => ({
+  recordWriterObservabilityEvent: (...a: unknown[]) => mocks.recordWriterObservabilityEvent(...a),
+}))
 
 import { holdTakesForVideoJob, releaseTakesForJob, takeBillingMode } from '@/lib/billing/take-hold'
 
@@ -44,7 +47,7 @@ describe('holdTakesForVideoJob', () => {
 
   it('mode=off 는 RPC 를 타지 않고 통과시킨다', async () => {
     delete process.env.TAKE_BILLING_MODE
-    const result = await holdTakesForVideoJob({ workspaceId: 'ws-1', userId: 'user-off', jobId: 'job-1', amount: 5 })
+    const result = await holdTakesForVideoJob({ workspaceId: 'ws-1', userId: 'user-off', jobId: 'job-1', amount: 5, projectId: 'proj-1' })
     expect(result).toEqual({ ok: true, insufficient: false, held: 0, balance: 0, skipped: 'off' })
     expect(mocks.rpc).not.toHaveBeenCalled()
   })
@@ -52,7 +55,7 @@ describe('holdTakesForVideoJob', () => {
   it('admin 워크스페이스는 RPC 를 타지 않고 통과시킨다', async () => {
     vi.stubEnv('TAKE_BILLING_MODE', 'enforce')
     mocks.getUserById.mockResolvedValue({ data: { user: { email: 'admin@tale.studio' } }, error: null })
-    const result = await holdTakesForVideoJob({ workspaceId: 'ws-1', userId: 'user-admin', jobId: 'job-1', amount: 5 })
+    const result = await holdTakesForVideoJob({ workspaceId: 'ws-1', userId: 'user-admin', jobId: 'job-1', amount: 5, projectId: 'proj-1' })
     expect(result.skipped).toBe('admin')
     expect(mocks.rpc).not.toHaveBeenCalled()
   })
@@ -61,7 +64,7 @@ describe('holdTakesForVideoJob', () => {
     vi.stubEnv('TAKE_BILLING_MODE', 'shadow')
     mocks.getUserById.mockResolvedValue({ data: { user: { email: 'user@tale.studio' } }, error: null })
     mocks.rpc.mockResolvedValue({ data: { ok: true, balance: -3, held: 5, insufficient: false }, error: null })
-    const result = await holdTakesForVideoJob({ workspaceId: 'ws-1', userId: 'user-shadow', jobId: 'job-1', amount: 5 })
+    const result = await holdTakesForVideoJob({ workspaceId: 'ws-1', userId: 'user-shadow', jobId: 'job-1', amount: 5, projectId: 'proj-1' })
     expect(mocks.rpc).toHaveBeenCalledWith('take_hold', {
       p_workspace: 'ws-1',
       p_amount: 5,
@@ -69,13 +72,14 @@ describe('holdTakesForVideoJob', () => {
       p_enforce: false,
     })
     expect(result).toEqual({ ok: true, insufficient: false, held: 5, balance: -3, skipped: null })
+    expect(mocks.recordWriterObservabilityEvent).not.toHaveBeenCalled()
   })
 
   it('enforce 는 enforce=true 로 호출하고 insufficient 를 그대로 전파한다', async () => {
     vi.stubEnv('TAKE_BILLING_MODE', 'enforce')
     mocks.getUserById.mockResolvedValue({ data: { user: { email: 'user@tale.studio' } }, error: null })
     mocks.rpc.mockResolvedValue({ data: { ok: false, balance: 2, held: 0, insufficient: true }, error: null })
-    const result = await holdTakesForVideoJob({ workspaceId: 'ws-1', userId: 'user-enforce', jobId: 'job-1', amount: 5 })
+    const result = await holdTakesForVideoJob({ workspaceId: 'ws-1', userId: 'user-enforce', jobId: 'job-1', amount: 5, projectId: 'proj-1' })
     expect(mocks.rpc).toHaveBeenCalledWith('take_hold', {
       p_workspace: 'ws-1',
       p_amount: 5,
@@ -85,12 +89,25 @@ describe('holdTakesForVideoJob', () => {
     expect(result).toEqual({ ok: false, insufficient: true, held: 0, balance: 2, skipped: null })
   })
 
+  // #D(2026-09-02 observability-audit) — 402 거절 순간 generation_submit_rejected_takes 이벤트가 기록된다.
+  it('insufficient 이버트 generation_submit_rejected_takes 이벤트를 기록한다', async () => {
+    vi.stubEnv('TAKE_BILLING_MODE', 'enforce')
+    mocks.getUserById.mockResolvedValue({ data: { user: { email: 'user@tale.studio' } }, error: null })
+    mocks.rpc.mockResolvedValue({ data: { ok: false, balance: 2, held: 0, insufficient: true }, error: null })
+    await holdTakesForVideoJob({ workspaceId: 'ws-1', userId: 'user-insufficient', jobId: 'job-2', amount: 5, projectId: 'proj-42' })
+    expect(mocks.recordWriterObservabilityEvent).toHaveBeenCalledWith(
+      'proj-42',
+      'generation_submit_rejected_takes',
+      { required: 5, balance: 2, jobId: 'job-2' },
+    )
+  })
+
   it('RPC 에러를 전파한다', async () => {
     vi.stubEnv('TAKE_BILLING_MODE', 'enforce')
     mocks.getUserById.mockResolvedValue({ data: { user: { email: 'user@tale.studio' } }, error: null })
     mocks.rpc.mockResolvedValue({ data: null, error: { message: 'db down' } })
     await expect(
-      holdTakesForVideoJob({ workspaceId: 'ws-1', userId: 'user-error', jobId: 'job-1', amount: 5 }),
+      holdTakesForVideoJob({ workspaceId: 'ws-1', userId: 'user-error', jobId: 'job-1', amount: 5, projectId: 'proj-1' }),
     ).rejects.toMatchObject({ message: 'db down' })
   })
 
@@ -98,7 +115,7 @@ describe('holdTakesForVideoJob', () => {
     vi.stubEnv('TAKE_BILLING_MODE', 'enforce')
     mocks.getUserById.mockRejectedValue(new Error('auth lookup failed'))
     mocks.rpc.mockResolvedValue({ data: { ok: true, balance: 10, held: 5, insufficient: false }, error: null })
-    const result = await holdTakesForVideoJob({ workspaceId: 'ws-1', userId: 'user-lookup-fail', jobId: 'job-1', amount: 5 })
+    const result = await holdTakesForVideoJob({ workspaceId: 'ws-1', userId: 'user-lookup-fail', jobId: 'job-1', amount: 5, projectId: 'proj-1' })
     expect(result.skipped).toBeNull()
     expect(mocks.rpc).toHaveBeenCalled()
   })

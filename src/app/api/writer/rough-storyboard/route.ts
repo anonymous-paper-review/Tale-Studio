@@ -16,6 +16,8 @@ import {
   STALE_QUEUED_MS,
   getGenerationJobById,
 } from '@/lib/generation-jobs'
+import { checkGenerationCapacity } from '@/lib/generation-quota'
+import { quotaRejectionResponse } from '@/lib/api/quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { reconcileJobFromFal } from '@/lib/fal/reconcile'
 import { isRichStaticSpec, type RoughStoryboardSpec } from '@/lib/writer/rough-storyboard'
@@ -169,12 +171,15 @@ export async function POST(req: Request) {
       shotCount: shotIds?.length ?? 0,
     })
 
-    // #initial-rough-unblocked(2026-08-25 오너 지시 "처음에는 무조건 생성되게"): 러프 그리드는
-    //   파이프라인의 빈칸 자율 채움 — 첫 생성이 유저 쿼터(artist 백필 등 다른 잡의 점유)에 걸려
-    //   429 로 통째 막히면 "그냥 안 됨"으로 보인다. fal 은 초과분을 자기 큐에 대기시키므로(거부
-    //   아님) 우리 잡 등록은 막지 않는다 — 느려도 큐에는 들어간다. 쿼터 가드는 고가 작업
-    //   (실사 그리드·영상 라우트)에 그대로 남는다. 폭주 방어는 존치: 호출당 6샷 캡 + 샷 단위
-    //   dedupe + give-up 게이트.
+    // #initial-rough-unblocked(2026-08-25 오너 지시 "처음에는 무조건 생성되게") 번복(2026-09-02
+    //   오너 결정, 티켓 rough-storyboard-429-unreachable-2026-08-30): 러프 진입이 429 없이 무조건
+    //   뚫려 있어, 다른 7개 생성 라우트와 달리 이 경로만 429 관측이 전혀 없었다(observability-audit.md).
+    //   429 무흔적 구간을 없애고 다른 라우트와 동일하게 진입 1회 관문을 세운다 — 클라의 429 분기·대기
+    //   펌프(rough-storyboard-view.tsx)는 이미 있었으나 죽은 코드였던 것을 이 복원으로 되살린다.
+    //   청크 중간 재검사는 하지 않는다(그리드 최대 2잡/호출 — 마진이 흡수). 거절 429 는
+    //   generation_submit_rejected_quota 이벤트로 자동 기록된다(quotaRejectionResponse 내부).
+    const quota = await checkGenerationCapacity(access.userId!, 'image')
+    if (!quota.ok) return quotaRejectionResponse(quota, { projectId, kind: 'shot_rough_storyboard', userId: access.userId })
 
     const { data: project } = await supabaseAdmin
       .from('projects')

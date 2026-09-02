@@ -34,7 +34,9 @@ export default function PricingPage() {
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {/* Beta (현재) */}
-          <div className="rounded-3xl border border-primary/50 bg-white/[0.04] p-8 shadow-[0_0_60px_rgba(229,9,20,0.08)]">
+          <div
+            // eslint-disable-next-line no-restricted-syntax -- 글로우·하이라이트 원값 보존(픽셀 불변). 토큰화는 티켓 glow-token-cleanup(#accent-glow-tokenize)
+            className="rounded-3xl border border-primary/50 bg-white/[0.04] p-8 shadow-[0_0_60px_rgba(229,9,20,0.08)]">
             <div className="mb-1 flex items-center gap-2">
               <h2 className="text-xl font-semibold">Beta</h2>
               <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-[11px] font-semibold text-primary">

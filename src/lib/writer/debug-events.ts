@@ -31,6 +31,11 @@ export const WRITER_OBSERVABILITY_EVENTS = [
   // #f4(2026-08-27): refusal because the project's total video budget (100) is spent — same
   //   pre-ledger trace rationale as the quota rejection above.
   'generation_submit_rejected_video_budget',
+  // #D(2026-09-02 observability-audit): Take hold 부족(402) 거절 — 잡은 이미 제출된(fal 과금 발생) 다음이다.
+  //   402 거부로 잡은 즉시 failed 처리되니 장부 흔적(generation_jobs.status=failed)은 남는다 —
+  //   하지만 "왜 거부였는지"(필요·잔액)를 공유하는 공용 429 이벤트에 대응하는 짝이 없어
+  //   거절 사유를 상세히 남길 도구가 없었다. 거절 순간 범위(required·balance·jobId)만 단독 이벤트로 남긴다.
+  'generation_submit_rejected_takes',
   // Coordinate (4) of the generation lifecycle: the client actually folded a settled job's
   // result into visible UI state (store rehydrate after the job left the active queue).
   // A completed job with no ui_reflected row = "finished but the screen never showed it".

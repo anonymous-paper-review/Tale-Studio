@@ -126,16 +126,18 @@ function ProjectCard({
   return (
     <div
       onClick={() => !editing && onOpen(project)}
+      // eslint-disable-next-line no-restricted-syntax -- hover 상태 글로우, accent 원값. 토큰화는 티켓 glow-token-cleanup(#accent-glow-tokenize)
       className="group flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/5 text-left backdrop-blur-sm transition-all duration-300 hover:border-primary/50 hover:bg-white/10 hover:shadow-[0_10px_30px_rgba(229,9,20,0.1)]"
     >
       {/* 대표 썸네일(#landing-v2b) — 이름만으로는 구별이 어려워 프로젝트의 첫 그림을 얹는다.
           아직 그림이 없는 프로젝트는 제목 이니셜 워터마크가 구별을 돕는다.
+          워터마크 배경은 무채색 8% — 레드+스틸블루 안 폐기 (#design-gate 2026-09-02 오너 판정 C).
           [container-type:size] 는 #thumb-fit 의 100cqh(박스 높이 기준 팬 종점) 용. */}
       <div className="relative aspect-video overflow-hidden bg-black/60 [container-type:size]">
         {project.thumbnail_url ? (
           <ProjectThumb url={project.thumbnail_url} />
         ) : (
-          <div className="flex size-full items-center justify-center bg-[radial-gradient(ellipse_at_top_left,rgba(229,9,20,0.18),transparent_60%),radial-gradient(ellipse_at_bottom_right,rgba(70,130,180,0.12),transparent_60%)]">
+          <div className="flex size-full items-center justify-center bg-[radial-gradient(ellipse_at_top_left,color-mix(in_srgb,white_8%,transparent),transparent_60%)]">
             <span className="select-none text-5xl font-bold text-white/15">
               {(project.title || 'U').charAt(0).toUpperCase()}
             </span>

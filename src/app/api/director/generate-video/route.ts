@@ -753,6 +753,7 @@ export async function POST(req: Request) {
         userId: user.id,
         jobId: reservation.job_id,
         amount: holdAmount,
+        projectId,
       })
       if (!hold.ok && hold.insufficient) {
         try {

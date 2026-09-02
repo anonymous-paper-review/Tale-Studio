@@ -123,6 +123,7 @@ export async function POST(req: Request) {
       userId: access.userId!,
       jobId: job.id,
       amount: holdAmount,
+      projectId,
     })
     if (!hold.ok && hold.insufficient) {
       try {

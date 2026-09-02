@@ -133,6 +133,7 @@ function ProjectCard({
   return (
     <div
       onClick={() => !editing && onOpen(project)}
+      // eslint-disable-next-line no-restricted-syntax -- 글로우·하이라이트 원값 보존(픽셀 불변). 토큰화는 티켓 glow-token-cleanup(#accent-glow-tokenize)
       className="group flex cursor-pointer flex-col rounded-2xl border border-white/10 bg-white/5 p-6 text-left backdrop-blur-sm transition-all duration-300 hover:border-primary/50 hover:bg-white/10 hover:shadow-[0_10px_30px_rgba(229,9,20,0.1)]"
     >
       <div className="flex items-center justify-between">
@@ -474,6 +475,7 @@ export default function HomePage() {
           <div className="flex flex-col items-center justify-center gap-6 sm:flex-row">
             <button
               onClick={scrollToProjects}
+              // eslint-disable-next-line no-restricted-syntax -- 글로우·하이라이트 원값 보존(픽셀 불변). 토큰화는 티켓 glow-token-cleanup(#accent-glow-tokenize)
               className="group relative inline-flex w-full items-center justify-center gap-3 overflow-hidden rounded-full bg-primary px-8 py-5 text-lg font-medium text-primary-foreground transition-all duration-300 hover:bg-primary/90 hover:shadow-[0_0_40px_rgba(229,9,20,0.4)] sm:w-auto"
             >
               <span className="relative z-10 flex items-center gap-2">
@@ -485,6 +487,7 @@ export default function HomePage() {
             <button
               onClick={handleNew}
               disabled={creating}
+              // eslint-disable-next-line no-restricted-syntax -- 글로우·하이라이트 원값 보존(픽셀 불변). 토큰화는 티켓 glow-token-cleanup(#accent-glow-tokenize)
               className="group inline-flex w-full items-center justify-center gap-3 rounded-full border border-white/20 bg-black/30 px-8 py-5 text-lg font-medium text-white backdrop-blur-sm transition-all duration-300 hover:border-white hover:bg-white hover:text-black hover:shadow-[0_0_30px_rgba(255,255,255,0.3)] sm:w-auto"
             >
               <Sparkles className="size-5 transition-transform duration-300 group-hover:scale-110" />
@@ -530,6 +533,7 @@ export default function HomePage() {
           {SERVICES.map((service) => (
             <div
               key={service.title}
+              // eslint-disable-next-line no-restricted-syntax -- 글로우·하이라이트 원값 보존(픽셀 불변). 토큰화는 티켓 glow-token-cleanup(#accent-glow-tokenize)
               className="group relative aspect-[4/3] cursor-pointer overflow-hidden rounded-[2rem] bg-black shadow-sm transition-all duration-500 hover:shadow-[0_20px_40px_rgba(229,9,20,0.15)]"
             >
               <img
@@ -587,6 +591,7 @@ export default function HomePage() {
             <button
               onClick={handleNew}
               disabled={creating}
+              // eslint-disable-next-line no-restricted-syntax -- 글로우·하이라이트 원값 보존(픽셀 불변). 토큰화는 티켓 glow-token-cleanup(#accent-glow-tokenize)
               className="flex items-center gap-2 rounded-full bg-primary px-6 py-3 font-semibold text-primary-foreground transition-all duration-300 hover:bg-primary/90 hover:shadow-[0_0_30px_rgba(229,9,20,0.3)]"
             >
               {creating ? (

@@ -250,7 +250,15 @@ export function RoughStoryboardView() {
           if (s.characterAssets.length > 0 || s.worldAssets.length > 0) break
         }
       }
-      await useArtistStore.getState().autoGenerateBaseImages().catch(() => {})
+      // #B(2026-09-02 observability-audit): 실패는 여전히 삼킨다(store 자체가 429 토스트·중단 안내를 이미 하므로 별도 토스트는 불필요).
+      //   대신 이 실패가 무흔적으로 사라지지 않게 클라 관측 이벤트 기록 + console.warn 만 담당한다.
+      await useArtistStore.getState().autoGenerateBaseImages().catch((e) => {
+        console.warn('[rough-storyboard-view] autoGenerateBaseImages failed:', e instanceof Error ? e.message : e)
+        recordWriterObservabilityEventClient(projectId, 'route_failed', {
+          source: 'writer_to_artist_backfill',
+          error: e instanceof Error ? e.message : String(e),
+        })
+      })
     })()
   }, [projectId, roughAllReady])
   useEffect(() => {

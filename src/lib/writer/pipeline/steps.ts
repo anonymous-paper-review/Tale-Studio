@@ -444,7 +444,15 @@ export const WRITER_STEPS: WriterStep[] = [
       await persistAssetsToDb(projectId, s.characters!, s.scenes!, worldVisual, characterVisual, s.world).catch((e) => {
         console.error('[writer] persistAssetsToDb 실패 (best-effort 계속):', e instanceof Error ? e.message : e);
       });
-      await triggerAssetDrafts(projectId).catch(() => {});
+      // #C(2026-09-02 observability-audit): 생성 제출 자신는 best-effort 유지(v2Design 핵심경로를 막지 않는다)
+      //   하지만 실패 사실은 적어도 route_failed 관측 이벤트로 되살린다(이전에는 그대로 무흔적으로 삼켜졌다).
+      await triggerAssetDrafts(projectId).catch((e) => {
+        void recordWriterObservabilityEvent(projectId, 'route_failed', {
+          source: 'writer_v2_design',
+          kind: 'asset_trigger',
+          error: e instanceof Error ? e.message : String(e),
+        });
+      });
       return { characterVisual, worldVisual };
     },
   },

@@ -38,6 +38,9 @@ vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: { from: mocks.from, rpc: mocks.rpc, auth: { admin: { getUserById: mocks.getUserById } } },
 }))
 vi.mock('@/lib/admin', () => ({ isAdminEmail: () => false }))
+// #D(2026-09-02): take-hold.ts 거절 순간 관측 이벤트를 기록하다 — 이 파일이 감시하는 mocks.from 호출
+//   순서(shots.update 등)량 무관하도록 별도로 무려화(순서 직접 검증은 take-hold.test.ts 전담).
+vi.mock('@/lib/writer/debug-events', () => ({ recordWriterObservabilityEvent: vi.fn() }))
 
 import { POST } from '@/app/api/director/generate-previz-video/route'
 

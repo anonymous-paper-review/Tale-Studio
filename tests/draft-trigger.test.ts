@@ -62,6 +62,7 @@ import {
 
 const PROJECT_ID = 'proj-1'
 const WORKSPACE_ID = 'ws-1'
+const OWNER_ID = 'owner-1'
 const DESIGN_TOKENS = {
   l1: { art_style: 'ink storybook', shape_language: 'clear silhouettes' },
   palette: { primary: 'cobalt', secondary: 'ochre', accent: 'red' },
@@ -72,6 +73,11 @@ interface ProjectRow {
   workspace_id: string
   design_tokens: typeof DESIGN_TOKENS | null
   style_anchor_key?: string | null
+}
+
+interface WorkspaceRow {
+  id: string
+  owner_id: string
 }
 
 interface CharacterRow {
@@ -121,12 +127,14 @@ interface AppearanceRow {
 
 const dbState: {
   projects: ProjectRow[]
+  workspaces: WorkspaceRow[]
   characters: CharacterRow[]
   appearances: AppearanceRow[]
   locations: LocationRow[]
   candidates: CandidateRow[]
 } = {
   projects: [],
+  workspaces: [],
   characters: [],
   appearances: [],
   locations: [],
@@ -135,6 +143,7 @@ const dbState: {
 
 beforeEach(() => {
   dbState.projects = [projectFixture({ design_tokens: DESIGN_TOKENS })]
+  dbState.workspaces = [{ id: WORKSPACE_ID, owner_id: OWNER_ID }]
   dbState.characters = [characterFixture()]
   dbState.appearances = [appearanceFixture()]
   dbState.locations = []
@@ -313,6 +322,42 @@ describe('draft trigger relocation guards', () => {
     await expect(triggerWorldDrafts(PROJECT_ID)).resolves.toEqual({ submitted: 0, skipped: 0, failed: 1 })
     expect(mocks.createGenerationJob).not.toHaveBeenCalled()
   })
+
+  // #B(2026-09-02 용량 사전 점검) — design_tokens 확인 직후 owner 쿼터가 랬으부타마면 제출 전역 스킵.
+  it('quota 거절이면 제출 전역 스킵하고 asset_trigger_blocked(reason:quota) 이벤트를 낸다', async () => {
+    dbState.characters = [characterFixture()]
+    dbState.locations = [locationFixture()]
+    mocks.checkGenerationCapacity.mockResolvedValue({
+      ok: false,
+      queued: 6,
+      limit: 6,
+      scope: 'user',
+      category: 'image',
+    })
+
+    const result = await triggerAssetDrafts(PROJECT_ID)
+
+    expect(result).toEqual({ characters: { submitted: 0, skipped: 0, failed: 0 }, worlds: { submitted: 0, skipped: 0, failed: 0 } })
+    expect(mocks.falImageSubmit).not.toHaveBeenCalled()
+    expect(mocks.createGenerationJob).not.toHaveBeenCalled()
+    expect(mocks.checkGenerationCapacity).toHaveBeenCalledWith(OWNER_ID, 'image')
+  })
+
+  it('quota 통과이면 정상 제출을 진행한다(기존 동작 무해)', async () => {
+    dbState.characters = [characterFixture()]
+    mocks.checkGenerationCapacity.mockResolvedValue({
+      ok: true,
+      queued: 0,
+      limit: 6,
+      scope: 'user',
+      category: 'image',
+    })
+
+    const result = await triggerAssetDrafts(PROJECT_ID)
+
+    expect(result.characters).toEqual({ submitted: 1, skipped: 0, failed: 0 })
+    expect(mocks.checkGenerationCapacity).toHaveBeenCalledWith(OWNER_ID, 'image')
+  })
 })
 
 function projectFixture(overrides: Partial<ProjectRow> = {}): ProjectRow {
@@ -409,6 +454,7 @@ function resolveRows(
 
 function rowsForTable(table: string): Array<Record<string, unknown>> {
   if (table === 'projects') return dbState.projects as unknown as Array<Record<string, unknown>>
+  if (table === 'workspaces') return dbState.workspaces as unknown as Array<Record<string, unknown>>
   if (table === 'characters') return dbState.characters as unknown as Array<Record<string, unknown>>
   if (table === 'character_appearances') return dbState.appearances as unknown as Array<Record<string, unknown>>
   if (table === 'locations') return dbState.locations as unknown as Array<Record<string, unknown>>
