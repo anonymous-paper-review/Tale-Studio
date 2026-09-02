@@ -61,6 +61,7 @@ import {
   buildCharacterViewPrompt,
   type CharacterPromptInput,
 } from '@/lib/artist/turnaround'
+import { resolveCharacterPromptInput } from '@/lib/artist/sheet-prompt-input'
 
 const USER = { id: 'user-1' }
 const PROJECT_ID = 'project-1'
@@ -390,11 +391,18 @@ describe('style-anchor Phase 0 no-op characterization', () => {
 
     expect(result).toEqual({ submitted: 2, skipped: 0, failed: 0 })
     expect(mocks.falImageSubmit).toHaveBeenCalledTimes(2)
-    // draft-trigger.ts 는 image-models.ts 레지스트리와 무관한 자체 하드코딩 모델(openai/gpt-image-2)을 쓴다
-    //   (#owner-default 2026-08-31에서 미수정 — 본 태스크 범위 밖).
+    // #ref-gate(2026-09-02): 서버 초안은 Artist 와 같은 레지스트리 기본(nano-banana-2)과 같은 입력 조립
+    //   (의상·디자인 토큰·팔레트; 앵커 없으면 토큰 원문 그대로)을 쓴다 — 옛 자체 DRAFT_MODEL 상수 폐기.
+    const noAnchorInput = (character: CharacterRow) =>
+      resolveCharacterPromptInput({
+        character: { name: character.name, role: character.role },
+        appearance: { appearance: character.appearance, costume: character.costume },
+        designTokens,
+        hasAnchor: false,
+      })
     expect(falOptsAt(0)).toEqual({
-      model: 'openai/gpt-image-2/edit',
-      prompt: buildCharacterTurnaroundPrompt(draftPromptInput(templatePerson)),
+      model: 'fal-ai/nano-banana-2/edit',
+      prompt: buildCharacterTurnaroundPrompt(noAnchorInput(templatePerson)),
       reference_image_urls: [TEMPLATE_URL],
       webhookUrl: WEBHOOK_URL,
     })
@@ -405,10 +413,9 @@ describe('style-anchor Phase 0 no-op characterization', () => {
       view: 'main',
     })
     expect(falOptsAt(0).prompt).not.toContain('STYLE REFERENCE')
-    // draft-trigger.ts DRAFT_MODEL 은 image-models.ts 와 무관한 자체 하드코딩(openai/gpt-image-2) — 미수정.
     expect(falOptsAt(1)).toEqual({
-      model: 'openai/gpt-image-2',
-      prompt: buildCharacterTurnaroundPrompt(draftPromptInput(fallbackPerson)),
+      model: 'fal-ai/nano-banana-2',
+      prompt: buildCharacterTurnaroundPrompt(noAnchorInput(fallbackPerson)),
       aspect_ratio: '3:2',
       webhookUrl: WEBHOOK_URL,
     })
@@ -535,14 +542,6 @@ function sheetPromptInput(
     palette,
     delta: typeof opts.instruction === 'string' ? opts.instruction : undefined,
     safeMode: opts.safeMode ?? false,
-  }
-}
-
-function draftPromptInput(character: CharacterRow): CharacterPromptInput {
-  return {
-    name: character.name,
-    appearance: character.appearance ?? character.name,
-    role: character.role ?? undefined,
   }
 }
 

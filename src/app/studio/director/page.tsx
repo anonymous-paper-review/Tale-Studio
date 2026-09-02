@@ -2,7 +2,7 @@
 
 import '@xyflow/react/dist/style.css'
 
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type MouseEvent, useMemo } from 'react'
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -48,6 +48,7 @@ import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { getDirectorGaps, summarizeGaps } from '@/lib/completeness'
+import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import {
   isShotData,
   SNAP_GRID,
@@ -325,7 +326,19 @@ function CanvasInner() {
   //   새 참조라 deps 에 넣을 때 2000ms 디바운스가 렌더마다 리셋된다(#i18n-s5-batch4).
   //   summarizeGaps() 자체 산출물은 범위 밖(@/lib/completeness)이라 그대로 통과, 감싸는
   //   문장만 번역한다.
-  const gaps = getDirectorGaps(nodes)
+  // #ref-gate: 시트 없는 인물까지 잡으려면 에셋 store 의 이미지 유무가 필요하다(순수 함수엔 조회자로 넘긴다).
+  const assetCharacters = useAssetStorageStore((st) => st.characters)
+  const gapAssets = useMemo(
+    () => ({
+      hasCharacterImage: (id: string) => {
+        const c = assetCharacters[id]
+        return !!c && ((c.referenceImages?.length ?? 0) > 0 || (c.views?.single?.length ?? 0) > 0)
+      },
+      characterName: (id: string) => assetCharacters[id]?.name ?? id,
+    }),
+    [assetCharacters],
+  )
+  const gaps = getDirectorGaps(nodes, gapAssets)
   const gapNudgeContent =
     gaps.length > 0
       ? t('There are {count} things worth filling in:\n{summary}', {

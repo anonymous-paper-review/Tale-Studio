@@ -35,7 +35,8 @@ import {
 } from '@/types/asset'
 import { computeImageSourceHash, computeLookFingerprint } from '@/lib/image-provenance'
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
-import { applyStyleAnchor, resolveStyleAnchor, tokenUnlessMediaWord } from '@/lib/style-anchor'
+import { applyStyleAnchor, resolveStyleAnchor } from '@/lib/style-anchor'
+import { resolveCharacterPromptInput } from '@/lib/artist/sheet-prompt-input'
 import { templateAssetUrl } from '@/lib/storage/template-asset'
 import { normalizeImageModelKey, resolveImageEndpoint } from '@/lib/image-models'
 import { isChatTraceId } from '@/lib/chat-trace'
@@ -198,30 +199,14 @@ export async function POST(req: Request) {
     const anchor = await resolveStyleAnchor(project)
 
     const dt = (project.design_tokens ?? {}) as DesignTokens
-    const palette = [dt.palette?.primary, dt.palette?.secondary, dt.palette?.accent].filter(
-      (x): x is string => !!x,
-    )
+    // 입력 조립은 서버 초안(draft-trigger)과 공용 — 의상·디자인 토큰(앵커 시 매체어 정밀 드롭)·팔레트.
     const input: CharacterPromptInput = {
-      name: character.name,
-      appearance: appearance.appearance ?? character.name,
-      role: character.role ?? undefined,
-      costumes: appearance.costume ?? undefined,
-      // 앵커 존재 시 매체어 토큰만 정밀 드롭(#F-004 B4 2026-08-12 — 2026-07-14 통짜 억제 결정의
-      //   **명시적 번복**): 옛 규칙은 art_style 을 무조건 생략했는데, 실측(dc531572)에서 억제된 것이
-      //   앵커에 부합하는 유일한 토큰(3d_animation)이고 정작 매체어(texture: photorealistic)는
-      //   살아남아 앵커를 이겼다 — 취지가 정확히 뒤집힌 배치. 새 규칙: 매체어를 품은 토큰만 드롭
-      //   (dark_cinematic_realism 류 — 2026-07-14 실측의 교훈은 그대로 보존), 무해한 토큰은 유지.
-      //   앵커 없으면 기존 그대로(no-op).
-      artStyle: anchor ? tokenUnlessMediaWord(dt.l1?.art_style) : dt.l1?.art_style,
-      shapeLanguage: anchor ? tokenUnlessMediaWord(dt.l1?.shape_language) : dt.l1?.shape_language,
-      lineQuality: anchor ? tokenUnlessMediaWord(dt.l1?.line_quality) : dt.l1?.line_quality,
-      texturePhilosophy: anchor
-        ? tokenUnlessMediaWord(dt.l1?.texture_philosophy)
-        : dt.l1?.texture_philosophy,
-      characterProportion: anchor
-        ? tokenUnlessMediaWord(dt.l1?.character_proportion)
-        : dt.l1?.character_proportion,
-      palette,
+      ...resolveCharacterPromptInput({
+        character: { name: character.name, role: character.role },
+        appearance: { appearance: appearance.appearance, costume: appearance.costume },
+        designTokens: dt,
+        hasAnchor: !!anchor,
+      }),
       delta: typeof instruction === 'string' ? instruction : undefined,
       safeMode: effectiveSafeMode,
     }

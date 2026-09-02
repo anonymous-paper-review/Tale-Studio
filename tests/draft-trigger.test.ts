@@ -237,7 +237,7 @@ describe('draft trigger relocation guards', () => {
     expect(arg.inputSnapshot.source_hash).not.toBe(computeImageSourceHash(character.appearance, null))
   })
 
-  it('filters writer-origin opencast characters out of server drafts', async () => {
+  it('drafts writer-origin opencast characters too (#ref-gate 2026-09-02: Director 진입 전에 시트가 있어야 한다)', async () => {
     dbState.characters = [
       characterFixture({ character_id: 'char_producer', origin: 'producer' }),
       characterFixture({ character_id: 'char_writer', origin: 'writer' }),
@@ -249,9 +249,10 @@ describe('draft trigger relocation guards', () => {
 
     const result = await triggerCharacterDrafts(PROJECT_ID)
 
-    expect(result).toEqual({ submitted: 1, skipped: 0, failed: 0 })
-    expect(mocks.createGenerationJob).toHaveBeenCalledTimes(1)
-    expect((mocks.createGenerationJob.mock.calls[0][0] as { target: { characterId: string } }).target.characterId).toBe('char_producer')
+    expect(result).toEqual({ submitted: 2, skipped: 0, failed: 0 })
+    expect(mocks.createGenerationJob).toHaveBeenCalledTimes(2)
+    const ids = mocks.createGenerationJob.mock.calls.map((c) => (c[0] as { target: { characterId: string } }).target.characterId).sort()
+    expect(ids).toEqual(['char_producer', 'char_writer'])
   })
 
   it('triggerWorldDrafts uses prompt-only source_hash parity with generate-world and preserves target shape', async () => {

@@ -62,6 +62,7 @@ vi.mock('@/lib/storage/template-asset', () => ({ templateAssetUrl: mocks.templat
 import { POST as generateSheetPOST } from '@/app/api/artist/generate-sheet/route'
 import { POST as generateWorldPOST } from '@/app/api/artist/generate-world/route'
 import { POST as generateStoryboardPOST } from '@/app/api/director/generate-storyboard/route'
+import { resolveCharacterPromptInput } from '@/lib/artist/sheet-prompt-input'
 import { triggerCharacterDrafts } from '@/lib/artist/draft-trigger'
 import {
   buildCharacterTurnaroundPrompt,
@@ -429,6 +430,7 @@ describe('style-anchor route integration', () => {
       model: DEFAULT_EDIT_IMAGE_MODEL,
       style_anchor_key: ANCHOR_KEY,
       scene_time_of_day: null, // #F-006 — 스트립 아닌 폴백 경로는 씬 조명 미주입(null 기록)
+      reference_roles: null, // #ref-gate — shots 행이 없는(레거시) 호출은 서버 참조 계획 없음
       sheet_format: null, // #sheet-formats — 스트립 모드에서만 채워진다
       fal_request: {},
       ignored_fields: [],
@@ -481,20 +483,23 @@ describe('style-anchor route integration', () => {
 
     const result = await triggerCharacterDrafts(PROJECT_ID)
 
-    const expectedTemplatePrompt = `${STYLE_ANCHOR_CLAUSE}\n${STYLE_ANCHOR_TEMPLATE_CLAUSE}\n${buildCharacterTurnaroundPrompt(draftPromptInput(templatePerson))}`
-    const expectedFallbackPrompt = `${STYLE_ANCHOR_CLAUSE}\n${buildCharacterTurnaroundPrompt(draftPromptInput(fallbackPerson))}`
+    // #ref-gate(2026-09-02): 서버 초안도 라우트와 같은 입력 조립(의상·디자인 토큰·팔레트, 앵커 시 매체어 드롭) —
+    //   sheetPromptInput 은 라우트 정책의 독립 미러라 초안 프롬프트가 라우트와 같음을 교차 검증한다.
+    const expectedTemplatePrompt = `${STYLE_ANCHOR_CLAUSE}\n${STYLE_ANCHOR_TEMPLATE_CLAUSE}\n${buildCharacterTurnaroundPrompt(sheetPromptInput(templatePerson, designTokens))}`
+    const expectedFallbackPrompt = `${STYLE_ANCHOR_CLAUSE}\n${buildCharacterTurnaroundPrompt(sheetPromptInput(fallbackPerson, designTokens))}`
     expect(result).toEqual({ submitted: 2, skipped: 0, failed: 0 })
     expect(mocks.falImageSubmit).toHaveBeenCalledTimes(2)
     expect(mocks.createGenerationJob).toHaveBeenCalledTimes(2)
+    // 모델 = Artist 와 같은 레지스트리 기본(#owner-default 2026-09-02: nano-banana-2)의 edit 갈래.
     expect(falOptsAt(0)).toEqual({
-      model: DEFAULT_EDIT_IMAGE_MODEL,
+      model: 'fal-ai/nano-banana-2/edit',
       prompt: expectedTemplatePrompt,
       reference_image_urls: [ANCHOR_URL, TEMPLATE_URL],
       aspect_ratio: '16:9',
       webhookUrl: WEBHOOK_URL,
     })
     expect(generationJobArgAt(0).inputSnapshot).toMatchObject({
-      model: DEFAULT_EDIT_IMAGE_MODEL,
+      model: 'fal-ai/nano-banana-2/edit',
       prompt: expectedTemplatePrompt,
       reference_image_urls: [ANCHOR_URL, TEMPLATE_URL],
       aspect_ratio: '16:9',
@@ -522,6 +527,7 @@ describe('style-anchor route integration', () => {
         computeLookFingerprint(null, templatePerson.costume, null),
       ),
     )
+    // 템플릿 없는 폴백은 T2I 갈래(fal-ai/nano-banana-2)로 제출되지만, 앵커가 참조를 붙이면 Rule M 이 edit 로 되돌린다.
     expect(falOptsAt(1)).toEqual({
       model: DEFAULT_EDIT_IMAGE_MODEL,
       prompt: expectedFallbackPrompt,
@@ -565,19 +571,26 @@ describe('style-anchor route integration', () => {
 
     expect(result).toEqual({ submitted: 2, skipped: 0, failed: 0 })
     expect(mocks.falImageSubmit).toHaveBeenCalledTimes(2)
+    // #ref-gate: 앵커가 없으면 디자인 토큰을 매체어 드롭 없이 그대로 싣는다(라우트와 동일 정책).
+    const noAnchorInput = (character: CharacterRow) =>
+      resolveCharacterPromptInput({
+        character: { name: character.name, role: character.role },
+        appearance: { appearance: character.appearance, costume: character.costume },
+        designTokens,
+        hasAnchor: false,
+      })
     expect(falOptsAt(0)).toEqual({
-      model: DEFAULT_EDIT_IMAGE_MODEL,
-      prompt: buildCharacterTurnaroundPrompt(draftPromptInput(templatePerson)),
+      model: 'fal-ai/nano-banana-2/edit',
+      prompt: buildCharacterTurnaroundPrompt(noAnchorInput(templatePerson)),
       reference_image_urls: [TEMPLATE_URL],
       webhookUrl: WEBHOOK_URL,
     })
     expect(falOptsAt(0)).not.toHaveProperty('aspect_ratio')
     expect(falOptsAt(0).prompt).not.toContain(STYLE_ANCHOR_CLAUSE)
-    // draft-trigger.ts 는 image-models.ts 레지스트리와 무관한 자체 DRAFT_MODEL(openai/gpt-image-2)
-    //   상수를 쓴다 (본 태스크 범위 밖 파일 — #owner-default 2026-08-31에서 미수정).
+    // 서버 초안도 image-models.ts 레지스트리 기본을 따른다(#ref-gate 2026-09-02 — 옛 자체 DRAFT_MODEL 상수 폐기).
     expect(falOptsAt(1)).toEqual({
-      model: 'openai/gpt-image-2',
-      prompt: buildCharacterTurnaroundPrompt(draftPromptInput(fallbackPerson)),
+      model: 'fal-ai/nano-banana-2',
+      prompt: buildCharacterTurnaroundPrompt(noAnchorInput(fallbackPerson)),
       aspect_ratio: '3:2',
       webhookUrl: WEBHOOK_URL,
     })
@@ -714,14 +727,6 @@ function sheetPromptInput(character: CharacterRow, dt: DesignTokens): CharacterP
     safeMode: false,
   }
 }
-function draftPromptInput(character: CharacterRow): CharacterPromptInput {
-  return {
-    name: character.name,
-    appearance: character.appearance ?? character.name,
-    role: character.role ?? undefined,
-  }
-}
-
 
 function firstFalOpts(): FalImageOpts {
   return mocks.falImageSubmit.mock.calls[0][0] as FalImageOpts

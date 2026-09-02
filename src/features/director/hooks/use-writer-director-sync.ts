@@ -165,6 +165,27 @@ export function useWriterDirectorSync() {
     retryTimersRef.current.clear()
   }, [projectId])
 
+  // #ref-gate(2026-09-02): 에셋 하이드레이트는 프로젝트당 1회라, Artist 가 다른 탭에서 시트를 만드는 동안
+  //   Director 는 새로고침 전까지 옛 상태(시트 없음)를 본다. 탭이 다시 보일 때마다 DB 를 다시 읽는다 —
+  //   registerCharacter/registerWorld 가 키 기준 덮어쓰기라 재호출이 안전하다(멱등). 10초 스로틀.
+  useEffect(() => {
+    if (!projectId || typeof window === 'undefined') return
+    let last = 0
+    const refresh = () => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+      const now = Date.now()
+      if (now - last < 10_000) return
+      last = now
+      void useAssetStorageStore.getState().hydrateFromDb(projectId)
+    }
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [projectId])
+
   useEffect(() => {
     // Writer 데이터(sceneManifest/shots)는 writer-store.loadProject()로만 채워지는데,
     // 이 메서드는 director 직행/새로고침 경로에서 호출되지 않는다. manifest가 비어있고

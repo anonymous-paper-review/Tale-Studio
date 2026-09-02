@@ -21,6 +21,13 @@ import { applyStyleAnchor, resolveStyleAnchor, type AnchorableSubmit } from '@/l
 import { buildBestEffortFalRequestCapturePatch } from '@/lib/fal/observability'
 import { appendCheckConstraints } from '@/lib/writer/check-notes'
 import { composeRoughReferenceStrip, buildRealStripPrompt } from '@/lib/director/storyboard-strip'
+import {
+  loadShotReferencePlans,
+  missingSheetsMessage,
+  stripUrlQuery,
+  MISSING_CHARACTER_SHEETS,
+  type ShotRowForReferences,
+} from '@/lib/director/shot-references'
 import { storageKeySegment } from '@/lib/storage/key-segment'
 import { aspectRatioFromFormat, parseProjectFormat } from '@/types/project'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
@@ -83,7 +90,7 @@ export async function POST(req: Request) {
         .maybeSingle(),
       supabaseAdmin
         .from('shots')
-        .select('shot_id, scene_id, sort_order, rough_storyboard, check_notes, characters')
+        .select('shot_id, scene_id, sort_order, rough_storyboard, check_notes, characters, character_appearance_keys, static_spec')
         .eq('project_id', projectId)
         .eq('shot_id', writerShotId)
         .maybeSingle(),
@@ -104,6 +111,51 @@ export async function POST(req: Request) {
       if (c !== null && w !== null && c + w <= total) return { characterRefCount: c, worldRefCount: w } // 초과분 = 프레임 입력
       return { characterRefCount: total, worldRefCount: 0 } // 경계 미상(구 클라) — 종전 동작
     })()
+
+    // #ref-gate(2026-09-02, 실측 겨울_4 9ea9bd67): 인물 시트·배경은 서버 진실(DB)로 붙인다. 클라는 시트가
+    //   아직 없는 인물을 소리 없이 빼고 보냈고 서버는 shots.characters 와 대조하지 않아, 참조 0장이면
+    //   목각 인형이 그대로 렌더되고 1장이면 세 인형이 전부 그 인물이 됐다. shots.characters 가 배열이면
+    //   전원의 시트가 있어야 하고, 하나라도 없으면 code 있는 409 로 막는다. 클라 참조는 서버가 붙인
+    //   것과 겹치지 않는 추가 입력(프레임 참조)만 덧붙인다. characters 미정의(레거시) 샷은 종전 경로.
+    const serverPlan = shot && Array.isArray((shot as { characters?: unknown }).characters)
+      ? (await loadShotReferencePlans(projectId, [shot as ShotRowForReferences])).get(shot.shot_id as string) ?? null
+      : null
+    if (serverPlan && serverPlan.missing.length > 0) {
+      return NextResponse.json(
+        { error: missingSheetsMessage(serverPlan.missing), code: MISSING_CHARACTER_SHEETS, missing: serverPlan.missing },
+        { status: 409 },
+      )
+    }
+    const knownRefs = new Set(
+      serverPlan
+        ? [
+            ...serverPlan.characterRefs.map((r) => stripUrlQuery(r.url)),
+            ...(serverPlan.worldRef ? [stripUrlQuery(serverPlan.worldRef)] : []),
+          ]
+        : [],
+    )
+    const countsValid = Number.isInteger(bodyCharCount) && Number.isInteger(bodyWorldCount)
+    const rawExtras = countsValid
+      ? (callerRefs ?? []).slice(refSplit.characterRefCount + refSplit.worldRefCount)
+      : (callerRefs ?? [])
+    const clientExtras = serverPlan ? [...new Set(rawExtras.filter((u) => !knownRefs.has(stripUrlQuery(u))))] : []
+    const assembledRefs: string[] = serverPlan
+      ? [
+          ...serverPlan.characterRefs.map((r) => r.url),
+          ...(serverPlan.worldRef ? [serverPlan.worldRef] : []),
+          ...clientExtras,
+        ]
+      : (callerRefs ?? [])
+    const refCounts = serverPlan
+      ? {
+          characterRefCount: serverPlan.characterRefs.length,
+          worldRefCount: serverPlan.worldRef ? 1 : 0,
+          extraRefCount: clientExtras.length,
+        }
+      : { ...refSplit, extraRefCount: 0 }
+    const characterRefLabels = serverPlan
+      ? serverPlan.characterRefs.map((r) => ({ name: r.name, position: r.position, pose: r.pose }))
+      : undefined
 
     // #u17-2(2026-08-31 오너 지시): 수동 샷(shots.prompt=NULL)의 한국어 액션 원문 유출 방어 —
     //   영상 라우트(#w-c)와 동일하게 서버 최종 방어로 EN 파생. 이미 영어면 LLM 없이 통과,
@@ -190,9 +242,11 @@ export async function POST(req: Request) {
       //   applyStyleAnchor 는 앵커를 1번에 놓아 스트립 프롬프트와 충돌 → 스트립 모드는 수동 조립.
       finalOpts = {
         prompt: buildRealStripPrompt(guardedPrompt, {
-          // #asset-authority: 클라가 준 경계(인물 n, 배경 m)를 쓰고, 없으면 종전처럼 전부 인물로 간주.
-          characterRefCount: refSplit.characterRefCount,
-          worldRefCount: refSplit.worldRefCount,
+          // #ref-gate: 서버가 붙인 인물·배경·추가 입력의 경계. 레거시 샷(characters 미정의)만 클라 경계.
+          characterRefCount: refCounts.characterRefCount,
+          worldRefCount: refCounts.worldRefCount,
+          extraRefCount: refCounts.extraRefCount,
+          characterRefs: characterRefLabels,
           hasStyleRef: !!anchor,
           sceneLighting,
           // #anchor-wiring(2026-08-14 오너 확정): 검증 절 + 서브룩 그레이드 권위 + watercolor A안.
@@ -208,7 +262,7 @@ export async function POST(req: Request) {
         image_size: composed.geometry.repaintCanvas,
         reference_image_urls: [
           stripRefUrl,
-          ...(callerRefs ?? []),
+          ...assembledRefs,
           ...(anchor ? [anchor.imageUrl] : []),
           ...(anchor?.usePreviewRef && anchor.previewUrl ? [anchor.previewUrl] : []),
         ],
@@ -218,9 +272,9 @@ export async function POST(req: Request) {
         prompt: guardedPrompt,
         aspect_ratio:
           (projectFormat ? aspectRatioFromFormat(projectFormat) : null) ?? aspectRatio ?? '16:9',
-        ...(callerRefs ? { reference_image_urls: callerRefs } : {}),
+        ...(assembledRefs.length ? { reference_image_urls: assembledRefs } : {}),
       }
-      const mode = callerRefs ? 'multiref' : 'single'
+      const mode = assembledRefs.length ? 'multiref' : 'single'
       finalOpts = anchor ? applyStyleAnchor(anchor, baseOpts, mode) : baseOpts
     }
 
@@ -258,6 +312,14 @@ export async function POST(req: Request) {
         ...(finalOpts.model ? { model: finalOpts.model } : {}),
         style_anchor_key: anchor?.key ?? null,
         scene_time_of_day: sceneLighting,
+        // #ref-gate: 누가 몇 번 참조인지 — 사후 감사에서 "시트가 빠졌나"를 잡 기록만으로 읽게 한다.
+        reference_roles: serverPlan
+          ? {
+              characters: serverPlan.characterRefs.map((r) => ({ characterId: r.characterId, name: r.name })),
+              world: !!serverPlan.worldRef,
+              extras: clientExtras.length,
+            }
+          : null,
         ...(stripRefUrl ? { strip_ref_url: stripRefUrl } : {}),
         // #sheet-formats: finalize 크롭·방향 가드가 이 값으로 같은 지오메트리를 복원한다.
         sheet_format: stripSheetFormat,

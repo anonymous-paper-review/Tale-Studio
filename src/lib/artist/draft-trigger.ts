@@ -1,13 +1,21 @@
-// writer v2Design 직후 artist 초안(프로듀서 캐릭터 main + 로케이션 wide_shot) 서버사이드 트리거(C1).
+// writer v2Design 직후 artist 초안(인물 main 시트 + 로케이션 wide_shot) 서버사이드 트리거(C1).
 //
 // 원칙(#57 amend / architecture §5): 빈칸 채우기는 자율(멱등) — 차 있으면 skip. 차 있는 것 교체(재생성)는 사람만.
 //   projects.design_tokens 존재가 하드 게이트다. 새 트리거 경로는 lookFingerprint=null / look_present=false 잡을 만들지 않는다.
 //   대표 main 1장 + wide_shot 1장만 생성한다(4방향/추가 뷰는 사람 선별 이후 — 비용 튜닝).
+// #ref-gate(2026-09-02, 실측 겨울_4): 옛 트리거는 프로듀서 출신 인물만 그렸고 writer 출신(오픈캐스트)은 Artist
+//   탭에 들어가야 클라가 채웠다 — 그래서 writer 완료 직후 Director 로 가면 시트 0장인 채 실사가 돌았다.
+//   시트는 writer 완료의 일부로 서버가 전 인물에 대해 시작한다(생성 순서의 근본 수리). 클라 자동 채움은
+//   실패 회복용 폴백으로 남는다(queued 는 서버 dedupe, 완료분은 main 있음으로 skip).
+//   모델은 Artist 와 같은 레지스트리 기본(#owner-default) — 예전 하드코딩 gpt-image-2 는 08-31 결정과 어긋났다.
+//   프롬프트 입력도 라우트와 같은 조립(의상·디자인 토큰·팔레트 포함, sheet-prompt-input.ts).
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { falImageSubmit, type FalImageOptions } from '@/lib/writer/llm/fal'
 import { createGenerationJob, hasQueuedCharacterViewJob, hasQueuedWorldShotJob } from '@/lib/generation-jobs'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { buildCharacterTurnaroundPrompt } from '@/lib/artist/turnaround'
+import { resolveCharacterPromptInput, type SheetDesignTokens } from '@/lib/artist/sheet-prompt-input'
+import { DEFAULT_IMAGE_MODEL, resolveImageEndpoint } from '@/lib/image-models'
 import { CHARACTER_VIEW_COLUMNS } from '@/types/asset'
 import {
   computeImageSourceHash,
@@ -26,8 +34,6 @@ import { submitWorldShotJob } from '@/lib/artist/world-submit'
 import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events'
 import { checkGenerationCapacity } from '@/lib/generation-quota'
 
-const DRAFT_MODEL = 'openai/gpt-image-2'
-
 interface DraftCharacterRow {
   character_id: string
   name: string
@@ -40,6 +46,7 @@ interface DraftAppearanceRow {
   character_id: string
   appearance_key: string
   appearance: string | null
+  costume?: string[] | string | null
   sheet_url: string | null
 }
 
@@ -69,7 +76,8 @@ export interface AssetDraftTriggerResult {
 }
 
 /**
- * 프로젝트 프로듀서 캐릭터들의 대표 main 초안을 서버에서 생성(빈칸만, 멱등). v2Design 직후 1회.
+ * 프로젝트 인물(사람) 전원의 대표 main 초안을 서버에서 생성(빈칸만, 멱등). v2Design 직후 1회.
+ *   (#ref-gate 2026-09-02: 프로듀서 출신만 → 전 인물. writer 출신도 Director 진입 전에 시트가 있어야 한다.)
  *   멱등 3조건 — 하나라도 참이면 skip:
  *     (a) 기본 모습의 sheet_url 이미 존재(차 있음 — 교체는 사람만),
  *     (b) 기본 모습 main 슬롯 character_image_candidates 이미 존재,
@@ -85,11 +93,10 @@ export async function triggerCharacterDrafts(
       supabaseAdmin
         .from('characters')
         .select('character_id, name, role, costume, entity_type')
-        .eq('project_id', projectId)
-        .eq('origin', 'producer'),
+        .eq('project_id', projectId),
       supabaseAdmin
         .from('character_appearances')
-        .select('character_id, appearance_key, appearance, sheet_url')
+        .select('character_id, appearance_key, appearance, costume, sheet_url')
         .eq('project_id', projectId)
         .eq('is_default', true),
       supabaseAdmin
@@ -160,17 +167,23 @@ export async function triggerCharacterDrafts(
         const lookFingerprint = computeLookFingerprint(designTokens, c.costume, project?.style_anchor_key ?? null)
         // 턴어라운드 시트: 캐릭터 템플릿(public asset)을 reference 로 넣은 I2I(edit) — 버튼 경로(generate-sheet)와 정합.
         // base URL 없으면 동일 프롬프트 T2I(3:2) 폴백.
-        const promptInput = {
-          name: c.name,
-          appearance: defaultAppearance.appearance ?? c.name,
-          role: c.role ?? undefined,
-        }
+        // 라우트(generate-sheet)와 같은 입력 조립 — 의상·디자인 토큰·팔레트까지(sheet-prompt-input.ts).
+        const promptInput = resolveCharacterPromptInput({
+          character: { name: c.name, role: c.role },
+          appearance: {
+            appearance: defaultAppearance.appearance,
+            costume: defaultAppearance.costume ?? c.costume,
+          },
+          designTokens: designTokens as unknown as SheetDesignTokens,
+          hasAnchor: !!anchor,
+        })
         const prompt = buildCharacterTurnaroundPrompt(promptInput)
         // 템플릿은 스토리지에서 (template-asset.ts 주석 참고).
         const templateUrl = await templateAssetUrl('character-template.png')
+        // 모델 = Artist 기본(레지스트리) — 템플릿이 있으면 edit 갈래, 없으면 T2I 폴백.
         let submitOpts: FalImageOptions = templateUrl
-          ? { model: 'openai/gpt-image-2/edit', prompt, reference_image_urls: [templateUrl], webhookUrl }
-          : { model: DRAFT_MODEL, prompt, aspect_ratio: '3:2', webhookUrl }
+          ? { model: resolveImageEndpoint(DEFAULT_IMAGE_MODEL, true).endpoint, prompt, reference_image_urls: [templateUrl], webhookUrl }
+          : { model: resolveImageEndpoint(DEFAULT_IMAGE_MODEL, false).endpoint, prompt, aspect_ratio: '3:2', webhookUrl }
         if (anchor) {
           const { webhookUrl: wh, ...anchorable } = submitOpts
           const anchored = templateUrl

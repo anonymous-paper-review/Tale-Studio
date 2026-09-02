@@ -28,16 +28,30 @@ export function getArtistGaps(
   return gaps
 }
 
-/** Director 누락: 샷에 캐릭터·배경 참조가 없거나 스토리보드가 아직 안 만들어진 것들. */
-export function getDirectorGaps(nodes: DirectorNode[]): CompletenessGap[] {
+/** #ref-gate: 연결된 인물의 시트 유무를 store 없이 판정하려고 호출부가 주는 조회자. */
+export interface DirectorGapAssets {
+  hasCharacterImage: (characterId: string) => boolean
+  characterName: (characterId: string) => string
+}
+
+/** Director 누락: 샷에 캐릭터·배경 참조가 없거나, 연결된 인물의 시트가 없거나, 스토리보드가 아직 안 만들어진 것들. */
+export function getDirectorGaps(nodes: DirectorNode[], assets?: DirectorGapAssets): CompletenessGap[] {
   const gaps: CompletenessGap[] = []
   for (const n of nodes) {
     if (!isShotData(n.data)) continue
     const d = n.data
-    if (d.characterAssetIds.length === 0 && d.worldAssetIds.length === 0)
+    if (d.characterAssetIds.length === 0 && d.worldAssetIds.length === 0) {
       gaps.push({ label: `${d.label}: 캐릭터·배경 참조 없음` })
-    else if (d.storyboardImage?.status !== 'completed')
-      gaps.push({ label: `${d.label}: 스토리보드 미생성` })
+      continue
+    }
+    // #ref-gate(2026-09-02, 실측 겨울_4): 연결은 됐는데 시트가 없는 인물은 실사에서 목각 인형으로 남는다 —
+    //   옛 검사는 "참조가 둘 다 없음"만 봐서 이 경우를 놓쳤다.
+    const noSheet = assets ? d.characterAssetIds.filter((id) => !assets.hasCharacterImage(id)) : []
+    if (noSheet.length > 0) {
+      gaps.push({ label: `${d.label}: 시트 없는 인물 — ${noSheet.map((id) => assets!.characterName(id)).join(', ')}` }) // i18n-ok: 누락 넛지 라벨 — 이 파일의 기존 라벨과 같은 관행(채팅 제안 본문)
+      continue
+    }
+    if (d.storyboardImage?.status !== 'completed') gaps.push({ label: `${d.label}: 스토리보드 미생성` })
   }
   return gaps
 }

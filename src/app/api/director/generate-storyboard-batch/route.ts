@@ -18,7 +18,9 @@ import {
   composeRoughReferenceGrid,
   buildRealGridPrompt,
   realSheetCanvas,
+  type CharacterRefLabel,
 } from '@/lib/director/storyboard-strip'
+import { readCharacterBlocking } from '@/lib/director/shot-references'
 import { parseProjectFormat } from '@/types/project'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 import { storageKeySegment } from '@/lib/storage/key-segment'
@@ -36,6 +38,8 @@ interface EligibleShot {
   characters: string[]
   characterAppearanceKeys: Record<string, string>
   frames: { start: string; direction: string; end: string }
+  /** #ref-gate: 러프의 character_blocking — 칸 안에서 어느 인형이 누구인지. */
+  blocking: Map<string, { position: string | null; pose: string | null }>
 }
 
 class CharacterAppearanceContractError extends Error {}
@@ -91,7 +95,7 @@ export async function POST(req: NextRequest) {
 
     const { data: rows } = await supabaseAdmin
       .from('shots')
-      .select('shot_id, scene_id, characters, character_appearance_keys, rough_storyboard, storyboard_image')
+      .select('shot_id, scene_id, characters, character_appearance_keys, rough_storyboard, storyboard_image, static_spec')
       .eq('project_id', projectId)
       .order('sort_order')
 
@@ -116,6 +120,7 @@ export async function POST(req: NextRequest) {
         characters,
         characterAppearanceKeys,
         frames: { start: f.start, direction: f.direction, end: f.end },
+        blocking: readCharacterBlocking(s.static_spec),
       })
     }
 
@@ -255,8 +260,16 @@ export async function POST(req: NextRequest) {
           }
         })
       const nameById = new Map(groupRefs.map((r) => [r.characterId, r.name]))
-      const columnCharacters = group.map((s) =>
-        s.characters.map((id) => nameById.get(id)).filter((n): n is string => !!n),
+      // #ref-gate: 이름에 러프 위치·포즈를 붙여 칸 안의 인형↔인물 대응까지 준다.
+      const columnCharacters: CharacterRefLabel[][] = group.map((s) =>
+        s.characters
+          .map((id): CharacterRefLabel | null => {
+            const name = nameById.get(id)
+            if (!name) return null
+            const b = s.blocking.get(id)
+            return { name, position: b?.position ?? null, pose: b?.pose ?? null }
+          })
+          .filter((c): c is CharacterRefLabel => c !== null),
       )
 
       const sceneLighting = todByScene.get(group[0].scene_id) || null
@@ -314,7 +327,7 @@ export async function POST(req: NextRequest) {
           style_anchor_key: anchor?.key ?? null,
           prompt,
           reference_image_urls: referenceImageUrls,
-          column_characters: columnCharacters,
+          column_characters: columnCharacters.map((col) => col.map((c) => c.name)),
           scene_time_of_day: sceneLighting,
           image_size: sheetCanvas, // finalize 방향 가드 + 사고 역추적용 (#fal-canvas)
           sheet_format: projectFormat, // finalize 크롭이 포맷 시트 좌표를 복원 (#sheet-formats)

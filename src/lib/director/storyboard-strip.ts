@@ -209,7 +209,8 @@ export function buildRealGridPrompt(
      *  characterRefs 는 reference_image_urls[1..] 과 같은 순서의 표시명,
      *  columnCharacters 는 칸(그룹) 순서대로 그 칸에 나오는 인물 표시명들. */
     characterRefs?: { name: string }[]
-    columnCharacters?: string[][]
+    /** 칸(그룹) 순서대로 그 칸의 인물 — 문자열(이름) 또는 라벨(이름+러프 위치·포즈, #ref-gate). */
+    columnCharacters?: Array<Array<string | CharacterRefLabel>>
     /** #F-006(2026-08-13, 실측 1e166e55 sc_04): 시트 프롬프트에 씬 정보가 전무해 시트(=생성 콜)마다
      *  시간대를 지어냈다 — Night 씬이 시트 경계(21~24/25~27)에서 갈라진 실측. scenes.time_of_day 가
      *  진실인데 이 경로로 배선된 적이 없었다. 시트는 1콜 1이미지라 그레이드는 시트 전역 속성이고,
@@ -251,10 +252,12 @@ export function buildRealGridPrompt(
           ...(columnCharacters ?? []).map(
             (names, i) =>
               `    * Column ${i + 1}: ${
-                names.length ? names.join(' and ') : 'no character — keep this column free of people'
+                names.length ? names.map(describeCharacterRef).join(' and ') : 'no character — keep this column free of people'
               }`,
           ),
           `- Keep each character's identity, design and outfit exactly as in their reference, consistent across that column's three rows.`,
+          // #ref-gate(2026-09-02): 같은 인물 두 번 금지 + 배정 없는 인형은 다른 사람 — strip 과 같은 규칙.
+          `- Every assigned character appears exactly ONCE per panel — never paint the same character twice in one panel, and never merge two characters into one figure. A mannequin that matches no assignment in its column is a different, unnamed background person, never a copy of an assigned character.`,
           // #asset-authority: 연필 디테일보다 시트가 이긴다 + 환경 불변(그리드는 배경 레퍼런스 미첨부).
           assetAuthorityClause(characterRefs.length, opts.worldRefCount ?? 0, hasStyleRef, opts.styleRefCount === 2),
         ]
@@ -313,12 +316,67 @@ function renderGridCineBlock(cineLines?: (string | null | undefined)[]): string[
  * 실사 리페인트 프롬프트 — Phase B 검증 문안의 일반화.
  *   레퍼런스 순서 계약: [러프 스트립, ...캐릭터/월드 시트(characterRefCount), 스타일 앵커(hasStyleRef)].
  */
+/** #ref-gate(2026-09-02): "reference image N = 이름" 규약에 쓰는 라벨 — 위치·포즈는 러프의 character_blocking. */
+export interface CharacterRefLabel {
+  name: string
+  /** static_spec.character_blocking.position_in_frame (left_third 등). 없으면 이름만. */
+  position?: string | null
+  /** static_spec.character_blocking.pose — 어느 인형인지 고르는 단서. */
+  pose?: string | null
+}
+
+const POSITION_PHRASES: Record<string, string> = {
+  left_third: 'left third of the frame',
+  center_third: 'center of the frame',
+  right_third: 'right third of the frame',
+  left: 'left of the frame',
+  center: 'center of the frame',
+  right: 'right of the frame',
+  foreground: 'foreground',
+  midground: 'midground',
+  background: 'background',
+}
+
+function positionPhrase(position: string | null | undefined): string | null {
+  const token = (position ?? '').trim().toLowerCase()
+  if (!token) return null
+  return POSITION_PHRASES[token] ?? token.replace(/_/g, ' ')
+}
+
+/** "용족 수장 (right third of the frame — standing tall in gold breastplate)" */
+export function describeCharacterRef(ref: string | CharacterRefLabel): string {
+  if (typeof ref === 'string') return ref
+  const where = positionPhrase(ref.position)
+  const pose = (ref.pose ?? '').trim()
+  const hint = [where, pose ? pose.slice(0, 110) : null].filter(Boolean).join(' — ')
+  return hint ? `${ref.name} (${hint})` : ref.name
+}
+
+/**
+ * 인형↔인물 배정 블록(#ref-gate 2026-09-02, 실측 겨울_4 sh_01_27: 시트 1장 + 인형 셋 → 세 인형이 전부 같은 인물).
+ *   옛 "corresponding character(s)"는 대응 관계를 어디에도 정의하지 않아 모델이 자유 추측했다(그리드는
+ *   2026-08-12 에 고쳤고 strip 은 안 고친 상태였다). 참조 번호 = 이름, 러프의 위치·포즈로 어느 인형인지
+ *   못박고, 같은 인물 두 번 금지 + 배정 없는 인형은 "다른 사람"으로 규정한다.
+ */
+export function stripIdentityBlock(refs: CharacterRefLabel[]): string[] {
+  if (!refs.length) return []
+  return [
+    `- Character references, in order after the first image: ${refs
+      .map((r, i) => `reference image ${i + 2} = ${describeCharacterRef(r)}`)
+      .join('; ')}. The words in parentheses say where that figure stands in the pencil frame and what it is doing.`,
+    `- Replace each wooden mannequin with the character assigned to its place above. Every assigned character appears exactly ONCE per panel — never paint the same character twice in one panel, and never merge two characters into one figure. A mannequin that matches no assignment is a different, unnamed background person: give it its own plain look, never a copy of an assigned character.`,
+    `- Keep each character's identity, design and outfit exactly as in their sheet — the same character(s), consistent across all three panels.`,
+  ]
+}
+
 /** #asset-authority — 레퍼런스가 서로 다를 때의 권위 서열. 스트립·그리드 공용 문안. */
 export function assetAuthorityClause(
   characterRefCount: number,
   worldRefCount: number,
   hasStyleRef: boolean,
   twoStyleRefs: boolean,
+  /** #ref-gate: 인물·배경 뒤에 오는 추가 입력(프레임 참조 등) 수 — 인물로 오인되지 않게 역할을 적는다. */
+  extraRefCount = 0,
 ): string {
   const charSpan =
     characterRefCount > 0
@@ -332,8 +390,15 @@ export function assetAuthorityClause(
         ? `reference image ${2 + characterRefCount} is the LOCATION reference (the actual set and terrain)`
         : `reference images ${2 + characterRefCount} to ${1 + characterRefCount + worldRefCount} are the LOCATION references (the actual set and terrain)`
       : ''
+  const extraStart = 2 + characterRefCount + worldRefCount
+  const extraSpan =
+    extraRefCount > 0
+      ? extraRefCount === 1
+        ? `reference image ${extraStart} is an additional visual input for this shot (framing or prop reference) — not a character and not the set`
+        : `reference images ${extraStart} to ${extraStart + extraRefCount - 1} are additional visual inputs for this shot (framing or prop references) — not characters and not the set`
+      : ''
   const styleNote = hasStyleRef ? `; the last ${twoStyleRefs ? 'two images are' : 'image is'} style only` : ''
-  const roles = [charSpan, worldSpan].filter(Boolean).join('; ')
+  const roles = [charSpan, worldSpan, extraSpan].filter(Boolean).join('; ')
   return (
     `- Reference roles: ${roles}${styleNote}. AUTHORITY when references disagree — ` +
     (characterRefCount > 0
@@ -352,6 +417,10 @@ export function buildRealStripPrompt(
     characterRefCount: number
     /** #asset-authority: 인물 시트 뒤에 오는 배경(로케이션) 레퍼런스 수. 생략 = 0(종전 문안). */
     worldRefCount?: number
+    /** #ref-gate: 배경 뒤의 추가 입력(프레임 참조 등) 수. 생략 = 0. */
+    extraRefCount?: number
+    /** #ref-gate: 참조 순서(첫 이미지 다음)대로의 인물 라벨. 주면 익명 "corresponding" 문장을 대체한다. */
+    characterRefs?: CharacterRefLabel[]
     hasStyleRef: boolean
     /** #viz-gap 실험 arm: 이 샷의 시네 라인(비운반 채널만). 생략 시 현행 프롬프트 그대로. */
     cineLine?: string | null
@@ -409,16 +478,18 @@ export function buildRealStripPrompt(
     `- ${p3} panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly. Reproduce panel 3's arrived state faithfully: every element the motion changed (a drawer now open, a figure now moved or turned, an object now displaced) must be shown in its completed end state. If the shot contains two or more movements, show ALL of them completed — never repeat the ${p1.toLowerCase()} panel's state.`,
     // #end-fidelity: 그리드 쪽과 동일 — 샷 사이즈 불변(재프레이밍 금지) 명시.
     `- Every panel keeps its reference panel's exact shot size and camera distance — never push in, pull out or reframe: an extreme close-up stays an extreme close-up, a full shot stays a full shot, and each figure's size within the frame stays the same as in the reference.`,
-    ...(characterRefCount > 0
-      ? [
-          `- Replace every wooden mannequin with the corresponding character(s) from ${charLocation} (character/world references): keep their identity, design and outfit; the same character(s), consistent across all three panels.`,
-        ]
-      : []),
+    ...(opts.characterRefs && opts.characterRefs.length > 0
+      ? stripIdentityBlock(opts.characterRefs)
+      : characterRefCount > 0
+        ? [
+            `- Replace every wooden mannequin with the corresponding character(s) from ${charLocation} (character/world references): keep their identity, design and outfit; the same character(s), consistent across all three panels.`,
+          ]
+        : []),
     // #asset-authority(2026-09-02 오너 실측 bd5da55f: 갑옷·왕관이 샷마다 달라지고 떨어져 있던 바위가
     //   합쳐짐): 연필 previz 가 디테일까지 권위를 갖던 것을 뒤집는다 — 시트/배경이 이기고, 연필은
     //   구도·포즈·카메라만 정한다.
-    ...(characterRefCount > 0 || (opts.worldRefCount ?? 0) > 0
-      ? [assetAuthorityClause(characterRefCount, opts.worldRefCount ?? 0, hasStyleRef, twoStyleRefs)]
+    ...(characterRefCount > 0 || (opts.worldRefCount ?? 0) > 0 || (opts.extraRefCount ?? 0) > 0
+      ? [assetAuthorityClause(characterRefCount, opts.worldRefCount ?? 0, hasStyleRef, twoStyleRefs, opts.extraRefCount ?? 0)]
       : []),
     ...(hasStyleRef
       ? [

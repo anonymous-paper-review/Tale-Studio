@@ -718,6 +718,9 @@ export const KO: Record<string, string> = {
   'Google Gemini 3.1 · strong character consistency, up to 14 references':
     'Google Gemini 3.1 · 캐릭터 일관성이 강함, 참조 최대 14장',
   'Google Gemini 2.5 · previous generation': 'Google Gemini 2.5 · 이전 세대',
+  // #ref-gate: 실사 선행조건(인물 시트) 미충족 안내
+  'Character sheets are still missing for {names}. Generate them in the Artist tab first, then retry.':
+    '{names}의 인물 시트가 아직 없습니다. Artist 탭에서 시트를 먼저 만든 뒤 다시 시도하세요.',
   'ByteDance · high-res, rich editing': 'ByteDance · 고해상, 편집에 강함',
   'Black Forest Labs · fast & cheap, no reference': 'Black Forest Labs · 빠르고 저렴, 참조 미지원',
   Assets: '에셋',

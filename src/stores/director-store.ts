@@ -42,6 +42,7 @@ import {
   type DirectorVideoProvider,
 } from '@/types/director'
 import { notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
+import { notifyIfPrerequisiteMissing } from '@/lib/generation-prerequisite-toast'
 import {
   useAssetStorageStore,
   type RegisteredCharacter,
@@ -3888,7 +3889,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 httpStatus: res.status,
                 error: body.error ?? `HTTP ${res.status}`,
               })
-              if (notifyIfQuotaExceeded(res.status, body)) {
+              // #ref-gate: 시트 없는 인물(409 code) 도 한도 초과처럼 "왜 안 됐나"를 안내하고 노드는 원상 복구.
+              if (notifyIfQuotaExceeded(res.status, body) || notifyIfPrerequisiteMissing(res.status, body)) {
                 get().updateNodeData<'shot'>(shotNodeId, {
                   storyboardImage: {
                     url: prevUrl,
