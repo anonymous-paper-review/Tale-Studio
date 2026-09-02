@@ -11,6 +11,11 @@
 //   빠른 경로를 먼저 처리하고, keepalive 는 탭-닫힘 느린 안전망이다.
 
 export async function register() {
+  // Sentry 런타임별 초기화(#obs-audit 2026-09-02) — nodejs 조기 반환보다 먼저(edge도 초기화 필요).
+  //   DSN 미설정이면 각 config가 no-op — 제품 동작 불변.
+  if (process.env.NEXT_RUNTIME === 'nodejs') await import('../sentry.server.config')
+  if (process.env.NEXT_RUNTIME === 'edge') await import('../sentry.edge.config')
+
   if (process.env.NEXT_RUNTIME !== 'nodejs') return
 
   // outbound fetch 병렬화(#fetch-pool 2026-08-09) — 기본 디스패처가 origin당 요청을 사실상
@@ -80,6 +85,15 @@ export async function onRequestError(
   request: { path: string; method: string; headers: Record<string, string | string[] | undefined> },
   context: RequestErrorContext,
 ): Promise<void> {
+  // Sentry 이중 송신(#obs-audit) — 소스맵 해석·그룹핑·알림은 Sentry, 장기 보존·SQL 부검은 server_errors.
+  //   edge 예외는 DB 기록이 불가능하므로 Sentry가 유일한 흔적 — 런타임 가드보다 먼저 보낸다.
+  try {
+    const Sentry = await import('@sentry/nextjs')
+    Sentry.captureRequestError(err, request, context)
+  } catch (sentryErr) {
+    console.warn('[instrumentation] sentry capture failed:', sentryErr instanceof Error ? sentryErr.message : String(sentryErr))
+  }
+
   // Edge 런타임엔 service-role Supabase 클라이언트가 없다(Node 전용 API 의존) — nodejs 런타임만 기록.
   if (context.runtime !== 'nodejs') return
   try {

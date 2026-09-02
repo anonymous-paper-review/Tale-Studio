@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // 서버 500 무흔적 해소(#C, 2026-09-02 observability-audit) — onRequestError 가 nodejs 런타임에서만
 //   server_errors 에 insert 하고, edge 는 스킵하며, insert 실패는 삼키는지 고정한다.
-const mocks = vi.hoisted(() => ({ insert: vi.fn() }))
+const mocks = vi.hoisted(() => ({ insert: vi.fn(), captureRequestError: vi.fn() }))
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: { from: () => ({ insert: mocks.insert }) },
 }))
+// Sentry 이중 송신(2026-09-02) — 수집은 best-effort라 목으로 무력화하고 호출 여부만 고정.
+vi.mock('@sentry/nextjs', () => ({ captureRequestError: mocks.captureRequestError }))
 
 import { onRequestError } from '@/instrumentation'
 
