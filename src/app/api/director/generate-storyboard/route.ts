@@ -36,7 +36,7 @@ export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
   try {
-    const { projectId, writerShotId, prompt, referenceImageUrls, aspectRatio, traceId, imageModel } =
+    const { projectId, writerShotId, prompt, referenceImageUrls, aspectRatio, traceId, imageModel, characterRefCount: bodyCharCount, worldRefCount: bodyWorldCount } =
       (await req.json()) as {
         projectId?: string
         writerShotId?: string
@@ -45,6 +45,8 @@ export async function POST(req: Request) {
         aspectRatio?: string
         traceId?: string
         imageModel?: string
+        characterRefCount?: number
+        worldRefCount?: number
       }
     // #image-model-select: 화이트리스트 밖 모델명은 400 — 임의 fal 경로 주입 방지.
     //   실제 엔드포인트는 reference 유무가 정해지는 submit 시점에 고른다(#registry-merge).
@@ -95,6 +97,13 @@ export async function POST(req: Request) {
     )
 
     const callerRefs = referenceImageUrls?.length ? referenceImageUrls : undefined
+    const refSplit = (() => {
+      const total = callerRefs?.length ?? 0
+      const c = Number.isInteger(bodyCharCount) && (bodyCharCount as number) >= 0 ? (bodyCharCount as number) : null
+      const w = Number.isInteger(bodyWorldCount) && (bodyWorldCount as number) >= 0 ? (bodyWorldCount as number) : null
+      if (c !== null && w !== null && c + w <= total) return { characterRefCount: c, worldRefCount: w } // 초과분 = 프레임 입력
+      return { characterRefCount: total, worldRefCount: 0 } // 경계 미상(구 클라) — 종전 동작
+    })()
 
     // #u17-2(2026-08-31 오너 지시): 수동 샷(shots.prompt=NULL)의 한국어 액션 원문 유출 방어 —
     //   영상 라우트(#w-c)와 동일하게 서버 최종 방어로 EN 파생. 이미 영어면 LLM 없이 통과,
@@ -181,7 +190,9 @@ export async function POST(req: Request) {
       //   applyStyleAnchor 는 앵커를 1번에 놓아 스트립 프롬프트와 충돌 → 스트립 모드는 수동 조립.
       finalOpts = {
         prompt: buildRealStripPrompt(guardedPrompt, {
-          characterRefCount: callerRefs?.length ?? 0,
+          // #asset-authority: 클라가 준 경계(인물 n, 배경 m)를 쓰고, 없으면 종전처럼 전부 인물로 간주.
+          characterRefCount: refSplit.characterRefCount,
+          worldRefCount: refSplit.worldRefCount,
           hasStyleRef: !!anchor,
           sceneLighting,
           // #anchor-wiring(2026-08-14 오너 확정): 검증 절 + 서브룩 그레이드 권위 + watercolor A안.

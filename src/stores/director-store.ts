@@ -548,17 +548,31 @@ function pickAssetImageUrl(reg: RegisteredCharacter | undefined): string | null 
 
 /** Shot에 연결된 actor+world asset의 대표 이미지 URL을 모은다 (I2I 입력, 결정 #36) */
 function resolveShotAssetImages(data: ShotNodeData): string[] {
+  return resolveShotAssetRefs(data).urls
+}
+
+/** #asset-authority(2026-09-02 오너): 레퍼런스 배열은 [인물 시트..., 배경...] 순 — 서버가 역할별
+ *  권위 절을 쓰려면 경계가 필요하다. 카운트를 URL 배열과 함께 보낸다. */
+function resolveShotAssetRefs(data: ShotNodeData): { urls: string[]; characterRefCount: number; worldRefCount: number } {
   const store = useAssetStorageStore.getState()
   const urls: string[] = []
+  let characterRefCount = 0
   for (const id of data.characterAssetIds) {
     const u = pickAssetImageUrl(store.getCharacter(id))
-    if (u) urls.push(u)
+    if (u) {
+      urls.push(u)
+      characterRefCount += 1
+    }
   }
+  let worldRefCount = 0
   for (const id of data.worldAssetIds) {
     const u = pickAssetImageUrl(store.getWorld(id))
-    if (u) urls.push(u)
+    if (u) {
+      urls.push(u)
+      worldRefCount += 1
+    }
   }
-  return urls
+  return { urls, characterRefCount, worldRefCount }
 }
 
 function resolveShotImageInputs(
@@ -3836,9 +3850,12 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           },
         })
 
+        // #asset-authority: 배열은 [인물 시트..., 배경..., 프레임 입력...] 순. 서버가 역할 경계를
+        //   알아야 "시트가 연필을 이긴다" 절을 정확히 쓸 수 있어 카운트를 같이 보낸다.
+        const assetRefs = resolveShotAssetRefs(data)
         const referenceImageUrls = [
           ...new Set([
-            ...resolveShotAssetImages(data),
+            ...assetRefs.urls,
             ...resolveShotImageInputs(api.nodes, data.imageInputs),
           ]),
         ]
@@ -3860,6 +3877,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 writerShotId,
                 prompt,
                 referenceImageUrls,
+                characterRefCount: assetRefs.characterRefCount,
+                worldRefCount: assetRefs.worldRefCount,
                 // #image-model-select: 샷이 고른 fal 이미지 모델 (미지정 = 서버 기본)
                 ...(data.imageModel ? { imageModel: data.imageModel } : {}),
                 ...(options?.traceId ? { traceId: options.traceId } : {}),

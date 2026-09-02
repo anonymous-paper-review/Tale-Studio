@@ -147,6 +147,19 @@ export async function POST(req: NextRequest) {
     const todByScene = new Map(
       (sceneRows ?? []).map((s) => [s.scene_id as string, ((s.time_of_day as string) ?? '').trim()]),
     )
+    // #asset-authority(2026-09-02 오너 실측 bd5da55f: 떨어져 있던 바위가 샷 사이에서 합쳐짐): 그리드는
+    //   지금까지 배경 레퍼런스를 아예 안 실었다(감사 W1). 씬 로케이션의 wide_shot 을 시트마다 첨부해
+    //   지형·구조물의 권위를 artist 산출물에 둔다. 없으면(로케이션 미생성) 종전대로.
+    const { data: locRows } = await supabaseAdmin
+      .from('locations')
+      .select('scene_id, wide_shot')
+      .eq('project_id', projectId)
+      .in('scene_id', sceneIds)
+    const worldRefByScene = new Map<string, string>()
+    for (const l of locRows ?? []) {
+      const url = typeof l.wide_shot === 'string' ? l.wide_shot.trim() : ''
+      if (url && typeof l.scene_id === 'string' && !worldRefByScene.has(l.scene_id)) worldRefByScene.set(l.scene_id, url)
+    }
     // 인물 조회는 호출 전체 1회(쿼리 절약)로 두되 맵으로 보관 — 레퍼런스는 **시트별로** 꺼낸다
     //   (#real-grid-identity 2026-08-12): 옛 코드는 호출 전체(최대 2시트)의 합집합을 익명 URL
     //   배열로 모든 시트에 실었다. 그 시트에 안 나오는 인물의 레퍼런스가 오염원으로 첨부되고,
@@ -250,8 +263,10 @@ export async function POST(req: NextRequest) {
       // #anchor-wiring(2026-08-14 오너 확정): 앵커별 검증 절 + 서브룩 그레이드 권위 + watercolor
       //   A안(preview 2번 스타일 레퍼런스). 전부 DB(style_anchors)가 진실.
       const anchorTwoRef = !!(anchor?.usePreviewRef && anchor.previewUrl)
+      const worldRef = worldRefByScene.get(group[0].scene_id) ?? null
       const prompt = buildRealGridPrompt(group.length, {
         characterRefCount: groupRefs.length,
+        worldRefCount: worldRef ? 1 : 0,
         hasStyleRef: !!anchor,
         characterRefs: groupRefs.map((r) => ({ name: r.name })),
         columnCharacters,
@@ -263,6 +278,7 @@ export async function POST(req: NextRequest) {
       const referenceImageUrls = [
         refUrl,
         ...groupRefs.map((r) => r.url),
+        ...(worldRef ? [worldRef] : []),
         ...(anchor ? [anchor.imageUrl] : []),
         ...(anchorTwoRef ? [anchor!.previewUrl as string] : []),
       ]

@@ -197,6 +197,8 @@ export function buildRealGridPrompt(
   shotCount: number,
   opts: {
     characterRefCount: number
+    /** #asset-authority: 인물 시트 뒤 배경(로케이션) 레퍼런스 수(배치 라우트가 씬 wide_shot 을 첨부). */
+    worldRefCount?: number
     hasStyleRef: boolean
     /** #viz-gap 실험 arm: 컬럼(=샷) 순서대로의 시네 라인. 연필이 못 옮기는 조명/초점/DoF/렌즈/색만.
      *  생략(기본)이면 현행 프롬프트 그대로 — 라이브 라우트 무변경. renderRepaintCineLine 산출물. */
@@ -253,6 +255,8 @@ export function buildRealGridPrompt(
               }`,
           ),
           `- Keep each character's identity, design and outfit exactly as in their reference, consistent across that column's three rows.`,
+          // #asset-authority: 연필 디테일보다 시트가 이긴다 + 환경 불변(그리드는 배경 레퍼런스 미첨부).
+          assetAuthorityClause(characterRefs.length, opts.worldRefCount ?? 0, hasStyleRef, opts.styleRefCount === 2),
         ]
       : characterRefCount > 0
         ? [
@@ -309,10 +313,45 @@ function renderGridCineBlock(cineLines?: (string | null | undefined)[]): string[
  * 실사 리페인트 프롬프트 — Phase B 검증 문안의 일반화.
  *   레퍼런스 순서 계약: [러프 스트립, ...캐릭터/월드 시트(characterRefCount), 스타일 앵커(hasStyleRef)].
  */
+/** #asset-authority — 레퍼런스가 서로 다를 때의 권위 서열. 스트립·그리드 공용 문안. */
+export function assetAuthorityClause(
+  characterRefCount: number,
+  worldRefCount: number,
+  hasStyleRef: boolean,
+  twoStyleRefs: boolean,
+): string {
+  const charSpan =
+    characterRefCount > 0
+      ? characterRefCount === 1
+        ? 'reference image 2 is the CHARACTER sheet'
+        : `reference images 2 to ${1 + characterRefCount} are the CHARACTER sheets`
+      : ''
+  const worldSpan =
+    worldRefCount > 0
+      ? worldRefCount === 1
+        ? `reference image ${2 + characterRefCount} is the LOCATION reference (the actual set and terrain)`
+        : `reference images ${2 + characterRefCount} to ${1 + characterRefCount + worldRefCount} are the LOCATION references (the actual set and terrain)`
+      : ''
+  const styleNote = hasStyleRef ? `; the last ${twoStyleRefs ? 'two images are' : 'image is'} style only` : ''
+  const roles = [charSpan, worldSpan].filter(Boolean).join('; ')
+  return (
+    `- Reference roles: ${roles}${styleNote}. AUTHORITY when references disagree — ` +
+    (characterRefCount > 0
+      ? 'the character sheets decide identity, face, hair, costume, armor and every worn or carried prop: reproduce them exactly as in the sheet, even where the pencil strip shows a different outfit, a missing item or an extra item; '
+      : '') +
+    (worldRefCount > 0
+      ? 'the location reference decides the environment — terrain layout, structures, landmark positions and distances, set dressing: keep this geography identical to the reference and to the other shots of the scene; '
+      : 'keep the environment identical across all shots of the scene — never merge, move or invent terrain and structures; ') +
+    'the pencil strip decides ONLY framing, composition, poses, blocking and the direction arrows. A pencil-drawn detail never overrides a sheet.'
+  )
+}
+
 export function buildRealStripPrompt(
   shotPrompt: string,
   opts: {
     characterRefCount: number
+    /** #asset-authority: 인물 시트 뒤에 오는 배경(로케이션) 레퍼런스 수. 생략 = 0(종전 문안). */
+    worldRefCount?: number
     hasStyleRef: boolean
     /** #viz-gap 실험 arm: 이 샷의 시네 라인(비운반 채널만). 생략 시 현행 프롬프트 그대로. */
     cineLine?: string | null
@@ -374,6 +413,12 @@ export function buildRealStripPrompt(
       ? [
           `- Replace every wooden mannequin with the corresponding character(s) from ${charLocation} (character/world references): keep their identity, design and outfit; the same character(s), consistent across all three panels.`,
         ]
+      : []),
+    // #asset-authority(2026-09-02 오너 실측 bd5da55f: 갑옷·왕관이 샷마다 달라지고 떨어져 있던 바위가
+    //   합쳐짐): 연필 previz 가 디테일까지 권위를 갖던 것을 뒤집는다 — 시트/배경이 이기고, 연필은
+    //   구도·포즈·카메라만 정한다.
+    ...(characterRefCount > 0 || (opts.worldRefCount ?? 0) > 0
+      ? [assetAuthorityClause(characterRefCount, opts.worldRefCount ?? 0, hasStyleRef, twoStyleRefs)]
       : []),
     ...(hasStyleRef
       ? [
