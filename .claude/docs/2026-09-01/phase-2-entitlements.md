@@ -5,7 +5,11 @@
 슬라이스 1 완료분: 2-1 스키마(4테이블 · lot 추적 · RLS deny-all · dev→live 적용) · 2-2 v4 사다리(`getPlanEntitlements`) ·
 2-7 관리자 수동 부여(`/api/admin/billing` — set_plan+월분 적립·grant·adjust, 감사 reason 필수).
 검증: core 1749 passed + dev DB 실통합 7종 PASS(잔액 합산·CHECK 부호·hold 왕복·사다리).
-다음 슬라이스: 2-3 게이트 배선 · 2-4 hold/확정/반환(+티켓 gen-quota-atomic-gate 동시 마감) · 2-5 소모량 표시 · 2-6 만기 잡.
+슬라이스 2 완료 (2026-09-02, main `e45a004`): 2-4 hold/반환(take_hold·take_release_for_job RPC — lot FIFO 배분,
+멱등 반환, admin 슈퍼계정 면제) · 2-5 소모량 배지+잔액 API+402 토스트. `TAKE_BILLING_MODE=shadow`로
+전 환경 가동 중(기록만, 차단 없음). 티켓 gen-quota-atomic-gate 마감 — 실측 '잔액 1·동시 12 → 통과 1·거절 11'.
+계수 주의: seedance=5만 v4 확정, kling-o3·veo=5는 잠정(기획 확정 대상).
+다음 슬라이스: 2-3 나머지 축 게이트(생성 분량·Export·Account) · 2-6 월분 적립·만기 잡 · enforce 전환은 [beta-cutover.md](beta-cutover.md) 게이트 통과 후.
 
 v4 요금제를 코드로 번역하는 단계. 결제는 이 시스템의 스위치일 뿐이므로 스위치보다 회로를 먼저 만든다.
 검증은 관리자 수동 플랜 부여로 하고, 이 수동 경로가 나중에 국내 B2B 수동 계약 경로(기획 안건 ①)가 된다.
