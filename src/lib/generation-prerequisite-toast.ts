@@ -14,6 +14,7 @@ import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { createClient } from '@/lib/supabase/client'
+import { hasStoryboardImage } from '@/lib/director/storyboard-image'
 import type { StageId } from '@/types'
 
 export type PrerequisiteCode = 'missing_character_sheets' | 'missing_rough_storyboard' | 'missing_storyboard'
@@ -138,10 +139,9 @@ export function prerequisiteSatisfied(
       const frames = (state.shot?.rough_storyboard as { frames?: Record<string, unknown> } | null | undefined)?.frames
       return !!(frames && typeof frames.start === 'string' && typeof frames.direction === 'string' && typeof frames.end === 'string')
     }
-    case 'missing_storyboard': {
-      const img = state.shot?.storyboard_image
-      return typeof img === 'string' ? img.trim().length > 0 : !!img
-    }
+    case 'missing_storyboard':
+      // 서버 게이트(generate-video)와 같은 판정 — 생성 중 placeholder(status≠completed)는 아직 아님.
+      return hasStoryboardImage(state.shot?.storyboard_image)
   }
 }
 

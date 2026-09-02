@@ -74,6 +74,14 @@ describe('prerequisiteSatisfied', () => {
     expect(prerequisiteSatisfied(REAL, { shot: { storyboard_image: '  ' } })).toBe(false)
     expect(prerequisiteSatisfied(REAL, { shot: { storyboard_image: 'https://x/real.png' } })).toBe(true)
   })
+
+  it('실사: 실제 JSONB 형태 — completed 면 참, 생성 중 placeholder 면 거짓(서버 게이트와 같은 판정)', () => {
+    const completed = { url: 'https://x/s.png', frames: { start: 'https://x/s.png', direction: 'https://x/d.png', end: 'https://x/e.png' }, status: 'completed' }
+    expect(prerequisiteSatisfied(REAL, { shot: { storyboard_image: completed } })).toBe(true)
+    expect(prerequisiteSatisfied(REAL, { shot: { storyboard_image: { url: 'https://x/single.png', status: 'completed' } } })).toBe(true)
+    expect(prerequisiteSatisfied(REAL, { shot: { storyboard_image: { url: '', status: 'generating' } } })).toBe(false)
+    expect(prerequisiteSatisfied(REAL, { shot: { storyboard_image: { url: 'https://x/s.png', status: 'failed' } } })).toBe(false)
+  })
 })
 
 describe('waitForPrerequisite', () => {

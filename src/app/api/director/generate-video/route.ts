@@ -44,6 +44,7 @@ import {
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { holdTakesForVideoJob } from '@/lib/billing/take-hold'
 import { takeCostForVideo } from '@/lib/billing/take-cost'
+import { hasStoryboardImage } from '@/lib/director/storyboard-image'
 import type { Json } from '@/types/database'
 import type { CameraConfig, CameraPreset } from '@/types'
 import type { StandaloneVideoConfig } from '@/types/director'
@@ -506,7 +507,8 @@ export async function POST(req: Request) {
     // #ref-gate(2026-09-02 오너 결정): writer 샷의 실사 영상은 실사 스토리보드(시작 프레임)가 있어야 한다 —
     //   클라가 준 프레임을 검사 없이 받던 무음 폴백 폐지. 409 code 로 막고 클라가 실사 완성을 기다렸다가 자동 재개.
     //   (러프 previz 영상은 별도 잡 종류 shot_previz_video / 별도 라우트라 이 게이트와 무관.)
-    if (!standalone && shot && !(typeof shot.storyboard_image === 'string' && shot.storyboard_image.trim())) {
+    //   storyboard_image 는 JSONB {url, frames, status} — 판정은 hasStoryboardImage 한 곳(클라 대기 판정과 공유).
+    if (!standalone && shot && !hasStoryboardImage(shot.storyboard_image)) {
       return NextResponse.json(
         {
           error: `The live-action storyboard is missing for shot ${writerShotId} — generate it before the video.`,

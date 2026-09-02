@@ -28,6 +28,18 @@ import { POST } from '@/app/api/director/generate-video/route'
 import { GET as pollVideo } from '@/app/api/director/generate-video/[taskId]/route'
 
 const key = '123e4567-e89b-12d3-a456-426614174000'
+// shots.storyboard_image 의 실제 JSONB 형태(src/lib/fal/finalize.ts strip 완료 시점) — 전 프로젝트 실측 전부 객체.
+const PRODUCTION_STORYBOARD_IMAGE = {
+  url: 'https://storage.test/shot-1_storyboard_start.png',
+  frames: {
+    start: 'https://storage.test/shot-1_storyboard_start.png',
+    direction: 'https://storage.test/shot-1_storyboard_direction.png',
+    end: 'https://storage.test/shot-1_storyboard_end.png',
+  },
+  status: 'completed',
+  errorMessage: null,
+  generatedAt: 1756800000000,
+}
 function request(extra: Record<string, unknown> = {}) {
   return new Request('http://test/api/director/generate-video', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ projectId: 'project-1', shotId: 'shot-1', prompt: 'A scene', idempotencyKey: key, ...extra }) })
 }
@@ -37,8 +49,9 @@ function query(data: unknown) {
     data = { ...data, character_appearance_keys: {} }
   }
   // #ref-gate(2026-09-02): writer 샷의 실사 영상은 실사 스토리보드가 있어야 한다 — 픽스처가 명시하지 않으면 있는 것으로.
+  //   실제 저장 형태(finalize.ts JSONB)로 채운다 — 첫 판이 문자열로 채워 "문자열만 인정" 결함을 못 잡았다.
   if (data && typeof data === 'object' && !Array.isArray(data) && 'shot_id' in data && !('storyboard_image' in data)) {
-    data = { ...data, storyboard_image: 'https://storage.test/shot-1_storyboard.png' }
+    data = { ...data, storyboard_image: PRODUCTION_STORYBOARD_IMAGE }
   }
   const result = { data, error: null }
   const value = {
@@ -305,6 +318,63 @@ describe('director video generation reservation', () => {
     await expect(response.json()).resolves.toMatchObject({ code: 'missing_storyboard', shotId: 'shot-1' })
     expect(mocks.reserveTake).not.toHaveBeenCalled()
     expect(mocks.submit).not.toHaveBeenCalled()
+  })
+
+  it('#ref-gate: 생성 중 placeholder(status≠completed)도 아직 없는 것 — 409', async () => {
+    mocks.from.mockReset()
+    mocks.from
+      .mockReturnValueOnce(query({ workspace_id: 'workspace-1' }))
+      .mockReturnValueOnce(query({
+        shot_id: 'shot-1',
+        dynamic_spec: {},
+        character_appearance_keys: { 'char-1': 'young' },
+        storyboard_image: { url: '', status: 'generating', errorMessage: null, generatedAt: 0 },
+      }))
+
+    const response = await POST(request())
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({ code: 'missing_storyboard' })
+    expect(mocks.reserveTake).not.toHaveBeenCalled()
+  })
+
+  it('#ref-gate 회귀: 실제 JSONB 형태(url·frames·status completed)는 통과해 예약까지 간다', async () => {
+    // 2026-09-02 실측: 게이트가 문자열만 인정해 실사가 있는 30샷 전부 영상이 409 로 막혔다(겨울_4).
+    mocks.from.mockReset()
+    mocks.from
+      .mockReturnValueOnce(query({ workspace_id: 'workspace-1' }))
+      .mockReturnValueOnce(query({
+        shot_id: 'shot-1',
+        dynamic_spec: {},
+        character_appearance_keys: { 'char-1': 'young' },
+        storyboard_image: PRODUCTION_STORYBOARD_IMAGE,
+      }))
+      .mockReturnValue(query(null))
+    mocks.reserveTake.mockResolvedValueOnce({ ok: false, status: 402, error: 'stop here' })
+
+    const response = await POST(request())
+
+    expect(response.status).not.toBe(409)
+    expect(mocks.reserveTake).toHaveBeenCalledTimes(1)
+  })
+
+  it('#ref-gate: frames 없는 단일 이미지 구버전(url 만)도 실사로 인정한다', async () => {
+    mocks.from.mockReset()
+    mocks.from
+      .mockReturnValueOnce(query({ workspace_id: 'workspace-1' }))
+      .mockReturnValueOnce(query({
+        shot_id: 'shot-1',
+        dynamic_spec: {},
+        character_appearance_keys: { 'char-1': 'young' },
+        storyboard_image: { url: 'https://storage.test/shot-1_storyboard_image.png', status: 'completed', errorMessage: null, generatedAt: 1 },
+      }))
+      .mockReturnValue(query(null))
+    mocks.reserveTake.mockResolvedValueOnce({ ok: false, status: 402, error: 'stop here' })
+
+    const response = await POST(request())
+
+    expect(response.status).not.toBe(409)
+    expect(mocks.reserveTake).toHaveBeenCalledTimes(1)
   })
 
   it('reserves a new take and persists the provider-authoritative request', async () => {
