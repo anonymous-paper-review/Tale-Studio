@@ -161,6 +161,43 @@ const NANO_BANANA_EDIT_FIELDS = [
   'limit_generations',
 ] as const
 
+// fal-ai/nano-banana-2 (Google Gemini 3.1 Flash Image) text-to-image schema (fal 문서 2026-09-02 실측).
+//   aspect_ratio(auto·21:9~1:8) + resolution(0.5K/1K/2K/4K, 기본 1K). image_size 없음.
+const NANO_BANANA_2_FIELDS = [
+  'prompt',
+  'num_images',
+  'seed',
+  'aspect_ratio',
+  'output_format',
+  'safety_tolerance',
+  'sync_mode',
+  'system_prompt',
+  'resolution',
+  'limit_generations',
+  'enable_web_search',
+  'thinking_level',
+] as const
+
+// fal-ai/nano-banana-2/edit image-to-image schema. References are image_urls (up to 14); video/audio/pdf refs also exist.
+const NANO_BANANA_2_EDIT_FIELDS = [
+  'prompt',
+  'image_urls',
+  'num_images',
+  'seed',
+  'aspect_ratio',
+  'output_format',
+  'safety_tolerance',
+  'sync_mode',
+  'system_prompt',
+  'resolution',
+  'video_url',
+  'audio_url',
+  'pdf_url',
+  'limit_generations',
+  'enable_web_search',
+  'thinking_level',
+] as const
+
 // fal-ai/bytedance/seedream/v4/text-to-image schema. Uses image_size (min 960², max 4096²).
 const SEEDREAM_V4_T2I_FIELDS = [
   'prompt',
@@ -210,6 +247,8 @@ export const FAL_INPUT_ALLOWLIST: Record<string, Set<string>> = {
 
   'fal-ai/nano-banana': fieldSet(NANO_BANANA_FIELDS),
   'fal-ai/nano-banana/edit': fieldSet(NANO_BANANA_EDIT_FIELDS),
+  'fal-ai/nano-banana-2': fieldSet(NANO_BANANA_2_FIELDS),
+  'fal-ai/nano-banana-2/edit': fieldSet(NANO_BANANA_2_EDIT_FIELDS),
   'fal-ai/bytedance/seedream/v4/text-to-image': fieldSet(SEEDREAM_V4_T2I_FIELDS),
   'fal-ai/bytedance/seedream/v4/edit': fieldSet(SEEDREAM_V4_EDIT_FIELDS),
 }

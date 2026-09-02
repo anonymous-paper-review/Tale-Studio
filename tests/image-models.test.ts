@@ -36,8 +36,16 @@ describe('image-models 레지스트리', () => {
     expect(IMAGE_MODEL_ORDER[0]).toBe(DEFAULT_IMAGE_MODEL)
   })
 
+  it('#owner-default(2026-09-02): 기본 모델은 nano-banana-2, 1세대는 선택지로 남는다', () => {
+    expect(DEFAULT_IMAGE_MODEL).toBe('nano-banana-2')
+    expect(IMAGE_MODELS['nano-banana-2'].t2iEndpoint).toBe('fal-ai/nano-banana-2')
+    expect(IMAGE_MODELS['nano-banana-2'].editEndpoint).toBe('fal-ai/nano-banana-2/edit')
+    expect(isImageModelKey('nano-banana')).toBe(true)
+  })
+
   it('normalizeImageModelKey: 유효 키·레거시 endpoint·미상 처리', () => {
     expect(normalizeImageModelKey('nano-banana')).toBe('nano-banana')
+    expect(normalizeImageModelKey('fal-ai/nano-banana-2/edit')).toBe('nano-banana-2')
     expect(normalizeImageModelKey('openai/gpt-image-2/edit')).toBe('gpt-image-2') // 레거시 endpoint 흡수
     expect(normalizeImageModelKey('fal-ai/nano-banana')).toBe('nano-banana')
     expect(normalizeImageModelKey(undefined)).toBe(DEFAULT_IMAGE_MODEL)
@@ -54,11 +62,20 @@ describe('image-models 레지스트리', () => {
   it('imageModelSupportsReference: editEndpoint 유무를 반영', () => {
     expect(imageModelSupportsReference('gpt-image-2')).toBe(true)
     expect(imageModelSupportsReference('nano-banana')).toBe(true)
+    expect(imageModelSupportsReference('nano-banana-2')).toBe(true)
     expect(imageModelSupportsReference('seedream-4')).toBe(true)
     expect(imageModelSupportsReference('flux-2-klein')).toBe(false) // 순수 T2I
   })
 
   it('resolveImageEndpoint: reference 있으면 edit, 없으면 t2i', () => {
+    expect(resolveImageEndpoint('nano-banana-2', true)).toEqual({
+      endpoint: 'fal-ai/nano-banana-2/edit',
+      isEdit: true,
+    })
+    expect(resolveImageEndpoint('nano-banana-2', false)).toEqual({
+      endpoint: 'fal-ai/nano-banana-2',
+      isEdit: false,
+    })
     expect(resolveImageEndpoint('gpt-image-2', true)).toEqual({
       endpoint: 'openai/gpt-image-2/edit',
       isEdit: true,
@@ -87,6 +104,7 @@ describe('시트 지오메트리 계약 경로 (#sheet-model-guard 2026-09-01)',
     // 실측 3e0169eb: nano-banana 가 2880×1280 요청에 1024² 를 반환해 그리드 18/18 전멸.
     expect(resolveSheetImageModel(null)).toBe('gpt-image-2')
     expect(resolveSheetImageModel('nano-banana')).toBe('gpt-image-2')
+    expect(resolveSheetImageModel('nano-banana-2')).toBe('gpt-image-2') // resolution 등급만 있고 픽셀 캔버스 없음
     expect(resolveSheetImageModel('grok-imagine')).toBe('gpt-image-2')
     expect(resolveSheetImageModel('flux-2-klein')).toBe('gpt-image-2') // edit 미지원 — 시트 repaint 불가
   })

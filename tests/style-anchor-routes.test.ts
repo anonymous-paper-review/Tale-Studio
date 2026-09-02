@@ -16,9 +16,9 @@ const mocks = vi.hoisted(() => ({
   templateAssetUrl: vi.fn(),
   from: vi.fn(),
   webhookBaseUrl: 'https://base.test' as string | null,
-  // #owner-default(2026-08-31): generate-sheet 는 image-models.ts 의 DEFAULT_IMAGE_MODEL(nano-banana) 를 쓁다.
+  // #owner-default(2026-09-02): generate-sheet 는 image-models.ts 의 DEFAULT_IMAGE_MODEL(nano-banana-2) 를 쓴다.
   //   generate-storyboard 는 여전히 @/lib/writer/llm/fal 의 DEFAULT_EDIT_IMAGE_MODEL(gpt-image-2/edit) 를 쓰므로 둘 다 유지.
-  DEFAULT_IMAGE_MODEL: 'fal-ai/nano-banana',
+  DEFAULT_IMAGE_MODEL: 'fal-ai/nano-banana-2',
   DEFAULT_EDIT_IMAGE_MODEL: 'openai/gpt-image-2/edit',
 }))
 
@@ -239,14 +239,14 @@ describe('style-anchor route integration', () => {
     const expectedPrompt = `${STYLE_ANCHOR_CLAUSE}\n${STYLE_ANCHOR_TEMPLATE_CLAUSE}\n${buildCharacterTurnaroundPrompt(sheetPromptInput(character, designTokens))}`
     expect(response.status).toBe(200)
     expect(firstFalOpts()).toEqual({
-      model: 'fal-ai/nano-banana/edit',
+      model: 'fal-ai/nano-banana-2/edit',
       prompt: expectedPrompt,
       reference_image_urls: [ANCHOR_URL, TEMPLATE_URL],
       webhookUrl: WEBHOOK_URL,
       aspect_ratio: '16:9',
     })
     expect(firstGenerationJobArg().inputSnapshot).toMatchObject({
-      model: 'fal-ai/nano-banana/edit',
+      model: 'fal-ai/nano-banana-2/edit',
       prompt: expectedPrompt,
       reference_image_urls: [ANCHOR_URL, TEMPLATE_URL],
       aspect_ratio: '16:9',
@@ -357,8 +357,8 @@ describe('style-anchor route integration', () => {
 
     expect(response.status).toBe(200)
     expect(firstFalOpts()).toEqual({
-      // #owner-default(2026-08-31): 이 경로는 image-models.ts 의 resolveImageEndpoint 를 거치므로 DEFAULT_IMAGE_MODEL(nano-banana)의 edit 갈래.
-      model: 'fal-ai/nano-banana/edit',
+      // #owner-default(2026-08-31): 이 경로는 image-models.ts 의 resolveImageEndpoint 를 거치므로 DEFAULT_IMAGE_MODEL(nano-banana-2)의 edit 갈래.
+      model: 'fal-ai/nano-banana-2/edit',
       prompt: buildCharacterViewPrompt(sheetPromptInput(character, designTokens), 'back'),
       reference_image_urls: ['https://img/main.png'],
       webhookUrl: WEBHOOK_URL,

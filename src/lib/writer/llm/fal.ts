@@ -122,6 +122,8 @@ function isFluxFamilyModel(model: string): boolean {
 // nano-banana 계열(#nano-banana 2026-08-31): Google 이미지 모델의 fal 경로.
 //   T2I 는 prompt+aspect_ratio, /edit 는 prompt+image_urls 만 받는다 — image_size·
 //   negative_prompt·seed 는 스키마에 없어 보내면 422 (grok 과 같은 방어 규칙).
+//   fal-ai/nano-banana-2(#owner-default 2026-09-02, Gemini 3.1)도 같은 접두라 같은 분기를 탄다 —
+//   resolution(0.5K~4K) 필드가 더 있지만 보내지 않으면 기본 1K 로 1세대와 같은 급.
 function isNanoBananaModel(model: string): boolean {
   return model.startsWith('fal-ai/nano-banana');
 }
@@ -134,6 +136,7 @@ function isNanoBananaModel(model: string): boolean {
 const EDIT_VARIANT_BY_MODEL: Record<string, string> = {
   'openai/gpt-image-2': 'openai/gpt-image-2/edit',
   'fal-ai/nano-banana': 'fal-ai/nano-banana/edit',
+  'fal-ai/nano-banana-2': 'fal-ai/nano-banana-2/edit',
 };
 
 /** Consumed by src/lib/style-anchor.ts for Rule M model normalization. */

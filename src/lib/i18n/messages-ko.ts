@@ -715,7 +715,9 @@ export const KO: Record<string, string> = {
   'This model has no reference support — character identity may drift.':
     '이 모델은 참조 이미지를 지원하지 않아 캐릭터 얼굴이 흔들릴 수 있어요.',
   'OpenAI · crisp typography, reliable identity': 'OpenAI · 또렷한 글자, 안정적인 얼굴',
-  'Google Gemini · strong character consistency': 'Google Gemini · 캐릭터 일관성이 강함',
+  'Google Gemini 3.1 · strong character consistency, up to 14 references':
+    'Google Gemini 3.1 · 캐릭터 일관성이 강함, 참조 최대 14장',
+  'Google Gemini 2.5 · previous generation': 'Google Gemini 2.5 · 이전 세대',
   'ByteDance · high-res, rich editing': 'ByteDance · 고해상, 편집에 강함',
   'Black Forest Labs · fast & cheap, no reference': 'Black Forest Labs · 빠르고 저렴, 참조 미지원',
   Assets: '에셋',

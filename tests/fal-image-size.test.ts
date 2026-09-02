@@ -68,6 +68,19 @@ describe('buildFalImageInput — 신규 fal 이미지 모델(nano-banana / seedr
     expect('aspect_ratio' in input).toBe(false)
   })
 
+  it('nano-banana-2 t2i(#owner-default 2026-09-02): 1세대와 같은 분기 — prompt+aspect_ratio 만', () => {
+    const input = buildFalImageInput({ prompt: 'p', aspect_ratio: '3:2', seed: 7, negative_prompt: 'x' }, 'fal-ai/nano-banana-2')
+    expect(input).toEqual({ prompt: 'p', aspect_ratio: '3:2' })
+  })
+
+  it('nano-banana-2 edit: prompt+image_urls 만 (aspect_ratio 생략 → 템플릿·레퍼런스 비율 추종)', () => {
+    const input = buildFalImageInput(
+      { prompt: 'p', aspect_ratio: '16:9', reference_image_urls: ['tpl.png', 'face.png'] },
+      'fal-ai/nano-banana-2/edit',
+    )
+    expect(input).toEqual({ prompt: 'p', image_urls: ['tpl.png', 'face.png'] })
+  })
+
   it('seedream t2i: image_size 사용, aspect_ratio 는 preset 으로 유도(스키마에 aspect_ratio 없음)', () => {
     const input = buildFalImageInput({ prompt: 'p', aspect_ratio: '16:9' }, SEEDREAM)
     expect(input.image_size).toBe('landscape_16_9')

@@ -71,9 +71,9 @@ const WRITER_SHOT_ID = 'writer-shot-1'
 const WEBHOOK_URL = 'https://hook.test/webhook'
 const BASE_URL = 'https://base.test'
 const TEMPLATE_URL = `${BASE_URL}/character-template.png`
-// #owner-default(2026-08-31): generate-sheet 는 image-models.ts 의 DEFAULT_IMAGE_MODEL(nano-banana) 로 엔드포인트를 고른다.
-const DEFAULT_IMAGE_MODEL = 'fal-ai/nano-banana'
-const DEFAULT_EDIT_IMAGE_MODEL = 'fal-ai/nano-banana/edit'
+// #owner-default(2026-09-02): generate-sheet 는 image-models.ts 의 DEFAULT_IMAGE_MODEL(nano-banana-2) 로 엔드포인트를 고른다.
+const DEFAULT_IMAGE_MODEL = 'fal-ai/nano-banana-2'
+const DEFAULT_EDIT_IMAGE_MODEL = 'fal-ai/nano-banana-2/edit'
 
 interface DesignTokens {
   l1?: {

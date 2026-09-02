@@ -17,7 +17,8 @@
 //   openai/gpt-image-2/edit 로 되돌린다 — 그래서 editEndpoint 는 반드시 '/edit' 로 끝나야 존중된다.
 //
 // canvas 파라미터(모델 스키마 실측, fal llms.txt 기준):
-//   - aspect_ratio 계열: nano-banana(t2i·edit), openai/gpt-image-2(레거시 — 실제로는 image_size지만
+//   - aspect_ratio 계열: nano-banana-2(t2i·edit, resolution 0.5K~4K 등급만 있고 정확한 픽셀 캔버스는 없음),
+//     nano-banana(t2i·edit), openai/gpt-image-2(레거시 — 실제로는 image_size지만
 //     기존 라우트가 aspect_ratio 를 넘겨도 무해히 무시되는 검증된 경로라 그대로 둔다).
 //   - image_size 계열: seedream v4(t2i·edit), flux-2 klein.
 //   - grok-imagine 은 fal.ts 가 prompt+image_urls 만 보내는 전용 분기라 canvas 값을 쓰지 않는다.
@@ -28,6 +29,7 @@
 
 export type ImageModelKey =
   | 'gpt-image-2'
+  | 'nano-banana-2'
   | 'nano-banana'
   | 'seedream-4'
   | 'flux-2-klein'
@@ -53,7 +55,8 @@ export interface ImageModelSpec {
 }
 
 // #owner-default(2026-08-31): Artist 기본 이미지 모델을 nano-banana 로 변경(오너 지시).
-export const DEFAULT_IMAGE_MODEL: ImageModelKey = 'nano-banana'
+// #owner-default(2026-09-02): nano-banana-2(Gemini 3.1 Flash Image) 로 교체(오너 지시). 1세대는 선택지로 남긴다.
+export const DEFAULT_IMAGE_MODEL: ImageModelKey = 'nano-banana-2'
 
 export const IMAGE_MODELS: Record<ImageModelKey, ImageModelSpec> = {
   'gpt-image-2': {
@@ -65,10 +68,20 @@ export const IMAGE_MODELS: Record<ImageModelKey, ImageModelSpec> = {
     canvas: 'aspect_ratio',
     pricePerImage: null,
   },
+  'nano-banana-2': {
+    key: 'nano-banana-2',
+    label: 'Nano Banana 2',
+    description: 'Google Gemini 3.1 · strong character consistency, up to 14 references',
+    t2iEndpoint: 'fal-ai/nano-banana-2',
+    editEndpoint: 'fal-ai/nano-banana-2/edit',
+    canvas: 'aspect_ratio',
+    // fal 표기 $0.08/장(1K 기준; 2K ×1.5, 4K ×2). 라우트는 resolution 을 보내지 않아 기본 1K.
+    pricePerImage: 0.08,
+  },
   'nano-banana': {
     key: 'nano-banana',
     label: 'Nano Banana',
-    description: 'Google Gemini · strong character consistency',
+    description: 'Google Gemini 2.5 · previous generation',
     t2iEndpoint: 'fal-ai/nano-banana',
     editEndpoint: 'fal-ai/nano-banana/edit',
     canvas: 'aspect_ratio',
@@ -106,6 +119,7 @@ export const IMAGE_MODELS: Record<ImageModelKey, ImageModelSpec> = {
 
 /** 팝업/채팅/패널에 노출하는 순서 (기본 모델 먼저). */
 export const IMAGE_MODEL_ORDER: ImageModelKey[] = [
+  'nano-banana-2',
   'nano-banana',
   'gpt-image-2',
   'seedream-4',
@@ -137,7 +151,7 @@ export function imageModelSupportsReference(key: ImageModelKey): boolean {
 
 // ── 시트 지오메트리 계약 경로(#sheet-model-guard 2026-09-01) ──
 // 러프/실사 시트 repaint(스트립·그리드)는 **정확한 픽셀 캔버스**(예: 2880×1280)를 요구한다 —
-// finalize 가 반환 치수를 계약 검증하므로, aspect_ratio 방식 모델(nano-banana 등 고정 ~1024²)이
+// finalize 가 반환 치수를 계약 검증하므로, aspect_ratio 방식 모델(nano-banana·nano-banana-2 등 고정 ~1024²)이
 // 들어오면 전 잡이 '계약 위반(요청 2880x1280, 반환 1024x1024)'으로 죽는다(실측 3e0169eb 18/18).
 // 자격 = image_size 를 실제로 존중 + edit(레퍼런스) 지원. gpt-image-2 는 canvas 표기가 legacy
 // aspect_ratio 지만 image_size 를 수락하는 검증된 시트 경로다(완료 239건 실측).

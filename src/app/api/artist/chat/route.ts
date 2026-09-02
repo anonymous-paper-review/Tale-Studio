@@ -45,7 +45,7 @@ Every image generation call is billed. Emit regenerate actions ONLY when the use
    - role / description / appearance 는 선택. 사용자가 새 캐릭터를 원할 때 사용.
 2. {"type":"regenerateCharacter","characterId":"<id>","views":["main","back","sideLeft","sideRight"],"model":"<image-model>"}
    - views 선택 (생략 = 4뷰 전체 재생성). context 의 정확한 id 사용.
-   - model 선택 (생략 = 기본 nano-banana). 사용자가 이미지 생성기를 지정할 때만 <image-models> 의 키로 전달.
+   - model 선택 (생략 = 기본 nano-banana-2). 사용자가 이미지 생성기를 지정할 때만 <image-models> 의 키로 전달.
 3. {"type":"regenerateWorldAsset","locationId":"<id>"}
    - context 의 정확한 id 사용.
 4. {"type":"createAppearance","characterId":"<id>","label":"...","appearance":"외형 prose","narrativeTime":"present"|"past"|"future"}
@@ -57,8 +57,9 @@ Every image generation call is billed. Emit regenerate actions ONLY when the use
 </actions>
 
 <image-models>
-regenerateCharacter 의 선택적 model 필드로 이미지 생성기를 고른다. 사용자가 모델을 명시할 때만 넣어라(생략 시 기본 nano-banana). 임의로 바꾸지 마라.
-- nano-banana — Google Gemini. 기본값. 캐릭터 일관성이 강함. (사용자 표현: "nano banana", "나노바나나", "제미나이", "구글")
+regenerateCharacter 의 선택적 model 필드로 이미지 생성기를 고른다. 사용자가 모델을 명시할 때만 넣어라(생략 시 기본 nano-banana-2). 임의로 바꾸지 마라.
+- nano-banana-2 — Google Gemini 3.1. 기본값. 캐릭터 일관성이 강함, 참조 최대 14장. (사용자 표현: "nano banana 2", "나노바나나2", "나노바나나", "제미나이", "구글")
+- nano-banana — Google Gemini 2.5, 이전 세대. 사용자가 1세대·구버전을 콕 집을 때만. (사용자 표현: "nano banana 1", "나노바나나1", "옛날 나노바나나")
 - gpt-image-2 — OpenAI. 선명한 글자·안정적 정체성. (사용자 표현: "gpt", "지피티", "오픈ai")
 - seedream-4 — ByteDance. 고해상·편집 강함. (사용자 표현: "seedream", "시드림", "바이트댄스")
 - flux-2-klein — Black Forest Labs. 빠르고 저렴하나 정체성 참조(reference) 미지원이라 얼굴이 흔들릴 수 있음. (사용자 표현: "flux", "플럭스", "klein")
@@ -108,11 +109,11 @@ The JSON block (if any) MUST be the LAST element in the response.
 
 <example>
 <user>char_woman 나노바나나로 다시 뽑아줘</user>
-<assistant>char_woman을 Nano Banana 모델로 재생성합니다.
+<assistant>char_woman을 Nano Banana 2 모델로 재생성합니다.
 
 \`\`\`json
 {"updates":[
-  {"type":"regenerateCharacter","characterId":"char_woman","model":"nano-banana"}
+  {"type":"regenerateCharacter","characterId":"char_woman","model":"nano-banana-2"}
 ]}
 \`\`\`</assistant>
 </example>

@@ -73,7 +73,7 @@ export async function POST(req: Request) {
         traceId?: string
         model?: string // 이미지 생성 모델 선택(image-models 레지스트리 키). 미지정/미상은 기본 모델.
       }
-    // 선택 모델 정규화 — 유효하지 않으면 기본(DEFAULT_IMAGE_MODEL, #owner-default 2026-08-31: nano-banana).
+    // 선택 모델 정규화 — 유효하지 않으면 기본(DEFAULT_IMAGE_MODEL, #owner-default 2026-09-02: nano-banana-2).
     //   reference 유무에 따라 아래에서 t2i/edit 갈래를 고른다.
     const modelKey = normalizeImageModelKey(modelInput)
     if (!projectId || !characterId || !appearanceKey || !view) {
