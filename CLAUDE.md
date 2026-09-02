@@ -21,18 +21,15 @@
 - 결제 워크스트림 원장: `.claude/docs/2026-09-01/` (phase-1~3 + fal 키 풀) · 전체 지도: `specs/payments-readiness.md`
   · 기획 안건: `specs/payments-planner-agenda.html`
 
-## 활성 실행 계약
+## vault 봉인 (2026-09-02)
 
-> 밤 루프(Orca automation)는 2026-09-01부로 **폐지** — 밤 계약(inbox 스냅샷 · `runs/` 아침 보고 ·
-> `feedback/` 소비)은 없다. `_NIGHT.md`는 `_archive/`로 이관했고, 어떤 새 작업도 밤 계약을 전제하지 않는다.
-
-- `.claude/vault/backlog/tickets/`는 티켓과 결과 카드의 원장이다. `ready`는 실행, `waiting`은 조건 확인,
-  `needs-owner`는 사람의 선택, `draft`는 닫힘 조건 보완이 필요하다.
-- `.claude/vault/_archive/`는 닫힌 기록과 폐지된 원문의 보관소다. live 입력이나 실행 의존성으로 쓰지 않는다.
+- 밤 루프(Orca automation)는 2026-09-01부로 폐지됐고, `.claude/vault/`는 2026-09-02부로 **봉인**했다.
+  티켓·inbox·아카이브·스크립트 전부 **읽지도 쓰지도 않는다**. `/warp`·`night-*` 스킬과 에이전트도 호출하지 않는다.
+  세션에서 남는 미결은 티켓으로 만들지 말고 대화에서 오너에게 직접 보고한다.
+- 다시 열 때는 오너가 이 절을 지우고 원장 문장을 되살린다.
 
 ## 판단과 연구
 
 - 그림·영상의 최종 품질 판정은 오너만 한다. 실행자는 원본·입력·시점·설정·비교 자료를 남긴다.
 - `research/`는 선택적인 로컬 실험 공간이다. 실험 규칙은 `.claude/rules/experiments.md`를 따르며,
   `map:dev`·`map:build`가 사용하는 `research/tools/writer-map`은 유지한다.
-- 세션 미결과 실측은 `/warp`로 티켓 또는 실험 기록에 붙인다. `/warp`는 inbox 원문을 대신 쓰지 않는다.

@@ -9,7 +9,6 @@
     "start": "next start --port 3000",
     "lint": "eslint",
     "test": "node scripts/test-suites.mjs core",
-    "test:all": "node scripts/test-suites.mjs all",
     "test:writer": "node scripts/test-suites.mjs writer",
     "test:producer": "node scripts/test-suites.mjs producer",
     "test:artist": "node scripts/test-suites.mjs artist",

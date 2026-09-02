@@ -102,9 +102,6 @@ parallel_dev/
 !.claude/hooks/*.sh
 # 스킬 부속 스크립트도 추적 (SKILL.md가 참조하는 bin/*.sh 등이 *.sh 전역 규칙에 삼켜지지 않게)
 !.claude/skills/**/*.sh
-# 야간 automation 부속도 추적 (orca --precheck 가 참조 — 사라지면 밤이 조용히 깨진다)
-!.claude/vault/backlog/*.sh
-!.claude/vault/night-*.sh
 docs/homepage_legacy/
 
 
@@ -194,20 +191,7 @@ lab/
 # 실험 뷰어 생성물 (viewer.mjs가 만드는 로컬 전용 인덱스)
 research/experiments/_viewer.html
 
-# 밤 러너 — git으로 나누는 것은 계약·실행 도구·설치 문서, 공유 inbox
-# (.claude/vault/inbox/<actor>.md — 각자 자기 파일에만 쓴다), 그리고 밤이 만든
-# 수리 branch 뿐이다. 결과물(runs/)은 전부 로컬이다.
-.claude/vault/_archive/
-.claude/vault/backlog/sweep/
-.claude/vault/backlog/tickets/
+# 폐지된 밤 루프의 로컬 산출물 (2026-09-02 vault 봉인 — 백업은 ~/Downloads/tale-studio-vault-2026-09-02.tar.gz)
 /feedback/
-
-# runs/ 는 전부 로컬이다 (2026-08-23 오너 결정 — 지금은 공유하지 않는다).
-# 사람 보고서·세션·기계 기록 모두 자기 컴퓨터에만 남는다.
 /runs/**
-
-# 밤 입력 snapshot은 로컬 검증용 immutable binding이다.
-# 사람용 archive와 consumption manifest는 `_archive/inbox/`에 따로 추적한다.
-.claude/vault/backlog/night-runtime/
-.claude/vault/inbox/*.lock
 .env*

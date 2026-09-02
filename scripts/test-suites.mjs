@@ -9,7 +9,6 @@ const TEST_ROOT = path.join(ROOT, 'tests')
 const TEST_FILE_RE = /\.test\.(?:ts|tsx)$/
 const MANUAL_RE = /\.manual\.test\.(?:ts|tsx)$/
 const EXPERIMENTAL_RE = /(?:_experiment|\.experiment)\.test\.(?:ts|tsx)$/
-const VAULT_RE = /(?:^|\/)vault-/
 
 async function collectTests(dir = TEST_ROOT) {
   const entries = await readdir(dir, { withFileTypes: true })
@@ -28,7 +27,6 @@ async function collectTests(dir = TEST_ROOT) {
 const isManual = (file) => MANUAL_RE.test(file)
 const isExperimental = (file) => EXPERIMENTAL_RE.test(file)
 const isAutomated = (file) => !isManual(file) && !isExperimental(file)
-const isProduct = (file) => isAutomated(file) && !VAULT_RE.test(file)
 
 const DOMAIN_PATTERNS = {
   writer:
@@ -47,40 +45,36 @@ const DOMAIN_PATTERNS = {
 
 const SUITES = {
   core: {
-    description: '제품 코드의 빠른 자동 회귀 테스트 — 수동·실험·Vault 운영 테스트 제외',
-    pick: isProduct,
-  },
-  all: {
-    description: '수동·실험 테스트를 제외한 전체 자동 테스트',
+    description: '제품 코드의 빠른 자동 회귀 테스트 — 수동·실험 테스트 제외',
     pick: isAutomated,
   },
   writer: {
     description: 'Writer 파이프라인·러프 previz·샷·단계 전환',
-    pick: (file) => isProduct(file) && DOMAIN_PATTERNS.writer.test(file),
+    pick: (file) => isAutomated(file) && DOMAIN_PATTERNS.writer.test(file),
   },
   producer: {
     description: 'Producer 입력·게이트·핸드오프·참조 가져오기',
-    pick: (file) => isProduct(file) && DOMAIN_PATTERNS.producer.test(file),
+    pick: (file) => isAutomated(file) && DOMAIN_PATTERNS.producer.test(file),
   },
   artist: {
     description: 'Artist 이미지·자산·출처·생성 실패 처리',
-    pick: (file) => isProduct(file) && DOMAIN_PATTERNS.artist.test(file),
+    pick: (file) => isAutomated(file) && DOMAIN_PATTERNS.artist.test(file),
   },
   director: {
     description: 'Director 캔버스·샷·영상 생성',
-    pick: (file) => isProduct(file) && DOMAIN_PATTERNS.director.test(file),
+    pick: (file) => isAutomated(file) && DOMAIN_PATTERNS.director.test(file),
   },
   editor: {
     description: 'Editor·내보내기·미디어 저장',
-    pick: (file) => isProduct(file) && DOMAIN_PATTERNS.editor.test(file),
+    pick: (file) => isAutomated(file) && DOMAIN_PATTERNS.editor.test(file),
   },
   security: {
     description: '권한·입력 경계·red-team 방어 회귀',
-    pick: (file) => isProduct(file) && DOMAIN_PATTERNS.security.test(file),
+    pick: (file) => isAutomated(file) && DOMAIN_PATTERNS.security.test(file),
   },
   reference: {
     description: '참조 프로젝트 가져오기 계약',
-    pick: (file) => isProduct(file) && DOMAIN_PATTERNS.reference.test(file),
+    pick: (file) => isAutomated(file) && DOMAIN_PATTERNS.reference.test(file),
   },
   manual: {
     description: '실제 API·Fal·라이브 스키마가 필요한 수동 테스트',
