@@ -547,10 +547,6 @@ function pickAssetImageUrl(reg: RegisteredCharacter | undefined): string | null 
 }
 
 /** Shot에 연결된 actor+world asset의 대표 이미지 URL을 모은다 (I2I 입력, 결정 #36) */
-function resolveShotAssetImages(data: ShotNodeData): string[] {
-  return resolveShotAssetRefs(data).urls
-}
-
 /** #asset-authority(2026-09-02 오너): 레퍼런스 배열은 [인물 시트..., 배경...] 순 — 서버가 역할별
  *  권위 절을 쓰려면 경계가 필요하다. 카운트를 URL 배열과 함께 보낸다. */
 function resolveShotAssetRefs(data: ShotNodeData): { urls: string[]; characterRefCount: number; worldRefCount: number } {
