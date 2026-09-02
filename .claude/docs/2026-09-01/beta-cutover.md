@@ -13,7 +13,7 @@
 | test-9f2d8640@tale.studio | (워크스페이스 미생성) | Notion 체크 | 08-31 로그인 |
 | test-9490a4d7@tale.studio | (워크스페이스 미생성) | Notion 체크 (기존계정 비번 리셋) | 최근 활동 없음 |
 | test-1c9dfc14@tale.studio | `f44a846b-1e9f-4c2a-b1a1-264ca193ff43` | Notion 체크 — **live 스모크 E2E 계정** | 잡 28 |
-| test-d8f28352@tale.studio | `ff37e493-5231-47ac-bb31-abb9c7da9e7f` | ⚠ Notion 미체크 · **실사용 발견** | 08-31 로그인 · 프로젝트 2 · 잡 28 |
+| test-d8f28352@tale.studio | `ff37e493-5231-47ac-bb31-abb9c7da9e7f` | 정정(09-02): **상주 env의 TALE_SMOKE 계정** — 베타 유저 아님, 스모크/운영 축(admin 처리) | 잡 28 = 스모크 활동 |
 | test-9b52b921@tale.studio | `299cd6fe-5dd1-424f-86db-2a4c1edb3e3d` | ⚠ Notion 미체크 · 실사용 발견 | 프로젝트 2 |
 | test-eb2da004@tale.studio | `24a64502-9d9b-49ee-9c0e-6329e3a390ed` | ⚠ Notion 미체크 · **헤비 유저** | 프로젝트 3 · **잡 230** |
 
