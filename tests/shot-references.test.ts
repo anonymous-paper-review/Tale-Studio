@@ -4,6 +4,7 @@ import {
   readCharacterBlocking,
   missingSheetsMessage,
   pairKey,
+  resolveSceneWorldRefs,
   stripUrlQuery,
   type ReferenceLookup,
 } from '@/lib/director/shot-references'
@@ -101,5 +102,25 @@ describe('readCharacterBlocking / stripUrlQuery', () => {
   it('캐시버스트 쿼리를 떼고 같은 객체를 판정한다', () => {
     expect(stripUrlQuery('https://x/a.png?v=123')).toBe('https://x/a.png')
     expect(stripUrlQuery('https://x/a.png')).toBe('https://x/a.png')
+  })
+})
+
+describe('resolveSceneWorldRefs (씬→배경)', () => {
+  it('scenes.location(location_id) 로 wide_shot 을 찾고, 없으면 locations.scene_id 로 폴백한다', () => {
+    const m = resolveSceneWorldRefs(
+      [
+        { scene_id: 'sc_01', location: 'location' },
+        { scene_id: 'sc_02', location: 'missing_loc' },
+        { scene_id: 'sc_03', location: null },
+      ],
+      [
+        { location_id: 'location', scene_id: null, wide_shot: 'https://x/loc_wide.png' },
+        { location_id: 'other', scene_id: 'sc_02', wide_shot: 'https://x/other_wide.png' },
+        { location_id: 'empty', scene_id: 'sc_03', wide_shot: '' },
+      ],
+    )
+    expect(m.get('sc_01')).toBe('https://x/loc_wide.png') // scenes.location 우선 (겨울_4 실측 형태: locations.scene_id 는 null)
+    expect(m.get('sc_02')).toBe('https://x/other_wide.png') // 폴백: locations.scene_id
+    expect(m.has('sc_03')).toBe(false) // wide_shot 없음
   })
 })

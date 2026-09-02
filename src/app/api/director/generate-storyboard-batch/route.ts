@@ -20,7 +20,7 @@ import {
   realSheetCanvas,
   type CharacterRefLabel,
 } from '@/lib/director/storyboard-strip'
-import { readCharacterBlocking } from '@/lib/director/shot-references'
+import { loadSceneWorldRefs, readCharacterBlocking } from '@/lib/director/shot-references'
 import { parseProjectFormat } from '@/types/project'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 import { storageKeySegment } from '@/lib/storage/key-segment'
@@ -155,16 +155,9 @@ export async function POST(req: NextRequest) {
     // #asset-authority(2026-09-02 오너 실측 bd5da55f: 떨어져 있던 바위가 샷 사이에서 합쳐짐): 그리드는
     //   지금까지 배경 레퍼런스를 아예 안 실었다(감사 W1). 씬 로케이션의 wide_shot 을 시트마다 첨부해
     //   지형·구조물의 권위를 artist 산출물에 둔다. 없으면(로케이션 미생성) 종전대로.
-    const { data: locRows } = await supabaseAdmin
-      .from('locations')
-      .select('scene_id, wide_shot')
-      .eq('project_id', projectId)
-      .in('scene_id', sceneIds)
-    const worldRefByScene = new Map<string, string>()
-    for (const l of locRows ?? []) {
-      const url = typeof l.wide_shot === 'string' ? l.wide_shot.trim() : ''
-      if (url && typeof l.scene_id === 'string' && !worldRefByScene.has(l.scene_id)) worldRefByScene.set(l.scene_id, url)
-    }
+    //   #ref-gate 수정: 씬→로케이션은 scenes.location(location_id) 이 진실 — locations.scene_id 만 보던 첫 배선은
+    //   실측 전 프로젝트에서 null 이라 배경을 한 번도 못 붙였다. 공용 헬퍼(scenes.location 우선, scene_id 폴백).
+    const worldRefByScene = await loadSceneWorldRefs(projectId, sceneIds)
     // 인물 조회는 호출 전체 1회(쿼리 절약)로 두되 맵으로 보관 — 레퍼런스는 **시트별로** 꺼낸다
     //   (#real-grid-identity 2026-08-12): 옛 코드는 호출 전체(최대 2시트)의 합집합을 익명 URL
     //   배열로 모든 시트에 실었다. 그 시트에 안 나오는 인물의 레퍼런스가 오염원으로 첨부되고,
