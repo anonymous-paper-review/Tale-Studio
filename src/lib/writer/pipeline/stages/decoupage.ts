@@ -85,7 +85,11 @@ const CAMERA_CONTRACT_RELAXED_V3 = `== 카메라 규율 ==
   **기본은** 시선을 따라가는 팬·틸트·줌아웃(motivated_move, 동기="X의 시선을 따라 Y를 드러낸다").
   대상이 다른 공간일 때만 static 으로 두고 다음 샷을 reveal/pov 로 added 하라(#coverage-first).
   (실측: '눈을 뜨며 주위를 살핀다' → static → 두 수장 마스터 샷 점프 = 관객이 시선의 연결을 잃는다.)
-- 감정이 강하거나 인물이 서두른다는 이유만으로 push-in하지 마라.
+- 감정이 강하다는 이유만으로 push-in하지 마라 — 단, 긴 샷(≥5s)에서 긴장이 **축적**되는 동안의 느린
+  dolly_in 은 동기가 있다.
+- static 은 기본값이 아니다(#static-bias 2026-09-02 실측: 샷의 54~68% 가 static): 씬 energy 가
+  breathing/kinetic 이면 연속 3샷이 모두 static 인 구간을 두지 마라 — 시선·이동·공간 리빌 중 하나는
+  무브로 찍는다.
 - motion 비트와 static 비트를 한 샷에 합칠 때 static 비트는 이동의 추가 근거가 아니다.
   두 비트의 카메라 처리가 다르면 가능하면 split하라.
 - 동기가 있으면 크기도 그 동기에 맞춰라: 질주를 최소 움직임으로 축소하지 마라.`;

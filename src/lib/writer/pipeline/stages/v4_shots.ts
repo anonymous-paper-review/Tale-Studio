@@ -425,12 +425,15 @@ async function generateL4ForScene(
 짧은 영상(D1~D3)이라 씬 비주얼 플랜 단계가 생략됨.
 디시플린을 V4 자체에서 결정한다:
 - lens_mm: 50mm 기본, 필요 시 35/85 변주 (씬 내 1~2종으로 제한)
-- camera_motion.type: 짧은 영상은 단순/안정 우선 (static or handheld_drift 위주)
+- camera_motion.type: 동기가 있으면 움직인다 — 시선 리빌(pan/tilt/zoom_out)·인물 이동 동반(tracking)·긴장 축적(느린 dolly_in). static 은 사건이 프레임 안에서 완결될 때의 선택이지 기본값이 아니다(#static-bias 2026-09-02 실측: 샷의 54~68% 가 static).
 - color_temp_kelvin: 씬 시간대/무드에 맞춰 일관 유지
 - key_fill_ratio: 4:1 기본 (드라마틱) 또는 2:1 (자연)
 - 샷 개수: 액션 예산에 따라 자동
 - 시선/180°축: 대화 씬이면 자체적으로 일관 유지`
     : `[일반 모드 — V3 디시플린 준수]
+- **static 은 기본값이 아니다** (#static-bias 2026-09-02 실측: 샷의 54~68% 가 static): 샷마다 "카메라가
+  움직일 동기가 있는가"를 먼저 묻고, 시선 리빌·인물 이동·공간 드러내기·긴장 축적은 동기다. 데쿠파주
+  camera_intent=motivated_move 는 반드시 실제 무브 타입으로 옮긴다.
 - lens_mm은 반드시 V3.lens_vocabulary 안에서 선택
 - camera_motion.type은 V3.camera_mounting + camera_energy에 부합
   · tripod + static → 'static'만

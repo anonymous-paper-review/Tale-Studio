@@ -224,3 +224,28 @@ describe('detectCoverageGapIssues — 커버리지 결함 검출 (#coverage-firs
     expect(detectCoverageGapIssues([makeShot({ id: 's1', dur: 5 })], scenes, characters)).toHaveLength(0)
   })
 })
+
+describe('detectCoverageGapIssues — 이름 머리명사 매칭 (리뷰 §3 2차)', () => {
+  it('"전당포 노인" 캐릭터가 산문의 "노인이"로, "추적자들"이 "추적자가"로 잡힌다', () => {
+    const scenes = {
+      scenes: [{
+        scene_id: 'scene_1',
+        characters_in_scene: ['pawnbroker', 'girl', 'hunters'],
+        scene_actions: ['노인이 귀찮은 듯 돋보기 안경을 고쳐 쓰며 소녀에게 손을 내민다.', '추적자가 문을 부수고 들어온다.'],
+      }],
+    } as never as import('@/lib/writer/types/pipeline').Scenes
+    const characters = {
+      characters: [{ id: 'pawnbroker', name: '전당포 노인' }, { id: 'girl', name: '소녀' }, { id: 'hunters', name: '오아시스 추적자들' }],
+    } as never as import('@/lib/writer/types/pipeline').Characters
+    const shot = (id: string, beats: number[]) => ({
+      ...makeShot({ id, dur: 5 }),
+      source_beats: beats,
+      shot_function: 'action',
+    }) as never as import('@/lib/writer/types/pipeline').ShotSequenceItem
+    const issues = detectCoverageGapIssues([shot('s1', [0]), shot('s2', [1])], scenes, characters)
+    // beat 0: 노인+소녀 다인 비트, 반응 없음 → 경고 / beat 1: 추적자 단독 → 무경고
+    expect(issues).toHaveLength(1)
+    expect(issues[0].location).toBe('s1')
+    expect(issues[0].message).toContain('pawnbroker, girl')
+  })
+})

@@ -396,7 +396,11 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
   // #v2-cell-dedup: rich dynamicSpec 이 없으면 previz 카메라 자유서술이 MOTION 재료 —
   //   이게 없으면 V2 샷 전부가 'static hold' 로 균질화된다.
   const pvzCam = !dyn && pvz?.camera ? `camera: ${stripColor(pvz.camera)}` : null
-  const motionParts = [camMove, pvzCam, ...charMoves, ...gazeMoves].filter(Boolean) as string[]
+  // #direction-unify(2026-09-02): writer 의 연출 프로즈(motion_prompt)를 DIRECTION 재료에 싣는다 —
+  //   동사 목록만으로는 "고개를 돌려 주위를 훑는다" 같은 의도가 빠졌다(실측 sh_01_02).
+  const mpRaw = (dyn as { motion_prompt?: unknown } | undefined)?.motion_prompt
+  const motionProse = typeof mpRaw === 'string' && mpRaw.trim() ? `intent: ${stripColor(mpRaw.trim()).slice(0, 160)}` : null
+  const motionParts = [camMove, pvzCam, ...charMoves, ...gazeMoves, motionProse].filter(Boolean) as string[]
   // 샷 길이(초) 상속(#rough-grid duration, 2026-07-22): START↔END 변화량의 기준 —
   //   없으면 모델이 미세한 변화만 그리는 경향(실측). rich(intent) 우선, DB 폴백.
   const dur = input.spec?.intent?.duration_seconds ?? input.durationSeconds ?? null

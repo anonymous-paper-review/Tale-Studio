@@ -495,7 +495,7 @@ export async function POST(req: Request) {
       // #motion-contract: dynamic_spec(모션 계약 소스) + design_ref(구버전 state 폴백 조인 키) 동봉.
       standalone
         ? Promise.resolve({ data: null, error: null })
-        : supabaseAdmin.from('shots').select('shot_id, dynamic_spec, design_ref, dialogue_lines, character_appearance_keys').eq('project_id', projectId).eq('shot_id', writerShotId).maybeSingle(),
+        : supabaseAdmin.from('shots').select('shot_id, dynamic_spec, design_ref, dialogue_lines, character_appearance_keys, prompt').eq('project_id', projectId).eq('shot_id', writerShotId).maybeSingle(),
     ])
     if (projectError) throw projectError
     if (shotError) throw shotError
@@ -636,6 +636,20 @@ export async function POST(req: Request) {
     //   캐릭터를 이름 없이 외형으로만 묘사하므로 이름만으로는 화면 속 누구인지 알 수 없다.
     //   대사에 characterId 가 실제로 있을 때만 조회(무대사 샷 비용 0·테스트 목 순서 불변),
     //   실패는 fail-open — 화자 표기는 정확도 보조지 유료 생성의 성립 조건이 아니다.
+    // #direction-unify(2026-09-02 오너 실측 sh_01_02): 영상의 장면 프로즈가 shots.prompt = **첫 프레임 묘사**
+    //   ("lying motionlessly, eyes closed")라 모션 계약과 싸우며 정지를 부추겼고, writer 의 연출 프로즈
+    //   (dynamic_spec.motion_prompt — "opens eyes and turns head to scan")는 previz·영상 어디에도 안 실렸다.
+    //   사용자가 프롬프트를 덮어쓰지 않았을 때(body == shots.prompt)만 motion_prompt 를 앞에 싣는다.
+    const writerMotionPrompt = (() => {
+      const mp = (shot?.dynamic_spec as { motion_prompt?: unknown } | null | undefined)?.motion_prompt
+      return typeof mp === 'string' && mp.trim() ? mp.trim() : null
+    })()
+    const promptIsStoredComposition =
+      !standalone && typeof shot?.prompt === 'string' && shot.prompt.trim() === prompt.trim()
+    const promptForVideo =
+      writerMotionPrompt && promptIsStoredComposition && !promptEn.includes(writerMotionPrompt)
+        ? `${writerMotionPrompt} ${promptEn}`
+        : promptEn
     const dialogueLines = !standalone && Array.isArray(shot!.dialogue_lines) ? (shot!.dialogue_lines as DialogueLine[]) : null
     let dialogueSpeakers: Record<string, DialogueSpeaker> | null = null
     const speakerIds = [...new Set(
@@ -675,7 +689,7 @@ export async function POST(req: Request) {
       }))
     }
     const { fullPrompt, prompt_parts: promptParts } = buildVideoPrompt({
-      prompt: promptEn,
+      prompt: promptForVideo, // #direction-unify
       camera,
       movementPreset,
       cameraPreset: suppressGear ? null : cameraPreset,

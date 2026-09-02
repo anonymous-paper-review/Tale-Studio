@@ -187,7 +187,9 @@ export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: st
   if (modelKey === 'veo' && durationSeconds < 8) {
     const blackInstruction = `Show the described action only for the first ${durationSeconds} seconds; after ${durationSeconds}s the frame must be a completely black screen — no subject, no motion — until the video ends.`
     prompt_parts.black = blackInstruction
-    return { fullPrompt: `${fullPrompt} ${blackInstruction}`.slice(0, contract.text ? 1400 : 1000), prompt_parts }
+    // 리뷰 R2: 옛 하드코딩 1400 이 캡 인상(1400/1650)과 함께 안 움직여 black 지시가 통째로 잘렸다.
+    //   black 지시는 기능 요구사항이라 항상 뒤에 붙인다(앞 본문은 이미 cap(+확장)으로 잘려 있다).
+    return { fullPrompt: `${fullPrompt} ${blackInstruction}`, prompt_parts }
   }
 
   return { fullPrompt, prompt_parts }

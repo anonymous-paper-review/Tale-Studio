@@ -228,7 +228,9 @@ async function runLaneVisual(
     //   수백 초의 유료 호출이다. 양보하면 다음 인보케이션이 예산 전체를 쥐고 shotCheck 를 시작한다.
     // #coverage-first 리뷰 M5: 고정 160s 는 샷 수와 무관했다 — 커버리지로 샷이 늘면 판단이 틀린다.
     //   실측(87~154s / 15~25샷, 최대 278s) 기준 샷당 6s, 바닥 160s.
-    const EST_SHOTCHECK_MS = Math.max(160_000, (s.shotDesign?.length ?? 0) * 6_000);
+    //   상한 200s(리뷰 R1): EST 가 step 예산(240s)에 닿으면 어떤 인보케이션도 착수 조건을 못 채워
+    //   좀비 run(영구 paused)이 된다 — 신선한 인보케이션은 항상 시도하고 300s 하드킬·attempt 예산에 맡긴다.
+    const EST_SHOTCHECK_MS = Math.min(200_000, Math.max(160_000, (s.shotDesign?.length ?? 0) * 6_000));
     if (deadlineMs != null && Date.now() + EST_SHOTCHECK_MS > deadlineMs) {
       console.log(
         `[writer] shotCheck 착수 보류 — 남은 예산 ${Math.round((deadlineMs - Date.now()) / 1000)}s < 예상 ${EST_SHOTCHECK_MS / 1000}s. shotDesign 체크포인트 후 다음 step 으로.`,

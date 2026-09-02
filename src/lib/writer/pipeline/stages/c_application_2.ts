@@ -452,10 +452,21 @@ const COVERAGE_FOLLOWUPS = new Set(['reaction', 'reveal', 'pov']);
 const OBJECT_GAZE_FOLLOWUPS = new Set(['reaction', 'reveal', 'pov', 'insert', 'detail']);
 /** 비트 텍스트에 등장하는 캐스트 — slug(char_2)와 이름(소녀·노인) 둘 다 매칭한다(리뷰 §3: 산문은 이름을 쓴다). */
 function agentsInBeat(beat: string, cast: string[], characters: Characters | null | undefined): string[] {
+  // 리뷰 §3(2차): 캐릭터 name 은 완전 명사구("전당포 노인")인데 산문은 머리명사("노인이")를 쓴다 —
+  //   전체 이름 + 공백 토큰(≥2자) + 복수 접미 '들' 제거형을 후보로 두고 includes(어간 prefix) 매칭.
   const nameById = new Map<string, string[]>();
   for (const c of characters?.characters ?? []) {
-    const names = [c.name, (c as { name_native?: string }).name_native].filter((n): n is string => typeof n === 'string' && n.trim().length >= 2);
-    if (names.length) nameById.set(c.id, names);
+    const raw = [c.name, (c as { name_native?: string }).name_native].filter((n): n is string => typeof n === 'string' && n.trim().length >= 2);
+    const cands = new Set<string>();
+    for (const n of raw) {
+      cands.add(n.trim());
+      for (const tok of n.split(/\s+/)) {
+        const t = tok.trim();
+        if (t.length >= 2) cands.add(t);
+        if (t.endsWith('들') && t.length >= 3) cands.add(t.slice(0, -1));
+      }
+    }
+    if (cands.size) nameById.set(c.id, [...cands]);
   }
   const escape = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const hit: string[] = [];
