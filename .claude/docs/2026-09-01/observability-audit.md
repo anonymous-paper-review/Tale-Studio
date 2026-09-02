@@ -19,8 +19,8 @@
 | 사례 | 왜 | 보강 |
 |---|---|---|
 | 브라우저 JS 에러·hydration | 클라 이벤트는 일부(cache_*)만 best-effort. Sentry 없음 | 결제 라이브 전 Sentry (readiness 1장 기존 항목 — 지금은 미룸) |
-| 라우트 500 예외(관문 이전) | Vercel 로그에만, 보존 짧음. route_failed는 일부 라우트만 | 수용 (Sentry가 같이 해결) |
-| **enforce 402 거절 (미래)** | hold RPC insufficient는 행 미삽입 — 429는 기록되는데 402는 무흔적 | **보강 #1: rejected_quota와 같은 이벤트 1줄 — enforce 켜기 전 필수, 다음 슬라이스** |
+| 라우트 500 예외(관문 이전) | ~~Vercel 로그에만~~ → ✅ 해소(2026-09-02, `098cf05`): `instrumentation.onRequestError` → `server_errors` 테이블 | 완료 |
+| **enforce 402 거절 (미래)** | ~~무흔적~~ → ✅ 해소(같은 커밋): `generation_submit_rejected_takes` 이벤트 | 완료 |
 | 웹훅 유실 | 유실은 정의상 무흔적 | phase-3 3-7 일일 대사 + 3-8 실패 알림 (기존 계획) |
 | fal 계정 상태(한도·잔액) | 우리 DB 밖 | 지출 알림(오너) + 프로브 재측정 |
 
@@ -30,8 +30,8 @@
 
 | 자동생성 경로 | 429 관문 | 꽉 찼을 때 실제 동작 |
 |---|---|---|
-| ① 러프 previz 자동 제출 (writer 진입) | **없음** (8/25 오너 지시 `#initial-rough-unblocked`) | 거절되지 않고 제출됨 → fal 큐에서 침묵 대기. 화면의 429 대기 코드는 죽은 코드(티켓 rough-storyboard-429-unreachable) |
-| ② writer→artist 초안 (triggerAssetDrafts, 서버) | 없음 | 제출됨 → fal 큐 대기. 반복 실패 시 give-up 임계로 자동 중단 |
+| ① 러프 previz 자동 제출 (writer 진입) | ✅ **복원**(2026-09-02 오너 번복, `098cf05`) | 429 → 화면의 대기 펌프(안내+8초×40 재시도) 소생 — "혼잡 대기" UX |
+| ② writer→artist 초안 (triggerAssetDrafts, 서버) | ✅ 용량 사전 체크 추가(같은 커밋) | 막히면 제출 스킵 + `asset_trigger_blocked(quota)` 이벤트, 회복은 artist 진입 보강·재시도 버튼 |
 | ③ artist 진입/완료 시 빈칸 보강 (클라, 동시성 1) | **있음** | **실측: 429 → 이벤트 기록 + 채팅에 자동 중단 안내, 수동 재시도는 허용** |
 
 "동시성 꽉 참 + 새 유저 previz 자동생성" 답: **실패하지 않는다** — ①은 관문이 없어 fal 큐로 넘어가 순서를 기다린다(fal은 초과를 거부하지 않음). 대가: 관문 없는 경로가 전역 카운트를 채워 관문 있는 경로(artist·director)가 먼저 429를 맞는다 — "첫 러프는 막지 않는다"는 오너 정책의 의도된 트레이드오프. 유저 체감은 오류가 아니라 "오래 걸림".
