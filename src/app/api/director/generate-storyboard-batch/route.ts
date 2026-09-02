@@ -100,12 +100,21 @@ export async function POST(req: NextRequest) {
       .order('sort_order')
 
     const eligible: EligibleShot[] = []
+    // #ref-gate(2026-09-02): 건너뛴 샷은 이유와 함께 돌려준다 — 클라가 선행 산출물을 기다렸다가 자동 재개한다.
+    const skipped: Array<{
+      shotId: string
+      reason: 'missing_rough_storyboard' | 'missing_character_sheets'
+      missing?: Array<{ characterId: string; appearanceKey: string; name: string }>
+    }> = []
     for (const s of rows ?? []) {
       // 기본은 빈칸만(교체는 개별 재생성 소관). force 면 이미 있는 것도 다시 만든다 —
       //   오너가 "하나씩 하는 거 짜쳐서" 전체 재생성을 원한 경로(#c3).
       if (!force && s.storyboard_image) continue
       const f = (s.rough_storyboard as { frames?: Record<string, string> } | null)?.frames
-      if (!f?.start || !f?.direction || !f?.end) continue
+      if (!f?.start || !f?.direction || !f?.end) {
+        skipped.push({ shotId: s.shot_id as string, reason: 'missing_rough_storyboard' })
+        continue
+      }
       const characterAppearanceKeys = requireCharacterAppearanceKeys(s.character_appearance_keys, s.shot_id as string)
       const characters = ((s.characters as string[]) ?? []).slice().sort()
       if (
@@ -136,7 +145,7 @@ export async function POST(req: NextRequest) {
     const planned = groups.slice(0, MAX_GRID_JOBS_PER_CALL)
     const plannedShots = planned.reduce((n, g) => n + g.length, 0)
     if (!planned.length) {
-      return NextResponse.json({ ok: true, data: { submitted: [], remaining: 0 } })
+      return NextResponse.json({ ok: true, data: { submitted: [], remaining: 0, skipped } })
     }
 
     const anchor = await resolveStyleAnchor(project)
@@ -199,16 +208,36 @@ export async function POST(req: NextRequest) {
         appearance,
       ]),
     )
-    for (const { characterId, appearanceKey } of appearancePairs) {
-      const sheetUrl = appearanceByPair.get(`${characterId}\u0000${appearanceKey}`)?.sheet_url
-      if (typeof sheetUrl !== 'string' || !sheetUrl.trim()) {
-        throw new CharacterAppearanceContractError(`Character appearance contract error: ${characterId}/${appearanceKey} has no required sheet_url`)
+    // #ref-gate: 시트 없는 인물이 있는 샷은 이번 배치에서 빼고 이유(이름)와 함께 돌려준다 — 전체를 409 로
+    //   죽이던 종전 동작 대신 준비된 샷은 진행하고, 클라가 시트 완성을 기다렸다가 자동 재개한다.
+    const sheetMissingByShot = new Map<string, Array<{ characterId: string; appearanceKey: string; name: string }>>()
+    for (const group of planned) {
+      for (const s of group) {
+        const missing = s.characters
+          .map((characterId) => ({ characterId, appearanceKey: s.characterAppearanceKeys[characterId] }))
+          .filter(({ characterId, appearanceKey }) => {
+            const sheetUrl = appearanceByPair.get(`${characterId}\u0000${appearanceKey}`)?.sheet_url
+            return typeof sheetUrl !== 'string' || !sheetUrl.trim()
+          })
+          .map(({ characterId, appearanceKey }) => ({
+            characterId,
+            appearanceKey,
+            name: (((charById.get(characterId)?.name as string) || characterId).trim()) || characterId,
+          }))
+        if (missing.length) sheetMissingByShot.set(s.shot_id, missing)
       }
+    }
+    for (const [shotId, missing] of sheetMissingByShot) skipped.push({ shotId, reason: 'missing_character_sheets', missing })
+    const readyPlanned = planned
+      .map((group) => group.filter((s) => !sheetMissingByShot.has(s.shot_id)))
+      .filter((group) => group.length > 0)
+    if (!readyPlanned.length) {
+      return NextResponse.json({ ok: true, data: { submitted: [], remaining: eligible.length - plannedShots, skipped } })
     }
 
     const webhookUrl = resolveWebhookUrl()
     const submitted: Array<{ jobId: string; shotIds: string[] }> = []
-    for (const group of planned) {
+    for (const group of readyPlanned) {
       // #sheet-formats: 레퍼런스 시트는 프레임 AR 매칭(왜곡 방지 — 레거시 프레임이면 레거시 시트),
       //   출력 캔버스·크롭은 포맷 스펙 — 가로 레퍼런스+세로 캔버스는 T2 실측 검증 경로.
       const refGrid = await composeRoughReferenceGrid(
@@ -336,7 +365,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      data: { submitted, remaining: eligible.length - plannedShots },
+      data: { submitted, remaining: eligible.length - plannedShots, skipped },
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

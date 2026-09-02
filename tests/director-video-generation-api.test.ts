@@ -36,6 +36,10 @@ function query(data: unknown) {
   if (data && typeof data === 'object' && !Array.isArray(data) && 'shot_id' in data && !('character_appearance_keys' in data)) {
     data = { ...data, character_appearance_keys: {} }
   }
+  // #ref-gate(2026-09-02): writer 샷의 실사 영상은 실사 스토리보드가 있어야 한다 — 픽스처가 명시하지 않으면 있는 것으로.
+  if (data && typeof data === 'object' && !Array.isArray(data) && 'shot_id' in data && !('storyboard_image' in data)) {
+    data = { ...data, storyboard_image: 'https://storage.test/shot-1_storyboard.png' }
+  }
   const result = { data, error: null }
   const value = {
     select: vi.fn(), eq: vi.fn(), in: vi.fn(), is: vi.fn(), contains: vi.fn(), maybeSingle: vi.fn(), order: vi.fn(), limit: vi.fn(),
@@ -280,6 +284,25 @@ describe('director video generation reservation', () => {
     await expect(response.json()).resolves.toEqual({
       error: 'Character appearance contract error: shot shot-1 has no character_appearance_keys snapshot',
     })
+    expect(mocks.reserveTake).not.toHaveBeenCalled()
+    expect(mocks.submit).not.toHaveBeenCalled()
+  })
+
+  it('#ref-gate: writer 샷에 실사 스토리보드가 없으면 예약·제출 전에 409 missing_storyboard 로 막는다', async () => {
+    mocks.from.mockReset()
+    mocks.from
+      .mockReturnValueOnce(query({ workspace_id: 'workspace-1' }))
+      .mockReturnValueOnce(query({
+        shot_id: 'shot-1',
+        dynamic_spec: {},
+        character_appearance_keys: { 'char-1': 'young' },
+        storyboard_image: null,
+      }))
+
+    const response = await POST(request())
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({ code: 'missing_storyboard', shotId: 'shot-1' })
     expect(mocks.reserveTake).not.toHaveBeenCalled()
     expect(mocks.submit).not.toHaveBeenCalled()
   })

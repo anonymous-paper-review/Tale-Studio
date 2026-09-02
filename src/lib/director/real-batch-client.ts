@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { refreshGenerationQueue } from '@/lib/generation-queue'
 import { notifyQuotaExceeded } from '@/lib/generation-quota-toast'
+import { waitForPrerequisite, type PrerequisiteBody, type PrerequisiteCode } from '@/lib/generation-prerequisite-toast'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 import type { GenerationJobObserver } from '@/lib/generation-jobs-client'
@@ -16,6 +17,38 @@ import type { GenerationJobObserver } from '@/lib/generation-jobs-client'
 export interface RealBatchResult {
   generated: number
   quotaBlocked: boolean
+}
+
+type BatchSkipped = {
+  shotId: string
+  reason: PrerequisiteCode
+  missing?: Array<{ characterId: string; appearanceKey: string; name: string }>
+}
+
+// #ref-gate(오너 결정 1번): 건너뛴 샷의 선행 산출물(러프·시트)이 나타나면 배치를 다시 돌린다(멱등 — 빈칸만).
+//   프로젝트당 재개 체인 1개, 최대 5회. 탭을 닫으면 끊긴다.
+const resumeDepthByProject = new Map<string, number>()
+function scheduleRealBatchResume(projectId: string, skipped: BatchSkipped[], opts?: { traceId?: string; onJob?: GenerationJobObserver }) {
+  const depth = resumeDepthByProject.get(projectId) ?? 0
+  if (!skipped.length || depth >= 5) return
+  resumeDepthByProject.set(projectId, depth + 1)
+  const bodies: Array<PrerequisiteBody & { code: PrerequisiteCode }> = skipped.map((s) =>
+    s.reason === 'missing_character_sheets'
+      ? { code: s.reason, shotId: s.shotId, missing: s.missing ?? [] }
+      : { code: s.reason, shotId: s.shotId },
+  )
+  let settled = false
+  const isCancelled = () => settled || useDirectorCanvasStore.getState().projectId !== projectId
+  // 하나라도 준비되면 재실행 — 나머지 대기는 settled 로 함께 끝내고, 남은 샷은 재실행의 skipped 로 다시 예약된다.
+  void Promise.race(bodies.map((b) => waitForPrerequisite(projectId, b, { isCancelled }))).then((outcome) => {
+    const projectChanged = useDirectorCanvasStore.getState().projectId !== projectId
+    settled = true
+    if (outcome !== 'ready' || projectChanged) {
+      resumeDepthByProject.delete(projectId)
+      return
+    }
+    void runRealBatch(projectId, { silent: true, traceId: opts?.traceId, onJob: opts?.onJob })
+  })
 }
 
 /** 라운드 반복 일괄 생성 — 완료 시 캔버스 rehydrate. 이미 진행 중이면 no-op. */
@@ -33,6 +66,7 @@ export async function runRealBatch(
   store.setState({ realBatchBusy: true, realBatchRemaining: null })
   let generated = 0
   let quotaBlocked = false
+  let lastSkipped: BatchSkipped[] = []
   try {
     for (let round = 0; round < 10; round++) {
       const requestBody: { projectId: string; force?: boolean; traceId?: string } =
@@ -53,11 +87,12 @@ export async function runRealBatch(
         break
       }
       const j = (await res.json().catch(() => null)) as {
-        data?: { submitted: Array<{ jobId: string; shotIds: string[] }>; remaining: number }
+        data?: { submitted: Array<{ jobId: string; shotIds: string[] }>; remaining: number; skipped?: BatchSkipped[] }
         error?: string
       } | null
       if (!res.ok || !j?.data) throw new Error(j?.error ?? `HTTP ${res.status}`)
       const { submitted, remaining } = j.data
+      lastSkipped = j.data.skipped ?? []
       // #batch-backlog: 아직 제출 안 된 잔량을 알림바 분모에 태운다 — "fal 큐 수만 보인다"(오너
       //   2026-08-25)의 수리. 라운드마다 갱신되고 러너 종료 시 finally 가 지운다.
       store.setState({ realBatchRemaining: remaining })
@@ -92,6 +127,25 @@ export async function runRealBatch(
       }
       if (remaining <= 0) break
     }
+    if (lastSkipped.length > 0) {
+      // #ref-gate: 이유별로 한 줄 안내 + 자동 재개 예약(과금 없음 — 준비될 때까지 폴링만).
+      const sheetNames = [...new Set(lastSkipped.flatMap((s) => (s.missing ?? []).map((m) => m.name)))]
+      const roughCount = lastSkipped.filter((s) => s.reason === 'missing_rough_storyboard').length
+      const what = [
+        sheetNames.length ? translate(useLocaleStore.getState().locale, 'character sheets for {names}', { names: sheetNames.join(', ') }) : null,
+        roughCount ? translate(useLocaleStore.getState().locale, 'rough storyboards for {count} shots', { count: roughCount }) : null,
+      ].filter(Boolean).join(' · ')
+      toast.info(
+        translate(useLocaleStore.getState().locale, '{count} shots skipped — waiting for {what}. The batch resumes automatically.', {
+          count: lastSkipped.length,
+          what,
+        }),
+        { id: 'generation-prerequisite' },
+      )
+      scheduleRealBatchResume(projectId, lastSkipped, { traceId: opts?.traceId, onJob: opts?.onJob })
+    } else {
+      resumeDepthByProject.delete(projectId)
+    }
     if (generated > 0) {
       await store.getState().hydrateFromDb(projectId)
       toast.success(
@@ -99,7 +153,7 @@ export async function runRealBatch(
           count: generated,
         }),
       )
-    } else if (!opts?.silent && !quotaBlocked) {
+    } else if (!opts?.silent && !quotaBlocked && lastSkipped.length === 0) {
       toast.info(
         translate(
           useLocaleStore.getState().locale,

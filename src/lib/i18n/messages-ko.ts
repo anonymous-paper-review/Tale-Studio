@@ -718,9 +718,19 @@ export const KO: Record<string, string> = {
   'Google Gemini 3.1 · strong character consistency, up to 14 references':
     'Google Gemini 3.1 · 캐릭터 일관성이 강함, 참조 최대 14장',
   'Google Gemini 2.5 · previous generation': 'Google Gemini 2.5 · 이전 세대',
-  // #ref-gate: 실사 선행조건(인물 시트) 미충족 안내
-  'Character sheets are still missing for {names}. Generate them in the Artist tab first, then retry.':
-    '{names}의 인물 시트가 아직 없습니다. Artist 탭에서 시트를 먼저 만든 뒤 다시 시도하세요.',
+  // #ref-gate: 생성 선행조건(인물 시트·러프·실사 스토리보드) 대기·자동 재개 안내
+  'character sheets for {names}': '{names}의 인물 시트',
+  'the rough storyboard of {shot}': '{shot}의 러프 스토리보드',
+  'the live-action storyboard of {shot}': '{shot}의 실사 스토리보드',
+  'rough storyboards for {count} shots': '{count}개 샷의 러프 스토리보드',
+  'Waiting for {what}. Generation resumes automatically when it is ready.':
+    '{what}을(를) 기다리는 중입니다. 준비되면 자동으로 이어서 생성합니다.',
+  '{what} ready — resuming generation.': '{what} 준비됨 — 생성을 이어갑니다.',
+  'Stopped waiting for {what} after 20 minutes. Generate it, then retry manually.':
+    '{what}을(를) 20분 동안 기다렸지만 오지 않아 대기를 멈췄습니다. 먼저 만든 뒤 다시 눌러 주세요.',
+  '{count} shots skipped — waiting for {what}. The batch resumes automatically.':
+    '{count}개 샷을 건너뛰었습니다 — {what}을(를) 기다립니다. 준비되면 일괄 생성이 자동으로 이어집니다.',
+  Generation: '생성',
   'ByteDance · high-res, rich editing': 'ByteDance · 고해상, 편집에 강함',
   'Black Forest Labs · fast & cheap, no reference': 'Black Forest Labs · 빠르고 저렴, 참조 미지원',
   Assets: '에셋',

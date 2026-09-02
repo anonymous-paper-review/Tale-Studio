@@ -178,6 +178,19 @@ export async function POST(req: Request) {
       roughFrames?.start && roughFrames.direction && roughFrames.end
         ? { start: roughFrames.start, direction: roughFrames.direction, end: roughFrames.end }
         : null
+    // #ref-gate(2026-09-02 오너 결정): writer 샷인데 러프 3프레임이 없으면 단일 이미지로 조용히 강등하지
+    //   않고 409 code 로 막는다 — 클라가 러프 완성을 기다렸다가 자동 재개한다. shots 행이 없는 캔버스 전용
+    //   샷만 종전 단일 경로.
+    if (shot && !stripFrames) {
+      return NextResponse.json(
+        {
+          error: `Rough storyboard frames are missing for shot ${writerShotId} — generate the rough storyboard first.`,
+          code: 'missing_rough_storyboard',
+          shotId: writerShotId,
+        },
+        { status: 409 },
+      )
+    }
 
     // #n-1(2026-08-05): 같은 씬 직전 샷의 종료 상태를 서버측 첨부 — 샷별 독립 잡이던 실사의
     //   연속성 봉합. DB pull 이라 잡 간 의존이 생기지 않는다 (architecture §0: 둘 다 진실을 읽는다).

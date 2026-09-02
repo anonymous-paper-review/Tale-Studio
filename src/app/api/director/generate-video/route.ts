@@ -497,12 +497,25 @@ export async function POST(req: Request) {
       // #motion-contract: dynamic_spec(모션 계약 소스) + design_ref(구버전 state 폴백 조인 키) 동봉.
       standalone
         ? Promise.resolve({ data: null, error: null })
-        : supabaseAdmin.from('shots').select('shot_id, dynamic_spec, design_ref, dialogue_lines, character_appearance_keys, prompt').eq('project_id', projectId).eq('shot_id', writerShotId).maybeSingle(),
+        : supabaseAdmin.from('shots').select('shot_id, dynamic_spec, design_ref, dialogue_lines, character_appearance_keys, prompt, storyboard_image').eq('project_id', projectId).eq('shot_id', writerShotId).maybeSingle(),
     ])
     if (projectError) throw projectError
     if (shotError) throw shotError
     if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404 })
     if (!standalone && !shot) return NextResponse.json({ error: 'writerShotId does not belong to project' }, { status: 400 })
+    // #ref-gate(2026-09-02 오너 결정): writer 샷의 실사 영상은 실사 스토리보드(시작 프레임)가 있어야 한다 —
+    //   클라가 준 프레임을 검사 없이 받던 무음 폴백 폐지. 409 code 로 막고 클라가 실사 완성을 기다렸다가 자동 재개.
+    //   (러프 previz 영상은 별도 잡 종류 shot_previz_video / 별도 라우트라 이 게이트와 무관.)
+    if (!standalone && shot && !(typeof shot.storyboard_image === 'string' && shot.storyboard_image.trim())) {
+      return NextResponse.json(
+        {
+          error: `The live-action storyboard is missing for shot ${writerShotId} — generate it before the video.`,
+          code: 'missing_storyboard',
+          shotId: writerShotId,
+        },
+        { status: 409 },
+      )
+    }
     let standaloneConfig: StandaloneVideoConfig | null = null
     if (standalone) {
       const { data: clip, error } = await supabaseAdmin

@@ -62,7 +62,9 @@ describe('Director storyboard character appearance contract', () => {
     expect(route).toContain('character_appearance_keys')
     expect(route).toContain("from('character_appearances')")
     expect(route).toContain("select('character_id, appearance_key, sheet_url')")
-    expect(route).toContain('has no required sheet_url')
+    // #ref-gate(2026-09-02): 시트 없는 인물은 전체 409 대신 그 샷만 skipped(이유·이름)로 보고하고 준비된 샷은 진행한다.
+    expect(route).toContain("reason: 'missing_character_sheets'")
+    expect(route).not.toContain('has no required sheet_url')
     expect(route).toContain('a.characterId.localeCompare(b.characterId) || a.appearanceKey.localeCompare(b.appearanceKey)')
     expect(route).not.toContain('view_main')
     expect(route).not.toContain('portrait')

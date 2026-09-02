@@ -42,7 +42,13 @@ import {
   type DirectorVideoProvider,
 } from '@/types/director'
 import { notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
-import { notifyIfPrerequisiteMissing } from '@/lib/generation-prerequisite-toast'
+import {
+  isPrerequisiteMissing,
+  notifyPrerequisiteResumed,
+  notifyPrerequisiteTimeout,
+  notifyPrerequisiteWaiting,
+  waitForPrerequisite,
+} from '@/lib/generation-prerequisite-toast'
 import {
   useAssetStorageStore,
   type RegisteredCharacter,
@@ -108,6 +114,8 @@ const DEFAULT_PROVIDER: DirectorVideoProvider = DEFAULT_VIDEO_MODEL
 export type DirectorGenerationRequestOptions = {
   traceId?: string
   onJob?: GenerationJobObserver
+  /** #ref-gate 자동 재개 깊이(내부) — 선행조건 대기 후 재호출이 무한히 이어지지 않게 상한(3). */
+  resumeDepth?: number
   /** Internal flag used exclusively by the explicit full-video batch runner. */
   batch?: boolean
   /**
@@ -3889,8 +3897,31 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 httpStatus: res.status,
                 error: body.error ?? `HTTP ${res.status}`,
               })
-              // #ref-gate: 시트 없는 인물(409 code) 도 한도 초과처럼 "왜 안 됐나"를 안내하고 노드는 원상 복구.
-              if (notifyIfQuotaExceeded(res.status, body) || notifyIfPrerequisiteMissing(res.status, body)) {
+              // #ref-gate(오너 결정 1번): 선행 산출물(인물 시트·러프)이 없으면 안내 후 대기 → 나타나면 자동 재개.
+              //   대기 중엔 노드를 generating(스피너)으로 두고, 사람이 다시 누르지 않아도 이어진다. 20분 상한.
+              if (isPrerequisiteMissing(res.status, body)) {
+                notifyPrerequisiteWaiting('director', body)
+                releaseAction(`director:storyboard:${shotNodeId}`)
+                const outcome = await waitForPrerequisite(projectId, body, {
+                  isCancelled: () => get().projectId !== projectId,
+                })
+                const depth = options?.resumeDepth ?? 0
+                if (outcome === 'ready' && depth < 3) {
+                  notifyPrerequisiteResumed(body)
+                  return get().generateStoryboardImage(shotNodeId, { ...options, resumeDepth: depth + 1 })
+                }
+                if (outcome === 'timeout') notifyPrerequisiteTimeout('director', body)
+                get().updateNodeData<'shot'>(shotNodeId, {
+                  storyboardImage: {
+                    url: prevUrl,
+                    status: 'pending',
+                    errorMessage: null,
+                    generatedAt: data.storyboardImage?.generatedAt ?? 0,
+                  },
+                })
+                return { jobId: null, status: 'failed', httpStatus: res.status, error: body.error ?? 'prerequisite missing' }
+              }
+              if (notifyIfQuotaExceeded(res.status, body)) {
                 get().updateNodeData<'shot'>(shotNodeId, {
                   storyboardImage: {
                     url: prevUrl,
@@ -4420,6 +4451,26 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 })
               }
               await get().hydrateFromDb(projectId)
+            }
+            // #ref-gate(오너 결정 1번): 실사 스토리보드가 아직 없으면 대기 → 나타나면 같은 샷의 영상 생성을 자동 재개.
+            //   false 를 돌려주면 호출부가 방금 만든 미저장 take 노드를 롤백하므로, 재개는 새 take 로 다시 시작한다.
+            if (isPrerequisiteMissing(res.status, body)) {
+              notifyPrerequisiteWaiting('director', body)
+              if (!preserveSuccess) get().setVideoStatus(videoNodeId, 'pending')
+              const depth = options?.resumeDepth ?? 0
+              const resumeShotNodeId = shotNode && isShotData(shotNode.data) ? shotNode.id : null
+              if (resumeShotNodeId && depth < 3) {
+                const resumeBody = body
+                void waitForPrerequisite(projectId, resumeBody, {
+                  isCancelled: () => get().projectId !== projectId,
+                }).then((outcome) => {
+                  if (outcome === 'ready') {
+                    notifyPrerequisiteResumed(resumeBody)
+                    void get().generateVideoForShot(resumeShotNodeId, { ...options, resumeDepth: depth + 1 })
+                  } else if (outcome === 'timeout') notifyPrerequisiteTimeout('director', resumeBody)
+                })
+              }
+              return false
             }
             if (notifyIfQuotaExceeded(res.status, body)) {
               if (!preserveSuccess) get().setVideoStatus(videoNodeId, 'pending')
