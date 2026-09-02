@@ -42,6 +42,8 @@ import {
   finalizeShotVideoJob,
 } from '@/lib/fal/finalize'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { holdTakesForVideoJob } from '@/lib/billing/take-hold'
+import { takeCostForVideo } from '@/lib/billing/take-cost'
 import type { Json } from '@/types/database'
 import type { CameraConfig, CameraPreset } from '@/types'
 import type { StandaloneVideoConfig } from '@/types/director'
@@ -742,6 +744,28 @@ export async function POST(req: Request) {
     reservation = videoClipId
       ? await reserveDirectorVideoRegeneration({ projectId, videoClipId, model: modelKey, target: { workspaceId: project.workspace_id, shotId: writerShotId, writerShotId, videoClipId, retakeMode: 'regeneration' }, idempotencyKey, inputSnapshot, userId: user.id, workspaceId: project.workspace_id, provider: isLocal ? 'local' : 'fal', actor: jobActor })
       : await reserveDirectorVideoTake({ projectId, shotId: writerShotId, model: modelKey, target: { workspaceId: project.workspace_id, shotId: writerShotId, writerShotId, retakeMode: 'new_take' }, idempotencyKey, inputSnapshot, userId: user.id, workspaceId: project.workspace_id, provider: isLocal ? 'local' : 'fal', actor: jobActor, takeLabel: normalizedNewTakeMetadata.take_label as string | null, override: normalizedNewTakeMetadata.override, canvasPosition: normalizedNewTakeMetadata.canvas_position })
+    // #payments-phase-2 #gen-quota-atomic-gate: Take hold — 예약(RPC) 직후 원자 관문. replay 는
+    //   이미 처음 시도에서 hold 된 같은 잡을 재사용하는 것이라 다시 hold 하지 않는다(중복 차감 방지).
+    if (!reservation.replayed) {
+      const holdAmount = takeCostForVideo(modelKey)
+      const hold = await holdTakesForVideoJob({
+        workspaceId: project.workspace_id as string,
+        userId: user.id,
+        jobId: reservation.job_id,
+        amount: holdAmount,
+      })
+      if (!hold.ok && hold.insufficient) {
+        try {
+          await markDirectorVideoAttemptFailed(projectId, reservation.job_id, 'insufficient_takes')
+        } catch (transitionErr) {
+          console.error('[director/generate-video] insufficient-takes failure transition failed:', transitionErr instanceof Error ? transitionErr.message : transitionErr)
+        }
+        return NextResponse.json(
+          { error: 'insufficient_takes', required: holdAmount, balance: hold.balance },
+          { status: 402 },
+        )
+      }
+    }
     if (traceId) {
       try {
         await linkGenerationJobToChatTrace(projectId, reservation.job_id, traceId)

@@ -20,6 +20,7 @@ import { markDirectorVideoAttemptFailed } from '@/lib/director-video-takes'
 import { falImageFetch, falVideoFetch } from '@/lib/writer/llm/fal'
 import { FalUnknownKeyError } from '@/lib/fal/keys'
 import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events'
+import { releaseTakesForJob } from '@/lib/billing/take-hold'
 import {
   DirectorVideoCompletionPersistenceError,
   finalizeGenerationJob,
@@ -29,9 +30,18 @@ async function terminalizeJob(job: GenerationJob, message: string): Promise<Gene
   // Detail-less provider placeholders get wrapped with job context before they hit the ledger.
   const evidence = normalizeFailureEvidence(message, job.kind)
   if (job.kind === 'shot_video' && job.video_clip_id) {
+    // markDirectorVideoAttemptFailed 가 hold 반환까지 맡는다(자체 이육 반복 방지).
     await markDirectorVideoAttemptFailed(job.project_id, job.id, evidence)
   } else {
     await failGenerationJob(job.id, evidence)
+    // #payments-phase-2 #gen-quota-atomic-gate: unlinked shot_video/shot_previz_video 도 hold 대상이다.
+    if (job.kind === 'shot_video' || job.kind === 'shot_previz_video') {
+      try {
+        await releaseTakesForJob(job.id)
+      } catch (releaseError) {
+        console.error('[fal/reconcile] take release failed:', releaseError instanceof Error ? releaseError.message : releaseError)
+      }
+    }
   }
   return { ...job, status: 'failed', error: evidence }
 }

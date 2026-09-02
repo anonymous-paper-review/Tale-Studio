@@ -7,10 +7,12 @@ import { Button } from '@/components/ui/button'
 import { GeneratedImage, GeneratingOverlay } from '@/components/generating-frame'
 import { BaseNode } from './BaseNode'
 import { LabeledTargetHandle } from './LabeledHandle'
-import { useDirectorCanvasStore } from '@/stores/director-store'
+import { getEffectiveVideoConfig, useDirectorCanvasStore } from '@/stores/director-store'
 import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
+import { useTakeBalance } from '@/lib/billing/use-take-balance'
+import { takeCostForVideo } from '@/lib/billing/take-cost'
 
 function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const t = useT()
@@ -47,6 +49,9 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
     const p = s.nodes.find((n) => n.id === parentShotId)
     return p && isShotData(p.data) ? p.data.label : null
   })
+  // #payments-phase-2 v4 #2: 생성 전 소모량 표시 — 리테이크 버튼은 이 샷을 다시 만든다(같은 provider).
+  const effectiveProvider = useDirectorCanvasStore((s) => getEffectiveVideoConfig(s, id)?.provider ?? null)
+  const takeBalance = useTakeBalance()
 
   // effect 입력은 early-return 전에 안전 추출 (훅은 무조건 호출돼야 함).
   const vStatus = isVideoData(data) ? data.status : null
@@ -156,6 +161,12 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             <RefreshCw className="size-3" />
             {t('Retake video')}
           </Button>
+          {/* #payments-phase-2 v4 #2: 생성 전 소모량 표시 — mode==='off'면 배지 숨김. */}
+          {takeBalance.mode !== 'off' && (
+            <span className="rounded-sm border border-primary/40 bg-primary/10 px-1.5 py-1 text-[10px] font-medium text-foreground">
+              {t('{count} Take', { count: takeCostForVideo(effectiveProvider) })}
+            </span>
+          )}
         </div>
       </NodeToolbar>
     <BaseNode

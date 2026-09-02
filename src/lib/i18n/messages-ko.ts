@@ -823,6 +823,9 @@ export const KO: Record<string, string> = {
   'All generation slots are busy right now. It will start automatically in a moment — please try again shortly.': '지금 생성 자리가 모두 사용 중이에요. 잠시 뒤에 다시 시도해 주세요.',
   'You can run up to {limit} video generations at once. Please retry after the current ones finish.': '영상은 동시에 {limit}개까지 생성할 수 있어요. 진행 중인 생성이 끝나면 다시 시도해 주세요.',
   'You can run up to {limit} image generations at once. Please retry after the current ones finish.': '이미지는 동시에 {limit}개까지 생성할 수 있어요. 진행 중인 생성이 끝나면 다시 시도해 주세요.',
+  // ── misc: #payments-phase-2 슬라이스 2 — Take 소모량 표시 + hold 부족 안내 ──
+  '{count} Take': 'Take {count}개',
+  'Not enough Takes for this generation — you need {required}, you have {balance}.': '이 생성에 필요한 Take가 부족해요 — {required}개 필요, 현재 {balance}개 보유.',
   'Generating the main image… just a moment': '대표 이미지 생성 중… 잠시만요',
   'Connects which characters and backgrounds each shot uses — drag assets to build references.': '샷마다 어떤 인물·배경이 쓰이는지 연결합니다 — 에셋을 드래그해 참조를 구성하세요.',
   'Create and refine concept images for characters and worlds, then hand off to the next stage.': '캐릭터·월드의 컨셉 이미지를 만들고 다듬어 다음 단계로 넘깁니다.',

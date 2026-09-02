@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { classifyJobError } from '@/lib/generation-jobs'
+import { releaseTakesForJob } from '@/lib/billing/take-hold'
 import type { Json, Tables } from '@/types/database'
 export {
   compareDirectorVideoTakeOrder,
@@ -101,8 +102,27 @@ export async function setDirectorVideoFinal(projectId: string, videoClipId: stri
 }
 
 export async function softDeleteDirectorVideoTake(projectId: string, videoClipId: string): Promise<void> {
+  // #payments-phase-2 #gen-quota-atomic-gate: 이 RPC 는 대기 중(queued)이던 잡을 SQL 안에서 직접
+  //   status='failed' 로 마킹한다(삭제로 인한 취소) — 삭제 전 그 잡 중 취소 대상이 있을 수 있어 미리
+  //   조회해 둘 수 없다. 삭제 후 hold 잔량을 잡 id 무관하게 반환 시도(멱등 RPC 이므로 해당
+  //   키율에 hold 가 없었던 경우도 안전).
+  const { data: cancelledJobs, error: cancelledJobsError } = await supabaseAdmin
+    .from('generation_jobs')
+    .select('id')
+    .eq('project_id', projectId)
+    .eq('video_clip_id', videoClipId)
+    .eq('kind', 'shot_video')
+    .eq('status', 'queued')
+  if (cancelledJobsError) console.error('[director-video-takes] cancelled-job lookup failed:', cancelledJobsError.message)
   const { error } = await supabaseAdmin.rpc('soft_delete_director_video_take', { p_project_id: projectId, p_video_clip_id: videoClipId })
   if (error) throw error
+  for (const { id } of cancelledJobs ?? []) {
+    try {
+      await releaseTakesForJob(id)
+    } catch (releaseError) {
+      console.error('[director-video-takes] take release failed:', releaseError instanceof Error ? releaseError.message : releaseError)
+    }
+  }
 }
 
 export async function updateDirectorVideoTakeMetadata(
@@ -233,4 +253,11 @@ export async function markDirectorVideoAttemptFailed(projectId: string, jobId: s
     .update({ error_class: classifyJobError(errorMessage) })
     .eq('id', jobId)
     .eq('status', 'failed')
+  // #payments-phase-2 #gen-quota-atomic-gate: 터미널 실패 → hold 반환. 실패해도 잡 마킹은 이미
+  //   끝났으니 삼키고 로그만 남긴다(release RPC 는 멱등 — 다음 reconcile/재시도가 마저 정리해도 안전).
+  try {
+    await releaseTakesForJob(jobId)
+  } catch (releaseError) {
+    console.error('[director-video-takes] take release failed:', releaseError instanceof Error ? releaseError.message : releaseError)
+  }
 }

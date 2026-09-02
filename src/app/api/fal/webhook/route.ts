@@ -23,6 +23,14 @@ import {
 } from '@/lib/fal/finalize'
 import { reconcileJobFromFal } from '@/lib/fal/reconcile'
 import { describeFinalizeError } from '@/lib/fal/error-evidence'
+import { releaseTakesForJob } from '@/lib/billing/take-hold'
+
+// #payments-phase-2 #gen-quota-atomic-gate: 영상 잍(shot_video 레거시 unlinked 포함/shot_previz_video)이
+//   failGenerationJob 경로로 종결될 때만 hold 반환을 함께 부른다. markDirectorVideoAttemptFailed 는 자체적으로
+//   반환을 물고 있어 이족이 필요 없다.
+function isTakeBilledVideoKind(kind: string): boolean {
+  return kind === 'shot_video' || kind === 'shot_previz_video'
+}
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -93,6 +101,13 @@ export async function POST(req: Request) {
         await markDirectorVideoAttemptFailed(job.project_id, job.id, `[moderation] ${raw}`)
       } else {
         await failGenerationJob(job.id, `[moderation] ${raw}`)
+        if (isTakeBilledVideoKind(job.kind)) {
+          try {
+            await releaseTakesForJob(job.id)
+          } catch (releaseError) {
+            console.error('[fal/webhook] take release failed:', releaseError instanceof Error ? releaseError.message : releaseError)
+          }
+        }
       }
       return NextResponse.json({ ok: true })
     }
@@ -127,6 +142,13 @@ export async function POST(req: Request) {
       await markDirectorVideoAttemptFailed(job.project_id, job.id, msg)
     } else {
       await failGenerationJob(job.id, msg)
+      if (isTakeBilledVideoKind(job.kind)) {
+        try {
+          await releaseTakesForJob(job.id)
+        } catch (releaseError) {
+          console.error('[fal/webhook] take release failed:', releaseError instanceof Error ? releaseError.message : releaseError)
+        }
+      }
     }
   }
 

@@ -8,11 +8,13 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { requireProjectAccess } from '@/lib/api/guard'
 import { falVideoSubmit } from '@/lib/writer/llm/fal'
-import { createGenerationJob, STALE_QUEUED_MS } from '@/lib/generation-jobs'
+import { createGenerationJob, failGenerationJob, STALE_QUEUED_MS } from '@/lib/generation-jobs'
 import { checkGenerationCapacity, checkProjectVideoBudget } from '@/lib/generation-quota'
 import { quotaRejectionResponse, videoBudgetRejectionResponse } from '@/lib/api/quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
+import { holdTakesForVideoJob, releaseTakesForJob } from '@/lib/billing/take-hold'
+import { takeCostForPreviz } from '@/lib/billing/take-cost'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -111,6 +113,28 @@ export async function POST(req: Request) {
         duration,
       },
     })
+
+    // #payments-phase-2 #gen-quota-atomic-gate: Take hold — 잡은 이미 제출된 뒤라 부족이어도
+    //   이 생성은 되돌릴 수 없다(fal 이미 과금된 상태) — hold 가 enforce 부족이면 잡을 즉시 실패
+    //   처리하고 402 로 안내한다(이미 제출된 fal 요청은 별도 정산이 필요 — v4 슬라이스 범위 밖).
+    const holdAmount = takeCostForPreviz()
+    const hold = await holdTakesForVideoJob({
+      workspaceId: project.workspace_id as string,
+      userId: access.userId!,
+      jobId: job.id,
+      amount: holdAmount,
+    })
+    if (!hold.ok && hold.insufficient) {
+      try {
+        await failGenerationJob(job.id, 'insufficient_takes')
+      } catch (transitionErr) {
+        console.error('[director/generate-previz-video] insufficient-takes failure transition failed:', transitionErr instanceof Error ? transitionErr.message : transitionErr)
+      }
+      return NextResponse.json(
+        { error: 'insufficient_takes', required: holdAmount, balance: hold.balance },
+        { status: 402 },
+      )
+    }
 
     // 낙관 상태 기록 — UI 폴링 전 새로고침에도 '생성 중'이 보이게.
     await supabaseAdmin

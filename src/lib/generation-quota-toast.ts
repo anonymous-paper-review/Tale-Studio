@@ -97,14 +97,49 @@ export function notifyVideoBudgetExceeded(body: VideoBudgetExceededBody | null |
   )
 }
 
+/** #payments-phase-2 슬라이스 2: Take hold 부족 402 — error==='insufficient_takes'인 응답의 계약. */
+export interface InsufficientTakesBody {
+  error?: string
+  required?: number
+  balance?: number
+}
+
+export function isInsufficientTakes(
+  status: number,
+  body: unknown,
+): body is InsufficientTakesBody {
+  return (
+    status === 402 &&
+    typeof body === 'object' &&
+    body !== null &&
+    (body as { error?: unknown }).error === 'insufficient_takes'
+  )
+}
+
+export function notifyInsufficientTakes(body: InsufficientTakesBody | null | undefined): void {
+  const locale = useLocaleStore.getState().locale
+  toast.error(
+    translate(locale, 'Not enough Takes for this generation — you need {required}, you have {balance}.', {
+      required: body?.required ?? 0,
+      balance: body?.balance ?? 0,
+    }),
+    { id: 'generation-quota-exceeded' },
+  )
+}
+
 /**
- * 429 면 안내하고 true. 호출부 관용구: `if (await notifyIfQuotaExceeded(res, body)) return`.
- * 429 가 아니면 아무 것도 하지 않고 false — 나머지 오류 처리는 호출부 몫이다.
- * 동시성 한도와 프로젝트 영상 예산(#f4) 둘 다 여기서 갈라 안내한다 — 진입점들은 이 함수 하나만 안다.
+ * 429/402 면 안내하고 true. 호출부 관용구: `if (await notifyIfQuotaExceeded(res, body)) return`.
+ * 안내 대상이 아니면 아무 것도 하지 않고 false — 나머지 오류 처리는 호출부 몷이다.
+ * 동시성 한도와 프로젝트 영상 예산(#f4)에 이어 Take 부족(#payments-phase-2)도 여기서 갈라 안내한다 —
+ * 진입점들은 이 함수 하나만 안다.
  */
 export function notifyIfQuotaExceeded(status: number, body: unknown): boolean {
   if (isVideoBudgetExceeded(status, body)) {
     notifyVideoBudgetExceeded(body)
+    return true
+  }
+  if (isInsufficientTakes(status, body)) {
+    notifyInsufficientTakes(body)
     return true
   }
   if (!isQuotaExceeded(status, body)) return false
