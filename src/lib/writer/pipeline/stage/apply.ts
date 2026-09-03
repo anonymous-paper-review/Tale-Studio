@@ -298,6 +298,16 @@ export function applyStageToShots(
         }
         if (!corrected) break
       }
+      // 이 샷이 관계를 다시 세운다 — 다음 샷은 "가장 최근에 함께 잡힌 샷"과 비교한다(인물이 화면에서 이동해
+      //   관계가 바뀐 것을 관객이 봤으면 그것이 새 기준이다).
+      const inFrameFinal = states.start.filter((c) => placeCharacter(startSolve.camera, c, aspect, startSolve.subjectDistance).in_frame)
+      for (let i = 0; i < inFrameFinal.length; i++) {
+        for (let j = i + 1; j < inFrameFinal.length; j++) {
+          const [A, B] = [inFrameFinal[i], inFrameFinal[j]].sort((p, q) => (p.character_id < q.character_id ? -1 : 1))
+          const side = axisSide({ x: A.x, y: A.y }, { x: B.x, y: B.y }, { x: startSolve.camera.x, y: startSolve.camera.y })
+          if (side !== 'on') pairSides.set(`${A.character_id}|${B.character_id}`, side)
+        }
+      }
     }
     const placementsStart = new Map(states.start.map((s) => [s.character_id, placeCharacter(startSolve.camera, s, aspect, startSolve.subjectDistance)]))
     const placementsEnd = endSolve
