@@ -64,6 +64,9 @@ function buildSystemInstruction(outputLocale?: AppLocale): string {
 7. 이야기 텍스트가 말하지 않은 상태 변화(누워 있다가 나중에 서 있는 인물 등)는 **그 변화가 일어나는 비트를 정해**
    end_characters 로 적어라. 어느 비트에서 일어났는지 없으면 관객은 그 인물이 언제 일어났는지 모른다.
 8. 인물 id 는 주어진 것만 쓴다. 사물(object) 캐스트는 무대에 올리지 않는다(필요하면 landmark 로).
+9. 데쿠파주의 added 샷(beats=[] — 설정·리액션 등)의 content 도 상태의 근거다. 예: 씬 첫머리의 설정 샷이
+   "세 인물이 흩어져 누워 있다"면 beat 0 의 시작 상태는 셋 다 lying 이고, 일어나는 순간은 그 뒤 비트의
+   end_characters 로 적는다. 첫 비트 전의 상황(오프닝)을 beat 0 시작 상태에 반영하라.
 
 [출력 — JSON 하나]
 {

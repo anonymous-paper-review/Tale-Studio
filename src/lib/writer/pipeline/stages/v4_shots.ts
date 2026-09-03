@@ -435,6 +435,7 @@ ${beats}
 이 무대 위에서 샷마다 **static_spec.camera_setup** 을 정하라 — 카메라 위치·화면 안 위치·깊이·크기·향은
 코드가 이 값과 무대에서 계산한다. 네가 적는 position_in_frame 은 참고값일 뿐 계산값으로 덮어쓴다.
 - subject: 이 샷의 피사체 — character_id 하나, 여러 명이면 배열, 전원이면 "group", 표지 id 도 가능.
+  설정(establishing)·마스터 샷은 "group"(또는 [표지, 인물…])로 — 표지만 피사체로 잡으면 인물이 프레임 가장자리로 밀린다.
 - from_direction: 카메라가 **피사체 기준 어느 쪽에 서는가**(세계 나침반 N/NE/E/SE/S/SW/W/NW).
   예: "S" = 피사체의 남쪽에 서서 북쪽을 본다. 축의 camera_side 쪽에 있는 방향을 골라라 — 반대편을 고르면
   코드가 축 안쪽으로 되돌린다(관객의 좌우가 뒤집히지 않게). 동기 있는 축 이동만 axis_cross:"motivated".
