@@ -210,3 +210,24 @@ describe('시야 가림 회전 — 겨울_4 sh_01_06 실측', () => {
     expect(spec.screen_layout!.axis_corrected).toBeUndefined()
   })
 })
+
+describe('정지 카메라의 END 배치 (#ledger 실측 sh_01_30)', () => {
+  it('카메라가 안 움직이면 START 카메라로 END 를 계산한다 — 걸어가는 셋이 작아지고 end_camera 는 없다', () => {
+    const s = shot('shot_7', {
+      shot_type: 'WS',
+      camera_setup: { subject: 'group', from_direction: 'S', height: 'eye', lens_mm: 35 },
+      character_blocking: [
+        { character_id: 'char', position_in_frame: 'left_third', pose: 'standing', gaze: 'ahead', asset_version: 'v1' },
+        { character_id: 'char_2', position_in_frame: 'right_third', pose: 'standing', gaze: 'ahead', asset_version: 'v1' },
+        { character_id: 'char_3', position_in_frame: 'center', pose: 'standing', gaze: 'ahead', asset_version: 'v1' },
+      ],
+    })
+    const r = applyStageToShots([s], STAGE, [dec('shot_7', [5])])
+    const lay = r.shots[0].static_spec.screen_layout!
+    expect(lay.end_camera).toBeUndefined()
+    for (const c of lay.characters) {
+      expect(c.end).toBeDefined()
+      expect(c.end!.apparent_height).toBeLessThan(c.start.apparent_height) // 북쪽으로 걸어가 멀어짐
+    }
+  })
+})

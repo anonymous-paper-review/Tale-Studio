@@ -53,18 +53,26 @@ export function normalizeStageTransitions(stage: SceneStage): SceneStage {
   const beats = [...stage.beats]
     .sort((a, b) => a.beat - b.beat)
     .map((b) => ({ ...b, characters: b.characters.map((c) => ({ ...c })), ...(b.end_characters ? { end_characters: b.end_characters.map((c) => ({ ...c })) } : {}) }))
-  for (let i = 0; i + 1 < beats.length; i++) {
+  for (let i = 0; i < beats.length; i++) {
     const cur = beats[i]
     const next = beats[i + 1]
-    const endList = (cur.end_characters ?? cur.characters).map((c) => ({ ...c }))
-    let changed = false
-    for (const n of next.characters) {
-      const idx = endList.findIndex((c) => c.character_id === n.character_id)
-      if (idx < 0) continue // 직전 비트에 없던 인물 — 첫 비트 검증이 막는다; 여기서는 만들지 않는다
-      const e = endList[idx]
-      if (isMajorChange(e, n)) {
-        endList[idx] = { ...e, x: n.x, y: n.y, facing_deg: n.facing_deg, posture: n.posture, ...(n.note ? { note: n.note } : {}) }
-        changed = true
+    // 무대 LLM 은 end_characters 에 바뀐 인물만 적기도 한다 — 시작 목록 위에 덮어 전원 목록으로 만든다.
+    //   (부분 목록이 그대로 남으면 다음 비트로의 이어짐·END 배치에서 나머지 인물이 사라진다.)
+    const partial = cur.end_characters
+    const endList = cur.characters.map((c) => {
+      const e = partial?.find((x) => x.character_id === c.character_id)
+      return e ? { ...c, ...e } : { ...c }
+    })
+    let changed = !!partial && partial.length !== endList.length
+    if (next) {
+      for (const n of next.characters) {
+        const idx = endList.findIndex((c) => c.character_id === n.character_id)
+        if (idx < 0) continue // 직전 비트에 없던 인물 — 첫 비트 검증이 막는다; 여기서는 만들지 않는다
+        const e = endList[idx]
+        if (isMajorChange(e, n)) {
+          endList[idx] = { ...e, x: n.x, y: n.y, facing_deg: n.facing_deg, posture: n.posture, ...(n.note ? { note: n.note } : {}) }
+          changed = true
+        }
       }
     }
     if (changed) cur.end_characters = endList
@@ -106,9 +114,10 @@ function moveVerbFromLayout(shot: ShotDesign, characterId: string): string | nul
   const parts: string[] = []
   const dx = e.screen_x - s.screen_x
   if (Math.abs(dx) > 0.15) parts.push(`toward screen-${dx < 0 ? 'left' : 'right'}`)
-  const dh = e.apparent_height - s.apparent_height
-  if (dh > 0.15) parts.push('toward the camera')
-  else if (dh < -0.15) parts.push('away from the camera')
+  // 크기 변화는 비율로 — 먼 인물은 절대값이 작아도 멀어짐이 뚜렷하다(실측 sh_01_30 요정 0.30→0.17).
+  const ratio = s.apparent_height > 0 ? e.apparent_height / s.apparent_height : 1
+  if (ratio > 1.25) parts.push('toward the camera')
+  else if (ratio < 0.8) parts.push('away from the camera')
   if (!e.in_frame && s.in_frame) return `walks out of frame ${dx < 0 ? 'to the left' : dx > 0 ? 'to the right' : 'into the distance'}`
   if (!s.in_frame && e.in_frame) return `walks into frame ${parts.length ? parts.join(' and ') : 'from off-screen'}`
   return `walks ${parts.length ? parts.join(' and ') : 'to a new position'}`
@@ -158,7 +167,7 @@ export function applyLedgerToShots(
         location: sid,
         message: `상태 장부: ${nameOf(t.character_id)} ${label}(비트 ${t.beat})${has ? ' — 작가 동작이 이미 있음' : ' — 배경 동작 보충'}`,
         constraint_target: 'visual',
-        constraint: `Continuity of ${nameOf(t.character_id)} (${t.character_id}): during this shot they ${verb}${t.kind === 'posture' ? ` (${t.from} → ${t.to})` : ''}; show the change between START and END.`,
+        constraint: `Continuity: during this shot ${nameOf(t.character_id)} (${t.character_id}) ${verb}${t.kind === 'posture' ? ` (${t.from} → ${t.to})` : ''} — show the change between START and END.`,
       })
     }
     const covered = shownBy.length > 0

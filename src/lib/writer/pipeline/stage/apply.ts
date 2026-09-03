@@ -188,7 +188,8 @@ export function applyStageToShots(
     const { setup, defaulted } = normalizeSetup(spec.camera_setup, spec, stage, states.start)
     if (defaulted) push('WARNING', 'camera_setup 이 없어 기본 카메라(축 안쪽·피사체 첫 인물)로 계산했다', 'v4 출력에 camera_setup 을 채워라')
 
-    let startSolve = solveCamera({ setup, shotType: spec.shot_type, aspect, stage, states: states.start })
+    const intendedIds = (Array.isArray(spec.character_blocking) ? spec.character_blocking : []).map((b) => b.character_id)
+    let startSolve = solveCamera({ setup, shotType: spec.shot_type, aspect, stage, states: states.start, intendedIds })
     const isOts = !!setup.over_shoulder_of && states.start.some((c) => c.character_id === setup.over_shoulder_of)
     const tight = /^(ECU|CU|MCU|INSERT)$/i.test(String(spec.shot_type ?? ''))
     const subjectsForSight = new Set(subjectIds(setup))
@@ -203,7 +204,7 @@ export function applyStageToShots(
         const tries = [1, -1, 2, -2, 3, -3, 4].map((k) => order[(i0 + k + order.length * 2) % order.length])
         let fixed = false
         for (const dir of tries) {
-          const alt = solveCamera({ setup: { ...setup, from_direction: dir }, shotType: spec.shot_type, aspect, stage, states: states.start })
+          const alt = solveCamera({ setup: { ...setup, from_direction: dir }, shotType: spec.shot_type, aspect, stage, states: states.start, intendedIds })
           if (alt.axisCorrected) continue
           if (lineOfSightObstructions(alt.camera, states.start, subjectsForSight, aspect, alt.subjectDistance).length) continue
           startSolve = alt
@@ -230,7 +231,7 @@ export function applyStageToShots(
       })
       if (!missing.length) break
       backoff *= 1.2
-      startSolve = solveCamera({ setup, shotType: spec.shot_type, aspect, stage, states: states.start, distanceScale: backoff })
+      startSolve = solveCamera({ setup, shotType: spec.shot_type, aspect, stage, states: states.start, distanceScale: backoff, intendedIds })
       if (k === 5) push('INFO', `${missing.join(', ')} 를 프레임에 담으려 물러섰지만 끝내 못 담았다`)
     }
     if (backoff > 1) push('INFO', `의도한 인물을 프레임에 담으려 카메라가 ×${Math.round(backoff * 100) / 100} 물러섰다(샷이 지정보다 넓다)`)
@@ -242,9 +243,13 @@ export function applyStageToShots(
     const endDir = setup.end?.from_direction
     const statesChange = states.end !== states.start
     const cameraMoves = endScale !== 1 || (!!endDir && endDir !== setup.from_direction)
-    const endSolve = cameraMoves || statesChange
-      ? solveCamera({ setup, shotType: spec.shot_type, aspect, stage, states: states.end, distanceScale: endScale * backoff, fromDirectionOverride: endDir })
-      : null
+    // 카메라가 움직일 때만 END 카메라를 END 피사체 기준으로 다시 푼다. 정지 카메라에서 인물만 이동하면 START 카메라
+    //   그대로 END 배치를 계산해야 화면상 이동(멀어짐·좌우 이동)이 남는다(실측 sh_01_30: 다시 풀면 셋이 제자리).
+    const endSolve = cameraMoves
+      ? solveCamera({ setup, shotType: spec.shot_type, aspect, stage, states: states.end, distanceScale: endScale * backoff, fromDirectionOverride: endDir, intendedIds })
+      : statesChange
+        ? startSolve
+        : null
 
     const placementsStart = new Map(states.start.map((s) => [s.character_id, placeCharacter(startSolve.camera, s, aspect, startSolve.subjectDistance)]))
     const placementsEnd = endSolve
@@ -297,7 +302,7 @@ export function applyStageToShots(
     const layout: ShotScreenLayout = {
       beat: states.beatUsed,
       camera: startSolve.camera,
-      ...(endSolve ? { end_camera: endSolve.camera } : {}),
+      ...(endSolve && cameraMoves ? { end_camera: endSolve.camera } : {}),
       ...(startSolve.axisCorrected ? { axis_corrected: true } : {}),
       characters: layoutChars,
       issues: issues.filter((x) => x.location === shotId && x.severity !== 'INFO').map((x) => x.message),

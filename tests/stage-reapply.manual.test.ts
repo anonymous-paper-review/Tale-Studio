@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { applyStageToShots } from '@/lib/writer/pipeline/stage/apply'
+import { applyLedgerToShots, normalizeStageTransitions } from '@/lib/writer/pipeline/stage/ledger'
 import type { DecoupageShot, ShotDesign } from '@/lib/writer/types/pipeline'
 
 const ENABLED = process.env.RUN_STAGE_REAPPLY === '1'
@@ -28,16 +29,25 @@ describe.skipIf(!ENABLED)('stage reapply', () => {
       beat_summary: '', shot_size: s.shot_type, intended_duration_seconds: 5, rhythm_role: 'develop', camera_intent: 'static', dramatic_purpose: '',
     }))
     // 첫 샷(added, EWS)은 비트가 없었다 — 드라이런의 beat 를 그대로 쓰되 added 로 표시
-    const r = applyStageToShots(shots, d.stage, dec, { format: 'horizontal_16:9' })
+    // 작가 동작만 남긴다(장부가 보충한 것은 다시 계산)
+    for (const s of shots) s.dynamic_spec.character_motion = s.dynamic_spec.character_motion.filter((m: any) => m.source !== 'ledger')
+    const stage = normalizeStageTransitions(d.stage)
+    const r = applyStageToShots(shots, stage, dec, { format: 'horizontal_16:9' })
+    const names = new Map<string, string>(Object.entries(JSON.parse(process.env.STAGE_NAMES ?? '{}')))
+    const L = applyLedgerToShots(r.shots, stage, names)
     const out = {
       ...d,
-      shots: r.shots.map((s, i) => ({
+      stage,
+      shots: L.shots.map((s, i) => ({
         ...d.shots[i],
         camera_setup: s.static_spec.camera_setup,
         screen_layout: s.static_spec.screen_layout,
         character_blocking: s.static_spec.character_blocking,
+        character_motion: s.dynamic_spec.character_motion,
       })),
-      layout_notes: [{ name: 'reapply', text: r.issues.map((i) => `[${i.severity}] ${i.location}: ${i.message}`).join('\n') }],
+      ledger: [L.ledger],
+      issues: [...r.issues, ...L.issues],
+      layout_notes: [{ name: 'reapply', text: [...r.issues, ...L.issues].map((i) => `[${i.severity}] ${i.location}: ${i.message}`).join('\n') }],
     }
     writeFileSync(process.env.STAGE_OUT!, JSON.stringify(out, null, 1))
     expect(r.shots.length).toBe(shots.length)

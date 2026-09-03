@@ -147,3 +147,22 @@ describe('applyLedgerToShots', () => {
     expect(applied.shots.find((s) => s.intent.shot_id === 'shot_2')!.dynamic_spec.character_motion.some((m) => m.character_id === 'char')).toBe(false)
   })
 })
+
+describe('부분 end_characters 정규화 (#ledger 실측)', () => {
+  it('바뀐 인물만 적힌 end_characters 를 전원 목록으로 채우고, 다음 비트 시작과의 차이(요정 누움→섬)도 잡는다', () => {
+    const partial: SceneStage = {
+      ...STAGE,
+      beats: [
+        { beat: 0, characters: STAGE.beats[0].characters, end_characters: [{ character_id: 'char_3', x: -2, y: -3, facing_deg: 0, posture: 'sitting' }] },
+        STAGE.beats[1],
+      ],
+    }
+    const n = normalizeStageTransitions(partial)
+    const end0 = n.beats[0].end_characters!
+    expect(end0.map((c) => c.character_id).sort()).toEqual(['char', 'char_2', 'char_3'])
+    expect(end0.find((c) => c.character_id === 'char_3')!.posture).toBe('sitting')
+    expect(end0.find((c) => c.character_id === 'char_2')!.posture).toBe('standing') // 비트 1 시작이 섬 → 비트 0 끝으로
+    const ts = deriveTransitions(n).filter((t) => t.beat === 0).map((t) => `${t.character_id}:${t.from}→${t.to}`).sort()
+    expect(ts).toEqual(['char:lying→standing', 'char_2:lying→standing', 'char_3:lying→sitting'])
+  })
+})

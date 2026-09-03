@@ -59,14 +59,15 @@ describe('180° 축', () => {
 
   it('반대편에 놓인 카메라는 축 안쪽으로 반사되고 이슈가 남는다', () => {
     // 수인(북쪽 5m)을 남쪽에서 MS 로 잡으면 카메라가 축(y=0.6) 북쪽에 놓인다 → 반사
-    const r = solveCamera({ setup: { subject: 'char_3', from_direction: 'S', height: 'eye', lens_mm: 35 }, shotType: 'MS', aspect: ASPECT, stage: STAGE, states: STAGE.beats[0].characters })
+    // 요정·용족을 프레임에 두려는 샷(intendedIds) — 축 인물이 의도 명단에 있으니 축을 지킨다
+    const r = solveCamera({ setup: { subject: 'char_3', from_direction: 'S', height: 'eye', lens_mm: 35 }, shotType: 'MS', aspect: ASPECT, stage: STAGE, states: STAGE.beats[0].characters, intendedIds: ['char_2', 'char'] })
     expect(r.axisCorrected).toBe(true)
     expect(r.camera.y).toBeLessThan(0.6)
     expect(r.issues.some((m) => m.includes('축'))).toBe(true)
   })
 
   it('동기 있는 축 넘기(axis_cross=motivated)는 그대로 둔다', () => {
-    const r = solveCamera({ setup: { subject: 'char_3', from_direction: 'S', height: 'eye', lens_mm: 35, axis_cross: 'motivated' }, shotType: 'MS', aspect: ASPECT, stage: STAGE, states: STAGE.beats[0].characters })
+    const r = solveCamera({ setup: { subject: 'char_3', from_direction: 'S', height: 'eye', lens_mm: 35, axis_cross: 'motivated' }, shotType: 'MS', aspect: ASPECT, stage: STAGE, states: STAGE.beats[0].characters, intendedIds: ['char_2', 'char'] })
     expect(r.axisCorrected).toBe(false)
     expect(r.camera.y).toBeGreaterThan(0.6)
   })
@@ -180,5 +181,30 @@ describe('어깨 너머(OTS)와 시야 가림 (#stage 실측 수리)', () => {
     expect(clear).toEqual([])
     const blocked = lineOfSightObstructions(cam, [{ ...DRAGON, x: -2, y: 0 }, blocker], new Set(['char']), ASPECT, 3.57)
     expect(blocked).toEqual(['char_3'])
+  })
+})
+
+describe('축 보정의 범위 (#stage 실측 sh_01_02/05)', () => {
+  it('축 인물이 프레임 밖이고 피사체도 아닌 단독 샷은 축을 넘어도 보정하지 않는다(MS 가 와이드로 변하지 않음)', () => {
+    // 축 = 용족(-1.5,-2)→요정(1.5,2) 대각선, 카메라는 오른쪽(남동). 수인(-3,0)은 축 왼쪽.
+    const stage: SceneStage = {
+      ...STAGE,
+      axis: { from: 'char', to: 'char_2' },
+      camera_side: 'right',
+      beats: [{ beat: 0, characters: [
+        { character_id: 'char', x: -1.5, y: -2, facing_deg: 0, posture: 'lying', height_m: 1.9 },
+        { character_id: 'char_2', x: 1.5, y: 2, facing_deg: 0, posture: 'lying', height_m: 1.7 },
+        { character_id: 'char_3', x: -3, y: 0, facing_deg: 0, posture: 'lying', height_m: 2.0 },
+      ] }],
+    }
+    const r = solveCamera({ setup: { subject: 'char_3', from_direction: 'S', height: 'low', lens_mm: 35 }, shotType: 'MS', aspect: ASPECT, stage, states: stage.beats[0].characters })
+    expect(r.axisCorrected).toBe(false)
+    expect(r.subjectDistance).toBeLessThan(3)
+    expect(r.issues.some((m) => m.includes('생략'))).toBe(true)
+  })
+
+  it('피사체가 축 인물이면 축을 지킨다', () => {
+    const r = solveCamera({ setup: { subject: 'char', from_direction: 'N', height: 'eye', lens_mm: 85 }, shotType: 'MCU', aspect: ASPECT, stage: STAGE, states: STAGE.beats[0].characters })
+    expect(r.axisCorrected).toBe(true)
   })
 })

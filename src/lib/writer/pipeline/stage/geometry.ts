@@ -180,6 +180,8 @@ export interface SolveCameraInput {
   /** 카메라 무브 끝 등 — 거리 배율·방향 덮어쓰기 */
   distanceScale?: number
   fromDirectionOverride?: CompassDir
+  /** LLM 이 이 샷에 보이길 의도한 인물(character_blocking) — 축 인물이 여기 있으면 축을 지킨다 */
+  intendedIds?: readonly string[]
 }
 
 export interface SolvedCamera {
@@ -245,7 +247,23 @@ export function solveCamera(input: SolveCameraInput): SolvedCamera {
   //      축을 넘을 때까지 물러선다(+여유 3m) — 샷은 넓어지지만 관객의 좌우가 지켜진다.
   //   ③ 둘 다 안 되면 점 반사(마지막 수단).
   let axisCorrected = false
-  if (axis && !ots) {
+  // 축 보정의 적용 범위(실측 겨울_4 sh_01_02/05): 180° 축은 두 축 인물의 관계(좌우·시선)를 지키는 규칙이다.
+  //   축 인물이 둘 다 프레임 밖이고 피사체도 아닌 단독 샷(예: 축 건너편에서 다가오는 수인의 MS)은 축을 넘어도
+  //   관객의 좌우가 뒤집히지 않는다 — 보정하면 MS 가 7m 와이드가 되는 부작용만 남는다.
+  const axisIds = stage.axis ? [stage.axis.from, stage.axis.to] : []
+  const subjectIds = setup.subject === 'group' || !setup.subject ? states.map((s) => s.character_id) : Array.isArray(setup.subject) ? setup.subject : [setup.subject]
+  const intended = input.intendedIds ?? []
+  const axisRelevant = (() => {
+    if (!axis || ots) return false
+    if (axisIds.some((id) => subjectIds.includes(id) || intended.includes(id))) return true
+    const tentative: StageCamera = { x: cam.x, y: cam.y, z: camZ, look_at: { x: center.x, y: center.y, z: lookZ }, lens_mm: lens, hfov_deg: 0 }
+    const tentativeDist = Math.hypot(cam.x - center.x, cam.y - center.y)
+    return states.some((s) => axisIds.includes(s.character_id) && placeCharacter(tentative, s, aspect, tentativeDist).in_frame)
+  })()
+  if (axis && !ots && !axisRelevant && axisSide(axis.from, axis.to, cam) !== stage.camera_side) {
+    issues.push('축 인물이 프레임 밖이고 피사체도 아니라 180° 축 보정을 생략했다(단독 샷)')
+  }
+  if (axis && !ots && axisRelevant) {
     const side = axisSide(axis.from, axis.to, cam)
     if (side !== 'on' && side !== stage.camera_side) {
       if (setup.axis_cross === 'motivated') {
