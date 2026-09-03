@@ -106,7 +106,7 @@ export async function POST(req: Request) {
     // 존재 및 소유권은 비용·중복 게이트보다 먼저 확인한다. 잘못된 모습 키가 다른 슬롯 응답으로 숨으면 안 된다.
     const { data: requestedAppearance, error: requestedAppearanceError } = await supabaseAdmin
       .from('character_appearances')
-      .select('appearance_key')
+      .select('appearance_key, sheet_url')
       .eq('project_id', projectId)
       .eq('character_id', characterId)
       .eq('appearance_key', appearanceKey)
@@ -114,6 +114,13 @@ export async function POST(req: Request) {
     if (requestedAppearanceError) throw requestedAppearanceError
     if (!requestedAppearance) {
       return NextResponse.json({ error: 'appearance not found' }, { status: 404 })
+    }
+
+    // 빈칸만 채운다(architecture §5, #artist-main-authority 2026-09-03): 자율 생성(actor='auto')은 이 모습의 시트가
+    //   이미 있으면 제출하지 않는다. 사람의 재생성(ui/chat)만 기존 시트를 참조로 다시 만든다.
+    //   실측 겨울_5: 클라이언트가 구 컬럼(view_main)만 보고 Artist 진입마다 전 인물을 재제출 — 서버가 최종 방어선.
+    if (actor === 'auto' && view === 'main' && typeof requestedAppearance.sheet_url === 'string' && requestedAppearance.sheet_url) {
+      return NextResponse.json({ ok: true, skipped: true, reason: 'exists' })
     }
 
     // give-up 게이트: 자율 first-fill(actor='auto')은 같은 슬롯(캐릭터×뷰) 실패가 임계값 이상이면

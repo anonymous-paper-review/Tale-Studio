@@ -787,3 +787,60 @@ function rowsForTable(table: string): Array<Record<string, unknown>> {
 function matchesFilters(row: Record<string, unknown>, filters: Array<[string, unknown]>): boolean {
   return filters.every(([column, value]) => row[column] === value)
 }
+
+// #artist-main-authority(2026-09-03): 자율 생성(actor='auto')은 시트가 이미 있는 모습을 다시 만들지 않는다 —
+//   실측 겨울_5: Artist 진입마다 writer 출신 인물 전원의 시트가 재제출됐다(클라가 구 컬럼 view_main 만 봄).
+describe('generate-sheet — 자율 생성은 빈칸만 채운다', () => {
+  it('auto + 기본 모습 시트 있음 → skipped(exists), fal 제출·잡 생성 없음', async () => {
+    setCharacters(characterFixture({ view_main: 'https://storage.test/character-1_sheet.png', origin: 'writer' }))
+
+    const response = await generateSheetPOST(
+      postRequest('/api/artist/generate-sheet', {
+        projectId: PROJECT_ID,
+        characterId: CHARACTER_ID,
+        appearanceKey: 'current',
+        view: 'main',
+        actor: 'auto',
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ ok: true, skipped: true, reason: 'exists' })
+    expect(mocks.falImageSubmit).not.toHaveBeenCalled()
+    expect(mocks.createGenerationJob).not.toHaveBeenCalled()
+  })
+
+  it('사람의 재생성(ui) + 시트 있음 → 기존 시트를 참조로 다시 만든다(제출됨)', async () => {
+    setCharacters(characterFixture({ view_main: 'https://storage.test/character-1_sheet.png', origin: 'writer' }))
+
+    const response = await generateSheetPOST(
+      postRequest('/api/artist/generate-sheet', {
+        projectId: PROJECT_ID,
+        characterId: CHARACTER_ID,
+        appearanceKey: 'current',
+        view: 'main',
+        actor: 'ui',
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(mocks.falImageSubmit).toHaveBeenCalledTimes(1)
+  })
+
+  it('auto + 시트 없음 → 정상 제출(첫 채움)', async () => {
+    setCharacters(characterFixture({ view_main: null, origin: 'writer' }))
+
+    const response = await generateSheetPOST(
+      postRequest('/api/artist/generate-sheet', {
+        projectId: PROJECT_ID,
+        characterId: CHARACTER_ID,
+        appearanceKey: 'current',
+        view: 'main',
+        actor: 'auto',
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(mocks.falImageSubmit).toHaveBeenCalledTimes(1)
+  })
+})

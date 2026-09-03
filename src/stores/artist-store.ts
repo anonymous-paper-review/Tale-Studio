@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { mainImageFromAppearances } from '@/lib/artist/main-image'
 import { displayNameOf } from '@/lib/display-name'
 import type { SceneManifest, CharacterAppearance, CharacterAsset, WorldAsset } from '@/types'
 import { type CharacterViewKey, type NarrativeTime } from '@/types/asset'
@@ -621,7 +622,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             name: displayNameOf(c.name, c.character_id),
             appearances: appearancesByChar.get(c.character_id as string) ?? [],
             views: {
-              main: c.view_main ?? null,
+              // 대표 이미지 = 기본 모습의 시트(#artist-main-authority). view_main 은 구 컬럼 폴백.
+              main: mainImageFromAppearances(c.view_main ?? null, appearancesByChar.get(c.character_id as string)),
               back: c.view_back ?? null,
               sideLeft: c.view_side_left ?? null,
               sideRight: c.view_side_right ?? null,
@@ -984,6 +986,13 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       // 서버 give-up 게이트(반복 실패 슬롯의 자율 재생성 차단) → jobId 없음.
       //   에러는 아니지만 **조용히 끝내면 안 된다** — 화면상 아무 일도 안 일어난 것과 구분이 안 되고,
       //   원인이 고쳐져도 자동으로는 복구되지 않아 사람이 눌러야 한다(2026-08-13 실사용에서 막힌 지점).
+      // 서버 "이미 있음" 게이트(#artist-main-authority): 자동 생성이 시트가 있는 슬롯을 다시 만들지 않는다 —
+      //   정상 상태이므로 조용히 끝낸다(give-up 안내와 다르다).
+      if (body.skipped && (body as { reason?: string }).reason === 'exists') {
+        alog(`[autogen] char ${key} — sheet already exists, server skipped (no submit)`)
+        options?.onJob?.({ jobId: null, status: 'skipped', httpStatus: res.status })
+        return { jobId: null, status: 'skipped', httpStatus: res.status }
+      }
       if (body.skipped || !body.jobId) {
         alog(`[autogen] char ${key} — give-up 게이트로 자동 생성 skip`)
         notifyGenerationGaveUp('artist', translate(useLocaleStore.getState().locale, 'Character image'))
