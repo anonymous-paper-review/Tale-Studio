@@ -1102,6 +1102,7 @@ export type Database = {
           i18n_provenance: Json
           source: string
           narrative_time: string
+          stage: Json | null
         }
         Insert: {
           id?: string
@@ -1123,6 +1124,7 @@ export type Database = {
           i18n_provenance?: Json
           source?: string
           narrative_time: string
+          stage?: Json | null
         }
         Update: {
           id?: string
@@ -1144,6 +1146,7 @@ export type Database = {
           i18n_provenance?: Json
           source?: string
           narrative_time?: string
+          stage?: Json | null
         }
         Relationships: [
           {

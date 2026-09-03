@@ -1,3 +1,4 @@
+import type { Json } from '@/types/database'
 // writer 파이프라인 결과 → DB 기록 (단일 생산자, §3 일원화)
 //
 // 기존 generate-scenes(낡은 writer)를 대체한다. lossy 한 adapters.ts 대신, 대사를 보유한
@@ -36,6 +37,7 @@ import {
 } from '@/lib/writer/i18n/derive-en'
 import type { ShotType } from '@/types'
 import type {
+  SceneStage,
   Characters,
   Scenes,
   WorldVisual,
@@ -665,6 +667,26 @@ export function applyShotCarryForward<T extends Record<string, unknown>>(
  *   characters/locations/scenes 는 Tier 1 이 이미 기록했으므로 건드리지 않는다(artist 편집 보존).
  *   기존 shots 행은 project_id 기준 삭제 후 재삽입(idempotent). 호출자는 non-blocking.
  */
+/**
+ * 씬 무대(#stage 2026-09-03) → scenes.stage. 씬 행은 persistAssetsToDb(v2Design)가 이미 넣었으므로 갱신만.
+ *   실패는 throw — 호출부(sceneStage step)가 로그로 드러내고 run 은 계속한다.
+ */
+export async function persistSceneStagesToDb(projectId: string, stages: SceneStage[]): Promise<number> {
+  if (!UUID_RE.test(projectId) || !stages.length) return 0
+  let n = 0
+  for (const st of stages) {
+    const { error, count } = await supabaseAdmin
+      .from('scenes')
+      .update({ stage: st as unknown as Json }, { count: 'exact' })
+      .eq('project_id', projectId)
+      .eq('scene_id', writerSceneIdToMain(st.scene_id))
+    if (error) throw new Error(`scenes.stage update(${st.scene_id}): ${error.message}`)
+    if (count === 0) console.warn(`[persistSceneStagesToDb] scene row not found: ${st.scene_id} → ${writerSceneIdToMain(st.scene_id)}`)
+    else n += 1
+  }
+  return n
+}
+
 export async function persistShotsToDb(
   projectId: string,
   shotSequence: ShotSequence,

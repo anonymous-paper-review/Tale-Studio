@@ -583,6 +583,112 @@ export interface SceneCinematography {
 }
 
 // =====================================================================
+// V3.5: 씬 무대 (Scene stage) — #stage 2026-09-03 (무대 진단서 1번)
+//   씬 안의 세계 좌표(미터)에 인물·표지를 놓고 샷마다 카메라를 둔다. 화면 안 위치·깊이·크기·향은
+//   여기서 **계산**으로 나온다 — 샷마다 LLM 이 화면 위치를 새로 고르던 것(좌우 뒤집힘의 원천)을
+//   없앤다. 좌표계: x = 동(카메라가 남쪽에 있을 때 화면 오른쪽), y = 북(앞), z = 위. 단위 m.
+//   facing_deg: 0 = +y(북), 90 = +x(동), 시계 방향.
+// =====================================================================
+
+export type StagePosture =
+  | 'standing' | 'sitting' | 'kneeling' | 'crouching' | 'lying'
+  | 'walking' | 'running' | 'floating' | 'other';
+
+export interface StageLandmark {
+  id: string;         // snake_case (로케이션 소품·지형 표지)
+  label: string;      // 영어 한 구절
+  x: number;
+  y: number;
+}
+
+export interface StageCharacterState {
+  character_id: string;
+  x: number;
+  y: number;
+  facing_deg: number;
+  posture: StagePosture;
+  height_m?: number;  // 기본 1.75
+  note?: string;      // "lying on a floating dirt mound" 등 — 러프 포즈 문장의 재료
+}
+
+export interface StageBeat {
+  beat: number;                       // scene_actions 인덱스 — 이 비트가 시작되는 순간의 상태
+  summary?: string;
+  characters: StageCharacterState[];  // 씬의 사람 인물 전원(화면 밖이어도 어딘가에 있다)
+  end_characters?: StageCharacterState[]; // 비트 안에서 이동·자세 변화가 있으면 끝 상태
+}
+
+export interface SceneStage {
+  scene_id: string;
+  unit: 'm';
+  landmarks: StageLandmark[];
+  /** 180° 축 — 두 인물(또는 표지) 사이 선. from→to 를 바라볼 때 camera_side 쪽에 카메라가 머문다. */
+  axis: { from: string; to: string } | null;
+  camera_side: 'left' | 'right';
+  beats: StageBeat[];
+  notes?: string;
+}
+
+export type CompassDir = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
+
+/** v4 가 무대 위에 두는 카메라 — 위치는 여기서 계산한다(LLM 은 방향·높이·렌즈·피사체만 고른다). */
+export interface ShotCameraSetup {
+  /** 피사체: character_id | landmark id | 'group'(씬 인물 전원) | character_id[] */
+  subject: string | string[];
+  /** 카메라가 피사체 기준 어느 쪽에 서는가(세계 나침반). S = 피사체의 남쪽에서 북쪽을 본다. */
+  from_direction: CompassDir;
+  height: 'eye' | 'low' | 'high' | 'overhead';
+  lens_mm: number;
+  /** OTS — 이 인물의 어깨 너머에서 subject 를 본다 */
+  over_shoulder_of?: string | null;
+  /** 축을 넘는 샷은 동기가 있을 때만(중립 샷·화면 안 이동 뒤) — 아니면 계산이 축 안쪽으로 되돌린다 */
+  axis_cross?: 'none' | 'motivated';
+  /** 카메라 무브의 끝(달리·트래킹): 방향/거리 배율. 없으면 camera_motion 에서 추정 */
+  end?: { from_direction?: CompassDir; distance_scale?: number } | null;
+}
+
+export type ScreenPositionWord =
+  | 'off_left' | 'frame_edge_left' | 'left_third' | 'center_third' | 'right_third' | 'frame_edge_right' | 'off_right';
+export type DepthBand = 'foreground' | 'midground' | 'background';
+export type FacingWord =
+  | 'front' | 'three_quarter_front_left' | 'three_quarter_front_right'
+  | 'profile_left' | 'profile_right'
+  | 'three_quarter_back_left' | 'three_quarter_back_right' | 'back';
+
+export interface ScreenPlacement {
+  in_frame: boolean;
+  screen_x: number;          // -1(왼쪽 끝)…1(오른쪽 끝)
+  screen_y: number;          // 발 위치, -1(아래)…1(위)
+  distance_m: number;
+  apparent_height: number;   // 프레임 높이 대비 인물 키(1 = 꽉 참, >1 = 잘림)
+  position_in_frame: ScreenPositionWord;
+  depth_band: DepthBand;
+  facing: FacingWord;
+}
+
+export interface StageCamera {
+  x: number; y: number; z: number;
+  look_at: { x: number; y: number; z: number };
+  lens_mm: number;
+  hfov_deg: number;
+}
+
+/** 무대 + camera_setup 에서 계산한 화면 배치(START/END). 러프·실사 프롬프트와 검증의 진실. */
+export interface ShotScreenLayout {
+  beat: number;
+  camera: StageCamera;
+  end_camera?: StageCamera;
+  /** 축 보정 — 카메라가 축 반대편에 놓여 축 안쪽으로 거울 반사했다 */
+  axis_corrected?: boolean;
+  characters: Array<{
+    character_id: string;
+    start: ScreenPlacement;
+    end?: ScreenPlacement;
+  }>;
+  issues: string[];
+}
+
+// =====================================================================
 // Découpage: 감독의 beat→shot 분해 (Director's authored shot breakdown)
 //   linear_pipeline.md Turn 7 설계. S3 내러티브 비트와 샷을 분리한다.
 //     - 비트(scene_actions) = "무슨 일이 일어나는가" (내러티브 단위)
@@ -732,6 +838,11 @@ export interface ShotStaticSpec {
 
   // 최종 출력 (compile 결과)
   first_frame_prompt: string;        // Image 생성기 입력 (200~400자 OK)
+
+  // #stage(2026-09-03): 무대 위 카메라(LLM 선택) + 계산된 화면 배치. 무대가 없는 run(구 state·
+  //   compact 폴백)은 둘 다 없고 character_blocking[].position_in_frame 이 LLM 값 그대로다.
+  camera_setup?: ShotCameraSetup;
+  screen_layout?: ShotScreenLayout;
 }
 
 export interface ShotDynamicSpec {

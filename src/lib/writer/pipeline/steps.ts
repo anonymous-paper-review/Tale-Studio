@@ -18,13 +18,15 @@ import { runActVisualArc } from '@/lib/writer/pipeline/stages/v1_act_arc';
 import { runV2Design } from '@/lib/writer/pipeline/stages/v2_design';
 import { runSceneCinematography } from '@/lib/writer/pipeline/stages/v3_scene_plan';
 import { runDecoupage } from '@/lib/writer/pipeline/stages/decoupage';
+import { runSceneStage } from '@/lib/writer/pipeline/stages/v3s_stage';
+import { isFlagOn } from '@/lib/flags';
 import { runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots';
 import { runShotCheck } from '@/lib/writer/pipeline/stages/c_application_2';
 import { runRenderPrompts } from '@/lib/writer/pipeline/stages/v5_prompts';
 import { runDialogue, toDialogueTrack, type DialogueProgress } from '@/lib/writer/pipeline/stages/dialogue';
 import { inferSceneCinematographyFromShots } from '@/lib/writer/pipeline/util/infer_v3';
 import { persistDesignTokens } from '@/lib/writer/pipeline/util/persist_design_tokens';
-import { persistAssetsToDb, persistShotsToDb } from '@/lib/writer/pipeline/util/persist_manifest';
+import { persistAssetsToDb, persistShotsToDb, persistSceneStagesToDb } from '@/lib/writer/pipeline/util/persist_manifest';
 import { triggerAssetDrafts } from '@/lib/artist/draft-trigger';
 import { isCompactDepth } from '@/lib/writer/types/pipeline';
 import { analyzeSceneActionBudget } from '@/lib/writer/pipeline/validators/action_budget';
@@ -55,6 +57,7 @@ import {
 import type {
   PipelineInput,
   SceneCinematography,
+  SceneStage,
   ValidationIssue,
   Genre,
   Dramaturgy,
@@ -106,6 +109,10 @@ export interface WriterRunState extends WriterRunStateBase {
   worldVisual?: WorldVisual;         // v2 (월드 비주얼)
   sceneCinematography?: SceneCinematography[];
   sceneBudgetIssues?: ValidationIssue[];
+  /** 씬 무대(#stage 2026-09-03) — decoupage 뒤, shotDesign 앞. [] = 건너뜀(플래그 off). */
+  sceneStage?: SceneStage[];
+  /** sceneStage 씬 단위 부분 진행 — decoupagePartial 과 같은 계약. */
+  sceneStagePartial?: SceneStage[];
 
   // Shot 축
   decoupage?: DecoupagePlan;
@@ -201,6 +208,8 @@ async function runLaneVisual(
         resume: s.shotDesignPartial ?? null,
         softDeadlineMs: deadlineMs,
         concurrency: Number(process.env.WRITER_SCENE_CONCURRENCY) || undefined,
+        // #stage: 무대가 있으면 v4 가 camera_setup 을 고르고 화면 배치를 계산한다. [] / 구 state = 옛 동작.
+        sceneStages: s.sceneStage?.length ? s.sceneStage : null,
       },
     );
     await logger.flushRawLlm('shotDesign');
@@ -530,6 +539,44 @@ export const WRITER_STEPS: WriterStep[] = [
         return { decoupagePartial: result.scenes };
       }
       return { decoupage: result.plan, decoupagePartial: undefined };
+    },
+  },
+  {
+    // 씬 무대(#stage 2026-09-03, 무대 진단서 1번) — decoupage 뒤, shotDesign 앞. 씬마다 세계 좌표 배치도를
+    //   세우고 scenes.stage 에 기록한다. v4 는 이 무대 위에서 camera_setup 만 고르고 화면 배치는 계산된다.
+    //   WRITER_STAGE_OFF=1 이면 건너뛴다(sceneStage=[] — v4 는 무대 없는 옛 동작).
+    key: 'sceneStage',
+    has: (s) => s.sceneStage !== undefined,
+    run: async (s, { logger, projectId, deadlineMs }) => {
+      if (isFlagOn('WRITER_STAGE_OFF')) {
+        await logger.markStage('sceneStage', 'completed', { skipped: true, reason: 'WRITER_STAGE_OFF' });
+        return { sceneStage: [], sceneStagePartial: undefined };
+      }
+      const models = resolveModels(s.input);
+      const compact = s.compact === true;
+      const result = await runSceneStage(
+        s.characters!,
+        s.scenes!,
+        s.worldVisual!,
+        compact ? null : (s.sceneCinematography ?? null),
+        s.decoupage ?? null,
+        logger,
+        models.V,
+        {
+          resume: s.sceneStagePartial ?? null,
+          softDeadlineMs: deadlineMs,
+          concurrency: Number(process.env.WRITER_SCENE_CONCURRENCY) || undefined,
+          outputLocale: s.input.outputLocale,
+        },
+      );
+      await logger.flushRawLlm('sceneStage');
+      if (!result.done) return { sceneStagePartial: result.stages };
+      // 씬 행은 v2Design 시점에 이미 있다(persistAssetsToDb) — 무대만 갱신. 실패는 침묵하지 않되 run 을 막지 않는다
+      //   (state.sceneStage 가 남아 있어 다음 persistShots 등에서 다시 시도할 수 있다).
+      await persistSceneStagesToDb(projectId, result.stages).catch((e) => {
+        console.error('[writer] persistSceneStagesToDb 실패 (best-effort 계속):', e instanceof Error ? e.message : e);
+      });
+      return { sceneStage: result.stages, sceneStagePartial: undefined };
     },
   },
   {

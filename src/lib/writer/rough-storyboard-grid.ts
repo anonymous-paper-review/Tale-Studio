@@ -15,6 +15,7 @@ import {
   type RoughStoryboardPromptInput,
 } from '@/lib/writer/rough-storyboard'
 import type { ProjectFormat } from '@/types/project'
+import type { ScreenPlacement } from '@/lib/writer/types/pipeline'
 
 // ── 셀 지오메트리 (finalize crop 이 소비) ─────────────────────────────────────
 // 템플릿 실측 비례 좌표(격자선 3px 인셋) — public/rough-storyboard-grid.png 1672×941 기준.
@@ -261,6 +262,40 @@ function clipText(s: string, n: number): string {
   return s.length > n ? `${s.slice(0, n)}…` : s
 }
 
+// ── #stage 화면 배치 문장 — 계산된 위치·깊이·크기·향을 러프 지시로 옮긴다 ────────────────
+const POSITION_PHRASES: Record<string, string> = {
+  off_left: 'just outside the left edge of the frame',
+  frame_edge_left: 'at the far left edge of the frame',
+  left_third: 'in the left third of the frame',
+  center_third: 'in the center of the frame',
+  right_third: 'in the right third of the frame',
+  frame_edge_right: 'at the far right edge of the frame',
+  off_right: 'just outside the right edge of the frame',
+}
+const FACING_PHRASES: Record<string, string> = {
+  front: 'facing the camera',
+  three_quarter_front_left: 'three-quarter view, turned toward screen-left',
+  three_quarter_front_right: 'three-quarter view, turned toward screen-right',
+  profile_left: 'in profile, facing screen-left',
+  profile_right: 'in profile, facing screen-right',
+  three_quarter_back_left: 'three-quarter back view, turned toward screen-left',
+  three_quarter_back_right: 'three-quarter back view, turned toward screen-right',
+  back: 'seen from behind',
+}
+function sizePhrase(apparentHeight: number): string {
+  if (apparentHeight >= 1.3) return 'very close, cut by the frame (only part of the body in view)'
+  if (apparentHeight >= 0.85) return 'large, filling most of the frame height'
+  if (apparentHeight >= 0.45) return 'mid-size, whole body in view'
+  if (apparentHeight >= 0.2) return 'small, far away'
+  return 'tiny in the distance'
+}
+export function describePlacement(p: ScreenPlacement): string {
+  return `${POSITION_PHRASES[p.position_in_frame] ?? words(p.position_in_frame)}, in the ${p.depth_band}, ${sizePhrase(p.apparent_height)}, ${FACING_PHRASES[p.facing] ?? words(p.facing)}`
+}
+function placementDiffers(a: ScreenPlacement, b: ScreenPlacement): boolean {
+  return a.position_in_frame !== b.position_in_frame || Math.abs(a.apparent_height - b.apparent_height) > 0.15 || a.depth_band !== b.depth_band || a.in_frame !== b.in_frame
+}
+
 /** rich(shotDesign)/fallback(DB) 공용 — 기존 RoughStoryboardPromptInput 을 셀 서술로 요약. */
 export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: string): RoughGridCell {
   const s = input.spec?.staticSpec
@@ -283,12 +318,18 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
     })
     .join('; ')
   const figureCount = blocking.length || input.characterNames.length
+  // #stage(2026-09-03): 무대에서 계산된 화면 배치(screen_layout)가 있으면 위치·깊이·크기·향을 문장에 싣는다.
+  //   위치 낱말은 LLM 값이 아니라 계산값(character_blocking.position_in_frame 도 이미 덮어써져 있다).
+  const layoutById = new Map((s?.screen_layout?.characters ?? []).map((c) => [c.character_id, c]))
   const personLine = blocking.length
     ? blocking
         .map(
           // 시선은 "머리(얼굴 없음)가 향하는 방향"으로 — gaze 단어는 눈/얼굴을 유발한다(목각 인형 캐논).
-          (b, i) =>
-            `figure ${i + 1} at ${words(b.position_in_frame) || 'center'}, ${stripColor(words(b.pose)) || 'standing'}, blank head facing ${words(b.gaze) || 'ahead'}`,
+          (b, i) => {
+            const lay = layoutById.get(b.character_id)
+            const place = lay ? describePlacement(lay.start) : `at ${words(b.position_in_frame) || 'center'}`
+            return `figure ${i + 1} ${place}, ${stripColor(words(b.pose)) || 'standing'}, blank head facing ${words(b.gaze) || 'ahead'}`
+          },
         )
         .join('; ')
     : figureCount
@@ -464,7 +505,16 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
   const endBase = motionParts.length
     ? `the same shot after ${durNote ? `the full ${durNote} seconds of` : ''} the movement completes — ${motionParts.join('; ')} has fully finished. END must be clearly and visibly different from START: show how far ${durNote ? `${durNote} seconds` : 'the shot'} of this movement actually carries the figures and camera (changed poses, positions and framing), not a subtle variation`
     : 'nearly identical to START (static shot) — only a subtle natural settling'
-  const end = drawLine ? `${endBase}. Same ${drawLine}` : endBase
+  // #stage: END 배치가 START 와 다르면(카메라 무브·인물 이동) 끝 위치·크기를 명시한다.
+  const endPlacements = blocking
+    .map((b, i) => {
+      const lay = layoutById.get(b.character_id)
+      if (!lay?.end || !placementDiffers(lay.start, lay.end)) return null
+      return `figure ${i + 1} ends ${describePlacement(lay.end)}`
+    })
+    .filter((v): v is string => !!v)
+  const endWithLayout = endPlacements.length ? `${endBase}. Positions at END: ${endPlacements.join('; ')}` : endBase
+  const end = drawLine ? `${endWithLayout}. Same ${drawLine}` : endWithLayout
 
   return { shotId, start: startParts.join('. '), motion, end }
 }

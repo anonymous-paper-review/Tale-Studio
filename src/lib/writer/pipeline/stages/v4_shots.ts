@@ -27,6 +27,7 @@ import type { ShotStaticSpec,
   WorldVisual,
   CharacterVisual,
   SceneCinematography,
+  SceneStage,
   ShotDesign,
   Genre,
   Characters,
@@ -34,6 +35,7 @@ import type { ShotStaticSpec,
   StoryScene,
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
+import { applyStageToShots } from '@/lib/writer/pipeline/stage/apply';
 
 /** 씬 단위 부분 진행 체크포인트(#long-writer-run 2026-07-15) — steps.ts가 state에 영속. */
 export interface ShotDesignProgress {
@@ -92,6 +94,9 @@ export async function runShotDesign(
     softDeadlineMs?: number;
     /** 씬 동시성(#parallel-shotdesign). 미지정 시 DEFAULT_SHOT_CONCURRENCY(env). 1이면 순차. */
     concurrency?: number;
+    /** 씬 무대(#stage 2026-09-03) — 있으면 v4 는 camera_setup 을 고르고 화면 배치는 계산으로 확정한다.
+     *  null/미지정 = 무대 없는 구 동작(LLM 의 position_in_frame 그대로). */
+    sceneStages?: SceneStage[] | null;
   },
 ): Promise<RunShotDesignResult> {
   const compactMode = sceneCinematographyPlans === null;
@@ -123,6 +128,7 @@ export async function runShotDesign(
       return [];
     }
     const sceneDec = decoupage?.scenes.find((d) => d.scene_id === scene.scene_id)?.shots ?? null;
+    const stage = opts?.sceneStages?.find((st) => st.scene_id === scene.scene_id) ?? null;
     const sceneShots: ShotDesign[] = [];
     if (sceneDec && sceneDec.length > SHOT_CHUNK_SIZE) {
       const totalChunks = Math.ceil(sceneDec.length / SHOT_CHUNK_SIZE);
@@ -130,13 +136,25 @@ export async function runShotDesign(
         const chunk = sceneDec.slice(i, i + SHOT_CHUNK_SIZE);
         const chunkNote = `(씬 전체 데쿠파주 ${sceneDec.length}개 중 ${i + 1}~${i + chunk.length}번째 묶음 — ${Math.floor(i / SHOT_CHUNK_SIZE) + 1}/${totalChunks}. 이 묶음의 샷들만 출력하라)`;
         // #n-1: 직전 청크의 확정 스펙 꼬리를 다음 청크에 계약으로 — 청크 경계 연속성.
-        const part = await generateL4ForScene(scene, plan, chunk, genre, characters, visualIdentity, worldVisual, characterVisual, seedV4, logger, axisConfig, chunkNote, sceneShots, countBadges);
+        const part = await generateL4ForScene(scene, plan, chunk, genre, characters, visualIdentity, worldVisual, characterVisual, seedV4, logger, axisConfig, chunkNote, sceneShots, countBadges, stage);
         sceneShots.push(...part);
       }
     } else {
       sceneShots.push(
-        ...(await generateL4ForScene(scene, plan, sceneDec, genre, characters, visualIdentity, worldVisual, characterVisual, seedV4, logger, axisConfig, undefined, undefined, countBadges)),
+        ...(await generateL4ForScene(scene, plan, sceneDec, genre, characters, visualIdentity, worldVisual, characterVisual, seedV4, logger, axisConfig, undefined, undefined, countBadges, stage)),
       );
+    }
+    // #stage: 무대가 있으면 씬 전체를 한 번에 적용 — 샷 순서대로 비트를 잇고(added 샷은 직전 비트),
+    //   카메라를 풀어 화면 배치를 확정한다. LLM 의 position_in_frame 은 여기서 덮어쓴다.
+    if (stage && sceneShots.length) {
+      const applied = applyStageToShots(sceneShots, stage, sceneDec, { format: genre.format ?? null });
+      if (applied.issues.length) {
+        await logger.saveText(
+          `L4_stage_layout_${scene.scene_id}.txt`,
+          applied.issues.map((i) => `[${i.severity}] ${i.location}: ${i.message}${i.suggestion ? ` → ${i.suggestion}` : ''}`).join('\n'),
+        );
+      }
+      return applied.shots;
     }
     return sceneShots;
   };
@@ -399,6 +417,38 @@ ${lines.join('\n')}
 `;
 }
 
+/** #stage: v4 지시서의 무대 절 — 좌표·축·비트별 인물 상태와 camera_setup 계약. */
+export function buildStageInstructionBlock(stage: SceneStage): string {
+  const st = (list: SceneStage['beats'][number]['characters']) =>
+    list.map((c) => `${c.character_id}@(${c.x},${c.y}) facing ${c.facing_deg}° ${c.posture}${c.note ? ` (${c.note})` : ''}`).join('; ');
+  const beats = stage.beats
+    .map((b) => `  beat ${b.beat}${b.summary ? ` — ${b.summary}` : ''}\n    start: ${st(b.characters)}${b.end_characters ? `\n    end:   ${st(b.end_characters)}` : ''}`)
+    .join('\n');
+  const landmarks = stage.landmarks.map((l) => `${l.id}@(${l.x},${l.y}) ${l.label}`).join('; ') || '(없음)';
+  return `[씬 무대 — 세계 좌표 (#stage). 화면 안 위치는 여기서 계산된다]
+좌표 단위 m. x = 동(+)/서(−), y = 북(+)/남(−). facing 0 = 북, 90 = 동, 180 = 남, 270 = 서.
+180° 축: ${stage.axis ? `${stage.axis.from} → ${stage.axis.to}, 카메라는 그 ${stage.camera_side === 'left' ? '왼쪽' : '오른쪽'}(camera_side=${stage.camera_side})` : '없음'}
+표지: ${landmarks}
+비트별 인물 상태(그 비트 시작 순간 / 끝):
+${beats}
+
+이 무대 위에서 샷마다 **static_spec.camera_setup** 을 정하라 — 카메라 위치·화면 안 위치·깊이·크기·향은
+코드가 이 값과 무대에서 계산한다. 네가 적는 position_in_frame 은 참고값일 뿐 계산값으로 덮어쓴다.
+- subject: 이 샷의 피사체 — character_id 하나, 여러 명이면 배열, 전원이면 "group", 표지 id 도 가능.
+- from_direction: 카메라가 **피사체 기준 어느 쪽에 서는가**(세계 나침반 N/NE/E/SE/S/SW/W/NW).
+  예: "S" = 피사체의 남쪽에 서서 북쪽을 본다. 축의 camera_side 쪽에 있는 방향을 골라라 — 반대편을 고르면
+  코드가 축 안쪽으로 되돌린다(관객의 좌우가 뒤집히지 않게). 동기 있는 축 이동만 axis_cross:"motivated".
+- height: eye | low | high | overhead. lens_mm: V3 lens_vocabulary 안에서.
+- over_shoulder_of: OTS 면 어깨 너머 인물 id, 아니면 null.
+- end: 달리·트래킹으로 카메라가 이동하면 { "from_direction"?: 끝 방향, "distance_scale"?: 끝 거리 배율(0.5=반으로 접근, 2=두 배로 후퇴) }. 없으면 null(camera_motion 에서 추정).
+- 거리는 shot_type(샷 사이즈)과 lens_mm 에서 계산된다 — 클로즈업이면 가까이, 와이드면 멀리.
+- character_blocking 에는 이 카메라에서 **보이길 의도한** 인물을 적어라. 기하상 프레임에 들어온 무대 인물은
+  코드가 추가하고, 타이트한 샷(ECU/CU/MCU)에서 프레임 밖인 비피사체는 코드가 뺀다.
+- 인물의 자세·이동은 무대의 비트 상태와 맞아야 한다(무대가 lying 이면 START 도 누워 있다).
+
+`;
+}
+
 async function generateL4ForScene(
   scene: StoryScene,
   plan: SceneCinematography | null,    // null = Compact Mode (sceneCinematography 미제공)
@@ -417,6 +467,8 @@ async function generateL4ForScene(
   prevDesigned?: ShotDesign[],
   // #p4-json-guard: 최종 시도에서 수용한 개수 불일치를 모으는 수집기(런 스코프 배열).
   badges?: ShotCountBadge[],
+  // #stage(2026-09-03): 씬 무대 — 있으면 camera_setup 을 요구하고 무대 좌표를 지시서에 싣는다.
+  stage?: SceneStage | null,
 ): Promise<ShotDesign[]> {
   const compactMode = plan === null;
   const decoupageDriven = sceneDec !== null && sceneDec.length > 0;
@@ -484,7 +536,7 @@ micro 모션만 / 내면 강조 = 느린 푸시인. 원문 표현을 first_frame
 (실측 결함: "소음이 사라지며"가 번역 없이 흘러 이미지가 배경 인파를 통째로 지워버렸다 —
 공간 연속성 붕괴.)
 
-[공간 앵커 — 같은 씬 연속성 (FIX-B #space-anchor)]
+${stage ? buildStageInstructionBlock(stage) : ''}[공간 앵커 — 같은 씬 연속성 (FIX-B #space-anchor)]
 같은 씬의 인접 샷은 프레이밍(사이즈·각도)이 크게 바뀌어도 직전 샷의 공간 앵커(배경 지형지물·
 구조물·환경 요소)를 framing.layers 중 최소 한 레이어에 유지하라. 원경 비스타·인서트로 빠지는
 샷도 전경/중경에 직전 공간의 요소를 남겨 관객의 공간 감각을 보존한다. 공간 앵커를 제거해도
@@ -622,7 +674,16 @@ ${compactMode ? `씬 길이(${scene.estimated_seconds}초)와 액션 수에 따�
           "quality": "soft",
           "key_direction": "top_left"
         },
-        "character_blocking": [
+${stage ? `        "camera_setup": {
+          "subject": "character_id | [ids] | 'group' | landmark_id",
+          "from_direction": "S",
+          "height": "eye",
+          "lens_mm": 35,
+          "over_shoulder_of": null,
+          "axis_cross": "none",
+          "end": null
+        },
+` : ''}        "character_blocking": [
           {
             "character_id": "...",
             "position_in_frame": "left_third",

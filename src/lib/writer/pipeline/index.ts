@@ -11,6 +11,8 @@ import { runActVisualArc } from '@/lib/writer/pipeline/stages/v1_act_arc';
 import { runV2Design } from '@/lib/writer/pipeline/stages/v2_design';
 import { runSceneCinematography } from '@/lib/writer/pipeline/stages/v3_scene_plan';
 import { runDecoupage } from '@/lib/writer/pipeline/stages/decoupage';
+import { runSceneStage } from '@/lib/writer/pipeline/stages/v3s_stage';
+import { isFlagOn } from '@/lib/flags';
 import { runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots';
 import { runShotCheck } from '@/lib/writer/pipeline/stages/c_application_2';
 import { runRenderPrompts } from '@/lib/writer/pipeline/stages/v5_prompts';
@@ -43,6 +45,7 @@ import type {
   WorldVisual,
   ShotDesign,
   DecoupagePlan,
+  SceneStage,
   RenderPromptsOutput,
   DialogueTrack,
 } from '@/lib/writer/types/pipeline';
@@ -324,6 +327,20 @@ async function _runPipelineInner(
     logger,
   )).value;
 
+  // 씬 무대(#stage 2026-09-03) — decoupage 뒤, shotDesign 앞. WRITER_STAGE_OFF=1 이면 건너뛴다(옛 동작).
+  const sceneStages: SceneStage[] = isFlagOn('WRITER_STAGE_OFF')
+    ? []
+    : (await loadOrRun<{ stages: SceneStage[] }>(
+        resume,
+        '10c_v3s_sceneStage.json',
+        () =>
+          runSceneStage(characters, scenes, worldVisual, compact ? null : sceneCinematography, decoupage, logger, models.V, {
+            concurrency: Number(process.env.WRITER_SCENE_CONCURRENCY) || undefined,
+          }).then((r) => ({ stages: r.stages })),
+        'sceneStage',
+        logger,
+      )).value.stages;
+
   // ===== decoupage 후 2-레인 분기 (#2lane 2026-08-10) =====
   //   Lane V: shotDesign → shotCheck → renderPrompts   (샷 축)
   //   Lane D: voiceProfiles → dialogue                 (대사 축)
@@ -350,6 +367,7 @@ async function _runPipelineInner(
         // 로컬 전체 실행 — 시간 예산 없음(softDeadlineMs 생략 → 항상 done까지 완주).
         const result = await runShotDesign(genre, characters, scenes, visualIdentity, worldVisual, characterVisual, compact ? null : sceneCinematography, decoupage, '', logger, models.V, {
           concurrency: Number(process.env.WRITER_SCENE_CONCURRENCY) || undefined,
+          sceneStages: sceneStages.length ? sceneStages : null,
         });
         return { shots: result.shots, compact_mode: compact };
       },
