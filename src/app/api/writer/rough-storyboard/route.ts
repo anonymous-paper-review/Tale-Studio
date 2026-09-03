@@ -391,6 +391,19 @@ export async function POST(req: Request) {
     const resolvedSpecByShotId = new Map<string, RoughStoryboardSpec>()
     for (const s of targets) {
       const sid = s.shot_id as string
+      const colStatic = s.static_spec as RoughStoryboardSpec['staticSpec'] | null
+      // #stage(2026-09-03): 무대에서 계산된 배치(screen_layout)를 가진 컬럼은 state 원본보다 우선한다 —
+      //   무대·배치의 진실은 DB(scenes.stage · shots.static_spec.screen_layout)이고, 사람이 나중에 무대를
+      //   고치면 반영되는 곳도 여기다. state 는 파이프라인의 작업 사본이다(실측: 컬럼에 쓴 배치가 무시돼
+      //   옛 위치 문장으로 러프가 나갔다).
+      if (colStatic && isRichStaticSpec(colStatic) && colStatic.screen_layout) {
+        resolvedSpecByShotId.set(sid, {
+          staticSpec: colStatic,
+          dynamicSpec:
+            (s.dynamic_spec as RoughStoryboardSpec['dynamicSpec'] | null) ?? undefined,
+        })
+        continue
+      }
       const spec = resolveShotDesign(specByShotId, {
         shotId: sid,
         designRef: typeof s.design_ref === 'string' ? s.design_ref : null,
@@ -404,7 +417,6 @@ export async function POST(req: Request) {
       //   상속 스펙을 컬럼에 남긴다. 컬럼은 그 샷 자신의 값이라 훔침 위험이 없다 — 영상
       //   라우트의 "shots.dynamic_spec 우선" 선례와 같은 원칙. 레거시/수동 샷은 컬럼이
       //   없으므로 기존 db_fallback 그대로.
-      const colStatic = s.static_spec as RoughStoryboardSpec['staticSpec'] | null
       // rich 모양일 때만 채택 (#v2-rough-500 2026-08-17): static_spec 컬럼은 rich 부분상속
       //   (#split-inherit) 외에 writer-v2 previz 스펙 등 다른 계약의 provenance 도 담긴다.
       //   rich 소비자(translateRoughSpecsEn·시트 셀)는 framing.layers·character_blocking 을
