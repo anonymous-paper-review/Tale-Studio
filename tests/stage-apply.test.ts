@@ -231,3 +231,44 @@ describe('정지 카메라의 END 배치 (#ledger 실측 sh_01_30)', () => {
     }
   })
 })
+
+describe('쌍 축 기억 (#pair-axis 실측 27→28)', () => {
+  // 용족(-1.5,-2)·요정(1.5,2)·수인(-3,0): 씬 축은 용족→요정. 와이드(남쪽)에서 수인은 용족의 왼쪽.
+  const stage: SceneStage = {
+    ...STAGE,
+    axis: { from: 'char', to: 'char_2' },
+    camera_side: 'right',
+    beats: [{
+      beat: 2,
+      characters: [
+        { character_id: 'char', x: -1.5, y: -2, facing_deg: 300, posture: 'standing', height_m: 1.9 },
+        { character_id: 'char_2', x: 1.5, y: 2, facing_deg: 210, posture: 'standing', height_m: 1.7 },
+        { character_id: 'char_3', x: -3, y: 0, facing_deg: 120, posture: 'standing', height_m: 2.0 },
+      ],
+    }],
+  }
+  const wide = shot('shot_a', { shot_type: 'WS', camera_setup: { subject: 'group', from_direction: 'S', height: 'eye', lens_mm: 35 }, character_blocking: [
+    { character_id: 'char', position_in_frame: 'x', pose: 's', gaze: 'g', asset_version: 'v1' },
+    { character_id: 'char_3', position_in_frame: 'x', pose: 's', gaze: 'g', asset_version: 'v1' },
+  ] })
+  // 용족 MCU 를 남동쪽에서 — 수인이 용족의 오른쪽에 잡혀 와이드와 뒤집힌다
+  const mcu = shot('shot_b', { shot_type: 'MS', camera_setup: { subject: 'char', from_direction: 'SE', height: 'eye', lens_mm: 50 }, character_blocking: [
+    { character_id: 'char', position_in_frame: 'x', pose: 's', gaze: 'g', asset_version: 'v1' },
+    { character_id: 'char_3', position_in_frame: 'x', pose: 's', gaze: 'g', asset_version: 'v1' },
+  ] })
+  it('두 번째 샷의 카메라를 두 인물의 선에 반사해 좌우를 지킨다', () => {
+    const r = applyStageToShots([wide, mcu], stage, [dec('shot_a', [2]), dec('shot_b', [2])])
+    const w = r.shots[0].static_spec.screen_layout!
+    const m = r.shots[1].static_spec.screen_layout!
+    const sx = (lay: typeof w, id: string) => lay.characters.find((c) => c.character_id === id)!.start.screen_x
+    expect(sx(w, 'char_3')).toBeLessThan(sx(w, 'char')) // 와이드: 수인이 왼쪽
+    expect(sx(m, 'char_3')).toBeLessThan(sx(m, 'char')) // 미디엄도 왼쪽 유지
+    expect(r.shots[1].static_spec.camera_setup?.from_direction).not.toBe('SE')
+    expect(r.issues.some((i) => i.message.includes('쌍 축'))).toBe(true)
+  })
+  it('axis_cross=motivated 면 그대로 둔다', () => {
+    const m2 = shot('shot_b', { ...mcu.static_spec, camera_setup: { ...mcu.static_spec.camera_setup!, axis_cross: 'motivated' } })
+    const r = applyStageToShots([wide, m2], stage, [dec('shot_a', [2]), dec('shot_b', [2])])
+    expect(r.shots[1].static_spec.camera_setup?.from_direction).toBe('SE')
+  })
+})

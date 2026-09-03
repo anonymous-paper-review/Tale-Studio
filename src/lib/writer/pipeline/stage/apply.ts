@@ -21,6 +21,7 @@ import {
   distanceScaleForMotion,
   isCompassDir,
   lineOfSightObstructions,
+  nearestCompassDir,
   placeCharacter,
   solveCamera,
   COMPASS_DIRS,
@@ -172,6 +173,10 @@ export function applyStageToShots(
   const issues: ValidationIssue[] = []
   let prevBeat = stage.beats[0]?.beat ?? 0
   const decById = new Map((sceneDec ?? []).map((d) => [d.shot_id, d]))
+  // #pair-axis(2026-09-03, 실측 겨울_4 27→28): 씬 축 하나로는 세 인물의 모든 쌍을 못 지킨다. 두 인물이 함께
+  //   프레임에 잡힌 첫 샷에서 그 쌍의 선에 대한 카메라 쪽을 기억하고, 이후 샷이 반대편이면 방향을 그 선에
+  //   반사한다(같은 거리). 못 고치면 경고. 어깨 너머·동기 있는 축 이동은 제외.
+  const pairSides = new Map<string, 'left' | 'right'>()
 
   const out = shots.map((shot, i) => {
     const spec = shot.static_spec
@@ -251,6 +256,49 @@ export function applyStageToShots(
         ? startSolve
         : null
 
+    // 쌍 축 검사 — 프레임 안 두 인물의 좌우가 이전 샷과 같은지.
+    if (!isOts && setup.axis_cross !== 'motivated') {
+      for (let pass = 0; pass < 2; pass++) {
+        const inFrame = states.start.filter((c) => placeCharacter(startSolve.camera, c, aspect, startSolve.subjectDistance).in_frame)
+        let corrected = false
+        for (let i = 0; i < inFrame.length && !corrected; i++) {
+          for (let j = i + 1; j < inFrame.length && !corrected; j++) {
+            const [A, B] = [inFrame[i], inFrame[j]].sort((p, q) => (p.character_id < q.character_id ? -1 : 1))
+            const key = `${A.character_id}|${B.character_id}`
+            const side = axisSide({ x: A.x, y: A.y }, { x: B.x, y: B.y }, { x: startSolve.camera.x, y: startSolve.camera.y })
+            if (side === 'on') continue
+            const prev = pairSides.get(key)
+            if (!prev) { pairSides.set(key, side); continue }
+            if (prev === side) continue
+            // 반대편 — 지금 방향에서 가까운 나침반 방향부터 돌려가며, 그 쌍의 선에서 이전 쪽에 놓이고
+            //   씬 축 보정도 안 걸리는 첫 방향을 고른다(같은 거리). 카메라가 두 인물의 선과 나란할 때
+            //   반사는 제자리라 소용없다 — 회전 탐색이 맞다.
+            const cur = nearestCompassDir({ x: startSolve.camera.x - startSolve.subjectCenter.x, y: startSolve.camera.y - startSolve.subjectCenter.y })
+            const i0 = COMPASS_DIRS.indexOf(cur)
+            const tries = [1, -1, 2, -2, 3, -3, 4].map((k) => COMPASS_DIRS[(i0 + k + COMPASS_DIRS.length * 2) % COMPASS_DIRS.length])
+            let fixedDir: typeof cur | null = null
+            for (const dir of tries) {
+              const alt = solveCamera({ setup: { ...setup, from_direction: dir }, shotType: spec.shot_type, aspect, stage, states: states.start, distanceScale: backoff, intendedIds })
+              if (alt.axisCorrected) continue
+              const altSide = axisSide({ x: A.x, y: A.y }, { x: B.x, y: B.y }, { x: alt.camera.x, y: alt.camera.y })
+              if (altSide !== prev) continue
+              startSolve = alt
+              fixedDir = dir
+              break
+            }
+            if (fixedDir) {
+              setup.from_direction = fixedDir
+              push('INFO', `${A.character_id}·${B.character_id} 의 좌우가 이전 샷과 뒤집혀 카메라 방향을 ${fixedDir} 로 돌렸다(쌍 축)`)
+              corrected = true
+            } else {
+              push('WARNING', `${A.character_id}·${B.character_id} 의 좌우가 이전 샷과 뒤집힌다 — 돌려도 못 지켰다`, '카메라 방향·샷 사이즈를 조정하거나 axis_cross:motivated 로 의도 표시')
+              pairSides.set(key, side) // 이 뒤 샷은 새 관계를 기준으로
+            }
+          }
+        }
+        if (!corrected) break
+      }
+    }
     const placementsStart = new Map(states.start.map((s) => [s.character_id, placeCharacter(startSolve.camera, s, aspect, startSolve.subjectDistance)]))
     const placementsEnd = endSolve
       ? new Map(states.end.map((s) => [s.character_id, placeCharacter(endSolve.camera, s, aspect, endSolve.subjectDistance)]))

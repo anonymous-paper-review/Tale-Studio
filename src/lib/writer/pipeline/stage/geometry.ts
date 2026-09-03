@@ -51,6 +51,19 @@ export function compassVector(dir: CompassDir): Vec2 {
   return COMPASS[dir] ?? COMPASS.S
 }
 
+/** 벡터에 가장 가까운 나침반 방향. */
+export function nearestCompassDir(v: Vec2): CompassDir {
+  const len = Math.hypot(v.x, v.y) || 1
+  let best: CompassDir = 'S'
+  let bestDot = -Infinity
+  for (const d of COMPASS_DIRS) {
+    const c = COMPASS[d]
+    const dot = (v.x / len) * c.x + (v.y / len) * c.y
+    if (dot > bestDot) { bestDot = dot; best = d }
+  }
+  return best
+}
+
 export function isCompassDir(v: unknown): v is CompassDir {
   return typeof v === 'string' && (COMPASS_DIRS as readonly string[]).includes(v)
 }
