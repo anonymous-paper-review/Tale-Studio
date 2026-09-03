@@ -20,6 +20,7 @@ const STAGE_LABELS: Record<string, string> = {
   renderFormat_artDirection: 'Setting the visual tone…',
   productionDesign: 'Building sets and props…',
   sceneCinematography: 'Framing the camera…',
+  sceneStage: 'Laying out the stage…',
   shotDesign: 'Designing shots…',
   shotCheck: 'Reviewing shots one by one…',
   shotSequence: 'Sequencing the shots…',

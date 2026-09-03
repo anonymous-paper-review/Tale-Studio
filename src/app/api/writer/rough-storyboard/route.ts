@@ -24,6 +24,7 @@ import { isRichStaticSpec, type RoughStoryboardSpec } from '@/lib/writer/rough-s
 // L4(shotDesign) state 로더 — 공용 lib(#motion-contract): 비디오 라우트와 공유.
 import { loadShotDesignByMainId, resolveShotDesign } from '@/lib/writer/shot-design-state'
 import {
+  buildBlockoutClause,
   buildRoughGridCell,
   buildRoughGridPrompt,
   buildCellContinuityLine,
@@ -33,6 +34,11 @@ import {
 } from '@/lib/writer/rough-storyboard-grid'
 import { parseProjectFormat } from '@/types/project'
 import { templateAssetUrl } from '@/lib/storage/template-asset'
+import { buildBlockoutSheetSvg, columnFromLayout, renderBlockoutPng } from '@/lib/writer/pipeline/stage/blockout'
+import { aspectRatioOf } from '@/lib/writer/pipeline/stage/geometry'
+import { mediaUpload } from '@/lib/storage/media'
+import { mediaPublicUrl } from '@/lib/storage/media-url'
+import { storageKeySegment } from '@/lib/storage/key-segment'
 import { parseCheckConstraints } from '@/lib/writer/check-notes'
 import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
 import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events'
@@ -560,6 +566,31 @@ export async function POST(req: Request) {
       await recordWriterObservabilityEvent(projectId, 'fal_submit_started', {
         shotCount: chunk.length,
       })
+      // #blockout(2026-09-03, 무대 진단서 3번): 무대 배치(screen_layout)가 있는 샷이 하나라도 있으면 열별 START/END
+      //   배치도 시트를 그려 두 번째 참조로 준다. 실패는 참조 없이 진행(로그) — 러프 생성을 막지 않는다.
+      let blockoutUrl: string | null = null
+      if (templateUrl) {
+        try {
+          const columns = chunk.map((s) => {
+            const st = resolvedSpecByShotId.get(s.shot_id as string)?.staticSpec
+            const lay = st?.screen_layout
+            if (!lay) return { start: null, end: null }
+            return columnFromLayout(lay, (st?.character_blocking ?? []).map((b) => b.character_id))
+          })
+          if (columns.some((c) => c.start)) {
+            const { svg } = buildBlockoutSheetSvg(columns, { aspect: aspectRatioOf(projectFormat) })
+            const png = await renderBlockoutPng(svg)
+            const path = `${project.workspace_id}/${projectId}/rough-blockouts/${Date.now()}-${storageKeySegment(chunk[0].shot_id as string)}.png`
+            const { error: upErr } = await mediaUpload(path, png, { contentType: 'image/png', upsert: true })
+            if (upErr) throw upErr
+            blockoutUrl = mediaPublicUrl(path) // 파일명에 시각이 있어 캐시 버스팅 불요
+            prompt = `${prompt}\n\n${buildBlockoutClause(chunk.length)}`
+          }
+        } catch (e) {
+          console.warn('[rough-storyboard] blockout sheet skipped:', e instanceof Error ? e.message : e)
+          blockoutUrl = null
+        }
+      }
       let falResult: { request_id: string; model: string; fal_key_id: string }
       try {
         falResult = await falImageSubmit(
@@ -567,7 +598,7 @@ export async function POST(req: Request) {
             ? {
                 model: DEFAULT_EDIT_IMAGE_MODEL, // gpt-image-2/edit — 템플릿 칸에 그려 넣기
                 prompt,
-                reference_image_urls: [templateUrl],
+                reference_image_urls: blockoutUrl ? [templateUrl, blockoutUrl] : [templateUrl],
                 // 포맷 시트는 캔버스 명시(=템플릿 치수, #sheet-formats) / 레거시는 미전달 →
                 //   image_size 'auto' (reference 비율 유지 — crop 좌표 정합의 핵심, 종전 그대로)
                 ...(sheetGeom.roughImageSize ? { image_size: sheetGeom.roughImageSize } : {}),
@@ -608,6 +639,7 @@ export async function POST(req: Request) {
           gridVariant,
           shotIds: chunkShotIds,
           templateUrl,
+          ...(blockoutUrl ? { blockoutUrl } : {}),
           // 포맷 시트를 썼을 때만 기록 — finalize 크롭이 같은 좌표·프레임 축을 복원 (#sheet-formats)
           sheet_format: sheetGeom.roughImageSize ? projectFormat : null,
         },

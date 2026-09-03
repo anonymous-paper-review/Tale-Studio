@@ -298,6 +298,15 @@ function placementDiffers(a: ScreenPlacement, b: ScreenPlacement): boolean {
   return a.position_in_frame !== b.position_in_frame || Math.abs(a.apparent_height - b.apparent_height) > 0.15 || a.depth_band !== b.depth_band || a.in_frame !== b.in_frame
 }
 
+/**
+ * #blockout(2026-09-03, 무대 진단서 3번): 두 번째 참조(배치도 시트)의 계약. 열 = 샷(스토리보드 열 순서),
+ *   위 = START, 아래 = END. 실험(2026-09-02)에서 이 문안으로 gpt-image-2 가 위치·크기·향을 3/3 따랐다.
+ */
+export function buildBlockoutClause(shotCount: number): string {
+  const cols = shotCount <= 1 ? 'a single column (this shot)' : `${shotCount} columns — column N is shot N in the same order as the storyboard columns`
+  return `The SECOND reference image is the blocking diagram sheet for these shots: ${cols}; the TOP panel of each column is that shot's START, the BOTTOM panel is its END. In each panel the ground grid shows the perspective and the horizon (eye level); each gray capsule marks where a figure stands and how large it appears from the camera, and the number drawn on it is that figure's number in the shot description (a wide horizontal capsule is a figure lying down); the short red stroke at its feet shows which way it faces (down = toward the camera, up = away, sideways = in profile); the ellipse under it is the ground patch or ledge it stands on. This diagram is a hard placement contract: draw figure N exactly where capsule N is — same position in the frame, same size, same depth and facing — in the START and END panels; figures cut by the panel edge in the diagram stay cut the same way. Never draw the grid, the capsules, the numbers, the red strokes or the diagram itself — only real figures, ground and scenery in those places.`
+}
+
 /** rich(shotDesign)/fallback(DB) 공용 — 기존 RoughStoryboardPromptInput 을 셀 서술로 요약. */
 export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: string): RoughGridCell {
   const s = input.spec?.staticSpec
