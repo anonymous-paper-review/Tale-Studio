@@ -140,10 +140,11 @@ export function panelSvg(panel: BlockoutPanel, x0: number, y0: number, W: number
     const rx = Math.max(10, (lying ? h * 1.2 : h * 0.42))
     parts.push(`<ellipse cx="${r(bx)}" cy="${r(by)}" rx="${r(rx)}" ry="${r(rx * 0.35)}" fill="${LEDGE_FILL}" stroke="${LEDGE_STROKE}" stroke-width="1"/>`)
     if (lying) {
-      const w = h * 2.6
-      const hh = Math.max(6, h * 0.55)
-      parts.push(`<rect class="fig" x="${r(bx - w / 2)}" y="${r(by - hh)}" width="${r(w)}" height="${r(hh)}" rx="${r(hh / 2)}" fill="${FIGURE_FILL}" stroke="${FIGURE_STROKE}" stroke-width="2"/>`)
-      parts.push(numberPaths(g.n, bx, by - hh / 2, Math.max(8, hh * 0.6)))
+      // 누운 인물: 화면 높이 h(발끝~몸 위, 이미 낮게 계산됨) 만큼의 가로 캡슐 — 발 위치에서 위로 h. 낮은 카메라에서
+      //   발이 프레임 아래로 나가도 몸통 띠가 보인다(실측: 0.55h 로 그리면 통째로 잘려 빈 칸이 됐다).
+      const w = Math.max(20, h * 2.6)
+      parts.push(`<rect class="fig" x="${r(bx - w / 2)}" y="${r(by - h)}" width="${r(w)}" height="${r(h)}" rx="${r(h / 2)}" fill="${FIGURE_FILL}" stroke="${FIGURE_STROKE}" stroke-width="2"/>`)
+      parts.push(numberPaths(g.n, bx, by - h / 2, Math.max(8, Math.min(40, h * 0.6))))
     } else {
       const w = Math.max(6, h * 0.28)
       parts.push(`<rect class="fig" x="${r(bx - w / 2)}" y="${r(by - h)}" width="${r(w)}" height="${r(h)}" rx="${r(w / 2)}" fill="${FIGURE_FILL}" stroke="${FIGURE_STROKE}" stroke-width="2"/>`)
