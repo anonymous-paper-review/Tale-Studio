@@ -11,6 +11,7 @@ import {
   sanitizeSceneStage,
   buildStageCorrectionNote,
 } from '@/lib/writer/pipeline/stage/validate';
+import { normalizeStageTransitions } from '@/lib/writer/pipeline/stage/ledger';
 import type {
   Characters,
   DecoupagePlan,
@@ -178,7 +179,8 @@ ${buildStageCorrectionNote(validation.issues)}`;
       valid: true,
     };
   }
-  return { stage, issues: validation.issues };
+  // #ledger: 비트 사이의 설명 없는 변화를 직전 비트 끝으로 옮겨(정규화) 보여줄 자리를 만든 상태로 기록한다.
+  return { stage: normalizeStageTransitions(stage), issues: validation.issues };
 }
 
 export async function runSceneStage(

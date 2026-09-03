@@ -32,11 +32,14 @@ export function getArtistGaps(
 export interface DirectorGapAssets {
   hasCharacterImage: (characterId: string) => boolean
   characterName: (characterId: string) => string
+  /** #ledger: 상태 변화를 보여주는 샷이 없는 항목의 라벨(씬·인물·변화) — 호출부가 scenes.stage.ledger 에서 만든다. */
+  ledgerGaps?: string[]
 }
 
 /** Director 누락: 샷에 캐릭터·배경 참조가 없거나, 연결된 인물의 시트가 없거나, 스토리보드가 아직 안 만들어진 것들. */
 export function getDirectorGaps(nodes: DirectorNode[], assets?: DirectorGapAssets): CompletenessGap[] {
   const gaps: CompletenessGap[] = []
+  for (const label of assets?.ledgerGaps ?? []) gaps.push({ label })
   for (const n of nodes) {
     if (!isShotData(n.data)) continue
     const d = n.data
@@ -64,4 +67,27 @@ export function summarizeGaps(gaps: CompletenessGap[], max = 3): string {
     .join('\n')
   const extra = gaps.length > max ? `\n…외 ${gaps.length - max}건` : ''
   return shown + extra
+}
+
+const LEDGER_POSTURE_KO: Record<string, string> = {
+  standing: '섬', sitting: '앉음', kneeling: '무릎', crouching: '웅크림', lying: '누움', // i18n-ok: 무대 장부 라벨
+  walking: '걸음', running: '달림', floating: '부유', other: '기타', // i18n-ok: 무대 장부 라벨
+}
+/** #ledger: scenes.stage.ledger 에서 "보여주는 샷이 없는 변화"를 사람 말 라벨로. */
+export function ledgerGapLabels(
+  sceneLedgers: Record<string, { transitions: Array<{ character_id: string; beat: number; kind: string; from: string; to: string; covered: boolean; distance_m?: number }> }> | null | undefined,
+  characterName: (id: string) => string,
+): string[] {
+  const out: string[] = []
+  for (const [sceneId, ledger] of Object.entries(sceneLedgers ?? {})) {
+    for (const t of ledger?.transitions ?? []) {
+      if (t.covered) continue
+      const change =
+        t.kind === 'posture'
+          ? `${LEDGER_POSTURE_KO[t.from] ?? t.from}→${LEDGER_POSTURE_KO[t.to] ?? t.to}`
+          : `이동 ${t.distance_m ?? '?'}m` // i18n-ok: 무대 장부 라벨
+      out.push(`${sceneId} 비트 ${t.beat}: ${characterName(t.character_id)} ${change} — 보여주는 샷 없음`) // i18n-ok: 무대 장부 라벨
+    }
+  }
+  return out
 }

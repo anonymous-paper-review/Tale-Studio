@@ -47,7 +47,7 @@ import { isVideoData } from '@/types/director'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
-import { getDirectorGaps, summarizeGaps } from '@/lib/completeness'
+import { getDirectorGaps, ledgerGapLabels, summarizeGaps } from '@/lib/completeness'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import {
   isShotData,
@@ -328,6 +328,8 @@ function CanvasInner() {
   //   문장만 번역한다.
   // #ref-gate: 시트 없는 인물까지 잡으려면 에셋 store 의 이미지 유무가 필요하다(순수 함수엔 조회자로 넘긴다).
   const assetCharacters = useAssetStorageStore((st) => st.characters)
+  // #ledger: 상태 변화(누움→섬 등)를 보여주는 샷이 없는 항목 — 무대 장부(scenes.stage.ledger)에서.
+  const sceneLedgers = useDirectorCanvasStore((st) => st.sceneLedgers)
   const gapAssets = useMemo(
     () => ({
       hasCharacterImage: (id: string) => {
@@ -335,8 +337,9 @@ function CanvasInner() {
         return !!c && ((c.referenceImages?.length ?? 0) > 0 || (c.views?.single?.length ?? 0) > 0)
       },
       characterName: (id: string) => assetCharacters[id]?.name ?? id,
+      ledgerGaps: ledgerGapLabels(sceneLedgers, (id) => assetCharacters[id]?.name ?? id),
     }),
-    [assetCharacters],
+    [assetCharacters, sceneLedgers],
   )
   const gaps = getDirectorGaps(nodes, gapAssets)
   const gapNudgeContent =

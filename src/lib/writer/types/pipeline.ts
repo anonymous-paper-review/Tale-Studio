@@ -618,6 +618,27 @@ export interface StageBeat {
   end_characters?: StageCharacterState[]; // 비트 안에서 이동·자세 변화가 있으면 끝 상태
 }
 
+/** 인물 상태 장부(#ledger 2026-09-03, 무대 진단서 2번): 비트 안의 상태 변화와 그것을 보여주는 샷. */
+export interface StateTransition {
+  character_id: string;
+  beat: number;                       // 변화가 일어나는 비트(그 비트의 start → end)
+  kind: 'posture' | 'move';
+  from: string;                       // 자세 낱말 또는 "x,y"
+  to: string;
+  verb: string;                       // 영어 동작 — 보이는 샷의 character_motion 으로 보충된다
+  distance_m?: number;
+  /** 이 비트에서 인물이 프레임 안에 있는 샷들 */
+  shown_by: string[];
+  /** character_motion 을 보충한 샷들 */
+  injected_into: string[];
+  covered: boolean;
+}
+
+export interface SceneLedger {
+  scene_id: string;
+  transitions: StateTransition[];
+}
+
 export interface SceneStage {
   scene_id: string;
   unit: 'm';
@@ -627,6 +648,8 @@ export interface SceneStage {
   camera_side: 'left' | 'right';
   beats: StageBeat[];
   notes?: string;
+  /** v4 뒤 채워지는 상태 장부(어느 샷이 변화를 보여주나). 무대 생성 시점엔 없다. */
+  ledger?: SceneLedger;
 }
 
 export type CompassDir = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
@@ -866,6 +889,8 @@ export interface ShotDynamicSpec {
     character_id: string;
     verb: string;                    // 동사 1~2개
     magnitude: CharacterMagnitude;   // 인물은 가운데가 'medium' (카메라와 다르다 — 혼동이 잦다)
+    /** 'ledger' = 상태 장부가 보충한 배경 동작(#ledger) — LLM 출력이 아니다 */
+    source?: 'writer' | 'ledger';
   }>;
 
   // 시선 arc (선택)

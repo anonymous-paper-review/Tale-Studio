@@ -19,7 +19,7 @@ import { runRenderPrompts } from '@/lib/writer/pipeline/stages/v5_prompts';
 import { runDialogue, toDialogueTrack } from '@/lib/writer/pipeline/stages/dialogue';
 import { inferSceneCinematographyFromShots } from '@/lib/writer/pipeline/util/infer_v3';
 import { persistDesignTokens } from '@/lib/writer/pipeline/util/persist_design_tokens';
-import { persistAssetsToDb, persistShotsToDb } from '@/lib/writer/pipeline/util/persist_manifest';
+import { persistAssetsToDb, persistShotsToDb, persistSceneLedgersToDb } from '@/lib/writer/pipeline/util/persist_manifest';
 import { isCompactDepth } from '@/lib/writer/types/pipeline';
 import { analyzeSceneActionBudget } from '@/lib/writer/pipeline/validators/action_budget';
 import { resetGeminiCallCount, getGeminiCallCount } from '@/lib/writer/llm/gemini';
@@ -360,7 +360,7 @@ async function _runPipelineInner(
 
   const laneVisual = async (): Promise<LaneVResult> => {
     // shotDesign: 샷 단위 3분할 (intent + static + dynamic). 데쿠파주가 정한 샷에 spec을 붙인다.
-    const shotDesignResult = await loadOrRun<{ shots: ShotDesign[]; compact_mode: boolean }>(
+    const shotDesignResult = await loadOrRun<{ shots: ShotDesign[]; compact_mode: boolean; stage_issues?: ValidationIssue[] }>(
       resume,
       '11_v4_shotDesign.json',
       async () => {
@@ -369,7 +369,13 @@ async function _runPipelineInner(
           concurrency: Number(process.env.WRITER_SCENE_CONCURRENCY) || undefined,
           sceneStages: sceneStages.length ? sceneStages : null,
         });
-        return { shots: result.shots, compact_mode: compact };
+        // #ledger: 로컬 러너도 장부를 기록한다(DB 프로젝트일 때만 — persist 가 UUID 로 판별).
+        if (result.ledgers?.length) {
+          await persistSceneLedgersToDb(projectId, result.ledgers).catch((e) => {
+            console.error('[writer] persistSceneLedgersToDb 실패 (best-effort 계속):', e instanceof Error ? e.message : e);
+          });
+        }
+        return { shots: result.shots, compact_mode: compact, stage_issues: result.issues ?? [] };
       },
       'shotDesign',
       logger,
@@ -400,7 +406,7 @@ async function _runPipelineInner(
       shotCheckResult = { shotSequence: cachedSeq, report: cachedReport };
       await logger.markStage('shotCheck', 'completed', { resumed: true });
     } else {
-      shotCheckResult = await runShotCheck(projectId, genre, characters, scenes, worldVisual, shotDesign, decoupage, sceneBudgetIssues, logger, models.C);
+      shotCheckResult = await runShotCheck(projectId, genre, characters, scenes, worldVisual, shotDesign, decoupage, sceneBudgetIssues, logger, models.C, undefined, shotDesignResult.value.stage_issues ?? []);
       await logger.flushRawLlm('shotCheck');
     }
 

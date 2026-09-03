@@ -27,15 +27,18 @@ import type { ShotStaticSpec,
   WorldVisual,
   CharacterVisual,
   SceneCinematography,
+  SceneLedger,
   SceneStage,
   ShotDesign,
   Genre,
   Characters,
   Scenes,
   StoryScene,
+  ValidationIssue,
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 import { applyStageToShots } from '@/lib/writer/pipeline/stage/apply';
+import { applyLedgerToShots, normalizeStageTransitions } from '@/lib/writer/pipeline/stage/ledger';
 
 /** 씬 단위 부분 진행 체크포인트(#long-writer-run 2026-07-15) — steps.ts가 state에 영속. */
 export interface ShotDesignProgress {
@@ -46,6 +49,10 @@ export interface ShotDesignProgress {
 export interface RunShotDesignResult extends ShotDesignProgress {
   /** false = 시간 예산으로 일부 씬만 처리 — 다음 step 인보케이션이 resume으로 이어간다. */
   done: boolean;
+  /** #stage/#ledger: 무대 적용·상태 장부 이슈(축 보정·프레임 밖·변화 미덮임). shotCheck 보고서·check_notes 로 합류. */
+  issues?: ValidationIssue[];
+  /** #ledger: 씬별 상태 장부 — scenes.stage.ledger 로 기록. */
+  ledgers?: SceneLedger[];
 }
 
 // 씬 하나의 데쿠파주 샷이 이 수를 넘으면 청크로 나눠 LLM을 여러 번 호출한다(#B).
@@ -117,6 +124,9 @@ export async function runShotDesign(
 
   // #p4-json-guard: 이번 패스에서 수용된 샷 수 불일치 — 스테이지 산출/마커로 노출한다.
   const countBadges: ShotCountBadge[] = [];
+  // #stage/#ledger: 무대 적용·장부 이슈와 씬별 장부 수집기(런 스코프).
+  const sceneIssues: ValidationIssue[] = [];
+  const sceneLedgers: SceneLedger[] = [];
 
   // 씬 하나 → 3분할 샷 배열. 씬끼리는 상류 산출물(plan·decoupage)만 읽고 서로의 출력을 참조하지
   //   않으므로 병렬 안전(#parallel-shotdesign). 청크는 씬 내부에서 순차 유지 — 청크 shot_id index
@@ -146,15 +156,23 @@ export async function runShotDesign(
     }
     // #stage: 무대가 있으면 씬 전체를 한 번에 적용 — 샷 순서대로 비트를 잇고(added 샷은 직전 비트),
     //   카메라를 풀어 화면 배치를 확정한다. LLM 의 position_in_frame 은 여기서 덮어쓴다.
+    // #ledger: 그 위에 상태 장부 — 비트 사이 설명 없는 변화를 직전 비트 끝으로 옮기고(정규화), 변화마다
+    //   보여주는 샷을 찾아 배경 동작을 보충하며, 없으면 report_only 경고를 남긴다.
     if (stage && sceneShots.length) {
-      const applied = applyStageToShots(sceneShots, stage, sceneDec, { format: genre.format ?? null });
-      if (applied.issues.length) {
+      const normalized = normalizeStageTransitions(stage);
+      const applied = applyStageToShots(sceneShots, normalized, sceneDec, { format: genre.format ?? null });
+      const names = new Map(characters.characters.map((c) => [c.id, c.name] as const));
+      const ledgered = applyLedgerToShots(applied.shots, normalized, names);
+      const issues = [...applied.issues, ...ledgered.issues];
+      sceneIssues.push(...issues);
+      sceneLedgers.push(ledgered.ledger);
+      if (issues.length) {
         await logger.saveText(
           `L4_stage_layout_${scene.scene_id}.txt`,
-          applied.issues.map((i) => `[${i.severity}] ${i.location}: ${i.message}${i.suggestion ? ` → ${i.suggestion}` : ''}`).join('\n'),
+          issues.map((i) => `[${i.severity}] ${i.location}: ${i.message}${i.suggestion ? ` → ${i.suggestion}` : ''}`).join('\n'),
         );
       }
-      return applied.shots;
+      return ledgered.shots;
     }
     return sceneShots;
   };
@@ -224,7 +242,7 @@ export async function runShotDesign(
     console.log(
       `[shotDesign] checkpoint: ${doneSceneIds.size}/${scenes.scenes.length} scenes done (concurrency=${concurrency}) — 다음 step에서 이어감`,
     );
-    return { done: false, doneSceneIds: [...doneSceneIds], shots: allShots };
+    return { done: false, doneSceneIds: [...doneSceneIds], shots: allShots, issues: sceneIssues, ledgers: sceneLedgers };
   }
 
   await logger.saveStage('11_v4_shotDesign.json', {
@@ -238,7 +256,7 @@ export async function runShotDesign(
     ...(countBadges.length ? { count_mismatches: countBadges.length } : {}),
   });
 
-  return { done: true, doneSceneIds: [...doneSceneIds], shots: allShots };
+  return { done: true, doneSceneIds: [...doneSceneIds], shots: allShots, issues: sceneIssues, ledgers: sceneLedgers };
 }
 
 /** 샷 객체 판별 — 3분할 스펙의 핵심 키(intent) 보유 여부. */
@@ -446,6 +464,8 @@ ${beats}
 - character_blocking 에는 이 카메라에서 **보이길 의도한** 인물을 적어라. 기하상 프레임에 들어온 무대 인물은
   코드가 추가하고, 타이트한 샷(ECU/CU/MCU)에서 프레임 밖인 비피사체는 코드가 뺀다.
 - 인물의 자세·이동은 무대의 비트 상태와 맞아야 한다(무대가 lying 이면 START 도 누워 있다).
+- 무대의 비트 안 상태 변화(start→end: 자세·이동)는 그 비트를 담는 샷에서 **프레임 안 인물 전원**의
+  character_motion 으로 적어라 — 배경 인물도(예: 뒤쪽의 용족이 일어선다). 빠지면 코드가 상태 장부로 보충한다(#ledger).
 
 `;
 }

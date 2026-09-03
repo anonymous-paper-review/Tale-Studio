@@ -58,6 +58,8 @@ export async function runShotCheck(
   cAxisConfig: LlmAxisConfig,   // C축: 의미/액션 검증 (현재 Claude)
   // #i18n-s5: 미지정(레거시)이면 systemInstruction 절 미주입 — 종전 동작 그대로.
   outputLocale?: AppLocale,
+  // #stage/#ledger(2026-09-03): v4 가 무대에서 계산·검사한 이슈 — visual 제약은 check_notes 로 부착, 전부 보고서에.
+  stageIssues: ValidationIssue[] = [],
 ): Promise<{ shotSequence: ShotSequence; report: ShotCheckReport }> {
   await logger.markStage('shotCheck', 'started');
 
@@ -207,7 +209,7 @@ ${JSON.stringify(assembledShots, null, 2)}
 
   // #p2-wiring 채널1: CRITICAL/WARNING constraint 를 해당 샷에 부착 — 리넘버 *전* id 공간에서
   //   매칭해야 한다 (이슈 location = Claude 가 본 조립 시퀀스의 id).
-  finalShots = attachCheckNotes(finalShots, valResult.semantic_issues);
+  finalShots = attachCheckNotes(finalShots, [...valResult.semantic_issues, ...stageIssues]);
 
   // 리넘버 + (분할 전 id → 분할 후 id) 매핑 — report 의 이슈 location 을 최종 id 로 재표기.
   const preToPost = new Map<string, string[]>();
@@ -265,7 +267,7 @@ ${JSON.stringify(assembledShots, null, 2)}
   const emotionIssues = detectEmotionChainIssues(finalShots);
   // #coverage-first: 다인 비트 반응 부재·시선 비트 리빌 부재 결정론 검출 — report 전용.
   const coverageIssues = detectCoverageGapIssues(finalShots, scenes, characters);
-  const allIssues = [...sceneBudgetIssues, ...semanticRemapped, ...assetNorm.issues, ...ladderIssues, ...emotionIssues, ...coverageIssues];
+  const allIssues = [...sceneBudgetIssues, ...stageIssues, ...semanticRemapped, ...assetNorm.issues, ...ladderIssues, ...emotionIssues, ...coverageIssues];
   const hasCritical = allIssues.some((i) => i.severity === 'CRITICAL');
 
   const report: ShotCheckReport = {

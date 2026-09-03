@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { SceneLedger } from '@/lib/writer/types/pipeline'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { XYPosition } from '@xyflow/react'
 import {
@@ -1165,6 +1166,8 @@ interface DirectorCanvasState {
   viewMode: 'node' | 'storyboard'
   /** Storyboard 뷰 미디어 모드(#previz-video) — Previz(목각, 기본) | Real(실사). 상단바 토글이 제어. */
   storyboardMediaMode: 'previz' | 'real'
+  /** #ledger: 씬별 상태 장부(scenes.stage.ledger) — hydrate 때 DB 에서 읽는다. 화면 파생 전용. */
+  sceneLedgers: Record<string, SceneLedger>
   // #real-grid-auto: 실사 일괄 생성 진행 중 — 개별 이미지 생성/재생성을 잠근다(시트 단위 작업과 충돌 방지).
   realBatchBusy: boolean
   /** #batch-backlog(2026-08-25): 일괄 생성에서 아직 fal 에 제출되지 않고 우리 서버 라운드를
@@ -1658,6 +1661,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       viewportInitializedProjects: {},
       viewMode: 'node',
       storyboardMediaMode: 'previz',
+      sceneLedgers: {},
       realBatchBusy: false,
       realBatchRemaining: null,
       videoBatchBusy: false,
@@ -1787,7 +1791,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           const [scenesRes, shotsRes, clipsRes] = await Promise.all([
             supabase
               .from('scenes')
-              .select('scene_id, canvas_position')
+              .select('scene_id, canvas_position, stage')
               .eq('project_id', projectId),
             loadShotsResult(projectId),
             fetch(`/api/director/video-takes?projectId=${encodeURIComponent(projectId)}`).then(
@@ -1809,10 +1813,16 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           if (shotsRes.error) throw shotsRes.error
 
           const scenePosBySceneId = new Map<string, { x: number; y: number }>()
+          const sceneLedgers: Record<string, SceneLedger> = {}
           for (const r of scenesRes.data ?? []) {
             const p = r.canvas_position as { x: number; y: number } | null
             if (p && r.scene_id) scenePosBySceneId.set(r.scene_id, p)
+            // #ledger: 씬 무대의 상태 장부 — Director 누락 목록("변화를 보여주는 샷 없음")의 원천.
+            const stage = (r as { stage?: unknown }).stage
+            const ledger = stage && typeof stage === 'object' ? (stage as { ledger?: SceneLedger }).ledger : undefined
+            if (ledger && r.scene_id) sceneLedgers[r.scene_id] = ledger
           }
+          if (get().projectId === projectId) set({ sceneLedgers })
           const shotPosByShotId = new Map<string, { x: number; y: number }>()
           for (const r of shotsRes.data ?? []) {
             const p = r.canvas_position as { x: number; y: number } | null

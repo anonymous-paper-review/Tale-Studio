@@ -37,6 +37,7 @@ import {
 } from '@/lib/writer/i18n/derive-en'
 import type { ShotType } from '@/types'
 import type {
+  SceneLedger,
   SceneStage,
   Characters,
   Scenes,
@@ -683,6 +684,34 @@ export async function persistSceneStagesToDb(projectId: string, stages: SceneSta
     if (error) throw new Error(`scenes.stage update(${st.scene_id}): ${error.message}`)
     if (count === 0) console.warn(`[persistSceneStagesToDb] scene row not found: ${st.scene_id} → ${writerSceneIdToMain(st.scene_id)}`)
     else n += 1
+  }
+  return n
+}
+
+/**
+ * 씬 상태 장부(#ledger) → scenes.stage.ledger (jsonb 병합). 무대가 없는 씬(구 run)은 건너뛴다.
+ */
+export async function persistSceneLedgersToDb(projectId: string, ledgers: SceneLedger[]): Promise<number> {
+  if (!UUID_RE.test(projectId) || !ledgers.length) return 0
+  let n = 0
+  for (const ledger of ledgers) {
+    const sceneId = writerSceneIdToMain(ledger.scene_id)
+    const { data: row, error: readErr } = await supabaseAdmin
+      .from('scenes')
+      .select('stage')
+      .eq('project_id', projectId)
+      .eq('scene_id', sceneId)
+      .maybeSingle()
+    if (readErr) throw new Error(`scenes.stage read(${ledger.scene_id}): ${readErr.message}`)
+    if (!row?.stage || typeof row.stage !== 'object') continue
+    const next = { ...(row.stage as Record<string, unknown>), ledger }
+    const { error } = await supabaseAdmin
+      .from('scenes')
+      .update({ stage: next as unknown as Json })
+      .eq('project_id', projectId)
+      .eq('scene_id', sceneId)
+    if (error) throw new Error(`scenes.stage.ledger update(${ledger.scene_id}): ${error.message}`)
+    n += 1
   }
   return n
 }

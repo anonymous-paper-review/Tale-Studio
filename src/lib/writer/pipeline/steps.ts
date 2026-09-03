@@ -26,7 +26,7 @@ import { runRenderPrompts } from '@/lib/writer/pipeline/stages/v5_prompts';
 import { runDialogue, toDialogueTrack, type DialogueProgress } from '@/lib/writer/pipeline/stages/dialogue';
 import { inferSceneCinematographyFromShots } from '@/lib/writer/pipeline/util/infer_v3';
 import { persistDesignTokens } from '@/lib/writer/pipeline/util/persist_design_tokens';
-import { persistAssetsToDb, persistShotsToDb, persistSceneStagesToDb } from '@/lib/writer/pipeline/util/persist_manifest';
+import { persistAssetsToDb, persistShotsToDb, persistSceneStagesToDb, persistSceneLedgersToDb } from '@/lib/writer/pipeline/util/persist_manifest';
 import { triggerAssetDrafts } from '@/lib/artist/draft-trigger';
 import { isCompactDepth } from '@/lib/writer/types/pipeline';
 import { analyzeSceneActionBudget } from '@/lib/writer/pipeline/validators/action_budget';
@@ -57,6 +57,7 @@ import {
 import type {
   PipelineInput,
   SceneCinematography,
+  SceneLedger,
   SceneStage,
   ValidationIssue,
   Genre,
@@ -113,6 +114,10 @@ export interface WriterRunState extends WriterRunStateBase {
   sceneStage?: SceneStage[];
   /** sceneStage 씬 단위 부분 진행 — decoupagePartial 과 같은 계약. */
   sceneStagePartial?: SceneStage[];
+  /** v4 가 무대에서 계산·검사한 이슈(축 보정·프레임 밖·상태 장부) — shotCheck 보고서·check_notes 로 합류(#ledger). */
+  shotDesignIssues?: ValidationIssue[];
+  /** 씬별 상태 장부(v4 결과) — scenes.stage.ledger 로 기록. */
+  sceneLedger?: SceneLedger[];
 
   // Shot 축
   decoupage?: DecoupagePlan;
@@ -221,6 +226,14 @@ async function runLaneVisual(
     shotDesign = result.shots;
     patch.shotDesign = shotDesign;
     patch.shotDesignPartial = undefined; // 체크포인트 정리 (JSONB 직렬화에서 키 제거)
+    // #stage/#ledger: 무대 적용·장부 이슈는 shotCheck 보고서·check_notes 로, 장부는 scenes.stage.ledger 로.
+    if (result.issues?.length) patch.shotDesignIssues = result.issues;
+    if (result.ledgers?.length) {
+      patch.sceneLedger = result.ledgers;
+      await persistSceneLedgersToDb(projectId, result.ledgers).catch((e) => {
+        console.error('[writer] persistSceneLedgersToDb 실패 (best-effort 계속):', e instanceof Error ? e.message : e);
+      });
+    }
     // Compact mode 사후처리: shotDesign 으로부터 sceneCinematography 역추론 (다운스트림 호환).
     if (compact) patch.sceneCinematography = inferSceneCinematographyFromShots(shotDesign, s.scenes!);
   }
@@ -258,6 +271,8 @@ async function runLaneVisual(
       logger,
       models.C,
       s.input.outputLocale,
+      // #stage/#ledger: 방금 만든 v4 이슈(같은 인보케이션) 또는 체크포인트에서 온 이슈.
+      patch.shotDesignIssues ?? s.shotDesignIssues ?? [],
     );
     await logger.flushRawLlm('shotCheck');
     shotSequence = result.shotSequence;

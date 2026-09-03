@@ -109,6 +109,8 @@ describe.skipIf(!ENABLED)('stage live dry-run', () => {
         character_motion: s.dynamic_spec.character_motion,
       })),
       layout_notes: texts,
+      ledger: v4.ledgers ?? [],
+      issues: v4.issues ?? [],
       llm_calls: calls.map((c) => ({ label: c.label, prompt_chars: c.prompt.length, response: c.response.slice(0, 4000) })),
     }
     mkdirSync(path.dirname(OUT), { recursive: true })
