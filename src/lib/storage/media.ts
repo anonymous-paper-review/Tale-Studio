@@ -55,17 +55,39 @@ export interface MediaUploadOptions {
   cacheControl?: string
 }
 
-/** 객체 하나를 올린다. 실패는 던지지 않고 `{ error }` 로 돌려준다. */
-export function mediaUpload(
+/** 보관함 오류의 상태 코드 — StorageApiError.status / statusCode('520') 어느 쪽이든 읽는다. */
+function storageErrorStatus(error: unknown): number | null {
+  if (!error || typeof error !== 'object') return null
+  const e = error as { status?: unknown; statusCode?: unknown }
+  const n = typeof e.status === 'number' ? e.status : Number(e.statusCode)
+  return Number.isFinite(n) ? n : null
+}
+
+const UPLOAD_RETRY_DELAYS_MS = [400, 900]
+
+/**
+ * 객체 하나를 올린다. 실패는 던지지 않고 `{ error }` 로 돌려준다.
+ *   서버 쪽 일시 오류(5xx — 실측 2026-09-03 러프 finalize 가 520 으로 실패해 잡이 failed 로 남음)는
+ *   짧게 두 번 더 시도한다. 4xx(권한·중복)는 즉시 돌려준다.
+ */
+export async function mediaUpload(
   path: string,
   data: Buffer | Uint8Array | Blob | ArrayBuffer,
   options: MediaUploadOptions,
 ) {
-  return bucket().upload(path, data, {
+  const opts = {
     contentType: options.contentType,
     upsert: options.upsert ?? false,
     cacheControl: options.cacheControl ?? MEDIA_CACHE_CONTROL,
-  })
+  }
+  let res = await bucket().upload(path, data, opts)
+  for (let i = 0; res.error && i < UPLOAD_RETRY_DELAYS_MS.length; i++) {
+    const status = storageErrorStatus(res.error)
+    if (status !== null && status < 500) break
+    await new Promise((r) => setTimeout(r, UPLOAD_RETRY_DELAYS_MS[i]))
+    res = await bucket().upload(path, data, { ...opts, upsert: true })
+  }
+  return res
 }
 
 /** 객체들을 지운다. 존재하지 않는 경로는 오류가 아니다. */
