@@ -9,6 +9,7 @@ import {
   distanceScaleForMotion,
   facingVector,
   facingWordOf,
+  lineOfSightObstructions,
   mirrorAcrossAxis,
   placeCharacter,
   positionWord,
@@ -143,5 +144,41 @@ describe('투영과 화면 낱말', () => {
     expect(distanceScaleForMotion({ type: 'dolly_out', magnitude: 'large' })).toBeGreaterThan(1.5)
     expect(distanceScaleForMotion({ type: 'pan', direction: 'left' })).toBe(1)
     expect(distanceScaleForMotion(null)).toBe(1)
+  })
+})
+
+describe('어깨 너머(OTS)와 시야 가림 (#stage 실측 수리)', () => {
+  it('OTS 는 씬 축 보정을 받지 않고 어깨 인물 뒤에 머문다 — 어깨 인물이 축 반대편에 있어도', () => {
+    // 용족(축 from)의 어깨 너머로 남쪽 5m 의 수인을 본다: 카메라는 용족 뒤(북쪽) = 씬 축 반대편
+    const beastSouth: StageCharacterState = { ...BEAST, y: -4, facing_deg: 0 }
+    const r = solveCamera({ setup: { subject: 'char_3', from_direction: 'N', height: 'eye', lens_mm: 35, over_shoulder_of: 'char' }, shotType: 'OTS', aspect: ASPECT, stage: STAGE, states: [FAIRY, DRAGON, beastSouth] })
+    expect(r.axisCorrected).toBe(false)
+    expect(Math.hypot(r.camera.x - DRAGON.x, r.camera.y - DRAGON.y)).toBeLessThan(1.6)
+    expect(r.camera.look_at.y).toBeCloseTo(-4, 1)
+  })
+
+  it('OTS 의 비키는 쪽은 가능하면 camera_side 쪽', () => {
+    // 요정 어깨 너머로 용족을 본다(둘 다 축 위) — 남쪽(right) 후보를 고른다
+    const r = solveCamera({ setup: { subject: 'char', from_direction: 'W', height: 'eye', lens_mm: 50, over_shoulder_of: 'char_2' }, shotType: 'OTS', aspect: ASPECT, stage: STAGE, states: [FAIRY, DRAGON] })
+    expect(axisSide({ x: FAIRY.x, y: FAIRY.y }, { x: DRAGON.x, y: DRAGON.y }, { x: r.camera.x, y: r.camera.y })).toBe('right')
+  })
+
+  it('프레임 안 판정과 off 낱말의 경계가 같다(±1.05)', () => {
+    const cam = { x: 0, y: -3, z: 1.5, look_at: { x: 0, y: 5, z: 1.0 }, lens_mm: 35, hfov_deg: 54.4 }
+    const edge = placeCharacter(cam, { ...DRAGON, x: 4.4, y: 5 }, ASPECT, 8) // u ≈ 1.07
+    expect(edge.in_frame).toBe(false)
+    expect(edge.position_in_frame).toBe('off_right')
+    const inside = placeCharacter(cam, { ...DRAGON, x: 3.9, y: 5 }, ASPECT, 8) // u ≈ 0.95
+    expect(inside.in_frame).toBe(true)
+    expect(inside.position_in_frame).toBe('frame_edge_right')
+  })
+
+  it('시야 가림: 피사체 앞을 막는 비피사체를 찾는다', () => {
+    const cam = { x: 0.52, y: -2.52, z: 1.54, look_at: { x: -2, y: 0, z: 1.7 }, lens_mm: 85, hfov_deg: 23.9 }
+    const blocker: StageCharacterState = { ...BEAST, x: -0.5, y: -1 }
+    const clear = lineOfSightObstructions(cam, [DRAGON, FAIRY], new Set(['char']), ASPECT, 3.57)
+    expect(clear).toEqual([])
+    const blocked = lineOfSightObstructions(cam, [{ ...DRAGON, x: -2, y: 0 }, blocker], new Set(['char']), ASPECT, 3.57)
+    expect(blocked).toEqual(['char_3'])
   })
 })

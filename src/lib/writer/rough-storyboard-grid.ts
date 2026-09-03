@@ -290,7 +290,9 @@ function sizePhrase(apparentHeight: number): string {
   return 'tiny in the distance'
 }
 export function describePlacement(p: ScreenPlacement): string {
-  return `${POSITION_PHRASES[p.position_in_frame] ?? words(p.position_in_frame)}, in the ${p.depth_band}, ${sizePhrase(p.apparent_height)}, ${FACING_PHRASES[p.facing] ?? words(p.facing)}`
+  // 누운 인물은 "seen from behind" 같은 향 문장이 오독을 부른다 — 자세만 말한다.
+  const facing = p.posture === 'lying' ? 'lying down' : (FACING_PHRASES[p.facing] ?? words(p.facing))
+  return `${POSITION_PHRASES[p.position_in_frame] ?? words(p.position_in_frame)}, in the ${p.depth_band}, ${sizePhrase(p.apparent_height)}, ${facing}`
 }
 function placementDiffers(a: ScreenPlacement, b: ScreenPlacement): boolean {
   return a.position_in_frame !== b.position_in_frame || Math.abs(a.apparent_height - b.apparent_height) > 0.15 || a.depth_band !== b.depth_band || a.in_frame !== b.in_frame

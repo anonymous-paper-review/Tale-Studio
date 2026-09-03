@@ -179,3 +179,34 @@ describe('applyStageToShots — 겨울_4 씬 1', () => {
     expect(r.shots[0].static_spec.character_blocking.some((b) => b.character_id === 'char_99')).toBe(true)
   })
 })
+
+describe('시야 가림 회전 — 겨울_4 sh_01_06 실측', () => {
+  it('타이트 샷에서 비피사체가 렌즈 앞을 막으면 축 안쪽 이웃 방향으로 돌리고 INFO 를 남긴다', () => {
+    const stage: SceneStage = {
+      ...STAGE,
+      axis: { from: 'char', to: 'char_2' },
+      camera_side: 'right',
+      beats: [{
+        beat: 4,
+        characters: [
+          { character_id: 'char', x: -2, y: 0, facing_deg: 150, posture: 'standing', height_m: 1.9 },
+          { character_id: 'char_2', x: 2, y: 1, facing_deg: 0, posture: 'standing', height_m: 1.7 },
+          { character_id: 'char_3', x: -0.5, y: -1, facing_deg: 0, posture: 'standing', height_m: 2.0 },
+        ],
+      }],
+    }
+    const s = shot('shot_6', {
+      shot_type: 'MCU',
+      lens_mm: 85,
+      camera_setup: { subject: 'char', from_direction: 'SE', height: 'eye', lens_mm: 85 },
+      character_blocking: [{ character_id: 'char', position_in_frame: 'center', pose: 'sneering', gaze: 'right', asset_version: 'v1' }],
+    })
+    const r = applyStageToShots([s], stage, [dec('shot_6', [4])])
+    const spec = r.shots[0].static_spec
+    expect(spec.camera_setup?.from_direction).not.toBe('SE')
+    expect(r.issues.some((i) => i.message.includes('렌즈 앞을 가려'))).toBe(true)
+    const beast = spec.screen_layout!.characters.find((c) => c.character_id === 'char_3')
+    expect(!beast || beast.start.apparent_height < 1.2).toBe(true)
+    expect(spec.screen_layout!.axis_corrected).toBeUndefined()
+  })
+})

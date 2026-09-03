@@ -664,6 +664,8 @@ export interface ScreenPlacement {
   position_in_frame: ScreenPositionWord;
   depth_band: DepthBand;
   facing: FacingWord;
+  /** 무대 자세 — 누운 인물은 향 문장 대신 '누워 있음'으로 서술한다 */
+  posture?: StagePosture;
 }
 
 export interface StageCamera {

@@ -20,6 +20,7 @@ import {
   compassVector,
   distanceScaleForMotion,
   isCompassDir,
+  lineOfSightObstructions,
   placeCharacter,
   solveCamera,
   COMPASS_DIRS,
@@ -188,11 +189,37 @@ export function applyStageToShots(
     if (defaulted) push('WARNING', 'camera_setup 이 없어 기본 카메라(축 안쪽·피사체 첫 인물)로 계산했다', 'v4 출력에 camera_setup 을 채워라')
 
     let startSolve = solveCamera({ setup, shotType: spec.shot_type, aspect, stage, states: states.start })
+    const isOts = !!setup.over_shoulder_of && states.start.some((c) => c.character_id === setup.over_shoulder_of)
+    const tight = /^(ECU|CU|MCU|INSERT)$/i.test(String(spec.shot_type ?? ''))
+    const subjectsForSight = new Set(subjectIds(setup))
+    if (isOts && setup.over_shoulder_of) subjectsForSight.add(setup.over_shoulder_of)
+    // 시야 가림(타이트 샷): 피사체가 아닌 인물이 렌즈 바로 앞을 막으면 카메라 방향을 이웃 나침반으로 돌린다
+    //   (씬 축 안쪽 방향만). 실측(겨울_4 sh_01_06): 다가온 수인이 용족 MCU 의 오른쪽 절반을 가렸다.
+    if (tight && !isOts) {
+      const blockers = lineOfSightObstructions(startSolve.camera, states.start, subjectsForSight, aspect, startSolve.subjectDistance)
+      if (blockers.length) {
+        const order = COMPASS_DIRS
+        const i0 = order.indexOf(setup.from_direction)
+        const tries = [1, -1, 2, -2, 3, -3, 4].map((k) => order[(i0 + k + order.length * 2) % order.length])
+        let fixed = false
+        for (const dir of tries) {
+          const alt = solveCamera({ setup: { ...setup, from_direction: dir }, shotType: spec.shot_type, aspect, stage, states: states.start })
+          if (alt.axisCorrected) continue
+          if (lineOfSightObstructions(alt.camera, states.start, subjectsForSight, aspect, alt.subjectDistance).length) continue
+          startSolve = alt
+          setup.from_direction = dir
+          push('INFO', `${blockers.join(', ')} 가 렌즈 앞을 가려 카메라 방향을 ${dir} 로 돌렸다`)
+          fixed = true
+          break
+        }
+        if (!fixed) push('WARNING', `${blockers.join(', ')} 가 렌즈 앞을 가리는데 축 안쪽에서 시야가 트인 방향이 없다`, '무대 위치나 샷 사이즈를 조정')
+      }
+    }
     // 명단 맞춤: LLM 이 화면에 두려던 인물(character_blocking)이 카메라 앞인데 가로로 잘리면 최대 6단계
     //   (×1.2) 물러선다 — 샷은 넓어지지만 의도한 인물이 빠지지 않는다. 뒤에 있는 인물은 물러서도 못 담는다.
     //   단, 타이트한 샷(ECU/CU/MCU/INSERT)은 데쿠파주의 샷 사이즈가 우선 — 물러서지 않고 프레임 밖 인물을 뺀다.
-    const tight = /^(ECU|CU|MCU|INSERT)$/i.test(String(spec.shot_type ?? ''))
-    const listedIds = tight ? [] : (Array.isArray(spec.character_blocking) ? spec.character_blocking : []).map((b) => b.character_id)
+    //   OTS 는 카메라가 어깨 인물에 붙어 있어 물러서기가 의미 없다.
+    const listedIds = tight || isOts ? [] : (Array.isArray(spec.character_blocking) ? spec.character_blocking : []).map((b) => b.character_id)
     let backoff = 1
     for (let k = 0; k < 6 && listedIds.length; k++) {
       const missing = listedIds.filter((id) => {

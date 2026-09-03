@@ -214,14 +214,20 @@ export function solveCamera(input: SolveCameraInput): SolvedCamera {
   const lookZ = subjectHeight * lookAtHeightRatio(input.shotType)
   const ots = setup.over_shoulder_of ? states.find((s) => s.character_id === setup.over_shoulder_of) : null
   if (setup.over_shoulder_of && !ots) issues.push(`over_shoulder_of "${setup.over_shoulder_of}" 가 무대에 없어 무시했다`)
+  const axis = resolveAxisPoints(stage, states)
   if (ots) {
-    // 어깨 너머: 그 인물 뒤 0.9m, 옆으로 0.45m 비켜서 피사체를 본다.
+    // 어깨 너머: 그 인물 뒤 0.9m, 옆으로 0.45m 비켜서 피사체를 본다. 비키는 쪽은 씬 축의 camera_side 쪽을
+    //   우선한다(가능할 때). OTS 는 어깨 인물–피사체 선이 자체 축이라 씬 축 보정(반사·물러서기)을 걸지 않는다 —
+    //   실측(겨울_4 sh_01_05): 씬 축으로 반사하면 카메라가 피사체 뒤로 넘어가 OTS 가 사라졌다.
     const dx = ots.x - center.x
     const dy = ots.y - center.y
     const len = Math.hypot(dx, dy) || 1
     const ux = dx / len
     const uy = dy / len
-    cam = { x: ots.x + ux * 0.9 - uy * 0.45, y: ots.y + uy * 0.9 + ux * 0.45 }
+    const candidates = [+1, -1].map((sgn) => ({ x: ots.x + ux * 0.9 - uy * 0.45 * sgn, y: ots.y + uy * 0.9 + ux * 0.45 * sgn }))
+    const onSide = axis ? candidates.find((c) => axisSide(axis.from, axis.to, c) === stage.camera_side) : undefined
+    cam = onSide ?? candidates[0]
+    if (axis && !onSide) issues.push('어깨 너머 카메라가 씬 축 반대편에 놓인다(어깨 인물 기준 유지 — OTS 는 자체 축)')
     camZ = (ots.height_m ?? DEFAULT_CHARACTER_HEIGHT_M) * 0.9
   } else {
     const dir = compassVector(input.fromDirectionOverride ?? setup.from_direction)
@@ -239,8 +245,7 @@ export function solveCamera(input: SolveCameraInput): SolvedCamera {
   //      축을 넘을 때까지 물러선다(+여유 3m) — 샷은 넓어지지만 관객의 좌우가 지켜진다.
   //   ③ 둘 다 안 되면 점 반사(마지막 수단).
   let axisCorrected = false
-  const axis = resolveAxisPoints(stage, states)
-  if (axis) {
+  if (axis && !ots) {
     const side = axisSide(axis.from, axis.to, cam)
     if (side !== 'on' && side !== stage.camera_side) {
       if (setup.axis_cross === 'motivated') {
@@ -391,7 +396,8 @@ export function placeCharacter(cam: StageCamera, state: StageCharacterState, asp
   const u = (base.u + top.u) / 2
   const apparent = (top.v - base.v) / 2
   const verticalOverlap = top.v > -1 && base.v < 1
-  const inFrame = Math.abs(u) <= 1.15 && verticalOverlap
+  // 가로 경계는 positionWord 의 off_* 경계(±1.05)와 같다 — "프레임 안인데 낱말은 off" 모순 방지.
+  const inFrame = Math.abs(u) <= 1.05 && verticalOverlap
   return {
     in_frame: inFrame,
     screen_x: round(u),
@@ -401,7 +407,29 @@ export function placeCharacter(cam: StageCamera, state: StageCharacterState, asp
     position_in_frame: inFrame ? positionWord(u) : u < 0 ? 'off_left' : 'off_right',
     depth_band: depthBandOf(distance, subjectDistance),
     facing: facingWordOf(state, cam),
+    posture: state.posture,
   }
+}
+
+/**
+ * 시야 가림 — 피사체가 아닌 인물이 카메라 바로 앞(피사체 거리의 절반 안)에 서서 프레임을 크게 막는가.
+ *   타이트 샷에서 카메라 방향을 돌리는 판단 근거(apply). 돌려주는 값은 가리는 인물 id 들.
+ */
+export function lineOfSightObstructions(
+  cam: StageCamera,
+  states: StageCharacterState[],
+  subjectIds: ReadonlySet<string>,
+  aspect: number,
+  subjectDistance: number,
+): string[] {
+  const out: string[] = []
+  for (const st of states) {
+    if (subjectIds.has(st.character_id)) continue
+    const pl = placeCharacter(cam, st, aspect, subjectDistance)
+    // 피사체 거리의 70% 안쪽에서 프레임 높이의 1.2배 넘게 잡히면 가림(실측 sh_01_06: 거리비 0.51, 높이 4.1).
+    if (pl.in_frame && pl.distance_m < subjectDistance * 0.7 && pl.apparent_height > 1.2) out.push(st.character_id)
+  }
+  return out
 }
 
 /** 카메라 무브 → END 카메라 거리 배율(설정이 없을 때의 추정). */
