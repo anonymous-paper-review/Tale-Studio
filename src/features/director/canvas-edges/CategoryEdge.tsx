@@ -1,7 +1,7 @@
 'use client'
 
 import { memo } from 'react'
-import { BaseEdge, EdgeLabelRenderer, getBezierPath, type EdgeProps } from '@xyflow/react'
+import { BaseEdge, EdgeLabelRenderer, getBezierPath, useViewport, type EdgeProps } from '@xyflow/react'
 import { X } from 'lucide-react'
 import type {
   DirectorEdge,
@@ -46,6 +46,8 @@ function CategoryEdgeImpl({
 }: EdgeProps<DirectorEdge>) {
   const t = useT()
   const deleteEdge = useDirectorCanvasStore((s) => s.deleteEdge)
+  // 라벨 렌더러는 캔버스 축척을 따라 줄어든다 — X 는 축척과 무관하게 화면에서 같은 크기여야 누를 수 있다(실측: 0.45 축척에서 9px).
+  const { zoom } = useViewport()
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
@@ -81,7 +83,7 @@ function CategoryEdgeImpl({
               deleteEdge(id)
             }}
             className="nodrag nopan pointer-events-auto absolute flex size-5 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm hover:bg-destructive hover:text-destructive-foreground"
-            style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
+            style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px) scale(${1 / Math.max(zoom, 0.05)})`, transformOrigin: 'center' }}
           >
             <X className="size-3" />
           </button>
