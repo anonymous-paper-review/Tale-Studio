@@ -21,6 +21,8 @@ export type PendingProposalKind =
   | 'artistCreateAppearance'
   | 'artistCreateLocationAppearance'
   | 'directorGenerateStoryboardImage'
+  // 약속 E3(2026-09-04): "영상 다 만들어줘" — 버튼 확인창과 같은 숫자(만들 영상 수·필요한 Take·가진 Take)를 보이고 승인 뒤 runVideoBatch.
+  | 'directorGenerateVideoBatch'
   | 'writerShrinkDialogue'
 
 export interface PendingProposal {

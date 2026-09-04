@@ -106,9 +106,10 @@ describe('runVideoBatch', () => {
     expect(maxActive).toBe(3)
     expect(result).toEqual({ total: 5, started: 4, failed: 1 })
     expect(mockStore.state.generateVideoForShot).toHaveBeenCalledTimes(5)
+    // 약속 E4(2026-09-04): 러너가 완료 영수증을 세려고 자기 observer 를 끼운다 — 항상 함수다.
     expect(mockStore.state.generateVideoForShot).toHaveBeenCalledWith('shot-1', {
       batch: true,
-      onJob: undefined,
+      onJob: expect.any(Function),
     })
     const progressUpdates = mockStore.setState.mock.calls
       .map(([patch]) => patch.videoBatchProgress)

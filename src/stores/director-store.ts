@@ -1420,6 +1420,8 @@ export type DirectorCanvasUpdate =
   // #c5 (2026-08-27): 진입 자동 실사 생성을 끄면서 채팅 경로를 열었다. id 를 주면 그 샷만,
   //   생략하면 미생성 전체를 일괄로 — 버튼과 같은 경로(generateStoryboardImage / runRealBatch)를 탄다.
   | { type: 'generateImage'; id?: string }
+  // 약속 E3(2026-09-04): 미생성 샷 전체 영상 일괄 — 채팅은 승인 카드(directorGenerateVideoBatch)로만 시작한다.
+  | { type: 'generateVideos' }
   | {
       type: 'connect'
       sourceId: string
@@ -4565,7 +4567,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               }
               if (!isCurrentAttempt()) return true
               if (status === 'completed') {
-                notifyGenerationComplete('director', translate(useLocaleStore.getState().locale, 'Video'))
+                // 약속 E4(2026-09-04): 일괄은 러너가 "N개 완료, M개 실패" 한 줄로 남긴다 — 건별 알림은 단건만.
+                if (options?.batch !== true) notifyGenerationComplete('director', translate(useLocaleStore.getState().locale, 'Video'))
                 // #adherence P2: 모션 계약 준수 검사(fire-and-forget) — 브라우저가 첫/끝 프레임을
                 //   캡처해 서버 판정 후 배지 반영. 실패는 조용히 무시(생성 결과에 영향 없음).
                 const doneNode = get().nodes.find((n) => n.id === videoNodeId)
@@ -5075,6 +5078,11 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                   update: u,
                   reason: 'video generation from chat requires an explicit approval contract',
                 })
+                break
+              }
+              case 'generateVideos': {
+                // 약속 E3: 일괄 영상은 승인 카드 뒤 runVideoBatch 로만 돈다 — 여기까지 오면 승인 없이 온 것이라 막는다.
+                result.skipped.push({ update: u, reason: 'video batch from chat runs only after the approval card' })
                 break
               }
               case 'connect': {

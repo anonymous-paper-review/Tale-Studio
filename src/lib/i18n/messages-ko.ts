@@ -1407,4 +1407,16 @@ export const KO: Record<string, string> = {
   'Batch generation failed': '일괄 생성에 실패했어요',
   'Generated {count} live-action storyboard shots': '실사 스토리보드 {count}개를 만들었어요',
   'No shots to generate. Only shots with a rough panel and no image yet are eligible.': '생성할 샷이 없어요. 러프 그림이 있고 아직 이미지가 없는 샷만 대상이에요.',
+  // 약속 E(2026-09-04): 영상 일괄 생성과 Take 사전 계산
+  'Takes needed: {required}. Takes you have: {balance}.': '필요한 Take {required}개, 가진 Take {balance}개.',
+  'Takes needed: {required}. This workspace has unlimited Takes.': '필요한 Take {required}개. 이 워크스페이스는 Take 제한이 없어요.',
+  'Only {run} of {count} videos can be made with your Takes. The first {run} will be generated.': 'Take가 모자라 {count}개 중 {run}개만 만들 수 있어요. 앞에서부터 {run}개를 만들어요.',
+  'Takes are short by {missing}. Billing is not enforced yet, so all {count} will be generated.': 'Take가 {missing}개 모자라요. 아직 차감을 막지 않아 {count}개 모두 만들어요.',
+  'No videos can be made until you add Takes.': 'Take를 충전해야 영상을 만들 수 있어요.',
+  'Generate videos for {count} shots': '샷 {count}개의 영상 생성',
+  'Costs Takes for every generated video.': '영상마다 Take가 차감돼요.',
+  'Every shot already has a video or one in progress.': '모든 샷에 이미 영상이 있거나 만들어지는 중이에요.',
+  '{done} videos done, {failed} failed': '영상 {done}개 완료, {failed}개 실패',
+  'A proposal is already pending, so the video generation proposal was held back.': '이미 대기 중인 제안이 있어 영상 생성 제안은 보류했어요.',
+  'Chat can start videos only for all remaining shots at once. For one shot, use the Video take button on the Shot node.': '채팅은 남은 샷 전체의 영상만 한꺼번에 시작할 수 있어요. 샷 하나는 Shot 카드의 Video take 버튼을 눌러 주세요.',
 }

@@ -44,6 +44,13 @@ export function refetchTakeBalance(): void {
   inflight = fetchOnce()
 }
 
+/** 약속 E(2026-09-04): 잔액을 새로 읽어 돌려준다 — 채팅 승인 카드가 숫자를 적기 전에 기다린다. */
+export async function fetchTakeBalance(): Promise<TakeBalanceState> {
+  inflight = fetchOnce()
+  await inflight
+  return cache
+}
+
 export function useTakeBalance(): TakeBalanceState {
   const [state, setState] = useState(cache)
   useEffect(() => {

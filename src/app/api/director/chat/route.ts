@@ -91,6 +91,8 @@ Non-destructive (direct execution):
 9. {"type":"generateVideo","id":"<videoId>"}
 9b. {"type":"generateImage","id":"<shotId>"}  — 그 샷의 실사 이미지 생성. id 를 빼면 미생성 샷 전체 일괄.
     (실사는 클라이언트 승인 카드를 거친 뒤에만 생성된다)
+9c. {"type":"generateVideos"}  — 영상이 없는 샷 전체의 영상 일괄 생성. 클라이언트 승인 카드가 만들 영상 수·필요한 Take·가진 Take 를
+    보여 준 뒤에만 시작된다. 특정 샷 하나의 영상은 채팅으로 시작할 수 없다.
 10. {"type":"connect","sourceId":"<id>","targetId":"<id>","category":"relates-to","relationText":"..."}
 11. {"type":"connectFrame","sourceId":"<sourceId|tempId>","targetId":"<videoId|tempId>","targetHandle":"frame-start"|"frame-end"|"frame-ref"}
     (semantic frame wiring only; targetHandle must be exactly frame-start, frame-end, or frame-ref)
@@ -110,9 +112,9 @@ Destructive — opens confirmation modal (NOT immediate):
 </hybrid_intent_rule>
 
 <video_request_rule>
-- Chat cannot start video generation yet — there is no approval-card contract for it (unlike generateImage).
-- When the user asks to generate/create/render a video (or a video take), do NOT emit generateVideo and do NOT emit addVideoTake for that request. Emitting addVideoTake alone creates an empty take placeholder while implying a video was queued — that is misleading, so skip both actions entirely.
-- Reply honestly that chat doesn't support video generation yet and point them to the canvas video-generation button (per-shot or the Video take button on the Shot node) instead of saying you will generate it.
+- When the user asks to generate videos for all remaining shots ("영상 다 만들어줘", "generate all the videos"), emit exactly one {"type":"generateVideos"} and say that an approval card will show how many videos it makes and how many Takes it needs. Do not say generation started.
+- A single shot's video still cannot start from chat: for that request do NOT emit generateVideo and do NOT emit addVideoTake. Emitting addVideoTake alone creates an empty take placeholder while implying a video was queued, which is misleading, so skip both actions entirely.
+- For a single shot, reply honestly that chat only starts the whole batch, and point them to the Video take button on the Shot node.
 - Never reply as if a video generation started, is queued, or will be ready soon.
 </video_request_rule>
 </actions>
@@ -202,6 +204,7 @@ const VALID_UPDATE_TYPES = new Set([
   'setCameraPreset',
   'generateVideo',
   'generateImage',
+  'generateVideos',
   'connect',
   'connectFrame',
   'connectImage',
@@ -386,6 +389,11 @@ function validateCanvasUpdates(raw: unknown[]): unknown[] {
       case 'generateImage': {
         // id 는 선택 — 없으면 미생성 전체 일괄(#c5). 있으면 그 Shot 만.
         out.push(asString(rec.id) ? { type: 'generateImage', id: rec.id } : { type: 'generateImage' })
+        break
+      }
+      case 'generateVideos': {
+        // 약속 E3: 필드 없음 — 미생성 샷 전체. 클라이언트가 승인 카드(만들 영상 수·필요한 Take·가진 Take)를 띄운다.
+        out.push({ type: 'generateVideos' })
         break
       }
       case 'generateVideo':

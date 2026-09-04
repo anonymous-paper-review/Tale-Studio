@@ -39,6 +39,14 @@ export function notifyGenerationFailed(stage: StageId, label: string, raw: strin
 }
 
 /**
+ * 약속 E4(2026-09-04): 일괄 생성이 끝났을 때 "N개 완료, M개 실패" 한 줄 — 보고 있는 stage 여도 남긴다
+ *   (일괄은 사람이 누른 것이라 결과 줄이 있어야 한다). 건별 완료 알림은 일괄 모드에서 내지 않는다.
+ */
+export function notifyBatchSummary(stage: StageId, content: string): void {
+  useGlobalChatStore.getState().notifyIssue(stage, content)
+}
+
+/**
  * give-up 게이트로 자동 생성이 멈췄을 때.
  *   이걸 안 알리면 화면상 아무 일도 안 일어난 것과 구분되지 않는다 — 그리고 원인이 고쳐져도
  *   자동으로는 복구되지 않으므로 "사람이 눌러야 한다"를 반드시 전달해야 한다.

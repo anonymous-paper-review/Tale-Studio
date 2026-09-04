@@ -29,6 +29,8 @@ import {
   eligibleVideoBatchShotIds,
   runVideoBatch,
 } from '@/lib/director/video-batch-client'
+import { describeVideoBatchPlan, planVideoBatch, videoBatchTakeCosts } from '@/lib/director/video-batch-plan'
+import { refetchTakeBalance, useTakeBalance } from '@/lib/billing/use-take-balance'
 import { RegenerateConfirmDialog } from '@/features/director/regenerate-confirm-dialog'
 import { useAltArrowCycle } from '@/lib/use-alt-arrow-cycle'
 import { AltArrowHint } from '@/components/alt-arrow-hint'
@@ -809,6 +811,9 @@ function PaletteBar({
   )
   const eligibleVideoCount = eligibleVideoBatchShotIds(nodes).length
   const [confirmVideoBatch, setConfirmVideoBatch] = useState(false)
+  // 약속 E1·E2(2026-09-04): 확인창에 만들 영상 수·필요한 Take·가진 Take — 채팅 승인 카드와 같은 계산(video-batch-plan).
+  const takeState = useTakeBalance()
+  const videoPlan = planVideoBatch(videoBatchTakeCosts(nodes, eligibleVideoBatchShotIds(nodes)), takeState.balance, takeState.mode)
 
   // 상단 이동(#e1 2026-07-13): 하단 border-t 바 → 캔버스 위 border-b 바.
   //   Node/Storyboard 토글은 artist 탭(Characters/World/Inventory)과 동일한 TabsList 스타일.
@@ -920,6 +925,7 @@ function PaletteBar({
               toast.info(t('No eligible shots for video generation.'))
               return
             }
+            refetchTakeBalance()
             setConfirmVideoBatch(true)
           }}
           disabled={videoBatchBusy}
@@ -1066,20 +1072,25 @@ function PaletteBar({
         onOpenChange={setConfirmVideoBatch}
         title={t('Generate videos for eligible shots?')}
         description={t('Generate videos for {count} eligible shots.', {
-          count: eligibleVideoCount,
+          count: videoPlan.total,
         })}
         impact={[
           t('Costs money for every generated video: {count} videos.', {
-            count: eligibleVideoCount,
+            count: videoPlan.runCount,
           }),
+          ...describeVideoBatchPlan(videoPlan, t),
           t('Only shots without a completed video or active generation will be included.'),
         ]}
         confirmLabel={t('Generate videos')}
         busy={videoBatchBusy}
         onConfirm={() => {
           setConfirmVideoBatch(false)
+          if (videoPlan.runCount === 0) {
+            toast.warning(t('No videos can be made until you add Takes.'))
+            return
+          }
           const pid = useDirectorCanvasStore.getState().projectId
-          if (pid) void runVideoBatch(pid)
+          if (pid) void runVideoBatch(pid, { limit: videoPlan.runCount })
         }}
       />
     </div>

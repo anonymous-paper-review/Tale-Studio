@@ -96,3 +96,15 @@ paths:
 - 잡 폴링은 `pollGenerationJob` 이 잡 id 별로 한 루프만 돈다(`inFlightPolls`). 배경 자동 생성은 이 세션에서 이미 도는 배경을 건너뛰고
   (`generatingLocations`), 서버는 같은 슬롯의 queued 잡을 `hasQueuedWorldShotJob` 으로 막는다.
 - Artist 탭(인물/배경)은 스토어 `uiTab`, 고른 카드는 `loadData` 가 되돌리지 않는다(`keepSelection`).
+
+## 영상 일괄 생성과 Take (2026-09-04, 약속 E — `tests/promise-e-video-batch-takes.test.ts`, `tests/promise-e-chat-approval.test.ts`)
+
+- 일괄 생성은 Take 를 **미리 센다**: `src/lib/director/video-batch-plan.ts`(순수)가 샷별 단가(마더 샷의 모델 → `takeCostForVideo`, 서버 hold 와 같은
+  계산기)와 잔액(`/api/billing/take-balance`)으로 만들 영상 수·필요한 Take·가진 Take·만들 수 있는 수(runCount)를 낸다. 버튼 확인창과
+  채팅 승인 카드가 같은 `describeVideoBatchPlan` 줄을 쓴다.
+- 모자라면(오너 E2, 1안) enforce 는 앞에서부터 runCount 만 요청하고 "N개 중 M개만"을 미리 알린다. shadow 는 숫자는 보이되 막지 않는다.
+  off 는 Take 줄이 없다. 무제한(admin, balance null)은 "제한 없음"만 적는다.
+- 채팅 "영상 다 만들어줘" = Director 액션 `generateVideos`(필드 없음) → 승인 카드 `directorGenerateVideoBatch`(payload.limit) → 승인 시
+  `runVideoBatch(pid, { limit })`. 승인 없이 스토어까지 온 `generateVideos` 는 skipped. 샷 하나의 영상은 여전히 채팅으로 시작하지 않는다.
+- 끝나면 러너가 완료 영수증(잡 id 별 첫 종결)을 세어 "N개 완료, M개 실패" 한 줄을 남긴다(`notifyBatchSummary`, 보고 있는 stage 여도).
+  일괄 모드에서는 건별 완료 알림을 내지 않는다.

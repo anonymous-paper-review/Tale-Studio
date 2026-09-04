@@ -3,10 +3,14 @@
 import { toast } from 'sonner'
 import type { DirectorNode } from '@/types/director'
 import { isShotData, isVideoData } from '@/types/director'
-import type { GenerationJobObserver } from '@/lib/generation-jobs-client'
+import type { GenerationJobObserver, GenerationJobReceipt } from '@/lib/generation-jobs-client'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
+import { notifyBatchSummary } from '@/lib/generation-notify'
+
+/** 완료 영수증이 끝내 안 오는 잡(새로고침·유실)이 있어도 요약 줄은 남긴다. */
+const BATCH_SUMMARY_TIMEOUT_MS = 15 * 60 * 1000
 
 const EMPTY_RESULT = { total: 0, started: 0, failed: 0 }
 
@@ -48,10 +52,14 @@ export type VideoBatchResult = {
   failed: number
 }
 
-/** Run explicit full-video generation using the existing per-shot pipeline. */
+/**
+ * Run explicit full-video generation using the existing per-shot pipeline.
+ *   약속 E(2026-09-04): `limit` 은 Take 사전 계산(video-batch-plan)이 정한 "만들 수 있는 수" — 앞에서부터 그만큼만 요청한다.
+ *   끝나면 채팅에 "N개 완료, M개 실패" 한 줄을 남긴다(E4): 제출 실패는 바로, 제출된 잡은 완료 영수증을 세어서.
+ */
 export async function runVideoBatch(
   projectId: string,
-  opts?: { onJob?: GenerationJobObserver; silent?: boolean },
+  opts?: { onJob?: GenerationJobObserver; silent?: boolean; limit?: number },
 ): Promise<VideoBatchResult> {
   const store = useDirectorCanvasStore
   const current = store.getState()
@@ -59,8 +67,34 @@ export async function runVideoBatch(
     return { ...EMPTY_RESULT }
   }
 
-  const shotIds = eligibleVideoBatchShotIds(current.nodes)
+  const eligible = eligibleVideoBatchShotIds(current.nodes)
+  const limit = opts?.limit == null ? eligible.length : Math.max(0, Math.min(eligible.length, Math.floor(opts.limit)))
+  const shotIds = eligible.slice(0, limit)
   const total = shotIds.length
+
+  // 완료 집계 — 잡 id 마다 첫 종결 영수증만 센다.
+  const settledJobs = new Set<string>()
+  let completed = 0
+  let failedJobs = 0
+  let summarized = false
+  const locale = () => useLocaleStore.getState().locale
+  const summarize = () => {
+    if (summarized || total === 0) return
+    summarized = true
+    const doneCount = completed
+    const failedCount = failedJobs + failed
+    const line = translate(locale(), '{done} videos done, {failed} failed', { done: doneCount, failed: failedCount })
+    notifyBatchSummary('director', `${doneCount > 0 ? '✓' : '⚠'} ${line}`)
+  }
+  const onJob: GenerationJobObserver = (receipt: GenerationJobReceipt) => {
+    opts?.onJob?.(receipt)
+    if (receipt.status === 'queued' || !receipt.jobId || settledJobs.has(receipt.jobId)) return
+    settledJobs.add(receipt.jobId)
+    if (receipt.status === 'completed') completed += 1
+    else failedJobs += 1
+    if (submissionDone && settledJobs.size >= started) summarize()
+  }
+  let submissionDone = false
   store.setState({
     videoBatchBusy: true,
     videoBatchProgress: { done: 0, total, failed: 0 },
@@ -86,7 +120,7 @@ export async function runVideoBatch(
       try {
         result = await store.getState().generateVideoForShot(shotIds[index]!, {
           batch: true,
-          onJob: opts?.onJob,
+          onJob,
         })
       } catch {
         // A rejected per-shot action is a settled failed shot, just like null.
@@ -100,6 +134,9 @@ export async function runVideoBatch(
     await Promise.all(
       Array.from({ length: Math.min(3, total) }, () => worker()),
     )
+    submissionDone = true
+    if (started === 0 || settledJobs.size >= started) summarize()
+    else setTimeout(summarize, BATCH_SUMMARY_TIMEOUT_MS)
     if (!opts?.silent && total > 0) {
       const locale = useLocaleStore.getState().locale
       if (failed > 0) {

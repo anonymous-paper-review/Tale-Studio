@@ -1276,8 +1276,13 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           // 이미지는 과금 생성이므로 채팅 응답에서 바로 실행하지 않는다. 같은 응답의 무과금
           // 수정은 즉시 반영하되, 이미지 생성은 하나의 승인 카드로만 묶는다.
           const imageUpdates = updates.filter((update) => update.type === 'generateImage')
-          const immediateUpdates = updates.filter((update) => update.type !== 'generateImage')
+          // 약속 E3(2026-09-04): 영상 일괄도 승인 카드로만 — 버튼 확인창과 같은 숫자를 보인다.
+          const videoBatchUpdates = updates.filter((update) => update.type === 'generateVideos')
+          const immediateUpdates = updates.filter(
+            (update) => update.type !== 'generateImage' && update.type !== 'generateVideos',
+          )
           let imageProposalAccepted = false
+          let videoProposalAccepted = false
           if (imageUpdates.length > 0) {
             const locale = contentLocale()
             imageProposalAccepted = get().offerPendingProposal(
@@ -1303,6 +1308,53 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
               })
             }
           }
+          if (videoBatchUpdates.length > 0) {
+            const locale = contentLocale()
+            const tr = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars)
+            if (imageUpdates.length > 0) {
+              set({ error: tr('A proposal is already pending, so the video generation proposal was held back.') })
+            } else {
+              // 러너·잔액 훅은 지연 로드 — video-batch-client 가 스토어를 import 하므로 정적 import 는 순환이 된다.
+              const [{ eligibleVideoBatchShotIds }, { fetchTakeBalance }, { planVideoBatch, videoBatchTakeCosts, describeVideoBatchPlan }] =
+                await Promise.all([
+                  import('@/lib/director/video-batch-client'),
+                  import('@/lib/billing/use-take-balance'),
+                  import('@/lib/director/video-batch-plan'),
+                ])
+              const nodes = useDirectorCanvasStore.getState().nodes
+              const eligible = eligibleVideoBatchShotIds(nodes)
+              if (eligible.length === 0) {
+                get().notifyIssue('director', tr('Every shot already has a video or one in progress.'))
+              } else {
+                const takes = await fetchTakeBalance()
+                const plan = planVideoBatch(videoBatchTakeCosts(nodes, eligible), takes.balance, takes.mode)
+                videoProposalAccepted = get().offerPendingProposal(
+                  createPendingProposal({
+                    traceId,
+                    stage: 'director',
+                    kind: 'directorGenerateVideoBatch',
+                    target: tr('Videos'),
+                    action: tr('Generate videos for {count} shots', { count: plan.total }),
+                    impact: [
+                      tr('Costs Takes for every generated video.'),
+                      ...describeVideoBatchPlan(plan, tr),
+                      tr('Nothing runs until you approve.'),
+                    ],
+                    payload: {
+                      limit: plan.runCount,
+                      total: plan.total,
+                      requiredTakes: plan.requiredTakes,
+                      balance: plan.balance,
+                      mode: plan.mode,
+                    },
+                  }),
+                )
+                if (!videoProposalAccepted) {
+                  set({ error: tr('A proposal is already pending, so the video generation proposal was held back.') })
+                }
+              }
+            }
+          }
           const result = useDirectorCanvasStore
             .getState()
             .applyUpdates(immediateUpdates, {
@@ -1312,8 +1364,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           patchTrace({
             appliedCount: result.applied,
             skippedCount: result.skipped.length,
-            pendingProposal: imageProposalAccepted,
-            ...(imageProposalAccepted
+            pendingProposal: imageProposalAccepted || videoProposalAccepted,
+            ...(imageProposalAccepted || videoProposalAccepted
               ? { generationStatus: 'awaiting_approval' }
               : immediateUpdates.some((u) => u.type === 'generateVideo') &&
                   result.skipped.length > 0
@@ -1336,9 +1388,10 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           //   "생성할게요" 라고 이미 답한 채팅에 거절 흔적이 안 남는 사고를 막는다. skip 사유로
           //   판별해 정직한 안내를 별도 모델 메시지로 영속화한다(원래 reply 는 건드리지 않는다).
           if (result.skipped.some((s) => s.update.type === 'generateVideo')) {
+            // 약속 E3(2026-09-04): 일괄은 승인 카드로 되지만 샷 하나는 여전히 안 된다 — 문구도 그대로 말한다.
             const honestNotice = translate(
               contentLocale(),
-              "Chat doesn't support video generation yet. Please use the video generation button on the canvas.",
+              'Chat can start videos only for all remaining shots at once. For one shot, use the Video take button on the Shot node.',
             )
             set((state) => ({
               messages: [
@@ -1838,6 +1891,19 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         })
         if (result.applied === 0) {
           throw new Error('no storyboard image updates could run')
+        }
+      } else if (proposal.kind === 'directorGenerateVideoBatch') {
+        // 약속 E3: 승인 = 버튼과 똑같이 runVideoBatch — 카드에 적힌 "만들 수 있는 수"(limit)만 요청한다.
+        const pid = useDirectorCanvasStore.getState().projectId
+        if (!pid) throw new Error('director project missing')
+        const limit = typeof proposal.payload.limit === 'number' ? proposal.payload.limit : undefined
+        if (limit === 0) {
+          throw new Error(translate(contentLocale(), 'No videos can be made until you add Takes.'))
+        }
+        const { runVideoBatch } = await import('@/lib/director/video-batch-client')
+        const outcome = await runVideoBatch(pid, { onJob: observeGeneration, limit })
+        if (outcome.total === 0) {
+          throw new Error(translate(contentLocale(), 'Every shot already has a video or one in progress.'))
         }
       } else if (proposal.kind === 'writerShrinkDialogue') {
         const shotId = proposal.payload.shotId

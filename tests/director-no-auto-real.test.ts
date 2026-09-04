@@ -72,12 +72,13 @@ describe('#영상거짓수락 — 채팅이 영상 생성 요청을 거짓 수�
   it('프롬프트가 영상 요청에 generateVideo/addVideoTake 둘 다 내지 말라고 명시한다', () => {
     expect(chatRoute).toContain('<video_request_rule>')
     expect(chatRoute).toContain('do NOT emit generateVideo and do NOT emit addVideoTake')
-    expect(chatRoute).toContain("doesn't support video generation yet")
+    // 약속 E3(2026-09-04): 일괄(generateVideos)은 승인 카드로 허용, 샷 하나는 여전히 불가.
+    expect(chatRoute).toContain('chat only starts the whole batch')
   })
 
   it('generateVideo skip 사유가 있으면 유저에게 정직한 문구를 모델 메시지로 남긴다 (클라 방어선)', () => {
     expect(globalChatStore).toContain("result.skipped.some((s) => s.update.type === 'generateVideo')")
-    expect(globalChatStore).toContain("doesn't support video generation yet")
+    expect(globalChatStore).toContain('Chat can start videos only for all remaining shots at once.')
     expect(globalChatStore).toContain('saveChatMessage(projectId, stage, \'model\', honestNotice)')
   })
 })
