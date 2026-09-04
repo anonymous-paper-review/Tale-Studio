@@ -133,7 +133,9 @@ describe('evaluateProducerGate — gate B (cast, depth-linked)', () => {
       backgrounds: [{ ...fullBackground(), visualDescription: '' }],
     })
     expect(r.canHandoff).toBe(false)
-    expect(r.hardMissing.map((i) => i.field)).toContain('background:minComplete')
+    // 약속 L(2026-09-04): 배경이 있으면 카드별 빈 칸으로 짚는다 — "배경 1개 필요"는 배경이 아예 없을 때만.
+    expect(r.hardMissing.map((i) => i.field)).toContain('background:b1:visualDescription')
+    expect(r.hardMissing.map((i) => i.field)).not.toContain('background:minComplete')
   })
 })
 

@@ -136,6 +136,23 @@ function depthAtLeast(
   return DEPTH_ORDER.indexOf(depth) >= DEPTH_ORDER.indexOf(min)
 }
 
+/** 약속 L: 배경 카드의 빈 칸 하나하나를 카드 이름과 함께 — "○○: 목적이 비어 있어요". */
+export function evaluateBackgroundFields(
+  background: BackgroundSource,
+  locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
+): GateIssue[] {
+  const t = (text: string, params?: Record<string, string | number>) => translate(locale, text, params)
+  const who = background.name?.trim() || t('Unnamed background')
+  const out: GateIssue[] = []
+  if (!isFilled(background.name))
+    out.push({ field: `background:${background.localId}:name`, label: t('{who}: name needed', { who }) })
+  if (!isFilled(background.visualDescription))
+    out.push({ field: `background:${background.localId}:visualDescription`, label: t('{who}: visual description needed', { who }) })
+  if (!isFilled(background.purpose))
+    out.push({ field: `background:${background.localId}:purpose`, label: t('{who}: purpose needed', { who }) })
+  return out
+}
+
 export function isProducerBackgroundComplete(background: BackgroundSource): boolean {
   return (
     isFilled(background.name) &&
@@ -230,12 +247,22 @@ export function evaluateProducerGate({
   }
 
   // ── 게이트 C: Background source (producer-owned location pool) ───────
-  if (!backgrounds.filter(isProducerOrigin).some(isProducerBackgroundComplete)) {
+  //   약속 L(2026-09-04): 빈 칸이 있는 배경 카드는 이름과 빈 칸을 목록에 싣는다 — 완성 배경이 하나라도 있으면 넘김은 통과하되
+  //   권장 목록(soft)에, 완성 배경이 없으면 필수 목록(hard)에. 옛 코드는 "완성 배경 하나"만 보고 나머지 카드의 빈 칸을 삼켜
+  //   채팅과 여정이 몰랐다(실측 겨울_6: 배경 4장 중 3장 목적 비었는데 "남은 필수 항목 없음").
+  const producerBackgrounds = backgrounds.filter(isProducerOrigin)
+  const hasCompleteBackground = producerBackgrounds.some(isProducerBackgroundComplete)
+  if (producerBackgrounds.length === 0) {
     hardMissing.push({
       field: 'background:minComplete',
       label: t('At least 1 background needed'),
       detail: t('A background card with a name, visual description, and purpose is needed'),
     })
+  }
+  for (const b of producerBackgrounds) {
+    const issues = evaluateBackgroundFields(b, locale)
+    if (!issues.length) continue
+    ;(hasCompleteBackground ? softMissing : hardMissing).push(...issues)
   }
 
   return {

@@ -1452,4 +1452,8 @@ export const KO: Record<string, string> = {
   // 약속 K(2026-09-04): 자막
   'Subtitle': '자막',
   'Click to add a subtitle': '누르면 자막을 넣어요',
+  // 약속 L(2026-09-04): 배경 카드 빈 칸
+  'Unnamed background': '이름 없는 배경',
+  '{who}: visual description needed': '{who}: 시각 설명이 비어 있어요',
+  '{who}: purpose needed': '{who}: 목적이 비어 있어요',
 }

@@ -144,3 +144,9 @@ paths:
   진실은 편집기 스냅샷(editor_states)이고, 복원은 DB 원본 샷에도 저장된 자막을 다시 입힌다(`loadPersisted`).
 - 자리·줄바꿈·모양(흰 글자 + 검은 테두리, 아래 가운데 기본)은 `src/lib/editor/subtitle.ts` 하나가 정한다: 미리보기 `SubtitleLayer`(누르면 편집,
   끌기·방향키 이동)와 내보내기 `drawSubtitle` 이 같은 함수를 쓴다. 지금 재생 중인 샷의 자막만 얹는다.
+
+## 배경 카드 빈 칸은 카드 이름으로 짚는다 (2026-09-04, 약속 L — `tests/promise-l-background-gaps.test.ts`)
+
+- Producer 게이트(`evaluateProducerGate`)는 배경 카드마다 빈 칸(이름·시각 설명·목적)을 `background:<localId>:<field>` 로 싣는다.
+  완성 배경이 하나라도 있으면 권장 목록(soft)이고 넘김은 통과, 없으면 필수 목록(hard). 배경이 아예 없을 때만 "배경 1개 필요".
+- 같은 목록이 채팅 요청(`gate.hardMissing/softMissing` → `[Handoff Gate Status]`)과 제작 여정에 실린다 — 화면이 아는 빈 칸을 채팅이 모르는 일이 없다.
