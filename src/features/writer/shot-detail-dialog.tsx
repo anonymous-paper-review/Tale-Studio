@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { DirectingArrowEditor } from '@/features/writer/directing-arrow-editor'
+import { RoughFramesStill } from '@/features/writer/rough-frames-still'
 import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
 import type { RoughStoryboardImage } from '@/types'
@@ -52,7 +53,7 @@ export function ShotDetailDialog({ shotId, panel, onOpenChange }: ShotDetailDial
 
   return (
     <Dialog open={!!shotId} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">{positionLabel}</span>
@@ -66,13 +67,23 @@ export function ShotDetailDialog({ shotId, panel, onOpenChange }: ShotDetailDial
         </DialogHeader>
 
         {panel && panel.status === 'completed' ? (
-          <DirectingArrowEditor
-            key={shot.shotId}
-            projectId={projectId}
-            shotId={shot.shotId}
-            panel={panel}
-            onSaved={() => void loadProject()}
-          />
+          <>
+            {/* 약속 I: 시작·연출·끝 3장이 나란히 멈춰 보이고, 각 장 아래 "이 장만 다시 만들기". */}
+            <RoughFramesStill
+              key={`still-${shot.shotId}-${panel.generatedAt}`}
+              projectId={projectId}
+              shotId={shot.shotId}
+              panel={panel}
+              onRegenerated={() => void loadProject()}
+            />
+            <DirectingArrowEditor
+              key={shot.shotId}
+              projectId={projectId}
+              shotId={shot.shotId}
+              panel={panel}
+              onSaved={() => void loadProject()}
+            />
+          </>
         ) : (
           <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
             {t('No rough panel yet. Generate a panel on the board first.')}

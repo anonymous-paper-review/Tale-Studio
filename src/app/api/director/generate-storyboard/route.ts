@@ -174,6 +174,8 @@ export async function POST(req: Request) {
         frames?: { start?: string; direction?: string; end?: string }
       } | null
     )?.frames
+    // 약속 I4: 이 실사가 참조하는 러프의 시각 — 나중에 러프가 바뀌면 카드에 "러프 바뀜"이 뜬다.
+    const roughGeneratedAt = (shot?.rough_storyboard as { generatedAt?: number } | null)?.generatedAt
     const stripFrames =
       roughFrames?.start && roughFrames.direction && roughFrames.end
         ? { start: roughFrames.start, direction: roughFrames.direction, end: roughFrames.end }
@@ -342,6 +344,7 @@ export async function POST(req: Request) {
         workspaceId: project.workspace_id,
         writerShotId,
         ...(stripFrames ? { gridVariant: 'strip1' as const } : {}),
+        ...(typeof roughGeneratedAt === 'number' ? { roughGeneratedAt } : {}),
       },
     })
 

@@ -994,6 +994,8 @@ async function finalizeStoryboardStripJob(
         status: 'completed',
         errorMessage: null,
         generatedAt: Date.now(),
+        // 약속 I4: 참조한 러프의 시각 — 러프가 바뀌면 "러프 바뀜"(자동 재생성은 하지 않는다, 오너 I5).
+        roughGeneratedAt: job.target.roughGeneratedAt ?? null,
       },
     })
     .eq('project_id', job.project_id)
@@ -1032,6 +1034,7 @@ export async function finalizeShotStoryboardJob(
         status: 'completed',
         errorMessage: null,
         generatedAt: Date.now(),
+        roughGeneratedAt: job.target.roughGeneratedAt ?? null,
       },
     })
     .eq('project_id', job.project_id)
@@ -1128,6 +1131,7 @@ async function finalizeRealGridJob(
           status: 'completed',
           errorMessage: null,
           generatedAt: Date.now(),
+          roughGeneratedAt: job.target.roughGeneratedAtByShot?.[shotId] ?? null,
         },
       })
       .eq('project_id', job.project_id)

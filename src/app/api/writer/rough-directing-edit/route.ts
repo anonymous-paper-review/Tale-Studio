@@ -10,6 +10,7 @@ import {
   separateArrowLayer,
   saveDirectingFrame,
   regenerateEndFrame,
+  regenerateRoughFrame,
 } from '@/lib/writer/directing-edit'
 
 export const runtime = 'nodejs'
@@ -34,6 +35,13 @@ const BodySchema = z.discriminatedUnion('action', [
     projectId: z.string().uuid(),
     shotId: z.string().min(1),
   }),
+  z.object({
+    // 약속 I(2026-09-04): 시작·연출·끝 중 한 장만 다시 그린다 — 나머지 두 장은 그대로.
+    action: z.literal('regenerate-frame'),
+    projectId: z.string().uuid(),
+    shotId: z.string().min(1),
+    frame: z.enum(['start', 'direction', 'end']),
+  }),
 ])
 
 export async function POST(req: Request) {
@@ -53,6 +61,10 @@ export async function POST(req: Request) {
     }
     if (body.action === 'regenerate-end') {
       const data = await regenerateEndFrame(body.projectId, body.shotId)
+      return NextResponse.json({ data })
+    }
+    if (body.action === 'regenerate-frame') {
+      const data = await regenerateRoughFrame(body.projectId, body.shotId, body.frame)
       return NextResponse.json({ data })
     }
     const data = await saveDirectingFrame(body.projectId, body.shotId, body.image)

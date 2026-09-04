@@ -2,6 +2,7 @@
 
 import { memo } from 'react'
 import { cn } from '@/lib/utils'
+import { classifyRoughChanged } from '@/lib/image-provenance'
 import { NodeToolbar, Position, type NodeProps } from '@xyflow/react'
 import { Camera, Lightbulb, ImageIcon, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -149,6 +150,12 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             <span className="pointer-events-none absolute left-1 top-1 rounded-sm bg-background/70 px-1 text-[9px] uppercase text-muted-foreground">
               {realImage ? t('Live-action') : t('Previz')}
             </span>
+            {/* 약속 I4: 러프 3장 중 하나라도 바뀌면 "러프 바뀜" — 자동으로 다시 만들지 않는다(오너 I5). */}
+            {realImage && classifyRoughChanged(rough, data.storyboardImage) && (
+              <span className="pointer-events-none absolute right-1 top-1 rounded-sm border border-warning/60 bg-background/80 px-1 text-[9px] text-warning">
+                {t('Rough changed')}
+              </span>
+            )}
           </div>
         )}
 

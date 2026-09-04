@@ -30,8 +30,9 @@ import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import { useActiveGenerationJobs, activeShotIds } from '@/lib/generation-queue'
 import { useRoughStoryboard, useShotActionDescription } from '@/features/director/hooks/use-rough-storyboard'
-import { RegenerateConfirmDialog } from '@/features/director/regenerate-confirm-dialog'
 import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
+import { classifyRoughChanged } from '@/lib/image-provenance'
+import { RegenerateConfirmDialog } from '@/features/director/regenerate-confirm-dialog'
 import { replaceSlugs, type SlugEntry } from '@/lib/script-lines'
 import {
   isMentionModifierClick,
@@ -281,6 +282,14 @@ function ShotCell({
   const hasImage = status === 'completed' && !!img?.url
   const roughUrl = rough?.status === 'completed' ? rough.url : null
   const roughStartUrl = rough?.frames?.start ?? roughUrl
+  // 약속 I4(2026-09-04): 러프 3장 중 하나라도 바뀌면 실사 카드에 "러프 바뀜" — 자동 재생성은 하지 않는다(오너 I5).
+  const roughChanged = mediaMode === 'real' && classifyRoughChanged(rough, img)
+  // 약속 I(오너 확정): 그리드에서 이미지를 눌러도 글자를 눌러도 같은 연출 편집 팝업(Writer 것) — writer 샷일 때.
+  //   #e6 의 Previz 편집 팝업(previzOpen)이 이미 그 팝업이다 — 같은 상태를 연다.
+  const openDetail = () => {
+    if (writerShotId) setPrevizOpen(true)
+    else openPopup(node.id)
+  }
   const prompt = effectivePrompt(data)
 
   // 파이프라인 단계 배지(#e2 2026-07-18) — 이 샷이 어느 단계인지 한눈에: 영상 / 이미지 / Previz.
@@ -443,6 +452,7 @@ function ShotCell({
   }
 
   return (
+    <>
     <div
       className="group flex cursor-pointer flex-col rounded-xl border border-border bg-card p-2.5 transition-colors duration-100 hover:bg-accent/40 hover-red-beam"
       onClickCapture={(event) => {
@@ -453,7 +463,7 @@ function ShotCell({
       }}
       onDoubleClick={(event) => {
         if (isMentionModifierClick(event)) return
-        openPopup(node.id)
+        openDetail()
       }}
     >
       {/* 그림은 카드에 '담긴' 사각형(#card-inset 2026-08-11). writer 러프 카드와 동일 규칙
@@ -550,6 +560,11 @@ function ShotCell({
               )}
               <span className="whitespace-nowrap">{stageBadge.label}</span>
             </span>
+            {roughChanged && (
+              <span className="inline-flex items-center rounded-full border border-warning/50 px-1.5 py-0.5 text-[10px] text-warning">
+                {t('Rough changed')}
+              </span>
+            )}
             {/* 액션 목록(#e1 2026-08-12) — absolute 라 자리를 차지하지 않는다: 리스트가 투명한
                 동안(pointer-events-none) 그 영역 호버는 통과되므로 **배지 위에서만** 열린다.
                 열린 뒤에는 pt-1 브리지가 배지→리스트 이동 중 호버 이탈을 막는다. w-24 로 축소. */}
@@ -663,7 +678,7 @@ function ShotCell({
         onClick={(event) => {
           if (isMentionModifierClick(event)) return
           event.stopPropagation()
-          openPopup(node.id)
+          openDetail()
         }}
       >
         <span className="truncate text-sm font-medium text-foreground">
@@ -681,6 +696,7 @@ function ShotCell({
         )}
       </div>
     </div>
+    </>
   )
 }
 

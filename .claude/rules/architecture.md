@@ -118,3 +118,13 @@ paths:
 - 참조 목록의 진실: 사람이 손댄 샷은 `referenceOverride` + `shots.director_refs`(20260904120000, `{characters, locations}`; null = Writer 그대로).
   Writer→Director 동기화는 손댄 목록을 덮지 않고, 실사 생성(단건·배치)은 `shots.characters ∩ director_refs.characters` 만 붙이며
   `locations` 가 비면 배경도 붙이지 않는다(배치 시트는 그 시트의 샷 전부가 뺐을 때만). 하이드레이트가 이 열을 읽어 되살아남을 막는다.
+
+## 러프 3장 개별 재생성 (2026-09-04, 약속 I — `tests/promise-i-rough-frames.test.ts`)
+
+- 러프(shots.rough_storyboard.frames start·direction·end)는 한 장씩 다시 그린다: `regenerateRoughFrame(projectId, shotId, frame)`
+  (`/api/writer/rough-directing-edit` action `regenerate-frame`) — Grok i2i 1회, 나머지 두 장은 손대지 않는다(`mergeRoughFrame` 순수).
+  end·start 는 DIRECTING 을 참조("움직임 뒤/앞"), direction 은 START + action_description 을 참조. 연출 장이 바뀌면 클린 플레이트 캐시를 버린다.
+- 3장 정지 보기 + "이 장만 다시 만들기"는 Writer 팝업(`ShotDetailDialog` → `RoughFramesStill`)의 것이고, Director 그리드의 이미지·글자
+  클릭은 같은 팝업(previzOpen)을 연다.
+- 실사(storyboard_image)는 참조한 러프의 `roughGeneratedAt` 을 기록한다(단건·스트립·배치 잡 타깃 → finalize). `classifyRoughChanged` 가
+  지금 러프의 generatedAt 과 다르면 "러프 바뀜" 배지(ShotNode·그리드). 자동 재생성은 없다(오너 I5) — 사람이 다시 만든다.

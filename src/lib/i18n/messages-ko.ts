@@ -1423,4 +1423,17 @@ export const KO: Record<string, string> = {
   'Delete connection': '연결 지우기',
   // 약속 H(2026-09-04): 카드 상태 글자
   'Take {n}': '테이크 {n}',
+  // 약속 I(2026-09-04): 러프 3장 개별 재생성
+  'Start frame': '시작',
+  'Directing frame': '연출',
+  'End frame': '끝',
+  'Regenerate this frame only': '이 장만 다시 만들기',
+  'Redraw only this frame (1 image generation). The other two stay as they are.': '이 장만 다시 그려요(이미지 생성 1회). 나머지 두 장은 그대로예요.',
+  'Redrawing the {frame} frame, about 30 seconds': '{frame} 장을 다시 그리는 중이에요. 30초쯤 걸려요.',
+  'Redrew the {frame} frame. The other two are unchanged.': '{frame} 장을 다시 그렸어요. 나머지 두 장은 그대로예요.',
+  'Regeneration failed': '다시 만들기에 실패했어요.',
+  'Rough changed': '러프 바뀜',
+  'You need the 3-frame rough set to redraw a frame': '한 장을 다시 그리려면 러프 3장 세트가 있어야 해요.',
+  'Failed to download the {frame} frame: HTTP {status}': '{frame} 프레임을 내려받지 못했어요: HTTP {status}',
+  'The {frame} frame is abnormally small ({bytes}b)': '{frame} 프레임이 비정상적으로 작아요({bytes}b)',
 }

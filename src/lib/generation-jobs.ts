@@ -38,6 +38,10 @@ export interface GenerationJobTarget {
   //   열 순서와 배열 순서가 1:1 — finalize 가 셀을 잘라 각 샷에 배분한다. (writerShotId 단일은 구버전 경로)
   writerShotIds?: string[]
   gridVariant?: 'grid4' | 'strip1'
+  /** 약속 I4(2026-09-04): 실사가 참조한 러프의 generatedAt — 러프가 바뀌면 "러프 바뀜" 판정의 근거. */
+  roughGeneratedAt?: number
+  /** 배치(그리드) 잡: 샷별 러프 generatedAt. */
+  roughGeneratedAtByShot?: Record<string, number>
 }
 
 export interface GenerationJob {

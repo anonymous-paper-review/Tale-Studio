@@ -127,45 +127,99 @@ const END_FROM_DIRECTION_PROMPT =
   'line, dashed path and handwritten annotation. Keep the same characters, costumes, background ' +
   'and monochrome pencil style. Return only the cleaned drawing.'
 
+export type RoughFrameKey = 'start' | 'direction' | 'end'
+export const ROUGH_FRAME_KEYS: readonly RoughFrameKey[] = ['start', 'direction', 'end']
+
+// 약속 I(2026-09-04): 3장 중 한 장만 다시 그린다 — 나머지 두 장은 손대지 않는다.
+//   start: DIRECTING 을 참조로 "움직임이 시작되기 전" · end: "움직임이 끝난 뒤" · direction: START 를 참조로 화살표를 그린다.
+const START_FROM_DIRECTION_PROMPT =
+  'This pencil storyboard sketch marks the intended movement of a shot with arrows, motion lines ' +
+  'and handwritten annotations. Draw the START frame: the same scene just before that movement ' +
+  'begins, with the figures, objects and framing at the positions where the arrows start. Remove ' +
+  'every arrow, motion line, dashed path and handwritten annotation. Keep the same characters, ' +
+  'costumes, background and monochrome pencil style. Return only the cleaned drawing.'
+const DIRECTION_FROM_START_PROMPT =
+  'This pencil storyboard sketch is the START frame of a shot. Draw the DIRECTING frame: the same ' +
+  'scene, same composition and figures, with clear arrows, motion lines and short handwritten ' +
+  'annotations that mark how the figures, objects and camera move during the shot. Keep the same ' +
+  'characters, costumes, background and monochrome pencil style.'
+
+/** 순수: 한 장만 바꾼 새 러프 JSON — 나머지 프레임은 그대로, generatedAt 만 올린다(캐시버스트).
+ *  DIRECTING 이 바뀌면 화살표 클린 플레이트 캐시는 낡은 것이라 버리고, 아니면 for 를 올려 재과금을 막는다. */
+export function mergeRoughFrame(
+  rough: RoughJson,
+  frame: RoughFrameKey,
+  url: string,
+  now: number,
+): RoughJson {
+  const frames = { ...(rough.frames ?? {}), [frame]: url }
+  const cleanDirection =
+    frame === 'direction'
+      ? undefined
+      : rough.cleanDirection
+        ? { ...rough.cleanDirection, for: now }
+        : undefined
+  const { cleanDirection: _dropped, ...rest } = rough
+  void _dropped
+  return { ...rest, frames, generatedAt: now, ...(cleanDirection ? { cleanDirection } : {}) }
+}
+
+function promptForFrame(frame: RoughFrameKey, action: string | null): { prompt: string; refs: (f: NonNullable<RoughJson['frames']>) => string[] } {
+  if (frame === 'end') return { prompt: END_FROM_DIRECTION_PROMPT, refs: (f) => [f.direction!] }
+  if (frame === 'start') return { prompt: START_FROM_DIRECTION_PROMPT, refs: (f) => [f.direction!] }
+  const withAction = action?.trim()
+    ? `${DIRECTION_FROM_START_PROMPT} The movement to mark: ${action.trim()}. Return only the drawing.`
+    : `${DIRECTION_FROM_START_PROMPT} Return only the drawing.`
+  return { prompt: withAction, refs: (f) => [f.start!] }
+}
+
 /**
- * DIRECTING 프레임을 참조로 END 프레임을 재생성한다.
- * 과금: fal i2i 1회 — 사람이 "저장 후 재생성"을 명시적으로 누를 때만 호출된다(자동 경로 없음).
+ * 러프 3장 중 한 장만 다시 그린다(약속 I1·I2·I3). 과금: fal i2i 1회 — 사람이 "이 장만 다시 만들기"를 눌렀을 때만.
+ *   생성 중에 러프 세트가 통째로 바뀌었으면(다른 generatedAt) 덮어쓰지 않는다.
  */
-export async function regenerateEndFrame(
+export async function regenerateRoughFrame(
   projectId: string,
   shotId: string,
+  frame: RoughFrameKey,
   locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
-): Promise<{ url: string; generatedAt: number }> {
+): Promise<{ url: string; generatedAt: number; frame: RoughFrameKey }> {
   const rb = await loadRough(projectId, shotId)
-  if (rb?.status !== 'completed' || !rb.frames?.direction || !rb.frames?.end) {
-    throw new Error(
-      translate(locale, 'You need the 3-frame rough set to redraw the END frame'),
-    )
+  if (rb?.status !== 'completed' || !rb.frames?.start || !rb.frames?.direction || !rb.frames?.end) {
+    throw new Error(translate(locale, 'You need the 3-frame rough set to redraw a frame'))
   }
-
+  let action: string | null = null
+  if (frame === 'direction') {
+    const { data } = await supabaseAdmin
+      .from('shots')
+      .select('action_description')
+      .eq('project_id', projectId)
+      .eq('shot_id', shotId)
+      .maybeSingle()
+    action = typeof data?.action_description === 'string' ? data.action_description : null
+  }
+  const { prompt, refs } = promptForFrame(frame, action)
   const result = await falImageGenerate({
     model: GROK_EDIT_MODEL,
-    prompt: END_FROM_DIRECTION_PROMPT,
-    reference_image_urls: [rb.frames.direction],
+    prompt,
+    reference_image_urls: refs(rb.frames),
   })
   const res = await fetch(result.url)
   if (!res.ok)
     throw new Error(
-      translate(locale, 'Failed to download the END frame: HTTP {status}', { status: res.status }),
+      translate(locale, 'Failed to download the {frame} frame: HTTP {status}', { frame: frame.toUpperCase(), status: res.status }),
     )
   const buf = Buffer.from(await res.arrayBuffer())
   if (buf.length < 10_000) {
     throw new Error(
-      translate(locale, 'The END frame is abnormally small ({bytes}b)', { bytes: buf.length }),
+      translate(locale, 'The {frame} frame is abnormally small ({bytes}b)', { frame: frame.toUpperCase(), bytes: buf.length }),
     )
   }
   const contentType = res.headers.get('content-type') ?? 'image/jpeg'
   const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg'
-  const endPath = `${storagePathFromPublicUrl(rb.frames.end, locale).replace(/\.[a-z]+$/i, '')}.${ext}`
-  const newUrl = await uploadToMedia(endPath, buf, contentType)
+  const current = rb.frames[frame]!
+  const framePath = `${storagePathFromPublicUrl(current, locale).replace(/\.[a-z]+$/i, '')}.${ext}`
+  const newUrl = await uploadToMedia(framePath, buf, contentType)
 
-  // 생성 중에 러프가 재생성됐으면(다른 generatedAt) 덮어쓰지 않는다 — 낡은 END 로 새 세트를
-  //   오염시키는 것을 막는다(separateArrowLayer 와 같은 방어).
   const latest = await loadRough(projectId, shotId)
   if (!latest || (latest.generatedAt ?? 0) !== (rb.generatedAt ?? 0)) {
     throw new Error(translate(locale, 'The rough set was regenerated in the meantime. Please try again'))
@@ -173,19 +227,21 @@ export async function regenerateEndFrame(
   const now = Date.now()
   const { error } = await supabaseAdmin
     .from('shots')
-    .update({
-      rough_storyboard: {
-        ...latest,
-        frames: { ...latest.frames, end: newUrl },
-        generatedAt: now,
-        // DIRECTING 은 그대로이므로 클린 플레이트 캐시는 유효 — for 를 함께 올려 재과금을 막는다.
-        ...(latest.cleanDirection ? { cleanDirection: { ...latest.cleanDirection, for: now } } : {}),
-      },
-    })
+    .update({ rough_storyboard: mergeRoughFrame(latest, frame, newUrl, now) })
     .eq('project_id', projectId)
     .eq('shot_id', shotId)
   if (error) throw error
-  return { url: newUrl, generatedAt: now }
+  return { url: newUrl, generatedAt: now, frame }
+}
+
+/** DIRECTING 프레임을 참조로 END 프레임을 재생성한다 — regenerateRoughFrame(..., 'end') 의 이름 호환. */
+export async function regenerateEndFrame(
+  projectId: string,
+  shotId: string,
+  locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
+): Promise<{ url: string; generatedAt: number }> {
+  const { url, generatedAt } = await regenerateRoughFrame(projectId, shotId, 'end', locale)
+  return { url, generatedAt }
 }
 
 /** 편집기가 평탄화한 direction 프레임(PNG data URL)을 기존 경로에 upsert + 캐시버스트. */

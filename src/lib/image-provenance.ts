@@ -249,3 +249,18 @@ export function selectCandidatesToEvict(
     .slice(keep)
     .map((c) => c.id)
 }
+
+/**
+ * 약속 I4(2026-09-04): 러프 3장 중 하나라도 바뀌면 그 샷의 실사 카드에 "러프 바뀜". 실사는 참조한 러프의 generatedAt 을
+ *   기록하고(roughGeneratedAt), 지금 러프의 generatedAt 과 다르면 바뀐 것이다. 기록이 없는 옛 실사는 판정하지 않는다(소음 방지).
+ *   자동 재생성은 하지 않는다(오너 I5) — 표시만.
+ */
+export function classifyRoughChanged(
+  rough: { generatedAt?: number | null; status?: string } | null | undefined,
+  image: { roughGeneratedAt?: number | null; status?: string } | null | undefined,
+): boolean {
+  if (!rough || !image) return false
+  if (image.status !== 'completed' || rough.status !== 'completed') return false
+  if (typeof image.roughGeneratedAt !== 'number' || typeof rough.generatedAt !== 'number') return false
+  return image.roughGeneratedAt !== rough.generatedAt
+}

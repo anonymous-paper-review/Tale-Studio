@@ -42,6 +42,8 @@ interface EligibleShot {
   blocking: Map<string, { position: string | null; pose: string | null }>
   /** 약속 F3: Director 에서 배경 참조 선을 지운 샷 — 시트 전체가 뺐을 때만 배경을 안 붙인다. */
   excludeWorld: boolean
+  /** 약속 I4: 참조한 러프의 generatedAt. */
+  roughGeneratedAt: number | null
 }
 
 class CharacterAppearanceContractError extends Error {}
@@ -133,6 +135,7 @@ export async function POST(req: NextRequest) {
         characters: applyDirectorRefs(characters, directorRefs),
         characterAppearanceKeys,
         excludeWorld: directorRefsExcludeWorld(directorRefs),
+        roughGeneratedAt: (s.rough_storyboard as { generatedAt?: number } | null)?.generatedAt ?? null,
         frames: { start: f.start, direction: f.direction, end: f.end },
         blocking: readCharacterBlocking(s.static_spec),
       })
@@ -363,6 +366,9 @@ export async function POST(req: NextRequest) {
           workspaceId: project.workspace_id as string,
           writerShotIds: group.map((s) => s.shot_id),
           gridVariant: 'grid4',
+          roughGeneratedAtByShot: Object.fromEntries(
+            group.filter((s) => typeof s.roughGeneratedAt === 'number').map((s) => [s.shot_id, s.roughGeneratedAt as number]),
+          ),
         },
       })
       submitted.push({ jobId: job.id, shotIds: group.map((s) => s.shot_id) })
