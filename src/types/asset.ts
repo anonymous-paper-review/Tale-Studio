@@ -116,6 +116,20 @@ export interface WorldAsset {
   styleDescription?: string
   lightingSources?: string[]
   props?: string[]
-  /** wide_shot 후보 히스토리(최근 5장, 선택본 포함) — 약속 B4(2026-09-04). generated_at 내림차순. */
+  /** wide_shot 후보 히스토리(최근 5장, 선택본 포함) — 약속 B4(2026-09-04). generated_at 내림차순. 기본 모습 것. */
   candidates?: CandidateImage[]
+  /** 배경의 모습(타임라인) 변형 — 약속 C10(2026-09-04). 기본 모습은 이 목록에 없고 locations 행 자체다. */
+  appearances?: LocationAppearance[]
 }
+
+/** 배경 모습 변형(location_appearances 행). 기본 모습(키 'default')은 WorldAsset 자체가 담당한다. */
+export interface LocationAppearance {
+  appearanceKey: string
+  label: string
+  narrativeTime: NarrativeTime | null
+  visualDescription: string | null
+  visualDescriptionNative: string | null
+  wideShot: string | null
+  candidates: CandidateImage[]
+}
+export const DEFAULT_LOCATION_APPEARANCE_KEY = 'default'

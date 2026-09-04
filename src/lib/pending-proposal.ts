@@ -19,6 +19,7 @@ export type PendingProposalKind =
   | 'artistSourceLocationPatch'
   // 약속 C3·C4(2026-09-04): 새 모습 만들기 — 행 추가 뒤 이미지를 바로 만들어 과금이 생기므로 승인 카드를 거친다.
   | 'artistCreateAppearance'
+  | 'artistCreateLocationAppearance'
   | 'directorGenerateStoryboardImage'
   | 'writerShrinkDialogue'
 

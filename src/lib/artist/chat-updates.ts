@@ -77,7 +77,12 @@ export function validateUpdates(raw: unknown[]): unknown[] {
         break
       case 'regenerateWorldAsset':
         if (asString(rec.locationId)) {
-          out.push({ type: 'regenerateWorldAsset', locationId: rec.locationId })
+          out.push({
+            type: 'regenerateWorldAsset',
+            locationId: rec.locationId,
+            // 약속 C10: 특정 배경 모습(변형)만 다시 그린다. 없으면 기본 모습.
+            ...(asString(rec.appearanceKey)?.trim() ? { appearanceKey: (rec.appearanceKey as string).trim() } : {}),
+          })
         }
         break
       case 'createAppearance': {
@@ -137,6 +142,34 @@ export function extractAppearanceCreations(raw: unknown[]): AppearanceCreation[]
       characterId,
       label,
       appearance,
+      ...(typeof rec.narrativeTime === 'string' && VALID_NARRATIVE_TIMES.has(rec.narrativeTime) ? { narrativeTime: rec.narrativeTime } : {}),
+    })
+  }
+  return out
+}
+
+export interface LocationAppearanceCreation {
+  locationId: string
+  label: string
+  visualDescription: string
+  narrativeTime?: string
+}
+
+/** cc 가 emit 한 "배경의 새 모습 만들기"(createLocationAppearance) 의도 — 약속 C10. 승인 뒤 행 생성 + 이미지 자동 생성. */
+export function extractLocationAppearanceCreations(raw: unknown[]): LocationAppearanceCreation[] {
+  const out: LocationAppearanceCreation[] = []
+  for (const u of raw) {
+    if (!u || typeof u !== 'object') continue
+    const rec = u as Record<string, unknown>
+    if (rec.type !== 'createLocationAppearance') continue
+    const locationId = asString(rec.locationId)?.trim()
+    const label = asString(rec.label)?.trim()
+    const visualDescription = (asString(rec.visualDescription) ?? asString(rec.description))?.trim()
+    if (!locationId || !label || !visualDescription) continue
+    out.push({
+      locationId,
+      label,
+      visualDescription,
       ...(typeof rec.narrativeTime === 'string' && VALID_NARRATIVE_TIMES.has(rec.narrativeTime) ? { narrativeTime: rec.narrativeTime } : {}),
     })
   }

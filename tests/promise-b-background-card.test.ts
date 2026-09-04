@@ -122,7 +122,7 @@ describe('약속 B — 배경 카드는 캐릭터 카드와 같다', () => {
     expect(panel).not.toMatch(/generateWorldAsset\(/)
     expect(panel).not.toMatch(/Generating…/) // 카드에 남아 있던 번역 안 된 영어 문구
     // 카드 클릭은 여전히 팝업을 연다
-    expect(panel).toMatch(/setViewDialog\(\{ locationId: world\.locationId, shot: 'wideShot' \}\)/)
+    expect(panel).toMatch(/setViewDialog\(\{ locationId: world\.locationId, shot: 'wideShot', appearanceKey: variantKey \}\)/)
   })
 
   it('배경 팝업에서 프롬프트를 고치고 닫았다 열어도 남아 있고, 배경 원천 설명에 저장돼 Writer 씬에도 반영된다', async () => {
@@ -235,7 +235,7 @@ describe('약속 B — 배경 카드는 캐릭터 카드와 같다', () => {
     expect(classifyWorldImageStale('아무 설명', undefined)).toBe('fresh')
     // 카드가 이 판정으로 배지를 그린다.
     const panel = read('src/features/artist/world-panel.tsx')
-    expect(panel).toMatch(/classifyWorldImageStale\(world\.visualDescription, selectedCandidate\)/)
+    expect(panel).toMatch(/classifyWorldImageStale\(variant \? variant\.visualDescription : world\.visualDescription, selectedCandidate\)/)
     expect(panel).toMatch(/t\('Description changed'\)/)
   })
 
@@ -243,10 +243,10 @@ describe('약속 B — 배경 카드는 캐릭터 카드와 같다', () => {
     // 실패 근거는 서버 상태 조회(generation-status → worldFailures), 카드는 배지, 팝업은 재생성 버튼.
     expect(read('src/app/api/artist/generation-status/route.ts')).toMatch(/listFailedWorldShotJobs\(projectId\)/)
     const panel = read('src/features/artist/world-panel.tsx')
-    expect(panel).toMatch(/worldFailures\[world\.locationId\]/)
+    expect(panel).toMatch(/worldFailures\[worldFailureKey\(world\.locationId, variantKey\)\]/)
     expect(panel).toMatch(/t\('Image failed'\)/)
     const dialog = read('src/features/artist/world-view-dialog.tsx')
-    expect(dialog).toMatch(/s\.worldFailures\[locationId\]/)
+    expect(dialog).toMatch(/s\.worldFailures\[worldFailureKey\(locationId, variantKey\)\]/)
     expect(dialog).toMatch(/t\('Generation failed\. Please try again\.'\)/)
   })
 
@@ -274,7 +274,7 @@ describe('약속 B — 배경 카드는 캐릭터 카드와 같다', () => {
     expect(mocks.submitWorldShotJob.mock.calls[1][0].safeMode).toBe(false)
     expect(mocks.submitWorldShotJob.mock.calls[1][0].prompt).toContain('a gory battlefield')
     // 팝업의 우회 버튼
-    expect(read('src/features/artist/world-view-dialog.tsx')).toMatch(/retryWorldShotSafe\(world\.locationId, imageModel\)/)
+    expect(read('src/features/artist/world-view-dialog.tsx')).toMatch(/retryWorldShotSafe\(world\.locationId, imageModel, variantKey\)/)
   })
 
   it('같은 슬롯에 이미 도는 잡이 있으면 새로 제출하지 않는다(캐릭터와 같은 중복 가드)', async () => {

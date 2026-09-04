@@ -17,8 +17,10 @@ import {
   validateUpdates,
   extractAppearanceCreations,
   extractAppearanceProposals,
+  extractLocationAppearanceCreations,
   extractLocationProposals,
   type AppearanceCreation,
+  type LocationAppearanceCreation,
   type AppearanceProposal,
   type LocationProposal,
 } from '@/lib/artist/chat-updates'
@@ -61,6 +63,10 @@ Every image generation call is billed. Emit regenerate actions ONLY when the use
      새 "행"을 추가하는 createAppearance 를 emit하라. 이건 자동 실행되지 않고 앱이 "새 모습을 추가하고 이미지를 만들까요?" 승인 카드로
      띄운다 — 승인하면 모습이 추가되고 그 이미지가 기본 모습의 얼굴을 참조해 바로 만들어진다(과금). appearance 는 이 새 모습의
      전체 외형 prose(이미지 프롬프트). label 은 화면에 보이는 이름(예: "젊은 시절", "다친 모습"). narrativeTime 은 과거/현재/미래 중 하나.
+5. {"type":"createLocationAppearance","locationId":"<id>","label":"...","visualDescription":"바뀐 전체 배경 설명","narrativeTime":"present"|"past"|"future"}
+   - 배경(월드)의 다른 시점 모습(불탄 뒤 / 겨울 / 전쟁 전 등)을 원할 때 쓴다 — 기본 설명을 바꾸는 changeLocationDescription 이 아니라
+     새 모습 "행"을 추가한다. 캐릭터의 createAppearance 처럼 승인 카드로 뜨고, 승인하면 기본 배경 이미지를 참조해 이미지가 바로 만들어진다.
+   - regenerateWorldAsset 에 appearanceKey 를 넣으면 그 모습의 배경 이미지만 다시 그린다(생략 = 기본 모습).
 </actions>
 
 <image-models>
@@ -162,6 +168,7 @@ function parseUpdates(text: string): {
   proposals: AppearanceProposal[]
   locationProposals: LocationProposal[]
   appearanceCreations: AppearanceCreation[]
+  locationAppearanceCreations: LocationAppearanceCreation[]
   parseStatus: string
   rawUpdateCount: number
   validUpdateCount: number
@@ -180,6 +187,7 @@ function parseUpdates(text: string): {
     proposals: extractAppearanceProposals(raw),
     locationProposals: extractLocationProposals(raw),
     appearanceCreations: extractAppearanceCreations(raw),
+    locationAppearanceCreations: extractLocationAppearanceCreations(raw),
     parseStatus: status,
     rawUpdateCount: raw.length,
     validUpdateCount: updates.length,
@@ -267,6 +275,7 @@ export async function POST(req: Request) {
       proposals,
       locationProposals,
       appearanceCreations,
+      locationAppearanceCreations,
       parseStatus,
       rawUpdateCount,
       validUpdateCount,
@@ -292,6 +301,7 @@ export async function POST(req: Request) {
       proposals,
       locationProposals,
       appearanceCreations,
+      locationAppearanceCreations,
       trace,
     })
   } catch (err) {

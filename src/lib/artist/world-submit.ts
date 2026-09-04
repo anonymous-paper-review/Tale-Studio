@@ -22,17 +22,23 @@ export interface SubmitWorldShotJobInput {
   safeMode?: boolean
   /** 배경 설명(EN base)의 해시 — 후보의 appearance_hash 로 저장돼 "설명 바뀜"(B7) 판정 근거가 된다. */
   descriptionHash?: string | null
+  /** 배경 모습(약속 C10) — 변형 키. 없거나 'default' 면 locations 행(기본 모습)이 대상. */
+  appearanceKey?: string | null
+  /** 변형 생성의 연속성 참조(기본 모습 wide_shot) — 캐릭터가 기본 얼굴을 참조하는 것과 같다. */
+  referenceImageUrls?: string[] | null
 }
 
 export async function submitWorldShotJob(
   input: SubmitWorldShotJobInput,
 ): Promise<GenerationJob> {
   const modelKey: ImageModelKey = input.model ?? DEFAULT_WORLD_IMAGE_MODEL
+  const refs = (input.referenceImageUrls ?? []).filter((u) => typeof u === 'string' && !!u)
   const baseOpts: AnchorableSubmit = {
     prompt: input.prompt,
     aspect_ratio: input.aspectRatio ?? '16:9',
+    ...(refs.length ? { reference_image_urls: refs } : {}),
   }
-  const anchored = input.anchor ? applyStyleAnchor(input.anchor, baseOpts, 'single') : baseOpts
+  const anchored = input.anchor ? applyStyleAnchor(input.anchor, baseOpts, refs.length ? 'multiref' : 'single') : baseOpts
   // 모델은 참조(앵커 이미지) 유무에 따라 t2i/edit 엔드포인트를 고른다 — 캐릭터 시트 라우트와 같은 규칙.
   const finalOpts: AnchorableSubmit = {
     ...anchored,
@@ -66,6 +72,11 @@ export async function submitWorldShotJob(
       ...(input.safeMode ? { safe_mode: true } : {}),
     },
     chatTraceId: input.chatTraceId ?? null,
-    target: { workspaceId: input.workspaceId ?? undefined, locationId: input.locationId, column: input.column },
+    target: {
+      workspaceId: input.workspaceId ?? undefined,
+      locationId: input.locationId,
+      column: input.column,
+      ...(input.appearanceKey && input.appearanceKey !== 'default' ? { appearanceKey: input.appearanceKey } : {}),
+    },
   })
 }

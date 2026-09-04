@@ -269,6 +269,8 @@ export async function hasQueuedWorldShotJob(
   projectId: string,
   locationId: string,
   column: string,
+  /** 약속 C10: 배경 모습(변형) 키 — null/undefined 는 기본 모습. 변형과 기본은 서로 다른 슬롯이다. */
+  appearanceKey?: string | null,
 ): Promise<boolean> {
   const { data, error } = await supabaseAdmin
     .from('generation_jobs')
@@ -280,7 +282,7 @@ export async function hasQueuedWorldShotJob(
   if (!data) throw new Error('generation job queued-world query returned no data')
   return data.some((row) => {
     const t = (row.target ?? {}) as GenerationJobTarget
-    return t.locationId === locationId && t.column === column
+    return t.locationId === locationId && t.column === column && (t.appearanceKey ?? null) === (appearanceKey ?? null)
   })
 }
 
@@ -402,6 +404,8 @@ export async function listFailedCharacterViewJobs(projectId: string): Promise<Ch
 export interface WorldShotFailure {
   locationId: string
   column: string
+  /** 배경 모습(변형) 키 — null 은 기본 모습. */
+  appearanceKey: string | null
   error: string | null
   failCount: number
   safeFailCount: number
@@ -434,12 +438,14 @@ export async function listFailedWorldShotJobs(projectId: string): Promise<WorldS
     const t = row.target ?? {}
     if (!t.locationId) continue // 레거시 행(타깃 없음)은 슬롯이 아니다
     const column = t.column ?? 'wide_shot'
-    const key = `${t.locationId}\u0000${column}`
+    const appearanceKey = t.appearanceKey ?? null
+    const key = `${t.locationId}\u0000${column}\u0000${appearanceKey ?? ''}`
     let slot = bySlot.get(key)
     if (!slot) {
       slot = {
         locationId: t.locationId,
         column,
+        appearanceKey,
         error: row.error,
         failCount: 0,
         safeFailCount: 0,

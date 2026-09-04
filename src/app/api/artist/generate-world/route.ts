@@ -35,7 +35,7 @@ export async function POST(req: Request) {
   try {
     const {
       projectId, locationId, column, prompt, aspectRatio, actor, sourceHash, traceId,
-      model: modelInput, safeMode, descriptionHash,
+      model: modelInput, safeMode, descriptionHash, appearanceKey: appearanceKeyInput,
     } =
       (await req.json()) as {
         projectId?: string
@@ -49,6 +49,7 @@ export async function POST(req: Request) {
         model?: string // 약속 B5: 이미지 생성 모델(없으면 캐릭터와 같은 기본값)
         safeMode?: boolean // 약속 B9: 콘텐츠 정책 거절 뒤 우회 재시도
         descriptionHash?: string | null // 약속 B7: 설명(EN base) 해시 → 후보 appearance_hash
+        appearanceKey?: string | null // 약속 C10: 배경 모습(변형) 키. 없거나 'default' = 기본 모습(locations 행)
       }
 
     if (!projectId || !locationId || !column || !prompt) {
@@ -77,9 +78,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: `Invalid column: ${column}` }, { status: 400 })
     }
     const model: ImageModelKey | null = isImageModelKey(modelInput) ? modelInput : null
+    const appearanceKey = typeof appearanceKeyInput === 'string' && appearanceKeyInput.trim() && appearanceKeyInput !== 'default'
+      ? appearanceKeyInput.trim()
+      : null
 
     // 중복 제출 가드(DB-authoritative, 캐릭터 시트 라우트와 대칭): 같은 슬롯에 queued 잡이 있으면 새 제출 생략.
-    if (await hasQueuedWorldShotJob(projectId, locationId, column)) {
+    if (await hasQueuedWorldShotJob(projectId, locationId, column, appearanceKey)) {
       return NextResponse.json({ ok: true, status: 'queued', deduped: true, locationId, column })
     }
 
@@ -122,6 +126,24 @@ export async function POST(req: Request) {
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     const anchor = await resolveStyleAnchor(project)
 
+    // 약속 C10: 변형(모습)은 존재해야 하고, 기본 모습의 wide_shot 을 연속성 참조로 붙인다(캐릭터의 기본 얼굴 참조와 같다).
+    let referenceImageUrls: string[] = []
+    if (appearanceKey) {
+      const [{ data: variant }, { data: base }] = await Promise.all([
+        supabaseAdmin
+          .from('location_appearances')
+          .select('appearance_key')
+          .eq('project_id', projectId)
+          .eq('location_id', locationId)
+          .eq('appearance_key', appearanceKey)
+          .maybeSingle(),
+        supabaseAdmin.from('locations').select('wide_shot').eq('project_id', projectId).eq('location_id', locationId).maybeSingle(),
+      ])
+      if (!variant) return NextResponse.json({ error: 'Appearance not found' }, { status: 404 })
+      const baseUrl = typeof base?.wide_shot === 'string' ? base.wide_shot : ''
+      if (baseUrl) referenceImageUrls = [baseUrl]
+    }
+
     const job = await submitWorldShotJob({
       projectId,
       locationId,
@@ -137,6 +159,8 @@ export async function POST(req: Request) {
       model,
       safeMode: effectiveSafeMode,
       descriptionHash: typeof descriptionHash === 'string' ? descriptionHash : null,
+      appearanceKey,
+      referenceImageUrls,
     })
 
     return NextResponse.json({ ok: true, jobId: job.id, status: 'queued' })

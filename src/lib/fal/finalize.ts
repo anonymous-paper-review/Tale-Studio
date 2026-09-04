@@ -782,6 +782,8 @@ async function recordLocationImageCandidate(
   locationId: string,
   view: string,
   url: string,
+  /** 약속 C10: 배경 모습(변형) 키 — 후보 슬롯은 (location, view, variant_key). null = 기본 모습. */
+  variantKey: string | null = null,
 ): Promise<void> {
   const snapshot = job.input_snapshot as
     | { source_hash?: string; appearance_hash?: string }
@@ -790,11 +792,12 @@ async function recordLocationImageCandidate(
   const sourceHash = snapshot?.source_hash ?? null
   const appearanceHash = snapshot?.appearance_hash ?? null
   const slot = { project_id: job.project_id, location_id: locationId, view }
-  const clear = await supabaseAdmin
+  const clearQ = supabaseAdmin
     .from('location_image_candidates')
     .update({ is_selected: false })
     .match(slot)
     .eq('is_selected', true)
+  const clear = await (variantKey ? clearQ.eq('variant_key', variantKey) : clearQ.is('variant_key', null))
   if (clear.error) return // 024 미적용 → best-effort skip(locations 미러만 동작)
   const ins = await supabaseAdmin.from('location_image_candidates').insert({
     project_id: job.project_id,
@@ -805,15 +808,17 @@ async function recordLocationImageCandidate(
     appearance_hash: appearanceHash,
     job_id: job.id,
     is_selected: true,
+    variant_key: variantKey,
   })
   if (ins.error) return
   // 보관 정리(약속 B4, 2026-09-04): #6 의 "비선택 전량 삭제"를 되돌려 캐릭터(#owner-keep-prev)와 같이
   //   슬롯당 최근 CANDIDATE_RETENTION(5)장을 남긴다 — 재생성해도 직전 이미지로 되돌릴 수 있다. 선택본은 보존.
-  const { data: unselected } = await supabaseAdmin
+  const unselectedQ = supabaseAdmin
     .from('location_image_candidates')
     .select('id, generated_at')
     .match(slot)
     .eq('is_selected', false)
+  const { data: unselected } = await (variantKey ? unselectedQ.eq('variant_key', variantKey) : unselectedQ.is('variant_key', null))
   const staleIds = selectCandidatesToEvict(
     (unselected ?? []).map((r) => ({
       id: r.id as string,
@@ -838,17 +843,31 @@ export async function finalizeWorldShotJob(
     throw new Error('world_shot job target missing workspaceId/locationId/column')
   }
   await recordFalResponseSnapshot(job, falPayload)
-  const path = `${workspaceId}/${job.project_id}/locations/${storageKeySegment(locationId)}_${column}.png`
+  // 약속 C10: 변형(모습)은 location_appearances 행의 wide_shot 을, 기본 모습은 locations[column] 을 갱신한다.
+  const appearanceKey = job.target.appearanceKey && job.target.appearanceKey !== 'default' ? job.target.appearanceKey : null
+  const path = appearanceKey
+    ? `${workspaceId}/${job.project_id}/locations/${storageKeySegment(locationId)}_${storageKeySegment(appearanceKey)}_${column}.png`
+    : `${workspaceId}/${job.project_id}/locations/${storageKeySegment(locationId)}_${column}.png`
   const publicUrl = await uploadImageFromUrl(falImageUrl, path)
 
-  const { error } = await supabaseAdmin
-    .from('locations')
-    .update({ [column]: publicUrl })
-    .eq('project_id', job.project_id)
-    .eq('location_id', locationId)
-  if (error) throw error
+  if (appearanceKey) {
+    const { error } = await supabaseAdmin
+      .from('location_appearances')
+      .update({ [column]: publicUrl, updated_at: new Date().toISOString() })
+      .eq('project_id', job.project_id)
+      .eq('location_id', locationId)
+      .eq('appearance_key', appearanceKey)
+    if (error) throw error
+  } else {
+    const { error } = await supabaseAdmin
+      .from('locations')
+      .update({ [column]: publicUrl })
+      .eq('project_id', job.project_id)
+      .eq('location_id', locationId)
+    if (error) throw error
+  }
   // world 후보 히스토리 기록(AC18, 캐릭터 019/023과 대칭). 024 미적용이면 best-effort skip.
-  await recordLocationImageCandidate(job, locationId, column, publicUrl)
+  await recordLocationImageCandidate(job, locationId, column, publicUrl, appearanceKey)
 
   await completeGenerationJob(job.id, publicUrl)
   return publicUrl

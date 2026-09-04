@@ -69,3 +69,14 @@ paths:
   `classifyWorldImageStale` 이 edited. 해시 없는 옛 후보는 fresh(소음 방지).
 - 실패·우회: `listFailedWorldShotJobs`(generation-status `worldFailures`) → 카드 배지·팝업 배너, moderation 류면
   safe-mode 재시도(`applyWorldSafeMode`, `SAFE_RETRY_CAP`). 모델 선택은 캐릭터와 같은 `DEFAULT_IMAGE_MODEL`.
+
+## 모습(타임라인) — 캐릭터·배경 공통 (2026-09-04, 약속 C — `tests/promise-c-appearances.test.ts`, `tests/promise-c-location-appearances.test.ts`)
+
+- 캐릭터: `character_appearances` 행 = 모습. 탭 줄은 모습이 하나뿐이어도 보이고 "+ 모습 추가"(이름·시점·외형)는 행 추가 뒤
+  기본 모습 얼굴을 참조해 이미지를 바로 만든다(오너 C4). 채팅 `createAppearance` 는 과금이 생기므로 승인 카드(`artistCreateAppearance`).
+  `regenerateCharacter.appearanceKey` 로 특정 모습만 다시 그린다. 관리는 `character-appearance` PATCH(label·narrativeTime·isDefault)·DELETE.
+- 배경: 기본 모습 = `locations` 행(키 `default`), 변형 = `location_appearances`(20260904110000). 변형 이미지는 `generate-world`
+  `appearanceKey` → 잡 타깃 `appearanceKey` → finalize 가 변형 행의 wide_shot 에 쓰고 후보는 `variant_key` 슬롯. 변형 생성은 기본
+  배경 wide_shot 을 연속성 참조로 붙인다. Writer 러프 설명·Director 배경 참조는 씬 `narrative_time` 과 같은 변형에 이미지가 있으면
+  그것(`resolveLocationAppearanceForScene`), 아니면 기본. 배경은 "기본으로 지정"이 없다(기본 = 배경 자체).
+- Artist AI 는 뒷모습·측면 4뷰를 말하지 않는다 — 모습마다 시트 1장이 전부다(C9).

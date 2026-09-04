@@ -250,6 +250,23 @@ export async function POST(req: Request) {
     const locationDescById = new Map(
       (locations ?? []).map((l) => [l.location_id as string, l.visual_description as string | null]),
     )
+    // 약속 C10(2026-09-04): 씬의 서사 시점과 같은 배경 모습(변형)이 설명을 가지면 그 설명을 배경 한 줄로 쓴다.
+    const { data: locationVariants } = await supabaseAdmin
+      .from('location_appearances')
+      .select('location_id, narrative_time, visual_description')
+      .eq('project_id', projectId)
+      .order('created_at')
+    const locationDescForScene = (scene: Record<string, unknown> | undefined): string | null => {
+      const locationId = scene?.location as string | undefined
+      if (!locationId) return null
+      const time = scene?.narrative_time as string | undefined
+      const variant = time
+        ? (locationVariants ?? []).find(
+            (v) => v.location_id === locationId && v.narrative_time === time && typeof v.visual_description === 'string' && !!v.visual_description.trim(),
+          )
+        : undefined
+      return (variant?.visual_description as string | undefined) ?? locationDescById.get(locationId) ?? null
+    }
     const nameById = new Map(
       (chars ?? []).map((c) => [c.character_id as string, c.name as string]),
     )
@@ -523,7 +540,7 @@ export async function POST(req: Request) {
             location:
               (scene ? locEnByScene.get(scene.scene_id as string) : undefined) ??
               (scene?.location as string | undefined),
-            locationDescription: locationDescById.get(scene?.location as string) ?? null,
+            locationDescription: locationDescForScene(scene as Record<string, unknown> | undefined),
             timeOfDay:
               (scene ? timeEnByScene.get(scene.scene_id as string) : undefined) ??
               (scene?.time_of_day as string | undefined),

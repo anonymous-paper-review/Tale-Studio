@@ -6,7 +6,9 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { classifyWorldImageStale } from '@/lib/image-provenance'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { WorldViewDialog } from '@/features/artist/world-view-dialog'
-import { useArtistStore, type WorldShotKey } from '@/stores/artist-store'
+import { LocationAppearanceCreateDialog } from '@/features/artist/location-appearance-create-dialog'
+import { useArtistStore, worldFailureKey, type WorldShotKey } from '@/stores/artist-store'
+import { DEFAULT_LOCATION_APPEARANCE_KEY } from '@/types/asset'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
 import { cn } from '@/lib/utils'
@@ -32,7 +34,11 @@ export function WorldPanel({
   const [viewDialog, setViewDialog] = useState<{
     locationId: string
     shot: WorldShotKey
+    appearanceKey: string | null
   } | null>(null)
+  // 약속 C10: 카드 안에서 고른 모습(기본 = 'default'). 캐릭터 카드의 pickedAppearance 와 같다.
+  const [pickedAppearance, setPickedAppearance] = useState<Record<string, string>>({})
+  const [createFor, setCreateFor] = useState<string | null>(null)
 
   // 입력창에 @멘션돼 있는 카드 하이라이트(#artist-mention) — mentionItems 의 id = locationId.
   const mentionedRefs = useChatUiStore((s) => s.mentionedRefs)
@@ -73,10 +79,16 @@ export function WorldPanel({
             const scene = getScene(world.sceneId)
             const isGenerating = generatingLocations.includes(world.locationId)
             const isSelected = selectedLocationId === world.locationId
+            // 약속 C10: 고른 모습(탭). 기본 모습은 배경 자체, 변형은 appearances 의 행.
+            const pickedKey = pickedAppearance[world.locationId] ?? DEFAULT_LOCATION_APPEARANCE_KEY
+            const variant = pickedKey !== DEFAULT_LOCATION_APPEARANCE_KEY ? (world.appearances ?? []).find((a) => a.appearanceKey === pickedKey) ?? null : null
+            const variantKey = variant ? variant.appearanceKey : null
+            const shownImage = variant ? variant.wideShot : world.wideShot
             // 약속 B7·B8: 설명이 바뀐 뒤 재생성 전이면 "설명 바뀜", 최근 생성이 실패했으면 "이미지 실패".
-            const selectedCandidate = (world.candidates ?? []).find((c) => c.isSelected)
-            const descriptionChanged = classifyWorldImageStale(world.visualDescription, selectedCandidate) !== 'fresh'
-            const failed = !!worldFailures[world.locationId]
+            const candidates = variant ? variant.candidates : (world.candidates ?? [])
+            const selectedCandidate = candidates.find((c) => c.isSelected)
+            const descriptionChanged = classifyWorldImageStale(variant ? variant.visualDescription : world.visualDescription, selectedCandidate) !== 'fresh'
+            const failed = !!worldFailures[worldFailureKey(world.locationId, variantKey)]
 
             return (
               <div
@@ -106,7 +118,7 @@ export function WorldPanel({
                 }}
                 // 더블 클릭 = 사진 클릭과 동일(#d5 2026-08-03) — 프롬프트/재생성 팝업
                 onDoubleClick={() =>
-                  setViewDialog({ locationId: world.locationId, shot: 'wideShot' })
+                  setViewDialog({ locationId: world.locationId, shot: 'wideShot', appearanceKey: variantKey })
                 }
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ')
@@ -140,21 +152,49 @@ export function WorldPanel({
                   )}
                 </div>
 
+                {/* 모습 탭(약속 C10) — 캐릭터 카드와 같은 줄: 기본 + 변형들 + "+ 모습 추가". 항상 보인다. */}
+                <div className="mb-2 flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
+                  {[{ appearanceKey: DEFAULT_LOCATION_APPEARANCE_KEY, label: t('Default') }, ...(world.appearances ?? [])].map((ap) => {
+                    const active = pickedKey === ap.appearanceKey
+                    return (
+                      <button
+                        key={ap.appearanceKey}
+                        type="button"
+                        onClick={() => setPickedAppearance((prev) => ({ ...prev, [world.locationId]: ap.appearanceKey }))}
+                        className={cn(
+                          'rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors',
+                          active ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-accent',
+                        )}
+                      >
+                        {ap.label}
+                      </button>
+                    )
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setCreateFor(world.locationId)}
+                    className="rounded-md border border-dashed border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent"
+                    title={t('Add appearance')}
+                  >
+                    {t('+ Add appearance')}
+                  </button>
+                </div>
+
                 {/* 배경 = 이미지 1장(#6·#9): establishing 셀 제거, wide 1컷만. 클릭 → 프롬프트/재생성 Dialog. */}
                 <button
                   type="button"
                   title={t('Background: click to view or regenerate the prompt')}
                   onClick={(e) => {
                     e.stopPropagation()
-                    setViewDialog({ locationId: world.locationId, shot: 'wideShot' })
+                    setViewDialog({ locationId: world.locationId, shot: 'wideShot', appearanceKey: variantKey })
                   }}
                   className="block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
                 >
                   <ImagePlaceholder
                     label={t('Background')}
                     aspectRatio="video"
-                    imageUrl={world.wideShot}
-                    generating={isGenerating && !world.wideShot}
+                    imageUrl={shownImage}
+                    generating={isGenerating && !shownImage}
                     hideCaption
                   />
                 </button>
@@ -169,8 +209,10 @@ export function WorldPanel({
       <WorldViewDialog
         locationId={viewDialog?.locationId ?? null}
         shot={viewDialog?.shot ?? null}
+        appearanceKey={viewDialog?.appearanceKey ?? null}
         onClose={() => setViewDialog(null)}
       />
+      <LocationAppearanceCreateDialog locationId={createFor} onClose={() => setCreateFor(null)} />
     </div>
   )
 }

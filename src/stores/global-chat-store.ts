@@ -807,11 +807,16 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           })
           return [header, '  외형 타임라인:', ...appearanceLines]
         })
-        const worldLines = a.worldAssets.map((w) => {
-          const shots = [w.wideShot ? 'wide' : null]
-            .filter(Boolean)
-            .join(', ')
-          return `- ${w.name} (${w.locationId}) — shots: ${shots || '(없음)'}`
+        const worldLines = a.worldAssets.flatMap((w) => {
+          const header = `- ${w.name} (${w.locationId}) — ${w.wideShot ? 'has image' : 'no image'}`
+          const variants = w.appearances ?? []
+          if (!variants.length) return [header, '  배경 타임라인: 기본 모습만 있음 (default)']
+          return [
+            header,
+            '  배경 타임라인:',
+            `  · default ("${translate(contentLocale(), 'Default')}", ${w.wideShot ? 'has image' : 'no image'})`,
+            ...variants.map((v) => `  · ${v.appearanceKey} ("${v.label}", ${v.narrativeTime ?? '-'}, ${v.wideShot ? 'has image' : 'no image'})`),
+          ]
         })
         const canvasContext = [
           '## Artist 에셋',
@@ -1204,6 +1209,27 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
                 appearance: ac.appearance,
                 ...(ac.narrativeTime ? { narrativeTime: ac.narrativeTime } : {}),
               },
+            }),
+          )
+        }
+        // 배경 모습 만들기 제안(약속 C10) — 캐릭터 모습 만들기와 같은 승인 카드.
+        const locationAppearanceCreations = Array.isArray(data.locationAppearanceCreations) ? data.locationAppearanceCreations : []
+        if (locationAppearanceCreations.length > 0 && !get().pendingProposal) {
+          const lc = locationAppearanceCreations[0] as { locationId: string; label: string; visualDescription: string; narrativeTime?: string }
+          const lcName = useArtistStore.getState().worldAssets.find((w) => w.locationId === lc.locationId)?.name || lc.locationId
+          const lcLocale = contentLocale()
+          get().offerPendingProposal(
+            createPendingProposal({
+              traceId,
+              stage: 'artist',
+              kind: 'artistCreateLocationAppearance',
+              target: lcName,
+              action: translate(lcLocale, 'Add the appearance "{label}" and generate its image', { label: lc.label }),
+              impact: [
+                translate(lcLocale, 'A new appearance tab is added to the background. The default background stays as it is.'),
+                translate(lcLocale, 'Its image is generated right away using the default background as the reference (generation cost).'),
+              ],
+              payload: { locationId: lc.locationId, label: lc.label, visualDescription: lc.visualDescription, ...(lc.narrativeTime ? { narrativeTime: lc.narrativeTime } : {}) },
             }),
           )
         }
@@ -1766,6 +1792,18 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         const time = narrativeTime === 'past' || narrativeTime === 'present' || narrativeTime === 'future' ? narrativeTime : undefined
         // 승인 뒤: 행 추가 → 이미지 자동 생성(기본 모습 얼굴 참조, 잡 귀속 chat).
         await useArtistStore.getState().createAppearance(characterId, label, appearance, time, { generate: true, actor: 'chat' })
+      } else if (proposal.kind === 'artistCreateLocationAppearance') {
+        const { locationId, label, visualDescription, narrativeTime } = proposal.payload as {
+          locationId?: unknown
+          label?: unknown
+          visualDescription?: unknown
+          narrativeTime?: unknown
+        }
+        if (typeof locationId !== 'string' || typeof label !== 'string' || typeof visualDescription !== 'string') {
+          throw new Error('location appearance creation payload missing')
+        }
+        const time = narrativeTime === 'past' || narrativeTime === 'present' || narrativeTime === 'future' ? narrativeTime : undefined
+        await useArtistStore.getState().createLocationAppearance(locationId, label, visualDescription, time, { generate: true, actor: 'chat' })
       } else if (proposal.kind === 'artistSourceLocationPatch') {
         const locationId = proposal.payload.locationId
         const visualDescription = proposal.payload.visualDescription

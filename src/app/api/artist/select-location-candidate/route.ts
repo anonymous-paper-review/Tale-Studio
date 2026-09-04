@@ -15,12 +15,14 @@ export async function POST(req: Request) {
   if (demoBlocked) return demoBlocked
 
   try {
-    const { projectId, locationId, view = 'wide_shot', candidateId } = (await req.json()) as {
+    const { projectId, locationId, view = 'wide_shot', candidateId, appearanceKey: appearanceKeyInput } = (await req.json()) as {
       projectId?: string
       locationId?: string
       view?: string
       candidateId?: string
+      appearanceKey?: string | null // 약속 C10: 변형 키(없거나 'default' = 기본 모습)
     }
+    const appearanceKey = typeof appearanceKeyInput === 'string' && appearanceKeyInput && appearanceKeyInput !== 'default' ? appearanceKeyInput : null
     if (!projectId || !locationId || !candidateId) {
       return NextResponse.json(
         { error: 'Invalid request: projectId, locationId, candidateId required' },
@@ -61,12 +63,20 @@ export async function POST(req: Request) {
       .eq('id', candidateId)
     if (selectError) throw selectError
 
-    // 미러 컬럼(locations.wide_shot) — finalizeWorldShotJob 과 대칭.
-    const { error: mirrorError } = await supabaseAdmin
-      .from('locations')
-      .update({ [view]: candidate.url })
-      .eq('project_id', projectId)
-      .eq('location_id', locationId)
+    // 미러 컬럼 — finalizeWorldShotJob 과 대칭: 변형은 location_appearances, 기본 모습은 locations.
+    const mirror = appearanceKey
+      ? supabaseAdmin
+          .from('location_appearances')
+          .update({ [view]: candidate.url })
+          .eq('project_id', projectId)
+          .eq('location_id', locationId)
+          .eq('appearance_key', appearanceKey)
+      : supabaseAdmin
+          .from('locations')
+          .update({ [view]: candidate.url })
+          .eq('project_id', projectId)
+          .eq('location_id', locationId)
+    const { error: mirrorError } = await mirror
     if (mirrorError) throw mirrorError
 
     return NextResponse.json({ ok: true, url: candidate.url })
