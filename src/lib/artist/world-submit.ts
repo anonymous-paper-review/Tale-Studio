@@ -2,6 +2,7 @@ import { createGenerationJob, type GenerationJob, type GenerationJobActor } from
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { applyStyleAnchor, type AnchorableSubmit, type ResolvedStyleAnchor } from '@/lib/style-anchor'
 import { falImageSubmit } from '@/lib/writer/llm/fal'
+import { DEFAULT_WORLD_IMAGE_MODEL, resolveImageEndpoint, type ImageModelKey } from '@/lib/image-models'
 
 export interface SubmitWorldShotJobInput {
   projectId: string
@@ -15,16 +16,28 @@ export interface SubmitWorldShotJobInput {
   workspaceId?: string | null
   anchor?: ResolvedStyleAnchor | null
   chatTraceId?: string | null
+  /** 이미지 생성 모델(약속 B5) — 없으면 배경 기본값(DEFAULT_WORLD_IMAGE_MODEL = 지금 것, GPT Image 2). */
+  model?: ImageModelKey | null
+  /** 콘텐츠 정책 거절 뒤 우회 재시도(약속 B9) — 실패 집계의 safeFailCount 기준으로 스냅샷에 남긴다. */
+  safeMode?: boolean
+  /** 배경 설명(EN base)의 해시 — 후보의 appearance_hash 로 저장돼 "설명 바뀜"(B7) 판정 근거가 된다. */
+  descriptionHash?: string | null
 }
 
 export async function submitWorldShotJob(
   input: SubmitWorldShotJobInput,
 ): Promise<GenerationJob> {
+  const modelKey: ImageModelKey = input.model ?? DEFAULT_WORLD_IMAGE_MODEL
   const baseOpts: AnchorableSubmit = {
     prompt: input.prompt,
     aspect_ratio: input.aspectRatio ?? '16:9',
   }
-  const finalOpts = input.anchor ? applyStyleAnchor(input.anchor, baseOpts, 'single') : baseOpts
+  const anchored = input.anchor ? applyStyleAnchor(input.anchor, baseOpts, 'single') : baseOpts
+  // 모델은 참조(앵커 이미지) 유무에 따라 t2i/edit 엔드포인트를 고른다 — 캐릭터 시트 라우트와 같은 규칙.
+  const finalOpts: AnchorableSubmit = {
+    ...anchored,
+    model: resolveImageEndpoint(modelKey, !!anchored.reference_image_urls?.length).endpoint,
+  }
 
   const { request_id, model, fal_key_id } = await falImageSubmit({
     ...finalOpts,
@@ -47,7 +60,10 @@ export async function submitWorldShotJob(
       ...(finalOpts.reference_image_urls ? { reference_image_urls: finalOpts.reference_image_urls } : {}),
       ...(finalOpts.model ? { model: finalOpts.model } : {}),
       source_hash: input.sourceHash ?? null,
+      appearance_hash: input.descriptionHash ?? null,
       style_anchor_key: input.anchor?.key ?? null,
+      image_model: modelKey,
+      ...(input.safeMode ? { safe_mode: true } : {}),
     },
     chatTraceId: input.chatTraceId ?? null,
     target: { workspaceId: input.workspaceId ?? undefined, locationId: input.locationId, column: input.column },

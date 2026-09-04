@@ -398,6 +398,69 @@ export async function listFailedCharacterViewJobs(projectId: string): Promise<Ch
     })
 }
 
+/** 배경(world_shot) 슬롯의 현재 실패 상태 — 약속 B8·B9(2026-09-04), 캐릭터 CharacterViewFailure 대칭. */
+export interface WorldShotFailure {
+  locationId: string
+  column: string
+  error: string | null
+  failCount: number
+  safeFailCount: number
+  moderation: boolean
+}
+
+/**
+ * 최근 24h 기준, 현재 실패 상태인 world_shot 슬롯(locationId+column) 목록. 슬롯의 최신 잡이 failed 일 때만
+ *   포함되고, safeFailCount 는 input_snapshot.safe_mode=true 인 실패 수(우회 재시도 cap 기준).
+ */
+export async function listFailedWorldShotJobs(projectId: string): Promise<WorldShotFailure[]> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const { data, error } = await supabaseAdmin
+    .from('generation_jobs')
+    .select('target, error, status, input_snapshot, created_at')
+    .eq('project_id', projectId)
+    .eq('kind', 'world_shot')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  if (!data) throw new Error('generation job failed-world query returned no data')
+  type Row = {
+    target: GenerationJobTarget | null
+    error: string | null
+    status: string
+    input_snapshot: { safe_mode?: boolean } | null
+  }
+  const bySlot = new Map<string, WorldShotFailure & { _latestSeen: boolean }>()
+  for (const row of data as Row[]) {
+    const t = row.target ?? {}
+    if (!t.locationId) continue // 레거시 행(타깃 없음)은 슬롯이 아니다
+    const column = t.column ?? 'wide_shot'
+    const key = `${t.locationId}\u0000${column}`
+    let slot = bySlot.get(key)
+    if (!slot) {
+      slot = {
+        locationId: t.locationId,
+        column,
+        error: row.error,
+        failCount: 0,
+        safeFailCount: 0,
+        moderation: classifyFalFailure(row.error) === 'moderation',
+        _latestSeen: row.status === 'failed',
+      }
+      bySlot.set(key, slot)
+    }
+    if (row.status === 'failed') {
+      slot.failCount++
+      if (row.input_snapshot?.safe_mode === true) slot.safeFailCount++
+    }
+  }
+  return [...bySlot.values()]
+    .filter((s) => s._latestSeen)
+    .map(({ _latestSeen, ...s }) => {
+      void _latestSeen
+      return s
+    })
+}
+
 /** 진행 중 잡 1건 — 클라가 "무엇이 도는 중인지"를 복원하는 데 필요한 최소 필드. */
 export interface ActiveGenerationJob {
   id: string

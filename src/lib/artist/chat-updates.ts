@@ -110,6 +110,28 @@ export interface AppearanceProposal {
  *   validateUpdates(자동 실행 화이트리스트)는 이 type 을 드롭하므로, 외형 변경은 오직 이 함수를 거쳐
  *   pending-proposal('artistSourceAppearancePatch')로만 흐르고 사용자 승인 후에만 커밋된다(원천 = 사람 명시).
  */
+export interface LocationProposal {
+  locationId: string
+  visualDescription: string
+}
+
+/**
+ * cc 가 emit 한 "배경 설명(원천) 변경"(changeLocationDescription) 의도 — 약속 B6(2026-09-04).
+ *   changeAppearance 와 같은 승인 채널: 자동 실행 화이트리스트 밖이라 여기서만 흘러 pending-proposal 이 된다.
+ */
+export function extractLocationProposals(raw: unknown[]): LocationProposal[] {
+  const out: LocationProposal[] = []
+  for (const u of raw) {
+    if (!u || typeof u !== 'object') continue
+    const rec = u as Record<string, unknown>
+    if (rec.type !== 'changeLocationDescription') continue
+    const locationId = asString(rec.locationId)?.trim()
+    const visualDescription = (asString(rec.visualDescription) ?? asString(rec.description))?.trim()
+    if (locationId && visualDescription) out.push({ locationId, visualDescription })
+  }
+  return out
+}
+
 export function extractAppearanceProposals(raw: unknown[]): AppearanceProposal[] {
   const out: AppearanceProposal[] = []
   for (const u of raw) {

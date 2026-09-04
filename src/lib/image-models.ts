@@ -57,6 +57,9 @@ export interface ImageModelSpec {
 // #owner-default(2026-08-31): Artist 기본 이미지 모델을 nano-banana 로 변경(오너 지시).
 // #owner-default(2026-09-02): nano-banana-2(Gemini 3.1 Flash Image) 로 교체(오너 지시). 1세대는 선택지로 남긴다.
 export const DEFAULT_IMAGE_MODEL: ImageModelKey = 'nano-banana-2'
+/** 배경(월드) 기본 모델 — 오너 B5(2026-09-04) "지금 것": 배경은 종전대로 GPT Image 2(앵커가 있으면 edit)로 첫 생성한다.
+ *  캐릭터와 같은 것은 "고를 수 있다"는 기능이지 기본값이 아니다. */
+export const DEFAULT_WORLD_IMAGE_MODEL: ImageModelKey = 'gpt-image-2'
 
 export const IMAGE_MODELS: Record<ImageModelKey, ImageModelSpec> = {
   'gpt-image-2': {

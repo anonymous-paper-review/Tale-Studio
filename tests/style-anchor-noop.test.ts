@@ -331,12 +331,13 @@ describe('style-anchor Phase 0 no-op characterization', () => {
     )
 
     expect(response.status).toBe(200)
+    // 약속 B(2026-09-04): 배경은 사람 금지 절이 서버에서 붙고, 모델은 배경 기본값(GPT Image 2 = 종전 fal 기본과 같음)이 명시된다.
     expect(firstFalOpts()).toEqual({
-      prompt: 'WORLD PROMPT',
+      prompt: 'WORLD PROMPT, no people or characters, empty environment',
       aspect_ratio: '16:9',
+      model: 'openai/gpt-image-2',
       webhookUrl: WEBHOOK_URL,
     })
-    expect(firstFalOpts()).not.toHaveProperty('model')
     expect(firstFalOpts()).not.toHaveProperty('reference_image_urls')
     expect(firstFalOpts().prompt).not.toContain('STYLE REFERENCE')
   })

@@ -53,6 +53,7 @@ import {
 import {
   computeImageSourceHash,
   computeLookFingerprint,
+  computeWorldDescriptionHash,
   computeWorldImageSourceHash,
 } from '@/lib/image-provenance'
 import {
@@ -286,6 +287,8 @@ describe('draft trigger relocation guards', () => {
           prompt: builtPrompt,
           aspectRatio: '16:9',
           sourceHash: computeWorldImageSourceHash(builtPrompt),
+          // 약속 B7(2026-09-04): 클라(artist-store)도 설명 해시를 동반한다 — 초안 경로와 스냅샷이 같아야 한다.
+          descriptionHash: computeWorldDescriptionHash(location.visual_description),
         }),
       }),
     )

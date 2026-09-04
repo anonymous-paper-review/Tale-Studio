@@ -807,12 +807,24 @@ async function recordLocationImageCandidate(
     is_selected: true,
   })
   if (ins.error) return
-  // 단일 이미지 정책(#6, 2026-07-11): 이 슬롯의 비선택 후보 전부 삭제 — 최신 선택본 1장만 유지(누적→교체).
-  await supabaseAdmin
+  // 보관 정리(약속 B4, 2026-09-04): #6 의 "비선택 전량 삭제"를 되돌려 캐릭터(#owner-keep-prev)와 같이
+  //   슬롯당 최근 CANDIDATE_RETENTION(5)장을 남긴다 — 재생성해도 직전 이미지로 되돌릴 수 있다. 선택본은 보존.
+  const { data: unselected } = await supabaseAdmin
     .from('location_image_candidates')
-    .delete()
+    .select('id, generated_at')
     .match(slot)
     .eq('is_selected', false)
+  const staleIds = selectCandidatesToEvict(
+    (unselected ?? []).map((r) => ({
+      id: r.id as string,
+      isSelected: false,
+      pinned: false,
+      generatedAt: r.generated_at as string,
+    })),
+  )
+  if (staleIds.length) {
+    await supabaseAdmin.from('location_image_candidates').delete().in('id', staleIds)
+  }
 }
 
 /** 월드 샷(wide/establishing) 이미지 영속화 → locations[column] 갱신. */

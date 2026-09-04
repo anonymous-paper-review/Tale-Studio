@@ -56,3 +56,16 @@ paths:
   축 안쪽으로 되돌린다 — 방향 반사 → 같은 방향으로 물러서기 → 점 반사 순.
 - 무대가 없는 run(구 state·`WRITER_STAGE_OFF`)은 옛 동작(LLM 위치 그대로) — 소비처는 `screen_layout` 유무로 분기한다.
 - 진실: 무대는 `scenes.stage`, 샷 배치는 `shots.static_spec.screen_layout`. 러프·실사 프롬프트는 이 값을 읽는다.
+
+## 배경 카드 = 캐릭터 카드 (2026-09-04, 약속 B — `tests/promise-b-background-card.test.ts`)
+
+- 배경(locations)은 캐릭터와 같은 기능을 갖는다. 차이는 프롬프트에 사람이 들어가지 않는 것뿐이며 그 절은
+  서버(`/api/artist/generate-world` → `ensureNoPeopleClause`)가 최종 보장한다. 카드에는 생성 버튼이 없다(팝업·채팅).
+- 원천 = `locations.visual_description`(EN base) + `_native`(유저 언어). 팝업의 설명 편집과 채팅 승인
+  (`artistSourceLocationPatch`)은 모두 `PATCH /api/artist/location` 으로 커밋한다 → Writer 씬이 같은 설명을 읽는다.
+- 후보 히스토리 `location_image_candidates`: finalize 가 슬롯당 최근 5장(선택본 보존)을 남기고,
+  `/api/artist/select-location-candidate` 로 되돌린다. 브라우저 읽기는 소유자 SELECT 정책(20260904100000).
+- "설명 바뀜": submit 때 설명 해시를 `appearance_hash` 에 두고(`computeWorldDescriptionHash`), 지금 설명과 다르면
+  `classifyWorldImageStale` 이 edited. 해시 없는 옛 후보는 fresh(소음 방지).
+- 실패·우회: `listFailedWorldShotJobs`(generation-status `worldFailures`) → 카드 배지·팝업 배너, moderation 류면
+  safe-mode 재시도(`applyWorldSafeMode`, `SAFE_RETRY_CAP`). 모델 선택은 캐릭터와 같은 `DEFAULT_IMAGE_MODEL`.

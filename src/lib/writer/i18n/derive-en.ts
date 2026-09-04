@@ -179,6 +179,26 @@ export async function appearanceI18nFields(
   }
 }
 
+/** 배경(locations) 설명 원천 편집 — 약속 B3(2026-09-04). appearanceI18nFields 와 같은 계약. */
+export async function locationI18nFields(
+  locationId: string,
+  native: string | null | undefined,
+): Promise<{
+  visual_description: string | null
+  visual_description_native: string | null
+  i18n_provenance: Record<string, string>
+}> {
+  const n = (native ?? '').trim()
+  if (!n) return { visual_description: null, visual_description_native: null, i18n_provenance: {} }
+  const enMap = await deriveEnBatch([{ id: locationId, native: n }], 'location visual description')
+  const derived = enMap.get(locationId)
+  return {
+    visual_description: derived ?? n,
+    visual_description_native: n,
+    i18n_provenance: derived ? { visual_description: i18nHash(n) } : {},
+  }
+}
+
 // ── EN base → 유저 언어(native) 역파생 (표시용) ─────────────────────────────
 //   deriveEnBatch 의 거울상. 왜 필요한가: writer 파이프라인(Gemini/Claude, 영어 템플릿)은 producer
 //   입력이 한국어여도 씬/샷 서술을 **영어로 산출**한다(검증: locale=ko 프로젝트도 action_description 전부 영어).

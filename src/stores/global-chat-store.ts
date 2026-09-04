@@ -1193,6 +1193,35 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             }),
           )
         }
+        // 배경 설명(원천) 변경 제안(약속 B6, 2026-09-04) — 외형 제안과 같은 승인 게이트. 한 턴에 하나만 띄운다.
+        const locationProposals = Array.isArray(data.locationProposals) ? data.locationProposals : []
+        if (locationProposals.length > 0 && !get().pendingProposal) {
+          const lp = locationProposals[0] as { locationId: string; visualDescription: string }
+          const lpName =
+            useArtistStore.getState().worldAssets.find((w) => w.locationId === lp.locationId)?.name ||
+            lp.locationId
+          const lpLocale = contentLocale()
+          get().offerPendingProposal(
+            createPendingProposal({
+              traceId,
+              stage: 'artist',
+              kind: 'artistSourceLocationPatch',
+              target: lpName,
+              action: translate(lpLocale, 'Change the background description (source): {description}', {
+                description: `${lp.visualDescription.slice(0, 60)}${lp.visualDescription.length > 60 ? '…' : ''}`,
+              }),
+              impact: [
+                translate(lpLocale, "The background's description (source) changes, and Writer scenes read the new one."),
+                translate(
+                  lpLocale,
+                  'After approval the existing image of that background is marked "description changed". It is not regenerated automatically.',
+                ),
+                translate(lpLocale, 'The description does not change until you approve.'),
+              ],
+              payload: { locationId: lp.locationId, visualDescription: lp.visualDescription },
+            }),
+          )
+        }
         patchTrace({
           appliedCount: immediateUpdates.length,
           skippedCount: 0,
@@ -1710,6 +1739,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         }
         // 로컬 외형 갱신 → 기존 파생 이미지가 즉시 stale 로 표시(자동 재생성 없음, #57). 이후 cc 가 재생성 제안.
         useArtistStore.getState().applyAppearancePatch(characterId, appearance)
+      } else if (proposal.kind === 'artistSourceLocationPatch') {
+        const locationId = proposal.payload.locationId
+        const visualDescription = proposal.payload.visualDescription
+        if (typeof locationId !== 'string' || typeof visualDescription !== 'string') {
+          throw new Error('location patch payload missing')
+        }
+        // 승인 뒤에만 원천이 바뀐다 — 서버 라우트가 EN base 파생·저장, 스토어는 표시값 갱신(이미지는 "설명 바뀜" 표시).
+        await useArtistStore.getState().updateLocationDescription(locationId, visualDescription)
       } else if (proposal.kind === 'directorGenerateStoryboardImage') {
         const payloadUpdates = proposal.payload.updates
         if (!Array.isArray(payloadUpdates) || payloadUpdates.length === 0) {

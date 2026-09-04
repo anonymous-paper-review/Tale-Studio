@@ -20,6 +20,7 @@ import { CHARACTER_VIEW_COLUMNS } from '@/types/asset'
 import {
   computeImageSourceHash,
   computeLookFingerprint,
+  computeWorldDescriptionHash,
   computeWorldImageSourceHash,
   type LookTokens,
 } from '@/lib/image-provenance'
@@ -343,6 +344,8 @@ export async function triggerWorldDrafts(
             prompt: builtPrompt,
             aspectRatio: '16:9',
             sourceHash: computeWorldImageSourceHash(builtPrompt),
+            // 약속 B7: 자동 초안도 설명 해시를 남겨야 뒤에 설명이 바뀌었을 때 "설명 바뀜"을 판정할 수 있다.
+            descriptionHash: computeWorldDescriptionHash(location.visual_description),
             actor: 'writer',
             workspaceId: project?.workspace_id ?? undefined,
             anchor,

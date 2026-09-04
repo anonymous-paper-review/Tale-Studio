@@ -9,9 +9,14 @@ import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { requireProjectAccess } from '@/lib/api/guard'
 import {
   countFailedJobsForTarget,
+  hasQueuedWorldShotJob,
+  listFailedWorldShotJobs,
   AUTO_GENERATION_GIVE_UP_THRESHOLD,
   type GenerationJobActor,
 } from '@/lib/generation-jobs'
+import { isImageModelKey, type ImageModelKey } from '@/lib/image-models'
+import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
+import { applyWorldSafeMode, ensureNoPeopleClause } from '@/lib/artist/world-prompt'
 import { checkGenerationCapacity } from '@/lib/generation-quota'
 import { quotaRejectionResponse } from '@/lib/api/quota'
 import { resolveStyleAnchor } from '@/lib/style-anchor'
@@ -28,7 +33,10 @@ export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
   try {
-    const { projectId, locationId, column, prompt, aspectRatio, actor, sourceHash, traceId } =
+    const {
+      projectId, locationId, column, prompt, aspectRatio, actor, sourceHash, traceId,
+      model: modelInput, safeMode, descriptionHash,
+    } =
       (await req.json()) as {
         projectId?: string
         locationId?: string
@@ -38,6 +46,9 @@ export async function POST(req: Request) {
         actor?: string
         sourceHash?: string // F2: 호출자가 computeWorldImageSourceHash(prompt)로 계산해 동반 — 라우트는 DB 재조립 안 함.
         traceId?: string
+        model?: string // 약속 B5: 이미지 생성 모델(없으면 캐릭터와 같은 기본값)
+        safeMode?: boolean // 약속 B9: 콘텐츠 정책 거절 뒤 우회 재시도
+        descriptionHash?: string | null // 약속 B7: 설명(EN base) 해시 → 후보 appearance_hash
       }
 
     if (!projectId || !locationId || !column || !prompt) {
@@ -65,6 +76,28 @@ export async function POST(req: Request) {
     if (!VALID_COLUMNS.has(column)) {
       return NextResponse.json({ error: `Invalid column: ${column}` }, { status: 400 })
     }
+    const model: ImageModelKey | null = isImageModelKey(modelInput) ? modelInput : null
+
+    // 중복 제출 가드(DB-authoritative, 캐릭터 시트 라우트와 대칭): 같은 슬롯에 queued 잡이 있으면 새 제출 생략.
+    if (await hasQueuedWorldShotJob(projectId, locationId, column)) {
+      return NextResponse.json({ ok: true, status: 'queued', deduped: true, locationId, column })
+    }
+
+    // safe-mode 자격/상한(약속 B9): 슬롯의 최근 실패가 moderation 류일 때만 순화 변환을 적용하고,
+    //   사람이 누른 우회 재시도는 SAFE_RETRY_CAP 으로 비용 상한을 둔다.
+    let effectiveSafeMode = false
+    if (safeMode === true) {
+      const failures = await listFailedWorldShotJobs(projectId)
+      const slot = failures.find((f) => f.locationId === locationId && f.column === column)
+      if (slot) {
+        if ((jobActor === 'ui' || jobActor === 'chat') && slot.safeFailCount >= SAFE_RETRY_CAP) {
+          return NextResponse.json({ ok: true, skipped: true, reason: 'capped', safeFailCount: slot.safeFailCount })
+        }
+        effectiveSafeMode = slot.moderation
+      }
+    }
+    // 약속 B1: 어떤 경로(팝업 편집·채팅·자동 초안)로 왔든 배경 프롬프트에는 사람 금지 절이 붙는다.
+    const finalPrompt = ensureNoPeopleClause(effectiveSafeMode ? applyWorldSafeMode(prompt) : prompt)
 
     // give-up 게이트: 자율 first-fill(actor='auto')은 같은 슬롯 실패가 임계값 이상이면 멈춘다
     //   (무한 재시도·fal 과금 차단). 사람의 명시적 재생성(ui/chat)은 통과 → 회복 경로(architecture §5).
@@ -93,7 +126,7 @@ export async function POST(req: Request) {
       projectId,
       locationId,
       column: column as 'wide_shot',
-      prompt,
+      prompt: finalPrompt,
       aspectRatio: aspectRatio ?? '16:9',
       actor: jobActor,
       userId: access.userId!,
@@ -101,6 +134,9 @@ export async function POST(req: Request) {
       sourceHash: sourceHash ?? null,
       anchor,
       chatTraceId: traceId ?? null,
+      model,
+      safeMode: effectiveSafeMode,
+      descriptionHash: typeof descriptionHash === 'string' ? descriptionHash : null,
     })
 
     return NextResponse.json({ ok: true, jobId: job.id, status: 'queued' })

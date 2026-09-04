@@ -16,7 +16,9 @@ import { buildArtistActivityContext } from '@/lib/artist/chat-context'
 import {
   validateUpdates,
   extractAppearanceProposals,
+  extractLocationProposals,
   type AppearanceProposal,
+  type LocationProposal,
 } from '@/lib/artist/chat-updates'
 import { buildChatTrace, createChatTraceId, type ChatLlmUsage } from '@/lib/chat-trace'
 import { persistChatTraceBestEffort } from '@/lib/chat-trace-server'
@@ -71,6 +73,10 @@ regenerateCharacter 의 선택적 model 필드로 이미지 생성기를 고른�
 - 파생(이 이미지만): regenerateCharacter 로 즉시 처리. 사용자가 말한 변경 요청은 instruction 필드로 함께 전달한다.
 - 원천(캐릭터 기본 외형 자체 변경, 예: "얘는 원래 머리가 붉은색이야"): updates 에 {"type":"changeAppearance","characterId":"<id>","appearance":"바뀐 전체 외형 prose"} 를 emit하라. 이건 자동 실행되지 않고, 앱이 "캐릭터 기본 외형을 …로 바꿀까요?" 승인 절차로 띄운다 — 승인 시에만 characters.appearance 가 커밋되고 그 캐릭터의 기존 이미지들이 갱신 대상(stale)이 된다. appearance 는 델타가 아니라 변경 후 전체 외형을 적어라(외형을 통째 대체하므로).
 - 애매하면("머리 붉게") 되물어라: 이 이미지만 바꿀지, 아니면 캐릭터 기본 외형을 붉은 머리로 바꿀지.
+- 배경(월드)도 같다. 배경 이미지 한 장만 다시 뽑는 요청은 regenerateWorldAsset. 배경의 설명 자체를 바꾸는 요청
+  (예: "이 시장은 밤에 비가 오는 곳이야")은 updates 에 {"type":"changeLocationDescription","locationId":"<id>","visualDescription":"바뀐 전체 배경 설명"} 를
+  emit하라. 자동 실행되지 않고 앱이 "배경 설명을 …로 바꿀까요?" 승인 카드로 띄운다 — 승인 시에만 locations.visual_description 이 커밋되고
+  그 배경의 기존 이미지가 "설명 바뀜"으로 표시된다(자동 재생성 없음). visualDescription 은 델타가 아니라 변경 후 전체 설명이다.
 - Writer 디자인(룩: 그림체/팔레트/의상)이 아직 준비 안 된 상태로 보이면, 지금 임시본으로 만들지 룩이 나온 뒤 만들지 먼저 물어보고 진행하라.
 </source-vs-derived>
 
@@ -149,6 +155,7 @@ function parseUpdates(text: string): {
   reply: string
   updates: unknown[]
   proposals: AppearanceProposal[]
+  locationProposals: LocationProposal[]
   parseStatus: string
   rawUpdateCount: number
   validUpdateCount: number
@@ -165,6 +172,7 @@ function parseUpdates(text: string): {
     reply,
     updates,
     proposals: extractAppearanceProposals(raw),
+    locationProposals: extractLocationProposals(raw),
     parseStatus: status,
     rawUpdateCount: raw.length,
     validUpdateCount: updates.length,
@@ -250,6 +258,7 @@ export async function POST(req: Request) {
       reply,
       updates,
       proposals,
+      locationProposals,
       parseStatus,
       rawUpdateCount,
       validUpdateCount,
@@ -273,6 +282,7 @@ export async function POST(req: Request) {
       reply,
       updates,
       proposals,
+      locationProposals,
       trace,
     })
   } catch (err) {

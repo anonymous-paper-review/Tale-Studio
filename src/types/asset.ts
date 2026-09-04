@@ -116,4 +116,6 @@ export interface WorldAsset {
   styleDescription?: string
   lightingSources?: string[]
   props?: string[]
+  /** wide_shot 후보 히스토리(최근 5장, 선택본 포함) — 약속 B4(2026-09-04). generated_at 내림차순. */
+  candidates?: CandidateImage[]
 }

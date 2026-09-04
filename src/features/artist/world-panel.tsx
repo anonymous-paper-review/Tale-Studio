@@ -1,10 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, Sparkles } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { classifyWorldImageStale } from '@/lib/image-provenance'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { WorldViewDialog } from '@/features/artist/world-view-dialog'
 import { useArtistStore, type WorldShotKey } from '@/stores/artist-store'
@@ -26,8 +25,8 @@ export function WorldPanel({
     worldAssets,
     selectedLocationId,
     generatingLocations,
+    worldFailures,
     selectLocation,
-    generateWorldAsset,
   } = useArtistStore()
 
   const [viewDialog, setViewDialog] = useState<{
@@ -74,6 +73,10 @@ export function WorldPanel({
             const scene = getScene(world.sceneId)
             const isGenerating = generatingLocations.includes(world.locationId)
             const isSelected = selectedLocationId === world.locationId
+            // 약속 B7·B8: 설명이 바뀐 뒤 재생성 전이면 "설명 바뀜", 최근 생성이 실패했으면 "이미지 실패".
+            const selectedCandidate = (world.candidates ?? []).find((c) => c.isSelected)
+            const descriptionChanged = classifyWorldImageStale(world.visualDescription, selectedCandidate) !== 'fresh'
+            const failed = !!worldFailures[world.locationId]
 
             return (
               <div
@@ -118,8 +121,18 @@ export function WorldPanel({
                     'mention-flash ring-2 ring-sky-400/70 border-sky-400/50 bg-sky-400/10',
                 )}
               >
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="font-medium">{world.name}</span>
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate font-medium">{world.name}</span>
+                  {failed && (
+                    <Badge variant="destructive" className="text-[10px]">
+                      {t('Image failed')}
+                    </Badge>
+                  )}
+                  {descriptionChanged && !isGenerating && (
+                    <Badge variant="outline" className="text-[10px] text-warning">
+                      {t('Description changed')}
+                    </Badge>
+                  )}
                   {scene && (
                     <Badge variant="outline" className="text-[10px]">
                       {scene.timeOfDay}
@@ -146,32 +159,7 @@ export function WorldPanel({
                   />
                 </button>
 
-                {/* Actions(#d3 2026-07-15) — Register(에셋은 진입 시 DB 하이드레이트로 자동 공급)·
-                    인벤토리 저장 버튼 제거, 생성 버튼 문구는 '이미지 생성'으로 통일. */}
-                <div className="mt-3 flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1 hover-red-beam"
-                    disabled={isGenerating}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      generateWorldAsset(world.locationId)
-                    }}
-                  >
-                    {isGenerating ? (
-                      <>
-                        <Loader2 className="size-3.5 animate-spin" />
-                        Generating…
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="size-3.5" />
-                        {t('Generate image')}
-                      </>
-                    )}
-                  </Button>
-                </div>
+                {/* 카드 생성 버튼 제거(약속 B2, 2026-09-04) — 캐릭터 카드와 같이 생성/재생성은 팝업과 채팅으로만. */}
               </div>
             )
           })}

@@ -125,6 +125,26 @@ export function computeImageSourceHash(
   return lookFingerprint ? fnv1a(fnv1a(base) + LOOK_SEP + lookFingerprint) : fnv1a(base)
 }
 
+
+/**
+ * 배경 이미지의 "설명 바뀜"(약속 B7, 2026-09-04). 캐릭터의 classifyImageStale 과 같은 원리인데 룩 축이 없다:
+ *   submit 때 설명(EN base)만 해시해 appearance_hash 에 두고, 지금 설명의 해시와 다르면 edited.
+ *   appearance_hash 가 없는 후보(2026-09-04 이전 생성)는 알 수 없으므로 fresh 로 둔다 — 옛 프로젝트 전체에
+ *   경고가 뜨는 소음을 막는다.
+ */
+export function computeWorldDescriptionHash(visualDescription: string | null | undefined): string {
+  return fnv1a(normalizeAppearance(visualDescription))
+}
+
+export function classifyWorldImageStale(
+  currentVisualDescription: string | null | undefined,
+  candidate: { appearanceHash?: string | null } | null | undefined,
+): 'fresh' | 'edited' {
+  const hash = candidate?.appearanceHash
+  if (!hash) return 'fresh'
+  return hash === computeWorldDescriptionHash(currentVisualDescription) ? 'fresh' : 'edited'
+}
+
 /** 월드(로케이션) 이미지 생성 입력 지문 — 캐릭터와 동일 하위호환 규칙(룩 부재=visualDescription만). */
 export function computeWorldImageSourceHash(
   visualDescription: string | null | undefined,

@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import {
   listFailedCharacterViewJobs,
+  listFailedWorldShotJobs,
   listQueuedMainJobs,
   userOwnsProject,
 } from '@/lib/generation-jobs'
@@ -26,9 +27,10 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 })
   }
 
-  const [failures, queuedMain] = await Promise.all([
+  const [failures, queuedMain, worldFailures] = await Promise.all([
     listFailedCharacterViewJobs(projectId),
     listQueuedMainJobs(projectId),
+    listFailedWorldShotJobs(projectId), // 약속 B8(2026-09-04): 배경 실패 표시·우회 재시도의 근거
   ])
-  return NextResponse.json({ failures, queuedMain })
+  return NextResponse.json({ failures, queuedMain, worldFailures })
 }

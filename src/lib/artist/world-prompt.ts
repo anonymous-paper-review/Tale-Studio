@@ -28,6 +28,28 @@ export interface LocationRowForWorldPrompt {
   props?: string[] | null
 }
 
+/** 배경 프롬프트에 항상 붙는 "사람 없음" 지시(약속 B1, 2026-09-04). 서버(generate-world)가 최종 보장한다. */
+export const NO_PEOPLE_CLAUSE = 'no people or characters, empty environment'
+const NO_PEOPLE_RE = /\bno (?:people|humans?|characters|figures|persons?)\b/i
+
+/** 사용자·채팅이 고친 프롬프트에도 사람 금지 절이 빠지지 않게 한다. 이미 있으면 그대로(멱등). */
+export function ensureNoPeopleClause(prompt: string): string {
+  const p = prompt.trim()
+  if (!p) return NO_PEOPLE_CLAUSE
+  return NO_PEOPLE_RE.test(p) ? p : `${p.replace(/[,\s]+$/, '')}, ${NO_PEOPLE_CLAUSE}`
+}
+
+// safe-mode(약속 B9) — 콘텐츠 정책 거절 뒤 우회 재시도: 그래픽·유혈 낱말을 걷고 순화 토큰을 붙인다.
+//   캐릭터(turnaround.ts safeScrub)와 같은 원칙, 배경은 나이 토큰이 없으므로 그래픽 낱말만.
+const WORLD_SAFE_GRAPHIC_RE =
+  /(유혈|혈흔|선혈|피범벅|피투성이|낭자|시체|시신|사체|고문|학살|절단|참수|토막|\bblood(?:y|stained|ied)?\b|\bgore\b|\bgory\b|\bcorpses?\b|\bdead bod(?:y|ies)\b|\bmutilat\w*|\bdismember\w*|\bgruesome\b|\bviscera\w*|\bentrails\b|\bmassacre\b|\bcarnage\b|\bslaughter\w*|\btortur\w*|\bsevered\b)/gi // i18n-ok: 순화 대상 낱말(그래픽 묘사) 정규식
+export const WORLD_SAFE_TOKENS = 'stylized non-graphic illustration, tasteful, safe-for-work, no violence'
+
+export function applyWorldSafeMode(prompt: string): string {
+  const scrubbed = prompt.replace(WORLD_SAFE_GRAPHIC_RE, ' ').replace(/\s{2,}/g, ' ').replace(/\s+,/g, ',').replace(/,\s*,/g, ',').trim()
+  return `${scrubbed.replace(/[,\s]+$/, '')}, ${WORLD_SAFE_TOKENS}`
+}
+
 export function worldShotPrompt(
   visualDescription: string,
   timeOfDay: string,
@@ -37,7 +59,7 @@ export function worldShotPrompt(
 ): string {
   return [
     buildWorldPrompt(visualDescription, timeOfDay, mood, boost),
-    'no people or characters, empty environment',
+    NO_PEOPLE_CLAUSE,
     WORLD_SHOT_SUFFIX[shot],
   ]
     .filter(Boolean)

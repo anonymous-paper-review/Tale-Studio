@@ -382,7 +382,8 @@ describe('style-anchor route integration', () => {
       }),
     )
 
-    const expectedPrompt = `${STYLE_ANCHOR_CLAUSE}\nWORLD PROMPT`
+    // 약속 B(2026-09-04): 사람 금지 절이 서버에서 붙고, 스냅샷에 설명 해시·모델 키가 남는다. 모델은 종전과 같은 GPT Image 2 edit.
+    const expectedPrompt = `${STYLE_ANCHOR_CLAUSE}\nWORLD PROMPT, no people or characters, empty environment`
     expect(response.status).toBe(200)
     expect(firstFalOpts()).toEqual({
       prompt: expectedPrompt,
@@ -397,7 +398,9 @@ describe('style-anchor route integration', () => {
       reference_image_urls: [ANCHOR_URL],
       model: DEFAULT_EDIT_IMAGE_MODEL,
       source_hash: null,
+      appearance_hash: null,
       style_anchor_key: ANCHOR_KEY,
+      image_model: 'gpt-image-2',
     })
   })
 
@@ -615,12 +618,13 @@ describe('style-anchor route integration', () => {
     )
 
     expect(response.status).toBe(200)
+    // 약속 B(2026-09-04): 앵커가 없어도 사람 금지 절과 배경 기본 모델(GPT Image 2 = 종전 fal 기본과 같음)은 붙는다.
     expect(firstFalOpts()).toEqual({
-      prompt: 'WORLD PROMPT',
+      prompt: 'WORLD PROMPT, no people or characters, empty environment',
       aspect_ratio: '16:9',
+      model: 'openai/gpt-image-2',
       webhookUrl: WEBHOOK_URL,
     })
-    expect(firstFalOpts()).not.toHaveProperty('model')
     expect(firstFalOpts()).not.toHaveProperty('reference_image_urls')
     expect(firstFalOpts().prompt).not.toContain(STYLE_ANCHOR_CLAUSE)
   })
