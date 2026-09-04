@@ -201,7 +201,7 @@ export function CharacterViewDialog({ charId, appearanceKey, view, onClose }: Pr
           {candidates.length >= 2 && (
             <div className="space-y-1.5">
               <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                {t('Candidate history')}
+                {t('History')}
               </p>
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {candidates.map((cand) => {

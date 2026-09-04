@@ -42,7 +42,6 @@ import { HOVER_RED_BORDER } from './interaction-styles'
 import { HoverBeam } from '@/components/hover-beam'
 import { cn } from '@/lib/utils'
 import { useModifierHeld } from '@/hooks/use-modifier-held'
-import { AgentFace } from '@/components/agent-face'
 import { ProducerQuestJournal, StoryFoundationBadges } from './quest-journal'
 import { WriterEnginePicker } from '@/features/writer/writer-engine-picker'
 import { useLocale, useT } from '@/lib/i18n'
@@ -402,13 +401,16 @@ function CastRow({
         {ready ? (
           <CheckCircle2 className="size-3.5 shrink-0 text-success" aria-label={t('Ready')} />
         ) : (
-          <span
-            title={issues.map((i) => i.label).join(' · ')}
-            className="flex shrink-0 items-center gap-1 text-xs text-destructive"
-          >
-            <AlertCircle className="size-3.5" />
-            {issues.length}
-          </span>
+          <Tooltip delayDuration={0}>
+            {/* 약속 N(2026-09-04): 브라우저 title 은 1초쯤 기다려야 떠서 즉시 뜨는 툴팁으로. */}
+            <TooltipTrigger asChild>
+              <span className="flex shrink-0 items-center gap-1 text-xs text-destructive">
+                <AlertCircle className="size-3.5" />
+                {issues.length}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{issues.map((i) => i.label).join(' · ')}</TooltipContent>
+          </Tooltip>
         )}
 
         <RowIconButton
@@ -598,13 +600,17 @@ function BackgroundRow({
         {ready ? (
           <CheckCircle2 className="size-3.5 shrink-0 text-success" aria-label={t('Ready')} />
         ) : (
-          <span
-            title={t('{fields} needed', { fields: missing.map((m) => t(m)).join(' · ') })}
-            className="flex shrink-0 items-center gap-1 text-xs text-destructive"
-          >
-            <AlertCircle className="size-3.5" />
-            {missing.length}
-          </span>
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <span className="flex shrink-0 items-center gap-1 text-xs text-destructive">
+                <AlertCircle className="size-3.5" />
+                {missing.length}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              {t('{fields} needed', { fields: missing.map((m) => t(m)).join(' · ') })}
+            </TooltipContent>
+          </Tooltip>
         )}
         <RowIconButton
           icon={Wand2}
@@ -717,26 +723,12 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   const askProducer = (prompt: string) => {
     void useGlobalChatStore.getState().sendMessage(prompt)
   }
-  // 헤더 우측 Producer 호출 버튼(#b8) — 옛 Brief Story 카드의 "기본적인 스토리를 알려주세요"
-  //   기능을 승격. 접힌 채팅을 펴고 프롬프트 전송 + 입력창 포커스.
-  const callProducerForStory = () => {
-    useChatUiStore.getState().setCollapsed(false)
-    askProducer(
-      t(
-        'Producer, please ask about one missing piece (character, setting, or beginning-conflict-ending) so this story is ready to hand off to Writer.',
-      ),
-    )
-    useChatUiStore.getState().requestChatFocus()
-  }
   const addPerson = () => {
     addCastMember('person')
   }
   const addBg = () => {
     addBackground()
   }
-  // Producer 호출 버튼 호버(#b1 2026-07-15) — 얼굴이 웃고 깜빡이는 인터랙션. CSS로는
-  //   AgentFace의 expression/animate prop을 못 바꾸므로 상태로 전달.
-  const [producerHover, setProducerHover] = useState(false)
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -759,35 +751,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
         <div className="flex shrink-0 items-center gap-2">
           {syncing ? <Badge variant="outline">{t('Saving…')}</Badge> : null}
           <WriterEnginePicker projectId={projectId} />
-          {/* Producer 호출 CTA(#b8) — 얼굴 + 이름 병기, 헤더 맨오른쪽.
-              호버 시 얼굴이 활짝 웃으며 깜빡이고(#b1) 살짝 커진다 + 툴팁 안내. */}
-          <Tooltip delayDuration={150}>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className={HOVER_RED_BORDER}
-                onClick={callProducerForStory}
-                onMouseEnter={() => setProducerHover(true)}
-                onMouseLeave={() => setProducerHover(false)}
-              >
-                <span
-                  className={cn(
-                    'flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted transition-transform duration-200',
-                    producerHover && 'scale-125',
-                  )}
-                >
-                  <AgentFace
-                    stage="producer"
-                    size={15}
-                    expression={producerHover ? 'happy' : 'idle'}
-                  />
-                </span>
-                {t('Build the story with Producer')}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">{t('Need help? Call me')}</TooltipContent>
-          </Tooltip>
+          {/* 헤더 CTA "Producer와 스토리 만들기" 는 약속 N(2026-09-04)으로 제거 — 채팅에 직접 말하는 것과 같은 경로였다. */}
         </div>
       </div>
 

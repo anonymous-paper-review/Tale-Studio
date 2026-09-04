@@ -18,9 +18,6 @@ import { IMAGE_MODELS, normalizeImageModelKey } from '@/lib/image-models'
 import { prettyNodeLabel } from '@/features/director/node-label'
 import { ThumbImage } from '@/components/thumb-image'
 import { useT } from '@/lib/i18n'
-import { useTakeBalance } from '@/lib/billing/use-take-balance'
-import { takeCostForVideo } from '@/lib/billing/take-cost'
-import { normalizeProvider } from '@/lib/video-models'
 
 
 function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
@@ -40,7 +37,6 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const writerShotId = isShotData(data) ? data.writerShotId : null
   const rough = useRoughStoryboard(writerShotId)
   // #payments-phase-2 v4 #2: 생성 전 소모량 표시 — mode==='off'면 배지를 숨긴다(현재 기본값).
-  const takeBalance = useTakeBalance()
 
   if (!isShotData(data)) return null
 
@@ -196,12 +192,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
               <Lightbulb className="size-2.5" />
               {data.lighting.position}
             </span>
-            {/* #payments-phase-2 v4 #2: 이 샷을 영상으로 뿑을 때 소모될 Take — mode==='off'면 숨김. */}
-            {takeBalance.mode !== 'off' && (
-              <span className="rounded-sm border border-primary/40 bg-primary/10 px-1 font-medium text-foreground">
-                {t('{count} Take', { count: takeCostForVideo(normalizeProvider(data.provider)) })}
-              </span>
-            )}
+            {/* Take 배지는 영상 카드에만 둔다(약속 O 2026-09-04 — 이미지 카드의 "Take N" 제거). */}
           </span>
         </div>
       </BaseNode>

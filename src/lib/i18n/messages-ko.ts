@@ -708,7 +708,7 @@ export const KO: Record<string, string> = {
   'Generate {label}': '{label} 생성',
   'Bypass retry limit reached': '우회 재시도 한도 도달',
   'Redo with bypass (safe)': '우회(safe)로 다시 만들기',
-  'Candidate history': '후보 히스토리',
+  'History': '히스토리',
   'Candidate image': '후보 이미지',
   'Pre-look': '룩 이전',
   'Pre-edit': '외형 이전',
