@@ -302,11 +302,27 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         </div>
       )}
 
-      <div className="mt-2 flex items-center justify-between text-[10px] text-muted-foreground">
-        <span className="font-mono">
-          take {data.takeNumber} · {data.lastAttemptStatus ?? data.status}
+      {/* 약속 H(2026-09-04, 오너 1안): 작은 영문 "take 1 · completed" 대신 큰 상태 글자. take 번호는 카드에서 빼고
+          마우스를 올리면(title)·왼쪽 상세·팝업에서 작게 보인다. */}
+      <div
+        className="mt-2 flex items-center justify-between"
+        title={t('Take {n}', { n: data.takeNumber })}
+      >
+        <span
+          className={cn(
+            'text-sm font-semibold',
+            (data.lastAttemptStatus ?? data.status) === 'failed'
+              ? 'text-destructive'
+              : (data.lastAttemptStatus ?? data.status) === 'generating'
+                ? 'text-primary'
+                : (data.lastAttemptStatus ?? data.status) === 'completed'
+                  ? 'text-success'
+                  : 'text-muted-foreground',
+          )}
+        >
+          {videoStatusLabel(data.lastAttemptStatus ?? data.status, t)}
         </span>
-        {data.final && <span className="font-mono text-warning">★ FINAL</span>}
+        {data.final && <span className="font-mono text-[10px] text-warning">★ FINAL</span>}
       </div>
       {/* #adherence P2: 모션 계약 위반 배지 — 첫/끝 프레임 검사 결과. */}
       {data.adherence && data.adherence.status !== 'ok' && data.adherence.status !== 'skipped' && (
@@ -331,3 +347,11 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
 }
 
 export const VideoNode = memo(VideoNodeImpl)
+
+/** 약속 H1: 상태 한 단어 — 완료 / 생성 중 / 실패 / 대기 중 (사전의 식별자 키). */
+function videoStatusLabel(status: string | null | undefined, t: (key: string) => string): string {
+  if (status === 'completed') return t('Completed')
+  if (status === 'generating') return t('Generating')
+  if (status === 'failed') return t('Failed')
+  return t('Waiting')
+}

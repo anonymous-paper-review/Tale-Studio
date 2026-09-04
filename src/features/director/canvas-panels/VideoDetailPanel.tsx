@@ -240,6 +240,8 @@ export function VideoDetailPanel({
               from {mother.label}
             </Badge>
           )}
+          {/* 약속 H2: take 번호는 카드에서 빼고 여기서만 작게. */}
+          <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{t('Take {n}', { n: data.takeNumber })}</span>
           {!isStandalone && <button
             type="button"
             onClick={() => void handleFinalToggle()}

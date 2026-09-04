@@ -1,6 +1,7 @@
 'use client'
 
 import { memo } from 'react'
+import { cn } from '@/lib/utils'
 import { NodeToolbar, Position, type NodeProps } from '@xyflow/react'
 import { Camera, Lightbulb, ImageIcon, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -182,7 +183,28 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           </div>
         )}
 
-        <div className="mt-2 text-[10px] text-muted-foreground">
+        {/* 약속 H3(2026-09-04, 오너 1안): 이미지 카드에도 영상 카드와 같은 큰 상태 글자. */}
+        <div
+          className={cn(
+            'mt-2 text-sm font-semibold',
+            failed
+              ? 'text-destructive'
+              : isGenerating || data.storyboardImage?.status === 'generating'
+                ? 'text-primary'
+                : realImage
+                  ? 'text-success'
+                  : 'text-muted-foreground',
+          )}
+        >
+          {failed
+            ? t('Failed')
+            : isGenerating || data.storyboardImage?.status === 'generating'
+              ? t('Generating')
+              : realImage
+                ? t('Completed')
+                : t('Waiting')}
+        </div>
+        <div className="mt-1 text-[10px] text-muted-foreground">
           <span className="flex items-center gap-2">
             <span className="flex items-center gap-0.5">
               <Camera className="size-2.5" />

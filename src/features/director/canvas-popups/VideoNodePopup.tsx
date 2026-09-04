@@ -224,6 +224,7 @@ export function VideoNodePopup({ nodeId, data }: Props) {
             <Badge variant="secondary" className="ml-2 text-[10px]">
               from {mother.label}
             </Badge>
+            <span className="font-mono text-[10px] font-normal text-muted-foreground">{t('Take {n}', { n: data.takeNumber })}</span>
             <button
               type="button"
               onClick={() => void handleFinalToggle()}

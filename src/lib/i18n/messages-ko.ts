@@ -1421,4 +1421,6 @@ export const KO: Record<string, string> = {
   'Chat can start videos only for all remaining shots at once. For one shot, use the Video take button on the Shot node.': '채팅은 남은 샷 전체의 영상만 한꺼번에 시작할 수 있어요. 샷 하나는 Shot 카드의 Video take 버튼을 눌러 주세요.',
   // 약속 F(2026-09-04): 선 지우기
   'Delete connection': '연결 지우기',
+  // 약속 H(2026-09-04): 카드 상태 글자
+  'Take {n}': '테이크 {n}',
 }
