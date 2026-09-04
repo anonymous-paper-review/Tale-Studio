@@ -55,7 +55,7 @@ describe('막힌 재생성은 조용히 죽지 않는다', () => {
   })
 
   it('안내 문구가 한국어 사전에 있다', () => {
-    const key = 'Still finishing the previous generation for {count} panels — try again in a moment.'
+    const key = 'Still finishing the previous generation for {count} panels. Try again in a moment.'
     expect(koMessages[key]).toBeTruthy()
   })
 

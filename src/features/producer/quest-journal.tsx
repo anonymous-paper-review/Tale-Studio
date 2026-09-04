@@ -160,7 +160,7 @@ export function StoryFoundationBadges({ className }: { className?: string }) {
           type="number"
           min={5}
           value={settings.playtime || ''}
-          placeholder={t('e.g. 120')}
+          placeholder={t('E.g. 120')}
           onChange={(e) => updateSettings({ playtime: Number(e.target.value) || 0 })}
           className="number-spin h-8 font-mono tabular-nums"
         />
@@ -170,7 +170,7 @@ export function StoryFoundationBadges({ className }: { className?: string }) {
         <label className="mb-1.5 block text-[11px] font-medium text-muted-foreground">{t('Genre')}</label>
         <Input
           value={settings.genre}
-          placeholder={t('e.g. thriller')}
+          placeholder={t('E.g. thriller')}
           onChange={(e) => updateSettings({ genre: e.target.value })}
           className="h-8"
         />
@@ -200,12 +200,12 @@ export function StoryFoundationBadges({ className }: { className?: string }) {
 
       <SettingBadge k={t('Tone')} value={settings.tone.length ? settings.tone.join(', ') : null}>
         <label className="mb-1.5 block text-[11px] font-medium text-muted-foreground">
-          {t('Tone — fill this in for a better script')}
+          {t('Tone: fill this in for a better script')}
         </label>
         <TagInput
           values={settings.tone}
           onChange={(tone) => updateSettings({ tone })}
-          placeholder={t('e.g. dark')}
+          placeholder={t('E.g. dark')}
         />
       </SettingBadge>
 
@@ -267,12 +267,12 @@ export function ProducerQuestJournal({
   const nodes: JourneyNode[] = [
     {
       title: t('Story seed'),
-      desc: t('One scene, one feeling is enough — drop it in chat.'),
+      desc: t('One scene, one feeling is enough. Drop it in chat.'),
       done: storyDone,
     },
     {
       title: t('Settings locked in'),
-      desc: t('These fill in as you talk — runtime, genre, format, language.'),
+      desc: t('These fill in as you talk: runtime, genre, format, language.'),
       done: settingsDone,
     },
     {
@@ -280,8 +280,8 @@ export function ProducerQuestJournal({
       desc: castDone
         ? t('A vividly-drawn character is ready.')
         : personCount === 0
-          ? t('No character yet — describe one in chat.')
-          : t('{count} fields are empty — try describing a character.', { count: castIssues.length }),
+          ? t('No character yet. Describe one in chat.')
+          : t('{count} fields are empty. Try describing a character.', { count: castIssues.length }),
       done: castDone,
     },
     {
@@ -294,7 +294,7 @@ export function ProducerQuestJournal({
     {
       title: t('Call Writer'),
       desc: gate.canHandoff
-        ? t("Everything's ready — call Writer from the chat.")
+        ? t("Everything's ready. Call Writer from the chat.")
         : t('Complete the milestones to call Writer.'),
       done: false,
     },

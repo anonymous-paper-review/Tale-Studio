@@ -179,7 +179,7 @@ export function VideoPreviewer() {
             />
           ) : (
             <p className="max-w-[520px] cursor-text whitespace-pre-wrap text-2xl font-semibold text-white">
-              {activeShot?.titleCard?.text || t('(Empty title) — double-click to edit')}
+              {activeShot?.titleCard?.text || t('(Empty title) double-click to edit')}
             </p>
           )}
         </div>

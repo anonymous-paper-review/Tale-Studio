@@ -72,7 +72,7 @@ export function WriterV2Preview({ projectId }: { projectId: string }) {
     <div className="flex min-h-0 flex-1 flex-col">
       <WriterHeader
         description={t(
-          'V2 experimental previz — review story and visual together within each semantic unit',
+          'V2 experimental previz: review story and visual together within each semantic unit',
         )}
       />
       <ScrollArea className="min-h-0 flex-1">
@@ -82,7 +82,7 @@ export function WriterV2Preview({ projectId }: { projectId: string }) {
             <Badge variant="secondary">{t('Admin only')}</Badge>
             <span className="text-sm text-muted-foreground">
               {t(
-                'Not applied automatically — once approved via User Review and applied, Artist and Director will read this result.',
+                'Not applied automatically. Once approved via User Review and applied, Artist and Director will read this result.',
               )}
             </span>
           </div>
@@ -104,7 +104,7 @@ export function WriterV2Preview({ projectId }: { projectId: string }) {
                   <div>
                     <h2 className="font-semibold">{t('Review status')}</h2>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {t('revision {revisionId} · current attempt {attempt}', {
+                      {t('Revision {revisionId} · current attempt {attempt}', {
                         revisionId: pkg.revision_id,
                         attempt: pkg.current_attempt,
                       })}
@@ -147,7 +147,7 @@ export function WriterV2Preview({ projectId }: { projectId: string }) {
                     </Button>
                     <span className="text-xs text-muted-foreground">
                       {t(
-                        'This selection is recorded as a Writer review — final production decisions happen downstream.',
+                        'This selection is recorded as a Writer review. Final production decisions happen downstream.',
                       )}
                     </span>
                   </div>
@@ -237,7 +237,7 @@ export function WriterV2Preview({ projectId }: { projectId: string }) {
                             <ul className="mt-1 space-y-1 text-muted-foreground">
                               {unit.story.dialogue.map((line) => (
                                 <li key={`${line.character_id}:${line.timing}`}>
-                                  {line.character_id} · {line.timing} — {line.line}
+                                  {line.character_id} · {line.timing}: {line.line}
                                 </li>
                               ))}
                             </ul>

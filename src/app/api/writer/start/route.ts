@@ -254,10 +254,10 @@ export async function POST(req: NextRequest) {
     const { projectId, story, runtimeSeconds, models, genre, cast, backgrounds } = body;
 
     if (!projectId || typeof projectId !== 'string') {
-      return NextResponse.json({ error: 'projectId required' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid request: projectId required' }, { status: 400 });
     }
     if (!story || typeof story !== 'string') {
-      return NextResponse.json({ error: 'story required' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid request: story required' }, { status: 400 });
     }
 
     const writerEngine: WriterEngine = isWriterEngine(body.writerEngine)
@@ -294,14 +294,14 @@ export async function POST(req: NextRequest) {
     const existing = await getActiveRun(projectId);
     if (existing?.status === 'running') {
       return NextResponse.json(
-        { error: 'already running', code: 'writer_run_active', projectId, status: existing.status },
+        { error: 'Already running', code: 'writer_run_active', projectId, status: existing.status },
         { status: 409 },
       );
     }
     if (existing?.status === 'awaiting_confirmation') {
       return NextResponse.json(
         {
-          error: 'writer scene gate is awaiting confirmation',
+          error: 'Writer scene gate is awaiting confirmation',
           code: 'writer_gate_pending',
           projectId,
           status: existing.status,
@@ -315,7 +315,7 @@ export async function POST(req: NextRequest) {
     if (existing?.status === 'completed' && body.rerun !== true) {
       return NextResponse.json(
         {
-          error: 'writer rerun confirmation required',
+          error: 'Writer rerun confirmation required',
           code: 'writer_rerun_confirmation_required',
           projectId,
           status: existing.status,
@@ -517,7 +517,7 @@ export async function POST(req: NextRequest) {
       if (!latest || latest.id !== existing.id || latest.status !== 'completed') {
         return NextResponse.json(
           {
-            error: 'writer rerun already started',
+            error: 'Writer rerun already started',
             code: 'writer_run_active',
             projectId,
             status: latest?.status ?? null,

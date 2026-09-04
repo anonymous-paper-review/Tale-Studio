@@ -370,13 +370,13 @@ export default function ProjectsPage() {
           <DialogHeader>
             <DialogTitle>{t('New project')}</DialogTitle>
             <DialogDescription>
-              {t('Name your project — you can rename it anytime.')}
+              {t('Name your project. You can rename it anytime.')}
             </DialogDescription>
           </DialogHeader>
           <Input
             value={nameValue}
             onChange={(e) => setNameValue(e.target.value)}
-            placeholder={t('e.g. One rainy night in the city')}
+            placeholder={t('E.g. One rainy night in the city')}
             autoFocus
             maxLength={120}
             onKeyDown={(e) => {
@@ -469,7 +469,7 @@ export default function ProjectsPage() {
           <DialogHeader>
             <DialogTitle>{t('Delete project')}</DialogTitle>
             <DialogDescription>
-              {t('This deletes "{title}" and everything in it — story, characters, scenes, shots, videos. This cannot be undone.', { title: deleteTarget?.title || 'Untitled' })}
+              {t('This deletes "{title}" and everything in it: story, characters, scenes, shots, videos. This cannot be undone.', { title: deleteTarget?.title || 'Untitled' })}
             </DialogDescription>
           </DialogHeader>
           {deleteError ? <p className="text-sm text-destructive">{deleteError}</p> : null}

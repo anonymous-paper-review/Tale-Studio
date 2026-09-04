@@ -199,7 +199,7 @@ function deletedDialoguePreview(current: DialogueLine[], next: DialogueLine[]): 
   const locale = contentLocale()
   const suffix =
     deleted.length > 3
-      ? ` ${translate(locale, 'and {count} more', { count: deleted.length - 3 })}`
+      ? ` ${translate(locale, 'and {count} more', { count: deleted.length - 3 })}` // copy-ok: fragment
       : ''
   return previewLines.length > 0
     ? `${translate(locale, 'Dialogue to delete: {lines}', { lines: previewLines.join(' / ') })}${suffix}`
@@ -387,7 +387,7 @@ function handoffBlockers(spec: HandoffSpec): HandoffBlockers {
     const soft =
       missingTurnaroundCount > 0
         ? [
-            translate(locale, '{count} characters have only a main view — no back/side views yet', {
+            translate(locale, '{count} characters have only a main view, with no back or side views yet', {
               count: missingTurnaroundCount,
             }),
           ]
@@ -634,7 +634,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           ? softWarning(
               translate(
                 locale,
-                "Everything's ready — approve the card below and I'll bring in the Writer right away.",
+                "Everything's ready. Approve the card below and I'll bring in the Writer right away.",
               ),
             )
           : translate(
@@ -648,7 +648,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           // 느린 saveAndHandoff(수 초) 동안 무반응 공백을 즉시 반응 발화로 메운다(D11).
           const reaction = translate(
             locale,
-            'On it — handing your materials to the Writer! Scene and shot design starts now.',
+            'On it, handing your materials to the Writer! Scene and shot design starts now.',
           )
           set((state) => ({
             messages: [
@@ -665,7 +665,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             handoffSpec.from === 'producer'
               ? translate(
                   locale,
-                  'Handed over to {stage}. Starting scene and shot generation — you can follow the progress in the {stage} tab.',
+                  'Handed over to {stage}. Starting scene and shot generation. You can follow the progress in the {stage} tab.',
                   { stage: STAGE_LABEL[handoffSpec.to] },
                 )
               : translate(locale, 'Moving on to {stage}.', {
@@ -679,7 +679,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           const detail =
             handoffSpec.from === 'producer' ? useProducerStore.getState().error : null
           reply = detail
-            ? translate(locale, 'Handoff failed — {detail}', { detail })
+            ? translate(locale, 'Handoff failed: {detail}', { detail })
             : translate(locale, 'Handoff failed. Please try again in a moment.')
         }
       }
@@ -1028,7 +1028,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           // 모델은 이미 "이 화풍으로 잡았어요"라고 답했다. 저장이 실패했는데 조용하면 거짓말이 된다.
           const failure = translate(
             contentLocale(),
-            "Couldn't save the art style — {reason}",
+            "Couldn't save the art style: {reason}",
             { reason: anchorError },
           )
           set((state) => ({
@@ -1052,7 +1052,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             patchTrace({ skippedCount: 1 })
             const failure = translate(
               contentLocale(),
-              "Couldn't find that art style in the catalog — tell me the feel again or pick one in the style picker.",
+              "Couldn't find that art style in the catalog. Tell me the feel again or pick one in the style picker.",
             )
             set((state) => ({
               messages: [...state.messages, { id: makeId(), stage, role: 'model', content: failure }],
@@ -1185,7 +1185,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
                 translate(apLocale, "The character's canonical appearance (source) changes."),
                 translate(
                   apLocale,
-                  'After approval the existing images of that character are marked stale — they are not regenerated automatically.',
+                  'After approval the existing images of that character are marked stale. They are not regenerated automatically.',
                 ),
                 translate(apLocale, 'The appearance does not change until you approve.'),
               ],
@@ -1270,7 +1270,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           if (result.skipped.some((s) => s.update.type === 'generateVideo')) {
             const honestNotice = translate(
               contentLocale(),
-              "Chat doesn't support video generation yet — please use the video generation button on the canvas.",
+              "Chat doesn't support video generation yet. Please use the video generation button on the canvas.",
             )
             set((state) => ({
               messages: [
@@ -1313,7 +1313,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         const locale = contentLocale()
         if (result.skipped.length > 0) {
           toast.warning(
-            translate(locale, "Couldn't apply {count} changes — {reason}", {
+            translate(locale, "Couldn't apply {count} changes: {reason}", {
               count: result.skipped.length,
               reason: result.skipped[0].reason,
             }),
@@ -1569,7 +1569,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         speak(
           translate(
             voice,
-            "On it — handing your materials to the Writer! Scene and shot design starts now.",
+            "On it, handing your materials to the Writer! Scene and shot design starts now.",
           ),
         )
         const ok = await useProducerStore.getState().saveAndHandoff()
@@ -1578,7 +1578,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           const detail = useProducerStore.getState().error
           speak(
             detail
-              ? translate(voice, 'Handoff failed — {detail}', { detail })
+              ? translate(voice, 'Handoff failed: {detail}', { detail })
               : translate(voice, 'Handoff failed. Please try again in a moment.'),
           )
           return false
@@ -1595,7 +1595,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         speak(
           translate(
             voice,
-            'On it — re-running the Writer with your current source. This can take a while.',
+            'On it, re-running the Writer with your current source. This can take a while.',
           ),
         )
         const ok = await useProducerStore.getState().saveAndHandoff({ rerun: true })
@@ -1603,7 +1603,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           const detail = useProducerStore.getState().error
           speak(
             detail
-              ? translate(voice, 'Handoff failed — {detail}', { detail })
+              ? translate(voice, 'Handoff failed: {detail}', { detail })
               : translate(voice, 'Handoff failed. Please try again in a moment.'),
           )
           return false
@@ -1803,7 +1803,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const locale = contentLocale()
     get().notifyIssue(
       stage,
-      `⚠ ${translate(locale, "Couldn't start {label} generation — {message}", {
+      `⚠ ${translate(locale, "Couldn't start {label} generation: {message}", {
         label,
         message: trimmed || translate(locale, 'Unknown error'),
       })}`,

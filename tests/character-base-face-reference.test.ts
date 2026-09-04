@@ -26,7 +26,7 @@ describe('비기본 모습은 같은 캐릭터의 기본 얼굴을 참조한다'
   })
 
   it('비기본 모습은 같은 캐릭터의 기본 portrait가 없으면 생성하지 않는다', () => {
-    expect(route).toContain('default appearance portrait is required')
+    expect(route).toContain('Default appearance portrait is required')
     expect(route).toContain('defaultAppearance.portrait_url')
   })
 

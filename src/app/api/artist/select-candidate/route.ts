@@ -27,12 +27,12 @@ export async function POST(req: Request) {
 
     if (!projectId || !characterId || !appearanceKey || !view || !candidateId) {
       return NextResponse.json(
-        { error: 'projectId, characterId, appearanceKey, view, candidateId required' },
+        { error: 'Invalid request: projectId, characterId, appearanceKey, view, candidateId required' },
         { status: 400 },
       )
     }
     if (!CHARACTER_VIEW_KEYS.includes(view)) {
-      return NextResponse.json({ error: `invalid view: ${view}` }, { status: 400 })
+      return NextResponse.json({ error: `Invalid view: ${view}` }, { status: 400 })
     }
 
     const access = await requireProjectAccess(req, projectId)
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
       .eq('view', candidateView)
       .maybeSingle()
     if (candidateError) throw candidateError
-    if (!candidate) return NextResponse.json({ error: 'candidate not found' }, { status: 404 })
+    if (!candidate) return NextResponse.json({ error: 'Candidate not found' }, { status: 404 })
 
     // 슬롯(project_id + character_id + appearance_key + view)의 기존 is_selected 해제 → 대상만 true.
     const { error: clearError } = await supabaseAdmin

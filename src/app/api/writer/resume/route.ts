@@ -21,14 +21,14 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const { projectId } = (await req.json()) as { projectId?: string };
     if (!projectId || typeof projectId !== 'string') {
-      return NextResponse.json({ error: 'projectId required' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid request: projectId required' }, { status: 400 });
     }
     if (!(await userOwnsProject(projectId, user.id))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const run = await getActiveRun(projectId);
-    if (!run) return NextResponse.json({ error: 'no run' }, { status: 404 });
+    if (!run) return NextResponse.json({ error: 'No run' }, { status: 404 });
 
     if (run.status === 'running') {
       // 킥: 체인이 끊겼을 수 있으니 step 을 한 번 찔러준다. 이미 도는 인보케이션과 경쟁해도

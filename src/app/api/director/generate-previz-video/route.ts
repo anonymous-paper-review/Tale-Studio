@@ -69,17 +69,17 @@ export async function POST(req: Request) {
         .gte('created_at', new Date(Date.now() - STALE_QUEUED_MS).toISOString())
         .contains('target', { writerShotId }),
     ])
-    if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404 })
-    if (!shot) return NextResponse.json({ error: 'shot not found' }, { status: 404 })
+    if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    if (!shot) return NextResponse.json({ error: 'Shot not found' }, { status: 404 })
     if (queued?.length)
-      return NextResponse.json({ error: 'previz video already generating' }, { status: 409 })
+      return NextResponse.json({ error: 'Previz video already generating' }, { status: 409 })
 
     // V2 refs: 러프 3프레임의 START+END. 없으면(구버전 단일 패널) 생성 불가 — 러프 재생성 유도.
     const frames = (shot.rough_storyboard as { frames?: { start?: string; end?: string } } | null)
       ?.frames
     if (!frames?.start || !frames?.end) {
       return NextResponse.json(
-        { error: 'rough storyboard frames missing — generate the rough storyboard in the writer tab first' },
+        { error: 'Rough storyboard frames are missing. Generate the rough storyboard in the Writer tab first' },
         { status: 422 },
       )
     }

@@ -413,7 +413,7 @@ export function RoughStoryboardView() {
             toast.info(
               translate(
                 locale,
-                'Still finishing the previous generation for {count} panels — try again in a moment.',
+                'Still finishing the previous generation for {count} panels. Try again in a moment.',
                 { count: blocked.length },
               ),
             )
@@ -626,7 +626,7 @@ export function RoughStoryboardView() {
   // 제목 아래 설명문은 제거(#c2 2026-07-14) — 카드 사용법은 첫 진입 브리핑 채팅이 안내한다.
   // 트리트먼트·대사 탭과 같은 자리의 도움말(#c4 2026-08-03) — 헤더 아래 한 줄.
   const headerDescription = t(
-    'Rough storyboard — click a card to review, edit, or regenerate; click a scene name to collapse it',
+    'Rough storyboard: click a card to review, edit, or regenerate; click a scene name to collapse it',
   )
   const storyboardActions = hasShots ? (
     <>
@@ -1160,7 +1160,7 @@ export function RoughStoryboardView() {
                               title={shot.roughStoryboard.adherence.reason ?? undefined}
                             >
                               <AlertCircle className="size-3.5 shrink-0" />
-                              {t('The image may not match the description — click the card to try regenerating')}
+                              {t('The image may not match the description. Click the card to try regenerating')}
                             </p>
                           ) : null}
                         </div>

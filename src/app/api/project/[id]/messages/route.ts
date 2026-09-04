@@ -51,7 +51,7 @@ export async function POST(
     const { stage, role, content } = await req.json()
 
     if (!stage || !role || !content) {
-      return NextResponse.json({ error: 'stage, role, content are required' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request: stage, role, content are required' }, { status: 400 })
     }
 
     await supabaseAdmin

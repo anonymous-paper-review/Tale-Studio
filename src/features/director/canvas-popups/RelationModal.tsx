@@ -66,7 +66,7 @@ export function RelationModal() {
               rows={2}
               value={relationText}
               onChange={(e) => setRelationText(e.target.value)}
-              placeholder={t('e.g. continuous action from Shot A / a different POV of the same character')}
+              placeholder={t('E.g. continuous action from Shot A / a different POV of the same character')}
               autoFocus
             />
           </HoverBeam>

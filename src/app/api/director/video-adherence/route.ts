@@ -36,7 +36,7 @@ export async function POST(req: Request) {
     const user = await getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const parsed = BodySchema.safeParse(await req.json())
-    if (!parsed.success) return NextResponse.json({ error: 'invalid body' }, { status: 400 })
+    if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
     if (!ADHERENCE_MOTION_ENABLED) return NextResponse.json({ status: 'skipped', reason: 'disabled' })
     const { projectId, writerShotId, videoClipId, firstFrame, lastFrame } = parsed.data
     if (!(await userOwnsProject(projectId, user.id))) {
@@ -55,7 +55,7 @@ export async function POST(req: Request) {
       .eq('project_id', projectId)
       .maybeSingle()
     if (!clip || clip.shot_id !== writerShotId) {
-      return NextResponse.json({ error: 'clip does not belong to shot' }, { status: 400 })
+      return NextResponse.json({ error: 'Clip does not belong to shot' }, { status: 400 })
     }
 
     // 모션 기대치: shots.dynamic_spec 우선 → 구버전은 state.shotDesign 폴백(#motion-contract 와 동일)

@@ -315,10 +315,10 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           title={[data.adherence.reason, data.adherence.observed].filter(Boolean).join(' / ')}
         >
           ⚠ {data.adherence.status === 'over_motion'
-            ? t('Static contract violated — the camera moved')
+            ? t('Static contract violated: the camera moved')
             : data.adherence.status === 'under_motion'
-              ? t("Not enough motion — the designed big movement isn't visible")
-              : t('Direction mismatch — moved differently from the arrow')}
+              ? t("Not enough motion: the designed big movement isn't visible")
+              : t('Direction mismatch: moved differently from the arrow')}
         </p>
       )}
       {finalError && <p className="mt-1 text-[10px] text-destructive">{finalError}</p>}

@@ -1477,7 +1477,7 @@ export function scheduleServerSave(
           toast.error(
             translate(
               useLocaleStore.getState().locale,
-              "Couldn't save your edits to the server — the project may have been deleted or the session may have expired. Refresh to restore your most recent project.",
+              "Couldn't save your edits to the server. The project may have been deleted or the session may have expired. Refresh to restore your most recent project.",
             ),
           )
         }

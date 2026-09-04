@@ -42,18 +42,18 @@ export async function POST(req: Request) {
 
     if (!projectId || !locationId || !column || !prompt) {
       return NextResponse.json(
-        { error: 'projectId, locationId, column, prompt required' },
+        { error: 'Invalid request: projectId, locationId, column, prompt required' },
         { status: 400 },
       )
     }
     if (traceId !== undefined && !isChatTraceId(traceId)) {
-      return NextResponse.json({ error: 'traceId must be a UUID' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request: traceId must be a UUID' }, { status: 400 })
     }
     // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
     const access = await requireProjectAccess(req, projectId)
     if (!access.ok) return access.response
     if (traceId && !(await chatTraceBelongsToProject(projectId, traceId))) {
-      return NextResponse.json({ error: 'traceId does not belong to project' }, { status: 409 })
+      return NextResponse.json({ error: 'Invalid request: traceId does not belong to project' }, { status: 409 })
     }
 
     // 멀티유저 동시성 게이트: 유저 상한 + 전역 fal 슬롯(#global-semaphore). 둘 중 하나라도 차면 429.
@@ -63,7 +63,7 @@ export async function POST(req: Request) {
     // 클라이언트 진입점 귀속 — 'chat'(글로벌 채팅 updates)만 구분, 그 외는 전부 'ui'.
     const jobActor: GenerationJobActor = actor === 'chat' ? 'chat' : 'ui'
     if (!VALID_COLUMNS.has(column)) {
-      return NextResponse.json({ error: `invalid column: ${column}` }, { status: 400 })
+      return NextResponse.json({ error: `Invalid column: ${column}` }, { status: 400 })
     }
 
     // give-up 게이트: 자율 first-fill(actor='auto')은 같은 슬롯 실패가 임계값 이상이면 멈춘다
@@ -86,7 +86,7 @@ export async function POST(req: Request) {
       .select('workspace_id, style_anchor_key, custom_style_anchor')
       .eq('id', projectId)
       .maybeSingle()
-    if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404 })
+    if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     const anchor = await resolveStyleAnchor(project)
 
     const job = await submitWorldShotJob({

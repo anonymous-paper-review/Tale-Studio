@@ -58,24 +58,24 @@ export async function POST(req: Request) {
     // #image-model-select: 화이트리스트 밖 모델명은 400 — 임의 fal 경로 주입 방지.
     //   실제 엔드포인트는 reference 유무가 정해지는 submit 시점에 고른다(#registry-merge).
     if (imageModel !== undefined && !isImageModelKey(imageModel)) {
-      return NextResponse.json({ error: 'unknown imageModel' }, { status: 400 })
+      return NextResponse.json({ error: 'Unknown imageModel' }, { status: 400 })
     }
     const requestedModelKey = imageModel !== undefined ? normalizeImageModelKey(imageModel) : null
 
     if (!projectId || !writerShotId || !prompt) {
       return NextResponse.json(
-        { error: 'projectId, writerShotId, prompt required' },
+        { error: 'Invalid request: projectId, writerShotId, prompt required' },
         { status: 400 },
       )
     }
     if (traceId !== undefined && !isChatTraceId(traceId)) {
-      return NextResponse.json({ error: 'traceId must be a UUID' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request: traceId must be a UUID' }, { status: 400 })
     }
     // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
     const access = await requireProjectAccess(req, projectId)
     if (!access.ok) return access.response
     if (traceId && !(await chatTraceBelongsToProject(projectId, traceId))) {
-      return NextResponse.json({ error: 'traceId does not belong to project' }, { status: 409 })
+      return NextResponse.json({ error: 'Invalid request: traceId does not belong to project' }, { status: 409 })
     }
 
     // 멀티유저 동시성 게이트: 유저 상한 + 전역 fal 슬롯(#global-semaphore). 둘 중 하나라도 차면 429.
@@ -95,7 +95,7 @@ export async function POST(req: Request) {
         .eq('shot_id', writerShotId)
         .maybeSingle(),
     ])
-    if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404 })
+    if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     const anchor = await resolveStyleAnchor(project)
     // #fal-canvas(2026-08-17): 프로듀서 포맷이 화면비의 진실 — 클라 aspectRatio 는 포맷 미상
     //   구 프로젝트의 폴백일 뿐이다 (director-store 가 '16:9'를 하드코딩하던 결함의 교정).
@@ -184,7 +184,7 @@ export async function POST(req: Request) {
     if (shot && !stripFrames) {
       return NextResponse.json(
         {
-          error: `Rough storyboard frames are missing for shot ${writerShotId} — generate the rough storyboard first.`,
+          error: `Rough storyboard frames are missing for shot ${writerShotId}. Generate the rough storyboard first.`,
           code: 'missing_rough_storyboard',
           shotId: writerShotId,
         },

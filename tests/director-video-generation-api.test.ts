@@ -552,7 +552,7 @@ describe('reserved replay recovery', () => {
 
     expect(response.status).toBe(409)
     await expect(response.json()).resolves.toEqual({
-      error: 'idempotencyKey replay does not match the reserved video input',
+      error: 'Invalid request: idempotencyKey replay does not match the reserved video input',
     })
     expect(mocks.submit).not.toHaveBeenCalled()
   })
@@ -593,7 +593,7 @@ describe('reserved replay recovery', () => {
     const response = await POST(request({ prompt: 'Changed scene' }))
     expect(response.status).toBe(409)
     await expect(response.json()).resolves.toEqual({
-      error: 'idempotencyKey replay does not match the reserved video input',
+      error: 'Invalid request: idempotencyKey replay does not match the reserved video input',
     })
     expect(mocks.submit).not.toHaveBeenCalled()
   })
@@ -690,7 +690,7 @@ describe('reserved replay recovery', () => {
 
     expect(response.status).toBe(409)
     await expect(response.json()).resolves.toEqual({
-      error: 'idempotencyKey is already reserved for a different video operation',
+      error: 'Invalid request: idempotencyKey is already reserved for a different video operation',
     })
     expect(mocks.submit).not.toHaveBeenCalled()
     expect(mocks.attach).not.toHaveBeenCalled()

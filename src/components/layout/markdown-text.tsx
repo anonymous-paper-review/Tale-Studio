@@ -5,14 +5,17 @@ import { renderInlineMarkdown } from '@/lib/inline-markdown'
 export function MarkdownText({
   text,
   className,
+  polish = true,
 }: {
   text: string
   className?: string
+  /** false = 사용자가 쓴 글(대시·단계 이름 후처리를 하지 않는다). 기본은 AI 답변용 후처리. */
+  polish?: boolean
 }) {
   return (
     <span
       className={className}
-      dangerouslySetInnerHTML={{ __html: renderInlineMarkdown(text ?? '') }}
+      dangerouslySetInnerHTML={{ __html: renderInlineMarkdown(text ?? '', { polish }) }}
     />
   )
 }

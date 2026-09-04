@@ -20,10 +20,10 @@ export async function POST(req: NextRequest) {
     }
     const { projectId, action, feedback } = body
     if (!projectId || (action !== 'confirm' && action !== 'revise')) {
-      return NextResponse.json({ error: 'projectId, action(confirm|revise) required' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request: projectId, action(confirm|revise) required' }, { status: 400 })
     }
     if (action === 'revise' && !feedback?.trim()) {
-      return NextResponse.json({ error: 'feedback is required for a revision request' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request: feedback is required for a revision request' }, { status: 400 })
     }
 
     // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
     const run = await getActiveRun(access.projectId)
     if (!run || run.status !== 'awaiting_confirmation') {
-      return NextResponse.json({ error: 'no awaiting run', status: run?.status ?? null }, { status: 409 })
+      return NextResponse.json({ error: 'No awaiting run', status: run?.status ?? null }, { status: 409 })
     }
 
     const state = { ...(run.state as WriterRunState) }
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
       .select('id')
     if (error) throw new Error(error.message)
     if (!data?.length) {
-      return NextResponse.json({ error: 'gate already resolved' }, { status: 409 })
+      return NextResponse.json({ error: 'Gate already resolved' }, { status: 409 })
     }
 
     after(async () => {

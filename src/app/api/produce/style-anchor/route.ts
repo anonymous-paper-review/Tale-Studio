@@ -37,7 +37,7 @@ export async function POST(req: Request) {
     const { projectId, imageUrl, label, medium } = body as Record<string, unknown>
 
     if (typeof projectId !== 'string' || !projectId) {
-      return NextResponse.json({ error: 'projectId is required' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request: projectId is required' }, { status: 400 })
     }
     if (!(await userOwnsProject(projectId, user.id))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

@@ -216,7 +216,7 @@ function confirmUnknownExportSize(t: ReturnType<typeof useT>): boolean {
     return true
   }
 
-  return window.confirm(t('Could not estimate size — continue anyway?'))
+  return window.confirm(t('Could not estimate size. Continue anyway?'))
 }
 
 function formatBytes(bytes: number): string {

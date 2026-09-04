@@ -59,11 +59,11 @@ export function prerequisiteLabel(body: PrerequisiteBody & { code: PrerequisiteC
   const locale = useLocaleStore.getState().locale
   switch (body.code) {
     case 'missing_character_sheets':
-      return translate(locale, 'character sheets for {names}', { names: missingNames(body) || '?' })
+      return translate(locale, 'character sheets for {names}', { names: missingNames(body) || '?' }) // copy-ok: fragment
     case 'missing_rough_storyboard':
-      return translate(locale, 'the rough storyboard of {shot}', { shot: body.shotId ?? '?' })
+      return translate(locale, 'the rough storyboard of {shot}', { shot: body.shotId ?? '?' }) // copy-ok: fragment
     case 'missing_storyboard':
-      return translate(locale, 'the live-action storyboard of {shot}', { shot: body.shotId ?? '?' })
+      return translate(locale, 'the live-action storyboard of {shot}', { shot: body.shotId ?? '?' }) // copy-ok: fragment
   }
 }
 
@@ -83,7 +83,7 @@ export function notifyPrerequisiteWaiting(stage: StageId, body: PrerequisiteBody
 
 export function notifyPrerequisiteResumed(body: PrerequisiteBody & { code: PrerequisiteCode }): void {
   const locale = useLocaleStore.getState().locale
-  toast.success(translate(locale, '{what} ready — resuming generation.', { what: prerequisiteLabel(body) }), { id: TOAST_ID })
+  toast.success(translate(locale, '{what} ready. Resuming generation.', { what: prerequisiteLabel(body) }), { id: TOAST_ID })
 }
 
 export function notifyPrerequisiteTimeout(stage: StageId, body: PrerequisiteBody & { code: PrerequisiteCode }): void {

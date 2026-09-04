@@ -160,13 +160,13 @@ export async function POST(req: Request) {
 
     if (!prompt || typeof prompt !== 'string') {
       return NextResponse.json(
-        { error: 'prompt is required' },
+        { error: 'Invalid request: prompt is required' },
         { status: 400 },
       )
     }
     if (imageModel !== undefined && !isImageModelKey(imageModel)) {
       return NextResponse.json(
-        { error: 'imageModel is invalid' },
+        { error: 'Invalid request: imageModel is invalid' },
         { status: 400 },
       )
     }

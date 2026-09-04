@@ -655,7 +655,7 @@ export default function HomePage() {
           <Input
             value={nameValue}
             onChange={(e) => setNameValue(e.target.value)}
-            placeholder="e.g. a rainy night in the city"
+            placeholder="E.g. a rainy night in the city"
             autoFocus
             maxLength={120}
             onKeyDown={(e) => {

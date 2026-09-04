@@ -64,7 +64,7 @@ export async function POST(req: Request) {
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json(
-        { error: 'message is required' },
+        { error: 'Invalid request: message is required' },
         { status: 400 },
       )
     }

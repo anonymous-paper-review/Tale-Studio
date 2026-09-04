@@ -33,7 +33,7 @@ function isCanvasPosition(value: unknown): value is { x: number; y: number } {
 
 export async function GET(req: Request) {
   const projectId = new URL(req.url).searchParams.get('projectId')
-  if (!projectId) return NextResponse.json({ error: 'projectId is required' }, { status: 400 })
+  if (!projectId) return NextResponse.json({ error: 'Invalid request: projectId is required' }, { status: 400 })
 
   const user = await getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -72,7 +72,7 @@ export async function POST(req: Request) {
       || !body.projectId
       || !isCanvasPosition(body.canvasPosition)
     ) {
-      return NextResponse.json({ error: 'projectId and finite canvasPosition {x, y} are required' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request: projectId and finite canvasPosition {x, y} are required' }, { status: 400 })
     }
     if (!(await userOwnsProject(body.projectId, user.id))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

@@ -7,12 +7,12 @@ export async function PATCH(req: Request) {
     const { projectId, shotId, speed } = await req.json()
 
     if (!shotId) {
-      return NextResponse.json({ error: 'shotId is required' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request: shotId is required' }, { status: 400 })
     }
 
     if (typeof speed !== 'number' || speed < 0.25 || speed > 4.0) {
       return NextResponse.json(
-        { error: 'speed must be a number between 0.25 and 4.0' },
+        { error: 'Invalid request: speed must be a number between 0.25 and 4.0' },
         { status: 400 },
       )
     }

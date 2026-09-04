@@ -164,7 +164,7 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, Props>(
         {showList && (
           <div className="absolute bottom-full left-0 z-popover mb-1 max-h-72 w-full overflow-y-auto rounded-md border border-border bg-popover p-1 shadow-md">
             <div className="px-2 py-1 text-[10px] text-muted-foreground">
-              {t('Card/object mentions — ↑↓ to move, Enter to select')}
+              {t('Card/object mentions: ↑↓ to move, Enter to select')}
             </div>
             {filtered.map((it, i) => (
               <button

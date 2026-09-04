@@ -43,14 +43,14 @@ describe('C3 — 전체 재생성 경로가 존재한다', () => {
 
 describe('C3 — 막힐 때 이유를 말한다', () => {
   it('생성 중 disabled 상태에 사유 툴팁이 붙는다', () => {
-    expect(page).toContain('Generation in progress — you can start again when it finishes.')
+    expect(page).toContain('Generation in progress. You can start again when it finishes.')
   })
 
   it('안내 문구가 한국어 사전에 있다', () => {
     for (const key of [
       'Regenerate every storyboard image?',
       'Regenerate all',
-      'Generation in progress — you can start again when it finishes.',
+      'Generation in progress. You can start again when it finishes.',
     ]) {
       expect(ko[key], `missing ko: ${key}`).toBeTruthy()
     }

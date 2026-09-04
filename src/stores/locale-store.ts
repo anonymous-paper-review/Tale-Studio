@@ -58,7 +58,7 @@ export const useLocaleStore = create<LocaleState>()(
           toast.error(
             translate(
               l,
-              "Couldn't save your language setting — new projects may not follow it. Please try again.",
+              "Couldn't save your language setting, so new projects may not follow it. Please try again.",
             ),
           )
         }

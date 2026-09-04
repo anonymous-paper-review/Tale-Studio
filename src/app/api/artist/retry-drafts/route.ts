@@ -38,13 +38,13 @@ export async function POST(req: Request) {
     try {
       rawBody = await req.json()
     } catch {
-      return NextResponse.json({ error: 'invalid body' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
     }
 
     const parsed = BodySchema.safeParse(rawBody)
     if (!parsed.success) {
       return NextResponse.json(
-        { error: 'invalid body', issues: parsed.error.issues },
+        { error: 'Invalid body', issues: parsed.error.issues },
         { status: 400 },
       )
     }
@@ -64,7 +64,7 @@ export async function POST(req: Request) {
     if (queuedDrafts > 0) {
       return NextResponse.json(
         {
-          error: 'draft image generation already queued',
+          error: 'Draft image generation already queued',
           code: 'drafts_already_queued',
           queued_count: queuedDrafts,
         },

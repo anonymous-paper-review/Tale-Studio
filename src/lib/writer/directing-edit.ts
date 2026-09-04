@@ -70,7 +70,7 @@ export async function separateArrowLayer(
   const rb = await loadRough(projectId, shotId)
   if (rb?.status !== 'completed' || !rb.frames?.direction) {
     throw new Error(
-      translate(locale, 'The DIRECTING frame is missing — you need the 3-frame rough set first'),
+      translate(locale, 'The DIRECTING frame is missing. You need the 3-frame rough set first'),
     )
   }
   const genAt = rb.generatedAt ?? 0
@@ -168,7 +168,7 @@ export async function regenerateEndFrame(
   //   오염시키는 것을 막는다(separateArrowLayer 와 같은 방어).
   const latest = await loadRough(projectId, shotId)
   if (!latest || (latest.generatedAt ?? 0) !== (rb.generatedAt ?? 0)) {
-    throw new Error(translate(locale, 'The rough set was regenerated in the meantime — please try again'))
+    throw new Error(translate(locale, 'The rough set was regenerated in the meantime. Please try again'))
   }
   const now = Date.now()
   const { error } = await supabaseAdmin
@@ -197,7 +197,7 @@ export async function saveDirectingFrame(
 ): Promise<{ url: string; generatedAt: number }> {
   const rb = await loadRough(projectId, shotId)
   if (rb?.status !== 'completed' || !rb.frames?.direction) {
-    throw new Error(translate(locale, "The DIRECTING frame is missing — there's nothing to save"))
+    throw new Error(translate(locale, "The DIRECTING frame is missing, so there's nothing to save"))
   }
   const m = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(imageDataUrl)
   if (!m) throw new Error(translate(locale, "This isn't a PNG data URL"))

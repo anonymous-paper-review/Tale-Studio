@@ -95,8 +95,8 @@ export const STAGE_FACE_COLOR: Record<StageId, string> = {
 // 값은 영어 원문 = i18n 키(#i18n-s5-batch4). 렌더 지점(global-chat.tsx)이 t() 로 번역한다.
 export const STAGE_PLACEHOLDER: Record<StageId, string> = {
   producer: 'Tell us about your story…',
-  writer: 'e.g. make scene 2 shot 3 darker',
-  artist: 'e.g. create a character named Kai with brown hair',
+  writer: 'E.g. make scene 2 shot 3 darker',
+  artist: 'E.g. create a character named Kai with brown hair',
   director: 'Try generating the rough storyboard into shooting-ready images.',
   editor: "Chat isn't available at this stage yet.",
 }
@@ -157,7 +157,7 @@ export const STAGE_PROMPT_PRESETS: Record<StageId, readonly string[]> = {
     'Make the overall mood darker',
   ],
   artist: [
-    "Create a character — I'll tell you the name and appearance",
+    "Create a character. I'll tell you the name and appearance",
     'Fill in the empty character views',
     'Regenerate the background image',
   ],

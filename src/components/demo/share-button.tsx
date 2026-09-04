@@ -27,7 +27,7 @@ export function ShareButton() {
       const { path } = (await res.json()) as { path: string }
       const url = `${window.location.origin}${path}`
       await navigator.clipboard.writeText(url).catch(() => {})
-      toast.success(t('Share link copied — a read-only preview that opens without logging in'))
+      toast.success(t('Share link copied. It opens a read-only preview without logging in'))
     } catch {
       toast.error(t('Failed to create share link'))
     } finally {

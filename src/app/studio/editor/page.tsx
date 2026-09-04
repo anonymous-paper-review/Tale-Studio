@@ -149,7 +149,7 @@ export default function PostPage() {
     renderAbortRef.current = ctrl
     setRenderLabel(t('Preparing clips…'))
     toast.info(
-      t('Draft render records in real time — keep this tab visible until it finishes.'),
+      t('Draft render records in real time. Keep this tab visible until it finishes.'),
     )
     try {
       const base = (projectTitle || 'draft').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 60)
@@ -172,7 +172,7 @@ export default function PostPage() {
         },
       })
       toast.success(
-        t('Draft video saved — {seconds}s, {size}MB.', {
+        t('Draft video saved: {seconds}s, {size}MB.', {
           seconds: Math.round(stats.durationSec),
           size: (stats.bytes / (1024 * 1024)).toFixed(1),
         }),
@@ -209,7 +209,7 @@ export default function PostPage() {
       .map((item) => st.videoClips.find((c) => c.shotId === item.shotId)?.url)
       .filter((u): u is string => !!u)
     if (urls.length === 0) {
-      toast.info(t('No videos on the timeline yet — generate videos in Director first.'))
+      toast.info(t('No videos on the timeline yet. Generate videos in Director first.'))
       return
     }
     setPrefetching({ done: 0, total: urls.length })
@@ -219,7 +219,7 @@ export default function PostPage() {
       )
       if (r.failed > 0) {
         toast.warning(
-          t('{failed} of {total} clips could not be preloaded — they will stream as before.', {
+          t('{failed} of {total} clips could not be preloaded. They will stream as before.', {
             failed: r.failed,
             total: r.total,
           }),
@@ -657,7 +657,7 @@ export default function PostPage() {
                     toast.info(t('No shot videos to download. (Generate videos first)'))
                   } else if (r.failed > 0) {
                     toast.warning(
-                      t('{downloaded}/{total} ZIP complete — {failed} failed (see _failed.txt inside the zip).', {
+                      t('{downloaded}/{total} ZIP complete, {failed} failed (see _failed.txt inside the zip).', {
                         downloaded: r.downloaded,
                         total: r.total,
                         failed: r.failed,

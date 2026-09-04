@@ -311,7 +311,7 @@ export function ScriptView() {
   const header = (
     <WriterHeader
       description={t(
-        'Treatment viewer — click a line to request an edit directly in chat (click again to release)',
+        'Treatment viewer: click a line to request an edit directly in chat (click again to release)',
       )}
     />
   )

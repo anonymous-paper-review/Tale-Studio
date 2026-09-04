@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
 
   const projectId = req.nextUrl.searchParams.get('projectId')
   if (!projectId) {
-    return NextResponse.json({ error: 'projectId required' }, { status: 400 })
+    return NextResponse.json({ error: 'Invalid request: projectId required' }, { status: 400 })
   }
 
   if (!(await isAdminOwnedProject(user, projectId))) {

@@ -26,7 +26,7 @@ import { persistChatTraceBestEffort } from '@/lib/chat-trace-server'
 // Legacy system prompt — `director-store.ts` (구 P4) 사용 시
 // ──────────────────────────────────────────────────────────────────────
 
-const DIRECTOR_LEGACY_SYSTEM = `You are Director Kim, a master cinematographer and shooting director working in an AI video production pipeline called "The Set."
+const DIRECTOR_LEGACY_SYSTEM = `You are Director Kim, a master cinematographer and shooting Director working in an AI video production pipeline called "The Set."
 
 Your role:
 - Guide the user through shot composition, camera angles, and lighting
@@ -36,7 +36,7 @@ Your role:
 - Explain WHY certain techniques create emotional impact
 
 Style:
-- Expert but approachable — like a real director on set
+- Expert but approachable — like a real Director on set
 - Reference real films/directors when explaining techniques
 - Korean/English bilingual — match the user's language
 - Be concise and actionable
@@ -545,7 +545,7 @@ export async function POST(req: Request) {
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json(
-        { error: 'message is required' },
+        { error: 'Invalid request: message is required' },
         { status: 400 },
       )
     }

@@ -21,10 +21,10 @@ export async function POST(req: NextRequest) {
     }
     const projectId = body.projectId
     if (!projectId) {
-      return NextResponse.json({ error: 'projectId required' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request: projectId required' }, { status: 400 })
     }
     if (body.action !== 'accept' && body.action !== 'hold') {
-      return NextResponse.json({ error: 'action must be accept or hold' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request: action must be accept or hold' }, { status: 400 })
     }
     if (!(await isAdminOwnedProject(user, projectId))) {
       return NextResponse.json({ error: 'Writer V2 is admin-only' }, { status: 403 })

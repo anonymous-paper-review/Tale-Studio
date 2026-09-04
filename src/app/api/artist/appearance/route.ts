@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     }
     const { projectId, characterId } = body
     if (!projectId || !characterId) {
-      return NextResponse.json({ error: 'projectId, characterId required' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request: projectId, characterId required' }, { status: 400 })
     }
 
     const access = await requireProjectAccess(req, projectId)
@@ -56,10 +56,10 @@ export async function POST(req: Request) {
       (personAppearances.data.length === 1 &&
         (!person.data || person.data.entity_type !== 'person' || prop.data))
     ) {
-      return NextResponse.json({ error: 'ambiguous character entity' }, { status: 409 })
+      return NextResponse.json({ error: 'Ambiguous character entity' }, { status: 409 })
     }
     if (personAppearances.data.length === 0 && !prop.data) {
-      return NextResponse.json({ error: 'character not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Character not found' }, { status: 404 })
     }
 
     const i18n = await appearanceI18nFields(characterId, result.appearance)

@@ -87,7 +87,7 @@ describe('writer rerun consent', () => {
     // D11: 제안 순간 발화는 안내 문장 — "승인 전에는 실행 없음"만 덩그러니 남지 않는다.
     const proposalReply = useGlobalChatStore.getState().messages.at(-1)
     expect(proposalReply?.role).toBe('model')
-    expect(proposalReply?.content).toContain('approve the card below')
+    expect(proposalReply?.content).toContain('Approve the card below')
     // 채팅 메시지 영속화는 fetch를 쓴다 — 승인 전 금지 대상은 Writer 시작 API뿐이다.
     expect(
       fetchSpy.mock.calls.filter(([url]) => url === '/api/writer/start'),

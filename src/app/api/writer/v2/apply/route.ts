@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as { projectId?: string }
     const projectId = body.projectId
     if (!projectId) {
-      return NextResponse.json({ error: 'projectId required' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request: projectId required' }, { status: 400 })
     }
     if (!(await isAdminOwnedProject(user, projectId))) {
       return NextResponse.json({ error: 'Writer V2 is admin-only' }, { status: 403 })

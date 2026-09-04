@@ -177,8 +177,8 @@ describe('collectDirectorArtifacts', () => {
     expect(files.some((file) => file.path === 'director/shots/sc_02-sh_02_01.png')).toBe(false)
 
     const shotlist = textFile(files, 'director/shotlist.md')
-    expect(shotlist).toContain('생성 중 (generating) — 미포함')
-    expect(shotlist).toContain('실패 (failed): moderation blocked — 미포함')
+    expect(shotlist).toContain('생성 중 (generating) (미포함)')
+    expect(shotlist).toContain('실패 (failed): moderation blocked (미포함)')
     expect(shotlist).not.toContain('https://cdn.example.com/storyboards/stale-generating.png')
     expect(shotlist).not.toContain('https://cdn.example.com/storyboards/stale-failed.png')
   })
@@ -197,7 +197,7 @@ describe('collectDirectorArtifacts', () => {
       'https://cdn.example.com/shots/sh_02_02-final.mp4',
     )
 
-    expect(textFile(files, 'director/shotlist.md')).toContain('생성 중/최종 없음 — 미포함')
+    expect(textFile(files, 'director/shotlist.md')).toContain('생성 중이거나 최종본이 없어 미포함')
     expect(files.filter((file) => file.path.startsWith('director/clips/'))).toHaveLength(3)
     expect(files.some((file) => file.url === 'https://cdn.example.com/shots/stale-projection.mp4')).toBe(false)
   })

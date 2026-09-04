@@ -228,7 +228,7 @@ function ShotCell({
         throw new Error(`HTTP ${res.status}`)
       }
       refreshGenerationQueue() // 다음 폴링 틱을 기다리지 않고 카드 오버레이를 켠다(#f10)
-      toast.success(t('Previz regeneration started — this card updates when the new frames land.'))
+      toast.success(t('Previz regeneration started. This card updates when the new frames land.'))
     } catch (e) {
       toast.error(
         t('Failed to start previz regeneration: {message}', {
@@ -300,7 +300,7 @@ function ShotCell({
 
   const runImage = async () => {
     if (realBatchBusy) {
-      setVideoError(t('Batch live-action generation is running — try again after it finishes.'))
+      setVideoError(t('Batch live-action generation is running. Try again after it finishes.'))
       return
     }
     try {
@@ -313,7 +313,7 @@ function ShotCell({
   const runVideo = async () => {
     if (videoBusy) return
     if (realBatchBusy) {
-      setVideoError(t('Batch live-action generation is running — try again after it finishes.'))
+      setVideoError(t('Batch live-action generation is running. Try again after it finishes.'))
       return
     }
     setVideoBusy(true)
@@ -374,8 +374,8 @@ function ShotCell({
             key: 'previz-arrows',
             label: t('Edit directing'),
             title: writerShotId
-              ? t('Directing arrow editor — the same popup as the writer tab card')
-              : t("This node isn't linked to a writer shot"),
+              ? t('Directing arrow editor, the same popup as the Writer tab card')
+              : t("This node isn't linked to a Writer shot"),
             primary: false,
             disabled: !writerShotId,
             onClick: () => setPrevizOpen(true),
@@ -384,8 +384,8 @@ function ShotCell({
             key: 'previz-regen',
             label: t('Regenerate previz'),
             title: writerShotId
-              ? t('Redraws this shot\'s rough 3-frame set with the writer pipeline')
-              : t("This node isn't linked to a writer shot"),
+              ? t('Redraws this shot\'s rough 3-frame set with the Writer pipeline')
+              : t("This node isn't linked to a Writer shot"),
             primary: true,
             disabled: !writerShotId || previzRegenBusy,
             onClick: () => {
@@ -413,7 +413,7 @@ function ShotCell({
           {
             key: 'video',
             label: completedVideoUrl ? t('Regenerate video') : t('Generate video'),
-            title: t('Generate video — creates the shooting image first if missing, then the video'),
+            title: t('Generate video: creates the shooting image first if missing, then the video'),
             primary: true,
             onClick: () => {
               if (completedVideoUrl) setConfirm('video')
@@ -633,7 +633,7 @@ function ShotCell({
         }
         impact={
           confirm === 'video'
-            ? [t('Costs money to generate the video.'), t('Adds a new take — the card shows the latest successful one.')]
+            ? [t('Costs money to generate the video.'), t('Adds a new take. The card shows the latest successful one.')]
             : confirm === 'previz'
               ? [t('Costs money to generate the previz.'), t('Replaces the existing rough frames with the new result.')]
               : [t('Costs money to generate the image.'), t('Replaces the existing shooting image with the new result.')]

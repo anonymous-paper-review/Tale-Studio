@@ -29,7 +29,7 @@ export async function GET(
 
     // path traversal 방지
     if (file.includes('..') || file.includes('/') || file.includes('\\')) {
-      return NextResponse.json({ error: 'invalid file path' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid file path' }, { status: 400 });
     }
 
     const filepath = path.join(dir, file);
@@ -45,6 +45,6 @@ export async function GET(
   } catch (e: unknown) {
     // 원문에는 서버 절대경로(ENOENT … '/Users/…/logs/…')가 실린다 — 서버 로그에만 남긴다.
     console.error('[writer/logs]', e instanceof Error ? e.message : e);
-    return NextResponse.json({ error: 'not found' }, { status: 404 });
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
 }

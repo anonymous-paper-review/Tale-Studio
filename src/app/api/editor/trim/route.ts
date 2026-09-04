@@ -11,7 +11,7 @@ export async function PATCH(req: Request) {
     const { projectId, shotId, trimStart, trimEnd } = await req.json()
 
     if (!shotId) {
-      return NextResponse.json({ error: 'shotId is required' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request: shotId is required' }, { status: 400 })
     }
 
     if (
@@ -23,7 +23,7 @@ export async function PATCH(req: Request) {
       trimEnd <= trimStart
     ) {
       return NextResponse.json(
-        { error: 'trimStart/trimEnd must be finite numbers with 0 <= trimStart < trimEnd' },
+        { error: 'Invalid request: trimStart/trimEnd must be finite numbers with 0 <= trimStart < trimEnd' },
         { status: 400 },
       )
     }

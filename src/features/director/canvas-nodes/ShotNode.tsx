@@ -145,7 +145,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             ) : (
               <ThumbImage
                 src={stageImageUrl}
-                alt="rough storyboard"
+                alt="Rough storyboard"
                 className="h-full w-full object-cover"
               />
             )}

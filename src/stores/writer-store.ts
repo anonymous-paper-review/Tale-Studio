@@ -331,7 +331,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
 
     if (error) {
       set({ shots: prevShots, error: error.message })
-      notifySaveError("Couldn't add the shot — the change was rolled back.", error.message)
+      notifySaveError("Couldn't add the shot. The change was rolled back.", error.message)
       return null
     }
     // 자리 확보: 신규 order 이상이던 기존 샷들을 +1 로 밀어 DB 반영(순서 무결성). insert 성공 후 실행 —
@@ -375,7 +375,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
 
     if (error) {
       set({ shots: prev, error: error.message })
-      notifySaveError("Couldn't delete the shot — it was restored.", error.message)
+      notifySaveError("Couldn't delete the shot. It was restored.", error.message)
       return
     }
     void invalidateShots(projectId)
@@ -471,7 +471,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           : state.sceneManifest,
         error: error.message,
       }))
-      notifySaveError("Couldn't add the scene — the change was rolled back.", error.message)
+      notifySaveError("Couldn't add the scene. The change was rolled back.", error.message)
       return null
     }
     if (shift) {
@@ -529,7 +529,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         shots: prevShots,
         error: (shotErr ?? sceneErr)?.message ?? 'Delete failed',
       })
-      notifySaveError("Couldn't delete the scene — it was restored.", (shotErr ?? sceneErr)?.message)
+      notifySaveError("Couldn't delete the scene. It was restored.", (shotErr ?? sceneErr)?.message)
       return
     }
     void invalidateShots(projectId)
@@ -571,7 +571,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
                   type: 'all',
                   reason: translate(
                     useLocaleStore.getState().locale,
-                    'Draft generation is in progress — you can edit once scene confirmation and generation finish',
+                    'Draft generation is in progress. You can edit once scene confirmation and generation finish',
                   ),
                 },
               ],

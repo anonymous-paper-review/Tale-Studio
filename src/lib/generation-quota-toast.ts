@@ -52,7 +52,7 @@ export function notifyQuotaExceeded(body: QuotaExceededBody | null | undefined):
     scope === 'global'
       ? translate(
           locale,
-          'All generation slots are busy right now. It will start automatically in a moment — please try again shortly.',
+          'All generation slots are busy right now. It will start automatically in a moment, so please try again shortly.',
         )
       : body?.category === 'video'
         ? translate(
@@ -119,7 +119,7 @@ export function isInsufficientTakes(
 export function notifyInsufficientTakes(body: InsufficientTakesBody | null | undefined): void {
   const locale = useLocaleStore.getState().locale
   toast.error(
-    translate(locale, 'Not enough Takes for this generation — you need {required}, you have {balance}.', {
+    translate(locale, 'Not enough Takes for this generation: you need {required}, you have {balance}.', {
       required: body?.required ?? 0,
       balance: body?.balance ?? 0,
     }),

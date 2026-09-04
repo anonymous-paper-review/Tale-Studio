@@ -206,7 +206,7 @@ export async function POST(req: Request) {
       traceId: requestedTraceId,
     } = await req.json()
     if (!message || typeof message !== 'string')
-      return NextResponse.json({ error: 'message is required' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request: message is required' }, { status: 400 })
 
     // 인물 id 정본 로스터(#F-003 R1) — DB 가 진실. 클라가 보내는 writerContext 의 로스터는
     //   프롬프트용 표시일 뿐 검증 근거가 아니다. 프롬프트("Never invent new IDs")는 보조 방어 —

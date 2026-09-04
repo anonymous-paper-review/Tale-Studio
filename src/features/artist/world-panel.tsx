@@ -130,7 +130,7 @@ export function WorldPanel({
                 {/* 배경 = 이미지 1장(#6·#9): establishing 셀 제거, wide 1컷만. 클릭 → 프롬프트/재생성 Dialog. */}
                 <button
                   type="button"
-                  title={t('Background — click to view/regenerate the prompt')}
+                  title={t('Background: click to view or regenerate the prompt')}
                   onClick={(e) => {
                     e.stopPropagation()
                     setViewDialog({ locationId: world.locationId, shot: 'wideShot' })

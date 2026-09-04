@@ -38,7 +38,7 @@ export async function sendSceneGate(
       toast.success(translate(locale, 'Applying your feedback and rewriting the scene story…'))
     else
       toast.success(
-        translate(locale, 'Scenes confirmed — starting character, visual, and shot design'),
+        translate(locale, 'Scenes confirmed. Starting character, visual, and shot design'),
       )
     return true
   } catch (e) {

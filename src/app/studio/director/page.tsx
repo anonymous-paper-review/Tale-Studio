@@ -844,7 +844,7 @@ function PaletteBar({
           type="button"
           title={
             isGenerating || realBatchBusy
-              ? t('Generation in progress — you can start again when it finishes.')
+              ? t('Generation in progress. You can start again when it finishes.')
               : t('Generate the rough storyboard into a real shooting-image storyboard in one go')
           }
           onClick={() => {
@@ -1020,7 +1020,7 @@ function PaletteBar({
         title={t('Regenerate every storyboard image?')}
         description={t('Redraws the shooting image for all {count} shots.', { count: totalShots })}
         impact={[
-          t('Costs money for every shot — {count} images.', { count: totalShots }),
+          t('Costs money for every shot: {count} images.', { count: totalShots }),
           t('Replaces the existing shooting images with the new results.'),
         ]}
         confirmLabel={t('Regenerate all')}
@@ -1038,7 +1038,7 @@ function PaletteBar({
           count: eligibleVideoCount,
         })}
         impact={[
-          t('Costs money for every generated video — {count} videos.', {
+          t('Costs money for every generated video: {count} videos.', {
             count: eligibleVideoCount,
           }),
           t('Only shots without a completed video or active generation will be included.'),
@@ -1138,13 +1138,13 @@ export default function DirectorCanvasPage() {
       content:
         viewMode === 'storyboard'
           ? t(
-              'This is the storyboard — see every shot image per scene at a glance.\n\n' +
+              'This is the storyboard. See every shot image per scene at a glance.\n\n' +
                 '· A card marked "Image generation needed" is still in rough stage\n' +
                 '· Press "Generate video" on a card to go from image to video in one go\n' +
                 '· Double-click a card to open detailed editing',
             )
           : t(
-              'This is The Set — where scenes → shots → videos connect as nodes.\n\n' +
+              'This is The Set, where scenes → shots → videos connect as nodes.\n\n' +
                 '· Double-click a card to open detailed editing\n' +
                 '· Select a shot card and an image-generation button appears above it\n' +
                 '· Use "Generate storyboard" at the top to turn every shot into a real image at once',

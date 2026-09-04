@@ -607,7 +607,7 @@ export function AddItemDialog({
                         {t('Appearing:')} {lockedShotSceneChars.join(', ') || t('None')}
                         <span className="text-muted-foreground/70">
                           {' '}
-                          {t('(inherited from the scene — adjustable after adding)')}
+                          {t('(inherited from the scene, adjustable after adding)')}
                         </span>
                       </p>
                     )}
@@ -621,7 +621,7 @@ export function AddItemDialog({
                           <Input
                             value={locationText}
                             onChange={(e) => setLocationText(e.target.value)}
-                            placeholder={t('e.g. a desolate rocky mountain')}
+                            placeholder={t('E.g. a desolate rocky mountain')}
                           />
                         </HoverBeam>
                       </div>
@@ -631,7 +631,7 @@ export function AddItemDialog({
                           <Input
                             value={timeText}
                             onChange={(e) => setTimeText(e.target.value)}
-                            placeholder={t('e.g. day, night, dusk')}
+                            placeholder={t('E.g. day, night, dusk')}
                           />
                         </HoverBeam>
                       </div>
@@ -643,7 +643,7 @@ export function AddItemDialog({
                         <Input
                           value={moodText}
                           onChange={(e) => setMoodText(e.target.value)}
-                          placeholder={t('e.g. tense, grim')}
+                          placeholder={t('E.g. tense, grim')}
                         />
                       </HoverBeam>
                     </div>

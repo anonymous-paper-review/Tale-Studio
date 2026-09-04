@@ -833,7 +833,7 @@ export function GlobalChat() {
         'writer',
         msg,
         t(
-          "I'm still building scenes and shots right now, so I can't take revision requests. Once the draft is ready, let me know — I'll apply it right away.",
+          "I'm still building scenes and shots right now, so I can't take revision requests. Once the draft is ready, let me know and I'll apply it right away.",
         ),
       )
       return
@@ -880,9 +880,9 @@ export function GlobalChat() {
           body: JSON.stringify({ projectId: pid, action: 'confirm' }),
         })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        toast.success(t('Scenes confirmed — starting character, visual, and shot design'))
+        toast.success(t('Scenes confirmed. Starting character, visual, and shot design'))
       } catch {
-        toast.error(t('Confirmation failed — try again from the gate panel in the writer screen'))
+        toast.error(t('Confirmation failed. Try again from the gate panel in the Writer screen'))
       }
       return
     }
@@ -986,7 +986,7 @@ export function GlobalChat() {
           }),
         )
         if (data.truncated) {
-          toast.warning(t('{name} exceeded the limit — the rest was cut off.', { name: file.name }))
+          toast.warning(t('{name} exceeded the limit, so the rest was cut off.', { name: file.name }))
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : t('Upload failed.')
@@ -1341,7 +1341,7 @@ export function GlobalChat() {
                               ))}
                             </div>
                           )}
-                          <MarkdownText text={text} />
+                          <MarkdownText text={text} polish={false} />
                           <CopyButton text={text} />
                         </div>
                       </div>
@@ -1772,9 +1772,9 @@ export function GlobalChat() {
                   choices && !choices.displayOnly
                     ? t('Answer using the choices above')
                     : sceneGateActive
-                      ? t('Type your changes — or press Enter as-is to confirm the scenes')
+                      ? t('Type your changes, or press Enter as-is to confirm the scenes')
                       : canSendAttachments
-                        ? t("Tell us how to use it — leave blank and we'll fold it into the story")
+                        ? t("Tell us how to use it, or leave it blank and we'll fold it into the story")
                         : t(STAGE_PLACEHOLDER[currentStage])
                 }
                 className={cn(
@@ -1801,7 +1801,7 @@ export function GlobalChat() {
                       className="rounded-full"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={loading || uploading}
-                      title={t('Attach a file — manuscript (txt·md·docx) or image (jpg·png·webp)')}
+                      title={t('Attach a file: manuscript (txt·md·docx) or image (jpg·png·webp)')}
                       aria-label={t('Attach file')}
                     >
                       <Plus className="size-4" />

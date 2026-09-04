@@ -243,7 +243,7 @@ export function DirectingArrowEditor({
       toast.success(
         j.data.cached
           ? t('Loaded the previously separated layer')
-          : t('Separated the arrow layer — scrape with the eraser to reveal the layer underneath'),
+          : t('Separated the arrow layer. Scrape with the eraser to reveal the layer underneath'),
       )
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t('Layer separation failed'))
@@ -292,7 +292,7 @@ export function DirectingArrowEditor({
         return
       }
       // 저장이 끝난 뒤(= 서버가 새 DIRECTING 을 갖고 있는 상태) END 를 그 그림 기준으로 다시 그린다.
-      toast.info(t('Redrawing the END frame — about 30 seconds'))
+      toast.info(t('Redrawing the END frame, about 30 seconds'))
       const endRes = await fetch('/api/writer/rough-directing-edit', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },

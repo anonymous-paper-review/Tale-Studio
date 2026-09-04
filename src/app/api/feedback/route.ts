@@ -12,7 +12,7 @@ export async function POST(req: Request): Promise<Response> {
     const subject = isContact ? '[TaleStudio] Contact 문의' : '[TaleStudio] 사용자 피드백'
 
     if (!message?.trim()) {
-      return NextResponse.json({ error: 'message required' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request: message required' }, { status: 400 })
     }
 
     let userEmail: string | null = null

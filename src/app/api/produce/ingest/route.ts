@@ -53,7 +53,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid project identifier' }, { status: 400 })
     }
     if (!(file instanceof File)) {
-      return NextResponse.json({ error: 'file is required' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request: file is required' }, { status: 400 })
     }
     if (!(await userOwnsProject(projectId, user.id))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -85,7 +85,7 @@ export async function POST(req: Request) {
       } catch (error) {
         console.warn('[produce/ingest] docx parse failed', diagnostic(error))
         return NextResponse.json(
-          { error: `Couldn't read ${file.name} — the file may be corrupted.` },
+          { error: `Couldn't read ${file.name}. The file may be corrupted.` },
           { status: 400 },
         )
       }

@@ -22,9 +22,29 @@ function stripSeparatorLines(input: string): string {
     .replace(/\n{3,}/g, '\n\n')
 }
 
+// 화면 표시 후처리(#copy-polish 2026-09-04, 약속 A4·A5·A7): AI 답변은 저장본을 고치지 않고 그릴 때 다듬는다 —
+//   그래야 과거 채팅에도 같은 규칙이 먹는다. 라이브러리 대신 우리 후처리기로 관리한다(오너 A7):
+//   기존 렌더러가 기울임·코드·@멘션은 살리고 굵게 마커만 걷는 식이라 범용 마크다운 제거기와 맞지 않는다.
+//   ① 긴 대시(—·–·―)를 지운다 — 숫자 범위는 하이픈, 줄머리는 하이픈 불릿, 줄끝은 삭제, 그 밖은 쉼표.
+//   ② 단계 고유명(writer·producer·artist·director·editor)이 낱말로 쓰이면 첫 글자를 대문자로 —
+//      식별자·경로·이메일·코드(`writer`, writer_runs, /studio/writer, writer@…)는 건드리지 않는다.
+const STAGE_WORD = /(^|[^A-Za-z0-9_./:=\-'"`@[])(writer|producer|artist|director)(?=$|[^A-Za-z0-9_./:=\-'"`@\]])/gm
+
+export function polishAssistantProse(input: string): string {
+  return (input ?? '')
+    .replace(/(\d)[ \t]*[–—―][ \t]*(?=\d)/g, '$1-')
+    .replace(/^[ \t]*[—–―]+[ \t]*(?=\S)/gm, '- ')
+    .replace(/[ \t]*[—–―]+[ \t]*$/gm, '')
+    .replace(/([,;:!?.])[ \t]*[—–―]+[ \t]*/g, '$1 ')
+    .replace(/[ \t]*[—–―]+[ \t]*/g, ', ')
+    .replace(STAGE_WORD, (_m, pre: string, word: string) => `${pre}${word[0].toUpperCase()}${word.slice(1)}`)
+}
+
 // escape된 안전한 문자열에 대해서만 inline 마크다운 변환을 적용한다.
-export function renderInlineMarkdown(input: string): string {
-  const escaped = escapeHtml(stripSeparatorLines(input ?? ''))
+//   polish=false 는 사용자 말풍선처럼 AI 답변이 아닌 글에 쓴다(사용자가 쓴 그대로 보여준다).
+export function renderInlineMarkdown(input: string, opts?: { polish?: boolean }): string {
+  const stripped = stripSeparatorLines(input ?? '')
+  const escaped = escapeHtml(opts?.polish === false ? stripped : polishAssistantProse(stripped))
   return (
     escaped
       // 줄머리 #/##/### 헤딩 마커 제거(#heading-strip 2026-08-31, 오너 실측) — 이 렌더러는

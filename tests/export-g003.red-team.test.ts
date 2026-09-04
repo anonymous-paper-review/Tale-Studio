@@ -198,10 +198,10 @@ describe('G003 director collector red-team coverage', () => {
     expect(mediaPaths(files)).not.toContain('director/shots/sc_storyboard-sh_completed_empty.png')
 
     const shotlist = textFile(files, 'director/shotlist.md')
-    expect(shotlist).toContain('생성 중 (generating) — 미포함')
-    expect(shotlist).toContain('실패 (failed): moderation blocked — 미포함')
-    expect(shotlist).toContain('이미지 없음 — 미포함')
-    expect(shotlist).toContain('완료 (completed), URL 없음 — 미포함')
+    expect(shotlist).toContain('생성 중 (generating) (미포함)')
+    expect(shotlist).toContain('실패 (failed): moderation blocked (미포함)')
+    expect(shotlist).toContain('이미지 없음 (미포함)')
+    expect(shotlist).toContain('완료 (completed), URL 없음 (미포함)')
     expect(shotlist).not.toContain('https://cdn.test/storyboards/stale-generating.png')
     expect(shotlist).not.toContain('https://cdn.test/storyboards/stale-failed.png')
   })
@@ -281,7 +281,7 @@ describe('G003 director collector red-team coverage', () => {
     )
 
     const shotlist = textFile(files, 'director/shotlist.md')
-    expect(shotlist).toContain('생성 중/최종 없음 — 미포함')
+    expect(shotlist).toContain('생성 중이거나 최종본이 없어 미포함')
     expect(shotlist).not.toContain('https://cdn.test/clips/pending.mp4')
     expect(shotlist).not.toContain('https://cdn.test/clips/failed.mp4')
   })

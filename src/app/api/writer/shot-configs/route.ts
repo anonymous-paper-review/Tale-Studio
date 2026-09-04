@@ -23,10 +23,10 @@ export async function POST(req: Request) {
   try {
     body = await req.json()
   } catch {
-    return NextResponse.json({ error: 'invalid json' }, { status: 400 })
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
   const parsed = BodySchema.safeParse(body)
-  if (!parsed.success) return NextResponse.json({ error: 'invalid body' }, { status: 400 })
+  if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
 
   // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
   const access = await requireProjectAccess(req, parsed.data.projectId)

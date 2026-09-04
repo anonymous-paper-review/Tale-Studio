@@ -28,7 +28,7 @@ export async function POST(req: Request) {
     const { projectId, characterId, name, role, entity_type, description, appearance } = body
     if (!projectId || !characterId || !name?.trim()) {
       return NextResponse.json(
-        { error: 'projectId, characterId, name required' },
+        { error: 'Invalid request: projectId, characterId, name required' },
         { status: 400 },
       )
     }
@@ -98,7 +98,7 @@ export async function PATCH(req: Request) {
     const { projectId, characterId, name, role, description, appearance } = body
     if (!projectId || !characterId) {
       return NextResponse.json(
-        { error: 'projectId, characterId required' },
+        { error: 'Invalid request: projectId, characterId required' },
         { status: 400 },
       )
     }
@@ -123,19 +123,19 @@ export async function PATCH(req: Request) {
     if (personResult.error) throw personResult.error
     if (propResult.error) throw propResult.error
     if (!personResult.data && !propResult.data) {
-      return NextResponse.json({ error: 'character not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Character not found' }, { status: 404 })
     }
     if (
       (personResult.data && personResult.data.entity_type !== 'person') ||
       (personResult.data && propResult.data)
     ) {
-      return NextResponse.json({ error: 'ambiguous character entity' }, { status: 409 })
+      return NextResponse.json({ error: 'Ambiguous character entity' }, { status: 409 })
     }
 
     const identityPatch: Record<string, unknown> = {}
     if (name !== undefined) {
       if (!name.trim()) {
-        return NextResponse.json({ error: 'name cannot be empty' }, { status: 400 })
+        return NextResponse.json({ error: 'Invalid request: name cannot be empty' }, { status: 400 })
       }
       identityPatch.name = name.trim()
     }

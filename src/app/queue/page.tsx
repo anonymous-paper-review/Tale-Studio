@@ -141,7 +141,7 @@ export default function QueuePage() {
       setNotice(
         body.data
           ? t('Checked {checked} stale, settled {settled}', { checked: body.data.checked, settled: body.data.settled })
-          : t('Recovery failed — try again shortly'),
+          : t('Recovery failed. Try again shortly'),
       )
       await load()
     } finally {
@@ -309,7 +309,7 @@ export default function QueuePage() {
                           <span className="align-middle">{job.error.slice(0, 60)}</span>
                         </span>
                       ) : (
-                        <span className="text-xs text-gray-600">—</span>
+                        <span className="text-xs text-gray-600">-</span>
                       )}
                     </td>
                     <td className="px-4 py-2.5">
@@ -364,7 +364,7 @@ export default function QueuePage() {
 
         <p className="mt-4 text-xs text-gray-600">
           {t(
-            'reconcile recovers the result of an already-submitted fal request (no regeneration, no extra charge). Jobs in progress for more than 10 minutes are shown as zombies whose webhook was lost, and the nightly watchdog attempts automatic recovery each night. Completed jobs are preserved as history and cannot be deleted.',
+            'Reconcile recovers the result of an already-submitted fal request (no regeneration, no extra charge). Jobs in progress for more than 10 minutes are shown as zombies whose webhook was lost, and the nightly watchdog attempts automatic recovery each night. Completed jobs are preserved as history and cannot be deleted.',
           )}
         </p>
       </main>
@@ -486,7 +486,7 @@ export default function QueuePage() {
           </div>
 
           <div>
-            <p className="mb-1 text-[11px] uppercase tracking-wider text-gray-500">input snapshot</p>
+            <p className="mb-1 text-[11px] uppercase tracking-wider text-gray-500">Input snapshot</p>
             <pre className="max-h-72 overflow-auto rounded-md border border-white/10 bg-white/[0.03] p-3 text-[11px] leading-relaxed text-gray-300">
               {JSON.stringify(detail?.input_snapshot ?? null, null, 2)}
             </pre>
@@ -494,7 +494,7 @@ export default function QueuePage() {
           {detail?.response_snapshot != null && (
             <div>
               <p className="mb-1 text-[11px] uppercase tracking-wider text-gray-500">
-                {t('response snapshot (fal original response)')}
+                {t('Response snapshot (fal original response)')}
               </p>
               <pre className="max-h-72 overflow-auto rounded-md border border-white/10 bg-white/[0.03] p-3 text-[11px] leading-relaxed text-gray-300">
                 {JSON.stringify(detail.response_snapshot, null, 2)}
@@ -503,7 +503,7 @@ export default function QueuePage() {
           )}
           <p className="text-[11px] text-gray-600">
             {t(
-              "Our server (Vercel) runtime logs can only be viewed in the dashboard and are kept briefly — the job's permanent trace is only the snapshot/error/timeline above, and the fal queue block is a live lookup every time you open it.",
+              "Our server (Vercel) runtime logs can only be viewed in the dashboard and are kept briefly. The job's permanent trace is only the snapshot/error/timeline above, and the fal queue block is a live lookup every time you open it.",
             )}
           </p>
         </DialogContent>

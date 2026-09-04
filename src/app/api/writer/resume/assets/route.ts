@@ -72,13 +72,13 @@ export async function POST(req: NextRequest) {
             setItem({ ...a, status: 'failed', error: r.error });
           } else if (tooOld) {
             // 아직 IN_QUEUE/IN_PROGRESS인데 제한시간 초과 → 포기
-            setItem({ ...a, status: 'failed', error: `timeout: not completed within ${Math.round(TIMEOUT_MS / 60000)} min (last status ${r.status})` });
+            setItem({ ...a, status: 'failed', error: `Timeout: not completed within ${Math.round(TIMEOUT_MS / 60000)} min (last status ${r.status})` });
           }
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
           if (tooOld) {
             // fetch가 계속 실패(예: Forbidden)하고 제한시간도 초과 → 포기
-            setItem({ ...a, status: 'failed', error: `timeout after fetch error: ${msg}` });
+            setItem({ ...a, status: 'failed', error: `Timeout after fetch error: ${msg}` });
           } else {
             console.warn(`[resume/assets] ${a.id} fetch error (will retry):`, msg);
           }

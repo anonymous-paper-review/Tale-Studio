@@ -117,7 +117,7 @@ export async function POST(req: Request) {
       if (field !== 'thumbnail' && field !== 'chain_frame') {
         return NextResponse.json({ error: 'Only thumbnail or chain-frame uploads are allowed for video takes' }, { status: 400 })
       }
-      if (!generationJobId || !isCanonicalSegment(generationJobId)) return NextResponse.json({ error: 'generationJobId is required for video thumbnails' }, { status: 400 })
+      if (!generationJobId || !isCanonicalSegment(generationJobId)) return NextResponse.json({ error: 'Invalid request: generationJobId is required for video thumbnails' }, { status: 400 })
       if (file.size === 0 || file.size > MAX_IMAGE_BYTES) {
         return NextResponse.json({ error: 'Video thumbnail must be an image no larger than 10 MB' }, { status: 400 })
       }

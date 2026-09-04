@@ -76,7 +76,7 @@ export function WorldViewDialog({ locationId, shot, onClose }: Props) {
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-sm">
-            {world.name} — {label}
+            {world.name} · {label}
           </DialogTitle>
         </DialogHeader>
 

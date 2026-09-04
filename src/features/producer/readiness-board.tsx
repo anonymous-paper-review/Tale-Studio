@@ -245,7 +245,7 @@ function castIssuesFor(gate: GateResult, localId: string) {
 //   안의 컴포넌트라 t 전달이 안전하다, writer 배치의 relativeTime 패턴). issue.label 은
 //   src/lib/producer-gate.ts(이번 배치 범위 밖)가 하드코딩한 한국어라 그대로 통과시킨다.
 function castDraftPrompt(member: CastMember, t: ReturnType<typeof useT>, issue?: GateIssue) {
-  const label = member.name || (member.entityType === 'person' ? t('this character') : t('this object'))
+  const label = member.name || (member.entityType === 'person' ? t('this character') : t('this object')) // copy-ok: fragment
   const current = [
     member.name ? t('Name: {value}', { value: member.name }) : null,
     member.appearance ? t('Appearance: {value}', { value: member.appearance }) : null,
@@ -378,7 +378,7 @@ function CastRow({
               value={member.appearance}
               rows={1}
               className={cn(CARD_TEXTAREA, QUIET_CONTROL, 'min-h-8 py-1.5')}
-              placeholder={isPerson ? t('Appearance — clothing, age, features') : t('Shape, material, features')}
+              placeholder={isPerson ? t('Appearance: clothing, age, features') : t('Shape, material, features')}
               onChange={(e) => onPatch(member.localId, { appearance: e.target.value })}
             />
           </HoverBeam>
@@ -392,7 +392,7 @@ function CastRow({
           ) : null}
           {member.origin === 'writer' ? (
             <Badge variant="ghost" className="text-[10px] text-muted-foreground">
-              writer
+              {t('Writer')}
             </Badge>
           ) : null}
         </div>
@@ -488,8 +488,8 @@ function CastRow({
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground">{t('Motivation (want / need)')}</label>
                   <div className="grid grid-cols-2 gap-2">
-                    <HoverBeam><Input value={member.motivation?.want ?? ''} placeholder={t('want (required)')} tabIndex={detailsOpen ? 0 : -1} onChange={(e) => patchMot({ want: e.target.value })} /></HoverBeam>
-                    <HoverBeam><Input value={member.motivation?.need ?? ''} placeholder={t('need (optional)')} tabIndex={detailsOpen ? 0 : -1} onChange={(e) => patchMot({ need: e.target.value })} /></HoverBeam>
+                    <HoverBeam><Input value={member.motivation?.want ?? ''} placeholder={t('Want (required)')} tabIndex={detailsOpen ? 0 : -1} onChange={(e) => patchMot({ want: e.target.value })} /></HoverBeam>
+                    <HoverBeam><Input value={member.motivation?.need ?? ''} placeholder={t('Need (optional)')} tabIndex={detailsOpen ? 0 : -1} onChange={(e) => patchMot({ need: e.target.value })} /></HoverBeam>
                   </div>
                   {motivationIssue ? <p className="text-xs text-destructive">{motivationIssue.label}</p> : null}
                 </div>
@@ -519,7 +519,7 @@ function backgroundDraftPrompt(t: ReturnType<typeof useT>, background?: Backgrou
     : ''
   return (
     t(
-      'Producer, please fill in one background card that writer and artist can use right away. It needs a name, visual description, and purpose in the story.',
+      'Producer, please fill in one background card that Writer and Artist can use right away. It needs a name, visual description, and purpose in the story.',
     ) + (current ? t(' Current info: {current}.', { current }) : '')
   )
 }
@@ -588,7 +588,7 @@ function BackgroundRow({
 
         <div className="flex shrink-0 items-center gap-1">
           {background.origin === 'writer' ? (
-            <Badge variant="ghost" className="text-[10px] text-muted-foreground">writer</Badge>
+            <Badge variant="ghost" className="text-[10px] text-muted-foreground">{t('Writer')}</Badge>
           ) : null}
           {background.stale ? (
             <Badge variant="outline" className="text-[10px] text-warning">stale</Badge>
@@ -620,7 +620,7 @@ function BackgroundRow({
           <HoverBeam>
             <Input
               value={background.purpose}
-              placeholder={t('e.g. Where the chase begins')}
+              placeholder={t('E.g. Where the chase begins')}
               className={cn(QUIET_CONTROL, 'h-8')}
               onChange={(e) => onPatch(background.localId, { purpose: e.target.value })}
             />
@@ -723,7 +723,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
     useChatUiStore.getState().setCollapsed(false)
     askProducer(
       t(
-        'Producer, please ask about one missing piece — character, setting, or beginning-conflict-ending — so this story is ready to hand off to writer.',
+        'Producer, please ask about one missing piece (character, setting, or beginning-conflict-ending) so this story is ready to hand off to Writer.',
       ),
     )
     useChatUiStore.getState().requestChatFocus()
@@ -746,7 +746,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
             <h1 className="text-lg font-semibold">Meeting Room</h1>
             <StageHelpBadge
               text={t(
-                'This is the planning room where you fill in story, settings, and cast. Talk with Producer and the board fills in together — once every required item is complete, you can hand off to Writer.',
+                'This is the planning room where you fill in story, settings, and cast. Talk with Producer and the board fills in together. Once every required item is complete, you can hand off to Writer.',
               )}
             />
             {gate.canHandoff ? (
@@ -901,7 +901,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                 ) : (
                   <p className="text-sm italic text-muted-foreground/70">
                     {t(
-                      'Drop your story into chat and Producer will keep organizing it here — one scene, one feeling is enough.',
+                      'Drop your story into chat and Producer will keep organizing it here. One scene, one feeling is enough.',
                     )}
                   </p>
                 )}

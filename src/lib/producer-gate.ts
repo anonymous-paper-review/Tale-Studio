@@ -165,7 +165,7 @@ export function evaluateProducerGate({
   if (!isFilled(styleAnchorKey))
     hardMissing.push({ field: 'styleAnchor', label: t('Video style needed') })
   if (!(typeof settings.playtime === 'number' && settings.playtime >= 5 && settings.playtime <= 1800 + 600))
-    hardMissing.push({ field: 'playtime', label: t('Runtime needed (5 sec – 30 min+)') })
+    hardMissing.push({ field: 'playtime', label: t('Runtime needed (5 sec to 30 min+)') })
   if (!isFilled(settings.format))
     hardMissing.push({ field: 'format', label: t('Format needed') })
   if (!isFilled(settings.dialogueLanguage))
@@ -178,7 +178,7 @@ export function evaluateProducerGate({
     softMissing.push({
       field: 'subGenre',
       label: t('Sub-genre (subGenre)'),
-      detail: t('Leaves it blank when passed to writer'),
+      detail: t('Leaves it blank when passed to Writer'),
     })
   if (!isFilled(settings.tone))
     softMissing.push({

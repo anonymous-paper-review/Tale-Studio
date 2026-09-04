@@ -37,12 +37,12 @@ export async function POST(req: Request) {
       !label.trim()
     ) {
       return NextResponse.json(
-        { error: 'projectId, characterId, label required' },
+        { error: 'Invalid request: projectId, characterId, label required' },
         { status: 400 },
       )
     }
     if (narrativeTime !== undefined && narrativeTime !== null && !VALID_NARRATIVE_TIMES.has(narrativeTime as string)) {
-      return NextResponse.json({ error: 'narrativeTime must be present, past, or future' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request: narrativeTime must be present, past, or future' }, { status: 400 })
     }
     const appearanceResult = validateAppearancePatch(body)
     if (!appearanceResult.ok) {
@@ -60,7 +60,7 @@ export async function POST(req: Request) {
       .maybeSingle()
     if (personError) throw personError
     if (!person || person.entity_type !== 'person') {
-      return NextResponse.json({ error: 'character not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Character not found' }, { status: 404 })
     }
 
     // appearance_key = label 슬러그, 그 캐릭터 안에서 유일 — 부분 유니크 인덱스(project_id, character_id, appearance_key)와
@@ -128,7 +128,7 @@ export async function PATCH(req: Request) {
       !appearanceKey.trim()
     ) {
       return NextResponse.json(
-        { error: 'projectId, characterId, appearanceKey required' },
+        { error: 'Invalid request: projectId, characterId, appearanceKey required' },
         { status: 400 },
       )
     }
@@ -155,7 +155,7 @@ export async function PATCH(req: Request) {
 
     if (error) throw error
     if (!data || data.length !== 1) {
-      return NextResponse.json({ error: 'appearance not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Appearance not found' }, { status: 404 })
     }
 
     return NextResponse.json({

@@ -65,16 +65,16 @@ export async function POST(req: NextRequest) {
       force?: boolean
       traceId?: string
     }
-    if (!projectId) return NextResponse.json({ error: 'projectId required' }, { status: 400 })
+    if (!projectId) return NextResponse.json({ error: 'Invalid request: projectId required' }, { status: 400 })
 
     // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
     const access = await requireProjectAccess(req, projectId)
     if (!access.ok) return access.response
     if (traceId !== undefined && !isChatTraceId(traceId)) {
-      return NextResponse.json({ error: 'traceId must be a UUID' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request: traceId must be a UUID' }, { status: 400 })
     }
     if (traceId && !(await chatTraceBelongsToProject(projectId, traceId))) {
-      return NextResponse.json({ error: 'traceId does not belong to project' }, { status: 409 })
+      return NextResponse.json({ error: 'Invalid request: traceId does not belong to project' }, { status: 409 })
     }
 
     const quota = await checkGenerationCapacity(access.userId!, 'image')
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
       .select('workspace_id, style_anchor_key, custom_style_anchor, settings')
       .eq('id', projectId)
       .maybeSingle()
-    if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404 })
+    if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     // #fal-canvas(2026-08-17): 프로듀서 포맷 → 시트 캔버스. 캔버스 방향이 곧 셀 방향이라
     //   이 한 줄이 "화면비를 fal 에 전달"의 본체다 (vertical 실측: 4×3 유지 + 세로 패널 재구도).
     const projectFormat = parseProjectFormat(

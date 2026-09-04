@@ -8,7 +8,7 @@ import { SiteFooter } from '@/components/marketing/site-footer'
 //   자리만 잡는다(가격 확정 시 여기만 수정).
 
 export const metadata: Metadata = {
-  title: 'Pricing — Tale Studio',
+  title: 'Pricing · Tale Studio',
   description: 'All Tale Studio features are free to use during the beta.',
 }
 
@@ -74,7 +74,7 @@ export default function PricingPage() {
             </div>
             <p className="mb-6 text-sm text-gray-400">For teams that need more generation volume</p>
             <p className="mb-8">
-              <span className="text-5xl font-semibold tracking-tight text-gray-500">—</span>
+              <span className="text-5xl font-semibold tracking-tight text-gray-500">-</span>
             </p>
             <p className="text-sm leading-relaxed text-gray-500">
               Usage-based plans will launch when the beta ends. Beta participants

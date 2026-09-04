@@ -452,7 +452,7 @@ export async function POST(req: Request) {
     const traceId = body.traceId
     const jobActor = body.actor === 'chat' ? 'chat' : 'ui'
     if (traceId !== undefined && !isChatTraceId(traceId)) {
-      return NextResponse.json({ error: 'traceId must be a UUID' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request: traceId must be a UUID' }, { status: 400 })
     }
     // V2 refs(#real-strip): [START, END] 등 다중 레퍼런스. referenceImageUrl(단일)과 병행 수신 —
     //   단일은 I2V 판별·스냅샷 하위호환 축, 배열은 실제 제출 레퍼런스로 우선.
@@ -482,15 +482,15 @@ export async function POST(req: Request) {
         ? !videoClipId || !isStandaloneVideoOwnerKey(standaloneVideoKey)
         : !writerShotId || !prompt)
     ) {
-      return NextResponse.json({ error: 'projectId, shotId, prompt, and idempotencyKey are required' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request: projectId, shotId, prompt, and idempotencyKey are required' }, { status: 400 })
     }
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idempotencyKey)) {
-      return NextResponse.json({ error: 'idempotencyKey must be a UUID' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request: idempotencyKey must be a UUID' }, { status: 400 })
     }
-    if (generationMethod === 'I2V' && !referenceImageUrl) return NextResponse.json({ error: 'referenceImageUrl is required for I2V' }, { status: 400 })
+    if (generationMethod === 'I2V' && !referenceImageUrl) return NextResponse.json({ error: 'Invalid request: referenceImageUrl is required for I2V' }, { status: 400 })
     if (!(await userOwnsProject(projectId, user.id))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     if (traceId && !(await chatTraceBelongsToProject(projectId, traceId))) {
-      return NextResponse.json({ error: 'traceId does not belong to project' }, { status: 409 })
+      return NextResponse.json({ error: 'Invalid request: traceId does not belong to project' }, { status: 409 })
     }
 
     const [{ data: project, error: projectError }, { data: shot, error: shotError }] = await Promise.all([
@@ -502,8 +502,8 @@ export async function POST(req: Request) {
     ])
     if (projectError) throw projectError
     if (shotError) throw shotError
-    if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404 })
-    if (!standalone && !shot) return NextResponse.json({ error: 'writerShotId does not belong to project' }, { status: 400 })
+    if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    if (!standalone && !shot) return NextResponse.json({ error: 'Invalid request: writerShotId does not belong to project' }, { status: 400 })
     // #ref-gate(2026-09-02 오너 결정): writer 샷의 실사 영상은 실사 스토리보드(시작 프레임)가 있어야 한다 —
     //   클라가 준 프레임을 검사 없이 받던 무음 폴백 폐지. 409 code 로 막고 클라가 실사 완성을 기다렸다가 자동 재개.
     //   (러프 previz 영상은 별도 잡 종류 shot_previz_video / 별도 라우트라 이 게이트와 무관.)
@@ -511,7 +511,7 @@ export async function POST(req: Request) {
     if (!standalone && shot && !hasStoryboardImage(shot.storyboard_image)) {
       return NextResponse.json(
         {
-          error: `The live-action storyboard is missing for shot ${writerShotId} — generate it before the video.`,
+          error: `The live-action storyboard is missing for shot ${writerShotId}. Generate it before the video.`,
           code: 'missing_storyboard',
           shotId: writerShotId,
         },
@@ -529,7 +529,7 @@ export async function POST(req: Request) {
         .maybeSingle()
       if (error) throw error
       if (!clip || clip.shot_id !== standaloneVideoKey) {
-        return NextResponse.json({ error: 'videoClipId does not belong to standaloneVideoKey' }, { status: 400 })
+        return NextResponse.json({ error: 'Invalid request: videoClipId does not belong to standaloneVideoKey' }, { status: 400 })
       }
       standaloneConfig = normalizeStandaloneVideoConfig(body.standaloneConfig)
       if (!standaloneConfig) {
@@ -568,7 +568,7 @@ export async function POST(req: Request) {
     if (videoClipId && !standalone) {
       const { data: clip, error } = await supabaseAdmin.from('video_clips').select('id, shot_id').eq('id', videoClipId).eq('project_id', projectId).is('deleted_at', null).maybeSingle()
       if (error) throw error
-      if (!clip || clip.shot_id !== writerShotId) return NextResponse.json({ error: 'videoClipId does not belong to writerShotId' }, { status: 400 })
+      if (!clip || clip.shot_id !== writerShotId) return NextResponse.json({ error: 'Invalid request: videoClipId does not belong to writerShotId' }, { status: 400 })
     }
     const replayTarget = existingReplay && typeof existingReplay.target === 'object' && existingReplay.target !== null && !Array.isArray(existingReplay.target)
       ? existingReplay.target as Record<string, unknown>
@@ -581,11 +581,11 @@ export async function POST(req: Request) {
         : replayTarget?.retakeMode === 'new_take' && replayTarget?.writerShotId === writerShotId
     )
     if (existingReplay && !exactReplay) {
-      return NextResponse.json({ error: 'idempotencyKey is already reserved for a different video operation' }, { status: 409 })
+      return NextResponse.json({ error: 'Invalid request: idempotencyKey is already reserved for a different video operation' }, { status: 409 })
     }
     if (recoveryReceipt && !exactReplay) {
       return NextResponse.json(
-        { error: 'recoveryReceipt can only recover an existing reservation' },
+        { error: 'Invalid request: recoveryReceipt can only recover an existing reservation' },
         { status: 409 },
       )
     }
@@ -809,7 +809,7 @@ export async function POST(req: Request) {
       ? { ...reservedSubmission.input, new_take_metadata: normalizedNewTakeMetadata }
       : reservedSubmission.input
     if (!snapshotValueMatches(storedSnapshot, inputSnapshot as unknown as Record<string, unknown>)) {
-      return NextResponse.json({ error: 'idempotencyKey replay does not match the reserved video input' }, { status: 409 })
+      return NextResponse.json({ error: 'Invalid request: idempotencyKey replay does not match the reserved video input' }, { status: 409 })
     }
     if (standaloneConfig && videoClipId) {
       await updateDirectorVideoTakeMetadata(projectId, videoClipId, {

@@ -109,7 +109,7 @@ export function WriterGenerationView({
   // content/label 은 global-chat(범위 밖)이 t() 없이 그대로 렌더하므로, 여기서 미리 t() 로
   //   번역해 넘긴다(#i18n-s5-batch3) — 문자열 값 비교라 로케일이 안 바뀌면 effect 재실행 없음.
   const sceneGateMessage = t(
-    "The scene story draft is ready. Please review it on the screen.\nIf there's anything you'd like to change, type it in the input box below — or press Enter with it empty to confirm and move to the next step.",
+    "The scene story draft is ready. Please review it on the screen.\nIf there's anything you'd like to change, type it in the input box below, or press Enter with it empty to confirm and move to the next step.",
   )
   const confirmAsIsLabel = t('Confirm as-is')
   // 확정 게이트는 blocking 제안(dismissible:false) — 파이프라인이 멈춰 사용자 확정을 반드시
@@ -151,18 +151,18 @@ export function WriterGenerationView({
           <h1 className="text-lg font-semibold">Writers&apos; Room</h1>
           {debug ? (
             <span className="rounded-full border border-warning/50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-warning">
-              debug preview
+              Debug preview
             </span>
           ) : null}
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
           {debug
-            ? t('Debug preview — showing the generation screen using output from the last run.')
+            ? t('Debug preview: showing the generation screen using output from the last run.')
             : awaiting
               ? t(
-                  'The scene story draft is ready — review it, then request changes or confirm to move on.',
+                  'The scene story draft is ready. Review it, then request changes or confirm to move on.',
                 )
-              : t("Generating the story — read finished scenes below as they're ready.")}
+              : t("Generating the story. Read finished scenes below as they're ready.")}
         </p>
       </header>
 

@@ -70,11 +70,11 @@ export interface StoryboardImageValue extends Record<string, unknown> {
 }
 
 function imageOmittedSuffix(locale: AppLocale): string {
-  return `— ${translate(locale, 'not included')}`
+  return `(${translate(locale, 'not included')})` // copy-ok: fragment
 }
 
 function clipOmittedNote(locale: AppLocale): string {
-  return translate(locale, 'Generating/no final take — not included')
+  return translate(locale, 'Generating or no final take, not included')
 }
 
 export const DIRECTOR_SCENES_SELECT =

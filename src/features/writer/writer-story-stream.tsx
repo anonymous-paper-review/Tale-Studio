@@ -121,7 +121,7 @@ export function WriterStoryStream({
       </article>
       {awaiting ? null : (
         <p className="pt-6 text-center text-xs text-muted-foreground/70">
-          {t("The story is still being written — new content will appear automatically as it's ready.")}
+          {t("The story is still being written. New content will appear automatically as it's ready.")}
         </p>
       )}
     </div>

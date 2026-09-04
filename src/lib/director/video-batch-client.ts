@@ -104,7 +104,7 @@ export async function runVideoBatch(
       const locale = useLocaleStore.getState().locale
       if (failed > 0) {
         toast.warning(
-          translate(locale, '{started}/{total} videos generated — {failed} failed.', {
+          translate(locale, '{started}/{total} videos generated, {failed} failed.', {
             started,
             total,
             failed,

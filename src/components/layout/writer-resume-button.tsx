@@ -37,7 +37,7 @@ export function WriterResumeButton({
         {resuming ? t('Resuming…') : t('Resume')}
       </Button>
       <p className="text-xs text-muted-foreground">
-        {t("Picks up from where it stopped — it won't start over from scratch.")}
+        {t("Picks up from where it stopped. It won't start over from scratch.")}
       </p>
     </div>
   )

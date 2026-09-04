@@ -10,16 +10,16 @@ export const SHOT_TYPES: ShotType[] = [
 ]
 
 export const SHOT_TYPE_DESCRIPTIONS: Record<string, string> = {
-  ECU: 'Extreme close-up — an extremely narrow area, like an eye or hand',
-  CU: 'Close-up — mostly the face',
-  MCU: 'Medium close-up — chest and up',
-  MS: 'Medium shot — waist and up',
-  MFS: 'Medium full shot — knees and up',
-  FS: 'Full shot — full body',
-  WS: 'Wide shot — the subject and surrounding space',
-  EWS: 'Extreme wide shot — vast background, subject small',
-  OTS: 'Over-the-shoulder — the other person, over the shoulder',
-  POV: "Point of view — through the character's eyes",
-  TRACK: 'Tracking shot — moves along with the subject',
-  '2S': 'Two shot — two characters in one frame',
+  ECU: 'Extreme close-up: an extremely narrow area, like an eye or hand',
+  CU: 'Close-up: mostly the face',
+  MCU: 'Medium close-up: chest and up',
+  MS: 'Medium shot: waist and up',
+  MFS: 'Medium full shot: knees and up',
+  FS: 'Full shot: full body',
+  WS: 'Wide shot: the subject and surrounding space',
+  EWS: 'Extreme wide shot: vast background, subject small',
+  OTS: 'Over-the-shoulder: the other person, over the shoulder',
+  POV: "Point of view: through the character's eyes",
+  TRACK: 'Tracking shot: moves along with the subject',
+  '2S': 'Two shot: two characters in one frame',
 }

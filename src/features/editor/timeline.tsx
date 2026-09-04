@@ -319,7 +319,7 @@ function AudioClipBlock({
             onPointerDown={handleGain}
             className="absolute inset-x-1.5 h-2.5 -translate-y-1/2 cursor-ns-resize"
             style={{ top: gainTop }}
-            title={t('Volume {percent}% — drag up/down', { percent: Math.round(vol * 100) })}
+            title={t('Volume {percent}%. Drag up or down', { percent: Math.round(vol * 100) })}
           />
 
           {/* 트림 핸들 (요청): 좌=시작점, 우=끝점 + hover 라벨 */}

@@ -62,12 +62,12 @@ export function WriterEnginePicker({ projectId }: WriterEnginePickerProps) {
           setWriterEnginePreference(projectId, next)
         }}
       >
-        <SelectTrigger size="sm" aria-label={t('Select writer engine')}>
+        <SelectTrigger size="sm" aria-label={t('Select Writer engine')}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="v1">{t('V1 — existing pipeline')}</SelectItem>
-          <SelectItem value="v2">{t('V2 — semantic unit experiment')}</SelectItem>
+          <SelectItem value="v1">{t('V1: existing pipeline')}</SelectItem>
+          <SelectItem value="v2">{t('V2: semantic unit experiment')}</SelectItem>
         </SelectContent>
       </Select>
     </div>

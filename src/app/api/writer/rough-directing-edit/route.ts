@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     const user = await getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const parsed = BodySchema.safeParse(await req.json())
-    if (!parsed.success) return NextResponse.json({ error: 'invalid body' }, { status: 400 })
+    if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
     const body = parsed.data
     if (!(await userOwnsProject(body.projectId, user.id))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })

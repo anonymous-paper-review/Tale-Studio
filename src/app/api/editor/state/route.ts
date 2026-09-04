@@ -8,7 +8,7 @@ export async function GET(req: Request) {
     const projectId = searchParams.get('projectId')
 
     if (!projectId) {
-      return NextResponse.json({ error: 'projectId is required' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request: projectId is required' }, { status: 400 })
     }
 
     // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
@@ -36,7 +36,7 @@ export async function PUT(req: Request) {
     const { projectId, state } = await req.json()
 
     if (!projectId) {
-      return NextResponse.json({ error: 'projectId is required' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request: projectId is required' }, { status: 400 })
     }
 
     // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
@@ -55,7 +55,7 @@ export async function PUT(req: Request) {
       //   서버 장애가 아니라 만료된 클라이언트다. 410으로 구분해 클라이언트가 재시도를 멈추게 한다.
       if ((error as { code?: string }).code === '23503') {
         return NextResponse.json(
-          { error: 'project no longer exists' },
+          { error: 'Project no longer exists' },
           { status: 410 },
         )
       }

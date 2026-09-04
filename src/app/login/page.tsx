@@ -98,7 +98,7 @@ export default function LoginPage() {
           />
           {capsLockOn ? (
             <p id="caps-lock-hint" role="status" className="text-sm text-muted-foreground">
-              Caps Lock is on — passwords are case-sensitive.
+              Caps Lock is on. Passwords are case-sensitive.
             </p>
           ) : null}
           {errorMsg ? (

@@ -79,21 +79,21 @@ export async function POST(req: Request) {
     const modelKey = normalizeImageModelKey(modelInput)
     if (!projectId || !characterId || !appearanceKey || !view) {
       return NextResponse.json(
-        { error: 'projectId, characterId, appearanceKey, view required' },
+        { error: 'Invalid request: projectId, characterId, appearanceKey, view required' },
         { status: 400 },
       )
     }
     if (traceId !== undefined && !isChatTraceId(traceId)) {
-      return NextResponse.json({ error: 'traceId must be a UUID' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid request: traceId must be a UUID' }, { status: 400 })
     }
     // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
     const access = await requireProjectAccess(req, projectId)
     if (!access.ok) return access.response
     if (!CHARACTER_VIEW_KEYS.includes(view)) {
-      return NextResponse.json({ error: `invalid view: ${view}` }, { status: 400 })
+      return NextResponse.json({ error: `Invalid view: ${view}` }, { status: 400 })
     }
     if (traceId && !(await chatTraceBelongsToProject(projectId, traceId))) {
-      return NextResponse.json({ error: 'traceId does not belong to project' }, { status: 409 })
+      return NextResponse.json({ error: 'Invalid request: traceId does not belong to project' }, { status: 409 })
     }
 
     // 멀티유저 동시성 게이트: 유저 상한 + 전역 fal 슬롯(#global-semaphore). 둘 중 하나라도 차면 429.
@@ -113,7 +113,7 @@ export async function POST(req: Request) {
       .maybeSingle()
     if (requestedAppearanceError) throw requestedAppearanceError
     if (!requestedAppearance) {
-      return NextResponse.json({ error: 'appearance not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Appearance not found' }, { status: 404 })
     }
 
     // 빈칸만 채운다(architecture §5, #artist-main-authority 2026-09-03): 자율 생성(actor='auto')은 이 모습의 시트가
@@ -191,15 +191,15 @@ export async function POST(req: Request) {
           .eq('is_default', true)
           .maybeSingle(),
       ])
-    if (!project) return NextResponse.json({ error: 'project not found' }, { status: 404 })
-    if (!character) return NextResponse.json({ error: 'character not found' }, { status: 404 })
-    if (!appearance) return NextResponse.json({ error: 'appearance not found' }, { status: 404 })
+    if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    if (!character) return NextResponse.json({ error: 'Character not found' }, { status: 404 })
+    if (!appearance) return NextResponse.json({ error: 'Appearance not found' }, { status: 404 })
     if (!defaultAppearance) {
-      return NextResponse.json({ error: 'default appearance not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Default appearance not found' }, { status: 404 })
     }
     if (!appearance.is_default && !defaultAppearance.portrait_url) {
       return NextResponse.json(
-        { error: 'default appearance portrait is required for non-default appearance generation' },
+        { error: 'Default appearance portrait is required for non-default appearance generation' },
         { status: 409 },
       )
     }
@@ -259,7 +259,7 @@ export async function POST(req: Request) {
           // 비기본 모습은 기준 얼굴 참조가 필수 — reference 미지원 모델을 골랐거나 템플릿이 없으면 막는다.
           if (baseFaceUrl && !isEdit) {
             return NextResponse.json(
-              { error: 'selected image model does not support the identity reference required for a non-default appearance' },
+              { error: 'Selected image model does not support the identity reference required for a non-default appearance' },
               { status: 409 },
             )
           }

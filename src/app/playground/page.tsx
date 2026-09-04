@@ -72,7 +72,7 @@ export default function PlaygroundPage() {
         <div className="mb-10">
           <h1 className="mb-2 text-3xl font-semibold tracking-tighter md:text-4xl">Playground</h1>
           <p className="text-sm font-light text-gray-400">
-            Works shared by creators — made with Tale Studio.
+            Works shared by creators, made with Tale Studio.
           </p>
         </div>
 

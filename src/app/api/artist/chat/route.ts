@@ -71,7 +71,7 @@ regenerateCharacter 의 선택적 model 필드로 이미지 생성기를 고른�
 - 파생(이 이미지만): regenerateCharacter 로 즉시 처리. 사용자가 말한 변경 요청은 instruction 필드로 함께 전달한다.
 - 원천(캐릭터 기본 외형 자체 변경, 예: "얘는 원래 머리가 붉은색이야"): updates 에 {"type":"changeAppearance","characterId":"<id>","appearance":"바뀐 전체 외형 prose"} 를 emit하라. 이건 자동 실행되지 않고, 앱이 "캐릭터 기본 외형을 …로 바꿀까요?" 승인 절차로 띄운다 — 승인 시에만 characters.appearance 가 커밋되고 그 캐릭터의 기존 이미지들이 갱신 대상(stale)이 된다. appearance 는 델타가 아니라 변경 후 전체 외형을 적어라(외형을 통째 대체하므로).
 - 애매하면("머리 붉게") 되물어라: 이 이미지만 바꿀지, 아니면 캐릭터 기본 외형을 붉은 머리로 바꿀지.
-- writer 디자인(룩: 그림체/팔레트/의상)이 아직 준비 안 된 상태로 보이면, 지금 임시본으로 만들지 룩이 나온 뒤 만들지 먼저 물어보고 진행하라.
+- Writer 디자인(룩: 그림체/팔레트/의상)이 아직 준비 안 된 상태로 보이면, 지금 임시본으로 만들지 룩이 나온 뒤 만들지 먼저 물어보고 진행하라.
 </source-vs-derived>
 
 <format>
@@ -184,7 +184,7 @@ export async function POST(req: Request) {
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json(
-        { error: 'message is required' },
+        { error: 'Invalid request: message is required' },
         { status: 400 },
       )
     }

@@ -138,7 +138,7 @@ export function DialogueView() {
   return (
     <div className="flex h-full flex-col">
       <WriterHeader
-        description={t('Dialogue viewer — select a character to highlight only their lines')}
+        description={t('Dialogue viewer: select a character to highlight only their lines')}
       />
 
       {/* 인물 칩 + 생성 버튼 */}
@@ -172,7 +172,7 @@ export function DialogueView() {
         <div className="ml-auto flex items-center gap-2">
           {confirming && !generating && (
             <span className="text-[11px] text-muted-foreground">
-              {t('This rewrites the existing {count} dialogue lines — press again to run', {
+              {t('This rewrites the existing {count} dialogue lines. Press again to run', {
                 count: totalLines,
               })}
             </span>
@@ -209,7 +209,7 @@ export function DialogueView() {
         <div className="w-full max-w-3xl px-6 py-6">
           {scenes.length === 0 ? (
             <p className="py-16 text-center text-sm text-muted-foreground">
-              {t('No scenes yet — the script will appear here once writer generation finishes.')}
+              {t('No scenes yet. The script will appear here once Writer generation finishes.')}
             </p>
           ) : (
             scenes.map((scene, sceneIdx) => {
@@ -302,7 +302,7 @@ export function DialogueView() {
               <p className="text-sm text-muted-foreground">
                 {(() => {
                   const [l1, l2] = t(
-                    'No shot dialogue yet — press "Generate dialogue" above to design character voices{br}and write shot-by-shot dialogue that follows the scene.',
+                    'No shot dialogue yet. Press "Generate dialogue" above to design character voices{br}and write shot-by-shot dialogue that follows the scene.',
                   ).split('{br}')
                   return (
                     <>

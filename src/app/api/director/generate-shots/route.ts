@@ -56,7 +56,7 @@ export async function POST(req: Request) {
 
     if (!scene || !scene.narrativeSummary) {
       return NextResponse.json(
-        { error: 'scene with narrativeSummary is required' },
+        { error: 'Scene with narrativeSummary is required' },
         { status: 400 },
       )
     }

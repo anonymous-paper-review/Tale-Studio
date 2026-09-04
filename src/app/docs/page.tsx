@@ -7,8 +7,8 @@ import { SiteFooter } from '@/components/marketing/site-footer'
 //   내용이 늘어나면 /docs/[slug] 로 쪼갠다 — 지금은 온보딩에 필요한 최소만.
 
 export const metadata: Metadata = {
-  title: 'Docs — Tale Studio',
-  description: 'Tale Studio getting started guide — how to turn a story into a previz video with the 5-stage pipeline.',
+  title: 'Docs · Tale Studio',
+  description: 'Tale Studio getting started guide: how to turn a story into a previz video with the 5-stage pipeline.',
 }
 
 const STAGE_GUIDE = [
@@ -70,7 +70,7 @@ export default function DocsPage() {
       <main className="mx-auto w-full max-w-3xl flex-1 px-6 pb-20 pt-32">
         <h1 className="mb-3 text-4xl font-semibold tracking-tighter md:text-5xl">Docs</h1>
         <p className="mb-14 text-base font-light text-gray-400">
-          From a one-line story to a previz video — your guide to the 5-stage pipeline.
+          From a one-line story to a previz video. Your guide to the 5-stage pipeline.
         </p>
 
         <section className="mb-16">
@@ -78,7 +78,7 @@ export default function DocsPage() {
           <ol className="space-y-3 text-sm leading-relaxed text-gray-300">
             <li>
               1. <Link href="/login" className="text-primary underline-offset-4 hover:underline">Log in</Link>{' '}
-              and create a new project.
+              and create a new project. // copy-ok: fragment
             </li>
             <li>2. Tell the Producer chat your story idea in one line.</li>
             <li>3. Once the required fields are filled in, say &ldquo;Hand this to the Writer&rdquo; in the chat.</li>

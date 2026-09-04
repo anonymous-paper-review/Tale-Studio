@@ -32,7 +32,7 @@ type Authorization = { projectId: string } | { error: NextResponse }
 
 
 async function authorize(projectId: unknown): Promise<Authorization> {
-  if (typeof projectId !== 'string' || !projectId) return { error: NextResponse.json({ error: 'projectId is required' }, { status: 400 }) }
+  if (typeof projectId !== 'string' || !projectId) return { error: NextResponse.json({ error: 'Invalid request: projectId is required' }, { status: 400 }) }
   const user = await getUser()
   if (!user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
   if (!(await userOwnsProject(projectId, user.id))) return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
@@ -83,7 +83,7 @@ export async function PATCH(req: Request, { params }: Context) {
   }
   const final = body.is_final
   if ('is_final' in body && typeof final !== 'boolean') {
-    return NextResponse.json({ error: 'is_final must be a boolean' }, { status: 400 })
+    return NextResponse.json({ error: 'Invalid request: is_final must be a boolean' }, { status: 400 })
   }
 
   const metadata = {
@@ -95,22 +95,22 @@ export async function PATCH(req: Request, { params }: Context) {
     ...(Object.prototype.hasOwnProperty.call(body, 'video_chain') ? { video_chain: body.video_chain as never } : {}),
   }
   if ('is_final' in body && Object.keys(metadata).length) {
-    return NextResponse.json({ error: 'is_final cannot be changed with take metadata' }, { status: 400 })
+    return NextResponse.json({ error: 'Invalid request: is_final cannot be changed with take metadata' }, { status: 400 })
   }
   if ('take_label' in metadata && metadata.take_label !== null && typeof metadata.take_label !== 'string') {
-    return NextResponse.json({ error: 'take_label must be a string or null' }, { status: 400 })
+    return NextResponse.json({ error: 'Invalid request: take_label must be a string or null' }, { status: 400 })
   }
   if ('override' in metadata && metadata.override !== null && !isPlainJsonObject(metadata.override)) {
-    return NextResponse.json({ error: 'override must be a plain JSON object or null' }, { status: 400 })
+    return NextResponse.json({ error: 'Invalid request: override must be a plain JSON object or null' }, { status: 400 })
   }
   if ('canvas_position' in metadata && metadata.canvas_position !== null && !isCanvasPosition(metadata.canvas_position)) {
-    return NextResponse.json({ error: 'canvas_position must be null or a finite {x,y} object' }, { status: 400 })
+    return NextResponse.json({ error: 'Invalid request: canvas_position must be null or a finite {x,y} object' }, { status: 400 })
   }
   if ('frame_inputs' in metadata && metadata.frame_inputs !== null && !isPlainJsonObject(metadata.frame_inputs)) {
-    return NextResponse.json({ error: 'frame_inputs must be a plain JSON object or null' }, { status: 400 })
+    return NextResponse.json({ error: 'Invalid request: frame_inputs must be a plain JSON object or null' }, { status: 400 })
   }
   if ('video_chain' in metadata && metadata.video_chain !== null && !isPlainJsonObject(metadata.video_chain)) {
-    return NextResponse.json({ error: 'video_chain must be a plain JSON object or null' }, { status: 400 })
+    return NextResponse.json({ error: 'Invalid request: video_chain must be a plain JSON object or null' }, { status: 400 })
   }
 
   try {

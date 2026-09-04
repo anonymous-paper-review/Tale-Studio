@@ -132,11 +132,11 @@ export async function runRealBatch(
       const sheetNames = [...new Set(lastSkipped.flatMap((s) => (s.missing ?? []).map((m) => m.name)))]
       const roughCount = lastSkipped.filter((s) => s.reason === 'missing_rough_storyboard').length
       const what = [
-        sheetNames.length ? translate(useLocaleStore.getState().locale, 'character sheets for {names}', { names: sheetNames.join(', ') }) : null,
-        roughCount ? translate(useLocaleStore.getState().locale, 'rough storyboards for {count} shots', { count: roughCount }) : null,
+        sheetNames.length ? translate(useLocaleStore.getState().locale, 'character sheets for {names}', { names: sheetNames.join(', ') }) : null, // copy-ok: fragment
+        roughCount ? translate(useLocaleStore.getState().locale, 'rough storyboards for {count} shots', { count: roughCount }) : null, // copy-ok: fragment
       ].filter(Boolean).join(' · ')
       toast.info(
-        translate(useLocaleStore.getState().locale, '{count} shots skipped — waiting for {what}. The batch resumes automatically.', {
+        translate(useLocaleStore.getState().locale, '{count} shots skipped while waiting for {what}. The batch resumes automatically.', {
           count: lastSkipped.length,
           what,
         }),
@@ -157,7 +157,7 @@ export async function runRealBatch(
       toast.info(
         translate(
           useLocaleStore.getState().locale,
-          'No shots to generate — only shots with a rough panel and no image yet are eligible.',
+          'No shots to generate. Only shots with a rough panel and no image yet are eligible.',
         ),
       )
     }

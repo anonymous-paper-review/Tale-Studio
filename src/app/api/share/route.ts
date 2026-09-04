@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     live?: boolean
   }
   if (!body.projectId)
-    return NextResponse.json({ error: 'projectId required' }, { status: 400 })
+    return NextResponse.json({ error: 'Invalid request: projectId required' }, { status: 400 })
   if (!(await isOwner(body.projectId, user.id)))
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
@@ -113,7 +113,7 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const projectId = req.nextUrl.searchParams.get('projectId')
   if (!projectId)
-    return NextResponse.json({ error: 'projectId required' }, { status: 400 })
+    return NextResponse.json({ error: 'Invalid request: projectId required' }, { status: 400 })
   if (!(await isOwner(projectId, user.id)))
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
@@ -132,7 +132,7 @@ export async function DELETE(req: NextRequest) {
   const id = req.nextUrl.searchParams.get('id')
   const token = req.nextUrl.searchParams.get('token')
   if (!id && !token)
-    return NextResponse.json({ error: 'id or token required' }, { status: 400 })
+    return NextResponse.json({ error: 'Invalid request: id or token required' }, { status: 400 })
 
   const base = supabaseAdmin.from('project_shares').select('id, project_id')
   const { data: share } = await (id

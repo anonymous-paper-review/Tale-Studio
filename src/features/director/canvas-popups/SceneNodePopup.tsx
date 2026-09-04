@@ -105,7 +105,7 @@ export function SceneNodePopup({ nodeId, data }: Props) {
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 onBlur={commit}
-                placeholder={t('e.g. on a bridge, a ruined city')}
+                placeholder={t('E.g. on a bridge, a ruined city')}
                 className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
               />
             </HoverBeam>
@@ -117,7 +117,7 @@ export function SceneNodePopup({ nodeId, data }: Props) {
                 value={timeOfDay}
                 onChange={(e) => setTimeOfDay(e.target.value)}
                 onBlur={commit}
-                placeholder={t('e.g. golden hour, midnight')}
+                placeholder={t('E.g. golden hour, midnight')}
                 className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
               />
             </HoverBeam>
@@ -129,7 +129,7 @@ export function SceneNodePopup({ nodeId, data }: Props) {
                 value={mood}
                 onChange={(e) => setMood(e.target.value)}
                 onBlur={commit}
-                placeholder={t('e.g. tense, melancholic, hopeful')}
+                placeholder={t('E.g. tense, melancholic, hopeful')}
                 className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
               />
             </HoverBeam>

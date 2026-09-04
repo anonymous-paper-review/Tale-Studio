@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
 
     const { projectId } = (await req.json()) as { projectId?: string };
     if (!projectId || typeof projectId !== 'string') {
-      return NextResponse.json({ error: 'projectId required' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid request: projectId required' }, { status: 400 });
     }
 
     const deadlineMs = Date.now() + STEP_BUDGET_MS;

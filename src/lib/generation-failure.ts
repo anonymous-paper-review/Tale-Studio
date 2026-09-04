@@ -101,7 +101,7 @@ export function explainGenerationFailure(
   }
 
   return {
-    what: t('Image generation failed — {detail}', { detail: condense(raw) || t('unknown error') }),
+    what: t('Image generation failed: {detail}', { detail: condense(raw) || t('unknown error') }), // copy-ok: fragment
     next: t('Please try again. If it keeps happening, try tweaking the description a bit.'),
   }
 }
@@ -129,7 +129,7 @@ export function generationGaveUpMessage(
 ): string {
   return `⚠ ${translate(
     locale,
-    "{label} auto-generation stopped — repeated failures triggered a cost-protection pause on automatic retries. Click generate again on the card (manual requests aren't limited).",
+    "{label} auto-generation stopped. Repeated failures triggered a cost-protection pause on automatic retries. Click generate again on the card (manual requests aren't limited).",
     { label },
   )}`
 }

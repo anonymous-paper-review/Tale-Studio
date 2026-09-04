@@ -141,8 +141,8 @@ export function CharacterViewDialog({ charId, appearanceKey, view, onClose }: Pr
             <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
               <RefreshCw className="size-3.5 shrink-0" />
               {staleClass === 'look-pending'
-                ? t('This is a draft from before the final look — regenerating remakes it in the final art style')
-                : t('The appearance changed — regenerating will apply the new appearance')}
+                ? t('This is a draft from before the final look. Regenerating remakes it in the final art style')
+                : t('The appearance changed. Regenerating will apply the new appearance')}
             </div>
           )}
 
@@ -264,7 +264,7 @@ export function CharacterViewDialog({ charId, appearanceKey, view, onClose }: Pr
             </div>
             {!isObject && !imageModelSupportsReference(imageModel) && (
               <p className="mt-1 text-[10px] text-amber-600 dark:text-amber-400">
-                {t('This model has no reference support — character identity may drift.')}
+                {t('This model has no reference support, so character identity may drift.')}
               </p>
             )}
           </div>
