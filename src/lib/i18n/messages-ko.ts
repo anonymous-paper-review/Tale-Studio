@@ -714,6 +714,12 @@ export const KO: Record<string, string> = {
   'Saving creates the tab and generates its image right away, using the default background as the reference.': '저장하면 탭이 생기고 기본 배경을 참조해 이미지를 바로 만들어요.',
   'A new appearance tab is added to the background. The default background stays as it is.': '배경에 새 모습 탭이 생겨요. 기본 배경은 그대로예요.',
   'Its image is generated right away using the default background as the reference (generation cost).': '기본 배경을 참조해 이미지를 바로 만들어요(생성 비용).',
+  // 숫자 싱크(약속 D, 2026-09-04)
+  '{done} done, {failed} failed': '{done}개 완료, {failed}개 실패',
+  '{count} done': '{count}개 완료',
+  '{count} available': '생성 가능 {count}개',
+  '{agent} is generating videos': '{agent}가 영상을 만들고 있어요',
+  '{agent} is generating previz videos': '{agent}가 previz 영상을 만들고 있어요',
   'Background image (bypass retry)': '배경 이미지(우회 재시도)',
   'Change the background description (source): {description}': '배경 설명(원천)을 바꿉니다: {description}',
   "The background's description (source) changes, and Writer scenes read the new one.": '배경의 설명(원천)이 바뀌고 Writer 씬이 새 설명을 읽어요.',

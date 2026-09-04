@@ -46,7 +46,9 @@ export default function VisualPage() {
   } = useArtistStore()
 
   const projectId = useProjectStore((s) => s.projectId)
-  const [tab, setTab] = useState<ArtistTab>('characters')
+  // 약속 D15(2026-09-04): 보던 탭은 스토어가 기억한다 — 떠났다 돌아와도 그대로.
+  const tab = useArtistStore((s) => s.uiTab)
+  const setTab = useArtistStore((s) => s.setUiTab)
   // Alt+←/→ 로 인물 ↔ 배경 순환(#keyboard-only 2026-08-11) — 오너 지정 범위는 두 탭.
   //   인벤토리에 있다가 누르면 인물로 복귀한다(두 탭 순환에 합류).
   useAltArrowCycle(['characters', 'world'] as const, tab, setTab)

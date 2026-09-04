@@ -417,6 +417,12 @@ async function refreshWorldFailures(
   }
 }
 
+/** 약속 D15(2026-09-04): 다시 불러와도 고른 카드는 그대로 — 아직 있으면 유지, 없으면 첫 카드. */
+function keepSelection(current: string | null, ids: readonly string[]): string | null {
+  if (current && ids.includes(current)) return current
+  return ids[0] ?? null
+}
+
 /** 새 캐릭터의 character_id 생성 — 이름 슬러그 + 짧은 난수 (프로젝트 내 충돌 회피) */
 function makeCharacterId(name: string): string {
   const slug = name
@@ -593,6 +599,9 @@ interface ArtistState {
   applyUpdates: (updates: ArtistUpdate[]) => Promise<void>
   /** 진입 허용된 projectId 기록 (멱등). 페이지가 ready 도달 시 1회 호출. */
   markEntered: (projectId: string) => void
+  /** 약속 D15(2026-09-04): 보던 탭(인물/배경) — 떠났다 돌아와도 그대로. 고른 카드는 selected* 가 이미 기억한다. */
+  uiTab: 'characters' | 'world'
+  setUiTab: (tab: 'characters' | 'world') => void
   /** 승인된 원천 외형 변경을 로컬 반영(C3 F6) — fixedPrompt 갱신 → 기존 파생 이미지가 stale 로 표시(자동 재생성 없음). */
   applyAppearancePatch: (characterId: string, appearance: string) => void
   updateCharacterAppearance: (
@@ -843,8 +852,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             lookSummary: dtFull
               ? { artStyle: dtFull.l1?.art_style ?? null, colorMeaning: dtFull.color_meaning ?? null }
               : null,
-            selectedCharacterId: characterAssets[0]?.characterId ?? null,
-            selectedLocationId: worldAssets[0]?.locationId ?? null,
+            selectedCharacterId: keepSelection(get().selectedCharacterId, characterAssets.map((c) => c.characterId)),
+            selectedLocationId: keepSelection(get().selectedLocationId, worldAssets.map((w) => w.locationId)),
           })
 
           // 생성 상태(실패/대기) 조회 — generation_jobs 는 RLS 로 클라 직접 불가 → owner-checked 엔드포인트 1회.
@@ -957,8 +966,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         sceneManifest: writerManifest,
         characterAssets,
         worldAssets,
-        selectedCharacterId: characterAssets[0]?.characterId ?? null,
-        selectedLocationId: worldAssets[0]?.locationId ?? null,
+        selectedCharacterId: keepSelection(get().selectedCharacterId, characterAssets.map((c) => c.characterId)),
+        selectedLocationId: keepSelection(get().selectedLocationId, worldAssets.map((w) => w.locationId)),
       })
       return
     }
@@ -1690,6 +1699,12 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       }
     }
     for (const w of worldAssets) {
+      // 약속 D9·D10(2026-09-04): 이 세션에서 이미 도는(대기 포함) 배경은 다시 요청하지 않는다 — Artist↔Writer 왕복으로
+      //   페이지가 다시 마운트돼도 요청은 하나다. 서버 큐에 queued 잡이 있으면 라우트(hasQueuedWorldShotJob)가 또 막는다.
+      if (get().generatingLocations.includes(w.locationId)) {
+        skipped.push(`world ${w.locationId}:wideShot (already generating)`)
+        continue
+      }
       if (w.wideShot == null) {
         // (b) 중복 제거: writer v2Design 서버 초안이 이미 wide 를 submit 했으면 webhook 으로 채워진다 →
         //   잠깐 기다렸다 채워지면 client skip, timeout 이면 post-unlock client fallback 생성.
@@ -1811,6 +1826,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         ? state
         : { enteredProjects: { ...state.enteredProjects, [projectId]: true } },
     ),
+  uiTab: 'characters',
+  setUiTab: (tab) => set({ uiTab: tab }),
 
   updateCharacterAppearance: async (characterId, appearanceKey, appearance) => {
     const projectId = useProjectStore.getState().projectId

@@ -78,7 +78,7 @@ import {
   SHELL_INSET,
 } from '@/lib/constants'
 import { buildChatSections } from '@/lib/chat-sections'
-import { buildChatBlocks, parseAttachmentMarker, parseHandoffMarker } from '@/lib/chat-blocks'
+import { buildChatBlocks, groupStatusStacks, parseAttachmentMarker, parseHandoffMarker } from '@/lib/chat-blocks'
 import {
   CASCADE_STEP_MS,
   EPHEMERAL_SETTLE_MS,
@@ -244,6 +244,59 @@ function ThinkingIndicator({ stage }: { stage: StageId }) {
 }
 
 /** 말풍선 우상단 호버 복사 버튼. 클립보드 복사 후 1.5초간 체크 표시. */
+
+/**
+ * 연속된 상태 행 스택(약속 D11, 2026-09-04) — 안드로이드 알림처럼 한 줄에 "N개 완료(, M개 실패)"와 "+N" 칩을 보이고,
+ *   누르면 건별 줄이 펼쳐진다. 저장본은 건별 그대로라 새로고침에도 같은 스택이다.
+ */
+function StatusStackRow({
+  stack,
+  scrub,
+}: {
+  stack: { id: string; items: Array<{ msg: { id?: string; content: string }; failed: boolean }>; done: number; failed: number }
+  scrub: (text: string) => string
+}) {
+  const t = useT()
+  const [open, setOpen] = useState(false)
+  const first = stack.items[0]
+  const summary =
+    stack.failed > 0
+      ? t('{done} done, {failed} failed', { done: stack.done, failed: stack.failed })
+      : t('{count} done', { count: stack.done })
+  return (
+    <div className="space-y-1">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-2.5 rounded-2xl border border-border bg-muted/40 px-3.5 py-2.5 text-left text-xs text-foreground hover:bg-muted/60"
+      >
+        {stack.failed > 0 && stack.done === 0 ? (
+          <AlertTriangle className="size-3.5 shrink-0 text-warning" />
+        ) : (
+          <CheckCircle2 className="size-3.5 shrink-0 text-success" />
+        )}
+        <span className="min-w-0 flex-1 truncate">
+          <MarkdownText text={scrub(first.msg.content.trimStart().replace(/^[✓⚠]\s*/, ''))} />
+        </span>
+        <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+          {summary} · +{stack.items.length - 1}
+        </span>
+      </button>
+      {open && (
+        <div className="space-y-1 pl-4">
+          {stack.items.map(({ msg, failed }, i) => (
+            <div key={msg.id ?? i} className="flex items-center gap-2 rounded-xl border border-border/60 px-3 py-1.5 text-[11px] text-muted-foreground">
+              {failed ? <AlertTriangle className="size-3 shrink-0 text-warning" /> : <CheckCircle2 className="size-3 shrink-0 text-success" />}
+              <span className="min-w-0"><MarkdownText text={scrub(msg.content.trimStart().replace(/^[✓⚠]\s*/, ''))} /></span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function CopyButton({ text }: { text: string }) {
   const t = useT()
   const [copied, setCopied] = useState(false)
@@ -1321,7 +1374,12 @@ export function GlobalChat() {
                 <StageDivider stage={section.stage} current={section.current} />
                 {/* 렌더 분류 (#oiioii-chat) — 유저만 채운 말풍선, 에이전트는 flat 출력 +
                     턴당 1회 role plate, ✓/⚠ 알림은 tool-row 스타일 (기준: chat-blocks.ts). */}
-                {buildChatBlocks(section.messages).map(({ msg, kind, showRolePlate }) => {
+                {groupStatusStacks(buildChatBlocks(section.messages)).map((block) => {
+                  // 약속 D11: 연속된 완료/실패 줄은 스택 하나로 — 앞줄에 "+N", 누르면 펼쳐진다.
+                  if (block.kind === 'statusStack') {
+                    return <StatusStackRow key={block.id} stack={block} scrub={scrubProse} />
+                  }
+                  const { msg, kind, showRolePlate } = block
                   if (kind === 'user') {
                     // 첨부 마커 분리 — 본문은 말풍선에, 원본 URL 은 썸네일로.
                     const { text, urls } = parseAttachmentMarker(msg.content)

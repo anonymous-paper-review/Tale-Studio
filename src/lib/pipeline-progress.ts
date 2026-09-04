@@ -17,6 +17,7 @@
 
 import { STAGE_AGENT_NAME } from '@/lib/constants'
 import type { GenerationJobKind } from '@/lib/generation-jobs'
+import type { GenerationBatch, GenerationLane } from '@/lib/generation-batches'
 import type { DirectorNode } from '@/types/director'
 import { isShotData, isVideoData } from '@/types/director'
 import type { StageId } from '@/types'
@@ -479,4 +480,31 @@ export function queueWorks(
     out.push({ key: `queue-${kind}`, label, total: count, stage: spec.stage })
   }
   return out
+}
+
+/** 레인별 배치 라벨 — KIND_WORK 와 같은 어휘(에이전트 이름 + 무엇을 만드는지). */
+const LANE_WORK: Record<GenerationLane, { labelKey: string; agent: string }> = {
+  artist: { labelKey: '{agent} is generating images', agent: STAGE_AGENT_NAME.artist },
+  'writer-rough': { labelKey: '{agent} is drawing the rough storyboard', agent: STAGE_AGENT_NAME.writer },
+  'director-storyboard': { labelKey: '{agent} is generating shooting-ready images', agent: STAGE_AGENT_NAME.director },
+  'director-video': { labelKey: '{agent} is generating videos', agent: STAGE_AGENT_NAME.director },
+  'director-previz': { labelKey: '{agent} is generating previz videos', agent: STAGE_AGENT_NAME.director },
+}
+
+/**
+ * 약속 D(2026-09-04): 핀의 줄은 서버 배치에서만 파생한다 — 화면 상태(생성 중 플래그·진행 집계)는 세지 않는다.
+ *   배치가 없으면 줄도 없다(도는 잡이 없으면 핀이 사라진다).
+ */
+export function batchWorks(batches: readonly GenerationBatch[], locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK): PipelineWork[] {
+  return batches.map((b) => {
+    const spec = LANE_WORK[b.lane]
+    return {
+      key: `batch-${b.lane}`,
+      label: translate(locale, spec.labelKey, { agent: spec.agent }),
+      done: b.done,
+      total: b.total,
+      failed: b.failed || undefined,
+      stage: b.stage,
+    }
+  })
 }

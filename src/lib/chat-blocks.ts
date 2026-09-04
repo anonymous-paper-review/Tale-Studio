@@ -21,6 +21,8 @@ import type { StageId } from '@/types'
 export type ChatBlockKind = 'user' | 'status' | 'text' | 'handoff'
 
 export interface ChatBlockMessage {
+  /** 스택 키·React key 용 — 옛 호출자(테스트)는 없을 수 있다. */
+  id?: string
   role: 'user' | 'model'
   content: string
 }
@@ -179,6 +181,53 @@ export interface ChatBlock<M extends ChatBlockMessage> {
   kind: ChatBlockKind
   /** 이 메시지 위에 화자 name plate 를 그린다 — model run 의 첫 text 메시지만 true. */
   showRolePlate: boolean
+}
+
+/** 연속된 상태 행(✓/⚠)의 묶음 — 약속 D11·D12·D13(2026-09-04): 화면에서 한 줄로 합쳐 보이고 눌러 펼친다. */
+export interface ChatStatusStack<M extends ChatBlockMessage> {
+  kind: 'statusStack'
+  /** 스택 id = 첫 메시지 id(펼침 상태 키). */
+  id: string
+  items: Array<{ msg: M; failed: boolean }>
+  done: number
+  failed: number
+}
+
+export type ChatRenderBlock<M extends ChatBlockMessage> = ChatBlock<M> | ChatStatusStack<M>
+
+/**
+ * 순수: 렌더 블록 목록에서 **연속된** 상태 행을 스택으로 묶는다. 사이에 다른 메시지(대화·제안)가 끼면 새 스택이
+ *   시작된다(D12). 저장된 줄은 그대로라 새로고침해도 같은 규칙으로 같은 스택이 된다(D13). 한 건은 그대로 둔다.
+ */
+export function groupStatusStacks<M extends ChatBlockMessage>(blocks: readonly ChatBlock<M>[]): ChatRenderBlock<M>[] {
+  const out: ChatRenderBlock<M>[] = []
+  let run: ChatBlock<M>[] = []
+  const flush = () => {
+    if (run.length === 0) return
+    if (run.length === 1) {
+      out.push(run[0])
+    } else {
+      const items = run.map((b) => ({ msg: b.msg, failed: b.msg.content.trimStart().startsWith('⚠') }))
+      out.push({
+        kind: 'statusStack',
+        id: run[0].msg.id ?? `stack-${out.length}`,
+        items,
+        done: items.filter((i) => !i.failed).length,
+        failed: items.filter((i) => i.failed).length,
+      })
+    }
+    run = []
+  }
+  for (const b of blocks) {
+    if (b.kind === 'status') {
+      run.push(b)
+      continue
+    }
+    flush()
+    out.push(b)
+  }
+  flush()
+  return out
 }
 
 /**

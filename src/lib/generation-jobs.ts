@@ -3,6 +3,7 @@
 // 모든 접근은 service-role(supabaseAdmin)로만 — RLS ON + policy 없음이라 클라이언트 직접 접근 불가.
 // 프론트는 GET /api/generation-jobs/[id] (소유권 체크) 경유로만 상태를 읽는다.
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import type { GenerationBatchRow } from '@/lib/generation-batches'
 import { normalizeFailureEvidence } from '@/lib/fal/error-evidence'
 import type { Json } from '@/types/database'
 import { isChatTraceId } from '@/lib/chat-trace'
@@ -505,6 +506,30 @@ export async function listActiveGenerationJobs(
       startedAt: Number.isNaN(parsed) ? null : parsed,
     }
   })
+}
+
+/**
+ * 약속 D(2026-09-04): 핀·배지·버튼 숫자의 근거 행 — 최근 24h 의 잡(도는 것·끝난 것). 요약은 generation-batches 의
+ *   순수 함수가 한다(클라·서버 공용). 500행 상한 — 배지·배치 창(2분)에는 충분하다.
+ */
+export async function listRecentGenerationJobRows(projectId: string): Promise<GenerationBatchRow[]> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const { data, error } = await supabaseAdmin
+    .from('generation_jobs')
+    .select('id, kind, status, target, created_at, updated_at')
+    .eq('project_id', projectId)
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(500)
+  if (error) throw error
+  return (data ?? []).map((row) => ({
+    id: row.id as string,
+    kind: row.kind as GenerationJobKind,
+    status: row.status as GenerationJobStatus,
+    target: (row.target as GenerationJobTarget | null) ?? null,
+    created_at: row.created_at as string,
+    updated_at: (row.updated_at as string | null) ?? null,
+  }))
 }
 
 /** queued 인 character_view main 잡 목록(클라가 [id] reconcile 로 마무리할 대상). */

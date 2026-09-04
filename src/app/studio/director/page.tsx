@@ -47,6 +47,8 @@ import { isVideoData } from '@/types/director'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
+import { useGenerationBatches } from '@/lib/generation-queue'
+import { withStoryboardBacklog } from '@/lib/generation-batches'
 import { getDirectorGaps, ledgerGapLabels, summarizeGaps } from '@/lib/completeness'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import {
@@ -782,6 +784,12 @@ function PaletteBar({
   const realBatchBusy = useDirectorCanvasStore((s) => s.realBatchBusy)
   const videoBatchBusy = useDirectorCanvasStore((s) => s.videoBatchBusy)
   const videoBatchProgress = useDirectorCanvasStore((s) => s.videoBatchProgress)
+  // 약속 D7(2026-09-04): 버튼 숫자는 핀과 같은 서버 배치에서 온다 — 배치가 도는 동안은 그 done/total, 아니면 화면 집계.
+  const projectId = useProjectStore((s) => s.projectId)
+  const generationBatches = useGenerationBatches(projectId ?? null)
+  const realBatchRemaining = useDirectorCanvasStore((s) => s.realBatchRemaining)
+  const storyboardBatch = withStoryboardBacklog(generationBatches, realBatchRemaining ?? 0).find((b) => b.lane === 'director-storyboard') ?? null
+  const videoBatch = generationBatches.find((b) => b.lane === 'director-video') ?? null
   const relayoutCanvas = useDirectorCanvasStore((s) => s.relayoutCanvas)
   const showUnusedAssets = useDirectorCanvasStore((s) => s.showUnusedAssets)
   const toggleUnusedAssets = useDirectorCanvasStore((s) => s.toggleUnusedAssets)
@@ -885,11 +893,18 @@ function PaletteBar({
             <ImageIcon className="size-4" />
           )}
           <span>{t('Generate storyboard')}</span>
-          {totalShots > 0 && (
+          {storyboardBatch ? (
+            <span className="font-mono tabular-nums text-muted-foreground">
+              {storyboardBatch.done}/{storyboardBatch.total}
+              {storyboardBatch.failed > 0 && (
+                <span className="text-destructive"> · {t('{count} failed', { count: storyboardBatch.failed })}</span>
+              )}
+            </span>
+          ) : totalShots > 0 ? (
             <span className="font-mono tabular-nums text-muted-foreground">
               {completedShots}/{totalShots}
             </span>
-          )}
+          ) : null}
         </button>
 
         {/* 명시적 전체 영상 생성 — 과금 동작은 확인 후에만 시작한다. */}
@@ -923,7 +938,23 @@ function PaletteBar({
             <ImageIcon className="size-4" />
           )}
           <span>{t('Generate videos')}</span>
-          {videoBatchBusy && videoBatchProgress && (
+          {videoBatch ? (
+            <>
+              <span className="font-mono tabular-nums text-muted-foreground">
+                {videoBatch.done}/{videoBatch.total}
+              </span>
+              {videoBatch.failed > 0 && (
+                <span className="text-destructive">
+                  {t('{count} failed', { count: videoBatch.failed })}
+                </span>
+              )}
+            </>
+          ) : !videoBatchBusy && eligibleVideoCount > 0 ? (
+            <span className="font-mono tabular-nums text-muted-foreground">
+              {t('{count} available', { count: eligibleVideoCount })}
+            </span>
+          ) : null}
+          {videoBatchBusy && videoBatchProgress && !videoBatch && (
             <>
               <span className="font-mono tabular-nums text-muted-foreground">
                 {videoBatchProgress.done}/{videoBatchProgress.total}

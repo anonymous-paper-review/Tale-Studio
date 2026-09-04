@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useProjectStore } from '@/stores/project-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { markStageSeen } from '@/lib/stage-seen'
 import { useProducerStore } from '@/stores/producer-store'
 import { useWriterStore } from '@/stores/writer-store'
 import { useArtistStore } from '@/stores/artist-store'
@@ -146,6 +147,8 @@ export default function StudioLayout({
     }
     // 진입한 stage의 완료 알림 배지 클리어 (chat-proactive-copilot Phase 2)
     useGlobalChatStore.getState().clearStageBadge(stage.id as StageId)
+    // 약속 D3: 서버 파생 배지의 기준점 — 이 스테이지를 지금 봤다.
+    if (projectId) markStageSeen(projectId, stage.id as StageId)
   }, [pathname, canNavigateTo, initLoading, projectId, router, setStage])
 
   return (

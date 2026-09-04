@@ -210,7 +210,6 @@ function deletedDialoguePreview(current: DialogueLine[], next: DialogueLine[]): 
 
 // 완료 알림 코얼레싱 — 같은 stage+label 완료를 짧은 윈도우로 모아 한 줄("N개 생성 완료")로 emit.
 //   배치 이미지(웹훅 다발) 스팸 방지. 창 안에 이어지면 누적, 조용해지면 1개 메시지로 flush.
-const COMPLETION_COALESCE_MS = 2500
 type PendingCompletion = { count: number; timer: ReturnType<typeof setTimeout> }
 const pendingCompletions: Record<string, PendingCompletion> = {}
 const completionKey = (stage: StageId, label: string) => `${stage}::${label}`
@@ -1873,26 +1872,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const currentStage = useProjectStore.getState().currentStage
     if (currentStage === stage) return // 이미 해당 stage를 보고 있음 → 알림 불필요
 
-    set((state) => ({
-      stageBadges: {
-        ...state.stageBadges,
-        [stage]: (state.stageBadges[stage] ?? 0) + 1,
-      },
-    }))
-
-    // 완료 메시지는 즉시 쌓지 않고 stage+label 로 모아 조용해지면 한 줄로 flush(스팸 방지).
+    // 배지는 더 이상 여기서 올리지 않는다(약속 D3) — 사이드바가 서버 완료 기록에서 파생한다(lib/stage-seen).
+    // 완료 줄은 한 건에 한 줄(약속 D11·D13): 저장본은 건별로 남기고 화면이 연속된 줄을 스택으로 합친다 —
+    //   새로고침해도 같은 규칙으로 합쳐지고, 사이에 다른 대화가 끼면 새 줄이 시작된다(D12).
     const key = completionKey(stage, label)
     const existing = pendingCompletions[key]
-    if (existing) {
-      existing.count += 1
-      clearTimeout(existing.timer)
-      existing.timer = setTimeout(() => flushCompletion(stage, label), COMPLETION_COALESCE_MS)
-    } else {
-      pendingCompletions[key] = {
-        count: 1,
-        timer: setTimeout(() => flushCompletion(stage, label), COMPLETION_COALESCE_MS),
-      }
-    }
+    if (existing) clearTimeout(existing.timer)
+    delete pendingCompletions[key]
+    pendingCompletions[key] = { count: 1, timer: setTimeout(() => flushCompletion(stage, label), 0) }
   },
 
   // 생성 트리거 실패 통지(#double-fire 2026-07-31) — 방금 누른 버튼의 즉답이므로 완료 통지와

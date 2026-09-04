@@ -80,3 +80,19 @@ paths:
   배경 wide_shot 을 연속성 참조로 붙인다. Writer 러프 설명·Director 배경 참조는 씬 `narrative_time` 과 같은 변형에 이미지가 있으면
   그것(`resolveLocationAppearanceForScene`), 아니면 기본. 배경은 "기본으로 지정"이 없다(기본 = 배경 자체).
 - Artist AI 는 뒷모습·측면 4뷰를 말하지 않는다 — 모습마다 시트 1장이 전부다(C9).
+
+## 숫자 싱크 — 생성 큐 하나 (2026-09-04, 약속 D — `tests/promise-d-number-sync.test.ts`)
+
+- 채팅 핀·왼쪽 탭 배지·Director "스토리보드/영상 생성" 버튼 숫자는 **서버 큐(`generation_jobs`) 하나에서 파생**한다.
+  `/api/generation/active` 가 `batches`(레인별 active/done/failed/total)와 `completions`(완료 기록)를 동봉하고,
+  `generation-queue` 싱글턴 폴러가 그것을 `useGenerationBatches/useGenerationCompletions` 로 나눠 준다. 순수 함수는
+  `src/lib/generation-batches.ts`(`summarizeGenerationBatches`·`completionsOf`·`deriveStageBadges`·`withStoryboardBacklog`).
+- 배치 = 레인(artist·writer-rough·director-storyboard·director-video·director-previz)별 "도는 잡 + 같은 창(2분) 안에서 끝난 잡".
+  도는 잡이 없으면 배치도 없다(핀이 사라진다). 유령 queued(10분)는 세지 않는다. 그리드 잡은 샷 수만큼 단위다.
+  실사 레인만 아직 제출 못 한 일괄 잔여(`realBatchRemaining`)를 핀·버튼이 같은 함수로 더한다(2026-08-25 피드백).
+- 스테이지 배지 = "그 스테이지를 마지막으로 본 시각(`stage-seen.ts`, localStorage) 이후의 완료 단위 수". 클라이언트 증가(`stageBadges`) 는 쓰지 않는다.
+- 채팅 완료 줄은 **건별로 저장**하고(`notifyCompletion` 즉시 flush) **화면이 합친다**(`groupStatusStacks` → `StatusStackRow`,
+  안드로이드 알림 스택: 앞줄 "+N"·"N개 완료, M개 실패", 누르면 펼침). 사이에 다른 말이 끼면 새 스택. 저장본에 코얼레싱 타이머 없음.
+- 잡 폴링은 `pollGenerationJob` 이 잡 id 별로 한 루프만 돈다(`inFlightPolls`). 배경 자동 생성은 이 세션에서 이미 도는 배경을 건너뛰고
+  (`generatingLocations`), 서버는 같은 슬롯의 queued 잡을 `hasQueuedWorldShotJob` 으로 막는다.
+- Artist 탭(인물/배경)은 스토어 `uiTab`, 고른 카드는 `loadData` 가 되돌리지 않는다(`keepSelection`).

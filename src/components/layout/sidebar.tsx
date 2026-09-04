@@ -28,6 +28,7 @@ import { ContactPopover } from '@/components/contact-popover'
 import { ExportMenu } from '@/components/export-menu'
 import { useProjectStore } from '@/stores/project-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { useStageBadges } from '@/lib/stage-seen'
 import { useVideoUsage } from '@/lib/generation-queue'
 import type { StageId } from '@/types'
 import { OwnerOnly } from '@/components/demo/owner-only'
@@ -56,7 +57,10 @@ export function Sidebar() {
   const artistImagesStalled = useProjectStore((s) => s.artistImagesStalled)
   const retryArtistDrafts = useProjectStore((s) => s.retryArtistDrafts)
   // 크로스스테이지 완료 알림 배지 (chat-proactive-copilot Phase 2)
-  const stageBadges = useGlobalChatStore((s) => s.stageBadges)
+  // 약속 D3(2026-09-04): 배지는 서버 완료 기록에서 파생 — 화면이 완료를 봤는지와 무관하다.
+  const currentStage = useProjectStore((s) => s.currentStage)
+  const badgeProjectId = useProjectStore((s) => s.projectId)
+  const stageBadges = useStageBadges(badgeProjectId ?? null, currentStage ?? null)
   const projectTitle = useProjectStore((s) => s.projectTitle)
   const renameProject = useProjectStore((s) => s.renameProject)
 

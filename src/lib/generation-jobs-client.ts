@@ -24,7 +24,33 @@ export interface GenerationJobReceipt {
 
 export type GenerationJobObserver = (receipt: GenerationJobReceipt) => void
 
-export async function pollGenerationJob(
+// 약속 D8(2026-09-04): 같은 잡을 두 번 폴링하지 않는다 — Artist 탭을 떠났다 돌아올 때마다 loadData 가 queued 잡을
+//   다시 폴링 걸던 것을, 잡 id 당 진행 중인 루프 하나로 합친다. 두 번째 호출자는 같은 결과(Promise)를 받는다.
+const inFlightPolls = new Map<string, Promise<string>>()
+
+/** 테스트·진단용: 지금 도는 폴링 루프 수. */
+export function inFlightPollCount(): number {
+  return inFlightPolls.size
+}
+
+export function pollGenerationJob(
+  jobId: string,
+  opts: {
+    intervalMs?: number
+    timeoutMs?: number
+    onStatus?: GenerationJobObserver
+  } = {},
+): Promise<string> {
+  const existing = inFlightPolls.get(jobId)
+  if (existing) return existing
+  const run = pollGenerationJobOnce(jobId, opts).finally(() => {
+    if (inFlightPolls.get(jobId) === run) inFlightPolls.delete(jobId)
+  })
+  inFlightPolls.set(jobId, run)
+  return run
+}
+
+async function pollGenerationJobOnce(
   jobId: string,
   {
     intervalMs = 3000,

@@ -10,6 +10,7 @@
 
 import { useCallback, useSyncExternalStore } from 'react'
 import type { GenerationJobKind, GenerationJobTarget } from '@/lib/generation-jobs'
+import type { GenerationBatch, GenerationCompletion } from '@/lib/generation-batches'
 
 export interface ActiveJob {
   id: string
@@ -34,6 +35,11 @@ export interface VideoUsage {
 
 let jobs: ActiveJob[] = EMPTY
 let videoUsage: VideoUsage | null = null
+// 약속 D: 서버가 파생한 배치(n/N)와 완료 기록 — 같은 폴러가 받아 모든 구독자가 같은 숫자를 본다.
+const EMPTY_BATCHES: GenerationBatch[] = []
+const EMPTY_COMPLETIONS: GenerationCompletion[] = []
+let batches: GenerationBatch[] = EMPTY_BATCHES
+let completions: GenerationCompletion[] = EMPTY_COMPLETIONS
 let signature = ''
 let projectId: string | null = null
 let timer: ReturnType<typeof setTimeout> | null = null
@@ -61,16 +67,22 @@ async function fetchOnce(): Promise<void> {
     )
     if (!res.ok) return
     const body = (await res.json()) as {
-      data?: { jobs?: ActiveJob[]; videoUsage?: VideoUsage }
+      data?: { jobs?: ActiveJob[]; videoUsage?: VideoUsage; batches?: GenerationBatch[]; completions?: GenerationCompletion[] }
     }
     const next = body.data?.jobs ?? []
     const usage = body.data?.videoUsage ?? null
-    // 사용량 변화도 emit 대상 — 시그니처에 함께 태운다(잡 목록이 그대로여도 카운트는 오른다).
-    const sig = `${signatureOf(next)}|v:${usage ? `${usage.used}/${usage.limit}` : '-'}`
+    const nextBatches = body.data?.batches ?? []
+    const nextCompletions = body.data?.completions ?? []
+    // 사용량·배치·완료 기록 변화도 emit 대상 — 시그니처에 함께 태운다(잡 목록이 그대로여도 카운트는 오른다).
+    const batchSig = nextBatches.map((b) => `${b.lane}:${b.active}/${b.done}/${b.failed}/${b.total}`).join(',')
+    const completionSig = nextCompletions.length ? `${nextCompletions.length}:${nextCompletions[nextCompletions.length - 1].at}` : '0'
+    const sig = `${signatureOf(next)}|v:${usage ? `${usage.used}/${usage.limit}` : '-'}|b:${batchSig}|c:${completionSig}`
     if (sig === signature) return
     signature = sig
     jobs = next.length === 0 ? EMPTY : next
     videoUsage = usage
+    batches = nextBatches.length === 0 ? EMPTY_BATCHES : nextBatches
+    completions = nextCompletions.length === 0 ? EMPTY_COMPLETIONS : nextCompletions
     emit()
   } catch {
     // 네트워크 실패는 조용히 — 다음 틱이 재시도한다. 진행 표시가 사라지는 것보다 낫다.
@@ -96,6 +108,8 @@ function start(id: string) {
     projectId = id
     jobs = EMPTY
     videoUsage = null
+    batches = EMPTY_BATCHES
+    completions = EMPTY_COMPLETIONS
     signature = ''
   }
   void fetchOnce().finally(() => {
@@ -115,6 +129,12 @@ export function refreshGenerationQueue(): void {
 
 function getSnapshot(): ActiveJob[] {
   return jobs
+}
+function getBatchesSnapshot(): GenerationBatch[] {
+  return batches
+}
+function getCompletionsSnapshot(): GenerationCompletion[] {
+  return completions
 }
 
 function getVideoUsageSnapshot(): VideoUsage | null {
@@ -208,4 +228,44 @@ export function hasActiveKind(
   return list.some((j) => wanted.has(j.kind))
 }
 
+/** 약속 D: 서버가 파생한 배치(레인별 n/N). 도는 잡이 없으면 빈 배열 — 핀·버튼 숫자의 단일 근거. */
+export function useGenerationBatches(projectId: string | null): GenerationBatch[] {
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      if (!projectId) return () => {}
+      listeners.add(onChange)
+      if (listeners.size === 1) start(projectId)
+      return () => {
+        listeners.delete(onChange)
+        if (listeners.size === 0) stop()
+      }
+    },
+    [projectId],
+  )
+  return useSyncExternalStore(subscribe, projectId ? getBatchesSnapshot : () => EMPTY_BATCHES, () => EMPTY_BATCHES)
+}
 
+/** 약속 D3: 최근 완료 기록(스테이지 배지의 근거). */
+export function useGenerationCompletions(projectId: string | null): GenerationCompletion[] {
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      if (!projectId) return () => {}
+      listeners.add(onChange)
+      if (listeners.size === 1) start(projectId)
+      return () => {
+        listeners.delete(onChange)
+        if (listeners.size === 0) stop()
+      }
+    },
+    [projectId],
+  )
+  return useSyncExternalStore(subscribe, projectId ? getCompletionsSnapshot : () => EMPTY_COMPLETIONS, () => EMPTY_COMPLETIONS)
+}
+
+/** 테스트 전용 — 스냅샷 주입(서버 없이 파생 훅을 검증). */
+export function _setGenerationQueueSnapshotForTests(next: { jobs?: ActiveJob[]; batches?: GenerationBatch[]; completions?: GenerationCompletion[] }): void {
+  if (next.jobs) jobs = next.jobs
+  if (next.batches) batches = next.batches
+  if (next.completions) completions = next.completions
+  emit()
+}
