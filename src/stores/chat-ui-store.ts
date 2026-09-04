@@ -15,7 +15,9 @@ interface MentionInsertRequest {
   id: number
   label: string
   // 'toggle': 입력창에 이미 있으면 제거(선택 해제), 없으면 삽입. 기본(undefined)=삽입만.
-  mode?: 'toggle'
+  // 'compose'(약속 M, 2026-09-04): 입력창을 "@라벨 " 로 바꾸고 커서를 뒤에 둔다 — 보내지는 않는다. hint 는 회색 안내.
+  mode?: 'toggle' | 'compose'
+  hint?: string
 }
 
 interface ChatUiState {
@@ -32,6 +34,8 @@ interface ChatUiState {
   requestMentionInsert: (label: string) => void
   // 라인 재클릭 시 선택 해제까지 지원하는 토글 요청(스크립트 뷰어). GlobalChat이 소비.
   requestMentionToggle: (label: string) => void
+  /** 약속 M: 완드 — 입력창에 "@라벨 "만 넣고 커서를 뒤에 둔다(보내지 않음). hint 는 회색 안내("이 카드 채워줘"). */
+  requestMentionCompose: (label: string, hint: string) => void
   consumeMentionInsert: (id: number) => void
   // 채팅 입력창 포커스(+빔) 요청 브리지 — 첫 진입 웰컴 등에서 set, GlobalChat이 소비.
   focusRequest: number | null
@@ -63,6 +67,8 @@ export const useChatUiStore = create<ChatUiState>()(
       requestMentionInsert: (label) => set({ mentionInsert: { id: Date.now(), label } }),
       requestMentionToggle: (label) =>
         set({ mentionInsert: { id: Date.now(), label, mode: 'toggle' } }),
+      requestMentionCompose: (label, hint) =>
+        set({ mentionInsert: { id: Date.now(), label, mode: 'compose', hint } }),
       consumeMentionInsert: (id) =>
         set((s) => (s.mentionInsert?.id === id ? { mentionInsert: null } : s)),
       focusRequest: null,

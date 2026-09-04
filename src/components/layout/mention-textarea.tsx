@@ -37,12 +37,14 @@ interface Props {
   items: MentionItem[]
   disabled?: boolean
   placeholder?: string
+  /** 약속 M: 입력 뒤에 회색으로 보이는 안내("이 카드 채워줘") — 값이 있어도 보인다(placeholder 는 빈 칸에서만 보이므로). */
+  ghost?: string
   className?: string
 }
 
 export const MentionTextarea = forwardRef<HTMLTextAreaElement, Props>(
   function MentionTextarea(
-    { value, onChange, onSubmit, items, disabled, placeholder, className },
+    { value, onChange, onSubmit, items, disabled, placeholder, ghost, className },
     ref,
   ) {
     const innerRef = useRef<HTMLTextAreaElement>(null)
@@ -210,6 +212,18 @@ export const MentionTextarea = forwardRef<HTMLTextAreaElement, Props>(
           onScroll={syncScrollHint}
           onBlur={() => setTimeout(() => setOpen(false), 120)}
         />
+        {/* 회색 안내(ghost) — 같은 클래스(패딩·글꼴)의 거울 층에 값을 투명하게 깔고 그 뒤에 안내를 잇는다. 클릭은 통과. */}
+        {ghost && (
+          <div
+            aria-hidden
+            data-testid="mention-ghost"
+            className={cn(className, 'pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words')}
+            style={{ color: 'transparent' }}
+          >
+            <span>{value}</span>
+            <span className="text-muted-foreground/60">{ghost}</span>
+          </div>
+        )}
         {/* 위/아래에 가려진 입력 내용이 있음을 알리는 회색 ^/v — 클릭 시 몇 줄씩 스크롤(#a3).
             mousedown preventDefault로 textarea 포커스를 뺏지 않는다. */}
         {scrollHint.up && (

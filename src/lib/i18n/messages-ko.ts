@@ -1456,4 +1456,6 @@ export const KO: Record<string, string> = {
   'Unnamed background': '이름 없는 배경',
   '{who}: visual description needed': '{who}: 시각 설명이 비어 있어요',
   '{who}: purpose needed': '{who}: 목적이 비어 있어요',
+  // 약속 M(2026-09-04): 완드에 @ 붙이기
+  'Fill in this card': '이 카드 채워줘',
 }

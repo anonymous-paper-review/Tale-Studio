@@ -150,3 +150,10 @@ paths:
 - Producer 게이트(`evaluateProducerGate`)는 배경 카드마다 빈 칸(이름·시각 설명·목적)을 `background:<localId>:<field>` 로 싣는다.
   완성 배경이 하나라도 있으면 권장 목록(soft)이고 넘김은 통과, 없으면 필수 목록(hard). 배경이 아예 없을 때만 "배경 1개 필요".
 - 같은 목록이 채팅 요청(`gate.hardMissing/softMissing` → `[Handoff Gate Status]`)과 제작 여정에 실린다 — 화면이 아는 빈 칸을 채팅이 모르는 일이 없다.
+
+## 완드 = 입력창에 @카드이름 (2026-09-04, 약속 M — `tests/promise-m-wand-mention.test.ts`)
+
+- Producer 카드의 완드는 보내지 않는다(오너 2안). `useChatUiStore.requestMentionCompose(label, hint)` → 채팅이 입력창을 `@라벨 ` 로 바꾸고
+  커서를 뒤에 두며, 입력이 그 상태인 동안 회색 안내(`MentionTextarea ghost`, "이 카드 채워줘")를 보인다.
+- 라벨은 `card-mention.ts`(이름 없는 카드도 "이름 미정 인물 2" 같은 고정 라벨)이고 서버가 같은 목록으로 카드 ref 를 찾는다 — 이름 없는 카드도 AI 가 안다.
+  Artist·Director·Editor 에는 완드를 새로 만들지 않는다(별도 결정 1안).

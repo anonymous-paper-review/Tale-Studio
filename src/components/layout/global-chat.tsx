@@ -672,9 +672,24 @@ export function GlobalChat() {
   }, [input, mentionItems, setMentionedRefs])
 
   // Cmd/Ctrl+클릭(카드) 또는 스크립트 라인 클릭 → 입력창에 @멘션 삽입/토글
+  // 약속 M(2026-09-04, 오너 2안): 완드는 보내지 않는다 — 입력창을 "@카드이름 " 로 바꾸고 커서를 그 뒤에 둔 채 회색 안내를 보인다.
+  const [composeHint, setComposeHint] = useState<{ token: string; hint: string } | null>(null)
   useEffect(() => {
     if (!mentionInsert) return
     const token = `@${mentionInsert.label}`
+    if (mentionInsert.mode === 'compose') {
+      const composed = `${token} `
+      setInput(composed)
+      setComposeHint({ token: composed, hint: mentionInsert.hint ?? '' })
+      consumeMentionInsert(mentionInsert.id)
+      requestAnimationFrame(() => {
+        const el = textareaRef.current
+        if (!el) return
+        el.focus()
+        el.setSelectionRange(composed.length, composed.length)
+      })
+      return
+    }
     setInput((prev) =>
       mentionInsert.mode === 'toggle'
         ? toggleMentionToken(prev, mentionInsert.label)
@@ -1828,6 +1843,7 @@ export function GlobalChat() {
                 onSubmit={handleSend}
                 items={mentionItems}
                 disabled={inputLocked}
+                ghost={composeHint && input === composeHint.token && composeHint.hint ? composeHint.hint : undefined}
                 placeholder={
                   choices && !choices.displayOnly
                     ? t('Answer using the choices above')

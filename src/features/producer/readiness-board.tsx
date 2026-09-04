@@ -29,7 +29,6 @@ import { Input } from '@/components/ui/input'
 import { StageHelpBadge } from '@/components/stage-help-badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Textarea } from '@/components/ui/textarea'
-import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { castMentions, backgroundMentions } from '@/lib/card-mention'
 import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
@@ -243,23 +242,6 @@ function castIssuesFor(gate: GateResult, localId: string) {
 // t 를 인자로 받는다 — 이 함수 자체는 컴포넌트가 아니라 훅을 못 쓴다(호출부는 전부 이 파일
 //   안의 컴포넌트라 t 전달이 안전하다, writer 배치의 relativeTime 패턴). issue.label 은
 //   src/lib/producer-gate.ts(이번 배치 범위 밖)가 하드코딩한 한국어라 그대로 통과시킨다.
-function castDraftPrompt(member: CastMember, t: ReturnType<typeof useT>, issue?: GateIssue) {
-  const label = member.name || (member.entityType === 'person' ? t('this character') : t('this object')) // copy-ok: fragment
-  const current = [
-    member.name ? t('Name: {value}', { value: member.name }) : null,
-    member.appearance ? t('Appearance: {value}', { value: member.appearance }) : null,
-    member.role
-      ? t('Role: {value}', { value: t(ROLE_LABEL[member.role] ?? member.role) })
-      : null,
-  ]
-    .filter(Boolean)
-    .join(' / ')
-  const target = issue?.label ?? t("{label}'s empty field", { label })
-  return (
-    t('Producer, please ask one question to help fill in {target}.', { target }) +
-    (current ? t(' Current info: {current}.', { current }) : '')
-  )
-}
 
 // 캐스트 한 줄(#b-rows) — [삭제] [아이콘] [이름] [외모] [배지] [상태] [상세] [프로듀서 호출].
 //   필수 두 칸(이름·외모)은 줄 위에서 바로 고치고, 역할·아크·동기는 아래로 펼친다.
@@ -267,7 +249,6 @@ function CastRow({
   member,
   issues,
   onPatch,
-  onAskProducer,
   onDelete,
   runtimeSeconds,
   mentionLabel,
@@ -275,13 +256,14 @@ function CastRow({
   member: CastMember
   issues: GateIssue[]
   onPatch: (localId: string, patch: Partial<CastMember>) => void
-  onAskProducer: (prompt: string) => void
   onDelete: (localId: string) => void
   runtimeSeconds: number
   mentionLabel: string
 }) {
   const t = useT()
   const isPerson = member.entityType === 'person'
+  // 약속 M: 완드는 보내지 않고 입력창에 "@카드이름 "을 넣는다(오너 2안).
+  const requestMentionCompose = useChatUiStore((s) => s.requestMentionCompose)
   const ready = issues.length === 0
   const nameIssue = issues.find((i) => i.field.endsWith(':name'))
   const appearanceIssue = issues.find((i) => i.field.endsWith(':appearance'))
@@ -416,7 +398,7 @@ function CastRow({
         <RowIconButton
           icon={Wand2}
           label={t('Ask Producer to fill this in')}
-          onClick={() => onAskProducer(castDraftPrompt(member, t, issues[0]))}
+          onClick={() => requestMentionCompose(mentionLabel, t('Fill in this card'))}
         />
         {/* 상세 펼침/접힘 전용 버튼(2026-08-06) — 빈 공간 클릭 토글(#b3)은 줄이 입력창으로
             가득 차 닫을 자리가 거의 없었다. 명시적 chevron 이 항상 열고 닫는다. */}
@@ -509,39 +491,22 @@ function backgroundReady(background: BackgroundSource): boolean {
   return isProducerBackgroundComplete(background)
 }
 
-function backgroundDraftPrompt(t: ReturnType<typeof useT>, background?: BackgroundSource) {
-  const current = background
-    ? [
-        background.name ? t('Name: {value}', { value: background.name }) : null,
-        background.visualDescription
-          ? t('Visual description: {value}', { value: background.visualDescription })
-          : null,
-        background.purpose ? t('Purpose: {value}', { value: background.purpose }) : null,
-      ].filter(Boolean).join(' / ')
-    : ''
-  return (
-    t(
-      'Producer, please fill in one background card that Writer and Artist can use right away. It needs a name, visual description, and purpose in the story.',
-    ) + (current ? t(' Current info: {current}.', { current }) : '')
-  )
-}
 
 // 배경 한 줄(#b-rows) — [삭제] [아이콘] [이름] [시각 설명] [목적] [배지] [상태] [프로듀서 호출].
 //   세 칸 모두 완성돼야 배경 게이트를 통과하므로(isProducerBackgroundComplete) 셋 다 줄 위에 둔다.
 function BackgroundRow({
   background,
   onPatch,
-  onAskProducer,
   onDelete,
   mentionLabel,
 }: {
   background: BackgroundSource
   onPatch: (localId: string, patch: Partial<BackgroundSource>) => void
-  onAskProducer: (prompt: string) => void
   onDelete: (localId: string) => void
   mentionLabel: string
 }) {
   const t = useT()
+  const requestMentionCompose = useChatUiStore((s) => s.requestMentionCompose)
   const ready = backgroundReady(background)
   // 내부 식별은 영어 키로 고정(includes 비교용) — 표시는 t() 로 별도 감싼다.
   const missing = [
@@ -615,7 +580,7 @@ function BackgroundRow({
         <RowIconButton
           icon={Wand2}
           label={t('Ask Producer to fill this in')}
-          onClick={() => onAskProducer(backgroundDraftPrompt(t, background))}
+          onClick={() => requestMentionCompose(mentionLabel, t('Fill in this card'))}
         />
       </div>
       {/* 목적 — 둘째 줄. 들여쓰기는 첫 줄 "묘사" head 의 x 위치에 맞춘다(#b1 2026-08-03):
@@ -719,10 +684,6 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
     return () => clearTimeout(t)
   }, [storyPulse])
 
-  // C5: 버튼 클릭 시 프롬프트를 타이핑창에 채우는 대신 대화에 바로 보내고 전송 동작을 수행한다.
-  const askProducer = (prompt: string) => {
-    void useGlobalChatStore.getState().sendMessage(prompt)
-  }
   const addPerson = () => {
     addCastMember('person')
   }
@@ -910,7 +871,6 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                     member={member}
                     issues={castIssuesFor(gate, member.localId)}
                     onPatch={updateCastMember}
-                    onAskProducer={askProducer}
                     onDelete={removeCastMember}
                     runtimeSeconds={projectSettings.playtime || 0}
                     mentionLabel={castMentionList[i]?.label ?? member.name}
@@ -949,7 +909,6 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                     key={background.localId}
                     background={background}
                     onPatch={updateBackground}
-                    onAskProducer={askProducer}
                     onDelete={removeBackground}
                     mentionLabel={bgMentionList[i]?.label ?? background.name}
                   />
