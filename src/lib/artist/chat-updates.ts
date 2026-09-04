@@ -17,11 +17,12 @@ const VALID_NARRATIVE_TIMES = new Set(['present', 'past', 'future'])
 // 자동 실행(applyUpdates) 허용 type 화이트리스트. 외형(원천) 변경 type 은 의도적으로 제외(F6).
 //   createAppearance(#g4-chat 2026-08-31): 새 모습 "행"을 추가할 뿐 기존 모습을 덮지 않아 changeAppearance 와
 //   달리 원천 mutation 이 아니다 — 무과금(이미지 생성은 별도 요청)이라 자동 실행 화이트리스트에 넣는다.
+// createAppearance 는 약속 C3·C4(2026-09-04)로 승인 게이트로 옮겼다 — 새 모습은 만든 직후 이미지를 자동 생성해
+//   과금이 생기므로 제안 카드(artistCreateAppearance)를 거친다(extractAppearanceCreations).
 export const AUTO_APPLY_UPDATE_TYPES = new Set([
   'createCharacter',
   'regenerateCharacter',
   'regenerateWorldAsset',
-  'createAppearance',
 ])
 
 function asString(x: unknown): string | undefined {
@@ -65,6 +66,8 @@ export function validateUpdates(raw: unknown[]): unknown[] {
           out.push({
             type: 'regenerateCharacter',
             characterId: rec.characterId,
+            // 약속 C6: 특정 모습을 다시 그린다(없으면 기본 모습). 존재 여부는 스토어가 확인한다.
+            ...(asString(rec.appearanceKey)?.trim() ? { appearanceKey: (rec.appearanceKey as string).trim() } : {}),
             ...(views.length ? { views } : {}),
             ...(asString(rec.instruction) ? { instruction: rec.instruction } : {}),
             // 이미지 모델 지정(선택) — 유효한 image-models 키만 통과, 미지정은 라우트 기본 모델.
@@ -110,6 +113,36 @@ export interface AppearanceProposal {
  *   validateUpdates(자동 실행 화이트리스트)는 이 type 을 드롭하므로, 외형 변경은 오직 이 함수를 거쳐
  *   pending-proposal('artistSourceAppearancePatch')로만 흐르고 사용자 승인 후에만 커밋된다(원천 = 사람 명시).
  */
+export interface AppearanceCreation {
+  characterId: string
+  label: string
+  appearance: string
+  narrativeTime?: string
+}
+
+/**
+ * cc 가 emit 한 "새 모습 만들기"(createAppearance) 의도 — 약속 C3(2026-09-04). 승인 뒤 행 생성 + 이미지 자동 생성.
+ */
+export function extractAppearanceCreations(raw: unknown[]): AppearanceCreation[] {
+  const out: AppearanceCreation[] = []
+  for (const u of raw) {
+    if (!u || typeof u !== 'object') continue
+    const rec = u as Record<string, unknown>
+    if (rec.type !== 'createAppearance') continue
+    const characterId = asString(rec.characterId)?.trim()
+    const label = asString(rec.label)?.trim()
+    const appearance = asString(rec.appearance)?.trim()
+    if (!characterId || !label || !appearance) continue
+    out.push({
+      characterId,
+      label,
+      appearance,
+      ...(typeof rec.narrativeTime === 'string' && VALID_NARRATIVE_TIMES.has(rec.narrativeTime) ? { narrativeTime: rec.narrativeTime } : {}),
+    })
+  }
+  return out
+}
+
 export interface LocationProposal {
   locationId: string
   visualDescription: string

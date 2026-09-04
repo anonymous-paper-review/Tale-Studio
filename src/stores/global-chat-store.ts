@@ -375,23 +375,9 @@ function handoffBlockers(spec: HandoffSpec): HandoffBlockers {
   if (spec.from === 'artist') {
     const gate = useProjectStore.getState().lifecycleStatus.director
     const hard = gate?.ready === false ? gate.blockers.map((b) => b.label) : []
-    // artist → director soft: main 사진만 있고 back/side 가 없는 캐릭터 수 — 하드게이트(main 미생성)와 겹치지 않도록 main 있는 캐릭터만 셀다.
-    const missingTurnaroundCount = useArtistStore
-      .getState()
-      .characterAssets.filter(
-        (c) =>
-          c.entityType === 'person'
-          && c.views.main != null
-          && (c.views.back == null || c.views.sideLeft == null || c.views.sideRight == null),
-      ).length
-    const soft =
-      missingTurnaroundCount > 0
-        ? [
-            translate(locale, '{count} characters have only a main view, with no back or side views yet', {
-              count: missingTurnaroundCount,
-            }),
-          ]
-        : []
+    // artist → director soft: 옛 "뒷모습·측면 없음" 경고는 약속 C9(2026-09-04)로 뺐다 — 시트 1장에 모든 각도가 있어
+    //   따로 만들 뒷모습·측면이 없다(개별 방향 뷰 생성은 2026-07-11 폐기).
+    const soft: string[] = []
     return { hard, soft }
   }
   if (spec.from === 'director') {
@@ -805,13 +791,13 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         //   외형 타임라인(#g4-chat 2026-08-31): 4뷰 횟수만 알려서는 "늙은/젊은 버전" 요청을 changeAppearance(원천
         //   교체)로 오인해 4뷰 레거시 어휘로만 답하던 오너 실측("천사의 old 버전")을 고친다 — 모습 목록을 노출해야
         //   cc 가 createAppearance(신규 행)와 changeAppearance 를 구분할 근거가 생긴다.
+        // 약속 C9(2026-09-04): 뒷모습·측면 4뷰 어휘를 쓰지 않는다 — 모습마다 시트 1장이 있는지만 말한다.
         const charLines = a.characterAssets.flatMap((c) => {
-          const filled = (['main', 'back', 'sideLeft', 'sideRight'] as const)
-            .filter((v) => c.views[v])
-            .join(', ')
-          const header = `- ${c.name} (${c.characterId}) — views: ${filled || '(없음)'}`
+          const header = `- ${c.name} (${c.characterId})`
           if (c.appearances.length <= 1) {
-            return [header, '  외형 타임라인: 기본 외형만 있음']
+            const only = c.appearances[0]
+            const hasImage = only && (only.sheetUrl || only.portraitUrl) ? 'has image' : 'no image'
+            return [header, `  외형 타임라인: 기본 모습만 있음 (${only?.appearanceKey ?? 'default'}, ${hasImage})`]
           }
           const appearanceLines = c.appearances.map((appearance) => {
             const time = appearance.narrativeTime ?? '-'
@@ -1190,6 +1176,34 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
                 translate(apLocale, 'The appearance does not change until you approve.'),
               ],
               payload: { characterId: ap.characterId, appearance: ap.appearance },
+            }),
+          )
+        }
+        // 새 모습 만들기 제안(약속 C3·C4, 2026-09-04) — 승인하면 행 추가 + 이미지 자동 생성(과금). 한 턴에 하나만.
+        const appearanceCreations = Array.isArray(data.appearanceCreations) ? data.appearanceCreations : []
+        if (appearanceCreations.length > 0 && !get().pendingProposal) {
+          const ac = appearanceCreations[0] as { characterId: string; label: string; appearance: string; narrativeTime?: string }
+          const acName =
+            useArtistStore.getState().characterAssets.find((c) => c.characterId === ac.characterId)?.name ||
+            ac.characterId
+          const acLocale = contentLocale()
+          get().offerPendingProposal(
+            createPendingProposal({
+              traceId,
+              stage: 'artist',
+              kind: 'artistCreateAppearance',
+              target: acName,
+              action: translate(acLocale, 'Add the appearance "{label}" and generate its image', { label: ac.label }),
+              impact: [
+                translate(acLocale, 'A new appearance tab is added to the character. The default appearance stays as it is.'),
+                translate(acLocale, 'Its image is generated right away using the default appearance as the face reference (generation cost).'),
+              ],
+              payload: {
+                characterId: ac.characterId,
+                label: ac.label,
+                appearance: ac.appearance,
+                ...(ac.narrativeTime ? { narrativeTime: ac.narrativeTime } : {}),
+              },
             }),
           )
         }
@@ -1739,6 +1753,19 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         }
         // 로컬 외형 갱신 → 기존 파생 이미지가 즉시 stale 로 표시(자동 재생성 없음, #57). 이후 cc 가 재생성 제안.
         useArtistStore.getState().applyAppearancePatch(characterId, appearance)
+      } else if (proposal.kind === 'artistCreateAppearance') {
+        const { characterId, label, appearance, narrativeTime } = proposal.payload as {
+          characterId?: unknown
+          label?: unknown
+          appearance?: unknown
+          narrativeTime?: unknown
+        }
+        if (typeof characterId !== 'string' || typeof label !== 'string' || typeof appearance !== 'string') {
+          throw new Error('appearance creation payload missing')
+        }
+        const time = narrativeTime === 'past' || narrativeTime === 'present' || narrativeTime === 'future' ? narrativeTime : undefined
+        // 승인 뒤: 행 추가 → 이미지 자동 생성(기본 모습 얼굴 참조, 잡 귀속 chat).
+        await useArtistStore.getState().createAppearance(characterId, label, appearance, time, { generate: true, actor: 'chat' })
       } else if (proposal.kind === 'artistSourceLocationPatch') {
         const locationId = proposal.payload.locationId
         const visualDescription = proposal.payload.visualDescription

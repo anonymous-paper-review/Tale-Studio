@@ -15,8 +15,10 @@ import { userOwnsProject } from '@/lib/generation-jobs'
 import { buildArtistActivityContext } from '@/lib/artist/chat-context'
 import {
   validateUpdates,
+  extractAppearanceCreations,
   extractAppearanceProposals,
   extractLocationProposals,
+  type AppearanceCreation,
   type AppearanceProposal,
   type LocationProposal,
 } from '@/lib/artist/chat-updates'
@@ -29,7 +31,8 @@ A character can have MULTIPLE appearances (an appearance timeline) — narrative
 
 <role>
 You can both discuss concept/art-direction AND directly mutate the studio by emitting an updates[] block.
-When the user wants to CREATE a new character, or REGENERATE a character's images or a world's background, plan the actions and emit them.
+When the user wants to CREATE a new character, or REGENERATE a character's image (its turnaround sheet) or a world's background, plan the actions and emit them.
+Each character has ONE image per appearance: a turnaround sheet that already contains every angle. Never talk about separate back/side views or "4 views" — there is only the sheet, per appearance.
 </role>
 
 <context>
@@ -45,17 +48,19 @@ Every image generation call is billed. Emit regenerate actions ONLY when the use
 <actions>
 1. {"type":"createCharacter","name":"...","role":"protagonist"|"antagonist"|"supporting","description":"성격·서사적 배경","appearance":"외형 prose (이미지 생성 프롬프트로 사용)"}
    - role / description / appearance 는 선택. 사용자가 새 캐릭터를 원할 때 사용.
-2. {"type":"regenerateCharacter","characterId":"<id>","views":["main","back","sideLeft","sideRight"],"model":"<image-model>"}
-   - views 선택 (생략 = 4뷰 전체 재생성). context 의 정확한 id 사용.
+2. {"type":"regenerateCharacter","characterId":"<id>","appearanceKey":"<appearance key>","instruction":"...","model":"<image-model>"}
+   - 그 캐릭터의 시트(턴어라운드 1장)를 다시 그린다. context 의 정확한 id 사용.
+   - appearanceKey 선택: 사용자가 특정 모습("젊은 시절 다시 그려줘")을 짚으면 context 의 외형 타임라인에 있는 그 모습의 키를
+     넣어라. 생략 = 기본 모습. 기본 모습이 아닌 모습을 다시 그릴 때 기본 모습을 건드리지 마라.
+   - instruction 선택: "더 낡게", "머리 짧게" 같은 이번 재생성에만 적용할 지시.
    - model 선택 (생략 = 기본 nano-banana-2). 사용자가 이미지 생성기를 지정할 때만 <image-models> 의 키로 전달.
 3. {"type":"regenerateWorldAsset","locationId":"<id>"}
    - context 의 정확한 id 사용.
 4. {"type":"createAppearance","characterId":"<id>","label":"...","appearance":"외형 prose","narrativeTime":"present"|"past"|"future"}
    - 사용자가 기존 캐릭터의 새로운 서사 시점 버전(old / young / injured 등)을 원할 때 쓴다 — 기본 외형을 덮어쓰는 changeAppearance 가 아니라
-     새 "행"을 추가하는 createAppearance 를 emit하라. 행 생성은 무과금이다 — 이미지 생성은 별도 요청이다. 사용자가
-     이어서 "그거 그려줘"라고 하면, 그때 새로 만든 appearanceKey 로 regenerateCharacter 를 emit해 그 모습의 이미지를 만든다
-     (지금은 행 생성만 하고 이미지는 생성하지 마라). appearance 는 이 새 모습의 전체 외형 prose(이미지 프롬프트).
-     label 은 화면에 보이는 이름(예: "젊은 시절", "다친 모습"). narrativeTime 은 선택(생략 가능).
+     새 "행"을 추가하는 createAppearance 를 emit하라. 이건 자동 실행되지 않고 앱이 "새 모습을 추가하고 이미지를 만들까요?" 승인 카드로
+     띄운다 — 승인하면 모습이 추가되고 그 이미지가 기본 모습의 얼굴을 참조해 바로 만들어진다(과금). appearance 는 이 새 모습의
+     전체 외형 prose(이미지 프롬프트). label 은 화면에 보이는 이름(예: "젊은 시절", "다친 모습"). narrativeTime 은 과거/현재/미래 중 하나.
 </actions>
 
 <image-models>
@@ -103,12 +108,12 @@ The JSON block (if any) MUST be the LAST element in the response.
 </example>
 
 <example>
-<user>char_woman 옆모습 다시 뽑아줘</user>
-<assistant>char_woman의 좌/우 측면 뷰를 재생성합니다.
+<user>char_woman 젊은 시절 모습 더 낡은 옷으로 다시 그려줘</user>
+<assistant>char_woman의 "젊은 시절" 모습 시트를 더 낡은 옷으로 다시 그립니다.
 
 \`\`\`json
 {"updates":[
-  {"type":"regenerateCharacter","characterId":"char_woman","views":["sideLeft","sideRight"]}
+  {"type":"regenerateCharacter","characterId":"char_woman","appearanceKey":"young","instruction":"더 낡고 해진 옷"}
 ]}
 \`\`\`</assistant>
 </example>
@@ -156,6 +161,7 @@ function parseUpdates(text: string): {
   updates: unknown[]
   proposals: AppearanceProposal[]
   locationProposals: LocationProposal[]
+  appearanceCreations: AppearanceCreation[]
   parseStatus: string
   rawUpdateCount: number
   validUpdateCount: number
@@ -173,6 +179,7 @@ function parseUpdates(text: string): {
     updates,
     proposals: extractAppearanceProposals(raw),
     locationProposals: extractLocationProposals(raw),
+    appearanceCreations: extractAppearanceCreations(raw),
     parseStatus: status,
     rawUpdateCount: raw.length,
     validUpdateCount: updates.length,
@@ -259,6 +266,7 @@ export async function POST(req: Request) {
       updates,
       proposals,
       locationProposals,
+      appearanceCreations,
       parseStatus,
       rawUpdateCount,
       validUpdateCount,
@@ -283,6 +291,7 @@ export async function POST(req: Request) {
       updates,
       proposals,
       locationProposals,
+      appearanceCreations,
       trace,
     })
   } catch (err) {

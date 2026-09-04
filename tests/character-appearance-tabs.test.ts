@@ -129,12 +129,18 @@ describe('PATCH /api/artist/character-appearance', () => {
   })
 
   it('updates exactly the selected appearance row', async () => {
-    const select = vi.fn().mockResolvedValue({ data: [{ appearance_key: 'young' }], error: null })
-    const appearanceKey = vi.fn().mockReturnValue({ select })
-    const characterId = vi.fn().mockReturnValue({ eq: appearanceKey })
-    const projectId = vi.fn().mockReturnValue({ eq: characterId })
-    const update = vi.fn().mockReturnValue({ eq: projectId })
-    routeMocks.from.mockReturnValue({ update })
+    // 약속 C8(2026-09-04) 뒤 PATCH 는 먼저 대상 행을 읽고(select…maybeSingle) 그다음 update 한다 — 한 체인 모의로 둘 다 받는다.
+    const chain: Record<string, unknown> = {}
+    const eq = vi.fn(() => chain)
+    const update = vi.fn(() => chain)
+    const select = vi.fn(() => chain)
+    chain.eq = eq
+    chain.update = update
+    chain.select = select
+    chain.maybeSingle = vi.fn(async () => ({ data: { appearance_key: 'young', is_default: false, narrative_time: 'past' }, error: null }))
+    chain.then = (onFulfilled: (v: unknown) => unknown, onRejected?: (e: unknown) => unknown) =>
+      Promise.resolve({ data: [{ appearance_key: 'young', label: 'Young', narrative_time: 'past', is_default: false }], error: null }).then(onFulfilled, onRejected)
+    routeMocks.from.mockReturnValue(chain)
     const { PATCH } = await import('@/app/api/artist/character-appearance/route')
 
     const response = await PATCH(
@@ -159,9 +165,9 @@ describe('PATCH /api/artist/character-appearance', () => {
         i18n_provenance: expect.any(Object),
       }),
     )
-    expect(projectId).toHaveBeenCalledWith('project_id', 'project-1')
-    expect(characterId).toHaveBeenCalledWith('character_id', 'char_3')
-    expect(appearanceKey).toHaveBeenCalledWith('appearance_key', 'young')
+    expect(eq).toHaveBeenCalledWith('project_id', 'project-1')
+    expect(eq).toHaveBeenCalledWith('character_id', 'char_3')
+    expect(eq).toHaveBeenCalledWith('appearance_key', 'young')
     await expect(response.json()).resolves.toMatchObject({
       appearanceKey: 'young',
       appearance: 'young prompt revised',

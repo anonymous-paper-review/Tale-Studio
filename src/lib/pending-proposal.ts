@@ -17,6 +17,8 @@ export type PendingProposalKind =
   | 'artistSourceAppearancePatch'
   // 약속 B6(2026-09-04): 배경 설명(원천) 변경도 같은 승인 게이트 — 승인 뒤 /api/artist/location 이 커밋한다.
   | 'artistSourceLocationPatch'
+  // 약속 C3·C4(2026-09-04): 새 모습 만들기 — 행 추가 뒤 이미지를 바로 만들어 과금이 생기므로 승인 카드를 거친다.
+  | 'artistCreateAppearance'
   | 'directorGenerateStoryboardImage'
   | 'writerShrinkDialogue'
 

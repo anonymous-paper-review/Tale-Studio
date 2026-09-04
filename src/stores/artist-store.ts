@@ -89,6 +89,8 @@ export interface NewCharacterInput {
 export type ArtistUpdate =
   | {
       type: 'regenerateCharacter'
+      /** 약속 C6: 다시 그릴 모습(없으면 기본 모습). */
+      appearanceKey?: string
       characterId: string
       views?: CharacterViewKey[]
       /** 재생성 시 유저 요청 델타(merge, AC13) — generate-sheet instruction 으로 전달. */
@@ -544,7 +546,13 @@ interface ArtistState {
     label: string,
     appearance: string,
     narrativeTime?: NarrativeTime,
-  ) => Promise<void>
+    /** 약속 C4(2026-09-04 오너): 새 모습은 만든 직후 이미지를 자동 생성한다. actor 는 잡 귀속용. */
+    options?: { generate?: boolean; actor?: GenerationActor; model?: ImageModelKey },
+  ) => Promise<string>
+  /** 약속 C8: 모습 이름·시점 바꾸기 / 기본 모습 지정 / 지우기. */
+  renameAppearance: (characterId: string, appearanceKey: string, label: string, narrativeTime?: NarrativeTime | null) => Promise<void>
+  setDefaultAppearance: (characterId: string, appearanceKey: string) => Promise<void>
+  deleteAppearance: (characterId: string, appearanceKey: string) => Promise<void>
   /** 후보 히스토리에서 이전 이미지를 선택본으로 되돌린다(#owner-keep-prev 2026-08-31). 무과금 — DB flip만. */
   selectCandidate: (
     characterId: string,
@@ -1563,7 +1571,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       } else if (u.type === 'regenerateCharacter') {
         const character = get().characterAssets.find((asset) => asset.characterId === u.characterId)
         if (!character) throw new Error(`Character ${u.characterId} was not found`)
-        const appearanceKey = requireDefaultAppearanceKey(character)
+        // 약속 C6(2026-09-04): 채팅이 특정 모습을 짚으면 그 모습을 다시 그린다 — 없거나 모르는 키면 기본 모습.
+        const requested = u.appearanceKey && character.appearances.some((a) => a.appearanceKey === u.appearanceKey)
+          ? u.appearanceKey
+          : null
+        const appearanceKey = requested ?? requireDefaultAppearanceKey(character)
         // 채팅발 재생성 — generation_jobs.actor='chat' 귀속 (chat-aware-regeneration).
         if (u.views?.length) {
           await runPool(
@@ -1626,7 +1638,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
 
   // 채팅 createAppearance(#g4-chat 2026-08-31) 배선 — 새 서사 시점 모습 "행"만 만든다. 이미지 생성은
   //   트리거하지 않는다(무과금 원칙). 서버가 appearance_key(label 슬러그 + 중복 suffix)를 정해 반환.
-  createAppearance: async (characterId, label, appearance, narrativeTime) => {
+  createAppearance: async (characterId, label, appearance, narrativeTime, options) => {
     const projectId = useProjectStore.getState().projectId
     if (!projectId) throw new Error('A project is required to create an appearance')
     const res = await fetch('/api/artist/character-appearance', {
@@ -1665,6 +1677,88 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
                 },
               ],
             }
+          : c,
+      ),
+    }))
+    // 약속 C4: 만든 직후 이미지 자동 생성(기본 모습 얼굴을 참조) — 호출자가 켤 때만(승인·버튼 뒤).
+    if (options?.generate) {
+      await get().generateCharacterView(characterId, created.appearanceKey, 'main', options.actor ?? 'ui', undefined, undefined, options.model)
+    }
+    return created.appearanceKey
+  },
+
+  renameAppearance: async (characterId, appearanceKey, label, narrativeTime) => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) throw new Error('A project is required to rename an appearance')
+    const res = await fetch('/api/artist/character-appearance', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId, characterId, appearanceKey, label, ...(narrativeTime !== undefined ? { narrativeTime } : {}) }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(body.error ?? `HTTP ${res.status}`)
+    }
+    const row = (await res.json()) as { label: string; narrativeTime: NarrativeTime | null }
+    set((state) => ({
+      characterAssets: state.characterAssets.map((c) =>
+        c.characterId === characterId
+          ? {
+              ...c,
+              appearances: c.appearances.map((a) =>
+                a.appearanceKey === appearanceKey ? { ...a, label: row.label, narrativeTime: row.narrativeTime } : a,
+              ),
+            }
+          : c,
+      ),
+    }))
+  },
+
+  setDefaultAppearance: async (characterId, appearanceKey) => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) throw new Error('A project is required to change the default appearance')
+    const res = await fetch('/api/artist/character-appearance', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId, characterId, appearanceKey, isDefault: true }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(body.error ?? `HTTP ${res.status}`)
+    }
+    const row = (await res.json()) as { narrativeTime: NarrativeTime | null }
+    set((state) => ({
+      characterAssets: state.characterAssets.map((c) =>
+        c.characterId === characterId
+          ? {
+              ...c,
+              appearances: c.appearances.map((a) =>
+                a.appearanceKey === appearanceKey
+                  ? { ...a, isDefault: true, narrativeTime: row.narrativeTime ?? a.narrativeTime }
+                  : { ...a, isDefault: false },
+              ),
+            }
+          : c,
+      ),
+    }))
+  },
+
+  deleteAppearance: async (characterId, appearanceKey) => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) throw new Error('A project is required to delete an appearance')
+    const res = await fetch('/api/artist/character-appearance', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId, characterId, appearanceKey }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(body.error ?? `HTTP ${res.status}`)
+    }
+    set((state) => ({
+      characterAssets: state.characterAssets.map((c) =>
+        c.characterId === characterId
+          ? { ...c, appearances: c.appearances.filter((a) => a.appearanceKey !== appearanceKey) }
           : c,
       ),
     }))

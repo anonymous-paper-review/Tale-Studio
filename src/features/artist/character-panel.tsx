@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/tooltip'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { CharacterViewDialog } from '@/features/artist/character-view-dialog'
+import { AppearanceCreateDialog } from '@/features/artist/appearance-create-dialog'
 import { TurnaroundRegionCycle } from '@/features/artist/turnaround-region-cycle'
 import { sameCharacterAppearanceSlot, useArtistStore } from '@/stores/artist-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
@@ -58,6 +59,8 @@ export function CharacterPanel({
     appearanceKey: string
     view: CharacterViewKey
   } | null>(null)
+  // "+ 모습 추가"(약속 C1·C2 2026-09-04) — 탭 줄은 모습이 하나뿐이어도 항상 보인다.
+  const [createFor, setCreateFor] = useState<string | null>(null)
 
   // Ctrl+휠 → 축척(#d1). passive:false 네이티브 리스너로 브라우저 페이지 줌을 막는다.
   //   굴림 판정은 공용 스텝퍼(wheel-notch, #a1) — burst = 1단계, OS 스크롤 설정과 무관.
@@ -220,13 +223,12 @@ export function CharacterPanel({
                 </div>
               </div>
 
-              {/* 모습 탭(#g4 2026-08-27) — 옥화 ┬ 현재 └ 젊은 시절.
-                  모습이 하나뿐이면 그리지 않는다: 지금까지의 카드와 똑같이 보인다.
-                  카드를 늘리는 대신 여기서 갈아끼우는 이유는, 카드를 나누면
-                  "이 둘이 같은 사람"이라는 정보가 화면에서 사라지기 때문이다. */}
-              {(char.appearances?.length ?? 0) > 1 && (
+              {/* 모습 탭(#g4 2026-08-27) — 옥화 ┬ 현재 └ 젊은 시절. 카드를 나누면 "이 둘이 같은 사람"이라는
+                  정보가 사라지므로 같은 카드 안에서 갈아끼운다. 약속 C1(2026-09-04): 모습이 하나뿐이어도 탭 줄을
+                  항상 보여 "+ 모습 추가" 자리를 둔다. 사물(object)은 모습 개념이 없다. */}
+              {!isObject && (
                 <div className="mb-2 flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
-                  {char.appearances!.map((ap) => {
+                  {(char.appearances ?? []).map((ap) => {
                     const active =
                       (pickedAppearance[char.characterId] ??
                         char.appearances!.find((a) => a.isDefault)?.appearanceKey) ===
@@ -252,6 +254,14 @@ export function CharacterPanel({
                       </button>
                     )
                   })}
+                  <button
+                    type="button"
+                    onClick={() => setCreateFor(char.characterId)}
+                    className="rounded-md border border-dashed border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent"
+                    title={t('Add appearance')}
+                  >
+                    {t('+ Add appearance')}
+                  </button>
                 </div>
               )}
 
@@ -314,6 +324,7 @@ export function CharacterPanel({
         view={viewDialog?.view ?? null}
         onClose={() => setViewDialog(null)}
       />
+      <AppearanceCreateDialog charId={createFor} onClose={() => setCreateFor(null)} />
     </div>
   )
 }

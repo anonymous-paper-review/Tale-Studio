@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Loader2, Sparkles, RefreshCw, AlertTriangle } from 'lucide-react'
+import { Loader2, Sparkles, RefreshCw, AlertTriangle, Pencil, Star, Trash2, Check } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { HoverBeam } from '@/components/hover-beam'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
@@ -46,6 +47,9 @@ export function CharacterViewDialog({ charId, appearanceKey, view, onClose }: Pr
   const generateCharacterView = useArtistStore((s) => s.generateCharacterView)
   const updateCharacterAppearance = useArtistStore((s) => s.updateCharacterAppearance)
   const selectCandidate = useArtistStore((s) => s.selectCandidate)
+  const renameAppearance = useArtistStore((s) => s.renameAppearance)
+  const setDefaultAppearance = useArtistStore((s) => s.setDefaultAppearance)
+  const deleteAppearance = useArtistStore((s) => s.deleteAppearance)
   const viewFailures = useArtistStore((s) => s.viewFailures)
   const retryCharacterViewSafe = useArtistStore((s) => s.retryCharacterViewSafe)
   const isGenerating = useArtistStore((s) =>
@@ -57,8 +61,13 @@ export function CharacterViewDialog({ charId, appearanceKey, view, onClose }: Pr
   // 외형 프롬프트(수정 후 재생성, 월드 다이얼로그와 대칭) — 대상(캐릭터×뷰) 전환 시 초기화.
   const [prompt, setPrompt] = useState('')
   const [promptKey, setPromptKey] = useState<string | null>(null)
-  // 이미지 생성 모델 선택 — 다이얼로그가 열려 있는 동안 유지(마지막 선택 기억). 기본은 gpt-image-2.
+  // 이미지 생성 모델 선택 — 다이얼로그가 열려 있는 동안 유지(마지막 선택 기억). 기본은 DEFAULT_IMAGE_MODEL.
   const [imageModel, setImageModel] = useState<ImageModelKey>(DEFAULT_IMAGE_MODEL)
+  // 모습 관리(약속 C8 2026-09-04): 이름 바꾸기 인라인 입력.
+  const [renaming, setRenaming] = useState(false)
+  const [renameDraft, setRenameDraft] = useState('')
+  const [manageBusy, setManageBusy] = useState(false)
+  const [manageError, setManageError] = useState<string | null>(null)
 
   // 클릭 즉시 잠금(#double-fire) — generatingViews 는 sendCharacterPatchNow 왕복 *뒤에* 세워지므로,
   //   느린 서버에서 그 사이 버튼이 열려 있어 두 번째 클릭이 기존 중복 가드까지 통과했다.
@@ -137,6 +146,113 @@ export function CharacterViewDialog({ charId, appearanceKey, view, onClose }: Pr
         </DialogHeader>
 
         <div className="space-y-3">
+          {/* 모습 관리(약속 C8) — 사람 캐릭터의 대표 뷰에서만: 이름 바꾸기 / 기본 모습으로 / 지우기(기본 모습은 못 지운다). */}
+          {!isObject && view === 'main' && (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-border px-3 py-2 text-xs">
+              {renaming ? (
+                <>
+                  <Input
+                    value={renameDraft}
+                    onChange={(e) => setRenameDraft(e.target.value)}
+                    className="h-7 max-w-[200px] text-xs"
+                    aria-label={t('Appearance name')}
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7"
+                    disabled={manageBusy || !renameDraft.trim()}
+                    onClick={async () => {
+                      setManageBusy(true)
+                      setManageError(null)
+                      try {
+                        await renameAppearance(char.characterId, appearanceKey, renameDraft.trim())
+                        setRenaming(false)
+                      } catch (e) {
+                        setManageError(e instanceof Error ? e.message : String(e))
+                      } finally {
+                        setManageBusy(false)
+                      }
+                    }}
+                  >
+                    <Check className="size-3.5" /> {t('Save')}
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-7" onClick={() => setRenaming(false)}>
+                    {t('Cancel')}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <span className="font-medium">{appearance.label}</span>
+                  {appearance.isDefault && (
+                    <span className="rounded-sm bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">{t('Default appearance')}</span>
+                  )}
+                  <span className="text-muted-foreground">
+                    {appearance.narrativeTime ? t(appearance.narrativeTime === 'past' ? 'Past' : appearance.narrativeTime === 'future' ? 'Future' : 'Present') : ''}
+                  </span>
+                  <span className="ml-auto flex items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7"
+                      onClick={() => {
+                        setRenameDraft(appearance.label)
+                        setRenaming(true)
+                      }}
+                    >
+                      <Pencil className="size-3.5" /> {t('Rename')}
+                    </Button>
+                    {!appearance.isDefault && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7"
+                        disabled={manageBusy}
+                        onClick={async () => {
+                          setManageBusy(true)
+                          setManageError(null)
+                          try {
+                            await setDefaultAppearance(char.characterId, appearanceKey)
+                          } catch (e) {
+                            setManageError(e instanceof Error ? e.message : String(e))
+                          } finally {
+                            setManageBusy(false)
+                          }
+                        }}
+                      >
+                        <Star className="size-3.5" /> {t('Set as default')}
+                      </Button>
+                    )}
+                    {!appearance.isDefault && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-destructive"
+                        disabled={manageBusy}
+                        onClick={async () => {
+                          if (!window.confirm(t('Delete the appearance "{label}"? Its images are removed from the history too.', { label: appearance.label }))) return
+                          setManageBusy(true)
+                          setManageError(null)
+                          try {
+                            await deleteAppearance(char.characterId, appearanceKey)
+                            onClose()
+                          } catch (e) {
+                            setManageError(e instanceof Error ? e.message : String(e))
+                          } finally {
+                            setManageBusy(false)
+                          }
+                        }}
+                      >
+                        <Trash2 className="size-3.5" /> {t('Delete')}
+                      </Button>
+                    )}
+                  </span>
+                </>
+              )}
+              {manageError && <p className="w-full text-destructive">{manageError}</p>}
+            </div>
+          )}
+
           {staleClass !== 'fresh' && (
             <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
               <RefreshCw className="size-3.5 shrink-0" />
