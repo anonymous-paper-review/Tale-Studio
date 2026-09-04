@@ -7,6 +7,9 @@
 //   공개 가능 키(수집 주소일 뿐 조회 권한 없음)라 NEXT_PUBLIC_ 노출이 표준이다.
 import * as Sentry from '@sentry/nextjs'
 
+// SDK가 요구하는 네비게이션 훅 — 추적(tracing) 0이라 실질 no-op지만 빌드 경고를 없애고 향후 호환 유지.
+export const onRouterTransitionStart = Sentry.captureRouterTransitionStart
+
 if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
   Sentry.init({
     dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
