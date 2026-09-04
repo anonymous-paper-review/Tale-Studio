@@ -276,7 +276,9 @@ function StatusStackRow({
         ) : (
           <CheckCircle2 className="size-3.5 shrink-0 text-success" />
         )}
-        <span className="min-w-0 flex-1 truncate">
+        {/* w-0: 채팅 목록은 Radix ScrollArea(display:table) 안이라 nowrap 텍스트의 min-content 가 목록 폭을 옆으로 늘린다 — 폭을 0 으로
+            선언해 flex 가 남는 자리만 주게 한다(가로 스크롤 방지). */}
+        <span className="w-0 flex-1 truncate">
           <MarkdownText text={scrub(first.msg.content.trimStart().replace(/^[✓⚠]\s*/, ''))} />
         </span>
         <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
