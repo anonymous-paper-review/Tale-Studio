@@ -108,3 +108,13 @@ paths:
   `runVideoBatch(pid, { limit })`. 승인 없이 스토어까지 온 `generateVideos` 는 skipped. 샷 하나의 영상은 여전히 채팅으로 시작하지 않는다.
 - 끝나면 러너가 완료 영수증(잡 id 별 첫 종결)을 세어 "N개 완료, M개 실패" 한 줄을 남긴다(`notifyBatchSummary`, 보고 있는 stage 여도).
   일괄 모드에서는 건별 완료 알림을 내지 않는다.
+
+## 캔버스 선 = 실제 입력 (2026-09-04, 약속 F·G — `tests/promise-f-edge-delete.test.ts`, `tests/promise-g-edge-truth.test.ts`)
+
+- 선은 노드 데이터에서만 파생된다: 참조 선 ← `characterAssetIds/worldAssetIds`(rebuildAssetNodes), 이미지 선 ← `imageInputs`,
+  프레임 선 ← `frameInputs`, 영상 체인 ← `videoChainInputId`. 없는 입력에는 선이 없다. 목록을 바꾸는 `updateNodeData` 는 참조 선을 바로 다시 그린다.
+- 선 지우기(`deleteEdge`)는 확인창 없이 노드 데이터의 그 입력을 지우고(`commitHistory` 로 Ctrl+Z), Delete 키·고른 선 위의 X(`CategoryEdge`)가
+  같은 경로다. 계층(parent)·previz 파생(chain)·프롬프트 선은 지우지 않는다.
+- 참조 목록의 진실: 사람이 손댄 샷은 `referenceOverride` + `shots.director_refs`(20260904120000, `{characters, locations}`; null = Writer 그대로).
+  Writer→Director 동기화는 손댄 목록을 덮지 않고, 실사 생성(단건·배치)은 `shots.characters ∩ director_refs.characters` 만 붙이며
+  `locations` 가 비면 배경도 붙이지 않는다(배치 시트는 그 시트의 샷 전부가 뺐을 때만). 하이드레이트가 이 열을 읽어 되살아남을 막는다.

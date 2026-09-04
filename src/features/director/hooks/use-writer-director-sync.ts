@@ -352,9 +352,11 @@ export function useWriterDirectorSync() {
           const d = existing.data
           const patch: Partial<ShotNodeData> = {}
           Object.assign(patch, buildWriterDirectorPromptPatch(d, sourcePrompt))
+          // 약속 F·G(2026-09-04): 사람이 손댄 참조 목록(referenceOverride)은 동기화가 덮지 않는다.
           if (
-            characterAssetIds.join(',') !== d.characterAssetIds.join(',') ||
-            worldAssetIds.join(',') !== d.worldAssetIds.join(',')
+            !d.referenceOverride &&
+            (characterAssetIds.join(',') !== d.characterAssetIds.join(',') ||
+              worldAssetIds.join(',') !== d.worldAssetIds.join(','))
           ) {
             patch.characterAssetIds = characterAssetIds
             patch.worldAssetIds = worldAssetIds

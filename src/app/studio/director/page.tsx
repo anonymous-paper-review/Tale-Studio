@@ -292,6 +292,14 @@ function CanvasInner() {
         if (target) {
           e.preventDefault()
           st.openDeleteConfirm(target.id)
+          return
+        }
+        // 약속 F1·F4(2026-09-04): 고른 선은 확인창 없이 지운다(Ctrl+Z 로 되돌림). 선 위의 X 와 같은 경로.
+        const selectedEdgeIds = st.edges.filter((edge) => edge.selected).map((edge) => edge.id)
+        const edgeIds = selectedEdgeIds.length ? selectedEdgeIds : st.selectedEdgeId ? [st.selectedEdgeId] : []
+        if (edgeIds.length) {
+          e.preventDefault()
+          for (const edgeId of edgeIds) st.deleteEdge(edgeId)
         }
         return
       }

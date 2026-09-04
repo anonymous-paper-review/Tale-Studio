@@ -57,6 +57,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import type { Json } from '@/types/database'
 import { invalidateShots, loadShotsResult } from '@/lib/shots-cache'
+import { parseDirectorRefs } from '@/lib/director/shot-references'
 import {
   isEmptyStableFrameInputs,
   parseStableFrameInputs,
@@ -954,12 +955,14 @@ function scheduleWiringSweepToDb(getState: () => DirectorCanvasState) {
             nodes,
             normalizeImageInputs(node.data.imageInputs),
           )
+          // 약속 F3·G3: 사람이 손댄 참조 목록만 DB 에 남긴다(null = Writer 그대로).
+          const refs = directorRefsOf(node.data)
           const key = `shot:${node.data.writerShotId}`
-          const json = JSON.stringify(stable)
+          const json = JSON.stringify({ i: stable, r: refs })
           if (lastSavedWiringByKey.get(key) === json) continue
           const { error } = await supabase
             .from('shots')
-            .update({ image_inputs: stable as unknown as Json })
+            .update({ image_inputs: stable as unknown as Json, director_refs: refs as unknown as Json })
             .eq('project_id', projectId)
             .eq('shot_id', node.data.writerShotId)
           if (error) throw error
@@ -1009,6 +1012,12 @@ function scheduleWiringSweepToDb(getState: () => DirectorCanvasState) {
       console.error('[director-store] wiring DB save failed:', err)
     }
   }, 500)
+}
+
+/** 약속 F·G: 샷의 참조 목록 → shots.director_refs 페이로드. 손대지 않은 샷은 null. */
+export function directorRefsOf(data: ShotNodeData): { characters: string[]; locations: string[] } | null {
+  if (!data.referenceOverride) return null
+  return { characters: [...data.characterAssetIds], locations: [...data.worldAssetIds] }
 }
 
 const pendingVideoClipSaves = new Map<string, ReturnType<typeof setTimeout>>()
@@ -1843,12 +1852,16 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           }
           // #wiring-persistence: DB에 저장된 안정 참조 연결. 노드 재구성 후 resolve 해 복원한다.
           const stableImageInputsByShotId = new Map<string, StableWiringRef[]>()
+          // 약속 F·G: 사람이 손댄 참조 목록(shots.director_refs) — 있으면 그것이 진실이다.
+          const directorRefsByShotId = new Map<string, { characters: string[]; locations: string[] }>()
           for (const r of shotsRes.data ?? []) {
             if (r.shot_id) {
               stableImageInputsByShotId.set(
                 r.shot_id,
                 parseStableImageInputs((r as { image_inputs?: unknown }).image_inputs),
               )
+              const refs = parseDirectorRefs((r as { director_refs?: unknown }).director_refs)
+              if (refs) directorRefsByShotId.set(r.shot_id, refs)
             }
           }
           const stableFrameByClipId = new Map<string, StableFrameInputs | null>()
@@ -2092,20 +2105,39 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             let changed = false
             const nodes = allNodes.map((node) => {
               if (isShotData(node.data) && node.data.writerShotId) {
+                let next = node
+                const refs = directorRefsByShotId.get(node.data.writerShotId)
+                if (
+                  refs &&
+                  (!node.data.referenceOverride ||
+                    refs.characters.join(',') !== node.data.characterAssetIds.join(',') ||
+                    refs.locations.join(',') !== node.data.worldAssetIds.join(','))
+                ) {
+                  changed = true
+                  next = {
+                    ...node,
+                    data: {
+                      ...node.data,
+                      characterAssetIds: refs.characters,
+                      worldAssetIds: refs.locations,
+                      referenceOverride: true,
+                    },
+                  } as DirectorNode
+                }
                 const stable = stableImageInputsByShotId.get(node.data.writerShotId)
-                if (!stable || stable.length === 0) return node
+                if (!stable || stable.length === 0) return next
                 const resolved = resolveImageInputs(allNodes, stable)
                 const local = normalizeImageInputs(node.data.imageInputs)
                 if (
                   resolved.length === local.length &&
                   resolved.every((v, i) => v === local[i])
                 ) {
-                  return node
+                  return next
                 }
                 changed = true
                 return {
-                  ...node,
-                  data: { ...node.data, imageInputs: resolved },
+                  ...next,
+                  data: { ...next.data, imageInputs: resolved },
                 } as DirectorNode
               }
               if (isVideoData(node.data) && node.data.videoClipId) {
@@ -2153,6 +2185,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             })
             return changed ? { nodes, lastSavedAt: Date.now() } : {}
           })
+          // 약속 F·G: DB 참조 목록을 적용했으면 참조 선을 다시 그린다.
+          if (directorRefsByShotId.size > 0) get().rebuildAssetNodes()
           // 스윅 캐시 시드 — DB와 같은 값을 다시 쓰지 않게. 로컬 우위로 달라진 항목은
           //   캐시 미스가 나 아래 스윅이 자연스럽게 백필한다.
           for (const [shotId, stable] of stableImageInputsByShotId) {
@@ -2828,6 +2862,12 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         if (isShotConfigChange) {
           get().propagateStaleFromShot(id)
         }
+        // 약속 G3(2026-09-04): 팝업에서 참조를 빼면 선도 같이 사라지고 넣으면 생긴다 — 목록이 바뀌면 참조 선을 바로 다시
+        //   그리고, 사람이 손댄 목록(referenceOverride)은 DB(shots.director_refs)에 남긴다.
+        if (isShotData(prev.data) && ('characterAssetIds' in shotPatch || 'worldAssetIds' in shotPatch)) {
+          get().rebuildAssetNodes()
+          if (shotPatch.referenceOverride || prev.data.referenceOverride) scheduleWiringSweepToDb(get)
+        }
 
         // Step 0 (unify-director-store-db): camera/lighting/cameraPreset 변경을
         // DB shots로 write-through (캐넌 일원화). writerShotId 있는 노드만 — 수동생성 노드는 Step 2까지 skip.
@@ -3415,6 +3455,16 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       deleteEdge: (id) => {
         if (isDemoSession()) return
         const removedEdge = get().edges.find((edge) => edge.id === id)
+        if (!removedEdge) return
+        // 약속 F4(2026-09-04): 확인창 없이 지우되 Ctrl+Z 로 되돌린다 — 지우기 전 스냅샷.
+        get().commitHistory()
+        // 약속 F3: 참조 선(에셋→샷)을 지우면 그 샷의 참조 목록에서도 빠진다 — 사람이 손댄 목록(referenceOverride)이 되어
+        //   Writer 동기화가 덮지 않고, DB(shots.director_refs)로 남아 다음 실사 생성에 쓰이지 않는다.
+        const refSource =
+          removedEdge.data?.category === 'references'
+            ? get().nodes.find((n) => n.id === removedEdge.source)
+            : null
+        const refAsset = refSource && isAssetData(refSource.data) ? refSource.data : null
         set((s) => ({
           nodes:
             removedEdge?.data?.category === 'video-chain'
@@ -3500,16 +3550,39 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                       },
                     } as DirectorNode
                   })
+              : refAsset
+                ? s.nodes.map((node) => {
+                    if (node.id !== removedEdge.target || !isShotData(node.data)) return node
+                    const nextChars =
+                      refAsset.assetKind === 'character'
+                        ? node.data.characterAssetIds.filter((x) => x !== refAsset.assetId)
+                        : node.data.characterAssetIds
+                    const nextWorlds =
+                      refAsset.assetKind === 'world'
+                        ? node.data.worldAssetIds.filter((x) => x !== refAsset.assetId)
+                        : node.data.worldAssetIds
+                    return {
+                      ...node,
+                      data: {
+                        ...node.data,
+                        characterAssetIds: nextChars,
+                        worldAssetIds: nextWorlds,
+                        referenceOverride: true,
+                        stale: node.data.storyboardImage?.status === 'completed' ? true : node.data.stale,
+                      },
+                    } as DirectorNode
+                  })
               : s.nodes,
           edges: s.edges.filter((e) => e.id !== id),
           selectedEdgeId: s.selectedEdgeId === id ? null : s.selectedEdgeId,
           lastSavedAt: Date.now(),
         }))
-        // #wiring-persistence: frame/image/video-chain 해제도 DB에 반영한다.
+        // #wiring-persistence: frame/image/video-chain/references 해제도 DB에 반영한다.
         if (
-          removedEdge?.data?.category === 'frame' ||
-          removedEdge?.data?.category === 'image' ||
-          removedEdge?.data?.category === 'video-chain'
+          removedEdge.data?.category === 'frame' ||
+          removedEdge.data?.category === 'image' ||
+          removedEdge.data?.category === 'video-chain' ||
+          refAsset
         ) {
           scheduleWiringSweepToDb(get)
         }
@@ -4672,6 +4745,10 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         })
         get().rebuildAssetNodes()
         get().rebuildShotChainNodes()
+        // 약속 F4: 되돌린 노드 입력(imageInputs·videoChainInputId)에서 파생 선을 다시 그리고 DB 에도 남긴다.
+        get().rebuildImageEdges()
+        get().rebuildVideoChainEdges()
+        scheduleWiringSweepToDb(get)
       },
       redo: () => {
         const s = get()
@@ -4696,6 +4773,10 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         })
         get().rebuildAssetNodes()
         get().rebuildShotChainNodes()
+        // 약속 F4: 되돌린 노드 입력(imageInputs·videoChainInputId)에서 파생 선을 다시 그리고 DB 에도 남긴다.
+        get().rebuildImageEdges()
+        get().rebuildVideoChainEdges()
+        scheduleWiringSweepToDb(get)
       },
 
       ensureVideoThumbnail: async (videoNodeId) => {

@@ -90,7 +90,7 @@ export async function POST(req: Request) {
         .maybeSingle(),
       supabaseAdmin
         .from('shots')
-        .select('shot_id, scene_id, sort_order, rough_storyboard, check_notes, characters, character_appearance_keys, static_spec')
+        .select('shot_id, scene_id, sort_order, rough_storyboard, check_notes, characters, character_appearance_keys, static_spec, director_refs')
         .eq('project_id', projectId)
         .eq('shot_id', writerShotId)
         .maybeSingle(),

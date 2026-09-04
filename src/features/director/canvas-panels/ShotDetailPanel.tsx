@@ -56,14 +56,14 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
     const next = data.characterAssetIds.includes(id)
       ? data.characterAssetIds.filter((x) => x !== id)
       : [...data.characterAssetIds, id]
-    updateNodeData<'shot'>(nodeId, { characterAssetIds: next })
+    updateNodeData<'shot'>(nodeId, { characterAssetIds: next, referenceOverride: true })
   }
 
   const toggleWorld = (id: string) => {
     const next = data.worldAssetIds.includes(id)
       ? data.worldAssetIds.filter((x) => x !== id)
       : [...data.worldAssetIds, id]
-    updateNodeData<'shot'>(nodeId, { worldAssetIds: next })
+    updateNodeData<'shot'>(nodeId, { worldAssetIds: next, referenceOverride: true })
   }
 
   const handleAddReferenceImage = (file: File) => {

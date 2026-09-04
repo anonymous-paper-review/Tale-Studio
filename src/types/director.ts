@@ -123,6 +123,9 @@ export type ShotNodeData = {
   characterAssetIds: string[]
   /** Artist Asset Storage RegisteredWorld.id 목록 */
   worldAssetIds: string[]
+  /** 약속 F·G(2026-09-04): 사람이 참조 목록을 손댔다(선 삭제·팝업 토글). true 면 Writer 동기화가 목록을 덮지 않고
+   *  DB(shots.director_refs)에 남아 실사 생성이 이 목록만 붙인다. */
+  referenceOverride?: boolean
   camera: CameraConfig
   lighting: LightingConfig
   cameraPreset: CameraPreset

@@ -1201,6 +1201,7 @@ export type Database = {
           dynamic_spec: Json | null
           source: string
           image_inputs: Json
+          director_refs: Json | null
           character_appearance_keys: Json
         }
         Insert: {
@@ -1245,6 +1246,7 @@ export type Database = {
           dynamic_spec?: Json | null
           source?: string
           image_inputs?: Json
+          director_refs?: Json | null
           character_appearance_keys: Json
         }
         Update: {
@@ -1289,6 +1291,7 @@ export type Database = {
           dynamic_spec?: Json | null
           source?: string
           image_inputs?: Json
+          director_refs?: Json | null
           character_appearance_keys?: Json
         }
         Relationships: [

@@ -20,7 +20,7 @@ import {
   realSheetCanvas,
   type CharacterRefLabel,
 } from '@/lib/director/storyboard-strip'
-import { loadSceneWorldRefs, readCharacterBlocking } from '@/lib/director/shot-references'
+import { applyDirectorRefs, directorRefsExcludeWorld, loadSceneWorldRefs, parseDirectorRefs, readCharacterBlocking } from '@/lib/director/shot-references'
 import { parseProjectFormat } from '@/types/project'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 import { storageKeySegment } from '@/lib/storage/key-segment'
@@ -40,6 +40,8 @@ interface EligibleShot {
   frames: { start: string; direction: string; end: string }
   /** #ref-gate: 러프의 character_blocking — 칸 안에서 어느 인형이 누구인지. */
   blocking: Map<string, { position: string | null; pose: string | null }>
+  /** 약속 F3: Director 에서 배경 참조 선을 지운 샷 — 시트 전체가 뺐을 때만 배경을 안 붙인다. */
+  excludeWorld: boolean
 }
 
 class CharacterAppearanceContractError extends Error {}
@@ -95,7 +97,7 @@ export async function POST(req: NextRequest) {
 
     const { data: rows } = await supabaseAdmin
       .from('shots')
-      .select('shot_id, scene_id, characters, character_appearance_keys, rough_storyboard, storyboard_image, static_spec')
+      .select('shot_id, scene_id, characters, character_appearance_keys, rough_storyboard, storyboard_image, static_spec, director_refs')
       .eq('project_id', projectId)
       .order('sort_order')
 
@@ -123,11 +125,14 @@ export async function POST(req: NextRequest) {
       ) {
         throw new CharacterAppearanceContractError(`Character appearance contract error: shot ${s.shot_id} character_appearance_keys does not match its characters`)
       }
+      // 약속 F3: 사람이 지운 참조는 붙이지 않는다(계약 검사는 Writer 원본으로, 참조는 override 로).
+      const directorRefs = parseDirectorRefs((s as { director_refs?: unknown }).director_refs)
       eligible.push({
         shot_id: s.shot_id as string,
         scene_id: s.scene_id as string,
-        characters,
+        characters: applyDirectorRefs(characters, directorRefs),
         characterAppearanceKeys,
+        excludeWorld: directorRefsExcludeWorld(directorRefs),
         frames: { start: f.start, direction: f.direction, end: f.end },
         blocking: readCharacterBlocking(s.static_spec),
       })
@@ -298,7 +303,7 @@ export async function POST(req: NextRequest) {
       // #anchor-wiring(2026-08-14 오너 확정): 앵커별 검증 절 + 서브룩 그레이드 권위 + watercolor
       //   A안(preview 2번 스타일 레퍼런스). 전부 DB(style_anchors)가 진실.
       const anchorTwoRef = !!(anchor?.usePreviewRef && anchor.previewUrl)
-      const worldRef = worldRefByScene.get(group[0].scene_id) ?? null
+      const worldRef = group.every((s) => s.excludeWorld) ? null : (worldRefByScene.get(group[0].scene_id) ?? null)
       const prompt = buildRealGridPrompt(group.length, {
         characterRefCount: groupRefs.length,
         worldRefCount: worldRef ? 1 : 0,

@@ -1419,4 +1419,6 @@ export const KO: Record<string, string> = {
   '{done} videos done, {failed} failed': '영상 {done}개 완료, {failed}개 실패',
   'A proposal is already pending, so the video generation proposal was held back.': '이미 대기 중인 제안이 있어 영상 생성 제안은 보류했어요.',
   'Chat can start videos only for all remaining shots at once. For one shot, use the Video take button on the Shot node.': '채팅은 남은 샷 전체의 영상만 한꺼번에 시작할 수 있어요. 샷 하나는 Shot 카드의 Video take 버튼을 눌러 주세요.',
+  // 약속 F(2026-09-04): 선 지우기
+  'Delete connection': '연결 지우기',
 }
