@@ -112,7 +112,7 @@ describe('handoff soft blockers warn but still proceed', () => {
     expect(useProjectStore.getState().currentStage).toBe('artist')
   })
 
-  it('artist → director: characters with only a main view (soft) still hands off with a quality warning', async () => {
+  it('artist → director: a character whose sheet exists hands off without a back/side-view warning (약속 C9 2026-09-04)', async () => {
     useProjectStore.setState({ currentStage: 'artist', reachedStage: 'artist' })
     useProjectStore.setState({
       lifecycleStatus: {
@@ -153,7 +153,8 @@ describe('handoff soft blockers warn but still proceed', () => {
     const messages = useGlobalChatStore.getState().messages
     const reply = messages.find((m) => m.role === 'model')
     expect(reply?.content).not.toContain("Can't move to")
-    expect(reply?.content).toMatch(/quality may suffer|퀄리티/i)
+    // 시트 1장에 모든 각도가 있으므로 "뒷모습·측면 없음" 경고는 사라졌다(약속 C9). 넘김은 그대로 진행된다.
+    expect(reply?.content).not.toMatch(/back or side|뒷모습|측면/i)
     expect(useProjectStore.getState().currentStage).toBe('director')
   })
 })
