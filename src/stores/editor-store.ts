@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { TitleCardData } from '@/types/shot'
 import type { Shot, VideoClip, DialogueLine, AudioTrackClip, AudioSource } from '@/types'
 import { toast } from 'sonner'
 import { useProjectStore } from '@/stores/project-store'
@@ -62,7 +63,9 @@ export function baseShotIdOf(shotId: string): string {
 }
 
 // 타이틀 카드 판별(#owner-title-card) — __t 접미. baseShotIdOf 대상이 없다(독립 클립, 원본 shot 미연결).
-const TITLE_CARD_RE = /__t[A-Za-z0-9-]+$/
+// 약속 J2(2026-09-04): 타이틀 카드를 가운데서 자르면 조각 id 가 `title__tX__cY` 가 된다 — 접미가 __t 로 끝나지 않아도
+//   타이틀 카드다. 옛 정규식(/__t…$/)은 자른 조각을 못 알아봐 새로고침 복원에서 버렸다(사라지는 버그의 원인).
+const TITLE_CARD_RE = /__t[A-Za-z0-9-]+(?:__[ci][A-Za-z0-9-]+)*$/
 export function isTitleCardShotId(shotId: string): boolean {
   return TITLE_CARD_RE.test(shotId)
 }
@@ -149,7 +152,9 @@ interface EditorState {
   //   인접 경계에 삽입. 길이는 기존 트림 문법(setTrim)을 재사용.
   addTitleCard: (atGlobalSec: number) => void
   // 타이틀 카드 텍스트/이미지 갱신(인스펙터/더블클릭 편집). history 는 호출부가 관리.
-  updateTitleCard: (shotId: string, patch: Partial<{ text: string; imageUrl: string | null }>) => void
+  updateTitleCard: (shotId: string, patch: Partial<TitleCardData>) => void
+  /** 약속 J3·J4: 타이틀 카드 길이를 초 단위 숫자로 — 5초를 넘을 수 있다. */
+  setTitleCardDuration: (shotId: string, seconds: number) => void
 
   // Video Source 패널 액션
   toggleSourcePanel: () => void
@@ -1068,6 +1073,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       videoClips: state.videoClips.map((c) =>
         c.shotId === shotId ? { ...c, trimStart: start, trimEnd } : c,
       ),
+      // 약속 J3: 타이틀 카드는 원본 영상이 없어 "원본 길이"가 없다 — 손잡이로 늘린 만큼 카드 길이가 길어진다.
+      shots: isTitleCardShotId(shotId)
+        ? state.shots.map((s) => (s.shotId === shotId && trimEnd > s.durationSeconds ? { ...s, durationSeconds: trimEnd } : s))
+        : state.shots,
     }))
 
     // synthetic pieces have no shots row - the editor_states snapshot restores them instead.
@@ -1369,10 +1378,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => ({
       shots: state.shots.map((s) =>
         s.shotId === shotId
-          ? { ...s, titleCard: { text: s.titleCard?.text ?? '', imageUrl: s.titleCard?.imageUrl ?? null, ...patch } }
+          ? { ...s, titleCard: { text: s.titleCard?.text ?? '', imageUrl: s.titleCard?.imageUrl ?? null, layout: s.titleCard?.layout ?? null, ...patch } }
           : s,
       ),
     })),
+
+  setTitleCardDuration: (shotId, seconds) =>
+    set((state) => {
+      if (!isTitleCardShotId(shotId) || !Number.isFinite(seconds)) return state
+      const sec = Math.max(0.5, Math.min(600, Math.round(seconds * 10) / 10))
+      return {
+        shots: state.shots.map((s) => (s.shotId === shotId ? { ...s, durationSeconds: sec } : s)),
+        videoClips: state.videoClips.map((c) => (c.shotId === shotId ? { ...c, trimStart: 0, trimEnd: sec } : c)),
+        past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
+        future: [],
+      }
+    }),
 
 }))
 

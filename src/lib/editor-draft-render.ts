@@ -13,6 +13,8 @@
 //   - 출력: MediaRecorder 가 지원하면 mp4, 아니면 webm → <a download> 저장.
 
 import type { AudioTrackClip } from '@/types'
+import { drawTitleCard } from '@/lib/editor/title-card'
+import type { TitleCardData } from '@/types/shot'
 import { cachedVideoUrl, prefetchVideos } from '@/features/editor/video-prefetch'
 
 export interface DraftRenderStats {
@@ -106,6 +108,23 @@ function drawImageSafe(
   } catch {
     /* skip frame */
   }
+}
+
+/** 타이틀 카드 이미지 미리 받기 — 실패·지연(8초)이면 이미지 없이 글자만 그린다(내보내기를 막지 않는다). */
+function loadTitleImage(url: string | null | undefined): Promise<HTMLImageElement | null> {
+  if (!url) return Promise.resolve(null)
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    const done = (v: HTMLImageElement | null) => {
+      clearTimeout(timer)
+      resolve(v)
+    }
+    const timer = setTimeout(() => done(null), 8000)
+    img.onload = () => done(img)
+    img.onerror = () => done(null)
+    img.src = url
+  })
 }
 
 function drawPlaceholder(ctx: CanvasRenderingContext2D, W: number, H: number, label: string) {
@@ -247,6 +266,7 @@ export async function renderDraftTimeline(opts: {
   // 세그먼트 러너가 갱신 — 그리기 루프는 "지금 활성인 세그먼트"만 읽는다.
   let activeLabel = ''
   let videoActive = false
+  let activeTitle: { card: TitleCardData; image: HTMLImageElement | null } | null = null
 
   const cleanup = () => {
     if (raf != null) cancelAnimationFrame(raf)
@@ -291,6 +311,8 @@ export async function renderDraftTimeline(opts: {
       onPhase?.('record', Math.min(1, clock / total))
       if (videoActive && videoEl.readyState >= 2) {
         drawCover(ctx, videoEl, W, H)
+      } else if (activeTitle) {
+        drawTitleCard(ctx, W, H, activeTitle.card, activeTitle.image)
       } else if (!videoActive) {
         drawPlaceholder(ctx, W, H, activeLabel)
       }
@@ -336,9 +358,12 @@ export async function renderDraftTimeline(opts: {
       // 타이틀 카드(#owner-title-card): FFmpeg drawtext 없이도 캔버스 placeholder 경로를 그대로
       //   재사용해 검은 배경+텍스트를 그린다 — 이미지 합성(이미지 위에 텍스트 오버레이)은 범위 밖(MVP: 텍스트만).
       if (shot?.titleCard) {
-        activeLabel = shot.titleCard.text || item.shotId
+        // 약속 J6·J7·J8(2026-09-04): 이미지+글자를 미리보기와 같은 배치·줄바꿈으로 그린다. 빈 글자는 아무것도 찍지 않는다.
+        activeTitle = { card: shot.titleCard, image: await loadTitleImage(shot.titleCard.imageUrl) }
+        activeLabel = ''
         videoActive = false
         await waitUntil(item.startSec + item.durationSec)
+        activeTitle = null
         continue
       }
       activeLabel = shot?.shotType ? `${item.shotId} · ${shot.shotType}` : item.shotId

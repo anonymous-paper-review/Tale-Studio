@@ -1436,4 +1436,17 @@ export const KO: Record<string, string> = {
   'You need the 3-frame rough set to redraw a frame': '한 장을 다시 그리려면 러프 3장 세트가 있어야 해요.',
   'Failed to download the {frame} frame: HTTP {status}': '{frame} 프레임을 내려받지 못했어요: HTTP {status}',
   'The {frame} frame is abnormally small ({bytes}b)': '{frame} 프레임이 비정상적으로 작아요({bytes}b)',
+  // 약속 J(2026-09-04): 타이틀 카드
+  'Put an image on the title card': '타이틀 카드에 이미지 넣기',
+  'Pick one made in Artist or Director, or upload a file from your computer.': 'Artist·Director에서 만든 것 중 고르거나 내 컴퓨터의 파일을 올려요.',
+  'Upload from my computer': '내 컴퓨터에서 올리기',
+  'No project images yet. Upload a file instead.': '아직 프로젝트 이미지가 없어요. 파일을 올려 주세요.',
+  'Upload failed': '올리지 못했어요.',
+  'Replace image': '이미지 바꾸기',
+  'Put an image': '이미지 넣기',
+  'Remove image': '이미지 빼기',
+  'Text in front': '글자를 앞으로',
+  'Image in front': '이미지를 앞으로',
+  'Reset layout': '배치 되돌리기',
+  'Title card length (seconds)': '타이틀 카드 길이(초)',
 }

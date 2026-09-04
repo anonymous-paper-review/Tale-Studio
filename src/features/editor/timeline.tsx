@@ -85,6 +85,8 @@ interface TimelineProps {
   onUpdateAudioClip: (id: string, patch: Partial<AudioTrackClip>) => void
   // trim commit on handle drop - persists via store (DB write-through / snapshot restore)
   onSetTrim: (shotId: string, trimStart: number, trimEnd: number) => void
+  /** 약속 J4: 타이틀 카드 길이를 초 단위 숫자로(라벨 클릭·더블클릭). */
+  onSetTitleCardDuration: (shotId: string, seconds: number) => void
   onPushHistory: () => void
 }
 
@@ -405,6 +407,7 @@ export function Timeline({
   onUpdateVideoClip,
   onUpdateAudioClip,
   onSetTrim,
+  onSetTitleCardDuration,
   onPushHistory,
 }: TimelineProps) {
   const t = useT()
@@ -420,6 +423,8 @@ export function Timeline({
   const [reorder, setReorder] = useState<{ shotId: string; targetIndex: number } | null>(null)
   const [cutHoverSec, setCutHoverSec] = useState<number | null>(null) // cut 모드 미리보기 위치
   // 트림 미리보기: 드래그 중엔 실제 변경 없이 점선 박스 + 마우스 옆 시간초만 표시, 드롭 시 적용 (요청)
+  // 약속 J4(2026-09-04): 타이틀 카드 길이 숫자 입력 — 어느 클립의 라벨을 열었는지.
+  const [durationEdit, setDurationEdit] = useState<{ shotId: string; value: string } | null>(null)
   const [trimPreview, setTrimPreview] = useState<
     { scope: 'video' | string; leftSec: number; rightSec: number; label: string; clientX: number; clientY: number } | null
   >(null)
@@ -863,8 +868,54 @@ export function Timeline({
                             <span className="font-mono">{shot.shotType}</span>
                           )}
                         </div>
-                        <span className="pointer-events-none absolute left-1 top-0.5 rounded bg-black/60 px-1 font-mono text-[8px] text-white">
-                          {isTitleCardShotId(item.shotId) ? t('Title') : shot.shotType}
+                        {/* 약속 J4: 타이틀 카드는 라벨에 길이가 보이고, 누르면 초 단위 숫자를 넣는다. */}
+                        {isTitleCardShotId(item.shotId) && durationEdit?.shotId === item.shotId ? (
+                          <input
+                            data-no-seek
+                            autoFocus
+                            type="number"
+                            min={0.5}
+                            max={600}
+                            step={0.1}
+                            value={durationEdit.value}
+                            aria-label={t('Title card length (seconds)')}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onChange={(e) => setDurationEdit({ shotId: item.shotId, value: e.target.value })}
+                            onKeyDown={(e) => {
+                              e.stopPropagation()
+                              if (e.key === 'Enter') {
+                                const n = Number(durationEdit.value)
+                                if (Number.isFinite(n) && n > 0) onSetTitleCardDuration(item.shotId, n)
+                                setDurationEdit(null)
+                              } else if (e.key === 'Escape') {
+                                setDurationEdit(null)
+                              }
+                            }}
+                            onBlur={() => {
+                              const n = Number(durationEdit.value)
+                              if (Number.isFinite(n) && n > 0) onSetTitleCardDuration(item.shotId, n)
+                              setDurationEdit(null)
+                            }}
+                            className="absolute left-1 top-0.5 z-20 w-14 rounded border border-primary bg-black px-1 font-mono text-[9px] text-white outline-none"
+                          />
+                        ) : null}
+                        <span
+                          data-no-seek={isTitleCardShotId(item.shotId) ? true : undefined}
+                          onPointerDown={(e) => {
+                            if (isTitleCardShotId(item.shotId)) e.stopPropagation()
+                          }}
+                          onClick={(e) => {
+                            if (!isTitleCardShotId(item.shotId)) return
+                            e.stopPropagation()
+                            setDurationEdit({ shotId: item.shotId, value: item.durationSec.toFixed(1) })
+                          }}
+                          title={isTitleCardShotId(item.shotId) ? t('Title card length (seconds)') : undefined}
+                          className={cn(
+                            'absolute left-1 top-0.5 rounded bg-black/60 px-1 font-mono text-[8px] text-white',
+                            isTitleCardShotId(item.shotId) ? 'cursor-text hover:bg-primary/70' : 'pointer-events-none',
+                          )}
+                        >
+                          {isTitleCardShotId(item.shotId) ? `${t('Title')} · ${item.durationSec.toFixed(1)}s` : shot.shotType}
                           {clip?.speed && clip.speed !== 1 && <span className="ml-1 text-primary">{clip.speed.toFixed(2)}×</span>}
                         </span>
                         {/* 트림 핸들 (요청): 점선 미리보기 → 드롭 시 적용. 원본 길이 초과 불가. */}
@@ -919,7 +970,10 @@ export function Timeline({
                             const t0 = clip?.trimStart ?? 0
                             const startSec = item.startSec
                             const minRight = startSec + TRIM_MIN
-                            const maxRight = startSec + (base - t0) / speed // 원본 끝까지만
+                            // 약속 J3: 타이틀 카드는 원본이 없어 끝이 없다 — 늘린 만큼 길어진다(상한 600초).
+                            const maxRight = isTitleCardShotId(item.shotId)
+                              ? startSec + 600
+                              : startSec + (base - t0) / speed // 원본 끝까지만
                             const startX = e.clientX
                             let moved = false
                             const calc = (cx: number) => Math.max(minRight, Math.min(clientXToSec(cx), maxRight))

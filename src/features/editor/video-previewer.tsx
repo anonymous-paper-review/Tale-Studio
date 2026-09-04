@@ -3,7 +3,7 @@
 import { Play, Pause, Volume2, VolumeX } from 'lucide-react'
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
+import { TitleCardStage } from '@/features/editor/title-card-stage'
 import { useEditorStore, selectTimelineLayout, isTitleCardShotId } from '@/stores/editor-store'
 import { cachedVideoUrl } from '@/features/editor/video-prefetch'
 import { useT } from '@/lib/i18n'
@@ -146,43 +146,20 @@ export function VideoPreviewer() {
 
   return (
     <div className="relative flex h-full flex-col items-center justify-center bg-black">
-      {isTitleCard ? (
-        <div
-          className="flex max-h-full max-w-full flex-col items-center justify-center gap-4 p-8 text-center"
-          onDoubleClick={() => {
+      {isTitleCard && activeShotId ? (
+        // 약속 J(2026-09-04): 글자·이미지 자유 배치 무대 — 내보내기와 같은 배치·줄바꿈(src/lib/editor/title-card.ts).
+        <TitleCardStage
+          key={activeShotId}
+          card={activeShot?.titleCard ?? { text: '', imageUrl: null }}
+          editing={editingTitleCard}
+          onStartEdit={() => {
             if (!editingTitleCard) pushHistory()
             setEditingTitleCard(true)
           }}
-        >
-          {activeShot?.titleCard?.imageUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={activeShot.titleCard.imageUrl}
-              alt=""
-              className="max-h-[60%] max-w-full rounded object-contain"
-            />
-          )}
-          {editingTitleCard && activeShotId ? (
-            <Textarea
-              autoFocus
-              value={activeShot?.titleCard?.text ?? ''}
-              onChange={(e) => updateTitleCard(activeShotId, { text: e.target.value })}
-              onBlur={() => setEditingTitleCard(false)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape' || (e.key === 'Enter' && !e.shiftKey)) {
-                  e.preventDefault()
-                  setEditingTitleCard(false)
-                }
-              }}
-              placeholder={t('Title text')}
-              className="max-w-[520px] resize-none border-white/30 bg-black/40 text-center text-2xl font-semibold text-white placeholder:text-white/40"
-            />
-          ) : (
-            <p className="max-w-[520px] cursor-text whitespace-pre-wrap text-2xl font-semibold text-white">
-              {activeShot?.titleCard?.text || t('(Empty title) double-click to edit')}
-            </p>
-          )}
-        </div>
+          onStopEdit={() => setEditingTitleCard(false)}
+          onChange={(patch) => updateTitleCard(activeShotId, patch)}
+          onBeforeChange={pushHistory}
+        />
       ) : activeClip?.url ? (
         <video
           key={activeShotId ?? 'none'}

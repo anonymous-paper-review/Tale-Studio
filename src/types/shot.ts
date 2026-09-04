@@ -102,7 +102,26 @@ export interface Shot {
    * 타이틀 카드(#owner-title-card 2026-08-31) — 검은 배경 위에 텍스트(+선택 이미지)만 보여주는
    * synthetic 클립(shotId 접미 __t) 전용 필드. DB shots 에 대응 행이 없다(editor_states 스냅샷 소관).
    */
-  titleCard?: { text: string; imageUrl: string | null } | null
+  titleCard?: TitleCardData | null
+}
+
+/** 타이틀 카드 레이어 자리 — 카드 폭·높이 비율(0..1). x·y 는 왼쪽 위, w 는 폭 비율(높이는 내용이 정한다). */
+export interface TitleCardLayer {
+  x: number
+  y: number
+  w: number
+}
+export interface TitleCardLayout {
+  text: TitleCardLayer
+  image: TitleCardLayer
+  /** 겹칠 때 어느 것이 위인가(우클릭 메뉴로 바꾼다, 약속 J 배치). */
+  order: 'text-over-image' | 'image-over-text'
+}
+/** 약속 J(2026-09-04): 글자·이미지를 자유 배치하고, 미리보기와 내보내기가 같은 배치를 쓴다(src/lib/editor/title-card.ts). */
+export interface TitleCardData {
+  text: string
+  imageUrl: string | null
+  layout?: TitleCardLayout | null
 }
 
 export interface VideoClip {

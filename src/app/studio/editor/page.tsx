@@ -80,6 +80,7 @@ export default function PostPage() {
     splitVideoClipAt,
     addClipInstanceAt,
     addTitleCard,
+    setTitleCardDuration,
     previewSource,
     addAudioSource,
     removeAudioSource,
@@ -747,6 +748,7 @@ export default function PostPage() {
               onUpdateVideoClip={updateVideoClip}
               onUpdateAudioClip={updateAudioClip}
               onSetTrim={setTrim}
+              onSetTitleCardDuration={setTitleCardDuration}
               onPushHistory={pushHistory}
             />
           </div>

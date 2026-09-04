@@ -128,3 +128,12 @@ paths:
   클릭은 같은 팝업(previzOpen)을 연다.
 - 실사(storyboard_image)는 참조한 러프의 `roughGeneratedAt` 을 기록한다(단건·스트립·배치 잡 타깃 → finalize). `classifyRoughChanged` 가
   지금 러프의 generatedAt 과 다르면 "러프 바뀜" 배지(ShotNode·그리드). 자동 재생성은 없다(오너 I5) — 사람이 다시 만든다.
+
+## 타이틀 카드 = 다른 클립처럼 (2026-09-04, 약속 J — `tests/promise-j-title-card.test.ts`)
+
+- 타이틀 카드 클립(shotId 접미 `__t…`, 자른 조각은 `__t…__c…`)은 자르기·늘이기·옮기기가 영상 클립과 같은 액션이다. `isTitleCardShotId` 가
+  자른 조각도 알아보고, 새로고침 복원은 타이틀 카드를 원본 샷 검증 없이 스냅샷 그대로 되살린다.
+- 길이: 원본이 없으므로 손잡이로 늘린 만큼 `durationSeconds` 가 길어진다(`setTrim`, 상한 600초). 라벨 클릭 → 초 단위 숫자 입력(`setTitleCardDuration`). 기본 5초.
+- 배치·줄바꿈의 진실은 `src/lib/editor/title-card.ts` 하나다: 레이어 자리는 카드 비율(0..1), 줄바꿈은 `layoutTitleText`(줄바꿈 문자 → 단어 → 글자),
+  겹침 순서는 `layout.order`. 미리보기(`TitleCardStage`, 끌어 배치·우클릭 메뉴)와 내보내기(`drawTitleCard`)가 같은 함수를 쓴다. 빈 글자는 아무것도 찍지 않는다.
+- 이미지: 프로젝트 이미지(에셋 저장소 인물·배경, Writer 러프 첫 장)에서 고르거나 `/api/editor/title-image` 로 올린다(보관함만, DB 행 없음).
