@@ -137,3 +137,10 @@ paths:
 - 배치·줄바꿈의 진실은 `src/lib/editor/title-card.ts` 하나다: 레이어 자리는 카드 비율(0..1), 줄바꿈은 `layoutTitleText`(줄바꿈 문자 → 단어 → 글자),
   겹침 순서는 `layout.order`. 미리보기(`TitleCardStage`, 끌어 배치·우클릭 메뉴)와 내보내기(`drawTitleCard`)가 같은 함수를 쓴다. 빈 글자는 아무것도 찍지 않는다.
 - 이미지: 프로젝트 이미지(에셋 저장소 인물·배경, Writer 러프 첫 장)에서 고르거나 `/api/editor/title-image` 로 올린다(보관함만, DB 행 없음).
+
+## 클립 자막 (2026-09-04, 약속 K — `tests/promise-k-subtitles.test.ts`)
+
+- 자막은 편집기 샷의 `subtitle`(글자·자리 비율) 한 덩어리다. `undefined` = 손대지 않음(Writer 대사 `dialogueLines` 가 초기값), `null` = 지움.
+  진실은 편집기 스냅샷(editor_states)이고, 복원은 DB 원본 샷에도 저장된 자막을 다시 입힌다(`loadPersisted`).
+- 자리·줄바꿈·모양(흰 글자 + 검은 테두리, 아래 가운데 기본)은 `src/lib/editor/subtitle.ts` 하나가 정한다: 미리보기 `SubtitleLayer`(누르면 편집,
+  끌기·방향키 이동)와 내보내기 `drawSubtitle` 이 같은 함수를 쓴다. 지금 재생 중인 샷의 자막만 얹는다.

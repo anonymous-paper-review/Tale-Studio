@@ -14,7 +14,8 @@
 
 import type { AudioTrackClip } from '@/types'
 import { drawTitleCard } from '@/lib/editor/title-card'
-import type { TitleCardData } from '@/types/shot'
+import type { ShotSubtitle, TitleCardData } from '@/types/shot'
+import { drawSubtitle, resolveSubtitle } from '@/lib/editor/subtitle'
 import { cachedVideoUrl, prefetchVideos } from '@/features/editor/video-prefetch'
 
 export interface DraftRenderStats {
@@ -42,7 +43,10 @@ interface ShotLike {
   shotId: string
   shotType?: string | null
   /** 타이틀 카드(#owner-title-card) — 있으면 검은 플레이스홀더 라벨을 카드 텍스트로 대체. */
-  titleCard?: { text: string; imageUrl: string | null } | null
+  titleCard?: TitleCardData | null
+  /** 약속 K: 클립 자막(손대지 않았으면 대사가 초기값). */
+  subtitle?: ShotSubtitle | null
+  dialogueLines?: readonly { text: string }[]
 }
 
 const RECORD_FPS = 30
@@ -267,6 +271,8 @@ export async function renderDraftTimeline(opts: {
   let activeLabel = ''
   let videoActive = false
   let activeTitle: { card: TitleCardData; image: HTMLImageElement | null } | null = null
+  // 약속 K6: 지금 구간의 자막 — 세그먼트 러너가 갱신하고 그리기 루프가 프레임 위에 찍는다.
+  let activeSubtitle: ShotSubtitle | null = null
 
   const cleanup = () => {
     if (raf != null) cancelAnimationFrame(raf)
@@ -316,6 +322,7 @@ export async function renderDraftTimeline(opts: {
       } else if (!videoActive) {
         drawPlaceholder(ctx, W, H, activeLabel)
       }
+      if (activeSubtitle) drawSubtitle(ctx, W, H, activeSubtitle)
       // 오디오: 활성 구간 진입 시 소스 오프셋으로 시킹해 재생, 이탈 시 정지.
       for (const a of audioEls) {
         const active = clock >= a.clip.startSec && clock < a.endSec
@@ -357,6 +364,7 @@ export async function renderDraftTimeline(opts: {
       const shot = shots.find((s) => s.shotId === item.shotId)
       // 타이틀 카드(#owner-title-card): FFmpeg drawtext 없이도 캔버스 placeholder 경로를 그대로
       //   재사용해 검은 배경+텍스트를 그린다 — 이미지 합성(이미지 위에 텍스트 오버레이)은 범위 밖(MVP: 텍스트만).
+      activeSubtitle = shot ? resolveSubtitle(shot) : null
       if (shot?.titleCard) {
         // 약속 J6·J7·J8(2026-09-04): 이미지+글자를 미리보기와 같은 배치·줄바꿈으로 그린다. 빈 글자는 아무것도 찍지 않는다.
         activeTitle = { card: shot.titleCard, image: await loadTitleImage(shot.titleCard.imageUrl) }

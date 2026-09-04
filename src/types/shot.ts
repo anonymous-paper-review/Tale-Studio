@@ -103,6 +103,17 @@ export interface Shot {
    * synthetic 클립(shotId 접미 __t) 전용 필드. DB shots 에 대응 행이 없다(editor_states 스냅샷 소관).
    */
   titleCard?: TitleCardData | null
+  /**
+   * 클립 자막(약속 K, 2026-09-04) — 클립마다 한 덩어리. undefined = 손대지 않음(Writer 대사가 초기값), null = 지움.
+   *   자리는 화면 비율(덩어리 가운데). 편집기 스냅샷(editor_states)에 저장된다.
+   */
+  subtitle?: ShotSubtitle | null
+}
+
+export interface ShotSubtitle {
+  text: string
+  x: number
+  y: number
 }
 
 /** 타이틀 카드 레이어 자리 — 카드 폭·높이 비율(0..1). x·y 는 왼쪽 위, w 는 폭 비율(높이는 내용이 정한다). */

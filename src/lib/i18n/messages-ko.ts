@@ -1449,4 +1449,7 @@ export const KO: Record<string, string> = {
   'Image in front': '이미지를 앞으로',
   'Reset layout': '배치 되돌리기',
   'Title card length (seconds)': '타이틀 카드 길이(초)',
+  // 약속 K(2026-09-04): 자막
+  'Subtitle': '자막',
+  'Click to add a subtitle': '누르면 자막을 넣어요',
 }

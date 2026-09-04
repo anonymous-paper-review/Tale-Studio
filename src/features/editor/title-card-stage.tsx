@@ -4,6 +4,7 @@
 //   우클릭 메뉴로 겹치는 순서·이미지 넣기/빼기를 정한다. 배치는 비율(0..1)로 저장돼 내보내기(drawTitleCard)와 같은 자리에 찍힌다.
 //   줄바꿈은 layoutTitleText 가 정한다 — 내보내기와 같은 글꼴을 오프스크린 캔버스로 재서 줄이 같다(약속 J8).
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type React from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 
 import { Textarea } from '@/components/ui/textarea'
@@ -45,6 +46,7 @@ export function TitleCardStage({
   onStopEdit,
   onChange,
   onBeforeChange,
+  overlay,
 }: {
   card: TitleCardData
   editing: boolean
@@ -53,6 +55,8 @@ export function TitleCardStage({
   onChange: (patch: Partial<TitleCardData>) => void
   /** 끌기·메뉴 조작 직전 한 번 — 되돌리기 스냅샷용. */
   onBeforeChange: () => void
+  /** 카드 위에 얹을 것(자막 오버레이, 약속 K). */
+  overlay?: React.ReactNode
 }) {
   const t = useT()
   const boxRef = useRef<HTMLDivElement>(null)
@@ -190,6 +194,7 @@ export function TitleCardStage({
           <div ref={boxRef} className="relative aspect-video max-h-full w-full max-w-full overflow-hidden bg-black" data-testid="title-card-stage">
             {imageLayer}
             {textLayer}
+            {overlay}
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-52">

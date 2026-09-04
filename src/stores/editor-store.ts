@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import type { TitleCardData } from '@/types/shot'
+import type { ShotSubtitle, TitleCardData } from '@/types/shot'
+import { resolveSubtitle } from '@/lib/editor/subtitle'
 import type { Shot, VideoClip, DialogueLine, AudioTrackClip, AudioSource } from '@/types'
 import { toast } from 'sonner'
 import { useProjectStore } from '@/stores/project-store'
@@ -155,6 +156,8 @@ interface EditorState {
   updateTitleCard: (shotId: string, patch: Partial<TitleCardData>) => void
   /** 약속 J3·J4: 타이틀 카드 길이를 초 단위 숫자로 — 5초를 넘을 수 있다. */
   setTitleCardDuration: (shotId: string, seconds: number) => void
+  /** 약속 K: 클립 자막(글자·자리) — 손대는 순간 대사 초기값이 저장값이 된다. null 이면 지운다. */
+  setSubtitle: (shotId: string, patch: Partial<ShotSubtitle> | null) => void
 
   // Video Source 패널 액션
   toggleSourcePanel: () => void
@@ -681,7 +684,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       })
       canonicalShotIds.add(savedShot.shotId)
     }
-    const combinedShots = restoredShots.length ? [...cur.shots, ...restoredShots] : cur.shots
+    // 약속 K8: 자막은 새로고침해도 남는다 — DB 에서 온 원본 샷에도 스냅샷의 자막(글자·자리)을 다시 입힌다.
+    const savedSubtitleById = new Map<string, ShotSubtitle | null>()
+    for (const savedShot of saved.shots ?? []) {
+      if (savedShot.subtitle !== undefined) savedSubtitleById.set(savedShot.shotId, savedShot.subtitle ?? null)
+    }
+    const baseShots = savedSubtitleById.size
+      ? cur.shots.map((s) => (savedSubtitleById.has(s.shotId) ? { ...s, subtitle: savedSubtitleById.get(s.shotId) ?? null } : s))
+      : cur.shots
+    const combinedShots = restoredShots.length ? [...baseShots, ...restoredShots] : baseShots
     const combinedClips = restoredClips.length ? [...cur.videoClips, ...restoredClips] : cur.videoClips
 
     const canonicalOrder = new Map<string, string[]>()
@@ -1381,6 +1392,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           ? { ...s, titleCard: { text: s.titleCard?.text ?? '', imageUrl: s.titleCard?.imageUrl ?? null, layout: s.titleCard?.layout ?? null, ...patch } }
           : s,
       ),
+    })),
+
+  setSubtitle: (shotId, patch) =>
+    set((state) => ({
+      shots: state.shots.map((s) => {
+        if (s.shotId !== shotId) return s
+        if (patch === null) return { ...s, subtitle: null }
+        const base = resolveSubtitle(s)
+        return { ...s, subtitle: { ...base, ...patch } }
+      }),
     })),
 
   setTitleCardDuration: (shotId, seconds) =>

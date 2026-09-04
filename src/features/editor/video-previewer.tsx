@@ -4,6 +4,8 @@ import { Play, Pause, Volume2, VolumeX } from 'lucide-react'
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { TitleCardStage } from '@/features/editor/title-card-stage'
+import { SubtitleLayer } from '@/features/editor/subtitle-layer'
+import { resolveSubtitle } from '@/lib/editor/subtitle'
 import { useEditorStore, selectTimelineLayout, isTitleCardShotId } from '@/stores/editor-store'
 import { cachedVideoUrl } from '@/features/editor/video-prefetch'
 import { useT } from '@/lib/i18n'
@@ -43,6 +45,7 @@ export function VideoPreviewer() {
   const seek = useEditorStore((s) => s.seek)
   const setMasterVolume = useEditorStore((s) => s.setMasterVolume)
   const updateTitleCard = useEditorStore((s) => s.updateTitleCard)
+  const setSubtitle = useEditorStore((s) => s.setSubtitle)
   const pushHistory = useEditorStore((s) => s.pushHistory)
 
   // ── 동기화 루프 ──
@@ -159,21 +162,42 @@ export function VideoPreviewer() {
           onStopEdit={() => setEditingTitleCard(false)}
           onChange={(patch) => updateTitleCard(activeShotId, patch)}
           onBeforeChange={pushHistory}
+          overlay={
+            activeShot ? (
+              <SubtitleLayer
+                key={`sub-${activeShotId}`}
+                subtitle={resolveSubtitle(activeShot)}
+                onChange={(patch) => setSubtitle(activeShotId, patch)}
+                onBeforeChange={pushHistory}
+              />
+            ) : null
+          }
         />
       ) : activeClip?.url ? (
-        <video
-          key={activeShotId ?? 'none'}
-          ref={videoRef}
-          // "전체 보기" 프리패치가 받아둔 blob 이 있으면 그걸로 — 클립 경계 전환이 즉시가 된다(#watch-all).
-          src={cachedVideoUrl(activeClip.url) ?? activeClip.url}
-          muted
-          playsInline
-          preload="auto"
-          className="max-h-full max-w-full rounded"
-          onLoadedMetadata={() => {
-            if (videoRef.current) setActualDuration(videoRef.current.duration)
-          }}
-        />
+        // 약속 K: 자막은 영상 그림 위에 얹힌다 — 상자가 영상 크기를 따라가므로 자리 비율이 내보내기와 같다.
+        <div className="relative max-h-full max-w-full">
+          <video
+            key={activeShotId ?? 'none'}
+            ref={videoRef}
+            // "전체 보기" 프리패치가 받아둔 blob 이 있으면 그걸로 — 클립 경계 전환이 즉시가 된다(#watch-all).
+            src={cachedVideoUrl(activeClip.url) ?? activeClip.url}
+            muted
+            playsInline
+            preload="auto"
+            className="block max-h-full max-w-full rounded"
+            onLoadedMetadata={() => {
+              if (videoRef.current) setActualDuration(videoRef.current.duration)
+            }}
+          />
+          {activeShot && activeShotId && (
+            <SubtitleLayer
+              key={`sub-${activeShotId}`}
+              subtitle={resolveSubtitle(activeShot)}
+              onChange={(patch) => setSubtitle(activeShotId, patch)}
+              onBeforeChange={pushHistory}
+            />
+          )}
+        </div>
       ) : activeShot ? (
         <div className="flex flex-col items-center gap-3">
           <div className="flex h-48 w-80 items-center justify-center rounded-lg border border-dashed border-muted-foreground/30 bg-muted/10">
