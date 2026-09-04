@@ -57,7 +57,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import type { Json } from '@/types/database'
 import { invalidateShots, loadShotsResult } from '@/lib/shots-cache'
-import { parseDirectorRefs } from '@/lib/director/shot-references'
+import { parseDirectorRefs } from '@/lib/director/director-refs'
 import {
   isEmptyStableFrameInputs,
   parseStableFrameInputs,
