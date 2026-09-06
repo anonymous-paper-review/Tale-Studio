@@ -91,6 +91,14 @@ function v2PrevizDirectionOf(
  *   shotDesign 은 표시되지 않는 파이프라인 내부 상태라 native 보존 불요 — 생성용 EN 만 필요(language boundary S3c).
  *   deriveEnBatch 가 이미 영어면 LLM skip(파이프라인 한국어 산출만 번역). 캐싱 없이 호출당 1배치(추후 최적화 여지).
  */
+
+type StageLandmarkRow = { id: string; label: string; x: number; y: number }
+/** scenes.stage.landmarks 를 안전하게 읽는다(무대 없음·모양 다름 → 빈 배열). */
+function stageLandmarksOf(stage: unknown): StageLandmarkRow[] {
+  const lm = (stage as { landmarks?: unknown } | null | undefined)?.landmarks
+  return Array.isArray(lm) ? (lm as StageLandmarkRow[]) : []
+}
+
 async function translateRoughSpecsEn(
   specByShotId: Map<string, RoughStoryboardSpec>,
   shotIds: string[],
@@ -453,7 +461,7 @@ export async function POST(req: Request) {
         })
       }
     }
-    const [actionEnByShot, moodEnByScene, translatedSpecs, timeEnByScene, locEnByScene, nameEnById, previzEnByKey] =
+    const [actionEnByShot, moodEnByScene, translatedSpecs, timeEnByScene, locEnByScene, nameEnById, previzEnByKey, landmarkEnByKey] =
       await Promise.all([
         deriveEnBatch(
           targets.map((s) => ({ id: s.shot_id as string, native: (s.action_description as string) ?? '' })),
@@ -493,6 +501,14 @@ export async function POST(req: Request) {
               .map((k) => ({ id: `${s.shot_id as string}|${k}`, native: st[k] as string }))
           }),
           'writer-v2 previz direction',
+        ),
+        // 무대 표지 라벨 → EN (정지 프롬프트 위생 2026-09-06): 무대 LLM 이 콘텐츠 언어로 라벨을 적으므로
+        //   영어 셀의 배경 문장에 한국어가 섞이지 않게 번역. 키 = `${scene_id}|${landmark.id}`.
+        deriveEnBatch(
+          targetScenes.flatMap((sc) =>
+            stageLandmarksOf(sc.stage).map((l) => ({ id: `${sc.scene_id as string}|${l.id}`, native: l.label })),
+          ),
+          'stage landmark label (short English noun phrase)',
         ),
       ])
     // 프롬프트용 EN 이름 맵 — DB 조회 키(scene.location / characters id)는 원문 유지, 라벨만 EN.
@@ -554,7 +570,12 @@ export async function POST(req: Request) {
             durationSeconds: (s.duration_seconds as number | null) ?? null,
             spec: translatedSpecs.get(shotId) ?? null,
             // 정지 프롬프트 위생(2026-09-05): 무대 표지 + 화면 비율 → 시야 안 표지 배경 문장.
-            stageLandmarks: ((scene?.stage as { landmarks?: Array<{ id: string; label: string; x: number; y: number }> } | null)?.landmarks) ?? null,
+            stageLandmarks: scene
+              ? stageLandmarksOf(scene.stage).map((l) => ({
+                  ...l,
+                  label: landmarkEnByKey.get(`${scene.scene_id as string}|${l.id}`) ?? l.label,
+                }))
+              : null,
             frameAspect: aspectRatioOf(projectFormat),
             previzDirection: v2PrevizDirectionOf(
               translatedSpecs.has(shotId) ? null : s.static_spec,

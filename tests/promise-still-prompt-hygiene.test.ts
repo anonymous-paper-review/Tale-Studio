@@ -76,7 +76,10 @@ describe('러프 셀이 위생 규칙을 쓴다', () => {
   it('러프 라우트가 씬 무대의 표지와 화면 비율을 셀에 넘긴다', () => {
     const route = read('src/app/api/writer/rough-storyboard/route.ts')
     expect(route).toMatch(/\.select\('scene_id, location, time_of_day, mood, stage'\)/)
-    expect(route).toMatch(/stageLandmarks: \(\(scene\?\.stage as/)
+    expect(route).toMatch(/stageLandmarks: scene\n\s+\? stageLandmarksOf\(scene\.stage\)\.map\(/)
+    // 표지 라벨은 콘텐츠 언어로 적히므로 영어 셀에 넣기 전에 EN 으로 번역한다(실측: 겨울_6 씬 1 러프에 한국어 라벨이 섞임).
+    expect(route).toMatch(/'stage landmark label \(short English noun phrase\)'/)
+    expect(route).toMatch(/landmarkEnByKey\.get\(`\$\{scene\.scene_id as string\}\|\$\{l\.id\}`\) \?\? l\.label/)
     expect(route).toMatch(/frameAspect: aspectRatioOf\(projectFormat\)/)
   })
   it('작가 프롬프트가 환경 사건의 출처·방향을 요구하고 정지 프롬프트에서 카메라 무브를 금한다', () => {

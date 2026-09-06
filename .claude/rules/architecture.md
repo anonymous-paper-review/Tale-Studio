@@ -173,3 +173,4 @@ paths:
 - **정지 프롬프트 위생**(5, 2026-09-05 — `tests/promise-still-prompt-hygiene.test.ts`): 러프 셀의 배경은 `stage/view.landmarksInView`(screen_layout.camera 시야 안 표지)로
   고정한 문장(`backgroundClauseFromView`)을 싣고, moment 문장에서 카메라 무브 서술을 뺀다(`stripCameraMoveSentences`). 러프 라우트가 scenes.stage 의
   표지와 화면 비율을 셀에 넘긴다. 작가(v4) 프롬프트는 환경 사건의 출처·방향을 요구하고 first_frame_prompt 의 카메라 무브를 금한다.
+  표지 라벨은 무대 LLM 이 콘텐츠 언어로 적으므로 라우트가 `deriveEnBatch` 로 영어로 바꿔 셀에 넘긴다(2026-09-06 실측: 겨울_6 러프에 한국어 라벨이 섞임).
