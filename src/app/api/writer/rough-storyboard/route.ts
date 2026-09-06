@@ -216,7 +216,7 @@ export async function POST(req: Request) {
           .order('sort_order'),
         supabaseAdmin
           .from('scenes')
-          .select('scene_id, location, time_of_day, mood')
+          .select('scene_id, location, time_of_day, mood, stage')
           .eq('project_id', projectId),
         supabaseAdmin
           .from('locations')
@@ -553,6 +553,9 @@ export async function POST(req: Request) {
             lightPosition: lighting.position ?? null,
             durationSeconds: (s.duration_seconds as number | null) ?? null,
             spec: translatedSpecs.get(shotId) ?? null,
+            // 정지 프롬프트 위생(2026-09-05): 무대 표지 + 화면 비율 → 시야 안 표지 배경 문장.
+            stageLandmarks: ((scene?.stage as { landmarks?: Array<{ id: string; label: string; x: number; y: number }> } | null)?.landmarks) ?? null,
+            frameAspect: aspectRatioOf(projectFormat),
             previzDirection: v2PrevizDirectionOf(
               translatedSpecs.has(shotId) ? null : s.static_spec,
               shotId,

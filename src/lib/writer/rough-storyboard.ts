@@ -188,6 +188,10 @@ export interface RoughStoryboardPromptInput {
   safeMode?: boolean
   /** 방향 칩 — 사용자가 누른 상대적 연출 방향(영문 수식어). 프롬프트 끝 Emphasis 절로 주입(2026-06-25). */
   styleHints?: string[]
+  /** 정지 프롬프트 위생(2026-09-05): 씬 무대의 표지 — screen_layout.camera 와 함께 "시야 안 표지" 배경 문장을 만든다. */
+  stageLandmarks?: Array<{ id: string; label: string; x: number; y: number }> | null
+  /** 프로젝트 화면 비율(가로/세로) — 표지 시야 판정용. 없으면 16:9. */
+  frameAspect?: number | null
 }
 
 // 모델(fal flux-2 klein)은 text-encoder 확산(instruction LLM 아님) — 직설 단어 나열·긍정문·앞쪽 토큰에

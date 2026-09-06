@@ -170,3 +170,6 @@ paths:
 - **프레임 밖 봉인**: 카메라 밖 인물은 `screen_layout.off_frame` + WARNING visual 제약("OFF-SCREEN … do not draw") → check_notes 로 러프·실사에 실린다.
   러프 셀은 이름을 대고 못박고, 실사 참조 계획(`planShotCharacterRefs`·배치 라우트)은 그 인물의 시트를 붙이지 않는다.
   START 에 없고 END 에 들어오는 인물은 "NOT visible at START; enters from the left/right".
+- **정지 프롬프트 위생**(5, 2026-09-05 — `tests/promise-still-prompt-hygiene.test.ts`): 러프 셀의 배경은 `stage/view.landmarksInView`(screen_layout.camera 시야 안 표지)로
+  고정한 문장(`backgroundClauseFromView`)을 싣고, moment 문장에서 카메라 무브 서술을 뺀다(`stripCameraMoveSentences`). 러프 라우트가 scenes.stage 의
+  표지와 화면 비율을 셀에 넘긴다. 작가(v4) 프롬프트는 환경 사건의 출처·방향을 요구하고 first_frame_prompt 의 카메라 무브를 금한다.

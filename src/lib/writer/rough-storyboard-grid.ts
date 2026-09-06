@@ -14,6 +14,7 @@ import {
   angleWords,
   type RoughStoryboardPromptInput,
 } from '@/lib/writer/rough-storyboard'
+import { backgroundClauseFromView, landmarksInView, stripCameraMoveSentences } from '@/lib/writer/pipeline/stage/view'
 import type { ProjectFormat } from '@/types/project'
 import type { ScreenPlacement } from '@/lib/writer/types/pipeline'
 
@@ -391,6 +392,12 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
           ? 'this panel has NO people — anyone mentioned in the moment is OFF-SCREEN; draw the scene without any figure'
           : null
   const setting = [stripColor(input.location), input.timeOfDay].filter(Boolean).join(', ')
+  // 정지 프롬프트 위생(2026-09-05): 배경은 무대 표지 중 이 카메라 시야 안의 것으로 고정한다 — 샷마다 환경을 다시 상상하지 않게.
+  const stageCam = s?.screen_layout?.camera
+  const bgLine =
+    stageCam && input.stageLandmarks?.length
+      ? backgroundClauseFromView(landmarksInView(stageCam, input.stageLandmarks, input.frameAspect ?? 16 / 9))
+      : null
   const focal =
     stripColor(s?.framing?.focal_point) ||
     stripColor(input.spec?.intent?.audience_focus) ||
@@ -441,7 +448,9 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
     figures || 'empty landscape, no figures',
     cuGuard,
     layerLine || (setting ? `setting: ${setting}` : null),
-    input.actionDescription ? `moment: ${stripColor(input.actionDescription)}` : null,
+    bgLine,
+    // 정지 프롬프트 위생: 카메라 무브 서술은 정지 그림의 재료가 아니다(MOTION 줄이 따로 싣는다).
+    input.actionDescription ? `moment: ${stripColor(stripCameraMoveSentences(input.actionDescription))}` : null,
     pvzStartLine,
     figureGuard,
     `focal point: ${focal}`,
