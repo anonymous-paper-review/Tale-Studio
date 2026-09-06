@@ -20,7 +20,7 @@ import {
   realSheetCanvas,
   type CharacterRefLabel,
 } from '@/lib/director/storyboard-strip'
-import { applyDirectorRefs, directorRefsExcludeWorld, loadSceneWorldRefs, parseDirectorRefs, readCharacterBlocking } from '@/lib/director/shot-references'
+import { applyDirectorRefs, directorRefsExcludeWorld, loadSceneWorldRefs, parseDirectorRefs, readCharacterBlocking, readOffFrame } from '@/lib/director/shot-references'
 import { parseProjectFormat } from '@/types/project'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 import { storageKeySegment } from '@/lib/storage/key-segment'
@@ -129,10 +129,12 @@ export async function POST(req: NextRequest) {
       }
       // 약속 F3: 사람이 지운 참조는 붙이지 않는다(계약 검사는 Writer 원본으로, 참조는 override 로).
       const directorRefs = parseDirectorRefs((s as { director_refs?: unknown }).director_refs)
+      // 프레임 밖 봉인(2026-09-05): 무대가 프레임 밖으로 판정한 인물의 시트는 붙이지 않는다.
+      const offFrame = new Set(readOffFrame(s.static_spec))
       eligible.push({
         shot_id: s.shot_id as string,
         scene_id: s.scene_id as string,
-        characters: applyDirectorRefs(characters, directorRefs),
+        characters: applyDirectorRefs(characters, directorRefs).filter((id) => !offFrame.has(id)),
         characterAppearanceKeys,
         excludeWorld: directorRefsExcludeWorld(directorRefs),
         roughGeneratedAt: (s.rough_storyboard as { generatedAt?: number } | null)?.generatedAt ?? null,

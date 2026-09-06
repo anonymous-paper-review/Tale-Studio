@@ -11,7 +11,7 @@ import {
   sanitizeSceneStage,
   buildStageCorrectionNote,
 } from '@/lib/writer/pipeline/stage/validate';
-import { normalizeStageTransitions } from '@/lib/writer/pipeline/stage/ledger';
+import { gateStageEvidence, normalizeStageTransitions } from '@/lib/writer/pipeline/stage/ledger';
 import type {
   Characters,
   DecoupagePlan,
@@ -62,8 +62,11 @@ function buildSystemInstruction(outputLocale?: AppLocale): string {
    출구·목적지(다음 씬으로 가는 방향)가 있으면 반드시 넣어라.
 6. posture ∈ standing | sitting | kneeling | crouching | lying | walking | running | floating | other.
    note 에는 발판·상태 한 구절(영어, 예: "lying on a floating dirt mound", "arms crossed").
-7. 이야기 텍스트가 말하지 않은 상태 변화(누워 있다가 나중에 서 있는 인물 등)는 **그 변화가 일어나는 비트를 정해**
-   end_characters 로 적어라. 어느 비트에서 일어났는지 없으면 관객은 그 인물이 언제 일어났는지 모른다.
+7. 상태 변화(자세가 바뀌거나 2m 이상 옮김)는 **이야기 텍스트에 근거가 있을 때만** 적어라. 변화한 인물의 항목마다
+   evidence 에 그 근거가 되는 원문 구절을 **그대로 인용**하라(비트 시작 상태가 직전 비트 끝과 다를 때도 같다).
+   근거 없는 변화는 적지 마라 — 코드가 인용을 원문과 대조해 근거 없는 변화를 버리고 직전 상태를 잇는다.
+   "자세를 낮춘다·균형을 잡는다·무기를 고쳐 잡는다" 같은 작은 반응은 자세 변화가 아니다: posture 는 그대로 두고
+   note 에 한 구절만 적어라.
 8. 인물 id 는 주어진 것만 쓴다. 사물(object) 캐스트는 무대에 올리지 않는다(필요하면 landmark 로).
 9. 데쿠파주의 added 샷(beats=[] — 설정·리액션 등)의 content 도 상태의 근거다. 예: 씬 첫머리의 설정 샷이
    "세 인물이 흩어져 누워 있다"면 beat 0 의 시작 상태는 셋 다 lying 이고, 일어나는 순간은 그 뒤 비트의
@@ -82,7 +85,7 @@ function buildSystemInstruction(outputLocale?: AppLocale): string {
       "characters": [
         { "character_id": "char_a", "x": -4, "y": 0, "facing_deg": 90, "posture": "lying", "note": "on a floating rock" }
       ],
-      "end_characters": [ ... 비트 안에서 바뀌면 끝 상태 (없으면 생략) ... ]
+      "end_characters": [ ... 비트 안에서 바뀌면 끝 상태 (없으면 생략). 바뀐 인물에는 "evidence": "<원문 구절 인용>" ... ]
     }
   ],
   "notes": "한 줄: 왜 이렇게 놓았나"
@@ -137,7 +140,7 @@ async function stageForScene(
   const personIds = personIdsOf(characters);
   const ctx = { scene_id: scene.scene_id, characters_in_scene: scene.characters_in_scene, scene_actions: scene.scene_actions };
 
-  const call = async (prompt: string, label: string, temperature: number) => {
+  const call = async (prompt: string, label: string, temperature: number): Promise<SceneStage | null> => {
     const raw = await generateJson<unknown>(prompt, axisConfig, { systemInstruction, temperature });
     await logger.saveLlmCall(label, {
       prompt,
@@ -145,7 +148,9 @@ async function stageForScene(
       model: describeAxisConfig(axisConfig),
       provider: axisConfig.provider,
     });
-    return extractSceneStage(raw, scene.scene_id);
+    const parsed = extractSceneStage(raw, scene.scene_id);
+    // 무대 계약 버전 2(2026-09-05): evidence 필수 프롬프트 — 근거 게이트가 이 표시를 보고 건다.
+    return parsed ? { ...parsed, version: 2 } : parsed;
   };
 
   let stage = await call(userPrompt, `stage_${scene.scene_id}`, 0.4);
@@ -179,8 +184,11 @@ ${buildStageCorrectionNote(validation.issues)}`;
       valid: true,
     };
   }
+  // 근거 게이트(2026-09-05, 오너 결정): 원문에 근거 없는 큰 변화는 버리고 gated_note 메모로만 남긴다.
+  const names = new Map(characters.characters.map((c) => [c.id, c.name] as const));
+  const gated = gateStageEvidence(stage, [...scene.scene_actions, scene.purpose ?? ''], names);
   // #ledger: 비트 사이의 설명 없는 변화를 직전 비트 끝으로 옮겨(정규화) 보여줄 자리를 만든 상태로 기록한다.
-  return { stage: normalizeStageTransitions(stage), issues: validation.issues };
+  return { stage: normalizeStageTransitions(gated.stage), issues: [...validation.issues, ...gated.issues] };
 }
 
 export async function runSceneStage(

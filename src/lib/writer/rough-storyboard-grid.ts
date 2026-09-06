@@ -338,7 +338,13 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
           // 시선은 "머리(얼굴 없음)가 향하는 방향"으로 — gaze 단어는 눈/얼굴을 유발한다(목각 인형 캐논).
           (b, i) => {
             const lay = layoutById.get(b.character_id)
-            const place = lay ? describePlacement(lay.start) : `at ${words(b.position_in_frame) || 'center'}`
+            // 프레임 밖 봉인(2026-09-05): START 에 없고 END 에 들어오는 인물은 "가장자리 바로 밖"이 아니라
+            //   "START 에는 안 보임, 왼쪽/오른쪽에서 진입"으로 — 옛 문구는 모델이 가장자리에 인물을 그리게 했다.
+            const place = lay
+              ? !lay.start.in_frame && lay.end?.in_frame
+                ? `NOT visible at START (off-screen ${lay.start.screen_x < 0 ? 'left' : 'right'}); enters from the ${lay.start.screen_x < 0 ? 'left' : 'right'} and by END is ${describePlacement(lay.end)}`
+                : describePlacement(lay.start)
+              : `at ${words(b.position_in_frame) || 'center'}`
             return `figure ${i + 1} ${place}, ${stripColor(words(b.pose)) || 'standing'}, blank head facing ${words(b.gaze) || 'ahead'}`
           },
         )
@@ -348,8 +354,18 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
       //   인물(추적자 등)이 스며들기 쉽다 — 인원수를 못박고 추가 인물을 명시적으로 금지.
       ? `exactly ${figureCount} figure${figureCount > 1 ? 's' : ''} placed naturally for the action — do not draw any other people in this panel`
       : ''
+  // 명단 규칙(2026-09-05): 화면 높이 8% 미만 인물은 번호 없이 "먼 인물"로만 — 시트 참조·자세 없이 실루엣.
+  const distant = (s?.screen_layout?.characters ?? []).filter((c) => c.distant)
+  const distantLine = distant.length
+    ? `plus ${distant.length} distant figure${distant.length > 1 ? 's' : ''} tiny in the far background (${distant.map((c) => stripColor(input.characterNameById?.get(c.character_id) ?? c.character_id)).join(', ')}) — unnumbered silhouettes only, no detail`
+    : null
+  // 프레임 밖 봉인(2026-09-05): 씬에 있지만 이 카메라 밖인 인물은 이름을 대고 그리지 말라고 못박는다.
+  const offFrameIds = s?.screen_layout?.off_frame ?? []
+  const offFrameLine = offFrameIds.length
+    ? `OFF-SCREEN in this shot (do not draw them at all): ${offFrameIds.map((id) => stripColor(input.characterNameById?.get(id) ?? id)).join(', ')}`
+    : null
   // 사물 소품 문장은 인물 유무와 무관하게 항상 살린다(사물 단독 인서트 컷 포함).
-  const figures = [personLine, objectProps].filter(Boolean).join('; ')
+  const figures = [personLine, distantLine, objectProps, offFrameLine].filter(Boolean).join('; ')
 
   const layers = s?.framing?.layers ?? {}
   const layerLine = [

@@ -45,6 +45,147 @@ function isMajorChange(a: StageCharacterState, b: StageCharacterState): boolean 
   return postureVerb(a.posture, b.posture) !== null || distance(a, b) >= MOVE_THRESHOLD_M
 }
 
+// ── 근거 게이트(2026-09-05, 오너 결정: 근거 없는 변화는 버리고 작은 메모로만 남긴다) ─────────────────────
+//   무대 LLM 이 원문에 없는 상태 변화를 지어냈다(겨울_6 sh 4: "셋 다 웅크림"이 전이 6개로 불어나 shot4~6 오염).
+//   버전 2 무대(evidence 필수 프롬프트)만 게이트를 건다 — 옛 무대는 evidence 가 없어 전부 버려지므로 손대지 않는다.
+const EVIDENCE_MIN_CHARS = 4
+const EVIDENCE_SHINGLE_RATIO = 0.6
+
+function normalizeForEvidence(s: string): string {
+  return s.toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, '')
+}
+
+/** 순수: 인용이 원문에 있는가 — 그대로 포함되거나, 2글자 조각의 60% 이상이 원문에 있으면 인정(작은 바꿔쓰기 허용). */
+export function evidenceSupported(evidence: string | undefined, texts: readonly string[]): boolean {
+  const ev = normalizeForEvidence(evidence ?? '')
+  if (ev.length < EVIDENCE_MIN_CHARS) return false
+  const hay = normalizeForEvidence(texts.join(' '))
+  if (!hay) return false
+  if (hay.includes(ev)) return true
+  const shingles: string[] = []
+  for (let i = 0; i + 2 <= ev.length; i++) shingles.push(ev.slice(i, i + 2))
+  if (!shingles.length) return false
+  const hit = shingles.filter((sh) => hay.includes(sh)).length
+  return hit / shingles.length >= EVIDENCE_SHINGLE_RATIO
+}
+
+function changeLabel(from: StageCharacterState, to: StageCharacterState): string {
+  const parts: string[] = []
+  if (from.posture !== to.posture) parts.push(`${from.posture} → ${to.posture}`)
+  const d = distance(from, to)
+  if (d >= MOVE_THRESHOLD_M) parts.push(`moves ${Math.round(d * 10) / 10}m`)
+  return parts.join(', ') || 'change'
+}
+
+export interface GateStageResult {
+  stage: SceneStage
+  issues: ValidationIssue[]
+}
+
+/**
+ * 근거 없는 큰 변화(자세·2m 이상 이동)를 직전 상태로 되돌리고 gated_note 에 메모만 남긴다. 비트 안(end_characters)과
+ *   비트 사이(다음 비트 시작 ≠ 직전 비트 끝) 둘 다 본다. stage.version < 2 면 그대로 돌려준다.
+ */
+export function gateStageEvidence(
+  stage: SceneStage,
+  texts: readonly string[],
+  names?: ReadonlyMap<string, string>,
+): GateStageResult {
+  if ((stage.version ?? 1) < 2) return { stage, issues: [] }
+  const nameOf = (id: string) => names?.get(id) ?? id
+  const issues: ValidationIssue[] = []
+  const beats = [...stage.beats]
+    .sort((a, b) => a.beat - b.beat)
+    .map((b) => ({ ...b, characters: b.characters.map((c) => ({ ...c })), ...(b.end_characters ? { end_characters: b.end_characters.map((c) => ({ ...c })) } : {}) }))
+  const revert = (target: StageCharacterState, base: StageCharacterState, where: string) => {
+    const label = changeLabel(base, target)
+    target.x = base.x
+    target.y = base.y
+    target.facing_deg = base.facing_deg
+    target.posture = base.posture
+    target.gated_note = `${label} (no text evidence${target.evidence ? `: "${target.evidence.slice(0, 60)}"` : ''})`
+    issues.push({
+      category: 'continuity',
+      severity: 'WARNING',
+      location: stage.scene_id,
+      message: `근거 게이트: ${nameOf(target.character_id)} ${label}(${where}) — 원문에 근거가 없어 버리고 메모로만 남김`,
+      constraint_target: 'report_only',
+    })
+  }
+  let prevEnd: StageCharacterState[] | null = null
+  for (const b of beats) {
+    // 비트 사이: 시작 상태가 직전 비트 끝과 크게 다르면 근거가 있어야 한다.
+    if (prevEnd) {
+      for (const c of b.characters) {
+        const p = prevEnd.find((x) => x.character_id === c.character_id)
+        if (p && isMajorChange(p, c) && !evidenceSupported(c.evidence, texts)) revert(c, p, `비트 ${b.beat} 시작`)
+      }
+    }
+    // 비트 안: 끝 상태가 시작과 크게 다르면 근거가 있어야 한다.
+    if (b.end_characters) {
+      for (const e of b.end_characters) {
+        const s = b.characters.find((x) => x.character_id === e.character_id)
+        if (s && isMajorChange(s, e) && !evidenceSupported(e.evidence, texts)) revert(e, s, `비트 ${b.beat}`)
+      }
+    }
+    prevEnd = (b.end_characters ?? b.characters).map((c) => ({ ...c }))
+  }
+  return { stage: { ...stage, beats }, issues }
+}
+
+// ── 전이 소유권(2026-09-05, 오너 승인 규칙) ───────────────────────────────────────────────────────────
+//   전이마다 보여줄 샷 하나: 작가 동작이 있는 샷 > 인물이 가장 크게 잡힌 샷. 화면 높이 15% 미만은 제외(다른 후보가 없을 때만 허용).
+//   같은 비트의 앞 샷은 START 상태, 뒤 샷은 END 상태로 고정된다(apply 의 pins).
+export const OWNER_MIN_APPARENT_HEIGHT = 0.15
+
+export const transitionKey = (beat: number, characterId: string) => `${beat}:${characterId}`
+
+export type TransitionOwners = Map<string, string>
+export type TransitionPins = Map<string, Map<string, 'start' | 'end'>>
+
+export function decideTransitionOwners(shots: readonly ShotDesign[], stage: SceneStage): TransitionOwners {
+  const owners: TransitionOwners = new Map()
+  const seen = new Set<string>()
+  for (const t of deriveTransitions(stage)) {
+    const key = transitionKey(t.beat, t.character_id)
+    if (seen.has(key)) continue
+    seen.add(key)
+    const candidates = shots
+      .map((s, index) => ({ s, index, ch: s.static_spec.screen_layout?.beat === t.beat ? s.static_spec.screen_layout?.characters.find((c) => c.character_id === t.character_id) : undefined }))
+      .filter((c): c is { s: ShotDesign; index: number; ch: NonNullable<typeof c.ch> } => !!c.ch && (c.ch.start.in_frame || !!c.ch.end?.in_frame))
+    if (!candidates.length) continue
+    const scored = candidates.map((c) => {
+      const apparent = Math.max(c.ch.start.apparent_height, c.ch.end?.apparent_height ?? 0)
+      const hasWriterMotion = (c.s.dynamic_spec?.character_motion ?? []).some((m) => m.character_id === t.character_id && m.source !== 'ledger')
+      return { ...c, apparent, hasWriterMotion }
+    })
+    const big = scored.filter((c) => c.apparent >= OWNER_MIN_APPARENT_HEIGHT)
+    const pool = big.length ? big : scored
+    pool.sort((a, b) => Number(b.hasWriterMotion) - Number(a.hasWriterMotion) || b.apparent - a.apparent || a.index - b.index)
+    owners.set(key, pool[0].s.intent.shot_id)
+  }
+  return owners
+}
+
+/** 소유 샷 앞의 샷은 그 인물을 비트 시작 상태로, 뒤 샷은 끝 상태로 고정한다 — apply 에 넘기는 핀. */
+export function transitionPins(shots: readonly ShotDesign[], stage: SceneStage, owners: TransitionOwners): TransitionPins {
+  const pins: TransitionPins = new Map()
+  const indexOf = new Map(shots.map((s, i) => [s.intent.shot_id, i] as const))
+  for (const t of deriveTransitions(stage)) {
+    const owner = owners.get(transitionKey(t.beat, t.character_id))
+    if (!owner) continue
+    const ownerIndex = indexOf.get(owner)
+    if (ownerIndex === undefined) continue
+    shots.forEach((s, i) => {
+      if (s.static_spec.screen_layout?.beat !== t.beat || i === ownerIndex) return
+      const m = pins.get(s.intent.shot_id) ?? new Map<string, 'start' | 'end'>()
+      m.set(t.character_id, i < ownerIndex ? 'start' : 'end')
+      pins.set(s.intent.shot_id, m)
+    })
+  }
+  return pins
+}
+
 /**
  * 비트 사이의 "설명 없는 변화"(직전 비트 끝 ≠ 다음 비트 시작)를 직전 비트의 end_characters 로 옮긴다 —
  *   그래야 그 변화를 보여줄 자리(직전 비트의 샷 END)가 생긴다. 무대 LLM 규칙 7이 놓친 것의 결정론 보정.
@@ -137,6 +278,7 @@ export function applyLedgerToShots(
   shots: ShotDesign[],
   stage: SceneStage,
   names?: ReadonlyMap<string, string>,
+  opts?: { owners?: TransitionOwners },
 ): ApplyLedgerResult {
   const issues: ValidationIssue[] = []
   const nameOf = (id: string) => names?.get(id) ?? id
@@ -145,10 +287,13 @@ export function applyLedgerToShots(
 
   for (const t of deriveTransitions(stage)) {
     const candidates = out.filter((s) => s.static_spec.screen_layout?.beat === t.beat)
-    const shownBy = candidates.filter((s) => {
+    const visibleIn = candidates.filter((s) => {
       const ch = s.static_spec.screen_layout?.characters.find((c) => c.character_id === t.character_id)
       return !!ch && (ch.start.in_frame || !!ch.end?.in_frame)
     })
+    // 전이 소유권: 소유 샷이 정해졌으면 그 샷만 변화를 보여준다(다른 샷은 START/END 상태로 고정돼 있다).
+    const owner = opts?.owners?.get(transitionKey(t.beat, t.character_id)) ?? null
+    const shownBy = owner ? visibleIn.filter((s) => s.intent.shot_id === owner) : visibleIn
     const injected: string[] = []
     let verb = t.verb
     for (const s of shownBy) {
@@ -183,7 +328,7 @@ export function applyLedgerToShots(
         constraint_target: 'report_only',
       })
     }
-    transitions.push({ ...t, verb, shown_by: shownBy.map((s) => s.intent.shot_id), injected_into: injected, covered })
+    transitions.push({ ...t, verb, shown_by: shownBy.map((s) => s.intent.shot_id), injected_into: injected, covered, ...(opts?.owners ? { owner } : {}) })
   }
 
   return { shots: out, ledger: { scene_id: stage.scene_id, transitions }, issues }

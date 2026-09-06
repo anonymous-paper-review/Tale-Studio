@@ -53,6 +53,7 @@ function normState(raw: unknown): StageCharacterState | null {
   const h = num(r.height_m, NaN)
   if (Number.isFinite(h) && h > 0.3 && h < 6) state.height_m = Math.round(h * 100) / 100
   if (typeof r.note === 'string' && r.note.trim()) state.note = r.note.trim().slice(0, 160)
+  if (typeof r.evidence === 'string' && r.evidence.trim()) state.evidence = r.evidence.trim().slice(0, 200)
   return state
 }
 

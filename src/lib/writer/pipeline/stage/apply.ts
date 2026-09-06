@@ -43,6 +43,25 @@ export function stageStatesForBeat(stage: SceneStage, beat: number): { start: St
   return { start: carried, end: carried, beatUsed: prev.beat }
 }
 
+/** 전이 소유권 핀: 소유 샷이 아닌 샷은 그 인물을 비트 시작('start') 또는 끝('end') 상태로 고정한다 — 변화는 한 샷만 보여준다. */
+export function pinStates(
+  states: { start: StageCharacterState[]; end: StageCharacterState[]; beatUsed: number },
+  pins?: ReadonlyMap<string, 'start' | 'end'>,
+): { start: StageCharacterState[]; end: StageCharacterState[]; beatUsed: number } {
+  if (!pins || pins.size === 0) return states
+  const pick = (id: string, which: 'start' | 'end') => (which === 'start' ? states.start : states.end).find((c) => c.character_id === id)
+  const start = states.start.map((c) => {
+    const p = pins.get(c.character_id)
+    return p === 'end' ? (pick(c.character_id, 'end') ?? c) : c
+  })
+  const end = states.end.map((c) => {
+    const p = pins.get(c.character_id)
+    return p === 'start' ? (pick(c.character_id, 'start') ?? c) : c
+  })
+  const same = start.length === end.length && start.every((c, i) => c === end[i])
+  return { start, end: same ? start : end, beatUsed: states.beatUsed }
+}
+
 /** 샷의 비트 — 데쿠파주 source_beats 첫 값. 추가(added) 샷은 직전 샷의 비트를 잇는다. */
 export function beatForShot(shot: ShotDesign, dec: DecoupageShot | null | undefined, prevBeat: number): number {
   if (dec) {
@@ -163,11 +182,21 @@ function subjectIds(setup: ShotCameraSetup): string[] {
  * 한 씬의 샷들에 무대를 적용한다. 샷 순서대로 비트를 잇고, 샷마다 START/END 카메라·배치를 계산해
  *   static_spec.screen_layout 과 character_blocking(위치·포함 여부)을 갱신한다.
  */
+/** 명단 규칙(2026-09-05, 오너 승인): 화면 높이 8% 미만 인물은 blocking 에서 빼고 "먼 인물"로만 서술한다. */
+export const DISTANT_APPARENT_HEIGHT = 0.08
+
 export function applyStageToShots(
   shots: ShotDesign[],
   stage: SceneStage,
   sceneDec: DecoupageShot[] | null,
-  opts?: { format?: string | null; aspect?: number },
+  opts?: {
+    format?: string | null
+    aspect?: number
+    /** 전이 소유권 핀(ledger.transitionPins): 샷별 인물을 비트 시작('start') 또는 끝('end') 상태로 고정한다. */
+    pins?: ReadonlyMap<string, ReadonlyMap<string, 'start' | 'end'>>
+    /** 사람이 읽는 이름 — 프레임 밖 봉인 제약 문장에 쓴다. */
+    names?: ReadonlyMap<string, string>
+  },
 ): ApplyStageResult {
   const aspect = opts?.aspect ?? aspectRatioOf(opts?.format)
   const issues: ValidationIssue[] = []
@@ -185,7 +214,7 @@ export function applyStageToShots(
     const dec = decById.get(shotId) ?? sceneDec?.[i] ?? null
     const beat = beatForShot(shot, dec, prevBeat)
     prevBeat = beat
-    const states = stageStatesForBeat(stage, beat)
+    const states = pinStates(stageStatesForBeat(stage, beat), opts?.pins?.get(shotId))
     if (states.start.length === 0) return shot
     const push = (severity: ValidationIssue['severity'], message: string, suggestion?: string) =>
       issues.push({ category: 'cinematography', severity, location: shotId, message, ...(suggestion ? { suggestion } : {}) })
@@ -323,6 +352,8 @@ export function applyStageToShots(
     ]
     const blocking: ShotStaticSpec['character_blocking'] = []
     const layoutChars: ShotScreenLayout['characters'] = []
+    const offFrame: string[] = []
+    const nameOf = (id: string) => opts?.names?.get(id) ?? id
     for (const id of orderedIds) {
       const start = placementsStart.get(id)!
       const end = placementsEnd?.get(id)
@@ -331,6 +362,24 @@ export function applyStageToShots(
       const existing = listedById.get(id)
       if (!visible && !isSubject) {
         if (existing) push('INFO', `${id} 는 이 카메라에서 프레임 밖 — blocking 에서 뺐다`)
+        // 프레임 밖 봉인(2026-09-05): 씬에 있지만 이 카메라 밖인 인물은 프롬프트가 "그리지 말 것"으로 못박는다 —
+        //   명단에서만 빼면 작가 문장("세 수장")과 참조 시트가 남아 모델이 인물을 지어낸다(겨울_6 sh 5·7 실측).
+        offFrame.push(id)
+        issues.push({
+          category: 'continuity',
+          severity: 'WARNING',
+          location: shotId,
+          message: `${nameOf(id)} 프레임 밖 — "그리지 말 것" 제약을 붙였다`,
+          constraint_target: 'visual',
+          constraint: `${nameOf(id)} (${id}) is OFF-SCREEN in this shot, not inside the frame at all: do not draw ${nameOf(id)} anywhere in START or END.`,
+        })
+        continue
+      }
+      // 명단 규칙: 프레임 안이어도 8% 미만이면 번호 인물이 아니라 "먼 인물" — 시트 참조·자세 문장 없이 배경 실루엣로만.
+      const tiny = start.apparent_height < DISTANT_APPARENT_HEIGHT && (!end || end.apparent_height < DISTANT_APPARENT_HEIGHT)
+      if (tiny && !isSubject) {
+        if (existing) push('INFO', `${id} 는 화면 높이 ${Math.round(start.apparent_height * 100)}% 로 너무 작아 blocking 에서 빼고 먼 인물로 둔다`)
+        layoutChars.push({ character_id: id, start, ...(end ? { end } : {}), distant: true })
         continue
       }
       if (!visible && isSubject) push('WARNING', `피사체 ${id} 가 프레임 밖이다 — 샷 사이즈·렌즈·방향을 확인`, 'camera_setup 을 바꾸거나 무대 위치를 조정')
@@ -363,6 +412,7 @@ export function applyStageToShots(
       ...(endSolve && cameraMoves ? { end_camera: endSolve.camera } : {}),
       ...(startSolve.axisCorrected ? { axis_corrected: true } : {}),
       characters: layoutChars,
+      ...(offFrame.length ? { off_frame: offFrame } : {}),
       issues: issues.filter((x) => x.location === shotId && x.severity !== 'INFO').map((x) => x.message),
     }
     const nextSpec: ShotStaticSpec = {

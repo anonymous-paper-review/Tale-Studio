@@ -157,3 +157,16 @@ paths:
   커서를 뒤에 두며, 입력이 그 상태인 동안 회색 안내(`MentionTextarea ghost`, "이 카드 채워줘")를 보인다.
 - 라벨은 `card-mention.ts`(이름 없는 카드도 "이름 미정 인물 2" 같은 고정 라벨)이고 서버가 같은 목록으로 카드 ref 를 찾는다 — 이름 없는 카드도 AI 가 안다.
   Artist·Director·Editor 에는 완드를 새로 만들지 않는다(별도 결정 1안).
+
+## 씬 무대 수리 (2026-09-05, 오너 결정 — `tests/promise-stage-repair.test.ts`)
+
+- **전이 소유권**: 상태 변화(자세·2m 이상 이동)는 샷 하나만 보여준다. `decideTransitionOwners`(작가 동작 있는 샷 > 인물이 가장 크게 잡힌 샷,
+  화면 높이 15% 미만 제외) → `transitionPins`(앞 샷은 START 상태, 뒤 샷은 END 상태로 고정) → 2차 `applyStageToShots({ pins })` → 장부는
+  소유 샷에만 보충. 순서는 `stage/orchestrate.runStageForScene` 하나가 갖고 파이프라인(v4_shots)과 재적용 하네스가 같이 쓴다.
+- **근거 게이트**(버전 2 무대만): 변화한 인물 항목의 `evidence`(원문 인용)가 원문에 없으면 직전 상태로 되돌리고 `gated_note` 메모만 남긴다
+  (`gateStageEvidence`; 프롬프트는 메모를 읽지 않는다). 옛 무대(version 없음)는 건드리지 않는다. 작은 반응(자세를 낮춤 등)은 note 로만.
+- **기하**: 표지 피사체도 거리 계산은 인물 키. 와이드(EWS/ELS/VWS/WS/LS/FS/MLS)에서 피사체가 표지뿐인데 인물 명단이 있으면 합집합.
+  화면 높이 8% 미만 인물은 blocking 에서 빼고 `screen_layout.characters[].distant` 로만 남긴다(러프 문장 "먼 인물").
+- **프레임 밖 봉인**: 카메라 밖 인물은 `screen_layout.off_frame` + WARNING visual 제약("OFF-SCREEN … do not draw") → check_notes 로 러프·실사에 실린다.
+  러프 셀은 이름을 대고 못박고, 실사 참조 계획(`planShotCharacterRefs`·배치 라우트)은 그 인물의 시트를 붙이지 않는다.
+  START 에 없고 END 에 들어오는 인물은 "NOT visible at START; enters from the left/right".

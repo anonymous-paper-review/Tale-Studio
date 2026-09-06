@@ -123,17 +123,26 @@ function readAppearanceKeys(value: unknown): Record<string, string> {
  * 순수 계획 — 한 샷의 인물 참조(결정적 순서)와 빠진 시트 목록.
  *   characters 가 배열이 아니면(레거시/미정의) 빈 계획 — 호출부가 종전 동작(클라 참조)으로 간다.
  */
+/** 프레임 밖 봉인(2026-09-05): 무대가 이 카메라 밖으로 판정한 인물 id(static_spec.screen_layout.off_frame). */
+export function readOffFrame(staticSpec: unknown): string[] {
+  if (!staticSpec || typeof staticSpec !== 'object') return []
+  const lay = (staticSpec as { screen_layout?: { off_frame?: unknown } }).screen_layout
+  const raw = lay?.off_frame
+  return Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string' && x.trim().length > 0) : []
+}
+
 export function planShotCharacterRefs(
   shot: ShotRowForReferences,
   lookup: ReferenceLookup,
 ): { characterRefs: ShotCharacterRef[]; missing: MissingSheet[] } {
   if (!Array.isArray(shot.characters)) return { characterRefs: [], missing: [] }
+  const offFrame = new Set(readOffFrame(shot.static_spec))
   const ids = applyDirectorRefs(
     [...new Set(
       (shot.characters as unknown[]).filter((x): x is string => typeof x === 'string' && x.trim().length > 0).map((x) => x.trim()),
     )].sort((a, b) => a.localeCompare(b)),
     parseDirectorRefs(shot.director_refs),
-  )
+  ).filter((id) => !offFrame.has(id)) // 프레임 밖 인물의 시트는 붙이지 않는다 — 남은 참조로 인물을 지어내는 원천
   const keys = readAppearanceKeys(shot.character_appearance_keys)
   const blocking = readCharacterBlocking(shot.static_spec)
   const characterRefs: ShotCharacterRef[] = []

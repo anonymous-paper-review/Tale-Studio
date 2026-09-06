@@ -164,10 +164,15 @@ export function resolveSubjectPoints(
       continue
     }
     const l = landmarks.find((m) => m.id === id)
-    if (l) out.push({ x: l.x, y: l.y, height: 1.2, id: l.id })
+    // 기하 수리(2026-09-05, 오너 승인): 표지 피사체도 거리 계산은 인물 키로 — 1.2m 로 잡으면 FS 거리가 2.5m 가 돼
+    //   사람이 전부 프레임 밖으로 나갔다(겨울_6 sh 5 실측).
+    if (l) out.push({ x: l.x, y: l.y, height: DEFAULT_CHARACTER_HEIGHT_M, id: l.id })
   }
   return out
 }
+
+/** 설정·와이드 샷 — 표지 피사체에 인물 명단이 딸려 있으면 피사체는 그룹과 표지의 합집합이다. */
+export const WIDE_SHOT_RE = /^(EWS|ELS|VWS|WS|LS|FS|MLS)$/i
 
 function resolveAxisPoints(stage: SceneStage, states: StageCharacterState[]): { from: Vec2; to: Vec2 } | null {
   if (!stage.axis) return null
@@ -210,6 +215,12 @@ export function solveCamera(input: SolveCameraInput): SolvedCamera {
   const issues: string[] = []
   const lens = Number.isFinite(setup.lens_mm) && setup.lens_mm > 0 ? setup.lens_mm : 35
   let pts = resolveSubjectPoints(setup.subject, states, stage.landmarks)
+  // 기하 수리(2026-09-05): 와이드 샷의 피사체가 표지뿐인데 LLM 이 인물을 화면에 두려 했으면(intendedIds) 피사체를
+  //   표지 + 그 인물들의 합집합으로 강제한다 — 표지만 보고 물러서면 인물이 가장자리에 뭉치거나 빠진다(겨울_6 sh 1).
+  if (pts.length && !pts.some((p) => states.some((s) => s.character_id === p.id)) && WIDE_SHOT_RE.test(String(input.shotType ?? '')) && input.intendedIds?.length) {
+    const extra = states.filter((s) => input.intendedIds!.includes(s.character_id)).map((c) => ({ x: c.x, y: c.y, height: c.height_m ?? DEFAULT_CHARACTER_HEIGHT_M, id: c.character_id }))
+    if (extra.length) pts = [...pts, ...extra]
+  }
   if (pts.length === 0) {
     issues.push(`피사체 "${Array.isArray(setup.subject) ? setup.subject.join(',') : String(setup.subject)}" 가 무대에 없어 그룹 중심으로 대체했다`)
     pts = resolveSubjectPoints('group', states, stage.landmarks)

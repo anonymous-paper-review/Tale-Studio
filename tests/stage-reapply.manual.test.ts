@@ -3,8 +3,8 @@
 //   RUN_STAGE_REAPPLY=1 STAGE_IN=<in.json> STAGE_OUT=<out.json> pnpm vitest run tests/stage-reapply.manual.test.ts
 import { describe, it, expect } from 'vitest'
 import { readFileSync, writeFileSync } from 'node:fs'
-import { applyStageToShots } from '@/lib/writer/pipeline/stage/apply'
-import { applyLedgerToShots, normalizeStageTransitions } from '@/lib/writer/pipeline/stage/ledger'
+import { normalizeStageTransitions } from '@/lib/writer/pipeline/stage/ledger'
+import { runStageForScene } from '@/lib/writer/pipeline/stage/orchestrate'
 import type { DecoupageShot, ShotDesign } from '@/lib/writer/types/pipeline'
 
 const ENABLED = process.env.RUN_STAGE_REAPPLY === '1'
@@ -32,9 +32,8 @@ describe.skipIf(!ENABLED)('stage reapply', () => {
     // 작가 동작만 남긴다(장부가 보충한 것은 다시 계산)
     for (const s of shots) s.dynamic_spec.character_motion = s.dynamic_spec.character_motion.filter((m: any) => m.source !== 'ledger')
     const stage = normalizeStageTransitions(d.stage)
-    const r = applyStageToShots(shots, stage, dec, { format: 'horizontal_16:9' })
     const names = new Map<string, string>(Object.entries(JSON.parse(process.env.STAGE_NAMES ?? '{}')))
-    const L = applyLedgerToShots(r.shots, stage, names)
+    const L = runStageForScene(shots, stage, dec, { format: 'horizontal_16:9', names })
     const out = {
       ...d,
       stage,
@@ -46,10 +45,10 @@ describe.skipIf(!ENABLED)('stage reapply', () => {
         character_motion: s.dynamic_spec.character_motion,
       })),
       ledger: [L.ledger],
-      issues: [...r.issues, ...L.issues],
-      layout_notes: [{ name: 'reapply', text: [...r.issues, ...L.issues].map((i) => `[${i.severity}] ${i.location}: ${i.message}`).join('\n') }],
+      issues: L.issues,
+      layout_notes: [{ name: 'reapply', text: L.issues.map((i) => `[${i.severity}] ${i.location}: ${i.message}`).join('\n') }],
     }
     writeFileSync(process.env.STAGE_OUT!, JSON.stringify(out, null, 1))
-    expect(r.shots.length).toBe(shots.length)
+    expect(L.shots.length).toBe(shots.length)
   })
 })

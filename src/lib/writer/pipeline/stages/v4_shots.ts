@@ -37,8 +37,8 @@ import type { ShotStaticSpec,
   ValidationIssue,
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
-import { applyStageToShots } from '@/lib/writer/pipeline/stage/apply';
-import { applyLedgerToShots, normalizeStageTransitions } from '@/lib/writer/pipeline/stage/ledger';
+import { normalizeStageTransitions } from '@/lib/writer/pipeline/stage/ledger';
+import { runStageForScene } from '@/lib/writer/pipeline/stage/orchestrate';
 
 /** 씬 단위 부분 진행 체크포인트(#long-writer-run 2026-07-15) — steps.ts가 state에 영속. */
 export interface ShotDesignProgress {
@@ -160,10 +160,10 @@ export async function runShotDesign(
     //   보여주는 샷을 찾아 배경 동작을 보충하며, 없으면 report_only 경고를 남긴다.
     if (stage && sceneShots.length) {
       const normalized = normalizeStageTransitions(stage);
-      const applied = applyStageToShots(sceneShots, normalized, sceneDec, { format: genre.format ?? null });
       const names = new Map(characters.characters.map((c) => [c.id, c.name] as const));
-      const ledgered = applyLedgerToShots(applied.shots, normalized, names);
-      const issues = [...applied.issues, ...ledgered.issues];
+      // 전이 소유권(2026-09-05): 1차 적용 → 소유 샷 결정 → 핀 걸고 2차 적용 → 장부(소유 샷에만 보충).
+      const ledgered = runStageForScene(sceneShots, normalized, sceneDec, { format: genre.format ?? null, names });
+      const issues = ledgered.issues;
       sceneIssues.push(...issues);
       sceneLedgers.push(ledgered.ledger);
       if (issues.length) {

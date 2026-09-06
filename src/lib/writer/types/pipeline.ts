@@ -609,6 +609,10 @@ export interface StageCharacterState {
   posture: StagePosture;
   height_m?: number;  // 기본 1.75
   note?: string;      // "lying on a floating dirt mound" 등 — 러프 포즈 문장의 재료
+  /** 근거 게이트(2026-09-05): 이 상태(변화)의 원문 인용. 큰 변화(자세·2m 이상 이동)는 인용이 원문에 있어야 살아남는다. */
+  evidence?: string;
+  /** 근거 없이 적힌 변화를 버리고 남긴 메모 — 사람이 보는 보고용. 프롬프트는 읽지 않는다. */
+  gated_note?: string;
 }
 
 export interface StageBeat {
@@ -632,6 +636,8 @@ export interface StateTransition {
   /** character_motion 을 보충한 샷들 */
   injected_into: string[];
   covered: boolean;
+  /** 전이 소유권(2026-09-05): 이 변화를 보여주는 단 하나의 샷. 앞 샷은 START 상태, 뒤 샷은 END 상태로 고정된다. */
+  owner?: string | null;
 }
 
 export interface SceneLedger {
@@ -650,6 +656,8 @@ export interface SceneStage {
   notes?: string;
   /** v4 뒤 채워지는 상태 장부(어느 샷이 변화를 보여주나). 무대 생성 시점엔 없다. */
   ledger?: SceneLedger;
+  /** 무대 계약 버전. 2 = 근거 게이트 프롬프트(evidence 필수, 2026-09-05). 없으면 옛 무대 — 게이트를 걸지 않는다. */
+  version?: number;
 }
 
 export type CompassDir = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW';
@@ -709,7 +717,11 @@ export interface ShotScreenLayout {
     character_id: string;
     start: ScreenPlacement;
     end?: ScreenPlacement;
+    /** 명단 규칙(2026-09-05): 프레임 안이지만 화면 높이 8% 미만 — blocking 에서 빼고 "먼 인물"로만 서술한다. */
+    distant?: boolean;
   }>;
+  /** 프레임 밖 봉인(2026-09-05): 씬에 있지만 이 카메라의 프레임 밖인 인물 id — 프롬프트가 "그리지 말 것"으로 못박는다. */
+  off_frame?: string[];
   issues: string[];
 }
 
