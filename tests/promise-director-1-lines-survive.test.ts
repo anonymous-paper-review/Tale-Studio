@@ -104,7 +104,7 @@ function take(id: string, shotId: string, frameInputs: unknown) {
   }
 }
 
-const takes: { rows: unknown[] } = { rows: [] }
+const takes: { rows: unknown[]; gates: Array<Promise<void> | null> } = { rows: [], gates: [] }
 
 function seed() {
   api().reset()
@@ -135,12 +135,16 @@ beforeEach(() => {
   db.shots = []
   db.writes = []
   takes.rows = []
+  takes.gates = []
   vi.useFakeTimers()
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === 'string' ? input : input.toString()
       if (url.startsWith('/api/director/video-takes?')) {
+        // n 번째 호출을 붙잡아 재수화 둘이 겹치는 상황을 만든다(프로덕션 실측: 진입 재수화 + Pass 2.5).
+        const gate = takes.gates.shift() ?? null
+        if (gate) await gate
         return new Response(JSON.stringify({ takes: takes.rows }), { status: 200 })
       }
       if (url.includes('/api/director/video-takes/')) {
@@ -207,6 +211,23 @@ describe('Director 배선 1 — 손으로 이은 선은 프로젝트 전환·새
 
     const video = api().nodes.find((n) => isVideoData(n.data) && n.data.videoClipId === 'clip-1')
     expect(video && isVideoData(video.data) ? video.data.frameInputs.refs : []).toContain(ASSET_NODE)
+  })
+
+  it('재수화 둘이 겹쳐 앞 것이 밀려나도, 앞 것의 스윅이 아직 안 풀린 빈 목록을 DB 에 되쓰지 않는다', async () => {
+    const { s1, s2 } = seed()
+    db.shots = [shotRow('s1', { image_inputs: [{ kind: 'shot', shotId: 's2' }] }), shotRow('s2')]
+    let openSecond!: () => void
+    takes.gates = [null, new Promise((r) => { openSecond = r })]
+    const first = api().hydrateFromDb('p1') // 큐 훅의 진입 재수화
+    const second = api().hydrateFromDb('p1') // 동기화 훅 Pass 2.5 — 영상 테이크 응답이 늦다
+    await first
+    await vi.advanceTimersByTimeAsync(700) // 앞 재수화가 예약한 스윅이 돌 시각
+    expect(db.writes.filter((w) => w.table === 'shots' && 'image_inputs' in w.payload)).toEqual([])
+    openSecond()
+    await second
+    await vi.advanceTimersByTimeAsync(700)
+    expect(db.writes.filter((w) => w.table === 'shots' && 'image_inputs' in w.payload)).toEqual([])
+    expect(shotImageInputs(s1)).toEqual([s2])
   })
 
   it('재수화 결과가 DB 와 같으면 스윅은 아무것도 쓰지 않는다', async () => {

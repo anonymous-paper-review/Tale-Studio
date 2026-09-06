@@ -956,6 +956,11 @@ function scheduleWiringSweepToDb(getState: () => DirectorCanvasState) {
   if (pendingWiringSweep) clearTimeout(pendingWiringSweep)
   pendingWiringSweep = setTimeout(async () => {
     pendingWiringSweep = null
+    if (hydrationsInFlight > 0) {
+      // 재수화가 끝나기 전의 로컬 목록은 DB 보다 적을 수 있다 — 끝난 뒤로 미룬다.
+      scheduleWiringSweepToDb(getState)
+      return
+    }
     const state = getState()
     const projectId = state.projectId
     if (!projectId) return
@@ -1041,6 +1046,8 @@ const pendingVideoFinalWrites = new Map<string, Promise<void>>()
 const latestVideoFinalIntent = new Map<string, number>()
 const latestVideoDeleteIntent = new Map<string, number>()
 let hydrationEpoch = 0
+// 진행 중인 재수화 수(Director 배선 1, 2026-09-06 실측): 재수화가 돌고 있으면 로컬 목록이 곧 바뀔 수 있으니 스윅은 기다린다.
+let hydrationsInFlight = 0
 type HydrationLocalSnapshot = {
   position: XYPosition
   label?: string
@@ -1817,6 +1824,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         if (!projectId || get().projectId !== projectId) return
         const hydrationToken = ++hydrationEpoch
         const localSnapshot = snapshotHydrationLocals(get().nodes)
+        hydrationsInFlight += 1
         try {
           const supabase = createClient()
           const [scenesRes, shotsRes, clipsRes] = await Promise.all([
@@ -2214,6 +2222,10 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             })
             return changed ? { nodes, lastSavedAt: Date.now() } : {}
           })
+          // 뒤에 시작한 재수화가 있으면(에포크 바뀜) 이 재수화의 뒷정리(시드·스윅·선 재구성)는 하지 않는다 —
+          //   위 set 은 이미 건너뛰었는데 시드와 스윅만 돌면, 아직 안 풀린 로컬 목록([])을 DB 에 되쓴다
+          //   (2026-09-06 프로덕션 실측: 진입 재수화 + Pass 2.5 겹침 → image_inputs [] 되쓰기).
+          if (hydrationEpoch !== hydrationToken || get().projectId !== projectId) return
           // 약속 F·G: DB 참조 목록을 적용했으면 참조 선을 다시 그린다.
           if (directorRefsByShotId.size > 0) get().rebuildAssetNodes()
           // 스윅 캐시 시드 — DB와 같은 값을 다시 쓰지 않게. 로컬 우위로 달라진 항목은
@@ -2259,6 +2271,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         } catch (err) {
           console.error('[director-store] hydrateFromDb failed:', err)
           throw err
+        } finally {
+          hydrationsInFlight -= 1
         }
       },
 
