@@ -103,10 +103,73 @@ export function resolveImageInputs(
   nodes: DirectorNode[],
   refs: StableWiringRef[],
 ): string[] {
-  const resolved = refs
-    .map((ref) => resolveWiringRef(nodes, ref))
-    .filter((id): id is string => !!id)
-  return [...new Set(resolved)]
+  return splitImageInputs(nodes, refs).resolved
+}
+
+// #wiring-pending (Director 배선 1, 2026-09-06): 재수화 시점에 아직 없는 노드(에셋 노드는 Pass 2.6 에야
+//   생긴다)를 가리키는 참조는 버리지 않는다. 풀린 것과 못 푼 것을 나눠 돌려주고, 못 푼 것은 스토어가
+//   보관했다가 노드가 생기면 다시 푼다. 스윅은 보관분을 DB 값에 합쳐 "줄어든 목록"을 되쓰지 않는다.
+export function splitImageInputs(
+  nodes: DirectorNode[],
+  refs: StableWiringRef[],
+): { resolved: string[]; unresolved: StableWiringRef[] } {
+  const resolved: string[] = []
+  const unresolved: StableWiringRef[] = []
+  for (const ref of refs) {
+    const id = resolveWiringRef(nodes, ref)
+    if (id) {
+      if (!resolved.includes(id)) resolved.push(id)
+    } else {
+      unresolved.push(ref)
+    }
+  }
+  return { resolved, unresolved }
+}
+
+export function splitFrameInputs(
+  nodes: DirectorNode[],
+  stable: StableFrameInputs,
+): { resolved: VideoNodeData['frameInputs']; unresolved: StableFrameInputs | null } {
+  const start = stable.start ? resolveWiringRef(nodes, stable.start) : null
+  const end = stable.end ? resolveWiringRef(nodes, stable.end) : null
+  const { resolved: refs, unresolved: unresolvedRefs } = splitImageInputs(nodes, stable.refs)
+  const unresolved: StableFrameInputs = {
+    start: stable.start && !start ? stable.start : null,
+    end: stable.end && !end ? stable.end : null,
+    refs: unresolvedRefs,
+  }
+  return {
+    resolved: { start, end, refs },
+    unresolved: isEmptyStableFrameInputs(unresolved) ? null : unresolved,
+  }
+}
+
+/** 같은 참조는 하나만 — 앞 목록의 순서를 지키고 뒤 목록의 새 참조를 덧붙인다. */
+export function mergeStableRefs(
+  primary: StableWiringRef[],
+  pending: StableWiringRef[],
+): StableWiringRef[] {
+  const out: StableWiringRef[] = []
+  const seen = new Set<string>()
+  for (const ref of [...primary, ...pending]) {
+    const key = JSON.stringify(ref)
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(ref)
+  }
+  return out
+}
+
+export function mergeStableFrameInputs(
+  local: StableFrameInputs,
+  pending: StableFrameInputs | null,
+): StableFrameInputs {
+  if (!pending) return local
+  return {
+    start: local.start ?? pending.start,
+    end: local.end ?? pending.end,
+    refs: mergeStableRefs(local.refs, pending.refs),
+  }
 }
 
 export function serializeFrameInputs(
@@ -126,14 +189,7 @@ export function resolveFrameInputs(
   nodes: DirectorNode[],
   stable: StableFrameInputs,
 ): VideoNodeData['frameInputs'] {
-  const refs = stable.refs
-    .map((ref) => resolveWiringRef(nodes, ref))
-    .filter((id): id is string => !!id)
-  return {
-    start: stable.start ? resolveWiringRef(nodes, stable.start) : null,
-    end: stable.end ? resolveWiringRef(nodes, stable.end) : null,
-    refs: [...new Set(refs)],
-  }
+  return splitFrameInputs(nodes, stable).resolved
 }
 
 /** DB jsonb 값 → StableWiringRef. 형태가 어긋나면 null (관대한 파싱 — 연결 하나 잃는 쪽이 throw 보다 낫다). */

@@ -8,6 +8,7 @@
 
 import { useEffect, useMemo, useRef } from 'react'
 import { useDirectorCanvasStore } from '@/stores/director-store'
+import { useWriterStore } from '@/stores/writer-store'
 import { useActiveGenerationJobs, type ActiveJob } from '@/lib/generation-queue'
 import { invalidateShots } from '@/lib/shots-cache'
 import {
@@ -21,8 +22,10 @@ import {
   type DirectorNode,
 } from '@/types/director'
 
+// Director 배선 2 (2026-09-06): 러프·previz 는 writer 스토어에서 읽으므로, 그 잡도 감시하고 정산 때 writer 의 두 칸을 채운다.
 const WATCHED_KINDS = new Set([
   'shot_storyboard',
+  'shot_rough_storyboard',
   'storyboard_real_grid',
   'shot_video',
   'shot_previz_video',
@@ -93,7 +96,9 @@ export function useQueueRehydrate(projectId: string | null): void {
     let cancelled = false
     const unreflectedPromise = fetchUnreflectedCompletedJobs(projectId)
     void invalidateShots(projectId)
-      .then(() => hydrateFromDb(projectId))
+      .then(() =>
+        Promise.all([hydrateFromDb(projectId), useWriterStore.getState().refreshShotMedia(projectId)]),
+      )
       .then(async () => {
         const unreflected = await unreflectedPromise
         if (!cancelled) {
@@ -119,7 +124,7 @@ export function useQueueRehydrate(projectId: string | null): void {
     const settled = computeSettledJobs(prev, watched)
     if (settled.length === 0) return
     void invalidateShots(projectId)
-    void hydrateFromDb(projectId)
+    void Promise.all([hydrateFromDb(projectId), useWriterStore.getState().refreshShotMedia(projectId)])
       .then(() => {
         // 좌표 ④ (#a2-observability): 재수화까지 끝나 결과가 화면 상태에 반영된 시점 보고.
         reportUiReflected(projectId, settled, 'director-canvas')

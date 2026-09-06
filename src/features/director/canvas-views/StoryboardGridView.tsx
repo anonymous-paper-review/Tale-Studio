@@ -329,15 +329,16 @@ function ShotCell({
     setVideoError(null)
     try {
       if (!hasImage) {
-        await generateStoryboardImage(node.id)
-        const fresh = useDirectorCanvasStore
-          .getState()
-          .nodes.find((n) => n.id === node.id)
-        const ok =
-          fresh &&
-          isShotData(fresh.data) &&
-          fresh.data.storyboardImage?.status === 'completed'
-        if (!ok) return
+        await useDirectorCanvasStore.getState().hydrateFreshFromDb().catch(() => {})
+        // Director 배선 5: 로컬이 낡았을 수 있다 — DB 를 먼저 다시 읽고, 그래도 없을 때만 이미지를 새로 만든다(승인한 그림 보호).
+        const completedNow = () => {
+          const fresh = useDirectorCanvasStore.getState().nodes.find((n) => n.id === node.id)
+          return !!fresh && isShotData(fresh.data) && fresh.data.storyboardImage?.status === 'completed'
+        }
+        if (!completedNow()) {
+          await generateStoryboardImage(node.id)
+          if (!completedNow()) return
+        }
       }
       await generateVideoForShot(node.id)
     } catch (error) {

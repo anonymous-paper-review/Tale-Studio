@@ -8,6 +8,7 @@
 import { toast } from 'sonner'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { refreshGenerationQueue } from '@/lib/generation-queue'
+import { invalidateShots } from '@/lib/shots-cache'
 import { notifyQuotaExceeded } from '@/lib/generation-quota-toast'
 import { waitForPrerequisite, type PrerequisiteBody, type PrerequisiteCode } from '@/lib/generation-prerequisite-toast'
 import { translate } from '@/lib/i18n'
@@ -122,6 +123,8 @@ export async function runRealBatch(
         }
         // 시트 하나가 끝날 때마다 즉시 반영(#live-refresh 2026-08-11) — 옛 코드는 전체 라운드가
         //   끝나야 1회 재수화라, 첫 시트가 완성돼도 화면은 새로고침 전까지 빈 카드였다.
+        // Director 배선 3: 사물함(30초)을 먼저 낡음으로 표시해야 완료된 행을 받는다 — 안 하면 옛 행으로 헛돈다.
+        await invalidateShots(projectId)
         await store.getState().hydrateFromDb(projectId).catch(() => {})
         refreshGenerationQueue()
       }
@@ -147,6 +150,7 @@ export async function runRealBatch(
       resumeDepthByProject.delete(projectId)
     }
     if (generated > 0) {
+      await invalidateShots(projectId)
       await store.getState().hydrateFromDb(projectId)
       toast.success(
         translate(useLocaleStore.getState().locale, 'Generated {count} live-action storyboard shots', {

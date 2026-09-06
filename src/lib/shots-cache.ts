@@ -28,6 +28,13 @@ export const shotsKey = (projectId: string) => ['shots', projectId] as const
 
 /** 샷은 편집 중 자주 바뀌는 층 — 캐릭터 시트(5분)보다 짧게. */
 const SHOTS_STALE_MS = 30_000
+// Director 배선 4 (2026-09-06): 무효화 세대. 무효화 전에 시작된 조회가 아직 진행 중이면 fetchQuery 는 그
+//   요청에 합류해 옛 행을 돌려주고, 그 요청이 뒤늦게 성공하면 칸이 다시 "신선"이 된다(isInvalidated 소실).
+//   요청이 시작될 때의 세대를 적어 두고, 받은 뒤 세대가 달라져 있으면 한 번 더 받는다.
+const invalidationGen = new Map<string, number>()
+/** 응답 배열마다 "요청이 시작될 때의 세대" — 합류한 호출자 여럿이 같은 배열을 받으므로 배열에 붙인다. */
+const rowsGen = new WeakMap<ShotRow[], number>()
+const genOf = (projectId: string) => invalidationGen.get(projectId) ?? 0
 const cacheDebugState = new Map<string, string>()
 const cacheDebugInvalidatedAt = new Map<string, number>()
 
@@ -66,13 +73,27 @@ async function fetchShots(projectId: string): Promise<ShotRow[]> {
  * 나머지 소비처의 부분집합은 전체 행의 진부분집합이다. 칸을 소비처별로 쪼개면
  * "같은 진실의 사본"이 다시 생긴다 — 각자 필요한 열만 골라 쓰는 것은 소비처 몫.
  */
-export function loadShots(projectId: string): Promise<ShotRow[]> {
+export async function loadShots(projectId: string): Promise<ShotRow[]> {
   recordCacheState(projectId)
-  return getQueryClient().fetchQuery({
-    queryKey: shotsKey(projectId),
-    queryFn: () => fetchShots(projectId),
-    staleTime: SHOTS_STALE_MS,
-  })
+  const run = (staleTime: number) =>
+    getQueryClient().fetchQuery({
+      queryKey: shotsKey(projectId),
+      queryFn: async () => {
+        const startedAtGen = genOf(projectId)
+        const rows = await fetchShots(projectId)
+        rowsGen.set(rows, startedAtGen)
+        return rows
+      },
+      staleTime,
+      // 칸이 queryFn 이 돌려준 배열 그대로를 들고 있어야 위 세대 표시가 살아남는다(구조 공유는 옛 배열을 되살린다).
+      structuralSharing: false,
+    })
+  let rows = await run(SHOTS_STALE_MS)
+  // 받은 배열의 요청이 최근 무효화보다 먼저 시작됐다면 그 행은 쓰기 전 것일 수 있다 — 다시 받는다(합류한 호출자도 같다).
+  for (let attempt = 0; attempt < 2 && rowsGen.get(rows) !== genOf(projectId); attempt++) {
+    rows = await run(0)
+  }
+  return rows
 }
 
 /**
@@ -80,6 +101,7 @@ export function loadShots(projectId: string): Promise<ShotRow[]> {
  * 다음 loadShots 가 신선 기간과 무관하게 다시 받는다.
  */
 export function invalidateShots(projectId: string): Promise<void> {
+  invalidationGen.set(projectId, genOf(projectId) + 1)
   const now = Date.now()
   const last = cacheDebugInvalidatedAt.get(projectId) ?? 0
   if (now - last >= 10_000) {

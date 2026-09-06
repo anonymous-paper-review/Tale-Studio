@@ -125,6 +125,9 @@ interface WriterState {
   error: string | null
 
   loadProject: () => Promise<void>
+  /** Director 배선 2 (2026-09-06): 러프·previz 두 칸만 DB 로 다시 채운다 — 잡이 큐에서 빠진 순간 큐 훅이 부른다.
+   *  다른 칸(타이핑 중인 설명 등)과 바뀌지 않은 샷의 객체는 그대로 둔다. */
+  refreshShotMedia: (projectId: string) => Promise<void>
   /** 목각 previz 영상 생성(#previz-video) — 러프 START+END refs. 완료 시 shots 리로드.
    *  ⚠️ 2026-07-27 UI 에서 진입점 제거(유저 부담 완화 — 영상 생성은 SHOT VIDEO 하나로 통일).
    *  현재 호출자 없음. 백엔드(API/webhook/DB 컬럼)와 함께 남겨둔 휴면 경로 — 되살릴 때 UI 만 붙이면 된다. */
@@ -768,6 +771,27 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       }))
       throw err
     }
+  },
+
+  refreshShotMedia: async (projectId) => {
+    if (!projectId || get().shots.length === 0) return
+    const { data } = await loadShotsResult(projectId)
+    if (!data) return
+    const byId = new Map(data.map((r) => [r.shot_id as string, r]))
+    const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+    set((state) => {
+      let changed = false
+      const shots = state.shots.map((sh) => {
+        const row = byId.get(sh.shotId)
+        if (!row) return sh
+        const rough = (row.rough_storyboard as RoughStoryboardImage | null) ?? null
+        const previz = (row.previz_video as RoughStoryboardImage | null) ?? null
+        if (same(sh.roughStoryboard, rough) && same(sh.previzVideo, previz)) return sh
+        changed = true
+        return { ...sh, roughStoryboard: rough, previzVideo: previz }
+      })
+      return changed ? { shots } : {}
+    })
   },
 
   loadProject: async () => {

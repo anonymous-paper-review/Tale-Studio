@@ -45,6 +45,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { holdTakesForVideoJob } from '@/lib/billing/take-hold'
 import { takeCostForVideo } from '@/lib/billing/take-cost'
 import { hasStoryboardImage } from '@/lib/director/storyboard-image'
+import { resolveVideoReferenceFrames } from '@/lib/director/video-reference-frames'
 import type { Json } from '@/types/database'
 import type { CameraConfig, CameraPreset } from '@/types'
 import type { StandaloneVideoConfig } from '@/types/director'
@@ -424,6 +425,8 @@ export async function POST(req: Request) {
       idempotencyKey?: string; videoClipId?: string; takeLabel?: string | null; override?: Json; canvasPosition?: Json | null
       recoveryReceipt?: string; traceId?: string; actor?: string; standaloneVideoKey?: string
       standaloneConfig?: unknown
+      /** Director 배선 5: 사람이 배선한 프레임('manual')만 존중, 그 밖('auto')은 서버가 DB 실사로 정한다. */
+      frameSource?: 'manual' | 'auto'
     }
     let {
       prompt,
@@ -435,8 +438,8 @@ export async function POST(req: Request) {
     } = body
     const {
       aspectRatio,
-      generationMethod = 'T2V',
-      referenceImageUrl,
+      generationMethod: clientGenerationMethod = 'T2V',
+      referenceImageUrl: clientReferenceImageUrl,
       movementPreset,
       idempotencyKey,
       videoClipId,
@@ -456,7 +459,7 @@ export async function POST(req: Request) {
     }
     // V2 refs(#real-strip): [START, END] 등 다중 레퍼런스. referenceImageUrl(단일)과 병행 수신 —
     //   단일은 I2V 판별·스냅샷 하위호환 축, 배열은 실제 제출 레퍼런스로 우선.
-    const referenceImageUrlsV2 = Array.isArray(body.referenceImageUrls)
+    const clientReferenceImageUrls = Array.isArray(body.referenceImageUrls)
       ? body.referenceImageUrls.filter((u): u is string => typeof u === 'string' && !!u).slice(0, 4)
       : undefined
     const referenceImageRolesV2 = Array.isArray(body.referenceImageRoles)
@@ -468,9 +471,9 @@ export async function POST(req: Request) {
         ? body.referenceImageRoles
         : undefined
       : undefined
-    const alignedReferenceImageRoles =
-      referenceImageUrlsV2?.length &&
-      referenceImageRolesV2?.length === referenceImageUrlsV2.length
+    const clientAlignedRoles =
+      clientReferenceImageUrls?.length &&
+      referenceImageRolesV2?.length === clientReferenceImageUrls.length
         ? referenceImageRolesV2
         : undefined
     let writerShotId = body.writerShotId ?? body.shotId
@@ -487,7 +490,7 @@ export async function POST(req: Request) {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idempotencyKey)) {
       return NextResponse.json({ error: 'Invalid request: idempotencyKey must be a UUID' }, { status: 400 })
     }
-    if (generationMethod === 'I2V' && !referenceImageUrl) return NextResponse.json({ error: 'Invalid request: referenceImageUrl is required for I2V' }, { status: 400 })
+    if (clientGenerationMethod === 'I2V' && !clientReferenceImageUrl) return NextResponse.json({ error: 'Invalid request: referenceImageUrl is required for I2V' }, { status: 400 })
     if (!(await userOwnsProject(projectId, user.id))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     if (traceId && !(await chatTraceBelongsToProject(projectId, traceId))) {
       return NextResponse.json({ error: 'Invalid request: traceId does not belong to project' }, { status: 409 })
@@ -518,6 +521,19 @@ export async function POST(req: Request) {
         { status: 409 },
       )
     }
+    // Director 배선 5 (2026-09-06): 참조 프레임은 서버가 DB 로 정한다 — 클라 스토어가 낡아도 이미지 없이 T2V 로 나가거나
+    //   옛 프레임이 실리지 않는다. 사람이 배선한 프레임(frameSource 'manual')은 존중하고 빠진 시작 프레임만 채운다.
+    const frames = resolveVideoReferenceFrames({
+      frameSource: body.frameSource === 'manual' || body.frameSource === 'auto' ? body.frameSource : undefined,
+      referenceImageUrl: clientReferenceImageUrl,
+      referenceImageUrls: clientReferenceImageUrls,
+      referenceImageRoles: clientAlignedRoles,
+      storyboardImage: standalone ? null : shot!.storyboard_image,
+    })
+    const generationMethod: GenerationMethod = frames.generationMethod
+    const referenceImageUrl = frames.referenceImageUrl ?? undefined
+    const referenceImageUrlsV2 = frames.referenceImageUrls
+    const alignedReferenceImageRoles = frames.referenceImageRoles
     let standaloneConfig: StandaloneVideoConfig | null = null
     if (standalone) {
       const { data: clip, error } = await supabaseAdmin

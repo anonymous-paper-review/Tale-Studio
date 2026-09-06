@@ -26,6 +26,15 @@ export function storyboardImageStartFrame(raw: unknown): string | null {
   return url || null
 }
 
+/** 영상 끝 프레임(frames.end) — 스트립 3장이 없거나 완료가 아니면 null. 대표 url 로 대신하지 않는다(시작과 같은 그림이 된다). */
+export function storyboardImageEndFrame(raw: unknown): string | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const img = raw as StoryboardImageLike & { frames?: { end?: unknown } | null }
+  if (typeof img.status === 'string' && img.status !== 'completed') return null
+  const end = typeof img.frames?.end === 'string' ? img.frames.end.trim() : ''
+  return end || null
+}
+
 /** 실사 스토리보드가 "있다"(영상 선행조건 충족)로 치는가. */
 export function hasStoryboardImage(raw: unknown): boolean {
   return storyboardImageStartFrame(raw) !== null

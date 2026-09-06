@@ -63,15 +63,18 @@ import {
   parseStableFrameInputs,
   parseStableImageInputs,
   parseStableVideoChain,
-  resolveFrameInputs,
-  resolveImageInputs,
+  mergeStableFrameInputs,
+  mergeStableRefs,
   serializeFrameInputs,
   serializeImageInputs,
+  splitFrameInputs,
+  splitImageInputs,
   type StableFrameInputs,
   type StableVideoChain,
   type StableWiringRef,
 } from '@/lib/director/wiring-persistence'
 import { runVideoAdherence } from '@/lib/director/video-adherence-client'
+import { refreshGenerationQueue } from '@/lib/generation-queue'
 import { isDemoSession } from '@/lib/demo/context'
 import {
   pollGenerationJob,
@@ -937,6 +940,17 @@ function debouncedPositionSaveToDb(
 // 노드 id 는 기기-로컬이라 안정 참조(wiring-persistence.ts)로 변환해 저장한다.
 let pendingWiringSweep: ReturnType<typeof setTimeout> | null = null
 const lastSavedWiringByKey = new Map<string, string>()
+// #wiring-pending (Director 배선 1, 2026-09-06): DB 연결 참조 중 아직 캔버스에 없는 대상(에셋 노드는 Pass 2.6 에야
+//   생긴다)을 가리키는 것. 버리지 않고 두었다가 노드가 생기면(rebuildAssetNodes → resolvePendingWiring) 풀어 쓰고,
+//   스윅은 이 보관분을 DB 값에 그대로 합쳐 "줄어든 목록"을 되쓰지 않는다. 키는 shots.shot_id / video_clips.id —
+//   프로젝트마다 겹치는 키라 프로젝트 전환·reset 때 스윅 시드와 함께 비운다.
+const pendingImageRefsByShot = new Map<string, StableWiringRef[]>()
+const pendingFrameRefsByClip = new Map<string, StableFrameInputs>()
+function clearPendingWiring() {
+  pendingImageRefsByShot.clear()
+  pendingFrameRefsByClip.clear()
+  lastSavedWiringByKey.clear()
+}
 
 function scheduleWiringSweepToDb(getState: () => DirectorCanvasState) {
   if (pendingWiringSweep) clearTimeout(pendingWiringSweep)
@@ -951,9 +965,10 @@ function scheduleWiringSweepToDb(getState: () => DirectorCanvasState) {
       for (const node of nodes) {
         if (getState().projectId !== projectId) return
         if (isShotData(node.data) && node.data.writerShotId) {
-          const stable = serializeImageInputs(
-            nodes,
-            normalizeImageInputs(node.data.imageInputs),
+          // #wiring-pending: 아직 못 푼 DB 참조는 그대로 합쳐 되쓴다 — 줄어든 목록으로 덮지 않는다.
+          const stable = mergeStableRefs(
+            serializeImageInputs(nodes, normalizeImageInputs(node.data.imageInputs)),
+            pendingImageRefsByShot.get(node.data.writerShotId) ?? [],
           )
           // 약속 F3·G3: 사람이 손댄 참조 목록만 DB 에 남긴다(null = Writer 그대로).
           const refs = directorRefsOf(node.data)
@@ -968,9 +983,9 @@ function scheduleWiringSweepToDb(getState: () => DirectorCanvasState) {
           if (error) throw error
           lastSavedWiringByKey.set(key, json)
         } else if (isVideoData(node.data) && node.data.videoClipId) {
-          const stableFrames = serializeFrameInputs(
-            nodes,
-            normalizeFrameInputs(node.data.frameInputs),
+          const stableFrames = mergeStableFrameInputs(
+            serializeFrameInputs(nodes, normalizeFrameInputs(node.data.frameInputs)),
+            pendingFrameRefsByClip.get(node.data.videoClipId) ?? null,
           )
           const framePayload = isEmptyStableFrameInputs(stableFrames)
             ? null
@@ -1266,6 +1281,10 @@ interface DirectorCanvasState {
   rebuildFrameEdges: () => void
   /** Persisted Video chain inputs에서 last-frame chain 엣지를 멱등 재생성한다. */
   rebuildVideoChainEdges: () => void
+  /** #wiring-pending: 보관 중인 DB 연결 참조를 지금 있는 노드로 다시 푼다(멱등). 풀린 것이 있으면 선을 다시 그린다. */
+  resolvePendingWiring: () => boolean
+  /** Director 배선 5: 사물함을 낡음으로 표시하고 DB 로 다시 채운다 — 유료 생성 전 "정말 없는지" 확인용. */
+  hydrateFreshFromDb: () => Promise<void>
   /**
    * Shot 체인 파생 노드/엣지 재생성(#previz-chain 2026-07-22, 멱등) —
    * writerShotId 있는 Shot 마다 SHOT IMAGE(우측) 노드를 만들고
@@ -1703,6 +1722,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             viewportInitializedProjects[previous.projectId] = true
           }
           hydrationEpoch += 1
+          clearPendingWiring()
           set({
             projectId,
             nodes: initialNodes,
@@ -2125,8 +2145,14 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                   } as DirectorNode
                 }
                 const stable = stableImageInputsByShotId.get(node.data.writerShotId)
-                if (!stable || stable.length === 0) return next
-                const resolved = resolveImageInputs(allNodes, stable)
+                if (!stable || stable.length === 0) {
+                  pendingImageRefsByShot.delete(node.data.writerShotId)
+                  return next
+                }
+                // #wiring-pending: 아직 없는 노드를 가리키는 참조는 보관한다(버리면 스윅이 줄어든 목록을 되쓴다).
+                const { resolved, unresolved } = splitImageInputs(allNodes, stable)
+                if (unresolved.length > 0) pendingImageRefsByShot.set(node.data.writerShotId, unresolved)
+                else pendingImageRefsByShot.delete(node.data.writerShotId)
                 const local = normalizeImageInputs(node.data.imageInputs)
                 if (
                   resolved.length === local.length &&
@@ -2145,8 +2171,11 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 const stableC = stableChainByClipId.get(node.data.videoClipId) ?? null
                 let data = node.data
                 let touched = false
+                if (!stableF) pendingFrameRefsByClip.delete(node.data.videoClipId)
                 if (stableF) {
-                  const resolved = resolveFrameInputs(allNodes, stableF)
+                  const { resolved, unresolved } = splitFrameInputs(allNodes, stableF)
+                  if (unresolved) pendingFrameRefsByClip.set(node.data.videoClipId, unresolved)
+                  else pendingFrameRefsByClip.delete(node.data.videoClipId)
                   const local = normalizeFrameInputs(data.frameInputs)
                   if (
                     resolved.start !== local.start ||
@@ -2190,7 +2219,11 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           // 스윅 캐시 시드 — DB와 같은 값을 다시 쓰지 않게. 로컬 우위로 달라진 항목은
           //   캐시 미스가 나 아래 스윅이 자연스럽게 백필한다.
           for (const [shotId, stable] of stableImageInputsByShotId) {
-            lastSavedWiringByKey.set(`shot:${shotId}`, JSON.stringify(stable))
+            // 스윅의 비교 모양({ i, r })과 같아야 시드가 먹는다 — 모양이 다르면 재수화마다 전 샷을 되쓴다(배선 1 실측).
+            lastSavedWiringByKey.set(
+              `shot:${shotId}`,
+              JSON.stringify({ i: stable, r: directorRefsByShotId.get(shotId) ?? null }),
+            )
           }
           for (const [clipId, stableF] of stableFrameByClipId) {
             lastSavedWiringByKey.set(
@@ -3394,9 +3427,64 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
 
           return { nodes, edges, lastSavedAt: Date.now() }
         })
+        // #wiring-pending: 에셋 노드가 이제 있으니 보관 중인 DB 참조를 푼다.
+        get().resolvePendingWiring()
         get().rebuildFrameEdges()
         get().rebuildImageEdges()
         get().rebuildVideoChainEdges()
+      },
+
+      resolvePendingWiring: () => {
+        if (pendingImageRefsByShot.size === 0 && pendingFrameRefsByClip.size === 0) return false
+        let changed = false
+        set((s) => {
+          const nodes = s.nodes.map((node) => {
+            if (isShotData(node.data) && node.data.writerShotId) {
+              const pending = pendingImageRefsByShot.get(node.data.writerShotId)
+              if (!pending) return node
+              const { resolved, unresolved } = splitImageInputs(s.nodes, pending)
+              if (unresolved.length > 0) pendingImageRefsByShot.set(node.data.writerShotId, unresolved)
+              else pendingImageRefsByShot.delete(node.data.writerShotId)
+              const local = normalizeImageInputs(node.data.imageInputs)
+              const added = resolved.filter((id) => !local.includes(id))
+              if (added.length === 0) return node
+              changed = true
+              return { ...node, data: { ...node.data, imageInputs: [...local, ...added] } } as DirectorNode
+            }
+            if (isVideoData(node.data) && node.data.videoClipId) {
+              const pending = pendingFrameRefsByClip.get(node.data.videoClipId)
+              if (!pending) return node
+              const { resolved, unresolved } = splitFrameInputs(s.nodes, pending)
+              if (unresolved) pendingFrameRefsByClip.set(node.data.videoClipId, unresolved)
+              else pendingFrameRefsByClip.delete(node.data.videoClipId)
+              const local = normalizeFrameInputs(node.data.frameInputs)
+              const next = {
+                start: local.start ?? resolved.start,
+                end: local.end ?? resolved.end,
+                refs: [...local.refs, ...resolved.refs.filter((id) => !local.refs.includes(id))],
+              }
+              if (next.start === local.start && next.end === local.end && next.refs.length === local.refs.length) {
+                return node
+              }
+              changed = true
+              return { ...node, data: { ...node.data, frameInputs: next } } as DirectorNode
+            }
+            return node
+          })
+          return changed ? { nodes, lastSavedAt: Date.now() } : {}
+        })
+        if (changed) {
+          get().rebuildImageEdges()
+          get().rebuildFrameEdges()
+        }
+        return changed
+      },
+
+      hydrateFreshFromDb: async () => {
+        const projectId = get().projectId
+        if (!projectId) return
+        await invalidateShots(projectId)
+        await get().hydrateFromDb(projectId)
       },
 
       rebuildShotChainNodes: () => {
@@ -4022,6 +4110,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             }
             const { jobId } = (await res.json()) as { jobId: string }
             activeJobId = jobId
+            refreshGenerationQueue() // Director 배선 4: 큐 훅이 이 잡의 정산(완료 뒤 재수화)을 보게 한다.
             options?.onJob?.({ jobId, status: 'queued', httpStatus: res.status })
             const url = await pollGenerationJob(jobId, { onStatus: options?.onJob })
             get().updateNodeData<'shot'>(shotNodeId, {
@@ -4461,6 +4550,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           provider: toRouteProvider(eff.provider),
           durationSeconds: eff.durationSeconds,
           referenceImageUrl,
+          // Director 배선 5: 서버가 DB 프레임으로 정한다 — 사람이 배선한 프레임·영상 체인만 'manual'.
+          frameSource: chainFrameUrl || hasManualFrameInputs ? 'manual' : 'auto',
           ...(referenceImageUrls ? { referenceImageUrls } : {}),
           ...(referenceImageUrls && referenceImageRoles ? { referenceImageRoles } : {}),
           ...(options?.traceId ? { traceId: options.traceId, actor: 'chat' } : {}),
@@ -5402,6 +5493,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
 
       reset: () => {
         resetPipelineProgressBatches()
+        clearPendingWiring()
         set({
           nodes: initialNodes,
           edges: initialEdges,

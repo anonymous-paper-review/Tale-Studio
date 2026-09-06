@@ -174,3 +174,22 @@ paths:
   고정한 문장(`backgroundClauseFromView`)을 싣고, moment 문장에서 카메라 무브 서술을 뺀다(`stripCameraMoveSentences`). 러프 라우트가 scenes.stage 의
   표지와 화면 비율을 셀에 넘긴다. 작가(v4) 프롬프트는 환경 사건의 출처·방향을 요구하고 first_frame_prompt 의 카메라 무브를 금한다.
   표지 라벨은 무대 LLM 이 콘텐츠 언어로 적으므로 라우트가 `deriveEnBatch` 로 영어로 바꿔 셀에 넘긴다(2026-09-06 실측: 겨울_6 러프에 한국어 라벨이 섞임).
+
+## Director 배선 수리 (2026-09-06, 오너 지시 — `tests/promise-director-1~5-*.test.ts`)
+
+겨울_6 조사에서 적은 위험 5건. 실시간 구독은 없고 폴링·수동 재수화 구조 그대로이며, 클라이언트 쪽 배선만 고쳤다.
+
+- **1 선이 남는다**(`promise-director-1-lines-survive`): 재수화가 DB 연결 참조(`image_inputs`·`frame_inputs`)를 풀 때 아직 없는 노드(에셋 노드는
+  Pass 2.6 에야 생긴다)를 가리키는 참조는 버리지 않고 `pendingImageRefsByShot`/`pendingFrameRefsByClip` 에 둔다(`splitImageInputs`/`splitFrameInputs`).
+  `rebuildAssetNodes` 끝에서 `resolvePendingWiring` 이 풀어 선으로 되돌리고, 스윅은 보관분을 합쳐(`mergeStableRefs`) 되쓴다.
+  스윅 시드는 스윅과 같은 모양(`{ i, r }`)이어야 한다 — 모양이 달라 재수화마다 전 샷을 되쓰던 것이 선을 지운 실제 경로였다.
+  프로젝트 전환·reset 은 보관분과 시드를 비운다(shot_id 는 프로젝트마다 겹친다).
+- **2 러프·previz 는 새로고침 없이 뜬다**: 큐 훅(`use-queue-rehydrate`)이 `shot_rough_storyboard` 도 감시하고, 정산·복귀 때 Director 재수화와 함께
+  writer 스토어의 `refreshShotMedia`(러프·previz 두 칸만 DB 로 다시 채움, 타이핑 중인 다른 칸은 그대로)를 부른다.
+- **3 배치 러너**: 시트 완료·라운드 종료 재수화 앞에 `invalidateShots` — 30초 사물함의 옛 행으로 헛돌지 않는다.
+- **4 이미지가 되돌아가지 않는다**: `shots-cache` 는 무효화 세대를 응답 배열에 붙여(`rowsGen`, structuralSharing off) 무효화보다 먼저 시작된 요청에
+  합류했거나 그 결과로 채워진 칸이면 한 번 더 받는다. 단건 이미지 잡은 제출 즉시 `refreshGenerationQueue()` 로 큐 훅의 정산 재수화를 탄다.
+- **5 영상 프레임은 서버가 DB 로 정한다**(`video-reference-frames.ts`, #ref-gate 와 같은 방향): 클라는 `frameSource`('manual' = 손으로 배선한
+  프레임·영상 체인, 그 밖 'auto')만 보내고, 라우트는 게이트 뒤에 `resolveVideoReferenceFrames` 로 auto 는 DB 실사의 시작·끝 프레임, manual 은 클라
+  목록에 빠진 시작 프레임만 채운다. `frameSource` 가 없는 호출(구 클라·직접 호출)은 종전대로 클라 값을 쓴다.
+  그리드 카드의 "영상 생성"은 이미지를 새로 만들기 전에 `hydrateFreshFromDb` 로 DB 를 먼저 읽는다(승인한 그림 보호).
