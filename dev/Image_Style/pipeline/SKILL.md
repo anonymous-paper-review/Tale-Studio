@@ -144,24 +144,21 @@ python3 .claude/skills/artist-style-anchor/bin/style_stats.py <img1> [img2 ...]
 
 **금지**: 작가·프랜차이즈·작품·브랜드 고유명사 — 부정문에서도 금지(후속 생성기가 해당 명칭을 차단하거나 토큰으로 반영할 수 있음). 중립 서술어와 hex만.
 
-## 단계 3 — 중립 앵커 보드 생성
+## 단계 3 — 앵커 보드 (보관 · 기본 파이프라인에서 제외, 2026-09-08 오너 확정)
 
-`templates/anchor_board.txt`의 `{RENDERING_RULES}`에 캡슐(+hex 팔레트, 재질 규칙, 장식 모티프)을 채워 프롬프트 작성 후, `bin/hf_image.sh`로 I2I 생성 (제출→대기→다운로드 일체. 2026-08-13 정정: 래퍼는 소실이 아니라 **현존·git 추적 중** — bare 배열 응답 방어 포함):
+**기본 레시피는 보드 없음이다.** 보드 A/B(`dev/Image_Style/board_ab/synthesis.md`, refer5·refer1·refer6 × Codex·Claude 6 판정)에서 원작 직접 참조가 확장 보드보다 스타일 충실도가 같거나 높았고(5/6), 보드 I2I 생성이 원작의 극단값(네온 대비·굵은 선·큐보이드 면분할)을 평균화해 프로브로 전이시키는 손실 채널이 확인됐다. 보드가 이긴 프로브는 캐릭터뿐이며, 보드의 가치는 "원작에 없는 어휘(인물·특정 재질)의 보충"으로 한정된다.
 
-```bash
-# HF_AR 기본 1:1. 로컬 경로 ref는 자동 업로드.
-.claude/skills/artist-style-anchor/bin/hf_image.sh <run_dir>/prompt.txt <run_dir>/anchor_board.png <core_ref1> [core_ref2 ...]
-# CLI 직결이 필요하면: higgsfield generate create gpt_image_2 --prompt ... --image-references ... --aspect_ratio 1:1 --json
-#   → 응답은 bare 배열 ["uuid"] → higgsfield generate wait <id> → 결과 URL curl -o
-```
+보드 템플릿은 `templates/archive/`에 보관한다 — `anchor_board_expanded_2x2.txt`(최종판: 정물 + 성인 남녀 전신 + 동물 + 풍경 소경 2×2 시트) · `anchor_board_still_life.txt`(원판: 방 코너 정물). 보드를 **선택적으로** 쓰는 조건과 절차는 `templates/archive/README.md`(원작에 인물 문법이 없는데 인물 프로브가 필요할 때만, 참조 순서 `[원작, 보드]`, QA 게이트 통과 시에만).
 
-## 단계 4 — 앵커 보드 QA (vision, Claude)
+## 단계 4 — 앵커 보드 QA (보드를 쓸 때만)
 
-Read로 보드를 열어 facet 대조: ①핵심 facet 재현(선/명암/팔레트/가장자리/재질규칙) ②정물 7요소 완비 ③원작 캐릭터·모티프·텍스트 누수 없음 ④콘텐츠 중립성. 실패 축을 명시해 rendering rules를 강화하고 **≤2회 재시도**. 통과 보드만 앵커로 사용.
+보드를 생성했다면 Read로 열어 facet 대조: ①핵심 facet 재현(선/명암/팔레트/가장자리/재질규칙) ②콘텐츠 중립성 ③원작 캐릭터·모티프·텍스트 누수 없음 ④**계측 게이트** — 선 굵기 p75·고채도 면적 비율·장식 마크 수·흰/크림 비율·곡면의 저폴리 면분할 여부를 원작과 대조해 허용 범위 밖이면 폐기(refer1 보드는 고채도 5% vs 원작 39%, refer6 보드는 로우폴리로 탈락감). 실패 축을 명시해 rendering rules를 강화하고 **≤2회 재시도**. 통과 보드만 두 번째 참조로 쓴다.
 
-## 단계 5 — 전이 프로브 4장
+## 단계 5 — 전이 프로브 4장 (확정 레시피 = 원작 직접 참조, 2026-09-08)
 
-`templates/probe.txt`의 `{CONTENT}`에 아래 표준 4종(오리지널 콘텐츠, 매 실행 동일 권장 — 런 간 비교 가능)을 채우고, **아래 「확정 레시피 매트릭스」대로 생성** — 장면(카페·스쿠터) = `[보드, 원작 Core]` + 장면 절, 인물(캐릭터·액션) = `[보드, 원작 Core]` + 인물 절 + 방언 절 (refer2 런 실행례와 동일. 보드 단독 refs는 T 기준선 비교 실험용):
+`templates/probe.txt`의 `{CONTENT}`에 아래 표준 4종(오리지널 콘텐츠, 매 실행 동일 권장 — 런 간 비교 가능)을 채우고, **참조는 `[원작 Core]` 하나**로 생성한다 — 장면(카페·스쿠터) = `[원작]` + 장면 절, 인물(캐릭터·액션) = `[원작]` + 인물 절 + 방언 절. 프로브 프롬프트에는 첫 참조 문장("sets the visual style ONLY … Do NOT reproduce its subject")만 두고 두 번째 참조 문장은 뺀다(`dev/Image_Style/board_ab/<ref>/noboard/*.txt`가 실행례).
+
+누출 가드(refer1 실측 — 누출은 프롬프트가 비워 둔 슬롯에서 난다): 인물 속성(머리색·의상·신발·소품)과 배경 표면(바닥·벽·하늘)을 프롬프트에서 **반드시 지정**하고, 부정 절은 모티프 이름이 아니라 구조 서술("no star-burst sparkles, no horizontal color-band backdrop")로 쓴다. 그래도 원작 모티프가 복제되면 보관 보드를 `[원작, 보드]` 순서로 더하는 변형을 시험한다(미검증).
 
 | 프로브 | 표준 콘텐츠 | 검증 축 |
 |---|---|---|
