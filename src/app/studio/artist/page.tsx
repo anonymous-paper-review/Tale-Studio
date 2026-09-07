@@ -364,7 +364,7 @@ export default function VisualPage() {
   //   긴 버블이 채팅을 점유하고, 초안이 남아 있는 동안 Director 핸드오프 제안을 가렸다).
   //   룩 미반영/실패는 카드 배지가 알리고, 일괄 정리는 채팅으로 요청할 수 있다.
   const artistBriefContent = t(
-    'I have concepts ready for the characters and backgrounds — {count} characters · {worldCount} backgrounds.\n' +
+    'I have concepts ready for the characters and backgrounds: {count} characters · {worldCount} backgrounds.\n' +
       "Let me know which character or background you'd like to revise or add.\n" +
       'Press "@" to pick a character or background (Ctrl+click a card does the same).',
     { count: characterAssets.length, worldCount: worldAssets.length },

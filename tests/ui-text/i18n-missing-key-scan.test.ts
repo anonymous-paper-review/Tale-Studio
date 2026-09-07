@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { KO } from '@/lib/i18n/messages-ko'
+import { translate } from '@/lib/i18n/translate'
 
 // 사전 누락 게이트 — i18n-korean-scan 의 반대 방향.
 //
@@ -55,15 +56,66 @@ function readArg(text: string, start: number): { arg: string; end: number } {
   return { arg: text.slice(start, i), end: i }
 }
 
-const LITERAL = /'((?:[^'\\]|\\.)*)'/g
+const LITERAL = /'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)"/g
 
 /** 리터럴(이어붙이기 포함)만으로 된 인자면 합친 키, 아니면 null. */
 function staticKey(arg: string): string | null {
-  const parts = [...arg.matchAll(LITERAL)].map((m) => m[1])
+  const parts = [...arg.matchAll(LITERAL)].map((m) => m[1] ?? m[2])
   if (parts.length === 0) return null
   const residue = arg.replace(LITERAL, '').replace(/\+/g, '').trim()
   if (residue) return null
-  return parts.join('').replace(/\\'/g, "'").replace(/\\n/g, '\n').replace(/\\\\/g, '\\')
+  return parts
+    .join('')
+    .replace(/\\'/g, "'")
+    .replace(/\\"/g, '"')
+    .replace(/\\n/g, '\n')
+    .replace(/\\\\/g, '\\')
+}
+
+/** const 선언 시작점에서 리터럴(이어붙이기 포함) 초기값만 읽는다. */
+function readStaticConstant(text: string, start: number): string | null {
+  let i = start
+  let value = ''
+
+  while (true) {
+    while (/\s/.test(text[i] ?? '')) i += 1
+    const quote = text[i]
+    if (quote !== "'" && quote !== '"') return null
+
+    const literalStart = i
+    i += 1
+    while (i < text.length && text[i] !== quote) i += text[i] === '\\' ? 2 : 1
+    if (i === text.length) return null
+    i += 1
+    const literal = staticKey(text.slice(literalStart, i))
+    if (literal === null) return null
+    value += literal
+
+    let hasNewline = false
+    while (/\s/.test(text[i] ?? '')) {
+      hasNewline ||= text[i] === '\n' || text[i] === '\r'
+      i += 1
+    }
+    if (text[i] === '+') {
+      i += 1
+      continue
+    }
+    return text[i] === ';' || hasNewline || i === text.length ? value : null
+  }
+}
+
+/** 파일 안에서 리터럴(이어붙이기 포함)만으로 선언한 const 문자열. */
+function staticConstants(text: string): Map<string, string> {
+  const constants = new Map<string, string>()
+  for (const match of text.matchAll(/\bconst\s+([A-Za-z_$][\w$]*)\s*=\s*/g)) {
+    const value = readStaticConstant(text, match.index! + match[0].length)
+    if (value !== null) constants.set(match[1], value)
+  }
+  return constants
+}
+
+function keyFromArg(arg: string, constants: Map<string, string>): string | null {
+  return staticKey(arg) ?? constants.get(arg.trim()) ?? null
 }
 
 function collectCalls(): Map<string, Set<string>> {
@@ -78,15 +130,16 @@ function collectCalls(): Map<string, Set<string>> {
     const rel = path.relative(process.cwd(), file)
     if (SKIP.includes(rel)) continue
     const text = readFileSync(file, 'utf8')
+    const constants = staticConstants(text)
 
     for (const m of text.matchAll(/\bt\(/g)) {
-      const key = staticKey(readArg(text, m.index! + m[0].length).arg)
+      const key = keyFromArg(readArg(text, m.index! + m[0].length).arg, constants)
       if (key) record(key, file)
     }
     // translate(locale, '...') — 둘째 인자가 키
     for (const m of text.matchAll(/\btranslate\(/g)) {
       const first = readArg(text, m.index! + m[0].length)
-      const key = staticKey(readArg(text, first.end + 1).arg)
+      const key = keyFromArg(readArg(text, first.end + 1).arg, constants)
       if (key) record(key, file)
     }
   }
@@ -120,8 +173,26 @@ describe('i18n — 사전 누락 게이트', () => {
     )
   })
 
+  it('정적 문자열 상수도 실제 키로 해석한다', () => {
+    const constants = staticConstants("const NAME = 'Scene ' +\n  'name'")
+
+    expect(keyFromArg('NAME', constants)).toBe('Scene name')
+  })
+
   it('변수가 섞인 동적 키는 판정하지 않는다', () => {
     expect(staticKey("someVar")).toBeNull()
     expect(staticKey("'prefix' + someVar")).toBeNull()
+    expect(staticConstants("const NAME = 'prefix' + someVar").has('NAME')).toBe(false)
+    expect(staticConstants("const NAME = makeKey()").has('NAME')).toBe(false)
+  })
+
+  it('한국어 프로젝트의 첫 Producer 안내는 한국어로 나온다', () => {
+    const producerPage = readFileSync(path.join(SRC, 'app/studio/producer/page.tsx'), 'utf8')
+    const welcomeKey = staticConstants(producerPage).get('PRODUCER_WELCOME_KEY')
+
+    expect(welcomeKey).toBeTypeOf('string')
+    if (!welcomeKey) throw new Error('PRODUCER_WELCOME_KEY 정적 문자열 상수를 찾지 못했습니다.')
+    expect(welcomeKey in KO).toBe(true)
+    expect(translate('ko', welcomeKey)).toMatch(/[가-힣]/)
   })
 })

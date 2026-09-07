@@ -23,7 +23,7 @@ import { useContentLocale } from '@/lib/i18n/content'
 // #style-entry(#feedback 2026-08-07): 스타일 진입점 안내 — 버튼엔 첫 클릭 전까지 레이더 핑.
 const PRODUCER_WELCOME_KEY =
   "Hi! I'm your AI producer. Just tell me in one relaxed sentence the story you want to make. \n"
-  + 'Genre, protagonist, one scene that just came to mind — anything works! \n\n'
+  + 'Genre, protagonist, one scene that just came to mind, anything works! \n\n'
   + 'For example, if you say "a rainy city, one night with a detective who\'s lost his memory," I\'ll help sort out the characters, setting, and structure together. \n\n'
   + 'If you already have a story file written, share it with me using the upload button below. \n'
   + 'You can pick the visual style anytime from the palette button below.'
