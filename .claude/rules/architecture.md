@@ -214,5 +214,5 @@ paths:
   명단·배치에서 빼며 "카메라 자신" 제약을 붙인다(`screen_layout.pov_of`); 시야 가림·물러섬·쌍 축 보정은 걸지 않는다.
 - **프롬프트**: 러프 MOVEMENT 줄이 `camera pan right, medium — to reveal Elf Chief, …` 처럼 "왜"를 달고, pov 는 START 첫머리에 "point-of-view shot: the camera is
   X's eyes"를 싣는다. 영상 계약문은 카메라 절 뒤 `Purpose: …`(라우트가 대상 인물 이름을 조회해 넘긴다).
-- **에너지 예외(오너 결정 2번 — 전후 비교 중)**: `WRITER_ENERGY_EXCEPTION=1` 일 때만 V4 지시서에 "energy 액션 비트에서는 카메라 큰 무브 + 인물 큰 액션 허용,
-  환경 변화만 따로" 가 실린다. 기본은 꺼짐(종전 동시 금지 유지).
+- **에너지 예외(오너 결정 2번 — 2026-09-07 전후 비교 뒤 켬)**: V4 지시서에 "energy 액션 비트에서는 카메라 큰 무브 + 인물 큰 액션 허용, 환경 변화만 따로" 가
+  기본으로 실린다. `WRITER_ENERGY_EXCEPTION=0` 으로만 끈다(종전 동시 금지로 복귀). 비교 실측(겨울_6 sh_01_05): 전진 트래킹의 체감은 분명했으나 START 구도 수렴이 약해졌다.

@@ -114,9 +114,9 @@ describe('지시서가 닫힌 목록을 보여준다', () => {
     expect(v4).toMatch(/\$\{CAMERA_MOTIVATION_GUIDE\}/)
   })
 
-  it('에너지 예외(결정 2번, 전후 비교 중)는 WRITER_ENERGY_EXCEPTION=1 일 때만 지시서에 실린다', () => {
+  it('에너지 예외(결정 2번, 전후 비교 뒤 켬)는 기본으로 지시서에 실리고 WRITER_ENERGY_EXCEPTION=0 으로만 꺼진다', () => {
     const v4 = read('src/lib/writer/pipeline/stages/v4_shots.ts')
-    expect(v4).toMatch(/process\.env\.WRITER_ENERGY_EXCEPTION === '1'/)
+    expect(v4).toMatch(/process\.env\.WRITER_ENERGY_EXCEPTION === '0' \? '' :/)
     expect(v4).toMatch(/motivation=energy 인 액션 비트에서는 카메라 큰 무브와 인물 큰 액션을 함께 쓴다/)
   })
 })

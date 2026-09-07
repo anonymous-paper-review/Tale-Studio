@@ -615,8 +615,8 @@ V4c (Dynamic) 작성 규칙 (가장 중요):
 - **시선의 대상이 프레임 밖이면 리빌이다**: gaze_arc 로 시선을 적고 camera_motion 을 pan/tilt/
   zoom_out 으로 그 대상을 드러내라(데쿠파주 camera_intent=motivated_move 를 따른다). 정지
   카메라로 두려면 그 대상을 담는 다음 샷이 있어야 한다.
-- 카메라 큰 무브 + 캐릭터 큰 액션 + 환경 변화 동시 금지${process.env.WRITER_ENERGY_EXCEPTION === '1' ? `
-  — 단(#energy-exception, 전후 비교 중) motivation=energy 인 액션 비트에서는 카메라 큰 무브와 인물 큰 액션을 함께 쓴다. 환경 변화만 따로 둔다.` : ''}
+- 카메라 큰 무브 + 캐릭터 큰 액션 + 환경 변화 동시 금지${process.env.WRITER_ENERGY_EXCEPTION === '0' ? '' : `
+  — 단(#energy-exception, 오너 결정 2026-09-07: 전후 비교 뒤 켬) motivation=energy 인 액션 비트에서는 카메라 큰 무브와 인물 큰 액션을 함께 쓴다. 환경 변화만 따로 둔다.`}
 - 환경 사건(붕괴·낙하·분출·바람·흔들림)은 **출처와 방향**을 적어라 — 무엇이 어디서 어느 쪽으로 움직이는지("천장의 흙이 위에서
   아래로 쏟아진다"처럼). first_frame_prompt 는 정지 그림이라 카메라 무브를 말하지 않는다(카메라는 camera_motion 에만).
 - motion_prompt (최종 출력): ${MOTION_PROMPT_CHARS}, 동사 1~${SHOT_PHYSICS.verbsPerShotMax}개
