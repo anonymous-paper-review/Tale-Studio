@@ -378,12 +378,20 @@ describe('경보 (P11)', () => {
     const { deps, state } = makeDeps()
     await send(deps, txnCompleted({}, null))
     await send(deps, { ...txnCompleted({ id: 'txn_2', items: [{ price: { id: 'pri_nope' }, quantity: 1 }] }), event_id: 'evt_txn_2' })
-    await send(deps, { event_id: 'evt_pf2', event_type: 'transaction.payment_failed', occurred_at: NOW.toISOString(), data: { id: 'txn_3', subscription_id: 'sub_1', custom_data: { workspace_id: WS } } })
+    await send(deps, { event_id: 'evt_pf2', event_type: 'transaction.payment_failed', occurred_at: NOW.toISOString(), data: { id: 'txn_3', subscription_id: 'sub_1', origin: 'subscription_recurring', custom_data: { workspace_id: WS } } })
     deps.grant = async () => {
       throw new Error('boom')
     }
     await send(deps, { ...txnCompleted({ id: 'txn_4' }), event_id: 'evt_txn_4' })
     expect(state.alerts.map((a) => a.level)).toEqual(['error', 'error', 'warn', 'error'])
+  })
+
+  it('결제창에서 카드가 거절된 것은 경보로 가지 않고, 구독 갱신 실패만 경보로 간다', async () => {
+    const { deps, state } = makeDeps()
+    await send(deps, { event_id: 'evt_decl', event_type: 'transaction.payment_failed', occurred_at: NOW.toISOString(), data: { id: 'txn_d', subscription_id: null, origin: 'web', custom_data: { workspace_id: WS } } })
+    expect(state.alerts).toEqual([])
+    await send(deps, { event_id: 'evt_ren', event_type: 'transaction.payment_failed', occurred_at: NOW.toISOString(), data: { id: 'txn_r', subscription_id: 'sub_1', origin: 'subscription_recurring', custom_data: { workspace_id: WS } } })
+    expect(state.alerts.map((a) => a.title)).toEqual(['갱신 결제 실패'])
   })
 
   it('알 수 없는 종류의 알림은 원문만 남기고 성공으로 답한다', async () => {

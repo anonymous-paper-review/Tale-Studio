@@ -1525,4 +1525,8 @@ export const KO: Record<string, string> = {
   '{n} Takes added to your balance.': 'Take {n}개가 들어왔어요.',
   'Your balance is updated.': '잔액이 갱신됐어요.',
   'Still confirming. Check the account page in a minute.': '확인이 늦어지고 있어요. 잠시 뒤 계정 페이지에서 확인해주세요.',
+  // 고객 포털 (P9)
+  'Billing & receipts': '결제 정보·영수증',
+  'No billing account yet. Buy Takes or subscribe first.': '아직 결제 기록이 없어요. Take를 사거나 구독하면 열려요.',
+  'Could not open billing portal. Please try again.': '결제 관리 화면을 열지 못했어요. 다시 시도해주세요.',
 }

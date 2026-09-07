@@ -30,8 +30,29 @@ export interface PaddleTakePack {
   paddlePriceId: string | null
 }
 
+// 브라우저 번들에는 `process.env.NEXT_PUBLIC_…` 를 **글자 그대로** 쓴 곳만 값이 심긴다(Next 인라인 규칙).
+//   `process.env[key]` 처럼 이름을 조합하면 서버에서만 읽히고 클라 화면(/account)에서는 undefined 가 된다 —
+//   2026-09-07 오너 실측: /pricing(서버)은 버튼이 살고 /account(브라우저)는 "Coming soon". 그래서 13개를 전부 적는다.
+function readPriceEnv(): Record<string, string | undefined> {
+  return {
+    NEXT_PUBLIC_PADDLE_PRICE_PLAN_S1: process.env.NEXT_PUBLIC_PADDLE_PRICE_PLAN_S1,
+    NEXT_PUBLIC_PADDLE_PRICE_PLAN_S2: process.env.NEXT_PUBLIC_PADDLE_PRICE_PLAN_S2,
+    NEXT_PUBLIC_PADDLE_PRICE_PLAN_S5: process.env.NEXT_PUBLIC_PADDLE_PRICE_PLAN_S5,
+    NEXT_PUBLIC_PADDLE_PRICE_PLAN_S10: process.env.NEXT_PUBLIC_PADDLE_PRICE_PLAN_S10,
+    NEXT_PUBLIC_PADDLE_PRICE_PLAN_P10: process.env.NEXT_PUBLIC_PADDLE_PRICE_PLAN_P10,
+    NEXT_PUBLIC_PADDLE_PRICE_PLAN_P15: process.env.NEXT_PUBLIC_PADDLE_PRICE_PLAN_P15,
+    NEXT_PUBLIC_PADDLE_PRICE_PLAN_P20: process.env.NEXT_PUBLIC_PADDLE_PRICE_PLAN_P20,
+    NEXT_PUBLIC_PADDLE_PRICE_PLAN_P25: process.env.NEXT_PUBLIC_PADDLE_PRICE_PLAN_P25,
+    NEXT_PUBLIC_PADDLE_PRICE_PLAN_P30: process.env.NEXT_PUBLIC_PADDLE_PRICE_PLAN_P30,
+    NEXT_PUBLIC_PADDLE_PRICE_PACK_MINI: process.env.NEXT_PUBLIC_PADDLE_PRICE_PACK_MINI,
+    NEXT_PUBLIC_PADDLE_PRICE_PACK_STANDARD: process.env.NEXT_PUBLIC_PADDLE_PRICE_PACK_STANDARD,
+    NEXT_PUBLIC_PADDLE_PRICE_PACK_PRO: process.env.NEXT_PUBLIC_PADDLE_PRICE_PACK_PRO,
+    NEXT_PUBLIC_PADDLE_PRICE_PACK_STUDIO: process.env.NEXT_PUBLIC_PADDLE_PRICE_PACK_STUDIO,
+  }
+}
+
 function envPriceId(key: string): string | null {
-  const value = process.env[key]
+  const value = readPriceEnv()[key]
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null
 }
 

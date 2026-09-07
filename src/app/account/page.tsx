@@ -13,6 +13,7 @@ import { useRouter } from 'next/navigation'
 import { AlertTriangle, Check, LogOut, RefreshCw, X } from 'lucide-react'
 import { DashboardHeader } from '@/components/dashboard/dashboard-header'
 import { CheckoutButton } from '@/components/billing/checkout-button'
+import { PortalButton } from '@/components/billing/portal-button'
 import { createClient } from '@/lib/supabase/client'
 import { clearLastProjectId } from '@/lib/session-restore'
 import { useT } from '@/lib/i18n'
@@ -137,9 +138,15 @@ export default function AccountPage() {
               <AlertTriangle className="size-4 shrink-0 text-warning" />
               {t('Payment failed. Please check your card.')}
             </span>
-            <button type="button" disabled title={t('Available once payments go live.')} className={disabledButtonClass}>
-              {t('Update payment method')}
-            </button>
+            {data?.hasPaddleCustomer ? (
+              <PortalButton target="payment" className={linkButtonClass}>
+                {t('Update payment method')}
+              </PortalButton>
+            ) : (
+              <button type="button" disabled title={t('Available once payments go live.')} className={disabledButtonClass}>
+                {t('Update payment method')}
+              </button>
+            )}
           </div>
         )}
 
@@ -191,9 +198,15 @@ export default function AccountPage() {
               <Link href="/pricing" className={linkButtonClass}>
                 {t('Change plan')}
               </Link>
-              <button type="button" disabled title={t('Available once payments go live.')} className={disabledButtonClass}>
-                {t('Manage subscription')}
-              </button>
+              {data?.hasPaddleCustomer ? (
+                <PortalButton target={subscription?.status === 'active' || subscription?.status === 'cancel_scheduled' || subscription?.status === 'past_due' ? 'cancel' : 'overview'} className={linkButtonClass}>
+                  {subscription?.status === 'active' || subscription?.status === 'cancel_scheduled' || subscription?.status === 'past_due' ? t('Manage subscription') : t('Billing & receipts')}
+                </PortalButton>
+              ) : (
+                <button type="button" disabled title={t('Available once payments go live.')} className={disabledButtonClass}>
+                  {t('Manage subscription')}
+                </button>
+              )}
             </div>
           </div>
         </Card>

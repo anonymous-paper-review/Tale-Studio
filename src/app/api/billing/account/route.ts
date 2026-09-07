@@ -27,6 +27,8 @@ export interface BillingAccountResponse {
   recent: ActivityItem[]
   packPurchasedBefore: boolean
   canBuyPack: boolean
+  /** Paddle 고객이 있으면 포털(구독 관리·결제 수단·영수증)을 열 수 있다 (P9). */
+  hasPaddleCustomer: boolean
 }
 
 export async function GET() {
@@ -59,6 +61,7 @@ export async function GET() {
         recent: [],
         packPurchasedBefore: false,
         canBuyPack: true,
+        hasPaddleCustomer: false,
       }
       return NextResponse.json(body)
     }
@@ -67,7 +70,7 @@ export async function GET() {
     const plan = typeof workspace.plan === 'string' ? workspace.plan : 'free'
     const isAdmin = isAdminWorkspaceOwner(user, workspace.owner_id)
 
-    const [{ data: subscription, error: subError }, { data: ledger, error: ledgerError }] = await Promise.all([
+    const [{ data: subscription, error: subError }, { data: ledger, error: ledgerError }, { data: customer }] = await Promise.all([
       supabaseAdmin
         .from('subscriptions')
         .select('plan, status, current_period_end')
@@ -78,6 +81,7 @@ export async function GET() {
         .select('id, kind, delta, grant_id, expires_at, ref_kind, ref_id, reason, created_at')
         .eq('workspace_id', workspaceId)
         .order('created_at', { ascending: true }),
+      supabaseAdmin.from('billing_customers').select('mor_customer_id').eq('workspace_id', workspaceId).maybeSingle(),
     ])
     if (subError) throw subError
     if (ledgerError) throw ledgerError
@@ -94,6 +98,7 @@ export async function GET() {
       recent: groupRecentActivity(rows),
       packPurchasedBefore,
       canBuyPack: canBuyTakePack({ plan, packPurchasedBefore }),
+      hasPaddleCustomer: typeof customer?.mor_customer_id === 'string',
     }
     return NextResponse.json(body)
   } catch (err) {

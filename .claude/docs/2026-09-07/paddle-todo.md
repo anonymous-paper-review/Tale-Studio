@@ -80,9 +80,7 @@
 - [x] **P7 결제창 연결** - ✅ 2026-09-07. `/pricing`·`/account` 버튼 → `POST /api/billing/checkout`(서버 판정: 로그인·무료 팩 1회·구독 중 중복 금지·상품 ID) → Paddle 거래 생성(custom_data.workspace_id, 고객 재사용) → `Paddle.Checkout.open({ transactionId })`. 약속 10개 `tests/paddle-checkout.test.ts`.
       **실물 전 구간 1회 완료**: 로컬 /pricing → Mini $29 결제창 → 테스트 카드 4242 → Paddle 결제 성공 → 웹훅(dev) → dev DB 적립 50(2027-09-07 만료) → 로컬 토스트 "Take 50개가 들어왔어요" → 계정 페이지 잔액 50 · 내역 · 두 번째 팩 버튼 409 차단. 스크린샷 `evidence/checkout-*.png`, `account-after-real-payment.png`.
 - [x] **P8 결제 직후 화면** - ✅ 최소 버전: 결제 완료 콜백 → "결제 확인 중…" 토스트 → 3초 폴링 → 잔액 바뀌면 "Take N개가 들어왔어요"(실측 ~20초). 90초 넘으면 계정 페이지 안내. 별도 페이지는 안 만들었다.
-- [ ] **P9 앱 안 충전 화면** - 잔액 · 소멸 예정 · 팩 구매 · 현재 플랜 · "구독 관리"(Paddle 고객 포털 링크, 취소·카드 변경 화면은 Paddle 것).
-      부족 토스트의 "채우러 가기" 버튼이 여기로 온다(3-10).
-      검수: 스크린샷 + 약속.
+- [x] **P9 구독 관리·결제 수단 변경(Paddle 고객 포털)** - ✅ 2026-09-07. 계정 페이지 "구독 관리"/"결제 정보·영수증"/실패 배너 "결제 수단 변경" → `POST /api/billing/portal` → Paddle 포털 새 탭. 약속 3개 `tests/billing/paddle-portal.test.ts`. 실물: 스모크 계정 S-1 구독 취소 화면까지 열림(`evidence/paddle-portal-cancel.png`).
 - [ ] **P10 dev 전 구간 스모크** - 샌드박스 카드 `4242 4242 4242 4242` → 알림 → 적립 → 생성 1회 → 차감 확인. 같은 알림 2회 재전송 → 적립 1회. 환불 → 회수.
 - [x] **P11 알림 처리 실패 시 경보** - ✅ 디스코드 웹훅(`src/lib/ops-alert.ts`). 처리 실패·갱신 실패·상품 매핑 실패·워크스페이스 없음·무료 초과 팩·환불 회수가 간다. 로컬·dev 실측 전송 확인.
 - [ ] **P12 일일 대사** - Paddle 거래 목록 vs `billing_events` 비교. Vercel Cron(`CRON_SECRET` 재사용). 놓친 알림은 반드시 생긴다.

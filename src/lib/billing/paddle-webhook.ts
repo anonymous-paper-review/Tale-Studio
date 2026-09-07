@@ -291,10 +291,15 @@ async function handleTransactionCompleted(event: PaddleEvent, deps: PaddleWebhoo
 
 async function handlePaymentFailed(event: PaddleEvent, deps: PaddleWebhookDeps): Promise<string> {
   const data = event.data
+  const subscriptionId = str(data.subscription_id)
+  const origin = str(data.origin) ?? 'web'
+  // 결제창에서 카드가 거절된 것(origin web, 구독 없음)은 유저가 다시 시도하면 되는 일이라 경보 대상이 아니다.
+  //   2026-09-07 오너 실측: 거절 카드 테스트가 "갱신 결제 실패"로 디스코드에 왔다. 갱신(subscription_recurring)만 경보.
+  if (!subscriptionId || origin === 'web') return 'card_declined_noted'
   await deps.alert({
     level: 'warn',
     title: '갱신 결제 실패', // i18n-ok: 운영 경보(디스코드), 유저 화면 아님
-    body: `transaction ${str(data.id) ?? '?'}, subscription ${str(data.subscription_id) ?? '?'}, workspace ${customWorkspaceId(data) ?? '?'}. Paddle 이 재시도한다. 최종 실패면 subscription.past_due/canceled 가 뒤따른다.`, // i18n-ok: 운영 경보(디스코드), 유저 화면 아님
+    body: `transaction ${str(data.id) ?? '?'}, subscription ${subscriptionId}, workspace ${customWorkspaceId(data) ?? '?'}. Paddle 이 재시도한다. 최종 실패면 subscription.past_due/canceled 가 뒤따른다.`, // i18n-ok: 운영 경보(디스코드), 유저 화면 아님
   })
   return 'payment_failed_noted'
 }
