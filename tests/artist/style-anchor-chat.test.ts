@@ -27,7 +27,7 @@ beforeEach(() => {
 })
 
 describe('applyStyleAnchorKeyFromChat', () => {
-  it('applies a catalog key through setStyleAnchor', async () => {
+  it('목록에 있는 스타일을 고르면 바로 적용한다', async () => {
     const applied: Array<string | null> = []
     useProducerStore.setState({
       styleAnchors: catalog,
@@ -42,7 +42,7 @@ describe('applyStyleAnchorKeyFromChat', () => {
     expect(applied).toEqual(['jp_anime'])
   })
 
-  it('rejects a key the catalog does not have — the model must not invent anchors', async () => {
+  it('목록에 없는 스타일을 고르면 새 스타일을 만들어 적용하지 않는다', async () => {
     const applied: Array<string | null> = []
     useProducerStore.setState({
       styleAnchors: catalog,

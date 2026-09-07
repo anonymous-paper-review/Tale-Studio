@@ -1,3 +1,4 @@
+// Writer에서 바뀐 장면 설명은 사용자의 수정 내용을 지키면서 Director에 반영한다
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { effectivePrompt } from '@/stores/director-store'
@@ -20,8 +21,8 @@ function applySync(data: PromptFields, sourcePrompt: string): PromptFields {
   return { ...data, ...buildWriterDirectorPromptPatch(data, sourcePrompt) }
 }
 
-describe('writer → director prompt sync contract v2', () => {
-  it('신규 v2 Shot sync는 writer prompt를 derivedPrompt에 쓴다', () => {
+describe('Writer에서 Director로 장면 설명을 반영하는 약속', () => {
+  it('새 장면 설명을 받으면 Writer의 내용을 Director에 반영한다', () => {
     const sourcePrompt = writerDirectorPromptSource({
       prompt: 'rich writer prompt',
       actionDescription: 'fallback action',
@@ -34,7 +35,7 @@ describe('writer → director prompt sync contract v2', () => {
     expect(effectivePrompt(synced)).toBe('rich writer prompt')
   })
 
-  it('기존 Shot re-sync는 promptOverride를 보존하고 derivedPrompt만 갱신한다', () => {
+  it('장면 설명을 다시 받아도 사용자가 고친 내용을 지킨다', () => {
     const synced = applySync(
       promptFields({
         prompt: 'legacy prompt',
@@ -50,7 +51,7 @@ describe('writer → director prompt sync contract v2', () => {
     expect(effectivePrompt(synced)).toBe('user edit')
   })
 
-  it('legacy prompt가 sync source와 같으면 derivedPrompt로 흡수하고 migrated flag를 세운다', () => {
+  it('기존 장면 설명이 Writer 내용과 같으면 최신 내용으로 정리한다', () => {
     const synced = applySync(
       promptFields({ prompt: '  writer prompt  ' }),
       'writer prompt',
@@ -62,7 +63,7 @@ describe('writer → director prompt sync contract v2', () => {
     expect(effectivePrompt(synced)).toBe('writer prompt')
   })
 
-  it('legacy prompt가 sync source와 다르면 promptOverride로 1회 이관한다', () => {
+  it('기존 장면 설명이 Writer 내용과 다르면 사용자의 수정을 우선한다', () => {
     const synced = applySync(
       promptFields({ prompt: 'user edited prompt' }),
       'writer prompt',
@@ -74,7 +75,7 @@ describe('writer → director prompt sync contract v2', () => {
     expect(effectivePrompt(synced)).toBe('user edited prompt')
   })
 
-  it('effectivePrompt 우선순위는 override → derived → legacy prompt → empty', () => {
+  it('사용자 수정과 Writer 내용과 기존 내용을 차례로 적용하고 모두 없으면 비워 둔다', () => {
     expect(
       effectivePrompt(
         promptFields({
@@ -95,7 +96,7 @@ describe('writer → director prompt sync contract v2', () => {
     expect(effectivePrompt(promptFields())).toBe('')
   })
 
-  it('sync hook contract writes writer source to derivedPrompt, not legacy prompt', () => {
+  it('Writer 내용은 장면 설명에 반영하고 기존 입력 칸은 덮어쓰지 않는다', () => {
     const source = readFileSync(
       'src/features/director/hooks/use-writer-director-sync.ts',
       'utf8',

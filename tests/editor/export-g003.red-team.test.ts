@@ -1,11 +1,12 @@
+// 작품 자료를 모아 내보낼 때 이름과 설명은 읽기 쉽고, 준비되지 않은 자료는 빠짐없이 알려 준다
 import { describe, expect, it } from 'vitest'
 
 import { collectArtistArtifacts, type ArtistData } from '@/lib/export/artist'
 import { DIRECTOR_SCENES_SELECT, collectDirectorArtifacts, type DirectorExportData } from '@/lib/export/director'
 import type { ArtifactFile } from '@/lib/export/types'
 
-describe('G003 artist collector red-team coverage', () => {
-  it('dedupes 3+ same-name character folders, keeps media-less index rows, and sanitizes hostile names', () => {
+describe('아티스트 자료를 모을 때 이름과 설명을 안전하게 정리한다 (G003)', () => {
+  it('같은 이름의 인물이 여러 명이어도 각각 보존하고, 자료가 없어도 목록에 남기며, 이상한 이름은 안전하게 바꾼다', () => {
     const files = collectArtistArtifacts({
       characters: [
         {
@@ -57,7 +58,7 @@ describe('G003 artist collector red-team coverage', () => {
     expect(markdown).toContain('| 중복 | character | 미설정 | 미생성 |')
   })
 
-  it('renders assets.md native-first without raw JSON-braced prose', () => {
+  it('한국어 설명을 우선 보여 주고 낯선 표시가 드러나지 않게 읽기 쉽게 정리한다', () => {
     const files = collectArtistArtifacts({
       characters: [
         {
@@ -99,7 +100,7 @@ describe('G003 artist collector red-team coverage', () => {
     expect(markdown).not.toContain('}')
   })
 
-  it('is pure and does not throw on malformed artist rows', () => {
+  it('잘못된 자료가 섞여도 오류 없이 같은 결과를 만들고 원본 자료는 바꾸지 않는다', () => {
     const data = {
       characters: [
         null,
@@ -140,8 +141,8 @@ describe('G003 artist collector red-team coverage', () => {
   })
 })
 
-describe('G003 director loader/collector contract guard', () => {
-  it('keeps native-first renderer columns selected by the director loader', () => {
+describe('감독 자료를 불러올 때 한국어 설명을 빠뜨리지 않는다 (G003)', () => {
+  it('감독 자료를 불러오면 한국어 장면 설명과 분위기를 함께 확인한다', () => {
     expect(selectColumns(DIRECTOR_SCENES_SELECT)).toEqual(
       expect.arrayContaining(['narrative_summary', 'narrative_summary_native', 'mood', 'mood_native']),
     )
@@ -150,8 +151,8 @@ describe('G003 director loader/collector contract guard', () => {
   })
 })
 
-describe('G003 director collector red-team coverage', () => {
-  it('emits storyboard pngs only for completed storyboard_image rows with usable urls and notes every omitted status', () => {
+describe('감독 자료를 모을 때 준비된 이미지와 영상을 골라 읽기 쉽게 정리한다 (G003)', () => {
+  it('스토리보드 이미지가 완료된 경우에만 넣고 빠진 이유는 목록에 알린다', () => {
     const files = collectDirectorArtifacts({
       scenes: [scene('sc_storyboard')],
       shots: [
@@ -206,7 +207,7 @@ describe('G003 director collector red-team coverage', () => {
     expect(shotlist).not.toContain('https://cdn.test/storyboards/stale-failed.png')
   })
 
-  it('selects successful live Finals before newer takes, otherwise orders successful takes deterministically, and falls back to legacy URLs', () => {
+  it('최종본이 있으면 최신 작업보다 먼저 쓰고, 없으면 최근 완료본을 쓰며, 그것도 없을 때 기존 영상 주소를 사용한다', () => {
     const files = collectDirectorArtifacts({
       scenes: [scene('sc_clip')],
       shots: [
@@ -286,7 +287,7 @@ describe('G003 director collector red-team coverage', () => {
     expect(shotlist).not.toContain('https://cdn.test/clips/failed.mp4')
   })
 
-  it('renders native-first readable directing prose without JSON braces and escapes markdown injection', () => {
+  it('한국어 설명을 우선 보여 주고 특수 표시와 자료 구조가 글을 깨뜨리지 않게 정리한다', () => {
     const files = collectDirectorArtifacts({
       scenes: [
         {
@@ -338,7 +339,7 @@ describe('G003 director collector red-team coverage', () => {
     expect(shotlist).not.toContain('}')
   })
 
-  it('is pure and does not throw on malformed director rows', () => {
+  it('잘못된 감독 자료가 섞여도 오류 없이 같은 결과를 만들고 원본 자료는 바꾸지 않는다', () => {
     const data = {
       scenes: [null, [], { scene_id: { raw: 'bad-scene' }, sort_order: Number.NaN }],
       shots: [

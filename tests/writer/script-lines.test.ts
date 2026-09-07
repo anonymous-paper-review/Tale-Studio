@@ -1,3 +1,4 @@
+// 장면과 촬영 단위의 내용을 줄 번호로 정리해 대사와 함께 정확히 찾고 전달한다
 import { describe, expect, it } from 'vitest'
 import { activeMentionRefs } from '@/lib/card-mention'
 import {
@@ -135,7 +136,7 @@ const syntheticLines = (count: number): ScriptLine[] =>
   }))
 
 describe('buildScriptLines', () => {
-  it('uses global continuous numbering across scene headings, actions, and dialogue', () => {
+  it('장면 제목·행동·대사를 모두 이어지는 줄 번호로 정리한다', () => {
     const { manifest, shots } = fixture()
     const lines = buildScriptLines(manifest, shots)
 
@@ -156,7 +157,7 @@ describe('buildScriptLines', () => {
     ])
   })
 
-  it('keeps one semantic line per heading, shot action, and dialogue entry', () => {
+  it('장면 제목·촬영 단위 행동·대사를 각각 한 줄로 보여준다', () => {
     const { manifest, shots } = fixture()
     const lines = buildScriptLines(manifest, shots)
 
@@ -169,7 +170,7 @@ describe('buildScriptLines', () => {
     )
   })
 
-  it('formats scene headings with location only or location plus mood', () => {
+  it('장소와 분위기가 있으면 장면 제목에 함께 보여주고, 분위기가 없으면 장소만 보여준다', () => {
     const { manifest, shots } = fixture()
     const lines = buildScriptLines(manifest, shots)
 
@@ -178,7 +179,7 @@ describe('buildScriptLines', () => {
     expect(lines.find((line) => line.ref === 'sc_02.heading')?.text).toBe('옥상')
   })
 
-  it('handles empty input, scenes without shots, and orphan shots at the end', () => {
+  it('내용이 없어도 빈 결과와 장면 없는 촬영 단위를 정해진 순서로 보여준다', () => {
     expect(buildScriptLines(null, [])).toEqual([])
 
     const { manifest, shots } = fixture()
@@ -201,7 +202,7 @@ describe('buildScriptLines', () => {
 })
 
 describe('scriptLineMentions', () => {
-  it('uses L labels with stable line refs', () => {
+  it('각 줄에 L 번호와 변하지 않는 찾기 표식을 붙인다', () => {
     const { manifest, shots } = fixture()
     const mentions = scriptLineMentions(buildScriptLines(manifest, shots))
 
@@ -213,7 +214,7 @@ describe('scriptLineMentions', () => {
     ])
   })
 
-  it('stays prefix-safe with activeMentionRefs for @L4 and @L45', () => {
+  it('L4와 L45를 함께 언급해도 서로 다른 줄로 정확히 찾는다', () => {
     const mentions = scriptLineMentions(syntheticLines(45))
 
     expect(activeMentionRefs('@L45 고쳐줘', mentions)).toEqual(['ref_45'])
@@ -222,7 +223,7 @@ describe('scriptLineMentions', () => {
 })
 
 describe('serializeWriterScriptContext', () => {
-  it('keeps [L#] markers aligned with buildScriptLines line numbers', () => {
+  it('전달하는 내용의 [L#] 표시가 실제 줄 번호와 맞는다', () => {
     const { manifest, shots } = fixture()
     const lines = buildScriptLines(manifest, shots)
     const context = serializeWriterScriptContext(manifest, shots)
@@ -240,7 +241,7 @@ describe('serializeWriterScriptContext', () => {
 })
 
 describe('resolveLineRefs', () => {
-  it('resolves L45 and @L45 against the send-time line snapshot', () => {
+  it('L45와 @L45를 보내 시점의 줄 목록에서 같은 줄로 찾는다', () => {
     const lines = syntheticLines(45)
 
     expect(resolveLineRefs('L45 고쳐줘', lines)).toEqual([
@@ -251,7 +252,7 @@ describe('resolveLineRefs', () => {
     ])
   })
 
-  it('drops missing labels, avoids prefix confusion, dedupes, and handles empty lines', () => {
+  it('없는 번호나 비슷한 번호는 빼고 중복 없이 줄을 찾는다', () => {
     const lines = syntheticLines(45)
 
     expect(resolveLineRefs('XL45 L45a @L4 @L45 @L45 L999', lines)).toEqual([

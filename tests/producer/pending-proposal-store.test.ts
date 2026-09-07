@@ -1,3 +1,4 @@
+// 이미 작업을 진행한 뒤의 변경은 먼저 확인받고, 승인한 작업만 실행하며 한 번에 하나만 보류한다
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ProjectSettings } from '@/types'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
@@ -28,8 +29,8 @@ afterEach(() => {
   useDirectorCanvasStore.setState({ applyUpdates: directorApplyUpdates })
 })
 
-describe('producer chat extraction pending proposal guard', () => {
-  it('post-handoff overwrites become a pending proposal instead of mutating source immediately', async () => {
+describe('이미 진행한 작업의 변경을 바로 반영하지 않고 확인받는다', () => {
+  it('다음 단계로 넘긴 뒤 설정을 바꾸면 먼저 확인을 받고 나서 반영한다', async () => {
     useProjectStore.setState({ currentStage: 'producer', reachedStage: 'artist' })
     useProducerStore.setState({
       storyText: '기존 스토리',
@@ -55,7 +56,7 @@ describe('producer chat extraction pending proposal guard', () => {
     expect(useGlobalChatStore.getState().pendingProposal).toBeNull()
   })
 
-  it('pre-handoff empty/fill updates still apply directly', () => {
+  it('아직 비어 있는 설정을 처음 채울 때는 바로 반영한다', () => {
     useProjectStore.setState({ currentStage: 'producer', reachedStage: 'producer' })
     useProducerStore.setState({
       storyText: '',
@@ -74,7 +75,7 @@ describe('producer chat extraction pending proposal guard', () => {
     expect(useGlobalChatStore.getState().pendingProposal).toBeNull()
   })
 
-  it('reports rejected when the proposal slot is already occupied', () => {
+  it('확인할 변경이 이미 있으면 새 변경은 거절한다', () => {
     useProjectStore.setState({ currentStage: 'producer', reachedStage: 'artist' })
     useProducerStore.setState({
       storyText: '기존 스토리',
@@ -94,8 +95,8 @@ describe('producer chat extraction pending proposal guard', () => {
   })
 })
 
-describe('pending proposal store policy', () => {
-  it('accepts a Director storyboard image proposal and only calls the generation path after approval', async () => {
+describe('보류된 작업의 확인 규칙', () => {
+  it('Director 이미지 작업은 승인한 뒤에만 실행한다', async () => {
     const applyUpdates = vi.fn(() => ({ applied: 2, skipped: [] }))
     useDirectorCanvasStore.setState({ applyUpdates })
     const proposal = createPendingProposal({
@@ -124,7 +125,7 @@ describe('pending proposal store policy', () => {
     )
   })
 
-  it('rejects a Director image proposal with no executable updates', async () => {
+  it('실행할 내용이 없는 Director 이미지 작업은 진행하지 않는다', async () => {
     const applyUpdates = vi.fn(() => ({ applied: 0, skipped: [] }))
     useDirectorCanvasStore.setState({ applyUpdates })
     useGlobalChatStore.getState().offerPendingProposal(
@@ -142,7 +143,7 @@ describe('pending proposal store policy', () => {
     expect(applyUpdates).not.toHaveBeenCalled()
   })
 
-  it('keeps one pending proposal at a time', () => {
+  it('확인할 작업은 한 번에 하나만 둔다', () => {
     const first = createPendingProposal({
       id: 'first',
       stage: 'artist',

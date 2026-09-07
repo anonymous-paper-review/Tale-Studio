@@ -1,3 +1,4 @@
+// 장면 그림을 잘라낼 때 경계선과 종이 여백을 빼고 세 장면을 같은 크기로 만든다 (#repaint-crop 2026-08-25 오너 ③C)
 import { describe, it, expect } from 'vitest'
 import sharp from 'sharp'
 import { cropRoughGridFrames } from '@/lib/writer/rough-grid-crop'
@@ -63,8 +64,8 @@ async function assertSolid(frame: Buffer, hex: string): Promise<void> {
   expect(bad, `${hex} 프레임의 침입 픽셀 수 (${info.width}x${info.height})`).toBe(0)
 }
 
-describe('repaint 표면 크롭 — 스펙 셀 고정 + 인셋 (#repaint-crop)', () => {
-  it('보더가 스펙 자리 그대로여도, +6px 드리프트해도 프레임에 보더·종이 픽셀이 없다', async () => {
+describe('장면 그림을 잘라낼 때 경계선과 종이 여백을 제외한다 (#repaint-crop)', () => {
+  it('구분선이 조금 어긋나도 각 장면 그림에 종이 여백이나 구분선이 섞이지 않는다', async () => {
     for (const shift of [0, 6]) {
       const sheet = await synthSheet(shift)
       const perShot = await cropRoughGridFrames(sheet, 'grid4', 4, FMT, 'repaint')
@@ -77,7 +78,7 @@ describe('repaint 표면 크롭 — 스펙 셀 고정 + 인셋 (#repaint-crop)',
     }
   })
 
-  it('세 프레임 크기가 전부 동일하다 (셀 표준 — 영상 레퍼런스 전제)', async () => {
+  it('세 장면 그림은 영상 참고 자료로 써도 같은 크기가 된다', async () => {
     const sheet = await synthSheet(0)
     const [{ start, direction, end }] = await cropRoughGridFrames(sheet, 'grid4', 1, FMT, 'repaint')
     const dims = await Promise.all(

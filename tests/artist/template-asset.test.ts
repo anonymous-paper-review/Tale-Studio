@@ -1,3 +1,4 @@
+// 필요한 그림 파일을 최신 주소로 한 번만 보관하고, 오래된 파일은 안전하게 정리한다
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
@@ -68,21 +69,21 @@ afterEach(() => {
 })
 
 describe('templateAssetUrl', () => {
-  it('내용 해시가 경로에 들어간다 (레포 PNG 교체 시 자동 무효화)', async () => {
+  it('파일 내용이 달라지면 다른 주소를 사용한다', async () => {
     const url = await templateAssetUrl('rough-storyboard-grid.png')
     expect(url).toMatch(
       /^https:\/\/cdn\.test\/media\/templates\/rough-storyboard-grid-[0-9a-f]{12}\.png$/,
     )
   })
 
-  it('프로세스당 한 번만 올린다 (콜드스타트마다 1.4MB 재업로드 금지)', async () => {
+  it('같은 파일은 한 번만 올려 불필요하게 다시 올리지 않는다', async () => {
     await templateAssetUrl('rough-storyboard-grid.png')
     await templateAssetUrl('rough-storyboard-grid.png')
     await templateAssetUrl('rough-storyboard-grid.png')
     expect(mocks.upload).toHaveBeenCalledTimes(1)
   })
 
-  it('현재 해시 객체가 이미 있으면 업로드를 건너뛴다', async () => {
+  it('최신 파일이 이미 보관되어 있으면 다시 올리지 않는다', async () => {
     mocks.list.mockResolvedValue({
       data: [{ name: hashedName('character-template.png') }],
       error: null,
@@ -92,16 +93,16 @@ describe('templateAssetUrl', () => {
     expect(url).toContain('templates/character-template-')
   })
 
-  it('업로드 실패는 던지지 않고 null — 호출부가 T2I 로 폴백한다', async () => {
+  it('파일을 올리지 못해도 전체 작업을 막지 않고 다른 방법으로 진행한다', async () => {
     mocks.upload.mockResolvedValue({ error: new Error('storage down') })
     expect(await templateAssetUrl('rough-storyboard-strip.png')).toBeNull()
   })
 
-  it('없는 파일도 null (생성 경로를 막지 않는다)', async () => {
+  it('파일이 없어도 그림 만들기를 막지 않는다', async () => {
     expect(await templateAssetUrl('does-not-exist.png')).toBeNull()
   })
 
-  it('파일마다 다른 해시 → 다른 경로', async () => {
+  it('파일마다 다른 주소를 사용한다', async () => {
     const grid = await templateAssetUrl('rough-storyboard-grid.png')
     const strip = await templateAssetUrl('rough-storyboard-strip.png')
     expect(grid).not.toBe(strip)
@@ -112,7 +113,7 @@ describe('templateAssetUrl', () => {
 describe('_staleSiblings — 스테일 형제 판별 (순수)', () => {
   const ext = '.png'
 
-  it('구판 해시만 고르고 현재본은 남긴다', () => {
+  it('오래된 버전만 치우고 현재 버전은 남긴다', () => {
     expect(
       _staleSiblings(
         ['rough-storyboard-grid-cinema-aaaaaaaaaaaa.png', 'rough-storyboard-grid-cinema-bbbbbbbbbbbb.png'],
@@ -124,7 +125,7 @@ describe('_staleSiblings — 스테일 형제 판별 (순수)', () => {
     ).toEqual(['rough-storyboard-grid-cinema-aaaaaaaaaaaa.png'])
   })
 
-  it('base 가 다른 자산의 접두여도 잘못 잡지 않는다 (grid ⊄ grid-cinema)', () => {
+  it('이름이 비슷한 다른 파일은 잘못 지우지 않는다', () => {
     expect(
       _staleSiblings(
         ['rough-storyboard-grid-cinema-aaaaaaaaaaaa.png', 'rough-storyboard-grid-aaaaaaaaaaaa.png'],
@@ -136,7 +137,7 @@ describe('_staleSiblings — 스테일 형제 판별 (순수)', () => {
     ).toEqual(['rough-storyboard-grid-aaaaaaaaaaaa.png'])
   })
 
-  it('해시 패턴이 아닌 이름은 무시한다', () => {
+  it('규칙에 맞지 않는 파일 이름은 건드리지 않는다', () => {
     expect(
       _staleSiblings(
         ['character-template-notahash.png', 'character-template-.png'],
@@ -148,7 +149,7 @@ describe('_staleSiblings — 스테일 형제 판별 (순수)', () => {
     ).toEqual([])
   })
 
-  it('queued 잡이 참조하는 객체는 보호한다 (?v= 쿼리 포함)', () => {
+  it('진행 중인 작업이 쓰는 파일은 보호한다', () => {
     expect(
       _staleSiblings(
         ['rough-storyboard-grid-aaaaaaaaaaaa.png', 'rough-storyboard-grid-cccccccccccc.png'],
@@ -162,7 +163,7 @@ describe('_staleSiblings — 스테일 형제 판별 (순수)', () => {
 })
 
 describe('templateAssetUrl — 구판 자동 청소', () => {
-  it('승격 시 같은 base 의 구판 객체를 remove 한다', async () => {
+  it('새 버전을 올릴 때 같은 파일의 오래된 버전을 지운다', async () => {
     mocks.list.mockResolvedValue({
       data: [{ name: 'rough-storyboard-grid-000000000000.png' }],
       error: null,
@@ -172,7 +173,7 @@ describe('templateAssetUrl — 구판 자동 청소', () => {
     expect(mocks.remove).toHaveBeenCalledWith(['templates/rough-storyboard-grid-000000000000.png'])
   })
 
-  it('queued 잡이 참조하는 구판은 지우지 않는다', async () => {
+  it('진행 중인 작업이 쓰는 오래된 파일은 지우지 않는다', async () => {
     mocks.list.mockResolvedValue({
       data: [{ name: 'rough-storyboard-grid-000000000000.png' }],
       error: null,
@@ -193,7 +194,7 @@ describe('templateAssetUrl — 구판 자동 청소', () => {
     expect(mocks.remove).not.toHaveBeenCalled()
   })
 
-  it('청소 실패는 URL 반환을 막지 않는다 (다음 콜드스타트 재시도)', async () => {
+  it('오래된 파일 정리에 실패해도 새 파일 주소는 돌려준다', async () => {
     mocks.list.mockResolvedValue({
       data: [{ name: 'rough-storyboard-grid-000000000000.png' }],
       error: null,

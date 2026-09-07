@@ -1,3 +1,4 @@
+// 인물 정보를 등록하면 나중에 같은 인물을 다시 확인할 수 있다
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   useAssetStorageStore,
@@ -31,7 +32,7 @@ function makeInput(
 }
 
 describe('asset-storage-store.registerCharacter', () => {
-  it('id로 저장 + getCharacter 조회', () => {
+  it('인물 정보를 등록하면 이름과 등록·수정 시각을 확인할 수 있다', () => {
     api().registerCharacter('reg_1', makeInput('proj_a', 'Kai'))
     const got = api().getCharacter('reg_1')
     expect(got?.name).toBe('Kai')

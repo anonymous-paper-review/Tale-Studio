@@ -1,3 +1,4 @@
+// 다음 단계에 아직 도달하지 않았으면 넘기기를 안내하고, 이미 도달했으면 같은 안내를 다시 띄우지 않는다 (#handoff-once 2026-08-12)
 import { describe, it, expect } from 'vitest'
 import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
 
@@ -20,7 +21,7 @@ describe('shouldOfferHandoffNudge', () => {
     expect(shouldOfferHandoffNudge('director', 'editor')).toBe(false)
   })
 
-  it('reached 가 from 보다 뒤(비정상)여도 안전하게 띄운다', () => {
+  it('현재 단계보다 뒤처진 기록이어도 안전하게 넘기기를 안내한다', () => {
     expect(shouldOfferHandoffNudge('artist', 'producer')).toBe(true)
   })
 })

@@ -1,3 +1,4 @@
+// 아티스트 자료를 내보내면 이미지와 설명이 읽기 쉬운 목록으로 정리된다
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
@@ -43,7 +44,7 @@ function fixtureData(): ArtistData {
 }
 
 describe('collectArtistArtifacts', () => {
-  it('emits present artist media with remapped filenames and deduped folders', () => {
+  it('있는 아티스트 자료는 안전한 파일 이름으로 정리하고 같은 이름도 각각 보존한다', () => {
     const files = collectArtistArtifacts(fixtureData(), 'ko')
 
     expect(mediaPaths(files)).toEqual([
@@ -63,7 +64,7 @@ describe('collectArtistArtifacts', () => {
     expect(mediaPaths(files)).not.toContain('artist/worlds/네온-골목/wide.png')
   })
 
-  it('renders a readable assets.md index with native-first descriptions and remap notes', () => {
+  it('아티스트 자료 목록은 한국어 설명을 우선 보여 주고 이름이 바뀐 이유도 알린다', () => {
     const files = collectArtistArtifacts(fixtureData(), 'ko')
     const markdown = textFile(files, 'artist/assets.md')
 
@@ -89,7 +90,7 @@ describe('collectArtistArtifacts', () => {
     }
   })
 
-  it('renders an explicit Korean empty note when there are no artist assets', () => {
+  it('아티스트 자료가 없으면 한국어로 비어 있음을 알린다', () => {
     const files = collectArtistArtifacts({ characters: [], locations: [] }, 'ko')
 
     expect(files).toHaveLength(1)
@@ -97,7 +98,7 @@ describe('collectArtistArtifacts', () => {
     expect(textFile(files, 'artist/assets.md')).toContain('에셋 없음')
   })
 
-  it('stays pure and does not import the asset-storage store', () => {
+  it('자료를 모아도 원본을 바꾸지 않고 다른 저장 화면 없이 같은 결과를 만든다', () => {
     const data = fixtureData()
     const before = JSON.parse(JSON.stringify(data))
 

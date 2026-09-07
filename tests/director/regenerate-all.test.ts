@@ -1,3 +1,4 @@
+// 전체 재생성을 누르면 이미 만든 그림도 다시 만들고, 비용이 드는 작업임을 먼저 알린다 (#c3 2026-08-27 오너)
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { KO as ko } from '@/lib/i18n/messages-ko'
@@ -13,26 +14,26 @@ const page = readFileSync('src/app/studio/director/page.tsx', 'utf8')
 const client = readFileSync('src/lib/director/real-batch-client.ts', 'utf8')
 const route = readFileSync('src/app/api/director/generate-storyboard-batch/route.ts', 'utf8')
 
-describe('C3 — 전체 재생성 경로가 존재한다', () => {
-  it('서버가 force 를 받고, force 면 이미 생성된 샷도 대상에 넣는다', () => {
+describe('C3 — 전체 재생성을 요청할 수 있다', () => {
+  it('전체 재생성을 요청하면 이미 만든 장면 그림도 다시 만든다', () => {
     expect(route).toContain('force?: boolean')
     // 되돌아간 형태: if (s.storyboard_image) continue  ← force 무시
     expect(route).not.toMatch(/^\s*if \(s\.storyboard_image\) continue/m)
     expect(route).toContain('if (!force && s.storyboard_image) continue')
   })
 
-  it('클라 러너가 force 를 서버로 전달한다', () => {
+  it('전체 재생성 요청이 실제 작업까지 전달된다', () => {
     expect(client).toContain('force?: boolean')
     expect(client).toContain("opts?.force ? { projectId, force: true } : { projectId }")
   })
 
-  it('전부 생성된 상태에서 안내로 끝나지 않고 확인 모달을 연다', () => {
+  it('모든 그림이 있어도 전체 재생성 전에 확인을 요청한다', () => {
     // 예전: toast.info('All storyboards have already been generated.') 후 return
     expect(page).toContain('setConfirmRegenAll(true)')
     expect(page).toContain('runRealBatch(pid, { force: true })')
   })
 
-  it('과금이 큰 동작이라 확인을 거친다 — 바로 쏘지 않는다', () => {
+  it('비용이 드는 전체 재생성은 확인한 뒤 시작한다', () => {
     expect(page).toContain('RegenerateConfirmDialog')
     expect(page).toContain('Regenerate every storyboard image?')
     // 영향 고지에 과금·교체가 둘 다 있어야 한다
@@ -42,11 +43,11 @@ describe('C3 — 전체 재생성 경로가 존재한다', () => {
 })
 
 describe('C3 — 막힐 때 이유를 말한다', () => {
-  it('생성 중 disabled 상태에 사유 툴팁이 붙는다', () => {
+  it('생성 중에는 다시 누를 수 없는 이유를 알려준다', () => {
     expect(page).toContain('Generation in progress. You can start again when it finishes.')
   })
 
-  it('안내 문구가 한국어 사전에 있다', () => {
+  it('전체 재생성 안내 문구를 한국어로 보여준다', () => {
     for (const key of [
       'Regenerate every storyboard image?',
       'Regenerate all',
@@ -57,8 +58,8 @@ describe('C3 — 막힐 때 이유를 말한다', () => {
   })
 })
 
-describe('Director storyboard character appearance contract', () => {
-  it('uses each shot’s persisted appearance key and exact appearance sheet, never legacy character images', () => {
+describe('Director 장면 그림의 인물 모습 약속', () => {
+  it('각 장면에 저장한 인물 모습의 기준 그림만 사용하고 예전 그림은 쓰지 않는다', () => {
     expect(route).toContain('character_appearance_keys')
     expect(route).toContain("from('character_appearances')")
     expect(route).toContain("select('character_id, appearance_key, sheet_url')")

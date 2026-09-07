@@ -1,3 +1,4 @@
+// 다시 만든 영상 중 조건에 맞는 결과를 고르고 실패와 완료를 빠짐없이 기록한다
 import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -48,8 +49,8 @@ function take(overrides: Partial<DirectorVideoTake>): DirectorVideoTake {
 
 beforeEach(() => vi.resetAllMocks())
 
-describe('director video take selectors', () => {
-  it('uses newest live success for the grid, ignoring Final and unusable newer takes', () => {
+describe('영상 다시 만들기 결과를 고르는 기준', () => {
+  it('사용 가능한 영상 중 최신 결과를 화면에 보여주고 최종 영상과 쓸 수 없는 결과는 건너뛴다', () => {
     const selected = selectNewestSuccessfulTake([
       take({ id: 'final-old', take_number: 1, is_final: true }),
       take({ id: 'success', take_number: 2 }),
@@ -60,35 +61,35 @@ describe('director video take selectors', () => {
     expect(selected?.id).toBe('success')
   })
 
-  it('uses successful Final for handoff, otherwise the newest successful take', () => {
+  it('최종으로 지정한 영상이 성공했으면 넘겨주고 아니면 최신 성공 영상을 넘겨준다', () => {
     const takes = [take({ id: 'final', take_number: 1, is_final: true }), take({ id: 'newest', take_number: 3 })]
     expect(selectHandoffTake(takes)?.id).toBe('final')
     expect(selectHandoffTake(takes.map(item => item.id === 'final' ? { ...item, status: 'failed' } : item))?.id).toBe('newest')
   })
 
-  it('breaks equal-take equal-time ties deterministically by id', () => {
+  it('같은 차례와 시간의 영상이 여러 개면 정해진 순서로 하나를 고른다', () => {
     const a = take({ id: 'a', take_number: 2 })
     const z = take({ id: 'z', take_number: 2 })
     expect(selectNewestSuccessfulTake([a, z])?.id).toBe('z')
   })
 
-  it('returns null when no live successful URL exists', () => {
+  it('사용 가능한 성공 영상이 없으면 결과를 비워 둔다', () => {
     expect(selectNewestSuccessfulTake([take({ url: null }), take({ status: 'failed' })])).toBeNull()
     expect(selectHandoffTake([take({ is_final: true, deleted_at: '2026-07-20T01:00:00Z' })])).toBeNull()
   })
-  it('treats blank URLs as unusable and selects the latest attempt regardless of status', () => {
+  it('영상 주소가 비어 있으면 쓸 수 없는 결과로 보고 상태와 상관없이 최신 시도를 고른다', () => {
     const blank = take({ id: 'blank', take_number: 3, url: '   ' })
     const pending = take({ id: 'pending', take_number: 4, status: 'queued', url: null })
     expect(selectNewestSuccessfulTake([blank])).toBeNull()
     expect(selectLatestAttempt([blank, pending])?.id).toBe('pending')
   })
 
-  it('exposes a stable newest-first comparator for consumers with richer records', () => {
+  it('영상이 많아도 최신 결과부터 같은 순서로 고른다', () => {
     expect(compareDirectorVideoTakeOrder(take({ id: 'a', take_number: 2 }), take({ id: 'b', take_number: 1 }))).toBeLessThan(0)
   })
 })
-describe('director video attempt completion boundary', () => {
-  it('rejects blank result media fields before calling the atomic completion RPC', async () => {
+describe('영상 결과를 완료 처리하는 규칙', () => {
+  it('영상 주소나 보관 위치가 비어 있으면 완료 처리하지 않는다', async () => {
     await expect(completeDirectorVideoAttempt('project-1', 'job-1', 'clip-1', '   ', 'videos/clip-1.mp4'))
       .rejects.toThrow(/result URL must be nonblank/)
     await expect(completeDirectorVideoAttempt('project-1', 'job-1', 'clip-1', 'https://video.example/1', '\t'))
@@ -96,7 +97,7 @@ describe('director video attempt completion boundary', () => {
     expect(mocks.rpc).not.toHaveBeenCalled()
   })
 
-  it('preserves legacy scalar and null input snapshots when normalizing linked video jobs', () => {
+  it('예전 형식의 영상 요청 정보도 기존 내용 그대로 보존한다', () => {
     const migration = readFileSync(
       'supabase/migrations/20260720043400_director_video_retakes_integrity.sql',
       'utf8',
@@ -106,7 +107,7 @@ describe('director video attempt completion boundary', () => {
   })
 })
 
-describe('director video reservation and terminal RPC boundaries', () => {
+describe('영상 다시 만들기 요청과 완료·실패 기록 규칙', () => {
   const reservation = {
     video_clip_id: 'clip-1',
     job_id: 'job-1',
@@ -114,7 +115,7 @@ describe('director video reservation and terminal RPC boundaries', () => {
     replayed: false,
   }
 
-  it('defaults only undefined input snapshots and rejects non-object shapes before reservation RPCs', async () => {
+  it('요청 설정이 없을 때만 기본값을 쓰고 모양이 잘못되면 다시 만들기를 시작하지 않는다', async () => {
     mocks.rpc.mockResolvedValue({ data: [reservation], error: null })
 
     await reserveDirectorVideoTake({
@@ -141,7 +142,7 @@ describe('director video reservation and terminal RPC boundaries', () => {
     expect(mocks.rpc).toHaveBeenCalledTimes(1)
   })
 
-  it('wires successful completion and trimmed failure evidence to their terminal RPCs', async () => {
+  it('완료 결과는 그대로 기록하고 너무 긴 실패 사유는 읽을 수 있게 줄여 기록한다', async () => {
     mocks.rpc.mockResolvedValue({ error: null })
 
     await completeDirectorVideoAttempt('project-1', 'job-1', 'clip-1', 'https://video.example/1', 'videos/clip-1.mp4')
@@ -161,7 +162,7 @@ describe('director video reservation and terminal RPC boundaries', () => {
     })
   })
 
-  it('rejects blank failure evidence and propagates terminal RPC errors', async () => {
+  it('실패 사유가 비어 있으면 기록하지 않고 기록 중 오류는 알린다', async () => {
     await expect(markDirectorVideoAttemptFailed('project-1', 'job-1', ' \t '))
       .rejects.toThrow(/nonblank/)
     expect(mocks.rpc).not.toHaveBeenCalled()

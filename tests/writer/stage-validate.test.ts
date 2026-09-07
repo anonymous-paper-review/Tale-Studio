@@ -1,3 +1,4 @@
+// 장면의 인물 위치와 움직임을 읽기 쉽게 정리하고, 빠진 사람과 잘못된 값은 알려준다 (#stage 2026-09-03)
 // 씬 무대 추출·정규화·검증(#stage 2026-09-03).
 import { describe, it, expect } from 'vitest'
 import { extractSceneStage, validateSceneStage, sanitizeSceneStage, normalizePosture, buildStageCorrectionNote } from '@/lib/writer/pipeline/stage/validate'
@@ -29,7 +30,7 @@ const GOOD = {
 }
 
 describe('extractSceneStage', () => {
-  it('{stage:{…}} / 직접 객체 / 배열 래핑을 모두 읽고 숫자·자세·각도를 정규화한다', () => {
+  it('장면 정보가 여러 형태로 와도 숫자와 자세와 바라보는 방향을 올바르게 읽는다', () => {
     for (const raw of [{ stage: GOOD }, GOOD, [GOOD], { scene_stage: GOOD }]) {
       const s = extractSceneStage(raw, 'scene_1')!
       expect(s.scene_id).toBe('scene_1')
@@ -46,7 +47,7 @@ describe('extractSceneStage', () => {
     expect(extractSceneStage('garbage', 'scene_1')).toBeNull()
   })
 
-  it('자세 동의어', () => {
+  it('비슷한 자세 표현도 같은 자세로 알아본다', () => {
     expect(normalizePosture('seated')).toEqual({ posture: 'sitting', changed: true })
     expect(normalizePosture('lying down')).toEqual({ posture: 'lying', changed: true })
     expect(normalizePosture('walking')).toEqual({ posture: 'walking', changed: false })
@@ -55,13 +56,13 @@ describe('extractSceneStage', () => {
 })
 
 describe('validateSceneStage', () => {
-  it('정상 무대는 통과', () => {
+  it('빠짐없는 장면 정보는 통과시킨다', () => {
     const v = validateSceneStage(extractSceneStage(GOOD, 'scene_1')!, SCENE, PEOPLE, [{ source_beats: [0] }, { source_beats: [1] }])
     expect(v.valid).toBe(true)
     expect(v.issues.filter((i) => i.severity === 'CRITICAL')).toHaveLength(0)
   })
 
-  it('첫 비트에 씬 인물이 빠지면 CRITICAL, 알 수 없는 id 도 CRITICAL', () => {
+  it('처음 장면에 사람이 빠졌거나 모르는 사람이 있으면 문제로 알린다', () => {
     const bad = { ...GOOD, beats: [{ beat: 0, characters: [{ character_id: 'char', x: 0, y: 0, facing_deg: 0, posture: 'standing' }, { character_id: 'ghost', x: 1, y: 1, facing_deg: 0, posture: 'standing' }] }] }
     const v = validateSceneStage(extractSceneStage(bad, 'scene_1')!, SCENE, PEOPLE)
     expect(v.valid).toBe(false)
@@ -70,7 +71,7 @@ describe('validateSceneStage', () => {
     expect(buildStageCorrectionNote(v.issues)).toContain('[CRITICAL]')
   })
 
-  it('겹침·참조 비트 누락·범위 밖 비트는 WARNING', () => {
+  it('사람이 겹치거나 필요한 장면 정보가 없거나 범위를 벗어나면 주의로 알린다', () => {
     const crowd = { ...GOOD, beats: [{ beat: 0, characters: GOOD.beats[0].characters.map((c) => ({ ...c, x: 0, y: 0 })) }, { beat: 9, characters: GOOD.beats[0].characters }] }
     const v = validateSceneStage(extractSceneStage(crowd, 'scene_1')!, SCENE, PEOPLE, [{ source_beats: [3] }])
     expect(v.valid).toBe(true)
@@ -80,14 +81,14 @@ describe('validateSceneStage', () => {
     expect(msgs).toMatch(/범위 밖 비트 번호: 9/)
   })
 
-  it('빈 beats 는 CRITICAL', () => {
+  it('장면 움직임이 비어 있으면 문제로 알린다', () => {
     const v = validateSceneStage(extractSceneStage({ ...GOOD, beats: [] }, 'scene_1')!, SCENE, PEOPLE)
     expect(v.valid).toBe(false)
   })
 })
 
 describe('sanitizeSceneStage', () => {
-  it('알 수 없는 id 를 걷어내고 빠진 인물은 가장자리에 세우며 축이 깨지면 null', () => {
+  it('모르는 사람은 빼고 빠진 사람은 가장자리에 세우며 관계를 알 수 없으면 비워 둔다', () => {
     const bad = { ...GOOD, axis: { from: 'ghost', to: 'char' }, beats: [{ beat: 0, characters: [{ character_id: 'char', x: 0, y: 0, facing_deg: 0, posture: 'standing' }, { character_id: 'ghost', x: 1, y: 1, facing_deg: 0, posture: 'standing' }] }] }
     const s = sanitizeSceneStage(extractSceneStage(bad, 'scene_1')!, SCENE, PEOPLE)
     const ids = s.beats[0].characters.map((c) => c.character_id).sort()

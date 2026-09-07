@@ -1,3 +1,4 @@
+// 생성 한도를 넘으면 시작 전에 알리고, 여유가 있으면 프로젝트 결과를 정확히 보여준다 (#A 2026-09-02 오너 결정 #initial-rough-unblocked rough-storyboard-429-unreachable-2026-08-30)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // 러프 previz 429 관문 복원(#A, 2026-09-02 오너 결정 — #initial-rough-unblocked 번복,
@@ -51,8 +52,8 @@ beforeEach(() => {
   })
 })
 
-describe('rough-storyboard 진입 관문 — 429 복원', () => {
-  it('quota 거절이면 프로젝트/DB 조회 전에 429 를 반환한다', async () => {
+describe('러프 스토리보드는 생성 한도를 먼저 확인한다', () => {
+  it('생성 한도를 넘으면 프로젝트를 확인하기 전에 한도 초과를 알린다', async () => {
     mocks.checkGenerationCapacity.mockResolvedValue({
       ok: false,
       queued: 6,
@@ -71,7 +72,7 @@ describe('rough-storyboard 진입 관문 — 429 복원', () => {
     expect(mocks.from).not.toHaveBeenCalledWith('projects')
   })
 
-  it('전역 슬롯(scope=global) 거절도 429 로 표면화한다', async () => {
+  it('모든 생성 자리가 차도 한도 초과로 알린다', async () => {
     mocks.checkGenerationCapacity.mockResolvedValue({
       ok: false,
       queued: 40,
@@ -87,7 +88,7 @@ describe('rough-storyboard 진입 관문 — 429 복원', () => {
     expect(body.scope).toBe('global')
   })
 
-  it('quota 통과면 429 를 내지 않는다(이후 project not found 로 404)', async () => {
+  it('생성 여유가 있으면 프로젝트를 찾지 못했다는 결과를 알린다', async () => {
     mocks.checkGenerationCapacity.mockResolvedValue({
       ok: true,
       queued: 0,

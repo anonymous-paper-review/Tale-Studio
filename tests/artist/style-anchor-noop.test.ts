@@ -1,3 +1,4 @@
+// 캐릭터·배경·스토리보드를 만들 때 사용자가 고른 내용과 안전 기준만 반영하고, 전역 스타일은 몰래 덧붙이지 않는다
 import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -208,8 +209,8 @@ beforeEach(() => {
   mocks.from.mockImplementation((table: string) => queryFor(table))
 })
 
-describe('style-anchor Phase 0 no-op characterization', () => {
-  it('D.1 generate-sheet person main uses template edit opts with no aspect_ratio', async () => {
+describe('스타일을 따로 덧붙이지 않는 기본 동작을 확인한다', () => {
+  it('기본 인물 그림이 없으면 정해진 캐릭터 양식을 참고해 그림을 만든다 (D.1)', async () => {
     const character = characterFixture({ view_main: null, entity_type: 'person' })
     setCharacters(character)
 
@@ -233,7 +234,7 @@ describe('style-anchor Phase 0 no-op characterization', () => {
     expect(firstFalOpts().prompt).not.toContain('STYLE REFERENCE')
   })
 
-  it('D.2 generate-sheet person main falls back to 3:2 T2I when no base URL exists', async () => {
+  it('캐릭터 양식을 쓸 수 없으면 3:2 비율로 새 그림을 만든다 (D.2)', async () => {
     mocks.webhookBaseUrl = null
     const character = characterFixture({ view_main: null, entity_type: 'person' })
     setCharacters(character)
@@ -258,7 +259,7 @@ describe('style-anchor Phase 0 no-op characterization', () => {
     expect(firstFalOpts().prompt).not.toContain('STYLE REFERENCE')
   })
 
-  it('D.4 generate-sheet directional view uses the main image as edit reference with no aspect_ratio', async () => {
+  it('옆모습이나 뒷모습을 만들 때 정면 그림을 참고한다 (D.4)', async () => {
     const character = characterFixture({ view_main: 'https://img/main.png', entity_type: 'person' })
     setCharacters(character)
 
@@ -282,7 +283,7 @@ describe('style-anchor Phase 0 no-op characterization', () => {
     expect(firstFalOpts().prompt).not.toContain('STYLE REFERENCE')
   })
 
-  it('D.5 generate-sheet safeMode forwards the safe prompt and records safe_mode in inputSnapshot', async () => {
+  it('사용자가 안전 모드를 켜면 안전한 표현으로 바꾸어 그림을 만든다 (D.5)', async () => {
     const character = characterFixture({
       appearance: '12-year-old ranger with bloodstained gloves and a moonlit cloak',
       costume: ['torn navy jacket', 'blood red scarf'],
@@ -317,7 +318,7 @@ describe('style-anchor Phase 0 no-op characterization', () => {
     expect(firstFalOpts().prompt).not.toContain('STYLE REFERENCE')
   })
 
-  it('D.6 generate-world forwards caller prompt/aspect only, with no model or reference urls', async () => {
+  it('배경을 만들면 사람 없이 요청한 내용과 화면 비율을 반영한다 (D.6)', async () => {
     dbState.projects = [projectFixture({ design_tokens: null })]
 
     const response = await generateWorldPOST(
@@ -342,7 +343,7 @@ describe('style-anchor Phase 0 no-op characterization', () => {
     expect(firstFalOpts().prompt).not.toContain('STYLE REFERENCE')
   })
 
-  it('D.7 generate-storyboard forwards caller prompt/aspect/references with no model key', async () => {
+  it('스토리보드를 만들면 요청한 내용과 참고 이미지를 화면 비율에 맞춰 반영한다 (D.7)', async () => {
     dbState.projects = [projectFixture({ design_tokens: null })]
 
     const response = await generateStoryboardPOST(
@@ -366,7 +367,7 @@ describe('style-anchor Phase 0 no-op characterization', () => {
     expect(firstFalOpts().prompt).not.toContain('STYLE REFERENCE')
   })
 
-  it('D.8 triggerCharacterDrafts submits current template and fallback opts', async () => {
+  it('캐릭터 초안을 만들 때 양식이 있으면 참고하고 없으면 3:2 비율로 만든다 (D.8)', async () => {
     dbState.projects = [projectFixture({ design_tokens: designTokens })]
     const templatePerson = draftCharacter({
       character_id: 'draft-person-template',
@@ -429,7 +430,7 @@ describe('style-anchor Phase 0 no-op characterization', () => {
     })
   })
 
-  it('D.9 PREVIZ GUARD keeps rough storyboard source free of style-anchor wiring', () => {
+  it('러프 스토리보드를 만들 때 장면 스타일을 임의로 덧붙이지 않는다 (D.9)', () => {
     const src = readFileSync('src/app/api/writer/rough-storyboard/route.ts', 'utf8')
 
     expect(src).not.toContain('@/lib/style-anchor')
@@ -440,7 +441,7 @@ describe('style-anchor Phase 0 no-op characterization', () => {
     // this durable source guard is the Phase 0 no-op lock without that disproportionate mock graph.
   })
 
-  it('D.10 fal submit layer stays free of style-anchor global injection', () => {
+  it('이미지 생성 요청에 전역 스타일을 몰래 덧붙이지 않는다 (D.10)', () => {
     // Guards the ADR-rejected alternative (global injection inside falImageSubmit),
     // which the fully-mocked fal module in the cases above cannot see. Phase 1.1 only
     // adds `export` to isImageEditModel/DEFAULT_EDIT_IMAGE_MODEL — this stays green.

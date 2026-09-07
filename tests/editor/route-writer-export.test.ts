@@ -1,3 +1,4 @@
+// 로그인한 소유자에게만 완성된 이야기 내용을 보여주고, 준비된 내용이 없으면 비워 둔다
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -100,7 +101,7 @@ beforeEach(() => {
 })
 
 describe('GET /api/writer/export/[projectId]', () => {
-  it('returns 401 for unauthenticated requests', async () => {
+  it('로그인하지 않은 요청이면 접근을 거절한다', async () => {
     mocks.getUser.mockResolvedValue(null)
 
     const response = await GET(request(), ctx())
@@ -111,7 +112,7 @@ describe('GET /api/writer/export/[projectId]', () => {
     expect(mocks.from).not.toHaveBeenCalled()
   })
 
-  it('returns 403 for authenticated non-owners', async () => {
+  it('로그인했어도 다른 사람의 프로젝트면 보여주지 않는다', async () => {
     mocks.getUser.mockResolvedValue(USER)
     mocks.userOwnsProject.mockResolvedValue(false)
 
@@ -123,7 +124,7 @@ describe('GET /api/writer/export/[projectId]', () => {
     expect(mocks.from).not.toHaveBeenCalled()
   })
 
-  it('returns a normalized projection for an owner with a completed run', async () => {
+  it('완성된 이야기 내용이 있으면 소유자에게 단계별 결과를 보여준다', async () => {
     mocks.getUser.mockResolvedValue(USER)
     mocks.userOwnsProject.mockResolvedValue(true)
     const query = mockWriterRuns([run('completed', completedState, '2026-07-01T00:00:00Z')])
@@ -143,7 +144,7 @@ describe('GET /api/writer/export/[projectId]', () => {
     expect(query.limit).toHaveBeenCalledWith(5)
   })
 
-  it('prefers an older completed run over a newer failed run with data', async () => {
+  it('새 작업이 실패했으면 이전에 완성된 이야기를 보여준다', async () => {
     mocks.getUser.mockResolvedValue(USER)
     mocks.userOwnsProject.mockResolvedValue(true)
     const failedState = {
@@ -166,7 +167,7 @@ describe('GET /api/writer/export/[projectId]', () => {
     expect(body.storyBible.genre.genre).toBe('completed-older')
   })
 
-  it('prefers an older completed run from the scoped extra query when the recent window is failed-only', async () => {
+  it('최근 작업이 모두 실패했으면 더 이전의 완성된 이야기를 찾아 보여준다', async () => {
     mocks.getUser.mockResolvedValue(USER)
     mocks.userOwnsProject.mockResolvedValue(true)
     const failedRuns = Array.from({ length: 5 }, (_, index) =>
@@ -200,7 +201,7 @@ describe('GET /api/writer/export/[projectId]', () => {
     expect(completedQuery.limit).toHaveBeenCalledWith(1)
   })
 
-  it('returns all-null stages for an owner with no run', async () => {
+  it('아직 작업이 없으면 이야기 내용을 비워서 보여준다', async () => {
     mocks.getUser.mockResolvedValue(USER)
     mocks.userOwnsProject.mockResolvedValue(true)
     mockWriterRuns([])

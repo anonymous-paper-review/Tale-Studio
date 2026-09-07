@@ -21,7 +21,12 @@
   빨간 스위트는 커밋이 안 된다. 우회는 `--no-verify` + 커밋 메시지에 사유.
   테스트는 셸·`.env.local`의 제품 스위치를 물려받지 않는다(vitest.setup.ts가 지움) — 사람마다 결과가 다르면 안 된다.
   결제 코드 경로(`/api/billing/**`·웹훅)는 테스트 없이 main 금지.
-- 테스트 원장: `pnpm test:ledger`(묶음→파일→케이스 이름, 오너용 한국어 표면) · 묶음 실행 `pnpm test:<묶음>` · `test:unsorted`는 분류 부채.
+- 테스트 폴더 = 묶음 (2026-09-07 오너 확정): `tests/<묶음>/` 에 넣으면 `pnpm test:<묶음>` 으로 돌고 원장도 그 이름으로 실린다.
+  묶음은 `scripts/test-suites.mjs` 의 FOLDERS 한 곳에만 적는다: producer · writer · artist · director · editor · chat · job(생성 작업) ·
+  billing · llm-call · ui-text(화면 문구) · permission · reference · project · login · ops · manual(과금·운영 DB, 사람이 켤 때만).
+  새 테스트는 폴더 안에 만든다. 파일 이름에 폴더 이름을 또 붙이지 않는다(`writer/dialogue.test.ts`, `writer/writer-dialogue` 아님).
+  `tests/` 바로 아래 파일은 `test:unsorted` 에 분류 부채로 뜨고 0이어야 정상. red-team 은 파일 이름 꾸리(`.red-team.test.ts`)로 잡는 방식별 묶음.
+- 테스트 원장: `pnpm test:ledger`(묶음→파일→머리말→케이스 이름, 오너용 한국어 표면). 파일 첫 줄 `//` 머리말과 it 이름이 오너에겐 테스트의 전부다.
   `pnpm test`가 실패하면 판정 카드(약속 문장 · 실제 결과 · 선택지 3)가 자동으로 찍힌다.
 - 결제 워크스트림 원장: `.claude/docs/2026-09-01/` (phase-1~3 + fal 키 풀) · 전체 지도: `specs/payments-readiness.md`
   · 기획 안건: `specs/payments-planner-agenda.html`

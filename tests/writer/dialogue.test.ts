@@ -1,3 +1,4 @@
+// 대사를 만들면 장면마다 빠짐없이 이어지고, 일부 문제가 생겨도 나머지 내용은 계속 만든다 (#dialogue-v4)
 // 대사 스테이지(#dialogue-v4) 단위 테스트 — 샷 집합 계약·메모리 누적·부분 진행·장애 흡수.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -113,7 +114,7 @@ beforeEach(() => {
 })
 
 describe('normalizeWriterTab — 대사탭 활성화 회귀 가드', () => {
-  it("'dialogue'가 유효 탭으로 통과한다 (준비 중 시절 가드 잔존 시 탭 클릭 무시 사고)", () => {
+  it('대사 화면을 선택하면 해당 화면으로 이동한다 (준비 중 시절 탭 클릭 무시 사고)', () => {
     expect(normalizeWriterTab('dialogue')).toBe('dialogue')
     expect(normalizeWriterTab('script')).toBe('script')
     expect(normalizeWriterTab('unknown')).toBe('storyboard')
@@ -123,7 +124,7 @@ describe('normalizeWriterTab — 대사탭 활성화 회귀 가드', () => {
 describe('normalizeSceneDialogue — 샷 집합 계약', () => {
   const shots = [decShot('shot_1'), decShot('shot_2')]
 
-  it('누락 샷은 침묵으로 채우고 여분 샷은 버린다 (순서 = decoupage)', () => {
+  it('빠진 장면은 말없이 채우고 넘친 장면은 버린다 (원래 순서 유지)', () => {
     const out = normalizeSceneDialogue(
       { scene_id: 'scene_1', shots: [
         { shot_id: 'shot_2', dialogue: [{ character_id: 'a', line: '안녕', delivery: 'd' }], narration: null },
@@ -137,7 +138,7 @@ describe('normalizeSceneDialogue — 샷 집합 계약', () => {
     expect(out.shots[1].dialogue[0].line).toBe('안녕')
   })
 
-  it('빈 line·배열 래핑·공백 내레이션을 정규화한다', () => {
+  it('빈 대사와 잘못 감싼 목록, 공백 내레이션을 알아보기 쉽게 정리한다', () => {
     const out = normalizeSceneDialogue(
       [{ scene_id: 'scene_1', shots: [
         { shot_id: 'shot_1', dialogue: [{ character_id: 'a', line: '  ' }, { character_id: 'a', line: '말' }], narration: '  ' },
@@ -149,13 +150,13 @@ describe('normalizeSceneDialogue — 샷 집합 계약', () => {
     expect(out.shots[0].narration).toBeNull()
   })
 
-  it('shots 없는 응답은 throw', () => {
+  it('장면 목록이 없는 답변은 거부한다', () => {
     expect(() => normalizeSceneDialogue({ scene_id: 'x' }, 'x', shots)).toThrow(/unexpected shape/)
   })
 
   // #p4-json-guard: 침묵으로 채우고 나면 "모델이 침묵을 골랐다"와 "답이 잘려 사라졌다"가
   //   결과물에서 똑같이 생긴다. 응답에 아예 없던 샷만 여기서 구분할 수 있다.
-  it('응답에 없던 샷을 missing_shot_ids 로 표면화한다 (침묵 vs 소실 구분)', () => {
+  it('답변에서 빠진 장면을 따로 드러내 침묵과 누락을 구분한다', () => {
     const out = normalizeSceneDialogue(
       { scene_id: 'scene_1', shots: [{ shot_id: 'shot_1', dialogue: [], narration: null }] },
       'scene_1',
@@ -166,7 +167,7 @@ describe('normalizeSceneDialogue — 샷 집합 계약', () => {
     expect(out.shots[0].dialogue).toEqual([])
   })
 
-  it('전 샷이 응답에 있으면 missing_shot_ids 를 달지 않는다', () => {
+  it('모든 장면이 답변에 있으면 누락 표시를 남기지 않는다', () => {
     const out = normalizeSceneDialogue(
       {
         scene_id: 'scene_1',
@@ -190,14 +191,14 @@ describe('applyMemoryUpdate — 전개 메모리', () => {
     notable_lines: [{ character_id: 'a', line: 'l1' }],
   }
 
-  it('누적 + 미제공 필드는 유지', () => {
+  it('새 내용이 없어도 이전 내용을 그대로 이어 간다', () => {
     const next = applyMemoryUpdate(base, { new_facts: ['f2'] })
     expect(next.established_facts).toEqual(['f1', 'f2'])
     expect(next.relationship_state).toBe('r')
     expect(next.notable_lines).toHaveLength(1)
   })
 
-  it('슬라이딩 윈도우 — 사실 12·대사 10 유지', () => {
+  it('새 내용이 많아도 최근 사실 12개와 대사 10개만 이어 간다', () => {
     const next = applyMemoryUpdate(base, {
       new_facts: Array.from({ length: 20 }, (_, i) => `n${i}`),
       notable_lines: Array.from({ length: 20 }, (_, i) => ({ character_id: 'a', line: `n${i}` })),
@@ -209,8 +210,8 @@ describe('applyMemoryUpdate — 전개 메모리', () => {
 
 // 기본값은 2026-08-11부터 'parallel' — 이 블록은 킬스위치(WRITER_DIALOGUE_PARALLEL=0) 경로의
 //   계약을 계속 지킨다. 그래서 mode 를 명시 고정한다(기본값 변화에 흔들리지 않게).
-describe('runDialogue — 씬 순차 러너 (킬스위치 경로)', () => {
-  it('프로파일 1회 + 씬별 호출, 메모리가 다음 씬 프롬프트에 반영된다', async () => {
+describe('runDialogue — 장면을 차례로 이어 만드는 경우', () => {
+  it('인물 말투를 한 번 정하면 다음 장면의 대사에 이어서 반영한다', async () => {
     const scenes = makeScenes(['scene_1', 'scene_2'])
     const dec = makeDecoupage(['scene_1', 'scene_2'])
     generateJsonMock
@@ -243,7 +244,7 @@ describe('runDialogue — 씬 순차 러너 (킬스위치 경로)', () => {
     expect(scene2Prompt).toContain('첫 대사')
   })
 
-  it('씬 호출 2회 실패 → 그 씬만 침묵 흡수, 파이프라인은 계속', async () => {
+  it('한 장면을 만들지 못해도 그 장면만 말없이 두고 나머지는 계속 만든다', async () => {
     const scenes = makeScenes(['scene_1', 'scene_2'])
     const dec = makeDecoupage(['scene_1', 'scene_2'])
     generateJsonMock
@@ -268,7 +269,7 @@ describe('runDialogue — 씬 순차 러너 (킬스위치 경로)', () => {
     expect(s2.shots[0].dialogue[0].line).toBe('살아있다')
   })
 
-  it('softDeadline 경과 시 체크포인트 반환(done=false) → resume이 이어간다 (프로파일 재사용)', async () => {
+  it('시간이 부족해도 지금까지 만든 장면을 남기고 다음 작업에서 이어 간다 (인물 말투는 유지)', async () => {
     const scenes = makeScenes(['scene_1', 'scene_2'])
     const dec = makeDecoupage(['scene_1', 'scene_2'])
     const sceneResponse = (sid: string, ids: string[]) => ({
@@ -314,14 +315,14 @@ function richScenes(n: number): Scenes {
   return base
 }
 
-describe('deriveLedger — 사전유도 원장', () => {
-  it('첫 씬은 빈 메모리 (선행 씬이 없으므로 유도할 것도 없다)', () => {
+describe('deriveLedger — 이전 장면 요약으로 다음 내용을 준비', () => {
+  it('첫 장면은 앞선 내용 없이 시작한다', () => {
     const out = deriveLedger(richScenes(3).scenes, 0)
     expect(out.established_facts).toEqual([])
     expect(out.notable_lines).toEqual([])
   })
 
-  it('선행 씬들의 dialogue_summary 를 확립 사실로, 직전 씬 감정 끝을 관계 상태로 유도한다', () => {
+  it('앞선 장면의 요약과 직전 감정으로 다음 장면의 배경과 관계를 준비한다', () => {
     const out = deriveLedger(richScenes(4).scenes, 2)
     expect(out.established_facts).toEqual(['[scene_1] 1번째 씬 요약', '[scene_2] 2번째 씬 요약'])
     expect(out.relationship_state).toBe('end2')
@@ -329,20 +330,20 @@ describe('deriveLedger — 사전유도 원장', () => {
     expect(out.tone_notes).toContain('audience=character') // scene_3 의 info_asymmetry
   })
 
-  it('notable_lines 는 항상 비어 있다 — 사전 유도 불가가 병렬화의 유일한 대가', () => {
+  it('앞서 나온 인상적인 대사는 미리 넘기지 않는다 (동시에 장면을 준비하는 대신 치르는 대가)', () => {
     for (const i of [0, 1, 5]) {
       expect(deriveLedger(richScenes(8).scenes, i).notable_lines).toEqual([])
     }
   })
 
-  it('확립 사실은 순차 체인과 같은 유계 계약(최근 12개)을 지킨다', () => {
+  it('앞선 내용은 최근 12개까지만 다음 장면에 이어진다', () => {
     const out = deriveLedger(richScenes(20).scenes, 19)
     expect(out.established_facts).toHaveLength(12)
     expect(out.established_facts[11]).toBe('[scene_19] 19번째 씬 요약')
   })
 })
 
-describe('runDialogue — 병렬 모드', () => {
+describe('runDialogue — 여러 장면을 동시에 준비하는 경우', () => {
   /** 씬 프롬프트를 scene_id 로 식별해 응답 — 병렬이라 호출 순서를 가정할 수 없다. */
   function mockByScene(dec: DecoupagePlan) {
     generateJsonMock.mockImplementation(async (prompt: string) => {
@@ -361,7 +362,7 @@ describe('runDialogue — 병렬 모드', () => {
     })
   }
 
-  it('전 씬을 호출하고 출력은 원래 씬 순서로 병합된다 (결정론 병합)', async () => {
+  it('모든 장면을 준비해도 결과는 원래 순서로 정리된다', async () => {
     const scenes = richScenes(4)
     const dec = makeDecoupage(['scene_1', 'scene_2', 'scene_3', 'scene_4'])
     mockByScene(dec)
@@ -380,7 +381,7 @@ describe('runDialogue — 병렬 모드', () => {
     expect(generateJsonMock).toHaveBeenCalledTimes(5) // profiles + 씬 4
   })
 
-  it('기본값이 병렬+원장이다 (2026-08-11 채택 — opts 없이 호출해도 원장이 주입된다)', async () => {
+  it('기본 설정으로도 앞선 장면 요약이 이어진다 (2026-08-11 채택)', async () => {
     const scenes = richScenes(3)
     const dec = makeDecoupage(['scene_1', 'scene_2', 'scene_3'])
     mockByScene(dec)
@@ -395,7 +396,7 @@ describe('runDialogue — 병렬 모드', () => {
     expect(scene3).toContain('이미 나온 주요 대사(반복 금지, 콜백 재료): (없음)')
   })
 
-  it('ledger=true 면 선행 씬 요약이 프롬프트에 들어간다 (순차 메모리의 대체재)', async () => {
+  it('앞선 장면 요약을 사용하면 다음 대사를 준비할 때 함께 참고한다', async () => {
     const scenes = richScenes(3)
     const dec = makeDecoupage(['scene_1', 'scene_2', 'scene_3'])
     mockByScene(dec)
@@ -411,7 +412,7 @@ describe('runDialogue — 병렬 모드', () => {
     expect(scene3).toContain('[scene_2] 2번째 씬 요약')
   })
 
-  it('ledger=false 면 확립 사실이 비어 프롬프트에 선행 씬이 없다 (바닥 대조군)', async () => {
+  it('앞선 장면 요약을 끄면 다음 대사에 앞선 장면이 섞이지 않는다 (비교용)', async () => {
     const scenes = richScenes(3)
     const dec = makeDecoupage(['scene_1', 'scene_2', 'scene_3'])
     mockByScene(dec)
@@ -427,7 +428,7 @@ describe('runDialogue — 병렬 모드', () => {
     expect(scene3).toContain('확립된 사실: (없음)')
   })
 
-  it('병렬에서도 씬 실패는 그 씬만 침묵 흡수 (순차와 같은 계약)', async () => {
+  it('여러 장면을 함께 준비해도 한 장면이 실패하면 그 장면만 비워 둔다', async () => {
     const scenes = richScenes(3)
     const dec = makeDecoupage(['scene_1', 'scene_2', 'scene_3'])
     generateJsonMock.mockImplementation(async (prompt: string) => {

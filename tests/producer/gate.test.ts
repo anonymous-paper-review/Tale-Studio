@@ -1,3 +1,4 @@
+// 이야기와 카드의 필수 내용을 갖추고 영상 스타일을 고르면 Writer로 넘긴다
 import { describe, expect, it } from 'vitest'
 import { evaluateProducerGate, type BackgroundSource, type CastMember } from '@/lib/producer-gate'
 import type { ProjectSettings } from '@/types'
@@ -30,8 +31,8 @@ const fullBackground = (over: Partial<BackgroundSource> = {}): BackgroundSource 
   ...over,
 })
 
-describe('evaluateProducerGate — gate A (story foundation)', () => {
-  it('blocks when a hard setting is missing', () => {
+describe('evaluateProducerGate (이야기 기본 조건)', () => {
+  it('필수 설정이 비어 있으면 Writer로 넘기지 않는다', () => {
     const r = evaluateProducerGate({
       settings: { ...baseSettings, genre: '' },
       storyReady: true,
@@ -43,14 +44,14 @@ describe('evaluateProducerGate — gate A (story foundation)', () => {
     expect(r.hardMissing.map((i) => i.field)).toContain('genre')
   })
 
-  it('blocks when story is not ready', () => {
+  it('이야기 준비가 안 되면 Writer로 넘기지 않는다', () => {
     const r = evaluateProducerGate({ settings: baseSettings, storyReady: false,
       styleAnchorKey: 'style_a', cast: [fullPerson()], backgrounds: [fullBackground()] })
     expect(r.canHandoff).toBe(false)
     expect(r.hardMissing.map((i) => i.field)).toContain('storyText')
   })
 
-  it('reports empty tone/subGenre as SOFT only (not blocking)', () => {
+  it('분위기와 세부 장르가 비어 있어도 필수 조건만 갖추면 Writer로 넘긴다', () => {
     const r = evaluateProducerGate({
       settings: { ...baseSettings, tone: [], subGenre: '' },
       storyReady: true,
@@ -65,8 +66,8 @@ describe('evaluateProducerGate — gate A (story foundation)', () => {
   })
 })
 
-describe('evaluateProducerGate — gate B (cast, depth-linked)', () => {
-  it('D1 (10s) allows zero cast', () => {
+describe('evaluateProducerGate (등장인물 조건)', () => {
+  it('짧은 이야기(D1, 10초)는 등장인물이 없어도 Writer로 넘긴다', () => {
     const r = evaluateProducerGate({
       settings: { ...baseSettings, playtime: 10 },
       storyReady: true,
@@ -77,14 +78,14 @@ describe('evaluateProducerGate — gate B (cast, depth-linked)', () => {
     expect(r.canHandoff).toBe(true)
   })
 
-  it('D3 (120s) requires at least one person', () => {
+  it('D3 이야기(120초)는 등장인물이 한 명 이상 있어야 Writer로 넘긴다', () => {
     const r = evaluateProducerGate({ settings: baseSettings, storyReady: true,
       styleAnchorKey: 'style_a', cast: [], backgrounds: [fullBackground()] })
     expect(r.canHandoff).toBe(false)
     expect(r.hardMissing.map((i) => i.field)).toContain('cast:minPerson')
   })
 
-  it('D3 person missing arc/want is blocked', () => {
+  it('D3 인물의 변화 과정이나 원하는 목표가 비어 있으면 Writer로 넘기지 않는다', () => {
     const r = evaluateProducerGate({
       settings: baseSettings,
       storyReady: true,
@@ -98,7 +99,7 @@ describe('evaluateProducerGate — gate B (cast, depth-linked)', () => {
     expect(fields).toContain('cast:p1:want')
   })
 
-  it('object only needs name + appearance even at D3', () => {
+  it('D3에서도 사물은 이름과 모습만 있으면 Writer로 넘긴다', () => {
     const r = evaluateProducerGate({
       settings: baseSettings,
       storyReady: true,
@@ -112,7 +113,7 @@ describe('evaluateProducerGate — gate B (cast, depth-linked)', () => {
     expect(r.canHandoff).toBe(true)
   })
 
-  it('D4 (600s) recommends a second person as SOFT', () => {
+  it('D4 이야기(600초)는 인물이 한 명뿐이면 한 명을 더 준비하라고 알린다', () => {
     const r = evaluateProducerGate({
       settings: { ...baseSettings, playtime: 600 },
       storyReady: true,
@@ -124,7 +125,7 @@ describe('evaluateProducerGate — gate B (cast, depth-linked)', () => {
     expect(r.softMissing.map((i) => i.field)).toContain('cast:recommendPersons')
   })
 
-  it('requires at least one complete background source card', () => {
+  it('배경 카드가 있어도 모든 칸을 채운 카드가 하나는 있어야 Writer로 넘긴다', () => {
     const r = evaluateProducerGate({
       settings: baseSettings,
       storyReady: true,
@@ -139,8 +140,8 @@ describe('evaluateProducerGate — gate B (cast, depth-linked)', () => {
   })
 })
 
-describe('evaluateProducerGate — writer-origin cards do not block handoff', () => {
-  it('ignores an incomplete writer-origin person (partial writer run addition)', () => {
+describe('evaluateProducerGate (Writer가 덧붙인 카드는 다음 단계 조건을 막지 않는다)', () => {
+  it('Writer가 덜 채운 인물을 추가해도 다음 단계로 넘긴다', () => {
     // producer 카스트는 완성, writer 가 부분 실행 중 arc/motivation 없는 인물을 추가한 상황.
     const r = evaluateProducerGate({
       settings: baseSettings,
@@ -162,7 +163,7 @@ describe('evaluateProducerGate — writer-origin cards do not block handoff', ()
     expect(r.hardMissing).toHaveLength(0)
   })
 
-  it('ignores writer-origin backgrounds for the min-complete requirement', () => {
+  it('Writer가 덜 채운 배경을 더해도 다음 단계로 넘길 수 있다', () => {
     const r = evaluateProducerGate({
       settings: baseSettings,
       storyReady: true,
@@ -176,7 +177,7 @@ describe('evaluateProducerGate — writer-origin cards do not block handoff', ()
     expect(r.canHandoff).toBe(true)
   })
 
-  it('still requires a producer-origin background (writer-only backgrounds do not satisfy)', () => {
+  it('Writer에서 만든 배경만 있으면 부족하고 Producer 배경이 하나는 있어야 한다', () => {
     const r = evaluateProducerGate({
       settings: baseSettings,
       storyReady: true,
@@ -193,8 +194,8 @@ describe('evaluateProducerGate — writer-origin cards do not block handoff', ()
 
 // #style-gate 2026-08-11 — 실측 사고의 회귀: 스타일이 비었는데 핸드오프 제안이 떠서 스타일
 // 픽커의 Enter 와 수락 Enter 가 경합했다. 스타일은 하드 게이트다 — 골라야 핸드오프가 열린다.
-describe('evaluateProducerGate — 영상 스타일 하드 게이트', () => {
-  it('스타일 미선택이면 다른 항목이 다 차 있어도 막힌다', () => {
+describe('evaluateProducerGate (영상 스타일을 골라야 다음 단계로 넘긴다)', () => {
+  it('영상 스타일을 고르지 않으면 다른 조건이 맞아도 다음 단계로 넘기지 않는다', () => {
     const r = evaluateProducerGate({
       settings: baseSettings,
       storyReady: true,
@@ -206,7 +207,7 @@ describe('evaluateProducerGate — 영상 스타일 하드 게이트', () => {
     expect(r.hardMissing.map((i) => i.field)).toContain('styleAnchor')
   })
 
-  it('미지정(undefined)도 미선택과 같다', () => {
+  it('영상 스타일을 정하지 않으면 선택하지 않은 경우와 같이 다음 단계로 넘기지 않는다', () => {
     const r = evaluateProducerGate({
       settings: baseSettings,
       storyReady: true,
@@ -217,7 +218,7 @@ describe('evaluateProducerGate — 영상 스타일 하드 게이트', () => {
     expect(r.hardMissing.map((i) => i.field)).toContain('styleAnchor')
   })
 
-  it('스타일이 선택되면 통과한다', () => {
+  it('영상 스타일을 고르면 다음 단계로 넘길 수 있다', () => {
     const r = evaluateProducerGate({
       settings: baseSettings,
       storyReady: true,

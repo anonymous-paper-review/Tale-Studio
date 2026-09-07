@@ -1,3 +1,4 @@
+// 줄을 찾거나 바꿀 때 잘못된 입력은 무시하고 사용자가 적은 내용만 안전하게 반영한다
 import { describe, expect, it } from 'vitest'
 import {
   buildScriptLines,
@@ -79,8 +80,8 @@ const syntheticLines = (count: number): ScriptLine[] =>
     shotId: `sh_${index + 1}`,
   }))
 
-describe('resolveLineRefs red-team boundaries', () => {
-  it('RT-01 resolves Korean particles but rejects malformed line-token variants', () => {
+describe('줄 번호를 찾을 때 예상 밖 입력도 안전하게 처리한다', () => {
+  it('줄 번호 뒤에 조사가 붙어도 해당 줄만 찾고 잘못된 표기는 무시한다 (RT-01)', () => {
     const lines = syntheticLines(45)
 
     expect(resolveLineRefs('L45가 이상해', lines)).toEqual([
@@ -93,7 +94,7 @@ describe('resolveLineRefs red-team boundaries', () => {
     expect(resolveLineRefs('L0 L01 L999999 45 l45 L1L2', lines)).toEqual([])
   })
 
-  it('RT-02 scans very long mention text without duplicate or runaway output', () => {
+  it('아주 긴 글에서 같은 줄을 여러 번 언급해도 한 번만 찾는다 (RT-02)', () => {
     const lines = syntheticLines(45)
     const text = `${'가'.repeat(10_000)} L45가 ${'x'.repeat(10_000)} @L45`
 
@@ -104,8 +105,8 @@ describe('resolveLineRefs red-team boundaries', () => {
   })
 })
 
-describe('buildScriptLines red-team boundaries', () => {
-  it('RT-03 tolerates nullish dialogueLines and does not synthesize dialogue entries', () => {
+describe('장면과 대사를 줄로 만들 때 예상 밖 입력도 안전하게 처리한다', () => {
+  it('대사가 없거나 비어 있으면 대사 줄을 임의로 만들지 않는다 (RT-03)', () => {
     const lines = buildScriptLines(manifest(), [
       { ...shot({ shotId: 'sh_undefined', sceneId: 'sc_01' }), dialogueLines: undefined } as unknown as Shot,
       { ...shot({ shotId: 'sh_null', sceneId: 'sc_01' }), dialogueLines: null } as unknown as Shot,
@@ -119,7 +120,7 @@ describe('buildScriptLines red-team boundaries', () => {
     expect(lines.filter((line) => line.kind === 'dialogue')).toEqual([])
   })
 
-  it('RT-04 keeps orphan-only manifests line-numbered without headings', () => {
+  it('장면 정보가 없어도 남은 촬영 단위에 줄 번호를 붙이고 제목 없이 보여준다 (RT-04)', () => {
     const lines = buildScriptLines(manifest([]), [
       shot({
         shotId: 'orphan_01',
@@ -145,7 +146,7 @@ describe('buildScriptLines red-team boundaries', () => {
     ])
   })
 
-  it('RT-05 keeps script refs unambiguous when shotId values collide', () => {
+  it('촬영 단위 번호가 겹쳐도 각 줄을 서로 헷갈리지 않게 구분한다 (RT-05)', () => {
     const lines = buildScriptLines(manifest(), [
       shot({ shotId: 'dup_shot', sceneId: 'sc_01', actionDescription: '첫 번째' }),
       shot({ shotId: 'dup_shot', sceneId: 'sc_01', actionDescription: '두 번째' }),
@@ -156,8 +157,8 @@ describe('buildScriptLines red-team boundaries', () => {
   })
 })
 
-describe('sanitizeLineRefs red-team boundaries', () => {
-  it('RT-06 rejects prototype-inherited refs and label regex bypasses', () => {
+describe('줄 참조를 정리할 때 잘못된 값도 안전하게 걸러낸다', () => {
+  it('줄 참조 형식이 올바르지 않으면 무시하고 올바른 형식만 남긴다 (RT-06)', () => {
     const inheritedLineRef = {
       __proto__: { label: 'L1', ref: 'polluted.action', kind: 'action' },
     } as unknown
@@ -174,7 +175,7 @@ describe('sanitizeLineRefs red-team boundaries', () => {
     ).toEqual([{ label: 'L2', ref: 'safe.dialogue[0]', kind: 'dialogue' }])
   })
 
-  it('RT-07 handles circular sanitizeLineRefs input without recursion', () => {
+  it('서로를 가리키는 잘못된 줄 목록이 들어와도 멈추지 않고 올바른 줄만 남긴다 (RT-07)', () => {
     const circularRef: Record<string, unknown> = { label: 'L2', ref: 'safe.dialogue[0]' }
     circularRef.self = circularRef
     const raw: unknown[] = [circularRef]
@@ -187,8 +188,8 @@ describe('sanitizeLineRefs red-team boundaries', () => {
   })
 })
 
-describe('validateWriterUpdates red-team boundaries', () => {
-  it('RT-08 drops nested malformed patches and type-confused dialogueLines', () => {
+describe('장면과 대사 변경을 확인할 때 잘못된 내용은 반영하지 않는다', () => {
+  it('잘못된 장면 변경 내용과 대사 목록은 모두 반영하지 않는다 (RT-08)', () => {
     const notText = () => '대사처럼 보이는 함수'
 
     expect(
@@ -218,7 +219,7 @@ describe('validateWriterUpdates red-team boundaries', () => {
     ).toEqual([])
   })
 
-  it('RT-09 ignores deleteScene requests with non-string ids', () => {
+  it('장면 번호가 글자가 아니면 삭제 요청을 무시한다 (RT-09)', () => {
     expect(
       validateWriterUpdates([
         { type: 'deleteScene', id: 45 },
@@ -229,8 +230,8 @@ describe('validateWriterUpdates red-team boundaries', () => {
   })
 })
 
-describe('classifyDialoguePatch red-team boundaries', () => {
-  it('RT-10 treats same-reference and empty dialogue patches as apply', () => {
+describe('대사 변경 내용을 판단할 때 같은 내용도 요청으로 적용한다', () => {
+  it('대사 내용이 그대로이거나 비어 있어도 변경 요청으로 적용한다 (RT-10)', () => {
     const sameRef = [dialogue('char_a', '그대로')]
 
     expect(classifyDialoguePatch(sameRef, sameRef)).toBe('apply')

@@ -1,3 +1,4 @@
+// 수동으로 연결한 카드가 다른 기기에서도 같은 대상을 가리키도록 저장하고 복원한다 (#wiring-persistence 2026-08-31)
 // Director 수동 연결의 DB 직렬화 계약(#wiring-persistence 2026-08-31).
 //
 // 핵심 계약: 노드 id(dn_*)는 기기-로컬 난수 — DB에는 안정 참조(shot_id/clip_id/asset_id)로
@@ -40,8 +41,8 @@ function seedCanvas(suffix: string) {
   return { sceneId, sourceShotId, targetShotId, videoId }
 }
 
-describe('serializeWiringRef / resolveWiringRef', () => {
-  it('writer 샷·클립·에셋은 안정 참조로 직렬화되고 같은 캔버스에서 되돌아온다', () => {
+describe('연결 대상 저장과 복원', () => {
+  it('Writer에서 만든 장면과 영상은 같은 대상을 다시 찾는다', () => {
     const { sourceShotId, videoId } = seedCanvas('a')
     const nodes = api().nodes
 
@@ -54,7 +55,7 @@ describe('serializeWiringRef / resolveWiringRef', () => {
     expect(resolveWiringRef(nodes, videoRef!)).toBe(videoId)
   })
 
-  it('안정 키가 없는 노드(수동 Shot·미생성 테이크)는 직렬화 불가(null)', () => {
+  it('이름이 없는 수동 장면과 미완성 영상은 연결 대상으로 저장하지 않는다', () => {
     const standaloneShotId = api().addShotNode(null, { x: 0, y: 0 }, 'Manual')
     const videoId = api().addVideoTake(standaloneShotId)! // videoClipId 없음
     const nodes = api().nodes
@@ -63,7 +64,7 @@ describe('serializeWiringRef / resolveWiringRef', () => {
     expect(serializeWiringRef(nodes, 'missing')).toBeNull()
   })
 
-  it("구 DB의 'shotImage' 참조는 부모 Shot 노드로 해석된다 (#node-merge 하위호환)", () => {
+  it('구버전의 그림 연결도 부모 장면 카드로 되돌린다 (#node-merge 하위호환)', () => {
     const { sourceShotId } = seedCanvas('b')
     api().rebuildShotChainNodes()
     // 파생 카드는 더 이상 없지만, 구 버전이 저장한 shotImage 참조는 여전히 풀린다.
@@ -74,8 +75,8 @@ describe('serializeWiringRef / resolveWiringRef', () => {
   })
 })
 
-describe('새 기기 시뮬레이션 — 다른 노드 id 집합에서의 복원', () => {
-  it('frameInputs가 새 캔버스의 대응 노드 id로 복원된다', () => {
+describe('새 기기에서 같은 연결 대상을 복원한다', () => {
+  it('영상 연결 정보가 새 캔버스의 대응 카드로 복원된다', () => {
     // 기기 1: 연결을 만들고 직렬화
     const first = seedCanvas('x')
     api().wireFrameToVideo(first.sourceShotId, first.videoId, 'frame-start')
@@ -99,7 +100,7 @@ describe('새 기기 시뮬레이션 — 다른 노드 id 집합에서의 복원
     expect(restored.end).toBeNull()
   })
 
-  it('imageInputs 복원은 사라진 참조를 버리고 중복을 제거한다', () => {
+  it('사라진 그림 연결은 버리고 같은 연결은 한 번만 남긴다', () => {
     const { sourceShotId, targetShotId } = seedCanvas('y')
     const stable = serializeImageInputs(api().nodes, [sourceShotId, sourceShotId, 'ghost'])
     expect(stable).toHaveLength(1)
@@ -115,8 +116,8 @@ describe('새 기기 시뮬레이션 — 다른 노드 id 집합에서의 복원
   })
 })
 
-describe('DB jsonb 관대한 파싱', () => {
-  it('형태가 어긋난 참조는 버리고 유효한 것만 남긴다', () => {
+describe('저장된 연결 정보가 조금 달라도 유효한 대상만 남긴다', () => {
+  it('모양이 어긋난 연결은 버리고 유효한 대상만 남긴다', () => {
     expect(
       parseStableImageInputs([
         { kind: 'shot', shotId: 's1' },
@@ -133,7 +134,7 @@ describe('DB jsonb 관대한 파싱', () => {
     expect(parseStableImageInputs('not-array')).toEqual([])
   })
 
-  it('frame_inputs/video_chain 파싱 — null·불량 형태는 null', () => {
+  it('영상 연결 정보가 없거나 잘못되면 없는 것으로 처리한다', () => {
     expect(parseStableFrameInputs(null)).toBeNull()
     expect(parseStableFrameInputs([])).toBeNull()
     const parsed = parseStableFrameInputs({
@@ -158,7 +159,7 @@ describe('DB jsonb 관대한 파싱', () => {
     })
   })
 
-  it('빈 frameInputs 판정 — 스윕이 DB에 null을 쓰는 기준', () => {
+  it('영상 연결이 비어 있으면 저장할 내용이 없다고 판단한다', () => {
     expect(isEmptyStableFrameInputs({ start: null, end: null, refs: [] })).toBe(true)
     expect(
       isEmptyStableFrameInputs({ start: { kind: 'shot', shotId: 's' }, end: null, refs: [] }),
@@ -166,8 +167,8 @@ describe('DB jsonb 관대한 파싱', () => {
   })
 })
 
-describe('video-chain 직렬화 전제', () => {
-  it('완료 테이크의 videoClipId가 안정 키로 쓰인다', () => {
+describe('완료된 영상 연결 정보를 안전하게 저장한다', () => {
+  it('완료된 영상의 이름을 연결 대상으로 사용한다', () => {
     const { videoId } = seedCanvas('c')
     const node = api().nodes.find((n) => n.id === videoId)!
     expect(isVideoData(node.data) && node.data.videoClipId).toBe('clip-c')

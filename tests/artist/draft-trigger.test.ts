@@ -1,3 +1,4 @@
+// 그림체가 준비된 경우에만 캐릭터와 장소 그림 초안을 만들고, 한도와 중복 요청을 안전하게 막는다
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -170,8 +171,8 @@ beforeEach(() => {
   mocks.from.mockImplementation((table: string) => queryFor(table))
 })
 
-describe('draft trigger relocation guards', () => {
-  it('design_tokens null skips all submits and never records look_present=false', async () => {
+describe('그림 초안 생성 — 그림체가 없거나 설정을 읽지 못하면 안전하게 멈춘다', () => {
+  it('그림체 설정이 없으면 그림 초안을 보내지 않고 없다고 잘못 기록하지 않는다', async () => {
     dbState.projects = [projectFixture({ design_tokens: null })]
     dbState.characters = [characterFixture()]
     dbState.locations = [locationFixture()]
@@ -192,7 +193,7 @@ describe('draft trigger relocation guards', () => {
     ).toBe(false)
   })
 
-  it('design_tokens query error also skips (fail-safe, never look_present=false)', async () => {
+  it('그림체 설정을 읽지 못해도 초안 생성을 멈추고 없다고 잘못 기록하지 않는다', async () => {
     mocks.from.mockImplementation((table: string) => {
       if (table === 'projects') {
         return {
@@ -213,7 +214,7 @@ describe('draft trigger relocation guards', () => {
     expect(mocks.createGenerationJob).not.toHaveBeenCalled()
   })
 
-  it('look-present asset trigger creates a look-bearing character job with workspace target', async () => {
+  it('그림체가 있으면 캐릭터 그림 초안을 만들고 작업 공간 정보를 함께 기록한다', async () => {
     const character = characterFixture({
       appearance: 'silver-haired courier',
       costume: ['blue raincoat'],
@@ -238,7 +239,7 @@ describe('draft trigger relocation guards', () => {
     expect(arg.inputSnapshot.source_hash).not.toBe(computeImageSourceHash(character.appearance, null))
   })
 
-  it('drafts writer-origin opencast characters too (#ref-gate 2026-09-02: Director 진입 전에 시트가 있어야 한다)', async () => {
+  it('Writer에서 온 캐릭터도 Director에 들어가기 전에 그림 초안을 만든다 (#ref-gate 2026-09-02)', async () => {
     dbState.characters = [
       characterFixture({ character_id: 'char_producer', origin: 'producer' }),
       characterFixture({ character_id: 'char_writer', origin: 'writer' }),
@@ -256,7 +257,7 @@ describe('draft trigger relocation guards', () => {
     expect(ids).toEqual(['char_producer', 'char_writer'])
   })
 
-  it('triggerWorldDrafts uses prompt-only source_hash parity with generate-world and preserves target shape', async () => {
+  it('장소 초안과 화면에서 만든 장소 그림이 같은 설명을 사용하고 대상 정보를 유지한다', async () => {
     const location = locationFixture()
     dbState.locations = [location]
     const builtPrompt = buildWorldShotPromptForLocation(
@@ -308,7 +309,7 @@ describe('draft trigger relocation guards', () => {
     expect(routeArg.target).toEqual(triggerArg.target)
   })
 
-  it('triggerWorldDrafts skips when a queued world_shot already exists', async () => {
+  it('같은 장소 그림을 만들라는 요청이 이미 대기 중이면 새로 보내지 않는다', async () => {
     dbState.locations = [locationFixture()]
     mocks.hasQueuedWorldShotJob.mockResolvedValue(true)
 
@@ -319,7 +320,7 @@ describe('draft trigger relocation guards', () => {
     expect(mocks.createGenerationJob).not.toHaveBeenCalled()
   })
 
-  it('absorbs per-entity submit failures into counts', async () => {
+  it('일부 대상에서 생성에 실패해도 전체 결과에 실패 수로 반영한다', async () => {
     dbState.locations = [locationFixture()]
     mocks.falImageSubmit.mockRejectedValueOnce(new Error('fal unavailable'))
 
@@ -328,7 +329,7 @@ describe('draft trigger relocation guards', () => {
   })
 
   // #B(2026-09-02 용량 사전 점검) — design_tokens 확인 직후 owner 쿼터가 랬으부타마면 제출 전역 스킵.
-  it('quota 거절이면 제출 전역 스킵하고 asset_trigger_blocked(reason:quota) 이벤트를 낸다', async () => {
+  it('사용 한도를 넘으면 그림 초안을 보내지 않고 차단 사실을 알린다', async () => {
     dbState.characters = [characterFixture()]
     dbState.locations = [locationFixture()]
     mocks.checkGenerationCapacity.mockResolvedValue({
@@ -347,7 +348,7 @@ describe('draft trigger relocation guards', () => {
     expect(mocks.checkGenerationCapacity).toHaveBeenCalledWith(OWNER_ID, 'image')
   })
 
-  it('quota 통과이면 정상 제출을 진행한다(기존 동작 무해)', async () => {
+  it('사용 한도 안이면 그림 초안을 정상적으로 보낸다 (기존 동작 유지)', async () => {
     dbState.characters = [characterFixture()]
     mocks.checkGenerationCapacity.mockResolvedValue({
       ok: true,

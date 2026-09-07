@@ -1,10 +1,11 @@
+// 장소와 장면 정보를 바탕으로 사람 없는 배경을 만들고, 사용자의 생성을 구분해 기록한다
 import { describe, expect, it } from 'vitest'
 import { buildWorldShotPromptForLocation } from '@/lib/artist/world-prompt'
 import { buildCharacterPrompt } from '@/lib/prompts'
 import { shouldMarkWorldGenerationUserEdited } from '@/stores/artist-store'
 
-describe('artist background source prompts', () => {
-  it('builds a Producer-only world prompt when no writer scene exists yet', () => {
+describe('Artist 배경 만들기 안내', () => {
+  it('Producer 정보만 있고 장면이 없으면 사람이 없는 넓은 배경을 만든다', () => {
     const prompt = buildWorldShotPromptForLocation(
       {
         locationId: 'neon_alley',
@@ -33,7 +34,7 @@ describe('artist background source prompts', () => {
     expect(prompt).not.toContain('during  ,')
   })
 
-  it('keeps the person exclusion scoped to background prompts', () => {
+  it('인물 설명으로 만든 안내문에서는 배경에 사람을 넣지 않는다', () => {
     const prompt = buildCharacterPrompt('a detective in a wool coat', 'front')
 
     expect(prompt).toBe(
@@ -42,7 +43,7 @@ describe('artist background source prompts', () => {
     expect(prompt).not.toContain('no people')
   })
 
-  it('adds writer scene context when available for regeneration prompts', () => {
+  it('장면 정보가 있으면 배경을 다시 만들 때 시간과 분위기를 반영한다', () => {
     const prompt = buildWorldShotPromptForLocation(
       {
         locationId: 'rooftop',
@@ -75,7 +76,7 @@ describe('artist background source prompts', () => {
     expect(prompt).toContain('wide shot, panoramic')
   })
 
-  it('marks explicit generation as user-edited but leaves auto first-fill unmarked', () => {
+  it('사용자가 직접 시작한 생성은 수정으로 기록하고 자동 생성은 기록하지 않는다', () => {
     expect(shouldMarkWorldGenerationUserEdited('ui')).toBe(true)
     expect(shouldMarkWorldGenerationUserEdited('chat')).toBe(true)
     expect(shouldMarkWorldGenerationUserEdited('auto')).toBe(false)

@@ -1,3 +1,4 @@
+// 작가 이미지 준비가 끝난 프로젝트만 Artist 단계로 들어가며, 실패하면 다시 시도할 수 있다
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { sceneRows } = vi.hoisted(() => ({
@@ -51,8 +52,8 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('project-store artist image lock gate', () => {
-  it('blocks only artist navigation until artistImagesReady', () => {
+describe('project-store 작가 이미지 진입 잠금 확인', () => {
+  it('작가 이미지가 준비되기 전에는 Artist로 이동하지 못하게 한다', () => {
     useProjectStore.setState({ reachedStage: 'director', artistImagesReady: false })
 
     const store = useProjectStore.getState()
@@ -67,7 +68,7 @@ describe('project-store artist image lock gate', () => {
     expect(useProjectStore.getState().canNavigateTo('artist')).toBe(true)
   })
 
-  it('lets grandfathered projects through when status assets seed images_ready', async () => {
+  it('기존 프로젝트의 준비된 이미지 정보가 있으면 Artist 진입을 허용한다', async () => {
     sceneRows.current = [{ scene_id: 'scene-1' }]
     useProjectStore.setState({ currentStage: 'artist', reachedStage: 'artist' })
     const fetchSpy = mockWriterStatus({
@@ -91,7 +92,7 @@ describe('project-store artist image lock gate', () => {
     expect(useProjectStore.getState().canNavigateTo('artist')).toBe(true)
   })
 
-  it('seeds failed and stalled CTA fields from status assets', async () => {
+  it('이미지 준비 실패와 멈춤 상태를 안내 정보에 반영한다', async () => {
     sceneRows.current = [{ scene_id: 'scene-1' }]
     useProjectStore.setState({ currentStage: 'artist', reachedStage: 'artist' })
     mockWriterStatus({
@@ -118,7 +119,7 @@ describe('project-store artist image lock gate', () => {
     expect(useProjectStore.getState().canNavigateTo('artist')).toBe(false)
   })
 
-  it('does not let the old producer-source-location reachability bypass open artist', async () => {
+  it('예전 Producer 준비 정보만으로는 Artist 진입을 허용하지 않는다', async () => {
     useProjectStore.setState({ currentStage: 'artist', reachedStage: 'artist' })
     mockWriterStatus({
       started: false,
@@ -134,7 +135,7 @@ describe('project-store artist image lock gate', () => {
     expect(useProjectStore.getState().canNavigateTo('artist')).toBe(false)
   })
 
-  it('resets artist image gate fields with the project gate flags', () => {
+  it('프로젝트를 초기화하면 작가 이미지 진입 상태도 초기화한다', () => {
     useProjectStore.setState({
       artistImagesReady: false,
       artistAssetProgress: { ready: 1, total: 4 },
@@ -150,7 +151,7 @@ describe('project-store artist image lock gate', () => {
     expect(useProjectStore.getState().artistImagesStalled).toBe(false)
   })
 
-  it('does not flag failed while retry jobs are queued (in-flight), latches when queue drains', () => {
+  it('재시도 작업이 남아 있으면 실패로 표시하지 않고, 모두 끝나면 실패를 표시한다', () => {
     useProjectStore
       .getState()
       .setArtistAssetGate(assets({ failed_count: 3, queued_count: 2, chars_total: 2 }))
@@ -163,8 +164,8 @@ describe('project-store artist image lock gate', () => {
   })
 })
 
-describe('retryArtistDrafts action', () => {
-  it('POSTs retry-drafts and clears failed/stalled on 200 (resumes polling)', async () => {
+describe('retryArtistDrafts 재시도 동작', () => {
+  it('재시도를 요청해 성공하면 실패와 멈춤 표시를 지우고 상태 확인을 다시 시작한다', async () => {
     useProjectStore.setState({ projectId: 'project-1', artistImagesFailed: true, artistImagesStalled: true })
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
@@ -180,7 +181,7 @@ describe('retryArtistDrafts action', () => {
     expect(useProjectStore.getState().artistImagesStalled).toBe(false)
   })
 
-  it('also clears on 409 (drafts already queued = progress)', async () => {
+  it('이미 작업이 대기 중이면 실패와 멈춤 표시를 지운다 (진행 중)', async () => {
     useProjectStore.setState({ projectId: 'project-1', artistImagesFailed: true, artistImagesStalled: true })
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: false, status: 409 } as Response)
 
@@ -190,7 +191,7 @@ describe('retryArtistDrafts action', () => {
     expect(useProjectStore.getState().artistImagesStalled).toBe(false)
   })
 
-  it('keeps the CTA (does not clear) on quota/other errors', async () => {
+  it('한도 초과나 다른 오류가 나면 실패와 멈춤 안내를 유지한다', async () => {
     useProjectStore.setState({ projectId: 'project-1', artistImagesFailed: true, artistImagesStalled: true })
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: false, status: 429 } as Response)
 
@@ -200,7 +201,7 @@ describe('retryArtistDrafts action', () => {
     expect(useProjectStore.getState().artistImagesStalled).toBe(true)
   })
 
-  it('no-ops without a projectId', async () => {
+  it('프로젝트를 고르지 않았으면 재시도를 요청하지 않는다', async () => {
     useProjectStore.setState({ projectId: null, artistImagesFailed: true })
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
 

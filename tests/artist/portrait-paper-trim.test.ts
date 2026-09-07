@@ -1,3 +1,4 @@
+// 가장자리의 종이 띠만 잘라내고 그림 배경은 보존한다 (#portrait-paper-trim 2026-08-26)
 import { describe, it, expect } from 'vitest'
 import sharp from 'sharp'
 import { trimFlatPaperEdges } from '@/lib/artist/portrait'
@@ -35,8 +36,8 @@ async function dims(buf: Buffer): Promise<{ w: number; h: number }> {
   return { w: m.width ?? 0, h: m.height ?? 0 }
 }
 
-describe('trimFlatPaperEdges — 종이 띠 + 보더 라인만 걷는다', () => {
-  it('우측 [보더 2px + 종이 15px]·상단 종이 6px 가 걷힌다 (실측 모사)', async () => {
+describe('trimFlatPaperEdges — 종이 띠와 테두리 선만 걷어낸다', () => {
+  it('우측 테두리 선 2px와 종이 15px, 상단 종이 6px를 걷어낸다 (실측 모사)', async () => {
     const buf = await synth({ w: 320, h: 210, rightPaper: 15, rightBorder: 2, topPaper: 6 })
     const out = await trimFlatPaperEdges(buf)
     const d = await dims(out)

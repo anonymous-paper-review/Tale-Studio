@@ -1,3 +1,4 @@
+// 저장할 수 없는 오류는 곧바로 멈추고, 잠시 뒤 해결될 오류만 다시 시도한다 (#editor-save-500 2026-08-07)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { scheduleServerSave } from '@/stores/editor-store'
 import type { PersistedEditor } from '@/lib/editor-persistence'
@@ -37,8 +38,8 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('scheduleServerSave 재시도 분류', () => {
-  it('410(삭제된 프로젝트)은 1회 시도 후 중단 — 5초 재시도 루프 없음', async () => {
+describe('저장 실패 상황별 약속', () => {
+  it('삭제된 프로젝트에 저장하려 하면 한 번만 시도하고 바로 멈춘다', async () => {
     fetchMock.mockResolvedValue(jsonResponse(410, { error: 'project no longer exists' }))
 
     scheduleServerSave('proj-fatal', snapshot, 0)
@@ -56,7 +57,7 @@ describe('scheduleServerSave 재시도 분류', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('500(일시 장애)은 3회 백오프 후 5초 뒤 재시도 사이클 지속', async () => {
+  it('잠시 장애가 생기면 몇 차례 다시 시도하고 다음 저장도 이어간다', async () => {
     fetchMock.mockResolvedValue(jsonResponse(500, { error: 'db hiccup' }))
 
     scheduleServerSave('proj-retry', snapshot, 0)
@@ -69,7 +70,7 @@ describe('scheduleServerSave 재시도 분류', () => {
     expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(4)
   })
 
-  it('성공하면 스냅샷을 비우고 멈춘다', async () => {
+  it('저장에 성공하면 같은 내용을 다시 보내지 않는다', async () => {
     fetchMock.mockResolvedValue(jsonResponse(200, { ok: true }))
 
     scheduleServerSave('proj-ok', snapshot, 0)

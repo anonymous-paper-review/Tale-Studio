@@ -1,3 +1,4 @@
+// 내보내기 전에 예상 용량과 대상 단계를 알려 주고, 큰 작업은 확인을 거친다
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -58,8 +59,8 @@ beforeEach(() => {
   vi.resetAllMocks()
 })
 
-describe('export-menu pure helpers', () => {
-  it('maps current project stages to export stages', () => {
+describe('내보내기 도움 기능', () => {
+  it('현재 화면의 단계를 내보낼 단계로 올바르게 연결한다', () => {
     expect(resolveExportStage('producer')).toBe('producer')
     expect(resolveExportStage('writer')).toBe('writer')
     expect(resolveExportStage('artist')).toBe('artist')
@@ -70,7 +71,7 @@ describe('export-menu pure helpers', () => {
     expect(resolveExportStage(undefined)).toBeNull()
   })
 
-  it('estimates bytes from positive per-kind file counts only', () => {
+  it('자료 종류별 개수로 예상 용량을 계산하고 잘못된 개수는 세지 않는다', () => {
     const imageBytes = estimateExportBytes({ image: 1 })
     const videoBytes = estimateExportBytes({ video: 1 })
     const audioBytes = estimateExportBytes({ audio: 1 })
@@ -85,7 +86,7 @@ describe('export-menu pure helpers', () => {
     expect(estimateExportBytes({ image: 0, video: -1, audio: Number.NaN })).toBe(0)
   })
 
-  it('requires confirmation only at the large export threshold', () => {
+  it('예상 용량이 큰 작업일 때만 한 번 더 확인한다', () => {
     expect(LARGE_EXPORT_CONFIRM_BYTES).toBeGreaterThanOrEqual(300 * MB)
     expect(LARGE_EXPORT_CONFIRM_BYTES).toBeLessThanOrEqual(400 * MB)
 
@@ -96,8 +97,8 @@ describe('export-menu pure helpers', () => {
   })
 })
 
-describe('whole-project size estimation', () => {
-  it('marks the estimate unknown when a database query fails so export uses its confirmation fail-safe', async () => {
+describe('전체 프로젝트의 내보내기 크기를 가늠한다', () => {
+  it('저장된 자료를 확인할 수 없으면 예상치를 알 수 없음으로 표시해 안전하게 확인을 요구한다', async () => {
     mocks.createClient.mockReturnValue({
       from: vi.fn(() => query({ data: null, error: { message: 'database unavailable' } })),
     })
@@ -107,7 +108,7 @@ describe('whole-project size estimation', () => {
       known: false,
     })
   })
-  it('counts the default appearance sheet and portrait, not legacy character views', async () => {
+  it('기본 인물의 인물표와 초상화만 세고 예전 보기 자료는 세지 않는다', async () => {
     const appearanceQuery = query({ data: [{ sheet_url: 'sheet.png', portrait_url: 'portrait.png' }], error: null })
     mocks.createClient.mockReturnValue({
       from: vi.fn((table: string) => {

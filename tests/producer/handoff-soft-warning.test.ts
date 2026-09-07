@@ -1,3 +1,4 @@
+// 필수 정보가 빠지면 진행을 막고, 선택 정보가 빠지면 품질 경고와 함께 다음 단계로 넘긴다 (#b 2026-08-28 오너 확정)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ProjectSettings } from '@/types'
 import type { BackgroundSource } from '@/lib/producer-gate'
@@ -56,8 +57,8 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('handoff hard blockers stay unchanged', () => {
-  it('producer → writer still blocks when a hard field (background) is missing', async () => {
+describe('필수 정보가 없으면 다음 단계로 넘기지 않는다', () => {
+  it('필수 배경 정보가 없으면 Writer로 넘기지 않는다', async () => {
     useProducerStore.setState({
       storyText: '스토리',
       storyReady: true,
@@ -76,8 +77,8 @@ describe('handoff hard blockers stay unchanged', () => {
   })
 })
 
-describe('handoff soft blockers warn but still proceed', () => {
-  it('producer → writer: missing subGenre/tone(soft) still offers the handoff proposal with a quality warning', async () => {
+describe('선택 정보가 없으면 경고를 보여주고도 다음 단계로 넘긴다', () => {
+  it('장르 설명과 분위기가 비어 있어도 품질 경고와 함께 Writer로 넘기기를 제안한다', async () => {
     useProducerStore.setState({
       storyText: '스토리',
       storyReady: true,
@@ -96,7 +97,7 @@ describe('handoff soft blockers warn but still proceed', () => {
     expect(proposal?.impact.join(' ')).toMatch(/Quality may suffer|퀄리티/)
   })
 
-  it('writer → artist: no scenes/shots (soft) still hands off with a quality warning in the reply', async () => {
+  it('장면 정보가 없어도 품질 경고를 보여주며 Artist로 넘긴다', async () => {
     useProjectStore.setState({ currentStage: 'writer', reachedStage: 'writer' })
     useWriterStore.setState({
       sceneManifest: { scenes: [], characters: [], locations: [] },
@@ -112,7 +113,7 @@ describe('handoff soft blockers warn but still proceed', () => {
     expect(useProjectStore.getState().currentStage).toBe('artist')
   })
 
-  it('artist → director: a character whose sheet exists hands off without a back/side-view warning (약속 C9 2026-09-04)', async () => {
+  it('인물의 기본 모습이 있으면 뒷모습·측면 경고 없이 Director로 넘긴다 (약속 C9 2026-09-04)', async () => {
     useProjectStore.setState({ currentStage: 'artist', reachedStage: 'artist' })
     useProjectStore.setState({
       lifecycleStatus: {

@@ -1,3 +1,4 @@
+// 룩이 확정되기 전 만든 캐릭터와 이미지 없는 Writer 캐릭터를 다시 만들고, 최신 결과는 건드리지 않는다
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useArtistStore } from '@/stores/artist-store'
 import { computeImageSourceHash, computeLookFingerprint } from '@/lib/image-provenance'
@@ -41,7 +42,7 @@ describe('refreshLookPendingDrafts', () => {
     useArtistStore.setState({ characterAssets: [] })
   })
 
-  it('look-pending 초안 + writer-무이미지만 main 재생성, fresh/producer-무이미지 제외', async () => {
+  it('룩이 확정되기 전 만든 캐릭터와 Writer가 추가한 이미지 없는 캐릭터만 다시 만든다', async () => {
     const calls: Array<[string, string, string]> = []
     // generateCharacterView 스텁 — 실제 fetch 대신 호출 기록.
     useArtistStore.setState({
@@ -77,7 +78,7 @@ describe('refreshLookPendingDrafts', () => {
     expect(calls.every((c) => c[1] === 'current' && c[2] === 'main')).toBe(true)
   })
 
-  it('대상 없으면 아무 것도 호출 안 함', async () => {
+  it('다시 만들 대상이 없으면 결과를 바꾸지 않는다', async () => {
     const fn = vi.fn(async () => {})
     useArtistStore.setState({
       generateCharacterView: fn as never,

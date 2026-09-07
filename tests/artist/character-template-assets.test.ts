@@ -1,3 +1,4 @@
+// 캐릭터 양식 그림이 정해진 칸과 크기를 지켜 안정적으로 쓰인다
 import { describe, it, expect } from 'vitest'
 import { existsSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
@@ -101,16 +102,16 @@ async function renderTemplate(): Promise<Buffer> {
   return sharp(base).composite([{ input: Buffer.from(svg), left: 0, top: 0 }]).png().toBuffer()
 }
 
-describe('character template v3 — 스펙↔PNG 정합 (#f8)', () => {
+describe('캐릭터 양식 v3 그림이 정해진 모습과 맞는다 (#f8)', () => {
   it.runIf(process.env.GENERATE_CHARACTER_TEMPLATE === '1')(
-    '생성기: 스펙에서 v3 템플릿을 그려 public/ 에 쓴다',
+    '필요한 설정을 켜면 v3 캐릭터 양식을 만들어 보관한다',
     async () => {
       await writeFile(TEMPLATE_PATH, await renderTemplate())
     },
     60_000,
   )
 
-  it('커밋된 템플릿 존재 + 치수 = 스펙 캔버스', async () => {
+  it('캐릭터 양식 그림이 있고 정해진 크기와 일치한다', async () => {
     expect(existsSync(TEMPLATE_PATH)).toBe(true)
     const meta = await sharp(await readFile(TEMPLATE_PATH)).metadata()
     expect({ w: meta.width, h: meta.height }).toEqual({
@@ -119,7 +120,7 @@ describe('character template v3 — 스펙↔PNG 정합 (#f8)', () => {
     })
   })
 
-  it('타일이 캔버스 안에 있고 서로 겹치지 않는다 (정형 타일 불변식)', () => {
+  it('모든 칸이 전체 그림 안에 들어오고 서로 겹치지 않는다', () => {
     const { canvas, portrait, expressions, palette, turnaround, poses, details } =
       CHARACTER_SHEET_SPEC
     const boxes: SheetBox[] = [portrait, ...expressions, palette, turnaround, ...poses, ...details]
@@ -140,7 +141,7 @@ describe('character template v3 — 스펙↔PNG 정합 (#f8)', () => {
     }
   })
 
-  it('포트레이트 크롭 좌표가 스펙 파생값과 일치한다 (v3 — v2 시트에 쓰지 말 것)', () => {
+  it('대표 얼굴 영역이 정해진 위치와 맞는다 (v3, v2 양식에는 쓰지 말 것)', () => {
     expect(TURNAROUND_PORTRAIT_REGION).toEqual(portraitRegionOfSpec())
   })
 })

@@ -1,3 +1,4 @@
+// 인물의 모습은 고른 항목만 바꾸고, 기본 모습과 접근 권한을 지킨다
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { requireDefaultAppearanceKey, useArtistStore } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
@@ -48,13 +49,13 @@ const character: CharacterAsset = {
   ],
 }
 
-describe('character appearance generation identity', () => {
+describe('인물 모습을 만들 때 고른 모습의 정체성을 지킨다', () => {
   beforeEach(() => {
     useProjectStore.setState({ projectId: 'project-1' })
     useArtistStore.setState({ characterAssets: [character], generatingViews: [], error: null })
   })
 
-  it('sends young explicitly without using current sheet or key', async () => {
+  it('젊은 모습을 고르면 현재 모습이 아닌 젊은 모습으로 만든다', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ deduped: true }) })
     vi.stubGlobal('fetch', fetchMock)
 
@@ -69,7 +70,7 @@ describe('character appearance generation identity', () => {
     expect(useArtistStore.getState().characterAssets[0].appearances[0].sheetUrl).toBe('current-sheet')
   })
 
-  it('rejects a missing appearance key before making a request', async () => {
+  it('모습을 고르지 않으면 만들지 않고 알려준다', async () => {
     const fetchMock = vi.fn()
     vi.stubGlobal('fetch', fetchMock)
 
@@ -77,7 +78,7 @@ describe('character appearance generation identity', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('resolves only one declared default appearance for automatic callers', () => {
+  it('자동으로 만들 때 기본 모습은 하나만 정해져야 한다', () => {
     expect(requireDefaultAppearanceKey(character)).toBe('current')
     expect(() =>
       requireDefaultAppearanceKey({
@@ -90,7 +91,7 @@ describe('character appearance generation identity', () => {
     ).toThrow('requires exactly one default appearance')
   })
 
-  it('patches only the explicitly selected appearance', async () => {
+  it('고른 모습만 바꾸고 다른 모습은 그대로 둔다', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
@@ -128,7 +129,7 @@ describe('PATCH /api/artist/character-appearance', () => {
     routeMocks.from.mockReset()
   })
 
-  it('updates exactly the selected appearance row', async () => {
+  it('고른 모습 하나만 바꾼다', async () => {
     // 약속 C8(2026-09-04) 뒤 PATCH 는 먼저 대상 행을 읽고(select…maybeSingle) 그다음 update 한다 — 한 체인 모의로 둘 다 받는다.
     const chain: Record<string, unknown> = {}
     const eq = vi.fn(() => chain)
@@ -174,7 +175,7 @@ describe('PATCH /api/artist/character-appearance', () => {
     })
   })
 
-  it('does not update when project access is denied', async () => {
+  it('접근 권한이 없으면 모습을 바꾸지 않는다', async () => {
     routeMocks.requireProjectAccess.mockResolvedValue({
       ok: false,
       response: new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 }),
@@ -213,7 +214,7 @@ describe('POST /api/artist/character canonical writes', () => {
     routeMocks.rpc.mockReset()
   })
 
-  it('creates a person and its current appearance atomically through the RPC', async () => {
+  it('사람을 만들면 현재 모습을 함께 저장한다', async () => {
     routeMocks.rpc.mockResolvedValue({
       data: { character_id: 'char_3', appearance_key: 'current' },
       error: null,
@@ -249,7 +250,7 @@ describe('POST /api/artist/character canonical writes', () => {
     expect(routeMocks.from).not.toHaveBeenCalledWith('characters')
   })
 
-  it('creates an object only in props', async () => {
+  it('소품을 만들면 소품 목록에만 저장한다', async () => {
     const single = vi.fn().mockResolvedValue({ data: { prop_id: 'prop_1' }, error: null })
     const select = vi.fn().mockReturnValue({ single })
     const insert = vi.fn().mockReturnValue({ select })

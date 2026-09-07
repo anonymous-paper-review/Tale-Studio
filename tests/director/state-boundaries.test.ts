@@ -1,3 +1,4 @@
+// 영상 생성과 최종 선택이 겹쳐도 이전 결과를 지키고 최신 상태를 정확히 반영한다
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const dbMocks = vi.hoisted(() => ({ createClient: vi.fn() }))
@@ -109,8 +110,8 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('director media state boundaries', () => {
-  it('keeps a prior successful take playable when a later canonical reconciliation fails', () => {
+describe('영상 결과와 생성 상태의 약속', () => {
+  it('이전 영상이 성공했으면 뒤의 저장 확인이 실패해도 계속 재생한다', () => {
     const prior = take({ id: 'prior', take_number: 1 })
     const failedReconciliation = take({
       id: 'retry',
@@ -128,7 +129,7 @@ describe('director media state boundaries', () => {
     )
   })
 
-  it('projects the newest attempt independently from Final intent', () => {
+  it('새 생성 시도가 있어도 최종으로 고른 영상은 따로 지킨다', () => {
     const finalOlderTake = take({ id: 'final', take_number: 1, is_final: true })
     const newerAttempt = take({
       id: 'new',
@@ -142,7 +143,7 @@ describe('director media state boundaries', () => {
     expect(selectLatestAttempt([finalOlderTake, newerAttempt])?.id).toBe('new')
     expect(selectNewestSuccessfulTake([finalOlderTake, newerAttempt])?.id).toBe('final')
   })
-  it('preserves contradictory canonical failure status even when a legacy row retains a URL', () => {
+  it('실패한 생성은 이전 영상 주소가 남아 있어도 실패로 표시한다', () => {
     expect(
       hydratedVideoStatus({
         id: 'take-1',
@@ -191,7 +192,7 @@ describe('director media state boundaries', () => {
     ).toBe('generating')
   })
 
-  it('only replays a structurally signed recovery receipt for the active attempt', () => {
+  it('현재 생성 시도에 맞는 복구 증표만 다시 사용한다', () => {
     const response = { retryable: true, recoveryReceipt: 'payload.signature' }
 
     expect(canRecoverGenerationAttempt(response, 0, true)).toBe(true)
@@ -261,8 +262,8 @@ function hydratedTake(overrides: Record<string, unknown> = {}) {
   }
 }
 
-describe('video generation orchestration boundaries', () => {
-  it('reserves one new take while a same-shot generation is in flight and releases the lock', async () => {
+describe('영상 생성 흐름의 약속', () => {
+  it('같은 장면에서 영상 생성 중이면 새 영상을 겹쳐 만들지 않고 끝나면 다시 만들 수 있다', async () => {
     const store = useDirectorCanvasStore.getState()
     const sceneId = store.addSceneNode({ x: 0, y: 0 }, 'Scene')
     const shotId = store.addShotNode(sceneId, { x: 100, y: 0 }, 'Shot')
@@ -293,7 +294,7 @@ describe('video generation orchestration boundaries', () => {
     expect(fetch).toHaveBeenCalledTimes(2)
   })
 
-  it('prevents simultaneous regeneration of the same take', async () => {
+  it('같은 영상을 다시 만들 때 동시에 두 번 진행하지 않는다', async () => {
     const { videoId } = generationTestVideo()
     let resolveRequest!: (response: Response) => void
     const request = new Promise<Response>((resolve) => {
@@ -312,7 +313,7 @@ describe('video generation orchestration boundaries', () => {
     expect(fetch).toHaveBeenCalledTimes(2)
   })
 
-  it('retains an unsaved generating take when an older hydration snapshot commits', async () => {
+  it('아직 저장되지 않은 생성 중 영상은 오래된 저장 내용이 반영돼도 유지한다', async () => {
     const store = useDirectorCanvasStore.getState()
     useDirectorCanvasStore.setState({ projectId: 'project-1' })
     const sceneId = store.addSceneNode({ x: 0, y: 0 }, 'Scene')
@@ -334,7 +335,7 @@ describe('video generation orchestration boundaries', () => {
     )
   })
 
-  it('preserves a newer local attempt identity over a stale persisted clip snapshot', async () => {
+  it('새로 시작한 영상 생성 정보는 오래된 저장 내용으로 덮어쓰지 않는다', async () => {
     const store = useDirectorCanvasStore.getState()
     useDirectorCanvasStore.setState({ projectId: 'project-1' })
     const sceneId = store.addSceneNode({ x: 0, y: 0 }, 'Scene')
@@ -366,7 +367,7 @@ describe('video generation orchestration boundaries', () => {
       status: 'completed',
     })
   })
-  it('replaces an older local generating attempt with a newer canonical terminal attempt', async () => {
+  it('서버에 끝난 새 생성 결과가 있으면 예전 생성 중 표시를 새 결과로 바꾼다', async () => {
     const store = useDirectorCanvasStore.getState()
     useDirectorCanvasStore.setState({ projectId: 'project-1' })
     const sceneId = store.addSceneNode({ x: 0, y: 0 }, 'Scene')
@@ -401,7 +402,7 @@ describe('video generation orchestration boundaries', () => {
     expect(isVideoData(node.data) && node.data.lastAttemptStatus).toBe('completed')
   })
 
-  it('preserves storyboard mutations made after hydration starts', async () => {
+  it('불러오는 동안 바꾼 스토리보드 내용은 불러오기가 끝나도 지킨다', async () => {
     const store = useDirectorCanvasStore.getState()
     useDirectorCanvasStore.setState({ projectId: 'project-1' })
     const sceneId = store.addSceneNode({ x: 0, y: 0 }, 'Scene')
@@ -458,7 +459,7 @@ describe('video generation orchestration boundaries', () => {
       !isVideoData(node.data) && node.data.kind === 'shot' && node.data.storyboardImage?.url,
     ).toBe('https://media.example/local-after-start.png')
   })
-  it('accepts a newer persisted attempt over an older non-generating local identity', async () => {
+  it('저장된 새 생성 결과가 있으면 예전 로컬 상태보다 우선한다', async () => {
     const store = useDirectorCanvasStore.getState()
     useDirectorCanvasStore.setState({ projectId: 'project-1' })
     const sceneId = store.addSceneNode({ x: 0, y: 0 }, 'Scene')
@@ -492,7 +493,7 @@ describe('video generation orchestration boundaries', () => {
     expect(isVideoData(node.data) && node.data.generationJobId).toBe('newer-persisted-attempt')
     expect(isVideoData(node.data) && node.data.lastAttemptStatus).toBe('completed')
   })
-  it('replays a signed recovery receipt and reaches a completed polling terminal state', async () => {
+  it('유효한 복구 증표로 다시 이어가면 완료된 영상까지 확인한다', async () => {
     vi.useFakeTimers()
     const { videoId } = generationTestVideo()
     const fetch = vi
@@ -518,7 +519,7 @@ describe('video generation orchestration boundaries', () => {
     })
   })
 
-  it('sends manually wired START/REF/END images with aligned roles', async () => {
+  it('직접 연결한 시작·참조·끝 화면은 역할에 맞게 보낸다', async () => {
     vi.useFakeTimers()
     const store = useDirectorCanvasStore.getState()
     useDirectorCanvasStore.setState({
@@ -576,7 +577,7 @@ describe('video generation orchestration boundaries', () => {
     expect(body.referenceImageUrls).not.toContain('https://media.example/source-direction.png')
   })
 
-  it('uses a previous Video last frame as the target START image without sending video input', async () => {
+  it('이전 영상의 마지막 화면을 다음 영상의 시작으로 쓰고 영상 자체는 보내지 않는다', async () => {
     vi.useFakeTimers()
     const store = useDirectorCanvasStore.getState()
     useDirectorCanvasStore.setState({
@@ -631,7 +632,7 @@ describe('video generation orchestration boundaries', () => {
     vi.useRealTimers()
   })
 
-  it('does not fall back to T2V when a configured video chain has no frame', async () => {
+  it('영상 연결에 필요한 화면이 없으면 생성 요청을 보내지 않는다', async () => {
     const store = useDirectorCanvasStore.getState()
     const { videoId } = generationTestVideo()
     store.updateNodeData<'video'>(videoId, {
@@ -649,7 +650,7 @@ describe('video generation orchestration boundaries', () => {
     )
   })
 
-  it('sends wired Shot image references to storyboard I2I without leaking node IDs', async () => {
+  it('연결한 장면의 그림으로 새 스토리보드를 만들고 내부 식별자는 외부에 보내지 않는다', async () => {
     const store = useDirectorCanvasStore.getState()
     useDirectorCanvasStore.setState({
       projectId: 'project-1',
@@ -689,7 +690,7 @@ describe('video generation orchestration boundaries', () => {
     expect(body.referenceImageUrls).not.toContain(sourceShotId)
   })
 
-  it('stops signed recovery when the attempt is stale', async () => {
+  it('지난 생성 시도의 복구는 새 시도가 시작되면 멈춘다', async () => {
     vi.useFakeTimers()
     const { videoId } = generationTestVideo()
     const fetch = vi.fn().mockResolvedValue(jsonResponse({ retryable: true, recoveryReceipt: 'payload.signature' }, 409))
@@ -705,7 +706,7 @@ describe('video generation orchestration boundaries', () => {
     vi.useRealTimers()
   })
 
-  it('exhausts signed recovery retries without polling', async () => {
+  it('복구를 정해진 횟수만큼 시도해도 안 되면 상태 확인을 계속하지 않는다', async () => {
     vi.useFakeTimers()
     const { videoId } = generationTestVideo()
     const fetch = vi.fn().mockImplementation(() => Promise.resolve(
@@ -730,7 +731,7 @@ describe('video generation orchestration boundaries', () => {
     const node = useDirectorCanvasStore.getState().nodes.find((candidate) => candidate.id === videoId)!
     expect(isVideoData(node.data) && node.data.lastAttemptStatus).toBe('failed')
   })
-  it('fails a malformed successful generation response without losing the provisional attempt identity', async () => {
+  it('성공 응답 형식이 잘못되면 실패로 표시하되 새 생성 시도 정보는 남긴다', async () => {
     const { videoId } = generationTestVideo()
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ status: 'queued' })))
 
@@ -741,7 +742,7 @@ describe('video generation orchestration boundaries', () => {
     expect(isVideoData(node.data) && node.data.generationJobId).toBeTruthy()
   })
 
-  it('records failed polling terminal state and releases its shot reservation', async () => {
+  it('상태 확인이 실패하면 영상 생성을 실패로 기록하고 같은 장면을 다시 만들 수 있게 한다', async () => {
     const { videoId } = generationTestVideo()
     const fetch = vi
       .fn()
@@ -759,8 +760,8 @@ describe('video generation orchestration boundaries', () => {
     expect(fetch).toHaveBeenCalledTimes(3)
   })
 })
-describe('Final mutation recovery boundaries', () => {
-  it('rolls back the optimistic sibling Final flags when PATCH and hydration both fail', async () => {
+describe('최종 영상 선택을 되돌리는 약속', () => {
+  it('최종 영상을 바꾸다 실패하면 기존 선택을 되돌린다', async () => {
     const { first, second } = finalTestVideos()
     useDirectorCanvasStore.getState().updateNodeData<'video'>(first, { final: true })
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('PATCH unavailable')))
@@ -776,7 +777,7 @@ describe('Final mutation recovery boundaries', () => {
     expect(useDirectorCanvasStore.getState().generationErrors[second]).toContain('PATCH unavailable')
   })
 
-  it('does not let an older rejected Final intent overwrite the newest sibling intent', async () => {
+  it('오래된 최종 선택 실패가 새 선택을 덮어쓰지 않는다', async () => {
     const { first, second } = finalTestVideos()
     let resolveFirst!: (response: Response) => void
     const firstRequest = new Promise<Response>((resolve) => {
@@ -804,7 +805,7 @@ describe('Final mutation recovery boundaries', () => {
       ['/api/director/video-takes/clip-2', { projectId: 'project-1', is_final: true }],
     ])
   })
-  it('reconciles a rejected latest Final PATCH to canonical flags and leaves its queue reusable', async () => {
+  it('최종 영상 선택이 거절돼도 실제 선택을 다시 맞추고 다음 선택을 할 수 있다', async () => {
     const { first, second } = finalTestVideos()
     const fetch = vi
       .fn()
@@ -836,7 +837,7 @@ describe('Final mutation recovery boundaries', () => {
     expect(finalFlags(first, second)).toEqual([false, true])
   })
 
-  it('cleans a rejected Final queue entry without a detached rejecting promise', async () => {
+  it('실패한 최종 선택 요청을 정리하고 다음 요청을 막지 않는다', async () => {
     const { first, second } = finalTestVideos()
     const fetch = vi
       .fn()

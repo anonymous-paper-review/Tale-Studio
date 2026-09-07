@@ -1,3 +1,4 @@
+// 선택한 스타일을 그림에 알맞게 반영하고, 사용할 수 없는 스타일은 안전하게 건너뛴다
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -56,7 +57,7 @@ afterEach(() => {
 })
 
 describe('applyStyleAnchor', () => {
-  it('returns the same object reference for null anchors in every mode', () => {
+  it('스타일이 없으면 모든 방식에서 기존 내용을 그대로 돌려준다', () => {
     const base: AnchorableSubmit = {
       prompt: 'Base prompt',
       reference_image_urls: ['https://cdn.test/base.png'],
@@ -69,13 +70,13 @@ describe('applyStyleAnchor', () => {
     expect(applyStyleAnchor(null, base, 'turnaround', { pinAspectRatio: '16:9' })).toBe(base)
   })
 
-  it('exports the exact style anchor clause strings', () => {
+  it('스타일 안내 문구를 정해진 내용 그대로 제공한다', () => {
     expect(STYLE_ANCHOR_CLAUSE).toBe(STYLE_CLAUSE)
     expect(STYLE_ANCHOR_MULTIREF_CLAUSE).toBe(MULTIREF_CLAUSE)
     expect(STYLE_ANCHOR_TEMPLATE_CLAUSE).toBe(TEMPLATE_CLAUSE)
   })
 
-  it('assembles the prompt clause matrix by mode', () => {
+  it('그림 종류에 따라 스타일 안내와 참고 자료 설명을 알맞게 붙인다', () => {
     const prompt = 'Render Mira on the rooftop.'
 
     const single = applyStyleAnchor(anchor, { prompt, aspect_ratio: '16:9' }, 'single')
@@ -94,7 +95,7 @@ describe('applyStyleAnchor', () => {
     expect(multiref.prompt).not.toContain(STYLE_ANCHOR_TEMPLATE_CLAUSE)
   })
 
-  it('prepends anchor references while preserving existing reference order', () => {
+  it('스타일 참고 이미지를 먼저 두고 기존 참고 이미지 순서를 지킨다', () => {
     const withRefs = applyStyleAnchor(
       anchor,
       {
@@ -114,7 +115,7 @@ describe('applyStyleAnchor', () => {
     expect(withoutRefs.reference_image_urls).toEqual([anchor.imageUrl])
   })
 
-  it('pins aspect ratio only when needed and warns when single mode has no ratio source', () => {
+  it('필요할 때만 화면 비율을 고정하고 비율 정보가 없으면 알린다', () => {
     const base: AnchorableSubmit = { prompt: 'Turnaround template prompt' }
     const pinned = applyStyleAnchor(anchor, base, 'turnaround', { pinAspectRatio: '16:9' })
     const explicit = applyStyleAnchor(
@@ -159,13 +160,13 @@ describe('applyStyleAnchor', () => {
       base: { prompt: 'Base prompt', aspect_ratio: '1:1', model: 'fal-ai/flux/ip-adapter' },
       expectedModel: 'fal-ai/flux/ip-adapter',
     },
-  ])('$name', ({ base, expectedModel }) => {
+  ])('$name인 상황이면 알맞은 그림 방식을 선택한다', ({ base, expectedModel }) => {
     expect(applyStyleAnchor(anchor, base, 'single').model).toBe(expectedModel)
   })
 })
 
 describe('resolveStyleAnchorByKey', () => {
-  it('returns null for empty keys without querying', async () => {
+  it('스타일 이름이 없으면 목록을 확인하지 않고 비워 둔다', async () => {
     await expect(resolveStyleAnchorByKey(null)).resolves.toBeNull()
     await expect(resolveStyleAnchorByKey(undefined)).resolves.toBeNull()
     await expect(resolveStyleAnchorByKey('')).resolves.toBeNull()
@@ -173,7 +174,7 @@ describe('resolveStyleAnchorByKey', () => {
     expect(mocks.from).not.toHaveBeenCalled()
   })
 
-  it('resolves and caches an active style anchor row', async () => {
+  it('사용 가능한 스타일을 찾으면 다음에도 바로 쓸 수 있게 기억한다', async () => {
     mocks.maybeSingle.mockResolvedValueOnce({ data: styleRow(), error: null })
 
     await expect(resolveStyleAnchorByKey('jp_anime')).resolves.toEqual({
@@ -192,19 +193,19 @@ describe('resolveStyleAnchorByKey', () => {
     expect(mocks.eq).toHaveBeenCalledWith('key', 'jp_anime')
   })
 
-  it('returns null for inactive rows', async () => {
+  it('사용 중지된 스타일은 찾지 못한 것으로 처리한다', async () => {
     mocks.maybeSingle.mockResolvedValueOnce({ data: styleRow({ is_active: false }), error: null })
 
     await expect(resolveStyleAnchorByKey('jp_anime')).resolves.toBeNull()
   })
 
-  it('returns null for missing rows', async () => {
+  it('없는 스타일은 찾지 못한 것으로 처리한다', async () => {
     mocks.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
 
     await expect(resolveStyleAnchorByKey('jp_anime')).resolves.toBeNull()
   })
 
-  it('returns null for query errors', async () => {
+  it('스타일 목록을 확인하지 못하면 찾지 못한 것으로 처리한다', async () => {
     const error = { message: 'permission denied' }
     mocks.maybeSingle.mockResolvedValueOnce({ data: null, error })
 
@@ -212,7 +213,7 @@ describe('resolveStyleAnchorByKey', () => {
     expect(console.warn).toHaveBeenCalledWith('[style-anchor] resolve failed', error)
   })
 
-  it('returns null and warns when the query throws', async () => {
+  it('스타일 목록을 확인하는 중 문제가 생기면 찾지 못한 것으로 처리하고 알린다', async () => {
     const error = new Error('network down')
     mocks.maybeSingle.mockRejectedValueOnce(error)
 
@@ -220,7 +221,7 @@ describe('resolveStyleAnchorByKey', () => {
     expect(console.warn).toHaveBeenCalledWith('[style-anchor] resolve failed', error)
   })
 
-  it('uses a positive cache hit without re-querying', async () => {
+  it('이미 찾은 사용 가능한 스타일은 다시 확인하지 않고 바로 쓴다', async () => {
     mocks.maybeSingle.mockResolvedValueOnce({ data: styleRow(), error: null })
 
     await expect(resolveStyleAnchorByKey('jp_anime')).resolves.toEqual({
@@ -248,7 +249,7 @@ describe('resolveStyleAnchorByKey', () => {
     expect(mocks.maybeSingle).toHaveBeenCalledTimes(1)
   })
 
-  it('re-queries after the positive cache TTL expires', async () => {
+  it('기억해 둔 유효 시간이 지나면 스타일을 다시 확인한다', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-07-13T00:00:00.000Z'))
     mocks.maybeSingle
@@ -286,7 +287,7 @@ describe('resolveStyleAnchorByKey', () => {
   it.each([
     ['missing', { data: null, error: null }],
     ['inactive', { data: styleRow({ is_active: false }), error: null }],
-  ])('does not cache %s results', async (_name, firstResult) => {
+  ])('없는 스타일 상태인 %s는 기억해 두지 않는다', async (_name, firstResult) => {
     mocks.maybeSingle
       .mockResolvedValueOnce(firstResult)
       .mockResolvedValueOnce({ data: styleRow(), error: null })

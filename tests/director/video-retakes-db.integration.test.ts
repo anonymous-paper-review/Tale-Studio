@@ -1,3 +1,4 @@
+// 영상 다시 만들기 약속이 실제 저장 정보에도 빠짐없이 지켜진다
 import { readFileSync } from 'node:fs'
 import { Client, type QueryResultRow } from 'pg'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -59,13 +60,13 @@ async function reserveNewTake(ids: { workspace_id: string, project_id: string, s
   )
 }
 
-describeDatabase('director video retakes database integration', () => {
+describeDatabase('영상 다시 만들기 약속이 실제 저장 정보에도 지켜진다', () => {
   beforeEach(async () => {
     client = new Client({ connectionString: databaseUrl })
     await client.connect()
     await query('begin')
   })
-  it('rejects non-object reservation snapshots before normalization', async () => {
+  it('영상 다시 만들기 요청의 설정이 올바른 모양이 아니면 처음부터 거절한다', async () => {
     const ids = await fixture()
     const target = JSON.stringify({ retakeMode: 'new_take', writerShotId: ids.shot_id, workspaceId: ids.workspace_id })
     await expectQueryError(
@@ -98,7 +99,7 @@ describeDatabase('director video retakes database integration', () => {
     )
   })
 
-  it('projects each live clip newest linked attempt job', async () => {
+  it('현재 영상은 가장 최근 시도의 결과를 보여준다', async () => {
     const ids = await fixture()
     const first = await reserveNewTake(ids)
     const initial = await query<{ last_attempt_job_id: string | null }>(
@@ -124,7 +125,7 @@ describeDatabase('director video retakes database integration', () => {
     )
     expect(latest.rows[0].last_attempt_job_id).toBe(regeneration.rows[0].job_id)
   })
-  it('atomically merges submission resolution and returns false after reservation CAS loss', async () => {
+  it('제출 결과를 합칠 때 기존 내용은 보존하고 요청이 바뀌면 반영하지 않는다', async () => {
     const ids = await fixture()
     const reserved = await reserveNewTake(ids)
     await query(
@@ -151,7 +152,7 @@ describeDatabase('director video retakes database integration', () => {
     )
     expect(casMiss.rows[0].record_director_video_submission_resolution).toBe(false)
   })
-  it('scopes regeneration replay keys to the clip and preserves new-take network replay identity', async () => {
+  it('같은 다시 만들기 요청은 영상별로 한 번만 처리하고 새 영상 요청은 같은 결과를 돌려준다', async () => {
     const ids = await fixture()
     const operationKey = crypto.randomUUID()
     const first = await reserveNewTake(ids, operationKey)
@@ -200,7 +201,7 @@ describeDatabase('director video retakes database integration', () => {
     expect(firstReplay.rows[0]).toMatchObject({ job_id: firstRegeneration.rows[0].job_id, replayed: true })
     expect(secondReplay.rows[0]).toMatchObject({ job_id: secondRegeneration.rows[0].job_id, replayed: true })
   })
-  it('serializes a concurrent cross-shot new-take key into an idempotency conflict', async () => {
+  it('서로 다른 장면에 같은 요청 이름을 동시에 쓰면 하나만 처리하고 충돌을 알린다', async () => {
     const ids = await fixture()
     const secondShotId = 'shot-2'
     await query(
@@ -246,7 +247,7 @@ describeDatabase('director video retakes database integration', () => {
     await client.end()
   })
 
-  it('normalizes legacy blanks before hardening constraints validate', async () => {
+  it('예전에 비어 있던 영상 정보도 새 기준에 맞게 정리한다', async () => {
     const ids = await fixture()
     const reserved = await reserveNewTake(ids)
     const clip = reserved.rows[0]
@@ -263,7 +264,7 @@ describeDatabase('director video retakes database integration', () => {
     expect(normalized.rows[0]).toEqual({ url: null, result_url: null })
   })
 
-  it('enforces service-only RPC access, replay identity, take semantics, and terminal invariants', async () => {
+  it('권한 없는 사용자는 다시 만들기를 실행할 수 없고 반복 요청과 완료 규칙을 지킨다', async () => {
     const ids = await fixture()
     const grant = await query<{ take_service: boolean, take_anon: boolean, take_authenticated: boolean, regeneration_service: boolean, regeneration_anon: boolean, regeneration_authenticated: boolean, resolution_service: boolean, resolution_anon: boolean, resolution_authenticated: boolean }>(`
       select

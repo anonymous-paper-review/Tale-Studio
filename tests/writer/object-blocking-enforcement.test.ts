@@ -1,3 +1,4 @@
+// 사물은 인물로 잘못 인식되지 않고 소품으로 표시된다 (#g4 2026-08-27)
 import { describe, expect, it } from 'vitest'
 import { moveObjectsToProps } from '@/lib/writer/pipeline/stages/v4_shots'
 import type { ShotStaticSpec } from '@/lib/writer/types/pipeline'
@@ -35,7 +36,7 @@ const blocking = (id: string, pos = 'center') => ({
 })
 
 describe('사물은 인물 자리에 앉을 수 없다', () => {
-  it('실사고 재현: 엿판이 blocking 에 있으면 prop_placement 로 옮긴다', () => {
+  it('사물이 인물 위치에 섞이면 소품으로 옮긴다 (엿판 사례)', () => {
     const out = moveObjectsToProps(
       spec({ character_blocking: [blocking('char_1'), blocking('obj_1', 'chest')] }),
       new Set(['obj_1']),
@@ -48,7 +49,7 @@ describe('사물은 인물 자리에 앉을 수 없다', () => {
     ])
   })
 
-  it('사물만 있는 인서트 컷도 처리한다 — blocking 이 비어도 소품은 남는다', () => {
+  it('사물만 보여 주는 장면은 인물 없이도 소품으로 남긴다', () => {
     const out = moveObjectsToProps(
       spec({ character_blocking: [blocking('obj_1')] }),
       new Set(['obj_1']),
@@ -57,7 +58,7 @@ describe('사물은 인물 자리에 앉을 수 없다', () => {
     expect(out.prop_placement).toHaveLength(1)
   })
 
-  it('이미 prop_placement 에 있으면 중복해 넣지 않는다 (모델이 양쪽에 쓴 경우)', () => {
+  it('같은 소품이 이미 제자리에 있으면 한 번만 남긴다', () => {
     const out = moveObjectsToProps(
       spec({
         character_blocking: [blocking('obj_1')],
@@ -70,18 +71,18 @@ describe('사물은 인물 자리에 앉을 수 없다', () => {
     expect(out.prop_placement[0].significance).toBe('hero')
   })
 
-  it('사물이 없으면 원본을 그대로 돌려준다 (불필요한 객체 생성 없음)', () => {
+  it('옮길 사물이 없으면 원래 화면 정보를 그대로 돌려준다', () => {
     const input = spec({ character_blocking: [blocking('char_1')] })
     expect(moveObjectsToProps(input, new Set(['obj_1']))).toBe(input)
     expect(moveObjectsToProps(input, new Set())).toBe(input)
   })
 
-  it('blocking 이 비어 있으면 손대지 않는다', () => {
+  it('인물 위치가 비어 있으면 내용을 그대로 둔다', () => {
     const input = spec()
     expect(moveObjectsToProps(input, new Set(['obj_1']))).toBe(input)
   })
 
-  it('사람 여럿 + 사물 여럿을 한 번에 가른다', () => {
+  it('여러 인물과 사물을 한 번에 올바른 자리로 나눈다', () => {
     const out = moveObjectsToProps(
       spec({
         character_blocking: [
@@ -94,7 +95,7 @@ describe('사물은 인물 자리에 앉을 수 없다', () => {
     expect(out.prop_placement.map((p) => p.prop)).toEqual(['obj_1', 'obj_2'])
   })
 
-  it('결정론 — 같은 입력이면 같은 출력', () => {
+  it('같은 내용을 넣으면 같은 결과가 나온다', () => {
     const input = spec({ character_blocking: [blocking('char_1'), blocking('obj_1')] })
     const ids = new Set(['obj_1'])
     expect(moveObjectsToProps(input, ids)).toEqual(moveObjectsToProps(input, ids))

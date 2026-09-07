@@ -1,3 +1,4 @@
+// 생성이 끝난 뒤 다른 화면에서도 최신 샷 목록을 바로 보여준다 (#shots-cache-invalidate 2026-08-24 티켓)
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -68,8 +69,8 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('감독 화면 생성 완료 → shots 사물함 무효화 (#shots-cache-invalidate)', () => {
-  it('generateStoryboardImage 완료 뒤 다음 loadShots(다른 화면 재진입 시뮬레이션)는 30초 신선 기간과 무관하게 다시 받는다', async () => {
+describe('감독 화면에서 생성이 끝나면 다른 화면에도 최신 샷 목록을 보여준다 (#shots-cache-invalidate)', () => {
+  it('생성이 끝난 뒤 다른 화면에 다시 들어오면 30초가 지나지 않아도 최신 샷 목록을 다시 불러온다', async () => {
     // hydrateFromDb 는 이 시험의 대상이 아니다(별도 시험이 이미 잠갔다 — director-state-boundaries.test.ts).
     // no-op 로 대체해 무효화 신호 하나만 재게 한다.
     useDirectorCanvasStore.setState({ projectId: 'p1', hydrateFromDb: async () => {} })

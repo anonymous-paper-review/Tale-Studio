@@ -1,3 +1,4 @@
+// 편집 화면을 열어도 같은 준비 작업이 되풀이되지 않는다 (#editor-render-loop 2026-08-24)
 // 무한 되그리기 회귀 잠금 (#editor-render-loop 2026-08-24).
 //
 // 실사고: 프로덕션 빌드로 /studio/editor 에 들어가면 React #185(Maximum update depth exceeded)가
@@ -51,8 +52,8 @@ function tsxFilesUnder(...roots: string[]): string[] {
   return files
 }
 
-describe('무한 리렌더 방지 (React #185)', () => {
-  it('useT 는 렌더마다 새 함수를 만들지 않는다 (locale 로만 갱신)', () => {
+describe('편집 화면을 열어도 같은 작업이 되풀이되지 않는다 (React #185)', () => {
+  it('언어 설정이 그대로이면 화면 안내를 매번 새로 준비하지 않는다', () => {
     const src = readFileSync(I18N, 'utf8')
     expect(src).toMatch(
       /return useCallback\(\s*\([\s\S]*?\) =>\s*translate\(locale, text, params\),\s*\[locale\],\s*\)/,
@@ -61,7 +62,7 @@ describe('무한 리렌더 방지 (React #185)', () => {
     expect(src).not.toMatch(/return \(text, params\) => translate\(/)
   })
 
-  it('t 를 훅 deps 로 쓰는 화면이 실제로 있다 — 위 잠금이 살아있는 이유', () => {
+  it('화면 안내가 바뀌어야 할 때만 화면 준비 작업을 다시 진행한다', () => {
     const users = tsxFilesUnder('src/app', 'src/features', 'src/components').filter((f) => {
       const src = readFileSync(f, 'utf8')
       const bound = src.match(/const\s+(\w+)\s*=\s*useT\(\)/)
@@ -72,7 +73,7 @@ describe('무한 리렌더 방지 (React #185)', () => {
     expect(users).toContain(EDITOR_PAGE)
   })
 
-  it('editor 마운트 로드 effect 의 deps 는 전부 안정 참조다', () => {
+  it('편집 화면을 열면 저장된 내용이 반복 호출 없이 안정적으로 준비된다', () => {
     const page = readFileSync(EDITOR_PAGE, 'utf8')
     // loadData/loadPersisted 를 부르는 effect 를 찾아 그 deps 를 검사한다.
     const deps = depArrays(page.slice(page.indexOf('await loadData()')))[0]

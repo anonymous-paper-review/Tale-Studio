@@ -1,3 +1,4 @@
+// 채팅에서 정한 인물과 배경은 보드에 반영하고 직접 고친 내용은 보호한다
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProducerStore } from '@/stores/producer-store'
@@ -35,8 +36,8 @@ beforeEach(() => {
   useProjectStore.setState({ currentStage: 'producer', reachedStage: 'producer' })
 })
 
-describe('producer chat ↔ board two-way sync', () => {
-  it('overwrites a pipeline placeholder ("미정") appearance directly when not user-edited', () => {
+describe('Producer 채팅과 보드가 서로 같은 내용을 보여준다', () => {
+  it('직접 고치지 않은 미정 외모는 새 설정을 넣으면 바로 바뀐다', () => {
     useProducerStore.setState({
       cast: [castMember({ name: '소녀', appearance: '미정', userEdited: false })],
     })
@@ -49,7 +50,7 @@ describe('producer chat ↔ board two-way sync', () => {
     expect(useProducerStore.getState().cast[0].appearance).toBe('20대 여성, 흰 원피스')
   })
 
-  it('removes a stale card directly when not user-edited', () => {
+  it('직접 고치지 않은 오래된 배경은 새 설정에서 빼면 바로 사라진다', () => {
     useProducerStore.setState({
       backgrounds: [bg({ name: '회화세계', visualDescription: '미정', userEdited: false })],
     })
@@ -62,7 +63,7 @@ describe('producer chat ↔ board two-way sync', () => {
     expect(useProducerStore.getState().backgrounds).toHaveLength(0)
   })
 
-  it('merges two cards (remove loser + update survivor) in one patch', () => {
+  it('같은 대상을 가리키는 카드가 둘이면 하나로 합쳐 최신 내용을 남긴다', () => {
     useProducerStore.setState({
       cast: [
         castMember({ name: '기사', appearance: '미정', userEdited: false }),
@@ -83,7 +84,7 @@ describe('producer chat ↔ board two-way sync', () => {
     expect(cast[0].appearance).toBe('백발, 얼굴 없는 갑옷')
   })
 
-  it('gates overwrite of a user-edited card value behind the approval proposal', async () => {
+  it('직접 고친 카드의 내용을 바꿀 때는 먼저 사용자 확인을 받는다', async () => {
     useProducerStore.setState({
       cast: [castMember({ name: '소녀', appearance: '내가 직접 적은 외모', userEdited: true })],
     })
@@ -102,7 +103,7 @@ describe('producer chat ↔ board two-way sync', () => {
     expect(useGlobalChatStore.getState().pendingProposal).toBeNull()
   })
 
-  it('gates deletion of a user-edited card behind the approval proposal', () => {
+  it('직접 고친 카드를 지울 때는 먼저 사용자 확인을 받는다', () => {
     useProducerStore.setState({
       backgrounds: [bg({ name: '내 배경', visualDescription: '내가 적은 설명', userEdited: true })],
     })
@@ -115,7 +116,7 @@ describe('producer chat ↔ board two-way sync', () => {
     expect(useGlobalChatStore.getState().pendingProposal?.kind).toBe('producerSourcePatch')
   })
 
-  it('still fills an empty field on a user-edited card without gating (no clobber)', () => {
+  it('직접 고친 카드라도 비어 있는 칸은 확인 없이 채우되 기존 내용은 덮어쓰지 않는다', () => {
     useProducerStore.setState({
       cast: [castMember({ name: '소녀', appearance: '', role: undefined, userEdited: true })],
     })

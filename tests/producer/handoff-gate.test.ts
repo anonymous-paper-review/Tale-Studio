@@ -1,3 +1,4 @@
+// 배경을 하나라도 완성하면 Writer로 안전하게 넘기고 비어 있으면 보내지 않는다
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ProjectSettings } from '@/types'
 import type { BackgroundSource } from '@/lib/producer-gate'
@@ -45,8 +46,8 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('saveAndHandoff producer gate enforcement', () => {
-  it('blocks handoff and never calls writer/start when no complete background exists', async () => {
+describe('saveAndHandoff (Producer 인계 조건을 지킨다)', () => {
+  it('완성된 배경이 없으면 Writer로 넘기지 않고 시작 요청도 보내지 않는다', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(new Response('{}', { status: 200 }))
@@ -67,7 +68,7 @@ describe('saveAndHandoff producer gate enforcement', () => {
     expect(fetchSpy).not.toHaveBeenCalled()
   })
 
-  it('proceeds past the gate and starts the writer when a complete background exists', async () => {
+  it('완성된 배경이 있으면 Writer를 시작하고 다음 단계로 넘긴다', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(new Response(JSON.stringify({ runId: 'r1' }), { status: 200 }))

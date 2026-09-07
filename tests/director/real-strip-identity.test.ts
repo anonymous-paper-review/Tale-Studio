@@ -1,3 +1,4 @@
+// 각 인물 그림은 지정된 사람과 위치·자세를 따르고, 미지정 인물은 따로 구분하며 같은 사람을 중복하지 않는다 (#ref-gate 2026-09-02, 겨울_4 sh_01_27)
 import { describe, it, expect } from 'vitest'
 import {
   assetAuthorityClause,
@@ -17,7 +18,7 @@ const REFS = [
 ]
 
 describe('describeCharacterRef', () => {
-  it('위치 토큰을 사람 말로, 포즈를 덧붙인다 — 단서 없으면 이름만', () => {
+  it('인물 위치와 자세가 있으면 이름과 함께 설명하고, 없으면 이름만 적는다', () => {
     expect(describeCharacterRef(REFS[0])).toBe('용족 수장 (right third of the frame — standing tall in gold breastplate, hand resting on waist ornament)')
     expect(describeCharacterRef(REFS[2])).toBe('수인 수장')
     expect(describeCharacterRef('그냥 이름')).toBe('그냥 이름')
@@ -26,7 +27,7 @@ describe('describeCharacterRef', () => {
 })
 
 describe('stripIdentityBlock', () => {
-  it('참조 번호 = 이름 규약, 같은 인물 두 번 금지, 배정 없는 인형은 다른 사람', () => {
+  it('그림 번호와 인물 이름을 맞추고, 같은 사람을 두 번 그리지 않으며 지정하지 않은 인형은 다른 사람으로 구분한다', () => {
     const lines = stripIdentityBlock(REFS)
     expect(lines[0]).toContain('reference image 2 = 용족 수장 (right third of the frame')
     expect(lines[0]).toContain('reference image 3 = 요정 수장 (left third of the frame')
@@ -38,10 +39,10 @@ describe('stripIdentityBlock', () => {
   })
 })
 
-describe('buildRealStripPrompt 인물 배정', () => {
+describe('인물별 위치와 자세 안내', () => {
   const base = { hasStyleRef: true, worldRefCount: 1 }
 
-  it('characterRefs 를 주면 익명 "corresponding character(s)" 문장을 배정 블록으로 대체한다', () => {
+  it('인물 목록이 있으면 이름 없는 안내 대신 인물별 그림 번호를 알려준다', () => {
     const p = buildRealStripPrompt('a shot', { ...base, characterRefCount: 3, characterRefs: REFS })
     expect(p).toContain('reference image 2 = 용족 수장')
     expect(p).toContain('exactly ONCE per panel')
@@ -50,21 +51,21 @@ describe('buildRealStripPrompt 인물 배정', () => {
     expect(p).toContain('reference images 2 to 4 are the CHARACTER sheets; reference image 5 is the LOCATION reference')
   })
 
-  it('characterRefs 가 없으면(레거시 샷) 종전 익명 문장을 유지한다', () => {
+  it('인물 목록이 없으면 이름 없는 안내를 그대로 유지한다', () => {
     const p = buildRealStripPrompt('a shot', { ...base, characterRefCount: 2 })
     expect(p).toContain('corresponding character(s)')
     expect(p).not.toContain('exactly ONCE per panel')
   })
 
-  it('추가 입력(프레임 참조)은 권위 절에서 인물·세트가 아니라고 못박는다', () => {
+  it('추가로 준 그림은 인물이나 장소가 아닌 참고 자료로 구분한다', () => {
     const p = buildRealStripPrompt('a shot', { ...base, characterRefCount: 1, characterRefs: [REFS[0]], extraRefCount: 2 })
     expect(p).toContain('reference images 4 to 5 are additional visual inputs for this shot')
     expect(assetAuthorityClause(0, 0, false, false, 1)).toContain('reference image 2 is an additional visual input')
   })
 })
 
-describe('buildRealGridPrompt 칸 배정', () => {
-  it('칸 인물에 러프 위치·포즈를 붙이고 같은 인물 두 번 금지 규칙을 싣는다', () => {
+describe('칸마다 인물을 지정하는 규칙', () => {
+  it('칸마다 인물의 위치와 자세를 보여주고, 같은 사람을 두 번 그리지 않는다', () => {
     const p = buildRealGridPrompt(2, {
       characterRefCount: 2,
       hasStyleRef: true,
@@ -76,7 +77,7 @@ describe('buildRealGridPrompt 칸 배정', () => {
     expect(p).toMatch(/exactly ONCE per panel/)
   })
 
-  it('문자열 이름만 줘도(종전 호출) 그대로 동작한다', () => {
+  it('이름만 알려도 해당 인물을 칸에 넣는다', () => {
     const p = buildRealGridPrompt(1, {
       characterRefCount: 1,
       hasStyleRef: false,

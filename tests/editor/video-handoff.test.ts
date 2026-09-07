@@ -1,3 +1,4 @@
+// 다른 프로젝트와 늦게 도착한 결과가 섞여도 현재 프로젝트의 최신 영상을 안전하게 보여준다
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -154,8 +155,8 @@ function editorSnapshot(sourceW: number) {
   }
 }
 
-describe('editor video handoff loading', () => {
-  it('uses the Final take URL, thumbnail, and completed status over a newer successful take', async () => {
+describe('편집 화면이 영상 결과를 안전하게 이어받는다', () => {
+  it('Final 영상의 주소와 미리보기, 완료 상태를 더 최신 결과보다 우선해 보여준다', async () => {
     configureLoad([shot('https://legacy.test/stale.mp4')], [
       clip({ id: 'final', url: 'https://video.test/final.mp4', thumbnail_url: 'https://video.test/final.jpg', is_final: true, take_number: 1 }),
       clip({ id: 'newer', url: 'https://video.test/newer.mp4', thumbnail_url: 'https://video.test/newer.jpg', take_number: 2 }),
@@ -171,7 +172,7 @@ describe('editor video handoff loading', () => {
     }])
   })
 
-  it('keeps the newest successful media when a later attempt failed', async () => {
+  it('나중 작업이 실패해도 가장 최근에 성공한 영상을 유지한다', async () => {
     configureLoad([shot()], [
       clip({
         id: 'older-success',
@@ -207,7 +208,7 @@ describe('editor video handoff loading', () => {
     })
   })
 
-  it('does not revive a legacy projection when relational rows are unusable', async () => {
+  it('현재 영상 정보를 쓸 수 없으면 예전 영상을 되살리지 않는다', async () => {
     configureLoad([shot('https://legacy.test/stale.mp4')], [
       clip({ url: null, status: 'failed', thumbnail_url: null }),
     ])
@@ -221,7 +222,7 @@ describe('editor video handoff loading', () => {
     })
   })
 
-  it('uses the legacy projection only when there are no relational rows', async () => {
+  it('현재 영상 정보가 하나도 없을 때만 예전 영상을 사용한다', async () => {
     configureLoad([shot('https://legacy.test/compatible.mp4')], [])
 
     await useEditorStore.getState().loadData()
@@ -233,7 +234,7 @@ describe('editor video handoff loading', () => {
     })
   })
 
-  it('clears prior project media after an empty or failed reload', async () => {
+  it('새 프로젝트에 영상이 없거나 불러오기에 실패하면 이전 프로젝트 영상을 남기지 않는다', async () => {
     configureLoad([shot()], [clip({ url: 'https://video.test/prior.mp4' })])
     await useEditorStore.getState().loadData()
     expect(useEditorStore.getState().videoClips).toHaveLength(1)
@@ -251,7 +252,7 @@ describe('editor video handoff loading', () => {
     expect(useEditorStore.getState().error).toContain('network unavailable')
   })
 
-  it('discards late successful and rejected loads after reset without changing projects', async () => {
+  it('초기화한 뒤 늦게 도착한 결과가 있어도 현재 프로젝트를 바꾸지 않는다', async () => {
     const lateSuccess = deferredLoadClient()
     mocks.createClient.mockReturnValueOnce(lateSuccess.client)
 
@@ -283,7 +284,7 @@ describe('editor video handoff loading', () => {
     })
   })
 
-  it('discards a late persisted snapshot after reset without changing projects', async () => {
+  it('초기화한 뒤 늦게 도착한 저장 내용이 있어도 현재 프로젝트를 바꾸지 않는다', async () => {
     vi.stubGlobal('window', {})
     let resolvePersisted!: (value: unknown) => void
     mocks.loadEditorState.mockReturnValueOnce(new Promise((resolve) => {
@@ -314,7 +315,7 @@ describe('editor video handoff loading', () => {
       panelSizes: { sourceW: 256, previewH: 360 },
     })
   })
-  it('keeps a populated new-project canonical snapshot when an old-project load resolves late', async () => {
+  it('새 프로젝트를 불러온 뒤 이전 프로젝트 결과가 늦게 와도 새 프로젝트 내용을 지킨다', async () => {
     const oldProject = deferredLoadClient()
     mocks.createClient.mockReturnValue(oldProject.client)
 
@@ -351,7 +352,7 @@ describe('editor video handoff loading', () => {
       clipOrder: { 'scene-2': ['shot-2'] },
     })
   })
-  it('keeps a populated new-project canonical snapshot when an old-project load rejects late', async () => {
+  it('새 프로젝트를 불러온 뒤 이전 프로젝트 불러오기가 늦게 실패해도 새 프로젝트 내용을 지킨다', async () => {
     const oldProject = deferredLoadClient()
     mocks.createClient.mockReturnValue(oldProject.client)
 
@@ -390,7 +391,7 @@ describe('editor video handoff loading', () => {
   })
 
 
-  it('keeps the newest same-project canonical load when an older load resolves last', async () => {
+  it('같은 프로젝트를 여러 번 불러오면 가장 최근 결과를 지킨다', async () => {
     const older = deferredLoadClient()
     const newer = deferredLoadClient()
     mocks.createClient
@@ -418,7 +419,7 @@ describe('editor video handoff loading', () => {
       'https://video.test/new-final.mp4',
     )
   })
-  it('keeps the newest same-project canonical snapshot when an older load rejects late', async () => {
+  it('같은 프로젝트의 이전 불러오기가 늦게 실패해도 가장 최근 결과를 지킨다', async () => {
     const older = deferredLoadClient()
     const newer = deferredLoadClient()
     mocks.createClient
@@ -448,7 +449,7 @@ describe('editor video handoff loading', () => {
     })
   })
 
-  it('clears a stale load error after a populated canonical reload succeeds', async () => {
+  it('새로 불러오기에 성공하면 이전 오류를 지운다', async () => {
     configureLoad(null, null, 'temporary outage')
     await useEditorStore.getState().loadData()
     expect(useEditorStore.getState().error).toContain('temporary outage')
@@ -462,8 +463,8 @@ describe('editor video handoff loading', () => {
     )
   })
 })
-describe('editor server save serialization', () => {
-  it('sends the in-flight snapshot before only the newest pending snapshot', async () => {
+describe('편집 내용 저장 순서를 지킨다', () => {
+  it('저장 중 새 내용이 여러 번 바뀌면 최신 내용만 이어서 저장한다', async () => {
     vi.useFakeTimers()
     vi.clearAllTimers()
     const first = deferredResponse()
@@ -487,7 +488,7 @@ describe('editor server save serialization', () => {
     expect(fetchMock.mock.calls.map(savedPanelWidth)).toEqual([401, 403])
   })
 
-  it('does not retry a stale failure and retries the newest snapshot', async () => {
+  it('오래된 저장 실패는 다시 보내지 않고 최신 내용만 다시 저장한다', async () => {
     vi.useFakeTimers()
     vi.clearAllTimers()
     const first = deferredResponse()

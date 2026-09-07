@@ -1,3 +1,4 @@
+// 저장할 때 실패를 숨기지 않고, 사용자가 다시 시도할 수 있도록 알려준다 (#persist-guard 2026-07-31)
 // persist DB 쓰기 가드(#persist-guard 2026-07-31) — supabase-js 는 에러를 throw 하지 않고
 //   { error } 로 반환한다. 결과를 버리면 실패가 조용히 지나가 "run completed 인데 shots 0행"
 //   실사고(fe699c5b: 미적용 스키마 42703)가 났다. persistShotsToDb 가 insert/delete 실패를
@@ -98,8 +99,8 @@ beforeEach(() => {
   responses.set('scene_character_appearance_overrides.select', { data: [], error: null })
 })
 
-describe('persistShotsToDb — DB 쓰기 가드', () => {
-  it('shots insert 가 error 를 반환하면 throw 한다 (조용한 0행 금지)', async () => {
+describe('persistShotsToDb — 저장 실패를 숨기지 않고 사용자에게 알린다', () => {
+  it('저장 중 오류가 나면 조용히 성공한 것으로 처리하지 않고 알려준다', async () => {
     responses.set('shots.insert', {
       data: null,
       error: { message: 'column shots.static_spec does not exist' },
@@ -109,12 +110,12 @@ describe('persistShotsToDb — DB 쓰기 가드', () => {
     )
   })
 
-  it('shots delete 가 error 를 반환해도 throw 한다', async () => {
+  it('기존 장면을 지울 수 없으면 저장을 완료한 것으로 처리하지 않고 알려준다', async () => {
     responses.set('shots.delete', { data: null, error: { message: 'permission denied' } })
     await expect(persistShotsToDb(PROJECT_ID, seq(), null)).rejects.toThrow(/shots delete failed/)
   })
 
-  it('정상 경로 — 에러 없으면 delete → insert 순으로 완료된다', async () => {
+  it('문제없이 저장하면 이전 장면을 정리한 뒤 새 장면을 기록한다', async () => {
     await persistShotsToDb(PROJECT_ID, seq(), null)
     const shotOps = calls.filter((c) => c.table === 'shots').map((c) => c.op)
     expect(shotOps[0]).toBe('select') // carry-forward 조회
@@ -128,13 +129,13 @@ describe('persistShotsToDb — DB 쓰기 가드', () => {
 // 쓸어버린다(사고 당시엔 persist 가 채팅보다 먼저라 16샷이 살았을 뿐). 계약: 파이프라인은
 // source='pipeline' 행만 갈아엎고, 생존 수동 행과 shot_id 가 충돌하면 수동이 이긴다
 // (파이프라인 산출은 재생성 가능, 사람의 글은 불가 — architecture §5 원칙 2).
-describe('persistShotsToDb — 소유권 경계 (#F-003 R3)', () => {
-  it('delete 는 source=pipeline 으로 스코프된다 — 수동 샷은 재런에서 살아남는다', async () => {
+describe('persistShotsToDb — 자동으로 만든 장면만 바꾸고 사람이 만든 장면은 보존한다 (#F-003 R3)', () => {
+  it('자동으로 만든 장면만 다시 저장하고 사람이 만든 장면은 다음 실행에도 남긴다', async () => {
     await persistShotsToDb(PROJECT_ID, seq(), null)
     expect(eqArgs).toContainEqual({ table: 'shots', op: 'delete', col: 'source', val: 'pipeline' })
   })
 
-  it('파이프라인 insert 행은 source=pipeline 을 명시한다', async () => {
+  it('자동으로 만든 장면임을 분명히 표시해 서로 구분한다', async () => {
     await persistShotsToDb(PROJECT_ID, seq(), null)
     const payload = insertPayloads.find((p) => p.table === 'shots')?.rows as Array<
       Record<string, unknown>
@@ -146,7 +147,7 @@ describe('persistShotsToDb — 소유권 경계 (#F-003 R3)', () => {
     }
   })
 
-  it('생존 수동 샷과 shot_id 충돌 시 수동이 이긴다 — 파이프라인 행 스킵 + 경고 표면화', async () => {
+  it('사람이 만든 장면과 같은 번호가 나오면 사람의 장면을 남기고 자동 결과를 건너뛴 사실을 알린다', async () => {
     // survivors 조회가 sh_01_01(= seq() 의 shot_1 이 매핑될 main id)을 반환하도록 주입.
     responses.set('shots.select', { data: [{ shot_id: 'sh_01_01' }], error: null })
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})

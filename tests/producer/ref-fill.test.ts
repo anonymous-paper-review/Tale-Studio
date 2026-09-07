@@ -1,3 +1,4 @@
+// 이름 없는 인물·배경 카드도 기존 자리에 내용을 채우고, 같은 카드를 새로 만들지 않는다
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProducerStore } from '@/stores/producer-store'
@@ -28,8 +29,8 @@ beforeEach(() => {
   useProjectStore.setState({ currentStage: 'producer', reachedStage: 'producer' })
 })
 
-describe('ref-targeted fill of empty (이름 미정) cards', () => {
-  it('fills an unnamed cast card by ref — no duplicate', () => {
+describe('이름 없는 인물·배경 카드에 내용을 채우는 규칙', () => {
+  it('이름 없는 인물 카드에 내용을 채우면 기존 카드 하나만 갱신한다', () => {
     useProducerStore.setState({ cast: [emptyPerson('u1')] })
     useProducerStore
       .getState()
@@ -41,7 +42,7 @@ describe('ref-targeted fill of empty (이름 미정) cards', () => {
     expect(cast[0].appearance).toBe('검은 후디')
   })
 
-  it('fills an unnamed background card by ref — no duplicate', () => {
+  it('이름 없는 배경 카드에 내용을 채우면 기존 카드 하나만 갱신한다', () => {
     useProducerStore.setState({ backgrounds: [emptyBackground('b1')] })
     useProducerStore
       .getState()
@@ -52,7 +53,7 @@ describe('ref-targeted fill of empty (이름 미정) cards', () => {
     expect(bgs[0].name).toBe('네온 골목')
   })
 
-  it('disambiguates: ref targets the exact unnamed card among several', () => {
+  it('같은 종류 카드가 여러 개여도 지정한 카드 하나만 채운다', () => {
     useProducerStore.setState({ cast: [emptyPerson('p1'), emptyPerson('p2')] })
     useProducerStore.getState().applyExtractedSettings({ characters: [{ ref: 'p2', name: '두번째' }] })
     const cast = useProducerStore.getState().cast
@@ -61,7 +62,7 @@ describe('ref-targeted fill of empty (이름 미정) cards', () => {
     expect(cast.find((c) => c.localId === 'p2')?.name).toBe('두번째')
   })
 
-  it('named edits still match by name (no regression)', () => {
+  it('이름이 있는 카드의 내용을 바꿔도 해당 카드 하나만 갱신한다', () => {
     useProducerStore.setState({
       cast: [{ ...emptyPerson('k'), name: '카르타' }],
     })

@@ -1,3 +1,4 @@
+// 실제로 등록된 인물과 장소만 샷에 사용해 장면 구성을 일관되게 연결한다
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,20 +17,20 @@ const hasFixture = fs.existsSync(LOG);
 const read = (f: string) =>
   hasFixture ? JSON.parse(fs.readFileSync(path.join(LOG, f), 'utf8')) : ({} as never);
 
-describe.skipIf(!hasFixture)('asset_refs normalization (real logged data)', () => {
+describe.skipIf(!hasFixture)('실제 기록에서도 샷에 쓰인 인물과 장소를 올바르게 연결한다', () => {
   const s2 = read('04_S2.json') as Characters;
   const l2 = read('09_L2.json') as WorldVisual;
   const s3 = read('05_S3.json') as Scenes;
   // skipIf 여도 본문은 수집 시 실행 — 픽스처 없으면 registry 계산도 건너뛴다(빈 폴백).
   const reg = hasFixture ? buildAssetRegistry(s2, l2) : ({ characterIds: new Set<string>(), locationIds: [] } as ReturnType<typeof buildAssetRegistry>);
 
-  it('builds canonical registry from S2 + L2', () => {
+  it('등록된 장면 정보에서 사용할 인물과 장소 목록을 만든다', () => {
     expect(reg.characterIds.has('the_silver_knight')).toBe(true);
     expect(reg.characterIds.has('malenia')).toBe(true);
     expect(reg.locationIds.length).toBe(1);
   });
 
-  it('recovers version-suffixed character refs (the _v1/_v2 bug)', () => {
+  it('버전 표시가 붙은 인물 이름도 원래 인물로 알아본다', () => {
     expect(resolveAssetRef('the_silver_knight_v1', reg)).toMatchObject({
       id: 'the_silver_knight',
       kind: 'character',
@@ -39,7 +40,7 @@ describe.skipIf(!hasFixture)('asset_refs normalization (real logged data)', () =
     expect(resolveAssetRef('the_silver_knight', reg)).toMatchObject({ id: 'the_silver_knight', kind: 'character' });
   });
 
-  it('drops invented refs that match no real asset', () => {
+  it('실제로 등록되지 않은 인물과 장소는 사용하지 않는다', () => {
     for (const bad of [
       'cliff_edge', 'cliff_path', 'cliffside', 'castle_gate', 'castle_gate_v1',
       'demon_king_castle', 'throne_room', 'crumbling_throne_room', 'obsidian_throne_v1',
@@ -49,13 +50,13 @@ describe.skipIf(!hasFixture)('asset_refs normalization (real logged data)', () =
     }
   });
 
-  it('resolves canonical (Korean) location ids exactly', () => {
+  it('등록된 한국어 장소 이름은 그대로 장소로 알아본다', () => {
     for (const id of reg.locationIds) {
       expect(resolveAssetRef(id, reg)).toMatchObject({ id, kind: 'location' });
     }
   });
 
-  it('normalizes the real shot sequence: only canonical refs survive + locations recovered via scene fallback', () => {
+  it('실제 샷 순서에서 등록된 인물과 장소만 남기고 빠진 장소는 장면 정보로 채운다', () => {
     const seq = read('13_shot_sequence.json') as ShotSequence;
     const sceneLocById = new Map<string, string>(s3.scenes.map((sc) => [sc.scene_id, sc.location]));
 

@@ -1,3 +1,4 @@
+// 이전 장면의 마지막 모습이 다음 장면에 이어져 화면 흐름이 끊기지 않는다 (#n-1 2026-08-05 PREVIZ#2)
 // n−1 연속성 주입(#n-1 2026-08-05) 회귀 — PREVIZ#2 "shot이 자기 자신만 참조" 해소.
 //
 // 계약:
@@ -18,7 +19,7 @@ function design(id: string, ff: string, motion: string): ShotDesign {
 }
 
 describe('buildV4ContinuityBlock — 청크 경계 연속성 계약', () => {
-  it('직전 K=2개의 first_frame/motion 만 실린다', () => {
+  it('직전 두 장면의 마지막 모습과 움직임만 다음 장면에 전한다', () => {
     const block = buildV4ContinuityBlock([
       design('shot_1', 'ff-one', 'mo-one'),
       design('shot_2', 'ff-two', 'mo-two'),
@@ -31,13 +32,13 @@ describe('buildV4ContinuityBlock — 청크 경계 연속성 계약', () => {
     expect(block).not.toContain('ff-one')
   })
 
-  it('직전 샷이 없으면 빈 문자열 — 첫 청크는 기존 프롬프트 그대로', () => {
+  it('앞선 장면이 없으면 안내를 덧붙이지 않고 첫 장면을 그대로 시작한다', () => {
     expect(buildV4ContinuityBlock([])).toBe('')
   })
 })
 
-describe('buildCellContinuityLine — 러프 셀 연속성 줄', () => {
-  it('그리기 금지를 명시하고 110자에서 클립한다', () => {
+describe('buildCellContinuityLine — 러프 보드에서 이전 모습 잇기', () => {
+  it('이전 모습을 이어 그리고 110자를 넘으면 뒤를 줄인다', () => {
     const line = buildCellContinuityLine('X'.repeat(200))
     // #grid-shift: 부정 지시("do NOT draw")는 칸 밀림 유발 실측 — 긍정 참조형이어야 한다.
     expect(line).not.toContain('do NOT')
@@ -49,7 +50,7 @@ describe('buildCellContinuityLine — 러프 셀 연속성 줄', () => {
     expect(line).toContain('surrounding environment')
   })
 
-  it('이전 텍스트가 없으면 null — 셀은 그대로', () => {
+  it('이전 내용이 없으면 새 안내를 만들지 않아 화면이 그대로다', () => {
     expect(buildCellContinuityLine(null)).toBeNull()
     expect(buildCellContinuityLine('  ')).toBeNull()
   })

@@ -1,3 +1,4 @@
+// 기준 시트만 지우고 다른 그림과 사용자 업로드는 안전하게 보존한다 (#ref-sheet-ttl)
 import { describe, it, expect } from 'vitest'
 import { _refSheetStoragePath } from '@/lib/fal/finalize'
 
@@ -7,19 +8,19 @@ import { _refSheetStoragePath } from '@/lib/fal/finalize'
 const BASE = 'https://x.supabase.co/storage/v1/object/public/media'
 
 describe('_refSheetStoragePath', () => {
-  it('배치 그리드 ref (타임스탬프 네이밍) — 경로 추출', () => {
+  it('여러 장 그림의 기준 시트를 올바른 위치에서 찾는다', () => {
     expect(
       _refSheetStoragePath(`${BASE}/ws1/proj1/shots/real_grid_ref_1755500000000_sh_01_01.png`),
     ).toBe('ws1/proj1/shots/real_grid_ref_1755500000000_sh_01_01.png')
   })
 
-  it('단건 스트립 ref (고정 네이밍 + ?v= 캐시버스터) — 쿼리 제거 후 추출', () => {
+  it('한 장 그림의 기준 시트도 주소 뒤 추가 정보와 상관없이 찾는다', () => {
     expect(
       _refSheetStoragePath(`${BASE}/ws1/proj1/shots/sh_02_04_storyboard_ref_strip.png?v=123`),
     ).toBe('ws1/proj1/shots/sh_02_04_storyboard_ref_strip.png')
   })
 
-  it('ref 가 아닌 자산은 전부 null — 러프 프레임·실사 산출·템플릿·업로드', () => {
+  it('기준 시트가 아닌 다른 그림과 사용자 업로드는 지우지 않는다', () => {
     for (const url of [
       `${BASE}/ws1/proj1/shots/sh_01_01_rough_storyboard.png`,
       `${BASE}/ws1/proj1/shots/real_grid_abc123.png`,

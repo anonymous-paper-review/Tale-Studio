@@ -1,3 +1,4 @@
+// 화면에서 쓰이는 파일은 옮기고, 임시 파일과 연결 없는 파일은 이유를 남겨 구분한다
 import { describe, expect, it } from 'vitest'
 import {
   classifyMediaObject,
@@ -17,11 +18,11 @@ const ctx: ClassifyContext = {
 const verdict = (path: string) => classifyMediaObject(path, ctx).disposition
 
 describe('projectIdOfPath', () => {
-  it('작업공간/프로젝트 형태에서 프로젝트 id를 꺼낸다', () => {
+  it('작업공간과 프로젝트가 함께 적힌 경로에서 프로젝트를 알아낸다', () => {
     expect(projectIdOfPath(`${WS}/${LIVE}/shots/a.png`)).toBe(LIVE)
   })
 
-  it('공용 자산 경로는 null', () => {
+  it('공용 자산 경로에는 프로젝트를 찾지 않는다', () => {
     expect(projectIdOfPath('templates/rough-storyboard-grid-abc.png')).toBeNull()
     expect(projectIdOfPath('style-anchors/watercolor.png')).toBeNull()
     expect(projectIdOfPath(`${WS}/inventory/item-1.png`)).toBeNull()
@@ -51,12 +52,12 @@ describe('classifyMediaObject', () => {
     expect(verdict(`${WS}/${LIVE}/shots/v1-abc_storyboard_ref_strip.png`)).toBe('skip-temp')
   })
 
-  it('임시물 판정이 프로젝트 판정보다 먼저다', () => {
+  it('임시로 만든 자료라면 프로젝트가 살아 있어도 옮기지 않는다', () => {
     // 살아 있는 프로젝트 안에 있어도 임시물은 다시 만들어지므로 옮기지 않는다.
     expect(verdict(`${WS}/${TEST_PROJECT}/shots/real_grid_ref_v1-x.png`)).toBe('skip-temp')
   })
 
-  it('주인 프로젝트가 없으면 옮기지 않는다', () => {
+  it('연결된 프로젝트가 없으면 옮기지 않는다', () => {
     expect(verdict(`${WS}/${DEAD}/shots/v1-abc_rough_start.png`)).toBe('skip-orphan')
   })
 
@@ -65,12 +66,12 @@ describe('classifyMediaObject', () => {
     expect(verdict(`${WS}/${TEST_PROJECT}/shots/v1-abc_rough_start.png`)).toBe('migrate')
   })
 
-  it('업로드 원본도 조각도 옮긴다', () => {
+  it('올린 파일과 그 조각도 옮긴다', () => {
     expect(verdict(`${WS}/${LIVE}/uploads/up-1/original.png`)).toBe('migrate')
     expect(verdict(`${WS}/${LIVE}/uploads/up-1/s000.jpg`)).toBe('migrate')
   })
 
-  it('앞의 슬래시가 붙어도 같은 판정', () => {
+  it('경로 앞에 슬래시가 붙어도 같은 결과를 낸다', () => {
     expect(verdict(`/${WS}/${LIVE}/shots/a.png`)).toBe('migrate')
   })
 

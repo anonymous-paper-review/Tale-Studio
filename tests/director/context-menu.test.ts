@@ -1,3 +1,4 @@
+// 우클릭한 카드에서 할 수 있는 일과 대표 이미지를 올바르게 보여준다 (#context-menu 2026-08-31)
 // 우클릭 컨텍스트 메뉴 결정 로직 + 노드 대표 이미지 해석(#context-menu 2026-08-31).
 //
 // 인터랙션 계약: 좌클릭=선택(RF 기본), 더블클릭=편집 모달, 우클릭=메뉴.
@@ -20,8 +21,8 @@ function api() {
   return useDirectorCanvasStore.getState()
 }
 
-describe('nodeContextMenuItems (우클릭 메뉴 구성)', () => {
-  it('scene/shot/video는 편집과 삭제를 가진다', () => {
+describe('nodeContextMenuItems (우클릭한 카드에서 할 수 있는 일)', () => {
+  it('Scene·Shot·Video 카드에서는 편집과 삭제를 고를 수 있다', () => {
     for (const kind of ['scene', 'shot', 'video'] as const) {
       const items = nodeContextMenuItems(kind, false)
       expect(items).toContain('edit')
@@ -29,19 +30,19 @@ describe('nodeContextMenuItems (우클릭 메뉴 구성)', () => {
     }
   })
 
-  it('이미지가 있으면 복사·다운로드가 추가된다', () => {
+  it('이미지가 있으면 복사와 다운로드를 고를 수 있다', () => {
     const items = nodeContextMenuItems('shot', true)
     expect(items).toContain('copy-image')
     expect(items).toContain('download-image')
   })
 
-  it('이미지가 없으면 복사·다운로드가 빠진다', () => {
+  it('이미지가 없으면 복사와 다운로드를 고를 수 없다', () => {
     const items = nodeContextMenuItems('shot', false)
     expect(items).not.toContain('copy-image')
     expect(items).not.toContain('download-image')
   })
 
-  it('asset Image는 편집·복사가 가능하지만 upstream 연결 때문에 직접 삭제하지 않는다', () => {
+  it('asset Image는 편집과 복사는 할 수 있지만 원본과 연결되어 있어 직접 삭제할 수 없다', () => {
     expect(nodeContextMenuItems('asset', true)).toEqual([
       'edit',
       'copy-image',
@@ -49,18 +50,18 @@ describe('nodeContextMenuItems (우클릭 메뉴 구성)', () => {
     ])
   })
 
-  it('파생 카드 kind(구 persist 쟔재)는 편집 없이 삭제만 남는다 (#node-merge)', () => {
+  it('예전에 만들어진 파생 카드는 편집 없이 삭제만 고를 수 있다 (#node-merge)', () => {
     expect(nodeContextMenuItems('shotImage', false)).toEqual(['delete'])
     expect(nodeContextMenuItems('videoPlaceholder', false)).toEqual(['delete'])
   })
 
-  it('prompt는 삭제만 있다', () => {
+  it('prompt 카드에서는 삭제만 고를 수 있다', () => {
     expect(nodeContextMenuItems('prompt', false)).toEqual(['delete'])
   })
 })
 
-describe('nodePrimaryImageUrl (대표 이미지 해석)', () => {
-  it('Shot은 완료된 스토리보드 이미지 URL을 준다', () => {
+describe('nodePrimaryImageUrl (카드에 보여줄 대표 이미지)', () => {
+  it('Shot 카드에는 완성된 스토리보드 이미지를 보여준다', () => {
     const sceneId = api().addSceneNode({ x: 0, y: 0 }, 'Scene')
     const shotId = api().addShotNode(sceneId, { x: 360, y: 0 }, 'Shot')
     api().updateNodeData<'shot'>(shotId, {
@@ -76,14 +77,14 @@ describe('nodePrimaryImageUrl (대표 이미지 해석)', () => {
     )
   })
 
-  it('생성 전/실패 Shot과 Scene은 null', () => {
+  it('아직 만들지 않았거나 실패한 Shot과 Scene에는 대표 이미지를 보여주지 않는다', () => {
     const sceneId = api().addSceneNode({ x: 0, y: 0 }, 'Scene')
     const shotId = api().addShotNode(sceneId, { x: 360, y: 0 }, 'Shot')
     expect(nodePrimaryImageUrl(api().nodes, shotId)).toBeNull()
     expect(nodePrimaryImageUrl(api().nodes, sceneId)).toBeNull()
   })
 
-  it('Video는 썸네일을 준다', () => {
+  it('Video 카드에는 미리보기 이미지를 보여준다', () => {
     const sceneId = api().addSceneNode({ x: 0, y: 0 }, 'Scene')
     const shotId = api().addShotNode(sceneId, { x: 360, y: 0 }, 'Shot')
     api().updateNodeData<'shot'>(shotId, {
@@ -107,13 +108,13 @@ describe('nodePrimaryImageUrl (대표 이미지 해석)', () => {
     expect(api().nodes.some((n) => n.data.kind === 'shotImage')).toBe(false)
   })
 
-  it('없는 노드는 null', () => {
+  it('없는 카드를 찾아도 대표 이미지를 보여주지 않는다', () => {
     expect(nodePrimaryImageUrl(api().nodes, 'missing')).toBeNull()
   })
 })
 
-describe('addShotNode standalone (Higgsfield식 독립 이미지 노드)', () => {
-  it('부모 Scene 없이 생성되고 parent 엣지가 없다', () => {
+describe('addShotNode (Higgsfield식으로 부모 없이 만든 이미지 카드)', () => {
+  it('부모 Scene이 없어도 이미지 카드가 생기고 연결선은 만들지 않는다', () => {
     const shotId = api().addShotNode(null, { x: 100, y: 100 }, 'Standalone')
     const node = api().nodes.find((n) => n.id === shotId)
     expect(node && isShotData(node.data)).toBe(true)
@@ -122,7 +123,7 @@ describe('addShotNode standalone (Higgsfield식 독립 이미지 노드)', () =>
     ).toHaveLength(0)
   })
 
-  it('독립 Shot에서도 Video Branch가 가능하다', () => {
+  it('독립 Shot에서도 Video를 만들 수 있다', () => {
     const shotId = api().addShotNode(null, { x: 100, y: 100 }, 'Standalone')
     const videoId = api().addVideoTake(shotId)
     expect(videoId).toBeTruthy()
@@ -131,8 +132,8 @@ describe('addShotNode standalone (Higgsfield식 독립 이미지 노드)', () =>
   })
 })
 
-describe('addStandaloneVideo (독립 영상 노드)', () => {
-  it('영속 clip을 받은 뒤 Video 하나만 만들고 Shot·parent 엣지를 만들지 않는다', async () => {
+describe('addStandaloneVideo (독립 영상 카드 만들기)', () => {
+  it('저장된 영상 정보를 받으면 Video 하나만 만들고 Shot과 연결선을 만들지 않는다', async () => {
     api().setProjectId('project-1')
     const before = api()
     const ownerKey = 'standalone:123e4567-e89b-42d3-a456-426614174000'
@@ -178,7 +179,7 @@ describe('addStandaloneVideo (독립 영상 노드)', () => {
     ).toBe(false)
   })
 
-  it('최신 자체 설정을 같은 clip의 생성 snapshot으로 보낸다', async () => {
+  it('바꾼 설정으로 같은 영상의 새 생성을 요청한다', async () => {
     api().setProjectId('project-1')
     const ownerKey = 'standalone:123e4567-e89b-42d3-a456-426614174000'
     vi.stubGlobal(

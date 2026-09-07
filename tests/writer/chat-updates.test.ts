@@ -1,3 +1,4 @@
+// 채팅에서 보낸 장면과 대사 수정이 올바른 내용만 반영되도록 한다
 import { describe, expect, it } from 'vitest'
 import {
   classifyDialoguePatch,
@@ -17,8 +18,8 @@ const dialogue = (characterId: string, text: string): DialogueLine => ({
   durationHint: 2,
 })
 
-describe('writer chat update validation', () => {
-  it('keeps dialogue spec fields (emotion/delivery/durationHint) and drops unknown/invalid extras', () => {
+describe('채팅으로 보낸 장면과 대사 수정에서 올바른 내용만 반영한다', () => {
+  it('대사의 감정과 말투, 길이 정보는 보존하고 알 수 없거나 잘못된 내용은 버린다', () => {
     // 예전 계약은 characterId+text 외 전부를 버려서, 챗 대사 수정마다 연기 지시가
     //   유실됐다(2026-08-31 실측). 이제 스펙 필드는 통과시키고 미정의·불량 값만 건다.
     const out = validateWriterUpdates([
@@ -61,7 +62,7 @@ describe('writer chat update validation', () => {
     ])
   })
 
-  it('strips malformed dialogueLines entries and drops non-array dialogueLines', () => {
+  it('대사 목록에서 형식이 잘못된 항목과 목록이 아닌 값은 제외한다', () => {
     expect(
       pickShotFields({
         dialogueLines: [
@@ -85,7 +86,7 @@ describe('writer chat update validation', () => {
     ).toEqual([])
   })
 
-  it('keeps existing shot field validation behavior', () => {
+  it('기존 샷 입력 규칙을 지키며 잘못된 값은 허용 범위로 바로잡는다', () => {
     const out = validateWriterUpdates([
       {
         type: 'addShot',
@@ -127,7 +128,7 @@ describe('writer chat update validation', () => {
     ])
   })
 
-  it('keeps existing scene field validation behavior', () => {
+  it('기존 장면 입력 규칙을 지키며 잘못된 값은 허용 범위로 바로잡는다', () => {
     const out = validateWriterUpdates([
       {
         type: 'updateScene',
@@ -156,7 +157,7 @@ describe('writer chat update validation', () => {
 })
 
 describe('classifyDialoguePatch', () => {
-  it('applies same-length, longer, and new dialogue patches', () => {
+  it('대사 수가 같거나 늘거나 새로 생긴 수정은 바로 반영한다', () => {
     expect(
       classifyDialoguePatch(
         [dialogue('char_a', '기존')],
@@ -172,7 +173,7 @@ describe('classifyDialoguePatch', () => {
     expect(classifyDialoguePatch([], [dialogue('char_a', '신규')])).toBe('apply')
   })
 
-  it('requires confirmation when the next dialogue array is shorter', () => {
+  it('다음 대사 수가 줄면 확인을 먼저 받는다', () => {
     expect(
       classifyDialoguePatch(
         [dialogue('char_a', '하나'), dialogue('char_b', '둘')],
@@ -183,7 +184,7 @@ describe('classifyDialoguePatch', () => {
 })
 
 describe('sanitizeLineRefs', () => {
-  it('passes valid line refs and strips invalid labels or empty refs', () => {
+  it('올바른 대사 위치는 남기고 잘못된 표시나 빈 위치는 제외한다', () => {
     expect(
       sanitizeLineRefs([
         { label: 'L1', ref: 'sc_01.heading', kind: 'sceneHeading' },
@@ -197,7 +198,7 @@ describe('sanitizeLineRefs', () => {
     ])
   })
 
-  it('returns an empty array for non-arrays and caps output at 200 entries', () => {
+  it('대사 위치 목록이 아니면 비우고 200개까지만 남긴다', () => {
     expect(sanitizeLineRefs('not-array')).toEqual([])
 
     const raw = Array.from({ length: 250 }, (_, index) => ({
@@ -217,10 +218,10 @@ describe('sanitizeLineRefs', () => {
 // 무검증 저장돼 하류 에셋 조인이 전부 끊겼다. 계약: 정본 집합 밖 id 는 드롭 + dropped 로 수집,
 // 전부 탈락한 필드는 필드째 뺀다(씬 상속 폴백), 발명 화자의 대사는 대사째 드롭.
 
-describe('validateWriterUpdates — 인물 id 화이트리스트 (R1)', () => {
+describe('등록된 인물만 장면과 대사 수정에 반영한다 (R1)', () => {
   const allowed = new Set(['char', 'kingdom_pursuer'])
 
-  it('발명 id 는 걸러지고 정본만 남는다 + dropped 수집', () => {
+  it('등록되지 않은 인물은 제외하고 등록된 인물만 남긴다 (제외된 인물도 기록한다)', () => {
     const dropped: string[] = []
     const out = validateWriterUpdates(
       [
@@ -238,7 +239,7 @@ describe('validateWriterUpdates — 인물 id 화이트리스트 (R1)', () => {
     expect(dropped.sort()).toEqual(['girl', 'tracker'])
   })
 
-  it('전부 발명 id 면 characters 필드 자체가 빠진다 (씬 상속 폴백)', () => {
+  it('등록된 인물이 하나도 없으면 샷에서 인물 정보를 빼고 장면 정보를 따른다', () => {
     const out = validateWriterUpdates(
       [{ type: 'addShot', sceneId: 'sc_01', actionDescription: 'a', characters: ['girl'] }],
       allowed,
@@ -246,7 +247,7 @@ describe('validateWriterUpdates — 인물 id 화이트리스트 (R1)', () => {
     expect(out[0].characters).toBeUndefined()
   })
 
-  it('charactersPresent(씬)와 dialogueLines 화자도 같은 집합으로 거른다', () => {
+  it('장면의 인물과 대사의 화자도 등록된 인물만 남긴다', () => {
     const dropped: string[] = []
     const out = validateWriterUpdates(
       [
@@ -273,14 +274,14 @@ describe('validateWriterUpdates — 인물 id 화이트리스트 (R1)', () => {
     expect(dropped).toContain('tracker')
   })
 
-  it('allowed 미지정이면 종전 동작 — 무필터 (구 클라 하위 호환)', () => {
+  it('인물 목록을 지정하지 않으면 기존처럼 모든 인물을 허용한다 (이전 화면 호환)', () => {
     const out = validateWriterUpdates([
       { type: 'addShot', sceneId: 'sc_01', actionDescription: 'a', characters: ['girl'] },
     ]) as Array<{ characters?: string[] }>
     expect(out[0].characters).toEqual(['girl'])
   })
 
-  it('명시적 빈 대사 배열([])의 "전체 삭제" 의미는 필터와 무관하게 보존된다', () => {
+  it('대사를 빈 목록으로 보내면 모두 지우려는 뜻을 그대로 반영한다', () => {
     const out = validateWriterUpdates(
       [{ type: 'updateShot', id: 'sh_01_01', patch: { dialogueLines: [] } }],
       allowed,

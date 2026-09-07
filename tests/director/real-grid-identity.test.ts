@@ -1,3 +1,4 @@
+// 인물별 그림은 지정된 사람만 담고, 한 장면의 시간대와 빛을 모든 칸에 맞춘다 (#real-grid-identity 2026-08-12, #F-006 2026-08-13)
 import { describe, it, expect } from 'vitest'
 import { buildRealGridPrompt, buildRealStripPrompt } from '@/lib/director/storyboard-strip'
 
@@ -8,8 +9,8 @@ import { buildRealGridPrompt, buildRealStripPrompt } from '@/lib/director/storyb
 
 const BASE = { characterRefCount: 2, hasStyleRef: true }
 
-describe('buildRealGridPrompt — 칸별 인물 배정 (#real-grid-identity)', () => {
-  it('characterRefs 가 오면 레퍼런스 순서 규약과 칸별 배정을 명시한다', () => {
+describe('실사 그림의 칸마다 지정한 인물을 배정한다 (#real-grid-identity)', () => {
+  it('인물 목록이 있으면 참조 순서와 칸별 인물을 안내한다', () => {
     const p = buildRealGridPrompt(4, {
       ...BASE,
       characterRefs: [{ name: '소녀' }, { name: '왕국의 추적자' }],
@@ -27,7 +28,7 @@ describe('buildRealGridPrompt — 칸별 인물 배정 (#real-grid-identity)', (
     expect(p).not.toContain('corresponding character(s)')
   })
 
-  it('두 인물이 한 칸에 같이 나오면 and 로 병기한다', () => {
+  it('한 칸에 두 사람이 나오면 두 사람 이름을 함께 적는다', () => {
     const p = buildRealGridPrompt(2, {
       ...BASE,
       characterRefs: [{ name: 'A' }, { name: 'B' }],
@@ -36,7 +37,7 @@ describe('buildRealGridPrompt — 칸별 인물 배정 (#real-grid-identity)', (
     expect(p).toContain('* Column 1: A and B')
   })
 
-  it('인물 없는 칸은 사람 없이 유지하라고 지시한다 (인서트 샷)', () => {
+  it('사람 없는 칸에는 사람을 넣지 않는다 (삽입 장면)', () => {
     const p = buildRealGridPrompt(2, {
       ...BASE,
       characterRefCount: 1,
@@ -46,19 +47,19 @@ describe('buildRealGridPrompt — 칸별 인물 배정 (#real-grid-identity)', (
     expect(p).toContain('* Column 2: no character — keep this column free of people')
   })
 
-  it('characterRefs 미전달(구 호출자)이면 현행 익명 문장 그대로 — 하위 호환', () => {
+  it('인물 목록이 없으면 이름 없는 안내를 그대로 유지한다', () => {
     const p = buildRealGridPrompt(4, BASE)
     expect(p).toContain('corresponding character(s)')
     expect(p).not.toContain('reference image 2 =')
   })
 
-  it('인물 레퍼런스가 0이면 배정 블록 자체가 없다', () => {
+  it('인물이 없으면 칸별 인물 안내를 넣지 않는다', () => {
     const p = buildRealGridPrompt(4, { characterRefCount: 0, hasStyleRef: false })
     expect(p).not.toContain('Column 1:')
     expect(p).not.toContain('corresponding')
   })
 
-  it('스타일 앵커(LAST) 지시는 배정 블록과 공존한다', () => {
+  it('스타일 기준 그림과 칸별 인물 안내를 함께 제공한다', () => {
     const p = buildRealGridPrompt(4, {
       ...BASE,
       characterRefs: [{ name: '소녀' }],
@@ -72,8 +73,8 @@ describe('buildRealGridPrompt — 칸별 인물 배정 (#real-grid-identity)', (
 // 시트(=생성 콜)마다 시간대를 지어냈고, 21~24/25~27 시트가 서로 다른 시간대로 갈라졌다.
 // 계약: scenes.time_of_day 가 오면 시트 전역 조명 한 줄이 실리고, 앵커 절은 조명·그레이드
 // 권위를 이 줄에 넘긴다(§6D 실측: 텍스트 그레이드 권위 > 앵커 이미지 — 문구가 남으면 경합).
-describe('씬 전역 조명 (#F-006)', () => {
-  it('그리드: sceneLighting 이 오면 시트 전역 조명 줄이 실리고 앵커 절에서 조명·그레이드 문구가 빠진다', () => {
+describe('한 장면의 시간대와 빛을 모든 칸에 적용한다 (#F-006)', () => {
+  it('시간대를 지정하면 전체 그림에 같은 빛을 적용하고 기준 그림과 겹치는 안내는 뺀다', () => {
     const p = buildRealGridPrompt(4, { ...BASE, sceneLighting: 'Night' })
     expect(p).toContain('Scene lighting — the whole sheet is ONE scene, time of day: Night')
     expect(p).toContain('identical across all columns')
@@ -82,7 +83,7 @@ describe('씬 전역 조명 (#F-006)', () => {
     expect(p).toContain('do NOT copy its time of day or lighting')
   })
 
-  it('그리드: sceneLighting 미전달·공백이면 현행 프롬프트 그대로 — 하위 호환', () => {
+  it('시간대가 없거나 비어 있으면 기존 안내를 그대로 유지한다', () => {
     for (const p of [
       buildRealGridPrompt(4, BASE),
       buildRealGridPrompt(4, { ...BASE, sceneLighting: '  ' }),
@@ -92,7 +93,7 @@ describe('씬 전역 조명 (#F-006)', () => {
     }
   })
 
-  it('그리드: 앵커가 없어도(라이브액션 폴백) 씬 조명 줄은 독립적으로 실린다', () => {
+  it('기준 그림이 없어도 지정한 시간대의 빛 안내는 적용한다', () => {
     const p = buildRealGridPrompt(4, {
       characterRefCount: 0,
       hasStyleRef: false,
@@ -102,7 +103,7 @@ describe('씬 전역 조명 (#F-006)', () => {
     expect(p).not.toContain('LAST reference image')
   })
 
-  it('스트립: 같은 계약 — 조명 줄 + 앵커 절 권위 이관, 미전달이면 현행 그대로', () => {
+  it('시간대를 지정하면 세 장면 그림에 같은 빛을 적용하고 없으면 기존 안내를 유지한다', () => {
     const withScene = buildRealStripPrompt('shot desc', {
       characterRefCount: 1,
       hasStyleRef: true,

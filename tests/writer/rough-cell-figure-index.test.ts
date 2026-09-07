@@ -1,3 +1,4 @@
+// 같은 인물의 동작과 시선을 한 번호로 묶어 엉뚱한 인물에게 붙지 않게 한다 (#figure-index 2026-09-02)
 // #figure-index(2026-09-02): 러프 셀의 동작·시선 "figure N" 은 인물의 blocking 번호를 따른다.
 //   실측 겨울_4(9ea9bd67) sh_01_28 — 옛 코드는 동작 목록 인덱스로 번호를 매겨 수인의 두 번째 동작이
 //   figure 2(용족)에게 붙었고, 러프 END 에서 용족이 한 발 내딛는 그림이 나왔다.
@@ -64,8 +65,8 @@ const SH_01_28: RoughStoryboardPromptInput = {
   },
 }
 
-describe('러프 셀 동작 번호 — 인물의 blocking 번호를 따른다 (#figure-index)', () => {
-  it('sh_01_28 실측: 수인의 두 동작이 모두 figure 1 에 붙고, 용족(figure 2)은 동작을 받지 않는다', () => {
+describe('러프 그림에서 같은 인물의 동작 번호를 일관되게 매긴다 (#figure-index)', () => {
+  it('같은 인물의 두 동작은 같은 번호로 표시하고 다른 인물에게 붙이지 않는다', () => {
     const cell = buildRoughGridCell(SH_01_28, 'sh_01_28')
     expect(cell.motion).toContain('figure 1: exhales heavily (small)')
     expect(cell.motion).toContain('figure 1: steps forward showing palms (medium)')
@@ -74,7 +75,7 @@ describe('러프 셀 동작 번호 — 인물의 blocking 번호를 따른다 (#
     expect(cell.end).not.toContain('figure 2:')
   })
 
-  it('동작 목록 순서가 blocking 순서와 달라도 각 동작은 자기 인물의 번호를 받는다', () => {
+  it('동작을 적은 순서가 달라도 각 인물에게 올바른 번호를 붙인다', () => {
     const input: RoughStoryboardPromptInput = {
       ...SH_01_28,
       spec: {
@@ -93,7 +94,7 @@ describe('러프 셀 동작 번호 — 인물의 blocking 번호를 따른다 (#
     expect(cell.motion).not.toContain('figure 1:')
   })
 
-  it('시선 arc 도 인물 번호를 달고 실린다', () => {
+  it('인물의 시선 변화에도 해당 인물 번호를 붙인다', () => {
     const input: RoughStoryboardPromptInput = {
       ...SH_01_28,
       spec: {
@@ -105,7 +106,7 @@ describe('러프 셀 동작 번호 — 인물의 blocking 번호를 따른다 (#
     expect(cell.motion).toContain('figure 2: blank head turns toward char 3 → far left')
   })
 
-  it('blocking 에 없는 인물(START 계약상 화면 밖)의 동작은 싣지 않는다 — 유령 figure 금지', () => {
+  it('화면에 없는 인물의 동작은 그림에 넣지 않는다', () => {
     const input: RoughStoryboardPromptInput = {
       ...SH_01_28,
       spec: {
@@ -124,7 +125,7 @@ describe('러프 셀 동작 번호 — 인물의 blocking 번호를 따른다 (#
     expect(cell.motion).not.toContain('figure 4')
   })
 
-  it('sh_01_29 실측: 인물이 하나뿐이면 두 동작 모두 figure 1 — 유령 figure 2 가 생기지 않는다', () => {
+  it('인물이 하나면 두 동작 모두 그 인물 번호로 표시한다', () => {
     const input: RoughStoryboardPromptInput = {
       shotType: 'MCU',
       actionDescription: 'char lets out a scoff, turns their head away, and stares at the forest.',
@@ -150,7 +151,7 @@ describe('러프 셀 동작 번호 — 인물의 blocking 번호를 따른다 (#
     expect(cell.motion).not.toContain('figure 2')
   })
 
-  it('인물이 하나뿐인 셀은 id 가 어긋나도 그 하나에 붙인다(모호하지 않다)', () => {
+  it('인물이 하나뿐이면 표기가 달라도 그 인물의 동작으로 연결한다', () => {
     const input: RoughStoryboardPromptInput = {
       shotType: 'CU',
       actionDescription: 'she looks up.',
@@ -163,7 +164,7 @@ describe('러프 셀 동작 번호 — 인물의 blocking 번호를 따른다 (#
     expect(buildRoughGridCell(input, 'x').motion).toContain('figure 1: looks up (small)')
   })
 
-  it('blocking 이 없는 폴백 셀은 characterNames 순서로 번호를 잇는다', () => {
+  it('인물 배치 정보가 없으면 이름을 적은 순서대로 번호를 붙인다', () => {
     const input: RoughStoryboardPromptInput = {
       shotType: 'WS',
       actionDescription: 'two figures cross the bridge.',

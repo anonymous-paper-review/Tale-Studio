@@ -1,3 +1,4 @@
+// 일시적인 문제는 한 번 다시 시도하고, 결정적인 문제는 이유를 바로 알려준다 (#stage-retry 2026-08-13, 오너 정책)
 import { describe, it, expect } from 'vitest'
 import {
   classifyStageError,
@@ -12,7 +13,7 @@ import {
 // 대가가 "1회 낭비"로 상한이 있는 쪽으로 기운다.
 
 describe('classifyStageError', () => {
-  it('network — 429/타임아웃/네트워크/5xx 는 예산 무차감 재시도 클래스 (오너 정책 확장)', () => {
+  it('일시적인 연결 문제나 한도 초과·서버 오류는 비용을 쓰지 않고 다시 시도한다 (오너 정책 확장)', () => {
     for (const msg of [
       '429 Too Many Requests',
       'Resource has been exhausted (e.g. check quota).', // 프로바이더 rate limit — quota 단어에 낚이면 안 된다
@@ -27,14 +28,14 @@ describe('classifyStageError', () => {
     }
   })
 
-  it('LLM 출력 형태 실패(JSON/계약)는 transient — 재샘플이 고칠 수 있다', () => {
+  it('답변 형식이 잘못되면 일시적인 문제로 보고 다시 요청한다', () => {
     expect(classifyStageError(new Error('Unexpected token < in JSON at position 0'))).toBe(
       'transient',
     )
     expect(classifyStageError(new Error('repairJson: unrecoverable'))).toBe('transient')
   })
 
-  it('결정 오류 — DB 제약/권한/결제/모더레이션은 permanent', () => {
+  it('권한·결제·내용 제한처럼 해결이 필요한 문제는 바로 실패로 알린다', () => {
     for (const msg of [
       // F5-R2 인계철선이 여기로 온다 — 재시도로 문지르면 F-005 재연.
       'shots insert failed: new row for relation "shots" violates check constraint "shots_prompt_not_blanked"',
@@ -49,36 +50,36 @@ describe('classifyStageError', () => {
     }
   })
 
-  it('모르는 오류는 transient — 1회 재시도 후 표면화 (비용 상한 있음)', () => {
+  it('원인을 모르는 문제도 한 번 다시 시도한 뒤 실패를 알려준다 (비용 상한 있음)', () => {
     expect(classifyStageError(new Error('something inexplicable'))).toBe('transient')
     expect(classifyStageError('string error')).toBe('transient')
   })
 })
 
-describe('shouldAutoRetry — 오너 정책: transient 만 예산 1회 (network 는 별도 무차감 경로)', () => {
+describe('shouldAutoRetry — 일시적인 문제만 한 번 다시 시도한다 (네트워크 문제는 별도)', () => {
   const transient = new Error('Unexpected token < in JSON')
   const network = new Error('fetch failed')
   const permanent = new Error('violates check constraint')
 
-  it('transient 첫 시도(count=1) 실패는 자동 재시도한다', () => {
+  it('처음 발생한 일시적인 문제는 자동으로 한 번 다시 시도한다', () => {
     expect(shouldAutoRetry(transient, 1)).toBe(true)
   })
 
-  it('두 번째(count=2)부터는 표면화 — resume 버튼이 사람 방아쇠', () => {
+  it('두 번째 실패부터는 사람에게 알리고 다시 시작할 때 판단하게 한다', () => {
     expect(shouldAutoRetry(transient, 1 + AUTO_RETRY_PER_STAGE)).toBe(false)
   })
 
-  it('permanent 는 첫 시도도 재시도하지 않는다', () => {
+  it('해결이 필요한 문제는 처음부터 다시 시도하지 않는다', () => {
     expect(shouldAutoRetry(permanent, 1)).toBe(false)
   })
 
-  it('network 는 이 예산 경로가 아니다 — 러너의 무차감 경로(캡 소진 후엔 즉시 표면화)', () => {
+  it('연결 문제는 별도 경로로 다시 시도하고, 정해진 횟수를 넘으면 바로 알린다', () => {
     expect(shouldAutoRetry(network, 1)).toBe(false)
   })
 })
 
-describe('network 무차감 재시도 파라미터', () => {
-  it('안전핀 캡은 양수, 백오프는 지수 증가 후 15s 상한', () => {
+describe('네트워크 문제를 다시 시도하는 간격', () => {
+  it('다시 시도하는 횟수는 제한하고, 간격은 점점 늘되 최대 15초를 넘기지 않는다', () => {
     expect(NET_RETRY_CAP).toBeGreaterThan(0)
     expect(netBackoffMs(1)).toBe(2_000)
     expect(netBackoffMs(2)).toBe(4_000)

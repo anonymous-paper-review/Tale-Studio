@@ -1,3 +1,4 @@
+// 샷에 들어갈 인물과 배경 정보를 빠짐없이 찾아, 없는 참조는 사용자에게 알려준다 (#ref-gate 2026-09-02, 실측 겨울_4 9ea9bd67)
 import { describe, it, expect } from 'vitest'
 import {
   planShotCharacterRefs,
@@ -41,7 +42,7 @@ const blocking = {
 }
 
 describe('planShotCharacterRefs', () => {
-  it('시트 없는 인물은 missing 으로 돌려주고, 있는 인물만 결정적 순서(characterId 오름차순)로 참조에 넣는다', () => {
+  it('시트가 없는 인물은 빠졌다고 알리고, 있는 인물은 정해진 순서로 참조에 넣는다', () => {
     const plan = planShotCharacterRefs(
       { shot_id: 'sh_01_24', characters: ['char_3', 'char', 'char_2'], character_appearance_keys: { char: 'current', char_2: 'current', char_3: 'current' }, static_spec: blocking },
       lookup(),
@@ -50,7 +51,7 @@ describe('planShotCharacterRefs', () => {
     expect(plan.missing).toEqual([{ characterId: 'char_3', appearanceKey: 'current', name: '수인 수장' }])
   })
 
-  it('러프 character_blocking 의 위치·포즈를 인물 참조에 싣는다(없으면 null)', () => {
+  it('인물의 위치와 자세를 알 수 있으면 참조에 함께 보여주고, 없으면 비워 둔다', () => {
     const plan = planShotCharacterRefs(
       { shot_id: 's', characters: ['char', 'char_2'], character_appearance_keys: { char: 'current', char_2: 'current' }, static_spec: blocking },
       lookup(),
@@ -59,34 +60,34 @@ describe('planShotCharacterRefs', () => {
     expect(plan.characterRefs[1]).toMatchObject({ characterId: 'char_2', position: null, pose: null })
   })
 
-  it('character_appearance_keys 가 없는 레거시 샷은 기본 모습 키로 폴백한다', () => {
+  it('모습 선택 정보가 없으면 기본 모습을 사용한다', () => {
     const plan = planShotCharacterRefs({ shot_id: 's', characters: ['char'], character_appearance_keys: null }, lookup())
     expect(plan.characterRefs).toHaveLength(1)
     expect(plan.characterRefs[0].appearanceKey).toBe('current')
   })
 
-  it('characters 가 배열이 아니면(미정의) 빈 계획 — 호출부가 종전 경로로 간다', () => {
+  it('인물 목록을 알 수 없으면 참조를 만들지 않고 기존 흐름으로 진행한다', () => {
     expect(planShotCharacterRefs({ shot_id: 's', characters: undefined }, lookup())).toEqual({ characterRefs: [], missing: [] })
     expect(planShotCharacterRefs({ shot_id: 's', characters: null }, lookup())).toEqual({ characterRefs: [], missing: [] })
   })
 
-  it('빈 배열(인물 없는 샷)은 참조도 missing 도 없다', () => {
+  it('인물이 없는 샷은 참조와 누락 알림을 만들지 않는다', () => {
     expect(planShotCharacterRefs({ shot_id: 's', characters: [] }, lookup())).toEqual({ characterRefs: [], missing: [] })
   })
 
-  it('characters 표에 없는 id 는 이름 대신 id 로 missing 에 잡힌다(소리 없이 빠지지 않는다)', () => {
+  it('목록에 없는 인물은 이름 대신 그 값을 누락 알림에 넣는다', () => {
     const plan = planShotCharacterRefs({ shot_id: 's', characters: ['ghost'] }, lookup())
     expect(plan.missing).toEqual([{ characterId: 'ghost', appearanceKey: 'current', name: 'ghost' }])
   })
 
-  it('missingSheetsMessage 는 이름을 나열한다', () => {
+  it('누락된 인물의 이름을 한 문장으로 나열해 알려준다', () => {
     expect(missingSheetsMessage([{ characterId: 'a', appearanceKey: 'current', name: '요정 수장' }, { characterId: 'b', appearanceKey: 'current', name: '수인 수장' }]))
       .toBe('Character sheets are missing for 요정 수장, 수인 수장 — generate them in the Artist tab first.')
   })
 })
 
 describe('readCharacterBlocking / stripUrlQuery', () => {
-  it('블로킹 배열을 character_id 맵으로 — 비문자열·빈값은 null, 중복 id 는 첫 항목', () => {
+  it('인물별 위치와 자세를 읽을 때 잘못된 값은 비우고, 같은 인물은 처음 정보를 사용한다', () => {
     const m = readCharacterBlocking({
       character_blocking: [
         { character_id: 'a', position_in_frame: ' center_third ', pose: '' },
@@ -99,14 +100,14 @@ describe('readCharacterBlocking / stripUrlQuery', () => {
     expect(readCharacterBlocking(null).size).toBe(0)
   })
 
-  it('캐시버스트 쿼리를 떼고 같은 객체를 판정한다', () => {
+  it('주소 뒤의 추가 정보가 달라도 같은 그림으로 알아본다', () => {
     expect(stripUrlQuery('https://x/a.png?v=123')).toBe('https://x/a.png')
     expect(stripUrlQuery('https://x/a.png')).toBe('https://x/a.png')
   })
 })
 
 describe('resolveSceneWorldRefs (씬→배경)', () => {
-  it('scenes.location(location_id) 로 wide_shot 을 찾고, 없으면 locations.scene_id 로 폴백한다', () => {
+  it('장면의 장소로 배경을 찾고, 없으면 장면 번호로 다시 찾아 연결한다', () => {
     const m = resolveSceneWorldRefs(
       [
         { scene_id: 'sc_01', location: 'location' },

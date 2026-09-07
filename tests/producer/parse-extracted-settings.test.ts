@@ -1,3 +1,4 @@
+// 설정 형식이 답변에 드러나지 않으면서도 이야기 설정은 빠짐없이 반영된다 (C8)
 import { describe, expect, it } from 'vitest'
 import { parseExtractedSettings } from '@/lib/parse-extracted-settings'
 
@@ -5,8 +6,8 @@ import { parseExtractedSettings } from '@/lib/parse-extracted-settings'
 const hasJsonLeak = (reply: string) =>
   /extractedSettings/.test(reply) || /```/.test(reply) || /\{\s*"/.test(reply)
 
-describe('parseExtractedSettings (C8 JSON leak)', () => {
-  it('trailing fenced json: extracts settings, reply is clean prose', () => {
+describe('parseExtractedSettings (C8 답변에는 설정 형식이 보이지 않음)', () => {
+  it('답변 뒤에 설정 형식이 붙어도 사용자에게는 자연스러운 문장만 보여준다', () => {
     const text = '좋아요! 설정할게요.\n\n```json\n{"extractedSettings": {"genre": "thriller"}}\n```'
     const { reply, extractedSettings } = parseExtractedSettings(text)
     expect(reply).toBe('좋아요! 설정할게요.')
@@ -14,7 +15,7 @@ describe('parseExtractedSettings (C8 JSON leak)', () => {
     expect(hasJsonLeak(reply)).toBe(false)
   })
 
-  it('unfenced trailing json object does not leak', () => {
+  it('답변 뒤에 표시된 설정 내용이 사용자에게 드러나지 않는다', () => {
     const text = '정리했어요.\n{"extractedSettings": {"playtime": 30}}'
     const { reply, extractedSettings } = parseExtractedSettings(text)
     expect(reply).toBe('정리했어요.')
@@ -22,7 +23,7 @@ describe('parseExtractedSettings (C8 JSON leak)', () => {
     expect(hasJsonLeak(reply)).toBe(false)
   })
 
-  it('mid-message fenced json (text after the block) does not leak', () => {
+  it('답변 중간에 설정 내용이 있어도 앞뒤 문장만 보여준다', () => {
     const text = '앞부분 설명.\n```json\n{"extractedSettings": {"genre": "drama"}}\n```\n그리고 뒷부분 코멘트.'
     const { reply, extractedSettings } = parseExtractedSettings(text)
     expect(hasJsonLeak(reply)).toBe(false)
@@ -31,14 +32,14 @@ describe('parseExtractedSettings (C8 JSON leak)', () => {
     expect(extractedSettings).toEqual({ genre: 'drama' })
   })
 
-  it('multiple fenced blocks: none leak, last valid extracted wins', () => {
+  it('설정 내용이 여러 번 와도 보이지 않고 마지막으로 올바른 내용만 반영한다', () => {
     const text = 'a\n```json\n{"extractedSettings": {"genre": "x"}}\n```\nb\n```json\n{"extractedSettings": {"genre": "y"}}\n```'
     const { reply, extractedSettings } = parseExtractedSettings(text)
     expect(hasJsonLeak(reply)).toBe(false)
     expect(extractedSettings).toEqual({ genre: 'y' })
   })
 
-  it('malformed json inside fence does not leak (block stripped, settings empty)', () => {
+  it('잘못된 설정 내용이 섞여도 형식이 보이지 않고 설정은 비워 둔다', () => {
     const text = '여기요.\n```json\n{"extractedSettings": {"genre": "thriller"  // broken\n```'
     const { reply, extractedSettings } = parseExtractedSettings(text)
     expect(hasJsonLeak(reply)).toBe(false)
@@ -46,14 +47,14 @@ describe('parseExtractedSettings (C8 JSON leak)', () => {
     expect(extractedSettings).toEqual({})
   })
 
-  it('uppercase JSON fence label is handled', () => {
+  it('설정 표시가 대문자로 적혀도 내용을 알아본다', () => {
     const text = 'ok\n```JSON\n{"extractedSettings": {"format": "square_1:1"}}\n```'
     const { reply, extractedSettings } = parseExtractedSettings(text)
     expect(hasJsonLeak(reply)).toBe(false)
     expect(extractedSettings).toEqual({ format: 'square_1:1' })
   })
 
-  it('unterminated fence (token cutoff) leaves no fence marker or json in reply', () => {
+  it('설정 표시가 끝나지 않아도 흔적 없이 안내 문장만 보여준다', () => {
     const text = '여기 설정이에요.\n```json\n{"extractedSettings": {"genre": "noir"'
     const { reply, extractedSettings } = parseExtractedSettings(text)
     expect(reply).toBe('여기 설정이에요.')
@@ -62,7 +63,7 @@ describe('parseExtractedSettings (C8 JSON leak)', () => {
     expect(extractedSettings).toEqual({})
   })
 
-  it('plain reply with no json returns text untouched and empty settings', () => {
+  it('설정 내용이 없으면 답변은 그대로 보여주고 설정은 비워 둔다', () => {
     const { reply, extractedSettings } = parseExtractedSettings('주인공은 어떤 사람인가요?')
     expect(reply).toBe('주인공은 어떤 사람인가요?')
     expect(extractedSettings).toEqual({})

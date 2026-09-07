@@ -1,3 +1,4 @@
+// 영상 결과 주소가 안전하고 재생 가능할 때만 보관하고 완료 처리한다
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ uploadImmutableObject: vi.fn(), complete: vi.fn(), fail: vi.fn(), completeJob: vi.fn(), failJob: vi.fn(), patch: vi.fn(), from: vi.fn(), falVideoFetch: vi.fn() }))
@@ -116,29 +117,29 @@ afterEach(() => {
   vi.useRealTimers()
   vi.unstubAllEnvs()
 })
-describe('linked director video finalization', () => {
-  it('persists an immutable object and dispatches linked completion with the exact key', async () => {
+describe('연결된 영상 결과는 안전하게 저장하고 완료 처리한다', () => {
+  it('영상 결과를 저장하면 연결된 영상이 정확한 위치로 완료된다', async () => {
     await expect(finalizeShotVideoJob(job, 'https://fal.media/video.mp4')).resolves.toBe(LINKED_VIDEO_URL)
     const path = LINKED_VIDEO_KEY
     expect(mocks.uploadImmutableObject).toHaveBeenCalledWith(path, expect.any(Buffer), 'video/mp4')
     expect(mocks.complete).toHaveBeenCalledWith('project-1', 'job-1', 'clip-1', LINKED_VIDEO_URL, path)
   })
-  it('accepts a new fal CDN subdomain (#fal-cdn-host) — 정적 목록에 없어도 도메인 소속이면 통과', async () => {
+  it('새로운 FAL 주소라도 FAL 소속이면 영상 결과로 받아들인다 (#fal-cdn-host)', async () => {
     // 2026-07-31 실패 재현: fal 이 v3b.fal.media 로 내보내자 정상 영상이 전부 죽었다.
     await expect(finalizeShotVideoJob(job, 'https://v3b.fal.media/files/b/0aa/x.mp4'))
       .resolves.toBe(LINKED_VIDEO_URL)
   })
-  it('still rejects a host that merely impersonates the fal domain', async () => {
+  it('FAL처럼 보이기만 하는 주소는 영상 결과로 받아들이지 않는다', async () => {
     await expect(finalizeShotVideoJob(job, 'https://evilfal.media/video.mp4'))
       .rejects.toThrow('invalid video url in provider result')
   })
-  it('propagates immutable storage conflicts and does not falsely complete the attempt', async () => {
+  it('같은 영상 저장 내용이 충돌하면 완료로 잘못 표시하지 않는다', async () => {
     mocks.uploadImmutableObject.mockRejectedValue(new ImmutableObjectMismatchError(LINKED_VIDEO_KEY, 'content'))
     await expect(finalizeShotVideoJob(job, 'https://fal.media/video.mp4'))
       .rejects.toMatchObject({ code: 'storage_conflict' })
     expect(mocks.complete).not.toHaveBeenCalled()
   })
-  it('rejects corrupt provider media before immutable upload', async () => {
+  it('손상된 영상 결과는 저장하지 않고 거절한다', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('<html>error</html>', { headers: { 'content-type': 'text/html' } })))
     await expect(finalizeShotVideoJob(job, 'https://fal.media/video.mp4')).rejects.toThrow('invalid MP4')
     expect(mocks.uploadImmutableObject).not.toHaveBeenCalled()
@@ -147,14 +148,14 @@ describe('linked director video finalization', () => {
     ['declared oversize', new Response(responseBody(validMp4), { headers: { 'content-type': 'video/mp4', 'content-length': String(129 * 1024 * 1024) } })],
     ['empty body', new Response(responseBody(Buffer.alloc(0)), { headers: { 'content-type': 'video/mp4' } })],
     ['truncated MP4', new Response(responseBody(Buffer.from([0, 0, 0, 16, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73])), { headers: { 'content-type': 'video/mp4' } })],
-  ])('rejects %s before immutable upload', async (_name, response) => {
+  ])('영상 결과가 %s이면 저장하지 않고 거절한다', async (_name, response) => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response))
     await expect(finalizeShotVideoJob(job, 'https://fal.media/video.mp4'))
       .rejects.toMatchObject({ code: 'invalid_provider_result' })
     expect(mocks.uploadImmutableObject).not.toHaveBeenCalled()
   })
 
-  it('accepts a playable MP4 when its content length is absent', async () => {
+  it('재생 가능한 MP4는 크기 정보가 없어도 저장한다', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
       responseBody(validMp4),
       { headers: { 'content-type': 'video/mp4' } },
@@ -162,7 +163,7 @@ describe('linked director video finalization', () => {
     await expect(finalizeShotVideoJob(job, 'https://fal.media/video.mp4')).resolves.toBe(LINKED_VIDEO_URL)
     expect(mocks.uploadImmutableObject).toHaveBeenCalled()
   })
-  it('rejects an ftyp-only MP4 before immutable upload', async () => {
+  it('내용이 없는 MP4는 저장하지 않고 거절한다', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
       Buffer.from([0, 0, 0, 16, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d, 0, 0, 0, 0]),
       { headers: { 'content-type': 'video/mp4' } },
@@ -179,7 +180,7 @@ describe('linked director video finalization', () => {
       return malformed
     })()],
     ['truncated moov', validMp4.subarray(0, -1)],
-  ])('rejects malformed %s before immutable upload', async (_name, bytes) => {
+  ])('영상 파일 형식이 깨졌으면 %s 경우에도 저장하지 않고 거절한다', async (_name, bytes) => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(responseBody(bytes), { headers: { 'content-type': 'video/mp4' } })))
     await expect(finalizeShotVideoJob(job, 'https://fal.media/video.mp4'))
       .rejects.toMatchObject({ code: 'invalid_provider_result' })
@@ -199,13 +200,13 @@ describe('linked director video finalization', () => {
       malformed.writeUInt32BE(0, malformed.indexOf('stsz') + 12)
       return malformed
     })()],
-  ])('rejects invalid track metadata: %s', async (_name, bytes) => {
+  ])('영상 정보가 잘못되었으면 %s 경우에도 저장하지 않고 거절한다', async (_name, bytes) => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(responseBody(bytes), { headers: { 'content-type': 'video/mp4' } })))
     await expect(finalizeShotVideoJob(job, 'https://fal.media/video.mp4'))
       .rejects.toMatchObject({ code: 'invalid_provider_result' })
     expect(mocks.uploadImmutableObject).not.toHaveBeenCalled()
   })
-  it('rejects an inflated fixed-size sample count without uploading', async () => {
+  it('영상에 기록된 장면 수가 비정상적으로 크면 저장하지 않는다', async () => {
     const malformed = Buffer.from(validMp4)
     malformed.writeUInt32BE(0xffffffff, malformed.indexOf('stsz') + 12)
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
@@ -216,7 +217,7 @@ describe('linked director video finalization', () => {
       .rejects.toMatchObject({ code: 'invalid_provider_result' })
     expect(mocks.uploadImmutableObject).not.toHaveBeenCalled()
   })
-  it('rejects a top-level box flood before immutable upload', async () => {
+  it('영상 구조가 지나치게 복잡하면 저장하지 않고 거절한다', async () => {
     const flood = Buffer.concat(Array.from({ length: 10_000 }, () => box('free')))
     const bytes = Buffer.concat([
       validMp4.subarray(0, 16),
@@ -231,7 +232,7 @@ describe('linked director video finalization', () => {
       .rejects.toMatchObject({ code: 'invalid_provider_result' })
     expect(mocks.uploadImmutableObject).not.toHaveBeenCalled()
   })
-  it('rejects many mdat ranges with a late invalid sample without uploading', async () => {
+  it('영상 구간이 지나치게 많고 잘못되면 저장하지 않고 거절한다', async () => {
     const bytes = manyMdatSamplesFixture(2_000)
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
       responseBody(bytes),
@@ -241,7 +242,7 @@ describe('linked director video finalization', () => {
       .rejects.toMatchObject({ code: 'invalid_provider_result' })
     expect(mocks.uploadImmutableObject).not.toHaveBeenCalled()
   })
-  it('rejects repeated video tracks beyond the aggregate sample budget without uploading', async () => {
+  it('영상 정보가 허용량을 넘으면 저장하지 않고 거절한다', async () => {
     const bytes = repeatedVideoTracksFixture(600_000, 2)
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
       responseBody(bytes),
@@ -251,7 +252,7 @@ describe('linked director video finalization', () => {
       .rejects.toMatchObject({ code: 'invalid_provider_result' })
     expect(mocks.uploadImmutableObject).not.toHaveBeenCalled()
   })
-  it('allows configured local and FAL media origins', async () => {
+  it('허용된 내 컴퓨터와 FAL 주소의 영상은 저장한다', async () => {
     const localJob = { ...(job as object), provider: 'local', request_id: 'http://local.test/api/tasks/1' } as never
     await expect(finalizeShotVideoJob(localJob, 'http://local.test/api/tasks/1/output.mp4')).resolves.toBe(LINKED_VIDEO_URL)
     await expect(finalizeShotVideoJob(job, 'https://v3.fal.media/video.mp4')).resolves.toBe(LINKED_VIDEO_URL)
@@ -266,19 +267,19 @@ describe('linked director video finalization', () => {
     'https://evil.test/video.mp4',
     'https://user@fal.media/video.mp4',
     'https://fal.media:8443/video.mp4',
-  ])('blocks unsafe FAL media target %s before fetching', async (url) => {
+  ])('안전하지 않은 FAL 영상 주소 %s는 가져오지 않는다', async (url) => {
     await expect(finalizeShotVideoJob(job, url)).rejects.toMatchObject({ code: 'invalid_provider_result' })
     expect(fetch).not.toHaveBeenCalled()
   })
 
-  it('blocks local media targets outside the configured origin', async () => {
+  it('허용한 내 컴퓨터 주소가 아니면 영상을 가져오지 않는다', async () => {
     const localJob = { ...(job as object), provider: 'local', request_id: 'http://local.test/api/tasks/1' } as never
     await expect(finalizeShotVideoJob(localJob, 'https://local.test/api/tasks/1/output.mp4'))
       .rejects.toMatchObject({ code: 'invalid_provider_result' })
     expect(fetch).not.toHaveBeenCalled()
   })
 
-  it('blocks redirects that leave the approved provider policy', async () => {
+  it('영상 주소가 허용 범위를 벗어나도록 바뀌면 거절한다', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, {
       status: 302,
       headers: { location: 'https://evil.test/video.mp4' },
@@ -287,7 +288,7 @@ describe('linked director video finalization', () => {
       .rejects.toMatchObject({ code: 'invalid_provider_result' })
     expect(fetch).toHaveBeenCalledTimes(1)
   })
-  it('follows approved redirects and cancels each intermediate body', async () => {
+  it('허용된 주소 변경은 따라가고 중간 내용은 정리한다', async () => {
     let cancelled = false
     const redirect = new Response(new ReadableStream({ cancel() { cancelled = true } }), {
       status: 302,
@@ -300,7 +301,7 @@ describe('linked director video finalization', () => {
     expect(cancelled).toBe(true)
     expect(fetch).toHaveBeenCalledTimes(2)
   })
-  it('rejects redirect budget exhaustion and cancels the final redirect body', async () => {
+  it('주소 변경이 너무 많으면 마지막 내용을 정리하고 거절한다', async () => {
     let cancellations = 0
     vi.stubGlobal('fetch', vi.fn().mockImplementation(() => new Response(
       new ReadableStream({ cancel() { cancellations += 1 } }),
@@ -310,7 +311,7 @@ describe('linked director video finalization', () => {
       .rejects.toMatchObject({ code: 'invalid_provider_result' })
     expect(cancellations).toBe(4)
   })
-  it('cancels a non-success response body before terminalizing it', async () => {
+  it('영상 응답이 실패하면 내용을 정리하고 종료한다', async () => {
     let cancelled = false
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
       new ReadableStream({ cancel() { cancelled = true } }),
@@ -321,7 +322,7 @@ describe('linked director video finalization', () => {
     expect(cancelled).toBe(true)
   })
 
-  it('aborts a stalled total video download deadline as retryable', async () => {
+  it('영상 받기가 오래 걸리면 다시 시도할 수 있게 중단한다', async () => {
     vi.useFakeTimers()
     vi.stubGlobal('fetch', vi.fn().mockImplementation((_url, init: RequestInit) => new Promise((_resolve, reject) => {
       init.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
@@ -332,7 +333,7 @@ describe('linked director video finalization', () => {
     await vi.advanceTimersByTimeAsync(45_000)
     await finalized
   })
-  it('cancels a body that stalls after headers at the download deadline', async () => {
+  it('영상 받기가 시작된 뒤 멈춰도 오래 기다리지 않고 다시 시도한다', async () => {
     vi.useFakeTimers()
     let cancelled = false
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(
@@ -349,7 +350,7 @@ describe('linked director video finalization', () => {
   it.each([
     ['absent', undefined],
     ['dishonest', '12'],
-  ])('rejects streamed %s content-length overruns at the configured byte limit', async (_name, contentLength) => {
+  ])('영상 크기가 허용량을 넘으면 %s 경우에도 중단한다', async (_name, contentLength) => {
     let cancelled = false
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
@@ -365,7 +366,7 @@ describe('linked director video finalization', () => {
     expect(cancelled).toBe(true)
   })
 
-  it('classifies immutable conflicts and explicit database failures as terminal', async () => {
+  it('저장 충돌과 명확한 서버 오류는 더 시도하지 않고 종료한다', async () => {
     mocks.uploadImmutableObject.mockRejectedValue(Object.assign(new Error('storage timeout'), { code: 'ETIMEDOUT' }))
     await expect(finalizeShotVideoJob(job, 'https://fal.media/video.mp4'))
       .rejects.toMatchObject({ code: 'storage_retryable' })
@@ -398,25 +399,25 @@ describe('linked director video finalization', () => {
     ['statusCode', 408],
     ['statusCode', 425],
     ['statusCode', 429],
-  ])('keeps transient storage status %s=%s retryable', async (field, status) => {
+  ])('일시적인 저장 오류 상태 %s=%s이면 다시 시도한다', async (field, status) => {
     mocks.uploadImmutableObject.mockRejectedValue(Object.assign(new Error('storage transient'), { [field]: status }))
     await expect(finalizeShotVideoJob(job, 'https://fal.media/video.mp4'))
       .rejects.toMatchObject({ code: 'storage_retryable' })
   })
-  it('keeps unknown persistence failures retryable after immutable upload', async () => {
+  it('원인을 알 수 없는 저장 실패는 다시 시도한다', async () => {
     mocks.complete.mockRejectedValue(new Error('complete RPC failed'))
     await expect(finalizeShotVideoJob(job, 'https://fal.media/video.mp4'))
       .rejects.toMatchObject({ code: 'database_retryable' })
   })
 })
-describe('linked reconcile boundaries', () => {
-  it('dispatches linked provider failure through the video-attempt RPC', async () => {
+describe('연결된 영상 결과를 상태에 맞게 반영한다', () => {
+  it('연결된 영상 제공처가 실패하면 실패 상태로 기록한다', async () => {
     const { reconcileJobFromFal } = await import('@/lib/fal/reconcile')
     mocks.falVideoFetch.mockResolvedValue({ status: 'FAILED', error: 'provider failed' })
     await expect(reconcileJobFromFal(job)).resolves.toMatchObject({ status: 'failed', error: 'provider failed' })
     expect(mocks.fail).toHaveBeenCalledWith('project-1', 'job-1', 'provider failed')
   })
-  it('reconciles a linked local result through the Director completion dispatcher', async () => {
+  it('연결된 내 컴퓨터 영상은 Director 결과로 완료한다', async () => {
     const { reconcileJobFromFal } = await import('@/lib/fal/reconcile')
     const localJob = { ...(job as object), provider: 'local', request_id: 'http://local.test/api/output.mp4' } as never
     await expect(reconcileJobFromFal(localJob)).resolves.toMatchObject({
@@ -431,7 +432,7 @@ describe('linked reconcile boundaries', () => {
       LINKED_VIDEO_KEY,
     )
   })
-  it('reconciles an unlinked local result through the generic completion dispatcher', async () => {
+  it('연결되지 않은 내 컴퓨터 영상도 완료 결과로 기록한다', async () => {
     const { reconcileJobFromFal } = await import('@/lib/fal/reconcile')
     const localJob = {
       ...(job as object),
@@ -446,7 +447,7 @@ describe('linked reconcile boundaries', () => {
     })
     expect(mocks.completeJob).toHaveBeenCalledWith('job-1', 'http://local.test/api/output.mp4')
   })
-  it('terminalizes an invalid unlinked local result through the generic failure dispatcher', async () => {
+  it('연결되지 않은 영상 주소가 잘못되면 실패로 기록한다', async () => {
     const { reconcileJobFromFal } = await import('@/lib/fal/reconcile')
     const localJob = {
       ...(job as object),
@@ -463,7 +464,7 @@ describe('linked reconcile boundaries', () => {
     'https://evil.test/output.mp4',
     'ftp://local.test/output.mp4',
     'http://user@local.test/output.mp4',
-  ])('terminalizes unlinked local results outside the configured origin: %s', async (requestId) => {
+  ])('허용하지 않은 내 컴퓨터 영상 주소 %s는 실패로 기록한다', async (requestId) => {
     const { reconcileJobFromFal } = await import('@/lib/fal/reconcile')
     const localJob = {
       ...(job as object),
@@ -476,7 +477,7 @@ describe('linked reconcile boundaries', () => {
     // [finalize] prefix marks the failing stage (#a2-observability 2026-08-26)
     expect(mocks.failJob).toHaveBeenCalledWith('job-1', '[finalize] local video job has no valid result URL')
   })
-  it('terminalizes a permanent linked provider lookup error through the attempt RPC', async () => {
+  it('연결된 영상 제공처의 영구 오류는 실패로 기록한다', async () => {
     const { reconcileJobFromFal } = await import('@/lib/fal/reconcile')
     mocks.falVideoFetch.mockRejectedValue(Object.assign(new Error('provider request invalid'), { status: 400 }))
     // HTTP status 를 사유에 합성한다 (#a1-inflight-block 2026-08-27) — fal 404 는 message 가 비어
@@ -485,27 +486,27 @@ describe('linked reconcile boundaries', () => {
     expect(mocks.fail).toHaveBeenCalledWith('project-1', 'job-1', 'provider request invalid (status 400)')
   })
 
-  it('retains queued state for unclassified provider lookup errors', async () => {
+  it('원인을 모르는 영상 제공처 오류는 대기 상태를 유지한다', async () => {
     const { reconcileJobFromFal } = await import('@/lib/fal/reconcile')
     mocks.falVideoFetch.mockRejectedValue(new Error('provider lookup unavailable'))
     await expect(reconcileJobFromFal(job)).resolves.toBe(job)
     expect(mocks.fail).not.toHaveBeenCalled()
   })
 
-  it('retains queued state after a transient provider fetch failure', async () => {
+  it('일시적인 영상 제공처 오류는 대기 상태를 유지한다', async () => {
     const { reconcileJobFromFal } = await import('@/lib/fal/reconcile')
     mocks.falVideoFetch.mockRejectedValue(new TypeError('temporary provider outage'))
     await expect(reconcileJobFromFal(job)).resolves.toBe(job)
   })
 
-  it('propagates terminal linked failure persistence errors', async () => {
+  it('연결된 영상 실패를 기록할 수 없으면 그 오류를 알린다', async () => {
     const { reconcileJobFromFal } = await import('@/lib/fal/reconcile')
     mocks.falVideoFetch.mockResolvedValue({ status: 'FAILED', error: 'provider failed' })
     mocks.fail.mockRejectedValue(new Error('fail RPC unavailable'))
     await expect(reconcileJobFromFal(job)).rejects.toThrow('fail RPC unavailable')
   })
 })
-describe('generation job terminal transitions', () => {
+describe('영상 작업의 완료와 실패 상태를 올바르게 기록한다', () => {
   function transitionQuery(result: unknown) {
     const value = { update: vi.fn(), eq: vi.fn(), is: vi.fn(), select: vi.fn(), maybeSingle: vi.fn() }
     value.update.mockReturnValue(value)
@@ -516,7 +517,7 @@ describe('generation job terminal transitions', () => {
     return value
   }
 
-  it('surfaces database write errors from terminal transitions', async () => {
+  it('완료나 실패를 기록할 수 없으면 오류를 알린다', async () => {
     const generationJobs = await vi.importActual<typeof import('@/lib/generation-jobs')>('@/lib/generation-jobs')
     mocks.from.mockReturnValue(transitionQuery({ data: null, error: new Error('terminal write unavailable') }))
 
@@ -524,7 +525,7 @@ describe('generation job terminal transitions', () => {
       .rejects.toThrow('terminal write unavailable')
   })
 
-  it('distinguishes a non-terminal CAS miss from an idempotent terminal outcome', async () => {
+  it('처리가 끝나지 않은 충돌과 이미 끝난 처리를 구분한다', async () => {
     const generationJobs = await vi.importActual<typeof import('@/lib/generation-jobs')>('@/lib/generation-jobs')
     const casMiss = transitionQuery({ data: null, error: null })
     const currentQueued = transitionQuery({ data: { status: 'queued' }, error: null })

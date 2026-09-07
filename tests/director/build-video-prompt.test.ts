@@ -1,10 +1,11 @@
+// 영상 설명에 카메라와 장면 연결 안내를 알맞게 넣고 길이 제한도 지킨다
 import { describe, expect, it } from 'vitest'
 import { buildVideoPrompt } from '@/lib/director/video-prompt'
 
 const STILL_CAMERA = { horizontal: 0, vertical: 0, pan: 0, tilt: 0, roll: 0, zoom: 0 }
 
 describe('buildVideoPrompt', () => {
-  it('snapshots a standard Kling I2V prompt with camera text and no movement preset fragment', () => {
+  it('Kling I2V 영상은 카메라 움직임을 설명하고 이동 설정은 넣지 않는다', () => {
     const result = buildVideoPrompt({
       prompt: 'A moonlit fox pauses by a river',
       camera: { horizontal: 4, vertical: 0, pan: 0, tilt: -7, roll: 0, zoom: 2 },
@@ -17,7 +18,7 @@ describe('buildVideoPrompt', () => {
     expect(result.fullPrompt).toMatchInlineSnapshot('"A moonlit fox pauses by a river. Camera tracks steadily to the right. Camera pans dramatically to the left. Camera zooms slowly in"')
   })
 
-  it('snapshots a T2V movement preset fragment', () => {
+  it('T2V 영상은 선택한 움직임 설정을 설명에 덧붙인다', () => {
     const result = buildVideoPrompt({
       prompt: 'A courier sprints through rain',
       movementPreset: 'dolly-in',
@@ -29,7 +30,7 @@ describe('buildVideoPrompt', () => {
     expect(result.fullPrompt).toMatchInlineSnapshot('"A courier sprints through rain. dolly in, slow forward push"')
   })
 
-  it('snapshots a camera preset gear fragment', () => {
+  it('카메라 설정을 고르면 Arri Alexa 촬영 정보를 설명에 덧붙인다', () => {
     const result = buildVideoPrompt({
       prompt: 'Macro shot of a glass orchid',
       camera: STILL_CAMERA,
@@ -42,7 +43,7 @@ describe('buildVideoPrompt', () => {
     expect(result.fullPrompt).toMatchInlineSnapshot('"Macro shot of a glass orchid. shot on Arri Alexa, 50mm, f/2.8, white balance 5600K"')
   })
 
-  it('snapshots the Veo under-8s black-screen instruction and 1000 character cap path', () => {
+  it('Veo 영상이 8초보다 짧으면 뒤를 검은 화면으로 채우고 설명을 1000자로 제한한다', () => {
     const result = buildVideoPrompt({
       prompt: 'A lighthouse keeper extinguishes the lamp',
       generationMethod: 'I2V',
@@ -54,7 +55,7 @@ describe('buildVideoPrompt', () => {
     expect(result.fullPrompt).toMatchInlineSnapshot('"A lighthouse keeper extinguishes the lamp Show the described action only for the first 6 seconds; after 6s the frame must be a completely black screen — no subject, no motion — until the video ends."')
   })
 
-  it('appends the START/END convergence clause for V2 two-reference I2V, but not for T2V', () => {
+  it('START와 END를 함께 고른 I2V 영상에는 두 장면 연결을 안내하고 T2V에는 넣지 않는다', () => {
     const i2v = buildVideoPrompt({
       prompt: 'A duelist draws a rapier',
       generationMethod: 'I2V',
@@ -77,7 +78,7 @@ describe('buildVideoPrompt', () => {
     expect(t2v.prompt_parts.startEnd).toBeUndefined()
   })
 
-  it('describes ordered START/REF/END roles without treating REF as a temporal keyframe', () => {
+  it('START·REF·END 순서를 설명하되 REF를 시간 흐름의 기준 장면으로 취급하지 않는다', () => {
     const result = buildVideoPrompt({
       prompt: 'A duelist draws a rapier',
       generationMethod: 'I2V',
@@ -94,7 +95,7 @@ describe('buildVideoPrompt', () => {
     expect(result.fullPrompt).toContain('END image is the completed composition')
   })
 
-  it('does not claim an END frame when only REF images are supplied', () => {
+  it('REF 이미지만 주면 END 장면이 있다고 잘못 안내하지 않는다', () => {
     const result = buildVideoPrompt({
       prompt: 'A duelist studies the room',
       generationMethod: 'I2V',
@@ -110,7 +111,7 @@ describe('buildVideoPrompt', () => {
     expect(result.fullPrompt).not.toContain('finish exactly at the END composition')
   })
 
-  it('keeps legacy START/END convergence when roles are absent', () => {
+  it('역할 정보가 없으면 예전 START·END 연결 안내를 유지한다', () => {
     const result = buildVideoPrompt({
       prompt: 'A duelist draws a rapier',
       generationMethod: 'I2V',
@@ -124,7 +125,7 @@ describe('buildVideoPrompt', () => {
     expect(result.prompt_parts.referenceRoles).toBeUndefined()
   })
 
-  it('snapshots the 500 character base prompt cap boundary', () => {
+  it('기본 설명이 500자를 넘으면 500자로 자른다', () => {
     const result = buildVideoPrompt({
       prompt: '0123456789'.repeat(52),
       generationMethod: 'T2V',

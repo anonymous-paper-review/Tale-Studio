@@ -1,3 +1,4 @@
+// 저장한 초안을 다시 열어도 이야기와 설정을 잃지 않고 최신 카드 내용을 보여준다
 import { describe, expect, it } from 'vitest'
 import {
   parseProducerDraft,
@@ -47,14 +48,14 @@ const emptyDb: ProducerBoardState = {
 }
 
 describe('parseProducerDraft', () => {
-  it('returns null for non-object / malformed payloads', () => {
+  it('초안이 아니거나 필수 내용이 빠져 형식이 깨지면 받아들이지 않는다', () => {
     expect(parseProducerDraft(null)).toBeNull()
     expect(parseProducerDraft('x')).toBeNull()
     expect(parseProducerDraft({ cast: [] })).toBeNull() // missing backgrounds/settings
     expect(parseProducerDraft({ cast: [], backgrounds: [] })).toBeNull() // missing settings
   })
 
-  it('parses a well-formed draft and coerces fields', () => {
+  it('형식에 맞는 초안이면 필요한 내용을 읽어 정상 초안으로 만든다', () => {
     const d = parseProducerDraft(draft())
     expect(d).not.toBeNull()
     expect(d!.storyReady).toBe(true)
@@ -64,12 +65,12 @@ describe('parseProducerDraft', () => {
 })
 
 describe('mergeDraftWithDb', () => {
-  it('returns db board unchanged when no draft exists', () => {
+  it('저장된 초안이 없으면 현재 보드를 그대로 둔다', () => {
     const db: ProducerBoardState = { ...emptyDb, cast: [cast('writer인물', { origin: 'writer' })] }
     expect(mergeDraftWithDb(null, db)).toBe(db)
   })
 
-  it('restores the draft when DB is empty (the re-entry bug fix)', () => {
+  it('다시 들어왔을 때 보드가 비어 있으면 저장한 초안을 복원한다', () => {
     const restored = mergeDraftWithDb(draft(), emptyDb)
     expect(restored.storyText).toBe('드래프트 스토리')
     expect(restored.cast.map((c) => c.name)).toEqual(['소녀'])
@@ -77,7 +78,7 @@ describe('mergeDraftWithDb', () => {
     expect(restored.backgrounds.map((b) => b.name)).toEqual(['회화세계'])
   })
 
-  it('merges writer-origin DB cards that are absent from the draft', () => {
+  it('초안에 없는 Writer 카드도 기존 보드에 함께 남긴다', () => {
     const db: ProducerBoardState = {
       ...emptyDb,
       cast: [

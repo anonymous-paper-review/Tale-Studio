@@ -1,3 +1,4 @@
+// 앞 장면의 마지막 화면을 다음 영상의 시작으로 연결하고, 끊긴 연결은 남기지 않는다
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { isVideoData } from '@/types/director'
 import { useDirectorCanvasStore } from '@/stores/director-store'
@@ -32,8 +33,8 @@ function completeSource(sourceVideoId: string) {
   })
 }
 
-describe('Director previous-video last-frame chaining', () => {
-  it('rejects an incomplete source without creating a chain edge', async () => {
+describe('이전 영상의 마지막 화면을 다음 영상 시작에 연결하는 약속', () => {
+  it('완성되지 않은 이전 영상이면 연결선을 만들지 않는다', async () => {
     const { sourceVideoId, targetVideoId } = seedVideos()
 
     const connected = await api().wireVideoChainToVideo(
@@ -48,7 +49,7 @@ describe('Director previous-video last-frame chaining', () => {
     expect(target && isVideoData(target.data) ? target.data.videoChainInputId : null).toBeNull()
   })
 
-  it('restores a valid persisted chain edge and rejects a cycle', () => {
+  it('저장된 올바른 연결은 복원하고 순환 연결은 거부한다', () => {
     const { sourceVideoId, targetVideoId } = seedVideos()
     completeSource(sourceVideoId)
     api().updateNodeData<'video'>(targetVideoId, {
@@ -81,7 +82,7 @@ describe('Director previous-video last-frame chaining', () => {
     expect(target && isVideoData(target.data) ? target.data.videoChainInputId : null).toBeNull()
   })
 
-  it('cleans up an optimistic chain when browser frame capture is unavailable', async () => {
+  it('마지막 화면을 읽을 수 없으면 임시 연결을 지운다', async () => {
     const { sourceVideoId, targetVideoId } = seedVideos()
     completeSource(sourceVideoId)
 
@@ -107,7 +108,7 @@ describe('Director previous-video last-frame chaining', () => {
     )
   })
 
-  it('captures and uploads the source last frame before completing the chain', async () => {
+  it('연결을 확정하기 전에 이전 영상의 마지막 화면을 저장한다', async () => {
     const { sourceVideoId, targetVideoId } = seedVideos()
     completeSource(sourceVideoId)
 
@@ -179,7 +180,7 @@ describe('Director previous-video last-frame chaining', () => {
     )
   })
 
-  it('applyUpdates uses the dedicated connectVideo action and handle', async () => {
+  it('영상 연결을 요청하면 지정한 연결 방식으로 적용한다', async () => {
     const { sourceVideoId, targetVideoId } = seedVideos()
     completeSource(sourceVideoId)
 
@@ -202,7 +203,7 @@ describe('Director previous-video last-frame chaining', () => {
     await Promise.resolve()
   })
 
-  it('invalidates a dependent frame when the source Video attempt changes', () => {
+  it('이전 영상이 바뀌면 다음 영상의 오래된 시작 화면을 버린다', () => {
     const { sourceVideoId, targetVideoId } = seedVideos()
     completeSource(sourceVideoId)
     api().updateNodeData<'video'>(targetVideoId, {

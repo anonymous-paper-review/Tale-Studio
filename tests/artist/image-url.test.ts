@@ -1,3 +1,4 @@
+// 이미지 주소를 안전하게 줄여 쓰고, 원본 주소와 외부 주소는 그대로 보존한다
 import { describe, it, expect, vi } from 'vitest'
 import { toThumbUrl, thumbUrl } from '@/lib/image-url'
 import { mediaPublicUrl } from '@/lib/storage/media-url'
@@ -8,15 +9,15 @@ const PUBLIC = mediaPublicUrl('proj/shot_1_storyboard.png')
 const THUMB = mediaPublicUrl('proj/shot_1_storyboard_thumb.webp')
 
 describe('toThumbUrl', () => {
-  it('swaps a media bucket public image URL to its _thumb.webp sibling', () => {
+  it('보관함의 이미지 주소는 같은 위치의 작은 이미지 주소로 바꾼다', () => {
     expect(toThumbUrl(PUBLIC)).toBe(THUMB)
   })
 
-  it('preserves the version query (?v=)', () => {
+  it('주소의 버전 표시(?v=)를 그대로 보존한다', () => {
     expect(toThumbUrl(`${PUBLIC}?v=1720000000000`)).toBe(`${THUMB}?v=1720000000000`)
   })
 
-  it('leaves non-media URLs unchanged (fal/blob/external)', () => {
+  it('우리 보관함이 아닌 외부 주소는 그대로 둔다', () => {
     expect(toThumbUrl('https://fal.media/files/x.png')).toBe('https://fal.media/files/x.png')
     expect(toThumbUrl('blob:http://localhost/abc')).toBe('blob:http://localhost/abc')
   })
@@ -27,12 +28,12 @@ describe('toThumbUrl', () => {
     expect(toThumbUrl(foreign)).toBe(foreign)
   })
 
-  it('leaves extension-less paths unchanged', () => {
+  it('파일 확장자가 없는 주소는 그대로 둔다', () => {
     const u = mediaPublicUrl('proj/folder')
     expect(toThumbUrl(u)).toBe(u)
   })
 
-  it('이미 썸네일인 파일은 재치환하지 않는다 (_thumb.webp / 영상 _thumbnail.jpg)', () => {
+  it('이미 작은 이미지인 파일은 다시 바꾸지 않는다 (_thumb.webp / 영상 _thumbnail.jpg)', () => {
     // 영상 poster 류를 GeneratedImage(ThumbImage)로 그릴 때, 존재하지 않는
     // *_thumbnail_thumb.webp 를 매번 404 로 두드리는 낭비를 막는다.
     const already = mediaPublicUrl('proj/a_thumb.webp')
@@ -45,13 +46,13 @@ describe('toThumbUrl', () => {
 })
 
 describe('thumbUrl', () => {
-  it('normalizes null/undefined/empty to undefined', () => {
+  it('주소가 없거나 비어 있으면 주소를 만들지 않는다', () => {
     expect(thumbUrl(null)).toBeUndefined()
     expect(thumbUrl(undefined)).toBeUndefined()
     expect(thumbUrl('')).toBeUndefined()
   })
 
-  it('passes through the original when the thumbs flag is disabled', async () => {
+  it('작은 이미지 기능을 끄면 원본 주소를 그대로 쓴다', async () => {
     vi.stubEnv('NEXT_PUBLIC_IMAGE_THUMBS', '0')
     vi.resetModules()
     const disabledModule = await import('@/lib/image-url')

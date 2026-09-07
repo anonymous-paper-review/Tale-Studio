@@ -161,8 +161,8 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('Director 배선 1 — 손으로 이은 선은 프로젝트 전환·새 기기에서도 남는다', () => {
-  it('DB 참조가 아직 없는 에셋 노드를 가리켜도, 재수화 뒤의 스윅은 그 참조를 지운 목록을 DB 에 되쓰지 않는다', async () => {
+describe('Director에서 손으로 이은 연결은 프로젝트 전환·새 기기에서도 남는다', () => {
+  it('아직 보이지 않는 에셋을 가리켜도 다시 들어온 뒤 연결을 빼지 않고 그대로 보존한다', async () => {
     seed()
     db.shots = [
       shotRow('s1', { image_inputs: [{ kind: 'shot', shotId: 's2' }, { kind: 'asset', assetId: 'char-a' }] }),
@@ -175,7 +175,7 @@ describe('Director 배선 1 — 손으로 이은 선은 프로젝트 전환·새
     }
   })
 
-  it('에셋 노드가 나중에 생기면 보관해 둔 참조가 이미지 입력과 선으로 돌아온다', async () => {
+  it('에셋이 나중에 나타나면 보관한 연결이 이미지 목록과 선으로 돌아온다', async () => {
     const { s1 } = seed()
     db.shots = [
       shotRow('s1', { image_inputs: [{ kind: 'shot', shotId: 's2' }, { kind: 'asset', assetId: 'char-a' }] }),
@@ -194,7 +194,7 @@ describe('Director 배선 1 — 손으로 이은 선은 프로젝트 전환·새
     ).toBe(true)
   })
 
-  it('영상 카드의 프레임 참조도 같다 — 아직 없는 에셋을 가리키면 보관했다가 노드가 생기면 되돌린다', async () => {
+  it('영상 카드가 아직 없는 에셋을 가리켜도 연결을 보관했다가 에셋이 나타나면 다시 이어 준다', async () => {
     const { s1 } = seed()
     db.shots = [shotRow('s1'), shotRow('s2')]
     takes.rows = [take('clip-1', 's1', { start: null, end: null, refs: [{ kind: 'asset', assetId: 'char-a' }] })]
@@ -213,7 +213,7 @@ describe('Director 배선 1 — 손으로 이은 선은 프로젝트 전환·새
     expect(video && isVideoData(video.data) ? video.data.frameInputs.refs : []).toContain(ASSET_NODE)
   })
 
-  it('재수화 둘이 겹쳐 앞 것이 밀려나도, 앞 것의 스윅이 아직 안 풀린 빈 목록을 DB 에 되쓰지 않는다', async () => {
+  it('화면을 다시 불러오는 중 요청이 겹쳐도 먼저 시작한 결과로 연결이 비워졌다고 저장하지 않는다', async () => {
     const { s1, s2 } = seed()
     db.shots = [shotRow('s1', { image_inputs: [{ kind: 'shot', shotId: 's2' }] }), shotRow('s2')]
     let openSecond!: () => void
@@ -230,7 +230,7 @@ describe('Director 배선 1 — 손으로 이은 선은 프로젝트 전환·새
     expect(shotImageInputs(s1)).toEqual([s2])
   })
 
-  it('재수화 결과가 DB 와 같으면 스윅은 아무것도 쓰지 않는다', async () => {
+  it('다시 불러온 연결이 기존 내용과 같으면 불필요하게 저장하지 않는다', async () => {
     seed()
     db.shots = [shotRow('s1', { image_inputs: [{ kind: 'shot', shotId: 's2' }] }), shotRow('s2')]
     await api().hydrateFromDb('p1')
@@ -238,7 +238,7 @@ describe('Director 배선 1 — 손으로 이은 선은 프로젝트 전환·새
     expect(db.writes.filter((w) => w.table === 'shots' && 'image_inputs' in w.payload)).toEqual([])
   })
 
-  it('순수 함수: 풀 수 없는 참조는 버리지 않고 따로 돌려주고, 합칠 때 같은 참조는 하나만 남는다', () => {
+  it('아직 찾지 못한 연결도 버리지 않고 보관하며 다시 합칠 때 같은 연결은 하나만 남긴다', () => {
     const { s1 } = seed()
     const { resolved, unresolved } = splitImageInputs(api().nodes, [
       { kind: 'shot', shotId: 's1' },

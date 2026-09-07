@@ -1,3 +1,4 @@
+// Director에서 만든 장면 자료와 설명 연결은 다시 정리해도 유지되고, 최신 작업 단계를 올바르게 보여준다
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   useDirectorCanvasStore,
@@ -15,8 +16,8 @@ beforeEach(() => {
   useAssetStorageStore.getState().reset()
 })
 
-describe('asset-backed Image template', () => {
-  it('캐릭터 원본을 editable Image로 만들고 rebuild 뒤 편집값을 보존한다', () => {
+describe('원본 그림을 연결한 카드', () => {
+  it('인물 원본을 편집 가능한 카드로 만들고 다시 정리해도 편집 내용을 보존한다', () => {
     api().setProjectId('project-1')
     const sceneId = api().addSceneNode({ x: 400, y: 0 }, 'S1')
     const shotId = api().addShotNode(sceneId, { x: 700, y: 0 }, 'Shot1')
@@ -106,19 +107,19 @@ const completedImage = {
   generatedAt: 1,
 }
 
-describe('getShotStage (파생 단계: video > live > rough)', () => {
-  it('storyboardImage 없으면 rough', () => {
+describe('장면 그림 단계 판단', () => {
+  it('그림이 없으면 초안 단계로 본다', () => {
     const shotId = makeShot()
     expect(getShotStage(api(), shotId)).toBe('rough')
   })
 
-  it('storyboardImage completed면 live', () => {
+  it('완성된 실사 그림이 있으면 실사 단계로 본다', () => {
     const shotId = makeShot()
     api().updateNodeData<'shot'>(shotId, { storyboardImage: completedImage })
     expect(getShotStage(api(), shotId)).toBe('live')
   })
 
-  it('storyboardImage가 generating이면 아직 rough (완료만 live)', () => {
+  it('그림을 만드는 중이면 완성 전 단계로 본다', () => {
     const shotId = makeShot()
     api().updateNodeData<'shot'>(shotId, {
       storyboardImage: { url: '', status: 'generating', errorMessage: null, generatedAt: 0 },
@@ -126,7 +127,7 @@ describe('getShotStage (파생 단계: video > live > rough)', () => {
     expect(getShotStage(api(), shotId)).toBe('rough')
   })
 
-  it('자식 Video가 있으면 video — storyboardImage가 generating이어도 우선', () => {
+  it('영상이 있으면 그림을 만드는 중이어도 영상 단계로 본다', () => {
     const shotId = makeShot()
     api().updateNodeData<'shot'>(shotId, {
       storyboardImage: { url: '', status: 'generating', errorMessage: null, generatedAt: 0 },
@@ -135,13 +136,13 @@ describe('getShotStage (파생 단계: video > live > rough)', () => {
     expect(getShotStage(api(), shotId)).toBe('video')
   })
 
-  it('존재하지 않는 노드는 rough', () => {
+  it('없는 장면은 초안 단계로 본다', () => {
     expect(getShotStage(api(), 'no_such_node')).toBe('rough')
   })
 })
 
-describe('addPromptNode / wirePromptToShot', () => {
-  it('addPromptNode가 prompt 노드를 추가', () => {
+describe('장면 설명 연결', () => {
+  it('설명 카드를 만들면 새 카드가 추가된다', () => {
     const id = api().addPromptNode({ x: 0, y: 0 }, '텍스트')
     const node = api().nodes.find((n) => n.id === id)
     expect(node?.type).toBe('prompt')
@@ -149,7 +150,7 @@ describe('addPromptNode / wirePromptToShot', () => {
     expect((node?.data as PromptNodeData).targetShotNodeId).toBeNull()
   })
 
-  it('wirePromptToShot이 prompt 엣지를 추가하고 Shot.promptOverride를 동기', () => {
+  it('설명 카드를 장면에 연결하면 장면 설명이 함께 바뀐다', () => {
     const shotId = makeShot()
     const promptId = api().addPromptNode({ x: 0, y: 0 }, '강아지가 소년 옆에 앉아있음')
 
@@ -167,14 +168,14 @@ describe('addPromptNode / wirePromptToShot', () => {
     expect((prompt.data as PromptNodeData).targetShotNodeId).toBe(shotId)
   })
 
-  it('대상이 Shot이 아니면 no-op', () => {
+  it('장면이 아닌 대상에는 설명을 연결하지 않는다', () => {
     const promptId = api().addPromptNode({ x: 0, y: 0 }, 't')
     const before = api().edges.length
     api().wirePromptToShot(promptId, 'no_such_shot')
     expect(api().edges.length).toBe(before)
   })
 
-  it('prompt 엣지는 rebuildAssetNodes 후에도 생존 (references와 달리 wipe 안 됨)', () => {
+  it('장면 설명 연결은 자료를 다시 정리해도 유지된다', () => {
     const shotId = makeShot()
     const promptId = api().addPromptNode({ x: 0, y: 0 }, '유지되어야 함')
     api().wirePromptToShot(promptId, shotId)
@@ -187,7 +188,7 @@ describe('addPromptNode / wirePromptToShot', () => {
   })
 })
 
-describe('selectRoughStoryboard (writerShotId 스코프 셀렉터)', () => {
+describe('장면별 초안 그림 선택', () => {
   const rough: RoughStoryboardImage = {
     url: 'rough.png',
     status: 'completed',
@@ -199,23 +200,23 @@ describe('selectRoughStoryboard (writerShotId 스코프 셀렉터)', () => {
     { shotId: 's2' },
   ] as unknown as Shot[]
 
-  it('해당 writerShotId의 roughStoryboard 반환', () => {
+  it('지정한 장면의 초안 그림을 돌려준다', () => {
     expect(selectRoughStoryboard(shots, 's1')).toBe(rough)
   })
 
-  it('roughStoryboard 없는 샷은 null', () => {
+  it('초안 그림이 없는 장면은 비워 둔다', () => {
     expect(selectRoughStoryboard(shots, 's2')).toBeNull()
   })
 
-  it('null id는 null', () => {
+  it('장면을 지정하지 않으면 비워 둔다', () => {
     expect(selectRoughStoryboard(shots, null)).toBeNull()
   })
 
-  it('없는 샷은 null', () => {
+  it('없는 장면은 비워 둔다', () => {
     expect(selectRoughStoryboard(shots, 'nope')).toBeNull()
   })
 
-  it('참조 안정 — 같은 입력은 같은 객체 참조', () => {
+  it('같은 장면을 다시 찾아도 같은 그림을 가리킨다', () => {
     expect(selectRoughStoryboard(shots, 's1')).toBe(selectRoughStoryboard(shots, 's1'))
   })
 })

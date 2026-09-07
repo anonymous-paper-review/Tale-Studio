@@ -1,3 +1,4 @@
+// 글과 미디어를 묶어 내려받을 때 모든 파일을 빠짐없이 담고 실패 내역을 남긴다
 import JSZip from 'jszip'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -9,7 +10,7 @@ afterEach(() => {
 })
 
 describe('extOfContentType', () => {
-  it('prefers Content-Type and falls back to safe URL extensions', () => {
+  it('응답에 파일 형식이 있으면 우선 쓰고 없으면 주소에서 안전한 형식을 찾는다', () => {
     expect(extOfContentType('image/png; charset=binary', 'https://cdn.test/file.jpg')).toBe('png')
     expect(extOfContentType('image/jpeg', 'https://cdn.test/file.png')).toBe('jpg')
     expect(extOfContentType('video/webm', 'https://cdn.test/file.bin')).toBe('mp4')
@@ -19,8 +20,8 @@ describe('extOfContentType', () => {
   })
 })
 
-describe('buildZipBlob export core', () => {
-  it('bundles text artifacts and fetched media artifacts into the expected zip entries', async () => {
+describe('내려받을 파일 묶음을 만든다', () => {
+  it('글과 미디어를 묶어 내려받으면 각 파일이 제자리에 담긴다', async () => {
     const files: ArtifactFile[] = [
       { path: 'producer/story.md', kind: 'text', content: '# Story' },
       { path: 'writer/script.txt', kind: 'text', content: 'line 1\nline 2' },
@@ -48,7 +49,7 @@ describe('buildZipBlob export core', () => {
     expect(result).toEqual({ total: 4, downloaded: 4, failed: 0 })
   })
 
-  it('records failed media in _failed.txt without throwing or creating the missing entry', async () => {
+  it('미디어를 받을 수 없으면 _failed.txt에 이유를 남기고 빈 파일은 만들지 않는다', async () => {
     const files: ArtifactFile[] = [
       { path: 'producer/story.md', kind: 'text', content: 'safe text' },
       { path: 'artist/missing.png', kind: 'media', url: 'https://cdn.test/missing.png' },
@@ -74,7 +75,7 @@ describe('buildZipBlob export core', () => {
     expect(result).toEqual({ total: 2, downloaded: 1, failed: 1 })
   })
 
-  it('writes every duplicate media URL path with one fetch and identical bytes', async () => {
+  it('같은 미디어 주소를 여러 곳에서 써도 한 번만 받아 모든 곳에 같은 파일을 쓴다', async () => {
     const files: ArtifactFile[] = [
       { path: 'artist/original.png', kind: 'media', url: 'https://cdn.test/shared.png' },
       { path: 'director/duplicate.png', kind: 'media', url: 'https://cdn.test/shared.png' },
@@ -96,7 +97,7 @@ describe('buildZipBlob export core', () => {
     expect(result).toEqual({ total: 2, downloaded: 2, failed: 0 })
   })
 
-  it('records nullish text content in _failed.txt while preserving explicit empty text entries', async () => {
+  it('글 내용이 없으면 _failed.txt에 이유를 남기고 빈 글은 그대로 담는다', async () => {
     const files: ArtifactFile[] = [
       { path: 'writer/null.md', kind: 'text', content: null },
       { path: 'writer/undefined.txt', kind: 'text' },

@@ -1,3 +1,4 @@
+// 같은 이야기 자료는 순서가 달라도 같은 것으로 보고, 필요한 정보가 갖춰진 다음 단계만 열어 둔다
 import { describe, expect, it } from 'vitest'
 import type { ProjectSettings } from '@/types'
 import {
@@ -54,12 +55,12 @@ const producerSource = {
 }
 
 describe('computeProducerSourceHash', () => {
-  it('cast order does not change the source hash', () => {
+  it('등장인물 순서만 바뀌면 같은 이야기 자료로 본다', () => {
     const reversed = { ...producerSource, cast: [...producerSource.cast].reverse() }
     expect(computeProducerSourceHash(reversed)).toBe(computeProducerSourceHash(producerSource))
   })
 
-  it('contracted source field changes alter the hash', () => {
+  it('등장인물의 겉모습이 바뀌면 다른 이야기 자료로 본다', () => {
     const changed = {
       ...producerSource,
       cast: producerSource.cast.map((c) =>
@@ -69,7 +70,7 @@ describe('computeProducerSourceHash', () => {
     expect(computeProducerSourceHash(changed)).not.toBe(computeProducerSourceHash(producerSource))
   })
 
-  it('background source changes alter the source hash', () => {
+  it('배경의 쓰임새가 바뀌면 다른 이야기 자료로 본다', () => {
     const changed = {
       ...producerSource,
       backgrounds: producerSource.backgrounds.map((background) =>
@@ -83,7 +84,7 @@ describe('computeProducerSourceHash', () => {
 })
 
 describe('evaluateProducerSourceImpact', () => {
-  it('reports writer stale and selected artist image stale without regenerating anything', () => {
+  it('이야기 자료가 바뀌면 Writer와 선택한 Artist 이미지를 다시 확인 대상으로 알린다', () => {
     const changed = {
       ...producerSource,
       cast: producerSource.cast.map((c) =>
@@ -105,7 +106,7 @@ describe('evaluateProducerSourceImpact', () => {
 })
 
 describe('evaluateArtistGate', () => {
-  it('requires fallback non-object producer cast main images and warns on objects/worlds', () => {
+  it('인물 사진이 없으면 Artist 진행을 막고 물건과 장소 사진은 경고한다', () => {
     const gate = evaluateArtistGate({
       characters: [
         { characterId: 'char_a', name: '아라', entityType: 'person', appearance: '검은 후디' },
@@ -122,7 +123,7 @@ describe('evaluateArtistGate', () => {
     )
   })
 
-  it('uses writer references when provided and ignores non-referenced fallback characters', () => {
+  it('Writer에서 사용한 인물만 확인하고 나머지 인물은 진행을 막지 않는다', () => {
     const gate = evaluateArtistGate({
       characters: [
         { characterId: 'char_a', name: '아라', entityType: 'person', appearance: '검은 후디', mainImageUrl: 'https://img/a.png' },
@@ -138,7 +139,7 @@ describe('evaluateArtistGate', () => {
 })
 
 describe('evaluateDirectorGate', () => {
-  it('treats unknown writer status as blocking, never ready', () => {
+  it('Writer 준비 여부를 알 수 없으면 Director 진행을 막는다', () => {
     const artist = evaluateArtistGate({
       characters: [
         { characterId: 'char_a', name: '아라', entityType: 'person', appearance: '검은 후디', mainImageUrl: 'https://img/a.png' },
@@ -152,8 +153,8 @@ describe('evaluateDirectorGate', () => {
   })
 })
 
-describe('project-store lifecycle plumbing', () => {
-  it('unlockThrough advances reachedStage without changing currentStage', () => {
+describe('프로젝트 단계 진행 규칙', () => {
+  it('현재 단계는 유지하면서 완료한 단계까지만 다음 단계 접근을 연다', () => {
     useProjectStore.setState({ currentStage: 'writer', reachedStage: 'writer' })
 
     useProjectStore.getState().unlockThrough('artist')

@@ -1,3 +1,4 @@
+// 사용자가 고른 그림체는 주소가 있으면 그대로 쓰고, 없으면 기본 그림체를 찾아준다
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -35,7 +36,7 @@ beforeEach(() => {
 })
 
 describe('parseCustomStyleAnchor', () => {
-  it('url 이 있어야만 앵커로 인정한다', () => {
+  it('그림 주소가 있을 때만 사용자가 고른 그림체로 인정한다', () => {
     expect(parseCustomStyleAnchor({ url: 'https://x/a.jpg' })).toEqual({
       url: 'https://x/a.jpg',
       label: null,
@@ -47,7 +48,7 @@ describe('parseCustomStyleAnchor', () => {
     expect(parseCustomStyleAnchor('https://x/a.jpg')).toBeNull()
   })
 
-  it('label·medium 은 문자열일 때만 취한다', () => {
+  it('그림 이름과 표현 방식은 글자로 적힌 값만 사용한다', () => {
     expect(parseCustomStyleAnchor({ url: 'u', label: 3, medium: {} })).toEqual({
       url: 'u',
       label: null,
@@ -57,7 +58,7 @@ describe('parseCustomStyleAnchor', () => {
 })
 
 describe('resolveStyleAnchor', () => {
-  it('커스텀 앵커가 있으면 카탈로그를 아예 조회하지 않는다', async () => {
+  it('사용자가 고른 그림체가 있으면 기본 목록을 조회하지 않는다', async () => {
     const anchor = await resolveStyleAnchor({
       style_anchor_key: 'custom_abc',
       custom_style_anchor: { url: 'https://x/mine.jpg', label: '내 그림체', medium: '2d_cartoon' },
@@ -68,7 +69,7 @@ describe('resolveStyleAnchor', () => {
     expect(mocks.from).not.toHaveBeenCalled()
   })
 
-  it('커스텀 key 를 그대로 되돌려준다 (룩 지문·생성 기록의 정체성)', async () => {
+  it('선택한 그림체의 이름을 그대로 유지해 같은 그림체로 이어간다', async () => {
     // 여기서 다른 값을 지어내면 서버/클라 지문이 어긋나 모든 에셋이 영구 stale 이 된다.
     const anchor = await resolveStyleAnchor({
       style_anchor_key: 'custom_9f2',
@@ -77,7 +78,7 @@ describe('resolveStyleAnchor', () => {
     expect(anchor?.key).toBe('custom_9f2')
   })
 
-  it('커스텀이 없으면 카탈로그로 폴백한다', async () => {
+  it('사용자가 고른 그림체가 없으면 기본 목록에서 찾아준다', async () => {
     mocks.maybeSingle.mockResolvedValue({
       data: { key: 'jp_anime', image_url: 'https://cdn/jp.png', is_active: true },
       error: null,
@@ -90,7 +91,7 @@ describe('resolveStyleAnchor', () => {
     expect(mocks.from).toHaveBeenCalledWith('style_anchors')
   })
 
-  it('url 없는 깨진 jsonb 는 커스텀으로 치지 않고 카탈로그로 넘어간다', async () => {
+  it('그림 주소가 없는 잘못된 선택은 기본 목록에서 다시 찾는다', async () => {
     mocks.maybeSingle.mockResolvedValue({
       data: { key: 'real', image_url: 'https://cdn/real.png', is_active: true },
       error: null,
@@ -104,7 +105,7 @@ describe('resolveStyleAnchor', () => {
     expect(anchor?.key).toBe('real')
   })
 
-  it('둘 다 없으면 null (앵커 없이 진행 — 기존 동작)', async () => {
+  it('사용자 그림체와 기본 그림체가 모두 없으면 그림체 없이 진행한다 (기존 동작)', async () => {
     expect(await resolveStyleAnchor({ style_anchor_key: null })).toBeNull()
     expect(await resolveStyleAnchor(null)).toBeNull()
   })

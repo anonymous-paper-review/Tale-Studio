@@ -1,3 +1,4 @@
+// Writer 자료를 내보내면 이야기와 장면·촬영 계획이 읽기 쉬운 문서로 정리된다
 import { describe, expect, it, vi } from 'vitest'
 
 import {
@@ -115,8 +116,8 @@ const projection: WriterExportProjection = {
   },
 }
 
-describe('collectWriterArtifacts writer markdown', () => {
-  it('renders the four writer markdown files with native-first prose and EN prompts', async () => {
+describe('Writer 자료를 모아 읽기 쉬운 문서로 정리한다', () => {
+  it('Writer 자료를 네 문서로 정리하고 한국어 설명과 영어 제작 문구를 알맞게 보여 준다', async () => {
     const files = await collectWriterArtifacts('project-1', { fetchFn: fetchProjection(projection) }, 'ko')
 
     expect(files.map((file) => file.path).sort()).toEqual([
@@ -156,7 +157,7 @@ describe('collectWriterArtifacts writer markdown', () => {
     }
   })
 
-  it('marks incomplete pipeline sections and renders injected DB fallback rows for a no-run projection', async () => {
+  it('일부 내용이 준비되지 않아도 미완료 안내를 표시하고 저장된 장면과 촬영 자료를 함께 보여 준다', async () => {
     const files = await collectWriterArtifacts('project-2', {
       fetchFn: fetchProjection({ storyBible: null, scenes: null, shotDesign: null, renderPrompts: null }),
       loadDbFallback: async () => ({

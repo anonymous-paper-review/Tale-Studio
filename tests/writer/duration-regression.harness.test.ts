@@ -1,3 +1,4 @@
+// 장면 길이와 인물 움직임이 자연스럽게 이어지는지 두 장면을 다시 만들어 확인한다 (#duration-surgery #w-a 2026-08-31 U17-1 오너 지시)
 import { describe, it, expect } from 'vitest'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { runDecoupage } from '@/lib/writer/pipeline/stages/decoupage'
@@ -13,9 +14,9 @@ import { PipelineLogger } from '@/lib/writer/logger'
 
 const GATED = process.env.RUN_DURATION_REGRESSION === '1'
 
-describe('duration/characters 프롬프트 개정 회귀 (env 게이트)', () => {
+describe('장면 길이와 인물 움직임 안내를 고쳐도 기존 결과와 비교한다', () => {
   it.runIf(GATED)(
-    '개정 프롬프트로 2씬 재생성 → 구산출과 대조 리포트',
+    '새 안내로 두 장면을 다시 만들어 기존 결과와 비교한다',
     async () => {
       const statePath = process.env.REGRESSION_STATE
       expect(statePath, 'REGRESSION_STATE 경로 필요').toBeTruthy()
@@ -98,7 +99,7 @@ describe('duration/characters 프롬프트 개정 회귀 (env 게이트)', () =>
     900_000,
   )
 
-  it('게이트 꺼짐 — CI 무부하', () => {
+  it('선택하지 않으면 추가 작업을 하지 않는다', () => {
     expect(true).toBe(true)
   })
 })

@@ -1,3 +1,4 @@
+// 로그인한 사용자가 초안을 다시 만들 때 권한과 사용 한도를 확인하고 처리 결과를 알려준다
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { STALE_QUEUED_MS } = vi.hoisted(() => ({ STALE_QUEUED_MS: 10 * 60 * 1000 }))
@@ -49,7 +50,7 @@ describe('POST /api/artist/retry-drafts', () => {
     mocks.from.mockImplementation(() => queuedCountQuery())
   })
 
-  it('returns 401 when unauthenticated', async () => {
+  it('로그인하지 않으면 접근을 막는다', async () => {
     mocks.getUser.mockResolvedValue(null)
 
     const response = await POST(postRequest({ projectId: PROJECT_ID }))
@@ -59,7 +60,7 @@ describe('POST /api/artist/retry-drafts', () => {
     expect(mocks.triggerAssetDrafts).not.toHaveBeenCalled()
   })
 
-  it('returns 400 for an invalid body', async () => {
+  it('요청 내용이 올바르지 않으면 거절한다', async () => {
     const response = await POST(postRequest({}))
 
     expect(response.status).toBe(400)
@@ -67,7 +68,7 @@ describe('POST /api/artist/retry-drafts', () => {
     expect(mocks.triggerAssetDrafts).not.toHaveBeenCalled()
   })
 
-  it('returns 403 when the user does not own the project', async () => {
+  it('프로젝트를 맡은 사람이 아니면 접근을 막는다', async () => {
     mocks.userOwnsProject.mockResolvedValue(false)
 
     const response = await POST(postRequest({ projectId: PROJECT_ID }))
@@ -78,7 +79,7 @@ describe('POST /api/artist/retry-drafts', () => {
     expect(mocks.triggerAssetDrafts).not.toHaveBeenCalled()
   })
 
-  it('returns quota-exceeded 4xx before checking project queued drafts', async () => {
+  it('사용 한도를 넘으면 초안을 다시 만들지 않고 거절한다', async () => {
     mocks.countQueuedJobsByUser.mockResolvedValue(8)
 
     const response = await POST(postRequest({ projectId: PROJECT_ID }))
@@ -91,7 +92,7 @@ describe('POST /api/artist/retry-drafts', () => {
     expect(mocks.triggerAssetDrafts).not.toHaveBeenCalled()
   })
 
-  it('rejects when the project already has queued draft jobs', async () => {
+  it('프로젝트에 이미 다시 만들 초안이 대기 중이면 거절한다', async () => {
     mocks.projectQueuedCount = 2
 
     const response = await POST(postRequest({ projectId: PROJECT_ID }))
@@ -102,7 +103,7 @@ describe('POST /api/artist/retry-drafts', () => {
     expect(mocks.triggerAssetDrafts).not.toHaveBeenCalled()
   })
 
-  it('calls triggerAssetDrafts and returns idempotent skip counts on the happy path', async () => {
+  it('초안 다시 만들기가 정상 처리되면 항목별 결과와 건너뛴 수를 알려준다', async () => {
     const result = triggerResultFixture({
       characters: { submitted: 0, skipped: 2, failed: 0 },
       worlds: { submitted: 0, skipped: 1, failed: 0 },

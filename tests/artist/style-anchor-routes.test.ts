@@ -1,3 +1,4 @@
+// 선택한 스타일과 참고 이미지를 반영해 필요한 그림만 만들고, 이미 있는 그림은 함부로 바꾸지 않는다
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -223,8 +224,8 @@ beforeEach(() => {
   mocks.from.mockImplementation((table: string) => queryFor(table))
 })
 
-describe('style-anchor route integration', () => {
-  it('AC1 generate-sheet person/template injects anchor before the layout template', async () => {
+describe('선택한 스타일을 그림 만들기에 반영한다', () => {
+  it('인물 그림을 처음 만들 때 선택한 스타일과 캐릭터 양식을 함께 반영한다 (AC1)', async () => {
     const character = characterFixture({ view_main: null, entity_type: 'person' })
     setCharacters(character)
 
@@ -264,7 +265,7 @@ describe('style-anchor route integration', () => {
   //   - texture/line/shape/palette 토큰은 앵커와 공존해도 앵커가 매체를 이긴다(실측) → 그대로 나간다.
   //   - art_style 토큰은 값에 매체어가 실리면(dark_cinematic_realism) 앵커를 이겨버린다(실측, d6208bba
   //     거인 실사화) → 앵커 존재 시 무조건 억제. 이 특성을 고정한다 — 되돌리려면 실 A/B 재판정 선행.
-  it('AC1b generate-sheet with anchor drops only media-word tokens — benign art_style survives (#F-004 B4, 2026-07-14 판정의 명시적 번복)', async () => {
+  it('선택한 스타일과 어울리는 표현은 유지하고 충돌하는 표현만 덜어낸다 (AC1b, #F-004 B4, 2026-07-14 판정의 명시적 번복)', async () => {
     // 번복 근거(2026-08-12 실측 dc531572): 통짜 억제는 앵커에 부합하는 유일한 토큰(3d_animation)을
     //   지우고 매체어(texture: photorealistic)를 살리는, 취지가 뒤집힌 배치였다. 새 계약:
     //   매체어를 품은 토큰만 드롭(2026-07-14 의 dark_cinematic_realism 교훈은 보존), 무해 토큰 유지.
@@ -292,7 +293,7 @@ describe('style-anchor route integration', () => {
     expect(prompt).toContain('palette: deep cobalt, warm ochre, signal red')
   })
 
-  it('AC10 Q5 generate-sheet folds the anchor key into source_hash (false-stale guard)', async () => {
+  it('선택한 스타일이 달라지면 그림을 최신 결과로 다시 만든다 (AC10, Q5)', async () => {
     const character = characterFixture({ view_main: null, entity_type: 'person' })
     setCharacters(character)
     await generateSheetPOST(
@@ -319,7 +320,7 @@ describe('style-anchor route integration', () => {
     )
   })
 
-  it('AC2 generate-sheet person/T2I fallback injects anchor and normalizes to the edit model', async () => {
+  it('캐릭터 양식을 쓸 수 없어도 선택한 스타일을 반영해 3:2 비율로 그림을 만든다 (AC2)', async () => {
     mocks.webhookBaseUrl = null
     const character = characterFixture({ view_main: null, entity_type: 'person' })
     setCharacters(character)
@@ -343,7 +344,7 @@ describe('style-anchor route integration', () => {
     })
   })
 
-  it('AC4 generate-sheet directional views stay anchor-free even when the project has an anchor key', async () => {
+  it('뒷모습이나 옆모습은 정면 그림만 참고하고 전체 스타일은 따로 덧붙이지 않는다 (AC4)', async () => {
     const character = characterFixture({ view_main: 'https://img/main.png', entity_type: 'person' })
     setCharacters(character)
 
@@ -369,7 +370,7 @@ describe('style-anchor route integration', () => {
     expect(firstFalOpts().prompt).not.toContain(STYLE_ANCHOR_CLAUSE)
   })
 
-  it('AC5 generate-world injects anchor fields and records the post-injection snapshot', async () => {
+  it('배경 그림에도 선택한 스타일을 반영하고 요청한 비율을 지킨다 (AC5)', async () => {
     dbState.projects = [projectFixture({ design_tokens: null, style_anchor_key: ANCHOR_KEY })]
 
     const response = await generateWorldPOST(
@@ -404,7 +405,7 @@ describe('style-anchor route integration', () => {
     })
   })
 
-  it('AC6 generate-storyboard with caller refs uses multiref mode and records the post-injection snapshot', async () => {
+  it('스토리보드에 선택한 스타일과 사용자가 준 참고 이미지를 함께 반영한다 (AC6)', async () => {
     dbState.projects = [projectFixture({ design_tokens: null, style_anchor_key: ANCHOR_KEY })]
 
     const response = await generateStoryboardPOST(
@@ -440,7 +441,7 @@ describe('style-anchor route integration', () => {
     })
   })
 
-  it('AC6 generate-storyboard without caller refs uses single mode', async () => {
+  it('참고 이미지가 없어도 스토리보드에 선택한 스타일을 반영한다 (AC6)', async () => {
     dbState.projects = [projectFixture({ design_tokens: null, style_anchor_key: ANCHOR_KEY })]
 
     const response = await generateStoryboardPOST(
@@ -462,7 +463,7 @@ describe('style-anchor route integration', () => {
     })
   })
 
-  it('AC7 triggerCharacterDrafts injects anchor for character main template and fallback drafts', async () => {
+  it('캐릭터 초안을 만들 때 선택한 스타일을 양식 유무와 관계없이 반영한다 (AC7)', async () => {
     dbState.projects = [projectFixture({ design_tokens: designTokens, style_anchor_key: ANCHOR_KEY })]
     const templatePerson = draftCharacter({
       character_id: 'draft-person-template',
@@ -547,7 +548,7 @@ describe('style-anchor route integration', () => {
     })
   })
 
-  it('AC7 triggerCharacterDrafts treats an inactive anchor as a fail-soft no-op for draft opts', async () => {
+  it('선택한 스타일을 쓸 수 없으면 캐릭터 초안을 기존 방식으로 만든다 (AC7)', async () => {
     dbState.projects = [projectFixture({ design_tokens: designTokens, style_anchor_key: ANCHOR_KEY })]
     dbState.styleAnchors = [styleAnchorFixture({ is_active: false })]
     const templatePerson = draftCharacter({
@@ -603,7 +604,7 @@ describe('style-anchor route integration', () => {
     expect(generationJobArgAt(1).inputSnapshot.style_anchor_key).toBeNull()
   })
 
-  it('AC9 treats an inactive anchor row as a fail-soft no-op for fal submit opts', async () => {
+  it('선택한 스타일을 사용할 수 없어도 배경 그림은 사람 없이 만든다 (AC9)', async () => {
     dbState.projects = [projectFixture({ design_tokens: null, style_anchor_key: ANCHOR_KEY })]
     dbState.styleAnchors = [styleAnchorFixture({ is_active: false })]
 
@@ -795,7 +796,7 @@ function matchesFilters(row: Record<string, unknown>, filters: Array<[string, un
 // #artist-main-authority(2026-09-03): 자율 생성(actor='auto')은 시트가 이미 있는 모습을 다시 만들지 않는다 —
 //   실측 겨울_5: Artist 진입마다 writer 출신 인물 전원의 시트가 재제출됐다(클라가 구 컬럼 view_main 만 봄).
 describe('generate-sheet — 자율 생성은 빈칸만 채운다', () => {
-  it('auto + 기본 모습 시트 있음 → skipped(exists), fal 제출·잡 생성 없음', async () => {
+  it('자동으로 만들 때 이미 그림이 있으면 다시 만들지 않는다', async () => {
     setCharacters(characterFixture({ view_main: 'https://storage.test/character-1_sheet.png', origin: 'writer' }))
 
     const response = await generateSheetPOST(
@@ -814,7 +815,7 @@ describe('generate-sheet — 자율 생성은 빈칸만 채운다', () => {
     expect(mocks.createGenerationJob).not.toHaveBeenCalled()
   })
 
-  it('사람의 재생성(ui) + 시트 있음 → 기존 시트를 참조로 다시 만든다(제출됨)', async () => {
+  it('사용자가 다시 만들면 기존 그림이 있어도 새 그림을 만든다', async () => {
     setCharacters(characterFixture({ view_main: 'https://storage.test/character-1_sheet.png', origin: 'writer' }))
 
     const response = await generateSheetPOST(
@@ -831,7 +832,7 @@ describe('generate-sheet — 자율 생성은 빈칸만 채운다', () => {
     expect(mocks.falImageSubmit).toHaveBeenCalledTimes(1)
   })
 
-  it('auto + 시트 없음 → 정상 제출(첫 채움)', async () => {
+  it('자동으로 만들 때 그림이 없으면 처음 그림을 만든다', async () => {
     setCharacters(characterFixture({ view_main: null, origin: 'writer' }))
 
     const response = await generateSheetPOST(

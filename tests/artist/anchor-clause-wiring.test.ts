@@ -1,3 +1,4 @@
+// 장면을 만들 때 정한 화풍과 조명, 그림의 우선순위를 일관되게 지킨다
 import { describe, it, expect } from 'vitest'
 import {
   applyStyleAnchor,
@@ -14,8 +15,8 @@ import { buildRealGridPrompt, buildRealStripPrompt } from '@/lib/director/storyb
 
 const BASE_ANCHOR = { key: 'k', imageUrl: 'https://a/board.png', medium: '3d' }
 
-describe('applyStyleAnchor — 검증 절 주입', () => {
-  it('styleClause 가 있으면 앵커 절 다음 줄에 실린다 (스크럽 대상 아님 — 매체어 포함 가능)', () => {
+describe('applyStyleAnchor — 정한 화풍 안내를 결과에 반영한다', () => {
+  it('화풍 설명을 넣으면 설명은 보존하고 장면 문구의 매체 표현은 정리한다', () => {
     const out = applyStyleAnchor(
       { ...BASE_ANCHOR, styleClause: 'A real photograph, not an illustration.' },
       { prompt: 'photorealistic scene of a cafe', aspect_ratio: '1:1' },
@@ -26,13 +27,13 @@ describe('applyStyleAnchor — 검증 절 주입', () => {
     expect(out.prompt).not.toContain('photorealistic scene')
   })
 
-  it('styleClause 미설정(역사극·공포 NULL)이면 종전 프롬프트 그대로 — 하위 호환', () => {
+  it('화풍 설명이 없으면 기존 장면 문구를 그대로 유지한다', () => {
     const out = applyStyleAnchor(BASE_ANCHOR, { prompt: 'scene', aspect_ratio: '1:1' }, 'single')
     expect(out.prompt).toBe(`${STYLE_ANCHOR_CLAUSE}\nscene`)
   })
 })
 
-describe('applyStyleAnchor — watercolor A안 (preview 2번 스타일 레퍼런스)', () => {
+describe('applyStyleAnchor — 수채화 A안과 미리보기 그림을 함께 반영한다', () => {
   const wc = {
     ...BASE_ANCHOR,
     usePreviewRef: true,
@@ -40,7 +41,7 @@ describe('applyStyleAnchor — watercolor A안 (preview 2번 스타일 레퍼런
     styleClause: 'Carry HOW the style references render scenes.',
   }
 
-  it('refs 가 [앵커, preview, ...기존] 이 되고 절이 FIRST TWO 로 바뀐다', () => {
+  it('미리보기 그림을 쓰면 기준 그림과 미리보기를 먼저 두고 인물 그림은 그다음에 따른다', () => {
     const out = applyStyleAnchor(wc, { prompt: 'p', reference_image_urls: ['c1'], aspect_ratio: '1:1' }, 'multiref')
     expect(out.reference_image_urls).toEqual(['https://a/board.png', 'https://a/preview.jpg', 'c1'])
     expect(out.prompt).toContain(STYLE_ANCHOR_2REF_CLAUSE)
@@ -48,22 +49,22 @@ describe('applyStyleAnchor — watercolor A안 (preview 2번 스타일 레퍼런
     expect(out.prompt).toContain(STYLE_ANCHOR_2REF_MULTIREF_CLAUSE)
   })
 
-  it('turnaround 는 2번 슬롯이 레이아웃 템플릿 계약이라 preview 를 넣지 않는다', () => {
+  it('인물 방향표를 만들 때는 미리보기 그림을 추가하지 않는다', () => {
     const out = applyStyleAnchor(wc, { prompt: 'p' }, 'turnaround', { pinAspectRatio: '3:2' })
     expect(out.reference_image_urls).toEqual(['https://a/board.png'])
     expect(out.prompt).toContain(STYLE_ANCHOR_CLAUSE)
   })
 })
 
-describe('그리드/스트립 — 절 주입·서브룩 그레이드 권위·2-ref 위치 문구', () => {
+describe('장면 격자와 묶음 — 화풍·조명·인물 그림의 우선순위를 지킨다', () => {
   const G = { characterRefCount: 0, hasStyleRef: true }
 
-  it('그리드: styleClause 가 앵커 절 다음 항목으로 실린다', () => {
+  it('장면 격자에 화풍 설명을 넣으면 기준 화풍 다음에 표시한다', () => {
     const p = buildRealGridPrompt(4, { ...G, styleClause: 'LOOK - big city blockbuster.' })
     expect(p).toContain('- LOOK - big city blockbuster.')
   })
 
-  it('그리드: 서브룩(anchorKeepsGrade)은 씬 조명이 있어도 그레이드·팔레트를 앵커에 남긴다 (Rule 6)', () => {
+  it('장면 조명을 정해도 기준 그림의 색감과 색상은 유지한다 (Rule 6)', () => {
     const p = buildRealGridPrompt(4, { ...G, sceneLighting: 'Night', anchorKeepsGrade: true })
     expect(p).toContain("KEEP the style reference's color grade and palette")
     expect(p).not.toContain('do NOT copy its time of day')
@@ -71,19 +72,19 @@ describe('그리드/스트립 — 절 주입·서브룩 그레이드 권위·2-r
     expect(p).toContain("Render that time of day's light in every panel")
   })
 
-  it('그리드: 매체 앵커는 종전 권위 이관 유지 (F-006 그대로)', () => {
+  it('장면 조명을 정하면 기준 그림의 시간대와 조명을 따라 하지 않는다 (F-006)', () => {
     const p = buildRealGridPrompt(4, { ...G, sceneLighting: 'Night' })
     expect(p).toContain('do NOT copy its time of day or lighting')
   })
 
-  it('스트립: styleRefCount=2 면 LAST TWO + 캐릭터 구간 "between the first and the last two"', () => {
+  it('화풍 그림 두 장을 쓰면 두 장은 뒤에 두고 인물은 앞 그림과 화풍 그림 사이 기준을 따른다', () => {
     const p = buildRealStripPrompt('shot', { characterRefCount: 1, hasStyleRef: true, styleRefCount: 2 })
     expect(p).toContain('the LAST TWO reference images (style references)')
     expect(p).toContain('between the first and the last two')
     expect(p).toContain('their subjects')
   })
 
-  it('스트립: 서브룩 + 씬 조명 — 그레이드 유지 분기', () => {
+  it('장면 조명을 정해도 기준 그림의 색감과 색상을 유지한다', () => {
     const p = buildRealStripPrompt('shot', {
       characterRefCount: 0,
       hasStyleRef: true,

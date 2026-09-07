@@ -1,3 +1,4 @@
+// 장면에 맞는 컷 정보를 순서대로 조립하고, 빠진 장면도 안전하게 이어 붙인다 (E12b 2026-07-21)
 import { describe, expect, it } from 'vitest'
 import { assembleShotsFromDesigns } from '@/lib/writer/pipeline/stages/c_application_2'
 import type { ShotDesign, Scenes, StoryScene } from '@/lib/writer/types/pipeline'
@@ -68,8 +69,8 @@ const scenes: Scenes = {
 }
 
 // E12b (2026-07-21): LLM 조립 제거 — 조립은 항상 결정론. 이 테스트는 그 1:1 계약을 가드한다.
-describe('assembleShotsFromDesigns (C2 결정론 조립)', () => {
-  it('입력 shotDesign 1개당 ShotSequenceItem 정확히 1개, 입력 순서 보존', () => {
+describe('assembleShotsFromDesigns (장면 순서대로 조립)', () => {
+  it('컷 하나를 넣으면 결과도 하나가 되고 입력 순서를 지킨다', () => {
     const designs = [
       design('shot_1', 'scene_1'),
       design('shot_2', 'scene_1'),
@@ -83,7 +84,7 @@ describe('assembleShotsFromDesigns (C2 결정론 조립)', () => {
     expect(shots.map((s) => s.S.scene_id)).toEqual(['scene_1', 'scene_1', 'scene_2', 'scene_2'])
   })
 
-  it('렌더 프롬프트(first_frame/motion)를 L4에서 그대로 확보한다 — v5_prompts가 최우선 소비', () => {
+  it('첫 화면과 움직임 안내를 입력한 내용 그대로 사용한다', () => {
     const d = design('shot_9', 'scene_2', {
       firstFrame: 'DETERMINISTIC first frame prompt long enough',
       motion: 'DET motion',
@@ -101,7 +102,7 @@ describe('assembleShotsFromDesigns (C2 결정론 조립)', () => {
     expect(shots[0].duration_seconds).toBe(6) // intent.duration_seconds
   })
 
-  it('씬 목록에 없는 scene_id여도 죽지 않고 L4 intent 기반으로 채운다', () => {
+  it('장면 목록에 없는 장면도 입력한 설명으로 멈추지 않고 채운다', () => {
     const d = design('shot_1', 'scene_missing')
     const shots = assembleShotsFromDesigns([d], scenes)
 

@@ -1,3 +1,4 @@
+// 화면 비율별 러프 템플릿이 정해진 칸 배치와 크기를 지켜 안정적으로 그려진다 (#sheet-formats 2026-08-17 2차 오너 육안 피드백)
 import { describe, it, expect } from 'vitest'
 import { existsSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
@@ -113,9 +114,9 @@ ${cells.join('\n')}
   return sharp(base).composite([{ input: Buffer.from(svg), left: 0, top: 0 }]).png().toBuffer()
 }
 
-describe('rough template assets — 스펙↔PNG 정합', () => {
+describe('화면 비율별 템플릿이 정해진 모양과 맞는다', () => {
   it.runIf(process.env.GENERATE_ROUGH_TEMPLATES === '1')(
-    '생성기: 스펙에서 포맷 템플릿 8장을 그려 public/ 에 쓴다 (레거시 질감 승계)',
+    '모든 화면 비율의 템플릿을 만들면 화면에 쓸 파일로 저장한다 (기존 질감 유지)',
     async () => {
       for (const format of ALL_FORMATS) {
         for (const variant of VARIANTS) {
@@ -129,7 +130,7 @@ describe('rough template assets — 스펙↔PNG 정합', () => {
     120_000,
   )
 
-  it('포맷 템플릿 8장: 존재 + 치수 = 스펙 캔버스', async () => {
+  it('화면 비율별 템플릿 8장이 있고 정해진 크기와 일치한다', async () => {
     for (const format of ALL_FORMATS) {
       for (const variant of VARIANTS) {
         const spec = sheetSpecOf(variant, format)
@@ -145,7 +146,7 @@ describe('rough template assets — 스펙↔PNG 정합', () => {
     }
   })
 
-  it('스키마 준수: 캔버스 16배수 · 최대 변 3840 · AR ≤3:1 · 총 0.66~8.29MP', () => {
+  it('모든 템플릿이 정해진 크기·비율·화질 범위를 지킨다', () => {
     for (const format of ALL_FORMATS) {
       for (const variant of VARIANTS) {
         const { width: w, height: h } = sheetSpecOf(variant, format)!.canvas
@@ -159,14 +160,14 @@ describe('rough template assets — 스펙↔PNG 정합', () => {
     }
   })
 
-  it('레거시 템플릿 2장: 실측 좌표의 기준 치수 그대로 (1672×941 / 488×941 — null 포맷 전용)', async () => {
+  it('기존 템플릿 2장도 정해진 기준 크기를 그대로 유지한다 (화면 비율을 정하지 않은 경우 전용)', async () => {
     const grid = await sharp(path.join(PUB, 'rough-storyboard-grid.png')).metadata()
     expect({ w: grid.width, h: grid.height }).toEqual({ w: 1672, h: 941 })
     const strip = await sharp(path.join(PUB, 'rough-storyboard-strip.png')).metadata()
     expect({ w: strip.width, h: strip.height }).toEqual({ w: 488, h: 941 })
   })
 
-  it('셀 비례 좌표: 0~1 범위 + 인접 셀 사이 거터 (크롭 불변식 "거터=빈 종이")', () => {
+  it('각 칸의 위치가 화면 안에 있고 칸 사이 여백이 비어 있다', () => {
     for (const format of [...ALL_FORMATS, null]) {
       for (const variant of VARIANTS) {
         const g = sheetGeometry(variant, format)
@@ -185,7 +186,7 @@ describe('rough template assets — 스펙↔PNG 정합', () => {
   // #rough-canvas-regression(2026-08-26): 연필 크롭의 잉크 밀도 휴리스틱은 1728px 대역 실측
   //   보정값 — 캔버스만 키우면 커진 캡션 글자가 행 래치(0.35)를 넘어 END 프레임에 캡션 띠가
   //   침입한다(실측 c7871e04). 러프는 검증 대역에 남고 리페인트만 상향(#hd-grid)이 계약.
-  it('16:9 grid4: 러프 캔버스는 1728×768(검증 대역), 리페인트는 2880×1280(#hd-grid)', () => {
+  it('가로형 16:9 러프와 완성본이 정해진 크기로 만들어진다 (#hd-grid)', () => {
     const g = sheetGeometry('grid4', 'horizontal_16:9')
     expect(g.roughImageSize).toBe('1728x768')
     expect(g.repaintCanvas).toBe('2880x1280')
@@ -193,7 +194,7 @@ describe('rough template assets — 스펙↔PNG 정합', () => {
     expect(768 % 16).toBe(0)
   })
 
-  it('세로 스트립만 frameAxis cols — 나머지는 rows', () => {
+  it('세로형 띠 템플릿은 칸을 세로로 나누고, 나머지는 가로로 나눈다', () => {
     expect(sheetGeometry('strip1', 'vertical_9:16').frameAxis).toBe('cols')
     expect(sheetGeometry('strip1', 'vertical_9:16').cols.length).toBe(3)
     expect(sheetGeometry('strip1', 'vertical_9:16').rows.length).toBe(1)
@@ -203,7 +204,7 @@ describe('rough template assets — 스펙↔PNG 정합', () => {
     expect(sheetGeometry('grid4', 'vertical_9:16').frameAxis).toBe('rows')
   })
 
-  it('셀 종횡비 = 포맷 정확값 (±1% — 레거시 16:9 셀의 -13.2% 오차를 반복하지 않는다)', () => {
+  it('각 칸의 가로세로 비율이 화면 비율과 맞는다 (기존 16:9 오차를 반복하지 않는다)', () => {
     for (const format of ALL_FORMATS) {
       for (const variant of VARIANTS) {
         const spec = sheetSpecOf(variant, format)!

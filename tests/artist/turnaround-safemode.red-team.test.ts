@@ -1,3 +1,4 @@
+// 안전 모드는 위험할 수 있는 표현만 덜어내면서 인물의 성별·피부·그림체 정보는 필요한 만큼 보존한다
 import { describe, expect, it } from 'vitest'
 import {
   buildCharacterMainPrompt,
@@ -9,8 +10,8 @@ const SAFE_TOKENS =
   'depicted as an adult, age-ambiguous, stylized non-graphic illustration, tasteful, safe-for-work'
 const VIEWS = ['back', 'sideLeft', 'sideRight'] as const
 
-describe('turnaround safe-mode red-team', () => {
-  it('keeps safeMode:false byte-identical to omitted across varied inputs', () => {
+describe('인물 여러 방향 그림에서 안전 모드를 점검한다', () => {
+  it('안전 모드를 끄면 설정을 생략했을 때와 모든 입력에서 같은 그림이 나온다', () => {
     const cases: CharacterPromptInput[] = [
       {
         name: '빈 캐릭터',
@@ -51,7 +52,7 @@ describe('turnaround safe-mode red-team', () => {
     }
   })
 
-  it('preserves gender nouns, skin words, art style, and English partial matches in safeMode', () => {
+  it('안전 모드에서도 성별·피부 표현과 그림체, 일부 영어 표현은 그대로 남긴다', () => {
     const out = buildCharacterMainPrompt({
       name: '소녀',
       appearance:
@@ -78,7 +79,7 @@ describe('turnaround safe-mode red-team', () => {
     expect(out).toContain('palette: 피부색, #FFF0F0')
   })
 
-  it('removes supported explicit minor and graphic tokens from appearance and costumes', () => {
+  it('안전 모드를 켜면 미성년자와 유혈을 드러내는 표현을 외형과 의상에서 덜어낸다', () => {
     const out = buildCharacterMainPrompt({
       name: '테스트 캐릭터',
       appearance:
@@ -101,7 +102,7 @@ describe('turnaround safe-mode red-team', () => {
     expect(out).toContain('skin')
   })
 
-  it('applies safeMode scrubbing to every directional view while preserving reference invariants', () => {
+  it('안전 모드를 켜면 모든 방향의 그림에서 위험한 표현을 덜어내고 같은 인물이라는 약속을 지킨다', () => {
     const input: CharacterPromptInput = {
       name: 'View 캐릭터',
       appearance: '15-year-old child with blood and gore, girl with skin texture',
@@ -120,7 +121,7 @@ describe('turnaround safe-mode red-team', () => {
     }
   })
 
-  it('scrubs Korean numeric ages and standalone 어린 without over-scrubbing 어린이날', () => {
+  it('안전 모드에서 한국어 나이 표현은 덜어내되 어린이날처럼 뜻이 다른 말은 보존한다', () => {
     const out = buildCharacterMainPrompt({
       name: '경계 캐릭터',
       appearance: '12살 8세 어린 소녀, 어린이날 꽃장식과 피부',
@@ -137,7 +138,7 @@ describe('turnaround safe-mode red-team', () => {
     expect(out).toContain('피부')
   })
 
-  it('handles empty, unicode, and long strings stably under safeMode', () => {
+  it('안전 모드에서 값이 없거나 유니코드·긴 문장이어도 안정적으로 다룬다', () => {
     const longAppearance = `${'피부 '.repeat(80)}${'blood child 유혈 10대 '.repeat(80)}${'🌕'.repeat(80)}`
     const longCostume = `${'피부'.repeat(80)} ${'gore '.repeat(80)}`
 

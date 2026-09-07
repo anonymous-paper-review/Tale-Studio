@@ -1,3 +1,4 @@
+// 영상에 연결한 시작·끝 장면과 참고 이미지를 다시 불러와도 그대로 유지한다
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   isShotImageData,
@@ -21,8 +22,8 @@ function seedVideo() {
   return { sourceShotId, targetShotId, videoId }
 }
 
-describe('Director Video frame wiring', () => {
-  it('START/END는 한 개씩 저장하고 같은 source도 서로 다른 슬롯에 연결한다', () => {
+describe('Director 영상의 장면 연결', () => {
+  it('START와 END에는 각각 한 장면을 연결하고 같은 장면도 둘 다 쓸 수 있다', () => {
     const { sourceShotId, videoId } = seedVideo()
 
     api().wireFrameToVideo(sourceShotId, videoId, 'frame-start')
@@ -41,7 +42,7 @@ describe('Director Video frame wiring', () => {
     ).toHaveLength(2)
   })
 
-  it('START/END 재연결은 기존 입력을 교체하고 REF는 여러 장·중복 방지다', () => {
+  it('START와 END를 다시 연결하면 이전 장면을 바꾸고 REF에는 여러 장면을 중복 없이 남긴다', () => {
     const { sourceShotId, targetShotId, videoId } = seedVideo()
     const secondSourceId = api().addShotNode(
       api().nodes.find((node) => node.id === targetShotId)?.data.kind === 'shot'
@@ -73,7 +74,7 @@ describe('Director Video frame wiring', () => {
     ).toHaveLength(1)
   })
 
-  it('writer 샷 본체에서 연결한 frame 엣지가 rebuild 후에도 복원된다 (#node-merge)', () => {
+  it('Writer에서 이어온 샷의 장면 연결은 다시 불러와도 유지된다 (#node-merge)', () => {
     const sceneId = api().addSceneNode({ x: 0, y: 0 }, 'Scene')
     const sourceShotId = api().addShotNode(sceneId, { x: 360, y: 0 }, 'Source')
     api().updateNodeData<'shot'>(sourceShotId, { writerShotId: 'writer-source' })
@@ -95,7 +96,7 @@ describe('Director Video frame wiring', () => {
     ).toBe(true)
   })
 
-  it('frame 엣지를 삭제하면 대응하는 입력만 제거한다', () => {
+  it('장면 연결 하나를 지우면 그 장면만 영상 입력에서 빠진다', () => {
     const { sourceShotId, videoId } = seedVideo()
     api().wireFrameToVideo(sourceShotId, videoId, 'frame-start')
     api().wireFrameToVideo(sourceShotId, videoId, 'frame-ref')
@@ -125,8 +126,8 @@ describe('Director Video frame wiring', () => {
   })
 })
 
-describe('Director Shot image-reference wiring', () => {
-  it('여러 이미지 source를 Shot에 연결하고 중복은 한 번만 저장한다', () => {
+describe('Director Shot의 참고 이미지 연결', () => {
+  it('여러 이미지를 Shot에 연결해도 같은 이미지는 한 번만 남긴다', () => {
     const sceneId = api().addSceneNode({ x: 0, y: 0 }, 'Scene')
     const sourceOneId = api().addShotNode(sceneId, { x: 360, y: 0 }, 'Source one')
     const sourceTwoId = api().addShotNode(sceneId, { x: 360, y: 560 }, 'Source two')
@@ -148,7 +149,7 @@ describe('Director Shot image-reference wiring', () => {
     ).toHaveLength(2)
   })
 
-  it('image 엣지를 삭제하면 해당 source만 Shot 입력에서 제거한다', () => {
+  it('이미지 연결 하나를 지우면 그 이미지만 Shot에서 빠진다', () => {
     const sceneId = api().addSceneNode({ x: 0, y: 0 }, 'Scene')
     const sourceOneId = api().addShotNode(sceneId, { x: 360, y: 0 }, 'Source one')
     const sourceTwoId = api().addShotNode(sceneId, { x: 360, y: 560 }, 'Source two')
@@ -170,7 +171,7 @@ describe('Director Shot image-reference wiring', () => {
     ])
   })
 
-  it('applyUpdates가 connectImage를 같은 배선 경로로 적용한다', () => {
+  it('이미지 연결 요청도 화면에서 직접 연결한 것과 같은 결과가 된다', () => {
     const sceneId = api().addSceneNode({ x: 0, y: 0 }, 'Scene')
     const sourceShotId = api().addShotNode(sceneId, { x: 360, y: 0 }, 'Source')
     const targetShotId = api().addShotNode(sceneId, { x: 720, y: 0 }, 'Target')
@@ -192,7 +193,7 @@ describe('Director Shot image-reference wiring', () => {
     ])
   })
 
-  it('writer 샷 본체의 image 엣지가 rebuild 후에도 복원된다 (#node-merge)', () => {
+  it('Writer에서 이어온 샷의 이미지 연결은 다시 불러와도 유지된다 (#node-merge)', () => {
     const sceneId = api().addSceneNode({ x: 0, y: 0 }, 'Scene')
     const sourceShotId = api().addShotNode(sceneId, { x: 360, y: 0 }, 'Source')
     api().updateNodeData<'shot'>(sourceShotId, { writerShotId: 'writer-source' })

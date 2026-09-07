@@ -1,3 +1,4 @@
+// 이미 끝난 작업을 다시 시작할 때는 먼저 확인을 받고, 취소하면 아무것도 바꾸지 않는다
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ProjectSettings } from '@/types'
 import type { BackgroundSource } from '@/lib/producer-gate'
@@ -61,8 +62,8 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('writer rerun consent', () => {
-  it('holds the initial Producer-to-Writer run behind a proposal until approval', async () => {
+describe('Producer에서 Writer로 넘기는 작업을 다시 시작할 때 확인한다', () => {
+  it('처음 Producer 자료를 Writer로 넘길 때 먼저 확인을 받고 승인 전에는 시작하지 않는다', async () => {
     // vi.spyOn 금지(zustand): set()이 상태를 스프레드 복사해 스파이가 다음 테스트까지 살아남고,
     //   같은 프로퍼티를 다시 spyOn하면 기존 목이 카운트째 재사용된다 — 카운터 교체+복원 패턴을 쓴다.
     const originalSaveAndHandoff = useProducerStore.getState().saveAndHandoff
@@ -121,7 +122,7 @@ describe('writer rerun consent', () => {
     ).toBe(true)
   })
 
-  it('runs the handoff directly without a second approval card when the explicit button consents', async () => {
+  it('명시적으로 넘기기를 누르면 두 번째 확인 없이 바로 시작한다', async () => {
     // D12(2026-08-31 오너): "Writer 호출하기를 늈는데 승인 카드가 또 뜨는 게 이상함" —
     //   명시 버튼이 곳 동의다. 카드 없이 바로 실행하고, 즉시 반응 발화 + ⇄ 연출이 남는다.
     const originalSaveAndHandoff = useProducerStore.getState().saveAndHandoff
@@ -152,7 +153,7 @@ describe('writer rerun consent', () => {
     useProducerStore.setState({ saveAndHandoff: originalSaveAndHandoff })
   })
 
-  it('speaks an honest failure message when the approved handoff fails', async () => {
+  it('승인한 작업을 넘기지 못하면 실패 사실을 솔직하게 알린다', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ runId: 'run-1' }), { status: 200 }),
     )
@@ -177,7 +178,7 @@ describe('writer rerun consent', () => {
     }
   })
 
-  it('turns completed-run 409 into a consent proposal without rerunning', async () => {
+  it('이미 끝난 작업을 다시 시작하려 하면 확인을 받고 자동으로 다시 시작하지 않는다', async () => {
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(
@@ -202,7 +203,7 @@ describe('writer rerun consent', () => {
     expect(proposal?.action).toBe(WRITER_RERUN_CONSENT_TEXT)
   })
 
-  it('sends rerun consent with the explicit rerun flag and keeps cancellation side-effect free', async () => {
+  it('다시 시작을 승인하면 다시 실행하고 취소했을 때는 아무것도 바꾸지 않는다', async () => {
     // D11 반응 발화의 채팅 영속화 fetch가 사이에 끼어도 깨지지 않게 위치 순서가 아니라 URL로 라우팅한다.
     let writerStartCalls = 0
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {

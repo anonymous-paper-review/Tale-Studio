@@ -1,3 +1,4 @@
+// 영상 제작 결과 알림이 오면 확인된 결과만 반영하고, 저장 실패는 다시 처리할 수 있게 남긴다
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -60,8 +61,8 @@ beforeEach(() => {
   mocks.getJob.mockResolvedValue(job)
 })
 
-describe('linked Director video webhook persistence', () => {
-  it('keeps the job retryable when immutable upload succeeded but completion persistence failed', async () => {
+describe('연결된 Director 영상 결과 저장', () => {
+  it('파일을 올린 뒤 완료 정보 저장에 실패하면 다시 시도할 수 있게 남긴다', async () => {
     const { DirectorVideoCompletionPersistenceError } = await import('@/lib/fal/finalize')
     mocks.finalizeGeneration.mockRejectedValue(
       new DirectorVideoCompletionPersistenceError(
@@ -77,7 +78,7 @@ describe('linked Director video webhook persistence', () => {
     expect(mocks.failLegacy).not.toHaveBeenCalled()
   })
 
-  it('terminalizes an ordinary linked finalization failure', async () => {
+  it('연결된 영상 결과 반영에 실패하면 처리를 끝내고 실패로 남긴다', async () => {
     mocks.finalizeGeneration.mockRejectedValue(new Error('provider object unavailable'))
     const response = await POST(request())
 
@@ -92,14 +93,14 @@ describe('linked Director video webhook persistence', () => {
     expect(mocks.failLegacy).not.toHaveBeenCalled()
   })
 })
-describe('webhook identifiers and dispatch', () => {
+describe('영상 결과 알림의 종류별 처리', () => {
   it.each([
     ['character_view', 'image', { image: { url: 'https://fal.test/image.png' } }],
     ['world_shot', 'image', { image: { url: 'https://fal.test/image.png' } }],
     ['shot_storyboard', 'image', { image: { url: 'https://fal.test/image.png' } }],
     ['shot_rough_storyboard', 'image', { image: { url: 'https://fal.test/image.png' } }],
     ['shot_video', 'video', { video: { url: 'https://fal.test/video.mp4' } }],
-  ] as const)('dispatches %s through the exhaustive finalizer', async (kind, media, payload) => {
+  ] as const)('%s 결과가 오면 알맞은 방식으로 최종 반영한다', async (kind, media, payload) => {
     mocks.getJob.mockResolvedValue({ ...job, kind, video_clip_id: kind === 'shot_video' ? 'clip-1' : null })
     const response = await POST(request({ request_id: 'request-1', status: 'OK', payload }))
     expect(response.status).toBe(200)
@@ -112,21 +113,21 @@ describe('webhook identifiers and dispatch', () => {
   it.each([
     ['shot_video', { image: { url: 'https://fal.test/image.png' } }],
     ['world_shot', { video: { url: 'https://fal.test/video.mp4' } }],
-  ])('terminalizes a %s media mismatch without invoking the finalizer', async (kind, payload) => {
+  ])('%s 결과와 내용이 맞지 않으면 실패로 끝내고 반영하지 않는다', async (kind, payload) => {
     mocks.getJob.mockResolvedValue({ ...job, kind, video_clip_id: kind === 'shot_video' ? 'clip-1' : null })
     const response = await POST(request({ request_id: 'request-1', status: 'OK', payload }))
     expect(response.status).toBe(200)
     expect(mocks.finalizeGeneration).not.toHaveBeenCalled()
   })
 
-  it('rejects an unknown runtime job kind without dispatching a finalizer', async () => {
+  it('알 수 없는 작업 종류는 반영하지 않고 거절한다', async () => {
     mocks.getJob.mockResolvedValue({ ...job, kind: 'future_kind', video_clip_id: null })
     const response = await POST(request())
     expect(response.status).toBe(200)
     expect(mocks.finalizeGeneration).not.toHaveBeenCalled()
   })
 
-  it('rejects signed payloads with absent or malformed request identifiers', async () => {
+  it('확인된 결과에 요청 이름이 없거나 올바르지 않으면 거절한다', async () => {
     for (const body of [
       { status: 'OK', payload: {} },
       { request_id: 42, status: 'OK', payload: {} },

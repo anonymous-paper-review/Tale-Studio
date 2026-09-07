@@ -1,3 +1,4 @@
+// 이전 생성이 끝나지 않아도 다시 만들기를 누르면 막힌 작업을 정리해 계속 진행한다 (#a1-inflight-block 2026-08-27 오너 신고 A1)
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { describeFinalizeError } from '@/lib/fal/error-evidence'
@@ -16,29 +17,29 @@ const route = readFileSync('src/app/api/writer/rough-storyboard/route.ts', 'utf8
 const view = readFileSync('src/features/writer/rough-storyboard-view.tsx', 'utf8')
 const reconcile = readFileSync('src/lib/fal/reconcile.ts', 'utf8')
 
-describe('force 재생성은 좀비 잡에 영구히 막히지 않는다', () => {
-  it('force + 특정 샷이면 막고 있는 잡을 fal 진실로 회수한다', () => {
+describe('다시 만들기는 이전 작업에 영구히 막히지 않는다', () => {
+  it('특정 장면을 다시 만들면 끝나지 않은 작업을 확인한 뒤 제출한다', () => {
     expect(route).toContain('inFlightJobByShot')
     expect(route).toContain('reconcileJobFromFal')
     // 회수는 잡당 조회+finalize 라 무겁다 — maxDuration 안에서 끝나게 상한이 있어야 한다
     expect(route).toContain('RECONCILE_ON_FORCE_CAP')
   })
 
-  it('회수로 종결된 샷은 in_flight 집합에서 빠져 같은 요청에서 제출된다', () => {
+  it('끝난 이전 작업은 목록에서 빠져 같은 요청으로 다시 만든다', () => {
     expect(route).toMatch(/if \(after\.status !== 'queued'\)[\s\S]{0,160}inFlight\.delete/)
   })
 
-  it('회수 실패는 삼키고 기존 중복 방지는 유지한다', () => {
+  it('이전 작업 확인에 실패해도 중복 작업은 계속 막는다', () => {
     expect(route).toContain('[rough-storyboard] force reconcile failed:')
   })
 })
 
-describe('provider 404 는 사유를 채워 종결한다', () => {
-  it('reconcile 이 원본 빈 message 대신 합성 증거를 넘긴다', () => {
+describe('서비스에서 찾을 수 없는 오류도 이유를 남겨 마무리한다', () => {
+  it('서비스 오류에 설명이 없어도 실패 이유를 만들어 남긴다', () => {
     expect(reconcile).toContain('terminalizeJob(job, describeFinalizeError(error))')
   })
 
-  it('message 가 비어도 status 가 남아 종결 가드를 통과한다', () => {
+  it('오류 설명이 비어도 실패 이유를 남기고 마무리한다', () => {
     // fal ApiError 재현: message 빈 문자열 + status 404
     const apiError = Object.assign(new Error(''), { name: 'ApiError', status: 404 })
     const evidence = describeFinalizeError(apiError)
@@ -47,19 +48,19 @@ describe('provider 404 는 사유를 채워 종결한다', () => {
   })
 })
 
-describe('막힌 재생성은 조용히 죽지 않는다', () => {
-  it('클릭 유래(force) 요청이 전부 막히면 스피너를 풀고 안내한다', () => {
+describe('다시 만들기가 막히면 멈춘 이유를 알려준다', () => {
+  it('다시 만들기가 모두 막히면 진행 표시를 멈추고 안내한다', () => {
     expect(view).toMatch(/if \(force && !auto && submitted\.length === 0\)/)
     expect(view).toContain("x.reason === 'in_flight'")
     expect(view).toContain('Still finishing the previous generation for {count} panels')
   })
 
-  it('안내 문구가 한국어 사전에 있다', () => {
+  it('다시 만들기가 막혔다는 안내를 한국어로 보여준다', () => {
     const key = 'Still finishing the previous generation for {count} panels. Try again in a moment.'
     expect(koMessages[key]).toBeTruthy()
   })
 
-  it('자동 경로는 여전히 조용하다 — 진짜 생성 중 표시를 지우지 않는다', () => {
+  it('자동으로 시작한 작업은 안내를 띄우지 않고 진행 표시를 유지한다', () => {
     // auto 를 제외하지 않으면 진입 자동 생성마다 토스트가 뜨고, 실제 생성 중인 샷의 스피너까지 지운다
     expect(view).not.toMatch(/if \(force && submitted\.length === 0\)/)
   })

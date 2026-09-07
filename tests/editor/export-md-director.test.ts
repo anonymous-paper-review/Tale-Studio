@@ -1,3 +1,4 @@
+// 감독 자료를 내보내면 장면과 촬영 자료가 최신 완료본을 기준으로 읽기 쉽게 정리된다
 import { describe, expect, it } from 'vitest'
 
 import { collectDirectorArtifacts, type DirectorExportData } from '@/lib/export/director'
@@ -167,7 +168,7 @@ const fixtureData: DirectorExportData = {
 }
 
 describe('collectDirectorArtifacts', () => {
-  it('emits storyboard pngs only for completed storyboard_image rows with a url', () => {
+  it('완료된 스토리보드 이미지만 넣고 주소가 없는 자료는 넣지 않는다', () => {
     const files = collectDirectorArtifacts(fixtureData, 'ko')
 
     expect(mediaFile(files, 'director/shots/sc_01-sh_01_01.png')?.url).toBe(
@@ -183,7 +184,7 @@ describe('collectDirectorArtifacts', () => {
     expect(shotlist).not.toContain('https://cdn.example.com/storyboards/stale-failed.png')
   })
 
-  it('selects a successful live Final over newer takes, otherwise uses the newest successful take, and only uses shots.video_url without relational rows', () => {
+  it('사용할 수 있는 최종본을 우선하고 없으면 최근 완료본을 쓰며, 연결된 영상이 없을 때만 기존 주소를 쓴다', () => {
     const files = collectDirectorArtifacts(fixtureData, 'ko')
 
     expect(mediaFile(files, 'director/clips/sc_01-sh_01_01.mp4')?.url).toBe(
@@ -202,7 +203,7 @@ describe('collectDirectorArtifacts', () => {
     expect(files.some((file) => file.url === 'https://cdn.example.com/shots/stale-projection.mp4')).toBe(false)
   })
 
-  it('renders a readable native-first shotlist without raw JSON bodies', () => {
+  it('장면 목록은 한국어 설명을 우선 보여 주고 낯선 기호가 드러나지 않게 읽기 쉽게 정리한다', () => {
     const files = collectDirectorArtifacts(fixtureData, 'ko')
     const shotlist = textFile(files, 'director/shotlist.md')
 
@@ -226,7 +227,7 @@ describe('collectDirectorArtifacts', () => {
   })
 })
 
-describe('Director video take selection', () => {
+describe('영상 자료에서 사용할 최종본을 고르는 규칙', () => {
   function take(overrides: Partial<VideoTakeSelectionRecord> = {}): VideoTakeSelectionRecord {
     return {
       id: 'take-1',
@@ -241,7 +242,7 @@ describe('Director video take selection', () => {
     }
   }
 
-  it('prefers a usable Final, then the newest usable take while excluding deleted, failed, pending, and whitespace URLs', () => {
+  it('최종본과 최근 완료본을 고르고 실패·삭제·준비 중이거나 주소가 비어 있는 자료는 제외한다', () => {
     const takes = [
       take({ id: 'final', take_number: 1, is_final: true }),
       take({ id: 'newest', take_number: 2 }),
@@ -256,7 +257,7 @@ describe('Director video take selection', () => {
     expect(selectHandoffTake(takes.map(item => item.id === 'final' ? { ...item, url: ' ' } : item))?.id).toBe('newest')
   })
 
-  it('uses deterministic ids to resolve equal take timestamps and attempt timestamps before take ordering', () => {
+  it('시간이 같은 자료도 고유한 이름으로 순서를 정해 항상 같은 결과를 고른다', () => {
     const a = take({ id: 'a', take_number: 2, last_attempt_at: '2026-07-20T02:00:00.000Z' })
     const z = take({ id: 'z', take_number: 2, last_attempt_at: '2026-07-20T02:00:00.000Z' })
     const newestAttempt = take({ id: 'older-take-new-attempt', take_number: 1, last_attempt_at: '2026-07-20T03:00:00.000Z' })

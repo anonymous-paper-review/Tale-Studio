@@ -1,3 +1,4 @@
+// 숫자 Alt 단축키는 지정된 단계로만 이동하고, 다른 키 조합과 일반 입력은 건드리지 않는다 (#keyboard-only 2026-08-12, Alt+숫자로 이관)
 import { describe, it, expect } from 'vitest'
 import {
   STAGE_ACCESS_KEY,
@@ -20,31 +21,31 @@ const ev = (code: string, mods: Partial<Record<'altKey' | 'ctrlKey' | 'metaKey' 
 })
 
 describe('stageForShortcut', () => {
-  it('Alt + 1~5 가 STAGES 순서와 1:1 로 대응한다 (넘패드 포함)', () => {
+  it('Alt 숫자 1~5를 누르면 해당 단계로 이동하고 숫자 키패드도 똑같이 동작한다', () => {
     const got = STAGES.map((s) => stageForShortcut(ev(`Digit${STAGE_ACCESS_KEY[s.id]}`, { altKey: true })))
     expect(got).toEqual(STAGES.map((s) => s.id))
     const numpad = STAGES.map((s) => stageForShortcut(ev(`Numpad${STAGE_ACCESS_KEY[s.id]}`, { altKey: true })))
     expect(numpad).toEqual(STAGES.map((s) => s.id))
   })
 
-  it('모디파이어가 없으면 발화하지 않는다 (그냥 타이핑)', () => {
+  it('Alt 없이 숫자를 입력하면 단계 이동 없이 글자로 입력된다', () => {
     expect(stageForShortcut(ev('Digit2'))).toBeNull()
   })
 
-  it('Ctrl/Cmd/Shift 가 섞이면 양보한다 — 브라우저·선택 조작의 몫', () => {
+  it('다른 보조 키를 함께 누르면 단계 이동을 가로채지 않는다', () => {
     expect(stageForShortcut(ev('Digit2', { altKey: true, ctrlKey: true }))).toBeNull()
     expect(stageForShortcut(ev('Digit2', { altKey: true, metaKey: true }))).toBeNull()
     expect(stageForShortcut(ev('Digit2', { altKey: true, shiftKey: true }))).toBeNull()
     expect(stageForShortcut(ev('Digit2', { metaKey: true }))).toBeNull()
   })
 
-  it('할당되지 않은 키는 무시한다', () => {
+  it('지정하지 않은 키를 누르면 아무 단계도 열지 않는다', () => {
     expect(stageForShortcut(ev('KeyA', { altKey: true }))).toBeNull()
     expect(stageForShortcut(ev('KeyQ', { altKey: true }))).toBeNull() // 구 배열 폐기 확인
     expect(stageForShortcut(ev('Digit6', { altKey: true }))).toBeNull()
   })
 
-  it('e.key 가 아니라 code 로 판정 — macOS 의 Option+숫자(¡™£…)도 잡힌다', () => {
+  it('Mac에서 Option과 숫자를 눌러도 해당 단계로 이동한다', () => {
     // 실제 이벤트에서 key 는 '¡' 등으로 오지만 code 는 물리 위치라 변하지 않는다.
     expect(stageForShortcut(ev('Digit1', { altKey: true }))).toBe('producer')
     expect(stageForShortcut(ev('Digit3', { altKey: true }))).toBe('artist')
@@ -52,7 +53,7 @@ describe('stageForShortcut', () => {
 })
 
 describe('accessModifierLabel', () => {
-  it('macOS 는 Option, 나머지는 Alt 로 표기', () => {
+  it('사용하는 운영체제에 맞는 보조 키 이름을 보여준다', () => {
     expect(accessModifierLabel('MacIntel')).toBe('Option')
     expect(accessModifierLabel('iPhone')).toBe('Option')
     expect(accessModifierLabel('Win32')).toBe('Alt')

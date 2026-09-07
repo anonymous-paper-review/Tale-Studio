@@ -1,3 +1,4 @@
+// 이미지 크기 요청은 모델 약속에 맞추고, 화면 형식별 시트 크기를 정확히 지킨다 (#fal-canvas 2026-08-17)
 import { describe, it, expect } from 'vitest'
 import { buildFalImageInput } from '@/lib/writer/llm/fal'
 import { realSheetCanvas } from '@/lib/director/storyboard-strip'
@@ -10,25 +11,25 @@ import { realSheetCanvas } from '@/lib/director/storyboard-strip'
 
 const EDIT = 'openai/gpt-image-2/edit'
 
-describe('buildFalImageInput — image_size 정규화', () => {
-  it("edit 모델: 'WxH' 는 {width,height} 객체로 변환된다 (문자열 그대로는 422 실측)", () => {
+describe('buildFalImageInput — 이미지 크기와 비율을 모델 약속에 맞춘다', () => {
+  it('기존 그림을 고칠 때 가로×세로를 지정하면 숫자 크기로 전달한다', () => {
     const input = buildFalImageInput({ prompt: 'p', image_size: '1536x1024' }, EDIT)
     expect(input.image_size).toEqual({ width: 1536, height: 1024 })
   })
 
-  it('edit 모델: preset 문자열은 그대로 통과한다', () => {
+  it('기존 그림을 고칠 때 정해진 크기 이름은 그대로 사용한다', () => {
     const input = buildFalImageInput({ prompt: 'p', image_size: 'landscape_4_3' }, EDIT)
     expect(input.image_size).toBe('landscape_4_3')
   })
 
-  it('edit 모델: image_size 미지정이면 aspect_ratio 유도 preset (기존 계약 유지)', () => {
+  it('기존 그림을 고칠 때 크기를 생략하면 화면 비율에 맞는 기본 크기를 사용한다 (기존 약속 유지)', () => {
     expect(buildFalImageInput({ prompt: 'p', aspect_ratio: '16:9' }, EDIT).image_size).toBe(
       'landscape_16_9',
     )
     expect(buildFalImageInput({ prompt: 'p' }, EDIT).image_size).toBe('auto')
   })
 
-  it("flux 계열: 명시 'WxH' 를 객체로 존중, 미지정이면 preset ('auto' 미지원 → 16:9)", () => {
+  it('Flux 그림 모델은 가로×세로를 그대로 반영하고, 생략하면 16:9 크기를 사용한다', () => {
     const flux = 'fal-ai/flux-2/klein/9b'
     expect(buildFalImageInput({ prompt: 'p', image_size: '1024x1536' }, flux).image_size).toEqual({
       width: 1024,
@@ -37,7 +38,7 @@ describe('buildFalImageInput — image_size 정규화', () => {
     expect(buildFalImageInput({ prompt: 'p' }, flux).image_size).toBe('landscape_16_9')
   })
 
-  it('grok: image_size 는 스키마에 없어 어떤 값이든 전송하지 않는다 (422 방어)', () => {
+  it('Grok 그림 모델은 크기 설정을 받지 않으므로 크기를 보내지 않는다', () => {
     const input = buildFalImageInput(
       { prompt: 'p', image_size: '1024x1536' },
       'xai/grok-imagine-image',
@@ -46,20 +47,20 @@ describe('buildFalImageInput — image_size 정규화', () => {
   })
 })
 
-describe('buildFalImageInput — 신규 fal 이미지 모델(nano-banana / seedream) 스키마 분기', () => {
+describe('buildFalImageInput — 새 이미지 모델마다 크기와 비율을 다르게 적용한다', () => {
   const NANO = 'fal-ai/nano-banana'
   const NANO_EDIT = 'fal-ai/nano-banana/edit'
   const SEEDREAM = 'fal-ai/bytedance/seedream/v4/text-to-image'
   const SEEDREAM_EDIT = 'fal-ai/bytedance/seedream/v4/edit'
 
-  it('nano t2i: aspect_ratio 를 그대로 싣고 image_urls/image_size 는 없다', () => {
+  it('새 그림을 만들 때 화면 비율은 그대로 사용하고 참고 그림과 별도 크기는 보내지 않는다', () => {
     const input = buildFalImageInput({ prompt: 'p', aspect_ratio: '1:1' }, NANO)
     expect(input.aspect_ratio).toBe('1:1')
     expect('image_urls' in input).toBe(false)
     expect('image_size' in input).toBe(false)
   })
 
-  it("nano edit: reference 를 image_urls 로, aspect_ratio 'auto' 는 생략(입력 비율 추종)", () => {
+  it('기존 그림을 고칠 때 참고 그림을 사용하고 자동 비율은 따로 보내지 않는다', () => {
     const input = buildFalImageInput(
       { prompt: 'p', aspect_ratio: 'auto', reference_image_urls: ['a.png', 'b.png'] },
       NANO_EDIT,
@@ -68,12 +69,12 @@ describe('buildFalImageInput — 신규 fal 이미지 모델(nano-banana / seedr
     expect('aspect_ratio' in input).toBe(false)
   })
 
-  it('nano-banana-2 t2i(#owner-default 2026-09-02): 1세대와 같은 분기 — prompt+aspect_ratio 만', () => {
+  it('nano-banana-2로 새 그림을 만들면 설명과 화면 비율만 보낸다 (#owner-default 2026-09-02)', () => {
     const input = buildFalImageInput({ prompt: 'p', aspect_ratio: '3:2', seed: 7, negative_prompt: 'x' }, 'fal-ai/nano-banana-2')
     expect(input).toEqual({ prompt: 'p', aspect_ratio: '3:2' })
   })
 
-  it('nano-banana-2 edit: prompt+image_urls 만 (aspect_ratio 생략 → 템플릿·레퍼런스 비율 추종)', () => {
+  it('nano-banana-2로 기존 그림을 고칠 때 설명과 참고 그림만 보내 비율을 따라간다', () => {
     const input = buildFalImageInput(
       { prompt: 'p', aspect_ratio: '16:9', reference_image_urls: ['tpl.png', 'face.png'] },
       'fal-ai/nano-banana-2/edit',
@@ -81,17 +82,17 @@ describe('buildFalImageInput — 신규 fal 이미지 모델(nano-banana / seedr
     expect(input).toEqual({ prompt: 'p', image_urls: ['tpl.png', 'face.png'] })
   })
 
-  it('seedream t2i: image_size 사용, aspect_ratio 는 preset 으로 유도(스키마에 aspect_ratio 없음)', () => {
+  it('seedream으로 새 그림을 만들 때 화면 비율에 맞는 크기를 사용한다', () => {
     const input = buildFalImageInput({ prompt: 'p', aspect_ratio: '16:9' }, SEEDREAM)
     expect(input.image_size).toBe('landscape_16_9')
     expect('aspect_ratio' in input).toBe(false)
   })
 
-  it('seedream: canvas 미지정이면 image_size 를 생략한다(모델 기본 2048² 정사각)', () => {
+  it('seedream에서 크기를 생략하면 모델 기본 정사각형을 사용한다', () => {
     expect('image_size' in buildFalImageInput({ prompt: 'p' }, SEEDREAM)).toBe(false)
   })
 
-  it("seedream edit: reference 를 image_urls 로, 'WxH' 는 {width,height} 객체로", () => {
+  it('seedream으로 기존 그림을 고칠 때 참고 그림과 가로×세로 크기를 올바르게 전달한다', () => {
     const input = buildFalImageInput(
       { prompt: 'p', image_size: '1024x1536', reference_image_urls: ['t.png'] },
       SEEDREAM_EDIT,
@@ -101,20 +102,20 @@ describe('buildFalImageInput — 신규 fal 이미지 모델(nano-banana / seedr
   })
 })
 
-describe('realSheetCanvas — 프로듀서 포맷 → 실사 시트 캔버스 (#sheet-formats 2차: 4포맷 전부 스펙)', () => {
-  it('그리드: 셀 AR 정확·데드밴드 제거 캔버스 (horizontal 도 레거시에서 스펙 시트로 이동)', () => {
+describe('realSheetCanvas — 프로듀서 화면 형식에 맞는 실사 시트 크기 (#sheet-formats 2차: 4포맷 전부 스펙)', () => {
+  it('그리드 시트는 모든 화면 형식에서 칸 비율을 맞추고 빈 여백을 없앤다', () => {
     expect(realSheetCanvas('horizontal_16:9', 'grid4')).toBe('2880x1280') // #hd-grid 상향(오너 ③D)
     expect(realSheetCanvas('vertical_9:16', 'grid4')).toBe('1152x1536')
     expect(realSheetCanvas('square_1:1', 'grid4')).toBe('1344x1024')
     expect(realSheetCanvas('cinema_2.39:1', 'grid4')).toBe('2400x880') // #cinema-row-pitch 확대 추종
   })
 
-  it('포맷 미상(구 프로젝트 null)만 레거시 캔버스 유지 — 하위 호환', () => {
+  it('화면 형식을 알 수 없는 예전 프로젝트만 이전 시트 크기를 유지한다', () => {
     expect(realSheetCanvas(null, 'grid4')).toBe('1536x1024')
     expect(realSheetCanvas(null, 'strip1')).toBe('1024x1536')
   })
 
-  it('스트립: 세로 포맷만 가로 3열(1536x896), 나머지는 적층', () => {
+  it('세로 화면 형식의 스트립은 세 칸을 가로로 놓고, 나머지는 세로로 쌓는다', () => {
     expect(realSheetCanvas('horizontal_16:9', 'strip1')).toBe('1024x1712')
     expect(realSheetCanvas('cinema_2.39:1', 'strip1')).toBe('1024x1296')
     expect(realSheetCanvas('vertical_9:16', 'strip1')).toBe('1536x896')

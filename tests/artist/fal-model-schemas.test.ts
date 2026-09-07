@@ -1,8 +1,9 @@
+// 이미지 요청에는 각 모델이 받을 수 있는 정보만 남겨 잘못된 설정을 보내지 않는다
 import { describe, expect, it } from 'vitest'
 import { computeIgnoredFields } from '@/lib/fal/model-schemas'
 
 describe('computeIgnoredFields', () => {
-  it('returns an empty array when only allowed fields are sent', () => {
+  it('허용된 정보만 보내면 빠지는 정보가 없다', () => {
     expect(
       computeIgnoredFields(
         {
@@ -17,7 +18,7 @@ describe('computeIgnoredFields', () => {
     ).toEqual([])
   })
 
-  it('returns field names that are not allowed for the registered model', () => {
+  it('모델이 받지 않는 정보는 빠질 항목으로 알려준다', () => {
     expect(
       computeIgnoredFields(
         {
@@ -31,7 +32,7 @@ describe('computeIgnoredFields', () => {
     ).toEqual(['negative_prompt', 'audio'])
   })
 
-  it('returns an empty array for unregistered models so schema diff can be skipped', () => {
+  it('등록되지 않은 모델은 비교하지 않고 빠지는 정보도 없다고 본다', () => {
     expect(
       computeIgnoredFields(
         {

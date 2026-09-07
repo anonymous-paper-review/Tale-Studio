@@ -1,3 +1,4 @@
+// 다른 화면을 다녀와도 잘라 낸 영상 구간과 최신 영상이 그대로 유지된다 (#a3-state-loss 2026-08-26)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useEditorStore, isSyntheticShotId, baseShotIdOf } from '@/stores/editor-store'
 import { useProjectStore } from '@/stores/project-store'
@@ -64,8 +65,8 @@ afterEach(() => {
   localStorage.clear()
 })
 
-describe('synthetic shot id helpers', () => {
-  it('classifies cut pieces and drag instances', () => {
+describe('잘라 낸 영상 조각과 복사한 조각을 구분한다', () => {
+  it('잘라 낸 조각과 끌어 놓아 만든 복사본을 구분한다', () => {
     expect(isSyntheticShotId('sh_01_02__cab12cd34')).toBe(true)
     expect(isSyntheticShotId('sh_01_02__i99ffee00')).toBe(true)
     expect(isSyntheticShotId('sh_01_02')).toBe(false)
@@ -74,8 +75,8 @@ describe('synthetic shot id helpers', () => {
   })
 })
 
-describe('loadPersisted synthetic piece restore', () => {
-  it('restores a cut piece whose base shot is canonical, replaying the base clip current url', async () => {
+describe('다른 화면을 다녀온 뒤 잘라 낸 조각을 되살린다', () => {
+  it('원본 영상이 남아 있으면 잘라 낸 조각에 최신 영상을 이어 붙인다', async () => {
     // canonical state as loadData would leave it (base shot only, fresh url after regen)
     useEditorStore.setState({
       shots: [shot('sh_01_02')],
@@ -109,7 +110,7 @@ describe('loadPersisted synthetic piece restore', () => {
     expect(state.clipOrder.sc_01).toEqual(['sh_01_02', 'sh_01_02__cdeadbeef'])
   })
 
-  it('drops a piece whose base shot no longer exists (deleted media must not resurrect)', async () => {
+  it('원본 영상이 삭제됐으면 잘라 낸 조각을 되살리지 않는다', async () => {
     useEditorStore.setState({
       shots: [shot('sh_01_05')],
       videoClips: [clip('sh_01_05')],
@@ -135,8 +136,8 @@ describe('loadPersisted synthetic piece restore', () => {
   })
 })
 
-describe('setTrim write-through', () => {
-  it('updates the clip locally and persists canonical trims to /api/editor/trim (debounced)', async () => {
+describe('영상 구간 변경을 저장한다', () => {
+  it('영상 구간을 바꾸면 화면에 먼저 반영하고 잠시 뒤 저장한다', async () => {
     vi.useFakeTimers()
     const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
@@ -167,7 +168,7 @@ describe('setTrim write-through', () => {
     vi.useRealTimers()
   })
 
-  it('never sends synthetic piece trims to the shots table route', async () => {
+  it('잘라 낸 조각만 바꾸면 원본 영상의 구간은 저장하지 않는다', async () => {
     vi.useFakeTimers()
     const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
@@ -191,7 +192,7 @@ describe('setTrim write-through', () => {
     vi.useRealTimers()
   })
 
-  it('rejects degenerate ranges', () => {
+  it('끝이 시작과 같거나 앞선 구간은 저장하지 않는다', () => {
     useEditorStore.setState({
       shots: [shot('sh_02_04')],
       videoClips: [clip('sh_02_04', { trimStart: 1, trimEnd: 2 })],

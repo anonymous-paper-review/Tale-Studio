@@ -1,3 +1,4 @@
+// 프로젝트를 내보내면 네 단계 상태와 자료 수를 한눈에 확인하고 안전한 이름으로 내려받는다
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { createClientMock } = vi.hoisted(() => ({
@@ -42,8 +43,8 @@ afterEach(() => {
   vi.clearAllMocks()
 })
 
-describe('composeProjectArtifacts export manifest', () => {
-  it('prepends README.md listing all four stages with counts matching bundled files', async () => {
+describe('내보내기 목록은 네 단계 상태와 자료 수를 정확히 보여 준다', () => {
+  it('네 단계를 내보내면 안내 문서에 각 단계 상태와 자료 수를 적는다', async () => {
     const deps = depsFromFiles({
       producer: [textFile('producer/story.md'), textFile('producer/settings.md')],
       writer: [textFile('writer/scenes.md')],
@@ -72,7 +73,7 @@ describe('composeProjectArtifacts export manifest', () => {
     expect(readme).toContain('| director | 완료 | 2 |  |')
   })
 
-  it('marks a zero-file stage as 비어 있음 without adding an empty folder artifact', async () => {
+  it('자료가 없는 단계는 비어 있다고 알리고 빈 폴더는 만들지 않는다', async () => {
     const deps = depsFromFiles({
       producer: [textFile('producer/story.md')],
       writer: [textFile('writer/scenes.md')],
@@ -93,7 +94,7 @@ describe('composeProjectArtifacts export manifest', () => {
     expect(paths(files).some((path) => path === 'artist' || path.startsWith('artist/'))).toBe(false)
   })
 
-  it('records a failed stage as 오류 and keeps exporting the remaining stages', async () => {
+  it('한 단계에 문제가 생겨도 오류를 알리고 나머지 단계는 계속 내보낸다', async () => {
     const deps = depsFromFiles({
       producer: [textFile('producer/story.md')],
       writer: new Error('writer offline'),
@@ -113,7 +114,7 @@ describe('composeProjectArtifacts export manifest', () => {
     ])
   })
 
-  it('escapes pipes and newlines in README manifest error cells', async () => {
+  it('오류 내용에 줄바꿈이나 세로줄이 있어도 안내 문서 표가 흐트러지지 않는다', async () => {
     const deps = depsFromFiles({
       producer: [textFile('producer/story.md')],
       writer: new Error('writer | offline\nretry later'),
@@ -128,7 +129,7 @@ describe('composeProjectArtifacts export manifest', () => {
     expect(readme).not.toContain('| writer | 오류 | 0 | writer | offline')
   })
 
-  it('uses DB-derived producer files when the default producer collector runs with a cold store', async () => {
+  it('화면을 열지 않아도 저장된 Producer 자료를 내보내고 단계 수를 맞춘다', async () => {
     createClientMock.mockReturnValue(
       mockProducerSupabase({
         project: {
@@ -197,8 +198,8 @@ describe('composeProjectArtifacts export manifest', () => {
   })
 })
 
-describe('export orchestrator download names', () => {
-  it('uses sanitizeSegment(project.name) for project and stage zip names', async () => {
+describe('내보내기 이름을 안전하게 만든다', () => {
+  it('프로젝트 이름에 기호나 경로 표시가 있어도 프로젝트와 단계의 내려받기 이름을 안전하게 만든다', async () => {
     const project = { id: 'project-unsafe', name: '../../My Project:*?' }
     const deps = depsFromFiles({
       producer: [textFile('producer/story.md')],

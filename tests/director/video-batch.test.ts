@@ -1,3 +1,4 @@
+// 여러 장면의 영상을 한 번에 만들 때 중복 없이 진행 상황과 실패 수를 정확히 보여준다
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DirectorNode } from '@/types/director'
 
@@ -65,7 +66,7 @@ beforeEach(() => {
 })
 
 describe('eligibleVideoBatchShotIds', () => {
-  it('keeps Shot node order and excludes playable or generating children', () => {
+  it('영상 일괄 생성 대상은 장면 순서를 지키고 이미 재생 가능하거나 생성 중인 장면은 제외한다', () => {
     const nodes = [
       shot('shot-3'),
       video('video-generating', 'shot-3', { status: 'generating' }),
@@ -85,7 +86,7 @@ describe('eligibleVideoBatchShotIds', () => {
 })
 
 describe('runVideoBatch', () => {
-  it('runs at most three jobs, counts null results as failures, and clears progress', async () => {
+  it('동시에 세 장면까지만 만들고 실패 수를 세어 진행 표시를 끝낸다', async () => {
     mockStore.state.nodes = [shot('shot-1'), shot('shot-2'), shot('shot-3'), shot('shot-4'), shot('shot-5')]
     let active = 0
     let maxActive = 0

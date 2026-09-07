@@ -1,3 +1,4 @@
+// 어떤 크기의 그림판도 네 칸을 같은 크기로 잘라 글씨가 그림을 침범하지 않게 한다 (#label-invasion → #fixed-crop 2026-08-17, 오너 결정)
 import { describe, it, expect } from 'vitest'
 import sharp from 'sharp'
 import { sheetSpecOf, sheetGeometry } from '@/lib/writer/rough-storyboard-grid'
@@ -44,8 +45,8 @@ async function syntheticSheet(withTextBands: boolean): Promise<Buffer> {
   return sharp(Buffer.from(svg)).png().toBuffer()
 }
 
-describe('cropRoughGridFrames — 포맷 시트 고정 좌표 (#fixed-crop)', () => {
-  it('드리프트·라벨 밴드가 있어도 프레임은 스펙 셀 내부 크기로 상시 균일', async () => {
+describe('cropRoughGridFrames — 어떤 크기에서도 같은 위치와 크기로 잘라낸다 (#fixed-crop)', () => {
+  it('그림과 글씨가 조금 어긋나도 네 칸을 같은 크기로 잘라낸다', async () => {
     const g = sheetGeometry('grid4', 'vertical_9:16')
     const spec = sheetSpecOf('grid4', 'vertical_9:16')!
     const wantW = Math.round(g.cols[0][1] * spec.canvas.width) - Math.round(g.cols[0][0] * spec.canvas.width) + 6 // X_BLEED 3px×2 — 라벨 첫 글자 보호(#fixed-crop square 실측)
@@ -63,7 +64,7 @@ describe('cropRoughGridFrames — 포맷 시트 고정 좌표 (#fixed-crop)', ()
     }
   })
 
-  it('캔버스가 요청과 다른 크기로 와도(리샘플) 비례 좌표가 절대 좌표를 유지한다', async () => {
+  it('그림판 크기가 달라져도 네 칸의 비율과 크기를 맞춰 잘라낸다', async () => {
     // fal 실측상 요청 치수 그대로 반환되지만, 방어적으로 0.5배 리샘플에도 비례가 성립해야 한다.
     const sheet = await syntheticSheet(false)
     const half = await sharp(sheet).resize({ width: 576 }).png().toBuffer()
@@ -78,7 +79,7 @@ describe('cropRoughGridFrames — 포맷 시트 고정 좌표 (#fixed-crop)', ()
     }
   })
 
-  it('레거시(null 포맷)는 종전 적응형 경로 유지 — 레거시 비례 시트 파스', async () => {
+  it('예전 형식의 그림판도 장면 칸을 빠짐없이 잘라낸다', async () => {
     // 레거시 템플릿 비례(1672×941)로 깨끗한 시트를 합성 — v4/v5 경로 스모크.
     const g = sheetGeometry('grid4', null)
     const W = 1672

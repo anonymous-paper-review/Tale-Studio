@@ -1,3 +1,4 @@
+// 카드를 누르거나 연결할 때 알맞은 편집 화면과 관계를 보여준다
 import { describe, expect, it } from 'vitest'
 import {
   compareDirectorVideoTakeOrder,
@@ -18,78 +19,78 @@ import { translate } from '@/lib/i18n'
 
 // 테스트는 useT() 훅을 못 쓴다(React 렌더 밖) — 고정 locale로 바인딩한 t 스텁을 넘긴다.
 const t = (text: string, params?: Record<string, string | number>) => translate('en', text, params)
-describe('editActionForKind (BaseNode Edit 분기)', () => {
+describe('editActionForKind (카드 종류별 편집 화면)', () => {
   // #panel-unify 2026-08-31: 생성 이미지/영상 편집은 좌측 패널 — 모달은 캔버스를 가린다.
-  it('shot/video/asset Image는 좌측 패널 선택', () => {
+  it('Shot·Video·asset Image를 누르면 왼쪽 패널에서 편집한다', () => {
     expect(editActionForKind('shot')).toBe('select')
     expect(editActionForKind('video')).toBe('select')
     expect(editActionForKind('asset')).toBe('select')
   })
-  it('scene은 모달(패널 미지원)', () => {
+  it('Scene을 누르면 편집 창에서 연다', () => {
     expect(editActionForKind('scene')).toBe('popup')
   })
-  it('prompt는 액션 없음', () => {
+  it('prompt를 눌러도 아무 동작을 하지 않는다', () => {
     expect(editActionForKind('prompt')).toBe('none')
   })
 })
 
-describe('popupVisibleInView (DirectorNodePopup 가드)', () => {
-  it('그리드 뷰는 scene/shot/video 모달 허용', () => {
+describe('popupVisibleInView (화면별 팝업 표시 여부)', () => {
+  it('그리드 화면에서는 Scene·Shot·Video를 눌러 편집 창을 열 수 있다', () => {
     expect(popupVisibleInView('storyboard', 'shot')).toBe(true)
     expect(popupVisibleInView('storyboard', 'video')).toBe(true)
     expect(popupVisibleInView('storyboard', 'scene')).toBe(true)
   })
-  it('노드 뷰는 scene만 모달 — shot/video는 좌측 패널 (#panel-unify)', () => {
+  it('카드 화면에서는 Scene만 편집 창을 열고 Shot·Video는 왼쪽 패널에서 연다 (#panel-unify)', () => {
     expect(popupVisibleInView('node', 'scene')).toBe(true)
     expect(popupVisibleInView('node', 'shot')).toBe(false)
     expect(popupVisibleInView('node', 'video')).toBe(false)
   })
-  it('asset/prompt는 모달 없음', () => {
+  it('asset과 prompt는 편집 창을 열지 않는다', () => {
     expect(popupVisibleInView('node', 'asset')).toBe(false)
     expect(popupVisibleInView('storyboard', 'prompt')).toBe(false)
   })
 })
 
-describe('doubleClickActionForKind (노드 뷰 더블클릭)', () => {
-  it('scene은 모달, shot/video/asset은 좌측 패널 (#panel-unify)', () => {
+describe('doubleClickActionForKind (카드 더블클릭 동작)', () => {
+  it('Scene은 편집 창에서, Shot·Video·asset은 왼쪽 패널에서 연다 (#panel-unify)', () => {
     expect(doubleClickActionForKind('scene')).toBe('popup')
     expect(doubleClickActionForKind('shot')).toBe('select')
     expect(doubleClickActionForKind('video')).toBe('select')
     expect(doubleClickActionForKind('asset')).toBe('select')
   })
-  it('prompt는 no-op', () => {
+  it('prompt를 더블클릭해도 아무 동작을 하지 않는다', () => {
     expect(doubleClickActionForKind('prompt')).toBe('none')
   })
 })
 
-describe('clickToggleSelection (재클릭 토글)', () => {
-  it('같은 노드 재클릭 → 선택 해제(null)', () => {
+describe('clickToggleSelection (다시 누른 카드 선택)', () => {
+  it('같은 카드를 다시 누르면 선택을 해제한다', () => {
     expect(clickToggleSelection('n1', 'n1')).toBeNull()
   })
-  it('다른 노드 클릭 → 그 노드 선택', () => {
+  it('다른 카드를 누르면 그 카드만 선택한다', () => {
     expect(clickToggleSelection('n1', 'n2')).toBe('n2')
   })
-  it('선택 없음에서 클릭 → 그 노드 선택', () => {
+  it('선택된 카드가 없을 때 누른 카드를 선택한다', () => {
     expect(clickToggleSelection(null, 'n1')).toBe('n1')
   })
 })
 
-describe('connectRouteForTargetHandle (onConnect 라우팅)', () => {
-  it('targetHandle=prompt → 프롬프트 와이어링', () => {
+describe('connectRouteForTargetHandle (연결할 곳에 따른 처리)', () => {
+  it('프롬프트 칸에 연결하면 프롬프트 내용으로 이어진다', () => {
     expect(connectRouteForTargetHandle('prompt')).toBe('prompt-wire')
   })
-  it('Shot 이미지 레퍼런스 핸들 → 이미지 와이어링', () => {
+  it('Shot의 참고 이미지 칸에 연결하면 이미지로 이어진다', () => {
     expect(connectRouteForTargetHandle('image-reference')).toBe('image-wire')
   })
-  it('Video 프레임 입력 핸들 → 프레임 와이어링', () => {
+  it('Video의 START·END·REF 칸에 연결하면 장면 입력으로 이어진다', () => {
     expect(connectRouteForTargetHandle('frame-start')).toBe('frame-wire')
     expect(connectRouteForTargetHandle('frame-end')).toBe('frame-wire')
     expect(connectRouteForTargetHandle('frame-ref')).toBe('frame-wire')
   })
-  it('이전 Video 마지막 프레임 핸들 → Video 체인 와이어링', () => {
+  it('이전 Video의 마지막 장면을 연결하면 다음 Video로 이어진다', () => {
     expect(connectRouteForTargetHandle('video-chain')).toBe('video-chain')
   })
-  it('다른 핸들 → 관계 모달', () => {
+  it('그 밖의 연결은 관계 선택 창을 연다', () => {
     expect(connectRouteForTargetHandle('left')).toBe('relation')
     expect(connectRouteForTargetHandle(null)).toBe('relation')
     expect(connectRouteForTargetHandle(undefined)).toBe('relation')
@@ -102,7 +103,7 @@ type TestVideoTake = VideoTakeSelectionRecord & {
   last_attempt_error: string | null
 }
 
-describe('Director video-take selection contracts', () => {
+describe('Director 영상 선택 약속', () => {
   const take = (
     id: string,
     takeNumber: number,
@@ -123,7 +124,7 @@ describe('Director video-take selection contracts', () => {
     last_attempt_error: lastAttemptError,
   })
 
-  it('keeps the newest successful playback when a newer attempt fails', () => {
+  it('새 시도가 실패해도 가장 최근 성공한 영상을 계속 재생한다', () => {
     const successful = take('success', 1, 'completed', 'https://video.example/success.mp4', 'completed', '2026-07-20T00:00:01.000Z')
     const failed = take('failed', 2, 'completed', 'https://video.example/previous.mp4', 'failed', '2026-07-20T00:00:02.000Z')
 
@@ -131,14 +132,14 @@ describe('Director video-take selection contracts', () => {
     expect(selectLatestAttempt([successful, failed])).toBe(failed)
   })
 
-  it('treats the latest overall attempt, rather than any historical failure, as the failure badge source', () => {
+  it('이전 실패가 있어도 가장 최근 시도의 결과만 실패 안내로 보여준다', () => {
     const failed = take('failed', 1, 'failed', null, 'failed', '2026-07-20T00:00:01.000Z')
     const completed = take('completed', 2, 'completed', 'https://video.example/latest.mp4', 'completed', '2026-07-20T00:00:02.000Z')
 
     expect(selectNewestSuccessfulTake([failed, completed])).toBe(completed)
     expect(selectLatestAttempt([failed, completed])).toBe(completed)
   })
-  it('derives generation and failure badges from the same newest attempt', () => {
+  it('생성 중 표시와 실패 안내는 같은 최신 시도 결과에서 정한다', () => {
     const oldGenerating = take(
       'old-generating',
       1,
@@ -163,7 +164,7 @@ describe('Director video-take selection contracts', () => {
       failure: 'provider rejected request',
     })
   })
-  it('orders malformed take values deterministically without NaN', () => {
+  it('영상 순서 정보가 잘못돼도 결과를 일정하게 정한다', () => {
     const malformed: VideoTakeSelectionRecord[] = [
       { id: 'a', take_number: null, created_at: '' },
       { id: 'z', take_number: 'not-a-number', created_at: '' },

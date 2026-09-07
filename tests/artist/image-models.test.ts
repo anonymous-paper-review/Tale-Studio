@@ -1,3 +1,4 @@
+// 이미지 모델을 고르면 지원되는 방식으로 요청하고, 시트에 맞지 않는 모델은 안전한 선택으로 바꾼다
 import { describe, it, expect } from 'vitest'
 import { resolveSheetImageModel,
   DEFAULT_IMAGE_MODEL,
@@ -11,8 +12,8 @@ import { resolveSheetImageModel,
 import { getAllowedFields } from '@/lib/fal/model-schemas'
 
 // image-models 레지스트리 계약 — 팝업/채팅 모델 선택 + generate-sheet 엔드포인트 결정의 단일 진실.
-describe('image-models 레지스트리', () => {
-  it("모든 editEndpoint 는 '/edit' 로 끝나거나 null 이다 (style-anchor Rule M 존중 조건)", () => {
+describe('이미지 모델 선택 약속', () => {
+  it("모델의 편집용 요청 주소는 편집 경로로 끝나거나 비워 둔다 (style-anchor Rule M 존중 조건)", () => {
     // applyStyleAnchor 는 base.model 이 '/edit' 로 안 끝나면 gpt-image-2/edit 로 되돌린다.
     for (const spec of Object.values(IMAGE_MODELS)) {
       if (spec.editEndpoint !== null) {
@@ -21,7 +22,7 @@ describe('image-models 레지스트리', () => {
     }
   })
 
-  it('레지스트리의 모든 엔드포인트가 model-schemas(FAL_INPUT_ALLOWLIST)에 등록돼 있다', () => {
+  it('사용 가능한 모델마다 필요한 요청 항목을 빠짐없이 등록해 둔다', () => {
     // 누락 시 computeIgnoredFields 가 관측을 못 한다 — 새 모델 추가할 때 스키마 등록을 강제한다.
     for (const spec of Object.values(IMAGE_MODELS)) {
       expect(getAllowedFields(spec.t2iEndpoint), `t2i: ${spec.t2iEndpoint}`).toBeTruthy()
@@ -31,7 +32,7 @@ describe('image-models 레지스트리', () => {
     }
   })
 
-  it('IMAGE_MODEL_ORDER 는 레지스트리 키와 정확히 일치한다(중복·누락 없음)', () => {
+  it('모델 선택 순서는 등록된 모델과 중복·누락 없이 일치한다', () => {
     expect([...IMAGE_MODEL_ORDER].sort()).toEqual(Object.keys(IMAGE_MODELS).sort())
     expect(IMAGE_MODEL_ORDER[0]).toBe(DEFAULT_IMAGE_MODEL)
   })
@@ -43,7 +44,7 @@ describe('image-models 레지스트리', () => {
     expect(isImageModelKey('nano-banana')).toBe(true)
   })
 
-  it('normalizeImageModelKey: 유효 키·레거시 endpoint·미상 처리', () => {
+  it('알려진 모델 이름과 예전 요청 주소는 맞는 모델로 바꾸고, 모르는 값은 기본 모델을 쓴다', () => {
     expect(normalizeImageModelKey('nano-banana')).toBe('nano-banana')
     expect(normalizeImageModelKey('fal-ai/nano-banana-2/edit')).toBe('nano-banana-2')
     expect(normalizeImageModelKey('openai/gpt-image-2/edit')).toBe('gpt-image-2') // 레거시 endpoint 흡수
@@ -52,14 +53,14 @@ describe('image-models 레지스트리', () => {
     expect(normalizeImageModelKey('garbage')).toBe(DEFAULT_IMAGE_MODEL)
   })
 
-  it('isImageModelKey: 화이트리스트 판정 (채팅 cc 입력 검증용)', () => {
+  it('지원하는 모델 이름만 채팅 선택으로 인정한다', () => {
     expect(isImageModelKey('seedream-4')).toBe(true)
     expect(isImageModelKey('nope')).toBe(false)
     expect(isImageModelKey(undefined)).toBe(false)
     expect(isImageModelKey(42)).toBe(false)
   })
 
-  it('imageModelSupportsReference: editEndpoint 유무를 반영', () => {
+  it('참조 이미지를 지원하는 모델만 이미지와 함께 요청할 수 있다', () => {
     expect(imageModelSupportsReference('gpt-image-2')).toBe(true)
     expect(imageModelSupportsReference('nano-banana')).toBe(true)
     expect(imageModelSupportsReference('nano-banana-2')).toBe(true)
@@ -67,7 +68,7 @@ describe('image-models 레지스트리', () => {
     expect(imageModelSupportsReference('flux-2-klein')).toBe(false) // 순수 T2I
   })
 
-  it('resolveImageEndpoint: reference 있으면 edit, 없으면 t2i', () => {
+  it('참조 이미지가 있으면 편집 방식으로, 없으면 새로 만드는 방식으로 요청한다', () => {
     expect(resolveImageEndpoint('nano-banana-2', true)).toEqual({
       endpoint: 'fal-ai/nano-banana-2/edit',
       isEdit: true,
@@ -90,7 +91,7 @@ describe('image-models 레지스트리', () => {
     })
   })
 
-  it('resolveImageEndpoint: reference 미지원 모델은 reference 요청이 와도 T2I 로 폴백', () => {
+  it('참조 이미지를 지원하지 않는 모델은 참조 요청이 와도 새 이미지 만들기로 처리한다', () => {
     // flux-2-klein 은 editEndpoint 가 없다 → 라우트가 reference 를 버리고 t2i 로 간다.
     expect(resolveImageEndpoint('flux-2-klein', true)).toEqual({
       endpoint: 'fal-ai/flux-2/klein/9b',
@@ -99,8 +100,8 @@ describe('image-models 레지스트리', () => {
   })
 })
 
-describe('시트 지오메트리 계약 경로 (#sheet-model-guard 2026-09-01)', () => {
-  it('시트 부적합 모델(기본 nano-banana 포함)은 검증된 시트 모델로 강제된다', () => {
+describe('시트에 맞는 이미지 모델 선택 (#sheet-model-guard 2026-09-01)', () => {
+  it('시트에 맞지 않는 모델(기본 nano-banana 포함)은 검증된 모델로 바꿔서 사용한다', () => {
     // 실측 3e0169eb: nano-banana 가 2880×1280 요청에 1024² 를 반환해 그리드 18/18 전멸.
     expect(resolveSheetImageModel(null)).toBe('gpt-image-2')
     expect(resolveSheetImageModel('nano-banana')).toBe('gpt-image-2')
@@ -109,7 +110,7 @@ describe('시트 지오메트리 계약 경로 (#sheet-model-guard 2026-09-01)',
     expect(resolveSheetImageModel('flux-2-klein')).toBe('gpt-image-2') // edit 미지원 — 시트 repaint 불가
   })
 
-  it('시트 가능 모델의 선택은 존중된다', () => {
+  it('시트에 맞는 모델을 고르면 그대로 사용한다', () => {
     expect(resolveSheetImageModel('gpt-image-2')).toBe('gpt-image-2')
     expect(resolveSheetImageModel('seedream-4')).toBe('seedream-4')
   })

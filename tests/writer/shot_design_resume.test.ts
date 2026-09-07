@@ -1,3 +1,4 @@
+// 샷 설계는 장면을 빠짐없이 이어서 만들고, 오래 걸리면 진행한 만큼 안전하게 돌려준다 (#A #B long-writer-run 2026-07-15)
 // shotDesign 씬 단위 이어달리기(#A) + 샷 청크 분할(#B) 계약 검증 (long-writer-run 2026-07-15).
 //   LLM(dispatch.generateJson)을 스텁해 과금 없이: resume 스킵 / softDeadline 부분 반환 /
 //   패스당 최소 1씬 보장 / 청크 분할 호출 수·병합 결과를 확인한다.
@@ -107,8 +108,8 @@ function run(
   )
 }
 
-describe('runShotDesign — 씬 단위 이어달리기(#A)', () => {
-  it('예산 없으면 전 씬 완주(done=true), 씬당 1호출(소형 씬)', async () => {
+describe('runShotDesign — 장면별로 끊김 없이 이어 만들기(#A)', () => {
+  it('시간 제한을 주지 않으면 모든 장면을 끝까지 만들고 장면마다 한 번씩 요청한다', async () => {
     const inputs = makeInputs(3, 4)
     const res = await run(inputs)
     expect(res.done).toBe(true)
@@ -117,7 +118,7 @@ describe('runShotDesign — 씬 단위 이어달리기(#A)', () => {
     expect(generateJsonMock).toHaveBeenCalledTimes(3)
   })
 
-  it('softDeadline이 이미 지났어도 패스당 최소 1씬은 처리하고 부분 반환한다', async () => {
+  it('시간이 이미 지났어도 한 번에 장면 하나는 만들고 지금까지 결과를 돌려준다', async () => {
     const inputs = makeInputs(3, 4)
     const res = await run(inputs, { softDeadlineMs: Date.now() - 1000 })
     expect(res.done).toBe(false)
@@ -126,7 +127,7 @@ describe('runShotDesign — 씬 단위 이어달리기(#A)', () => {
     expect(generateJsonMock).toHaveBeenCalledTimes(1)
   })
 
-  it('resume이 주어지면 완료 씬을 건너뛰고 이어서 생성한다', async () => {
+  it('완성된 장면을 알려주면 그 장면은 건너뛰고 다음 장면부터 이어 만든다', async () => {
     const inputs = makeInputs(3, 4)
     const first = await run(inputs, { softDeadlineMs: Date.now() - 1000 })
     generateJsonMock.mockClear()
@@ -144,8 +145,8 @@ describe('runShotDesign — 씬 단위 이어달리기(#A)', () => {
   })
 })
 
-describe('runShotDesign — 샷 청크 분할(#B)', () => {
-  it('씬의 데쿠파주 샷이 청크 크기를 넘으면 청크 단위로 나눠 호출하고 병합한다', async () => {
+describe('runShotDesign — 많은 장면을 나눠 만들고 다시 합치기(#B)', () => {
+  it('한 장면의 컷이 많아도 여러 묶음으로 나눠 모두 만들고 하나로 합친다', async () => {
     // #coverage-first: 청크 8→5 (커버리지 샷 증가로 출력 잘림 방지). 17샷 → 5+5+5+2 = 4청크
     const inputs = makeInputs(1, 17)
     const res = await run(inputs)
@@ -162,7 +163,7 @@ describe('runShotDesign — 샷 청크 분할(#B)', () => {
     expect(prompts[prompts.length - 1]).toContain('16~17번째 묶음')
   })
 
-  it('청크 크기 이하 씬은 단일 호출(기존 동작 보존)', async () => {
+  it('컷이 적은 장면은 한 번에 만들고 결과를 그대로 보존한다', async () => {
     const inputs = makeInputs(1, SHOT_CHUNK_SIZE)
     const res = await run(inputs)
     expect(generateJsonMock).toHaveBeenCalledTimes(1)
@@ -170,32 +171,32 @@ describe('runShotDesign — 샷 청크 분할(#B)', () => {
   })
 })
 
-describe('parseL4Shots — 응답 shape 방어(#shape-resilience)', () => {
-  it('케이스 ⑤: 샷 id 키 맵(배열 래핑, 2026-07-15 실측 shape)을 순서대로 평탄화한다', () => {
+describe('parseL4Shots — 여러 답변 형태를 안전하게 읽기(#shape-resilience)', () => {
+  it('케이스 ⑤: 컷 목록을 감싼 답변도 원래 순서대로 읽는다 (2026-07-15)', () => {
     const raw = [{ shot_1: makeShot('a'), shot_2: makeShot('b'), shot_3: makeShot('c') }]
     const shots = parseL4Shots(raw, 'sc_1')
     expect(shots.map((s) => s.intent.shot_id)).toEqual(['a', 'b', 'c'])
   })
 
-  it('케이스 ⑤: 단일 객체 id 맵도 파싱한다', () => {
+  it('케이스 ⑤: 한 개의 컷 목록도 빠짐없이 읽는다', () => {
     const raw = { shot_1: makeShot('a'), shot_2: makeShot('b') }
     expect(parseL4Shots(raw, 'sc_1')).toHaveLength(2)
   })
 
-  it('기존 케이스(①~③) 회귀 없음', () => {
+  it('기존 형식(①~③)도 예전처럼 읽는다', () => {
     expect(parseL4Shots({ shots: [makeShot('a')] }, 'sc_1')).toHaveLength(1)
     expect(parseL4Shots([{ shots: [makeShot('a')] }], 'sc_1')).toHaveLength(1)
     expect(parseL4Shots([makeShot('a'), makeShot('b')], 'sc_1')).toHaveLength(2)
   })
 
-  it('해석 불가 shape은 throw', () => {
+  it('읽을 수 없는 답변은 오류로 알린다', () => {
     expect(() => parseL4Shots([{ nonsense: 1 }], 'sc_1')).toThrow(/unexpected/)
     expect(() => parseL4Shots('garbage', 'sc_1')).toThrow(/unexpected/)
   })
 })
 
-describe('generateL4ForScene 재시도(#shape-resilience)', () => {
-  it('첫 응답이 비정형이면 1회 재시도 후 성공한다', async () => {
+describe('generateL4ForScene 다시 시도하기(#shape-resilience)', () => {
+  it('첫 답변을 읽지 못하면 한 번 더 요청해 성공한다', async () => {
     let call = 0
     generateJsonMock.mockImplementation(async (userPrompt: string) => {
       call++
@@ -211,7 +212,7 @@ describe('generateL4ForScene 재시도(#shape-resilience)', () => {
     expect(generateJsonMock).toHaveBeenCalledTimes(2) // 실패 1 + 재시도 성공 1
   })
 
-  it('2회 연속 비정형이면 그 씬에서 throw(스테이지 실패로 표면화)', async () => {
+  it('두 번 연속 답변을 읽지 못하면 해당 장면의 실패를 알려준다', async () => {
     generateJsonMock.mockImplementation(async () => ({ totally: 'wrong' }))
     const inputs = makeInputs(1, 4)
     await expect(run(inputs)).rejects.toThrow(/unexpected/)
@@ -221,7 +222,7 @@ describe('generateL4ForScene 재시도(#shape-resilience)', () => {
   // 개수 가드 계약 개정(#p4-json-guard 2026-08-11, Q6): 종전엔 최종 시도의 불일치를 규모와
   //   무관하게 수용했다 — 8샷→2샷 같은 대량 소실이 에러 0으로 통과한 실사고의 마지막 관문이
   //   여기였다. 이제 소실 규모로 갈린다: 절반 이하는 씬 실패로 표면화, 경미한 어긋남만 수용.
-  it('샷 수 대량 소실(기대 4 → 1)은 재시도 후에도 수용하지 않고 표면화한다', async () => {
+  it('필요한 컷의 대부분이 빠지면 다시 요청해도 결과를 받아들이지 않고 실패를 알린다', async () => {
     generateJsonMock.mockImplementation(async () => ({
       shots: [makeShot('only_one')], // 항상 1개만 반환 (기대 4개 = 75% 소실)
     }))
@@ -230,7 +231,7 @@ describe('generateL4ForScene 재시도(#shape-resilience)', () => {
     expect(generateJsonMock).toHaveBeenCalledTimes(2) // 불일치 재시도 1회는 그대로
   })
 
-  it('경미한 샷 수 어긋남(기대 4 → 3)은 재시도 후 수용하고 배지로 남긴다', async () => {
+  it('컷이 조금 모자라면 다시 요청한 뒤 결과를 받아들이고 차이를 기록한다', async () => {
     generateJsonMock.mockImplementation(async () => ({
       shots: [makeShot('a'), makeShot('b'), makeShot('c')],
     }))

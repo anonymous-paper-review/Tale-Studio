@@ -1,3 +1,4 @@
+// 영상 생성은 선택한 장면과 설정을 지키고, 실패한 요청은 안전하게 다시 이어간다
 import { createHmac } from 'node:crypto'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -131,8 +132,8 @@ beforeEach(() => {
   mocks.from.mockReturnValueOnce(query({ workspace_id: 'workspace-1' })).mockReturnValueOnce(query({ shot_id: 'shot-1', character_appearance_keys: {} })).mockReturnValueOnce(query(null))
   vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-service-role-key')
 })
-describe('U16 — chat trace 배선 (2026-08-31 복원)', () => {
-  it('형식이 UUID 가 아닌 traceId 는 400 으로 거절한다', async () => {
+describe('U16 대화 기록 연결 (2026-08-31 복원)', () => {
+  it('형식이 잘못된 대화 추적 번호는 요청 전에 거절한다', async () => {
     mocks.getUser.mockResolvedValue({ id: 'user-1' })
     const res = await POST(request({ traceId: 'not-a-uuid' }))
     expect(res.status).toBe(400)
@@ -141,8 +142,8 @@ describe('U16 — chat trace 배선 (2026-08-31 복원)', () => {
   })
 })
 
-describe('director video generation reservation', () => {
-  it('uses a standalone clip’s persisted config without loading a Shot', async () => {
+describe('영상 생성 요청을 예약하는 약속', () => {
+  it('독립 영상은 저장된 설정을 사용하고 장면을 불러오지 않는다', async () => {
     const standaloneKey =
       'standalone:123e4567-e89b-42d3-a456-426614174000'
     const persistedConfig = {
@@ -233,7 +234,7 @@ describe('director video generation reservation', () => {
     expect(mocks.reserveTake).not.toHaveBeenCalled()
   })
 
-  it('uses the dialogue speaker’s exact persisted appearance snapshot rather than the current character appearance', async () => {
+  it('대화하는 인물은 저장된 모습 그대로 사용한다', async () => {
     mocks.from.mockReset()
     mocks.from
       .mockReturnValueOnce(query({ workspace_id: 'workspace-1' }))
@@ -257,7 +258,7 @@ describe('director video generation reservation', () => {
     }))
   })
 
-  it('rejects a missing exact dialogue appearance before reserving or submitting paid video work', async () => {
+  it('대화하는 인물의 모습이 없으면 비용이 드는 영상 작업을 시작하지 않는다', async () => {
     mocks.from.mockReset()
     mocks.from
       .mockReturnValueOnce(query({ workspace_id: 'workspace-1' }))
@@ -281,7 +282,7 @@ describe('director video generation reservation', () => {
     expect(mocks.submit).not.toHaveBeenCalled()
   })
 
-  it('rejects a missing appearance snapshot before reserving or submitting paid video work', async () => {
+  it('인물 모습 기록이 없으면 비용이 드는 영상 작업을 시작하지 않는다', async () => {
     mocks.from.mockReset()
     mocks.from
       .mockReturnValueOnce(query({ workspace_id: 'workspace-1' }))
@@ -301,7 +302,7 @@ describe('director video generation reservation', () => {
     expect(mocks.submit).not.toHaveBeenCalled()
   })
 
-  it('#ref-gate: writer 샷에 실사 스토리보드가 없으면 예약·제출 전에 409 missing_storyboard 로 막는다', async () => {
+  it('#ref-gate: 승인된 장면 그림이 없으면 영상 작업을 시작하지 않는다', async () => {
     mocks.from.mockReset()
     mocks.from
       .mockReturnValueOnce(query({ workspace_id: 'workspace-1' }))
@@ -320,7 +321,7 @@ describe('director video generation reservation', () => {
     expect(mocks.submit).not.toHaveBeenCalled()
   })
 
-  it('#ref-gate: 생성 중 placeholder(status≠completed)도 아직 없는 것 — 409', async () => {
+  it('#ref-gate: 장면 그림이 만들어지는 중이면 아직 영상 작업을 시작하지 않는다', async () => {
     mocks.from.mockReset()
     mocks.from
       .mockReturnValueOnce(query({ workspace_id: 'workspace-1' }))
@@ -338,7 +339,7 @@ describe('director video generation reservation', () => {
     expect(mocks.reserveTake).not.toHaveBeenCalled()
   })
 
-  it('#ref-gate 회귀: 실제 JSONB 형태(url·frames·status completed)는 통과해 예약까지 간다', async () => {
+  it('#ref-gate 회귀: 완성된 장면 그림 형식이면 영상 작업을 예약한다', async () => {
     // 2026-09-02 실측: 게이트가 문자열만 인정해 실사가 있는 30샷 전부 영상이 409 로 막혔다(겨울_4).
     mocks.from.mockReset()
     mocks.from
@@ -358,7 +359,7 @@ describe('director video generation reservation', () => {
     expect(mocks.reserveTake).toHaveBeenCalledTimes(1)
   })
 
-  it('#ref-gate: frames 없는 단일 이미지 구버전(url 만)도 실사로 인정한다', async () => {
+  it('#ref-gate: 그림 한 장만 저장된 예전 장면도 영상 작업에 사용한다', async () => {
     mocks.from.mockReset()
     mocks.from
       .mockReturnValueOnce(query({ workspace_id: 'workspace-1' }))
@@ -377,7 +378,7 @@ describe('director video generation reservation', () => {
     expect(mocks.reserveTake).toHaveBeenCalledTimes(1)
   })
 
-  it('reserves a new take and persists the provider-authoritative request', async () => {
+  it('새 영상을 예약하면 선택한 제작 방식과 요청 내용을 저장한다', async () => {
     mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 2, replayed: false })
     mocks.getJob.mockResolvedValueOnce(reservedFalJob())
     mocks.submit.mockResolvedValue({ request_id: 'fal-1' })
@@ -386,7 +387,7 @@ describe('director video generation reservation', () => {
     expect(mocks.reserveTake).toHaveBeenCalledWith(expect.objectContaining({ projectId: 'project-1', shotId: 'shot-1', provider: 'fal' }))
     expect(mocks.attach).toHaveBeenCalledWith('project-1', 'job-1', 'fal-1', expect.objectContaining({ provider: 'fal' }))
   })
-  it('uses regeneration reservation and returns attached replay without resubmitting', async () => {
+  it('다시 만들기 요청은 이미 이어진 작업이면 새 제출 없이 결과를 돌려준다', async () => {
     mocks.from.mockReset()
     mocks.from
       .mockReturnValueOnce(query({ workspace_id: 'workspace-1' }))
@@ -402,7 +403,7 @@ describe('director video generation reservation', () => {
     expect(mocks.checkGenerationCapacity).not.toHaveBeenCalled()
     await expect(response.json()).resolves.toMatchObject({ replayed: true, taskId: 'fal-existing', model: 'stored-model' })
   })
-  it('validates regeneration ancestry before accepting a same-key recovery replay', async () => {
+  it('다시 만들기 복구는 원래 영상에 속한 요청인지 확인한다', async () => {
     mocks.from.mockReset()
     mocks.from
       .mockReturnValueOnce(query({ workspace_id: 'workspace-1' }))
@@ -417,7 +418,7 @@ describe('director video generation reservation', () => {
     expect(mocks.reserveRegeneration).not.toHaveBeenCalled()
     expect(mocks.submit).not.toHaveBeenCalled()
   })
-  it('does not treat a same-key regeneration on another clip as a replay', async () => {
+  it('다른 영상의 같은 재요청 표시는 새 작업으로 처리한다', async () => {
     mocks.from.mockReset()
     const replayLookup = query(null)
     mocks.from
@@ -437,7 +438,7 @@ describe('director video generation reservation', () => {
     expect(mocks.checkGenerationCapacity).toHaveBeenCalledWith('user-1', 'video')
     expect(mocks.submit).toHaveBeenCalledTimes(1)
   })
-  it('persists a submission failure and reports a failed attempt', async () => {
+  it('영상 제출이 실패하면 실패한 작업으로 기록한다', async () => {
     mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: false })
     mocks.getJob.mockResolvedValue(reservedFalJob())
     mocks.submit.mockRejectedValue(new Error('FAL terminal error'))
@@ -446,7 +447,7 @@ describe('director video generation reservation', () => {
     expect(mocks.fail).toHaveBeenCalledWith('project-1', 'job-1', 'FAL terminal error')
     await expect(response.json()).resolves.toMatchObject({ status: 'failed' })
   })
-  it('leaves a truly ambiguous submission queued for manual recovery without auto-resubmitting', async () => {
+  it('결과를 알 수 없는 제출은 대기 상태로 두고 자동 재제출하지 않는다', async () => {
     mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: false })
     mocks.getJob.mockResolvedValue(reservedFalJob())
     const ambiguous = Object.assign(new Error('gateway timeout'), { status: 503 })
@@ -468,7 +469,7 @@ describe('director video generation reservation', () => {
       p_code: 'HTTP_503',
     })
   })
-  it('treats a zero-row ambiguity resolution CAS as retryable persistence failure', async () => {
+  it('제출 결과를 확인하지 못한 기록 실패는 다시 시도할 수 있게 남긴다', async () => {
     mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: false })
     mocks.getJob.mockResolvedValue(reservedFalJob())
     mocks.submit.mockRejectedValue(Object.assign(new Error('gateway timeout'), { status: 503 }))
@@ -483,7 +484,7 @@ describe('director video generation reservation', () => {
       unresolved: true,
     })
   })
-  it('accepts reordered JSON replay snapshots without submitting twice', async () => {
+  it('같은 요청의 순서가 달라도 작업을 두 번 제출하지 않는다', async () => {
     mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: true })
     const baseJob = reservedFalJob()
     const job = {
@@ -504,8 +505,8 @@ describe('director video generation reservation', () => {
     expect(mocks.submit).not.toHaveBeenCalled()
 })
 })
-describe('reserved replay recovery', () => {
-  it('does not resubmit a replayed reservation whose provider state is unknown', async () => {
+describe('예약된 요청을 다시 이어가는 약속', () => {
+  it('제작 결과를 알 수 없는 재요청은 다시 제출하지 않는다', async () => {
     mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: true })
     mocks.getJob.mockResolvedValueOnce(reservedFalJob())
 
@@ -520,7 +521,7 @@ describe('reserved replay recovery', () => {
       retryable: false,
     })
   })
-  it('accepts a replayed pre-438 new-take snapshot without metadata', async () => {
+  it('이전 형식의 새 영상 정보가 없으면 다시 제출하지 않는다', async () => {
     mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: true })
     const job = reservedFalJob()
     const { new_take_metadata: _legacyMetadata, ...legacySnapshot } = job.input_snapshot
@@ -537,7 +538,7 @@ describe('reserved replay recovery', () => {
     expect(mocks.submit).not.toHaveBeenCalled()
   })
 
-  it('rejects a replayed new-take snapshot whose stored metadata differs', async () => {
+  it('저장된 새 영상 정보가 다르면 재요청을 거절한다', async () => {
     mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: true })
     const job = reservedFalJob()
     mocks.getJob.mockResolvedValue({
@@ -557,7 +558,7 @@ describe('reserved replay recovery', () => {
     expect(mocks.submit).not.toHaveBeenCalled()
   })
 
-  it('returns recovery details when the failure transition itself cannot persist', async () => {
+  it('실패 기록도 저장하지 못하면 다시 이어갈 정보를 돌려준다', async () => {
     mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: false })
     mocks.getJob.mockResolvedValue(reservedFalJob())
     mocks.submit.mockRejectedValue(new Error('provider unavailable'))
@@ -566,7 +567,7 @@ describe('reserved replay recovery', () => {
     expect(response.status).toBe(500)
     await expect(response.json()).resolves.toMatchObject({ status: 'generating', retryable: true, transitionError: 'fail RPC unavailable' })
   })
-  it('submits a fresh reservation from its immutable FAL snapshot', async () => {
+  it('새 예약은 처음 확정한 요청 내용으로 제출한다', async () => {
     mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: false })
     mocks.getJob.mockResolvedValue(reservedFalJob())
     mocks.submit.mockResolvedValue({ request_id: 'fal-replayed' })
@@ -586,7 +587,7 @@ describe('reserved replay recovery', () => {
     )
   })
 
-  it('rejects changed replay inputs without submitting provider work', async () => {
+  it('다시 요청한 내용이 달라지면 제작 작업을 제출하지 않는다', async () => {
     mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: true })
     mocks.getJob.mockResolvedValue(reservedFalJob())
 
@@ -598,7 +599,7 @@ describe('reserved replay recovery', () => {
     expect(mocks.submit).not.toHaveBeenCalled()
   })
 
-  it('returns terminal jobs without resubmitting reserved placeholders', async () => {
+  it('끝난 작업은 예약된 자리만 남아 있어도 다시 제출하지 않는다', async () => {
     mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: true })
     mocks.getJob.mockResolvedValue(reservedFalJob({ status: 'failed' }))
 
@@ -609,7 +610,7 @@ describe('reserved replay recovery', () => {
     await expect(response.json()).resolves.toMatchObject({ status: 'failed' })
   })
 
-  it('returns the provider recovery handle when request attachment fails', async () => {
+  it('작업 연결에 실패하면 다시 이어갈 복구 증표를 돌려준다', async () => {
     mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: false })
     mocks.getJob.mockResolvedValue(reservedFalJob())
     mocks.submit.mockResolvedValue({ request_id: 'fal-live' })
@@ -625,7 +626,7 @@ describe('reserved replay recovery', () => {
     })
     expect(mocks.fail).not.toHaveBeenCalled()
   })
-  it('recovers a failed FAL attachment from its signed receipt without a second submission', async () => {
+  it('작업 연결이 실패해도 서명된 복구 증표로 한 번만 제출하고 이어간다', async () => {
     mocks.from.mockReset()
     mocks.from
       .mockReturnValueOnce(query({ workspace_id: 'workspace-1' }))
@@ -661,7 +662,7 @@ describe('reserved replay recovery', () => {
     ['take label', { takeLabel: 'Alternate cut' }],
     ['override', { override: { seed: 7 } }],
     ['canvas position', { canvasPosition: { x: 12, y: 24 } }],
-  ])('rejects changed new-take %s on a replay without submitting provider work', async (_name, changedMetadata) => {
+  ])('새 영상 정보의 %s가 달라진 재요청은 작업을 제출하지 않는다', async (_name, changedMetadata) => {
     mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: true })
     mocks.getJob.mockResolvedValue(reservedFalJob())
 
@@ -672,7 +673,7 @@ describe('reserved replay recovery', () => {
     expect(mocks.attach).not.toHaveBeenCalled()
   })
 
-  it('rejects an unrecognized raw provider handle as a conflicting operation', async () => {
+  it('알 수 없는 작업 번호는 이미 진행 중인 요청과 충돌하므로 거절한다', async () => {
     mocks.from.mockReset()
     mocks.from
       .mockReturnValueOnce(query({ workspace_id: 'workspace-1' }))
@@ -696,7 +697,7 @@ describe('reserved replay recovery', () => {
     expect(mocks.attach).not.toHaveBeenCalled()
   })
 
-  it('keeps a local job queued when immutable upload landed but completion persistence failed', async () => {
+  it('영상 파일은 올라갔지만 완료 기록 저장이 실패하면 작업을 대기 상태로 둔다', async () => {
     const { DirectorVideoCompletionPersistenceError } = await import('@/lib/fal/finalize')
     mocks.reserveTake.mockResolvedValue({
       video_clip_id: 'clip-1',
@@ -744,8 +745,8 @@ describe('reserved replay recovery', () => {
     }
   })
 })
-describe('recovery input safety', () => {
-  it('rejects tampered recovery input without terminalizing the queued attempt', async () => {
+describe('복구 입력을 안전하게 확인하는 약속', () => {
+  it('변조된 복구 정보는 대기 중인 작업을 끝내지 않는다', async () => {
     mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: true })
     mocks.getJob.mockResolvedValue(reservedFalJob())
 
@@ -756,7 +757,7 @@ describe('recovery input safety', () => {
     expect(mocks.attach).not.toHaveBeenCalled()
   })
 
-  it('terminalizes fresh off-origin local provider output rather than stranding the attempt', async () => {
+  it('허용되지 않은 영상 주소가 오면 작업을 실패로 끝내고 방치하지 않는다', async () => {
     mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: false })
     mocks.getJob.mockResolvedValue(reservedLocalJob())
     vi.stubEnv('TAILSCALE_VIDEO_API_URL', 'http://local.test/api')
@@ -777,13 +778,13 @@ describe('recovery input safety', () => {
     }
   })
 })
-describe('director video polling contract', () => {
+describe('영상 생성 결과를 확인하는 약속', () => {
   const poll = (taskId = 'fal-1') => pollVideo(new Request(`http://test/api/director/generate-video/${taskId}`), { params: Promise.resolve({ taskId }) })
 
   it.each([
     ['unauthenticated', null, undefined, 401, { error: 'Unauthorized' }],
     ['missing', { id: 'user-1' }, null, 404, { error: 'Video job not found' }],
-  ])('returns %s polling result without reconciliation', async (_name, user, job, status, body) => {
+  ])('로그인이나 작업이 %s이면 상태를 다시 확인하지 않고 결과를 돌려준다', async (_name, user, job, status, body) => {
     mocks.getUser.mockResolvedValue(user)
     mocks.getJob.mockResolvedValue(job)
     const response = await poll()
@@ -791,7 +792,7 @@ describe('director video polling contract', () => {
     await expect(response.json()).resolves.toMatchObject(body)
   })
 
-  it('rejects a job owned by another user before reconciling it', async () => {
+  it('다른 사람의 작업은 결과를 확인하기 전에 거절한다', async () => {
     mocks.getJob.mockResolvedValue({ ...reservedFalJob(), request_id: 'fal-1', project_id: 'project-1' })
     mocks.userOwnsProject.mockResolvedValue(false)
     const response = await poll()
@@ -803,7 +804,7 @@ describe('director video polling contract', () => {
     ['pending', { ...reservedFalJob(), request_id: 'fal-1', status: 'queued' }, { ...reservedFalJob(), request_id: 'fal-1', status: 'queued' }, { status: 'generating' }],
     ['completed', { ...reservedFalJob(), request_id: 'fal-1', status: 'completed', result_url: 'https://media.test/video.mp4' }, undefined, { status: 'completed', url: 'https://media.test/video.mp4' }],
     ['failed', { ...reservedFalJob(), request_id: 'fal-1', status: 'failed', error: 'provider failed' }, undefined, { status: 'failed', error: 'provider failed' }],
-  ])('returns %s provider state', async (_name, initial, reconciled, body) => {
+  ])('작업이 %s 상태이면 그 상태를 결과로 보여준다', async (_name, initial, reconciled, body) => {
     mocks.getJob.mockResolvedValue(initial)
     mocks.reconcile.mockResolvedValue(reconciled ?? initial)
     const response = await poll()
@@ -811,7 +812,7 @@ describe('director video polling contract', () => {
     await expect(response.json()).resolves.toMatchObject(body)
   })
 
-  it('returns a server error when reconciliation cannot establish state', async () => {
+  it('서버에서 작업 상태를 확인할 수 없으면 오류를 돌려준다', async () => {
     mocks.getJob.mockResolvedValue({ ...reservedFalJob(), request_id: 'fal-1', status: 'queued' })
     mocks.reconcile.mockRejectedValue(new Error('reconciliation unavailable'))
     const response = await poll()
@@ -821,7 +822,7 @@ describe('director video polling contract', () => {
   it.each([
     ['completed', { ...reservedFalJob(), request_id: 'fal-1', status: 'completed', result_url: 'https://media.test/video.mp4' }, { status: 'completed', url: 'https://media.test/video.mp4' }],
     ['failed', { ...reservedFalJob(), request_id: 'fal-1', status: 'failed', error: 'provider failed' }, { status: 'failed', error: 'provider failed' }],
-  ])('reconciles a queued poll to %s provider state', async (_name, reconciled, expected) => {
+  ])('대기 중인 작업을 다시 확인해 %s 상태를 보여준다', async (_name, reconciled, expected) => {
     mocks.getJob.mockResolvedValue({ ...reservedFalJob(), request_id: 'fal-1', status: 'queued' })
     mocks.reconcile.mockResolvedValue(reconciled)
     const response = await pollVideo(
@@ -832,7 +833,7 @@ describe('director video polling contract', () => {
     await expect(response.json()).resolves.toMatchObject(expected)
   })
 })
-describe('signed recovery receipts', () => {
+describe('서명된 복구 증표를 확인하는 약속', () => {
   function receipt(payload: Record<string, unknown>) {
     const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url')
     const signature = createHmac('sha256', 'director-video-recovery:test-service-role-key').update(encoded).digest('base64url')
@@ -849,7 +850,7 @@ describe('signed recovery receipts', () => {
     mocks.getJob.mockResolvedValue(reservedLocalJob())
   }
 
-  it('attaches only a valid matching local receipt and never resubmits provider work', async () => {
+  it('조건에 맞는 복구 증표만 연결하고 작업을 다시 제출하지 않는다', async () => {
     replayedLocalReservation()
     vi.stubEnv('TAILSCALE_VIDEO_API_URL', 'http://local.test/api')
     try {
@@ -872,7 +873,7 @@ describe('signed recovery receipts', () => {
   it.each([
     ['tampered', (value: string) => `${value}x`, 400],
     ['expired', () => receipt({ projectId: 'project-1', jobId: 'job-1', provider: 'local', model: 'hunyuan-t2v', taskId: 'http://local.test/api/tasks/1', exp: Date.now() - 1 }), 409],
-  ])('rejects %s receipts without attaching or submitting', async (_name, mutate, expectedStatus) => {
+  ])('유효하지 않은 %s 복구 증표는 연결하거나 제출하지 않는다', async (_name, mutate, expectedStatus) => {
     replayedLocalReservation()
     vi.stubEnv('TAILSCALE_VIDEO_API_URL', 'http://local.test/api')
     try {
@@ -892,7 +893,7 @@ describe('signed recovery receipts', () => {
     ['provider', { provider: 'fal', model: 'hunyuan-t2v', taskId: 'fal-1' }, 409],
     ['model', { provider: 'local', model: 'other', taskId: 'http://local.test/api/tasks/1' }, 409],
     ['off-origin local task', { provider: 'local', model: 'hunyuan-t2v', taskId: 'http://evil.test/api/tasks/1' }, 400],
-  ])('rejects %s receipt mismatches without attaching or submitting', async (_name, override, expectedStatus) => {
+  ])('복구 증표의 %s가 다르면 연결하거나 제출하지 않는다', async (_name, override, expectedStatus) => {
     replayedLocalReservation()
     vi.stubEnv('TAILSCALE_VIDEO_API_URL', 'http://local.test/api')
     try {

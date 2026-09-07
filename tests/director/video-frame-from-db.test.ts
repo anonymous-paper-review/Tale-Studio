@@ -1,3 +1,4 @@
+// 승인된 스토리보드 화면은 영상에 우선 사용하고, 화면이 없으면 입력한 선택을 지킨다 (Director 배선 5, #ref-gate 2026-09-06)
 // Director 배선 5 — 영상의 참조 프레임은 서버가 DB 에서 읽는다 (2026-09-06, #ref-gate 와 같은 방향)
 //
 //   게이트만 DB 를 보고 제출 프레임은 로컬 노드 값이라, 스토어가 낡으면 이미지 없이 T2V 로 나가거나 옛 프레임이
@@ -23,8 +24,8 @@ const SB = {
   status: 'completed',
 }
 
-describe('Director 배선 5 — 영상의 참조 프레임은 서버가 DB 에서 읽는다', () => {
-  it('클라가 이미지 없이(T2V) 보내도 DB 에 실사가 있으면 시작·끝 프레임을 DB 로 채워 I2V 로 낸다', () => {
+describe('승인된 스토리보드 화면을 영상에 쓰는 약속 (Director 배선 5)', () => {
+  it('그림 없이 요청해도 승인된 스토리보드가 있으면 시작과 끝 화면을 채워 영상으로 만든다', () => {
     const r = resolveVideoReferenceFrames({
       frameSource: 'auto',
       referenceImageUrl: undefined,
@@ -41,7 +42,7 @@ describe('Director 배선 5 — 영상의 참조 프레임은 서버가 DB 에�
     })
   })
 
-  it('자동 프레임은 클라가 낡은 이미지를 보내도 DB 의 프레임으로 바꾼다', () => {
+  it('자동으로 화면을 고르면 오래된 그림 대신 승인된 스토리보드 화면을 쓴다', () => {
     const r = resolveVideoReferenceFrames({
       frameSource: 'auto',
       referenceImageUrl: 'https://s/old.png',
@@ -54,7 +55,7 @@ describe('Director 배선 5 — 영상의 참조 프레임은 서버가 DB 에�
     expect(r.source).toBe('db')
   })
 
-  it('손으로 배선한 프레임은 존중하고, 시작 프레임이 빠졌을 때만 DB 의 시작 프레임을 앞에 채운다', () => {
+  it('직접 연결한 그림은 그대로 쓰고 시작 그림이 없을 때만 승인된 시작 화면을 앞에 더한다', () => {
     const r = resolveVideoReferenceFrames({
       frameSource: 'manual',
       referenceImageUrl: 'https://s/asset.png',
@@ -77,7 +78,7 @@ describe('Director 배선 5 — 영상의 참조 프레임은 서버가 DB 에�
     expect(manualStart.referenceImageUrls).toEqual(['https://s/mine.png', 'https://s/end.png'])
   })
 
-  it('DB 에 실사가 없으면(독립 영상·미생성) 클라 값을 그대로 둔다', () => {
+  it('승인된 스토리보드가 없으면 독립 영상은 입력한 그림을 그대로 사용한다', () => {
     const r = resolveVideoReferenceFrames({
       frameSource: 'auto',
       referenceImageUrl: undefined,
@@ -96,7 +97,7 @@ describe('Director 배선 5 — 영상의 참조 프레임은 서버가 DB 에�
     expect(storyboardImageEndFrame(SB)).toBe(SB.frames.end)
   })
 
-  it('frameSource 를 보내지 않는 옛 호출은 종전대로 클라 값을 쓴다 — 새 클라는 항상 보낸다', () => {
+  it('연결 정보를 보내지 않은 예전 요청은 입력한 그림을 그대로 사용한다', () => {
     const r = resolveVideoReferenceFrames({
       frameSource: undefined,
       referenceImageUrl: undefined,
@@ -108,7 +109,7 @@ describe('Director 배선 5 — 영상의 참조 프레임은 서버가 DB 에�
     expect(r.source).toBe('client')
   })
 
-  it('영상 라우트는 게이트 뒤에 이 규칙으로 프레임을 정하고, 클라는 배선 여부(frameSource)를 보낸다', () => {
+  it('영상 생성은 먼저 그림을 확인하고 연결한 그림인지 구분해 사용한다', () => {
     const route = read('src/app/api/director/generate-video/route.ts')
     expect(route).toMatch(/resolveVideoReferenceFrames\(\{/)
     expect(route).toMatch(/storyboardImage: standalone \? null : shot!\.storyboard_image/)
@@ -116,7 +117,7 @@ describe('Director 배선 5 — 영상의 참조 프레임은 서버가 DB 에�
     expect(store).toMatch(/frameSource: chainFrameUrl \|\| hasManualFrameInputs \? 'manual' : 'auto'/)
   })
 
-  it('그리드 카드의 "영상 생성"은 이미지를 새로 만들기 전에 DB 를 먼저 다시 읽는다 — 승인한 그림을 갈아치우지 않는다', () => {
+  it('그리드의 "영상 생성"은 새 그림을 만들기 전에 저장된 그림을 다시 확인해 승인한 그림을 지킨다', () => {
     const grid = read('src/features/director/canvas-views/StoryboardGridView.tsx')
     expect(grid).toMatch(/if \(!hasImage\) \{\n\s*await useDirectorCanvasStore\.getState\(\)\.hydrateFreshFromDb\(\)/)
   })

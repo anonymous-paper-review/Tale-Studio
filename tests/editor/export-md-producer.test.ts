@@ -1,3 +1,4 @@
+// Producer 자료를 내보내면 이야기와 인물·배경 설정을 읽기 쉬운 문서로 확인한다
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const { createClientMock } = vi.hoisted(() => ({
@@ -66,7 +67,7 @@ const fixtureBoard: ProducerArtifactBoard = {
 }
 
 describe('collectProducerArtifacts', () => {
-  it('emits readable producer markdown artifacts for a populated board', () => {
+  it('내용이 있는 Producer 자료는 이야기·설정·인물·배경 문서로 정리한다', () => {
     const files = collectProducerArtifacts(fixtureBoard, 'ko')
 
     expect(files.map((file) => file.path)).toEqual([
@@ -103,7 +104,7 @@ describe('collectProducerArtifacts', () => {
     }
   })
 
-  it('renders explicit Korean empty notes for empty story, cast, and backgrounds', () => {
+  it('이야기·인물·배경이 비어 있으면 한국어 안내를 적는다', () => {
     const files = collectProducerArtifacts({
       ...fixtureBoard,
       storyText: '   ',
@@ -116,7 +117,7 @@ describe('collectProducerArtifacts', () => {
     expect(textFile(files, 'producer/backgrounds.md')).toContain('배경 없음')
   })
 
-  it('falls back to English labels for the en locale (and the unset-key default)', () => {
+  it('영어 화면에서는 영어 안내를 쓰고 정하지 않은 값은 미설정으로 표시한다', () => {
     const files = collectProducerArtifacts(
       { ...fixtureBoard, storyText: '   ', cast: [], backgrounds: [] },
       'en',
@@ -130,7 +131,7 @@ describe('collectProducerArtifacts', () => {
     expect(textFile(defaulted, 'producer/settings.md')).toContain('Not set')
   })
 
-  it('does not emit producer background image files for today\'s BackgroundSource shape', () => {
+  it('현재 배경 자료에는 배경 이미지를 따로 만들지 않는다', () => {
     const files = collectProducerArtifacts(fixtureBoard, 'ko')
 
     expect(files.filter((file) => file.path.startsWith('producer/backgrounds/'))).toEqual([])
@@ -139,7 +140,7 @@ describe('collectProducerArtifacts', () => {
 })
 
 describe('loadProducerBoard', () => {
-  it('maps producer_draft plus character/location rows into a producer artifact board', async () => {
+  it('저장된 이야기·인물·장소를 합쳐 Producer 자료로 불러온다', async () => {
     createClientMock.mockReturnValue(
       mockProducerSupabase({
         project: {

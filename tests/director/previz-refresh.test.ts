@@ -54,8 +54,8 @@ beforeEach(() => {
   cache.invalidated = 0
 })
 
-describe('Director 배선 2 — 러프·previz 재생성 결과는 새로고침 없이 카드에 뜬다', () => {
-  it('refreshShotMedia 는 러프·previz 두 칸만 DB 로 다시 채우고, 다른 칸과 손대지 않은 샷의 객체는 그대로 둔다', async () => {
+describe('러프와 미리보기 영상을 다시 만들면 새로고침 없이 카드에 바로 반영된다', () => {
+  it('그림을 새로 고치면 러프와 미리보기 영상만 최신 내용으로 바뀌고 다른 내용은 그대로 둔다', async () => {
     const a = shot('sh_01_01', { actionDescription: 'typed but unsaved' })
     const b = shot('sh_01_02')
     useWriterStore.setState({ shots: [a, b] })
@@ -75,7 +75,7 @@ describe('Director 배선 2 — 러프·previz 재생성 결과는 새로고침 
     expect(nb).toBe(b)
   })
 
-  it('큐 훅은 러프 잡(shot_rough_storyboard)도 감시하고, 잡이 빠지면 Director 재수화와 함께 writer 의 러프·previz 칸을 다시 채운다', () => {
+  it('러프 그림 작업이 끝나면 새로고침 없이 Director 카드의 러프와 미리보기 영상이 갱신된다', () => {
     const hook = read('src/features/director/hooks/use-queue-rehydrate.ts')
     expect(hook).toMatch(/'shot_rough_storyboard',/)
     expect(hook).toMatch(/'shot_previz_video',/)

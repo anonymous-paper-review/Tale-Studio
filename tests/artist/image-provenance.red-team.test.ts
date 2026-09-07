@@ -1,3 +1,4 @@
+// 외모와 룩이 바뀌었는지 정확히 판단하고, 다양한 입력에서도 이미지 출처를 안전하게 구분한다
 import { describe, expect, it } from 'vitest'
 import {
   computeImageSourceHash,
@@ -6,8 +7,8 @@ import {
   isImageStale,
 } from '@/lib/image-provenance'
 
-describe('image provenance red-team/property cases', () => {
-  it('empty look containers and whitespace-only fields produce null look fingerprint', () => {
+describe('이미지 출처 판단의 예외 사례', () => {
+  it('룩 정보가 비어 있거나 공백뿐이면 룩 정보를 만들지 않는다', () => {
     expect(
       computeLookFingerprint(
         {
@@ -19,14 +20,14 @@ describe('image provenance red-team/property cases', () => {
     ).toBeNull()
   })
 
-  it('separator-shaped NUL sequence in appearance does not collide with look-scoped hash', () => {
+  it('외모 설명에 구분 문자가 있어도 룩을 붙인 결과와 섞이지 않는다', () => {
     const appearanceOnly = computeImageSourceHash('portrait\u0000look:art:anime')
     const lookScoped = computeImageSourceHash('portrait', 'art:anime')
 
     expect(appearanceOnly).not.toBe(lookScoped)
   })
 
-  it('palette duplicate values are deterministic and blank values are ignored', () => {
+  it('색상 값이 중복되거나 비어 있어도 같은 룩 정보로 정리한다', () => {
     const a = computeLookFingerprint(
       { palette: { primary: '#222', secondary: ' ', accent: '#222' } },
       null,
@@ -40,7 +41,7 @@ describe('image provenance red-team/property cases', () => {
     expect(b).toBe(a)
   })
 
-  it('very long appearance and look strings remain deterministic and content-sensitive', () => {
+  it('매우 긴 외모와 룩도 내용이 같으면 같게, 달라지면 다르게 판단한다', () => {
     const longAppearance = `${'긴 머리와 검은 망토 '.repeat(5_000)}끝`
     const longLook = `${'art:수채화 '.repeat(2_000)}palette:#000,#fff`
 
@@ -53,7 +54,7 @@ describe('image provenance red-team/property cases', () => {
     )
   })
 
-  it('unicode and emoji are preserved while whitespace is normalized', () => {
+  it('한글과 이모지는 보존하고 공백 차이는 무시한다', () => {
     const lookA = computeLookFingerprint(
       {
         l1: { art_style: '수묵화   ✨', shape_language: '둥근   실루엣' },
@@ -78,11 +79,11 @@ describe('image provenance red-team/property cases', () => {
     )
   })
 
-  it('costume-only look creates a normalized look fingerprint', () => {
+  it('의상만 있어도 룩 정보를 만든다', () => {
     expect(computeLookFingerprint(null, '  은색   갑옷 🛡️  ')).toBe('costume:은색 갑옷 🛡️')
   })
 
-  it('isImageStale crosses appearance-only change, look arrival, both changes, and absent data', () => {
+  it('외모나 룩이 바뀌었을 때와 정보가 없을 때 이미지 변경 여부를 올바르게 판단한다', () => {
     const draftHash = computeImageSourceHash('검은 망토', null)
 
     expect(isImageStale('검은 망토', null, draftHash)).toBe(false)
@@ -93,7 +94,7 @@ describe('image provenance red-team/property cases', () => {
     expect(isImageStale('검은 망토', 'art:anime', null)).toBe(false)
   })
 
-  it('world image hash keeps character-hash backward compatibility symmetry', () => {
+  it('배경 이미지도 기존 캐릭터 이미지와 같은 기준으로 출처를 판단한다', () => {
     const visualDescription = '  네온   뒷골목 🌃  '
     const base = computeWorldImageSourceHash(visualDescription)
 

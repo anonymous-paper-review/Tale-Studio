@@ -1,3 +1,4 @@
+// 시간이 부족하거나 한쪽 작업이 실패해도 완성된 화면과 대사가 사라지지 않는다 (#shotcheck-gate #lane-independent 2026-08-11)
 // shotsAndDialogue 합성 step 의 유료 호출 보존 계약(2026-08-11).
 //   ① 착수 게이트(#shotcheck-gate): 남은 예산으로 못 끝낼 shotCheck 는 시작하지 않고 shotDesign 을 저장한다.
 //   ② 레인 독립(#lane-independent): 한 레인이 실패해도 반대 레인의 완료분을 버리지 않는다.
@@ -97,8 +98,8 @@ beforeEach(() => {
   mocks.runDialogue.mockResolvedValue(DIALOGUE_DONE)
 })
 
-describe('shotsAndDialogue — shotCheck 착수 게이트', () => {
-  it('남은 예산이 부족하면 shotCheck 를 시작하지 않고 shotDesign 을 체크포인트한다', async () => {
+describe('shotsAndDialogue — 시간이 부족할 때 다음 작업을 미루는 약속', () => {
+  it('남은 시간이 부족하면 다음 검사를 시작하지 않고 지금 만든 화면 정보를 남긴다', async () => {
     // 예산 10s 남음 < 예상 160s → 착수 보류.
     const patch = (await runLanes(state(), Date.now() + 10_000)) as Record<string, unknown>
 
@@ -109,7 +110,7 @@ describe('shotsAndDialogue — shotCheck 착수 게이트', () => {
     expect(patch.shotDesign).toEqual(SHOTS)
   })
 
-  it('예산이 충분하면 그대로 이어서 shotCheck·renderPrompts 까지 간다', async () => {
+  it('남은 시간이 충분하면 검사와 안내 작성까지 이어 간다', async () => {
     const patch = (await runLanes(state(), Date.now() + 300_000)) as Record<string, unknown>
 
     expect(mocks.runShotCheck).toHaveBeenCalledTimes(1)
@@ -118,14 +119,14 @@ describe('shotsAndDialogue — shotCheck 착수 게이트', () => {
     expect(patch.shotSequence).toEqual(SEQUENCE)
   })
 
-  it('예산이 없으면(로컬 러너) 게이트가 걸리지 않는다', async () => {
+  it('남은 시간 제한이 없으면 검사 작업을 막지 않는다', async () => {
     await runLanes(state(), undefined)
     expect(mocks.runShotCheck).toHaveBeenCalledTimes(1)
   })
 })
 
-describe('shotsAndDialogue — 레인 독립 체크포인트', () => {
-  it('대사 레인이 실패해도 비주얼 레인 산출물을 버리지 않는다 (throw 없음)', async () => {
+describe('shotsAndDialogue — 한쪽 작업이 실패해도 결과를 지키는 약속', () => {
+  it('대사 작업이 실패해도 화면 결과는 버리지 않는다', async () => {
     mocks.runDialogue.mockRejectedValue(new Error('dialogue down'))
 
     const patch = (await runLanes(state(), Date.now() + 300_000)) as Record<string, unknown>
@@ -135,7 +136,7 @@ describe('shotsAndDialogue — 레인 독립 체크포인트', () => {
     expect(patch.dialogue).toBeUndefined() // 실패 레인은 다음 인보케이션이 이어받는다
   })
 
-  it('비주얼 레인이 실패해도 대사 레인 산출물을 버리지 않는다', async () => {
+  it('화면 작업이 실패해도 대사 결과는 버리지 않는다', async () => {
     mocks.runShotDesign.mockRejectedValue(new Error('shotDesign down'))
 
     const patch = (await runLanes(state(), Date.now() + 300_000)) as Record<string, unknown>
@@ -144,7 +145,7 @@ describe('shotsAndDialogue — 레인 독립 체크포인트', () => {
     expect(patch.shotDesign).toBeUndefined()
   })
 
-  it('진전이 0 인데 레인이 실패하면 표면화한다 (무한 재시도 방지)', async () => {
+  it('아무것도 만들지 못한 채 작업이 실패하면 다시 시도하라는 오류를 알린다 (무한 반복 방지)', async () => {
     mocks.runDialogue.mockRejectedValue(new Error('dialogue down'))
     // 비주얼 레인은 이미 전부 끝나 있어 빈 patch 를 낸다 → 흡수할 진전이 없다.
     const done = state({

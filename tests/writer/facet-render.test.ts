@@ -1,3 +1,4 @@
+// 화면의 연출 정보가 일관되고 다시 그릴 때 필요한 안내만 전달되도록 보장한다
 import { describe, expect, it, vi } from 'vitest'
 import {
   facetsHash,
@@ -54,7 +55,7 @@ function makeSpec(overrides: Partial<ShotStaticSpec> = {}): ShotStaticSpec {
 }
 
 describe('facetsHash', () => {
-  it('returns the same hash for the same spec and a different hash when facets change', () => {
+  it('같은 화면 정보는 같은 식별값을 만들고 정보가 달라지면 식별값도 달라진다', () => {
     const spec = makeSpec()
     const sameSpec = {
       ...JSON.parse(JSON.stringify(spec)),
@@ -76,7 +77,7 @@ describe('facetsHash', () => {
 })
 
 describe('renderDirectorPromptTemplate', () => {
-  it('renders deterministically and includes shot type and blocking vocabulary', () => {
+  it('같은 연출 정보를 넣으면 같은 안내가 나오고 인물 위치와 화면 크기를 담는다', () => {
     const spec = makeSpec()
     const first = renderDirectorPromptTemplate(spec)
     const second = renderDirectorPromptTemplate(JSON.parse(JSON.stringify(spec)) as ShotStaticSpec)
@@ -91,7 +92,7 @@ describe('renderDirectorPromptTemplate', () => {
 })
 
 describe('renderRepaintCineLine (#viz-gap)', () => {
-  it('결정론적이고, 연필이 못 옮기는 채널(렌즈·DoF·조명·색·초점)을 담는다', () => {
+  it('다시 그릴 때 바뀌면 안 되는 렌즈·초점·조명·색 정보를 담는다', () => {
     const spec = makeSpec()
     const first = renderRepaintCineLine(spec)
     const second = renderRepaintCineLine(JSON.parse(JSON.stringify(spec)) as ShotStaticSpec)
@@ -107,7 +108,7 @@ describe('renderRepaintCineLine (#viz-gap)', () => {
     expect(first).toContain('Kai reaching toward the glowing map')
   })
 
-  it('시트가 이미 운반하는 채널(블로킹 pose/gaze·프레이밍 레이어·소품)은 제외한다', () => {
+  it('이미 화면에 정해진 인물 자세·시선·구도·소품은 다시 지시하지 않는다', () => {
     // 리페인트 "포즈 유지" 지시와 충돌하지 않도록 — 가설의 반증 축(구도·포즈 훼손) 방어.
     const line = renderRepaintCineLine(makeSpec())
     expect(line).not.toContain('Blocking')
@@ -117,7 +118,7 @@ describe('renderRepaintCineLine (#viz-gap)', () => {
     expect(line).not.toContain('foreground amber rain') // framing.layers
   })
 
-  it('facet 부재는 조용히 건너뛴다(빈 spec → 빈/짧은 라인, 예외 없음)', () => {
+  it('일부 연출 정보가 없으면 빈 부분은 건너뛰고 가능한 안내만 남긴다', () => {
     expect(() => renderRepaintCineLine({})).not.toThrow()
     const partial = renderRepaintCineLine({ lens_mm: 85, depth_of_field: 'shallow' })
     expect(partial).toContain('85mm lens')
@@ -126,7 +127,7 @@ describe('renderRepaintCineLine (#viz-gap)', () => {
 })
 
 describe('renderDirectorPromptFromFacets', () => {
-  it('falls back to the deterministic template when injected LLM rendering throws', async () => {
+  it('안내를 만들지 못하면 정해진 기본 안내를 대신 사용한다', async () => {
     const spec = makeSpec()
     const llm = vi.fn(async () => {
       throw new Error('LLM failed')
@@ -138,7 +139,7 @@ describe('renderDirectorPromptFromFacets', () => {
     expect(llm).toHaveBeenCalledTimes(1)
   })
 
-  it('uses the template and does not call the injected LLM when FACET_RENDER is off', async () => {
+  it('다시 그리기 기능을 끄면 기본 안내만 사용한다', async () => {
     const spec = makeSpec()
     const llm = vi.fn(async () => ({ prompt: 'LLM prompt' }))
 

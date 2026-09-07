@@ -1,3 +1,4 @@
+// 샷이 나뉘거나 번호가 바뀌어도 각 샷에 맞는 대사를 연결한다 (#dialogue-join 2026-08-10)
 // 샷 ↔ 대사 조인 정합 (#dialogue-join 2026-08-10) — 회귀 방지.
 //
 // 실측 결함(f32b3f50): 대사 트랙은 데쿠파주 id 공간에 키가 잡히는데 shotCheck Step 3 가 분할 적용 후
@@ -66,7 +67,7 @@ const track: DialogueTrack = {
 /** 대사 라인이 어느 소스 샷에서 왔는지 — 'line-of-shot_N' → 'shot_N'. */
 const sourceOfLine = (line: string) => line.replace('line-of-', '')
 
-describe('buildShotDialogueMap — 분할 시퀀스 조인 정합', () => {
+describe('나뉜 샷에도 원래 대사를 맞게 연결한다', () => {
   // shot_2 가 두 자식으로 분할된 최종 시퀀스. 리넘버 때문에 최종 id 는 소스와 어긋난다.
   const split = [
     seqShot('shot_1', 'scene_1', 'shot_1'),
@@ -77,7 +78,7 @@ describe('buildShotDialogueMap — 분할 시퀀스 조인 정합', () => {
     seqShot('shot_6', 'scene_2', 'shot_5'),
   ]
 
-  it('① 오배치 0 — 모든 샷이 자기 소스의 대사를 물고, 씬도 일치한다', () => {
+  it('① 모든 샷에 자기 대사가 연결되고 장면도 어긋나지 않는다', () => {
     const map = buildShotDialogueMap(split, track)
     const sceneOfSource = new Map<string, string>()
     for (const sc of track.scenes) for (const sh of sc.shots) sceneOfSource.set(sh.shot_id, sc.scene_id)
@@ -98,13 +99,13 @@ describe('buildShotDialogueMap — 분할 시퀀스 조인 정합', () => {
     expect(map.get('shot_5')?.dialogue[0].line).toBe('line-of-shot_4')
   })
 
-  it('② 형제는 첫 자식만 상속 — 둘째 자식은 빈 대사', () => {
+  it('② 나뉜 샷은 첫 번째 샷만 대사를 받고 다음 샷은 비워 둔다', () => {
     const map = buildShotDialogueMap(split, track)
     expect(map.get('shot_2')?.dialogue[0].line).toBe('line-of-shot_2') // 첫 자식
     expect(map.has('shot_3')).toBe(false) // 형제 — 같은 말을 두 번 하지 않는다
   })
 
-  it('③ 분할 0이면 종전(직접 id 조인)과 동일', () => {
+  it('③ 샷을 나누지 않으면 기존처럼 각 샷에 맞는 대사가 연결된다', () => {
     const noSplit = [
       seqShot('shot_1', 'scene_1', 'shot_1'),
       seqShot('shot_2', 'scene_1', 'shot_2'),
@@ -119,7 +120,7 @@ describe('buildShotDialogueMap — 분할 시퀀스 조인 정합', () => {
     expect(map.size).toBe(5)
   })
 
-  it('④ source_shot_id 없는 구 시퀀스는 직접 id 조인으로 폴백', () => {
+  it('④ 예전 형식의 샷도 각 샷에 맞는 대사를 찾아 연결한다', () => {
     const legacy = [
       seqShot('shot_1', 'scene_1'),
       seqShot('shot_2', 'scene_1'),
@@ -131,7 +132,7 @@ describe('buildShotDialogueMap — 분할 시퀀스 조인 정합', () => {
     expect(map.size).toBe(3)
   })
 
-  it('대사 트랙이 없으면 빈 맵', () => {
+  it('대사 정보가 없으면 연결 결과도 비워 둔다', () => {
     expect(buildShotDialogueMap(split, null).size).toBe(0)
   })
 })

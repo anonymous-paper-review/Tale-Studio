@@ -1,3 +1,4 @@
+// 장면의 행동과 검수 안내를 화면에 정확히 보여주고, 나눠진 컷에도 필요한 주의를 이어 준다 (#p2-wiring 2026-08-04)
 // shotCheck 배선 수정(#p2-wiring 2026-08-04) 회귀 — 진단: lab/previz-quality/REPORT.md
 //
 // 계약:
@@ -62,8 +63,8 @@ const SCENES = {
   ],
 } as unknown as Scenes
 
-describe('assembleShotsFromDesigns — 표시문 소스 랭킹 + provenance (W1·W3)', () => {
-  it('데쿠파주 beat native 가 최우선으로 character_action 이 된다', () => {
+describe('assembleShotsFromDesigns — 화면에 보여줄 행동을 올바른 순서로 고르기 (W1·W3)', () => {
+  it('장면에 적힌 실제 행동이 있으면 화면에 그 행동을 먼저 보여준다', () => {
     const beats = new Map([
       ['shot_1', { en: 'The girl stuffs blueprints into her vest.', native: '소녀가 도면을 조끼에 넣는다.' }],
     ])
@@ -71,7 +72,7 @@ describe('assembleShotsFromDesigns — 표시문 소스 랭킹 + provenance (W1�
     expect(item.S.character_action).toBe('소녀가 도면을 조끼에 넣는다.')
   })
 
-  it('native 부재 시 beat EN, beat 부재 시 motion_prompt, 최후에만 dramatic_purpose', () => {
+  it('실제 행동이 없으면 다른 행동 설명을 차례로 사용하고, 마지막에 장면 목적을 보여준다', () => {
     const beats = new Map([['shot_1', { en: 'She digs through the sand.' }]])
     const designs = [
       makeDesign({ shotId: 'shot_1' }),
@@ -84,14 +85,14 @@ describe('assembleShotsFromDesigns — 표시문 소스 랭킹 + provenance (W1�
     expect(items[2].S.character_action).toBe('긴장감을 조성한다.')
   })
 
-  it('design_ref 와 static_spec 원본이 아이템에 부착된다', () => {
+  it('컷을 나눠도 원래 설계와 화면 원본을 함께 보존한다', () => {
     const [item] = assembleShotsFromDesigns([makeDesign({ shotId: 'shot_7' })], SCENES)
     expect(item.design_ref).toBe('shot_7')
     expect(item.static_spec?.first_frame_prompt).toBe('first frame of shot_7')
   })
 })
 
-describe('attachCheckNotes — 채널1 부착 규칙 (W4)', () => {
+describe('attachCheckNotes — 화면 주의사항을 필요한 컷에 붙이기 (W4)', () => {
   const baseShots = () => {
     const [a, b] = assembleShotsFromDesigns(
       [makeDesign({ shotId: 'shot_1' }), makeDesign({ shotId: 'shot_2' })],
@@ -120,12 +121,12 @@ describe('attachCheckNotes — 채널1 부착 규칙 (W4)', () => {
     { category: 'action_budget', severity: 'WARNING', location: 'shot_1', message: 'constraint 없음' },
   ]
 
-  it('CRITICAL/WARNING+constraint 만 부착되고 INFO·constraint 부재는 제외된다', () => {
+  it('중요하거나 주의가 필요한 시각 안내만 붙이고, 정보용·글 전용 안내는 제외한다', () => {
     const [a] = attachCheckNotes(baseShots(), issues)
     expect(a.check_notes).toHaveLength(1)
     expect(a.check_notes?.[0].constraint).toMatch(/tucked inside her vest/)
   })
-  it('글 전용 constraint는 shotCheck 보고서에만 남고 check_notes에는 부착하지 않는다', () => {
+  it('글 내용 전용 안내는 검수 보고서에만 남기고 화면 주의사항에는 붙이지 않는다', () => {
     const [a] = attachCheckNotes(baseShots(), [
       {
         category: 'verisimilitude',
@@ -139,19 +140,19 @@ describe('attachCheckNotes — 채널1 부착 규칙 (W4)', () => {
     expect(a.check_notes).toBeUndefined()
   })
 
-  it('분할 자식은 _splitFrom(부모 id)으로 부모의 제약을 상속한다', () => {
+  it('나뉜 컷은 원래 컷의 주의사항을 이어받는다', () => {
     const [, child] = attachCheckNotes(baseShots(), issues)
     expect(child.shot_id).toBe('shot_2b')
     expect(child.check_notes?.[0].constraint).toMatch(/ground level/)
   })
 
-  it('매칭 이슈가 없으면 샷은 그대로다', () => {
+  it('관련된 주의사항이 없으면 컷 내용을 그대로 둔다', () => {
     const shots = baseShots()
     const out = attachCheckNotes(shots, [])
     expect(out[0].check_notes).toBeUndefined()
   })
 
-  it('F1: 분할 부모의 action_budget 제약은 자식에게 상속되지 않는다 (분할이 곧 수정)', () => {
+  it('F1: 나누기 전 컷의 동작 제한은 나뉜 컷에 이어 주지 않는다 (나누기가 곧 수정)', () => {
     const [a] = assembleShotsFromDesigns([makeDesign({ shotId: 'shot_9' })], SCENES)
     const child = { ...a, shot_id: 'shot_9b', _splitFrom: 'shot_9' }
     const out = attachCheckNotes([child], [
@@ -177,7 +178,7 @@ describe('attachCheckNotes — 채널1 부착 규칙 (W4)', () => {
   })
 })
 
-describe('buildSplitChildren — 분할 형제 개별화 (F2)', () => {
+describe('buildSplitChildren — 나뉜 컷마다 내용을 알맞게 나누기 (F2)', () => {
   const parent = () => {
     const [p] = assembleShotsFromDesigns([makeDesign({ shotId: 'shot_3' })], SCENES)
     return p
@@ -188,7 +189,7 @@ describe('buildSplitChildren — 분할 형제 개별화 (F2)', () => {
       { shot_id: 'shot_3b', video_generation: { motion_prompt: 'She reaches into the broken window.' } },
     ] as never[]
 
-  it('design_ref 는 첫 자식만 — 둘째는 부분 상속 스펙을 받는다 (#split-inherit: 훔치지도 굶기지도 않는다)', () => {
+  it('나뉜 컷은 첫 컷만 원래 설계를 갖고, 뒤 컷은 필요한 부분만 이어받는다 (#split-inherit: 훔치지도 굶기지도 않는다)', () => {
     const [c1, c2] = buildSplitChildren(parent(), 'shot_3', newShots())
     expect(c1.design_ref).toBe('shot_3')
     expect(c1.static_spec).toBeTruthy()
@@ -202,7 +203,7 @@ describe('buildSplitChildren — 분할 형제 개별화 (F2)', () => {
     expect(c2.static_spec?.framing?.focal_point).toBe('')
   })
 
-  it('모델이 new_shots 에 design_ref 를 에코해도 무시된다 — provenance 는 시스템 소유 (실측 92948d6f)', () => {
+  it('자동 생성 결과에 설계 표시가 섞여도 정해진 기준을 따른다 (실측 92948d6f)', () => {
     const echoed = newShots().map((ns) => ({
       ...(ns as object),
       design_ref: 'shot_3',
@@ -216,14 +217,14 @@ describe('buildSplitChildren — 분할 형제 개별화 (F2)', () => {
     expect(c2.static_spec?.first_frame_prompt).toBe('')
   })
 
-  it('S 누락 자식은 자기 모션 서술로 표시문이 개별화된다 (T4)', () => {
+  it('나뉜 컷은 각자 자기 동작을 화면에 보여준다 (T4)', () => {
     const [c1, c2] = buildSplitChildren(parent(), 'shot_3', newShots())
     expect(c1.S.character_action).toBe('She shakes the canteen at her ear.')
     expect(c2.S.character_action).toBe('She reaches into the broken window.')
     expect(c1._splitFrom).toBe('shot_3')
   })
 
-  it('S2: 둘째의 산문 채널은 부모 통짜 상속 금지 — 델타 없으면 빈다 (부모 START/전체모션은 자식에 거짓)', () => {
+  it('S2: 둘째 컷은 자기 설명이 없으면 이전 컷의 전체 화면과 동작을 물려받지 않고 비워 둔다 (부모의 전체 화면과 동작은 자식에 거짓)', () => {
     const noDelta = [{ shot_id: 'shot_3a' }, { shot_id: 'shot_3b' }] as never[]
     const [c1, c2] = buildSplitChildren(parent(), 'shot_3', noDelta)
     // 첫째는 종전대로 부모 병합(부모의 START = 첫째의 START — 참)
@@ -238,7 +239,7 @@ describe('buildSplitChildren — 분할 형제 개별화 (F2)', () => {
     expect(c2.video_generation.motion_prompt).toBe('')
   })
 
-  it('S3: 둘째의 dynamic_spec 은 축소 계약 — 카메라·환경 유지, 인물 동사·시선 아크 제거, 모션 산문은 자기 것', () => {
+  it('S3: 둘째 컷은 카메라와 환경은 이어 가고, 인물 동작과 시선은 자기 움직임만 보여준다', () => {
     const [, c2] = buildSplitChildren(parent(), 'shot_3', newShots())
     expect(c2.dynamic_spec).toBeTruthy()
     expect(c2.dynamic_spec?.camera_motion?.type).toBe('static') // 분할 경계를 넘는 연속 무빙 유지
@@ -247,7 +248,7 @@ describe('buildSplitChildren — 분할 형제 개별화 (F2)', () => {
     expect(c2.dynamic_spec?.motion_prompt).toBe('She reaches into the broken window.')
   })
 
-  it('S3: 전환 재배치 — transition_in 은 첫째만, transition_out 은 막내만', () => {
+  it('S3: 화면 전환은 첫 컷에 들어오고 마지막 컷에서 나간다', () => {
     const p = parent()
     p.dynamic_spec = {
       ...(p.dynamic_spec as object),
@@ -266,7 +267,7 @@ describe('buildSplitChildren — 분할 형제 개별화 (F2)', () => {
     expect(c3.dynamic_spec?.transition_out).toBe('dissolve')
   })
 
-  it('S1: 둘째의 blocking pose 는 자기 액션 텍스트로 — 부모의 순간 자세를 물려받지 않는다', () => {
+  it('S1: 둘째 컷의 자세는 자기 동작에 맞추고 부모의 순간 자세를 물려받지 않는다', () => {
     const p = parent()
     p.static_spec = {
       ...(p.static_spec as object),
@@ -281,8 +282,8 @@ describe('buildSplitChildren — 분할 형제 개별화 (F2)', () => {
   })
 })
 
-describe('writerShotIdToMain — id 체계 통일 (#id-unify)', () => {
-  it('1자리 번호도 메인 포맷으로 — 한 프로젝트 두 체계 공존 결함 재발 방지', () => {
+describe('writerShotIdToMain — 컷 번호 형식 통일 (#id-unify)', () => {
+  it('한 자리 컷 번호도 같은 규칙으로 정리한다', () => {
     expect(writerShotIdToMain('shot_1', 'scene_1')).toBe('sh_01_01')
     expect(writerShotIdToMain('shot_9', 'scene_1')).toBe('sh_01_09')
     expect(writerShotIdToMain('shot_10', 'scene_2')).toBe('sh_02_10')
@@ -290,8 +291,8 @@ describe('writerShotIdToMain — id 체계 통일 (#id-unify)', () => {
   })
 })
 
-describe('parseCheckConstraints / appendCheckConstraints — DB jsonb 방어 파싱', () => {
-  it('정상 배열에서 constraint 문자열만 추출한다', () => {
+describe('parseCheckConstraints / appendCheckConstraints — 저장된 주의사항을 안전하게 읽기', () => {
+  it('정상적으로 저장된 주의사항에서 필요한 문장만 골라낸다', () => {
     const value = [
       { category: 'continuity', severity: 'CRITICAL', constraint_target: 'visual', constraint: 'Keep the vest closed.' },
       { category: 'continuity', severity: 'WARNING', constraint_target: 'visual', constraint: '  ' },
@@ -302,13 +303,13 @@ describe('parseCheckConstraints / appendCheckConstraints — DB jsonb 방어 파
     expect(parseCheckConstraints(value)).toEqual(['Keep the vest closed.'])
   })
 
-  it('배열이 아니거나 깨진 값은 빈 배열 — 프롬프트는 원문 유지', () => {
+  it('읽을 수 없는 주의사항은 비워 두고 원래 안내 문장은 그대로 둔다', () => {
     expect(parseCheckConstraints(null)).toEqual([])
     expect(parseCheckConstraints('garbage')).toEqual([])
     expect(appendCheckConstraints('base prompt', null)).toBe('base prompt')
   })
 
-  it('제약이 있으면 프롬프트 꼬리에 한 줄로 첨부된다', () => {
+  it('주의사항이 있으면 안내문 끝에 한 줄로 덧붙인다', () => {
     const out = appendCheckConstraints('base prompt', [
       { category: 'continuity', severity: 'CRITICAL', constraint_target: 'visual', constraint: 'A.' },
       { category: 'continuity', severity: 'WARNING', constraint_target: 'visual', constraint: 'B.' },

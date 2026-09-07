@@ -1,3 +1,4 @@
+// 파일 이름과 내려받을 자료가 어떤 입력에도 안전하게 묶여, 빠진 자료를 알 수 있게 한다
 import JSZip from 'jszip'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -10,14 +11,14 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('sanitizeSegment adversarial filesystem inputs', () => {
-  it('falls back for empty, all-reserved, and dot/space-only segments', () => {
+describe('파일 이름에 이상한 문자가 들어와도 안전한 이름으로 정리한다', () => {
+  it('이름이 비어 있거나 쓸 수 없으면 안전한 기본 이름을 쓴다', () => {
     expect(sanitizeSegment('')).toBe('untitled')
     expect(sanitizeSegment('<>:"/\\|?*\u0000\u001F')).toBe('untitled')
     expect(sanitizeSegment(' ...   . .  ')).toBe('untitled')
   })
 
-  it('caps Korean names at 80 code points rather than 80 bytes', () => {
+  it('한글 이름은 글자 수를 기준으로 알맞은 길이로 줄인다', () => {
     const safe = sanitizeSegment('가'.repeat(120))
 
     expect(Array.from(safe)).toHaveLength(80)
@@ -25,25 +26,25 @@ describe('sanitizeSegment adversarial filesystem inputs', () => {
     expect(safe).toBe('가'.repeat(80))
   })
 
-  it('prefixes Windows device names even when cased or extension-bearing', () => {
+  it('컴퓨터에서 특별한 이름으로 쓰이는 파일명도 안전하게 바꾼다', () => {
     expect(sanitizeSegment('CON.txt')).toBe('_CON.txt')
     expect(sanitizeSegment('nul')).toBe('_nul')
     expect(sanitizeSegment('NuL ')).toBe('_NuL')
   })
 
-  it('neutralizes traversal and embedded path separators inside one segment', () => {
+  it('경로처럼 보이는 이름도 한 파일 이름 안에서 안전하게 바꾼다', () => {
     expect(sanitizeSegment('../../etc/passwd')).toBe('etc-passwd')
     expect(sanitizeSegment('a/b\\c')).toBe('a-b-c')
   })
 
-  it('normalizes combining-mark input to NFC before trimming and capping', () => {
+  it('조합된 글자도 올바르게 합친 뒤 이름을 정리한다', () => {
     expect(sanitizeSegment('Cafe\u0301 noir')).toBe('Café-noir')
     expect(sanitizeSegment('\u1100\u1161\u1102\u1161')).toBe('가나')
   })
 })
 
-describe('PathAllocator adversarial collisions', () => {
-  it('dedupes many identical files as base, base-2, and base-3', () => {
+describe('같은 이름의 자료가 겹쳐도 서로 다른 이름으로 보존한다', () => {
+  it('같은 이름의 자료가 여러 개면 차례대로 다른 이름을 붙인다', () => {
     const allocator = new PathAllocator()
 
     expect(allocator.file('', 'base', 'md')).toBe('base.md')
@@ -51,14 +52,14 @@ describe('PathAllocator adversarial collisions', () => {
     expect(allocator.file('', 'base', 'md')).toBe('base-3.md')
   })
 
-  it('treats IMG and img as a case-insensitive collision', () => {
+  it('대소문자만 다른 이름도 같은 이름으로 보고 겹치지 않게 한다', () => {
     const allocator = new PathAllocator()
 
     expect(allocator.file('media', 'IMG', 'png')).toBe('media/IMG.png')
     expect(allocator.file('media', 'img', 'png')).toBe('media/img-2.png')
   })
 
-  it('keeps the same sanitized name independent across different directories', () => {
+  it('서로 다른 위치에서는 같은 이름을 각각 그대로 쓸 수 있게 한다', () => {
     const allocator = new PathAllocator()
 
     expect(allocator.child('producer', 'draft')).toBe('producer/draft')
@@ -66,7 +67,7 @@ describe('PathAllocator adversarial collisions', () => {
     expect(allocator.child('producer', 'draft')).toBe('producer/draft-2')
   })
 
-  it('dedupes file() and child() calls through the same directory namespace', () => {
+  it('같은 위치의 자료 이름은 종류가 달라도 서로 겹치지 않게 한다', () => {
     const allocator = new PathAllocator()
 
     expect(allocator.child('artist', 'thumb.png')).toBe('artist/thumb.png')
@@ -74,8 +75,8 @@ describe('PathAllocator adversarial collisions', () => {
   })
 })
 
-describe('buildZipBlob adversarial fetch and archive behavior', () => {
-  it('records a thrown media fetch as a failed entry without throwing', async () => {
+describe('자료를 묶어 내려받을 때 실패한 자료를 알려 주고 나머지는 보존한다', () => {
+  it('자료를 받지 못하면 실패 목록에 기록하고 다른 자료는 계속 묶는다', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockRejectedValueOnce(new Error('network down'))
     vi.stubGlobal('fetch', fetchMock)
 
@@ -92,7 +93,7 @@ describe('buildZipBlob adversarial fetch and archive behavior', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('records a non-ok media response as a failed entry without creating the media file', async () => {
+  it('자료를 내려받을 수 없으면 해당 자료를 넣지 않고 실패 목록에 기록한다', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
       mockResponse('server error', {
         ok: false,
@@ -115,7 +116,7 @@ describe('buildZipBlob adversarial fetch and archive behavior', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('creates an empty archive and zeroed result for an empty files array', async () => {
+  it('내보낼 자료가 없으면 빈 묶음과 0건 결과를 만든다', async () => {
     const { blob, result } = await buildZipBlob([])
     const zip = await loadZip(blob)
 
@@ -123,7 +124,7 @@ describe('buildZipBlob adversarial fetch and archive behavior', () => {
     expect(entryPaths(zip)).toEqual([])
   })
 
-  it('keeps all-media-fail archives downloadable with _failed.txt and failed equal to total', async () => {
+  it('모든 자료를 받지 못해도 실패 목록을 담은 묶음을 내려받는다', async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockRejectedValueOnce(new Error('socket closed'))
@@ -145,7 +146,7 @@ describe('buildZipBlob adversarial fetch and archive behavior', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
-  it('fetches the same media URL once while writing every sharing path', async () => {
+  it('같은 자료를 여러 곳에서 써도 한 번만 받고 모든 위치에 넣는다', async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(mockResponse('shared bytes', { contentType: 'image/png' }))
@@ -173,7 +174,7 @@ describe('buildZipBlob adversarial fetch and archive behavior', () => {
     expect(Array.from(duplicateB)).toEqual(Array.from(original))
   })
 
-  it('records nullish text content as failures while preserving explicit empty strings', async () => {
+  it('글 내용이 없으면 실패로 알리고 빈 글은 그대로 담는다', async () => {
     const { blob, result } = await buildZipBlob([
       { path: 'writer/null.txt', kind: 'text', content: null },
       { path: 'writer/undefined.txt', kind: 'text' },
@@ -189,8 +190,8 @@ describe('buildZipBlob adversarial fetch and archive behavior', () => {
   })
 })
 
-describe('escapeMd adversarial markdown injection', () => {
-  it('collapses newlines and escapes leading heading or blockquote markers', () => {
+describe('글 내용의 줄바꿈과 표시 문자가 문서 형식을 깨뜨리지 않게 한다', () => {
+  it('줄바꿈과 제목·인용 표시가 글 형식을 깨뜨리지 않게 바꾼다', () => {
     expect(escapeMd('# Heading\n- injected list\n> injected quote *em*')).toBe(
       '\\# Heading - injected list > injected quote \\*em\\*',
     )
@@ -198,8 +199,8 @@ describe('escapeMd adversarial markdown injection', () => {
   })
 })
 
-describe('extOfContentType adversarial matrix', () => {
-  it('maps known content types, URL fallbacks, and unknowns to safe extensions', () => {
+describe('자료 형식과 주소를 보고 안전한 파일 확장자를 정한다', () => {
+  it('자료 형식과 주소가 달라도 안전한 파일 확장자를 정한다', () => {
     expect(extOfContentType('image/png', 'https://cdn.test/file.jpg')).toBe('png')
     expect(extOfContentType('image/jpeg', 'https://cdn.test/file.png')).toBe('jpg')
     expect(extOfContentType('video/mp4', 'https://cdn.test/file.bin')).toBe('mp4')

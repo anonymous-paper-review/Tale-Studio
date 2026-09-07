@@ -1,3 +1,4 @@
+// 장면을 저장할 때 사용자가 정한 화면 연출과 안내 문구를 잃지 않는다
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ShotSequence } from '@/lib/writer/types/pipeline'
 
@@ -203,8 +204,8 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('persistShotsToDb facet persistence', () => {
-  it('persists static_spec and prompt_source_hash on inserted shot rows', async () => {
+describe('persistShotsToDb — 화면 연출 정보 저장', () => {
+  it('새 장면을 저장하면 화면 연출 정보와 안내 출처를 함께 보존한다', async () => {
     const staticSpec = { shot_id: 'shot_001', first_frame_prompt: 'Spec prompt', shot_type: 'MS' }
 
     await persistShotsToDb(PROJECT_ID, sequence([shot({ static_spec: staticSpec })]))
@@ -215,7 +216,7 @@ describe('persistShotsToDb facet persistence', () => {
     expect(mocks.insertedShots[0].character_appearance_keys).toEqual({ kai: 'kai-current' })
   })
 
-  it('keeps the legacy prompt path when FACET_RENDER is off', async () => {
+  it('새 연출 기능을 끄면 기존 안내 문구를 그대로 사용한다', async () => {
     const staticSpec = { shot_id: 'shot_001', first_frame_prompt: 'Spec prompt', shot_type: 'MS' }
 
     await persistShotsToDb(PROJECT_ID, sequence([shot({ static_spec: staticSpec })]))
@@ -224,7 +225,7 @@ describe('persistShotsToDb facet persistence', () => {
     expect(mocks.insertedShots[0].prompt).toBe('Legacy composition prompt')
   })
 
-  it('uses facet rendered prose only for static_spec shots when FACET_RENDER is on', async () => {
+  it('새 연출 기능을 켜도 연출 정보가 있는 장면만 새 안내를 사용한다', async () => {
     mocks.isFlagOn.mockReturnValue(true)
     const staticSpec = { shot_id: 'shot_001', first_frame_prompt: 'Spec prompt', shot_type: 'MS' }
     const legacyOnly = shot({
@@ -243,7 +244,7 @@ describe('persistShotsToDb facet persistence', () => {
     ])
   })
 
-  it('falls back to deterministic templates when a FACET_RENDER chunk throws', async () => {
+  it('새 안내를 만들지 못하면 정해진 기본 안내를 대신 사용한다', async () => {
     mocks.isFlagOn.mockReturnValue(true)
     mocks.renderDirectorPromptFromFacets.mockRejectedValue(new Error('LLM down'))
     const staticSpec = { shot_id: 'shot_001', first_frame_prompt: 'Spec prompt', shot_type: 'MS' }
@@ -253,7 +254,7 @@ describe('persistShotsToDb facet persistence', () => {
     expect(mocks.insertedShots[0].prompt).toBe('template:shot_001')
   })
 
-  it('skips facet rendering and preserves prompt when prompt_source_hash matches', async () => {
+  it('안내 출처가 같으면 새로 만들지 않고 기존 안내를 보존한다', async () => {
     mocks.isFlagOn.mockReturnValue(true)
     mocks.existingShots = [
       {
@@ -270,7 +271,7 @@ describe('persistShotsToDb facet persistence', () => {
     expect(mocks.insertedShots[0].prompt).toBe('cached director prose')
   })
 
-  it('carries forward current user-edit columns while overwriting pipeline facet outputs', async () => {
+  it('사용자가 고친 화면 설정은 지키고 자동으로 만든 연출 정보만 새로 덮어쓴다', async () => {
     const carriedCamera = { horizontal: 4, vertical: 0, pan: 12, tilt: 0, roll: 0, zoom: 1 }
     const carriedLighting = { position: 'side', brightness: 80, colorTemp: 3200 }
     const staticSpec = { shot_id: 'shot_001', first_frame_prompt: 'New spec prompt', shot_type: 'CU' }
