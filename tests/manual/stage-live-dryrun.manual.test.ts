@@ -1,3 +1,4 @@
+// 한 장면을 다시 만들면 무대 배치와 카메라 구도가 정리된다 (실제 AI 호출 2회·fal 과금 없음·운영 DB는 설정 시 장면과 그림 정보를 갱신하고 저장소에는 쓰지 않으며 결과 파일을 쓴다 #stage 2026-09-03)
 /* eslint-disable @typescript-eslint/no-explicit-any -- 수동 하네스: writer_runs.state 의 비정형 JSON 을 그대로 다룬다 */
 // 씬 무대 라이브 드라이런(#stage 2026-09-03) — 실 프로젝트의 writer_runs.state 로 한 씬의 무대를 만들고(LLM),
 //   그 무대 위에서 v4 를 다시 돌려(LLM) camera_setup·screen_layout 이 어떻게 나오는지 본다. 기본은 DB 에
@@ -43,8 +44,8 @@ function memLogger() {
   }
 }
 
-describe.skipIf(!ENABLED)('stage live dry-run', () => {
-  it('builds a stage for one scene and re-runs v4 on it', async () => {
+describe.skipIf(!ENABLED)('장면 무대 배치와 카메라 구도를 실제로 확인한다', () => {
+  it('한 장면을 넣으면 무대 배치와 카메라 구도를 다시 만든다', async () => {
     loadEnv()
     expect(PROJECT).toMatch(/^[0-9a-f-]{36}$/)
     const { supabaseAdmin } = await import('@/lib/supabase/admin')

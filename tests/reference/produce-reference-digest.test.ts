@@ -1,3 +1,4 @@
+// Producer 대화에 참고 작품을 안전하게 활용하되, 현재 작품 내용과 권한을 지킨다
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -71,8 +72,8 @@ beforeEach(() => {
   mocks.getProjectReferenceId.mockResolvedValue('source')
 })
 
-describe('POST /api/produce/chat — reference digest context', () => {
-  it('returns prompt shape and provider usage without exposing the prompt', async () => {
+describe('Producer 대화에 참고 작품 정보를 안전하게 덧붙인다', () => {
+  it('대화 결과에 사용량을 기록하되 실제 이야기 내용은 노출하지 않는다', async () => {
     mocks.llmChat.mockImplementationOnce(async (...args: unknown[]) => {
       const options = args[5] as {
         onUsage?: (usage: {
@@ -120,7 +121,7 @@ describe('POST /api/produce/chat — reference digest context', () => {
     expect(JSON.stringify(body.trace)).not.toContain('Current story')
   })
 
-  it('appends a read-only reference block after current project context', async () => {
+  it('현재 작품 설정 뒤에 참고 작품 정보를 읽기 전용으로 덧붙인다', async () => {
     mocks.buildReferenceDigest.mockResolvedValue(
       `[Referenced Project: Episode One] (read-only background from a referenced project — not the current project's cards)\n\nCast:\n- Mina`,
     )
@@ -145,7 +146,7 @@ describe('POST /api/produce/chat — reference digest context', () => {
     expect(mocks.buildReferenceDigest).toHaveBeenCalledWith('source', 'owner')
   })
 
-  it('silently omits a missing or unauthorized reference digest', async () => {
+  it('참고 작품이 없거나 권한이 없으면 해당 정보를 조용히 제외한다', async () => {
     mocks.buildReferenceDigest.mockResolvedValue(null)
 
     const response = await POST(
@@ -159,7 +160,7 @@ describe('POST /api/produce/chat — reference digest context', () => {
     expect(mocks.llmChat.mock.calls[0][2]).not.toContain('[Referenced Project:')
   })
 
-  it('warns on system digest failure but keeps chat available', async () => {
+  it('참고 작품을 불러오지 못해도 대화는 계속 제공한다', async () => {
     mocks.buildReferenceDigest.mockRejectedValue(new Error('digest query failed'))
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
 

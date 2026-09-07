@@ -1,3 +1,4 @@
+// 여러 화면 비율의 시트와 장면 그림을 다시 만들면 올바른 모양으로 저장된다 (실제 AI 호출은 설정에 따라 여러 회·fal 과금 발생·운영 DB와 저장소에 결과를 쓴다 #sheet-formats·오너 지시 2026-08-17)
 import { describe, it, expect, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { writeFile, mkdir } from 'node:fs/promises'
@@ -53,9 +54,9 @@ const post = (p: string, body: unknown): Request =>
     headers: { 'Content-Type': 'application/json' },
   })
 
-describe.runIf(LIVE)('sheet-formats E2E — storage 시드 + writer/director 실생성', () => {
+describe.runIf(LIVE)('여러 화면 비율의 시트와 장면 그림을 실제로 만든다', () => {
   it(
-    'templateAssetUrl 시드 → rough force 재생성(세로 grid) → director 개별 재생성(가로 3열 리페인트)',
+    '시트 형식을 준비하면 러프 장면과 개별 장면을 화면 비율에 맞게 다시 저장한다',
     async () => {
       loadEnv()
       const outDir = process.env.SHEET_OUT ?? path.join(process.cwd(), 'research/experiments/sheet-formats/out-e2e')

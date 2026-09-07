@@ -1,3 +1,4 @@
+// 낡은 시트 파일을 넣으면 최신 파일로 바꾸고 다른 자료는 남긴다 (실제 AI 호출 0회·fal 과금 없음·운영 DB에는 쓰지 않고 운영 저장소에 시험 파일을 쓰고 지운다 #template-latest-only)
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -19,8 +20,8 @@ function loadEnv() {
   }
 }
 
-describe.runIf(LIVE)('template-asset 최신본 자동 관리 — 실 storage', () => {
-  it('가짜 구판을 심으면 승격 호출이 지우고, 현재본과 타 자산은 남는다', async () => {
+describe.runIf(LIVE)('최신 시트 파일을 자동으로 관리한다', () => {
+  it('낡은 시트 파일을 넣으면 최신 파일로 바꾸고 다른 자료는 남긴다', async () => {
     loadEnv()
     const { supabaseAdmin } = await import('@/lib/supabase/admin')
     const { templateAssetUrl } = await import('@/lib/storage/template-asset')

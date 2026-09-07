@@ -1,3 +1,4 @@
+// 여러 화면 비율의 시트를 자르면 모든 장면 칸이 같은 크기이고 빈 띠 없이 내용이 남는다 (실제 AI 호출 0회·fal 과금 없음·운영 DB·저장소에는 쓰지 않고 로컬 자료만 읽는다 #detect-normalize)
 import { describe, it, expect } from 'vitest'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -37,10 +38,10 @@ async function whiteBand(buf: Buffer, edge: 'top' | 'bottom'): Promise<number> {
   return best
 }
 
-describe.runIf(BATTERY_READY)('rough crop battery — 실측 시트 코퍼스', () => {
+describe.runIf(BATTERY_READY)('화면 비율별 러프 시트 자르기 결과를 확인한다', () => {
   const dir = CORPUS_DIR
   const files = existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.png')) : []
-  it(`코퍼스 ${files.length}장: 균일·빈밴드·라벨 지표`, async () => {
+  it(`자료 ${files.length}장을 자르면 모든 장면 칸의 크기가 같고 빈 띠 없이 내용이 보인다`, async () => {
     expect(files.length).toBeGreaterThan(0)
     for (const f of files) {
       const m = /^([a-z]+)-.*-n(\d+)\.png$/.exec(f)

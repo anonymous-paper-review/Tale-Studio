@@ -1,3 +1,4 @@
+// 화면에 번역되지 않은 한글이 새로 남지 않도록 찾아낸다 (#i18n-s5)
 import { describe, it, expect } from 'vitest'
 import { readdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs'
 import path from 'node:path'
@@ -93,8 +94,8 @@ function scan(): Record<string, number> {
   return counts
 }
 
-describe('i18n — 한글 잔존 게이트', () => {
-  it('비주석 한글 라인 수가 허용 목록을 넘지 않는다 (배치마다 래칫 다운)', () => {
+describe('화면의 번역되지 않은 한글 점검', () => {
+  it('화면에 번역되지 않은 한글이 더 늘지 않는다', () => {
     const counts = scan()
 
     if (process.env.UPDATE_I18N_ALLOWLIST === '1') {

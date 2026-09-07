@@ -1,3 +1,4 @@
+// 저장된 장면 자료에 무대 규칙을 다시 적용하면 배치와 움직임을 빠짐없이 정리한다 (실제 AI 호출 0회·fal 과금 없음·운영 DB·저장소에는 쓰지 않고 결과 파일만 쓴다)
 /* eslint-disable @typescript-eslint/no-explicit-any -- 수동 하네스: 드라이런 JSON 을 그대로 다룬다 */
 // 저장된 드라이런 JSON(stage + shots)에 현재 apply 코드를 다시 적용한다 — LLM·DB 없음, 결정론.
 //   RUN_STAGE_REAPPLY=1 STAGE_IN=<in.json> STAGE_OUT=<out.json> pnpm vitest run tests/stage-reapply.manual.test.ts
@@ -9,8 +10,8 @@ import type { DecoupageShot, ShotDesign } from '@/lib/writer/types/pipeline'
 
 const ENABLED = process.env.RUN_STAGE_REAPPLY === '1'
 
-describe.skipIf(!ENABLED)('stage reapply', () => {
-  it('re-applies the stage to saved shots', () => {
+describe.skipIf(!ENABLED)('저장된 장면에 무대 규칙을 다시 적용한다', () => {
+  it('저장된 장면에 무대 규칙을 다시 적용해 모든 결과를 빠짐없이 만든다', () => {
     const d = JSON.parse(readFileSync(process.env.STAGE_IN!, 'utf8'))
     const shots: ShotDesign[] = d.shots.map((s: any) => ({
       intent: { shot_id: s.shot_id, scene_id: d.scene, story_beat_ref: 0, dramatic_purpose: '', duration_seconds: 5, duration_justification: '', audience_focus: '', shot_position_in_scene: 'developing' },

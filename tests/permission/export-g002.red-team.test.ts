@@ -1,3 +1,4 @@
+// 프로젝트 주인만 Writer 내보내기를 열고, 문제가 있는 자료도 안전한 문서로 정리한다 (G002)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -29,8 +30,8 @@ beforeEach(() => {
   mocks.from.mockReset()
 })
 
-describe('G002 writer export route auth boundaries', () => {
-  it('returns 401 before ownership or writer_runs access for unauthenticated requests', async () => {
+describe('프로젝트 내보내기 권한 확인 (G002)', () => {
+  it('로그인하지 않은 사람은 프로젝트를 내보낼 수 없다', async () => {
     mocks.getUser.mockResolvedValue(null)
     mocks.from.mockImplementation(() => {
       throw new Error(SECRET_MARKER)
@@ -46,7 +47,7 @@ describe('G002 writer export route auth boundaries', () => {
     expect(mocks.from).not.toHaveBeenCalled()
   })
 
-  it('returns 403 for a valid user who owns project A but requests project B', async () => {
+  it('다른 사람의 프로젝트는 내보낼 수 없다', async () => {
     mocks.getUser.mockResolvedValue(USER_A)
     mocks.userOwnsProject.mockImplementation(async (projectId: string, userId: string) => {
       return projectId === PROJECT_A && userId === USER_A.id
@@ -66,8 +67,8 @@ describe('G002 writer export route auth boundaries', () => {
   })
 })
 
-describe('G002 writer export route run selection', () => {
-  it('prefers an older completed usable run over a newer failed usable run', async () => {
+describe('내보낼 자료를 고르는 기준 (G002)', () => {
+  it('새 자료가 실패했으면 이전에 완성된 자료를 우선 내보낸다', async () => {
     mockOwner()
     mockWriterRuns([
       run('failed', stateWithGenre('newer-failed'), '2026-07-02T00:00:00Z'),
@@ -81,7 +82,7 @@ describe('G002 writer export route run selection', () => {
     expect(body.storyBible.genre.genre).toBe('older-completed')
   })
 
-  it('falls back to the newest usable run when every usable run failed', async () => {
+  it('모든 자료가 실패했으면 가장 최근 자료를 내보낸다', async () => {
     mockOwner()
     mockWriterRuns([
       run('failed', stateWithGenre('newest-usable-failed'), '2026-07-03T00:00:00Z'),
@@ -95,7 +96,7 @@ describe('G002 writer export route run selection', () => {
     expect(body.storyBible.genre.genre).toBe('newest-usable-failed')
   })
 
-  it('returns an all-null 200 when recent runs have non-record or empty unusable state', async () => {
+  it('최근 자료가 유효하지 않으면 내용 없는 내보내기를 돌려준다', async () => {
     mockOwner()
     mockWriterRuns([
       run('completed', null, '2026-07-04T00:00:00Z'),
@@ -119,7 +120,7 @@ describe('G002 writer export route run selection', () => {
     })
   })
 
-  it('throws on supabaseAdmin writer_runs errors instead of masking them as empty exports', async () => {
+  it('자료를 불러오는 중 저장소 오류가 나면 원인을 숨기지 않고 알린다', async () => {
     mockOwner()
     mockWriterRunLoadError('database unavailable')
 
@@ -129,8 +130,8 @@ describe('G002 writer export route run selection', () => {
   })
 })
 
-describe('G002 writer collector markdown robustness', () => {
-  it('does not throw or inline raw JSON braces for deeply malformed partial projections', async () => {
+describe('내보내는 문서의 내용 정리 (G002)', () => {
+  it('자료가 심하게 망가져도 문서 생성을 중단하지 않고 읽기 쉬운 내용만 담는다', async () => {
     const malformedProjection = {
       storyBible: {
         genre: {
@@ -187,7 +188,7 @@ describe('G002 writer collector markdown robustness', () => {
     }
   })
 
-  it('keeps markdown injection in scene prose inside escaped table cells', async () => {
+  it('장면 설명에 특수 문자가 있어도 문서 표가 깨지지 않는다', async () => {
     const files = await collectWriterArtifacts('project-injection', {
       fetchFn: fetchProjection({
         storyBible: null,
@@ -212,7 +213,7 @@ describe('G002 writer collector markdown robustness', () => {
     expect(scenes).toContain('\\| pipe \\|')
   })
 
-  it('uses native text over EN base fields when native variants are present', async () => {
+  it('번역된 설명이 있으면 기본 영어 설명보다 번역문을 우선한다', async () => {
     const nativeProjection: WriterExportProjection = {
       storyBible: {
         genre: { genre: 'English genre', genre_native: '네이티브 장르' },
@@ -270,8 +271,8 @@ describe('G002 writer collector markdown robustness', () => {
   })
 })
 
-describe('G002 producer collector robustness', () => {
-  it('does not throw on malformed missing board fields and remains markdown-only', () => {
+describe('Producer 정보 내보내기 안정성 (G002)', () => {
+  it('내용이 빠진 인물과 배경 자료도 오류 없이 문서로만 내보낸다', () => {
     const malformedBoard = {
       projectSettings: {
         playtime: 'not a number',

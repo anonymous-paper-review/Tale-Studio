@@ -1,3 +1,4 @@
+// 사용자가 쓰는 언어를 따라 프로젝트와 답변 언어를 안전하게 맞춘다 (#chat-locale-follow 2026-08-31)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // 발화 언어 추종 (#chat-locale-follow 2026-08-31) — produce/chat 의 locale 채택 계약.
@@ -75,8 +76,8 @@ beforeEach(() => {
   mocks.getProjectReferenceId.mockResolvedValue(null)
 })
 
-describe('POST /api/produce/chat — 발화 언어 추종', () => {
-  it('한글 발화 + en 프로젝트: ko 로 저장하고 이번 턴부터 ko 로 응답한다', async () => {
+describe('대화 응답은 사용자가 쓰는 언어를 따른다', () => {
+  it('한국어로 말하면 프로젝트 언어를 한국어로 바꾸고 바로 한국어로 답한다', async () => {
     const response = await POST(request({ projectId: 'p1', message: '한글로도 되나요?' }))
 
     expect(response.status).toBe(200)
@@ -88,7 +89,7 @@ describe('POST /api/produce/chat — 발화 언어 추종', () => {
     expect(body.contentLocale).toBe('ko')
   })
 
-  it('영어 발화 + ko 프로젝트: en 으로 강등하지 않는다 (비대칭)', async () => {
+  it('영어로 말해도 이미 정한 한국어 응답을 영어로 바꾸지 않는다 (비대칭)', async () => {
     mocks.fetchProjectLocaleState.mockResolvedValue({ locale: 'ko', writerRan: false })
 
     const response = await POST(request({ projectId: 'p1', message: 'make it a thriller' }))
@@ -100,7 +101,7 @@ describe('POST /api/produce/chat — 발화 언어 추종', () => {
     expect(body.contentLocale).toBe('ko')
   })
 
-  it('영어 발화 + en 프로젝트: 채택 없음, contentLocale 은 en 그대로', async () => {
+  it('영어로 말한 프로젝트는 한국어로 바꾸지 않고 영어로 답한다', async () => {
     const response = await POST(request({ projectId: 'p1', message: 'make it a thriller' }))
 
     expect(response.status).toBe(200)
@@ -109,7 +110,7 @@ describe('POST /api/produce/chat — 발화 언어 추종', () => {
     expect(body.contentLocale).toBe('en')
   })
 
-  it('writer 산출물이 있는 프로젝트는 한글 발화여도 언어를 바꾸지 않는다', async () => {
+  it('이미 작성된 내용이 있는 프로젝트는 한국어로 말해도 응답 언어를 바꾸지 않는다', async () => {
     mocks.fetchProjectLocaleState.mockResolvedValue({ locale: 'en', writerRan: true })
 
     const response = await POST(request({ projectId: 'p1', message: '주인공을 더 어둡게 바꿔줘' }))
@@ -119,7 +120,7 @@ describe('POST /api/produce/chat — 발화 언어 추종', () => {
     expect(mocks.responseLanguageDirective).toHaveBeenCalledWith('en')
   })
 
-  it('저장 실패 시 locale 을 승격하지 않는다 — 응답 언어와 저장 상태가 갈리면 안 된다', async () => {
+  it('언어 저장에 실패하면 바뀐 언어로 답하지 않는다', async () => {
     mocks.updateProjectLocale.mockResolvedValue(false)
 
     const response = await POST(request({ projectId: 'p1', message: '한글로 해주세요' }))
@@ -130,7 +131,7 @@ describe('POST /api/produce/chat — 발화 언어 추종', () => {
     expect(body.contentLocale).toBe('en')
   })
 
-  it('소유가 아닌 프로젝트는 조회도 채택도 하지 않는다', async () => {
+  it('내 프로젝트가 아니면 언어를 확인하거나 바꾸지 않는다', async () => {
     mocks.userOwnsProject.mockResolvedValue(false)
 
     const response = await POST(request({ projectId: 'p1', message: '한글로 해주세요' }))

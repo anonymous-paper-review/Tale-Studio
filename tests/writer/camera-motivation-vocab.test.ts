@@ -19,7 +19,7 @@ const ROOT = process.cwd()
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
 
 describe('동기 어휘는 여섯으로 닫힌다', () => {
-  it('정본 여섯 값과 분명한 동의어·한국어 표현만 동기로 인정하고, 나머지는 null 이다', () => {
+  it('정본 여섯 값과 분명한 동의어·한국어 표현만 동기로 인정하고, 나머지는 동기 없음으로 본다', () => {
     expect([...CAMERA_MOTIVATIONS]).toEqual(['emphasis', 'emotion', 'reveal', 'energy', 'pov', 'long_take'])
     expect(normalizeCameraMotivation('reveal')).toBe('reveal')
     expect(normalizeCameraMotivation('point of view')).toBe('pov')

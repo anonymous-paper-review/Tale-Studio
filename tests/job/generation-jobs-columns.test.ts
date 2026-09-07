@@ -1,3 +1,4 @@
+// 작업을 끝낼 때 필요한 정보를 보존하고, 인물 모습별 작업을 서로 섞지 않는다
 import { describe, it, expect, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 
@@ -8,22 +9,22 @@ import { GENERATION_JOB_COLUMNS } from '@/lib/generation-jobs'
 
 const generationJobs = readFileSync('src/lib/generation-jobs.ts', 'utf8')
 
-describe('GENERATION_JOB_COLUMNS — 웹훅 finalize 의존 컬럼 회귀 가드', () => {
-  it('finalize 가 읽는 input_snapshot 을 포함한다', () => {
+describe('GENERATION_JOB_COLUMNS에 작업을 끝내는 데 필요한 정보가 있는지', () => {
+  it('작업을 끝낼 때 필요한 입력 정보를 포함한다', () => {
     expect(GENERATION_JOB_COLUMNS).toContain('input_snapshot')
   })
 
-  it('finalize 가 읽는 target 을 포함한다', () => {
+  it('작업 대상을 확인하는 정보를 포함한다', () => {
     expect(GENERATION_JOB_COLUMNS).toContain('target')
   })
 })
 
-describe('character_view 작업 슬롯 계약', () => {
-  it('작업 target은 appearanceKey를 보존한다', () => {
+describe('인물 모습 작업 칸의 약속', () => {
+  it('인물의 모습 선택을 작업 칸에 보존한다', () => {
     expect(generationJobs).toContain('appearanceKey?: string')
   })
 
-  it('대기와 실패 슬롯은 characterId, appearanceKey, view를 모두 구분한다', () => {
+  it('대기 중이거나 실패한 작업은 인물과 모습과 방향별로 서로 구분한다', () => {
     expect(generationJobs).toContain('t.appearanceKey === appearanceKey')
     expect(generationJobs).toContain('`${t.characterId}\\u0000${t.appearanceKey}\\u0000${t.view}`')
   })

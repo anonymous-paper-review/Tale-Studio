@@ -1,8 +1,9 @@
+// 대화 요청의 길이와 사용량은 기록하되 실제 대화 내용은 남기지 않는다.
 import { describe, expect, it } from 'vitest'
 import { buildChatTrace, totalInputTokens } from '@/lib/chat-trace'
 
-describe('chat trace', () => {
-  it('keeps request shape separate from provider usage', () => {
+describe('대화 기록', () => {
+  it('대화 요청을 기록할 때 본문은 저장하지 않고 길이와 사용량만 남긴다', () => {
     const trace = buildChatTrace({
       traceId: 'trace-1',
       stage: 'director',
@@ -39,7 +40,7 @@ describe('chat trace', () => {
     expect(JSON.stringify(trace)).not.toContain('vertical +2')
   })
 
-  it('provides safe zero usage when a mocked LLM does not report metadata', () => {
+  it('사용량 정보가 없으면 기본값으로 안전하게 기록하고 대기 중 제안은 비워 둔다', () => {
     const trace = buildChatTrace({
       traceId: 'trace-2',
       stage: 'producer',

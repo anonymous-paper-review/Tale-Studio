@@ -1,3 +1,4 @@
+// 대화 기록은 로그인한 사용자의 프로젝트에서만 안전하게 저장하고 다시 읽는다.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -37,8 +38,8 @@ beforeEach(() => {
   mocks.upsertChatTrace.mockResolvedValue(undefined)
 })
 
-describe('chat trace API', () => {
-  it('requires authentication and project ownership', async () => {
+describe('대화 기록 서버 요청', () => {
+  it('로그인하지 않았거나 다른 사람 프로젝트를 요청하면 접근을 막는다', async () => {
     mocks.getUser.mockResolvedValue(null)
     const unauthenticated = await GET(request('GET', undefined, '?projectId=p-1'))
     if (!unauthenticated) throw new Error('expected a response')
@@ -51,7 +52,7 @@ describe('chat trace API', () => {
     expect(forbidden.status).toBe(403)
   })
 
-  it('upserts a trace while ignoring fields outside the safe receipt', async () => {
+  it('허용된 대화 기록만 저장하고 나머지 요청 내용은 무시한다', async () => {
     const response = await POST(
       request('POST', {
         projectId: 'p-1',
@@ -74,7 +75,7 @@ describe('chat trace API', () => {
     }))
   })
 
-  it('whitelists patches and returns the persisted trace', async () => {
+  it('대화 기록을 읽고 허용된 변경만 저장해 돌려준다', async () => {
     const trace = { traceId: TRACE_ID, stage: 'artist' }
     mocks.getChatTrace.mockResolvedValue(trace)
     const loaded = await GET(request('GET', undefined, `?projectId=p-1&traceId=${TRACE_ID}`))

@@ -1,3 +1,4 @@
+// 로그인한 사람이나 허가받은 공유 링크만 프로젝트를 열 수 있게 한다 (2026-08-11 보안 감사)
 // requireProjectAccess — 프로젝트 종속 API 라우트의 접근 가드 (2026-08-11 보안 감사).
 //
 // 감사 배경: middleware matcher 가 `api/` 를 제외해 API 는 미들웨어 인증을 안 받는다.
@@ -131,7 +132,7 @@ beforeEach(() => {
 })
 
 describe('requireProjectAccess', () => {
-  it('비로그인은 401 — 감사 이전엔 이게 200 이었다', async () => {
+  it('로그인하지 않은 사람은 프로젝트에 접근할 수 없다고 알린다', async () => {
     mocks.getUser.mockResolvedValue(null)
 
     const result = await requireProjectAccess(req(), PROJECT)
@@ -141,7 +142,7 @@ describe('requireProjectAccess', () => {
     expect(result.response.status).toBe(401)
   })
 
-  it('소유자는 통과하고 검증된 projectId 를 돌려준다', async () => {
+  it('소유자에게는 요청한 프로젝트를 열어 준다', async () => {
     mocks.getUser.mockResolvedValue({ id: OWNER })
 
     const result = await requireProjectAccess(req(), PROJECT)
@@ -152,7 +153,7 @@ describe('requireProjectAccess', () => {
     expect(result.viaShare).toBe(false)
   })
 
-  it('로그인했지만 남의 프로젝트면 403 (IDOR 차단)', async () => {
+  it('다른 사람의 프로젝트에는 접근하지 못하게 한다', async () => {
     mocks.getUser.mockResolvedValue({ id: STRANGER })
 
     const result = await requireProjectAccess(req(), PROJECT)
@@ -162,7 +163,7 @@ describe('requireProjectAccess', () => {
     expect(result.response.status).toBe(403)
   })
 
-  it('워크스페이스가 하나도 없는 유저도 403', async () => {
+  it('작업 공간이 없는 사람도 프로젝트에 접근하지 못하게 한다', async () => {
     mocks.getUser.mockResolvedValue({ id: STRANGER })
     mocks.db.workspaces = []
 
@@ -173,7 +174,7 @@ describe('requireProjectAccess', () => {
     expect(result.response.status).toBe(403)
   })
 
-  it('형태가 틀린 projectId 는 400 (DB 조회 전에 끊는다)', async () => {
+  it('잘못된 프로젝트 주소는 조회하지 않고 요청을 거부한다', async () => {
     mocks.getUser.mockResolvedValue({ id: OWNER })
 
     const result = await requireProjectAccess(req(), '../../etc/passwd')
@@ -184,7 +185,7 @@ describe('requireProjectAccess', () => {
     expect(mocks.from).not.toHaveBeenCalled()
   })
 
-  it('projectId 가 없으면 400', async () => {
+  it('프로젝트 주소가 없으면 요청을 거부한다', async () => {
     mocks.getUser.mockResolvedValue({ id: OWNER })
 
     const result = await requireProjectAccess(req(), undefined)
@@ -194,7 +195,7 @@ describe('requireProjectAccess', () => {
     expect(result.response.status).toBe(400)
   })
 
-  describe('공유 티켓 (allowShare)', () => {
+  describe('공유 링크로 프로젝트를 여는 경우', () => {
     beforeEach(() => {
       mocks.getUser.mockResolvedValue(null)
       mocks.db.shares = [
@@ -202,7 +203,7 @@ describe('requireProjectAccess', () => {
       ]
     })
 
-    it('allowShare 없이는 유효한 티켓이어도 401 — 쓰기 라우트 보호', async () => {
+    it('공유 링크를 허용하지 않으면 로그인하지 않은 사람은 접근하지 못한다', async () => {
       const result = await requireProjectAccess(req(), PROJECT, {
         allowShare: false,
       })
@@ -212,7 +213,7 @@ describe('requireProjectAccess', () => {
       expect(result.response.status).toBe(401)
     })
 
-    it('쿠키의 유효한 티켓은 통과(viaShare)', async () => {
+    it('유효한 공유 링크를 사용하면 로그인하지 않아도 프로젝트를 연다', async () => {
       const result = await requireProjectAccess(
         req(undefined, { cookie: `demo_share=${TOKEN}` }),
         PROJECT,
@@ -225,7 +226,7 @@ describe('requireProjectAccess', () => {
       expect(result.userId).toBeNull()
     })
 
-    it('?share= 쿼리의 유효한 티켓도 통과 (쿠키 차단 브라우저 경로)', async () => {
+    it('주소에 붙인 유효한 공유 링크도 프로젝트를 연다', async () => {
       const result = await requireProjectAccess(
         req(`http://localhost/api/writer/preview/${PROJECT}?share=${TOKEN}`),
         PROJECT,
@@ -235,7 +236,7 @@ describe('requireProjectAccess', () => {
       expect(result.ok).toBe(true)
     })
 
-    it('revoke 된 티켓은 거부', async () => {
+    it('취소된 공유 링크는 사용할 수 없다', async () => {
       mocks.db.shares[0].revoked_at = '2026-08-01T00:00:00.000Z'
 
       const result = await requireProjectAccess(
@@ -247,7 +248,7 @@ describe('requireProjectAccess', () => {
       expect(result.ok).toBe(false)
     })
 
-    it('만료된 티켓은 거부', async () => {
+    it('기한이 지난 공유 링크는 사용할 수 없다', async () => {
       mocks.db.shares[0].expires_at = '2020-01-01T00:00:00.000Z'
 
       const result = await requireProjectAccess(
@@ -259,7 +260,7 @@ describe('requireProjectAccess', () => {
       expect(result.ok).toBe(false)
     })
 
-    it('다른 프로젝트의 티켓으로는 이 프로젝트를 못 연다', async () => {
+    it('다른 프로젝트의 공유 링크로는 이 프로젝트를 열 수 없다', async () => {
       const result = await requireProjectAccess(
         req(
           `http://localhost/api/writer/preview/${OTHER_PROJECT}?share=${TOKEN}`,
@@ -271,7 +272,7 @@ describe('requireProjectAccess', () => {
       expect(result.ok).toBe(false)
     })
 
-    it('형태가 틀린 티켓은 DB 조회조차 하지 않는다', async () => {
+    it('형식이 잘못된 공유 링크는 확인하지 않고 바로 거부한다', async () => {
       const result = await requireProjectAccess(
         req(undefined, { cookie: 'demo_share=not-a-token' }),
         PROJECT,
@@ -290,12 +291,12 @@ describe('requireProjectAccess', () => {
 //   배치했는가"만 확인한다. PROJECT 소유자는 OWNER, STRANGER 는 워크스페이스가 없어
 //   ownsProject 가 즉시 false → 403(비로그인은 401). 다운스트림(fal/DB 조작)이 실행되지
 //   않았다는 것도 mocks.from 호출 테이블로 교차 확인한다.
-describe('라우트 소유권 가드 — 비소유자는 401/403', () => {
+describe('프로젝트를 소유하지 않은 사람의 접근 차단', () => {
   beforeEach(() => {
     mocks.getUser.mockResolvedValue({ id: STRANGER })
   })
 
-  it('POST /api/artist/generate-sheet — 403', async () => {
+  it('다른 사람의 인물 그림을 만들 수 없다', async () => {
     const res = await generateSheetPOST(
       postReq('/api/artist/generate-sheet', {
         projectId: PROJECT,
@@ -307,7 +308,7 @@ describe('라우트 소유권 가드 — 비소유자는 401/403', () => {
     expect(res.status).toBe(403)
   })
 
-  it('POST /api/artist/generate-world — 403', async () => {
+  it('다른 사람의 배경 그림을 만들 수 없다', async () => {
     const res = await generateWorldPOST(
       postReq('/api/artist/generate-world', {
         projectId: PROJECT,
@@ -319,7 +320,7 @@ describe('라우트 소유권 가드 — 비소유자는 401/403', () => {
     expect(res.status).toBe(403)
   })
 
-  it('POST /api/artist/character — 403 before any character or prop write', async () => {
+  it('다른 사람의 인물 정보를 저장하거나 바꾸지 않는다', async () => {
     const res = await artistCharacterPOST(
       postReq('/api/artist/character', {
         projectId: PROJECT,
@@ -333,7 +334,7 @@ describe('라우트 소유권 가드 — 비소유자는 401/403', () => {
     expect(mocks.from).not.toHaveBeenCalledWith('props')
   })
 
-  it('PATCH /api/artist/character — 403 before entity lookup or write', async () => {
+  it('다른 사람의 인물 정보를 찾거나 바꾸지 않는다', async () => {
     const res = await artistCharacterPATCH(
       patchReq('/api/artist/character', {
         projectId: PROJECT,
@@ -346,7 +347,7 @@ describe('라우트 소유권 가드 — 비소유자는 401/403', () => {
     expect(mocks.from).not.toHaveBeenCalledWith('props')
   })
 
-  it('POST /api/artist/appearance — 403 before canonical appearance or prop write', async () => {
+  it('다른 사람의 인물 모습을 저장하거나 바꾸지 않는다', async () => {
     const res = await artistAppearancePOST(
       postReq('/api/artist/appearance', {
         projectId: PROJECT,
@@ -359,14 +360,14 @@ describe('라우트 소유권 가드 — 비소유자는 401/403', () => {
     expect(mocks.from).not.toHaveBeenCalledWith('props')
   })
 
-  it('POST /api/writer/rough-storyboard — 403', async () => {
+  it('다른 사람의 스토리보드 초안을 만들 수 없다', async () => {
     const res = await roughStoryboardPOST(
       postReq('/api/writer/rough-storyboard', { projectId: ROUTE_PROJECT_ID }),
     )
     expect(res.status).toBe(403)
   })
 
-  it('POST /api/director/generate-storyboard — 403', async () => {
+  it('다른 사람의 스토리보드를 만들 수 없다', async () => {
     const res = await generateStoryboardPOST(
       postReq('/api/director/generate-storyboard', {
         projectId: PROJECT,
@@ -377,14 +378,14 @@ describe('라우트 소유권 가드 — 비소유자는 401/403', () => {
     expect(res.status).toBe(403)
   })
 
-  it('POST /api/director/generate-storyboard-batch — 403', async () => {
+  it('다른 사람의 스토리보드를 한꺼번에 만들 수 없다', async () => {
     const res = await generateStoryboardBatchPOST(
       postReq('/api/director/generate-storyboard-batch', { projectId: PROJECT }) as never,
     )
     expect(res.status).toBe(403)
   })
 
-  it('POST /api/director/generate-previz-video — 403', async () => {
+  it('다른 사람의 미리보기 영상을 만들 수 없다', async () => {
     const res = await generatePrevizVideoPOST(
       postReq('/api/director/generate-previz-video', {
         projectId: ROUTE_PROJECT_ID,
@@ -394,12 +395,12 @@ describe('라우트 소유권 가드 — 비소유자는 401/403', () => {
     expect(res.status).toBe(403)
   })
 
-  it('GET /api/editor/state — 403', async () => {
+  it('다른 사람의 편집 상태를 볼 수 없다', async () => {
     const res = await editorStateGET(req(`http://localhost/api/editor/state?projectId=${PROJECT}`))
     expect(res.status).toBe(403)
   })
 
-  it('PUT /api/editor/state — 403', async () => {
+  it('다른 사람의 편집 상태를 바꿀 수 없다', async () => {
     const res = await editorStatePUT(
       postReq('/api/editor/state', { projectId: PROJECT, state: { evil: true } }),
     )
@@ -408,7 +409,7 @@ describe('라우트 소유권 가드 — 비소유자는 401/403', () => {
     expect(mocks.from).not.toHaveBeenCalledWith('editor_states')
   })
 
-  it('PATCH /api/editor/speed — 403', async () => {
+  it('다른 사람 영상의 재생 속도를 바꿀 수 없다', async () => {
     const res = await editorSpeedPATCH(
       patchReq('/api/editor/speed', { projectId: PROJECT, shotId: 'sh_01_01', speed: 1.5 }),
     )
@@ -416,7 +417,7 @@ describe('라우트 소유권 가드 — 비소유자는 401/403', () => {
     expect(mocks.from).not.toHaveBeenCalledWith('shots')
   })
 
-  it('POST /api/writer/scene-gate — 403 (revise 의 scenes/storyCheck 삭제 전에 끊긴다)', async () => {
+  it('다른 사람 이야기의 장면을 고칠 수 없다', async () => {
     const res = await sceneGatePOST(
       postReq('/api/writer/scene-gate', {
         projectId: PROJECT,
@@ -429,19 +430,19 @@ describe('라우트 소유권 가드 — 비소유자는 401/403', () => {
     expect(mocks.from).not.toHaveBeenCalledWith('writer_runs')
   })
 
-  it('POST /api/writer/dialogue — 403', async () => {
+  it('다른 사람 이야기의 대사를 만들 수 없다', async () => {
     const res = await dialoguePOST(postReq('/api/writer/dialogue', { projectId: ROUTE_PROJECT_ID }))
     expect(res.status).toBe(403)
   })
 
-  it('POST /api/writer/shot-configs — 403', async () => {
+  it('다른 사람 이야기의 촬영 구성을 만들 수 없다', async () => {
     const res = await shotConfigsPOST(
       postReq('/api/writer/shot-configs', { projectId: ROUTE_PROJECT_ID }),
     )
     expect(res.status).toBe(403)
   })
 
-  it('비로그인은 401 (예: scene-gate)', async () => {
+  it('로그인하지 않은 사람은 이야기 장면을 바꿀 수 없다', async () => {
     mocks.getUser.mockResolvedValue(null)
     const res = await sceneGatePOST(
       postReq('/api/writer/scene-gate', { projectId: PROJECT, action: 'confirm' }) as never,

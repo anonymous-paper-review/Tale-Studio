@@ -1,3 +1,4 @@
+// 제안이 겹쳐도 필요한 안내가 사라지지 않고 다시 나타나도록 보장한다 (#handoff-suggestion-drop 2026-08-07, #handoff-starved 2026-08-11, #fix-scene-gate-suggestion-resurface 2026-08-25)
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useGlobalChatStore, type ChatSuggestion } from '@/stores/global-chat-store'
 
@@ -34,8 +35,8 @@ beforeEach(() => {
   useGlobalChatStore.getState().reset()
 })
 
-describe('suggestion dismiss 의미론', () => {
-  it('다른 제안(선택지)이 떠 있으면 핸드오프 제안은 무시된다 — 슬롯이 비면 재시도로 성공', () => {
+describe('제안을 닫고 다시 띄우는 규칙', () => {
+  it('다른 선택지가 떠 있으면 다음 단계 안내를 보류하고, 자리가 비면 다시 안내한다', () => {
     const s = useGlobalChatStore.getState()
     s.offerSuggestion(choicesSuggestion)
     s.offerSuggestion(handoffSuggestion) // 충돌 — 조용히 무시 (기존 버그: 여기서 원샷 ref 소모)
@@ -47,7 +48,7 @@ describe('suggestion dismiss 의미론', () => {
     expect(useGlobalChatStore.getState().suggestion?.id).toBe('handoff:producer:p1')
   })
 
-  it('implicit dismiss(유저가 다른 말) 후에는 같은 id 가 다시 뜰 수 있다', () => {
+  it('사용자가 다른 말을 해 안내가 닫히면 같은 안내를 다시 띄울 수 있다', () => {
     const s = useGlobalChatStore.getState()
     s.offerSuggestion(handoffSuggestion)
     useGlobalChatStore.getState().dismissSuggestion({ implicit: true })
@@ -58,7 +59,7 @@ describe('suggestion dismiss 의미론', () => {
     expect(useGlobalChatStore.getState().suggestion?.id).toBe('handoff:producer:p1')
   })
 
-  it('explicit dismiss("나중에") 후에는 같은 id 재발사가 막힌다', () => {
+  it('사용자가 "나중에"를 누르면 같은 안내를 다시 띄우지 않는다', () => {
     const s = useGlobalChatStore.getState()
     s.offerSuggestion(handoffSuggestion)
     useGlobalChatStore.getState().dismissSuggestion()
@@ -74,22 +75,22 @@ describe('suggestion dismiss 의미론', () => {
 //   쓴다. 그래서 게이트가 충족되는 순간에도 슬롯이 늘 차 있어 "Writer 호출하기"가 못 떴다.
 //   처방: 명시적 선점(preempt)만 기존 제안을 밀어낸다.
 
-describe('선점(preempt)', () => {
-  it('선점 요청이 없으면 기존 제안이 유지된다 (암묵 교체 금지)', () => {
+describe('중요한 안내가 기존 제안을 대신하는 규칙', () => {
+  it('더 중요한 안내를 요청하지 않으면 기존 안내를 그대로 유지한다', () => {
     const s = useGlobalChatStore.getState()
     s.offerSuggestion(choicesSuggestion)
     s.offerSuggestion(handoffSuggestion)
     expect(useGlobalChatStore.getState().suggestion?.id).toBe('choices:abc')
   })
 
-  it('선점 요청이 있으면 떠 있는 선택지를 밀어낸다', () => {
+  it('더 중요한 안내를 요청하면 떠 있는 선택지를 내리고 새 안내를 보여준다', () => {
     const s = useGlobalChatStore.getState()
     s.offerSuggestion(choicesSuggestion)
     s.offerSuggestion(handoffSuggestion, { preempt: true })
     expect(useGlobalChatStore.getState().suggestion?.id).toBe('handoff:producer:p1')
   })
 
-  it('내릴 수 없는 제안(웰컴 등)은 선점해도 밀리지 않는다', () => {
+  it('닫을 수 없는 안내(첫 인사 등)는 새 안내가 와도 유지한다', () => {
     const s = useGlobalChatStore.getState()
     s.offerSuggestion({
       id: 'producer-welcome:p1',
@@ -102,7 +103,7 @@ describe('선점(preempt)', () => {
     expect(useGlobalChatStore.getState().suggestion?.id).toBe('producer-welcome:p1')
   })
 
-  it('이미 그 제안이 떠 있으면 선점해도 그대로 (반복 호출이 상태를 흔들지 않는다)', () => {
+  it('같은 안내가 이미 떠 있으면 다시 요청해도 그대로 둔다', () => {
     const s = useGlobalChatStore.getState()
     s.offerSuggestion(handoffSuggestion, { preempt: true })
     const before = useGlobalChatStore.getState().suggestion
@@ -110,7 +111,7 @@ describe('선점(preempt)', () => {
     expect(useGlobalChatStore.getState().suggestion).toBe(before)
   })
 
-  it('명시적으로 거절한 제안은 선점으로도 되살아나지 않는다', () => {
+  it('사용자가 거절한 안내는 새 안내 요청이 와도 다시 띄우지 않는다', () => {
     const s = useGlobalChatStore.getState()
     s.offerSuggestion(handoffSuggestion)
     useGlobalChatStore.getState().dismissSuggestion()
@@ -123,8 +124,8 @@ describe('선점(preempt)', () => {
 // #fix-scene-gate-suggestion-resurface (2026-08-25) — 씬 확정 게이트는 blocking 제안이라
 //   닫힘/선점으로 사라지면 안 되고, 어떤 경로로 사라져도 서버가 awaiting 인 한 되살아나야 한다.
 //   핵심 계약: dismissible:false 제안은 dismissedSuggestionIds 래치에 갇히지 않는다.
-describe('blocking 게이트 재등록 (dismissible:false)', () => {
-  it('명시적 dismiss(확정 실패·수정 피드백) 후에도 blocking 게이트는 다시 뜬다', () => {
+describe('반드시 확인해야 하는 안내를 다시 띄우는 규칙', () => {
+  it('확정하지 못해 안내를 닫아도 반드시 확인할 안내를 다시 띄운다', () => {
     const s = useGlobalChatStore.getState()
     s.offerSuggestion(sceneGate, { preempt: true })
     expect(useGlobalChatStore.getState().suggestion?.id).toBe('scene-gate:p1')
@@ -136,7 +137,7 @@ describe('blocking 게이트 재등록 (dismissible:false)', () => {
     expect(useGlobalChatStore.getState().suggestion?.id).toBe('scene-gate:p1')
   })
 
-  it('일반(dismissible 미지정) 제안은 여전히 명시적 dismiss 후 재발사가 막힌다 (래치 회귀 방지)', () => {
+  it('일반 안내는 사용자가 "나중에" 미루면 다시 띄우지 않는다', () => {
     const s = useGlobalChatStore.getState()
     s.offerSuggestion(handoffSuggestion)
     useGlobalChatStore.getState().dismissSuggestion()
@@ -144,14 +145,14 @@ describe('blocking 게이트 재등록 (dismissible:false)', () => {
     expect(useGlobalChatStore.getState().suggestion).toBeNull()
   })
 
-  it('떠 있는 blocking 게이트는 다른 제안이 선점(preempt)으로도 못 밀어난다', () => {
+  it('반드시 확인할 안내가 떠 있으면 다른 안내가 대신할 수 없다', () => {
     const s = useGlobalChatStore.getState()
     s.offerSuggestion(sceneGate, { preempt: true })
     s.offerSuggestion(handoffSuggestion, { preempt: true })
     expect(useGlobalChatStore.getState().suggestion?.id).toBe('scene-gate:p1')
   })
 
-  it('폴링 self-heal(반복 재등록)은 떠 있는 게이트를 흔들지 않는다', () => {
+  it('반복해서 확인해도 이미 떠 있는 확인 안내를 바꾸지 않는다', () => {
     const s = useGlobalChatStore.getState()
     s.offerSuggestion(sceneGate, { preempt: true })
     const before = useGlobalChatStore.getState().suggestion

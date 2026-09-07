@@ -1,3 +1,4 @@
+// 로그인한 사람이 작업 공간 한도와 참고 작품 규칙을 지키며 새 프로젝트를 만든다
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
@@ -77,8 +78,8 @@ beforeEach(() => {
   })
 })
 
-describe('POST /api/project/new — v4 slot and reference contract', () => {
-  it('rejects unauthenticated callers before reading workspace state', async () => {
+describe('새 프로젝트를 만들 때 작업 공간 한도와 참고 작품 규칙을 지킨다 (v4)', () => {
+  it('로그인하지 않은 사용자는 작업 공간을 확인하기 전에 거절한다', async () => {
     mocks.getUser.mockResolvedValue({ data: { user: null } })
 
     const response = await POST(request({ title: 'Private project' }))
@@ -88,7 +89,7 @@ describe('POST /api/project/new — v4 slot and reference contract', () => {
     expect(mocks.rpc).not.toHaveBeenCalled()
   })
 
-  it('fails closed when the slot RPC fails', async () => {
+  it('작업 공간 한도 확인에 실패하면 프로젝트를 만들지 않는다', async () => {
     mocks.rpcError = { message: 'count unavailable' }
 
     const response = await POST(request({ title: 'New project' }))
@@ -99,7 +100,7 @@ describe('POST /api/project/new — v4 slot and reference contract', () => {
     expect(mocks.inserted).toBeNull()
   })
 
-  it('blocks a free workspace at its one-project limit', async () => {
+  it('무료 작업 공간이 한 개 한도에 도달하면 두 번째 프로젝트를 막는다', async () => {
     mocks.rpcResult = { status: 'slot_limit', count: 1 }
 
     const response = await POST(request({ title: 'Second project' }))
@@ -114,7 +115,7 @@ describe('POST /api/project/new — v4 slot and reference contract', () => {
     expect(mocks.inserted).toBeNull()
   })
 
-  it('fails closed on an unexpected RPC status without leaking a project', async () => {
+  it('알 수 없는 결과가 오면 프로젝트를 만들지 않고 오류를 알린다', async () => {
     mocks.rpcResult = { status: 'workspace_not_found' }
 
     const response = await POST(request({ title: 'Orphan project' }))
@@ -125,7 +126,7 @@ describe('POST /api/project/new — v4 slot and reference contract', () => {
     expect(mocks.inserted).toBeNull()
   })
 
-  it('routes reference selection through the server helper for an open plan', async () => {
+  it('참고 작품을 고를 수 있는 요금제에서는 선택한 작품을 새 프로젝트에 연결한다', async () => {
     mocks.workspace.plan = 'p10'
 
     const response = await POST(
@@ -156,7 +157,7 @@ describe('POST /api/project/new — v4 slot and reference contract', () => {
     )
   })
 
-  it('keeps the old body-less call working with the Untitled title', async () => {
+  it('내용 없이 요청해도 Untitled 프로젝트를 만든다', async () => {
     const response = await POST(request(undefined))
 
     expect(response.status).toBe(200)
@@ -165,14 +166,14 @@ describe('POST /api/project/new — v4 slot and reference contract', () => {
 
   // #chat-locale-follow 2026-08-31: 계정에 언어 설정이 없는 en 은 폴백이지 선택이 아니다 —
   //   잠그면 한국어 사용자의 채팅이 영어로 고착된다(실사고). 발화 추종·스토리 감지가 후정하게 연다.
-  it('locks the locale only when the account actually stored one', async () => {
+  it('계정에 언어 설정이 없으면 기본 언어를 고정하지 않는다', async () => {
     const response = await POST(request({ title: 'Defaulted' }))
 
     expect(response.status).toBe(200)
     expect(mocks.inserted).toMatchObject({ locale: 'en', locale_locked: false })
   })
 
-  it('locks the locale when user_metadata carries a real setting', async () => {
+  it('계정에 저장된 언어가 있으면 그 언어로 프로젝트를 고정한다', async () => {
     mocks.getUser.mockResolvedValue({
       data: { user: { id: 'user-1', user_metadata: { locale: 'ko' } } },
     })

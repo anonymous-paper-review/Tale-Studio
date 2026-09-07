@@ -1,3 +1,4 @@
+// 오래 멈춘 작업을 다시 확인해 끝난 작업은 회수하고, 영구 실패는 실패로 알린다 (#ghost-reconcile 2026-08-17, S2·S3·S5·M5·M11)
 // #ghost-reconcile (2026-08-17) 회귀 가드 — 리뷰 반영 개정판 (S2·S3·S5·M5·M11).
 //
 // STALE_QUEUED_MS 를 넘긴 queued 잡(유령)은 active 목록에서 숨겨지기만 했고, 제출 탭의
@@ -111,7 +112,7 @@ beforeEach(() => {
 })
 
 describe('reconcileGhostQueuedJobs', () => {
-  it('완료된 유령 잡을 finalize 로 회수하고, 스윕 쿼리 인자가 계약대로다 (S5)', async () => {
+  it('끝난 유령 작업을 회수하고, 다시 확인하는 조건이 약속과 같다 (S5)', async () => {
     const recorded = installGenerationJobsStub({
       ghostIds: ['job-1'],
       rowsById: { 'job-1': ghostRow('job-1') },
@@ -134,7 +135,7 @@ describe('reconcileGhostQueuedJobs', () => {
     expect(list.limit).toEqual([5])
   })
 
-  it('목록 조회 후 남이 먼저 종결한 잡은 재조회에서 건너뛴다 (M11)', async () => {
+  it('목록에서 찾은 뒤 이미 끝난 작업은 다시 확인해 건너뛴다 (M11)', async () => {
     installGenerationJobsStub({
       ghostIds: ['job-1'],
       rowsById: { 'job-1': ghostRow('job-1', { status: 'completed' }) },
@@ -147,7 +148,7 @@ describe('reconcileGhostQueuedJobs', () => {
     expect(mocks.finalizeGenerationJob).not.toHaveBeenCalled()
   })
 
-  it('아직 진행 중(IN_PROGRESS)인 잡은 건드리지 않는다', async () => {
+  it('아직 처리 중인 작업은 건드리지 않는다', async () => {
     installGenerationJobsStub({
       ghostIds: ['job-1'],
       rowsById: { 'job-1': ghostRow('job-1') },
@@ -160,7 +161,7 @@ describe('reconcileGhostQueuedJobs', () => {
     expect(mocks.finalizeGenerationJob).not.toHaveBeenCalled()
   })
 
-  it('404(영구 조회 실패)는 failed 로 종결한다 — 실제 update 체인 경유 (M5)', async () => {
+  it('영구적으로 확인할 수 없는 유령 작업은 실패로 끝낸다 (M5)', async () => {
     const recorded = installGenerationJobsStub({
       ghostIds: ['job-1'],
       rowsById: { 'job-1': ghostRow('job-1') },
@@ -176,7 +177,7 @@ describe('reconcileGhostQueuedJobs', () => {
     expect((recorded.updates[0].payload as { status?: string }).status).toBe('failed')
   })
 
-  it('401/403(자격증명 문제)은 잡을 파괴하지 않고 queued 로 남긴다 (S2)', async () => {
+  it('인증 정보 문제면 작업을 없애지 않고 대기 상태로 남긴다 (S2)', async () => {
     const recorded = installGenerationJobsStub({
       ghostIds: ['job-1'],
       rowsById: { 'job-1': ghostRow('job-1') },
@@ -190,7 +191,7 @@ describe('reconcileGhostQueuedJobs', () => {
     expect(mocks.finalizeGenerationJob).not.toHaveBeenCalled()
   })
 
-  it('같은 프로젝트 연속 호출은 스로틀돼 재조회하지 않는다', async () => {
+  it('같은 프로젝트를 짧은 시간 안에 다시 요청해도 한 번만 확인한다', async () => {
     const recorded = installGenerationJobsStub({ ghostIds: [] })
 
     await reconcileGhostQueuedJobs('project-1')
@@ -200,7 +201,7 @@ describe('reconcileGhostQueuedJobs', () => {
     expect(recorded.listChains).toHaveLength(1)
   })
 
-  it('스윕이 도는 중엔 스로틀 창이 지나도 재진입하지 않는다 (S3)', async () => {
+  it('확인 작업이 진행 중이면 시간이 지나도 같은 프로젝트를 다시 시작하지 않는다 (S3)', async () => {
     vi.useFakeTimers()
     try {
       const recorded = installGenerationJobsStub({
@@ -228,7 +229,7 @@ describe('reconcileGhostQueuedJobs', () => {
     }
   })
 
-  it('조회 실패는 삼키고 0 을 돌려준다 (목록 조회를 막지 않는다)', async () => {
+  it('목록을 확인하지 못해도 다른 작업을 막지 않고 0건으로 끝낸다', async () => {
     installGenerationJobsStub({ listError: { message: 'db down' } })
 
     await expect(reconcileGhostQueuedJobs('project-1')).resolves.toBe(0)

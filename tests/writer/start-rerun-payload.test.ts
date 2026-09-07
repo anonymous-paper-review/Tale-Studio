@@ -1,3 +1,4 @@
+// 지난 작업의 장면·쇼트·대화·Producer 결정을 다시 사용해 이어서 작업한다
 import { expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/supabase/auth', () => ({ getUser: vi.fn() }))
@@ -17,7 +18,7 @@ vi.mock('@/lib/style-anchor', () => ({ parseCustomStyleAnchor: vi.fn(() => null)
 
 import { buildRerunContext } from '@/app/api/writer/start/route'
 
-it('builds rerun input from scenes, shots, chat, and producer decisions', () => {
+it('장면·쇼트·대화·Producer 결정을 넣으면 다시 시작할 내용으로 모은다', () => {
   const context = buildRerunContext(
     'run-previous',
     [

@@ -1,3 +1,4 @@
+// 같은 생성 요청이 겹쳐도 저장된 결과를 잃지 않고 성공 여부를 정확히 보여준다 (#dup-finalize-null-url 2026-07-31)
 // #dup-finalize-null-url (2026-07-31) 회귀 가드.
 //
 // webhook 과 폴링(GET /api/generation-jobs/[id])이 같은 잡을 동시에 finalize 하면 CAS 패자가
@@ -62,7 +63,7 @@ const QUEUED_SNAPSHOT = {
 
 const WINNER_URL = 'https://cdn.example/media/shot_1_storyboard_start.png?v=1785489691388'
 
-describe('reconcileJobFromFal — 중복 finalize 경쟁', () => {
+describe('reconcileJobFromFal — 같은 요청이 겹친 경우', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     mocks.falImageFetch.mockResolvedValue({
@@ -72,7 +73,7 @@ describe('reconcileJobFromFal — 중복 finalize 경쟁', () => {
     })
   })
 
-  it('경쟁에 져도 DB 의 result_url 을 돌려준다 (queued 스냅샷의 null 을 흘리지 않음)', async () => {
+  it('같은 생성이 겹쳐도 저장된 결과 주소를 되돌려준다', async () => {
     mocks.finalizeGenerationJob.mockRejectedValue(
       new GenerationJobTerminalTransitionError('job-1', 'completed'),
     )
@@ -87,7 +88,7 @@ describe('reconcileJobFromFal — 중복 finalize 경쟁', () => {
     expect(out.result_url).toBe(WINNER_URL)
   })
 
-  it('승자가 실패로 종결했으면 실패를 그대로 보고한다', async () => {
+  it('먼저 끝난 생성이 실패하면 그 실패를 그대로 알려준다', async () => {
     mocks.finalizeGenerationJob.mockRejectedValue(
       new GenerationJobTerminalTransitionError('job-1', 'failed'),
     )
@@ -101,7 +102,7 @@ describe('reconcileJobFromFal — 중복 finalize 경쟁', () => {
     expect(out.error).toBe('content policy')
   })
 
-  it('경쟁이 없으면 finalize 결과 URL 을 그대로 쓴다', async () => {
+  it('겹치는 요청이 없으면 생성 결과 주소를 그대로 사용한다', async () => {
     mocks.finalizeGenerationJob.mockResolvedValue(WINNER_URL)
 
     const out = await reconcileJobFromFal(QUEUED_SNAPSHOT)

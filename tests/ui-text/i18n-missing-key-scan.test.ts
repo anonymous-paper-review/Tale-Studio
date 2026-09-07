@@ -1,3 +1,4 @@
+// 한국어 화면에서 번역이 빠져 영어가 보이지 않도록 사전을 확인한다 (2026-08-28)
 import { describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
@@ -146,8 +147,8 @@ function collectCalls(): Map<string, Set<string>> {
   return calls
 }
 
-describe('i18n — 사전 누락 게이트', () => {
-  it('t()/translate() 로 부르는 정적 키가 한국어 사전에 전부 있다', () => {
+describe('한국어 번역 사전의 누락 점검', () => {
+  it('화면에 표시할 문구가 한국어 번역 사전에 모두 등록되어 있다', () => {
     const missing: string[] = []
     for (const [key, files] of collectCalls()) {
       if (key in KO || INTENTIONAL_ENGLISH.has(key)) continue
@@ -162,24 +163,24 @@ describe('i18n — 사전 누락 게이트', () => {
     ).toEqual([])
   })
 
-  it('스캐너가 실제로 키를 찾아낸다 (빈 결과로 통과하는 것 방지)', () => {
+  it('화면 문구를 실제로 찾아내며, 찾지 못한 채 통과하지 않는다', () => {
     // 스캐너가 고장나 0건을 수집하면 위 시험이 언제나 통과한다 — 그 사각지대를 막는다.
     expect(collectCalls().size).toBeGreaterThan(300)
   })
 
-  it('이어붙인 문자열도 한 키로 합쳐 본다', () => {
+  it('나뉘어 적은 문구도 하나의 번역 문구로 합쳐 확인한다', () => {
     expect(staticKey("'Scene and shot work is done.\\n\\n' + '· Edit here'")).toBe(
       'Scene and shot work is done.\n\n· Edit here',
     )
   })
 
-  it('정적 문자열 상수도 실제 키로 해석한다', () => {
+  it('미리 정한 문구도 번역 대상으로 확인한다', () => {
     const constants = staticConstants("const NAME = 'Scene ' +\n  'name'")
 
     expect(keyFromArg('NAME', constants)).toBe('Scene name')
   })
 
-  it('변수가 섞인 동적 키는 판정하지 않는다', () => {
+  it('내용이 중간에 달라지는 문구는 자동으로 판정하지 않는다', () => {
     expect(staticKey("someVar")).toBeNull()
     expect(staticKey("'prefix' + someVar")).toBeNull()
     expect(staticConstants("const NAME = 'prefix' + someVar").has('NAME')).toBe(false)

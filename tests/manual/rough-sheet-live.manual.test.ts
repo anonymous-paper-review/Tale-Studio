@@ -1,3 +1,4 @@
+// 화면 비율이 다른 러프 시트를 만들면 모든 장면 칸을 같은 크기로 잘라낸다 (실제 AI 호출 1회·fal 과금 1회·운영 DB·저장소에는 쓰지 않고 로컬 결과 파일만 쓴다 #sheet-formats·#geometry-contract·2026-08-18)
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { writeFile, mkdir } from 'node:fs/promises'
@@ -196,9 +197,9 @@ const FIXTURE: Fixture[] = [
   },
 ]
 
-describe.runIf(LIVE)('rough-sheet live — 포맷 시트 실생성 + 프로덕션 크롭 (DB 불요)', () => {
+describe.runIf(LIVE)('화면 비율별 러프 시트를 만들고 장면 칸을 고르게 자른다', () => {
   it(
-    `${FMT} grid4: storage 템플릿 → fal 생성 → cropRoughGridFrames 파싱`,
+    `${FMT} 형식으로 시트를 만들면 장면 칸을 고르게 잘라낸다`,
     async () => {
       loadEnv()
       await mkdir(OUT, { recursive: true })

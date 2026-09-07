@@ -1,3 +1,4 @@
+// 영상 생성에 필요한 Take를 설정에 맞게 처리하고, 잔액 부족과 실패 때 사용량을 정확히 관리한다 (#payments-phase-2 #gen-quota-atomic-gate)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Take hold 서버 래퍼(#payments-phase-2 #gen-quota-atomic-gate) — mode off/admin 스킵,
@@ -22,18 +23,18 @@ afterEach(() => {
 })
 
 describe('takeBillingMode', () => {
-  it('미설정이면 off', () => {
+  it('설정값이 없으면 사용량을 받지 않는다', () => {
     vi.stubEnv('TAKE_BILLING_MODE', '')
     delete process.env.TAKE_BILLING_MODE
     expect(takeBillingMode()).toBe('off')
   })
 
-  it('미지 값도 off로 폴백한다', () => {
+  it('알 수 없는 설정값이면 사용량을 받지 않는다', () => {
     vi.stubEnv('TAKE_BILLING_MODE', 'bogus')
     expect(takeBillingMode()).toBe('off')
   })
 
-  it('shadow/enforce 를 그대로 인식한다', () => {
+  it('기록만 하는 설정과 실제 차감 설정을 구분한다', () => {
     vi.stubEnv('TAKE_BILLING_MODE', 'shadow')
     expect(takeBillingMode()).toBe('shadow')
     vi.stubEnv('TAKE_BILLING_MODE', 'enforce')
@@ -45,14 +46,14 @@ describe('holdTakesForVideoJob', () => {
   // 각 테스트마다 userId 를 달리한다 — admin 판별 캠시(모듈 스코프 Map)가 테스트 간 공유되어
   //   같은 userId 재사용 시 이전 테스트의 admin 판정이 그대로 살아있는 오염을 막는다.
 
-  it('mode=off 는 RPC 를 타지 않고 통과시킨다', async () => {
+  it('사용량을 받지 않는 설정에서는 차감 없이 통과시킨다', async () => {
     delete process.env.TAKE_BILLING_MODE
     const result = await holdTakesForVideoJob({ workspaceId: 'ws-1', userId: 'user-off', jobId: 'job-1', amount: 5, projectId: 'proj-1' })
     expect(result).toEqual({ ok: true, insufficient: false, held: 0, balance: 0, skipped: 'off' })
     expect(mocks.rpc).not.toHaveBeenCalled()
   })
 
-  it('admin 워크스페이스는 RPC 를 타지 않고 통과시킨다', async () => {
+  it('관리자 작업 공간은 사용량을 차감하지 않고 통과시킨다', async () => {
     vi.stubEnv('TAKE_BILLING_MODE', 'enforce')
     mocks.getUserById.mockResolvedValue({ data: { user: { email: 'admin@tale.studio' } }, error: null })
     const result = await holdTakesForVideoJob({ workspaceId: 'ws-1', userId: 'user-admin', jobId: 'job-1', amount: 5, projectId: 'proj-1' })
@@ -60,7 +61,7 @@ describe('holdTakesForVideoJob', () => {
     expect(mocks.rpc).not.toHaveBeenCalled()
   })
 
-  it('shadow 는 enforce=false 로 RPC 를 호출한다', async () => {
+  it('기록만 하는 설정은 잔액이 부족해도 통과시킨다', async () => {
     vi.stubEnv('TAKE_BILLING_MODE', 'shadow')
     mocks.getUserById.mockResolvedValue({ data: { user: { email: 'user@tale.studio' } }, error: null })
     mocks.rpc.mockResolvedValue({ data: { ok: true, balance: -3, held: 5, insufficient: false }, error: null })
@@ -75,7 +76,7 @@ describe('holdTakesForVideoJob', () => {
     expect(mocks.recordWriterObservabilityEvent).not.toHaveBeenCalled()
   })
 
-  it('enforce 는 enforce=true 로 호출하고 insufficient 를 그대로 전파한다', async () => {
+  it('실제로 차감하는 설정에서 잔액이 부족하면 부족 상태를 알린다', async () => {
     vi.stubEnv('TAKE_BILLING_MODE', 'enforce')
     mocks.getUserById.mockResolvedValue({ data: { user: { email: 'user@tale.studio' } }, error: null })
     mocks.rpc.mockResolvedValue({ data: { ok: false, balance: 2, held: 0, insufficient: true }, error: null })
@@ -90,7 +91,7 @@ describe('holdTakesForVideoJob', () => {
   })
 
   // #D(2026-09-02 observability-audit) — 402 거절 순간 generation_submit_rejected_takes 이벤트가 기록된다.
-  it('insufficient 이버트 generation_submit_rejected_takes 이벤트를 기록한다', async () => {
+  it('잔액이 부족하면 생성 거절 기록을 남긴다', async () => {
     vi.stubEnv('TAKE_BILLING_MODE', 'enforce')
     mocks.getUserById.mockResolvedValue({ data: { user: { email: 'user@tale.studio' } }, error: null })
     mocks.rpc.mockResolvedValue({ data: { ok: false, balance: 2, held: 0, insufficient: true }, error: null })
@@ -102,7 +103,7 @@ describe('holdTakesForVideoJob', () => {
     )
   })
 
-  it('RPC 에러를 전파한다', async () => {
+  it('사용량 처리에 실패하면 오류를 알린다', async () => {
     vi.stubEnv('TAKE_BILLING_MODE', 'enforce')
     mocks.getUserById.mockResolvedValue({ data: { user: { email: 'user@tale.studio' } }, error: null })
     mocks.rpc.mockResolvedValue({ data: null, error: { message: 'db down' } })
@@ -111,7 +112,7 @@ describe('holdTakesForVideoJob', () => {
     ).rejects.toMatchObject({ message: 'db down' })
   })
 
-  it('admin 판별 실패는 일반 유저로 취급해 RPC 를 타다', async () => {
+  it('관리자 확인에 실패하면 일반 사용자처럼 사용량을 차감한다', async () => {
     vi.stubEnv('TAKE_BILLING_MODE', 'enforce')
     mocks.getUserById.mockRejectedValue(new Error('auth lookup failed'))
     mocks.rpc.mockResolvedValue({ data: { ok: true, balance: 10, held: 5, insufficient: false }, error: null })
@@ -122,7 +123,7 @@ describe('holdTakesForVideoJob', () => {
 })
 
 describe('releaseTakesForJob', () => {
-  it('mode=off 여도 RPC 를 호출한다(과거 shadow hold 정리)', async () => {
+  it('사용량을 받지 않는 설정이어도 이전에 기록한 사용량은 반환한다', async () => {
     delete process.env.TAKE_BILLING_MODE
     mocks.rpc.mockResolvedValue({ data: 5, error: null })
     const result = await releaseTakesForJob('job-1')
@@ -130,12 +131,12 @@ describe('releaseTakesForJob', () => {
     expect(result).toBe(5)
   })
 
-  it('null 데이터는 0으로 정규화한다', async () => {
+  it('반환량이 없으면 0으로 처리한다', async () => {
     mocks.rpc.mockResolvedValue({ data: null, error: null })
     await expect(releaseTakesForJob('job-1')).resolves.toBe(0)
   })
 
-  it('RPC 에러를 전파한다', async () => {
+  it('사용량 반환에 실패하면 오류를 알린다', async () => {
     mocks.rpc.mockResolvedValue({ data: null, error: { message: 'db down' } })
     await expect(releaseTakesForJob('job-1')).rejects.toMatchObject({ message: 'db down' })
   })

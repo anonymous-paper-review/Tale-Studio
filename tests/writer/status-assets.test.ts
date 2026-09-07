@@ -1,3 +1,4 @@
+// Writer 작업 상태에서 인물·장소 이미지 준비 현황과 멈춘 이유를 보여준다
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NextRequest } from 'next/server'
 
@@ -98,7 +99,7 @@ const PROJECT_ID = 'project-1'
 const FRESH_CREATED_AT = new Date(NOW.getTime() - 1_000).toISOString()
 const STALE_CREATED_AT = new Date(NOW.getTime() - STALE_QUEUED_MS - 1_000).toISOString()
 
-describe('writer status assets block', () => {
+describe('Writer 작업 상태에서 인물·장소 이미지 현황을 보여준다', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     vi.setSystemTime(NOW)
@@ -119,7 +120,7 @@ describe('writer status assets block', () => {
     vi.useRealTimers()
   })
 
-  it('adds opt-in assets with partial producer-character completion', async () => {
+  it('이미지 현황을 요청하면 Producer 인물 일부가 준비된 상태를 보여준다', async () => {
     mocks.db.characters = [
       characterFixture({ character_id: 'producer-ready', view_main: 'https://img/char.png' }),
       characterFixture({ character_id: 'producer-missing', view_main: null }),
@@ -169,7 +170,7 @@ describe('writer status assets block', () => {
       ],
       locations: [locationFixture({ location_id: 'ready-world', wide_shot: 'https://img/world.png' })],
     },
-  ])('marks stalled for R3 dead-end: $name', async ({ runStatus, designTokens, chars, locations }) => {
+  ])('R3에서 더 진행할 수 없으면 멈춘 상태로 표시한다: $name', async ({ runStatus, designTokens, chars, locations }) => {
     mocks.getRunStatusLight.mockResolvedValue(runFixture({ status: runStatus }))
     mocks.db.projects = [projectFixture({ design_tokens: designTokens })]
     mocks.db.characters = chars
@@ -184,7 +185,7 @@ describe('writer status assets block', () => {
     expect(assets.stalled).toBe(true)
   })
 
-  it('counts stuck queued draft jobs as failed, not queued', async () => {
+  it('오래 대기한 이미지 작업은 실패로 세고 대기 중으로 남기지 않는다', async () => {
     mocks.db.characters = [characterFixture({ character_id: 'missing-char', view_main: null })]
     mocks.db.locations = [locationFixture({ wide_shot: 'https://img/world.png' })]
     mocks.db.generationJobs = [
@@ -199,7 +200,7 @@ describe('writer status assets block', () => {
     expect(assets.stalled).toBe(true)
   })
 
-  it('grandfathers existing images and main candidates as ready', async () => {
+  it('기존 이미지와 대표 이미지가 있으면 준비 완료로 센다', async () => {
     mocks.db.characters = [
       characterFixture({ character_id: 'view-main-ready', view_main: 'https://img/char.png' }),
       characterFixture({ character_id: 'candidate-ready', view_main: null }),
@@ -221,7 +222,7 @@ describe('writer status assets block', () => {
     })
   })
 
-  it('degrades asset query errors to zero assets without failing status', async () => {
+  it('이미지 현황을 읽지 못해도 상태 화면은 빈 현황으로 보여준다', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     mocks.from.mockImplementation((table: string) =>
       table === 'characters' ? errorQuery('characters unavailable') : queryFor(table),
@@ -245,7 +246,7 @@ describe('writer status assets block', () => {
     }
   })
 
-  it('does not compute assets or query supabase without ?assets=1', async () => {
+  it('이미지 현황을 요청하지 않으면 관련 정보를 조회하지 않는다', async () => {
     const body = await statusBody('/api/writer/status/project-1')
 
     expect(body).not.toHaveProperty('assets')

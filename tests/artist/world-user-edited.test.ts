@@ -1,3 +1,4 @@
+// 제작자만 정한 장소는 자동 생성과 사용자 요청에 따라 수정 기록을 다르게 남긴다
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SceneManifest } from '@/types/scene'
 import type { WorldAsset } from '@/types/asset'
@@ -63,8 +64,8 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('artist world generation user_edited semantics (producer-only location)', () => {
-  it('auto first-fill generates from Producer source without marking user_edited', async () => {
+describe('제작자가 정한 장소의 세계 이미지를 사용자 요청에 따라 만든다', () => {
+  it('처음 자동으로 만들면 제작자가 정한 장소를 그대로 쓰고 사용자 수정으로 기록하지 않는다', async () => {
     useArtistStore.setState({ sceneManifest: producerOnlyManifest(), worldAssets: worldAssets() })
 
     await useArtistStore.getState().generateWorldAsset(LOC, 'auto')
@@ -73,7 +74,7 @@ describe('artist world generation user_edited semantics (producer-only location)
     expect(asset?.userEdited).toBe(false)
   })
 
-  it('explicit chat regeneration marks the producer-only location user_edited', async () => {
+  it('채팅으로 다시 만들면 제작자만 정한 장소도 사용자 수정으로 기록한다', async () => {
     useArtistStore.setState({ sceneManifest: producerOnlyManifest(), worldAssets: worldAssets() })
 
     await useArtistStore.getState().generateWorldAsset(LOC, 'chat')

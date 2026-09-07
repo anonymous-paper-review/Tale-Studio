@@ -1,3 +1,4 @@
+// 한 장면의 이야기와 화면 구성이 빠짐없이 이어지고, 필요한 인물과 장소를 확인한다
 import { describe, expect, it } from 'vitest'
 import {
   checkWriterV2Draft,
@@ -55,8 +56,8 @@ function validDraft(): WriterV2Draft {
   }
 }
 
-describe('Writer V2 semantic-unit contract', () => {
-  it('accepts a complete unit with production references and previz direction', () => {
+describe('Writer 장면 구성 약속', () => {
+  it('이야기·제작 참조·화면 연출이 모두 있으면 한 장면을 인정한다', () => {
     const draft = validDraft()
 
     expect(WriterV2DraftSchema.safeParse(draft).success).toBe(true)
@@ -72,7 +73,7 @@ describe('Writer V2 semantic-unit contract', () => {
     })
   })
 
-  it('rejects a unit that hides missing asset references', () => {
+  it('필요한 인물이나 장소가 빠지면 장면을 인정하지 않는다', () => {
     const draft = validDraft()
     draft.units[0].visual.character_refs = []
     draft.units[0].visual.background_ref = undefined
@@ -88,7 +89,7 @@ describe('Writer V2 semantic-unit contract', () => {
     )
   })
 
-  it('rejects duplicate semantic and shot identifiers', () => {
+  it('같은 장면이나 쇼트가 두 번 나오면 인정하지 않는다', () => {
     const draft = validDraft()
     draft.units.push({
       ...validDraft().units[0],

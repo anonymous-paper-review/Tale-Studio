@@ -1,3 +1,4 @@
+// 생성 서비스의 실패 사유를 헷갈리지 않게 구분해 알맞게 안내한다
 import { describe, it, expect } from 'vitest'
 import { classifyFalFailure } from '@/lib/generation-jobs'
 
@@ -11,8 +12,8 @@ function expectClassifications(
   }
 }
 
-describe('classifyFalFailure red-team boundaries', () => {
-  it('honors blocked as a whole word without broad block false positives', () => {
+describe('실패 사유를 분류할 때의 경계 상황', () => {
+  it('차단을 뜻하는 단어가 단독으로 있을 때만 콘텐츠 정책 문제로 분류한다', () => {
     expectClassifications([
       { message: 'the retry was unblocked by the provider', expected: 'generic' },
       { message: 'queue worker hit a blocker before upload', expected: 'generic' },
@@ -24,7 +25,7 @@ describe('classifyFalFailure red-team boundaries', () => {
     ])
   })
 
-  it('matches content policy separator variants case-insensitively', () => {
+  it('콘텐츠 정책의 표기 방식과 대소문자가 달라도 같은 문제로 분류한다', () => {
     expectClassifications([
       { message: 'content-policy from fal', expected: 'moderation' },
       { message: 'content_policy from fal', expected: 'moderation' },
@@ -34,7 +35,7 @@ describe('classifyFalFailure red-team boundaries', () => {
     ])
   })
 
-  it('matches violat and disallow stems as intentional partial keywords', () => {
+  it('정책 위반이나 허용되지 않음을 나타내면 콘텐츠 정책 문제로 분류한다', () => {
     expectClassifications([
       { message: 'policy violation detected', expected: 'moderation' },
       { message: 'the prompt violates provider guidance', expected: 'moderation' },
@@ -44,7 +45,7 @@ describe('classifyFalFailure red-team boundaries', () => {
     ])
   })
 
-  it('keeps ordinary infrastructure failures generic', () => {
+  it('네트워크나 서버 같은 일반 오류는 콘텐츠 정책 문제로 잘못 보지 않는다', () => {
     expectClassifications([
       { message: 'fal webhook reported ERROR', expected: 'generic' },
       { message: 'network timeout after 120 seconds', expected: 'generic' },
@@ -55,7 +56,7 @@ describe('classifyFalFailure red-team boundaries', () => {
     ])
   })
 
-  it('handles nullish, blank, unicode, symbols, and long messages deterministically', () => {
+  it('오류 내용이 비어 있거나 특수 문자와 긴 문장을 포함해도 일관되게 분류한다', () => {
     const longGenericMessage = `${'transient render retry '.repeat(200)}끝 🚧 500`
     const longModerationMessage = `${'provider detail '.repeat(200)}content-policy 🚫 flagged`
 

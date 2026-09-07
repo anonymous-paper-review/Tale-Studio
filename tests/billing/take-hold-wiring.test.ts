@@ -1,3 +1,4 @@
+// 영상 생성이 시작될 때 Take를 안전하게 처리하고, 실패하면 사용량을 되돌린다 (#payments-phase-2 #gen-quota-atomic-gate)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Take hold 배선 (#payments-phase-2 #gen-quota-atomic-gate) — generate-previz-video 라우트가
@@ -104,8 +105,8 @@ beforeEach(() => {
   mocks.failGenerationJob.mockResolvedValue(undefined)
 })
 
-describe('generate-previz-video — Take hold 배선', () => {
-  it('mode=off 는 hold RPC 를 타지 않고 정상 제출한다', async () => {
+describe('영상 미리보기 생성 — Take 사용량 처리', () => {
+  it('사용량을 받지 않는 모드에서는 영상 생성을 정상 제출한다', async () => {
     delete process.env.TAKE_BILLING_MODE
     mockProjectShotQueued()
     // shots.update (낙관 상태 기록)
@@ -118,7 +119,7 @@ describe('generate-previz-video — Take hold 배선', () => {
     expect(mocks.failGenerationJob).not.toHaveBeenCalled()
   })
 
-  it('enforce 모드에서 잔액 부족이면 402 + 잡을 failed 로 마킹하고 shots 낙관 갱신을 하지 않는다', async () => {
+  it('사용량을 실제로 차감하는 모드에서 잔액이 부족하면 생성을 막고 실패로 기록하며 상태를 바꾸지 않는다', async () => {
     vi.stubEnv('TAKE_BILLING_MODE', 'enforce')
     mockProjectShotQueued()
     mocks.rpc.mockResolvedValue({ data: { ok: false, balance: 0, held: 0, insufficient: true }, error: null })
@@ -137,7 +138,7 @@ describe('generate-previz-video — Take hold 배선', () => {
     expect(mocks.from).toHaveBeenCalledTimes(3)
   })
 
-  it('shadow 모드는 잔액 부족이어도 통과시켜 잡을 정상 제출한다', async () => {
+  it('기록만 하는 모드에서는 잔액이 부족해도 생성을 정상 제출한다', async () => {
     vi.stubEnv('TAKE_BILLING_MODE', 'shadow')
     mockProjectShotQueued()
     mocks.from.mockReturnValueOnce(query({ data: null, error: null })) // shots.update
@@ -155,8 +156,8 @@ describe('generate-previz-video — Take hold 배선', () => {
   })
 })
 
-describe('release wiring — 실패 마킹 경로', () => {
-  it('director-video-takes.markDirectorVideoAttemptFailed 는 fail RPC 후 release RPC 를 부른다', async () => {
+describe('사용량 반환 — 생성 실패 처리', () => {
+  it('영상 생성 실패를 기록하면 사용량 반환도 요청한다', async () => {
     vi.resetModules()
     const rpcMock = vi.fn()
       .mockResolvedValueOnce({ data: null, error: null }) // fail_director_video_attempt
@@ -179,7 +180,7 @@ describe('release wiring — 실패 마킹 경로', () => {
     vi.doUnmock('@/lib/billing/take-hold')
   })
 
-  it('release 실패는 삼키고 실패 마킹 자체는 성공한다', async () => {
+  it('사용량 반환에 실패해도 생성 실패 기록은 성공한다', async () => {
     vi.resetModules()
     const rpcMock = vi.fn().mockResolvedValue({ data: null, error: null })
     const fromMock = vi.fn().mockReturnValue(query({ data: null, error: null }))

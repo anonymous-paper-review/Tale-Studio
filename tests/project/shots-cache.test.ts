@@ -1,3 +1,4 @@
+// 여러 화면이 같은 프로젝트의 장면 목록을 함께 보되 바뀐 내용은 다시 확인한다
 import { QueryClient } from '@tanstack/react-query'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -41,8 +42,8 @@ beforeEach(() => {
   db.gate = null
 })
 
-describe('loadShots — 칸 하나를 여러 소비처가 공유한다', () => {
-  it('동시 호출 둘은 한 요청으로 합쳐진다 (writer·director 가 같이 진입하는 상황)', async () => {
+describe('한 프로젝트의 장면 목록을 여러 화면이 함께 사용한다', () => {
+  it('Writer와 Director가 동시에 장면 목록을 열면 한 번만 불러온다', async () => {
     let open!: () => void
     db.gate = new Promise((r) => { open = r })
 
@@ -56,7 +57,7 @@ describe('loadShots — 칸 하나를 여러 소비처가 공유한다', () => {
     expect(rb).toBe(ra) // 같은 칸의 같은 결과 객체
   })
 
-  it('신선 기간(30초) 안의 재호출은 네트워크 없이 즉답한다', async () => {
+  it('30초 안에 다시 열면 인터넷에 다시 묻지 않고 바로 보여준다', async () => {
     await loadShots('p1')
     await loadShots('p1')
     await loadShots('p1')
@@ -64,7 +65,7 @@ describe('loadShots — 칸 하나를 여러 소비처가 공유한다', () => {
     expect(db.fetchCount).toBe(1)
   })
 
-  it('프로젝트가 다르면 칸이 다르다 — 섞이지 않는다', async () => {
+  it('다른 프로젝트의 장면 목록은 서로 섞이지 않는다', async () => {
     await loadShots('p1')
     db.rows = [{ shot_id: 'other' }]
     const p2 = await loadShots('p2')
@@ -77,8 +78,8 @@ describe('loadShots — 칸 하나를 여러 소비처가 공유한다', () => {
   })
 })
 
-describe('invalidateShots — 쓰기 성공·생성 완료 지점의 "이 칸 못 믿겠다"', () => {
-  it('무효화 뒤의 loadShots 는 신선 기간과 무관하게 다시 받는다', async () => {
+describe('장면 목록을 바꾼 뒤 최신 내용을 다시 가져온다', () => {
+  it('내용이 바뀌었다고 알리면 30초가 지나지 않아도 최신 장면 목록을 다시 불러온다', async () => {
     await loadShots('p1')
     expect(db.fetchCount).toBe(1)
 
@@ -90,7 +91,7 @@ describe('invalidateShots — 쓰기 성공·생성 완료 지점의 "이 칸 �
     expect(after.map((s) => s.shot_id)).toContain('new')
   })
 
-  it('다른 프로젝트의 칸은 건드리지 않는다', async () => {
+  it('다른 프로젝트의 장면 목록은 다시 불러오지 않는다', async () => {
     await loadShots('p1')
     await loadShots('p2')
     expect(db.fetchCount).toBe(2)
@@ -102,14 +103,14 @@ describe('invalidateShots — 쓰기 성공·생성 완료 지점의 "이 칸 �
   })
 })
 
-describe('loadShotsResult — 옛 Promise.all 다리용 { data, error } 어댑터', () => {
-  it('성공: { data: 행들, error: null }', async () => {
+describe('장면 목록을 성공 또는 오류 결과로 전달한다', () => {
+  it('성공하면 장면 목록을 오류 없이 돌려준다', async () => {
     const res = await loadShotsResult('p1')
     expect(res.error).toBeNull()
     expect(res.data?.map((s) => s.shot_id)).toEqual(['s1', 's2'])
   })
 
-  it('실패: 던지지 않고 { data: null, error: { message } } — 옛 supabase 반환 모양 보존', async () => {
+  it('불러오기에 실패해도 멈추지 않고 오류 이유를 함께 돌려준다', async () => {
     db.error = { message: 'permission denied' }
     const res = await loadShotsResult('p-err')
     expect(res.data).toBeNull()

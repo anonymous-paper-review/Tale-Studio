@@ -1,3 +1,4 @@
+// 같은 한국어 이야기를 영어와 한국어로 만들면 설명도 선택한 언어로 나온다 (실제 AI 호출 2회·fal 과금 없음·운영 DB·저장소에는 쓰지 않는다 #i18n-s5)
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -27,9 +28,9 @@ const KOREAN_STORY =
 
 const hasKorean = (s: string) => /[가-힣]/.test(s)
 
-describe.runIf(LIVE)('출력 언어 강제 — s0 실측 (한국어 스토리 고정, locale 만 변경)', () => {
+describe.runIf(LIVE)('같은 한국어 이야기에서 선택한 언어로 설명이 나온다', () => {
   it(
-    'outputLocale=en → 산출 자유서술 전부 영어 / ko → 한국어',
+    '영어를 고르면 설명은 영어가 되고, 한국어를 고르면 설명은 한국어가 된다',
     async () => {
       loadEnv()
       const { runDramaturgy } = await import('@/lib/writer/pipeline/stages/s0_dramaturgy')

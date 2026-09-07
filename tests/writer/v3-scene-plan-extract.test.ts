@@ -1,3 +1,4 @@
+// 장면 계획이 어떤 응답 형태로 와도 쇼트 수를 잃지 않고 모두 반영한다 (2026-06-28 사고 회귀)
 import { describe, it, expect } from 'vitest'
 import { extractScenePlans } from '@/lib/writer/pipeline/stages/v3_scene_plan'
 
@@ -10,15 +11,15 @@ describe('extractScenePlans', () => {
     { scene_id: 'scene_2', shot_count_target: 4 },
   ]
 
-  it('기대형 { scene_plans: [...] } 수용', () => {
+  it('장면 계획이 묶음 형태로 오면 모든 계획을 반영한다', () => {
     expect(extractScenePlans({ scene_plans: plans })).toEqual(plans)
   })
 
-  it('최상위 배열 [...] (Gemini 변형) 수용 — 사고 케이스', () => {
+  it('장면 계획이 목록으로 바로 오면 모든 계획을 반영한다 (Gemini 변형, 사고 케이스)', () => {
     expect(extractScenePlans(plans)).toEqual(plans)
   })
 
-  it('빈/malformed 응답은 빈 배열', () => {
+  it('응답이 없거나 알아볼 수 없으면 장면 계획을 만들지 않는다', () => {
     expect(extractScenePlans(null)).toEqual([])
     expect(extractScenePlans(undefined)).toEqual([])
     expect(extractScenePlans({})).toEqual([])

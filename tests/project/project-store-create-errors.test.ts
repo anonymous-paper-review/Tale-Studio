@@ -1,3 +1,4 @@
+// 새 프로젝트를 만들 수 있는지 먼저 알리고 성공하면 결과와 주의사항을 전한다
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -34,8 +35,8 @@ beforeEach(() => {
   useProjectStore.getState().resetProject()
 })
 
-describe('project store createNewProject result contract', () => {
-  it('returns a failure and does not expose the previous project id after a slot-limit response', async () => {
+describe('새 프로젝트를 만들 때 결과와 기존 작업을 안전하게 알린다', () => {
+  it('만들 수 있는 프로젝트 수를 넘으면 실패를 알리고 기존 프로젝트는 유지한다', async () => {
     useProjectStore.setState({ projectId: 'previous-project' })
     mocks.fetch.mockResolvedValue(
       new Response(JSON.stringify({ error: 'slot_limit' }), {
@@ -55,7 +56,7 @@ describe('project store createNewProject result contract', () => {
     expect(useProjectStore.getState().projectId).toBe('previous-project')
   })
 
-  it('returns the created id and warnings without changing the request contract', async () => {
+  it('새 프로젝트를 만들면 생성 결과와 주의사항을 알려준다', async () => {
     mocks.fetch.mockResolvedValue(
       new Response(
         JSON.stringify({

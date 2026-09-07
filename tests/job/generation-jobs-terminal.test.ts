@@ -1,3 +1,4 @@
+// 작업을 중복으로 끝내지 않고, 결과와 실패를 정확히 기록하며 잘못된 요청은 실행하지 않는다
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn() }))
@@ -49,9 +50,9 @@ function query(result: unknown) {
   return value
 }
 
-describe('generation job terminal CAS helpers', () => {
+describe('작업 종료 처리', () => {
   beforeEach(() => vi.resetAllMocks())
-  it('stores an empty object when inputSnapshot is omitted at creation', async () => {
+  it('처음 만들 때 내용이 없으면 빈 내용으로 기록한다', async () => {
     const creation = query({ data: { id: 'job-1' }, error: null })
     mocks.from.mockReturnValueOnce(creation)
 
@@ -77,7 +78,7 @@ describe('generation job terminal CAS helpers', () => {
     }))
   })
 
-  it('accepts only an exact completed replay with its result URL', async () => {
+  it('이미 끝난 작업은 같은 결과 주소일 때만 그대로 인정한다', async () => {
     const casMiss = query({ data: null, error: null })
     const exactReplay = query({ data: { status: 'completed', result_url: 'https://media.test/a.mp4', error: null, last_error: 'old failure' }, error: null })
     mocks.from.mockReturnValueOnce(casMiss).mockReturnValueOnce(exactReplay)
@@ -91,7 +92,7 @@ describe('generation job terminal CAS helpers', () => {
       .rejects.toBeInstanceOf(GenerationJobTerminalTransitionError)
   })
 
-  it('rejects opposite terminal outcomes and only replays the exact failure', async () => {
+  it('이미 끝난 작업의 결과가 다르면 거절하고, 같은 실패만 그대로 인정한다', async () => {
     const completedMiss = query({ data: null, error: null })
     const failedCurrent = query({ data: { status: 'failed', result_url: null, error: 'provider failed', last_error: 'provider failed' }, error: null })
     mocks.from.mockReturnValueOnce(completedMiss).mockReturnValueOnce(failedCurrent)
@@ -110,7 +111,7 @@ describe('generation job terminal CAS helpers', () => {
     await expect(failGenerationJob('job-1', 'provider failed')).resolves.toBeUndefined()
   })
 
-  it('records completed_at when failing a queued job', async () => {
+  it('대기 중인 작업이 실패하면 끝난 시각을 기록한다', async () => {
     const transition = query({ data: { id: 'job-1' }, error: null })
     mocks.from.mockReturnValueOnce(transition)
     await failGenerationJob('job-1', 'provider failed')
@@ -119,12 +120,12 @@ describe('generation job terminal CAS helpers', () => {
       completed_at: expect.any(String),
     }))
   })
-  it('rejects blank terminal evidence before issuing mutations', async () => {
+  it('끝난 근거가 비어 있으면 아무것도 바꾸지 않고 거절한다', async () => {
     await expect(completeGenerationJob('job-1', '   ')).rejects.toThrow(/nonblank/)
     await expect(failGenerationJob('job-1', '\t')).rejects.toThrow(/nonblank/)
     expect(mocks.from).not.toHaveBeenCalled()
   })
-  it('refuses linked shot_video jobs through generic terminal helpers and scopes both CAS mutations to unlinked rows', async () => {
+  it('영상 조각에 연결된 작업은 일반 종료 처리로 바꾸지 않고 연결되지 않은 작업만 처리한다', async () => {
     const completionMiss = query({ data: null, error: null })
     const linkedCompletion = query({
       data: { kind: 'shot_video', video_clip_id: 'clip-1', status: 'completed', result_url: 'https://media.test/a.mp4', error: null, last_error: null },
@@ -150,7 +151,7 @@ describe('generation job terminal CAS helpers', () => {
     expect(linkedCompletion.select).toHaveBeenCalledWith(expect.stringContaining('kind'))
   })
 
-  it('projects response_snapshot when reading a generation job by ID', async () => {
+  it('작업을 조회하면 응답 내용을 함께 보여준다', async () => {
     const read = query({
       data: {
         id: 'job-1',
@@ -167,7 +168,7 @@ describe('generation job terminal CAS helpers', () => {
     })
     expect(read.select).toHaveBeenCalledWith(expect.stringContaining('response_snapshot'))
   })
-  it('delegates response-snapshot patches to the atomic RPC and validates patch shape', async () => {
+  it('응답 내용 일부를 바꿀 때 한 번에 안전하게 처리하고 요청 형식을 확인한다', async () => {
     mocks.rpc.mockResolvedValue({ error: null })
 
     await Promise.all([
@@ -188,7 +189,7 @@ describe('generation job terminal CAS helpers', () => {
     expect(mocks.rpc).toHaveBeenCalledTimes(2)
   })
 
-  it('rejects blank response-snapshot request IDs before issuing the RPC', async () => {
+  it('응답 내용을 바꿀 요청 번호가 비어 있으면 실행하지 않고 거절한다', async () => {
     await expect(patchGenerationJobResponseSnapshotByRequestId('   ', { callback: true }))
       .rejects.toThrow(/request ID must be nonblank/)
     expect(mocks.rpc).not.toHaveBeenCalled()
@@ -196,7 +197,7 @@ describe('generation job terminal CAS helpers', () => {
       .rejects.toThrow(/request ID must be nonblank/)
   })
 
-  it('propagates missing-row and other response-snapshot RPC errors', async () => {
+  it('대상 작업이 없거나 응답 내용 변경 중 다른 오류가 나면 그대로 알린다', async () => {
     const rpcError = { message: 'generation job request ID was not found' }
     mocks.rpc.mockResolvedValue({ error: rpcError })
 
@@ -204,7 +205,7 @@ describe('generation job terminal CAS helpers', () => {
       .rejects.toBe(rpcError)
   })
 
-  it('propagates ownership, list, and count query errors', async () => {
+  it('권한 확인과 목록·개수 확인에서 난 오류를 그대로 알린다', async () => {
     const ownershipError = { message: 'project unavailable' }
     const listError = { message: 'list unavailable' }
     const countError = { message: 'count unavailable' }
@@ -216,7 +217,7 @@ describe('generation job terminal CAS helpers', () => {
     await expect(countFailedJobsForTarget('project-1', 'shot_video', {})).rejects.toBe(countError)
   })
 
-  it('give-up 게이트는 provider/infra 실패를 세지 않는다 (#error-class 오너 정책 2026-08-13)', async () => {
+  it('제공처나 시스템에서 난 일시 오류는 포기 횟수에 세지 않는다 (#error-class 오너 정책 2026-08-13)', async () => {
     // 일시 인프라 실패는 예산 무차감 — 빈칸 자율 채움이 백그라운드에서 계속 재시도한다.
     // 미태깅(null)은 보수적으로 센다(게이트가 약해지는 방향의 실수 방지).
     mocks.from.mockReturnValueOnce(
@@ -233,7 +234,7 @@ describe('generation job terminal CAS helpers', () => {
     await expect(countFailedJobsForTarget('project-1', 'shot_video', {})).resolves.toBe(2)
   })
 
-  it('uses the quota fallback only for the exact legacy schema-cache error', async () => {
+  it('작업 수 확인에서 예전 형식의 특정 오류일 때만 다른 방식으로 다시 확인한다', async () => {
     const legacyError = { code: 'PGRST204', message: "Could not find the 'user_id' column of 'generation_jobs' in the schema cache" }
     mocks.from
       .mockReturnValueOnce(query({ count: null, error: legacyError }))

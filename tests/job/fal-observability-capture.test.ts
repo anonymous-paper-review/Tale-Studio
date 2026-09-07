@@ -1,8 +1,9 @@
+// 생성 요청에 사용한 내용과 빠진 항목을 사람이 확인할 수 있게 기록한다
 import { describe, expect, it } from 'vitest'
 import { buildFalRequestCapturePatch } from '@/lib/fal/observability'
 
-describe('fal observability capture', () => {
-  it('reports fields omitted by a registered fal model allowlist', () => {
+describe('생성 요청과 빠진 항목 기록', () => {
+  it('지원하지 않는 요청 항목은 빠졌다고 알려준다', () => {
     const patch = buildFalRequestCapturePatch(
       {
         prompt: 'move through the alley',
@@ -16,7 +17,7 @@ describe('fal observability capture', () => {
     expect(patch.ignored_fields).toEqual(['negative_prompt'])
   })
 
-  it('maps the exact fal request body into an input snapshot patch', () => {
+  it('생성 서비스에 보낸 요청 내용을 그대로 기록한다', () => {
     const falRequest = {
       prompt: 'establishing storyboard panel',
       image_size: 'landscape_16_9',

@@ -1,3 +1,4 @@
+// 작업 실패 이유를 사람 말로 나누어, 다시 시도할 수 있는지 올바르게 판단한다 (#error-class 2026-08-13)
 import { describe, it, expect } from 'vitest'
 import { classifyJobError, classifyFalFailure } from '@/lib/generation-jobs'
 
@@ -37,19 +38,19 @@ describe('classifyJobError — 실측 메시지 분류', () => {
       'bad_request',
     ],
   ]
-  it.each(CASES)('%s → %s', (msg, cls) => {
+  it.each(CASES)('%s 상황은 %s로 분류한다', (msg, cls) => {
     expect(classifyJobError(msg)).toBe(cls)
   })
 
-  it('빈/모르는 메시지는 unknown — 분류 실패가 아니라 축적 대상', () => {
+  it('내용이 없거나 처음 보는 실패는 알 수 없음으로 모아 둔다', () => {
     expect(classifyJobError('')).toBe('unknown')
     expect(classifyJobError(null)).toBe('unknown')
     expect(classifyJobError('something entirely new')).toBe('unknown')
   })
 })
 
-describe('classifyFalFailure — 기존 웹훅 계약 유지 (위임 후에도)', () => {
-  it('moderation 만 moderation, 나머지는 generic — Bad Request 는 reconcile 경로로 가야 한다', () => {
+describe('classifyFalFailure 실패 분류 약속', () => {
+  it('내용이 제한되면 그 사유로 분류하고, 그 밖의 실패는 일반 실패로 처리한다', () => {
     expect(classifyFalFailure('[moderation] blocked')).toBe('moderation')
     expect(classifyFalFailure('Bad Request')).toBe('generic')
     expect(classifyFalFailure('fal webhook reported ERROR')).toBe('generic')

@@ -1,3 +1,4 @@
+// 새로고침해도 선택지 이름은 다시 보여 주고 이미 지난 선택을 실행하지 않는다 (오너 결정 2026-08-18)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { choiceSuggestionMarker, parseChoiceSuggestionMarker } from '@/lib/chat-blocks'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
@@ -15,8 +16,8 @@ afterEach(() => {
   useProjectStore.setState({ projectId: null })
 })
 
-describe('선택지 복원 (표시 전용)', () => {
-  it('새로고침 후 선택지를 라벨만 복원하고 실행 가능한 action 은 복원하지 않는다', async () => {
+describe('새로고침 뒤 선택지 안내', () => {
+  it('새로고침하면 선택지 이름만 다시 보여 주고 바로 실행되지는 않게 한다', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -59,7 +60,7 @@ describe('선택지 복원 (표시 전용)', () => {
     expect(suggestion?.action).toBeNull()
   })
 
-  it('깨진 내부 표식은 화면에 노출하지 않고 조용히 버린다', async () => {
+  it('읽을 수 없는 선택 안내는 화면에 보이지 않게 버린다', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({

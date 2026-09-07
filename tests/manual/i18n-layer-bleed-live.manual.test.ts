@@ -1,3 +1,4 @@
+// 같은 이야기를 영어와 한국어로 끝까지 만들고 언어별 결과를 남겨 섞임을 확인한다 (실제 AI 호출 다수·fal 과금 없음·운영 DB·저장소에는 쓰지 않고 로컬 결과 파일만 쓴다 #i18n-layer-bleed·#20)
 import { describe, it, expect } from 'vitest'
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
@@ -317,9 +318,9 @@ async function runLocaleChain(locale: 'en' | 'ko'): Promise<LocaleChainResult> {
   }
 }
 
-describe.runIf(LIVE)('i18n 레이어 침범 감사 — en/ko 동일 한국어 시드, 전 레이어', () => {
+describe.runIf(LIVE)('같은 한국어 이야기의 영어·한국어 결과에서 언어가 섞이지 않는지 확인한다', () => {
   it(
-    '같은 한국어 스토리+캐스트로 outputLocale en/ko 순차 구동 — 레이어별 JSON 저장',
+    '같은 이야기를 영어와 한국어로 끝까지 만들면 언어별 결과 파일을 남긴다',
     async () => {
       loadEnv()
       if (!OUT_DIR) throw new Error('BLEED_OUT 환경변수가 필요합니다 (예: BLEED_OUT=/tmp/bleed)')

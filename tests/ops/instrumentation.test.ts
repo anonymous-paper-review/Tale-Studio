@@ -1,3 +1,4 @@
+// 서버 오류를 운영 기록에 남기되, 기록이 실패해도 사용자의 요청을 막지 않는다 (#C, 2026-09-02 observability-audit)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // 서버 500 무흔적 해소(#C, 2026-09-02 observability-audit) — onRequestError 가 nodejs 런타임에서만
@@ -30,7 +31,7 @@ beforeEach(() => {
 })
 
 describe('onRequestError', () => {
-  it('nodejs 런타임에서 server_errors 에 insert 한다', async () => {
+  it('서버에서 발생한 오류를 운영 기록에 남긴다', async () => {
     await onRequestError(new Error('boom'), req(), ctx('nodejs'))
     expect(mocks.insert).toHaveBeenCalledWith({
       path: '/api/writer/rough-storyboard',
@@ -40,12 +41,12 @@ describe('onRequestError', () => {
     })
   })
 
-  it('edge 런타임은 insert 를 스킵한다', async () => {
+  it('서버 밖에서 처리하는 경우 운영 기록을 남기지 않는다', async () => {
     await onRequestError(new Error('boom'), req(), ctx('edge'))
     expect(mocks.insert).not.toHaveBeenCalled()
   })
 
-  it('message/stack 을 각각 500/1000자로 절단한다', async () => {
+  it('오류 설명과 발생 위치는 정해진 길이까지만 기록한다', async () => {
     const longMessage = 'x'.repeat(600)
     const err = new Error(longMessage)
     err.stack = 'y'.repeat(1500)
@@ -55,19 +56,19 @@ describe('onRequestError', () => {
     expect(arg.stack.length).toBe(1000)
   })
 
-  it('Error 가 아닌 값도 문자열화해 기록한다', async () => {
+  it('오류가 아닌 값도 글자로 바꿔 기록한다', async () => {
     await onRequestError('plain string error', req(), ctx('nodejs'))
     const arg = mocks.insert.mock.calls[0][0] as { message: string; stack: string | null }
     expect(arg.message).toBe('plain string error')
     expect(arg.stack).toBeNull()
   })
 
-  it('insert 실패는 삼킨다(진단이 제품을 막지 않는다)', async () => {
+  it('오류 기록에 실패해도 실제 요청 처리는 막지 않는다', async () => {
     mocks.insert.mockResolvedValue({ error: { message: 'db down' } })
     await expect(onRequestError(new Error('boom'), req(), ctx('nodejs'))).resolves.toBeUndefined()
   })
 
-  it('supabaseAdmin import 자체가 던져도 삼킨다', async () => {
+  it('운영 기록 기능 자체에 문제가 생겨도 실제 요청 처리는 막지 않는다', async () => {
     mocks.insert.mockRejectedValue(new Error('unexpected'))
     await expect(onRequestError(new Error('boom'), req(), ctx('nodejs'))).resolves.toBeUndefined()
   })

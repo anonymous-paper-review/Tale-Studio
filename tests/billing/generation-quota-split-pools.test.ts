@@ -1,3 +1,4 @@
+// 영상과 이미지 생성 한도를 따로 관리해 서로의 작업을 막지 않고, 영상 크레딧 사용량을 통제한다 (오너 결정 2026-08-26, tale_pricing v4 정합)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // 영상/이미지 분리 풀 + admin 면제 (2026-08-26 오너 결정, tale_pricing v4 정합).
@@ -43,22 +44,22 @@ beforeEach(() => {
   mocks.totalMaxInflight.mockReturnValue(MAX_GLOBAL_INFLIGHT_JOBS)
 })
 
-describe('checkGenerationCapacity — 분리 풀', () => {
-  it('counts only video kinds against the video cap (3)', async () => {
+describe('checkGenerationCapacity — 영상·이미지 한도 분리', () => {
+  it('영상 작업은 영상 한도 3개만 계산한다', async () => {
     mocks.countByUser.mockResolvedValue(MAX_QUEUED_VIDEO_JOBS_PER_USER)
     const check = await checkGenerationCapacity('u-1', 'video')
     expect(mocks.countByUser).toHaveBeenCalledWith('u-1', VIDEO_JOB_KINDS)
     expect(check).toMatchObject({ ok: false, scope: 'user', category: 'video', limit: 3 })
   })
 
-  it('counts only image kinds against the image cap (6)', async () => {
+  it('이미지 작업은 이미지 한도 6개만 계산한다', async () => {
     mocks.countByUser.mockResolvedValue(MAX_QUEUED_IMAGE_JOBS_PER_USER)
     const check = await checkGenerationCapacity('u-1', 'image')
     expect(mocks.countByUser).toHaveBeenCalledWith('u-1', IMAGE_JOB_KINDS)
     expect(check).toMatchObject({ ok: false, scope: 'user', category: 'image', limit: 6 })
   })
 
-  it('lets video run while the image pool is saturated — the C1 regression', async () => {
+  it('이미지 한도가 가득 차도 영상 작업은 계속할 수 있다 (C1 회귀)', async () => {
     // image 풀이 6/6 이어도 video 검사는 video kind 만 세므로 통과해야 한다.
     mocks.countByUser.mockImplementation(async (_u: string, kinds: readonly string[]) =>
       kinds.includes('shot_video') ? 0 : 6,
@@ -70,22 +71,22 @@ describe('checkGenerationCapacity — 분리 풀', () => {
   })
 })
 
-describe('checkGenerationCapacity — admin 면제', () => {
-  it('exempts admin accounts from the per-user cap', async () => {
+describe('checkGenerationCapacity — 관리자 개인 한도 면제', () => {
+  it('관리자는 개인별 생성 한도에 걸리지 않는다', async () => {
     mocks.isAdminEmail.mockReturnValue(true)
     mocks.countByUser.mockResolvedValue(MAX_QUEUED_VIDEO_JOBS_PER_USER + 5)
     const check = await checkGenerationCapacity('admin-1', 'video')
     expect(check.ok).toBe(true)
   })
 
-  it('still applies the global fal-slot semaphore to admins', async () => {
+  it('관리자도 전체 동시 작업 한도는 지킨다', async () => {
     mocks.isAdminEmail.mockReturnValue(true)
     mocks.countGlobal.mockResolvedValue(MAX_GLOBAL_INFLIGHT_JOBS)
     const check = await checkGenerationCapacity('admin-1', 'video')
     expect(check).toMatchObject({ ok: false, scope: 'global' })
   })
 
-  it('treats admin-lookup failure as a normal user (quota still applies)', async () => {
+  it('관리자 확인에 실패하면 일반 사용자 한도를 적용한다', async () => {
     mocks.getUserById.mockRejectedValue(new Error('auth down'))
     mocks.countByUser.mockResolvedValue(MAX_QUEUED_IMAGE_JOBS_PER_USER)
     const check = await checkGenerationCapacity('u-1', 'image')
@@ -93,8 +94,8 @@ describe('checkGenerationCapacity — admin 면제', () => {
   })
 })
 
-describe('quotaExceededBody — 카테고리 문구 계약', () => {
-  it('names the saturated pool so the client toast can distinguish video vs image', () => {
+describe('quotaExceededBody — 종류별 한도 안내', () => {
+  it('가득 찬 종류를 알려 영상과 이미지를 구분해 안내한다', () => {
     const video = quotaExceededBody({ ok: false, queued: 3, limit: 3, scope: 'user', category: 'video' })
     const image = quotaExceededBody({ ok: false, queued: 6, limit: 6, scope: 'user', category: 'image' })
     expect(video.error).toContain('video')

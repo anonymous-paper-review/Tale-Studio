@@ -1,3 +1,4 @@
+// 회상이 있는 이야기를 만들면 장면마다 현재·과거·미래 중 알맞은 시점을 표시한다 (실제 AI 호출 2회·fal 과금 없음·운영 DB·저장소에는 쓰지 않는다·2026-08-28)
 // 이야기 생성이 서사 시점을 실제로 내놓는지 — 진짜 모델을 호출해 검증한다.
 //
 // 왜 수동 시험인가: 나머지 시험은 프롬프트 문자열과 스키마만 본다. "규격에 적혀 있다"와
@@ -55,9 +56,9 @@ const CAST: Characters = {
   subtext_notes: [],
 }
 
-describe.skipIf(!LIVE)('이야기 생성이 서사 시점을 채운다 — 실제 모델', () => {
+describe.skipIf(!LIVE)('이야기 장면마다 알맞은 시점을 기록한다', () => {
   it(
-    '회상이 있는 스토리에서 씬마다 present/past/future 중 하나가 나온다',
+    '회상이 있는 이야기를 넣으면 장면마다 현재·과거·미래 중 하나를 표시한다',
     async () => {
       loadEnv()
       const { runNarrativeStructure } = await import('@/lib/writer/pipeline/stages/s1_structure')

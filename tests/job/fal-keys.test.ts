@@ -1,3 +1,4 @@
+// 여러 생성 요청이 몰려도 사용 가능한 연결로 나누어 처리하고, 잘못된 설정은 알려준다 (#fal-key-pool)
 // fal 다중 키 레지스트리(#fal-key-pool) 회귀 가드.
 //   lazy 파싱(모듈 캐시 리셋으로 검증) + least-loaded 선택 + 미지정 키 조회 계약.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -31,25 +32,25 @@ afterEach(() => {
   else process.env.FAL_KEYS = ORIGINAL_FAL_KEYS
 })
 
-describe('falKeys — lazy parsing failures', () => {
-  it('throws when FAL_KEYS is unset', async () => {
+describe('falKeys — 설정이 잘못된 경우', () => {
+  it('설정값이 없으면 오류를 알려준다', async () => {
     const { falKeys } = await import('@/lib/fal/keys')
     expect(() => falKeys()).toThrow(/FAL_KEYS not set or invalid/)
   })
 
-  it('throws when FAL_KEYS is broken JSON', async () => {
+  it('설정 형식을 읽을 수 없으면 오류를 알려준다', async () => {
     process.env.FAL_KEYS = '{not json'
     const { falKeys } = await import('@/lib/fal/keys')
     expect(() => falKeys()).toThrow(/FAL_KEYS not set or invalid/)
   })
 
-  it('throws when FAL_KEYS is an empty array', async () => {
+  it('사용할 연결 목록이 비어 있으면 오류를 알려준다', async () => {
     process.env.FAL_KEYS = '[]'
     const { falKeys } = await import('@/lib/fal/keys')
     expect(() => falKeys()).toThrow(/FAL_KEYS not set or invalid/)
   })
 
-  it('throws when FAL_KEYS has a duplicate id', async () => {
+  it('연결 이름이 중복되면 오류를 알려준다', async () => {
     process.env.FAL_KEYS = JSON.stringify([
       { id: 'a', key: 'k1', maxInflight: 10 },
       { id: 'a', key: 'k2', maxInflight: 10 },
@@ -58,14 +59,14 @@ describe('falKeys — lazy parsing failures', () => {
     expect(() => falKeys()).toThrow(/duplicate id/)
   })
 
-  it('does not throw at import time — only on first use (lazy)', async () => {
+  it('설정 오류는 실제 사용 시점에만 알려준다', async () => {
     // FAL_KEYS 미설정 상태에서 모듈을 import 만 해도 안전해야 한다(테스트/빌드가 env 없이도 돈다).
     await expect(import('@/lib/fal/keys')).resolves.toBeTruthy()
   })
 })
 
-describe('pickFalKey — least-loaded 선택', () => {
-  it('picks the key with the largest headroom (maxInflight - inflight)', async () => {
+describe('pickFalKey — 가장 여유 있는 연결 선택', () => {
+  it('처리 여유가 가장 큰 연결로 새 요청을 보낸다', async () => {
     process.env.FAL_KEYS = JSON.stringify([
       { id: 'k1', key: 'secret1', maxInflight: 40 },
       { id: 'k2', key: 'secret2', maxInflight: 40 },
@@ -79,7 +80,7 @@ describe('pickFalKey — least-loaded 선택', () => {
     expect(picked.id).toBe('k2')
   })
 
-  it('breaks ties toward the earlier array entry', async () => {
+  it('여유가 같으면 먼저 등록된 연결을 선택한다', async () => {
     process.env.FAL_KEYS = JSON.stringify([
       { id: 'first', key: 'secret1', maxInflight: 20 },
       { id: 'second', key: 'secret2', maxInflight: 20 },
@@ -92,7 +93,7 @@ describe('pickFalKey — least-loaded 선택', () => {
     expect(picked.id).toBe('first')
   })
 
-  it('returns the least-loaded key even when every key is saturated (429 is the quota gate\u2019s job)', async () => {
+  it('모든 연결이 한도에 닿아도 가장 덜 바쁜 연결을 고른다', async () => {
     process.env.FAL_KEYS = JSON.stringify([
       { id: 'over-a', key: 'secret1', maxInflight: 10 },
       { id: 'over-b', key: 'secret2', maxInflight: 10 },
@@ -108,14 +109,14 @@ describe('pickFalKey — least-loaded 선택', () => {
 })
 
 describe('falKeyById', () => {
-  it('returns null for an unknown id', async () => {
+  it('등록되지 않은 연결 이름을 찾으면 없다고 알려준다', async () => {
     process.env.FAL_KEYS = JSON.stringify([{ id: 'known', key: 'secret', maxInflight: 10 }])
     const { falKeyById } = await import('@/lib/fal/keys')
 
     expect(falKeyById('unknown')).toBeNull()
   })
 
-  it('returns the matching entry for a known id', async () => {
+  it('등록된 연결 이름을 찾으면 해당 연결을 돌려준다', async () => {
     process.env.FAL_KEYS = JSON.stringify([{ id: 'known', key: 'secret', maxInflight: 10 }])
     const { falKeyById } = await import('@/lib/fal/keys')
 
@@ -124,7 +125,7 @@ describe('falKeyById', () => {
 })
 
 describe('totalMaxInflight', () => {
-  it('sums maxInflight across all registered keys', async () => {
+  it('등록된 모든 연결의 처리 한도를 합산한다', async () => {
     process.env.FAL_KEYS = JSON.stringify([
       { id: 'a', key: 's1', maxInflight: 34 },
       { id: 'b', key: 's2', maxInflight: 20 },

@@ -1,3 +1,4 @@
+// 데모에서는 프로젝트 자료를 안전하게 보여 주고 실제 자료 변경은 일어나지 않게 한다
 import { describe, it, expect, beforeEach } from 'vitest'
 import { setDemoSnapshot, parseShareParam, withDemoShare } from '@/lib/demo/context'
 import { createDemoClient } from '@/lib/demo/supabase-shim'
@@ -21,10 +22,10 @@ const snap: ProjectSnapshot = {
   },
 }
 
-describe('demo supabase shim', () => {
+describe('데모 프로젝트 자료 이용 규칙', () => {
   beforeEach(() => setDemoSnapshot(snap))
 
-  it('filters by eq from snapshot (no real DB)', async () => {
+  it('데모 자료에서 선택한 프로젝트의 등장인물만 보여 준다', async () => {
     const db = createDemoClient()
     const { data, error } = await db
       .from('characters')
@@ -34,7 +35,7 @@ describe('demo supabase shim', () => {
     expect((data as unknown[]).length).toBe(2)
   })
 
-  it('orders ascending + limit + maybeSingle', async () => {
+  it('정렬과 개수 제한을 적용해 첫 번째 자료만 보여 준다', async () => {
     const db = createDemoClient()
     const { data } = await db
       .from('characters')
@@ -46,7 +47,7 @@ describe('demo supabase shim', () => {
     expect((data as { character_id: string }).character_id).toBe('c2')
   })
 
-  it('writes are no-op', async () => {
+  it('데모에서 자료를 바꿔도 실제 내용은 바뀌지 않는다', async () => {
     const db = createDemoClient()
     const { data, error } = await db
       .from('characters')
@@ -56,15 +57,15 @@ describe('demo supabase shim', () => {
     expect(error).toBeNull()
   })
 
-  it('missing table → empty array', async () => {
+  it('없는 자료 종류를 요청하면 결과가 없다고 보여 준다', async () => {
     const db = createDemoClient()
     const { data } = await db.from('nope').select('*')
     expect(data).toEqual([])
   })
 })
 
-describe('demo fetch classification', () => {
-  it('passes share endpoints and non-api', () => {
+describe('데모에서 자료 요청을 처리하는 방식', () => {
+  it('공유 링크와 화면 자료 요청은 그대로 통과시킨다', () => {
     expect(classifyDemoFetch('/api/share/abc', 'GET')).toBe('passthrough')
     expect(classifyDemoFetch('https://x.com/api/share/abc/', 'GET')).toBe(
       'passthrough',
@@ -73,14 +74,14 @@ describe('demo fetch classification', () => {
     expect(classifyDemoFetch('blob:xyz', 'GET')).toBe('passthrough')
   })
 
-  it('read-noop on api GET', () => {
+  it('읽기 요청은 데모 자료로 응답한다', () => {
     expect(classifyDemoFetch('/api/project/init', 'GET')).toBe('read-noop')
     expect(classifyDemoFetch('/api/project/123/messages', 'GET')).toBe(
       'read-noop',
     )
   })
 
-  it('write-noop on api mutation/generation', () => {
+  it('자료를 바꾸거나 만들기 요청은 실제로 처리하지 않는다', () => {
     expect(classifyDemoFetch('/api/artist/generate-sheet', 'POST')).toBe(
       'write-noop',
     )
@@ -89,8 +90,8 @@ describe('demo fetch classification', () => {
   })
 })
 
-describe('canned chat', () => {
-  it('covers all stages', () => {
+describe('단계별 데모 대화', () => {
+  it('모든 작업 단계에 데모 대화가 준비되어 있다', () => {
     for (const s of [
       'producer',
       'writer',
@@ -104,42 +105,42 @@ describe('canned chat', () => {
   })
 })
 
-describe('demo server guard', () => {
+describe('데모 접근 보호', () => {
   const withCookie = (v: string) =>
     new Request('https://x.com/api/artist/generate-sheet', {
       method: 'POST',
       headers: { cookie: v },
     })
 
-  it('detects demo cookie', () => {
+  it('데모 공유 표시가 있는지 확인한다', () => {
     expect(hasDemoCookie(withCookie('demo_share=abc'))).toBe(true)
     expect(hasDemoCookie(withCookie('other=1'))).toBe(false)
     expect(hasDemoCookie(new Request('https://x.com/'))).toBe(false)
   })
 
-  it('blocks writes with 403 when demo cookie present', () => {
+  it('데모 공유 상태에서는 자료 변경을 막는다', () => {
     expect(demoWriteBlock(withCookie('demo_share=abc'))?.status).toBe(403)
     expect(demoWriteBlock(withCookie('x=1'))).toBeNull()
   })
 })
 
-describe('share url ticket (URL 티켓 방식)', () => {
+describe('주소로 공유 링크를 여는 경우', () => {
   // 실 토큰 형태(64-hex)와 동일한 합성 값 — 라이브 공유 토큰을 저장소에 남기지 않는다.
   const token = '0123456789abcdef'.repeat(4)
 
-  it('parses valid 64-hex share param', () => {
+  it('올바른 64자리 공유 링크를 읽는다', () => {
     expect(parseShareParam(`?share=${token}`)).toBe(token)
     expect(parseShareParam(`?projectId=p1&share=${token}`)).toBe(token)
   })
 
-  it('rejects malformed tokens', () => {
+  it('형식이 잘못된 공유 링크는 거부한다', () => {
     expect(parseShareParam('?share=short')).toBeNull()
     expect(parseShareParam(`?share=${token}zz`)).toBeNull()
     expect(parseShareParam('?share=')).toBeNull()
     expect(parseShareParam('')).toBeNull()
   })
 
-  it('withDemoShare is a no-op outside browser (SSR/node)', () => {
+  it('브라우저 밖에서는 주소를 그대로 둔다', () => {
     // node 컨텍스트(document 없음)에선 데모 판정 불가 → 경로 그대로.
     expect(withDemoShare('/studio/writer')).toBe('/studio/writer')
   })

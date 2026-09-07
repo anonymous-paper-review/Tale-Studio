@@ -1,3 +1,4 @@
+// 여러 장면을 저장해도 각 장면의 미리보기를 빠짐없이 바로 보여준다 (#thumb-pipeline)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import sharp from 'sharp'
 
@@ -60,8 +61,8 @@ beforeEach(() => {
   })
 })
 
-describe('rough grid finalize — 3프레임 썸네일', () => {
-  it('샷마다 start/direction/end 세 장 전부, 업로드와 같은 경로·같은 버퍼로 썸네일을 만든다', async () => {
+describe('러프 그리드 저장 — 세 장면 미리보기', () => {
+  it('각 장면의 시작·진행·끝 세 컷을 저장하면 같은 그림으로 미리보기도 모두 만든다', async () => {
     // 러프 그리드는 이미지 파싱 없이 길이(50KB)만 검사한다 — 아무 버퍼면 된다.
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(Buffer.alloc(60_000))))
     mocks.crop.mockResolvedValue([frames('s1'), frames('s2')])
@@ -88,8 +89,8 @@ describe('rough grid finalize — 3프레임 썸네일', () => {
   })
 })
 
-describe('real grid finalize — 3프레임 썸네일', () => {
-  it('실사 그리드도 storyboard start/direction/end 세 장 전부 썸네일을 만든다', async () => {
+describe('실사 그리드 저장 — 세 장면 미리보기', () => {
+  it('실사 그리드도 시작·진행·끝 세 컷 모두 미리보기를 만든다', async () => {
     // 실사 그리드는 sharp.metadata 로 방향을 검사한다 — 실제 PNG 가 필요하다.
     //   요청 캔버스 기본값(1536x1024)과 같은 가로 방향 + 50KB 이상이면 통과.
     const raw = Buffer.alloc(512 * 342 * 3)

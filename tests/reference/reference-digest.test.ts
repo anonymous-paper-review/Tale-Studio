@@ -1,3 +1,4 @@
+// 참고 작품은 소유자와 이용 권한을 확인한 뒤 필요한 내용만 안전하게 보여준다
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -21,8 +22,8 @@ beforeEach(() => {
   })
 })
 
-describe('reference digest', () => {
-  it('rechecks owner and plan, then serializes the source project within 1500 characters', async () => {
+describe('참고 작품 정보를 안전하게 읽어온다', () => {
+  it('작품 소유자와 이용 권한을 다시 확인한 뒤 참고 작품을 1500자 안에 정리한다', async () => {
     mocks.responses.projects = [
       {
         data: {
@@ -62,7 +63,7 @@ describe('reference digest', () => {
     expect(digest!.length).toBeLessThanOrEqual(1500)
   })
 
-  it('returns null for another owner or a plan without reference access', async () => {
+  it('다른 사람의 작품이거나 참고 권한이 없으면 내용을 제공하지 않는다', async () => {
     mocks.responses.projects = [
       {
         data: { id: 'source', workspace_id: 'workspace-1', title: 'Private' },
@@ -90,7 +91,7 @@ describe('reference digest', () => {
     expect(mocks.from).toHaveBeenCalledTimes(4)
   })
 
-  it('throws system query failures so the chat route can warn and continue', async () => {
+  it('참고 작품을 불러오지 못해도 대화를 이어갈 수 있게 오류를 알린다', async () => {
     mocks.responses.projects = [
       { data: null, error: { message: 'database unavailable' } },
     ]
@@ -100,7 +101,7 @@ describe('reference digest', () => {
     })
   })
 
-  it('reads only the current project reference pointer', async () => {
+  it('현재 프로젝트가 가리키는 참고 작품만 읽는다', async () => {
     mocks.responses.projects = [
       { data: { reference_project_id: 'source' }, error: null },
     ]

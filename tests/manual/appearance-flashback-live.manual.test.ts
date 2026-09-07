@@ -1,3 +1,4 @@
+// 회상 장면은 알맞은 모습을 고르고 잘못된 지정은 저장하지 않는다 (실제 AI 호출 0회·fal 과금 없음·운영 DB에 시험 자료를 쓰고 지우며 저장소에는 쓰지 않는다)
 // 회상 장면에서 모습이 실제로 골라지는지 — 운영 DB 에 실데이터를 만들어 검증한다.
 //
 // 왜 수동 시험인가: 나머지 시험은 전부 가짜 DB 응답으로 돈다. 그건 "코드가 규칙대로 도는가"는
@@ -138,7 +139,7 @@ afterAll(async () => {
   await client.end()
 }, 60_000)
 
-describe.skipIf(!LIVE)('회상 장면 모습 선택 — 실제 DB', () => {
+describe.skipIf(!LIVE)('회상 장면의 모습 선택과 저장 규칙을 지킨다', () => {
   it('과거 모습이 둘이면 지정 없이는 자동 선택하지 않는다', async () => {
     const { byCharacter, scenesById } = await loadResolutionData(projectId)
     const scene = scenesById.get(`${P}_sc_past_ambiguous`)!
@@ -179,7 +180,7 @@ describe.skipIf(!LIVE)('회상 장면 모습 선택 — 실제 DB', () => {
     expect(resolveCharacterAppearance(scene.narrativeTime, byCharacter.get(`${P}_char`)!, undefined)).toBe('current')
   })
 
-  it('DB 제약이 "기본 모습은 하나"를 실제로 막는다', async () => {
+  it('기본 모습은 하나만 등록할 수 있다', async () => {
     await expect(
       client.query(
         `insert into character_appearances (project_id, character_id, appearance_key, label, is_default, narrative_time)
@@ -189,7 +190,7 @@ describe.skipIf(!LIVE)('회상 장면 모습 선택 — 실제 DB', () => {
     ).rejects.toThrow()
   })
 
-  it('DB 제약이 없는 모습을 가리키는 지정을 막는다', async () => {
+  it('등록되지 않은 모습을 지정하면 저장하지 않는다', async () => {
     await expect(
       client.query(
         `insert into scene_character_appearance_overrides (project_id, scene_id, character_id, appearance_key)
@@ -199,7 +200,7 @@ describe.skipIf(!LIVE)('회상 장면 모습 선택 — 실제 DB', () => {
     ).rejects.toThrow()
   })
 
-  it('DB 제약이 허용되지 않는 시점 값을 막는다', async () => {
+  it('허용하지 않는 이야기 시점을 넣으면 저장하지 않는다', async () => {
     await expect(
       client.query('update scenes set narrative_time=$3 where project_id=$1 and scene_id=$2', [
         projectId,

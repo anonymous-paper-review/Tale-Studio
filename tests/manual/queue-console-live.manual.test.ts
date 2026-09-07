@@ -1,3 +1,4 @@
+// 생성 작업 목록을 안전하게 살피고 실패한 시험 작업은 지우며 끝난 작업은 지우지 않는다 (실제 AI 호출 0회·fal 과금 없음·운영 DB에 시험 작업을 쓰고 지우며 저장소에는 쓰지 않는다 #queue-console)
 import { describe, it, expect, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -24,8 +25,8 @@ vi.mock('@/lib/supabase/auth', () => ({
   getUser: async () => ({ id: 'd93f86e2-bbd6-4a23-b0c4-11a0a4c980ac' }),
 }))
 
-describe.runIf(LIVE)('queue console — 실 라우트 · 프로덕션 DB', () => {
-  it('목록 → stale 회수 no-op → 가짜 실패 잡 삽입·삭제 → completed 삭제 거부', async () => {
+describe.runIf(LIVE)('생성 작업 대기 목록과 삭제 규칙을 지킨다', () => {
+  it('목록을 보고 오래된 작업을 정리하며 실패 작업은 지우고 끝난 작업은 지우지 않는다', async () => {
     loadEnv()
     const { GET, POST } = await import('@/app/api/generation/queue/route')
     const { DELETE } = await import('@/app/api/generation-jobs/[id]/route')

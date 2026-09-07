@@ -1,3 +1,4 @@
+// 진행 중인 작업을 대상별로 정확히 표시해 해당 카드만 기다리게 한다 (#queue-restore)
 import { describe, it, expect } from 'vitest'
 import {
   activeShotIds,
@@ -17,7 +18,7 @@ const job = (kind: ActiveJob['kind'], target: ActiveJob['target']): ActiveJob =>
 })
 
 describe('activeShotIds', () => {
-  it('그리드 잡의 writerShotIds 를 펴서 전부 대상으로 삼는다', () => {
+  it('여러 장면을 묶은 작업은 해당 장면 모두를 진행 중으로 표시한다', () => {
     const ids = activeShotIds(
       [job('shot_rough_storyboard', { writerShotIds: ['sh_01', 'sh_02', 'sh_03'] })],
       ['shot_rough_storyboard'],
@@ -25,7 +26,7 @@ describe('activeShotIds', () => {
     expect([...ids].sort()).toEqual(['sh_01', 'sh_02', 'sh_03'])
   })
 
-  it('구 단일 경로(writerShotId)와 director 의 shotId 도 함께 인식한다', () => {
+  it('예전 방식으로 지정한 장면과 Director가 지정한 장면도 진행 중으로 표시한다', () => {
     const ids = activeShotIds(
       [
         job('shot_rough_storyboard', { writerShotId: 'sh_old' }),
@@ -36,7 +37,7 @@ describe('activeShotIds', () => {
     expect([...ids].sort()).toEqual(['sh_dir', 'sh_old'])
   })
 
-  it('요청하지 않은 종류의 잡은 세지 않는다 (영상 큐가 이미지 스피너를 켜면 안 된다)', () => {
+  it('요청하지 않은 영상 작업은 그림을 진행 중으로 표시하지 않는다', () => {
     const ids = activeShotIds(
       [job('shot_video', { shotId: 'sh_01' })],
       ['shot_rough_storyboard'],
@@ -44,13 +45,13 @@ describe('activeShotIds', () => {
     expect(ids.size).toBe(0)
   })
 
-  it('target 이 비어도 터지지 않는다', () => {
+  it('작업 대상이 비어 있어도 오류 없이 지나간다', () => {
     expect(activeShotIds([job('shot_video', {})], ['shot_video']).size).toBe(0)
   })
 })
 
 describe('activeAssetIds', () => {
-  it('캐릭터/로케이션을 종류별로 갈라 담는다', () => {
+  it('인물과 장소를 각각 따로 진행 중으로 표시한다', () => {
     const { characters, locations } = activeAssetIds([
       job('character_view', { characterId: 'ch_1', view: 'main' }),
       job('character_view', { characterId: 'ch_2', view: 'side' }),
@@ -63,7 +64,7 @@ describe('activeAssetIds', () => {
 })
 
 describe('hasActiveKind', () => {
-  it('해당 종류가 하나라도 있으면 true', () => {
+  it('해당 작업이 하나라도 있으면 진행 중으로 판단한다', () => {
     const jobs = [job('shot_previz_video', { writerShotId: 'sh_1' })]
     expect(hasActiveKind(jobs, ['shot_previz_video'])).toBe(true)
     expect(hasActiveKind(jobs, ['shot_video'])).toBe(false)

@@ -1,3 +1,4 @@
+// 저장된 이미지를 첨부하면 모델이 그림 속 내용을 읽어 설명한다 (실제 AI 호출 1회·fal 과금 없음·운영 DB·저장소에는 쓰지 않고 기존 저장소를 읽기만 한다 #p1-attach·2026-08-18)
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -29,8 +30,8 @@ const SLICE_PATHS = [
   'ce053575-62d5-4c8d-898f-34a1a5c6b40b/90a988e8-e269-4b1b-adff-352a0387d6e9/uploads/v1-2a004f0918cac8f837c4bb203b7de018c03ffddc8e724a0b3fe0624656efa203/s001.jpg',
 ]
 
-describe.skipIf(!LIVE)('produce 첨부 경로 라이브 진단', () => {
-  it('실존 슬라이스 URL 이 화이트리스트를 통과하고, 모델이 내용을 실제로 읽는다', async () => {
+describe.skipIf(!LIVE)('저장된 이미지를 첨부하면 내용을 설명한다', () => {
+  it('저장된 이미지를 첨부하면 안전하게 전달되고 그림 속 내용을 읽어 설명한다', async () => {
     loadEnv()
     const { sanitizeAttachmentUrls } = await import('@/lib/upload/attachment')
     const { mediaPublicUrl } = await import('@/lib/storage/media-url')

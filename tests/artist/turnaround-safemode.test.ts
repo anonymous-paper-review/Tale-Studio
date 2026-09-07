@@ -1,3 +1,4 @@
+// 위험한 인물 묘사가 들어오면 미성년·유혈 표현을 덜어 안전한 인물 이미지를 만든다 (#A)
 import { describe, it, expect } from 'vitest'
 import {
   buildCharacterMainPrompt,
@@ -18,15 +19,15 @@ const base: CharacterPromptInput = {
   palette: ['#1A1A1A', '#B22222'],
 }
 
-describe('turnaround safe-mode', () => {
-  it('safeMode 미지정 == safeMode:false (byte-identical, 기존 동작 보존)', () => {
+describe('인물 앞·뒤·옆모습 안전 변환', () => {
+  it('안전 기능을 끄거나 지정하지 않으면 기존 설명을 그대로 유지한다', () => {
     expect(buildCharacterMainPrompt({ ...base, safeMode: false })).toBe(buildCharacterMainPrompt(base))
     expect(buildCharacterViewPrompt({ ...base, safeMode: false }, 'back')).toBe(
       buildCharacterViewPrompt(base, 'back'),
     )
   })
 
-  it('safeMode off: 원본 묘사/나이 유지, safe 토큰 없음', () => {
+  it('안전 기능을 끄면 원래 묘사와 나이를 유지한다', () => {
     const off = buildCharacterMainPrompt(base)
     expect(off).toContain('10대 초반')
     expect(off).toContain('유혈')
@@ -34,7 +35,7 @@ describe('turnaround safe-mode', () => {
     expect(off).not.toContain('age-ambiguous')
   })
 
-  it('safeMode on: 미성년 나이 + 그래픽 제거, adult/stylized 토큰 추가', () => {
+  it('안전 기능을 켜면 미성년·유혈 표현을 덜고 자극 없는 성인풍 묘사로 바꾼다', () => {
     const on = buildCharacterMainPrompt({ ...base, safeMode: true })
     // 제거 대상
     expect(on).not.toMatch(/10대|유혈|낭자|피범벅/)
@@ -49,7 +50,7 @@ describe('turnaround safe-mode', () => {
     expect(on).toContain('피부')
   })
 
-  it('safeMode on: 방향 뷰도 동일 변형 + reference 일관성 문구 유지', () => {
+  it('안전 기능을 켜면 옆모습도 같은 기준으로 인물 일관성을 지킨다', () => {
     const on = buildCharacterViewPrompt({ ...base, safeMode: true }, 'sideLeft')
     expect(on).toContain('age-ambiguous')
     expect(on).not.toMatch(/유혈|10대/)

@@ -1,3 +1,4 @@
+// Writer가 화면 구성을 저장한 뒤에만 이미지 준비를 한 번 요청하고, 실패해도 저장 결과를 지킨다
 import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -73,8 +74,8 @@ beforeEach(() => {
   })
 })
 
-describe('writer v2Design image trigger timing', () => {
-  it('calls triggerAssetDrafts after design_tokens and asset persists', async () => {
+describe('Writer 화면 구성 뒤 이미지 초안 요청 시점을 지킨다', () => {
+  it('화면 구성과 인물·장소 정보를 모두 저장한 뒤 이미지 초안을 요청한다', async () => {
     const patch = await runV2DesignStep()
 
     expect(patch).toEqual({ characterVisual: CHARACTER_VISUAL, worldVisual: WORLD_VISUAL })
@@ -82,7 +83,7 @@ describe('writer v2Design image trigger timing', () => {
     expect(mocks.triggerAssetDrafts).toHaveBeenCalledWith('project-1')
   })
 
-  it('fails the v2Design step when persistDesignTokens rejects', async () => {
+  it('화면 구성을 저장하지 못하면 이후 이미지 준비를 진행하지 않는다', async () => {
     mocks.persistDesignTokens.mockRejectedValueOnce(new Error('persist failed'))
 
     await expect(runV2DesignStep()).rejects.toThrow('persist failed')
@@ -90,7 +91,7 @@ describe('writer v2Design image trigger timing', () => {
     expect(mocks.triggerAssetDrafts).not.toHaveBeenCalled()
   })
 
-  it('absorbs triggerAssetDrafts rejection after both persists', async () => {
+  it('이미지 초안 요청이 실패해도 앞서 저장한 화면 구성 결과는 유지한다', async () => {
     mocks.triggerAssetDrafts.mockImplementationOnce(async () => {
       mocks.events.push('trigger')
       throw new Error('trigger failed')
@@ -100,7 +101,7 @@ describe('writer v2Design image trigger timing', () => {
     expect(mocks.events).toEqual(['designTokens', 'assets', 'trigger'])
   })
 
-  it('writer/start after() no longer imports or calls the draft trigger', () => {
+  it('Writer 시작 요청이 끝난 뒤에는 이미지 초안을 중복 요청하지 않는다', () => {
     const source = readFileSync('src/app/api/writer/start/route.ts', 'utf8')
 
     expect(source).not.toContain('@/lib/artist/draft-trigger')

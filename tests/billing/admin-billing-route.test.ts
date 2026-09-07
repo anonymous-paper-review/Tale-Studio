@@ -1,3 +1,4 @@
+// 관리자는 무료로 처리하고, 권한에 따라 크레딧 적립과 조정 내역을 정확히 기록한다 (#payments-phase-2)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
@@ -55,32 +56,32 @@ beforeEach(() => {
   vi.resetAllMocks()
 })
 
-describe('admin billing route — 인증 게이트', () => {
-  it('비인증은 401', async () => {
+describe('관리자 결제 요청 — 접근 권한 확인', () => {
+  it('로그인하지 않은 사용자는 접근할 수 없다', async () => {
     mocks.getUser.mockResolvedValue({ data: { user: null } })
     const res = await POST(postReq({ workspaceId: WORKSPACE_ID, action: 'adjust', delta: 5, reason: 'x' }))
     expect(res.status).toBe(401)
   })
 
-  it('비admin 은 403', async () => {
+  it('관리자가 아닌 사용자는 접근할 수 없다', async () => {
     mocks.getUser.mockResolvedValue({ data: { user: { id: 'u1', email: 'not-admin@x.test' } } })
     const res = await POST(postReq({ workspaceId: WORKSPACE_ID, action: 'adjust', delta: 5, reason: 'x' }))
     expect(res.status).toBe(403)
   })
 
-  it('GET 도 비admin 은 403', async () => {
+  it('정보를 조회해도 관리자가 아니면 접근할 수 없다', async () => {
     mocks.getUser.mockResolvedValue({ data: { user: { id: 'u1', email: 'not-admin@x.test' } } })
     const res = await GET(getReq(`?workspaceId=${WORKSPACE_ID}`))
     expect(res.status).toBe(403)
   })
 })
 
-describe('admin billing route — set_plan', () => {
+describe('관리자 결제 요청 — 요금제 변경', () => {
   beforeEach(() => {
     mocks.getUser.mockResolvedValue({ data: { user: { id: 'admin-1', email: 'admin@tale.studio' } } })
   })
 
-  it('plan 갱신 + grant_plan 적립을 둘 다 수행한다', async () => {
+  it('요금제를 바꾸면 해당 월 크레딧을 함께 적립한다', async () => {
     const updateCall = query({ error: null })
     const insertCall = query({ data: { id: 'grant-1' }, error: null })
     mocks.from.mockReturnValueOnce(updateCall).mockReturnValueOnce(insertCall)
@@ -100,7 +101,7 @@ describe('admin billing route — set_plan', () => {
     expect(json.grant).toEqual({ id: 'grant-1' })
   })
 
-  it('free 로 전환하면 grant 를 적립하지 않는다', async () => {
+  it('무료 요금제로 바꾸면 추가 크레딧을 적립하지 않는다', async () => {
     const updateCall = query({ error: null })
     mocks.from.mockReturnValueOnce(updateCall)
 
@@ -113,12 +114,12 @@ describe('admin billing route — set_plan', () => {
   })
 })
 
-describe('admin billing route — adjust', () => {
+describe('관리자 결제 요청 — 크레딧 조정', () => {
   beforeEach(() => {
     mocks.getUser.mockResolvedValue({ data: { user: { id: 'admin-1', email: 'admin@tale.studio' } } })
   })
 
-  it('reason 없으면 400', async () => {
+  it('조정 사유가 없으면 처리하지 않는다', async () => {
     const res = await POST(postReq({ workspaceId: WORKSPACE_ID, action: 'adjust', delta: -5 }))
     expect(res.status).toBe(500)
     const json = await res.json()
@@ -126,7 +127,7 @@ describe('admin billing route — adjust', () => {
     expect(mocks.from).not.toHaveBeenCalled()
   })
 
-  it('reason 있으면 manual_adjust 행을 삽입한다', async () => {
+  it('조정 사유가 있으면 크레딧 변경 내역을 기록한다', async () => {
     const insertCall = query({ data: { id: 'adj-1' }, error: null })
     mocks.from.mockReturnValueOnce(insertCall)
 
@@ -138,19 +139,19 @@ describe('admin billing route — adjust', () => {
   })
 })
 
-describe('admin billing route — grant_takes', () => {
+describe('관리자 결제 요청 — 크레딧 적립', () => {
   beforeEach(() => {
     mocks.getUser.mockResolvedValue({ data: { user: { id: 'admin-1', email: 'admin@tale.studio' } } })
   })
 
-  it('알 수 없는 kind 는 400', async () => {
+  it('지원하지 않는 적립 종류면 거부한다', async () => {
     const res = await POST(
       postReq({ workspaceId: WORKSPACE_ID, action: 'grant_takes', amount: 10, kind: 'not_a_kind' }),
     )
     expect(res.status).toBe(400)
   })
 
-  it('유효한 grant 는 200 + grant 행 삽입', async () => {
+  it('유효한 크레딧 적립 요청은 변경 내역을 기록한다', async () => {
     const insertCall = query({ data: { id: 'grant-2' }, error: null })
     mocks.from.mockReturnValueOnce(insertCall)
 
@@ -164,8 +165,8 @@ describe('admin billing route — grant_takes', () => {
   })
 })
 
-describe('admin billing route — GET', () => {
-  it('plan/entitlements/takeBalance 를 반환한다', async () => {
+describe('관리자 결제 요청 — 정보 조회', () => {
+  it('요금제와 사용 권한, 남은 크레딧을 보여준다', async () => {
     mocks.getUser.mockResolvedValue({ data: { user: { id: 'admin-1', email: 'admin@tale.studio' } } })
     const workspaceLookup = query({ data: { plan: 'p10' }, error: null })
     const balanceLookup = query({ data: [{ delta: 100 }, { delta: -20 }], error: null })

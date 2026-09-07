@@ -1,3 +1,4 @@
+// 생성 한도가 가득 차면 사용자에게 이유를 알리고, 거절 기록도 남긴다 (#a2-observability 2026-08-26)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // #a2-observability (2026-08-26) — 429(한도 거부)는 generation_jobs 행이 생기기 전에 일어나
@@ -20,7 +21,7 @@ beforeEach(() => {
 })
 
 describe('quotaRejectionResponse', () => {
-  it('records the rejection as an observability event with kind/scope/counts', async () => {
+  it('거절되면 어떤 한도에서 얼마나 대기 중인지 기록한다', async () => {
     const res = quotaRejectionResponse(userBlocked, {
       projectId: 'proj-1',
       kind: 'storyboard_real_grid',
@@ -37,7 +38,7 @@ describe('quotaRejectionResponse', () => {
     })
   })
 
-  it('keeps the standard quota body contract the client toast depends on', async () => {
+  it('한도 초과 응답에는 화면에 필요한 상태 정보를 담는다', async () => {
     const res = quotaRejectionResponse(globalBlocked, { projectId: 'proj-2', kind: 'shot_video' })
     const body = await res.json()
     expect(body.code).toBe('quota_exceeded')
@@ -51,7 +52,7 @@ describe('quotaRejectionResponse', () => {
     )
   })
 
-  it('never lets a recording failure change the 429 response', async () => {
+  it('기록에 실패해도 한도 초과 응답은 그대로 반환한다', async () => {
     recordMock.mockRejectedValueOnce(new Error('db down'))
     const res = quotaRejectionResponse(userBlocked, { projectId: 'proj-3', kind: 'character_view' })
     expect(res.status).toBe(429)

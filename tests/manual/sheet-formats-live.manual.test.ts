@@ -1,3 +1,4 @@
+// 여러 화면 비율의 러프 시트를 만들고 장면 칸을 잘라내면 세로 장면도 가로 시트로 다시 그려진다 (실제 AI 호출 6회·fal 과금 약 $0.4·운영 DB·우리 저장소에는 쓰지 않고 fal 저장소와 로컬 결과 파일에 쓴다 #sheet-formats)
 import { describe, it, expect } from 'vitest'
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import path from 'node:path'
@@ -33,9 +34,9 @@ interface ShotRow {
   char_names: Record<string, string> | null
 }
 
-describe.runIf(LIVE)('sheet-formats 라이브 실측', () => {
+describe.runIf(LIVE)('여러 화면 비율 시트가 장면을 올바르게 담는지 확인한다', () => {
   it(
-    '신규 템플릿 러프 4종 + 세로 스트립 리페인트 — 수락·치수·크롭 파스',
+    '여러 형식의 시트를 만들면 장면 칸이 맞는 모양으로 잘리고 세로 장면도 가로 시트로 다시 그려진다',
     async () => {
       const repo = process.cwd()
       const outDir = process.env.SHEET_OUT ?? path.join(repo, 'research/experiments/sheet-formats/out')

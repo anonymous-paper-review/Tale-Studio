@@ -1,3 +1,4 @@
+// 참고 작품을 가져올 때 권한을 확인하고 안전한 이미지 자료만 새 프로젝트에 복사한다
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -61,8 +62,8 @@ beforeEach(() => {
   })
 })
 
-describe('reference-import server boundary', () => {
-  it('rejects a source project outside the requester workspace without revealing it', async () => {
+describe('참고 작품 가져오기에서 권한과 자료 복사 규칙을 지킨다', () => {
+  it('다른 작업 공간의 참고 작품은 존재 여부도 알리지 않고 거절한다', async () => {
     mocks.responses.projects = [
       { data: { id: 'source', workspace_id: 'other-workspace' }, error: null },
     ]
@@ -76,7 +77,7 @@ describe('reference-import server boundary', () => {
     ).rejects.toMatchObject({ code: 'reference_not_found', status: 404 })
   })
 
-  it('rejects a closed plan after rechecking the source workspace owner', async () => {
+  it('참고 작품을 허용하지 않는 요금제면 소유자를 다시 확인해도 거절한다', async () => {
     mocks.responses.projects = [
       {
         data: {
@@ -104,7 +105,7 @@ describe('reference-import server boundary', () => {
     expect(error).toMatchObject({ code: 'reference_unavailable', status: 403 })
   })
 
-  it('copies a custom anchor and the selected last-shot storyboard start frame internally', async () => {
+  it('선택한 스타일과 마지막 쇼트 시작 화면을 안전한 내부 공간으로 복사한다', async () => {
     const source = {
       id: 'source',
       workspaceId: 'workspace-1',
@@ -169,7 +170,7 @@ describe('reference-import server boundary', () => {
     expect(mocks.from).toHaveBeenLastCalledWith('projects')
   })
 
-  it('uses rough storyboard frames when the final storyboard has no start frame', async () => {
+  it('완성된 스토리보드의 시작 화면이 없으면 러프 스토리보드의 화면을 사용한다', async () => {
     mocks.responses.scenes = [
       { data: [{ id: 'scene-1', sort_order: 1 }], error: null },
     ]
@@ -210,7 +211,7 @@ describe('reference-import server boundary', () => {
     )
   })
 
-  it('warns and never copies an external custom-anchor URL', async () => {
+  it('외부 스타일 이미지 주소는 복사하지 않고 경고만 남긴다', async () => {
     const result = await copyReferenceAssets({
       source: {
         id: 'source',
@@ -238,7 +239,7 @@ describe('reference-import server boundary', () => {
     expect(mocks.from).toHaveBeenCalledWith('projects')
   })
 
-  it('turns storage copy failures into warnings instead of throwing after insert', async () => {
+  it('스타일 이미지를 복사하지 못해도 프로젝트를 만든 뒤 경고로 알린다', async () => {
     mocks.mediaCopy.mockRejectedValueOnce(new Error('storage unavailable'))
     mocks.responses.projects = [{ data: null, error: null }]
 
@@ -262,7 +263,7 @@ describe('reference-import server boundary', () => {
     ])
   })
 
-  it('turns source scene lookup failures into frame warnings', async () => {
+  it('참고 작품의 장면을 찾지 못하면 화면 복사 경고로 알린다', async () => {
     mocks.responses.scenes = [
       { data: null, error: { message: 'scene lookup unavailable' } },
     ]

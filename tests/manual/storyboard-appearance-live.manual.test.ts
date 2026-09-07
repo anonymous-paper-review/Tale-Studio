@@ -1,3 +1,4 @@
+// 그림과 영상은 장면에 저장된 모습을 쓰고 잘못된 모습이면 유료 생성을 막는다 (실제 AI 호출 0회·fal 과금 없음·운영 DB를 읽고 시험 행을 잠시 고쳤다가 되돌리며 저장소에는 쓰지 않는다)
 // 최종 스토리보드가 "샷에 저장된 모습"으로 참조 이미지를 고르는지 — 실제 DB 로 검증한다.
 //
 // 왜 수동 시험인가: 나머지 시험은 가짜 DB 응답으로 돈다. 그건 규칙은 잡아도 "운영 데이터가
@@ -56,8 +57,8 @@ afterAll(async () => {
   if (LIVE && client) await client.end()
 })
 
-describe.skipIf(!LIVE)('스토리보드·영상이 샷에 저장된 모습을 쓴다 — 실제 DB', () => {
-  it('운영 샷이 등장인물마다 모습 키를 하나씩 갖는다', async () => {
+describe.skipIf(!LIVE)('그림과 영상이 장면별 모습을 올바르게 사용한다', () => {
+  it('운영 장면에 나오는 인물마다 모습이 하나씩 기록되어 있다', async () => {
     const { rows } = await client.query(
       `select shot_id, characters, character_appearance_keys
          from shots
@@ -77,7 +78,7 @@ describe.skipIf(!LIVE)('스토리보드·영상이 샷에 저장된 모습을 �
     }
   })
 
-  it('저장된 모습 키가 실제 모습 행을 가리킨다 (끊어진 참조 0건)', async () => {
+  it('저장된 모습이 실제 인물 자료와 연결된다 (끊어진 참조 0건)', async () => {
     const { rows } = await client.query(
       `select s.shot_id, c.character_id, c.appearance_key
          from shots s
@@ -93,7 +94,7 @@ describe.skipIf(!LIVE)('스토리보드·영상이 샷에 저장된 모습을 �
     expect(rows, `끊어진 참조: ${JSON.stringify(rows.slice(0, 5))}`).toEqual([])
   })
 
-  it('과거 장면으로 바꾸면 그 샷의 참조가 젊은 시절 시트로 바뀐다', async () => {
+  it('과거 장면으로 바꾸면 그 장면의 인물 모습이 젊은 시절 자료로 바뀐다', async () => {
     // 옥화가 등장하는 샷 하나를 골라 모습 키만 young 으로 바꿔보고, 제품 조회가
     //   실제로 다른 시트를 집어오는지 확인한다. 원복은 finally.
     const target = (
@@ -144,7 +145,7 @@ describe.skipIf(!LIVE)('스토리보드·영상이 샷에 저장된 모습을 �
     }
   })
 
-  it('스냅샷이 비면 유료 제출 전에 막힌다', () => {
+  it('필요한 모습 정보가 없으면 유료 생성을 시작하지 않는다', () => {
     // 검증 함수는 라우트 내부 비공개다 — 계약 문구와 그 순서로 확인한다.
     const source = readFileSync('src/app/api/director/generate-storyboard-batch/route.ts', 'utf8')
     expect(source).toContain('has no character_appearance_keys snapshot')
@@ -153,7 +154,7 @@ describe.skipIf(!LIVE)('스토리보드·영상이 샷에 저장된 모습을 �
     expect(source.indexOf('has no required sheet_url')).toBeLessThan(source.indexOf('falImageSubmit({'))
   })
 
-  it('영상 경로도 같은 스냅샷 계약을 쓴다', () => {
+  it('영상도 장면에 저장된 모습을 그대로 사용한다', () => {
     const source = readFileSync('src/app/api/director/generate-video/route.ts', 'utf8')
     expect(source).toContain('character_appearance_keys')
     // 기본 모습으로 되돌아가는 우회로가 없어야 한다

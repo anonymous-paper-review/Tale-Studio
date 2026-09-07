@@ -1,3 +1,4 @@
+// 로그인한 사용자의 프로젝트 삭제 결과를 알기 쉬운 말로 정확히 알려준다
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
@@ -37,8 +38,8 @@ beforeEach(() => {
   mocks.rpc.mockResolvedValue({ data: 'ok', error: null })
 })
 
-describe('DELETE /api/project/[id] — delete_project_deep contract', () => {
-  it('rejects unauthenticated callers before touching the database', async () => {
+describe('프로젝트 삭제 요청의 결과를 사용자에게 정확히 알린다', () => {
+  it('로그인하지 않은 사람이 삭제하면 프로젝트를 지우지 않고 거절한다', async () => {
     mocks.getUser.mockResolvedValue({ data: { user: null } })
 
     const response = await call()
@@ -47,7 +48,7 @@ describe('DELETE /api/project/[id] — delete_project_deep contract', () => {
     expect(mocks.rpc).not.toHaveBeenCalled()
   })
 
-  it('deletes through the single RPC with the caller identity', async () => {
+  it('로그인한 사용자가 삭제하면 해당 프로젝트를 지우고 성공을 알린다', async () => {
     const response = await call()
 
     expect(response.status).toBe(200)
@@ -59,7 +60,7 @@ describe('DELETE /api/project/[id] — delete_project_deep contract', () => {
     })
   })
 
-  it('maps not_found to 404', async () => {
+  it('없는 프로젝트를 삭제하려 하면 찾을 수 없다고 알린다', async () => {
     mocks.rpc.mockResolvedValue({ data: 'not_found', error: null })
 
     const response = await call()
@@ -68,7 +69,7 @@ describe('DELETE /api/project/[id] — delete_project_deep contract', () => {
     await expect(response.json()).resolves.toEqual({ error: 'Project not found' })
   })
 
-  it('maps forbidden to 403', async () => {
+  it('권한 없는 프로젝트를 삭제하려 하면 권한 부족이라고 알린다', async () => {
     mocks.rpc.mockResolvedValue({ data: 'forbidden', error: null })
 
     const response = await call()
@@ -77,7 +78,7 @@ describe('DELETE /api/project/[id] — delete_project_deep contract', () => {
     await expect(response.json()).resolves.toEqual({ error: 'Forbidden' })
   })
 
-  it('surfaces RPC errors as 500 without claiming success', async () => {
+  it('서버에서 삭제하지 못하면 성공으로 알리지 않고 오류를 알린다', async () => {
     mocks.rpc.mockResolvedValue({
       data: null,
       error: { message: 'connection lost' },
@@ -89,7 +90,7 @@ describe('DELETE /api/project/[id] — delete_project_deep contract', () => {
     await expect(response.json()).resolves.toEqual({ error: 'connection lost' })
   })
 
-  it('fails closed on an unexpected RPC status', async () => {
+  it('예상하지 못한 삭제 결과가 오면 성공으로 처리하지 않는다', async () => {
     mocks.rpc.mockResolvedValue({ data: null, error: null })
 
     const response = await call()

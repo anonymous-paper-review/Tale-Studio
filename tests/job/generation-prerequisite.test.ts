@@ -1,3 +1,4 @@
+// 필요한 자료가 준비되지 않으면 안내하고, 준비될 때까지 기다렸다가 자동으로 작업을 이어간다 (#ref-gate 2026-09-02, 오너 결정 1번)
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // #ref-gate(2026-09-02, 오너 결정 1번): 선행조건 409 → 안내 → DB 폴링 → 자동 재개의 순수 부분.
@@ -30,7 +31,7 @@ beforeEach(() => {
 })
 
 describe('isPrerequisiteMissing', () => {
-  it('409 + 알려진 code 만 참', () => {
+  it('선행 자료가 빠졌다는 충돌 응답이면 준비되지 않은 것으로 판단한다', () => {
     expect(isPrerequisiteMissing(409, SHEETS)).toBe(true)
     expect(isPrerequisiteMissing(409, ROUGH)).toBe(true)
     expect(isPrerequisiteMissing(409, REAL)).toBe(true)
@@ -47,7 +48,7 @@ describe('prerequisiteLabel / notify', () => {
     expect(prerequisiteLabel(REAL)).toBe('the live-action storyboard of sh_01_27')
   })
 
-  it('대기 안내는 toast 와 채팅 둘 다에 남긴다', () => {
+  it('대기 안내는 화면 알림과 채팅 둘 다에 남긴다', () => {
     notifyPrerequisiteWaiting('director', SHEETS)
     expect(mocks.toast.info).toHaveBeenCalledTimes(1)
     expect(String(mocks.toast.info.mock.calls[0][0])).toContain('character sheets for 수인 수장')
@@ -56,26 +57,26 @@ describe('prerequisiteLabel / notify', () => {
 })
 
 describe('prerequisiteSatisfied', () => {
-  it('시트: 빠졌던 (인물, 모습) 전부에 sheet_url 이 생겨야 참', () => {
+  it('시트: 빠졌던 모든 인물과 모습에 그림 주소가 생기면 준비된 것으로 본다', () => {
     expect(prerequisiteSatisfied(SHEETS, { sheets: [] })).toBe(false)
     expect(prerequisiteSatisfied(SHEETS, { sheets: [{ character_id: 'char_3', appearance_key: 'current', sheet_url: null }] })).toBe(false)
     expect(prerequisiteSatisfied(SHEETS, { sheets: [{ character_id: 'char_3', appearance_key: 'young', sheet_url: 'https://x/y.png' }] })).toBe(false) // 다른 모습
     expect(prerequisiteSatisfied(SHEETS, { sheets: [{ character_id: 'char_3', appearance_key: 'current', sheet_url: 'https://x/s.png' }] })).toBe(true)
   })
 
-  it('러프: start·direction·end 세 프레임이 다 있어야 참', () => {
+  it('러프: 시작·방향·끝 세 장면이 모두 있으면 준비된 것으로 본다', () => {
     expect(prerequisiteSatisfied(ROUGH, { shot: { rough_storyboard: null } })).toBe(false)
     expect(prerequisiteSatisfied(ROUGH, { shot: { rough_storyboard: { frames: { start: 'a', direction: 'b' } } } })).toBe(false)
     expect(prerequisiteSatisfied(ROUGH, { shot: { rough_storyboard: { frames: { start: 'a', direction: 'b', end: 'c' } } } })).toBe(true)
   })
 
-  it('실사: storyboard_image 가 비어 있지 않아야 참', () => {
+  it('실사: 스토리보드 그림이 있으면 준비된 것으로 본다', () => {
     expect(prerequisiteSatisfied(REAL, { shot: { storyboard_image: null } })).toBe(false)
     expect(prerequisiteSatisfied(REAL, { shot: { storyboard_image: '  ' } })).toBe(false)
     expect(prerequisiteSatisfied(REAL, { shot: { storyboard_image: 'https://x/real.png' } })).toBe(true)
   })
 
-  it('실사: 실제 JSONB 형태 — completed 면 참, 생성 중 placeholder 면 거짓(서버 게이트와 같은 판정)', () => {
+  it('실사: 작업이 끝난 그림만 준비된 것으로 보고, 만드는 중이거나 실패한 그림은 제외한다', () => {
     const completed = { url: 'https://x/s.png', frames: { start: 'https://x/s.png', direction: 'https://x/d.png', end: 'https://x/e.png' }, status: 'completed' }
     expect(prerequisiteSatisfied(REAL, { shot: { storyboard_image: completed } })).toBe(true)
     expect(prerequisiteSatisfied(REAL, { shot: { storyboard_image: { url: 'https://x/single.png', status: 'completed' } } })).toBe(true)
@@ -87,7 +88,7 @@ describe('prerequisiteSatisfied', () => {
 describe('waitForPrerequisite', () => {
   const sleep = async () => {}
 
-  it('조회가 준비를 보고하면 ready — 그 전엔 간격마다 다시 본다', async () => {
+  it('확인 결과 자료가 준비되면 끝내고, 그전에는 일정한 간격으로 다시 확인한다', async () => {
     let n = 0
     const fetchState = async (): Promise<PrerequisiteState> => (++n < 3 ? { shot: { storyboard_image: null } } : { shot: { storyboard_image: 'https://x/r.png' } })
     const outcome = await waitForPrerequisite('p1', REAL, { fetchState, sleep, intervalMs: 1 })
@@ -95,19 +96,19 @@ describe('waitForPrerequisite', () => {
     expect(n).toBe(3)
   })
 
-  it('상한을 넘기면 timeout', async () => {
+  it('기다릴 수 있는 시간이 지나면 시간 초과로 끝낸다', async () => {
     const fetchState = async (): Promise<PrerequisiteState> => ({ shot: { storyboard_image: null } })
     const outcome = await waitForPrerequisite('p1', REAL, { fetchState, sleep, intervalMs: 1, timeoutMs: 0 })
     expect(outcome).toBe('timeout')
   })
 
-  it('isCancelled 가 참이면 cancelled', async () => {
+  it('사용자가 취소하면 취소된 상태로 끝낸다', async () => {
     const fetchState = async (): Promise<PrerequisiteState> => ({ shot: { storyboard_image: null } })
     const outcome = await waitForPrerequisite('p1', REAL, { fetchState, sleep, intervalMs: 1, isCancelled: () => true })
     expect(outcome).toBe('cancelled')
   })
 
-  it('조회 실패는 대기를 끝내지 않는다(다음 틱에 재시도)', async () => {
+  it('확인에 실패해도 기다림을 끝내지 않고 다음 간격에 다시 시도한다', async () => {
     let n = 0
     const fetchState = async (): Promise<PrerequisiteState> => {
       n += 1
@@ -121,7 +122,7 @@ describe('waitForPrerequisite', () => {
     expect(n).toBe(2)
   })
 
-  it('같은 키의 새 대기가 시작되면 이전 대기는 cancelled', async () => {
+  it('같은 자료를 새로 기다리기 시작하면 이전 기다림은 취소한다', async () => {
     let release: (() => void) | null = null
     const gate = new Promise<void>((r) => { release = r })
     const slowFetch = async (): Promise<PrerequisiteState> => { await gate; return { shot: { storyboard_image: null } } }
