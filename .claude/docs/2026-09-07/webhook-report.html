@@ -134,8 +134,8 @@
   <p class="eyebrow">세션 보고서 · 2026-09-07 · 결제 P1 + P11</p>
   <h1>웹훅과 경보</h1>
   <p class="bluf">Paddle 결제 알림을 받아 Take 와 플랜을 장부에 옮기는 웹훅을 만들었고, 실패·이상 신호는 디스코드로 간다. 약속 23개를 메모리 장부로, 8건을 dev 서버 실물로, 1건을 Paddle 이 직접 서명해 보낸 알림으로 확인했다. 결제창은 아직 없다.</p>
-  <p class="bluf"><b>결정할 것 3개</b>: 디스코드 웹훅 URL 재발급, 플랜 Take 만료 기준(결제 주기 끝), 샌드박스 상품 등록 착수. <b>알아둘 것 6개</b>, 지뢰 5개.</p>
-  <p class="asof">근거 커밋 a964c3e → d64c8a8 (dev) · 원장 문서 .claude/docs/2026-09-07/ · 실측 2026-09-07 15:40~16:05 KST</p>
+  <p class="bluf"><b>결정할 것 1개</b>: 샌드박스 상품 등록 착수. (플랜 Take 만료 기준·디스코드 URL·경보 채널은 09-07 18:40 오너가 답했다. 4·5절에 반영.) <b>알아둘 것 6개</b>, 지뢰 5개.</p>
+  <p class="asof">근거 커밋 a964c3e → d64c8a8 (dev) · 오너 답 반영 18:40 · 원장 문서 .claude/docs/2026-09-07/ · 실측 2026-09-07 15:40~16:05 KST</p>
 </header>
 
 <section>
@@ -149,7 +149,7 @@
         <td>오늘 확정한 업그레이드 정책이 "갱신일이 그날로 바뀐다"라 결제 주기와 달력 월이 어긋난다. v4 시트의 "월말 소멸"을 그대로 두면 9월 15일 결제한 사람의 Take 가 9월 30일에 사라진다. Paddle 이 주기 끝 날짜를 알림에 실어 준다</td>
         <td>달력 월말(v4 문구 그대로)</td>
         <td class="gate-cell">비쌈<span class="path">장부에 만료일이 행으로 남는다. 첫 결제 뒤엔 되돌리기 힘듦</span></td>
-        <td><span class="gate-empty"></span></td>
+        <td class="gate-cell">확인<span class="path">09-07 18:40 "맞음. v4 시트의 월말도 이 뜻으로"</span></td>
       </tr>
       <tr>
         <td>서명 시각 허용 오차 5분<span class="path">paddle-webhook.ts:21</span></td>
@@ -160,7 +160,7 @@
       </tr>
       <tr>
         <td>재전송 판정을 두 겹으로<span class="path">paddle-webhook.ts:169-170 · 246 · 279</span></td>
-        <td>알림 번호로 한 번, 적립·회수의 참조 번호(transaction·adjustment id)로 한 번 더. 처리 도중 실패해 5xx 를 돌려준 뒤 재전송이 오면 절반만 다시 하는 일이 없게</td>
+        <td>거르는 문이 둘이다. 첫 문 "이 알림 번호 이미 처리 끝냈나". 둘째 문 "이 결제로 이미 Take 넣었나". 둘째 문은 첫 시도에서 Take 는 넣었는데 직후 DB 가 죽어 "실패"로 답한 경우를 위한 것. 그때 재전송이 오면 첫 문은 통과시키고 둘째 문이 막는다</td>
         <td>알림 번호 한 겹</td>
         <td>쉬움</td>
         <td></td>
@@ -188,7 +188,7 @@
       </tr>
       <tr>
         <td>경보 문구는 한국어, 앞에 환경 이름<span class="path">src/lib/ops-alert.ts:20-25</span></td>
-        <td>오너만 보는 채널이다. Preview 와 Production 이 같은 채널을 쓰니 <code>[tale · preview:dev]</code> 처럼 구분한다. 경보 전송 실패는 삼킨다. 경보가 결제를 막으면 안 된다</td>
+        <td>오너만 보는 채널이다. 앞에 <code>[tale · main]</code> <code>[tale · dev]</code> <code>[tale · local]</code> 로 어느 서버가 보낸 건지 적는다(오너 09-07: "main, dev 만 구분"). 경보 전송 실패는 삼킨다. 경보가 결제를 막으면 안 된다</td>
         <td>환경별 채널 2개</td>
         <td>쉬움</td>
         <td></td>
@@ -285,12 +285,12 @@
   <b>const alreadyRevoked = await deps.revokedTotalForTransaction(txnId)
   const amount = Math.min(Math.round(granted * ratio), Math.max(0, granted - alreadyRevoked))</b>
   if (amount <= 0) return 'nothing_to_revoke'</pre>
-    <p class="code-diff"><span class="chip c-pass">같다</span>"음수인 동안 새 영상 생성이 막힌다"는 이 코드가 아니라 기존 <code>take_hold</code>(enforce 모드)가 한다. 지금 전 환경이 shadow 라 음수여도 생성은 된다. 5절 지뢰.</p>
+    <p class="code-diff"><span class="chip c-pass">같다</span>"음수인 동안 새 영상 생성이 막힌다"는 맞다. 막는 부품이 둘로 나뉘어 있을 뿐이다. 웹훅은 잔액을 음수로 만드는 것까지, 생성 버튼을 막는 건 원래 있던 <code>take_hold</code> 다. 그 코드에 스위치 <code>TAKE_BILLING_MODE</code> 가 있고 지금 전 환경이 <code>shadow</code>(장부에 적기만 하고 안 막음)라 오늘 기준으로는 음수여도 생성된다. <code>enforce</code> 로 켜는 날은 Paddle 라이브 날(오너 09-04). 코드는 있고 스위치가 꺼져 있다.</p>
   </div>
 
   <div class="card same">
     <div class="card-head"><h3>무료 워크스페이스에 이미 충전 기록이 있는데 팩 결제가 또 오면 Take 는 주되 경보</h3><span class="chip c-pass">같다</span></div>
-    <p class="agreed"><b>논의(장면 1):</b> v4 충전 상한(무료는 Mini 1회)은 결제창 앞에서 서버가 막는다(P7). 웹훅까지 온 건 이상 신호. 돈은 받았으니 Take 는 준다.</p>
+    <p class="agreed"><b>논의(장면 1):</b> 무료 플랜 워크스페이스가 이미 팩을 한 번 샀는데 <b>또</b> 사는 경우다(최초 구매가 아니다. 구독하다 무료로 떨어진 유저도 같은 규칙). v4 상한(무료는 Mini 1회)은 결제창을 열기 전에 서버가 막는다(P7). 그걸 뚫고 결제까지 됐으면 뭔가 새는 것이라 경보. 돈은 받았으니 Take 는 준다. 최초 구매는 경보 없이 적립.</p>
     <p class="code-what">팩이면 참조 번호로 이중 적립을 거르고, 무료 플랜인데 충전 기록이 있으면 경고 경보를 보낸 뒤 적립한다.</p>
 <pre><span class="path">src/lib/billing/paddle-webhook.ts:245-258</span>  if (resolved.kind === 'pack') {
     if (await deps.hasGrant(refKind, txnId)) return 'already_granted'
@@ -341,7 +341,7 @@
     console.error('[ops-alert] send failed', err instanceof Error ? err.message : err)
   }
 }</pre>
-    <p class="code-diff"><span class="chip c-pass">같다</span>경보 종류 7가지: 처리 실패(error) · 워크스페이스 표시 없음(error) · 워크스페이스 못 찾음(error) · 상품 매핑 없음(error) · 갱신 결제 실패(warn) · 무료 두 번째 팩(warn) · 환불 회수(info).</p>
+    <p class="code-diff"><span class="chip c-pass">같다</span>웹훅이 아는 실패는 전부 간다. 7가지: 처리 실패(error) · 워크스페이스 표시 없음(error) · 워크스페이스 못 찾음(error) · 상품 매핑 없음(error) · 갱신 결제 실패(warn) · 무료 두 번째 팩(warn) · 환불 회수(info). 못 가는 것 둘: 결제창에서 카드가 거절된 것(Paddle 안에서 끝나 알림이 안 온다. 유저가 다시 시도하면 됨) · 알림 자체가 유실된 것(우리 서버가 죽어 있을 때. 일일 대사 P12 가 잡는다).</p>
   </div>
 </section>
 
@@ -352,7 +352,33 @@
     <div class="yes">
       <h4>돌린 것</h4>
       <ul>
-        <li><b>단위 23건</b> <code>tests/paddle-webhook.test.ts</code>, 메모리 장부. 위조 서명 401 · 5분 경과 401 · 재전송 3회 → 적립 1회 · 실패 시 원문 잔존 · 500 뒤 재전송 성공 · 워크스페이스 없음 · 상품 없음 · 팩 12개월 · 무료 두 번째 팩 경보 · 첫 결제 · 갱신 · 취소 예약→취소 · 갱신 실패→무료→재시도 복구 · 플랜 변경 표시 · 환불 음수 · 부분 환불 · 부분 환불 누적 캡 · 환불 알림 2회 → 회수 1회 · 미승인 환불 무시 · 차지백 · 경보 4종 순서 · 미지 이벤트 무시 · 디스코드 전송 유무</li>
+        <li><b>단위 23건</b> <code>tests/paddle-webhook.test.ts</code>, 메모리 장부. 테스트 이름이 곧 약속 문장이다(<code>pnpm test:ledger</code> 로 같은 목록이 나온다):
+          <ol style="margin:8px 0 0;padding-left:20px;font-size:13.5px;line-height:1.65">
+            <li>Paddle이 보낸 것이 아니면(서명이 틀리면) 받지 않고 장부에 아무것도 넣지 않는다</li>
+            <li>서명이 맞아도 5분 넘게 지난 알림은 받지 않는다(재전송 공격 방어)</li>
+            <li>같은 알림이 몇 번 와도 Take는 한 번만 들어가고 플랜도 한 번만 바뀐다</li>
+            <li>받은 알림 원문은 처리 성공·실패와 무관하게 전부 남는다</li>
+            <li>알림 처리 중 오류가 나면 Paddle에 "실패"로 답해 다시 보내게 하고, 재전송에서 처리되면 "성공"이다</li>
+            <li>알림에 어느 워크스페이스 결제인지 표시가 없으면 넣지 않고 원문만 남긴다</li>
+            <li>알림에 적힌 상품이 우리 상품 목록에 없으면 넣지 않고 원문만 남긴다</li>
+            <li>팩 결제 알림이 오면 그 팩의 Take가 결제일부터 12개월 유효로 들어간다</li>
+            <li>무료 워크스페이스에 이미 충전 기록이 있는데 팩 결제 알림이 또 오면 Take는 들어가되 경보가 울린다</li>
+            <li>구독 첫 결제 알림이 오면 플랜이 그 플랜으로 바뀌고 포함 Take가 결제 주기 끝까지 유효로 들어간다</li>
+            <li>갱신 결제 알림이 오면 그 주기 포함 Take가 다시 들어간다</li>
+            <li>구독을 취소해도 낸 기간이 끝날 때까지는 플랜과 Take가 유지되고, 끝나면 무료로 돌아간다</li>
+            <li>갱신 결제가 실패하면 그 즉시 무료 플랜으로 돌아가고 그 주기 Take는 들어가지 않으며, 재시도가 성공하면 다시 그 플랜으로 돌아가고 Take가 들어간다</li>
+            <li>플랜이 바뀌었다는 알림이 오면 플랜 표시를 바꾼다. 이미 들어간 Take와 충전 Take는 건드리지 않는다</li>
+            <li>환불 알림이 오면 그 결제로 들어간 Take를 회수한다. 이미 써서 모자라면 잔액이 음수가 된다</li>
+            <li>부분 환불이면 환불 금액 비율만큼 회수한다</li>
+            <li>부분 환불이 여러 번 와도 회수 합은 그 결제로 들어간 양을 넘지 않는다</li>
+            <li>같은 환불 알림이 두 번 와도 회수는 한 번이다</li>
+            <li>아직 승인되지 않은 환불 요청은 회수하지 않는다</li>
+            <li>카드사 분쟁(차지백) 알림도 환불과 똑같이 처리한다</li>
+            <li>처리 실패·워크스페이스 없음·상품 매핑 없음·갱신 결제 실패는 경보로 간다</li>
+            <li>알 수 없는 종류의 알림은 원문만 남기고 성공으로 답한다</li>
+            <li>경보 주소가 없으면 보내지 않고, 있으면 그 주소로 한 번 보낸다</li>
+          </ol>
+        </li>
         <li><b>dev 서버 실물 8건</b> <code>https://tale-git-dev-talestudio.vercel.app/api/billing/paddle/webhook</code>, 진짜 시크릿으로 서명해 전송, dev DB 에서 결과 읽음. 위조 401 · 10분 경과 401 · 모르는 상품 200(원문만) · 같은 알림 재전송 duplicate · 워크스페이스 없음 200 · 응답 1,576ms · 원문 3건 저장 + processed_at 3건. 팩 적립 경로는 dev 에 상품 ID 가 없어 <code>unknown_price</code> 로 갔다(아래 로컬에서 확인)</li>
         <li><b>로컬 서버 실물 8/8</b> 임시 상품 ID 주입. 위와 같은 8건 + <b>팩 결제 → 50 적립 → 재전송 → 그대로 50</b>. dev DB 에 실제 행이 들어갔다 확인 후 삭제. 응답 499ms</li>
         <li><b>Paddle 시뮬레이터 → dev 1건</b> Paddle 이 직접 서명한 <code>transaction.completed</code> 을 dev 로 보냈다. 우리 응답 200 <code>no_workspace</code>. Paddle 서명이 우리 검증을 통과한다는 유일한 실물 증거</li>
@@ -376,24 +402,12 @@
 
 <section>
   <div class="sec-head"><span class="sec-num">4</span><h2>결정이 필요한 것</h2></div>
-  <p class="sec-lede">오너가 오늘 답할 수 있는 것.</p>
+  <p class="sec-lede">오너가 오늘 답할 수 있는 것. 09-07 18:40 답한 둘(만료 기준 확정, 디스코드 URL 그대로)은 뺐다.</p>
   <div class="tbl"><table>
     <thead><tr><th>질문</th><th>안 정하면</th><th>선택지</th><th>추천</th><th>언제까지</th></tr></thead>
     <tbody>
-      <tr>
-        <td><b>디스코드 웹훅 URL 재발급</b></td>
-        <td>이 세션의 터미널 출력에 URL 대부분이 찍혔다(env 파일 끝 줄바꿈 누락을 고치다가). URL 을 아는 사람은 그 채널에 아무 글이나 쓸 수 있다</td>
-        <td>재발급 / 그대로</td>
-        <td>재발급. 채널 설정 → 연동 → 웹훅 → 삭제 후 새로. 새 URL 을 <code>.env.local</code> 에 넣으면 Vercel 은 내가 갱신한다</td>
-        <td>오늘</td>
-      </tr>
-      <tr>
-        <td><b>플랜 Take 만료 = 결제 주기 끝</b> (1절 첫 행)</td>
-        <td>v4 시트 "월말 소멸"과 코드가 다른 채로 간다. 첫 결제 뒤엔 바꾸기 힘들다</td>
-        <td>결제 주기 끝 / 달력 월말</td>
-        <td>결제 주기 끝. 업그레이드 정책(갱신일 리셋)과 한 몸이다. 시트 6_소멸시효에 한 줄 고치면 된다</td>
-        <td>상품 등록 전</td>
-      </tr>
+      
+      
       <tr>
         <td><b>샌드박스 상품 등록(P6) 착수</b></td>
         <td>dev 에서 팩 적립·구독 경로를 실물로 못 본다. 결제창(P7)도 못 붙인다</td>
@@ -413,9 +427,9 @@
     <tbody>
       <tr><td>결제창을 열 때 <code>custom_data.workspace_id</code> 를 우리가 넣는다(P7)</td><td>모든 결제가 "워크스페이스 표시 없음" 경보로 끝나고 적립이 안 된다</td><td>P7 에서 체크아웃 파라미터에 넣고 시뮬레이터 대신 실제 결제로 확인</td></tr>
       <tr><td>Paddle 이 구독 갱신 때마다 <code>transaction.completed</code> 를 보낸다</td><td>갱신 Take 가 안 들어간다</td><td>문서 기준 맞다. 샌드박스 구독을 하나 만들어 한 달 뒤 확인하거나, 시뮬레이터 <code>subscription_recurring</code> 시나리오</td></tr>
-      <tr><td>Vercel Preview 가 공개 접근이다</td><td>Preview 보호를 켜는 순간 Paddle 이 401 을 받고 알림이 유실된다</td><td>지금 200 확인. 보호를 켜면 웹훅 경로만 예외로</td></tr>
+      <tr><td>dev 배포 주소(<code>tale-git-dev-…vercel.app</code>, Vercel 이 "Preview" 라 부름)는 지금 누구나 들어올 수 있다</td><td>Vercel 에는 이 주소를 "로그인한 팀원만" 보게 잠그는 옵션이 있다. 켜면 Paddle 서버도 문 앞에서 막혀 알림이 전부 실패한다</td><td>오너가 할 일 없음. 나중에 dev 화면을 외부에 숨기고 싶어지면 그때 웹훅 주소만 예외로 연다</td></tr>
       <tr><td>샌드박스 재전송은 3회/15분, 라이브는 60회/3일</td><td>dev 가 15분 넘게 죽어 있으면 알림이 사라진다</td><td>일일 대사(P12)가 잡는다. 그 전까진 Paddle 대시보드 알림 로그</td></tr>
-      <tr><td>경보 채널 하나에 Preview·Production 이 같이 온다</td><td>라이브 뒤 dev 테스트 경보가 섞여 진짜를 놓친다</td><td>메시지 접두 <code>[tale · production]</code> 으로 구분. 시끄러우면 채널 분리</td></tr>
+      <tr><td>경보 채널 하나에 main·dev 가 같이 온다</td><td>라이브 뒤 dev 테스트 경보가 섞여 진짜를 놓친다</td><td>메시지 앞 <code>[tale · main]</code> / <code>[tale · dev]</code> 로 구분. 오너 09-07: "테스트해 보고 채널 하나 더 판다"</td></tr>
       <tr><td><code>.env.local</code> 에 임시 상품 ID 두 줄이 있다(<code>pri_e2e_mini</code>, <code>pri_e2e_s5</code>)</td><td>가격 페이지 로컬 화면에서 Mini·S-5 결제 버튼이 살아 보인다. 실제 Paddle 에는 없는 ID</td><td>P6 등록 뒤 실제 ID 로 교체. 파일 끝 주석에 적어 뒀다</td></tr>
     </tbody>
   </table></div>

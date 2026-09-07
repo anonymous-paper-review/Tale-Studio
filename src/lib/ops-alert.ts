@@ -13,10 +13,11 @@ export interface OpsAlert {
 
 const LEVEL_PREFIX: Record<OpsAlertLevel, string> = { info: 'ℹ️', warn: '⚠️', error: '🚨' }
 
+// 오너 09-07: main · dev · local 셋만 구분한다.
 function environmentLabel(): string {
   const vercel = process.env.VERCEL_ENV
-  if (vercel === 'production') return 'production'
-  if (vercel === 'preview') return `preview:${process.env.VERCEL_GIT_COMMIT_REF ?? '?'}`
+  if (vercel === 'production') return 'main'
+  if (vercel === 'preview') return 'dev'
   return 'local'
 }
 
