@@ -195,3 +195,24 @@ paths:
   프레임·영상 체인, 그 밖 'auto')만 보내고, 라우트는 게이트 뒤에 `resolveVideoReferenceFrames` 로 auto 는 DB 실사의 시작·끝 프레임, manual 은 클라
   목록에 빠진 시작 프레임만 채운다. `frameSource` 가 없는 호출(구 클라·직접 호출)은 종전대로 클라 값을 쓴다.
   그리드 카드의 "영상 생성"은 이미지를 새로 만들기 전에 `hydrateFreshFromDb` 로 DB 를 먼저 읽는다(승인한 그림 보호).
+
+## 카메라 동기 — 여섯으로 닫힌 목록 (2026-09-07, 오너 결정 — `tests/promise-camera-motivation-*.test.ts`)
+
+현직 감독의 "카메라는 언제 움직일까"(강조·감정 고조·리빌·에너지·시점·롱테이크)를 계약으로 옮겼다. 여섯에 들지 않으면 움직이지 않는다.
+
+- **어휘**: `motion-vocabulary.ts` `CAMERA_MOTIVATIONS = emphasis | emotion | reveal | energy | pov | long_take`, 동기별 허용 종류·속도·진폭과 기본값
+  (`MOTIVATION_MOTION_RULES`), 지시서 문구 `CAMERA_MOTIVATION_GUIDE`, 동의어·한국어 접기 `normalizeCameraMotivation`, 꼴 교정 `coerceMotionForMotivation`,
+  "왜" 문장 `cameraWhyClause`. `long_take` 는 예약(오너 결정 3번 — 클립 5~10초라 테이크 묶음·영상 사슬 설계 전까지 쓰지 않는다).
+- **데쿠파주**: 기본 계약 `CAMERA_CONTRACT_MOTIVATED`(relaxed-v3 판단 규칙 + 닫힌 동기). 출력 `camera_motivation`·`camera_target`; 자유 문장 `camera_move_motivation` 은
+  선택. `util/camera_motivation.coerceDecoupageCamera` 가 motivated_move 인데 여섯에 안 들면 static 으로 내리고 `decoupage_motivation_repair_*.txt` 에 남긴다.
+  되돌림: `WRITER_CAMERA_CONTRACT=relaxed-v3|legacy`.
+- **V4**: `camera_motion.motivation`·`target`(데쿠파주 값을 잇는다), `camera_setup.end.subject`(reveal 대상), `camera_setup.pov_of`(시점 주인).
+  `enforceCameraMotivation` 이 유일한 강제 지점 — 동기 없는 무브는 static 으로, 동기 있는 무브는 꼴을 교정(`L4_vocab_repair_*.txt`). reveal/pov 대상은
+  camera_setup 에 이어 준다.
+- **기하**(`stage/apply.ts`): reveal 은 대상이 START 밖·END 안인지 검사하고, END 에 없으면 회전형(pan/tilt·무브 없음)은 제자리에서 대상을 향해 돌리고
+  이동형은 대상을 피사체로 END 카메라를 다시 푼다(`screen_layout.reveal`). pov 는 카메라를 시점 주인의 눈(위치·눈높이·향)에 놓고(`povCamera`) 그 인물을
+  명단·배치에서 빼며 "카메라 자신" 제약을 붙인다(`screen_layout.pov_of`); 시야 가림·물러섬·쌍 축 보정은 걸지 않는다.
+- **프롬프트**: 러프 MOVEMENT 줄이 `camera pan right, medium — to reveal Elf Chief, …` 처럼 "왜"를 달고, pov 는 START 첫머리에 "point-of-view shot: the camera is
+  X's eyes"를 싣는다. 영상 계약문은 카메라 절 뒤 `Purpose: …`(라우트가 대상 인물 이름을 조회해 넘긴다).
+- **에너지 예외(오너 결정 2번 — 전후 비교 중)**: `WRITER_ENERGY_EXCEPTION=1` 일 때만 V4 지시서에 "energy 액션 비트에서는 카메라 큰 무브 + 인물 큰 액션 허용,
+  환경 변화만 따로" 가 실린다. 기본은 꺼짐(종전 동시 금지 유지).

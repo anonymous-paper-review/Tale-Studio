@@ -721,6 +721,20 @@ export async function POST(req: Request) {
         return [characterId, { name: character.name, appearance: appearance.appearance }] as const
       }))
     }
+    // #camera-motivation(2026-09-07): 카메라 동기의 대상이 인물이면 이름을 찾아 계약문의 Purpose 절에 싣는다.
+    //   대상이 없거나 표지면 조회 없음(비용 0) — 표지 라벨은 씬 무대에 있으나 여기서는 대상 없는 문장으로 둔다.
+    let motivationTargetNames: Record<string, string> | null = null
+    const motivationTarget = (dynamicSpec?.camera_motion as { target?: unknown } | undefined)?.target
+    if (!standalone && typeof motivationTarget === 'string' && motivationTarget.trim()) {
+      const { data: targetRows } = await supabaseAdmin
+        .from('characters')
+        .select('character_id, name')
+        .eq('project_id', projectId)
+        .eq('character_id', motivationTarget.trim())
+        .limit(1)
+      const row = targetRows?.[0]
+      if (row && typeof row.name === 'string' && row.name.trim()) motivationTargetNames = { [row.character_id as string]: row.name }
+    }
     const { fullPrompt, prompt_parts: promptParts } = buildVideoPrompt({
       prompt: promptForVideo, // #direction-unify
       camera,
@@ -736,6 +750,7 @@ export async function POST(req: Request) {
       //   DB 에 있는데 여태 아무도 읽지 않아 모델이 대사의 존재를 몰랐다.
       dialogueLines,
       dialogueSpeakers, // #g7-speakers
+      characterNames: motivationTargetNames, // #camera-motivation
     })
     const falSubmitRequest = isLocal
       ? null

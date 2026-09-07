@@ -197,6 +197,9 @@ export interface RawCameraMotion {
   direction?: unknown;
   speed?: unknown;
   magnitude?: unknown;
+  /** #camera-motivation(2026-09-07) — 동기·대상은 util/camera_motivation.ts 가 접는다. */
+  motivation?: unknown;
+  target?: unknown;
 }
 
 export interface NormalizedCameraMotion {
@@ -375,4 +378,152 @@ export function normalizeCameraMotion(
 export function isCameraStatic(motion: NormalizedCameraMotion): boolean {
   if (!motion.mapped) return false;
   return motion.type === 'static' || motion.type === 'handheld_drift' || motion.type === 'rack_focus';
+}
+
+// ── 카메라 동기(#camera-motivation 2026-09-07, 오너 결정 1번: 동기 목록을 여섯으로 닫는다) ──────────────────
+//   출처: 현직 감독의 "카메라는 언제 움직일까" — 강조·감정 고조·리빌·에너지·시점·롱테이크. 여섯에 들지 않으면
+//   움직이지 않는다. 동기가 움직임의 꼴(종류·속도·진폭·대상)을 정하므로 여기서 동기별 허용 집합과 기본값을 갖는다.
+//   long_take 는 예약 — 클립 5~10초 제약으로 별도 설계(테이크 묶음·영상 사슬) 전까지 쓰지 않는다(오너 결정 3번).
+
+export const CAMERA_MOTIVATIONS = ['emphasis', 'emotion', 'reveal', 'energy', 'pov', 'long_take'] as const;
+export type CameraMotivation = (typeof CAMERA_MOTIVATIONS)[number];
+export const CAMERA_MOTIVATION_ENUM_TEXT = quoteJoin(CAMERA_MOTIVATIONS);
+
+export interface MotivationMotionRule {
+  /** 허용 유형(정지 포함 여부는 배열에 'static' 이 있는지로) */
+  types: readonly CameraMotionType[];
+  speeds: readonly MotionSpeed[];
+  magnitudes: readonly CameraMagnitude[];
+  default: { type: CameraMotionType; direction: string; speed: MotionSpeed; magnitude: CameraMagnitude };
+  /** 대상(id)이 필요한가 — energy·long_take 만 없이 가능 */
+  needsTarget: boolean;
+}
+
+export const MOTIVATION_MOTION_RULES: Record<CameraMotivation, MotivationMotionRule> = {
+  emphasis: {
+    types: ['dolly_in', 'tilt', 'pan', 'rack_focus'],
+    speeds: ['slow'],
+    magnitudes: ['minimal', 'moderate'],
+    default: { type: 'dolly_in', direction: 'forward', speed: 'slow', magnitude: 'moderate' },
+    needsTarget: true,
+  },
+  emotion: {
+    types: ['dolly_in'],
+    speeds: ['slow'],
+    magnitudes: ['minimal', 'moderate'],
+    default: { type: 'dolly_in', direction: 'forward', speed: 'slow', magnitude: 'minimal' },
+    needsTarget: true,
+  },
+  reveal: {
+    types: ['pan', 'tilt', 'crane', 'dolly_out', 'tracking'],
+    speeds: ['slow', 'medium'],
+    magnitudes: ['moderate', 'large'],
+    default: { type: 'pan', direction: 'right', speed: 'medium', magnitude: 'moderate' },
+    needsTarget: true,
+  },
+  energy: {
+    types: ['tracking', 'handheld_drift', 'pan', 'crane', 'dolly_in'],
+    speeds: ['medium', 'fast'],
+    magnitudes: ['moderate', 'large'],
+    default: { type: 'tracking', direction: 'forward', speed: 'fast', magnitude: 'large' },
+    needsTarget: false,
+  },
+  pov: {
+    types: ['static', 'handheld_drift', 'tracking', 'pan', 'tilt'],
+    speeds: ['slow', 'medium', 'fast'],
+    magnitudes: ['minimal', 'moderate', 'large'],
+    default: { type: 'handheld_drift', direction: 'none', speed: 'slow', magnitude: 'minimal' },
+    needsTarget: true,
+  },
+  long_take: {
+    types: ['tracking', 'crane', 'pan', 'tilt', 'dolly_in', 'dolly_out', 'handheld_drift'],
+    speeds: ['slow', 'medium', 'fast'],
+    magnitudes: ['minimal', 'moderate', 'large'],
+    default: { type: 'tracking', direction: 'forward', speed: 'medium', magnitude: 'moderate' },
+    needsTarget: false,
+  },
+};
+
+/** 지시서에 싣는 동기 안내 — 낱말과 뜻, 요구하는 꼴. 데쿠파주·V4 가 같은 문장을 쓴다. */
+export const CAMERA_MOTIVATION_GUIDE = `[카메라 동기 — 카메라가 움직이는 샷은 동기를 아래 여섯 중 **하나로만** 적는다(${CAMERA_MOTIVATION_ENUM_TEXT}). 여섯에 들지 않으면 움직이지 않는다(static). 동기가 움직임의 꼴을 정한다 — 코드가 동기에 맞지 않는 종류·속도·진폭을 교정한다.]
+- emphasis  관객이 놓치면 안 되는 정보를 강조 — target(사물·표지·인물 id)을 향한 느린 dolly_in(또는 작은 tilt/pan/rack_focus). 끝 구도에서 대상이 더 크다.
+- emotion   서서히 고조되는 감정 — target(인물 id)의 얼굴을 향한 아주 느린 dolly_in, 진폭 minimal~moderate, 샷 전체에 걸쳐 끊김 없이. 빠르거나 큰 값 금지. 리액션·감정 비트에서만.
+- reveal    프레임 밖의 새 정보를 드러냄 — target(인물·표지 id)이 START 에는 없고 END 에는 있다. pan/tilt/crane/dolly_out/tracking. camera_setup.end.subject 에 같은 id 를 적는다(코드가 END 카메라를 대상 쪽으로 확인·교정).
+- energy    액션의 박진감 — tracking/handheld_drift/pan/crane, medium~fast, moderate~large. 인물이 실제로 크게 움직이는 액션 비트에서만. target 없이 가능.
+- pov       카메라가 인물의 눈 — target = 시점 주인 character_id, camera_setup.pov_of 에 같은 id. 그 인물은 프레임에 없다(손·무기만 가장자리에 들어올 수 있다).
+- long_take (예약) 아직 쓰지 않는다 — 여러 비트를 한 샷에 잇는 계약은 별도 설계 전.`;
+
+const MOTIVATION_SET = new Set<string>(CAMERA_MOTIVATIONS);
+
+/** 동의어·한국어 표현 → 정본 동기. 옛 데쿠파주의 자유 문장(camera_move_motivation)도 여기로 접는다. */
+const MOTIVATION_SYNONYMS: Array<[RegExp, CameraMotivation]> = [
+  [/\b(point[_ ]?of[_ ]?view|subjective|first[_ ]?person)\b|시점/i, 'pov'],
+  [/\b(one[_ ]?r|oner|one[_ ]?take|long[_ ]?take|continuous[_ ]?take)\b|롱테이크|롱 테이크|원테이크/i, 'long_take'],
+  [/\b(reveal|revealing|discover|discovery|unveil|uncover|reframe)\b|드러|리빌|발견|공간을 보여/i, 'reveal'],
+  [/\b(action|kinetic|chase|energy|energetic|momentum|dynamic)\b|액션|질주|추격|박진|에너지|역동/i, 'energy'],
+  [/\b(emphasi[sz]e?|emphasis|highlight|detail|insert|attention)\b|강조|디테일|주목/i, 'emphasis'],
+  [/\b(emotion|emotional|tension|intensif|build|escalat|dread|rising)\b|감정|긴장|고조|압박/i, 'emotion'],
+];
+
+export function normalizeCameraMotivation(raw: unknown): CameraMotivation | null {
+  if (raw == null) return null;
+  const text = String(raw).trim();
+  if (!text) return null;
+  const s = slug(text);
+  if (MOTIVATION_SET.has(s)) return s as CameraMotivation;
+  for (const [re, m] of MOTIVATION_SYNONYMS) if (re.test(text)) return m;
+  return null;
+}
+
+/** 동기에 맞춰 움직임의 꼴을 접는다 — 허용 밖 유형은 기본 유형으로, 속도·진폭은 허용 집합의 가장 가까운 값으로. */
+export function coerceMotionForMotivation(
+  motion: NormalizedCameraMotion,
+  motivation: CameraMotivation,
+): { motion: NormalizedCameraMotion; repairs: string[] } {
+  const rule = MOTIVATION_MOTION_RULES[motivation];
+  const repairs: string[] = [];
+  let { type, direction, speed, magnitude } = motion;
+  const mapped = motion.mapped;
+  if (mapped && !rule.types.includes(type as CameraMotionType)) {
+    repairs.push(`camera_motion.type "${type}" 은 동기 ${motivation} 에 맞지 않아 "${rule.default.type}" 로`);
+    type = rule.default.type;
+    if (direction === 'none' && rule.default.direction !== 'none') direction = rule.default.direction;
+  }
+  if (type === 'static') return { motion: { ...motion, type, direction: 'none' }, repairs };
+  const nearest = <T extends string>(value: T, allowed: readonly T[], order: readonly T[]): T => {
+    if (allowed.includes(value)) return value;
+    const i = order.indexOf(value);
+    let best = allowed[0];
+    let bestDist = Infinity;
+    for (const a of allowed) {
+      const d = Math.abs(order.indexOf(a) - i);
+      if (d < bestDist) { bestDist = d; best = a; }
+    }
+    return best;
+  };
+  const nextSpeed = nearest(speed, rule.speeds, MOTION_SPEEDS);
+  if (nextSpeed !== speed) { repairs.push(`camera_motion.speed "${speed}" → "${nextSpeed}" (동기 ${motivation})`); speed = nextSpeed; }
+  const nextMag = nearest(magnitude, rule.magnitudes, CAMERA_MAGNITUDES);
+  if (nextMag !== magnitude) { repairs.push(`camera_motion.magnitude "${magnitude}" → "${nextMag}" (동기 ${motivation})`); magnitude = nextMag; }
+  return { motion: { ...motion, type, direction, speed, magnitude }, repairs };
+}
+
+/** 러프 MOVEMENT 줄·영상 계약문에 싣는 "왜" — 영어 한 구절. 대상 라벨이 없으면 대상 없는 문장으로. */
+export function cameraWhyClause(motivation: CameraMotivation | null | undefined, targetLabel?: string | null): string | null {
+  if (!motivation) return null;
+  const t = targetLabel?.trim() || null;
+  switch (motivation) {
+    case 'emphasis':
+      return t ? `to emphasize ${t} — the audience must not miss it` : 'to emphasize a detail the audience must not miss';
+    case 'emotion':
+      return t ? `to build the rising emotion on ${t}'s face` : 'to build the rising emotion on the face in frame';
+    case 'reveal':
+      return t ? `to reveal ${t}, who is outside the frame at the start` : 'to reveal what lies outside the frame at the start';
+    case 'energy':
+      return 'to carry the kinetic energy of the action';
+    case 'pov':
+      return t ? `the camera is ${t}'s point of view` : "the camera is a character's point of view";
+    case 'long_take':
+      return 'one continuous take carrying the action across beats';
+  }
 }

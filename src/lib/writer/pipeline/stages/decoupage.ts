@@ -12,6 +12,8 @@ import { DURATION_RUBRIC, SHOT_SECONDS_RANGE, SHOT_SECONDS_HARD_MAX } from '@/li
 import { COVERAGE_GRAMMAR, VISUAL_BEAT_DOCTRINE } from '@/lib/writer/pipeline/visual-doctrine';
 import { REPRESENTATIVE_DEPTHS, REPRESENTATIVE_SHOT_CAP } from '@/lib/writer/pipeline/budget';
 import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
+import { CAMERA_MOTIVATION_ENUM_TEXT, CAMERA_MOTIVATION_GUIDE } from '@/lib/writer/motion-vocabulary';
+import { coerceDecoupageCamera } from '@/lib/writer/pipeline/util/camera_motivation';
 import type {
   DecoupagePlan,
   DecoupageShot,
@@ -94,10 +96,23 @@ const CAMERA_CONTRACT_RELAXED_V3 = `== 카메라 규율 ==
   두 비트의 카메라 처리가 다르면 가능하면 split하라.
 - 동기가 있으면 크기도 그 동기에 맞춰라: 질주를 최소 움직임으로 축소하지 마라.`;
 
+// #camera-motivation(2026-09-07, 오너 결정 1번): 동기 목록을 여섯으로 닫는다. relaxed-v3 의 판단 규칙은 그대로 두고,
+//   자유 문장 동기(camera_move_motivation) 대신 camera_motivation(여섯 중 하나)·camera_target(대상 id)을 받는다.
+//   코드가 여섯에 안 드는 motivated_move 를 static 으로 내린다(util/camera_motivation.ts).
+const CAMERA_CONTRACT_MOTIVATED = `${CAMERA_CONTRACT_RELAXED_V3.replace(
+  '그 동기를 camera_move_motivation에 **카메라가 왜 움직여야 하는지**로 적는다.',
+  '그 동기를 camera_motivation 에 여섯 중 **하나로만** 적고(아래 [카메라 동기]), 대상 id 를 camera_target 에 적는다. 여섯에 들지 않으면 움직이지 않는다 — 코드가 static 으로 내린다.',
+).replace(
+  '(motivated_move, 동기="X의 시선을 따라 Y를 드러낸다")',
+  '(motivated_move, camera_motivation="reveal", camera_target=Y 의 id)',
+)}
+
+${CAMERA_MOTIVATION_GUIDE}`;
+
 export function buildSystemInstruction(outputLocale?: AppLocale): string {
   const contract = process.env.WRITER_CAMERA_CONTRACT;
-  // 기본 = relaxed-v3(채택본). 'legacy' 만 옛 문구로 되돌린다 — 되돌림 스위치는 남겨둔다
-  //   (연출 방침 변경이라 관측이 나쁘면 즉시 원복할 수 있어야 한다).
+  // 기본 = motivated(닫힌 여섯 동기, 2026-09-07). 'relaxed-v3' 는 직전 채택본, 'legacy' 는 옛 문구 —
+  //   되돌림 스위치는 남겨둔다(연출 방침 변경이라 관측이 나쁘면 즉시 원복할 수 있어야 한다).
   //   'relaxed'/'relaxed-v2' 는 과거 실험 팔 재현용으로 유지.
   const cameraContract =
     contract === 'legacy'
@@ -106,7 +121,9 @@ export function buildSystemInstruction(outputLocale?: AppLocale): string {
         ? CAMERA_CONTRACT_RELAXED_V2
         : contract === 'relaxed'
           ? CAMERA_CONTRACT_RELAXED
-          : CAMERA_CONTRACT_RELAXED_V3;
+          : contract === 'relaxed-v3'
+            ? CAMERA_CONTRACT_RELAXED_V3
+            : CAMERA_CONTRACT_MOTIVATED;
   return `당신은 영화 감독이다. 한 씬의 내러티브 비트(scene_actions)를 받아 *데쿠파주(découpage)* — 샷 분해 — 를 저작한다.
 
 == 핵심 원칙 ==
@@ -252,7 +269,9 @@ ${JSON.stringify(worldVisual.locations.filter((loc) => loc.id === scene.location
       "intended_duration_seconds": 4,
       "rhythm_role": "establish" | "develop" | "punctuate" | "sustain" | "accelerate" | "breath",
       "camera_intent": "static" | "motivated_move",
-      "camera_move_motivation": "motivated_move일 때만",
+      "camera_motivation": ${CAMERA_MOTIVATION_ENUM_TEXT} | null,
+      "camera_target": "동기의 대상 id (character_id | 표지 id | 소품) | null",
+      "camera_move_motivation": "한 줄 이유(자유 문장, 선택)",
       "dramatic_purpose": "왜 이 샷인가"
     }
   ]
@@ -309,16 +328,25 @@ async function decoupageForScene(
 
   const parsed = coerceSceneShots(raw);
 
-  // shot_id 표준화 + scene_id 주입
+  // shot_id 표준화 + scene_id 주입 + 카메라 동기 접기(#camera-motivation)
+  const motivationRepairs: string[] = [];
   const shots: DecoupageShot[] = parsed.shots.map((s, i) => {
     const sid = s.shot_id ?? `shot_${scene.scene_id}_${String(i + 1).padStart(3, '0')}`;
+    const cam = coerceDecoupageCamera(s as unknown as Record<string, unknown>);
+    if (cam.repair) motivationRepairs.push(`${sid}: ${cam.repair}`);
     return {
       ...s,
       shot_id: sid,
       scene_id: scene.scene_id,
       source_beats: Array.isArray(s.source_beats) ? s.source_beats : [],
+      camera_intent: cam.camera_intent,
+      camera_motivation: cam.camera_motivation,
+      camera_target: cam.camera_target,
     };
   });
+  if (motivationRepairs.length) {
+    await logger.saveText(`decoupage_motivation_repair_${scene.scene_id}.txt`, motivationRepairs.join('\n'));
+  }
 
   if (shots.length === 0) {
     throw new Error(`Découpage empty shots (scene=${scene.scene_id})`);

@@ -15,6 +15,7 @@ import {
   type RoughStoryboardPromptInput,
 } from '@/lib/writer/rough-storyboard'
 import { backgroundClauseFromView, landmarksInView, stripCameraMoveSentences } from '@/lib/writer/pipeline/stage/view'
+import { cameraWhyClause } from '@/lib/writer/motion-vocabulary'
 import type { ProjectFormat } from '@/types/project'
 import type { ScreenPlacement } from '@/lib/writer/types/pipeline'
 
@@ -443,8 +444,15 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
         .join('; ') || null
     : null
 
+  // #camera-motivation pov: START 가 카메라의 정체를 말한다 — 시점 주인은 절대 그리지 않는다.
+  const povOf = s?.screen_layout?.pov_of ?? (s?.camera_setup as { pov_of?: string | null } | undefined)?.pov_of ?? null
+  const povName = povOf ? input.characterNameById?.get(povOf) ?? povOf : null
+  const povLine = povName
+    ? `point-of-view shot: the camera is ${povName}'s eyes — ${povName} is never visible (at most a hand or weapon at the frame edge)`
+    : null
   const startParts = [
     `${size}, ${angle}, ${lens}mm, ${rule}`,
+    povLine,
     figures || 'empty landscape, no figures',
     cuGuard,
     layerLine || (setting ? `setting: ${setting}` : null),
@@ -460,9 +468,19 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
   // MOTION — DIRECTION 행의 화살표·라벨 재료 (camera + character motion).
   const dyn = input.spec?.dynamicSpec
   const cam = dyn?.camera_motion
+  // #camera-motivation(2026-09-07): 무브에 "왜"를 단다 — 대상은 인물 이름 또는 표지 라벨.
+  const targetLabel = (id: string | null | undefined): string | null => {
+    if (!id) return null
+    return (
+      input.characterNameById?.get(id) ??
+      input.stageLandmarks?.find((l) => l.id === id)?.label ??
+      (input.characterNames.includes(id) ? id : null)
+    )
+  }
+  const why = cam ? cameraWhyClause(cam.motivation ?? null, targetLabel(cam.target)) : null
   const camMove =
     cam && cam.type && cam.type !== 'static'
-      ? `camera ${words(cam.type)}${cam.direction && cam.direction !== 'none' ? ` ${words(cam.direction)}` : ''}${cam.speed ? `, ${words(cam.speed)}` : ''}`
+      ? `camera ${words(cam.type)}${cam.direction && cam.direction !== 'none' ? ` ${words(cam.direction)}` : ''}${cam.speed ? `, ${words(cam.speed)}` : ''}${why ? ` — ${why}` : ''}`
       : null
   // #figure-index(2026-09-02, 실측 겨울_4 sh_01_25·28·29): 동작·시선의 "figure N" 은 그 인물이 START 에서
   //   받은 번호(blocking 순서)로 매긴다. 옛 코드는 동작 목록의 인덱스로 번호를 매겨, 수인의 두 번째 동작

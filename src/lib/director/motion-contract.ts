@@ -25,6 +25,7 @@ import {
   normalizeCameraMotion,
   normalizeCharacterMagnitude,
   type NormalizedCameraMotion,
+  cameraWhyClause,
 } from '@/lib/writer/motion-vocabulary'
 
 export interface MotionContract {
@@ -193,10 +194,24 @@ function subjectClauses(dyn: ShotDynamicSpec, durationSeconds: number): string[]
 export function compileMotionContract(
   dyn: ShotDynamicSpec | null | undefined,
   durationSeconds: number,
+  opts?: {
+    /** #camera-motivation: 대상 id → 이름(인물)·라벨(표지). 없으면 대상 없는 "왜" 문장. */
+    names?: ReadonlyMap<string, string> | null
+  },
 ): MotionContract {
   if (!dyn) return { text: '', cameraStatic: false }
   const { motion } = normalizeCameraMotion(dyn.camera_motion)
-  const cam = cameraClause(motion, durationSeconds)
+  const camBase = cameraClause(motion, durationSeconds)
+  // #camera-motivation(2026-09-07): 카메라 절 뒤에 "왜"를 붙인다 — 영상 모델이 무브의 목적(드러낼 대상·강조할 것)을 안다.
+  const motivation = (dyn.camera_motion as { motivation?: unknown } | undefined)?.motivation
+  const target = (dyn.camera_motion as { target?: unknown } | undefined)?.target
+  const why = !camBase.isStatic || motivation === 'pov'
+    ? cameraWhyClause(
+        typeof motivation === 'string' ? (motivation as Parameters<typeof cameraWhyClause>[0]) : null,
+        typeof target === 'string' ? (opts?.names?.get(target) ?? null) : null,
+      )
+    : null
+  const cam = why ? { ...camBase, clause: `${camBase.clause} Purpose: ${why}.` } : camBase
   const subjects = subjectClauses(dyn, durationSeconds)
   const subjectText = subjects.length
     ? `Subjects: ${subjects.join('; ')}.`

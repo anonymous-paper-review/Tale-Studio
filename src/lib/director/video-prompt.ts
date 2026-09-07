@@ -44,6 +44,8 @@ export type BuildVideoPromptInput = {
   dialogueLines?: DialogueLine[] | null
   /** #g7-speakers (2026-08-27 오너 확정): characterId → 화자. 없으면 종전 무명 표기. */
   dialogueSpeakers?: Record<string, DialogueSpeaker> | null
+  /** #camera-motivation(2026-09-07): 카메라 동기의 대상 id → 이름. 계약문의 "Purpose" 절이 이름을 쓴다. */
+  characterNames?: Record<string, string> | null
 }
 
 function referenceRolesClause(roles: VideoReferenceImageRole[]): string {
@@ -137,8 +139,10 @@ export function dialogueClause(
 }
 
 export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: string; prompt_parts: VideoPromptParts } {
-  const { prompt, camera, movementPreset, cameraPreset, generationMethod, modelKey, durationSeconds, startEndReference, referenceImageRoles, dynamicSpec, dialogueLines, dialogueSpeakers } = parts
-  const contract: MotionContract = compileMotionContract(dynamicSpec, durationSeconds)
+  const { prompt, camera, movementPreset, cameraPreset, generationMethod, modelKey, durationSeconds, startEndReference, referenceImageRoles, dynamicSpec, dialogueLines, dialogueSpeakers, characterNames } = parts
+  const contract: MotionContract = compileMotionContract(dynamicSpec, durationSeconds, {
+    names: characterNames ? new Map(Object.entries(characterNames)) : null,
+  })
   const dialogue = dialogueClause(dialogueLines, dialogueSpeakers)
   const cameraText = camera ? cameraToText(camera) : ''
   const movementFragment = generationMethod === 'T2V' && movementPreset ? findCameraMovement(movementPreset)?.prompt_fragment ?? '' : ''

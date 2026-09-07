@@ -17,9 +17,11 @@ import {
   MOTION_SPEED_ENUM_TEXT,
   CAMERA_MAGNITUDE_ENUM_TEXT,
   CHARACTER_MAGNITUDE_ENUM_TEXT,
-  normalizeCameraMotion,
+  CAMERA_MOTIVATION_ENUM_TEXT,
+  CAMERA_MOTIVATION_GUIDE,
   normalizeCharacterMagnitude,
 } from '@/lib/writer/motion-vocabulary';
+import { enforceCameraMotivation } from '@/lib/writer/pipeline/util/camera_motivation';
 import type { ShotStaticSpec,
   DecoupagePlan,
   DecoupageShot,
@@ -459,7 +461,9 @@ ${beats}
   코드가 축 안쪽으로 되돌린다(관객의 좌우가 뒤집히지 않게). 동기 있는 축 이동만 axis_cross:"motivated".
 - height: eye | low | high | overhead. lens_mm: V3 lens_vocabulary 안에서.
 - over_shoulder_of: OTS 면 어깨 너머 인물 id, 아니면 null.
-- end: 달리·트래킹으로 카메라가 이동하면 { "from_direction"?: 끝 방향, "distance_scale"?: 끝 거리 배율(0.5=반으로 접근, 2=두 배로 후퇴) }. 없으면 null(camera_motion 에서 추정).
+- end: 달리·트래킹으로 카메라가 이동하면 { "from_direction"?: 끝 방향, "distance_scale"?: 끝 거리 배율(0.5=반으로 접근, 2=두 배로 후퇴), "subject"?: reveal 의 대상 id }. 없으면 null(camera_motion 에서 추정).
+  reveal 동기면 end.subject 에 드러날 인물·표지 id 를 반드시 적어라 — 코드가 START 밖·END 안을 검사하고 END 카메라를 그쪽으로 교정한다.
+- pov_of: 시점(pov) 동기면 시점 주인 character_id, 아니면 null — 카메라가 그 인물의 눈에 놓이고 그 인물은 프레임에서 빠진다.
 - 거리는 shot_type(샷 사이즈)과 lens_mm 에서 계산된다 — 클로즈업이면 가까이, 와이드면 멀리.
 - character_blocking 에는 이 카메라에서 **보이길 의도한** 인물을 적어라. 기하상 프레임에 들어온 무대 인물은
   코드가 추가하고, 타이트한 샷(ECU/CU/MCU)에서 프레임 밖인 비피사체는 코드가 뺀다.
@@ -498,16 +502,17 @@ async function generateL4ForScene(
 짧은 영상(D1~D3)이라 씬 비주얼 플랜 단계가 생략됨.
 디시플린을 V4 자체에서 결정한다:
 - lens_mm: 50mm 기본, 필요 시 35/85 변주 (씬 내 1~2종으로 제한)
-- camera_motion.type: 동기가 있으면 움직인다 — 시선 리빌(pan/tilt/zoom_out)·인물 이동 동반(tracking)·긴장 축적(느린 dolly_in). static 은 사건이 프레임 안에서 완결될 때의 선택이지 기본값이 아니다(#static-bias 2026-09-02 실측: 샷의 54~68% 가 static).
+- camera_motion.type: 동기가 있으면 움직인다 — 동기는 [카메라 동기] 여섯 중 하나(camera_motion.motivation)로 적고 대상을 target 에 적는다. 여섯에 들지 않으면 static. static 은 사건이 프레임 안에서 완결될 때의 선택이지 기본값이 아니다(#static-bias 2026-09-02 실측: 샷의 54~68% 가 static).
 - color_temp_kelvin: 씬 시간대/무드에 맞춰 일관 유지
 - key_fill_ratio: 4:1 기본 (드라마틱) 또는 2:1 (자연)
 - 샷 개수: 액션 예산에 따라 자동
 - 시선/180°축: 대화 씬이면 자체적으로 일관 유지`
     : `[일반 모드 — V3 디시플린 준수]
 - **static 은 기본값이 아니다** (#static-bias 2026-09-02 실측: 샷의 54~68% 가 static): 샷마다 "카메라가
-  움직일 동기가 있는가"를 먼저 묻고, 시선 리빌·인물 이동·공간 드러내기·긴장 축적은 동기다. 데쿠파주
-  camera_intent=motivated_move 는 실제 무브 타입으로 옮긴다 — 아래 V3 표는 마운팅의 **기본값**이고 리빌
-  동기가 있으면 표의 예외가 우선한다.
+  움직일 동기가 있는가"를 먼저 묻는다. 동기는 [카메라 동기] 여섯(emphasis·emotion·reveal·energy·pov·long_take) 중
+  하나로만 camera_motion.motivation 에 적고 대상 id 를 camera_motion.target 에 적는다 — 여섯에 들지 않으면 움직이지
+  않는다(코드가 동기 없는 무브를 static 으로 내린다). 데쿠파주 camera_intent=motivated_move 와 camera_motivation 은
+  그대로 잇는다 — 아래 V3 표는 마운팅의 **기본값**이고 동기가 있으면 표의 예외가 우선한다.
 - lens_mm은 반드시 V3.lens_vocabulary 안에서 선택
 - camera_motion.type은 V3.camera_mounting + camera_energy에 부합
   · tripod + static → 'static' 기본 — 단 시선 리빌·공간 드러내기는 pan/tilt/zoom_out 허용(#static-bias)
@@ -525,7 +530,7 @@ async function generateL4ForScene(
 - 각 샷의 shot_id, shot_function, shot_size, intended_duration_seconds, source_beats, camera_intent를 존중하라.
 - static_spec.shot_type은 데쿠파주의 shot_size를 그대로 사용한다.
 - intent.duration_seconds는 데쿠파주의 intended_duration_seconds를 따른다.
-- dynamic_spec.camera_motion.type은 camera_intent를 따른다 (static이면 'static').
+- dynamic_spec.camera_motion.type은 camera_intent를 따른다 (static이면 'static'). motivation·target 은 데쿠파주의 camera_motivation·camera_target 을 잇는다.
 - intent.shot_id는 데쿠파주 shot_id를 그대로 유지한다.` : ''}
 한 씬 안의 모든 샷을 생성한다.
 
@@ -590,6 +595,8 @@ ${stage ? buildStageInstructionBlock(stage) : ''}[공간 앵커 — 같은 씬 �
 
 ${MOTION_VOCABULARY_GUIDE}
 
+${CAMERA_MOTIVATION_GUIDE}
+
 ${disciplineSection}
 
 샷 분배 원칙:
@@ -608,7 +615,8 @@ V4c (Dynamic) 작성 규칙 (가장 중요):
 - **시선의 대상이 프레임 밖이면 리빌이다**: gaze_arc 로 시선을 적고 camera_motion 을 pan/tilt/
   zoom_out 으로 그 대상을 드러내라(데쿠파주 camera_intent=motivated_move 를 따른다). 정지
   카메라로 두려면 그 대상을 담는 다음 샷이 있어야 한다.
-- 카메라 큰 무브 + 캐릭터 큰 액션 + 환경 변화 동시 금지
+- 카메라 큰 무브 + 캐릭터 큰 액션 + 환경 변화 동시 금지${process.env.WRITER_ENERGY_EXCEPTION === '1' ? `
+  — 단(#energy-exception, 전후 비교 중) motivation=energy 인 액션 비트에서는 카메라 큰 무브와 인물 큰 액션을 함께 쓴다. 환경 변화만 따로 둔다.` : ''}
 - 환경 사건(붕괴·낙하·분출·바람·흔들림)은 **출처와 방향**을 적어라 — 무엇이 어디서 어느 쪽으로 움직이는지("천장의 흙이 위에서
   아래로 쏟아진다"처럼). first_frame_prompt 는 정지 그림이라 카메라 무브를 말하지 않는다(카메라는 camera_motion 에만).
 - motion_prompt (최종 출력): ${MOTION_PROMPT_CHARS}, 동사 1~${SHOT_PHYSICS.verbsPerShotMax}개
@@ -704,7 +712,8 @@ ${stage ? `        "camera_setup": {
           "lens_mm": 35,
           "over_shoulder_of": null,
           "axis_cross": "none",
-          "end": null
+          "end": null | { "from_direction": "N", "distance_scale": 0.7, "subject": "reveal 대상 id" },
+          "pov_of": null
         },
 ` : ''}        "character_blocking": [
           {
@@ -729,7 +738,9 @@ ${stage ? `        "camera_setup": {
           "type": ${CAMERA_MOTION_TYPE_ENUM_TEXT},
           "direction": ${CAMERA_DIRECTION_ENUM_TEXT},
           "speed": ${MOTION_SPEED_ENUM_TEXT},
-          "magnitude": ${CAMERA_MAGNITUDE_ENUM_TEXT}
+          "magnitude": ${CAMERA_MAGNITUDE_ENUM_TEXT},
+          "motivation": ${CAMERA_MOTIVATION_ENUM_TEXT} | null,
+          "target": "동기의 대상 id | null"
         },
         "character_motion": [
           { "character_id": "char", "verb": "opens eyes", "magnitude": "small" },
@@ -816,10 +827,12 @@ ${stage ? `        "camera_setup": {
   //   여기서 정본 낱말로 만들어 저장하므로 하류 소비처(계약문·6축·검수·씬 역추론)는
   //   깨끗한 값을 받는다. 소비처의 개별 정규화는 이미 저장된 옛 행을 위한 안전망으로 남긴다.
   const vocabRepairs: string[] = [];
-  const normalized = shots.map((shot) => {
+  const normalized = shots.map((shot, shotIndex) => {
     const dyn = shot.dynamic_spec;
     if (!dyn) return shot;
-    const { motion, repairs } = normalizeCameraMotion(dyn.camera_motion);
+    // #camera-motivation(2026-09-07): 어휘 교정 위에 동기 강제 — 동기는 V4 값 → 데쿠파주 값 순, 동기 없는 무브는 static.
+    const decForMotivation = decoupageDriven && sceneDec![shotIndex] ? sceneDec![shotIndex] : null;
+    const { camera_motion: cameraMotion, repairs } = enforceCameraMotivation(dyn.camera_motion, decForMotivation);
     const characterMotion = (dyn.character_motion ?? []).map((m) => {
       const magnitude = normalizeCharacterMagnitude(m?.magnitude);
       if (m?.magnitude && m.magnitude !== magnitude) {
@@ -830,17 +843,26 @@ ${stage ? `        "camera_setup": {
     if (repairs.length) {
       vocabRepairs.push(`${shot.intent?.shot_id ?? '(id 없음)'}: ${repairs.join(' / ')}`);
     }
+    // reveal 은 camera_setup.end.subject, pov 는 camera_setup.pov_of 에 대상을 이어 준다(모델이 빠뜨려도 기하가 검사하게).
+    const setupRaw = shot.static_spec?.camera_setup as Record<string, unknown> | undefined;
+    let cameraSetup = setupRaw;
+    if (setupRaw && typeof setupRaw === 'object' && cameraMotion.target) {
+      if (cameraMotion.motivation === 'reveal') {
+        const endRaw = setupRaw.end && typeof setupRaw.end === 'object' ? (setupRaw.end as Record<string, unknown>) : {};
+        if (typeof endRaw.subject !== 'string' || !endRaw.subject.trim()) {
+          cameraSetup = { ...setupRaw, end: { ...endRaw, subject: cameraMotion.target } };
+        }
+      } else if (cameraMotion.motivation === 'pov' && (typeof setupRaw.pov_of !== 'string' || !setupRaw.pov_of.trim())) {
+        cameraSetup = { ...setupRaw, pov_of: cameraMotion.target };
+      }
+    }
     return {
       ...shot,
+      ...(cameraSetup !== setupRaw ? { static_spec: { ...shot.static_spec, camera_setup: cameraSetup } } : {}),
       dynamic_spec: {
         ...dyn,
         // 매핑 실패(mapped:false)는 원문이 그대로 남는다 — 조용히 static 으로 접지 않는다.
-        camera_motion: {
-          type: motion.type,
-          direction: motion.direction,
-          speed: motion.speed,
-          magnitude: motion.magnitude,
-        },
+        camera_motion: cameraMotion,
         character_motion: characterMotion,
       },
     } as ShotDesign;

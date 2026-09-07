@@ -8,6 +8,7 @@ import type {
   CameraMagnitude,
   CharacterMagnitude,
   MotionSpeed,
+  CameraMotivation,
 } from '@/lib/writer/motion-vocabulary';
 import type { WriterEngine } from '@/lib/writer/engine';
 
@@ -674,8 +675,11 @@ export interface ShotCameraSetup {
   over_shoulder_of?: string | null;
   /** 축을 넘는 샷은 동기가 있을 때만(중립 샷·화면 안 이동 뒤) — 아니면 계산이 축 안쪽으로 되돌린다 */
   axis_cross?: 'none' | 'motivated';
-  /** 카메라 무브의 끝(달리·트래킹): 방향/거리 배율. 없으면 camera_motion 에서 추정 */
-  end?: { from_direction?: CompassDir; distance_scale?: number } | null;
+  /** 카메라 무브의 끝(달리·트래킹): 방향/거리 배율. 없으면 camera_motion 에서 추정.
+   *  subject(#camera-motivation reveal): 드러날 대상 id — 코드가 START 밖·END 안을 검사하고 END 카메라를 그쪽으로 교정한다. */
+  end?: { from_direction?: CompassDir; distance_scale?: number; subject?: string } | null;
+  /** #camera-motivation pov: 시점 주인 character_id — 카메라가 그 인물의 눈에 놓이고 그 인물은 프레임에서 봉인된다. */
+  pov_of?: string | null;
 }
 
 export type ScreenPositionWord =
@@ -722,6 +726,10 @@ export interface ShotScreenLayout {
   }>;
   /** 프레임 밖 봉인(2026-09-05): 씬에 있지만 이 카메라의 프레임 밖인 인물 id — 프롬프트가 "그리지 말 것"으로 못박는다. */
   off_frame?: string[];
+  /** #camera-motivation pov: 카메라가 이 인물의 눈이다(그 인물은 off_frame 에도 든다). */
+  pov_of?: string;
+  /** #camera-motivation reveal: 대상이 START 밖·END 안인지의 검사 결과. resolved = 코드가 END 카메라를 대상 쪽으로 돌렸다. */
+  reveal?: { target: string; in_start: boolean; in_end: boolean; resolved: boolean };
   issues: string[];
 }
 
@@ -776,7 +784,12 @@ export interface DecoupageShot {
   intended_duration_seconds: number;
   rhythm_role: RhythmRole;
   camera_intent: 'static' | 'motivated_move';
-  camera_move_motivation?: string; // camera_intent==='motivated_move'일 때 필수: 감정적 동기
+  /** @deprecated 자유 문장 동기 — #camera-motivation(2026-09-07)부터 camera_motivation(닫힌 여섯)이 진실. 옛 run 읽기용. */
+  camera_move_motivation?: string;
+  /** #camera-motivation: motivated_move 의 동기(여섯 중 하나). 없으면 코드가 static 으로 내린다. */
+  camera_motivation?: CameraMotivation | null;
+  /** 동기의 대상 id(character_id | landmark id | prop). energy 만 없이 가능. */
+  camera_target?: string | null;
   dramatic_purpose: string;
 }
 
@@ -894,6 +907,10 @@ export interface ShotDynamicSpec {
     direction?: string;              // left/right/up/down/forward/backward/none
     speed: MotionSpeed;
     magnitude: CameraMagnitude;      // 카메라는 가운데가 'moderate'
+    /** #camera-motivation(2026-09-07): 움직이는 카메라의 동기(닫힌 여섯). 정지 카메라는 없어도 된다. */
+    motivation?: CameraMotivation | null;
+    /** 동기의 대상 id — 러프·영상 프롬프트가 이름으로 "왜"를 적는다. */
+    target?: string | null;
   };
 
   // 캐릭터 모션 (1~2개 동사로 압축)
