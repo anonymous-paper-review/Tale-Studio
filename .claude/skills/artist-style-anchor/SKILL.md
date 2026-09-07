@@ -1,12 +1,12 @@
 ---
-description: 임의 작가 그림체를 스타일 앵커로 온보딩 — 레퍼런스 이미지(1~N장)를 계산 통계+facet 분석해 Style Card를 만들고, 중립 정물 앵커 보드를 I2I 생성·QA한 뒤 전이 프로브 4장으로 검증. 사용자가 "작가 스타일 앵커", "그림체 분석/앵커화", "/artist-style-anchor" + 이미지 경로 제시 시 사용.
+description: 임의 작가 그림체를 스타일 앵커로 온보딩 — 레퍼런스 이미지(1~N장)를 계산 통계+facet 분석해 Style Card를 만들고, 원작을 단일 참조로 전이 프로브 4장을 생성·검증(앵커 보드는 2026-09-08부터 선택·보관). 사용자가 "작가 스타일 앵커", "그림체 분석/앵커화", "/artist-style-anchor" + 이미지 경로 제시 시 사용.
 when_to_use: 프리셋 7매체 밖의 유저 제공 그림체를 앵커화·검증할 때 (dev 검증 루프 — 프로덕션 배선(업로드 API·style_anchors 시드)은 별개 spec 작업). 전제 - higgsfield CLI 로그인 + workspace 선택. 장당 7크레딧.
 allowed-tools: Bash, Read, Write, Edit
 ---
 
 # artist-style-anchor — 작가 그림체 앵커화 파이프라인 (B안)
 
-레퍼런스 그림체 → 중립 앵커 보드 → 전이 검증까지. 이론 문서 2종(neutral_style_analysis_workflow·style-anchor-injection)은 2026-08-05 대청소로 삭제 — **git 히스토리(각 2~3커밋)와 `~/tale-studio-backup-2026-08-05.tar.gz`에서 복구 가능**. refer1/refer2 견본 카드와 전 산출물·프롬프트 원문은 `dev/Image_Style/`에 현존하나 **폴더 전체가 gitignore(로컬 전용)** — 리뷰 패키지 인덱스는 `dev/Image_Style/README.md` (2026-08-13 정리). 운영에 필요한 루브릭·실측 규칙은 이 파일에 자기완결로 담겨 있다.
+레퍼런스 그림체 → Style Card → 원작 직접 참조 전이 검증까지(앵커 보드는 2026-09-08 오너 확정으로 기본 파이프라인에서 제외, `templates/archive/` 보관). 이론 문서 2종(neutral_style_analysis_workflow·style-anchor-injection)은 2026-08-05 대청소로 삭제 — **git 히스토리(각 2~3커밋)와 `~/tale-studio-backup-2026-08-05.tar.gz`에서 복구 가능**. refer1/refer2 견본 카드와 전 산출물·프롬프트 원문은 `dev/Image_Style/`에 현존하나 **폴더 전체가 gitignore(로컬 전용)** — 리뷰 패키지 인덱스는 `dev/Image_Style/README.md` (2026-08-13 정리). 운영에 필요한 루브릭·실측 규칙은 이 파일에 자기완결로 담겨 있다.
 
 **산출 디렉토리**: `dev/Image_Style/<run_name>/` (없으면 생성, gitignore — 로컬 전용) — `style-card-<run_name>.md` + `anchor_board.png` + `test_*.png`.
 
