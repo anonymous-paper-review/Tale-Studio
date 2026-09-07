@@ -82,6 +82,23 @@ export function isPurchasable(item: { paddlePriceId: string | null }): boolean {
   return typeof item.paddlePriceId === 'string' && item.paddlePriceId.length > 0
 }
 
+export type ResolvedPaddlePrice = { kind: 'plan'; plan: PaddlePlan } | { kind: 'pack'; pack: PaddleTakePack }
+
+/**
+ * 웹훅 역매핑 — 결제 알림에 실린 Paddle 가격 ID 를 우리 플랜·팩으로. env 를 매 호출 다시 읽는다
+ * (테스트가 env 를 바꾸며 돌고, 런타임에서도 모듈 로드 시점에 고정되지 않게). 모르는 ID 는 null.
+ */
+export function resolvePaddlePrice(priceId: string | null | undefined): ResolvedPaddlePrice | null {
+  if (!priceId) return null
+  for (const p of PADDLE_PLANS) {
+    if (envPriceId(`NEXT_PUBLIC_PADDLE_PRICE_PLAN_${p.id.toUpperCase()}`) === priceId) return { kind: 'plan', plan: p }
+  }
+  for (const p of PADDLE_TAKE_PACKS) {
+    if (envPriceId(`NEXT_PUBLIC_PADDLE_PRICE_PACK_${p.id.toUpperCase()}`) === priceId) return { kind: 'pack', pack: p }
+  }
+  return null
+}
+
 /** Take 계수 (v4 2_Take경제) — 가격 페이지 각주용. 실제 차감 계수는 take-cost.ts 가 소유한다. */
 export const TAKE_COEFFICIENT_NOTES: readonly { model: string; takes: number }[] = [
   { model: 'Seedance Pro 720p', takes: 1 },
