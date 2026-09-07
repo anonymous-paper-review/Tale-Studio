@@ -7,7 +7,6 @@ import {
   PenTool,
   Palette,
   Clapperboard,
-  Coins,
   Film,
   Home,
   Loader2,
@@ -30,7 +29,6 @@ import { ExportMenu } from '@/components/export-menu'
 import { useProjectStore } from '@/stores/project-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useStageBadges } from '@/lib/stage-seen'
-import { useVideoUsage } from '@/lib/generation-queue'
 import { useTakeBalance } from '@/lib/billing/use-take-balance'
 import { refetchBillingAccount, useBillingAccount } from '@/lib/billing/use-billing-account'
 import type { StageId } from '@/types'
@@ -333,7 +331,6 @@ export function Sidebar() {
       {/* 푸터 액션 — 공유·내보내기·문의·프로필: 버튼 크기·캡션 타이포·세로 간격을 FooterIconItem 로 통일 */}
       <div className="mt-2 flex shrink-0 flex-col items-center gap-2.5">
         <SidebarTakeBalance />
-        <SidebarVideoUsage />
         <OwnerOnly>
           <FooterIconItem label={t('Share')}>
             <ShareButton />
@@ -387,6 +384,7 @@ export function Sidebar() {
 // #payments-phase-3 P9a(2026-09-07): Take 잔액 배지 — 합계는 기존 잔액 훅, 호버하면 종류별(플랜/충전/무료)로
 //   나눠 보인다(오너 09-07: 소멸 알림 대신 호버 구분). 누르면 계정·결제 페이지. 과금 모드 off 면 숨긴다.
 //   관리자(무제한)는 ∞. 잔액 음수(환불 회수)는 경고색.
+//   오너 09-07: 옛 "영상 0/100" 게이지(#f4)는 이 배지로 통합 — 아이콘은 그 게이지의 Film 을 이어받는다.
 function SidebarTakeBalance() {
   const t = useT()
   const router = useRouter()
@@ -419,7 +417,7 @@ function SidebarTakeBalance() {
                 negative ? 'border-destructive/60 text-destructive' : 'border-border text-muted-foreground',
               )}
             >
-              <Coins className="size-3.5" />
+              <Film className="size-3.5" />
               <span className="text-[9px] font-medium leading-none tabular-nums">
                 {unlimited ? '∞' : take.balance}
               </span>
@@ -452,55 +450,6 @@ function SidebarTakeBalance() {
             <p className="mt-2 text-xs text-muted-foreground">{t('Click to open account & billing.')}</p>
           </HoverCardContent>
         </HoverCard>
-      </FooterIconItem>
-    </OwnerOnly>
-  )
-}
-
-// #f4(2026-08-27 오너): 프로젝트당 영상 생성 사용량 게이지 — active 잡 단일 폴러에 실려 와
-//   영상 생성 직후 다음 틱(≤4s)에 반영된다. 표시용 진실(하드 블록 아님).
-function SidebarVideoUsage() {
-  const t = useT()
-  const projectId = useProjectStore((s) => s.projectId)
-  const usage = useVideoUsage(projectId)
-  if (!projectId || !usage) return null
-  const ratio = usage.limit > 0 ? usage.used / usage.limit : 0
-  return (
-    <OwnerOnly>
-      <FooterIconItem label={t('Videos')}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div
-              className={cn(
-                'flex h-10 w-10 flex-col items-center justify-center rounded-full border bg-background/60',
-                ratio >= 1
-                  ? 'border-destructive/60 text-destructive'
-                  : ratio >= 0.9
-                    ? 'border-warning/60 text-warning'
-                    : 'border-border text-muted-foreground',
-              )}
-            >
-              <Film className="size-3.5" />
-              <span className="text-[9px] font-medium leading-none tabular-nums">
-                {usage.used}/{usage.limit}
-              </span>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side="right" className="max-w-52">
-            <span className="font-medium">
-              {t('Video generations in this project: {used} of {limit}', {
-                used: usage.used,
-                limit: usage.limit,
-              })}
-            </span>
-            <span className="mt-0.5 block text-xs text-muted-foreground">
-              {t('Every video generation (including previz and retakes) counts toward the limit.')}
-            </span>
-            <span className="mt-0.5 block text-xs text-muted-foreground">
-              {t('When the limit is reached, new video generations are blocked.')}
-            </span>
-          </TooltipContent>
-        </Tooltip>
       </FooterIconItem>
     </OwnerOnly>
   )

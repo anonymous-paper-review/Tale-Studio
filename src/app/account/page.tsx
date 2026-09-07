@@ -164,6 +164,10 @@ export default function AccountPage() {
                         ? t('Canceled')
                         : t('No active subscription')}
               </p>
+              {plan === 'free' ? (
+                // 오너 09-07: 무료는 "프로젝트당 0분 · 월 0 Take" 대신 한 줄 안내.
+                <p className="mt-4 text-sm text-gray-300">{t('Add Takes to start generating video. Images are always free.')}</p>
+              ) : (
               <ul className="mt-4 grid grid-cols-1 gap-x-8 gap-y-1.5 text-sm text-gray-300 sm:grid-cols-2">
                 {planRows.map((row) => (
                   <li key={row} className="flex items-center gap-2">
@@ -180,6 +184,7 @@ export default function AccountPage() {
                   <span className={entitlements.canExport ? undefined : 'text-gray-500'}>{t('Export previz data')}</span>
                 </li>
               </ul>
+              )}
             </div>
             <div className="flex shrink-0 gap-2">
               <Link href="/pricing" className={linkButtonClass}>

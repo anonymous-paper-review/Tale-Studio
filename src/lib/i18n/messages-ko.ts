@@ -1474,6 +1474,7 @@ export const KO: Record<string, string> = {
   'Access until {date}': '{date}까지 이용 가능',
   Canceled: '취소됨',
   'No active subscription': '구독 없음',
+  'Add Takes to start generating video. Images are always free.': 'Take를 충전하면 영상을 만들 수 있어요. 이미지는 언제나 무료예요.',
   '{n} min per project': '프로젝트당 {n}분',
   '1 linked project': '연결 프로젝트 1개',
   '{n} linked projects': '연결 프로젝트 {n}개',
