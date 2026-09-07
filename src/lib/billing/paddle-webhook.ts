@@ -82,6 +82,8 @@ export interface PaddleWebhookDeps {
   /** 원 결제 총액(최소 단위, 예: 2900 = $29.00). 우리가 저장한 transaction.completed 원문에서 읽는다. */
   findTransactionTotal(transactionId: string): Promise<number | null>
   hasRevoke(adjustmentId: string): Promise<boolean>
+  /** 이 결제에 대해 이미 회수한 Take 합(양수). 부분 환불이 여러 번 와도 적립을 넘지 않게 캡을 건다. */
+  revokedTotalForTransaction(transactionId: string): Promise<number>
   revoke(input: { workspaceId: string; amount: number; refId: string; reason: string }): Promise<void>
   alert(alert: OpsAlert): Promise<void>
 }
@@ -385,7 +387,8 @@ async function handleAdjustment(event: PaddleEvent, deps: PaddleWebhookDeps): Pr
   const refunded = totals && typeof totals === 'object' ? Number.parseInt(String((totals as Record<string, unknown>).total ?? ''), 10) : NaN
   const original = await deps.findTransactionTotal(txnId)
   const ratio = Number.isFinite(refunded) && original && original > 0 ? Math.min(1, refunded / original) : 1
-  const amount = Math.round(granted * ratio)
+  const alreadyRevoked = await deps.revokedTotalForTransaction(txnId)
+  const amount = Math.min(Math.round(granted * ratio), Math.max(0, granted - alreadyRevoked))
   if (amount <= 0) return 'nothing_to_revoke'
 
   await deps.revoke({

@@ -157,6 +157,17 @@ const deps: PaddleWebhookDeps = {
     return (data?.length ?? 0) > 0
   },
 
+  async revokedTotalForTransaction(transactionId) {
+    // 회수 행의 reason 에 원 결제 id 를 남긴다(`paddle refund of txn_… (50%)`) — 그걸로 합산한다.
+    const { data, error } = await supabaseAdmin
+      .from('take_ledger')
+      .select('delta')
+      .eq('kind', 'refund_revoke')
+      .like('reason', `% of ${transactionId} %`)
+    if (error) throw error
+    return (data ?? []).reduce((sum, r) => sum - (r.delta as number), 0)
+  },
+
   async revoke(input) {
     const { error } = await supabaseAdmin.from('take_ledger').insert({
       workspace_id: input.workspaceId,

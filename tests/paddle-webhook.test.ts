@@ -80,6 +80,8 @@ function makeDeps(init?: { plan?: string; ledger?: LedgerRow[]; transactionTotal
         .map((r) => ({ id: r.id, workspaceId: r.workspaceId, kind: r.kind, delta: r.delta })),
     findTransactionTotal: async (txnId) => state.transactionTotals[txnId] ?? null,
     hasRevoke: async (adjId) => state.ledger.some((r) => r.kind === 'refund_revoke' && r.refId === adjId),
+    revokedTotalForTransaction: async (txnId) =>
+      state.ledger.filter((r) => r.kind === 'refund_revoke' && r.reason?.includes(txnId)).reduce((s, r) => s - r.delta, 0),
     revoke: async (input) => {
       state.ledger.push({
         id: `r${++seq}`,
@@ -352,6 +354,15 @@ describe('환불', () => {
     await send(deps, txnCompleted())
     await send(deps, adjustmentEvent('evt_adj_p', { status: 'pending_approval' }))
     expect(balance()).toBe(50)
+  })
+
+  it('부분 환불이 여러 번 와도 회수 합은 그 결제로 들어간 양을 넘지 않는다', async () => {
+    const { deps, balance } = makeDeps({ transactionTotals: { txn_1: 2900 } })
+    await send(deps, txnCompleted())
+    await send(deps, adjustmentEvent('evt_a1', { id: 'adj_a1', totals: { total: '1450', currency_code: 'USD' } }))
+    await send(deps, adjustmentEvent('evt_a2', { id: 'adj_a2', totals: { total: '1450', currency_code: 'USD' } }))
+    await send(deps, adjustmentEvent('evt_a3', { id: 'adj_a3', totals: { total: '1450', currency_code: 'USD' } }))
+    expect(balance()).toBe(0)
   })
 
   it('카드사 분쟁(차지백) 알림도 환불과 똑같이 처리한다', async () => {

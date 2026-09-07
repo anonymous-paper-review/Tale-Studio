@@ -40,9 +40,8 @@
 - [~] **P9a 앱 안 계정·결제 페이지 + 좌측 nav Take 배지** - ✅ 구현·테스트 초록 (2026-09-07). `/account` 페이지(플랜·결제일·실패 배너·종류별 잔액·팩 카드·최근 내역·계정) · 대시보드 헤더 "Account" 탭 · 스튜디오 nav Take 배지(호버 종류 구분, 클릭 → /account) · 사용자 메뉴 항목 · 부족 토스트 "Add Takes" 버튼(3-10).
       약속 → [paddle-promises.md §P9a](paddle-promises.md#p9a). 스크린샷 `evidence/account-{free,s5,payment-failed,negative}.png`, `sidebar-badge-*.png`.
       남음: 오너 스크린샷 검수 · 결제 버튼·포털 링크 활성(P7·P9). Director 안 소모량 배지 UI 개선은 별도.
-- [ ] **P1 결제 알림(웹훅) 받기** - 약속 문장 → [paddle-promises.md §P1](paddle-promises.md#p1). 결제의 유일한 진실.
-      Paddle이 보낸 것만 받고, 같은 알림은 한 번만 처리하고, 팩·구독·갱신·환불·취소를 장부에 옮긴다.
-      검수: 약속(화면 없음). 가짜 서명 시크릿으로 테스트가 돈다.
+- [x] **P1 결제 알림(웹훅) 받기** - ✅ 2026-09-07. `POST /api/billing/paddle/webhook` · 로직 `src/lib/billing/paddle-webhook.ts` · 약속 23개 초록 · dev 실물 8건 · Paddle 시뮬레이터 → dev 200.
+      샌드박스 알림 목적지 등록(ntfset_01m1x9ykr2t1k432f4d39shff9, 이벤트 11종) · 시크릿은 `.env.local`·Vercel Preview/Development. 보고서 `webhook-report.html`.
 - [~] **P2 상품 목록 정의 + 등록 스크립트** - ✅ 대응표 `src/lib/billing/catalog.ts` + `tests/paddle-catalog.test.ts` 6케이스 초록(2026-09-07).
       가격 ID는 `NEXT_PUBLIC_PADDLE_PRICE_PLAN_<ID>` / `NEXT_PUBLIC_PADDLE_PRICE_PACK_<ID>` env 에서 읽고 없으면 버튼 비활성.
       남음: 등록 스크립트(P6에서 실행).
@@ -60,7 +59,7 @@
 - [x] **샌드박스 계정 개설** - https://sandbox-vendors.paddle.com/signup (2026-09-07 완료)
 - [x] **키 2개 발급** - `.env.local`에 `PADDLE_API_KEY`(`_sdbx`, 샌드박스 API 응답 확인) · `NEXT_PUBLIC_PADDLE_CLIENT_TOKEN`(`test_`) · `NEXT_PUBLIC_PADDLE_ENV=sandbox` (2026-09-07 완료).
       남음: 같은 값을 Vercel **Preview/Development 스코프에만** 넣는다(P1 배포 전). Production에 넣지 않는다.
-- [ ] **웹훅 시크릿** - 비어 있는 게 정상. Paddle에 "알림 목적지"를 만들 때 발급된다. 에이전트가 API로 만든다(P1 끝나면).
+- [x] **웹훅 시크릿** - ✅ 2026-09-07 발급·배선. (원래 메모: 비어 있는 게 정상. Paddle에 "알림 목적지"를 만들 때 발급된다. 에이전트가 API로 만든다(P1 끝나면).
       목적지 URL: `https://tale-git-dev-talestudio.vercel.app/api/billing/paddle/webhook` (dev 브랜치 고정 주소, 2026-09-07 확인).
 - [ ] **Default payment link 설정** - 샌드박스 대시보드 > Checkout > Checkout settings. 샌드박스는 `https://localhost/`도 된다.
 - [ ] **디스코드 경보 웹훅** (2026-09-07 오너 확정, P11 채널) - 5분.
@@ -86,7 +85,7 @@
       부족 토스트의 "채우러 가기" 버튼이 여기로 온다(3-10).
       검수: 스크린샷 + 약속.
 - [ ] **P10 dev 전 구간 스모크** - 샌드박스 카드 `4242 4242 4242 4242` → 알림 → 적립 → 생성 1회 → 차감 확인. 같은 알림 2회 재전송 → 적립 1회. 환불 → 회수.
-- [ ] **P11 알림 처리 실패 시 경보** - 이메일/텔레그램 아무거나. "결제했는데 0개"를 유저가 신고하기 전에 안다.
+- [x] **P11 알림 처리 실패 시 경보** - ✅ 디스코드 웹훅(`src/lib/ops-alert.ts`). 처리 실패·갱신 실패·상품 매핑 실패·워크스페이스 없음·무료 초과 팩·환불 회수가 간다. 로컬·dev 실측 전송 확인.
 - [ ] **P12 일일 대사** - Paddle 거래 목록 vs `billing_events` 비교. Vercel Cron(`CRON_SECRET` 재사용). 놓친 알림은 반드시 생긴다.
 
 ## 3. 라이브 전환
