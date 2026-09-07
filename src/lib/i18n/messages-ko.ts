@@ -1529,4 +1529,50 @@ export const KO: Record<string, string> = {
   'Billing & receipts': '결제 정보·영수증',
   'No billing account yet. Buy Takes or subscribe first.': '아직 결제 기록이 없어요. Take를 사거나 구독하면 열려요.',
   'Could not open billing portal. Please try again.': '결제 관리 화면을 열지 못했어요. 다시 시도해주세요.',
+
+  // ── 가격 페이지 /pricing (P4 · 2026-09-08 오너: 한국어도 보이게) ──
+  Pricing: '요금제',
+  'Pay for the minutes you plan and the Takes you spend. Images are always free.': '기획한 분량과 쓴 Take만큼만 냅니다. 이미지는 언제나 무료예요.',
+  Beta: '베타',
+  'Everything is free until launch. The plans below go live when the beta ends. Beta participants hear first.':
+    '정식 출시 전까지 전부 무료예요. 아래 요금제는 베타가 끝나면 열리고, 베타 참여자에게 먼저 알려드려요.',
+  'Four things a plan gives you': '요금제가 주는 네 가지',
+  'Every plan is measured on the same four axes. Higher plans do not unlock features. They give you more room.':
+    '모든 요금제는 같은 네 축으로 재요. 상위 요금제가 기능을 더 여는 게 아니라, 쓸 수 있는 양이 커져요.',
+  'Minutes per project': '프로젝트당 분량',
+  'Video minutes your plan covers per project. First-pass 720p generation is included.': '요금제가 프로젝트 하나에 보장하는 영상 분량. 720p 첫 생성이 포함돼요.',
+  'Linked projects': '연결 프로젝트',
+  'Projects you can hold at once and cut into a single result.': '동시에 갖고 있다가 하나로 이어붙일 수 있는 프로젝트 수.',
+  'Takes per month': '월 Take',
+  'Regenerations, 1080p, and premium models spend Takes. Images never do.': '재생성·1080p·프리미엄 모델이 Take를 써요. 이미지는 쓰지 않아요.',
+  'Take previz data and AX agent settings out of Tale. Final video exports on every plan.': 'Previz 데이터와 AX 에이전트 설정을 밖으로 가져가요. 최종 영상은 모든 요금제에서 내보낼 수 있어요.',
+  Starter: '스타터',
+  'For one person and one project at a time. The full production team, all five stages, all models. Previz data stays inside Tale.':
+    '한 사람이 한 프로젝트씩. 제작팀 전체, 다섯 단계, 모든 모델을 다 써요. Previz 데이터는 Tale 안에 남아요.',
+  Production: '프로덕션',
+  'For teams running several projects side by side. More linked projects, more accounts, and Export for the edit suite and client delivery.':
+    '여러 프로젝트를 나란히 굴리는 팀용. 연결 프로젝트와 계정이 늘고, 편집실·클라이언트 납품용 내보내기가 열려요.',
+  'Best value': '가장 유리',
+  '/ month': '/ 월',
+  Subscribe: '구독하기',
+  'Take packs': 'Take 팩',
+  'Ran out before the month did? Top up. Pack Takes are spent after your plan Takes and never expire mid-year.':
+    '달이 끝나기 전에 다 썼나요? 충전하세요. 팩 Take는 요금제 Take를 다 쓴 뒤에 빠지고, 1년 안에는 사라지지 않아요.',
+  '{n} Takes · {price} per Take': '{n} Take · Take당 {price}',
+  'Valid for 12 months from purchase.': '구매일부터 12개월 유효.',
+  Studio: '스튜디오',
+  'More than 4 linked projects or 8 accounts? Studio plans are annual contracts with a shared Take pool, invoicing, and dedicated support. Studio S starts at 10 accounts and 30,000 Takes a year.':
+    '연결 프로젝트 4개나 계정 8개보다 더 필요하세요? 스튜디오는 연 단위 계약으로, Take를 공유하고 세금계산서와 전담 지원이 붙어요. Studio S는 계정 10개, 연 30,000 Take부터예요.',
+  'Contact us': '문의하기',
+  'What is a Take?': 'Take가 뭐예요?',
+  'One Take is one 720p video generation. Regenerating a shot, rendering at 1080p, or using a premium model spends more. You always see the cost before you generate.':
+    'Take 하나는 720p 영상 한 번 생성이에요. 샷을 다시 만들거나, 1080p로 뽑거나, 프리미엄 모델을 쓰면 더 들어요. 만들기 전에 항상 얼마가 드는지 보여줘요.',
+  '1 Take': '1 Take',
+  'Images are free.': '이미지는 무료예요.',
+  'Storyboards, concept art, and character sheets never spend Takes on any plan.': '스토리보드, 컨셉아트, 캐릭터 시트는 어느 요금제에서도 Take를 쓰지 않아요.',
+  'Plan Takes reset each billing period.': '요금제 Take는 결제 주기마다 새로 채워져요.',
+  'Unused plan Takes expire when the billing period ends. Pack Takes are valid for 12 months.': '안 쓴 요금제 Take는 결제 주기가 끝나면 사라져요. 팩 Take는 12개월 유효해요.',
+  'Spent in order.': '순서대로 빠져요.',
+  'Free Takes first, then plan Takes, then pack Takes, so nothing you paid for expires before something that was free.':
+    '무료 Take → 요금제 Take → 팩 Take 순서라, 돈 주고 산 것이 공짜보다 먼저 사라지는 일은 없어요.',
 }
