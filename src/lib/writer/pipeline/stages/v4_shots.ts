@@ -846,14 +846,21 @@ ${stage ? `        "camera_setup": {
     // reveal 은 camera_setup.end.subject, pov 는 camera_setup.pov_of 에 대상을 이어 준다(모델이 빠뜨려도 기하가 검사하게).
     const setupRaw = shot.static_spec?.camera_setup as Record<string, unknown> | undefined;
     let cameraSetup = setupRaw;
-    if (setupRaw && typeof setupRaw === 'object' && cameraMotion.target) {
-      if (cameraMotion.motivation === 'reveal') {
-        const endRaw = setupRaw.end && typeof setupRaw.end === 'object' ? (setupRaw.end as Record<string, unknown>) : {};
-        if (typeof endRaw.subject !== 'string' || !endRaw.subject.trim()) {
-          cameraSetup = { ...setupRaw, end: { ...endRaw, subject: cameraMotion.target } };
+    if (setupRaw && typeof setupRaw === 'object') {
+      const endRaw = setupRaw.end && typeof setupRaw.end === 'object' ? (setupRaw.end as Record<string, unknown>) : null;
+      if (cameraMotion.motivation === 'reveal' && cameraMotion.target) {
+        if (typeof endRaw?.subject !== 'string' || !endRaw.subject.trim()) {
+          cameraSetup = { ...setupRaw, end: { ...(endRaw ?? {}), subject: cameraMotion.target } };
         }
-      } else if (cameraMotion.motivation === 'pov' && (typeof setupRaw.pov_of !== 'string' || !setupRaw.pov_of.trim())) {
-        cameraSetup = { ...setupRaw, pov_of: cameraMotion.target };
+      } else if (endRaw && typeof endRaw.subject === 'string') {
+        // end.subject 는 reveal 의 대상이다 — 다른 동기(실측 겨울_7 sh_02_12: emotion 인데 end.subject)에 남으면 기하가
+        //   리빌 검사를 걸어 헛경고를 낸다. 지운다(end 의 방향·거리 배율은 유지).
+        const { subject: _drop, ...rest } = endRaw;
+        void _drop;
+        cameraSetup = { ...setupRaw, end: Object.keys(rest).length ? rest : null };
+      }
+      if (cameraMotion.motivation === 'pov' && cameraMotion.target && (typeof setupRaw.pov_of !== 'string' || !setupRaw.pov_of.trim())) {
+        cameraSetup = { ...(cameraSetup ?? setupRaw), pov_of: cameraMotion.target };
       }
     }
     return {
