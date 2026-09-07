@@ -116,6 +116,7 @@ export function isInsufficientTakes(
   )
 }
 
+// 베타 약속 2(2026-09-04 오너, phase-3 3-10): "부족 안내에는 크레딧을 채우러 가는 버튼이 있다" — 목적지는 계정·결제 페이지(P9a).
 export function notifyInsufficientTakes(body: InsufficientTakesBody | null | undefined): void {
   const locale = useLocaleStore.getState().locale
   toast.error(
@@ -123,7 +124,15 @@ export function notifyInsufficientTakes(body: InsufficientTakesBody | null | und
       required: body?.required ?? 0,
       balance: body?.balance ?? 0,
     }),
-    { id: 'generation-quota-exceeded' },
+    {
+      id: 'generation-quota-exceeded',
+      action: {
+        label: translate(locale, 'Add Takes'),
+        onClick: () => {
+          if (typeof window !== 'undefined') window.location.assign('/account')
+        },
+      },
+    },
   )
 }
 

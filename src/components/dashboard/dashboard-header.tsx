@@ -28,6 +28,8 @@ const TABS = [
   { key: 'playground', label: 'Playground', href: '/playground' },
   // #queue-console: 전 프로젝트 생성 잡 운영 콘솔 — 좀비·실패를 보는 유일한 전역 창구.
   { key: 'queue', label: 'Queue', href: '/queue' },
+  // #payments-phase-3 P9a: 계정·결제(플랜·Take·구매 내역).
+  { key: 'account', label: 'Account', href: '/account' },
 ] as const
 
 // 언어 표시명은 자기 언어로 고정 표기(언어 선택 UI 관례 — 번역하지 않는다).

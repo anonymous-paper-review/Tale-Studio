@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, LogOut, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Check, CreditCard, LogOut, Pencil, Plus, Trash2 } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -216,6 +216,11 @@ export function UserMenu() {
           New Project
         </DropdownMenuItem>
         <DropdownMenuSeparator />
+        {/* #payments-phase-3 P9a: 계정·결제 페이지 */}
+        <DropdownMenuItem onClick={() => router.push('/account')}>
+          <CreditCard className="mr-2 h-4 w-4" />
+          {t('Account & billing')}
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={handleLogout}>
           <LogOut className="mr-2 h-4 w-4" />
           Logout

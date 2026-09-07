@@ -37,9 +37,9 @@
 - [~] **P4 `/pricing` 실물화** - 2026-09-07 보여주기 버전 배선(결제 버튼은 "Coming soon" 비활성, 베타 배너 유지). 로컬 `pnpm dev` → http://localhost:3000/pricing
       스크린샷: `evidence/pricing-0~3.png`. P2 대응표(`src/lib/billing/catalog.ts`)를 같이 만들어 숫자는 테스트가 v4 시트와 대조한다.
       남음: 오너 스크린샷 검수 · 문구 수정 · 커밋(미커밋, dev 브랜치로 갈지 오너 결정).
-- [ ] **P9a 앱 안 계정·결제 페이지 + 좌측 nav Take 배지** - 시나리오의 "산 뒤" 장면. 약속 → [paddle-promises.md §P9a](paddle-promises.md#p9a) (2026-09-07 초안, 오너 삼진 대기).
-      nav 배지(호버로 종류 구분) · 계정·결제 페이지(플랜·결제일·실패 배너·잔액·팩 카드·내역·계정 설정) · 3-10 버튼 목적지.
-      결제 버튼과 포털 링크는 키 받은 뒤(P7·P9). 검수: 스크린샷 + 약속. Director 안 소모량 배지 UI 개선은 별도.
+- [~] **P9a 앱 안 계정·결제 페이지 + 좌측 nav Take 배지** - ✅ 구현·테스트 초록 (2026-09-07). `/account` 페이지(플랜·결제일·실패 배너·종류별 잔액·팩 카드·최근 내역·계정) · 대시보드 헤더 "Account" 탭 · 스튜디오 nav Take 배지(호버 종류 구분, 클릭 → /account) · 사용자 메뉴 항목 · 부족 토스트 "Add Takes" 버튼(3-10).
+      약속 → [paddle-promises.md §P9a](paddle-promises.md#p9a). 스크린샷 `evidence/account-{free,s5,payment-failed,negative}.png`, `sidebar-badge-*.png`.
+      남음: 오너 스크린샷 검수 · 결제 버튼·포털 링크 활성(P7·P9). Director 안 소모량 배지 UI 개선은 별도.
 - [ ] **P1 결제 알림(웹훅) 받기** - 약속 문장 → [paddle-promises.md §P1](paddle-promises.md#p1). 결제의 유일한 진실.
       Paddle이 보낸 것만 받고, 같은 알림은 한 번만 처리하고, 팩·구독·갱신·환불·취소를 장부에 옮긴다.
       검수: 약속(화면 없음). 가짜 서명 시크릿으로 테스트가 돈다.
