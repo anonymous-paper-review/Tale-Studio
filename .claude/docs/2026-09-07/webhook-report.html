@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>웹훅과 경보</title>
+<style>
+  :root {
+    --bg:#F1F3F5; --surface:#FFFFFF; --surface-2:#E8EBEF;
+    --ink:#16181D; --ink-2:#3B4048; --muted:#676D77;
+    --line:#D6DBE1; --line-2:#BFC6CE;
+    --accent:#1F5F7A; --accent-soft:#DCEAF1;
+    --pass:#2E7350; --pass-soft:#DFEDE5;
+    --fail:#A33A38; --fail-soft:#F6E2E1;
+    --gate:#6A579E; --gate-soft:#EAE4F5;
+    --warn:#8A6412; --warn-soft:#F4EBD6;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI","Malgun Gothic",sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+      --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+      --line:#2B3038; --line-2:#3C434D;
+      --accent:#74B4D0; --accent-soft:#17303C;
+      --pass:#5FB98A; --pass-soft:#17301F;
+      --fail:#E0817D; --fail-soft:#3A2321;
+      --gate:#A794D8; --gate-soft:#272040;
+      --warn:#D2A64F; --warn-soft:#33290F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+    --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+    --line:#2B3038; --line-2:#3C434D;
+    --accent:#74B4D0; --accent-soft:#17303C;
+    --pass:#5FB98A; --pass-soft:#17301F;
+    --fail:#E0817D; --fail-soft:#3A2321;
+    --gate:#A794D8; --gate-soft:#272040;
+    --warn:#D2A64F; --warn-soft:#33290F;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:0 20px 110px;background:var(--bg);color:var(--ink);
+    font-family:var(--sans);font-size:16px;line-height:1.82;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto}
+
+  header.page{padding:56px 0 20px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 14px;font-weight:600}
+  h1{font-size:clamp(27px,5vw,40px);font-weight:800;letter-spacing:-.028em;line-height:1.22;
+    margin:0 0 18px;text-wrap:balance}
+  .bluf{font-size:17.5px;color:var(--ink);margin:0 0 6px;max-width:64ch}
+  .bluf b{color:var(--gate)}
+  .asof{font-family:var(--mono);font-size:12px;color:var(--muted);margin:10px 0 0}
+  header.page::after{content:"";display:block;height:3px;background:var(--ink);margin-top:26px;opacity:.9}
+
+  section{margin:58px 0 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .sec-num{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);
+    border:1.5px solid var(--accent);border-radius:3px;padding:0 7px;line-height:1.7}
+  h2{font-size:23px;font-weight:800;letter-spacing:-.018em;margin:0;text-wrap:balance}
+  .sec-lede{color:var(--muted);font-size:15px;margin:0 0 24px;max-width:62ch}
+  p{margin:0 0 16px;max-width:64ch}
+  h3{font-size:17px;font-weight:750;margin:28px 0 10px;letter-spacing:-.01em}
+  h3:first-child{margin-top:0}
+  ul.plain{margin:0 0 16px;padding-left:22px;max-width:64ch}
+  ul.plain li{margin-bottom:8px}
+  strong,b{font-weight:750}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    padding:24px 26px 20px;margin:0 0 18px}
+  .card.same{border-left:3px solid var(--pass)}
+  .card.diff{border-left:3px solid var(--warn)}
+  .card > :last-child{margin-bottom:0}
+  .card-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:12px}
+  .card-head h3{flex:1 1 240px;margin:0}
+  .agreed{font-size:15px;color:var(--ink-2);margin:0 0 12px}
+  .agreed b{color:var(--ink);font-weight:750}
+
+  .chip{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.03em;
+    border-radius:3px;padding:2px 8px;white-space:nowrap}
+  .c-pass{background:var(--pass-soft);color:var(--pass)}
+  .c-fail{background:var(--fail-soft);color:var(--fail)}
+  .c-warn{background:var(--warn-soft);color:var(--warn)}
+  .c-gate{background:var(--gate-soft);color:var(--gate)}
+  .c-acc{background:var(--accent-soft);color:var(--accent)}
+
+  pre{background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--line-2);
+    border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+    font-family:var(--mono);font-size:12px;line-height:1.68;margin:8px 0;color:var(--ink-2);
+    white-space:pre;tab-size:2}
+  pre b{color:var(--ink);font-weight:700}
+  pre .path{display:block;color:var(--muted);margin-bottom:8px;font-size:11.5px}
+  code{font-family:var(--mono);font-size:.87em;background:var(--surface-2);padding:1px 6px;border-radius:3px}
+  .code-what{font-size:14.5px;color:var(--ink-2);margin:0 0 4px}
+  .code-diff{font-size:14.5px;margin:8px 0 0}
+  .code-diff .chip{margin-right:8px}
+
+  .tbl{overflow-x:auto;margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}
+  th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:700;
+    padding:10px 12px;border-bottom:2px solid var(--line-2);vertical-align:bottom}
+  td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+  td .path{font-family:var(--mono);font-size:11.5px;color:var(--muted);display:block;margin-top:3px}
+  .gate-cell{color:var(--gate);font-weight:750}
+  .gate-empty{display:inline-block;min-width:60px;border-bottom:1.5px dashed var(--gate);opacity:.7}
+
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);
+    border-radius:10px;overflow:hidden;margin:16px 0}
+  @media (max-width:640px){.split{grid-template-columns:1fr}}
+  .split > div{padding:18px 20px}
+  .split .yes{background:var(--pass-soft);border-right:1px solid var(--line)}
+  .split .no{background:var(--fail-soft)}
+  .split h4{margin:0 0 10px;font-size:14.5px;font-weight:800}
+  .split .yes h4{color:var(--pass)}
+  .split .no h4{color:var(--fail)}
+  .split ul{margin:0;padding-left:20px;font-size:14px;line-height:1.7}
+  .split li{margin-bottom:7px}
+
+  footer{margin-top:66px;padding-top:20px;border-top:2px solid var(--ink);font-size:13.5px;color:var(--muted)}
+  footer b{color:var(--ink)}
+  footer p{max-width:none}
+  a{color:var(--accent)}
+  a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <p class="eyebrow">세션 보고서 · 2026-09-07 · 결제 P1 + P11</p>
+  <h1>웹훅과 경보</h1>
+  <p class="bluf">Paddle 결제 알림을 받아 Take 와 플랜을 장부에 옮기는 웹훅을 만들었고, 실패·이상 신호는 디스코드로 간다. 약속 23개를 메모리 장부로, 8건을 dev 서버 실물로, 1건을 Paddle 이 직접 서명해 보낸 알림으로 확인했다. 결제창은 아직 없다.</p>
+  <p class="bluf"><b>결정할 것 3개</b>: 디스코드 웹훅 URL 재발급, 플랜 Take 만료 기준(결제 주기 끝), 샌드박스 상품 등록 착수. <b>알아둘 것 6개</b>, 지뢰 5개.</p>
+  <p class="asof">근거 커밋 a964c3e → d64c8a8 (dev) · 원장 문서 .claude/docs/2026-09-07/ · 실측 2026-09-07 15:40~16:05 KST</p>
+</header>
+
+<section>
+  <div class="sec-head"><span class="sec-num">1</span><h2>혼자 정한 것</h2></div>
+  <p class="sec-lede">오너에게 묻지 않고 정했다. 되돌리기가 <span class="gate-cell">비쌈</span> 이상인 항목은 오너 확인 칸을 비워 뒀다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>결정</th><th>왜</th><th>버린 선택지</th><th>되돌리기</th><th>오너 확인</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>플랜 Take 의 만료일 = 결제 주기가 끝나는 날<span class="path">src/lib/billing/paddle-webhook.ts:271-289</span></td>
+        <td>오늘 확정한 업그레이드 정책이 "갱신일이 그날로 바뀐다"라 결제 주기와 달력 월이 어긋난다. v4 시트의 "월말 소멸"을 그대로 두면 9월 15일 결제한 사람의 Take 가 9월 30일에 사라진다. Paddle 이 주기 끝 날짜를 알림에 실어 준다</td>
+        <td>달력 월말(v4 문구 그대로)</td>
+        <td class="gate-cell">비쌈<span class="path">장부에 만료일이 행으로 남는다. 첫 결제 뒤엔 되돌리기 힘듦</span></td>
+        <td><span class="gate-empty"></span></td>
+      </tr>
+      <tr>
+        <td>서명 시각 허용 오차 5분<span class="path">paddle-webhook.ts:21</span></td>
+        <td>Paddle SDK 기본은 5초. Vercel 콜드 스타트와 재전송 지연을 감안했다. 5분 안에서 같은 알림을 다시 보내는 공격은 알림 번호 멱등으로 막힌다</td>
+        <td>5초</td>
+        <td>쉬움</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td>재전송 판정을 두 겹으로<span class="path">paddle-webhook.ts:169-170 · 246 · 279</span></td>
+        <td>알림 번호로 한 번, 적립·회수의 참조 번호(transaction·adjustment id)로 한 번 더. 처리 도중 실패해 5xx 를 돌려준 뒤 재전송이 오면 절반만 다시 하는 일이 없게</td>
+        <td>알림 번호 한 겹</td>
+        <td>쉬움</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td>처리 실패면 원문은 남기되 <code>processed_at</code> 을 찍지 않는다<span class="path">paddle-webhook.ts:172-184</span></td>
+        <td>재전송이 오면 다시 처리해야 한다. 처리 여부를 저장 여부와 분리했다</td>
+        <td>실패 시 원문 삭제</td>
+        <td>쉬움</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td>부분 환불 회수량 = 적립량 × (환불액 ÷ 결제액), 누적 캡 있음<span class="path">paddle-webhook.ts:384-392</span></td>
+        <td>결제액은 우리가 저장한 결제 알림 원문에서 읽는다. 처음 짠 코드엔 캡이 없어 50% 환불이 세 번 오면 150% 를 회수했다. 오너 요청으로 검증 항목을 정리하다 발견해 고쳤다</td>
+        <td>전액만 회수</td>
+        <td>쉬움</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td>구독 상태 값 5개를 문자열로<span class="path">active · past_due · cancel_scheduled · canceled · paused</span></td>
+        <td>기존 <code>subscriptions.status</code> 컬럼이 text 라 마이그레이션 없이 들어간다. 계정 페이지가 이 다섯 값을 읽는다</td>
+        <td>enum 컬럼 추가</td>
+        <td>쉬움</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td>경보 문구는 한국어, 앞에 환경 이름<span class="path">src/lib/ops-alert.ts:20-25</span></td>
+        <td>오너만 보는 채널이다. Preview 와 Production 이 같은 채널을 쓰니 <code>[tale · preview:dev]</code> 처럼 구분한다. 경보 전송 실패는 삼킨다. 경보가 결제를 막으면 안 된다</td>
+        <td>환경별 채널 2개</td>
+        <td>쉬움</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td>Paddle 샌드박스에 알림 목적지를 API 로 등록, 이벤트 11종 구독<span class="path">ntfset_01m1x9ykr2t1k432f4d39shff9 → tale-git-dev-talestudio.vercel.app</span></td>
+        <td>시크릿은 목적지를 만들 때 나온다. 손으로 대시보드에서 만들면 라이브 갈 때 또 손으로 해야 한다</td>
+        <td>대시보드 수동</td>
+        <td>쉬움</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td>Vercel Preview/Development 에 Paddle 키 4개 + 디스코드 URL + 웹훅 시크릿 배선</td>
+        <td>dev 배포가 웹훅을 받으려면 필요했다. Production 에는 넣지 않았다</td>
+        <td>오너가 대시보드에서</td>
+        <td>쉬움</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">2</span><h2>같이 정한 것이 코드에 어떻게 들어갔나</h2></div>
+  <p class="sec-lede">paddle-scenarios.md 와 paddle-promises.md §P1 에서 정한 것 7개. 각각 실제 코드와 대조했다.</p>
+
+  <div class="card same">
+    <div class="card-head"><h3>Paddle 이 보낸 것이 아니면 받지 않고 장부에 아무것도 넣지 않는다</h3><span class="chip c-pass">같다</span></div>
+    <p class="agreed"><b>약속:</b> 서명이 틀리면 거절. 원문도 남기지 않는다.</p>
+    <p class="code-what"><code>ts:본문</code> 을 시크릿으로 HMAC-SHA256 해 헤더의 <code>h1</code> 과 비교한다. 5분 넘게 지난 시각은 거절. 비교는 시간 고정 비교*로. (*값이 다를 때 몇 글자에서 틀렸는지 응답 시간으로 새지 않게 하는 비교)</p>
+<pre><span class="path">src/lib/billing/paddle-webhook.ts:39-49</span>  const ts = parts.get('ts')?.[0]
+  const signatures = parts.get('h1') ?? []
+  if (!ts || signatures.length === 0) return false
+  const tsMs = Number.parseInt(ts, 10) * 1000
+  if (!Number.isFinite(tsMs)) return false
+  <b>if (Math.abs(input.nowMs - tsMs) > (input.toleranceMs ?? PADDLE_SIGNATURE_TOLERANCE_MS)) return false</b>
+  const expected = createHmac('sha256', input.secret).update(`${ts}:${input.rawBody}`).digest()
+  return signatures.some((h1) => {
+    const given = Buffer.from(h1, 'hex')
+    return given.length === expected.length && <b>timingSafeEqual(given, expected)</b>
+  })</pre>
+    <p class="code-diff"><span class="chip c-pass">같다</span>Paddle 이 시크릿을 바꿀 때 <code>h1</code> 을 두 개 보내는 기간이 있다. 그것도 통과한다.</p>
+  </div>
+
+  <div class="card same">
+    <div class="card-head"><h3>같은 알림이 몇 번 와도 Take 는 한 번만 들어간다. 처리 실패면 "실패"로 답해 다시 보내게 한다</h3><span class="chip c-pass">같다</span></div>
+    <p class="agreed"><b>약속:</b> 재전송은 무시. 처리 중 오류는 5xx. 원문은 성공·실패와 무관하게 남는다.</p>
+    <p class="code-what">먼저 원문을 저장한다. 이미 있고 처리까지 끝난 번호면 바로 "성공"으로 답한다. 처리가 끝나야 <code>processed_at</code> 을 찍고, 도중에 터지면 경보를 보내고 500.</p>
+<pre><span class="path">src/lib/billing/paddle-webhook.ts:169-183</span>  const recorded = await deps.recordEvent({ id: event.event_id, type: event.event_type, payload: event })
+  <b>if (recorded === 'duplicate_processed') return { status: 200, body: { ok: true, result: 'duplicate' } }</b>
+
+  try {
+    const result = await dispatch(event, deps)
+    <b>await deps.markProcessed(event.event_id)</b>
+    return { status: 200, body: { ok: true, result } }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    await deps.alert({ level: 'error', title: `Paddle 웹훅 처리 실패 (${event.event_type})`, … })
+    <b>return { status: 500, body: { ok: false, error: 'processing_failed' } }</b>
+  }</pre>
+    <p class="code-diff"><span class="chip c-pass">같다</span>저장은 <code>billing_events.mor_event_id</code> UNIQUE 가 잡는다(route.ts:23-33). 재전송이 처리 미완 번호로 오면 다시 처리하고, 적립은 참조 번호로 한 번 더 걸러(246·279행) 이중 적립을 막는다.</p>
+  </div>
+
+  <div class="card same">
+    <div class="card-head"><h3>갱신 결제가 실패하면 즉시 무료. 재시도가 성공하면 다시 그 플랜</h3><span class="chip c-pass">같다</span></div>
+    <p class="agreed"><b>논의(장면 5):</b> 표기상 무료로. 유예 없음. 재시도 성공은 "결제됨" 알림이 다시 올린다. 실패는 우리 쪽 경보.</p>
+    <p class="code-what">Paddle 이 구독 상태를 <code>past_due</code> 로 보내면 플랜을 <code>free</code> 로, 취소·정지도 <code>free</code> 로. 취소가 예약만 된 상태는 플랜을 그대로 둔다.</p>
+<pre><span class="path">src/lib/billing/paddle-webhook.ts:336-353</span>  if (paddleStatus === 'past_due') {
+    status = 'past_due'
+    <b>plan = 'free'</b>
+    await deps.alert({ level: 'warn', title: '갱신 결제 실패 — 구독이 밀렸다', … })
+  } else if (paddleStatus === 'canceled' || paddleStatus === 'paused') {
+    status = paddleStatus
+    plan = 'free'
+  } else if (scheduledAction === 'cancel' || scheduledAction === 'pause') {
+    <b>status = 'cancel_scheduled'
+    plan = planId ?? workspace.plan</b>
+  } else {
+    status = 'active'
+    plan = planId ?? workspace.plan
+  }</pre>
+    <p class="code-diff"><span class="chip c-pass">같다</span>재시도 성공은 <code>transaction.completed</code> 처리(271-289행)가 플랜을 다시 세우고 그 주기 Take 를 적립한다. 테스트 "갱신 결제가 실패하면 … 재시도가 성공하면 다시 그 플랜으로 돌아가고 Take 가 들어간다"가 이 왕복을 통째로 돈다.</p>
+  </div>
+
+  <div class="card same">
+    <div class="card-head"><h3>환불 알림이 오면 그 결제로 들어간 Take 를 회수한다. 부분 환불은 비율만큼</h3><span class="chip c-pass">같다</span></div>
+    <p class="agreed"><b>논의(장면 7):</b> 비율 회수. 이미 써서 모자라면 잔액 음수. 차지백도 같게.</p>
+    <p class="code-what">승인된 환불·차지백만 처리한다. 회수량은 적립량 × 비율이고, 같은 결제에 대해 이미 회수한 만큼을 빼 적립량을 넘지 못하게 한다.</p>
+<pre><span class="path">src/lib/billing/paddle-webhook.ts:385-392</span>  const granted = grants.reduce((s, g) => s + g.delta, 0)
+  const totals = data.totals
+  const refunded = … Number.parseInt(String((totals as Record&lt;string, unknown&gt;).total ?? ''), 10) …
+  const original = await deps.findTransactionTotal(txnId)
+  const ratio = Number.isFinite(refunded) && original && original > 0 ? Math.min(1, refunded / original) : 1
+  <b>const alreadyRevoked = await deps.revokedTotalForTransaction(txnId)
+  const amount = Math.min(Math.round(granted * ratio), Math.max(0, granted - alreadyRevoked))</b>
+  if (amount <= 0) return 'nothing_to_revoke'</pre>
+    <p class="code-diff"><span class="chip c-pass">같다</span>"음수인 동안 새 영상 생성이 막힌다"는 이 코드가 아니라 기존 <code>take_hold</code>(enforce 모드)가 한다. 지금 전 환경이 shadow 라 음수여도 생성은 된다. 5절 지뢰.</p>
+  </div>
+
+  <div class="card same">
+    <div class="card-head"><h3>무료 워크스페이스에 이미 충전 기록이 있는데 팩 결제가 또 오면 Take 는 주되 경보</h3><span class="chip c-pass">같다</span></div>
+    <p class="agreed"><b>논의(장면 1):</b> v4 충전 상한(무료는 Mini 1회)은 결제창 앞에서 서버가 막는다(P7). 웹훅까지 온 건 이상 신호. 돈은 받았으니 Take 는 준다.</p>
+    <p class="code-what">팩이면 참조 번호로 이중 적립을 거르고, 무료 플랜인데 충전 기록이 있으면 경고 경보를 보낸 뒤 적립한다.</p>
+<pre><span class="path">src/lib/billing/paddle-webhook.ts:245-258</span>  if (resolved.kind === 'pack') {
+    if (await deps.hasGrant(refKind, txnId)) return 'already_granted'
+    <b>if (workspace.plan === 'free' && (await deps.hasPackPurchase(workspace.id))) {
+      await deps.alert({ level: 'warn', title: '무료 워크스페이스가 팩을 두 번째 샀다', … })
+    }</b>
+    await deps.grant({
+      workspaceId: workspace.id,
+      kind: 'grant_purchase',
+      amount: resolved.pack.takes,
+      expiresAt: addMonths(billedAt, 12),</pre>
+    <p class="code-diff"><span class="chip c-pass">같다</span></p>
+  </div>
+
+  <div class="card diff">
+    <div class="card-head"><h3>플랜이 바뀌었다는 알림이 오면 플랜 표시를 바꾼다. 이미 들어간 Take 와 충전 Take 는 건드리지 않는다</h3><span class="chip c-warn">다르다</span></div>
+    <p class="agreed"><b>논의(장면 8, 최종):</b> 첫 버전은 표시만. 업그레이드 시 "새 플랜 한 달치 전액 + 남은 Take 이월 + 갱신일 리셋"은 플랜 변경 화면 슬라이스에서.</p>
+    <p class="code-what"><code>subscription.updated</code> 에 실린 가격 ID 로 플랜을 바꾼다. Take 는 손대지 않는다. 그런데 Paddle 이 업그레이드 때 보내는 <code>transaction.completed</code>(origin <code>subscription_update</code>)는 271-289행이 받아 새 플랜 Take 를 전액 적립한다.</p>
+<pre><span class="path">src/lib/billing/paddle-webhook.ts:279-289</span>  if (await deps.hasGrant(refKind, txnId)) return 'already_granted'
+  await deps.grant({
+    workspaceId: workspace.id,
+    kind: 'grant_plan',
+    amount: plan.entitlements.includedTakesPerMonth,
+    expiresAt: ends,
+    refKind,
+    refId: txnId,
+    <b>reason: `paddle plan ${plan.id} (${str(data.origin) ?? 'web'})`,</b>
+  })</pre>
+    <p class="code-diff"><span class="chip c-warn">다르다</span>약속 문장은 "표시만"이지만 코드는 업그레이드 결제에도 새 플랜 Take 전액을 준다. 최종 정책("새 플랜 한 달치 전액 + 남은 것 이월")과는 맞고, 남은 Take 의 만료일을 새 갱신일로 옮기는 것만 아직 없다. 그건 플랜 변경 슬라이스. 지금은 관리자가 Paddle 에서 플랜을 바꿔 줄 때만 이 경로가 돈다.</p>
+  </div>
+
+  <div class="card same">
+    <div class="card-head"><h3>처리 실패·갱신 실패·상품 매핑 실패·워크스페이스 없음은 디스코드로 간다</h3><span class="chip c-pass">같다</span></div>
+    <p class="agreed"><b>논의(장면 5 표 #9):</b> 디스코드 웹훅 하나. 오너가 URL 발급, 에이전트가 배선.</p>
+    <p class="code-what">주소가 없으면 콘솔에만 남기고, 있으면 그 주소로 한 번 보낸다. 전송 실패는 삼킨다.</p>
+<pre><span class="path">src/lib/ops-alert.ts:28-46</span>export async function sendOpsAlert(alert: OpsAlert): Promise&lt;void&gt; {
+  const url = process.env.DISCORD_ALERT_WEBHOOK_URL
+  const line = `${LEVEL_PREFIX[alert.level]} [tale · ${environmentLabel()}] ${alert.title}`
+  const content = clip(alert.body ? `${line}\n${alert.body}` : line)
+  <b>if (!url) {
+    console.warn('[ops-alert] no DISCORD_ALERT_WEBHOOK_URL —', content)
+    return
+  }</b>
+  try {
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content }) })
+    if (!res.ok) console.error('[ops-alert] discord responded', res.status)
+  } catch (err) {
+    console.error('[ops-alert] send failed', err instanceof Error ? err.message : err)
+  }
+}</pre>
+    <p class="code-diff"><span class="chip c-pass">같다</span>경보 종류 7가지: 처리 실패(error) · 워크스페이스 표시 없음(error) · 워크스페이스 못 찾음(error) · 상품 매핑 없음(error) · 갱신 결제 실패(warn) · 무료 두 번째 팩(warn) · 환불 회수(info).</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">3</span><h2>확인한 것 / 안 한 것</h2></div>
+  <p class="sec-lede">왼쪽은 실제로 돌렸다. 오른쪽은 안 돌렸거나 흉내로만 봤다.</p>
+  <div class="split">
+    <div class="yes">
+      <h4>돌린 것</h4>
+      <ul>
+        <li><b>단위 23건</b> <code>tests/paddle-webhook.test.ts</code>, 메모리 장부. 위조 서명 401 · 5분 경과 401 · 재전송 3회 → 적립 1회 · 실패 시 원문 잔존 · 500 뒤 재전송 성공 · 워크스페이스 없음 · 상품 없음 · 팩 12개월 · 무료 두 번째 팩 경보 · 첫 결제 · 갱신 · 취소 예약→취소 · 갱신 실패→무료→재시도 복구 · 플랜 변경 표시 · 환불 음수 · 부분 환불 · 부분 환불 누적 캡 · 환불 알림 2회 → 회수 1회 · 미승인 환불 무시 · 차지백 · 경보 4종 순서 · 미지 이벤트 무시 · 디스코드 전송 유무</li>
+        <li><b>dev 서버 실물 8건</b> <code>https://tale-git-dev-talestudio.vercel.app/api/billing/paddle/webhook</code>, 진짜 시크릿으로 서명해 전송, dev DB 에서 결과 읽음. 위조 401 · 10분 경과 401 · 모르는 상품 200(원문만) · 같은 알림 재전송 duplicate · 워크스페이스 없음 200 · 응답 1,576ms · 원문 3건 저장 + processed_at 3건. 팩 적립 경로는 dev 에 상품 ID 가 없어 <code>unknown_price</code> 로 갔다(아래 로컬에서 확인)</li>
+        <li><b>로컬 서버 실물 8/8</b> 임시 상품 ID 주입. 위와 같은 8건 + <b>팩 결제 → 50 적립 → 재전송 → 그대로 50</b>. dev DB 에 실제 행이 들어갔다 확인 후 삭제. 응답 499ms</li>
+        <li><b>Paddle 시뮬레이터 → dev 1건</b> Paddle 이 직접 서명한 <code>transaction.completed</code> 을 dev 로 보냈다. 우리 응답 200 <code>no_workspace</code>. Paddle 서명이 우리 검증을 통과한다는 유일한 실물 증거</li>
+        <li><b>디스코드 경보 실측</b> 채널 연결 확인 1건(14:15) + 로컬·dev 실물 테스트에서 "상품이 목록에 없다" "워크스페이스 표시가 없다" 경보가 실제로 도착</li>
+        <li><b>훅 전체</b> typecheck · lint:design · 2,087 테스트 통과(커밋 d64c8a8)</li>
+      </ul>
+    </div>
+    <div class="no">
+      <h4>안 한 것</h4>
+      <ul>
+        <li><b>샌드박스 실제 결제.</b> 결제창(P7)이 없어 카드로 결제해 알림이 오는 전 구간은 못 돌렸다. Paddle 시뮬레이터는 샘플 페이로드라 <code>custom_data</code> 가 없다</li>
+        <li><b>구독 갱신·취소·환불의 Paddle 실물 페이로드.</b> 시뮬레이터로 보낸 건 <code>transaction.completed</code> 하나. 나머지 이벤트의 필드 이름(<code>scheduled_change.action</code>, <code>adjustment.totals.total</code>, <code>current_billing_period.ends_at</code>)은 문서 기준이고 실물로 대조하지 않았다</li>
+        <li><b>동시 재전송 경쟁.</b> 같은 알림이 동시에 두 요청으로 오면 둘 다 처리 시도한다. 적립은 참조 번호로 막히지만 <code>hasGrant</code> 조회와 <code>grant</code> 삽입 사이의 좁은 창은 DB 제약이 아니라 조회로만 막는다. 테스트 없음</li>
+        <li><b>콜드 스타트 응답 시간.</b> 1,576ms 는 따뜻한 서버. Paddle 기준 5초 안이지만 콜드는 미실측</li>
+        <li><b>환불 후 생성 차단.</b> 음수 잔액에서 <code>enforce</code> 가 막는 것은 기존 테스트 몫이고 오늘 다시 돌리지 않았다. 전 환경 shadow</li>
+        <li><b>일일 대사(P12)·만료 잡(2-6).</b> 없음. 알림 유실은 지금 감지 못 한다</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">4</span><h2>결정이 필요한 것</h2></div>
+  <p class="sec-lede">오너가 오늘 답할 수 있는 것.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>질문</th><th>안 정하면</th><th>선택지</th><th>추천</th><th>언제까지</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>디스코드 웹훅 URL 재발급</b></td>
+        <td>이 세션의 터미널 출력에 URL 대부분이 찍혔다(env 파일 끝 줄바꿈 누락을 고치다가). URL 을 아는 사람은 그 채널에 아무 글이나 쓸 수 있다</td>
+        <td>재발급 / 그대로</td>
+        <td>재발급. 채널 설정 → 연동 → 웹훅 → 삭제 후 새로. 새 URL 을 <code>.env.local</code> 에 넣으면 Vercel 은 내가 갱신한다</td>
+        <td>오늘</td>
+      </tr>
+      <tr>
+        <td><b>플랜 Take 만료 = 결제 주기 끝</b> (1절 첫 행)</td>
+        <td>v4 시트 "월말 소멸"과 코드가 다른 채로 간다. 첫 결제 뒤엔 바꾸기 힘들다</td>
+        <td>결제 주기 끝 / 달력 월말</td>
+        <td>결제 주기 끝. 업그레이드 정책(갱신일 리셋)과 한 몸이다. 시트 6_소멸시효에 한 줄 고치면 된다</td>
+        <td>상품 등록 전</td>
+      </tr>
+      <tr>
+        <td><b>샌드박스 상품 등록(P6) 착수</b></td>
+        <td>dev 에서 팩 적립·구독 경로를 실물로 못 본다. 결제창(P7)도 못 붙인다</td>
+        <td>지금 / 가격 페이지 문구 검수 뒤</td>
+        <td>지금. 스크립트 한 번이고 잘못 만들면 보관(archive) 처리하면 된다. 가격 문구는 등록 뒤 바꿔도 된다</td>
+        <td>이번 주</td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">5</span><h2>알고만 있으면 되는 것</h2></div>
+  <p class="sec-lede">결정은 필요 없지만 모르면 나중에 놀랄 것.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>가정</th><th>틀리면</th><th>확인 방법</th></tr></thead>
+    <tbody>
+      <tr><td>결제창을 열 때 <code>custom_data.workspace_id</code> 를 우리가 넣는다(P7)</td><td>모든 결제가 "워크스페이스 표시 없음" 경보로 끝나고 적립이 안 된다</td><td>P7 에서 체크아웃 파라미터에 넣고 시뮬레이터 대신 실제 결제로 확인</td></tr>
+      <tr><td>Paddle 이 구독 갱신 때마다 <code>transaction.completed</code> 를 보낸다</td><td>갱신 Take 가 안 들어간다</td><td>문서 기준 맞다. 샌드박스 구독을 하나 만들어 한 달 뒤 확인하거나, 시뮬레이터 <code>subscription_recurring</code> 시나리오</td></tr>
+      <tr><td>Vercel Preview 가 공개 접근이다</td><td>Preview 보호를 켜는 순간 Paddle 이 401 을 받고 알림이 유실된다</td><td>지금 200 확인. 보호를 켜면 웹훅 경로만 예외로</td></tr>
+      <tr><td>샌드박스 재전송은 3회/15분, 라이브는 60회/3일</td><td>dev 가 15분 넘게 죽어 있으면 알림이 사라진다</td><td>일일 대사(P12)가 잡는다. 그 전까진 Paddle 대시보드 알림 로그</td></tr>
+      <tr><td>경보 채널 하나에 Preview·Production 이 같이 온다</td><td>라이브 뒤 dev 테스트 경보가 섞여 진짜를 놓친다</td><td>메시지 접두 <code>[tale · production]</code> 으로 구분. 시끄러우면 채널 분리</td></tr>
+      <tr><td><code>.env.local</code> 에 임시 상품 ID 두 줄이 있다(<code>pri_e2e_mini</code>, <code>pri_e2e_s5</code>)</td><td>가격 페이지 로컬 화면에서 Mini·S-5 결제 버튼이 살아 보인다. 실제 Paddle 에는 없는 ID</td><td>P6 등록 뒤 실제 ID 로 교체. 파일 끝 주석에 적어 뒀다</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>지뢰</h3>
+  <ul class="plain">
+    <li><b>동시 재전송.</b> 같은 알림 두 요청이 동시에 오면 둘 다 처리한다. 적립은 참조 조회로 막지만 DB 제약이 아니다. <code>take_ledger(ref_kind, ref_id, kind)</code> 유일 제약을 마이그레이션으로 거는 것이 근본 해법. 6절 3번.</li>
+    <li><b>shadow 모드.</b> 환불로 잔액이 음수가 돼도 생성이 막히지 않는다. enforce 전환은 Paddle 라이브와 같이(beta-cutover.md).</li>
+    <li><b>만료 잡 없음.</b> 결제 주기 끝에 플랜 Take 를 지우는 잡(2-6)이 없다. 장부에 만료일만 적혀 있다. 첫 결제 전에 필요.</li>
+    <li><b>adjustment 필드 이름은 문서 기준.</b> 실물 페이로드가 다르면 환불이 <code>nothing_to_revoke</code> 로 조용히 끝나고 경보만 남는다. 샌드박스 환불 1건으로 확인해야 한다(자동 승인 10분).</li>
+    <li><b>Next 개발 오버레이 "1 Issue".</b> 로컬에서만 뜬다. 콘솔 에러 0건 확인. 배포엔 없다.</li>
+  </ul>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">6</span><h2>결제 서비스가 더 검증해야 하는 것</h2></div>
+  <p class="sec-lede">오너 요청으로 붙인 절. 오늘 한 것 밖에서, 돈이 오가는 서비스라면 라이브 전에 한 번씩 돌려야 하는 것. 순서는 위험 순.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>#</th><th>검증</th><th>왜</th><th>어떻게</th><th>지금 상태</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1</td><td><b>전 구간 스모크</b> 결제창 → 알림 → 적립 → 영상 1개 생성 → 차감 → 잔액</td><td>부품은 다 맞아도 이음새에서 깨진다. "결제했는데 0개"가 이 이음새 사고다</td><td>샌드박스 카드 4242 로 dev 에서. <code>pnpm test:manual</code> 계열로 남겨 라이브 키 전환 직후 한 번 더</td><td class="gate-cell">P10, 결제창 뒤</td></tr>
+      <tr><td class="num">2</td><td><b>일일 대사</b> Paddle 거래 목록 vs <code>billing_events</code></td><td>알림 유실은 반드시 일어난다(서버 다운, 배포 순간, Preview 보호). 유저가 신고하기 전에 알아야 한다</td><td>Vercel Cron 하루 1회. 차이 나면 디스코드 경보. 기존 <code>CRON_SECRET</code> 재사용</td><td class="gate-cell">P12</td></tr>
+      <tr><td class="num">3</td><td><b>이중 적립 DB 제약</b></td><td>지금은 조회로 막는다. 동시 요청엔 조회가 못 미친다</td><td><code>take_ledger</code> 에 <code>(ref_kind, ref_id, kind)</code> 부분 유일 인덱스(grant·revoke 만). 위반 시 조용히 무시</td><td class="gate-cell">마이그레이션 1개</td></tr>
+      <tr><td class="num">4</td><td><b>환불 실물 페이로드</b></td><td>필드 이름 하나 틀리면 회수가 안 되고 경보만 남는다</td><td>샌드박스에서 팩 결제 1건 → 대시보드 환불 → 10분 뒤 자동 승인 → 회수 확인</td><td class="gate-cell">P6·P7 뒤</td></tr>
+      <tr><td class="num">5</td><td><b>장부 불변량 점검</b></td><td>원장은 행이 쌓일수록 "합이 맞나"를 아무도 안 본다</td><td>스크립트: 워크스페이스별 grant 잔여가 음수인 lot 없음 · hold 와 hold_release 가 같은 잡에 쌍 · refund_revoke 합 ≤ 그 결제 적립. 대사와 같은 Cron 에</td><td class="gate-cell">없음</td></tr>
+      <tr><td class="num">6</td><td><b>시크릿 로테이션 리허설</b></td><td>시크릿이 새면 바꿔야 하는데, 바꾸는 동안 알림이 끊기면 안 된다</td><td>Paddle 은 교체 기간에 <code>h1</code> 두 개를 보낸다. 우리 코드가 둘 다 받는 건 단위로 확인. 실제로 한 번 돌려 본다</td><td class="gate-cell">라이브 전</td></tr>
+      <tr><td class="num">7</td><td><b>콜드 스타트 응답</b></td><td>Paddle 은 5초 넘으면 실패로 보고 재전송한다. 재전송은 멱등이라 안전하지만 알림 로그가 지저분해진다</td><td>배포 직후 첫 요청 시간 측정. 5초 근처면 원문 저장만 하고 200 → 처리는 뒤로(Next <code>after()</code>)</td><td class="gate-cell">미실측</td></tr>
+      <tr><td class="num">8</td><td><b>환불 후 생성 차단</b></td><td>음수 잔액인데 생성이 되면 환불이 곧 공짜 Take 다</td><td>enforce 모드에서 잔액 −12 상태로 영상 생성 요청 → 402</td><td class="gate-cell">enforce 전환 시</td></tr>
+      <tr><td class="num">9</td><td><b>Preview 보호·도메인 변경 시 웹훅</b></td><td>URL 하나가 바뀌면 알림 전부 유실</td><td>알림 목적지 URL 을 env 로 두고, 배포 후 헬스 체크(서명 없는 요청 → 401 이 정상)</td><td class="gate-cell">없음</td></tr>
+      <tr><td class="num">10</td><td><b>계정 삭제와 장부 보존</b></td><td>워크스페이스를 지우면 <code>take_ledger</code> 가 cascade 로 같이 지워진다. 환불 분쟁 근거가 사라진다</td><td>삭제 전 장부를 별도 보관하거나 cascade 를 끊는다. 정책 문서(P3)와 세트</td><td class="gate-cell">P3 안건</td></tr>
+      <tr><td class="num">11</td><td><b>관리자 수동 적립 감사</b></td><td>돈을 만드는 권한이 이메일 하드코딩이면 그 계정이 털리는 순간 전 고객 Take 가 위험</td><td>관리자 적립마다 디스코드 경보(누가·얼마·왜). 이미 <code>reason</code> 필수라 한 줄 추가</td><td class="gate-cell">없음</td></tr>
+      <tr><td class="num">12</td><td><b>시간대 경계</b></td><td>만료일을 UTC 로 저장하고 화면은 KST 로 보인다. 자정 전후에 "아직 안 됐는데 사라졌다" 문의</td><td>만료 잡이 도는 시각과 화면 표시가 같은 기준인지 한 번 대조</td><td class="gate-cell">만료 잡과 함께</td></tr>
+    </tbody>
+  </table></div>
+  <p>1·2·3 은 라이브 전 필수로 본다. 4 는 상품 등록 직후 10분이면 된다. 나머지는 첫 결제 뒤 순서대로.</p>
+</section>
+
+<footer>
+  <p><b>근거로 쓴 것</b> — 커밋 a964c3e → d64c8a8 (dev 브랜치). 약속 문서 <code>.claude/docs/2026-09-07/paddle-promises.md</code> §P1·§P11, 시나리오 <code>paddle-scenarios.md</code>. 테스트 <code>tests/paddle-webhook.test.ts</code>(23). dev 실물 스크립트는 세션 중 임시 파일로 돌리고 지웠다(결과는 3절에 그대로). Paddle 시뮬레이션 <code>ntfsim_01m1xa7qp9peth6d07js28rc2p</code>. 코드 블럭은 커밋 시점 파일에서 줄 번호 그대로.</p>
+  <p><b>이 문서가 하지 않는 것</b> — 샌드박스 실제 결제를 돌리지 않았다(결제창 없음). 구독 갱신·취소·환불의 Paddle 실물 페이로드를 보지 않았다. 6절은 제안이고 하나도 구현하지 않았다(3번 캡은 오늘 고쳤고 나머지는 열려 있다). 상품 등록(P6)·결제창(P7)·결제 직후 화면(P8)은 코드에 없다.</p>
+</footer>
+
+</div>
+</body>
+</html>
