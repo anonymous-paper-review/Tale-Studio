@@ -22,8 +22,7 @@
 | `artist_style_test_3/` | **실험 4** (refer3, 스톱모션 퍼펫 실사진 — 2026-08-13 추가) — 보드 + 프로브 4장 + `style-card-refer3.md` + `prompts/` 5개 |
 | `artist_style_test_5/` | **실험 5** (refer5, 아이소메트릭 라인아트 — 2026-09-03 추가) — 보드 + 프로브 4장 + `style-card-refer5.md` + `prompts/` 5개 |
 | `artist_style_test_6/` | **실험 6** (refer6, 아이소메트릭 무선 플랫 면분할 — 2026-09-03 추가) — 보드 + 프로브 4장 + `style-card-refer6.md` + `prompts/` 5개 |
-| `artist_style_test_5/ab_scaffold/` | **실험 7** — facet 스캐폴드 A/B (분석자=Codex 고정, 원문 vs 복원 SKILL.md). `comparison.md` + 조건별 `orig/`·`v2/`(Codex `analysis.md`·comms·보드·프로브·프롬프트) + 조립 스크립트(v3 NEGATIVE 슬롯 대응) |
-| `scaffold_review/` | **실험 8** — 스캐폴드 v3 개발: Codex 리뷰어 2회(`review.md` 누락 축 11건 발굴·24축 계층화, `review-2.md` VLM 실행자 관점 수정안 22건) + 입력 자료 + 통신 로그. **산출 정본 `scaffolds/v3.md`**. 09-04 **v4 라운드(역할 교대)**: Claude 리뷰 `inputs/review-3-claude.md` → Codex 저작 → Claude 반려 `inputs/review-4-claude.md` → 통과 → `scaffolds/v4.md` |
+| `artist_style_test_5/ab_scaffold/` | **실험 7** — facet 스캐폴드 A/B (분석자=Codex 고정, 원문 vs 복원 SKILL.md). `comparison.md` + 조건별 `orig/`·`v2/`(Codex `analysis.md`·comms·보드·프로브·프롬프트) + 조립 스크립트 |
 | `refer1.jpg` · `ChatGPT Image …03_55_11.png` (루트), `artist_style_test_2/refer2.{png,webp}`, `artist_style_test_3/refer3.jpeg`, `artist_style_test_5/refer5.png`, `artist_style_test_6/refer6.png` | **원작 레퍼런스 원본** — refer1(실험 2)·유저 무드보드(히어로 프리뷰 v2 구도 근거, 픽셀 ref 미사용)·refer2(실험 3)·refer3(실험 4)·refer5/6(실험 5/6). ⚠ 원작은 앵커 슬롯(`image_url`) 직결 금지 (§9) |
 | `pipeline/` | 실행 파이프라인 **스냅샷** (2026-08-13 복사본 — **정본은 `.claude/skills/artist-style-anchor/`**) |
 | `old/` | 폐기·구버전 (6up 시트, 히어로 v1) |
@@ -69,7 +68,7 @@ refer1과 정반대 축(정밀 선화+셀·그라디언트+연극 조명)에서 
 
 **실험 5·6 (refer5·refer6, 2026-09-03 추가)**: 제4·5축 — **아이소메트릭 라인아트**(균일 인디고 선+선택적 블루 채움, refer5)와 **아이소메트릭 무선 플랫 면분할**(면별 명도 3단+앰버 액센트 규율, refer6). 두 런 모두 보드 1회 통과·프로브 4/4 (잡 재시도 0, 각 35크레딧) — 같은 계열(아이소메트릭) 내 서브 문법(선-중심 vs 면-중심)도 분리 보존됨을 확인. 신규 실측 3건: ① **콘텐츠 색 지시가 스타일 모노크롬을 부분 오버라이드**(refer5 — 선·형태·구도 문법은 유지; 색은 콘텐츠 우선, 조형 문법은 스타일 우선이라는 우선순위 비대칭), ② **표본 없는 영역의 문법 외삽 성립**(refer5 무인물→방언 외삽, refer6 곡면→로우폴리·야간→면 셰이딩 명도 시프트), ③ **화면 촬영 원본의 캐스트/모아레를 Content-bound로 제거하는 정규화** 성립(hex 보정 추정 포함). 상세: `artist_style_test_5/style-card-refer5.md` · `artist_style_test_6/style-card-refer6.md`.
 
-**실험 7 (스캐폴드 A/B, 2026-09-03)**: "facet이 너무 약하지 않나"에 대한 실측. 분석자를 **Codex(VLM)로 고정**하고 분석 지침만 교체 — 원문 워크플로 4~7단계 vs 복원·개선한 SKILL.md 단계 2(원문 구조 + 신설 축 3개). 결과: 스타일 충실도 **2.9 → 4.5** (참조점 Claude+약한 스캐폴드 4.75). 결정 축은 **입력 아티팩트 분리(2-0)** — 원문 스캐폴드는 화면 촬영 회색 캐스트를 "종이 바탕"으로 채택해 보드와 프로브 4장 전부가 잉크-워시 룩으로 표류. 신설 축(색 분배·야간 외삽)은 산출물에 그대로 구현됨. 상세: `artist_style_test_5/ab_scaffold/comparison.md`. **같은 날 오후 확장**: v1(3.5)·v3(4.9) 추가 → 사다리 원문 2.9 / v1 3.5 / v2 4.5 / v3 4.9, v3가 Claude 참조점(4.75) 초과 — 승격 조건 충족(오너 판정 대기). 비교 아티팩트 "refer5 스캐폴드 사다리" https://claude.ai/code/artifact/4507f8fe-a72f-4590-ab5d-51a9eb032399 (`ab_scaffold/artifact.html` 사본). **09-04 v4 추가(6조건)**: 역할 교대 라운드(Codex 저작·Claude 검수)로 만든 v4는 하네스 검증 경고 0건·보드 최청정이나 캡슐에 액센트 hex가 빠져 충실도 4.6(v3 4.9 미만) — 승격 조건 미충족, v5 후보 1건 특정.
+**실험 7 (스캐폴드 A/B, 2026-09-03)**: "facet이 너무 약하지 않나"에 대한 실측. 분석자를 **Codex(VLM)로 고정**하고 분석 지침만 교체 — 원문 워크플로 4~7단계 vs 복원·개선한 SKILL.md 단계 2(원문 구조 + 신설 축 3개). 결과: 스타일 충실도 **2.9 → 4.5** (참조점 Claude+약한 스캐폴드 4.75). 결정 축은 **입력 아티팩트 분리(2-0)** — 원문 스캐폴드는 화면 촬영 회색 캐스트를 "종이 바탕"으로 채택해 보드와 프로브 4장 전부가 잉크-워시 룩으로 표류. 신설 축(색 분배·야간 외삽)은 산출물에 그대로 구현됨. 상세: `artist_style_test_5/ab_scaffold/comparison.md`.
 
 ## 6. 핵심 발견 (프로덕션 설계 직결)
 
@@ -98,7 +97,7 @@ pipeline/bin/hf_image.sh <프롬프트.txt> <출력.png> <ref1> [ref2 ...]
 
 ## 8. 비용 실측
 
-실험 1(프리셋+프리뷰) ≈ 133크레딧 · 실험 2(refer1 전 라운드) 238크레딧(카드 §비용(최종) 실측 = 34장×7) · 실험 3(refer2) 35크레딧 · 실험 4(refer3) 35크레딧 · 실험 5·6(refer5·6) 각 35크레딧 · 실험 7(스캐폴드 A/B, 5조건×5장) 175크레딧 — **전체 ≈ 686크레딧** (장당 7). 스타일 1종 온보딩 최소 비용 = 보드 1 + 프로브 4 = **35크레딧** (재시도 0 기준).
+실험 1(프리셋+프리뷰) ≈ 133크레딧 · 실험 2(refer1 전 라운드) 238크레딧(카드 §비용(최종) 실측 = 34장×7) · 실험 3(refer2) 35크레딧 · 실험 4(refer3) 35크레딧 · 실험 5·6(refer5·6) 각 35크레딧 · 실험 7(스캐폴드 A/B, 2조건×5장) 70크레딧 — **전체 ≈ 581크레딧** (장당 7). 스타일 1종 온보딩 최소 비용 = 보드 1 + 프로브 4 = **35크레딧** (재시도 0 기준).
 
 ## 9. 프로덕션 기능화 체크리스트 (남은 것)
 
@@ -110,9 +109,7 @@ pipeline/bin/hf_image.sh <프롬프트.txt> <출력.png> <ref1> [ref2 ...]
 - [ ] **UI**: 온보딩 플로우(업로드→분석 결과 확인→보드 승인), 룩 옵션(표준/각진 보드), 팔레트 파라미터 노출 여부
 - [ ] 서버 자동화 시 vision QA 판정자(현재 Claude 수동)를 무엇으로 대체할지
 - [ ] **IP 레퍼런스 정책**: 유저 업로드가 기존 IP(캐릭터 상품 사진 등)일 때 처리 — 캐릭터 비유사 누수 게이트는 작동하나(refer3 실측: 조형 문법만 추출 시 산출물 비유사 통과) 스타일 자체의 IP성 허용 기준·약관은 미결
-- [x] **스캐폴드 v3 A/B 검증** — 완료(2026-09-03): v3 4.9 ≥ v2 4.5, 분석자 고정 4조건 사다리 확보(Codex+v1 포함). 실행자 채점 n=1
-- [ ] **v3 승격 판정(오너)** — 승격 시 SKILL.md 단계 2 본문을 `scaffolds/v3.md`로 교체. 잔여: 반복 안정성 n=4, 미검증 축(#4 다중 입력·#16 LOD·#10 그림자 단독) 개별 실험, v3 액센트 면적 상한 강제·위계 게이트 [실측] 엄격화
-- [x] **v4 A/B 검증** — 완료(09-04): 4.6 < v3 4.9, 검증 경고 0건. 원인 = 캡슐 ② 액센트 hex 누락 → **v5 후보**: "accent #hex ≤ N%" 필수 토큰 + `build_prompts.py` 액센트 hex 검사
+- [ ] **스캐폴드 후속(실험 7 잔여)**: 2-0에 배경 정규화 규칙(순백 vs 틴트 판정 기준) 명시 · Facet 14에 "촬영·압축 흔적은 불완전성이 아님" 명시 · E′ 기본 절을 Style Vector 불규칙성 게이트로 조건화 · 액센트 면적 상한을 캡슐에 수치로 · 분석자 고정 3자 비교(Codex+약한 스캐폴드, 35크레딧)
 
 ## 10. ⚠ 근거 문서 상태 (2026-08-05 대청소 영향)
 
@@ -120,6 +117,4 @@ pipeline/bin/hf_image.sh <프롬프트.txt> <출력.png> <ref1> [ref2 ...]
 - **삭제됨** (git 히스토리 / `~/tale-studio-backup-2026-08-05.tar.gz`에서 복구 가능): `docs/style-anchor-prompts.md`·`style-anchor-injection.md`·`style-anchor-art-style-authority.md`(v2 앵커 3형제), `docs/character-template-restyle-prompts.md`
 - **생존**: `docs/모작_이미지_평가_기준_및_수정사항.md`(무효 배너 처리됨), `docs/Neutral_스타일_분석_및_수정_가이드.md`(E 레이어 근거)
 - 스킬(`pipeline/` 스냅샷 동일)은 14-facet 요지를 내장하도록 보정됨 — 삭제된 원문 없이도 실행 가능
-- **스캐폴드 버전 관리 (2026-09-03)**: `.claude/skills/artist-style-anchor/scaffolds/` — v1(폐기)·v2(보관)·**v3(확정 = SKILL.md 본문, 2026-09-07 오너 승격)**·v4(Codex 저작·Claude 검수, A/B 4.6 — 승격 미충족, v5 후보 특정), 이력·승격 조건 `CHANGELOG.md`. git 추적 중
-- **facet 템플릿 (2026-09-04)**: 같은 디렉토리 `facet-template-v0.guide.md`(목적·작성 규칙 7항·lint) · `facet-input-v0.jsonc`(입력 서식) · `facet-template-v0.jsonc`(조립도 본문) · `.json` 파생물 · `facets-v4.json`(평면 목록). 1차 목표 = 채워진 템플릿만으로 원본 **스타일** 재현(상황·포즈는 그 뒤). 도구 `bin/facet_template.py lint|strip`. **사이클 1 완료(2026-09-04)** → `facet-*-v1.*`(리프 239) — 실험 폴더 `facet_cycle_1/`(README·synthesis.md·<ref>/fill·compile·gen·judge, 무참조 생성 42크레딧, 아티팩트 "facet 사이클 1"). v1.1은 오너 육안 확인 + 외부 조사 후 논의. **캐릭터 템플릿 v0(2026-09-07)**: `facet-character-v0.*`(리프 285, 계층 A~G + 변동성·기여도 태그) — 조사 폴더 `facet_character/`(오너 원문·계층별 조각·조사 노트·synthesis.md). 이력 `CHANGELOG.md` 말미
 - **⚠ 이 폴더 전체가 `.gitignore`(109행) 대상 — git 밖 로컬 전용.** 스타일 카드·프롬프트·이미지 전부 커밋 이력 없음. 프로덕션 착수 전 보존 필요 시: (a) 카드+프롬프트+README만 추적 대상으로 예외 등록(`!dev/Image_Style/**/*.md` 류), 또는 (b) 별도 백업. 스킬(`.claude/skills/`)은 git 추적 중이라 안전

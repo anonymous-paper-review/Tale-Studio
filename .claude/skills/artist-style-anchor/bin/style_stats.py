@@ -30,6 +30,13 @@ def analyze(path: str) -> None:
     print(f"- 채도 평균 {st.mean[1] / 255 * 100:.0f}% (std {st.stddev[1] / 255 * 100:.0f})"
           f" · 명도 평균 {st.mean[2] / 255 * 100:.0f}% (std {st.stddev[2] / 255 * 100:.0f})")
 
+    # Rec.709 상대휘도 — facet 템플릿 v1 '명암.키' 기준 (HSV V는 고채도 팔레트에서 부풀려짐)
+    lum = [0.2126 * r + 0.7152 * g + 0.0722 * b for r, g, b in small.getdata()]
+    y_mean = sum(lum) / len(lum) / 255 * 100
+    near_black = sum(1 for v in lum if v < 0.15 * 255) / len(lum) * 100
+    key = "하이키" if y_mean >= 65 else "미드" if y_mean >= 40 else "로우키"
+    print(f"- Rec.709 휘도 평균 {y_mean:.0f}% · 근흑(Y<15%) 면적 {near_black:.0f}% → 키 {key} (기준: ≥65 하이키 / 40~65 미드 / <40 로우키)")
+
     edges = small.convert("L").filter(ImageFilter.FIND_EDGES)
     strong = sum(1 for p in edges.getdata() if p > 60) / (W * H) * 100
     print(f"- 강엣지 픽셀 {strong:.1f}% (선 두께/윤곽 밀도 프록시)")

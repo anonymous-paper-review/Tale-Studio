@@ -150,6 +150,14 @@ dev/Skill_Test/*
 dev/Image_Style/**
 !dev/Image_Style/**/
 !dev/Image_Style/**/*.md
+!dev/Image_Style/**/*.jsonc
+# 2026-09-07 오너 결정: md·jsonc는 추적, 실험 결과물(런 폴더·다운로드 사진·로그·생성 이미지)은 제외
+dev/Image_Style/facet_cycle_*/refer*/**
+dev/Image_Style/facet_character/runs/**
+dev/Image_Style/board_ab/refer*/**
+dev/Image_Style/facet_reference/**
+!dev/Image_Style/facet_reference/manifest.md
+!dev/Image_Style/facet_reference/taxonomy.md
 dev/db-backups/
 # 테스트 계정 평문 비번 (커밋 금지)
 docs/test-accounts.md

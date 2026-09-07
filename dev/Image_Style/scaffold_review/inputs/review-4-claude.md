@@ -1,0 +1,16 @@
+# v4 초안 검수 (검수자 = Claude, 2026-09-04) — 판정: 반려, 수정 후 재검수
+
+D1~D6·S1~S4 전 항목 반영 확인. 방향은 맞다. 아래 R1~R8을 고쳐 `v4-draft.md`를 갱신하고 `v4-changes.md`에 "2차 수정" 절을 덧붙여라. 길이 예산 ≤ 130줄 유지(현재 110줄 — 20줄 여유).
+
+| ID | 문제 (위치·증거) | 요구 |
+|---|---|---|
+| **R1** | 출력 계약 표에서 `## 11. FIELDS`가 `## 4`와 `## 5` 사이에 끼어 번호 순서가 깨진다. 또 `## 4. 특징 분류` "끝에 게이트 판정 1줄"은 FIELDS·일관성 검사·게이트 판정보다 **먼저** 쓰이는 위치라 작성 순서와 모순 | FIELDS를 `## 5. FIELDS`로 두고 이후를 재번호(6 CAPSULE · 7 FIGURE_RULES · 8 NEGATIVE · 9 OVERRIDE · 10 QA_CHECKS · 11 NOTES). 게이트 판정은 §4가 아니라 FIELDS 블록 마지막 두 키 `gates_inserted:` / `gates_skipped:`(게이트 이름 나열)로 기록 |
+| **R2** | FIELDS 값이 한글·원문자·영문 혼용(`ⓑ`, `순백`, `플랫 오프셋 실루엣`, `geometric`, `smooth digital flat`)이고 키별 허용값 집합이 한곳에 없다 → 기계 검사 불가 | **FIELDS 허용값 표**(키 / 타입 / 허용값)를 `### FIELDS 작성 규칙`에 넣고 값은 전부 ASCII 토큰: `capture` a\|b\|c\|d · `fill_topology` a\|b\|c\|d · `shadow_type` none\|soft_contact\|flat_offset\|planar · `ground_restore` white\|offwhite\|tint\|studio_floor\|stage_backdrop · `decor_rhythm` even\|uneven\|unknown · `precision_signature` geometric\|hand_drawn\|mixed · `*_tag` measured\|estimated\|corrected\|extrapolated\|na · `intended_texture` none\|paper_grain\|brush\|fiber\|noise\|polish · 불리언 true\|false · 숫자는 단위 없이. `ground`는 관찰 유형이 아니라 **복원 목표**임을 이름(`ground_restore`)으로 못박는다. 게이트 조건식도 이 토큰으로 다시 쓴다 |
+| **R3** | `figure_request`·`user_purity_toggle`은 이미지 속성이 아니라 **생성 시점의 런타임 입력**이다(당신의 시뮬레이션도 그냥 `false`로 추측). `figure_rules_ready`는 FIGURE_RULES 존재로 대체 가능한 중복 | 두 키를 FIELDS에서 제거하고 게이트 표의 해당 행 입력 필드 셀에 `(런타임)` 표시 — 하네스가 프롬프트별로 제공한다고 명시. `figure_rules_ready` 삭제, 조건은 `figure_samples > 0 or FIGURE_RULES 존재` |
+| **R4** | 재질 사전 11행 표가 한 줄 산문으로 압축됨(46행). v3 A/B에서 재질 사전의 행별 질문이 실측 5행을 구체화했고 고정 외삽 문구가 과지시를 막았다 — 둘 다 표가 있어야 작동한다 | v3의 11행 표(재질 / 답할 것)를 복원. 길이 여유 20줄 안에 들어간다 |
+| **R5** | CAPSULE 필수 토큰 중 "투영 enum", "경계/채움"의 **영문 어휘가 정의돼 있지 않다**(#6·#9는 한글 선택지) → VLM마다 다른 영어를 쓰고 하네스 문자열 검증이 불가 | 영문 토큰 표를 CAPSULE 계약 행 또는 별도 줄에: 투영 `linear perspective` / `isometric parallel projection` / `flat frontal staging` / `photographic lens perspective` / `diorama overhead view` · 경계/채움 `closed line art with selective spot fills` / `no-outline planar value blocks` / `flat cel fills` / `blended painterly gradients` · 그림자 `no cast shadows` / `soft contact shadow` / `flat colored offset shadow` / `hard planar face shadows` · 정밀도 `clean geometric regularity` / `hand-drawn wobble`. 1차 리뷰 D절의 당신 문구를 재사용해도 좋다 |
+| **R6** | 선 위계 게이트 사각지대: `2.0 < line_variation < 2.5`이거나 `line_ratio < 1.5`·태그≠measured면 삽입도 대체도 없다. strict monochrome 조건 `accent_pct_max > 0`은 액센트 0인 순수 모노크롬을 배제 | 대체 문구 셀에 "그 외에는 선 굵기 언급 생략"을 명시. strict monochrome: `accent_pct_max == 0`이면 삽입 문구 "strict monochrome, no accent hue" 분기 추가 |
+| **R7** | 파싱 규칙이 v3보다 약해졌다: CAPSULE에만 "표·목록·따옴표 금지"가 있고 FIGURE_RULES·NEGATIVE·FIELDS의 "코드블록 없이, 헤더 다음 문단/블록 하나" 규칙이 빠짐. 카드 전체에 걸린 고유명사 금지 일반 규칙(사유 포함)도 빠짐 | 출력 계약 아래에 1줄: "CAPSULE·FIGURE_RULES·NEGATIVE·FIELDS는 코드블록 없이 각각 헤더 바로 다음에 문단/블록 하나". 마지막에 1줄: 고유명사 금지(부정문 포함, 후속 생성기가 차단·토큰 반영 가능) — v3 문장 재사용 |
+| **R8** | #22 문구 "색·재질·조형/얼굴·투영·배경별 strict monochrome 강제 절 필요 여부 확정"은 의미가 꼬였다(strict monochrome은 색 축에만 해당) | "5축 각각 default/style/user override를 채우고, 색 축에서 strict monochrome 강제 여부를 확정" |
+
+부수: `v4-changes.md`의 refer5 시뮬레이션 FIELDS 예시를 R2 토큰으로 갱신하고, `gates_inserted/gates_skipped` 예시도 추가. 다른 파일 수정 금지. 최종 메시지에 "2차 수정" 절 전문을 붙여라.
