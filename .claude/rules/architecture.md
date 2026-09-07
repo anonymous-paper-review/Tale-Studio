@@ -167,6 +167,8 @@ paths:
   (`gateStageEvidence`; 프롬프트는 메모를 읽지 않는다). 옛 무대(version 없음)는 건드리지 않는다. 작은 반응(자세를 낮춤 등)은 note 로만.
 - **기하**: 표지 피사체도 거리 계산은 인물 키. 와이드(EWS/ELS/VWS/WS/LS/FS/MLS)에서 피사체가 표지뿐인데 인물 명단이 있으면 합집합.
   화면 높이 8% 미만 인물은 blocking 에서 빼고 `screen_layout.characters[].distant` 로만 남긴다(러프 문장 "먼 인물").
+  END 카메라는 START 의 **최종** 카메라(시야 가림·물러섬·쌍 축 보정 뒤)에서 푼다(`tests/promise-stage-end-camera.test.ts`, 2026-09-07 실측
+  겨울_6 sh_01_02: 쌍 축 보정 전 카메라로 END 를 계산해 안 움직인 용족이 화면 왼쪽→오른쪽으로 옮겨갔다).
 - **프레임 밖 봉인**: 카메라 밖 인물은 `screen_layout.off_frame` + WARNING visual 제약("OFF-SCREEN … do not draw") → check_notes 로 러프·실사에 실린다.
   러프 셀은 이름을 대고 못박고, 실사 참조 계획(`planShotCharacterRefs`·배치 라우트)은 그 인물의 시트를 붙이지 않는다.
   START 에 없고 END 에 들어오는 인물은 "NOT visible at START; enters from the left/right".

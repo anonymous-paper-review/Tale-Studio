@@ -271,20 +271,6 @@ export function applyStageToShots(
     if (backoff > 1) push('INFO', `의도한 인물을 프레임에 담으려 카메라가 ×${Math.round(backoff * 100) / 100} 물러섰다(샷이 지정보다 넓다)`)
     for (const m of startSolve.issues) push(startSolve.axisCorrected && m.includes('축') ? 'WARNING' : 'INFO', m)
 
-    // END: 카메라 무브(설정 또는 camera_motion 추정) 또는 비트 안 이동이 있을 때만 별도 계산.
-    const motion = shot.dynamic_spec?.camera_motion
-    const endScale = setup.end?.distance_scale ?? distanceScaleForMotion(motion)
-    const endDir = setup.end?.from_direction
-    const statesChange = states.end !== states.start
-    const cameraMoves = endScale !== 1 || (!!endDir && endDir !== setup.from_direction)
-    // 카메라가 움직일 때만 END 카메라를 END 피사체 기준으로 다시 푼다. 정지 카메라에서 인물만 이동하면 START 카메라
-    //   그대로 END 배치를 계산해야 화면상 이동(멀어짐·좌우 이동)이 남는다(실측 sh_01_30: 다시 풀면 셋이 제자리).
-    const endSolve = cameraMoves
-      ? solveCamera({ setup, shotType: spec.shot_type, aspect, stage, states: states.end, distanceScale: endScale * backoff, fromDirectionOverride: endDir, intendedIds })
-      : statesChange
-        ? startSolve
-        : null
-
     // 쌍 축 검사 — 프레임 안 두 인물의 좌우가 이전 샷과 같은지.
     if (!isOts && setup.axis_cross !== 'motivated') {
       for (let pass = 0; pass < 2; pass++) {
@@ -338,6 +324,23 @@ export function applyStageToShots(
         }
       }
     }
+    // END: 카메라 무브(설정 또는 camera_motion 추정) 또는 비트 안 이동이 있을 때만 별도 계산.
+    //   반드시 START 의 **최종** 카메라(시야 가림·물러섬·쌍 축 보정 뒤) 다음에 푼다 — 앞에서 풀면 쌍 축 검사가 카메라를
+    //   돌린 뒤에도 END 가 돌리기 전 카메라를 쥐고 있어, 한 발짝도 안 움직인 인물이 화면에서 옮겨간다
+    //   (2026-09-07 실측 겨울_6 sh_01_02: 용족이 왼쪽→오른쪽, 향 three_quarter→front).
+    const motion = shot.dynamic_spec?.camera_motion
+    const endScale = setup.end?.distance_scale ?? distanceScaleForMotion(motion)
+    const endDir = setup.end?.from_direction
+    const statesChange = states.end !== states.start
+    const cameraMoves = endScale !== 1 || (!!endDir && endDir !== setup.from_direction)
+    // 카메라가 움직일 때만 END 카메라를 END 피사체 기준으로 다시 푼다. 정지 카메라에서 인물만 이동하면 START 카메라
+    //   그대로 END 배치를 계산해야 화면상 이동(멀어짐·좌우 이동)이 남는다(실측 sh_01_30: 다시 풀면 셋이 제자리).
+    const endSolve = cameraMoves
+      ? solveCamera({ setup, shotType: spec.shot_type, aspect, stage, states: states.end, distanceScale: endScale * backoff, fromDirectionOverride: endDir, intendedIds })
+      : statesChange
+        ? startSolve
+        : null
+
     const placementsStart = new Map(states.start.map((s) => [s.character_id, placeCharacter(startSolve.camera, s, aspect, startSolve.subjectDistance)]))
     const placementsEnd = endSolve
       ? new Map(states.end.map((s) => [s.character_id, placeCharacter(endSolve.camera, s, aspect, endSolve.subjectDistance)]))
