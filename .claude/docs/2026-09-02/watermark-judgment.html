@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>워터마크 판정</title>
+<style>
+  /* 의도된 단일 테마 — 실제 앱의 다크 바탕(oklch(0.156 0 0)) 위에서 판정해야 하므로
+     라이트 변형을 두지 않는다. 모든 색을 명시적으로 칠한다. */
+  :root{
+    --app-bg:oklch(0.156 0 0);
+    --ink:#E7E9ED; --muted:#949AA4; --line:rgba(255,255,255,.14);
+    --chip-bg:rgba(255,255,255,.08);
+    --ok:#5FB98A; --warn:#D2A64F;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI","Malgun Gothic",sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:0 20px 90px;background:var(--app-bg);color:var(--ink);
+    font-family:var(--sans);font-size:16px;line-height:1.75}
+  .wrap{max-width:1040px;margin:0 auto}
+  header{padding:48px 0 8px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--muted);margin:0 0 12px;font-weight:600}
+  h1{font-size:clamp(24px,4.5vw,34px);font-weight:800;letter-spacing:-.02em;margin:0 0 12px}
+  .lede{color:var(--ink);max-width:64ch;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:14.5px;max-width:64ch;margin:0}
+  h2{font-size:19px;font-weight:750;margin:44px 0 6px;letter-spacing:-.01em}
+  .note{color:var(--muted);font-size:14px;margin:0 0 18px;max-width:64ch}
+
+  .variants{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px}
+  figure{margin:0}
+  figcaption{margin-top:10px}
+  .vtag{display:inline-block;font-family:var(--mono);font-size:12px;font-weight:700;
+    background:var(--chip-bg);border:1px solid var(--line);border-radius:4px;padding:1px 8px;margin-right:8px}
+  .vname{font-weight:750;font-size:15px}
+  .rule{display:block;font-size:13px;color:var(--muted);margin-top:4px;line-height:1.55}
+  .rule.ok{color:var(--ok)}
+  .rule.warn{color:var(--warn)}
+
+  /* ── 실제 카드 재현 — src/app/projects/page.tsx:127-146 의 클래스를 CSS 로 그대로 옮김 ── */
+  .pcard{border-radius:1rem;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);
+    overflow:hidden;display:flex;flex-direction:column}
+  .thumb{aspect-ratio:16/9;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center}
+  .initial{font-size:48px;font-weight:700;color:rgba(255,255,255,.15);user-select:none}
+  .pbody{padding:12px 16px 14px}
+  .ptitle{font-size:14.5px;font-weight:600;margin:0}
+  .pmeta{font-size:12px;color:var(--muted);margin:2px 0 0}
+
+  .gA{background:
+    radial-gradient(ellipse at top left, rgba(229,9,20,.18), transparent 60%),
+    radial-gradient(ellipse at bottom right, rgba(70,130,180,.12), transparent 60%)}
+  .gB{background:radial-gradient(ellipse at top left, rgba(229,9,20,.18), transparent 60%)}
+  .gC{background:radial-gradient(ellipse at top left, rgba(255,255,255,.08), transparent 60%)}
+  /* gD = 그라디언트 없음 */
+
+  /* ── 그리드 맥락 — 라디오로 변형 전환 ── */
+  .picker{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px}
+  .picker label{font-family:var(--mono);font-size:13px;font-weight:700;border:1px solid var(--line);
+    border-radius:6px;padding:6px 14px;cursor:pointer;background:var(--chip-bg)}
+  .picker input{position:absolute;opacity:0;pointer-events:none}
+  .picker label:has(input:checked){border-color:var(--ink);background:rgba(255,255,255,.16)}
+  .picker label:has(input:focus-visible){outline:2px solid var(--ink);outline-offset:2px}
+  .grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px}
+  .grid3 .thumb{background-color:rgba(0,0,0,.6)}
+  .ctx:has(#vb:checked) .grid3 .thumb{background-image:radial-gradient(ellipse at top left, rgba(229,9,20,.18), transparent 60%)}
+  .ctx:has(#va:checked) .grid3 .thumb{background-image:
+    radial-gradient(ellipse at top left, rgba(229,9,20,.18), transparent 60%),
+    radial-gradient(ellipse at bottom right, rgba(70,130,180,.12), transparent 60%)}
+  .ctx:has(#vc:checked) .grid3 .thumb{background-image:radial-gradient(ellipse at top left, rgba(255,255,255,.08), transparent 60%)}
+  .ctx:has(#vd:checked) .grid3 .thumb{background-image:none}
+
+  .verdict{border:1px solid var(--ok);color:var(--ok);border-radius:8px;padding:10px 14px;
+    font-size:14.5px;max-width:64ch;margin:16px 0 0;background:rgba(95,185,138,.08)}
+  .verdict b{color:var(--ok)}
+  footer{margin-top:56px;padding-top:16px;border-top:1px solid var(--line);
+    font-size:13px;color:var(--muted);max-width:72ch}
+  footer b{color:var(--ink)}
+  code{font-family:var(--mono);font-size:.86em;background:var(--chip-bg);padding:1px 6px;border-radius:3px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">판정 재료 · 2026-09-02 · 실제 CSS 원값 재현</p>
+  <h1>빈 프로젝트 카드의 워터마크 배경</h1>
+  <p class="lede">그림이 아직 없는 프로젝트 카드의 썸네일 자리 배경을 고르면 됩니다. 답은 글자 하나 — <b>A / B / C / D</b>.</p>
+  <p class="sub">판정 당시 코드는 A였습니다. 색상 게이트가 "토큰 밖 두 번째 색(스틸블루)"으로 잡아서 존치 여부가 열려 있었습니다.</p>
+  <p class="verdict">판정 완료 — 오너가 <b>C(무채색)</b>로 확정 (2026-09-02). 코드 반영과 실화면 확인(.smoke/tale-auth/projects.png)까지 끝났고, 아래는 판정 재료 원본 그대로입니다.</p>
+</header>
+
+<h2>변형 4종 — 카드 하나 근접</h2>
+<p class="note">네 카드는 그라디언트만 다르고 나머지는 동일합니다.</p>
+<div class="variants">
+  <figure>
+    <div class="pcard"><div class="thumb gA"><span class="initial">U</span></div>
+      <div class="pbody"><p class="ptitle">Untitled</p><p class="pmeta">방금 만든 프로젝트</p></div></div>
+    <figcaption><span class="vtag">A</span><span class="vname">현행 — 레드 18% + 스틸블루 12%</span>
+      <span class="rule warn">규칙 충돌 2건: 토큰 밖 두 번째 색 + 장식 그라디언트 (specs/design.md one accent · 장식 금지)</span></figcaption>
+  </figure>
+  <figure>
+    <div class="pcard"><div class="thumb gB"><span class="initial">U</span></div>
+      <div class="pbody"><p class="ptitle">Untitled</p><p class="pmeta">방금 만든 프로젝트</p></div></div>
+    <figcaption><span class="vtag">B</span><span class="vname">레드만 — 스틸블루 제거</span>
+      <span class="rule warn">규칙 충돌 1건: accent를 CTA·active 밖 장식에 사용</span></figcaption>
+  </figure>
+  <figure>
+    <div class="pcard"><div class="thumb gC"><span class="initial">U</span></div>
+      <div class="pbody"><p class="ptitle">Untitled</p><p class="pmeta">방금 만든 프로젝트</p></div></div>
+    <figcaption><span class="vtag">C</span><span class="vname">무채색 — 흰색 8%로 교체 · 확정</span>
+      <span class="rule ok">규칙 충돌 없음 (무채색 명암은 장식 아님)</span></figcaption>
+  </figure>
+  <figure>
+    <div class="pcard"><div class="thumb"><span class="initial">U</span></div>
+      <div class="pbody"><p class="ptitle">Untitled</p><p class="pmeta">방금 만든 프로젝트</p></div></div>
+    <figcaption><span class="vtag">D</span><span class="vname">제거 — 이니셜만</span>
+      <span class="rule ok">규칙 충돌 없음</span></figcaption>
+  </figure>
+</div>
+
+<div class="ctx">
+  <h2>그리드 맥락 — 빈 카드가 여러 장일 때</h2>
+  <p class="note">프로젝트 목록에서는 빈 카드가 나란히 뜹니다. 버튼을 눌러 변형을 바꿔 보세요. one accent 규칙이 걱정하는 것이 이 화면입니다 — 빈 카드마다 레드가 반복되면 진짜 CTA가 묻힙니다.</p>
+  <div class="picker" role="radiogroup" aria-label="변형 선택">
+    <label><input type="radio" name="v" id="va" checked>A 현행</label>
+    <label><input type="radio" name="v" id="vb">B 레드만</label>
+    <label><input type="radio" name="v" id="vc">C 무채색</label>
+    <label><input type="radio" name="v" id="vd">D 제거</label>
+  </div>
+  <div class="grid3">
+    <div class="pcard"><div class="thumb"><span class="initial">U</span></div>
+      <div class="pbody"><p class="ptitle">Untitled</p><p class="pmeta">방금 만든 프로젝트</p></div></div>
+    <div class="pcard"><div class="thumb"><span class="initial">테</span></div>
+      <div class="pbody"><p class="ptitle">테스트 광고 A안</p><p class="pmeta">어제</p></div></div>
+    <div class="pcard"><div class="thumb"><span class="initial">M</span></div>
+      <div class="pbody"><p class="ptitle">Music video draft</p><p class="pmeta">지난주</p></div></div>
+  </div>
+</div>
+
+<footer>
+  <p><b>재현 근거</b> — 카드·썸네일·이니셜·그라디언트는 <code>src/app/projects/page.tsx:127-146</code>의 클래스 값을 그대로 옮겼고, 바탕은 <code>globals.css</code> 다크 <code>--background</code>(oklch(0.156 0 0))다. 카드 본문(제목 줄)은 근사치. <b>최종 확인은 실제 화면에서</b> — 이 페이지는 색 판정용 재현이고 실화면의 hover·간격까지 대신하지 않는다. 판정이 나오면 코드 반영과 예외 주석 정리는 다음 세션 몫.</p>
+</footer>
+
+</div>
+</body>
+</html>

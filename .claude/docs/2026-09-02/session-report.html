@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>오너 관문</title>
+<style>
+  :root {
+    --bg:#F1F3F5; --surface:#FFFFFF; --surface-2:#E8EBEF;
+    --ink:#16181D; --ink-2:#3B4048; --muted:#676D77;
+    --line:#D6DBE1; --line-2:#BFC6CE;
+    --accent:#1F5F7A; --accent-soft:#DCEAF1;
+    --pass:#2E7350; --pass-soft:#DFEDE5;
+    --fail:#A33A38; --fail-soft:#F6E2E1;
+    --gate:#6A579E; --gate-soft:#EAE4F5;
+    --warn:#8A6412; --warn-soft:#F4EBD6;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI","Malgun Gothic",sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+      --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+      --line:#2B3038; --line-2:#3C434D;
+      --accent:#74B4D0; --accent-soft:#17303C;
+      --pass:#5FB98A; --pass-soft:#17301F;
+      --fail:#E0817D; --fail-soft:#3A2321;
+      --gate:#A794D8; --gate-soft:#272040;
+      --warn:#D2A64F; --warn-soft:#33290F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+    --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+    --line:#2B3038; --line-2:#3C434D;
+    --accent:#74B4D0; --accent-soft:#17303C;
+    --pass:#5FB98A; --pass-soft:#17301F;
+    --fail:#E0817D; --fail-soft:#3A2321;
+    --gate:#A794D8; --gate-soft:#272040;
+    --warn:#D2A64F; --warn-soft:#33290F;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:0 20px 110px;background:var(--bg);color:var(--ink);
+    font-family:var(--sans);font-size:16px;line-height:1.82;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto}
+
+  header.page{padding:56px 0 20px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 14px;font-weight:600}
+  h1{font-size:clamp(27px,5vw,40px);font-weight:800;letter-spacing:-.028em;line-height:1.22;
+    margin:0 0 18px;text-wrap:balance}
+  .bluf{font-size:17.5px;color:var(--ink);margin:0 0 6px;max-width:64ch}
+  .bluf b{color:var(--gate)}
+  .asof{font-family:var(--mono);font-size:12px;color:var(--muted);margin:10px 0 0}
+  header.page::after{content:"";display:block;height:3px;background:var(--ink);margin-top:26px;opacity:.9}
+
+  section{margin:58px 0 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .sec-num{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);
+    border:1.5px solid var(--accent);border-radius:3px;padding:0 7px;line-height:1.7}
+  h2{font-size:23px;font-weight:800;letter-spacing:-.018em;margin:0;text-wrap:balance}
+  .sec-lede{color:var(--muted);font-size:15px;margin:0 0 24px;max-width:62ch}
+  p{margin:0 0 16px;max-width:64ch}
+  h3{font-size:17px;font-weight:750;margin:28px 0 10px;letter-spacing:-.01em}
+  h3:first-child{margin-top:0}
+  ul.plain{margin:0 0 16px;padding-left:22px;max-width:64ch}
+  ul.plain li{margin-bottom:8px}
+  strong,b{font-weight:750}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    padding:24px 26px 20px;margin:0 0 18px}
+  .card.same{border-left:3px solid var(--pass)}
+  .card.diff{border-left:3px solid var(--warn)}
+  .card > :last-child{margin-bottom:0}
+  .card-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:12px}
+  .card-head h3{flex:1 1 240px;margin:0}
+  .agreed{font-size:15px;color:var(--ink-2);margin:0 0 12px}
+  .agreed b{color:var(--ink);font-weight:750}
+
+  .chip{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.03em;
+    border-radius:3px;padding:2px 8px;white-space:nowrap}
+  .c-pass{background:var(--pass-soft);color:var(--pass)}
+  .c-fail{background:var(--fail-soft);color:var(--fail)}
+  .c-warn{background:var(--warn-soft);color:var(--warn)}
+  .c-gate{background:var(--gate-soft);color:var(--gate)}
+  .c-acc{background:var(--accent-soft);color:var(--accent)}
+
+  pre{background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--line-2);
+    border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+    font-family:var(--mono);font-size:12px;line-height:1.68;margin:8px 0;color:var(--ink-2);
+    white-space:pre;tab-size:2}
+  pre b{color:var(--ink);font-weight:700}
+  pre .path{display:block;color:var(--muted);margin-bottom:8px;font-size:11.5px}
+  code{font-family:var(--mono);font-size:.87em;background:var(--surface-2);padding:1px 6px;border-radius:3px}
+  .code-what{font-size:14.5px;color:var(--ink-2);margin:0 0 4px}
+  .code-diff{font-size:14.5px;margin:8px 0 0}
+  .code-diff .chip{margin-right:8px}
+
+  .tbl{overflow-x:auto;margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}
+  th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:700;
+    padding:10px 12px;border-bottom:2px solid var(--line-2);vertical-align:bottom}
+  td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+  td .path{font-family:var(--mono);font-size:11.5px;color:var(--muted);display:block;margin-top:3px}
+  .gate-cell{color:var(--gate);font-weight:750}
+  .gate-empty{display:inline-block;min-width:60px;border-bottom:1.5px dashed var(--gate);opacity:.7}
+
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);
+    border-radius:10px;overflow:hidden;margin:16px 0}
+  @media (max-width:640px){.split{grid-template-columns:1fr}}
+  .split > div{padding:18px 20px}
+  .split .yes{background:var(--pass-soft);border-right:1px solid var(--line)}
+  .split .no{background:var(--fail-soft)}
+  .split h4{margin:0 0 10px;font-size:14.5px;font-weight:800}
+  .split .yes h4{color:var(--pass)}
+  .split .no h4{color:var(--fail)}
+  .split ul{margin:0;padding-left:20px;font-size:14px;line-height:1.7}
+  .split li{margin-bottom:7px}
+
+  footer{margin-top:66px;padding-top:20px;border-top:2px solid var(--ink);font-size:13.5px;color:var(--muted)}
+  footer b{color:var(--ink)}
+  footer p{max-width:none}
+  a{color:var(--accent)}
+  a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <p class="eyebrow">세션 보고서 · 2026-09-02</p>
+  <h1>오너 관문</h1>
+  <p class="bluf">빌링 정책 12문장을 오너가 삼진한 결과가 내가 정함 0 · 인지 4 · 미인지 8이었다. 이 실측을 받아 오너가 채택한 레버리지 4종 — 색상 lint 게이트, 정책 문장 diff, 스크린샷 보드, 분기 테스트 정리 — 를 코드·규칙·티켓으로 켰다. 게이트는 가동 직후 정규식 구멍(Tailwind 밑줄 앞 \b 불성립)이 발견돼 수리됐고, 최종 실측 raw 색은 8곳(글로우·하이라이트 7 + 워터마크 1)이다.</p>
+  <p class="bluf"><b>결정할 것 1개</b>: 가격 미결 숫자 3개 결정 세션. 워터마크는 오너가 C(무채색)로 판정해 코드 반영·실화면 확인까지 끝났다. <b>알아둘 것 5개</b>.</p>
+  <p class="asof">커밋 없음(working tree) · 규칙 .claude/rules/owner-gates.md · AGENTS.md 신규 · 티켓 3건 신규</p>
+</header>
+
+<section>
+  <div class="sec-head"><span class="sec-num">1</span><h2>혼자 정한 것</h2></div>
+  <p class="sec-lede">오너에게 묻지 않고 정했다. 이번 세션은 전부 되돌리기 쉬움이다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>결정</th><th>왜</th><th>버린 선택지</th><th>되돌리기</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>색상 게이트를 전체 lint와 분리해 별도 config로<span class="path">eslint.design.config.mjs</span></td>
+        <td>전체 <code>pnpm lint</code>는 부채 247건(대부분 <code>no-explicit-any</code> 198건)이라 CI에 넣으면 모든 push가 빨개진다</td>
+        <td>부채 전량 수정 후 편입</td>
+        <td>쉬움</td>
+      </tr>
+      <tr>
+        <td>게이트 범위를 <code>src/components</code>·<code>src/app</code>으로 한정</td>
+        <td>디자인 규칙이 검사하던 층과 일치하고, 실측 위반 1건이라 바로 켤 수 있다</td>
+        <td>src 전체</td>
+        <td>쉬움</td>
+      </tr>
+      <tr>
+        <td>워터마크 그라디언트는 색을 안 바꾸고 예외 주석으로 기록 — 이후 오너 판정 C(무채색)로 해소<span class="path">src/app/projects/page.tsx</span></td>
+        <td>화면 판정은 오너 몫이라는 저장소 규칙. 색을 고치면 화면이 바뀐다</td>
+        <td>스틸블루 즉시 제거</td>
+        <td>쉬움</td>
+      </tr>
+      <tr>
+        <td>게이트가 추가로 잡은 글로우·하이라이트 7곳도 픽셀 불변 예외로 보존, 토큰화는 티켓으로<span class="path">glow-token-cleanup (ready)</span></td>
+        <td><code>--primary</code>가 라이트에선 near-black이라 토큰 치환은 라이트 픽셀이 바뀐다. 화면이 바뀌는 일은 오너 판정을 거친다</td>
+        <td>즉시 토큰 치환</td>
+        <td>쉬움</td>
+      </tr>
+      <tr>
+        <td>gjc 접속은 레포 루트 AGENTS.md 포인터로<span class="path">AGENTS.md (신규)</span></td>
+        <td>오너 답: gjc가 루트 agents.md·rules.md를 읽는 듯. 포인터는 도구 중립이라 Codex류에도 통한다</td>
+        <td>~/.gjc 하네스에 tale-studio 절</td>
+        <td>쉬움</td>
+      </tr>
+      <tr>
+        <td>테스트 정리 패스 발동 조건: 2026-12-01 또는 스위트 체감 둔화 (제안)</td>
+        <td>파운더 사례의 주기가 분기였고, 지금 스위트는 7.5초로 건강하다</td>
+        <td>매월</td>
+        <td>쉬움</td>
+      </tr>
+      <tr>
+        <td>스크린샷 보드 해상도 1440·1024 두 종 (제안)</td>
+        <td>데스크톱 도구라 모바일 제외. 라이트 모드 포함 여부는 토글 실구동 확인 뒤</td>
+        <td>모바일 해상도 포함</td>
+        <td>쉬움</td>
+      </tr>
+      <tr>
+        <td>Claude Code 메모리 2건 저장: 오너는 코드를 못 읽는다 · 빌링 정책 소유권 간극</td>
+        <td>다음 세션이 오너에게 코드 파일을 내밀지 않게. gjc에는 공유되지 않는다(5절)</td>
+        <td>저장 안 함</td>
+        <td>쉬움</td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">2</span><h2>같이 정한 것이 코드에 어떻게 들어갔나</h2></div>
+  <p class="sec-lede">오너가 채택한 4항목. 각각 실제 코드·규칙 파일과 대조했다.</p>
+
+  <div class="card same">
+    <div class="card-head"><h3>색상 lint 게이트 — 토큰 밖 raw 색을 기계가 막는다</h3><span class="chip c-pass">같다</span></div>
+    <p class="agreed"><b>논의:</b> "지금까지 0건"을 관례가 지켰으니, "앞으로도 0건"은 lint가 보장한다. 위반이 눈검수가 아니라 기계에서 걸리게.</p>
+    <p class="code-what">문자열과 템플릿 문자열 안의 hex 색·rgb/hsl/oklch 호출을 에러로 만든다. 색 정의는 15·18줄의 정규식 상수(<code>HEX</code>, <code>COLOR_FN</code>).</p>
+<pre><span class="path">eslint.design.config.mjs:36-44</span>    files: ["src/components/**/*.{ts,tsx}", "src/app/**/*.{ts,tsx}"],
+    rules: {
+      <b>"no-restricted-syntax"</b>: [
+        "error",
+        { selector: `Literal[value=/${HEX}/]`, message: MESSAGE },
+        { selector: `TemplateElement[value.raw=/${HEX}/]`, message: MESSAGE },
+        { selector: `Literal[value=/${COLOR_FN}/]`, message: MESSAGE },
+        { selector: `TemplateElement[value.raw=/${COLOR_FN}/]`, message: MESSAGE },
+      ],
+    },</pre>
+    <p class="code-diff"><span class="chip c-pass">같다</span>검증은 실패 먼저: 위반 5종 카나리가 전부 잡히는 것을 보고 지운 뒤 실트리 통과를 확인했다. 가동 직후 Tailwind 밑줄 표기(<code>_rgba(</code>)가 \b 단어 경계에 안 걸리는 구멍을 발견해 lookbehind로 수리했고(18줄), 재스캔에서 7곳이 더 나왔다 — 처리 방식은 1절, 목록은 티켓 <code>glow-token-cleanup</code>.</p>
+  </div>
+
+  <div class="card same">
+    <div class="card-head"><h3>게이트를 CI에 편입</h3><span class="chip c-pass">같다</span></div>
+    <p class="agreed"><b>논의:</b> 어느 도구가 코드를 바꾸든 push·PR에서 걸리게. CLAUDE.md의 CI 서술도 같이 갱신.</p>
+    <p class="code-what">typecheck와 test 사이에 게이트가 돈다.</p>
+<pre><span class="path">.github/workflows/ci.yml:20-25</span>      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      # 색상 게이트 — specs/design.md "토큰 외 신규 색 금지"의 기계 강제 (eslint.design.config.mjs).
+      # 전체 lint 는 기존 부채(no-explicit-any 등)로 아직 CI 에 못 들어간다.
+      <b>- run: pnpm lint:design</b>
+      - run: pnpm test</pre>
+    <p class="code-diff"><span class="chip c-pass">같다</span>단, 커밋 전이라 CI 실주행은 없다(3절). Vercel은 CI를 기다리지 않으므로 이 게이트도 신호등이지 방벽이 아니다.</p>
+  </div>
+
+  <div class="card same">
+    <div class="card-head"><h3>정책 문장 diff + 스크린샷 보드 — 관례를 규칙 파일로</h3><span class="chip c-pass">같다</span></div>
+    <p class="agreed"><b>논의:</b> 오너 검수 표면은 한국어 문장과 화면 이미지 둘뿐. 정책성 슬라이스는 새 정책 문장을 보고에 나열하고 오너가 태어날 때 삼진한다.</p>
+    <p class="code-what">규칙 파일의 정책 문장 diff 절. CLAUDE.md 판단과 연구 절에서 이 파일을 가리킨다.</p>
+<pre><span class="path">.claude/rules/owner-gates.md:8-14</span>## 정책 문장 diff (정책성 슬라이스)
+
+- 대상: 빌링·쿼터·게이트·플랜 등 "고객에게 한 약속"이 코드로 들어가는 슬라이스.
+- 슬라이스 완료 보고(세션 보고 artifact의 "혼자 정한 것" 섹션)에 <b>이번에 태어나거나 바뀐
+  정책 문장</b>을 한국어로 나열한다. 구현 용어 금지 — 테스트 it() 이름 수준의 정책 문장으로.
+- 오너는 새 문장에만 삼진한다: ① 내가 정함 / ② 인지 / ③ 처음 봄.
+  ③은 구현 확정과 별개로 오너 결정 안건("결정 필요" 섹션)으로 승격한다.</pre>
+    <p class="code-diff"><span class="chip c-pass">같다</span>스크린샷 보드는 같은 파일 다음 절에 있고, 보드 자동화는 티켓 <code>smoke-screenshot-board</code>(ready)로 팠다. 자동화 전까지는 현행 smoke 스크린샷 첨부가 최소 이행이다.</p>
+  </div>
+
+  <div class="card same">
+    <div class="card-head"><h3>분기 테스트 정리 — 지금은 티켓만</h3><span class="chip c-pass">같다</span></div>
+    <p class="agreed"><b>논의:</b> 1,704개 테스트의 중복·구식 후보를 사유와 함께 목록화하고 오너가 유지/삭제만 판정. 삭제는 이 티켓에서 하지 않는다.</p>
+    <p class="code-what">발동 조건이 적힌 waiting 티켓.</p>
+<pre><span class="path">.claude/vault/backlog/tickets/test-suite-triage-quarterly.md:4-10</span>id: test-suite-triage-quarterly
+source: 2026-09-02 레버리지 설계 토론 (오너 채택) — 파운더 사례의 "정리작업" 이식
+kind: audit
+budget: { usd: 0, runs: 1, wall_min: 60 }
+<b>blockers: [until:2026-12-01 또는 core 스위트가 체감으로 느려질 때]</b>
+status: waiting
+priority: normal</pre>
+    <p class="code-diff"><span class="chip c-pass">같다</span></p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">3</span><h2>확인한 것 / 안 한 것</h2></div>
+  <div class="split">
+    <div class="yes">
+      <h4>실제로 돌려서 봤다</h4>
+      <ul>
+        <li>카나리 파일의 위반 5종(hex·짧은 hex·Tailwind 대괄호 표기·rgb()·템플릿 oklch) 전부 검출 → 삭제 → 실트리 통과</li>
+        <li><code>pnpm typecheck</code> 통과 · core 스위트 통과(7.5초)</li>
+        <li>전체 lint 부채 실측 247건: <code>no-explicit-any</code> 198 · <code>no-unused-vars</code> 39 · <code>no-img-element</code> 6</li>
+        <li>raw 색 재실측 — 세션 앞부분의 "hex 6개"는 전부 주석 태그 <code>#feedback</code> 오탐. 첫 스캔 1건 → \b 구멍 수리 후 재스캔 7건 추가, <b>최종 8곳</b>. 밑줄 형태는 카나리에 추가해 회귀를 고정했다</li>
+        <li><code>--primary</code> 실측: 다크(globals.css:194)만 레드, 라이트(104)는 near-black — raw 글로우들의 라이트 패리티 어긋남 발견</li>
+        <li>MCP 연결 실측: godot 1개뿐. Playwright·Aside는 이 프로젝트에 연결돼 있지 않고, smoke는 Orca 내장 브라우저를 쓴다</li>
+        <li>smoke 대상 원장: targets.json 3건 + targets.auth.json 6건</li>
+        <li>워터마크 C(무채색 8%, color-mix 경유라 게이트 예외 불필요) 반영 후: 게이트·typecheck 통과, <code>pnpm smoke /</code>·<code>/projects --auth</code> 모두 HTTP 200·기대 문구 확인. 실화면(.smoke/tale-auth/projects.png)에서 레드·스틸블루 없는 무채색 워터마크 확인</li>
+        <li>gjc 설정 확인: 전역 하네스(~/.gjc/agent/AGENTS.md·RULES.md)만 로드. 레포 CLAUDE.md·.claude/rules를 읽는 흔적 없음</li>
+      </ul>
+    </div>
+    <div class="no">
+      <h4>안 했다</h4>
+      <ul>
+        <li>브라우저 스모크는 안 돌렸다(오너 중단). UI 변경이 예외 주석 1줄뿐이라 렌더 영향 없음의 근거는 typecheck 통과와 그 줄이 실제 eslint 지시문으로 작동한 것</li>
+        <li>CI 실주행 없음 — 커밋·push를 안 했다</li>
+        <li>라이트 모드 화면은 안 봤다(라이트는 현재 미사용) — 글로우 원값들의 라이트 어긋남은 티켓에 기록만</li>
+        <li>lint 부채 247건과 글로우 토큰화는 안 했다(후자는 티켓 <code>glow-token-cleanup</code>)</li>
+        <li>gjc가 루트 AGENTS.md를 정말 읽는지는 오너 기억 기준이다. 다음 gjc 세션에서 실검증 필요</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">4</span><h2>결정이 필요한 것</h2></div>
+  <p class="sec-lede">오너가 답할 수 있는 것. 답이 없으면 "막히는 것" 칸이 그대로 멈춘다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>질문</th><th>안 정하면 뭐가 막히나</th><th>선택지</th><th>추천</th><th>언제까지</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>가격 미결 숫자 3개(계정 초과 단가·자동충전 상한·무료 Take 유효기간) 결정 세션을 여나</td>
+        <td>결제 켜기. 겸사겸사 미인지 8문장 중 6개의 배경이 이 세션에서 오너 머리로 들어온다</td>
+        <td>① 결정 카드 3장 준비시켜 진행 ② v4 시트 후보값 그대로</td>
+        <td>① 카드 3장. MoR 수수료 미반영 재검산도 같은 자리에서</td>
+        <td>결제 라이브 전</td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">5</span><h2>알고만 있으면 되는 것</h2></div>
+  <p class="sec-lede">결정은 필요 없다. 모르면 나중에 놀란다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>가정</th><th>틀리면 뭐가 깨지나</th><th>확인 방법</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>CI 색상 게이트는 어느 도구가 코드를 바꿔도 push·PR에서 걸린다</td>
+        <td>Vercel은 CI를 기다리지 않으므로 빨간 채로 배포는 된다. 신호등이지 방벽이 아니다</td>
+        <td>GitHub Actions 체크 상태</td>
+      </tr>
+      <tr>
+        <td>gjc 접속은 루트 AGENTS.md 포인터로 해소됐다 — 단 메모리·훅은 여전히 Claude Code 전용</td>
+        <td>gjc가 루트 AGENTS.md를 안 읽는 도구라면 관례 없이 작업한다</td>
+        <td>다음 gjc 세션에서 owner-gates 인지 여부 확인</td>
+      </tr>
+      <tr>
+        <td>게이트는 문자열·템플릿 리터럴만 본다</td>
+        <td>src/lib 등 범위 밖의 색, 조각으로 조립한 색은 통과한다</td>
+        <td>위반이 재발하면 범위·패턴 확장</td>
+      </tr>
+      <tr>
+        <td>가격 정본은 여전히 tale_pricing_usd_v4.xlsx다 — 미인지 8문장의 출처도 이 한 파일</td>
+        <td>시트가 낡았으면 4절 2행의 결정 카드가 낡은 근거로 만들어진다</td>
+        <td>결정 세션에서 시트를 열 때 날짜·탭 대조</td>
+      </tr>
+      <tr>
+        <td>세션 보고 표준이 오늘 개편됐다(readable-report는 artifact 스킬로 흡수)</td>
+        <td>옛 형식으로 쓴 보고는 반려 대상이다. 이 문서가 새 표준의 첫 적용</td>
+        <td>~/.claude/skills/artifact/SKILL.md</td>
+      </tr>
+    </tbody>
+  </table></div>
+  <h3>지뢰</h3>
+  <ul class="plain">
+    <li>게이트 예외(<code>eslint-disable</code>)가 7개다(#accent-glow-tokenize — 워터마크 예외는 오너 판정 C 반영으로 삭제됨). 세는 장치가 없어 예외가 늘어도 신호가 없다 — 7개는 티켓 <code>glow-token-cleanup</code>이 지우는 게 목표.</li>
+    <li>오늘 변경 전부가 커밋 전이다. CLAUDE.md의 CI 서술은 이미 lint:design 포함으로 갱신됐는데, ci.yml과 따로 놀면 문서와 실제가 어긋난다. 커밋할 때 한 덩어리로.</li>
+  </ul>
+</section>
+
+<footer>
+  <p><b>근거로 쓴 것</b> — 이 세션 대화(파운더 포스트 토론 → 빌링 정책 12문장 삼진 → 채택 4항목), 실측 명령 출력(lint 부채·raw 색 grep·MCP 설정·gjc 설정), 코드 블럭은 working tree 파일에서 줄 번호 그대로. 변경 파일: eslint.design.config.mjs(신규) · AGENTS.md(신규) · package.json · .github/workflows/ci.yml · CLAUDE.md · .claude/rules/owner-gates.md(신규) · 티켓 3건(신규) · src/app/page.tsx·pricing/page.tsx·projects/page.tsx(글로우 예외 주석 7곳, 픽셀 불변) · projects/page.tsx 워터마크 무채색 교체(오너 판정 C — 판정 재료 <a href="https://claude.ai/code/artifact/c2ce611a-f7a6-47b3-b68c-e01b3aaabdce">워터마크 판정</a>) · 스크린샷 .smoke/tale-smoke/root.png·.smoke/tale-auth/projects.png.</p>
+  <p><b>이 문서가 하지 않는 것</b> — 커밋·배포를 하지 않았다. 가격 숫자를 정하지 않았다. 테스트를 지우지 않았고 글로우 토큰화를 하지 않았다. gjc의 루트 AGENTS.md 로딩은 오너 기억 기준이고 실행 검증이 아니다. 빌링 정책 삼진(0·4·8)의 소유 이전 자체는 4절 2행의 결정 세션 몫이다.</p>
+</footer>
+
+</div>
+</body>
+</html>

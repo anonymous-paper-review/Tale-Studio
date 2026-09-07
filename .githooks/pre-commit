@@ -1,0 +1,18 @@
+#!/bin/sh
+# 커밋 전 관문 — CI(.github/workflows/ci.yml)와 같은 3종을 로컬에서 먼저 돈다.
+# 2026-09-02 실측: 세 개 합쳐 약 12초(typecheck 2s · lint:design 2s · test 7.5s).
+# 목적: 빨간 스위트가 커밋에 실리는 일(2026-08-28 · 2026-09-02 재발)을 커밋 시점에 막는다.
+# 우회가 꼭 필요하면 `git commit --no-verify` — 사유를 커밋 메시지에 남길 것.
+set -e
+
+step() {
+  name="$1"; shift
+  if ! "$@"; then
+    printf '\n[pre-commit] %s 실패 — 커밋을 막았습니다. 고치고 다시 커밋하세요. (우회: git commit --no-verify)\n' "$name" >&2
+    exit 1
+  fi
+}
+
+step typecheck   pnpm typecheck
+step lint:design pnpm lint:design
+step test        pnpm test

@@ -19,4 +19,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+      # 색상 게이트 — specs/design.md "토큰 외 신규 색 금지"의 기계 강제 (eslint.design.config.mjs).
+      # 전체 lint 는 기존 부채(no-explicit-any 등)로 아직 CI 에 못 들어간다.
+      - run: pnpm lint:design
       - run: pnpm test
