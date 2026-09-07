@@ -61,7 +61,7 @@
       남음: 같은 값을 Vercel **Preview/Development 스코프에만** 넣는다(P1 배포 전). Production에 넣지 않는다.
 - [x] **웹훅 시크릿** - ✅ 2026-09-07 발급·배선. (원래 메모: 비어 있는 게 정상. Paddle에 "알림 목적지"를 만들 때 발급된다. 에이전트가 API로 만든다(P1 끝나면).
       목적지 URL: `https://tale-git-dev-talestudio.vercel.app/api/billing/paddle/webhook` (dev 브랜치 고정 주소, 2026-09-07 확인).
-- [ ] **Default payment link 설정** - 샌드박스 대시보드 > Checkout > Checkout settings. 샌드박스는 `https://localhost/`도 된다.
+- [x] **Default payment link 설정** - ✅ 2026-09-07 에이전트가 오너 브라우저의 샌드박스 대시보드 탭에서 `https://tale-git-dev-talestudio.vercel.app/account` 로 저장. 이게 없으면 Paddle 이 거래 생성을 거부한다(실측 400).
 - [ ] **디스코드 경보 웹훅** (2026-09-07 오너 확정, P11 채널) - 5분.
       1. 디스코드 서버(혹은 혼자 쓰는 서버 새로) → 채널 하나 만들기(예: `#tale-alerts`).
       2. 그 채널 ⚙️ 채널 편집 → **연동** → **웹훅** → 새 웹훅 → 이름 `Tale` → **웹훅 URL 복사**.
@@ -76,11 +76,10 @@
 
 ## 2. 샌드박스 키 받은 뒤 (에이전트)
 
-- [ ] **P6 상품 등록 실행** - P2 스크립트를 샌드박스 키로 실행 → 가격 ID 13개를 env에.
-- [ ] **P7 결제창 연결** - `/pricing`과 앱 안 충전 화면의 버튼이 Paddle 결제창(overlay)을 연다. 어느 워크스페이스 결제인지 실어 보낸다.
-      검수: 스크린샷 + 약속(로그인 안 했으면 로그인으로 보낸다 등).
-- [ ] **P8 결제 직후 화면** - "결제 확인 중" 폴링. 알림이 수 초~수 분 늦어도 유저가 0개를 보지 않는다.
-      검수: 약속 + 스크린샷.
+- [x] **P6 상품 등록 실행** - ✅ 2026-09-07 `scripts/paddle-register-catalog.mts` 로 샌드박스에 13개(플랜 9·팩 4) 등록. 멱등(두 번째 실행 exists 13). 가격 ID 13개 → `.env.local` + Vercel Preview/Development.
+- [x] **P7 결제창 연결** - ✅ 2026-09-07. `/pricing`·`/account` 버튼 → `POST /api/billing/checkout`(서버 판정: 로그인·무료 팩 1회·구독 중 중복 금지·상품 ID) → Paddle 거래 생성(custom_data.workspace_id, 고객 재사용) → `Paddle.Checkout.open({ transactionId })`. 약속 10개 `tests/paddle-checkout.test.ts`.
+      **실물 전 구간 1회 완료**: 로컬 /pricing → Mini $29 결제창 → 테스트 카드 4242 → Paddle 결제 성공 → 웹훅(dev) → dev DB 적립 50(2027-09-07 만료) → 로컬 토스트 "Take 50개가 들어왔어요" → 계정 페이지 잔액 50 · 내역 · 두 번째 팩 버튼 409 차단. 스크린샷 `evidence/checkout-*.png`, `account-after-real-payment.png`.
+- [x] **P8 결제 직후 화면** - ✅ 최소 버전: 결제 완료 콜백 → "결제 확인 중…" 토스트 → 3초 폴링 → 잔액 바뀌면 "Take N개가 들어왔어요"(실측 ~20초). 90초 넘으면 계정 페이지 안내. 별도 페이지는 안 만들었다.
 - [ ] **P9 앱 안 충전 화면** - 잔액 · 소멸 예정 · 팩 구매 · 현재 플랜 · "구독 관리"(Paddle 고객 포털 링크, 취소·카드 변경 화면은 Paddle 것).
       부족 토스트의 "채우러 가기" 버튼이 여기로 온다(3-10).
       검수: 스크린샷 + 약속.

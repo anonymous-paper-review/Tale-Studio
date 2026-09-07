@@ -279,7 +279,7 @@ export default function AccountPage() {
                       {item.reason ? ` · ${item.reason}` : ''}
                     </span>
                   </span>
-                  <span className={cn('tabular-nums', item.delta > 0 ? 'text-success-foreground' : 'text-gray-300')}>
+                  <span className={cn('tabular-nums', item.delta > 0 ? 'text-success' : 'text-gray-300')}>
                     {item.delta > 0 ? `+${item.delta}` : item.delta}
                   </span>
                 </li>
