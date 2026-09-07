@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { Check, Clapperboard, Download, Layers, Users, X } from 'lucide-react'
 import { ContactPopover } from '@/components/contact-popover'
+import { CheckoutButton } from '@/components/billing/checkout-button'
 import { SiteHeader } from '@/components/marketing/site-header'
 import { SiteFooter } from '@/components/marketing/site-footer'
 import {
@@ -95,12 +95,13 @@ function PlanCard({ plan, highlight }: { plan: PaddlePlan; highlight?: boolean }
         </li>
       </ul>
       {purchasable ? (
-        <Link
-          href={`/login?plan=${plan.id}`}
-          className="block rounded-full bg-primary py-3 text-center text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+        <CheckoutButton
+          kind="plan"
+          id={plan.id}
+          className="block w-full rounded-full bg-primary py-3 text-center text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
         >
           Subscribe
-        </Link>
+        </CheckoutButton>
       ) : (
         <button
           type="button"
@@ -128,12 +129,13 @@ function PackCard({ pack }: { pack: PaddleTakePack }) {
       </p>
       <p className="mb-6 flex-1 text-xs text-gray-500">Valid for 12 months from purchase.</p>
       {purchasable ? (
-        <Link
-          href={`/login?pack=${pack.id}`}
-          className="block rounded-full bg-primary py-3 text-center text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+        <CheckoutButton
+          kind="pack"
+          id={pack.id}
+          className="block w-full rounded-full bg-primary py-3 text-center text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
         >
           Buy Takes
-        </Link>
+        </CheckoutButton>
       ) : (
         <button
           type="button"

@@ -35,6 +35,7 @@ function envPriceId(key: string): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null
 }
 
+// paddlePriceId 는 getter — 읽을 때마다 env 를 본다(모듈 로드 시점에 굳히면 서버·테스트에서 env 순서에 따라 null 이 된다).
 function plan(id: PaddlePlanId, name: string, tier: PlanTier, monthlyPriceUsd: number): PaddlePlan {
   return {
     id,
@@ -42,7 +43,9 @@ function plan(id: PaddlePlanId, name: string, tier: PlanTier, monthlyPriceUsd: n
     tier,
     monthlyPriceUsd,
     entitlements: getPlanEntitlements(id),
-    paddlePriceId: envPriceId(`NEXT_PUBLIC_PADDLE_PRICE_PLAN_${id.toUpperCase()}`),
+    get paddlePriceId() {
+      return envPriceId(`NEXT_PUBLIC_PADDLE_PRICE_PLAN_${id.toUpperCase()}`)
+    },
   }
 }
 
@@ -52,7 +55,9 @@ function pack(id: PaddleTakePackId, name: string, takes: number, priceUsd: numbe
     name,
     takes,
     priceUsd,
-    paddlePriceId: envPriceId(`NEXT_PUBLIC_PADDLE_PRICE_PACK_${id.toUpperCase()}`),
+    get paddlePriceId() {
+      return envPriceId(`NEXT_PUBLIC_PADDLE_PRICE_PACK_${id.toUpperCase()}`)
+    },
   }
 }
 

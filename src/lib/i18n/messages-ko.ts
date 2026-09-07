@@ -1514,5 +1514,15 @@ export const KO: Record<string, string> = {
   'Open account & billing': '계정·결제 열기',
   'Click to open account & billing.': '누르면 계정·결제로 갑니다.',
   'No Takes yet.': '아직 Take가 없어요.',
-  'Plan Takes expire at the end of the billing month. Pack Takes last 12 months.': '플랜 Take는 결제 월말에 사라지고, 충전 Take는 12개월 간니다.',
+  'Plan Takes expire at the end of the billing period. Pack Takes last 12 months.': '플랜 Take는 결제 주기가 끝나면 사라지고, 충전 Take는 12개월 갑니다.',
+  // 결제창 (P7·P8)
+  'That product is not available.': '그 상품은 살 수 없어요.',
+  'Payments for this product open soon.': '이 상품의 결제는 곧 열려요.',
+  'You already have a subscription. Plan changes are coming soon.': '이미 구독 중이에요. 플랜 변경은 곧 열려요.',
+  'Your last payment failed. Please update your card before subscribing again.': '지난 결제가 실패했어요. 카드를 먼저 바꿔주세요.',
+  'Could not open checkout. Please try again.': '결제창을 열지 못했어요. 다시 시도해주세요.',
+  'Confirming your payment…': '결제 확인 중…',
+  '{n} Takes added to your balance.': 'Take {n}개가 들어왔어요.',
+  'Your balance is updated.': '잔액이 갱신됐어요.',
+  'Still confirming. Check the account page in a minute.': '확인이 늦어지고 있어요. 잠시 뒤 계정 페이지에서 확인해주세요.',
 }

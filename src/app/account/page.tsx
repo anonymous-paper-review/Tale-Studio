@@ -12,6 +12,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, Check, LogOut, RefreshCw, X } from 'lucide-react'
 import { DashboardHeader } from '@/components/dashboard/dashboard-header'
+import { CheckoutButton } from '@/components/billing/checkout-button'
 import { createClient } from '@/lib/supabase/client'
 import { clearLastProjectId } from '@/lib/session-restore'
 import { useT } from '@/lib/i18n'
@@ -246,12 +247,13 @@ export default function AccountPage() {
                   <span className="text-xs text-gray-400">{t('{n} Takes', { n: pack.takes.toLocaleString('en-US') })}</span>
                   <span className="mb-4 mt-1 text-xs text-gray-500">{t('Valid for 12 months.')}</span>
                   {isPurchasable(pack) ? (
-                    <button
-                      type="button"
+                    <CheckoutButton
+                      kind="pack"
+                      id={pack.id}
                       className="mt-auto rounded-md bg-primary py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
                     >
                       {t('Buy')}
-                    </button>
+                    </CheckoutButton>
                   ) : (
                     <button type="button" disabled title={t('Available once payments go live.')} className={cn(disabledButtonClass, 'mt-auto w-full')}>
                       {t('Coming soon')}

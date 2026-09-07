@@ -442,7 +442,7 @@ function SidebarTakeBalance() {
                 ))}
                 {b?.planExpiresAt && (
                   <li className="pt-1 text-muted-foreground">
-                    {t('Plan Takes expire at the end of the billing month. Pack Takes last 12 months.')}
+                    {t('Plan Takes expire at the end of the billing period. Pack Takes last 12 months.')}
                   </li>
                 )}
               </ul>
