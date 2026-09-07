@@ -39,4 +39,8 @@ process.env.SUPABASE_SERVICE_ROLE_KEY ??= 'test-service-role-key'
 // 스위치를 검증하는 파일은 vi.stubEnv 로 직접 켠다(tests/take-hold.test.ts 가 그 패턴).
 // 2026-09-02 실측: 셔에 TAKE_BILLING_MODE=shadow 가 있으면 director-video-generation-api 9건이
 // 로컬에서만 빨개 떴다(CI 는 초록). 같은 스위트가 사람마다 다르게 나오면 믿을 수 없다.
-for (const key of ['TAKE_BILLING_MODE']) delete process.env[key]
+// 2026-09-07 재발: Paddle 샌드박스 상품 등록 뒤 .env.local 의 NEXT_PUBLIC_PADDLE_PRICE_* 13개가 올라와
+// paddle-checkout "상품 ID 없으면 결제창 안 열림" 1건이 로컬에서만 빨개 떴다. 가격 ID 를 검증하는 파일은 자기가 직접 켠다.
+for (const key of Object.keys(process.env)) {
+  if (key === 'TAKE_BILLING_MODE' || key.startsWith('NEXT_PUBLIC_PADDLE_PRICE_')) delete process.env[key]
+}

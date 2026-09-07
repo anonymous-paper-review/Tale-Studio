@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { shouldBackfill, shouldDeleteThumb } from '../scripts/backfill-filter.mjs'
+import { shouldBackfill, shouldDeleteThumb } from '../../scripts/backfill-filter.mjs'
 
 // 소급 썸네일 생성 대상 필터 — 화면에 안 뜨는 생성용 임시 파일을 걸러낸다.
 // 제외 목록 방식이라 "정상 화면 이미지가 통과하는가"가 회귀의 핵심이다.

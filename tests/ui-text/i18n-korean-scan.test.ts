@@ -15,7 +15,7 @@ import path from 'node:path'
 //   - `// i18n-ok` 프라그마 라인          : 언어 고유 표기 등 정당한 한글 (예: '한국어' 라벨)
 
 const SRC = path.join(process.cwd(), 'src')
-const ALLOWLIST_PATH = path.join(process.cwd(), 'tests', 'i18n-korean-allowlist.json')
+const ALLOWLIST_PATH = path.join(process.cwd(), 'tests', 'ui-text', 'i18n-korean-allowlist.json')
 const EXCLUDED = [
   path.join('src', 'lib', 'i18n', 'messages-ko.ts'),
   path.join('src', 'lib', 'writer', 'pipeline') + path.sep,

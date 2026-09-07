@@ -108,7 +108,7 @@ describe('collectArtistArtifacts', () => {
     expect(data).toEqual(before)
 
     const source = readFileSync(
-      fileURLToPath(new URL('../src/lib/export/artist.ts', import.meta.url)),
+      fileURLToPath(new URL('../../src/lib/export/artist.ts', import.meta.url)),
       'utf8',
     )
     expect(source).not.toContain('asset-storage-store')

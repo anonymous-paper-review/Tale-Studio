@@ -7,7 +7,7 @@ import {
   genEmail,
   genPassword,
   parseCount,
-} from '../scripts/seed-test-accounts.mjs'
+} from '../../scripts/seed-test-accounts.mjs'
 
 describe('parseCount', () => {
   it('defaults to 10 when no count is given', () => {

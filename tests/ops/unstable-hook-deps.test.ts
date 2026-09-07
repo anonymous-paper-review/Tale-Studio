@@ -18,7 +18,7 @@
 //   2. 사람이 봐서 안전하다고 판단되면 REVIEWED_UNKNOWN 에 근거와 함께 추가한다.
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { runDetector as runDetectorUntyped } from './helpers/unstable-hook-deps-detector.mjs'
+import { runDetector as runDetectorUntyped } from '../helpers/unstable-hook-deps-detector.mjs'
 
 // 사람이 이미 안전을 확인한 UNKNOWN 목록 (야간 조사 2026-08-25 확인 3건).
 // 출처: research/experiments/unstable-hook-deps-detector/detector.mjs 상단 주석
