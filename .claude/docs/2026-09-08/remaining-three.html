@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>남은 세 조각</title>
+<style>
+  :root {
+    --bg:#F1F3F5; --surface:#FFFFFF; --surface-2:#E8EBEF;
+    --ink:#16181D; --ink-2:#3B4048; --muted:#676D77;
+    --line:#D6DBE1; --line-2:#BFC6CE;
+    --accent:#1F5F7A; --accent-soft:#DCEAF1;
+    --pass:#2E7350; --pass-soft:#DFEDE5;
+    --fail:#A33A38; --fail-soft:#F6E2E1;
+    --gate:#6A579E; --gate-soft:#EAE4F5;
+    --warn:#8A6412; --warn-soft:#F4EBD6;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI","Malgun Gothic",sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+      --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+      --line:#2B3038; --line-2:#3C434D;
+      --accent:#74B4D0; --accent-soft:#17303C;
+      --pass:#5FB98A; --pass-soft:#17301F;
+      --fail:#E0817D; --fail-soft:#3A2321;
+      --gate:#A794D8; --gate-soft:#272040;
+      --warn:#D2A64F; --warn-soft:#33290F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+    --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+    --line:#2B3038; --line-2:#3C434D;
+    --accent:#74B4D0; --accent-soft:#17303C;
+    --pass:#5FB98A; --pass-soft:#17301F;
+    --fail:#E0817D; --fail-soft:#3A2321;
+    --gate:#A794D8; --gate-soft:#272040;
+    --warn:#D2A64F; --warn-soft:#33290F;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:0 20px 110px;background:var(--bg);color:var(--ink);
+    font-family:var(--sans);font-size:16px;line-height:1.82;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto}
+
+  header.page{padding:56px 0 20px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 14px;font-weight:600}
+  h1{font-size:clamp(27px,5vw,40px);font-weight:800;letter-spacing:-.028em;line-height:1.22;
+    margin:0 0 18px;text-wrap:balance}
+  .bluf{font-size:17.5px;color:var(--ink);margin:0 0 6px;max-width:64ch}
+  .bluf b{color:var(--gate)}
+  .asof{font-family:var(--mono);font-size:12px;color:var(--muted);margin:10px 0 0}
+  header.page::after{content:"";display:block;height:3px;background:var(--ink);margin-top:26px;opacity:.9}
+
+  section{margin:58px 0 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .sec-num{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);
+    border:1.5px solid var(--accent);border-radius:3px;padding:0 7px;line-height:1.7}
+  h2{font-size:23px;font-weight:800;letter-spacing:-.018em;margin:0;text-wrap:balance}
+  .sec-lede{color:var(--muted);font-size:15px;margin:0 0 24px;max-width:62ch}
+  p{margin:0 0 16px;max-width:64ch}
+  h3{font-size:17px;font-weight:750;margin:28px 0 10px;letter-spacing:-.01em}
+  h3:first-child{margin-top:0}
+  ul.plain{margin:0 0 16px;padding-left:22px;max-width:64ch}
+  ul.plain li{margin-bottom:8px}
+  strong,b{font-weight:750}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    padding:24px 26px 20px;margin:0 0 18px}
+  .card.same{border-left:3px solid var(--pass)}
+  .card.diff{border-left:3px solid var(--warn)}
+  .card > :last-child{margin-bottom:0}
+  .card-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:12px}
+  .card-head h3{flex:1 1 240px;margin:0}
+  .agreed{font-size:15px;color:var(--ink-2);margin:0 0 12px}
+  .agreed b{color:var(--ink);font-weight:750}
+
+  .chip{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.03em;
+    border-radius:3px;padding:2px 8px;white-space:nowrap}
+  .c-pass{background:var(--pass-soft);color:var(--pass)}
+  .c-fail{background:var(--fail-soft);color:var(--fail)}
+  .c-warn{background:var(--warn-soft);color:var(--warn)}
+  .c-gate{background:var(--gate-soft);color:var(--gate)}
+  .c-acc{background:var(--accent-soft);color:var(--accent)}
+
+  pre{background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--line-2);
+    border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+    font-family:var(--mono);font-size:12px;line-height:1.68;margin:8px 0;color:var(--ink-2);
+    white-space:pre;tab-size:2}
+  pre b{color:var(--ink);font-weight:700}
+  pre .path{display:block;color:var(--muted);margin-bottom:8px;font-size:11.5px}
+  code{font-family:var(--mono);font-size:.87em;background:var(--surface-2);padding:1px 6px;border-radius:3px}
+  .code-what{font-size:14.5px;color:var(--ink-2);margin:0 0 4px}
+  .code-diff{font-size:14.5px;margin:8px 0 0}
+  .code-diff .chip{margin-right:8px}
+
+  .tbl{overflow-x:auto;margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}
+  th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:700;
+    padding:10px 12px;border-bottom:2px solid var(--line-2);vertical-align:bottom}
+  td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+  td .path{font-family:var(--mono);font-size:11.5px;color:var(--muted);display:block;margin-top:3px}
+  .gate-cell{color:var(--gate);font-weight:750}
+  .gate-empty{display:inline-block;min-width:60px;border-bottom:1.5px dashed var(--gate);opacity:.7}
+
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);
+    border-radius:10px;overflow:hidden;margin:16px 0}
+  @media (max-width:640px){.split{grid-template-columns:1fr}}
+  .split > div{padding:18px 20px}
+  .split .yes{background:var(--pass-soft);border-right:1px solid var(--line)}
+  .split .no{background:var(--fail-soft)}
+  .split h4{margin:0 0 10px;font-size:14.5px;font-weight:800}
+  .split .yes h4{color:var(--pass)}
+  .split .no h4{color:var(--fail)}
+  .split ul{margin:0;padding-left:20px;font-size:14px;line-height:1.7}
+  .split li{margin-bottom:7px}
+
+  footer{margin-top:66px;padding-top:20px;border-top:2px solid var(--ink);font-size:13.5px;color:var(--muted)}
+  footer b{color:var(--ink)}
+  footer p{max-width:none}
+  a{color:var(--accent)}
+  a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <p class="eyebrow">문제 정의 · 2026-09-08 · 결제 P12 · P10 · P15</p>
+  <h1>남은 세 조각</h1>
+  <p class="bluf">장부의 두 구멍은 오늘 막았다(P14·P13). 남은 셋은 <b>놓친 결제를 찾는 것</b>(P12), <b>결제 전 구간을 사람 없이 도는 것</b>(P10), <b>유저가 플랜을 바꾸는 것</b>(P15)이다. 앞의 둘은 라이브 전, 셋째는 첫 결제 뒤라도 된다.</p>
+  <p class="bluf"><b>결정할 것 3개</b>: 대사 결과를 매주 요약할지, 스모크가 영상까지 만들지, 스모크를 얼마나 자주 돌릴지. <b>알아둘 것 4개</b>.</p>
+  <p class="asof">구현 전 문서 · Paddle API 문서 실측 2026-09-08 10:50 KST · 코드 상태 커밋 a2009a22 기준</p>
+</header>
+
+<section>
+  <div class="sec-head"><span class="sec-num">1</span><h2>P12 일일 대사 — 놓친 결제를 다음 날 아침에 안다</h2></div>
+  <p class="sec-lede">유저는 돈을 냈는데 우리 장부에 아무 기록이 없는 경우. 지금은 아무도 모른다.</p>
+
+  <h3>먼저 알아둘 것</h3>
+  <p><b>대사(對査)</b> = 두 장부를 나란히 놓고 어긋난 줄을 찾는 것. 여기서는 <b>Paddle 이 가진 결제 목록</b>과 <b>우리 장부(<code>billing_events</code>)</b>를 맞춰 본다. 회계에서 은행 거래내역과 회사 장부를 맞추는 그 작업과 같은 말이다.</p>
+
+  <h3>장면</h3>
+  <p>유저가 $29 를 결제한다. Paddle 이 우리 서버에 알림을 건다. 그런데 그 순간 우리가 배포 중이라 서버가 안 뜬다. Paddle 이 재시도한다 — <b>샌드박스 3회/15분, 라이브 60회/3일.</b> 그 안에 우리가 못 살아나면 Paddle 은 포기한다.</p>
+  <p>유저 화면: 결제 성공. 카드에서 $29 빠짐. Take 0 개. 우리 화면: 아무 일도 없었다. <b>유저가 문의를 넣기 전까지 우리는 모른다.</b></p>
+
+  <h3>지금</h3>
+  <p class="code-what">웹훅은 받은 알림을 전부 저장한다. 안 온 알림은 저장할 것이 없다 — 그래서 "안 온 것"은 장부 어디에도 흔적이 없다.</p>
+<pre><span class="path">src/lib/billing/paddle-webhook.ts:169</span>const recorded = await deps.recordEvent({ id: event.event_id, type: event.event_type, payload: event })
+<b>← 이 줄은 알림이 도착했을 때만 실행된다. 안 온 알림은 이 코드를 지나가지 않는다.</b></pre>
+
+  <h3>고치는 법</h3>
+  <p>하루 한 번 Paddle 에 "어제 완료된 결제 목록"을 물어보고 우리 장부와 대조한다. Paddle API 가 날짜로 거르는 걸 지원한다(<code>billed_at[GTE]</code>, <code>status=completed</code>).</p>
+  <div class="tbl"><table>
+    <thead><tr><th>어긋난 모양</th><th>뜻</th><th>우리가 하는 것</th></tr></thead>
+    <tbody>
+      <tr><td>Paddle 에 있는데 우리 장부에 없다</td><td><b>알림 유실.</b> 이 잡의 존재 이유</td><td>디스코드로 결제 번호. 관리자가 Paddle 대시보드에서 재전송하거나 손으로 적립</td></tr>
+      <tr><td>우리 장부에 있는데 Paddle 에 없다</td><td>있을 수 없는 일 — 위조나 버그 신호</td><td>디스코드 경보</td></tr>
+      <tr><td>전부 맞다</td><td>정상</td><td><b>아무것도 안 한다.</b> 매일 "OK" 가 오면 진짜 경보를 안 읽게 된다</td></tr>
+    </tbody>
+  </table></div>
+  <p>어제 하루치만 본다. 매일 전체를 훑으면 Paddle 호출이 늘고 같은 경보가 매일 반복된다. 자동으로 다시 처리하는 것(빠진 알림을 우리가 직접 만들어 넣기)은 <b>첫 버전에 안 넣는다</b> — 잘못 만들면 없는 결제로 Take 를 주게 된다. 경보까지만.</p>
+
+  <p class="code-diff"><span class="chip c-acc">재사용</span>Cron 자리는 오늘 만든 만료 잡과 같다(<code>vercel.json</code> + <code>CRON_SECRET</code>). 새 부품 없음.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">2</span><h2>P10 스모크 자동화 — 어제 내가 손으로 한 것을 기계가 한다</h2></div>
+  <p class="sec-lede">부품은 다 맞는데 이음새에서 깨지는 것을 잡는다.</p>
+
+  <h3>먼저 알아둘 것</h3>
+  <p><b>스모크</b> = 켜자마자 연기가 나는지 보는 검사. 이 저장소에는 이미 있다(<code>pnpm smoke</code>) — 브라우저를 열어 화면이 뜨는지, 콘솔 에러가 있는지, 스크린샷을 남긴다. <b>판정은 하지 않는다</b>(오너 몫). 여기에 결제 한 바퀴를 추가하는 일이다.</p>
+  <p>단위 테스트(2,112개)와 다른 점: 단위 테스트는 부품 하나를 흉내 DB 로 본다. 스모크는 <b>진짜 브라우저 · 진짜 Paddle · 진짜 DB</b> 를 관통한다. 어제 이 관통을 사람 손으로 한 번 했고(결제창 → 카드 4242 → 웹훅 → 적립 50 → 토스트), 그게 P7 을 끝냈다.</p>
+
+  <h3>장면</h3>
+  <p>라이브 키로 바꾼 직후. 상품 ID 가 라이브 것으로 갈렸고 웹훅 주소도 바뀌었다. 하나라도 어긋나면 첫 유저 결제가 그대로 사고다. <b>사람이 그때 한 번 더 카드를 꺼내 눌러야 하나?</b> 그걸 기계가 하게 만든다.</p>
+
+  <h3>지금</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>있는 것</th><th>없는 것</th></tr></thead>
+    <tbody>
+      <tr><td><code>pnpm smoke</code> — 로그인·화면 열기·클릭·스크린샷·콘솔 에러 수집</td><td>Paddle 결제창(iframe) 안에 카드번호를 넣는 부분</td></tr>
+      <tr><td>어제 실물 1회 통과 기록(수동)</td><td>적립·차감을 확인하고 흔적을 지우는 부분</td></tr>
+    </tbody>
+  </table></div>
+  <p>결제창은 <b>iframe</b>(우리 페이지 위에 뜨는 Paddle 의 별도 화면)이라 바깥에서 요소를 못 잡는다. 어제는 브라우저 도구로 iframe 안 요소를 직접 짚어 넣었다 — 그 방법이 되는 것은 실측으로 확인했다.</p>
+
+  <h3>고치는 법</h3>
+  <p>스모크 계정으로 dev 에서 한 바퀴를 돌린다. <b>Mini 팩 결제 → 웹훅 → 적립 50 → 영상 생성 1회 → 차감 확인 → 흔적 정리.</b> 어느 단계에서 멈추면 그 화면 스크린샷과 그때의 장부 상태를 남긴다.</p>
+  <p>스모크 계정은 <b>구독 상태</b>로 둔다. 무료 플랜이면 "무료는 팩 1회" 규칙에 두 번째 실행이 막혀 반복이 안 된다(그 규칙 자체는 정상 동작이다).</p>
+
+  <h3>이 검사가 잡는 것</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>깨지는 자리</th><th>단위 테스트가 잡나</th><th>스모크가 잡나</th></tr></thead>
+    <tbody>
+      <tr><td>상품 ID 가 env 에 안 들어감</td><td class="num">✗</td><td class="num">○</td></tr>
+      <tr><td>웹훅 주소·시크릿이 어긋남</td><td class="num">✗</td><td class="num">○</td></tr>
+      <tr><td>결제창이 안 열림(도메인 승인 등)</td><td class="num">✗</td><td class="num">○</td></tr>
+      <tr><td>적립은 됐는데 생성이 그 잔액을 못 봄</td><td class="num">✗</td><td class="num">○</td></tr>
+      <tr><td>웹훅 계산 로직 오류</td><td class="num">○</td><td class="num">○</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">3</span><h2>P15 플랜 변경 — 유저가 스스로 올리고 내린다</h2></div>
+  <p class="sec-lede">정책은 09-07 에 확정됐다. 남은 것은 화면과 Paddle 호출.</p>
+
+  <h3>지금</h3>
+  <p>구독 중인 유저가 <code>/pricing</code> 에서 다른 플랜을 누르면 <b>"이미 구독 중이에요. 플랜 변경은 곧 열려요"</b> 토스트가 뜨고 끝난다(P7 에서 그렇게 막아 뒀다 — 안 막으면 구독이 두 개가 된다). 플랜을 바꾸려면 지금은 관리자가 Paddle 대시보드에서 손으로 해야 한다.</p>
+
+  <h3>확정된 정책 (09-07)</h3>
+  <div class="tbl"><table>
+    <thead><tr><th></th><th>돈</th><th>갱신일</th><th>Take</th></tr></thead>
+    <tbody>
+      <tr><td><b>상위로</b></td><td>그날 새 플랜 <b>한 달치 전액</b>. 옛 플랜 안 쓴 날짜는 안 깎는다</td><td><b>오늘로 리셋</b></td><td>남은 것 그대로 + 새 플랜 전액. 얹은 것도 새 갱신일에 같이 사라진다</td></tr>
+      <tr><td><b>하위로</b></td><td>지금 결제 없음</td><td>그대로</td><td>다음 갱신일부터 새 플랜 기준</td></tr>
+    </tbody>
+  </table></div>
+  <p>예: S-5(잔여 40) → S-10 을 9월 15일에. 오늘 $110, 갱신일 10월 15일, 잔액 40 + 100 = <b>140</b>.</p>
+
+  <h3>열려 있던 질문 — 문서에는 답이 있다</h3>
+  <p>"Paddle 에 <b>전액 즉시 청구</b>와 <b>갱신일 리셋</b>을 한 요청으로 보낼 수 있나" 가 P15 의 유일한 미지였다. API 문서를 확인했다.</p>
+<pre><span class="path">Paddle API 문서 — 구독 수정(PATCH /subscriptions/{id}), 2026-09-08 확인</span>next_billed_at            : "Include to change the next billing date."
+proration_billing_mode    : "Required when making changes to items or the next billing date."
+  full_immediately        : "Paddle does not calculate proration, creating a transaction
+                             to collect for the full amount immediately."</pre>
+  <p class="code-diff"><span class="chip c-pass">문서상 된다</span>같은 요청에 <code>items</code>(새 플랜) + <code>next_billed_at</code>(오늘+1개월) + <code>proration_billing_mode: full_immediately</code> 를 함께 보낸다. <b>실측은 아직이다</b> — 샌드박스에서 한 번 돌려 봐야 확정이다.</p>
+  <p>안 되면 대안은 "옛 구독 즉시 취소 + 새 구독 시작"인데, 결제창이 한 번 더 뜨는 흐름이라 오너가 09-07 에 피하자고 한 "새로 결제하는 것처럼"이 된다. 그래서 위 방법을 먼저 실측한다.</p>
+
+  <h3>화면</h3>
+  <p>결제창은 안 뜬다. 저장된 카드로 서버가 바로 청구한다. 대신 확인창 하나가 뜬다 — 오늘 낼 금액 · 새 갱신일 · 바뀔 Take. 하위 플랜이면 "N월 N일부터 S-5 로 바뀝니다".</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">4</span><h2>순서와 크기</h2></div>
+  <div class="tbl"><table>
+    <thead><tr><th>순서</th><th>슬라이스</th><th>크기</th><th>라이브 전 필수</th><th>의존</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1</td><td><b>P12 일일 대사</b></td><td>반나절~1일</td><td class="gate-cell">필수</td><td>만료 잡의 Cron 인프라(오늘 만듦)</td></tr>
+      <tr><td class="num">2</td><td><b>P10 스모크 자동화</b></td><td>1일</td><td class="gate-cell">필수</td><td>기존 <code>pnpm smoke</code>. 스모크 계정이 구독 상태여야 함</td></tr>
+      <tr><td class="num">3</td><td><b>P15 플랜 변경</b></td><td>2일</td><td>아니오 — 첫 결제 뒤라도 된다</td><td>없음. Paddle API 실측 1건이 앞에</td></tr>
+    </tbody>
+  </table></div>
+  <p>P12·P10 을 먼저 두는 이유는 <b>라이브 전환의 안전망</b>이라서다. P12 는 라이브에서 놓친 결제를 잡고, P10 은 라이브 키로 바꾼 직후 전 구간을 한 번 더 확인한다. P15 는 기능이라 없어도 라이브가 안전하다(관리자가 대신 바꿔 주면 된다).</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">5</span><h2>결정이 필요한 것</h2></div>
+  <div class="tbl"><table>
+    <thead><tr><th>질문</th><th>안 정하면</th><th>선택지</th><th>추천</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>대사 결과를 매주 요약해서 보낼까</b></td>
+        <td>디스코드에 아무것도 안 오는 날, 그게 "정상"인지 "잡이 죽었는지" 구분이 안 된다</td>
+        <td>안 보낸다 / 주 1회 "이번 주 결제 N건, 불일치 0"</td>
+        <td>안 보낸다. 잡이 죽는 것은 잡 자체의 실패 경보가 잡는다. 조용함 = 정상을 지킨다</td>
+      </tr>
+      <tr>
+        <td><b>스모크가 영상까지 만들까</b></td>
+        <td>"결제 → 적립" 까지만 보고 "적립 → 생성 → 차감" 이음새는 안 본다</td>
+        <td>결제까지만(fal 비용 $0) / 영상 1개까지(1회당 원가 <b>$0.31</b>)</td>
+        <td>영상까지. 그 이음새가 깨지면 "결제했는데 못 만든다" 가 되고, 그건 환불 문의다. 하루 1회면 월 $9.3</td>
+      </tr>
+      <tr>
+        <td><b>스모크를 얼마나 자주</b></td>
+        <td>언제 도는지 안 정해지면 안 돌게 된다</td>
+        <td>배포마다(하루 5회면 월 $46) / 하루 1회(월 $9.3) / 손으로만($0)</td>
+        <td>하루 1회 + 라이브 키 전환 직후 손으로 1회. 결제 코드는 매일 안 바뀌니 배포마다는 과하다</td>
+      </tr>
+    </tbody>
+  </table></div>
+  <p>P15 의 확인창에 무엇을 보일지는 화면이 나온 뒤 스크린샷으로 판정한다 — 지금 문장으로 물으면 답하기 어렵다.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">6</span><h2>알고만 있으면 되는 것</h2></div>
+  <div class="tbl"><table>
+    <thead><tr><th>사실</th><th>뜻</th></tr></thead>
+    <tbody>
+      <tr><td>P12 는 빠진 알림을 <b>자동으로 처리하지 않는다</b></td><td>첫 버전은 경보까지. 잘못 만들면 없는 결제로 Take 를 준다. 재처리는 Paddle 대시보드에서 재전송을 누르거나 관리자 적립</td></tr>
+      <tr><td>P10 은 샌드박스 카드만 쓴다</td><td>실 카드 자동화는 스모크 헌법상 금지. 라이브 전환 뒤의 확인은 사람이 한 번</td></tr>
+      <tr><td>P15 의 Paddle 호출은 <b>문서 기준</b>이다</td><td>한 요청에 되는 것은 문서로 확인했고 실측은 안 했다. 안 되면 "옛 구독 취소 + 새 구독" 으로 바뀌고 크기가 늘어난다</td></tr>
+      <tr><td>스모크 계정이 구독 상태여야 한다</td><td>P10 을 만들기 전에 스모크 계정으로 dev 에서 구독을 하나 걸어 둔다(어제 오너가 S-1 을 이미 걸었다 — 그대로 쓰면 된다)</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<footer>
+  <p><b>근거로 쓴 것</b> — 약속 문장은 <code>.claude/docs/2026-09-07/paddle-promises.md</code> §P12 §P10 §P15. Paddle API 문서 2026-09-08 확인(구독 수정의 <code>next_billed_at</code>·<code>proration_billing_mode</code>, 거래 목록의 <code>billed_at[GTE]</code>·<code>status</code>). 코드 상태는 커밋 <code>a2009a22</code>. 원가 $0.31/Take 는 v4 시트 2_Take경제. 스모크 인프라는 <code>.claude/skills/smoke/smoke.mjs</code>.</p>
+  <p><b>이 문서가 하지 않는 것</b> — 셋 다 아직 아무것도 구현하지 않았다. P15 의 Paddle 호출은 샌드박스 실측 전이라 "문서상 된다" 까지다. P12 의 자동 재처리, P10 의 라이브 키 스모크, P15 의 확인창 문구는 이 문서 밖이다. 라이브 전환 절차(심사·정책 문서·라이브 키)는 <code>paddle-todo.md</code> §3 에 있다.</p>
+</footer>
+
+</div>
+</body>
+</html>
