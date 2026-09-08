@@ -1651,6 +1651,53 @@ function collectCascadeIds(
 const initialNodes: DirectorNode[] = []
 const initialEdges: DirectorEdge[] = []
 
+/**
+ * 프로젝트를 이 브라우저에서 **처음 열 때**, 만들고 있는 게 있으면 그 결과가 보이는 화면으로 연다.
+ *
+ * 호출부가 "처음 보는 프로젝트" 가지 안에만 있다(#view-first-entry-only 2026-09-08 오너 판정).
+ *   재진입(새로고침 포함)에서는 부르지 않는다 — 배선 작업 중 새로고침하면 하던 화면을 잃었기 때문.
+ *   판별은 #first-entry-node 가 쓰는 viewportInitializedProjects 를 그대로 쓴다.
+ *
+ * shot_previz_video 는 목록에 없다(도입 시부터). 의도인지 누락인지 확인되지 않았다.
+ */
+async function restoreActiveGenerationView(projectId: string): Promise<void> {
+  if (typeof window === 'undefined' || !projectId || projectId === 'default') return
+  try {
+    const response = await fetch(
+      `/api/generation/active?projectId=${encodeURIComponent(projectId)}`,
+    )
+    if (!response.ok) return
+    const body: unknown = await response.json()
+    const rawJobs =
+      body && typeof body === 'object' && (body as { data?: unknown }).data
+        ? (body as { data: { jobs?: unknown } }).data.jobs
+        : null
+    if (!Array.isArray(rawJobs)) return
+    const kinds = new Set(
+      rawJobs
+        .filter(
+          (job): job is { kind: string } =>
+            !!job &&
+            typeof job === 'object' &&
+            typeof (job as { kind?: unknown }).kind === 'string',
+        )
+        .map((job) => job.kind),
+    )
+    const real =
+      kinds.has('storyboard_real_grid') ||
+      kinds.has('shot_storyboard') ||
+      kinds.has('shot_video')
+    const previz = kinds.has('shot_rough_storyboard')
+    if (!real && !previz) return
+    const current = useDirectorCanvasStore.getState()
+    if (current.projectId !== projectId) return
+    current.setViewMode('storyboard')
+    current.setStoryboardMediaMode(real ? 'real' : 'previz')
+  } catch {
+    // 진행 상태 조회 실패는 마지막 탭 복원을 방해하지 않는다.
+  }
+}
+
 export const useDirectorCanvasStore = create<DirectorCanvasState>()(
   persist(
     (set, get) => ({
@@ -1722,16 +1769,18 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             historyFuture: [],
             lastSavedAt: Date.now(),
           })
+          // 이 브라우저가 처음 보는 프로젝트에 한해, 만들고 있는 게 있으면 그 결과가 보이는
+          //   화면으로 연다(#view-first-entry-only 2026-09-08 오너 판정).
+          //   재진입(새로고침 포함)에서는 부르지 않는다 — 예전에는 진입할 때마다 불려서
+          //   배선 작업(Node 탭) 중 새로고침하면 하던 화면을 잃었다.
+          //   위 #first-entry-node 가 Node 뷰를 기본으로 깔고, 만들고 있는 게 있을 때만
+          //   이 비동기 확인이 그 위를 덮는다. 없으면 Node 뷰 그대로다.
+          if (viewportInitializedProjects[projectId] !== true) {
+            void restoreActiveGenerationView(projectId)
+          }
         } else {
           set({ projectId })
         }
-        // 진입 시 진행 중인 잡을 보고 스토리보드 탭으로 강제 전환하던 코드를 제거했다
-        //   (#view-not-forced 2026-09-08 오너 판정). 탭은 사용자가 고르는 것이고 그 선택은
-        //   persist 된다 — 배선 작업 중 새로고침하면 하던 화면을 잃었고, 스토리보드 안의
-        //   Previz/Real 토글까지 덮어써 이미 스토리보드를 보던 사람도 당했다.
-        //   도입 의도(#06a0b045 결과를 바로 보여주자)는 같은 파일의 "화면을 빼앗지 않는다"(#c4)와
-        //   충돌했고, shot_previz_video 가 목록에서 빠져 일관되게 작동한 적도 없다.
-        //   진행 표시는 사이드바 배지·채팅 진행 핀·카드 스피너가 그대로 담당한다.
       },
       setViewport: (vp) => set({ viewport: vp }),
       setViewMode: (m) => set({ viewMode: m }),
