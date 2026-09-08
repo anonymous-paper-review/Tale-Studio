@@ -43,7 +43,8 @@
     "media:plan": "node --import ./tests/fixtures/alias-hook.mjs scripts/media-migration-plan.mts",
     "map:dev": "node research/tools/writer-map/serve.mjs",
     "map:build": "node research/tools/writer-map/build.mjs",
-    "fixture:writer": "node --import ./tests/fixtures/alias-hook.mjs tests/fixtures/writer-output.ts"
+    "fixture:writer": "node --import ./tests/fixtures/alias-hook.mjs tests/fixtures/writer-output.ts",
+    "smoke:billing": "node --import ./tests/fixtures/alias-hook.mjs scripts/smoke-billing.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
@@ -71,6 +72,7 @@
     "radix-ui": "^1.4.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "server-only": "^0.0.1",
     "sharp": "^0.34.5",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",

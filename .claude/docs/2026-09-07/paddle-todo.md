@@ -96,7 +96,7 @@
 | 3 | ~~만료(2-6)~~ ✅ 2026-09-08 | 에이전트 | 읽을 때 만료 lot 제외(새는 창 0) + `take_expire_due()` Cron 하루 1회. dev DB 적용·실측 완료 |
 | 4 | ~~이중 적립 DB 제약~~ ✅ 2026-09-08 | 에이전트 | `take_ledger_ref_grant_unique` 부분 유일 인덱스 + 웹훅이 23505 를 "이미 적립됨"으로. dev DB 적용·실측 완료. **live 적용은 라이브 전환 때** |
 | 5 | ~~놓친 결제 찾기(P12)~~ ✅ 2026-09-08 | 에이전트 | 즉시 재조회(`POST /api/billing/reconcile-me`, 폴링 90초 뒤 자동) + 일일 대사(Cron 매일 0시 UTC). dev 실측: 유실 흉내 → 검출 → 복구 |
-| 6 | **P10 전 구간 스모크 자동화**(`pnpm test:manual` 계열) | 에이전트 | 라이브 키 전환 직후 한 번 더 돌리려고 |
+| 6 | ~~P10 스모크~~ 🟡 절반 2026-09-08 | 에이전트 | ✅ 공짜 검사 8개 `pnpm smoke:billing`(배포마다, $0). 🔴 남음: 돈 드는 검사(실결제 + 영상 1개, 하루 1회) — Orca 가 Paddle iframe 안에 카드번호를 넣을 수 있는지 실측 필요 |
 | 7 | 가격 페이지 한국어 문안 검수 · 베타 배너 문구 | 오너 | 심사 때 이 페이지를 본다 |
 | 8 | 기획 숫자 3개(Account 초과 단가 · 자동 충전 상한 · 무료 Take 유효기간) · PITR · 세무사 1회 | 오너 | 라이브 전 |
 | 9 | **라이브 전환**: Paddle 라이브 계정(사업자·정산 계좌) → Website approval → `paddle-register-catalog.mts` 라이브 키로 → Production env(키·시크릿·가격 ID·디스코드) → 라이브 알림 목적지 → beta-cutover grant → `enforce` | 오너 + 에이전트 | 아래 §3 |
