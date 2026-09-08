@@ -20,6 +20,7 @@ import { IMAGE_MODELS, normalizeImageModelKey } from '@/lib/image-models'
 import { prettyNodeLabel } from '@/features/director/node-label'
 import { ThumbImage } from '@/components/thumb-image'
 import { useT } from '@/lib/i18n'
+import { useActiveGenerationJobs, activeShotIds } from '@/lib/generation-queue'
 
 
 function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
@@ -38,6 +39,13 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   // 목각(rough) 단계 이미지는 writer-store roughStoryboard에서 (writerShotId 스코프 구독)
   const writerShotId = isShotData(data) ? data.writerShotId : null
   const rough = useRoughStoryboard(writerShotId)
+  // 만드는 중 판정은 서버 큐가 근거다(#shot-node-video-lock 2026-09-08).
+  //   예전엔 브라우저 메모리의 잠금(generationLocks)뿐이라 새로고침·새 탭이면 사라져 같은 샷을
+  //   또 만들 수 있었다 — 영상 1건은 최대 5 Take. 같은 화면의 그리드 뷰는 이 근거를 이미 쓴다
+  //   (StoryboardGridView: queuedVideoShots). Node 뷰도 같은 것을 본다.
+  const projectId = useDirectorCanvasStore((s) => s.projectId)
+  const activeJobs = useActiveGenerationJobs(projectId)
+  const videoQueued = !!writerShotId && activeShotIds(activeJobs, ['shot_video']).has(writerShotId)
   // #payments-phase-2 v4 #2: 생성 전 소모량 표시 — mode==='off'면 배지를 숨긴다(현재 기본값).
 
   if (!isShotData(data)) return null
@@ -98,8 +106,9 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             ? 'success'
             : null
         }
-        canBranch
+        canBranch={!videoQueued}
         onBranch={() => {
+          if (videoQueued) return
           void generateVideoForShot(id)
         }}
       >
