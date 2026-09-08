@@ -21,7 +21,7 @@ export interface LayoutItem {
  * 전역 시각 t 에서 검은 막의 투명도(0 = 없음, 1 = 완전한 검정).
  *   디졸브가 걸린 클립의 시작 경계 B, 길이 D 에 대해 |t − B| < D/2 이면 1 − |t − B| / (D/2). 여러 경계가 겹치면 짙은 쪽.
  */
-export function dissolveOpacityAt(layout: readonly LayoutItem[], clips: readonly VideoClip[], t: number): number {
+export function dissolveOpacityAt(layout: readonly LayoutItem[], clips: readonly Pick<VideoClip, 'shotId' | 'transitionIn'>[], t: number): number {
   let opacity = 0
   for (const item of layout) {
     const clip = clips.find((c) => c.shotId === item.shotId)

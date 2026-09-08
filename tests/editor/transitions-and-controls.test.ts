@@ -83,6 +83,12 @@ describe('2 · 디졸브 — 검은 막의 투명도만 시간에 따라 바뀐�
     expect(timeline).toMatch(/onSetTransitionIn\(/)
   })
 
+  it('드래프트 렌더도 같은 검은 막을 프레임에 얹는다 — 미리보기와 내보내기가 같은 함수를 쓴다', () => {
+    const render = read('src/lib/editor-draft-render.ts')
+    expect(render).toMatch(/const dip = dissolveOpacityAt\(layout, videoClips, clock\)/)
+    expect(render).toMatch(/ctx\.fillStyle = `rgba\(0,0,0,\$\{dip\}\)`/)
+  })
+
   it('미리보기는 검은 막의 투명도만 바꿔 디졸브를 그린다(영상 픽셀은 손대지 않는다)', () => {
     const previewer = read('src/features/editor/video-previewer.tsx')
     expect(previewer).toMatch(/dissolveOpacityAt\(layout, st\.videoClips, t\)/)

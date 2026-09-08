@@ -14,7 +14,8 @@
 
 import type { AudioTrackClip } from '@/types'
 import { drawTitleCard } from '@/lib/editor/title-card'
-import type { ShotSubtitle, TitleCardData } from '@/types/shot'
+import type { ClipTransition, ShotSubtitle, TitleCardData } from '@/types/shot'
+import { dissolveOpacityAt } from '@/lib/editor/transition'
 import { drawSubtitle, resolveSubtitle } from '@/lib/editor/subtitle'
 import { cachedVideoUrl, prefetchVideos } from '@/features/editor/video-prefetch'
 
@@ -37,6 +38,8 @@ interface VideoClipLike {
   url?: string | null
   trimStart?: number
   speed?: number
+  /** 화면 전환(2026-09-08): 클립 앞 경계의 디졸브 — 미리보기와 같은 검은 막을 프레임에 얹는다. */
+  transitionIn?: ClipTransition | null
 }
 
 interface ShotLike {
@@ -323,6 +326,12 @@ export async function renderDraftTimeline(opts: {
         drawPlaceholder(ctx, W, H, activeLabel)
       }
       if (activeSubtitle) drawSubtitle(ctx, W, H, activeSubtitle)
+      // 디졸브(2026-09-08): 미리보기와 같은 검은 막 — 투명도만 시간에 따라. 자막 위에 얹는다(경계에서는 자막도 같이 잠긴다).
+      const dip = dissolveOpacityAt(layout, videoClips, clock)
+      if (dip > 0) {
+        ctx.fillStyle = `rgba(0,0,0,${dip})`
+        ctx.fillRect(0, 0, W, H)
+      }
       // 오디오: 활성 구간 진입 시 소스 오프셋으로 시킹해 재생, 이탈 시 정지.
       for (const a of audioEls) {
         const active = clock >= a.clip.startSec && clock < a.endSec
