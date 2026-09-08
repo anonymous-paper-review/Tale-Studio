@@ -134,8 +134,8 @@
   <p class="eyebrow">문제 정의 · 2026-09-08 · 결제 P12 · P10 · P15</p>
   <h1>남은 세 조각</h1>
   <p class="bluf">장부의 두 구멍은 오늘 막았다(P14·P13). 남은 셋은 <b>놓친 결제를 찾는 것</b>(P12), <b>결제 전 구간을 사람 없이 도는 것</b>(P10), <b>유저가 플랜을 바꾸는 것</b>(P15)이다. 앞의 둘은 라이브 전, 셋째는 첫 결제 뒤라도 된다.</p>
-  <p class="bluf"><b>결정할 것 3개</b>: 대사 결과를 매주 요약할지, 스모크가 영상까지 만들지, 스모크를 얼마나 자주 돌릴지. <b>알아둘 것 4개</b>.</p>
-  <p class="asof">구현 전 문서 · Paddle API 문서 실측 2026-09-08 10:50 KST · 코드 상태 커밋 a2009a22 기준</p>
+  <p class="bluf"><b>결정할 것 2개</b>: 대사 결과를 매주 요약할지, 스모크를 얼마나 자주 돌릴지. 영상까지 만드는 것은 09-08 오너가 확정했다. <b>알아둘 것 4개</b>.</p>
+  <p class="asof">구현 전 문서 · Paddle API 문서 실측 2026-09-08 10:50 KST · 코드 상태 커밋 a2009a22 기준 · 11:30 오너 질문 3건 반영 2판(즉시 재조회 신설 · 스모크 두 층)</p>
 </header>
 
 <section>
@@ -154,8 +154,32 @@
 <pre><span class="path">src/lib/billing/paddle-webhook.ts:169</span>const recorded = await deps.recordEvent({ id: event.event_id, type: event.event_type, payload: event })
 <b>← 이 줄은 알림이 도착했을 때만 실행된다. 안 온 알림은 이 코드를 지나가지 않는다.</b></pre>
 
-  <h3>고치는 법</h3>
-  <p>하루 한 번 Paddle 에 "어제 완료된 결제 목록"을 물어보고 우리 장부와 대조한다. Paddle API 가 날짜로 거르는 걸 지원한다(<code>billed_at[GTE]</code>, <code>status=completed</code>).</p>
+  <h3>먼저 — 대사는 유저를 기다리게 하는 답이 아니다</h3>
+  <p>초판에서 대사를 이 문제의 해답처럼 적었다. <b>과대포장이었다</b>(2026-09-08 오너 지적: "cron 이 돌기 전에는 유저 입장에서 결제 실패한 상태 아님?"). 정확히 나누면 세 층이고, 대사는 그중 마지막이다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>층</th><th>무엇이 고치나</th><th>유저가 기다리는 시간</th><th>지금</th></tr></thead>
+    <tbody>
+      <tr><td>1차</td><td><b>Paddle 재시도</b> (라이브 60회/3일)</td><td>수 초~수 분. 대부분 여기서 저절로 낫는다</td><td class="gate-cell">있음</td></tr>
+      <tr><td>2차</td><td><b>결제 직후 폴링</b> (90초)</td><td>1차가 그 안에 성공하면 유저는 눈치도 못 챈다</td><td class="gate-cell">있음</td></tr>
+      <tr><td><b>2.5차</b></td><td><b>즉시 재조회</b> — 폴링이 실패로 끝나는 그 자리에서 Paddle 에 직접 물어본다</td><td><b>90초</b>. 그 뒤 화면이 저절로 바뀐다</td><td class="gate-cell">없음 ← 이번에 넣는다</td></tr>
+      <tr><td>3차</td><td><b>일일 대사</b></td><td>다음 날 아침. 관리자가 손으로</td><td class="gate-cell">없음</td></tr>
+    </tbody>
+  </table></div>
+  <p>대사가 잡는 것은 <b>1차가 3일 내내 실패한 잔여물</b>이다 — 웹훅 주소가 잘못 박혀 있거나, 우리 코드가 그 결제에서만 계속 실패하는 경우. 그런 건 하루가 지나도 저절로 안 낫는다. 그래서 대사는 필요하지만, 유저를 기다리게 하지 않는 답은 2.5차다.</p>
+
+  <h3>고치는 법 (1) — 즉시 재조회: 유저가 보고 있을 때</h3>
+  <p>결제 직후 폴링이 90초를 다 쓰고도 잔액이 그대로면, 지금은 "확인이 늦어지고 있어요" 로 끝난다. 그 자리에서 <b>그 유저의 최근 결제만</b> Paddle 에 물어본다(API 가 <code>customer_id</code> 로 거르는 걸 지원한다). Paddle 에 있는데 우리 장부에 없으면 그 결제를 그 자리에서 처리한다.</p>
+  <p class="code-what">지금 폴링이 끝나는 자리. 여기서 포기하는 대신 재조회를 부른다.</p>
+<pre><span class="path">src/components/billing/checkout-button.tsx:44-57</span>  while (Date.now() - startedAt &lt; 90_000) {
+    await new Promise((r) =&gt; setTimeout(r, 3000))
+    const [take] = await Promise.all([fetchTakeBalance(), refetchBillingAccount()])
+    if (take.balance !== null &amp;&amp; before !== null &amp;&amp; take.balance !== before) { … return }
+  }
+  <b>toast.warning(t('Still confirming. Check the account page in a minute.'), …)   ← 여기서 끝난다</b></pre>
+  <p class="code-diff"><span class="chip c-warn">바뀐다</span>90초를 다 쓰면 <code>POST /api/billing/reconcile-me</code> 를 부르고, 그게 결제를 찾아 처리하면 화면이 "Take 50 개가 들어왔어요" 로 바뀐다. 유저는 90초 기다린 것 말고는 아무 일도 없었던 것으로 끝난다.</p>
+
+  <h3>고치는 법 (2) — 일일 대사: 유저가 안 보고 있을 때</h3>
+  <p>유저가 결제하고 창을 닫아버렸거나, 구독 갱신처럼 애초에 유저가 화면을 안 보는 결제가 있다. 그건 즉시 재조회가 못 잡는다. 하루 한 번 Paddle 에 "어제 완료된 결제 목록" 을 물어 우리 장부와 대조한다(<code>billed_at[GTE]</code>, <code>status=completed</code>).</p>
   <div class="tbl"><table>
     <thead><tr><th>어긋난 모양</th><th>뜻</th><th>우리가 하는 것</th></tr></thead>
     <tbody>
@@ -164,7 +188,7 @@
       <tr><td>전부 맞다</td><td>정상</td><td><b>아무것도 안 한다.</b> 매일 "OK" 가 오면 진짜 경보를 안 읽게 된다</td></tr>
     </tbody>
   </table></div>
-  <p>어제 하루치만 본다. 매일 전체를 훑으면 Paddle 호출이 늘고 같은 경보가 매일 반복된다. 자동으로 다시 처리하는 것(빠진 알림을 우리가 직접 만들어 넣기)은 <b>첫 버전에 안 넣는다</b> — 잘못 만들면 없는 결제로 Take 를 주게 된다. 경보까지만.</p>
+  <p>어제 하루치만 본다. 매일 전체를 훑으면 Paddle 호출이 늘고 같은 경보가 매일 반복된다. 대사가 <b>자동으로 적립까지 하지는 않는다</b> — 즉시 재조회는 유저가 방금 결제한 건 하나만 보니 안전하지만, 대사는 남의 결제까지 훑기 때문에 잘못 만들면 없는 결제로 Take 를 준다. 경보까지만.</p>
 
   <p class="code-diff"><span class="chip c-acc">재사용</span>Cron 자리는 오늘 만든 만료 잡과 같다(<code>vercel.json</code> + <code>CRON_SECRET</code>). 새 부품 없음.</p>
 </section>
@@ -194,6 +218,33 @@
   <p>스모크 계정으로 dev 에서 한 바퀴를 돌린다. <b>Mini 팩 결제 → 웹훅 → 적립 50 → 영상 생성 1회 → 차감 확인 → 흔적 정리.</b> 어느 단계에서 멈추면 그 화면 스크린샷과 그때의 장부 상태를 남긴다.</p>
   <p>스모크 계정은 <b>구독 상태</b>로 둔다. 무료 플랜이면 "무료는 팩 1회" 규칙에 두 번째 실행이 막혀 반복이 안 된다(그 규칙 자체는 정상 동작이다).</p>
 
+  <h3>두 층으로 나눈다 — 돈 드는 검사와 공짜 검사</h3>
+  <p>초판은 결제 한 줄기만 적었다. 결제 없이도 확인할 수 있는 게 많고, 그건 배포마다 돌려도 $0 이다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th></th><th>돈 드는 검사 (1회 $0.31)</th><th>공짜 검사 ($0)</th></tr></thead>
+    <tbody>
+      <tr><td><b>무엇을</b></td><td>실제 결제 + 영상 생성</td><td>서버 판정·게이트만 (API 호출)</td></tr>
+      <tr><td><b>얼마나 자주</b></td><td>하루 1회 + 라이브 키 전환 직후 1회</td><td>배포마다</td></tr>
+      <tr><td><b>목록</b></td><td>① 팩 결제 → 적립 50 → 영상 1개 → 차감<br>② <b>구독 결제 → 플랜 세팅 → 포함 Take 적립</b></td><td>아래 8개</td></tr>
+    </tbody>
+  </table></div>
+  <p><b>구독 줄기를 따로 두는 이유:</b> 팩과 구독은 웹훅에서 코드 경로가 다르다(플랜 세팅 · 구독 행 upsert · 만료일을 결제 주기 끝으로 계산). 팩만 돌면 구독 쪽은 한 줄도 안 지나간다.</p>
+
+  <h3>공짜 검사 8개</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>확인</th><th>기대</th><th>지키는 것</th></tr></thead>
+    <tbody>
+      <tr><td>무료 플랜이 팩을 두 번째 산다</td><td>409 free_pack_limit</td><td>v4 충전 상한(앞문)</td></tr>
+      <tr><td>로그인 없이 결제 시도</td><td>401 → 로그인으로</td><td>남의 워크스페이스에 적립되는 것</td></tr>
+      <tr><td>구독 중에 다른 플랜 누름</td><td>409 already_subscribed</td><td>구독이 두 개 되는 것</td></tr>
+      <tr><td>고객 포털 주소 요청</td><td>200 + 포털 URL</td><td>유저가 스스로 취소하는 길</td></tr>
+      <tr><td>서명 틀린 웹훅</td><td>401, 장부 변화 0</td><td>위조 알림으로 공짜 Take</td></tr>
+      <tr><td>같은 알림 두 번</td><td>적립 1회</td><td>이중 적립(P14)</td></tr>
+      <tr><td>만료된 Take 로 생성 시도</td><td>잔액에 안 잡힘</td><td>만료 처리(P13)</td></tr>
+      <tr><td>계정 페이지 열기</td><td>잔액·플랜·내역 렌더 + 스크린샷</td><td>화면이 뜨는 것 자체</td></tr>
+    </tbody>
+  </table></div>
+
   <h3>이 검사가 잡는 것</h3>
   <div class="tbl"><table>
     <thead><tr><th>깨지는 자리</th><th>단위 테스트가 잡나</th><th>스모크가 잡나</th></tr></thead>
@@ -202,6 +253,8 @@
       <tr><td>웹훅 주소·시크릿이 어긋남</td><td class="num">✗</td><td class="num">○</td></tr>
       <tr><td>결제창이 안 열림(도메인 승인 등)</td><td class="num">✗</td><td class="num">○</td></tr>
       <tr><td>적립은 됐는데 생성이 그 잔액을 못 봄</td><td class="num">✗</td><td class="num">○</td></tr>
+      <tr><td>구독 결제만 플랜 세팅이 안 됨</td><td class="num">✗</td><td class="num">○ (구독 줄기)</td></tr>
+      <tr><td>Cron 이 안 돌아 만료가 안 됨</td><td class="num">✗</td><td class="num">○ (만료 검사)</td></tr>
       <tr><td>웹훅 계산 로직 오류</td><td class="num">○</td><td class="num">○</td></tr>
     </tbody>
   </table></div>
@@ -264,8 +317,8 @@ proration_billing_mode    : "Required when making changes to items or the next b
       <tr>
         <td><b>스모크가 영상까지 만들까</b></td>
         <td>"결제 → 적립" 까지만 보고 "적립 → 생성 → 차감" 이음새는 안 본다</td>
-        <td>결제까지만(fal 비용 $0) / 영상 1개까지(1회당 원가 <b>$0.31</b>)</td>
-        <td>영상까지. 그 이음새가 깨지면 "결제했는데 못 만든다" 가 되고, 그건 환불 문의다. 하루 1회면 월 $9.3</td>
+        <td>결제까지만(fal 비용 $0) / 영상 1개까지(1회당 원가 $0.31)</td>
+        <td class="gate-cell">✅ 영상까지<span class="path">오너 09-08 "이렇게 하자 영상까지 봐야할듯". 하루 1회면 월 $9.3</span></td>
       </tr>
       <tr>
         <td><b>스모크를 얼마나 자주</b></td>
@@ -293,7 +346,7 @@ proration_billing_mode    : "Required when making changes to items or the next b
 
 <footer>
   <p><b>근거로 쓴 것</b> — 약속 문장은 <code>.claude/docs/2026-09-07/paddle-promises.md</code> §P12 §P10 §P15. Paddle API 문서 2026-09-08 확인(구독 수정의 <code>next_billed_at</code>·<code>proration_billing_mode</code>, 거래 목록의 <code>billed_at[GTE]</code>·<code>status</code>). 코드 상태는 커밋 <code>a2009a22</code>. 원가 $0.31/Take 는 v4 시트 2_Take경제. 스모크 인프라는 <code>.claude/skills/smoke/smoke.mjs</code>.</p>
-  <p><b>이 문서가 하지 않는 것</b> — 셋 다 아직 아무것도 구현하지 않았다. P15 의 Paddle 호출은 샌드박스 실측 전이라 "문서상 된다" 까지다. P12 의 자동 재처리, P10 의 라이브 키 스모크, P15 의 확인창 문구는 이 문서 밖이다. 라이브 전환 절차(심사·정책 문서·라이브 키)는 <code>paddle-todo.md</code> §3 에 있다.</p>
+  <p><b>이 문서가 하지 않는 것</b> — 셋 다 아직 아무것도 구현하지 않았다. 초판은 대사를 이 문제의 해답처럼 적었는데 그게 과대포장이라 2판에서 3층으로 갈랐다(오너 지적). P15 의 Paddle 호출은 샌드박스 실측 전이라 "문서상 된다" 까지다. P12 의 자동 재처리, P10 의 라이브 키 스모크, P15 의 확인창 문구는 이 문서 밖이다. 라이브 전환 절차(심사·정책 문서·라이브 키)는 <code>paddle-todo.md</code> §3 에 있다.</p>
 </footer>
 
 </div>
