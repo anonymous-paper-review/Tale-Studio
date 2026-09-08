@@ -16,9 +16,36 @@
 //   pnpm smoke:billing:paid --no-generate                      # 영상 생성 빼고(무료)
 //   종료 코드: 0 = 전부 통과 / 1 = 하나라도 실패 / 2 = 전제 미충족·내부 오류
 
+import { execFileSync } from 'node:child_process'
 import { createHmac } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { createClient } from '@supabase/supabase-js'
+
+const ORCA = `${process.env.HOME}/.local/bin/orca`
+
+function orca(args, { raw = false } = {}) {
+  const stdout = execFileSync(ORCA, args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  if (raw) return stdout
+  const parsed = JSON.parse(stdout)
+  if (!parsed.ok) throw new Error(`orca ${args[0]} 실패: ${stdout.slice(0, 200)}`)
+  return parsed.result
+}
+
+/** 로그인 세션이 필요한 라우트를 브라우저 안에서 부른다(우리 API 는 Supabase SSR 쿠키를 본다). */
+function fetchInPage(page, { method, path, body }) {
+  const expr = `(async () => {
+    const opts = { method: ${JSON.stringify(method)}, headers: { 'Content-Type': 'application/json' } };
+    ${body ? `opts.body = ${JSON.stringify(JSON.stringify(body))};` : ''}
+    const r = await fetch(${JSON.stringify(path)}, opts);
+    let b = null; try { b = await r.json() } catch { b = null }
+    return JSON.stringify({ status: r.status, body: b });
+  })()`
+  const raw = orca(['eval', '--page', page, '--expression', expr], { raw: true }).trim()
+  let value = raw
+  try { value = JSON.parse(raw) } catch { /* 감싸지 않은 문자열 */ }
+  if (typeof value === 'string') value = JSON.parse(value)
+  return value
+}
 
 function env() {
   return Object.fromEntries(
@@ -179,46 +206,80 @@ async function main() {
 
   // ④ 영상 생성 1회 → hold
   let jobId = null
+  let page = null
   if (opt.generate && project && shot) {
-    const before4 = await balance()
-    // 실제 생성 라우트(POST /api/director/generate-previz-video)는 로그인 세션이 필요하고, 그 앞에 러프
-    //   스토리보드 게이트가 있다. 2026-09-08 실측: 브라우저 세션으로 부르면 422 "Rough storyboard frames are
-    //   missing" 로 막힌다 — 스모크 계정 프로젝트에 러프가 없어서다. 세션·라우트·게이트는 다 정상이고 데이터가
-    //   없는 것이라, 여기서는 생성 라우트가 hold 를 잡는 그 함수(take_hold RPC)를 직접 불러 장부 왕복만 본다.
-    //   러프까지 준비된 스모크 프로젝트를 만들면 실제 생성으로 바꿀 수 있다(그때 1회 $0.31).
-    jobId = crypto.randomUUID()
-    const { data: held, error: holdErr } = await sb.rpc('take_hold', {
-      p_workspace: ws.id,
-      p_amount: 5,
-      p_job: jobId,
-      p_enforce: true,
-    })
-    await sleep(800)
-    const after4 = await balance()
-    check(
-      '영상 생성이 Take를 잡아두면 잔액이 그만큼 준다 (생성 라우트가 부르는 그 함수)',
-      !holdErr && held?.ok === true && before4 - after4 === 5,
-      holdErr ? `RPC 오류 ${holdErr.message}` : `held ${held?.held}, 잔액 ${before4}→${after4}`,
-      '결제와 생성이 같은 장부를 보는지. "결제는 됐는데 생성이 못 쓴다" 를 잡는다',
-    )
+    // 실제 생성 라우트를 부른다. 로그인 세션이 필요해 브라우저 안에서 호출한다.
+    //   2026-09-08: 러프 스토리보드가 없어 422 로 막혔던 것을 러프를 만들어 풀었다(dev media 버킷도 이때 만들었다).
+    //   1회 약 $0.31 이 실제로 나간다.
+    let status
+    try {
+      status = orca(['status', '--json'])
+    } catch {
+      status = null
+    }
+    if (!status?.app?.running || status?.runtime?.state !== 'ready') {
+      console.log('  skip  영상 생성 — Orca 가 안 떠 있다(로그인 세션을 못 만든다)')
+    } else {
+      const { profiles } = orca(['tab', 'profile', 'list', '--json'])
+      const profileId = profiles.find((p) => p.label === 'tale-smoke')?.id
+      if (!profileId) {
+        console.log('  skip  영상 생성 — tale-smoke 프로필이 없다. 먼저 pnpm smoke:billing 을 한 번 돌려라')
+      } else {
+        const { browserPageId } = orca(['tab', 'create', '--url', `${opt.base}/account`, '--profile', profileId, '--json'])
+        page = browserPageId
+        await sleep(4000)
 
-    // 되돌리기 — 생성이 실패했을 때 돌려주는 그 경로
-    const { data: released } = await sb.rpc('take_release_for_job', { p_job: jobId })
-    await sleep(800)
-    const after5 = await balance()
-    check(
-      '생성이 실패하면 잡아둔 Take를 돌려준다',
-      after5 === before4,
-      `released ${JSON.stringify(released)}, 잔액 ${after4}→${after5}`,
-      '실패한 생성이 Take 를 먹으면 그게 환불 문의다',
-    )
+        const before4 = await balance()
+        const gen = fetchInPage(page, {
+          method: 'POST',
+          path: '/api/director/generate-previz-video',
+          body: { projectId: project.id, writerShotId: shot.shot_id },
+        })
+        jobId = gen.body?.jobId ?? null
+        await sleep(2000)
+        const after4 = await balance()
+        const { data: holdRow } = jobId
+          ? await sb.from('take_ledger').select('kind, delta').eq('ref_id', jobId).maybeSingle()
+          : { data: null }
+        check(
+          '영상 생성을 요청하면 잡아두기 행이 생기고 잔액이 그만큼 준다',
+          gen.status === 200 && !!jobId && holdRow?.kind === 'hold' && before4 - after4 === Math.abs(holdRow?.delta ?? 0),
+          `HTTP ${gen.status}, job ${jobId?.slice(0, 8) ?? '없음'}, ${holdRow?.kind} ${holdRow?.delta}, 잔액 ${before4}→${after4}`,
+          '결제와 생성이 같은 장부를 보는지. "결제는 됐는데 생성이 못 쓴다" 를 잡는다',
+        )
+
+        // 생성이 끝날 때까지 기다린다. 성공하면 hold 가 그대로 확정(차감), 실패하면 반환된다.
+        let jobState = 'unknown'
+        for (let i = 0; i < 20; i++) {
+          await sleep(15_000)
+          const { data: j } = await sb.from('generation_jobs').select('status').eq('id', jobId).maybeSingle()
+          jobState = j?.status ?? 'unknown'
+          if (jobState === 'completed' || jobState === 'succeeded' || jobState === 'failed') break
+        }
+        const after5 = await balance()
+        check(
+          '생성이 끝나면 성공은 차감된 채로, 실패는 되돌려진 채로 장부가 맞는다',
+          (['completed', 'succeeded'].includes(jobState) && after5 === after4) ||
+            (jobState === 'failed' && after5 === before4),
+          `잡 ${jobState}, 잔액 ${after4}→${after5}(생성 전 ${before4})`,
+          '성공했는데 반환되면 공짜 생성, 실패했는데 안 돌아오면 환불 문의',
+        )
+      }
+    }
   } else if (opt.generate) {
     console.log('  skip  영상 생성 — 스모크 계정에 프로젝트나 샷이 없다')
   }
 
   // ⑤ 정리 — 스모크가 만든 것을 전부 지우고 플랜을 되돌린다
   await sb.from('take_ledger').delete().like('ref_id', `txn_${RUN}_%`)
-  if (jobId) await sb.from('take_ledger').delete().eq('ref_id', jobId)
+  // 생성 hold 는 지우지 않는다 — 실제로 영상을 만들었으니 그 차감은 진짜다(지우면 공짜 생성이 된다).
+  if (page) {
+    try {
+      orca(['tab', 'close', '--page', page], { raw: true })
+    } catch {
+      /* 이미 닫혔으면 무시 */
+    }
+  }
   await sb.from('billing_events').delete().like('mor_event_id', `evt_${RUN}_%`)
   if (subBefore) {
     await sb.from('subscriptions').upsert({ ...subBefore, updated_at: new Date().toISOString() }, { onConflict: 'workspace_id' })
@@ -232,8 +293,8 @@ async function main() {
   const subRestored = subBefore ? subFinal?.mor_subscription_id === subBefore.mor_subscription_id : !subFinal
   check(
     '스모크가 만든 적립·구독·플랜 변경은 끝나면 정리되고 원래 구독이 그대로 돌아온다',
-    final === before1 && wsFinal?.plan === planBefore && subRestored,
-    `잔액 ${before1}→${final}, 플랜 ${wsFinal?.plan}, 구독 ${subFinal?.mor_subscription_id ?? '없음'}(원래 ${subBefore?.mor_subscription_id ?? '없음'})`,
+    final <= before1 && wsFinal?.plan === planBefore && subRestored,
+    `잔액 ${before1}→${final}(생성분은 빠진 채가 정상), 플랜 ${wsFinal?.plan}, 구독 ${subFinal?.mor_subscription_id ?? '없음'}(원래 ${subBefore?.mor_subscription_id ?? '없음'})`,
     '스모크가 진짜 구독 행을 덮어쓴 채 지우면 Paddle 에는 구독이 있는데 우리 DB 에는 없는 상태가 된다',
   )
 
