@@ -58,6 +58,20 @@ export const webhookDeps: PaddleWebhookDeps = {
   },
 
   async upsertSubscription(row) {
+    // 활성 구독은 워크스페이스당 하나다(subscriptions_one_live_per_workspace, 20260908140000).
+    //   새 구독이 오면 그 워크스페이스의 옛 활성 구독을 먼저 끝난 것으로 내린다 — 안 그러면 유일 인덱스가
+    //   23505 로 막고 웹훅이 500 을 낸다(Paddle 이 사흘간 재전송한다).
+    //   플랜 변경(P15)은 같은 구독 번호를 유지하므로 여기 안 걸리고, 취소 후 재구독처럼 번호가 새로 생길 때만 탄다.
+    if (['active', 'trialing', 'past_due'].includes(row.status)) {
+      const { error: demoteError } = await supabaseAdmin
+        .from('subscriptions')
+        .update({ status: 'superseded', updated_at: new Date().toISOString() })
+        .eq('workspace_id', row.workspaceId)
+        .neq('mor_subscription_id', row.morSubscriptionId)
+        .in('status', ['active', 'trialing', 'past_due'])
+      if (demoteError) throw demoteError
+    }
+
     const { error } = await supabaseAdmin.from('subscriptions').upsert(
       {
         workspace_id: row.workspaceId,
@@ -67,7 +81,9 @@ export const webhookDeps: PaddleWebhookDeps = {
         current_period_end: row.currentPeriodEnd,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: 'workspace_id' },
+      // 구독 하나당 한 행이다(20260908140000). workspace_id 로 충돌시키면 새 구독이 옛 구독을 덮어쓴다 —
+      //   2026-09-08 에 스모크가 진짜 구독을 지운 그 사고. 활성 하나 제약은 부분 유일 인덱스가 따로 건다.
+      { onConflict: 'mor_subscription_id' },
     )
     if (error) throw error
   },

@@ -102,10 +102,10 @@ async function main() {
     : { data: null }
 
   const planBefore = ws.plan
-  // 구독 행은 워크스페이스당 하나다(upsert onConflict: workspace_id). 스모크의 가짜 구독이 진짜 구독 행을
-  //   덮어쓰므로, 시작 전에 통째로 떠 두고 끝나면 그대로 되돌린다. 2026-09-08 실측으로 드러난 사고 —
-  //   sub_${RUN} 만 지우면 덮어쓰인 진짜 행이 사라진 채로 남는다(Paddle 쪽 구독은 살아 있어 더 위험하다).
-  const { data: subBefore } = await sb.from('subscriptions').select('*').eq('workspace_id', ws.id).maybeSingle()
+  // 구독은 이제 구독 하나당 한 행이고 활성은 워크스페이스당 하나다(20260908140000). 스모크의 가짜 구독은
+  //   진짜 구독을 못 덮어쓴다 — 활성이 이미 있으면 DB 가 거부한다. 그래도 시작 상태를 떠 둬서 마지막에 대조한다.
+  const { data: subsBefore } = await sb.from('subscriptions').select('*').eq('workspace_id', ws.id)
+  const subBefore = (subsBefore ?? []).find((r) => ['active', 'trialing', 'past_due'].includes(r.status)) ?? null
   const balance = async () => {
     const { data } = await sb.from('take_ledger').select('delta').eq('workspace_id', ws.id)
     return (data ?? []).reduce((s, r) => s + r.delta, 0)
@@ -281,21 +281,26 @@ async function main() {
     }
   }
   await sb.from('billing_events').delete().like('mor_event_id', `evt_${RUN}_%`)
+  await sb.from('subscriptions').delete().eq('mor_subscription_id', `sub_${RUN}`)
+  // 스모크의 가짜 구독이 진짜 구독을 superseded 로 내렸다(웹훅이 활성 하나를 지키려고 하는 정상 동작).
+  //   가짜를 지운 뒤 진짜를 원래 상태로 되돌린다. 안 되돌리면 활성 구독이 없는 상태로 남는다.
   if (subBefore) {
-    await sb.from('subscriptions').upsert({ ...subBefore, updated_at: new Date().toISOString() }, { onConflict: 'workspace_id' })
-  } else {
-    await sb.from('subscriptions').delete().eq('workspace_id', ws.id).eq('mor_subscription_id', `sub_${RUN}`)
+    await sb
+      .from('subscriptions')
+      .update({ status: subBefore.status, plan: subBefore.plan, updated_at: new Date().toISOString() })
+      .eq('mor_subscription_id', subBefore.mor_subscription_id)
   }
   await sb.from('workspaces').update({ plan: planBefore }).eq('id', ws.id)
   const final = await balance()
   const { data: wsFinal } = await sb.from('workspaces').select('plan').eq('id', ws.id).maybeSingle()
-  const { data: subFinal } = await sb.from('subscriptions').select('mor_subscription_id, plan').eq('workspace_id', ws.id).maybeSingle()
+  const { data: subsFinal } = await sb.from('subscriptions').select('mor_subscription_id, plan, status').eq('workspace_id', ws.id)
+  const subFinal = (subsFinal ?? []).find((r) => ['active', 'trialing', 'past_due'].includes(r.status)) ?? null
   const subRestored = subBefore ? subFinal?.mor_subscription_id === subBefore.mor_subscription_id : !subFinal
   check(
-    '스모크가 만든 적립·구독·플랜 변경은 끝나면 정리되고 원래 구독이 그대로 돌아온다',
+    '스모크가 만든 적립·구독·플랜 변경은 끝나면 정리되고 진짜 구독은 건드려지지 않는다',
     final <= before1 && wsFinal?.plan === planBefore && subRestored,
     `잔액 ${before1}→${final}(생성분은 빠진 채가 정상), 플랜 ${wsFinal?.plan}, 구독 ${subFinal?.mor_subscription_id ?? '없음'}(원래 ${subBefore?.mor_subscription_id ?? '없음'})`,
-    '스모크가 진짜 구독 행을 덮어쓴 채 지우면 Paddle 에는 구독이 있는데 우리 DB 에는 없는 상태가 된다',
+    '2026-09-08 사고: 스모크가 진짜 구독 행을 덮어쓴 채 지워 Paddle 에는 있는데 우리 DB 에는 없는 상태가 됐다',
   )
 
   const failed = results.filter((r) => !r.ok)

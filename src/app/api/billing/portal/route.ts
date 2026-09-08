@@ -3,6 +3,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { pickActiveSubscription, type SubscriptionRow } from '@/lib/billing/subscription-state'
 import { createPortalSession } from '@/lib/billing/portal'
 
 export const runtime = 'nodejs'
@@ -25,16 +26,15 @@ export async function POST() {
     if (wsError) throw wsError
     if (!workspace) return NextResponse.json({ error: 'no_workspace' }, { status: 409 })
 
-    const [{ data: customer }, { data: subscription }] = await Promise.all([
+    const [{ data: customer }, { data: subscriptions }] = await Promise.all([
       supabaseAdmin.from('billing_customers').select('mor_customer_id').eq('workspace_id', workspace.id).maybeSingle(),
-      supabaseAdmin.from('subscriptions').select('mor_subscription_id, status').eq('workspace_id', workspace.id).maybeSingle(),
+      supabaseAdmin.from('subscriptions').select('*').eq('workspace_id', workspace.id),
     ])
     const customerId = typeof customer?.mor_customer_id === 'string' ? customer.mor_customer_id : null
     if (!customerId) return NextResponse.json({ error: 'no_customer' }, { status: 409 })
-    const subscriptionId =
-      subscription && subscription.status !== 'canceled' && typeof subscription.mor_subscription_id === 'string'
-        ? subscription.mor_subscription_id
-        : null
+    // 이력에서 지금 유효한 구독 하나를 고른다(구독 하나당 한 행, 20260908140000).
+    const subscription = pickActiveSubscription(subscriptions as SubscriptionRow[] | null)
+    const subscriptionId = typeof subscription?.mor_subscription_id === 'string' ? subscription.mor_subscription_id : null
 
     const links = await createPortalSession({ customerId, subscriptionId })
     return NextResponse.json(links)

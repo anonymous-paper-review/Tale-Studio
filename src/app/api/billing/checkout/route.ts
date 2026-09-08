@@ -4,6 +4,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { pickActiveSubscription, type SubscriptionRow } from '@/lib/billing/subscription-state'
 import { summarizeSubscription } from '@/lib/billing/account-summary'
 import { createPaddleTransaction, decideCheckout, type CheckoutKind } from '@/lib/billing/checkout'
 import { sendOpsAlert } from '@/lib/ops-alert'
@@ -35,11 +36,13 @@ export async function POST(req: NextRequest) {
     const workspaceId = workspace.id as string
     const plan = typeof workspace.plan === 'string' ? workspace.plan : 'free'
 
-    const [{ data: subscription }, { data: purchases }, { data: customer }] = await Promise.all([
-      supabaseAdmin.from('subscriptions').select('plan, status, current_period_end').eq('workspace_id', workspaceId).maybeSingle(),
+    const [{ data: subscriptions }, { data: purchases }, { data: customer }] = await Promise.all([
+      supabaseAdmin.from('subscriptions').select('*').eq('workspace_id', workspaceId),
       supabaseAdmin.from('take_ledger').select('id').eq('workspace_id', workspaceId).eq('kind', 'grant_purchase').limit(1),
       supabaseAdmin.from('billing_customers').select('mor_customer_id').eq('workspace_id', workspaceId).maybeSingle(),
     ])
+
+    const subscription = pickActiveSubscription(subscriptions as SubscriptionRow[] | null)
 
     const decision = decideCheckout({
       kind,
