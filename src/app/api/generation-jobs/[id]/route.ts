@@ -11,6 +11,7 @@ import {
   userOwnsProject,
 } from '@/lib/generation-jobs'
 import { reconcileJobFromFal } from '@/lib/fal/reconcile'
+import { releaseTakesForJob } from '@/lib/billing/take-hold'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -92,6 +93,25 @@ export async function DELETE(
     )
   }
 
+  // 지우기 전에 잡아둔 Take 를 돌려준다(#queue-delete-release 2026-09-08) — 행이 사라지면
+  //   take_ledger.ref_id 가 가리키던 잡을 다시 찾을 길이 없어 hold 가 고아로 남는다.
+  //   RPC 는 hold 가 없으면 0 을 돌려주므로(20260902150000:133) kind 무관 무조건 불러도 안전하다.
+  //   되돌리기가 실패하면 지우지 않는다 — 다음 시도에 다시 돌려받을 근거를 남긴다.
+  try {
+    await releaseTakesForJob(id)
+  } catch (err) {
+    console.error('[generation-jobs] release before delete failed:', id, err)
+    return NextResponse.json(
+      {
+        ok: false,
+        error: {
+          code: 'release_failed',
+          message: 'could not return held takes — job kept so it can be retried',
+        },
+      },
+      { status: 500 },
+    )
+  }
   await deleteGenerationJobById(id)
   return NextResponse.json({ ok: true, data: { deleted: id } })
 }
