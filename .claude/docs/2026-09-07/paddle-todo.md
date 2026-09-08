@@ -153,3 +153,22 @@ main 푸시: 코드는 지금 올려도 된다. Production 에 Paddle 키·가�
 | `PADDLE_PRICE_*` | 서버·브라우저 | 플랜 9 + 팩 4 = 13개. P2에서 이름 확정 |
 
 샌드박스 값은 Preview/Development, 라이브 값은 Production에만. 둘이 한 스코프에 공존하는 순간 사고가 난다(CLAUDE.md 개발환경 절).
+
+
+## 라이브 전환 (2026-09-08 진행 중)
+
+| 항목 | 누가 | 상태 |
+|---|---|---|
+| live DB 마이그레이션 3개(P14·P13·P16) | 에이전트 | ✅ 09-08 적용·실측 |
+| 라이브 상품 13개 등록 | 에이전트 | ✅ `--live` 로 등록 |
+| 라이브 웹훅 목적지 11종 | 에이전트 | ✅ `ntfset_01m1zv6dc45nkdedkf2e44sqak` |
+| Vercel Production env 16개 | 에이전트 | ✅ 가격 13 + 시크릿 + API 키 + ENV |
+| 웹훅 IP 허용목록 | 에이전트 | ✅ `api.paddle.com/ips` 에서 받아 씀(하드코딩 금지) |
+| 결제 준비 중 안내 문구 | 에이전트 | ✅ 승인 나면 pricing 배너 블록만 삭제 |
+| 도메인 승인 `talestudio.art` | 오너 | 🟡 **pending** |
+| Checkout settings · 계좌 | 오너 | ✅ 09-08 |
+| **P3 정책 3종(약관·환불·개인정보)** | 오너 검수 | 🔴 **심사 병목** |
+| 02 Verify 심사 제출 | 오너 | P3 뒤 |
+| Default payment link | 오너 | 도메인 승인 뒤 → `https://talestudio.art/account` |
+| main 머지 + enforce 전환 | 오너 지시 | 승인 뒤 |
+
