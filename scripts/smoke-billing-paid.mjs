@@ -75,6 +75,10 @@ async function main() {
     : { data: null }
 
   const planBefore = ws.plan
+  // 구독 행은 워크스페이스당 하나다(upsert onConflict: workspace_id). 스모크의 가짜 구독이 진짜 구독 행을
+  //   덮어쓰므로, 시작 전에 통째로 떠 두고 끝나면 그대로 되돌린다. 2026-09-08 실측으로 드러난 사고 —
+  //   sub_${RUN} 만 지우면 덮어쓰인 진짜 행이 사라진 채로 남는다(Paddle 쪽 구독은 살아 있어 더 위험하다).
+  const { data: subBefore } = await sb.from('subscriptions').select('*').eq('workspace_id', ws.id).maybeSingle()
   const balance = async () => {
     const { data } = await sb.from('take_ledger').select('delta').eq('workspace_id', ws.id)
     return (data ?? []).reduce((s, r) => s + r.delta, 0)
@@ -216,15 +220,21 @@ async function main() {
   await sb.from('take_ledger').delete().like('ref_id', `txn_${RUN}_%`)
   if (jobId) await sb.from('take_ledger').delete().eq('ref_id', jobId)
   await sb.from('billing_events').delete().like('mor_event_id', `evt_${RUN}_%`)
-  await sb.from('subscriptions').delete().eq('mor_subscription_id', `sub_${RUN}`)
+  if (subBefore) {
+    await sb.from('subscriptions').upsert({ ...subBefore, updated_at: new Date().toISOString() }, { onConflict: 'workspace_id' })
+  } else {
+    await sb.from('subscriptions').delete().eq('workspace_id', ws.id).eq('mor_subscription_id', `sub_${RUN}`)
+  }
   await sb.from('workspaces').update({ plan: planBefore }).eq('id', ws.id)
   const final = await balance()
   const { data: wsFinal } = await sb.from('workspaces').select('plan').eq('id', ws.id).maybeSingle()
+  const { data: subFinal } = await sb.from('subscriptions').select('mor_subscription_id, plan').eq('workspace_id', ws.id).maybeSingle()
+  const subRestored = subBefore ? subFinal?.mor_subscription_id === subBefore.mor_subscription_id : !subFinal
   check(
-    '스모크가 만든 적립·구독·플랜 변경은 끝나면 정리된다',
-    final === before1 && wsFinal?.plan === planBefore,
-    `잔액 ${before1}→${final}, 플랜 ${wsFinal?.plan}`,
-    '스모크 계정 잔액이 매번 늘면 다른 검사 숫자가 어긋난다',
+    '스모크가 만든 적립·구독·플랜 변경은 끝나면 정리되고 원래 구독이 그대로 돌아온다',
+    final === before1 && wsFinal?.plan === planBefore && subRestored,
+    `잔액 ${before1}→${final}, 플랜 ${wsFinal?.plan}, 구독 ${subFinal?.mor_subscription_id ?? '없음'}(원래 ${subBefore?.mor_subscription_id ?? '없음'})`,
+    '스모크가 진짜 구독 행을 덮어쓴 채 지우면 Paddle 에는 구독이 있는데 우리 DB 에는 없는 상태가 된다',
   )
 
   const failed = results.filter((r) => !r.ok)
