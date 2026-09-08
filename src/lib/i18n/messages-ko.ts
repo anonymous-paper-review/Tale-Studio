@@ -550,7 +550,7 @@ export const KO: Record<string, string> = {
   Storyboard: '스토리보드',
   'Storyboard image': '스토리보드 이미지',
   'Timed out (90s)': '시간 초과 (90s)',
-  'Video generation timed out (5 min)': '영상 생성 타임아웃 (5분)',
+  'Video is taking longer than expected. It may still finish in the background.': '영상 만들기가 예상보다 오래 걸립니다. 뒤에서 계속 진행 중일 수 있습니다.',
 
   // ── producer 스테이지: tag-input ──
   'Remove {value}': '{value} 제거',
@@ -1254,7 +1254,7 @@ export const KO: Record<string, string> = {
   'Your session is about to expire': '세션이 곧 만료됩니다',
   "You'll be automatically logged out after 5 minutes of inactivity.": '5분 내 활동이 없으면 자동 로그아웃됩니다.',
   // ── misc: generation-jobs-client.ts ──
-  'Generation timed out (5 min)': '생성 타임아웃 (5분)',
+  'Generation is taking longer than expected. It may still finish in the background.': '만들기가 예상보다 오래 걸립니다. 뒤에서 계속 진행 중일 수 있습니다.',
   'Completed, but no result URL': '완료됐지만 결과 URL이 없음',
 
   // ── #20-export: ZIP 내보내기 콘텐츠 라벨 (프로젝트 locale 이 지배) ──
@@ -1575,4 +1575,22 @@ export const KO: Record<string, string> = {
   'Spent in order.': '순서대로 빠져요.',
   'Free Takes first, then plan Takes, then pack Takes, so nothing you paid for expires before something that was free.':
     '무료 Take → 요금제 Take → 팩 Take 순서라, 돈 주고 산 것이 공짜보다 먼저 사라지는 일은 없어요.',
+
+  // 플랜 변경 확인창 (#payments-phase-3 P15)
+  'Switch to {plan}?': '{plan}으로 올릴까요?',
+  'Move down to {plan}?': '{plan}으로 내릴까요?',
+  'We charge your saved card right away. No checkout window.': '저장된 카드로 지금 바로 결제해요. 결제창은 뜨지 않아요.',
+  'Nothing is charged today.': '오늘은 결제하지 않아요.',
+  'You pay today': '오늘 내는 금액',
+  'Next renewal': '다음 결제일',
+  'Takes after the switch': '바꾼 뒤 Take',
+  '{total} ({kept} kept + {added} new)': '{total}개 (남은 {kept}개 + 새로 {added}개)',
+  '{added} new': '새로 {added}개',
+  'Your current plan runs until your renewal date. {plan} starts after that.': '지금 요금제는 결제일까지 그대로 쓰고, 그다음부터 {plan}으로 바뀌어요.',
+  'Pay ${amount} and switch': '${amount} 결제하고 바꾸기',
+  'Schedule the change': '다음 결제일에 바꾸기',
+  'Working…': '처리 중…',
+  'You are on {plan} now.': '이제 {plan}이에요.',
+  'Your plan changes on your next renewal date.': '다음 결제일에 요금제가 바뀌어요.',
+  'Could not change your plan. Please try again in a moment.': '요금제를 바꾸지 못했어요. 잠시 뒤 다시 해주세요.',
 }

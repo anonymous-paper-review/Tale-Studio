@@ -75,6 +75,7 @@ import {
 } from '@/lib/director/wiring-persistence'
 import { runVideoAdherence } from '@/lib/director/video-adherence-client'
 import { refreshGenerationQueue } from '@/lib/generation-queue'
+import { STALE_QUEUED_MS } from '@/lib/generation-jobs'
 import { isDemoSession } from '@/lib/demo/context'
 import {
   pollGenerationJob,
@@ -656,7 +657,10 @@ async function persistDirectorAssetImage(
 // ============================================================================
 
 const VIDEO_POLL_INTERVAL_MS = 5_000
-const VIDEO_POLL_TIMEOUT_MS = 300_000
+// 서버가 "유령"으로 보는 시각과 맞춘다(#poll-timeout-align 2026-09-08).
+//   따로 적어 5분이었고, 그 탓에 5~10분 구간은 "화면은 실패 · DB 는 진행 중 · 자동 회수도
+//   안 도는" 사각지대였다(ghost sweep 은 STALE_QUEUED_MS 를 넘긴 것만 본다).
+const VIDEO_POLL_TIMEOUT_MS = STALE_QUEUED_MS
 type GenerationLock = { key: string; token: symbol }
 
 const generationLocks = new Map<string, symbol>()
@@ -4771,7 +4775,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             }
             await new Promise((resolve) => setTimeout(resolve, VIDEO_POLL_INTERVAL_MS))
           }
-          throw new Error(translate(useLocaleStore.getState().locale, 'Video generation timed out (5 min)'))
+          throw new Error(translate(useLocaleStore.getState().locale, 'Video is taking longer than expected. It may still finish in the background.'))
         } catch (err) {
           const message = err instanceof Error ? err.message : 'Unknown error'
           if (message.startsWith('Canonical video-take hydration failed:')) throw err

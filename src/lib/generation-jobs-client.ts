@@ -5,6 +5,8 @@
 // 여러 store가 공유 (store 간 import 금지 규칙 회피 — 공용 lib).
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
+// 서버가 "유령"으로 보는 시각과 맞춘다(#poll-timeout-align 2026-09-08) — 따로 적으면 조용히 어긋난다.
+import { STALE_QUEUED_MS } from '@/lib/generation-jobs'
 
 export type GenerationJobLifecycle =
   | 'queued'
@@ -54,7 +56,7 @@ async function pollGenerationJobOnce(
   jobId: string,
   {
     intervalMs = 3000,
-    timeoutMs = 300_000,
+    timeoutMs = STALE_QUEUED_MS,
     onStatus,
   }: {
     intervalMs?: number
@@ -68,9 +70,9 @@ async function pollGenerationJobOnce(
       onStatus?.({
         jobId,
         status: 'timed_out',
-        error: 'Generation timed out (5 min)',
+        error: 'Generation is taking longer than expected. It may still finish in the background.',
       })
-      throw new Error(translate(useLocaleStore.getState().locale, 'Generation timed out (5 min)'))
+      throw new Error(translate(useLocaleStore.getState().locale, 'Generation is taking longer than expected. It may still finish in the background.'))
     }
     const res = await fetch(`/api/generation-jobs/${encodeURIComponent(jobId)}`)
     if (!res.ok) {
