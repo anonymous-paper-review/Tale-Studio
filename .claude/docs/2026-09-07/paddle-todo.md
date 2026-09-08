@@ -97,7 +97,7 @@
 | 4 | ~~이중 적립 DB 제약~~ ✅ 2026-09-08 | 에이전트 | `take_ledger_ref_grant_unique` 부분 유일 인덱스 + 웹훅이 23505 를 "이미 적립됨"으로. dev DB 적용·실측 완료. **live 적용은 라이브 전환 때** |
 | 5 | ~~놓친 결제 찾기(P12)~~ ✅ 2026-09-08 | 에이전트 | 즉시 재조회(`POST /api/billing/reconcile-me`, 폴링 90초 뒤 자동) + 일일 대사(Cron 매일 0시 UTC). dev 실측: 유실 흉내 → 검출 → 복구 |
 | 6 | ~~P10 스모크~~ ✅ 2026-09-08 | 에이전트 | `pnpm smoke:billing` 공짜 8개(배포마다, $0) + `pnpm smoke:billing:paid` 전 구간 6개(팩·재전송 멱등·구독·hold·반환·정리). 로컬·dev 양쪽 통과. 결제창 대신 서명한 알림을 쏜다(Orca 가 Paddle 카드칸에 값을 못 넣는 실측 뒤 오너 결정). 실제 생성 라우트까지 돈다(러프 만들어 게이트 통과, 1회 $0.31). dev media 버킷 없던 것도 이때 발견·생성 |
-| 6.5 | **Paddle 키에 구독 write 권한 켜기** ⛔ 오너 | 오너 | Developer tools → Authentication. 지금 키는 읽기만 있어 P15 를 못 만든다. 켤 때 이 구독의 취소 예약(10/07 발효)도 같이 지워야 함 → `2026-09-08/plan-change-probe.html` 4절 |
+| 6.5 | ~~Paddle 키 구독 write 권한~~ ✅ 2026-09-08 | 오너 | 열어줌. 취소 예약(10/07 발효)도 지웠다 |
 | 7 | 가격 페이지 한국어 문안 검수 · 베타 배너 문구 | 오너 | 심사 때 이 페이지를 본다 |
 | 8 | 기획 숫자 3개(Account 초과 단가 · 자동 충전 상한 · 무료 Take 유효기간) · PITR · 세무사 1회 | 오너 | 라이브 전 |
 | 9 | **라이브 전환**: Paddle 라이브 계정(사업자·정산 계좌) → Website approval → `paddle-register-catalog.mts` 라이브 키로 → Production env(키·시크릿·가격 ID·디스코드) → 라이브 알림 목적지 → beta-cutover grant → `enforce` | 오너 + 에이전트 | 아래 §3 |

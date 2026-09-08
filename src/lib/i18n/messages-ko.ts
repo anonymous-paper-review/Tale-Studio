@@ -1518,7 +1518,7 @@ export const KO: Record<string, string> = {
   // 결제창 (P7·P8)
   'That product is not available.': '그 상품은 살 수 없어요.',
   'Payments for this product open soon.': '이 상품의 결제는 곧 열려요.',
-  'You already have a subscription. Plan changes are coming soon.': '이미 구독 중이에요. 플랜 변경은 곧 열려요.',
+  'You already have a subscription.': '이미 구독 중인 요금제예요.',
   'Your last payment failed. Please update your card before subscribing again.': '지난 결제가 실패했어요. 카드를 먼저 바꿔주세요.',
   'Could not open checkout. Please try again.': '결제창을 열지 못했어요. 다시 시도해주세요.',
   'Confirming your payment…': '결제 확인 중…',

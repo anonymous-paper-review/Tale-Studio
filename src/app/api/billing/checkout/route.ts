@@ -5,6 +5,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { pickActiveSubscription, type SubscriptionRow } from '@/lib/billing/subscription-state'
+import { decidePlanChange } from '@/lib/billing/plan-change'
+import { takeBalance } from '@/lib/billing/take-ledger'
 import { summarizeSubscription } from '@/lib/billing/account-summary'
 import { createPaddleTransaction, decideCheckout, type CheckoutKind } from '@/lib/billing/checkout'
 import { sendOpsAlert } from '@/lib/ops-alert'
@@ -51,7 +53,36 @@ export async function POST(req: NextRequest) {
       packPurchasedBefore: (purchases?.length ?? 0) > 0,
       subscriptionStatus: summarizeSubscription(plan, subscription ?? null).status,
     })
-    if (!decision.ok) return NextResponse.json({ error: decision.reason }, { status: 409 })
+    if (!decision.ok) {
+      // 구독 중인데 다른 플랜을 눌렀다 = 플랜 변경이다(P15). 거절만 하지 말고 판정을 실어 보내
+      //   화면이 확인창을 띄우게 한다. 금액·갱신일·합산 Take 를 서버가 계산해야 화면과 청구가 안 어긋난다.
+      if (decision.reason === 'already_subscribed' && kind === 'plan') {
+        const change = decidePlanChange({
+          currentPlan: plan,
+          targetPlan: id,
+          subscriptionId: subscription?.mor_subscription_id ?? null,
+          now: new Date(),
+        })
+        if (change.ok) {
+          const balance = await takeBalance(workspaceId).catch(() => null)
+          return NextResponse.json(
+            {
+              error: decision.reason,
+              planChange: {
+                targetPlan: id,
+                direction: change.direction,
+                chargeTodayUsd: change.chargeTodayUsd,
+                nextBilledAt: change.nextBilledAt,
+                takesAdded: change.takesAdded,
+                currentBalance: balance,
+              },
+            },
+            { status: 409 },
+          )
+        }
+      }
+      return NextResponse.json({ error: decision.reason }, { status: 409 })
+    }
 
     const existingCustomerId = typeof customer?.mor_customer_id === 'string' ? customer.mor_customer_id : null
     const { transactionId, customerId } = await createPaddleTransaction({

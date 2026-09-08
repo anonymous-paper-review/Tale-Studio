@@ -14,6 +14,8 @@ import { fetchTakeBalance } from '@/lib/billing/use-take-balance'
 import { refetchBillingAccount } from '@/lib/billing/use-billing-account'
 import type { CheckoutDenyReason, CheckoutKind } from '@/lib/billing/checkout'
 import { cn } from '@/lib/utils'
+import { PlanChangeDialog, type PlanChangePreview } from '@/components/billing/plan-change-dialog'
+import { PADDLE_PLANS } from '@/lib/billing/catalog'
 
 let paddlePromise: Promise<Paddle | undefined> | null = null
 
@@ -33,7 +35,7 @@ const DENY_COPY: Record<CheckoutDenyReason, string> = {
   unknown_item: 'That product is not available.',
   not_purchasable: 'Payments for this product open soon.',
   free_pack_limit: 'Free plans can buy one pack. Subscribe to keep topping up.',
-  already_subscribed: 'You already have a subscription. Plan changes are coming soon.',
+  already_subscribed: 'You already have a subscription.',
   past_due: 'Your last payment failed. Please update your card before subscribing again.',
 }
 
@@ -88,6 +90,9 @@ export function CheckoutButton({
   const router = useRouter()
   const pathname = usePathname()
   const [busy, setBusy] = useState(false)
+  // 구독 중인 유저가 다른 플랜을 누르면 결제창이 아니라 확인창이다(P15). 서버가 already_subscribed 로 거절할 때
+  //   그 응답에 담긴 판정으로 창을 띄운다 — 금액·갱신일·합산 Take 를 서버가 계산해야 화면과 청구가 안 어긋난다.
+  const [planChange, setPlanChange] = useState<PlanChangePreview | null>(null)
 
   const open = async () => {
     if (busy) return
@@ -102,8 +107,18 @@ export function CheckoutButton({
         router.push(`/login?next=${encodeURIComponent(pathname || '/pricing')}`)
         return
       }
-      const body = (await res.json().catch(() => ({}))) as { transactionId?: string; error?: string }
+      const body = (await res.json().catch(() => ({}))) as {
+        transactionId?: string
+        error?: string
+        planChange?: Omit<PlanChangePreview, 'targetPlanName'>
+      }
       if (!res.ok || !body.transactionId) {
+        // 구독 중 + 다른 플랜이면 서버가 판정을 실어 보낸다. 확인창을 띄운다.
+        if (body.planChange) {
+          const name = PADDLE_PLANS.find((p) => p.id === body.planChange!.targetPlan)?.name ?? body.planChange.targetPlan
+          setPlanChange({ ...body.planChange, targetPlanName: name })
+          return
+        }
         const reason = body.error as CheckoutDenyReason | undefined
         toast.error(t(reason && reason in DENY_COPY ? DENY_COPY[reason] : 'Could not open checkout. Please try again.'))
         return
@@ -128,8 +143,11 @@ export function CheckoutButton({
   }
 
   return (
-    <button type="button" onClick={() => void open()} disabled={disabled || busy} className={cn(className, busy && 'opacity-70')}>
-      {children}
-    </button>
+    <>
+      <button type="button" onClick={() => void open()} disabled={disabled || busy} className={cn(className, busy && 'opacity-70')}>
+        {children}
+      </button>
+      <PlanChangeDialog preview={planChange} open={planChange !== null} onOpenChange={(v) => !v && setPlanChange(null)} />
+    </>
   )
 }
