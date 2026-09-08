@@ -455,11 +455,19 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     const origStage = get().currentStage
     try {
       const supabase = createClient()
-      const { data: scenes } = await supabase
+      const { data: scenes, error: scenesError } = await supabase
         .from('scenes')
         .select('scene_id')
         .eq('project_id', projectId)
         .limit(1)
+      // 조회 실패는 "장면이 없다" 가 아니라 "모른다" 다(#gate-unknown-vs-empty 2026-09-08).
+      //   Supabase 는 실패해도 throw 하지 않고 { data: null, error } 를 돌려준다. 그걸 빈 목록으로
+      //   읽으면 네트워크가 한 번 흔들렸을 때 장면이 멀줦한 프로젝트도 producer 로 게이트백된다.
+      //   생성은 뒤에서 계속 도는데 사용자만 화면을 잃는다 — 모를 땐 잠그지 않는다.
+      if (scenesError) {
+        console.error('[project-store] verifyWriterGate scenes query failed:', scenesError)
+        return
+      }
       const hasScenes = !!(scenes && scenes.length > 0)
 
       // writer_runs 는 RLS(service-role only)라 클라이언트가 못 읽음 → 서버 status 라우트 사용.
