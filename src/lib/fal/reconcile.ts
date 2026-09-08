@@ -124,8 +124,25 @@ function isPermanentProviderLookupFailure(error: unknown): boolean {
 }
 
 /** queued job을 persisted provider의 진실로 reconcile한다. Provider 조회 오류만 queued로 남긴다. */
-export async function reconcileJobFromFal(job: GenerationJob): Promise<GenerationJob> {
-  if (job.request_id.startsWith('reserved:')) return job
+export async function reconcileJobFromFal(
+  job: GenerationJob,
+  options: { settleStaleReserved?: boolean } = {},
+): Promise<GenerationJob> {
+  // 예약만 되고 제출은 못 한 상태(#reserved-zombie 2026-09-08).
+  //   fal 은 이 작업을 모른다 — 물어볼 대상이 없어 예전에는 그냥 지나쳤고, 그 탓에 잡은 Take 가
+  //   영원히 묶였다(webhook 은 request_id 매칭이라 'reserved:' 와 절대 안 맞는다).
+  //   fal 이 모른다는 것 자체가 답이다 — 제출이 안 됐으니 물어볼 필요 없이 실패로 확정하면 된다.
+  //
+  //   다만 "지금 제출 중" 과 "제출 못 하고 죽음" 을 이 함수 안에서는 구분할 수 없다 —
+  //   GenerationJob 은 created_at 을 싣지 않는다(COLUMNS, generation-jobs.ts:77).
+  //   그래서 나이 판정은 호출자 몫이다: 유령 청소부는 이미 .lt(created_at, now-STALE) 로 거르므로
+  //   settleStaleReserved 를 켜서 부르고, 폴링(GET [id])은 켜지 않아 제출 중인 작업을 죽이지 않는다.
+  //   terminalizeJob 이 hold 반환까지 맡는다(연결형은 markDirectorVideoAttemptFailed,
+  //   비연결형은 releaseTakesForJob).
+  if (job.request_id.startsWith('reserved:')) {
+    if (!options.settleStaleReserved) return job
+    return terminalizeJob(job, 'job was never submitted to the provider (reserved slot expired) — held takes returned')
+  }
 
   if (job.provider === 'local') {
     if (job.kind !== 'shot_video') return job
@@ -223,7 +240,9 @@ export async function reconcileGhostQueuedJobs(projectId: string): Promise<numbe
         //   queued 일 때만 착수해 중복 finalize 시도를 줄인다 (review M11). CAS 는 그대로 최종 방어선.
         const job = await getGenerationJobById(id)
         if (!job || job.status !== 'queued') continue
-        const after = await reconcileJobFromFal(job)
+        // 이 목록은 이미 STALE_QUEUED_MS 를 넘긴 것만 담고 있다(위 .lt 조건) — 그래서 제출도
+        //   못 한 채 남은 reserved: 잡을 여기서 정리해도 안전하다(#reserved-zombie).
+        const after = await reconcileJobFromFal(job, { settleStaleReserved: true })
         if (after.status !== 'queued') settled += 1
       } catch (e) {
         // 잡 하나의 회수 실패가 스윕 전체·목록 조회를 죽이면 안 된다. 다음 스윕이 재시도한다.
