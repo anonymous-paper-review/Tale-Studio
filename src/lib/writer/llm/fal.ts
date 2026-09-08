@@ -451,16 +451,22 @@ function extractVideoUrlFromData(raw: unknown): { url: string; duration?: number
 }
 
 /** submit only */
+// 재시도하지 않는다(#fal-submit-no-retry 2026-09-08). 제출은 과금이 발생하는 동작이라
+//   503·타임아웃은 "안 들어갔다"가 아니라 "들어갔는지 모른다"이다. fal 이 이미 큐에
+//   넣고 응답만 못 준 경우 withLlmRetry 는 같은 영상을 최대 4번 만들고 4번 과금했다.
+//   게다가 기록되는 request_id 는 마지막 시도 하나뿐이라 앞선 제출들은 webhook 매칭에도
+//   실패해 결과 없이 돈만 나간다. 본 영상 라우트는 이미 재시도 없이 모호한 실패를
+//   별도 처리한다(generate-video/route.ts:224, isAmbiguousSubmitError) — 여기도 같은 규칙을 따른다.
+//   조회(falVideoFetch)는 과금이 없으므로 그쪽 재시도는 그대로 둔다.
 export async function falVideoSubmit(
   opts: FalVideoOptions,
 ): Promise<FalSubmitReceipt> {
   const model = opts.model ?? DEFAULT_VIDEO_MODEL;
   const input = buildFalVideoInput(opts, model);
   const k = await pickFalKey();
-  const { request_id } = await withLlmRetry(
-    () =>
-      k.client.queue.submit(model, opts.webhookUrl ? { input, webhookUrl: opts.webhookUrl } : { input }),
-    'fal-video-submit',
+  const { request_id } = await k.client.queue.submit(
+    model,
+    opts.webhookUrl ? { input, webhookUrl: opts.webhookUrl } : { input },
   );
   return { request_id, model, fal_request: input, fal_key_id: k.id };
 }
