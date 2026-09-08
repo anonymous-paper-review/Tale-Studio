@@ -17,10 +17,10 @@ export async function GET(req: Request) {
   const cronSecret = process.env.CRON_SECRET
   if (!cronSecret) {
     if (process.env.NODE_ENV === 'production') {
-      console.error('[cron/take-expire] CRON_SECRET 미설정 — 프로덕션에서 요청 거부')
+      console.error('[cron/take-expire] CRON_SECRET 미설정 — 프로덕션에서 요청 거부') // i18n-ok: 서버 로그·운영 경보, 유저 화면 아님
       return NextResponse.json({ ok: false, error: 'not_configured' }, { status: 401 })
     }
-    console.warn('[cron/take-expire] CRON_SECRET 미설정 — 개발 환경이라 통과시킴')
+    console.warn('[cron/take-expire] CRON_SECRET 미설정 — 개발 환경이라 통과시킴') // i18n-ok: 서버 로그·운영 경보, 유저 화면 아님
   } else if (req.headers.get('authorization') !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
   }

@@ -220,6 +220,32 @@ async function dispatch(event: PaddleEvent, deps: PaddleWebhookDeps): Promise<st
   }
 }
 
+/**
+ * 결제 하나를 장부에 옮긴다. 웹훅과 재조회(P12)가 같은 코드를 쓴다 — 적립 규칙이 두 벌이 되면 반드시 어긋난다.
+ * 재조회는 Paddle API 에서 받은 거래를 이 함수가 아는 모양(event.data)으로 감싸서 넘긴다. 서명 검증은 재조회에
+ * 필요 없다 — Paddle API 응답 자체가 출처다. 이중 적립은 hasGrant 와 DB 유일 제약(P14)이 막는다.
+ */
+export async function processPaddleTransaction(
+  transaction: Record<string, unknown>,
+  deps: PaddleWebhookDeps,
+  occurredAt?: string,
+): Promise<string> {
+  const event: PaddleEvent = {
+    event_id: `recon_${str(transaction.id) ?? 'unknown'}`,
+    event_type: 'transaction.completed',
+    occurred_at: occurredAt,
+    data: transaction,
+  }
+  // 웹훅과 같은 순서로 간다: 원문 저장 → 처리 → 처리 완료 표시.
+  //   원문을 안 남기면 분쟁 때 근거가 사라진다 — 재조회로 들어온 적립만 출처가 없는 상태가 된다.
+  //   같은 결제를 두 번 재조회해도 여기서 duplicate_processed 로 걸린다(적립 이중 방어의 첫 겹).
+  const recorded = await deps.recordEvent({ id: event.event_id, type: event.event_type, payload: event })
+  if (recorded === 'duplicate_processed') return 'duplicate'
+  const result = await handleTransactionCompleted(event, deps)
+  await deps.markProcessed(event.event_id)
+  return result
+}
+
 async function handleTransactionCompleted(event: PaddleEvent, deps: PaddleWebhookDeps): Promise<string> {
   const data = event.data
   const txnId = str(data.id) ?? event.event_id

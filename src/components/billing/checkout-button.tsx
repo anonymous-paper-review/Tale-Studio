@@ -54,6 +54,20 @@ async function confirmAfterCheckout(t: ReturnType<typeof useT>, before: number |
       return
     }
   }
+  // 90초를 다 썼다 = Paddle 재시도와 폴링이 둘 다 실패했다. 그 자리에서 Paddle 에 직접 물어본다(P12 즉시 재조회).
+  //   그 유저의 결제만 본다 — 서버가 로그인 유저의 워크스페이스에 묶인 Paddle 고객으로만 조회한다.
+  try {
+    const res = await fetch('/api/billing/reconcile-me', { method: 'POST' })
+    const body = (await res.json().catch(() => ({}))) as { recovered?: number }
+    if (res.ok && (body.recovered ?? 0) > 0) {
+      const [take] = await Promise.all([fetchTakeBalance(), refetchBillingAccount()])
+      const delta = take.balance !== null && before !== null ? take.balance - before : 0
+      toast.success(delta > 0 ? t('{n} Takes added to your balance.', { n: delta }) : t('Your balance is updated.'), { id })
+      return
+    }
+  } catch {
+    // 재조회 실패는 아래 안내로 떨어진다 — 유저에게 보일 것은 같다.
+  }
   toast.warning(t('Still confirming. Check the account page in a minute.'), { id, duration: 10_000 })
 }
 

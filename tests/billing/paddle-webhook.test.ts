@@ -418,6 +418,32 @@ describe('이중 적립 DB 제약 (P14)', () => {
   })
 })
 
+describe('재조회로 들어온 결제 (P12)', () => {
+  // 왜: 재조회는 Paddle API 응답이 출처라 서명이 없다. 그래도 원문을 남겨야 분쟁 때 근거가 있다.
+  //   원문 없이 적립만 있으면 "이 Take 는 어디서 왔나" 에 답할 수 없다.
+  it('재조회로 처리한 결제도 원문이 장부에 남고 처리 완료로 표시된다', async () => {
+    const { deps, state, balance } = makeDeps()
+    const { processPaddleTransaction } = await import('@/lib/billing/paddle-webhook')
+    const result = await processPaddleTransaction(txnCompleted().data as Record<string, unknown>, deps, NOW.toISOString())
+    expect(result).toBe('pack_granted')
+    expect(balance()).toBe(50)
+    const saved = state.events.get('recon_txn_1')
+    expect(saved?.type).toBe('transaction.completed')
+    expect(saved?.processed).toBe(true)
+  })
+
+  // 왜: 같은 결제를 두 번 재조회해도 Take 가 두 번 들어가면 안 된다(웹훅 재전송과 같은 문제).
+  it('같은 결제를 두 번 재조회해도 Take는 한 번만 들어간다', async () => {
+    const { deps, balance } = makeDeps()
+    const { processPaddleTransaction } = await import('@/lib/billing/paddle-webhook')
+    const data = txnCompleted().data as Record<string, unknown>
+    await processPaddleTransaction(data, deps, NOW.toISOString())
+    const second = await processPaddleTransaction(data, deps, NOW.toISOString())
+    expect(second).toBe('duplicate')
+    expect(balance()).toBe(50)
+  })
+})
+
 describe('경보 (P11)', () => {
   it('처리 실패·워크스페이스 없음·상품 매핑 없음·갱신 결제 실패는 경보로 간다', async () => {
     const { deps, state } = makeDeps()
