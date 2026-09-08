@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>장부의 두 구멍</title>
+<style>
+  :root {
+    --bg:#F1F3F5; --surface:#FFFFFF; --surface-2:#E8EBEF;
+    --ink:#16181D; --ink-2:#3B4048; --muted:#676D77;
+    --line:#D6DBE1; --line-2:#BFC6CE;
+    --accent:#1F5F7A; --accent-soft:#DCEAF1;
+    --pass:#2E7350; --pass-soft:#DFEDE5;
+    --fail:#A33A38; --fail-soft:#F6E2E1;
+    --gate:#6A579E; --gate-soft:#EAE4F5;
+    --warn:#8A6412; --warn-soft:#F4EBD6;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI","Malgun Gothic",sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+      --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+      --line:#2B3038; --line-2:#3C434D;
+      --accent:#74B4D0; --accent-soft:#17303C;
+      --pass:#5FB98A; --pass-soft:#17301F;
+      --fail:#E0817D; --fail-soft:#3A2321;
+      --gate:#A794D8; --gate-soft:#272040;
+      --warn:#D2A64F; --warn-soft:#33290F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+    --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+    --line:#2B3038; --line-2:#3C434D;
+    --accent:#74B4D0; --accent-soft:#17303C;
+    --pass:#5FB98A; --pass-soft:#17301F;
+    --fail:#E0817D; --fail-soft:#3A2321;
+    --gate:#A794D8; --gate-soft:#272040;
+    --warn:#D2A64F; --warn-soft:#33290F;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:0 20px 110px;background:var(--bg);color:var(--ink);
+    font-family:var(--sans);font-size:16px;line-height:1.82;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto}
+
+  header.page{padding:56px 0 20px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 14px;font-weight:600}
+  h1{font-size:clamp(27px,5vw,40px);font-weight:800;letter-spacing:-.028em;line-height:1.22;
+    margin:0 0 18px;text-wrap:balance}
+  .bluf{font-size:17.5px;color:var(--ink);margin:0 0 6px;max-width:64ch}
+  .bluf b{color:var(--gate)}
+  .asof{font-family:var(--mono);font-size:12px;color:var(--muted);margin:10px 0 0}
+  header.page::after{content:"";display:block;height:3px;background:var(--ink);margin-top:26px;opacity:.9}
+
+  section{margin:58px 0 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .sec-num{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);
+    border:1.5px solid var(--accent);border-radius:3px;padding:0 7px;line-height:1.7}
+  h2{font-size:23px;font-weight:800;letter-spacing:-.018em;margin:0;text-wrap:balance}
+  .sec-lede{color:var(--muted);font-size:15px;margin:0 0 24px;max-width:62ch}
+  p{margin:0 0 16px;max-width:64ch}
+  h3{font-size:17px;font-weight:750;margin:28px 0 10px;letter-spacing:-.01em}
+  h3:first-child{margin-top:0}
+  ul.plain{margin:0 0 16px;padding-left:22px;max-width:64ch}
+  ul.plain li{margin-bottom:8px}
+  strong,b{font-weight:750}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    padding:24px 26px 20px;margin:0 0 18px}
+  .card.same{border-left:3px solid var(--pass)}
+  .card.diff{border-left:3px solid var(--warn)}
+  .card > :last-child{margin-bottom:0}
+  .card-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:12px}
+  .card-head h3{flex:1 1 240px;margin:0}
+  .agreed{font-size:15px;color:var(--ink-2);margin:0 0 12px}
+  .agreed b{color:var(--ink);font-weight:750}
+
+  .chip{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.03em;
+    border-radius:3px;padding:2px 8px;white-space:nowrap}
+  .c-pass{background:var(--pass-soft);color:var(--pass)}
+  .c-fail{background:var(--fail-soft);color:var(--fail)}
+  .c-warn{background:var(--warn-soft);color:var(--warn)}
+  .c-gate{background:var(--gate-soft);color:var(--gate)}
+  .c-acc{background:var(--accent-soft);color:var(--accent)}
+
+  pre{background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--line-2);
+    border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+    font-family:var(--mono);font-size:12px;line-height:1.68;margin:8px 0;color:var(--ink-2);
+    white-space:pre;tab-size:2}
+  pre b{color:var(--ink);font-weight:700}
+  pre .path{display:block;color:var(--muted);margin-bottom:8px;font-size:11.5px}
+  code{font-family:var(--mono);font-size:.87em;background:var(--surface-2);padding:1px 6px;border-radius:3px}
+  .code-what{font-size:14.5px;color:var(--ink-2);margin:0 0 4px}
+  .code-diff{font-size:14.5px;margin:8px 0 0}
+  .code-diff .chip{margin-right:8px}
+
+  .tbl{overflow-x:auto;margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}
+  th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:700;
+    padding:10px 12px;border-bottom:2px solid var(--line-2);vertical-align:bottom}
+  td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+  td .path{font-family:var(--mono);font-size:11.5px;color:var(--muted);display:block;margin-top:3px}
+  .gate-cell{color:var(--gate);font-weight:750}
+  .gate-empty{display:inline-block;min-width:60px;border-bottom:1.5px dashed var(--gate);opacity:.7}
+
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);
+    border-radius:10px;overflow:hidden;margin:16px 0}
+  @media (max-width:640px){.split{grid-template-columns:1fr}}
+  .split > div{padding:18px 20px}
+  .split .yes{background:var(--pass-soft);border-right:1px solid var(--line)}
+  .split .no{background:var(--fail-soft)}
+  .split h4{margin:0 0 10px;font-size:14.5px;font-weight:800}
+  .split .yes h4{color:var(--pass)}
+  .split .no h4{color:var(--fail)}
+  .split ul{margin:0;padding-left:20px;font-size:14px;line-height:1.7}
+  .split li{margin-bottom:7px}
+
+  footer{margin-top:66px;padding-top:20px;border-top:2px solid var(--ink);font-size:13.5px;color:var(--muted)}
+  footer b{color:var(--ink)}
+  footer p{max-width:none}
+  a{color:var(--accent)}
+  a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <p class="eyebrow">문제 정의 · 2026-09-08 · 결제 P14 + P13</p>
+  <h1>장부의 두 구멍</h1>
+  <p class="bluf">Take 장부에 구멍이 둘 있다. <b>같은 결제로 Take 가 두 번 들어갈 수 있고</b>, <b>만료일이 지난 Take 가 사라지지 않는다.</b> 둘 다 돈이 새는 방향이고, 둘 다 DB 를 고쳐야 해서 묶어서 한다.</p>
+  <p class="bluf"><b>결정할 것 2개</b>: 만료 알림 안 함(확인만), 만료 잡 주기. <b>알아둘 것 4개</b>.</p>
+  <p class="asof">구현 전 문서 · 코드 실측 2026-09-08 09:00 KST · dev 장부 3행(오너 스모크 결제 3건) 기준</p>
+</header>
+
+<section>
+  <div class="sec-head"><span class="sec-num">1</span><h2>구멍 1 — 같은 결제로 Take 가 두 번 들어간다</h2></div>
+  <p class="sec-lede">언제 일어나는가, 왜 지금 코드로는 못 막는가.</p>
+
+  <h3>장면</h3>
+  <p>유저가 Mini 팩 $29 를 산다. Paddle 이 "결제됐다" 알림을 우리 서버로 보낸다. 우리 서버가 처리하는 데 5초가 넘게 걸린다(배포 직후 첫 요청, 콜드 스타트). Paddle 은 5초 안에 답이 없으면 실패로 보고 <b>같은 알림을 다시 보낸다.</b> 이제 요청이 둘이고, Vercel 은 요청마다 다른 서버 인스턴스에 태울 수 있다. 둘이 동시에 돈다.</p>
+  <p>둘 다 "이 결제로 이미 Take 넣었나?" 를 장부에 물어본다. 둘 다 아직 안 넣었으니 둘 다 "없다" 를 받는다. 둘 다 넣는다. <b>$29 를 받고 100 개를 준다.</b></p>
+
+  <h3>지금 코드</h3>
+  <p class="code-what">적립 전에 장부를 한 번 조회해서 이미 있으면 건너뛴다. 조회와 삽입 사이에 시간이 있고, 그 사이에 다른 요청이 끼어들 수 있다.</p>
+<pre><span class="path">src/lib/billing/paddle-webhook.ts:245-258</span>  if (resolved.kind === 'pack') {
+    <b>if (await deps.hasGrant(refKind, txnId)) return 'already_granted'</b>   ← 요청 A 도 B 도 여기서 "없다"
+    …
+    await deps.grant({                                                  ← 둘 다 여기로 온다
+      workspaceId: workspace.id,
+      kind: 'grant_purchase',
+      amount: resolved.pack.takes,
+      expiresAt: addMonths(billedAt, 12),</pre>
+  <p class="code-diff"><span class="chip c-warn">구멍</span>조회(<code>hasGrant</code>)와 삽입(<code>grant</code>) 사이가 원자적이지 않다. 한 요청 안에서는 맞지만 두 요청이 겹치면 못 막는다.</p>
+
+  <h3>왜 아직 안 터졌나</h3>
+  <p>재전송은 보통 5초 뒤에 오고 우리 처리는 0.5초에 끝난다(실측 499ms). 겹칠 창이 좁다. 어제 실물 테스트에서도 재전송이 <code>duplicate</code> 로 정상 처리됐다. 이 구멍은 <b>느려질 때만</b> 열린다 — 배포 순간, 콜드 스타트, DB 지연.</p>
+
+  <h3>고치는 법</h3>
+  <p>DB 에 "이 결제 번호로 이 종류의 적립은 한 줄만" 이라는 제약을 건다. 두 번째 삽입은 DB 가 거부한다. 웹훅은 거부를 "이미 적립됨" 으로 읽고 성공으로 답한다. 조회는 그대로 두되, 조회가 놓친 것을 DB 가 잡는다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>돈으로</th><th>지금</th><th>고친 뒤</th></tr></thead>
+    <tbody>
+      <tr><td>Mini 팩 이중 적립 1건</td><td>$29 받고 100 Take(원가 $31) → <b>−$2 적자</b></td><td>50 Take, 마진 정상</td></tr>
+      <tr><td>Studio 팩 이중 적립 1건</td><td>$2,199 받고 10,000 Take(원가 $3,100) → <b>−$901</b></td><td>5,000 Take</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">2</span><h2>구멍 2 — 만료일이 지난 Take 가 사라지지 않는다</h2></div>
+  <p class="sec-lede">화면에는 "10월 7일 만료" 라고 쓰여 있는데, 10월 8일에도 그대로 있다.</p>
+
+  <h3>장면</h3>
+  <p>어제 오너가 dev 에서 S-1 을 구독했다. 장부에 이렇게 들어갔다.</p>
+<pre><span class="path">dev 장부 실측 2026-09-08 09:00 KST</span>grant_purchase   50 | 만료 2027-09-07 | txn_01m1xpbffccf03   ← Mini 팩
+<b>grant_plan       16 | 만료 2026-10-07 | txn_01m1xqgnmk2swk   ← S-1 한 달치</b>
+grant_purchase  200 | 만료 2027-09-07 | txn_01m1xqqrvb7h98   ← Standard 팩
+잔액 266</pre>
+  <p>가운데 줄이 문제다. 10월 7일이 지나면 저 16 개는 사라져야 한다(v4 "구독 포함분은 매월 말 소멸 — 원가 방어"). 그런데 사라지게 하는 코드가 없다. 10월 8일에도 잔액은 266 이고, 유저는 안 쓴 9월분으로 10월에 영상을 만든다. 우리는 9월치 원가를 10월에 한 번 더 낸다.</p>
+
+  <h3>지금 코드</h3>
+  <p class="code-what">잔액은 장부 행의 단순 합이다. 만료일은 행에 적혀만 있고 합산에서 빠지지 않는다. 주석이 이미 "다음 슬라이스" 라고 적어 뒀다 — 그 다음 슬라이스가 이것이다.</p>
+<pre><span class="path">src/lib/billing/take-ledger.ts:16-24</span>/**
+ * 워크스페이스의 현재 Take 잔액 — sum(delta).
+ * <b>만기(expires_at &lt; now)인 grant 의 잔여분을 제외하지 않는다</b> — 만기 정산은 expire 행이 처리하며
+ * (다음 슬라이스), 이번 슬라이스는 원장 전체의 단순 합만 계산한다.
+ */
+export async function takeBalance(workspaceId: string): Promise&lt;number&gt; {
+  const { data, error } = await supabaseAdmin
+    .from('take_ledger').select('delta').eq('workspace_id', workspaceId)
+  if (error) throw error
+  return (data ?? []).reduce((sum, row) =&gt; sum + (row.delta as number), 0)
+}</pre>
+  <p class="code-diff"><span class="chip c-warn">구멍</span>합산을 바꿔 만료를 빼는 방법도 있지만 안 쓴다. 잔액이 "장부 행의 합" 이라는 규칙이 깨지고, 내역 화면에 "왜 줄었는지" 가 안 남는다. 대신 <b>만료 행을 실제로 넣는</b> 잡을 만든다.</p>
+
+  <h3>고치는 법</h3>
+  <p>한 시간에 한 번 도는 잡이 만료일 지난 lot 의 남은 양만큼 "만료" 행을 넣어 0 으로 만든다. 계산은 DB 안에서 한 덩어리로 한다(기존 잡아두기 RPC 와 같은 방식). 잔액은 여전히 행의 합이고, 내역에 "만료 −16" 이 남는다.</p>
+  <p>까다로운 데가 셋이다. <b>생성 중인 것을 뺏지 않기</b>(자정 직전에 시작한 영상이 만료 때문에 실패하면 안 된다) · <b>두 번 돌아도 두 번 만료 안 하기</b> · <b>시간대</b>(UTC 로 저장하고 화면은 KST — 하루 일찍 지우면 문의가 온다).</p>
+
+  <div class="tbl"><table>
+    <thead><tr><th>돈으로</th><th>지금</th><th>고친 뒤</th></tr></thead>
+    <tbody>
+      <tr><td>S-5 유저 1명이 월 60 개 중 30 개를 안 씀</td><td>다음 달로 이월 → 원가 $9.3 추가 부담</td><td>사라짐. v4 마진 유지</td></tr>
+      <tr><td>같은 유저 100 명</td><td>월 <b>$930</b></td><td>$0</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">3</span><h2>둘을 묶는 이유</h2></div>
+  <ul class="plain">
+    <li><b>둘 다 DB 를 고친다.</b> 하나는 유일 제약, 하나는 만료 계산 함수. 마이그레이션을 한 번에 dev DB → live 로 옮긴다. 따로 하면 두 번 옮긴다.</li>
+    <li><b>둘 다 첫 라이브 결제 전에 끝나야 한다.</b> 결제가 시작된 뒤에 만료 규칙을 켜면 "어제까진 있었는데" 가 되고, 이중 적립은 터진 뒤에 고치면 이미 나간 Take 를 회수해야 한다.</li>
+    <li><b>둘 다 화면이 없다.</b> 검수 표면이 약속 문장뿐이라 한 번에 삼진하는 게 낫다.</li>
+    <li>합쳐서 1.5일 예상. 마이그레이션 2개(제약 1 + 함수 1), Cron 1개, 약속 12문장.</li>
+  </ul>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">4</span><h2>결정이 필요한 것</h2></div>
+  <div class="tbl"><table>
+    <thead><tr><th>질문</th><th>안 정하면</th><th>선택지</th><th>추천</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>만료 직전 알림</b></td>
+        <td>만료 잡을 짤 때 알림 자리를 비워둘지 넣을지 모른다</td>
+        <td>안 알림(9월 7일 결정) / 30·7·1일 전 이메일(v4 시트)</td>
+        <td>안 알림. 잔액 호버에 "이달 말 사라짐 N" 이 이미 보인다. 이메일은 라이브 뒤 후보</td>
+      </tr>
+      <tr>
+        <td><b>만료 잡 주기</b></td>
+        <td>한 시간마다 vs 하루 한 번</td>
+        <td>1시간 / 하루 1회(새벽)</td>
+        <td>1시간. 하루 1회면 만료 시각과 실제 사라지는 시각이 최대 24시간 어긋나 "아직 있는데요" 문의가 그만큼 길어진다. Cron 비용은 같다</td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">5</span><h2>알고만 있으면 되는 것</h2></div>
+  <div class="tbl"><table>
+    <thead><tr><th>사실</th><th>뜻</th></tr></thead>
+    <tbody>
+      <tr><td>지금 dev 장부에 중복 적립 0건, 만료 지난 lot 0건</td><td>제약을 거는 마이그레이션이 기존 데이터에 걸려 실패할 일이 없다. live 도 같은지 마이그레이션 전에 확인한다</td></tr>
+      <tr><td>영상 생성의 잡아두기(hold)는 한 영상에 여러 줄이 정상</td><td>유일 제약은 적립·회수에만 건다. hold 까지 걸면 lot 을 쪼개 잡는 기존 방식이 깨진다</td></tr>
+      <tr><td>충전 Take 12개월 만료도 같은 잡이 처리한다</td><td>플랜분과 코드가 같다. 다만 유상 충전분 소멸은 법률 확인 미완(v4 6_소멸시효 ⚠) — 코드는 만들되 켜고 끄는 것은 정책 파라미터</td></tr>
+      <tr><td>Cron 은 <code>CRON_SECRET</code> 인프라를 재사용한다</td><td>새 시크릿·새 설정 없음. 일일 대사(다음 슬라이스)도 같은 자리에 붙는다</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<footer>
+  <p><b>근거로 쓴 것</b> — 코드 실측 2026-09-08 09:00 KST (`src/lib/billing/paddle-webhook.ts:245-258`, `src/lib/billing/take-ledger.ts:16-24`). dev 장부 3행(어제 오너 스모크 결제: Mini 팩·S-1 구독·Standard 팩). 원가 $0.31/Take 는 v4 시트 2_Take경제. 약속 문장은 `.claude/docs/2026-09-07/paddle-promises.md` §P14 §P13.</p>
+  <p><b>이 문서가 하지 않는 것</b> — 아직 아무것도 구현하지 않았다. 마이그레이션 파일도 없다. 만료 잡이 도는 주기와 알림 여부는 4절 답을 받고 정한다. 일일 대사(P12)·스모크 자동화(P10)·플랜 변경(P15)은 다음 슬라이스라 여기 없다.</p>
+</footer>
+
+</div>
+</body>
+</html>
