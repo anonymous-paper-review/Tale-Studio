@@ -25,7 +25,7 @@ python3 .claude/skills/artist-style-anchor/bin/style_stats.py <img1> [img2 ...]
 
 ## 단계 2 — facet 분석 → Style Card (분석자 = Claude 또는 VLM)
 
-> **스캐폴드 버전**: 이 본문 = **v3 (확정, 2026-09-07 — 오너 승격, refer5 A/B 4.9 ≥ v2 4.5)** = `scaffolds/v3.md`. 이전 확정판 **v2** = `scaffolds/v2.md`(보관, 2026-09-03~07 본문). 개발판 **v4** = `scaffolds/v4.md`(FIELDS 기계 판독·게이트 조건식·캡슐 필수 토큰, A/B 4.6 — 캡슐 액센트 hex 누락 → v5 후보). 이력·검증 방법 `scaffolds/CHANGELOG.md`. 폐기판 v1 = `scaffolds/v1-weak.md`. 그림 1:1 조립도(facet 템플릿)는 `scaffolds/facet-template-v1*.jsonc`, 캐릭터 템플릿은 `scaffolds/facet-character-v0.jsonc`.
+> **스캐폴드 버전**: 이 본문 = **v3 (확정, 2026-09-07 — 오너 승격, refer5 A/B 4.9 ≥ v2 4.5)** = `scaffolds/v3.md`. 이전 확정판 **v2** = `scaffolds/v2.md`(보관, 2026-09-03~07 본문). 개발판 **v4** = `scaffolds/v4.md`(FIELDS 기계 판독·게이트 조건식·캡슐 필수 토큰, A/B 4.6 — 캡슐 액센트 hex 누락 → v5 후보). 이력·검증 방법 `scaffolds/CHANGELOG.md`. 폐기판 v1 = `scaffolds/v1-weak.md`. 그림 1:1 조립도(facet 템플릿)는 `scaffolds/facet-template-v1*.jsonc`(정본 v1.2 — 가이드 `facet-template-v1.2.guide.md`의 추측 허용 규약 §4 12~18항과 채움 검사 `bin/check_fill.py`를 따른다), 캐릭터 템플릿은 `scaffolds/facet-character-v0.jsonc`.
 
 
 > v3는 아래 계약을 따른다. 변경 이력·근거는 `scaffolds/CHANGELOG.md`. **분석자(Claude 또는 VLM)는 번호 순서대로 항목별로 답한다.** 값 셀의 첫 토큰은 `[실측]` `[추정]` `[보정]` `[외삽]` `[해당 없음]` 중 하나 — `[실측]` = 픽셀·형태·반복 표본으로 바로 확인되는 것, `[추정]` = 의도·원인·전이 규칙처럼 해석이 필요한 것, `[보정]` = 아티팩트 제거 후 추정, `[외삽]` = 표본 없음·문법에서 유도. 한 셀에 근거가 여럿이면 `실측: … / 보정: …`로 분리한다. 값 셀은 1문장, 세부는 재질 사전·NOTES로.

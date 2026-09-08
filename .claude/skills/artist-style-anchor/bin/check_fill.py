@@ -19,7 +19,7 @@ COUNT_LEAVES = [  # 개수·단계·가닥·돌기·부호·조각 — §4 14항
 ]
 SKIP_ENUM = ('생성 규칙', '분류', '입력')  # 나열 검사 제외 가지(부정 절·분류·게이트는 목록이 본업)
 TAG_RE = re.compile(r'^\s*\[(실측|추정|보정|외삽|해당 없음)\]')
-OPEN_RE = re.compile(r'(\d+\s*(?:개|줄|색|단|가닥|묶음|조각|명)?\s*(?:이상|\+))|수십|수백|다수의|무수')
+OPEN_RE = re.compile(r'(\d+\s*(?:개|줄|색|단|가닥|묶음|조각|명)?\s*이상)|(\d+\+(?![\s\d]))|수십|수백|다수의|무수')  # '20+'는 열린 상한, '2 + 1'(합산식)은 아님
 RANGE_RE = re.compile(r'(?<![#\w])(\d+)\s*~\s*(\d+)(?!\s*px|\s*%|\s*:|\s*배|\s*등신|\s*단계 어둡)')
 MANY_RE = re.compile(r'많음|높음|다수|풍부|조밀')
 GENRE_RE = re.compile(r'보통|일반적으로|전형적|흔히|typical|usually')
@@ -96,8 +96,21 @@ def main():
     # (j) 정교화
     el = get(data, ('생성 규칙', '부정 절', '정교화')) or ''
     if grade is not None and grade <= 2 and (not el or '해당 없음' in el): V('생성 규칙.부정 절.정교화', f'등급 {grade}인데 정교화 부정 절 비어 있음(§4 18항, §6 18)', el)
-    if grade is not None and grade >= 4 and el and '해당 없음' not in el: W('생성 규칙.부정 절.정교화', f'등급 {grade}에서는 [해당 없음]이 기본', el)
     core = get(data, ('분류', 'Core')) or ''
+    # v1.2.1: 정교화 목록이 스타일의 핵심 부호를 지우지 않는지(refer1 'extra sparkles'가 별을 지움) — 영문 정교화 토큰 ↔ 부호 목록·Core의 부호 어휘 대조
+    vocab = (get(data, ('장식', '어휘', '부호 목록')) or '') + ' ' + core
+    PAIRS = {'sparkle': r'별|스파클|반짝', 'star': r'별', 'confetti': r'컨페티|색종이', 'particle': r'입자|파티클', 'bokeh': r'보케', 'halo': r'광륜|후광', 'stroke': r'스트로크|붓', 'gradient': r'그라디언트|그라데이션', 'strand': r'가닥', 'glow': r'글로우|발광', 'ray': r'광선', 'trim': r'트림', 'seam': r'봉제|솔기'}
+    if el and '해당 없음' not in el:
+        for en, ko in PAIRS.items():
+            if re.search(en, el, re.I) and re.search(f'({ko})(?![^,·;]{{0,8}}(없|이하|0개|금지))', vocab): W('생성 규칙.부정 절.정교화', f"'{en}'이 Core·부호 목록의 부호({ko.split('|')[0]})를 금지할 수 있음 — 종류 금지 대신 '장식.개수'로 막는다(§4 18항 v1.2.1)", el)
+    if grade is None or grade >= 3:
+        if not el or '해당 없음' in el: W('생성 규칙.부정 절.정교화', '등급 3~5도 원작이 쓰지 않는 정교화 종류를 적는다(v1.2.1 — 사이클 4 refer2 프로브의 보케 밭·반복 타일·젖은 반사)', el)
+    # v1.2.1: 판독 한계에 '판독 불가'로 선언한 구조가 본문에 [실측] 개수로 나오면 모순(refer2: 홍채 셋째 단계 판독 불가 vs 홍채 톤 3)
+    lim = get(data, ('입력', '판독 한계', '최소 판독 크기')) or ''
+    if re.search(r'홍채[^,·;]*(단계|톤)[^,·;]*판독 불가|판독 불가[^,·;]*홍채', lim):
+        eye = get(data, ('인물', '눈', '디테일')) or ''
+        m3 = re.search(r'홍채 톤\s*([3-9])', eye)
+        if m3 and eye.startswith('[실측]'): W('인물.눈.디테일', f"판독 한계가 홍채 단계 판독 불가인데 홍채 톤 {m3.group(1)}을 [실측]으로 적음 — 내부 모순(§4 16항)", eye)
     if grade is not None and grade <= 2 and not re.search(r'단순|적음|없음|최소|매끈|sparse|few', core): W('분류.Core', f'등급 {grade}인데 Core 첫 항목에 단순함이 없음(§4 18항)', core)
 
     lines = [f'# 채움 검사 — {a.file.name}', '', f'- 묘사 밀도 등급: {grade if grade is not None else "?"} · 위반 {len(viol)} · 경고 {len(warn)}', '', f'## 위반 ({len(viol)}) — 고쳐야 한다']
