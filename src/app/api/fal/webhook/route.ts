@@ -134,7 +134,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, deduped: true })
     }
     if (e instanceof DirectorVideoCompletionPersistenceError) {
-      console.error('[fal/webhook] video persistence failed; retaining queued attempt:', msg)
+      // 영상·이미지 공통(#image-persist-retryable 2026-09-08) — 일시적 저장 실패는 queued 로 두어
+      //   다음 webhook·폴링이 다시 시도하게 한다. 결과는 fal 큐에 남아 있으므로 재시도가 공짜다.
+      console.error('[fal/webhook] media persistence failed; retaining queued attempt:', msg)
       throw e
     }
     console.error('[fal/webhook] finalize failed:', msg)

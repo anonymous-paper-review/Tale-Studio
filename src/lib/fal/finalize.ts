@@ -106,6 +106,14 @@ export class DirectorVideoTerminalError extends Error {
   }
 }
 
+/** fal 이미지 내려받기 실패 — 영상(providerVideoFetchFailure)과 같은 규칙(#image-persist-retryable). */
+function providerImageFetchFailure(status: number): Error {
+  if (status === 408 || status === 425 || status === 429 || status >= 500) {
+    return new DirectorVideoCompletionPersistenceError('provider_fetch_retryable', new Error(`fal image fetch failed: ${status}`))
+  }
+  return new DirectorVideoTerminalError('provider_fetch_terminal', `fal image fetch failed: ${status}`)
+}
+
 function providerVideoFetchFailure(status: number): Error {
   if (status === 408 || status === 425 || status === 429 || status >= 500) {
     return new DirectorVideoCompletionPersistenceError('provider_fetch_retryable', new Error(`provider video fetch failed: ${status}`))
@@ -396,6 +404,30 @@ function databaseTerminalPersistenceError(error: unknown): DirectorVideoTerminal
   }
   return null
 }
+/**
+ * 저장 실패를 "다시 하면 되는 것" 과 "다시 해도 안 되는 것" 으로 가른다(#image-persist-retryable 2026-09-08).
+ *
+ * 영상은 이 구분을 이미 하고 있었다(storage_retryable / database_retryable). 이미지는 맨몸 Error 라
+ *   즉시 failed 로 굳었고, 이후 구제 경로가 전부 status==='queued' 조건이라 회수가 닿지 않았다 —
+ *   fal 큐에 결과가 멀쩡히 있는데도 재생성(재과금) 외 방법이 없었다.
+ *
+ * 모르는 오류는 재시도 쪽으로 둔다. 재시도는 공짜이고(fal 은 이미 끝났다, 우리 스토리지에 넣는 것만
+ *   다시 한다) 영구로 굳히면 되살릴 방법이 없기 때문이다 — 실패할 거면 값싼 쪽으로 실패한다.
+ */
+export function classifyMediaPersistenceFailure(
+  error: unknown,
+  layer: 'storage' | 'database',
+): DirectorVideoCompletionPersistenceError | DirectorVideoTerminalError {
+  const terminal = layer === 'storage'
+    ? storageTerminalPersistenceError(error)
+    : databaseTerminalPersistenceError(error)
+  if (terminal) return terminal
+  return new DirectorVideoCompletionPersistenceError(
+    layer === 'storage' ? 'storage_retryable' : 'database_retryable',
+    error,
+  )
+}
+
 function storageTerminalPersistenceError(error: unknown): DirectorVideoTerminalError | null {
   const code = errorCode(error)?.toLowerCase()
   const statusValue = typeof error === 'object' && error !== null
@@ -584,12 +616,13 @@ export async function finalizeCharacterViewJob(
   await recordFalResponseSnapshot(job, falPayload)
 
   const imgRes = await fetch(falImageUrl)
-  if (!imgRes.ok) throw new Error(`fal image fetch failed: ${imgRes.status}`)
+  // 내려받기 실패도 일시·영구를 가른다 — 5xx·429 는 다시 하면 되고, 404 는 결과가 사라진 것이다.
+  if (!imgRes.ok) throw providerImageFetchFailure(imgRes.status)
   const buf = Buffer.from(await imgRes.arrayBuffer())
 
   const path = `${workspaceId}/${job.project_id}/characters/${storageKeySegment(characterId)}/${storageKeySegment(appearanceKey)}_${view}.png`
   const { error: upErr } = await mediaUpload(path, buf, { contentType: 'image/png', upsert: true })
-  if (upErr) throw upErr
+  if (upErr) throw classifyMediaPersistenceFailure(upErr, 'storage')
   await uploadThumbnail(path, buf)
   const publicUrl = versionedUrl(
     mediaPublicUrl(path),
@@ -652,7 +685,7 @@ async function savePortraitFromMain(
     if (cropped) {
       const path = `${job.target.workspaceId}/${job.project_id}/characters/${storageKeySegment(characterId)}/${storageKeySegment(appearanceKey)}_portrait.png`
       const { error: upErr } = await mediaUpload(path, cropped, { contentType: 'image/png', upsert: true })
-      if (upErr) throw upErr
+      if (upErr) throw classifyMediaPersistenceFailure(upErr, 'storage')
       await uploadThumbnail(path, cropped)
       portraitUrl = versionedUrl(
         mediaPublicUrl(path),
@@ -757,7 +790,8 @@ export async function uploadImageFromUrl(
   opts?: { minBytes?: number },
 ): Promise<string> {
   const imgRes = await fetch(remoteUrl)
-  if (!imgRes.ok) throw new Error(`fal image fetch failed: ${imgRes.status}`)
+  // 내려받기 실패도 일시·영구를 가른다 — 5xx·429 는 다시 하면 되고, 404 는 결과가 사라진 것이다.
+  if (!imgRes.ok) throw providerImageFetchFailure(imgRes.status)
   const buf = Buffer.from(await imgRes.arrayBuffer())
   // 검은/빈 이미지 방어 — klein 등은 입력 모더레이션에 걸리면 에러가 아니라 검은 이미지(수 KB)를 반환한다.
   //   completed 로 저장하면 재생성해도 같은 검정(seed 무관) → throw 로 failed 처리해, 호출부(webhook)가
@@ -768,7 +802,7 @@ export async function uploadImageFromUrl(
     )
   }
   const { error: upErr } = await mediaUpload(path, buf, { contentType: 'image/png', upsert: true })
-  if (upErr) throw upErr
+  if (upErr) throw classifyMediaPersistenceFailure(upErr, 'storage')
   await uploadThumbnail(path, buf)
   return versionedUrl(mediaPublicUrl(path))
 }
@@ -1282,7 +1316,7 @@ export async function finalizeShotPrevizVideoJob(
   const bytes = Buffer.from(await res.arrayBuffer())
   const path = `${workspaceId}/${job.project_id}/shots/${storageKeySegment(writerShotId)}_previz.mp4`
   const { error: upErr } = await mediaUpload(path, bytes, { contentType: 'video/mp4', upsert: true })
-  if (upErr) throw upErr
+  if (upErr) throw classifyMediaPersistenceFailure(upErr, 'storage')
   const publicUrl = versionedUrl(
     mediaPublicUrl(path),
   )

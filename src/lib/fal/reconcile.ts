@@ -72,7 +72,8 @@ async function completeOrTerminalizeJob(
       return (await getGenerationJobById(job.id)) ?? { ...job, status: 'completed' }
     }
     if (error instanceof DirectorVideoCompletionPersistenceError) {
-      console.error('[fal/reconcile] video persistence failed; retaining queued attempt:', error.message)
+      // 영상·이미지 공통(#image-persist-retryable 2026-09-08).
+      console.error('[fal/reconcile] media persistence failed; retaining queued attempt:', error.message)
       throw error
     }
     const message = `[finalize] ${describeFinalizeError(error)}`
