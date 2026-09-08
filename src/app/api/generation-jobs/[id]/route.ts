@@ -44,7 +44,21 @@ export async function GET(
     )
   }
 
-  if (job.status === 'queued') job = await reconcileJobFromFal(job)
+  // 확인 중 터진 예외를 화면으로 흘리지 않는다(#poll-keeps-queued 2026-09-08).
+  //   finalize 는 일시적 저장 실패에 DirectorVideoCompletionPersistenceError 를 던진다 —
+  //   "queued 로 두고 나중에 다시 하자" 는 신호다(reconcile.ts 주석: retaining queued attempt).
+  //   그걸 안 받고 보내면 프레임워크가 500 을 만들고, 화면은 res.ok 가 아니면 status:'failed' 로
+  //   굳히고 폴링을 끝낸다(generation-jobs-client.ts) — 서버 의도("기다려")와 정반대 결과다.
+  //   나중에 webhook 이 정상 처리해도 그 화면은 갱신되지 않는다.
+  //   알 수 없는 오류도 같이 삼킨다 — 확인 한 번 실패했다고 진행 중인 생성을 죽일 이유가 없고,
+  //   다음 폴링·webhook·유령 청소부가 다시 묻는다. DB 상태(queued)를 그대로 돌려준다.
+  if (job.status === 'queued') {
+    try {
+      job = await reconcileJobFromFal(job)
+    } catch (err) {
+      console.error('[generation-jobs] reconcile failed; keeping queued:', id, err instanceof Error ? err.message : err)
+    }
+  }
 
   return NextResponse.json({
     ok: true,
