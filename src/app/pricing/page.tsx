@@ -2,7 +2,7 @@
 
 // Pricing (#payments-phase-3 P4, 2026-09-07) — v4 가격표를 실물로 게시한다. 숫자는 src/lib/billing/catalog.ts
 //   (v4 시트 사본)만 읽는다. 결제 버튼은 Paddle 가격 ID 가 있을 때만 살아난다(P7 CheckoutButton — 서버 판정 뒤 Paddle 결제창).
-//   없으면 "Coming soon". 베타 무료 안내는 상단 배너로 남긴다 — 라이브 전환(심사) 때 배너만 떼면 된다.
+//   없으면 "Coming soon". 베타 무료 배너는 2026-09-08 라이브 상품 등록과 함께 뗐다(오너 지시).
 //   2026-09-08 오너: 한국어도 보이게 — 문구는 전부 t() 를 타고(사전 messages-ko.ts), 헤더에 언어 토글. metadata 는 layout.tsx.
 
 import { Check, Clapperboard, Download, Layers, Users, X } from 'lucide-react'
@@ -160,12 +160,6 @@ export default function PricingPage() {
           <p className="text-base font-light text-gray-400">
             {t('Pay for the minutes you plan and the Takes you spend. Images are always free.')}
           </p>
-        </div>
-
-        <div className="mb-16 rounded-2xl border border-primary/30 bg-primary/10 px-5 py-4 text-center text-sm text-gray-200">
-          <span className="font-semibold text-primary">{t('Beta')}</span>
-          {' · '}
-          {t('Everything is free until launch. The plans below go live when the beta ends. Beta participants hear first.')}
         </div>
 
         <section className="mb-20">

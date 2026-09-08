@@ -80,6 +80,9 @@ scripts/*
 # src/lib/billing/smoke-checks.ts 가 소유한다. 빠지면 배포마다 도는 검사가 클린 클론에서 사라진다.
 !scripts/smoke-billing.mjs
 !scripts/smoke-billing-paid.mjs
+# Paddle 상품 등록(#payments-phase-3) — catalog.ts 를 읽어 샌드박스/라이브에 상품을 만든다.
+# 멱등이고 --live 를 명시할 때만 라이브를 건드린다. 하드코딩 비밀 없음(키는 env).
+!scripts/paddle-register-catalog.mts
 # DB 타입 재생성(#db-types-drift) — pnpm db:types 가 부르고 tests/ops/db-types-drift.test.ts 가
 # 이 명령의 존재를 검사한다. 빠지면 클린 클론에서 pnpm test 가 깨진다.
 !scripts/db-types.mjs

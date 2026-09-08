@@ -1534,8 +1534,6 @@ export const KO: Record<string, string> = {
   Pricing: '요금제',
   'Pay for the minutes you plan and the Takes you spend. Images are always free.': '기획한 분량과 쓴 Take만큼만 냅니다. 이미지는 언제나 무료예요.',
   Beta: '베타',
-  'Everything is free until launch. The plans below go live when the beta ends. Beta participants hear first.':
-    '정식 출시 전까지 전부 무료예요. 아래 요금제는 베타가 끝나면 열리고, 베타 참여자에게 먼저 알려드려요.',
   'Four things a plan gives you': '요금제가 주는 네 가지',
   'Every plan is measured on the same four axes. Higher plans do not unlock features. They give you more room.':
     '모든 요금제는 같은 네 축으로 재요. 상위 요금제가 기능을 더 여는 게 아니라, 쓸 수 있는 양이 커져요.',
