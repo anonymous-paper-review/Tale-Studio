@@ -51,6 +51,30 @@ def analyze(path: str) -> None:
     flat = sum(1 for b in blocks if b < 3) / len(blocks) * 100
     print(f"- 플랫 {BLOCK}px 블록 {flat:.0f}% (플랫 채움 비율 프록시 — 그라디언트/텍스처 많으면 낮음)")
 
+    # v1.2 (2026-09-08) 추측 허용 규약 접지: 전역 밀도 프록시 + 판독 한계 참고. 전역 밀도는 '구도가 빽빽한가'이지 개체 하나의 묘사량(디테일.묘사 밀도)이 아니다.
+    try:
+        import numpy as np
+        from scipy import ndimage
+        w2 = 512; h2 = max(1, round(im.height * w2 / im.width))
+        gray = np.asarray(im.resize((w2, h2), Image.LANCZOS).convert("L"), dtype=float)
+        mag = np.hypot(ndimage.sobel(gray, axis=1), ndimage.sobel(gray, axis=0)) > 200
+        lab, n = ndimage.label(mag, structure=np.ones((3, 3)))
+        sizes = ndimage.sum(mag, lab, range(1, n + 1)) if n else []
+        comps = int((np.asarray(sizes) >= 12).sum()) if n else 0
+        q16 = np.asarray(im.resize((w2, h2), Image.LANCZOS).quantize(colors=16, method=Image.MEDIANCUT))
+        regs = 0
+        for c in range(16):
+            m = q16 == c
+            if not m.any(): continue
+            l2, n2 = ndimage.label(m); s2 = ndimage.sum(m, l2, range(1, n2 + 1)); regs += int((np.asarray(s2) >= 16).sum())
+        print(f"- 전역 밀도 프록시(512px 폭): 엣지 성분 {comps}개 = {comps / (w2 * h2 / 1000):.2f}개/1000px² · 16색 영역 {regs}개 "
+              f"(참고: refer1 0.31·420 / refer5 0.31·417 / refer6 0.43·533 / refer4 0.51·536 / refer2 0.68·1864 — 구도의 빽빽함이지 묘사 밀도가 아니다; 묘사 밀도는 표본 개체 1개에서 센다)")
+    except Exception as e:  # numpy/scipy 없으면 생략
+        print(f"- 전역 밀도 프록시: 계산 생략 ({type(e).__name__})")
+    W0, H0 = im.size
+    print(f"- 판독 한계 참고: 원본 {W0}×{H0} — 화면 높이의 25% = {H0 * 0.25:.0f}px · 10% = {H0 * 0.1:.0f}px · 3px 선 = 폭의 {3 / W0 * 100:.2f}% "
+          f"(얼굴 높이 = 화면 높이 비율 × {H0}; 눈 폭이 약 20px 아래면 홍채 단계·속눈썹 가닥은 판독 불가로 적는다)")
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
