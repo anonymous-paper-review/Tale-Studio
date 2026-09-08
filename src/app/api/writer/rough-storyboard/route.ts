@@ -41,6 +41,7 @@ import { mediaPublicUrl } from '@/lib/storage/media-url'
 import { storageKeySegment } from '@/lib/storage/key-segment'
 import { parseCheckConstraints } from '@/lib/writer/check-notes'
 import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
+import { ensureEntityNamesEn, ensureStageLandmarkLabelsEn, sceneLocationLabelsEn } from '@/lib/writer/i18n/entity-names'
 import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events'
 
 
@@ -477,14 +478,13 @@ export async function POST(req: Request) {
           targetScenes.map((sc) => ({ id: sc.scene_id as string, native: (sc.time_of_day as string) ?? '' })),
           'scene time of day',
         ),
-        deriveEnBatch(
-          targetScenes.map((sc) => ({ id: sc.scene_id as string, native: (sc.location as string) ?? '' })),
-          'location place label',
+        // #name-en(2026-09-08, 오너 지시): 장소·인물 이름은 한 번 정해 저장한 영어 표기를 쓴다 — 요청마다 다시 번역하면
+        //   표기가 흔들린다(실측 겨울_8: "Fairy Clan Chief" ↔ "Yojeong Sujang").
+        sceneLocationLabelsEn(
+          projectId,
+          targetScenes.map((sc) => ({ scene_id: sc.scene_id as string, location: sc.location as string | null })),
         ),
-        deriveEnBatch(
-          targetChars.map((c) => ({ id: c.character_id as string, native: (c.name as string) ?? '' })),
-          'character name (transliterate to Latin)',
-        ),
+        ensureEntityNamesEn(projectId, { characterIds: targetChars.map((c) => c.character_id as string) }).then((r) => r.characters),
         // 비-rich 엔진(writer-v2) 샷별 previz 연출 → EN (#v2-cell-dedup). rich 채택 샷은 제외.
         deriveEnBatch(
           targets.flatMap((s) => {
@@ -504,11 +504,10 @@ export async function POST(req: Request) {
         ),
         // 무대 표지 라벨 → EN (정지 프롬프트 위생 2026-09-06): 무대 LLM 이 콘텐츠 언어로 라벨을 적으므로
         //   영어 셀의 배경 문장에 한국어가 섞이지 않게 번역. 키 = `${scene_id}|${landmark.id}`.
-        deriveEnBatch(
-          targetScenes.flatMap((sc) =>
-            stageLandmarksOf(sc.stage).map((l) => ({ id: `${sc.scene_id as string}|${l.id}`, native: l.label })),
-          ),
-          'stage landmark label (short English noun phrase)',
+        //   #name-en: 표지 라벨도 첫 파생 뒤 scenes.stage.landmarks[].label_en 에 저장해 다시 쓴다.
+        ensureStageLandmarkLabelsEn(
+          projectId,
+          targetScenes.map((sc) => ({ scene_id: sc.scene_id as string, stage: sc.stage })),
         ),
       ])
     // 프롬프트용 EN 이름 맵 — DB 조회 키(scene.location / characters id)는 원문 유지, 라벨만 EN.

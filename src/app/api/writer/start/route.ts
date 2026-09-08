@@ -22,6 +22,7 @@ import type {
 import { isAdminOwnedProject } from '@/lib/admin';
 import { isWriterEngine, type WriterEngine } from '@/lib/writer/engine';
 import { appearanceI18nFields, applyProducerI18n } from '@/lib/writer/i18n/derive-en';
+import { ensureEntityNamesEn } from '@/lib/writer/i18n/entity-names';
 import { resolveOutputLocale } from '@/lib/locale';
 import { parseDialogueLanguage } from '@/lib/writer/pipeline/util/output-language';
 import { assessContentSafetyRisk } from '@/lib/writer/content-safety-hint';
@@ -335,6 +336,11 @@ export async function POST(req: NextRequest) {
         console.error('[writer/start] location i18n derive failed (proceeding):', e);
       });
     }
+    // #name-en(2026-09-08, 오너 지시): 인물·배경 이름의 영어 표기를 핸드오프 때 한 번 정해 둔다 — 러프·프롬프트가 저장값을 쓴다.
+    //   best-effort(실패해도 러프 라우트가 처음 필요할 때 한 번 정한다).
+    await ensureEntityNamesEn(projectId).catch((e) => {
+      console.error('[writer/start] name_en derive failed (proceeding):', e);
+    });
 
     // 1.6 언어 경계(S4→S5): projects.locale 확정 + 파이프라인 출력 언어로 전달 (#i18n-s5).
     //   신규 프로젝트는 생성 시 사용자 설정으로 잠겨 온다(project/new). 잠긴 값이 곧 출력 언어.

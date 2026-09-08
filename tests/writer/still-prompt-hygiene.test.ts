@@ -78,7 +78,8 @@ describe('러프 셀이 위생 규칙을 쓴다', () => {
     expect(route).toMatch(/\.select\('scene_id, location, time_of_day, mood, stage'\)/)
     expect(route).toMatch(/stageLandmarks: scene\n\s+\? stageLandmarksOf\(scene\.stage\)\.map\(/)
     // 표지 라벨은 콘텐츠 언어로 적히므로 영어 셀에 넣기 전에 EN 으로 번역한다(실측: 겨울_6 씬 1 러프에 한국어 라벨이 섞임).
-    expect(route).toMatch(/'stage landmark label \(short English noun phrase\)'/)
+    //   #name-en(2026-09-08): 번역은 한 번 정해 scenes.stage 에 저장하는 ensureStageLandmarkLabelsEn 이 맡는다.
+    expect(route).toMatch(/ensureStageLandmarkLabelsEn\(/)
     expect(route).toMatch(/landmarkEnByKey\.get\(`\$\{scene\.scene_id as string\}\|\$\{l\.id\}`\) \?\? l\.label/)
     expect(route).toMatch(/frameAspect: aspectRatioOf\(projectFormat\)/)
   })

@@ -259,3 +259,24 @@ paths:
   "now sitting" 꼬리를 단다. 추정은 INFO `END 추정(러프 전용, …)` 로만 남는다.
 - **경계(오너 결정)**: 추정은 previz 전용이다. 무대 비트·상태 장부·다음 샷 START 는 바뀌지 않고, 실사 스트립·그리드 라우트는 배치도(`rough-blockouts`)·`end_derived` 를
   읽지 않는다(소스 스캔 테스트). 실사의 참조는 종전대로 러프 스트립 → 캐릭터 시트 → 배경 wide_shot → 스타일 앵커.
+
+## 이름 영어 표기는 한 번 정해 저장 (2026-09-08, 오너 지시 — `tests/writer/entity-names-en.test.ts`)
+
+- **원인**: 러프 라우트가 요청마다 `deriveEnBatch` 로 인물·장소·무대 표지 이름을 새로 번역해 표기가 흔들렸다(겨울_8: "Fairy Clan Chief" ↔ "Yojeong Sujang").
+- **저장**: `characters.name_en` · `locations.name_en`(+ `name_en_source` = 정할 때의 원문 name, 마이그레이션 20260908160000) · 무대 표지는 `scenes.stage.landmarks[].label_en`(+ `label_en_source`).
+  원문이 바뀌면(source ≠ name) 다시 정한다. 파생 실패는 원문 폴백이고 저장하지 않는다(다음에 다시 시도).
+- **읽는 곳**: `lib/writer/i18n/entity-names.ts` — `ensureEntityNamesEn`(인물·배경, 없는 것만 정해 저장) · `sceneLocationLabelsEn`(scenes.location 이 배경 id 면 저장값, 자유 라벨이면 종전 번역) ·
+  `ensureStageLandmarkLabelsEn`. 러프 라우트가 이 셋을 쓰고, 작가 시작(`writer/start`)이 핸드오프 때 미리 정해 둔다(best-effort).
+- **경계**: 설명·외형(`appearance`·`visual_description`)의 EN base 는 종전 `derive-en.ts` 그대로. 실사 참조 라벨(캐릭터 시트 = 한국어 이름)은 손대지 않았다.
+
+## 채팅 언어 v2 — 웹페이지 언어 상속 + 채팅으로 전환 (2026-09-08, 오너 결정 — `tests/chat/chat-locale-follow.test.ts`, `tests/chat/produce-chat-locale-follow.test.ts`)
+
+오너: "웹페이지 언어 상속받아서 표시하되 채팅에서 다른 언어로 여러 번 말하거나 요청하면 프로젝트 언어 변경 가능하게." 종전(2026-08-31) 규칙(한국어 쪽으로만·작가가 돌기 전에만·Producer 채팅만)은 폐기.
+
+- **상속**: 잠기지 않은 프로젝트(`locale_locked=false`)의 채팅 언어는 웹페이지(UI) 언어다. 서버는 `resolveChatLocale`(`chat-format.ts`)이 클라가 보낸 `uiLocale`(없으면 `user_metadata.locale`)과 다르면 `projects.locale` 을 잠그지 않은 채 따라가고(`reason:'inherit'`),
+  화면은 `pickContentLocale`(`i18n/content.ts`)이 잠기지 않은 프로젝트에서 UI 언어를 고른다(project-store `projectLocaleLocked`).
+- **전환**: 사용자가 다른 언어로 `LOCALE_FOLLOW_STREAK`(3)번 연속 말하거나 바꿔 달라고 하면(`chat-locale.ts` — `detectMessageLocale`·`explicitLocaleRequest`·`decideLocaleFollow`) 그 언어로 바꾸고 잠근다.
+  작가가 돌았어도 바꾼다. 글자 없는 말(숫자·이모지)은 세지도 끊지도 않는다. 대사·자막 언어 얘기("영어 대사로 해줘")는 채팅 언어 요청이 아니다.
+- **네 라우트 공용**: produce·writer·artist·director 채팅이 `resolveChatLocale({ projectId, message, history, uiLocale })` 을 쓰고 응답에 `contentLocale`·`localeSwitched` 를 싣는다.
+  클라(`global-chat-store`)는 `uiLocale` 을 보내고, `localeSwitched` 가 오면 `adoptProjectLocale(locale, true)` 뒤 "채팅 언어를 …로 바꿨어요" 한 줄을 답변 뒤에 남긴다(저장도 함).
+- **잠금의 다른 경로는 그대로**: 보드의 채팅 언어 배지(PATCH /api/project/[id]) · writer/start 스토리 감지 · 계정 설정이 있는 신규 프로젝트(project/new).

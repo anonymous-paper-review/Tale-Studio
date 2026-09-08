@@ -597,9 +597,12 @@ export type StagePosture =
 
 export interface StageLandmark {
   id: string;         // snake_case (로케이션 소품·지형 표지)
-  label: string;      // 영어 한 구절
+  label: string;      // 콘텐츠 언어 한 구절(무대 LLM 이 적는다)
   x: number;
   y: number;
+  /** 영어 표기 — 러프 라우트가 첫 파생 뒤 저장한다(#name-en 2026-09-08). label_en_source ≠ label 이면 다시 정한다. */
+  label_en?: string;
+  label_en_source?: string;
 }
 
 export interface StageCharacterState {

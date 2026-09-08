@@ -9,7 +9,8 @@ import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
-import { CHAT_OUTPUT_FORMAT_GUIDE, CHAT_UPDATES_BATCH_GUIDE, fetchProjectLocale, responseLanguageDirective } from '@/lib/chat-format'
+import { CHAT_OUTPUT_FORMAT_GUIDE, CHAT_UPDATES_BATCH_GUIDE, resolveChatLocale, responseLanguageDirective } from '@/lib/chat-format'
+import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import { parseFencedUpdates } from '@/lib/agentic-reply-guard'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { buildArtistActivityContext } from '@/lib/artist/chat-context'
@@ -203,7 +204,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { message, history, canvasContext, projectId, traceId: requestedTraceId } = await req.json()
+    const { message, history, uiLocale, canvasContext, projectId, traceId: requestedTraceId } = await req.json()
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json(
@@ -216,17 +217,24 @@ export async function POST(req: Request) {
     //   UI/writer 가 트리거한 재생성도 채팅이 다음 턴에 인지한다 (chat-aware-regeneration).
     //   소유권 미확인 projectId 는 무시 (타 프로젝트 활동 로그 누설 방지). 실패는 비치명 — 채팅은 계속.
     let activityContext = ''
-    let projectLocale: Awaited<ReturnType<typeof fetchProjectLocale>> = null
+    let projectLocale: AppLocale | null = null
+    let localeSwitched: AppLocale | null = null
     if (typeof projectId === 'string' && projectId) {
       try {
         if (await userOwnsProject(projectId, user.id)) {
-          // 활동 로그와 응답 언어(#i18n-s5-batch6-chat) 조회를 병렬로 — 추가 왕복 없음.
+          // 활동 로그와 채팅 언어 규칙 v2(#chat-locale-follow v2) 조회를 병렬로 — 추가 왕복 없음.
           const [activity, locale] = await Promise.all([
             buildArtistActivityContext(projectId),
-            fetchProjectLocale(projectId),
+            resolveChatLocale({
+              projectId,
+              message,
+              history,
+              uiLocale: parseAppLocale(uiLocale) ?? parseAppLocale(user.user_metadata?.locale),
+            }),
           ])
           activityContext = activity
-          projectLocale = locale
+          projectLocale = locale.locale
+          localeSwitched = locale.switched
         }
       } catch (err) {
         console.warn(
@@ -296,6 +304,8 @@ export async function POST(req: Request) {
     await persistChatTraceBestEffort(projectId, trace)
 
     return NextResponse.json({
+      contentLocale: projectLocale,
+      localeSwitched,
       reply,
       updates,
       proposals,

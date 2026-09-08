@@ -8,11 +8,10 @@ import { parseChatChoices } from '@/lib/chat-choices'
 import { castMentions, backgroundMentions } from '@/lib/card-mention'
 import {
   CHAT_OUTPUT_FORMAT_GUIDE,
-  fetchProjectLocaleState,
+  resolveChatLocale,
   responseLanguageDirective,
-  updateProjectLocale,
 } from '@/lib/chat-format'
-import { detectLocaleFromText, type AppLocale } from '@/lib/locale'
+import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import { translate } from '@/lib/i18n/translate'
 import { sanitizeAttachmentUrls } from '@/lib/upload/attachment'
 import { listStyleAnchorCatalog, listStyleAnchorMediums } from '@/lib/style-anchor'
@@ -52,6 +51,7 @@ export async function POST(req: Request) {
     const {
       message,
       history,
+      uiLocale,
       currentSettings,
       currentCast,
       currentBackgrounds,
@@ -72,26 +72,22 @@ export async function POST(req: Request) {
     // 응답 언어 강제(#i18n-s5-batch6-chat) — projects.locale 조회. 소유 확인 실패/미상은
     //   null 로 남고, responseLanguageDirective(null) 이 종전 동작(무주입)으로 폴백.
     let projectLocale: AppLocale | null = null
+    let localeSwitched: AppLocale | null = null
     let ownsCurrentProject = false
     if (typeof projectId === 'string' && projectId) {
       try {
         if (await userOwnsProject(projectId, user.id)) {
           ownsCurrentProject = true
-          const localeState = await fetchProjectLocaleState(projectId)
-          projectLocale = localeState?.locale ?? null
-          // 발화 언어 추종(#chat-locale-follow 2026-08-31): 사용자가 한국어로 말하는데 프로젝트가
-          //   ko 가 아니면 — 계정 기본값(en)이 사용자의 실제 언어를 이기지 못하게 그 턴부터 ko 로
-          //   확정한다. 비대칭(en 으로는 자동 전환 안 함)인 이유: en 은 detectLocaleFromText 의
-          //   디폴트 폴백이라 약한 신호고, 한글 포함은 강한 신호다. 명시 전환은 보드의 채팅 언어
-          //   배지가 담당. writer 산출물이 이미 있으면 기존 콘텐츠와 섞이므로 건드리지 않는다.
-          if (
-            localeState &&
-            !localeState.writerRan &&
-            projectLocale !== 'ko' &&
-            detectLocaleFromText(message) === 'ko'
-          ) {
-            if (await updateProjectLocale(projectId, 'ko')) projectLocale = 'ko'
-          }
+          // 채팅 언어 규칙 v2(#chat-locale-follow v2, 2026-09-08 오너 결정): 안 잠긴 프로젝트는 웹페이지(UI) 언어를
+          //   물려받고, 다른 언어로 세 번 연속 말하거나 바꿔 달라고 하면(작가가 돌았어도) 그 언어로 바꾸고 잠근다. 네 라우트 공용.
+          const resolved = await resolveChatLocale({
+            projectId,
+            message,
+            history,
+            uiLocale: parseAppLocale(uiLocale) ?? parseAppLocale(user.user_metadata?.locale),
+          })
+          projectLocale = resolved.locale
+          localeSwitched = resolved.switched
         }
       } catch (err) {
         console.warn('[produce/chat] locale lookup skipped:', err instanceof Error ? err.message : err)
@@ -286,6 +282,8 @@ export async function POST(req: Request) {
       // 클라이언트 동기화(#chat-locale-follow) — 서버가 이번 턴에 채택한 콘텐츠 언어.
       //   project-store.projectLocale 이 이 값으로 갱신돼야 코드 발화(contentLocale())도 같은 턴부터 따라온다.
       contentLocale: projectLocale,
+      // 이번 턴에 채팅이 언어를 바꿨으면 — 클라가 "채팅 언어를 …로 바꿨어요" 한 줄을 남긴다(v2).
+      localeSwitched,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'

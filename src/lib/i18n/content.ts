@@ -13,14 +13,26 @@ import { useLocaleStore } from '@/stores/locale-store'
 import { useProjectStore } from '@/stores/project-store'
 import type { AppLocale } from '@/lib/locale'
 
+/**
+ * 순수: 표시할 콘텐츠 언어(#chat-locale-follow v2, 2026-09-08 오너 결정 "웹페이지 언어 상속받아서 표시").
+ *   잠긴 프로젝트(명시·채팅·스토리 감지로 확정)는 그 언어, 안 잠긴 프로젝트는 웹페이지(UI) 언어를 물려받는다.
+ *   잠김을 아직 모르면(null) 종전대로 프로젝트 언어.
+ */
+export function pickContentLocale(input: { projectLocale: AppLocale | null; locked: boolean | null; uiLocale: AppLocale }): AppLocale {
+  if (input.projectLocale && input.locked !== false) return input.projectLocale
+  return input.uiLocale
+}
+
 /** store 액션·비훅 컨텍스트용 — 호출 시점의 콘텐츠 언어. */
 export function contentLocale(): AppLocale {
-  return useProjectStore.getState().projectLocale ?? useLocaleStore.getState().locale
+  const p = useProjectStore.getState()
+  return pickContentLocale({ projectLocale: p.projectLocale, locked: p.projectLocaleLocked, uiLocale: useLocaleStore.getState().locale })
 }
 
 /** 컴포넌트용 — 구독형. translate(useContentLocale(), …) 로 쓴다. */
 export function useContentLocale(): AppLocale {
   const project = useProjectStore((s) => s.projectLocale)
+  const locked = useProjectStore((s) => s.projectLocaleLocked)
   const ui = useLocaleStore((s) => s.locale)
-  return project ?? ui
+  return pickContentLocale({ projectLocale: project, locked, uiLocale: ui })
 }

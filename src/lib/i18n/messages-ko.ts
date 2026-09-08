@@ -1582,4 +1582,8 @@ export const KO: Record<string, string> = {
   'Spent in order.': '순서대로 빠져요.',
   'Free Takes first, then plan Takes, then pack Takes, so nothing you paid for expires before something that was free.':
     '무료 Take → 요금제 Take → 팩 Take 순서라, 돈 주고 산 것이 공짜보다 먼저 사라지는 일은 없어요.',
+  // 채팅 언어 규칙 v2 (#chat-locale-follow v2, 2026-09-08)
+  'Chat language switched to {lang}': '채팅 언어를 {lang}로 바꿨어요',
+  English: '영어',
+  Korean: '한국어',
 }

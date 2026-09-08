@@ -5,6 +5,8 @@ import type { LifecycleStatus } from '@/lib/lifecycle'
 import { EMPTY_LIFECYCLE_STATUS } from '@/lib/lifecycle'
 import { createClient } from '@/lib/supabase/client'
 import { parseAppLocale, type AppLocale } from '@/lib/locale'
+
+const parseLocked = (v: unknown): boolean | null => (typeof v === 'boolean' ? v : null)
 import {
   isDemoSession,
   getDemoSnapshot,
@@ -54,6 +56,8 @@ interface ProjectState {
   /** 콘텐츠 언어(projects.locale, 생성 시 잠금) — 채팅 발화·웰컴·게이트 라벨이 이 언어를 따른다
    *  (#i18n-content-voice 2026-08-23). null = 아직 미조회(switchProject 직후 1쿼리 사이) → UI 언어 폴백. */
   projectLocale: AppLocale | null
+  /** 잠김(projects.locale_locked) — false 면 웹페이지(UI) 언어를 물려받아 표시한다(#chat-locale-follow v2). null = 미조회. */
+  projectLocaleLocked: boolean | null
   initLoading: boolean
 
   // ── writer 산출물 게이트 (씬/샷 존재 여부 = "writer 완료"의 진실) ──
@@ -83,8 +87,8 @@ interface ProjectState {
   ) => Promise<ProjectCreationResult>
   switchProject: (id: string, title: string, stage?: StageId) => void
   renameProject: (title: string) => Promise<void>
-  /** 서버가 채택한 콘텐츠 언어를 반영(#chat-locale-follow) — 저장 없이 상태만 동기화. */
-  adoptProjectLocale: (locale: AppLocale) => void
+  /** 서버가 채택한 콘텐츠 언어를 반영(#chat-locale-follow) — 저장 없이 상태만 동기화. locked = 채팅이 확정(잠금)했을 때. */
+  adoptProjectLocale: (locale: AppLocale, locked?: boolean) => void
   /** 명시 전환(보드 배지) — PATCH /api/project/[id] 로 저장 + 잠금. 실패 시 이전 값 복원. */
   setContentLocale: (locale: AppLocale) => Promise<boolean>
   /** 진입 시 writer 산출물(씬) 검증 → 없으면 producer 로 게이트백 + writerNeedsRerun 표시 */
@@ -170,6 +174,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   projectId: null,
   projectTitle: 'Untitled',
   projectLocale: null,
+  projectLocaleLocked: null,
   initLoading: false,
   // 기본 true — 게이트 검증(verifyWriterGate) 전에는 잠그지 않는다(플래시 방지).
   writerComplete: true,
@@ -250,7 +255,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         }
       }
       const p = snap?.project as
-        | { title?: string; current_stage?: StageId; locale?: unknown }
+        | { title?: string; current_stage?: StageId; locale?: unknown; locale_locked?: unknown }
         | null
         | undefined
       if (snap && p) {
@@ -259,6 +264,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           projectId: snap.projectId,
           projectTitle: p.title ?? 'Untitled',
           projectLocale: parseAppLocale(p.locale),
+          projectLocaleLocked: parseLocked(p.locale_locked),
           initLoading: false,
           currentStage: p.current_stage ?? 'producer',
           reachedStage: p.current_stage ?? 'producer',
@@ -286,6 +292,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         projectId,
         projectTitle: project.title ?? 'Untitled',
         projectLocale: parseAppLocale(project.locale),
+        projectLocaleLocked: parseLocked(project.locale_locked),
         initLoading: false,
         currentStage: project.current_stage ?? 'producer',
         // DB current_stage = 지금까지 진행한 최고 단계 → 새로고침/복원 시 그만큼 열어둔다
@@ -340,6 +347,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         projectId,
         projectTitle: trimmed,
         projectLocale: parseAppLocale(project?.locale),
+        projectLocaleLocked: parseLocked(project?.locale_locked),
         initLoading: false,
         currentStage: 'producer',
         reachedStage: 'producer',
@@ -374,6 +382,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       projectId: id,
       projectTitle: title,
       projectLocale: null, // 이전 프로젝트 언어 잔상 금지 — 아래 조회가 채울 때까지 UI 언어 폴백
+      projectLocaleLocked: null,
       currentStage: stage ?? 'producer',
       reachedStage: stage ?? 'producer',
       // 새 프로젝트 진입 — 게이트 플래그 초기화 (verifyWriterGate 가 곧 재계산).
@@ -389,11 +398,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       try {
         const { data } = await createClient()
           .from('projects')
-          .select('locale')
+          .select('locale, locale_locked')
           .eq('id', id)
           .maybeSingle()
         if (get().projectId === id) {
-          set({ projectLocale: parseAppLocale((data as { locale?: unknown } | null)?.locale) })
+          const row = data as { locale?: unknown; locale_locked?: unknown } | null
+          set({ projectLocale: parseAppLocale(row?.locale), projectLocaleLocked: parseLocked(row?.locale_locked) })
         }
       } catch {
         /* 폴백: UI 언어 */
@@ -418,15 +428,16 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     }
   },
 
-  adoptProjectLocale: (locale) => {
-    if (get().projectLocale === locale) return
-    set({ projectLocale: locale })
+  adoptProjectLocale: (locale, locked) => {
+    const cur = get()
+    if (cur.projectLocale === locale && (locked === undefined || cur.projectLocaleLocked === locked)) return
+    set({ projectLocale: locale, ...(locked === undefined ? {} : { projectLocaleLocked: locked }) })
   },
 
   setContentLocale: async (locale) => {
-    const { projectId, projectLocale: prev } = get()
+    const { projectId, projectLocale: prev, projectLocaleLocked: prevLocked } = get()
     if (!projectId) return false
-    set({ projectLocale: locale })
+    set({ projectLocale: locale, projectLocaleLocked: true })
     try {
       const res = await fetch(`/api/project/${projectId}`, {
         method: 'PATCH',
@@ -438,7 +449,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     } catch (err) {
       // 무음 실패 금지 — 표시만 바뀌고 서버는 예전 언어면 다음 응답에서 또 어긋난다. 되돌린다.
       console.error('[project-store] locale save failed:', err)
-      set({ projectLocale: prev })
+      set({ projectLocale: prev, projectLocaleLocked: prevLocked })
       return false
     }
   },

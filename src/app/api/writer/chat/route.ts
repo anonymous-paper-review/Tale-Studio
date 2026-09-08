@@ -9,7 +9,8 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
-import { CHAT_OUTPUT_FORMAT_GUIDE, CHAT_UPDATES_BATCH_GUIDE, fetchProjectLocale, responseLanguageDirective } from '@/lib/chat-format'
+import { CHAT_OUTPUT_FORMAT_GUIDE, CHAT_UPDATES_BATCH_GUIDE, resolveChatLocale, responseLanguageDirective } from '@/lib/chat-format'
+import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import { parseDialogueLanguage, type DialogueLanguage } from '@/lib/writer/pipeline/util/output-language'
 import { sanitizeLineRefs, validateWriterUpdates } from '@/lib/writer-chat-updates'
 import { parseFencedUpdates } from '@/lib/agentic-reply-guard'
@@ -200,6 +201,7 @@ export async function POST(req: Request) {
     const {
       message,
       history,
+      uiLocale,
       writerContext,
       lineRefs,
       projectId,
@@ -214,7 +216,8 @@ export async function POST(req: Request) {
     //   끊겼다(architecture §3 "모델 출력의 무검증 실행 금지" 위반). projectId 미전달(구 클라)이면
     //   무필터로 종전 동작.
     let allowedCharacterIds: ReadonlySet<string> | undefined
-    let projectLocale: Awaited<ReturnType<typeof fetchProjectLocale>> = null
+    let projectLocale: AppLocale | null = null
+    let localeSwitched: AppLocale | null = null
     let dialogueLanguage: DialogueLanguage | undefined
     if (typeof projectId === 'string' && projectId) {
       if (!(await userOwnsProject(projectId, user.id))) {
@@ -223,13 +226,20 @@ export async function POST(req: Request) {
       // 로스터(#F-003 R1)·응답 언어(#i18n-s5-batch6-chat)·대사 언어(#dialogue-language-chat) 병렬 조회.
       const [{ data: roster }, locale, { data: projRow }] = await Promise.all([
         supabaseAdmin.from('characters').select('character_id').eq('project_id', projectId),
-        fetchProjectLocale(projectId),
+        // 채팅 언어 규칙 v2(#chat-locale-follow v2): 웹페이지 언어 상속 + 다른 언어 3회 연속·명시 요청 시 전환.
+        resolveChatLocale({
+          projectId,
+          message,
+          history,
+          uiLocale: parseAppLocale(uiLocale) ?? parseAppLocale(user.user_metadata?.locale),
+        }),
         supabaseAdmin.from('projects').select('settings').eq('id', projectId).maybeSingle(),
       ])
       allowedCharacterIds = new Set(
         (roster ?? []).map((r) => r.character_id as string).filter(Boolean),
       )
-      projectLocale = locale
+      projectLocale = locale.locale
+      localeSwitched = locale.switched
       dialogueLanguage = parseDialogueLanguage(
         (projRow?.settings as { dialogueLanguage?: unknown } | null)?.dialogueLanguage,
       )
@@ -293,6 +303,8 @@ export async function POST(req: Request) {
     await persistChatTraceBestEffort(projectId, trace)
 
     return NextResponse.json({
+      contentLocale: projectLocale,
+      localeSwitched,
       reply: replyOut,
       updates,
       trace,

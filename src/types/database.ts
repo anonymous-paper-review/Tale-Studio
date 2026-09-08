@@ -265,6 +265,8 @@ export type Database = {
           arc: Json | null
           motivation: Json | null
           appearance_native: string | null
+          name_en: string | null
+          name_en_source: string | null
           i18n_provenance: Json
           portrait: string | null
         }
@@ -288,6 +290,8 @@ export type Database = {
           arc?: Json | null
           motivation?: Json | null
           appearance_native?: string | null
+          name_en?: string | null
+          name_en_source?: string | null
           i18n_provenance?: Json
           portrait?: string | null
         }
@@ -311,6 +315,8 @@ export type Database = {
           arc?: Json | null
           motivation?: Json | null
           appearance_native?: string | null
+          name_en?: string | null
+          name_en_source?: string | null
           i18n_provenance?: Json
           portrait?: string | null
         }
@@ -815,6 +821,8 @@ export type Database = {
           user_edited: boolean
           last_writer_run_id: string | null
           visual_description_native: string | null
+          name_en: string | null
+          name_en_source: string | null
           i18n_provenance: Json
         }
         Insert: {
@@ -838,6 +846,8 @@ export type Database = {
           user_edited?: boolean
           last_writer_run_id?: string | null
           visual_description_native?: string | null
+          name_en?: string | null
+          name_en_source?: string | null
           i18n_provenance?: Json
         }
         Update: {
@@ -861,6 +871,8 @@ export type Database = {
           user_edited?: boolean
           last_writer_run_id?: string | null
           visual_description_native?: string | null
+          name_en?: string | null
+          name_en_source?: string | null
           i18n_provenance?: Json
         }
         Relationships: [

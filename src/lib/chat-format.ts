@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { parseAppLocale, type AppLocale } from '@/lib/locale'
+import { decideLocaleFollow, recentUserMessages, type LocaleFollowDecision } from '@/lib/chat-locale'
 
 // 챗 응답 언어 강제(#i18n-s5-batch6-chat) — 4개 챗 라우트(producer/writer/artist/director)가 공유.
 //   콘텐츠 언어(projects.locale)를 시스템 프롬프트 맨 끝(다른 가이드보다 뒤)에 주입해 최신 지시로
@@ -36,24 +37,27 @@ export async function fetchProjectLocale(projectId: string): Promise<AppLocale |
 
 export interface ProjectLocaleState {
   locale: AppLocale | null
-  /** writer 산출물이 이미 있는 프로젝트 — 언어를 뒤집으면 기존 산출물과 섞이므로 자동 전환 금지. */
+  /** 잠김 — 명시 전환·채팅 전환·스토리 감지로 확정된 언어. 안 잠긴 프로젝트는 웹페이지(UI) 언어를 물려받는다(v2). */
+  locked: boolean
+  /** writer 산출물이 이미 있는 프로젝트(정보용 — v2 부터 전환을 막지 않는다, 2026-09-08 오너 결정). */
   writerRan: boolean
 }
 
-/** produce/chat 전용 — locale 과 함께 자동 전환 가드(writer 산출물 유무)를 1쿼리로 읽는다. */
+/** locale·잠김·writer 산출물 유무를 1쿼리로 읽는다. */
 export async function fetchProjectLocaleState(
   projectId: string,
 ): Promise<ProjectLocaleState | null> {
   try {
     const { data, error } = await supabaseAdmin
       .from('projects')
-      .select('locale, last_writer_run_id')
+      .select('locale, locale_locked, last_writer_run_id')
       .eq('id', projectId)
       .maybeSingle()
     if (error || !data) return null
-    const row = data as { locale?: unknown; last_writer_run_id?: unknown }
+    const row = data as { locale?: unknown; locale_locked?: unknown; last_writer_run_id?: unknown }
     return {
       locale: parseAppLocale(row.locale),
+      locked: row.locale_locked === true,
       writerRan: row.last_writer_run_id != null,
     }
   } catch {
@@ -61,20 +65,64 @@ export async function fetchProjectLocaleState(
   }
 }
 
-/** 콘텐츠 언어 확정 — 발화 추종·명시 변경 공용. 확정이므로 잠근다(writer/start 재감지 불요). */
+/** 콘텐츠 언어 저장 — 기본은 확정(잠금). lock:false 는 웹페이지 언어 상속(안 잠긴 채 따라감)에만 쓴다. */
 export async function updateProjectLocale(
   projectId: string,
   locale: AppLocale,
+  opts?: { lock?: boolean },
 ): Promise<boolean> {
   try {
     const { error } = await supabaseAdmin
       .from('projects')
-      .update({ locale, locale_locked: true })
+      .update(opts?.lock === false ? { locale } : { locale, locale_locked: true })
       .eq('id', projectId)
     return !error
   } catch {
     return false
   }
+}
+
+// ── 채팅 언어 규칙 v2 (#chat-locale-follow v2, 2026-09-08 오너 결정) — 네 챗 라우트 공용 ──────────
+//   "웹페이지 언어 상속받아서 표시하되 채팅에서 다른 언어로 여러 번 말하거나 요청하면 프로젝트 언어 변경 가능하게."
+//   ① 안 잠긴 프로젝트: 웹페이지(UI) 언어와 다르면 그 언어로 따라간다(잠그지 않음).
+//   ② 다른 언어로 세 번 연속 말하거나 바꿔 달라고 하면 그 언어로 바꾸고 잠근다 — 작가가 돌았어도(종전 가드 폐기).
+//   결정 로직은 chat-locale.ts(순수), 여기는 DB 어댑터. deps 주입은 테스트용.
+
+export interface ChatLocaleInput {
+  projectId: string
+  message: string
+  history: unknown
+  /** 웹페이지(UI) 언어 — 클라가 보낸 값, 없으면 계정 설정(user_metadata.locale) */
+  uiLocale: AppLocale | null
+}
+export interface ChatLocaleResult {
+  locale: AppLocale | null
+  /** 이번 턴에 채팅이 바꾼 언어(클라가 안내 한 줄을 남긴다). 안 바꿨으면 null. */
+  switched: AppLocale | null
+  reason: LocaleFollowDecision['reason'] | 'inherit' | null
+}
+export interface ChatLocaleDeps {
+  fetchState: (projectId: string) => Promise<ProjectLocaleState | null>
+  update: (projectId: string, locale: AppLocale, opts?: { lock?: boolean }) => Promise<boolean>
+}
+const defaultChatLocaleDeps: ChatLocaleDeps = { fetchState: fetchProjectLocaleState, update: updateProjectLocale }
+
+export async function resolveChatLocale(input: ChatLocaleInput, deps: ChatLocaleDeps = defaultChatLocaleDeps): Promise<ChatLocaleResult> {
+  const state = await deps.fetchState(input.projectId)
+  if (!state) return { locale: null, switched: null, reason: null }
+  let locale = state.locale
+  let reason: ChatLocaleResult['reason'] = null
+  if (!state.locked && input.uiLocale && input.uiLocale !== locale) {
+    if (await deps.update(input.projectId, input.uiLocale, { lock: false })) {
+      locale = input.uiLocale
+      reason = 'inherit'
+    }
+  }
+  const decision = decideLocaleFollow({ current: locale, recentUserMessages: recentUserMessages(input.history, input.message) })
+  if (decision && (await deps.update(input.projectId, decision.locale))) {
+    return { locale: decision.locale, switched: decision.locale, reason: decision.reason }
+  }
+  return { locale, switched: null, reason }
 }
 
 // 채팅 응답 공용 출력 형식 가이드 — 모든 stage 챗 라우트의 시스템 프롬프트 끝에 append 한다.
