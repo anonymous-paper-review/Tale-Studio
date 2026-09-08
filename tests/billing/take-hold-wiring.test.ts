@@ -34,6 +34,10 @@ vi.mock('@/lib/api/quota', () => ({
   videoBudgetRejectionResponse: () => new Response(JSON.stringify({ error: 'video budget' }), { status: 429 }),
 }))
 vi.mock('@/lib/fal/webhook-url', () => ({ resolveWebhookUrl: () => undefined }))
+// #previz-record-before-submit: 라우트가 제출 전에 키를 골라 작업 행에 기록한다.
+vi.mock('@/lib/fal/keys', () => ({
+  pickFalKey: async () => ({ id: 'key-1', client: { queue: { submit: vi.fn() } } }),
+}))
 vi.mock('@/lib/writer/i18n/derive-en', () => ({ deriveEnBatch: mocks.deriveEnBatch }))
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: { from: mocks.from, rpc: mocks.rpc, auth: { admin: { getUserById: mocks.getUserById } } },
@@ -109,6 +113,8 @@ describe('영상 미리보기 생성 — Take 사용량 처리', () => {
   it('사용량을 받지 않는 모드에서는 영상 생성을 정상 제출한다', async () => {
     delete process.env.TAKE_BILLING_MODE
     mockProjectShotQueued()
+    // generation_jobs.update (제출 뒤 request_id 교체, #previz-record-before-submit)
+    mocks.from.mockReturnValueOnce(query({ data: null, error: null }))
     // shots.update (낙관 상태 기록)
     mocks.from.mockReturnValueOnce(query({ data: null, error: null }))
 
@@ -141,6 +147,7 @@ describe('영상 미리보기 생성 — Take 사용량 처리', () => {
   it('기록만 하는 모드에서는 잔액이 부족해도 생성을 정상 제출한다', async () => {
     vi.stubEnv('TAKE_BILLING_MODE', 'shadow')
     mockProjectShotQueued()
+    mocks.from.mockReturnValueOnce(query({ data: null, error: null })) // generation_jobs.update (request_id 교체)
     mocks.from.mockReturnValueOnce(query({ data: null, error: null })) // shots.update
     mocks.rpc.mockResolvedValue({ data: { ok: true, balance: -1, held: 1, insufficient: false }, error: null })
 

@@ -460,10 +460,13 @@ function extractVideoUrlFromData(raw: unknown): { url: string; duration?: number
 //   조회(falVideoFetch)는 과금이 없으므로 그쪽 재시도는 그대로 둔다.
 export async function falVideoSubmit(
   opts: FalVideoOptions,
+  /** 제출 전에 키를 미리 정해야 하는 호출자용(#previz-record-before-submit) — 작업 행에 fal_key_id 를
+   *  먼저 기록해야 조회 경로가 그 키를 쓸 수 있다. 생략하면 종전대로 여기서 고른다. */
+  presetKey?: Awaited<ReturnType<typeof pickFalKey>>,
 ): Promise<FalSubmitReceipt> {
   const model = opts.model ?? DEFAULT_VIDEO_MODEL;
   const input = buildFalVideoInput(opts, model);
-  const k = await pickFalKey();
+  const k = presetKey ?? await pickFalKey();
   const { request_id } = await k.client.queue.submit(
     model,
     opts.webhookUrl ? { input, webhookUrl: opts.webhookUrl } : { input },

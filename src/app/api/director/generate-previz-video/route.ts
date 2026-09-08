@@ -8,6 +8,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { requireProjectAccess } from '@/lib/api/guard'
 import { falVideoSubmit } from '@/lib/writer/llm/fal'
+import { pickFalKey } from '@/lib/fal/keys'
 import { createGenerationJob, failGenerationJob, STALE_QUEUED_MS } from '@/lib/generation-jobs'
 import { checkGenerationCapacity, checkProjectVideoBudget } from '@/lib/generation-quota'
 import { quotaRejectionResponse, videoBudgetRejectionResponse } from '@/lib/api/quota'
@@ -92,31 +93,33 @@ export async function POST(req: Request) {
       : ''
     const duration = Math.max(3, Math.min(15, Math.round((shot.duration_seconds as number) || 5)))
 
-    const { request_id, model, fal_key_id } = await falVideoSubmit({
-      prompt: buildPrevizVideoPrompt(actionEn, duration),
-      image_url: frames.start,
-      image_urls: [frames.start, frames.end],
-      duration,
-      aspect_ratio: '16:9',
-      webhookUrl: resolveWebhookUrl(),
-    })
+    const prompt = buildPrevizVideoPrompt(actionEn, duration)
+
+    // 기록 → Take → 제출 순서다(#previz-record-before-submit 2026-09-08).
+    //   예전에는 제출이 맨 앞이라 두 가지가 샜다. (1) 제출과 행 생성 사이에 요청이 죽으면 fal 은
+    //   만들고 과금하는데 추적 행이 없어 webhook 이 와도 버려졌다. (2) 잔액 0 인 사용자도 제출이
+    //   먼저 나가 회사 비용만 나갔다. 본 영상은 이미 예약이 제출보다 앞이다(generate-video:790).
+    //   제출 전 잡은 request_id='reserved:<id>' 로 남고, 제출이 끝나면 실제 id 로 교체한다.
+    //   그 사이에 죽으면 유령 청소부가 10분 뒤 정리하며 Take 도 돌려준다(#reserved-zombie).
+    // 제출 전에 키를 먼저 고른다 — 작업 행에 fal_key_id 를 기록해야 조회 경로가 그 키를 쓴다.
+    //   키 선택은 과금이 아니다(여유가 가장 큰 키를 고르는 계산일 뿐).
+    const falKey = await pickFalKey()
     const job = await createGenerationJob({
       projectId,
-      requestId: request_id,
-      model,
-      falKeyId: fal_key_id,
+      requestId: `reserved:${crypto.randomUUID()}`,
+      // 제출 전이라 실제 모델을 모른다(falVideoSubmit 의 기본값을 쓴다). 제출 뒤 교체한다.
+      model: 'pending',
+      falKeyId: falKey.id,
       kind: 'shot_previz_video',
       target: { workspaceId: project.workspace_id as string, writerShotId },
       inputSnapshot: {
-        prompt: buildPrevizVideoPrompt(actionEn, duration),
+        prompt,
         image_urls: [frames.start, frames.end],
         duration,
       },
     })
 
-    // #payments-phase-2 #gen-quota-atomic-gate: Take hold — 잡은 이미 제출된 뒤라 부족이어도
-    //   이 생성은 되돌릴 수 없다(fal 이미 과금된 상태) — hold 가 enforce 부족이면 잡을 즉시 실패
-    //   처리하고 402 로 안내한다(이미 제출된 fal 요청은 별도 정산이 필요 — v4 슬라이스 범위 밖).
+    // #payments-phase-2 #gen-quota-atomic-gate: Take hold — 제출 앞이므로 부족이면 아직 되돌릴 수 있다.
     const holdAmount = takeCostForPreviz()
     const hold = await holdTakesForVideoJob({
       workspaceId: project.workspace_id as string,
@@ -135,6 +138,46 @@ export async function POST(req: Request) {
         { error: 'insufficient_takes', required: holdAmount, balance: hold.balance },
         { status: 402 },
       )
+    }
+
+    let request_id: string
+    let model: string
+    let fal_key_id: string
+    try {
+      ;({ request_id, model, fal_key_id } = await falVideoSubmit({
+        prompt,
+        image_url: frames.start,
+        image_urls: [frames.start, frames.end],
+        duration,
+        aspect_ratio: '16:9',
+        webhookUrl: resolveWebhookUrl(),
+      }, falKey))
+    } catch (submitError) {
+      // 제출이 확실히 실패했으면 잡아둔 Take 를 즉시 돌려준다. 모호한 실패(들어갔는지 모름)는
+      //   reserved: 인 채 남고 유령 청소부가 10분 뒤 같은 처리를 한다 — 어느 쪽이든 묶이지 않는다.
+      try {
+        await failGenerationJob(job.id, submitError instanceof Error ? submitError.message : String(submitError))
+      } catch (transitionErr) {
+        console.error('[director/generate-previz-video] submit failure transition failed:', transitionErr instanceof Error ? transitionErr.message : transitionErr)
+      }
+      try {
+        await releaseTakesForJob(job.id)
+      } catch (releaseErr) {
+        console.error('[director/generate-previz-video] take release failed:', releaseErr instanceof Error ? releaseErr.message : releaseErr)
+      }
+      throw submitError
+    }
+
+    // 제출 성공 — reserved: 를 실제 provider 요청 id 로 교체한다. 이게 있어야 webhook 이 매칭된다.
+    const { error: attachError } = await supabaseAdmin
+      .from('generation_jobs')
+      .update({ request_id, model, fal_key_id, submitted_at: new Date().toISOString(), attempts: 1 })
+      .eq('id', job.id)
+      .eq('status', 'queued')
+    if (attachError) {
+      // 교체 실패는 치명적이지 않다 — 청소부가 reserved: 로 보고 10분 뒤 정리하며 Take 를 돌려준다.
+      //   fal 결과는 잃지만 사용자 잔액은 회복된다.
+      console.error('[director/generate-previz-video] attach provider request failed:', attachError.message)
     }
 
     // 낙관 상태 기록 — UI 폴링 전 새로고침에도 '생성 중'이 보이게.
