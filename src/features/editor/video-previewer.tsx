@@ -1,6 +1,8 @@
 'use client'
 
 import { Play, Pause, Volume2, VolumeX } from 'lucide-react'
+import { useEntityNames } from '@/lib/writer/use-entity-names'
+import { resolveEntityNames } from '@/lib/writer/resolve-entity-names'
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { TitleCardStage } from '@/features/editor/title-card-stage'
@@ -24,6 +26,7 @@ function formatTime(sec: number) {
  *   2) 소스 미리보기 모드(previewSourceShotId): 단일 클립을 원본 그대로 loop 재생.
  */
 export function VideoPreviewer() {
+  const entityNames = useEntityNames()
   const t = useT()
   const videoRef = useRef<HTMLVideoElement>(null)
   const fillRef = useRef<HTMLDivElement>(null)
@@ -203,7 +206,7 @@ export function VideoPreviewer() {
           <div className="flex h-48 w-80 items-center justify-center rounded-lg border border-dashed border-muted-foreground/30 bg-muted/10">
             <div className="text-center">
               <p className="text-lg font-semibold text-muted-foreground">{activeShot.shotType}</p>
-              <p className="mt-1 max-w-[260px] text-xs text-muted-foreground/70">{activeShot.actionDescription}</p>
+              <p className="mt-1 max-w-[260px] text-xs text-muted-foreground/70">{resolveEntityNames(activeShot.actionDescription, entityNames)}</p>
               <p className="mt-2 text-[10px] text-muted-foreground/50">
                 {activeClip?.status === 'generating' ? 'Generating...' : 'No video generated yet'}
               </p>

@@ -6,6 +6,7 @@ import { computeSceneBudget, renderBudgetBlock, validateSceneBudget } from '@/li
 import { SHOT_PHYSICS } from '@/lib/writer/pipeline/physics';
 import { VISUAL_BEAT_DOCTRINE } from '@/lib/writer/pipeline/visual-doctrine';
 import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
+import { PROSE_NAME_RULE, cleanSceneProse } from '@/lib/writer/pipeline/util/prose_names';
 import type { Genre, NarrativeStructure, Characters, Scenes, PipelineInput, StoryCharacter, BackgroundContract, Dramaturgy, DramaturgyStageCandidate } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 
@@ -167,6 +168,7 @@ act 커버리지 (필수):
 scene_actions:
 - 씬에서 일어나는 행동을 **카메라가 한 번에 볼 수 있는 가시적 행동 단위**로 분리해 쓴다 (한 단위 ≈ 한 샷 ${SHOT_PHYSICS.shotSecondsMin}~${SHOT_PHYSICS.shotSecondsMax}초).
 - 씬당 액션 수는 위 시간 예산을 가이드로 따르되, 아래 시각적 서술 원칙이 요구하는 연결 비트(몸의 전이·시선의 대상·반응)를 예산 때문에 지우지 마라.
+${PROSE_NAME_RULE}
 ${VISUAL_BEAT_DOCTRINE}
 
 서사 시점 (필수, time_of_day와 다른 축):
@@ -361,6 +363,8 @@ ${budgetViolations.map((x) => `- ${x.scene_id ?? '(전체)'}: ${x.message}`).joi
 
   // coverage_mode는 코드가 설정 (LLM 출력 아님) — 하류가 대표 스토리보드 여부를 판별하는 근거.
   scenes = { ...scenes, coverage_mode: budget.mode };
+  // #names-in-prose: 문장에 남은 id 는 이름으로 — 데쿠파주·V4·이미지 프롬프트가 이 문장을 잇는다.
+  scenes = cleanSceneProse(scenes, characters);
 
   await logger.saveStage('05_s3_scenes.json', scenes);
   await logger.markStage('scenes', 'completed', {

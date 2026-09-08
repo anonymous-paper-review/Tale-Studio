@@ -1,6 +1,8 @@
 'use client'
 
 import { useRef, useCallback, useMemo, useEffect, useState } from 'react'
+import { useEntityNames } from '@/lib/writer/use-entity-names'
+import { resolveEntityNames } from '@/lib/writer/resolve-entity-names'
 import { Trash2, Plus, Volume2, VolumeX, Scissors, Gauge, Type } from 'lucide-react'
 import type { Shot, VideoClip, AudioTrackClip, AudioSource } from '@/types'
 import { cn } from '@/lib/utils'
@@ -410,6 +412,7 @@ export function Timeline({
   onSetTitleCardDuration,
   onPushHistory,
 }: TimelineProps) {
+  const entityNames = useEntityNames()
   const t = useT()
   const trackRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -843,7 +846,7 @@ export function Timeline({
                       <div
                         data-no-seek
                         onPointerDown={(e) => handleClipPointerDown(e, item)}
-                        title={shot.actionDescription}
+                        title={resolveEntityNames(shot.actionDescription, entityNames)}
                         className={cn(
                           'group absolute top-1 flex h-[72px] flex-col overflow-hidden rounded border',
                           cutMode ? 'cursor-col-resize' : 'cursor-pointer',

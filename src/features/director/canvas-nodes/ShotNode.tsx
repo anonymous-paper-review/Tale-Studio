@@ -20,10 +20,13 @@ import { IMAGE_MODELS, normalizeImageModelKey } from '@/lib/image-models'
 import { prettyNodeLabel } from '@/features/director/node-label'
 import { ThumbImage } from '@/components/thumb-image'
 import { useT } from '@/lib/i18n'
+import { useEntityNames } from '@/lib/writer/use-entity-names'
+import { resolveEntityNames } from '@/lib/writer/resolve-entity-names'
 
 
 function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const t = useT()
+  const entityNames = useEntityNames()
   const stage = useDirectorCanvasStore((s) => getShotStage(s, id))
   const isGenerating = useDirectorCanvasStore((s) => !!s.generatingNodeIds[id])
   const generateStoryboardImage = useDirectorCanvasStore(
@@ -55,7 +58,8 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const stageImageUrl = realImage?.url ?? roughUrl
 
   const failed = data.storyboardImage?.status === 'failed'
-  const prompt = effectivePrompt(data)
+  // #names-in-prose: 카드 문구는 이름으로(id 는 구동값, 표시는 이름).
+  const prompt = resolveEntityNames(effectivePrompt(data), entityNames)
 
   return (
     <>

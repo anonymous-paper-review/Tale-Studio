@@ -22,6 +22,7 @@ import {
   normalizeCharacterMagnitude,
 } from '@/lib/writer/motion-vocabulary';
 import { enforceCameraMotivation } from '@/lib/writer/pipeline/util/camera_motivation';
+import { PROSE_NAME_RULE, castEntities, cleanShotDesignProse } from '@/lib/writer/pipeline/util/prose_names';
 import type { ShotStaticSpec,
   DecoupagePlan,
   DecoupageShot,
@@ -641,10 +642,11 @@ ${seedV4 || '(없음)'}
 [genre (장르/톤)]
 ${JSON.stringify(genre)}
 
-[이 씬 등장 캐릭터 상세]
+[이 씬 등장 캐릭터 상세 — 문장에는 name, character_id 칸에는 id]
 ${JSON.stringify(
   characters.characters.filter((c) => scene.characters_in_scene.includes(c.id))
 )}
+${PROSE_NAME_RULE}
 
 [비주얼 스타일 (v0 VisualIdentity — 전역 고정)]
 ${JSON.stringify(visualIdentity.style)}
@@ -863,7 +865,7 @@ ${stage ? `        "camera_setup": {
         cameraSetup = { ...(cameraSetup ?? setupRaw), pov_of: cameraMotion.target };
       }
     }
-    return {
+    const withMotion = {
       ...shot,
       ...(cameraSetup !== setupRaw ? { static_spec: { ...shot.static_spec, camera_setup: cameraSetup } } : {}),
       dynamic_spec: {
@@ -873,6 +875,8 @@ ${stage ? `        "camera_setup": {
         character_motion: characterMotion,
       },
     } as ShotDesign;
+    // #names-in-prose: 산문 필드의 id → 이름 (character_id·gaze_arc·target 은 그대로).
+    return cleanShotDesignProse(withMotion, castEntities(characters));
   });
   // 교정은 조용히 하지 않는다 — 조용한 열화가 이번 사고의 본체였다.
   //   이 파일이 계속 쌓이면 지시서(1차 방어)가 아직 새고 있다는 신호로 읽는다.

@@ -1,22 +1,21 @@
-// 설명문에 새어 나온 엔티티 id 를 사람 이름으로 바꾼다 (#id-leak 2026-08-11).
+// 표시·산문용 id → 이름 치환(#id-leak 2026-08-11, #names-in-prose 2026-09-08).
 //
-// 실측(프로덕션 shots.action_description):
-//   "The father (char_3) waves his arms at nearby workers…"
-//   "char_3 steps into the narrow observation station."
-//   "Beyond the horizon, the silhouette of location_2 appears…"
-// 파이프라인이 산문 안에 id 를 그대로 쓰는 경우가 있다. 사람이 읽는 화면에서는 이름이어야 한다.
-//
-// 여기는 **표시 계층 처방**이다 — 저장된 값은 건드리지 않는다. 근본 처방(상류가 산문에 이름을
-//   쓰게 하는 것)은 프롬프트 변경 + 전량 재생성이 필요하고, 같은 문장이 이미지 생성 프롬프트로도
-//   흘러가므로 품질 회귀 검증이 따라붙는다 — 별건으로 분리한다.
-//
-// 매칭 규칙: id 는 `char_3`·`character_3`·`location_2`·`loc_2` 꼴로만 인식한다. 맨몸 "Char"
-//   (모델이 이름 대신 쓴 것)는 **건드리지 않는다** — 어느 인물인지 알 수 없어 추측하면 틀린 이름을
-//   보여주게 된다. 틀린 이름은 안 고친 id 보다 나쁘다.
+//   파이프라인이 산문 안에 인물·장소 id(char·char_3·location_2)를 그대로 쓴다(프로덕션 실측). 로스터에 있는 id 만
+//   이름으로 바꾸고, 모르는 id 는 지어내지 않는다 — 틀린 이름은 안 고친 id 보다 나쁘다.
+//   2026-09-08: 한글 이름은 슬러그가 비어 'char' 로 폴백하므로 맨몸 id 도 로스터에 있으면 바꾼다. 긴 id 가 먼저
+//   잡혀(char_2 → char) 접두 오인이 없고, 바꾼 뒤 한국어 조사를 받침에 맞춘다.
+import { fixKoreanParticles } from '@/lib/korean-particles'
 
 interface NamedEntity {
   id: string
   name: string
+}
+
+/** 영어 낱말과 겹치는 폴백 id — 한글 조사가 붙은 자리에서만 id 로 인정한다. */
+const GENERIC_WORD_IDS = new Set(['location', 'loc'])
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 /** id 를 이름으로 바꾼 문장. 대응하는 이름이 없으면 원문 그대로(모르는 건 지어내지 않는다). */
@@ -30,18 +29,27 @@ export function resolveEntityNames(
   const byId = new Map<string, string>()
   for (const e of entities) {
     if (!e.id || !e.name?.trim()) continue
-    byId.set(e.id.toLowerCase(), e.name.trim())
+    const id = e.id.trim().toLowerCase()
+    if (!id) continue
+    byId.set(id, e.name.trim())
     // `char_3` 로 저장돼 있어도 실제 id 가 `character_3` 인(혹은 그 반대인) 경우를 함께 받는다.
-    const alias = e.id.toLowerCase().replace(/^character_/, 'char_').replace(/^location_/, 'loc_')
-    if (alias !== e.id.toLowerCase()) byId.set(alias, e.name.trim())
-    const expanded = e.id.toLowerCase().replace(/^char_/, 'character_').replace(/^loc_/, 'location_')
-    if (expanded !== e.id.toLowerCase()) byId.set(expanded, e.name.trim())
+    const alias = id.replace(/^character_/, 'char_').replace(/^location_/, 'loc_')
+    if (alias !== id) byId.set(alias, e.name.trim())
+    const expanded = id.replace(/^char_/, 'character_').replace(/^loc_/, 'location_')
+    if (expanded !== id) byId.set(expanded, e.name.trim())
   }
   if (byId.size === 0) return text
 
-  // 토큰 경계: 앞뒤가 영숫자/언더바가 아닐 때만 — `char_30` 을 `char_3` 으로 잘못 짚지 않게.
-  let out = text.replace(/\b(?:char|character|loc|location)_[A-Za-z0-9]+\b/gi, (token) => {
-    return byId.get(token.toLowerCase()) ?? token
+  // 토큰 경계: 앞뒤가 영숫자/언더바가 아닐 때만 — `char_30` 을 `char_3` 으로, `charcoal` 을 `char` 로 잘못 짚지 않게.
+  //   긴 id 부터 하나의 정규식으로 잡는다(교대 순서 = 길이 내림차순).
+  //   영어 낱말이기도 한 폴백 id(location·loc)는 한글이 바로 뒤따를 때만 id 로 본다 — "origin location of …" 의
+  //   location 을 장소 이름으로 바꾸면 틀린 문장이 된다(겨울_7 sh_01_05 실측).
+  const keys = [...byId.keys()].sort((a, b) => b.length - a.length).map(escapeRegExp)
+  const re = new RegExp(`(?<![A-Za-z0-9_])(?:${keys.join('|')})(?![A-Za-z0-9_])`, 'gi')
+  let out = text.replace(re, (token, offset: number, whole: string) => {
+    const lower = token.toLowerCase()
+    if (GENERIC_WORD_IDS.has(lower) && !/^[가-힣]/.test(whole.slice(offset + token.length))) return token // i18n-ok: 한글 범위 판정
+    return byId.get(lower) ?? token
   })
 
   // 이름으로 치환하고 나면 "The father (Kai)" 처럼 동격 괄호가 남는다 — 앞말과 같은 대상을
@@ -51,7 +59,7 @@ export function resolveEntityNames(
     names.has(inner.trim()) ? '' : whole,
   )
 
-  return out
+  return fixKoreanParticles(out, [...names])
 }
 
 /** SceneManifest 의 인물+장소를 한 목록으로 — 두 종류가 한 문장에 섞여 나오므로 함께 푼다. */

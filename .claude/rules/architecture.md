@@ -216,3 +216,17 @@ paths:
   X's eyes"를 싣는다. 영상 계약문은 카메라 절 뒤 `Purpose: …`(라우트가 대상 인물 이름을 조회해 넘긴다).
 - **에너지 예외(오너 결정 2번 — 2026-09-07 전후 비교 뒤 켬)**: V4 지시서에 "energy 액션 비트에서는 카메라 큰 무브 + 인물 큰 액션 허용, 환경 변화만 따로" 가
   기본으로 실린다. `WRITER_ENERGY_EXCEPTION=0` 으로만 끈다(종전 동시 금지로 복귀). 비교 실측(겨울_6 sh_01_05): 전진 트래킹의 체감은 분명했으나 START 구도 수렴이 약해졌다.
+
+## 이야기 문장에는 이름이 나온다 (2026-09-08, 오너 지시 — `tests/promise-names-in-prose.test.ts`)
+
+- **원인**: 한글 이름은 슬러그가 비어 `char`,`char_2` 로 폴백하고(`cast-slug.ts`), 씬 스토리 지시서가 캐스트를 "char (용족수장)" 로만 보여 줘 모델이
+  문장에도 id 를 썼다. 그 문장이 데쿠파주·V4·이미지 프롬프트까지 번졌고, 표시 층은 화면마다 치환이 달랐다(조사도 못 고침).
+- **규칙**: 산문 필드는 표시 이름, 구조 칸(characters_in_scene·character_id·gaze_arc·camera_target)은 id. 지시서 공통 문구 `PROSE_NAME_RULE`
+  (`pipeline/util/prose_names.ts`)을 s3·merged·데쿠파주·V4 가 싣고, 데쿠파주 캐스트 JSON 에 name 을 넣는다.
+- **코드 치환(2차 방어)**: `cleanSceneProse`(scene_actions·dialogue_summary·key_dialogue.line, new_characters 포함) → `cleanDecoupageProse`
+  (beat_summary·native·목적·사유) → `cleanShotDesignProse`(layers·focal·pose·prop significance·first_frame_prompt·motion_prompt·verb·환경 description).
+  모르는 id 는 지어내지 않는다.
+- **치환기**: `resolveEntityNames` 가 로스터의 맨몸 id(char)도 토큰 단위로 바꾸고(긴 id 먼저), `korean-particles.fixKoreanParticles` 로 이/가·을/를·은/는·
+  과/와·아/야·으로/로를 받침에 맞춘다. `script-lines.replaceSlugs` 도 같은 규칙(prefix '' 일 때).
+- **표시**: Director 그리드 카드의 한국어 설명·노드 카드 프롬프트 줄, Writer 대사 뷰, Editor 타임라인·소스 패널·미리보기가 치환을 쓴다.
+  로스터는 `use-entity-names.ts`(writer 스토어 sceneManifest, 없으면 loadProject 1회).

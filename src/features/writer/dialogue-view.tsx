@@ -14,6 +14,7 @@ import { useGuardedAction } from '@/hooks/use-guarded-action'
 import { cn } from '@/lib/utils'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterStore } from '@/stores/writer-store'
+import { manifestEntities, resolveEntityNames } from '@/lib/writer/resolve-entity-names'
 import type { DialogueLine, Shot } from '@/types'
 import { useT } from '@/lib/i18n'
 
@@ -40,6 +41,7 @@ export function DialogueView() {
   const t = useT()
   const projectId = useProjectStore((state) => state.projectId)
   const sceneManifest = useWriterStore((state) => state.sceneManifest)
+  const entityNames = useMemo(() => manifestEntities(sceneManifest), [sceneManifest])
   const shots = useWriterStore((state) => state.shots)
   const loadProject = useWriterStore((state) => state.loadProject)
 
@@ -234,7 +236,7 @@ export function DialogueView() {
                             <span className="mr-1.5 font-mono text-xs font-semibold text-muted-foreground/60">
                               Shot {shotIdx + 1}
                             </span>
-                            {shot.actionDescription}
+                            {resolveEntityNames(shot.actionDescription, entityNames)}
                           </p>
                           {lines.length > 0 && (
                             <div className="mt-1 flex flex-col gap-1 pl-4">
