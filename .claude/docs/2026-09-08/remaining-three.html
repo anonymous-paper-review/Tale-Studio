@@ -283,7 +283,7 @@
 proration_billing_mode    : "Required when making changes to items or the next billing date."
   full_immediately        : "Paddle does not calculate proration, creating a transaction
                              to collect for the full amount immediately."</pre>
-  <p class="code-diff"><span class="chip c-pass">문서상 된다</span>같은 요청에 <code>items</code>(새 플랜) + <code>next_billed_at</code>(오늘+1개월) + <code>proration_billing_mode: full_immediately</code> 를 함께 보낸다. <b>실측은 아직이다</b> — 샌드박스에서 한 번 돌려 봐야 확정이다.</p>
+  <p class="code-diff"><span class="chip c-warn">틀렸다 — 09-08 실측</span>Paddle 이 <code>"not possible to change items and billing date in the same request"</code> 로 거부한다. 문서에는 두 필드가 각각 설명돼 있고 "같이 못 쓴다" 는 말이 없었다. <b>두 요청으로 나누면 된다</b>(① items + full_immediately → 전액 청구 ② next_billed_at + do_not_bill → 갱신일 리셋). 실측 전체 → <code>plan-change-probe.html</code></p>
   <p>안 되면 대안은 "옛 구독 즉시 취소 + 새 구독 시작"인데, 결제창이 한 번 더 뜨는 흐름이라 오너가 09-07 에 피하자고 한 "새로 결제하는 것처럼"이 된다. 그래서 위 방법을 먼저 실측한다.</p>
 
   <h3>화면</h3>
