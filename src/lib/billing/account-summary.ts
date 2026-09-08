@@ -45,7 +45,14 @@ export interface TakeBreakdown {
   purchaseExpiresAt: string | null
 }
 
-export function takeBreakdown(rows: readonly LedgerRow[]): TakeBreakdown {
+/**
+ * @param now 만료 판정 기준 시각. 만료일이 지난 lot 은 남은 양을 0 으로 친다 — 잡(Cron)이 만료 행을 넣기 전에도
+ *   잔액에 안 잡히게(2026-09-08 오너 지적: 잡을 기다리면 주기만큼 새는 창이 생긴다. 1시간 주기면 최악 59분).
+ *   잡이 만료 행을 넣은 뒤에도 같은 숫자가 나온다 — 그 lot 은 이미 0 이라 두 번 빠지지 않는다.
+ */
+export function takeBreakdown(rows: readonly LedgerRow[], now: Date = new Date()): TakeBreakdown {
+  const nowMs = now.getTime()
+  const expired = (row: LedgerRow) => row.expires_at !== null && new Date(row.expires_at).getTime() <= nowMs
   const remainingByGrant = new Map<string, number>()
   for (const row of rows) {
     if (GRANT_KINDS.has(row.kind)) remainingByGrant.set(row.id, (remainingByGrant.get(row.id) ?? 0) + row.delta)
@@ -72,7 +79,9 @@ export function takeBreakdown(rows: readonly LedgerRow[]): TakeBreakdown {
   }
   for (const row of rows) {
     if (!GRANT_KINDS.has(row.kind)) continue
-    const remaining = remainingByGrant.get(row.id) ?? 0
+    // 만료일이 지난 lot 의 남은 양은 0 으로 친다(위 @param now). 이미 쓴 만큼은 되살아나지 않는다 —
+    //   remaining 만 0 이 되고 그 lot 을 가리키는 hold/consume 행은 총합에서 그대로 빠져 있다.
+    const remaining = expired(row) ? 0 : remainingByGrant.get(row.id) ?? 0
     if (row.kind === 'grant_free') out.free += remaining
     else if (row.kind === 'grant_plan') out.plan += remaining
     else if (row.kind === 'grant_purchase') out.purchase += remaining
@@ -86,7 +95,9 @@ export function takeBreakdown(rows: readonly LedgerRow[]): TakeBreakdown {
       }
     }
   }
-  out.total = rows.reduce((sum, row) => sum + row.delta, 0)
+  // 합계는 종류별 합 + 기타(grant 에 안 묶인 행). 단순 sum(delta) 이 아니다 — 만료된 lot 의 남은 양이 빠져야 한다.
+  //   잡이 만료 행을 넣으면 그 lot 의 remaining 이 0 이 되고 만료 행은 grant_id 로 그 lot 에 묶여 other 에 안 잡힌다.
+  out.total = out.free + out.plan + out.purchase + out.bonus + out.other
   return out
 }
 

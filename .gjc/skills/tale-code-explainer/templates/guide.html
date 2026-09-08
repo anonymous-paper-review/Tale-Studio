@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- {{GUIDE_TITLE}}: 가이드의 한국어 제목. -->
+  <title>{{GUIDE_TITLE}}</title>
+  <style>
+    :root { color-scheme: light dark; --bg:#f7f8fc; --panel:#fff; --ink:#182033; --muted:#5f6b85; --line:#d9dfeb; --accent:#3559d8; --code:#172033; --code-ink:#edf3ff; --good:#087a53; --warn:#9a5a00; }
+    @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#10141f; --panel:#191f2e; --ink:#edf2fc; --muted:#b2bed3; --line:#34405a; --accent:#9ab3ff; --code:#080c14; --code-ink:#e8efff; --good:#59d6a4; --warn:#ffc36f; } }
+    :root[data-theme="dark"] { --bg:#10141f; --panel:#191f2e; --ink:#edf2fc; --muted:#b2bed3; --line:#34405a; --accent:#9ab3ff; --code:#080c14; --code-ink:#e8efff; --good:#59d6a4; --warn:#ffc36f; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.65 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    a { color:var(--accent); } code { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }
+    .shell { width:min(1180px,100%); margin:auto; padding:24px; }
+    .hero, section { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:clamp(20px,4vw,36px); margin-block:18px; }
+    .hero { border-top:5px solid var(--accent); } h1,h2,h3 { line-height:1.25; } h1 { margin:0; } h2 { margin-top:0; }
+    .meta,.badges,.legend { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; }
+    .badge { display:inline-flex; align-items:center; border:1px solid var(--line); border-radius:999px; padding:2px 9px; color:var(--muted); font-size:.88rem; }
+    .badge.evidence { color:var(--good); border-color:currentColor; } .badge.inference { color:var(--warn); border-color:currentColor; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; } .card { border:1px solid var(--line); border-radius:12px; padding:16px; }
+    .visual { width:100%; overflow:auto; border:1px solid var(--line); border-radius:12px; background:var(--bg); padding:10px; } .visual svg { min-width:560px; width:100%; height:auto; }
+    .code-card { border:1px solid var(--line); border-radius:12px; overflow:hidden; margin-top:16px; } .code-card header { padding:10px 14px; background:var(--bg); color:var(--muted); font-size:.9rem; } pre { margin:0; padding:16px; overflow:auto; background:var(--code); color:var(--code-ink); line-height:1.5; }
+    table { border-collapse:collapse; width:100%; } th,td { border:1px solid var(--line); text-align:left; vertical-align:top; padding:10px; } th { background:var(--bg); } details { border:1px solid var(--line); border-radius:8px; padding:10px; margin-top:10px; } summary { cursor:pointer; font-weight:700; }
+    .skip { position:absolute; left:-999px; } .skip:focus { left:12px; top:12px; background:var(--panel); padding:8px; z-index:1; }
+    @media (max-width:700px) { .shell { padding:12px; } .hero,section { border-radius:10px; padding:20px; } .grid { grid-template-columns:1fr; } table { display:block; overflow:auto; } }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#overview">본문으로 건너뛰기</a>
+  <main class="shell">
+    <!-- {{GUIDE_TITLE}}: 가이드 제목. {{MODE}}: onboarding, lesson 등 가이드 종류. {{TARGET}}: 질문 또는 코드 대상. -->
+    <header class="hero"><p class="badge">{{MODE}}</p><h1>{{GUIDE_TITLE}}</h1><p>{{TARGET}}</p><div class="meta"><span class="badge">기준 커밋 {{COMMIT}}</span><span class="badge">생성 {{GENERATED_AT}}</span><span class="badge">핵심 파일 {{FILE_COUNT}}개</span></div><p>{{LEARNING_GOAL}}</p></header>
+    <!-- {{OVERVIEW_SVG_TITLE}}, {{OVERVIEW_SVG_DESC}}, {{OVERVIEW_NODES}}: 전체 위치를 설명하는 접근 가능한 인라인 SVG의 제목, 설명, 실제 노드. {{OVERVIEW_CONTENT}}: 실행 위치와 선행 지식. -->
+    <section id="overview" data-guide-section="overview"><h2>전체 위치</h2><div class="visual"><svg viewBox="0 0 800 220" role="img" aria-labelledby="overview-svg-title overview-svg-desc"><title id="overview-svg-title">{{OVERVIEW_SVG_TITLE}}</title><desc id="overview-svg-desc">{{OVERVIEW_SVG_DESC}}</desc>{{OVERVIEW_NODES}}</svg></div><div>{{OVERVIEW_CONTENT}}</div></section>
+    <!-- {{ARCHITECTURE_SVG_TITLE}}, {{ARCHITECTURE_SVG_DESC}}, {{ARCHITECTURE_NODES}}: 디렉터리 지도 SVG의 제목, 설명, 실제 디렉터리와 책임. {{ARCHITECTURE_CONTENT}}: Next.js 규칙/프로젝트 관례. -->
+    <section id="architecture" data-guide-section="architecture"><h2>디렉터리와 책임</h2><div class="visual"><svg viewBox="0 0 800 260" role="img" aria-labelledby="architecture-svg-title architecture-svg-desc"><title id="architecture-svg-title">{{ARCHITECTURE_SVG_TITLE}}</title><desc id="architecture-svg-desc">{{ARCHITECTURE_SVG_DESC}}</desc>{{ARCHITECTURE_NODES}}</svg></div><div>{{ARCHITECTURE_CONTENT}}</div></section>
+    <!-- {{FLOW_SVG_TITLE}}, {{FLOW_SVG_DESC}}, {{FLOW_NODES}}: 실제 호출과 데이터 이동을 표현하는 흐름 SVG의 제목, 설명, 노드와 화살표. {{FLOW_CONTENT}}: 입력, 출력, 상태 소유자 설명. -->
+    <section id="flow" data-guide-section="flow"><h2>기능 흐름</h2><div class="visual"><svg viewBox="0 0 800 260" role="img" aria-labelledby="flow-svg-title flow-svg-desc"><title id="flow-svg-title">{{FLOW_SVG_TITLE}}</title><desc id="flow-svg-desc">{{FLOW_SVG_DESC}}</desc>{{FLOW_NODES}}</svg></div><div>{{FLOW_CONTENT}}</div></section>
+    <!-- {{CODE_JOURNEY_CONTENT}}: 흐름 순서의 코드 카드들. 각 카드는 실제 경로, 줄 범위, 원문 코드, 질문을 포함한다. -->
+    <section id="code-journey" data-guide-section="code-journey"><h2>코드 여정</h2><div>{{CODE_JOURNEY_CONTENT}}</div></section>
+    <!-- {{TRADEOFFS_ROWS}}: 현재 코드 근거를 갖춘 선택, 이점, 비용, 대안, 변경 영향 표 행. -->
+    <section id="tradeoffs" data-guide-section="tradeoffs"><h2>설계 선택</h2><table><thead><tr><th>선택</th><th>코드 근거</th><th>얻는 것</th><th>비용</th><th>비교할 대안</th><th>변경 영향</th></tr></thead><tbody>{{TRADEOFFS_ROWS}}</tbody></table></section>
+    <!-- {{CHECK_CONTENT}}: 정확히 세 학습 질문과 details 안의 근거 있는 답. -->
+    <section id="check" data-guide-section="check"><h2>학습 확인</h2><div>{{CHECK_CONTENT}}</div></section>
+    <!-- {{EVIDENCE_CONTENT}}: 읽은 파일/테스트/규칙/런타임, 확인하지 않은 것, 추론을 구분한 목록. -->
+    <section id="evidence" data-guide-section="evidence"><h2>근거와 한계</h2><div class="legend"><span class="badge evidence">확인한 근거</span><span class="badge inference">추론 또는 미확인</span></div><div>{{EVIDENCE_CONTENT}}</div></section>
+  </main>
+</body>
+</html>

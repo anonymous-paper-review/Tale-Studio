@@ -9,22 +9,24 @@
 //   부호 규약: grant_* 와 hold_release(반환)는 양수, hold/consume/expire/refund_revoke 는 음수,
 //   manual_adjust 만 양방향 — DB CHECK 와 일치(20260901220000 마이그레이션).
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { takeBreakdown, type LedgerRow } from '@/lib/billing/account-summary'
 
 const GRANT_KINDS = ['grant_free', 'grant_plan', 'grant_purchase', 'grant_bonus'] as const
 type GrantKind = (typeof GRANT_KINDS)[number]
 
 /**
- * 워크스페이스의 현재 Take 잔액 — sum(delta).
- * 만기(expires_at < now)인 grant 의 잔여분을 제외하지 않는다 — 만기 정산은 expire 행이 처리하며
- * (다음 슬라이스), 이번 슬라이스는 원장 전체의 단순 합만 계산한다.
+ * 워크스페이스의 현재 Take 잔액.
+ * 만료일이 지난 lot 의 남은 양은 0 으로 친다 (#payments-phase-3 P13) — 만료 잡(Cron)이 만료 행을 넣기
+ * 전에도 잔액에 안 잡히게. 잡을 기다리면 잡 주기만큼 새는 창이 생긴다(1시간 주기면 최악 59분).
+ * 계산은 account-summary.takeBreakdown 과 같은 규칙이고, 화면·게이트가 같은 숫자를 보게 그 함수를 쓴다.
  */
 export async function takeBalance(workspaceId: string): Promise<number> {
   const { data, error } = await supabaseAdmin
     .from('take_ledger')
-    .select('delta')
+    .select('id, kind, delta, grant_id, expires_at, ref_kind, ref_id, reason, created_at')
     .eq('workspace_id', workspaceId)
   if (error) throw error
-  return (data ?? []).reduce((sum, row) => sum + (row.delta as number), 0)
+  return takeBreakdown((data ?? []) as LedgerRow[]).total
 }
 
 export interface GrantTakesInput {

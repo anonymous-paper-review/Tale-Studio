@@ -20,6 +20,20 @@ import type { OpsAlert } from '@/lib/ops-alert'
 
 export const PADDLE_SIGNATURE_TOLERANCE_MS = 5 * 60 * 1000
 
+/**
+ * DB 유일 제약 위반(Postgres 23505)인가 (#payments-phase-3 P14).
+ *   웹훅 재전송이 우리 서버 두 대에 동시에 떨어지면 조회(hasGrant/hasRevoke)는 둘 다 "없다" 를 받는다.
+ *   그때 두 번째 삽입을 DB 가 거부하는데, 그 거부는 사고가 아니라 "이미 적립됨" 이다 — 200 으로 답해야
+ *   Paddle 이 재전송을 멈춘다. 5xx 로 답하면 사흘간 계속 온다.
+ */
+function isUniqueViolation(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const code = (err as { code?: unknown }).code
+  if (code === '23505') return true
+  const message = (err as { message?: unknown }).message
+  return typeof message === 'string' && message.includes('duplicate key value violates unique constraint')
+}
+
 export function verifyPaddleSignature(input: {
   rawBody: string
   header: string | null | undefined
@@ -251,15 +265,20 @@ async function handleTransactionCompleted(event: PaddleEvent, deps: PaddleWebhoo
         body: `workspace ${workspace.id}, transaction ${txnId}. v4 충전 상한(무료는 Mini 1회)을 결제창 앞 판정이 막았어야 한다. Take 는 적립했다.`, // i18n-ok: 운영 경보(디스코드), 유저 화면 아님
       })
     }
-    await deps.grant({
-      workspaceId: workspace.id,
-      kind: 'grant_purchase',
-      amount: resolved.pack.takes,
-      expiresAt: addMonths(billedAt, 12),
-      refKind,
-      refId: txnId,
-      reason: `paddle pack ${resolved.pack.id}`,
-    })
+    try {
+      await deps.grant({
+        workspaceId: workspace.id,
+        kind: 'grant_purchase',
+        amount: resolved.pack.takes,
+        expiresAt: addMonths(billedAt, 12),
+        refKind,
+        refId: txnId,
+        reason: `paddle pack ${resolved.pack.id}`,
+      })
+    } catch (err) {
+      if (isUniqueViolation(err)) return 'already_granted'
+      throw err
+    }
     return 'pack_granted'
   }
 
@@ -277,15 +296,20 @@ async function handleTransactionCompleted(event: PaddleEvent, deps: PaddleWebhoo
     })
   }
   if (await deps.hasGrant(refKind, txnId)) return 'already_granted'
-  await deps.grant({
-    workspaceId: workspace.id,
-    kind: 'grant_plan',
-    amount: plan.entitlements.includedTakesPerMonth,
-    expiresAt: ends,
-    refKind,
-    refId: txnId,
-    reason: `paddle plan ${plan.id} (${str(data.origin) ?? 'web'})`,
-  })
+  try {
+    await deps.grant({
+      workspaceId: workspace.id,
+      kind: 'grant_plan',
+      amount: plan.entitlements.includedTakesPerMonth,
+      expiresAt: ends,
+      refKind,
+      refId: txnId,
+      reason: `paddle plan ${plan.id} (${str(data.origin) ?? 'web'})`,
+    })
+  } catch (err) {
+    if (isUniqueViolation(err)) return 'already_granted'
+    throw err
+  }
   return 'plan_granted'
 }
 
@@ -396,12 +420,17 @@ async function handleAdjustment(event: PaddleEvent, deps: PaddleWebhookDeps): Pr
   const amount = Math.min(Math.round(granted * ratio), Math.max(0, granted - alreadyRevoked))
   if (amount <= 0) return 'nothing_to_revoke'
 
-  await deps.revoke({
-    workspaceId: grants[0].workspaceId,
-    amount,
-    refId: adjId,
-    reason: `paddle ${action} of ${txnId} (${Math.round(ratio * 100)}%)`,
-  })
+  try {
+    await deps.revoke({
+      workspaceId: grants[0].workspaceId,
+      amount,
+      refId: adjId,
+      reason: `paddle ${action} of ${txnId} (${Math.round(ratio * 100)}%)`,
+    })
+  } catch (err) {
+    if (isUniqueViolation(err)) return 'already_revoked'
+    throw err
+  }
   await deps.alert({
     level: 'info',
     title: `${action === 'chargeback' ? '차지백' : '환불'} 회수`, // i18n-ok: 운영 경보(디스코드), 유저 화면 아님

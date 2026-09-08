@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-labelledby="diagram-title diagram-desc">
+  <!-- {{DIAGRAM_TITLE}}: 이 그림이 설명하는 실제 코드 흐름의 제목. -->
+  <title id="diagram-title">{{DIAGRAM_TITLE}}</title>
+  <!-- {{DIAGRAM_DESC}}: 화살표와 영역이 의미하는 실제 근거의 짧은 설명. -->
+  <desc id="diagram-desc">{{DIAGRAM_DESC}}</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/></marker>
+    <marker id="arrow-dashed" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/></marker>
+    <style>
+      .region { stroke-width:2; rx:16; } .browser { fill:#e9f1ff; stroke:#3766c3; } .server { fill:#f0eaff; stroke:#7650ba; } .database { fill:#e7f8ef; stroke:#287a55; } .external { fill:#fff1df; stroke:#a8610a; }
+      .node { fill:#fff; stroke:#3d4a63; stroke-width:1.5; rx:8; } .label { fill:#172033; font:600 16px system-ui,sans-serif; } .small { fill:#3f4c65; font:13px system-ui,sans-serif; } .flow { fill:none; stroke:#3559d8; stroke-width:2.5; marker-end:url(#arrow); } .intent { fill:none; stroke:#9a5a00; stroke-width:2.5; stroke-dasharray:8 6; marker-end:url(#arrow-dashed); }
+    </style>
+  </defs>
+  <!-- {{BROWSER_LABEL}}, {{SERVER_LABEL}}, {{DATABASE_LABEL}}, {{EXTERNAL_LABEL}}: 실행 영역의 실제 역할 이름. -->
+  <rect class="region browser" x="24" y="50" width="200" height="390"/><text class="label" x="44" y="82">브라우저 · {{BROWSER_LABEL}}</text>
+  <rect class="region server" x="260" y="50" width="260" height="390"/><text class="label" x="280" y="82">Next.js 서버 · {{SERVER_LABEL}}</text>
+  <rect class="region database" x="556" y="50" width="170" height="390"/><text class="label" x="576" y="82">DB · {{DATABASE_LABEL}}</text>
+  <rect class="region external" x="762" y="50" width="174" height="390"/><text class="label" x="782" y="82">외부 서비스 · {{EXTERNAL_LABEL}}</text>
+  <!-- {{BROWSER_NODE}}, {{SERVER_NODE}}, {{DATABASE_NODE}}, {{EXTERNAL_NODE}}: 실제 파일 또는 심볼 이름. 화살표는 확인한 호출/이동만 남긴다. -->
+  <rect class="node" x="48" y="170" width="152" height="70"/><text class="small" x="64" y="198">{{BROWSER_NODE}}</text><text class="small" x="64" y="219">입력 또는 화면 상태</text>
+  <rect class="node" x="284" y="170" width="212" height="70"/><text class="small" x="300" y="198">{{SERVER_NODE}}</text><text class="small" x="300" y="219">검사 · 비즈니스 규칙</text>
+  <rect class="node" x="576" y="170" width="130" height="70"/><text class="small" x="592" y="198">{{DATABASE_NODE}}</text><text class="small" x="592" y="219">읽기/쓰기</text>
+  <rect class="node" x="782" y="170" width="134" height="70"/><text class="small" x="798" y="198">{{EXTERNAL_NODE}}</text><text class="small" x="798" y="219">요청/응답</text>
+  <path class="flow" d="M200 205 H284"/><text class="small" x="218" y="190">{{REQUEST_LABEL}}</text>
+  <path class="flow" d="M496 205 H576"/><text class="small" x="512" y="190">{{DATABASE_LABEL}}</text>
+  <path class="flow" d="M496 225 H782"/><text class="small" x="628" y="252">{{EXTERNAL_LABEL}}</text>
+  <!-- {{INTENDED_RELATION}}: 구현되지 않았지만 의도를 명시해야 할 때만 점선으로 표시한다. 없으면 이 path를 제거한다. -->
+  <path class="intent" d="M124 320 H850"/><text class="small" x="440" y="308">의도: {{INTENDED_RELATION}}</text>
+  <text class="small" x="24" y="490">실선: 확인한 호출 또는 데이터 이동 · 점선: 의도한 관계 · {{EVIDENCE_NOTE}}</text>
+</svg>

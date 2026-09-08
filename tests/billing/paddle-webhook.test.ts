@@ -373,6 +373,51 @@ describe('환불', () => {
   })
 })
 
+describe('이중 적립 DB 제약 (P14)', () => {
+  // 왜: 웹훅 재전송이 우리 서버 두 대에 동시에 떨어지면 조회는 둘 다 "없다" 를 받는다. 그때 DB 가 두 번째를 거부하고,
+  //   핸들러는 그 거부를 "이미 적립됨" 으로 읽어야 한다. 5xx 로 답하면 Paddle 이 사흘간 재전송한다.
+  it('같은 결제로 두 번째 적립을 DB가 거부하면 이미 적립됨으로 보고 성공으로 답한다', async () => {
+    const { deps, state, balance } = makeDeps()
+    deps.grant = async () => {
+      const err = new Error('duplicate key value violates unique constraint "take_ledger_ref_unique"') as Error & { code?: string }
+      err.code = '23505'
+      throw err
+    }
+    const res = await send(deps, txnCompleted())
+    expect(res.status).toBe(200)
+    expect(res.body.result).toBe('already_granted')
+    expect(balance()).toBe(0)
+    expect(state.alerts).toEqual([])
+  })
+
+  // 왜: 같은 환불 알림이 "만들어짐"·"승인됨" 두 번 오는 것이 정상이라 회수도 같은 경로를 탄다.
+  it('같은 환불로 두 번째 회수를 DB가 거부해도 성공으로 답한다', async () => {
+    const { deps, state, balance } = makeDeps({ transactionTotals: { txn_1: 2900 } })
+    await send(deps, txnCompleted())
+    deps.revoke = async () => {
+      const err = new Error('duplicate key') as Error & { code?: string }
+      err.code = '23505'
+      throw err
+    }
+    const res = await send(deps, adjustmentEvent('evt_adj_dup'))
+    expect(res.status).toBe(200)
+    expect(res.body.result).toBe('already_revoked')
+    expect(balance()).toBe(50)
+    expect(state.alerts.some((a) => a.level === 'error')).toBe(false)
+  })
+
+  // 왜: 제약 위반이 아닌 진짜 오류(DB 다운 등)까지 삼키면 적립이 조용히 사라진다.
+  it('제약 위반이 아닌 오류는 그대로 실패로 답해 재전송을 받는다', async () => {
+    const { deps, state } = makeDeps()
+    deps.grant = async () => {
+      throw new Error('connection terminated')
+    }
+    const res = await send(deps, txnCompleted())
+    expect(res.status).toBe(500)
+    expect(state.alerts.some((a) => a.level === 'error')).toBe(true)
+  })
+})
+
 describe('경보 (P11)', () => {
   it('처리 실패·워크스페이스 없음·상품 매핑 없음·갱신 결제 실패는 경보로 간다', async () => {
     const { deps, state } = makeDeps()
