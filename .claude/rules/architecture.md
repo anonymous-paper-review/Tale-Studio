@@ -240,3 +240,22 @@ paths:
 - **자막 자리표시**: "누르면 자막을 넣어요"는 자막 상자에 마우스를 올렸을 때만 보이고(`group-hover/sub`), 재생 중에는 그리지 않는다.
 - **안내 문구 삭제**: "클립 우클릭 → 속도·분할·삭제" 제거(사전 키도 제거).
 - **축척 +/−**: 전체 보기 왼쪽에 −·"1초 = N px"·+. `zoomStep`(×1.25 / ÷1.25, 8~240 px 한계).
+
+## 배치도의 자세 권위와 END 추정 (2026-09-08, 오너 결정 — `tests/writer/stage-posture-authority.test.ts`, `tests/writer/stage-derived-end.test.ts`, `tests/director/real-no-blockout-ref.test.ts`)
+
+실측 겨울_8 sh_02_08(용족 수장 도약): 무대 비트는 '부유', 샷 배치 문장은 "crouched on ground" — 배치도는 비트를, 러프는 문장을 따라 어긋났고,
+비트에 END 가 없어 배치도 END 는 START 의 복사본이었다. 오너 결정: "B안에서 END 는 필요해. previz 생성 시 END 까지 생성하되 real 에서 이를 참조하지 않고
+생성하게 하자. A 도 같이."
+
+- **자세 권위(A)**: `stage/posture_text.postureFromPoseText` 가 샷 배치 문장(`character_blocking[].pose`)의 첫 절에서 가장 앞의 자세 낱말(영·한)을 읽고,
+  `apply.applyPostureAuthority` 가 START 의 자세를 비트 대신 그 낱말로 바꾼다. 비트가 START≠END 로 전이를 적었으면 END 의 전이는 지킨다. 바꿨으면
+  WARNING `자세 권위: 인물 — 샷 문장 "낱말" → 자세 (무대 비트: 자세)`. 비트 배열은 복사본만 쓴다(장부·다음 샷 불변).
+- **END 추정(B′)**: 비트에 END 가 없는 인물(핀 없음·프레임 안)은 `stage/derive_end.deriveShotEnd` 가 동작 문장(`character_motion.verb`)에서 끝 자세(가장 뒤 낱말)와
+  수직 방향(도약·비행 = up, 추락·착지 = down)을 읽어 END 상태를 만든다 — 공중이면 `posture:'floating'` + `z`(높이 m, 동작 크기별 0.8/2/3.5).
+  카메라가 이미 움직이지 않으면 카메라 무브도 추정: 상하 트래킹(대상 인물이 오르내리면 절반만 따라감), 좌우 트래킹, 틸트, 팬(크기별 고정값).
+  `geometry.placeCharacter` 가 `z` 를 발 위치에 반영하고 `ScreenPlacement.elevation_m` 을 남긴다. 결과는 `screen_layout.end`/`end_camera` + `end_derived {characters, camera}`.
+- **표시·프롬프트**: 배치도는 추정 캡슐을 점선으로, 공중 인물은 발밑 타원 대신 짧은 점선으로 그린다(`blockout.ts`). 러프 프롬프트는 추정 열을 "ESTIMATE …
+  the written movement and END description come first" 로 밝히고(`buildBlockoutClause(count, { estimatedColumns })`), END 자리 문장에 "airborne, clearly higher …"·
+  "now sitting" 꼬리를 단다. 추정은 INFO `END 추정(러프 전용, …)` 로만 남는다.
+- **경계(오너 결정)**: 추정은 previz 전용이다. 무대 비트·상태 장부·다음 샷 START 는 바뀌지 않고, 실사 스트립·그리드 라우트는 배치도(`rough-blockouts`)·`end_derived` 를
+  읽지 않는다(소스 스캔 테스트). 실사의 참조는 종전대로 러프 스트립 → 캐릭터 시트 → 배경 wide_shot → 스타일 앵커.

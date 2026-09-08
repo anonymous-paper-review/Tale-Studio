@@ -9,6 +9,8 @@ export interface BlockoutFigure {
   /** 러프 프롬프트의 "figure N" — character_blocking 순서(1부터) */
   n: number
   placement: ScreenPlacement
+  /** END 추정(#derived-end): 무대가 아니라 동작 문장에서 유도한 자리 — 점선 캡슐로 그린다 */
+  estimated?: boolean
 }
 
 export interface BlockoutPanel {
@@ -138,18 +140,27 @@ export function panelSvg(panel: BlockoutPanel, x0: number, y0: number, W: number
     const h = Math.max(6, p.apparent_height * H)
     const lying = p.posture === 'lying'
     const rx = Math.max(10, (lying ? h * 1.2 : h * 0.42))
-    parts.push(`<ellipse cx="${r(bx)}" cy="${r(by)}" rx="${r(rx)}" ry="${r(rx * 0.35)}" fill="${LEDGE_FILL}" stroke="${LEDGE_STROKE}" stroke-width="1"/>`)
+    // END 추정(#derived-end): 점선 캡슐 — 무대가 잰 자리가 아니라 동작 문장에서 유도한 자리라는 표시.
+    const dash = g.estimated ? ' stroke-dasharray="7 5"' : ''
+    const airborne = (p.elevation_m ?? 0) > 0
+    if (airborne) {
+      // 공중 인물: 발밑 타원(지면 자리) 대신 발 아래로 짧은 점선 — 지면에서 떠 있음.
+      const drop = Math.max(10, Math.min(30, h * 0.35))
+      parts.push(`<line x1="${r(bx)}" y1="${r(by)}" x2="${r(bx)}" y2="${r(by + drop)}" stroke="${LEDGE_STROKE}" stroke-width="1.5" stroke-dasharray="3 3"/>`)
+    } else {
+      parts.push(`<ellipse cx="${r(bx)}" cy="${r(by)}" rx="${r(rx)}" ry="${r(rx * 0.35)}" fill="${LEDGE_FILL}" stroke="${LEDGE_STROKE}" stroke-width="1"/>`)
+    }
     if (lying) {
       // 누운 인물: 화면 높이 h(발끝~몸 위, 이미 낮게 계산됨) 만큼의 가로 캡슐 — 발 위치에서 위로 h. 낮은 카메라에서
       //   발이 프레임 아래로 나가도 몸통 띠가 보인다(실측: 0.55h 로 그리면 통째로 잘려 빈 칸이 됐다).
       const w = Math.max(20, h * 2.6)
-      parts.push(`<rect class="fig" x="${r(bx - w / 2)}" y="${r(by - h)}" width="${r(w)}" height="${r(h)}" rx="${r(h / 2)}" fill="${FIGURE_FILL}" stroke="${FIGURE_STROKE}" stroke-width="2"/>`)
+      parts.push(`<rect class="fig" x="${r(bx - w / 2)}" y="${r(by - h)}" width="${r(w)}" height="${r(h)}" rx="${r(h / 2)}" fill="${FIGURE_FILL}" stroke="${FIGURE_STROKE}" stroke-width="2"${dash}/>`)
       parts.push(numberPaths(g.n, bx, by - h / 2, Math.max(8, Math.min(40, h * 0.6))))
     } else {
       const w = Math.max(6, h * 0.28)
-      parts.push(`<rect class="fig" x="${r(bx - w / 2)}" y="${r(by - h)}" width="${r(w)}" height="${r(h)}" rx="${r(w / 2)}" fill="${FIGURE_FILL}" stroke="${FIGURE_STROKE}" stroke-width="2"/>`)
+      parts.push(`<rect class="fig" x="${r(bx - w / 2)}" y="${r(by - h)}" width="${r(w)}" height="${r(h)}" rx="${r(w / 2)}" fill="${FIGURE_FILL}" stroke="${FIGURE_STROKE}" stroke-width="2"${dash}/>`)
       const hr = Math.max(4, w * 0.62)
-      parts.push(`<circle cx="${r(bx)}" cy="${r(by - h + hr * 0.6)}" r="${r(hr)}" fill="${FIGURE_FILL}" stroke="${FIGURE_STROKE}" stroke-width="2"/>`)
+      parts.push(`<circle cx="${r(bx)}" cy="${r(by - h + hr * 0.6)}" r="${r(hr)}" fill="${FIGURE_FILL}" stroke="${FIGURE_STROKE}" stroke-width="2"${dash}/>`)
       parts.push(numberPaths(g.n, bx, by - h * 0.45, Math.max(8, Math.min(40, h * 0.22))))
     }
     const [dx, dy] = facingDelta(p.facing)
@@ -186,16 +197,21 @@ export function buildBlockoutSheetSvg(columns: BlockoutColumn[], opts: BlockoutS
   return { svg, width, height }
 }
 
-/** screen_layout → 패널 쌍. 번호는 blocking 순서(1부터). END 배치가 없으면(정지) START 를 END 로 쓴다. */
+/** screen_layout → 패널 쌍. 번호는 blocking 순서(1부터). END 배치가 없으면(정지) START 를 END 로 쓴다.
+ *  END 추정(#derived-end)이 있으면 그 인물(카메라도 추정이면 전원)의 END 캡슐은 점선(estimated). */
 export function columnFromLayout(layout: ShotScreenLayout, blockingIds: string[]): BlockoutColumn {
   const n = (id: string) => blockingIds.indexOf(id) + 1
+  const derived = layout.end_derived
+  const estimated = (id: string) => !!derived && (derived.camera || derived.characters.includes(id))
   const start: BlockoutPanel = {
     camera: layout.camera,
     figures: layout.characters.filter((c) => n(c.character_id) > 0).map((c) => ({ n: n(c.character_id), placement: c.start })),
   }
   const end: BlockoutPanel = {
     camera: layout.end_camera ?? layout.camera,
-    figures: layout.characters.filter((c) => n(c.character_id) > 0).map((c) => ({ n: n(c.character_id), placement: c.end ?? c.start })),
+    figures: layout.characters
+      .filter((c) => n(c.character_id) > 0)
+      .map((c) => ({ n: n(c.character_id), placement: c.end ?? c.start, ...(estimated(c.character_id) ? { estimated: true } : {}) })),
   }
   return { start, end }
 }

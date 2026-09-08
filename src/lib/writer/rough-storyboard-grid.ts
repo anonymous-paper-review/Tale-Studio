@@ -297,16 +297,43 @@ export function describePlacement(p: ScreenPlacement): string {
   return `${POSITION_PHRASES[p.position_in_frame] ?? words(p.position_in_frame)}, in the ${p.depth_band}, ${sizePhrase(p.apparent_height)}, ${facing}`
 }
 function placementDiffers(a: ScreenPlacement, b: ScreenPlacement): boolean {
-  return a.position_in_frame !== b.position_in_frame || Math.abs(a.apparent_height - b.apparent_height) > 0.15 || a.depth_band !== b.depth_band || a.in_frame !== b.in_frame
+  return (
+    a.position_in_frame !== b.position_in_frame ||
+    Math.abs(a.apparent_height - b.apparent_height) > 0.15 ||
+    a.depth_band !== b.depth_band ||
+    a.in_frame !== b.in_frame ||
+    // #derived-end: 위아래 이동(도약·추락)과 자세 변화(서기↔걷기↔달리기는 같은 그림)도 END 자리로 친다.
+    Math.abs(a.screen_y - b.screen_y) > 0.25 ||
+    postureClass(a.posture) !== postureClass(b.posture)
+  )
+}
+function postureClass(p: ScreenPlacement['posture']): string {
+  return !p || p === 'standing' || p === 'walking' || p === 'running' || p === 'other' ? 'up' : p
+}
+/** END 자리 문장 — 공중(도약·비행)과 낮은 자세는 위치 낱말만으로 안 보인다. 프레임 위로 나간 인물은 자리 대신 그 사실을 적는다. */
+function endPlacementSentence(figureNo: number, p: ScreenPlacement): string {
+  if ((p.elevation_m ?? 0) > 0 && !p.in_frame) return `figure ${figureNo} has risen out of the frame through the top edge by END — airborne, no longer visible`
+  const note =
+    (p.elevation_m ?? 0) > 0
+      ? ' — airborne, clearly higher in the frame than at START, off the ground'
+      : p.posture === 'sitting' || p.posture === 'kneeling' || p.posture === 'crouching'
+        ? `, now ${p.posture}`
+        : ''
+  return `figure ${figureNo} ends ${describePlacement(p)}${note}`
 }
 
 /**
  * #blockout(2026-09-03, 무대 진단서 3번): 두 번째 참조(배치도 시트)의 계약. 열 = 샷(스토리보드 열 순서),
  *   위 = START, 아래 = END. 실험(2026-09-02)에서 이 문안으로 gpt-image-2 가 위치·크기·향을 3/3 따랐다.
  */
-export function buildBlockoutClause(shotCount: number): string {
+export function buildBlockoutClause(shotCount: number, opts?: { estimatedColumns?: number[] }): string {
   const cols = shotCount <= 1 ? 'a single column (this shot)' : `${shotCount} columns — column N is shot N in the same order as the storyboard columns`
-  return `The SECOND reference image is the blocking diagram sheet for these shots: ${cols}; the TOP panel of each column is that shot's START, the BOTTOM panel is its END. In each panel the ground grid shows the perspective and the horizon (eye level); each gray capsule marks where a figure stands and how large it appears from the camera, and the number drawn on it is that figure's number in the shot description (a wide horizontal capsule is a figure lying down); the short red stroke at its feet shows which way it faces (down = toward the camera, up = away, sideways = in profile); the ellipse under it is the ground patch or ledge it stands on. This diagram is a hard placement contract: draw figure N exactly where capsule N is — same position in the frame, same size, same depth and facing — in the START and END panels; figures cut by the panel edge in the diagram stay cut the same way. Never draw the grid, the capsules, the numbers, the red strokes or the diagram itself — only real figures, ground and scenery in those places.`
+  const base = `The SECOND reference image is the blocking diagram sheet for these shots: ${cols}; the TOP panel of each column is that shot's START, the BOTTOM panel is its END. In each panel the ground grid shows the perspective and the horizon (eye level); each gray capsule marks where a figure stands and how large it appears from the camera, and the number drawn on it is that figure's number in the shot description (a wide horizontal capsule is a figure lying down); the short red stroke at its feet shows which way it faces (down = toward the camera, up = away, sideways = in profile); the ellipse under it is the ground patch or ledge it stands on; a capsule with no ellipse and a short dotted line below its feet is a figure in the air, off the ground. This diagram is a hard placement contract: draw figure N exactly where capsule N is — same position in the frame, same size, same depth and facing — in the START and END panels; figures cut by the panel edge in the diagram stay cut the same way. Never draw the grid, the capsules, the numbers, the red strokes or the diagram itself — only real figures, ground and scenery in those places.`
+  // #derived-end(2026-09-08): 동작 문장에서 유도한 END 는 점선 캡슐 — 추정이라 움직임 문장이 우선한다.
+  const est = (opts?.estimatedColumns ?? []).filter((c) => Number.isInteger(c) && c > 0)
+  if (!est.length) return base
+  const which = shotCount <= 1 ? 'this column' : `column${est.length > 1 ? 's' : ''} ${est.join(', ')}`
+  return `${base} In ${which} the END panel is an ESTIMATE derived from the written movement (dashed capsules), not a measured stage position: for that END panel the written movement and END description come first, and the diagram only shows the direction and rough amount of the change.`
 }
 
 /** rich(shotDesign)/fallback(DB) 공용 — 기존 RoughStoryboardPromptInput 을 셀 서술로 요약. */
@@ -564,7 +591,7 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
     .map((b, i) => {
       const lay = layoutById.get(b.character_id)
       if (!lay?.end || !placementDiffers(lay.start, lay.end)) return null
-      return `figure ${i + 1} ends ${describePlacement(lay.end)}`
+      return endPlacementSentence(i + 1, lay.end)
     })
     .filter((v): v is string => !!v)
   const endWithLayout = endPlacements.length ? `${endBase}. Positions at END: ${endPlacements.join('; ')}` : endBase

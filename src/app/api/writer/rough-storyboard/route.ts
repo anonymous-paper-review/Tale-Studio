@@ -625,7 +625,14 @@ export async function POST(req: Request) {
             const { error: upErr } = await mediaUpload(path, png, { contentType: 'image/png', upsert: true })
             if (upErr) throw upErr
             blockoutUrl = mediaPublicUrl(path) // 파일명에 시각이 있어 캐시 버스팅 불요
-            prompt = `${prompt}\n\n${buildBlockoutClause(chunk.length)}`
+            // #derived-end(2026-09-08): 동작 문장에서 유도한 END 가 있는 열은 추정이라고 밝힌다(점선 캡슐).
+            const estimatedColumns = chunk
+              .map((s, i) => {
+                const lay = resolvedSpecByShotId.get(s.shot_id as string)?.staticSpec?.screen_layout
+                return lay?.end_derived && (lay.end_derived.camera || lay.end_derived.characters.length) ? i + 1 : 0
+              })
+              .filter((c) => c > 0)
+            prompt = `${prompt}\n\n${buildBlockoutClause(chunk.length, { estimatedColumns })}`
           }
         } catch (e) {
           console.warn('[rough-storyboard] blockout sheet skipped:', e instanceof Error ? e.message : e)
