@@ -230,3 +230,13 @@ paths:
   과/와·아/야·으로/로를 받침에 맞춘다. `script-lines.replaceSlugs` 도 같은 규칙(prefix '' 일 때).
 - **표시**: Director 그리드 카드의 한국어 설명·노드 카드 프롬프트 줄, Writer 대사 뷰, Editor 타임라인·소스 패널·미리보기가 치환을 쓴다.
   로스터는 `use-entity-names.ts`(writer 스토어 sceneManifest, 없으면 loadProject 1회).
+
+## Editor 다섯 가지 (2026-09-08, 오너 지시 — `tests/editor/transitions-and-controls.test.ts`)
+
+- **타이틀 카드 삽입 시 오디오 동행**: `addTitleCard` 가 끼우는 자리(끼어드는 영상의 시작, 맨 뒤면 전체 길이) 뒤에서 시작하는 오디오를 카드 길이만큼 민다. 앞의 오디오는 그대로.
+- **디졸브**(`lib/editor/transition.ts`): 클립 앞 경계의 `VideoClip.transitionIn = { type: 'dissolve', durationSec }`. 미리보기는 검은 막(`dissolve-overlay`)의
+  투명도만 `dissolveOpacityAt` 로 바꾼다 — 경계에서 1, 길이의 절반 밖에서 0. 우클릭 메뉴 "디졸브(검은 화면 전환)" 에서 없음·0.5·1·2초.
+  스냅샷(editor_states)에 저장·복원, 되돌리기 대상. 내보내기 합성은 없다(샷 ZIP 은 원본 파일).
+- **자막 자리표시**: "누르면 자막을 넣어요"는 자막 상자에 마우스를 올렸을 때만 보이고(`group-hover/sub`), 재생 중에는 그리지 않는다.
+- **안내 문구 삭제**: "클립 우클릭 → 속도·분할·삭제" 제거(사전 키도 제거).
+- **축척 +/−**: 전체 보기 왼쪽에 −·"1초 = N px"·+. `zoomStep`(×1.25 / ÷1.25, 8~240 px 한계).

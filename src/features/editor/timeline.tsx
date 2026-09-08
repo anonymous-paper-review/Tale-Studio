@@ -3,7 +3,9 @@
 import { useRef, useCallback, useMemo, useEffect, useState } from 'react'
 import { useEntityNames } from '@/lib/writer/use-entity-names'
 import { resolveEntityNames } from '@/lib/writer/resolve-entity-names'
-import { Trash2, Plus, Volume2, VolumeX, Scissors, Gauge, Type } from 'lucide-react'
+import { Trash2, Plus, Volume2, VolumeX, Scissors, Gauge, Type, Blend } from 'lucide-react'
+import { DISSOLVE_CHOICES } from '@/lib/editor/transition'
+import type { ClipTransition } from '@/types'
 import type { Shot, VideoClip, AudioTrackClip, AudioSource } from '@/types'
 import { cn } from '@/lib/utils'
 import { ingestAudioFile, drawWaveform } from '@/lib/audio-waveform'
@@ -68,6 +70,8 @@ interface TimelineProps {
   onZoom: (nextPxPerSec: number) => void
   onSplitVideo: (shotId: string, atGlobalSec: number) => void
   onSetSpeed: (shotId: string, speed: number) => void
+  /** 화면 전환(2026-09-08): 클립 앞 경계의 디졸브 넣기·빼기 */
+  onSetTransitionIn: (shotId: string, transition: ClipTransition | null) => void
   onAddAudioSource: (source: AudioSource) => void
   onAddAudioFromSource: (sourceId: string, atGlobalSec: number, trackId?: string) => void
   onAddAudioTrack: () => void
@@ -391,6 +395,7 @@ export function Timeline({
   onZoom,
   onSplitVideo,
   onSetSpeed,
+  onSetTransitionIn,
   onAddAudioSource,
   onAddAudioFromSource,
   onAddAudioTrack,
@@ -1028,6 +1033,20 @@ export function Timeline({
                           <ContextMenuRadioGroup value={String(clip?.speed ?? 1)} onValueChange={(v) => targets.forEach((id) => onSetSpeed(id, Number(v)))}>
                             {CLIP_SPEEDS.map((sp) => (
                               <ContextMenuRadioItem key={sp} value={String(sp)} className="text-xs">{sp.toFixed(2)}×</ContextMenuRadioItem>
+                            ))}
+                          </ContextMenuRadioGroup>
+                        </ContextMenuSubContent>
+                      </ContextMenuSub>
+                      <ContextMenuSub>
+                        <ContextMenuSubTrigger className="text-xs"><Blend className="size-3.5" /> {t('Dissolve (dip to black)')}</ContextMenuSubTrigger>
+                        <ContextMenuSubContent>
+                          <ContextMenuRadioGroup
+                            value={clip?.transitionIn ? String(clip.transitionIn.durationSec) : 'none'}
+                            onValueChange={(v) => targets.forEach((id) => onSetTransitionIn(id, v === 'none' ? null : { type: 'dissolve', durationSec: Number(v) }))}
+                          >
+                            <ContextMenuRadioItem value="none" className="text-xs">{t('No dissolve')}</ContextMenuRadioItem>
+                            {DISSOLVE_CHOICES.map((sec) => (
+                              <ContextMenuRadioItem key={sec} value={String(sec)} className="text-xs">{t('{seconds}s dissolve', { seconds: sec })}</ContextMenuRadioItem>
                             ))}
                           </ContextMenuRadioGroup>
                         </ContextMenuSubContent>

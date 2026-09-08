@@ -16,6 +16,8 @@ import {
   Undo2,
   Redo2,
   Type,
+  Minus,
+  Plus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { VideoPreviewer } from '@/features/editor/video-previewer'
@@ -25,7 +27,7 @@ import { AudioMeter } from '@/features/editor/audio-meter'
 import { ResizeHandle } from '@/features/editor/resize-handle'
 import { useEditorPlayback } from '@/features/editor/use-editor-playback'
 import { prefetchVideos, resetVideoPrefetchFor } from '@/features/editor/video-prefetch'
-import { useEditorStore, selectTimelineLayout } from '@/stores/editor-store'
+import { useEditorStore, selectTimelineLayout, zoomStep } from '@/stores/editor-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { decodeAudioPeaks } from '@/lib/audio-waveform'
@@ -95,6 +97,7 @@ export default function PostPage() {
     toggleSourcePanel,
     seek,
     setPxPerSec,
+    setTransitionIn,
     setPanelSize,
     toggleAudioMute,
     toggleAudioTrackMute,
@@ -616,11 +619,19 @@ export default function PostPage() {
             </Button>
           </div>
 
-          <span className="text-[10px] text-muted-foreground">
-            {t('Right-click a clip → speed, split, delete')}
-          </span>
-
           <div className="ml-auto flex items-center gap-2">
+            {/* 축척 −·지표·+ (2026-09-08 오너 지시 5번) — 전체 보기 왼쪽. 지표는 1초당 픽셀. */}
+            <div className="flex items-center gap-0.5 rounded-md border border-border px-0.5">
+              <Button size="icon" variant="ghost" className="size-6 hover-red-beam" onClick={() => setPxPerSec(zoomStep(pxPerSec, 'out'))} title={t('Zoom out timeline')}>
+                <Minus className="size-3" />
+              </Button>
+              <span className="min-w-[64px] text-center font-mono text-[10px] tabular-nums text-muted-foreground" title={t('Timeline scale')}>
+                {t('1s = {px}px', { px: Math.round(pxPerSec) })}
+              </span>
+              <Button size="icon" variant="ghost" className="size-6 hover-red-beam" onClick={() => setPxPerSec(zoomStep(pxPerSec, 'in'))} title={t('Zoom in timeline')}>
+                <Plus className="size-3" />
+              </Button>
+            </div>
             {/* 전체 보기(#watch-all) — 전 클립 프리로드 후 처음부터 연속 재생 */}
             <Button
               size="sm"
@@ -749,6 +760,7 @@ export default function PostPage() {
               onUpdateAudioClip={updateAudioClip}
               onSetTrim={setTrim}
               onSetTitleCardDuration={setTitleCardDuration}
+              onSetTransitionIn={setTransitionIn}
               onPushHistory={pushHistory}
             />
           </div>

@@ -17,6 +17,7 @@ import {
   type ShotSubtitle,
 } from '@/lib/editor/subtitle'
 import { layoutTitleText } from '@/lib/editor/title-card'
+import { useEditorStore } from '@/stores/editor-store'
 import { useT } from '@/lib/i18n'
 
 let measureCanvas: HTMLCanvasElement | null = null
@@ -101,6 +102,8 @@ export function SubtitleLayer({
   }
 
   const empty = lines.length === 0
+  // 자리표시 문구(2026-09-08 오너 지시 3번): 마우스를 올렸을 때만 보이고, 재생 중에는 보이지 않는다.
+  const isPlaying = useEditorStore((s) => s.isPlaying)
   return (
     <div
       ref={boxRef}
@@ -108,7 +111,7 @@ export function SubtitleLayer({
       tabIndex={0}
       role="textbox"
       aria-label={t('Subtitle')}
-      className="absolute z-10 max-w-[90%] -translate-x-1/2 -translate-y-1/2 cursor-move select-none text-center text-white outline-none focus-visible:ring-1 focus-visible:ring-primary"
+      className="group/sub absolute z-10 max-w-[90%] -translate-x-1/2 -translate-y-1/2 cursor-move select-none text-center text-white outline-none focus-visible:ring-1 focus-visible:ring-primary"
       style={{
         left: `${subtitle.x * 100}%`,
         top: `${subtitle.y * 100}%`,
@@ -147,7 +150,12 @@ export function SubtitleLayer({
           style={{ font: subtitleFont(size.h), lineHeight: `${fontPx * SUBTITLE_LINE_HEIGHT}px`, WebkitTextStroke: '0' }}
         />
       ) : empty ? (
-        <span className="text-white/35" style={{ WebkitTextStroke: '0' }}>{t('Click to add a subtitle')}</span>
+        <span
+          className={`text-white/35 opacity-0 transition-opacity group-hover/sub:opacity-100 ${isPlaying ? 'invisible' : ''}`}
+          style={{ WebkitTextStroke: '0' }}
+        >
+          {!isPlaying && t('Click to add a subtitle')}
+        </span>
       ) : (
         lines.map((line, i) => (
           <div key={i} className="whitespace-pre">

@@ -1,6 +1,7 @@
 'use client'
 
 import { Play, Pause, Volume2, VolumeX } from 'lucide-react'
+import { dissolveOpacityAt } from '@/lib/editor/transition'
 import { useEntityNames } from '@/lib/writer/use-entity-names'
 import { resolveEntityNames } from '@/lib/writer/resolve-entity-names'
 import { useRef, useState, useEffect, useCallback } from 'react'
@@ -31,6 +32,7 @@ export function VideoPreviewer() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const fillRef = useRef<HTMLDivElement>(null)
   const timeRef = useRef<HTMLSpanElement>(null)
+  const dissolveRef = useRef<HTMLDivElement>(null)
   const activeIdRef = useRef<string | null>(null)
 
   const [activeShotId, setActiveShotId] = useState<string | null>(null)
@@ -60,6 +62,7 @@ export function VideoPreviewer() {
       const preview = st.previewSourceShotId
 
       if (preview) {
+        if (dissolveRef.current) dissolveRef.current.style.opacity = '0'
         if (preview !== activeIdRef.current) {
           activeIdRef.current = preview
           setActiveShotId(preview)
@@ -88,6 +91,8 @@ export function VideoPreviewer() {
       const layout = selectTimelineLayout(st)
       const total = layout.reduce((sum, l) => sum + l.durationSec, 0)
       const t = st.currentTime
+      // 디졸브(2026-09-08): 검은 막의 투명도만 시간에 따라 — 영상 픽셀은 손대지 않는다.
+      if (dissolveRef.current) dissolveRef.current.style.opacity = String(dissolveOpacityAt(layout, st.videoClips, t))
 
       // 영상이 없는 구간에선 클립을 강제로 잡지 않음 → 검은 화면 (요청 1)
       const item = layout.find((l) => t >= l.startSec && t < l.startSec + l.durationSec)
@@ -217,6 +222,9 @@ export function VideoPreviewer() {
         // 영상 없는 구간 = 검은 화면. 타임라인이 비었을 때만 안내 문구.
         !hasClips && <p className="text-sm text-muted-foreground">{t('No clips in the timeline')}</p>
       )}
+
+      {/* 디졸브 막(2026-09-08): 검은 화면의 투명도만 바뀐다 — 클릭은 통과 */}
+      <div ref={dissolveRef} data-testid="dissolve-overlay" className="pointer-events-none absolute inset-0 z-20 bg-black" style={{ opacity: 0 }} />
 
       {/* 재생 컨트롤 (항상 표시 — 검은 구간에서도 스크럽 가능) */}
       <div className="absolute bottom-0 left-0 right-0 flex items-center gap-3 bg-gradient-to-t from-black/80 to-transparent px-4 pb-4 pt-8">

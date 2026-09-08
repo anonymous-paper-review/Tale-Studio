@@ -14,6 +14,7 @@ export type {
   VideoClip,
   AudioTrackClip,
   AudioSource,
+  ClipTransition,
 } from './shot'
 export { DEFAULT_CAMERA_PRESET } from './shot'
 export type { TechniqueCategory, KnowledgeTechnique } from './knowledge'
