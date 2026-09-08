@@ -1534,6 +1534,8 @@ export const KO: Record<string, string> = {
   Pricing: '요금제',
   'Pay for the minutes you plan and the Takes you spend. Images are always free.': '기획한 분량과 쓴 Take만큼만 냅니다. 이미지는 언제나 무료예요.',
   Beta: '베타',
+  // 결제 준비 중 안내 — 도메인 승인 나면 pricing 배너와 함께 지운다 (2026-09-08)
+  'Payments are being set up. Buttons open soon.': '결제를 준비하고 있어요. 곧 열려요.',
   'Four things a plan gives you': '요금제가 주는 네 가지',
   'Every plan is measured on the same four axes. Higher plans do not unlock features. They give you more room.':
     '모든 요금제는 같은 네 축으로 재요. 상위 요금제가 기능을 더 여는 게 아니라, 쓸 수 있는 양이 커져요.',

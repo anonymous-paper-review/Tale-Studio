@@ -162,6 +162,12 @@ export default function PricingPage() {
           </p>
         </div>
 
+        {/* 결제 준비 중 안내 — Paddle 도메인 승인이 나기 전에는 결제창이 안 열린다(거래 생성 단계에서 막힘).
+            승인되면 이 블록만 지우면 된다. 2026-09-08. */}
+        <div className="mb-16 rounded-2xl border border-primary/30 bg-primary/10 px-5 py-4 text-center text-sm text-gray-200">
+          {t('Payments are being set up. Buttons open soon.')}
+        </div>
+
         <section className="mb-20">
           <SectionHeading
             title={t('Four things a plan gives you')}
