@@ -791,23 +791,11 @@ export function StoryboardGridView({
     [activeJobs],
   )
 
-  // 진행 중인 산출물이 있으면 해당 Storyboard 화면을 우선 보여준다.
-  // 큐가 사라질 때 사용자가 고른 마지막 미디어 모드로 되돌리지 않는다(마지막 탭 기억은 store가 담당).
-  const hasQueuedRealWork = activeJobs.some(
-    (job) =>
-      job.kind === 'storyboard_real_grid' ||
-      job.kind === 'shot_storyboard' ||
-      job.kind === 'shot_video',
-  )
-  const hasQueuedPrevizWork = activeJobs.some(
-    (job) => job.kind === 'shot_rough_storyboard',
-  )
-  useEffect(() => {
-    if (hasQueuedRealWork && mediaMode !== 'real') setStoryboardMediaMode('real')
-    else if (!hasQueuedRealWork && hasQueuedPrevizWork && mediaMode !== 'previz') {
-      setStoryboardMediaMode('previz')
-    }
-  }, [hasQueuedPrevizWork, hasQueuedRealWork, mediaMode, setStoryboardMediaMode])
+  // 진행 중인 작업을 보고 Previz/Real 을 대신 바꾸던 effect 를 제거했다
+  //   (#view-not-forced 2026-09-08 오너 판정). 진입 시 한 번이 아니라 작업이 도는 내내
+  //   되돌려서, 사용자가 Previz 를 눌러도 다음 렌더에 Real 로 다시 튕겼다.
+  //   같은 판정으로 store 의 restoreActiveGenerationView 도 함께 없앴다 —
+  //   탭·미디어 모드는 사용자가 고르고, 진행 표시는 카드 스피너·배지가 담당한다.
 
   // 완료 즉시 반영(#live-refresh) — 페이지 레벨 훅(use-queue-rehydrate)으로 승격돼 Node 뷰와
   //   공유한다(2026-08-12). 여기서 중복 구독하지 않는다.
