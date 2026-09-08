@@ -13,6 +13,10 @@
 - 브랜치 = 환경: `main` → Vercel Production(live) / `dev` → Preview(개발).
   local·dev는 개발 Supabase 프로젝트를 공유하고 live는 main 전용 — live DB를 dev가 바라보게 하지 않는다.
 - 스키마는 `supabase/migrations/` 파일로만 바꾼다. 대시보드 직접 수정 금지, 개발 DB 먼저 → live 순서.
+  마이그레이션을 넣었으면 `pnpm db:types` 로 `src/types/database.ts` 를 다시 만든다(#db-types-drift 2026-09-08).
+  안 만들면 `tests/ops/db-types-drift.test.ts` 가 빠진 표 이름을 찍으며 커밋을 막는다.
+  기준은 **개발 DB**다 — live 에는 아직 안 올라간 마이그레이션이 있을 수 있고 코드는 개발 DB 를 본다.
+  단, 지금은 `createClient` 에 `<Database>` 를 물리지 않아 **타입이 쿼리를 검사하지 못한다**(미결).
 - 키 스코프: 개발·샌드박스 키 = Vercel Preview/Development, 라이브 키 = Production에만.
   결제(MoR) 웹훅도 같은 매핑 — 샌드박스 → dev 도메인 / 라이브 → production 도메인.
 - CI: `.github/workflows/ci.yml`이 main·dev push와 PR에서 `pnpm typecheck && pnpm lint:design && pnpm test`를 돈다

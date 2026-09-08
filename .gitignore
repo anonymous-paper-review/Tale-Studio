@@ -80,6 +80,9 @@ scripts/*
 # src/lib/billing/smoke-checks.ts 가 소유한다. 빠지면 배포마다 도는 검사가 클린 클론에서 사라진다.
 !scripts/smoke-billing.mjs
 !scripts/smoke-billing-paid.mjs
+# DB 타입 재생성(#db-types-drift) — pnpm db:types 가 부르고 tests/ops/db-types-drift.test.ts 가
+# 이 명령의 존재를 검사한다. 빠지면 클린 클론에서 pnpm test 가 깨진다.
+!scripts/db-types.mjs
 # 같은 이유 — tests/seed-test-accounts.test.ts 가 이 스크립트를 import 한다.
 # 빠지면 클린 클론에서 pnpm typecheck 가 TS2307 로 깨진다. 하드코딩 비밀 없음
 # (service-role 키는 .env.local 에서 읽는다).

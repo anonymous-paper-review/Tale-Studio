@@ -7,40 +7,98 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.1"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
-      camera_light_presets: {
+      billing_customers: {
+        Row: {
+          created_at: string
+          mor_customer_id: string | null
+          mor_provider: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          mor_customer_id?: string | null
+          mor_provider?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          mor_customer_id?: string | null
+          mor_provider?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "billing_customers_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      billing_events: {
         Row: {
           id: string
-          project_id: string
-          name: string
-          camera: Json
-          lighting: Json
-          camera_preset: Json
-          created_at: string | null
-          updated_at: string | null
+          mor_event_id: string
+          payload: Json
+          processed_at: string | null
+          received_at: string
+          type: string
         }
         Insert: {
           id?: string
-          project_id: string
-          name: string
-          camera: Json
-          lighting: Json
-          camera_preset: Json
-          created_at?: string | null
-          updated_at?: string | null
+          mor_event_id: string
+          payload: Json
+          processed_at?: string | null
+          received_at?: string
+          type: string
         }
         Update: {
           id?: string
-          project_id?: string
-          name?: string
+          mor_event_id?: string
+          payload?: Json
+          processed_at?: string | null
+          received_at?: string
+          type?: string
+        }
+        Relationships: []
+      }
+      camera_light_presets: {
+        Row: {
+          camera: Json
+          camera_preset: Json
+          created_at: string | null
+          id: string
+          lighting: Json
+          name: string
+          project_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          camera: Json
+          camera_preset: Json
+          created_at?: string | null
+          id?: string
+          lighting: Json
+          name: string
+          project_id: string
+          updated_at?: string | null
+        }
+        Update: {
           camera?: Json
-          lighting?: Json
           camera_preset?: Json
           created_at?: string | null
+          id?: string
+          lighting?: Json
+          name?: string
+          project_id?: string
           updated_at?: string | null
         }
         Relationships: [
@@ -53,66 +111,137 @@ export type Database = {
           },
         ]
       }
-      character_image_candidates: {
+      character_appearances: {
         Row: {
-          id: string
-          project_id: string
+          appearance: string | null
+          appearance_key: string
+          appearance_native: string | null
           character_id: string
-          view: string
-          url: string
-          source_hash: string | null
-          job_id: string | null
-          is_selected: boolean
-          generated_at: string
+          costume: string[] | null
           created_at: string
-          pinned: boolean
-          variant_key: string | null
-          appearance_hash: string | null
+          derived_from_url: string | null
+          i18n_provenance: Json | null
+          id: string
+          is_default: boolean
+          label: string
+          narrative_time: string | null
+          portrait_url: string | null
+          project_id: string
+          sheet_url: string | null
+          source_hash: string | null
+          updated_at: string
         }
         Insert: {
-          id?: string
-          project_id: string
+          appearance?: string | null
+          appearance_key: string
+          appearance_native?: string | null
           character_id: string
-          view: string
-          url: string
-          source_hash?: string | null
-          job_id?: string | null
-          is_selected?: boolean
-          generated_at?: string
+          costume?: string[] | null
           created_at?: string
-          pinned?: boolean
-          variant_key?: string | null
-          appearance_hash?: string | null
+          derived_from_url?: string | null
+          i18n_provenance?: Json | null
+          id?: string
+          is_default?: boolean
+          label: string
+          narrative_time?: string | null
+          portrait_url?: string | null
+          project_id: string
+          sheet_url?: string | null
+          source_hash?: string | null
+          updated_at?: string
         }
         Update: {
-          id?: string
-          project_id?: string
+          appearance?: string | null
+          appearance_key?: string
+          appearance_native?: string | null
           character_id?: string
-          view?: string
-          url?: string
-          source_hash?: string | null
-          job_id?: string | null
-          is_selected?: boolean
-          generated_at?: string
+          costume?: string[] | null
           created_at?: string
-          pinned?: boolean
-          variant_key?: string | null
-          appearance_hash?: string | null
+          derived_from_url?: string | null
+          i18n_provenance?: Json | null
+          id?: string
+          is_default?: boolean
+          label?: string
+          narrative_time?: string | null
+          portrait_url?: string | null
+          project_id?: string
+          sheet_url?: string | null
+          source_hash?: string | null
+          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "character_image_candidates_project_id_character_id_fkey"
-            columns: ["character_id"]
+            foreignKeyName: "character_appearances_character_fk"
+            columns: ["project_id", "character_id"]
             isOneToOne: false
             referencedRelation: "characters"
-            referencedColumns: ["character_id"]
+            referencedColumns: ["project_id", "character_id"]
           },
           {
-            foreignKeyName: "character_image_candidates_project_id_character_id_fkey"
-            columns: ["character_id"]
+            foreignKeyName: "character_appearances_project_id_fkey"
+            columns: ["project_id"]
             isOneToOne: false
-            referencedRelation: "characters"
-            referencedColumns: ["project_id"]
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      character_image_candidates: {
+        Row: {
+          appearance_hash: string | null
+          appearance_key: string
+          character_id: string
+          created_at: string
+          generated_at: string
+          id: string
+          is_selected: boolean
+          job_id: string | null
+          pinned: boolean
+          project_id: string
+          source_hash: string | null
+          url: string
+          variant_key: string | null
+          view: string
+        }
+        Insert: {
+          appearance_hash?: string | null
+          appearance_key: string
+          character_id: string
+          created_at?: string
+          generated_at?: string
+          id?: string
+          is_selected?: boolean
+          job_id?: string | null
+          pinned?: boolean
+          project_id: string
+          source_hash?: string | null
+          url: string
+          variant_key?: string | null
+          view: string
+        }
+        Update: {
+          appearance_hash?: string | null
+          appearance_key?: string
+          character_id?: string
+          created_at?: string
+          generated_at?: string
+          id?: string
+          is_selected?: boolean
+          job_id?: string | null
+          pinned?: boolean
+          project_id?: string
+          source_hash?: string | null
+          url?: string
+          variant_key?: string | null
+          view?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "character_image_candidates_appearance_fk"
+            columns: ["project_id", "character_id", "appearance_key"]
+            isOneToOne: false
+            referencedRelation: "character_appearances"
+            referencedColumns: ["project_id", "character_id", "appearance_key"]
           },
           {
             foreignKeyName: "character_image_candidates_job_id_fkey"
@@ -120,20 +249,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "generation_jobs"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "character_image_candidates_project_id_character_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "characters"
-            referencedColumns: ["project_id"]
-          },
-          {
-            foreignKeyName: "character_image_candidates_project_id_character_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "characters"
-            referencedColumns: ["character_id"]
           },
           {
             foreignKeyName: "character_image_candidates_project_id_fkey"
@@ -146,94 +261,52 @@ export type Database = {
       }
       character_relationships: {
         Row: {
+          character_a: string
+          character_b: string
+          created_at: string
           id: string
           project_id: string
-          character_a: string
-          character_b: string
-          type: string
           state_change: string | null
-          visible_in_video: boolean
-          created_at: string
+          type: string
           updated_at: string
+          visible_in_video: boolean
         }
         Insert: {
-          id?: string
-          project_id: string
           character_a: string
           character_b: string
-          type?: string
-          state_change?: string | null
-          visible_in_video?: boolean
           created_at?: string
+          id?: string
+          project_id: string
+          state_change?: string | null
+          type?: string
           updated_at?: string
+          visible_in_video?: boolean
         }
         Update: {
-          id?: string
-          project_id?: string
           character_a?: string
           character_b?: string
-          type?: string
-          state_change?: string | null
-          visible_in_video?: boolean
           created_at?: string
+          id?: string
+          project_id?: string
+          state_change?: string | null
+          type?: string
           updated_at?: string
+          visible_in_video?: boolean
         }
         Relationships: [
           {
             foreignKeyName: "character_relationships_project_id_character_a_fkey"
-            columns: ["character_a"]
+            columns: ["project_id", "character_a"]
             isOneToOne: false
             referencedRelation: "characters"
-            referencedColumns: ["character_id"]
-          },
-          {
-            foreignKeyName: "character_relationships_project_id_character_a_fkey"
-            columns: ["character_a"]
-            isOneToOne: false
-            referencedRelation: "characters"
-            referencedColumns: ["project_id"]
+            referencedColumns: ["project_id", "character_id"]
           },
           {
             foreignKeyName: "character_relationships_project_id_character_b_fkey"
-            columns: ["character_b"]
+            columns: ["project_id", "character_b"]
             isOneToOne: false
             referencedRelation: "characters"
-            referencedColumns: ["project_id"]
-          },
-          {
-            foreignKeyName: "character_relationships_project_id_character_b_fkey"
-            columns: ["character_b"]
-            isOneToOne: false
-            referencedRelation: "characters"
-            referencedColumns: ["character_id"]
-          },
-          {
-            foreignKeyName: "character_relationships_project_id_character_b_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "characters"
-            referencedColumns: ["character_id"]
-          },
-          {
-            foreignKeyName: "character_relationships_project_id_character_a_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "characters"
-            referencedColumns: ["project_id"]
-          },
-          {
-            foreignKeyName: "character_relationships_project_id_character_a_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "characters"
-            referencedColumns: ["character_id"]
-          },
-          {
-            foreignKeyName: "character_relationships_project_id_character_b_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "characters"
-            referencedColumns: ["project_id"]
+            referencedColumns: ["project_id", "character_id"]
           },
           {
             foreignKeyName: "character_relationships_project_id_fkey"
@@ -246,73 +319,73 @@ export type Database = {
       }
       characters: {
         Row: {
-          id: string
-          project_id: string
-          character_id: string
-          name: string
-          role: string | null
-          description: string | null
-          view_back: string | null
-          created_at: string | null
-          updated_at: string | null
           appearance: string | null
+          appearance_native: string | null
+          arc: Json | null
+          character_id: string
           costume: string[] | null
+          created_at: string | null
+          description: string | null
+          entity_type: string
+          i18n_provenance: Json
+          id: string
+          motivation: Json | null
+          name: string
+          origin: string
+          portrait: string | null
+          project_id: string
+          role: string | null
+          updated_at: string | null
+          view_back: string | null
           view_main: string | null
           view_side_left: string | null
           view_side_right: string | null
-          entity_type: string
-          origin: string
-          arc: Json | null
-          motivation: Json | null
-          appearance_native: string | null
-          i18n_provenance: Json
-          portrait: string | null
         }
         Insert: {
-          id?: string
-          project_id: string
-          character_id: string
-          name: string
-          role?: string | null
-          description?: string | null
-          view_back?: string | null
-          created_at?: string | null
-          updated_at?: string | null
           appearance?: string | null
+          appearance_native?: string | null
+          arc?: Json | null
+          character_id: string
           costume?: string[] | null
+          created_at?: string | null
+          description?: string | null
+          entity_type?: string
+          i18n_provenance?: Json
+          id?: string
+          motivation?: Json | null
+          name: string
+          origin?: string
+          portrait?: string | null
+          project_id: string
+          role?: string | null
+          updated_at?: string | null
+          view_back?: string | null
           view_main?: string | null
           view_side_left?: string | null
           view_side_right?: string | null
-          entity_type?: string
-          origin?: string
-          arc?: Json | null
-          motivation?: Json | null
-          appearance_native?: string | null
-          i18n_provenance?: Json
-          portrait?: string | null
         }
         Update: {
-          id?: string
-          project_id?: string
-          character_id?: string
-          name?: string
-          role?: string | null
-          description?: string | null
-          view_back?: string | null
-          created_at?: string | null
-          updated_at?: string | null
           appearance?: string | null
+          appearance_native?: string | null
+          arc?: Json | null
+          character_id?: string
           costume?: string[] | null
+          created_at?: string | null
+          description?: string | null
+          entity_type?: string
+          i18n_provenance?: Json
+          id?: string
+          motivation?: Json | null
+          name?: string
+          origin?: string
+          portrait?: string | null
+          project_id?: string
+          role?: string | null
+          updated_at?: string | null
+          view_back?: string | null
           view_main?: string | null
           view_side_left?: string | null
           view_side_right?: string | null
-          entity_type?: string
-          origin?: string
-          arc?: Json | null
-          motivation?: Json | null
-          appearance_native?: string | null
-          i18n_provenance?: Json
-          portrait?: string | null
         }
         Relationships: [
           {
@@ -326,97 +399,97 @@ export type Database = {
       }
       chat_traces: {
         Row: {
-          trace_id: string
-          project_id: string
-          stage: string
-          route: string
-          model: string
-          duration_ms: number
-          input_tokens: number
-          output_tokens: number
-          cache_read_input_tokens: number
-          cache_creation_input_tokens: number
-          stop_reason: string | null
-          history_count: number
-          history_chars: number
-          context_chars: number
-          prompt_chars: number
-          parse_status: string | null
-          raw_update_count: number | null
-          valid_update_count: number | null
           applied_count: number | null
-          skipped_count: number | null
-          pending_proposal: boolean | null
-          choices_marker_found: boolean | null
+          cache_creation_input_tokens: number
+          cache_read_input_tokens: number
           choices_count: number | null
+          choices_marker_found: boolean | null
+          context_chars: number
+          created_at: string
+          duration_ms: number
+          error: string | null
           generation_http_status: number | null
           generation_status: string | null
+          history_chars: number
+          history_count: number
+          input_tokens: number
+          model: string
+          output_tokens: number
+          parse_status: string | null
+          pending_proposal: boolean | null
+          project_id: string
+          prompt_chars: number
+          raw_update_count: number | null
           request_status: number | null
-          error: string | null
-          created_at: string
+          route: string
+          skipped_count: number | null
+          stage: string
+          stop_reason: string | null
+          trace_id: string
           updated_at: string
+          valid_update_count: number | null
         }
         Insert: {
-          trace_id: string
-          project_id: string
-          stage: string
-          route: string
-          model?: string
-          duration_ms?: number
-          input_tokens?: number
-          output_tokens?: number
-          cache_read_input_tokens?: number
-          cache_creation_input_tokens?: number
-          stop_reason?: string | null
-          history_count?: number
-          history_chars?: number
-          context_chars?: number
-          prompt_chars?: number
-          parse_status?: string | null
-          raw_update_count?: number | null
-          valid_update_count?: number | null
           applied_count?: number | null
-          skipped_count?: number | null
-          pending_proposal?: boolean | null
-          choices_marker_found?: boolean | null
+          cache_creation_input_tokens?: number
+          cache_read_input_tokens?: number
           choices_count?: number | null
+          choices_marker_found?: boolean | null
+          context_chars?: number
+          created_at?: string
+          duration_ms?: number
+          error?: string | null
           generation_http_status?: number | null
           generation_status?: string | null
+          history_chars?: number
+          history_count?: number
+          input_tokens?: number
+          model?: string
+          output_tokens?: number
+          parse_status?: string | null
+          pending_proposal?: boolean | null
+          project_id: string
+          prompt_chars?: number
+          raw_update_count?: number | null
           request_status?: number | null
-          error?: string | null
-          created_at?: string
+          route: string
+          skipped_count?: number | null
+          stage: string
+          stop_reason?: string | null
+          trace_id: string
           updated_at?: string
+          valid_update_count?: number | null
         }
         Update: {
-          trace_id?: string
-          project_id?: string
-          stage?: string
-          route?: string
-          model?: string
-          duration_ms?: number
-          input_tokens?: number
-          output_tokens?: number
-          cache_read_input_tokens?: number
-          cache_creation_input_tokens?: number
-          stop_reason?: string | null
-          history_count?: number
-          history_chars?: number
-          context_chars?: number
-          prompt_chars?: number
-          parse_status?: string | null
-          raw_update_count?: number | null
-          valid_update_count?: number | null
           applied_count?: number | null
-          skipped_count?: number | null
-          pending_proposal?: boolean | null
-          choices_marker_found?: boolean | null
+          cache_creation_input_tokens?: number
+          cache_read_input_tokens?: number
           choices_count?: number | null
+          choices_marker_found?: boolean | null
+          context_chars?: number
+          created_at?: string
+          duration_ms?: number
+          error?: string | null
           generation_http_status?: number | null
           generation_status?: string | null
+          history_chars?: number
+          history_count?: number
+          input_tokens?: number
+          model?: string
+          output_tokens?: number
+          parse_status?: string | null
+          pending_proposal?: boolean | null
+          project_id?: string
+          prompt_chars?: number
+          raw_update_count?: number | null
           request_status?: number | null
-          error?: string | null
-          created_at?: string
+          route?: string
+          skipped_count?: number | null
+          stage?: string
+          stop_reason?: string | null
+          trace_id?: string
           updated_at?: string
+          valid_update_count?: number | null
         }
         Relationships: [
           {
@@ -448,7 +521,7 @@ export type Database = {
           {
             foreignKeyName: "editor_states_project_id_fkey"
             columns: ["project_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
@@ -456,110 +529,112 @@ export type Database = {
       }
       feedback: {
         Row: {
+          created_at: string
           id: string
           message: string
-          user_email: string | null
           status: string
-          created_at: string
+          user_email: string | null
         }
         Insert: {
+          created_at?: string
           id?: string
           message: string
-          user_email?: string | null
           status?: string
-          created_at?: string
+          user_email?: string | null
         }
         Update: {
+          created_at?: string
           id?: string
           message?: string
-          user_email?: string | null
           status?: string
-          created_at?: string
+          user_email?: string | null
         }
-        Relationships: [
-        ]
+        Relationships: []
       }
       generation_jobs: {
         Row: {
-          id: string
-          project_id: string
-          request_id: string
-          model: string
-          kind: string
-          status: string
-          target: Json
-          result_url: string | null
-          error: string | null
-          created_at: string
-          updated_at: string
           actor: string
-          user_id: string | null
-          workspace_id: string | null
-          provider: string
-          input_snapshot: Json
-          submitted_at: string | null
-          completed_at: string | null
           attempts: number
-          last_error: string | null
-          video_clip_id: string | null
-          idempotency_key: string | null
-          response_snapshot: Json | null
-          error_class: string | null
           chat_trace_id: string | null
+          completed_at: string | null
+          created_at: string
+          error: string | null
+          error_class: string | null
+          fal_key_id: string | null
+          id: string
+          idempotency_key: string | null
+          input_snapshot: Json
+          kind: string
+          last_error: string | null
+          model: string
+          project_id: string
+          provider: string
+          request_id: string
+          response_snapshot: Json | null
+          result_url: string | null
+          status: string
+          submitted_at: string | null
+          target: Json
+          updated_at: string
+          user_id: string | null
+          video_clip_id: string | null
+          workspace_id: string | null
         }
         Insert: {
-          id?: string
-          project_id: string
-          request_id: string
-          model: string
-          kind: string
-          status?: string
-          target?: Json
-          result_url?: string | null
-          error?: string | null
-          created_at?: string
-          updated_at?: string
           actor?: string
-          user_id?: string | null
-          workspace_id?: string | null
-          provider?: string
-          input_snapshot?: Json
-          submitted_at?: string | null
-          completed_at?: string | null
           attempts?: number
-          last_error?: string | null
-          video_clip_id?: string | null
-          idempotency_key?: string | null
-          response_snapshot?: Json | null
-          error_class?: string | null
           chat_trace_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          error_class?: string | null
+          fal_key_id?: string | null
+          id?: string
+          idempotency_key?: string | null
+          input_snapshot?: Json
+          kind: string
+          last_error?: string | null
+          model: string
+          project_id: string
+          provider?: string
+          request_id: string
+          response_snapshot?: Json | null
+          result_url?: string | null
+          status?: string
+          submitted_at?: string | null
+          target?: Json
+          updated_at?: string
+          user_id?: string | null
+          video_clip_id?: string | null
+          workspace_id?: string | null
         }
         Update: {
-          id?: string
-          project_id?: string
-          request_id?: string
-          model?: string
-          kind?: string
-          status?: string
-          target?: Json
-          result_url?: string | null
-          error?: string | null
-          created_at?: string
-          updated_at?: string
           actor?: string
-          user_id?: string | null
-          workspace_id?: string | null
-          provider?: string
-          input_snapshot?: Json
-          submitted_at?: string | null
-          completed_at?: string | null
           attempts?: number
-          last_error?: string | null
-          video_clip_id?: string | null
-          idempotency_key?: string | null
-          response_snapshot?: Json | null
-          error_class?: string | null
           chat_trace_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          error?: string | null
+          error_class?: string | null
+          fal_key_id?: string | null
+          id?: string
+          idempotency_key?: string | null
+          input_snapshot?: Json
+          kind?: string
+          last_error?: string | null
+          model?: string
+          project_id?: string
+          provider?: string
+          request_id?: string
+          response_snapshot?: Json | null
+          result_url?: string | null
+          status?: string
+          submitted_at?: string | null
+          target?: Json
+          updated_at?: string
+          user_id?: string | null
+          video_clip_id?: string | null
+          workspace_id?: string | null
         }
         Relationships: [
           {
@@ -578,31 +653,10 @@ export type Database = {
           },
           {
             foreignKeyName: "generation_jobs_video_clip_project_fkey"
-            columns: ["project_id"]
+            columns: ["video_clip_id", "project_id"]
             isOneToOne: false
             referencedRelation: "video_clips"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "generation_jobs_video_clip_project_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "video_clips"
-            referencedColumns: ["project_id"]
-          },
-          {
-            foreignKeyName: "generation_jobs_video_clip_project_fkey"
-            columns: ["video_clip_id"]
-            isOneToOne: false
-            referencedRelation: "video_clips"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "generation_jobs_video_clip_project_fkey"
-            columns: ["video_clip_id"]
-            isOneToOne: false
-            referencedRelation: "video_clips"
-            referencedColumns: ["project_id"]
+            referencedColumns: ["id", "project_id"]
           },
           {
             foreignKeyName: "generation_jobs_workspace_id_fkey"
@@ -615,110 +669,109 @@ export type Database = {
       }
       knowledge_techniques: {
         Row: {
-          id: number
-          technique_id: string
-          name: string
           category: string
-          prompt_fragment: string
-          emotional_tags: string[]
-          shot_type_affinity: string[]
-          description: string | null
           created_at: string | null
+          description: string | null
+          emotional_tags: string[]
+          id: number
+          name: string
+          prompt_fragment: string
+          shot_type_affinity: string[]
+          technique_id: string
           updated_at: string | null
         }
         Insert: {
-          id?: number
-          technique_id: string
-          name: string
           category: string
-          prompt_fragment: string
-          emotional_tags?: string[]
-          shot_type_affinity?: string[]
-          description?: string | null
           created_at?: string | null
+          description?: string | null
+          emotional_tags?: string[]
+          id?: number
+          name: string
+          prompt_fragment: string
+          shot_type_affinity?: string[]
+          technique_id: string
           updated_at?: string | null
         }
         Update: {
-          id?: number
-          technique_id?: string
-          name?: string
           category?: string
-          prompt_fragment?: string
-          emotional_tags?: string[]
-          shot_type_affinity?: string[]
-          description?: string | null
           created_at?: string | null
+          description?: string | null
+          emotional_tags?: string[]
+          id?: number
+          name?: string
+          prompt_fragment?: string
+          shot_type_affinity?: string[]
+          technique_id?: string
           updated_at?: string | null
         }
-        Relationships: [
-        ]
+        Relationships: []
       }
       llm_calls: {
         Row: {
-          id: string
-          project_id: string
-          stage: string
-          seq: number
-          provider: string
-          model: string
-          system_instruction: string | null
-          prompt: string
-          response: string
-          duration_ms: number | null
-          input_chars: number | null
-          output_chars: number | null
-          input_tokens: number | null
-          output_tokens: number | null
-          finish_reason: string | null
-          stop_reason: string | null
-          error: string | null
           called_at: string
           created_at: string
+          duration_ms: number | null
+          error: string | null
+          finish_reason: string | null
+          id: string
+          input_chars: number | null
+          input_tokens: number | null
+          model: string
+          output_chars: number | null
+          output_tokens: number | null
+          project_id: string
+          prompt: string
+          provider: string
+          response: string
           run_id: string | null
+          seq: number
+          stage: string
+          stop_reason: string | null
+          system_instruction: string | null
         }
         Insert: {
-          id?: string
-          project_id: string
-          stage: string
-          seq: number
-          provider: string
-          model: string
-          system_instruction?: string | null
-          prompt: string
-          response: string
-          duration_ms?: number | null
-          input_chars?: number | null
-          output_chars?: number | null
-          input_tokens?: number | null
-          output_tokens?: number | null
-          finish_reason?: string | null
-          stop_reason?: string | null
-          error?: string | null
           called_at: string
           created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          finish_reason?: string | null
+          id?: string
+          input_chars?: number | null
+          input_tokens?: number | null
+          model: string
+          output_chars?: number | null
+          output_tokens?: number | null
+          project_id: string
+          prompt: string
+          provider: string
+          response: string
           run_id?: string | null
+          seq: number
+          stage: string
+          stop_reason?: string | null
+          system_instruction?: string | null
         }
         Update: {
-          id?: string
-          project_id?: string
-          stage?: string
-          seq?: number
-          provider?: string
-          model?: string
-          system_instruction?: string | null
-          prompt?: string
-          response?: string
-          duration_ms?: number | null
-          input_chars?: number | null
-          output_chars?: number | null
-          input_tokens?: number | null
-          output_tokens?: number | null
-          finish_reason?: string | null
-          stop_reason?: string | null
-          error?: string | null
           called_at?: string
           created_at?: string
+          duration_ms?: number | null
+          error?: string | null
+          finish_reason?: string | null
+          id?: string
+          input_chars?: number | null
+          input_tokens?: number | null
+          model?: string
+          output_chars?: number | null
+          output_tokens?: number | null
+          project_id?: string
+          prompt?: string
+          provider?: string
+          response?: string
           run_id?: string | null
+          seq?: number
+          stage?: string
+          stop_reason?: string | null
+          system_instruction?: string | null
         }
         Relationships: [
           {
@@ -730,51 +783,104 @@ export type Database = {
           },
         ]
       }
-      location_image_candidates: {
+      location_appearances: {
         Row: {
-          id: string
-          project_id: string
-          location_id: string
-          view: string
-          url: string
-          source_hash: string | null
-          job_id: string | null
-          is_selected: boolean
-          pinned: boolean
-          variant_key: string | null
-          generated_at: string
+          appearance_key: string
           created_at: string
-          appearance_hash: string | null
+          i18n_provenance: Json
+          id: string
+          label: string
+          location_id: string
+          narrative_time: string | null
+          project_id: string
+          updated_at: string
+          visual_description: string | null
+          visual_description_native: string | null
+          wide_shot: string | null
         }
         Insert: {
-          id?: string
-          project_id: string
-          location_id: string
-          view: string
-          url: string
-          source_hash?: string | null
-          job_id?: string | null
-          is_selected?: boolean
-          pinned?: boolean
-          variant_key?: string | null
-          generated_at?: string
+          appearance_key: string
           created_at?: string
-          appearance_hash?: string | null
+          i18n_provenance?: Json
+          id?: string
+          label: string
+          location_id: string
+          narrative_time?: string | null
+          project_id: string
+          updated_at?: string
+          visual_description?: string | null
+          visual_description_native?: string | null
+          wide_shot?: string | null
         }
         Update: {
-          id?: string
-          project_id?: string
-          location_id?: string
-          view?: string
-          url?: string
-          source_hash?: string | null
-          job_id?: string | null
-          is_selected?: boolean
-          pinned?: boolean
-          variant_key?: string | null
-          generated_at?: string
+          appearance_key?: string
           created_at?: string
+          i18n_provenance?: Json
+          id?: string
+          label?: string
+          location_id?: string
+          narrative_time?: string | null
+          project_id?: string
+          updated_at?: string
+          visual_description?: string | null
+          visual_description_native?: string | null
+          wide_shot?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "location_appearances_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      location_image_candidates: {
+        Row: {
+          appearance_hash: string | null
+          created_at: string
+          generated_at: string
+          id: string
+          is_selected: boolean
+          job_id: string | null
+          location_id: string
+          pinned: boolean
+          project_id: string
+          source_hash: string | null
+          url: string
+          variant_key: string | null
+          view: string
+        }
+        Insert: {
           appearance_hash?: string | null
+          created_at?: string
+          generated_at?: string
+          id?: string
+          is_selected?: boolean
+          job_id?: string | null
+          location_id: string
+          pinned?: boolean
+          project_id: string
+          source_hash?: string | null
+          url: string
+          variant_key?: string | null
+          view: string
+        }
+        Update: {
+          appearance_hash?: string | null
+          created_at?: string
+          generated_at?: string
+          id?: string
+          is_selected?: boolean
+          job_id?: string | null
+          location_id?: string
+          pinned?: boolean
+          project_id?: string
+          source_hash?: string | null
+          url?: string
+          variant_key?: string | null
+          view?: string
         }
         Relationships: [
           {
@@ -795,73 +901,73 @@ export type Database = {
       }
       locations: {
         Row: {
-          id: string
-          project_id: string
-          location_id: string
-          scene_id: string | null
-          name: string
-          visual_description: string | null
-          time_of_day: string | null
-          lighting_direction: string | null
-          wide_shot: string | null
-          establishing_shot: string | null
           created_at: string | null
-          updated_at: string | null
-          style_description: string | null
+          establishing_shot: string | null
+          i18n_provenance: Json
+          id: string
+          last_writer_run_id: string | null
+          lighting_direction: string | null
           lighting_sources: string[] | null
+          location_id: string
+          name: string
+          origin: string
+          project_id: string
           props: string[] | null
           purpose: string | null
-          origin: string
+          scene_id: string | null
+          style_description: string | null
+          time_of_day: string | null
+          updated_at: string | null
           user_edited: boolean
-          last_writer_run_id: string | null
+          visual_description: string | null
           visual_description_native: string | null
-          i18n_provenance: Json
+          wide_shot: string | null
         }
         Insert: {
-          id?: string
-          project_id: string
-          location_id: string
-          scene_id?: string | null
-          name: string
-          visual_description?: string | null
-          time_of_day?: string | null
-          lighting_direction?: string | null
-          wide_shot?: string | null
-          establishing_shot?: string | null
           created_at?: string | null
-          updated_at?: string | null
-          style_description?: string | null
+          establishing_shot?: string | null
+          i18n_provenance?: Json
+          id?: string
+          last_writer_run_id?: string | null
+          lighting_direction?: string | null
           lighting_sources?: string[] | null
+          location_id: string
+          name: string
+          origin?: string
+          project_id: string
           props?: string[] | null
           purpose?: string | null
-          origin?: string
+          scene_id?: string | null
+          style_description?: string | null
+          time_of_day?: string | null
+          updated_at?: string | null
           user_edited?: boolean
-          last_writer_run_id?: string | null
+          visual_description?: string | null
           visual_description_native?: string | null
-          i18n_provenance?: Json
+          wide_shot?: string | null
         }
         Update: {
-          id?: string
-          project_id?: string
-          location_id?: string
-          scene_id?: string | null
-          name?: string
-          visual_description?: string | null
-          time_of_day?: string | null
-          lighting_direction?: string | null
-          wide_shot?: string | null
-          establishing_shot?: string | null
           created_at?: string | null
-          updated_at?: string | null
-          style_description?: string | null
+          establishing_shot?: string | null
+          i18n_provenance?: Json
+          id?: string
+          last_writer_run_id?: string | null
+          lighting_direction?: string | null
           lighting_sources?: string[] | null
+          location_id?: string
+          name?: string
+          origin?: string
+          project_id?: string
           props?: string[] | null
           purpose?: string | null
-          origin?: string
+          scene_id?: string | null
+          style_description?: string | null
+          time_of_day?: string | null
+          updated_at?: string | null
           user_edited?: boolean
-          last_writer_run_id?: string | null
+          visual_description?: string | null
           visual_description_native?: string | null
-          i18n_provenance?: Json
+          wide_shot?: string | null
         }
         Relationships: [
           {
@@ -882,28 +988,28 @@ export type Database = {
       }
       messages: {
         Row: {
-          id: string
-          project_id: string
-          stage: string
-          role: string
           content: string
           created_at: string | null
+          id: string
+          project_id: string
+          role: string
+          stage: string
         }
         Insert: {
-          id?: string
-          project_id: string
-          stage: string
-          role: string
           content: string
           created_at?: string | null
+          id?: string
+          project_id: string
+          role: string
+          stage: string
         }
         Update: {
-          id?: string
-          project_id?: string
-          stage?: string
-          role?: string
           content?: string
           created_at?: string | null
+          id?: string
+          project_id?: string
+          role?: string
+          stage?: string
         }
         Relationships: [
           {
@@ -917,74 +1023,73 @@ export type Database = {
       }
       playground_items: {
         Row: {
+          author_name: string
+          created_at: string
           id: string
           kind: string
-          url: string
-          thumbnail_url: string | null
-          title: string
-          author_name: string
           project_id: string | null
           published: boolean
           sort_order: number
-          created_at: string
+          thumbnail_url: string | null
+          title: string
+          url: string
         }
         Insert: {
+          author_name?: string
+          created_at?: string
           id?: string
           kind: string
-          url: string
-          thumbnail_url?: string | null
-          title?: string
-          author_name?: string
           project_id?: string | null
           published?: boolean
           sort_order?: number
-          created_at?: string
+          thumbnail_url?: string | null
+          title?: string
+          url: string
         }
         Update: {
+          author_name?: string
+          created_at?: string
           id?: string
           kind?: string
-          url?: string
-          thumbnail_url?: string | null
-          title?: string
-          author_name?: string
           project_id?: string | null
           published?: boolean
           sort_order?: number
-          created_at?: string
+          thumbnail_url?: string | null
+          title?: string
+          url?: string
         }
-        Relationships: [
-        ]
+        Relationships: []
       }
       project_shares: {
         Row: {
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
           id: string
           project_id: string
-          token: string
-          created_by: string | null
-          snapshot: Json | null
-          expires_at: string | null
           revoked_at: string | null
-          created_at: string
+          snapshot: Json | null
+          token: string
         }
         Insert: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
           id?: string
           project_id: string
-          token: string
-          created_by?: string | null
-          snapshot?: Json | null
-          expires_at?: string | null
           revoked_at?: string | null
-          created_at?: string
+          snapshot?: Json | null
+          token: string
         }
         Update: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
           id?: string
           project_id?: string
-          token?: string
-          created_by?: string | null
-          snapshot?: Json | null
-          expires_at?: string | null
           revoked_at?: string | null
-          created_at?: string
+          snapshot?: Json | null
+          token?: string
         }
         Relationships: [
           {
@@ -998,64 +1103,64 @@ export type Database = {
       }
       projects: {
         Row: {
-          id: string
-          workspace_id: string
-          title: string
-          story_text: string | null
-          expanded_story: string | null
-          settings: Json | null
-          current_stage: string | null
           created_at: string | null
-          updated_at: string | null
+          current_stage: string | null
+          custom_style_anchor: Json | null
           design_tokens: Json | null
+          expanded_story: string | null
+          id: string
           last_writer_run_id: string | null
-          producer_draft: Json | null
           locale: string
           locale_locked: boolean
-          style_anchor_key: string | null
-          custom_style_anchor: Json | null
-          reference_project_id: string | null
           optional_reference_frame_url: string | null
+          producer_draft: Json | null
+          reference_project_id: string | null
+          settings: Json | null
+          story_text: string | null
+          style_anchor_key: string | null
+          title: string
+          updated_at: string | null
+          workspace_id: string
         }
         Insert: {
-          id?: string
-          workspace_id: string
-          title?: string
-          story_text?: string | null
-          expanded_story?: string | null
-          settings?: Json | null
-          current_stage?: string | null
           created_at?: string | null
-          updated_at?: string | null
+          current_stage?: string | null
+          custom_style_anchor?: Json | null
           design_tokens?: Json | null
+          expanded_story?: string | null
+          id?: string
           last_writer_run_id?: string | null
-          producer_draft?: Json | null
           locale?: string
           locale_locked?: boolean
-          style_anchor_key?: string | null
-          custom_style_anchor?: Json | null
-          reference_project_id?: string | null
           optional_reference_frame_url?: string | null
+          producer_draft?: Json | null
+          reference_project_id?: string | null
+          settings?: Json | null
+          story_text?: string | null
+          style_anchor_key?: string | null
+          title?: string
+          updated_at?: string | null
+          workspace_id: string
         }
         Update: {
-          id?: string
-          workspace_id?: string
-          title?: string
-          story_text?: string | null
-          expanded_story?: string | null
-          settings?: Json | null
-          current_stage?: string | null
           created_at?: string | null
-          updated_at?: string | null
+          current_stage?: string | null
+          custom_style_anchor?: Json | null
           design_tokens?: Json | null
+          expanded_story?: string | null
+          id?: string
           last_writer_run_id?: string | null
-          producer_draft?: Json | null
           locale?: string
           locale_locked?: boolean
-          style_anchor_key?: string | null
-          custom_style_anchor?: Json | null
-          reference_project_id?: string | null
           optional_reference_frame_url?: string | null
+          producer_draft?: Json | null
+          reference_project_id?: string | null
+          settings?: Json | null
+          story_text?: string | null
+          style_anchor_key?: string | null
+          title?: string
+          updated_at?: string | null
+          workspace_id?: string
         }
         Relationships: [
           {
@@ -1066,87 +1171,182 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "projects_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "projects_reference_project_id_fkey"
             columns: ["reference_project_id"]
             isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "projects_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      props: {
+        Row: {
+          appearance: string | null
+          appearance_native: string | null
+          created_at: string
+          description: string | null
+          id: string
+          image_url: string | null
+          name: string
+          origin: string
+          project_id: string
+          prop_id: string
+          source_hash: string | null
+          updated_at: string
+        }
+        Insert: {
+          appearance?: string | null
+          appearance_native?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          name: string
+          origin?: string
+          project_id: string
+          prop_id: string
+          source_hash?: string | null
+          updated_at?: string
+        }
+        Update: {
+          appearance?: string | null
+          appearance_native?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          name?: string
+          origin?: string
+          project_id?: string
+          prop_id?: string
+          source_hash?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "props_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      scene_character_appearance_overrides: {
+        Row: {
+          appearance_key: string
+          character_id: string
+          created_at: string
+          project_id: string
+          scene_id: string
+          updated_at: string
+        }
+        Insert: {
+          appearance_key: string
+          character_id: string
+          created_at?: string
+          project_id: string
+          scene_id: string
+          updated_at?: string
+        }
+        Update: {
+          appearance_key?: string
+          character_id?: string
+          created_at?: string
+          project_id?: string
+          scene_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scene_character_appearance_overrides_appearance_fk"
+            columns: ["project_id", "character_id", "appearance_key"]
+            isOneToOne: false
+            referencedRelation: "character_appearances"
+            referencedColumns: ["project_id", "character_id", "appearance_key"]
+          },
+          {
+            foreignKeyName: "scene_character_appearance_overrides_scene_fk"
+            columns: ["project_id", "scene_id"]
+            isOneToOne: false
+            referencedRelation: "scenes"
+            referencedColumns: ["project_id", "scene_id"]
+          },
         ]
       }
       scenes: {
         Row: {
+          canvas_position: Json | null
+          characters_present: string[] | null
+          created_at: string | null
+          estimated_duration_seconds: number | null
+          i18n_provenance: Json
           id: string
+          location: string | null
+          mood: string | null
+          mood_native: string | null
+          narrative_summary: string | null
+          narrative_summary_native: string | null
+          narrative_time: string
+          original_text_quote: string | null
           project_id: string
           scene_id: string
-          narrative_summary: string | null
-          original_text_quote: string | null
-          location: string | null
-          time_of_day: string | null
-          mood: string | null
-          characters_present: string[] | null
-          estimated_duration_seconds: number | null
           sort_order: number | null
-          created_at: string | null
-          updated_at: string | null
-          canvas_position: Json | null
-          narrative_summary_native: string | null
-          mood_native: string | null
-          i18n_provenance: Json
           source: string
-          narrative_time: string
           stage: Json | null
+          time_of_day: string | null
+          updated_at: string | null
         }
         Insert: {
+          canvas_position?: Json | null
+          characters_present?: string[] | null
+          created_at?: string | null
+          estimated_duration_seconds?: number | null
+          i18n_provenance?: Json
           id?: string
+          location?: string | null
+          mood?: string | null
+          mood_native?: string | null
+          narrative_summary?: string | null
+          narrative_summary_native?: string | null
+          narrative_time: string
+          original_text_quote?: string | null
           project_id: string
           scene_id: string
-          narrative_summary?: string | null
-          original_text_quote?: string | null
-          location?: string | null
-          time_of_day?: string | null
-          mood?: string | null
-          characters_present?: string[] | null
-          estimated_duration_seconds?: number | null
           sort_order?: number | null
-          created_at?: string | null
-          updated_at?: string | null
-          canvas_position?: Json | null
-          narrative_summary_native?: string | null
-          mood_native?: string | null
-          i18n_provenance?: Json
           source?: string
-          narrative_time: string
           stage?: Json | null
+          time_of_day?: string | null
+          updated_at?: string | null
         }
         Update: {
+          canvas_position?: Json | null
+          characters_present?: string[] | null
+          created_at?: string | null
+          estimated_duration_seconds?: number | null
+          i18n_provenance?: Json
           id?: string
+          location?: string | null
+          mood?: string | null
+          mood_native?: string | null
+          narrative_summary?: string | null
+          narrative_summary_native?: string | null
+          narrative_time?: string
+          original_text_quote?: string | null
           project_id?: string
           scene_id?: string
-          narrative_summary?: string | null
-          original_text_quote?: string | null
-          location?: string | null
-          time_of_day?: string | null
-          mood?: string | null
-          characters_present?: string[] | null
-          estimated_duration_seconds?: number | null
           sort_order?: number | null
-          created_at?: string | null
-          updated_at?: string | null
-          canvas_position?: Json | null
-          narrative_summary_native?: string | null
-          mood_native?: string | null
-          i18n_provenance?: Json
           source?: string
-          narrative_time?: string
           stage?: Json | null
+          time_of_day?: string | null
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -1158,141 +1358,168 @@ export type Database = {
           },
         ]
       }
-      shots: {
+      server_errors: {
         Row: {
+          created_at: string
           id: string
-          project_id: string
-          scene_id: string
-          shot_id: string
-          shot_type: string
-          action_description: string | null
-          characters: string[] | null
-          duration_seconds: number | null
-          generation_method: string | null
-          dialogue_lines: Json | null
-          camera_config: Json | null
-          lighting_config: Json | null
-          prompt: string | null
-          sort_order: number | null
-          created_at: string | null
-          updated_at: string | null
-          trim_start: number | null
-          trim_end: number | null
-          video_url: string | null
-          reference_image: string | null
-          camera_brand: string | null
-          focal_length: number | null
-          aperture: number | null
-          white_balance: number | null
-          movement_preset: string | null
-          movement_intensity: number | null
-          speed: number | null
-          storyboard_image: Json | null
-          canvas_position: Json | null
-          rough_storyboard: Json | null
-          action_description_native: string | null
-          i18n_provenance: Json
-          location_ids: string[] | null
-          previz_video: Json | null
-          static_spec: Json | null
-          prompt_source_hash: string | null
-          design_ref: string | null
-          check_notes: Json | null
-          dynamic_spec: Json | null
-          source: string
-          image_inputs: Json
-          director_refs: Json | null
-          character_appearance_keys: Json
+          message: string
+          method: string
+          path: string
+          stack: string | null
         }
         Insert: {
+          created_at?: string
           id?: string
+          message: string
+          method: string
+          path: string
+          stack?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string
+          method?: string
+          path?: string
+          stack?: string | null
+        }
+        Relationships: []
+      }
+      shots: {
+        Row: {
+          action_description: string | null
+          action_description_native: string | null
+          aperture: number | null
+          camera_brand: string | null
+          camera_config: Json | null
+          canvas_position: Json | null
+          character_appearance_keys: Json
+          characters: string[] | null
+          check_notes: Json | null
+          created_at: string | null
+          design_ref: string | null
+          dialogue_lines: Json | null
+          director_refs: Json | null
+          duration_seconds: number | null
+          dynamic_spec: Json | null
+          focal_length: number | null
+          generation_method: string | null
+          i18n_provenance: Json
+          id: string
+          image_inputs: Json
+          lighting_config: Json | null
+          location_ids: string[] | null
+          movement_intensity: number | null
+          movement_preset: string | null
+          previz_video: Json | null
           project_id: string
+          prompt: string | null
+          prompt_source_hash: string | null
+          reference_image: string | null
+          rough_storyboard: Json | null
           scene_id: string
           shot_id: string
           shot_type: string
+          sort_order: number | null
+          source: string
+          speed: number | null
+          static_spec: Json | null
+          storyboard_image: Json | null
+          trim_end: number | null
+          trim_start: number | null
+          updated_at: string | null
+          video_url: string | null
+          white_balance: number | null
+        }
+        Insert: {
           action_description?: string | null
-          characters?: string[] | null
-          duration_seconds?: number | null
-          generation_method?: string | null
-          dialogue_lines?: Json | null
-          camera_config?: Json | null
-          lighting_config?: Json | null
-          prompt?: string | null
-          sort_order?: number | null
-          created_at?: string | null
-          updated_at?: string | null
-          trim_start?: number | null
-          trim_end?: number | null
-          video_url?: string | null
-          reference_image?: string | null
-          camera_brand?: string | null
-          focal_length?: number | null
-          aperture?: number | null
-          white_balance?: number | null
-          movement_preset?: string | null
-          movement_intensity?: number | null
-          speed?: number | null
-          storyboard_image?: Json | null
-          canvas_position?: Json | null
-          rough_storyboard?: Json | null
           action_description_native?: string | null
-          i18n_provenance?: Json
-          location_ids?: string[] | null
-          previz_video?: Json | null
-          static_spec?: Json | null
-          prompt_source_hash?: string | null
-          design_ref?: string | null
-          check_notes?: Json | null
-          dynamic_spec?: Json | null
-          source?: string
-          image_inputs?: Json
-          director_refs?: Json | null
+          aperture?: number | null
+          camera_brand?: string | null
+          camera_config?: Json | null
+          canvas_position?: Json | null
           character_appearance_keys: Json
+          characters?: string[] | null
+          check_notes?: Json | null
+          created_at?: string | null
+          design_ref?: string | null
+          dialogue_lines?: Json | null
+          director_refs?: Json | null
+          duration_seconds?: number | null
+          dynamic_spec?: Json | null
+          focal_length?: number | null
+          generation_method?: string | null
+          i18n_provenance?: Json
+          id?: string
+          image_inputs?: Json
+          lighting_config?: Json | null
+          location_ids?: string[] | null
+          movement_intensity?: number | null
+          movement_preset?: string | null
+          previz_video?: Json | null
+          project_id: string
+          prompt?: string | null
+          prompt_source_hash?: string | null
+          reference_image?: string | null
+          rough_storyboard?: Json | null
+          scene_id: string
+          shot_id: string
+          shot_type: string
+          sort_order?: number | null
+          source?: string
+          speed?: number | null
+          static_spec?: Json | null
+          storyboard_image?: Json | null
+          trim_end?: number | null
+          trim_start?: number | null
+          updated_at?: string | null
+          video_url?: string | null
+          white_balance?: number | null
         }
         Update: {
+          action_description?: string | null
+          action_description_native?: string | null
+          aperture?: number | null
+          camera_brand?: string | null
+          camera_config?: Json | null
+          canvas_position?: Json | null
+          character_appearance_keys?: Json
+          characters?: string[] | null
+          check_notes?: Json | null
+          created_at?: string | null
+          design_ref?: string | null
+          dialogue_lines?: Json | null
+          director_refs?: Json | null
+          duration_seconds?: number | null
+          dynamic_spec?: Json | null
+          focal_length?: number | null
+          generation_method?: string | null
+          i18n_provenance?: Json
           id?: string
+          image_inputs?: Json
+          lighting_config?: Json | null
+          location_ids?: string[] | null
+          movement_intensity?: number | null
+          movement_preset?: string | null
+          previz_video?: Json | null
           project_id?: string
+          prompt?: string | null
+          prompt_source_hash?: string | null
+          reference_image?: string | null
+          rough_storyboard?: Json | null
           scene_id?: string
           shot_id?: string
           shot_type?: string
-          action_description?: string | null
-          characters?: string[] | null
-          duration_seconds?: number | null
-          generation_method?: string | null
-          dialogue_lines?: Json | null
-          camera_config?: Json | null
-          lighting_config?: Json | null
-          prompt?: string | null
           sort_order?: number | null
-          created_at?: string | null
-          updated_at?: string | null
-          trim_start?: number | null
-          trim_end?: number | null
-          video_url?: string | null
-          reference_image?: string | null
-          camera_brand?: string | null
-          focal_length?: number | null
-          aperture?: number | null
-          white_balance?: number | null
-          movement_preset?: string | null
-          movement_intensity?: number | null
-          speed?: number | null
-          storyboard_image?: Json | null
-          canvas_position?: Json | null
-          rough_storyboard?: Json | null
-          action_description_native?: string | null
-          i18n_provenance?: Json
-          location_ids?: string[] | null
-          previz_video?: Json | null
-          static_spec?: Json | null
-          prompt_source_hash?: string | null
-          design_ref?: string | null
-          check_notes?: Json | null
-          dynamic_spec?: Json | null
           source?: string
-          image_inputs?: Json
-          director_refs?: Json | null
-          character_appearance_keys?: Json
+          speed?: number | null
+          static_spec?: Json | null
+          storyboard_image?: Json | null
+          trim_end?: number | null
+          trim_start?: number | null
+          updated_at?: string | null
+          video_url?: string | null
+          white_balance?: number | null
         }
         Relationships: [
           {
@@ -1306,71 +1533,105 @@ export type Database = {
       }
       style_anchors: {
         Row: {
+          anchor_kind: string
+          created_at: string | null
           id: string
+          image_url: string
+          is_active: boolean
           key: string
           label: string
           medium: string
-          image_url: string
-          sort_order: number
-          is_active: boolean
-          created_at: string | null
           preview_url: string | null
-          subtitle: string | null
+          sort_order: number
           style_clause: string | null
+          subtitle: string | null
           use_preview_ref: boolean
-          anchor_kind: string
         }
         Insert: {
+          anchor_kind?: string
+          created_at?: string | null
           id?: string
+          image_url: string
+          is_active?: boolean
           key: string
           label: string
           medium: string
-          image_url: string
-          sort_order?: number
-          is_active?: boolean
-          created_at?: string | null
           preview_url?: string | null
-          subtitle?: string | null
+          sort_order?: number
           style_clause?: string | null
+          subtitle?: string | null
           use_preview_ref?: boolean
-          anchor_kind?: string
         }
         Update: {
+          anchor_kind?: string
+          created_at?: string | null
           id?: string
+          image_url?: string
+          is_active?: boolean
           key?: string
           label?: string
           medium?: string
-          image_url?: string
-          sort_order?: number
-          is_active?: boolean
-          created_at?: string | null
           preview_url?: string | null
-          subtitle?: string | null
+          sort_order?: number
           style_clause?: string | null
+          subtitle?: string | null
           use_preview_ref?: boolean
-          anchor_kind?: string
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          current_period_end: string | null
+          mor_subscription_id: string | null
+          plan: string
+          status: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          current_period_end?: string | null
+          mor_subscription_id?: string | null
+          plan: string
+          status: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          current_period_end?: string | null
+          mor_subscription_id?: string | null
+          plan?: string
+          status?: string
+          updated_at?: string
+          workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "subscriptions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
         ]
       }
       subtext_notes: {
         Row: {
-          id: string
-          project_id: string
-          note: string
           created_at: string
+          id: string
+          note: string
+          project_id: string
         }
         Insert: {
-          id?: string
-          project_id: string
-          note: string
           created_at?: string
+          id?: string
+          note: string
+          project_id: string
         }
         Update: {
-          id?: string
-          project_id?: string
-          note?: string
           created_at?: string
+          id?: string
+          note?: string
+          project_id?: string
         }
         Relationships: [
           {
@@ -1382,83 +1643,137 @@ export type Database = {
           },
         ]
       }
+      take_ledger: {
+        Row: {
+          created_at: string
+          delta: number
+          expires_at: string | null
+          grant_id: string | null
+          id: string
+          kind: string
+          reason: string | null
+          ref_id: string | null
+          ref_kind: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          delta: number
+          expires_at?: string | null
+          grant_id?: string | null
+          id?: string
+          kind: string
+          reason?: string | null
+          ref_id?: string | null
+          ref_kind?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          delta?: number
+          expires_at?: string | null
+          grant_id?: string | null
+          id?: string
+          kind?: string
+          reason?: string | null
+          ref_id?: string | null
+          ref_kind?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "take_ledger_grant_id_fkey"
+            columns: ["grant_id"]
+            isOneToOne: false
+            referencedRelation: "take_ledger"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "take_ledger_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       video_clips: {
         Row: {
+          adherence: Json | null
+          canvas_position: Json | null
+          created_at: string | null
+          deleted_at: string | null
+          duration: number | null
+          frame_inputs: Json | null
           id: string
+          is_final: boolean
+          last_attempt_at: string | null
+          last_attempt_error: string | null
+          last_attempt_job_id: string | null
+          last_attempt_status: string | null
+          override: Json | null
           project_id: string
           shot_id: string
+          status: string | null
           storage_path: string | null
-          url: string | null
+          take_label: string | null
+          take_number: number
           thumbnail_path: string | null
           thumbnail_url: string | null
-          status: string | null
-          duration: number | null
-          created_at: string | null
           updated_at: string | null
-          canvas_position: Json | null
-          is_final: boolean
-          take_label: string | null
-          override: Json | null
-          take_number: number
-          deleted_at: string | null
-          last_attempt_status: string | null
-          last_attempt_error: string | null
-          last_attempt_at: string | null
-          last_attempt_job_id: string | null
-          adherence: Json | null
-          frame_inputs: Json | null
+          url: string | null
           video_chain: Json | null
         }
         Insert: {
+          adherence?: Json | null
+          canvas_position?: Json | null
+          created_at?: string | null
+          deleted_at?: string | null
+          duration?: number | null
+          frame_inputs?: Json | null
           id?: string
+          is_final?: boolean
+          last_attempt_at?: string | null
+          last_attempt_error?: string | null
+          last_attempt_job_id?: string | null
+          last_attempt_status?: string | null
+          override?: Json | null
           project_id: string
           shot_id: string
+          status?: string | null
           storage_path?: string | null
-          url?: string | null
+          take_label?: string | null
+          take_number: number
           thumbnail_path?: string | null
           thumbnail_url?: string | null
-          status?: string | null
-          duration?: number | null
-          created_at?: string | null
           updated_at?: string | null
-          canvas_position?: Json | null
-          is_final?: boolean
-          take_label?: string | null
-          override?: Json | null
-          take_number: number
-          deleted_at?: string | null
-          last_attempt_status?: string | null
-          last_attempt_error?: string | null
-          last_attempt_at?: string | null
-          last_attempt_job_id?: string | null
-          adherence?: Json | null
-          frame_inputs?: Json | null
+          url?: string | null
           video_chain?: Json | null
         }
         Update: {
+          adherence?: Json | null
+          canvas_position?: Json | null
+          created_at?: string | null
+          deleted_at?: string | null
+          duration?: number | null
+          frame_inputs?: Json | null
           id?: string
+          is_final?: boolean
+          last_attempt_at?: string | null
+          last_attempt_error?: string | null
+          last_attempt_job_id?: string | null
+          last_attempt_status?: string | null
+          override?: Json | null
           project_id?: string
           shot_id?: string
+          status?: string | null
           storage_path?: string | null
-          url?: string | null
+          take_label?: string | null
+          take_number?: number
           thumbnail_path?: string | null
           thumbnail_url?: string | null
-          status?: string | null
-          duration?: number | null
-          created_at?: string | null
           updated_at?: string | null
-          canvas_position?: Json | null
-          is_final?: boolean
-          take_label?: string | null
-          override?: Json | null
-          take_number?: number
-          deleted_at?: string | null
-          last_attempt_status?: string | null
-          last_attempt_error?: string | null
-          last_attempt_at?: string | null
-          last_attempt_job_id?: string | null
-          adherence?: Json | null
-          frame_inputs?: Json | null
+          url?: string | null
           video_chain?: Json | null
         }
         Relationships: [
@@ -1480,64 +1795,70 @@ export type Database = {
       }
       workspaces: {
         Row: {
+          created_at: string | null
           id: string
           name: string
-          slug: string
-          created_at: string | null
-          updated_at: string | null
           owner_id: string | null
           plan: string
+          slug: string
+          updated_at: string | null
         }
         Insert: {
+          created_at?: string | null
           id?: string
           name: string
-          slug: string
-          created_at?: string | null
-          updated_at?: string | null
           owner_id?: string | null
           plan?: string
+          slug: string
+          updated_at?: string | null
         }
         Update: {
+          created_at?: string | null
           id?: string
           name?: string
-          slug?: string
-          created_at?: string | null
-          updated_at?: string | null
           owner_id?: string | null
           plan?: string
+          slug?: string
+          updated_at?: string | null
         }
-        Relationships: [
-        ]
+        Relationships: []
       }
       writer_observability_events: {
         Row: {
+          created_at: string
+          event: string
+          generation_job_id: string | null
           id: string
+          payload: Json
           project_id: string
           run_id: string | null
-          generation_job_id: string | null
-          event: string
-          payload: Json
-          created_at: string
         }
         Insert: {
+          created_at?: string
+          event: string
+          generation_job_id?: string | null
           id?: string
+          payload?: Json
           project_id: string
           run_id?: string | null
-          generation_job_id?: string | null
-          event: string
-          payload?: Json
-          created_at?: string
         }
         Update: {
+          created_at?: string
+          event?: string
+          generation_job_id?: string | null
           id?: string
+          payload?: Json
           project_id?: string
           run_id?: string | null
-          generation_job_id?: string | null
-          event?: string
-          payload?: Json
-          created_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "writer_observability_events_generation_job_id_fkey"
+            columns: ["generation_job_id"]
+            isOneToOne: false
+            referencedRelation: "generation_jobs"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "writer_observability_events_project_id_fkey"
             columns: ["project_id"]
@@ -1552,57 +1873,50 @@ export type Database = {
             referencedRelation: "writer_runs"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "writer_observability_events_generation_job_id_fkey"
-            columns: ["generation_job_id"]
-            isOneToOne: false
-            referencedRelation: "generation_jobs"
-            referencedColumns: ["id"]
-          },
         ]
       }
       writer_runs: {
         Row: {
+          completed_units: number
+          created_at: string
+          current_stage: string | null
+          error: string | null
+          error_detail: Json | null
           id: string
           project_id: string
-          status: string
-          current_stage: string | null
-          completed_units: number
-          total_units: number
           state: Json
-          error: string | null
-          created_at: string
-          updated_at: string
-          error_detail: Json | null
           state_version: number
+          status: string
+          total_units: number
+          updated_at: string
         }
         Insert: {
+          completed_units?: number
+          created_at?: string
+          current_stage?: string | null
+          error?: string | null
+          error_detail?: Json | null
           id?: string
           project_id: string
-          status?: string
-          current_stage?: string | null
-          completed_units?: number
-          total_units?: number
           state?: Json
-          error?: string | null
-          created_at?: string
-          updated_at?: string
-          error_detail?: Json | null
           state_version?: number
+          status?: string
+          total_units?: number
+          updated_at?: string
         }
         Update: {
+          completed_units?: number
+          created_at?: string
+          current_stage?: string | null
+          error?: string | null
+          error_detail?: Json | null
           id?: string
           project_id?: string
-          status?: string
-          current_stage?: string | null
-          completed_units?: number
-          total_units?: number
           state?: Json
-          error?: string | null
-          created_at?: string
-          updated_at?: string
-          error_detail?: Json | null
           state_version?: number
+          status?: string
+          total_units?: number
+          updated_at?: string
         }
         Relationships: [
           {
@@ -1619,7 +1933,147 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      attach_director_video_provider_request: {
+        Args: {
+          p_job_id: string
+          p_model?: string
+          p_project_id: string
+          p_provider?: string
+          p_provider_request_id: string
+        }
+        Returns: undefined
+      }
+      complete_director_video_attempt: {
+        Args: {
+          p_job_id: string
+          p_project_id: string
+          p_result_url: string
+          p_storage_path: string
+          p_video_clip_id: string
+        }
+        Returns: undefined
+      }
+      create_person_with_default_appearance: {
+        Args: { p_person: Json; p_project_id: string }
+        Returns: Json
+      }
+      create_project_slotted: {
+        Args: {
+          p_locale: string
+          p_locale_locked: boolean
+          p_project_id: string
+          p_reference_project_id: string
+          p_slot_limit: number
+          p_title: string
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+      delete_project_deep: {
+        Args: { p_project_id: string; p_user_id: string }
+        Returns: string
+      }
+      fail_director_video_attempt: {
+        Args: { p_error: string; p_job_id: string; p_project_id: string }
+        Returns: undefined
+      }
+      patch_generation_job_response_snapshot: {
+        Args: { p_patch: Json; p_request_id: string }
+        Returns: undefined
+      }
+      record_director_video_submission_resolution: {
+        Args: {
+          p_cause: string
+          p_code: string
+          p_job_id: string
+          p_project_id: string
+          p_provider_status: number
+        }
+        Returns: boolean
+      }
+      refresh_director_video_projection: {
+        Args: { p_project_id: string; p_shot_id: string }
+        Returns: undefined
+      }
+      reserve_director_video_regeneration: {
+        Args: {
+          p_actor?: string
+          p_idempotency_key: string
+          p_input_snapshot?: Json
+          p_model: string
+          p_project_id: string
+          p_provider?: string
+          p_target: Json
+          p_user_id?: string
+          p_video_clip_id: string
+          p_workspace_id?: string
+        }
+        Returns: {
+          job_id: string
+          replayed: boolean
+          take_number: number
+          video_clip_id: string
+        }[]
+      }
+      reserve_director_video_take: {
+        Args: {
+          p_actor?: string
+          p_canvas_position?: Json
+          p_idempotency_key: string
+          p_input_snapshot?: Json
+          p_model: string
+          p_override?: Json
+          p_project_id: string
+          p_provider?: string
+          p_shot_id: string
+          p_take_label?: string
+          p_target: Json
+          p_user_id?: string
+          p_workspace_id?: string
+        }
+        Returns: {
+          job_id: string
+          replayed: boolean
+          take_number: number
+          video_clip_id: string
+        }[]
+      }
+      set_director_video_final: {
+        Args: {
+          p_final: boolean
+          p_project_id: string
+          p_video_clip_id: string
+        }
+        Returns: undefined
+      }
+      soft_delete_director_video_take: {
+        Args: { p_project_id: string; p_video_clip_id: string }
+        Returns: undefined
+      }
+      take_expire_due: { Args: never; Returns: Json }
+      take_hold: {
+        Args: {
+          p_amount: number
+          p_enforce: boolean
+          p_job: string
+          p_workspace: string
+        }
+        Returns: Json
+      }
+      take_release_for_job: { Args: { p_job: string }; Returns: number }
+      update_person_with_default_appearance: {
+        Args: {
+          p_appearance_patch: Json
+          p_character_id: string
+          p_identity_patch: Json
+          p_project_id: string
+        }
+        Returns: Json
+      }
+      upsert_people_with_default_appearances: {
+        Args: { p_people: Json; p_project_id: string }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never
@@ -1638,12 +2092,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1667,11 +2121,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1692,11 +2146,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1717,11 +2171,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1734,11 +2188,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1746,3 +2200,9 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
+
+export const Constants = {
+  public: {
+    Enums: {},
+  },
+} as const
