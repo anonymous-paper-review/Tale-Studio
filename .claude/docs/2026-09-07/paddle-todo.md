@@ -96,7 +96,7 @@
 | 3 | ~~만료(2-6)~~ ✅ 2026-09-08 | 에이전트 | 읽을 때 만료 lot 제외(새는 창 0) + `take_expire_due()` Cron 하루 1회. dev DB 적용·실측 완료 |
 | 4 | ~~이중 적립 DB 제약~~ ✅ 2026-09-08 | 에이전트 | `take_ledger_ref_grant_unique` 부분 유일 인덱스 + 웹훅이 23505 를 "이미 적립됨"으로. dev DB 적용·실측 완료. **live 적용은 라이브 전환 때** |
 | 5 | ~~놓친 결제 찾기(P12)~~ ✅ 2026-09-08 | 에이전트 | 즉시 재조회(`POST /api/billing/reconcile-me`, 폴링 90초 뒤 자동) + 일일 대사(Cron 매일 0시 UTC). dev 실측: 유실 흉내 → 검출 → 복구 |
-| 6 | ~~P10 스모크~~ 🟡 절반 2026-09-08 | 에이전트 | ✅ 공짜 검사 8개 `pnpm smoke:billing`(배포마다, $0). 🔴 남음: 돈 드는 검사(실결제 + 영상 1개). **2026-09-08 실측: Orca 로 결제창까지는 열리고 iframe 내부도 읽히지만 카드번호 입력이 막힌다**(Paddle 카드칸이 중첩 iframe). 결과·대안 → `2026-09-08/smoke-billing-result.html` 3절. 오너 판단 대기 |
+| 6 | ~~P10 스모크~~ ✅ 2026-09-08 | 에이전트 | `pnpm smoke:billing` 공짜 8개(배포마다, $0) + `pnpm smoke:billing:paid` 전 구간 6개(팩·재전송 멱등·구독·hold·반환·정리). 로컬·dev 양쪽 통과. 결제창 대신 서명한 알림을 쏜다(Orca 가 Paddle 카드칸에 값을 못 넣는 실측 뒤 오너 결정). 실제 생성 라우트는 러프 게이트에 막혀 take_hold RPC 로 대체 — 러프 있는 스모크 프로젝트가 생기면 바꾼다 |
 | 7 | 가격 페이지 한국어 문안 검수 · 베타 배너 문구 | 오너 | 심사 때 이 페이지를 본다 |
 | 8 | 기획 숫자 3개(Account 초과 단가 · 자동 충전 상한 · 무료 Take 유효기간) · PITR · 세무사 1회 | 오너 | 라이브 전 |
 | 9 | **라이브 전환**: Paddle 라이브 계정(사업자·정산 계좌) → Website approval → `paddle-register-catalog.mts` 라이브 키로 → Production env(키·시크릿·가격 ID·디스코드) → 라이브 알림 목적지 → beta-cutover grant → `enforce` | 오너 + 에이전트 | 아래 §3 |

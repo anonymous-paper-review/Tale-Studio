@@ -79,6 +79,7 @@ scripts/*
 # 결제 게이트 스모크(#payments-phase-3 P10) — pnpm smoke:billing 이 부르고 판정 규칙은
 # src/lib/billing/smoke-checks.ts 가 소유한다. 빠지면 배포마다 도는 검사가 클린 클론에서 사라진다.
 !scripts/smoke-billing.mjs
+!scripts/smoke-billing-paid.mjs
 # 같은 이유 — tests/seed-test-accounts.test.ts 가 이 스크립트를 import 한다.
 # 빠지면 클린 클론에서 pnpm typecheck 가 TS2307 로 깨진다. 하드코딩 비밀 없음
 # (service-role 키는 .env.local 에서 읽는다).
