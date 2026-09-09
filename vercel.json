@@ -11,10 +11,6 @@
     {
       "path": "/api/cron/billing-reconcile",
       "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/cron/video-batches",
-      "schedule": "*/2 * * * *"
     }
   ]
 }
