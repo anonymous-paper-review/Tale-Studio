@@ -71,9 +71,13 @@ describe('연결된 Director 영상 결과 저장', () => {
       ),
     )
 
-    await expect(POST(request())).rejects.toBeInstanceOf(
-      DirectorVideoCompletionPersistenceError,
-    )
+    // 확인 방법 변경(#webhook-answers-fast 2026-09-08 오너 판정 ②) — 약속 문장은 그대로다.
+    //   예전에는 예외가 밖으로 나오는 것으로 확인했다. 이제 알림에 먼저 답하고 저장을 그 뒤에
+    //   하므로(after) 던질 대상이 없다. "다시 시도할 수 있게 남긴다" 의 직접 증거는
+    //   실패로 굳히는 함수가 안 불리는 것 — 잡이 queued 로 남아야 폴링·유령 청소부가 회수한다.
+    const response = await POST(request())
+
+    expect(response.status).toBe(200)
     expect(mocks.failLinked).not.toHaveBeenCalled()
     expect(mocks.failLegacy).not.toHaveBeenCalled()
   })
