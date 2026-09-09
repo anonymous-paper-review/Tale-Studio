@@ -81,7 +81,8 @@ const COLUMNS =
 //   job.input_snapshot.source_hash 를 읽으므로 둘 다 반드시 포함돼야 한다(누락 시 후보 source_hash=null → stale 무력화).
 export const GENERATION_JOB_COLUMNS = COLUMNS
 
-export const STALE_QUEUED_MS = 10 * 60 * 1000
+import { STALE_QUEUED_MS } from '@/lib/generation-job-timing'
+export { STALE_QUEUED_MS }
 
 function toJsonSnapshot(value: unknown): Json {
   try {

@@ -75,7 +75,7 @@ import {
 } from '@/lib/director/wiring-persistence'
 import { runVideoAdherence } from '@/lib/director/video-adherence-client'
 import { refreshGenerationQueue } from '@/lib/generation-queue'
-import { STALE_QUEUED_MS } from '@/lib/generation-jobs'
+import { STALE_QUEUED_MS } from '@/lib/generation-job-timing'
 import { isDemoSession } from '@/lib/demo/context'
 import {
   pollGenerationJob,

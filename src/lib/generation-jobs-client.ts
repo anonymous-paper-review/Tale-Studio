@@ -6,7 +6,7 @@
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 // 서버가 "유령"으로 보는 시각과 맞춘다(#poll-timeout-align 2026-09-08) — 따로 적으면 조용히 어긋난다.
-import { STALE_QUEUED_MS } from '@/lib/generation-jobs'
+import { STALE_QUEUED_MS } from '@/lib/generation-job-timing'
 
 export type GenerationJobLifecycle =
   | 'queued'
