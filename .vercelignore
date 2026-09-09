@@ -1,0 +1,22 @@
+# CLI deployments may upload only application build inputs, never internal documents or keys.
+/*
+!/src
+!/public
+!/package.json
+!/pnpm-lock.yaml
+!/pnpm-workspace.yaml
+!/next.config.ts
+!/next-env.d.ts
+!/tsconfig.json
+!/postcss.config.mjs
+!/sentry.server.config.ts
+!/sentry.edge.config.ts
+!/vercel.json
+.env*
+.claude
+.omx
+.agents
+.codex
+node_modules
+.next
+.vercel

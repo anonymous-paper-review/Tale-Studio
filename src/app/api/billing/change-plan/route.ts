@@ -12,6 +12,7 @@ import { decidePlanChange } from '@/lib/billing/plan-change'
 import { pickActiveSubscription, type SubscriptionRow } from '@/lib/billing/subscription-state'
 import { PADDLE_PLANS } from '@/lib/billing/catalog'
 import { sendOpsAlert } from '@/lib/ops-alert'
+import { isCheckoutEnabled } from '@/lib/billing/checkout-availability'
 
 export const runtime = 'nodejs'
 
@@ -45,6 +46,9 @@ export async function POST(req: Request) {
       now: new Date(),
     })
     if (!decision.ok) return NextResponse.json({ ok: false, error: decision.reason }, { status: 409 })
+    if (!isCheckoutEnabled() && decision.steps.some((step) => step.prorationBillingMode !== 'do_not_bill')) {
+      return NextResponse.json({ ok: false, error: 'payments_not_open' }, { status: 503 })
+    }
 
     // 순서대로 보낸다. Paddle 이 항목 변경과 갱신일 변경을 한 요청에 못 받는다(2026-09-08 실측).
     for (const [index, step] of decision.steps.entries()) {

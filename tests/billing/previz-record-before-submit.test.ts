@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   requireProjectAccess: vi.fn(),
   falVideoSubmit: vi.fn(),
+  pickFalKey: vi.fn(),
   createGenerationJob: vi.fn(),
   failGenerationJob: vi.fn(),
   holdTakesForVideoJob: vi.fn(),
@@ -25,6 +26,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/lib/demo/guard-server', () => ({ demoWriteBlock: () => null }))
 vi.mock('@/lib/api/guard', () => ({ requireProjectAccess: mocks.requireProjectAccess }))
 vi.mock('@/lib/writer/llm/fal', () => ({ falVideoSubmit: mocks.falVideoSubmit }))
+vi.mock('@/lib/fal/keys', () => ({ pickFalKey: mocks.pickFalKey }))
 vi.mock('@/lib/generation-jobs', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/generation-jobs')>()),
   createGenerationJob: mocks.createGenerationJob,
@@ -42,7 +44,7 @@ vi.mock('@/lib/billing/take-hold', () => ({
   holdTakesForVideoJob: mocks.holdTakesForVideoJob,
   releaseTakesForJob: mocks.releaseTakesForJob,
 }))
-vi.mock('@/lib/writer/llm/translate', () => ({ deriveEnBatch: mocks.deriveEnBatch }))
+vi.mock('@/lib/writer/i18n/derive-en', () => ({ deriveEnBatch: mocks.deriveEnBatch }))
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: { from: mocks.from, rpc: mocks.rpc } }))
 vi.mock('@/lib/fal/webhook-url', () => ({ resolveWebhookUrl: () => 'https://example.test/api/fal/webhook' }))
 
@@ -75,6 +77,7 @@ beforeEach(() => {
   mocks.checkProjectVideoBudget.mockResolvedValue({ ok: true })
   mocks.checkGenerationCapacity.mockResolvedValue({ ok: true })
   mocks.deriveEnBatch.mockResolvedValue(new Map([['a', 'a man walks']]))
+  mocks.pickFalKey.mockResolvedValue({ id: 'key-1' })
   mocks.createGenerationJob.mockImplementation(async () => {
     mocks.order.push('create-job')
     return { id: 'job-1' }

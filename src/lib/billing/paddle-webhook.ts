@@ -98,7 +98,7 @@ export interface PaddleWebhookDeps {
   hasRevoke(adjustmentId: string): Promise<boolean>
   /** 이 결제에 대해 이미 회수한 Take 합(양수). 부분 환불이 여러 번 와도 적립을 넘지 않게 캡을 건다. */
   revokedTotalForTransaction(transactionId: string): Promise<number>
-  revoke(input: { workspaceId: string; amount: number; refId: string; reason: string }): Promise<void>
+  revoke(input: { workspaceId: string; grantId: string; amount: number; refId: string; reason: string }): Promise<void>
   alert(alert: OpsAlert): Promise<void>
 }
 
@@ -437,7 +437,9 @@ async function handleAdjustment(event: PaddleEvent, deps: PaddleWebhookDeps): Pr
     })
     return 'nothing_to_revoke'
   }
-  const granted = grants.reduce((s, g) => s + g.delta, 0)
+  // 현재 결제 하나는 상품 하나를 지급한다. 출처가 모호하면 첫 행을 임의로 골라 회수하지 않는다.
+  if (grants.length !== 1) throw new Error(`Ambiguous grants for Paddle transaction ${txnId}`)
+  const granted = grants[0].delta
   const totals = data.totals
   const refunded = totals && typeof totals === 'object' ? Number.parseInt(String((totals as Record<string, unknown>).total ?? ''), 10) : NaN
   const original = await deps.findTransactionTotal(txnId)
@@ -449,6 +451,7 @@ async function handleAdjustment(event: PaddleEvent, deps: PaddleWebhookDeps): Pr
   try {
     await deps.revoke({
       workspaceId: grants[0].workspaceId,
+      grantId: grants[0].id,
       amount,
       refId: adjId,
       reason: `paddle ${action} of ${txnId} (${Math.round(ratio * 100)}%)`,

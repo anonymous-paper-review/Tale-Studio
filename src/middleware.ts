@@ -55,6 +55,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/playground')
   const isPublicPath =
     isMarketingPath ||
+    pathname === '/checkout' ||
     pathname.startsWith('/login') ||
     isPublicAsset ||
     isSharePath ||

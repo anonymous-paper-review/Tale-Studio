@@ -9,7 +9,7 @@ import { canBuyTakePack, type SubscriptionStatus } from '@/lib/billing/account-s
 import { paddleRequest } from '@/lib/billing/paddle-api'
 
 export type CheckoutKind = 'plan' | 'pack'
-export type CheckoutDenyReason = 'unknown_item' | 'not_purchasable' | 'free_pack_limit' | 'already_subscribed' | 'past_due'
+export type CheckoutDenyReason = 'payments_not_open' | 'unknown_item' | 'not_purchasable' | 'free_pack_limit' | 'already_subscribed' | 'past_due'
 
 export type CheckoutDecision = { ok: true; priceId: string; label: string } | { ok: false; reason: CheckoutDenyReason }
 
@@ -67,6 +67,7 @@ export async function createPaddleTransaction(input: {
     items: [{ price_id: input.priceId, quantity: 1 }],
     customer_id: customerId,
     custom_data: { workspace_id: input.workspaceId },
+    currency_code: 'USD',
     collection_mode: 'automatic',
   })
   return { transactionId: txn.id, customerId }

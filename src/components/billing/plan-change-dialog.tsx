@@ -70,7 +70,7 @@ export function PlanChangeDialog({
       })
       const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }
       if (!res.ok || !body.ok) {
-        toast.error(t('Could not change your plan. Please try again in a moment.'))
+        toast.error(t(body.error === 'payments_not_open' ? 'Payments are being prepared' : 'Could not change your plan. Please try again in a moment.'))
         return
       }
       onOpenChange(false)

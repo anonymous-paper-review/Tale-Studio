@@ -2073,6 +2073,17 @@ export type Database = {
         Returns: Json
       }
       take_release_for_job: { Args: { p_job: string }; Returns: number }
+      take_resolved_ledger: {
+        Args: { p_workspace: string }
+        Returns: {
+          created_at: string
+          delta: number
+          expires_at: string
+          grant_id: string
+          id: string
+          kind: string
+        }[]
+      }
       update_person_with_default_appearance: {
         Args: {
           p_appearance_patch: Json

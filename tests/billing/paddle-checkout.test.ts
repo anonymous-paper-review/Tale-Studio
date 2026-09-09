@@ -79,6 +79,14 @@ describe('Paddle 거래 만들기', () => {
     expect(body.items).toEqual([{ price_id: 'pri_mini', quantity: 1 }])
   })
 
+  // 왜: 오너는 한국 고객도 USD로 결제받는다. 거래 생성 시 통화를 생략해 결제 설정에 맡기지 않는다.
+  it('한국 고객을 제외하지 않고 USD 카드결제를 받는다', async () => {
+    const calls = stubPaddle({ '/transactions': () => ({ body: { id: 'txn_usd' } }) })
+    await createPaddleTransaction({ priceId: 'pri_mini', workspaceId: 'ws-1', email: 'buyer@example.co.kr', existingCustomerId: 'ctm_existing' })
+    const body = JSON.parse(String(calls[0].init?.body))
+    expect(body.currency_code).toBe('USD')
+  })
+
   // 왜: 같은 사람이 팩을 두 번 사면 Paddle 에 고객이 둘 생기고 영수증·포털이 갈라진다.
   it('같은 이메일은 Paddle 고객 하나를 다시 쓴다', async () => {
     const calls = stubPaddle({

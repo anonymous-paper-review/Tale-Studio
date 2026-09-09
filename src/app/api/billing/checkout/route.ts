@@ -10,10 +10,12 @@ import { takeBalance } from '@/lib/billing/take-ledger'
 import { summarizeSubscription } from '@/lib/billing/account-summary'
 import { createPaddleTransaction, decideCheckout, type CheckoutKind } from '@/lib/billing/checkout'
 import { sendOpsAlert } from '@/lib/ops-alert'
+import { isCheckoutEnabled } from '@/lib/billing/checkout-availability'
 
 export const runtime = 'nodejs'
 
 export async function POST(req: NextRequest) {
+  if (!isCheckoutEnabled()) return NextResponse.json({ error: 'payments_not_open' }, { status: 503 })
   try {
     const supabase = await createClient()
     const {
