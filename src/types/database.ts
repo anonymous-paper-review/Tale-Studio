@@ -507,6 +507,117 @@ export type Database = {
           },
         ]
       }
+      director_video_batch_items: {
+        Row: {
+          batch_id: string
+          created_at: string
+          error: string | null
+          id: string
+          job_id: string | null
+          position: number
+          prepared: Json
+          shot_id: string
+          status: string
+          submission_response: Json | null
+          updated_at: string
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          error?: string | null
+          id: string
+          job_id?: string | null
+          position: number
+          prepared: Json
+          shot_id: string
+          status?: string
+          submission_response?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          error?: string | null
+          id?: string
+          job_id?: string | null
+          position?: number
+          prepared?: Json
+          shot_id?: string
+          status?: string
+          submission_response?: Json | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "director_video_batch_items_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "director_video_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "director_video_batch_items_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "generation_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      director_video_batches: {
+        Row: {
+          created_at: string
+          id: string
+          lease_expires_at: string | null
+          lease_token: string | null
+          project_id: string
+          status: string
+          stop_reason: string | null
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          lease_expires_at?: string | null
+          lease_token?: string | null
+          project_id: string
+          status?: string
+          stop_reason?: string | null
+          updated_at?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lease_expires_at?: string | null
+          lease_token?: string | null
+          project_id?: string
+          status?: string
+          stop_reason?: string | null
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "director_video_batches_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "director_video_batches_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       editor_states: {
         Row: {
           project_id: string
@@ -557,10 +668,27 @@ export type Database = {
         }
         Relationships: []
       }
+      generation_capacity_exempt_users: {
+        Row: {
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       generation_jobs: {
         Row: {
           actor: string
           attempts: number
+          batch_id: string | null
+          batch_total: number | null
           chat_trace_id: string | null
           completed_at: string | null
           created_at: string
@@ -589,6 +717,8 @@ export type Database = {
         Insert: {
           actor?: string
           attempts?: number
+          batch_id?: string | null
+          batch_total?: number | null
           chat_trace_id?: string | null
           completed_at?: string | null
           created_at?: string
@@ -617,6 +747,8 @@ export type Database = {
         Update: {
           actor?: string
           attempts?: number
+          batch_id?: string | null
+          batch_total?: number | null
           chat_trace_id?: string | null
           completed_at?: string | null
           created_at?: string
@@ -1955,6 +2087,27 @@ export type Database = {
         }
         Returns: undefined
       }
+      claim_director_video_batch: {
+        Args: { p_batch_id: string; p_token: string }
+        Returns: {
+          created_at: string
+          id: string
+          lease_expires_at: string | null
+          lease_token: string | null
+          project_id: string
+          status: string
+          stop_reason: string | null
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "director_video_batches"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       complete_director_video_attempt: {
         Args: {
           p_job_id: string
@@ -1964,6 +2117,15 @@ export type Database = {
           p_video_clip_id: string
         }
         Returns: undefined
+      }
+      create_director_video_batch: {
+        Args: {
+          p_batch_id: string
+          p_items: Json
+          p_project_id: string
+          p_user_id: string
+        }
+        Returns: string
       }
       create_person_with_default_appearance: {
         Args: { p_person: Json; p_project_id: string }
@@ -2006,6 +2168,15 @@ export type Database = {
       refresh_director_video_projection: {
         Args: { p_project_id: string; p_shot_id: string }
         Returns: undefined
+      }
+      reserve_director_video_batch_item: {
+        Args: { p_args: Json; p_item_id: string; p_lease_token: string }
+        Returns: {
+          job_id: string
+          replayed: boolean
+          take_number: number
+          video_clip_id: string
+        }[]
       }
       reserve_director_video_regeneration: {
         Args: {

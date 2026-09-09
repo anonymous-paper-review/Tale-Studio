@@ -141,6 +141,9 @@ export async function reconcileJobFromFal(
   //   terminalizeJob 이 hold 반환까지 맡는다(연결형은 markDirectorVideoAttemptFailed,
   //   비연결형은 releaseTakesForJob).
   if (job.request_id.startsWith('reserved:')) {
+    // #batch-resume: 접수 뒤 연결 기록만 잃었을 수도 있다. 일괄은 저장한 증표로 복구하며,
+    //   시간만으로 미제출이라 단정해 환급하거나 다른 키로 다시 제출하지 않는다.
+    if (job.batch_id) return job
     if (!options.settleStaleReserved) return job
     return terminalizeJob(job, 'job was never submitted to the provider (reserved slot expired) — held takes returned')
   }

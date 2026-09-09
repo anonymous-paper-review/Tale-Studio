@@ -11,7 +11,7 @@ import { falVideoSubmit } from '@/lib/writer/llm/fal'
 import { pickFalKey } from '@/lib/fal/keys'
 import { createGenerationJob, failGenerationJob, STALE_QUEUED_MS } from '@/lib/generation-jobs'
 import { checkGenerationCapacity, checkProjectVideoBudget } from '@/lib/generation-quota'
-import { quotaRejectionResponse, videoBudgetRejectionResponse } from '@/lib/api/quota'
+import { quotaRejectionResponse, videoBudgetRejectionResponse, videoCapacityReservationRejection } from '@/lib/api/quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
 import { holdTakesForVideoJob, releaseTakesForJob } from '@/lib/billing/take-hold'
@@ -104,20 +104,29 @@ export async function POST(req: Request) {
     // 제출 전에 키를 먼저 고른다 — 작업 행에 fal_key_id 를 기록해야 조회 경로가 그 키를 쓴다.
     //   키 선택은 과금이 아니다(여유가 가장 큰 키를 고르는 계산일 뿐).
     const falKey = await pickFalKey()
-    const job = await createGenerationJob({
-      projectId,
-      requestId: `reserved:${crypto.randomUUID()}`,
-      // 제출 전이라 실제 모델을 모른다(falVideoSubmit 의 기본값을 쓴다). 제출 뒤 교체한다.
-      model: 'pending',
-      falKeyId: falKey.id,
-      kind: 'shot_previz_video',
-      target: { workspaceId: project.workspace_id as string, writerShotId },
-      inputSnapshot: {
-        prompt,
-        image_urls: [frames.start, frames.end],
-        duration,
-      },
-    })
+    let job: Awaited<ReturnType<typeof createGenerationJob>>
+    // #video-capacity-trigger: 기록 RPC 자체가 동시 경쟁 한도 거절을 던질 수 있다 — 이 예외만 이 자리에서
+    //   429 로 전환한다(hold/provider 는 아직 불리지 않았다). 다른 예외는 그대로 바깥 층의 기존 catch 로 전파된다.
+    try {
+      job = await createGenerationJob({
+        projectId,
+        requestId: `reserved:${crypto.randomUUID()}`,
+        // 제출 전이라 실제 모델을 모른다(falVideoSubmit 의 기본값을 쓴다). 제출 뒤 교체한다.
+        model: 'pending',
+        falKeyId: falKey.id,
+        kind: 'shot_previz_video',
+        target: { workspaceId: project.workspace_id as string, writerShotId },
+        inputSnapshot: {
+          prompt,
+          image_urls: [frames.start, frames.end],
+          duration,
+        },
+      })
+    } catch (createError) {
+      const rejection = videoCapacityReservationRejection(createError, { projectId, kind: 'shot_previz_video', userId: access.userId })
+      if (rejection) return rejection
+      throw createError
+    }
 
     // #payments-phase-2 #gen-quota-atomic-gate: Take hold — 제출 앞이므로 부족이면 아직 되돌릴 수 있다.
     const holdAmount = takeCostForPreviz()

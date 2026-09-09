@@ -5,7 +5,7 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import type { GenerationBatchRow } from '@/lib/generation-batches'
 import { normalizeFailureEvidence } from '@/lib/fal/error-evidence'
-import type { Json } from '@/types/database'
+import type { Json, Tables } from '@/types/database'
 import { isChatTraceId } from '@/lib/chat-trace'
 
 export type GenerationJobKind =
@@ -54,6 +54,9 @@ export interface GenerationJob {
   /** 읽기 경로(웹훅/폴링)는 actor 를 select 하지 않으므로 optional — 생성/활동 로그 경로만 채워진다. */
   actor?: GenerationJobActor
   user_id?: string | null
+  /** 일괄 묶음 표시(#batch-resume 2026-09-09). 단건 생성은 둘 다 null. */
+  batch_id?: string | null
+  batch_total?: number | null
   workspace_id?: string | null
   provider?: string
   input_snapshot?: Json
@@ -74,8 +77,36 @@ export interface GenerationJob {
 
 // Read/finalize paths intentionally select only the fields they consume. Provider is authoritative for
 // local-vs-FAL reconciliation; actor/runtime metadata is selected only by activity/quota callsites.
-const COLUMNS =
-  'id, project_id, request_id, model, kind, status, target, video_clip_id, idempotency_key, provider, input_snapshot, response_snapshot, result_url, error, chat_trace_id, fal_key_id'
+// #batch-resume: 생성된 DB 타입에 없는 열을 전체 조회에 넣지 못하게 한다
+type Join<T extends readonly string[], D extends string> = T extends readonly [
+  infer F extends string,
+  ...infer R extends string[],
+]
+  ? R extends []
+    ? F
+    : `${F}${D}${Join<R, D>}`
+  : ''
+const COLUMNS_LIST = [
+  'id',
+  'project_id',
+  'request_id',
+  'model',
+  'kind',
+  'status',
+  'target',
+  'video_clip_id',
+  'idempotency_key',
+  'provider',
+  'input_snapshot',
+  'response_snapshot',
+  'result_url',
+  'error',
+  'chat_trace_id',
+  'fal_key_id',
+  'batch_id',
+  'batch_total',
+] as const satisfies readonly (keyof Tables<'generation_jobs'>)[]
+const COLUMNS = COLUMNS_LIST.join(', ') as Join<typeof COLUMNS_LIST, ', '>
 
 // 웹훅 finalize/폴링 경로가 의존하는 컬럼 집합(회귀 가드용 export). finalize 는 job.target.workspaceId 와
 //   job.input_snapshot.source_hash 를 읽으므로 둘 다 반드시 포함돼야 한다(누락 시 후보 source_hash=null → stale 무력화).

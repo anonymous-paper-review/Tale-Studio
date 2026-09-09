@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   checkProjectVideoBudget: vi.fn(),
   checkGenerationCapacity: vi.fn(),
   deriveEnBatch: vi.fn(),
+  recordObservability: vi.fn(),
   order: [] as string[],
 }))
 
@@ -32,13 +33,24 @@ vi.mock('@/lib/generation-jobs', async (importOriginal) => ({
   createGenerationJob: mocks.createGenerationJob,
   failGenerationJob: mocks.failGenerationJob,
 }))
-vi.mock('@/lib/generation-quota', () => ({
+// videoCapacityReservationRejection 이 actual quota.ts 를 거쳐 quotaExceededBody 를 부르므로 이 머지 export 도
+//   importOriginal 로 보존한다 — 기존 두 check 함수 mock 은 그대로 유지(약화 없음).
+vi.mock('@/lib/generation-quota', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/generation-quota')>()),
   checkGenerationCapacity: mocks.checkGenerationCapacity,
   checkProjectVideoBudget: mocks.checkProjectVideoBudget,
 }))
-vi.mock('@/lib/api/quota', () => ({
+// 새 videoCapacityReservationRejection(error, ctx) 는 actual quota.ts 에서 그대로 재사용한다 —
+//   부모가 그 헬퍼를 구현하면 이 spread 로 자동 반영되고, 여기서 하드코딩한 가짜 count 는 없다.
+//   기존 두 헬퍼는 기존 계약대로 계속 오버라이드한다(약화 없음).
+vi.mock('@/lib/api/quota', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api/quota')>()),
   quotaRejectionResponse: () => new Response(JSON.stringify({ error: 'quota' }), { status: 429 }),
   videoBudgetRejectionResponse: () => new Response(JSON.stringify({ error: 'budget' }), { status: 429 }),
+}))
+// 관측 기록만 목 — 실제 DB 접속 금지.
+vi.mock('@/lib/writer/debug-events', () => ({
+  recordWriterObservabilityEvent: mocks.recordObservability,
 }))
 vi.mock('@/lib/billing/take-hold', () => ({
   holdTakesForVideoJob: mocks.holdTakesForVideoJob,
@@ -134,5 +146,25 @@ describe('미리보기 영상 만들기 순서', () => {
 
     expect(response.status).toBe(500)
     expect(mocks.releaseTakesForJob).toHaveBeenCalledWith('job-1')
+  })
+})
+
+describe('예약 경쟁에서 한도에 걸리면 Take 를 잡거나 제출하지 않고 대기 안내를 보내는 약속', () => {
+  it('createGenerationJob 이 DB trigger 로 한도 거절되면 429 를 돌려주고 hold/provider 를 부르지 않는다', async () => {
+    // #video-capacity-trigger(후속): 최근 30분 영상 3개 원자 강제 — 기록(createGenerationJob) 이 이 예외로 거절한다.
+    mocks.createGenerationJob.mockRejectedValue(Object.assign(new Error('video_user_at_capacity'), { details: '3' }))
+
+    const response = await POST(request())
+
+    expect(response.status).toBe(429)
+    expect(mocks.holdTakesForVideoJob).not.toHaveBeenCalled()
+    expect(mocks.falVideoSubmit).not.toHaveBeenCalled()
+    // 관측: quotaRejectionResponse 를 거쳐 실제 큐/한도/스코프 인자로 기록됐는지 검사한다 —
+    //   임의의 가짜 count 가 아니라 trigger 가 준 details 값이 그대로 실려야 한다.
+    expect(mocks.recordObservability).toHaveBeenCalledWith(
+      '11111111-2222-4333-8444-555555555555',
+      'generation_submit_rejected_quota',
+      expect.objectContaining({ scope: 'user', queued: 3, limit: 3 }),
+    )
   })
 })
