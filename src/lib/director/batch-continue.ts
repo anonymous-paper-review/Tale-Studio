@@ -12,6 +12,17 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { decideNextBatchSubmissions, type BatchStopReason } from '@/lib/director/batch-next'
 import type { BatchJobRow } from '@/lib/director/batch-progress'
+import { eligibleShotIdsFromRows, type ShotVideoRow } from '@/lib/director/batch-eligible'
+import { MAX_QUEUED_VIDEO_JOBS_PER_USER } from '@/lib/generation-quota'
+import { takeBalance } from '@/lib/billing/take-ledger'
+import { TAKE_COST_BY_MODEL } from '@/lib/billing/take-cost'
+
+/**
+ * 영상 하나에 드는 Take 의 최대치 — 카탈로그에서 파생시킨다.
+ *   숫자를 따로 적으면 모델 단가가 바뀔 때 조용히 어긋나고, 적게 잡으면 잔액이 모자란 채
+ *   제출해서 402 만 쌓인다(브라우저가 없으므로 그 거절을 볼 사람도 없다).
+ */
+const MAX_TAKE_COST_PER_VIDEO = Math.max(...Object.values(TAKE_COST_BY_MODEL))
 
 export interface ContinueBatchInput {
   batchId: string
@@ -51,16 +62,69 @@ export async function continueVideoBatch(
 
   const total = jobs.find((job) => job.batch_total != null)?.batch_total ?? 0
 
-  // 실제 제출은 다음 커밋에서 붙인다. 지금은 판정까지만 — 판정이 무엇을 시키는지 먼저 고정한다.
+  // 판정 재료를 모은다. 남은 "목록" 은 저장하지 않으므로 매번 DB 에서 다시 센다 —
+  //   그래야 다른 경로로 채워진 영상도 반영된다.
+  const [eligibleShotIds, takesAvailable] = await Promise.all([
+    loadEligibleShotIds(input.projectId),
+    loadTakeBalance(input.projectId),
+  ])
+
   const decision = decideNextBatchSubmissions({
     jobs,
     total,
-    eligibleShotIds: [],
-    concurrencyLimit: 3,
-    takesAvailable: 0,
-    takeCostPerVideo: 0,
+    eligibleShotIds,
+    concurrencyLimit: MAX_QUEUED_VIDEO_JOBS_PER_USER,
+    takesAvailable,
+    // 모델별로 다르지만 여기서는 가장 비싼 값을 쓴다 — 적게 잡으면 잔액이 모자란 채 제출한다.
+    takeCostPerVideo: MAX_TAKE_COST_PER_VIDEO,
+    // 중단은 브라우저 상태다. 서버가 이어갈 때의 중단 표시는 다음 슬라이스에서 DB 로 옮긴다.
     cancelled: false,
   })
 
-  return { submitted: 0, stopReason: decision.stopReason }
+  if (decision.shotIds.length === 0) {
+    return { submitted: 0, stopReason: decision.stopReason }
+  }
+
+  // 실제 제출 배선은 다음 커밋이다. 지금은 "무엇을 몇 개 낼지" 까지 확정하고 기록만 남긴다 —
+  //   판정이 실제 재료로 맞게 도는지 먼저 확인하고 제출을 붙인다.
+  console.info(
+    '[batch-continue] ready to submit:',
+    input.batchId,
+    decision.shotIds.length,
+    decision.shotIds.join(','),
+  )
+  return { submitted: 0, stopReason: null }
+}
+
+/** 이 프로젝트에서 아직 완성 영상이 없는 샷 — 화면 기준과 같은 두 조건을 DB 행으로 본다. */
+async function loadEligibleShotIds(projectId: string): Promise<string[]> {
+  const { data: shots, error: shotsError } = await supabaseAdmin
+    .from('shots')
+    .select('shot_id')
+    .eq('project_id', projectId)
+    .order('shot_id')
+  if (shotsError) throw shotsError
+
+  const { data: clips, error: clipsError } = await supabaseAdmin
+    .from('video_clips')
+    .select('shot_id, status, url, last_attempt_status, deleted_at')
+    .eq('project_id', projectId)
+  if (clipsError) throw clipsError
+
+  return eligibleShotIdsFromRows(
+    (shots ?? []).map((row) => row.shot_id as string),
+    (clips ?? []) as ShotVideoRow[],
+  )
+}
+
+/** 이 프로젝트가 속한 작업 공간의 잔액. 도는 잡의 몫은 이미 hold 로 빠져 있다. */
+async function loadTakeBalance(projectId: string): Promise<number> {
+  const { data: project, error } = await supabaseAdmin
+    .from('projects')
+    .select('workspace_id')
+    .eq('id', projectId)
+    .maybeSingle()
+  if (error) throw error
+  if (!project?.workspace_id) return 0
+  return takeBalance(project.workspace_id as string)
 }
