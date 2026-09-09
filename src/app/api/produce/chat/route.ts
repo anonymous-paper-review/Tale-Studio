@@ -4,6 +4,7 @@ import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
 import { buildProducerSystem } from './system-prompt'
 import { parseExtractedSettings } from '@/lib/parse-extracted-settings'
+import { resolveProducerDialogueLanguage } from '@/lib/producer-dialogue-language'
 import { parseChatChoices } from '@/lib/chat-choices'
 import { castMentions, backgroundMentions } from '@/lib/card-mention'
 import {
@@ -113,7 +114,15 @@ export async function POST(req: Request) {
       )
     }
 
+    const dialogueLanguage = resolveProducerDialogueLanguage({
+      message,
+      history,
+      currentLanguage: currentSettings?.dialogueLanguage,
+    })
     const contextParts: string[] = []
+    contextParts.push(dialogueLanguage
+      ? `[Dialogue Language Decision]\n${dialogueLanguage}\nThe user confirmed this dialogue language. Use this exact code for dialogueLanguage. Never infer a different language from the setting, country, names, visual style, or chat language.`
+      : '[Dialogue Language Decision]\nUNDECIDED\nThe user has not confirmed a dialogue language. Omit dialogueLanguage from extractedSettings. Ask the user in the ongoing conversation before confirming it; at most one focused question per reply. If this reply already asks about another missing detail, leave dialogue language unresolved for a later turn.')
     if (storyText) {
       contextParts.push(`[Current Story Text]\n${storyText}`)
     }
@@ -258,7 +267,11 @@ export async function POST(req: Request) {
       throw err
     }
 
-    const { reply: replyRaw, extractedSettings } = parseExtractedSettings(text)
+    const { reply: replyRaw, extractedSettings: proposedSettings } = parseExtractedSettings(text)
+    // 모델은 배경/그림체에서 발화 언어를 추측할 수 있다. 제품이 결정한 값만 보드에 적용한다.
+    const extractedSettings = { ...proposedSettings }
+    if (dialogueLanguage) extractedSettings.dialogueLanguage = dialogueLanguage
+    else delete extractedSettings.dialogueLanguage
     // #p4-choices: Foundation 빈칸을 되묻기 대신 선택지 버튼으로 — [CHOICES] 라인 추출.
     const { reply, choices, markerFound } = parseChatChoices(replyRaw)
     const trace = buildChatTrace({

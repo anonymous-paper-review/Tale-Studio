@@ -1017,8 +1017,8 @@ export const KO: Record<string, string> = {
   'On it, re-running the Writer with your current source. This can take a while.':
     '좋아요, 지금 원천 그대로 Writer를 다시 실행할게요! 시간이 좀 걸릴 수 있어요.',
   // D12 — 채팅이 이름/느낌으로 스타일 앵커를 직접 반영 (2026-08-31 오너)
-  "Couldn't find that art style in the catalog. Tell me the feel again or pick one in the style picker.":
-    '그 그림체는 목록에서 못 찾았어요. 느낌을 다시 말해 주거나 스타일 피커에서 골라 주세요.',
+  "Couldn't find that art style in the catalog. Tell me the feel again or choose one using the palette icon below the chat input.":
+    '그 그림체는 목록에서 못 찾았어요. 느낌을 다시 말해 주거나 채팅 입력창 아래의 팔레트 아이콘을 눌러 골라 주세요.',
   "The previous Writer run didn't finish (no scenes/shots)": '이전 Writer 실행이 완료되지 않았어요 (씬/샷 없음)',
   'Check the story and settings, then re-run to generate scenes/shots and fill in Director/Editor.': '스토리·설정을 확인하고 다시 실행하면 씬·샷이 생성돼 Director/Editor 가 채워집니다.',
   'Suggest re-running Writer': 'Writer 다시 실행 제안',

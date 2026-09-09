@@ -52,6 +52,7 @@ import {
   type SceneShotMentionTarget,
 } from '@/lib/card-mention'
 import { StyleAnchorPicker } from '@/features/producer/style-anchor-picker'
+import { selectStyleAnchorFromPicker } from '@/features/producer/select-style-anchor'
 import { SceneGateControls, sendSceneGate } from '@/features/writer/scene-gate-panel'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import {
@@ -794,7 +795,6 @@ export function GlobalChat() {
   //   빨간 빔(회전)과 모션·색을 갈라 "안내"와 "호버 반응"이 섞이지 않게 한다(#feedback v2).
   const styleAnchors = useProducerStore((s) => s.styleAnchors)
   const styleAnchorKey = useProducerStore((s) => s.styleAnchorKey)
-  const setStyleAnchor = useProducerStore((s) => s.setStyleAnchor)
   const loadStyleAnchors = useProducerStore((s) => s.loadStyleAnchors)
   const [stylePressed, setStylePressed] = useState(false)
   useEffect(() => {
@@ -1945,7 +1945,7 @@ export function GlobalChat() {
                   <StyleAnchorPicker
                     anchors={styleAnchors}
                     value={styleAnchorKey}
-                    onSelect={(k) => void setStyleAnchor(k)}
+                    onSelect={(k) => void selectStyleAnchorFromPicker(k)}
                     open={stylePickerOpen}
                     onOpenChange={setStylePickerOpen}
                   >

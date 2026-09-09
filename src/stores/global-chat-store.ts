@@ -1060,7 +1060,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             patchTrace({ skippedCount: 1 })
             const failure = translate(
               contentLocale(),
-              "Couldn't find that art style in the catalog. Tell me the feel again or pick one in the style picker.",
+              "Couldn't find that art style in the catalog. Tell me the feel again or choose one using the palette icon below the chat input.",
             )
             set((state) => ({
               messages: [...state.messages, { id: makeId(), stage, role: 'model', content: failure }],
