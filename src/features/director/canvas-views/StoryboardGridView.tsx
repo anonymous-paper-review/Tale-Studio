@@ -692,7 +692,7 @@ function ShotCell({
             style={{ fontSize: descriptionFontSize }}
           >
             {/* writer 유저 언어 설명 우선(#e5) — 폴백은 프롬프트(슬러그 → @이름 치환, #e6) */}
-            {nativeDescription || replaceSlugs(prompt, roster)}
+            {nativeDescription ? replaceSlugs(nativeDescription, roster, '') : replaceSlugs(prompt, roster)}
           </p>
         )}
       </div>

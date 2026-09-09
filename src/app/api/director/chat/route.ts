@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
-import { CHAT_OUTPUT_FORMAT_GUIDE, CHAT_UPDATES_BATCH_GUIDE, fetchProjectLocale, responseLanguageDirective } from '@/lib/chat-format'
+import { CHAT_OUTPUT_FORMAT_GUIDE, CHAT_UPDATES_BATCH_GUIDE, resolveChatLocale, responseLanguageDirective } from '@/lib/chat-format'
+import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import {
   NOTICE_PARTIAL,
   parseFencedJsonReply,
@@ -546,6 +547,7 @@ export async function POST(req: Request) {
     const {
       message,
       history,
+      uiLocale,
       shotContext,
       canvasContext,
       projectId,
@@ -561,11 +563,20 @@ export async function POST(req: Request) {
 
     // 응답 언어 강제(#i18n-s5-batch6-chat) — projects.locale 조회. 소유 확인 실패/미상은
     //   fetchProjectLocale 이 null 을 주고, responseLanguageDirective(null) 이 종전 동작(무주입)으로 폴백.
-    let projectLocale: Awaited<ReturnType<typeof fetchProjectLocale>> = null
+    let projectLocale: AppLocale | null = null
+    let localeSwitched: AppLocale | null = null
     if (typeof projectId === 'string' && projectId) {
       try {
         if (await userOwnsProject(projectId, user.id)) {
-          projectLocale = await fetchProjectLocale(projectId)
+          // 채팅 언어 규칙 v2(#chat-locale-follow v2): 웹페이지 언어 상속 + 다른 언어 3회 연속·명시 요청 시 전환.
+          const resolved = await resolveChatLocale({
+            projectId,
+            message,
+            history,
+            uiLocale: parseAppLocale(uiLocale) ?? parseAppLocale(user.user_metadata?.locale),
+          })
+          projectLocale = resolved.locale
+          localeSwitched = resolved.switched
         }
       } catch (err) {
         console.warn('[director/chat] locale lookup skipped:', err instanceof Error ? err.message : err)
@@ -618,6 +629,8 @@ export async function POST(req: Request) {
       await persistChatTraceBestEffort(projectId, trace)
 
       return NextResponse.json({
+        contentLocale: projectLocale,
+        localeSwitched,
         reply,
         updates,
         trace,
@@ -661,6 +674,8 @@ export async function POST(req: Request) {
     await persistChatTraceBestEffort(projectId, trace)
 
     return NextResponse.json({
+      contentLocale: projectLocale,
+      localeSwitched,
       ...legacyResult,
       trace,
     })

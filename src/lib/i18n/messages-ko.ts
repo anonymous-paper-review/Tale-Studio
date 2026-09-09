@@ -965,7 +965,14 @@ export const KO: Record<string, string> = {
   'Play/pause (Space)': '재생/정지 (Space)',
   'Next frame (→) · hold for continuous': '다음 프레임 (→) · 꾹 누르면 연속',
   'Redo (Ctrl+Y)': '다시실행 (Ctrl+Y)',
-  'Right-click a clip → speed, split, delete': '클립 우클릭 → 속도·분할·삭제',
+  // ── editor: 화면 전환·축척 (2026-09-08) ──
+  'Dissolve (dip to black)': '디졸브(검은 화면 전환)',
+  'No dissolve': '디졸브 없음',
+  '{seconds}s dissolve': '{seconds}초 디졸브',
+  'Zoom out timeline': '타임라인 축소',
+  'Zoom in timeline': '타임라인 확대',
+  'Timeline scale': '타임라인 축척',
+  '1s = {px}px': '1초 = {px}px',
   'No shot videos to download. (Generate videos first)': '다운로드할 샷 영상이 없습니다. (먼저 영상을 생성하세요)',
   '{downloaded}/{total} ZIP complete, {failed} failed (see _failed.txt inside the zip).': '{downloaded}/{total}개 ZIP 완료, {failed}개 실패(zip 안 _failed.txt 참고).',
   'Downloaded {count} shots as a ZIP in order.': '샷 {count}개를 순서대로 ZIP 다운로드했습니다.',
@@ -1596,4 +1603,8 @@ export const KO: Record<string, string> = {
   'You are on {plan} now.': '이제 {plan}이에요.',
   'Your plan changes on your next renewal date.': '다음 결제일에 요금제가 바뀌어요.',
   'Could not change your plan. Please try again in a moment.': '요금제를 바꾸지 못했어요. 잠시 뒤 다시 해주세요.',
+  // 채팅 언어 규칙 v2 (#chat-locale-follow v2, 2026-09-08)
+  'Chat language switched to {lang}': '채팅 언어를 {lang}로 바꿨어요',
+  English: '영어',
+  Korean: '한국어',
 }

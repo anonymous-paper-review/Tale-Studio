@@ -59,6 +59,7 @@ import { stripLegacyStageMarkers } from '@/lib/display-names'
 import { translate } from '@/lib/i18n'
 import { contentLocale } from '@/lib/i18n/content'
 import { parseAppLocale } from '@/lib/locale'
+import { useLocaleStore } from '@/stores/locale-store'
 import {
   STAGE_LABEL,
   CHAT_HISTORY_WINDOW,
@@ -767,6 +768,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         body = {
           message: trimmed,
           history: historyPayload,
+          // 웹페이지(UI) 언어 — 안 잠긴 프로젝트는 이 언어를 물려받는다(#chat-locale-follow v2).
+          uiLocale: useLocaleStore.getState().locale,
           attachmentImageUrls: attachmentImageUrls ?? [],
           currentSettings: p.projectSettings,
           storyText: p.storyText,
@@ -828,6 +831,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         body = {
           message: trimmed,
           history: historyPayload,
+          // 웹페이지(UI) 언어 — 안 잠긴 프로젝트는 이 언어를 물려받는다(#chat-locale-follow v2).
+          uiLocale: useLocaleStore.getState().locale,
           canvasContext,
           // 서버가 generation_jobs 활동 로그(작업공간 인식)를 주입할 수 있게 전달 (chat-aware-regeneration)
           projectId,
@@ -843,6 +848,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         body = {
           message: trimmed,
           history: historyPayload,
+          // 웹페이지(UI) 언어 — 안 잠긴 프로젝트는 이 언어를 물려받는다(#chat-locale-follow v2).
+          uiLocale: useLocaleStore.getState().locale,
           canvasContext,
           // 서버가 projects.locale 을 조회해 응답 언어를 강제할 수 있게 전달(#i18n-s5-batch6-chat).
           projectId,
@@ -858,6 +865,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         body = {
           message: trimmed,
           history: historyPayload,
+          // 웹페이지(UI) 언어 — 안 잠긴 프로젝트는 이 언어를 물려받는다(#chat-locale-follow v2).
+          uiLocale: useLocaleStore.getState().locale,
           // 인물 id 화이트리스트(#F-003 R1) — 서버가 DB 로스터로 모델 출력을 거른다.
           projectId,
           writerContext: serializeWriterScriptContext(
@@ -928,7 +937,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       //   바꿨으면(한글 발화 → ko 채택) 같은 턴의 코드 발화(contentLocale())부터 따라가야
       //   한 대화창에 두 언어가 섞이지 않는다. reply 처리보다 먼저 반영한다.
       const adoptedLocale = parseAppLocale((data as { contentLocale?: unknown }).contentLocale)
-      if (adoptedLocale) useProjectStore.getState().adoptProjectLocale(adoptedLocale)
+      const switchedLocale = parseAppLocale((data as { localeSwitched?: unknown }).localeSwitched)
+      if (adoptedLocale) useProjectStore.getState().adoptProjectLocale(adoptedLocale, switchedLocale ? true : undefined)
+      // 채팅이 언어를 바꿨으면(#chat-locale-follow v2) 답변 뒤에 "채팅 언어를 …로 바꿨어요" 한 줄을 남긴다.
+      const localeNotice = switchedLocale
+        ? translate(switchedLocale, 'Chat language switched to {lang}', {
+            lang: translate(switchedLocale, switchedLocale === 'ko' ? 'Korean' : 'English'),
+          })
+        : null
       const replyValue = data.reply ?? data.message ?? ''
       const reply = stripLegacyStageMarkers(
         typeof replyValue === 'string' ? replyValue : String(replyValue),
@@ -986,10 +1002,12 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             role: 'model',
             content: reply,
           },
+          ...(localeNotice ? [{ id: makeId(), stage, role: 'model' as const, content: localeNotice }] : []),
         ],
       }))
 
       if (projectId) saveChatMessage(projectId, stage, 'model', reply)
+      if (projectId && localeNotice) saveChatMessage(projectId, stage, 'model', localeNotice)
 
       if (stage === 'producer' && data.extractedSettings) {
         // 영수증은 실제 결과를 기록한다 — 승인 카드로 간 것을 applied로 적으면 거짓 영수증이 된다.

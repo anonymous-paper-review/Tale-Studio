@@ -1,6 +1,8 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import { useEntityNames } from '@/lib/writer/use-entity-names'
+import { resolveEntityNames } from '@/lib/writer/resolve-entity-names'
 import { ChevronLeft, ChevronRight, GripVertical, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -28,6 +30,7 @@ export function ShotTimeline({
   onReorder,
   onDelete,
 }: ShotTimelineProps) {
+  const entityNames = useEntityNames()
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [overIndex, setOverIndex] = useState<number | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -142,7 +145,7 @@ export function ShotTimeline({
 
             {/* Info */}
             <p className="mt-1 truncate text-[10px]">
-              {shot.actionDescription}
+              {resolveEntityNames(shot.actionDescription, entityNames)}
             </p>
             <div className="mt-0.5 flex items-center gap-1">
               <Badge

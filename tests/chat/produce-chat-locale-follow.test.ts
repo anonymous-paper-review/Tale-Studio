@@ -1,13 +1,8 @@
-// 사용자가 쓰는 언어를 따라 프로젝트와 답변 언어를 안전하게 맞춘다 (#chat-locale-follow 2026-08-31)
+// Producer 채팅은 공용 채팅 언어 규칙(v2)이 정한 언어로 답하고, 바뀐 언어를 화면에 알린다 (#chat-locale-follow v2, 2026-09-08 오너 결정)
+//   왜: 종전(2026-08-31) 라우트 안의 한국어 한쪽 규칙을 네 라우트 공용 규칙(chat-format.resolveChatLocale)으로 바꿨다 —
+//   결정 자체의 약속은 tests/chat/chat-locale-follow.test.ts 에 있고, 여기는 라우트가 그 결정을 쓰는지 잠근다.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-
-// 발화 언어 추종 (#chat-locale-follow 2026-08-31) — produce/chat 의 locale 채택 계약.
-//
-// 실사고: user_metadata.locale 미저장 계정의 프로젝트가 en 으로 박혀, 한국어로 말 거는
-//   사용자에게 채팅 전체가 영어로 나갔다. 이 테스트는 그 수리의 세 가지 경계를 잠근다:
-//   ① 한글 발화 + 비-ko 프로젝트 → ko 채택(저장 + 이번 턴 directive + contentLocale 응답)
-//   ② 비대칭 — 영어 발화는 ko 프로젝트를 en 으로 강등하지 않는다(en 은 감지 폴백이라 약한 신호)
-//   ③ writer 산출물이 있으면 채택하지 않는다(기존 콘텐츠와 언어가 섞이면 안 된다)
+import type { NextRequest } from 'next/server'
 
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(),
@@ -16,8 +11,7 @@ const mocks = vi.hoisted(() => ({
   buildProducerSystem: vi.fn(),
   parseExtractedSettings: vi.fn(),
   parseChatChoices: vi.fn(),
-  fetchProjectLocaleState: vi.fn(),
-  updateProjectLocale: vi.fn(),
+  resolveChatLocale: vi.fn(),
   responseLanguageDirective: vi.fn(),
   sanitizeAttachmentUrls: vi.fn(),
   listStyleAnchorMediums: vi.fn(),
@@ -37,8 +31,7 @@ vi.mock('@/lib/parse-extracted-settings', () => ({
 }))
 vi.mock('@/lib/chat-choices', () => ({ parseChatChoices: mocks.parseChatChoices }))
 vi.mock('@/lib/chat-format', () => ({
-  fetchProjectLocaleState: mocks.fetchProjectLocaleState,
-  updateProjectLocale: mocks.updateProjectLocale,
+  resolveChatLocale: mocks.resolveChatLocale,
   responseLanguageDirective: mocks.responseLanguageDirective,
   CHAT_OUTPUT_FORMAT_GUIDE: '',
 }))
@@ -57,95 +50,70 @@ vi.mock('@/lib/reference-import', () => ({
 
 import { POST } from '@/app/api/produce/chat/route'
 
+function request(body: Record<string, unknown>): NextRequest {
+  return new Request('http://localhost/api/produce/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }) as unknown as NextRequest
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
-  mocks.getUser.mockResolvedValue({ id: 'owner' })
+  mocks.getUser.mockResolvedValue({ id: 'owner', user_metadata: { locale: 'ko' } })
   mocks.userOwnsProject.mockResolvedValue(true)
   mocks.llmChat.mockResolvedValue('plain reply')
   mocks.buildProducerSystem.mockReturnValue('producer system')
-  mocks.parseExtractedSettings.mockReturnValue({
-    reply: 'plain reply',
-    extractedSettings: null,
-  })
+  mocks.parseExtractedSettings.mockReturnValue({ reply: 'plain reply', extractedSettings: null })
   mocks.parseChatChoices.mockReturnValue({ reply: 'plain reply', choices: [] })
-  mocks.fetchProjectLocaleState.mockResolvedValue({ locale: 'en', writerRan: false })
-  mocks.updateProjectLocale.mockResolvedValue(true)
+  mocks.resolveChatLocale.mockResolvedValue({ locale: 'ko', switched: null, reason: null })
   mocks.responseLanguageDirective.mockReturnValue('')
   mocks.sanitizeAttachmentUrls.mockReturnValue({ urls: [], truncated: false })
   mocks.listStyleAnchorMediums.mockResolvedValue([])
   mocks.getProjectReferenceId.mockResolvedValue(null)
 })
 
-describe('대화 응답은 사용자가 쓰는 언어를 따른다', () => {
-  it('한국어로 말하면 프로젝트 언어를 한국어로 바꾸고 바로 한국어로 답한다', async () => {
-    const response = await POST(request({ projectId: 'p1', message: '한글로도 되나요?' }))
-
+describe('Producer 채팅과 언어 규칙', () => {
+  it('채팅이 언어를 바꿨으면 그 턴의 지시서와 답변 언어부터 새 언어이고, 응답에 바뀐 언어를 실어 화면이 따라온다', async () => {
+    // 왜: 다음 턴이 아니라 이번 턴부터 — 한 대화창에 두 언어가 섞이면 안 된다.
+    mocks.resolveChatLocale.mockResolvedValue({ locale: 'en', switched: 'en', reason: 'explicit' })
+    const response = await POST(request({ projectId: 'p1', message: '영어로 말해줘' }))
     expect(response.status).toBe(200)
-    expect(mocks.updateProjectLocale).toHaveBeenCalledWith('p1', 'ko')
-    // 이번 턴의 프롬프트·directive 가 이미 ko 로 구성된다 — 다음 턴이 아니라.
-    expect(mocks.buildProducerSystem).toHaveBeenCalledWith('ko')
-    expect(mocks.responseLanguageDirective).toHaveBeenCalledWith('ko')
-    const body = await response.json()
-    expect(body.contentLocale).toBe('ko')
-  })
-
-  it('영어로 말해도 이미 정한 한국어 응답을 영어로 바꾸지 않는다 (비대칭)', async () => {
-    mocks.fetchProjectLocaleState.mockResolvedValue({ locale: 'ko', writerRan: false })
-
-    const response = await POST(request({ projectId: 'p1', message: 'make it a thriller' }))
-
-    expect(response.status).toBe(200)
-    expect(mocks.updateProjectLocale).not.toHaveBeenCalled()
-    expect(mocks.responseLanguageDirective).toHaveBeenCalledWith('ko')
-    const body = await response.json()
-    expect(body.contentLocale).toBe('ko')
-  })
-
-  it('영어로 말한 프로젝트는 한국어로 바꾸지 않고 영어로 답한다', async () => {
-    const response = await POST(request({ projectId: 'p1', message: 'make it a thriller' }))
-
-    expect(response.status).toBe(200)
-    expect(mocks.updateProjectLocale).not.toHaveBeenCalled()
-    const body = await response.json()
-    expect(body.contentLocale).toBe('en')
-  })
-
-  it('이미 작성된 내용이 있는 프로젝트는 한국어로 말해도 응답 언어를 바꾸지 않는다', async () => {
-    mocks.fetchProjectLocaleState.mockResolvedValue({ locale: 'en', writerRan: true })
-
-    const response = await POST(request({ projectId: 'p1', message: '주인공을 더 어둡게 바꿔줘' }))
-
-    expect(response.status).toBe(200)
-    expect(mocks.updateProjectLocale).not.toHaveBeenCalled()
-    expect(mocks.responseLanguageDirective).toHaveBeenCalledWith('en')
-  })
-
-  it('언어 저장에 실패하면 바뀐 언어로 답하지 않는다', async () => {
-    mocks.updateProjectLocale.mockResolvedValue(false)
-
-    const response = await POST(request({ projectId: 'p1', message: '한글로 해주세요' }))
-
-    expect(response.status).toBe(200)
+    expect(mocks.buildProducerSystem).toHaveBeenCalledWith('en')
     expect(mocks.responseLanguageDirective).toHaveBeenCalledWith('en')
     const body = await response.json()
     expect(body.contentLocale).toBe('en')
+    expect(body.localeSwitched).toBe('en')
   })
 
-  it('내 프로젝트가 아니면 언어를 확인하거나 바꾸지 않는다', async () => {
+  it('바뀌지 않았으면 프로젝트 언어로 답하고 바뀐 언어 칸은 비어 있다', async () => {
+    // 왜: 정상 경로 고정 — 안 바뀐 턴에 화면이 안내 줄을 남기면 안 된다.
+    const response = await POST(request({ projectId: 'p1', message: '더 어둡게' }))
+    expect(response.status).toBe(200)
+    expect(mocks.responseLanguageDirective).toHaveBeenCalledWith('ko')
+    const body = await response.json()
+    expect(body.contentLocale).toBe('ko')
+    expect(body.localeSwitched).toBeNull()
+  })
+
+  it('라우트는 지금 말·대화 기록·웹페이지 언어(없으면 계정 설정)를 언어 규칙에 넘긴다', async () => {
+    // 왜: 규칙이 세 번 연속과 상속을 판단하려면 기록과 웹페이지 언어가 필요하다.
+    await POST(request({ projectId: 'p1', message: 'hello there', history: [{ role: 'user', content: 'hi' }], uiLocale: 'en' }))
+    expect(mocks.resolveChatLocale).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: 'p1', message: 'hello there', history: [{ role: 'user', content: 'hi' }], uiLocale: 'en' }),
+    )
+    mocks.resolveChatLocale.mockClear()
+    await POST(request({ projectId: 'p1', message: 'hello there' }))
+    expect(mocks.resolveChatLocale).toHaveBeenCalledWith(expect.objectContaining({ uiLocale: 'ko' }))
+  })
+
+  it('내 프로젝트가 아니면 언어 규칙을 돌리지 않고 종전대로(미주입) 답한다', async () => {
+    // 왜: 소유 확인 실패에서 남의 프로젝트 언어를 바꾸면 안 된다.
     mocks.userOwnsProject.mockResolvedValue(false)
-
-    const response = await POST(request({ projectId: 'p1', message: '한글로 해주세요' }))
-
+    const response = await POST(request({ projectId: 'p1', message: 'hello there' }))
     expect(response.status).toBe(200)
-    expect(mocks.fetchProjectLocaleState).not.toHaveBeenCalled()
-    expect(mocks.updateProjectLocale).not.toHaveBeenCalled()
+    expect(mocks.resolveChatLocale).not.toHaveBeenCalled()
+    const body = await response.json()
+    expect(body.contentLocale).toBeNull()
   })
 })
-
-function request(body: unknown): Request {
-  return new Request('http://localhost/api/produce/chat', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-}

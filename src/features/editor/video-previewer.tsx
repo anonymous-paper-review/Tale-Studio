@@ -1,6 +1,9 @@
 'use client'
 
 import { Play, Pause, Volume2, VolumeX } from 'lucide-react'
+import { dissolveOpacityAt } from '@/lib/editor/transition'
+import { useEntityNames } from '@/lib/writer/use-entity-names'
+import { resolveEntityNames } from '@/lib/writer/resolve-entity-names'
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { TitleCardStage } from '@/features/editor/title-card-stage'
@@ -24,10 +27,12 @@ function formatTime(sec: number) {
  *   2) 소스 미리보기 모드(previewSourceShotId): 단일 클립을 원본 그대로 loop 재생.
  */
 export function VideoPreviewer() {
+  const entityNames = useEntityNames()
   const t = useT()
   const videoRef = useRef<HTMLVideoElement>(null)
   const fillRef = useRef<HTMLDivElement>(null)
   const timeRef = useRef<HTMLSpanElement>(null)
+  const dissolveRef = useRef<HTMLDivElement>(null)
   const activeIdRef = useRef<string | null>(null)
 
   const [activeShotId, setActiveShotId] = useState<string | null>(null)
@@ -57,6 +62,7 @@ export function VideoPreviewer() {
       const preview = st.previewSourceShotId
 
       if (preview) {
+        if (dissolveRef.current) dissolveRef.current.style.opacity = '0'
         if (preview !== activeIdRef.current) {
           activeIdRef.current = preview
           setActiveShotId(preview)
@@ -85,6 +91,8 @@ export function VideoPreviewer() {
       const layout = selectTimelineLayout(st)
       const total = layout.reduce((sum, l) => sum + l.durationSec, 0)
       const t = st.currentTime
+      // 디졸브(2026-09-08): 검은 막의 투명도만 시간에 따라 — 영상 픽셀은 손대지 않는다.
+      if (dissolveRef.current) dissolveRef.current.style.opacity = String(dissolveOpacityAt(layout, st.videoClips, t))
 
       // 영상이 없는 구간에선 클립을 강제로 잡지 않음 → 검은 화면 (요청 1)
       const item = layout.find((l) => t >= l.startSec && t < l.startSec + l.durationSec)
@@ -203,7 +211,7 @@ export function VideoPreviewer() {
           <div className="flex h-48 w-80 items-center justify-center rounded-lg border border-dashed border-muted-foreground/30 bg-muted/10">
             <div className="text-center">
               <p className="text-lg font-semibold text-muted-foreground">{activeShot.shotType}</p>
-              <p className="mt-1 max-w-[260px] text-xs text-muted-foreground/70">{activeShot.actionDescription}</p>
+              <p className="mt-1 max-w-[260px] text-xs text-muted-foreground/70">{resolveEntityNames(activeShot.actionDescription, entityNames)}</p>
               <p className="mt-2 text-[10px] text-muted-foreground/50">
                 {activeClip?.status === 'generating' ? 'Generating...' : 'No video generated yet'}
               </p>
@@ -214,6 +222,9 @@ export function VideoPreviewer() {
         // 영상 없는 구간 = 검은 화면. 타임라인이 비었을 때만 안내 문구.
         !hasClips && <p className="text-sm text-muted-foreground">{t('No clips in the timeline')}</p>
       )}
+
+      {/* 디졸브 막(2026-09-08): 검은 화면의 투명도만 바뀐다 — 클릭은 통과 */}
+      <div ref={dissolveRef} data-testid="dissolve-overlay" className="pointer-events-none absolute inset-0 z-20 bg-black" style={{ opacity: 0 }} />
 
       {/* 재생 컨트롤 (항상 표시 — 검은 구간에서도 스크럽 가능) */}
       <div className="absolute bottom-0 left-0 right-0 flex items-center gap-3 bg-gradient-to-t from-black/80 to-transparent px-4 pb-4 pt-8">

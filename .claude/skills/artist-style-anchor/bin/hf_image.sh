@@ -2,13 +2,15 @@
 # artist-style-anchor 공용 생성 헬퍼: higgsfield gpt_image_2 제출→대기→다운로드.
 #
 # 사용법: hf_image.sh <prompt_file> <out_png> [ref_image ...]
-# 환경:   HF_AR (기본 1:1) — aspect_ratio 오버라이드.
+# 환경:   HF_AR (기본 1:1) — aspect_ratio 오버라이드. HF_MODEL (기본 gpt_image_2) — job_type (예: nano_banana_flash = Nano Banana 2). HF_RES — resolution(1k/2k/4k) 지정 시에만 전달.
 # 전제:   higgsfield auth login + workspace set 완료 상태.
 # 실패:   nsfw/타임아웃 등은 비-0 exit + 원인 출력 (IP 고유명사는 부정문이어도 nsfw 거부됨 — 프롬프트에서 제거할 것).
 set -euo pipefail
 
 PROMPT_FILE=$1; OUT=$2; shift 2
 AR=${HF_AR:-1:1}
+MODEL=${HF_MODEL:-gpt_image_2}
+RES_ARGS=(); [ -n "${HF_RES:-}" ] && RES_ARGS=(--resolution "$HF_RES")
 
 REF_ARGS=()
 for r in "$@"; do REF_ARGS+=(--image-references "$r"); done
@@ -16,8 +18,8 @@ for r in "$@"; do REF_ARGS+=(--image-references "$r"); done
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
-higgsfield generate create gpt_image_2 --prompt "$(cat "$PROMPT_FILE")" \
-  ${REF_ARGS[@]+"${REF_ARGS[@]}"} --aspect_ratio "$AR" --json > "$TMP/create.json"
+higgsfield generate create "$MODEL" --prompt "$(cat "$PROMPT_FILE")" \
+  ${REF_ARGS[@]+"${REF_ARGS[@]}"} --aspect_ratio "$AR" ${RES_ARGS[@]+"${RES_ARGS[@]}"} --json > "$TMP/create.json"
 
 ID=$(node -e "
   // create --json 응답은 bare 배열 [\"uuid\"] (구버전 {id:[...]} 도 방어)

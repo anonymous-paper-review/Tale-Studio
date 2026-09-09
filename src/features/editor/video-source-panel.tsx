@@ -1,6 +1,8 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import { useEntityNames } from '@/lib/writer/use-entity-names'
+import { resolveEntityNames } from '@/lib/writer/resolve-entity-names'
 import { PanelLeftClose, PanelLeftOpen, Film, Music, Plus, X, Loader2, Eye, ListPlus } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -64,6 +66,7 @@ export function VideoSourcePanel({
   onBinDragEnd,
   onSetBinDropSec,
 }: VideoSourcePanelProps) {
+  const entityNames = useEntityNames()
   const t = useT()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
@@ -139,7 +142,7 @@ export function VideoSourcePanel({
                             onDrop: ({ target, clientX }) => onAddClip(shot.shotId, dropTargetSec(target, clientX)),
                           })
                         }
-                        title={`${shot.actionDescription}\n${t('(Click: preview / drag·right-click: add to timeline)')}`}
+                        title={`${resolveEntityNames(shot.actionDescription, entityNames)}\n${t('(Click: preview / drag·right-click: add to timeline)')}`}
                         className="group flex cursor-grab flex-col rounded-md border border-border p-1.5 transition-all hover:bg-accent/50 active:cursor-grabbing"
                       >
                         <div className="flex aspect-video items-center justify-center overflow-hidden rounded bg-muted text-[9px] text-muted-foreground">
@@ -153,7 +156,7 @@ export function VideoSourcePanel({
                             shot.shotType
                           )}
                         </div>
-                        <p className="mt-1 truncate text-[9px] leading-tight">{shot.actionDescription}</p>
+                        <p className="mt-1 truncate text-[9px] leading-tight">{resolveEntityNames(shot.actionDescription, entityNames)}</p>
                         <div className="mt-0.5 flex items-center gap-1">
                           <Badge variant="secondary" className="h-3.5 px-1 font-mono text-[8px]">{shot.durationSeconds}s</Badge>
                           {clip && (

@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { ShotSubtitle, TitleCardData } from '@/types/shot'
 import { resolveSubtitle } from '@/lib/editor/subtitle'
-import type { Shot, VideoClip, DialogueLine, AudioTrackClip, AudioSource } from '@/types'
+import type { Shot, VideoClip, DialogueLine, AudioTrackClip, AudioSource, ClipTransition } from '@/types'
 import { toast } from 'sonner'
 import { useProjectStore } from '@/stores/project-store'
 import { createClient } from '@/lib/supabase/client'
@@ -158,6 +158,8 @@ interface EditorState {
   setTitleCardDuration: (shotId: string, seconds: number) => void
   /** 약속 K: 클립 자막(글자·자리) — 손대는 순간 대사 초기값이 저장값이 된다. null 이면 지운다. */
   setSubtitle: (shotId: string, patch: Partial<ShotSubtitle> | null) => void
+  /** 화면 전환(2026-09-08): 클립 앞 경계의 디졸브를 넣거나(길이) 뺀다(null). 되돌리기 대상. */
+  setTransitionIn: (shotId: string, transition: ClipTransition | null) => void
 
   // Video Source 패널 액션
   toggleSourcePanel: () => void
@@ -236,6 +238,11 @@ export const PANEL_PREVIEW_H_MAX = 760
 export const PX_PER_SEC_MIN = 8
 export const PX_PER_SEC_MAX = 240
 export const PX_PER_SEC_DEFAULT = 40
+/** 축척 +/− 한 단계(2026-09-08 오너 지시 5번): ×1.25 / ÷1.25, 한계 안에서. */
+export function zoomStep(px: number, dir: 'in' | 'out'): number {
+  const next = dir === 'in' ? px * 1.25 : px / 1.25
+  return Math.max(PX_PER_SEC_MIN, Math.min(PX_PER_SEC_MAX, next))
+}
 
 // 타임라인 selector 입력 — 필요한 필드만 (전체 EditorState 불필요)
 type TimelineInput = Pick<EditorState, 'shots' | 'videoClips' | 'clipOrder'>
@@ -664,6 +671,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           trimStart: savedClip?.trimStart,
           trimEnd: savedClip?.trimEnd,
           speed: savedClip?.speed ?? 1.0,
+          transitionIn: savedClip?.transitionIn ?? null,
         })
         canonicalShotIds.add(savedShot.shotId)
         continue
@@ -681,6 +689,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         trimStart: savedClip?.trimStart,
         trimEnd: savedClip?.trimEnd,
         speed: savedClip?.speed ?? 1.0,
+        transitionIn: savedClip?.transitionIn ?? null,
       })
       canonicalShotIds.add(savedShot.shotId)
     }
@@ -1370,10 +1379,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       const sceneOrder = [...(state.clipOrder[insertSceneId] ?? [])]
       sceneOrder.splice(localIndex, 0, newId)
+      // 오디오 동행(2026-09-08 오너 지시 1번): 카드가 끼는 자리 뒤에서 시작하는 오디오는 영상처럼 카드 길이만큼 밀린다.
+      //   카드 자리는 끼어드는 영상 클립의 시작(맨 뒤면 전체 길이). 그 앞에서 시작한 오디오는 그대로.
+      const insertAtSec = g < layout.length ? layout[g].startSec : layout.reduce((sum, l) => sum + l.durationSec, 0)
+      const audioClips = state.audioClips.map((a) =>
+        a.startSec >= insertAtSec - 1e-6 ? { ...a, startSec: a.startSec + DEFAULT_DURATION } : a,
+      )
 
       return {
         shots: [...state.shots, { ...newShot, sceneId: insertSceneId }],
         videoClips: [...state.videoClips, newClip],
+        audioClips,
         clipOrder: { ...state.clipOrder, [insertSceneId]: sceneOrder },
         selectedClipShotId: newId,
         selectedShotIds: [newId],
@@ -1403,6 +1419,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         return { ...s, subtitle: { ...base, ...patch } }
       }),
     })),
+
+  setTransitionIn: (shotId, transition) =>
+    set((state) => {
+      if (!state.videoClips.some((c) => c.shotId === shotId)) return state
+      const next = transition ? { type: 'dissolve' as const, durationSec: Math.max(0.1, Math.min(10, transition.durationSec)) } : null
+      return {
+        videoClips: state.videoClips.map((c) => (c.shotId === shotId ? { ...c, transitionIn: next } : c)),
+        past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
+        future: [],
+      }
+    }),
 
   setTitleCardDuration: (shotId, seconds) =>
     set((state) => {

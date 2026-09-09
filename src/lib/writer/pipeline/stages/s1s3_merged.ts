@@ -26,6 +26,7 @@ import { SHOT_PHYSICS } from '@/lib/writer/pipeline/physics';
 import { VISUAL_BEAT_DOCTRINE } from '@/lib/writer/pipeline/visual-doctrine';
 import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
 import { normalizeSceneLocations, uncoveredActs } from '@/lib/writer/pipeline/stages/s3_scenes';
+import { PROSE_NAME_RULE, cleanSceneProse } from '@/lib/writer/pipeline/util/prose_names';
 import type { Genre, NarrativeStructure, Characters, Scenes, PipelineInput, BackgroundContract, StoryScene, NewCharacter } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 import { MergedRawSchema } from '@/lib/writer/pipeline/schemas';
@@ -106,6 +107,7 @@ act 커버리지 (필수):
 scene_actions:
 - 씬에서 일어나는 행동을 **카메라가 한 번에 볼 수 있는 가시적 행동 단위**로 분리해 쓴다 (한 단위 ≈ 한 샷 ${SHOT_PHYSICS.shotSecondsMin}~${SHOT_PHYSICS.shotSecondsMax}초).
 - 씬당 액션 수는 위 시간 예산을 가이드로 따르되, 아래 시각적 서술 원칙이 요구하는 연결 비트(몸의 전이·시선의 대상·반응)를 예산 때문에 지우지 마라.
+${PROSE_NAME_RULE}
 ${VISUAL_BEAT_DOCTRINE}
 
 서사 시점 (필수, time_of_day와 다른 축):
@@ -240,6 +242,8 @@ ${JSON.stringify(narrativeStructure, null, 2)}`;
 
   // coverage_mode는 코드가 설정(LLM 출력 아님) — 하류가 대표 스토리보드 여부를 판별하는 근거.
   scenes = { ...scenes, coverage_mode: budget.mode };
+  // #names-in-prose: 문장에 남은 id 는 이름으로.
+  scenes = cleanSceneProse(scenes, characters);
 
   // 체크포인트 재설계: 병합 1콜 산출을 기존 구조/장면 저장 슬롯 양쪽에 기록 — 하류 스테이지와
   //   재실행 단위가 2콜 때와 동일하게 보인다.

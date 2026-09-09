@@ -135,11 +135,19 @@ export interface TitleCardData {
   layout?: TitleCardLayout | null
 }
 
+/** 화면 전환(2026-09-08): 클립 앞 경계의 디졸브(검은 화면 전환) — 미리보기가 검은 막의 투명도로 그린다. */
+export interface ClipTransition {
+  type: 'dissolve'
+  durationSec: number
+}
+
 export interface VideoClip {
   shotId: string
   url: string | null
   status: 'pending' | 'generating' | 'completed' | 'failed'
   thumbnailUrl: string | null
+  /** 이 클립 앞 경계의 전환. 없으면 컷. 편집기 스냅샷(editor_states)에 저장된다. */
+  transitionIn?: ClipTransition | null
   trimStart?: number  // seconds, client-only for P5 crop
   trimEnd?: number    // seconds, client-only for P5 crop
   speed?: number      // 0.25 ~ 4.0, default 1.0

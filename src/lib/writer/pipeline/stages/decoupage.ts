@@ -14,6 +14,7 @@ import { REPRESENTATIVE_DEPTHS, REPRESENTATIVE_SHOT_CAP } from '@/lib/writer/pip
 import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
 import { CAMERA_MOTIVATION_ENUM_TEXT, CAMERA_MOTIVATION_GUIDE } from '@/lib/writer/motion-vocabulary';
 import { coerceDecoupageCamera } from '@/lib/writer/pipeline/util/camera_motivation';
+import { PROSE_NAME_RULE, castEntities, cleanDecoupageProse } from '@/lib/writer/pipeline/util/prose_names';
 import type {
   DecoupagePlan,
   DecoupageShot,
@@ -241,12 +242,13 @@ ${ladderRule}${budgetHint}
 [genre 장르/톤]
 genre=${genre.genre}, tone=${genre.tone.join('/')}, targetEmotion=${genre.targetEmotion.join('/')}
 
-[등장 캐릭터]
+[등장 캐릭터 — 문장에는 name, 구조 칸에는 id]
 ${JSON.stringify(
   characters.characters
     .filter((c) => scene.characters_in_scene.includes(c.id))
-    .map((c) => ({ id: c.id, role: c.role, personality: c.personality }))
+    .map((c) => ({ id: c.id, name: c.name, role: c.role, personality: c.personality }))
 )}
+${PROSE_NAME_RULE}
 
 [로케이션 디자인]
 ${JSON.stringify(worldVisual.locations.filter((loc) => loc.id === scene.location || scene.location.includes(loc.id)))}
@@ -347,6 +349,8 @@ async function decoupageForScene(
   if (motivationRepairs.length) {
     await logger.saveText(`decoupage_motivation_repair_${scene.scene_id}.txt`, motivationRepairs.join('\n'));
   }
+  // #names-in-prose: beat_summary(_native)·목적 문장의 id → 이름 (camera_target 은 그대로).
+  const cleanShots = cleanDecoupageProse(shots, castEntities(characters));
 
   if (shots.length === 0) {
     throw new Error(`Découpage empty shots (scene=${scene.scene_id})`);
@@ -356,11 +360,11 @@ async function decoupageForScene(
   return {
     scene_id: scene.scene_id,
     beat_count: beatCount,
-    shot_count: shots.length,
-    coverage_ratio: beatCount > 0 ? Number((shots.length / beatCount).toFixed(2)) : 0,
+    shot_count: cleanShots.length,
+    coverage_ratio: beatCount > 0 ? Number((cleanShots.length / beatCount).toFixed(2)) : 0,
     rhythm_profile: parsed.rhythm_profile ?? '',
     uncovered_beats: parsed.uncovered_beats ?? [],
-    shots,
+    shots: cleanShots,
   };
 }
 

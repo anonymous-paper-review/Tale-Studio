@@ -216,3 +216,67 @@ paths:
   X's eyes"를 싣는다. 영상 계약문은 카메라 절 뒤 `Purpose: …`(라우트가 대상 인물 이름을 조회해 넘긴다).
 - **에너지 예외(오너 결정 2번 — 2026-09-07 전후 비교 뒤 켬)**: V4 지시서에 "energy 액션 비트에서는 카메라 큰 무브 + 인물 큰 액션 허용, 환경 변화만 따로" 가
   기본으로 실린다. `WRITER_ENERGY_EXCEPTION=0` 으로만 끈다(종전 동시 금지로 복귀). 비교 실측(겨울_6 sh_01_05): 전진 트래킹의 체감은 분명했으나 START 구도 수렴이 약해졌다.
+
+## 이야기 문장에는 이름이 나온다 (2026-09-08, 오너 지시 — `tests/promise-names-in-prose.test.ts`)
+
+- **원인**: 한글 이름은 슬러그가 비어 `char`,`char_2` 로 폴백하고(`cast-slug.ts`), 씬 스토리 지시서가 캐스트를 "char (용족수장)" 로만 보여 줘 모델이
+  문장에도 id 를 썼다. 그 문장이 데쿠파주·V4·이미지 프롬프트까지 번졌고, 표시 층은 화면마다 치환이 달랐다(조사도 못 고침).
+- **규칙**: 산문 필드는 표시 이름, 구조 칸(characters_in_scene·character_id·gaze_arc·camera_target)은 id. 지시서 공통 문구 `PROSE_NAME_RULE`
+  (`pipeline/util/prose_names.ts`)을 s3·merged·데쿠파주·V4 가 싣고, 데쿠파주 캐스트 JSON 에 name 을 넣는다.
+- **코드 치환(2차 방어)**: `cleanSceneProse`(scene_actions·dialogue_summary·key_dialogue.line, new_characters 포함) → `cleanDecoupageProse`
+  (beat_summary·native·목적·사유) → `cleanShotDesignProse`(layers·focal·pose·prop significance·first_frame_prompt·motion_prompt·verb·환경 description).
+  모르는 id 는 지어내지 않는다.
+- **치환기**: `resolveEntityNames` 가 로스터의 맨몸 id(char)도 토큰 단위로 바꾸고(긴 id 먼저), `korean-particles.fixKoreanParticles` 로 이/가·을/를·은/는·
+  과/와·아/야·으로/로를 받침에 맞춘다. `script-lines.replaceSlugs` 도 같은 규칙(prefix '' 일 때).
+- **표시**: Director 그리드 카드의 한국어 설명·노드 카드 프롬프트 줄, Writer 대사 뷰, Editor 타임라인·소스 패널·미리보기가 치환을 쓴다.
+  로스터는 `use-entity-names.ts`(writer 스토어 sceneManifest, 없으면 loadProject 1회).
+
+## Editor 다섯 가지 (2026-09-08, 오너 지시 — `tests/editor/transitions-and-controls.test.ts`)
+
+- **타이틀 카드 삽입 시 오디오 동행**: `addTitleCard` 가 끼우는 자리(끼어드는 영상의 시작, 맨 뒤면 전체 길이) 뒤에서 시작하는 오디오를 카드 길이만큼 민다. 앞의 오디오는 그대로.
+- **디졸브**(`lib/editor/transition.ts`): 클립 앞 경계의 `VideoClip.transitionIn = { type: 'dissolve', durationSec }`. 미리보기는 검은 막(`dissolve-overlay`)의
+  투명도만 `dissolveOpacityAt` 로 바꾼다 — 경계에서 1, 길이의 절반 밖에서 0. 우클릭 메뉴 "디졸브(검은 화면 전환)" 에서 없음·0.5·1·2초.
+  스냅샷(editor_states)에 저장·복원, 되돌리기 대상. 드래프트 렌더(`editor-draft-render.ts`)도 같은 함수로 프레임에 검은 막을 얹는다(샷 ZIP 은 원본 파일이라 전환 없음).
+- **자막 자리표시**: "누르면 자막을 넣어요"는 자막 상자에 마우스를 올렸을 때만 보이고(`group-hover/sub`), 재생 중에는 그리지 않는다.
+- **안내 문구 삭제**: "클립 우클릭 → 속도·분할·삭제" 제거(사전 키도 제거).
+- **축척 +/−**: 전체 보기 왼쪽에 −·"1초 = N px"·+. `zoomStep`(×1.25 / ÷1.25, 8~240 px 한계).
+
+## 배치도의 자세 권위와 END 추정 (2026-09-08, 오너 결정 — `tests/writer/stage-posture-authority.test.ts`, `tests/writer/stage-derived-end.test.ts`, `tests/director/real-no-blockout-ref.test.ts`)
+
+실측 겨울_8 sh_02_08(용족 수장 도약): 무대 비트는 '부유', 샷 배치 문장은 "crouched on ground" — 배치도는 비트를, 러프는 문장을 따라 어긋났고,
+비트에 END 가 없어 배치도 END 는 START 의 복사본이었다. 오너 결정: "B안에서 END 는 필요해. previz 생성 시 END 까지 생성하되 real 에서 이를 참조하지 않고
+생성하게 하자. A 도 같이."
+
+- **자세 권위(A)**: `stage/posture_text.postureFromPoseText` 가 샷 배치 문장(`character_blocking[].pose`)의 첫 절에서 가장 앞의 자세 낱말(영·한)을 읽고,
+  `apply.applyPostureAuthority` 가 START 의 자세를 비트 대신 그 낱말로 바꾼다. 비트가 START≠END 로 전이를 적었으면 END 의 전이는 지킨다. 바꿨으면
+  WARNING `자세 권위: 인물 — 샷 문장 "낱말" → 자세 (무대 비트: 자세)`. 비트 배열은 복사본만 쓴다(장부·다음 샷 불변).
+- **END 추정(B′)**: 비트에 END 가 없는 인물(핀 없음·프레임 안)은 `stage/derive_end.deriveShotEnd` 가 동작 문장(`character_motion.verb`)에서 끝 자세(가장 뒤 낱말)와
+  수직 방향(도약·비행 = up, 추락·착지 = down)을 읽어 END 상태를 만든다 — 공중이면 `posture:'floating'` + `z`(높이 m, 동작 크기별 0.8/2/3.5).
+  카메라가 이미 움직이지 않으면 카메라 무브도 추정: 상하 트래킹(대상 인물이 오르내리면 절반만 따라감), 좌우 트래킹, 틸트, 팬(크기별 고정값).
+  `geometry.placeCharacter` 가 `z` 를 발 위치에 반영하고 `ScreenPlacement.elevation_m` 을 남긴다. 결과는 `screen_layout.end`/`end_camera` + `end_derived {characters, camera}`.
+- **표시·프롬프트**: 배치도는 추정 캡슐을 점선으로, 공중 인물은 발밑 타원 대신 짧은 점선으로 그린다(`blockout.ts`). 러프 프롬프트는 추정 열을 "ESTIMATE …
+  the written movement and END description come first" 로 밝히고(`buildBlockoutClause(count, { estimatedColumns })`), END 자리 문장에 "airborne, clearly higher …"·
+  "now sitting" 꼬리를 단다. 추정은 INFO `END 추정(러프 전용, …)` 로만 남는다.
+- **경계(오너 결정)**: 추정은 previz 전용이다. 무대 비트·상태 장부·다음 샷 START 는 바뀌지 않고, 실사 스트립·그리드 라우트는 배치도(`rough-blockouts`)·`end_derived` 를
+  읽지 않는다(소스 스캔 테스트). 실사의 참조는 종전대로 러프 스트립 → 캐릭터 시트 → 배경 wide_shot → 스타일 앵커.
+
+## 이름 영어 표기는 한 번 정해 저장 (2026-09-08, 오너 지시 — `tests/writer/entity-names-en.test.ts`)
+
+- **원인**: 러프 라우트가 요청마다 `deriveEnBatch` 로 인물·장소·무대 표지 이름을 새로 번역해 표기가 흔들렸다(겨울_8: "Fairy Clan Chief" ↔ "Yojeong Sujang").
+- **저장**: `characters.name_en` · `locations.name_en`(+ `name_en_source` = 정할 때의 원문 name, 마이그레이션 20260908160000) · 무대 표지는 `scenes.stage.landmarks[].label_en`(+ `label_en_source`).
+  원문이 바뀌면(source ≠ name) 다시 정한다. 파생 실패는 원문 폴백이고 저장하지 않는다(다음에 다시 시도).
+- **읽는 곳**: `lib/writer/i18n/entity-names.ts` — `ensureEntityNamesEn`(인물·배경, 없는 것만 정해 저장) · `sceneLocationLabelsEn`(scenes.location 이 배경 id 면 저장값, 자유 라벨이면 종전 번역) ·
+  `ensureStageLandmarkLabelsEn`. 러프 라우트가 이 셋을 쓰고, 작가 시작(`writer/start`)이 핸드오프 때 미리 정해 둔다(best-effort).
+- **경계**: 설명·외형(`appearance`·`visual_description`)의 EN base 는 종전 `derive-en.ts` 그대로. 실사 참조 라벨(캐릭터 시트 = 한국어 이름)은 손대지 않았다.
+
+## 채팅 언어 v2 — 웹페이지 언어 상속 + 채팅으로 전환 (2026-09-08, 오너 결정 — `tests/chat/chat-locale-follow.test.ts`, `tests/chat/produce-chat-locale-follow.test.ts`)
+
+오너: "웹페이지 언어 상속받아서 표시하되 채팅에서 다른 언어로 여러 번 말하거나 요청하면 프로젝트 언어 변경 가능하게." 종전(2026-08-31) 규칙(한국어 쪽으로만·작가가 돌기 전에만·Producer 채팅만)은 폐기.
+
+- **상속**: 잠기지 않은 프로젝트(`locale_locked=false`)의 채팅 언어는 웹페이지(UI) 언어다. 서버는 `resolveChatLocale`(`chat-format.ts`)이 클라가 보낸 `uiLocale`(없으면 `user_metadata.locale`)과 다르면 `projects.locale` 을 잠그지 않은 채 따라가고(`reason:'inherit'`),
+  화면은 `pickContentLocale`(`i18n/content.ts`)이 잠기지 않은 프로젝트에서 UI 언어를 고른다(project-store `projectLocaleLocked`).
+- **전환**: 사용자가 다른 언어로 `LOCALE_FOLLOW_STREAK`(3)번 연속 말하거나 바꿔 달라고 하면(`chat-locale.ts` — `detectMessageLocale`·`explicitLocaleRequest`·`decideLocaleFollow`) 그 언어로 바꾸고 잠근다.
+  작가가 돌았어도 바꾼다. 글자 없는 말(숫자·이모지)은 세지도 끊지도 않는다. 대사·자막 언어 얘기("영어 대사로 해줘")는 채팅 언어 요청이 아니다.
+- **네 라우트 공용**: produce·writer·artist·director 채팅이 `resolveChatLocale({ projectId, message, history, uiLocale })` 을 쓰고 응답에 `contentLocale`·`localeSwitched` 를 싣는다.
+  클라(`global-chat-store`)는 `uiLocale` 을 보내고, `localeSwitched` 가 오면 `adoptProjectLocale(locale, true)` 뒤 "채팅 언어를 …로 바꿨어요" 한 줄을 답변 뒤에 남긴다(저장도 함).
+- **잠금의 다른 경로는 그대로**: 보드의 채팅 언어 배지(PATCH /api/project/[id]) · writer/start 스토리 감지 · 계정 설정이 있는 신규 프로젝트(project/new).

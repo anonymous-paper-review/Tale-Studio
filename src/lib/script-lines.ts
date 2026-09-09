@@ -6,6 +6,7 @@ import {
   type SceneShotMentionTarget,
 } from '@/lib/card-mention'
 import type { DialogueLine, Scene, SceneManifest, Shot } from '@/types'
+import { fixKoreanParticles } from '@/lib/korean-particles'
 import { translate } from '@/lib/i18n'
 import type { AppLocale } from '@/lib/locale'
 
@@ -143,16 +144,20 @@ export function replaceSlugs(
   prefix: '@' | '' = '@',
 ): string {
   let out = text
-  for (const e of entries) {
+  // #names-in-prose(2026-09-08): 긴 슬러그부터 — 'char_2' 가 'char' 로 오인되지 않게. 치환 뒤 한국어 조사를 맞춘다.
+  const sorted = [...entries].sort((a, b) => (b.slug?.length ?? 0) - (a.slug?.length ?? 0))
+  const names: string[] = []
+  for (const e of sorted) {
     const slug = e.slug?.trim()
     const name = e.name?.trim()
     if (!slug || !name || name === slug) continue
     out = out.replace(
-      new RegExp(`\\b${escapeRegExp(slug)}\\b`, 'gi'),
+      new RegExp(`(?<![A-Za-z0-9_])${escapeRegExp(slug)}(?![A-Za-z0-9_])`, 'gi'),
       `${prefix}${name}`,
     )
+    names.push(name)
   }
-  return out
+  return prefix === '' ? fixKoreanParticles(out, names) : out
 }
 
 export function scriptLineMentions(

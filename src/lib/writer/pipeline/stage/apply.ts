@@ -31,7 +31,9 @@ import {
   DEFAULT_CHARACTER_HEIGHT_M,
 } from '@/lib/writer/pipeline/stage/geometry'
 import { landmarksInView } from '@/lib/writer/pipeline/stage/view'
-import type { StageCamera } from '@/lib/writer/types/pipeline'
+import { postureFromPoseText, POSTURE_KO } from '@/lib/writer/pipeline/stage/posture_text'
+import { deriveShotEnd } from '@/lib/writer/pipeline/stage/derive_end'
+import type { StageCamera, StagePosture } from '@/lib/writer/types/pipeline'
 
 export interface ApplyStageResult {
   shots: ShotDesign[]
@@ -66,6 +68,54 @@ export function pinStates(
   })
   const same = start.length === end.length && start.every((c, i) => c === end[i])
   return { start, end: same ? start : end, beatUsed: states.beatUsed }
+}
+
+/**
+ * 자세 권위(#posture-authority 2026-09-08, 오너 결정): 샷 배치 문장(character_blocking.pose)에 자세 낱말이 있으면 START 의
+ *   자세는 무대 비트가 아니라 그 낱말을 따른다. 비트가 START≠END 로 자세 전이를 적어 두었으면 END 의 전이는 지킨다
+ *   (전이가 없으면 END 도 함께 바뀐다). 비트 배열은 건드리지 않고 새 배열을 돌려준다(states.end === states.start 관계 유지).
+ *   실측 겨울_8 sh_02_08: 비트 '부유' vs 문장 "crouched on ground" → 배치도(비트)와 러프(문장)가 어긋났다.
+ */
+export function applyPostureAuthority(
+  states: { start: StageCharacterState[]; end: StageCharacterState[]; beatUsed: number },
+  blocking: ShotStaticSpec['character_blocking'] | undefined,
+  onOverride?: (id: string, from: StagePosture, to: StagePosture, word: string) => void,
+): { start: StageCharacterState[]; end: StageCharacterState[]; beatUsed: number } {
+  const list = Array.isArray(blocking) ? blocking : []
+  const overrides = new Map<string, { posture: StagePosture; word: string }>()
+  for (const b of list) {
+    const m = postureFromPoseText(b?.pose)
+    if (m && b.character_id) overrides.set(b.character_id, { posture: m.posture, word: m.word })
+  }
+  if (!overrides.size) return states
+  const sameRef = states.end === states.start
+  let touched = false
+  const start = states.start.map((c) => {
+    const o = overrides.get(c.character_id)
+    if (!o || o.posture === c.posture) return c
+    // 비트가 이 샷 안에서 자세 전이(START≠END)를 적었으면 이 샷이 그 변화를 보여준다 — 문장은 한 상태만 적으므로 START 를 건드리지 않는다
+    //   (실측 겨울_8 sh_01_03: 누움→섬 전이 샷의 문장 "standing up …" 이 START 를 섬으로 바꿔 전이를 지웠다).
+    const e = sameRef ? undefined : states.end.find((x) => x.character_id === c.character_id)
+    if (e && e.posture !== c.posture) return c
+    touched = true
+    onOverride?.(c.character_id, c.posture, o.posture, o.word)
+    return { ...c, posture: o.posture }
+  })
+  if (!touched) return states
+  if (sameRef) return { ...states, start, end: start }
+  const end = states.end.map((c) => {
+    const o = overrides.get(c.character_id)
+    const s0 = states.start.find((x) => x.character_id === c.character_id)
+    // 비트가 START≠END 로 자세 전이를 적었으면 END 는 비트대로(전이 유지). 같으면 START 와 함께 바꾼다.
+    if (!o || !s0 || s0.posture !== c.posture || o.posture === c.posture) return c
+    return { ...c, posture: o.posture }
+  })
+  return { ...states, start, end }
+}
+
+function sameState(a: StageCharacterState | undefined, b: StageCharacterState | undefined): boolean {
+  if (!a || !b) return false
+  return a.x === b.x && a.y === b.y && a.facing_deg === b.facing_deg && a.posture === b.posture && (a.z ?? 0) === (b.z ?? 0)
 }
 
 /** 샷의 비트 — 데쿠파주 source_beats 첫 값. 추가(added) 샷은 직전 샷의 비트를 잇는다. */
@@ -247,11 +297,15 @@ export function applyStageToShots(
     const dec = decById.get(shotId) ?? sceneDec?.[i] ?? null
     const beat = beatForShot(shot, dec, prevBeat)
     prevBeat = beat
-    const states = pinStates(stageStatesForBeat(stage, beat), opts?.pins?.get(shotId))
-    if (states.start.length === 0) return shot
     const push = (severity: ValidationIssue['severity'], message: string, suggestion?: string) =>
       issues.push({ category: 'cinematography', severity, location: shotId, message, ...(suggestion ? { suggestion } : {}) })
     const nameOf = (id: string) => opts?.names?.get(id) ?? id
+    const pinned = opts?.pins?.get(shotId)
+    // #posture-authority: 샷 문장의 자세가 비트보다 우선 — 바꿨으면 경고로 남겨 오너가 모순(비트 vs 문장)을 본다.
+    const states = applyPostureAuthority(pinStates(stageStatesForBeat(stage, beat), pinned), spec.character_blocking, (id, from, to, word) =>
+      push('WARNING', `자세 권위: ${nameOf(id)} — 샷 문장 "${word}" → ${POSTURE_KO[to]} (무대 비트: ${POSTURE_KO[from]})`),
+    )
+    if (states.start.length === 0) return shot
 
     const { setup, defaulted } = normalizeSetup(spec.camera_setup, spec, stage, states.start)
     if (defaulted) push('WARNING', 'camera_setup 이 없어 기본 카메라(축 안쪽·피사체 첫 인물)로 계산했다', 'v4 출력에 camera_setup 을 채워라')
@@ -373,6 +427,16 @@ export function applyStageToShots(
     const endDir = setup.end?.from_direction
     const statesChange = states.end !== states.start
     let cameraMoves = endScale !== 1 || (!!endDir && endDir !== setup.from_direction)
+    // #derived-end: 따라가는 무브(트래킹·크레인·스테디캠·달리·붐)는 비트 END 에서 대상이 움직였으면 END 카메라를 END 상태로
+    //   다시 푼다(카메라가 인물을 따라간다). 종전엔 앞뒤 무브만 END 를 풀어, 상하좌우 트래킹은 START 카메라로 END 를 계산했다.
+    if (!cameraMoves && statesChange && !povOwner && /tracking|crane|steadicam|dolly|boom|pedestal/i.test(String(motion?.type ?? ''))) {
+      const movedIn = (id: string) => !sameState(states.start.find((c) => c.character_id === id), states.end.find((c) => c.character_id === id))
+      const tid = typeof motion?.target === 'string' && motion.target ? motion.target : null
+      if (tid ? movedIn(tid) : states.start.some((c) => movedIn(c.character_id))) {
+        cameraMoves = true
+        push('INFO', `따라가는 카메라(${motion?.type}): 비트 END 상태로 END 카메라를 다시 풀었다`)
+      }
+    }
     // 카메라가 움직일 때만 END 카메라를 END 피사체 기준으로 다시 푼다. 정지 카메라에서 인물만 이동하면 START 카메라
     //   그대로 END 배치를 계산해야 화면상 이동(멀어짐·좌우 이동)이 남는다(실측 sh_01_30: 다시 풀면 셋이 제자리).
     let endSolve = cameraMoves
@@ -435,8 +499,43 @@ export function applyStageToShots(
     }
 
     const placementsStart = new Map(states.start.map((s) => [s.character_id, placeCharacter(startSolve.camera, s, aspect, startSolve.subjectDistance)]))
+
+    // #derived-end(2026-09-08, 오너 결정): 비트에 END 가 없는 인물·카메라는 동작·카메라 문장에서 END 를 추정한다(러프 전용).
+    //   비트가 END 를 적은 인물·핀 걸린 인물·시점 샷은 추정하지 않는다. 비트·장부는 그대로 — 다음 샷의 시작은 비트를 따른다.
+    let endStates = states.end
+    let endDerived: ShotScreenLayout['end_derived'] | undefined
+    if (!povOwner) {
+      const skipIds = new Set<string>([...(pinned?.keys() ?? [])])
+      for (const c of states.start) {
+        if (!sameState(c, states.end.find((e) => e.character_id === c.character_id))) skipIds.add(c.character_id)
+      }
+      const candidateIds = new Set(states.start.filter((c) => placementsStart.get(c.character_id)?.in_frame).map((c) => c.character_id))
+      const derived = deriveShotEnd({
+        start: states.start,
+        end: states.end,
+        motions: shot.dynamic_spec?.character_motion ?? [],
+        cameraMotion: motion,
+        camera: startSolve.camera,
+        cameraAlreadyMoves: cameraMoves,
+        skipIds,
+        candidateIds,
+        startPlacements: placementsStart,
+        aspect,
+      })
+      if (derived) {
+        endStates = derived.states
+        if (derived.camera) {
+          endSolve = { ...startSolve, camera: derived.camera }
+          cameraMoves = true
+        } else if (!endSolve) {
+          endSolve = startSolve
+        }
+        endDerived = { characters: derived.characters, camera: !!derived.camera }
+        push('INFO', `END 추정(러프 전용, 무대 비트에 END 없음): ${derived.notes.join(' · ')}`)
+      }
+    }
     const placementsEnd = endSolve
-      ? new Map(states.end.map((s) => [s.character_id, placeCharacter(endSolve.camera, s, aspect, endSolve.subjectDistance)]))
+      ? new Map(endStates.map((s) => [s.character_id, placeCharacter(endSolve.camera, s, aspect, endSolve.subjectDistance)]))
       : null
 
     const listed = Array.isArray(spec.character_blocking) ? spec.character_blocking : []
@@ -520,6 +619,7 @@ export function applyStageToShots(
       ...(endSolve && cameraMoves ? { end_camera: endSolve.camera } : {}),
       ...(povOwner ? { pov_of: povOwner.character_id } : {}),
       ...(reveal ? { reveal } : {}),
+      ...(endDerived ? { end_derived: endDerived } : {}),
       ...(startSolve.axisCorrected ? { axis_corrected: true } : {}),
       characters: layoutChars,
       ...(offFrame.length ? { off_frame: offFrame } : {}),

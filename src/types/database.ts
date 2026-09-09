@@ -331,6 +331,8 @@ export type Database = {
           id: string
           motivation: Json | null
           name: string
+          name_en: string | null
+          name_en_source: string | null
           origin: string
           portrait: string | null
           project_id: string
@@ -354,6 +356,8 @@ export type Database = {
           id?: string
           motivation?: Json | null
           name: string
+          name_en?: string | null
+          name_en_source?: string | null
           origin?: string
           portrait?: string | null
           project_id: string
@@ -377,6 +381,8 @@ export type Database = {
           id?: string
           motivation?: Json | null
           name?: string
+          name_en?: string | null
+          name_en_source?: string | null
           origin?: string
           portrait?: string | null
           project_id?: string
@@ -910,6 +916,8 @@ export type Database = {
           lighting_sources: string[] | null
           location_id: string
           name: string
+          name_en: string | null
+          name_en_source: string | null
           origin: string
           project_id: string
           props: string[] | null
@@ -933,6 +941,8 @@ export type Database = {
           lighting_sources?: string[] | null
           location_id: string
           name: string
+          name_en?: string | null
+          name_en_source?: string | null
           origin?: string
           project_id: string
           props?: string[] | null
@@ -956,6 +966,8 @@ export type Database = {
           lighting_sources?: string[] | null
           location_id?: string
           name?: string
+          name_en?: string | null
+          name_en_source?: string | null
           origin?: string
           project_id?: string
           props?: string[] | null
@@ -1582,7 +1594,7 @@ export type Database = {
       subscriptions: {
         Row: {
           current_period_end: string | null
-          mor_subscription_id: string | null
+          mor_subscription_id: string
           plan: string
           status: string
           updated_at: string
@@ -1590,7 +1602,7 @@ export type Database = {
         }
         Insert: {
           current_period_end?: string | null
-          mor_subscription_id?: string | null
+          mor_subscription_id: string
           plan: string
           status: string
           updated_at?: string
@@ -1598,7 +1610,7 @@ export type Database = {
         }
         Update: {
           current_period_end?: string | null
-          mor_subscription_id?: string | null
+          mor_subscription_id?: string
           plan?: string
           status?: string
           updated_at?: string
@@ -1608,7 +1620,7 @@ export type Database = {
           {
             foreignKeyName: "subscriptions_workspace_id_fkey"
             columns: ["workspace_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },

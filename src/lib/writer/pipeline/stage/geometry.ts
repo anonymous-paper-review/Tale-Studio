@@ -420,8 +420,10 @@ export function placeCharacter(cam: StageCamera, state: StageCharacterState, asp
   const h = state.height_m ?? DEFAULT_CHARACTER_HEIGHT_M
   // 누움·앉음은 실효 높이가 낮다 — 프레임 점유·잘림 판정에 반영.
   const effH = state.posture === 'lying' ? h * 0.35 : state.posture === 'sitting' || state.posture === 'kneeling' || state.posture === 'crouching' ? h * 0.65 : h
-  const base = project(cam, { x: state.x, y: state.y, z: 0 }, aspect)
-  const top = project(cam, { x: state.x, y: state.y, z: effH }, aspect)
+  // 지면 위 높이(#derived-end): 도약·비행 END 추정만 0 보다 크다 — 발 위치가 그만큼 떠오른다.
+  const z0 = Math.max(0, state.z ?? 0)
+  const base = project(cam, { x: state.x, y: state.y, z: z0 }, aspect)
+  const top = project(cam, { x: state.x, y: state.y, z: z0 + effH }, aspect)
   const distance = Math.hypot(cam.x - state.x, cam.y - state.y)
   if (!base || !top) {
     return {
@@ -450,6 +452,7 @@ export function placeCharacter(cam: StageCamera, state: StageCharacterState, asp
     depth_band: depthBandOf(distance, subjectDistance),
     facing: facingWordOf(state, cam),
     posture: state.posture,
+    ...(z0 > 0 ? { elevation_m: round(z0) } : {}),
   }
 }
 

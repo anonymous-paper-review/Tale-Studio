@@ -597,9 +597,12 @@ export type StagePosture =
 
 export interface StageLandmark {
   id: string;         // snake_case (로케이션 소품·지형 표지)
-  label: string;      // 영어 한 구절
+  label: string;      // 콘텐츠 언어 한 구절(무대 LLM 이 적는다)
   x: number;
   y: number;
+  /** 영어 표기 — 러프 라우트가 첫 파생 뒤 저장한다(#name-en 2026-09-08). label_en_source ≠ label 이면 다시 정한다. */
+  label_en?: string;
+  label_en_source?: string;
 }
 
 export interface StageCharacterState {
@@ -610,6 +613,8 @@ export interface StageCharacterState {
   posture: StagePosture;
   height_m?: number;  // 기본 1.75
   note?: string;      // "lying on a floating dirt mound" 등 — 러프 포즈 문장의 재료
+  /** 지면 위 높이(m). 무대 LLM 은 적지 않는다 — END 추정(#derived-end 2026-09-08)이 도약·비행에만 채운다. */
+  z?: number;
   /** 근거 게이트(2026-09-05): 이 상태(변화)의 원문 인용. 큰 변화(자세·2m 이상 이동)는 인용이 원문에 있어야 살아남는다. */
   evidence?: string;
   /** 근거 없이 적힌 변화를 버리고 남긴 메모 — 사람이 보는 보고용. 프롬프트는 읽지 않는다. */
@@ -701,6 +706,8 @@ export interface ScreenPlacement {
   facing: FacingWord;
   /** 무대 자세 — 누운 인물은 향 문장 대신 '누워 있음'으로 서술한다 */
   posture?: StagePosture;
+  /** 지면 위 높이(m) — 도약·비행 END 추정에서만 0 보다 크다. 배치도는 이 인물의 발밑 타원을 그리지 않는다. */
+  elevation_m?: number;
 }
 
 export interface StageCamera {
@@ -730,6 +737,9 @@ export interface ShotScreenLayout {
   pov_of?: string;
   /** #camera-motivation reveal: 대상이 START 밖·END 안인지의 검사 결과. resolved = 코드가 END 카메라를 대상 쪽으로 돌렸다. */
   reveal?: { target: string; in_start: boolean; in_end: boolean; resolved: boolean };
+  /** END 추정(#derived-end 2026-09-08, 오너 결정): 무대 비트에 END 가 없을 때 동작·카메라 문장에서 유도한 END —
+   *  러프(previz) 전용. characters = 추정된 인물 id, camera = END 카메라도 추정. 무대 원장·실사는 읽지 않는다. */
+  end_derived?: { characters: string[]; camera: boolean };
   issues: string[];
 }
 
