@@ -24,6 +24,7 @@ import {
 import { reconcileJobFromFal } from '@/lib/fal/reconcile'
 import { describeFinalizeError } from '@/lib/fal/error-evidence'
 import { releaseTakesForJob } from '@/lib/billing/take-hold'
+import { continueVideoBatch } from '@/lib/director/batch-continue'
 
 // #payments-phase-2 #gen-quota-atomic-gate: 영상 잍(shot_video 레거시 unlinked 포함/shot_previz_video)이
 //   failGenerationJob 경로로 종결될 때만 hold 반환을 함께 부른다. markDirectorVideoAttemptFailed 는 자체적으로
@@ -165,8 +166,10 @@ export async function POST(req: Request) {
   }
 
   await runAfterResponse(async () => {
+  let saved = false
   try {
     await finalizeGenerationJob(job, result)
+    saved = true
   } catch (e) {
     const msg = `[finalize] ${describeFinalizeError(e)}`
     if (e instanceof GenerationJobTerminalTransitionError) {
@@ -196,6 +199,17 @@ export async function POST(req: Request) {
         }
       }
     }
+  }
+
+  // 저장이 끝났으면 같은 묶음의 다음 것을 낸다(#batch-resume 슬라이스 B 2026-09-09).
+  //   저장이 실패했으면 이 영상은 아직 안 끝난 것이다 — 이어가면 남은 개수 계산이 틀어진다.
+  if (!saved || !job.batch_id) return
+  try {
+    await continueVideoBatch({ batchId: job.batch_id, projectId: job.project_id })
+  } catch (err) {
+    // 이어가기 실패를 위 catch 로 흘리면 안 된다 — 거기 가면 방금 저장에 성공한 영상을
+    //   실패로 마킹하고 Take 까지 돌려준다. 여기서 삼키고 주기 점검(약속 10)에 맡긴다.
+    console.error('[fal/webhook] batch continue failed:', job.batch_id, err instanceof Error ? err.message : err)
   }
   })
 
