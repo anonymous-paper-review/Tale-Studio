@@ -84,6 +84,16 @@ describe('제출되지 못한 영상 작업 정리', () => {
     expect(mocks.markDirectorVideoAttemptFailed).not.toHaveBeenCalled()
   })
 
+  it('일괄의 제출 결과를 모르면 시간만으로 실패와 환급을 확정하지 않는다', async () => {
+    // #batch-resume: provider 접수 직후 연결 저장 전에 끊겼을 수도 있어 재제출·자동 환급은 위험하다.
+    const job = reservedJob({ batch_id: 'batch-1', batch_total: 1 })
+    const after = await reconcileJobFromFal(job, { settleStaleReserved: true })
+    expect(after.status).toBe('queued')
+    expect(mocks.markDirectorVideoAttemptFailed).not.toHaveBeenCalled()
+    expect(mocks.releaseTakesForJob).not.toHaveBeenCalled()
+    expect(mocks.falVideoFetch).not.toHaveBeenCalled()
+  })
+
   it('영상 카드에 연결되지 않은 작업도 Take 를 돌려준다', async () => {
     // previz 처럼 video_clips 를 쓰지 않는 영상도 Take 를 잡는다.
     const job = reservedJob({ kind: 'shot_previz_video', video_clip_id: null })

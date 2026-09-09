@@ -95,6 +95,19 @@ import {
   beginPipelineProgressBatch,
   resetPipelineProgressBatches,
 } from '@/lib/pipeline-progress'
+import {
+  EMPTY_FRAME_INPUTS,
+  chainFrameMatchesSource,
+  effectivePromptOf,
+  isFrameSourceNode,
+  isImageSourceNode,
+  normalizeFrameInputs,
+  normalizeImageInputs,
+  resolveFrameInputImageUrl,
+  resolveImageInputImageUrl,
+  resolveShotFrameImageUrl,
+  usableFrameImageUrl,
+} from '@/lib/director/video-frame-inputs'
 
 // ============================================================================
 // Defaults
@@ -207,127 +220,6 @@ type VideoGenerationResponse = {
   recoveryReceipt?: string
 }
 
-const EMPTY_FRAME_INPUTS = (): VideoNodeData['frameInputs'] => ({
-  start: null,
-  end: null,
-  refs: [],
-})
-
-/**
- * Persisted Director snapshots can predate frame wiring. Normalize that payload
- * at every rebuild boundary so old cached Video nodes remain usable.
- */
-function normalizeFrameInputs(value: unknown): VideoNodeData['frameInputs'] {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return EMPTY_FRAME_INPUTS()
-  }
-  const row = value as Record<string, unknown>
-  const refs = Array.isArray(row.refs)
-    ? row.refs.filter(
-        (id): id is string => typeof id === 'string' && id.length > 0,
-      )
-    : []
-  return {
-    start: typeof row.start === 'string' && row.start.length > 0 ? row.start : null,
-    end: typeof row.end === 'string' && row.end.length > 0 ? row.end : null,
-    refs: [...new Set(refs)],
-  }
-}
-
-/** Persisted Shot image-reference IDs may be absent or malformed in old caches. */
-function normalizeImageInputs(value: unknown): string[] {
-  if (!Array.isArray(value)) return []
-  return [
-    ...new Set(
-      value.filter(
-        (id): id is string => typeof id === 'string' && id.length > 0,
-      ),
-    ),
-  ]
-}
-
-function isFrameSourceNode(node: DirectorNode): boolean {
-  // #node-merge: 파생 shotImage 카드 제거 — 이미지 출처는 Shot/Asset 노드뿐.
-  return isShotData(node.data) || isAssetData(node.data)
-}
-
-function isImageSourceNode(node: DirectorNode): boolean {
-  return isFrameSourceNode(node)
-}
-
-type FrameInputSlot = 'start' | 'end' | 'ref'
-
-function usableFrameImageUrl(value: unknown): string | null {
-  return typeof value === 'string' && value.trim() ? value : null
-}
-
-function firstUploadedReferenceImageUrl(value: unknown): string | null {
-  if (!Array.isArray(value)) return null
-  for (const image of value) {
-    if (!image || typeof image !== 'object' || Array.isArray(image)) continue
-    const url = usableFrameImageUrl((image as { url?: unknown }).url)
-    if (url) return url
-  }
-  return null
-}
-
-function resolveShotFrameImageUrl(
-  data: ShotNodeData,
-  slot: FrameInputSlot,
-): string | null {
-  const storyboard = data.storyboardImage
-  if (storyboard?.status === 'completed') {
-    const frame =
-      slot === 'start'
-        ? storyboard.frames?.start
-        : slot === 'end'
-          ? storyboard.frames?.end
-          : undefined
-    const storyboardUrl = usableFrameImageUrl(frame) ?? usableFrameImageUrl(storyboard.url)
-    if (storyboardUrl) return storyboardUrl
-  }
-  return firstUploadedReferenceImageUrl(data.referenceImages)
-}
-
-/**
- * Resolve a persisted frame-input source node ID to an image URL. Frame inputs
- * intentionally store Director IDs, so unsupported or not-yet-generated nodes
- * must resolve to null rather than leaking an ID into the generation request.
- */
-function resolveFrameInputImageUrl(
-  nodes: DirectorNode[],
-  sourceNodeId: string,
-  slot: FrameInputSlot,
-): string | null {
-  const source = nodes.find((node) => node.id === sourceNodeId)
-  if (!source || !isFrameSourceNode(source)) return null
-  if (isAssetData(source.data)) return usableFrameImageUrl(source.data.imageUrl)
-  return isShotData(source.data)
-    ? resolveShotFrameImageUrl(source.data, slot)
-    : null
-}
-
-function resolveStoryboardImageUrl(data: ShotNodeData): string | null {
-  const storyboard = data.storyboardImage
-  if (!storyboard || storyboard.status !== 'completed') return null
-  return (
-    usableFrameImageUrl(storyboard.url) ??
-    usableFrameImageUrl(storyboard.frames?.start)
-  )
-}
-
-function resolveImageInputImageUrl(
-  nodes: DirectorNode[],
-  sourceNodeId: string,
-): string | null {
-  const source = nodes.find((node) => node.id === sourceNodeId)
-  if (!source || !isImageSourceNode(source)) return null
-  if (isAssetData(source.data)) return usableFrameImageUrl(source.data.imageUrl)
-  return isShotData(source.data)
-    ? resolveStoryboardImageUrl(source.data)
-    : null
-}
-
 function frameEdgeId(
   sourceNodeId: string,
   videoNodeId: string,
@@ -404,20 +296,6 @@ function videoChainWouldCycle(
     currentId = current.data.videoChainInputId
   }
   return false
-}
-
-function chainFrameMatchesSource(
-  frameUrl: string | null,
-  source: VideoNodeData,
-): boolean {
-  const frame = usableFrameImageUrl(frameUrl)
-  if (!frame || !source.videoClipId || !source.generationJobId) {
-    return false
-  }
-  return (
-    frame.includes(source.videoClipId) &&
-    frame.includes(source.generationJobId)
-  )
 }
 
 function isHydratedVideoTake(value: unknown): value is HydratedVideoTake {
@@ -1213,6 +1091,8 @@ interface DirectorCanvasState {
   /** Explicit full-video batch progress. Ephemeral UI state; never persisted. */
   videoBatchBusy: boolean
   videoBatchProgress: { done: number; total: number; failed: number } | null
+  /** #batch-resume: 이전 실행의 완료 처리와 선행조건 대기를 구별하는 임시 식별자. */
+  videoBatchRunId: string | null
   /**
    * 사용자가 일괄을 그만뒀나(#batch-resume 2026-09-09 오너 결정 ①).
    *   예전에는 창을 닫는 것이 곧 중단이었다 — 브라우저가 순번을 들고 돌았기 때문이다.
@@ -1254,8 +1134,8 @@ interface DirectorCanvasState {
   setStoryboardMediaMode: (m: 'previz' | 'real') => void
   /** 일괄 시작 — 중단 표시를 풀고 진행 상태를 연다. */
   beginVideoBatch: (total: number) => void
-  /** 일괄 중단 — 도는 중일 때만 먹는다. */
-  cancelVideoBatch: () => void
+  /** 일괄 중단 — 도는 중일 때만 먹는다. 서버 DELETE로 중단을 확인한 뒤 반환한다. */
+  cancelVideoBatch: () => Promise<void>
 
   // Step 2 (unify-director-store-db): DB 일원화
   /** 노드 이동 후 canvas_position을 해당 테이블에 debounce write (drag end에서 호출) */
@@ -1546,7 +1426,7 @@ export function getFinalVideo(
 export function effectivePrompt(
   data: Pick<ShotNodeData, 'prompt' | 'derivedPrompt' | 'promptOverride'>,
 ): string {
-  return data.promptOverride ?? data.derivedPrompt ?? data.prompt ?? ''
+  return effectivePromptOf(data)
 }
 
 /** Video 노드의 최종 생성 설정. Shot-backed는 상속, standalone은 자체 설정을 쓴다. */
@@ -1726,6 +1606,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       realBatchRemaining: null,
       videoBatchBusy: false,
       videoBatchProgress: null,
+      videoBatchRunId: null,
       videoBatchCancelled: false,
       popupNodeId: null,
       deleteConfirmInfo: null,
@@ -1773,6 +1654,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             relationModal: null,
             videoBatchBusy: false,
             videoBatchProgress: null,
+            videoBatchRunId: null,
+            videoBatchCancelled: false,
             generatingNodeIds: {},
             generationErrors: {},
             playingNodeId: null,
@@ -1801,15 +1684,32 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       beginVideoBatch: (total) =>
         set({
           videoBatchBusy: true,
+          videoBatchRunId: crypto.randomUUID(),
           // 안 풀면 다음 일괄이 시작하자마자 멈춘다.
           videoBatchCancelled: false,
           videoBatchProgress: { done: 0, total, failed: 0 },
         }),
 
-      cancelVideoBatch: () => {
+      cancelVideoBatch: async () => {
         // 돌지 않을 때 눌러도 아무 일이 없어야 한다 — 다음 일괄에 중단이 새면 안 된다.
         if (!get().videoBatchBusy) return
+        const runProjectId = get().projectId
+        const batchId = get().videoBatchRunId
+        // 즉시 설정 — 중복 클릭을 막는다(#batch-resume). 이미 접수된 작업의 수집은 멈추지 않는다.
         set({ videoBatchCancelled: true })
+        if (!batchId) return
+        // 늘었거나 다른 실행으로 바뀌면 이 취소에 한해서만 되돌린다.
+        const ownsRun = () => get().projectId === runProjectId && get().videoBatchRunId === batchId
+        try {
+          const response = await fetch(
+            `/api/director/video-batches?projectId=${encodeURIComponent(runProjectId)}&batchId=${encodeURIComponent(batchId)}`,
+            { method: 'DELETE' },
+          )
+          if (!response.ok) throw new Error(`cancel failed: ${response.status}`)
+        } catch (err) {
+          if (ownsRun()) set({ videoBatchCancelled: false })
+          throw err
+        }
       },
 
       // ─── Step 2: DB 일원화 (position write-back + hydrate) ──────────────
@@ -4320,6 +4220,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       //   잠그므로 더 강하다. 여기에 창을 덧대면 앞 시도가 *끝난 뒤*의 정당한 재시도까지 막힌다.
       generateVideoForShot: async (shotNodeId, options) => {
         if (get().videoBatchBusy && options?.batch !== true) return null
+        if (options?.batch === true && get().videoBatchCancelled) return null
         if (isDemoSession()) return null
         // #c4 (2026-08-27): Node 뷰에서 영상 생성을 눌렀는데 Storyboard 로 튀던 것 — 화면을
         //   빼앗지 않는다. 스토리보드 뷰일 때만 실사 모드로 맞춘다.
@@ -4377,6 +4278,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       // generateVideoForShot 과 같은 이유로 창을 두지 않는다 — 아래 lock 이 전 구간을 덮는다.
       regenerateVideo: async (videoNodeId, heldLock, options) => {
         if (isDemoSession()) return true
+        if (options?.batch === true && get().videoBatchCancelled) return false
+        const batchRunId = get().videoBatchRunId
         const initialVideoNode = get().nodes.find((n) => n.id === videoNodeId)
         if (!initialVideoNode || !isVideoData(initialVideoNode.data)) return true
         let videoNode = initialVideoNode as DirectorNode & {
@@ -4695,11 +4598,17 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               if (!preserveSuccess) get().setVideoStatus(videoNodeId, 'pending')
               const depth = options?.resumeDepth ?? 0
               const resumeShotNodeId = shotNode && isShotData(shotNode.data) ? shotNode.id : null
-              if (resumeShotNodeId && depth < 3) {
+              // #batch-resume: 중단하거나 새 실행으로 바뀐 뒤에는 예전 그림 대기가 영상을 내지 않는다.
+              const isCancelled = () =>
+                get().projectId !== projectId ||
+                (options?.batch === true &&
+                  (get().videoBatchCancelled || get().videoBatchRunId !== batchRunId))
+              if (resumeShotNodeId && depth < 3 && !isCancelled()) {
                 const resumeBody = body
                 void waitForPrerequisite(projectId, resumeBody, {
-                  isCancelled: () => get().projectId !== projectId,
+                  isCancelled,
                 }).then((outcome) => {
+                  if (isCancelled()) return
                   if (outcome === 'ready') {
                     notifyPrerequisiteResumed(resumeBody)
                     void get().generateVideoForShot(resumeShotNodeId, { ...options, resumeDepth: depth + 1 })
@@ -5566,6 +5475,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           relationModal: null,
           videoBatchBusy: false,
           videoBatchProgress: null,
+          videoBatchRunId: null,
+          videoBatchCancelled: false,
           generatingNodeIds: {},
           generationErrors: {},
           playingNodeId: null,

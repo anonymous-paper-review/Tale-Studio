@@ -98,6 +98,34 @@ async function isAdminUserId(userId: string): Promise<boolean> {
   }
 }
 
+// 영상의 원자 예약에 기존 관리자 예외를 전달한다. 예산 확인이 먼저 admin 캐시를 채워도
+// 영상 검사마다 동기화하며, 기록에 실패하면 한도 면제를 추측하지 않고 제출을 막는다.
+class GenerationCapacityExemptSyncError extends Error {
+  constructor(cause: unknown) {
+    super('generation_capacity_exempt_users sync failed', { cause })
+    this.name = 'GenerationCapacityExemptSyncError'
+  }
+}
+
+async function syncVideoCapacityExemption(userId: string, admin: boolean): Promise<void> {
+  try {
+    if (admin) {
+      const { error } = await supabaseAdmin
+        .from('generation_capacity_exempt_users')
+        .upsert({ user_id: userId, updated_at: new Date().toISOString() })
+      if (error) throw error
+    } else {
+      const { error } = await supabaseAdmin
+        .from('generation_capacity_exempt_users')
+        .delete()
+        .eq('user_id', userId)
+      if (error) throw error
+    }
+  } catch (err) {
+    throw new GenerationCapacityExemptSyncError(err)
+  }
+}
+
 /**
  * 생성 1건을 지금 제출해도 되는지 — 유저 카테고리 상한과 전역 슬롯을 함께 본다.
  *
@@ -113,11 +141,13 @@ export async function checkGenerationCapacity(
   category: QuotaCategory,
 ): Promise<QuotaCheck> {
   const limit = limitOf(category)
+  const admin = await isAdminUserId(userId)
+  // 집계 장애로 반환하기 전에 오래된 면제를 없애야 한다. 이미지에는 이 표를 적용하지 않는다.
+  if (category === 'video') await syncVideoCapacityExemption(userId, admin)
   try {
-    const [userQueued, globalQueued, admin] = await Promise.all([
+    const [userQueued, globalQueued] = await Promise.all([
       countQueuedJobsByUser(userId, kindsOf(category)),
       countQueuedJobsGlobal(),
-      isAdminUserId(userId),
     ])
     if (!admin && userQueued >= limit) {
       return { ok: false, queued: userQueued, limit, scope: 'user', category }

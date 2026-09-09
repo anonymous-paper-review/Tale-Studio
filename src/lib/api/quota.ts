@@ -48,3 +48,34 @@ export function videoBudgetRejectionResponse(
   })
   return NextResponse.json(videoBudgetExceededBody(budget), { status: 429 })
 }
+
+// #video-capacity-trigger(2026-09-09): 예약 경쟁(동시 reserve RPC 두 개가 같은 순간 통과)은 사전
+//   checkGenerationCapacity 만으로 못 막는다 — 그래서 새 DB trigger 가 최근 30분 영상 3개를
+//   원자적으로 강제하고, 넘으면 reserve/기록 RPC 자체가 예외로 거절한다(message='video_user_at_capacity',
+//   details=실제 큐 카운트 문자열). 이 헬퍼는 그 예외를 기존 quotaRejectionResponse 와 같은 429 +
+//   관측 이벤트로 변환한다 — 유료 제출(hold/provider) 이후의 오류와 절대 섞이지 않도록, 호출부는
+//   reserve/기록 RPC 실패 지점의 catch 에서만 이 헬퍼를 부른다.
+const VIDEO_CAPACITY_REJECTION_MESSAGE = 'video_user_at_capacity'
+
+/**
+ * 예약 경쟁 중 DB trigger 가 던진 영상 한도 거절만 골라 기존 quotaRejectionResponse 로 응답/관측한다.
+ * message 가 일치하고 details 가 유효한 정수(≥3)일 때만 처리 — 그 외는 null(호출부가 기존 오류
+ * 경로로 계속 처리). count 는 details 를 그대로 쓴다: 임의의 가짜 큐 수를 만들지 않는다.
+ */
+export function videoCapacityReservationRejection(
+  error: unknown,
+  ctx: QuotaRejectionContext,
+): NextResponse | null {
+  if (
+    !error || typeof error !== 'object'
+    || !('message' in error) || error.message !== VIDEO_CAPACITY_REJECTION_MESSAGE
+  ) return null
+  const rawDetails = (error as { details?: unknown }).details
+  if (typeof rawDetails !== 'string' || !/^\d+$/.test(rawDetails)) return null
+  const count = Number(rawDetails)
+  if (!Number.isSafeInteger(count) || count < 3) return null
+  return quotaRejectionResponse(
+    { ok: false, scope: 'user', category: 'video', queued: count, limit: 3 },
+    ctx,
+  )
+}

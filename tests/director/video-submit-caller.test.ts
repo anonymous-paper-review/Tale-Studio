@@ -11,6 +11,7 @@
 // 한 번에 리팩터링과 새 기능을 같이 하면 뭐가 깨졌는지 알 수 없다. 여기서는 갈래만 만들고,
 // 실제로 서버가 부르는 것은 다음 커밋이다.
 import { describe, expect, it, vi } from 'vitest'
+// #batch-resume(2026-09-09) 슬라이스 A
 import { resolveSubmitIdentity } from '@/lib/director/video-submit-identity'
 
 describe('영상 제출 신원 확인', () => {
@@ -52,5 +53,25 @@ describe('영상 제출 신원 확인', () => {
     })
 
     expect(identity).toEqual({ ok: false, reason: 'unauthorized' })
+  })
+
+  // #batch-resume(2026-09-09) 이어가기 신원 프로퍼티가 명시적으로 null/undefined 로 온 경우
+  // 세션을 대신 읽어버리면 다른 로그인 사용자로 제출되거나 요청 컨텍스트 오류가 튈 수 있다.
+  // 서버 경로임을 이미 알고 있으므로 getUser 를 아예 부르지 말고 거절해야 한다.
+  it.each([
+    ['null', null],
+    ['undefined', undefined],
+  ])('이어가기 신원이 비어 있으면 거절한다 (명시적 %s)', async (_label, value) => {
+    const getUser = vi.fn(async () => {
+      throw new Error('요청 컨텍스트 없음 — 세션을 읽으면 안 되는 경로다')
+    })
+
+    const identity = await resolveSubmitIdentity({
+      getUser: getUser as never,
+      onBehalfOfUserId: value,
+    })
+
+    expect(identity).toEqual({ ok: false, reason: 'unauthorized' })
+    expect(getUser).not.toHaveBeenCalled()
   })
 })

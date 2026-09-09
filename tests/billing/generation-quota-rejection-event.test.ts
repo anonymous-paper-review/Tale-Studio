@@ -10,11 +10,36 @@ vi.mock('@/lib/writer/debug-events', () => ({
   recordWriterObservabilityEvent: (...args: unknown[]) => recordMock(...args),
 }))
 
-import { quotaRejectionResponse } from '@/lib/api/quota'
+import { quotaRejectionResponse, videoCapacityReservationRejection } from '@/lib/api/quota'
 import type { QuotaCheck } from '@/lib/generation-quota'
 
 const userBlocked: QuotaCheck = { ok: false, queued: 6, limit: 6, scope: 'user', category: 'image' }
 const globalBlocked: QuotaCheck = { ok: false, queued: 18, limit: 18, scope: 'global', category: 'video' }
+
+describe('예약 경쟁에서 한도에 걸리면 대기 안내를 보내는 약속', () => {
+  const context = { projectId: 'proj-1', kind: 'shot_video', userId: 'user-1' }
+
+  it.each([
+    { message: 'video_user_at_capacity', details: '4', code: 'P0001' },
+    Object.assign(new Error('video_user_at_capacity'), { details: '4' }),
+  ])('예약 시 한도에 걸리면 실제 대기 수로 안내하고 기록한다 (%#)', async (error) => {
+    const response = videoCapacityReservationRejection(error, context)
+    expect(response?.status).toBe(429)
+    expect(await response?.json()).toMatchObject({ code: 'quota_exceeded', queued: 4, limit: 3 })
+    expect(recordMock).toHaveBeenCalledWith('proj-1', 'generation_submit_rejected_quota', {
+      kind: 'shot_video', scope: 'user', queued: 4, limit: 3, userId: 'user-1',
+    })
+  })
+
+  it.each(['3junk', '3.5', '3e2', '9007199254740993', '2', '', undefined])(
+    '대기 수를 확인할 수 없으면 임의의 수로 안내하지 않는다 (%s)',
+    (details) => {
+      const error = Object.assign(new Error('video_user_at_capacity'), { details })
+      expect(videoCapacityReservationRejection(error, context)).toBeNull()
+      expect(recordMock).not.toHaveBeenCalled()
+    },
+  )
+})
 
 beforeEach(() => {
   recordMock.mockClear()

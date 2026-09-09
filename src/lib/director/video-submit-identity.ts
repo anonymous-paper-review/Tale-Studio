@@ -27,9 +27,12 @@ export interface SubmitIdentityInput {
 export async function resolveSubmitIdentity(
   input: SubmitIdentityInput,
 ): Promise<SubmitIdentity> {
-  // 서버 경로가 먼저다. 요청 컨텍스트가 없으므로 세션을 아예 묻지 않는다.
-  if (input.onBehalfOfUserId !== undefined && input.onBehalfOfUserId !== null) {
-    const userId = input.onBehalfOfUserId.trim()
+  // 서버 경로가 먼저다. 프로퍼티 자체가 있으면(값이 null/undefined/공백이어도) 요청 컨텍스트가
+  // 없다는 뜻이므로 세션을 아예 묻지 않는다.
+  // #batch-resume(2026-09-09) 명시적으로 비어 있는 이어가기 신원도 세션으로 폴백하지 않는다 —
+  //   getUser 호출 자체가 남의 로그인 사용자로 오인될 위험을 만든다.
+  if (Object.prototype.hasOwnProperty.call(input, 'onBehalfOfUserId')) {
+    const userId = input.onBehalfOfUserId?.trim() ?? ''
     return userId ? { ok: true, userId } : { ok: false, reason: 'unauthorized' }
   }
 

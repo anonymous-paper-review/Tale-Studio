@@ -29,6 +29,7 @@ import { runRealBatch } from '@/lib/director/real-batch-client'
 import {
   eligibleVideoBatchShotIds,
   runVideoBatch,
+  restoreVideoBatch,
 } from '@/lib/director/video-batch-client'
 import { describeVideoBatchPlan, planVideoBatch, videoBatchTakeCosts } from '@/lib/director/video-batch-plan'
 import { refetchTakeBalance, useTakeBalance } from '@/lib/billing/use-take-balance'
@@ -926,13 +927,23 @@ function PaletteBar({
         <button
           type="button"
           title={t('Generate videos for every eligible shot')}
-          onClick={() => {
+          onClick={async () => {
             // 도는 중이면 같은 자리가 중단 버튼이다(#batch-resume 2026-09-09 오너 결정 ①).
             //   예전에는 진행 중에 비활성이라 멈출 방법이 창을 닫는 것뿐이었다.
             if (videoBatchBusy) {
               if (videoBatchCancelled) return
-              useDirectorCanvasStore.getState().cancelVideoBatch()
-              toast.info(t('Stop after current videos finish.'))
+              const run = useDirectorCanvasStore.getState()
+              const stillCurrent = () => {
+                const current = useDirectorCanvasStore.getState()
+                return current.projectId === run.projectId && current.videoBatchRunId === run.videoBatchRunId
+              }
+              try {
+                await run.cancelVideoBatch()
+                if (stillCurrent()) toast.info(t('Stop after current videos finish.'))
+              } catch (error) {
+                console.error('[video-batches] cancel failed:', error)
+                if (stillCurrent()) toast.error(t('Please try again in a moment.'))
+              }
               return
             }
             const eligible = eligibleVideoBatchShotIds(
@@ -1158,6 +1169,19 @@ export default function DirectorCanvasPage() {
 
   // 큐 축소 → 재수화(#live-refresh) — Node/Storyboard 어느 뷰든 생성 완료가 즉시 보인다.
   useQueueRehydrate(guideProjectId && guideProjectId !== 'default' ? guideProjectId : null)
+
+  useEffect(() => {
+    if (!stageReady || !guideProjectId || guideProjectId === 'default') return
+    const restore = () => {
+      if (document.hidden) return
+      void restoreVideoBatch(guideProjectId).catch((error) => {
+        console.error('[video-batches] restore failed:', error)
+      })
+    }
+    restore()
+    document.addEventListener('visibilitychange', restore)
+    return () => document.removeEventListener('visibilitychange', restore)
+  }, [guideProjectId, stageReady])
 
   // SHOT VIDEO 재생 상태(#video-pause 2026-08-12) — playingNodeId 가 스토어에 남아 탭을
   //   떠났다 오면 <video autoPlay> 가 재마운트되며 저절로 재생됐다. 떠날 때(unmount)와
