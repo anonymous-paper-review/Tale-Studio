@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from 'node:crypto'
 import { NextResponse } from 'next/server'
 import { resolveStyleAnchorByKey } from '@/lib/style-anchor'
 import { getUser } from '@/lib/supabase/auth'
+import { resolveSubmitIdentity } from '@/lib/director/video-submit-identity'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { pickFalKey } from '@/lib/fal/keys'
 import {
@@ -414,8 +415,13 @@ export async function POST(req: Request) {
   let reservation: { video_clip_id: string; job_id: string; take_number: number; replayed: boolean } | null = null
   let projectId = ''
   try {
-    const user = await getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // 신원은 한 자리에서 정한다(#batch-resume 슬라이스 A 2026-09-09).
+    //   지금은 화면 경로뿐이라 결과가 종전과 같다 — getUser() 그대로다. 서버가 이어가는 경로
+    //   (완료 알림·주기 점검)가 붙을 때 onBehalfOfUserId 로 잡의 주인을 넘기면 같은 길을 탄다.
+    //   그 뒤 단계(소유권·예산·한도·예약·hold·제출)는 userId 하나만 바뀔 뿐 검사를 그대로 받는다.
+    const identity = await resolveSubmitIdentity({ getUser })
+    if (!identity.ok) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const user = { id: identity.userId }
     const body = (await req.json()) as {
       shotId?: string; projectId?: string; writerShotId?: string | null; prompt?: string; camera?: CameraConfig
       durationSeconds?: number; aspectRatio?: string; generationMethod?: GenerationMethod; provider?: VideoProvider
