@@ -95,10 +95,8 @@ export async function runVideoBatch(
     if (submissionDone && settledJobs.size >= started) summarize()
   }
   let submissionDone = false
-  store.setState({
-    videoBatchBusy: true,
-    videoBatchProgress: { done: 0, total, failed: 0 },
-  })
+  // 중단 표시를 풀고 진행 상태를 연다(#batch-resume 오너 결정 ①).
+  store.getState().beginVideoBatch(total)
 
   let cursor = 0
   let done = 0
@@ -114,6 +112,8 @@ export async function runVideoBatch(
 
   const worker = async () => {
     while (true) {
+      // 사용자가 그만뒀으면 더 내지 않는다 — 도는 것은 그대로 둔다(제출된 영상은 이미 과금됐다).
+      if (store.getState().videoBatchCancelled) return
       const index = cursor++
       if (index >= shotIds.length) return
       let result: string | null = null

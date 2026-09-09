@@ -1213,6 +1213,13 @@ interface DirectorCanvasState {
   /** Explicit full-video batch progress. Ephemeral UI state; never persisted. */
   videoBatchBusy: boolean
   videoBatchProgress: { done: number; total: number; failed: number } | null
+  /**
+   * 사용자가 일괄을 그만뒀나(#batch-resume 2026-09-09 오너 결정 ①).
+   *   예전에는 창을 닫는 것이 곧 중단이었다 — 브라우저가 순번을 들고 돌았기 때문이다.
+   *   서버가 이어받으면 창을 닫아도 계속 만들어지므로 명시적인 중단 수단이 필요하다.
+   *   "더 내지 않는다" 는 뜻이지 도는 것을 죽이지는 않는다 — 제출된 영상은 이미 과금됐다.
+   */
+  videoBatchCancelled: boolean
 
   // popup/modal
   popupNodeId: string | null
@@ -1245,6 +1252,10 @@ interface DirectorCanvasState {
   setViewport: (vp: { x: number; y: number; zoom: number }) => void
   setViewMode: (m: 'node' | 'storyboard') => void
   setStoryboardMediaMode: (m: 'previz' | 'real') => void
+  /** 일괄 시작 — 중단 표시를 풀고 진행 상태를 연다. */
+  beginVideoBatch: (total: number) => void
+  /** 일괄 중단 — 도는 중일 때만 먹는다. */
+  cancelVideoBatch: () => void
 
   // Step 2 (unify-director-store-db): DB 일원화
   /** 노드 이동 후 canvas_position을 해당 테이블에 debounce write (drag end에서 호출) */
@@ -1715,6 +1726,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       realBatchRemaining: null,
       videoBatchBusy: false,
       videoBatchProgress: null,
+      videoBatchCancelled: false,
       popupNodeId: null,
       deleteConfirmInfo: null,
       relationModal: null,
@@ -1785,6 +1797,20 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       setViewport: (vp) => set({ viewport: vp }),
       setViewMode: (m) => set({ viewMode: m }),
       setStoryboardMediaMode: (m) => set({ storyboardMediaMode: m }),
+
+      beginVideoBatch: (total) =>
+        set({
+          videoBatchBusy: true,
+          // 안 풀면 다음 일괄이 시작하자마자 멈춘다.
+          videoBatchCancelled: false,
+          videoBatchProgress: { done: 0, total, failed: 0 },
+        }),
+
+      cancelVideoBatch: () => {
+        // 돌지 않을 때 눌러도 아무 일이 없어야 한다 — 다음 일괄에 중단이 새면 안 된다.
+        if (!get().videoBatchBusy) return
+        set({ videoBatchCancelled: true })
+      },
 
       // ─── Step 2: DB 일원화 (position write-back + hydrate) ──────────────
 

@@ -13,6 +13,16 @@ const mockStore = vi.hoisted(() => {
     nodes: [] as DirectorNode[],
     videoBatchBusy: false,
     videoBatchProgress: null as { done: number; total: number; failed: number } | null,
+    // #batch-resume(2026-09-09): 일괄 시작·중단이 store 액션이 됐다.
+    videoBatchCancelled: false,
+    beginVideoBatch: vi.fn((total: number) => {
+      state.videoBatchBusy = true
+      state.videoBatchCancelled = false
+      state.videoBatchProgress = { done: 0, total, failed: 0 }
+    }),
+    cancelVideoBatch: vi.fn(() => {
+      if (state.videoBatchBusy) state.videoBatchCancelled = true
+    }),
     generateVideoForShot: vi.fn(),
   }
   const setState = vi.fn((patch: Record<string, unknown>) => {

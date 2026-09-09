@@ -21,7 +21,8 @@ import {
   type OnConnectStart,
   type OnConnectEnd,
 } from '@xyflow/react'
-import { Loader2, ImageIcon, ChevronDown, ChevronUp, LayoutGrid, Boxes, Map as MapIcon, Lock, Unlock, Type } from 'lucide-react'
+import { Loader2,
+  Square, ImageIcon, ChevronDown, ChevronUp, LayoutGrid, Boxes, Map as MapIcon, Lock, Unlock, Type } from 'lucide-react'
 
 import { toast } from 'sonner'
 import { runRealBatch } from '@/lib/director/real-batch-client'
@@ -793,6 +794,7 @@ function PaletteBar({
   // #real-grid: 일괄 생성은 4샷 시트 러너(runRealBatch)로 통합 — 진행 플래그는 스토어 공유.
   const realBatchBusy = useDirectorCanvasStore((s) => s.realBatchBusy)
   const videoBatchBusy = useDirectorCanvasStore((s) => s.videoBatchBusy)
+  const videoBatchCancelled = useDirectorCanvasStore((s) => s.videoBatchCancelled)
   const videoBatchProgress = useDirectorCanvasStore((s) => s.videoBatchProgress)
   // 약속 D7(2026-09-04): 버튼 숫자는 핀과 같은 서버 배치에서 온다 — 배치가 도는 동안은 그 done/total, 아니면 화면 집계.
   const projectId = useProjectStore((s) => s.projectId)
@@ -925,7 +927,14 @@ function PaletteBar({
           type="button"
           title={t('Generate videos for every eligible shot')}
           onClick={() => {
-            if (videoBatchBusy) return
+            // 도는 중이면 같은 자리가 중단 버튼이다(#batch-resume 2026-09-09 오너 결정 ①).
+            //   예전에는 진행 중에 비활성이라 멈출 방법이 창을 닫는 것뿐이었다.
+            if (videoBatchBusy) {
+              if (videoBatchCancelled) return
+              useDirectorCanvasStore.getState().cancelVideoBatch()
+              toast.info(t('Stop after current videos finish.'))
+              return
+            }
             const eligible = eligibleVideoBatchShotIds(
               useDirectorCanvasStore.getState().nodes,
             )
@@ -936,22 +945,32 @@ function PaletteBar({
             refetchTakeBalance()
             setConfirmVideoBatch(true)
           }}
-          disabled={videoBatchBusy}
+          disabled={videoBatchBusy && videoBatchCancelled}
           aria-busy={videoBatchBusy}
           className={cn(
             'flex h-8 items-center gap-2 rounded-md border border-border px-3',
             'text-xs font-medium text-foreground',
             'transition-colors duration-100 hover:bg-accent',
-            videoBatchBusy && 'cursor-not-allowed opacity-70',
+            videoBatchBusy && videoBatchCancelled && 'cursor-not-allowed opacity-70',
             'hover-red-beam',
           )}
         >
           {videoBatchBusy ? (
-            <Loader2 className="size-4 animate-spin" />
+            videoBatchCancelled ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Square className="size-4" />
+            )
           ) : (
             <ImageIcon className="size-4" />
           )}
-          <span>{t('Generate videos')}</span>
+          <span>
+            {videoBatchBusy
+              ? videoBatchCancelled
+                ? t('Stopping')
+                : t('Stop generating')
+              : t('Generate videos')}
+          </span>
           {videoBatch ? (
             <>
               <span className="font-mono tabular-nums text-muted-foreground">
