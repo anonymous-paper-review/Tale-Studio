@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils'
 
 const FAMILY_COPY = {
   starter: { title: 'Starter', cadence: 'Monthly subscription', audience: 'For individual creators', description: 'One project at a time. Choose the video minutes you need.', icon: Clapperboard },
-  production: { title: 'Production', cadence: 'Monthly subscription', audience: 'For production teams', description: 'More projects, more accounts, and previz export for your team.', icon: Users },
+  production: { title: 'Producer', cadence: 'Monthly subscription', audience: 'For production teams', description: 'More projects, more accounts, and previz export for your team.', icon: Users },
   take: { title: 'Take', cadence: 'One-time top-up', audience: 'For your next generation', description: 'Top up Takes for regenerations and premium video models.', icon: Zap },
 } as const
 

@@ -21,17 +21,17 @@ const shotDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '../.clau
 // catalog.ts + plan-limits.ts의 승인된 13개 옵션. [분량, 연결 프로젝트, 월 Take, 계정 수], export 여부.
 const expected = {
   starter: [
-    { id: 's1', name: 'S-1', price: 15, allowances: [1, 1, 16, 1], export: false },
-    { id: 's2', name: 'S-2', price: 30, allowances: [2, 1, 30, 1], export: false },
-    { id: 's5', name: 'S-5', price: 60, allowances: [5, 1, 60, 1], export: false },
-    { id: 's10', name: 'S-10', price: 110, allowances: [10, 1, 100, 1], export: false },
+    { id: 's1', name: 'Starter1', price: 15, allowances: [1, 1, 16, 1], export: false },
+    { id: 's2', name: 'Starter2', price: 30, allowances: [2, 1, 30, 1], export: false },
+    { id: 's5', name: 'Starter5', price: 60, allowances: [5, 1, 60, 1], export: false },
+    { id: 's10', name: 'Starter10', price: 110, allowances: [10, 1, 100, 1], export: false },
   ],
   production: [
-    { id: 'p10', name: 'P-10', price: 199, allowances: [10, 2, 150, 3], export: true },
-    { id: 'p15', name: 'P-15', price: 449, allowances: [15, 3, 200, 4], export: true },
-    { id: 'p20', name: 'P-20', price: 649, allowances: [20, 3, 360, 5], export: true },
-    { id: 'p25', name: 'P-25', price: 999, allowances: [25, 4, 410, 6], export: true },
-    { id: 'p30', name: 'P-30', price: 1299, allowances: [30, 4, 710, 8], export: true },
+    { id: 'p10', name: 'Producer10', price: 199, allowances: [10, 2, 150, 3], export: true },
+    { id: 'p15', name: 'Producer15', price: 449, allowances: [15, 3, 200, 4], export: true },
+    { id: 'p20', name: 'Producer20', price: 649, allowances: [20, 3, 360, 5], export: true },
+    { id: 'p25', name: 'Producer25', price: 999, allowances: [25, 4, 410, 6], export: true },
+    { id: 'p30', name: 'Producer30', price: 1299, allowances: [30, 4, 710, 8], export: true },
   ],
   take: [
     { id: 'mini', name: 'Mini', price: 29, takes: 50 },
@@ -166,7 +166,7 @@ async function main() {
   await goto('/pricing', '[data-pricing-family]:not(:disabled)')
   assert.deepEqual(evaluate('[...document.querySelectorAll("[data-pricing-family]")].map(el => el.dataset.pricingFamily)'), Object.keys(expected))
   assert.equal(evaluate('document.querySelectorAll("input[type=range]").length'), 0)
-  console.log('통과: 가격표에는 Starter·Production·Take 카드 세 개만 있고 슬라이더는 팝업 안에서만 보인다.')
+  console.log('통과: 가격표에는 Starter·Producer·Take 카드 세 개만 있고 슬라이더는 팝업 안에서만 보인다.')
   screenshot('main')
 
   for (const [family, options] of Object.entries(expected)) {

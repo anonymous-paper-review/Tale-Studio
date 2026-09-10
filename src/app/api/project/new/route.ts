@@ -9,6 +9,7 @@ import {
 } from '@/lib/reference-import'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { ensureWorkspace } from '@/lib/supabase/workspace'
 import { parseAppLocale } from '@/lib/locale'
 import { isAdminWorkspaceOwner } from '@/lib/admin'
 import { NextResponse, type NextRequest } from 'next/server'
@@ -35,21 +36,7 @@ export async function POST(req: NextRequest) {
         : ''
     const includeLastShotFrame = body?.includeLastShotFrame === true
 
-    // Find workspace for this user
-    const { data: workspace } = await supabaseAdmin
-      .from('workspaces')
-      .select('id, plan, owner_id')
-      .eq('owner_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-
-    if (!workspace) {
-      return NextResponse.json(
-        { error: 'Workspace not found' },
-        { status: 404 },
-      )
-    }
+    const workspace = await ensureWorkspace(user)
 
     const isAdmin = isAdminWorkspaceOwner(user, workspace.owner_id)
     const limit = getPlanLimit(workspace.plan)

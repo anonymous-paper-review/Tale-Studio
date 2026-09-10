@@ -4,7 +4,7 @@ import { PADDLE_PLANS, PADDLE_TAKE_PACKS } from '@/lib/billing/catalog'
 import { PRICING_FAMILIES, pricingOptions, pricingSelectionFromSearch, pricingReturnPath } from '@/lib/billing/pricing-selection'
 
 describe('가격표 팝업의 상품 선택', () => {
-  it('가격표는 Starter, Production, Take 세 분류로 기존 상품 13개를 제공한다', () => {
+  it('가격표는 Starter, Producer, Take 세 분류로 기존 상품 13개를 제공한다', () => {
     expect(PRICING_FAMILIES).toEqual(['starter', 'production', 'take'])
     expect(PRICING_FAMILIES.map(f => pricingOptions(f).length)).toEqual([4, 5, 4])
     expect(PRICING_FAMILIES.flatMap(f => pricingOptions(f).map(o => o.item))).toEqual([...PADDLE_PLANS, ...PADDLE_TAKE_PACKS])

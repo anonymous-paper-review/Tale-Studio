@@ -432,7 +432,7 @@ export default function ProjectsPage() {
             <p id="projects-reference-project-help" className="text-xs text-gray-400">
               {canUseReference
                 ? t('Optionally copy assets from an existing project in this workspace.')
-                : t('Reference projects are available on P-10+ plans.')}
+                : t('Reference projects are available on Producer10 and above.')}
             </p>
             {referenceProjectId && canUseReference && (
               <label

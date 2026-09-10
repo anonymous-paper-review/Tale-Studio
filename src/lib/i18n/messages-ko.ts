@@ -1411,7 +1411,7 @@ export const KO: Record<string, string> = {
   'Reference project': '참조 프로젝트',
   'No reference project': '참조 프로젝트 없음',
   'Reference project locked': '참조 프로젝트 잠김',
-  'Reference projects are available on P-10+ plans.': '참조 프로젝트는 P-10 이상 요금제에서 쓸 수 있어요.',
+  'Reference projects are available on Producer10 and above.': '참조 프로젝트는 Producer10 이상 요금제에서 쓸 수 있어요.',
   'Optionally copy assets from an existing project in this workspace.': '이 워크스페이스의 기존 프로젝트에서 에셋을 가져올 수 있어요. 선택 사항이에요.',
   'Some reference assets could not be copied to the new project.': '일부 참조 에셋을 새 프로젝트로 가져오지 못했어요.',
   'Batch generation failed': '일괄 생성에 실패했어요',
@@ -1575,6 +1575,8 @@ export const KO: Record<string, string> = {
   Studio: '스튜디오',
   'More than 4 linked projects or 8 accounts? Studio plans are annual contracts with a shared Take pool, invoicing, and dedicated support. Studio S starts at 10 accounts and 30,000 Takes a year.':
     '연결 프로젝트 4개나 계정 8개보다 더 필요하세요? 스튜디오는 연 단위 계약으로, Take를 공유하고 세금계산서와 전담 지원이 붙어요. Studio S는 계정 10개, 연 30,000 Take부터예요.',
+  'Projects, prompts, and generated content created in Studio are not used to train AI models.':
+    'Studio에서 작업한 프로젝트, 프롬프트와 생성물은 AI 모델 학습에 사용하지 않습니다.',
   'Contact us': '문의하기',
   'What is a Take?': 'Take가 뭐예요?',
   'One Take is one 720p video generation. Regenerating a shot, rendering at 1080p, or using a premium model spends more. You always see the cost before you generate.':

@@ -21,7 +21,7 @@ describe('결제창을 열지 판정', () => {
     expect(decideCheckout({ kind: 'pack', id: 'mini', workspacePlan: 'free', packPurchasedBefore: false, subscriptionStatus: 'none' })).toEqual({ ok: true, priceId: 'pri_mini', label: 'Mini' })
   })
   it('무료 플랜이 구독을 시작하면 결제창이 열린다', () => {
-    expect(decideCheckout({ kind: 'plan', id: 's5', workspacePlan: 'free', packPurchasedBefore: false, subscriptionStatus: 'none' })).toEqual({ ok: true, priceId: 'pri_s5', label: 'S-5' })
+    expect(decideCheckout({ kind: 'plan', id: 's5', workspacePlan: 'free', packPurchasedBefore: false, subscriptionStatus: 'none' })).toEqual({ ok: true, priceId: 'pri_s5', label: 'Starter5' })
   })
   // 왜: v4 충전 상한. 무료는 Mini 1회. 이게 앞문이고 웹훅의 경보는 이 문이 뚫렸을 때의 안전망이다.
   it('무료 플랜이 이미 팩을 샀으면 팩 결제창이 열리지 않고 정액 가입을 권한다', () => {

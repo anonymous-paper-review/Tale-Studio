@@ -5,7 +5,7 @@
 //   구매가 닫혀 있어도 공개 요금제와 옵션 비교는 그대로 유지한다.
 //   2026-09-08 오너: 한국어도 보이게 — 문구는 전부 t() 를 타고(사전 messages-ko.ts), 헤더에 언어 토글. metadata 는 layout.tsx.
 
-import { Clapperboard, Download, Layers, Users } from 'lucide-react'
+import { Clapperboard, Download, Layers, ShieldCheck, Users } from 'lucide-react'
 import { ContactPopover } from '@/components/contact-popover'
 import { PricingFamilies } from '@/components/billing/pricing-families'
 import { SiteHeader } from '@/components/marketing/site-header'
@@ -95,6 +95,10 @@ export function PricingPageContent({ checkoutEnabled }: { checkoutEnabled: boole
                 {t(
                   'More than 4 linked projects or 8 accounts? Studio plans are annual contracts with a shared Take pool, invoicing, and dedicated support. Studio S starts at 10 accounts and 30,000 Takes a year.',
                 )}
+              </p>
+              <p className="mt-4 flex max-w-xl items-start gap-2 text-sm leading-relaxed text-foreground">
+                <ShieldCheck className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <span>{t('Projects, prompts, and generated content created in Studio are not used to train AI models.')}</span>
               </p>
             </div>
             <ContactPopover
