@@ -35,6 +35,8 @@ let providerCalls: Row[]
 let pollWaiters: Map<string, (response: Response) => void>
 let finishImmediately: boolean
 let rejectCharacter: string | null
+let loseSubmitResponse: string | null
+let losePollResponse: string | null
 let activeRun: Promise<boolean> | null
 let beforeAppearance: (() => Promise<void>) | null
 let releaseAppearance: (() => void) | null
@@ -107,6 +109,8 @@ beforeEach(() => {
   pollWaiters = new Map()
   finishImmediately = false
   rejectCharacter = null
+  loseSubmitResponse = null
+  losePollResponse = null
   activeRun = null
   beforeAppearance = null
   releaseAppearance = null
@@ -139,10 +143,13 @@ beforeEach(() => {
     }
     if (url === '/api/artist/generate-sheet') {
       if (JSON.parse(init!.body as string).characterId === rejectCharacter) return Response.json({ error: 'Generation capacity reached' }, { status: 429 })
-      return generateSheet(new Request(`http://localhost${url}`, init))
+      const response = await generateSheet(new Request(`http://localhost${url}`, init))
+      if (JSON.parse(init!.body as string).characterId === loseSubmitResponse) throw new TypeError('Failed to fetch')
+      return response
     }
     if (url.startsWith('/api/generation-jobs/')) {
       const jobId = url.split('/').at(-1)!
+      if (jobId === losePollResponse) throw new TypeError('Failed to fetch')
       if (finishImmediately) return completion(jobId)
       return new Promise<Response>(resolve => { pollWaiters.set(jobId, resolve) })
     }
@@ -244,6 +251,46 @@ describe('채팅에서 두 모습이 실제 생성 접수까지 이어진다', (
     expect(useGlobalChatStore.getState().restorePendingProposal(id)).toBe(false)
     expect(providerCalls).toHaveLength(2)
     expect(tables.character_appearances.filter(row => !row.is_default)).toHaveLength(2)
+  })
+
+  it('첫 인물의 접수 응답이 유실되어도 둘째는 완성하고 접수 여부가 불확실한 첫 인물은 완료 처리하거나 다시 발주하지 않는다', async () => {
+    loseSubmitResponse = 'kyotaro'
+    await requestAndApprove()
+    await vi.waitFor(() => expect(pollWaiters.size).toBe(1))
+    finishAll()
+    await expect(activeRun).resolves.toBe(false)
+    expect(providerCalls).toHaveLength(2)
+    expect(useArtistStore.getState().characterAssets[1].appearances.at(-1)?.sheetUrl).toBe('https://assets.test/job-2.webp')
+    const remaining = useGlobalChatStore.getState().deferredProposals[0]
+    expect(remaining.target).toContain('쿄타로')
+    expect(remaining.target).not.toContain('코마츠')
+    expect(remaining.submissionUncertain).toBe(true)
+    expect(remaining.jobIds ?? []).toHaveLength(0)
+    useGlobalChatStore.getState().restorePendingProposal(remaining.id)
+    await expect(useGlobalChatStore.getState().approvePendingProposal(remaining.id)).resolves.toBe(false)
+    expect(providerCalls).toHaveLength(2)
+    expect(tables.character_appearances.filter(row => !row.is_default)).toHaveLength(2)
+    expect(useGlobalChatStore.getState().messages.at(-1)?.content).toContain('접수 상태를 확인할 수 없어요. 기존 작업을 확인한 뒤 다시 시도해 주세요.')
+  })
+
+  it('첫 인물의 완료 확인이 끊겨도 둘째 결과를 유지하고 다시 확인할 때 기존 첫 작업만 조회한다', async () => {
+    losePollResponse = 'job-1'
+    await requestAndApprove()
+    await vi.waitFor(() => expect(pollWaiters.size).toBe(1))
+    finishAll()
+    await expect(activeRun).resolves.toBe(false)
+    const remaining = useGlobalChatStore.getState().deferredProposals[0]
+    expect(remaining.target).toContain('쿄타로')
+    expect(remaining.target).not.toContain('코마츠')
+    expect(remaining.jobIds).toEqual(['job-1'])
+    expect(remaining.submissionUncertain).toBe(false)
+    expect(providerCalls).toHaveLength(2)
+    losePollResponse = null
+    useGlobalChatStore.getState().restorePendingProposal(remaining.id)
+    await expect(useGlobalChatStore.getState().approvePendingProposal(remaining.id)).resolves.toBe(true)
+    expect(providerCalls).toHaveLength(2)
+    expect(tables.character_appearances.filter(row => !row.is_default)).toHaveLength(2)
+    expect(useGlobalChatStore.getState().deferredProposals).toHaveLength(0)
   })
 
   it('모델이 첫 인물의 제안만 보내면 두 인물을 완료했다고 하지 않고 빠진 이름을 알려준다', async () => {

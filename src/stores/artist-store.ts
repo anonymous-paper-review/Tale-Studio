@@ -1229,6 +1229,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     }))
     const t0 = Date.now()
     let activeJobId: string | null = null
+    let lastReceipt: GenerationJobReceipt | null = null
+    const onJob: GenerationJobObserver = (receipt) => {
+      lastReceipt = receipt
+      options?.onJob?.(receipt)
+    }
     alog(`[autogen] char ${key} → submitting…`)
     try {
       const res = await fetch('/api/artist/generate-sheet', {
@@ -1249,7 +1254,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
         const error = body.error ?? `HTTP ${res.status}`
-        options?.onJob?.({ jobId: null, status: 'failed', httpStatus: res.status, error })
+        onJob({ jobId: null, status: 'failed', httpStatus: res.status, error })
         if (notifyIfQuotaExceeded(res.status, body)) {
           return { jobId: null, status: 'failed', httpStatus: res.status, error }
         }
@@ -1260,7 +1265,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       // 서버 dedupe(이미 같은 슬롯에 queued 잡 존재) → 새 fal 제출 없이 종료. 에러/재시도 아님(중복 방지).
       if (body.deduped) {
         alog(`[autogen] char ${key} — 이미 큐에 있음(서버 dedupe), 제출 생략`)
-        options?.onJob?.({ jobId: null, status: 'deduped', httpStatus: res.status })
+        onJob({ jobId: null, status: 'deduped', httpStatus: res.status })
         return { jobId: null, status: 'deduped', httpStatus: res.status }
       }
       // 서버 give-up 게이트(반복 실패 슬롯의 자율 재생성 차단) → jobId 없음.
@@ -1270,20 +1275,20 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       //   정상 상태이므로 조용히 끝낸다(give-up 안내와 다르다).
       if (body.skipped && (body as { reason?: string }).reason === 'exists') {
         alog(`[autogen] char ${key} — sheet already exists, server skipped (no submit)`)
-        options?.onJob?.({ jobId: null, status: 'skipped', httpStatus: res.status })
+        onJob({ jobId: null, status: 'skipped', httpStatus: res.status })
         return { jobId: null, status: 'skipped', httpStatus: res.status }
       }
       if (body.skipped || !body.jobId) {
         alog(`[autogen] char ${key} — give-up 게이트로 자동 생성 skip`)
         notifyGenerationGaveUp('artist', translate(useLocaleStore.getState().locale, 'Character image'))
-        options?.onJob?.({ jobId: null, status: 'skipped', httpStatus: res.status })
+        onJob({ jobId: null, status: 'skipped', httpStatus: res.status })
         return { jobId: null, status: 'skipped', httpStatus: res.status }
       }
       const jobId = body.jobId
       activeJobId = jobId
       alog(`[autogen] char ${key} job ${jobId} queued, polling…`)
-      options?.onJob?.({ jobId, status: 'queued', httpStatus: res.status })
-      const url = await pollGenerationJob(jobId, { onStatus: options?.onJob })
+      onJob({ jobId, status: 'queued', httpStatus: res.status })
+      const url = await pollGenerationJob(jobId, { onStatus: onJob })
       alog(`[autogen] char ${key} ✓ done in ${((Date.now() - t0) / 1000).toFixed(1)}s`)
       atime(`char ${key}`, Date.now() - t0)
       set((state) => {
@@ -1322,6 +1327,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         err instanceof Error ? err.message : err,
       )
       const raw = err instanceof Error ? err.message : String(err)
+      const receipt = lastReceipt as GenerationJobReceipt | null
+      if (!receipt || !['failed', 'timed_out'].includes(receipt.status)) onJob({ jobId: activeJobId, status: 'failed', error: raw })
       set({ error: raw || 'Character view generation failed' })
       // 카드의 작은 배지는 스크롤하면 사라진다 — 채팅은 stage 를 옮겨도 남는 기록이다.
       notifyGenerationFailed('artist', translate(useLocaleStore.getState().locale, 'Character image'), raw)

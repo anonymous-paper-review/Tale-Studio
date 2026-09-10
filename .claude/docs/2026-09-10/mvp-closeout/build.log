@@ -1,0 +1,141 @@
+$ next build
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+- Experiments (use with caution):
+  · clientTraceMetadata
+
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+(node:68379) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+(node:68380) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+✓ Compiled successfully in 4.0s
+  Running next.config.js provided runAfterProductionCompile ...
+✓ Completed runAfterProductionCompile in 10354ms
+  Running TypeScript ...
+  Collecting page data using 9 workers ...
+  Generating static pages using 9 workers (0/89) ...
+  Generating static pages using 9 workers (22/89)
+  Generating static pages using 9 workers (44/89)
+(node:68439) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  Generating static pages using 9 workers (66/89)
+✓ Generating static pages using 9 workers (89/89) in 212.4ms
+  Finalizing page optimization ...
+
+Route (app)                                  Revalidate  Expire
+┌ ○ /
+├ ○ /_not-found
+├ ○ /account
+├ ƒ /api/admin/billing
+├ ƒ /api/artist/appearance
+├ ƒ /api/artist/character
+├ ƒ /api/artist/character-appearance
+├ ƒ /api/artist/chat
+├ ƒ /api/artist/generate-sheet
+├ ƒ /api/artist/generate-world
+├ ƒ /api/artist/generation-status
+├ ƒ /api/artist/location
+├ ƒ /api/artist/location-appearance
+├ ƒ /api/artist/retry-drafts
+├ ƒ /api/artist/select-candidate
+├ ƒ /api/artist/select-location-candidate
+├ ƒ /api/assets/upload-image
+├ ƒ /api/billing/account
+├ ƒ /api/billing/catalog-status
+├ ƒ /api/billing/change-plan
+├ ƒ /api/billing/checkout
+├ ƒ /api/billing/paddle/webhook
+├ ƒ /api/billing/portal
+├ ƒ /api/billing/reconcile-me
+├ ƒ /api/billing/take-balance
+├ ƒ /api/chat/trace
+├ ƒ /api/cron/billing-reconcile
+├ ƒ /api/cron/take-expire
+├ ƒ /api/cron/video-batches
+├ ƒ /api/debug-flags
+├ ƒ /api/debug-prompt-trace
+├ ƒ /api/director/chat
+├ ƒ /api/director/generate-previz-video
+├ ƒ /api/director/generate-shots
+├ ƒ /api/director/generate-storyboard
+├ ƒ /api/director/generate-storyboard-batch
+├ ƒ /api/director/generate-video
+├ ƒ /api/director/generate-video/[taskId]
+├ ƒ /api/director/video-adherence
+├ ƒ /api/director/video-batches
+├ ƒ /api/director/video-takes
+├ ƒ /api/director/video-takes/[clipId]
+├ ƒ /api/editor/speed
+├ ƒ /api/editor/state
+├ ƒ /api/editor/title-image
+├ ƒ /api/editor/trim
+├ ƒ /api/fal/webhook
+├ ƒ /api/feedback
+├ ƒ /api/generate/health
+├ ƒ /api/generate/image
+├ ƒ /api/generate/video-health
+├ ƒ /api/generation-jobs/[id]
+├ ƒ /api/generation/active
+├ ƒ /api/generation/queue
+├ ƒ /api/knowledge/cameras
+├ ƒ /api/knowledge/movements
+├ ○ /api/playground                                  1m      1y
+├ ƒ /api/produce/chat
+├ ƒ /api/produce/ingest
+├ ƒ /api/produce/style-anchor
+├ ƒ /api/project/[id]
+├ ƒ /api/project/[id]/handoff
+├ ƒ /api/project/[id]/messages
+├ ƒ /api/project/init
+├ ƒ /api/project/list
+├ ƒ /api/project/new
+├ ƒ /api/share
+├ ƒ /api/share/[token]
+├ ƒ /api/writer/chat
+├ ƒ /api/writer/debug-events
+├ ƒ /api/writer/dialogue
+├ ƒ /api/writer/engine
+├ ƒ /api/writer/export/[projectId]
+├ ƒ /api/writer/generate/images
+├ ƒ /api/writer/generate/videos
+├ ƒ /api/writer/logs/[projectId]
+├ ƒ /api/writer/preview/[projectId]
+├ ƒ /api/writer/resume
+├ ƒ /api/writer/resume/assets
+├ ƒ /api/writer/resume/images
+├ ƒ /api/writer/resume/videos
+├ ƒ /api/writer/rough-adherence
+├ ƒ /api/writer/rough-directing-edit
+├ ƒ /api/writer/rough-storyboard
+├ ƒ /api/writer/scene-gate
+├ ƒ /api/writer/shot-configs
+├ ƒ /api/writer/start
+├ ƒ /api/writer/status/[projectId]
+├ ƒ /api/writer/step
+├ ƒ /api/writer/v2/apply
+├ ƒ /api/writer/v2/review
+├ ƒ /api/writer/watchdog
+├ ƒ /auth/callback
+├ ƒ /checkout
+├ ○ /design
+├ ○ /docs
+├ ○ /icon.png
+├ ○ /login
+├ ○ /playground
+├ ƒ /pricing
+├ ○ /projects
+├ ○ /queue
+├ ƒ /share/[token]
+├ ○ /studio/artist
+├ ○ /studio/director
+├ ○ /studio/editor
+├ ○ /studio/producer
+└ ○ /studio/writer
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand

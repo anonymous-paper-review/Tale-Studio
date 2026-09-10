@@ -1,0 +1,51 @@
+{
+  "checkedAt": "2026-09-10T06:21:40.442Z",
+  "projectId": "18140f42-309e-4845-b97a-3c54d6fc2d0f",
+  "jobs": [
+    {
+      "id": "452be7f4-c164-4d91-8185-5a0cf730e586",
+      "status": "completed",
+      "created_at": "2026-09-10T06:20:04.036575+00:00",
+      "completed_at": "2026-09-10T06:21:28.306+00:00",
+      "input_snapshot": {
+        "model": "openai/gpt-image-2/edit",
+        "prompt": "A school rooftop matching the base image layout: iron safety fence, benches, stairwell access structure, outdoor AC units, and surrounding building arrangement preserved. Time has shifted to deep night. Dark navy night sky, cold moonlight casting pale shadows, only faint glows from distant building windows visible. No sunlight, no bright daytime sky. No people present., 학교 옥상, Use the reference image for spatial layout and architecture only; apply the time of day, lighting, weather and condition specified in this appearance description, no people or characters, empty environment, wide shot, panoramic",
+        "image_model": "gpt-image-2",
+        "source_hash": "c9c2001d",
+        "aspect_ratio": "16:9",
+        "appearance_hash": "92266072",
+        "style_anchor_key": null,
+        "reference_image_urls": [
+          "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/locations/v1-7a491a7afcbffb36ab684b293af806d138e045eeb2b6db4ab97b92e9a8751019_wide_shot.png?v=1788959327963"
+        ]
+      },
+      "result_url": "https://pbiumddivadgbzxuymak.supabase.co/storage/v1/object/public/media/e17c6749-a1d2-4f10-a2f9-c35bb81b9492/18140f42-309e-4845-b97a-3c54d6fc2d0f/locations/v1-aa31ae0749ce3ab4617f2a0eb0cbdfa3ee928bc10c0a1f3b9906f6d717a101c1_v1-6d1622d0f2bc1a5dba81addf168d43afb5a0d0d0d86973bff39a546062f35301_wide_shot.png?v=1789021287931",
+      "error": null,
+      "target": {
+        "column": "wide_shot",
+        "locationId": "loc_alley",
+        "workspaceId": "e17c6749-a1d2-4f10-a2f9-c35bb81b9492",
+        "appearanceKey": "appearance"
+      },
+      "model": "openai/gpt-image-2/edit"
+    }
+  ],
+  "appearances": [
+    {
+      "id": "bba6a6a6-914f-4139-b220-08efec376497",
+      "project_id": "18140f42-309e-4845-b97a-3c54d6fc2d0f",
+      "location_id": "loc_alley",
+      "appearance_key": "appearance",
+      "label": "밤 · 달빛 아래 옥상",
+      "narrative_time": "present",
+      "visual_description": "A school rooftop matching the base image layout: iron safety fence, benches, stairwell access structure, outdoor AC units, and surrounding building arrangement preserved. Time has shifted to deep night. Dark navy night sky, cold moonlight casting pale shadows, only faint glows from distant building windows visible. No sunlight, no bright daytime sky. No people present.",
+      "visual_description_native": "기본 이미지와 같은 학교 옥상. 철제 울타리, 벤치, 계단실, 실외기와 건물 배치를 유지한다. 시간이 깊은 밤으로 바뀌었다. 어두운 남색 밤하늘, 차가운 달빛, 먼 건물 창문의 희미한 불빛만 있으며 햇빛과 낮의 밝은 하늘은 없다. 인물은 없다.",
+      "i18n_provenance": {
+        "visual_description": "62f098e3ea6c79a227ffa40a37126239"
+      },
+      "wide_shot": "https://pbiumddivadgbzxuymak.supabase.co/storage/v1/object/public/media/e17c6749-a1d2-4f10-a2f9-c35bb81b9492/18140f42-309e-4845-b97a-3c54d6fc2d0f/locations/v1-aa31ae0749ce3ab4617f2a0eb0cbdfa3ee928bc10c0a1f3b9906f6d717a101c1_v1-6d1622d0f2bc1a5dba81addf168d43afb5a0d0d0d86973bff39a546062f35301_wide_shot.png?v=1789021295156",
+      "created_at": "2026-09-10T06:20:01.998537+00:00",
+      "updated_at": "2026-09-10T06:21:35.156+00:00"
+    }
+  ]
+}
