@@ -38,7 +38,8 @@ import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { WriterResumeButton } from '@/components/layout/writer-resume-button'
-import { friendlyStageLabel, formatRemaining } from '@/lib/writer/stage-labels'
+import { writerProgressView } from '@/lib/writer/progress-view'
+import { summarizeRoughProgress } from '@/lib/writer/rough-progress'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { resolveEntityNames, manifestEntities } from '@/lib/writer/resolve-entity-names'
 import {
@@ -176,8 +177,6 @@ export function RoughStoryboardView() {
     mode: AddMode
     contextSceneId: string | null
   } | null>(null)
-  // 진행 중 단계 경과시간 라이브 표시(긴 단계에서 "멈춤" 오인 방지) — 1s 틱.
-  const [nowMs, setNowMs] = useState(0)
   // Director Storyboard와 같은 축척 단계·저장 규칙을 사용한다.
   const [zoomLevel, setZoomLevel] = useStoryboardZoom('writer:zoomLevel')
   const boardRef = useRef<HTMLDivElement>(null)
@@ -296,7 +295,7 @@ export function RoughStoryboardView() {
       force?: boolean,
       auto?: boolean,
       styleHints?: string[],
-    ): Promise<{ submitted: number; remaining: number; quota: boolean; done: Promise<unknown> } | null> => {
+    ): Promise<{ submitted: number; remaining: number; quota: boolean; confirmationPending?: boolean; done: Promise<unknown> } | null> => {
       if (!projectId) return null
       if (shotIds?.length) {
         // 클릭 즉시 피드백 — 서버가 in_flight skip 으로 응답하면 아래에서 정리됨
@@ -341,7 +340,12 @@ export function RoughStoryboardView() {
         const submitted = (j.data?.submitted ?? []) as Array<{
           shotId: string
           jobId: string
+          confirmationPending?: boolean
         }>
+        const confirmationPending = j.data?.confirmationPending === true || submitted.some((item) => item.confirmationPending)
+        if (confirmationPending) {
+          toast.info(translate(locale, 'Confirming the previous rough request. It will not be submitted again.'))
+        }
         if (auto) {
           const skipped = (j.data?.skipped ?? []) as Array<{ reason?: unknown }>
           const skippedByReason = skipped.reduce<Record<string, number>>((counts, item) => {
@@ -404,7 +408,7 @@ export function RoughStoryboardView() {
           )
             .filter((x) => x.reason === 'in_flight')
             .map((x) => x.shotId)
-          if (blocked.length) {
+          if (blocked.length && !confirmationPending) {
             setPanelJobs((prev) => {
               const next = { ...prev }
               for (const id of blocked) delete next[id]
@@ -522,6 +526,7 @@ export function RoughStoryboardView() {
           submitted: submitted.length,
           remaining: (j.data?.remaining as number | undefined) ?? 0,
           quota: false,
+          confirmationPending,
           // 이번 라운드 잡들의 종결(성공/실패 모두 위에서 상태 반영) — 펌프의 라운드 배리어.
           done: Promise.allSettled(polls),
         }
@@ -590,8 +595,9 @@ export function RoughStoryboardView() {
             await sleep(8000)
             continue
           }
-          if (r.submitted === 0) return // 전부 완료/제외 — 수렴
+          if (r.submitted === 0 && r.remaining <= 0) return // 전부 완료/제외 — 수렴
           await r.done
+          if (r.confirmationPending) return // 접수 여부가 불확실한 라운드는 새 요청으로 복구하지 않는다.
           // remaining<=0 이어도 바로 끝내지 않는다 — 다음 라운드가 이번 라운드 실패분을
           //   재제출할 기회(그 라운드 submitted 0 이면 그때 종료). give-up 게이트가 무한 재시도를 막는다.
         }
@@ -620,9 +626,8 @@ export function RoughStoryboardView() {
   const missingIds = shots
     .filter((s) => !panelOf(s) && !jobOf(s.shotId) && shotHasInfo(s.actionDescription))
     .map((s) => s.shotId)
-  const generatingCount = shots.filter(
-    (s) => jobOf(s.shotId)?.status === 'generating',
-  ).length
+  const roughProgress = summarizeRoughProgress(shots, overrides, panelJobs, queuedRoughIds)
+  const generatingCount = roughProgress.generating
   // 제목 아래 설명문은 제거(#c2 2026-07-14) — 카드 사용법은 첫 진입 브리핑 채팅이 안내한다.
   // 트리트먼트·대사 탭과 같은 자리의 도움말(#c4 2026-08-03) — 헤더 아래 한 줄.
   const headerDescription = t(
@@ -635,12 +640,6 @@ export function RoughStoryboardView() {
         zoomLevel={zoomLevel}
         onZoomLevelChange={setZoomLevel}
       />
-      {generatingCount > 0 && (
-        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Loader2 className="size-3.5 animate-spin" />
-          {t('{count} panels generating', { count: generatingCount })}
-        </span>
-      )}
       {missingIds.length > 0 && generatingCount === 0 && (
         <Button
           size="sm"
@@ -746,14 +745,6 @@ export function RoughStoryboardView() {
     return () => el.removeEventListener('wheel', onWheel)
   }, [hasShots, setZoomLevel])
 
-  // 진행 중일 때만 1초마다 현재 시각 갱신 → 현재 단계 경과시간 라이브 표시(shotCheck 등 100s+ 단계가 "멈춘" 듯 보이는 오인 방지).
-  useEffect(() => {
-    if (hasShots || !running) return
-    setNowMs(Date.now())
-    const t = setInterval(() => setNowMs(Date.now()), 1000)
-    return () => clearInterval(t)
-  }, [hasShots, running])
-
   // 보드 drag-to-scroll (빈 영역을 잡고 끌면 패닝). 버튼/입력 위에서 시작한 드래그는 무시.
   const handleBoardPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return
@@ -828,22 +819,14 @@ export function RoughStoryboardView() {
 
   // ── 파이프라인 진행 중 (샷이 아직 없음) ─────────────────────────────────
   if (!hasShots && running) {
-    const pct = Math.max(0, Math.min(100, status?.progress_percent ?? 0))
-    // 진행(경과) 시간은 계산만 하고 표시하지 않는다(#c4) — 남은 예상 시간 산출에만 사용.
-    //   실측 자체는 writer_runs(created_at/updated_at + state._timings)에 이미 영속된다.
-    const startedAtMs = status?.timings?.pipeline_started_at
-      ? Date.parse(status.timings.pipeline_started_at)
-      : null
-    const elapsedMs = startedAtMs != null ? Math.max(0, nowMs - startedAtMs) : null
-    const etaTotalMs = status?.eta_total_ms ?? null
-    const remainingMs =
-      etaTotalMs != null && elapsedMs != null ? etaTotalMs - elapsedMs : null
+    const progress = writerProgressView(status, locale)
+    const pct = progress.percent
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         <WriterHeader description={headerDescription} />
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
           <Loader2 className="size-6 animate-spin text-muted-foreground" aria-busy="true" />
-          <p className="text-base font-medium">{friendlyStageLabel(status?.current_stage, locale)}</p>
+          <p className="text-base font-medium">{progress.label}</p>
 
           {/* 진행률 바(#c3) — 우측에 % 병기 */}
           <div className="flex w-full max-w-md items-center gap-3">
@@ -859,17 +842,14 @@ export function RoughStoryboardView() {
                 style={{ width: `${pct}%` }}
               />
             </div>
-            <span className="w-10 shrink-0 text-right font-mono text-sm tabular-nums text-muted-foreground">
-              {pct}%
+            <span className="shrink-0 text-right font-mono text-xs tabular-nums text-muted-foreground">
+              {progress.countLabel}
             </span>
           </div>
 
-          {/* 남은 예상 시간 — 과거 실행 실측이 있을 때만(#c4, 기록 없으면 비움) */}
-          {remainingMs != null ? (
-            <p className="text-sm text-muted-foreground">{formatRemaining(remainingMs, locale)}</p>
-          ) : null}
+          <p className="text-xs text-muted-foreground">{progress.detail}</p>
           <p className="text-xs text-muted-foreground">
-            {t('Complex stages like shot design and validation can take 1-2 minutes.')}
+            {t('Steps take different amounts of time. Image generation follows separately.')}
           </p>
         </div>
       </div>
@@ -923,6 +903,16 @@ export function RoughStoryboardView() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <WriterHeader description={headerDescription} actions={storyboardActions} />
+      <div role="status" aria-label={t('Rough storyboard progress')} className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-border px-6 py-2 text-xs tabular-nums text-muted-foreground">
+        <span className="font-medium text-foreground">{t('Board total: {count} shots', { count: roughProgress.total })}</span>
+        <span>{t('Completed')} {roughProgress.completed}</span>
+        <span className="inline-flex items-center gap-1">
+          {generatingCount > 0 && <Loader2 className="size-3 animate-spin" />}
+          {t('Generating')} {roughProgress.generating}
+        </span>
+        <span>{t('Waiting')} {roughProgress.waiting}</span>
+        <span className={roughProgress.failed > 0 ? 'text-destructive' : undefined}>{t('Failed')} {roughProgress.failed}</span>
+      </div>
 
       {/* #coverage-first(2026-09-02 오너): 연출 점검 — 영상으로 넘어가기 전에 커버리지 결함
           (반응 없는 다인 비트·리빌 없는 시선 비트·감정 연쇄 단절·급전환)을 보여준다.

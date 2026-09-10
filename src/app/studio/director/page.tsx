@@ -1138,6 +1138,11 @@ function PaletteBar({
 // ────────────────────────────────────────────────────────────────────────────
 
 export default function DirectorCanvasPage() {
+  const handoffProjectId = useProjectStore((s) => s.projectId)
+  // 라우터 요청이 아닌 실제 Director 화면의 mount가 이동 완료를 확인한다.
+  useEffect(() => {
+    if (handoffProjectId) useGlobalChatStore.getState().confirmDirectorHandoff(handoffProjectId, '/studio/director')
+  }, [handoffProjectId])
   const t = useT()
   const viewMode = useDirectorCanvasStore((s) => s.viewMode)
   // 스토리보드 축척 — PaletteBar(컨트롤)와 StoryboardGridView(그리드·단축키)가 공유(#e-zoom-merge)

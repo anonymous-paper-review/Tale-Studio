@@ -39,6 +39,16 @@ const DEFAULT_LIGHTING = {
 
 const sceneSaveTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const shotSaveTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const writerSaveChains = new Map<string, Promise<void>>()
+
+async function serializeWriterSave(resource: string, projectId: string, id: string, save: () => Promise<void>) {
+  const key = `${resource}:${projectId}:${id}`
+  const previous = writerSaveChains.get(key) ?? Promise.resolve()
+  const next = previous.catch(() => undefined).then(save)
+  writerSaveChains.set(key, next)
+  try { await next } finally { if (writerSaveChains.get(key) === next) writerSaveChains.delete(key) }
+}
+
 
 function nextShotId(sceneId: string, existingShotIds: string[]): string {
   const match = sceneId.match(/sc_(\d+)/)
@@ -146,6 +156,7 @@ interface WriterState {
     opts?: { afterSceneId?: string | null; fields?: Partial<Scene> },
   ) => Promise<string | null>
   deleteScene: (sceneId: string) => Promise<void>
+  saveDialogueTranslation: (projectId: string, shot: Shot, lines: DialogueLine[]) => Promise<void>
   applyChatUpdates: (updates: WriterChatUpdate[]) => Promise<WriterApplyChatUpdatesResult>
   clearError: () => void
   reset: () => void
@@ -172,15 +183,11 @@ export const useWriterStore = create<WriterState>((set, get) => ({
 
     const existing = sceneSaveTimers.get(id)
     if (existing) clearTimeout(existing)
-    sceneSaveTimers.set(
-      id,
-      setTimeout(async () => {
-        const projectId = useProjectStore.getState().projectId
-        if (!projectId) return
-        const scene = get().sceneManifest?.scenes.find(
-          (s) => s.sceneId === id,
-        )
-        if (!scene) return
+    const projectId = useProjectStore.getState().projectId
+    const scene = get().sceneManifest?.scenes.find(s => s.sceneId === id)
+    if (!projectId || !scene) return
+    const timer = setTimeout(async () => {
+      try { await serializeWriterSave('scenes', projectId, id, async () => {
         const supabase = createClient()
         await supabase
           .from('scenes')
@@ -198,9 +205,9 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           })
           .eq('project_id', projectId)
           .eq('scene_id', id)
-        sceneSaveTimers.delete(id)
-      }, 500),
-    )
+      }) } finally { if (sceneSaveTimers.get(id) === timer) sceneSaveTimers.delete(id) }
+    }, 500)
+    sceneSaveTimers.set(id, timer)
   },
 
   updateShot: (id, changes) => {
@@ -219,32 +226,33 @@ export const useWriterStore = create<WriterState>((set, get) => ({
 
     const existing = shotSaveTimers.get(id)
     if (existing) clearTimeout(existing)
-    shotSaveTimers.set(
-      id,
-      setTimeout(async () => {
-        const projectId = useProjectStore.getState().projectId
-        if (!projectId) return
-        const shot = get().shots.find((s) => s.shotId === id)
-        if (!shot) return
+    const projectId = useProjectStore.getState().projectId
+    const shot = get().shots.find(s => s.shotId === id)
+    if (!projectId || !shot) return
+    const timer = setTimeout(async () => {
+      try { await serializeWriterSave('shots', projectId, id, async () => {
+        // 같은 프로젝트에서는 완료된 대사 저장을 포함한 최신 보드를 읽는다.
+        const savedShot = useProjectStore.getState().projectId === projectId
+          ? get().shots.find(current => current.shotId === id) ?? shot : shot
         const supabase = createClient()
         await supabase
           .from('shots')
           .update({
-            shot_type: shot.shotType,
+            shot_type: savedShot.shotType,
             // 편집은 유저 언어 → primary·_native 둘 다 native. 러프 라우트가 EN skip-or-derive. (S3b)
-            action_description: shot.actionDescription,
-            action_description_native: shot.actionDescription,
-            characters: shot.characters,
-            duration_seconds: shot.durationSeconds,
-            dialogue_lines: shot.dialogueLines,
-            generation_method: shot.generationMethod,
+            action_description: savedShot.actionDescription,
+            action_description_native: savedShot.actionDescription,
+            characters: savedShot.characters,
+            duration_seconds: savedShot.durationSeconds,
+            dialogue_lines: savedShot.dialogueLines,
+            generation_method: savedShot.generationMethod,
           })
           .eq('project_id', projectId)
           .eq('shot_id', id)
         void invalidateShots(projectId) // 사물함 표시 — 다른 화면의 다음 읽기가 새로 받게
-        shotSaveTimers.delete(id)
-      }, 500),
-    )
+      }) } finally { if (shotSaveTimers.get(id) === timer) shotSaveTimers.delete(id) }
+    }, 500)
+    shotSaveTimers.set(id, timer)
   },
 
   addShot: async (sceneId, opts) => {
@@ -541,6 +549,32 @@ export const useWriterStore = create<WriterState>((set, get) => ({
   // 채팅(/api/writer/chat)이 낸 검증된 updates 를 기존 CRUD 로 실행한다.
   //   LLM 은 add(scene→shot) → update → delete 순으로 배치하고, 같은 배치의 새 노드는 tempId 로 참조한다.
   //   각 update 는 best-effort — 하나 실패해도 나머지는 진행(에러는 store.error 로 표면화).
+  saveDialogueTranslation: async (projectId, original, lines) => {
+    if (isDemoSession()) throw new Error(translate(useLocaleStore.getState().locale, 'Editing is unavailable in a shared preview'))
+    const current = get().shots.find(shot => shot.shotId === original.shotId)
+    if (projectId !== useProjectStore.getState().projectId || !current) throw new Error(translate(useLocaleStore.getState().locale, 'The project or shot changed'))
+    if (JSON.stringify(current.dialogueLines) !== JSON.stringify(original.dialogueLines)) throw new Error(translate(useLocaleStore.getState().locale, 'The dialogue changed while translation was running'))
+    // 기존 화면 편집의 예약 저장도 같은 대사를 읽게 하되, 실제 성공 판정은 저장 응답까지 기다린다.
+    set(state => ({ shots: state.shots.map(shot => shot.shotId === current.shotId ? { ...shot, dialogueLines: lines } : shot) }))
+    try {
+      await serializeWriterSave('shots', projectId, current.shotId, async () => {
+        const { data, error } = await createClient().from('shots').update({ dialogue_lines: lines })
+          .eq('project_id', projectId).eq('shot_id', current.shotId).select('shot_id').maybeSingle()
+        if (error) throw new Error(error.message)
+        if (!data) throw new Error(translate(useLocaleStore.getState().locale, 'The project or shot changed'))
+      })
+    } catch (error) {
+      if (projectId === useProjectStore.getState().projectId) {
+        set(state => ({ shots: state.shots.map(shot => shot.shotId === current.shotId && JSON.stringify(shot.dialogueLines) === JSON.stringify(lines)
+          ? { ...shot, dialogueLines: original.dialogueLines } : shot) }))
+      }
+      throw error
+    }
+    if (projectId !== useProjectStore.getState().projectId) return
+    if (JSON.stringify(get().shots.find(shot => shot.shotId === current.shotId)?.dialogueLines) !== JSON.stringify(lines)) throw new Error(translate(useLocaleStore.getState().locale, 'The dialogue changed while translation was saving'))
+    await invalidateShots(projectId)
+  },
+
   applyChatUpdates: async (updates) => {
     const tempMap = new Map<string, string>() // tempId → 실제 id
     const pendingDialogueShrinks: WriterDialogueShrinkProposal[] = []

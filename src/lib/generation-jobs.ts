@@ -545,14 +545,14 @@ export async function listActiveGenerationJobs(
 }
 
 /**
- * 약속 D(2026-09-04): 핀·배지·버튼 숫자의 근거 행 — 최근 24h 의 잡(도는 것·끝난 것). 요약은 generation-batches 의
- *   순수 함수가 한다(클라·서버 공용). 500행 상한 — 배지·배치 창(2분)에는 충분하다.
+ * 진행 배치 숫자의 근거 행 — 최근 24h 의 잡(도는 것·끝난 것), 최대 500행.
+ *   미확인 완료 배지는 이 창을 쓰지 않고 listGenerationCompletionRows로 전체 완료를 읽는다.
  */
 export async function listRecentGenerationJobRows(projectId: string): Promise<GenerationBatchRow[]> {
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   const { data, error } = await supabaseAdmin
     .from('generation_jobs')
-    .select('id, kind, status, target, created_at, updated_at')
+    .select('id, kind, status, target, created_at, updated_at, completed_at')
     .eq('project_id', projectId)
     .gte('created_at', since)
     .order('created_at', { ascending: false })
@@ -565,7 +565,30 @@ export async function listRecentGenerationJobRows(projectId: string): Promise<Ge
     target: (row.target as GenerationJobTarget | null) ?? null,
     created_at: row.created_at as string,
     updated_at: (row.updated_at as string | null) ?? null,
+    completed_at: (row.completed_at as string | null) ?? null,
   }))
+}
+
+/** 아직 보지 않은 완료가 시간·행 상한 때문에 사라지지 않도록 성공 이력을 끝까지 읽는다. */
+export async function listGenerationCompletionRows(projectId: string, untilMs = Date.now()): Promise<GenerationBatchRow[]> {
+  const rows: GenerationBatchRow[] = []
+  const pageSize = 500
+  const until = new Date(untilMs).toISOString()
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabaseAdmin
+      .from('generation_jobs')
+      .select('id, kind, status, target, created_at, updated_at, completed_at')
+      .eq('project_id', projectId)
+      .eq('status', 'completed')
+      // 조회 도중 끝난 결과는 다음 조회에서 받는다. 완료 시각이 없는 예전 결과도 보존한다.
+      .or(`completed_at.lte.${until},completed_at.is.null`)
+      .order('completed_at', { ascending: true, nullsFirst: true })
+      .order('id', { ascending: true })
+      .range(offset, offset + pageSize - 1)
+    if (error) throw error
+    rows.push(...((data ?? []) as GenerationBatchRow[]))
+    if (!data || data.length < pageSize) return rows
+  }
 }
 
 /** queued 인 character_view main 잡 목록(클라가 [id] reconcile 로 마무리할 대상). */
@@ -589,6 +612,26 @@ export async function listQueuedMainJobs(
     }
   }
   return out
+}
+
+/** 새로고침 뒤 같은 배경 작업을 다시 발주하지 않고 확인할 모습별 작업 목록. */
+export async function listQueuedWorldShotJobs(
+  projectId: string,
+): Promise<Array<{ locationId: string; appearanceKey: string | null; jobId: string }>> {
+  const { data, error } = await supabaseAdmin
+    .from('generation_jobs')
+    .select('id, target')
+    .eq('project_id', projectId)
+    .eq('kind', 'world_shot')
+    .eq('status', 'queued')
+  if (error) throw error
+  if (!data) throw new Error('generation job queued-world query returned no data')
+  return data.flatMap((row) => {
+    const target = (row.target ?? {}) as GenerationJobTarget
+    return target.locationId && target.column === 'wide_shot'
+      ? [{ locationId: target.locationId, appearanceKey: target.appearanceKey && target.appearanceKey !== 'default' ? target.appearanceKey : null, jobId: row.id as string }]
+      : []
+  })
 }
 
 /**

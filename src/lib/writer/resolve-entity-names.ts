@@ -18,6 +18,12 @@ function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+/** 일반 낱말의 접두를 장소·인물 참조로 오인하지 않는 정확한 토큰 조회. */
+export function containsEntityToken(text: string, value: string): boolean {
+  if (!value.trim()) return false
+  return new RegExp(`(?<![\\p{L}\\p{N}_])${escapeRegExp(value.trim())}(?![A-Za-z0-9_])`, 'iu').test(text)
+}
+
 /** id 를 이름으로 바꾼 문장. 대응하는 이름이 없으면 원문 그대로(모르는 건 지어내지 않는다). */
 export function resolveEntityNames(
   text: string | null | undefined,
@@ -32,11 +38,14 @@ export function resolveEntityNames(
     const id = e.id.trim().toLowerCase()
     if (!id) continue
     byId.set(id, e.name.trim())
+  }
+  // 정확한 등록 ID를 모두 먼저 채운다. 다른 인물의 별칭이 실제 ID를 덮어쓰지 않는다.
+  for (const [id, name] of [...byId]) {
     // `char_3` 로 저장돼 있어도 실제 id 가 `character_3` 인(혹은 그 반대인) 경우를 함께 받는다.
     const alias = id.replace(/^character_/, 'char_').replace(/^location_/, 'loc_')
-    if (alias !== id) byId.set(alias, e.name.trim())
+    if (alias !== id && !byId.has(alias)) byId.set(alias, name)
     const expanded = id.replace(/^char_/, 'character_').replace(/^loc_/, 'location_')
-    if (expanded !== id) byId.set(expanded, e.name.trim())
+    if (expanded !== id && !byId.has(expanded)) byId.set(expanded, name)
   }
   if (byId.size === 0) return text
 

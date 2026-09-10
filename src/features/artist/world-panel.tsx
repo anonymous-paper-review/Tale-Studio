@@ -29,6 +29,8 @@ export function WorldPanel({
     generatingLocations,
     worldFailures,
     selectLocation,
+    selectedLocationAppearances,
+    selectLocationAppearance,
   } = useArtistStore()
 
   const [viewDialog, setViewDialog] = useState<{
@@ -37,7 +39,6 @@ export function WorldPanel({
     appearanceKey: string | null
   } | null>(null)
   // 약속 C10: 카드 안에서 고른 모습(기본 = 'default'). 캐릭터 카드의 pickedAppearance 와 같다.
-  const [pickedAppearance, setPickedAppearance] = useState<Record<string, string>>({})
   const [createFor, setCreateFor] = useState<string | null>(null)
 
   // 입력창에 @멘션돼 있는 카드 하이라이트(#artist-mention) — mentionItems 의 id = locationId.
@@ -77,12 +78,12 @@ export function WorldPanel({
         >
           {worldAssets.map((world) => {
             const scene = getScene(world.sceneId)
-            const isGenerating = generatingLocations.includes(world.locationId)
             const isSelected = selectedLocationId === world.locationId
             // 약속 C10: 고른 모습(탭). 기본 모습은 배경 자체, 변형은 appearances 의 행.
-            const pickedKey = pickedAppearance[world.locationId] ?? DEFAULT_LOCATION_APPEARANCE_KEY
+            const pickedKey = selectedLocationAppearances[world.locationId] ?? DEFAULT_LOCATION_APPEARANCE_KEY
             const variant = pickedKey !== DEFAULT_LOCATION_APPEARANCE_KEY ? (world.appearances ?? []).find((a) => a.appearanceKey === pickedKey) ?? null : null
             const variantKey = variant ? variant.appearanceKey : null
+            const isGenerating = generatingLocations.includes(worldFailureKey(world.locationId, variantKey))
             const shownImage = variant ? variant.wideShot : world.wideShot
             // 약속 B7·B8: 설명이 바뀐 뒤 재생성 전이면 "설명 바뀜", 최근 생성이 실패했으면 "이미지 실패".
             const candidates = variant ? variant.candidates : (world.candidates ?? [])
@@ -145,7 +146,7 @@ export function WorldPanel({
                       {t('Description changed')}
                     </Badge>
                   )}
-                  {scene && (
+                  {scene && !variant && (
                     <Badge variant="outline" className="text-[10px]">
                       {scene.timeOfDay}
                     </Badge>
@@ -160,7 +161,8 @@ export function WorldPanel({
                       <button
                         key={ap.appearanceKey}
                         type="button"
-                        onClick={() => setPickedAppearance((prev) => ({ ...prev, [world.locationId]: ap.appearanceKey }))}
+                        onClick={() => selectLocationAppearance(world.locationId, ap.appearanceKey)}
+                        aria-pressed={active}
                         className={cn(
                           'rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors',
                           active ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-accent',
@@ -194,7 +196,7 @@ export function WorldPanel({
                     label={t('Background')}
                     aspectRatio="video"
                     imageUrl={shownImage}
-                    generating={isGenerating && !shownImage}
+                    generating={isGenerating}
                     hideCaption
                   />
                 </button>

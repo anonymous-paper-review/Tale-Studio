@@ -12,7 +12,7 @@ import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { WriterCharacterPanel } from '@/features/writer/writer-character-panel'
 import type { WriterStatus } from '@/lib/writer/use-writer-status'
 import { useWriterPreview } from '@/lib/writer/use-writer-preview'
-import { friendlyStageLabel, formatRemaining } from '@/lib/writer/stage-labels'
+import { writerProgressView } from '@/lib/writer/progress-view'
 import { useLocale, useT } from '@/lib/i18n'
 
 // 확정 게이트 재등록 주기(#fix-scene-gate-suggestion-resurface 2026-08-25) — status 폴링(3s)과
@@ -34,13 +34,6 @@ export function WriterGenerationView({
   const t = useT()
   const { preview } = useWriterPreview(projectId)
 
-  // 남은 시간 카운트다운용 1s 틱.
-  const [nowMs, setNowMs] = useState(() => Date.now())
-  useEffect(() => {
-    const t = setInterval(() => setNowMs(Date.now()), 1000)
-    return () => clearInterval(t)
-  }, [])
-
   // #f2 드래그(2026-08-27 오너): 포인터 캡처 방식(에디터 DnD 관례) — 카드 아무 곳이나 잡고 이동,
   //   컨테이너 안으로 클램프, 위치는 localStorage('writer:progressCardPos') 에 기억한다.
   const dashRef = useRef<HTMLDivElement>(null)
@@ -51,7 +44,12 @@ export function WriterGenerationView({
       const raw = localStorage.getItem('writer:progressCardPos')
       if (raw) {
         const v = JSON.parse(raw) as { x?: number; y?: number }
-        if (typeof v.x === 'number' && typeof v.y === 'number') setCardPos({ x: v.x, y: v.y })
+        if (typeof v.x === 'number' && typeof v.y === 'number') {
+          const position = { x: v.x, y: v.y }
+          // 브라우저에 저장된 위치는 첫 프레임에서 복원하고, 이탈하면 예약을 해제한다.
+          const frame = requestAnimationFrame(() => setCardPos(position))
+          return () => cancelAnimationFrame(frame)
+        }
       }
     } catch {
       /* 저장값 없음/파손 → 중앙 기본 */
@@ -88,17 +86,10 @@ export function WriterGenerationView({
     })
   }
 
-  const pct = Math.max(0, Math.min(100, status?.progress_percent ?? 0))
-  // 단계 문구·ETA 는 UI 언어 (#c-locale — locale 미지정 시 ko 폴백이라 en UI 에서 한국어가 샜다)
   const locale = useLocale()
-  const startedAtMs = status?.timings?.pipeline_started_at
-    ? Date.parse(status.timings.pipeline_started_at)
-    : null
-  const elapsedMs = startedAtMs != null ? Math.max(0, nowMs - startedAtMs) : null
-  const etaTotalMs = status?.eta_total_ms ?? null
-  const remainingMs =
-    etaTotalMs != null && elapsedMs != null ? etaTotalMs - elapsedMs : null
-  const phrase = friendlyStageLabel(status?.current_stage, locale)
+  const progress = writerProgressView(status, locale)
+  const pct = progress.percent
+  const phrase = progress.detail
   // #s3-gate: storyCheck 후 씬 확정 대기 — 진행 바 대신 게이트 패널.
   const awaiting = status?.current_status === 'awaiting_confirmation'
 
@@ -185,11 +176,13 @@ export function WriterGenerationView({
             >
               <div className="flex items-center gap-2">
                 <Loader2 className="size-4 shrink-0 animate-spin text-primary" aria-busy="true" />
-                <span className="truncate text-sm font-medium">{phrase}</span>
+                <span className="text-sm font-medium">{progress.label}</span>
               </div>
+              <p className="mt-2 text-xs text-muted-foreground">{phrase}</p>
               <div className="mt-3 flex items-center gap-3">
                 <div
                   role="progressbar"
+                  aria-label={progress.label}
                   aria-valuenow={pct}
                   aria-valuemin={0}
                   aria-valuemax={100}
@@ -200,15 +193,7 @@ export function WriterGenerationView({
                     style={{ width: `${pct}%` }}
                   />
                 </div>
-                <span className="w-10 shrink-0 text-right font-mono text-sm tabular-nums text-muted-foreground">
-                  {pct}%
-                </span>
               </div>
-              {remainingMs != null ? (
-                <p className="mt-2 text-right text-xs text-muted-foreground">
-                  {formatRemaining(remainingMs, locale)}
-                </p>
-              ) : null}
             </div>
           </div>
         )}

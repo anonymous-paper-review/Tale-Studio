@@ -5,7 +5,7 @@
 //   "생성 중" 플래그를 들고 있다가 unmount 에 잃어버리는 대신, 다들 이 진실을 pull 한다.
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
-import { listActiveGenerationJobs, listRecentGenerationJobRows, userOwnsProject } from '@/lib/generation-jobs'
+import { listActiveGenerationJobs, listGenerationCompletionRows, listRecentGenerationJobRows, userOwnsProject } from '@/lib/generation-jobs'
 import { completionsOf, summarizeGenerationBatches } from '@/lib/generation-batches'
 import { VIDEO_JOB_KINDS } from '@/lib/generation-quota'
 import { PROJECT_VIDEO_GENERATION_LIMIT } from '@/lib/plan-limits'
@@ -53,7 +53,9 @@ export async function GET(req: Request) {
   // 약속 D(2026-09-04): 핀 "n/N"·왼쪽 탭 숫자·Director 버튼 숫자의 단일 근거 — 서버 큐에서 파생한 배치와 완료 기록.
   const recentRows = await listRecentGenerationJobRows(projectId)
   const batches = summarizeGenerationBatches(recentRows)
-  const completions = completionsOf(recentRows)
+  // 미확인 완료는 최근 진행 배치와 달리 하루가 지났거나 500건을 넘어도 남아야 한다.
+  const completionRows = await listGenerationCompletionRows(projectId)
+  const completions = completionsOf(completionRows)
   // 스테이지를 떠난 동안 완료된 잡은 클라의 prev active 목록에 한 번도 잡히지 않는다.
   // 복귀 마운트에서만 최근 완료·미반영 잡을 받아 DB 재수화 뒤 ui_reflected 를 찍는다.
   // 평상시 4초 active 폴링에는 쿼리 2개를 더하지 않도록 opt-in 이다(#a2-stage-away).

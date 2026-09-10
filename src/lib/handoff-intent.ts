@@ -84,6 +84,25 @@ function normalize(text: string): string {
   return text.toLowerCase().replace(/\s+/g, '')
 }
 
+// 이 함수는 대화 전체를 해석하는 에이전트가 아니라 즉시 이동하는 빠른 경로다.
+// 확인된 부정·질문·인용 표현은 일반 채팅에 남긴다. 모든 자연어의 의도 판정을 보장하지 않는다.
+function hasNonRequestContext(text: string): boolean {
+  if (/[?？]/.test(text)) return true
+  const compact = normalize(text)
+  if (/(?:하지|넘기지|넘어가지|보내(?:주)?지|넘겨(?:주)?지|가지)(?:는)?(?:마|말|않)/.test(compact)) return true // i18n-ok: 사용자 한국어 입력을 인식하는 패턴이며 화면 문구가 아니다.
+  if (/(?:안|못)(?:넘|보내|가|이동|할|해|돼|되)|보류|취소|금지|중지|멈춰|그만|나중/.test(compact)) return true // i18n-ok: 사용자 한국어 입력을 인식하는 패턴이며 화면 문구가 아니다.
+  if (/방법|설명|어떻게|무엇|뭐가|왜|가능|(?:넘어가|이동해|넘겨)도(?:돼|되)/.test(compact)) return true // i18n-ok: 사용자 한국어 입력을 인식하는 패턴이며 화면 문구가 아니다.
+  return /\b(?:don['’]?t|do\s+not|never|not|stop|cancel|avoid|wait|hold\s+off|how|what|why|when|where|whether|explain)\b/i.test(text)
+}
+
+function omitQuotedRequests(text: string): string {
+  return text.replace(
+    /```[\s\S]*?```|`[^`]*`|"[^"]*"|“[^”]*”|‘[^’]*’|「[^」]*」|『[^』]*』|(?<![A-Za-z])'[^'\n]*'/g,
+    // "Director"처럼 이름만 감싼 경우는 그대로 두고, 이동 문장이 인용된 경우에만 제외한다.
+    (quoted) => MOVE_WORDS.some((word) => normalize(quoted).includes(word)) ? '' : quoted,
+  )
+}
+
 /**
  * 이 stage 에서 "다음 단계로 넘어가자"고 말했는가.
  * 이동 동사 + (대상 스테이지 이름 | "다음 단계") 를 모두 만족해야 한다 — 둘 중 하나만으로는
@@ -92,9 +111,51 @@ function normalize(text: string): string {
 export function matchHandoffIntent(text: string, stage: StageId): HandoffSpec | null {
   const spec = handoffFrom(stage)
   if (!spec) return null
-  const t = normalize(text)
+  const request = omitQuotedRequests(text)
+  if (hasNonRequestContext(request)) return null
+  const t = normalize(request)
   if (!MOVE_WORDS.some((w) => t.includes(normalize(w)))) return null
   const mentionsTarget = STAGE_WORDS[spec.to].some((w) => t.includes(normalize(w)))
   const mentionsNextStep = NEXT_STEP_WORDS.some((w) => t.includes(w))
   return mentionsTarget || mentionsNextStep ? spec : null
+}
+
+/** Writer의 명시적 Director 요청. 모델의 이동 예고를 실행 근거로 사용하지 않는다. */
+export function resolveDirectorHandoffIntent(
+  text: string,
+  stage: StageId,
+  history: ReadonlyArray<{ role: 'user' | 'model'; content: string }>,
+): { mode: 'check' | 'move' | 'whenReady' } | null {
+  if (stage !== 'writer') return null
+  const request = omitQuotedRequests(text)
+  const compact = normalize(request)
+  // i18n-ok: 한국어 이동 의도 인식이며 사용자에게 출력하는 문구가 아니다.
+  const cancelled = (value: string) => /(?:하지|넘기지|넘겨(?:주)?지|넘어가지|보내(?:주)?지)(?:는)?(?:마|말|않)|취소|보류|나중|그만/.test(normalize(value)) || /\b(?:cancel|never|stop|don['’]?t|do\s*not)\b/i.test(value) // i18n-ok: 입력의 취소 표현을 판별한다.
+  if (cancelled(request)) return null
+  // 대사 통일은 별도의 저장 완료 경로가 소유한다.
+  if (/(?:번역|translate)|(?:대사|한국어|korean).*(?:맞추|바꾸|통일|수정|고치)/i.test(compact)) return null // i18n-ok: 복합 수정 요청 구분.
+  if (!MOVE_WORDS.some(word => compact.includes(word)) && !/넘길|갈수|갈수잇|can.*(?:go|move)/i.test(compact)) return null // i18n-ok: 자연어 이동 표현.
+  const namedStage = (value: string) => {
+    const normalized = normalize(value)
+    const mentions = (Object.keys(STAGE_WORDS) as StageId[]).flatMap(target => STAGE_WORDS[target]
+      .filter(word => normalized.includes(word))
+      .map(word => ({ target, index: normalized.lastIndexOf(word), destination: normalized.includes(`${word}로`) || normalized.includes(`${word}으로`) || normalized.includes(`to${word}`) }))) // i18n-ok: 목적격 단계 이름을 출발 단계보다 우선한다.
+    return mentions.sort((a, b) => Number(b.destination) - Number(a.destination) || b.index - a.index)[0]?.target
+  }
+  let target = namedStage(request)
+  if (!target) {
+    // ‘넘겨줘’·‘다 되면 넘겨줘’만 앞선 사용자 목적지를 이어받는다.
+    if (!/^(?:(?:그럼|응|네|이제|바로|다되면|다끝나면|완료되면|준비되면)[,.!]?)*(?:넘겨(?:줘|주세요)|넘기자|보내줘|이동해줘)[.!?]*$/.test(compact)) return null // i18n-ok: 대상 생략 이동 요청.
+    for (const message of [...history].reverse()) {
+      if (message.role !== 'user') continue
+      const previous = omitQuotedRequests(message.content)
+      if (cancelled(previous)) return null
+      target = namedStage(previous)
+      if (target) break
+    }
+  }
+  if (target !== 'director') return null
+  if (/[?？]|수\s*있|수\s*잇|수\s*없|가능|왜|어떻게|\b(?:can|could|why|how)\b/i.test(request)) return { mode: 'check' } // i18n-ok: 확인 질문은 완료 후 이동 예약에도 우선한다.
+  if (/다되면|다끝나면|완료되면|준비되면|when.*(?:ready|done|finished)/i.test(compact)) return { mode: 'whenReady' } // i18n-ok: 준비 완료 후 이동 요청.
+  return { mode: 'move' }
 }

@@ -91,16 +91,18 @@ function pickDialogueLines(
   if (!Array.isArray(src)) return undefined
   const entries = src
     .filter(
-      (line): line is Record<string, unknown> & { characterId: string; text: string } =>
+      (line): line is Record<string, unknown> & { characterId: string | null; text: string } =>
         line !== null &&
         typeof line === 'object' &&
-        typeof (line as { characterId?: unknown }).characterId === 'string' &&
+        ((line as { characterId?: unknown }).characterId === null ||
+          typeof (line as { characterId?: unknown }).characterId === 'string') &&
         typeof (line as { text?: unknown }).text === 'string',
     )
     // 화자 화이트리스트(#F-003 R1) — 발명된 화자의 대사는 대사째 드롭(화자만 바꿔치기하면
     //   남의 입에 대사를 넣는다). 명시적 [] 의 "전체 삭제" 의미는 아래 기존 규칙이 보존.
     .filter((line) => {
-      if (!allowedCharacterIds || allowedCharacterIds.has(line.characterId)) return true
+      // null은 발명된 인물이 아니라 기존 대사 계약의 내레이션(V.O.)이다.
+      if (line.characterId === null || !allowedCharacterIds || allowedCharacterIds.has(line.characterId)) return true
       droppedCharacterIds?.push(line.characterId)
       return false
     })

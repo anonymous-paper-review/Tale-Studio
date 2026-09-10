@@ -11,6 +11,8 @@ import { displayNameOf } from '@/lib/display-name';
 import { requireProjectAccess } from '@/lib/api/guard';
 import { getActiveRun } from '@/lib/writer/run-store';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { parseAppLocale, pickContentLocale, type AppLocale } from '@/lib/locale';
+import { resolveEntityNames } from '@/lib/writer/resolve-entity-names';
 import type { StoryScene, DecoupagePlan } from '@/lib/writer/types/pipeline';
 import type { WriterV2Package } from '@/lib/writer/v2/semantic-unit';
 
@@ -23,6 +25,7 @@ interface PreviewState {
   scenes?: { scenes?: StoryScene[] };
   decoupage?: DecoupagePlan;
   characters?: { characters?: Array<{ id?: string; name?: string; role?: string }> };
+  dramaturgy?: { world_inventory?: Array<{ id?: string; name?: string }> };
   world?: { locations?: Array<{ id?: string; name?: string }> };
   worldVisual?: { locations?: Array<{ id?: string; name?: string }> };
   v2Package?: WriterV2Package;
@@ -41,6 +44,7 @@ interface PreviewCharacter {
   name: string;
   role: string;
   description: string;
+  descriptionFallback: boolean;
   /** 카드용 정면샷(portrait). 없으면 templateUrl 폴백은 클라 몫. */
   portraitUrl: string | null;
   /** 클릭 팝업용 캐릭터 템플릿(기본 모습 시트). */
@@ -59,6 +63,13 @@ function pushRoster(
       out.push({ slug: r.id, name: displayNameOf(r.name, r.id) });
     }
   }
+}
+
+function previewDescription(base: string | null | undefined, native: string | null | undefined, locale: AppLocale) {
+  const original = base?.trim() ?? '';
+  const translated = native?.trim() ?? '';
+  const description = locale === 'ko' ? translated || original : original || translated;
+  return { description, descriptionFallback: locale === 'ko' && !/[가-힣]/.test(description) && !!description }; // i18n-ok: 표시 설명의 한글 포함 여부 판정
 }
 
 export async function GET(
@@ -124,18 +135,18 @@ export async function GET(
     pushRoster(roster, seen, state.worldVisual?.locations);
     pushRoster(roster, seen, state.world?.locations);
 
-    // 프로젝트 표시 locale — 샷 이야기 라인의 언어 필터(구형 run 의 EN 라인 숨김)에 사용.
-    let locale = 'en';
+    // 화면과 같은 콘텐츠 언어 계약: 잠긴 프로젝트 언어 우선, 미잠금은 요청한 화면 언어.
+    const uiLocale = parseAppLocale(req.nextUrl.searchParams.get('locale')) ?? 'en';
+    let locale: AppLocale = uiLocale;
     try {
-      const { data } = await supabaseAdmin.from('projects').select('locale').eq('id', projectId).maybeSingle();
-      locale = ((data?.locale as string) ?? 'en').trim() || 'en';
+      const { data } = await supabaseAdmin.from('projects').select('locale,locale_locked').eq('id', projectId).maybeSingle();
+      locale = pickContentLocale({ projectLocale: parseAppLocale(data?.locale), locked: data?.locale_locked ?? null, uiLocale });
     } catch {
-      // locale 조회 실패 → 'en' (스크립트 검출 없음 → native 병기 필드만 통과)
+      // 조회가 실패하면 현재 화면 언어를 사용한다.
     }
 
     // #s3-gate(2026-08-05): 샷 단위 이야기(#shot-story) 노출 중단 — 게이트 검토 대상은 씬 스토리다
     //   (요구: "shot 스토리 제거"). 필드는 클라 호환용으로 빈 배열 유지 — 토글이 자연히 숨는다.
-    void locale; // isTargetScript 소비처가 빠지며 남은 locale — worlds 병기 등 후속 소비 전까지 유지
 
     // 스토리 본문 = 씬별 scene_actions(네이티브 서사 비트). 씬 헤딩/요약/대사/연출은 제외.
     const rawScenes = state.scenes?.scenes ?? [];
@@ -154,7 +165,7 @@ export async function GET(
         .eq('project_id', projectId),
       supabaseAdmin
         .from('character_appearances')
-        .select('character_id,appearance,portrait_url,sheet_url')
+        .select('character_id,appearance,appearance_native,portrait_url,sheet_url')
         .eq('project_id', projectId)
         .eq('is_default', true),
     ]);
@@ -163,12 +174,14 @@ export async function GET(
 
     const appearancesByCharacterId = new Map<string, Array<{
       appearance?: string | null;
+      appearance_native?: string | null;
       portrait_url?: string | null;
       sheet_url?: string | null;
     }>>();
     for (const row of (appearancesRes.data ?? []) as Array<{
       character_id?: string;
       appearance?: string | null;
+      appearance_native?: string | null;
       portrait_url?: string | null;
       sheet_url?: string | null;
     }>) {
@@ -195,29 +208,37 @@ export async function GET(
         id: character.character_id,
         name: displayNameOf(character.name, character.character_id),
         role: character.role ?? '',
-        description: appearance.appearance ?? '',
+        ...previewDescription(appearance.appearance, appearance.appearance_native, locale),
         portraitUrl: appearance.portrait_url ?? null,
         templateUrl: appearance.sheet_url ?? null,
       };
     });
 
     // #p3b 쇼케이스: 배경(locations) 텍스트 카드 — writer 뒷단(v2)이 서술을 채우면 점진 노출.
-    let worlds: Array<{ id: string; name: string; description: string }> = [];
+    let worlds: Array<{ id: string; name: string; description: string; descriptionFallback: boolean }> = [];
     try {
       const { data: locRows } = await supabaseAdmin
         .from('locations')
-        .select('location_id, name, visual_description')
+        .select('location_id, name, visual_description, visual_description_native')
         .eq('project_id', projectId);
       worlds = (locRows ?? [])
         .map((r) => ({
           id: (r.location_id as string) ?? '',
           name: displayNameOf((r.name as string) ?? '', (r.location_id as string) ?? ''),
-          description: ((r.visual_description as string) ?? '').trim(),
+          ...previewDescription(r.visual_description, r.visual_description_native, locale),
         }))
         .filter((w) => w.id && w.name);
     } catch {
       // best-effort — 배경 카드는 부가 정보
     }
+
+    // 저장된 전체 로스터도 읽는다. 대표 씬 장소가 아닌 등록 장소와 늦게 추가된 인물을 빠뜨리지 않는다.
+    pushRoster(roster, seen, characters);
+    pushRoster(roster, seen, worlds);
+    // 과거 실행에서 본문에만 등장한 장소도 당시 기록된 이름으로 표시한다. 확정된 이름이 우선이다.
+    pushRoster(roster, seen, state.dramaturgy?.world_inventory);
+    const entities = roster.map((entry) => ({ id: entry.slug, name: entry.name }));
+    for (const scene of scenes) scene.beats = scene.beats.map((beat) => resolveEntityNames(beat, entities));
 
     return NextResponse.json(
       {

@@ -67,8 +67,13 @@ export function resolveStageCommit(): void {
 }
 
 type DocumentWithVT = Document & {
-  startViewTransition?: (update: () => Promise<void> | void) => { finished: Promise<void> }
+  startViewTransition?: (update: () => Promise<void> | void) => {
+    finished: Promise<void>
+    ready?: Promise<void>
+    updateCallbackDone?: Promise<void>
+  }
 }
+let activeStageTransition: object | null = null
 
 /**
  * 세로 연속 슬라이드로 스테이지를 전환한다. 방향을 <html data-stage-nav> 로 지정해
@@ -85,14 +90,37 @@ export function startStageViewTransition(direction: SlideDirection, navigate: ()
   }
   doc.documentElement.dataset.stageNav = direction
   stageNavMemory.viaViewTransition = true
-  const vt = doc.startViewTransition(() => {
-    navigate()
-    return createStageCommitWaiter()
-  })
-  void vt.finished.finally(() => {
+  const token = {}
+  activeStageTransition = token
+  let commitDone: (() => void) | null = null
+  let navigated = false
+  const cleanup = () => {
+    if (stageNavMemory.resolveCommit === commitDone) stageNavMemory.resolveCommit = null
+    commitDone?.()
+    if (activeStageTransition !== token) return
+    activeStageTransition = null
     delete doc.documentElement.dataset.stageNav
     stageNavMemory.viaViewTransition = false
-  })
+  }
+  try {
+    const vt = doc.startViewTransition(() => {
+      const committed = createStageCommitWaiter()
+      commitDone = stageNavMemory.resolveCommit
+      navigated = true
+      navigate()
+      return committed
+    })
+    // ready·updateCallbackDone도 독립적으로 거절된다. 연출 실패는 미처리 오류로 전파하지 않는다.
+    void vt.ready?.catch(() => {})
+    void vt.updateCallbackDone?.catch(() => {})
+    // finally가 만든 새 거절 Promise를 버리지 않고 성공/실패 양쪽에서 정리한다.
+    void vt.finished.then(cleanup, cleanup)
+  } catch (error) {
+    cleanup()
+    // 연출 시작 자체가 실패해도 이동한다. 이미 실행한 라우터 호출은 반복하지 않는다.
+    if (navigated) throw error
+    navigate()
+  }
 }
 
 /** 현재 경로 → 목적 경로의 방향을 계산해 전환한다 — 사이드바·채팅 핸드오프 공용 진입점. */

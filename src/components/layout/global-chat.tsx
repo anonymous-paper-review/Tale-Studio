@@ -82,7 +82,6 @@ import { buildChatSections } from '@/lib/chat-sections'
 import { buildChatBlocks, groupStatusStacks, parseAttachmentMarker, parseHandoffMarker } from '@/lib/chat-blocks'
 import {
   CASCADE_STEP_MS,
-  EPHEMERAL_SETTLE_MS,
   navigateWithStageSlide,
 } from '@/lib/stage-transition'
 import { useT } from '@/lib/i18n'
@@ -124,42 +123,6 @@ function defaultUtterance(texts: Attachment[], images: Attachment[], t: ReturnTy
     parts.push(t('Uploaded {names}. Please read them and put together a story.', { names }))
   }
   return parts.join(' ') || t('Please check the attached files.')
-}
-
-// 이 세션에서 이미 타이핑 연출을 재생한 suggestion id — 재렌더/스테이지 왕복 시 재생 방지(#b1).
-const typedSuggestionIds = new Set<string>()
-
-/** 에이전트 제안 말풍선의 타이핑(캐스케이드) 연출 — 전체 출력 5초 미만 보장(#b1). */
-function TypewriterMarkdown({ id, text }: { id: string; text: string }) {
-  const [shown, setShown] = useState(() =>
-    typedSuggestionIds.has(id) ? text.length : 0,
-  )
-  useEffect(() => {
-    if (typedSuggestionIds.has(id)) return
-    typedSuggestionIds.add(id)
-    // 글자당 ~14ms, 최소 600ms·최대 4.5초(5초 미만). rAF로 진행률 기반 부드럽게.
-    const total = text.length
-    const duration = Math.min(4500, Math.max(600, total * 14))
-    const start = performance.now()
-    let raf = 0
-    let done = false
-    const tick = (now: number) => {
-      const p = Math.min(1, (now - start) / duration)
-      setShown(Math.ceil(p * total))
-      if (p < 1) raf = requestAnimationFrame(tick)
-      else done = true
-    }
-    raf = requestAnimationFrame(tick)
-    return () => {
-      cancelAnimationFrame(raf)
-      // 완주 전에 정리되면(StrictMode 이중 실행·중도 unmount) 가드를 되돌려 재생 가능하게.
-      //   없으면 dev StrictMode에서 2번째 effect가 가드에 걸려 0자에서 멈춘다.
-      if (!done) typedSuggestionIds.delete(id)
-    }
-  }, [id, text])
-  return (
-    <MarkdownText className="whitespace-pre-wrap" text={text.slice(0, shown)} />
-  )
 }
 
 /**
@@ -471,10 +434,19 @@ export function GlobalChat() {
   const loadMessages = useGlobalChatStore((s) => s.loadMessages)
   const suggestion = useGlobalChatStore((s) => s.suggestion)
   const pendingNavigatePath = useGlobalChatStore((s) => s.pendingNavigatePath)
+  const directorHandoff = useGlobalChatStore((s) => s.directorHandoff)
   const dismissSuggestion = useGlobalChatStore((s) => s.dismissSuggestion)
   const pendingProposal = useGlobalChatStore((s) => s.pendingProposal)
   const approvePendingProposal = useGlobalChatStore((s) => s.approvePendingProposal)
   const dismissPendingProposal = useGlobalChatStore((s) => s.dismissPendingProposal)
+  const deferPendingProposal = useGlobalChatStore((s) => s.deferPendingProposal)
+  const deferSuggestion = useGlobalChatStore((s) => s.deferSuggestion)
+  const deferredProposals = useGlobalChatStore((s) => s.deferredProposals)
+  const deferredSuggestions = useGlobalChatStore((s) => s.deferredSuggestions)
+  const executingProposalIds = useGlobalChatStore((s) => s.executingProposalIds)
+  const restorePendingProposal = useGlobalChatStore((s) => s.restorePendingProposal)
+  const cancelDeferredProposal = useGlobalChatStore((s) => s.cancelDeferredProposal)
+  const restoreSuggestion = useGlobalChatStore((s) => s.restoreSuggestion)
   const t = useT()
 
   const router = useRouter()
@@ -489,21 +461,6 @@ export function GlobalChat() {
     storeStage
   const projectId = useProjectStore((s) => s.projectId)
 
-  // 탭 전환 직후엔 임시 요소(제안·승인 카드·워밍 팁)를 숨겼다가 1초 뒤 계단식으로 등장
-  //   (#chat-settle 2026-08-03). 진입 즉시 이들이 그려지면 스레드가 밀리며 "채팅방이 다시
-  //   조립된다"로 읽힌다 — 잠깐의 정적 후 순서대로 나타나면 방은 그대로 있고 에이전트가
-  //   말을 거는 것으로 읽힌다. (stage 전환 감지는 set-state-in-render 패턴)
-  const [stageSettled, setStageSettled] = useState(false)
-  const [settledStage, setSettledStage] = useState(currentStage)
-  if (currentStage !== settledStage) {
-    setSettledStage(currentStage)
-    setStageSettled(false)
-  }
-  useEffect(() => {
-    if (stageSettled) return
-    const t = setTimeout(() => setStageSettled(true), EPHEMERAL_SETTLE_MS)
-    return () => clearTimeout(t)
-  }, [stageSettled, settledStage])
   // 폭 리사이즈 + 접기 (chat-ui-store, persist)
   const chatWidth = useChatUiStore((s) => s.chatWidth)
   const collapsed = useChatUiStore((s) => s.collapsed)
@@ -618,20 +575,29 @@ export function GlobalChat() {
   useEffect(() => {
     if (!pendingNavigatePath) return
     useGlobalChatStore.setState({ pendingNavigatePath: null })
-    navigateWithStageSlide(pathname, pendingNavigatePath, () => router.push(pendingNavigatePath))
+    try {
+      navigateWithStageSlide(pathname, pendingNavigatePath, () => router.push(pendingNavigatePath))
+    } catch {
+      useGlobalChatStore.getState().failDirectorHandoff()
+    }
   }, [pendingNavigatePath, router, pathname])
 
-  // 새 메시지·stage 이동 시 스레드 끝으로. stage 를 넣는 이유는 이동하면 끝에 "지금" 구간
-  //   구분선이 새로 붙기 때문 — 같은 방이 이어졌다는 표식이 화면 안에 들어와야 의미가 있다.
   useEffect(() => {
-    // 에이전트가 말을 걸었으면 사용자가 위로 올려 읽던 중이어도 끝으로 다시 붙인다(아래 stick 참조).
-    stickRef.current = true
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-    // stageSettled: 1초 뒤 계단식으로 등장하는 제안/승인 카드(#chat-settle)가 스레드 끝에
-    //   붙으므로, 나타나는 순간 끝까지 따라가야 화면 밖에서 조용히 뜨지 않는다.
-    // suggestion/proposal id(2026-08-06): 핸드오프 등 제안은 messages 에 안 실려 이 effect 가
-    //   안 돌았다 — 위로 스크롤해 둔 상태에서 제안이 화면 밖(아래)에 조용히 떠 놓치는 문제.
-  }, [messages.length, loading, currentStage, stageSettled, suggestion?.id, pendingProposal?.id])
+    if (!directorHandoff || directorHandoff.projectId !== projectId) return
+    if (directorHandoff.phase === 'waiting') {
+      if (loading) return
+      const timer = setTimeout(() => { void useGlobalChatStore.getState().resumeDirectorHandoff() }, 4_000)
+      return () => clearTimeout(timer)
+    }
+    if (directorHandoff.phase !== 'navigating') return
+    const timer = setTimeout(() => useGlobalChatStore.getState().failDirectorHandoff(), 15_000)
+    return () => clearTimeout(timer)
+  }, [directorHandoff, pathname, projectId, loading])
+
+  // 새 대화는 하단을 보고 있을 때만 따라간다. 탭 이동은 읽던 위치를 바꾸지 않는다.
+  useEffect(() => {
+    if (stickRef.current) chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages.length, loading, suggestion?.id, pendingProposal?.id])
 
   // 끝에 붙어 따라가기 (#chat-autoscroll 2026-08-11).
   //   위 effect 는 "블록이 추가된 순간" 한 번만 스크롤한다. 그런데 핸드오프·제안 말풍선은
@@ -914,7 +880,7 @@ export function GlobalChat() {
     await sendMessage(msg, {
       imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
       thumbUrls,
-    })
+    }, { stageOverride: currentStage })
     // #attach-loud-fail(2026-08-24): 이미지 턴이 응답 없이 실패하면(모델 말풍선 미증가 + error)
     //   첨부를 복원한다 — 슬라이스는 이미 스토리지에 있으니 파일부터 다시 올리게 하지 않는다.
     const after = useGlobalChatStore.getState()
@@ -961,7 +927,7 @@ export function GlobalChat() {
     if (action.kind === 'handoff') {
       dismissSuggestion()
       // D12(2026-08-31 오너): 명시 버튼("Writer 호출하기")이 곳 동의다 — 승인 카드를 또 띄우지 않는다.
-      await sendMessage(action.utterance, undefined, { consentedHandoff: true })
+      await sendMessage(action.utterance, undefined, { consentedHandoff: true, stageOverride: suggestion?.stage })
       return
     }
     const path = await handoffToStage(action.targetStage)
@@ -1151,13 +1117,13 @@ export function GlobalChat() {
     const opt = choices.options.find((o) => o.label === selectedChoice)
     if (!opt) return
     dismissSuggestion()
-    void sendMessage(opt.utterance)
+    void sendMessage(opt.utterance, undefined, { stageOverride: currentStage })
   }
   const handleFreeformSend = () => {
     const text = freeformText.trim()
     if (!text || loading) return
     dismissSuggestion()
-    void sendMessage(text)
+    void sendMessage(text, undefined, { stageOverride: currentStage })
   }
 
   // 선택지 키보드 조작 (#choices-keys 2026-08-07) — Claude Code CLI 의 AskUserQuestion 문법 차용:
@@ -1224,8 +1190,8 @@ export function GlobalChat() {
   // 계단식 등장(#chat-settle) — settle 후 보이는 임시 블록이 위에서부터 CASCADE_STEP_MS 간격으로
   //   나타난다. fill-mode backwards: 자기 차례 전까지 첫 키프레임(투명)에 머문다.
   const showSuggestion =
-    stageSettled && !!suggestion && suggestion.stage === currentStage && !choices
-  const showProposal = stageSettled && !!pendingProposal && pendingProposal.stage === currentStage
+    !!suggestion?.action && suggestion.action.kind !== 'choices' && !choices
+  const showProposal = !!pendingProposal
   let cascadeSlots = 0
   const suggestionSlot = showSuggestion ? cascadeSlots++ : 0
   const proposalSlot = showProposal ? cascadeSlots++ : 0
@@ -1271,8 +1237,8 @@ export function GlobalChat() {
       e.preventDefault()
       e.stopPropagation()
       if (e.key === 'Escape') {
-        if (proposalOpen && pendingProposal) dismissPendingProposal(pendingProposal.id)
-        else if (suggestion?.dismissible !== false) dismissSuggestion()
+        if (proposalOpen && pendingProposal) deferPendingProposal(pendingProposal.id)
+        else if (suggestion?.dismissible !== false) deferSuggestion()
         return
       }
       if (proposalOpen) void handlePendingProposalApprove()
@@ -1383,7 +1349,7 @@ export function GlobalChat() {
         <ScrollArea className="min-h-0 flex-1 px-4 py-3">
           <div className="space-y-2">
 
-            {sections.map((section, si) => (
+            {sections.filter(section => section.messages.length > 0).map((section, si) => (
               <section
                 key={`${section.stage}-${si}`}
                 className={cn('space-y-2', si > 0 && 'pt-2')}
@@ -1515,14 +1481,6 @@ export function GlobalChat() {
                     className="tale-beam-once pointer-events-none absolute inset-0 rounded-2xl"
                   />
                 )}
-                <RolePlate stage={suggestion.stage} />
-                <div className="px-1 text-xs leading-relaxed text-foreground">
-                  <TypewriterMarkdown
-                    key={suggestion.id}
-                    id={suggestion.id}
-                    text={scrubProse(suggestion.content)}
-                  />
-                </div>
                 {/* 씬 게이트(#gate-to-chat) — 확정 한 번으로 안 끝나는 결정이라 캡슐 버튼 대신
                     피드백 입력 + 확정/수정 두 갈래를 여기서 렌더한다(생성 화면 하단 바에서 이사). */}
                 {suggestion.action?.kind === 'confirmScenes' ? (
@@ -1546,7 +1504,7 @@ export function GlobalChat() {
                       </Button>
                     ) : null}
                     {suggestion.dismissible !== false && (
-                      <Button size="sm" variant="ghost" className="rounded-full" onClick={() => dismissSuggestion()}>
+                      <Button size="sm" variant="ghost" className="rounded-full" onClick={deferSuggestion}>
                         {t('Later')}
                       </Button>
                     )}
@@ -1596,9 +1554,12 @@ export function GlobalChat() {
                     size="sm"
                     variant="ghost"
                     className="w-full rounded-full"
-                    onClick={() => dismissPendingProposal(pendingProposal.id)}
+                    onClick={() => deferPendingProposal(pendingProposal.id)}
                   >
                     {t('Later')}
+                  </Button>
+                  <Button size="sm" variant="ghost" className="w-full rounded-full" onClick={() => dismissPendingProposal(pendingProposal.id)}>
+                    {t('Cancel request')}
                   </Button>
                   <div className="flex justify-center">
                     <KeyHint dismissible />
@@ -1609,6 +1570,29 @@ export function GlobalChat() {
             <div ref={chatEndRef} />
           </div>
         </ScrollArea>
+
+        {(deferredProposals.length > 0 || deferredSuggestions.length > 0) && (
+          <details className="shrink-0 border-t border-border px-4 py-2 text-xs">
+            <summary className="cursor-pointer text-muted-foreground">{t('Saved for later')} ({deferredProposals.length + deferredSuggestions.length})</summary>
+            <div className="mt-2 max-h-36 space-y-2 overflow-auto">
+              {deferredProposals.map(proposal => (
+                <div key={proposal.id} className="flex items-start justify-between gap-2">
+                  <span className="min-w-0 whitespace-pre-wrap">{proposal.target}<br /><span className="text-muted-foreground">{proposal.action}</span></span>
+                  <div className="flex shrink-0 flex-col gap-1">
+                    <Button size="sm" variant="outline" disabled={!!pendingProposal || executingProposalIds.includes(proposal.id)} onClick={() => restorePendingProposal(proposal.id)}>{t('Reopen')}</Button>
+                    <Button size="sm" variant="ghost" onClick={() => cancelDeferredProposal(proposal.id)}>{t('Cancel remaining tasks')}</Button>
+                  </div>
+                </div>
+              ))}
+              {deferredSuggestions.map(item => (
+                <div key={item.id} className="flex items-start justify-between gap-2">
+                  <span className="min-w-0">{item.content}</span>
+                  <Button size="sm" variant="outline" disabled={suggestion?.dismissible === false} onClick={() => restoreSuggestion(item.id)}>{t('Reopen')}</Button>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
 
         {error && (
           <button

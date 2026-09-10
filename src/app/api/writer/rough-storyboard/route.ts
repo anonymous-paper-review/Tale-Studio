@@ -9,9 +9,9 @@ import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { requireProjectAccess } from '@/lib/api/guard'
-import { falImageSubmit, DEFAULT_EDIT_IMAGE_MODEL, DEFAULT_IMAGE_MODEL } from '@/lib/writer/llm/fal'
+import { DEFAULT_EDIT_IMAGE_MODEL, DEFAULT_IMAGE_MODEL } from '@/lib/writer/llm/fal'
+import { submitRoughStoryboardGrid } from '@/lib/writer/rough-submit'
 import {
-  createGenerationJob,
   AUTO_GENERATION_GIVE_UP_THRESHOLD,
   STALE_QUEUED_MS,
   getGenerationJobById,
@@ -48,11 +48,7 @@ import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events'
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
-// queued 잡이 webhook 유실(서버리스 fire-and-forget 종료 등)로 영영 미해결로 남으면, in_flight 가드가
-//   그 샷의 재생성을 영구 차단한다(아래 루프에서 force 보다 먼저 검사 → 사람이 눌러도 skip). fal 잡은
-//   maxDuration(60s) 안에 끝나므로, 이보다 한참 오래된 queued 는 버려진 것으로 보고 in_flight 에서 제외한다
-//   (2026-06-26, shot_9 가 stuck queued 로 재생성이 막혀 "검은 화면 그대로"이던 버그). 정상 중복 방지는 유지.
-//   TTL 값은 generation_jobs 상태/lock 집계와 공유한다(STALE_QUEUED_MS).
+// 최근 queued 조회는 빠른 화면 안내용이다. 실제 중복 접수는 시간 제한 없이 예약 RPC가 막는다.
 
 // force 재생성 1회가 fal 에 물어볼 잡 수 상한 — 회수는 잡당 조회+finalize 라 무겁다(maxDuration 60s).
 const RECONCILE_ON_FORCE_CAP = 4
@@ -212,8 +208,8 @@ export async function POST(req: Request) {
       { data: scenes },
       { data: locations },
       { data: chars },
-      { data: queuedJobs },
-      { data: failedJobs },
+      { data: queuedJobs, error: queuedError },
+      { data: failedJobs, error: failedError },
       specByShotId,
     ] = await Promise.all([
         supabaseAdmin
@@ -237,7 +233,7 @@ export async function POST(req: Request) {
           .eq('project_id', projectId),
         supabaseAdmin
           .from('generation_jobs')
-          .select('id, target')
+          .select('id, target, request_id')
           .eq('project_id', projectId)
           .eq('kind', 'shot_rough_storyboard')
           .eq('status', 'queued')
@@ -252,6 +248,9 @@ export async function POST(req: Request) {
           .eq('status', 'failed'),
         loadShotDesignByMainId(projectId),
       ])
+    if (queuedError) throw queuedError
+    if (failedError) throw failedError
+    if (!queuedJobs || !failedJobs) throw new Error('Rough generation history could not be verified')
 
     const sceneById = new Map((scenes ?? []).map((s) => [s.scene_id as string, s]))
     // scene.location 은 location_id (오픈캐스트: 원문 텍스트가 곧 id). 그 로케이션의 visual_description 을
@@ -281,11 +280,13 @@ export async function POST(req: Request) {
     )
     // 샷 → 그 샷을 막고 있는 queued 잡 id. force 재생성일 때 이 잡을 fal 진실로 회수한다(#a1-inflight-block).
     const inFlightJobByShot = new Map<string, string>()
+    const pendingConfirmationShots = new Set<string>()
     for (const j of queuedJobs ?? []) {
       const t = j.target as { writerShotId?: string; writerShotIds?: string[] }
       // 그리드 잡(writerShotIds, #rough-grid)과 구 단일 잡(writerShotId) 모두 중복 방지 대상.
       for (const id of [...(t?.writerShotIds ?? []), ...(t?.writerShotId ? [t.writerShotId] : [])]) {
         if (!inFlightJobByShot.has(id)) inFlightJobByShot.set(id, j.id as string)
+        if (j.request_id?.startsWith('reserved:')) pendingConfirmationShots.add(id)
       }
     }
     const inFlight = new Set(inFlightJobByShot.keys())
@@ -313,8 +314,10 @@ export async function POST(req: Request) {
     // 실패 누적 횟수(샷별) — safeMode 파생 + give-up 게이트(임계값 이상이면 자율 재생성 멈춤).
     const failCountByShot = new Map<string, number>()
     for (const j of failedJobs ?? []) {
-      const id = (j.target as { writerShotId?: string })?.writerShotId
-      if (id) failCountByShot.set(id, (failCountByShot.get(id) ?? 0) + 1)
+      const target = j.target as { writerShotId?: string; writerShotIds?: string[] }
+      for (const id of new Set([...(target?.writerShotIds ?? []), ...(target?.writerShotId ? [target.writerShotId] : [])])) {
+        failCountByShot.set(id, (failCountByShot.get(id) ?? 0) + 1)
+      }
     }
 
     const wanted = shotIds?.length
@@ -327,10 +330,12 @@ export async function POST(req: Request) {
       jobId: string
       promptSource: 'shotDesign' | 'db_fallback' | 'llm_rewrite'
       safeMode: boolean
+      confirmationPending?: boolean
     }> = []
     const skipped: Array<{
       shotId: string
       reason: 'exists' | 'in_flight' | 'gave_up' | 'no_info'
+      confirmationPending?: boolean
     }> = []
     const eligible: NonNullable<typeof shots> = []
     for (const s of wanted) {
@@ -343,7 +348,7 @@ export async function POST(req: Request) {
         continue
       }
       if (inFlight.has(shotId)) {
-        skipped.push({ shotId, reason: 'in_flight' })
+        skipped.push({ shotId, reason: 'in_flight', ...(pendingConfirmationShots.has(shotId) ? { confirmationPending: true } : {}) })
         continue
       }
       if (!force && s.rough_storyboard) {
@@ -378,7 +383,7 @@ export async function POST(req: Request) {
     }
     const cappedChunks = chunkPlan.slice(0, MAX_GRID_JOBS_PER_CALL)
     const plannedCount = cappedChunks.reduce((n, c) => n + c.length, 0)
-    const remaining = eligible.length - plannedCount
+    let remaining = eligible.length - plannedCount
     const skippedByReason = skipped.reduce<Record<string, number>>((counts, item) => {
       counts[item.reason] = (counts[item.reason] ?? 0) + 1
       return counts
@@ -603,9 +608,6 @@ export async function POST(req: Request) {
         prompt = `Create the storyboard sheet yourself on clean paper (no reference image available), matching the panel layout described below, then fill it.\n\n${prompt}`
       }
 
-      await recordWriterObservabilityEvent(projectId, 'fal_submit_started', {
-        shotCount: chunk.length,
-      })
       // #blockout(2026-09-03, 무대 진단서 3번): 무대 배치(screen_layout)가 있는 샷이 하나라도 있으면 열별 START/END
       //   배치도 시트를 그려 두 번째 참조로 준다. 실패는 참조 없이 진행(로그) — 러프 생성을 막지 않는다.
       let blockoutUrl: string | null = null
@@ -638,77 +640,47 @@ export async function POST(req: Request) {
           blockoutUrl = null
         }
       }
-      let falResult: { request_id: string; model: string; fal_key_id: string }
-      try {
-        falResult = await falImageSubmit(
-          templateUrl
-            ? {
-                model: DEFAULT_EDIT_IMAGE_MODEL, // gpt-image-2/edit — 템플릿 칸에 그려 넣기
-                prompt,
-                reference_image_urls: blockoutUrl ? [templateUrl, blockoutUrl] : [templateUrl],
-                // 포맷 시트는 캔버스 명시(=템플릿 치수, #sheet-formats) / 레거시는 미전달 →
-                //   image_size 'auto' (reference 비율 유지 — crop 좌표 정합의 핵심, 종전 그대로)
-                ...(sheetGeom.roughImageSize ? { image_size: sheetGeom.roughImageSize } : {}),
-                webhookUrl,
-              }
-            : {
-                model: DEFAULT_IMAGE_MODEL, // T2I 폴백 (dev)
-                prompt,
-                aspect_ratio: (() => {
-                  const [w, h] = sheetGeom.repaintCanvas.split('x').map(Number)
-                  return w > h ? '16:9' : w < h ? '9:16' : '1:1'
-                })(),
-                webhookUrl,
-              },
-        )
-      } catch (error) {
-        await recordWriterObservabilityEvent(projectId, 'fal_submit_failed', {
-          shotCount: chunk.length,
-          error: error instanceof Error ? error.message : String(error),
-        })
-        throw error
-      }
-      const { request_id, model, fal_key_id } = falResult
       const chunkShotIds = chunk.map((s) => s.shot_id as string)
-      const job = await createGenerationJob({
+      const result = await submitRoughStoryboardGrid({
         projectId,
-        requestId: request_id,
-        model,
-        falKeyId: fal_key_id,
-        kind: 'shot_rough_storyboard',
-        target: {
-          workspaceId: project.workspace_id,
-          writerShotIds: chunkShotIds,
-          gridVariant,
-        },
-        inputSnapshot: {
-          prompt,
-          gridVariant,
-          shotIds: chunkShotIds,
-          templateUrl,
+        workspaceId: project.workspace_id,
+        userId: access.userId!,
+        shotIds: chunkShotIds,
+        gridVariant,
+        force,
+        snapshot: {
+          prompt, gridVariant, shotIds: chunkShotIds, templateUrl,
           ...(blockoutUrl ? { blockoutUrl } : {}),
-          // 포맷 시트를 썼을 때만 기록 — finalize 크롭이 같은 좌표·프레임 축을 복원 (#sheet-formats)
           sheet_format: sheetGeom.roughImageSize ? projectFormat : null,
         },
+        options: templateUrl
+          ? {
+              model: DEFAULT_EDIT_IMAGE_MODEL, prompt,
+              reference_image_urls: blockoutUrl ? [templateUrl, blockoutUrl] : [templateUrl],
+              ...(sheetGeom.roughImageSize ? { image_size: sheetGeom.roughImageSize } : {}),
+              webhookUrl,
+            }
+          : {
+              model: DEFAULT_IMAGE_MODEL, prompt,
+              aspect_ratio: (() => {
+                const [w, h] = sheetGeom.repaintCanvas.split('x').map(Number)
+                return w > h ? '16:9' : w < h ? '9:16' : '1:1'
+              })(),
+              webhookUrl,
+            },
       })
-      await recordWriterObservabilityEvent(projectId, 'fal_submit_accepted', {
-        jobId: job.id,
-        requestId: request_id,
-        model,
-        shotCount: chunk.length,
-      })
-      for (const s of chunk) {
-        const shotId = s.shot_id as string
-        submitted.push({
-          shotId,
-          jobId: job.id,
-          promptSource: translatedSpecs.get(shotId) ? 'shotDesign' : 'db_fallback',
-          safeMode: false,
-        })
+      for (const receipt of result.submitted) {
+        if (submitted.some((item) => item.shotId === receipt.shotId)) continue
+        submitted.push({ ...receipt, promptSource: translatedSpecs.get(receipt.shotId) ? 'shotDesign' : 'db_fallback', safeMode: false })
       }
+      for (const shotId of result.exists) skipped.push({ shotId, reason: 'exists' })
     }
 
-    return NextResponse.json({ ok: true, data: { submitted, skipped, remaining } })
+    // 예약 단계에서 다른 요청의 완료/부분 선점이 확인되면 미접수 대상은 다음 라운드에 남긴다.
+    const settledDuringReservation = new Set(skipped.filter((item) => item.reason === 'exists').map((item) => item.shotId))
+    remaining = eligible.filter((shot) => !submitted.some((item) => item.shotId === shot.shot_id) && !settledDuringReservation.has(shot.shot_id as string)).length
+    const confirmationPending = submitted.some((item) => item.confirmationPending) || skipped.some((item) => item.confirmationPending)
+    return NextResponse.json({ ok: true, data: { submitted, skipped, remaining, ...(confirmationPending ? { confirmationPending: true } : {}) } })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     if (debugProjectId) {

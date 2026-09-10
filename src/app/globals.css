@@ -190,9 +190,9 @@
   --popover: oklch(0.222 0 0);
   --popover-foreground: oklch(1 0 0);
 
-  /* Primary: #E50914 (Netflix Red) */
-  --primary: oklch(0.537 0.234 29.23);
-  --primary-foreground: oklch(1 0 0);
+  /* MVP-01 검수안: 정상 진행은 중립 전경색, 삭제/오류는 destructive. */
+  --primary: var(--foreground);
+  --primary-foreground: var(--background);
 
   /* Secondary: #1a1a1a */
   --secondary: oklch(0.185 0 0);
@@ -213,7 +213,7 @@
   --border: oklch(0.278 0 0);
   --input: oklch(0.278 0 0);
   /* Ring: #E50914 */
-  --ring: oklch(0.537 0.234 29.23);
+  --ring: var(--primary);
   /* Canvas edge sources of truth: muted blue by default, muted purple when selected. */
   --edge-default: oklch(0.7 0.06 250);
   --edge-selected: oklch(0.72 0.07 300);
@@ -231,7 +231,7 @@
      밝아진 레일 위에서 눌린 것처럼 어두워져 elevation 이 뒤집힌다. */
   --sidebar: oklch(0.255 0 0);
   --sidebar-foreground: oklch(1 0 0);
-  --sidebar-primary: oklch(0.537 0.234 29.23);
+  --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: oklch(1 0 0);
   --sidebar-accent: oklch(0.315 0 0);
   --sidebar-accent-foreground: oklch(1 0 0);

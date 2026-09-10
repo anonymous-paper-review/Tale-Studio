@@ -134,6 +134,7 @@ interface WriterPipelineStatusLike {
   pipeline_failed: boolean
   current_status: string | null
   current_stage: string | null
+  engine?: 'v1' | 'v2'
   completed_units?: number
   total_units?: number
 }

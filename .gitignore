@@ -217,3 +217,10 @@ research/experiments/_viewer.html
 /feedback/
 /runs/**
 .env*
+
+# MVP feedback verification scripts
+!scripts/check-mvp-dialogue-ui.mjs
+!scripts/check-mvp-feedback-followup-ui.mjs
+!scripts/check-mvp-feedback-ui.mjs
+!scripts/test-rough-reservation-db.mjs
+!scripts/test-rough-reservation-dev-db.mjs

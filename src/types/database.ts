@@ -2221,6 +2221,24 @@ export type Database = {
           video_clip_id: string
         }[]
       }
+      reserve_rough_storyboard_grid: {
+        Args: {
+          p_force?: boolean
+          p_grid_variant: string
+          p_input_snapshot: Json
+          p_model: string
+          p_project_id: string
+          p_shot_ids: string[]
+          p_user_id: string
+          p_workspace_id: string
+        }
+        Returns: {
+          confirmation_pending: boolean
+          job_id: string
+          shot_ids: string[]
+          state: string
+        }[]
+      }
       set_director_video_final: {
         Args: {
           p_final: boolean

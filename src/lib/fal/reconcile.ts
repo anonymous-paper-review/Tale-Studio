@@ -141,6 +141,8 @@ export async function reconcileJobFromFal(
   //   terminalizeJob 이 hold 반환까지 맡는다(연결형은 markDirectorVideoAttemptFailed,
   //   비연결형은 releaseTakesForJob).
   if (job.request_id.startsWith('reserved:')) {
+    // 러프도 접수 응답을 잃었을 수 있다. 시간 경과만으로 실패 처리하면 같은 샷이 다시 발주된다.
+    if (job.kind === 'shot_rough_storyboard') return job
     // #batch-resume: 접수 뒤 연결 기록만 잃었을 수도 있다. 일괄은 저장한 증표로 복구하며,
     //   시간만으로 미제출이라 단정해 환급하거나 다른 키로 다시 제출하지 않는다.
     if (job.batch_id) return job

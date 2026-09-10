@@ -2,7 +2,7 @@
 //
 //   기본 모습 = locations 행(키 'default'), 변형 = location_appearances 행. 새 변형은 만든 직후 기본 배경을 참조해
 //   이미지를 자동 생성한다(오너 C4). Writer/Director 는 씬의 서사 시점과 같은 변형에 이미지가 있으면 그것을 쓴다.
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { NextRequest } from 'next/server'
@@ -25,7 +25,8 @@ vi.mock('@/lib/api/quota', () => ({ quotaRejectionResponse: () => new Response('
 vi.mock('@/lib/style-anchor', () => ({ resolveStyleAnchor: async () => null }))
 vi.mock('@/lib/artist/world-submit', () => ({ submitWorldShotJob: mocks.submitWorldShotJob }))
 vi.mock('@/lib/chat-trace-server', () => ({ chatTraceBelongsToProject: async () => true }))
-vi.mock('@/lib/chat-trace', () => ({ isChatTraceId: (v: unknown) => typeof v === 'string' }))
+vi.mock('@/lib/chat-trace', async (original) => ({ ...await original<typeof import('@/lib/chat-trace')>(), isChatTraceId: (v: unknown) => typeof v === 'string' }))
+vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTrace: vi.fn(), saveChatTracePatch: vi.fn(), loadLatestChatTrace: vi.fn() }))
 vi.mock('@/lib/generation-jobs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/generation-jobs')>()
   return {
@@ -48,10 +49,12 @@ import { resolveLocationAppearanceForScene, resolveSceneWorldRefs } from '@/lib/
 import { extractLocationAppearanceCreations, validateUpdates } from '@/lib/artist/chat-updates'
 import { useArtistStore, worldFailureKey } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
+import { useGlobalChatStore } from '@/stores/global-chat-store'
 import type { WorldAsset } from '@/types/asset'
 
 const ROOT = process.cwd()
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
+const originalGenerateWorldShot = useArtistStore.getState().generateWorldShot
 
 function chain(result: unknown, single?: unknown) {
   const value: Record<string, unknown> = {}
@@ -86,8 +89,14 @@ beforeEach(() => {
   mocks.listFailedWorldShotJobs.mockResolvedValue([])
   mocks.countFailedJobsForTarget.mockResolvedValue(0)
   mocks.submitWorldShotJob.mockResolvedValue({ id: 'job-1' })
-  useProjectStore.setState({ projectId: 'project-1' })
-  useArtistStore.setState({ worldAssets: [world()], sceneManifest: null, generatingLocations: [], error: null })
+  useGlobalChatStore.getState().reset()
+  useProjectStore.setState({ projectId: 'project-1', currentStage: 'artist', projectLocale: 'ko', projectLocaleLocked: true })
+  useArtistStore.setState({ generateWorldShot: originalGenerateWorldShot, worldAssets: [world()], sceneManifest: null, generatingLocations: [], error: null })
+})
+afterEach(() => {
+  useArtistStore.setState({ generateWorldShot: originalGenerateWorldShot })
+  useGlobalChatStore.getState().reset()
+  vi.unstubAllGlobals()
 })
 
 describe('약속 C — 배경도 캐릭터와 같은 모습(타임라인) 탭을 갖는다', () => {
@@ -137,19 +146,79 @@ describe('약속 C — 배경도 캐릭터와 같은 모습(타임라인) 탭을
     expect(mocks.hasQueuedWorldShotJob).toHaveBeenCalledWith('p', 'market', 'wide_shot', 'burned')
   })
 
-  it('채팅에서 배경의 새 모습을 만들어 달라고 하면 승인 뒤 추가되고, 특정 모습만 다시 그릴 수 있다', () => {
+  it('채팅에서 배경의 새 모습을 만들어 달라고 하면 승인 뒤 추가되고, 특정 모습만 다시 그릴 수 있다', async () => {
     const raw = [
-      { type: 'createLocationAppearance', locationId: 'market', label: '불탄 뒤', visualDescription: '불탄 시장', narrativeTime: 'future' },
+      { type: 'createLocationAppearance', locationId: 'market', label: '겨울', visualDescription: '눈 덮인 시장', narrativeTime: 'past' },
       { type: 'regenerateWorldAsset', locationId: 'market', appearanceKey: 'burned' },
     ]
     expect(validateUpdates(raw)).toEqual([{ type: 'regenerateWorldAsset', locationId: 'market', appearanceKey: 'burned' }])
-    expect(extractLocationAppearanceCreations(raw)).toEqual([{ locationId: 'market', label: '불탄 뒤', visualDescription: '불탄 시장', narrativeTime: 'future' }])
-    const store = read('src/stores/global-chat-store.ts')
-    expect(store).toMatch(/kind: 'artistCreateLocationAppearance'/)
-    expect(store).toMatch(/createLocationAppearance\(locationId, label, visualDescription, time, \{ generate: true, actor: 'chat' \}\)/)
-    expect(read('src/app/api/artist/chat/route.ts')).toMatch(/"type":"createLocationAppearance"/)
-    // regenerateWorldAsset(appearanceKey) 는 그 변형만 다시 그린다.
-    expect(read('src/stores/artist-store.ts')).toMatch(/generateWorldShot\(u\.locationId, 'wideShot', undefined, 'chat', undefined, \{ appearanceKey: variantKey \}\)/)
+    expect(extractLocationAppearanceCreations(raw)).toEqual([{ locationId: 'market', label: '겨울', visualDescription: '눈 덮인 시장', narrativeTime: 'past' }])
+    // 왜: 새 모습 저장·생성을 승인 전에 실행하지 않고, 재생성은 고른 변형에만 반영하는지 실제로 확인한다.
+    const rows = chain({ data: [{ appearance_key: 'burned' }], error: null }, { data: { appearance_key: 'appearance' }, error: null })
+    mocks.from.mockImplementation((table: string) => table === 'projects'
+      ? chain({ data: { workspace_id: 'ws', style_anchor_key: null }, error: null })
+      : table === 'locations'
+        ? chain({ data: { location_id: 'market', wide_shot: 'https://x/market.png' }, error: null })
+        : rows)
+    mocks.submitWorldShotJob.mockResolvedValueOnce({ id: 'winter-job' }).mockResolvedValueOnce({ id: 'burned-job' })
+    useArtistStore.setState({ sceneManifest: {
+      characters: [], scenes: [],
+      locations: [{ locationId: 'market', name: '네온 시장', visualDescription: 'neon market at night', timeOfDay: 'night', lightingDirection: 'neon signs', lightingSources: [], styleDescription: '', props: [], purpose: '' }],
+    } })
+    const createdRequests: unknown[] = []
+    const generationRequests: unknown[] = []
+    let chatResponse: Record<string, unknown> = { reply: '시장의 겨울 모습을 확인해 주세요.', updates: [], locationAppearanceCreations: extractLocationAppearanceCreations(raw) }
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/artist/chat') return Response.json(chatResponse)
+      if (url === '/api/artist/location-appearance') {
+        const body = JSON.parse(String(init?.body))
+        createdRequests.push(body)
+        return createAppearance(req(url, body, 'POST'))
+      }
+      if (url === '/api/artist/generate-world') {
+        const body = JSON.parse(String(init?.body))
+        generationRequests.push(body)
+        return generateWorld(req(url, body, 'POST'))
+      }
+      if (url.startsWith('/api/generation-jobs/')) return Response.json({ data: { status: 'completed', resultUrl: `https://images.test/${url.split('/').at(-1)}.png`, error: null } })
+      if (url.startsWith('/api/artist/generation-status')) return Response.json({ failures: [], worldFailures: [] })
+      throw new Error(`Unexpected request: ${url}`)
+    }))
+    await useGlobalChatStore.getState().sendMessage('네온 시장의 겨울 모습을 만들어줘')
+    const creation = useGlobalChatStore.getState().pendingProposal!
+    expect(creation).toMatchObject({ stage: 'artist', kind: 'artistCreateLocationAppearance', target: '네온 시장', payload: extractLocationAppearanceCreations(raw)[0] })
+    expect(createdRequests).toHaveLength(0)
+    expect(generationRequests).toHaveLength(0)
+    expect(mocks.submitWorldShotJob).not.toHaveBeenCalled()
+    await expect(useGlobalChatStore.getState().approvePendingProposal(creation.id)).resolves.toBe(true)
+    expect(createdRequests).toEqual([{ projectId: 'project-1', locationId: 'market', label: '겨울', visualDescription: '눈 덮인 시장', narrativeTime: 'past' }])
+    expect((rows.insert as ReturnType<typeof vi.fn>).mock.calls.map(call => call[0])).toEqual([expect.objectContaining({ project_id: 'project-1', location_id: 'market', label: '겨울', narrative_time: 'past' })])
+    expect(generationRequests).toEqual([expect.objectContaining({ projectId: 'project-1', locationId: 'market', appearanceKey: 'appearance', column: 'wide_shot', actor: 'chat' })])
+    const afterCreation = useArtistStore.getState().worldAssets[0]
+    expect(afterCreation.wideShot).toBe(world().wideShot)
+    expect(afterCreation.appearances?.find(appearance => appearance.appearanceKey === 'appearance')).toMatchObject({ label: '겨울', narrativeTime: 'past', visualDescription: '눈 덮인 시장', wideShot: 'https://images.test/winter-job.png' })
+    expect(afterCreation.appearances?.find(appearance => appearance.appearanceKey === 'burned')?.wideShot).toBeNull()
+
+    chatResponse = { reply: '불탄 뒤 모습만 다시 그릴까요?', updates: validateUpdates(raw) }
+    await useGlobalChatStore.getState().sendMessage('네온 시장의 불탄 뒤 모습만 다시 그려줘')
+    const regeneration = useGlobalChatStore.getState().pendingProposal!
+    expect(regeneration).toMatchObject({ kind: 'artistRegenerateWorldAsset', payload: { locationId: 'market', appearanceKey: 'burned' } })
+    expect(generationRequests).toHaveLength(1)
+    expect(mocks.submitWorldShotJob).toHaveBeenCalledTimes(1)
+    await expect(useGlobalChatStore.getState().approvePendingProposal(regeneration.id)).resolves.toBe(true)
+    expect(createdRequests).toHaveLength(1)
+    expect(generationRequests).toEqual([
+      expect.objectContaining({ appearanceKey: 'appearance' }),
+      expect.objectContaining({ projectId: 'project-1', locationId: 'market', appearanceKey: 'burned', column: 'wide_shot', actor: 'chat' }),
+    ])
+    expect(mocks.submitWorldShotJob.mock.calls.map(call => call[0])).toEqual([
+      expect.objectContaining({ locationId: 'market', appearanceKey: 'appearance', referenceImageUrls: ['https://x/market.png'] }),
+      expect.objectContaining({ locationId: 'market', appearanceKey: 'burned', referenceImageUrls: ['https://x/market.png'] }),
+    ])
+    const afterRegeneration = useArtistStore.getState().worldAssets[0]
+    expect(afterRegeneration.wideShot).toBe(world().wideShot)
+    expect(afterRegeneration.appearances?.find(appearance => appearance.appearanceKey === 'appearance')?.wideShot).toBe('https://images.test/winter-job.png')
+    expect(afterRegeneration.appearances?.find(appearance => appearance.appearanceKey === 'burned')?.wideShot).toBe('https://images.test/burned-job.png')
   })
 
   it('씬의 서사 시점과 같은 모습에 이미지가 있으면 Writer·Director 가 그것을 쓰고, 없으면 기본 모습을 쓴다', () => {

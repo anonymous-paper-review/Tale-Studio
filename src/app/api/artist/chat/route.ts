@@ -27,6 +27,9 @@ import {
 } from '@/lib/artist/chat-updates'
 import { buildChatTrace, createChatTraceId, type ChatLlmUsage } from '@/lib/chat-trace'
 import { persistChatTraceBestEffort } from '@/lib/chat-trace-server'
+import { supabaseAdmin } from '@/lib/supabase/admin'
+import { translate } from '@/lib/i18n/translate'
+import { isExplicitAppearanceAddition, missingMentionedAppearanceNames } from '@/lib/artist/chat-request-coverage'
 
 const ARTIST_SYSTEM = `You are the Concept Artist agent for the Tale L0 Artist studio — a CARD-based studio (no node graph). Users define Characters and World locations as cards. Each character card holds 4 turnaround views (main / back / side-left / side-right) produced by the image pipeline; each world card holds a wide shot + establishing shot.
 
@@ -219,9 +222,11 @@ export async function POST(req: Request) {
     let activityContext = ''
     let projectLocale: AppLocale | null = null
     let localeSwitched: AppLocale | null = null
+    let ownsProject = false
     if (typeof projectId === 'string' && projectId) {
       try {
-        if (await userOwnsProject(projectId, user.id)) {
+        ownsProject = await userOwnsProject(projectId, user.id)
+        if (ownsProject) {
           // 활동 로그와 채팅 언어 규칙 v2(#chat-locale-follow v2) 조회를 병렬로 — 추가 왕복 없음.
           const [activity, locale] = await Promise.all([
             buildArtistActivityContext(projectId),
@@ -289,6 +294,28 @@ export async function POST(req: Request) {
       validUpdateCount,
     } = parseUpdates(text)
 
+    // 모델의 제안이 한 인물에서 끝나도 명시된 다른 이름을 조용히 잃지 않는다.
+    // 이 대조는 안내만 만든다. 추측한 생성 명령이나 재호출을 추가하지 않는다.
+    let coverageNotice = ''
+    if (isExplicitAppearanceAddition(message)) {
+      const locale = projectLocale ?? parseAppLocale(uiLocale) ?? 'en'
+      try {
+        if (!ownsProject) throw new Error('Project ownership was not confirmed')
+        const { data: characters, error } = await supabaseAdmin
+          .from('characters')
+          .select('character_id,name')
+          .eq('project_id', projectId)
+        if (error || !characters) throw new Error('Character coverage could not be checked')
+        const missing = missingMentionedAppearanceNames(message, characters, appearanceCreations)
+        if (missing.length) {
+          coverageNotice = translate(locale, 'Generation is not complete for everyone. {names}: not handled. These names appear in your request, but no usable new-appearance proposal was received for them, so their new appearances were not started. Received proposals still require approval.', { names: missing.join(', ') })
+        }
+      } catch {
+        // 명단 조회 실패로 이미 받은 제안까지 버리거나 모델의 완료 주장을 보증하지 않는다.
+        coverageNotice = translate(locale, 'The received proposals are still available for approval, but I could not check for missing characters. This response does not confirm that all generation is complete.')
+      }
+    }
+
     const trace = buildChatTrace({
       traceId,
       stage: 'artist',
@@ -306,7 +333,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       contentLocale: projectLocale,
       localeSwitched,
-      reply,
+      reply: coverageNotice ? `${reply}\n\n${coverageNotice}` : reply,
       updates,
       proposals,
       locationProposals,
