@@ -1,0 +1,11 @@
+{
+  "id": "dpl_32B4a2Bs3BQRxQWTW8rb4RYGmVVU",
+  "url": "tale-il8s91zf4-talestudio.vercel.app",
+  "state": "READY",
+  "createdAt": 1789022176979,
+  "sha": "7d609a2871cfae11b20fce4267702339ce314941",
+  "message": "fix(artist): preserve uncertain appearance requests and verify MVP closeout",
+  "checkedAt": "2026-09-10T06:38:36.585Z",
+  "ci": "success",
+  "ciUrl": "https://github.com/anonymous-paper-review/Tale-Studio/actions/runs/34445947729"
+}

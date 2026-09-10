@@ -20,3 +20,6 @@
 현재 검증의 한계는 명시적으로 보존합니다. 18의 과거14표시 출처와 유료 운영47샷 전체 생성, 모든 이미지·번역의 품질 보증, 접수번호까지 잃은 작업의 자동탐색, 닫힌 브라우저의 자동대사작업 재개는 이번 완료 주장에 포함하지 않습니다. 실패·미확인 상태는 완료로 처리하지 않고 남은 대상과 이유를 안내합니다.
 
 증거 보존 후 새 개발 검증 프로젝트2개와 임시 탭·서버를 정리했습니다. 보고용 실제 밤 이미지 파일은 보존했습니다. 운영 사용자 원본을 복구하거나 재생성하지 않았습니다.
+
+
+운영 반영 완료: main 제품 커밋 `7d609a2871cfae11b20fce4267702339ce314941`, Vercel `dpl_32B4a2Bs3BQRxQWTW8rb4RYGmVVU` READY, [GitHub CI 성공](https://github.com/anonymous-paper-review/Tale-Studio/actions/runs/34445947729). 운영 첫 화면 HTTP200, 로그인 전 Artist 접근307→정상 로그인 경로. 최종 [배포 기록](release-status.json)과 [운영 확인](production-check.json).
