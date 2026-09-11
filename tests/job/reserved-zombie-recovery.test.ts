@@ -101,7 +101,6 @@ describe('제출되지 못한 영상 작업 정리', () => {
     expect(mocks.failGenerationJob).not.toHaveBeenCalled()
     expect(mocks.releaseTakesForJob).not.toHaveBeenCalled()
   })
-
   it('영상 카드에 연결되지 않은 작업도 Take 를 돌려준다', async () => {
     // previz 처럼 video_clips 를 쓰지 않는 영상도 Take 를 잡는다.
     const job = reservedJob({ kind: 'shot_previz_video', video_clip_id: null })

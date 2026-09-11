@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { isAdminWorkspaceOwner } from '@/lib/admin'
 import { NextResponse } from 'next/server'
+import { pickProjectThumbnails, type ThumbnailCharacterRow, type ThumbnailShotRow } from '@/lib/project-thumbnail'
 
 export async function GET() {
   try {
@@ -48,9 +49,10 @@ export async function GET() {
     //   그라디언트 폴백). 배치 2쿼리(shots·characters) 후 프로젝트별 첫 장 선택 — 목록 규모
     //   (수십 프로젝트 × 샷 JSONB 포인터)에서 충분히 가볍다.
     const ids = (projects ?? []).map((p) => p.id)
-    const thumbnails = new Map<string, string>()
+    let thumbnails = new Map<string, string>()
     if (ids.length > 0) {
-      type ImageJson = { url?: string | null; status?: string | null; frames?: { start?: string | null } | null } | null
+      // 인물 컬럼은 portrait(얼굴 크롭)다 — 2026-09-09 동업자 실측: 없는 컬럼 portrait_url 을 골라 PostgREST 가 undefined 를
+      //   돌려주고 항상 설정 시트(view_main)로 떨어졌다(에러 없이). 고르는 규칙은 lib/project-thumbnail.ts(순수).
       const [{ data: shots }, { data: chars }] = await Promise.all([
         supabaseAdmin
           .from('shots')
@@ -59,29 +61,13 @@ export async function GET() {
           .order('sort_order', { ascending: true }),
         supabaseAdmin
           .from('characters')
-          .select('project_id, portrait_url, view_main')
+          .select('project_id, portrait, view_main')
           .in('project_id', ids),
       ])
-      const pick = (img: ImageJson, allowFrames: boolean): string | null => {
-        if (!img || img.status !== 'completed') return null
-        return (allowFrames ? img.frames?.start : null) ?? img.url ?? null
-      }
-      // 실사 패스 먼저 — 첫 샷의 러프가 뒤 샷의 실사를 이기지 않게(패스 분리).
-      for (const s of shots ?? []) {
-        if (thumbnails.has(s.project_id)) continue
-        const url = pick(s.storyboard_image as ImageJson, true)
-        if (url) thumbnails.set(s.project_id, url)
-      }
-      for (const s of shots ?? []) {
-        if (thumbnails.has(s.project_id)) continue
-        const url = pick(s.rough_storyboard as ImageJson, true)
-        if (url) thumbnails.set(s.project_id, url)
-      }
-      for (const c of chars ?? []) {
-        if (thumbnails.has(c.project_id)) continue
-        const url = (c.portrait_url as string | null) ?? (c.view_main as string | null)
-        if (url) thumbnails.set(c.project_id, url)
-      }
+      thumbnails = pickProjectThumbnails(
+        (shots ?? []) as ThumbnailShotRow[],
+        (chars ?? []) as ThumbnailCharacterRow[],
+      )
     }
 
     return NextResponse.json({

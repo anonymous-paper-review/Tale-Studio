@@ -248,7 +248,6 @@ export async function runVideoBatch(
   if (ownsRun() && finalSummary.status === 'paused' && finalSummary.stopReason === 'global_at_capacity') {
     notifyQuotaExceeded({ code: 'quota_exceeded', scope: 'global', category: 'video' })
   }
-
   return finish(started, failed)
 }
 
