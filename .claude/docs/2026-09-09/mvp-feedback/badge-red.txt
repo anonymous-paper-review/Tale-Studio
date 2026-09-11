@@ -1,0 +1,37 @@
+
+ RUN  v4.1.6 /Users/xcape/projects/tale-studio
+
+(node:89511) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ tests/job/completion-badge-feedback.test.ts (2 tests | 1 failed) 4ms
+   × 왼쪽 단계 배지는 아직 확인하지 않은 새 완료 수임을 알 수 있게 표시한다. 4ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/job/completion-badge-feedback.test.ts > 왼쪽 단계 배지는 아직 확인하지 않은 새 완료 수임을 알 수 있게 표시한다.
+AssertionError: expected { writer: 4 } to deeply equal { writer: 2 }
+
+- Expected
++ Received
+
+  {
+-   "writer": 2,
++   "writer": 4,
+  }
+
+ ❯ tests/job/completion-badge-feedback.test.ts:7:75
+      5|   const done: GenerationBatchRow = { id:'same',kind:'shot_rough_storyb…
+      6|   const rows = [done, done, {...done,id:'active',status:'queued' as co…
+      7|   expect(deriveStageBadges(completionsOf(rows), {writer:1000}, 'artist…
+       |                                                                           ^
+      8| })
+      9| it('현재 보고 있는 단계에는 미확인 완료 배지가 남지 않는다.', () => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 1 passed (2)
+   Start at  23:35:44
+   Duration  105ms (transform 13ms, setup 9ms, import 9ms, tests 4ms, environment 0ms)
+

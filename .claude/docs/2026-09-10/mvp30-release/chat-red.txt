@@ -1,0 +1,145 @@
+
+ RUN  v4.1.6 /Users/xcape/projects/tale-studio
+
+(node:20195) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ tests/writer/director-handoff-chat.test.ts (9 tests | 8 failed) 27ms
+   × Director 이동 요청은 모델의 답변을 기다리지 않고 저장된 조건을 확인해 화면 이동을 요청한다. 23ms
+   × 실제 Director 화면이 열렸음을 확인하면 이동 완료를 한 번만 알린다. 1ms
+   × 이동 조건이 부족하면 이유와 필요한 작업을 알리고 이동하지 않는다. 1ms
+   × 이동 가능한지 확인한 뒤 넘겨 달라고 하면 사용자 목적지인 Director로 실행한다. 0ms
+   × 다 되면 넘겨 달라는 요청은 생성 중에도 유지하고 조건이 갖춰지면 한 번 이동한다. 0ms
+   × 자동 이동 대기를 취소하면 뒤늦게 준비되어도 이동하지 않는다. 0ms
+   × 이동 저장 권한이 거절되면 성공이라고 말하지 않고 다시 로그인할 필요를 알린다. 0ms
+   × 이동 요청 뒤 화면이 열리지 않으면 완료 대신 이동 실패와 재시도 방법을 남긴다. 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/writer/director-handoff-chat.test.ts > Director 이동 요청은 모델의 답변을 기다리지 않고 저장된 조건을 확인해 화면 이동을 요청한다.
+AssertionError: expected [ '/api/writer/chat' ] to deeply equal [ '/api/project/handoff-test/handoff' ]
+
+- Expected
++ Received
+
+  [
+-   "/api/project/handoff-test/handoff",
++   "/api/writer/chat",
+  ]
+
+ ❯ tests/writer/director-handoff-chat.test.ts:15:44
+     13| it('Director 이동 요청은 모델의 답변을 기다리지 않고 저장된 조건을 확인해 화면 이동을 요청한다.',async()=…
+     14|  await useGlobalChatStore.getState().sendMessage('디렉터로 넘겨줘')
+     15|  expect(fetchMock.mock.calls.map(c=>c[0])).toEqual(['/api/project/hand…
+       |                                            ^
+     16|  expect(JSON.parse(fetchMock.mock.calls[0][1].body).action).toBe('move…
+     17|  expect(useGlobalChatStore.getState().pendingNavigatePath).toContain('…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  tests/writer/director-handoff-chat.test.ts > 실제 Director 화면이 열렸음을 확인하면 이동 완료를 한 번만 알린다.
+TypeError: useGlobalChatStore.getState(...).confirmDirectorHandoff is not a function
+ ❯ tests/writer/director-handoff-chat.test.ts:24:32
+     22| it('실제 Director 화면이 열렸음을 확인하면 이동 완료를 한 번만 알린다.',async()=>{
+     23|  await useGlobalChatStore.getState().sendMessage('Director로 넘겨줘')
+     24|  useGlobalChatStore.getState().confirmDirectorHandoff('handoff-test','…
+       |                                ^
+     25|  expect(text()).not.toContain('⇄')
+     26|  useGlobalChatStore.getState().confirmDirectorHandoff('handoff-test','…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  tests/writer/director-handoff-chat.test.ts > 이동 조건이 부족하면 이유와 필요한 작업을 알리고 이동하지 않는다.
+AssertionError: expected 'Director로 넘겨줘' to contain '코마츠'
+
+Expected: "코마츠"
+Received: "Director로 넘겨줘"
+
+ ❯ tests/writer/director-handoff-chat.test.ts:34:17
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  tests/writer/director-handoff-chat.test.ts > 이동 가능한지 확인한 뒤 넘겨 달라고 하면 사용자 목적지인 Director로 실행한다.
+AssertionError: expected undefined to be 'check' // Object.is equality
+
+- Expected:
+"check"
+
++ Received:
+undefined
+
+ ❯ tests/writer/director-handoff-chat.test.ts:42:61
+     40| it('이동 가능한지 확인한 뒤 넘겨 달라고 하면 사용자 목적지인 Director로 실행한다.',async()=>{
+     41|  await useGlobalChatStore.getState().sendMessage('디렉터러 넘길수잇어?')
+     42|  expect(JSON.parse(fetchMock.mock.calls[0][1].body).action).toBe('chec…
+       |                                                             ^
+     43|  expect(useGlobalChatStore.getState().pendingNavigatePath).toBeNull()
+     44|  expect(text()).toContain('61')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  tests/writer/director-handoff-chat.test.ts > 다 되면 넘겨 달라는 요청은 생성 중에도 유지하고 조건이 갖춰지면 한 번 이동한다.
+AssertionError: expected undefined to be 'waiting' // Object.is equality
+
+- Expected:
+"waiting"
+
++ Received:
+undefined
+
+ ❯ tests/writer/director-handoff-chat.test.ts:53:63
+     51|  useGlobalChatStore.setState({messages:[{id:'target',role:'user',stage…
+     52|  await useGlobalChatStore.getState().sendMessage('다되면 넘겨줘')
+     53|  expect(useGlobalChatStore.getState().directorHandoff?.phase).toBe('wa…
+       |                                                               ^
+     54|  await useGlobalChatStore.getState().resumeDirectorHandoff()
+     55|  expect(useGlobalChatStore.getState().pendingNavigatePath).toContain('…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  tests/writer/director-handoff-chat.test.ts > 자동 이동 대기를 취소하면 뒤늦게 준비되어도 이동하지 않는다.
+TypeError: useGlobalChatStore.getState(...).resumeDirectorHandoff is not a function
+ ❯ tests/writer/director-handoff-chat.test.ts:64:38
+     62|  await useGlobalChatStore.getState().sendMessage('다되면 넘겨줘')
+     63|  await useGlobalChatStore.getState().sendMessage('취소해줘')
+     64|  await useGlobalChatStore.getState().resumeDirectorHandoff()
+       |                                      ^
+     65|  expect(fetchMock).toHaveBeenCalledTimes(1)
+     66|  expect(useGlobalChatStore.getState().directorHandoff).toBeNull()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+ FAIL  tests/writer/director-handoff-chat.test.ts > 이동 저장 권한이 거절되면 성공이라고 말하지 않고 다시 로그인할 필요를 알린다.
+AssertionError: expected 'Director로 넘겨줘' to contain '로그인'
+
+Expected: "로그인"
+Received: "Director로 넘겨줘"
+
+ ❯ tests/writer/director-handoff-chat.test.ts:71:17
+     69|  fetchMock.mockResolvedValue(Response.json({error:'Unauthorized'},{sta…
+     70|  await useGlobalChatStore.getState().sendMessage('Director로 넘겨줘')
+     71|  expect(text()).toContain('로그인')
+       |                 ^
+     72|  expect(text()).not.toContain('⇄')
+     73|  expect(useGlobalChatStore.getState().pendingNavigatePath).toBeNull()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯
+
+ FAIL  tests/writer/director-handoff-chat.test.ts > 이동 요청 뒤 화면이 열리지 않으면 완료 대신 이동 실패와 재시도 방법을 남긴다.
+TypeError: useGlobalChatStore.getState(...).failDirectorHandoff is not a function
+ ❯ tests/writer/director-handoff-chat.test.ts:87:32
+     85| it('이동 요청 뒤 화면이 열리지 않으면 완료 대신 이동 실패와 재시도 방법을 남긴다.',async()=>{
+     86|  await useGlobalChatStore.getState().sendMessage('Director로 넘겨줘')
+     87|  useGlobalChatStore.getState().failDirectorHandoff()
+       |                                ^
+     88|  expect(text()).toContain('화면을 열지 못했어요')
+     89|  expect(text()).not.toContain('⇄')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/8]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  8 failed | 1 passed (9)
+   Start at  14:09:55
+   Duration  392ms (transform 215ms, setup 9ms, import 269ms, tests 27ms, environment 0ms)
+

@@ -2,8 +2,8 @@
 //   순수 함수만. DB 는 /api/billing/account 라우트가 읽어서 넘긴다. 약속은 tests/billing-account.test.ts.
 //
 //   종류별 잔액 계산은 take_hold RPC(20260902150000)와 같은 규칙이다: grant 행의 잔여 = grant.delta +
-//   그 grant_id 를 가리키는 후속 행 delta 합. grant_id 없는 차감(환불 회수·미배분 hold)과 manual_adjust 는
-//   "other" 로 묶는다 — 음수 잔액의 원인이 거기 있다. 행 수가 늘어 무거워지면 RPC 로 옮긴다.
+//   그 grant_id 를 가리키는 후속 행 delta 합. 구형 Paddle 환불은 원 결제의 유일한 지급분에 계산상 연결한다.
+//   만료는 남은 양만 없앤다. 환불 전에 사용한 분량의 부족액은 만료 후에도 유지한다.
 
 export type LedgerKind =
   | 'grant_free'
@@ -54,14 +54,29 @@ export function takeBreakdown(rows: readonly LedgerRow[], now: Date = new Date()
   const nowMs = now.getTime()
   const expired = (row: LedgerRow) => row.expires_at !== null && new Date(row.expires_at).getTime() <= nowMs
   const remainingByGrant = new Map<string, number>()
+  const grantsById = new Map<string, LedgerRow>()
+  const grantByTransaction = new Map<string, string | null>()
   for (const row of rows) {
-    if (GRANT_KINDS.has(row.kind)) remainingByGrant.set(row.id, (remainingByGrant.get(row.id) ?? 0) + row.delta)
+    if (!GRANT_KINDS.has(row.kind)) continue
+    remainingByGrant.set(row.id, (remainingByGrant.get(row.id) ?? 0) + row.delta)
+    grantsById.set(row.id, row)
+    if (row.ref_kind === 'paddle_transaction' && row.ref_id) {
+      grantByTransaction.set(row.ref_id, grantByTransaction.has(row.ref_id) ? null : row.id)
+    }
   }
   let other = 0
   for (const row of rows) {
     if (GRANT_KINDS.has(row.kind)) continue
-    if (row.grant_id && remainingByGrant.has(row.grant_id)) {
-      remainingByGrant.set(row.grant_id, (remainingByGrant.get(row.grant_id) ?? 0) + row.delta)
+    // 장부는 append-only다. 구형 기록의 금액·출처를 고치지 않고, 서버가 남긴 정확한 형식만 해석한다.
+    const legacyTransaction = !row.grant_id && row.kind === 'refund_revoke' && row.ref_kind === 'paddle_adjustment'
+      ? /^paddle (?:refund|chargeback) of (txn_[a-z0-9]+) \([0-9]+%\)$/.exec(row.reason ?? '')?.[1]
+      : undefined
+    const grantId = row.grant_id ?? (legacyTransaction ? grantByTransaction.get(legacyTransaction) : null)
+    const grant = grantId ? grantsById.get(grantId) : undefined
+    if (grant) {
+      // 만료 감사행은 실사용이 아니다. 만료 후 환불이 들어와도 expire+refund를 사용분 채무로 세지 않는다.
+      if (row.kind === 'expire' && expired(grant)) continue
+      remainingByGrant.set(grant.id, (remainingByGrant.get(grant.id) ?? 0) + row.delta)
     } else {
       other += row.delta
     }
@@ -79,9 +94,9 @@ export function takeBreakdown(rows: readonly LedgerRow[], now: Date = new Date()
   }
   for (const row of rows) {
     if (!GRANT_KINDS.has(row.kind)) continue
-    // 만료일이 지난 lot 의 남은 양은 0 으로 친다(위 @param now). 이미 쓴 만큼은 되살아나지 않는다 —
-    //   remaining 만 0 이 되고 그 lot 을 가리키는 hold/consume 행은 총합에서 그대로 빠져 있다.
-    const remaining = expired(row) ? 0 : remainingByGrant.get(row.id) ?? 0
+    const unexpiredRemaining = remainingByGrant.get(row.id) ?? 0
+    // 양수 잔여만 만료한다. 실제 사용 + 환불로 생긴 음수는 원래 만료일에도 없어지지 않는다.
+    const remaining = expired(row) ? Math.min(0, unexpiredRemaining) : unexpiredRemaining
     if (row.kind === 'grant_free') out.free += remaining
     else if (row.kind === 'grant_plan') out.plan += remaining
     else if (row.kind === 'grant_purchase') out.purchase += remaining

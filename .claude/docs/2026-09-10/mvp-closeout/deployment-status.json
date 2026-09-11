@@ -1,0 +1,37 @@
+{
+  "checkedAt": "2026-09-10T06:42:30.356Z",
+  "deployments": [
+    {
+      "id": "dpl_EC8Wv8nGu2uBq3Le47L5e75jbSqE",
+      "url": "tale-pvyqvk9xh-talestudio.vercel.app",
+      "state": "READY",
+      "createdAt": 1789022457817,
+      "sha": "867cda835195315e6a73cb4f8d262ef736302ff9",
+      "message": "docs(mvp): publish final verification screenshots and rollout status"
+    },
+    {
+      "id": "dpl_32B4a2Bs3BQRxQWTW8rb4RYGmVVU",
+      "url": "tale-il8s91zf4-talestudio.vercel.app",
+      "state": "READY",
+      "createdAt": 1789022176979,
+      "sha": "7d609a2871cfae11b20fce4267702339ce314941",
+      "message": "fix(artist): preserve uncertain appearance requests and verify MVP closeout"
+    },
+    {
+      "id": "dpl_GBvS6sjpZc9b3yB6UVTikHeR9WDB",
+      "url": "tale-7vu4584ty-talestudio.vercel.app",
+      "state": "READY",
+      "createdAt": 1789018858743,
+      "sha": "39fe2081a64a09d33d34caf2d8eb0f6c16da40c1",
+      "message": "docs(mvp): record production rollout and verification"
+    },
+    {
+      "id": "dpl_9McdMPQRDTLb6VCPSyz7CRhU2t1b",
+      "url": "tale-gd6ybrtic-talestudio.vercel.app",
+      "state": "READY",
+      "createdAt": 1789018514259,
+      "sha": "3970a3c0d75b11bfa851aa595a5b3d166c21ee07",
+      "message": "fix(mvp): complete chat handoff and restore feedback workflows"
+    }
+  ]
+}

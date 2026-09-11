@@ -11,6 +11,11 @@ const mocks = vi.hoisted(() => ({
   getUserById: vi.fn(),
   isAdminEmail: vi.fn(),
   totalMaxInflight: vi.fn(),
+  // #generation_capacity_exempt_users: 신규 admin 면제 표 게이트용 supabaseAdmin.from 체인 mock.
+  //   (2026-09-09 오너 승인 — 혼합 영상 동시 한도 3, 기존 admin 예외 보존)
+  from: vi.fn(),
+  upsertExempt: vi.fn(),
+  deleteEqExempt: vi.fn(),
 }))
 
 vi.mock('@/lib/generation-jobs', () => ({
@@ -18,7 +23,10 @@ vi.mock('@/lib/generation-jobs', () => ({
   countQueuedJobsGlobal: mocks.countGlobal,
 }))
 vi.mock('@/lib/supabase/admin', () => ({
-  supabaseAdmin: { auth: { admin: { getUserById: mocks.getUserById } } },
+  supabaseAdmin: {
+    auth: { admin: { getUserById: mocks.getUserById } },
+    from: mocks.from,
+  },
 }))
 vi.mock('@/lib/admin', () => ({ isAdminEmail: mocks.isAdminEmail }))
 // #fal-key-pool: 전역 상한은 이제 키 레지스트리 합산(totalMaxInflight)이다 — 단일 상수 대신 mock 값 사용.
@@ -42,6 +50,13 @@ beforeEach(() => {
   mocks.getUserById.mockResolvedValue({ data: { user: { email: 'user@x.test' } }, error: null })
   mocks.isAdminEmail.mockReturnValue(false)
   mocks.totalMaxInflight.mockReturnValue(MAX_GLOBAL_INFLIGHT_JOBS)
+  // generation_capacity_exempt_users 체인 기본값 — 일반 흐름(기존 7개 검사 포함)은 항상 성공.
+  mocks.from.mockReturnValue({
+    upsert: mocks.upsertExempt,
+    delete: () => ({ eq: mocks.deleteEqExempt }),
+  })
+  mocks.upsertExempt.mockResolvedValue({ data: null, error: null })
+  mocks.deleteEqExempt.mockResolvedValue({ data: null, error: null })
 })
 
 describe('checkGenerationCapacity — 영상·이미지 한도 분리', () => {
@@ -91,6 +106,55 @@ describe('checkGenerationCapacity — 관리자 개인 한도 면제', () => {
     mocks.countByUser.mockResolvedValue(MAX_QUEUED_IMAGE_JOBS_PER_USER)
     const check = await checkGenerationCapacity('u-1', 'image')
     expect(check.ok).toBe(false)
+  })
+})
+
+// 신규 게이트(2026-09-09 오너 승인): admin 면제 여부를
+//   public.generation_capacity_exempt_users(user_id uuid pk, updated_at timestamptz) 로
+//   DB 에 동기화한다. 캐시 충돌 방지를 위해 이 describe 의 모든 테스트는 다른 곳에서
+//   쓰지 않는 고유 userId 를 쓴다. video 검사마다 sync 하므로(캐시 히트 여부와 무관) 조회
+//   1개가 추가되지만 관리자 명단이 오래된 캐시로 정확성이 깨지는 것보다 낫다는 선택이다.
+describe('checkGenerationCapacity — admin 면제 표 동기화 (신규 게이트)', () => {
+  it('관리자 video 검사는 면제 표에 user_id 를 upsert 한다', async () => {
+    mocks.isAdminEmail.mockReturnValue(true)
+    mocks.getUserById.mockResolvedValue({ data: { user: { email: 'admin@x.test' } }, error: null })
+
+    await checkGenerationCapacity('exempt-admin-1', 'video')
+
+    expect(mocks.from).toHaveBeenCalledWith('generation_capacity_exempt_users')
+    expect(mocks.upsertExempt).toHaveBeenCalledWith(
+      expect.objectContaining({ user_id: 'exempt-admin-1' }),
+    )
+  })
+
+  it('일반 사용자 video 검사는 기존 면제 행을 삭제한다', async () => {
+    mocks.isAdminEmail.mockReturnValue(false)
+
+    await checkGenerationCapacity('exempt-user-1', 'video')
+
+    expect(mocks.from).toHaveBeenCalledWith('generation_capacity_exempt_users')
+    expect(mocks.deleteEqExempt).toHaveBeenCalledWith('user_id', 'exempt-user-1')
+  })
+
+  it('영상 면제 동기화 실패는 안전하게 throw 하고, image 검사는 면제 표를 건드리지 않는다', async () => {
+    mocks.isAdminEmail.mockReturnValue(false)
+    mocks.deleteEqExempt.mockRejectedValueOnce(new Error('exempt sync down'))
+
+    // 정확한 권한 확인이 안 됐으므로 기존 쿼터 집계의 fail-open 과 달리 fail-closed 로 전파.
+    await expect(checkGenerationCapacity('exempt-fail-1', 'video')).rejects.toThrow()
+
+    // image 경로는 이 신규 표를 아예 건드리지 않아 기존 fail-open 정책이 그대로 유지된다.
+    mocks.from.mockClear()
+    const image = await checkGenerationCapacity('exempt-fail-1', 'image')
+    expect(image.ok).toBe(true)
+    expect(mocks.from).not.toHaveBeenCalled()
+  })
+
+  it('작업 수 조회가 실패해도 일반 사용자의 오래된 관리자 면제를 남기지 않는다', async () => {
+    mocks.countByUser.mockRejectedValueOnce(new Error('count unavailable'))
+    const check = await checkGenerationCapacity('exempt-count-failure', 'video')
+    expect(check.ok).toBe(true)
+    expect(mocks.deleteEqExempt).toHaveBeenCalledWith('user_id', 'exempt-count-failure')
   })
 })
 

@@ -14,6 +14,7 @@ import { AppearanceCreateDialog } from '@/features/artist/appearance-create-dial
 import { TurnaroundRegionCycle } from '@/features/artist/turnaround-region-cycle'
 import { sameCharacterAppearanceSlot, useArtistStore } from '@/stores/artist-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
+import { useProjectStore } from '@/stores/project-store'
 import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
 import { type CharacterViewKey } from '@/types/asset'
 
@@ -36,6 +37,13 @@ export function CharacterPanel({
     const key = pickedAppearance[c.characterId] ?? c.appearances.find((appearance) => appearance.isDefault)?.appearanceKey
     return c.appearances.find((appearance) => appearance.appearanceKey === key) ?? null
   }
+  const projectId = useProjectStore(s => s.projectId)
+  const noteSelection = (id: string, appearanceKey: string, source: 'card' | 'appearance' | 'image') => {
+    if (projectId) useArtistStore.getState().setChatSelection({ projectId, target: 'character', id, appearanceKey, source })
+  }
+  useEffect(() => () => {
+    if (useArtistStore.getState().chatSelection?.target === 'character') useArtistStore.getState().setChatSelection(null)
+  }, [])
   const t = useT()
   const {
     sceneManifest,
@@ -59,6 +67,10 @@ export function CharacterPanel({
     appearanceKey: string
     view: CharacterViewKey
   } | null>(null)
+  const openImage = (charId: string, appearanceKey: string) => {
+    noteSelection(charId, appearanceKey, 'image')
+    setViewDialog({ charId, appearanceKey, view: 'main' })
+  }
   // "+ 모습 추가"(약속 C1·C2 2026-09-04) — 탭 줄은 모습이 하나뿐이어도 항상 보인다.
   const [createFor, setCreateFor] = useState<string | null>(null)
 
@@ -163,7 +175,7 @@ export function CharacterPanel({
               key={char.characterId}
               role="button"
               tabIndex={0}
-              onClick={() => selectCharacter(char.characterId)}
+              onClick={() => { selectCharacter(char.characterId); if (appearance) noteSelection(char.characterId, appearance.appearanceKey, 'card'); else useArtistStore.getState().setChatSelection(null) }}
               // ⌘/Ctrl+클릭 = 채팅 @멘션 토글 (#artist-mention 2026-08-11, producer 카드와 동일 문법).
               //   캡처 단계에서 기본 동작(선택)을 끊는다 — 멘션하려던 클릭이 카드를 선택하면 안 된다.
               onPointerDownCapture={(e) => {
@@ -187,11 +199,13 @@ export function CharacterPanel({
               }}
               // 더블 클릭 = 사진 클릭과 동일(#d5 2026-08-03) — 상세/재생성 팝업
               onDoubleClick={() =>
-                appearance && setViewDialog({ charId: char.characterId, appearanceKey: appearance.appearanceKey, view: 'main' })
+                appearance && openImage(char.characterId, appearance.appearanceKey)
               }
               onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ')
+                if (e.key === 'Enter' || e.key === ' ') {
                   selectCharacter(char.characterId)
+                  if (appearance) noteSelection(char.characterId, appearance.appearanceKey, 'card'); else useArtistStore.getState().setChatSelection(null)
+                }
               }}
               className={cn(
                 'cursor-pointer rounded-xl border p-4 transition-colors',
@@ -237,12 +251,13 @@ export function CharacterPanel({
                       <button
                         key={ap.appearanceKey}
                         type="button"
-                        onClick={() =>
+                        onClick={() => {
+                          noteSelection(char.characterId, ap.appearanceKey, 'appearance')
                           setPickedAppearance((prev) => ({
                             ...prev,
                             [char.characterId]: ap.appearanceKey,
                           }))
-                        }
+                        }}
                         className={cn(
                           'rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors',
                           active
@@ -273,7 +288,7 @@ export function CharacterPanel({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation()
-                      if (appearance) setViewDialog({ charId: char.characterId, appearanceKey: appearance.appearanceKey, view: 'main' })
+                      if (appearance) openImage(char.characterId, appearance.appearanceKey)
                     }}
                     className="relative block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
                   >

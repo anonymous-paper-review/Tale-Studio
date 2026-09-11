@@ -1,0 +1,225 @@
+[
+  {
+    "name": "중앙·채팅 초안 진행 일치 1511px",
+    "details": {
+      "viewport": [
+        1511,
+        728
+      ],
+      "bars": [
+        {
+          "label": "씬 초안 준비",
+          "value": 50,
+          "ratio": 0.5
+        },
+        {
+          "label": "씬 초안 준비",
+          "value": 50,
+          "ratio": 0.4962962962962963
+        }
+      ],
+      "icons": [
+        {
+          "label": "프로젝트 목록으로",
+          "size": 20,
+          "stroke": "2"
+        },
+        {
+          "label": "Producer",
+          "size": 20,
+          "stroke": "2"
+        },
+        {
+          "label": "Writer",
+          "size": 20,
+          "stroke": "2"
+        },
+        {
+          "label": "Artist",
+          "size": 20,
+          "stroke": "2"
+        },
+        {
+          "label": "Director",
+          "size": 20,
+          "stroke": "2"
+        },
+        {
+          "label": "Editor",
+          "size": 20,
+          "stroke": "2"
+        },
+        {
+          "label": "계정·결제 열기",
+          "size": 14,
+          "stroke": "2"
+        },
+        {
+          "label": "공유 링크 만들기",
+          "size": 20,
+          "stroke": "2"
+        },
+        {
+          "label": "내보내기",
+          "size": 20,
+          "stroke": "2"
+        },
+        {
+          "label": "문의 / Help",
+          "size": 20,
+          "stroke": "2"
+        },
+        {
+          "label": "U"
+        }
+      ],
+      "primary": "lab(100% 0 0)"
+    }
+  },
+  {
+    "name": "중앙·채팅 초안 진행 일치 755px",
+    "details": {
+      "viewport": [
+        755,
+        728
+      ],
+      "bars": [
+        {
+          "label": "씬 초안 준비",
+          "value": 50,
+          "ratio": 0.5
+        },
+        {
+          "label": "씬 초안 준비",
+          "value": 50,
+          "ratio": 0.4962962962962963
+        }
+      ],
+      "icons": [
+        {
+          "label": "프로젝트 목록으로",
+          "size": 20,
+          "stroke": "2"
+        },
+        {
+          "label": "Producer",
+          "size": 20,
+          "stroke": "2"
+        },
+        {
+          "label": "Writer",
+          "size": 20,
+          "stroke": "2"
+        },
+        {
+          "label": "Artist",
+          "size": 20,
+          "stroke": "2"
+        },
+        {
+          "label": "Director",
+          "size": 20,
+          "stroke": "2"
+        },
+        {
+          "label": "Editor",
+          "size": 20,
+          "stroke": "2"
+        },
+        {
+          "label": "계정·결제 열기",
+          "size": 14,
+          "stroke": "2"
+        },
+        {
+          "label": "공유 링크 만들기",
+          "size": 20,
+          "stroke": "2"
+        },
+        {
+          "label": "내보내기",
+          "size": 20,
+          "stroke": "2"
+        },
+        {
+          "label": "문의 / Help",
+          "size": 20,
+          "stroke": "2"
+        },
+        {
+          "label": "U"
+        }
+      ],
+      "primary": "lab(100% 0 0)"
+    }
+  },
+  {
+    "name": "Help 열기",
+    "details": true
+  },
+  {
+    "name": "초안 검토 대기에는 진행 중 막대 없음",
+    "details": true
+  },
+  {
+    "name": "최종 저장 전 단계와 남은 작업 표시",
+    "details": [
+      {
+        "label": "샷·대사 작성과 저장",
+        "value": "91"
+      },
+      {
+        "label": "샷·대사 작성과 저장",
+        "value": "91"
+      }
+    ]
+  },
+  {
+    "name": "현재 보고 있는 Artist 배지 숨김",
+    "details": true
+  },
+  {
+    "name": "모습 탭 선택 시 저장 이미지 URL 변경",
+    "details": {
+      "before": [
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22640%22%20height%3D%22360%22%3E%3Crect%20width%3D%22640%22%20height%3D%22360%22%20fill%3D%22%2362798b%22%2F%3E%3Ctext%20x%3D%22320%22%20y%3D%22190%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2228%22%3E%EA%B8%B0%EB%B3%B8%20%EB%AA%A8%EC%8A%B5%20%ED%85%8C%EC%8A%A4%ED%8A%B8%20%EC%9D%B4%EB%AF%B8%EC%A7%80%3C%2Ftext%3E%3C%2Fsvg%3E",
+        "/agent-face/preview/writer_idle.gif",
+        "/agent-face/preview/artist_idle.gif"
+      ],
+      "after": [
+        "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22640%22%20height%3D%22360%22%3E%3Crect%20width%3D%22640%22%20height%3D%22360%22%20fill%3D%22%2329344c%22%2F%3E%3Ctext%20x%3D%22320%22%20y%3D%22190%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2228%22%3E%EB%B0%A4%20%EB%AA%A8%EC%8A%B5%20%ED%85%8C%EC%8A%A4%ED%8A%B8%20%EC%9D%B4%EB%AF%B8%EC%A7%80%3C%2Ftext%3E%3C%2Fsvg%3E",
+        "/agent-face/preview/writer_idle.gif",
+        "/agent-face/preview/artist_idle.gif"
+      ]
+    }
+  },
+  {
+    "name": "실제 단계 왕복 후 읽던 스크롤 위치 유지",
+    "details": 100
+  },
+  {
+    "name": "탭 이동 후 안내 1개·대화 ID와 순서 유지",
+    "details": 38
+  },
+  {
+    "name": "Writer에서 Artist의 두 대상 승인 표시",
+    "details": [
+      "쿄타로 · 잠옷",
+      "코마츠 · 잠옷"
+    ]
+  },
+  {
+    "name": "나중에 보류 목록 보존",
+    "details": [
+      "쿄타로, 코마츠"
+    ]
+  },
+  {
+    "name": "보류 목록에서 수동 재개",
+    "details": true
+  },
+  {
+    "name": "브라우저 미처리 오류",
+    "details": []
+  }
+]

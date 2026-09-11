@@ -1,0 +1,2 @@
+src/app/playground/mvp-feedback/page.tsx(51,31): error TS2353: Object literal may only specify known properties, and 'projectId' does not exist in type 'ArtistState | Partial<ArtistState> | ((state: ArtistState) => ArtistState | Partial<ArtistState>)'.
+tests/fixtures/mvp-feedback-page.tsx(51,31): error TS2353: Object literal may only specify known properties, and 'projectId' does not exist in type 'ArtistState | Partial<ArtistState> | ((state: ArtistState) => ArtistState | Partial<ArtistState>)'.

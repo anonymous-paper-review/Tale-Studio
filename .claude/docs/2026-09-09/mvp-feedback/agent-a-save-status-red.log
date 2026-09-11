@@ -1,0 +1,49 @@
+
+ RUN  v4.1.6 /Users/xcape/projects/tale-studio
+
+(node:94928) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ tests/chat/request-preservation.test.ts (21 tests | 2 failed) 34ms
+     × 인물의 원래 설명을 저장했으면 생성 진행 중이 아니라 완료로 알린다 2ms
+   × 다른 화면이 이미 확인 중인 작업이 끝나면 재조회도 완료로 알린다 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/chat/request-preservation.test.ts > 설명 저장과 생성 상태 구별 > 인물의 원래 설명을 저장했으면 생성 진행 중이 아니라 완료로 알린다
+AssertionError: expected '쿄타로: 진행 중' to be '쿄타로: 완료' // Object.is equality
+
+Expected: "쿄타로: 완료"
+Received: "쿄타로: 진행 중"
+
+ ❯ tests/chat/request-preservation.test.ts:303:68
+    301|     await useGlobalChatStore.getState().sendMessage('쿄타로의 원래 설명을 바꿔줘')
+    302|     await useGlobalChatStore.getState().approvePendingProposal()
+    303|     expect(useGlobalChatStore.getState().messages.at(-1)?.content).toB…
+       |                                                                    ^
+    304|   })
+    305| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/chat/request-preservation.test.ts > 다른 화면이 이미 확인 중인 작업이 끝나면 재조회도 완료로 알린다
+AssertionError: expected '옥상: 진행 중' to be '옥상: 완료' // Object.is equality
+
+Expected: "옥상: 완료"
+Received: "옥상: 진행 중"
+
+ ❯ tests/chat/request-preservation.test.ts:318:66
+    316|   respond(Response.json({ data: { status: 'completed', resultUrl: 'htt…
+    317|   await Promise.all([existing, approval])
+    318|   expect(useGlobalChatStore.getState().messages.at(-1)?.content).toBe(…
+       |                                                                  ^
+    319| })
+    320|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 19 passed (21)
+   Start at  23:42:42
+   Duration  375ms (transform 199ms, setup 9ms, import 251ms, tests 34ms, environment 0ms)
+

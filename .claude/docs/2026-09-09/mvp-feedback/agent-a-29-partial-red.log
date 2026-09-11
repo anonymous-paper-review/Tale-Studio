@@ -1,0 +1,38 @@
+
+ RUN  v4.1.6 /Users/xcape/projects/tale-studio
+
+(node:4592) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ tests/writer/dialogue-handoff-completion.test.ts (9 tests | 1 failed) 136ms
+   × 남은 한 씬도 여러 번 나뉘어 돌아오면 저장한 샷을 빼고 나머지를 계속 처리한다 4ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/writer/dialogue-handoff-completion.test.ts > 남은 한 씬도 여러 번 나뉘어 돌아오면 저장한 샷을 빼고 나머지를 계속 처리한다
+AssertionError: expected [ 'shot_1', 'shot_2' ] to deeply equal [ 'shot_1', 'shot_2', 'shot_3' ]
+
+- Expected
++ Received
+
+  [
+    "shot_1",
+    "shot_2",
+-   "shot_3",
+  ]
+
+ ❯ tests/writer/dialogue-handoff-completion.test.ts:145:41
+    143|   respond([[update(1)], [update(2)], [update(3)]])
+    144|   await useGlobalChatStore.getState().sendMessage('전체 한국어로 맞추고 넘겨줘')
+    145|   expect(writes.map(write => write.id)).toEqual(['shot_1','shot_2','sh…
+       |                                         ^
+    146|   expect(requests).toHaveLength(3)
+    147|   expect(handoff).toHaveBeenCalledOnce()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 8 passed (9)
+   Start at  23:53:09
+   Duration  488ms (transform 219ms, setup 10ms, import 255ms, tests 136ms, environment 0ms)
+

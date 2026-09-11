@@ -20,7 +20,7 @@ vi.mock('@/lib/generation-jobs', () => ({
 vi.mock('@/lib/billing/take-hold', () => ({ releaseTakesForJob: mocks.releaseTakesForJob }))
 vi.mock('@/lib/fal/reconcile', () => ({ reconcileJobFromFal: mocks.reconcileJobFromFal }))
 
-import { DELETE } from '@/app/api/generation-jobs/[id]/route'
+import { DELETE, GET } from '@/app/api/generation-jobs/[id]/route'
 
 const params = Promise.resolve({ id: 'job-1' })
 
@@ -45,6 +45,21 @@ beforeEach(() => {
 })
 
 describe('큐 화면에서 작업을 지울 때의 Take 처리', () => {
+  it('러프 상태를 다시 조회해도 접수 확인 대기 안내가 사라지지 않는다', async () => {
+    const job = { id: 'job-1', project_id: 'project-1', status: 'queued', kind: 'shot_rough_storyboard', request_id: 'reserved:job-1' }
+    mocks.getGenerationJobById.mockResolvedValue(job)
+    mocks.reconcileJobFromFal.mockResolvedValue(job)
+    const response = await GET(new Request('http://localhost'), { params })
+    expect((await response.json()).data.confirmationPending).toBe(true)
+  })
+  it.each(['reserved:job-1', 'provider-request-1'])('접수 중인 러프는 정리 버튼으로 예약을 풀어 중복 주문하지 않는다 (%s)', async (request_id) => {
+    mocks.getGenerationJobById.mockResolvedValue({ id: 'job-1', project_id: 'project-1', status: 'queued', kind: 'shot_rough_storyboard', request_id })
+    const response = await DELETE(new Request('http://localhost'), { params })
+    expect(response.status).toBe(409)
+    expect(mocks.releaseTakesForJob).not.toHaveBeenCalled()
+    expect(mocks.deleteGenerationJobById).not.toHaveBeenCalled()
+  })
+
   it('멈춘 영상 작업을 지우면 잡아둔 Take 를 먼저 돌려준다', async () => {
     const response = await DELETE(new Request('http://localhost'), { params })
 

@@ -1,7 +1,10 @@
+import { CHAT_AGENT_GUIDE, buildChatTaskContext, normalizeChatHistory } from '@/lib/chat-harness'
+import { parseChatModelSettings } from '@/lib/chat-model-settings'
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
+import { prepareChatTools } from '@/lib/chat-tools/protocol'
 import { buildProducerSystem } from './system-prompt'
 import { parseExtractedSettings } from '@/lib/parse-extracted-settings'
 import { parseChatChoices } from '@/lib/chat-choices'
@@ -20,28 +23,15 @@ import { buildReferenceDigest, getProjectReferenceId } from '@/lib/reference-imp
 import { buildChatTrace, createChatTraceId, type ChatLlmUsage } from '@/lib/chat-trace'
 import { persistChatTraceBestEffort } from '@/lib/chat-trace-server'
 
-interface ChatMessage {
-  role: 'user' | 'model'
-  content: string
-}
 
-interface IncomingHistoryItem {
-  role: 'user' | 'model'
-  content: string
-}
 
-function normalizeHistory(history: unknown): ChatMessage[] {
-  if (!Array.isArray(history)) return []
-  return (history as IncomingHistoryItem[]).map((m) => ({
-    role: m.role,
-    content: m.content,
-  }))
-}
+const normalizeHistory = normalizeChatHistory
 
 
 export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
+  let llmUsage: ChatLlmUsage | null = null
   try {
     const user = await getUser()
     if (!user) {
@@ -50,6 +40,7 @@ export async function POST(req: Request) {
 
     const {
       message,
+      modelSettings: rawModelSettings, taskContext,
       history,
       uiLocale,
       currentSettings,
@@ -59,8 +50,13 @@ export async function POST(req: Request) {
       gate,
       attachmentImageUrls,
       projectId,
+      chatTools: toolsEnabled,
+      chatWorkflow,
+      toolMessages,
       traceId: requestedTraceId,
     } = await req.json()
+    const modelSettings = parseChatModelSettings(rawModelSettings)
+    if (!modelSettings) return NextResponse.json({ error: 'Invalid chat model settings' }, { status: 400 })
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json(
@@ -203,6 +199,7 @@ export async function POST(req: Request) {
       const hard = Array.isArray(g.hardMissing) ? g.hardMissing : []
       const soft = Array.isArray(g.softMissing) ? g.softMissing : []
       const lines = [
+        'This checklist blocks Writer handoff; it is not a request to fill missing fields during every query/edit. Missing visual style is handled by the app picker.',
         `canHandoff: ${g.canHandoff === true}`,
         hard.length ? `남은 필수 항목(hard, 핸드오프 차단): ${hard.join(' / ')}` : '남은 필수 항목: 없음',
         soft.length ? `권장 항목(soft, 차단 안 함): ${soft.join(' / ')}` : null,
@@ -214,14 +211,17 @@ export async function POST(req: Request) {
       ? contextParts.join('\n\n') + '\n\n'
       : ''
 
+    if (toolsEnabled === true && (!ownsCurrentProject)) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+    const appTools = prepareChatTools('producer', toolsEnabled, toolMessages, chatWorkflow)
+
     const normalizedHistory = normalizeHistory(history)
     const traceId = createChatTraceId(requestedTraceId)
-    let llmUsage: ChatLlmUsage | null = null
     const systemPrompt =
+      CHAT_AGENT_GUIDE +
       buildProducerSystem(projectLocale ?? 'ko') +
       CHAT_OUTPUT_FORMAT_GUIDE +
       responseLanguageDirective(projectLocale)
-    const userPrompt = `${contextPrefix}${message}`
+    const userPrompt = `${contextPrefix}${buildChatTaskContext(taskContext)}${message}`
 
     let text: string
     try {
@@ -235,6 +235,9 @@ export async function POST(req: Request) {
         {
           webSearch: true,
           imageUrls: attachments.urls,
+          appTools,
+          modelSettings,
+          signal: req.signal,
           onUsage: (usage) => {
             llmUsage = usage
           },
@@ -258,6 +261,8 @@ export async function POST(req: Request) {
       throw err
     }
 
+    if (appTools?.turn) return NextResponse.json({ toolTurn: appTools.turn, toolSupport: true, toolUsage: llmUsage, contentLocale: projectLocale, localeSwitched })
+
     const { reply: replyRaw, extractedSettings } = parseExtractedSettings(text)
     // #p4-choices: Foundation 빈칸을 되묻기 대신 선택지 버튼으로 — [CHOICES] 라인 추출.
     const { reply, choices, markerFound } = parseChatChoices(replyRaw)
@@ -275,6 +280,7 @@ export async function POST(req: Request) {
     await persistChatTraceBestEffort(projectId, trace)
 
     return NextResponse.json({
+      toolSupport: !!appTools,
       reply,
       extractedSettings,
       choices,
@@ -288,6 +294,6 @@ export async function POST(req: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[produce/chat]', message)
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: message, ...(llmUsage ? { toolUsage: llmUsage } : {}) }, { status: 500 })
   }
 }

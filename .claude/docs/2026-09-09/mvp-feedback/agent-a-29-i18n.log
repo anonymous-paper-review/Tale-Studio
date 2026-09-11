@@ -1,0 +1,44 @@
+
+ RUN  v4.1.6 /Users/xcape/projects/tale-studio
+
+(node:5964) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ tests/ui-text/i18n-korean-scan.test.ts (1 test | 1 failed) 49ms
+     × 화면에 번역되지 않은 한글이 더 늘지 않는다 48ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/ui-text/i18n-korean-scan.test.ts > 화면의 번역되지 않은 한글 점검 > 화면에 번역되지 않은 한글이 더 늘지 않는다
+AssertionError: 하드코딩 한글 증가 — t() 사전화하거나 정당하면 // i18n-ok:
+src/app/playground/mvp-feedback/page.tsx: 5 > 허용 0
+    L24: const preview = { started: true, running: true, completed: false, failed: false,
+    L48: useProjectStore.setState({ projectId: pid, projectTitle: 'MVP 피드백 검수', currentSt
+    L51: useArtistStore.setState({  characterAssets:[{characterId:'kyotaro',name:'쿄타로',en: expected [ Array(1) ] to deeply equal []
+
+- Expected
++ Received
+
+- []
++ [
++   "src/app/playground/mvp-feedback/page.tsx: 5 > 허용 0
++     L24: const preview = { started: true, running: true, completed: false, failed: false,
++     L48: useProjectStore.setState({ projectId: pid, projectTitle: 'MVP 피드백 검수', currentSt
++     L51: useArtistStore.setState({  characterAssets:[{characterId:'kyotaro',name:'쿄타로',en",
++ ]
+
+ ❯ tests/ui-text/i18n-korean-scan.test.ts:126:7
+    124|       regressions,
+    125|       `하드코딩 한글 증가 — t() 사전화하거나 정당하면 // i18n-ok:\n${regressions.join('\…
+    126|     ).toEqual([])
+       |       ^
+    127|   })
+    128| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  23:56:23
+   Duration  261ms (transform 19ms, setup 18ms, import 15ms, tests 49ms, environment 0ms)
+

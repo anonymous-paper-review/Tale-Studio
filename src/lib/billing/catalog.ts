@@ -13,7 +13,7 @@ export type PlanTier = 'starter' | 'production'
 
 export interface PaddlePlan {
   id: PaddlePlanId
-  /** 시트 표기 그대로 (S-1 … P-30). */
+  /** 고객용 표시명. 내부 식별자(id)는 s1·p10 형식을 유지한다. */
   name: string
   tier: PlanTier
   monthlyPriceUsd: number
@@ -84,15 +84,15 @@ function pack(id: PaddleTakePackId, name: string, takes: number, priceUsd: numbe
 
 /** 구독 플랜 9개 — 무료(결제 없음)와 스튜디오(수동 계약)는 여기 없다. */
 export const PADDLE_PLANS: readonly PaddlePlan[] = [
-  plan('s1', 'S-1', 'starter', 15),
-  plan('s2', 'S-2', 'starter', 30),
-  plan('s5', 'S-5', 'starter', 60),
-  plan('s10', 'S-10', 'starter', 110),
-  plan('p10', 'P-10', 'production', 199),
-  plan('p15', 'P-15', 'production', 449),
-  plan('p20', 'P-20', 'production', 649),
-  plan('p25', 'P-25', 'production', 999),
-  plan('p30', 'P-30', 'production', 1299),
+  plan('s1', 'Starter1', 'starter', 15),
+  plan('s2', 'Starter2', 'starter', 30),
+  plan('s5', 'Starter5', 'starter', 60),
+  plan('s10', 'Starter10', 'starter', 110),
+  plan('p10', 'Producer10', 'production', 199),
+  plan('p15', 'Producer15', 'production', 449),
+  plan('p20', 'Producer20', 'production', 649),
+  plan('p25', 'Producer25', 'production', 999),
+  plan('p30', 'Producer30', 'production', 1299),
 ]
 
 /** Take 충전 팩 4개 — 구매일부터 12개월 유효 (v4 6_소멸시효). */

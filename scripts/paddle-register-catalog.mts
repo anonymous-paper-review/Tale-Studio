@@ -8,15 +8,29 @@
 // 사용:
 //   node --import ./tests/fixtures/alias-hook.mjs scripts/paddle-register-catalog.mts            # 등록(또는 재조회) 후 env 줄 출력
 //   node --import ./tests/fixtures/alias-hook.mjs scripts/paddle-register-catalog.mts --dry-run  # 만들 것만 보여줌
+//   node --import ./tests/fixtures/alias-hook.mjs scripts/paddle-register-catalog.mts --live --tax-category=saas # 승인된 SaaS 분류로 신규 상품 등록
+//   --tax-category 는 standard(기본값) 또는 saas. 기존 상품의 분류는 변경하지 않는다.
 //   PADDLE_API_KEY · NEXT_PUBLIC_PADDLE_ENV(sandbox|production) 를 .env.local 에서 읽는다.
 
 import { readFileSync } from 'node:fs'
+import { parseArgs } from 'node:util'
 import { PADDLE_PLANS, PADDLE_TAKE_PACKS } from '@/lib/billing/catalog'
 
-const dryRun = process.argv.includes('--dry-run')
+const { values: options } = parseArgs({
+  options: {
+    'dry-run': { type: 'boolean', default: false },
+    live: { type: 'boolean', default: false },
+    'tax-category': { type: 'string', default: 'standard' },
+  },
+})
+const dryRun = options['dry-run']
 // 라이브는 --live 를 명시할 때만 건드린다. env 하나로 갈리면 로컬에서 실수로 라이브에 상품이 생긴다.
 //   라이브 키는 PADDLE_LIVE_API_KEY 로 따로 둔다(CLAUDE.md 키 스코프 규칙).
-const live = process.argv.includes('--live')
+const live = options.live
+const taxCategory = options['tax-category']
+if (taxCategory !== 'standard' && taxCategory !== 'saas') {
+  throw new Error('--tax-category must be standard or saas')
+}
 
 const env = Object.fromEntries(
   readFileSync('.env.local', 'utf8')
@@ -122,7 +136,7 @@ for (const item of items) {
     product = await paddle<PaddleProduct>('POST', '/products', {
       name: item.productName,
       description: item.productDescription,
-      tax_category: 'standard',
+      tax_category: taxCategory,
       custom_data: { tale_id: item.taleId },
     })
   }
@@ -137,9 +151,9 @@ for (const item of items) {
       custom_data: { tale_id: item.taleId },
     })
   }
-  // 가격이 바뀌었으면 경고만 — Paddle 가격은 불변이라 새 가격을 만들고 옛 것을 archive 해야 한다(손으로).
+  // 가격 차이는 경고만. Paddle은 가격 수정을 지원하지만 이 등록 명령은 기존 가격을 바꾸지 않는다.
   if (price.unit_price.amount !== String(item.amountMinor)) {
-    console.warn(`  ⚠ price mismatch for ${item.taleId}: paddle=${price.unit_price.amount} catalog=${item.amountMinor}. archive old price and re-run.`)
+    console.warn(`  ⚠ price mismatch for ${item.taleId}: paddle=${price.unit_price.amount} catalog=${item.amountMinor}. review the existing price before updating or replacing it.`)
   }
   envLines.push(`${item.envKey}=${price.id}`)
 }

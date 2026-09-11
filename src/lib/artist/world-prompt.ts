@@ -130,3 +130,18 @@ export function buildWorldShotPromptForLocation(
 
   return worldShotPrompt(visual, timeOfDay, mood, boost, shot)
 }
+
+/** 모습 설명은 새 환경 조건의 원천이다. 기본 이미지에서는 구조만 참조하고 이전 씬의 조건은 섞지 않는다. */
+export function buildWorldShotPromptForAppearance(
+  location: ManifestLocation,
+  visualDescription: string,
+  boost: string | null,
+  shot: WorldShotKey,
+): string {
+  return worldShotPrompt(joinPromptParts([
+    visualDescription,
+    location.name,
+    location.props?.length ? `key props: ${location.props.join(', ')}` : '',
+    'Use the reference image for spatial layout and architecture only; apply the time of day, lighting, weather and condition specified in this appearance description',
+  ]), '', '', boost, shot)
+}

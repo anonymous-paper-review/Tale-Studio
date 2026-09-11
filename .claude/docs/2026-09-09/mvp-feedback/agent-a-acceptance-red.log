@@ -1,0 +1,28 @@
+
+ RUN  v4.1.6 /Users/xcape/projects/tale-studio
+
+(node:88487) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ tests/chat/request-preservation.test.ts (15 tests | 1 failed) 30ms
+     × 접수 결과를 받기 전에 새로고침하면 확인되지 않은 요청을 바로 재발주하지 않는다 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/chat/request-preservation.test.ts > 새로고침과 프로젝트 전환 중 접수 확인 > 접수 결과를 받기 전에 새로고침하면 확인되지 않은 요청을 바로 재발주하지 않는다
+AssertionError: expected "vi.fn()" to be called 1 times, but got 2 times
+ ❯ tests/chat/request-preservation.test.ts:223:20
+    221|     const retry = useGlobalChatStore.getState().approvePendingProposal…
+    222|     // 원래 접수의 결과를 모르면 같은 대상을 새로 만들지 않아야 한다.
+    223|     expect(create).toHaveBeenCalledTimes(1)
+       |                    ^
+    224|     finish('saved')
+    225|     await run
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 14 passed (15)
+   Start at  23:34:17
+   Duration  380ms (transform 206ms, setup 9ms, import 260ms, tests 30ms, environment 0ms)
+

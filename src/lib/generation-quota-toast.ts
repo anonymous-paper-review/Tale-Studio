@@ -6,9 +6,10 @@
 //   일도 안 일어난 것처럼 보였고, real-batch-client 는 한국어 하드코딩 toast 라 영어 UI 에서 한글이
 //   튀었다. 서버 게이트는 하나(checkGenerationCapacity)인데 안내가 7가지면 같은 상태가 7가지로 보인다.
 //
-// 여기 없는 예외 하나: rough-storyboard-view 의 자동 펌프. 거기서 429 는 "실패"가 아니라 "큐가 빌
-//   때까지 대기" 신호이고 라운드마다 재시도하므로, 매 라운드 toast 를 띄우면 소음이 된다. 그쪽은
-//   자체 억제 로직(3라운드째 1회)을 유지한다 — 의도된 분기이니 여기로 합치지 말 것.
+// 자리 부족은 어느 경로든 안내만 하고 자동 재시도하지 않는다(2026-09-11 오너 결정). 그래서 여기 문구는
+//   "잠시 뒤 다시 시도"만 말하고 "자동으로 시작된다"는 약속을 하지 않는다 — 예전 영어 문구가 그 약속을 했고
+//   실제로는 Artist·개별 영상 경로에 자동 재개가 없었다(2026-09-11 동시성 감사). 러프 전체 생성 펌프도
+//   이제 재시도 없이 멈추므로 같은 토스트를 쓴다(예전 자체 억제 로직은 사라졌다).
 
 import { toast } from 'sonner'
 import { translate } from '@/lib/i18n'
@@ -52,7 +53,7 @@ export function notifyQuotaExceeded(body: QuotaExceededBody | null | undefined):
     scope === 'global'
       ? translate(
           locale,
-          'All generation slots are busy right now. It will start automatically in a moment, so please try again shortly.',
+          'All generation slots are busy right now. Please try again in a moment.',
         )
       : body?.category === 'video'
         ? translate(

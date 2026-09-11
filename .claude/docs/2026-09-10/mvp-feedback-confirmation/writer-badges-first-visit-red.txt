@@ -1,0 +1,48 @@
+
+ RUN  v4.1.6 /Users/xcape/projects/tale-studio
+
+(node:76390) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ tests/job/completion-first-visit.test.ts (4 tests | 2 failed) 4ms
+   × 완료가 없는 Writer를 처음 방문하고 다른 탭으로 떠난 뒤 첫 이미지가 완료되면 숫자는 1이 된다. 3ms
+   × 완료가 없는 같은 Writer 화면을 다시 그려도 최초 방문 기록은 한 번만 저장한다. 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/job/completion-first-visit.test.ts > 완료가 없는 Writer를 처음 방문하고 다른 탭으로 떠난 뒤 첫 이미지가 완료되면 숫자는 1이 된다.
+AssertionError: expected undefined to be +0 // Object.is equality
+
+- Expected:
+0
+
++ Received:
+undefined
+
+ ❯ tests/job/completion-first-visit.test.ts:21:54
+     19|   expect(useStageBadges('first-empty-writer', 'writer')).toEqual({})
+     20|   commitEffects()
+     21|   expect(readStageSeen('first-empty-writer').writer).toBe(0)
+       |                                                      ^
+     22|   useStageBadges('first-empty-writer', 'artist')
+     23|   commitEffects()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/job/completion-first-visit.test.ts > 완료가 없는 같은 Writer 화면을 다시 그려도 최초 방문 기록은 한 번만 저장한다.
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ tests/job/completion-first-visit.test.ts:49:16
+     47|   useStageBadges('same-empty-writer', 'writer')
+     48|   commitEffects()
+     49|   expect(save).toHaveBeenCalledTimes(1)
+       |                ^
+     50| })
+     51|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 2 passed (4)
+   Start at  11:37:54
+   Duration  176ms (transform 19ms, setup 12ms, import 15ms, tests 4ms, environment 0ms)
+

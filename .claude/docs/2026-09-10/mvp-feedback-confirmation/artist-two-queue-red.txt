@@ -1,0 +1,41 @@
+
+ RUN  v4.1.6 /Users/xcape/projects/tale-studio
+
+(node:70582) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+stdout | tests/artist/two-appearance-queue.test.ts > 채팅에서 두 모습이 실제 생성 접수까지 이어진다 > 두 인물의 다른 시간대 모습을 함께 요청하고 승인하면 두 인물의 새 모습 이미지가 각각 큐에 등록된다
+[artist timing] char kyotaro:appearance:main 1.0s 
+
+stdout | tests/artist/two-appearance-queue.test.ts > 채팅에서 두 모습이 실제 생성 접수까지 이어진다 > 두 인물의 다른 시간대 모습을 함께 요청하고 승인하면 두 인물의 새 모습 이미지가 각각 큐에 등록된다
+[artist timing] char komatsu:appearance:main 0.0s 
+
+ ❯ tests/artist/two-appearance-queue.test.ts (1 test | 1 failed) 1025ms
+     × 두 인물의 다른 시간대 모습을 함께 요청하고 승인하면 두 인물의 새 모습 이미지가 각각 큐에 등록된다 1024ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/artist/two-appearance-queue.test.ts > 채팅에서 두 모습이 실제 생성 접수까지 이어진다 > 두 인물의 다른 시간대 모습을 함께 요청하고 승인하면 두 인물의 새 모습 이미지가 각각 큐에 등록된다
+AssertionError: expected [ { id: 'job-1', …(15) } ] to have a length of 2 but got 1
+
+- Expected
++ Received
+
+- 2
++ 1
+
+ ❯ vi.waitFor.timeout tests/artist/two-appearance-queue.test.ts:152:59
+    150|   it('두 인물의 다른 시간대 모습을 함께 요청하고 승인하면 두 인물의 새 모습 이미지가 각각 큐에 등록된다', async…
+    151|     await requestAndApprove()
+    152|     await vi.waitFor(() => expect(tables.generation_jobs).toHaveLength…
+       |                                                           ^
+    153|     expect(tables.generation_jobs.map(job => job.status)).toEqual(['qu…
+    154|     expect(tables.generation_jobs.map(job => job.target)).toEqual(name…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  11:27:28
+   Duration  1.46s (transform 252ms, setup 9ms, import 341ms, tests 1.03s, environment 0ms)
+

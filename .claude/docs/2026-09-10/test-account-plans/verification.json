@@ -1,0 +1,30 @@
+{
+  "verifiedAt": "2026-09-10T05:32:10.819Z",
+  "email": "test-1c9dfc14@tale.studio",
+  "plan": "s1",
+  "billingMode": "shadow",
+  "projectId": "aa2aaf98-2a2a-4e36-9781-6be7ac56a71c",
+  "writerShotId": "sh_02_04",
+  "jobId": "a7bdc4f0-b520-4515-a43a-48673afd441d",
+  "status": "completed",
+  "balanceBefore": 16,
+  "balanceAfter": 15,
+  "jobLedger": [
+    {
+      "id": "d7893f5a-abd3-47b5-98dd-3d306d42eb2d",
+      "workspace_id": "f44a846b-1e9f-4c2a-b1a1-264ca193ff43",
+      "kind": "hold",
+      "delta": -1,
+      "grant_id": "81d49544-af3b-409a-8ae1-626c75bd493b",
+      "ref_kind": "generation_job",
+      "ref_id": "a7bdc4f0-b520-4515-a43a-48673afd441d",
+      "created_at": "2026-09-10T05:28:53.774802+00:00"
+    }
+  ],
+  "media": {
+    "status": 206,
+    "contentType": "video/mp4",
+    "contentLength": "4096",
+    "mp4HeaderVerified": true
+  }
+}

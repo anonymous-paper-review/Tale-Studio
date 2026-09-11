@@ -14,7 +14,10 @@ export type BatchStopReason =
   | 'cancelled'
   | 'insufficient_takes'
   | 'nothing_eligible'
+  /** 내 영상 한도(개인 축) — 내 영상이 끝나면 완료 알림이 이어간다. */
   | 'at_capacity'
+  /** 모두의 자리(전역 축)가 찼다 — 묶음을 멈추고 사용자가 다시 누른다(2026-09-11 오너 결정, 자동 재시도 없음). */
+  | 'global_at_capacity'
 
 export interface BatchNextInput {
   /** 이 묶음의 잡 전부(도는 것 + 끝난 것). */

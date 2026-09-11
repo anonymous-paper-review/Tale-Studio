@@ -10,6 +10,7 @@ import { LocationAppearanceCreateDialog } from '@/features/artist/location-appea
 import { useArtistStore, worldFailureKey, type WorldShotKey } from '@/stores/artist-store'
 import { DEFAULT_LOCATION_APPEARANCE_KEY } from '@/types/asset'
 import { useChatUiStore } from '@/stores/chat-ui-store'
+import { useProjectStore } from '@/stores/project-store'
 import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
 import { cn } from '@/lib/utils'
 import { createWheelNotchStepper } from '@/lib/wheel-notch'
@@ -21,6 +22,13 @@ export function WorldPanel({
   columns = 1,
   onZoomStep,
 }: { columns?: number; onZoomStep?: (dir: 1 | -1) => void } = {}) {
+  const projectId = useProjectStore(s => s.projectId)
+  const noteSelection = (id: string, appearanceKey: string, source: 'card' | 'appearance' | 'image') => {
+    if (projectId) useArtistStore.getState().setChatSelection({ projectId, target: 'background', id, appearanceKey, source })
+  }
+  useEffect(() => () => {
+    if (useArtistStore.getState().chatSelection?.target === 'background') useArtistStore.getState().setChatSelection(null)
+  }, [])
   const t = useT()
   const {
     sceneManifest,
@@ -29,6 +37,8 @@ export function WorldPanel({
     generatingLocations,
     worldFailures,
     selectLocation,
+    selectedLocationAppearances,
+    selectLocationAppearance,
   } = useArtistStore()
 
   const [viewDialog, setViewDialog] = useState<{
@@ -37,7 +47,6 @@ export function WorldPanel({
     appearanceKey: string | null
   } | null>(null)
   // 약속 C10: 카드 안에서 고른 모습(기본 = 'default'). 캐릭터 카드의 pickedAppearance 와 같다.
-  const [pickedAppearance, setPickedAppearance] = useState<Record<string, string>>({})
   const [createFor, setCreateFor] = useState<string | null>(null)
 
   // 입력창에 @멘션돼 있는 카드 하이라이트(#artist-mention) — mentionItems 의 id = locationId.
@@ -77,12 +86,12 @@ export function WorldPanel({
         >
           {worldAssets.map((world) => {
             const scene = getScene(world.sceneId)
-            const isGenerating = generatingLocations.includes(world.locationId)
             const isSelected = selectedLocationId === world.locationId
             // 약속 C10: 고른 모습(탭). 기본 모습은 배경 자체, 변형은 appearances 의 행.
-            const pickedKey = pickedAppearance[world.locationId] ?? DEFAULT_LOCATION_APPEARANCE_KEY
+            const pickedKey = selectedLocationAppearances[world.locationId] ?? DEFAULT_LOCATION_APPEARANCE_KEY
             const variant = pickedKey !== DEFAULT_LOCATION_APPEARANCE_KEY ? (world.appearances ?? []).find((a) => a.appearanceKey === pickedKey) ?? null : null
             const variantKey = variant ? variant.appearanceKey : null
+            const isGenerating = generatingLocations.includes(worldFailureKey(world.locationId, variantKey))
             const shownImage = variant ? variant.wideShot : world.wideShot
             // 약속 B7·B8: 설명이 바뀐 뒤 재생성 전이면 "설명 바뀜", 최근 생성이 실패했으면 "이미지 실패".
             const candidates = variant ? variant.candidates : (world.candidates ?? [])
@@ -95,7 +104,7 @@ export function WorldPanel({
                 key={world.locationId}
                 role="button"
                 tabIndex={0}
-                onClick={() => selectLocation(world.locationId)}
+                onClick={() => { selectLocation(world.locationId); noteSelection(world.locationId, variantKey ?? DEFAULT_LOCATION_APPEARANCE_KEY, 'card') }}
                 // ⌘/Ctrl+클릭 = 채팅 @멘션 토글 (#artist-mention 2026-08-11, 캐릭터 카드와 동일).
                 onPointerDownCapture={(e) => {
                   if (e.metaKey || e.ctrlKey) {
@@ -117,12 +126,15 @@ export function WorldPanel({
                   })
                 }}
                 // 더블 클릭 = 사진 클릭과 동일(#d5 2026-08-03) — 프롬프트/재생성 팝업
-                onDoubleClick={() =>
+                onDoubleClick={() => {
+                  noteSelection(world.locationId, variantKey ?? DEFAULT_LOCATION_APPEARANCE_KEY, 'image')
                   setViewDialog({ locationId: world.locationId, shot: 'wideShot', appearanceKey: variantKey })
-                }
+                }}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ')
+                  if (e.key === 'Enter' || e.key === ' ') {
                     selectLocation(world.locationId)
+                    noteSelection(world.locationId, variantKey ?? DEFAULT_LOCATION_APPEARANCE_KEY, 'card')
+                  }
                 }}
                 className={cn(
                   'cursor-pointer rounded-xl border p-4 transition-colors',
@@ -145,7 +157,7 @@ export function WorldPanel({
                       {t('Description changed')}
                     </Badge>
                   )}
-                  {scene && (
+                  {scene && !variant && (
                     <Badge variant="outline" className="text-[10px]">
                       {scene.timeOfDay}
                     </Badge>
@@ -160,7 +172,8 @@ export function WorldPanel({
                       <button
                         key={ap.appearanceKey}
                         type="button"
-                        onClick={() => setPickedAppearance((prev) => ({ ...prev, [world.locationId]: ap.appearanceKey }))}
+                        onClick={() => { selectLocationAppearance(world.locationId, ap.appearanceKey); noteSelection(world.locationId, ap.appearanceKey, 'appearance') }}
+                        aria-pressed={active}
                         className={cn(
                           'rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors',
                           active ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-accent',
@@ -186,6 +199,7 @@ export function WorldPanel({
                   title={t('Background: click to view or regenerate the prompt')}
                   onClick={(e) => {
                     e.stopPropagation()
+                    noteSelection(world.locationId, variantKey ?? DEFAULT_LOCATION_APPEARANCE_KEY, 'image')
                     setViewDialog({ locationId: world.locationId, shot: 'wideShot', appearanceKey: variantKey })
                   }}
                   className="block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
@@ -194,7 +208,7 @@ export function WorldPanel({
                     label={t('Background')}
                     aspectRatio="video"
                     imageUrl={shownImage}
-                    generating={isGenerating && !shownImage}
+                    generating={isGenerating}
                     hideCaption
                   />
                 </button>

@@ -1,0 +1,72 @@
+[
+  {
+    "name": "18-eight",
+    "width": 1511,
+    "height": 1000,
+    "bytes": 52848,
+    "note": "Format compression only; original screenshot content and dimensions preserved."
+  },
+  {
+    "name": "18-retry-complete",
+    "width": 1511,
+    "height": 1000,
+    "bytes": 57610,
+    "note": "Format compression only; original screenshot content and dimensions preserved."
+  },
+  {
+    "name": "23-night-request",
+    "width": 1280,
+    "height": 800,
+    "bytes": 34924,
+    "note": "Format compression only; original screenshot content and dimensions preserved."
+  },
+  {
+    "name": "23-night-popup",
+    "width": 1280,
+    "height": 800,
+    "bytes": 50660,
+    "note": "Format compression only; original screenshot content and dimensions preserved."
+  },
+  {
+    "name": "27-two-queued",
+    "width": 3022,
+    "height": 1528,
+    "bytes": 60896,
+    "note": "Format compression only; original screenshot content and dimensions preserved."
+  },
+  {
+    "name": "27-partial",
+    "width": 3022,
+    "height": 1528,
+    "bytes": 78596,
+    "note": "Format compression only; original screenshot content and dimensions preserved."
+  },
+  {
+    "name": "27-lost-response",
+    "width": 3022,
+    "height": 1528,
+    "bytes": 88016,
+    "note": "Format compression only; original screenshot content and dimensions preserved."
+  },
+  {
+    "name": "29-complete",
+    "width": 3022,
+    "height": 1528,
+    "bytes": 139106,
+    "note": "Format compression only; original screenshot content and dimensions preserved."
+  },
+  {
+    "name": "29-incomplete",
+    "width": 3022,
+    "height": 1528,
+    "bytes": 128228,
+    "note": "Format compression only; original screenshot content and dimensions preserved."
+  },
+  {
+    "name": "29-reloaded-dialogue",
+    "width": 3022,
+    "height": 1528,
+    "bytes": 130254,
+    "note": "Format compression only; original screenshot content and dimensions preserved."
+  }
+]

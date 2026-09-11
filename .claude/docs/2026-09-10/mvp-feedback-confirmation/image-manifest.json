@@ -1,0 +1,54 @@
+[
+  {
+    "name": "roof-day",
+    "title": "학교 옥상 · 기본 낮",
+    "url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/locations/v1-7a491a7afcbffb36ab684b293af806d138e045eeb2b6db4ab97b92e9a8751019_wide_shot.png?v=1788959327963",
+    "file": "images/roof-day.png",
+    "bytes": 1021309,
+    "sha256": "6ae23bbe49c88cf35fe737cb4aaadaf7aeaeac2109032cfcdc58ab279b3ddb23"
+  },
+  {
+    "name": "roof-night",
+    "title": "학교 옥상 · 현재 저장된 밤",
+    "url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/locations/v1-7a491a7afcbffb36ab684b293af806d138e045eeb2b6db4ab97b92e9a8751019_v1-6d1622d0f2bc1a5dba81addf168d43afb5a0d0d0d86973bff39a546062f35301_wide_shot.png?v=1788960311972",
+    "file": "images/roof-night.png",
+    "bytes": 1603279,
+    "sha256": "334125632eac5aac362573e4238123bfe5168799b603686ecae6f364c6561834"
+  },
+  {
+    "name": "kyotaro-default",
+    "title": "쿄타로 · 현재",
+    "url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634/v1-97b0560280ed60a5a1eaa1bc45492543c8a986ad5a25b468c427eb83c3e88191_main.png?v=1788959269950",
+    "updatedAt": "2026-09-09T13:07:53.743261+00:00",
+    "file": "images/kyotaro-default.png",
+    "bytes": 1121857,
+    "sha256": "b1764db8551f943f5f1a10d24a58574b2f0a586d86693a79fecbccec43426659"
+  },
+  {
+    "name": "komatsu-default",
+    "title": "코마츠 · 현재",
+    "url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/characters/v1-c50f938b516a0c463fd8f294753aa219811679c3267f33f227edd6bcf5abad2a/v1-97b0560280ed60a5a1eaa1bc45492543c8a986ad5a25b468c427eb83c3e88191_main.png?v=1788959254986",
+    "updatedAt": "2026-09-09T13:07:38.270811+00:00",
+    "file": "images/komatsu-default.png",
+    "bytes": 1398258,
+    "sha256": "32761744cf9235e04cc7e597f7ffb6b6324d5bfd8a7367f4597839058edf0741"
+  },
+  {
+    "name": "kyotaro-pajamas",
+    "title": "쿄타로 · 잠옷 모습",
+    "url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634/v1-6d1622d0f2bc1a5dba81addf168d43afb5a0d0d0d86973bff39a546062f35301_main.png?v=1788960191247",
+    "updatedAt": "2026-09-09T13:23:14.692709+00:00",
+    "file": "images/kyotaro-pajamas.png",
+    "bytes": 1172088,
+    "sha256": "8afa3da5a879d3f90a7e4587a6179de907e80465ba360ad66d7a043c3f985256"
+  },
+  {
+    "name": "komatsu-pajamas",
+    "title": "코마츠 · 잠옷 모습",
+    "url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/characters/v1-c50f938b516a0c463fd8f294753aa219811679c3267f33f227edd6bcf5abad2a/v1-6d1622d0f2bc1a5dba81addf168d43afb5a0d0d0d86973bff39a546062f35301_main.png?v=1788960536864",
+    "updatedAt": "2026-09-09T13:29:00.027807+00:00",
+    "file": "images/komatsu-pajamas.png",
+    "bytes": 1351099,
+    "sha256": "91fea83ecbb742c79185063b07e350d357e5995b7cdbbaf9122b1e3cbe43fd1b"
+  }
+]

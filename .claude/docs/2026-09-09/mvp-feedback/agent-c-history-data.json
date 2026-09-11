@@ -1,0 +1,1027 @@
+{
+  "projectId": "7112d31e-70ce-4743-9562-057f7beac002",
+  "scope": "기존 사용자 소유 탭. 알려진 프로젝트 및 알려진 잡만 GET. UI 이동·생성·수정 없음. 프롬프트/원문/키/쿠키/URL 제외.",
+  "debug": {
+    "capturedAt": "2026-09-09T14:55:39.319Z",
+    "count": 200,
+    "earliest": "2026-09-09T13:12:17.684448+00:00",
+    "events": [
+      {
+        "at": "2026-09-09T13:19:26.145+00:00",
+        "event": "ui_reflected",
+        "jobId": "8066f5f3-0d4e-4ce4-b00a-c058fe9a4684",
+        "payload": {
+          "kind": "shot_rough_storyboard",
+          "view": "writer-rough"
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:19:25.507169+00:00",
+        "event": "ui_reflected",
+        "jobId": "ea4252c4-8bd1-462a-8e94-8d3a81859cf3",
+        "payload": {
+          "kind": "shot_rough_storyboard",
+          "view": "writer-rough"
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:19:22.931827+00:00",
+        "event": "auto_submit_response",
+        "jobId": null,
+        "payload": {
+          "auto": true,
+          "httpStatus": 200,
+          "remaining": 13,
+          "submittedCount": 7
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:19:22.013508+00:00",
+        "event": "finalize_completed",
+        "jobId": "ea4252c4-8bd1-462a-8e94-8d3a81859cf3",
+        "payload": {
+          "resultUrlPresent": true,
+          "status": "completed"
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:19:21.410484+00:00",
+        "event": "fal_submit_accepted",
+        "jobId": null,
+        "payload": {
+          "jobId": "fc9e0a2c-fb82-40a5-a755-b6df67f74b2c",
+          "model": "openai/gpt-image-2/edit",
+          "shotCount": 4
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:19:18.252494+00:00",
+        "event": "fal_submit_started",
+        "jobId": null,
+        "payload": {
+          "shotCount": 4
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:19:17.935751+00:00",
+        "event": "fal_submit_accepted",
+        "jobId": null,
+        "payload": {
+          "jobId": "9c0405fc-90aa-4883-be95-0cf770db628b",
+          "model": "openai/gpt-image-2/edit",
+          "shotCount": 3
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:19:12.705593+00:00",
+        "event": "fal_submit_started",
+        "jobId": null,
+        "payload": {
+          "shotCount": 3
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:18:59.99216+00:00",
+        "event": "ui_reflected",
+        "jobId": "d817bb05-85f2-4cbc-b626-31cbdc9ab894",
+        "payload": {
+          "kind": "shot_rough_storyboard",
+          "view": "writer-rough"
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:18:59.850371+00:00",
+        "event": "auto_check",
+        "jobId": null,
+        "payload": {
+          "autoTriggered": true,
+          "hasShots": true,
+          "missingCount": 20,
+          "pipelineCompleted": true,
+          "pipelineFailed": false,
+          "pipelineStatus": "completed",
+          "queuedCount": 12,
+          "reason": "eligible",
+          "running": false,
+          "shotCount": 47
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:18:59.699192+00:00",
+        "event": "route_classified",
+        "jobId": null,
+        "payload": {
+          "eligibleCount": 20,
+          "submittedCount": 7,
+          "wantedCount": 47
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:18:57.508669+00:00",
+        "event": "route_entered",
+        "jobId": null,
+        "payload": {
+          "shotCount": 0
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:18:57.506281+00:00",
+        "event": "auto_submit_started",
+        "jobId": null,
+        "payload": {
+          "missingCount": 20,
+          "queuedCount": 12,
+          "shotCount": 47,
+          "source": "writer_entry"
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:17:42.113771+00:00",
+        "event": "auto_submit_response",
+        "jobId": null,
+        "payload": {
+          "auto": true,
+          "httpStatus": 200,
+          "remaining": 20,
+          "submittedCount": 8
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:17:38.867997+00:00",
+        "event": "fal_submit_accepted",
+        "jobId": null,
+        "payload": {
+          "jobId": "8066f5f3-0d4e-4ce4-b00a-c058fe9a4684",
+          "model": "openai/gpt-image-2/edit",
+          "shotCount": 4
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:17:35.129288+00:00",
+        "event": "fal_submit_started",
+        "jobId": null,
+        "payload": {
+          "shotCount": 4
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:17:34.820158+00:00",
+        "event": "fal_submit_accepted",
+        "jobId": null,
+        "payload": {
+          "jobId": "ea4252c4-8bd1-462a-8e94-8d3a81859cf3",
+          "model": "openai/gpt-image-2/edit",
+          "shotCount": 4
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:17:31.704932+00:00",
+        "event": "fal_submit_started",
+        "jobId": null,
+        "payload": {
+          "shotCount": 4
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:17:29.266291+00:00",
+        "event": "auto_check",
+        "jobId": null,
+        "payload": {
+          "autoTriggered": true,
+          "hasShots": true,
+          "missingCount": 28,
+          "pipelineCompleted": true,
+          "pipelineFailed": false,
+          "pipelineStatus": "completed",
+          "queuedCount": 6,
+          "reason": "eligible",
+          "running": false,
+          "shotCount": 47
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:17:27.511259+00:00",
+        "event": "ui_reflected",
+        "jobId": "bdc76ba1-620b-4574-833a-d6e23a6c7898",
+        "payload": {
+          "kind": "shot_rough_storyboard",
+          "view": "writer-rough"
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:17:25.967601+00:00",
+        "event": "route_classified",
+        "jobId": null,
+        "payload": {
+          "eligibleCount": 28,
+          "submittedCount": 8,
+          "wantedCount": 47
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:17:23.515342+00:00",
+        "event": "auto_submit_started",
+        "jobId": null,
+        "payload": {
+          "missingCount": 28,
+          "queuedCount": 10,
+          "shotCount": 47,
+          "source": "writer_entry"
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:17:22.258373+00:00",
+        "event": "route_entered",
+        "jobId": null,
+        "payload": {
+          "shotCount": 0
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:17:20.192028+00:00",
+        "event": "ui_reflected",
+        "jobId": "46c22f6f-2935-4d83-b870-b3de05f10f14",
+        "payload": {
+          "kind": "shot_rough_storyboard",
+          "view": "writer-rough"
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:17:19.979108+00:00",
+        "event": "ui_reflected",
+        "jobId": "082ad968-dfb2-4c1e-8c6a-1b890659036e",
+        "payload": {
+          "kind": "shot_rough_storyboard",
+          "view": "writer-rough"
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:17:18.562141+00:00",
+        "event": "finalize_completed",
+        "jobId": "bdc76ba1-620b-4574-833a-d6e23a6c7898",
+        "payload": {
+          "resultUrlPresent": true,
+          "status": "completed"
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:17:11.567905+00:00",
+        "event": "auto_submit_response",
+        "jobId": null,
+        "payload": {
+          "auto": true,
+          "httpStatus": 200,
+          "remaining": 28,
+          "submittedCount": 6
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:17:08.996493+00:00",
+        "event": "fal_submit_accepted",
+        "jobId": null,
+        "payload": {
+          "jobId": "a9097cbd-9c58-43e3-accd-73a191644ea3",
+          "model": "openai/gpt-image-2/edit",
+          "shotCount": 2
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:17:07.265624+00:00",
+        "event": "fal_submit_started",
+        "jobId": null,
+        "payload": {
+          "shotCount": 2
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:17:06.966801+00:00",
+        "event": "fal_submit_accepted",
+        "jobId": null,
+        "payload": {
+          "jobId": "d817bb05-85f2-4cbc-b626-31cbdc9ab894",
+          "model": "openai/gpt-image-2/edit",
+          "shotCount": 4
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:17:04.490997+00:00",
+        "event": "fal_submit_started",
+        "jobId": null,
+        "payload": {
+          "shotCount": 4
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:17:03.355759+00:00",
+        "event": "ui_reflected",
+        "jobId": "5ac2483c-c5c4-4fa4-b140-00b96eda8cb3",
+        "payload": {
+          "kind": "shot_rough_storyboard",
+          "view": "writer-rough"
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:16:58.130686+00:00",
+        "event": "route_classified",
+        "jobId": null,
+        "payload": {
+          "eligibleCount": 34,
+          "submittedCount": 6,
+          "wantedCount": 47
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:16:57.626603+00:00",
+        "event": "auto_check",
+        "jobId": null,
+        "payload": {
+          "autoTriggered": true,
+          "hasShots": true,
+          "missingCount": 34,
+          "pipelineCompleted": true,
+          "pipelineFailed": false,
+          "pipelineStatus": "completed",
+          "queuedCount": 5,
+          "reason": "eligible",
+          "running": false,
+          "shotCount": 47
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:16:54.951781+00:00",
+        "event": "route_entered",
+        "jobId": null,
+        "payload": {
+          "shotCount": 0
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:16:53.734936+00:00",
+        "event": "auto_submit_started",
+        "jobId": null,
+        "payload": {
+          "missingCount": 34,
+          "queuedCount": 5,
+          "shotCount": 47,
+          "source": "writer_entry"
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:16:50.458417+00:00",
+        "event": "ui_reflected",
+        "jobId": "6f8ea5cf-86f2-49a1-836e-2d3eb409a39d",
+        "payload": {
+          "kind": "shot_rough_storyboard",
+          "view": "writer-rough"
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:16:43.273443+00:00",
+        "event": "ui_reflected",
+        "jobId": "5f1af52e-4199-4d93-8ca2-4bb2cdc37a66",
+        "payload": {
+          "kind": "shot_rough_storyboard",
+          "view": "writer-rough"
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:30.38279+00:00",
+        "event": "auto_submit_response",
+        "jobId": null,
+        "payload": {
+          "auto": true,
+          "httpStatus": 200,
+          "remaining": 34,
+          "submittedCount": 5
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:28.981112+00:00",
+        "event": "fal_submit_accepted",
+        "jobId": null,
+        "payload": {
+          "jobId": "bdc76ba1-620b-4574-833a-d6e23a6c7898",
+          "model": "openai/gpt-image-2/edit",
+          "shotCount": 4
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:23.512808+00:00",
+        "event": "auto_submit_response",
+        "jobId": null,
+        "payload": {
+          "auto": true,
+          "httpStatus": 200,
+          "remaining": 34,
+          "submittedCount": 5
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:22.500958+00:00",
+        "event": "ui_reflected",
+        "jobId": "7551f2e8-97e9-4051-89f1-162ae534f1e8",
+        "payload": {
+          "kind": "shot_rough_storyboard",
+          "view": "writer-rough"
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:22.065035+00:00",
+        "event": "fal_submit_accepted",
+        "jobId": null,
+        "payload": {
+          "jobId": "082ad968-dfb2-4c1e-8c6a-1b890659036e",
+          "model": "openai/gpt-image-2/edit",
+          "shotCount": 4
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:21.954199+00:00",
+        "event": "fal_submit_started",
+        "jobId": null,
+        "payload": {
+          "shotCount": 4
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:21.610007+00:00",
+        "event": "fal_submit_accepted",
+        "jobId": null,
+        "payload": {
+          "jobId": "5ac2483c-c5c4-4fa4-b140-00b96eda8cb3",
+          "model": "openai/gpt-image-2/edit",
+          "shotCount": 1
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:21.518431+00:00",
+        "event": "ui_reflected",
+        "jobId": "e66e0e6c-dffc-473e-9698-b10c726db072",
+        "payload": {
+          "kind": "shot_rough_storyboard",
+          "view": "writer-rough"
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:19.374163+00:00",
+        "event": "auto_submit_response",
+        "jobId": null,
+        "payload": {
+          "auto": true,
+          "httpStatus": 200,
+          "remaining": 34,
+          "submittedCount": 5
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:19.063311+00:00",
+        "event": "fal_submit_started",
+        "jobId": null,
+        "payload": {
+          "shotCount": 1
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:17.989974+00:00",
+        "event": "fal_submit_accepted",
+        "jobId": null,
+        "payload": {
+          "jobId": "46c22f6f-2935-4d83-b870-b3de05f10f14",
+          "model": "openai/gpt-image-2/edit",
+          "shotCount": 4
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:16.109802+00:00",
+        "event": "fal_submit_started",
+        "jobId": null,
+        "payload": {
+          "shotCount": 4
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:15.271537+00:00",
+        "event": "route_classified",
+        "jobId": null,
+        "payload": {
+          "eligibleCount": 39,
+          "submittedCount": 5,
+          "wantedCount": 47
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:15.04192+00:00",
+        "event": "fal_submit_accepted",
+        "jobId": null,
+        "payload": {
+          "jobId": "5f1af52e-4199-4d93-8ca2-4bb2cdc37a66",
+          "model": "openai/gpt-image-2/edit",
+          "shotCount": 1
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:14.910672+00:00",
+        "event": "fal_submit_started",
+        "jobId": null,
+        "payload": {
+          "shotCount": 4
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:14.609079+00:00",
+        "event": "fal_submit_accepted",
+        "jobId": null,
+        "payload": {
+          "jobId": "6f8ea5cf-86f2-49a1-836e-2d3eb409a39d",
+          "model": "openai/gpt-image-2/edit",
+          "shotCount": 1
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:12.186384+00:00",
+        "event": "fal_submit_started",
+        "jobId": null,
+        "payload": {
+          "shotCount": 1
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:11.784322+00:00",
+        "event": "route_entered",
+        "jobId": null,
+        "payload": {
+          "shotCount": 0
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:11.245327+00:00",
+        "event": "auto_check",
+        "jobId": null,
+        "payload": {
+          "autoTriggered": true,
+          "hasShots": true,
+          "missingCount": 39,
+          "pipelineCompleted": true,
+          "pipelineFailed": false,
+          "pipelineStatus": "completed",
+          "queuedCount": 8,
+          "reason": "eligible",
+          "running": false,
+          "shotCount": 47
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:09.558735+00:00",
+        "event": "auto_submit_started",
+        "jobId": null,
+        "payload": {
+          "missingCount": 39,
+          "queuedCount": 8,
+          "shotCount": 47,
+          "source": "writer_entry"
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:08.877358+00:00",
+        "event": "fal_submit_started",
+        "jobId": null,
+        "payload": {
+          "shotCount": 1
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:08.82017+00:00",
+        "event": "route_classified",
+        "jobId": null,
+        "payload": {
+          "eligibleCount": 39,
+          "submittedCount": 5,
+          "wantedCount": 47
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:06.285242+00:00",
+        "event": "auto_check",
+        "jobId": null,
+        "payload": {
+          "autoTriggered": true,
+          "hasShots": true,
+          "missingCount": 39,
+          "pipelineCompleted": true,
+          "pipelineFailed": false,
+          "pipelineStatus": "completed",
+          "queuedCount": 8,
+          "reason": "eligible",
+          "running": false,
+          "shotCount": 47
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:04.38792+00:00",
+        "event": "route_entered",
+        "jobId": null,
+        "payload": {
+          "shotCount": 0
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:04.100807+00:00",
+        "event": "auto_submit_started",
+        "jobId": null,
+        "payload": {
+          "missingCount": 39,
+          "queuedCount": 8,
+          "shotCount": 47,
+          "source": "writer_entry"
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:02.403706+00:00",
+        "event": "route_classified",
+        "jobId": null,
+        "payload": {
+          "eligibleCount": 39,
+          "submittedCount": 5,
+          "wantedCount": 47
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:15:01.553271+00:00",
+        "event": "auto_check",
+        "jobId": null,
+        "payload": {
+          "autoTriggered": true,
+          "hasShots": true,
+          "missingCount": 39,
+          "pipelineCompleted": true,
+          "pipelineFailed": false,
+          "pipelineStatus": "completed",
+          "queuedCount": 8,
+          "reason": "eligible",
+          "running": false,
+          "shotCount": 47
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:14:59.776978+00:00",
+        "event": "auto_submit_started",
+        "jobId": null,
+        "payload": {
+          "missingCount": 39,
+          "queuedCount": 8,
+          "shotCount": 47,
+          "source": "writer_entry"
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:14:59.628637+00:00",
+        "event": "route_entered",
+        "jobId": null,
+        "payload": {
+          "shotCount": 0
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:13:24.552837+00:00",
+        "event": "auto_submit_response",
+        "jobId": null,
+        "payload": {
+          "auto": true,
+          "httpStatus": 200,
+          "remaining": 39,
+          "submittedCount": 8
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:13:22.560416+00:00",
+        "event": "fal_submit_accepted",
+        "jobId": null,
+        "payload": {
+          "jobId": "7551f2e8-97e9-4051-89f1-162ae534f1e8",
+          "model": "openai/gpt-image-2/edit",
+          "shotCount": 4
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:13:20.271328+00:00",
+        "event": "fal_submit_started",
+        "jobId": null,
+        "payload": {
+          "shotCount": 4
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:13:19.907852+00:00",
+        "event": "fal_submit_accepted",
+        "jobId": null,
+        "payload": {
+          "jobId": "e66e0e6c-dffc-473e-9698-b10c726db072",
+          "model": "openai/gpt-image-2/edit",
+          "shotCount": 4
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:13:16.630077+00:00",
+        "event": "fal_submit_started",
+        "jobId": null,
+        "payload": {
+          "shotCount": 4
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:13:12.865729+00:00",
+        "event": "auto_check",
+        "jobId": null,
+        "payload": {
+          "autoTriggered": true,
+          "hasShots": true,
+          "missingCount": 47,
+          "pipelineCompleted": true,
+          "pipelineFailed": false,
+          "pipelineStatus": "completed",
+          "queuedCount": 0,
+          "reason": "eligible",
+          "running": false,
+          "shotCount": 47
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:13:11.907634+00:00",
+        "event": "route_classified",
+        "jobId": null,
+        "payload": {
+          "eligibleCount": 47,
+          "submittedCount": 8,
+          "wantedCount": 47
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:13:08.980993+00:00",
+        "event": "route_entered",
+        "jobId": null,
+        "payload": {
+          "shotCount": 0
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:13:08.902499+00:00",
+        "event": "auto_submit_started",
+        "jobId": null,
+        "payload": {
+          "missingCount": 47,
+          "queuedCount": 0,
+          "shotCount": 47,
+          "source": "writer_entry"
+        },
+        "runId": null
+      },
+      {
+        "at": "2026-09-09T13:13:05.674774+00:00",
+        "event": "stage_completed",
+        "jobId": null,
+        "payload": {
+          "attempt": 1,
+          "calls": 0,
+          "durationMs": 42210,
+          "rateLimitHits": 0,
+          "stage": "persistShots"
+        },
+        "runId": "7ece6db5-b87d-4f40-be33-5d093d9c9eb6"
+      },
+      {
+        "at": "2026-09-09T13:12:22.005448+00:00",
+        "event": "stage_started",
+        "jobId": null,
+        "payload": {
+          "attempt": 1,
+          "stage": "persistShots"
+        },
+        "runId": "7ece6db5-b87d-4f40-be33-5d093d9c9eb6"
+      },
+      {
+        "at": "2026-09-09T13:12:20.583468+00:00",
+        "event": "stage_completed",
+        "jobId": null,
+        "payload": {
+          "attempt": 1,
+          "calls": 1,
+          "durationMs": 1048,
+          "rateLimitHits": 0,
+          "stage": "shotsAndDialogue"
+        },
+        "runId": "7ece6db5-b87d-4f40-be33-5d093d9c9eb6"
+      },
+      {
+        "at": "2026-09-09T13:12:17.684448+00:00",
+        "event": "stage_started",
+        "jobId": null,
+        "payload": {
+          "attempt": 1,
+          "stage": "shotsAndDialogue"
+        },
+        "runId": "7ece6db5-b87d-4f40-be33-5d093d9c9eb6"
+      }
+    ],
+    "latest": "2026-09-09T14:03:40.729939+00:00"
+  },
+  "jobDetails": {
+    "capturedAt": "2026-09-09T14:59:16.224Z",
+    "jobs": [
+      {
+        "completedAt": "2026-09-09T13:16:40.402+00:00",
+        "createdAt": "2026-09-09T13:15:14.300545+00:00",
+        "httpStatus": 200,
+        "id": "6f8ea5cf-86f2-49a1-836e-2d3eb409a39d",
+        "kind": "shot_rough_storyboard",
+        "matched": true,
+        "shotIds": [
+          "sh_01_09"
+        ],
+        "snapshotShotIds": [
+          "sh_01_09"
+        ],
+        "status": "completed",
+        "submittedAt": "2026-09-09T13:15:13.637+00:00",
+        "updatedAt": "2026-09-09T13:16:40.402+00:00"
+      },
+      {
+        "completedAt": "2026-09-09T13:16:37.277+00:00",
+        "createdAt": "2026-09-09T13:15:14.678208+00:00",
+        "httpStatus": 200,
+        "id": "5f1af52e-4199-4d93-8ca2-4bb2cdc37a66",
+        "kind": "shot_rough_storyboard",
+        "matched": true,
+        "shotIds": [
+          "sh_01_09"
+        ],
+        "snapshotShotIds": [
+          "sh_01_09"
+        ],
+        "status": "completed",
+        "submittedAt": "2026-09-09T13:15:14.522+00:00",
+        "updatedAt": "2026-09-09T13:16:37.277+00:00"
+      },
+      {
+        "completedAt": "2026-09-09T13:17:13.026+00:00",
+        "createdAt": "2026-09-09T13:15:17.671988+00:00",
+        "httpStatus": 200,
+        "id": "46c22f6f-2935-4d83-b870-b3de05f10f14",
+        "kind": "shot_rough_storyboard",
+        "matched": true,
+        "shotIds": [
+          "sh_02_10",
+          "sh_02_11",
+          "sh_02_12",
+          "sh_02_13"
+        ],
+        "snapshotShotIds": [
+          "sh_02_10",
+          "sh_02_11",
+          "sh_02_12",
+          "sh_02_13"
+        ],
+        "status": "completed",
+        "submittedAt": "2026-09-09T13:15:16.957+00:00",
+        "updatedAt": "2026-09-09T13:17:13.026+00:00"
+      },
+      {
+        "completedAt": "2026-09-09T13:16:55.095+00:00",
+        "createdAt": "2026-09-09T13:15:21.276203+00:00",
+        "httpStatus": 200,
+        "id": "5ac2483c-c5c4-4fa4-b140-00b96eda8cb3",
+        "kind": "shot_rough_storyboard",
+        "matched": true,
+        "shotIds": [
+          "sh_01_09"
+        ],
+        "snapshotShotIds": [
+          "sh_01_09"
+        ],
+        "status": "completed",
+        "submittedAt": "2026-09-09T13:15:21.109+00:00",
+        "updatedAt": "2026-09-09T13:16:55.095+00:00"
+      },
+      {
+        "completedAt": "2026-09-09T13:17:10.409+00:00",
+        "createdAt": "2026-09-09T13:15:21.479042+00:00",
+        "httpStatus": 200,
+        "id": "082ad968-dfb2-4c1e-8c6a-1b890659036e",
+        "kind": "shot_rough_storyboard",
+        "matched": true,
+        "shotIds": [
+          "sh_02_10",
+          "sh_02_11",
+          "sh_02_12",
+          "sh_02_13"
+        ],
+        "snapshotShotIds": [
+          "sh_02_10",
+          "sh_02_11",
+          "sh_02_12",
+          "sh_02_13"
+        ],
+        "status": "completed",
+        "submittedAt": "2026-09-09T13:15:20.217+00:00",
+        "updatedAt": "2026-09-09T13:17:10.409+00:00"
+      },
+      {
+        "completedAt": "2026-09-09T13:17:18.099+00:00",
+        "createdAt": "2026-09-09T13:15:28.300928+00:00",
+        "httpStatus": 200,
+        "id": "bdc76ba1-620b-4574-833a-d6e23a6c7898",
+        "kind": "shot_rough_storyboard",
+        "matched": true,
+        "shotIds": [
+          "sh_02_10",
+          "sh_02_11",
+          "sh_02_12",
+          "sh_02_13"
+        ],
+        "snapshotShotIds": [
+          "sh_02_10",
+          "sh_02_11",
+          "sh_02_12",
+          "sh_02_13"
+        ],
+        "status": "completed",
+        "submittedAt": "2026-09-09T13:15:28.082+00:00",
+        "updatedAt": "2026-09-09T13:17:18.099+00:00"
+      }
+    ]
+  }
+}

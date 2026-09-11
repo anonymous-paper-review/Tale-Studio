@@ -76,7 +76,7 @@ describe('Producer에서 Writer로 넘기는 작업을 다시 시작할 때 확�
     })
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(new Response(JSON.stringify({ runId: 'run-1' }), { status: 200 }))
+      .mockImplementation(async () => Response.json({ runId: 'run-1', started: false }))
 
     await useGlobalChatStore.getState().sendMessage('Writer로 핸드오프해줘')
 
@@ -135,7 +135,7 @@ describe('Producer에서 Writer로 넘기는 작업을 다시 시작할 때 확�
     })
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(new Response(JSON.stringify({ runId: 'run-1' }), { status: 200 }))
+      .mockImplementation(async () => Response.json({ runId: 'run-1', started: false }))
 
     await useGlobalChatStore
       .getState()
@@ -154,9 +154,7 @@ describe('Producer에서 Writer로 넘기는 작업을 다시 시작할 때 확�
   })
 
   it('승인한 작업을 넘기지 못하면 실패 사실을 솔직하게 알린다', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ runId: 'run-1' }), { status: 200 }),
-    )
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({ runId: 'run-1', started: false }))
     await useGlobalChatStore.getState().sendMessage('Writer로 핸드오프해줘')
     const proposal = useGlobalChatStore.getState().pendingProposal
     expect(proposal?.kind).toBe('producerWriterInitialHandoff')

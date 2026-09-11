@@ -1,0 +1,2999 @@
+{
+  "id": "9fbff049-ec31-44c4-bc89-352dcedd422a",
+  "ok": true,
+  "result": {
+    "requests": [
+      {
+        "headers": {
+          "Origin": "http://127.0.0.1:3073",
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "font/woff2",
+        "requestId": "53302.101",
+        "resourceType": "Font",
+        "responseHeaders": {
+          "Cache-Control": "public, max-age=31536000, immutable",
+          "Content-Type": "font/woff2",
+          "Date": "Thu, 10 Sep 2026 06:15:27 GMT"
+        },
+        "status": 200,
+        "timestamp": 1789021100127,
+        "url": "http://127.0.0.1:3073/__nextjs_font/geist-latin.woff2"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "image/gif",
+        "requestId": "53302.108",
+        "resourceType": "Image",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "public, max-age=0",
+          "Connection": "keep-alive",
+          "Content-Length": "46475",
+          "Content-Type": "image/gif",
+          "Date": "Thu, 10 Sep 2026 06:18:20 GMT",
+          "ETag": "W/\"b58b-1a089b54669\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:05:53 GMT"
+        },
+        "status": 200,
+        "timestamp": 1789021100327,
+        "url": "http://127.0.0.1:3073/agent-face/preview/artist_idle.gif"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36"
+        },
+        "method": "GET",
+        "mimeType": "image/svg+xml",
+        "requestId": "53302.109",
+        "resourceType": "Image",
+        "responseHeaders": {
+          "Content-Type": "image/svg+xml"
+        },
+        "status": 200,
+        "timestamp": 1789021100327,
+        "url": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22640%22%20height%3D%22360%22%3E%3Crect%20width%3D%22640%22%20height%3D%22360%22%20fill%3D%22%236b7280%22%2F%3E%3Ctext%20x%3D%22320%22%20y%3D%22190%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2228%22%3E%EC%BF%84%ED%83%80%EB%A1%9C%20%C2%B7%20%EA%B2%80%EC%A6%9D%EC%9A%A9%20%EA%B8%B0%EB%B3%B8%20%EC%9D%B4%EB%AF%B8%EC%A7%80%3C%2Ftext%3E%3C%2Fsvg%3E"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36"
+        },
+        "method": "GET",
+        "mimeType": "image/svg+xml",
+        "requestId": "53302.110",
+        "resourceType": "Image",
+        "responseHeaders": {
+          "Content-Type": "image/svg+xml"
+        },
+        "status": 200,
+        "timestamp": 1789021100327,
+        "url": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22640%22%20height%3D%22360%22%3E%3Crect%20width%3D%22640%22%20height%3D%22360%22%20fill%3D%22%236b7280%22%2F%3E%3Ctext%20x%3D%22320%22%20y%3D%22190%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2228%22%3E%EC%BD%94%EB%A7%88%EC%B8%A0%20%C2%B7%20%EA%B2%80%EC%A6%9D%EC%9A%A9%20%EA%B8%B0%EB%B3%B8%20%EC%9D%B4%EB%AF%B8%EC%A7%80%3C%2Ftext%3E%3C%2Fsvg%3E"
+      },
+      {
+        "headers": {
+          "Upgrade-Insecure-Requests": "1",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36"
+        },
+        "method": "GET",
+        "mimeType": "text/html",
+        "requestId": "B561A9466DDA470C9E509F9828805C26",
+        "resourceType": "Document",
+        "responseHeaders": {
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "text/html; charset=utf-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "Keep-Alive": "timeout=5",
+          "Transfer-Encoding": "chunked",
+          "Vary": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding",
+          "X-Powered-By": "Next.js",
+          "link": "</_next/static/media/797e433ab948586e-s.p.29207c2f.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/media/PretendardVariable-s.p.77d5d991.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\""
+        },
+        "status": 200,
+        "timestamp": 1789021120928,
+        "url": "http://127.0.0.1:3073/playground/mvp-artist"
+      },
+      {
+        "headers": {
+          "Origin": "http://127.0.0.1:3073",
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist"
+        },
+        "method": "GET",
+        "mimeType": "font/woff2",
+        "requestId": "53302.112",
+        "resourceType": "Font",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "public, max-age=31536000, immutable",
+          "Content-Length": "23108",
+          "Content-Type": "font/woff2",
+          "Date": "Thu, 10 Sep 2026 06:15:11 GMT",
+          "ETag": "W/\"5a44-1a089c369f7\"",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/media/797e433ab948586e-s.p.29207c2f.woff2"
+      },
+      {
+        "headers": {
+          "Origin": "http://127.0.0.1:3073",
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist"
+        },
+        "method": "GET",
+        "mimeType": "font/woff2",
+        "requestId": "53302.113",
+        "resourceType": "Font",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "public, max-age=31536000, immutable",
+          "Content-Length": "2057688",
+          "Content-Type": "font/woff2",
+          "Date": "Thu, 10 Sep 2026 06:15:11 GMT",
+          "ETag": "W/\"1f65d8-1a089c369fa\"",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/media/PretendardVariable-s.p.77d5d991.woff2"
+      },
+      {
+        "headers": {
+          "Origin": "http://127.0.0.1:3073",
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist"
+        },
+        "method": "GET",
+        "mimeType": "font/woff2",
+        "requestId": "53302.114",
+        "resourceType": "Font",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "public, max-age=31536000, immutable",
+          "Content-Length": "29288",
+          "Content-Type": "font/woff2",
+          "Date": "Thu, 10 Sep 2026 06:15:11 GMT",
+          "ETag": "W/\"7268-1a089c36a03\"",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "text/css",
+        "requestId": "53302.115",
+        "resourceType": "Stylesheet",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "text/css; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"32936-1a089c369ff\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/%5Broot-of-the-server%5D__d67e1c1d._.css"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.116",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Length": "1006",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"3ee-1a089c36a00\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_d2d39dca._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.117",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"100a82-1a089c369f6\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/ff08c_next_dist_compiled_react-dom_2d17ba5c._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.118",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"2a32e-1a089c36a05\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/ff08c_next_dist_compiled_react-server-dom-turbopack_48185986._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.119",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"c758d-1a089c369f3\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/ff08c_next_dist_compiled_next-devtools_index_925f7894.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.120",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"2a8d5-1a089c36a00\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/ff08c_next_dist_compiled_08d4ded3._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.121",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"5c99e-1a089f75181\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 06:18:01 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/ff08c_next_dist_shared_lib_da95faa4._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.122",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"b4bdd-1a089c369fd\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/ff08c_next_dist_client_2b88b9bc._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.123",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"2a69e-1a089c369f9\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/ff08c_next_dist_e4f69e47._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.124",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Length": "998",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"3e6-1a089c369f9\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/ff08c_next_router_2bc45873.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.125",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"b2d55-1a089c369f6\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/6e576_%40sentry_core_build_esm_2566d085._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.126",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"41403-1a089c369ec\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/b822b_%40sentry_browser_build_npm_esm_dev_c415a9f3._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.127",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"7f12c-1a089c369eb\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/a22b6_%40sentry_conventions_dist_attributes_mjs_eb93548f._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.128",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"3fd97-1a089c369ea\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/201c3_%40sentry_browser-utils_build_esm_40e7c13d._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.129",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"1ebaf-1a089f4b71c\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 06:15:11 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/node_modules__pnpm_dfee261c._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.130",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"16fe-1a089c369ee\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/src_instrumentation-client_ts_3e309371._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.131",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"4a3-1a089c369fe\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/_a0ff3932._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.132",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"12895-1a089c369fe\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/turbopack-_4ea085f8._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.133",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"21c32-1a089c369ed\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/ff08c_next_dist_2cbcd10a._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.134",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Length": "255",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"ff-1a089c36a01\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/src_app_favicon_ico_mjs_a2a5aca9._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.135",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"c89e4-1a089c369f1\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/node_modules__pnpm_6f0a6826._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.136",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"76ce-1a089c369ee\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/src_d2b9429e._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.137",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Length": "351",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"15f-1a089c369f8\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/src_app_layout_tsx_6867a83b._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.138",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"1d23-1a089f77943\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 06:18:12 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/src_0006273a._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.139",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"8da28-1a089f5432c\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 06:15:47 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/src_lib_dbe170c8._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.140",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"c1388-1a089f544bb\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 06:15:47 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/src_stores_b56ebf3e._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.141",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"d12b8-1a089f54328\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 06:15:47 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/src_components_944770d8._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.142",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"f28e3-1a089f77945\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 06:18:12 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/src_features_67a7a085._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.143",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"1421c-1a089f7e8e5\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 06:18:40 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/src_7bd3350d._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.144",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"66e67-1a089c5f98c\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:24:08 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/ff08c_next_d83ea69e._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.145",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"57d0b-1a089c3e811\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:52 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/9e886_%40supabase_auth-js_dist_module_83919691._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.146",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"2662e-1a089c5f98e\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:24:08 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/a960d_jszip_lib_e477054f._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.147",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"3b0ef-1a089c5f98d\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:24:08 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/09734_pako_4e01b642._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.148",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"23001-1a089f54332\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 06:15:47 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/2c99e_%40radix-ui_react-select_dist_index_mjs_785da972._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.149",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"140492-1a089f77946\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 06:18:12 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/node_modules__pnpm_92413cd0._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.150",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Length": "794",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"31a-1a089f77946\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 06:18:12 GMT",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/src_app_playground_mvp-artist_page_tsx_3d024489._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.151",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Length": "206",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"ce-1a089c36a00\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121226,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/ff08c_next_dist_client_components_builtin_global-error_6867a83b.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.203",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"3d97-1a089c369f2\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121325,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_c8c997ce._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.204",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Length": "288",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:18:41 GMT",
+          "ETag": "W/\"120-1a089c36a03\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021121325,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_658f5926._.js"
+      },
+      {
+        "headers": {
+          "Origin": "http://127.0.0.1:3073",
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist"
+        },
+        "method": "GET",
+        "mimeType": "font/woff2",
+        "requestId": "53302.211",
+        "resourceType": "Font",
+        "responseHeaders": {
+          "Cache-Control": "public, max-age=31536000, immutable",
+          "Content-Type": "font/woff2",
+          "Date": "Thu, 10 Sep 2026 06:15:27 GMT"
+        },
+        "status": 200,
+        "timestamp": 1789021121325,
+        "url": "http://127.0.0.1:3073/__nextjs_font/geist-latin.woff2"
+      },
+      {
+        "headers": {
+          "Content-Type": "text/plain;charset=UTF-8",
+          "Referer": "http://127.0.0.1:3073/",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "POST",
+        "mimeType": "application/json",
+        "postData": "{\"sent_at\":\"2026-09-10T06:18:41.281Z\",\"sdk\":{\"name\":\"sentry.javascript.nextjs\",\"version\":\"10.73.0\"}}\n{\"type\":\"session\"}\n{\"sid\":\"38641296cc354424bb58bfc2db93ad31\",\"init\":true,\"started\":\"2026-09-10T06:18:41.203Z\",\"timestamp\":\"2026-09-10T06:18:41.281Z\",\"status\":\"exited\",\"errors\":0,\"attrs\":{\"release\":\"39fe2081a64a09d33d34caf2d8eb0f6c16da40c1\",\"environment\":\"development\",\"user_agent\":\"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36\"}}",
+        "requestId": "53302.213",
+        "resourceType": "Fetch",
+        "responseHeaders": {
+          "access-control-allow-origin": "*",
+          "access-control-expose-headers": "x-sentry-error,x-sentry-rate-limits,retry-after",
+          "alt-svc": "h3=\":443\"; ma=2592000",
+          "content-length": "2",
+          "content-type": "application/json",
+          "cross-origin-resource-policy": "cross-origin",
+          "date": "Thu, 10 Sep 2026 06:18:45 GMT",
+          "server": "nginx",
+          "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+          "vary": "origin, access-control-request-method, access-control-request-headers",
+          "via": "1.1 google"
+        },
+        "status": 200,
+        "timestamp": 1789021121326,
+        "url": "https://o4512015313403904.ingest.us.sentry.io/api/4512015322382336/envelope/?sentry_version=7&sentry_key=5635c403027737d2215c71db29260470&sentry_client=sentry.javascript.nextjs%2F10.73.0"
+      },
+      {
+        "headers": {
+          "Content-Type": "text/plain;charset=UTF-8",
+          "Referer": "http://127.0.0.1:3073/",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "POST",
+        "mimeType": "application/json",
+        "postData": "{\"sent_at\":\"2026-09-10T06:18:41.282Z\",\"sdk\":{\"name\":\"sentry.javascript.nextjs\",\"version\":\"10.73.0\"}}\n{\"type\":\"session\"}\n{\"sid\":\"6ceab1c46ab14c298518d90fe7c0524b\",\"init\":true,\"started\":\"2026-09-10T06:18:41.281Z\",\"timestamp\":\"2026-09-10T06:18:41.281Z\",\"status\":\"ok\",\"errors\":0,\"attrs\":{\"release\":\"39fe2081a64a09d33d34caf2d8eb0f6c16da40c1\",\"environment\":\"development\",\"user_agent\":\"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36\"}}",
+        "requestId": "53302.214",
+        "resourceType": "Fetch",
+        "responseHeaders": {
+          "access-control-allow-origin": "*",
+          "access-control-expose-headers": "x-sentry-error,x-sentry-rate-limits,retry-after",
+          "alt-svc": "h3=\":443\"; ma=2592000",
+          "content-length": "2",
+          "content-type": "application/json",
+          "cross-origin-resource-policy": "cross-origin",
+          "date": "Thu, 10 Sep 2026 06:18:45 GMT",
+          "server": "nginx",
+          "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+          "vary": "origin, access-control-request-method, access-control-request-headers",
+          "via": "1.1 google"
+        },
+        "status": 200,
+        "timestamp": 1789021121326,
+        "url": "https://o4512015313403904.ingest.us.sentry.io/api/4512015322382336/envelope/?sentry_version=7&sentry_key=5635c403027737d2215c71db29260470&sentry_client=sentry.javascript.nextjs%2F10.73.0"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/"
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.216",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "access-control-allow-origin": "*",
+          "age": "180",
+          "cache-control": "public, max-age=2678400",
+          "content-disposition": "inline; filename=\"script.debug.js\"",
+          "content-encoding": "br",
+          "content-type": "application/javascript; charset=utf-8",
+          "cross-origin-resource-policy": "cross-origin",
+          "date": "Wed, 09 Sep 2026 14:32:59 GMT",
+          "etag": "W/\"a71a819d0ac3330a501eeb62195b7ea0\"",
+          "last-modified": "Wed, 09 Sep 2026 13:50:22 GMT",
+          "server": "Vercel",
+          "x-vercel-cache": "HIT",
+          "x-vercel-id": "icn1::rjjsv-1788964379172-2d1fe73fa87b"
+        },
+        "status": 200,
+        "timestamp": 1789021121427,
+        "url": "https://va.vercel-scripts.com/v1/script.debug.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "image/gif",
+        "requestId": "53302.215",
+        "resourceType": "Image",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "public, max-age=0",
+          "Content-Length": "38906",
+          "Content-Type": "image/gif",
+          "Date": "Thu, 10 Sep 2026 06:18:42 GMT",
+          "ETag": "W/\"97fa-1a089b5466a\"",
+          "Last-Modified": "Thu, 10 Sep 2026 05:05:53 GMT"
+        },
+        "status": 200,
+        "timestamp": 1789021122327,
+        "url": "http://127.0.0.1:3073/agent-face/preview/writer_idle.gif"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36"
+        },
+        "method": "GET",
+        "mimeType": "image/svg+xml",
+        "requestId": "53302.218",
+        "resourceType": "Image",
+        "responseHeaders": {
+          "Content-Type": "image/svg+xml"
+        },
+        "status": 200,
+        "timestamp": 1789021127827,
+        "url": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22640%22%20height%3D%22360%22%3E%3Crect%20width%3D%22640%22%20height%3D%22360%22%20fill%3D%22%236b7280%22%2F%3E%3Ctext%20x%3D%22320%22%20y%3D%22190%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2228%22%3E%EC%BF%84%ED%83%80%EB%A1%9C%20%C2%B7%20%EA%B2%80%EC%A6%9D%EC%9A%A9%20%EA%B8%B0%EB%B3%B8%20%EC%9D%B4%EB%AF%B8%EC%A7%80%3C%2Ftext%3E%3C%2Fsvg%3E"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36"
+        },
+        "method": "GET",
+        "mimeType": "image/svg+xml",
+        "requestId": "53302.219",
+        "resourceType": "Image",
+        "responseHeaders": {
+          "Content-Type": "image/svg+xml"
+        },
+        "status": 200,
+        "timestamp": 1789021127827,
+        "url": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22640%22%20height%3D%22360%22%3E%3Crect%20width%3D%22640%22%20height%3D%22360%22%20fill%3D%22%236b7280%22%2F%3E%3Ctext%20x%3D%22320%22%20y%3D%22190%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2228%22%3E%EC%BD%94%EB%A7%88%EC%B8%A0%20%C2%B7%20%EA%B2%80%EC%A6%9D%EC%9A%A9%20%EA%B8%B0%EB%B3%B8%20%EC%9D%B4%EB%AF%B8%EC%A7%80%3C%2Ftext%3E%3C%2Fsvg%3E"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "image/gif",
+        "requestId": "53302.222",
+        "resourceType": "Image",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "public, max-age=0",
+          "Content-Length": "46475",
+          "Content-Type": "image/gif",
+          "Date": "Thu, 10 Sep 2026 06:18:47 GMT",
+          "ETag": "W/\"b58b-1a089b54669\"",
+          "Last-Modified": "Thu, 10 Sep 2026 05:05:53 GMT"
+        },
+        "status": 200,
+        "timestamp": 1789021127827,
+        "url": "http://127.0.0.1:3073/agent-face/preview/artist_idle.gif"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "image/gif",
+        "requestId": "53302.223",
+        "resourceType": "Image",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "public, max-age=0",
+          "Connection": "keep-alive",
+          "Content-Length": "18035",
+          "Content-Type": "image/gif",
+          "Date": "Thu, 10 Sep 2026 06:18:59 GMT",
+          "ETag": "W/\"4673-1a089b54669\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:05:53 GMT"
+        },
+        "status": 200,
+        "timestamp": 1789021139825,
+        "url": "http://127.0.0.1:3073/agent-face/preview/artist_thinking.gif"
+      },
+      {
+        "headers": {
+          "Upgrade-Insecure-Requests": "1",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36"
+        },
+        "method": "GET",
+        "mimeType": "text/html",
+        "requestId": "E6B64384F519274203F9833AFFBA3E5B",
+        "resourceType": "Document",
+        "responseHeaders": {
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "text/html; charset=utf-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "Keep-Alive": "timeout=5",
+          "Transfer-Encoding": "chunked",
+          "Vary": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch, Accept-Encoding",
+          "X-Powered-By": "Next.js",
+          "link": "</_next/static/media/797e433ab948586e-s.p.29207c2f.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/media/PretendardVariable-s.p.77d5d991.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\", </_next/static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2>; rel=preload; as=\"font\"; crossorigin=\"\"; type=\"font/woff2\""
+        },
+        "status": 200,
+        "timestamp": 1789021179028,
+        "url": "http://127.0.0.1:3073/playground/mvp-artist"
+      },
+      {
+        "headers": {
+          "Origin": "http://127.0.0.1:3073",
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist"
+        },
+        "method": "GET",
+        "mimeType": "font/woff2",
+        "requestId": "53302.228",
+        "resourceType": "Font",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "public, max-age=31536000, immutable",
+          "Content-Length": "23108",
+          "Content-Type": "font/woff2",
+          "Date": "Thu, 10 Sep 2026 06:15:11 GMT",
+          "ETag": "W/\"5a44-1a089c369f7\"",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/media/797e433ab948586e-s.p.29207c2f.woff2"
+      },
+      {
+        "headers": {
+          "Origin": "http://127.0.0.1:3073",
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist"
+        },
+        "method": "GET",
+        "mimeType": "font/woff2",
+        "requestId": "53302.229",
+        "resourceType": "Font",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "public, max-age=31536000, immutable",
+          "Content-Length": "2057688",
+          "Content-Type": "font/woff2",
+          "Date": "Thu, 10 Sep 2026 06:15:11 GMT",
+          "ETag": "W/\"1f65d8-1a089c369fa\"",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/media/PretendardVariable-s.p.77d5d991.woff2"
+      },
+      {
+        "headers": {
+          "Origin": "http://127.0.0.1:3073",
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist"
+        },
+        "method": "GET",
+        "mimeType": "font/woff2",
+        "requestId": "53302.230",
+        "resourceType": "Font",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "public, max-age=31536000, immutable",
+          "Content-Length": "29288",
+          "Content-Type": "font/woff2",
+          "Date": "Thu, 10 Sep 2026 06:15:11 GMT",
+          "ETag": "W/\"7268-1a089c36a03\"",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "text/css",
+        "requestId": "53302.231",
+        "resourceType": "Stylesheet",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "text/css; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"32936-1a089c369ff\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/%5Broot-of-the-server%5D__d67e1c1d._.css"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.232",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Length": "1006",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"3ee-1a089c36a00\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_d2d39dca._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.233",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"100a82-1a089c369f6\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/ff08c_next_dist_compiled_react-dom_2d17ba5c._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.234",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"2a32e-1a089c36a05\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/ff08c_next_dist_compiled_react-server-dom-turbopack_48185986._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.235",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"c758d-1a089c369f3\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/ff08c_next_dist_compiled_next-devtools_index_925f7894.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.236",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"2a8d5-1a089c36a00\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/ff08c_next_dist_compiled_08d4ded3._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.237",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"5c99e-1a089f75181\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 06:18:01 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/ff08c_next_dist_shared_lib_da95faa4._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.238",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"b4bdd-1a089c369fd\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/ff08c_next_dist_client_2b88b9bc._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.239",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"2a69e-1a089c369f9\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/ff08c_next_dist_e4f69e47._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.240",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Length": "998",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"3e6-1a089c369f9\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/ff08c_next_router_2bc45873.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.241",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"b2d55-1a089c369f6\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/6e576_%40sentry_core_build_esm_2566d085._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.242",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"41403-1a089c369ec\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/b822b_%40sentry_browser_build_npm_esm_dev_c415a9f3._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.243",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"7f12c-1a089c369eb\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/a22b6_%40sentry_conventions_dist_attributes_mjs_eb93548f._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.244",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"3fd97-1a089c369ea\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/201c3_%40sentry_browser-utils_build_esm_40e7c13d._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.245",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"1ebaf-1a089f4b71c\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 06:15:11 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/node_modules__pnpm_dfee261c._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.246",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"16fe-1a089c369ee\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/src_instrumentation-client_ts_3e309371._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.247",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"4a3-1a089c369fe\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/_a0ff3932._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.248",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"12895-1a089c369fe\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/turbopack-_4ea085f8._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.249",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"21c32-1a089c369ed\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/ff08c_next_dist_2cbcd10a._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.250",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Length": "255",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"ff-1a089c36a01\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/src_app_favicon_ico_mjs_a2a5aca9._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.251",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"c89e4-1a089c369f1\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/node_modules__pnpm_6f0a6826._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.252",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"76ce-1a089c369ee\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/src_d2b9429e._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.253",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Length": "351",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"15f-1a089c369f8\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/src_app_layout_tsx_6867a83b._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.254",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"1d23-1a089f77943\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 06:18:12 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/src_0006273a._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.255",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"8da28-1a089f5432c\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 06:15:47 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/src_lib_dbe170c8._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.256",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"c1388-1a089f544bb\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 06:15:47 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/src_stores_b56ebf3e._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.257",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"d12b8-1a089f54328\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 06:15:47 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/src_components_944770d8._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.258",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"f28e3-1a089f77945\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 06:18:12 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/src_features_67a7a085._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.259",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"14228-1a089f885e6\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 06:19:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/src_7bd3350d._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.260",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"66e67-1a089c5f98c\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:24:08 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/ff08c_next_d83ea69e._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.261",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"57d0b-1a089c3e811\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:52 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/9e886_%40supabase_auth-js_dist_module_83919691._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.262",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"2662e-1a089c5f98e\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:24:08 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/a960d_jszip_lib_e477054f._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.263",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"3b0ef-1a089c5f98d\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:24:08 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/09734_pako_4e01b642._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.264",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"23001-1a089f54332\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 06:15:47 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/2c99e_%40radix-ui_react-select_dist_index_mjs_785da972._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.265",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"140492-1a089f77946\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 06:18:12 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/node_modules__pnpm_92413cd0._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.266",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Length": "794",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"31a-1a089f77946\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 06:18:12 GMT",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/src_app_playground_mvp-artist_page_tsx_3d024489._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.267",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Length": "206",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"ce-1a089c36a00\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179225,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/ff08c_next_dist_client_components_builtin_global-error_6867a83b.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.319",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Encoding": "gzip",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"3d97-1a089c369f2\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Transfer-Encoding": "chunked",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179325,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_c8c997ce._.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.320",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "no-store, must-revalidate",
+          "Connection": "keep-alive",
+          "Content-Length": "288",
+          "Content-Type": "application/javascript; charset=UTF-8",
+          "Date": "Thu, 10 Sep 2026 06:19:39 GMT",
+          "ETag": "W/\"120-1a089c36a03\"",
+          "Keep-Alive": "timeout=5",
+          "Last-Modified": "Thu, 10 Sep 2026 05:21:20 GMT",
+          "Vary": "Accept-Encoding"
+        },
+        "status": 200,
+        "timestamp": 1789021179325,
+        "url": "http://127.0.0.1:3073/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_658f5926._.js"
+      },
+      {
+        "headers": {
+          "Origin": "http://127.0.0.1:3073",
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist"
+        },
+        "method": "GET",
+        "mimeType": "font/woff2",
+        "requestId": "53302.327",
+        "resourceType": "Font",
+        "responseHeaders": {
+          "Cache-Control": "public, max-age=31536000, immutable",
+          "Content-Type": "font/woff2",
+          "Date": "Thu, 10 Sep 2026 06:15:27 GMT"
+        },
+        "status": 200,
+        "timestamp": 1789021179325,
+        "url": "http://127.0.0.1:3073/__nextjs_font/geist-latin.woff2"
+      },
+      {
+        "headers": {
+          "Content-Type": "text/plain;charset=UTF-8",
+          "Referer": "http://127.0.0.1:3073/",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "POST",
+        "mimeType": "application/json",
+        "postData": "{\"sent_at\":\"2026-09-10T06:19:39.248Z\",\"sdk\":{\"name\":\"sentry.javascript.nextjs\",\"version\":\"10.73.0\"}}\n{\"type\":\"session\"}\n{\"sid\":\"f1c7571ba0f64b0396e7eb6db656130e\",\"init\":true,\"started\":\"2026-09-10T06:19:39.237Z\",\"timestamp\":\"2026-09-10T06:19:39.237Z\",\"status\":\"ok\",\"errors\":0,\"attrs\":{\"release\":\"39fe2081a64a09d33d34caf2d8eb0f6c16da40c1\",\"environment\":\"development\",\"user_agent\":\"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36\"}}",
+        "requestId": "53302.329",
+        "resourceType": "Fetch",
+        "responseHeaders": {
+          "access-control-allow-origin": "*",
+          "access-control-expose-headers": "x-sentry-error,x-sentry-rate-limits,retry-after",
+          "alt-svc": "h3=\":443\"; ma=2592000",
+          "content-length": "2",
+          "content-type": "application/json",
+          "cross-origin-resource-policy": "cross-origin",
+          "date": "Thu, 10 Sep 2026 06:19:43 GMT",
+          "server": "nginx",
+          "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+          "vary": "origin, access-control-request-method, access-control-request-headers",
+          "via": "1.1 google"
+        },
+        "status": 200,
+        "timestamp": 1789021179325,
+        "url": "https://o4512015313403904.ingest.us.sentry.io/api/4512015322382336/envelope/?sentry_version=7&sentry_key=5635c403027737d2215c71db29260470&sentry_client=sentry.javascript.nextjs%2F10.73.0"
+      },
+      {
+        "headers": {
+          "Content-Type": "text/plain;charset=UTF-8",
+          "Referer": "http://127.0.0.1:3073/",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "POST",
+        "mimeType": "application/json",
+        "postData": "{\"sent_at\":\"2026-09-10T06:19:39.334Z\",\"sdk\":{\"name\":\"sentry.javascript.nextjs\",\"version\":\"10.73.0\"}}\n{\"type\":\"session\"}\n{\"sid\":\"f1c7571ba0f64b0396e7eb6db656130e\",\"init\":false,\"started\":\"2026-09-10T06:19:39.237Z\",\"timestamp\":\"2026-09-10T06:19:39.334Z\",\"status\":\"exited\",\"errors\":0,\"attrs\":{\"release\":\"39fe2081a64a09d33d34caf2d8eb0f6c16da40c1\",\"environment\":\"development\",\"user_agent\":\"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36\"}}",
+        "requestId": "53302.330",
+        "resourceType": "Fetch",
+        "responseHeaders": {
+          "access-control-allow-origin": "*",
+          "access-control-expose-headers": "x-sentry-error,x-sentry-rate-limits,retry-after",
+          "alt-svc": "h3=\":443\"; ma=2592000",
+          "content-length": "2",
+          "content-type": "application/json",
+          "cross-origin-resource-policy": "cross-origin",
+          "date": "Thu, 10 Sep 2026 06:19:43 GMT",
+          "server": "nginx",
+          "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+          "vary": "origin, access-control-request-method, access-control-request-headers",
+          "via": "1.1 google"
+        },
+        "status": 200,
+        "timestamp": 1789021179428,
+        "url": "https://o4512015313403904.ingest.us.sentry.io/api/4512015322382336/envelope/?sentry_version=7&sentry_key=5635c403027737d2215c71db29260470&sentry_client=sentry.javascript.nextjs%2F10.73.0"
+      },
+      {
+        "headers": {
+          "Content-Type": "text/plain;charset=UTF-8",
+          "Referer": "http://127.0.0.1:3073/",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "POST",
+        "mimeType": "application/json",
+        "postData": "{\"sent_at\":\"2026-09-10T06:19:39.334Z\",\"sdk\":{\"name\":\"sentry.javascript.nextjs\",\"version\":\"10.73.0\"}}\n{\"type\":\"session\"}\n{\"sid\":\"8497a8e0310c447287af6dc3f604cafb\",\"init\":true,\"started\":\"2026-09-10T06:19:39.334Z\",\"timestamp\":\"2026-09-10T06:19:39.334Z\",\"status\":\"ok\",\"errors\":0,\"attrs\":{\"release\":\"39fe2081a64a09d33d34caf2d8eb0f6c16da40c1\",\"environment\":\"development\",\"user_agent\":\"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36\"}}",
+        "requestId": "53302.331",
+        "resourceType": "Fetch",
+        "responseHeaders": {
+          "access-control-allow-origin": "*",
+          "access-control-expose-headers": "x-sentry-error,x-sentry-rate-limits,retry-after",
+          "alt-svc": "h3=\":443\"; ma=2592000",
+          "content-length": "2",
+          "content-type": "application/json",
+          "cross-origin-resource-policy": "cross-origin",
+          "date": "Thu, 10 Sep 2026 06:19:43 GMT",
+          "server": "nginx",
+          "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+          "vary": "origin, access-control-request-method, access-control-request-headers",
+          "via": "1.1 google"
+        },
+        "status": 200,
+        "timestamp": 1789021179428,
+        "url": "https://o4512015313403904.ingest.us.sentry.io/api/4512015322382336/envelope/?sentry_version=7&sentry_key=5635c403027737d2215c71db29260470&sentry_client=sentry.javascript.nextjs%2F10.73.0"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/"
+        },
+        "method": "GET",
+        "mimeType": "application/javascript",
+        "requestId": "53302.333",
+        "resourceType": "Script",
+        "responseHeaders": {
+          "access-control-allow-origin": "*",
+          "age": "180",
+          "cache-control": "public, max-age=2678400",
+          "content-disposition": "inline; filename=\"script.debug.js\"",
+          "content-encoding": "br",
+          "content-type": "application/javascript; charset=utf-8",
+          "cross-origin-resource-policy": "cross-origin",
+          "date": "Wed, 09 Sep 2026 14:32:59 GMT",
+          "etag": "W/\"a71a819d0ac3330a501eeb62195b7ea0\"",
+          "last-modified": "Wed, 09 Sep 2026 13:50:22 GMT",
+          "server": "Vercel",
+          "x-vercel-cache": "HIT",
+          "x-vercel-id": "icn1::rjjsv-1788964379172-2d1fe73fa87b"
+        },
+        "status": 200,
+        "timestamp": 1789021179428,
+        "url": "https://va.vercel-scripts.com/v1/script.debug.js"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36"
+        },
+        "method": "GET",
+        "mimeType": "image/svg+xml",
+        "requestId": "53302.334",
+        "resourceType": "Image",
+        "responseHeaders": {
+          "Content-Type": "image/svg+xml"
+        },
+        "status": 200,
+        "timestamp": 1789021179528,
+        "url": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22640%22%20height%3D%22360%22%3E%3Crect%20width%3D%22640%22%20height%3D%22360%22%20fill%3D%22%236b7280%22%2F%3E%3Ctext%20x%3D%22320%22%20y%3D%22190%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2228%22%3E%EC%BF%84%ED%83%80%EB%A1%9C%20%C2%B7%20%EA%B2%80%EC%A6%9D%EC%9A%A9%20%EA%B8%B0%EB%B3%B8%20%EC%9D%B4%EB%AF%B8%EC%A7%80%3C%2Ftext%3E%3C%2Fsvg%3E"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36"
+        },
+        "method": "GET",
+        "mimeType": "image/svg+xml",
+        "requestId": "53302.335",
+        "resourceType": "Image",
+        "responseHeaders": {
+          "Content-Type": "image/svg+xml"
+        },
+        "status": 200,
+        "timestamp": 1789021179528,
+        "url": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22640%22%20height%3D%22360%22%3E%3Crect%20width%3D%22640%22%20height%3D%22360%22%20fill%3D%22%236b7280%22%2F%3E%3Ctext%20x%3D%22320%22%20y%3D%22190%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2228%22%3E%EC%BD%94%EB%A7%88%EC%B8%A0%20%C2%B7%20%EA%B2%80%EC%A6%9D%EC%9A%A9%20%EA%B8%B0%EB%B3%B8%20%EC%9D%B4%EB%AF%B8%EC%A7%80%3C%2Ftext%3E%3C%2Fsvg%3E"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "image/gif",
+        "requestId": "53302.338",
+        "resourceType": "Image",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "public, max-age=0",
+          "Content-Length": "46475",
+          "Content-Type": "image/gif",
+          "Date": "Thu, 10 Sep 2026 06:19:40 GMT",
+          "ETag": "W/\"b58b-1a089b54669\"",
+          "Last-Modified": "Thu, 10 Sep 2026 05:05:53 GMT"
+        },
+        "status": 200,
+        "timestamp": 1789021180327,
+        "url": "http://127.0.0.1:3073/agent-face/preview/artist_idle.gif"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "image/gif",
+        "requestId": "53302.343",
+        "resourceType": "Image",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "public, max-age=0",
+          "Content-Length": "18035",
+          "Content-Type": "image/gif",
+          "Date": "Thu, 10 Sep 2026 06:20:26 GMT",
+          "ETag": "W/\"4673-1a089b54669\"",
+          "Last-Modified": "Thu, 10 Sep 2026 05:05:53 GMT"
+        },
+        "status": 200,
+        "timestamp": 1789021226628,
+        "url": "http://127.0.0.1:3073/agent-face/preview/artist_thinking.gif"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36"
+        },
+        "method": "GET",
+        "mimeType": "image/svg+xml",
+        "requestId": "53302.347",
+        "resourceType": "Image",
+        "responseHeaders": {
+          "Content-Type": "image/svg+xml"
+        },
+        "status": 200,
+        "timestamp": 1789021298528,
+        "url": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22640%22%20height%3D%22360%22%3E%3Crect%20width%3D%22640%22%20height%3D%22360%22%20fill%3D%22%236b7280%22%2F%3E%3Ctext%20x%3D%22320%22%20y%3D%22190%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2228%22%3E%EC%BD%94%EB%A7%88%EC%B8%A0%20%C2%B7%20%EA%B2%80%EC%A6%9D%EC%9A%A9%20%EC%9E%A0%EC%98%B7%20%EC%9D%B4%EB%AF%B8%EC%A7%80%3C%2Ftext%3E%3C%2Fsvg%3E"
+      },
+      {
+        "headers": {
+          "Referer": "http://127.0.0.1:3073/playground/mvp-artist",
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Orca/1.4.198 Chrome/150.0.7871.224 Electron/43.4.1 Safari/537.36",
+          "sec-ch-ua": "\"Not;A=Brand\";v=\"8\", \"Chromium\";v=\"150\"",
+          "sec-ch-ua-mobile": "?0",
+          "sec-ch-ua-platform": "\"macOS\""
+        },
+        "method": "GET",
+        "mimeType": "image/gif",
+        "requestId": "53302.348",
+        "resourceType": "Image",
+        "responseHeaders": {
+          "Accept-Ranges": "bytes",
+          "Cache-Control": "public, max-age=0",
+          "Content-Length": "18035",
+          "Content-Type": "image/gif",
+          "Date": "Thu, 10 Sep 2026 06:22:16 GMT",
+          "ETag": "W/\"4673-1a089b54669\"",
+          "Last-Modified": "Thu, 10 Sep 2026 05:05:53 GMT"
+        },
+        "status": 200,
+        "timestamp": 1789021336726,
+        "url": "http://127.0.0.1:3073/agent-face/preview/artist_thinking.gif"
+      }
+    ]
+  },
+  "_meta": {
+    "runtimeId": "da993342-3f2f-4d76-bbf0-e447825a810b"
+  }
+}

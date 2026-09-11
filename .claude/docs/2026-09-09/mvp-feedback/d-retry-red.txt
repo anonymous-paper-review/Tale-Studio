@@ -1,0 +1,28 @@
+
+ RUN  v4.1.6 /Users/xcape/projects/tale-studio
+
+(node:94198) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ tests/writer/status-sharing.test.ts (4 tests | 1 failed) 22ms
+   × 다시 시작한 작업의 첫 상태 확인에 실패해도 다음 확인을 계속한다. 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/writer/status-sharing.test.ts > 다시 시작한 작업의 첫 상태 확인에 실패해도 다음 확인을 계속한다.
+AssertionError: expected "vi.fn()" to be called 3 times, but got 2 times
+ ❯ tests/writer/status-sharing.test.ts:52:19
+     50|   restartWriterStatus('retry')
+     51|   await vi.advanceTimersByTimeAsync(3001)
+     52|   expect(fetcher).toHaveBeenCalledTimes(3)
+       |                   ^
+     53|   expect(readWriterStatus('retry').status?.pipeline_failed).toBe(false)
+     54|   stop()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+   Start at  23:41:49
+   Duration  123ms (transform 14ms, setup 9ms, import 11ms, tests 22ms, environment 0ms)
+

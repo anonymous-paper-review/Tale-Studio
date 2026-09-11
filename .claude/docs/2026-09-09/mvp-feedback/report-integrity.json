@@ -1,0 +1,13 @@
+{
+  "todoCount": 29,
+  "checked": 17,
+  "open": 12,
+  "original28SourceHashPreserved": true,
+  "temporaryProductRouteRemoved": true,
+  "reportSelfContained": true,
+  "reportTableRows": 29,
+  "manualDbTestsPassed": 10,
+  "automaticTestsPassed": 2639,
+  "automaticTestsFailed": 2,
+  "automaticTestsSkipped": 22
+}

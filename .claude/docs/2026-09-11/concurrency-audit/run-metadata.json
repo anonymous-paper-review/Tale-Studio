@@ -1,0 +1,31 @@
+{
+  "commit": "867cda835195315e6a73cb4f8d262ef736302ff9",
+  "snapshot": "/var/folders/t6/snw_y0p96b5dhcbclfksgldm0000gn/T/tale-concurrency-main-TA7GGC",
+  "checkedAt": "2026-09-11T07:03:32.207Z",
+  "node": "v26.3.1",
+  "productionMutations": 0,
+  "generatedMediaRequests": 0,
+  "retainedSnapshot": true,
+  "runs": [
+    {
+      "name": "regression",
+      "exitCode": 0,
+      "files": [
+        "tests/billing/generation-quota-split-pools.test.ts",
+        "tests/billing/previz-record-before-submit.test.ts",
+        "tests/job/fal-keys.test.ts",
+        "tests/job/batch-continue-submission.test.ts",
+        "tests/job/batch-recovery.test.ts",
+        "tests/writer/rough-storyboard-quota-gate.test.ts",
+        "tests/writer/rough-submit-reservation.test.ts"
+      ]
+    },
+    {
+      "name": "capacity",
+      "exitCode": 1,
+      "files": [
+        "tests/manual/concurrency-capacity.manual.test.ts"
+      ]
+    }
+  ]
+}

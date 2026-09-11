@@ -1,0 +1,153 @@
+{
+  "verifiedOn": "2026-09-09",
+  "sellerId": "419628",
+  "environment": "production",
+  "productionDeploymentUpdated": false,
+  "ok": true,
+  "productCount": 13,
+  "rows": [
+    {
+      "tag": "plan:s1",
+      "productId": "pro_01m22d6pd5ctr797147e45he4w",
+      "priceId": "pri_01m22d6pn9s5akprpwdnfvsfwz",
+      "amount": "1500",
+      "currency": "USD",
+      "taxCategory": "saas",
+      "taxMode": "location",
+      "overrides": 0,
+      "matches": true
+    },
+    {
+      "tag": "plan:s2",
+      "productId": "pro_01m22d6pyabqd1zqccyf0fks59",
+      "priceId": "pri_01m22d6qsjg46y88q3qjy7t9h8",
+      "amount": "3000",
+      "currency": "USD",
+      "taxCategory": "saas",
+      "taxMode": "location",
+      "overrides": 0,
+      "matches": true
+    },
+    {
+      "tag": "plan:s5",
+      "productId": "pro_01m22d6r36e6mbzyd9frg137zy",
+      "priceId": "pri_01m22d6raqbns1aknkdb8zt7y2",
+      "amount": "6000",
+      "currency": "USD",
+      "taxCategory": "saas",
+      "taxMode": "location",
+      "overrides": 0,
+      "matches": true
+    },
+    {
+      "tag": "plan:s10",
+      "productId": "pro_01m22d6rktb4at2h00sr4pn6hj",
+      "priceId": "pri_01m22d6rv53x49kvhrf9xsyxad",
+      "amount": "11000",
+      "currency": "USD",
+      "taxCategory": "saas",
+      "taxMode": "location",
+      "overrides": 0,
+      "matches": true
+    },
+    {
+      "tag": "plan:p10",
+      "productId": "pro_01m22d6s44zavep777gqg6xxc8",
+      "priceId": "pri_01m22d6sbaydxm8ma0kd4b5ben",
+      "amount": "19900",
+      "currency": "USD",
+      "taxCategory": "saas",
+      "taxMode": "location",
+      "overrides": 0,
+      "matches": true
+    },
+    {
+      "tag": "plan:p15",
+      "productId": "pro_01m22d6smk8ta2t9rssvpqzv0j",
+      "priceId": "pri_01m22d6swce5t408ts7q7g3tnb",
+      "amount": "44900",
+      "currency": "USD",
+      "taxCategory": "saas",
+      "taxMode": "location",
+      "overrides": 0,
+      "matches": true
+    },
+    {
+      "tag": "plan:p20",
+      "productId": "pro_01m22d6t5mwnq9d3v7ht7a9d66",
+      "priceId": "pri_01m22d6td1abezsvb7jcjknrys",
+      "amount": "64900",
+      "currency": "USD",
+      "taxCategory": "saas",
+      "taxMode": "location",
+      "overrides": 0,
+      "matches": true
+    },
+    {
+      "tag": "plan:p25",
+      "productId": "pro_01m22d6tnqqea2qccxd4vpgcfg",
+      "priceId": "pri_01m22d6tx9ejn4svyzqkpgvzfb",
+      "amount": "99900",
+      "currency": "USD",
+      "taxCategory": "saas",
+      "taxMode": "location",
+      "overrides": 0,
+      "matches": true
+    },
+    {
+      "tag": "plan:p30",
+      "productId": "pro_01m22d6v6b2dnfqt0t8y2bsf8n",
+      "priceId": "pri_01m22d6vdfz4dgtvrb48kdfyw7",
+      "amount": "129900",
+      "currency": "USD",
+      "taxCategory": "saas",
+      "taxMode": "location",
+      "overrides": 0,
+      "matches": true
+    },
+    {
+      "tag": "pack:mini",
+      "productId": "pro_01m22d6vpk8t3szkc2j6w35x56",
+      "priceId": "pri_01m22d6vy0hj627b7vegx4227n",
+      "amount": "2900",
+      "currency": "USD",
+      "taxCategory": "saas",
+      "taxMode": "location",
+      "overrides": 0,
+      "matches": true
+    },
+    {
+      "tag": "pack:standard",
+      "productId": "pro_01m22d6w7bes44bbyppntp2061",
+      "priceId": "pri_01m22d6wep21s8vdh213h149cm",
+      "amount": "10900",
+      "currency": "USD",
+      "taxCategory": "saas",
+      "taxMode": "location",
+      "overrides": 0,
+      "matches": true
+    },
+    {
+      "tag": "pack:pro",
+      "productId": "pro_01m22d6wr8xmrr4jgz6f8c7fwj",
+      "priceId": "pri_01m22d6wzk46nww1dd85c7ra98",
+      "amount": "47900",
+      "currency": "USD",
+      "taxCategory": "saas",
+      "taxMode": "location",
+      "overrides": 0,
+      "matches": true
+    },
+    {
+      "tag": "pack:studio",
+      "productId": "pro_01m22d6x92deq7dd7xmyj3y62n",
+      "priceId": "pri_01m22d6xgfev6a9dvjteew9570",
+      "amount": "219900",
+      "currency": "USD",
+      "taxCategory": "saas",
+      "taxMode": "location",
+      "overrides": 0,
+      "matches": true
+    }
+  ]
+}

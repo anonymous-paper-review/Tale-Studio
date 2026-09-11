@@ -1,0 +1,1773 @@
+{
+  "date": "2026-09-09",
+  "baseline": "dev 123ef32f + uncommitted working tree",
+  "productEdits": false,
+  "automated": {
+    "command": "env -u DIRECTOR_VIDEO_RETAKES_TEST_DATABASE_URL node node_modules/vitest/vitest.mjs run tests/chat tests/producer tests/writer tests/artist tests/director",
+    "files": 197,
+    "passed": 1612,
+    "skipped": 15,
+    "failed": 0,
+    "byStage": {
+      "artist": {
+        "files": 39,
+        "pass": 343,
+        "skip": 1
+      },
+      "chat": {
+        "files": 10,
+        "pass": 81,
+        "skip": 0
+      },
+      "director": {
+        "files": 53,
+        "pass": 509,
+        "skip": 7
+      },
+      "producer": {
+        "files": 20,
+        "pass": 130,
+        "skip": 0
+      },
+      "writer": {
+        "files": 75,
+        "pass": 549,
+        "skip": 7
+      }
+    }
+  },
+  "diagnostics": {
+    "passed": 9,
+    "failed": 0,
+    "scopes": [
+      "Artist: sendMessage → 승인 → 생성 함수의 인자 확인. LLM 응답·생성 함수 대체.",
+      "Artist: 재생성 2건 중 1건만 실행되는 경로 확인. 생성 함수 대체.",
+      "공통: “취소” 입력 후 기존 pendingProposal 유지 확인. LLM 응답 대체.",
+      "Producer: 실제 추출 적용 함수에서 외모 비우기·need 단독 변경 미반영 확인.",
+      "Producer: 실제 스타일 함수에 DB 실패를 주입해 원복과 applied 반환 동시 확인.",
+      "Writer: 실제 대사 검증 함수에서 null 화자 제거 확인.",
+      "Director: sendMessage → 새 노드 추가 → 이미지 승인에서 대상 ID 단절 확인. LLM 응답·이미지 함수 대체.",
+      "Artist: addCharacter 성공 응답 후 appearances 빈 배열·기본 모습 검사 실패 확인. 저장 API 대체.",
+      "공통: 실제 단계 이동 인식 함수가 부정문을 이동 요청으로 분류함을 확인. 실제 단계 이동은 미실행."
+    ],
+    "results": [
+      {
+        "ancestorTitles": [],
+        "fullName": "Artist 실제 채팅 승인에서 지정 모습·모델·수정 지시가 빠지고 기본 모습으로 호출된다",
+        "status": "passed",
+        "title": "Artist 실제 채팅 승인에서 지정 모습·모델·수정 지시가 빠지고 기본 모습으로 호출된다",
+        "duration": 22.494167000000004,
+        "failureMessages": [],
+        "meta": {},
+        "tags": []
+      },
+      {
+        "ancestorTitles": [],
+        "fullName": "Artist 한 응답에 재생성 두 건이면 첫 건만 승인 카드와 실행에 남는다",
+        "status": "passed",
+        "title": "Artist 한 응답에 재생성 두 건이면 첫 건만 승인 카드와 실행에 남는다",
+        "duration": 0.5801660000000197,
+        "failureMessages": [],
+        "meta": {},
+        "tags": []
+      },
+      {
+        "ancestorTitles": [],
+        "fullName": "승인 대기 중 취소라고 입력해도 기존 승인 카드가 남는다",
+        "status": "passed",
+        "title": "승인 대기 중 취소라고 입력해도 기존 승인 카드가 남는다",
+        "duration": 0.5573339999999689,
+        "failureMessages": [],
+        "meta": {},
+        "tags": []
+      },
+      {
+        "ancestorTitles": [],
+        "fullName": "Producer 채팅 외모 빈 문자열과 내적 필요 단독 수정이 적용되지 않는다",
+        "status": "passed",
+        "title": "Producer 채팅 외모 빈 문자열과 내적 필요 단독 수정이 적용되지 않는다",
+        "duration": 0.3932500000000232,
+        "failureMessages": [],
+        "meta": {},
+        "tags": []
+      },
+      {
+        "ancestorTitles": [],
+        "fullName": "Producer 스타일 저장 실패는 원래 스타일로 되돌아가지만 채팅 적용 결과는 applied다",
+        "status": "passed",
+        "title": "Producer 스타일 저장 실패는 원래 스타일로 되돌아가지만 채팅 적용 결과는 applied다",
+        "duration": 0.22233399999998937,
+        "failureMessages": [],
+        "meta": {},
+        "tags": []
+      },
+      {
+        "ancestorTitles": [],
+        "fullName": "Writer 내레이션 characterId null은 채팅 수정 파서에서 제거된다",
+        "status": "passed",
+        "title": "Writer 내레이션 characterId null은 채팅 수정 파서에서 제거된다",
+        "duration": 0.2062090000000012,
+        "failureMessages": [],
+        "meta": {},
+        "tags": []
+      },
+      {
+        "ancestorTitles": [],
+        "fullName": "Director 생성한 새 샷의 임시 이름이 승인 시 사라져 이미지 생성 대상이 없다",
+        "status": "passed",
+        "title": "Director 생성한 새 샷의 임시 이름이 승인 시 사라져 이미지 생성 대상이 없다",
+        "duration": 1.0854160000000093,
+        "failureMessages": [],
+        "meta": {},
+        "tags": []
+      },
+      {
+        "ancestorTitles": [],
+        "fullName": "Artist 새 인물 추가 성공 응답 후 기본 모습이 없어 즉시 생성할 수 없다",
+        "status": "passed",
+        "title": "Artist 새 인물 추가 성공 응답 후 기본 모습이 없어 즉시 생성할 수 없다",
+        "duration": 0.49300000000005184,
+        "failureMessages": [],
+        "meta": {},
+        "tags": []
+      },
+      {
+        "ancestorTitles": [],
+        "fullName": "단계 이동 인식기는 넘기지 마라는 부정문도 다음 단계 요청으로 잡는다",
+        "status": "passed",
+        "title": "단계 이동 인식기는 넘기지 마라는 부정문도 다음 단계 요청으로 잡는다",
+        "duration": 0.16258400000003803,
+        "failureMessages": [],
+        "meta": {},
+        "tags": []
+      }
+    ]
+  },
+  "skipped": [
+    [
+      "Writer · 실제 기록의 인물·장소 연결",
+      5,
+      "로컬 실측 로그 fixture가 없음",
+      "tests/writer/asset_refs.test.ts"
+    ],
+    [
+      "Writer · 장면 길이·동선 LLM 회귀",
+      1,
+      "실제 LLM 실행용 스위치를 켜지 않음",
+      "tests/writer/duration-regression.harness.test.ts"
+    ],
+    [
+      "Writer · 화면비별 러프 템플릿 재생성",
+      1,
+      "생성용 스위치를 켜지 않음. 기존 템플릿 검사와 별개",
+      "tests/writer/rough-template-assets.test.ts"
+    ],
+    [
+      "Artist · 캐릭터 템플릿 재생성",
+      1,
+      "생성용 스위치를 켜지 않음. 기존 템플릿 검사와 별개",
+      "tests/artist/character-template-assets.test.ts"
+    ],
+    [
+      "Director · 리테이크 실제 DB 제약·중복·권한·완료 처리",
+      7,
+      "실DB 전용 연결 변수를 해제해 실행 제외",
+      "tests/director/video-retakes-db.integration.test.ts"
+    ]
+  ],
+  "unverified": [
+    [
+      "Producer",
+      "자연어 설정·스타일 선택, 첨부 원고 원문 보존, 실제 Writer 인계",
+      "코드와 기존 대체 테스트. 실제 LLM 해석·실DB 저장·화면 반영 미검증."
+    ],
+    [
+      "Producer",
+      "기존 카드 삭제·개명 후 다시 진입",
+      "복원 병합 코드상 재등장 조건 확인. 실제 DB 카드와 브라우저 재로드 미검증."
+    ],
+    [
+      "Writer",
+      "자연어 씬·샷·대사 편집, 씬 확정/수정 후 실제 파이프라인",
+      "허용 필드·입력 분기 확인. 실LLM 출력·실제 재실행 미검증."
+    ],
+    [
+      "Writer",
+      "저장 실패·없는 씬 수정·복수 대사 축소·Director 전달",
+      "코드 경로 확인. 실제 DB 장애·승인 UI·후속 생성 결과 미검증."
+    ],
+    [
+      "Writer",
+      "러프·대사 생성, 프레임·화살표 편집, Resume·V2 적용",
+      "UI 호출과 채팅 명령 부재 확인. 화면 클릭·외부 생성·결과 품질 미검증."
+    ],
+    [
+      "Artist",
+      "특정 모습/모델/지시 재생성, 새 모습 생성, 후보 선택",
+      "인물 승인 인자 유실은 대체 재현. 실제 이미지 API 발주·화면 이미지·Take 차감 미검증. 배경 변형은 코드 확인만."
+    ],
+    [
+      "Artist",
+      "새 인물 생성 뒤 팝업, 외형 변경 뒤 상세 정보·stale 표시",
+      "로컬 상태 누락 확인. 실제 API 저장·UI 재진입·이미지 표시 미검증."
+    ],
+    [
+      "Director",
+      "자연어 → 승인 → 유료 생성, Final 선택·Editor 인계",
+      "기존 보고서의 Happy Horse 영상 7편·실사 1장, API 일괄·UI 중단·복귀는 실검증 근거 있음. 채팅 전체 경로·Final 인계·다른 모델은 미검증."
+    ],
+    [
+      "Director",
+      "승인 전 모델/대상 변경, 영상 마지막 프레임 연결 실패",
+      "계산 순서·비동기 처리 확인. 실제 비용 차이·캡처/업로드 실패·화면 결과 미검증."
+    ],
+    [
+      "Director",
+      "수동 노드·프롬프트 수정 후 새 브라우저/기기 복원",
+      "DB와 localStorage 저장 범위 확인. 기기 간 실제 복원 미검증."
+    ],
+    [
+      "공통",
+      "Producer 외 단계 파일 드롭, 취소 UI, 대화 저장 실패·재접속",
+      "드롭/전송·저장 경로 확인, 취소 발화는 대체 재현. 실제 파일 드롭·장애·복원 화면 미검증."
+    ],
+    [
+      "전체",
+      "대화가 “똑똑한지”, 맥락 해석·제안의 적절성·그림/영상 품질",
+      "평가하지 않았다. 코드에 전달되는 정보와 실행 가능한 기능만 대조했다."
+    ]
+  ],
+  "inventory": [
+    {
+      "stage": "Producer",
+      "feature": "러닝타임·장르·화면비·톤·대사 언어 변경",
+      "status": "연결",
+      "actual": "값 변경 경로가 있다. 톤은 빈 목록으로 지울 수도 있다.",
+      "refs": [
+        "src/features/producer/quest-journal.tsx:155",
+        "src/stores/producer-store.ts:409"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "feature": "프로젝트·영화 제목 변경",
+      "status": "없음",
+      "actual": "화면에서는 변경한다. 채팅 허용 필드에 제목이 없다.",
+      "refs": [
+        "src/features/producer/readiness-board.tsx:620",
+        "src/stores/producer-store.ts:57"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "feature": "스토리 작성·수정",
+      "status": "부분",
+      "actual": "내용 변경은 연결. 빈 문자열로 비우기와 준비 완료 상태를 false로 되돌리기는 적용되지 않는다.",
+      "refs": [
+        "src/stores/producer-store.ts:736"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "feature": "이야기 더 보기·접기",
+      "status": "없음",
+      "actual": "화면 펼침 상태를 변경하는 채팅 명령이 없다.",
+      "refs": [
+        "src/features/producer/readiness-board.tsx:813"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "feature": "이름 있는 인물·배경 추가",
+      "status": "연결",
+      "actual": "이름 또는 카드 ref를 기준으로 추가·병합한다.",
+      "refs": [
+        "src/stores/producer-store.ts:86",
+        "src/stores/producer-store.ts:130"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "feature": "빈 인물·빈 배경 카드 추가",
+      "status": "없음",
+      "actual": "UI는 빈 카드 추가가 가능하다. 채팅 신규 추가에는 이름이 필요하다.",
+      "refs": [
+        "src/features/producer/readiness-board.tsx:687",
+        "src/stores/producer-store.ts:92",
+        "src/stores/producer-store.ts:110"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "feature": "인물 이름·외모·역할 변경",
+      "status": "부분",
+      "actual": "카드 ref로 대상 지정 후 변경 가능. 빈 문자열로 지우기는 미적용.",
+      "refs": [
+        "src/features/producer/readiness-board.tsx:348",
+        "src/stores/producer-store.ts:94"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "feature": "인물 아크 변경·비우기",
+      "status": "부분",
+      "actual": "시작·끝·유형 변경은 연결. 빈 값만 보내는 비우기는 조건에서 제외된다.",
+      "refs": [
+        "src/features/producer/readiness-board.tsx:465",
+        "src/stores/producer-store.ts:106"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "feature": "인물 동기 want·need 변경",
+      "status": "불일치",
+      "actual": "UI는 각각 바꾼다. 채팅은 want가 함께 있어야 need도 반영한다.",
+      "refs": [
+        "src/features/producer/readiness-board.tsx:475",
+        "src/stores/producer-store.ts:108"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "feature": "배경 이름·설명·목적 변경",
+      "status": "부분",
+      "actual": "값 변경은 연결. 빈 문자열로 비우기는 미적용.",
+      "refs": [
+        "src/features/producer/readiness-board.tsx:537",
+        "src/stores/producer-store.ts:146"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "feature": "인물·배경 삭제·중복 정리",
+      "status": "부분",
+      "actual": "remove 요청과 승인 경로가 있다. 기존 DB 카드가 재진입 때 재등장하는 조건은 별도 미검증.",
+      "refs": [
+        "src/stores/producer-store.ts:97",
+        "src/stores/producer-store.ts:474"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "feature": "직접 편집한 값·인계 후 원천 수정",
+      "status": "부분",
+      "actual": "승인 후 반영한다. 이름만 변경하는 경우는 영향·보호 검사에서 빠진다.",
+      "refs": [
+        "src/stores/producer-store.ts:290",
+        "src/stores/producer-store.ts:662"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "feature": "사물 추가·인물 종류 변경",
+      "status": "연결",
+      "actual": "채팅 entityType으로 지원. 현 UI에는 사물 추가 전용 버튼이 없다.",
+      "refs": [
+        "src/stores/producer-store.ts:105",
+        "src/features/producer/readiness-board.tsx:850"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "feature": "카드 상세·도움말·누락 안내 열기",
+      "status": "없음",
+      "actual": "내용은 채팅에 제공되나 화면 펼치기·툴팁 열기 명령은 없다.",
+      "refs": [
+        "src/features/producer/readiness-board.tsx:312",
+        "src/features/producer/readiness-board.tsx:385"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "feature": "스타일 이름·느낌으로 선택",
+      "status": "부분",
+      "actual": "카탈로그 키 선택은 연결. DB 저장 실패 후에도 채팅 결과는 적용 성공으로 반환한다.",
+      "refs": [
+        "src/stores/producer-store.ts:617",
+        "src/stores/producer-store.ts:653"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "feature": "스타일 후보 이미지·격자·슬라이드 보기",
+      "status": "없음",
+      "actual": "추천 답변과 별개로 스타일 선택창을 열고 조작할 명령은 없다.",
+      "refs": [
+        "src/features/producer/style-anchor-picker.tsx:135"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "feature": "텍스트·이미지 첨부와 첨부 제거",
+      "status": "부분",
+      "actual": "파일 선택·드롭·제거는 화면 조작이 필요하다. 첨부 후 의도는 채팅으로 전달한다.",
+      "refs": [
+        "src/components/layout/global-chat.tsx:977",
+        "src/components/layout/global-chat.tsx:981"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "feature": "이번에 첨부한 그림체를 스타일로 지정",
+      "status": "연결",
+      "actual": "이번 턴 이미지 인덱스를 선택해 저장하는 경로가 있다.",
+      "refs": [
+        "src/stores/global-chat-store.ts:1026"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "feature": "이전 턴 첨부 그림을 다시 보고 수정",
+      "status": "부분",
+      "actual": "썸네일은 남는다. 과거 이미지 원본은 다음 턴에 다시 전달하지 않는다.",
+      "refs": [
+        "src/stores/global-chat-store.ts:717",
+        "src/stores/global-chat-store.ts:773"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "feature": "업로드 원고 원문 보존",
+      "status": "부분",
+      "actual": "원문을 먼저 저장하지만 같은 턴 LLM이 새 storyText를 내면 덮일 수 있다. 실제 발생은 미측정.",
+      "refs": [
+        "src/components/layout/global-chat.tsx:876",
+        "src/stores/producer-store.ts:736",
+        "src/app/api/produce/chat/system-prompt.ts:197"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "feature": "Writer 인계·이미 실행한 Writer 재실행",
+      "status": "부분",
+      "actual": "인계 문구와 게이트·승인 경로는 연결. 단독 “Writer 다시 실행해줘”는 이동 인식어에 없고 전용 채팅 명령도 없다.",
+      "refs": [
+        "src/stores/global-chat-store.ts:569",
+        "src/stores/producer-store.ts:940",
+        "src/lib/handoff-intent.ts:68"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "feature": "관리자 Writer V1/V2 선택",
+      "status": "없음",
+      "actual": "관리자에게 보이는 선택기는 화면에서만 조작한다.",
+      "refs": [
+        "src/features/writer/writer-engine-picker.tsx:49"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "feature": "재실행 배너·오류 배너 닫기",
+      "status": "없음",
+      "actual": "해당 UI 상태를 바꾸는 채팅 명령이 없다.",
+      "refs": [
+        "src/app/studio/producer/page.tsx:275"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "feature": "씬 추가",
+      "status": "부분",
+      "actual": "씬 추가는 연결. 채팅은 맨 끝에 추가한 뒤 내용을 별도 저장한다.",
+      "refs": [
+        "src/stores/writer-store.ts:599"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "feature": "씬·샷을 특정 위치 앞뒤에 삽입",
+      "status": "없음",
+      "actual": "UI의 afterSceneId·afterShotId를 채팅에서 받지 않는다. “앞뒤 추가 가능” 안내와 다르다.",
+      "refs": [
+        "src/features/writer/add-item-dialog.tsx:265",
+        "src/features/writer/script-view.tsx:279",
+        "src/stores/writer-store.ts:599"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "feature": "씬 장소·시간·분위기·요약·등장인물·길이 수정",
+      "status": "부분",
+      "actual": "허용 필드 수정은 연결. 빈 문자열·빈 인물 목록은 걸러진다. DB 저장 오류를 채팅 적용 결과에 반영하지 않는다.",
+      "refs": [
+        "src/lib/writer-chat-updates.ts:31",
+        "src/lib/writer-chat-updates.ts:65",
+        "src/stores/writer-store.ts:173"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "feature": "씬 삭제·소속 샷 삭제",
+      "status": "부분",
+      "actual": "삭제 경로가 있다. 없는 씬 ID와 저장 실패의 적용 성공 집계는 별도 문제다.",
+      "refs": [
+        "src/stores/writer-store.ts:496",
+        "src/stores/writer-store.ts:665"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "feature": "기존 씬·샷 순서 변경·다른 씬으로 이동",
+      "status": "없음",
+      "actual": "프롬프트에는 순서 변경 역할이 있으나 실행 필드가 없다. 현 UI의 위치 지정 추가와도 구분해야 한다.",
+      "refs": [
+        "src/app/api/writer/chat/route.ts:45",
+        "src/lib/writer-chat-updates.ts:21"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "feature": "샷 추가·타입·설명·등장인물·길이 수정",
+      "status": "부분",
+      "actual": "텍스트 필드와 씬 지정은 연결. 설명을 바꿔도 기존 연출 스펙·이미지는 자동 갱신되지 않는다.",
+      "refs": [
+        "src/lib/writer-chat-updates.ts:125",
+        "src/stores/writer-store.ts:608"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "feature": "샷 추가 시 카메라·조명·생성 방식 지정",
+      "status": "없음",
+      "actual": "UI 추가 폼에는 있다. 채팅 허용 필드에는 없다.",
+      "refs": [
+        "src/features/writer/add-item-dialog.tsx:511",
+        "src/lib/writer-chat-updates.ts:125"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "feature": "샷 삭제",
+      "status": "부분",
+      "actual": "실행 경로가 있다. 채팅 적용 수는 삭제 저장 성공과 구분되지 않는다.",
+      "refs": [
+        "src/stores/writer-store.ts:651"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "feature": "일반 인물 대사·감정·말투·길이 힌트 편집",
+      "status": "연결",
+      "actual": "대사 배열 전체를 재제출해 반영한다. 인물 ID 검증을 거친다.",
+      "refs": [
+        "src/lib/writer-chat-updates.ts:86"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "feature": "내레이션 V.O. 추가·수정·보존",
+      "status": "불일치",
+      "actual": "화면과 저장은 null 화자를 지원하지만 채팅 검증은 문자열 ID만 남긴다. 혼합 대사에서 내레이션이 탈락한다.",
+      "refs": [
+        "src/app/api/writer/dialogue/route.ts:93",
+        "src/features/writer/dialogue-view.tsx:244",
+        "src/lib/writer-chat-updates.ts:94"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "feature": "한 샷의 대사 줄이기·전체 지우기",
+      "status": "부분",
+      "actual": "승인 카드 후 적용한다. “승인” 입력도 연결된다.",
+      "refs": [
+        "src/stores/global-chat-store.ts:1463",
+        "src/stores/global-chat-store.ts:1926"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "feature": "여러 샷 대사를 한 번에 줄이기",
+      "status": "불일치",
+      "actual": "첫 승인 카드 이후 요청은 보류되고 승인 뒤 자동으로 이어지지 않는다.",
+      "refs": [
+        "src/stores/global-chat-store.ts:1482",
+        "src/stores/global-chat-store.ts:1606"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "feature": "전용 대사 생성·재생성 실행",
+      "status": "없음",
+      "actual": "텍스트로 대사를 새로 쓰는 것과 별개다. UI의 전용 생성 API를 실행할 채팅 명령이 없다.",
+      "refs": [
+        "src/features/writer/dialogue-view.tsx:102",
+        "src/lib/writer-chat-updates.ts:21"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "feature": "러프 전체 생성·개별 생성·실패 재시도",
+      "status": "없음",
+      "actual": "UI에는 생성 버튼과 API가 있다. 채팅 재생성 명령이 없다.",
+      "refs": [
+        "src/features/writer/rough-storyboard-view.tsx:645",
+        "src/features/writer/rough-storyboard-view.tsx:1090",
+        "src/lib/writer-chat-updates.ts:21"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "feature": "START·DIRECTING·END 한 장 재생성",
+      "status": "없음",
+      "actual": "프레임 팝업에서 실행한다. 채팅 명령이 없다.",
+      "refs": [
+        "src/features/writer/rough-frames-still.tsx:45"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "feature": "연출 화살표 분리·그리기·지우기·복구·저장",
+      "status": "없음",
+      "actual": "펜·지우개·색·굵기·Undo·원본 복구·저장 후 END 재생성 모두 팝업 조작이다.",
+      "refs": [
+        "src/features/writer/directing-arrow-editor.tsx:234",
+        "src/features/writer/directing-arrow-editor.tsx:277"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "feature": "러프·트리트먼트·대사·V2 보기 전환",
+      "status": "없음",
+      "actual": "탭 상태를 읽거나 바꾸는 채팅 명령이 없다.",
+      "refs": [
+        "src/features/writer/writer-tabs.tsx:28"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "feature": "씬 접기·확대·드래그·팝업·화자 강조",
+      "status": "없음",
+      "actual": "해당 화면의 로컬 상태다. 채팅 조작 경로가 없다.",
+      "refs": [
+        "src/features/writer/rough-storyboard-view.tsx:634",
+        "src/features/writer/dialogue-view.tsx:157"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "feature": "씬·샷·대사 줄 멘션으로 대상 지정",
+      "status": "연결",
+      "actual": "카드·줄 클릭과 직접 멘션은 전송 시점의 참조표를 쓴다. 화면마다 Shot 번호 표기는 차이가 있다.",
+      "refs": [
+        "src/lib/script-lines.ts:202",
+        "src/stores/global-chat-store.ts:860"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "feature": "씬 검토 중 수정 피드백",
+      "status": "연결",
+      "actual": "일반 채팅을 거치지 않고 scene-gate 수정 요청으로 실행한다.",
+      "refs": [
+        "src/components/layout/global-chat.tsx:893"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "feature": "씬 검토 중 확정·일반 질문",
+      "status": "불일치",
+      "actual": "확정은 버튼 또는 빈 Enter. “확정해줘”나 질문을 입력해 보내면 모두 수정 요청이 된다.",
+      "refs": [
+        "src/components/layout/global-chat.tsx:893",
+        "src/app/api/writer/scene-gate/route.ts:42"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "feature": "생성 진행 중 질문·수정",
+      "status": "없음",
+      "actual": "씬 검토 대기를 제외한 생성 중에는 LLM을 호출하지 않고 로컬 안내만 한다.",
+      "refs": [
+        "src/components/layout/global-chat.tsx:854",
+        "src/components/layout/global-chat.tsx:901"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "feature": "실패 지점부터 재개",
+      "status": "없음",
+      "actual": "Resume 버튼 경로만 있다. Writer 채팅 명령은 없다.",
+      "refs": [
+        "src/components/layout/writer-resume-button.tsx:24",
+        "src/lib/writer-chat-updates.ts:21"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "feature": "V2 결과 선택·보류·다음 단계 적용",
+      "status": "없음",
+      "actual": "V2 검토·적용 API는 UI에서 호출한다.",
+      "refs": [
+        "src/features/writer/writer-v2-preview.tsx:25",
+        "src/features/writer/writer-v2-preview.tsx:54"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "feature": "Artist로 인계",
+      "status": "연결",
+      "actual": "정해진 이동 발화를 코드가 인식하고 게이트를 통과하면 이동한다.",
+      "refs": [
+        "src/stores/global-chat-store.ts:569",
+        "src/lib/handoff-intent.ts:34"
+      ]
+    },
+    {
+      "stage": "Artist",
+      "feature": "인물·배경·모습 목록 및 이미지 유무 질문",
+      "status": "연결",
+      "actual": "이름·ID·모습 키·시점·이미지 유무를 제공한다. 실제 그림은 전달하지 않는다.",
+      "refs": [
+        "src/stores/global-chat-store.ts:797"
+      ]
+    },
+    {
+      "stage": "Artist",
+      "feature": "최근 생성·실패·진행 상태 질문",
+      "status": "부분",
+      "actual": "최근 작업 12건이 입력에 들어간다. 같은 인물의 모습별 키는 작업 설명에 빠진다.",
+      "refs": [
+        "src/lib/artist/chat-context.ts:31",
+        "src/lib/artist/chat-context.ts:58"
+      ]
+    },
+    {
+      "stage": "Artist",
+      "feature": "기존 인물 기본 모습 이미지 생성·재생성",
+      "status": "부분",
+      "actual": "추가 조건 없는 기본 모습은 승인 후 생성 함수에 연결된다.",
+      "refs": [
+        "src/stores/global-chat-store.ts:1811"
+      ]
+    },
+    {
+      "stage": "Artist",
+      "feature": "인물 특정 모습·모델·일회성 수정 지시로 재생성",
+      "status": "불일치",
+      "actual": "허용된 요청값이 승인 카드에서 빠진다. 실행은 기본 모습·기본 모델·지시 없음으로 바뀐다.",
+      "refs": [
+        "src/lib/artist/chat-updates.ts:69",
+        "src/stores/global-chat-store.ts:1134",
+        "src/stores/global-chat-store.ts:1820"
+      ]
+    },
+    {
+      "stage": "Artist",
+      "feature": "기본 배경 생성·재생성",
+      "status": "부분",
+      "actual": "기본 배경은 승인 후 생성 함수로 연결된다.",
+      "refs": [
+        "src/stores/global-chat-store.ts:1825"
+      ]
+    },
+    {
+      "stage": "Artist",
+      "feature": "배경의 특정 모습 재생성",
+      "status": "불일치",
+      "actual": "appearanceKey를 검증 단계에서는 받지만 승인 과정에서 지워 기본 배경을 호출한다.",
+      "refs": [
+        "src/lib/artist/chat-updates.ts:83",
+        "src/stores/global-chat-store.ts:1154",
+        "src/stores/global-chat-store.ts:1830"
+      ]
+    },
+    {
+      "stage": "Artist",
+      "feature": "배경 생성 모델·일회성 지시 선택",
+      "status": "없음",
+      "actual": "UI 모델 선택과 달리 배경 채팅 명령에는 모델·일회성 지시 필드가 없다.",
+      "refs": [
+        "src/features/artist/world-view-dialog.tsx:268",
+        "src/lib/artist/chat-updates.ts:78"
+      ]
+    },
+    {
+      "stage": "Artist",
+      "feature": "인물 기본 외형 원천 변경",
+      "status": "부분",
+      "actual": "승인 후 저장한다. 자동 이미지 재생성은 별도이며 로컬 모습 상세가 옛 설명을 유지한다.",
+      "refs": [
+        "src/stores/global-chat-store.ts:1834",
+        "src/stores/artist-store.ts:1858",
+        "src/features/artist/character-view-dialog.tsx:115"
+      ]
+    },
+    {
+      "stage": "Artist",
+      "feature": "기본 배경 설명 원천 변경",
+      "status": "연결",
+      "actual": "승인 후 설명을 저장한다. 이미지 재생성은 별도 요청이다.",
+      "refs": [
+        "src/stores/global-chat-store.ts:1877",
+        "src/stores/artist-store.ts:1478"
+      ]
+    },
+    {
+      "stage": "Artist",
+      "feature": "인물·배경 비기본 모습 설명 변경",
+      "status": "없음",
+      "actual": "UI는 선택한 모습 설명을 편집한다. 채팅 원천 변경 명령에는 모습 키가 없다.",
+      "refs": [
+        "src/features/artist/character-view-dialog.tsx:86",
+        "src/features/artist/world-view-dialog.tsx:89",
+        "src/lib/artist/chat-updates.ts:188"
+      ]
+    },
+    {
+      "stage": "Artist",
+      "feature": "인물·배경 새 모습 추가",
+      "status": "부분",
+      "actual": "이름·시점·설명으로 승인 후 생성한다. 인물은 기본 모습 얼굴 참조가 없으면 생성 API가 거절한다.",
+      "refs": [
+        "src/stores/global-chat-store.ts:1852",
+        "src/stores/global-chat-store.ts:1865",
+        "src/app/api/artist/generate-sheet/route.ts:200"
+      ]
+    },
+    {
+      "stage": "Artist",
+      "feature": "모습 이름 변경·삭제·인물 기본 모습 지정",
+      "status": "없음",
+      "actual": "모습 팝업에는 있다. 채팅 대응 명령은 없다.",
+      "refs": [
+        "src/features/artist/character-view-dialog.tsx:169",
+        "src/features/artist/world-view-dialog.tsx:147",
+        "src/lib/artist/chat-updates.ts:22"
+      ]
+    },
+    {
+      "stage": "Artist",
+      "feature": "이전 이미지 후보를 선택본으로 되돌리기",
+      "status": "없음",
+      "actual": "후보 History는 UI에서 선택한다. 후보 ID 목록과 선택 명령이 채팅에 없다.",
+      "refs": [
+        "src/features/artist/character-view-dialog.tsx:317",
+        "src/features/artist/world-view-dialog.tsx:235",
+        "src/lib/artist/chat-updates.ts:22"
+      ]
+    },
+    {
+      "stage": "Artist",
+      "feature": "정책 거절 후 safe 재시도",
+      "status": "없음",
+      "actual": "실패 팝업의 safeMode 재시도만 있고 채팅 필드는 없다.",
+      "refs": [
+        "src/features/artist/character-view-dialog.tsx:408",
+        "src/features/artist/world-view-dialog.tsx:311"
+      ]
+    },
+    {
+      "stage": "Artist",
+      "feature": "여러 인물·배경 재생성 및 여러 모습 추가",
+      "status": "불일치",
+      "actual": "재생성은 첫 건만 선택한다. 다른 승인 작업도 첫 항목·단일 승인 슬롯에 제한된다.",
+      "refs": [
+        "src/stores/global-chat-store.ts:1088",
+        "src/stores/global-chat-store.ts:1177",
+        "src/stores/global-chat-store.ts:1206"
+      ]
+    },
+    {
+      "stage": "Artist",
+      "feature": "새 인물 추가 후 즉시 이미지 생성",
+      "status": "불일치",
+      "actual": "추가는 채팅에만 연결. 저장 성공 후 새 카드에 기본 모습 정보가 없어 재로드 전 생성이 막힌다.",
+      "refs": [
+        "src/stores/artist-store.ts:982",
+        "src/stores/artist-store.ts:999",
+        "src/stores/artist-store.ts:1026"
+      ]
+    },
+    {
+      "stage": "Artist",
+      "feature": "기존 인물 이름·역할·설명 변경·새 사물 추가",
+      "status": "없음",
+      "actual": "주석과 달리 이름·역할·설명 변경 명령은 없고, 사물 종류도 채팅 createCharacter에 전달되지 않는다.",
+      "refs": [
+        "src/features/artist/character-panel.tsx:205",
+        "src/lib/artist/chat-updates.ts:22",
+        "src/stores/artist-store.ts:1787"
+      ]
+    },
+    {
+      "stage": "Artist",
+      "feature": "새 기본 장소·자산 삭제·스타일·업로드 교체·잠금",
+      "status": "양쪽 없음",
+      "actual": "현재 Artist 전용 UI에도 대응 기능이 없다. 새 장소 모습 추가·Producer 스타일 선택과 구분한다.",
+      "refs": [
+        "src/app/studio/artist/page.tsx:442",
+        "src/lib/artist/chat-updates.ts:22",
+        "src/components/layout/global-chat.tsx:1944"
+      ]
+    },
+    {
+      "stage": "Artist",
+      "feature": "인물/배경 탭·모습 탭·팝업·확대 조작",
+      "status": "없음",
+      "actual": "UI 내부 상태이며 현재 선택한 모습도 채팅에 전달하지 않는다.",
+      "refs": [
+        "src/app/studio/artist/page.tsx:442",
+        "src/features/artist/character-panel.tsx:32",
+        "src/stores/global-chat-store.ts:797"
+      ]
+    },
+    {
+      "stage": "Artist",
+      "feature": "인물·배경 멘션",
+      "status": "연결",
+      "actual": "Ctrl/Cmd+카드 클릭과 직접 @멘션으로 이름을 전달한다.",
+      "refs": [
+        "src/features/artist/character-panel.tsx:175",
+        "src/components/layout/global-chat.tsx:1988"
+      ]
+    },
+    {
+      "stage": "Artist",
+      "feature": "진입 전 Writer 실패 재개",
+      "status": "없음",
+      "actual": "실패 화면에 Writer 재개 버튼이 있다. Artist 채팅 명령에는 없다.",
+      "refs": [
+        "src/app/studio/artist/page.tsx:409",
+        "src/components/layout/writer-resume-button.tsx:24"
+      ]
+    },
+    {
+      "stage": "Artist",
+      "feature": "Director로 인계",
+      "status": "연결",
+      "actual": "정해진 이동 발화와 게이트 경로가 있다.",
+      "refs": [
+        "src/stores/global-chat-store.ts:569",
+        "src/lib/handoff-intent.ts:40"
+      ]
+    },
+    {
+      "stage": "공통",
+      "feature": "대기 중인 변경 승인",
+      "status": "연결",
+      "actual": "버튼과 짧은 승인 발화가 같은 승인 함수를 실행한다.",
+      "refs": [
+        "src/stores/global-chat-store.ts:536",
+        "src/components/layout/global-chat.tsx:972"
+      ]
+    },
+    {
+      "stage": "공통",
+      "feature": "대기 중인 변경 취소·나중에",
+      "status": "불일치",
+      "actual": "버튼·Esc는 취소한다. “취소” 발화는 승인으로 보지 않을 뿐 기존 카드를 내리지 않는다.",
+      "refs": [
+        "src/stores/global-chat-store.ts:536",
+        "src/stores/global-chat-store.ts:1613",
+        "src/components/layout/global-chat.tsx:1599"
+      ]
+    },
+    {
+      "stage": "공통",
+      "feature": "다음 단계 이동·이전 단계 돌아가기",
+      "status": "부분",
+      "actual": "다음 단계만 지정 문구로 인식한다. 이전 단계·임의 단계 선택은 사이드바 조작이 필요하다.",
+      "refs": [
+        "src/lib/handoff-intent.ts:26",
+        "src/components/layout/sidebar.tsx:268"
+      ]
+    },
+    {
+      "stage": "공통",
+      "feature": "이동 부정문·수정과 이동 복합 요청",
+      "status": "불일치",
+      "actual": "“넘기지 마”도 이동어에 일치한다. “수정하고 넘겨”는 이동 분기가 먼저 끝나 수정 요청을 실행하지 않는다.",
+      "refs": [
+        "src/lib/handoff-intent.ts:92",
+        "src/stores/global-chat-store.ts:569",
+        "src/stores/global-chat-store.ts:697"
+      ]
+    },
+    {
+      "stage": "공통",
+      "feature": "Writer·Artist·Director 채팅에 파일 드롭",
+      "status": "불일치",
+      "actual": "이미지는 업로드·썸네일만 남고 해당 모델에 전달되지 않는다. 텍스트 전송은 Producer 원고부터 바꾼다.",
+      "refs": [
+        "src/components/layout/global-chat.tsx:879",
+        "src/components/layout/global-chat.tsx:1097",
+        "src/components/layout/global-chat.tsx:1782",
+        "src/stores/global-chat-store.ts:831",
+        "src/stores/global-chat-store.ts:864"
+      ]
+    },
+    {
+      "stage": "공통",
+      "feature": "응답 생성 중단",
+      "status": "부분",
+      "actual": "Stop 버튼은 클라이언트 응답 요청을 중단한다. 실행 중인 유료 이미지·영상 작업 취소와는 별개다.",
+      "refs": [
+        "src/stores/global-chat-store.ts:917",
+        "src/stores/global-chat-store.ts:1540",
+        "src/components/layout/global-chat.tsx:2022"
+      ]
+    },
+    {
+      "stage": "공통",
+      "feature": "대화 저장·재접속 복원",
+      "status": "부분",
+      "actual": "메시지 저장·로드는 연결. 저장 실패는 콘솔 기록만 남기며 재시도·사용자 실패 표시가 없다.",
+      "refs": [
+        "src/lib/chat-persistence.ts:3",
+        "src/stores/global-chat-store.ts:490"
+      ]
+    },
+    {
+      "stage": "공통",
+      "feature": "승인 대기 카드 재접속 복원",
+      "status": "없음",
+      "actual": "대화 메시지 복원과 달리 실행 가능한 pendingProposal을 저장·복원하지 않는다.",
+      "refs": [
+        "src/stores/global-chat-store.ts:1606",
+        "src/stores/global-chat-store.ts:2017"
+      ]
+    },
+    {
+      "stage": "공통",
+      "feature": "내보내기 ZIP·화면 JPEG",
+      "status": "없음",
+      "actual": "사이드바 내보내기 메뉴에만 실행 경로가 있다.",
+      "refs": [
+        "src/components/layout/sidebar.tsx:341",
+        "src/components/export-menu.tsx:88"
+      ]
+    },
+    {
+      "stage": "공통",
+      "feature": "프로젝트 전환·새 프로젝트·계정·로그아웃",
+      "status": "없음",
+      "actual": "공통 메뉴의 동작을 실행하는 단계별 채팅 명령은 없다.",
+      "refs": [
+        "src/components/layout/user-menu.tsx:171",
+        "src/components/layout/user-menu.tsx:214"
+      ]
+    },
+    {
+      "stage": "공통",
+      "feature": "채팅 선택지·제안·오류·패널 크기 조작",
+      "status": "부분",
+      "actual": "선택지 답변·승인은 연결된다. 닫기·너비 조절·오류 숨김 등 화면 조작은 채팅 명령이 없다.",
+      "refs": [
+        "src/components/layout/global-chat.tsx:1105",
+        "src/components/layout/global-chat.tsx:1274",
+        "src/stores/global-chat-store.ts:2005"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "씬 추가·메타데이터 수정·씬에 샷 추가",
+      "status": "연결",
+      "actual": "Scene 또는 같은 응답의 임시 ID를 지정한다. Scene은 현재 노드 화면에서 숨겨진다.",
+      "refs": [
+        "src/app/api/director/chat/route.ts:299",
+        "src/stores/director-store.ts:5012",
+        "src/app/studio/director/page.tsx:632"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "부모 없는 샷·독립 영상 노드 추가",
+      "status": "없음",
+      "actual": "UI에는 있다. 채팅 addShot은 Scene이 필요하고 독립 영상 추가 명령도 없다.",
+      "refs": [
+        "src/features/director/canvas-popups/CanvasContextMenu.tsx:141",
+        "src/stores/director-store.ts:5035",
+        "src/app/api/director/chat/route.ts:198"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "샷 이름·프롬프트·영상 provider 변경",
+      "status": "부분",
+      "actual": "변경은 연결. 이미지 모델 선택과는 별개이며 브라우저 간 저장 범위에 제한이 있다.",
+      "refs": [
+        "src/app/api/director/chat/route.ts:327",
+        "src/stores/director-store.ts:5065",
+        "src/stores/director-store.ts:2868"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "샷 이미지 생성 모델 선택",
+      "status": "없음",
+      "actual": "UI 이미지 모델 선택 값은 채팅 updateShot에서 받지 않는다.",
+      "refs": [
+        "src/features/director/canvas-panels/ShotDetailPanel.tsx:133",
+        "src/app/api/director/chat/route.ts:327"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "기존 테이크 이름·프롬프트·모델 변경",
+      "status": "없음",
+      "actual": "UI 편집은 가능하다. 채팅에는 updateVideo 명령이 없다. 새 테이크의 override 지정과 다르다.",
+      "refs": [
+        "src/features/director/canvas-panels/VideoDetailPanel.tsx:227",
+        "src/app/api/director/chat/route.ts:198"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "빈 자식 테이크 추가",
+      "status": "부분",
+      "actual": "노드 추가는 연결. 영상 생성은 별도이며 DB 생성 전 빈 테이크는 재접속 저장 대상에서 제외된다.",
+      "refs": [
+        "src/stores/director-store.ts:2272",
+        "src/stores/director-store.ts:5081",
+        "src/stores/director-store.ts:5500"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "카메라 6축·조명·카메라 프리셋 변경",
+      "status": "연결",
+      "actual": "Shot·Video에 적용한다. 현재 Video UI에는 일부 카메라·조명 편집이 제거되어 채팅 범위가 더 넓다.",
+      "refs": [
+        "src/app/api/director/chat/route.ts:370",
+        "src/stores/director-store.ts:5096"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "영상 길이 변경",
+      "status": "양쪽 없음",
+      "actual": "현재 Director 편집 패널과 채팅 명령에 없다. 자식 테이크는 Shot 길이를 상속한다. Writer 길이 편집은 별도다.",
+      "refs": [
+        "src/app/api/director/chat/route.ts:327",
+        "src/stores/director-store.ts:1453"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "특정 샷 이미지 생성·재생성",
+      "status": "부분",
+      "actual": "승인 후 생성 함수로 연결. 같은 응답에서 새로 추가한 샷은 임시 ID 단절 문제가 있다.",
+      "refs": [
+        "src/stores/global-chat-store.ts:1296",
+        "src/stores/global-chat-store.ts:1885",
+        "src/stores/director-store.ts:5199"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "미생성 이미지 전체 채우기",
+      "status": "연결",
+      "actual": "ID 없는 이미지 생성 명령으로 UI와 같은 runner를 호출한다.",
+      "refs": [
+        "src/stores/director-store.ts:5177"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "완성된 이미지 전체 재생성",
+      "status": "부분",
+      "actual": "UI의 force 일괄과 같은 명령은 없다. 기존 샷 ID를 하나씩 나열해 재생성하는 우회는 가능하다.",
+      "refs": [
+        "src/app/studio/director/page.tsx:1105",
+        "src/stores/director-store.ts:5184"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "특정 샷 영상 생성·특정 테이크 재생성",
+      "status": "없음",
+      "actual": "현재 채팅에서 명시적으로 차단한다. Shot/Video 버튼은 실행한다.",
+      "refs": [
+        "src/features/director/canvas-nodes/ShotNode.tsx:114",
+        "src/app/api/director/chat/route.ts:115",
+        "src/stores/director-store.ts:5215"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "미완성 샷 영상 전체 생성",
+      "status": "부분",
+      "actual": "승인 후 같은 runner를 호출한다. 승인 계획을 수정 전 상태로 계산하고 승인 시 대상·모델도 다시 읽는 문제가 있다.",
+      "refs": [
+        "src/stores/global-chat-store.ts:1329",
+        "src/stores/global-chat-store.ts:1913",
+        "src/lib/director/video-batch-client.ts:154"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "진행 중인 영상 일괄 중단",
+      "status": "없음",
+      "actual": "UI cancelVideoBatch와 연결된 채팅 명령이 없다. 응답 Stop 버튼과도 별개다.",
+      "refs": [
+        "src/app/studio/director/page.tsx:931",
+        "src/app/api/director/chat/route.ts:198"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "중단 뒤 남은 영상 생성·진행 복원",
+      "status": "부분",
+      "actual": "다시 전체 생성 요청은 현재 남은 대상으로 새 batch를 시작한다. 서버 진행 복원은 자동. 이전 batch ID 재개 명령은 없다.",
+      "refs": [
+        "src/lib/director/video-batch-client.ts:159",
+        "src/lib/director/video-batch-client.ts:248"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "최종 테이크 ★ Final 지정·해제",
+      "status": "없음",
+      "actual": "Editor로 넘길 영상 선택은 UI에서만 할 수 있다.",
+      "refs": [
+        "src/features/director/canvas-nodes/VideoNode.tsx:100",
+        "src/app/api/director/chat/route.ts:198"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "영상 재생·일시정지·정지",
+      "status": "없음",
+      "actual": "노드와 그리드의 재생 조작에 대응하는 채팅 명령이 없다.",
+      "refs": [
+        "src/features/director/canvas-nodes/VideoNode.tsx:132",
+        "src/app/api/director/chat/route.ts:198"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "이미지→Shot·Video START/END/REF 연결",
+      "status": "연결",
+      "actual": "이미지·프레임 연결 명령은 있다. 단, 이름으로 찾을 Asset 목록이 채팅 컨텍스트에서 빠진다.",
+      "refs": [
+        "src/stores/director-store.ts:5251",
+        "src/stores/director-store.ts:5376",
+        "src/stores/director-store.ts:5605"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "앞 영상 마지막 프레임→다음 영상 연결",
+      "status": "부분",
+      "actual": "연결 요청은 실행한다. 프레임 캡처·업로드가 나중에 실패해도 최초 적용 기록은 성공으로 남을 수 있다.",
+      "refs": [
+        "src/stores/director-store.ts:5353",
+        "src/stores/director-store.ts:2703"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "연결선·START/END/REF·영상 체인 해제",
+      "status": "없음",
+      "actual": "UI Delete/X와 달리 disconnect·deleteEdge·clearFrame 채팅 명령이 없다.",
+      "refs": [
+        "src/app/studio/director/page.tsx:299",
+        "src/app/api/director/chat/route.ts:198"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "인물·배경 참조 체크·해제",
+      "status": "없음",
+      "actual": "UI 참조 목록 편집은 가능하지만 채팅 updateShot은 해당 필드를 받지 않는다.",
+      "refs": [
+        "src/features/director/canvas-popups/ShotNodePopup.tsx:227",
+        "src/app/api/director/chat/route.ts:327"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "파일 참조 이미지 추가·제거",
+      "status": "없음",
+      "actual": "샷·Asset 편집 패널에서만 실행한다. Director 채팅에는 이미지 첨부 전달 필드가 없다.",
+      "refs": [
+        "src/features/director/canvas-panels/ShotDetailPanel.tsx:69",
+        "src/stores/global-chat-store.ts:842"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "Asset 이름·프롬프트·모델·참조·이미지 생성",
+      "status": "없음",
+      "actual": "UI에는 있다. 채팅 generateImage 대상은 Shot으로 제한되며 Asset 편집 명령이 없다.",
+      "refs": [
+        "src/features/director/canvas-panels/AssetDetailPanel.tsx:66",
+        "src/stores/director-store.ts:5200"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "프롬프트 노드 생성·글 편집·Shot 연결",
+      "status": "불일치",
+      "actual": "UI에서 빈 노드 생성·연결은 가능하나 글 편집 경로가 없다. 채팅에는 생성·편집·연결 명령도 없다.",
+      "refs": [
+        "src/app/studio/director/page.tsx:1079",
+        "src/features/director/canvas-nodes/PromptNode.tsx:40",
+        "src/stores/director-store.ts:2381",
+        "src/stores/director-store.ts:2408"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "사용자 정의 관계 추가",
+      "status": "연결",
+      "actual": "관계 추가는 연결. 기존 관계의 수정·삭제 전용 채팅 명령은 없다.",
+      "refs": [
+        "src/app/api/director/chat/route.ts:414",
+        "src/stores/director-store.ts:5229"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "노드 삭제 요청·삭제 확정",
+      "status": "부분",
+      "actual": "채팅은 삭제 확인 팝업을 연다. 최종 삭제·취소는 팝업 버튼·Enter/Esc가 필요하다.",
+      "refs": [
+        "src/stores/director-store.ts:5431",
+        "src/features/director/canvas-popups/DeleteConfirmModal.tsx:60"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "노드 선택·상세 열기·닫기",
+      "status": "부분",
+      "actual": "Node 뷰의 선택·상세 표시는 연결. Storyboard 팝업 열기·닫기와 선택 해제 명령은 없다.",
+      "refs": [
+        "src/stores/director-store.ts:5438",
+        "src/features/director/canvas-panels/DirectorDetailPanel.tsx:19"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "Previz 프레임 재생성·화살표 편집",
+      "status": "없음",
+      "actual": "Director에서 여는 Writer 팝업에는 있으나 Director 채팅 명령에는 없다.",
+      "refs": [
+        "src/features/director/canvas-views/StoryboardGridView.tsx:217",
+        "src/app/api/director/chat/route.ts:198"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "뷰·Previz/Real 전환·줌·미니맵·이동·정렬",
+      "status": "없음",
+      "actual": "미사용 에셋 표시·그룹 접기·잠금·노드 배치까지 UI 상태로만 조작한다.",
+      "refs": [
+        "src/app/studio/director/page.tsx:204",
+        "src/app/studio/director/page.tsx:836",
+        "src/app/studio/director/page.tsx:1038"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "실행취소·다시실행",
+      "status": "없음",
+      "actual": "UI 단축키만 연결. 노드 텍스트 수정은 UI에서도 Undo 대상이 아니라는 제한이 있다.",
+      "refs": [
+        "src/app/studio/director/page.tsx:308",
+        "src/stores/director-store.ts:2782"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "이미지 복사·개별 다운로드",
+      "status": "없음",
+      "actual": "캔버스 메뉴에서만 실행한다.",
+      "refs": [
+        "src/features/director/canvas-popups/CanvasContextMenu.tsx:200"
+      ]
+    },
+    {
+      "stage": "Director",
+      "feature": "Editor 인계",
+      "status": "연결",
+      "actual": "텍스트 인계 경로는 있다. Final 없는 샷은 경고만 하며 인계를 막지 않는다.",
+      "refs": [
+        "src/stores/global-chat-store.ts:383",
+        "src/stores/global-chat-store.ts:569"
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "stage": "Artist",
+      "title": "지정한 모습·모델·수정 지시 유실",
+      "condition": "특정 인물 모습을 특정 모델·지시로 재생성",
+      "result": "승인 실행은 기본 모습·기본 모델·추가 지시 없음. 배경 모습도 기본 배경으로 바뀐다.",
+      "proof": "대체 재현: 인물 / 코드: 배경",
+      "refs": [
+        "src/stores/global-chat-store.ts:1134",
+        "src/stores/global-chat-store.ts:1154",
+        "src/stores/global-chat-store.ts:1820",
+        "src/lib/artist/chat-updates.ts:69"
+      ]
+    },
+    {
+      "stage": "공통",
+      "title": "취소한 승인 카드가 남음",
+      "condition": "승인 카드가 있을 때 “취소” 입력",
+      "result": "카드는 남아 다음 제안을 막는다. 취소 버튼·Esc는 정상 해제 경로다.",
+      "proof": "대체 재현",
+      "refs": [
+        "src/stores/global-chat-store.ts:536",
+        "src/stores/global-chat-store.ts:1606",
+        "src/stores/global-chat-store.ts:1613",
+        "src/lib/pending-proposal.ts:69"
+      ]
+    },
+    {
+      "stage": "공통",
+      "title": "이동 부정문·복합 요청 오인",
+      "condition": "“Director로 이동하지 마” 또는 “장르 바꾸고 Writer로 넘겨”",
+      "result": "부정문도 이동 의도로 인식한다. 복합 요청은 수정 없이 인계 분기로 끝난다. Producer는 승인 카드까지, 다른 단계는 게이트 통과 시 이동할 수 있다.",
+      "proof": "대체 재현: 부정 인식 / 코드: 후속 실행",
+      "refs": [
+        "src/lib/handoff-intent.ts:92",
+        "src/stores/global-chat-store.ts:569",
+        "src/stores/global-chat-store.ts:631",
+        "src/stores/global-chat-store.ts:697"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "title": "확정·질문이 수정 재실행으로 처리됨",
+      "condition": "씬 검토 대기 중 “확정해줘”나 질문 입력",
+      "result": "비어 있지 않은 입력을 모두 revise로 보낸다. 실제 확정은 버튼 또는 빈 Enter다.",
+      "proof": "코드 확인",
+      "refs": [
+        "src/components/layout/global-chat.tsx:893",
+        "src/app/api/writer/scene-gate/route.ts:42"
+      ]
+    },
+    {
+      "stage": "Director",
+      "title": "새 샷 생성과 이미지 생성의 연결 단절",
+      "condition": "한 응답에 씬·샷 추가와 해당 샷 이미지 생성",
+      "result": "샷은 추가되지만 승인 때 임시 ID를 실제 ID로 해석하지 못해 이미지가 시작되지 않는다.",
+      "proof": "대체 재현",
+      "refs": [
+        "src/stores/global-chat-store.ts:1296",
+        "src/stores/global-chat-store.ts:1376",
+        "src/stores/global-chat-store.ts:1903",
+        "src/stores/director-store.ts:4995"
+      ]
+    },
+    {
+      "stage": "Director",
+      "title": "생성 시작 전 승인 내용·실행 조건 불일치",
+      "condition": "샷·모델 수정과 전체 생성을 함께 요청하거나 승인 전에 변경",
+      "result": "카드는 수정 전 상태로 계산한다. 승인 뒤에는 최신 대상·모델로 다시 실행하므로 승인 수량·비용 안내와 달라질 수 있다. 시작 후에는 입력을 고정하며 이전 운영 검증에서도 확인됐다. 이번 발견은 승인 카드 작성부터 최초 시작까지의 구간이다.",
+      "proof": "코드 확인 · 실제 영향 미검증",
+      "refs": [
+        "src/stores/global-chat-store.ts:1342",
+        "src/stores/global-chat-store.ts:1376",
+        "src/stores/global-chat-store.ts:1361",
+        "src/lib/director/video-batch-client.ts:154"
+      ]
+    },
+    {
+      "stage": "Artist·Writer",
+      "title": "여러 승인 작업의 후속 건 누락",
+      "condition": "여러 자산 재생성·여러 모습 추가·여러 샷 대사 축소",
+      "result": "Artist 재생성은 첫 건만 선택. 나머지 승인 작업도 단일 카드에 막혀 자동으로 이어지지 않는다.",
+      "proof": "대체 재현: Artist 재생성 / 나머지 코드",
+      "refs": [
+        "src/stores/global-chat-store.ts:1088",
+        "src/stores/global-chat-store.ts:1177",
+        "src/stores/global-chat-store.ts:1463",
+        "src/stores/global-chat-store.ts:1482"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "title": "필드 비우기·need 단독 변경 미적용",
+      "condition": "외모·역할·배경 설명을 지우거나 need만 변경",
+      "result": "UI에서는 가능하다. 채팅 병합은 빈 값을 무시하고 need에는 want를 요구한다. 스토리 초기화·아크 비우기도 제한된다.",
+      "proof": "대체 재현: 외모·need / 나머지 코드",
+      "refs": [
+        "src/stores/producer-store.ts:102",
+        "src/stores/producer-store.ts:108",
+        "src/stores/producer-store.ts:146",
+        "src/stores/producer-store.ts:736"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "title": "내레이션이 채팅 편집에서 탈락",
+      "condition": "null 화자의 V.O.가 포함된 대사 배열 수정",
+      "result": "내레이션 단독 수정은 무효화되고 혼합 배열에서는 내레이션이 빠진다. 이후 대사 축소 승인으로 바뀔 수도 있다.",
+      "proof": "대체 재현: 파서",
+      "refs": [
+        "src/app/api/writer/dialogue/route.ts:93",
+        "src/lib/writer-chat-updates.ts:94",
+        "src/stores/writer-store.ts:639"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "title": "앞뒤 삽입 안내와 실제 추가 위치 불일치",
+      "condition": "트리트먼트 줄을 골라 “이 앞에 추가”",
+      "result": "UI는 위치 지정 삽입이 가능하다. 채팅은 위치 필드를 받지 않아 맨 끝에 붙인다.",
+      "proof": "코드 확인",
+      "refs": [
+        "src/features/writer/script-view.tsx:279",
+        "src/features/writer/add-item-dialog.tsx:265",
+        "src/stores/writer-store.ts:599"
+      ]
+    },
+    {
+      "stage": "Artist",
+      "title": "새 인물 카드에 기본 모습 누락",
+      "condition": "Artist 진입 완료 후 채팅으로 인물 추가",
+      "result": "서버 성공 후에도 로컬 appearances가 비어 있다. 재로드 전 팝업 이미지 작업·채팅 재생성이 막힌다.",
+      "proof": "대체 재현: 추가 함수·기본 모습 검사",
+      "refs": [
+        "src/stores/artist-store.ts:982",
+        "src/stores/artist-store.ts:999",
+        "src/stores/artist-store.ts:1026",
+        "src/features/artist/character-panel.tsx:189"
+      ]
+    },
+    {
+      "stage": "Writer·Artist·Director",
+      "title": "첨부를 받지만 모델은 읽지 못함",
+      "condition": "Producer 외 단계의 채팅에 파일을 드롭하고 전송",
+      "result": "이미지는 썸네일만 남고 모델에 전달되지 않는다. 텍스트는 Producer 원고를 먼저 변경한다.",
+      "proof": "코드 확인 · 실제 드롭 미검증",
+      "refs": [
+        "src/components/layout/global-chat.tsx:879",
+        "src/components/layout/global-chat.tsx:1097",
+        "src/components/layout/global-chat.tsx:1782",
+        "src/stores/global-chat-store.ts:831",
+        "src/stores/global-chat-store.ts:864"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "title": "스타일 저장 실패를 채팅이 성공으로 반환",
+      "condition": "스타일 변경의 DB 저장 실패",
+      "result": "화면 스타일은 원복된다. 채팅 적용 결과는 applied라 성공 설명·기록과 어긋날 수 있다. 화면 오류 표시는 남는다.",
+      "proof": "대체 재현",
+      "refs": [
+        "src/stores/producer-store.ts:630",
+        "src/stores/producer-store.ts:653",
+        "src/stores/global-chat-store.ts:1056"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "title": "적용 성공과 저장 성공 구분 누락",
+      "condition": "씬·샷 편집 또는 삭제 저장이 실패",
+      "result": "편집은 즉시 로컬 반영·성공 집계 후 500ms 뒤 저장하며 반환 오류를 확인하지 않는다. 없는 씬 수정도 성공 집계 가능하다.",
+      "proof": "코드 확인 · DB 실패 미재현",
+      "refs": [
+        "src/stores/writer-store.ts:173",
+        "src/stores/writer-store.ts:220",
+        "src/stores/writer-store.ts:614",
+        "src/stores/writer-store.ts:665",
+        "src/stores/global-chat-store.ts:1460"
+      ]
+    },
+    {
+      "stage": "Writer→Director",
+      "title": "수정한 설명과 생성 원문 불일치",
+      "condition": "기존 prompt가 있는 샷의 actionDescription만 채팅 수정",
+      "result": "Director는 옛 prompt를 우선한다. 기존 Scene 변경·삭제도 동기화가 제한된다. 실제 그림·영상 영향은 미검증이다.",
+      "proof": "코드 확인",
+      "refs": [
+        "src/stores/writer-store.ts:230",
+        "src/features/director/hooks/use-writer-director-sync.ts:24",
+        "src/features/director/hooks/use-writer-director-sync.ts:304"
+      ]
+    },
+    {
+      "stage": "Artist",
+      "title": "외형 변경 후 상세 설명·변경 표시 지연",
+      "condition": "기본 외형을 채팅으로 변경·승인",
+      "result": "서버 모습은 변경되지만 로컬 appearances는 그대로다. 팝업은 옛 설명과 상태를 읽는다.",
+      "proof": "코드 확인 · 화면 미재현",
+      "refs": [
+        "src/app/api/artist/appearance/route.ts:66",
+        "src/stores/artist-store.ts:1858",
+        "src/features/artist/character-view-dialog.tsx:115"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "title": "삭제·개명한 기존 카드의 재등장 가능",
+      "condition": "DB에도 있던 카드 삭제·개명 후 재진입",
+      "result": "draft에 없는 이름의 DB 카드를 다시 합친다. 삭제한 A 또는 옛 이름 A가 재등장할 조건이 있다.",
+      "proof": "조건부 추론 · DB 재로드 미검증",
+      "refs": [
+        "src/stores/producer-store.ts:474",
+        "src/stores/producer-store.ts:530",
+        "src/stores/producer-store.ts:1029"
+      ]
+    },
+    {
+      "stage": "Producer",
+      "title": "추출 필드 타입 검증 부족",
+      "condition": "모델이 문법상 유효한 JSON에 tone:null 등을 반환",
+      "result": "객체 여부만 검사해 설정에 전달한다. UI가 목록을 전제하므로 화면 예외 가능성이 있다.",
+      "proof": "코드 확인 · 발생 빈도 미측정",
+      "refs": [
+        "src/lib/parse-extracted-settings.ts:12",
+        "src/stores/producer-store.ts:409",
+        "src/features/producer/quest-journal.tsx:201"
+      ]
+    },
+    {
+      "stage": "Director",
+      "title": "영상 연결의 비동기 실패 반영 누락",
+      "condition": "앞 영상 마지막 프레임 캡처·업로드 실패",
+      "result": "채팅은 임시 연결 직후 적용 성공을 집계한다. 나중에 선이 제거돼도 그 결과를 채팅 기록에 연결하지 않는다.",
+      "proof": "코드 확인 · 실패 실행 미검증",
+      "refs": [
+        "src/stores/director-store.ts:5353",
+        "src/stores/director-store.ts:2703",
+        "src/stores/director-store.ts:2679",
+        "src/app/studio/director/page.tsx:520"
+      ]
+    },
+    {
+      "stage": "Director",
+      "title": "편집 저장 범위가 브라우저에 의존",
+      "condition": "수동 노드·샷 프롬프트·provider 수정 후 다른 브라우저 접속",
+      "result": "카메라·조명·프리셋과 달리 일부 변경은 localStorage 중심이다. 빈 테이크는 저장 대상에서 제외된다.",
+      "proof": "코드 확인 · 기기 간 복원 미검증",
+      "refs": [
+        "src/stores/director-store.ts:733",
+        "src/stores/director-store.ts:2227",
+        "src/stores/director-store.ts:2868",
+        "src/stores/director-store.ts:5491"
+      ]
+    },
+    {
+      "stage": "Director",
+      "title": "빈 프롬프트 노드의 편집 경로 부재",
+      "condition": "UI에서 프롬프트 노드를 새로 추가",
+      "result": "글을 쓰는 UI·채팅 경로가 없다. 빈 노드를 Shot에 연결하면 빈 promptOverride가 적용되는 구조다.",
+      "proof": "코드 확인 · 화면 미재현",
+      "refs": [
+        "src/app/studio/director/page.tsx:1079",
+        "src/features/director/canvas-nodes/PromptNode.tsx:40",
+        "src/stores/director-store.ts:2408"
+      ]
+    },
+    {
+      "stage": "Writer",
+      "title": "되묻기와 변경의 동시 실행 가능",
+      "condition": "모델이 clarify와 수정 명령을 같은 응답에 반환",
+      "result": "프롬프트는 금지하지만 검증·클라이언트는 둘 다 처리한다. 대상을 되묻는 동안 수정도 적용될 수 있다.",
+      "proof": "조건부 추론 · 실LLM 미검증",
+      "refs": [
+        "src/app/api/writer/chat/route.ts:69",
+        "src/lib/writer-chat-updates.ts:160",
+        "src/stores/global-chat-store.ts:1427",
+        "src/stores/global-chat-store.ts:1445"
+      ]
+    },
+    {
+      "stage": "공통",
+      "title": "대화 기록 실패·승인 복원 한계",
+      "condition": "메시지 저장 실패 또는 승인 전 재접속",
+      "result": "저장 실패는 콘솔에만 남는다. 실행 가능한 승인 카드는 메시지와 함께 복원되지 않는다.",
+      "proof": "코드 확인 · 장애/재접속 미검증",
+      "refs": [
+        "src/lib/chat-persistence.ts:3",
+        "src/stores/global-chat-store.ts:490",
+        "src/stores/global-chat-store.ts:1606"
+      ]
+    }
+  ],
+  "priorDirectorEvidence": {
+    "source": ".claude/docs/2026-09-09/session-report.html",
+    "commit": "54455bc4dad73e49ce5505a4c21abf5963c36bce",
+    "observationUtc": "2026-09-09T10:49:58 to 2026-09-09T11:20:58",
+    "verified": [
+      "Happy Horse 3초 영상 7편 완료",
+      "실사 이미지 1장 완료",
+      "최초 4편 일괄에서 탭 종료 후 네 번째 접수",
+      "시작 입력 고정",
+      "UI 중단·이미 접수한 결과 수집",
+      "새로고침 뒤 진행 복원",
+      "수동 시작 없는 대기의 자동 접수·완료"
+    ],
+    "limits": [
+      "실제 자연어 채팅부터 실행하는 경로는 근거 없음",
+      "Seedance·Kling·Veo 실생성 미검증",
+      "당시 shadow 모드, 운영 잔액 부족 강제 차단 미검증",
+      "cron 원문과 실제 공급자 청구 조회 403",
+      "생성 품질은 오너 판정"
+    ],
+    "rawEvidence": [
+      ".smoke/batch-live-20260909/live-final-state.json",
+      ".smoke/batch-live-20260909/main-inputs-frozen.json",
+      ".smoke/batch-live-20260909/cancel-active-ui-result.json",
+      ".smoke/batch-live-20260909/cron-recovery-observed.json",
+      ".smoke/batch-live-20260909/final-ui-state.json"
+    ]
+  },
+  "notes": [
+    "pnpm exec attempted dependency status install and stopped before tests; installed Vitest invoked directly without installing packages.",
+    "Temporary diagnostic startup imports and an addCharacter fixture argument were corrected. No product code, existing tests or their expectations were changed."
+  ],
+  "artifact": {
+    "shareUrl": "https://share.onorca.dev/a/z5KSJHyPRio1",
+    "expiresAt": "2026-10-09T12:40:22.841Z",
+    "html": "session-report-2.html",
+    "screenshot": "chat-audit-preview.png",
+    "htmlSha256": "fd3af039e002a87f0536323505ca4f76a244bd366766ddde3ed0649af389dbc5",
+    "renderChecks": {
+      "viewportCssWidth": 755,
+      "horizontalOverflow": 0,
+      "inventoryRows": 113,
+      "searchAndLimitationsFilter": "passed",
+      "expandCollapse": "passed",
+      "screenshotReviewed": true,
+      "feedbackAndPlan": "dark/light rendered, horizontal overflow 0"
+    },
+    "publishedHttpStatus": 200,
+    "publishedContentMatchesLocal": true,
+    "previousShareUrl": "https://share.onorca.dev/a/VNRUcTBlwynu",
+    "additionalScreenshots": [
+      "chat-audit-feedback-preview.png",
+      "chat-audit-plan-preview.png"
+    ]
+  },
+  "userReportedFindings": [
+    {
+      "stage": "Producer 추정(제공 대화 기준; 실제 요청 경로 미확인)",
+      "feature": "대사 언어 ja → ko 변경",
+      "status": "사용자 실패 제보 · 원인 미확정",
+      "originalAudit": "설정 변경 묶음에서 코드 연결만 확인. 이 거절 사례는 최초 23건에 포함되지 않았다.",
+      "userMessages": [
+        "채팅으로 대사를 한국어로 변경해줄래?",
+        "네, 한국어(ko)로 바꿔주세요"
+      ],
+      "observedReply": "앱이 현재 대사 언어를 일본어(ja)로 확정한 상태라 이번 턴에서는 변경이 적용되지 않아요. 대사 언어를 바꾸려면 채팅 입력창 쪽 설정에서 직접 변경해 주세요!",
+      "currentCode": "Producer 추출 필드와 설정 패치는 dialogueLanguage 변경을 허용한다. 시스템 프롬프트도 명시 설정 변경을 같은 응답에 적용하도록 지시한다. 최초 인계 뒤에는 승인 경로가 있지만 영구 변경 금지는 확인되지 않았다.",
+      "refs": [
+        "src/app/api/produce/chat/system-prompt.ts:34",
+        "src/app/api/produce/chat/system-prompt.ts:93",
+        "src/stores/producer-store.ts:416",
+        "src/stores/producer-store.ts:663",
+        "src/lib/chat-locale.ts:31"
+      ],
+      "unverified": [
+        "실패 당시 배포 버전·프로젝트 단계·모델 원응답 및 추출 JSON",
+        "설정값과 실제 DB 변경 여부",
+        "실LLM 재현 빈도",
+        "변경 후 Writer 대사 생성과 기존 대사 번역"
+      ],
+      "nextCheck": "제공된 2턴 대화를 일본어 설정 프로젝트에서 재현하고 모델 원응답→추출값→승인→화면 설정→DEV DB/재접속을 비교한다. 이미지·영상 생성 불필요. 언어 설정 변경과 이미 작성된 대사 번역은 따로 판정한다."
+    }
+  ],
+  "collaborationPlan": {
+    "status": "제안 · 제품 수정 미실행",
+    "path": ".omx/plans/chat-parity-collaboration-2026-09-09.md",
+    "firstCase": "대사 언어 ja → ko 변경 거절",
+    "firstIncrement": "대사 언어 조회→변경→저장/재조회→결과 응답; 실패 시 구조화 결과와 제한된 후속 처리"
+  }
+}

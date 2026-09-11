@@ -9,6 +9,7 @@ vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
     from: () => ({
       update: () => ({ eq: async () => ({ error: null }) }),
+      select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { current_stage: 'artist' }, error: null }) }) }),
     }),
   }),
 }))
@@ -55,6 +56,7 @@ beforeEach(() => {
 afterEach(() => {
   useDirectorCanvasStore.setState({ applyUpdates: directorApplyUpdates, nodes: [], edges: [] })
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
 })
 
 describe('필수 정보가 없으면 다음 단계로 넘기지 않는다', () => {
@@ -98,6 +100,7 @@ describe('선택 정보가 없으면 경고를 보여주고도 다음 단계로 
   })
 
   it('장면 정보가 없어도 품질 경고를 보여주며 Artist로 넘긴다', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ started: true, assets: { images_ready: true, chars_ready: 0, chars_total: 0, worlds_ready: 0, worlds_total: 0, queued_count: 0, failed_count: 0, stalled: false } })))
     useProjectStore.setState({ currentStage: 'writer', reachedStage: 'writer' })
     useWriterStore.setState({
       sceneManifest: { scenes: [], characters: [], locations: [] },

@@ -211,10 +211,10 @@ interface ProducerState {
   /** 앵커 카탈로그 + 현재 프로젝트 선택값 로드 (readiness board 진입 시). */
   loadStyleAnchors: () => Promise<void>
   /** 스타일 앵커 선택 — 낙관적 반영 + projects.style_anchor_key 저장. */
-  setStyleAnchor: (key: string | null) => Promise<void>
+  setStyleAnchor: (key: string | null) => Promise<boolean>
   /** D12: 채팅이 이름/느낌으로 고른 카탈로그 앵커 키 적용 — 카탈로그 검증 후 setStyleAnchor.
    *  모델이 발명한 키는 unknown_key로 되돌려 호출부가 정직하게 말하게 한다. */
-  applyStyleAnchorKeyFromChat: (key: string) => Promise<'applied' | 'unknown_key'>
+  applyStyleAnchorKeyFromChat: (key: string) => Promise<'applied' | 'unknown_key' | 'failed'>
   /** 채팅이 해석한 화풍 의도를 반영 — 저장은 서버(api/produce/style-anchor)가 검증 후 한다. */
   applyCustomStyleAnchor: (anchor: {
     key: string
@@ -223,6 +223,8 @@ interface ProducerState {
     medium: string | null
   }) => void
   updateSettings: (partial: Partial<ProjectSettings>) => void
+  /** 현재 작업 초안을 저장하고 서버가 반환한 저장본을 확인한다. */
+  saveDraftNow: () => Promise<boolean>
   /** 반환값은 trace 영수증용 실제 결과 — applied·pending(승인 카드)·rejected(카드 자리 점유됨)·noop. */
   applyExtractedSettings: (
     extracted: ExtractedSettings,
@@ -514,46 +516,49 @@ function boardOf(
   }
 }
 
-// 디바운스 자동저장 — 보드 변경 후 800ms 무편집이면 projects.producer_draft 에 1회 저장.
+// 같은 프로젝트의 자동저장과 명시 저장은 순서를 지키고, 다른 프로젝트 저장은 기다리지 않는다.
 const DRAFT_SAVE_DEBOUNCE_MS = 800
 let draftSaveTimer: ReturnType<typeof setTimeout> | null = null
-let pendingDraftProjectId: string | null = null
+const draftSaveQueues = new Map<string, Promise<void>>()
 
 function cancelDraftSave(): void {
-  if (draftSaveTimer) {
-    clearTimeout(draftSaveTimer)
-    draftSaveTimer = null
-  }
-  pendingDraftProjectId = null
+  if (draftSaveTimer) clearTimeout(draftSaveTimer)
+  draftSaveTimer = null
 }
 
-function scheduleDraftSave(getState: () => ProducerBoardState): void {
+function scheduleDraftSave(): void {
   if (typeof window === 'undefined') return
   const projectId = useProjectStore.getState().projectId
   if (!projectId) return
-  pendingDraftProjectId = projectId
-  if (draftSaveTimer) clearTimeout(draftSaveTimer)
+  cancelDraftSave()
   draftSaveTimer = setTimeout(() => {
     draftSaveTimer = null
-    const targetId = pendingDraftProjectId
-    pendingDraftProjectId = null
-    // 저장 직전 프로젝트가 바뀌었으면 교차오염 방지를 위해 건너뛴다.
-    if (!targetId || useProjectStore.getState().projectId !== targetId) return
-    const draft = buildProducerDraft(getState())
-    void (async () => {
-      try {
-        const supabase = createClient()
-        await supabase
-          .from('projects')
-          .update({ producer_draft: draft as unknown as Json })
-          .eq('id', targetId)
-      } catch (err) {
-        console.error('[producer-store] draft save failed:', err)
-      }
-    })()
+    if (useProjectStore.getState().projectId === projectId) {
+      void useProducerStore.getState().saveDraftNow()
+    }
   }, DRAFT_SAVE_DEBOUNCE_MS)
 }
 
+function persistDraft(projectId: string, draft: ProducerDraft): Promise<void> {
+  const pending: Promise<void> = (draftSaveQueues.get(projectId) ?? Promise.resolve()).catch(() => undefined).then(async () => {
+    const { data, error } = await createClient()
+      .from('projects')
+      .update({ producer_draft: draft as unknown as Json })
+      .eq('id', projectId)
+      .select('producer_draft')
+      .single()
+    if (error) throw new Error(error.message)
+    // 성공 HTTP라도 저장본이 없거나 요청한 설정이 다르면 완료로 알리지 않는다.
+    const saved = parseProducerDraft(data?.producer_draft)
+    if (!saved || Object.entries(draft.settings).filter(([key]) => key !== 'targetEmotion').some(([key, value]) =>
+      JSON.stringify(saved.settings[key as keyof ProjectSettings]) !== JSON.stringify(value)
+    )) throw new Error('Saved settings did not match the requested settings')
+  }).finally(() => {
+    if (draftSaveQueues.get(projectId) === pending) draftSaveQueues.delete(projectId)
+  })
+  draftSaveQueues.set(projectId, pending)
+  return pending
+}
 
 export const useProducerStore = create<ProducerState>((set, get) => ({
   storyText: '',
@@ -570,7 +575,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   setStoryText: (text) => {
     if (isDemoSession()) return
     set({ storyText: text })
-    scheduleDraftSave(() => boardOf(get()))
+    scheduleDraftSave()
   },
 
   loadStyleAnchors: async () => {
@@ -615,26 +620,33 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   setStyleAnchor: async (key) => {
-    if (isDemoSession()) return
+    if (isDemoSession()) return false
     const projectId = useProjectStore.getState().projectId
     const prev = get().styleAnchorKey
     const prevCustom = get().customStyleAnchor
     // 프리셋을 고르면 커스텀 앵커는 반드시 비운다 — 남겨 두면 resolveStyleAnchor 가 커스텀을
     //   우선해서, 카드를 바꿨는데 화풍이 안 바뀌는 조용한 고장이 된다.
     set({ styleAnchorKey: key, customStyleAnchor: null })
-    if (!projectId) return
-    const { error } = await createClient()
-      .from('projects')
-      .update({ style_anchor_key: key ?? '', custom_style_anchor: null })
-      .eq('id', projectId)
-    if (error) {
-      set({
-        styleAnchorKey: prev,
-        customStyleAnchor: prevCustom,
-        error: translate(useLocaleStore.getState().locale, 'Failed to save style: {message}', {
-          message: error.message,
-        }),
+    if (!projectId) return false
+    const current = () => useProjectStore.getState().projectId === projectId
+    let written = false
+    try {
+      const db = createClient()
+      const { error } = await db.from('projects').update({ style_anchor_key: key ?? '', custom_style_anchor: null }).eq('id', projectId)
+      if (!current()) return false
+      if (error) throw new Error(error.message)
+      written = true
+      const { data, error: readError } = await db.from('projects').select('style_anchor_key,custom_style_anchor').eq('id', projectId).maybeSingle()
+      if (!current()) return false
+      if (readError || !data || data.style_anchor_key !== (key ?? '') || data.custom_style_anchor != null) throw new Error(readError?.message ?? 'Saved style could not be verified')
+      set({ error: null })
+      return true
+    } catch (error) {
+      if (current()) set({
+        ...(!written ? { styleAnchorKey: prev, customStyleAnchor: prevCustom } : {}),
+        error: translate(useLocaleStore.getState().locale, 'Failed to save style: {message}', { message: error instanceof Error ? error.message : String(error) }),
       })
+      return false
     }
   },
 
@@ -642,12 +654,31 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     set({ styleAnchorKey: key, customStyleAnchor: { url, label, medium } })
   },
 
+  saveDraftNow: async () => {
+    cancelDraftSave()
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId || isDemoSession()) return false
+    const draft = buildProducerDraft(boardOf(get()))
+    try {
+      await persistDraft(projectId, draft)
+      if (useProjectStore.getState().projectId !== projectId) return false
+      set({ error: null })
+      return true
+    } catch (err) {
+      if (useProjectStore.getState().projectId === projectId) {
+        set({ error: translate(contentLocale(), 'Could not save your changes. Please try again.') })
+      }
+      console.error('[producer-store] draft save failed:', err)
+      return false
+    }
+  },
+
   updateSettings: (partial) => {
     if (isDemoSession()) return
     set((state) => ({
       projectSettings: { ...state.projectSettings, ...partial },
     }))
-    scheduleDraftSave(() => boardOf(get()))
+    scheduleDraftSave()
   },
 
   applyStyleAnchorKeyFromChat: async (key) => {
@@ -655,8 +686,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     if (get().styleAnchors.length === 0) await get().loadStyleAnchors()
     const anchor = get().styleAnchors.find((a) => a.key === key)
     if (!anchor) return 'unknown_key'
-    await get().setStyleAnchor(anchor.key)
-    return 'applied'
+    return await get().setStyleAnchor(anchor.key) ? 'applied' : 'failed'
   },
 
   applyExtractedSettings: (extracted, traceId) => {
@@ -737,7 +767,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
         storyReady: nextReady === true ? true : state.storyReady,
       }
     })
-    scheduleDraftSave(() => boardOf(get()))
+    scheduleDraftSave()
   },
 
   addCastMember: (entityType) => {
@@ -750,7 +780,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
         { localId, name: '', entityType, appearance: '', origin: 'producer', userEdited: true },
       ],
     }))
-    scheduleDraftSave(() => boardOf(get()))
+    scheduleDraftSave()
     return localId
   },
 
@@ -759,7 +789,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     set((state) => ({
       cast: state.cast.map((m) => (m.localId === localId ? { ...m, ...patch, userEdited: true } : m)),
     }))
-    scheduleDraftSave(() => boardOf(get()))
+    scheduleDraftSave()
   },
 
   removeCastMember: (localId) => {
@@ -767,7 +797,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     set((state) => ({
       cast: state.cast.filter((m) => m.localId !== localId),
     }))
-    scheduleDraftSave(() => boardOf(get()))
+    scheduleDraftSave()
   },
 
   addBackground: () => {
@@ -779,7 +809,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
         { localId, name: '', visualDescription: '', purpose: '', origin: 'producer', userEdited: true },
       ],
     }))
-    scheduleDraftSave(() => boardOf(get()))
+    scheduleDraftSave()
     return localId
   },
 
@@ -792,7 +822,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
           : background,
       ),
     }))
-    scheduleDraftSave(() => boardOf(get()))
+    scheduleDraftSave()
   },
 
   removeBackground: (localId) => {
@@ -800,7 +830,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     set((state) => ({
       backgrounds: state.backgrounds.filter((background) => background.localId !== localId),
     }))
-    scheduleDraftSave(() => boardOf(get()))
+    scheduleDraftSave()
   },
 
   saveAndHandoff: async (options) => {
@@ -993,12 +1023,14 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
         })
         .eq('id', projectId)
       if (stageError) throw stageError
+      if (useProjectStore.getState().projectId !== projectId) return false
 
       useProjectStore.getState().unlockThrough('artist')
       useProjectStore.getState().setStage('writer')
       set({ syncing: false })
       return true
     } catch (err) {
+      if (useProjectStore.getState().projectId !== projectId) return false
       set({
         syncing: false,
         error: err instanceof Error ? err.message : 'Save failed',

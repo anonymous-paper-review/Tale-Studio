@@ -12,6 +12,17 @@ export type ChatLlmUsage = {
   cacheReadInputTokens: number
   cacheCreationInputTokens: number
   stopReason: string | null
+  effort?: 'low' | 'medium' | 'high' | 'max'
+  thinking?: 'off' | 'adaptive'
+}
+
+export type ChatRequestUsage = Pick<ChatLlmUsage, 'durationMs' | 'inputTokens' | 'outputTokens' | 'cacheReadInputTokens' | 'cacheCreationInputTokens'> & { modelCalls: number }
+export function summarizeChatUsage(calls: readonly ChatLlmUsage[]): ChatRequestUsage {
+  const sum: ChatRequestUsage = { modelCalls: calls.length, durationMs: 0, inputTokens: 0, outputTokens: 0, cacheReadInputTokens: 0, cacheCreationInputTokens: 0 }
+  for (const call of calls) for (const field of ['durationMs', 'inputTokens', 'outputTokens', 'cacheReadInputTokens', 'cacheCreationInputTokens'] as const) {
+    if (Number.isFinite(call[field]) && call[field] >= 0) sum[field] += call[field]
+  }
+  return sum
 }
 
 /** 생성 잡 하나의 영수증. 결과 URL 자체는 추적 기록에 저장하지 않는다. */
@@ -43,6 +54,7 @@ export interface ChatGenerationJobTrace {
  * route parses updates or applies a proposal.
  */
 export interface ChatTrace extends ChatLlmUsage {
+  requestUsage?: ChatRequestUsage
   traceId: string
   stage: string
   route: string

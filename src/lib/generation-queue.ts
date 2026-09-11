@@ -44,6 +44,8 @@ let signature = ''
 let projectId: string | null = null
 let timer: ReturnType<typeof setTimeout> | null = null
 let inFlight = false
+let requestVersion = 0
+let requestController: AbortController | null = null
 const listeners = new Set<() => void>()
 
 function emit() {
@@ -60,22 +62,31 @@ function signatureOf(next: ActiveJob[]): string {
 
 async function fetchOnce(): Promise<void> {
   if (!projectId || inFlight) return
+  const requestedProjectId = projectId
+  const version = requestVersion
+  const controller = new AbortController()
+  requestController = controller
   inFlight = true
   try {
     const res = await fetch(
-      `/api/generation/active?projectId=${encodeURIComponent(projectId)}`,
+      `/api/generation/active?projectId=${encodeURIComponent(requestedProjectId)}`,
+      { signal: controller.signal },
     )
     if (!res.ok) return
     const body = (await res.json()) as {
       data?: { jobs?: ActiveJob[]; videoUsage?: VideoUsage; batches?: GenerationBatch[]; completions?: GenerationCompletion[] }
     }
+    // 이전 프로젝트의 요청은 취소가 늦게 적용돼도 새 프로젝트 스냅샷에 반영하지 않는다.
+    if (version !== requestVersion || requestedProjectId !== projectId || listeners.size === 0) return
     const next = body.data?.jobs ?? []
     const usage = body.data?.videoUsage ?? null
     const nextBatches = body.data?.batches ?? []
     const nextCompletions = body.data?.completions ?? []
     // 사용량·배치·완료 기록 변화도 emit 대상 — 시그니처에 함께 태운다(잡 목록이 그대로여도 카운트는 오른다).
     const batchSig = nextBatches.map((b) => `${b.lane}:${b.active}/${b.done}/${b.failed}/${b.total}`).join(',')
-    const completionSig = nextCompletions.length ? `${nextCompletions.length}:${nextCompletions[nextCompletions.length - 1].at}` : '0'
+    // 개수·최신 시각만 같아도 이전 완료가 새 완료로 교체되거나 샷 수가 달라질 수 있다.
+    // 전체 집계 입력을 비교하되 응답 순서만 바뀐 것은 같은 스냅샷으로 유지한다.
+    const completionSig = nextCompletions.map((c) => `${c.stage}:${c.lane}:${c.at}:${c.units}`).sort().join(',')
     const sig = `${signatureOf(next)}|v:${usage ? `${usage.used}/${usage.limit}` : '-'}|b:${batchSig}|c:${completionSig}`
     if (sig === signature) return
     signature = sig
@@ -87,16 +98,20 @@ async function fetchOnce(): Promise<void> {
   } catch {
     // 네트워크 실패는 조용히 — 다음 틱이 재시도한다. 진행 표시가 사라지는 것보다 낫다.
   } finally {
-    inFlight = false
+    if (version === requestVersion) {
+      inFlight = false
+      requestController = null
+    }
   }
 }
 
 function schedule() {
   if (timer) clearTimeout(timer)
+  const version = requestVersion
   timer = setTimeout(
     () => {
       void fetchOnce().finally(() => {
-        if (listeners.size > 0) schedule()
+        if (listeners.size > 0 && version === requestVersion) schedule()
       })
     },
     jobs.length > 0 ? POLL_ACTIVE_MS : POLL_IDLE_MS,
@@ -105,21 +120,37 @@ function schedule() {
 
 function start(id: string) {
   if (projectId !== id) {
+    stop()
     projectId = id
     jobs = EMPTY
     videoUsage = null
     batches = EMPTY_BATCHES
     completions = EMPTY_COMPLETIONS
     signature = ''
+    emit()
   }
+  const version = requestVersion
   void fetchOnce().finally(() => {
-    if (listeners.size > 0) schedule()
+    if (listeners.size > 0 && version === requestVersion) schedule()
   })
 }
 
 function stop() {
   if (timer) clearTimeout(timer)
   timer = null
+  requestVersion += 1
+  requestController?.abort()
+  requestController = null
+  inFlight = false
+}
+
+function subscribeToProject(id: string, listener: () => void): () => void {
+  listeners.add(listener)
+  if (listeners.size === 1 || projectId !== id) start(id)
+  return () => {
+    listeners.delete(listener)
+    if (listeners.size === 0) stop()
+  }
 }
 
 /** 잡을 막 제출한 직후 호출 — 다음 폴링 틱을 기다리지 않고 진행 표시를 즉시 켠다. */
@@ -127,18 +158,18 @@ export function refreshGenerationQueue(): void {
   void fetchOnce()
 }
 
-function getSnapshot(): ActiveJob[] {
-  return jobs
+function getSnapshot(id: string | null): ActiveJob[] {
+  return id && id === projectId ? jobs : EMPTY
 }
-function getBatchesSnapshot(): GenerationBatch[] {
-  return batches
+function getBatchesSnapshot(id: string | null): GenerationBatch[] {
+  return id && id === projectId ? batches : EMPTY_BATCHES
 }
-function getCompletionsSnapshot(): GenerationCompletion[] {
-  return completions
+function getCompletionsSnapshot(id: string | null): GenerationCompletion[] {
+  return id && id === projectId ? completions : EMPTY_COMPLETIONS
 }
 
-function getVideoUsageSnapshot(): VideoUsage | null {
-  return videoUsage
+function getVideoUsageSnapshot(id: string | null): VideoUsage | null {
+  return id && id === projectId ? videoUsage : null
 }
 
 function getServerSnapshot(): ActiveJob[] {
@@ -150,16 +181,11 @@ export function useActiveGenerationJobs(projectId: string | null): ActiveJob[] {
   const subscribe = useCallback(
     (onChange: () => void) => {
       if (!projectId) return () => {}
-      listeners.add(onChange)
-      if (listeners.size === 1) start(projectId)
-      return () => {
-        listeners.delete(onChange)
-        if (listeners.size === 0) stop()
-      }
+      return subscribeToProject(projectId, onChange)
     },
     [projectId],
   )
-  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
+  return useSyncExternalStore(subscribe, () => getSnapshot(projectId), getServerSnapshot)
 }
 
 /** 프로젝트당 영상 생성 사용량(#f4) — 같은 단일 폴러를 공유한다. 없으면 null(첫 응답 전). */
@@ -167,16 +193,11 @@ export function useVideoUsage(projectId: string | null): VideoUsage | null {
   const subscribe = useCallback(
     (onChange: () => void) => {
       if (!projectId) return () => {}
-      listeners.add(onChange)
-      if (listeners.size === 1) start(projectId)
-      return () => {
-        listeners.delete(onChange)
-        if (listeners.size === 0) stop()
-      }
+      return subscribeToProject(projectId, onChange)
     },
     [projectId],
   )
-  return useSyncExternalStore(subscribe, getVideoUsageSnapshot, () => null)
+  return useSyncExternalStore(subscribe, () => getVideoUsageSnapshot(projectId), () => null)
 }
 
 // ── 순수 셀렉터 (테스트 대상) ────────────────────────────────────────────────
@@ -233,16 +254,11 @@ export function useGenerationBatches(projectId: string | null): GenerationBatch[
   const subscribe = useCallback(
     (onChange: () => void) => {
       if (!projectId) return () => {}
-      listeners.add(onChange)
-      if (listeners.size === 1) start(projectId)
-      return () => {
-        listeners.delete(onChange)
-        if (listeners.size === 0) stop()
-      }
+      return subscribeToProject(projectId, onChange)
     },
     [projectId],
   )
-  return useSyncExternalStore(subscribe, projectId ? getBatchesSnapshot : () => EMPTY_BATCHES, () => EMPTY_BATCHES)
+  return useSyncExternalStore(subscribe, () => getBatchesSnapshot(projectId), () => EMPTY_BATCHES)
 }
 
 /** 약속 D3: 최근 완료 기록(스테이지 배지의 근거). */
@@ -250,16 +266,11 @@ export function useGenerationCompletions(projectId: string | null): GenerationCo
   const subscribe = useCallback(
     (onChange: () => void) => {
       if (!projectId) return () => {}
-      listeners.add(onChange)
-      if (listeners.size === 1) start(projectId)
-      return () => {
-        listeners.delete(onChange)
-        if (listeners.size === 0) stop()
-      }
+      return subscribeToProject(projectId, onChange)
     },
     [projectId],
   )
-  return useSyncExternalStore(subscribe, projectId ? getCompletionsSnapshot : () => EMPTY_COMPLETIONS, () => EMPTY_COMPLETIONS)
+  return useSyncExternalStore(subscribe, () => getCompletionsSnapshot(projectId), () => EMPTY_COMPLETIONS)
 }
 
 /** 테스트 전용 — 스냅샷 주입(서버 없이 파생 훅을 검증). */

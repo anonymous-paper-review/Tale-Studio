@@ -13,6 +13,8 @@ export interface FalKeyEntry {
   id: string
   maxInflight: number
   client: FalClient
+  /** 유료 접수 응답 유실 시 SDK 내부 재시도까지 금지하는 HTTP 1회 경계. */
+  submitQueueOnce: (model: string, input: Record<string, unknown>, webhookUrl?: string) => Promise<{ request_id: string }>
 }
 
 interface FalKeysEnvEntry {
@@ -56,6 +58,25 @@ function parseFalKeysEnv(raw: string): FalKeyEntry[] {
       id: entry.id,
       maxInflight: entry.maxInflight,
       client: createFalClient({ credentials: () => entry.key }),
+      submitQueueOnce: async (model, input, webhookUrl) => {
+        // fal 공식 queue HTTP 계약. 키는 레지스트리 밖으로 노출하지 않는다.
+        // https://fal.ai/docs/documentation/development/calling-your-endpoints
+        if (!/^[\w-]+(?:\/[\w.-]+)+$/.test(model) || model.split('/').some((part) => part === '.' || part === '..')) throw new Error('Invalid fal model path')
+        const url = new URL(`https://queue.fal.run/${model}`)
+        if (webhookUrl) url.searchParams.set('fal_webhook', webhookUrl)
+        const response = await fetch(url.toString(), {
+          method: 'POST', redirect: 'error',
+          headers: { Authorization: `Key ${entry.key}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify(input),
+        })
+        if (!response.ok) {
+          const body: unknown = await response.json().catch(() => null)
+          throw Object.assign(new Error(response.statusText || 'fal queue rejected the request'), { status: response.status, body })
+        }
+        const receipt: unknown = await response.json()
+        if (!receipt || typeof receipt !== 'object' || !('request_id' in receipt) || typeof receipt.request_id !== 'string' || !receipt.request_id.trim()) throw new Error('fal queue response has no request ID')
+        return { request_id: receipt.request_id }
+      },
     })
   }
   return entries

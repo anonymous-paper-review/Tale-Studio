@@ -1,0 +1,144 @@
+
+ RUN  v4.1.6 /Users/xcape/projects/tale-studio
+
+(node:57422) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ tests/writer/status-eta.test.ts (5 tests | 5 failed) 9ms
+     × 검토 대기가 섞인 과거 기록으로 남은 시간을 표시하지 않는다 6ms
+     × 다른 제작 방식의 기록으로 남은 시간을 표시하지 않는다 1ms
+     × 마지막 실행 조각만 측정된 기록으로 남은 시간을 표시하지 않는다 1ms
+     × 초안 확인을 기다릴 때 예상 남은 시간을 표시하지 않는다 0ms
+     × 예상 시간을 숨긴 상태에서는 다른 프로젝트의 실행 기록을 읽지 않는다 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 5 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/writer/status-eta.test.ts > 근거 없는 예상 시간 제거 > 검토 대기가 섞인 과거 기록으로 남은 시간을 표시하지 않는다
+AssertionError: expected { projectId: 'approval-wait', …(16) } to match object { eta_total_ms: null, …(1) }
+(18 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "eta_based_on_runs": 0,
+-   "eta_total_ms": null,
++   "eta_based_on_runs": 1,
++   "eta_total_ms": 1080000,
+  }
+
+ ❯ tests/writer/status-eta.test.ts:61:43
+     59|   // 왜: 초안 확인을 기다린 18분이 실제 생성 시간으로 환산되던 경로를 막는다.
+     60|   it('검토 대기가 섞인 과거 기록으로 남은 시간을 표시하지 않는다', async () => {
+     61|     expect(await status('approval-wait')).toMatchObject({ eta_total_ms…
+       |                                           ^
+     62|   })
+     63|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/5]⎯
+
+ FAIL  tests/writer/status-eta.test.ts > 근거 없는 예상 시간 제거 > 다른 제작 방식의 기록으로 남은 시간을 표시하지 않는다
+AssertionError: expected { projectId: 'other-engine', …(16) } to match object { eta_total_ms: null, …(1) }
+(18 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "eta_based_on_runs": 0,
+-   "eta_total_ms": null,
++   "eta_based_on_runs": 1,
++   "eta_total_ms": 1080000,
+  }
+
+ ❯ tests/writer/status-eta.test.ts:67:42
+     65|   it('다른 제작 방식의 기록으로 남은 시간을 표시하지 않는다', async () => {
+     66|     mocks.history[0].engine = 'v2'
+     67|     expect(await status('other-engine')).toMatchObject({ eta_total_ms:…
+       |                                          ^
+     68|   })
+     69|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/5]⎯
+
+ FAIL  tests/writer/status-eta.test.ts > 근거 없는 예상 시간 제거 > 마지막 실행 조각만 측정된 기록으로 남은 시간을 표시하지 않는다
+AssertionError: expected { projectId: 'partial-timing', …(16) } to match object { eta_total_ms: null, …(1) }
+(18 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "eta_based_on_runs": 0,
+-   "eta_total_ms": null,
++   "eta_based_on_runs": 1,
++   "eta_total_ms": 1080000,
+  }
+
+ ❯ tests/writer/status-eta.test.ts:74:44
+     72|     mocks.current.current_stage = 'shotsAndDialogue'
+     73|     mocks.history[0].timings = { shotsAndDialogue: { ms: 1_000, attemp…
+     74|     expect(await status('partial-timing')).toMatchObject({ eta_total_m…
+       |                                            ^
+     75|   })
+     76|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/5]⎯
+
+ FAIL  tests/writer/status-eta.test.ts > 근거 없는 예상 시간 제거 > 초안 확인을 기다릴 때 예상 남은 시간을 표시하지 않는다
+AssertionError: expected { projectId: 'review', …(16) } to match object { eta_total_ms: null, …(1) }
+(18 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "eta_based_on_runs": 0,
+-   "eta_total_ms": null,
++   "eta_based_on_runs": 1,
++   "eta_total_ms": 1080000,
+  }
+
+ ❯ tests/writer/status-eta.test.ts:80:36
+     78|   it('초안 확인을 기다릴 때 예상 남은 시간을 표시하지 않는다', async () => {
+     79|     mocks.current.status = 'awaiting_confirmation'
+     80|     expect(await status('review')).toMatchObject({ eta_total_ms: null,…
+       |                                    ^
+     81|   })
+     82|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/5]⎯
+
+ FAIL  tests/writer/status-eta.test.ts > 근거 없는 예상 시간 제거 > 예상 시간을 숨긴 상태에서는 다른 프로젝트의 실행 기록을 읽지 않는다
+AssertionError: expected [ [ 'writer_runs' ], …(2) ] to deeply equal [ [ 'writer_runs' ] ]
+
+- Expected
++ Received
+
+  [
+    [
+      "writer_runs",
+    ],
++   [
++     "writer_runs",
++   ],
++   [
++     "projects",
++   ],
+  ]
+
+ ❯ tests/writer/status-eta.test.ts:86:35
+     84|   it('예상 시간을 숨긴 상태에서는 다른 프로젝트의 실행 기록을 읽지 않는다', async () => {
+     85|     await status('no-unrelated-reads')
+     86|     expect(mocks.from.mock.calls).toEqual([['writer_runs']])
+       |                                   ^
+     87|   })
+     88| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/5]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  5 failed (5)
+   Start at  11:02:50
+   Duration  157ms (transform 24ms, setup 9ms, import 53ms, tests 9ms, environment 0ms)
+

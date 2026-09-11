@@ -181,6 +181,7 @@ export const webhookDeps: PaddleWebhookDeps = {
   async revoke(input) {
     const { error } = await supabaseAdmin.from('take_ledger').insert({
       workspace_id: input.workspaceId,
+      grant_id: input.grantId,
       delta: -input.amount,
       kind: 'refund_revoke',
       ref_kind: 'paddle_adjustment',

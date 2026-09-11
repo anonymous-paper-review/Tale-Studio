@@ -1,0 +1,123 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>채팅 실행·복구</title><style>
+  :root {
+    --bg:#F1F3F5; --surface:#FFFFFF; --surface-2:#E8EBEF;
+    --ink:#16181D; --ink-2:#3B4048; --muted:#676D77;
+    --line:#D6DBE1; --line-2:#BFC6CE;
+    --accent:#1F5F7A; --accent-soft:#DCEAF1;
+    --pass:#2E7350; --pass-soft:#DFEDE5;
+    --fail:#A33A38; --fail-soft:#F6E2E1;
+    --gate:#6A579E; --gate-soft:#EAE4F5;
+    --warn:#8A6412; --warn-soft:#F4EBD6;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI","Malgun Gothic",sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+      --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+      --line:#2B3038; --line-2:#3C434D;
+      --accent:#74B4D0; --accent-soft:#17303C;
+      --pass:#5FB98A; --pass-soft:#17301F;
+      --fail:#E0817D; --fail-soft:#3A2321;
+      --gate:#A794D8; --gate-soft:#272040;
+      --warn:#D2A64F; --warn-soft:#33290F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+    --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+    --line:#2B3038; --line-2:#3C434D;
+    --accent:#74B4D0; --accent-soft:#17303C;
+    --pass:#5FB98A; --pass-soft:#17301F;
+    --fail:#E0817D; --fail-soft:#3A2321;
+    --gate:#A794D8; --gate-soft:#272040;
+    --warn:#D2A64F; --warn-soft:#33290F;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:0 20px 110px;background:var(--bg);color:var(--ink);
+    font-family:var(--sans);font-size:16px;line-height:1.82;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto}
+
+  header.page{padding:56px 0 20px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 14px;font-weight:600}
+  h1{font-size:clamp(27px,5vw,40px);font-weight:800;letter-spacing:-.028em;line-height:1.22;
+    margin:0 0 18px;text-wrap:balance}
+  .bluf{font-size:17.5px;color:var(--ink);margin:0 0 6px;max-width:64ch}
+  .bluf b{color:var(--gate)}
+  .asof{font-family:var(--mono);font-size:12px;color:var(--muted);margin:10px 0 0}
+  header.page::after{content:"";display:block;height:3px;background:var(--ink);margin-top:26px;opacity:.9}
+
+  section{margin:58px 0 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .sec-num{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);
+    border:1.5px solid var(--accent);border-radius:3px;padding:0 7px;line-height:1.7}
+  h2{font-size:23px;font-weight:800;letter-spacing:-.018em;margin:0;text-wrap:balance}
+  .sec-lede{color:var(--muted);font-size:15px;margin:0 0 24px;max-width:62ch}
+  p{margin:0 0 16px;max-width:64ch}
+  h3{font-size:17px;font-weight:750;margin:28px 0 10px;letter-spacing:-.01em}
+  h3:first-child{margin-top:0}
+  ul.plain{margin:0 0 16px;padding-left:22px;max-width:64ch}
+  ul.plain li{margin-bottom:8px}
+  strong,b{font-weight:750}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    padding:24px 26px 20px;margin:0 0 18px}
+  .card.same{border-left:3px solid var(--pass)}
+  .card.diff{border-left:3px solid var(--warn)}
+  .card > :last-child{margin-bottom:0}
+  .card-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:12px}
+  .card-head h3{flex:1 1 240px;margin:0}
+  .agreed{font-size:15px;color:var(--ink-2);margin:0 0 12px}
+  .agreed b{color:var(--ink);font-weight:750}
+
+  .chip{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.03em;
+    border-radius:3px;padding:2px 8px;white-space:nowrap}
+  .c-pass{background:var(--pass-soft);color:var(--pass)}
+  .c-fail{background:var(--fail-soft);color:var(--fail)}
+  .c-warn{background:var(--warn-soft);color:var(--warn)}
+  .c-gate{background:var(--gate-soft);color:var(--gate)}
+  .c-acc{background:var(--accent-soft);color:var(--accent)}
+
+  pre{background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--line-2);
+    border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+    font-family:var(--mono);font-size:12px;line-height:1.68;margin:8px 0;color:var(--ink-2);
+    white-space:pre;tab-size:2}
+  pre b{color:var(--ink);font-weight:700}
+  pre .path{display:block;color:var(--muted);margin-bottom:8px;font-size:11.5px}
+  code{font-family:var(--mono);font-size:.87em;background:var(--surface-2);padding:1px 6px;border-radius:3px}
+  .code-what{font-size:14.5px;color:var(--ink-2);margin:0 0 4px}
+  .code-diff{font-size:14.5px;margin:8px 0 0}
+  .code-diff .chip{margin-right:8px}
+
+  .tbl{overflow-x:auto;margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}
+  th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:700;
+    padding:10px 12px;border-bottom:2px solid var(--line-2);vertical-align:bottom}
+  td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+  td .path{font-family:var(--mono);font-size:11.5px;color:var(--muted);display:block;margin-top:3px}
+  .gate-cell{color:var(--gate);font-weight:750}
+  .gate-empty{display:inline-block;min-width:60px;border-bottom:1.5px dashed var(--gate);opacity:.7}
+
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);
+    border-radius:10px;overflow:hidden;margin:16px 0}
+  @media (max-width:640px){.split{grid-template-columns:1fr}}
+  .split > div{padding:18px 20px}
+  .split .yes{background:var(--pass-soft);border-right:1px solid var(--line)}
+  .split .no{background:var(--fail-soft)}
+  .split h4{margin:0 0 10px;font-size:14.5px;font-weight:800}
+  .split .yes h4{color:var(--pass)}
+  .split .no h4{color:var(--fail)}
+  .split ul{margin:0;padding-left:20px;font-size:14px;line-height:1.7}
+  .split li{margin-bottom:7px}
+
+  footer{margin-top:66px;padding-top:20px;border-top:2px solid var(--ink);font-size:13.5px;color:var(--muted)}
+  footer b{color:var(--ink)}
+  footer p{max-width:none}
+  a{color:var(--accent)}
+  a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+
+figure{margin:18px 0}figure img{display:block;width:100%;border:1px solid var(--line);border-radius:8px}figcaption{font-size:13px;color:var(--muted);margin-top:8px}details{margin:14px 0}summary{cursor:pointer;color:var(--accent)}button.theme{background:var(--surface);color:var(--ink);border:1px solid var(--line);padding:7px 12px;border-radius:6px;float:right}td:first-child{min-width:135px}td,p{word-break:keep-all;overflow-wrap:break-word}.asof{max-width:none}td small{display:block;color:var(--muted)}.flow{font-size:15px;padding:18px;background:var(--accent-soft);border-radius:8px;margin:18px 0}.wrap{max-width:980px}section{margin-top:40px}.tbl{border:1px solid var(--line);background:var(--surface);border-radius:8px}p.note{font-size:14px;color:var(--muted)}@media print{button.theme{display:none}details{display:block}.tbl{overflow:visible}body{padding:0}}
+</style></head><body><div class="wrap"><header class="page"><button class="theme" onclick="document.documentElement.dataset.theme=document.documentElement.dataset.theme==='dark'?'light':'dark'">테마 전환</button><p class="eyebrow">개발 검증 · 2026-09-10</p><h1>채팅 실행·복구</h1><p class="bluf">Producer·Writer·Artist에 공통 조회·편집 도구와 실패 복구 루프를 연결했다. 실제 LLM이 실행 결과를 받고 다음 행동을 정하며, 저장값을 다시 읽은 뒤 완료를 알린다.</p><p class="bluf">실제 DEV에서 설정·씬·샷·대사·인물·배경의 대표 변경을 확인했다. <b>언어·인물·배경을 다른 단계까지 일치시키는 데에는 초안·확정본 동기화 문제가 남아 있다.</b></p><p class="asof">신규 113/113 통과 · 전체 2,752 통과 · 기존 2실패·22제외</p><p class="asof">기존 MVP 변경 보존 · localhost:3001 / DEV · 새 의존성 0 · 커밋·운영 반영 없음</p></header><section><div class="sec-head"><span class="sec-num">1</span><h2>단계별 결과</h2></div><div class="tbl"><table><thead><tr><th>단계·항목</th><th>이번 연결 범위</th><th>실제 LLM → DEV 저장 확인</th></tr></thead><tbody><tr><td>Producer · 설정</td><td>Producer 초안의 러닝타임, 장르·세부 장르, 포맷, 톤, 대사 언어 조회·변경</td><td>초안 언어 ja → ko. 승인 전 ja 유지, 승인 후 ko 저장.<small>Writer가 읽는 확정 설정은 ja로 남았다. 전체 단계의 언어 변경 완료로 볼 수 없다. 기존 대사는 그대로다.</small></td></tr><tr><td>Writer · 씬</td><td>장소·시간대·분위기·요약·등장인물·예상 길이</td><td>첫 씬 분위기 긴장 → 차분함 저장.</td></tr><tr><td>Writer · 샷</td><td>종류·행동·등장인물·길이·대사</td><td>첫 샷 8 → 9초 저장. 둘째 샷 10초 유지. 씬 총길이 19초를 DB에서 확인했다.</td></tr><tr><td>Writer · 대사</td><td>샷별 대사 배열 조회·편집, 화자 없음 및 메타데이터 유지</td><td>내레이션 한국어 문장으로 변경. 화자 없음·감정·발화 방식·길이 힌트 유지.<small>마침표는 요청한 . 대신 。로 저장돼 문장 그대로 일치하지 않았다.</small></td></tr><tr><td>Artist · 인물</td><td>이름·역할·설명·기본 외형. 외형은 승인 후 저장.<small>Writer에도 같은 도구 연결.</small></td><td>도윤 → 도윤 검증 저장. 첫 저장에 HTTP 503을 한 번 주입한 뒤 실제 모델이 재시도해 성공.<small>역할·설명·외형 변경 및 Writer에서의 인물 편집은 자동 테스트로만 확인.</small></td></tr><tr><td>Artist · 배경</td><td>기본 배경 설명 조회·편집. 승인 후 저장.<small>Writer에도 같은 도구 연결.</small></td><td>붉은 간판 → 푸른 간판 등을 설명에 반영. 최초 편집 도구 누락을 내부 재확인으로 복구. 승인 전 원문 유지, 승인 후 새 설명 저장.<small>Writer에서의 배경 편집은 자동 테스트로만 확인.</small></td></tr><tr><td>Director</td><td>신규 연결 제외</td><td>기존 MVP의 대사 저장 후 이동 동작은 유지하고 회귀 테스트를 실행했다. 실제 영상 생성은 하지 않았다.</td></tr></tbody></table></div></section><section><div class="sec-head"><span class="sec-num">2</span><h2>공통 동작과 실제 복구</h2></div><div class="flow">요청 → 현재 값 조회 → 작은 편집 실행 → 저장·승인·실패 결과 반환 → 필요 시 입력 수정·재조회·재시도 → 저장값 확인</div><p>도구는 <code>read_project</code>와 <code>edit_project</code> 두 개다. 지원하는 조회·편집은 정상 처리부터 도구를 쓰고, 같은 실행 함수를 복구에도 쓴다. 생성·삭제·이동 등 기존 기능은 기존 처리 경로를 유지한다.</p><div class="tbl"><table><thead><tr><th>상황</th><th>처리·검증 결과</th></tr></thead><tbody><tr><td>저장 실패</td><td>인물 이름 변경의 첫 PATCH만 서버 도달 전에 503으로 차단했다. 모델이 실패 결과를 받고 같은 편집을 다시 호출했다. 다음 API 응답 200과 DB 값 일치를 확인했다.</td></tr><tr><td>도구 미선택</td><td>배경 설명을 조회한 모델이 편집 도구 없이 답변을 끝냈다. 앱이 한 번 더 실행을 요구하자 편집 도구를 호출했고 승인 대기로 이어졌다. 추가 사용자 메시지는 없었다.</td></tr><tr><td>잘못된 입력·낡은 조회값</td><td>허용 필드·대상·조회 버전을 검사한다. 문제가 있으면 실행 결과를 돌려 입력 수정·재조회하도록 한다. 이 경계는 고정 응답·DB 모형 테스트로 확인했다.</td></tr><tr><td>저장 응답 유실·일부 완료</td><td>저장 여부를 다시 읽고 확인한다. 후속 답변 실패·중단 때 이미 저장한 결과를 남긴다. 저장 결과가 불확실하면 완료로 표시하지 않는다. 자동 테스트로 확인했다.</td></tr><tr><td>승인·반복 실행</td><td>승인 전 원천 변경을 보류한다. 같은 도구 호출의 중복 실행과 반복 실패를 제한하고, 성공한 대상은 유지한다. 승인 전후 DB 확인은 Producer·배경 표본에서 수행했다.</td></tr></tbody></table></div><p class="note">성공한 요청 4개에서 채팅 API 왕복은 각각 3·3·4·4회였다. 요청 시간 합은 약 13~18초였으며, 승인 대기·별도 저장·브라우저 조작 시간은 제외했다. 성능 보장 수치가 아니다.</p></section><section><div class="sec-head"><span class="sec-num">3</span><h2>발견·수정한 결함</h2></div><div class="tbl"><table><thead><tr><th>문제</th><th>확인 근거</th><th>수정</th></tr></thead><tbody><tr><td>Writer 화면에서 Artist로 전송</td><td>실제 Writer 화면의 첫 요청이 Artist API로 나가 씬·샷 편집을 거절했다.</td><td>현재 화면의 단계를 전송에 명시했다. 같은 요청을 Writer API로 다시 보내 씬·샷·대사를 저장했다.</td></tr><tr><td>저장 실패인데 완료처럼 보이는 답변</td><td>실패 결과와 모델의 성공 문장이 충돌하는 자동 재현.</td><td>실패·승인 대기 시 실행 결과를 우선 표시하고 중복 JSON 변경을 막았다.</td></tr><tr><td>샷 길이만 저장되는 부분 실패</td><td>샷 저장 후 씬 총길이 갱신 실패·응답 유실을 자동 재현.</td><td>부분 완료로 반환하고 재시도 시 씬 총길이까지 다시 맞추도록 했다.</td></tr><tr><td>이전 예약 저장이 새 대사를 덮음</td><td>화면 저장 예약/응답 대기 각각에서 완료된 한국어 대사가 옛 대사로 복귀하는 테스트 2개 실패 확인.</td><td>같은 샷의 저장 순서를 보장하고 예약 실행 시 최신 대사를 읽는다. 대사와 앞선 화면 편집을 함께 보존하는 테스트 통과.</td></tr><tr><td>소품 조회의 없는 DB 컬럼</td><td>DEV DB에서 props.role 조회 오류 확인.</td><td>실제 컬럼만 조회하고 소품의 역할 변경은 거부한다.</td></tr></tbody></table></div><p class="note">이번 Writer 전송 오류를 과거 “일본어로 확정돼 변경할 수 없다” 응답의 원인으로 단정하지 않는다. 과거 발화의 당시 상태는 재현하지 않았다.</p></section><section><div class="sec-head"><span class="sec-num">4</span><h2>검증 수치</h2></div><div class="tbl"><table><thead><tr><th>구분</th><th>결과</th><th>해석·한계</th></tr></thead><tbody><tr><td>신규 약속 테스트</td><td>113 / 113 통과 · 12파일</td><td>SDK 도구 응답, 권한, 저장 확인, 실패 복구, 승인·취소, 프로젝트 전환, 예약 저장 충돌. 외부 모델·DB는 모형으로 대체한 자동 검사다.</td></tr><tr><td>전체 자동 검사</td><td>2,752 통과 · 2 실패 · 22 제외</td><td>기존 MVP 2,639 통과에서 신규 113개 추가. 기존 실패 2개와 제외 22개 유지. 수동 DB 검사는 자동 묶음에서 제외했다.</td></tr><tr><td>기존 실패 2개</td><td>Artist 인물·배경 새 모습의 호출 문자열 검사</td><td>이전 MVP 세션의 판정 대기 그대로다. 기대값·skip을 바꾸지 않았다.</td></tr><tr><td>정적 검사</td><td>타입·디자인·변경 diff 검사 통과</td><td>전체 소스 ESLint 오류 0 · 기존 경고 24.</td></tr><tr><td>실제 DEV 표본</td><td>성공 요청 4개 · 변경 항목 6종</td><td>1프로젝트 / 1씬 / 2샷 / 인물 1 / 배경 1. 최초 단계 오전송 실패 1회도 기록했다. 성공률 일반화는 불가하다.</td></tr><tr><td>이미지·영상</td><td>유료 생성 요청 0 · 생성 작업 0</td><td>기존 저장소 템플릿 이미지를 시험 데이터에 재사용했다. 화면의 이미지는 이번 생성 품질 증거가 아니다.</td></tr><tr><td>수동 검사 미실행 · Director</td><td>배치 재개 DB의 전용 환경변수 없음</td><td>수동 검사를 포함한 첫 실행에서는 이 사유로 실패했다. 요청 범위 밖이며 정상 자동 묶음에는 포함하지 않았다.</td></tr><tr><td>재접속 · 화면 캡처</td><td>Producer 재조회 DOM 확인 · PNG 미완료</td><td>별도 브라우저의 Writer·Artist 재접속 화면은 미검증. Orca 캡처는 표시/포커스 오류, 별도 브라우저 캡처는 로드·선택자 대기 오류로 완료하지 못했다. 기존 화면 DOM·실제 요청·DB 결과는 별도 확보했다.</td></tr></tbody></table></div></section><section><div class="sec-head"><span class="sec-num">5</span><h2>남은 범위와 구현 선택</h2></div><div class="tbl"><table><thead><tr><th>항목</th><th>현재 상태·후속 확인</th></tr></thead><tbody><tr><td>UI 전체와 채팅 대조</td><td>이번은 조회·편집 공통 기반과 대표 표본이다. 생성·삭제·모습 변형·후보 선택·배경 개명·스타일 등 모든 UI 동작을 새 도구로 연결하지 않았다. 기존 전수조사 목록은 남아 있다.</td></tr><tr><td>단계별 도구 노출</td><td>설정 도구는 Producer, 씬·샷·대사는 Writer, 인물·배경은 Writer·Artist에 노출한다. 어느 단계에서든 모든 도구를 사용할 수 있는 상태는 아니다.</td></tr><tr><td>확인된 잔여 · 인물 개명</td><td>Artist에서 도윤→도윤 검증을 저장한 뒤 Producer 재접속에 두 이름이 모두 표시됐다. 초안과 DB를 이름으로 병합하는 기존 복원 로직 때문이다. DB 인물 행은 1개다. 언어와 함께 초안·확정본 동기화 묶음으로 우선 수정할 항목이다.</td></tr><tr><td>확인된 잔여 · 배경 설명</td><td>Artist DB에는 새 설명이 저장됐지만 Producer 재접속 입력칸에는 옛 설명이 남았다. 이름이 같은 배경은 초안 값을 우선하는 병합 로직을 확인했다.</td></tr><tr><td>확인된 잔여 · 단계 간 언어</td><td>Producer는 초안(producer_draft)을 저장하고 Writer 채팅은 확정본(settings)을 읽는다. 실제 DB는 초안 ko / 확정본 ja다. 확정본 갱신은 기존 Writer 인계에 연결돼 있다. 언어만 즉시 전파할지, 인계 규칙을 조정할지는 별도 수정 범위로 남겼다.</td></tr><tr><td>미검증 · Producer</td><td>러닝타임·장르·포맷·톤 변경의 실제 LLM 표본 및 다양한 말투. 자동 검사만 통과했다.</td></tr><tr><td>미검증 · Writer</td><td>많은 샷 일괄 수정, 다른 탭·사용자와의 동시 편집, 모든 씬·샷 필드의 실제 호출. 두 샷의 결과로 대량 처리까지 보장하지 않는다.</td></tr><tr><td>미검증 · Artist</td><td>역할·설명·기본 외형 변경의 실제 LLM 저장, 외형의 다른 모습·후보 조작. 배경은 기본 설명 1건만 실제로 확인했다.</td></tr><tr><td>LLM 해석 품질</td><td>한국어 대사에 。를 쓴 사례가 남았다. 도구 실행 성공은 사용자 문장의 정확한 해석까지 보장하지 않는다. 다양한 발화·불필요한 거절은 사용 피드백으로 추가한다.</td></tr><tr><td>복구 한도</td><td>현재 내부 기본값: 모델 왕복 6회 / 도구 실행 16회 / 같은 실패 2회. 명시적 편집의 도구 누락은 한 번 재확인한다. 확정 제품 정책이 아니며 코드에서 조정 가능하다. 대규모 편집은 한도에 걸릴 수 있다.</td></tr><tr><td>기록·성능</td><td>채팅의 기존 토큰·적용 수 표시는 도구 전체 왕복을 합산하지 않는다. 전체 실행 이력의 영속화·총비용 표시·진행 중 재접속 복구는 후속 범위다.</td></tr><tr><td>충돌 보장 범위</td><td>Writer는 저장할 DB 값의 변경 여부도 비교한다. Producer·Artist의 읽기→쓰기 전체가 하나의 원자적 트랜잭션인 것은 아니다. 여러 브라우저 동시 수정은 미검증이다.</td></tr><tr><td>운영 반영</td><td>코드는 dev 작업 공간에만 있다. 새 의존성·DB 마이그레이션·커밋·배포를 추가하지 않았다. 이전 MVP 변경과 Director 연계를 보존했다.</td></tr></tbody></table></div></section><section><div class="sec-head"><span class="sec-num">6</span><h2>화면 검증의 한계</h2></div><p>실제 화면의 DOM과 채팅 요청·저장 결과는 확인했다. 제품 화면 PNG 수집은 완료하지 못했다. Orca 캡처의 표시/포커스 오류와 별도 브라우저의 로드·선택자 대기 오류를 기록했다. 화면 이미지로 결과를 검수할 수 있는 자료는 아직 없다.</p><p class="note">이 보고서 자체는 밝은·어두운 테마와 390px 화면에서 렌더를 확인했다. 제품 화면 캡처와 혼동하지 않는다.</p></section><section><div class="sec-head"><span class="sec-num">7</span><h2>사용자가 할 일</h2></div><p>다음 수정 우선순위는 초안·확정본 동기화다. 언어·인물 개명·배경 설명을 같은 묶음으로 대조하면 된다. 이번 공통 루프 구현·검증을 마치기 위해 사용자가 직접 할 필수 작업은 없다. 평소 사용 중 이상한 응답이 나오면 <code>단계 / 한 말 / 기대 결과 / 실제 결과</code>만 주면 된다. 그 사례의 실행 기록·저장값·회귀 테스트는 에이전트가 확인한다.</p><p class="note">기존 Artist 테스트 2개의 검사 방식 교체 판정은 <a href="https://share.onorca.dev/a/fsy_PukFJPI1">MVP 보고서</a>의 대기 항목으로 유지한다.</p></section><footer><p>근거: <code>.smoke/chat-tools-20260910/verification-summary.json</code>, <code>automated-tests.json</code>, <code>final-readback.json</code>, 단계별 실제 요청·응답 기록. 신규 코드: <code>src/lib/chat-tools/</code>, <code>src/stores/chat-tool-bindings.ts</code>. 기존 3단계 채팅 라우트·공통 채팅·Writer 예약 저장에 연결했다.</p><p>대조: <code>specs/mvp-feedback-todo.md</code>, 이전 MVP 검증 요약·판정서, <code>.omx/plans/chat-parity-collaboration-2026-09-09.md</code>. 표준 도구 결과 순서는 <a href="https://platform.claude.com/docs/en/agents-and-tools/tool-use/handle-tool-calls">Anthropic 공식 문서</a>와 대조했다.</p><p>이 보고서는 운영 배포, 실제 이미지·영상 생성 품질, 모든 말투의 성공률, 전체 UI의 채팅 조작 가능성을 검증하지 않는다.</p></footer></div></body></html>

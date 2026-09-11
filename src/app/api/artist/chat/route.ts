@@ -1,3 +1,7 @@
+import { CHAT_AGENT_GUIDE, buildChatTaskContext, normalizeChatHistory } from '@/lib/chat-harness'
+import { parseChatModelSettings } from '@/lib/chat-model-settings'
+import { ARTIST_DOMAIN_GUIDE } from '@/lib/chat-tools/inspect'
+import { hydrateInspectionImages } from '@/lib/chat-tools/inspect-images'
 // Artist 카드 스튜디오 채팅 에이전트 (카드 모델, 2026-06-06 재작성)
 //
 // 옛 L0 노드그래프(Actor/World/Status) 프롬프트를 폐기하고, 현재의 카드형 Artist
@@ -9,6 +13,7 @@ import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
+import { prepareChatTools } from '@/lib/chat-tools/protocol'
 import { CHAT_OUTPUT_FORMAT_GUIDE, CHAT_UPDATES_BATCH_GUIDE, resolveChatLocale, responseLanguageDirective } from '@/lib/chat-format'
 import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import { parseFencedUpdates } from '@/lib/agentic-reply-guard'
@@ -19,18 +24,25 @@ import {
   extractAppearanceCreations,
   extractAppearanceProposals,
   extractLocationAppearanceCreations,
+  extractAppearanceDeletions,
+  extractLocationAppearanceDeletions,
   extractLocationProposals,
   type AppearanceCreation,
   type LocationAppearanceCreation,
+  type AppearanceDeletion,
+  type LocationAppearanceDeletion,
   type AppearanceProposal,
   type LocationProposal,
 } from '@/lib/artist/chat-updates'
 import { buildChatTrace, createChatTraceId, type ChatLlmUsage } from '@/lib/chat-trace'
 import { persistChatTraceBestEffort } from '@/lib/chat-trace-server'
+import { supabaseAdmin } from '@/lib/supabase/admin'
+import { translate } from '@/lib/i18n/translate'
+import { isExplicitAppearanceAddition, missingMentionedAppearanceNames } from '@/lib/artist/chat-request-coverage'
 
-const ARTIST_SYSTEM = `You are the Concept Artist agent for the Tale L0 Artist studio — a CARD-based studio (no node graph). Users define Characters and World locations as cards. Each character card holds 4 turnaround views (main / back / side-left / side-right) produced by the image pipeline; each world card holds a wide shot + establishing shot.
+const ARTIST_SYSTEM = `You are the Concept Artist agent for the Tale L0 Artist studio. Users define Characters and World locations as cards. Each character appearance has one reference sheet; each world card has its background image and optional narrative-time appearances.
 
-A character can have MULTIPLE appearances (an appearance timeline) — narrative-time versions of the same person, e.g. "present" (default) and "young"/"old"/"injured". Each appearance has its own 4 turnaround views. The context lists each character's appearance timeline (key/label/narrative time/has-image). A character with only a default appearance is a normal single-look card.
+A character can have MULTIPLE appearances (an appearance timeline) — narrative-time versions of the same person, e.g. "present" (default) and "young"/"old"/"injured". Each appearance has its own reference sheet. The context lists each character's appearance timeline (key/label/narrative time/has-image). A character with only a default appearance is a normal single-look card.
 
 <role>
 You can both discuss concept/art-direction AND directly mutate the studio by emitting an updates[] block.
@@ -68,6 +80,11 @@ Every image generation call is billed. Emit regenerate actions ONLY when the use
    - 배경(월드)의 다른 시점 모습(불탄 뒤 / 겨울 / 전쟁 전 등)을 원할 때 쓴다 — 기본 설명을 바꾸는 changeLocationDescription 이 아니라
      새 모습 "행"을 추가한다. 캐릭터의 createAppearance 처럼 승인 카드로 뜨고, 승인하면 기본 배경 이미지를 참조해 이미지가 바로 만들어진다.
    - regenerateWorldAsset 에 appearanceKey 를 넣으면 그 모습의 배경 이미지만 다시 그린다(생략 = 기본 모습).
+   - regenerateWorldAsset 에도 선택적 model(<image-models> 키)을 넣을 수 있다. 사용자가 배경 이미지 생성기를 지정할 때만.
+6. {"type":"deleteAppearance","characterId":"<id>","appearanceKey":"<appearance key>"} / {"type":"deleteLocationAppearance","locationId":"<id>","appearanceKey":"<key>"}
+   - 사용자가 특정 모습(탭)을 지우라고 명시할 때만. 자동 실행되지 않고 "이 모습을 삭제할까요?" 승인 카드로 뜬다. 기본 모습·기본 배경은 삭제할 수 없다 — 기본을 바꾸려면 appearances 도구의 isDefault 를 먼저 쓰라고 안내한다.
+7. 안전 모드 재시도: 이미지가 정책 거절로 실패한 뒤 사용자가 "안전하게/순화해서 다시" 라고 하면 regenerateCharacter 또는 regenerateWorldAsset 에 "safeMode":true 를 넣는다. 사용자가 말하지 않으면 넣지 않는다.
+8. 모습의 설명·이름·시점·기본 지정·이전 후보 되돌리기는 이미지를 만들지 않는 편집이다. updates 가 아니라 앱 도구(read_project/edit_project 의 appearances·background_appearances 리소스)를 쓴다.
 </actions>
 
 <image-models>
@@ -142,23 +159,9 @@ The JSON block (if any) MUST be the LAST element in the response.
 </example>
 </examples>`
 
-interface ChatMessage {
-  role: 'user' | 'model'
-  content: string
-}
 
-interface IncomingHistoryItem {
-  role: 'user' | 'model'
-  content: string
-}
 
-function normalizeHistory(history: unknown): ChatMessage[] {
-  if (!Array.isArray(history)) return []
-  return (history as IncomingHistoryItem[]).map((m) => ({
-    role: m.role,
-    content: m.content,
-  }))
-}
+const normalizeHistory = normalizeChatHistory
 
 // 카드 모델 update 검증(F6 화이트리스트)은 src/lib/artist/chat-updates.ts 로 분리(순수 단위 테스트 대상).
 //   외형(원천) 변경 type 은 화이트리스트 밖이라 자동경로에서 드롭된다 — 승인 경로는 pending-proposal.
@@ -170,6 +173,8 @@ function parseUpdates(text: string): {
   locationProposals: LocationProposal[]
   appearanceCreations: AppearanceCreation[]
   locationAppearanceCreations: LocationAppearanceCreation[]
+  appearanceDeletions: AppearanceDeletion[]
+  locationAppearanceDeletions: LocationAppearanceDeletion[]
   parseStatus: string
   rawUpdateCount: number
   validUpdateCount: number
@@ -189,6 +194,8 @@ function parseUpdates(text: string): {
     locationProposals: extractLocationProposals(raw),
     appearanceCreations: extractAppearanceCreations(raw),
     locationAppearanceCreations: extractLocationAppearanceCreations(raw),
+    appearanceDeletions: extractAppearanceDeletions(raw),
+    locationAppearanceDeletions: extractLocationAppearanceDeletions(raw),
     parseStatus: status,
     rawUpdateCount: raw.length,
     validUpdateCount: updates.length,
@@ -198,13 +205,17 @@ function parseUpdates(text: string): {
 export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
+  let llmUsage: ChatLlmUsage | null = null
   try {
     const user = await getUser()
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { message, history, uiLocale, canvasContext, projectId, traceId: requestedTraceId } = await req.json()
+    const { message, history, uiLocale, canvasContext, projectId, modelSettings: rawModelSettings, taskContext, chatTools: toolsEnabled,
+      chatWorkflow, chatDomain, toolMessages, traceId: requestedTraceId } = await req.json()
+    const modelSettings = parseChatModelSettings(rawModelSettings)
+    if (!modelSettings) return NextResponse.json({ error: 'Invalid chat model settings' }, { status: 400 })
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json(
@@ -219,9 +230,11 @@ export async function POST(req: Request) {
     let activityContext = ''
     let projectLocale: AppLocale | null = null
     let localeSwitched: AppLocale | null = null
+    let ownsProject = false
     if (typeof projectId === 'string' && projectId) {
       try {
-        if (await userOwnsProject(projectId, user.id)) {
+        ownsProject = await userOwnsProject(projectId, user.id)
+        if (ownsProject) {
           // 활동 로그와 채팅 언어 규칙 v2(#chat-locale-follow v2) 조회를 병렬로 — 추가 왕복 없음.
           const [activity, locale] = await Promise.all([
             buildArtistActivityContext(projectId),
@@ -254,15 +267,20 @@ export async function POST(req: Request) {
       ? `${contextBlocks.join('\n\n')}\n\n---\n\n`
       : ''
 
+    if (toolsEnabled === true && (!ownsProject)) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+    const appTools = prepareChatTools('artist', toolsEnabled, toolMessages, chatWorkflow, chatDomain)
+    if (appTools) await hydrateInspectionImages(appTools, projectId)
+
     const normalizedHistory = normalizeHistory(history)
     const traceId = createChatTraceId(requestedTraceId)
-    let llmUsage: ChatLlmUsage | null = null
     const systemPrompt =
+      CHAT_AGENT_GUIDE +
+      (chatDomain === true ? ARTIST_DOMAIN_GUIDE : '') +
       ARTIST_SYSTEM +
       CHAT_OUTPUT_FORMAT_GUIDE +
       CHAT_UPDATES_BATCH_GUIDE +
       responseLanguageDirective(projectLocale)
-    const userPrompt = `${contextPrefix}${message}`
+    const userPrompt = `${contextPrefix}${buildChatTaskContext(taskContext)}${message}`
 
     const text = await llmChat(
       systemPrompt,
@@ -271,11 +289,16 @@ export async function POST(req: Request) {
       0.7,
       `chat:${traceId}`,
       {
-        onUsage: (usage) => {
+        appTools,
+        modelSettings,
+          signal: req.signal,
+          onUsage: (usage) => {
           llmUsage = usage
         },
       },
     )
+
+    if (appTools?.turn) return NextResponse.json({ toolTurn: appTools.turn, toolSupport: true, toolUsage: llmUsage, contentLocale: projectLocale, localeSwitched })
 
     const {
       reply,
@@ -284,10 +307,34 @@ export async function POST(req: Request) {
       locationProposals,
       appearanceCreations,
       locationAppearanceCreations,
+      appearanceDeletions,
+      locationAppearanceDeletions,
       parseStatus,
       rawUpdateCount,
       validUpdateCount,
     } = parseUpdates(text)
+
+    // 모델의 제안이 한 인물에서 끝나도 명시된 다른 이름을 조용히 잃지 않는다.
+    // 이 대조는 안내만 만든다. 추측한 생성 명령이나 재호출을 추가하지 않는다.
+    let coverageNotice = ''
+    if (isExplicitAppearanceAddition(message)) {
+      const locale = projectLocale ?? parseAppLocale(uiLocale) ?? 'en'
+      try {
+        if (!ownsProject) throw new Error('Project ownership was not confirmed')
+        const { data: characters, error } = await supabaseAdmin
+          .from('characters')
+          .select('character_id,name')
+          .eq('project_id', projectId)
+        if (error || !characters) throw new Error('Character coverage could not be checked')
+        const missing = missingMentionedAppearanceNames(message, characters, appearanceCreations)
+        if (missing.length) {
+          coverageNotice = translate(locale, 'Generation is not complete for everyone. {names}: not handled. These names appear in your request, but no usable new-appearance proposal was received for them, so their new appearances were not started. Received proposals still require approval.', { names: missing.join(', ') })
+        }
+      } catch {
+        // 명단 조회 실패로 이미 받은 제안까지 버리거나 모델의 완료 주장을 보증하지 않는다.
+        coverageNotice = translate(locale, 'The received proposals are still available for approval, but I could not check for missing characters. This response does not confirm that all generation is complete.')
+      }
+    }
 
     const trace = buildChatTrace({
       traceId,
@@ -304,19 +351,22 @@ export async function POST(req: Request) {
     await persistChatTraceBestEffort(projectId, trace)
 
     return NextResponse.json({
+      toolSupport: !!appTools,
       contentLocale: projectLocale,
       localeSwitched,
-      reply,
+      reply: coverageNotice ? `${reply}\n\n${coverageNotice}` : reply,
       updates,
       proposals,
       locationProposals,
       appearanceCreations,
       locationAppearanceCreations,
+      appearanceDeletions,
+      locationAppearanceDeletions,
       trace,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[artist/chat]', message)
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: message, ...(llmUsage ? { toolUsage: llmUsage } : {}) }, { status: 500 })
   }
 }

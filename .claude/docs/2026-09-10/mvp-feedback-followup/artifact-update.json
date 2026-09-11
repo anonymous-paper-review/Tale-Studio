@@ -1,0 +1,23 @@
+{
+  "id": "82379880-0d69-414c-a9ce-bbaf05d03e55",
+  "ok": true,
+  "result": {
+    "artifact": {
+      "version": 1,
+      "slug": "fsy_PukFJPI1",
+      "title": null,
+      "originalFileName": "mvp-feedback-report-share.html",
+      "sourceContentType": "text/html",
+      "renderedContentType": "text/html",
+      "createdAt": "2026-09-09T15:32:46.649Z",
+      "updatedAt": "2026-09-10T02:14:44.872Z",
+      "expiresAt": "2026-10-10T02:14:44.872Z",
+      "byteSize": 335555,
+      "deletedAt": null
+    },
+    "shareUrl": "https://share.onorca.dev/a/fsy_PukFJPI1"
+  },
+  "_meta": {
+    "runtimeId": "da993342-3f2f-4d76-bbf0-e447825a810b"
+  }
+}

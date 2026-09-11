@@ -211,9 +211,10 @@ if (suiteName === 'manual' && process.env.RUN_LIVE_TESTS !== '1') {
   process.exit(2)
 }
 
-// ── 빨간 약속 판정 카드 — 실패 시 자동 출력 (.claude/rules/tdd.md "빨간불 판정") ──
-// 오너가 코드 없이 "코드가 틀렸나 / 약속이 바뀌었나 / 약속이 없어졌나"만 고를 수 있게
-// 파일 머리말 · 케이스 이름(=약속 문장) · 실제 결과 첫 줄만 보여준다. 스택·구현 용어는 위의 vitest 출력에 있다.
+// ── 실패한 테스트 → "결정이 필요한 것" 표 — 실패 시 자동 출력 (.claude/rules/tdd.md) ──
+// 오너가 코드 없이 "코드를 고친다 / 동작이 바됌어 이름을 고친다 / 동작이 없어져 지운다"만 고를 수 있게
+// 파일 첫 줄 설명 · 테스트 이름 · 실제로 일어난 일 첫 줄만 보여준다. 스택·구현 용어는 위의 vitest 출력에 있다.
+// 용어는 세션 보고서 표준과 같다 — "약속"·"삼진"·"판정 카드" 같은 조어 금지(2026-09-11 오너 지시).
 const JSON_OUT = path.join(os.tmpdir(), `tale-studio-vitest-${process.pid}.json`)
 
 function firstLine(message) {
@@ -243,19 +244,20 @@ async function printTriage() {
   }
   if (failed.length === 0) return
   const count = failed.reduce((n, f) => n + Math.max(f.cases.length, 1), 0)
-  const out = ['', `━━ 빨간 약속 ${count}건 — 판정은 오너 몫, 셋 중 하나 ━━`]
-  out.push('  ① 코드가 틀렸다 → 약속 유지, 코드를 고친다 (기본값 — 에이전트가 바로)')
-  out.push('  ② 약속이 바뀌었다 → 문장을 고친다 (오너 판정 뒤에만)')
-  out.push('  ③ 약속이 없어졌다 → 지운다 (오너 판정 뒤에만)')
+  const out = ['', `━━ 결정이 필요한 것 — 실패한 테스트 ${count}건 ━━`]
+  out.push('  선택지 (건마다 하나):')
+  out.push('    · 코드를 고친다 — 기본값. 에이전트가 바로 고치고 보고에 남긴다')
+  out.push('    · 동작이 바됌었다 → 테스트 이름을 고친다 — 오너가 새 문장을 준 뒤에만')
+  out.push('    · 그 동작이 없어졌다 → 테스트를 지운다 — 오너가 정한 뒤에만')
   for (const f of failed) {
-    out.push('', `${f.file} — ${f.head ?? '(머리말 없음)'}`)
+    out.push('', `${f.file} — ${f.head ?? '(첫 줄 설명 없음)'}`)
     if (f.cases.length === 0) {
       out.push(`  · 파일 자체가 안 돌았다: ${firstLine(f.message)}`)
       continue
     }
     for (const c of f.cases) {
-      out.push(`  · 약속: ${c.title}`)
-      out.push(`    실제: ${firstLine(c.failureMessages?.[0]) || '(메시지 없음)'}`)
+      out.push(`  · 테스트: ${c.title}`)
+      out.push(`    실제로 일어난 일: ${firstLine(c.failureMessages?.[0]) || '(메시지 없음)'}`)
     }
   }
   out.push('')

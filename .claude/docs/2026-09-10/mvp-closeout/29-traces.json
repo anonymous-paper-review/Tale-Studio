@@ -1,0 +1,52 @@
+[
+  {
+    "trace_id": "5bf415f0-e508-4025-8ca0-dcfa2f18e7e3",
+    "model": "claude-sonnet-4-6",
+    "created_at": "2026-09-10T06:17:21.156624+00:00",
+    "raw_update_count": 0,
+    "valid_update_count": 0,
+    "parse_status": "none",
+    "duration_ms": 4064,
+    "error": null
+  },
+  {
+    "trace_id": "ed9512ec-fbe0-40a0-8170-d221e0e5d72c",
+    "model": "claude-sonnet-4-6",
+    "created_at": "2026-09-10T06:17:26.520394+00:00",
+    "raw_update_count": 0,
+    "valid_update_count": 0,
+    "parse_status": "none",
+    "duration_ms": 4746,
+    "error": null
+  },
+  {
+    "trace_id": "89736863-7a4a-45b9-ad48-66d3459905c4",
+    "model": "claude-sonnet-4-6",
+    "created_at": "2026-09-10T06:20:08.700864+00:00",
+    "raw_update_count": 2,
+    "valid_update_count": 2,
+    "parse_status": "ok",
+    "duration_ms": 5293,
+    "error": null
+  },
+  {
+    "trace_id": "d6b37bda-ce5f-4be7-8da7-cf0e266a1dfc",
+    "model": "claude-sonnet-4-6",
+    "created_at": "2026-09-10T06:21:59.514821+00:00",
+    "raw_update_count": 1,
+    "valid_update_count": 1,
+    "parse_status": "ok",
+    "duration_ms": 2870,
+    "error": null
+  },
+  {
+    "trace_id": "d3fb5806-0fff-494a-baa8-1051cdcc1f38",
+    "model": "claude-sonnet-4-6",
+    "created_at": "2026-09-10T06:22:03.369234+00:00",
+    "raw_update_count": 1,
+    "valid_update_count": 1,
+    "parse_status": "ok",
+    "duration_ms": 3145,
+    "error": null
+  }
+]

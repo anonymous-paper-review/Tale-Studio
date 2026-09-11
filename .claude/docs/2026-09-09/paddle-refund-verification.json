@@ -1,0 +1,34 @@
+{
+  "verifiedOn": "2026-09-09",
+  "ownerApproved": true,
+  "promises": [
+    "환불로 이미 회수한 Take는 원래 만료일에 다시 차감하지 않는다",
+    "환불 전에 이미 사용한 Take의 부족분은 기존 방침대로 음수로 남긴다"
+  ],
+  "redFirst": { "applicationFailuresReproduced": 12, "webhookLinkFailuresReproduced": 3, "databaseFailuresReproduced": 7 },
+  "green": { "targetedApplicationTests": 268, "fullCorePassed": 2389, "unchangedCoreSkips": 27, "coreFailures": 0, "isolatedPostgresCases": 15, "preCommitHooksPassedWithoutBypass": true },
+  "actualLedger": {
+    "source": "paddle-sandbox-e2e-result.json",
+    "refreshedAt": "2026-09-09T09:58:35.745Z",
+    "rows": 4,
+    "reasonsAndGrantIdsReadFromDatabase": true,
+    "dates": ["2026-09-09T09:25:37Z", "2026-10-09T09:02:00Z", "2027-09-09T09:10:00Z"],
+    "beforeTotals": [0, -16, -66],
+    "fixedTotals": [0, 0, 0],
+    "existingLedgerRowsRewritten": 0
+  },
+  "development": { "migrationApplied": true, "evidence": "paddle-refund-apply-dev.json", "generatedTypesUpdated": true, "unmatchedLegacyRefunds": 0 },
+  "production": { "migrationApplied": false, "auditOnly": true, "ledgerRows": 0, "evidence": "paddle-refund-audit-live.json", "mainPushed": false },
+  "commit": "6ed72c3a3447f8ea56dd5aca95ad36e2715f804d",
+  "changedFiles": 41,
+  "videoImplementationExcluded": true,
+  "deployment": { "id": "dpl_3BBBx5eAx6WCFw5GU8Sf9TNUSRCR", "state": "BLOCKED", "blockCode": "TEAM_ACCESS_REQUIRED", "author": "jxcape <j@xcape.run>", "buildSkipped": true, "domainChanged": false },
+  "cleanup": {
+    "leftoverTestSchemasFromHarnessSetup": 2,
+    "emptyTestSchemasRemoved": 2,
+    "remainingTestSchemas": 0,
+    "existingCustomerLedgerTouchedByIsolatedTests": false,
+    "subsequentDatabaseRunsRolledBack": true
+  },
+  "scopeLimits": ["Not a successful production build or deployment", "Not Paddle selling approval", "No real card charge", "Existing distinct partial-refund concurrency cap risk remains outside this fix"]
+}

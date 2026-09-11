@@ -1,0 +1,37 @@
+{
+  "checkedAt": "2026-09-10T05:43:37.102Z",
+  "deployments": [
+    {
+      "id": "dpl_GBvS6sjpZc9b3yB6UVTikHeR9WDB",
+      "url": "tale-7vu4584ty-talestudio.vercel.app",
+      "state": "READY",
+      "createdAt": 1789018858743,
+      "sha": "39fe2081a64a09d33d34caf2d8eb0f6c16da40c1",
+      "message": "docs(mvp): record production rollout and verification"
+    },
+    {
+      "id": "dpl_9McdMPQRDTLb6VCPSyz7CRhU2t1b",
+      "url": "tale-gd6ybrtic-talestudio.vercel.app",
+      "state": "READY",
+      "createdAt": 1789018514259,
+      "sha": "3970a3c0d75b11bfa851aa595a5b3d166c21ee07",
+      "message": "fix(mvp): complete chat handoff and restore feedback workflows"
+    },
+    {
+      "id": "dpl_H3Xeu3nMC6uK3uZBH9Fz55rU8jFs",
+      "url": "tale-e8j74fyn6-talestudio.vercel.app",
+      "state": "READY",
+      "createdAt": 1789016671262,
+      "sha": "a5d8dc183339d4f5ab22fa40f4e2a3e735743363",
+      "message": "fix(project): initialize first workspace and clarify public plan names"
+    },
+    {
+      "id": "dpl_7BGXq7ZYgPYJoucRYVkwXkRiZrFn",
+      "url": "tale-icsrg7xga-talestudio.vercel.app",
+      "state": "READY",
+      "createdAt": 1788958578306,
+      "sha": "7f201cb9062bed3fedbb66646d9e3ebdadebe04d",
+      "message": "fix(producer): explain character changes in plain language"
+    }
+  ]
+}

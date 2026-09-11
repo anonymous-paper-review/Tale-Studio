@@ -7,6 +7,8 @@ import { SHOT_PHYSICS } from '@/lib/writer/pipeline/physics';
 import { VISUAL_BEAT_DOCTRINE } from '@/lib/writer/pipeline/visual-doctrine';
 import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
 import { PROSE_NAME_RULE, cleanSceneProse } from '@/lib/writer/pipeline/util/prose_names';
+import { assertSceneContent } from '@/lib/writer/pipeline/validators/scene_content';
+import { containsEntityToken } from '@/lib/writer/resolve-entity-names';
 import type { Genre, NarrativeStructure, Characters, Scenes, PipelineInput, StoryCharacter, BackgroundContract, Dramaturgy, DramaturgyStageCandidate } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 
@@ -78,6 +80,18 @@ export function mergeOpenWorld(
       name: cand?.name || humanizeSlug(loc),
       description: cand?.description ?? '',
     });
+  }
+  // 씬의 대표 장소가 아니어도 실제 본문에 등장한 후보는 채택된 장소다.
+  // 이름으로 정리한 다음 다시 합치는 경로도 있어 표시 이름으로 등장한 경우도 포함한다.
+  const prose = scenes.scenes.flatMap((sc) => [
+    ...(sc.scene_actions ?? []), sc.dialogue_summary ?? '', ...(sc.key_dialogue ?? []).map((d) => d.line),
+  ]).join('\n');
+  for (const candidate of candidates ?? []) {
+    const key = candidate.id.toLowerCase().trim();
+    if (known.has(key) || seen.has(key)) continue;
+    if (!containsEntityToken(prose, candidate.id) && !containsEntityToken(prose, candidate.name)) continue;
+    seen.add(key);
+    fresh.push({ id: candidate.id, name: candidate.name, description: candidate.description });
   }
   if (!fresh.length) return base;
   return { ...base, locations: [...base.locations, ...fresh] };
@@ -317,6 +331,7 @@ new_characters에도 기존 캐스트와 같은 깊이의 서사 속성(personal
     const repaired = await generateJson<Scenes>(repairPrompt, axisConfig, {
       systemInstruction,
       temperature: 0.6,
+      schema: ScenesSchema,
     });
     await logger.saveLlmCall('scenes_repair', {
       prompt: repairPrompt,
@@ -343,6 +358,7 @@ ${budgetViolations.map((x) => `- ${x.scene_id ?? '(전체)'}: ${x.message}`).joi
     const budgetRepaired = await generateJson<Scenes>(budgetRepairPrompt, axisConfig, {
       systemInstruction,
       temperature: 0.5,
+      schema: ScenesSchema,
     });
     await logger.saveLlmCall('scenes_budget_repair', {
       prompt: budgetRepairPrompt,
@@ -364,7 +380,10 @@ ${budgetViolations.map((x) => `- ${x.scene_id ?? '(전체)'}: ${x.message}`).joi
   // coverage_mode는 코드가 설정 (LLM 출력 아님) — 하류가 대표 스토리보드 여부를 판별하는 근거.
   scenes = { ...scenes, coverage_mode: budget.mode };
   // #names-in-prose: 문장에 남은 id 는 이름으로 — 데쿠파주·V4·이미지 프롬프트가 이 문장을 잇는다.
-  scenes = cleanSceneProse(scenes, characters);
+  // 알려진 장소와 채택된 후보만 이름으로 정리한다. 알 수 없는 식별자를 새 이름으로 추측하지 않는다.
+  const knownWorld = { ...world, locations: [...(world?.locations ?? []), ...stageCandidates] };
+  scenes = cleanSceneProse(scenes, characters, knownWorld);
+  await assertSceneContent(scenes, characters, knownWorld, input.outputLocale, logger, 'scenes');
 
   await logger.saveStage('05_s3_scenes.json', scenes);
   await logger.markStage('scenes', 'completed', {

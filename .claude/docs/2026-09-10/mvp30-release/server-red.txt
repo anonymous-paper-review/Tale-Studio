@@ -1,0 +1,201 @@
+
+ RUN  v4.1.6 /Users/xcape/projects/tale-studio
+
+(node:20150) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ tests/project/director-handoff.test.ts (15 tests | 15 failed) 13ms
+   × Writer에서 바로 물어도 저장된 6씬·47샷과 두 인물 이미지가 준비되어 있으면 쓰기 없이 준비 완료를 알린다. 5ms
+   × 필수 인물 이미지가 없으면 누가 준비되지 않았는지와 Artist에서 할 일을 알려주고 이동하지 않는다. 1ms
+   × Writer가 아직 완료되지 않은 상태(running)면 예전 씬·샷이 있어도 넘기지 않는다. 1ms
+   × Writer가 아직 완료되지 않은 상태(failed)면 예전 씬·샷이 있어도 넘기지 않는다. 1ms
+   × Writer가 아직 완료되지 않은 상태(awaiting_scene_review)면 예전 씬·샷이 있어도 넘기지 않는다. 0ms
+   × Writer 완료 기록이 없거나 저장된 샷이 없으면 필요한 작업을 알리고 넘기지 않는다. 1ms
+   × 준비된 프로젝트는 Director 단계 저장을 확인한 뒤 실제 이동 경로를 반환한다. 1ms
+   × 이미 Editor까지 간 프로젝트는 Director로 이동해도 저장된 도달 단계를 뒤로 낮추지 않는다. 0ms
+   × 단계 저장이 거절되면 이동 경로나 성공 결과를 돌려주지 않는다. 0ms
+   × 저장된 행이 없고 단계도 그대로면 이동에 성공했다고 알리지 않는다. 0ms
+   × 동시에 Editor로 이동했다면 재조회로 이를 확인하고 Director로 낮춰 저장하지 않는다. 0ms
+   × 준비 상태 조회가 실패하면 빈 씬·샷 수를 만들지 않고 확인 실패로 응답한다. 0ms
+   × 다른 사람의 프로젝트에는 준비 상태를 읽거나 이동을 저장하지 않는다. 0ms
+   × 로그인하지 않은 공유 방문자는 Director 이동을 확인하거나 저장하지 않는다. 0ms
+   × 정해지지 않은 대상 단계나 동작은 실행하지 않는다. 0ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 15 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/project/director-handoff.test.ts > Writer에서 바로 물어도 저장된 6씬·47샷과 두 인물 이미지가 준비되어 있으면 쓰기 없이 준비 완료를 알린다.
+Error: Cannot find package '@/app/api/project/[id]/handoff/route' imported from /Users/xcape/projects/tale-studio/tests/project/director-handoff.test.ts
+ ❯ request tests/project/director-handoff.test.ts:72:20
+     70|
+     71| async function request(action: string = 'check', extra: Row = {}) {
+     72|   const { POST } = await import('@/app/api/project/[id]/handoff/route')
+       |                    ^
+     73|   const response = await POST(new Request('http://local/api/project/pr…
+     74|     method: 'POST', headers: { 'Content-Type': 'application/json' },
+ ❯ tests/project/director-handoff.test.ts:81:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/15]⎯
+
+ FAIL  tests/project/director-handoff.test.ts > 필수 인물 이미지가 없으면 누가 준비되지 않았는지와 Artist에서 할 일을 알려주고 이동하지 않는다.
+Error: Cannot find package '@/app/api/project/[id]/handoff/route' imported from /Users/xcape/projects/tale-studio/tests/project/director-handoff.test.ts
+ ❯ request tests/project/director-handoff.test.ts:72:20
+     70|
+     71| async function request(action: string = 'check', extra: Row = {}) {
+     72|   const { POST } = await import('@/app/api/project/[id]/handoff/route')
+       |                    ^
+     73|   const response = await POST(new Request('http://local/api/project/pr…
+     74|     method: 'POST', headers: { 'Content-Type': 'application/json' },
+ ❯ tests/project/director-handoff.test.ts:91:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/15]⎯
+
+ FAIL  tests/project/director-handoff.test.ts > Writer가 아직 완료되지 않은 상태(running)면 예전 씬·샷이 있어도 넘기지 않는다.
+ FAIL  tests/project/director-handoff.test.ts > Writer가 아직 완료되지 않은 상태(failed)면 예전 씬·샷이 있어도 넘기지 않는다.
+ FAIL  tests/project/director-handoff.test.ts > Writer가 아직 완료되지 않은 상태(awaiting_scene_review)면 예전 씬·샷이 있어도 넘기지 않는다.
+Error: Cannot find package '@/app/api/project/[id]/handoff/route' imported from /Users/xcape/projects/tale-studio/tests/project/director-handoff.test.ts
+ ❯ request tests/project/director-handoff.test.ts:72:20
+     70|
+     71| async function request(action: string = 'check', extra: Row = {}) {
+     72|   const { POST } = await import('@/app/api/project/[id]/handoff/route')
+       |                    ^
+     73|   const response = await POST(new Request('http://local/api/project/pr…
+     74|     method: 'POST', headers: { 'Content-Type': 'application/json' },
+ ❯ tests/project/director-handoff.test.ts:100:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/15]⎯
+
+ FAIL  tests/project/director-handoff.test.ts > Writer 완료 기록이 없거나 저장된 샷이 없으면 필요한 작업을 알리고 넘기지 않는다.
+Error: Cannot find package '@/app/api/project/[id]/handoff/route' imported from /Users/xcape/projects/tale-studio/tests/project/director-handoff.test.ts
+ ❯ request tests/project/director-handoff.test.ts:72:20
+     70|
+     71| async function request(action: string = 'check', extra: Row = {}) {
+     72|   const { POST } = await import('@/app/api/project/[id]/handoff/route')
+       |                    ^
+     73|   const response = await POST(new Request('http://local/api/project/pr…
+     74|     method: 'POST', headers: { 'Content-Type': 'application/json' },
+ ❯ tests/project/director-handoff.test.ts:109:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/15]⎯
+
+ FAIL  tests/project/director-handoff.test.ts > 준비된 프로젝트는 Director 단계 저장을 확인한 뒤 실제 이동 경로를 반환한다.
+Error: Cannot find package '@/app/api/project/[id]/handoff/route' imported from /Users/xcape/projects/tale-studio/tests/project/director-handoff.test.ts
+ ❯ request tests/project/director-handoff.test.ts:72:20
+     70|
+     71| async function request(action: string = 'check', extra: Row = {}) {
+     72|   const { POST } = await import('@/app/api/project/[id]/handoff/route')
+       |                    ^
+     73|   const response = await POST(new Request('http://local/api/project/pr…
+     74|     method: 'POST', headers: { 'Content-Type': 'application/json' },
+ ❯ tests/project/director-handoff.test.ts:117:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/15]⎯
+
+ FAIL  tests/project/director-handoff.test.ts > 이미 Editor까지 간 프로젝트는 Director로 이동해도 저장된 도달 단계를 뒤로 낮추지 않는다.
+Error: Cannot find package '@/app/api/project/[id]/handoff/route' imported from /Users/xcape/projects/tale-studio/tests/project/director-handoff.test.ts
+ ❯ request tests/project/director-handoff.test.ts:72:20
+     70|
+     71| async function request(action: string = 'check', extra: Row = {}) {
+     72|   const { POST } = await import('@/app/api/project/[id]/handoff/route')
+       |                    ^
+     73|   const response = await POST(new Request('http://local/api/project/pr…
+     74|     method: 'POST', headers: { 'Content-Type': 'application/json' },
+ ❯ tests/project/director-handoff.test.ts:125:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/15]⎯
+
+ FAIL  tests/project/director-handoff.test.ts > 단계 저장이 거절되면 이동 경로나 성공 결과를 돌려주지 않는다.
+Error: Cannot find package '@/app/api/project/[id]/handoff/route' imported from /Users/xcape/projects/tale-studio/tests/project/director-handoff.test.ts
+ ❯ request tests/project/director-handoff.test.ts:72:20
+     70|
+     71| async function request(action: string = 'check', extra: Row = {}) {
+     72|   const { POST } = await import('@/app/api/project/[id]/handoff/route')
+       |                    ^
+     73|   const response = await POST(new Request('http://local/api/project/pr…
+     74|     method: 'POST', headers: { 'Content-Type': 'application/json' },
+ ❯ tests/project/director-handoff.test.ts:134:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/15]⎯
+
+ FAIL  tests/project/director-handoff.test.ts > 저장된 행이 없고 단계도 그대로면 이동에 성공했다고 알리지 않는다.
+Error: Cannot find package '@/app/api/project/[id]/handoff/route' imported from /Users/xcape/projects/tale-studio/tests/project/director-handoff.test.ts
+ ❯ request tests/project/director-handoff.test.ts:72:20
+     70|
+     71| async function request(action: string = 'check', extra: Row = {}) {
+     72|   const { POST } = await import('@/app/api/project/[id]/handoff/route')
+       |                    ^
+     73|   const response = await POST(new Request('http://local/api/project/pr…
+     74|     method: 'POST', headers: { 'Content-Type': 'application/json' },
+ ❯ tests/project/director-handoff.test.ts:143:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/15]⎯
+
+ FAIL  tests/project/director-handoff.test.ts > 동시에 Editor로 이동했다면 재조회로 이를 확인하고 Director로 낮춰 저장하지 않는다.
+Error: Cannot find package '@/app/api/project/[id]/handoff/route' imported from /Users/xcape/projects/tale-studio/tests/project/director-handoff.test.ts
+ ❯ request tests/project/director-handoff.test.ts:72:20
+     70|
+     71| async function request(action: string = 'check', extra: Row = {}) {
+     72|   const { POST } = await import('@/app/api/project/[id]/handoff/route')
+       |                    ^
+     73|   const response = await POST(new Request('http://local/api/project/pr…
+     74|     method: 'POST', headers: { 'Content-Type': 'application/json' },
+ ❯ tests/project/director-handoff.test.ts:151:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/15]⎯
+
+ FAIL  tests/project/director-handoff.test.ts > 준비 상태 조회가 실패하면 빈 씬·샷 수를 만들지 않고 확인 실패로 응답한다.
+Error: Cannot find package '@/app/api/project/[id]/handoff/route' imported from /Users/xcape/projects/tale-studio/tests/project/director-handoff.test.ts
+ ❯ request tests/project/director-handoff.test.ts:72:20
+     70|
+     71| async function request(action: string = 'check', extra: Row = {}) {
+     72|   const { POST } = await import('@/app/api/project/[id]/handoff/route')
+       |                    ^
+     73|   const response = await POST(new Request('http://local/api/project/pr…
+     74|     method: 'POST', headers: { 'Content-Type': 'application/json' },
+ ❯ tests/project/director-handoff.test.ts:160:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/15]⎯
+
+ FAIL  tests/project/director-handoff.test.ts > 다른 사람의 프로젝트에는 준비 상태를 읽거나 이동을 저장하지 않는다.
+Error: Cannot find package '@/app/api/project/[id]/handoff/route' imported from /Users/xcape/projects/tale-studio/tests/project/director-handoff.test.ts
+ ❯ request tests/project/director-handoff.test.ts:72:20
+     70|
+     71| async function request(action: string = 'check', extra: Row = {}) {
+     72|   const { POST } = await import('@/app/api/project/[id]/handoff/route')
+       |                    ^
+     73|   const response = await POST(new Request('http://local/api/project/pr…
+     74|     method: 'POST', headers: { 'Content-Type': 'application/json' },
+ ❯ tests/project/director-handoff.test.ts:169:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/15]⎯
+
+ FAIL  tests/project/director-handoff.test.ts > 로그인하지 않은 공유 방문자는 Director 이동을 확인하거나 저장하지 않는다.
+Error: Cannot find package '@/app/api/project/[id]/handoff/route' imported from /Users/xcape/projects/tale-studio/tests/project/director-handoff.test.ts
+ ❯ request tests/project/director-handoff.test.ts:72:20
+     70|
+     71| async function request(action: string = 'check', extra: Row = {}) {
+     72|   const { POST } = await import('@/app/api/project/[id]/handoff/route')
+       |                    ^
+     73|   const response = await POST(new Request('http://local/api/project/pr…
+     74|     method: 'POST', headers: { 'Content-Type': 'application/json' },
+ ❯ tests/project/director-handoff.test.ts:177:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/15]⎯
+
+ FAIL  tests/project/director-handoff.test.ts > 정해지지 않은 대상 단계나 동작은 실행하지 않는다.
+Error: Cannot find package '@/app/api/project/[id]/handoff/route' imported from /Users/xcape/projects/tale-studio/tests/project/director-handoff.test.ts
+ ❯ request tests/project/director-handoff.test.ts:72:20
+     70|
+     71| async function request(action: string = 'check', extra: Row = {}) {
+     72|   const { POST } = await import('@/app/api/project/[id]/handoff/route')
+       |                    ^
+     73|   const response = await POST(new Request('http://local/api/project/pr…
+     74|     method: 'POST', headers: { 'Content-Type': 'application/json' },
+ ❯ tests/project/director-handoff.test.ts:184:18
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/15]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  15 failed (15)
+   Start at  14:09:49
+   Duration  165ms (transform 47ms, setup 26ms, import 33ms, tests 13ms, environment 0ms)
+

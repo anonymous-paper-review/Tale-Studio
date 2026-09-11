@@ -1,3 +1,6 @@
+import { CHAT_AGENT_GUIDE, buildChatTaskContext, normalizeChatHistory } from '@/lib/chat-harness'
+import { parseChatModelSettings } from '@/lib/chat-model-settings'
+import { WRITER_DOMAIN_GUIDE } from '@/lib/chat-tools/inspect'
 // POST /api/writer/chat — Writers' Room 채팅 (러프 스토리보드 검토 단계의 씬/샷 CRUD).
 //
 // director/chat 의 agentic 패턴을 writer 도메인으로 복제: LLM 이 자연어를 받아 reply + updates[] 를 내고,
@@ -9,6 +12,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
+import { prepareChatTools } from '@/lib/chat-tools/protocol'
 import { CHAT_OUTPUT_FORMAT_GUIDE, CHAT_UPDATES_BATCH_GUIDE, resolveChatLocale, responseLanguageDirective } from '@/lib/chat-format'
 import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import { parseDialogueLanguage, type DialogueLanguage } from '@/lib/writer/pipeline/util/output-language'
@@ -42,14 +46,15 @@ The user is reviewing the rough storyboard (pre-concept previz) of a story alrea
 
 <role>
 You BOTH discuss the story/staging AND directly mutate the scene/shot breakdown by emitting an updates[] block.
-When the user asks to add, modify, reorder, or remove scenes/shots, plan a sequence of actions and emit them.
+When the user asks to add, modify, or remove scenes/shots, plan a sequence of actions and emit them.
+Existing scenes/shots cannot be reordered or moved by these actions; explain that limitation rather than deleting and recreating them.
 For pure discussion or questions, omit the JSON block entirely.
 </role>
 
 <model>
 - Scene (씬, 서사 컨테이너): location, timeOfDay, mood, narrativeSummary, charactersPresent[], estimatedDurationSeconds
 - Shot (샷, 한 컷): belongs to a scene. shotType, actionDescription, characters[], durationSeconds, dialogueLines[]
-- Dialogue line (대사): {characterId, text}. characterId must be one of the character IDs shown in context.
+- Dialogue line (대사): {characterId, text}. characterId must be one of the character IDs shown in context, or null for narration (V.O.). Keep null when editing or retaining narration; never replace it with a character ID.
 - shotType ∈ ECU,CU,MCU,MS,MFS,FS,WS,EWS,OTS,POV,TRACK,2S (촬영 사이즈, 클로즈업→와이드)
 - characters / charactersPresent / dialogueLines[].characterId use the character IDs from the "## 등장인물" roster. In context speakers appear as characterId(name) — always emit the characterId (the part before the parenthesis), never the name. Never invent new IDs.
 </model>
@@ -71,6 +76,12 @@ Destructive — emit ONLY when the user clearly asks to remove something:
    //   candidates 는 2~4개, 사용자가 그대로 답할 수 있는 구체 표현으로. 다른 액션과 섞지 마라.
 
 Only include patch fields you are actually changing. Omit unknown fields rather than guessing.
+
+Insertion position for addScene/addShot:
+- addScene may include beforeSceneId or afterSceneId; addShot may include beforeShotId or afterShotId. Use exactly one, with the existing ID or a tempId from an earlier action in this batch.
+- before means immediately before that target; after means immediately after. A shot target must belong to the same scene as the new shot.
+- afterSceneId:null means the beginning of the project; afterShotId:null means the beginning of that scene. Omit both position fields only to append at the end.
+- If the user specifies a position, include it. If the target cannot be identified, emit clarify only; never silently append.
 </actions>
 
 <script-lines>
@@ -137,14 +148,6 @@ Reply text in 1-3 sentences (Korean if the user wrote Korean), then — only if 
 </example>
 </examples>`
 
-interface ChatMessage {
-  role: 'user' | 'model'
-  content: string
-}
-interface IncomingHistoryItem {
-  role: 'user' | 'model'
-  content: string
-}
 
 function formatLineRefTable(rawLineRefs: unknown): string {
   const lineRefs = sanitizeLineRefs(rawLineRefs)
@@ -155,13 +158,7 @@ function formatLineRefTable(rawLineRefs: unknown): string {
   ].join('\n')
 }
 
-function normalizeHistory(history: unknown): ChatMessage[] {
-  if (!Array.isArray(history)) return []
-  return (history as IncomingHistoryItem[]).map((m) => ({
-    role: m.role,
-    content: m.content,
-  }))
-}
+const normalizeHistory = normalizeChatHistory
 
 function parseAgenticResponse(
   text: string,
@@ -194,19 +191,27 @@ function parseAgenticResponse(
 export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
+  let llmUsage: ChatLlmUsage | null = null
   try {
     const user = await getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const {
       message,
+      modelSettings: rawModelSettings, taskContext,
       history,
       uiLocale,
       writerContext,
       lineRefs,
       projectId,
+      chatTools: toolsEnabled,
+      chatWorkflow,
+      chatDomain,
+      toolMessages,
       traceId: requestedTraceId,
     } = await req.json()
+    const modelSettings = parseChatModelSettings(rawModelSettings)
+    if (!modelSettings) return NextResponse.json({ error: 'Invalid chat model settings' }, { status: 400 })
     if (!message || typeof message !== 'string')
       return NextResponse.json({ error: 'Invalid request: message is required' }, { status: 400 })
 
@@ -245,6 +250,9 @@ export async function POST(req: Request) {
       )
     }
 
+    if (toolsEnabled === true && (typeof projectId !== 'string' || !projectId)) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+    const appTools = prepareChatTools('writer', toolsEnabled, toolMessages, chatWorkflow, chatDomain)
+
     const normalizedHistory = normalizeHistory(history)
     const contextSections = [
       formatLineRefTable(lineRefs),
@@ -252,14 +260,15 @@ export async function POST(req: Request) {
     ].filter(Boolean)
     const ctx = contextSections.length > 0 ? `${contextSections.join('\n\n')}\n\n---\n\n` : ''
     const traceId = createChatTraceId(requestedTraceId)
-    let llmUsage: ChatLlmUsage | null = null
     const systemPrompt =
+      CHAT_AGENT_GUIDE +
+      (chatDomain === true ? WRITER_DOMAIN_GUIDE : '') +
       WRITER_CHAT_SYSTEM +
       CHAT_OUTPUT_FORMAT_GUIDE +
       CHAT_UPDATES_BATCH_GUIDE +
       responseLanguageDirective(projectLocale) +
       dialogueLanguageChatDirective(dialogueLanguage)
-    const userPrompt = `${ctx}${message}`
+    const userPrompt = `${ctx}${buildChatTaskContext(taskContext)}${message}`
 
     const text = await llmChat(
       systemPrompt,
@@ -268,11 +277,16 @@ export async function POST(req: Request) {
       0.5,
       `chat:${traceId}`,
       {
-        onUsage: (usage) => {
+        appTools,
+        modelSettings,
+          signal: req.signal,
+          onUsage: (usage) => {
           llmUsage = usage
         },
       },
     )
+    if (appTools?.turn) return NextResponse.json({ toolTurn: appTools.turn, toolSupport: true, toolUsage: llmUsage, contentLocale: projectLocale, localeSwitched })
+
     const {
       reply,
       updates,
@@ -303,6 +317,7 @@ export async function POST(req: Request) {
     await persistChatTraceBestEffort(projectId, trace)
 
     return NextResponse.json({
+      toolSupport: !!appTools,
       contentLocale: projectLocale,
       localeSwitched,
       reply: replyOut,
@@ -312,6 +327,6 @@ export async function POST(req: Request) {
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : 'Unknown error'
     console.error('[writer/chat]', errMsg)
-    return NextResponse.json({ error: errMsg }, { status: 500 })
+    return NextResponse.json({ error: errMsg, ...(llmUsage ? { toolUsage: llmUsage } : {}) }, { status: 500 })
   }
 }

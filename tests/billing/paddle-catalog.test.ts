@@ -1,5 +1,5 @@
 // 가격 페이지의 플랜·팩 가격과 포함 Take는 v4 시트와 같고, Paddle 상품 ID를 모르는 상품은 결제 버튼이 비활성이다.
-//   기대값은 ~/Downloads/ref/tale_pricing_usd_v4.xlsx (v4.0 · 2026-08-24) 3_요금제·2_Take경제 시트를 손으로 옮긴 것.
+//   금액 기대값은 v4 시트, 고객용 이름은 2026-09-10 오너 지시(Starter1·Producer10)를 따른다.
 //   시트가 바뀌면 여기 숫자도 오너 결정으로 같이 바뀐다 (.claude/docs/2026-09-07/paddle-promises.md §P2).
 import { describe, expect, it } from 'vitest'
 
@@ -14,15 +14,15 @@ import { getPlanEntitlements } from '@/lib/plan-limits'
 
 // v4 3_요금제 — 플랜 | 프로젝트당 생성 최대(분) | 최대 연결 | Account | 포함 Take | Export | 월 가격($)
 const V4_PLANS = [
-  ['s1', 'S-1', 1, 1, 1, 16, false, 15],
-  ['s2', 'S-2', 2, 1, 1, 30, false, 30],
-  ['s5', 'S-5', 5, 1, 1, 60, false, 60],
-  ['s10', 'S-10', 10, 1, 1, 100, false, 110],
-  ['p10', 'P-10', 10, 2, 3, 150, true, 199],
-  ['p15', 'P-15', 15, 3, 4, 200, true, 449],
-  ['p20', 'P-20', 20, 3, 5, 360, true, 649],
-  ['p25', 'P-25', 25, 4, 6, 410, true, 999],
-  ['p30', 'P-30', 30, 4, 8, 710, true, 1299],
+  ['s1', 'Starter1', 1, 1, 1, 16, false, 15],
+  ['s2', 'Starter2', 2, 1, 1, 30, false, 30],
+  ['s5', 'Starter5', 5, 1, 1, 60, false, 60],
+  ['s10', 'Starter10', 10, 1, 1, 100, false, 110],
+  ['p10', 'Producer10', 10, 2, 3, 150, true, 199],
+  ['p15', 'Producer15', 15, 3, 4, 200, true, 449],
+  ['p20', 'Producer20', 20, 3, 5, 360, true, 649],
+  ['p25', 'Producer25', 25, 4, 6, 410, true, 999],
+  ['p30', 'Producer30', 30, 4, 8, 710, true, 1299],
 ] as const
 
 // v4 2_Take경제 — 팩 | Take 수 | 가격($)
@@ -46,7 +46,7 @@ const packById = (id: string): PaddleTakePack => {
 }
 
 describe('가격 페이지 상품 목록', () => {
-  it('플랜 9개의 이름과 월 가격은 v4 시트와 같다(S-1 $15 … P-30 $1,299)', () => {
+  it('고객에게는 Starter1·Producer10 형식의 이름을 표시하고 내부 코드와 월 가격은 유지한다', () => {
     expect(PADDLE_PLANS.map((p) => p.id)).toEqual(V4_PLANS.map((row) => row[0]))
     for (const [id, name, , , , , , priceUsd] of V4_PLANS) {
       const plan = planById(id)

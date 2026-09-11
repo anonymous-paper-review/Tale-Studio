@@ -711,7 +711,7 @@ export default function HomePage() {
             <p id="home-reference-project-help" className="text-xs text-gray-500">
               {canUseReference
                 ? 'Optionally copy assets from an existing project in this workspace.'
-                : 'Reference projects are available on P-10+ plans.'}
+                : 'Reference projects are available on Producer10 and above.'}
             </p>
             {referenceProjectId && canUseReference && (
               <label

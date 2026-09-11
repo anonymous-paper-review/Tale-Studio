@@ -2,6 +2,9 @@ import Anthropic from '@anthropic-ai/sdk'
 import { logTiming } from './timing'
 import { CHAT_COMPACTION_TRIGGER_TOKENS } from './constants'
 import type { ChatLlmUsage } from './chat-trace'
+import { parseChatModelSettings, type ChatModelSettings } from './chat-model-settings'
+import { CHAT_TOOL_GUIDE, type ChatToolContext } from './chat-tools/protocol'
+import type { BetaMessageParam } from '@anthropic-ai/sdk/resources/beta/messages/messages'
 
 const MODEL = 'claude-sonnet-4-6'
 
@@ -54,8 +57,13 @@ export async function claudeChat(
     webSearch?: boolean
     imageUrls?: string[]
     onUsage?: (usage: ChatLlmUsage) => void | PromiseLike<void>
+    appTools?: ChatToolContext
+    signal?: AbortSignal
+    modelSettings?: ChatModelSettings
   },
 ): Promise<string> {
+  const modelSettings = parseChatModelSettings(opts?.modelSettings)
+  if (!modelSettings) throw new Error('Invalid chat model settings')
   const imageUrls = opts?.imageUrls ?? []
   const userContent: UserContent = imageUrls.length
     ? [
@@ -67,26 +75,34 @@ export async function claudeChat(
       ]
     : userMessage
 
-  const messages: { role: 'user' | 'assistant'; content: UserContent }[] = [
+  const messages: BetaMessageParam[] = [
     ...history.map((m) => ({
       role: toClaudeRole(m.role),
       content: m.content,
     })),
     { role: 'user', content: userContent },
+    ...(opts?.appTools?.messages ?? []),
   ]
 
   const t0 = performance.now()
   const response = await getClient().beta.messages.create({
-    model: MODEL,
+    model: modelSettings.model,
     // #p4-json-guard(2026-08-11): 4096 → 8192. 채팅은 답변 산문과 변경(updates) 블록이 이 한 장을
     //   나눠 쓰는데, 변경 1건이 약 83tok(실측)이라 4096 에서는 48건 근처에서 잘렸다(76샷 일괄
     //   요청 유실 사고의 원인). 한도는 상한일 뿐이라 짧은 답변의 비용·지연은 그대로다.
     max_tokens: 8192,
-    system,
+    system: system + (opts?.appTools ? CHAT_TOOL_GUIDE : ''),
     messages,
-    temperature,
-    ...(opts?.webSearch
-      ? { tools: [{ type: 'web_search_20250305' as const, name: 'web_search' as const, max_uses: 3 }] }
+    ...(opts?.modelSettings ? {
+      output_config: { effort: modelSettings.effort },
+      thinking: { type: modelSettings.thinking === 'adaptive' ? 'adaptive' as const : 'disabled' as const },
+    } : {}),
+    ...(modelSettings.thinking === 'adaptive' ? {} : { temperature }),
+    ...(opts?.webSearch || opts?.appTools
+      ? { tools: [
+          ...(opts?.webSearch ? [{ type: 'web_search_20250305' as const, name: 'web_search' as const, max_uses: 3 }] : []),
+          ...(opts?.appTools?.tools ?? []),
+        ] }
       : {}),
     // 멀티턴 프롬프트 캐싱 (chat-context-management Phase 1) — top-level auto-cache가
     //   마지막 cacheable block(= 마지막 user 턴)에 breakpoint를 둔다. 다음 턴에는 그 이전
@@ -112,12 +128,12 @@ export async function claudeChat(
         },
       ],
     },
-  })
+  }, { signal: opts?.signal })
   const u = response.usage
   const durationMs = performance.now() - t0
   logTiming(
     'llm',
-    `${label} model=${MODEL} in=${u.input_tokens} out=${u.output_tokens} cache_read=${u.cache_read_input_tokens ?? 0} cache_write=${u.cache_creation_input_tokens ?? 0} stop_reason=${response.stop_reason ?? 'null'}${imageUrls.length ? ` img=${imageUrls.length}` : ''} ${durationMs.toFixed(0)}ms`,
+    `${label} model=${response.model} effort=${modelSettings.effort} thinking=${modelSettings.thinking} in=${u.input_tokens} out=${u.output_tokens} cache_read=${u.cache_read_input_tokens ?? 0} cache_write=${u.cache_creation_input_tokens ?? 0} stop_reason=${response.stop_reason ?? 'null'}${imageUrls.length ? ` img=${imageUrls.length}` : ''} ${durationMs.toFixed(0)}ms`,
   )
 
   // compaction/웹서치가 켜지면 응답 content에 비텍스트 블록이 끼고, 검색 시엔 텍스트가
@@ -126,7 +142,10 @@ export async function claudeChat(
     .filter((b): b is Extract<(typeof response.content)[number], { type: 'text' }> => b.type === 'text')
     .map((b) => b.text)
     .join('')
-  if (!text) throw new Error('Unexpected response type')
+  const hasToolTurn = opts?.appTools && (response.content.some(b => b.type === 'tool_use') || response.stop_reason === 'pause_turn')
+  if (hasToolTurn) {
+    opts.appTools!.turn = { content: response.content as unknown as import('./chat-tools/protocol').ToolBlock[], stopReason: response.stop_reason ?? '' }
+  }
 
   const usage: ChatLlmUsage = {
     model: response.model,
@@ -136,6 +155,8 @@ export async function claudeChat(
     cacheReadInputTokens: u.cache_read_input_tokens ?? 0,
     cacheCreationInputTokens: u.cache_creation_input_tokens ?? 0,
     stopReason: response.stop_reason,
+    effort: modelSettings.effort,
+    thinking: modelSettings.thinking,
   }
   try {
     const callbackResult = opts?.onUsage?.(usage)
@@ -144,6 +165,8 @@ export async function claudeChat(
     // Usage reporting must never turn a successful chat response into a failure.
   }
 
+  if (response.stop_reason === 'max_tokens' && !hasToolTurn) throw new Error('Chat response reached its output limit. The response was not completed; retry with lower effort or thinking off.')
+  if (!text && !hasToolTurn) throw new Error('Unexpected response type')
   return text
 }
 

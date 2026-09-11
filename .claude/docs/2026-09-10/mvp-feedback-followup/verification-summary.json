@@ -1,0 +1,39 @@
+{
+  "date": "2026-09-10",
+  "completed": 21,
+  "total": 30,
+  "open": [
+    1,
+    9,
+    18,
+    20,
+    23,
+    25,
+    27,
+    29,
+    30
+  ],
+  "owner_approved": [
+    12,
+    13,
+    14
+  ],
+  "tests": {
+    "passed": 2762,
+    "failed": 2,
+    "skipped": 22,
+    "files": 348
+  },
+  "typecheck": "passed",
+  "design_lint": "passed",
+  "eslint": {
+    "errors": 0,
+    "warnings": 24
+  },
+  "browser_checks": 5,
+  "progress_bar": "preserved; no time/step count; below completion until saved",
+  "source_tests_failed_due_to": "MVP call metadata/callback additions mismatch existing source-string regexes",
+  "deployment": "dev worktree only; main/production not updated in this turn",
+  "callback": "previous one-time callback already sent; not resent",
+  "temporary_fixture_route": "removed"
+}

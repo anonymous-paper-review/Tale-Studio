@@ -1,0 +1,73 @@
+
+/Users/xcape/projects/tale-studio/src/app/api/produce/ingest/route.ts
+  8:3  warning  'IMAGE_TYPES' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/xcape/projects/tale-studio/src/app/page.tsx
+  136:7   warning  Unused eslint-disable directive (no problems were reported from 'no-restricted-syntax')
+  396:23  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  478:15  warning  Unused eslint-disable directive (no problems were reported from 'no-restricted-syntax')
+  490:15  warning  Unused eslint-disable directive (no problems were reported from 'no-restricted-syntax')
+  536:15  warning  Unused eslint-disable directive (no problems were reported from 'no-restricted-syntax')
+  539:15  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  594:15  warning  Unused eslint-disable directive (no problems were reported from 'no-restricted-syntax')
+
+/Users/xcape/projects/tale-studio/src/app/playground/mvp-feedback/page.tsx
+  84:5  error    Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+/Users/xcape/projects/tale-studio/src/app/playground/mvp-feedback/page.tsx:84:5
+  82 |       badge: () => { state.completions = [{stage:'artist',lane:'artist',at:Date.now(),units:9}]; refreshGenerationQueue() },
+  83 |     } })
+> 84 |     setReady(true)
+     |     ^^^^^^^^ Avoid calling setState() directly within an effect
+  85 |     return () => { window.fetch = original }
+  86 |   }, [])
+  87 |   const navigate = (href: string) => { navigations.push(href);const stage = href.split('/')[2]?.split('?')[0] as StageId; setPath(href);if (['writer','artist','producer','director','editor'].includes(stage)) useProjectStore.getState().setStage(stage) }  react-hooks/set-state-in-effect
+  86:6  warning  React Hook useEffect has a missing dependency: 'navigations'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   react-hooks/exhaustive-deps
+
+/Users/xcape/projects/tale-studio/src/app/projects/page.tsx
+  129:7  warning  Unused eslint-disable directive (no problems were reported from 'no-restricted-syntax')
+
+/Users/xcape/projects/tale-studio/src/app/studio/artist/page.tsx
+    6:10  warning  'Badge' is defined but never used                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  136:9   warning  The 'writerGateStatus' conditional could make the dependencies of useEffect Hook (at line 260) change on every render. To fix this, wrap the initialization of 'writerGateStatus' in its own useMemo() Hook  react-hooks/exhaustive-deps
+
+/Users/xcape/projects/tale-studio/src/components/layout/global-chat.tsx
+  1774:25  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/Users/xcape/projects/tale-studio/src/components/layout/user-menu.tsx
+  152:13  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/Users/xcape/projects/tale-studio/src/features/director/canvas-views/StoryboardGridView.tsx
+  720:9  warning  'setStoryboardMediaMode' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/xcape/projects/tale-studio/src/features/editor/shot-timeline.tsx
+  136:17  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/Users/xcape/projects/tale-studio/src/features/editor/timeline.tsx
+  414:3  warning  'onUpdateVideoClip' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/xcape/projects/tale-studio/src/features/editor/video-source-panel.tsx
+  154:29  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/Users/xcape/projects/tale-studio/src/lib/demo/supabase-shim.ts
+  30:10  warning  '_cols' is defined but never used    @typescript-eslint/no-unused-vars
+  67:10  warning  '_values' is defined but never used  @typescript-eslint/no-unused-vars
+  71:10  warning  '_values' is defined but never used  @typescript-eslint/no-unused-vars
+  75:10  warning  '_values' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/xcape/projects/tale-studio/src/lib/lifecycle.ts
+  245:23  warning  '_stableId' is defined but never used  @typescript-eslint/no-unused-vars
+  249:23  warning  '_stableId' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/xcape/projects/tale-studio/src/lib/writer/pipeline/validators/action_budget.ts
+  5:7  warning  'SHOT_DURATION' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+✖ 26 problems (1 error, 25 warnings)
+  0 errors and 6 warnings potentially fixable with the `--fix` option.
+

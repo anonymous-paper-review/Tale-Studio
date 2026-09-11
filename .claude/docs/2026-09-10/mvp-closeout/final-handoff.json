@@ -1,0 +1,22 @@
+{
+  "finishedAt": "2026-09-10T06:43:19.950Z",
+  "productCommit": "7d609a2871cfae11b20fce4267702339ce314941",
+  "mainCommit": "867cda835195315e6a73cb4f8d262ef736302ff9",
+  "productionDeployment": {
+    "id": "dpl_EC8Wv8nGu2uBq3Le47L5e75jbSqE",
+    "url": "tale-pvyqvk9xh-talestudio.vercel.app",
+    "state": "READY",
+    "createdAt": 1789022457817,
+    "sha": "867cda835195315e6a73cb4f8d262ef736302ff9",
+    "message": "docs(mvp): publish final verification screenshots and rollout status"
+  },
+  "ci": {
+    "id": 34446302059,
+    "status": "completed",
+    "conclusion": "success",
+    "url": "https://github.com/anonymous-paper-review/Tale-Studio/actions/runs/34446302059"
+  },
+  "report": "https://share.onorca.dev/a/fsy_PukFJPI1",
+  "sharedProductFileEditingEnded": true,
+  "agentEditingEnded": true
+}

@@ -1,0 +1,35 @@
+(node:11837) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+ RUN  v4.1.6 /Users/xcape/projects/tale-studio
+
+ ❯ tests/writer/dialogue-handoff-completion.test.ts (12 tests | 1 failed) 189ms
+   × 47샷의 대사를 처리해도 같은 요청의 진행 안내는 한 줄만 갱신하고 마지막 기록만 저장한다 57ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/writer/dialogue-handoff-completion.test.ts > 47샷의 대사를 처리해도 같은 요청의 진행 안내는 한 줄만 갱신하고 마지막 기록만 저장한다
+AssertionError: expected [ { …(4) }, { …(4) }, { …(4) }, …(20) ] to have a length of 1 but got 23
+
+- Expected
++ Received
+
+- 1
++ 23
+
+ ❯ tests/writer/dialogue-handoff-completion.test.ts:191:26
+    189|   await send
+    190|   const progressAfter = useGlobalChatStore.getState().messages.filter(…
+    191|   expect(progressBefore).toHaveLength(1)
+       |                          ^
+    192|   expect(progressAfter).toHaveLength(1)
+    193|   expect(progressAfter[0].id).toBe(progressBefore[0].id)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 11 passed (12)
+   Start at  00:02:40
+   Duration  522ms (transform 207ms, setup 9ms, import 242ms, tests 189ms, environment 0ms)
+

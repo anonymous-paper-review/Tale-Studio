@@ -12,6 +12,7 @@ import { withDemoShare } from '@/lib/demo/context'
  */
 export async function handoffToStage(
   targetStage: StageId,
+  options?: { verify: boolean },
 ): Promise<string | null> {
   const target = STAGES.find((s) => s.id === targetStage)
   if (!target) return null
@@ -20,15 +21,22 @@ export async function handoffToStage(
   if (projectId && !canNavigateTo(targetStage)) {
     try {
       const supabase = createClient()
-      await supabase
+      const result = await supabase
         .from('projects')
         .update({ current_stage: targetStage })
         .eq('id', projectId)
+      if (options?.verify) {
+        if (result.error || useProjectStore.getState().projectId !== projectId) return null
+        const saved = await supabase.from('projects').select('current_stage').eq('id', projectId).maybeSingle()
+        if (saved.error || saved.data?.current_stage !== targetStage || useProjectStore.getState().projectId !== projectId) return null
+      }
     } catch {
+      if (options?.verify) return null
       // non-blocking
     }
   }
 
+  if (options?.verify && useProjectStore.getState().projectId !== projectId) return null
   setStage(targetStage)
   // 데모(URL 티켓): 반환 경로에 share 쿼리 유지 — 쿠키 차단 브라우저에서도 이동 생존.
   return withDemoShare(target.path)

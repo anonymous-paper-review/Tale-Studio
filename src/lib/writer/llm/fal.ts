@@ -253,22 +253,22 @@ function extractImageUrlFromData(raw: unknown): { url: string; width?: number; h
 /** submit only — request_id 반환 즉시 리턴. polling은 별도. */
 export async function falImageSubmit(
   opts: FalImageOptions,
+  submission: { retry?: boolean } = {},
 ): Promise<FalSubmitReceipt> {
   const model = resolveImageModel(opts);
   const input = buildFalImageInput(opts, model);
   const k = await pickFalKey();
   try {
-    const { request_id } = await withLlmRetry(
-      () =>
-        k.client.queue.submit(model, opts.webhookUrl ? { input, webhookUrl: opts.webhookUrl } : { input }),
-      'fal-image-submit',
-    );
+    const submit = () => k.client.queue.submit(model, opts.webhookUrl ? { input, webhookUrl: opts.webhookUrl } : { input });
+    const { request_id } = submission.retry === false
+      ? await k.submitQueueOnce(model, input, opts.webhookUrl)
+      : await withLlmRetry(submit, 'fal-image-submit');
     return { request_id, model, fal_request: input, fal_key_id: k.id };
   } catch (e) {
     // fal 실패 상세를 표면화 — 라우트(500 body.error)→client(✗ failed)까지 진짜 이유가 전파된다.
     const detail = falErrorDetail(e);
     console.error(`[fal-image-submit] model=${model} failed: ${detail}`);
-    throw new Error(`fal submit (${model}): ${detail}`);
+    throw new Error(`fal submit (${model}): ${detail}`, { cause: e });
   }
 }
 

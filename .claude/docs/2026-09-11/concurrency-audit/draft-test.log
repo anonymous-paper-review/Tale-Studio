@@ -1,0 +1,58 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/private/var/folders/t6/snw_y0p96b5dhcbclfksgldm0000gn/T/tale-concurrency-main-867cda83-z2mrtesd[39m
+
+[90mstdout[2m | tests/manual/concurrency-draft.manual.test.ts[2m > [22m[2m실제 main 초안 묶음의 전체 생성 자리 초과 진단[2m > [22m[2m전체 68칸에서 한 칸만 남으면 인물·배경 초안도 그 한 칸 안에서 접수한다
+[22m[39m[draft-trigger] concurrency-draft-project worlds — submitted 2, skipped 0, failed 0
+
+[90mstdout[2m | tests/manual/concurrency-draft.manual.test.ts[2m > [22m[2m실제 main 초안 묶음의 전체 생성 자리 초과 진단[2m > [22m[2m전체 68칸에서 한 칸만 남으면 인물·배경 초안도 그 한 칸 안에서 접수한다
+[22m[39m[draft-trigger] concurrency-draft-project — submitted 2, skipped 0, failed 0
+
+[90mstdout[2m | tests/manual/concurrency-draft.manual.test.ts[2m > [22m[2m실제 main 초안 묶음의 전체 생성 자리 초과 진단[2m > [22m[2m전체 68칸에서 한 칸만 남으면 인물·배경 초안도 그 한 칸 안에서 접수한다
+[22m[39m[v2design-trigger] concurrency-draft-project — chars 2/0/0, worlds 2/0/0
+
+[90mstdout[2m | tests/manual/concurrency-draft.manual.test.ts[2m > [22m[2m실제 main 초안 묶음의 전체 생성 자리 초과 진단[2m > [22m[2m전체 80칸에서 한 칸만 남으면 인물·배경 초안도 그 한 칸 안에서 접수한다
+[22m[39m[draft-trigger] concurrency-draft-project worlds — submitted 2, skipped 0, failed 0
+
+[90mstdout[2m | tests/manual/concurrency-draft.manual.test.ts[2m > [22m[2m실제 main 초안 묶음의 전체 생성 자리 초과 진단[2m > [22m[2m전체 80칸에서 한 칸만 남으면 인물·배경 초안도 그 한 칸 안에서 접수한다
+[22m[39m[draft-trigger] concurrency-draft-project — submitted 2, skipped 0, failed 0
+
+[90mstdout[2m | tests/manual/concurrency-draft.manual.test.ts[2m > [22m[2m실제 main 초안 묶음의 전체 생성 자리 초과 진단[2m > [22m[2m전체 80칸에서 한 칸만 남으면 인물·배경 초안도 그 한 칸 안에서 접수한다
+[22m[39m[v2design-trigger] concurrency-draft-project — chars 2/0/0, worlds 2/0/0
+
+ [31m❯[39m tests/manual/concurrency-draft.manual.test.ts [2m([22m[2m2 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[32m 5[2mms[22m[39m
+[31m     [31m×[31m 전체 68칸에서 한 칸만 남으면 인물·배경 초안도 그 한 칸 안에서 접수한다[39m[32m 4[2mms[22m[39m
+[31m     [31m×[31m 전체 80칸에서 한 칸만 남으면 인물·배경 초안도 그 한 칸 안에서 접수한다[39m[32m 0[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/manual/concurrency-draft.manual.test.ts[2m > [22m실제 main 초안 묶음의 전체 생성 자리 초과 진단[2m > [22m전체 68칸에서 한 칸만 남으면 인물·배경 초안도 그 한 칸 안에서 접수한다
+[31m[1mAssertionError[22m: 한 칸만 남았지만 4건 접수: 67 → 71 / 68: expected 71 to be less than or equal to 68[39m
+[36m [2m❯[22m tests/manual/concurrency-draft.manual.test.ts:[2m167:108[22m[39m
+    [90m165|[39m     [34mexpect[39m(accepted)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)
+    [90m166|[39m     [34mexpect[39m(audit[33m.[39mjobs[33m.[39mlength)[33m.[39m[34mtoBe[39m(accepted)
+    [90m167|[39m     expect(audit.queued, `한 칸만 남았지만 ${accepted}건 접수: ${audit.initialQu…
+    [90m   |[39m                                                                                                            [31m^[39m
+    [90m168|[39m   })
+    [90m169|[39m })
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/manual/concurrency-draft.manual.test.ts[2m > [22m실제 main 초안 묶음의 전체 생성 자리 초과 진단[2m > [22m전체 80칸에서 한 칸만 남으면 인물·배경 초안도 그 한 칸 안에서 접수한다
+[31m[1mAssertionError[22m: 한 칸만 남았지만 4건 접수: 79 → 83 / 80: expected 83 to be less than or equal to 80[39m
+[36m [2m❯[22m tests/manual/concurrency-draft.manual.test.ts:[2m167:108[22m[39m
+    [90m165|[39m     [34mexpect[39m(accepted)[33m.[39m[34mtoBeGreaterThan[39m([34m0[39m)
+    [90m166|[39m     [34mexpect[39m(audit[33m.[39mjobs[33m.[39mlength)[33m.[39m[34mtoBe[39m(accepted)
+    [90m167|[39m     expect(audit.queued, `한 칸만 남았지만 ${accepted}건 접수: ${audit.initialQu…
+    [90m   |[39m                                                                                                            [31m^[39m
+    [90m168|[39m   })
+    [90m169|[39m })
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[90m (2)[39m
+[2m   Start at [22m 16:06:22
+[2m   Duration [22m 165ms[2m (transform 49ms, setup 12ms, import 53ms, tests 5ms, environment 0ms)[22m
+
+JSON report written to /Users/xcape/projects/tale-studio/.claude/docs/2026-09-11/concurrency-audit/draft-vitest.json

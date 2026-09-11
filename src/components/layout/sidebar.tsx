@@ -27,7 +27,6 @@ import { UserMenu } from '@/components/layout/user-menu'
 import { ContactPopover } from '@/components/contact-popover'
 import { ExportMenu } from '@/components/export-menu'
 import { useProjectStore } from '@/stores/project-store'
-import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useStageBadges } from '@/lib/stage-seen'
 import { useTakeBalance } from '@/lib/billing/use-take-balance'
 import { refetchBillingAccount, useBillingAccount } from '@/lib/billing/use-billing-account'
@@ -61,7 +60,8 @@ export function Sidebar() {
   // 약속 D3(2026-09-04): 배지는 서버 완료 기록에서 파생 — 화면이 완료를 봤는지와 무관하다.
   const currentStage = useProjectStore((s) => s.currentStage)
   const badgeProjectId = useProjectStore((s) => s.projectId)
-  const stageBadges = useStageBadges(badgeProjectId ?? null, currentStage ?? null)
+  const visibleStage = STAGES.find((stage) => pathname.startsWith(stage.path))?.id ?? currentStage
+  const stageBadges = useStageBadges(badgeProjectId ?? null, visibleStage ?? null)
   const projectTitle = useProjectStore((s) => s.projectTitle)
   const renameProject = useProjectStore((s) => s.renameProject)
 
@@ -184,6 +184,7 @@ export function Sidebar() {
       >
         <HoverCardTrigger asChild>
           <button
+            aria-label={t('Back to Projects')}
             onClick={() => router.push('/projects')}
             className="mb-2 flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
           >
@@ -271,9 +272,11 @@ export function Sidebar() {
                     //   이동 자체는 goToStage 한 곳(단축키와 공유. 세로 스트립 전환 포함).
                     else if (!isLocked && !isCommitted) goToStage(stage.id)
                   }}
+                  aria-label={badge > 0 ? `${STAGE_LABEL[stage.id]} · ${t('Unseen completions: {count}', { count: badge })}` : STAGE_LABEL[stage.id]}
+                  aria-current={isCommitted ? 'page' : undefined}
                   disabled={isLocked && !isArtistRetryable}
                   className={cn(
-                    'relative flex h-14 w-14 flex-col items-center justify-center gap-1 rounded-xl transition-colors',
+                    'relative flex h-14 w-14 shrink-0 flex-col items-center justify-center gap-1 rounded-xl transition-colors',
                     isLocked && !isArtistRetryable && 'cursor-not-allowed opacity-30',
                     isArtistRetryable && 'cursor-pointer text-destructive hover:bg-sidebar-accent',
                     isActive && !isLocked
@@ -287,12 +290,12 @@ export function Sidebar() {
                     <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-full bg-primary" />
                   )}
                   <Icon className="size-5" />
-                  <span className="text-[10px] font-medium leading-none tracking-tight">
+                  <span className="text-xs font-medium leading-none">
                     {STAGE_LABEL[stage.id]}
                   </span>
                   {badge > 0 && (
                     <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-semibold leading-none text-primary-foreground">
-                      {badge > 9 ? '9+' : badge}
+                      {badge}
                     </span>
                   )}
                   {/* 액세스 키 배지 — Alt(Option) 를 누르고 있는 동안만. 잠긴 탭은 갈 수 없으니 안 보인다. */}
@@ -314,6 +317,7 @@ export function Sidebar() {
               </TooltipTrigger>
               <TooltipContent side="right" className="flex flex-col">
                 <span className="font-medium">{stage.name}</span>
+                {badge > 0 ? <span>{t('Unseen completions: {count}', { count: badge })}</span> : null}
                 <span className="text-xs text-muted-foreground">
                   {isLocked
                     ? isArtistImageLocked
@@ -329,7 +333,7 @@ export function Sidebar() {
       </div>
 
       {/* 푸터 액션 — 공유·내보내기·문의·프로필: 버튼 크기·캡션 타이포·세로 간격을 FooterIconItem 로 통일 */}
-      <div className="mt-2 flex shrink-0 flex-col items-center gap-2.5">
+      <div className="mt-2 flex shrink-0 flex-col items-center gap-1">
         <SidebarTakeBalance />
         <OwnerOnly>
           <FooterIconItem label={t('Share')}>
@@ -341,7 +345,7 @@ export function Sidebar() {
             <ExportMenu />
           </FooterIconItem>
         </OwnerOnly>
-        {/* 문의/도움("채널톡") — 빨간 원(bg-primary) + 흰 말풍선. 데모에서도 노출(OwnerOnly 밖). */}
+        {/* 도움말은 다른 보조 메뉴와 같은 강조 수준을 쓴다. */}
         <FooterIconItem label="Help">
           <ContactPopover
             side="right"
@@ -363,7 +367,7 @@ export function Sidebar() {
                 type="button"
                 aria-label={t('Contact / Help')}
                 title={t('Contact / Help')}
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary text-secondary-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <MessageCircle className="h-5 w-5" />
               </button>

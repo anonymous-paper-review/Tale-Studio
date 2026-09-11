@@ -12,6 +12,8 @@ import {
 } from '@/lib/generation-jobs'
 import { reconcileJobFromFal } from '@/lib/fal/reconcile'
 import { releaseTakesForJob } from '@/lib/billing/take-hold'
+import { translate } from '@/lib/i18n/translate'
+import { parseAppLocale } from '@/lib/locale'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -68,6 +70,7 @@ export async function GET(
       error: job.error,
       kind: job.kind,
       videoClipId: job.video_clip_id,
+      ...(job.kind === 'shot_rough_storyboard' && job.status === 'queued' && job.request_id?.startsWith('reserved:') ? { confirmationPending: true } : {}),
     },
   })
 }
@@ -103,6 +106,12 @@ export async function DELETE(
   if (job.status === 'completed') {
     return NextResponse.json(
       { ok: false, error: { code: 'completed_job', message: 'completed jobs are kept as history' } },
+      { status: 409 },
+    )
+  }
+  if (job.status === 'queued' && job.kind === 'shot_rough_storyboard') {
+    return NextResponse.json(
+      { ok: false, error: { code: 'rough_submission_pending', message: translate(parseAppLocale(user.user_metadata?.locale) ?? 'en', 'The rough request is still being confirmed or completed. Its record is kept to prevent duplicate generation.') } },
       { status: 409 },
     )
   }

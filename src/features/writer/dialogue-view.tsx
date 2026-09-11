@@ -221,7 +221,7 @@ export function DialogueView() {
                   <h3 className="mb-3 border-b border-border pb-1.5 font-mono text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Scene {sceneIdx + 1}
                     <span className="ml-2 font-normal normal-case">
-                      {scene.location}
+                      {resolveEntityNames(scene.location, entityNames)}
                       {scene.mood ? ` · ${scene.mood}` : ''}
                     </span>
                   </h3>
@@ -277,10 +277,10 @@ export function DialogueView() {
                                         focused && 'font-medium',
                                       )}
                                     >
-                                      &ldquo;{line.text}&rdquo;
+                                      &ldquo;{resolveEntityNames(line.text, entityNames)}&rdquo;
                                     </span>
                                     {line.delivery && (
-                                      <span className="ml-2 text-[11px] text-foreground/70">({line.delivery})</span>
+                                      <span className="ml-2 text-[11px] text-foreground/70">({resolveEntityNames(line.delivery, entityNames)})</span>
                                     )}
                                   </div>
                                 )

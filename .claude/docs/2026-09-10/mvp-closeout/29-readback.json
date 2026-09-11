@@ -1,0 +1,119 @@
+{
+  "checkedAt": "2026-09-10T06:22:09.300Z",
+  "projectId": "f48923c5-c98d-40ca-a30a-000446af6ea9",
+  "counts": {
+    "characters": 1,
+    "character_appearances": 1,
+    "locations": 1,
+    "scenes": 6,
+    "shots": 6,
+    "writer_runs": 1,
+    "generation_jobs": 0
+  },
+  "autoGenerationEligible": false,
+  "reuseNotice": "Repository template images are reused only to avoid automatic submissions. No image/video provider was run; actual Writer chat calls are recorded separately.",
+  "settings": {
+    "tone": [
+      "tense"
+    ],
+    "genre": "thriller",
+    "format": "horizontal_16:9",
+    "playtime": 18,
+    "subGenre": "mystery",
+    "dialogueLanguage": "ja"
+  },
+  "currentStage": "director",
+  "character": {
+    "id": "char_doyun",
+    "name": "도윤",
+    "appearance": "서른 살 남성, 검은 머리, 노란 우비, 갈색 배달 가방"
+  },
+  "background": {
+    "id": "loc_alley",
+    "description": "비가 내리는 밤의 좁은 골목, 젖은 아스팔트, 붉은 간판과 가로등"
+  },
+  "scene": {
+    "id": "sc_01",
+    "mood": "긴장"
+  },
+  "shots": [
+    {
+      "id": "sh_01_01",
+      "duration": 6,
+      "dialogue": [
+        {
+          "text": "비가 점점 세지고 있어.",
+          "emotion": "차분함",
+          "delivery": "낮은 목소리",
+          "characterId": "char_doyun",
+          "durationHint": 2
+        }
+      ]
+    },
+    {
+      "id": "sh_02_01",
+      "duration": 6,
+      "dialogue": [
+        {
+          "text": "이 상자는 누구의 것일까.",
+          "emotion": "차분함",
+          "delivery": "낮은 목소리",
+          "characterId": "char_doyun",
+          "durationHint": 2
+        }
+      ]
+    },
+    {
+      "id": "sh_03_01",
+      "duration": 6,
+      "dialogue": [
+        {
+          "text": "왜 내 이름이 여기 있는 거지.",
+          "emotion": "차분함",
+          "delivery": "낮은 목소리",
+          "characterId": "char_doyun",
+          "durationHint": 2
+        }
+      ]
+    },
+    {
+      "id": "sh_04_01",
+      "duration": 6,
+      "dialogue": [
+        {
+          "text": "약속 시간까지 5분 남았어.",
+          "emotion": "차분함",
+          "delivery": "낮은 목소리",
+          "characterId": "char_doyun",
+          "durationHint": 2
+        }
+      ]
+    },
+    {
+      "id": "sh_05_01",
+      "duration": 6,
+      "dialogue": [
+        {
+          "text": "같이 가자. 더 이상 혼자 두지 않을게.",
+          "emotion": "차분함",
+          "delivery": "낮은 목소리",
+          "characterId": "char_doyun",
+          "durationHint": 2
+        }
+      ]
+    },
+    {
+      "id": "sh_06_01",
+      "duration": 6,
+      "dialogue": [
+        {
+          "text": "모두 준비됐어. 이제 출발하자.",
+          "emotion": "차분함",
+          "delivery": "낮은 목소리",
+          "characterId": "char_doyun",
+          "durationHint": 2
+        }
+      ]
+    }
+  ]
+}

@@ -80,6 +80,19 @@ scripts/*
 # src/lib/billing/smoke-checks.ts 가 소유한다. 빠지면 배포마다 도는 검사가 클린 클론에서 사라진다.
 !scripts/smoke-billing.mjs
 !scripts/smoke-billing-paid.mjs
+# 가격표 팝업·로그인 복귀 브라우저 회귀 검사 — 실제 거래는 만들지 않는다.
+!scripts/check-pricing-ui.mjs
+# MVP 피드백 브라우저 회귀 — 격리된 localhost 고정 응답만 사용한다.
+!scripts/check-mvp-feedback-ui.mjs
+!scripts/check-mvp-feedback-followup-ui.mjs
+!scripts/check-mvp-dialogue-ui.mjs
+!scripts/test-rough-reservation-dev-db.mjs
+!scripts/test-rough-reservation-db.mjs
+# 68칸·80칸 메인 동시성 검사와 개발 DB 격리 실험을 재현하는 실행기.
+!scripts/test-concurrency-capacity.mjs
+!scripts/test-concurrency-capacity-db.mjs
+# 환불·만료 실제 DB 회귀 검사 진입점(개발 DB 격리 공간만 사용).
+!scripts/test-refund-expiry-db.mjs
 # Paddle 상품 등록(#payments-phase-3) — catalog.ts 를 읽어 샌드박스/라이브에 상품을 만든다.
 # 멱등이고 --live 를 명시할 때만 라이브를 건드린다. 하드코딩 비밀 없음(키는 env).
 !scripts/paddle-register-catalog.mts
@@ -213,3 +226,6 @@ research/experiments/_viewer.html
 /feedback/
 /runs/**
 .env*
+
+# pnpm 로컬 스토어 — 설치 캐시, 저장소에 넣지 않는다
+.pnpm-store/

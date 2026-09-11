@@ -1,0 +1,39 @@
+
+ RUN  v4.1.6 /Users/xcape/projects/tale-studio
+
+(node:99112) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ tests/writer/progress-scope.test.ts (4 tests | 1 failed) 5ms
+   × 여러 단계를 한 번에 만든 실행도 검토와 후속 단계의 진행을 빠뜨리지 않는다. 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/writer/progress-scope.test.ts > 여러 단계를 한 번에 만든 실행도 검토와 후속 단계의 진행을 빠뜨리지 않는다.
+AssertionError: expected { scope: 'review', done: 3, …(6) } to match object { done: 4, total: 4 }
+(6 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "done": 4,
++   "done": 3,
+    "total": 4,
+  }
+
+ ❯ tests/writer/progress-scope.test.ts:26:128
+     24| })
+     25| it('여러 단계를 한 번에 만든 실행도 검토와 후속 단계의 진행을 빠뜨리지 않는다.', () => {
+     26|   expect(writerProgressView({ ...base, current_status:'awaiting_confir…
+       |                                                                                                                                ^
+     27|   expect(writerProgressView({ ...base,current_stage:'actVisualArc',com…
+     28|   expect(writerProgressView({ ...base,current_stage:'persistShots',com…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 3 passed (4)
+   Start at  23:46:36
+   Duration  171ms (transform 48ms, setup 11ms, import 66ms, tests 5ms, environment 0ms)
+

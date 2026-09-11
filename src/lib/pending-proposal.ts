@@ -20,6 +20,9 @@ export type PendingProposalKind =
   // 약속 C3·C4(2026-09-04): 새 모습 만들기 — 행 추가 뒤 이미지를 바로 만들어 과금이 생기므로 승인 카드를 거친다.
   | 'artistCreateAppearance'
   | 'artistCreateLocationAppearance'
+  // 기본 동작 매트릭스 A(2026-09-11): 모습 삭제는 되돌릴 수 없어 승인 카드를 거친다. 기본 모습은 대상이 아니다.
+  | 'artistDeleteAppearance'
+  | 'artistDeleteLocationAppearance'
   | 'directorGenerateStoryboardImage'
   // 약속 E3(2026-09-04): "영상 다 만들어줘" — 버튼 확인창과 같은 숫자(만들 영상 수·필요한 Take·가진 Take)를 보이고 승인 뒤 runVideoBatch.
   | 'directorGenerateVideoBatch'
@@ -27,6 +30,12 @@ export type PendingProposalKind =
 
 export interface PendingProposal {
   id: string
+  /** 한 장의 승인 카드에 포함된 원래 요청들. */
+  items?: PendingProposal[]
+  projectId?: string
+  /** 이미 접수된 작업은 재발주하지 않고 이 작업을 조회한다. */
+  jobIds?: string[]
+  submissionUncertain?: boolean
   /** 이 제안을 만든 채팅 한 턴. 승인 뒤 생성 Job을 같은 trace에 연결한다. */
   traceId?: string
   stage: PendingProposalStage
@@ -75,6 +84,20 @@ export function isApprovalUtterance(text: string | null | undefined): boolean {
   return APPROVAL_PATTERNS.some((pattern) => pattern.test(normalized) || pattern.test(compactKorean))
 }
 
+const CANCELLATION_PATTERNS = [
+  /^(?:please )?(?:cancel(?: (?:it|this|that|this proposal|the proposal))?|never ?mind|not now|(?:maybe )?later|no(?: thanks)?|hold off)$/i,
+  /^(?:(?:그거|이거|이번제안|이제안|대기중인변경)(?:은|는|을|를)?)?취소(?:해|해줘|해주세요|해줘요|할게|할래)?$/, // i18n-ok: 사용자 한국어 입력을 인식하는 패턴이며 화면 문구가 아니다.
+  /^(?:나중에(?:하자|할게|해줘|해요)?|보류(?:해|해줘|해주세요)?|(?:진행)?하지마(?:세요)?|안할래|아니(?:요)?)$/, // i18n-ok: 사용자 한국어 입력을 인식하는 패턴이며 화면 문구가 아니다.
+]
+
+/** 현재 승인 카드에 대한 짧은 거절만 인식한다. 질문·부정의 부정·복합 요청은 일반 대화로 남긴다. */
+export function isCancellationUtterance(text: string | null | undefined): boolean {
+  if (!text || /[?？]/.test(text)) return false
+  const normalized = normalizeApprovalText(text)
+  const compactKorean = normalizeKoreanApprovalText(text)
+  return CANCELLATION_PATTERNS.some((pattern) => pattern.test(normalized) || pattern.test(compactKorean))
+}
+
 export function formatProposalImpact(impact: string[]): string {
   const items = impact.map((item) => item.trim()).filter(Boolean)
   if (items.length === 0) return translate(useLocaleStore.getState().locale, 'No impact')
@@ -90,4 +113,19 @@ export function createPendingProposal(input: Omit<PendingProposal, 'id' | 'creat
     id: input.id ?? `proposal_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
     createdAt: input.createdAt ?? new Date().toISOString(),
   }
+}
+
+/** 기존 카드 하나 계약을 유지하며 요청 대상을 전부 보존한다. */
+export function combinePendingProposals(items: PendingProposal[]): PendingProposal {
+  if (items.length === 1) return items[0]
+  return createPendingProposal({
+    ...items[0], id: undefined, items,
+    target: items.map(item => item.target).join(', '),
+    action: items.map(item => `${item.target}: ${item.action}`).join('\n'),
+    impact: [...new Set(items.flatMap(item => item.impact))],
+  })
+}
+
+export function isDeferralUtterance(text: string): boolean {
+  return isCancellationUtterance(text) && /나중|보류|later|not now|hold off/i.test(text) // i18n-ok: 사용자 입력의 보류 의도를 판별하는 정규식이며 화면 문구가 아니다.
 }

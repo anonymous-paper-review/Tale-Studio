@@ -876,7 +876,7 @@ ${stage ? `        "camera_setup": {
       },
     } as ShotDesign;
     // #names-in-prose: 산문 필드의 id → 이름 (character_id·gaze_arc·target 은 그대로).
-    return cleanShotDesignProse(withMotion, castEntities(characters));
+    return cleanShotDesignProse(withMotion, castEntities(characters, worldVisual.locations.flatMap((l) => l.name ? [{ id: l.id, name: l.name }] : [])));
   });
   // 교정은 조용히 하지 않는다 — 조용한 열화가 이번 사고의 본체였다.
   //   이 파일이 계속 쌓이면 지시서(1차 방어)가 아직 새고 있다는 신호로 읽는다.

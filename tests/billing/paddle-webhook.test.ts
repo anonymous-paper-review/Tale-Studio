@@ -170,6 +170,25 @@ async function send(deps: PaddleWebhookDeps, event: unknown, header?: string) {
   return handlePaddleWebhook({ rawBody: body, signatureHeader: header ?? sign(body), secret: SECRET, deps })
 }
 
+// 왜: 새 환불도 원래 지급분을 알아야 만료 때 다시 차감하지 않고 사용분 부족액만 유지할 수 있다.
+it('환불은 해당 결제로 지급한 Take에 연결해서 회수한다', async () => {
+  const { deps, state } = makeDeps()
+  await send(deps, txnCompleted())
+  const revoke = vi.spyOn(deps, 'revoke')
+  expect((await send(deps, adjustmentEvent('evt_refund_link'))).status).toBe(200)
+  expect(revoke).toHaveBeenCalledWith(expect.objectContaining({ grantId: state.ledger[0].id, amount: 50 }))
+})
+
+// 왜: 비정상적으로 지급분이 여러 개면 첫 행을 임의로 골라 다른 지급분의 잔액을 바꾸면 안 된다.
+it('환불의 원 지급분을 하나로 확인하지 못하면 임의로 회수하지 않는다', async () => {
+  const { deps, state } = makeDeps()
+  await send(deps, txnCompleted())
+  state.ledger.push({ ...state.ledger[0], id: 'ambiguous', kind: 'grant_plan' })
+  const revoke = vi.spyOn(deps, 'revoke')
+  expect((await send(deps, adjustmentEvent('evt_refund_ambiguous'))).status).toBe(500)
+  expect(revoke).not.toHaveBeenCalled()
+})
+
 describe('받기', () => {
   it('Paddle이 보낸 것이 아니면(서명이 틀리면) 받지 않고 장부에 아무것도 넣지 않는다', async () => {
     const { deps, state, balance } = makeDeps()

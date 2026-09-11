@@ -8,6 +8,7 @@ import { ProducerReadinessBoard } from '@/features/producer/readiness-board'
 import { useProducerStore } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { becameReadyForStyle, type ProducerStyleSnapshot } from '@/lib/producer-style-prompt'
 import { evaluateProducerGate } from '@/lib/producer-gate'
 import { createPendingProposal } from '@/lib/pending-proposal'
 import { handoffFrom } from '@/lib/handoff-intent'
@@ -134,6 +135,14 @@ export default function MeetingPage() {
   const activeSuggestion = useGlobalChatStore((s) => s.suggestion)
   // 이미 수락된 핸드오프는 다시 권하지 않는다(#handoff-once) — 진실은 DB 의 reachedStage.
   const reachedStage = useProjectStore((s) => s.reachedStage)
+  const previousStyleState = useRef<ProducerStyleSnapshot | null>(null)
+  const requestStylePicker = useChatUiStore((s) => s.requestStylePicker)
+  useEffect(() => {
+    const current = { projectId, loaded: producerLoaded, storyReady, reachedStage, styleAnchorKey }
+    if (becameReadyForStyle(previousStyleState.current, current) && projectId) requestStylePicker(projectId)
+    previousStyleState.current = current
+  }, [projectId, producerLoaded, storyReady, reachedStage, styleAnchorKey, requestStylePicker])
+
   // 아래 두 useEffect 의 offerSuggestion content/label 은 미리 완역해 상수로 뽑는다 —
   //   문자열 값이라 deps 에 넣어도 로케일이 안 바뀌면 재실행되지 않는다(#i18n-s5-batch4,
   //   writer 배치의 scene-gate 패턴과 동일). 발화라서 t() 가 아니라 콘텐츠 언어(#i18n-content-voice).

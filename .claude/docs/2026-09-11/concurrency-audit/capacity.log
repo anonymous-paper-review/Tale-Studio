@@ -1,0 +1,87 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/private/var/folders/t6/snw_y0p96b5dhcbclfksgldm0000gn/T/tale-concurrency-main-TA7GGC[39m
+
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 한 사람당 1개를 차례로 요청하면 전체 한도까지만 접수한다[32m 30[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 한 사람당 2개를 차례로 요청하면 전체 한도까지만 접수한다[32m 2[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 한 사람당 3개를 차례로 요청하면 전체 한도까지만 접수한다[32m 2[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 한 사람당 4개를 차례로 요청하면 전체 한도까지만 접수한다[32m 2[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 한 사람당 6개를 차례로 요청하면 전체 한도까지만 접수한다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 한 사람당 9개를 차례로 요청하면 전체 한도까지만 접수한다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 한 사용자의 영상 세 개와 이미지 여섯 개는 허용하고 각각 다음 작업은 거절한다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸을 이미지가 모두 사용하면 새로운 사용자의 영상도 전체 한도에 걸린다[32m 0[2mms[22m[39m
+ [31m×[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 이미지 다섯 개를 진행 중인 사용자가 동시에 열두 번 요청해도 개인 한도를 넘지 않는다[32m 2[2mms[22m[39m
+[31m   → expected 17 to be less than or equal to 6[39m
+ [31m×[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸의 마지막 한 자리에 여러 사용자가 동시에 요청해도 전체 접수 한도를 넘지 않는다[32m 1[2mms[22m[39m
+[31m   → expected 79 to be less than or equal to 68[39m
+ [31m×[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 새 요청 쉰 개가 동시에 연결을 골라도 한 연결의 설정 한도를 넘지 않는다[32m 1[2mms[22m[39m
+[31m   → expected 50 to be less than or equal to 34[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸이 찬 뒤 빈자리를 먼저 재신청하는 기존 사용자와 새 사용자의 접수 순서를 관측한다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸이 찬 뒤 새 사용자가 빈자리에 먼저 요청하면 그 사용자의 작업이 접수된다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 작업 수 조회가 실패할 때 새 접수를 허용하는지 관측한다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 삼십 분을 넘긴 미완료 작업이 집계에서 제외되는지 관측한다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 관리자는 개인 한도를 넘을 수 있지만 전체가 차면 멈춘다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 한 사람당 1개를 차례로 요청하면 전체 한도까지만 접수한다[32m 2[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 한 사람당 2개를 차례로 요청하면 전체 한도까지만 접수한다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 한 사람당 3개를 차례로 요청하면 전체 한도까지만 접수한다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 한 사람당 4개를 차례로 요청하면 전체 한도까지만 접수한다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 한 사람당 6개를 차례로 요청하면 전체 한도까지만 접수한다[32m 2[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 한 사람당 9개를 차례로 요청하면 전체 한도까지만 접수한다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 한 사용자의 영상 세 개와 이미지 여섯 개는 허용하고 각각 다음 작업은 거절한다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸을 이미지가 모두 사용하면 새로운 사용자의 영상도 전체 한도에 걸린다[32m 0[2mms[22m[39m
+ [31m×[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 이미지 다섯 개를 진행 중인 사용자가 동시에 열두 번 요청해도 개인 한도를 넘지 않는다[32m 0[2mms[22m[39m
+[31m   → expected 17 to be less than or equal to 6[39m
+ [31m×[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸의 마지막 한 자리에 여러 사용자가 동시에 요청해도 전체 접수 한도를 넘지 않는다[32m 1[2mms[22m[39m
+[31m   → expected 91 to be less than or equal to 80[39m
+ [31m×[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 새 요청 쉰 개가 동시에 연결을 골라도 한 연결의 설정 한도를 넘지 않는다[32m 1[2mms[22m[39m
+[31m   → expected 50 to be less than or equal to 40[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸이 찬 뒤 빈자리를 먼저 재신청하는 기존 사용자와 새 사용자의 접수 순서를 관측한다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸이 찬 뒤 새 사용자가 빈자리에 먼저 요청하면 그 사용자의 작업이 접수된다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 작업 수 조회가 실패할 때 새 접수를 허용하는지 관측한다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 삼십 분을 넘긴 미완료 작업이 집계에서 제외되는지 관측한다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 관리자는 개인 한도를 넘을 수 있지만 전체가 차면 멈춘다[32m 2[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 6 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 이미지 다섯 개를 진행 중인 사용자가 동시에 열두 번 요청해도 개인 한도를 넘지 않는다
+[41m[1m FAIL [22m[49m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 이미지 다섯 개를 진행 중인 사용자가 동시에 열두 번 요청해도 개인 한도를 넘지 않는다
+[31m[1mAssertionError[22m: expected 17 to be less than or equal to 6[39m
+[36m [2m❯[22m tests/manual/concurrency-capacity.manual.test.ts:[2m154:27[22m[39m
+
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸의 마지막 한 자리에 여러 사용자가 동시에 요청해도 전체 접수 한도를 넘지 않는다
+[31m[1mAssertionError[22m: expected 79 to be less than or equal to 68[39m
+[36m [2m❯[22m tests/manual/concurrency-capacity.manual.test.ts:[2m167:27[22m[39m
+
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 새 요청 쉰 개가 동시에 연결을 골라도 한 연결의 설정 한도를 넘지 않는다
+[31m[1mAssertionError[22m: expected 50 to be less than or equal to 34[39m
+[36m [2m❯[22m tests/manual/concurrency-capacity.manual.test.ts:[2m179:49[22m[39m
+
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸의 마지막 한 자리에 여러 사용자가 동시에 요청해도 전체 접수 한도를 넘지 않는다
+[31m[1mAssertionError[22m: expected 91 to be less than or equal to 80[39m
+[36m [2m❯[22m tests/manual/concurrency-capacity.manual.test.ts:[2m167:27[22m[39m
+
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 새 요청 쉰 개가 동시에 연결을 골라도 한 연결의 설정 한도를 넘지 않는다
+[31m[1mAssertionError[22m: expected 50 to be less than or equal to 40[39m
+[36m [2m❯[22m tests/manual/concurrency-capacity.manual.test.ts:[2m179:49[22m[39m
+
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m6 failed[39m[22m[2m | [22m[1m[32m26 passed[39m[22m[90m (32)[39m
+[2m   Start at [22m 16:03:32
+[2m   Duration [22m 169ms[2m (transform 42ms, setup 9ms, import 18ms, tests 62ms, environment 0ms)[22m
+
+JSON report written to /Users/xcape/projects/tale-studio/.claude/docs/2026-09-11/concurrency-audit/capacity-vitest.json

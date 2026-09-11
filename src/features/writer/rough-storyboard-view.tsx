@@ -38,8 +38,11 @@ import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { WriterResumeButton } from '@/components/layout/writer-resume-button'
-import { friendlyStageLabel, formatRemaining } from '@/lib/writer/stage-labels'
+import { writerProgressView } from '@/lib/writer/progress-view'
+import { summarizeRoughProgress } from '@/lib/writer/rough-progress'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
+import { notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
+import { runRoughPump } from '@/lib/writer/rough-pump-client'
 import { resolveEntityNames, manifestEntities } from '@/lib/writer/resolve-entity-names'
 import {
   useActiveGenerationJobs,
@@ -176,8 +179,6 @@ export function RoughStoryboardView() {
     mode: AddMode
     contextSceneId: string | null
   } | null>(null)
-  // 진행 중 단계 경과시간 라이브 표시(긴 단계에서 "멈춤" 오인 방지) — 1s 틱.
-  const [nowMs, setNowMs] = useState(0)
   // Director Storyboard와 같은 축척 단계·저장 규칙을 사용한다.
   const [zoomLevel, setZoomLevel] = useStoryboardZoom('writer:zoomLevel')
   const boardRef = useRef<HTMLDivElement>(null)
@@ -296,7 +297,7 @@ export function RoughStoryboardView() {
       force?: boolean,
       auto?: boolean,
       styleHints?: string[],
-    ): Promise<{ submitted: number; remaining: number; quota: boolean; done: Promise<unknown> } | null> => {
+    ): Promise<{ submitted: number; remaining: number; quota: boolean; confirmationPending?: boolean; done: Promise<unknown> } | null> => {
       if (!projectId) return null
       if (shotIds?.length) {
         // 클릭 즉시 피드백 — 서버가 in_flight skip 으로 응답하면 아래에서 정리됨
@@ -312,8 +313,11 @@ export function RoughStoryboardView() {
           body: JSON.stringify({ projectId, shotIds, force, styleHints }),
         })
         const j = await res.json().catch(() => null)
-        // 쿼터 초과(429)는 실패가 아니라 "큐가 빌 때까지 대기" 신호 — 펌프가 재시도한다(#c1).
+        // 자리 부족(429)은 멈춤이다 — 자동 재시도 없음(2026-09-11 오너 결정). 어느 경로든(전체 펌프·자동 진입·
+        //   개별 패널 버튼) 공용 토스트로 한 번 알린다. 예전에는 펌프가 "큐가 빌 때까지 대기" 신호로 재시도했고
+        //   개별 버튼은 무음으로 끝났다(2026-09-11 동시성 감사). 토스트 id 가 고정이라 여러 장이 동시에 429 를 받아도 하나만 보인다.
         if (res.status === 429) {
+          notifyIfQuotaExceeded(res.status, j)
           if (auto) {
             recordWriterObservabilityEventClient(projectId, 'auto_submit_response', {
               auto: true,
@@ -341,7 +345,12 @@ export function RoughStoryboardView() {
         const submitted = (j.data?.submitted ?? []) as Array<{
           shotId: string
           jobId: string
+          confirmationPending?: boolean
         }>
+        const confirmationPending = j.data?.confirmationPending === true || submitted.some((item) => item.confirmationPending)
+        if (confirmationPending) {
+          toast.info(translate(locale, 'Confirming the previous rough request. It will not be submitted again.'))
+        }
         if (auto) {
           const skipped = (j.data?.skipped ?? []) as Array<{ reason?: unknown }>
           const skippedByReason = skipped.reduce<Record<string, number>>((counts, item) => {
@@ -404,7 +413,7 @@ export function RoughStoryboardView() {
           )
             .filter((x) => x.reason === 'in_flight')
             .map((x) => x.shotId)
-          if (blocked.length) {
+          if (blocked.length && !confirmationPending) {
             setPanelJobs((prev) => {
               const next = { ...prev }
               for (const id of blocked) delete next[id]
@@ -522,6 +531,7 @@ export function RoughStoryboardView() {
           submitted: submitted.length,
           remaining: (j.data?.remaining as number | undefined) ?? 0,
           quota: false,
+          confirmationPending,
           // 이번 라운드 잡들의 종결(성공/실패 모두 위에서 상태 반영) — 펌프의 라운드 배리어.
           done: Promise.allSettled(polls),
         }
@@ -548,10 +558,8 @@ export function RoughStoryboardView() {
     [projectId, loadProject, locale],
   )
 
-  // 누락 패널 전체 생성 펌프(#c1·#c2·#c3 2026-07-15) — 서버가 호출당 6샷으로 캡하므로(504·쿼터
-  //   독점 방지) remaining 이 0이 될 때까지 라운드를 이어간다. 라운드 배리어(이전 잡 완료 대기)로
-  //   쿼터를 넘지 않고, 429(다른 생성이 큐 점유)는 8초 대기 후 재시도. 실패 샷은 다음 라운드가
-  //   자연 재제출하고 반복 실패는 서버 give-up 게이트가 멈춘다 → 수렴 보장.
+  // 누락 패널 전체 생성 펌프 — 루프 규칙은 rough-pump-client.ts(자리 부족은 재시도 없이 멈춤, 내 묶음이
+  //   끝나면 다음 묶음). 여기는 컴포넌트 상태(실행 중·이탈)만 잌는다.
   const pumpRunningRef = useRef(false)
   const pumpAbortRef = useRef(false)
   useEffect(() => {
@@ -564,42 +572,17 @@ export function RoughStoryboardView() {
     async (auto: boolean) => {
       if (pumpRunningRef.current) return
       pumpRunningRef.current = true
-      let quotaToasted = false
       try {
-        const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
-        const MAX_ROUNDS = 40 // 76샷=13라운드 + 429 대기 여유. 폭주 방지 상한.
-        for (let round = 0; round < MAX_ROUNDS; round++) {
-          if (pumpAbortRef.current) return
-          // give-up 안내 토스트는 수동 1라운드에서만 (라운드마다 반복 방지)
-          const r = await generate(undefined, false, auto || round > 0)
-          if (!r) return // 요청 실패 — generate 가 이미 토스트
-          if (r.quota) {
-            // #silent-pump(2026-08-25 실사고): 진입 자동 모드가 429(다른 생성이 큐 점유 — 예:
-            //   러프 완주 직후의 artist 백필)를 무음으로 삼키며 재시도하다 무음으로 포기해,
-            //   사용자에겐 "러프 생성이 그냥 안 됨"으로 보였다. 자동 모드도 3라운드째(≈16s
-            //   점유 지속)면 한 번은 말한다 — 수동 모드는 종전대로 즉시 1회.
-            if (!quotaToasted && (!auto || round >= 2)) {
-              quotaToasted = true
-              toast.info(
-                translate(
-                  locale,
-                  "The server is busy, so this is taking longer than usual. We'll continue automatically as soon as a slot opens.",
-                ),
-              )
-            }
-            await sleep(8000)
-            continue
-          }
-          if (r.submitted === 0) return // 전부 완료/제외 — 수렴
-          await r.done
-          // remaining<=0 이어도 바로 끝내지 않는다 — 다음 라운드가 이번 라운드 실패분을
-          //   재제출할 기회(그 라운드 submitted 0 이면 그때 종료). give-up 게이트가 무한 재시도를 막는다.
-        }
+        await runRoughPump({
+          // give-up 안내 토스트는 수동 1라운드에서만 (라운드마다 반복 방지). 429 안내는 generate 가 한다.
+          generate: (round) => generate(undefined, false, auto || round > 0),
+          isAborted: () => pumpAbortRef.current,
+        })
       } finally {
         pumpRunningRef.current = false
       }
     },
-    [generate, locale],
+    [generate],
   )
 
   const running = !!(
@@ -620,9 +603,8 @@ export function RoughStoryboardView() {
   const missingIds = shots
     .filter((s) => !panelOf(s) && !jobOf(s.shotId) && shotHasInfo(s.actionDescription))
     .map((s) => s.shotId)
-  const generatingCount = shots.filter(
-    (s) => jobOf(s.shotId)?.status === 'generating',
-  ).length
+  const roughProgress = summarizeRoughProgress(shots, overrides, panelJobs, queuedRoughIds)
+  const generatingCount = roughProgress.generating
   // 제목 아래 설명문은 제거(#c2 2026-07-14) — 카드 사용법은 첫 진입 브리핑 채팅이 안내한다.
   // 트리트먼트·대사 탭과 같은 자리의 도움말(#c4 2026-08-03) — 헤더 아래 한 줄.
   const headerDescription = t(
@@ -635,12 +617,6 @@ export function RoughStoryboardView() {
         zoomLevel={zoomLevel}
         onZoomLevelChange={setZoomLevel}
       />
-      {generatingCount > 0 && (
-        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Loader2 className="size-3.5 animate-spin" />
-          {t('{count} panels generating', { count: generatingCount })}
-        </span>
-      )}
       {missingIds.length > 0 && generatingCount === 0 && (
         <Button
           size="sm"
@@ -746,14 +722,6 @@ export function RoughStoryboardView() {
     return () => el.removeEventListener('wheel', onWheel)
   }, [hasShots, setZoomLevel])
 
-  // 진행 중일 때만 1초마다 현재 시각 갱신 → 현재 단계 경과시간 라이브 표시(shotCheck 등 100s+ 단계가 "멈춘" 듯 보이는 오인 방지).
-  useEffect(() => {
-    if (hasShots || !running) return
-    setNowMs(Date.now())
-    const t = setInterval(() => setNowMs(Date.now()), 1000)
-    return () => clearInterval(t)
-  }, [hasShots, running])
-
   // 보드 drag-to-scroll (빈 영역을 잡고 끌면 패닝). 버튼/입력 위에서 시작한 드래그는 무시.
   const handleBoardPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return
@@ -828,22 +796,14 @@ export function RoughStoryboardView() {
 
   // ── 파이프라인 진행 중 (샷이 아직 없음) ─────────────────────────────────
   if (!hasShots && running) {
-    const pct = Math.max(0, Math.min(100, status?.progress_percent ?? 0))
-    // 진행(경과) 시간은 계산만 하고 표시하지 않는다(#c4) — 남은 예상 시간 산출에만 사용.
-    //   실측 자체는 writer_runs(created_at/updated_at + state._timings)에 이미 영속된다.
-    const startedAtMs = status?.timings?.pipeline_started_at
-      ? Date.parse(status.timings.pipeline_started_at)
-      : null
-    const elapsedMs = startedAtMs != null ? Math.max(0, nowMs - startedAtMs) : null
-    const etaTotalMs = status?.eta_total_ms ?? null
-    const remainingMs =
-      etaTotalMs != null && elapsedMs != null ? etaTotalMs - elapsedMs : null
+    const progress = writerProgressView(status, locale)
+    const pct = progress.percent
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         <WriterHeader description={headerDescription} />
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
           <Loader2 className="size-6 animate-spin text-muted-foreground" aria-busy="true" />
-          <p className="text-base font-medium">{friendlyStageLabel(status?.current_stage, locale)}</p>
+          <p className="text-base font-medium">{progress.label}</p>
 
           {/* 진행률 바(#c3) — 우측에 % 병기 */}
           <div className="flex w-full max-w-md items-center gap-3">
@@ -859,17 +819,14 @@ export function RoughStoryboardView() {
                 style={{ width: `${pct}%` }}
               />
             </div>
-            <span className="w-10 shrink-0 text-right font-mono text-sm tabular-nums text-muted-foreground">
-              {pct}%
+            <span className="shrink-0 text-right font-mono text-xs tabular-nums text-muted-foreground">
+              {progress.countLabel}
             </span>
           </div>
 
-          {/* 남은 예상 시간 — 과거 실행 실측이 있을 때만(#c4, 기록 없으면 비움) */}
-          {remainingMs != null ? (
-            <p className="text-sm text-muted-foreground">{formatRemaining(remainingMs, locale)}</p>
-          ) : null}
+          <p className="text-xs text-muted-foreground">{progress.detail}</p>
           <p className="text-xs text-muted-foreground">
-            {t('Complex stages like shot design and validation can take 1-2 minutes.')}
+            {t('Steps take different amounts of time. Image generation follows separately.')}
           </p>
         </div>
       </div>
@@ -923,6 +880,16 @@ export function RoughStoryboardView() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <WriterHeader description={headerDescription} actions={storyboardActions} />
+      <div role="status" aria-label={t('Rough storyboard progress')} className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-border px-6 py-2 text-xs tabular-nums text-muted-foreground">
+        <span className="font-medium text-foreground">{t('Board total: {count} shots', { count: roughProgress.total })}</span>
+        <span>{t('Completed')} {roughProgress.completed}</span>
+        <span className="inline-flex items-center gap-1">
+          {generatingCount > 0 && <Loader2 className="size-3 animate-spin" />}
+          {t('Generating')} {roughProgress.generating}
+        </span>
+        <span>{t('Waiting')} {roughProgress.waiting}</span>
+        <span className={roughProgress.failed > 0 ? 'text-destructive' : undefined}>{t('Failed')} {roughProgress.failed}</span>
+      </div>
 
       {/* #coverage-first(2026-09-02 오너): 연출 점검 — 영상으로 넘어가기 전에 커버리지 결함
           (반응 없는 다인 비트·리빌 없는 시선 비트·감정 연쇄 단절·급전환)을 보여준다.
