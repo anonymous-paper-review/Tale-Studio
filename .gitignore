@@ -91,8 +91,12 @@ scripts/*
 # 68칸·80칸 메인 동시성 검사와 개발 DB 격리 실험을 재현하는 실행기.
 !scripts/test-concurrency-capacity.mjs
 !scripts/test-concurrency-capacity-db.mjs
+# 새 4축 용량 트리거를 개발 DB 격리 공간에서 시험하는 실행기 — 검사 규칙은 tests/manual/capacity-axes-db.manual.test.ts 가 소유한다.
+!scripts/test-capacity-axes-db.mjs
 # 환불·만료 실제 DB 회귀 검사 진입점(개발 DB 격리 공간만 사용).
 !scripts/test-refund-expiry-db.mjs
+# 개발 DB 에만 마이그레이션 하나를 적용하고 이력에 기록한다 — CLI 가 live 에 링크돼 있어 db push 를 쓰지 않는다.
+!scripts/apply-dev-migration.mjs
 # Paddle 상품 등록(#payments-phase-3) — catalog.ts 를 읽어 샌드박스/라이브에 상품을 만든다.
 # 멱등이고 --live 를 명시할 때만 라이브를 건드린다. 하드코딩 비밀 없음(키는 env).
 !scripts/paddle-register-catalog.mts

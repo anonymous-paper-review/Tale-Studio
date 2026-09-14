@@ -11,7 +11,7 @@ import { falVideoSubmit } from '@/lib/writer/llm/fal'
 import { pickFalKey } from '@/lib/fal/keys'
 import { createGenerationJob, failGenerationJob, STALE_QUEUED_MS } from '@/lib/generation-jobs'
 import { checkGenerationCapacity, checkProjectVideoBudget } from '@/lib/generation-quota'
-import { quotaRejectionResponse, videoBudgetRejectionResponse, videoCapacityReservationRejection } from '@/lib/api/quota'
+import { quotaRejectionResponse, videoBudgetRejectionResponse, capacityReservationRejection } from '@/lib/api/quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
 import { holdTakesForVideoJob, releaseTakesForJob } from '@/lib/billing/take-hold'
@@ -123,7 +123,7 @@ export async function POST(req: Request) {
         },
       })
     } catch (createError) {
-      const rejection = videoCapacityReservationRejection(createError, { projectId, kind: 'shot_previz_video', userId: access.userId })
+      const rejection = capacityReservationRejection(createError, { projectId, kind: 'shot_previz_video', userId: access.userId })
       if (rejection) return rejection
       throw createError
     }

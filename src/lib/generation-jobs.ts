@@ -7,6 +7,8 @@ import type { GenerationBatchRow } from '@/lib/generation-batches'
 import { normalizeFailureEvidence } from '@/lib/fal/error-evidence'
 import type { Json, Tables } from '@/types/database'
 import { isChatTraceId } from '@/lib/chat-trace'
+import { pickFalKey } from '@/lib/fal/keys'
+import { syncFalKeyLimits } from '@/lib/generation-quota'
 
 export type GenerationJobKind =
   | 'character_view'
@@ -136,6 +138,26 @@ function toJsonObjectSnapshot(value: unknown): { [key: string]: Json | undefined
 }
 
 
+/**
+ * 잡과 연결된 채팅 trace 를 queued 로 표시한다.
+ *   Job 생성은 이미 성공했다 — 관측 갱신 실패가 유료 작업을 실패로 보이게 만들지 않도록
+ *   로그만 남기고 상태 집계는 linked job 으로 복구한다.
+ */
+async function markChatTraceQueued(projectId: string, chatTraceId: string, nowIso: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('chat_traces')
+    .update({
+      pending_proposal: false,
+      generation_status: 'queued',
+      updated_at: nowIso,
+    })
+    .eq('trace_id', chatTraceId)
+    .eq('project_id', projectId)
+  if (error) {
+    console.error('[generation-jobs] chat trace queue update failed:', error)
+  }
+}
+
 async function resolveJobOwnership(input: {
   projectId: string
   workspaceId?: string | null
@@ -228,23 +250,193 @@ export async function createGenerationJob(input: {
     .select(`${COLUMNS}, actor`)
     .single()
   if (error) throw error
-  if (input.chatTraceId) {
-    const { error: traceError } = await supabaseAdmin
-      .from('chat_traces')
-      .update({
-        pending_proposal: false,
-        generation_status: 'queued',
-        updated_at: now,
-      })
-      .eq('trace_id', input.chatTraceId)
-      .eq('project_id', input.projectId)
-    if (traceError) {
-      // Job 생성은 이미 성공했다. 관측 갱신 실패가 유료 작업을 실패로
-      // 보이게 만들지 않도록 로그만 남기고 상태 집계는 linked job으로 복구한다.
-      console.error('[generation-jobs] chat trace queue update failed:', traceError)
-    }
-  }
+  if (input.chatTraceId) await markChatTraceQueued(input.projectId, input.chatTraceId, now)
   return data as GenerationJob
+}
+
+// ── 자리 예약 (#generation-capacity-trigger 2026-09-14) ──
+// 자리 판정은 DB 트리거(generation_jobs_capacity)가 네 축을 한 걸음에 한다 — 서버가 "세고 나서 넣는"
+//   두 단계 사이에 다른 요청이 끼어들어 상한을 뚫었기 때문이다(감사 2026-09-11: 67 → 79).
+
+/** 막힌 축 — 내 영상 · 내 이미지 · fal 계정 · 전체 합계. 안내 문장과 관측 이벤트가 이 어휘를 공유한다. */
+export type GenerationCapacityAxis = 'user_video' | 'user_image' | 'key' | 'global'
+
+/**
+ * 트리거가 자리 없음을 알린 거절. message 는 트리거 예외 이름 그대로다 — 429 변환기
+ * (api/quota.ts)가 트리거 예외와 이 오류를 같은 한 경로로 읽을 수 있게 하기 위함이다.
+ */
+export class GenerationCapacityError extends Error {
+  readonly axis: GenerationCapacityAxis
+  /** 트리거 detail 의 현재 수. */
+  readonly queued: number
+  /** 트리거 detail 의 상한(user 축은 3/6 고정). */
+  readonly limit: number
+  constructor(triggerMessage: string, axis: GenerationCapacityAxis, queued: number, limit: number) {
+    super(triggerMessage)
+    this.name = 'GenerationCapacityError'
+    this.axis = axis
+    this.queued = queued
+    this.limit = limit
+  }
+}
+
+const CAPACITY_AXIS_BY_TRIGGER_MESSAGE: Record<string, GenerationCapacityAxis> = {
+  video_user_at_capacity: 'user_video',
+  image_user_at_capacity: 'user_image',
+  key_at_capacity: 'key',
+  global_at_capacity: 'global',
+}
+
+// 개인 축의 상한은 트리거 안에 박혀 있어 detail 에 오지 않는다(generation-quota.ts 의
+//   MAX_QUEUED_VIDEO/IMAGE_JOBS_PER_USER 와 같은 값). 상수를 거기서 가져오면 이 모듈을
+//   불러오는 모든 경로가 쿼터 모듈을 같이 지고 다니게 되므로 여기에 따로 적는다.
+const USER_AXIS_LIMIT: Record<'user_video' | 'user_image', number> = { user_video: 3, user_image: 6 }
+
+/**
+ * insert 오류가 자리 거절이면 GenerationCapacityError 로 바꾼다. detail 을 읽을 수 없으면
+ * null — 가짜 수를 지어내지 않고 원래 오류를 그대로 올려보낸다.
+ */
+function capacityRejectionFrom(error: unknown): GenerationCapacityError | null {
+  if (!error || typeof error !== 'object') return null
+  const message = (error as { message?: unknown }).message
+  if (typeof message !== 'string') return null
+  const axis = CAPACITY_AXIS_BY_TRIGGER_MESSAGE[message]
+  if (!axis) return null
+  const details = (error as { details?: unknown }).details
+  if (typeof details !== 'string') return null
+  if (axis === 'user_video' || axis === 'user_image') {
+    if (!/^\d+$/.test(details)) return null
+    const queued = Number(details)
+    if (!Number.isSafeInteger(queued)) return null
+    return new GenerationCapacityError(message, axis, queued, USER_AXIS_LIMIT[axis])
+  }
+  const matched = /^(\d+)\/(\d+)$/.exec(details)
+  if (!matched) return null
+  const queued = Number(matched[1])
+  const limit = Number(matched[2])
+  if (!Number.isSafeInteger(queued) || !Number.isSafeInteger(limit)) return null
+  return new GenerationCapacityError(message, axis, queued, limit)
+}
+
+/**
+ * 자리 예약: 접수 번호 없이 generation_jobs 행을 먼저 넣는다(request_id='reserved:<id>',
+ * submitted_at=null, attempts=0). 이 insert 가 통과했다면 자리는 확보된 것이고, 트리거가
+ * 거절하면 GenerationCapacityError 를 던진다.
+ *
+ * ⚠️ 반환 행의 fal_key_id 는 서버가 고른 키와 다를 수 있다 — 그 키가 그 순간 가득 찼으면 트리거가
+ * 여유 있는 계정으로 바꿔 넣는다(오너 결정 2026-09-11). 제출은 반드시 반환 행의 값으로 한다.
+ */
+export async function reserveGenerationJob(
+  input: Omit<Parameters<typeof createGenerationJob>[0], 'requestId' | 'falKeyId'>,
+): Promise<GenerationJob> {
+  // 계정별 상한이 DB 에 없으면 계정 축·전체 축이 통째로 꺼진다 — 판정 전에 한 번 동기화한다.
+  await syncFalKeyLimits()
+  if (input.kind === 'shot_video') {
+    throw new Error('shot_video jobs must be created by a director video reservation')
+  }
+  if (
+    input.kind === 'character_view' &&
+    (!input.target.workspaceId || !input.target.characterId || !input.target.appearanceKey || !input.target.view)
+  ) {
+    throw new Error('character_view job target requires workspaceId/characterId/appearanceKey/view')
+  }
+  if (input.chatTraceId && !isChatTraceId(input.chatTraceId)) {
+    throw new Error('chat trace ID must be a UUID')
+  }
+  const ownership = await resolveJobOwnership({
+    projectId: input.projectId,
+    workspaceId: input.workspaceId ?? input.target.workspaceId,
+    userId: input.userId,
+  })
+  // id 를 먼저 정한다 — 접수 번호 자리에 넣을 'reserved:<id>' 가 그 id 에 매여 있어야
+  //   응답을 잃어도 그 자리를 다시 쓰지 않는다.
+  const id = crypto.randomUUID()
+  const falKey = await pickFalKey()
+  const { data, error } = await supabaseAdmin
+    .from('generation_jobs')
+    .insert({
+      id,
+      project_id: input.projectId,
+      request_id: `reserved:${id}`,
+      model: input.model,
+      kind: input.kind,
+      target: input.target,
+      actor: input.actor ?? 'ui',
+      user_id: ownership.userId,
+      workspace_id: ownership.workspaceId,
+      provider: input.provider ?? 'fal',
+      input_snapshot: toJsonSnapshot(input.inputSnapshot === undefined ? {} : input.inputSnapshot),
+      chat_trace_id: input.chatTraceId ?? null,
+      fal_key_id: falKey.id,
+      submitted_at: null,
+      attempts: 0,
+      status: 'queued',
+    })
+    .select(`${COLUMNS}, actor`)
+    .single()
+  if (error) throw capacityRejectionFrom(error) ?? error
+  if (input.chatTraceId) await markChatTraceQueued(input.projectId, input.chatTraceId, new Date().toISOString())
+  return data as GenerationJob
+}
+
+/**
+ * 제출 뒤 접수 번호를 채운다. 예약 그대로인 행(request_id='reserved:<id>', queued)만 갱신하고,
+ * 0행이면 throw — 그 사이에 자리가 바뀌었다는 뜻이라 조용히 지나가면 결과가 서로를 덮어쓴다.
+ */
+export async function confirmGenerationJobReceipt(
+  jobId: string,
+  projectId: string,
+  receipt: { request_id: string; model: string; fal_key_id: string },
+): Promise<void> {
+  const now = new Date().toISOString()
+  const { data, error } = await supabaseAdmin
+    .from('generation_jobs')
+    .update({
+      request_id: receipt.request_id,
+      model: receipt.model,
+      fal_key_id: receipt.fal_key_id,
+      submitted_at: now,
+      updated_at: now,
+      attempts: 1,
+    })
+    .eq('id', jobId)
+    .eq('project_id', projectId)
+    .eq('status', 'queued')
+    .eq('request_id', `reserved:${jobId}`)
+    .select('id')
+  if (error) throw error
+  if (!data?.length) throw new Error('generation job reservation changed before the receipt was saved')
+}
+
+/**
+ * 확정 거절(4xx, 408/425/429 제외)로 예약을 닫는다. 모호한 실패(통신 오류·5xx)에는 부르지
+ * 않는다 — 이미 접수된 작업을 실패로 닫으면 같은 그림이 다시 발주된다.
+ */
+export async function rejectGenerationJobReservation(
+  jobId: string,
+  projectId: string,
+  message: string,
+): Promise<void> {
+  const evidence = normalizeFailureEvidence(message).slice(0, 1000)
+  if (!evidence) throw new Error('generation job failure evidence must be nonblank')
+  const now = new Date().toISOString()
+  const { data, error } = await supabaseAdmin
+    .from('generation_jobs')
+    .update({
+      status: 'failed',
+      error: evidence,
+      last_error: evidence,
+      error_class: classifyJobError(evidence),
+      completed_at: now,
+      updated_at: now,
+    })
+    .eq('id', jobId)
+    .eq('project_id', projectId)
+    .eq('status', 'queued')
+    .eq('request_id', `reserved:${jobId}`)
+    .select('id')
+  if (error) throw error
+  if (!data?.length) throw new Error('generation job reservation changed before the rejection was saved')
 }
 
 /** RPC 예약으로 만들어진 영상 잡에 뒤늦게 채팅 trace를 연결한다. */
@@ -260,18 +452,7 @@ export async function linkGenerationJobToChatTrace(
     .eq('id', jobId)
     .eq('project_id', projectId)
   if (error) throw error
-  const { error: traceError } = await supabaseAdmin
-    .from('chat_traces')
-    .update({
-      pending_proposal: false,
-      generation_status: 'queued',
-      updated_at: new Date().toISOString(),
-    })
-    .eq('trace_id', chatTraceId)
-    .eq('project_id', projectId)
-  if (traceError) {
-    console.error('[generation-jobs] chat trace queue update failed:', traceError)
-  }
+  await markChatTraceQueued(projectId, chatTraceId, new Date().toISOString())
 }
 
 /**

@@ -33,7 +33,7 @@ vi.mock('@/lib/generation-quota', () => ({
   checkProjectVideoBudget: mocks.checkProjectVideoBudget,
   videoBudgetExceededBody: () => ({ error: 'video budget' }),
 }))
-// 새 videoCapacityReservationRejection(error, ctx) 는 actual quota.ts 에서 그대로 재사용한다 —
+// 새 capacityReservationRejection(error, ctx) 는 actual quota.ts 에서 그대로 재사용한다 —
 //   부모가 그 헬퍼를 구현하면 이 spread 로 자동 반영되고, 여기서 하드코딩한 가짜 count 는 없다.
 //   기존 두 헬퍼는 기존 계약대로 계속 오버라이드한다(약화 없음).
 vi.mock('@/lib/api/quota', async (importOriginal) => ({

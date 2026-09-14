@@ -17,7 +17,7 @@ import { getGenerationJobById, linkGenerationJobToChatTrace, userOwnsProject } f
 import { isChatTraceId } from '@/lib/chat-trace'
 import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
 import { checkGenerationCapacity, checkProjectVideoBudget } from '@/lib/generation-quota'
-import { quotaRejectionResponse, videoBudgetRejectionResponse, videoCapacityReservationRejection } from '@/lib/api/quota'
+import { quotaRejectionResponse, videoBudgetRejectionResponse, capacityReservationRejection } from '@/lib/api/quota'
 import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { buildBestEffortFalRequestCapturePatch } from '@/lib/fal/observability'
@@ -922,7 +922,7 @@ async function submitPreparedVideo(
         ? await reserveDirectorVideoRegeneration({ projectId, videoClipId, model: modelKey, target: { workspaceId: project.workspace_id, shotId: writerShotId, writerShotId, videoClipId, retakeMode: 'regeneration' }, idempotencyKey, inputSnapshot, userId: user.id, workspaceId: project.workspace_id, provider: isLocal ? 'local' : 'fal', actor: jobActor })
         : await (options.reserve ?? reserveDirectorVideoTake)({ projectId, shotId: writerShotId, model: modelKey, target: { workspaceId: project.workspace_id, shotId: writerShotId, writerShotId, retakeMode: 'new_take' }, idempotencyKey, inputSnapshot, userId: user.id, workspaceId: project.workspace_id, provider: isLocal ? 'local' : 'fal', actor: jobActor, takeLabel: normalizedNewTakeMetadata.take_label as string | null, override: normalizedNewTakeMetadata.override, canvasPosition: normalizedNewTakeMetadata.canvas_position })
     } catch (reserveError) {
-      const rejection = videoCapacityReservationRejection(reserveError, { projectId, kind: 'shot_video', userId: user.id })
+      const rejection = capacityReservationRejection(reserveError, { projectId, kind: 'shot_video', userId: user.id })
       if (rejection) return rejection
       throw reserveError
     }

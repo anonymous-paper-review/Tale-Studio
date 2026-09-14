@@ -160,11 +160,13 @@ describe('checkGenerationCapacity — admin 면제 표 동기화 (신규 게이�
 
 describe('quotaExceededBody — 종류별 한도 안내', () => {
   it('가득 찬 종류를 알려 영상과 이미지를 구분해 안내한다', () => {
-    const video = quotaExceededBody({ ok: false, queued: 3, limit: 3, scope: 'user', category: 'video' })
-    const image = quotaExceededBody({ ok: false, queued: 6, limit: 6, scope: 'user', category: 'image' })
+    const video = quotaExceededBody({ ok: false, queued: 3, limit: 3, scope: 'user', category: 'video', axis: 'user_video' })
+    const image = quotaExceededBody({ ok: false, queued: 6, limit: 6, scope: 'user', category: 'image', axis: 'user_image' })
     expect(video.error).toContain('video')
     expect(video.category).toBe('video')
+    expect(video.axis).toBe('user_video')
     expect(image.error).toContain('image')
     expect(image.category).toBe('image')
+    expect(image.axis).toBe('user_image')
   })
 })

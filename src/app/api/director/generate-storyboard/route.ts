@@ -13,12 +13,18 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { requireProjectAccess } from '@/lib/api/guard'
 import { falImageSubmit } from '@/lib/writer/llm/fal'
-import { createGenerationJob } from '@/lib/generation-jobs'
+import {
+  confirmGenerationJobReceipt,
+  reserveGenerationJob,
+  rejectGenerationJobReservation,
+  type GenerationJob,
+} from '@/lib/generation-jobs'
 import { checkGenerationCapacity } from '@/lib/generation-quota'
-import { quotaRejectionResponse } from '@/lib/api/quota'
+import { capacityReservationRejection, quotaRejectionResponse } from '@/lib/api/quota'
+import { isDefiniteSubmitRejection } from '@/lib/fal/submit-rejection'
+import { buildBestEffortFalRequestCapturePatch } from '@/lib/fal/observability'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { applyStyleAnchor, resolveStyleAnchor, type AnchorableSubmit } from '@/lib/style-anchor'
-import { buildBestEffortFalRequestCapturePatch } from '@/lib/fal/observability'
 import { appendCheckConstraints } from '@/lib/writer/check-notes'
 import { composeRoughReferenceStrip, buildRealStripPrompt } from '@/lib/director/storyboard-strip'
 import {
@@ -303,50 +309,120 @@ export async function POST(req: Request) {
     const requestedImageModel = effectiveModelKey
       ? resolveImageEndpoint(effectiveModelKey, !!finalOpts.reference_image_urls?.length).endpoint
       : null
-    const { request_id, model, fal_request, fal_key_id } = await falImageSubmit({
-      ...finalOpts,
-      ...(requestedImageModel ? { model: requestedImageModel } : {}),
-      webhookUrl: resolveWebhookUrl(),
-    })
-    const falCapture = buildBestEffortFalRequestCapturePatch(fal_request, model)
-
-    const job = await createGenerationJob({
-      projectId,
-      requestId: request_id,
-      model,
-      falKeyId: fal_key_id,
-      kind: 'shot_storyboard',
-      userId: access.userId!,
-      workspaceId: project.workspace_id,
-      provider: 'fal',
-      chatTraceId: traceId ?? null,
-      inputSnapshot: {
-        prompt: finalOpts.prompt,
-        aspect_ratio: finalOpts.aspect_ratio,
-        reference_image_urls: finalOpts.reference_image_urls,
-        ...(finalOpts.model ? { model: finalOpts.model } : {}),
-        style_anchor_key: anchor?.key ?? null,
-        scene_time_of_day: sceneLighting,
-        // #ref-gate: 누가 몇 번 참조인지 — 사후 감사에서 "시트가 빠졌나"를 잡 기록만으로 읽게 한다.
-        reference_roles: serverPlan
-          ? {
-              characters: serverPlan.characterRefs.map((r) => ({ characterId: r.characterId, name: r.name })),
-              world: !!serverPlan.worldRef,
-              extras: clientExtras.length,
-            }
-          : null,
-        ...(stripRefUrl ? { strip_ref_url: stripRefUrl } : {}),
-        // #sheet-formats: finalize 크롭·방향 가드가 이 값으로 같은 지오메트리를 복원한다.
-        sheet_format: stripSheetFormat,
-        ...falCapture,
-      },
-      target: {
+    // #generation-capacity-trigger(2026-09-14): 자리를 먼저 예약하고 그 다음에 제출한다 — fal 에 먼저
+    //   내면 트리거가 자리 넘는 기록을 거절해도 돈은 이미 나간 뒤다(감사 2026-09-11). 자동 재시도 없음.
+    const inputSnapshot: Record<string, unknown> = {
+      prompt: finalOpts.prompt,
+      aspect_ratio: finalOpts.aspect_ratio,
+      reference_image_urls: finalOpts.reference_image_urls,
+      ...(finalOpts.model ? { model: finalOpts.model } : {}),
+      style_anchor_key: anchor?.key ?? null,
+      scene_time_of_day: sceneLighting,
+      // #ref-gate: 누가 몇 번 참조인지 — 사후 감사에서 "시트가 빠졌나"를 잡 기록만으로 읽게 한다.
+      reference_roles: serverPlan
+        ? {
+            characters: serverPlan.characterRefs.map((r) => ({ characterId: r.characterId, name: r.name })),
+            world: !!serverPlan.worldRef,
+            extras: clientExtras.length,
+          }
+        : null,
+      ...(stripRefUrl ? { strip_ref_url: stripRefUrl } : {}),
+      // #sheet-formats: finalize 크롭·방향 가드가 이 값으로 같은 지오메트리를 복원한다.
+      sheet_format: stripSheetFormat,
+      // fal 요청 본문 캡처의 자리 — 예약 시점에는 접수 응답이 없어 빈 값이고, 접수가 확정되면
+      //   아래에서 실제 본문으로 덮는다. 키를 아예 빼면 같은 kind 의 잡마다 스냅샷 모양이 달라진다.
+      fal_request: {},
+      ignored_fields: [],
+    }
+    let job: GenerationJob
+    try {
+      job = await reserveGenerationJob({
+        projectId,
+        // 확정 모델을 아는 경우(샷이 모델을 고름)만 그 값 — 모르면 접수 뒤 receipt.model 이 덮는다.
+        model: requestedImageModel ?? 'pending',
+        kind: 'shot_storyboard',
+        userId: access.userId!,
         workspaceId: project.workspace_id,
-        writerShotId,
-        ...(stripFrames ? { gridVariant: 'strip1' as const } : {}),
-        ...(typeof roughGeneratedAt === 'number' ? { roughGeneratedAt } : {}),
-      },
-    })
+        provider: 'fal',
+        chatTraceId: traceId ?? null,
+        inputSnapshot,
+        target: {
+          workspaceId: project.workspace_id,
+          writerShotId,
+          ...(stripFrames ? { gridVariant: 'strip1' as const } : {}),
+          ...(typeof roughGeneratedAt === 'number' ? { roughGeneratedAt } : {}),
+        },
+      })
+    } catch (err) {
+      // 트리거가 자리 없음으로 거절한 것만 429(막힌 축 포함)로 옮긴다 — 그 외는 기존 오류 경로.
+      const rejected = capacityReservationRejection(err, { projectId, kind: 'shot_storyboard', userId: access.userId })
+      if (rejected) return rejected
+      throw err
+    }
+
+    try {
+      // 외부 접수는 한 번뿐이다. 응답을 잃은 호출을 SDK 재시도로 복제하지 않는다(러프와 같은 이유 —
+      //   예약이 이미 자리를 잡고 있으니 재시도는 이중 발주다).
+      const receipt = await falImageSubmit(
+        {
+          ...finalOpts,
+          ...(requestedImageModel ? { model: requestedImageModel } : {}),
+          webhookUrl: resolveWebhookUrl(),
+        },
+        // 트리거가 여유 있는 계정으로 바꿔 넣었을 수 있어 반드시 예약 행의 키로 제출한다.
+        { retry: false, falKeyId: job.fal_key_id },
+      )
+      try {
+        await confirmGenerationJobReceipt(job.id, projectId, receipt)
+      } catch (err) {
+        // 이미 접수됐다 — 새 번호로 다시 내지 않는다. 기록 실패는 로그로만 남긴다.
+        console.error(
+          '[director/generate-storyboard] accepted receipt could not be saved:',
+          job.id,
+          err instanceof Error ? err.message : String(err),
+        )
+      }
+      // fal 요청 본문 캡처는 접수 응답에서만 나온다 — 예약 스냅샷의 빈 자리를 이제 덮는다.
+      //   이 patch 가 실패해도 예약·접수는 이미 끝난 상태다 — 관측 값이라 로그만 남긴다.
+      try {
+        const { error: captureError } = await supabaseAdmin
+          .from('generation_jobs')
+          .update({
+            input_snapshot: {
+              ...inputSnapshot,
+              ...buildBestEffortFalRequestCapturePatch(receipt.fal_request, receipt.model),
+            },
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', job.id)
+          .eq('project_id', projectId)
+        if (captureError) throw captureError
+      } catch (err) {
+        console.error(
+          '[director/generate-storyboard] fal request capture could not be saved:',
+          job.id,
+          err instanceof Error ? err.message : String(err),
+        )
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      if (isDefiniteSubmitRejection(err)) {
+        // 확정 거절(4xx) — 자리를 물고 있을 이유가 없다. 닫기 실패는 원래 실패 이유를 가리지 않게 로그만.
+        try {
+          await rejectGenerationJobReservation(job.id, projectId, message)
+        } catch (closeError) {
+          console.error(
+            '[director/generate-storyboard] rejected reservation could not be closed:',
+            job.id,
+            closeError instanceof Error ? closeError.message : String(closeError),
+          )
+        }
+        throw err
+      }
+      // 접수 여부 불명(통신 오류·5xx·408/425/429): 예약(queued)을 남긴다 — 이미 접수됐을 수 있어
+      //   같은 자리를 새 번호로 다시 내지 않는다. 잡은 예약 id 그대로 돌려준다.
+      console.error('[director/generate-storyboard] submit outcome unknown, reservation kept:', job.id, message)
+    }
 
     return NextResponse.json({ ok: true, jobId: job.id, status: 'queued', mode: stripFrames ? 'strip3' : 'single' })
   } catch (e) {

@@ -20,12 +20,16 @@
 //   5명 규모에서는 이 러프함이 실무상 문제가 아니고, 진짜 fair-queue 는 잡을 pending 으로 재웠다가
 //   디스패처가 승격시키는 별도 상태머신이 필요하다. 유저가 늘고 편중이 실측될 때 도입한다.
 //   (거부→대기열 전환은 백로그 — .claude/docs/2026-08-26/group-a-state-loss.md 논의 3번)
+//
+// 2026-09-11 결정: 진짜 집행은 DB 트리거 하나가 네 축(개인 영상·개인 이미지·fal 계정·전체)을 원자적으로
+//   한다 — 여기 사전 검사는 "미리 알려주기"고, 거절된 자리를 다시 집어주는 자동 재시도는 없다.
 import {
   countQueuedJobsByUser,
   countQueuedJobsGlobal,
+  type GenerationCapacityAxis,
   type GenerationJobKind,
 } from '@/lib/generation-jobs'
-import { totalMaxInflight } from '@/lib/fal/keys'
+import { falKeys, totalMaxInflight } from '@/lib/fal/keys'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { PROJECT_VIDEO_GENERATION_LIMIT } from '@/lib/plan-limits'
 import { isAdminEmail } from '@/lib/admin'
@@ -69,6 +73,8 @@ export interface QuotaCheck {
   scope: QuotaScope
   /** 판정 대상 카테고리 — 클라 토스트가 "영상/이미지" 문구를 가른다. */
   category: QuotaCategory
+  /** 막힐 축 — 트리거와 같은 어휘로 기록해야 사전 검사와 예약 거절을 한 줄로 세어볼 수 있다. */
+  axis: GenerationCapacityAxis
 }
 
 function limitOf(category: QuotaCategory): number {
@@ -126,6 +132,39 @@ async function syncVideoCapacityExemption(userId: string, admin: boolean): Promi
   }
 }
 
+// fal 키 레지스트리(FAL_KEYS)의 계정별 상한을 DB 로 옮겨 적는다. 트리거는 환경변수를 읽을 수 없어
+//   이 표가 비면 계정 축·전체 축이 통째로 비활성화된다. 관리자 예외 표 동기화와 같은 규약:
+//   성공은 프로세스당 1회만 하고, 실패하면 상한 없는 삽입을 추측하지 않고 throw 한다.
+class FalKeyLimitSyncError extends Error {
+  constructor(cause: unknown) {
+    super('fal_key_limits sync failed', { cause })
+    this.name = 'FalKeyLimitSyncError'
+  }
+}
+
+let falKeyLimitsSynced = false
+
+export async function syncFalKeyLimits(): Promise<void> {
+  if (falKeyLimitsSynced) return
+  try {
+    const now = new Date().toISOString()
+    const keys = falKeys()
+    const { error } = await supabaseAdmin
+      .from('fal_key_limits')
+      .upsert(keys.map((key) => ({ key_id: key.id, max_inflight: key.maxInflight, updated_at: now })))
+    if (error) throw error
+    // 레지스트리에서 뻐 키의 행이 남으면 전체 축 합계(sum(max_inflight))가 실제보다 커진다 — 키를 븼 날 바로 생기는 구멍이라 같이 지운다.
+    const { error: pruneError } = await supabaseAdmin
+      .from('fal_key_limits')
+      .delete()
+      .not('key_id', 'in', `(${keys.map((key) => JSON.stringify(key.id)).join(',')})`)
+    if (pruneError) throw pruneError
+    falKeyLimitsSynced = true
+  } catch (err) {
+    throw new FalKeyLimitSyncError(err)
+  }
+}
+
 /**
  * 생성 1건을 지금 제출해도 되는지 — 유저 카테고리 상한과 전역 슬롯을 함께 본다.
  *
@@ -141,6 +180,7 @@ export async function checkGenerationCapacity(
   category: QuotaCategory,
 ): Promise<QuotaCheck> {
   const limit = limitOf(category)
+  const userAxis: GenerationCapacityAxis = category === 'video' ? 'user_video' : 'user_image'
   const admin = await isAdminUserId(userId)
   // 집계 장애로 반환하기 전에 오래된 면제를 없애야 한다. 이미지에는 이 표를 적용하지 않는다.
   if (category === 'video') await syncVideoCapacityExemption(userId, admin)
@@ -150,15 +190,15 @@ export async function checkGenerationCapacity(
       countQueuedJobsGlobal(),
     ])
     if (!admin && userQueued >= limit) {
-      return { ok: false, queued: userQueued, limit, scope: 'user', category }
+      return { ok: false, queued: userQueued, limit, scope: 'user', category, axis: userAxis }
     }
     const globalLimit = totalMaxInflight()
     if (globalQueued >= globalLimit) {
-      return { ok: false, queued: globalQueued, limit: globalLimit, scope: 'global', category }
+      return { ok: false, queued: globalQueued, limit: globalLimit, scope: 'global', category, axis: 'global' }
     }
-    return { ok: true, queued: userQueued, limit, scope: 'user', category }
+    return { ok: true, queued: userQueued, limit, scope: 'user', category, axis: userAxis }
   } catch {
-    return { ok: true, queued: 0, limit, scope: 'user', category }
+    return { ok: true, queued: 0, limit, scope: 'user', category, axis: userAxis }
   }
 }
 
@@ -179,6 +219,7 @@ export function quotaExceededBody(check: QuotaCheck) {
     code: 'quota_exceeded' as const,
     scope: check.scope,
     category: check.category,
+    axis: check.axis,
     queued: check.queued,
     limit: check.limit,
   }

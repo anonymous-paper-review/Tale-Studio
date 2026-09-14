@@ -1,0 +1,14 @@
+{
+  "appliedAt": "2026-09-14T02:13:43.684Z",
+  "environment": "development",
+  "developmentProject": "pbiumddivadgbzxuymak",
+  "migrationVersion": "20260914110000",
+  "migrationName": "generation_capacity_all_axes",
+  "sha256": "318b18f8bf373cca56bf64604f37dccf8627d887ee9ef90d70c58ba77cade22c",
+  "appliedWith": "node scripts/apply-dev-migration.mjs supabase/migrations/20260914110000_generation_capacity_all_axes.sql",
+  "historyRecorded": true,
+  "typesRegenerated": "pnpm db:types (표·함수 57 → 58, fal_key_limits)",
+  "applicationDataChanged": false,
+  "productionChanged": false,
+  "note": "CLI(supabase/.temp/project-ref)는 live 에 링크돼 있어 db push 를 쓰지 않았다. live 반영은 별도 오너 결정."
+}

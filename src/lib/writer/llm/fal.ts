@@ -253,11 +253,15 @@ function extractImageUrlFromData(raw: unknown): { url: string; width?: number; h
 /** submit only — request_id 반환 즉시 리턴. polling은 별도. */
 export async function falImageSubmit(
   opts: FalImageOptions,
-  submission: { retry?: boolean } = {},
+  /** falKeyId: 자리 예약이 이미 키를 정해둔 호출자용(#generation-capacity-trigger 2026-09-14) — 작업 행에
+   *  기록된 키로 제출해야 조회 경로가 그 키를 쓴다. 예약 행의 fal_key_id 는 트리거가 여유 있는
+   *  계정으로 바꿔둔 값일 수 있다. 생략하면 종전대로 여기서 고른다. */
+  submission: { retry?: boolean; falKeyId?: string } = {},
 ): Promise<FalSubmitReceipt> {
   const model = resolveImageModel(opts);
   const input = buildFalImageInput(opts, model);
-  const k = await pickFalKey();
+  const k = submission.falKeyId ? falKeyById(submission.falKeyId) : await pickFalKey();
+  if (!k) throw new FalUnknownKeyError(submission.falKeyId);
   try {
     const submit = () => k.client.queue.submit(model, opts.webhookUrl ? { input, webhookUrl: opts.webhookUrl } : { input });
     const { request_id } = submission.retry === false

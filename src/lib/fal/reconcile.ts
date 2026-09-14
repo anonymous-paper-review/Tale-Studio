@@ -141,8 +141,11 @@ export async function reconcileJobFromFal(
   //   terminalizeJob 이 hold 반환까지 맡는다(연결형은 markDirectorVideoAttemptFailed,
   //   비연결형은 releaseTakesForJob).
   if (job.request_id.startsWith('reserved:')) {
-    // 러프도 접수 응답을 잃었을 수 있다. 시간 경과만으로 실패 처리하면 같은 샷이 다시 발주된다.
-    if (job.kind === 'shot_rough_storyboard') return job
+    // 러프와 이미지(비영상 kind) 예약은 접수 응답을 잃었을 수 있으니 시간만으로 닫지 않는다 —
+    //   실패로 굳히면 같은 그림이 다시 발주된다. 2026-09-14: 이미지 5경로도 자리 예약을 먼저 잡고
+    //   제출하는 순서로 바뀌어, 러프만 예외로 두면 같은 사고가 나머지 이미지 kind 에서 그대로 재현된다.
+    //   Take(과금)가 묶이는 것은 영상뿐이라 시간 기반 정리가 꼭 필요한 곳도 영상이다.
+    if (job.kind !== 'shot_video' && job.kind !== 'shot_previz_video') return job
     // #batch-resume: 접수 뒤 연결 기록만 잃었을 수도 있다. 일괄은 저장한 증표로 복구하며,
     //   시간만으로 미제출이라 단정해 환급하거나 다른 키로 다시 제출하지 않는다.
     if (job.batch_id) return job

@@ -101,6 +101,16 @@ describe('제출되지 못한 영상 작업 정리', () => {
     expect(mocks.failGenerationJob).not.toHaveBeenCalled()
     expect(mocks.releaseTakesForJob).not.toHaveBeenCalled()
   })
+
+  it('이미지 접수 결과를 모르면 오래되었다는 이유로 예약을 해제하지 않는다', async () => {
+    // 왜: 이미지도 예약을 먼저 잡고 제출한다(2026-09-14) — 응답만 잃은 자리를 닫으면 같은 그림이 또 발주된다.
+    const job = reservedJob({ kind: 'character_view', video_clip_id: null })
+    const after = await reconcileJobFromFal(job, { settleStaleReserved: true })
+    expect(after.status).toBe('queued')
+    expect(mocks.failGenerationJob).not.toHaveBeenCalled()
+    expect(mocks.releaseTakesForJob).not.toHaveBeenCalled()
+  })
+
   it('영상 카드에 연결되지 않은 작업도 Take 를 돌려준다', async () => {
     // previz 처럼 video_clips 를 쓰지 않는 영상도 Take 를 잡는다.
     const job = reservedJob({ kind: 'shot_previz_video', video_clip_id: null })

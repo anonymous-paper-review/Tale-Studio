@@ -1,17 +1,10 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { falImageSubmit, type FalImageOptions } from '@/lib/writer/llm/fal'
 import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events'
+import { isDefiniteSubmitRejection } from '@/lib/fal/submit-rejection'
 
 type Reservation = { job_id: string | null; shot_ids: string[]; state: 'reserved' | 'existing' | 'exists'; confirmation_pending?: boolean }
 export type RoughSubmission = { shotId: string; jobId: string; confirmationPending?: boolean }
-
-/** 명시적인 접수 거절만 실패로 해제한다. 통신 오류·5xx는 이미 접수됐을 수 있다. */
-function definiteRejection(error: unknown): boolean {
-  if (!error || typeof error !== 'object') return false
-  const failure = error as { status?: unknown; cause?: unknown }
-  if (typeof failure.status === 'number') return failure.status >= 400 && failure.status < 500 && ![408, 425, 429].includes(failure.status)
-  return failure.cause ? definiteRejection(failure.cause) : false
-}
 
 async function patchReservation(projectId: string, jobId: string, patch: Record<string, unknown>): Promise<void> {
   const { data, error } = await supabaseAdmin.from('generation_jobs').update(patch)
@@ -71,7 +64,7 @@ export async function submitRoughStoryboardGrid(input: {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      const rejected = definiteRejection(error)
+      const rejected = isDefiniteSubmitRejection(error)
       await recordWriterObservabilityEvent(input.projectId, 'fal_submit_failed', {
         jobId, shotCount: reservation.shot_ids.length, error: message, confirmationPending: !rejected,
       })

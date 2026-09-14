@@ -14,9 +14,19 @@ vi.mock('@/lib/chat-format', async (original) => ({
 }))
 vi.mock('@/lib/chat-trace-server', () => ({ persistChatTraceBestEffort: vi.fn(), chatTraceBelongsToProject: async () => true }))
 vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTrace: vi.fn(), saveChatTracePatch: vi.fn(), loadLatestChatTrace: vi.fn() }))
-vi.mock('@/lib/generation-quota', () => ({ checkGenerationCapacity: async () => ({ ok: true }) }))
+// syncFalKeyLimits: 자리 예약(reserveGenerationJob)이 계정별 상한을 판정 전에 한 번 맞춘다 — 이 파일은 DB 경계만 메모리로 바꾼다.
+vi.mock('@/lib/generation-quota', () => ({ checkGenerationCapacity: async () => ({ ok: true }), syncFalKeyLimits: async () => {} }))
 vi.mock('@/lib/storage/template-asset', () => ({ templateAssetUrl: async () => 'https://assets.test/template.png' }))
-vi.mock('@/lib/fal/keys', () => ({ pickFalKey: async () => ({ id: 'test-key', client: { queue: { submit: mocks.queue } } }), FalUnknownKeyError: class extends Error {} }))
+// 예약 선행 경로는 예약 행에 적힌 키로 제출한다(falKeyById) — 유료 접수는 재시도 없는 1회 경계(submitQueueOnce)다.
+vi.mock('@/lib/fal/keys', () => {
+  const entry = {
+    id: 'test-key',
+    client: { queue: { submit: mocks.queue } },
+    submitQueueOnce: (model: string, input: Record<string, unknown>, webhookUrl?: string) =>
+      mocks.queue(model, webhookUrl ? { input, webhookUrl } : { input }),
+  }
+  return { pickFalKey: async () => entry, falKeyById: () => entry, FalUnknownKeyError: class extends Error {} }
+})
 
 import { POST as chat } from '@/app/api/artist/chat/route'
 import { POST as createAppearance } from '@/app/api/artist/character-appearance/route'
@@ -68,6 +78,11 @@ function from(table: string) {
     return matched
   }
   return chain
+}
+// 자리 예약이 작업 id 를 먼저 정한다(#generation-capacity-trigger 2026-09-14: request_id='reserved:<id>' 가
+//   그 id 에 매여야 한다) — 그래서 접수된 작업 번호는 기록된 행에서 읽는다.
+function jobIdAt(index: number) {
+  return String(tables.generation_jobs[index].id)
 }
 function completion(jobId: string, failure?: string) {
   const row = tables.generation_jobs.find(job => job.id === jobId)!
@@ -189,12 +204,13 @@ describe('채팅에서 두 모습이 실제 생성 접수까지 이어진다', (
   it('두 번째 인물의 이미지가 먼저 완성되어도 완료 안내와 결과는 해당 인물에 붙는다', async () => {
     await requestAndApprove()
     await vi.waitFor(() => expect(pollWaiters.size).toBe(2))
-    pollWaiters.get('job-2')!(completion('job-2'))
-    pollWaiters.delete('job-2')
+    const second = jobIdAt(1)
+    pollWaiters.get(second)!(completion(second))
+    pollWaiters.delete(second)
     await flush()
     const assets = useArtistStore.getState().characterAssets
     expect(assets[0].appearances.at(-1)?.sheetUrl).toBeNull()
-    expect(assets[1].appearances.at(-1)?.sheetUrl).toBe('https://assets.test/job-2.webp')
+    expect(assets[1].appearances.at(-1)?.sheetUrl).toBe(`https://assets.test/${second}.webp`)
     const messages = useGlobalChatStore.getState().messages.map(message => message.content)
     expect(messages.some(message => message.includes('코마츠') && message.includes('완료'))).toBe(true)
     expect(messages.some(message => message.includes('쿄타로') && message.includes('완료'))).toBe(false)
@@ -208,16 +224,17 @@ describe('채팅에서 두 모습이 실제 생성 접수까지 이어진다', (
   it('첫 이미지 생성이 실패해도 두 번째 인물의 접수와 완성은 유지하고 실패한 인물만 남긴다', async () => {
     await requestAndApprove()
     await vi.waitFor(() => expect(pollWaiters.size).toBe(2))
-    pollWaiters.get('job-1')!(completion('job-1', 'Image generation failed'))
-    pollWaiters.delete('job-1')
+    const [failing, finishing] = [jobIdAt(0), jobIdAt(1)]
+    pollWaiters.get(failing)!(completion(failing, 'Image generation failed'))
+    pollWaiters.delete(failing)
     finishAll()
     await expect(activeRun).resolves.toBe(false)
     expect(providerCalls).toHaveLength(2)
-    expect(useArtistStore.getState().characterAssets[1].appearances.at(-1)?.sheetUrl).toBe('https://assets.test/job-2.webp')
+    expect(useArtistStore.getState().characterAssets[1].appearances.at(-1)?.sheetUrl).toBe(`https://assets.test/${finishing}.webp`)
     const remaining = useGlobalChatStore.getState().deferredProposals[0]
     expect(remaining.target).toContain('쿄타로')
     expect(remaining.target).not.toContain('코마츠')
-    expect(remaining.jobIds).toEqual(['job-1'])
+    expect(remaining.jobIds).toEqual([failing])
   })
 
   it('첫 인물의 접수가 거절되어도 두 번째 인물을 접수하고 다시 시도할 때 새 모습 행을 중복으로 만들지 않는다', async () => {

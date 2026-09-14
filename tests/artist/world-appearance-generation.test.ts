@@ -8,7 +8,7 @@ import type { SceneManifest } from '@/types/scene'
 import type { WorldAsset } from '@/types/asset'
 import type { GenerationJobReceipt } from '@/lib/generation-jobs-client'
 
-const mocks = vi.hoisted(() => ({ from: vi.fn(), submit: vi.fn(), createJob: vi.fn() }))
+const mocks = vi.hoisted(() => ({ from: vi.fn(), submit: vi.fn(), reserveJob: vi.fn(), confirmReceipt: vi.fn(), rejectReservation: vi.fn() }))
 vi.mock('@/lib/supabase/client', () => ({ createClient: () => ({ from: mocks.from }) }))
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: { from: mocks.from } }))
 vi.mock('@/lib/demo/context', () => ({ isDemoSession: () => false }))
@@ -20,8 +20,12 @@ vi.mock('@/lib/style-anchor', () => ({ resolveStyleAnchor: async () => null, app
 vi.mock('@/lib/fal/webhook-url', () => ({ resolveWebhookUrl: () => 'https://example.test/webhook' }))
 vi.mock('@/lib/writer/llm/fal', () => ({ falImageSubmit: mocks.submit }))
 vi.mock('@/lib/generation-notify', () => ({ notifyGenerationComplete: vi.fn(), notifyGenerationFailed: vi.fn(), notifyGenerationGaveUp: vi.fn() }))
+// #generation-capacity-trigger(2026-09-14): 이미지 경로는 자리 예약 → 제출 → 접수 번호 채움 순서다.
+//   목 대상만 그 순서의 함수로 옮겼고, 각 케이스가 검사하는 동작은 그대로다.
 vi.mock('@/lib/generation-jobs', () => ({
-  createGenerationJob: mocks.createJob,
+  reserveGenerationJob: mocks.reserveJob,
+  confirmGenerationJobReceipt: mocks.confirmReceipt,
+  rejectGenerationJobReservation: mocks.rejectReservation,
   hasQueuedWorldShotJob: async () => false,
   listFailedWorldShotJobs: async () => [],
   countFailedJobsForTarget: async () => 0,
@@ -95,11 +99,13 @@ beforeEach(() => {
   status = { failures: [], queuedMain: [], queuedWorld: [], worldFailures: [] }
   mocks.from.mockImplementation(chain)
   mocks.submit.mockImplementation(async () => ({ request_id: `request-${jobs.length + 1}`, model: 'fal-test', fal_key_id: 'key' }))
-  mocks.createJob.mockImplementation(async (input) => {
-    const job = { ...input, id: `job-${jobs.length + 1}` }
+  mocks.reserveJob.mockImplementation(async (input) => {
+    const job = { ...input, id: `job-${jobs.length + 1}`, fal_key_id: 'key' }
     jobs.push(job)
     return job
   })
+  mocks.confirmReceipt.mockResolvedValue(undefined)
+  mocks.rejectReservation.mockResolvedValue(undefined)
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
     if (url === '/api/artist/location-appearance') {
       return Response.json({ appearanceKey: 'night', label: '밤', narrativeTime: 'present', visualDescription: NIGHT_DESCRIPTION, visualDescriptionNative: '달빛만 비치는 밤의 옥상' })

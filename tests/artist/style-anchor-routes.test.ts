@@ -5,7 +5,11 @@ const mocks = vi.hoisted(() => ({
   getUser: vi.fn(),
   checkGenerationCapacity: vi.fn(),
   quotaExceededBody: vi.fn(),
-  createGenerationJob: vi.fn(),
+  // #generation-capacity-trigger(2026-09-14): 이미지 경로는 자리 예약 → 제출 → 접수 번호 채움 순서다.
+  //   이 파일의 관심사는 프롬프트/앵커이므로 '작업 기록' 스파이 하나로 예약(reserve)을 받는다.
+  reserveGenerationJob: vi.fn(),
+  confirmGenerationJobReceipt: vi.fn(),
+  rejectGenerationJobReservation: vi.fn(),
   hasQueuedCharacterViewJob: vi.fn(),
   hasQueuedWorldShotJob: vi.fn(),
   countFailedJobsForTarget: vi.fn(),
@@ -38,7 +42,11 @@ vi.mock('@/lib/generation-quota', () => ({
   quotaExceededBody: mocks.quotaExceededBody,
 }))
 vi.mock('@/lib/generation-jobs', () => ({
-  createGenerationJob: mocks.createGenerationJob,
+  reserveGenerationJob: mocks.reserveGenerationJob,
+  // director 스토리보드는 아직 기록 선행 경로다 — 같은 스파이로 받아 이 파일의 단언을 유지한다.
+  createGenerationJob: mocks.reserveGenerationJob,
+  confirmGenerationJobReceipt: mocks.confirmGenerationJobReceipt,
+  rejectGenerationJobReservation: mocks.rejectGenerationJobReservation,
   hasQueuedCharacterViewJob: mocks.hasQueuedCharacterViewJob,
   hasQueuedWorldShotJob: mocks.hasQueuedWorldShotJob,
   countFailedJobsForTarget: mocks.countFailedJobsForTarget,
@@ -189,8 +197,12 @@ beforeEach(() => {
   mocks.quotaExceededBody.mockReset()
   mocks.quotaExceededBody.mockImplementation((check: unknown) => check)
 
-  mocks.createGenerationJob.mockReset()
-  mocks.createGenerationJob.mockResolvedValue({ id: 'job-1' })
+  mocks.reserveGenerationJob.mockReset()
+  mocks.reserveGenerationJob.mockResolvedValue({ id: 'job-1', fal_key_id: 'prod-2000' })
+  mocks.confirmGenerationJobReceipt.mockReset()
+  mocks.confirmGenerationJobReceipt.mockResolvedValue(undefined)
+  mocks.rejectGenerationJobReservation.mockReset()
+  mocks.rejectGenerationJobReservation.mockResolvedValue(undefined)
   mocks.hasQueuedCharacterViewJob.mockReset()
   mocks.hasQueuedCharacterViewJob.mockResolvedValue(false)
   mocks.hasQueuedWorldShotJob.mockReset()
@@ -254,7 +266,7 @@ describe('선택한 스타일을 그림 만들기에 반영한다', () => {
       aspect_ratio: '16:9',
       style_anchor_key: ANCHOR_KEY,
     })
-    expect((mocks.createGenerationJob.mock.calls[0][0] as { target: unknown }).target).toMatchObject({
+    expect((mocks.reserveGenerationJob.mock.calls[0][0] as { target: unknown }).target).toMatchObject({
       characterId: CHARACTER_ID,
       appearanceKey: 'current',
       view: 'main',
@@ -493,7 +505,7 @@ describe('선택한 스타일을 그림 만들기에 반영한다', () => {
     const expectedFallbackPrompt = `${STYLE_ANCHOR_CLAUSE}\n${buildCharacterTurnaroundPrompt(sheetPromptInput(fallbackPerson, designTokens))}`
     expect(result).toEqual({ submitted: 2, skipped: 0, failed: 0 })
     expect(mocks.falImageSubmit).toHaveBeenCalledTimes(2)
-    expect(mocks.createGenerationJob).toHaveBeenCalledTimes(2)
+    expect(mocks.reserveGenerationJob).toHaveBeenCalledTimes(2)
     // 모델 = Artist 와 같은 레지스트리 기본(#owner-default 2026-09-02: nano-banana-2)의 edit 갈래.
     expect(falOptsAt(0)).toEqual({
       model: 'fal-ai/nano-banana-2/edit',
@@ -509,12 +521,12 @@ describe('선택한 스타일을 그림 만들기에 반영한다', () => {
       aspect_ratio: '16:9',
       style_anchor_key: ANCHOR_KEY,
     })
-    expect((mocks.createGenerationJob.mock.calls[0][0] as { target: unknown }).target).toMatchObject({
+    expect((mocks.reserveGenerationJob.mock.calls[0][0] as { target: unknown }).target).toMatchObject({
       characterId: templatePerson.character_id,
       appearanceKey: 'current',
       view: 'main',
     })
-    expect((mocks.createGenerationJob.mock.calls[1][0] as { target: unknown }).target).toMatchObject({
+    expect((mocks.reserveGenerationJob.mock.calls[1][0] as { target: unknown }).target).toMatchObject({
       characterId: fallbackPerson.character_id,
       appearanceKey: 'current',
       view: 'main',
@@ -742,10 +754,10 @@ function falOptsAt(index: number): FalImageOpts {
 
 
 function firstGenerationJobArg(): { inputSnapshot: Record<string, unknown> } {
-  return mocks.createGenerationJob.mock.calls[0][0] as { inputSnapshot: Record<string, unknown> }
+  return mocks.reserveGenerationJob.mock.calls[0][0] as { inputSnapshot: Record<string, unknown> }
 }
 function generationJobArgAt(index: number): { inputSnapshot: Record<string, unknown> } {
-  return mocks.createGenerationJob.mock.calls[index][0] as { inputSnapshot: Record<string, unknown> }
+  return mocks.reserveGenerationJob.mock.calls[index][0] as { inputSnapshot: Record<string, unknown> }
 }
 
 function queryFor(table: string) {
@@ -812,7 +824,7 @@ describe('generate-sheet — 자율 생성은 빈칸만 채운다', () => {
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({ ok: true, skipped: true, reason: 'exists' })
     expect(mocks.falImageSubmit).not.toHaveBeenCalled()
-    expect(mocks.createGenerationJob).not.toHaveBeenCalled()
+    expect(mocks.reserveGenerationJob).not.toHaveBeenCalled()
   })
 
   it('사용자가 다시 만들면 기존 그림이 있어도 새 그림을 만든다', async () => {

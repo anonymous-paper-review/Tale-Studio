@@ -132,7 +132,7 @@ ul.plain li{margin-bottom:4px;font-size:13.5px}
 <header class="page">
   <p class="eyebrow">세션 보고서 · 2026-09-11 · 채팅 안정성</p>
   <h1>채팅 기본 동작 표</h1>
-  <p class="bluf">9월 9일 조사한 UI 113개 중 Director 32개와 화면 상태 조작 13개를 뺀 <b>68개</b>를 현재 코드로 다시 판정했다. 연결 13 → <b>26</b>, 없음 19 → <b>13</b>, 불일치 11 → <b>3</b>, 부분 25 → 26. 37개가 9월 9일과 달라졌다.</p>
+  <p class="bluf">(2026-09-14 갱신: A 묶음 반영) 9월 9일 조사한 UI 113개 중 Director 32개와 화면 상태 조작 13개를 뺀 <b>68개</b>를 현재 코드로 다시 판정했다. 연결 13 → <b>29</b>, 없음 19 → <b>8</b>, 불일치 11 → <b>3</b>, 부분 25 → 28. 37개가 9월 9일과 달라졌다.</p>
   <p class="bluf"><b>결정할 것 2개</b>: 첫 묶음 순서, 표에서 뺄 후보 3개. <b>알아둘 것 3개</b>.</p>
   <p class="asof">근거 HEAD 123ef32 + 미커밋 · 판정 원본 <code>.smoke/chat-matrix-20260911/matrix.json</code> · 계획 <code>.omx/plans/chat-basic-ops-matrix-2026-09-11.md</code></p>
 </header>
@@ -155,7 +155,7 @@ ul.plain li{margin-bottom:4px;font-size:13.5px}
   <div class="sec-head"><span class="sec-num">2</span><h2>단계별 변화</h2></div>
   <div class="tbl"><table>
     <thead><tr><th>단계</th><th>항목</th><th>연결</th><th>부분</th><th>불일치</th><th>없음</th></tr></thead>
-    <tbody><tr><td>Producer</td><td>18</td><td>4 → <b>6</b></td><td>11 → <b>9</b></td><td>1 → <b>1</b></td><td>2 → <b>2</b></td></tr><tr><td>Writer</td><td>22</td><td>4 → <b>8</b></td><td>6 → <b>7</b></td><td>3 → <b>1</b></td><td>9 → <b>6</b></td></tr><tr><td>Artist</td><td>20</td><td>4 → <b>11</b></td><td>5 → <b>4</b></td><td>4 → <b>0</b></td><td>7 → <b>5</b></td></tr><tr><td>공통</td><td>8</td><td>1 → <b>1</b></td><td>3 → <b>6</b></td><td>3 → <b>1</b></td><td>1 → <b>0</b></td></tr></tbody>
+    <tbody><tr><td>Producer</td><td>18</td><td>4 → <b>6</b></td><td>11 → <b>9</b></td><td>1 → <b>1</b></td><td>2 → <b>2</b></td></tr><tr><td>Writer</td><td>22</td><td>4 → <b>8</b></td><td>6 → <b>7</b></td><td>3 → <b>1</b></td><td>9 → <b>6</b></td></tr><tr><td>Artist</td><td>20</td><td>4 → <b>14</b></td><td>5 → <b>6</b></td><td>4 → <b>0</b></td><td>7 → <b>0</b></td></tr><tr><td>공통</td><td>8</td><td>1 → <b>1</b></td><td>3 → <b>6</b></td><td>3 → <b>1</b></td><td>1 → <b>0</b></td></tr></tbody>
   </table></div>
   <p class="sec-lede">숫자는 9월 9일 → 현재. Artist는 불일치 4개가 전부 사라졌다(모습·모델·지시 유실, 배경 모습 재생성, 복수 대상, 추가 후 생성). 공통은 대부분 "부분"으로 남았는데 승인·이동·취소 경로는 생겼고 빠진 조건이 각각 하나씩 있다.</p>
 </section>
@@ -630,9 +630,9 @@ ul.plain li{margin-bottom:4px;font-size:13.5px}
 <td>배경 이미지<span class="path">모델·지시 지정</span></td>
 <td>배경 생성 모델·일회성 지시 선택</td>
 <td><span class="chip c-fail">없음</span></td>
-<td><span class="chip c-fail">없음</span></td>
-<td>없음</td>
-<td class="note">UI 배경 팝업은 imageModel을 골라 generateWorldShot에 넘기지만, 채팅 regenerateWorldAsset 검증은 locationId·appearanceKey만 통과시키고 프롬프트 &lt;image-models&gt;도 regenerateCharacter 전용이다. 승인 실행도 model 인자 undefined 고정(2499) 또는 generateWorldAsset(모델 인자 없음). 일회성 지시는 UI에도 없다(promptOverride undefined, 설명 편집만). edit_project backgrounds도 visualDescription뿐.</td>
+<td><span class="chip c-warn">부분</span><span class="path">09-09와 다름</span></td>
+<td>기존 JSON</td>
+<td class="note">[A 묶음 2026-09-11/14] regenerateWorldAsset에 model·safeMode 전달, 승인 실행이 generateWorldShot(model)로 호출. 일회성 지시는 UI에도 없어 미지원. 실측은 자동 테스트만(배경 실제 생성 안 함).</td>
 <td><code>src/lib/artist/chat-updates.ts:79-88</code><br><code>src/app/api/artist/chat/route.ts:68-69</code><br><code>src/app/api/artist/chat/route.ts:81-82</code></td>
 <td><span class="muted">-</span></td>
 </tr><tr>
@@ -660,11 +660,11 @@ ul.plain li{margin-bottom:4px;font-size:13.5px}
 <td>모습 설명<span class="path">수정</span></td>
 <td>인물·배경 비기본 모습 설명 변경</td>
 <td><span class="chip c-fail">없음</span></td>
-<td><span class="chip c-fail">없음</span></td>
-<td>없음</td>
-<td class="note">UI는 updateCharacterAppearance(characterId, appearanceKey, …)/updateLocationAppearanceDescription으로 선택한 모습 설명을 편집한다. 채팅은 read/edit_project characters.appearance가 is_default 행만 읽고 /api/artist/appearance(기본 모습 전용)로 저장하며, backgrounds도 locations.visual_description(기본)만. JSON changeAppearance/changeLocationDescription에도 appearanceKey가 없다. inspect_project로 비기본 모습 설명을 읽을 수는 있으나 읽기 전용이다.</td>
+<td><span class="chip c-pass">연결</span><span class="path">09-09와 다름</span></td>
+<td>도구</td>
+<td class="note">[A 묶음 2026-09-11/14] appearances/background_appearances 리소스로 모습 행 설명을 저장하고 재조회 확인. 기본 모습·기본 배경은 승인 카드.</td>
 <td><code>src/stores/chat-tool-bindings.ts:176-179</code><br><code>src/stores/chat-tool-bindings.ts:188-191</code><br><code>src/stores/chat-tool-bindings.ts:205-206</code></td>
-<td><span class="muted">-</span></td>
+<td><span class="chip c-pass">있음</span><span class="path">.smoke/chat-matrix-a-20260911 (2026-09-11 18:2x, 09-14 10:4x) a1-young-desc.json, a3-bg-past-desc.json, a4-default-desc.json</span></td>
 </tr><tr>
 <td><b>M58</b><span class="path">Artist</span></td>
 <td>모습<span class="path">추가</span></td>
@@ -680,31 +680,31 @@ ul.plain li{margin-bottom:4px;font-size:13.5px}
 <td>모습<span class="path">이름 변경·삭제·기본 지정</span></td>
 <td>모습 이름 변경·삭제·인물 기본 모습 지정</td>
 <td><span class="chip c-fail">없음</span></td>
-<td><span class="chip c-fail">없음</span></td>
-<td>없음</td>
-<td class="note">스토어에 renameAppearance/setDefaultAppearance/deleteAppearance/renameLocationAppearance/deleteLocationAppearance가 있고 UI 팝업이 호출하지만, 채팅 JSON 화이트리스트(createCharacter/regenerateCharacter/regenerateWorldAsset + 제안 4종)와 edit_project 필드(name/role/description/appearance, visualDescription) 어디에도 모습 이름·시점·기본 지정·삭제 명령이 없다.</td>
+<td><span class="chip c-warn">부분</span><span class="path">09-09와 다름</span></td>
+<td>도구</td>
+<td class="note">[A 묶음 2026-09-11/14] label/narrativeTime/isDefault는 appearances 리소스로 저장. 삭제는 deleteAppearance JSON→승인 카드→UI와 같은 삭제 함수. 실측: 이름 변경·삭제 확인, 기본 지정은 자동 테스트만.</td>
 <td><code>src/lib/artist/chat-updates.ts:22-26</code><br><code>src/lib/chat-tools/protocol.ts:33-34</code><br><code>src/stores/chat-tool-bindings.ts:180-185</code></td>
-<td><span class="muted">-</span></td>
+<td><span class="chip c-pass">있음</span><span class="path">.smoke/chat-matrix-a-20260911 (2026-09-11 18:2x, 09-14 10:4x) a2-future-rename.json, a5-delete-future.json</span></td>
 </tr><tr>
 <td><b>M60</b><span class="path">Artist</span></td>
 <td>이미지 후보<span class="path">선택 복원</span></td>
 <td>이전 이미지 후보를 선택본으로 되돌리기</td>
 <td><span class="chip c-fail">없음</span></td>
-<td><span class="chip c-fail">없음</span></td>
-<td>없음</td>
-<td class="note">UI 후보 History는 selectCandidate/selectLocationCandidate로 DB flip. 채팅에는 후보 선택 명령이 없고 inspect_project 안내문이 &#x27;후보 선택 안 함&#x27;을 명시한다. inspect_project includeImage 결과가 선택본과 일치하는 candidateIds만 노출할 뿐 전체 후보 목록·선택 실행 경로는 없다.</td>
+<td><span class="chip c-pass">연결</span><span class="path">09-09와 다름</span></td>
+<td>도구</td>
+<td class="note">[A 묶음 2026-09-11/14] selectedCandidateId patch → /api/artist/select-candidate(UI와 동일). 후보 목록 밖 ID는 invalid_input. 실측: 이전 후보로 되돌림, 생성 0.</td>
 <td><code>src/stores/artist-store.ts:2182-2185</code><br><code>src/stores/artist-store.ts:628</code><br><code>src/features/artist/character-view-dialog.tsx:332</code></td>
-<td><span class="muted">-</span></td>
+<td><span class="chip c-pass">있음</span><span class="path">.smoke/chat-matrix-a-20260911 (2026-09-11 18:2x, 09-14 10:4x) a6-candidate-restore.json</span></td>
 </tr><tr>
 <td><b>M61</b><span class="path">Artist</span></td>
 <td>이미지 생성<span class="path">safe 재시도</span></td>
 <td>정책 거절 후 safe 재시도</td>
 <td><span class="chip c-fail">없음</span></td>
-<td><span class="chip c-fail">없음</span></td>
-<td>없음</td>
-<td class="note">UI는 retryCharacterViewSafe/retryWorldShotSafe로 safeMode 재시도. 채팅 regenerateCharacter 검증에 safeMode 필드가 없고 승인 실행은 generateCharacterView의 safeMode 인자를 undefined로 고정, generateWorldShot 호출에도 safeMode가 없다.</td>
+<td><span class="chip c-pass">연결</span><span class="path">09-09와 다름</span></td>
+<td>기존 JSON</td>
+<td class="note">[A 묶음 2026-09-11/14] regenerateCharacter/regenerateWorldAsset의 safeMode:true가 승인 카드 payload로 남고 실행이 UI safe 재시도와 같은 인자로 호출. 서버는 직전 실패가 정책 거절일 때만 안전 변환 적용(UI 동일). 실측: 기본 모습 flux 생성 완료 1건.</td>
 <td><code>src/features/artist/character-view-dialog.tsx:98</code><br><code>src/features/artist/world-view-dialog.tsx:102</code><br><code>src/stores/global-chat-store.ts:2438-2441</code></td>
-<td><span class="muted">-</span></td>
+<td><span class="chip c-pass">있음</span><span class="path">.smoke/chat-matrix-a-20260911 (2026-09-11 18:2x, 09-14 10:4x) a7b-default-safe-flux.json, a7b-job.json</span></td>
 </tr><tr>
 <td><b>M62</b><span class="path">Artist</span></td>
 <td>인물·배경·모습<span class="path">복수 대상</span></td>
@@ -861,7 +861,7 @@ ul.plain li{margin-bottom:4px;font-size:13.5px}
   <h3>묶음</h3>
   <div class="tbl"><table>
     <thead><tr><th></th><th>묶음</th><th>왜 묶었나</th><th>항목</th></tr></thead>
-    <tbody><tr><td><b>A</b></td><td>Artist 모습 관리</td><td>수정·삭제·기본 지정·후보 복원이 전부 없음. 데이터 동작이라 유료 생성 없이 연결 가능(safe 재시도만 생성).</td><td><ul class="plain"><li><b>M57</b> 인물·배경 비기본 모습 설명 변경 <span class="chip c-fail">없음</span></li><li><b>M59</b> 모습 이름 변경·삭제·인물 기본 모습 지정 <span class="chip c-fail">없음</span></li><li><b>M60</b> 이전 이미지 후보를 선택본으로 되돌리기 <span class="chip c-fail">없음</span></li><li><b>M61</b> 정책 거절 후 safe 재시도 <span class="chip c-fail">없음</span></li><li><b>M54</b> 배경 생성 모델·일회성 지시 선택 <span class="chip c-fail">없음</span></li></ul></td></tr><tr><td><b>B</b></td><td>Writer 생성 실행</td><td>대사 생성·러프 생성·프레임 재생성을 채팅에서 부를 경로가 없음. 러프·프레임은 유료(가벼운 모델·대표 1건).</td><td><ul class="plain"><li><b>M35</b> 전용 대사 생성·재생성 실행 <span class="chip c-fail">없음</span></li><li><b>M36</b> 러프 전체 생성·개별 생성·실패 재시도 <span class="chip c-fail">없음</span></li><li><b>M37</b> START·DIRECTING·END 한 장 재생성 <span class="chip c-fail">없음</span></li></ul></td></tr><tr><td><b>C</b></td><td>Producer 비우기·제목·need</td><td>값을 지우는 편집과 need 단독 변경이 UI와 다르게 무시됨. 제목은 채팅 필드 자체가 없음.</td><td><ul class="plain"><li><b>M01</b> 프로젝트·영화 제목 변경 <span class="chip c-fail">없음</span></li><li><b>M02</b> 스토리 작성·수정 <span class="chip c-warn">부분</span></li><li><b>M06</b> 인물 이름·외모·역할 변경 <span class="chip c-warn">부분</span></li><li><b>M07</b> 인물 아크 변경·비우기 <span class="chip c-warn">부분</span></li><li><b>M08</b> 인물 동기 want·need 변경 <span class="chip c-fail">불일치</span></li><li><b>M09</b> 배경 이름·설명·목적 변경 <span class="chip c-warn">부분</span></li><li><b>M11</b> 직접 편집한 값·인계 후 원천 수정 <span class="chip c-warn">부분</span></li></ul></td></tr><tr><td><b>D</b></td><td>Writer 편집 결과 안내</td><td>추가·삭제의 저장 실패가 채팅 결과에 안 나옴. 확정 발화, 카메라·조명 필드, 여러 샷 축소 이어가기.</td><td><ul class="plain"><li><b>M23</b> 씬 추가 <span class="chip c-warn">부분</span></li><li><b>M26</b> 씬 삭제·소속 샷 삭제 <span class="chip c-warn">부분</span></li><li><b>M28</b> 샷 추가·타입·설명·등장인물·길이 수정 <span class="chip c-warn">부분</span></li><li><b>M30</b> 샷 삭제 <span class="chip c-warn">부분</span></li><li><b>M29</b> 샷 추가 시 카메라·조명·생성 방식 지정 <span class="chip c-fail">없음</span></li><li><b>M34</b> 여러 샷 대사를 한 번에 줄이기 <span class="chip c-warn">부분</span></li><li><b>M43</b> 씬 검토 중 확정·일반 질문 <span class="chip c-fail">불일치</span></li></ul></td></tr><tr><td><b>E</b></td><td>공통</td><td>첨부 이미지가 Writer·Artist 모델에 안 감(불일치). 취소 발화 단계 비대칭, 승인 카드 서버 저장 없음, 저장 실패 표시 없음 등.</td><td><ul class="plain"><li><b>M74</b> Writer·Artist·Director 채팅에 파일 드롭 <span class="chip c-fail">불일치</span></li><li><b>M71</b> 대기 중인 변경 취소·나중에 <span class="chip c-warn">부분</span></li><li><b>M72</b> 다음 단계 이동·이전 단계 돌아가기 <span class="chip c-warn">부분</span></li><li><b>M73</b> 이동 부정문·수정과 이동 복합 요청 <span class="chip c-warn">부분</span></li><li><b>M77</b> 승인 대기 카드 재접속 복원 <span class="chip c-warn">부분</span></li><li><b>M76</b> 대화 저장·재접속 복원 <span class="chip c-warn">부분</span></li><li><b>M75</b> 응답 생성 중단 <span class="chip c-warn">부분</span></li><li><b>M20</b> Writer 인계·이미 실행한 Writer 재실행 <span class="chip c-warn">부분</span></li><li><b>M68</b> 진입 전 Writer 실패 재개 <span class="chip c-warn">부분</span></li><li><b>M63</b> 새 인물 추가 후 즉시 이미지 생성 <span class="chip c-warn">부분</span></li><li><b>M64</b> 기존 인물 이름·역할·설명 변경·새 사물 추가 <span class="chip c-warn">부분</span></li><li><b>M49</b> 최근 생성·실패·진행 상태 질문 <span class="chip c-warn">부분</span></li><li><b>M16</b> 텍스트·이미지 첨부와 첨부 제거 <span class="chip c-warn">부분</span></li><li><b>M18</b> 이전 턴 첨부 그림을 다시 보고 수정 <span class="chip c-warn">부분</span></li><li><b>M19</b> 업로드 원고 원문 보존 <span class="chip c-warn">부분</span></li><li><b>M44</b> 생성 진행 중 질문·수정 <span class="chip c-warn">부분</span></li></ul></td></tr></tbody>
+    <tbody><tr><td><b>A</b></td><td>Artist 모습 관리</td><td>수정·삭제·기본 지정·후보 복원이 전부 없음. 데이터 동작이라 유료 생성 없이 연결 가능(safe 재시도만 생성).</td><td><ul class="plain"><li><b>M57</b> 인물·배경 비기본 모습 설명 변경 <span class="chip c-pass">연결</span></li><li><b>M59</b> 모습 이름 변경·삭제·인물 기본 모습 지정 <span class="chip c-warn">부분</span></li><li><b>M60</b> 이전 이미지 후보를 선택본으로 되돌리기 <span class="chip c-pass">연결</span></li><li><b>M61</b> 정책 거절 후 safe 재시도 <span class="chip c-pass">연결</span></li><li><b>M54</b> 배경 생성 모델·일회성 지시 선택 <span class="chip c-warn">부분</span></li></ul></td></tr><tr><td><b>B</b></td><td>Writer 생성 실행</td><td>대사 생성·러프 생성·프레임 재생성을 채팅에서 부를 경로가 없음. 러프·프레임은 유료(가벼운 모델·대표 1건).</td><td><ul class="plain"><li><b>M35</b> 전용 대사 생성·재생성 실행 <span class="chip c-fail">없음</span></li><li><b>M36</b> 러프 전체 생성·개별 생성·실패 재시도 <span class="chip c-fail">없음</span></li><li><b>M37</b> START·DIRECTING·END 한 장 재생성 <span class="chip c-fail">없음</span></li></ul></td></tr><tr><td><b>C</b></td><td>Producer 비우기·제목·need</td><td>값을 지우는 편집과 need 단독 변경이 UI와 다르게 무시됨. 제목은 채팅 필드 자체가 없음.</td><td><ul class="plain"><li><b>M01</b> 프로젝트·영화 제목 변경 <span class="chip c-fail">없음</span></li><li><b>M02</b> 스토리 작성·수정 <span class="chip c-warn">부분</span></li><li><b>M06</b> 인물 이름·외모·역할 변경 <span class="chip c-warn">부분</span></li><li><b>M07</b> 인물 아크 변경·비우기 <span class="chip c-warn">부분</span></li><li><b>M08</b> 인물 동기 want·need 변경 <span class="chip c-fail">불일치</span></li><li><b>M09</b> 배경 이름·설명·목적 변경 <span class="chip c-warn">부분</span></li><li><b>M11</b> 직접 편집한 값·인계 후 원천 수정 <span class="chip c-warn">부분</span></li></ul></td></tr><tr><td><b>D</b></td><td>Writer 편집 결과 안내</td><td>추가·삭제의 저장 실패가 채팅 결과에 안 나옴. 확정 발화, 카메라·조명 필드, 여러 샷 축소 이어가기.</td><td><ul class="plain"><li><b>M23</b> 씬 추가 <span class="chip c-warn">부분</span></li><li><b>M26</b> 씬 삭제·소속 샷 삭제 <span class="chip c-warn">부분</span></li><li><b>M28</b> 샷 추가·타입·설명·등장인물·길이 수정 <span class="chip c-warn">부분</span></li><li><b>M30</b> 샷 삭제 <span class="chip c-warn">부분</span></li><li><b>M29</b> 샷 추가 시 카메라·조명·생성 방식 지정 <span class="chip c-fail">없음</span></li><li><b>M34</b> 여러 샷 대사를 한 번에 줄이기 <span class="chip c-warn">부분</span></li><li><b>M43</b> 씬 검토 중 확정·일반 질문 <span class="chip c-fail">불일치</span></li></ul></td></tr><tr><td><b>E</b></td><td>공통</td><td>첨부 이미지가 Writer·Artist 모델에 안 감(불일치). 취소 발화 단계 비대칭, 승인 카드 서버 저장 없음, 저장 실패 표시 없음 등.</td><td><ul class="plain"><li><b>M74</b> Writer·Artist·Director 채팅에 파일 드롭 <span class="chip c-fail">불일치</span></li><li><b>M71</b> 대기 중인 변경 취소·나중에 <span class="chip c-warn">부분</span></li><li><b>M72</b> 다음 단계 이동·이전 단계 돌아가기 <span class="chip c-warn">부분</span></li><li><b>M73</b> 이동 부정문·수정과 이동 복합 요청 <span class="chip c-warn">부분</span></li><li><b>M77</b> 승인 대기 카드 재접속 복원 <span class="chip c-warn">부분</span></li><li><b>M76</b> 대화 저장·재접속 복원 <span class="chip c-warn">부분</span></li><li><b>M75</b> 응답 생성 중단 <span class="chip c-warn">부분</span></li><li><b>M20</b> Writer 인계·이미 실행한 Writer 재실행 <span class="chip c-warn">부분</span></li><li><b>M68</b> 진입 전 Writer 실패 재개 <span class="chip c-warn">부분</span></li><li><b>M63</b> 새 인물 추가 후 즉시 이미지 생성 <span class="chip c-warn">부분</span></li><li><b>M64</b> 기존 인물 이름·역할·설명 변경·새 사물 추가 <span class="chip c-warn">부분</span></li><li><b>M49</b> 최근 생성·실패·진행 상태 질문 <span class="chip c-warn">부분</span></li><li><b>M16</b> 텍스트·이미지 첨부와 첨부 제거 <span class="chip c-warn">부분</span></li><li><b>M18</b> 이전 턴 첨부 그림을 다시 보고 수정 <span class="chip c-warn">부분</span></li><li><b>M19</b> 업로드 원고 원문 보존 <span class="chip c-warn">부분</span></li><li><b>M44</b> 생성 진행 중 질문·수정 <span class="chip c-warn">부분</span></li></ul></td></tr></tbody>
   </table></div>
 </section>
 

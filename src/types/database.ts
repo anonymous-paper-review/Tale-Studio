@@ -644,6 +644,24 @@ export type Database = {
           },
         ]
       }
+      fal_key_limits: {
+        Row: {
+          key_id: string
+          max_inflight: number
+          updated_at: string
+        }
+        Insert: {
+          key_id: string
+          max_inflight: number
+          updated_at?: string
+        }
+        Update: {
+          key_id?: string
+          max_inflight?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       feedback: {
         Row: {
           created_at: string

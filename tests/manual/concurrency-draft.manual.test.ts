@@ -59,12 +59,16 @@ vi.mock('@/lib/generation-jobs', () => ({
   },
   hasQueuedCharacterViewJob: async () => false,
   hasQueuedWorldShotJob: async () => false,
-  createGenerationJob: async (input: Record<string, unknown>) => {
-    const job = { id: `fake-job-${audit.jobs.length + 1}`, ...input }
+  // #generation-capacity-trigger(2026-09-14): 초안은 자리를 먼저 예약하고 제출한다. 이 목은 DB 트리거를
+  //   대신하지 않고 예약을 항상 수락하므로 아래 관측은 여전히 "한 칸에 몇 건이 들어가는가"의 진단이다.
+  reserveGenerationJob: async (input: Record<string, unknown>) => {
+    const job = { id: `fake-job-${audit.jobs.length + 1}`, fal_key_id: 'fake', ...input }
     audit.jobs.push(job)
     audit.queued += 1
     return job
   },
+  confirmGenerationJobReceipt: async () => undefined,
+  rejectGenerationJobReservation: async () => undefined,
 }))
 vi.mock('@/lib/writer/llm/fal', () => ({
   falImageSubmit: async (input: { model: string }) => {

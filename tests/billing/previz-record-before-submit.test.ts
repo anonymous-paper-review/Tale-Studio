@@ -33,14 +33,14 @@ vi.mock('@/lib/generation-jobs', async (importOriginal) => ({
   createGenerationJob: mocks.createGenerationJob,
   failGenerationJob: mocks.failGenerationJob,
 }))
-// videoCapacityReservationRejection 이 actual quota.ts 를 거쳐 quotaExceededBody 를 부르므로 이 머지 export 도
+// capacityReservationRejection 이 actual quota.ts 를 거쳐 quotaExceededBody 를 부르므로 이 머지 export 도
 //   importOriginal 로 보존한다 — 기존 두 check 함수 mock 은 그대로 유지(약화 없음).
 vi.mock('@/lib/generation-quota', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/generation-quota')>()),
   checkGenerationCapacity: mocks.checkGenerationCapacity,
   checkProjectVideoBudget: mocks.checkProjectVideoBudget,
 }))
-// 새 videoCapacityReservationRejection(error, ctx) 는 actual quota.ts 에서 그대로 재사용한다 —
+// 새 capacityReservationRejection(error, ctx) 는 actual quota.ts 에서 그대로 재사용한다 —
 //   부모가 그 헬퍼를 구현하면 이 spread 로 자동 반영되고, 여기서 하드코딩한 가짜 count 는 없다.
 //   기존 두 헬퍼는 기존 계약대로 계속 오버라이드한다(약화 없음).
 vi.mock('@/lib/api/quota', async (importOriginal) => ({
