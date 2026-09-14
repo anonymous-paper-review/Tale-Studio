@@ -25,6 +25,7 @@
 - A recipient of a Paddle payment or card-update link resumes that existing transaction.
 
 ## Information architecture
+- Main navigation: home and the signed-in dashboard expose a direct `/pricing` link. Preserve existing project/account actions; opening pricing does not start checkout. Small screens keep the link visible without page-level overflow.
 - `/pricing`: three family cards first, option popup, existing explanation/Studio contact/Take notes below.
 - `/checkout`: minimal Paddle payment-link destination, recovery and return navigation; not another catalog.
 - `/account`: existing subscription and balance management, unchanged.
@@ -56,6 +57,7 @@
 - Price/allowance updates use restrained live-region announcements; motion is nonessential.
 
 ## Responsive behavior
+- Main navigation: preserve the desktop menu treatment; expose Pricing beside the home logo on mobile, and wrap dashboard navigation when space is limited.
 - Desktop: three family cards across and a centered popup.
 - Mobile: stacked cards, viewport-bounded scrollable popup, always reachable purchase/close controls.
 - Touch and keyboard can select every tier without precise dragging.

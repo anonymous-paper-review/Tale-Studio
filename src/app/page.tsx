@@ -369,7 +369,13 @@ export default function HomePage() {
               Tale Studio
             </span>
           </div>
-          <div className="hidden items-center gap-10 text-sm font-medium md:flex">
+          <a
+            href="/pricing"
+            className="flex min-h-11 items-center rounded-sm px-2 text-sm font-medium text-gray-300 transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring md:hidden"
+          >
+            Pricing
+          </a>
+          <div className="hidden items-center gap-4 text-sm font-medium md:flex lg:gap-10">
             <a
               href="#services"
               className="text-gray-300 transition-colors hover:text-primary"
@@ -381,6 +387,12 @@ export default function HomePage() {
               className="text-gray-300 transition-colors hover:text-primary"
             >
               Projects
+            </a>
+            <a
+              href="/pricing"
+              className="rounded-sm text-gray-300 transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+            >
+              Pricing
             </a>
             <button
               onClick={handleNew}
