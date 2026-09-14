@@ -2,7 +2,9 @@ import { GoogleGenAI } from '@google/genai'
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
-import { falImageGenerate } from '@/lib/writer/llm/fal'
+import { userOwnsProject } from '@/lib/generation-jobs'
+import { generateReservedImage } from '@/lib/fal/generate-image'
+import { capacityReservationRejection } from '@/lib/api/quota'
 import {
   isImageModelKey,
   resolveImageEndpoint,
@@ -105,25 +107,33 @@ async function generateViaGemini(
 /* ── fal.ai (default) ──
  * T2I: openai/gpt-image-2. I2I: referenceImageUrls 있으면 fal 래퍼가 자동으로
  * openai/gpt-image-2/edit (image_urls 입력) 으로 라우팅한다 (src/lib/writer/llm/fal.ts).
- * fal은 호스팅 URL을 반환하므로, 기존 호출부(blob 소비) 계약 유지를 위해 바이트로 다시 받아 반환한다.
+ * generateReservedImage가 자리 예약·제출·완료 기록을 맡고, fal 호스팅 URL은 기존 호출부(blob 소비)
+ * 계약 유지를 위해 바이트로 다시 받아 반환한다.
  */
 async function generateViaFal(
   prompt: string,
   aspectRatio: string,
-  referenceImageUrls?: string[],
-  imageModel?: ImageModelKey,
+  referenceImageUrls: string[] | undefined,
+  imageModel: ImageModelKey | undefined,
+  context: { projectId: string; userId?: string },
 ): Promise<Response> {
   const resolvedModel = imageModel
     ? resolveImageEndpoint(imageModel, !!referenceImageUrls?.length).endpoint
     : undefined
-  const { url } = await falImageGenerate({
-    ...(resolvedModel ? { model: resolvedModel } : {}),
-    prompt,
-    aspect_ratio: aspectRatio,
-    reference_image_urls: referenceImageUrls?.length
-      ? referenceImageUrls
-      : undefined,
-  })
+  if (!context?.projectId) {
+    throw new Error('Project ID is required')
+  }
+  const { url } = await generateReservedImage(
+    {
+      ...(resolvedModel ? { model: resolvedModel } : {}),
+      prompt,
+      aspect_ratio: aspectRatio,
+      reference_image_urls: referenceImageUrls?.length
+        ? referenceImageUrls
+        : undefined,
+    },
+    context,
+  )
 
   const imgRes = await fetch(url)
   if (!imgRes.ok) {
@@ -156,6 +166,7 @@ export async function POST(req: Request) {
       provider,
       referenceImageUrls,
       imageModel,
+      projectId,
     } = await req.json()
 
     if (!prompt || typeof prompt !== 'string') {
@@ -184,12 +195,29 @@ export async function POST(req: Request) {
     if (providerUsed === 'gemini') {
       return await generateViaGemini(prompt, aspectRatio)
     }
-    return await generateViaFal(
-      prompt,
-      aspectRatio,
-      referenceImageUrls,
-      imageModel,
-    )
+    if (typeof projectId !== 'string' || !projectId.trim()) {
+      return NextResponse.json({ error: 'Project ID is required' }, { status: 400 })
+    }
+    if (!(await userOwnsProject(projectId, user.id))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    try {
+      return await generateViaFal(
+        prompt,
+        aspectRatio,
+        referenceImageUrls,
+        imageModel,
+        { projectId, userId: user.id },
+      )
+    } catch (error) {
+      const rejected = capacityReservationRejection(error, {
+        projectId,
+        kind: 'image_generation',
+        userId: user.id,
+      })
+      if (rejected) return rejected
+      throw error
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[generate/image]', {

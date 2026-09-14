@@ -2,6 +2,8 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { falImageSubmit, type FalImageOptions } from '@/lib/writer/llm/fal'
 import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events'
 import { isDefiniteSubmitRejection } from '@/lib/fal/submit-rejection'
+import { getGenerationJobById } from '@/lib/generation-jobs'
+import { syncFalKeyLimits } from '@/lib/generation-quota'
 
 type Reservation = { job_id: string | null; shot_ids: string[]; state: 'reserved' | 'existing' | 'exists'; confirmation_pending?: boolean }
 export type RoughSubmission = { shotId: string; jobId: string; confirmationPending?: boolean }
@@ -24,6 +26,7 @@ export async function submitRoughStoryboardGrid(input: {
   snapshot: Record<string, unknown>
   options: FalImageOptions & { model: string }
 }): Promise<{ submitted: RoughSubmission[]; exists: string[] }> {
+  await syncFalKeyLimits()
   const { data, error } = await supabaseAdmin.rpc('reserve_rough_storyboard_grid', {
     p_project_id: input.projectId, p_workspace_id: input.workspaceId, p_user_id: input.userId,
     p_shot_ids: input.shotIds, p_grid_variant: input.gridVariant, p_model: input.options.model,
@@ -43,11 +46,19 @@ export async function submitRoughStoryboardGrid(input: {
       continue
     }
     if (reservation.state !== 'reserved') throw new Error('Unknown rough reservation state')
+    const reservedJob = await getGenerationJobById(jobId)
+    if (!reservedJob || reservedJob.project_id !== input.projectId) {
+      throw new Error('Rough reservation job not found for project')
+    }
+    const falKeyId = reservedJob.fal_key_id
+    if (typeof falKeyId !== 'string' || !falKeyId.trim()) {
+      throw new Error('Rough reservation job has no final fal key')
+    }
     await recordWriterObservabilityEvent(input.projectId, 'fal_submit_started', { jobId, shotCount: reservation.shot_ids.length })
     let confirmationPending = false
     try {
       // 외부 접수는 한 번뿐이다. 응답을 잃은 호출을 SDK 재시도로 복제하지 않는다.
-      const receipt = await falImageSubmit(input.options, { retry: false })
+      const receipt = await falImageSubmit(input.options, { retry: false, falKeyId })
       await recordWriterObservabilityEvent(input.projectId, 'fal_submit_accepted', {
         jobId, requestId: receipt.request_id, model: receipt.model, shotCount: reservation.shot_ids.length,
       })

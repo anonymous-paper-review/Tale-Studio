@@ -42,6 +42,7 @@ export const IMAGE_JOB_KINDS: readonly GenerationJobKind[] = [
   'character_view',
   'world_shot',
   'shot_storyboard',
+  'image_generation',
   'storyboard_real_grid',
   'shot_rough_storyboard',
 ]
@@ -104,8 +105,8 @@ async function isAdminUserId(userId: string): Promise<boolean> {
   }
 }
 
-// 영상의 원자 예약에 기존 관리자 예외를 전달한다. 예산 확인이 먼저 admin 캐시를 채워도
-// 영상 검사마다 동기화하며, 기록에 실패하면 한도 면제를 추측하지 않고 제출을 막는다.
+// 원자 예약에 관리자 예외를 전달한다. 예산 확인이 먼저 admin 캐시를 채워도
+// 생성 검사·예약마다 동기화하며, 기록에 실패하면 한도 면제를 추측하지 않고 제출을 막는다.
 class GenerationCapacityExemptSyncError extends Error {
   constructor(cause: unknown) {
     super('generation_capacity_exempt_users sync failed', { cause })
@@ -113,7 +114,9 @@ class GenerationCapacityExemptSyncError extends Error {
   }
 }
 
-async function syncVideoCapacityExemption(userId: string, admin: boolean): Promise<void> {
+/** 관리자 여부를 면제 표에 반영하고, 이번 판정 결과를 반환한다. */
+export async function syncGenerationCapacityExemption(userId: string): Promise<boolean> {
+  const admin = await isAdminUserId(userId)
   try {
     if (admin) {
       const { error } = await supabaseAdmin
@@ -130,6 +133,7 @@ async function syncVideoCapacityExemption(userId: string, admin: boolean): Promi
   } catch (err) {
     throw new GenerationCapacityExemptSyncError(err)
   }
+  return admin
 }
 
 // fal 키 레지스트리(FAL_KEYS)의 계정별 상한을 DB 로 옮겨 적는다. 트리거는 환경변수를 읽을 수 없어
@@ -181,9 +185,7 @@ export async function checkGenerationCapacity(
 ): Promise<QuotaCheck> {
   const limit = limitOf(category)
   const userAxis: GenerationCapacityAxis = category === 'video' ? 'user_video' : 'user_image'
-  const admin = await isAdminUserId(userId)
-  // 집계 장애로 반환하기 전에 오래된 면제를 없애야 한다. 이미지에는 이 표를 적용하지 않는다.
-  if (category === 'video') await syncVideoCapacityExemption(userId, admin)
+  const admin = await syncGenerationCapacityExemption(userId)
   try {
     const [userQueued, globalQueued] = await Promise.all([
       countQueuedJobsByUser(userId, kindsOf(category)),

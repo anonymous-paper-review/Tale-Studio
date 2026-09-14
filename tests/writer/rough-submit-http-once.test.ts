@@ -33,3 +33,21 @@ it('러프 HTTP 접수는 같은 입력과 웹훅을 보내고 요청 번호와 
   expect(init.headers.Authorization).toBe('Key test-only-credential')
   expect(JSON.parse(init.body)).toEqual({ prompt: 'empty room' })
 })
+
+it('예약에서 지정한 fal 키로 HTTP 접수를 한 번만 보낸다', async () => {
+  vi.stubEnv('FAL_KEYS', JSON.stringify([
+    { id: 'key-a', key: 'first-credential', maxInflight: 2 },
+    { id: 'key-b', key: 'second-credential', maxInflight: 2 },
+  ]))
+  const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ request_id: 'request-b' }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+  vi.stubGlobal('fetch', fetch)
+  const { falImageSubmit } = await import('@/lib/writer/llm/fal')
+  const receipt = await falImageSubmit(
+    { prompt: 'empty room', model: 'openai/gpt-image-2' },
+    { retry: false, falKeyId: 'key-b' },
+  )
+  expect(receipt).toMatchObject({ request_id: 'request-b', fal_key_id: 'key-b' })
+  expect(fetch).toHaveBeenCalledTimes(1)
+  const [, init] = fetch.mock.calls[0]
+  expect(init.headers.Authorization).toBe('Key second-credential')
+})

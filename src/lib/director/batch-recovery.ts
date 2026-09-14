@@ -97,8 +97,8 @@ export async function recoverVideoBatches() {
             if (!job || job.status !== 'queued') continue
           }
         }
-        // 나이를 기준으로 하는 유령 청소가 아니다. 방금 제출 중인 예약을 실패로 만들면 안 된다.
-        await reconcileJobFromFal(job, { settleStaleReserved: false })
+        // 접수 여부가 확인될 때까지 예약과 사용량을 유지한다. 시간만으로 실패·환급하지 않는다.
+        await reconcileJobFromFal(job)
       } catch (error) {
         result.failed += 1
         console.error('[video-batches] job recovery failed:', jobId, error instanceof Error ? error.message : error)

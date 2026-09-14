@@ -116,4 +116,38 @@ describe('Producer 채팅과 언어 규칙', () => {
     const body = await response.json()
     expect(body.contentLocale).toBeNull()
   })
+
+  it('일본풍을 요청해도 대사 언어를 일본어로 임의 확정하지 않는다', async () => {
+    // 왜: 한국어로 일본 학교의 분위기를 요청했을 때 모델이 일본어 대사를 제안한 실제 고장이다.
+    mocks.parseExtractedSettings.mockReturnValue({
+      reply: '장르는 어느 쪽에 더 가까운가요?',
+      extractedSettings: { dialogueLanguage: 'ja', playtime: 300, styleAnchorKey: 'japanese_melodrama' },
+    })
+    const response = await POST(request({
+      projectId: 'p1',
+      message: '일본 배경 학교의 일상물을 만들고싶어 실사풍이면 좋겠어 일본 특유의 분위기가 잘 보여지면 좋겠음',
+      currentSettings: { dialogueLanguage: '' },
+    }))
+    const body = await response.json()
+    expect(body.extractedSettings).toEqual({ playtime: 300, styleAnchorKey: 'japanese_melodrama' })
+    expect(mocks.llmChat.mock.calls[0][2]).toContain('[Dialogue Language Decision]\nUNDECIDED')
+  })
+
+  it('이미 고른 대사 언어는 분위기 요청이나 채팅 언어 변경으로 덮어쓰지 않는다', async () => {
+    // 왜: 한국어로 기획하더라도 사용자가 직접 고른 일본어 대사는 유지해야 한다.
+    mocks.parseExtractedSettings.mockReturnValue({ reply: '좋아요', extractedSettings: { dialogueLanguage: 'ko' } })
+    const response = await POST(request({
+      projectId: 'p1', message: '대만 영화 같은 분위기로 해줘', currentSettings: { dialogueLanguage: 'ja' },
+    }))
+    expect((await response.json()).extractedSettings.dialogueLanguage).toBe('ja')
+  })
+
+  it('대사를 일본어로 해 달라고 명시하면 한국어 채팅에서도 일본어 대사를 적용한다', async () => {
+    // 왜: 분위기에서 추측하는 값만 막고 사용자가 요구한 언어 변경은 같은 답변에서 반영한다.
+    mocks.parseExtractedSettings.mockReturnValue({ reply: '좋아요', extractedSettings: { dialogueLanguage: 'ko' } })
+    const response = await POST(request({
+      projectId: 'p1', message: '대사는 일본어로 해줘', currentSettings: { dialogueLanguage: 'ko' },
+    }))
+    expect((await response.json()).extractedSettings.dialogueLanguage).toBe('ja')
+  })
 })

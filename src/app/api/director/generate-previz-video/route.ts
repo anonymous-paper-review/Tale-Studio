@@ -8,14 +8,15 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { requireProjectAccess } from '@/lib/api/guard'
 import { falVideoSubmit } from '@/lib/writer/llm/fal'
-import { pickFalKey } from '@/lib/fal/keys'
+import { falKeyById, pickFalKey } from '@/lib/fal/keys'
 import { createGenerationJob, failGenerationJob, STALE_QUEUED_MS } from '@/lib/generation-jobs'
-import { checkGenerationCapacity, checkProjectVideoBudget } from '@/lib/generation-quota'
+import { checkGenerationCapacity, checkProjectVideoBudget, syncFalKeyLimits } from '@/lib/generation-quota'
 import { quotaRejectionResponse, videoBudgetRejectionResponse, capacityReservationRejection } from '@/lib/api/quota'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
 import { holdTakesForVideoJob, releaseTakesForJob } from '@/lib/billing/take-hold'
 import { takeCostForPreviz } from '@/lib/billing/take-cost'
+import { isDefiniteSubmitRejection } from '@/lib/fal/submit-rejection'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -100,8 +101,10 @@ export async function POST(req: Request) {
     //   만들고 과금하는데 추적 행이 없어 webhook 이 와도 버려졌다. (2) 잔액 0 인 사용자도 제출이
     //   먼저 나가 회사 비용만 나갔다. 본 영상은 이미 예약이 제출보다 앞이다(generate-video:790).
     //   제출 전 잡은 request_id='reserved:<id>' 로 남고, 제출이 끝나면 실제 id 로 교체한다.
-    //   그 사이에 죽으면 유령 청소부가 10분 뒤 정리하며 Take 도 돌려준다(#reserved-zombie).
-    // 제출 전에 키를 먼저 고른다 — 작업 행에 fal_key_id 를 기록해야 조회 경로가 그 키를 쓴다.
+    //   접수 여부가 확인되기 전에는 예약과 사용량을 그대로 유지해 중복 제출·비용을 막는다.
+    // 제출 전에 키 상한을 동기화하고 키를 먼저 고른다 — 동기화가 실패하면 예약·과금·제출을
+    //   모두 시작하지 않는다. 작업 행에 fal_key_id 를 기록해야 조회 경로가 그 키를 쓴다.
+    await syncFalKeyLimits()
     //   키 선택은 과금이 아니다(여유가 가장 큰 키를 고르는 계산일 뿐).
     const falKey = await pickFalKey()
     let job: Awaited<ReturnType<typeof createGenerationJob>>
@@ -153,6 +156,12 @@ export async function POST(req: Request) {
     let model: string
     let fal_key_id: string
     try {
+      // 동시 예약 트리거가 요청한 키를 다른 계정으로 바꿔 넣을 수 있다. 제출은 반드시 insert
+      // 반환 행의 최종 키로만 한다 — 처음 고른 키를 재사용하면 webhook 조회가 엇갈린다.
+      const submitFalKey = falKeyById(job.fal_key_id)
+      if (!submitFalKey) {
+        throw Object.assign(new Error(`unknown fal key id: ${job.fal_key_id ?? '(missing)'}`), { status: 400 })
+      }
       ;({ request_id, model, fal_key_id } = await falVideoSubmit({
         prompt,
         image_url: frames.start,
@@ -160,21 +169,28 @@ export async function POST(req: Request) {
         duration,
         aspect_ratio: '16:9',
         webhookUrl: resolveWebhookUrl(),
-      }, falKey))
+      }, submitFalKey))
     } catch (submitError) {
-      // 제출이 확실히 실패했으면 잡아둔 Take 를 즉시 돌려준다. 모호한 실패(들어갔는지 모름)는
-      //   reserved: 인 채 남고 유령 청소부가 10분 뒤 같은 처리를 한다 — 어느 쪽이든 묶이지 않는다.
-      try {
-        await failGenerationJob(job.id, submitError instanceof Error ? submitError.message : String(submitError))
-      } catch (transitionErr) {
-        console.error('[director/generate-previz-video] submit failure transition failed:', transitionErr instanceof Error ? transitionErr.message : transitionErr)
+      const message = submitError instanceof Error ? submitError.message : String(submitError)
+      if (isDefiniteSubmitRejection(submitError)) {
+        // 제출이 확실히 실패했으면 잡아둔 Take 를 즉시 돌려준다. 알 수 없는 최종 키도
+        //   외부에 전혀 보내지 않았으므로 같은 경로로 닫는다.
+        try {
+          await failGenerationJob(job.id, message)
+        } catch (transitionErr) {
+          console.error('[director/generate-previz-video] submit failure transition failed:', transitionErr instanceof Error ? transitionErr.message : transitionErr)
+        }
+        try {
+          await releaseTakesForJob(job.id)
+        } catch (releaseErr) {
+          console.error('[director/generate-previz-video] take release failed:', releaseErr instanceof Error ? releaseErr.message : releaseErr)
+        }
+        throw submitError
       }
-      try {
-        await releaseTakesForJob(job.id)
-      } catch (releaseErr) {
-        console.error('[director/generate-previz-video] take release failed:', releaseErr instanceof Error ? releaseErr.message : releaseErr)
-      }
-      throw submitError
+      // 접수 여부가 모호하면(408/425/429/5xx·통신 오류) 이미 외부에 들어갔을 수 있다.
+      //   failed 로 닫거나 Take 를 반환하지 않고 reserved: queued 행을 그대로 보존한다.
+      console.error('[director/generate-previz-video] submit outcome unknown, reservation kept:', job.id, message)
+      return NextResponse.json({ jobId: job.id, status: 'queued' })
     }
 
     // 제출 성공 — reserved: 를 실제 provider 요청 id 로 교체한다. 이게 있어야 webhook 이 매칭된다.
@@ -184,8 +200,8 @@ export async function POST(req: Request) {
       .eq('id', job.id)
       .eq('status', 'queued')
     if (attachError) {
-      // 교체 실패는 치명적이지 않다 — 청소부가 reserved: 로 보고 10분 뒤 정리하며 Take 를 돌려준다.
-      //   fal 결과는 잃지만 사용자 잔액은 회복된다.
+      // 교체 실패는 치명적이지 않다 — 접수 여부를 확인할 수 없으므로 reserved: queued 행과
+      //   잡아 둔 사용량을 그대로 보존한다. 확인 전 재제출·환급은 중복 비용을 만들 수 있다.
       console.error('[director/generate-previz-video] attach provider request failed:', attachError.message)
     }
 

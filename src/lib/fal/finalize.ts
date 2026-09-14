@@ -2,6 +2,7 @@
 //
 // 캐릭터 뷰: FAL 이미지 URL → 바이트 회수 → Supabase storage 업로드 → characters 컬럼 갱신.
 //            (옛 동기 generate-sheet 라우트의 3~4단계를 그대로 서버사이드로 이동)
+// 수동 이미지: FAL 이미지 URL만 generation_jobs에 기록 — 실제 파일 저장은 호출부가 담당한다.
 // 샷 영상:   linked job은 clip/job별 immutable Storage 경로에 보관하고 RPC로 take를 완료한다.
 //            연결되지 않은 legacy job만 shots.video_url을 직접 갱신한다.
 //
@@ -807,6 +808,18 @@ export async function uploadImageFromUrl(
   return versionedUrl(mediaPublicUrl(path))
 }
 
+/** 수동·단일 편집 이미지 영속화 — 외부 결과 URL만 잡에 기록한다.
+ *   저장소/shot 갱신은 실제 결과를 소비하는 기존 호출부가 맡는다. */
+export async function finalizeImageGenerationJob(
+  job: GenerationJob,
+  falImageUrl: string,
+  falPayload?: unknown,
+): Promise<string> {
+  await recordFalResponseSnapshot(job, falPayload)
+  await completeGenerationJob(job.id, falImageUrl)
+  return falImageUrl
+}
+
 /**
  * 착지한 월드 이미지를 location_image_candidates 의 새 선택본으로 기록(#57, AC18 — 캐릭터 대칭).
  *   024 미적용 환경에선 update/insert 에러를 흡수(locations 컬럼 미러만으로 동작). best-effort.
@@ -1394,6 +1407,9 @@ function assertNever(value: never): never {
 
 export async function finalizeGenerationJob(job: GenerationJob, result: FinalizeProviderResult): Promise<string> {
   switch (job.kind) {
+    case 'image_generation':
+      if (result.media !== 'image') throw new Error('image_generation requires an image result')
+      return finalizeImageGenerationJob(job, result.url, result.payload)
     case 'character_view':
       if (result.media !== 'image') throw new Error('character_view requires an image result')
       return finalizeCharacterViewJob(job, result.url, result.payload)

@@ -17,15 +17,18 @@ function argument(name, fallback) {
 const credentialsPath = argument('--credentials-path', resolve(workspace, '.env.local'))
 const outputPath = argument('--output-path', resolve(workspace, '.claude/docs/2026-09-14/capacity-axes/db-results.json'))
 // 감사 재현기와 달리 이 검사는 작업 중인 저장소의 새 마이그레이션을 그대로 읽는다 — 고정 sha 검사는 없고 기록만 한다.
-const migrationName = '20260914110000_generation_capacity_all_axes.sql'
-const migrationPath = resolve(workspace, 'supabase/migrations', migrationName)
-const migrationSha256 = createHash('sha256').update(readFileSync(migrationPath)).digest('hex')
+const migrationNames = [
+  '20260914110000_generation_capacity_all_axes.sql',
+  '20260914150000_generation_capacity_key_assignment.sql',
+]
+const migrationPaths = migrationNames.map((name) => resolve(workspace, 'supabase/migrations', name))
+const migrationSha256 = migrationPaths.map((path) => createHash('sha256').update(readFileSync(path)).digest('hex'))
 const env = dotenv.parse(readFileSync(credentialsPath))
 const ref = 'pbiumddivadgbzxuymak'
 const schema = `capacity_axes_${randomUUID().replaceAll('-', '')}`
 const result = {
   startedAt: new Date().toISOString(), developmentProject: ref, schema,
-  migration: migrationName, migrationPath: `supabase/migrations/${migrationName}`,
+  migrations: migrationNames, migrationPaths: migrationNames.map((name) => `supabase/migrations/${name}`),
   migrationSha256,
   safety: { applicationRowsRead: 0, applicationRowsWritten: 0, paidFalRequests: 0, publicMigrationsApplied: 0 },
   observations: [], policyResults: [],
@@ -85,7 +88,8 @@ try {
   await client.query(`create schema ${schema}`)
   created = true
   save()
-  console.log(JSON.stringify({ check: 'isolated database experiment', developmentProject: ref, migration: migrationName, migrationSha256: result.migrationSha256, concurrency: 12, verifiedTls: true }))
+  console.log(JSON.stringify({ check: 'isolated database experiment', developmentProject: ref, migrations: migrationNames,
+    migrationSha256: result.migrationSha256, concurrency: 12, verifiedTls: true }))
   stage = 'isolated database tests'
   const status = await new Promise((resolveStatus, reject) => {
     const child = spawn(process.execPath, [resolve(workspace, 'node_modules/vitest/vitest.mjs'), 'run', 'tests/manual/capacity-axes-db.manual.test.ts', '--reporter=verbose'], {

@@ -2,14 +2,29 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { POST } from '@/app/api/writer/rough-storyboard/route'
 
-const mocks = vi.hoisted(() => ({ from: vi.fn(), rpc: vi.fn(), submit: vi.fn(), createJob: vi.fn(), events: vi.fn() }))
+const mocks = vi.hoisted(() => ({
+  from: vi.fn(),
+  rpc: vi.fn(),
+  submit: vi.fn(),
+  createJob: vi.fn(),
+  getJob: vi.fn(),
+  syncFalKeyLimits: vi.fn(),
+  events: vi.fn(),
+}))
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: { from: mocks.from, rpc: mocks.rpc } }))
 vi.mock('@/lib/demo/guard-server', () => ({ demoWriteBlock: () => null }))
 vi.mock('@/lib/api/guard', () => ({ requireProjectAccess: async () => ({ ok: true, userId: 'owner' }) }))
-vi.mock('@/lib/generation-quota', () => ({ checkGenerationCapacity: async () => ({ ok: true }) }))
+vi.mock('@/lib/generation-quota', () => ({
+  checkGenerationCapacity: async () => ({ ok: true }),
+  syncFalKeyLimits: mocks.syncFalKeyLimits,
+}))
 vi.mock('@/lib/writer/debug-events', () => ({ recordWriterObservabilityEvent: mocks.events }))
 vi.mock('@/lib/writer/llm/fal', () => ({ falImageSubmit: mocks.submit, DEFAULT_EDIT_IMAGE_MODEL: 'edit', DEFAULT_IMAGE_MODEL: 'image' }))
-vi.mock('@/lib/generation-jobs', async (original) => ({ ...await original<typeof import('@/lib/generation-jobs')>(), createGenerationJob: mocks.createJob }))
+vi.mock('@/lib/generation-jobs', async (original) => ({
+  ...await original<typeof import('@/lib/generation-jobs')>(),
+  createGenerationJob: mocks.createJob,
+  getGenerationJobById: mocks.getJob,
+}))
 vi.mock('@/lib/writer/shot-design-state', () => ({ loadShotDesignByMainId: async () => new Map(), resolveShotDesign: () => null }))
 vi.mock('@/lib/writer/i18n/derive-en', () => ({ deriveEnBatch: async (items: Array<{ id: string; native: string }>) => new Map(items.map((item) => [item.id, item.native])) }))
 vi.mock('@/lib/writer/i18n/entity-names', () => ({ ensureEntityNamesEn: async () => ({ characters: new Map() }), ensureStageLandmarkLabelsEn: async () => new Map(), sceneLocationLabelsEn: async () => new Map() }))
@@ -65,6 +80,19 @@ beforeEach(() => {
   exposeQueued = false
   updates = []
   mocks.from.mockImplementation(query)
+  mocks.syncFalKeyLimits.mockResolvedValue(undefined)
+  mocks.getJob.mockImplementation(async (id: string) => {
+    const job = reservations.get(id)
+    return job
+      ? {
+          id: job.id,
+          project_id: PROJECT,
+          request_id: job.request_id,
+          status: job.status,
+          fal_key_id: 'test-key',
+        }
+      : null
+  })
   mocks.rpc.mockImplementation(async (_name: string, args: { p_shot_ids: string[] }) => {
     const existing = [...reservations.values()].filter((job) => job.status === 'queued' && job.shots.some((id) => args.p_shot_ids.includes(id)))
     if (existing.length) return { data: existing.map((job) => ({ job_id: job.id, shot_ids: job.shots.filter((id) => args.p_shot_ids.includes(id)), state: 'existing', confirmation_pending: job.request_id.startsWith('reserved:') })), error: null }
@@ -102,6 +130,50 @@ describe('러프 외부 접수 앞의 예약', () => {
     const repeated = await POST(request())
     expect((await repeated.json()).data.submitted.every((item: { confirmationPending?: boolean }) => item.confirmationPending)).toBe(true)
     expect(mocks.submit).toHaveBeenCalledTimes(2)
+  })
+
+  it('예약 행의 최종 fal 키를 외부 접수에 그대로 사용한다', async () => {
+    mocks.getJob.mockImplementation(async (id: string) => {
+      const job = reservations.get(id)
+      return job
+        ? {
+            id: job.id,
+            project_id: PROJECT,
+            request_id: job.request_id,
+            status: job.status,
+            fal_key_id: 'B',
+          }
+        : null
+    })
+    const response = await POST(request())
+    expect(response.status).toBe(200)
+    expect(mocks.submit).toHaveBeenCalledTimes(2)
+    expect(mocks.submit).toHaveBeenNthCalledWith(
+      1,
+      expect.anything(),
+      expect.objectContaining({ retry: false, falKeyId: 'B' }),
+    )
+    expect(mocks.submit).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      expect.objectContaining({ retry: false, falKeyId: 'B' }),
+    )
+  })
+
+  it('예약 행의 키 조회가 실패하면 외부 접수 없이 예약을 보존한다', async () => {
+    mocks.getJob.mockRejectedValue(new Error('reserved job lookup failed'))
+    const response = await POST(request())
+    expect(response.status).toBe(500)
+    expect(mocks.submit).not.toHaveBeenCalled()
+    expect([...reservations.values()].every((job) => job.status === 'queued')).toBe(true)
+  })
+
+  it('fal 키 상한 동기화가 실패하면 외부 접수 없이 중단한다', async () => {
+    mocks.syncFalKeyLimits.mockRejectedValue(new Error('fal key limits sync failed'))
+    const response = await POST(request())
+    expect(response.status).toBe(500)
+    expect(mocks.rpc).not.toHaveBeenCalled()
+    expect(mocks.submit).not.toHaveBeenCalled()
   })
 
   it('서비스가 러프 접수를 거절했다고 확인되면 예약을 해제하고 실패를 알린다', async () => {

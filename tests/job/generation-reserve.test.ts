@@ -12,12 +12,20 @@ const mocks = vi.hoisted(() => ({
   upsertKeyLimits: vi.fn(),
   deleteKeyLimits: vi.fn(),
   deleteKeyLimitsNot: vi.fn(),
+  getUserById: vi.fn(),
+  upsertExempt: vi.fn(),
+  deleteExempt: vi.fn(),
   pickFalKey: vi.fn(),
   falImageSubmit: vi.fn(),
   recordObservability: vi.fn(),
 }))
 
-vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: { from: mocks.from } }))
+vi.mock('@/lib/supabase/admin', () => ({
+  supabaseAdmin: {
+    from: mocks.from,
+    auth: { admin: { getUserById: mocks.getUserById } },
+  },
+}))
 // 키 레지스트리는 실제 모듈을 쓴다(FAL_KEYS 파싱까지 같이 잠근다). 배분만 목으로 고정한다.
 vi.mock('@/lib/fal/keys', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/fal/keys')>()),
@@ -33,6 +41,7 @@ import {
   rejectGenerationJobReservation,
   reserveGenerationJob,
 } from '@/lib/generation-jobs'
+import { syncGenerationCapacityExemption } from '@/lib/generation-quota'
 import { capacityReservationRejection } from '@/lib/api/quota'
 
 const FAL_KEYS = JSON.stringify([
@@ -78,6 +87,12 @@ beforeEach(() => {
   vi.stubEnv('FAL_KEYS', FAL_KEYS)
   mocks.from.mockImplementation((table: string) => {
     if (table === 'fal_key_limits') return { upsert: mocks.upsertKeyLimits, delete: mocks.deleteKeyLimits }
+    if (table === 'generation_capacity_exempt_users') {
+      return {
+        upsert: mocks.upsertExempt,
+        delete: () => ({ eq: mocks.deleteExempt }),
+      }
+    }
     if (table === 'generation_jobs') return { insert: mocks.insert, update: mocks.update }
     throw new Error(`unexpected table: ${table}`)
   })
@@ -88,6 +103,9 @@ beforeEach(() => {
   mocks.upsertKeyLimits.mockResolvedValue({ data: null, error: null })
   mocks.deleteKeyLimitsNot.mockResolvedValue({ data: null, error: null })
   mocks.deleteKeyLimits.mockReturnValue({ not: mocks.deleteKeyLimitsNot })
+  mocks.upsertExempt.mockResolvedValue({ data: null, error: null })
+  mocks.deleteExempt.mockResolvedValue({ data: null, error: null })
+  mocks.getUserById.mockResolvedValue({ data: { user: { email: 'user@example.test' } }, error: null })
   mocks.pickFalKey.mockResolvedValue({ id: 'key-1', maxInflight: 8 })
   mocks.falImageSubmit.mockResolvedValue({ request_id: 'fal-1', model: 'openai/gpt-image-2', fal_key_id: 'key-1' })
 })
@@ -97,6 +115,55 @@ afterEach(() => {
 })
 
 describe('생성 자리 예약', () => {
+  it('관리자 이미지 예약은 먼저 면제 표에 등록하고 예약을 진행한다', async () => {
+    mocks.getUserById.mockResolvedValueOnce({
+      data: { user: { email: 'admin@tale.studio' } },
+      error: null,
+    })
+
+    await reserveGenerationJob({
+      ...reserveInput(),
+      userId: 'admin-image-user',
+      kind: 'image_generation',
+      target: {},
+    })
+
+    expect(mocks.upsertExempt).toHaveBeenCalledWith(
+      expect.objectContaining({ user_id: 'admin-image-user' }),
+    )
+    expect(mocks.upsertExempt.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.insert.mock.invocationCallOrder[0],
+    )
+  })
+
+  it('일반 사용자 예약은 오래된 관리자 면제를 지운 뒤 진행한다', async () => {
+    mocks.getUserById.mockResolvedValueOnce({
+      data: { user: { email: 'user@example.test' } },
+      error: null,
+    })
+
+    await reserveGenerationJob({
+      ...reserveInput(),
+      userId: 'stale-exemption-user',
+      kind: 'image_generation',
+      target: {},
+    })
+
+    expect(mocks.deleteExempt).toHaveBeenCalledWith('user_id', 'stale-exemption-user')
+    expect(mocks.deleteExempt.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.insert.mock.invocationCallOrder[0],
+    )
+  })
+
+  it('면제 동기화는 판정 결과를 반환한다', async () => {
+    mocks.getUserById.mockResolvedValueOnce({
+      data: { user: { email: 'admin@tale.studio' } },
+      error: null,
+    })
+
+    await expect(syncGenerationCapacityExemption('sync-admin-user')).resolves.toBe(true)
+  })
+
   it('자리 예약이 거절되면 외부 생성 서비스에 제출하지 않는다', async () => {
     // 왜: 자리 판정은 DB 가 원자적으로 한다 — 거절을 무시하고 제출하면 상한이 다시 뚫린다.
     mocks.insert.mockReturnValue(
@@ -138,6 +205,15 @@ describe('생성 자리 예약', () => {
     )
     const updateChain = mocks.update.mock.results[0].value as { eq: { mock: { calls: unknown[][] } } }
     expect(updateChain.eq.mock.calls).toContainEqual(['request_id', `reserved:${job.id}`])
+  })
+
+  it('DB 예약 결과에 최종 fal 키가 없으면 유료 제출 전에 오류를 낸다', async () => {
+    mocks.insert.mockImplementationOnce((payload: Record<string, unknown>) =>
+      chain({ data: { ...payload, fal_key_id: '  ' }, error: null }),
+    )
+
+    await expect(reserveThenSubmit()).rejects.toThrow(/fal key id.*paid submission blocked/i)
+    expect(mocks.falImageSubmit).not.toHaveBeenCalled()
   })
 
   it('접수 번호를 채우려는데 예약이 이미 바뀌었으면 오류로 알린다', async () => {

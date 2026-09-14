@@ -136,18 +136,26 @@ describe('checkGenerationCapacity — admin 면제 표 동기화 (신규 게이�
     expect(mocks.deleteEqExempt).toHaveBeenCalledWith('user_id', 'exempt-user-1')
   })
 
-  it('영상 면제 동기화 실패는 안전하게 throw 하고, image 검사는 면제 표를 건드리지 않는다', async () => {
+  it.each(['video', 'image'] as const)('%s에서 관리자 면제 확인을 저장하지 못하면 생성을 허용하지 않는다', async (category) => {
     mocks.isAdminEmail.mockReturnValue(false)
     mocks.deleteEqExempt.mockRejectedValueOnce(new Error('exempt sync down'))
 
     // 정확한 권한 확인이 안 됐으므로 기존 쿼터 집계의 fail-open 과 달리 fail-closed 로 전파.
-    await expect(checkGenerationCapacity('exempt-fail-1', 'video')).rejects.toThrow()
+    await expect(checkGenerationCapacity(`exempt-fail-${category}`, category)).rejects.toThrow()
+    expect(mocks.deleteEqExempt).toHaveBeenCalledWith('user_id', `exempt-fail-${category}`)
+  })
 
-    // image 경로는 이 신규 표를 아예 건드리지 않아 기존 fail-open 정책이 그대로 유지된다.
-    mocks.from.mockClear()
-    const image = await checkGenerationCapacity('exempt-fail-1', 'image')
-    expect(image.ok).toBe(true)
-    expect(mocks.from).not.toHaveBeenCalled()
+  it('이미지만 요청하는 관리자도 개인 이미지 상한을 면제받는다', async () => {
+    mocks.isAdminEmail.mockReturnValue(true)
+    mocks.getUserById.mockResolvedValue({ data: { user: { email: 'admin@x.test' } }, error: null })
+    mocks.countByUser.mockResolvedValue(6)
+
+    const check = await checkGenerationCapacity('exempt-image-admin', 'image')
+
+    expect(check.ok).toBe(true)
+    expect(mocks.upsertExempt).toHaveBeenCalledWith(
+      expect.objectContaining({ user_id: 'exempt-image-admin' }),
+    )
   })
 
   it('작업 수 조회가 실패해도 일반 사용자의 오래된 관리자 면제를 남기지 않는다', async () => {

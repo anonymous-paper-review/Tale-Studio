@@ -8,12 +8,16 @@ import { normalizeFailureEvidence } from '@/lib/fal/error-evidence'
 import type { Json, Tables } from '@/types/database'
 import { isChatTraceId } from '@/lib/chat-trace'
 import { pickFalKey } from '@/lib/fal/keys'
-import { syncFalKeyLimits } from '@/lib/generation-quota'
+import {
+  syncFalKeyLimits,
+  syncGenerationCapacityExemption,
+} from '@/lib/generation-quota'
 
 export type GenerationJobKind =
   | 'character_view'
   | 'world_shot'
   | 'shot_storyboard'
+  | 'image_generation' // 수동 이미지·단일 러프 편집: 외부 결과 URL만 기록
   | 'storyboard_real_grid' // #real-grid: 실사 4샷 일괄(1콜 시트→크롭 분배). 개별 재생성은 shot_storyboard 유지
   | 'shot_rough_storyboard'
   | 'shot_video'
@@ -348,6 +352,7 @@ export async function reserveGenerationJob(
     workspaceId: input.workspaceId ?? input.target.workspaceId,
     userId: input.userId,
   })
+  if (ownership.userId) await syncGenerationCapacityExemption(ownership.userId)
   // id 를 먼저 정한다 — 접수 번호 자리에 넣을 'reserved:<id>' 가 그 id 에 매여 있어야
   //   응답을 잃어도 그 자리를 다시 쓰지 않는다.
   const id = crypto.randomUUID()
@@ -375,8 +380,12 @@ export async function reserveGenerationJob(
     .select(`${COLUMNS}, actor`)
     .single()
   if (error) throw capacityRejectionFrom(error) ?? error
+  const reserved = data as GenerationJob | null
+  if (!reserved || typeof reserved.fal_key_id !== 'string' || !reserved.fal_key_id.trim()) {
+    throw new Error('generation job reservation has no fal key id; paid submission blocked')
+  }
   if (input.chatTraceId) await markChatTraceQueued(input.projectId, input.chatTraceId, new Date().toISOString())
-  return data as GenerationJob
+  return reserved
 }
 
 /**

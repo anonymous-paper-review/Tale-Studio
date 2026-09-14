@@ -15,7 +15,7 @@ vi.mock('@/lib/chat-format', async (original) => ({
 vi.mock('@/lib/chat-trace-server', () => ({ persistChatTraceBestEffort: vi.fn(), chatTraceBelongsToProject: async () => true }))
 vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTrace: vi.fn(), saveChatTracePatch: vi.fn(), loadLatestChatTrace: vi.fn() }))
 // syncFalKeyLimits: 자리 예약(reserveGenerationJob)이 계정별 상한을 판정 전에 한 번 맞춘다 — 이 파일은 DB 경계만 메모리로 바꾼다.
-vi.mock('@/lib/generation-quota', () => ({ checkGenerationCapacity: async () => ({ ok: true }), syncFalKeyLimits: async () => {} }))
+vi.mock('@/lib/generation-quota', () => ({ checkGenerationCapacity: async () => ({ ok: true }), syncFalKeyLimits: async () => {}, syncGenerationCapacityExemption: async () => false }))
 vi.mock('@/lib/storage/template-asset', () => ({ templateAssetUrl: async () => 'https://assets.test/template.png' }))
 // 예약 선행 경로는 예약 행에 적힌 키로 제출한다(falKeyById) — 유료 접수는 재시도 없는 1회 경계(submitQueueOnce)다.
 vi.mock('@/lib/fal/keys', () => {
@@ -45,6 +45,8 @@ let providerCalls: Row[]
 let pollWaiters: Map<string, (response: Response) => void>
 let finishImmediately: boolean
 let rejectCharacter: string | null
+let loseSubmitResponse: string | null
+let losePollResponse: string | null
 let activeRun: Promise<boolean> | null
 let beforeAppearance: (() => Promise<void>) | null
 let releaseAppearance: (() => void) | null
@@ -122,6 +124,8 @@ beforeEach(() => {
   pollWaiters = new Map()
   finishImmediately = false
   rejectCharacter = null
+  loseSubmitResponse = null
+  losePollResponse = null
   activeRun = null
   beforeAppearance = null
   releaseAppearance = null
@@ -154,10 +158,14 @@ beforeEach(() => {
     }
     if (url === '/api/artist/generate-sheet') {
       if (JSON.parse(init!.body as string).characterId === rejectCharacter) return Response.json({ error: 'Generation capacity reached' }, { status: 429 })
-      return generateSheet(new Request(`http://localhost${url}`, init))
+      const response = await generateSheet(new Request(`http://localhost${url}`, init))
+      if (JSON.parse(init!.body as string).characterId === loseSubmitResponse) throw new TypeError('Failed to fetch')
+      return response
     }
     if (url.startsWith('/api/generation-jobs/')) {
       const jobId = url.split('/').at(-1)!
+      const job = tables.generation_jobs.find(row => row.id === jobId)
+      if (losePollResponse && (job?.target as Row | undefined)?.characterId === losePollResponse) throw new TypeError('Failed to fetch')
       if (finishImmediately) return completion(jobId)
       return new Promise<Response>(resolve => { pollWaiters.set(jobId, resolve) })
     }
@@ -263,6 +271,45 @@ describe('채팅에서 두 모습이 실제 생성 접수까지 이어진다', (
     expect(tables.character_appearances.filter(row => !row.is_default)).toHaveLength(2)
   })
 
+  it('첫 인물의 접수 응답이 유실되어도 둘째는 완성하고 접수 여부가 불확실한 첫 인물은 완료 처리하거나 다시 발주하지 않는다', async () => {
+    loseSubmitResponse = 'kyotaro'
+    await requestAndApprove()
+    await vi.waitFor(() => expect(pollWaiters.size).toBe(1))
+    finishAll()
+    await expect(activeRun).resolves.toBe(false)
+    expect(providerCalls).toHaveLength(2)
+    expect(useArtistStore.getState().characterAssets[1].appearances.at(-1)?.sheetUrl).toBe(`https://assets.test/${jobIdAt(1)}.webp`)
+    const remaining = useGlobalChatStore.getState().deferredProposals[0]
+    expect(remaining.target).toContain('쿄타로')
+    expect(remaining.target).not.toContain('코마츠')
+    expect(remaining.submissionUncertain).toBe(true)
+    expect(remaining.jobIds ?? []).toHaveLength(0)
+    useGlobalChatStore.getState().restorePendingProposal(remaining.id)
+    await expect(useGlobalChatStore.getState().approvePendingProposal(remaining.id)).resolves.toBe(false)
+    expect(providerCalls).toHaveLength(2)
+    expect(tables.character_appearances.filter(row => !row.is_default)).toHaveLength(2)
+    expect(useGlobalChatStore.getState().messages.at(-1)?.content).toContain('접수 상태를 확인할 수 없어요. 기존 작업을 확인한 뒤 다시 시도해 주세요.')
+  })
+
+  it('첫 인물의 완료 확인이 끊겨도 둘째 결과를 유지하고 다시 확인할 때 기존 첫 작업만 조회한다', async () => {
+    losePollResponse = 'kyotaro'
+    await requestAndApprove()
+    await vi.waitFor(() => expect(pollWaiters.size).toBe(1))
+    finishAll()
+    await expect(activeRun).resolves.toBe(false)
+    const remaining = useGlobalChatStore.getState().deferredProposals[0]
+    expect(remaining.target).toContain('쿄타로')
+    expect(remaining.target).not.toContain('코마츠')
+    expect(remaining.jobIds).toEqual([jobIdAt(0)])
+    expect(remaining.submissionUncertain).toBe(false)
+    expect(providerCalls).toHaveLength(2)
+    losePollResponse = null
+    useGlobalChatStore.getState().restorePendingProposal(remaining.id)
+    await expect(useGlobalChatStore.getState().approvePendingProposal(remaining.id)).resolves.toBe(true)
+    expect(providerCalls).toHaveLength(2)
+    expect(tables.character_appearances.filter(row => !row.is_default)).toHaveLength(2)
+    expect(useGlobalChatStore.getState().deferredProposals).toHaveLength(0)
+  })
   it('모델이 첫 인물의 제안만 보내면 두 인물을 완료했다고 하지 않고 빠진 이름을 알려준다', async () => {
     answer(['kyotaro'])
     await useGlobalChatStore.getState().sendMessage('쿄타로와 코마츠의 잠옷입은 모습도 추가해줘')

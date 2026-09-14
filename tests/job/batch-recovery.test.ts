@@ -77,7 +77,7 @@ describe('서버가 놓친 일괄을 다시 확인한다', () => {
     batches = [cancelled]
     jobs = [job('job-b', 'batch-b', 'project-b')]
     await recoverVideoBatches()
-    expect(mocks.reconcile).toHaveBeenCalledWith(jobs[0], { settleStaleReserved: false })
+    expect(mocks.reconcile).toHaveBeenCalledWith(jobs[0])
     expect(mocks.continue).not.toHaveBeenCalled()
     expect(mocks.submit).not.toHaveBeenCalled()
   })
@@ -88,7 +88,7 @@ describe('서버가 놓친 일괄을 다시 확인한다', () => {
     mocks.getJob.mockRejectedValueOnce(new Error('temporary database failure'))
     const result = await recoverVideoBatches()
     expect(result.failed).toBe(1)
-    expect(mocks.reconcile).toHaveBeenCalledWith(jobs[1], { settleStaleReserved: false })
+    expect(mocks.reconcile).toHaveBeenCalledWith(jobs[1])
   })
 
   it('저장한 복구 증표로 기존 작업을 연결한 뒤 완료를 확인한다', async () => {

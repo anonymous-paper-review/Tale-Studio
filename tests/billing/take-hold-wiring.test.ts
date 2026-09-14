@@ -28,6 +28,7 @@ vi.mock('@/lib/generation-jobs', async (importOriginal) => ({
 vi.mock('@/lib/generation-quota', () => ({
   checkGenerationCapacity: mocks.checkGenerationCapacity,
   checkProjectVideoBudget: mocks.checkProjectVideoBudget,
+  syncFalKeyLimits: async () => {},
 }))
 vi.mock('@/lib/api/quota', () => ({
   quotaRejectionResponse: () => new Response(JSON.stringify({ error: 'quota' }), { status: 429 }),
@@ -37,6 +38,7 @@ vi.mock('@/lib/fal/webhook-url', () => ({ resolveWebhookUrl: () => undefined }))
 // #previz-record-before-submit: 라우트가 제출 전에 키를 골라 작업 행에 기록한다.
 vi.mock('@/lib/fal/keys', () => ({
   pickFalKey: async () => ({ id: 'key-1', client: { queue: { submit: vi.fn() } } }),
+  falKeyById: (id: string) => id === 'key-1' ? { id, client: { queue: { submit: vi.fn() } } } : null,
 }))
 vi.mock('@/lib/writer/i18n/derive-en', () => ({ deriveEnBatch: mocks.deriveEnBatch }))
 vi.mock('@/lib/supabase/admin', () => ({
@@ -105,7 +107,7 @@ beforeEach(() => {
   mocks.checkGenerationCapacity.mockResolvedValue({ ok: true })
   mocks.deriveEnBatch.mockResolvedValue(new Map([['a', 'walks forward']]))
   mocks.falVideoSubmit.mockResolvedValue({ request_id: 'fal-1', model: 'happy-horse-model', fal_key_id: 'key-1' })
-  mocks.createGenerationJob.mockResolvedValue({ id: 'job-1' })
+  mocks.createGenerationJob.mockResolvedValue({ id: 'job-1', fal_key_id: 'key-1' })
   mocks.failGenerationJob.mockResolvedValue(undefined)
 })
 

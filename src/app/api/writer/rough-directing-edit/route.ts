@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getUser } from '@/lib/supabase/auth'
 import { userOwnsProject } from '@/lib/generation-jobs'
+import { capacityReservationRejection } from '@/lib/api/quota'
 import {
   separateArrowLayer,
   saveDirectingFrame,
@@ -45,6 +46,7 @@ const BodySchema = z.discriminatedUnion('action', [
 ])
 
 export async function POST(req: Request) {
+  let capacityContext: { projectId: string; kind: string; userId: string } | null = null
   try {
     const user = await getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -54,6 +56,7 @@ export async function POST(req: Request) {
     if (!(await userOwnsProject(body.projectId, user.id))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+    capacityContext = { projectId: body.projectId, kind: 'image_generation', userId: user.id }
 
     if (body.action === 'separate') {
       const data = await separateArrowLayer(body.projectId, body.shotId)
@@ -70,6 +73,8 @@ export async function POST(req: Request) {
     const data = await saveDirectingFrame(body.projectId, body.shotId, body.image)
     return NextResponse.json({ data })
   } catch (e) {
+    const rejected = capacityContext && capacityReservationRejection(e, capacityContext)
+    if (rejected) return rejected
     const msg = e instanceof Error ? e.message : String(e)
     console.error('[writer/rough-directing-edit]', msg)
     return NextResponse.json({ error: msg }, { status: 500 })

@@ -125,33 +125,13 @@ function isPermanentProviderLookupFailure(error: unknown): boolean {
 }
 
 /** queued job을 persisted provider의 진실로 reconcile한다. Provider 조회 오류만 queued로 남긴다. */
-export async function reconcileJobFromFal(
-  job: GenerationJob,
-  options: { settleStaleReserved?: boolean } = {},
-): Promise<GenerationJob> {
-  // 예약만 되고 제출은 못 한 상태(#reserved-zombie 2026-09-08).
-  //   fal 은 이 작업을 모른다 — 물어볼 대상이 없어 예전에는 그냥 지나쳤고, 그 탓에 잡은 Take 가
-  //   영원히 묶였다(webhook 은 request_id 매칭이라 'reserved:' 와 절대 안 맞는다).
-  //   fal 이 모른다는 것 자체가 답이다 — 제출이 안 됐으니 물어볼 필요 없이 실패로 확정하면 된다.
-  //
-  //   다만 "지금 제출 중" 과 "제출 못 하고 죽음" 을 이 함수 안에서는 구분할 수 없다 —
-  //   GenerationJob 은 created_at 을 싣지 않는다(COLUMNS, generation-jobs.ts:77).
-  //   그래서 나이 판정은 호출자 몫이다: 유령 청소부는 이미 .lt(created_at, now-STALE) 로 거르므로
-  //   settleStaleReserved 를 켜서 부르고, 폴링(GET [id])은 켜지 않아 제출 중인 작업을 죽이지 않는다.
-  //   terminalizeJob 이 hold 반환까지 맡는다(연결형은 markDirectorVideoAttemptFailed,
-  //   비연결형은 releaseTakesForJob).
-  if (job.request_id.startsWith('reserved:')) {
-    // 러프와 이미지(비영상 kind) 예약은 접수 응답을 잃었을 수 있으니 시간만으로 닫지 않는다 —
-    //   실패로 굳히면 같은 그림이 다시 발주된다. 2026-09-14: 이미지 5경로도 자리 예약을 먼저 잡고
-    //   제출하는 순서로 바뀌어, 러프만 예외로 두면 같은 사고가 나머지 이미지 kind 에서 그대로 재현된다.
-    //   Take(과금)가 묶이는 것은 영상뿐이라 시간 기반 정리가 꼭 필요한 곳도 영상이다.
-    if (job.kind !== 'shot_video' && job.kind !== 'shot_previz_video') return job
-    // #batch-resume: 접수 뒤 연결 기록만 잃었을 수도 있다. 일괄은 저장한 증표로 복구하며,
-    //   시간만으로 미제출이라 단정해 환급하거나 다른 키로 다시 제출하지 않는다.
-    if (job.batch_id) return job
-    if (!options.settleStaleReserved) return job
-    return terminalizeJob(job, 'job was never submitted to the provider (reserved slot expired) — held takes returned')
-  }
+export async function reconcileJobFromFal(job: GenerationJob): Promise<GenerationJob> {
+  // 접수 여부가 확인될 때까지 예약과 사용량을 유지한다.
+  //   request_id='reserved:<id>' 는 어떤 kind·일괄 작업이든 제공자 요청이 접수됐을 수 있는 상태다.
+  //   확인이 늦으면 사용량이 묶이지만, 시간만으로 미제출이라 단정해 실패·환급하거나 재제출하면
+  //   같은 생성의 중복 비용이 발생할 수 있다. 접수 기록 복구는 호출자의 범위를 벗어나므로
+  //   현재 확인할 수 없는 상태를 queued 그대로 보존한다.
+  if (job.request_id.startsWith('reserved:')) return job
 
   if (job.provider === 'local') {
     if (job.kind !== 'shot_video') return job
@@ -202,9 +182,9 @@ export async function reconcileJobFromFal(
 // 숨기기만 하면 제출 탭의 폴링이 죽은 잡은 아무도 fal 진실을 회수하지 않는다 — 과금은 끝났고
 // 결과가 fal 큐에 있는데 화면은 영영 무반응(실측: rough 잡 5시간 queued 방치). webhook 없는
 // 로컬(resolveWebhookUrl()=undefined)에선 폴링이 유일한 완결 경로라 특히 잘 갇힌다.
-// active 라우트가 목록 조회 전에 이 스윕을 호출해, 유령을 fal 진실로 종결시킨다
-// (완료→finalize 회수, 실패→failed 배지, 진행 중→그대로). 자동 재생성이 아니라 이미 지불한
-// 결과의 회수이므로 과금 원칙(빈칸 자율 채움 금지 대상 아님)과 충돌하지 않는다.
+// active 라우트가 목록 조회 전에 이 스윕을 호출해, 접수된 유령을 fal 진실로 종결시킨다
+// (완료→finalize 회수, 실패→failed 배지, 진행 중→그대로). 접수 여부를 확인할 수 없는
+// reserved: 행은 여기서도 queued 그대로 보존해 시간만으로 실패·환급하지 않는다.
 
 const GHOST_SWEEP_THROTTLE_MS = 60_000
 const GHOST_SWEEP_MAX_JOBS = 5
@@ -249,9 +229,7 @@ export async function reconcileGhostQueuedJobs(projectId: string): Promise<numbe
         //   queued 일 때만 착수해 중복 finalize 시도를 줄인다 (review M11). CAS 는 그대로 최종 방어선.
         const job = await getGenerationJobById(id)
         if (!job || job.status !== 'queued') continue
-        // 이 목록은 이미 STALE_QUEUED_MS 를 넘긴 것만 담고 있다(위 .lt 조건) — 그래서 제출도
-        //   못 한 채 남은 reserved: 잡을 여기서 정리해도 안전하다(#reserved-zombie).
-        const after = await reconcileJobFromFal(job, { settleStaleReserved: true })
+        const after = await reconcileJobFromFal(job)
         if (after.status !== 'queued') settled += 1
       } catch (e) {
         // 잡 하나의 회수 실패가 스윕 전체·목록 조회를 죽이면 안 된다. 다음 스윕이 재시도한다.

@@ -1,0 +1,742 @@
+{
+  "startedAt": "2026-09-14T05:16:33.203Z",
+  "developmentProject": "pbiumddivadgbzxuymak",
+  "schema": "capacity_axes_1a21dead51d243e4be483661524378b3",
+  "migrations": [
+    "20260914110000_generation_capacity_all_axes.sql",
+    "20260914150000_generation_capacity_key_assignment.sql"
+  ],
+  "migrationPaths": [
+    "supabase/migrations/20260914110000_generation_capacity_all_axes.sql",
+    "supabase/migrations/20260914150000_generation_capacity_key_assignment.sql"
+  ],
+  "migrationSha256": [
+    "318b18f8bf373cca56bf64604f37dccf8627d887ee9ef90d70c58ba77cade22c",
+    "5ec5c5b93a686b75b8abf04e1a810ae83fd8d91b3fb1f59c231767192221274e"
+  ],
+  "safety": {
+    "applicationRowsRead": 0,
+    "applicationRowsWritten": 0,
+    "paidFalRequests": 0,
+    "publicMigrationsApplied": 0,
+    "verifiedTls": true,
+    "developmentIdentityVerified": true,
+    "publicFunctionsBefore": {
+      "function_count": 28,
+      "fingerprint": "a3c360f95b253b1469c58b0ff0a092f0"
+    },
+    "temporarySchemaRemoved": true,
+    "publicFunctionsAfter": {
+      "function_count": 28,
+      "fingerprint": "a3c360f95b253b1469c58b0ff0a092f0"
+    },
+    "publicFunctionsUnchanged": true
+  },
+  "observations": [
+    {
+      "id": "user_video_3",
+      "promise": "영상이 2개 진행 중일 때 12건을 동시에 요청해도 진행 영상은 3개를 넘지 않는다",
+      "expectedLimit": 3,
+      "expectedAccepted": 1,
+      "baseline": 2,
+      "requested": 12,
+      "accepted": 1,
+      "rejected": 11,
+      "finalActive": 3,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1450878,
+        1450877,
+        1450879,
+        1450873,
+        1450869,
+        1450871,
+        1450874,
+        1450872,
+        1450870,
+        1450876,
+        1450862,
+        1450868
+      ],
+      "transactionIds": [
+        "6911",
+        "6909",
+        "6910",
+        "6913",
+        "6914",
+        "6916",
+        "6917",
+        "6912",
+        "6908",
+        "6915",
+        "6919",
+        "6918"
+      ],
+      "preReadCounts": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "observedAdvisoryWaiters": 12,
+      "reassignedTo": null,
+      "allowedErrors": [
+        "video_user_at_capacity"
+      ],
+      "errors": [
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity"
+      ],
+      "observationValid": true,
+      "policyPassed": true
+    },
+    {
+      "id": "user_image_6",
+      "promise": "이미지가 5개 진행 중일 때 12건을 동시에 요청해도 진행 이미지 작업은 6개를 넘지 않는다",
+      "expectedLimit": 6,
+      "expectedAccepted": 1,
+      "baseline": 5,
+      "requested": 12,
+      "accepted": 1,
+      "rejected": 11,
+      "finalActive": 6,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1450878,
+        1450871,
+        1450862,
+        1450877,
+        1450879,
+        1450869,
+        1450874,
+        1450872,
+        1450870,
+        1450868,
+        1450873,
+        1450876
+      ],
+      "transactionIds": [
+        "6931",
+        "6932",
+        "6930",
+        "6933",
+        "6936",
+        "6938",
+        "6940",
+        "6939",
+        "6934",
+        "6935",
+        "6941",
+        "6937"
+      ],
+      "preReadCounts": [
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5
+      ],
+      "observedAdvisoryWaiters": null,
+      "reassignedTo": null,
+      "allowedErrors": [
+        "image_user_at_capacity"
+      ],
+      "errors": [
+        "image_user_at_capacity",
+        "image_user_at_capacity",
+        "image_user_at_capacity",
+        "image_user_at_capacity",
+        "image_user_at_capacity",
+        "image_user_at_capacity",
+        "image_user_at_capacity",
+        "image_user_at_capacity",
+        "image_user_at_capacity",
+        "image_user_at_capacity",
+        "image_user_at_capacity"
+      ],
+      "observationValid": true,
+      "policyPassed": true
+    },
+    {
+      "id": "null_key_reassigned",
+      "promise": "fal 예약 키가 비어 있으면 A가 꽉 차도 여유가 가장 큰 B에 최종 기록된다",
+      "expectedLimit": 2,
+      "expectedAccepted": 1,
+      "baseline": 1,
+      "requested": 1,
+      "accepted": 1,
+      "rejected": 0,
+      "finalActive": 2,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1450872
+      ],
+      "transactionIds": [
+        "6957"
+      ],
+      "preReadCounts": [
+        1
+      ],
+      "observedAdvisoryWaiters": null,
+      "reassignedTo": [
+        "key-b"
+      ],
+      "allowedErrors": [],
+      "errors": [],
+      "observationValid": true,
+      "policyPassed": true
+    },
+    {
+      "id": "all_keys_full",
+      "promise": "fal 계정 두 개가 모두 차면 키를 생략한 예약도 거절된다",
+      "expectedLimit": 2,
+      "expectedAccepted": 0,
+      "baseline": 2,
+      "requested": 1,
+      "accepted": 0,
+      "rejected": 1,
+      "finalActive": 2,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1450872
+      ],
+      "transactionIds": [
+        "6976"
+      ],
+      "preReadCounts": [
+        2
+      ],
+      "observedAdvisoryWaiters": null,
+      "reassignedTo": null,
+      "allowedErrors": [
+        "key_at_capacity"
+      ],
+      "errors": [
+        "key_at_capacity"
+      ],
+      "observationValid": true,
+      "policyPassed": true
+    },
+    {
+      "id": "empty_key_limits",
+      "promise": "fal 키 설정표가 비어 있으면 키를 생략한 예약은 명시 오류로 닫힌다",
+      "expectedLimit": 0,
+      "expectedAccepted": 0,
+      "baseline": 0,
+      "requested": 1,
+      "accepted": 0,
+      "rejected": 1,
+      "finalActive": 0,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1450872
+      ],
+      "transactionIds": [
+        "6985"
+      ],
+      "preReadCounts": [
+        0
+      ],
+      "observedAdvisoryWaiters": null,
+      "reassignedTo": null,
+      "allowedErrors": [
+        "fal_key_unavailable"
+      ],
+      "errors": [
+        "fal_key_unavailable"
+      ],
+      "observationValid": true,
+      "policyPassed": true
+    },
+    {
+      "id": "unknown_explicit_key",
+      "promise": "설정표 밖의 fal 키를 명시하면 명시 오류로 닫힌다",
+      "expectedLimit": 1,
+      "expectedAccepted": 0,
+      "baseline": 0,
+      "requested": 1,
+      "accepted": 0,
+      "rejected": 1,
+      "finalActive": 0,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1450872
+      ],
+      "transactionIds": [
+        "7001"
+      ],
+      "preReadCounts": [
+        0
+      ],
+      "observedAdvisoryWaiters": null,
+      "reassignedTo": null,
+      "allowedErrors": [
+        "fal_key_unknown"
+      ],
+      "errors": [
+        "fal_key_unknown"
+      ],
+      "observationValid": true,
+      "policyPassed": true
+    },
+    {
+      "id": "local_key_untouched",
+      "promise": "local 예약은 fal 키 설정이 있어도 키를 배정하지 않고 기존 전체 한도만 따른다",
+      "expectedLimit": 1,
+      "expectedAccepted": 1,
+      "baseline": 0,
+      "requested": 1,
+      "accepted": 1,
+      "rejected": 0,
+      "finalActive": 1,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1450872
+      ],
+      "transactionIds": [
+        "7024"
+      ],
+      "preReadCounts": [
+        0
+      ],
+      "observedAdvisoryWaiters": null,
+      "reassignedTo": null,
+      "allowedErrors": [],
+      "errors": [],
+      "observationValid": true,
+      "policyPassed": true
+    },
+    {
+      "id": "null_user_unresolved",
+      "promise": "user_id와 소유 workspace를 모두 확인할 수 없으면 예약을 fail closed 한다",
+      "expectedLimit": 0,
+      "expectedAccepted": 0,
+      "baseline": 0,
+      "requested": 1,
+      "accepted": 0,
+      "rejected": 1,
+      "finalActive": 0,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1450872
+      ],
+      "transactionIds": [
+        "7030"
+      ],
+      "preReadCounts": [
+        0
+      ],
+      "observedAdvisoryWaiters": null,
+      "reassignedTo": null,
+      "allowedErrors": [
+        "generation_owner_unresolved"
+      ],
+      "errors": [
+        "generation_owner_unresolved"
+      ],
+      "observationValid": true,
+      "policyPassed": true
+    },
+    {
+      "id": "null_user_owner_resolved",
+      "promise": "user_id가 비어도 project workspace 소유자로 보완해 개인 이미지 한도를 그대로 적용한다",
+      "expectedLimit": 6,
+      "expectedAccepted": 1,
+      "baseline": 5,
+      "requested": 1,
+      "accepted": 1,
+      "rejected": 0,
+      "finalActive": 6,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1450872
+      ],
+      "transactionIds": [
+        "7048"
+      ],
+      "preReadCounts": [
+        5
+      ],
+      "observedAdvisoryWaiters": null,
+      "reassignedTo": null,
+      "allowedErrors": [],
+      "errors": [],
+      "observationValid": true,
+      "policyPassed": true
+    },
+    {
+      "id": "global_68",
+      "promise": "전체 68칸(34+34) 중 1칸이 남았을 때 서로 다른 12명이 동시에 요청해도 전체 진행 작업은 68개를 넘지 않는다",
+      "expectedLimit": 68,
+      "expectedAccepted": 1,
+      "baseline": 67,
+      "requested": 12,
+      "accepted": 1,
+      "rejected": 11,
+      "finalActive": 68,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1450870,
+        1450877,
+        1450872,
+        1450873,
+        1450868,
+        1450869,
+        1450878,
+        1450876,
+        1450871,
+        1450879,
+        1450862,
+        1450874
+      ],
+      "transactionIds": [
+        "7065",
+        "7067",
+        "7059",
+        "7060",
+        "7066",
+        "7068",
+        "7069",
+        "7063",
+        "7061",
+        "7062",
+        "7070",
+        "7064"
+      ],
+      "preReadCounts": [
+        67,
+        67,
+        67,
+        67,
+        67,
+        67,
+        67,
+        67,
+        67,
+        67,
+        67,
+        67
+      ],
+      "observedAdvisoryWaiters": null,
+      "reassignedTo": null,
+      "allowedErrors": [
+        "global_at_capacity",
+        "key_at_capacity"
+      ],
+      "errors": [
+        "key_at_capacity",
+        "key_at_capacity",
+        "key_at_capacity",
+        "key_at_capacity",
+        "key_at_capacity",
+        "key_at_capacity",
+        "key_at_capacity",
+        "key_at_capacity",
+        "key_at_capacity",
+        "key_at_capacity",
+        "key_at_capacity"
+      ],
+      "observationValid": true,
+      "policyPassed": true
+    },
+    {
+      "id": "key_spillover",
+      "promise": "내가 고른 계정이 찼어도 옆 계정에 자리가 있으면 거절하지 않고 그 계정으로 넣는다",
+      "expectedLimit": 68,
+      "expectedAccepted": 5,
+      "baseline": 34,
+      "requested": 5,
+      "accepted": 5,
+      "rejected": 0,
+      "finalActive": 39,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1450868,
+        1450873,
+        1450871,
+        1450876,
+        1450874
+      ],
+      "transactionIds": [
+        "7077",
+        "7079",
+        "7078",
+        "7081",
+        "7080"
+      ],
+      "preReadCounts": [
+        34,
+        34,
+        34,
+        34,
+        34
+      ],
+      "observedAdvisoryWaiters": null,
+      "reassignedTo": [
+        "key-b"
+      ],
+      "allowedErrors": [],
+      "errors": [],
+      "observationValid": true,
+      "policyPassed": true
+    },
+    {
+      "id": "exempt_global_block",
+      "promise": "두 계정이 모두 찼으면 관리자도 거절된다",
+      "expectedLimit": 68,
+      "expectedAccepted": 0,
+      "baseline": 68,
+      "requested": 1,
+      "accepted": 0,
+      "rejected": 1,
+      "finalActive": 68,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1450871
+      ],
+      "transactionIds": [
+        "7095"
+      ],
+      "preReadCounts": [
+        68
+      ],
+      "observedAdvisoryWaiters": null,
+      "reassignedTo": null,
+      "allowedErrors": [
+        "global_at_capacity",
+        "key_at_capacity"
+      ],
+      "errors": [
+        "key_at_capacity"
+      ],
+      "observationValid": true,
+      "policyPassed": true
+    },
+    {
+      "id": "exempt_video_over_limit",
+      "promise": "관리자는 내 영상 3개를 넘어도 전체 자리가 남아 있으면 수용된다",
+      "expectedLimit": 4,
+      "expectedAccepted": 1,
+      "baseline": 3,
+      "requested": 1,
+      "accepted": 1,
+      "rejected": 0,
+      "finalActive": 4,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1450871
+      ],
+      "transactionIds": [
+        "7107"
+      ],
+      "preReadCounts": [
+        3
+      ],
+      "observedAdvisoryWaiters": null,
+      "reassignedTo": null,
+      "allowedErrors": [],
+      "errors": [],
+      "observationValid": true,
+      "policyPassed": true
+    },
+    {
+      "id": "completed_video_releases_slot",
+      "promise": "진행 영상 3개 중 1개가 끝나면 다음 영상 1개를 시작할 수 있다",
+      "expectedLimit": 3,
+      "expectedAccepted": 1,
+      "baseline": 2,
+      "requested": 1,
+      "accepted": 1,
+      "rejected": 0,
+      "finalActive": 3,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1450871
+      ],
+      "transactionIds": [
+        "7117"
+      ],
+      "preReadCounts": [
+        2
+      ],
+      "observedAdvisoryWaiters": null,
+      "reassignedTo": null,
+      "allowedErrors": [],
+      "errors": [],
+      "observationValid": true,
+      "policyPassed": true
+    }
+  ],
+  "policyResults": [
+    {
+      "id": "user_video_3",
+      "promise": "영상이 2개 진행 중일 때 12건을 동시에 요청해도 진행 영상은 3개를 넘지 않는다",
+      "expectedLimit": 3,
+      "expectedAccepted": 1,
+      "accepted": 1,
+      "observedActive": 3,
+      "reassignedTo": null,
+      "passed": true
+    },
+    {
+      "id": "user_image_6",
+      "promise": "이미지가 5개 진행 중일 때 12건을 동시에 요청해도 진행 이미지 작업은 6개를 넘지 않는다",
+      "expectedLimit": 6,
+      "expectedAccepted": 1,
+      "accepted": 1,
+      "observedActive": 6,
+      "reassignedTo": null,
+      "passed": true
+    },
+    {
+      "id": "null_key_reassigned",
+      "promise": "fal 예약 키가 비어 있으면 A가 꽉 차도 여유가 가장 큰 B에 최종 기록된다",
+      "expectedLimit": 2,
+      "expectedAccepted": 1,
+      "accepted": 1,
+      "observedActive": 2,
+      "reassignedTo": [
+        "key-b"
+      ],
+      "passed": true
+    },
+    {
+      "id": "all_keys_full",
+      "promise": "fal 계정 두 개가 모두 차면 키를 생략한 예약도 거절된다",
+      "expectedLimit": 2,
+      "expectedAccepted": 0,
+      "accepted": 0,
+      "observedActive": 2,
+      "reassignedTo": null,
+      "passed": true
+    },
+    {
+      "id": "empty_key_limits",
+      "promise": "fal 키 설정표가 비어 있으면 키를 생략한 예약은 명시 오류로 닫힌다",
+      "expectedLimit": 0,
+      "expectedAccepted": 0,
+      "accepted": 0,
+      "observedActive": 0,
+      "reassignedTo": null,
+      "passed": true
+    },
+    {
+      "id": "unknown_explicit_key",
+      "promise": "설정표 밖의 fal 키를 명시하면 명시 오류로 닫힌다",
+      "expectedLimit": 1,
+      "expectedAccepted": 0,
+      "accepted": 0,
+      "observedActive": 0,
+      "reassignedTo": null,
+      "passed": true
+    },
+    {
+      "id": "local_key_untouched",
+      "promise": "local 예약은 fal 키 설정이 있어도 키를 배정하지 않고 기존 전체 한도만 따른다",
+      "expectedLimit": 1,
+      "expectedAccepted": 1,
+      "accepted": 1,
+      "observedActive": 1,
+      "reassignedTo": null,
+      "passed": true
+    },
+    {
+      "id": "null_user_unresolved",
+      "promise": "user_id와 소유 workspace를 모두 확인할 수 없으면 예약을 fail closed 한다",
+      "expectedLimit": 0,
+      "expectedAccepted": 0,
+      "accepted": 0,
+      "observedActive": 0,
+      "reassignedTo": null,
+      "passed": true
+    },
+    {
+      "id": "null_user_owner_resolved",
+      "promise": "user_id가 비어도 project workspace 소유자로 보완해 개인 이미지 한도를 그대로 적용한다",
+      "expectedLimit": 6,
+      "expectedAccepted": 1,
+      "accepted": 1,
+      "observedActive": 6,
+      "reassignedTo": null,
+      "passed": true
+    },
+    {
+      "id": "global_68",
+      "promise": "전체 68칸(34+34) 중 1칸이 남았을 때 서로 다른 12명이 동시에 요청해도 전체 진행 작업은 68개를 넘지 않는다",
+      "expectedLimit": 68,
+      "expectedAccepted": 1,
+      "accepted": 1,
+      "observedActive": 68,
+      "reassignedTo": null,
+      "passed": true
+    },
+    {
+      "id": "key_spillover",
+      "promise": "내가 고른 계정이 찼어도 옆 계정에 자리가 있으면 거절하지 않고 그 계정으로 넣는다",
+      "expectedLimit": 68,
+      "expectedAccepted": 5,
+      "accepted": 5,
+      "observedActive": 39,
+      "reassignedTo": [
+        "key-b"
+      ],
+      "passed": true
+    },
+    {
+      "id": "exempt_global_block",
+      "promise": "두 계정이 모두 찼으면 관리자도 거절된다",
+      "expectedLimit": 68,
+      "expectedAccepted": 0,
+      "accepted": 0,
+      "observedActive": 68,
+      "reassignedTo": null,
+      "passed": true
+    },
+    {
+      "id": "exempt_video_over_limit",
+      "promise": "관리자는 내 영상 3개를 넘어도 전체 자리가 남아 있으면 수용된다",
+      "expectedLimit": 4,
+      "expectedAccepted": 1,
+      "accepted": 1,
+      "observedActive": 4,
+      "reassignedTo": null,
+      "passed": true
+    },
+    {
+      "id": "completed_video_releases_slot",
+      "promise": "진행 영상 3개 중 1개가 끝나면 다음 영상 1개를 시작할 수 있다",
+      "expectedLimit": 3,
+      "expectedAccepted": 1,
+      "accepted": 1,
+      "observedActive": 3,
+      "reassignedTo": null,
+      "passed": true
+    }
+  ],
+  "testProcessExitCode": 0,
+  "finishedAt": "2026-09-14T05:16:52.613Z"
+}

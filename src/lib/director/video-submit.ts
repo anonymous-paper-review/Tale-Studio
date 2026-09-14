@@ -4,7 +4,7 @@ import { resolveStyleAnchorByKey } from '@/lib/style-anchor'
 import { getUser } from '@/lib/supabase/auth'
 import { resolveSubmitIdentity } from '@/lib/director/video-submit-identity'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
-import { pickFalKey } from '@/lib/fal/keys'
+import { FalUnknownKeyError, falKeyById } from '@/lib/fal/keys'
 import {
   type DialogueLine,
   type DialogueSpeaker,
@@ -16,7 +16,7 @@ import type { ShotDynamicSpec } from '@/lib/writer/types/pipeline'
 import { getGenerationJobById, linkGenerationJobToChatTrace, userOwnsProject } from '@/lib/generation-jobs'
 import { isChatTraceId } from '@/lib/chat-trace'
 import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
-import { checkGenerationCapacity, checkProjectVideoBudget } from '@/lib/generation-quota'
+import { checkGenerationCapacity, checkProjectVideoBudget, syncFalKeyLimits } from '@/lib/generation-quota'
 import { quotaRejectionResponse, videoBudgetRejectionResponse, capacityReservationRejection } from '@/lib/api/quota'
 import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
@@ -222,9 +222,12 @@ function buildFalReferenceToVideoRequest(
 
 async function submitFalReferenceToVideo(
   request: FalVideoSubmitRequest,
-  webhookUrl?: string,
+  webhookUrl: string | undefined,
+  falKeyId: unknown,
 ) {
-  const k = await pickFalKey()
+  const normalizedFalKeyId = typeof falKeyId === 'string' && falKeyId.trim() ? falKeyId : null
+  const k = normalizedFalKeyId ? falKeyById(normalizedFalKeyId) : null
+  if (!k || k.id !== normalizedFalKeyId) throw new FalUnknownKeyError(normalizedFalKeyId)
   const { request_id } = await k.client.queue.submit(
     request.model,
     webhookUrl ? { input: request.input, webhookUrl } : { input: request.input },
@@ -914,6 +917,10 @@ async function submitPreparedVideo(
       }
     }
 
+    // FAL 예약 트리거가 계정별 상한을 판정할 수 있도록 환경의 키 한도를 먼저 동기화한다.
+    // local 제출은 FAL 키가 없으므로 이 동기화와 키 조회를 건너뛴다.
+    if (!isLocal) await syncFalKeyLimits()
+
     // #video-capacity-trigger: 예약 RPC 자체가 동시 경쟁 한도 거절을 던질 수 있다 — 이 예외만 이 자리에서
     //   429 로 전환한다(hold/provider 는 아직 불리지 않았다). 다른 예외는 그대로 바깥 층의 기존
     //   catch 로 전파된다.
@@ -1033,6 +1040,7 @@ async function submitPreparedVideo(
           : await submitFalReferenceToVideo(
               reservedSubmission.falRequest,
               resolveWebhookUrl(),
+              reservedJob.fal_key_id,
             )
       } catch (error) {
         if (error instanceof AmbiguousVideoSubmissionError || isAmbiguousSubmitError(error)) {

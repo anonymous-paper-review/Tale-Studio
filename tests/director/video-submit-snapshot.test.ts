@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   userOwnsProject: vi.fn(),
   checkGenerationCapacity: vi.fn(),
   checkProjectVideoBudget: vi.fn(),
+  syncFalKeyLimits: vi.fn(),
   reserveTake: vi.fn(),
   reserveRegeneration: vi.fn(),
   getJob: vi.fn(),
@@ -21,6 +22,9 @@ const mocks = vi.hoisted(() => ({
   finalize: vi.fn(),
   buildPrompt: vi.fn(),
   recordObservability: vi.fn(),
+  falKeyById: vi.fn(),
+  pickFalKey: vi.fn(),
+  submitKeyB: vi.fn(),
 }))
 
 vi.mock('@/lib/generation-jobs', () => ({
@@ -31,6 +35,7 @@ vi.mock('@/lib/generation-quota', () => ({
   checkGenerationCapacity: mocks.checkGenerationCapacity,
   quotaExceededBody: () => ({ error: 'quota' }),
   checkProjectVideoBudget: mocks.checkProjectVideoBudget,
+  syncFalKeyLimits: mocks.syncFalKeyLimits,
   videoBudgetExceededBody: () => ({ error: 'video budget' }),
 }))
 // 새 capacityReservationRejection(error, ctx) 는 actual quota.ts 에서 그대로 재사용한다 —
@@ -67,7 +72,14 @@ vi.mock('@/lib/fal/finalize', async (importOriginal) => ({
 }))
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: { from: mocks.from, rpc: mocks.rpc } }))
 vi.mock('@/lib/fal/keys', () => ({
-  pickFalKey: vi.fn(async () => ({ id: 'prod-2000', maxInflight: 40, client: { queue: { submit: mocks.submit } } })),
+  pickFalKey: mocks.pickFalKey,
+  falKeyById: mocks.falKeyById,
+  FalUnknownKeyError: class FalUnknownKeyError extends Error {
+    constructor(id: string | null | undefined) {
+      super(`unknown fal key id: ${id ?? '(missing)'}`)
+      this.name = 'FalUnknownKeyError'
+    }
+  },
 }))
 
 import {
@@ -126,6 +138,7 @@ function reservedFalJobFromSnapshot(inputSnapshot: unknown, overrides: Record<st
     id: 'job-1',
     request_id: 'reserved:job-1',
     provider: 'fal',
+    fal_key_id: 'prod-2000',
     model: 'stored-model',
     status: 'queued',
     input_snapshot: inputSnapshot,
@@ -139,6 +152,11 @@ beforeEach(() => {
   mocks.userOwnsProject.mockResolvedValue(true)
   mocks.checkGenerationCapacity.mockResolvedValue({ ok: true })
   mocks.checkProjectVideoBudget.mockResolvedValue({ ok: true, used: 0, limit: 100 })
+  mocks.syncFalKeyLimits.mockResolvedValue(undefined)
+  mocks.pickFalKey.mockResolvedValue({ id: 'prod-2000', maxInflight: 40, client: { queue: { submit: mocks.submit } } })
+  mocks.falKeyById.mockImplementation((id: string) => id === 'prod-2000'
+    ? { id: 'prod-2000', maxInflight: 40, client: { queue: { submit: mocks.submit } } }
+    : null)
   mocks.buildPrompt.mockImplementation((input: { prompt: string }) => ({ fullPrompt: input.prompt, prompt_parts: [] }))
   mocks.from
     .mockReturnValueOnce(query({ workspace_id: 'workspace-1' }))
@@ -220,6 +238,45 @@ describe('고정한 입력을 그대로 제출하는 약속', () => {
           PRODUCTION_STORYBOARD_IMAGE.frames.end,
         ],
       }) }),
+    )
+  })
+
+  it('DB trigger가 예약 계정을 B로 재배정하면 실제 FAL 제출도 B로 보낸다', async () => {
+    const prepared = await requirePrepared(request())
+    mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: false })
+    mocks.getJob.mockResolvedValue(reservedFalJobFromSnapshot(prepared.inputSnapshot, { fal_key_id: 'key-b' }))
+    mocks.falKeyById.mockImplementation((id: string) => id === 'key-b'
+      ? { id: 'key-b', maxInflight: 40, client: { queue: { submit: mocks.submitKeyB } } }
+      : null)
+    mocks.submitKeyB.mockResolvedValue({ request_id: 'fal-b' })
+
+    const response = await submitPreparedDirectorVideo(prepared)
+
+    expect(response.status).toBe(200)
+    expect(mocks.syncFalKeyLimits.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.reserveTake.mock.invocationCallOrder[0],
+    )
+    expect(mocks.falKeyById).toHaveBeenCalledWith('key-b')
+    expect(mocks.submitKeyB).toHaveBeenCalledTimes(1)
+    expect(mocks.submit).not.toHaveBeenCalled()
+    expect(mocks.pickFalKey).not.toHaveBeenCalled()
+  })
+
+  it('예약 행의 FAL 키 조회가 실패하면 외부 제출 없이 예약만 실패로 닫는다', async () => {
+    const prepared = await requirePrepared(request())
+    mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: false })
+    mocks.getJob.mockResolvedValue(reservedFalJobFromSnapshot(prepared.inputSnapshot, { fal_key_id: null }))
+    mocks.falKeyById.mockReturnValue(null)
+
+    const response = await submitPreparedDirectorVideo(prepared)
+
+    expect(response.status).toBe(500)
+    expect(mocks.submit).not.toHaveBeenCalled()
+    expect(mocks.submitKeyB).not.toHaveBeenCalled()
+    expect(mocks.fail).toHaveBeenCalledWith(
+      'project-1',
+      'job-1',
+      expect.stringContaining('unknown fal key id'),
     )
   })
 

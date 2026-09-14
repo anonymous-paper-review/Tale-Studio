@@ -6,11 +6,12 @@ const mocks = vi.hoisted(() => ({
   getUser: vi.fn(), userOwnsProject: vi.fn(), checkGenerationCapacity: vi.fn(),
   reserveTake: vi.fn(), reserveRegeneration: vi.fn(), getJob: vi.fn(), attach: vi.fn(), fail: vi.fn(),
   updateMetadata: vi.fn(), from: vi.fn(), rpc: vi.fn(), submit: vi.fn(), finalize: vi.fn(), reconcile: vi.fn(), buildPrompt: vi.fn(),
+  syncFalKeyLimits: vi.fn(), falKeyById: vi.fn(),
 }))
 vi.mock('@/lib/supabase/auth', () => ({ getUser: mocks.getUser }))
 vi.mock('@/lib/demo/guard-server', () => ({ demoWriteBlock: () => null }))
 vi.mock('@/lib/generation-jobs', () => ({ userOwnsProject: mocks.userOwnsProject, getGenerationJobById: mocks.getJob, getGenerationJobByRequestId: mocks.getJob }))
-vi.mock('@/lib/generation-quota', () => ({ checkGenerationCapacity: mocks.checkGenerationCapacity, quotaExceededBody: () => ({ error: 'quota' }), checkProjectVideoBudget: async () => ({ ok: true, used: 0, limit: 100 }), videoBudgetExceededBody: () => ({ error: 'video budget' }) }))
+vi.mock('@/lib/generation-quota', () => ({ checkGenerationCapacity: mocks.checkGenerationCapacity, quotaExceededBody: () => ({ error: 'quota' }), checkProjectVideoBudget: async () => ({ ok: true, used: 0, limit: 100 }), syncFalKeyLimits: mocks.syncFalKeyLimits, videoBudgetExceededBody: () => ({ error: 'video budget' }) }))
 vi.mock('@/lib/director-video-takes', () => ({ reserveDirectorVideoTake: mocks.reserveTake, reserveDirectorVideoRegeneration: mocks.reserveRegeneration, updateDirectorVideoTakeMetadata: mocks.updateMetadata, attachProviderRequestToReservedVideoJob: mocks.attach, markDirectorVideoAttemptFailed: mocks.fail }))
 vi.mock('@/lib/director/video-prompt', () => ({ buildVideoPrompt: mocks.buildPrompt }))
 vi.mock('@/lib/fal/webhook-url', () => ({ resolveWebhookUrl: () => 'https://webhook.test' }))
@@ -23,6 +24,13 @@ vi.mock('@/lib/fal/reconcile', () => ({ reconcileJobFromFal: mocks.reconcile }))
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: { from: mocks.from, rpc: mocks.rpc } }))
 vi.mock('@/lib/fal/keys', () => ({
   pickFalKey: vi.fn(async () => ({ id: 'prod-2000', maxInflight: 40, client: { queue: { submit: mocks.submit } } })),
+  falKeyById: mocks.falKeyById,
+  FalUnknownKeyError: class FalUnknownKeyError extends Error {
+    constructor(id: string | null | undefined) {
+      super(`unknown fal key id: ${id ?? '(missing)'}`)
+      this.name = 'FalUnknownKeyError'
+    }
+  },
 }))
 
 import { POST } from '@/app/api/director/generate-video/route'
@@ -69,6 +77,7 @@ function reservedFalJob(overrides: Record<string, unknown> = {}) {
     id: 'job-1',
     request_id: 'reserved:job-1',
     provider: 'fal',
+    fal_key_id: 'prod-2000',
     model: 'stored-model',
     status: 'queued',
     input_snapshot: {
@@ -128,6 +137,10 @@ function reservedLocalJob(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   vi.resetAllMocks()
   mocks.getUser.mockResolvedValue({ id: 'user-1' }); mocks.userOwnsProject.mockResolvedValue(true); mocks.checkGenerationCapacity.mockResolvedValue({ ok: true })
+  mocks.syncFalKeyLimits.mockResolvedValue(undefined)
+  mocks.falKeyById.mockImplementation((id: string) => id === 'prod-2000'
+    ? { id: 'prod-2000', maxInflight: 40, client: { queue: { submit: mocks.submit } } }
+    : null)
   mocks.buildPrompt.mockReturnValue({ fullPrompt: 'prompt', prompt_parts: [] })
   mocks.from.mockReturnValueOnce(query({ workspace_id: 'workspace-1' })).mockReturnValueOnce(query({ shot_id: 'shot-1', character_appearance_keys: {} })).mockReturnValueOnce(query(null))
   vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-service-role-key')
@@ -185,6 +198,7 @@ describe('영상 생성 요청을 예약하는 약속', () => {
           provider: 'fal',
           model: args.model,
           status: 'queued',
+          fal_key_id: 'prod-2000',
           input_snapshot: args.inputSnapshot,
         })
         return {

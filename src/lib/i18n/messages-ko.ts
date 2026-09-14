@@ -685,7 +685,7 @@ export const KO: Record<string, string> = {
   "{label}'s empty field": '{label}의 비어 있는 필드',
   'Producer, please ask one question to help fill in {target}.': 'Producer, {target}을 채울 수 있게 한 가지 질문을 해 주세요.',
   ' Current info: {current}.': ' 현재 정보: {current}.',
-  'Details (role, arc, motivation)': '상세 정보 (역할·아크·동기)',
+  'Details (role, arc, motivation)': '상세 정보 (역할·변화·동기)',
   'Name (e.g. Jia)': '이름 (예: 지아)',
   'Name (e.g. Silver Ring)': '이름 (예: 은빛 반지)',
   'Appearance: clothing, age, features': '외모: 복장, 나이, 특징',
@@ -693,10 +693,10 @@ export const KO: Record<string, string> = {
   Ready: '준비됨',
   'Ask Producer to fill this in': '프로듀서에게 채워달라',
   'Collapse details': '상세 접기',
-  'Expand details (role, arc, motivation)': '상세 펼치기 (역할·아크·동기)',
+  'Expand details (role, arc, motivation)': '상세 펼치기 (역할·변화·동기)',
   'Expand details': '상세 펼치기',
   Role: '역할',
-  'Arc (start / end / type)': '아크 (시작 / 끝 / 유형)',
+  'Arc (start / end / type)': '인물의 변화 (시작 / 끝 / 유형)',
   'Start state': '시작 상태',
   'End state': '끝 상태',
   Type: '유형',
@@ -951,7 +951,7 @@ export const KO: Record<string, string> = {
   'Unnamed object': '이름 미정 사물',
   '{who}: name needed': '{who}: 이름 필요',
   '{who}: appearance needed': '{who}: 외모(appearance) 필요',
-  '{who}: arc (start/end/type) needed': '{who}: 아크(시작/끝/유형) 필요',
+  '{who}: arc (start/end/type) needed': '{who}: 인물의 변화(시작/끝/유형) 필요',
   '{who}: motivation (want) needed': '{who}: 동기(want) 필요',
   'At least 1 background needed': '배경 1개 이상 필요',
   'A background card with a name, visual description, and purpose is needed': '이름, 시각 설명, 목적이 모두 있는 배경 카드가 필요합니다',
@@ -1098,8 +1098,8 @@ export const KO: Record<string, string> = {
   'On it, re-running the Writer with your current source. This can take a while.':
     '좋아요, 지금 원천 그대로 Writer를 다시 실행할게요! 시간이 좀 걸릴 수 있어요.',
   // D12 — 채팅이 이름/느낌으로 스타일 앵커를 직접 반영 (2026-08-31 오너)
-  "Couldn't find that art style in the catalog. Tell me the feel again or pick one in the style picker.":
-    '그 그림체는 목록에서 못 찾았어요. 느낌을 다시 말해 주거나 스타일 피커에서 골라 주세요.',
+  "Couldn't find that art style in the catalog. Tell me the feel again or choose one using the palette icon below the chat input.":
+    '그 그림체는 목록에서 못 찾았어요. 느낌을 다시 말해 주거나 채팅 입력창 아래의 팔레트 아이콘을 눌러 골라 주세요.',
   "The previous Writer run didn't finish (no scenes/shots)": '이전 Writer 실행이 완료되지 않았어요 (씬/샷 없음)',
   'Check the story and settings, then re-run to generate scenes/shots and fill in Director/Editor.': '스토리·설정을 확인하고 다시 실행하면 씬·샷이 생성돼 Director/Editor 가 채워집니다.',
   'Suggest re-running Writer': 'Writer 다시 실행 제안',
@@ -1349,7 +1349,7 @@ export const KO: Record<string, string> = {
   'Completed, but no result URL': '완료됐지만 결과 URL이 없음',
 
   // ── #20-export: ZIP 내보내기 콘텐츠 라벨 (프로젝트 locale 이 지배) ──
-  Arc: '아크',
+  Arc: '인물의 변화',
   'Artist Assets': '아티스트 에셋',
   'Asset description': '설명',
   Cast: '캐스트',

@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   requireProjectAccess: vi.fn(),
   falVideoSubmit: vi.fn(),
   pickFalKey: vi.fn(),
+  falKeyById: vi.fn(),
   createGenerationJob: vi.fn(),
   failGenerationJob: vi.fn(),
   holdTakesForVideoJob: vi.fn(),
@@ -19,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   rpc: vi.fn(),
   checkProjectVideoBudget: vi.fn(),
   checkGenerationCapacity: vi.fn(),
+  syncFalKeyLimits: vi.fn(),
   deriveEnBatch: vi.fn(),
   recordObservability: vi.fn(),
   order: [] as string[],
@@ -27,7 +29,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/lib/demo/guard-server', () => ({ demoWriteBlock: () => null }))
 vi.mock('@/lib/api/guard', () => ({ requireProjectAccess: mocks.requireProjectAccess }))
 vi.mock('@/lib/writer/llm/fal', () => ({ falVideoSubmit: mocks.falVideoSubmit }))
-vi.mock('@/lib/fal/keys', () => ({ pickFalKey: mocks.pickFalKey }))
+vi.mock('@/lib/fal/keys', () => ({ pickFalKey: mocks.pickFalKey, falKeyById: mocks.falKeyById }))
 vi.mock('@/lib/generation-jobs', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/generation-jobs')>()),
   createGenerationJob: mocks.createGenerationJob,
@@ -39,6 +41,7 @@ vi.mock('@/lib/generation-quota', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/generation-quota')>()),
   checkGenerationCapacity: mocks.checkGenerationCapacity,
   checkProjectVideoBudget: mocks.checkProjectVideoBudget,
+  syncFalKeyLimits: mocks.syncFalKeyLimits,
 }))
 // 새 capacityReservationRejection(error, ctx) 는 actual quota.ts 에서 그대로 재사용한다 —
 //   부모가 그 헬퍼를 구현하면 이 spread 로 자동 반영되고, 여기서 하드코딩한 가짜 count 는 없다.
@@ -82,17 +85,25 @@ function request() {
   })
 }
 
+function providerFailure(status: number): Error {
+  return Object.assign(new Error(`fal submit rejected (${status})`), { status })
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.order = []
   mocks.requireProjectAccess.mockResolvedValue({ ok: true, userId: 'user-1' })
   mocks.checkProjectVideoBudget.mockResolvedValue({ ok: true })
   mocks.checkGenerationCapacity.mockResolvedValue({ ok: true })
+  mocks.syncFalKeyLimits.mockImplementation(async () => {
+    mocks.order.push('sync')
+  })
   mocks.deriveEnBatch.mockResolvedValue(new Map([['a', 'a man walks']]))
   mocks.pickFalKey.mockResolvedValue({ id: 'key-1' })
+  mocks.falKeyById.mockImplementation((id: string) => (id === 'key-1' ? { id: 'key-1' } : null))
   mocks.createGenerationJob.mockImplementation(async () => {
     mocks.order.push('create-job')
-    return { id: 'job-1' }
+    return { id: 'job-1', fal_key_id: 'key-1' }
   })
   mocks.holdTakesForVideoJob.mockImplementation(async () => {
     mocks.order.push('hold')
@@ -122,7 +133,7 @@ describe('미리보기 영상 만들기 순서', () => {
     const response = await POST(request())
 
     expect(response.status).toBe(200)
-    expect(mocks.order).toEqual(['create-job', 'hold', 'submit'])
+    expect(mocks.order).toEqual(['sync', 'create-job', 'hold', 'submit'])
   })
 
   it('잔액이 모자라면 서비스로 보내지 않는다', async () => {
@@ -139,12 +150,79 @@ describe('미리보기 영상 만들기 순서', () => {
     expect(mocks.failGenerationJob).toHaveBeenCalledWith('job-1', 'insufficient_takes')
   })
 
-  it('보내기가 실패하면 잡아둔 Take 를 돌려준다', async () => {
-    mocks.falVideoSubmit.mockRejectedValue(new Error('fal unavailable'))
+  it('명확히 거절되면 잡을 실패로 닫고 잡아둔 Take 를 돌려준다', async () => {
+    mocks.falVideoSubmit.mockRejectedValue(providerFailure(400))
 
     const response = await POST(request())
 
     expect(response.status).toBe(500)
+    expect(mocks.failGenerationJob).toHaveBeenCalledWith('job-1', 'fal submit rejected (400)')
+    expect(mocks.releaseTakesForJob).toHaveBeenCalledWith('job-1')
+  })
+
+  it('예약 행의 최종 키가 처음 고른 키와 달라도 최종 키로만 보낸다', async () => {
+    const keyA = { id: 'key-a' }
+    const keyB = { id: 'key-b' }
+    mocks.pickFalKey.mockResolvedValue(keyA)
+    mocks.createGenerationJob.mockResolvedValue({ id: 'job-1', fal_key_id: keyB.id })
+    mocks.falKeyById.mockImplementation((id: string) => (id === keyB.id ? keyB : null))
+
+    const response = await POST(request())
+
+    expect(response.status).toBe(200)
+    expect(mocks.falKeyById).toHaveBeenCalledWith(keyB.id)
+    expect(mocks.falVideoSubmit).toHaveBeenCalledTimes(1)
+    expect(mocks.falVideoSubmit.mock.calls[0][1]).toBe(keyB)
+    expect(mocks.falVideoSubmit.mock.calls[0][1]).not.toBe(keyA)
+  })
+
+  it.each([408, 425, 429, 500, 503])(
+    '불명확한 제출 오류 %s 에서는 예약과 Take 를 보존한다',
+    async (status) => {
+      mocks.falVideoSubmit.mockRejectedValueOnce(providerFailure(status))
+
+      const response = await POST(request())
+
+      expect(response.status).toBe(200)
+      await expect(response.json()).resolves.toEqual({ jobId: 'job-1', status: 'queued' })
+      expect(mocks.falVideoSubmit).toHaveBeenCalledTimes(1)
+      expect(mocks.failGenerationJob).not.toHaveBeenCalled()
+      expect(mocks.releaseTakesForJob).not.toHaveBeenCalled()
+    },
+  )
+
+  it('네트워크 오류도 이미 접수됐을 수 있으므로 예약과 Take 를 보존한다', async () => {
+    mocks.falVideoSubmit.mockRejectedValueOnce(new TypeError('fetch failed'))
+
+    const response = await POST(request())
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({ jobId: 'job-1', status: 'queued' })
+    expect(mocks.failGenerationJob).not.toHaveBeenCalled()
+    expect(mocks.releaseTakesForJob).not.toHaveBeenCalled()
+  })
+
+  it('초기 fal 키 상한 동기화가 실패하면 예약과 외부 제출을 시작하지 않는다', async () => {
+    mocks.syncFalKeyLimits.mockRejectedValueOnce(new Error('fal key limit sync failed'))
+
+    const response = await POST(request())
+
+    expect(response.status).toBe(500)
+    expect(mocks.pickFalKey).not.toHaveBeenCalled()
+    expect(mocks.createGenerationJob).not.toHaveBeenCalled()
+    expect(mocks.holdTakesForVideoJob).not.toHaveBeenCalled()
+    expect(mocks.falVideoSubmit).not.toHaveBeenCalled()
+  })
+
+  it('예약 행의 최종 키를 찾을 수 없으면 외부 제출 없이 실패 처리한다', async () => {
+    mocks.createGenerationJob.mockResolvedValue({ id: 'job-1', fal_key_id: 'key-unknown' })
+    mocks.falKeyById.mockReturnValue(null)
+
+    const response = await POST(request())
+
+    expect(response.status).toBe(500)
+    expect(mocks.falVideoSubmit).not.toHaveBeenCalled()
+    expect(mocks.failGenerationJob).toHaveBeenCalledWith('job-1', 'unknown fal key id: key-unknown')
     expect(mocks.releaseTakesForJob).toHaveBeenCalledWith('job-1')
   })
 })

@@ -3883,6 +3883,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+              projectId: get().projectId,
               prompt,
               aspectRatio:
                 node.data.assetKind === 'character' ? '1:1' : '16:9',
@@ -3897,6 +3898,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             const body = (await response.json().catch(() => ({}))) as {
               error?: string
             }
+            notifyIfQuotaExceeded(response.status, body)
             throw new Error(body.error ?? `HTTP ${response.status}`)
           }
           blobUrl = URL.createObjectURL(await response.blob())
@@ -4118,6 +4120,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
+                projectId: get().projectId,
                 prompt,
                 aspectRatio: '16:9',
                 referenceImageUrls,
@@ -4126,6 +4129,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             })
             if (!res.ok) {
               const body = await res.json().catch(() => ({}))
+              notifyIfQuotaExceeded(res.status, body)
               throw new Error(body.error ?? `HTTP ${res.status}`)
             }
             const blob = await res.blob()

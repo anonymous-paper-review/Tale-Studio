@@ -1341,6 +1341,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         toolOutcomes.push(outcome)
         completedTools.push(outcome)
       }
+      let styleAnchorFailure: string | null = null
       if (stage === 'producer' && data.extractedSettings) {
         const settingsPatch = Object.fromEntries(Object.entries(data.extractedSettings).filter(([key]) => ['playtime', 'genre', 'subGenre', 'format', 'tone', 'dialogueLanguage'].includes(key)))
         if (Object.keys(settingsPatch).length) {
@@ -1361,9 +1362,29 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         if (typeof key === 'string' && key) {
           const outcome = await useProducerStore.getState().applyStyleAnchorKeyFromChat(key)
           if (!isCurrentSession()) return
-          recordLegacy({ styleAnchorKey: key }, outcome === 'applied' ? 'ok' : outcome === 'unknown_key' ? 'invalid_input' : 'unverified',
-            outcome === 'applied' ? undefined : useProducerStore.getState().error ?? translate(contentLocale(), 'Could not verify the saved changes.'))
-          patchTrace(outcome === 'applied' ? { appliedCount: 1 } : { skippedCount: 1 })
+          const styleError =
+            outcome === 'applied'
+              ? undefined
+              : useProducerStore.getState().error ??
+                translate(contentLocale(), 'Could not verify the saved changes.')
+          recordLegacy(
+            { styleAnchorKey: key },
+            outcome === 'applied'
+              ? 'ok'
+              : outcome === 'unknown_key'
+                ? 'invalid_input'
+                : 'unverified',
+            styleError,
+          )
+          if (outcome !== 'applied') {
+            patchTrace({ skippedCount: 1 })
+            styleAnchorFailure = translate(
+              contentLocale(),
+              "Couldn't find that art style in the catalog. Tell me the feel again or choose one using the palette icon below the chat input.",
+            )
+          } else {
+            patchTrace({ appliedCount: 1 })
+          }
         }
       }
       const replyBeforeReceipt = reply
@@ -1428,7 +1449,6 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           }))
           if (projectId) saveChatMessage(projectId, stage, 'model', failure)
         }
-
       }
       // #p4-choices: 에이전트가 낸 선택지를 버튼 제안으로 — 클릭 = 채팅 입력.
       if (stage === 'producer' && Array.isArray(data.choices) && data.choices.length >= 2) {
@@ -2027,6 +2047,13 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         set(state => ({ loading: false, messages: state.messages.map(message => message.id === replyId ? { ...message, content: finalReply } : message) }))
         if (projectId) saveChatMessage(projectId, stage, 'model', finalReply)
         pendingReplyId = null
+      }
+      if (styleAnchorFailure) {
+        const failure = styleAnchorFailure
+        set((state) => ({
+          messages: [...state.messages, { id: makeId(), stage, role: 'model', content: failure }],
+        }))
+        if (projectId) saveChatMessage(projectId, stage, 'model', failure)
       }
     } catch (err) {
       if (!isCurrentSession()) return

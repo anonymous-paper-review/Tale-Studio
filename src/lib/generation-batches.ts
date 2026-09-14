@@ -9,11 +9,12 @@ import type { StageId } from '@/types'
 
 export type GenerationLane = 'artist' | 'writer-rough' | 'director-storyboard' | 'director-video' | 'director-previz'
 
-export const LANE_OF_KIND: Record<GenerationJobKind, GenerationLane> = {
+export const LANE_OF_KIND: Record<GenerationJobKind, GenerationLane | null> = {
   character_view: 'artist',
   world_shot: 'artist',
   shot_rough_storyboard: 'writer-rough',
   shot_storyboard: 'director-storyboard',
+  image_generation: null,
   storyboard_real_grid: 'director-storyboard',
   shot_video: 'director-video',
   shot_previz_video: 'director-previz',
@@ -78,7 +79,7 @@ export function summarizeGenerationBatches(rows: readonly GenerationBatchRow[], 
   const byLane = new Map<GenerationLane, GenerationBatchRow[]>()
   for (const row of rows) {
     const lane = LANE_OF_KIND[row.kind]
-    if (!lane) continue
+    if (lane === null) continue
     ;(byLane.get(lane) ?? byLane.set(lane, []).get(lane)!).push(row)
   }
   const out: GenerationBatch[] = []
@@ -119,7 +120,7 @@ export function completionsOf(rows: readonly GenerationBatchRow[]): GenerationCo
     seen.add(row.id)
     if (row.status !== 'completed') continue
     const lane = LANE_OF_KIND[row.kind]
-    if (!lane) continue
+    if (lane === null) continue
     out.push({ stage: LANE_STAGE[lane], lane, at: ms(row.completed_at ?? row.updated_at ?? row.created_at), units: unitsOf(row) })
   }
   return out.sort((a, b) => a.at - b.at)
