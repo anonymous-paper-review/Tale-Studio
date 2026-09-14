@@ -3,7 +3,7 @@
 같이 정한 것:
 
 - 배포할 커밋을 지정하지 않으면 운영 설정과 DB를 바꾸지 않는다.
-- 이번 SQL 세 파일이 지정한 커밋과 같으면 그 파일만 적용한다.
+- 이번 SQL 네 파일이 지정한 커밋과 같으면 그 파일만 적용한다.
 - SQL을 적용하면 같은 트랜잭션에 적용 이력을 기록한다.
 - 같은 버전의 이력이 이미 있으면 내용까지 비교하고, 다르면 중단한다.
 - 운영 적용은 main의 커밋과 준비된 Production 배포가 일치하면 진행한다.
@@ -23,6 +23,10 @@
 - `20260914160000_storyboard_singleflight.sql`
 - `20260914170000_take_hold_idempotency.sql`
 - `20260914171000_director_video_singleflight.sql`
+- `20260914172000_generation_job_release_lifecycle.sql`
+
+네 번째 파일은 완료 작업의 차감 복구를 막고, 작업 삭제와 차감 복구를 한 번에 처리하는
+`delete_generation_job_with_release(uuid)`를 추가한다. 배포 후 함수 검증은 이 삭제 함수까지 포함한다.
 
 파일 내용은 `git show <sha>:supabase/migrations/<file>`로 읽고 현재 파일의 SHA-256과 비교한다.
 이번 파일 이외의 기존 마이그레이션 이력 부채를 정리하거나 재적용하지 않는다.
@@ -30,8 +34,8 @@
 
 ## 실행 순서
 
-1. 이번 코드와 세 SQL을 임시 배포 커밋으로 만들고 테스트를 마친다.
-2. `dev-migrate --sha <임시 SHA>`로 개발 DB에 세 SQL과 이력을 적용하고 검증한다.
+1. 이번 코드와 네 SQL을 임시 배포 커밋으로 만들고 테스트를 마친다.
+2. `dev-migrate --sha <임시 SHA>`로 개발 DB에 네 SQL과 이력을 적용하고 검증한다.
 3. 개발 DB를 기준으로 `pnpm db:types`를 실행한다. 타입·문서 보완을 후속 커밋으로 만들고 최종 검사를 마친다.
 4. `hold --sha <최종 40자리 SHA>`로 현재 운영 배포와 자동 도메인 연결 설정을 보존하고 자동 연결을 중지한다.
 5. 최종 커밋을 main에 반영한다. Git 연동으로 Production 빌드가 생성되지만 아직 운영 도메인은 옮기지 않는다.
@@ -41,11 +45,11 @@
 9. `restore --sha <최종 SHA>`로 자동 연결 설정을 원래 값으로 돌린다.
 
 개발 적용 뒤 타입 갱신 때문에 SHA가 달라지면, 첫 `hold`에서만 기록을 최종 SHA로 승계한다.
-새 SHA가 개발 검증 커밋의 후속이고, 세 SQL의 SHA-256이 모두 같으며, 아직 운영 hold를 시작하지 않았어야 한다.
+새 SHA가 개발 검증 커밋의 후속이고, 네 SQL의 SHA-256이 모두 같으며, 아직 운영 hold를 시작하지 않았어야 한다.
 개발 적용 기록의 `verifiedCommitSha`는 임시 SHA로 보존하고 `release-sha-updated` 이벤트에 이전·최종 SHA를 남긴다.
 SQL이 바뀌거나 hold 이후 SHA가 바뀌면 중단한다. 이때 원장 파일을 수동으로 바꿔 검증을 우회하지 않는다.
 
-`status`는 원격 설정·최근 배포·이번 세 이력을 읽기만 하며 파일을 쓰지 않는다.
+`status`는 원격 설정·최근 배포·이번 네 이력을 읽기만 하며 파일을 쓰지 않는다.
 모든 변경 단계는 `--sha`가 필수다. `--dry-run`을 추가하면 검증과 조회만 수행하며 API 변경·SQL 적용·결과 파일 쓰기를 하지 않는다.
 운영 적용과 승격은 `--deployment-id`도 필수다.
 
@@ -75,8 +79,8 @@ Vercel은 프로젝트 `prj_x0fGmBO62EJVmEZAhlUiOGZVHwnF`, 팀 `team_KkyWBlDMq7M
 
 ## 준비 검증 결과
 
-- 인자 필수값·이력 내용 비교·SQL 감싸기·READY/SHA·승계 제한·마스킹의 로컬 검사 26개 통과.
-- 실제 세 SQL을 조합해 실행 부분의 바깥 트랜잭션이 하나이고 원장 기록이 세 개인지 확인했다.
+- 인자 필수값·이력 내용 비교·SQL 감싸기·READY/SHA·승계 제한·마스킹의 로컬 검사 27개 통과.
+- 실제 네 SQL을 조합해 실행 부분의 바깥 트랜잭션이 하나이고 원장 기록이 네 개인지 확인했다. DB에는 실행하지 않았다.
 - `node --check`와 배포 도구 ESLint 통과.
 - `status` 읽기 전용 실행으로 Vercel 인증·프로젝트와 두 DB 이력을 확인했다.
 - 기존 main SHA를 넣은 `hold --dry-run`은 새 SQL이 그 커밋에 없어서 사전 단계에서 차단됐다.
@@ -84,3 +88,6 @@ Vercel은 프로젝트 `prj_x0fGmBO62EJVmEZAhlUiOGZVHwnF`, 팀 `team_KkyWBlDMq7M
 
 도구는 자신의 위치에서 저장소 루트를 계산한다. 별도 checkout의 같은 `.smoke/button-gating-20260914/` 경로로
 복사하면 그 checkout의 커밋·SQL·`.env.local`·`.vercel/project.json`·배포 기록을 사용한다.
+
+현재 과금 게이트는 Production·Preview 모두 `TAKE_BILLING_MODE=shadow`이다.
+배포 도구는 이 환경변수를 수정하지 않는다. 해당 키만 조회한 증거는 `take-billing-mode.json`에 보존한다.

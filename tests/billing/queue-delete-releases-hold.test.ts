@@ -41,6 +41,7 @@ beforeEach(() => {
   })
   mocks.deleteGenerationJobById.mockImplementation(async () => {
     mocks.order.push('delete')
+    return true
   })
 })
 
@@ -109,5 +110,16 @@ describe('큐 화면에서 작업을 지울 때의 Take 처리', () => {
     expect(response.status).toBe(409)
     expect(mocks.releaseTakesForJob).not.toHaveBeenCalled()
     expect(mocks.deleteGenerationJobById).not.toHaveBeenCalled()
+  })
+
+  it('작업 삭제 전에 영상이 완료되면 완료 기록과 차감액을 유지한다', async () => {
+    // 첫 조회 뒤 완료된 작업은 반환하지 않고, 삭제 직전 DB 판정도 완료 보존을 돌려준다.
+    mocks.releaseTakesForJob.mockResolvedValue(0)
+    mocks.deleteGenerationJobById.mockResolvedValue(false)
+
+    const response = await DELETE(new Request('http://localhost'), { params })
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({ ok: false, error: { code: 'completed_job' } })
   })
 })

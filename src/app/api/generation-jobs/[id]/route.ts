@@ -118,7 +118,7 @@ export async function DELETE(
 
   // 지우기 전에 잡아둔 Take 를 돌려준다(#queue-delete-release 2026-09-08) — 행이 사라지면
   //   take_ledger.ref_id 가 가리키던 잡을 다시 찾을 길이 없어 hold 가 고아로 남는다.
-  //   RPC 는 hold 가 없으면 0 을 돌려주므로(20260902150000:133) kind 무관 무조건 불러도 안전하다.
+  //   RPC 는 진행 중인 작업을 종료한 뒤 반환해 늦은 완료나 차감이 끼어들지 못하게 한다.
   //   되돌리기가 실패하면 지우지 않는다 — 다음 시도에 다시 돌려받을 근거를 남긴다.
   try {
     await releaseTakesForJob(id)
@@ -135,6 +135,12 @@ export async function DELETE(
       { status: 500 },
     )
   }
-  await deleteGenerationJobById(id)
+  const deleted = await deleteGenerationJobById(id)
+  if (!deleted) {
+    return NextResponse.json(
+      { ok: false, error: { code: 'completed_job', message: 'completed jobs are kept as history' } },
+      { status: 409 },
+    )
+  }
   return NextResponse.json({ ok: true, data: { deleted: id } })
 }

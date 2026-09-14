@@ -1,0 +1,218 @@
+{
+  "startedAt": "2026-09-14T08:48:59.206Z",
+  "developmentProject": "pbiumddivadgbzxuymak",
+  "schema": "job_lifecycle_5ee9c58e721f4c3295fa35eb71b159d1",
+  "safety": {
+    "paidProviderRequests": 0,
+    "applicationRowsRead": 0,
+    "applicationRowsWritten": 0,
+    "productionWrites": 0,
+    "publicFunctionsBefore": {
+      "count": 28,
+      "hash": "562453b89c2eb88b8d8714930e6e20a4"
+    },
+    "verifiedTls": true,
+    "isolation": "Random schema, no application rows copied; original SQL qualified to schema; unique synthetic user/project/workspace ids; no public/auth writes.",
+    "temporarySchemaRemoved": true,
+    "publicFunctionsAfter": {
+      "count": 28,
+      "hash": "562453b89c2eb88b8d8714930e6e20a4"
+    },
+    "publicFunctionsUnchanged": true
+  },
+  "scope": "Actual lifecycle SQL in an isolated schema. Baseline deletion executes the original route sequence: release RPC then separate DELETE; candidate executes one atomic RPC. No provider/application API calls.",
+  "baseline": true,
+  "observations": [
+    {
+      "behavior": "이미 완료된 영상에 늦은 실패 알림이 도착하면 차감액을 반환하지 않는다",
+      "returned": 5,
+      "job": {
+        "status": "completed",
+        "error": null,
+        "last_error": null,
+        "completed_at": null,
+        "updated_at": "2026-09-14T08:49:03.525Z"
+      },
+      "balance": 100,
+      "charged": 5,
+      "released": 5
+    },
+    {
+      "behavior": "완료 처리의 행 잠금 뒤에 반환이 도착하면 완료 확정 후 반환하지 않는다",
+      "returned": 5,
+      "job": {
+        "status": "completed",
+        "error": null,
+        "last_error": null,
+        "completed_at": null,
+        "updated_at": "2026-09-14T08:49:04.235Z"
+      },
+      "balance": 100,
+      "charged": 5,
+      "released": 5
+    },
+    {
+      "behavior": "작업 삭제와 늦은 차감이 겹치면 작업을 지우기 전에 남은 차감액을 모두 반환한다",
+      "deleted": true,
+      "late": {
+        "accepted": true,
+        "value": {
+          "ok": true,
+          "held": 5,
+          "balance": 100,
+          "replayed": false,
+          "insufficient": false
+        }
+      },
+      "job": null,
+      "balance": 95,
+      "charged": 5,
+      "released": 0
+    },
+    {
+      "behavior": "차감이 먼저 잠근 작업을 삭제하면 확정된 차감액을 반환한 뒤 삭제한다",
+      "deleted": true,
+      "job": null,
+      "balance": 100,
+      "charged": 5,
+      "released": 5
+    },
+    {
+      "behavior": "삭제가 먼저 잠근 작업에 차감이 도착하면 삭제 확정 후 차감을 거절한다",
+      "deleted": true,
+      "late": {
+        "accepted": false,
+        "error": "take_hold_job_missing"
+      },
+      "job": null,
+      "balance": 100,
+      "charged": 0,
+      "released": 0
+    },
+    {
+      "behavior": "작업 삭제 전에 영상이 완료되면 완료 기록과 차감액을 유지한다",
+      "deleted": true,
+      "job": null,
+      "balance": 100,
+      "charged": 5,
+      "released": 5
+    },
+    {
+      "behavior": "삭제가 먼저 잠근 작업에 완료가 도착하면 삭제 기록을 되살리지 않는다",
+      "changed": 0,
+      "job": null,
+      "balance": 100,
+      "charged": 5,
+      "released": 5
+    },
+    {
+      "behavior": "queued 작업을 삭제하면 남은 차감액을 반환하고 삭제한다",
+      "deleted": true,
+      "job": null,
+      "balance": 100,
+      "charged": 5,
+      "released": 5
+    },
+    {
+      "behavior": "failed 작업을 삭제하면 남은 차감액을 반환하고 삭제한다",
+      "deleted": true,
+      "job": null,
+      "balance": 100,
+      "charged": 5,
+      "released": 5
+    },
+    {
+      "behavior": "cancelled 작업을 삭제하면 남은 차감액을 반환하고 삭제한다",
+      "deleted": true,
+      "job": null,
+      "balance": 100,
+      "charged": 5,
+      "released": 5
+    },
+    {
+      "behavior": "차감 없는 이미지 작업과 이미 삭제한 작업을 삭제하면 성공을 반환한다",
+      "first": true,
+      "second": true,
+      "missing": true,
+      "job": null,
+      "balance": 100,
+      "charged": 0,
+      "released": 0
+    },
+    {
+      "behavior": "진행 중 작업을 반환하면 작업을 종료하고 늦은 완료나 차감을 받지 않는다: 기존 차감 false",
+      "returned": 0,
+      "completed": 1,
+      "late": {
+        "accepted": false,
+        "error": "take_hold_job_not_queued"
+      },
+      "job": {
+        "status": "completed",
+        "error": null,
+        "last_error": null,
+        "completed_at": null,
+        "updated_at": "2026-09-14T08:49:13.008Z"
+      },
+      "balance": 100,
+      "charged": 0,
+      "released": 0
+    },
+    {
+      "behavior": "진행 중 작업을 반환하면 작업을 종료하고 늦은 완료나 차감을 받지 않는다: 기존 차감 true",
+      "returned": 5,
+      "completed": 1,
+      "late": {
+        "accepted": false,
+        "error": "take_hold_already_released"
+      },
+      "job": {
+        "status": "completed",
+        "error": null,
+        "last_error": null,
+        "completed_at": null,
+        "updated_at": "2026-09-14T08:49:13.704Z"
+      },
+      "balance": 100,
+      "charged": 5,
+      "released": 5
+    },
+    {
+      "behavior": "반환이 먼저 잠근 작업에 완료가 도착하면 반환 확정 후 완료를 거절한다",
+      "returned": 5,
+      "changed": 1,
+      "job": {
+        "status": "completed",
+        "error": null,
+        "last_error": null,
+        "completed_at": null,
+        "updated_at": "2026-09-14T08:49:14.487Z"
+      },
+      "balance": 100,
+      "charged": 5,
+      "released": 5
+    }
+  ],
+  "functions": [
+    {
+      "name": "take_resolved_ledger",
+      "source": "supabase/migrations/20260909130000_fix_refund_expiry.sql",
+      "sqlSha256": "4d3ae3baa3bc3e0273100a01a47017877011d7fa585e23de5254ef4386ea9178",
+      "developmentBodyMatches": true
+    },
+    {
+      "name": "take_hold",
+      "source": "supabase/migrations/20260914170000_take_hold_idempotency.sql",
+      "sqlSha256": "4d6a9d1c8d2395b6e2d0d502c8105a2075339224c4e38659bd9e21600a3dd693",
+      "developmentBodyMatches": false
+    },
+    {
+      "name": "take_release_for_job",
+      "source": "supabase/migrations/20260914170000_take_hold_idempotency.sql",
+      "sqlSha256": "e7be7cd80fe2de81ffdc84c287e84771f1638c6ee003630f58f080d3f1cbe22d",
+      "developmentBodyMatches": false
+    }
+  ],
+  "testProcessExitCode": 1,
+  "finishedAt": "2026-09-14T08:49:15.871Z"
+}

@@ -1228,10 +1228,11 @@ export async function getQueueConsoleJobDetail(
   return (data as (GenerationJob & { created_at?: string; updated_at?: string; error_class?: string | null }) | null) ?? null
 }
 
-/** 콘솔 삭제 실행부 — 상태 가드(queued·failed 만)는 라우트가 잡 조회 후 판정한다. */
-export async function deleteGenerationJobById(id: string): Promise<void> {
-  const { error } = await supabaseAdmin.from('generation_jobs').delete().eq('id', id)
+/** 차감 반환과 삭제를 함께 처리하고, 직전에 완료된 작업은 보존한다. */
+export async function deleteGenerationJobById(id: string): Promise<boolean> {
+  const { data, error } = await supabaseAdmin.rpc('delete_generation_job_with_release', { p_job: id })
   if (error) throw error
+  return data === true
 }
 
 /** project → workspace.owner_id == userId 소유권 확인 (인증 polling 라우트에서 사용). */
