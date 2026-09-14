@@ -2161,6 +2161,10 @@ export type Database = {
         }
         Returns: Json
       }
+      delete_generation_job_with_release: {
+        Args: { p_job: string }
+        Returns: boolean
+      }
       delete_project_deep: {
         Args: { p_project_id: string; p_user_id: string }
         Returns: string

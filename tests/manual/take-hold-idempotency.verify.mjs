@@ -11,15 +11,17 @@ const env = dotenv.parse(readFileSync(resolve(root, '.env.local')))
 const ref = 'pbiumddivadgbzxuymak'
 const schema = `take_hold_${randomUUID().replaceAll('-', '')}`
 const baseline = process.argv.includes('--baseline')
-const output = resolve(root, `.claude/docs/2026-09-14/button-gating/take-hold-idempotency.${baseline ? 'before' : 'after'}.json`)
+const lifecycle = process.argv.includes('--lifecycle')
+if (baseline && lifecycle) throw new Error('Choose either --baseline or --lifecycle')
+const output = resolve(root, `.claude/docs/2026-09-14/button-gating/take-hold-idempotency.${lifecycle ? 'lifecycle' : baseline ? 'before' : 'after'}.json`)
 const result = { startedAt: new Date().toISOString(), developmentProject: ref, schema,
   safety: { paidProviderRequests: 0, applicationRowsRead: 0, applicationRowsWritten: 0, productionWrites: 0 },
-  scope: 'Actual hold/release SQL in isolated PostgreSQL schema; synthetic jobs/ledgers only; no provider or application API.', baseline,
+  scope: 'Actual hold/release SQL in isolated PostgreSQL schema; synthetic jobs/ledgers only; no provider or application API.', baseline, lifecycle,
   observations: [] }
 const sources = {
   take_resolved_ledger: '20260909130000_fix_refund_expiry.sql',
   take_hold: baseline ? '20260909130000_fix_refund_expiry.sql' : '20260914170000_take_hold_idempotency.sql',
-  take_release_for_job: baseline ? '20260902150000_take_hold_rpcs.sql' : '20260914170000_take_hold_idempotency.sql',
+  take_release_for_job: lifecycle ? '20260914172000_generation_job_release_lifecycle.sql' : baseline ? '20260902150000_take_hold_rpcs.sql' : '20260914170000_take_hold_idempotency.sql',
 }
 
 let client, created = false, connectionText = '', publicBefore
