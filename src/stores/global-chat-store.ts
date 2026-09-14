@@ -250,6 +250,7 @@ const completionKey = (stage: StageId, label: string) => `${stage}::${label}`
 // 진행 중인 LLM 응답의 abort 컨트롤러 (#oiioii-chat) — 한 번에 한 요청만 뜨므로(loading 가드) 단일 슬롯.
 let activeGeneration: AbortController | null = null
 let chatSession = 0
+let chatHistoryLoad = 0
 
 function projectChatStage(): { projectId: string | null; stage: StageId } {
   const project = useProjectStore.getState()
@@ -465,7 +466,12 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     //   완료 마커를 로드 전 비우고 모든 종료 경로에서 세워, 제안 발사측이 로드 뒤에만 쏘게 한다.
     set({ messagesLoadedProjectId: null, lastTrace: null, suggestion: null, pendingProposal: null, deferredProposals: [], deferredSuggestions: [], recordedSuggestionIds: [], dismissedSuggestionIds: [], cancelledProposalIds: [], ...loadConversationState(projectId) })
     const loadSession = chatSession
-    const stillCurrent = () => loadSession === chatSession && useProjectStore.getState().projectId === projectId
+    const loadId = ++chatHistoryLoad
+    const stillCurrent = () => loadSession === chatSession && loadId === chatHistoryLoad && useProjectStore.getState().projectId === projectId
+    const messagesAtStart = get().messages
+    const suggestionAtStart = get().suggestion
+    const traceAtStart = get().lastTrace
+    let traceMessages = messagesAtStart
     const hydrate = (
       rows: Array<{
         stage: string
@@ -474,6 +480,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         created_at?: string
       }>,
     ) => {
+      // 조회 중 새 대화나 선택지가 생겼으면 과거 스냅샷으로 덮지 않는다.
+      // 서버 행에는 안정적인 메시지 ID가 없어 본문을 비교해 합치면 같은 발화를 잘못 지울 수 있다.
+      if (get().messages !== messagesAtStart || get().suggestion !== suggestionAtStart) return
       let restoredChoice: ReturnType<typeof parseChoiceSuggestionMarker> = null
       const visible: GlobalChatMessage[] = []
       for (const row of rows) {
@@ -506,6 +515,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
               restoredChoices: { options: restoredChoice.labels },
             }
           : null
+      traceMessages = visible
       set({
         messages: visible,
         suggestion: suggestion ?? get().suggestion,
@@ -531,25 +541,28 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       const res = await fetch(`/api/project/${projectId}/messages`)
       if (!stillCurrent()) return
       if (!res.ok) {
-        set({ messages: [], suggestion: null, lastTrace: null, messagesLoadedProjectId: projectId })
+        set({ messagesLoadedProjectId: projectId })
         return
       }
-      const [{ messages }, persistedTrace] = await Promise.all([
-        res.json() as Promise<{ messages?: unknown }>,
-        loadLatestChatTrace(projectId),
-      ])
+      const messagesResponse = res.json() as Promise<{ messages?: unknown }>
+      // 응답 통계가 느려도 이전 대화와 입력 준비는 먼저 끝낸다.
+      void Promise.resolve(loadLatestChatTrace(projectId)).then((persistedTrace) => {
+        if (!stillCurrent() || get().lastTrace !== traceAtStart || get().messages !== traceMessages) return
+        set({ lastTrace: persistedTrace ?? null })
+      }).catch((err) => console.error('[global-chat-store] trace load failed:', err))
+      const { messages } = await messagesResponse
       if (!stillCurrent()) return
       hydrate((messages ?? []) as Array<{
         stage: string
         role: 'user' | 'model'
         content: string
       }>)
-      set({ messagesLoadedProjectId: projectId, lastTrace: persistedTrace })
+      set({ messagesLoadedProjectId: projectId })
     } catch (err) {
       if (!stillCurrent()) return
       console.error('[global-chat-store] loadMessages failed:', err)
       // 실패도 "로드 종료"다 — 마커를 세워야 웰컴 등 제안 발사측이 영영 굶지 않는다(빈 이력으로 진행).
-      set({ messages: [], suggestion: null, lastTrace: null, messagesLoadedProjectId: projectId })
+      set({ messagesLoadedProjectId: projectId })
     }
   },
 

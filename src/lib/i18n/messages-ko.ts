@@ -136,6 +136,8 @@ export const KO: Record<string, string> = {
   'Remove attachment': '첨부 제거',
   'Remove {name}': '{name} 첨부 제거',
   'Answer using the choices above': '위 선택지에서 답해 주세요',
+  'Choose above or type your answer…': '선택지를 고르거나 직접 답해 주세요…',
+  'Click an option to put it in your message, then send.': '선택지를 누르면 입력창에 들어가요. 확인한 뒤 보내 주세요.',
   'Type your changes, or press Enter as-is to confirm the scenes': '수정할 내용을 입력하세요. 없으면 그대로 Enter를 눌러 씬을 확정해요',
   "Tell us how to use it, or leave it blank and we'll fold it into the story": '어떻게 쓸지 적어 주세요. 비워 두면 스토리로 정리해요',
   'Attach a file: manuscript (txt·md·docx) or image (jpg·png·webp)': '파일 첨부: 원고(txt·md·docx)나 이미지(jpg·png·webp)',

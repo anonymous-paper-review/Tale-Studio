@@ -719,10 +719,8 @@ export function GlobalChat() {
     return () => window.removeEventListener('keydown', handler)
   }, [collapsed, currentStage])
 
-  // #p4-choices v3 (#choices-freeform 2026-08-07): 활성 선택지는 입력창 바로 위에 앵커하고,
-  //   떠 있는 동안 채팅 입력은 잠근다 — 답하는 곳이 두 군데면 눈이 갈리기 때문이다.
-  //   새로고침으로 복원된 선택지는 display-only라 입력을 막지 않는다.
-  //   자유 입력("기타" 답변)은 선택지 안의 "직접 입력" 행이 담당한다(Claude AskUserQuestion 의 Type my own answer 대응).
+  // 선택지는 입력창 위에 두되 일반 채팅으로도 답할 수 있다.
+  // 복원된 선택지는 과거 동작을 실행하지 않고 답변 문구를 입력하는 데만 쓴다.
   const choices =
     suggestion &&
     suggestion.stage === currentStage &&
@@ -742,12 +740,8 @@ export function GlobalChat() {
       : null
 
   const stageSupported = CHAT_SUPPORTED_STAGES.has(currentStage)
-  // 타이핑 잠금과 전송 잠금을 가른다 (#type-while-thinking 2026-08-11).
-  //   응답을 기다리는 동안 입력창까지 잠그면 "다음에 할 말"을 미리 적어둘 수 없다 — 생각은
-  //   기다리는 동안 하는 것이라 그게 제일 자연스러운 타이밍이다. 그래서 loading 은 **제출만**
-  //   막는다. 활성 선택지가 떠 있을 때는 타이핑도 잠근다 — 답하는 곳이 두 군데면 눈이
-  //   갈리기 때문이다(#choices-freeform). 복원된 display-only 선택지는 입력을 허용한다.
-  const inputLocked = !stageSupported || (!!choices && !choices.displayOnly)
+  // 응답 대기 중에도 다음 답변을 적을 수 있고, 중복 전송만 막는다.
+  const inputLocked = !stageSupported
   const sendDisabled = inputLocked || loading
   // (loading 중 disabled 해제 시 재포커스하던 #b3 effect 제거 — 이제 입력창이 잠기지 않아
   //  포커스를 잃을 일이 없다. 남겨두면 다른 곳으로 옮긴 포커스를 도로 뺏는다.)
@@ -1090,8 +1084,7 @@ export function GlobalChat() {
   //   하이라이트하고 [계속하기]로 확정한다. 선택지 세트가 바뀌면 선택 초기화(렌더 중 조정 패턴).
   const [selectedChoice, setSelectedChoice] = useState<string | null>(null)
   const [choiceSetId, setChoiceSetId] = useState<string | null>(null)
-  // #choices-freeform: '직접 입력' 행 — 선택지 마지막 행. 클릭 즉시(키보드는 Enter 확정) 인라인
-  //   인풋으로 펼쳐진다. 채팅 입력이 잠기는 동안 여기가 '기타' 답변의 유일한 통로.
+  // '직접 입력' 행은 선택지 안에서 답을 쓰는 보조 통로다.
   const FREEFORM = '__freeform__'
   const [freeformOpen, setFreeformOpen] = useState(false)
   const [freeformText, setFreeformText] = useState('')
@@ -1128,8 +1121,7 @@ export function GlobalChat() {
 
   // 선택지 키보드 조작 (#choices-keys 2026-08-07) — Claude Code CLI 의 AskUserQuestion 문법 차용:
   //   ↑/↓ 이동, 숫자키 바로 선택, Enter 확정('직접 입력' 행이면 인풋 열기), Esc 닫기.
-  //   #choices-freeform: 채팅 입력이 잠기므로 타이핑 우선 규칙은 폐기 — 대신 캡처 단계에서 듣되,
-  //   다른 입력 요소(인라인 '직접 입력' 인풋·뱃지 popover 인풋 등)에 포커스가 있으면 양보한다.
+  //   일반 채팅이나 인라인 입력에 포커스가 있으면 타이핑과 전송에 양보한다.
   useEffect(() => {
     if (!choices || choices.displayOnly || freeformOpen) return
     const labels = [...choices.options.map((o) => o.label), FREEFORM]
@@ -1221,6 +1213,8 @@ export function GlobalChat() {
       //   열린 다이얼로그의 존재 자체로 판정한다 — 모달 뒤의 조작은 없다.
       if (document.querySelector('[role="dialog"][data-state="open"]')) return
       const target = e.target as HTMLElement | null
+      // 선택지 버튼의 Enter는 그 버튼의 동작이다. 함께 복원된 승인 카드를 실행하지 않는다.
+      if (target?.closest('[data-chat-choices]')) return
       const inChatInput = !!target && target === textareaRef.current
       // 다른 입력 요소(인라인 '직접 입력', 이름 변경 등)에 있으면 그쪽 몫.
       if (
@@ -1611,11 +1605,10 @@ export function GlobalChat() {
             MentionTextarea 의 ^/v 버튼으로 안내(#a3). Enter 전송 / Shift+Enter 개행.
             툴바: + 업로드 · 에이전트 필(빠른 요청) · four-dot(@멘션) · 우측 원형 send→Stop. */}
         <div className="shrink-0 p-3 pt-1">
-          {/* 선택지 (#p4-choices v3 + #oiioii-chat) — 입력창 위 앵커는 유지(고르는 곳 = 답하는
-              곳), 모양은 oiioii choice 행 리스트. 떠 있는 동안 채팅 입력은 잠기고(#choices-freeform),
-              자유 입력은 마지막 '직접 입력' 행이 담당한다. */}
+          {/* 선택지를 고르거나 바로 아래 채팅창에 직접 답한다. */}
           {choices && (
             <div
+              data-chat-choices=""
               className={cn(
                 'mb-2 flex flex-col gap-1.5 px-1',
                 'animate-in fade-in-0 slide-in-from-bottom-1 duration-150 ease-out motion-reduce:animate-none',
@@ -1627,16 +1620,25 @@ export function GlobalChat() {
                   <p className="min-w-0 text-xs text-foreground">{choices.question}</p>
                 </div>
               )}
+              {choices.displayOnly && (
+                <p className="text-xs text-muted-foreground">
+                  {t('Click an option to put it in your message, then send.')}
+                </p>
+              )}
               {choices.options.map((opt, oi) => {
                 if (choices.displayOnly) {
                   return (
-                    <div
+                    <button
                       key={opt.label}
-                      role="note"
-                      className="w-full rounded-xl border border-border-subtle bg-muted/40 px-3 py-2 text-center text-xs text-muted-foreground"
+                      type="button"
+                      onClick={() => {
+                        setInput(opt.label)
+                        requestAnimationFrame(() => textareaRef.current?.focus())
+                      }}
+                      className="w-full rounded-xl border border-border-subtle bg-muted/40 px-3 py-2 text-center text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     >
                       {opt.label}
-                    </div>
+                    </button>
                   )
                 }
                 const selected = selectedChoice === opt.label
@@ -1672,8 +1674,7 @@ export function GlobalChat() {
               })}
               {!choices.displayOnly && (
                 <>
-              {/* 직접 입력 (#choices-freeform) — 마지막 행. 클릭 즉시(키보드는 선택 후 Enter)
-                  인라인 인풋으로 펼쳐진다. 잠긴 채팅 입력 대신 여기가 '기타' 답변 통로. */}
+              {/* 직접 입력 행을 누르면 선택지 안에서 답을 쓸 수 있다. */}
               {freeformOpen ? (
                 <div className="relative w-full rounded-xl border-2 border-border-strong bg-accent px-9 py-2">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[10px] text-foreground/70">
@@ -1829,8 +1830,8 @@ export function GlobalChat() {
                 disabled={inputLocked}
                 ghost={composeHint && input === composeHint.token && composeHint.hint ? composeHint.hint : undefined}
                 placeholder={
-                  choices && !choices.displayOnly
-                    ? t('Answer using the choices above')
+                  choices
+                    ? t('Choose above or type your answer…')
                     : sceneGateActive
                       ? t('Type your changes, or press Enter as-is to confirm the scenes')
                       : canSendAttachments
