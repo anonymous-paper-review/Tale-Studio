@@ -44,6 +44,8 @@ let signature = ''
 let projectId: string | null = null
 let timer: ReturnType<typeof setTimeout> | null = null
 let inFlight = false
+export type GenerationQueueStatus = 'loading' | 'ready' | 'error'
+let queueStatus: GenerationQueueStatus = 'loading'
 let requestVersion = 0
 let requestController: AbortController | null = null
 const listeners = new Set<() => void>()
@@ -67,12 +69,16 @@ async function fetchOnce(): Promise<void> {
   const controller = new AbortController()
   requestController = controller
   inFlight = true
+  if (queueStatus === 'error') {
+    queueStatus = 'loading'
+    emit()
+  }
   try {
     const res = await fetch(
       `/api/generation/active?projectId=${encodeURIComponent(requestedProjectId)}`,
       { signal: controller.signal },
     )
-    if (!res.ok) return
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const body = (await res.json()) as {
       data?: { jobs?: ActiveJob[]; videoUsage?: VideoUsage; batches?: GenerationBatch[]; completions?: GenerationCompletion[] }
     }
@@ -88,7 +94,12 @@ async function fetchOnce(): Promise<void> {
     // 전체 집계 입력을 비교하되 응답 순서만 바뀐 것은 같은 스냅샷으로 유지한다.
     const completionSig = nextCompletions.map((c) => `${c.stage}:${c.lane}:${c.at}:${c.units}`).sort().join(',')
     const sig = `${signatureOf(next)}|v:${usage ? `${usage.used}/${usage.limit}` : '-'}|b:${batchSig}|c:${completionSig}`
-    if (sig === signature) return
+    const statusChanged = queueStatus !== 'ready'
+    queueStatus = 'ready'
+    if (sig === signature) {
+      if (statusChanged) emit()
+      return
+    }
     signature = sig
     jobs = next.length === 0 ? EMPTY : next
     videoUsage = usage
@@ -97,6 +108,11 @@ async function fetchOnce(): Promise<void> {
     emit()
   } catch {
     // 네트워크 실패는 조용히 — 다음 틱이 재시도한다. 진행 표시가 사라지는 것보다 낫다.
+    // 첫 조회 실패는 빈 큐로 취급하지 않는다. 생성 버튼은 상태를 다시 확인한 뒤 열린다.
+    if (version === requestVersion && requestedProjectId === projectId && queueStatus !== 'ready') {
+      queueStatus = 'error'
+      emit()
+    }
   } finally {
     if (version === requestVersion) {
       inFlight = false
@@ -127,6 +143,7 @@ function start(id: string) {
     batches = EMPTY_BATCHES
     completions = EMPTY_COMPLETIONS
     signature = ''
+    queueStatus = 'loading'
     emit()
   }
   const version = requestVersion
@@ -142,6 +159,7 @@ function stop() {
   requestController?.abort()
   requestController = null
   inFlight = false
+  queueStatus = 'loading'
 }
 
 function subscribeToProject(id: string, listener: () => void): () => void {
@@ -186,6 +204,19 @@ export function useActiveGenerationJobs(projectId: string | null): ActiveJob[] {
     [projectId],
   )
   return useSyncExternalStore(subscribe, () => getSnapshot(projectId), getServerSnapshot)
+}
+
+/** 빈 큐가 확인된 것과 아직 조회하지 못한 것을 구분한다. */
+export function useGenerationQueueStatus(id: string | null): GenerationQueueStatus {
+  const subscribe = useCallback(
+    (onChange: () => void) => id ? subscribeToProject(id, onChange) : () => {},
+    [id],
+  )
+  return useSyncExternalStore(
+    subscribe,
+    () => !id ? 'ready' : id === projectId ? queueStatus : 'loading',
+    () => id ? 'loading' : 'ready',
+  )
 }
 
 /** 프로젝트당 영상 생성 사용량(#f4) — 같은 단일 폴러를 공유한다. 없으면 null(첫 응답 전). */

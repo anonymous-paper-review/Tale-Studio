@@ -1146,7 +1146,7 @@ export function GlobalChat() {
   }
   const handleFreeformSend = () => {
     const text = freeformText.trim()
-    if (!text || loading) return
+    if (!text || useGlobalChatStore.getState().loading) return
     dismissSuggestion()
     void sendMessage(text, undefined, { stageOverride: currentStage })
   }
@@ -1756,13 +1756,12 @@ export function GlobalChat() {
                   {t('Type my own answer…')}
                 </button>
               )}
-              {/* 확정 CTA (#oiioii-chat v2) — 고르고 [계속하기]. '직접 입력' 행을 골랐으면 전송
-                  대신 인풋을 연다. */}
+              {/* 직접 입력이 열려 있으면 입력한 답을, 아니면 고른 선택지를 전송한다. */}
               <Button
                 size="sm"
                 className="w-full rounded-full"
-                disabled={!selectedChoice || loading}
-                onClick={handleChoiceContinue}
+                disabled={loading || (freeformOpen ? !freeformText.trim() : !selectedChoice)}
+                onClick={freeformOpen ? handleFreeformSend : handleChoiceContinue}
               >
                 {t('Continue')}
               </Button>

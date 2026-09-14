@@ -1,0 +1,436 @@
+{
+  "startedAt": "2026-09-14T08:42:05.344Z",
+  "developmentProject": "pbiumddivadgbzxuymak",
+  "schema": "director_video_a0743f5ca5804fc584d087aa9028edb7",
+  "safety": {
+    "paidProviderRequests": 0,
+    "applicationRowsRead": 0,
+    "applicationRowsWritten": 0,
+    "productionWrites": 0,
+    "publicFunctionsBefore": {
+      "count": 28,
+      "hash": "562453b89c2eb88b8d8714930e6e20a4"
+    },
+    "verifiedTls": true,
+    "isolation": "Random schema, no application rows copied; original SQL qualified to schema; unique synthetic user/project/workspace ids; capacity advisory namespace isolated; no public/auth writes.",
+    "temporarySchemaRemoved": true,
+    "publicFunctionsAfter": {
+      "count": 28,
+      "hash": "562453b89c2eb88b8d8714930e6e20a4"
+    },
+    "publicFunctionsUnchanged": true
+  },
+  "scope": "Candidate video reservation SQL, idempotent hold/release SQL, storyboard singleflight trigger and capacity trigger coexist in one isolated schema. Existing reservation tests are unchanged; holds are explicitly charged per accepted reservation, not through a provider or API.",
+  "variant": "combined",
+  "observations": [
+    {
+      "id": "different-keys-same-shot",
+      "participants": [
+        {
+          "pid": 1467016,
+          "transaction_id": "8209"
+        },
+        {
+          "pid": 1467017,
+          "transaction_id": "8210"
+        }
+      ],
+      "observedAdvisoryWaiters": 2,
+      "outcomes": [
+        {
+          "accepted": false,
+          "error": "director_video_shot_busy",
+          "code": "P0001",
+          "detail": "b5678d81-3442-4dee-b769-cdcff8ab67bc"
+        },
+        {
+          "accepted": true,
+          "value": {
+            "video_clip_id": "ac4a3615-c112-49ca-bb81-7efd538b835c",
+            "job_id": "b5678d81-3442-4dee-b769-cdcff8ab67bc",
+            "take_number": 1,
+            "replayed": false
+          }
+        }
+      ],
+      "clips": 1,
+      "jobs": 1,
+      "queued": 1,
+      "charged": 5,
+      "holdScope": "One explicit 5 Take hold per accepted distinct job; no API or provider called."
+    },
+    {
+      "id": "same-key-replay",
+      "participants": [
+        {
+          "pid": 1466996,
+          "transaction_id": "8218"
+        },
+        {
+          "pid": 1467017,
+          "transaction_id": "8217"
+        }
+      ],
+      "observedAdvisoryWaiters": 2,
+      "outcomes": [
+        {
+          "accepted": true,
+          "value": {
+            "video_clip_id": "ccc2cb41-b256-40aa-9c0a-89b260654c7a",
+            "job_id": "e4c7975b-abd4-451c-b6cd-c56dd2b3349a",
+            "take_number": 1,
+            "replayed": true
+          }
+        },
+        {
+          "accepted": true,
+          "value": {
+            "video_clip_id": "ccc2cb41-b256-40aa-9c0a-89b260654c7a",
+            "job_id": "e4c7975b-abd4-451c-b6cd-c56dd2b3349a",
+            "take_number": 1,
+            "replayed": false
+          }
+        }
+      ],
+      "clips": 1,
+      "jobs": 1,
+      "queued": 1,
+      "charged": 0
+    },
+    {
+      "id": "same-clip-regeneration",
+      "participants": [
+        {
+          "pid": 1467017,
+          "transaction_id": "8227"
+        },
+        {
+          "pid": 1467016,
+          "transaction_id": "8226"
+        }
+      ],
+      "observedAdvisoryWaiters": 2,
+      "outcomes": [
+        {
+          "accepted": true,
+          "value": {
+            "video_clip_id": "5fde599f-7bd1-4136-ba17-9cfff1423de8",
+            "job_id": "e3541fd1-3519-4ce8-9d8c-6433b58d0c8a",
+            "take_number": 1,
+            "replayed": false
+          }
+        },
+        {
+          "accepted": false,
+          "error": "clip already has a queued attempt",
+          "code": "P0001"
+        }
+      ],
+      "clips": 1,
+      "jobs": 2,
+      "queued": 1,
+      "charged": 0
+    },
+    {
+      "id": "new-take-vs-regeneration",
+      "participants": [
+        {
+          "pid": 1467017,
+          "transaction_id": "8236"
+        },
+        {
+          "pid": 1466996,
+          "transaction_id": "8235"
+        }
+      ],
+      "observedAdvisoryWaiters": 2,
+      "outcomes": [
+        {
+          "accepted": true,
+          "value": {
+            "video_clip_id": "1af00c52-3f56-4454-96e1-09c99ba2cde6",
+            "job_id": "154bb7ce-1d0a-495b-91ae-4a52b2e6226e",
+            "take_number": 2,
+            "replayed": false
+          }
+        },
+        {
+          "accepted": false,
+          "error": "director_video_shot_busy",
+          "code": "P0001",
+          "detail": "154bb7ce-1d0a-495b-91ae-4a52b2e6226e"
+        }
+      ],
+      "clips": 2,
+      "jobs": 2,
+      "queued": 1,
+      "charged": 0
+    },
+    {
+      "id": "different-clips-same-shot",
+      "participants": [
+        {
+          "pid": 1467017,
+          "transaction_id": "8247"
+        },
+        {
+          "pid": 1467016,
+          "transaction_id": "8246"
+        }
+      ],
+      "observedAdvisoryWaiters": 2,
+      "outcomes": [
+        {
+          "accepted": false,
+          "error": "director_video_shot_busy",
+          "code": "P0001",
+          "detail": "4202f0f8-6a62-416c-a358-c51ca91c776f"
+        },
+        {
+          "accepted": true,
+          "value": {
+            "video_clip_id": "fcc92196-c229-4f03-9115-668604532e60",
+            "job_id": "4202f0f8-6a62-416c-a358-c51ca91c776f",
+            "take_number": 2,
+            "replayed": false
+          }
+        }
+      ],
+      "clips": 2,
+      "jobs": 3,
+      "queued": 1,
+      "charged": 0
+    },
+    {
+      "id": "different-shots",
+      "participants": [
+        {
+          "pid": 1466996,
+          "transaction_id": "8258"
+        },
+        {
+          "pid": 1467016,
+          "transaction_id": "8259"
+        }
+      ],
+      "observedAdvisoryWaiters": 2,
+      "outcomes": [
+        {
+          "accepted": true,
+          "value": {
+            "video_clip_id": "df6179bf-38af-4abe-8589-fb8dbf759266",
+            "job_id": "a0fbde2f-8358-4496-9fed-5b2d30120b2e",
+            "take_number": 1,
+            "replayed": false
+          }
+        },
+        {
+          "accepted": true,
+          "value": {
+            "video_clip_id": "f59e9eec-2cb2-4f39-884a-e6f75e271d32",
+            "job_id": "98881990-76e0-43e5-b663-4f14fdcd2684",
+            "take_number": 1,
+            "replayed": false
+          }
+        }
+      ],
+      "first": {
+        "clips": 1,
+        "jobs": 1,
+        "queued": 1,
+        "charged": 0
+      },
+      "second": {
+        "clips": 1,
+        "jobs": 1,
+        "queued": 1,
+        "charged": 0
+      }
+    },
+    {
+      "id": "terminal-completed",
+      "first": {
+        "video_clip_id": "ec3601c1-9d21-4ab1-b3b3-884ae0a7fd64",
+        "job_id": "22bc9af7-1547-4174-bc7b-71f26f193b3e",
+        "take_number": 1,
+        "replayed": false
+      },
+      "second": {
+        "video_clip_id": "d1bf957c-73de-455f-8358-1dac8e3f43e9",
+        "job_id": "b18e23fd-35e5-4bde-beb4-a9807f6b3133",
+        "take_number": 2,
+        "replayed": false
+      },
+      "clips": 2,
+      "jobs": 2,
+      "queued": 1,
+      "charged": 0
+    },
+    {
+      "id": "terminal-failed",
+      "first": {
+        "video_clip_id": "0a9a3108-0bbd-4cbe-8237-d764930eb6ba",
+        "job_id": "da4f0fe8-fc7d-4f1c-b212-ac1957400372",
+        "take_number": 1,
+        "replayed": false
+      },
+      "second": {
+        "video_clip_id": "fecca633-038d-4650-9a75-110306cb68c9",
+        "job_id": "823b197c-c47d-4f43-bdd7-4ca5b424a9d5",
+        "take_number": 2,
+        "replayed": false
+      },
+      "clips": 2,
+      "jobs": 2,
+      "queued": 1,
+      "charged": 0
+    },
+    {
+      "id": "batch-vs-individual",
+      "participants": [
+        {
+          "pid": 1466996,
+          "transaction_id": "8283"
+        },
+        {
+          "pid": 1467017,
+          "transaction_id": "8284"
+        }
+      ],
+      "observedAdvisoryWaiters": 2,
+      "outcomes": [
+        {
+          "accepted": false,
+          "error": "batch_shot_busy",
+          "code": "P0001"
+        },
+        {
+          "accepted": true,
+          "value": {
+            "video_clip_id": "49313958-b5ef-4bc2-a7e5-5180a57cb638",
+            "job_id": "325e9d3f-61d4-48a3-82dd-c0a3fb341653",
+            "take_number": 1,
+            "replayed": false
+          }
+        }
+      ],
+      "clips": 1,
+      "jobs": 1,
+      "queued": 1,
+      "charged": 0
+    },
+    {
+      "id": "batch-and-regeneration-replay",
+      "first": {
+        "video_clip_id": "67b32114-e566-409c-871e-60154fb53506",
+        "job_id": "b98ba8a1-ad24-4ff7-bf5a-9abe82685f93",
+        "take_number": 1,
+        "replayed": false
+      },
+      "replay": {
+        "video_clip_id": "67b32114-e566-409c-871e-60154fb53506",
+        "job_id": "b98ba8a1-ad24-4ff7-bf5a-9abe82685f93",
+        "take_number": 1,
+        "replayed": true
+      },
+      "regeneration": {
+        "video_clip_id": "67b32114-e566-409c-871e-60154fb53506",
+        "job_id": "533e7231-65ef-4dcf-9d72-3866f361279f",
+        "take_number": 1,
+        "replayed": false
+      },
+      "regenerationReplay": {
+        "video_clip_id": "67b32114-e566-409c-871e-60154fb53506",
+        "job_id": "533e7231-65ef-4dcf-9d72-3866f361279f",
+        "take_number": 1,
+        "replayed": true
+      },
+      "clips": 1,
+      "jobs": 2,
+      "queued": 1,
+      "charged": 0
+    },
+    {
+      "id": "legacy-clip-linkage",
+      "initial": {
+        "video_clip_id": "27bb28e0-dd20-45b4-b1e9-d06b8c2c9dd0",
+        "job_id": "aa66d748-4680-4ab0-a304-0d61c446e861",
+        "take_number": 1,
+        "replayed": false
+      },
+      "error": "director_video_shot_busy",
+      "clips": 1,
+      "jobs": 1,
+      "queued": 1,
+      "charged": 0
+    }
+  ],
+  "functions": [
+    {
+      "name": "reserve_director_video_take",
+      "source": "supabase/migrations/20260914171000_director_video_singleflight.sql",
+      "sqlSha256": "284ccf9d986b2562bb661246291657c3283779bc85549d2e1e24d46ee87645fc",
+      "developmentBodyMatches": false
+    },
+    {
+      "name": "reserve_director_video_regeneration",
+      "source": "supabase/migrations/20260914171000_director_video_singleflight.sql",
+      "sqlSha256": "a7138132f48d82bc2962b5725c2ef2d3cff0e9ede09072c37dc30fcbcee34cae",
+      "developmentBodyMatches": false
+    },
+    {
+      "name": "create_director_video_batch",
+      "source": "supabase/migrations/20260909110000_director_video_batches.sql",
+      "sqlSha256": "23568c473212afd6f36f8d9516d6d581296210c50c98ede34de03d5e4d5d7697",
+      "developmentBodyMatches": true
+    },
+    {
+      "name": "claim_director_video_batch",
+      "source": "supabase/migrations/20260909110000_director_video_batches.sql",
+      "sqlSha256": "e99d5117c5d9026f7bea7bd0a27393bb45b21c0af1abf13c96683f5506b6e87f",
+      "developmentBodyMatches": true
+    },
+    {
+      "name": "reserve_director_video_batch_item",
+      "source": "supabase/migrations/20260909110000_director_video_batches.sql",
+      "sqlSha256": "cfca4d54aebf067cbc7f765c8de8c14707bbd63a3066d1339f1f9f2fc80750ba",
+      "developmentBodyMatches": true
+    },
+    {
+      "name": "take_resolved_ledger",
+      "source": "supabase/migrations/20260909130000_fix_refund_expiry.sql",
+      "sqlSha256": "4d3ae3baa3bc3e0273100a01a47017877011d7fa585e23de5254ef4386ea9178",
+      "developmentBodyMatches": true
+    },
+    {
+      "name": "take_hold",
+      "source": "supabase/migrations/20260914170000_take_hold_idempotency.sql",
+      "sqlSha256": "4d6a9d1c8d2395b6e2d0d502c8105a2075339224c4e38659bd9e21600a3dd693",
+      "developmentBodyMatches": false
+    },
+    {
+      "name": "enforce_generation_capacity",
+      "source": "supabase/migrations/20260914150000_generation_capacity_key_assignment.sql",
+      "sqlSha256": "362ea567fc157c2f96b8ded00b23563faf417d4f6f146239febe59524c3e62b4",
+      "developmentBodyMatches": true
+    },
+    {
+      "name": "take_release_for_job",
+      "source": "supabase/migrations/20260914170000_take_hold_idempotency.sql",
+      "sqlSha256": "e7be7cd80fe2de81ffdc84c287e84771f1638c6ee003630f58f080d3f1cbe22d",
+      "developmentBodyMatches": false
+    },
+    {
+      "name": "guard_storyboard_singleflight",
+      "source": "supabase/migrations/20260914160000_storyboard_singleflight.sql",
+      "sqlSha256": "8a3b5acb00263db3a56da2060ed694ae20d47897922cdcc22ffb503efa63a640",
+      "developmentBodyMatches": false
+    }
+  ],
+  "storyboardTrigger": {
+    "source": "supabase/migrations/20260914160000_storyboard_singleflight.sql",
+    "sqlSha256": "c3e8e1ea813200f32c1dccc42f216a7843128f0a38dfa8031cb572a231a54ef5"
+  },
+  "testProcessExitCode": 0,
+  "finishedAt": "2026-09-14T08:42:26.388Z"
+}

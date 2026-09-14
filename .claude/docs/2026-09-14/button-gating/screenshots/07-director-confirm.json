@@ -1,0 +1,35 @@
+{
+  "origin": "http://127.0.0.1:3005/playground/button-gating-review?fixture=empty",
+  "refs": {
+    "e1": {
+      "name": "Notifications alt+T",
+      "role": "region"
+    },
+    "e2": {
+      "name": "Director 노드 편집 패널 검증",
+      "role": "region"
+    },
+    "e3": {
+      "name": "이미지를 다시 만들까요?",
+      "role": "heading"
+    },
+    "e4": {
+      "name": "취소",
+      "role": "button"
+    },
+    "e5": {
+      "name": "재생성",
+      "role": "button"
+    },
+    "e6": {
+      "name": "Close",
+      "role": "button"
+    },
+    "e7": {
+      "name": "Open Next.js Dev Tools",
+      "role": "button"
+    }
+  },
+  "snapshot": "- generic\n  - main\n    - region \"Director 노드 편집 패널 검증\" [ref=e2]\n      - application\n  - region \"Notifications alt+T\" [ref=e1]\n  - button \"Open Next.js Dev Tools\" [expanded=false, ref=e7]\n    - image\n  - dialog \"이미지를 다시 만들까요?\"\n    - heading \"이미지를 다시 만들까요?\" [level=2, ref=e3]\n    - paragraph\n      - StaticText \"이 샷의 촬영용 이미지를 새로 생성해요.\"\n    - list\n      - listitem [level=1]\n        - ListMarker \"• \"\n        - StaticText \"기존 촬영용 이미지가 새 결과로 교체됩니다.\"\n    - button \"취소\" [ref=e4]\n    - button \"재생성\" [ref=e5]\n    - button \"Close\" [ref=e6]\n      - StaticText \"Close\"",
+  "browserPageId": "fc24cc9d-4e3b-482f-bea3-c25128d44894"
+}

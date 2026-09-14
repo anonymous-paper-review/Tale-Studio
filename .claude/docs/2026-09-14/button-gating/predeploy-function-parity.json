@@ -1,0 +1,64 @@
+{
+  "at": "2026-09-14T08:41:54.677Z",
+  "development": [
+    {
+      "name": "enforce_generation_capacity",
+      "hash": "44136565a0139bbd284138c17b759551"
+    },
+    {
+      "name": "reserve_director_video_batch_item",
+      "hash": "b15c6d79950cd66fb897aa1e8713cc0d"
+    },
+    {
+      "name": "reserve_director_video_regeneration",
+      "hash": "2cae0fc84da0e3e3b28c8bc8854b08cf"
+    },
+    {
+      "name": "reserve_director_video_take",
+      "hash": "5ef5e94986912eae5ce1b1be19c8cc86"
+    },
+    {
+      "name": "take_hold",
+      "hash": "42077a377c3e83ed8fee31b906dcb279"
+    },
+    {
+      "name": "take_release_for_job",
+      "hash": "0d37417478d571bcb56cf242fba37b0f"
+    },
+    {
+      "name": "take_resolved_ledger",
+      "hash": "cb1b5bf79a8d203b34a78365a5685926"
+    }
+  ],
+  "production": [
+    {
+      "name": "enforce_generation_capacity",
+      "hash": "44136565a0139bbd284138c17b759551"
+    },
+    {
+      "name": "reserve_director_video_batch_item",
+      "hash": "b15c6d79950cd66fb897aa1e8713cc0d"
+    },
+    {
+      "name": "reserve_director_video_regeneration",
+      "hash": "2cae0fc84da0e3e3b28c8bc8854b08cf"
+    },
+    {
+      "name": "reserve_director_video_take",
+      "hash": "5ef5e94986912eae5ce1b1be19c8cc86"
+    },
+    {
+      "name": "take_hold",
+      "hash": "42077a377c3e83ed8fee31b906dcb279"
+    },
+    {
+      "name": "take_release_for_job",
+      "hash": "0d37417478d571bcb56cf242fba37b0f"
+    },
+    {
+      "name": "take_resolved_ledger",
+      "hash": "cb1b5bf79a8d203b34a78365a5685926"
+    }
+  ],
+  "definitionsMatch": true
+}

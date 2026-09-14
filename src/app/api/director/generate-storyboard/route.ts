@@ -41,6 +41,7 @@ import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
 import { isChatTraceId } from '@/lib/chat-trace'
 import { isImageModelKey, normalizeImageModelKey, resolveImageEndpoint, resolveSheetImageModel } from '@/lib/image-models'
 import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
+import { existingStoryboardJobId } from '@/lib/director/storyboard-active-job'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -354,6 +355,8 @@ export async function POST(req: Request) {
         },
       })
     } catch (err) {
+      const existingJobId = existingStoryboardJobId(err)
+      if (existingJobId) return NextResponse.json({ ok: true, jobId: existingJobId, status: 'queued', replayed: true })
       // 트리거가 자리 없음으로 거절한 것만 429(막힌 축 포함)로 옮긴다 — 그 외는 기존 오류 경로.
       const rejected = capacityReservationRejection(err, { projectId, kind: 'shot_storyboard', userId: access.userId })
       if (rejected) return rejected

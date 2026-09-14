@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import { ImageIcon, Loader2, Trash2, Upload, X } from 'lucide-react'
+import { Trash2, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { HoverBeam } from '@/components/hover-beam'
 import { Input } from '@/components/ui/input'
@@ -17,6 +17,7 @@ import {
   normalizeImageModelKey,
 } from '@/lib/image-models'
 import { useT } from '@/lib/i18n'
+import { StoryboardImageButton } from '@/features/director/storyboard-image-button'
 
 type Props = {
   nodeId: string
@@ -26,9 +27,6 @@ type Props = {
 export function ShotDetailPanel({ nodeId, data }: Props) {
   const t = useT()
   const updateNodeData = useDirectorCanvasStore((s) => s.updateNodeData)
-  const generateStoryboardImage = useDirectorCanvasStore(
-    (s) => s.generateStoryboardImage,
-  )
   const openDeleteConfirm = useDirectorCanvasStore(
     (s) => s.openDeleteConfirm,
   )
@@ -45,11 +43,8 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
     [worldRecords, projectId],
   )
 
-  const isGenerating = useDirectorCanvasStore(
-    (s) => !!s.generatingNodeIds[nodeId],
-  )
   const generationError = useDirectorCanvasStore(
-    (s) => s.generationErrors[nodeId],
+    (s) => data.storyboardImage?.errorMessage || s.generationErrors[nodeId],
   )
 
   const toggleCharacter = (id: string) => {
@@ -283,27 +278,7 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
       )}
 
       <div className="mt-auto flex flex-col gap-2 border-t border-border pt-3">
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => void generateStoryboardImage(nodeId)}
-          disabled={isGenerating}
-          className="w-full gap-1.5"
-        >
-          {isGenerating ? (
-            <>
-              <Loader2 className="size-3.5 animate-spin" />
-              Generating…
-            </>
-          ) : (
-            <>
-              <ImageIcon className="size-3.5" />
-              {data.storyboardImage?.status === 'completed'
-                ? t('Regenerate image')
-                : t('Generate image')}
-            </>
-          )}
-        </Button>
+        <StoryboardImageButton nodeId={nodeId} data={data} className="w-full" />
         <div className="grid grid-cols-2 gap-2">
           <Button
             type="button"

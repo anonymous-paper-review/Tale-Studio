@@ -1,0 +1,227 @@
+{
+  "origin": "http://127.0.0.1:3005/playground/button-gating-review?fixture=empty",
+  "refs": {
+    "e1": {
+      "name": "Notifications alt+T",
+      "role": "region"
+    },
+    "e10": {
+      "name": "2 영어 대사로",
+      "role": "button"
+    },
+    "e11": {
+      "name": "3 직접 입력…",
+      "role": "button"
+    },
+    "e12": {
+      "name": "계속하기",
+      "role": "button"
+    },
+    "e13": {
+      "name": "선택지 닫기",
+      "role": "button"
+    },
+    "e14": {
+      "name": "닫기",
+      "role": "button"
+    },
+    "e15": {
+      "name": "접수 중…",
+      "role": "button"
+    },
+    "e16": {
+      "name": "삭제",
+      "role": "button"
+    },
+    "e17": {
+      "name": "",
+      "role": "generic"
+    },
+    "e18": {
+      "name": "채팅 모델 설정",
+      "role": "button"
+    },
+    "e19": {
+      "name": "파일 첨부",
+      "role": "button"
+    },
+    "e2": {
+      "name": "Director 노드 편집 패널 검증",
+      "role": "region"
+    },
+    "e20": {
+      "name": "Producer",
+      "role": "button"
+    },
+    "e21": {
+      "name": "스타일 선택",
+      "role": "button"
+    },
+    "e22": {
+      "name": "보내기",
+      "role": "button"
+    },
+    "e23": {
+      "name": "Open Next.js Dev Tools",
+      "role": "button"
+    },
+    "e24": {
+      "name": "PROMPT",
+      "role": "heading"
+    },
+    "e25": {
+      "name": "MODEL",
+      "role": "heading"
+    },
+    "e26": {
+      "name": "Nano Banana 2",
+      "role": "button"
+    },
+    "e27": {
+      "name": "Nano Banana",
+      "role": "button"
+    },
+    "e28": {
+      "name": "GPT Image 2",
+      "role": "button"
+    },
+    "e29": {
+      "name": "Seedream 4",
+      "role": "button"
+    },
+    "e3": {
+      "name": "버튼 동작 검증 화면",
+      "role": "heading"
+    },
+    "e30": {
+      "name": "FLUX.2 Klein",
+      "role": "button"
+    },
+    "e31": {
+      "name": "Grok Imagine",
+      "role": "button"
+    },
+    "e32": {
+      "name": "REFERENCES",
+      "role": "heading"
+    },
+    "e33": {
+      "name": "",
+      "role": "LabelText"
+    },
+    "e34": {
+      "name": "CAST",
+      "role": "heading"
+    },
+    "e35": {
+      "name": "WORLD",
+      "role": "heading"
+    },
+    "e36": {
+      "name": "",
+      "role": "generic"
+    },
+    "e37": {
+      "name": "React Flow attribution",
+      "role": "link"
+    },
+    "e38": {
+      "name": "선택지를 고르거나 직접 답해 주세요…",
+      "role": "textbox"
+    },
+    "e39": {
+      "name": "Shot 라벨",
+      "role": "textbox"
+    },
+    "e4": {
+      "name": "이미지 없음",
+      "role": "button"
+    },
+    "e40": {
+      "name": "이 샷에서 일어나는 액션, 분위기, 카메라 의도 등",
+      "role": "textbox"
+    },
+    "e41": {
+      "name": "",
+      "role": "textbox"
+    },
+    "e42": {
+      "name": "default",
+      "role": "textbox"
+    },
+    "e43": {
+      "name": "1",
+      "role": "textbox"
+    },
+    "e44": {
+      "name": "참고 이미지 업로드",
+      "role": "button"
+    },
+    "e45": {
+      "name": "접수 중…",
+      "role": "button"
+    },
+    "e46": {
+      "name": "메시지 복사",
+      "role": "button"
+    },
+    "e47": {
+      "name": "",
+      "role": "group"
+    },
+    "e48": {
+      "name": "",
+      "role": "generic"
+    },
+    "e49": {
+      "name": "",
+      "role": "generic"
+    },
+    "e5": {
+      "name": "기존 이미지 있음",
+      "role": "button"
+    },
+    "e50": {
+      "name": "Edit",
+      "role": "button"
+    },
+    "e51": {
+      "name": "Branch",
+      "role": "button"
+    },
+    "e52": {
+      "name": "Duplicate",
+      "role": "button"
+    },
+    "e53": {
+      "name": "Delete",
+      "role": "button"
+    },
+    "e54": {
+      "name": "프롬프트 입력",
+      "role": "generic"
+    },
+    "e55": {
+      "name": "이미지 레퍼런스 입력",
+      "role": "generic"
+    },
+    "e6": {
+      "name": "진행 중 작업으로 재진입",
+      "role": "button"
+    },
+    "e7": {
+      "name": "Writer로 넘기기",
+      "role": "button"
+    },
+    "e8": {
+      "name": "채팅 접기",
+      "role": "button"
+    },
+    "e9": {
+      "name": "1 한국어 대사로",
+      "role": "button"
+    }
+  },
+  "snapshot": "- generic\n  - main\n    - generic\n      - heading \"버튼 동작 검증 화면\" [level=1, ref=e3]\n      - paragraph\n        - StaticText \"실제 화면 컴포넌트 · 모의 프로젝트 · 유료 생성과 운영 저장 없음\"\n      - button \"이미지 없음\" [ref=e4]\n      - button \"기존 이미지 있음\" [ref=e5]\n      - button \"진행 중 작업으로 재진입\" [ref=e6]\n    - region \"Director 노드 편집 패널 검증\" [ref=e2]\n      - generic\n        - StaticText \"이미지 상세\"\n        - button \"닫기\" [ref=e14]\n        - generic\n          - sectionheader\n            - textbox \"Shot 라벨\" [ref=e39]: 샷 1 · 산길의 아침\n              - StaticText \"샷 1 · 산길의 아침\"\n          - generic\n            - heading \"PROMPT\" [level=3, ref=e24]\n            - LabelText\n              - StaticText \"프롬프트 (영상 생성용)\"\n            - textbox \"이 샷에서 일어나는 액션, 분위기, 카메라 의도 등\" [ref=e40]: 산길을 걷는 인물. 부드러운 아침 햇빛과 멀리 보이는 산.\n              - StaticText \"산길을 걷는 인물. 부드러운 아침 햇빛과 멀리 보이는 산.\"\n          - generic\n            - heading \"MODEL\" [level=3, ref=e25]\n            - LabelText\n              - StaticText \"이미지 생성 모델\"\n            - button \"Nano Banana 2\" [ref=e26]\n              - StaticText \"Nano Banana 2\"\n            - button \"Nano Banana\" [ref=e27]\n              - StaticText \"Nano Banana\"\n            - button \"GPT Image 2\" [ref=e28]\n              - StaticText \"GPT Image 2\"\n            - button \"Seedream 4\" [ref=e29]\n              - StaticText \"Seedream 4\"\n            - button \"FLUX.2 Klein\" [ref=e30]\n              - StaticText \"FLUX.2 Klein\"\n            - button \"Grok Imagine\" [ref=e31]\n              - StaticText \"Grok Imagine\"\n            - LabelText\n              - StaticText \"Aspect Ratio\"\n            - textbox [disabled, ref=e41]: 16:9\n              - StaticText \"16:9\"\n            - LabelText\n              - StaticText \"Resolution\"\n            - textbox \"default\" [disabled, ref=e42]\n            - LabelText\n              - StaticText \"Batch Size\"\n            - textbox \"1\" [disabled, ref=e43]\n          - generic\n            - heading \"REFERENCES\" [level=3, ref=e32]\n            - LabelText\n              - StaticText \"참고 이미지 (0장)\"\n            - LabelText [ref=e33] clickable [cursor:pointer]\n              - button \"참고 이미지 업로드\" [ref=e44]: 선택된 파일 없음\n          - generic\n            - heading \"CAST\" [level=3, ref=e34]\n            - LabelText\n              - StaticText \"등장 캐릭터 (0/0)\"\n            - paragraph\n              - StaticText \"Artist에서 캐릭터를 Register하면 여기에 나타납니다.\"\n          - generic\n            - heading \"WORLD\" [level=3, ref=e35]\n            - LabelText\n              - StaticText \"월드 / 장소 (0/0)\"\n            - paragraph\n              - StaticText \"Artist에서 장소를 Register하면 여기에 나타납니다.\"\n          - button \"접수 중…\" [disabled, ref=e15]\n          - button \"삭제\" [ref=e16]\n      - generic \"Director 실제 샷 노드 검증\"\n        - paragraph\n          - StaticText \"편집 패널과 같은 샷의 이미지 카드\"\n        - application\n          - generic [ref=e17] clickable [onclick]\n            - generic [ref=e36] clickable [onclick]\n              - generic\n                - group [ref=e47] clickable [cursor:pointer, onclick, tabindex]\n                  - generic\n                    - generic [ref=e48] clickable [onclick]\n                    - generic [ref=e49] clickable [onclick]\n                    - StaticText \"Image\"\n                    - button \"Edit\" [ref=e50]\n                    - button \"Branch\" [ref=e51]\n                    - button \"Duplicate\" [disabled, ref=e52]\n                    - button \"Delete\" [ref=e53]\n                    - StaticText \"샷 1 · 산길의 아침\"\n                    - generic \"프롬프트 입력\" [ref=e54] clickable [onclick]\n                      - StaticText \"PROMPT\"\n                    - generic \"이미지 레퍼런스 입력\" [ref=e55] clickable [onclick]\n                      - StaticText \"IMAGE\"\n                    - paragraph\n                      - StaticText \"산길을 걷는 인물. 부드러운 아침 햇빛과 멀리 보이는 산.\"\n                    - StaticText \"접수 중…\"\n                    - StaticText \"0\"\n                    - StaticText \"/6\"\n                    - StaticText \"front\"\n            - button \"접수 중…\" [disabled, ref=e45]\n            - StaticText \"Nano Banana 2\"\n          - link \"React Flow attribution\" [ref=e37]\n            - StaticText \"React Flow\"\n    - complementary\n      - separator\n      - StaticText \"에이전트 채팅\"\n      - StaticText \"Producer\"\n      - StaticText \"모든 단계가 이어지는 하나의 대화\"\n      - button \"Writer로 넘기기\" [ref=e7]\n      - button \"채팅 접기\" [ref=e8]\n      - LayoutTable\n        - generic\n          - separator \"Producer 구간\"\n            - StaticText \"Producer\"\n            - StaticText \"· \"\n            - StaticText \"지금\"\n          - StaticText \"Producer\"\n          - generic\n            - StaticText \"대사 언어를 골라 주세요. 원하는 언어를 직접 적어도 됩니다.\"\n            - button \"메시지 복사\" [ref=e46]\n      - button \"1 한국어 대사로\" [ref=e9]\n        - StaticText \"1\"\n        - StaticText \"한국어 대사로\"\n      - button \"2 영어 대사로\" [ref=e10]\n        - StaticText \"2\"\n        - StaticText \"영어 대사로\"\n      - button \"3 직접 입력…\" [ref=e11]\n        - StaticText \"3\"\n        - StaticText \"직접 입력…\"\n      - button \"계속하기\" [disabled, ref=e12]\n      - paragraph\n        - StaticText \"↑↓·1-3 선택 (2회=확정) · Enter 확정 · Esc 닫기\"\n      - button \"선택지 닫기\" [ref=e13]\n      - textbox \"선택지를 고르거나 직접 답해 주세요…\" [ref=e38]\n      - button \"채팅 모델 설정\" [expanded=false, ref=e18]\n        - StaticText \"Sonnet 4.6\"\n        - StaticText \" · \"\n        - StaticText \"high\"\n      - button \"파일 첨부\" [ref=e19]\n      - button \"Producer\" [expanded=false, ref=e20]\n        - StaticText \"Producer\"\n      - button \"스타일 선택\" [expanded=false, ref=e21]\n      - button \"보내기\" [disabled, ref=e22]\n  - region \"Notifications alt+T\" [ref=e1]\n  - button \"Open Next.js Dev Tools\" [expanded=false, ref=e23]\n    - image\n  - alert",
+  "browserPageId": "fc24cc9d-4e3b-482f-bea3-c25128d44894"
+}

@@ -1,0 +1,420 @@
+{
+  "startedAt": "2026-09-14T08:28:45.809Z",
+  "developmentProject": "pbiumddivadgbzxuymak",
+  "schema": "director_video_de5378f3481f482990d2d18d2cc56ac7",
+  "safety": {
+    "paidProviderRequests": 0,
+    "applicationRowsRead": 0,
+    "applicationRowsWritten": 0,
+    "productionWrites": 0,
+    "publicFunctionsBefore": {
+      "count": 28,
+      "hash": "562453b89c2eb88b8d8714930e6e20a4"
+    },
+    "verifiedTls": true,
+    "isolation": "Random schema, no application rows copied; original SQL qualified to schema; unique synthetic user/project/workspace ids; capacity advisory namespace isolated; no public/auth writes.",
+    "temporarySchemaRemoved": true,
+    "publicFunctionsAfter": {
+      "count": 28,
+      "hash": "562453b89c2eb88b8d8714930e6e20a4"
+    },
+    "publicFunctionsUnchanged": true
+  },
+  "scope": "Reservation SQL in an isolated PostgreSQL schema with original capacity trigger. Holds are explicitly charged once per accepted reservation, not through a provider or API.",
+  "variant": "candidate",
+  "observations": [
+    {
+      "id": "different-keys-same-shot",
+      "participants": [
+        {
+          "pid": 1466040,
+          "transaction_id": "7747"
+        },
+        {
+          "pid": 1466039,
+          "transaction_id": "7746"
+        }
+      ],
+      "observedAdvisoryWaiters": 2,
+      "outcomes": [
+        {
+          "accepted": true,
+          "value": {
+            "video_clip_id": "3e3b9e9a-3d13-407a-9b9a-a9cac26f2798",
+            "job_id": "2e9b14ce-f2fd-4619-8819-7bbe47586fed",
+            "take_number": 1,
+            "replayed": false
+          }
+        },
+        {
+          "accepted": false,
+          "error": "director_video_shot_busy",
+          "code": "P0001",
+          "detail": "2e9b14ce-f2fd-4619-8819-7bbe47586fed"
+        }
+      ],
+      "clips": 1,
+      "jobs": 1,
+      "queued": 1,
+      "charged": 5,
+      "holdScope": "One explicit 5 Take hold per accepted distinct job; no API or provider called."
+    },
+    {
+      "id": "same-key-replay",
+      "participants": [
+        {
+          "pid": 1466024,
+          "transaction_id": "7755"
+        },
+        {
+          "pid": 1466040,
+          "transaction_id": "7754"
+        }
+      ],
+      "observedAdvisoryWaiters": 2,
+      "outcomes": [
+        {
+          "accepted": true,
+          "value": {
+            "video_clip_id": "0ed82c7e-c86d-4f4c-8d28-6981f5899690",
+            "job_id": "0b8c6678-efe1-4c22-b3af-3770ea2bdf22",
+            "take_number": 1,
+            "replayed": true
+          }
+        },
+        {
+          "accepted": true,
+          "value": {
+            "video_clip_id": "0ed82c7e-c86d-4f4c-8d28-6981f5899690",
+            "job_id": "0b8c6678-efe1-4c22-b3af-3770ea2bdf22",
+            "take_number": 1,
+            "replayed": false
+          }
+        }
+      ],
+      "clips": 1,
+      "jobs": 1,
+      "queued": 1,
+      "charged": 0
+    },
+    {
+      "id": "same-clip-regeneration",
+      "participants": [
+        {
+          "pid": 1466039,
+          "transaction_id": "7764"
+        },
+        {
+          "pid": 1466040,
+          "transaction_id": "7763"
+        }
+      ],
+      "observedAdvisoryWaiters": 2,
+      "outcomes": [
+        {
+          "accepted": false,
+          "error": "clip already has a queued attempt",
+          "code": "P0001"
+        },
+        {
+          "accepted": true,
+          "value": {
+            "video_clip_id": "330d4937-a706-4f55-875b-0f096d07d258",
+            "job_id": "d49b87ef-49a1-4be3-a3ed-aa49bbfb4e0b",
+            "take_number": 1,
+            "replayed": false
+          }
+        }
+      ],
+      "clips": 1,
+      "jobs": 2,
+      "queued": 1,
+      "charged": 0
+    },
+    {
+      "id": "new-take-vs-regeneration",
+      "participants": [
+        {
+          "pid": 1466024,
+          "transaction_id": "7773"
+        },
+        {
+          "pid": 1466040,
+          "transaction_id": "7772"
+        }
+      ],
+      "observedAdvisoryWaiters": 2,
+      "outcomes": [
+        {
+          "accepted": false,
+          "error": "director_video_shot_busy",
+          "code": "P0001",
+          "detail": "a946c003-0a81-4901-908b-de00de817cea"
+        },
+        {
+          "accepted": true,
+          "value": {
+            "video_clip_id": "95fe2a62-b05d-48fd-9622-899889f9c558",
+            "job_id": "a946c003-0a81-4901-908b-de00de817cea",
+            "take_number": 1,
+            "replayed": false
+          }
+        }
+      ],
+      "clips": 1,
+      "jobs": 2,
+      "queued": 1,
+      "charged": 0
+    },
+    {
+      "id": "different-clips-same-shot",
+      "participants": [
+        {
+          "pid": 1466039,
+          "transaction_id": "7784"
+        },
+        {
+          "pid": 1466040,
+          "transaction_id": "7783"
+        }
+      ],
+      "observedAdvisoryWaiters": 2,
+      "outcomes": [
+        {
+          "accepted": false,
+          "error": "director_video_shot_busy",
+          "code": "P0001",
+          "detail": "409c097b-870e-4827-8206-ac3a6d17ae62"
+        },
+        {
+          "accepted": true,
+          "value": {
+            "video_clip_id": "856cb9a6-3856-4f9f-a7b9-dbdae8980342",
+            "job_id": "409c097b-870e-4827-8206-ac3a6d17ae62",
+            "take_number": 2,
+            "replayed": false
+          }
+        }
+      ],
+      "clips": 2,
+      "jobs": 3,
+      "queued": 1,
+      "charged": 0
+    },
+    {
+      "id": "different-shots",
+      "participants": [
+        {
+          "pid": 1466024,
+          "transaction_id": "7796"
+        },
+        {
+          "pid": 1466040,
+          "transaction_id": "7795"
+        }
+      ],
+      "observedAdvisoryWaiters": 2,
+      "outcomes": [
+        {
+          "accepted": true,
+          "value": {
+            "video_clip_id": "fe0d198b-c810-4730-8333-d32f34abf635",
+            "job_id": "1786ed38-efa1-4654-8340-dc311aeefab8",
+            "take_number": 1,
+            "replayed": false
+          }
+        },
+        {
+          "accepted": true,
+          "value": {
+            "video_clip_id": "60123b30-1d67-468c-af11-759175e9d131",
+            "job_id": "2a5462a3-8a0a-411f-acb9-f4b418bee6e4",
+            "take_number": 1,
+            "replayed": false
+          }
+        }
+      ],
+      "first": {
+        "clips": 1,
+        "jobs": 1,
+        "queued": 1,
+        "charged": 0
+      },
+      "second": {
+        "clips": 1,
+        "jobs": 1,
+        "queued": 1,
+        "charged": 0
+      }
+    },
+    {
+      "id": "terminal-completed",
+      "first": {
+        "video_clip_id": "06ab6641-5a97-4e15-acd7-8871485521b1",
+        "job_id": "f830a7d8-1ba2-4c70-974d-ab2bdf7743e9",
+        "take_number": 1,
+        "replayed": false
+      },
+      "second": {
+        "video_clip_id": "74913ccb-6f01-4bcd-9693-6faa7a5b5dd4",
+        "job_id": "4bb87b4a-c232-4d1f-8015-0e4b074099c4",
+        "take_number": 2,
+        "replayed": false
+      },
+      "clips": 2,
+      "jobs": 2,
+      "queued": 1,
+      "charged": 0
+    },
+    {
+      "id": "terminal-failed",
+      "first": {
+        "video_clip_id": "c43ee153-d3a7-4f06-8dfe-31854f003a5b",
+        "job_id": "66ad9590-fabd-460c-9b0f-878b4511a891",
+        "take_number": 1,
+        "replayed": false
+      },
+      "second": {
+        "video_clip_id": "15104da8-d65b-425f-b2a1-666b42b6ad65",
+        "job_id": "81c9e245-4f3f-4ac2-87a3-0530d3712f6f",
+        "take_number": 2,
+        "replayed": false
+      },
+      "clips": 2,
+      "jobs": 2,
+      "queued": 1,
+      "charged": 0
+    },
+    {
+      "id": "batch-vs-individual",
+      "participants": [
+        {
+          "pid": 1466039,
+          "transaction_id": "7821"
+        },
+        {
+          "pid": 1466040,
+          "transaction_id": "7820"
+        }
+      ],
+      "observedAdvisoryWaiters": 2,
+      "outcomes": [
+        {
+          "accepted": false,
+          "error": "batch_shot_busy",
+          "code": "P0001"
+        },
+        {
+          "accepted": true,
+          "value": {
+            "video_clip_id": "a630d3e3-575e-4f5d-94f7-c4e7a4dc2907",
+            "job_id": "f4ea5cfb-04c3-4c8b-8530-1f2658311473",
+            "take_number": 1,
+            "replayed": false
+          }
+        }
+      ],
+      "clips": 1,
+      "jobs": 1,
+      "queued": 1,
+      "charged": 0
+    },
+    {
+      "id": "batch-and-regeneration-replay",
+      "first": {
+        "video_clip_id": "f6ed1818-8de8-4de8-993c-0d5ab965d474",
+        "job_id": "d48da1ea-d78d-4e0e-8812-7e42c09e9733",
+        "take_number": 1,
+        "replayed": false
+      },
+      "replay": {
+        "video_clip_id": "f6ed1818-8de8-4de8-993c-0d5ab965d474",
+        "job_id": "d48da1ea-d78d-4e0e-8812-7e42c09e9733",
+        "take_number": 1,
+        "replayed": true
+      },
+      "regeneration": {
+        "video_clip_id": "f6ed1818-8de8-4de8-993c-0d5ab965d474",
+        "job_id": "360e146f-64c7-41b5-846c-9ec6957d9263",
+        "take_number": 1,
+        "replayed": false
+      },
+      "regenerationReplay": {
+        "video_clip_id": "f6ed1818-8de8-4de8-993c-0d5ab965d474",
+        "job_id": "360e146f-64c7-41b5-846c-9ec6957d9263",
+        "take_number": 1,
+        "replayed": true
+      },
+      "clips": 1,
+      "jobs": 2,
+      "queued": 1,
+      "charged": 0
+    },
+    {
+      "id": "legacy-clip-linkage",
+      "initial": {
+        "video_clip_id": "04b33caa-5c86-4bc5-a1f5-892c4c445b66",
+        "job_id": "5493a775-2126-426b-a377-9f3e9b20a60d",
+        "take_number": 1,
+        "replayed": false
+      },
+      "error": "director_video_shot_busy",
+      "clips": 1,
+      "jobs": 1,
+      "queued": 1,
+      "charged": 0
+    }
+  ],
+  "functions": [
+    {
+      "name": "reserve_director_video_take",
+      "source": "supabase/migrations/20260914171000_director_video_singleflight.sql",
+      "sqlSha256": "284ccf9d986b2562bb661246291657c3283779bc85549d2e1e24d46ee87645fc",
+      "developmentBodyMatches": false
+    },
+    {
+      "name": "reserve_director_video_regeneration",
+      "source": "supabase/migrations/20260914171000_director_video_singleflight.sql",
+      "sqlSha256": "a7138132f48d82bc2962b5725c2ef2d3cff0e9ede09072c37dc30fcbcee34cae",
+      "developmentBodyMatches": false
+    },
+    {
+      "name": "create_director_video_batch",
+      "source": "supabase/migrations/20260909110000_director_video_batches.sql",
+      "sqlSha256": "23568c473212afd6f36f8d9516d6d581296210c50c98ede34de03d5e4d5d7697",
+      "developmentBodyMatches": true
+    },
+    {
+      "name": "claim_director_video_batch",
+      "source": "supabase/migrations/20260909110000_director_video_batches.sql",
+      "sqlSha256": "e99d5117c5d9026f7bea7bd0a27393bb45b21c0af1abf13c96683f5506b6e87f",
+      "developmentBodyMatches": true
+    },
+    {
+      "name": "reserve_director_video_batch_item",
+      "source": "supabase/migrations/20260909110000_director_video_batches.sql",
+      "sqlSha256": "cfca4d54aebf067cbc7f765c8de8c14707bbd63a3066d1339f1f9f2fc80750ba",
+      "developmentBodyMatches": true
+    },
+    {
+      "name": "take_resolved_ledger",
+      "source": "supabase/migrations/20260909130000_fix_refund_expiry.sql",
+      "sqlSha256": "4d3ae3baa3bc3e0273100a01a47017877011d7fa585e23de5254ef4386ea9178",
+      "developmentBodyMatches": true
+    },
+    {
+      "name": "take_hold",
+      "source": "supabase/migrations/20260909130000_fix_refund_expiry.sql",
+      "sqlSha256": "86f897406fac3691ba9ed7a97b8f3fb7013a9afdc9f68b3ac4e3c415e85e947d",
+      "developmentBodyMatches": true
+    },
+    {
+      "name": "enforce_generation_capacity",
+      "source": "supabase/migrations/20260914150000_generation_capacity_key_assignment.sql",
+      "sqlSha256": "362ea567fc157c2f96b8ded00b23563faf417d4f6f146239febe59524c3e62b4",
+      "developmentBodyMatches": true
+    }
+  ],
+  "testProcessExitCode": 0,
+  "finishedAt": "2026-09-14T08:29:06.169Z"
+}

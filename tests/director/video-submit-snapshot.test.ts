@@ -517,3 +517,41 @@ describe('기존 단건 요청과 같은 오류를 지키는 약속', () => {
     expect(mocks.submit).not.toHaveBeenCalled()
   })
 })
+
+describe('영상 중복 접수와 차감 거절', () => {
+  it('다른 요청에서 같은 샷의 영상을 생성 중이면 기존 작업을 안내하고 추가 차감하거나 제출하지 않는다', async () => {
+    const prepared = await requirePrepared(request())
+    const existingJobId = '123e4567-e89b-42d3-a456-426614174011'
+    mocks.reserveTake.mockRejectedValue({ code: 'P0001', message: 'director_video_shot_busy', details: existingJobId })
+    const response = await submitPreparedDirectorVideo(prepared)
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ code: 'director_video_shot_busy', existingJobId, status: 'queued' })
+    expect(mocks.holdTakesForVideoJob).not.toHaveBeenCalled()
+    expect(mocks.submit).not.toHaveBeenCalled()
+    expect(mocks.fail).not.toHaveBeenCalled()
+    expect(mocks.attach).not.toHaveBeenCalled()
+  })
+
+  it('차감이 승인되지 않았으면 잔액 부족 표시가 없더라도 외부 영상 생성을 시작하지 않는다', async () => {
+    const prepared = await requirePrepared(request())
+    mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: false })
+    mocks.getJob.mockResolvedValue(reservedFalJobFromSnapshot(prepared.inputSnapshot))
+    mocks.holdTakesForVideoJob.mockResolvedValue({ ok: false, insufficient: false, held: 0, balance: 100 })
+    mocks.submit.mockResolvedValue({ request_id: 'fal-1' })
+    const response = await submitPreparedDirectorVideo(prepared)
+    expect(response.ok).toBe(false)
+    expect(mocks.submit).not.toHaveBeenCalled()
+    expect(mocks.attach).not.toHaveBeenCalled()
+    expect(mocks.fail).toHaveBeenCalledExactlyOnceWith('project-1', 'job-1', 'Take reservation was not approved')
+  })
+
+  it('이미 반환된 작업의 차감을 거절하면 외부 영상 생성을 시작하지 않는다', async () => {
+    const prepared = await requirePrepared(request())
+    mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: false })
+    mocks.holdTakesForVideoJob.mockRejectedValue({ code: 'P0001', message: 'take_hold_already_released' })
+    const response = await submitPreparedDirectorVideo(prepared)
+    expect(response.ok).toBe(false)
+    expect(mocks.submit).not.toHaveBeenCalled()
+    expect(mocks.attach).not.toHaveBeenCalled()
+  })
+})

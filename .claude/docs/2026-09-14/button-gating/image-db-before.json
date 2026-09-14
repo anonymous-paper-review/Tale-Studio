@@ -1,0 +1,150 @@
+{
+  "testedAt": "2026-09-14T07:44:26.213Z",
+  "observations": [
+    {
+      "targets": [
+        {
+          "kind": "shot_storyboard",
+          "target": {
+            "writerShotId": "shot-1"
+          }
+        },
+        {
+          "kind": "shot_storyboard",
+          "target": {
+            "writerShotId": "shot-1"
+          }
+        },
+        {
+          "kind": "shot_storyboard",
+          "target": {
+            "writerShotId": "shot-1"
+          }
+        },
+        {
+          "kind": "shot_storyboard",
+          "target": {
+            "writerShotId": "shot-1"
+          }
+        },
+        {
+          "kind": "shot_storyboard",
+          "target": {
+            "writerShotId": "shot-1"
+          }
+        },
+        {
+          "kind": "shot_storyboard",
+          "target": {
+            "writerShotId": "shot-1"
+          }
+        }
+      ],
+      "outcomes": [
+        {
+          "inserted": true,
+          "jobId": "534bdcdf-f1af-427b-bd15-ff5a629c418a"
+        },
+        {
+          "inserted": true,
+          "jobId": "7c2cba7f-6f16-4861-9222-24d57c86789b"
+        },
+        {
+          "inserted": true,
+          "jobId": "6095c57e-d049-4af7-9388-33832dd51ee2"
+        },
+        {
+          "inserted": true,
+          "jobId": "ea5996ff-4a6b-4156-845c-9239a6355286"
+        },
+        {
+          "inserted": true,
+          "jobId": "325cfc8b-f280-4c3a-9253-8cdcc480ae2f"
+        },
+        {
+          "inserted": true,
+          "jobId": "d13d5996-0d2a-4bc1-9dfe-4971b64d0a76"
+        }
+      ],
+      "jobs": 6
+    },
+    {
+      "targets": [
+        {
+          "kind": "shot_storyboard",
+          "target": {
+            "writerShotId": "shot-1"
+          }
+        },
+        {
+          "kind": "storyboard_real_grid",
+          "target": {
+            "writerShotIds": [
+              "shot-1",
+              "shot-2"
+            ]
+          }
+        }
+      ],
+      "outcomes": [
+        {
+          "inserted": true,
+          "jobId": "5f3f073f-b243-4dac-905c-8ab395d9aab6"
+        },
+        {
+          "inserted": true,
+          "jobId": "c29f2a1f-fdc6-4149-8f4e-b8a25876f5f1"
+        }
+      ],
+      "jobs": 2
+    },
+    {
+      "targets": [
+        {
+          "kind": "shot_storyboard",
+          "target": {
+            "writerShotId": "shot-1"
+          }
+        },
+        {
+          "kind": "shot_storyboard",
+          "target": {
+            "writerShotId": "shot-2"
+          }
+        }
+      ],
+      "outcomes": [
+        {
+          "inserted": true,
+          "jobId": "886d4cff-de23-46e0-a3c4-0d971736f8db"
+        },
+        {
+          "inserted": true,
+          "jobId": "f153c4f8-9294-46d4-835d-e80c967539d7"
+        }
+      ],
+      "jobs": 2
+    },
+    {
+      "targets": [
+        {
+          "kind": "shot_storyboard",
+          "target": {
+            "writerShotId": "shot-1"
+          }
+        }
+      ],
+      "outcomes": [
+        {
+          "inserted": true,
+          "jobId": "622f1990-0ac4-4098-9ec8-2d5f6754ff7c"
+        }
+      ],
+      "jobs": 1
+    }
+  ],
+  "paidRequests": 0,
+  "publicRowsWritten": 0,
+  "migrationPresent": false,
+  "temporarySchemaRemoved": true
+}

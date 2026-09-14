@@ -1,0 +1,176 @@
+[
+  {
+    "at": "2026-09-14T07:57:25.488Z",
+    "observation": {
+      "case": "Producer 타이핑 직후",
+      "value": "한국어 내레이션과 짧은 대사로 진행해 주세요.",
+      "continueDisabled": false
+    }
+  },
+  {
+    "at": "2026-09-14T07:57:26.582Z",
+    "observation": {
+      "case": "Producer 모두 삭제",
+      "continueDisabled": false
+    }
+  },
+  {
+    "at": "2026-09-14T07:57:29.150Z",
+    "observation": {
+      "case": "Producer 계속하기 두 번 클릭",
+      "requests": [
+        {
+          "method": "CHAT",
+          "url": "review://producer",
+          "body": {
+            "content": "한국어 내레이션과 짧은 대사로 진행해 주세요."
+          },
+          "at": 1789372648578
+        }
+      ],
+      "loading": true
+    }
+  },
+  {
+    "at": "2026-09-14T07:58:07.915Z",
+    "observation": {
+      "case": "Producer 모두 삭제 재검증(앞선 fill 빈값은 도구가 거절해 입력 미변경)",
+      "value": "비울 문장",
+      "continueDisabled": false
+    }
+  },
+  {
+    "at": "2026-09-14T07:58:09.755Z",
+    "observation": {
+      "case": "한글 조합 중 Enter",
+      "chatCount": 0
+    }
+  },
+  {
+    "at": "2026-09-14T07:58:10.915Z",
+    "observation": {
+      "case": "일반 Enter로 동일 문장 전송",
+      "requests": [
+        {
+          "method": "CHAT",
+          "url": "review://producer",
+          "body": {
+            "content": "비울 문장"
+          },
+          "at": 1789372690315
+        }
+      ]
+    }
+  },
+  {
+    "at": "2026-09-14T07:58:44.325Z",
+    "observation": {
+      "case": "Producer 삭제 검증 완료",
+      "value": "",
+      "continueDisabled": true
+    }
+  },
+  {
+    "at": "2026-09-14T07:58:46.046Z",
+    "observation": {
+      "case": "한글 조합 중 Enter 최종",
+      "chatCount": 0
+    }
+  },
+  {
+    "at": "2026-09-14T07:58:47.178Z",
+    "observation": {
+      "case": "일반 Enter 동일 문장 최종",
+      "requests": [
+        {
+          "method": "CHAT",
+          "url": "review://producer",
+          "body": {
+            "content": "한국어 내레이션과 짧은 대사로 진행해 주세요."
+          },
+          "at": 1789372726594
+        }
+      ]
+    }
+  },
+  {
+    "at": "2026-09-14T07:59:04.766Z",
+    "observation": {
+      "case": "Director 최초 생성 클릭 직후",
+      "requests": [
+        {
+          "method": "POST",
+          "url": "http://127.0.0.1:3005/api/director/generate-storyboard",
+          "body": {
+            "projectId": "button-gating-review-3",
+            "writerShotId": "review-writer-shot-3",
+            "prompt": "산길을 걷는 인물. 부드러운 아침 햇빛과 멀리 보이는 산.",
+            "referenceImageUrls": [],
+            "characterRefCount": 0,
+            "worldRefCount": 0,
+            "imageModel": "nano-banana-2"
+          },
+          "at": 1789372744195
+        }
+      ],
+      "buttons": [
+        {
+          "text": "접수 중…",
+          "disabled": true,
+          "busy": "true"
+        }
+      ],
+      "dialog": false
+    }
+  },
+  {
+    "at": "2026-09-14T08:34:22.637Z",
+    "observation": {
+      "activeJobId": null,
+      "chatLoading": false,
+      "generatingNodeIds": {},
+      "image": {
+        "errorMessage": null,
+        "generatedAt": 1789374849969,
+        "status": "completed",
+        "url": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22960%22%20height%3D%22540%22%3E%3Crect%20width%3D%22960%22%20height%3D%22540%22%20fill%3D%22darkslategray%22%2F%3E%3Cpath%20d%3D%22M0%20460L230%20160L440%20405L640%20230L960%20500V540H0Z%22%20fill%3D%22slategray%22%2F%3E%3Ccircle%20cx%3D%22770%22%20cy%3D%22100%22%20r%3D%2245%22%20fill%3D%22palegoldenrod%22%2F%3E%3Ctext%20x%3D%22480%22%20y%3D%22300%22%20text-anchor%3D%22middle%22%20font-family%3D%22sans-serif%22%20font-size%3D%2238%22%20fill%3D%22white%22%3E%EA%B8%B0%EC%A1%B4%20%EC%9D%B4%EB%AF%B8%EC%A7%80%20%C2%B7%20%EA%B2%80%EC%A6%9D%EC%9A%A9%20%ED%91%9C%EB%B3%B8%3C%2Ftext%3E%3C%2Fsvg%3E"
+      },
+      "jobs": [],
+      "projectId": "button-gating-review-2",
+      "queueFailed": false,
+      "queueHeld": false,
+      "queuedVisible": false,
+      "shotNodeId": "review-shot-node-2",
+      "videoBusy": true,
+      "videoNodes": 0,
+      "writerShotId": "review-writer-shot-2"
+    }
+  },
+  {
+    "at": "2026-09-14T08:37:41.198Z",
+    "observation": {
+      "paidGeneration": false,
+      "state": {
+        "activeJobId": null,
+        "chatLoading": false,
+        "generatingNodeIds": {},
+        "image": {
+          "errorMessage": null,
+          "generatedAt": 1789375025396,
+          "status": "completed",
+          "url": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22960%22%20height%3D%22540%22%3E%3Crect%20width%3D%22960%22%20height%3D%22540%22%20fill%3D%22darkslategray%22%2F%3E%3Cpath%20d%3D%22M0%20460L230%20160L440%20405L640%20230L960%20500V540H0Z%22%20fill%3D%22slategray%22%2F%3E%3Ccircle%20cx%3D%22770%22%20cy%3D%22100%22%20r%3D%2245%22%20fill%3D%22palegoldenrod%22%2F%3E%3Ctext%20x%3D%22480%22%20y%3D%22300%22%20text-anchor%3D%22middle%22%20font-family%3D%22sans-serif%22%20font-size%3D%2238%22%20fill%3D%22white%22%3E%EA%B8%B0%EC%A1%B4%20%EC%9D%B4%EB%AF%B8%EC%A7%80%20%C2%B7%20%EA%B2%80%EC%A6%9D%EC%9A%A9%20%ED%91%9C%EB%B3%B8%3C%2Ftext%3E%3C%2Fsvg%3E"
+        },
+        "jobs": [],
+        "projectId": "button-gating-review-2",
+        "queueFailed": false,
+        "queueHeld": false,
+        "queuedVisible": false,
+        "shotNodeId": "review-shot-node-2",
+        "videoBusy": true,
+        "videoNodes": 0,
+        "writerShotId": "review-writer-shot-2"
+      },
+      "toastText": "이 샷의 영상이 이미 생성 중이에요."
+    }
+  }
+]

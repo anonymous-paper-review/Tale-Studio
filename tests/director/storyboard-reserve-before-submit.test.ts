@@ -164,6 +164,24 @@ beforeEach(() => {
 })
 
 describe('실사 스토리보드의 자리 예약 선행', () => {
+  it('같은 샷의 이미지가 이미 접수됐으면 새로 제출하지 않고 기존 작업을 돌려준다', async () => {
+    const jobId = '22222222-2222-4222-8222-222222222222'
+    mocks.reserveGenerationJob.mockRejectedValue({ code: 'P0001', message: 'storyboard_already_generating', details: jobId })
+    const response = await generateStoryboardPOST(storyboardRequest())
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ jobId, status: 'queued', replayed: true })
+    expect(mocks.falImageSubmit).not.toHaveBeenCalled()
+  })
+
+  it('일괄 이미지와 개별 이미지의 대상이 겹치면 중복 제출 없이 기존 작업을 기다린다', async () => {
+    db.shots = gridShots(4)
+    mocks.reserveGenerationJob.mockRejectedValue({ code: 'P0001', message: 'storyboard_already_generating', details: '22222222-2222-4222-8222-222222222222' })
+    const response = await generateStoryboardBatchPOST(batchRequest())
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ data: { submitted: [], remaining: 4 } })
+    expect(mocks.falImageSubmit).not.toHaveBeenCalled()
+  })
+
   // 왜: fal 에 먼저 내면 트리거가 기록을 거절해도 돈은 이미 나간 뒤다 — 순서가 곧 방어다.
   it('실사 단건은 외부 제출 전에 자리를 예약한다', async () => {
     const response = await generateStoryboardPOST(storyboardRequest())

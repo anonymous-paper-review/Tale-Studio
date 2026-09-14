@@ -1,0 +1,145 @@
+{
+  "recordedAt": "2026-09-14T08:39:34.597670+00:00",
+  "branch": "jxcape/button-gating-video-release",
+  "deployedToMain": false,
+  "productionDatabaseChanged": false,
+  "tests": {
+    "command": "pnpm test",
+    "exitCode": 0,
+    "filesPassed": 413,
+    "filesSkipped": 2,
+    "testsPassed": 3194,
+    "testsSkipped": 27
+  },
+  "build": {
+    "command": "pnpm build",
+    "exitCode": 0,
+    "note": "배포 전 분리된 체크아웃에서 빌드 통과"
+  },
+  "typecheck": {
+    "command": "pnpm typecheck",
+    "exitCode": 0
+  },
+  "designLint": {
+    "command": "pnpm lint:design",
+    "exitCode": 0
+  },
+  "scopedLint": {
+    "exitCode": 0,
+    "errors": 0,
+    "preexistingWarnings": 2
+  },
+  "dbTypes": {
+    "command": "pnpm db:types",
+    "changed": false
+  },
+  "browser": {
+    "actualComponents": true,
+    "projectAndResponses": "mocked",
+    "livePaidGeneration": false,
+    "directorObservationsPassed": 10,
+    "consoleErrors": 0,
+    "consoleWarnings": 0,
+    "temporaryRouteRemoved": true,
+    "notes": [
+      "빈 문자열 fill 명령과 반복 최상위 const 선언은 도구 오류로 입력을 바꾸지 못했음. 재검증에서 빈 값·비활성화·동일 전송·IME 차단 확인.",
+      "첫 Director 관측기는 상태 확인 버튼을 목록에서 누락. 버튼 수집만 수정한 뒤 같은 기대값으로 전체 10개 관측 통과.",
+      "확인창은 애니메이션 완료 후 다시 촬영."
+    ],
+    "videoDuplicateStateVerified": true
+  },
+  "databases": {
+    "imageConcurrency": {
+      "actualDevDatabase": true,
+      "isolatedSchema": true,
+      "casesPassed": 4,
+      "sixConcurrentRequestsCreated": 1,
+      "cleanupComplete": true
+    },
+    "directorTakes": {
+      "actualDevDatabase": true,
+      "isolatedSchema": true,
+      "originalFunctionBodiesMatched": 8,
+      "observationsComplete": 8,
+      "duplicateHoldSafe": true,
+      "differentRequestNewTakeOverlapSafe": true,
+      "cleanupComplete": true,
+      "holdReleaseCasesPassed": 20,
+      "videoReservationCasesPassed": 11,
+      "note": "original audit evidence preserved; new candidate SQL verification",
+      "combinedCasesPassed": 11
+    }
+  },
+  "sourceSha256": {
+    "src/app/api/director/generate-storyboard-batch/route.ts": "c7651e29181f36394cc58a5e3a79744906a1883eb584f00aa96cb96250d09cc2",
+    "src/app/api/director/generate-storyboard/route.ts": "35c1f2f114b6917e60c43c464d143a9499698c748558729ada6044db9677b348",
+    "src/components/layout/global-chat.tsx": "4c71f80bd7412b67e06333ddd6d7a2cffdebafda4ccc6dfcbc6cbbfc710270af",
+    "src/features/director/canvas-nodes/ShotNode.tsx": "b20710075f530b7d003d6f3d3036ec8a109f2367761ac21d007691bfea71d8a3",
+    "src/features/director/canvas-panels/ShotDetailPanel.tsx": "d043002dec95a1d27fbfdf070454b71f0cf0ea71746e1ed1df17b52ae3fe71af",
+    "src/features/director/canvas-popups/ShotNodePopup.tsx": "a6a654f970382c3b5c2331bb1589aaadd3c100e3a39e94165fb4a66249d2fcbc",
+    "src/features/director/canvas-views/StoryboardGridView.tsx": "fe036e2834dc2ec83429dcf144d8bd017181176dc7dfcfe674df9c8f86660115",
+    "src/features/director/hooks/use-storyboard-image-generation.ts": "c6f72963a13c65df3e17b49003bc385ef86cd0b03c4a2927674da993035bdbc9",
+    "src/features/director/storyboard-image-button.tsx": "31cebe59ff72dac4656bce2aa5fa934d54c0de2593e45443927004c45cbaa220",
+    "src/lib/director/storyboard-active-job.ts": "04dbdd8e66d592363804c4c22f57e73d887f138d78497fe0d0a2e0cf9153aa23",
+    "src/lib/director/video-submit.ts": "98439658240b12da89dbf36fa6e8686a846d5eb730f4e481630d3c386c081ab6",
+    "src/lib/generation-queue.ts": "63127a99746afdb9a56c643d8afdd38f7068da9ccaa6d8903a6056c1876519a2",
+    "src/lib/i18n/messages-ko.ts": "e4ad77c47b008e7cb67694565659c68489438900b1b006c685f7602cce6016d5",
+    "src/stores/director-store.ts": "5768bc0b3e7782cf24d4c1f2bbbb1a89b0ca2e86b73376e515b14eb897108e40",
+    "supabase/migrations/20260914160000_storyboard_singleflight.sql": "0434afff8c3cc3858667ecd42b49d74fdb73485fc63609f34c94b6dfcae5f6d7",
+    "supabase/migrations/20260914170000_take_hold_idempotency.sql": "edf7801461d9514b2b3be3b63255a5866e3f47886006ff1aa915b6b16ecb77e1",
+    "supabase/migrations/20260914171000_director_video_singleflight.sql": "67332a117dd58bfe2196ea2436671e07e126a22998706b65968aeaf3a844d937"
+  },
+  "screenshots": [
+    {
+      "path": "screenshots/01-producer-empty.png",
+      "sha256": "3ca5a3eee740741fc7673a68705f22eb131de9f649bc685c69f1d25db1a5110d"
+    },
+    {
+      "path": "screenshots/02-producer-typing-enabled.png",
+      "sha256": "4cae5e09d9a2b1e060981fc9a1a7b3283d4cca8cb34f251ce65918c11a7555f2"
+    },
+    {
+      "path": "screenshots/03-producer-sent-once.png",
+      "sha256": "cd9e86d4e59a1c47d92d75eed4829db78de2d9a1f1593a6a2c07ffd20e567d52"
+    },
+    {
+      "path": "screenshots/04-director-submitting.png",
+      "sha256": "2a94cd2da183060f95d49e2d81abc04b4677ff735a5a77bc207a930ee8259af2"
+    },
+    {
+      "path": "screenshots/05-director-generating.png",
+      "sha256": "2c26a8b722851290c97b2795629bb42a695405e934193b37fed50a88504092a1"
+    },
+    {
+      "path": "screenshots/06-director-completed.png",
+      "sha256": "8a3cf9e7454fd7ad4858ba4871fe92c6087bdd9ef585cef5f0dbdb4b1b1dc3aa"
+    },
+    {
+      "path": "screenshots/07-director-confirm.png",
+      "sha256": "fc20dd33553c3e2d9466e753b7d4b8dbbfe296a604616c1e4f32419f833b4025"
+    },
+    {
+      "path": "screenshots/08-director-failed.png",
+      "sha256": "8f219c195cb1dc3974cfcea803192fa02ebb8a9c759cff32880e0481f1499cfa"
+    },
+    {
+      "path": "screenshots/09-director-checking.png",
+      "sha256": "d19112c94211a13ef1e1f4cfe291822e11513fc8e0e7e140d0bc6a671a649f52"
+    },
+    {
+      "path": "screenshots/10-director-restored-job.png",
+      "sha256": "1036389b3f8cd4de5bafa2efb5e766b556f86c35cf13ae3e7b36f068fbc11322"
+    },
+    {
+      "path": "screenshots/11-both-fixes.png",
+      "sha256": "4aa3aecb438477deef162eb828f8f44d498185eb44bd1b13832b90349c2230f0"
+    },
+    {
+      "path": "screenshots/12-video-duplicate-blocked.png",
+      "sha256": "026e77319a8e7f3e1cc0a74e27cf60b3dbda13e97a65f8ebabf75375610c3d13"
+    }
+  ],
+  "pending": [
+    "개발 DB 적용·메인 및 운영 DB 배포·배포 후 검증"
+  ]
+}

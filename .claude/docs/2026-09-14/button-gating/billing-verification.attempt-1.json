@@ -1,0 +1,27 @@
+{
+  "startedAt": "2026-09-14T07:44:10.864Z",
+  "developmentProject": "pbiumddivadgbzxuymak",
+  "schema": "director_charge_5f37d892cd0642e0af7a65fda574a25e",
+  "safety": {
+    "paidProviderRequests": 0,
+    "applicationRowsRead": 0,
+    "applicationRowsWritten": 0,
+    "productionWrites": 0,
+    "publicFunctionsBefore": {
+      "count": 28,
+      "hash": "562453b89c2eb88b8d8714930e6e20a4"
+    },
+    "verifiedTls": true,
+    "temporarySchemaRemoved": true,
+    "publicFunctionsAfter": {
+      "count": 28,
+      "hash": "562453b89c2eb88b8d8714930e6e20a4"
+    },
+    "publicFunctionsUnchanged": true
+  },
+  "scope": "Original SQL in isolated PostgreSQL schema; API replay-to-hold guard is separately source-inspected, not simulated here.",
+  "observations": [],
+  "functions": [],
+  "failure": "column reference \"oid\" is ambiguous",
+  "finishedAt": "2026-09-14T07:44:14.064Z"
+}

@@ -929,6 +929,15 @@ async function submitPreparedVideo(
         ? await reserveDirectorVideoRegeneration({ projectId, videoClipId, model: modelKey, target: { workspaceId: project.workspace_id, shotId: writerShotId, writerShotId, videoClipId, retakeMode: 'regeneration' }, idempotencyKey, inputSnapshot, userId: user.id, workspaceId: project.workspace_id, provider: isLocal ? 'local' : 'fal', actor: jobActor })
         : await (options.reserve ?? reserveDirectorVideoTake)({ projectId, shotId: writerShotId, model: modelKey, target: { workspaceId: project.workspace_id, shotId: writerShotId, writerShotId, retakeMode: 'new_take' }, idempotencyKey, inputSnapshot, userId: user.id, workspaceId: project.workspace_id, provider: isLocal ? 'local' : 'fal', actor: jobActor, takeLabel: normalizedNewTakeMetadata.take_label as string | null, override: normalizedNewTakeMetadata.override, canvasPosition: normalizedNewTakeMetadata.canvas_position })
     } catch (reserveError) {
+      // 다른 요청키의 진행 작업은 재생(replay)으로 가장하지 않는다. 새 예약/차감 없이 현재 작업을 안내한다.
+      const busy = reserveError as { code?: unknown; message?: unknown; details?: unknown } | null
+      if (busy?.code === 'P0001' && busy.message === 'director_video_shot_busy' &&
+        typeof busy.details === 'string' && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(busy.details)) {
+        return NextResponse.json({
+          error: 'A video is already being generated for this shot.',
+          code: 'director_video_shot_busy', existingJobId: busy.details, status: 'queued',
+        }, { status: 409 })
+      }
       const rejection = capacityReservationRejection(reserveError, { projectId, kind: 'shot_video', userId: user.id })
       if (rejection) return rejection
       throw reserveError
@@ -955,6 +964,7 @@ async function submitPreparedVideo(
           { status: 402 },
         )
       }
+      if (!hold.ok) throw new Error('Take reservation was not approved')
     }
     if (traceId) {
       try {

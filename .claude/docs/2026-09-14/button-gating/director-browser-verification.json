@@ -1,0 +1,996 @@
+[
+  {
+    "label": "이미지 없음: 클릭 즉시 접수 중, 버튼 비활성",
+    "at": "2026-09-14T08:02:51.426Z",
+    "state": {
+      "projectId": "button-gating-review-6",
+      "shotNodeId": "review-shot-node-6",
+      "writerShotId": "review-writer-shot-6",
+      "activeJobId": "review-job-6-5",
+      "queuedVisible": false,
+      "queueHeld": false,
+      "queueFailed": false,
+      "jobs": [
+        [
+          "review-restored-job-2",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-3-6",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-4-6",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-restored-job-5",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-6-5",
+          {
+            "status": "queued",
+            "error": null
+          }
+        ]
+      ],
+      "generatingNodeIds": {},
+      "image": {
+        "url": "",
+        "status": "generating",
+        "errorMessage": null,
+        "generatedAt": 0
+      },
+      "chatLoading": false
+    },
+    "posts": [
+      {
+        "method": "POST",
+        "url": "http://127.0.0.1:3005/api/director/generate-storyboard",
+        "body": {
+          "projectId": "button-gating-review-6",
+          "writerShotId": "review-writer-shot-6",
+          "prompt": "산길을 걷는 인물. 부드러운 아침 햇빛과 멀리 보이는 산.",
+          "referenceImageUrls": [],
+          "characterRefCount": 0,
+          "worldRefCount": 0,
+          "imageModel": "nano-banana-2"
+        },
+        "at": 1789372971304
+      }
+    ],
+    "buttons": [
+      {
+        "text": "이미지 없음",
+        "disabled": false,
+        "busy": null
+      },
+      {
+        "text": "기존 이미지 있음",
+        "disabled": false,
+        "busy": null
+      },
+      {
+        "text": "접수 중…",
+        "disabled": true,
+        "busy": "true"
+      },
+      {
+        "text": "접수 중…",
+        "disabled": true,
+        "busy": "true"
+      }
+    ],
+    "dialog": null,
+    "spinning": 3
+  },
+  {
+    "label": "1.5초 후 두 화면의 생성 버튼을 반복 클릭해도 요청 1개",
+    "at": "2026-09-14T08:02:54.170Z",
+    "state": {
+      "projectId": "button-gating-review-6",
+      "shotNodeId": "review-shot-node-6",
+      "writerShotId": "review-writer-shot-6",
+      "activeJobId": "review-job-6-5",
+      "queuedVisible": false,
+      "queueHeld": false,
+      "queueFailed": false,
+      "jobs": [
+        [
+          "review-restored-job-2",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-3-6",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-4-6",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-restored-job-5",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-6-5",
+          {
+            "status": "queued",
+            "error": null
+          }
+        ]
+      ],
+      "generatingNodeIds": {},
+      "image": {
+        "url": "",
+        "status": "generating",
+        "errorMessage": null,
+        "generatedAt": 0
+      },
+      "chatLoading": false
+    },
+    "posts": [
+      {
+        "method": "POST",
+        "url": "http://127.0.0.1:3005/api/director/generate-storyboard",
+        "body": {
+          "projectId": "button-gating-review-6",
+          "writerShotId": "review-writer-shot-6",
+          "prompt": "산길을 걷는 인물. 부드러운 아침 햇빛과 멀리 보이는 산.",
+          "referenceImageUrls": [],
+          "characterRefCount": 0,
+          "worldRefCount": 0,
+          "imageModel": "nano-banana-2"
+        },
+        "at": 1789372971304
+      }
+    ],
+    "buttons": [
+      {
+        "text": "이미지 없음",
+        "disabled": false,
+        "busy": null
+      },
+      {
+        "text": "기존 이미지 있음",
+        "disabled": false,
+        "busy": null
+      },
+      {
+        "text": "접수 중…",
+        "disabled": true,
+        "busy": "true"
+      },
+      {
+        "text": "접수 중…",
+        "disabled": true,
+        "busy": "true"
+      }
+    ],
+    "dialog": null,
+    "spinning": 3
+  },
+  {
+    "label": "접수 응답 후 카드와 패널에 이미지 생성 중 표시",
+    "at": "2026-09-14T08:02:54.897Z",
+    "state": {
+      "projectId": "button-gating-review-6",
+      "shotNodeId": "review-shot-node-6",
+      "writerShotId": "review-writer-shot-6",
+      "activeJobId": "review-job-6-5",
+      "queuedVisible": true,
+      "queueHeld": false,
+      "queueFailed": false,
+      "jobs": [
+        [
+          "review-restored-job-2",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-3-6",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-4-6",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-restored-job-5",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-6-5",
+          {
+            "status": "queued",
+            "error": null
+          }
+        ]
+      ],
+      "generatingNodeIds": {},
+      "image": {
+        "url": "",
+        "status": "generating",
+        "errorMessage": null,
+        "generatedAt": 0
+      },
+      "chatLoading": false
+    },
+    "posts": [
+      {
+        "method": "POST",
+        "url": "http://127.0.0.1:3005/api/director/generate-storyboard",
+        "body": {
+          "projectId": "button-gating-review-6",
+          "writerShotId": "review-writer-shot-6",
+          "prompt": "산길을 걷는 인물. 부드러운 아침 햇빛과 멀리 보이는 산.",
+          "referenceImageUrls": [],
+          "characterRefCount": 0,
+          "worldRefCount": 0,
+          "imageModel": "nano-banana-2"
+        },
+        "at": 1789372971304
+      }
+    ],
+    "buttons": [
+      {
+        "text": "이미지 없음",
+        "disabled": false,
+        "busy": null
+      },
+      {
+        "text": "기존 이미지 있음",
+        "disabled": false,
+        "busy": null
+      },
+      {
+        "text": "이미지 생성 중",
+        "disabled": true,
+        "busy": "true"
+      },
+      {
+        "text": "이미지 생성 중",
+        "disabled": true,
+        "busy": "true"
+      }
+    ],
+    "dialog": null,
+    "spinning": 3
+  },
+  {
+    "label": "완료 응답 후 이미지 표시 및 재생성 버튼 활성",
+    "at": "2026-09-14T08:03:00.033Z",
+    "state": {
+      "projectId": "button-gating-review-6",
+      "shotNodeId": "review-shot-node-6",
+      "writerShotId": "review-writer-shot-6",
+      "activeJobId": "review-job-6-5",
+      "queuedVisible": true,
+      "queueHeld": false,
+      "queueFailed": false,
+      "jobs": [
+        [
+          "review-restored-job-2",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-3-6",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-4-6",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-restored-job-5",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-6-5",
+          {
+            "status": "completed",
+            "error": null
+          }
+        ]
+      ],
+      "generatingNodeIds": {},
+      "image": {
+        "url": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22960%22%20height%3D%22540%22%3E%3Crect%20width%3D%22960%22%20height%3D%22540%22%20fill%3D%22midnightblue%22%2F%3E%3Cpath%20d%3D%22M0%20440L280%20170L530%20440L780%20190L960%20470V540H0Z%22%20fill%3D%22steelblue%22%2F%3E%3Ctext%20x%3D%22480%22%20y%3D%22300%22%20text-anchor%3D%22middle%22%20font-family%3D%22sans-serif%22%20font-size%3D%2238%22%20fill%3D%22white%22%3E%EC%99%84%EB%A3%8C%20%EC%9D%B4%EB%AF%B8%EC%A7%80%20%C2%B7%20%EA%B2%80%EC%A6%9D%EC%9A%A9%20%ED%91%9C%EB%B3%B8%3C%2Ftext%3E%3C%2Fsvg%3E",
+        "status": "completed",
+        "errorMessage": null,
+        "generatedAt": 1789372977267
+      },
+      "chatLoading": false
+    },
+    "posts": [
+      {
+        "method": "POST",
+        "url": "http://127.0.0.1:3005/api/director/generate-storyboard",
+        "body": {
+          "projectId": "button-gating-review-6",
+          "writerShotId": "review-writer-shot-6",
+          "prompt": "산길을 걷는 인물. 부드러운 아침 햇빛과 멀리 보이는 산.",
+          "referenceImageUrls": [],
+          "characterRefCount": 0,
+          "worldRefCount": 0,
+          "imageModel": "nano-banana-2"
+        },
+        "at": 1789372971304
+      },
+      {
+        "method": "POST",
+        "url": "http://127.0.0.1:3005/api/writer/debug-events",
+        "body": {
+          "projectId": "button-gating-review-6",
+          "event": "cache_invalidated",
+          "payload": {
+            "reason": "explicit_invalidation"
+          }
+        },
+        "at": 1789372977268
+      },
+      {
+        "method": "POST",
+        "url": "http://127.0.0.1:3005/api/project/button-gating-review-6/messages",
+        "body": {
+          "stage": "director",
+          "role": "model",
+          "content": "✓ 스토리보드 생성이 완료됐어요. Director 탭에서 확인하세요."
+        },
+        "at": 1789372977301
+      }
+    ],
+    "buttons": [
+      {
+        "text": "이미지 없음",
+        "disabled": false,
+        "busy": null
+      },
+      {
+        "text": "기존 이미지 있음",
+        "disabled": false,
+        "busy": null
+      },
+      {
+        "text": "이미지 재생성",
+        "disabled": false,
+        "busy": "false"
+      },
+      {
+        "text": "이미지 재생성",
+        "disabled": false,
+        "busy": "false"
+      }
+    ],
+    "dialog": null,
+    "spinning": 0
+  },
+  {
+    "label": "기존 이미지의 재생성은 교체 확인창 표시, 아직 요청 없음",
+    "at": "2026-09-14T08:03:02.148Z",
+    "state": {
+      "projectId": "button-gating-review-7",
+      "shotNodeId": "review-shot-node-7",
+      "writerShotId": "review-writer-shot-7",
+      "activeJobId": null,
+      "queuedVisible": false,
+      "queueHeld": false,
+      "queueFailed": false,
+      "jobs": [
+        [
+          "review-restored-job-2",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-3-6",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-4-6",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-restored-job-5",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-6-5",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ]
+      ],
+      "generatingNodeIds": {},
+      "image": {
+        "url": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22960%22%20height%3D%22540%22%3E%3Crect%20width%3D%22960%22%20height%3D%22540%22%20fill%3D%22darkslategray%22%2F%3E%3Cpath%20d%3D%22M0%20460L230%20160L440%20405L640%20230L960%20500V540H0Z%22%20fill%3D%22slategray%22%2F%3E%3Ccircle%20cx%3D%22770%22%20cy%3D%22100%22%20r%3D%2245%22%20fill%3D%22palegoldenrod%22%2F%3E%3Ctext%20x%3D%22480%22%20y%3D%22300%22%20text-anchor%3D%22middle%22%20font-family%3D%22sans-serif%22%20font-size%3D%2238%22%20fill%3D%22white%22%3E%EA%B8%B0%EC%A1%B4%20%EC%9D%B4%EB%AF%B8%EC%A7%80%20%C2%B7%20%EA%B2%80%EC%A6%9D%EC%9A%A9%20%ED%91%9C%EB%B3%B8%3C%2Ftext%3E%3C%2Fsvg%3E",
+        "status": "completed",
+        "errorMessage": null,
+        "generatedAt": 1789372971558
+      },
+      "chatLoading": false
+    },
+    "posts": [],
+    "buttons": [
+      {
+        "text": "이미지 없음",
+        "disabled": false,
+        "busy": null
+      },
+      {
+        "text": "기존 이미지 있음",
+        "disabled": false,
+        "busy": null
+      },
+      {
+        "text": "이미지 재생성",
+        "disabled": false,
+        "busy": "false"
+      },
+      {
+        "text": "이미지 재생성",
+        "disabled": false,
+        "busy": "false"
+      }
+    ],
+    "dialog": "이미지를 다시 만들까요?이 샷의 촬영용 이미지를 새로 생성해요.기존 촬영용 이미지가 새 결과로 교체됩니다.취소재생성Close",
+    "spinning": 0
+  },
+  {
+    "label": "확인창 취소 시 요청 없음",
+    "at": "2026-09-14T08:03:03.666Z",
+    "state": {
+      "projectId": "button-gating-review-7",
+      "shotNodeId": "review-shot-node-7",
+      "writerShotId": "review-writer-shot-7",
+      "activeJobId": null,
+      "queuedVisible": false,
+      "queueHeld": false,
+      "queueFailed": false,
+      "jobs": [
+        [
+          "review-restored-job-2",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-3-6",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-4-6",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-restored-job-5",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-6-5",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ]
+      ],
+      "generatingNodeIds": {},
+      "image": {
+        "url": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22960%22%20height%3D%22540%22%3E%3Crect%20width%3D%22960%22%20height%3D%22540%22%20fill%3D%22darkslategray%22%2F%3E%3Cpath%20d%3D%22M0%20460L230%20160L440%20405L640%20230L960%20500V540H0Z%22%20fill%3D%22slategray%22%2F%3E%3Ccircle%20cx%3D%22770%22%20cy%3D%22100%22%20r%3D%2245%22%20fill%3D%22palegoldenrod%22%2F%3E%3Ctext%20x%3D%22480%22%20y%3D%22300%22%20text-anchor%3D%22middle%22%20font-family%3D%22sans-serif%22%20font-size%3D%2238%22%20fill%3D%22white%22%3E%EA%B8%B0%EC%A1%B4%20%EC%9D%B4%EB%AF%B8%EC%A7%80%20%C2%B7%20%EA%B2%80%EC%A6%9D%EC%9A%A9%20%ED%91%9C%EB%B3%B8%3C%2Ftext%3E%3C%2Fsvg%3E",
+        "status": "completed",
+        "errorMessage": null,
+        "generatedAt": 1789372971558
+      },
+      "chatLoading": false
+    },
+    "posts": [],
+    "buttons": [
+      {
+        "text": "이미지 없음",
+        "disabled": false,
+        "busy": null
+      },
+      {
+        "text": "기존 이미지 있음",
+        "disabled": false,
+        "busy": null
+      },
+      {
+        "text": "이미지 재생성",
+        "disabled": false,
+        "busy": "false"
+      },
+      {
+        "text": "이미지 재생성",
+        "disabled": false,
+        "busy": "false"
+      }
+    ],
+    "dialog": "이미지를 다시 만들까요?이 샷의 촬영용 이미지를 새로 생성해요.기존 촬영용 이미지가 새 결과로 교체됩니다.취소재생성Close",
+    "spinning": 0
+  },
+  {
+    "label": "교체 확인 후 생성 요청 1개",
+    "at": "2026-09-14T08:03:03.998Z",
+    "state": {
+      "projectId": "button-gating-review-7",
+      "shotNodeId": "review-shot-node-7",
+      "writerShotId": "review-writer-shot-7",
+      "activeJobId": "review-job-7-6",
+      "queuedVisible": false,
+      "queueHeld": false,
+      "queueFailed": false,
+      "jobs": [
+        [
+          "review-restored-job-2",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-3-6",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-4-6",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-restored-job-5",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-6-5",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-7-6",
+          {
+            "status": "queued",
+            "error": null
+          }
+        ]
+      ],
+      "generatingNodeIds": {},
+      "image": {
+        "url": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22960%22%20height%3D%22540%22%3E%3Crect%20width%3D%22960%22%20height%3D%22540%22%20fill%3D%22darkslategray%22%2F%3E%3Cpath%20d%3D%22M0%20460L230%20160L440%20405L640%20230L960%20500V540H0Z%22%20fill%3D%22slategray%22%2F%3E%3Ccircle%20cx%3D%22770%22%20cy%3D%22100%22%20r%3D%2245%22%20fill%3D%22palegoldenrod%22%2F%3E%3Ctext%20x%3D%22480%22%20y%3D%22300%22%20text-anchor%3D%22middle%22%20font-family%3D%22sans-serif%22%20font-size%3D%2238%22%20fill%3D%22white%22%3E%EA%B8%B0%EC%A1%B4%20%EC%9D%B4%EB%AF%B8%EC%A7%80%20%C2%B7%20%EA%B2%80%EC%A6%9D%EC%9A%A9%20%ED%91%9C%EB%B3%B8%3C%2Ftext%3E%3C%2Fsvg%3E",
+        "status": "generating",
+        "errorMessage": null,
+        "generatedAt": 1789372971558
+      },
+      "chatLoading": false
+    },
+    "posts": [
+      {
+        "method": "POST",
+        "url": "http://127.0.0.1:3005/api/director/generate-storyboard",
+        "body": {
+          "projectId": "button-gating-review-7",
+          "writerShotId": "review-writer-shot-7",
+          "prompt": "산길을 걷는 인물. 부드러운 아침 햇빛과 멀리 보이는 산.",
+          "referenceImageUrls": [],
+          "characterRefCount": 0,
+          "worldRefCount": 0,
+          "imageModel": "nano-banana-2"
+        },
+        "at": 1789372983867
+      }
+    ],
+    "buttons": [
+      {
+        "text": "이미지 없음",
+        "disabled": false,
+        "busy": null
+      },
+      {
+        "text": "기존 이미지 있음",
+        "disabled": false,
+        "busy": null
+      },
+      {
+        "text": "접수 중…",
+        "disabled": true,
+        "busy": "true"
+      },
+      {
+        "text": "접수 중…",
+        "disabled": true,
+        "busy": "true"
+      }
+    ],
+    "dialog": "이미지를 다시 만들까요?이 샷의 촬영용 이미지를 새로 생성해요.기존 촬영용 이미지가 새 결과로 교체됩니다.취소재생성Close",
+    "spinning": 4
+  },
+  {
+    "label": "생성 실패 후 사유 표시 및 다시 시도 가능",
+    "at": "2026-09-14T08:03:07.734Z",
+    "state": {
+      "projectId": "button-gating-review-7",
+      "shotNodeId": "review-shot-node-7",
+      "writerShotId": "review-writer-shot-7",
+      "activeJobId": "review-job-7-6",
+      "queuedVisible": true,
+      "queueHeld": false,
+      "queueFailed": false,
+      "jobs": [
+        [
+          "review-restored-job-2",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-3-6",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-4-6",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-restored-job-5",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-6-5",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-7-6",
+          {
+            "status": "failed",
+            "error": "검증용 생성 실패입니다. 다시 시도해 주세요."
+          }
+        ]
+      ],
+      "generatingNodeIds": {},
+      "image": {
+        "url": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22960%22%20height%3D%22540%22%3E%3Crect%20width%3D%22960%22%20height%3D%22540%22%20fill%3D%22darkslategray%22%2F%3E%3Cpath%20d%3D%22M0%20460L230%20160L440%20405L640%20230L960%20500V540H0Z%22%20fill%3D%22slategray%22%2F%3E%3Ccircle%20cx%3D%22770%22%20cy%3D%22100%22%20r%3D%2245%22%20fill%3D%22palegoldenrod%22%2F%3E%3Ctext%20x%3D%22480%22%20y%3D%22300%22%20text-anchor%3D%22middle%22%20font-family%3D%22sans-serif%22%20font-size%3D%2238%22%20fill%3D%22white%22%3E%EA%B8%B0%EC%A1%B4%20%EC%9D%B4%EB%AF%B8%EC%A7%80%20%C2%B7%20%EA%B2%80%EC%A6%9D%EC%9A%A9%20%ED%91%9C%EB%B3%B8%3C%2Ftext%3E%3C%2Fsvg%3E",
+        "status": "failed",
+        "errorMessage": "검증용 생성 실패입니다. 다시 시도해 주세요.",
+        "generatedAt": 0
+      },
+      "chatLoading": false
+    },
+    "posts": [
+      {
+        "method": "POST",
+        "url": "http://127.0.0.1:3005/api/director/generate-storyboard",
+        "body": {
+          "projectId": "button-gating-review-7",
+          "writerShotId": "review-writer-shot-7",
+          "prompt": "산길을 걷는 인물. 부드러운 아침 햇빛과 멀리 보이는 산.",
+          "referenceImageUrls": [],
+          "characterRefCount": 0,
+          "worldRefCount": 0,
+          "imageModel": "nano-banana-2"
+        },
+        "at": 1789372983867
+      },
+      {
+        "method": "POST",
+        "url": "http://127.0.0.1:3005/api/project/button-gating-review-7/messages",
+        "body": {
+          "stage": "director",
+          "role": "model",
+          "content": "⚠ 스토리보드 이미지 생성을 시작하지 못했어요: 검증용 생성 실패입니다. 다시 시도해 주세요."
+        },
+        "at": 1789372984091
+      }
+    ],
+    "buttons": [
+      {
+        "text": "이미지 없음",
+        "disabled": false,
+        "busy": null
+      },
+      {
+        "text": "기존 이미지 있음",
+        "disabled": false,
+        "busy": null
+      },
+      {
+        "text": "이미지 재생성",
+        "disabled": false,
+        "busy": "false"
+      },
+      {
+        "text": "이미지 재생성",
+        "disabled": false,
+        "busy": "false"
+      }
+    ],
+    "dialog": null,
+    "spinning": 0
+  },
+  {
+    "label": "재진입: 서버 조회를 기다리는 동안 생성 버튼 비활성",
+    "at": "2026-09-14T08:03:09.701Z",
+    "state": {
+      "projectId": "button-gating-review-8",
+      "shotNodeId": "review-shot-node-8",
+      "writerShotId": "review-writer-shot-8",
+      "activeJobId": "review-restored-job-8",
+      "queuedVisible": true,
+      "queueHeld": true,
+      "queueFailed": false,
+      "jobs": [
+        [
+          "review-restored-job-2",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-3-6",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-4-6",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-restored-job-5",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-6-5",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-7-6",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-restored-job-8",
+          {
+            "status": "queued",
+            "error": null
+          }
+        ]
+      ],
+      "generatingNodeIds": {},
+      "image": {
+        "url": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22960%22%20height%3D%22540%22%3E%3Crect%20width%3D%22960%22%20height%3D%22540%22%20fill%3D%22darkslategray%22%2F%3E%3Cpath%20d%3D%22M0%20460L230%20160L440%20405L640%20230L960%20500V540H0Z%22%20fill%3D%22slategray%22%2F%3E%3Ccircle%20cx%3D%22770%22%20cy%3D%22100%22%20r%3D%2245%22%20fill%3D%22palegoldenrod%22%2F%3E%3Ctext%20x%3D%22480%22%20y%3D%22300%22%20text-anchor%3D%22middle%22%20font-family%3D%22sans-serif%22%20font-size%3D%2238%22%20fill%3D%22white%22%3E%EA%B8%B0%EC%A1%B4%20%EC%9D%B4%EB%AF%B8%EC%A7%80%20%C2%B7%20%EA%B2%80%EC%A6%9D%EC%9A%A9%20%ED%91%9C%EB%B3%B8%3C%2Ftext%3E%3C%2Fsvg%3E",
+        "status": "completed",
+        "errorMessage": null,
+        "generatedAt": 1789372979241
+      },
+      "chatLoading": false
+    },
+    "posts": [],
+    "buttons": [
+      {
+        "text": "이미지 없음",
+        "disabled": false,
+        "busy": null
+      },
+      {
+        "text": "기존 이미지 있음",
+        "disabled": false,
+        "busy": null
+      },
+      {
+        "text": "생성 상태 확인 중…",
+        "disabled": true,
+        "busy": "false"
+      },
+      {
+        "text": "생성 상태 확인 중…",
+        "disabled": true,
+        "busy": "false"
+      }
+    ],
+    "dialog": null,
+    "spinning": 2
+  },
+  {
+    "label": "재진입: 서버의 진행 작업을 되살리고 기존 이미지 유지",
+    "at": "2026-09-14T08:03:11.412Z",
+    "state": {
+      "projectId": "button-gating-review-8",
+      "shotNodeId": "review-shot-node-8",
+      "writerShotId": "review-writer-shot-8",
+      "activeJobId": "review-restored-job-8",
+      "queuedVisible": true,
+      "queueHeld": false,
+      "queueFailed": false,
+      "jobs": [
+        [
+          "review-restored-job-2",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-3-6",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-4-6",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-restored-job-5",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-6-5",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-job-7-6",
+          {
+            "status": "failed",
+            "error": "검증을 초기화했습니다."
+          }
+        ],
+        [
+          "review-restored-job-8",
+          {
+            "status": "queued",
+            "error": null
+          }
+        ]
+      ],
+      "generatingNodeIds": {},
+      "image": {
+        "url": "data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22960%22%20height%3D%22540%22%3E%3Crect%20width%3D%22960%22%20height%3D%22540%22%20fill%3D%22darkslategray%22%2F%3E%3Cpath%20d%3D%22M0%20460L230%20160L440%20405L640%20230L960%20500V540H0Z%22%20fill%3D%22slategray%22%2F%3E%3Ccircle%20cx%3D%22770%22%20cy%3D%22100%22%20r%3D%2245%22%20fill%3D%22palegoldenrod%22%2F%3E%3Ctext%20x%3D%22480%22%20y%3D%22300%22%20text-anchor%3D%22middle%22%20font-family%3D%22sans-serif%22%20font-size%3D%2238%22%20fill%3D%22white%22%3E%EA%B8%B0%EC%A1%B4%20%EC%9D%B4%EB%AF%B8%EC%A7%80%20%C2%B7%20%EA%B2%80%EC%A6%9D%EC%9A%A9%20%ED%91%9C%EB%B3%B8%3C%2Ftext%3E%3C%2Fsvg%3E",
+        "status": "completed",
+        "errorMessage": null,
+        "generatedAt": 1789372979241
+      },
+      "chatLoading": false
+    },
+    "posts": [],
+    "buttons": [
+      {
+        "text": "이미지 없음",
+        "disabled": false,
+        "busy": null
+      },
+      {
+        "text": "기존 이미지 있음",
+        "disabled": false,
+        "busy": null
+      },
+      {
+        "text": "이미지 생성 중",
+        "disabled": true,
+        "busy": "true"
+      },
+      {
+        "text": "이미지 생성 중",
+        "disabled": true,
+        "busy": "true"
+      }
+    ],
+    "dialog": null,
+    "spinning": 3
+  }
+]

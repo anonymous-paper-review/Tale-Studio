@@ -20,7 +20,11 @@ vi.mock('@/lib/i18n', () => ({ useT: () => (text: string) => text }))
 vi.mock('@/hooks/use-guarded-action', () => ({ useGuardedAction: () => ({ execute: vi.fn() }) }))
 vi.mock('@/features/writer/writer-header', () => ({ WriterHeader: () => null }))
 vi.mock('@/features/director/hooks/use-rough-storyboard', () => ({ useRoughStoryboard: () => null }))
-vi.mock('@/lib/generation-queue', () => ({ useActiveGenerationJobs: () => [], activeShotIds: () => new Set() }))
+vi.mock('@/lib/generation-queue', () => ({
+  useActiveGenerationJobs: () => [],
+  useGenerationQueueStatus: () => 'ready',
+  activeShotIds: () => new Set(),
+}))
 vi.mock('@/stores/director-store', () => ({
   useDirectorCanvasStore: (select: (s: unknown) => unknown) => select({ projectId: 'project', generatingNodeIds: {}, generateStoryboardImage: vi.fn(), generateVideoForShot: vi.fn() }),
   getShotStage: () => 'rough', effectivePrompt: (d: { prompt: string }) => d.prompt,

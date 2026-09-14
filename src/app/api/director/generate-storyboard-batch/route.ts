@@ -3,6 +3,7 @@
 //   finalize(storyboard_real_grid)가 크롭 분배. 빈칸 채우기 전용(storyboard 미생성 샷만 —
 //   architecture §5: 차 있는 것 교체는 사람의 개별 재생성=단일 스트립). 검증: 실험 시트 통과(011fd4bd).
 import { NextResponse } from 'next/server'
+import { existingStoryboardJobId } from '@/lib/director/storyboard-active-job'
 import type { NextRequest } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
@@ -378,6 +379,11 @@ export async function POST(req: NextRequest) {
           },
         })
       } catch (err) {
+        if (existingStoryboardJobId(err)) {
+          // 다른 탭의 개별/일괄 작업이 먼저 예약했다. 남은 장은 보존하고 새 제출 없이 멈춘다.
+          capacitySkippedShots = readyPlanned.slice(groupIndex).reduce((n, g) => n + g.length, 0)
+          break
+        }
         const rejected = capacityReservationRejection(err, { projectId, kind: 'storyboard_real_grid', userId: access.userId })
         if (!rejected) throw err
         // 첫 장부터 자리가 없으면 아무것도 접수하지 않았으니 종전대로 자리 없음(429)으로 답한다.

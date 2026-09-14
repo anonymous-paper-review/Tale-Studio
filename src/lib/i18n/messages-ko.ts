@@ -3,6 +3,14 @@
 //   번역 공백이 깨진 화면이 아니라 영어 화면이 된다. 파이프라인 산출물·유저 콘텐츠는
 //   이 사전과 무관(프로젝트 locale 이 지배), 마케팅 페이지는 영어 고정이라 사전을 안 탄다.
 export const KO: Record<string, string> = {
+  'A video is already being generated for this shot.': '이 샷의 영상이 이미 생성 중이에요.',
+  'Submitting image request…': '접수 중…',
+  'Check image status': '이미지 상태 다시 확인',
+  'Generate again': '다시 생성',
+  'The previous request may still be running. Generating again sends a new request.': '이전 요청이 아직 진행 중일 수 있어요. 다시 생성하면 새 요청을 보냅니다.',
+  'Checking image generation…': '생성 상태 확인 중…',
+  'Could not check image generation.': '생성 상태를 확인하지 못했어요.',
+  'Checking the image request. It may still be running.': '이미지 요청 상태를 확인하고 있어요. 아직 생성 중일 수 있어요.',
   'Artist images are not ready. Check project status for the remaining work.': 'Artist에 필요한 이미지가 아직 준비되지 않았어요. 상태 조회로 남은 작업을 확인할 수 있어요.',
   'Checking the requested changes and their saved results.': '요청한 변경과 저장 결과를 확인하고 있어요.',
   '{stage} is now open.': '{stage} 화면을 열었어요.',
