@@ -1,0 +1,586 @@
+{
+  "timestamp": "2026-09-14T05:30:00.299235+00:00",
+  "workspace": "/Users/xcape/orca/workspaces/tale-studio/producer-chat-recovery",
+  "viewport": [
+    1048,
+    547
+  ],
+  "harness": "/private/tmp/tale-producer-browser-recovery-verify.mjs",
+  "source_sha256": {
+    "src/components/layout/global-chat.tsx": "f9e2c639f8e3d6f3b9234a81ba4449e119b5cb0144b99a0d48d0b3103309ac78",
+    "src/lib/i18n/messages-ko.ts": "647c98f83dba8e9f43e15497829a76259ec0756912e72b749ec8a89f13dc547c"
+  },
+  "limitations": [
+    "Isolated UI harness uses current actual GlobalChat/MentionTextarea/Textarea/ScrollArea/Button/globals.css and actual Korean i18n; stores and unrelated components are stubbed.",
+    "sendMessage is a local recording stub; no production API request or model generation.",
+    "Before-fix regression used deterministic DOM KeyboardEvent because native keys were initially inert. After explicit owned-tab switch, final Enter/Space/default-button activation and textarea Enter were verified with delivered native Orca keypress events. Digit capture-handler behavior used DOM KeyboardEvent and text entry used fill."
+  ],
+  "checks": [
+    {
+      "name": "활성 선택지가 있으면 일반 채팅에 일본어 답변을 입력할 수 있다",
+      "passed": true,
+      "evidence": {
+        "value": "日本語のセリフにしてください",
+        "disabled": false,
+        "sent": [],
+        "loading": false,
+        "activeElement": "TEXTAREA",
+        "placeholder": "선택지를 고르거나 직접 답해 주세요…",
+        "textarea": {
+          "x": 742,
+          "y": 451,
+          "width": 276,
+          "height": 36,
+          "top": 451,
+          "right": 1018,
+          "bottom": 487,
+          "left": 742
+        },
+        "send": {
+          "disabled": false,
+          "rect": {
+            "x": 986,
+            "y": 487,
+            "width": 32,
+            "height": 32,
+            "top": 487,
+            "right": 1018,
+            "bottom": 519,
+            "left": 986
+          }
+        },
+        "stop": false,
+        "viewport": [
+          1048,
+          547
+        ]
+      }
+    },
+    {
+      "name": "활성 선택지와 함께 입력한 답변을 보내면 한 번만 전송한다",
+      "passed": true,
+      "evidence": {
+        "value": "",
+        "disabled": false,
+        "sent": [
+          [
+            "日本語のセリフにしてください",
+            {
+              "thumbUrls": []
+            },
+            {
+              "stageOverride": "producer"
+            }
+          ]
+        ],
+        "loading": false,
+        "activeElement": "BODY",
+        "placeholder": "스토리에 대해 말해주세요…",
+        "textarea": {
+          "x": 742,
+          "y": 451,
+          "width": 276,
+          "height": 36,
+          "top": 451,
+          "right": 1018,
+          "bottom": 487,
+          "left": 742
+        },
+        "send": {
+          "disabled": true,
+          "rect": {
+            "x": 986,
+            "y": 487,
+            "width": 32,
+            "height": 32,
+            "top": 487,
+            "right": 1018,
+            "bottom": 519,
+            "left": 986
+          }
+        },
+        "stop": false,
+        "viewport": [
+          1048,
+          547
+        ]
+      }
+    },
+    {
+      "name": "복원된 선택지를 누르면 입력창만 채우고 자동으로 전송하지 않는다",
+      "passed": true,
+      "evidence": {
+        "value": "한국어 대사로",
+        "disabled": false,
+        "sent": [],
+        "loading": false,
+        "activeElement": "TEXTAREA",
+        "placeholder": "선택지를 고르거나 직접 답해 주세요…",
+        "textarea": {
+          "x": 742,
+          "y": 451,
+          "width": 276,
+          "height": 36,
+          "top": 451,
+          "right": 1018,
+          "bottom": 487,
+          "left": 742
+        },
+        "send": {
+          "disabled": false,
+          "rect": {
+            "x": 986,
+            "y": 487,
+            "width": 32,
+            "height": 32,
+            "top": 487,
+            "right": 1018,
+            "bottom": 519,
+            "left": 986
+          }
+        },
+        "stop": false,
+        "viewport": [
+          1048,
+          547
+        ]
+      }
+    },
+    {
+      "name": "복원된 선택지를 입력한 뒤 보내기를 누르면 한 번만 전송한다",
+      "passed": true,
+      "evidence": {
+        "value": "",
+        "disabled": false,
+        "sent": [
+          [
+            "한국어 대사로",
+            {
+              "thumbUrls": []
+            },
+            {
+              "stageOverride": "producer"
+            }
+          ]
+        ],
+        "loading": false,
+        "activeElement": "BODY",
+        "placeholder": "스토리에 대해 말해주세요…",
+        "textarea": {
+          "x": 742,
+          "y": 451,
+          "width": 276,
+          "height": 36,
+          "top": 451,
+          "right": 1018,
+          "bottom": 487,
+          "left": 742
+        },
+        "send": {
+          "disabled": true,
+          "rect": {
+            "x": 986,
+            "y": 487,
+            "width": 32,
+            "height": 32,
+            "top": 487,
+            "right": 1018,
+            "bottom": 519,
+            "left": 986
+          }
+        },
+        "stop": false,
+        "viewport": [
+          1048,
+          547
+        ]
+      }
+    },
+    {
+      "name": "복원된 선택지를 입력한 뒤 Enter로 한 번만 전송한다",
+      "passed": true,
+      "evidence": {
+        "before": {
+          "value": "영어 대사로",
+          "disabled": false,
+          "sent": [],
+          "loading": false,
+          "activeElement": "TEXTAREA",
+          "placeholder": "선택지를 고르거나 직접 답해 주세요…",
+          "textarea": {
+            "x": 742,
+            "y": 451,
+            "width": 276,
+            "height": 36,
+            "top": 451,
+            "right": 1018,
+            "bottom": 487,
+            "left": 742
+          },
+          "send": {
+            "disabled": false,
+            "rect": {
+              "x": 986,
+              "y": 487,
+              "width": 32,
+              "height": 32,
+              "top": 487,
+              "right": 1018,
+              "bottom": 519,
+              "left": 986
+            }
+          },
+          "stop": false,
+          "viewport": [
+            1048,
+            547
+          ]
+        },
+        "after": {
+          "value": "",
+          "disabled": false,
+          "sent": [
+            [
+              "영어 대사로",
+              {
+                "thumbUrls": []
+              },
+              {
+                "stageOverride": "producer"
+              }
+            ]
+          ],
+          "loading": false,
+          "activeElement": "TEXTAREA",
+          "placeholder": "스토리에 대해 말해주세요…",
+          "textarea": {
+            "x": 742,
+            "y": 451,
+            "width": 276,
+            "height": 36,
+            "top": 451,
+            "right": 1018,
+            "bottom": 487,
+            "left": 742
+          },
+          "send": {
+            "disabled": true,
+            "rect": {
+              "x": 986,
+              "y": 487,
+              "width": 32,
+              "height": 32,
+              "top": 487,
+              "right": 1018,
+              "bottom": 519,
+              "left": 986
+            }
+          },
+          "stop": false,
+          "viewport": [
+            1048,
+            547
+          ]
+        }
+      }
+    },
+    {
+      "name": "응답을 기다리는 동안 활성 선택지가 있어도 입력은 되고 전송은 막는다",
+      "passed": true,
+      "evidence": {
+        "value": "日本語でお願いします",
+        "disabled": false,
+        "sent": [],
+        "loading": true,
+        "activeElement": "TEXTAREA",
+        "placeholder": "선택지를 고르거나 직접 답해 주세요…",
+        "textarea": {
+          "x": 742,
+          "y": 451,
+          "width": 276,
+          "height": 36,
+          "top": 451,
+          "right": 1018,
+          "bottom": 487,
+          "left": 742
+        },
+        "send": null,
+        "stop": false,
+        "viewport": [
+          1048,
+          547
+        ]
+      }
+    },
+    {
+      "name": "승인 대기 카드가 있어도 복원 선택지의 Enter는 답변만 입력한다",
+      "passed": true,
+      "evidence": {
+        "key": "Enter",
+        "method": "Orca native keypress",
+        "actual": {
+          "approved": [],
+          "sent": [],
+          "value": "한국어 대사로",
+          "activeElement": "TEXTAREA",
+          "keys": [
+            {
+              "key": "Enter",
+              "code": "Enter",
+              "target": "BUTTON"
+            },
+            {
+              "key": "Enter",
+              "code": "Enter",
+              "target": "BUTTON"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "승인 대기 카드가 있어도 복원 선택지의 Space는 답변만 입력한다",
+      "passed": true,
+      "evidence": {
+        "key": "Space",
+        "method": "Orca native keypress",
+        "actual": {
+          "approved": [],
+          "sent": [],
+          "value": "영어 대사로",
+          "activeElement": "BUTTON",
+          "keys": [
+            {
+              "key": " ",
+              "code": "Space",
+              "target": "BUTTON"
+            },
+            {
+              "key": " ",
+              "code": "Space",
+              "target": "BUTTON"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "승인 대기 카드와 복원 선택지가 있어도 채팅의 숫자는 입력되고 Enter는 채팅만 보낸다",
+      "passed": true,
+      "evidence": {
+        "digit_events": [
+          {
+            "key": "1",
+            "defaultPrevented": false
+          },
+          {
+            "key": "2",
+            "defaultPrevented": false
+          },
+          {
+            "key": "3",
+            "defaultPrevented": false
+          }
+        ],
+        "before": {
+          "approved": [],
+          "sent": [],
+          "value": "123 日本語でお願いします",
+          "activeElement": "TEXTAREA",
+          "keys": [
+            {
+              "key": "1",
+              "code": "Digit1",
+              "target": "TEXTAREA"
+            },
+            {
+              "key": "1",
+              "code": "Digit1",
+              "target": "TEXTAREA"
+            },
+            {
+              "key": "2",
+              "code": "Digit2",
+              "target": "TEXTAREA"
+            },
+            {
+              "key": "2",
+              "code": "Digit2",
+              "target": "TEXTAREA"
+            },
+            {
+              "key": "3",
+              "code": "Digit3",
+              "target": "TEXTAREA"
+            },
+            {
+              "key": "3",
+              "code": "Digit3",
+              "target": "TEXTAREA"
+            }
+          ]
+        },
+        "method": "Orca native keypress",
+        "after": {
+          "approved": [],
+          "sent": [
+            [
+              "123 日本語でお願いします",
+              {
+                "thumbUrls": []
+              },
+              {
+                "stageOverride": "producer"
+              }
+            ]
+          ],
+          "value": "",
+          "activeElement": "TEXTAREA",
+          "keys": [
+            {
+              "key": "Enter",
+              "code": "Enter",
+              "target": "TEXTAREA"
+            },
+            {
+              "key": "Enter",
+              "code": "Enter",
+              "target": "TEXTAREA"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "screenshots": [
+    "/Users/xcape/orca/workspaces/tale-studio/producer-chat-recovery/.claude/docs/2026-09-14/producer-chat-recovery/active-choices-japanese-answer.png",
+    "/Users/xcape/orca/workspaces/tale-studio/producer-chat-recovery/.claude/docs/2026-09-14/producer-chat-recovery/restored-choice-in-composer.png",
+    "/Users/xcape/orca/workspaces/tale-studio/producer-chat-recovery/.claude/docs/2026-09-14/producer-chat-recovery/loading-choices-composer-enabled.png",
+    "/Users/xcape/orca/workspaces/tale-studio/producer-chat-recovery/.claude/docs/2026-09-14/producer-chat-recovery/restored-choice-with-pending-approval.png"
+  ],
+  "keyboard_regression": {
+    "red": {
+      "timestamp": "2026-09-14T05:27:52.521497+00:00",
+      "setup": "Restored Korean-choice button focused; unrelated pendingProposal; loading=false; empty composer",
+      "event": "bubbling cancelable DOM KeyboardEvent keydown Enter",
+      "expected": {
+        "approved": [],
+        "sent": [],
+        "value": "한국어 대사로"
+      },
+      "actual": {
+        "approved": [
+          "unrelated-proposal"
+        ],
+        "sent": [],
+        "value": "",
+        "activeElement": "BUTTON"
+      },
+      "source_sha256": "bba55994bf3b3ae3efd496a9dadc0e524616d674da96bd843b0c2c99eb27b45c"
+    },
+    "native_keypress_limitation": "During keyboard regression probe, Orca keypress Enter/Space returned success but no keydown event reached document (confirmed with capture event logger). Deterministic keyboard handler checks therefore use bubbling DOM KeyboardEvent; browser default activation must be checked separately.",
+    "green": {
+      "passed": true,
+      "checks": [
+        {
+          "key": "Enter",
+          "method": "Orca native keypress",
+          "actual": {
+            "approved": [],
+            "sent": [],
+            "value": "한국어 대사로",
+            "activeElement": "TEXTAREA",
+            "keys": [
+              {
+                "key": "Enter",
+                "code": "Enter",
+                "target": "BUTTON"
+              },
+              {
+                "key": "Enter",
+                "code": "Enter",
+                "target": "BUTTON"
+              }
+            ]
+          }
+        },
+        {
+          "key": "Space",
+          "method": "Orca native keypress",
+          "actual": {
+            "approved": [],
+            "sent": [],
+            "value": "영어 대사로",
+            "activeElement": "BUTTON",
+            "keys": [
+              {
+                "key": " ",
+                "code": "Space",
+                "target": "BUTTON"
+              },
+              {
+                "key": " ",
+                "code": "Space",
+                "target": "BUTTON"
+              }
+            ]
+          }
+        }
+      ],
+      "textarea_digits_enter": {
+        "digit_events": [
+          {
+            "key": "1",
+            "defaultPrevented": false
+          },
+          {
+            "key": "2",
+            "defaultPrevented": false
+          },
+          {
+            "key": "3",
+            "defaultPrevented": false
+          }
+        ],
+        "method": "Orca native keypress",
+        "actual": {
+          "approved": [],
+          "sent": [
+            [
+              "123 日本語でお願いします",
+              {
+                "thumbUrls": []
+              },
+              {
+                "stageOverride": "producer"
+              }
+            ]
+          ],
+          "value": "",
+          "activeElement": "TEXTAREA",
+          "keys": [
+            {
+              "key": "Enter",
+              "code": "Enter",
+              "target": "TEXTAREA"
+            },
+            {
+              "key": "Enter",
+              "code": "Enter",
+              "target": "TEXTAREA"
+            }
+          ]
+        }
+      },
+      "key_event_log_note": "The harness was rerun without navigation after a tool-only empty-fill setup error, so two capture loggers record each observed event; the recorded send and approval call arrays remain authoritative.",
+      "native_keyboard_verified": true
+    }
+  },
+  "passed": true,
+  "source_unchanged_after_verification": true,
+  "cleanup": {
+    "own_browser_tab_closed": true,
+    "local_server_stopped": true,
+    "source_files_modified_by_browser_verifier": false
+  }
+}
