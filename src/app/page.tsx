@@ -40,6 +40,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { clearLastProjectId, readLastProjectId } from '@/lib/session-restore'
 import { ContactPopover } from '@/components/contact-popover'
+import { LegalFooter } from '@/components/legal/legal-footer'
 import { toast } from 'sonner'
 
 interface ProjectItem {
@@ -810,17 +811,12 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 border-t border-gray-800 pt-8 md:flex-row">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 border-t border-gray-800 pt-8">
           <p className="text-sm font-light text-gray-500">
             &copy; {new Date().getFullYear()} Tale Studio. All rights reserved.
           </p>
-          <div className="flex gap-6 text-sm font-light text-gray-500">
-            <a href="#" className="transition-colors hover:text-white">
-              Privacy Policy
-            </a>
-            <a href="#" className="transition-colors hover:text-white">
-              Terms of Service
-            </a>
+          <div className="text-sm text-gray-500">
+            <LegalFooter />
           </div>
         </div>
       </footer>

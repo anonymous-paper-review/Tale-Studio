@@ -2,8 +2,8 @@
 
 ## Source of truth
 - Status: Active for the pricing and payment-link slice; broader product rules remain in `specs/design.md`.
-- Last refreshed: 2026-09-09.
-- Primary product surfaces: public `/pricing`, public `/checkout`, existing `/account` billing.
+- Last refreshed: 2026-09-14.
+- Primary product surfaces: public `/pricing`, public `/checkout`, public `/terms`, `/refund`, `/privacy`, existing `/account` billing.
 - Evidence reviewed: `specs/design.md`, `specs/design-references.md`, `src/app/pricing/page.tsx`, `src/lib/billing/catalog.ts`, `src/lib/plan-limits.ts`, existing Dialog/Slider/Button primitives and checkout flow.
 - Owner decision: three separate family cards; clicking a card opens a popup containing a horizontal stepped slider. The slider does not live on the cards. Existing prices and entitlements do not change.
 - This document records the slice contract, not a replacement color/token system. Token values remain in `src/app/globals.css`.
@@ -87,3 +87,13 @@
 ## Open questions
 - Production release scope remains separate from local UI completion; do not deploy the dirty dev branch wholesale.
 - Paddle domain approval and owner identity verification remain external prerequisites.
+
+## Public policy pages (2026-09-14)
+- Owner scope: publish only the supplied Notion policy text, readable without login; link from home and pricing. Earlier exclusion of policy section 4 does not apply to this publishing slice. No billing, refund, account-deletion or provider-retention behavior changes.
+- Evidence: owner-provided `Downloads/ref/{terms-of-service,refund-policy,privacy-policy,footer}.md` supersede the earlier Notion attachments; `src/components/billing/pricing-page.tsx`, `src/components/marketing/site-header.tsx`, `site-footer.tsx`, `src/app/page.tsx`.
+- Visual language: pricing's dark marketing shell, existing header/footer and primary accent; quiet bordered policy navigation, readable left-aligned article, no hero imagery or decorative motion. Use existing semantic tokens; no global token changes.
+- IA: exact public `/terms`, `/refund`, `/privacy`; `/refunds` from the supplied footer redirects to `/refund`. Cross-policy navigation and a pricing return link remain visible. Desktop has a narrow policy sidebar; mobile stacks navigation above the article. Long tables scroll within their own region, not the page.
+- Content: preserve supplied English words, punctuation, dates, emphasis and tables. Do not apply chat copy-polishing or invent translations/legal summaries. Original policy headings are exempt from sentence-case rewriting because the owner requested verbatim content. Source fingerprints record the imported version; Notion is not fetched at runtime.
+- Accessibility: semantic headings/lists/tables, `lang="en"`, labeled navigation, current-page state and visible keyboard focus. Policy text is server-rendered and available without JavaScript; no modal or sign-in gate. Horizontal table regions are keyboard focusable.
+- States: static content has no payment/loading/success state. Unknown policy paths remain protected; policy navigation never opens a checkout or writes account data.
+- Verification: Korean behavior tests for source preservation, actual links, public access and alias; desktop/mobile screenshots. Remaining open question: production deployment is separate from this dirty dev checkout; legal/operational correctness of supplied policy promises remains with the policy owner.

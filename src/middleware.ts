@@ -53,8 +53,11 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/pricing') ||
     pathname.startsWith('/docs') ||
     pathname.startsWith('/playground')
+  // 정책은 가입·결제 전에 공개한다. 비슷한 이름이나 하위 보호 경로까지 열지 않는다.
+  const isLegalPath = /^\/(?:terms|refunds?|privacy)\/?$/.test(pathname)
   const isPublicPath =
     isMarketingPath ||
+    isLegalPath ||
     pathname === '/checkout' ||
     pathname.startsWith('/login') ||
     isPublicAsset ||
