@@ -468,11 +468,12 @@ export default function HomePage() {
           </div>
 
           {/* Title */}
-          <h1 className="mb-8 text-6xl font-semibold leading-[1.05] tracking-tighter text-white md:text-[5.5rem] lg:text-9xl">
-            Create Beyond <br className="hidden md:block" />
+          <h1 className="mb-8 text-3xl font-semibold leading-[1.05] tracking-tighter text-white sm:text-5xl md:text-6xl lg:text-7xl">
+            Your Tale Deserves a Take <br className="hidden md:block" />
+            by{' '}
             <span className="relative inline-block">
               <span className="relative z-10 bg-gradient-to-r from-primary via-red-500 to-orange-500 bg-clip-text text-transparent">
-                Human Limits
+                Pre-visualization.
               </span>
               <span className="pointer-events-none absolute -inset-2 z-0 animate-pulse rounded-full bg-primary/20 opacity-50 blur-2xl" />
             </span>

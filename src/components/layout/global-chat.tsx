@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { useImageUploadConsent } from '@/components/upload/image-upload-consent'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { AgentFace } from '@/components/agent-face'
@@ -467,6 +468,7 @@ export function GlobalChat() {
     (STAGES.find((s) => pathname.startsWith(s.path))?.id as StageId | undefined) ??
     storeStage
   const projectId = useProjectStore((s) => s.projectId)
+  const { requestImageUploadConsent, imageUploadConsentDialog } = useImageUploadConsent(projectId)
 
   // 폭 리사이즈 + 접기 (chat-ui-store, persist)
   const chatWidth = useChatUiStore((s) => s.chatWidth)
@@ -1000,6 +1002,10 @@ export function GlobalChat() {
     }
     if (accepted.length === 0) return
 
+    const images = accepted.filter((file) => kindOf(file.name) === 'image')
+    if (images.length > 0 && !(await requestImageUploadConsent(images))) return
+    if (useProjectStore.getState().projectId !== projectId) return
+
     // 2) 칩을 먼저 세우고 한 장씩 올린다 — 진행이 눈에 보여야 하고, 요청 하나당 파일 하나여야
     //    본문 크기 한도에 안 걸린다(기존 assets/upload-image 와 같은 패턴).
     const entries = accepted.map((file) => ({
@@ -1159,6 +1165,7 @@ export function GlobalChat() {
     const labels = [...choices.options.map((o) => o.label), FREEFORM]
     const handler = (e: KeyboardEvent) => {
       if (loading || e.isComposing) return
+      if (document.querySelector('[role="dialog"][data-state="open"]')) return
       const target = e.target as HTMLElement | null
       if (target) {
         const tag = target.tagName
@@ -2088,6 +2095,7 @@ export function GlobalChat() {
           </Button>
         </aside>
       )}
+      {imageUploadConsentDialog}
     </>
   )
 }

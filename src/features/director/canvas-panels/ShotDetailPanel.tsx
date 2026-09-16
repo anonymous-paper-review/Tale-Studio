@@ -17,6 +17,7 @@ import {
   normalizeImageModelKey,
 } from '@/lib/image-models'
 import { useT } from '@/lib/i18n'
+import { useImageUploadConsent } from '@/components/upload/image-upload-consent'
 import { StoryboardImageButton } from '@/features/director/storyboard-image-button'
 
 type Props = {
@@ -26,6 +27,7 @@ type Props = {
 
 export function ShotDetailPanel({ nodeId, data }: Props) {
   const t = useT()
+  const { requestImageUploadConsent, imageUploadConsentDialog } = useImageUploadConsent(nodeId)
   const updateNodeData = useDirectorCanvasStore((s) => s.updateNodeData)
   const openDeleteConfirm = useDirectorCanvasStore(
     (s) => s.openDeleteConfirm,
@@ -61,7 +63,8 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
     updateNodeData<'shot'>(nodeId, { worldAssetIds: next, referenceOverride: true })
   }
 
-  const handleAddReferenceImage = (file: File) => {
+  const handleAddReferenceImage = async (file: File) => {
+    if (!await requestImageUploadConsent([file])) return
     const reader = new FileReader()
     reader.onload = () => {
       const url = String(reader.result)
@@ -83,6 +86,7 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
+      {imageUploadConsentDialog}
       <header className="space-y-2">
         <div className="flex items-center gap-2">
           <span className="inline-block size-2 rounded-full bg-chart-4" />
@@ -190,7 +194,7 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
                 aria-label={t('Upload reference image')}
                 onChange={(e) => {
                   const file = e.target.files?.[0]
-                  if (file) handleAddReferenceImage(file)
+                  if (file) void handleAddReferenceImage(file)
                   e.target.value = ''
                 }}
               />

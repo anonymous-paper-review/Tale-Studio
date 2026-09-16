@@ -3,6 +3,8 @@
 //   번역 공백이 깨진 화면이 아니라 영어 화면이 된다. 파이프라인 산출물·유저 콘텐츠는
 //   이 사전과 무관(프로젝트 locale 이 지배), 마케팅 페이지는 영어 고정이라 사전을 안 탄다.
 export const KO: Record<string, string> = {
+  'Confirm image usage rights': '이미지 사용 권한 확인',
+  'Confirm your rights before uploading.': '업로드 전에 이미지 사용 권한을 확인해 주세요.',
   'A video is already being generated for this shot.': '이 샷의 영상이 이미 생성 중이에요.',
   'Submitting image request…': '접수 중…',
   'Check image status': '이미지 상태 다시 확인',

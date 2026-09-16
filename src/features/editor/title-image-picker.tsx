@@ -7,6 +7,7 @@ import { Loader2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import { useImageUploadConsent } from '@/components/upload/image-upload-consent'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ThumbImage } from '@/components/thumb-image'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
@@ -63,6 +64,7 @@ export function TitleImagePicker({
 }) {
   const t = useT()
   const projectId = useProjectStore((s) => s.projectId)
+  const { requestImageUploadConsent, imageUploadConsentDialog } = useImageUploadConsent(projectId)
   const characters = useAssetStorageStore((s) => s.characters)
   const worlds = useAssetStorageStore((s) => s.worlds)
   const shots = useWriterStore((s) => s.shots)
@@ -72,6 +74,8 @@ export function TitleImagePicker({
 
   const upload = async (file: File) => {
     if (!projectId) return
+    if (!(await requestImageUploadConsent([file]))) return
+    if (useProjectStore.getState().projectId !== projectId) return
     setUploading(true)
     try {
       const form = new FormData()
@@ -150,6 +154,7 @@ export function TitleImagePicker({
             {t('No project images yet. Upload a file instead.')}
           </p>
         )}
+        {imageUploadConsentDialog}
       </DialogContent>
     </Dialog>
   )
