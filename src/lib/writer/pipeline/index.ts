@@ -16,6 +16,8 @@ import { isFlagOn } from '@/lib/flags';
 import { runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots';
 import { runShotCheck } from '@/lib/writer/pipeline/stages/c_application_2';
 import { runRenderPrompts } from '@/lib/writer/pipeline/stages/v5_prompts';
+import { preservedScript, scenesFromScript, annotateScriptScenes, dialogueTrackFromScript } from '@/lib/writer/script/preserve';
+import { makeScriptSceneAnnotator } from '@/lib/writer/script/annotate';
 import { runDialogue, toDialogueTrack } from '@/lib/writer/pipeline/stages/dialogue';
 import { inferSceneCinematographyFromShots } from '@/lib/writer/pipeline/util/infer_v3';
 import { persistDesignTokens } from '@/lib/writer/pipeline/util/persist_design_tokens';
@@ -184,9 +186,13 @@ async function _runPipelineInner(
   }
   const genre: Genre = input.genre;
   await logger.markStage('genre', 'completed', { seeded: true });
-  let characters: Characters = input.cast
-    ? castContractToCharacters(input.cast)
-    : { characters: [], relationships: [], subtext_notes: [] };
+  // #script-preserve 2026-09-17: 대본 보존이면 캐스트 = producer 캐스트 + 대본 인물(정합·추가). steps.ts/run-store 와 같은 규칙.
+  const preserved = preservedScript(input);
+  let characters: Characters = preserved
+    ? castContractToCharacters(preserved.cast)
+    : input.cast
+      ? castContractToCharacters(input.cast)
+      : { characters: [], relationships: [], subtext_notes: [] };
   await logger.markStage('characters', 'completed', { seeded: true, count: characters.characters.length });
 
   // s0.5 드라마투르그: s1 앞에서 "재료"(무대 후보 + 극적 진단)를 만든다. 스토리 원천은 불변 —
@@ -200,7 +206,16 @@ async function _runPipelineInner(
   )).value;
 
   const narrativeStructure = (await loadOrRun<NarrativeStructure>(resume, '03_s1_narrativeStructure.json', () => runNarrativeStructure(input, genre, logger, models.S, dramaturgy), 'narrativeStructure', logger)).value;
-  const scenes = (await loadOrRun<Scenes>(resume, '05_s3_scenes.json', () => runScenes(input, genre, narrativeStructure, characters, input.background, logger, models.S, undefined, dramaturgy), 'scenes', logger)).value;
+  const scenes = (await loadOrRun<Scenes>(
+    resume,
+    '05_s3_scenes.json',
+    () =>
+      preserved
+        ? annotateScriptScenes(scenesFromScript(preserved.doc, { structure: narrativeStructure }), makeScriptSceneAnnotator(models.S, logger)) // 대본 보존: 씬을 다시 나누지 않는다
+        : runScenes(input, genre, narrativeStructure, characters, input.background, logger, models.S, undefined, dramaturgy),
+    'scenes',
+    logger,
+  )).value;
   // 오픈 캐스트(§4): 전개상 추가된 new_characters 를 머지 → 하류 stage 와 persistAssetsToDb(origin='writer' insert)가 본다.
   characters = mergeOpenCast(characters, scenes);
 
@@ -437,6 +452,7 @@ async function _runPipelineInner(
       resume,
       '14b_dialogue.json',
       async () => {
+        if (preserved) return dialogueTrackFromScript(preserved.doc, scenes, decoupage); // 대본 보존: 대사를 저작하지 않는다
         const result = await runDialogue(input.story, genre, characters, scenes, decoupage, logger, models.S);
         return toDialogueTrack(result);
       },

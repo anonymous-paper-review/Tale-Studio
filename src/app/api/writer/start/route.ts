@@ -7,6 +7,7 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { getUser } from '@/lib/supabase/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { createRun, getActiveRun } from '@/lib/writer/run-store';
+import { readPreserveScript } from './preserve-flag';
 import {
   WRITER_TOTAL_UNITS,
   WRITER_V2_TOTAL_UNITS,
@@ -16,6 +17,7 @@ import type {
   PipelineInput,
   Genre,
   CastContract,
+  CastContractCharacter,
   WriterRerunContext,
   NarrativeTime,
 } from '@/lib/writer/types/pipeline';
@@ -27,6 +29,7 @@ import { resolveOutputLocale } from '@/lib/locale';
 import { parseDialogueLanguage } from '@/lib/writer/pipeline/util/output-language';
 import { assessContentSafetyRisk } from '@/lib/writer/content-safety-hint';
 import { parseCustomStyleAnchor } from '@/lib/style-anchor';
+import { planSourceImageWrites, stripSourceImages } from '@/lib/producer/source-image';
 
 // producer 핸드오프 배경 페이로드(원천 rich shape). writer 내부 BackgroundContract 와 분리 —
 //   locations 테이블엔 full 필드로 즉시 upsert 하고, 파이프라인엔 BackgroundContract 로 매핑해 전달한다.
@@ -37,6 +40,8 @@ interface ProducerBackgrounds {
     visual_description: string;
     purpose?: string;
     user_edited?: boolean;
+    /** #image-to-artist: Producer 카드에 붙은 그림(우리 보관함 주소만 유효). 그대로 wide_shot 이 된다. */
+    source_image_url?: string;
   }>;
 }
 
@@ -198,6 +203,36 @@ async function upsertProducerCast(projectId: string, cast: CastContract): Promis
   }
 }
 
+// producer 핸드오프 캐스트 페이로드 — 계약 + 카드 그림 주소(#image-to-artist). 파이프라인에는 stripSourceImages 로 뗀 계약만 간다.
+type CastContractWithImages = Omit<CastContract, 'characters'> & {
+  characters: Array<CastContractCharacter & { source_image_url?: string }>;
+};
+
+async function applySourceImages(
+  projectId: string,
+  cast: CastContractWithImages | undefined,
+  backgrounds: ProducerBackgrounds | undefined,
+): Promise<void> {
+  const plan = planSourceImageWrites({ cast: cast?.characters, backgrounds: backgrounds?.locations });
+  for (const { character_id, url } of plan.characters) {
+    const { error } = await supabaseAdmin
+      .from('character_appearances')
+      .update({ portrait_url: url, derived_from_url: url })
+      .eq('project_id', projectId)
+      .eq('character_id', character_id)
+      .eq('is_default', true);
+    if (error) throw new Error(`character source image failed: ${error.message}`);
+  }
+  for (const { location_id, url } of plan.locations) {
+    const { error } = await supabaseAdmin
+      .from('locations')
+      .update({ wide_shot: url })
+      .eq('project_id', projectId)
+      .eq('location_id', location_id);
+    if (error) throw new Error(`location source image failed: ${error.message}`);
+  }
+}
+
 async function upsertProducerBackgrounds(projectId: string, backgrounds: ProducerBackgrounds): Promise<void> {
   if (!backgrounds.locations.length) return;
 
@@ -248,11 +283,16 @@ export async function POST(req: NextRequest) {
       runtimeSeconds?: number;
       models?: PipelineInput['models'];
       genre?: Genre;
-      cast?: CastContract;
+      cast?: CastContractWithImages;
       backgrounds?: ProducerBackgrounds;
       chatHistory?: RerunMessageRow[];
     };
-    const { projectId, story, runtimeSeconds, models, genre, cast, backgrounds } = body;
+    const { projectId, story, runtimeSeconds, models, genre, cast: castWithImages, backgrounds } = body;
+    // #image-to-artist: 캐스트 계약의 그림 주소는 DB(대표 사진·시트 출처)에만 쓰고 파이프라인 시드에서는 뗀다 —
+    //   글 프롬프트에 URL 이 섞이면 안 된다.
+    const cast: CastContract | undefined = castWithImages ? stripSourceImages(castWithImages) : undefined;
+    // #script-preserve: producer 채팅에서 "그대로 보존"을 고른 대본. 명시적 true 만.
+    const preserveScript = readPreserveScript(body);
 
     if (!projectId || typeof projectId !== 'string') {
       return NextResponse.json({ error: 'Invalid request: projectId required' }, { status: 400 });
@@ -336,6 +376,11 @@ export async function POST(req: NextRequest) {
         console.error('[writer/start] location i18n derive failed (proceeding):', e);
       });
     }
+    // #image-to-artist(2026-09-17): 카드에 붙은 그림 — 배경은 그대로 와이드샷, 인물은 기본 모습의 대표 사진이자 시트의 출처.
+    //   우리 보관함 주소만 받는다(planSourceImageWrites 가 거른다). 실패해도 핸드오프는 진행한다(그림 없이 종전 경로).
+    await applySourceImages(projectId, castWithImages, backgrounds).catch((e) => {
+      console.error('[writer/start] source image apply failed (proceeding):', e);
+    });
     // #name-en(2026-09-08, 오너 지시): 인물·배경 이름의 영어 표기를 핸드오프 때 한 번 정해 둔다 — 러프·프롬프트가 저장값을 쓴다.
     //   best-effort(실패해도 러프 라우트가 처음 필요할 때 한 번 정한다).
     await ensureEntityNamesEn(projectId).catch((e) => {
@@ -421,6 +466,7 @@ export async function POST(req: NextRequest) {
       sceneGate: writerEngine === 'v1',
       genre,
       cast,
+      ...(preserveScript ? { preserveScript: true } : {}),
       background: backgrounds?.locations?.length
         ? {
             locations: backgrounds.locations.map((b) => ({

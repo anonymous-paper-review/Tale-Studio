@@ -32,7 +32,7 @@ export function CharacterPanel({
   const [pickedAppearance, setPickedAppearance] = useState<Record<string, string>>({})
 
   /** 선택한 모습의 시트만 표시한다. 다른 모습이나 legacy view_main으로 대체하지 않는다. */
-  const selectedAppearance = (c: { characterId: string; appearances: Array<{ appearanceKey: string; isDefault: boolean; sheetUrl: string | null }> }) => {
+  const selectedAppearance = <A extends { appearanceKey: string; isDefault: boolean; sheetUrl: string | null }>(c: { characterId: string; appearances: A[] }) => {
     const key = pickedAppearance[c.characterId] ?? c.appearances.find((appearance) => appearance.isDefault)?.appearanceKey
     return c.appearances.find((appearance) => appearance.appearanceKey === key) ?? null
   }
@@ -305,6 +305,22 @@ export function CharacterPanel({
                   {charTooltipBody}
                 </TooltipContent>
               </Tooltip>
+              {/* #image-to-artist(2026-09-17, 오너 결정): 사용자가 올린 원본은 시트와 별개로 그대로 남는다 — 시트는 이 원본을
+                  참조해 만들어졌다는 뜻이다. 원본이 있는 모습에서만 시트 아래에 작게 보인다. */}
+              {appearance?.sourceImageUrl && (
+                <div className="mt-1.5 flex items-center gap-2 rounded-md border border-border bg-muted/40 px-1.5 py-1">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- 사용자가 올린 원본(보관함 public URL), 최적화 불필요 */}
+                  <img
+                    src={appearance.sourceImageUrl}
+                    alt={t('Original picture')}
+                    className="size-9 shrink-0 rounded object-cover"
+                    loading="lazy"
+                  />
+                  <span className="truncate text-[11px] text-muted-foreground">
+                    {t('Original picture')} · {t('The sheet follows this picture')}
+                  </span>
+                </div>
+              )}
 
               {/* 카드 인라인 설정/외형 편집 제거(#d4 2026-08-03) — World 탭과 같은 이미지 중심
                   카드로. 텍스트 수정·이미지 재생성은 상세 팝업(사진/더블 클릭)과 채팅 경로가 담당한다. */}

@@ -70,6 +70,8 @@ export interface CharacterAppearance {
   portraitUrl: string | null
   appearance: string | null
   appearanceNative: string | null
+  /** #image-to-artist: 사용자가 Producer 채팅에 올린 원본(시트의 출처, DB derived_from_url). 있으면 카드가 함께 보여 준다. */
+  sourceImageUrl?: string | null
   /** 모습별 뷰 후보 히스토리. 다른 모습 후보를 표시·stale 판정에 섞지 않는다. */
   viewCandidates: Partial<Record<CharacterViewKey, CandidateImage[]>>
 }

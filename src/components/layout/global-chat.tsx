@@ -474,6 +474,7 @@ export function GlobalChat() {
   const pendingProposal = useGlobalChatStore((s) => s.pendingProposal)
   const approvePendingProposal = useGlobalChatStore((s) => s.approvePendingProposal)
   const dismissPendingProposal = useGlobalChatStore((s) => s.dismissPendingProposal)
+  const declineScriptPreserve = useGlobalChatStore((s) => s.declineScriptPreserve)
   const t = useT()
 
   const router = useRouter()
@@ -876,13 +877,14 @@ export function GlobalChat() {
     // 텍스트 원고는 모델을 거치지 않고 그대로 storyText 가 된다. 모델을 태우면 시스템
     //   프롬프트상 "short cohesive paragraph"로 압축되어 업로드한 원고가 사라진다.
     //   업로드는 사람의 명시적 행동이라 덮어쓰기가 허용된다(architecture §5-2).
-    if (texts.length > 0) {
-      const merged = texts
-        .map((t) => (texts.length > 1 ? `# ${t.name}\n\n${t.text ?? ''}` : (t.text ?? '')))
-        .join('\n\n')
-        .trim()
-      if (merged) useProducerStore.getState().setStoryText(merged)
-    }
+    const mergedTexts =
+      texts.length > 0
+        ? texts
+            .map((t) => (texts.length > 1 ? `# ${t.name}\n\n${t.text ?? ''}` : (t.text ?? '')))
+            .join('\n\n')
+            .trim()
+        : ''
+    if (mergedTexts) useProducerStore.getState().setStoryText(mergedTexts)
 
     // 판독용 슬라이스는 이번 턴에만, 원본 썸네일은 스레드에 남는다.
     const imageUrls = images.flatMap((a) => a.sliceUrls ?? [])
@@ -907,6 +909,33 @@ export function GlobalChat() {
         ),
       )
       return
+    }
+    // 대본 보존 관문(#script-preserve 2026-09-17) — Producer 에서 붙여 넣거나 올린 글이 대본이면 모델로 보내기 전에
+    //   "그대로 보존할까요"를 먼저 묻는다. 종전에는 이 턴이 바로 채팅 모델로 가서 "각색 문단"이 됐다. 붙들어 둔 턴은
+    //   결정 뒤 store 가 이어 보낸다(resumeScriptPreserveHeld).
+    if (currentStage === 'producer') {
+      const candidate = mergedTexts || typed
+      const offered =
+        candidate.length > 0 &&
+        useGlobalChatStore.getState().offerScriptPreserve(candidate, {
+          held: { msg, imageUrls: imageUrls.length > 0 ? imageUrls : undefined, thumbUrls },
+        })
+      if (offered) {
+        setAttachments([])
+        return
+      }
+      // 그림 역할 관문(#image-to-artist 2026-09-17) — Producer 에 올린 그림은 곧장 모델로 보내지 않고 쓰임새(인물·배경·참고)를
+      //   먼저 정한다. 말이 분명하면 바로, 아니면 장마다 선택지. 실행(카드 만들기·숨은 채우기 요청·참고 전송)은 store 가 한다.
+      if (images.length > 0) {
+        const roleOffered = useGlobalChatStore.getState().offerImageRoles(
+          images.map((a) => ({ id: a.id, name: a.name, thumbUrl: a.thumbUrl ?? '', sliceUrls: a.sliceUrls ?? [] })),
+          { typed, msg },
+        )
+        if (roleOffered) {
+          setAttachments([])
+          return
+        }
+      }
     }
     // 첨부 정리는 실제 전송 경로에서만 — 게이트/가드에 걸렸을 때 올린 파일이 사라지면 안 된다.
     const msgCountBefore = useGlobalChatStore.getState().messages.length
@@ -1590,15 +1619,20 @@ export function GlobalChat() {
                 {/* CTA — oiioii form 카드의 캡슐 버튼 매핑(Confirm & Continue). 승인은 전폭 캡슐. */}
                 <div className="mt-3 flex flex-col gap-1.5">
                   <Button size="sm" className="w-full rounded-full" onClick={handlePendingProposalApprove}>
-                    {t('Approve')}
+                    {pendingProposal.kind === 'producerPreserveScript' ? t('Keep as written') : t('Approve')}
                   </Button>
+                  {/* #script-preserve: 두 번째 버튼은 "나중에"가 아니라 명시적 거절(참고 자료로 각색) — 결정 없이 넘기면 조용히 각색된다. */}
                   <Button
                     size="sm"
                     variant="ghost"
                     className="w-full rounded-full"
-                    onClick={() => dismissPendingProposal(pendingProposal.id)}
+                    onClick={() =>
+                      pendingProposal.kind === 'producerPreserveScript'
+                        ? declineScriptPreserve()
+                        : dismissPendingProposal(pendingProposal.id)
+                    }
                   >
-                    {t('Later')}
+                    {pendingProposal.kind === 'producerPreserveScript' ? t('Use as reference only') : t('Later')}
                   </Button>
                   <div className="flex justify-center">
                     <KeyHint dismissible />

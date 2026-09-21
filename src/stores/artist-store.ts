@@ -690,7 +690,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           // #g4(2026-08-27): 캐릭터의 모습(시점·의상 변형). 기본 모습이 항상 하나 있다.
           supabase
             .from('character_appearances')
-            .select('character_id, appearance_key, label, is_default, narrative_time, sheet_url, portrait_url, appearance, appearance_native')
+            .select('character_id, appearance_key, label, is_default, narrative_time, sheet_url, portrait_url, appearance, appearance_native, derived_from_url')
             .eq('project_id', projectId)
             .order('is_default', { ascending: false }),
           // 배경 후보 히스토리(약속 B4) — 캐릭터 후보와 같은 소유자 SELECT 정책(20260904100000).
@@ -793,6 +793,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
               portraitUrl: (a.portrait_url as string | null) ?? null,
               appearance: (a.appearance as string | null) ?? null,
               appearanceNative: (a.appearance_native as string | null) ?? null,
+              // #image-to-artist: 올린 원본 — 카드가 시트 옆에 함께 보여 준다.
+              sourceImageUrl: (a.derived_from_url as string | null) ?? null,
               viewCandidates: candidatesByAppearanceView[a.character_id as string]?.[a.appearance_key as string] ?? {},
             })
             appearancesByChar.set(a.character_id as string, list)

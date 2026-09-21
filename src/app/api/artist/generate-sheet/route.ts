@@ -36,6 +36,7 @@ import {
 import { computeImageSourceHash, computeLookFingerprint } from '@/lib/image-provenance'
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
 import { applyStyleAnchor, resolveStyleAnchor } from '@/lib/style-anchor'
+import { sheetIdentityReferences } from '@/lib/artist/source-image'
 import { resolveCharacterPromptInput } from '@/lib/artist/sheet-prompt-input'
 import { templateAssetUrl } from '@/lib/storage/template-asset'
 import { normalizeImageModelKey, resolveImageEndpoint } from '@/lib/image-models'
@@ -178,7 +179,7 @@ export async function POST(req: Request) {
           .single(),
         supabaseAdmin
           .from('character_appearances')
-          .select('appearance_key, is_default, appearance, costume, sheet_url, portrait_url')
+          .select('appearance_key, is_default, appearance, costume, sheet_url, portrait_url, derived_from_url')
           .eq('project_id', projectId)
           .eq('character_id', characterId)
           .eq('appearance_key', appearanceKey)
@@ -221,6 +222,8 @@ export async function POST(req: Request) {
     // 2. 프롬프트 + 모델 결정. 비기본 모습은 같은 캐릭터의 기본 모습 portrait만 정체성 기준으로 쓴다.
     const baseFaceUrl = appearance.is_default ? null : (defaultAppearance.portrait_url as string)
     const refMain = appearance.sheet_url as string | null
+    // #image-to-artist: 사용자가 올린 원본(derived_from_url)이 있으면 시트의 정체성 참조 첫 자리다.
+    const sourceImageUrl = typeof appearance.derived_from_url === 'string' && appearance.derived_from_url ? (appearance.derived_from_url as string) : null
     const webhookUrl = resolveWebhookUrl()
     let submitOpts: FalImageOptions
     let styleAnchorMode: 'turnaround' | 'single' | null = null
@@ -239,7 +242,9 @@ export async function POST(req: Request) {
           //   - baseFaceUrl: 비기본 모습(젊은 시절 등)이 기본 모습 얼굴을 계승(#g4 연속성).
           //   - refMain(#reref 2026-08-31): 재생성 시 이 모습의 직전 시트 — 얼굴이 매번 바뀌는 것을 막는다.
           //     첫 생성(refMain 없음)은 템플릿만 — 기존 동작 그대로. 델타(instruction)가 우선이라 요청 변경은 반영된다.
+          //   - sourceImageUrl(#image-to-artist 2026-09-17): 사용자가 올린 원본 — 있으면 정체성 참조 첫 자리(순서는 sheetIdentityReferences 와 같다).
           const identityRefs = [
+            ...sheetIdentityReferences({ sourceImageUrl }),
             ...(baseFaceUrl ? [baseFaceUrl] : []),
             ...(refMain ? [refMain] : []),
           ]
@@ -248,6 +253,7 @@ export async function POST(req: Request) {
             prompt: buildCharacterTurnaroundPrompt(input, {
               hasBaseFace: !!baseFaceUrl,
               hasPriorRender: !!refMain,
+              hasSourceImage: !!sourceImageUrl,
             }),
             // 템플릿이 첫 장(레이아웃 기준), 그 뒤가 정체성 이미지(기준얼굴·직전 시트).
             //   순서가 뒤바뀌면 모델이 얼굴 이미지를 레이아웃으로 오인한다.

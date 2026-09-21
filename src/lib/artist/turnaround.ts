@@ -133,10 +133,19 @@ export function buildCharacterMainPrompt(input: CharacterPromptInput): string {
  */
 export function buildCharacterTurnaroundPrompt(
   input: CharacterPromptInput,
-  opts?: { hasBaseFace?: boolean; hasPriorRender?: boolean },
+  opts?: { hasBaseFace?: boolean; hasPriorRender?: boolean; hasSourceImage?: boolean },
 ): string {
   return [
     `Fill in this character reference-sheet template with ${input.name}`,
+    // #image-to-artist(2026-09-17): 사용자가 올린 원본이 참조로 붙어 있으면 그 사람을 그대로 그린다 —
+    //   얼굴·머리·피부·체형·옷·색. 원본의 배경·구도는 시트로 가져오지 않는다(템플릿 레이아웃이 우선).
+    //   위치 무관 표현 — 앵커·템플릿 순서에 밀려도 안전.
+    ...(opts?.hasSourceImage
+      ? [
+          'one of the reference images is the ORIGINAL picture of this exact character supplied by the user — draw the same person: reproduce the face, hair, skin, build, outfit and colors from that picture faithfully in every tile',
+          'do not copy its background, framing or pose into the sheet — only the character',
+        ]
+      : []),
     // #g4(2026-08-27): 둘째 참조 이미지가 있으면 그건 "이 인물의 다른 시점 얼굴"이다.
     //   memo.md 의 제작팀 방식 — 정체성 요소만 가져오고 그대로 복사하지는 않게 한다.
     //   여기서 "복사하지 마라"를 빼면 젊은 시절이 현재 얼굴을 그대로 베껴 나이가 안 바뀐다.

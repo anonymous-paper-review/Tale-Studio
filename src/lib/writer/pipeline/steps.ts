@@ -24,6 +24,9 @@ import { runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots';
 import { runShotCheck } from '@/lib/writer/pipeline/stages/c_application_2';
 import { runRenderPrompts } from '@/lib/writer/pipeline/stages/v5_prompts';
 import { runDialogue, toDialogueTrack, type DialogueProgress } from '@/lib/writer/pipeline/stages/dialogue';
+// #script-preserve 2026-09-17: 대본 보존 — 씬·대사를 LLM 으로 다시 쓰지 않고 대본에서 옮긴다(tests/writer/script-preserve-steps.test.ts).
+import { preservedScript, scenesFromScript, annotateScriptScenes, dialogueTrackFromScript } from '@/lib/writer/script/preserve';
+import { makeScriptSceneAnnotator } from '@/lib/writer/script/annotate';
 import { inferSceneCinematographyFromShots } from '@/lib/writer/pipeline/util/infer_v3';
 import { persistDesignTokens } from '@/lib/writer/pipeline/util/persist_design_tokens';
 import { persistAssetsToDb, persistShotsToDb, persistSceneStagesToDb, persistSceneLedgersToDb } from '@/lib/writer/pipeline/util/persist_manifest';
@@ -298,6 +301,9 @@ async function runLaneDialogue(
   { logger, deadlineMs }: StepContext,
 ): Promise<Partial<WriterRunState>> {
   if (s.dialogue !== undefined) return {};
+  // #script-preserve: 대본을 보존하면 대사는 저작하지 않고 대본의 대사를 샷에 싣는다(LLM 없음).
+  const preserved = preservedScript(s.input);
+  if (preserved) return { dialogue: dialogueTrackFromScript(preserved.doc, s.scenes!, s.decoupage!), dialoguePartial: undefined };
   const models = resolveModels(s.input);
   // ⚠️ 씬 순차 + 글로벌 메모리 체인은 V4 품질 메커니즘(블라인드 A/B 검증) — 레인으로 분리만
   //   하고 내부는 병렬화하지 않는다. 씬 실패는 빈 대사로 흡수(runDialogue 내부 계약).
@@ -359,7 +365,7 @@ export const WRITER_STEPS: WriterStep[] = [
       //   모두 기록한다 — 다음 루프에서 scenes step 은 has()=true 로 투명하게 skip 되고, 하류
       //   스테이지와 재실행 단위(체크포인트)는 2콜 때와 동일하게 보인다. 오픈 캐스트/월드 머지도
       //   scenes step 과 동일하게 여기서 수행(append-only, 원천 불변).
-      if (process.env.WRITER_MERGE_S1S3 === '1') {
+      if (process.env.WRITER_MERGE_S1S3 === '1' && !s.input.preserveScript) { // 보존 모드는 씬을 병합 생성하지 않는다
         const { narrativeStructure, scenes } = await runStructureScenesMerged(
           s.input,
           s.genre!,
@@ -387,6 +393,15 @@ export const WRITER_STEPS: WriterStep[] = [
     has: (s) => s.scenes !== undefined,
     run: async (s, { logger }) => {
       const models = resolveModels(s.input);
+      // #script-preserve: 대본 보존 — 씬 순서·장소·시간·인물·비트·대사는 대본 그대로, 대본에 없는 칸(목적·감정·비대칭·요약)만 주석기가 채운다.
+      //   대본으로 판별되지 않으면(보존 표시가 있어도) 종전 경로로 간다.
+      const preserved = preservedScript(s.input);
+      if (preserved) {
+        const base = scenesFromScript(preserved.doc, { structure: s.narrativeStructure ?? null });
+        const scenes = await annotateScriptScenes(base, makeScriptSceneAnnotator(models.S, logger));
+        await logger.flushRawLlm('scenes');
+        return { scenes };
+      }
       const scenes = await runScenes(s.input, s.genre!, s.narrativeStructure!, s.characters!, s.world, logger, models.S, s._sceneRevisionNotes, s.dramaturgy ?? null);
       await logger.flushRawLlm('scenes');
       // 오픈 캐스트(§4 + V축 재설계): 전개상 필요한 인물/월드를 producer 베이스라인에 append.

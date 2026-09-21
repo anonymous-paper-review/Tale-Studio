@@ -8,6 +8,7 @@
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import type { PipelineInput } from '@/lib/writer/types/pipeline';
 import type { Json } from '@/types/database';
+import { preservedScript } from '@/lib/writer/script/preserve';
 import { castContractToCharacters } from '@/lib/writer/cast-contract';
 import type { WriterEngine } from '@/lib/writer/engine';
 
@@ -73,7 +74,10 @@ export async function createRun(
   const state: WriterRunStateBase = { input };
   // producer-story-gate §3: producer 확정값 seed → s0(genre)/s2(characters) step 이 자연 생략.
   if (input.genre) state.genre = input.genre;
-  if (input.cast) state.characters = castContractToCharacters(input.cast);
+  // #script-preserve 2026-09-17: 대본 보존이면 캐스트는 producer 캐스트 + 대본 인물(정합·추가). 대본이 아니면 종전.
+  const preserved = preservedScript(input);
+  if (preserved) state.characters = castContractToCharacters(preserved.cast);
+  else if (input.cast) state.characters = castContractToCharacters(input.cast);
   // V축 재설계: 월드/세팅 seed (s2 = characters + 월드). producer 가 background 로 전달 (유저 입력, 원천).
   if (input.background) state.world = input.background;
   const { data, error } = await supabaseAdmin

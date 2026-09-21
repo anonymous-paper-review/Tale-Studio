@@ -27,6 +27,8 @@ const EXCLUDED = [
   path.join('src', 'app', 'api', 'director', 'chat') + path.sep,
   path.join('src', 'app', 'api', 'produce', 'chat', 'system-prompt.ts'),
   path.join('src', 'lib', 'writer', 'llm') + path.sep,
+  // 대본 파서·보존(#script-preserve 2026-09-17): 한국어 대본 표기 정규식(씬·막·등장인물)과 주석기 프롬프트 — 분류 C.
+  path.join('src', 'lib', 'writer', 'script') + path.sep,
   path.join('src', 'lib', 'writer', 'run-store.ts'),
   path.join('src', 'app', 'api', 'writer', 'step') + path.sep,
   path.join('src', 'app', 'api', 'writer', 'watchdog') + path.sep,

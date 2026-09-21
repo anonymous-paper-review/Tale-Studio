@@ -40,6 +40,8 @@ export interface CastMember {
   origin?: 'producer' | 'writer'
   // 사용자가 카드 UI 로 직접 손댄 값인지. true 면 채팅이 덮어쓰기 전에 승인 게이트를 거친다.
   userEdited?: boolean
+  /** #image-to-artist: 채팅에 올려 이 카드에 붙인 그림(원본 업로드 주소). 넘길 때 Artist 의 대표 사진·시트 출처가 된다. */
+  sourceImageUrl?: string
 }
 
 export interface BackgroundSource {
@@ -51,6 +53,8 @@ export interface BackgroundSource {
   origin?: 'producer' | 'writer'
   userEdited?: boolean
   stale?: boolean
+  /** #image-to-artist: 채팅에 올려 이 카드에 붙인 그림. 넘길 때 그대로 그 배경의 와이드샷이 된다. */
+  sourceImageUrl?: string
 }
 
 export interface GateIssue {

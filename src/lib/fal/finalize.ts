@@ -8,6 +8,7 @@
 // 멱등성: 호출부와 DB 상태 가드가 중복 webhook을 차단한다. linked 영상은 upsert 없이 같은
 //         clip/job 키만 재사용하며, DB 완료 실패는 queued 상태로 남겨 다음 webhook/poll이 재시도한다.
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { keepsSourcePortrait } from '@/lib/artist/source-image'
 import {
   completeGenerationJob,
   patchGenerationJobResponseSnapshotByRequestId,
@@ -639,12 +640,24 @@ async function savePortraitFromMain(
   sheetBuf: Buffer,
   mainUrl: string,
 ): Promise<void> {
-  const { data: ch } = await supabaseAdmin
-    .from('characters')
-    .select('entity_type')
-    .eq('project_id', job.project_id)
-    .eq('character_id', characterId)
-    .maybeSingle()
+  const [{ data: ch }, { data: sourceRow }] = await Promise.all([
+    supabaseAdmin
+      .from('characters')
+      .select('entity_type')
+      .eq('project_id', job.project_id)
+      .eq('character_id', characterId)
+      .maybeSingle(),
+    supabaseAdmin
+      .from('character_appearances')
+      .select('derived_from_url')
+      .eq('project_id', job.project_id)
+      .eq('character_id', characterId)
+      .eq('appearance_key', appearanceKey)
+      .maybeSingle(),
+  ])
+
+  // #image-to-artist(2026-09-17): 사용자가 올린 원본이 있는 모습은 그 원본이 대표 사진이다 — 시트 크롭으로 덮지 않는다.
+  if (keepsSourcePortrait(sourceRow as { derived_from_url?: string | null } | null)) return
 
   let portraitUrl = mainUrl // 사물 or 비-시트 폴백: main 자체가 이미 단일 포트레이트
   if (ch?.entity_type !== 'object') {

@@ -195,6 +195,8 @@ function parseCustomAnchorRow(
 interface ProducerState {
   storyText: string
   storyReady: boolean
+  /** #script-preserve: 대본 보존 결정. null = 아직 안 물었거나 글이 바뀜, true = 그대로 보존, false = 참고 자료(각색). */
+  preserveScript: boolean | null
   projectSettings: ProjectSettings
   cast: CastMember[]
   backgrounds: BackgroundSource[]
@@ -208,6 +210,7 @@ interface ProducerState {
   error: string | null
 
   setStoryText: (text: string) => void
+  setPreserveScript: (value: boolean | null) => void
   /** 앵커 카탈로그 + 현재 프로젝트 선택값 로드 (readiness board 진입 시). */
   loadStyleAnchors: () => Promise<void>
   /** 스타일 앵커 선택 — 낙관적 반영 + projects.style_anchor_key 저장. */
@@ -230,6 +233,10 @@ interface ProducerState {
   ) => 'applied' | 'pending' | 'rejected' | 'noop'
   applyProducerSourcePatch: (patch: ExtractedSettings) => void
   addCastMember: (entityType: EntityType) => string
+  /** #image-to-artist: 채팅에 올린 그림으로 인물 카드를 만든다(그림만 붙고 글 칸은 채팅이 채운다). localId 를 돌려준다. */
+  addCastFromImage: (sourceImageUrl: string) => string
+  /** #image-to-artist: 채팅에 올린 그림으로 배경 카드를 만든다. */
+  addBackgroundFromImage: (sourceImageUrl: string) => string
   updateCastMember: (localId: string, patch: Partial<CastMember>) => void
   removeCastMember: (localId: string) => void
   addBackground: () => string
@@ -406,6 +413,13 @@ function extractedClobbersUserEdited(
   return conflicts
 }
 
+// #script-preserve: 보존 중엔 줄거리 제안만 떼어 낸다(storyReady 는 setPreserveScript 가 이미 켰다).
+function withoutStoryProposal(extracted: ExtractedSettings): ExtractedSettings {
+  const copy = { ...extracted }
+  delete copy.storyText
+  return copy
+}
+
 function settingsPatchFromExtracted(patch: ExtractedSettings): Partial<ProjectSettings> {
   const next: Partial<ProjectSettings> = {}
   if (patch.playtime !== undefined) next.playtime = patch.playtime
@@ -437,6 +451,8 @@ export interface ProducerDraft {
   settings: ProjectSettings
   cast: CastMember[]
   backgrounds: BackgroundSource[]
+  /** #script-preserve: 대본 보존 결정(true 보존 · false 참고 자료 · null 아직 안 물음). 옛 초안엔 없다 → null. */
+  preserveScript?: boolean | null
 }
 
 export interface ProducerBoardState {
@@ -445,6 +461,7 @@ export interface ProducerBoardState {
   settings: ProjectSettings
   cast: CastMember[]
   backgrounds: BackgroundSource[]
+  preserveScript?: boolean | null
 }
 
 // jsonb 값을 안전하게 ProducerDraft 로 파싱 (형태가 안 맞으면 null).
@@ -461,6 +478,7 @@ export function parseProducerDraft(raw: unknown): ProducerDraft | null {
     settings: normalizeProducerSettings(d.settings),
     cast: d.cast as CastMember[],
     backgrounds: d.backgrounds as BackgroundSource[],
+    preserveScript: typeof d.preserveScript === 'boolean' ? d.preserveScript : null,
   }
 }
 
@@ -488,6 +506,8 @@ export function mergeDraftWithDb(
     settings: draft.settings,
     cast: [...draft.cast, ...extraCast],
     backgrounds: [...draft.backgrounds, ...extraBackgrounds],
+    // 결정은 초안의 그 글에 대한 것이다 — 초안 글이 비어 DB 글로 복원되면 결정도 없다.
+    preserveScript: draft.storyText ? (draft.preserveScript ?? null) : null,
   }
 }
 
@@ -500,10 +520,11 @@ function buildProducerDraft(state: ProducerBoardState): ProducerDraft {
     settings: state.settings,
     cast: state.cast,
     backgrounds: state.backgrounds,
+    preserveScript: state.preserveScript ?? null,
   }
 }
 function boardOf(
-  s: Pick<ProducerState, 'storyText' | 'storyReady' | 'projectSettings' | 'cast' | 'backgrounds'>,
+  s: Pick<ProducerState, 'storyText' | 'storyReady' | 'projectSettings' | 'cast' | 'backgrounds' | 'preserveScript'>,
 ): ProducerBoardState {
   return {
     storyText: s.storyText,
@@ -511,6 +532,7 @@ function boardOf(
     settings: s.projectSettings,
     cast: s.cast,
     backgrounds: s.backgrounds,
+    preserveScript: s.preserveScript,
   }
 }
 
@@ -558,6 +580,7 @@ function scheduleDraftSave(getState: () => ProducerBoardState): void {
 export const useProducerStore = create<ProducerState>((set, get) => ({
   storyText: '',
   storyReady: false,
+  preserveScript: null,
   projectSettings: { ...DEFAULT_SETTINGS },
   cast: [],
   backgrounds: [],
@@ -569,7 +592,13 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
 
   setStoryText: (text) => {
     if (isDemoSession()) return
-    set({ storyText: text })
+    // 글이 바뀌면 보존 결정은 그 글에 대한 것이 아니다 — 다시 묻는다(#script-preserve).
+    set((s) => ({ storyText: text, preserveScript: s.storyText === text ? s.preserveScript : null }))
+    scheduleDraftSave(() => boardOf(get()))
+  },
+  setPreserveScript: (value) => {
+    // 보존을 고르면 대본 전체가 곧 이야기다 — "스토리 준비"를 채팅 판단 없이 켠다(#script-preserve).
+    set((s) => ({ preserveScript: value, storyReady: value === true ? true : s.storyReady }))
     scheduleDraftSave(() => boardOf(get()))
   },
 
@@ -659,10 +688,13 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     return 'applied'
   },
 
-  applyExtractedSettings: (extracted, traceId) => {
-    if (!extracted) return 'noop'
+  applyExtractedSettings: (incoming, traceId) => {
+    if (!incoming) return 'noop'
     const project = useProjectStore.getState()
     const current = get()
+    // #script-preserve: 보존 중인 대본은 채팅이 제안한 줄거리로 덮지 않는다 — 모델은 제안만 하고
+    //   제품 층이 화이트리스트로 적용한다(architecture.md). 인물·배경·설정 제안은 그대로 간다.
+    const extracted: ExtractedSettings = current.preserveScript === true ? withoutStoryProposal(incoming) : incoming
     const afterHandoff = project.reachedStage !== 'producer'
     const affected = extractedAffectsExisting(current, extracted)
     const protectedConflicts = extractedClobbersUserEdited(current, extracted)
@@ -768,6 +800,27 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       cast: state.cast.filter((m) => m.localId !== localId),
     }))
     scheduleDraftSave(() => boardOf(get()))
+  },
+
+  addCastFromImage: (sourceImageUrl) => {
+    if (isDemoSession()) return ''
+    const localId = newLocalId()
+    // userEdited 는 false — 글 칸이 비어 있으니 채팅이 바로 채운다(승인 게이트 없이).
+    set((state) => ({
+      cast: [...state.cast, { localId, name: '', entityType: 'person', appearance: '', origin: 'producer', userEdited: false, sourceImageUrl }],
+    }))
+    scheduleDraftSave(() => boardOf(get()))
+    return localId
+  },
+
+  addBackgroundFromImage: (sourceImageUrl) => {
+    if (isDemoSession()) return ''
+    const localId = newLocalId('background')
+    set((state) => ({
+      backgrounds: [...state.backgrounds, { localId, name: '', visualDescription: '', purpose: '', origin: 'producer', userEdited: false, sourceImageUrl }],
+    }))
+    scheduleDraftSave(() => boardOf(get()))
+    return localId
   },
 
   addBackground: () => {
@@ -887,6 +940,8 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
             appearance: m.appearance,
             arc: m.arc,
             motivation: m.motivation,
+            // #image-to-artist: 카드에 붙은 그림 — 서버가 대표 사진·시트 출처로 적는다(파이프라인 시드에서는 서버가 뗀다).
+            ...(m.sourceImageUrl ? { source_image_url: m.sourceImageUrl } : {}),
           })),
         }
         const backgroundSlugged = assignLocationSlugs(backgrounds)
@@ -897,6 +952,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
             visual_description: background.visualDescription,
             purpose: background.purpose,
             user_edited: background.userEdited === true,
+            ...(background.sourceImageUrl ? { source_image_url: background.sourceImageUrl } : {}),
           })),
         }
         const genre = {
@@ -915,6 +971,8 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
           body: JSON.stringify({
             projectId,
             story: storyText,
+            // #script-preserve: 사람이 고른 보존 결정(true 일 때만 실린다).
+            ...(get().preserveScript === true ? { preserveScript: true } : {}),
             ...(options?.rerun === true ? { rerun: true } : {}),
             ...(options?.rerun === true
               ? {
@@ -1084,6 +1142,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
         set({
           storyText: restored.storyText,
           storyReady: restored.storyReady,
+          preserveScript: restored.preserveScript ?? null,
           projectSettings: restored.settings,
           cast: restored.cast,
           backgrounds: restored.backgrounds,
@@ -1106,6 +1165,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     set({
       storyText: '',
       storyReady: false,
+      preserveScript: null,
       projectSettings: { ...DEFAULT_SETTINGS },
       cast: [],
       backgrounds: [],

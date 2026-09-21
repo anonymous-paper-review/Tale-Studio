@@ -3,9 +3,13 @@ import { toast } from 'sonner'
 import type { DialogueLine, StageId } from '@/types'
 import type { PendingProposal } from '@/lib/pending-proposal'
 import { createPendingProposal, isApprovalUtterance } from '@/lib/pending-proposal'
+import { detectScript, parseScript } from '@/lib/writer/script/parse'
 import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore, type ExtractedSettings } from '@/stores/producer-store'
 import { evaluateProducerGate } from '@/lib/producer-gate'
+import { fixKoreanParticles } from '@/lib/korean-particles'
+import { coerceCardFill, matchImageRoleAnswer, matchImageRoleInText, type CardFill, type ImageRole } from '@/lib/producer/image-role'
+import { backgroundMentions, castMentions } from '@/lib/card-mention'
 import {
   requireDefaultAppearanceKey,
   useArtistStore,
@@ -58,7 +62,7 @@ import { stripLegacyStageMarkers } from '@/lib/display-names'
 //   같은 대화창에서 언어가 섞이지 않게. 미조회 시 UI 언어 폴백은 contentLocale() 안에 있다.
 import { translate } from '@/lib/i18n'
 import { contentLocale } from '@/lib/i18n/content'
-import { parseAppLocale } from '@/lib/locale'
+import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import { useLocaleStore } from '@/stores/locale-store'
 import {
   STAGE_LABEL,
@@ -112,6 +116,10 @@ interface GlobalChatState {
   suggestion: ChatSuggestion | null
   dismissedSuggestionIds: string[]
   pendingProposal: PendingProposal | null
+  /** #script-preserve: 대본 보존 질문에 답하기 전까지 붙들어 둔 턴 — 결정이 나면 숨은 요청으로 모델에 이어 보낸다. */
+  scriptPreserveHeld: ScriptPreserveHeld | null
+  /** #image-to-artist: 올린 그림의 쓰임새(인물·배경·참고)를 답하기 전까지 붙들어 둔 턴. 장마다 묻고 다 답하면 한꺼번에 처리한다. */
+  imageRoleGate: ImageRoleGate | null
   /** 크로스스테이지 완료 알림 배지 카운트 (chat-proactive-copilot Phase 2). 사이드바가 읽는다. */
   stageBadges: Partial<Record<StageId, number>>
   /** 핸드오프 성공 후 이동할 경로 — 라우팅은 컴포넌트 몫이라 GlobalChat 이 소비하고 비운다. */
@@ -133,7 +141,7 @@ interface GlobalChatState {
     attachments?: { imageUrls?: string[]; thumbUrls?: string[] },
     /** consentedHandoff: 명시적 핸드오프 버튼("Writer 호출하기")에서 온 호출 — 버튼이 곳 동의라
      *  승인 카드를 다시 띄우지 않고 바로 실행한다(D12, 2026-08-31 오너). */
-    opts?: { consentedHandoff?: boolean },
+    opts?: { consentedHandoff?: boolean; silentUser?: boolean; cardFill?: CardFill },
   ) => Promise<void>
   /** 진행 중인 LLM 응답 중단 (#oiioii-chat) — Stop 버튼. 대기 중이 아니면 no-op. */
   stopGeneration: () => void
@@ -145,6 +153,12 @@ interface GlobalChatState {
   dismissSuggestion: (opts?: { implicit?: boolean }) => void
   offerPendingProposal: (proposal: PendingProposal) => boolean
   dismissPendingProposal: (id?: string) => void
+  /** #script-preserve: 붙여 넣은 글이 대본이면 그 글을 그대로 스토리로 두고 "그대로 보존할까요" 카드를 띄운다. 대본이 아니면 false(종전 경로). */
+  offerScriptPreserve: (text: string, opts?: { traceId?: string; held?: ScriptPreserveHeld }) => boolean
+  /** #script-preserve: 카드를 내리고 결정을 "참고 자료(각색)" 로 기록한다. */
+  declineScriptPreserve: () => void
+  /** #image-to-artist: 올린 그림의 쓰임새를 정한다 — 말이 분명하면 바로, 아니면 장마다 선택지로 묻는다. 그림이 없으면 false. */
+  offerImageRoles: (images: ChatImageInput[], opts: { typed: string; msg: string }) => boolean
   approvePendingProposal: (id?: string) => Promise<boolean>
   /** 백그라운드 생성 완료 통지 — 다른 stage에 있을 때만 배지 bump + 스로틀된 채팅 메시지. */
   notifyCompletion: (stage: StageId, label: string) => void
@@ -217,6 +231,116 @@ const completionKey = (stage: StageId, label: string) => `${stage}::${label}`
 
 // 진행 중인 LLM 응답의 abort 컨트롤러 (#oiioii-chat) — 한 번에 한 요청만 뜨므로(loading 가드) 단일 슬롯.
 let activeGeneration: AbortController | null = null
+
+/** #script-preserve: 대본 보존 질문 동안 붙들어 둔 사용자 턴(붙여 넣은 글·첨부). */
+export type ScriptPreserveHeld = { msg: string; imageUrls?: string[]; thumbUrls?: string[] }
+
+// 결정 뒤 붙들어 둔 턴을 숨은 요청으로 이어 보낸다 — 보존이면 카드(인물·배경·설정)만 채우게, 참고 자료면 종전대로
+//   새 이야기를 만들게. setTimeout(0): 타이핑 승인 경로(sendMessage → approvePendingProposal)는 loading 이 켜져 있어
+//   즉시 부르면 무시되므로 그 턴이 닫힌 뒤에 보낸다. 붙들어 둔 턴이 없으면(카드만 있던 경우) 보낼 것도 없다.
+function resumeScriptPreserveHeld(
+  get: () => GlobalChatState,
+  set: (patch: Partial<GlobalChatState>) => void,
+  decision: 'preserve' | 'reference',
+): void {
+  const held = get().scriptPreserveHeld
+  if (!held) return
+  set({ scriptPreserveHeld: null })
+  const voice = contentLocale()
+  const text =
+    decision === 'preserve'
+      ? translate(voice, 'Keep my script exactly as written. Do not rewrite or summarize it. Fill in only the cast, background and project setting cards it supports.')
+      : translate(voice, 'Use my text as reference material and draft a new story from it.')
+  const attachments = held.imageUrls?.length ? { imageUrls: held.imageUrls } : undefined
+  setTimeout(() => {
+    void get().sendMessage(text, attachments, { silentUser: true })
+  }, 0)
+}
+
+/** #image-to-artist: 채팅에 올린 그림 한 장 — 원본(thumbUrl)과 판독용 슬라이스. */
+export interface ChatImageInput {
+  id: string
+  name: string
+  thumbUrl: string
+  sliceUrls: string[]
+}
+interface ImageRoleGate {
+  items: Array<{ image: ChatImageInput; role: ImageRole | null }>
+  typed: string
+  msg: string
+}
+
+function imageRoleOptions(voice: AppLocale): Array<{ label: string; utterance: string }> {
+  return [
+    { label: translate(voice, 'Character'), utterance: translate(voice, 'Use it as a character') },
+    { label: translate(voice, 'Background'), utterance: translate(voice, 'Use it as a background') },
+    { label: translate(voice, 'Reference only'), utterance: translate(voice, 'Use it as reference only') },
+  ]
+}
+
+// 아직 답하지 않은 첫 그림의 질문을 세운다. 닫을 수 없는 선택지(dismissible:false) — 올린 그림이 조용히 사라지면 안 된다.
+function askImageRole(get: () => GlobalChatState): void {
+  const gate = get().imageRoleGate
+  if (!gate) return
+  const idx = gate.items.findIndex((it) => it.role === null)
+  if (idx < 0) return
+  const voice = contentLocale()
+  const item = gate.items[idx]
+  const content =
+    gate.items.length > 1
+      ? translate(voice, 'Picture {i} of {n}: {name}. How should I use it?', { i: String(idx + 1), n: String(gate.items.length), name: item.image.name })
+      : translate(voice, 'How should I use this picture? ({name})', { name: item.image.name })
+  get().offerSuggestion(
+    { id: `image-role:${item.image.id}`, stage: 'producer', content, dismissible: false, action: { kind: 'choices', options: imageRoleOptions(voice) } },
+    { preempt: true },
+  )
+}
+
+// 다 답한 그림들을 정한 대로 쓴다 — 인물·배경은 카드를 만들고 그림을 붙인 뒤 숨은 요청으로 글 칸을 채우게 하고,
+//   참고 자료는 사용자의 말과 함께 종전대로 채팅에 보낸다. 순서대로 기다린다(채팅은 한 번에 한 요청).
+async function runImageRolePlan(get: () => GlobalChatState, plan: ImageRoleGate): Promise<void> {
+  const voice = contentLocale()
+  const projectId = useProjectStore.getState().projectId
+  const speak = (content: string) => {
+    useGlobalChatStore.setState((state) => ({
+      messages: [...state.messages, { id: makeId(), stage: 'producer' as const, role: 'model' as const, content }],
+    }))
+    if (projectId) saveChatMessage(projectId, 'producer', 'model', content)
+  }
+  const userSaid = plan.typed ? `\n${translate(voice, 'The user said: {text}', { text: plan.typed })}` : ''
+  for (const it of plan.items) {
+    if (it.role === 'character') {
+      const localId = useProducerStore.getState().addCastFromImage(it.image.thumbUrl)
+      if (!localId) continue
+      const label = castMentions(useProducerStore.getState().cast, voice).find((m) => m.ref === localId)?.label ?? localId
+      speak(translate(voice, 'Added a character card with {name}. I will fill in the appearance from the picture.', { name: it.image.name }))
+      const ask = translate(
+        voice,
+        'The attached picture is the character on card @{label}. Look at it and fill in only that card: a detailed appearance, and the name if it is obvious from the picture. Do not write a story.',
+        { label },
+      )
+      await get().sendMessage(`${ask}${userSaid}`, { imageUrls: it.image.sliceUrls }, { silentUser: true, cardFill: { kind: 'character', ref: localId } })
+    } else if (it.role === 'background') {
+      const localId = useProducerStore.getState().addBackgroundFromImage(it.image.thumbUrl)
+      if (!localId) continue
+      const label = backgroundMentions(useProducerStore.getState().backgrounds, voice).find((m) => m.ref === localId)?.label ?? localId
+      speak(translate(voice, 'Added a background card with {name}. I will fill in the description from the picture.', { name: it.image.name }))
+      const ask = translate(
+        voice,
+        'The attached picture is the background on card @{label}. Look at it and fill in only that card: a name for the place, a detailed visual description, and its purpose in a story. Do not write a story.',
+        { label },
+      )
+      await get().sendMessage(`${ask}${userSaid}`, { imageUrls: it.image.sliceUrls }, { silentUser: true, cardFill: { kind: 'background', ref: localId } })
+    }
+  }
+  const refs = plan.items.filter((it) => it.role === 'reference')
+  if (refs.length > 0) {
+    await get().sendMessage(plan.msg, {
+      imageUrls: refs.flatMap((r) => r.image.sliceUrls),
+      thumbUrls: refs.map((r) => r.image.thumbUrl),
+    })
+  }
+}
 
 function projectChatStage(): { projectId: string | null; stage: StageId } {
   const project = useProjectStore.getState()
@@ -417,6 +541,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   suggestion: null,
   dismissedSuggestionIds: [],
   pendingProposal: null,
+  scriptPreserveHeld: null,
+  imageRoleGate: null,
   stageBadges: {},
   pendingNavigatePath: null,
   messagesLoadedProjectId: null,
@@ -531,6 +657,34 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       (activeSuggestion.stage === stage || activeSuggestion.dismissible === false)
     ) {
       get().dismissSuggestion({ implicit: true })
+    }
+
+    // #image-to-artist: 그림 쓰임새 질문에 답하는 중 — 답이면 기록하고 다음 그림을 묻거나 다 답했으면 실행, 답이 아니면 다시 묻는다.
+    const imageGate = get().imageRoleGate
+    if (imageGate && stage === 'producer' && !opts?.silentUser) {
+      const answer = matchImageRoleAnswer(trimmed)
+      if (!answer) {
+        get().appendLocalExchange(
+          'producer',
+          trimmed,
+          translate(contentLocale(), 'Please choose first how to use the picture: character, background or reference.'),
+        )
+        askImageRole(get)
+        return
+      }
+      const userMsg: GlobalChatMessage = { id: makeId(), stage, role: 'user', content: trimmed }
+      set((state) => ({ messages: [...state.messages, userMsg] }))
+      if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
+      const idx = imageGate.items.findIndex((it) => it.role === null)
+      const items = imageGate.items.map((it, i) => (i === idx ? { ...it, role: answer } : it))
+      if (items.some((it) => it.role === null)) {
+        set({ imageRoleGate: { ...imageGate, items } })
+        askImageRole(get)
+        return
+      }
+      set({ imageRoleGate: null })
+      await runImageRolePlan(get, { ...imageGate, items })
+      return
     }
 
     const pendingProposal = get().pendingProposal
@@ -773,6 +927,10 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           attachmentImageUrls: attachmentImageUrls ?? [],
           currentSettings: p.projectSettings,
           storyText: p.storyText,
+          // #script-preserve: 보존 중이면 서버가 모델에 "다시 쓰지 말 것"을 알린다(최종 방어는 producer-store 가드).
+          preserveScript: p.preserveScript === true,
+          // #image-to-artist: 카드 채우기 턴 — 서버가 모델에 "그 카드만" 을 알린다(최종 방어는 coerceCardFill).
+          ...(opts?.cardFill ? { cardFill: opts.cardFill } : {}),
           currentCast: p.cast,
           currentBackgrounds: p.backgrounds,
           gate: {
@@ -905,14 +1063,16 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       content: displayContent,
     }
 
+    // silentUser(#script-preserve): 대본 보존 결정 뒤 이어지는 숨은 요청 — 사용자 말풍선은 붙여 넣은 턴에 이미 있다.
+    const silentUser = opts?.silentUser === true
     set((state) => ({
-      messages: [...state.messages, userMsg],
+      messages: silentUser ? state.messages : [...state.messages, userMsg],
       loading: true,
       error: null,
       lastTrace: requestTrace,
     }))
 
-    if (projectId) saveChatMessage(projectId, stage, 'user', displayContent)
+    if (projectId && !silentUser) saveChatMessage(projectId, stage, 'user', displayContent)
 
     // 응답 중단 (#oiioii-chat) — Stop 버튼이 이 컨트롤러를 abort 한다. LLM 호출 경로에만
     //   건다(핸드오프·승인 등 로컬 빠른 경로는 순식간이라 중단 대상이 아니다).
@@ -1012,9 +1172,13 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (stage === 'producer' && data.extractedSettings) {
         // 영수증은 실제 결과를 기록한다 — 승인 카드로 간 것을 applied로 적으면 거짓 영수증이 된다.
         //   제안에 traceId를 실어 승인/거절이 같은 trace로 이어지게 한다.
+        //   #image-to-artist: 카드 채우기 턴은 그 카드 하나로 좁힌다(줄거리·설정·다른 카드·화풍 제안은 버린다).
+        const extractedForApply = opts?.cardFill
+          ? (coerceCardFill(data.extractedSettings as ExtractedSettings, opts.cardFill) as ExtractedSettings)
+          : (data.extractedSettings as ExtractedSettings)
         const extractOutcome = useProducerStore
           .getState()
-          .applyExtractedSettings(data.extractedSettings, trace?.traceId ?? null)
+          .applyExtractedSettings(extractedForApply, trace?.traceId ?? null)
         patchTrace(
           extractOutcome === 'pending'
             ? { pendingProposal: true }
@@ -1026,11 +1190,13 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         // #p1-attach: 채팅이 "이 그림체로" 의도를 읽었으면 앵커로 확정한다.
         //   모델은 인덱스만 주고 URL 은 우리가 이번 턴 첨부에서 꺼낸다 — 모델이 뱉은 URL 은
         //   나중에 이미지 생성 프로바이더가 직접 가져가므로 신뢰하면 안 된다.
-        const anchorError = await applyStyleAnchorIntent(
-          data.extractedSettings.styleAnchorFromAttachment,
-          attachmentImageUrls ?? [],
-          projectId,
-        )
+        const anchorError = opts?.cardFill
+          ? null
+          : await applyStyleAnchorIntent(
+              data.extractedSettings.styleAnchorFromAttachment,
+              attachmentImageUrls ?? [],
+              projectId,
+            )
         if (anchorError) {
           patchTrace({ skippedCount: 1 })
           // 모델은 이미 "이 화풍으로 잡았어요"라고 답했다. 저장이 실패했는데 조용하면 거짓말이 된다.
@@ -1048,7 +1214,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         // D12(2026-08-31 오너): 이름/느낌("일본 애니 그림체")으로 고른 카탈로그 앵커 키 —
         //   무과금 데이터 수정이라 즉시 반영하고, 피커의 선택 표시가 UI 확인을 겸한다.
         //   "앱 화면에서 선택해 주세요"라고 떠넘기던 것을 없앤다.
-        const requestedAnchorKey = data.extractedSettings.styleAnchorKey
+        const requestedAnchorKey = opts?.cardFill ? undefined : data.extractedSettings.styleAnchorKey
         if (typeof requestedAnchorKey === 'string' && requestedAnchorKey) {
           const anchorOutcome = await useProducerStore
             .getState()
@@ -1610,6 +1776,102 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     return true
   },
 
+  offerScriptPreserve: (text, opts) => {
+    const det = detectScript(text)
+    if (det.kind === 'none') return false
+    const doc = parseScript(text)
+    if (!doc) return false
+    const voice = contentLocale()
+    const kindLabel =
+      det.kind === 'screenplay' ? translate(voice, 'screenplay') : det.kind === 'stage_play' ? translate(voice, 'stage play') : translate(voice, 'radio drama') // copy-ok: fragment
+    const lines = doc.stats.dialogue_lines
+    const proposal = createPendingProposal({
+      stage: 'producer',
+      kind: 'producerPreserveScript',
+      traceId: opts?.traceId,
+      // 한국어 조사는 종류 이름의 받침에 맞춘다("희곡으로" / "시나리오로").
+      target: fixKoreanParticles(translate(voice, 'This text looks like a {kind}.', { kind: kindLabel }), [kindLabel]),
+      action: translate(voice, 'Keep the script as written: scenes, characters and dialogue stay unchanged.'),
+      impact: [
+        translate(voice, 'Scenes: {n}', { n: String(doc.scenes.length) }),
+        translate(voice, 'Locations: {n}', { n: String(new Set(doc.scenes.map((sc) => sc.location.trim().toLowerCase()).filter(Boolean)).size) }),
+        translate(voice, 'Characters: {n}', { n: String(doc.characters.length) }),
+        translate(voice, 'Dialogue lines: {n}', { n: String(lines) }),
+        // 대사 밖 요소(지문·카메라/전환·소리 지시)도 그대로 실린다 — 있는 것만 세어 보인다(0 은 "없다"가 아니라
+        //   "표기된 지시가 없다"라 오해를 부른다: 소리는 대개 지문 문장 안에 있다).
+        ...(() => {
+          const parts: string[] = []
+          if (doc.stats.action_blocks > 0) parts.push(translate(voice, 'stage directions {n}', { n: String(doc.stats.action_blocks) })) // copy-ok: fragment
+          const cam = doc.stats.camera + doc.stats.transitions
+          if (cam > 0) parts.push(translate(voice, 'camera and transition cues {n}', { n: String(cam) })) // copy-ok: fragment
+          if (doc.stats.sound > 0) parts.push(translate(voice, 'sound cues {n}', { n: String(doc.stats.sound) })) // copy-ok: fragment
+          return parts.length > 0 ? [translate(voice, 'Also kept as written: {items}', { items: parts.join(', ') })] : []
+        })(),
+        translate(voice, 'Decline to use it as reference only. The Writer will adapt it as before.'),
+      ],
+      payload: { kind: det.kind, confidence: det.confidence, scenes: doc.scenes.length, characters: doc.characters.length, dialogue_lines: lines },
+    })
+    // 다른 승인 카드가 떠 있으면 관문을 세우지 않는다(승인 카드는 명시 응답으로만 내려간다) — 호출부가 종전 경로로 보낸다.
+    const accepted = get().offerPendingProposal(proposal)
+    if (!accepted) return false
+    // 압축(각색) 전에 원문을 그대로 스토리로 둔다 — 보존을 고르면 이 글이 Writer 에 그대로 간다.
+    useProducerStore.getState().setStoryText(text)
+    useProducerStore.getState().setPreserveScript(null)
+    const projectId = useProjectStore.getState().projectId
+    // 붙여 넣은 턴은 답을 듣기 전에는 모델로 보내지 않는다 — 말풍선만 남기고 턴을 붙들어 둔다.
+    const held = opts?.held ?? null
+    if (held) {
+      const userContent = withAttachmentMarker(held.msg, held.thumbUrls ?? [])
+      set((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'producer' as const, role: 'user' as const, content: userContent }] }))
+      if (projectId) saveChatMessage(projectId, 'producer', 'user', userContent)
+    }
+    const content = fixKoreanParticles(
+      translate(voice, 'This looks like a {kind}. Should I keep it exactly as written, or use it as reference for a new story?', { kind: kindLabel }),
+      [kindLabel],
+    )
+    set((state) => ({ scriptPreserveHeld: held, messages: [...state.messages, { id: makeId(), stage: 'producer' as const, role: 'model' as const, content }] }))
+    if (projectId) saveChatMessage(projectId, 'producer', 'model', content)
+    return true
+  },
+
+  declineScriptPreserve: () => {
+    const proposal = get().pendingProposal
+    if (!proposal || proposal.kind !== 'producerPreserveScript') return
+    useProducerStore.getState().setPreserveScript(false)
+    get().dismissPendingProposal(proposal.id)
+    resumeScriptPreserveHeld(get, set, 'reference')
+  },
+
+  offerImageRoles: (images, opts) => {
+    const ready = images.filter((img) => img && img.thumbUrl)
+    if (ready.length === 0) return false
+    const typed = opts.typed.trim()
+    const msg = opts.msg.trim() || typed
+    // 말이 분명하면 묻지 않는다 — 모든 그림에 같은 역할.
+    const direct = matchImageRoleInText(typed)
+    if (direct) {
+      // 사용자 말풍선은 그림과 함께 남긴다(참고 자료는 sendMessage 가 자기 말풍선을 만든다).
+      if (direct !== 'reference') {
+        const projectId = useProjectStore.getState().projectId
+        const content = withAttachmentMarker(msg, ready.map((r) => r.thumbUrl))
+        set((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'producer' as const, role: 'user' as const, content }] }))
+        if (projectId) saveChatMessage(projectId, 'producer', 'user', content)
+      }
+      void runImageRolePlan(get, { items: ready.map((image) => ({ image, role: direct })), typed, msg })
+      return true
+    }
+    // 묻는다 — 사용자 말풍선(그림 포함)을 먼저 남기고 첫 그림의 질문을 세운다.
+    const projectId = useProjectStore.getState().projectId
+    const content = withAttachmentMarker(msg, ready.map((r) => r.thumbUrl))
+    set((state) => ({
+      imageRoleGate: { items: ready.map((image) => ({ image, role: null })), typed, msg },
+      messages: [...state.messages, { id: makeId(), stage: 'producer' as const, role: 'user' as const, content }],
+    }))
+    if (projectId) saveChatMessage(projectId, 'producer', 'user', content)
+    askImageRole(get)
+    return true
+  },
+
   dismissPendingProposal: (id) => {
     const proposal = get().pendingProposal
     if (!proposal || (id && proposal.id !== id)) return
@@ -1696,7 +1958,13 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (projectId) saveChatMessage(projectId, proposal.stage, 'model', content)
     }
     try {
-      if (proposal.kind === 'producerSourcePatch') {
+      if (proposal.kind === 'producerPreserveScript') {
+        // #script-preserve: 보존 결정 — Writer 시작 요청에 preserveScript 로 실린다(producer-store.saveAndHandoff).
+        useProducerStore.getState().setPreserveScript(true)
+        speak(translate(contentLocale(), 'Got it. I will keep the script exactly as written. Scenes, characters and dialogue will not be rewritten.'))
+        patchTrace({ appliedCount: 1 })
+        resumeScriptPreserveHeld(get, set, 'preserve')
+      } else if (proposal.kind === 'producerSourcePatch') {
         useProducerStore
           .getState()
           .applyProducerSourcePatch(proposal.payload.patch as ExtractedSettings)
@@ -2021,6 +2289,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       lastTrace: null,
       suggestion: null,
       pendingProposal: null,
+      scriptPreserveHeld: null,
+      imageRoleGate: null,
       dismissedSuggestionIds: [],
       stageBadges: {},
       messagesLoadedProjectId: null,

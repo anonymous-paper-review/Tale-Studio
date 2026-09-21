@@ -14,6 +14,7 @@ import { falImageSubmit, type FalImageOptions } from '@/lib/writer/llm/fal'
 import { createGenerationJob, hasQueuedCharacterViewJob, hasQueuedWorldShotJob } from '@/lib/generation-jobs'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { buildCharacterTurnaroundPrompt } from '@/lib/artist/turnaround'
+import { sheetIdentityReferences } from '@/lib/artist/source-image'
 import { resolveCharacterPromptInput, type SheetDesignTokens } from '@/lib/artist/sheet-prompt-input'
 import { DEFAULT_IMAGE_MODEL, resolveImageEndpoint } from '@/lib/image-models'
 import { CHARACTER_VIEW_COLUMNS } from '@/types/asset'
@@ -49,6 +50,8 @@ interface DraftAppearanceRow {
   appearance: string | null
   costume?: string[] | string | null
   sheet_url: string | null
+  /** #image-to-artist: 사용자가 올린 원본(시트의 출처). 있으면 정체성 참조로 넣는다. */
+  derived_from_url?: string | null
 }
 
 interface DraftLocationRow extends LocationRowForWorldPrompt {
@@ -97,7 +100,7 @@ export async function triggerCharacterDrafts(
         .eq('project_id', projectId),
       supabaseAdmin
         .from('character_appearances')
-        .select('character_id, appearance_key, appearance, costume, sheet_url')
+        .select('character_id, appearance_key, appearance, costume, sheet_url, derived_from_url')
         .eq('project_id', projectId)
         .eq('is_default', true),
       supabaseAdmin
@@ -178,12 +181,21 @@ export async function triggerCharacterDrafts(
           designTokens: designTokens as unknown as SheetDesignTokens,
           hasAnchor: !!anchor,
         })
-        const prompt = buildCharacterTurnaroundPrompt(promptInput)
+        // #image-to-artist: 사용자가 올린 원본(derived_from_url)이 있으면 시트의 정체성 참조로 넣는다(버튼 경로와 같은 규칙).
+        const sourceImageUrl =
+          typeof defaultAppearance.derived_from_url === 'string' && defaultAppearance.derived_from_url ? defaultAppearance.derived_from_url : null
+        const prompt = buildCharacterTurnaroundPrompt(promptInput, { hasSourceImage: !!sourceImageUrl })
         // 템플릿은 스토리지에서 (template-asset.ts 주석 참고).
         const templateUrl = await templateAssetUrl('character-template.png')
         // 모델 = Artist 기본(레지스트리) — 템플릿이 있으면 edit 갈래, 없으면 T2I 폴백.
+        //   템플릿이 첫 장(레이아웃 기준), 그 뒤가 정체성 이미지(출처 원본). 순서가 뒤바뀌면 모델이 원본을 레이아웃으로 오인한다.
         let submitOpts: FalImageOptions = templateUrl
-          ? { model: resolveImageEndpoint(DEFAULT_IMAGE_MODEL, true).endpoint, prompt, reference_image_urls: [templateUrl], webhookUrl }
+          ? {
+              model: resolveImageEndpoint(DEFAULT_IMAGE_MODEL, true).endpoint,
+              prompt,
+              reference_image_urls: [templateUrl, ...sheetIdentityReferences({ sourceImageUrl })],
+              webhookUrl,
+            }
           : { model: resolveImageEndpoint(DEFAULT_IMAGE_MODEL, false).endpoint, prompt, aspect_ratio: '3:2', webhookUrl }
         if (anchor) {
           const { webhookUrl: wh, ...anchorable } = submitOpts

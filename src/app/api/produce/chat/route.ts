@@ -3,6 +3,7 @@ import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
 import { buildProducerSystem } from './system-prompt'
+import { imageCardFillDirective, preservedScriptDirective } from './preserve-context'
 import { parseExtractedSettings } from '@/lib/parse-extracted-settings'
 import { parseChatChoices } from '@/lib/chat-choices'
 import { castMentions, backgroundMentions } from '@/lib/card-mention'
@@ -60,6 +61,8 @@ export async function POST(req: Request) {
       attachmentImageUrls,
       projectId,
       traceId: requestedTraceId,
+      preserveScript,
+      cardFill,
     } = await req.json()
 
     if (!message || typeof message !== 'string') {
@@ -116,6 +119,9 @@ export async function POST(req: Request) {
     const contextParts: string[] = []
     if (storyText) {
       contextParts.push(`[Current Story Text]\n${storyText}`)
+      // #script-preserve: 보존 중인 대본은 다시 쓰지 말라고 알린다(클라 가드가 최종 방어).
+      const preserved = preservedScriptDirective(preserveScript)
+      if (preserved) contextParts.push(preserved)
     }
     if (attachments.urls.length > 0) {
       // 모델이 고를 medium 후보 — 저장 라우트가 검증에 쓰는 목록과 같은 출처여야 한다.
@@ -133,6 +139,9 @@ export async function POST(req: Request) {
         }`,
       )
     }
+    // #image-to-artist: 카드 채우기 턴 — 그 카드 하나만(클라 coerceCardFill 이 최종 방어).
+    const cardDirective = imageCardFillDirective(cardFill)
+    if (cardDirective) contextParts.push(cardDirective)
     if (currentSettings) {
       contextParts.push(
         `[Current Project Settings]\n${JSON.stringify(currentSettings)}`,

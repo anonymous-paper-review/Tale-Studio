@@ -24,6 +24,8 @@ export type PendingProposalKind =
   // 약속 E3(2026-09-04): "영상 다 만들어줘" — 버튼 확인창과 같은 숫자(만들 영상 수·필요한 Take·가진 Take)를 보이고 승인 뒤 runVideoBatch.
   | 'directorGenerateVideoBatch'
   | 'writerShrinkDialogue'
+  // #script-preserve(2026-09-17): 붙여 넣은 글이 대본이면 "그대로 보존할까요" — 승인 = 보존, 거절 = 종전대로 각색.
+  | 'producerPreserveScript'
 
 export interface PendingProposal {
   id: string

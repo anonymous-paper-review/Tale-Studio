@@ -1586,4 +1586,45 @@ export const KO: Record<string, string> = {
   'Chat language switched to {lang}': '채팅 언어를 {lang}로 바꿨어요',
   English: '영어',
   Korean: '한국어',
+  // 대본 보존 관문 (#script-preserve, 2026-09-17) — Producer 채팅에 붙여 넣은 글이 대본이면 먼저 묻는다
+  screenplay: '시나리오', // copy-ok: fragment
+  'stage play': '희곡', // copy-ok: fragment
+  'radio drama': '라디오 드라마', // copy-ok: fragment
+  'This text looks like a {kind}.': '이 글은 {kind}로 보여요.',
+  'Keep the script as written: scenes, characters and dialogue stay unchanged.': '대본을 그대로 보존해요. 씬, 인물, 대사를 바꾸지 않아요.',
+  'Scenes: {n}': '씬 {n}개',
+  'Locations: {n}': '배경 {n}곳',
+  'Characters: {n}': '인물 {n}명',
+  'stage directions {n}': '지문 {n}개', // copy-ok: fragment
+  'camera and transition cues {n}': '카메라·전환 지시 {n}개', // copy-ok: fragment
+  'sound cues {n}': '소리 지시 {n}개', // copy-ok: fragment
+  'Also kept as written: {items}': '함께 그대로 실려요: {items}',
+  'Dialogue lines: {n}': '대사 {n}줄',
+  'Decline to use it as reference only. The Writer will adapt it as before.': '거절하면 참고 자료로만 써요. Writer가 종전처럼 각색해요.',
+  'This looks like a {kind}. Should I keep it exactly as written, or use it as reference for a new story?':
+    '{kind}로 보이네요. 이 글을 그대로 보존할까요, 아니면 참고 자료로 삼아 새 이야기를 만들까요?',
+  'Got it. I will keep the script exactly as written. Scenes, characters and dialogue will not be rewritten.':
+    '네, 대본을 그대로 보존할게요. 씬, 인물, 대사는 다시 쓰지 않아요.',
+  'Keep my script exactly as written. Do not rewrite or summarize it. Fill in only the cast, background and project setting cards it supports.':
+    '제 대본을 그대로 보존해 주세요. 다시 쓰거나 요약하지 마세요. 대본이 뒷받침하는 인물, 배경, 프로젝트 설정 카드만 채워 주세요.',
+  'Use my text as reference material and draft a new story from it.': '이 글을 참고 자료로 삼아 새 이야기를 만들어 주세요.',
+  'Keep as written': '그대로 보존',
+  'Use as reference only': '참고 자료로만',
+  // 그림 역할 관문 (#image-to-artist, 2026-09-17) — Producer 채팅에 올린 그림의 쓰임새를 먼저 정한다
+  'Reference only': '참고 자료만',
+  'Use it as a character': '인물로 써 주세요',
+  'Use it as a background': '배경으로 써 주세요',
+  'Use it as reference only': '참고 자료로만 써 주세요',
+  'How should I use this picture? ({name})': '이 그림을 어떻게 쓸까요? ({name})',
+  'Picture {i} of {n}: {name}. How should I use it?': '그림 {i}/{n}: {name}. 어떻게 쓸까요?',
+  'Please choose first how to use the picture: character, background or reference.': '먼저 이 그림을 어떻게 쓸지 골라 주세요. 인물, 배경, 참고 자료 중 하나예요.',
+  'Added a character card with {name}. I will fill in the appearance from the picture.': '{name}(으)로 인물 카드를 만들었어요. 그림을 보고 외형을 채울게요.',
+  'Added a background card with {name}. I will fill in the description from the picture.': '{name}(으)로 배경 카드를 만들었어요. 그림을 보고 설명을 채울게요.',
+  'The attached picture is the character on card @{label}. Look at it and fill in only that card: a detailed appearance, and the name if it is obvious from the picture. Do not write a story.':
+    '첨부한 그림은 @{label} 카드의 인물이에요. 그림을 보고 그 카드만 채워 주세요. 외형은 자세히, 이름은 그림에서 분명할 때만요. 이야기는 만들지 마세요.',
+  'The attached picture is the background on card @{label}. Look at it and fill in only that card: a name for the place, a detailed visual description, and its purpose in a story. Do not write a story.':
+    '첨부한 그림은 @{label} 카드의 배경이에요. 그림을 보고 그 카드만 채워 주세요. 장소 이름, 자세한 시각 설명, 이야기에서의 용도요. 이야기는 만들지 마세요.',
+  'The user said: {text}': '사용자의 말: {text}',
+  'Original picture': '원본 그림',
+  'The sheet follows this picture': '시트는 이 그림을 따라 만들어요',
 }
