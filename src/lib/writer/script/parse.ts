@@ -37,6 +37,8 @@ export interface ScriptCharacter {
   name: string; // 정본 이름(설명 목록에 있으면 그 이름, 없으면 큐 이름)
   aliases: string[]; // 큐에 쓰인 다른 표기(예: MAYA ← MAYA RIVAS, 양수 ← 강양수)
   description?: string; // 인물 설정(character breakdown) 본문
+  /** 큐 줄의 괄호 메모 중 확장(V.O./O.S./CONT'D)이 아닌 것 — "제프 (보안요원)". 대사 지시가 아니라 인물 메모다(2026-09-21). */
+  notes?: string[];
   line_count: number;
 }
 
@@ -129,6 +131,8 @@ interface CueMatch {
   name: string;
   extension?: string;
   parenthetical?: string;
+  /** 큐 줄의 괄호 중 확장이 아닌 것(역할·별칭 메모) — 인물에 남기고 대사에는 붙이지 않는다(2026-09-21 오너 결정). */
+  cueNotes?: string[];
   inlineText: string | null; // "이름: 대사" 꼴이면 같은 줄의 대사, 아니면 null
 }
 
@@ -150,8 +154,8 @@ function matchCapsCue(line: string, next: string | undefined, known?: (name: str
   if (parseHeading(next) || TRANSITION_RE.test(next) || (!hasLower(next) && CAPS_CUE_RE.test(next) && !PARENTHETICAL_RE.test(next))) return null;
   const exts = [...(m[2] ?? '').matchAll(/\(([^)]{1,30})\)/g)].map((x) => x[1].trim());
   const extension = exts.find((e) => EXTENSION_RE.test(`(${e})`));
-  const parenthetical = exts.filter((e) => e !== extension).join(' / ') || undefined;
-  return { name, extension: extension?.replace(/\s+/g, '').replace(/^VO$/i, 'V.O.').replace(/^OS$/i, 'O.S.'), parenthetical, inlineText: null };
+  const cueNotes = exts.filter((e) => e !== extension);
+  return { name, extension: extension?.replace(/\s+/g, '').replace(/^VO$/i, 'V.O.').replace(/^OS$/i, 'O.S.'), cueNotes: cueNotes.length ? cueNotes : undefined, inlineText: null };
 }
 
 /** "이름: 대사" / "이름 (지문): 대사" / "**이름:** 대사" / "**이름** (지문) 대사" */
@@ -172,10 +176,9 @@ function matchColonCue(line: string): CueMatch | null {
   if (parseHeading(line) || ON_SCREEN_RE.test(line) || SOUND_LABEL_RE.test(line)) return null;
   const exts = [...(m[2] ?? '').matchAll(/\(([^)]{1,40})\)/g)].map((x) => x[1].trim());
   const extension = exts.find((e) => EXTENSION_RE.test(`(${e})`));
-  const pre = exts.filter((e) => e !== extension);
+  const cueNotes = exts.filter((e) => e !== extension);
   const { parenthetical, text } = splitLeadingParenthetical(m[3]);
-  const par = [...pre, ...(parenthetical ? [parenthetical] : [])].join(' / ') || undefined;
-  return { name, extension, parenthetical: par, inlineText: text };
+  return { name, extension, parenthetical, cueNotes: cueNotes.length ? cueNotes : undefined, inlineText: text };
 }
 
 /** 한국어 이름만 있는 큐 줄("리로이" / "엘레나 리바스") — 다음 줄이 대사·괄호 지시이고 이름을 이미 알 때만. */
@@ -189,7 +192,9 @@ function matchKoreanNameCue(line: string, next: string | undefined, known: (name
   const nx = stripMd(next);
   if (parseHeading(nx) || isActHeading(nx) || TRANSITION_RE.test(nx)) return null;
   const exts = [...(m[2] ?? '').matchAll(/\(([^)]{1,30})\)/g)].map((x) => x[1].trim());
-  return { name, parenthetical: exts.join(' / ') || undefined, inlineText: null };
+  const extension = exts.find((e) => EXTENSION_RE.test(`(${e})`));
+  const cueNotes = exts.filter((e) => e !== extension);
+  return { name, extension: extension?.replace(/\s+/g, '').replace(/^VO$/i, 'V.O.').replace(/^OS$/i, 'O.S.'), cueNotes: cueNotes.length ? cueNotes : undefined, inlineText: null };
 }
 
 /** 체호프 구텐베르크 꼴 "POPOVA. [Looking at the window] It isn't right…" — 대문자 이름 + 마침표 + 같은 줄 대사. */
@@ -286,6 +291,7 @@ interface CharacterDraft {
   name: string;
   description?: string;
   aliases: Set<string>;
+  notes?: Set<string>;
   line_count: number;
 }
 
@@ -348,6 +354,11 @@ export function parseScript(text: string): ScriptDocument | null {
   const frontLines: string[] = [];
   let sceneCounter = 0;
 
+  const noteChar = (d: CharacterDraft, notes?: string[]) => {
+    if (!notes?.length) return;
+    d.notes ??= new Set();
+    for (const n of notes) d.notes.add(n);
+  };
   const ensureChar = (rawCue: string): CharacterDraft => {
     const am = rawCue.match(/^(.+?)\s*[(（]([A-Za-z .'’\-]+)[)）]\s*$/);
     const cueName = am ? am[1].trim() : rawCue.trim();
@@ -418,6 +429,23 @@ export function parseScript(text: string): ScriptDocument | null {
     else if (el.type === 'transition') stats.transitions++;
     else if (el.type === 'sound') stats.sound++;
     else if (el.type === 'on_screen') stats.on_screen++;
+  };
+  // 대사 토막(2026-09-21 오너 결정): 지시가 본문 뒤에 오면 앞 토막을 닫고 새 토막을 연다 — 원문의 읽는 순서를 지킨다.
+  //   앞머리 지시(본문 전)는 첫 토막에 붙는다. 큐 줄 지시(cueNotes)는 인물 메모라 여기 오지 않는다.
+  type Seg = { pars: string[]; body: string[] };
+  const newSegs = (leading: string[] = []): Seg[] => [{ pars: [...leading], body: [] }];
+  const segNote = (segs: Seg[], par: string) => {
+    const last = segs[segs.length - 1];
+    if (last.body.length) segs.push({ pars: [par], body: [] }); else last.pars.push(par);
+  };
+  const segBody = (segs: Seg[], t: string) => { segs[segs.length - 1].body.push(t); };
+  const pushSegs = (d: CharacterDraft, segs: Seg[], extension?: string) => {
+    const filled = segs.filter((g) => g.body.length || g.pars.length);
+    if (!filled.length) return;
+    for (const g of filled) {
+      pushEl({ type: 'dialogue', character: d.name, character_id: '', text: g.body.join('\n'), parenthetical: g.pars.join(' / ') || undefined, extension });
+    }
+    d.line_count++;
   };
   const emitSounds = (actionText: string) => {
     const found = new Set<string>();
@@ -500,27 +528,28 @@ export function parseScript(text: string): ScriptDocument | null {
     if (sl && !hasLower(sl[1])) { pushEl({ type: 'sound', text: sl[2]?.trim() || s }); i++; continue; }
     const cm = s.match(CAMERA_RE);
     if (cm && !hasLower(cm[1])) { pushEl({ type: 'camera', text: s }); i++; continue; } // 지시어 자체가 대문자일 때만("the camera pulls back" 같은 지문은 제외)
-    // 대사: "이름: 대사" 꼴
-    const colon = matchColonCue(s);
+    // 대사: "이름: 대사" 꼴. 촬영용 대본의 첫 씬 헤딩 앞(앞머리)에서는 대사로 보지 않는다 — 번역 메모("번역 표기: …")가
+    //   가짜 인물·가짜 첫 대사가 됐던 실측(2026-09-21 script_test_2). 그 줄은 아래 지문 경로로 떨어져 앞머리 노트가 된다.
+    const colon = kind === 'screenplay' && !cur ? null : matchColonCue(s);
     if (colon) {
       const d = ensureChar(colon.name);
-      let textBody = colon.inlineText ?? '';
-      // 같은 줄에 대사가 없으면(라디오 "NAME:" 꼴) 다음 줄들이 대사
+      noteChar(d, colon.cueNotes);
+      const segs = newSegs(colon.parenthetical ? [colon.parenthetical] : []);
       let j = i + 1;
-      const extra: string[] = [];
-      const pars: string[] = colon.parenthetical ? [colon.parenthetical] : [];
-      if (!textBody) {
+      if (colon.inlineText) {
+        segBody(segs, colon.inlineText);
+      } else {
+        // 같은 줄에 대사가 없으면(라디오 "NAME:" 꼴) 다음 줄들이 대사
         while (j < lines.length && !isBlank(lines[j]) && !parseHeading(stripMd(lines[j])) && !matchColonCue(stripMd(lines[j])) && !TRANSITION_RE.test(stripMd(lines[j])) && !RADIO_CUE_RE.test(stripMd(lines[j]))) {
           const t = stripMd(lines[j]);
           const p = t.match(PARENTHETICAL_RE);
-          if (p) pars.push(p[1].trim()); else extra.push(t);
+          if (p) segNote(segs, p[1].trim()); else segBody(segs, t);
           j++;
         }
-        textBody = extra.join('\n');
       }
-      pushEl({ type: 'dialogue', character: d.name, character_id: '', text: textBody, parenthetical: pars.join(' / ') || undefined, extension: colon.extension });
-      d.line_count++;
-      i = textBody && !colon.inlineText ? j : i + 1;
+      const hasBody = segs.some((g) => g.body.length);
+      pushSegs(d, segs, colon.extension);
+      i = hasBody && !colon.inlineText ? j : i + 1;
       continue;
     }
     // 대사: "NAME. 대사" (체호프 구텐베르크 꼴)
@@ -539,18 +568,17 @@ export function parseScript(text: string): ScriptDocument | null {
     const koCue = matchKoreanNameCue(s, lines[i + 1], knownForCue);
     if (koCue) {
       const d = ensureChar(koCue.name);
+      noteChar(d, koCue.cueNotes);
       let j = i + 1;
-      const body: string[] = [];
-      const pars: string[] = koCue.parenthetical ? [koCue.parenthetical] : [];
+      const segs = newSegs();
       while (j < lines.length && !isBlank(lines[j])) {
         const t = stripMd(lines[j]);
         if (parseHeading(t) || TRANSITION_RE.test(t) || matchKoreanNameCue(t, lines[j + 1], knownForCue)) break;
         const p = t.match(PARENTHETICAL_RE);
-        if (p) pars.push(p[1].trim()); else body.push(t);
+        if (p) segNote(segs, p[1].trim()); else segBody(segs, t);
         j++;
       }
-      pushEl({ type: 'dialogue', character: d.name, character_id: '', text: body.join('\n'), parenthetical: pars.join(' / ') || undefined });
-      d.line_count++;
+      pushSegs(d, segs, koCue.extension);
       i = j;
       continue;
     }
@@ -563,28 +591,33 @@ export function parseScript(text: string): ScriptDocument | null {
     }
     if (caps) {
       const d = ensureChar(caps.name);
+      noteChar(d, caps.cueNotes);
       let j = i + 1 + gap;
-      const body: string[] = [];
-      const pars: string[] = caps.parenthetical ? [caps.parenthetical] : [];
+      const segs = newSegs();
       let openParen = false;
       for (;;) {
         if (j >= lines.length) break;
         if (isBlank(lines[j])) {
           // 빈 줄: gap 꼴에서는 괄호 블록 뒤 한 번 더 이어 읽고, 그 밖에는 대사 끝
-          if (gap && body.length === 0 && lines[j + 1] !== undefined && !isBlank(lines[j + 1]) && !matchCapsCue(stripMd(lines[j + 1]), lines[j + 2]) && !parseHeading(stripMd(lines[j + 1]))) { j++; continue; }
+          if (gap && !segs.some((g) => g.body.length) && lines[j + 1] !== undefined && !isBlank(lines[j + 1]) && !matchCapsCue(stripMd(lines[j + 1]), lines[j + 2]) && !parseHeading(stripMd(lines[j + 1]))) { j++; continue; }
           break;
         }
         const t = stripMd(lines[j]);
         if (parseHeading(t) || TRANSITION_RE.test(t)) break;
-        if (openParen) { const end = t.match(/^(.*?)\)\s*$/); if (end) { pars[pars.length - 1] += ' ' + end[1].trim(); openParen = false; } else pars[pars.length - 1] += ' ' + t; j++; continue; }
+        if (openParen) {
+          const last = segs[segs.length - 1].pars;
+          const end = t.match(/^(.*?)\)\s*$/);
+          if (end) { last[last.length - 1] += ' ' + end[1].trim(); openParen = false; } else last[last.length - 1] += ' ' + t;
+          j++;
+          continue;
+        }
         const p = t.match(PARENTHETICAL_RE);
-        if (p) pars.push(p[1].trim());
-        else if (/^\(/.test(t) && !/\)\s*$/.test(t)) { pars.push(t.replace(/^\(/, '').trim()); openParen = true; } // 여러 줄 괄호 지시
-        else body.push(t);
+        if (p) segNote(segs, p[1].trim());
+        else if (/^\(/.test(t) && !/\)\s*$/.test(t)) { segNote(segs, t.replace(/^\(/, '').trim()); openParen = true; } // 여러 줄 괄호 지시
+        else segBody(segs, t);
         j++;
       }
-      pushEl({ type: 'dialogue', character: d.name, character_id: '', text: body.join('\n'), parenthetical: pars.join(' / ') || undefined, extension: caps.extension });
-      d.line_count++;
+      pushSegs(d, segs, caps.extension);
       i = j;
       continue;
     }
@@ -608,7 +641,7 @@ export function parseScript(text: string): ScriptDocument | null {
   flushSection();
 
   // 인물 정본 확정 + character_id 부여
-  const characters: ScriptCharacter[] = drafts.map((d, idx) => ({ id: slugify(d.name, idx + 1), name: d.name, aliases: [...d.aliases], description: d.description, line_count: d.line_count }));
+  const characters: ScriptCharacter[] = drafts.map((d, idx) => ({ id: slugify(d.name, idx + 1), name: d.name, aliases: [...d.aliases], description: d.description, ...(d.notes?.size ? { notes: [...d.notes] } : {}), line_count: d.line_count }));
   const idByName = new Map<string, string>();
   characters.forEach((c) => { idByName.set(c.name, c.id); c.aliases.forEach((a) => idByName.set(a, c.id)); });
   for (const sc of scenes) {

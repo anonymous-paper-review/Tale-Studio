@@ -404,6 +404,8 @@ export interface StoryScene {
   scene_actions: string[]; // 씬에서 일어나는 주요 액션들 (분할 전)
   /** #script-preserve 2026-09-17: 대본 보존 모드로 만든 씬의 출처. generated_fields 는 대본에 없어 새로 채운 칸("추가됨"). */
   provenance?: { source: 'script'; generated_fields: string[] };
+  /** #script-preserve(2026-09-21): 대본에서 옮긴 씬의 화면 요약 = 대본의 첫 지문. 모델 요약(dialogue_summary) 대신 이것이 앞에 선다. */
+  source_summary?: string;
   /** #script-preserve: 대본 원문의 카메라·편집·화면 문자·소리 지시(순서대로). 비트에는 섞지 않는다 — V축이 다시 정하는 영역. */
   source_directions?: string[];
 }

@@ -32,6 +32,12 @@ function roleFromDescription(desc: string | undefined): CastContractCharacter['r
 }
 
 /** 인물 설정 + 큐에서 나온 인물 → producer 캐스트 계약. 새 인물을 만들지 않는다. */
+/** 씬 카드·DB 요약 자리에 쓰는 글 — 대본에서 옮긴 씬은 대본의 첫 지문, 그 밖은 종전대로 모델 요약(dialogue_summary → purpose). */
+export function sceneSummaryText(sc: Pick<StoryScene, 'provenance' | 'source_summary' | 'dialogue_summary' | 'purpose'>): string {
+  if (sc.provenance?.source === 'script' && sc.source_summary) return sc.source_summary;
+  return sc.dialogue_summary || sc.purpose || '';
+}
+
 export function castFromScript(doc: ScriptDocument): CastContract {
   return {
     characters: doc.characters.map((c) => ({
@@ -39,7 +45,7 @@ export function castFromScript(doc: ScriptDocument): CastContract {
       name: c.name,
       entity_type: 'person',
       role: roleFromDescription(c.description),
-      appearance: c.description ?? '',
+      appearance: c.description ?? (c.notes?.length ? c.notes.join(', ') : ''),
     })),
   };
 }
@@ -118,6 +124,8 @@ export function scenesFromScript(doc: ScriptDocument, opts: ScenesFromScriptOpti
       scene_actions: beats,
       provenance: { source: 'script', generated_fields: [...SCRIPT_GENERATED_FIELDS] },
       ...(directions.length ? { source_directions: directions } : {}),
+      // 화면 요약 자리(2026-09-21 오너 결정): 모델 요약이 아니라 대본의 첫 지문. 지문이 없으면 헤딩.
+      source_summary: sc.elements.find((e) => e.type === 'action')?.text ?? sc.heading,
     };
   });
   return {
@@ -239,7 +247,7 @@ export function reconcileCastWithScript(doc: ScriptDocument, cast?: CastContract
     if (hit) idMap.set(c.id, hit.character_id);
     else if (!base.characters.some((k) => k.character_id === c.id)) {
       idMap.set(c.id, c.id);
-      appended.push({ character_id: c.id, name: c.name, entity_type: 'person', role: roleFromDescription(c.description), appearance: c.description ?? '' });
+      appended.push({ character_id: c.id, name: c.name, entity_type: 'person', role: roleFromDescription(c.description), appearance: c.description ?? (c.notes?.length ? c.notes.join(', ') : '') });
     } else idMap.set(c.id, c.id);
   }
   const mapId = (id: string) => idMap.get(id) ?? id;

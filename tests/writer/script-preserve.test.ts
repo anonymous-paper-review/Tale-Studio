@@ -184,3 +184,24 @@ describe('대본 보존 — 주석 채우기', () => {
     expect(after.scenes[2].purpose).toBe('revelation')
   })
 })
+
+// 2026-09-21 오너 결정 — 씬 카드의 요약이 모델 요약(영어→한국어 재번역, "보스급 인물…")이라 보존한 대본에 어울리지 않았다.
+describe('대본에서 옮긴 씬의 화면 요약', () => {
+  // 왜: 요약 자리는 사람이 씬을 알아보는 첫 줄이다. 대본이 있는데 모델이 지어낸 요약이 앞에 서면 "원문과 다르다"로 읽힌다.
+  it('대본에서 옮긴 씬의 요약 자리에는 모델 요약 대신 대본의 첫 지문을 쓴다', async () => {
+    const doc = parseScript(SCRIPT)!
+    const { scenes } = scenesFromScript(doc)
+    const s1 = scenes[0]
+    expect(s1.source_summary).toMatch(/^KAIA, RODNEY, SPENCER, and LUIS talk/)
+    const { sceneSummaryText } = await import('@/lib/writer/script/preserve')
+    // 주석기가 요약을 채워도 대본 씬은 첫 지문이 요약이다.
+    expect(sceneSummaryText({ ...s1, dialogue_summary: 'Friends argue over dinner.' })).toMatch(/^KAIA, RODNEY/)
+    // 대본이 아닌 씬은 종전대로 모델 요약.
+    expect(sceneSummaryText({ ...s1, provenance: undefined, source_summary: undefined, dialogue_summary: 'Friends argue over dinner.' })).toBe('Friends argue over dinner.')
+    // 화면·DB 로 가는 두 길이 같은 함수를 쓴다.
+    const { adaptScenes } = await import('@/lib/writer/adapters')
+    expect(adaptScenes({ scenes: [{ ...s1, dialogue_summary: 'Friends argue over dinner.' }], total_estimated_seconds: 0, coverage_mode: 'honest' })[0].narrativeSummary).toMatch(/^KAIA, RODNEY/)
+    const { readFileSync } = await import('node:fs')
+    expect(readFileSync('src/lib/writer/pipeline/util/persist_manifest.ts', 'utf8')).toMatch(/sceneSummaryText\(/)
+  })
+})

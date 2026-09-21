@@ -14,6 +14,7 @@ import type {
   LightingConfig,
   GenerationMethod,
 } from '@/types';
+import { sceneSummaryText } from '@/lib/writer/script/preserve';
 import type {
   Characters,
   Scenes,
@@ -65,7 +66,7 @@ export function adaptCharacters(characters: Characters): Character[] {
 export function adaptScenes(scenes: Scenes): Scene[] {
   return scenes.scenes.map((sc) => ({
     sceneId: writerSceneIdToMain(sc.scene_id),
-    narrativeSummary: sc.dialogue_summary ?? sc.purpose ?? '',
+    narrativeSummary: sceneSummaryText(sc),
     originalTextQuote: sc.scene_actions?.join(' ') ?? '',
     location: sc.location ?? '',
     timeOfDay: sc.time_of_day ?? '',

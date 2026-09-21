@@ -15,6 +15,7 @@ import type { Json } from '@/types/database'
 import { humanizeSlug } from '@/lib/display-name'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { writerSceneIdToMain, writerShotIdToMain } from '@/lib/writer/adapters'
+import { sceneSummaryText } from '@/lib/writer/script/preserve'
 import {
   AppearanceSelectionError,
   resolveCharacterAppearance,
@@ -239,7 +240,7 @@ export async function persistAssetsToDb(
     // 언어 경계(S3): 파이프라인 산출 자유서술(narrative/mood) → EN base 파생(이미 영어면 skip). 표시는 _native.
     const sRowsAll = scenes.scenes.map((sc, i) => ({
       id: writerSceneIdToMain(sc.scene_id),
-      narrativeNative: sc.dialogue_summary ?? sc.purpose ?? '',
+      narrativeNative: sceneSummaryText(sc), // 대본에서 옮긴 씬은 첫 지문(2026-09-21)
       moodNative: `${sc.emotion_beat?.start ?? ''} → ${sc.emotion_beat?.end ?? ''}`,
       quote: (sc.scene_actions ?? []).join(' '),
       location: sc.location ?? '',

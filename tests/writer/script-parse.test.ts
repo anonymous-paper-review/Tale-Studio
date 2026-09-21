@@ -149,17 +149,20 @@ describe('촬영용 대본 파싱', () => {
   it('인물 큐 아래 줄이 대사가 되고 괄호 줄은 그 대사의 지시가 되며, (O.S.) 같은 확장은 이름에서 떼어 둔다', () => {
     const s1 = doc.scenes[0]
     const lines = s1.elements.filter((e) => e.type === 'dialogue')
-    expect(lines.map((l) => l.type === 'dialogue' && l.character)).toEqual(['JEFF', 'ELENA RIVAS'])
+    expect(lines.map((l) => l.type === 'dialogue' && l.character)).toEqual(['JEFF', 'ELENA RIVAS', 'ELENA RIVAS'])
     expect(lines[0].type === 'dialogue' && lines[0].extension).toBe('O.S.')
-    expect(lines[1].type === 'dialogue' && lines[1].parenthetical).toBe('switching tone')
-    expect(lines[1].type === 'dialogue' && lines[1].text).toBe("Guys, c'mon, turn off the TV.\nAnd I need the stairwell footage from November 22, Wing B.")
+    // 2026-09-21: 대사 중간의 괄호 지시는 토막을 나눈다 — 앞 토막은 지시 없이, 뒤 토막이 지시를 갖는다.
+    expect(lines[1].type === 'dialogue' && lines[1].parenthetical).toBeUndefined()
+    expect(lines[1].type === 'dialogue' && lines[1].text).toBe("Guys, c'mon, turn off the TV.")
+    expect(lines[2].type === 'dialogue' && lines[2].parenthetical).toBe('switching tone')
+    expect(lines[2].type === 'dialogue' && lines[2].text).toBe('And I need the stairwell footage from November 22, Wing B.')
   })
 
   // 왜: 카메라·트랜지션·화면 문자·효과음은 우리 V축·러프 경로와 충돌하는 요소라 종류별로 갈라 둬야 보존/표시를 정할 수 있다.
   it('지문·카메라·트랜지션·화면 문자·소리는 종류별로 갈라진다', () => {
     const types = (i: number) => doc.scenes[i].elements.map((e) => e.type)
-    // 빈 줄 없이 이어진 지문 두 줄은 한 문단(한 덩이)이다.
-    expect(types(0)).toEqual(['action', 'dialogue', 'action', 'dialogue'])
+    // 빈 줄 없이 이어진 지문 두 줄은 한 문단(한 덩이)이다. 엘레나의 대사는 중간 지시로 두 토막(2026-09-21).
+    expect(types(0)).toEqual(['action', 'dialogue', 'action', 'dialogue', 'dialogue'])
     expect(doc.scenes[1].elements.some((e) => e.type === 'sound' && /DING/.test(e.text))).toBe(true)
     expect(doc.scenes[1].elements.some((e) => e.type === 'transition' && /CUT TO/.test(e.text))).toBe(true)
     expect(doc.scenes[2].elements.some((e) => e.type === 'camera' && /PUSH IN/.test(e.text))).toBe(true)
@@ -184,7 +187,8 @@ describe('촬영용 대본 파싱', () => {
     const all = doc.scenes.flatMap((s) => s.elements).filter((e) => e.type === 'dialogue').map((e) => (e.type === 'dialogue' ? e.text : ''))
     expect(all).toEqual([
       "Oh, man… it's getting messy outside.",
-      "Guys, c'mon, turn off the TV.\nAnd I need the stairwell footage from November 22, Wing B.",
+      "Guys, c'mon, turn off the TV.",
+      'And I need the stairwell footage from November 22, Wing B.',
       'I heard the song. I thought… maybe it was my toy.',
     ])
   })
@@ -218,5 +222,128 @@ describe('무대 희곡 파싱', () => {
     const names = doc.characters.map((c) => c.name)
     expect(names).toEqual(expect.arrayContaining(['강양수', '강애경', '수연']))
     expect(doc.characters.find((c) => c.name === '강양수')!.line_count).toBe(2)
+  })
+})
+
+// 2026-09-21 오너 결정 — 배포 첫 실전(script_test_2)에서 대사가 원문과 다르게 보인 세 가지를 약속으로 고정한다.
+//   픽스처는 감지 문턱(씬 헤딩 2개·큐 3개, 한국어 이름 큐는 두 번 이상 나와야 큐로 센다)을 넘는 실전 꼴로 둔다.
+describe('대사 주변 처리 — 실전 결함 3건', () => {
+  // 왜: 대본 파일 앞머리의 번역 메모("번역 표기: INT./EXT.는 …")가 "이름: 대사"로 읽혀 가짜 인물과 가짜 첫 대사, 가짜 시트까지 생겼다.
+  it('첫 씬 헤딩 앞의 앞머리 글에서는 "이름: 글" 꼴을 대사로 보지 않는다', () => {
+    const doc = parseScript(`# 아기 상어 (BABY SHARK)
+
+| 항목 | 값 |
+|---|---|
+| 원제 | BABY SHARK |
+
+번역 표기: INT./EXT. 는 원문대로. (O.S.) 화면 밖 목소리, (V.O.) 내레이션/전화, (CONT'D) 이어지는 대사. 전문 번역, 요약 없음.
+
+**INT. 보안실 – 낮**
+
+보안요원 둘이 여러 대의 모니터를 지켜본다.
+
+> **제프 (O.S.)**
+> 아 진짜… 밖이 난리네.
+
+> **엘레나 리바스**
+> TV 꺼.
+
+**INT. 회의실 – 낮**
+
+> **엘레나 리바스**
+> 회의 시작하죠.
+
+> **제프**
+> 네.`)!
+    expect(doc.characters.map((c) => c.name)).toEqual(['제프', '엘레나 리바스'])
+    expect(doc.scenes).toHaveLength(2)
+    const first = doc.scenes[0].elements.filter((e) => e.type === 'dialogue')
+    expect(first.map((e) => e.type === 'dialogue' && e.text)).toEqual(['아 진짜… 밖이 난리네.', 'TV 꺼.'])
+    expect(doc.stats.dialogue_lines).toBe(4)
+    // 메모는 버리지 않고 앞머리에 남는다.
+    expect(doc.front_matter.raw + doc.front_matter.notes.join('\n')).toContain('번역 표기')
+  })
+
+  // 왜: "얘들아, 제발, TV 꺼. (말투를 바꿔) 그리고 …"가 한 덩어리로 합쳐지고 지시가 끝으로 밀려 읽는 순서가 원문과 달라졌다(38줄 중 9줄).
+  it('대사 중간의 괄호 지시는 대사를 앞뒤 두 토막으로 나누고, 지시는 뒤 토막에 붙는다', () => {
+    const en = parseScript(SCREENPLAY)!
+    const elena = en.scenes[0].elements.filter((e) => e.type === 'dialogue' && e.character === 'ELENA RIVAS')
+    expect(elena).toHaveLength(2)
+    expect(elena[0].type === 'dialogue' && elena[0].text).toBe("Guys, c'mon, turn off the TV.")
+    expect(elena[0].type === 'dialogue' && elena[0].parenthetical).toBeUndefined()
+    expect(elena[1].type === 'dialogue' && elena[1].text).toBe('And I need the stairwell footage from November 22, Wing B.')
+    expect(elena[1].type === 'dialogue' && elena[1].parenthetical).toBe('switching tone')
+
+    const ko = parseScript(`**INT. 보안실 – 낮**
+
+문이 벌컥 열린다.
+
+> **엘레나 리바스**
+> 얘들아, 제발, TV 꺼.
+> (말투를 바꿔)
+> 그리고 11월 22일 B동 계단실 영상 필요해.
+
+> **제프**
+> (조용히)
+> 네.
+
+**INT. 회의실 – 낮**
+
+> **엘레나 리바스**
+> 회의 시작하죠.
+
+> **제프**
+> 네, 알겠습니다.`)!
+    const lines = ko.scenes[0].elements.filter((e) => e.type === 'dialogue')
+    expect(lines.map((l) => l.type === 'dialogue' && l.text)).toEqual(['얘들아, 제발, TV 꺼.', '그리고 11월 22일 B동 계단실 영상 필요해.', '네.'])
+    expect(lines.map((l) => l.type === 'dialogue' && l.parenthetical)).toEqual([undefined, '말투를 바꿔', '조용히'])
+    // 앞에 오는 지시는 첫 토막에 붙고(토막을 새로 열지 않는다), 토막을 나눠도 인물의 대사 횟수는 큐 수 그대로다.
+    expect(ko.characters.find((c) => c.name === '제프')!.line_count).toBe(2)
+    expect(ko.characters.find((c) => c.name === '엘레나 리바스')!.line_count).toBe(2)
+  })
+
+  // 왜: "제프 (보안요원)"의 역할 메모가 (O.S.) 같은 확장으로 취급돼 "노숙인 또 있어요? (보안요원)"으로 보였다.
+  it("큐의 괄호 중 (V.O.), (O.S.), (CONT'D)만 전달 방식이고, 그 밖의 괄호는 대사에 붙이지 않는다", () => {
+    const doc = parseScript(`INT. SECURITY ROOM – DAY
+
+JEFF (SECURITY GUARD)
+Another homeless guy?
+
+ELENA RIVAS (CONT'D)
+No… something else.
+
+JEFF (O.S.)
+A kid? On this floor?
+
+INT. HALLWAY – DAY
+
+ELENA RIVAS
+Come with me.`)!
+    const [jeff, elena, jeffOs] = doc.scenes[0].elements.filter((e) => e.type === 'dialogue')
+    expect(jeff.type === 'dialogue' && jeff.parenthetical).toBeUndefined()
+    expect(jeff.type === 'dialogue' && jeff.extension).toBeUndefined()
+    expect(elena.type === 'dialogue' && elena.extension).toBe("CONT'D")
+    expect(jeffOs.type === 'dialogue' && jeffOs.extension).toBe('O.S.')
+    // 역할 메모는 인물 쪽에 남는다.
+    expect(doc.characters.find((c) => c.name === 'JEFF')!.notes).toEqual(['SECURITY GUARD'])
+
+    const ko = parseScript(`**INT. 보안실 – 낮**
+
+> **제프 (보안요원)**
+> 노숙인 또 있어요?
+
+> **엘레나 리바스**
+> 아니.
+
+**INT. 복도 – 낮**
+
+> **제프**
+> 애요?
+
+> **엘레나 리바스**
+> 그래.`)!
+    const [l] = ko.scenes[0].elements.filter((e) => e.type === 'dialogue')
+    expect(l.type === 'dialogue' && l.parenthetical).toBeUndefined()
+    expect(ko.characters.find((c) => c.name === '제프')!.notes).toEqual(['보안요원'])
   })
 })
