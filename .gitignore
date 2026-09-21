@@ -203,3 +203,9 @@ research/experiments/_viewer.html
 /feedback/
 /runs/**
 .env*
+
+# facet 실험은 전부 로컬 전용 (2026-09-21 오너 지시) — 재포함(!**/*.md·jsonc)보다 뒤에 두어 우선한다.
+dev/Image_Style/facet_*/
+dev/Image_Style/facet_*/**
+dev/Image_Style/pipeline/
+dev/Image_Style/pipeline/**
