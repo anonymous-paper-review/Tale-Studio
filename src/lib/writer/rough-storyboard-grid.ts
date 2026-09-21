@@ -273,6 +273,8 @@ const POSITION_PHRASES: Record<string, string> = {
   right_third: 'in the right third of the frame',
   frame_edge_right: 'at the far right edge of the frame',
   off_right: 'just outside the right edge of the frame',
+  off_top: 'just above the top edge of the frame',
+  off_bottom: 'just below the bottom edge of the frame',
 }
 const FACING_PHRASES: Record<string, string> = {
   front: 'facing the camera',

@@ -268,6 +268,11 @@ function subjectIds(setup: ShotCameraSetup): string[] {
 /** 명단 규칙(2026-09-05, 오너 승인): 화면 높이 8% 미만 인물은 blocking 에서 빼고 "먼 인물"로만 서술한다. */
 export const DISTANT_APPARENT_HEIGHT = 0.08
 
+/** 프레임 밖 위치 낱말 → 한국어 방향(피사체 프레임 밖 경고 메시지용). */
+function offDirKo(word: string): string {
+  return word === 'off_bottom' ? '아래' : word === 'off_top' ? '위' : word === 'off_left' ? '왼쪽' : word === 'off_right' ? '오른쪽' : '밖'
+}
+
 export function applyStageToShots(
   shots: ShotDesign[],
   stage: SceneStage,
@@ -322,9 +327,10 @@ export function applyStageToShots(
     const tight = /^(ECU|CU|MCU|INSERT)$/i.test(String(spec.shot_type ?? ''))
     const subjectsForSight = new Set(subjectIds(setup))
     if (isOts && setup.over_shoulder_of) subjectsForSight.add(setup.over_shoulder_of)
-    // 시야 가림(타이트 샷): 피사체가 아닌 인물이 렌즈 바로 앞을 막으면 카메라 방향을 이웃 나침반으로 돌린다
-    //   (씬 축 안쪽 방향만). 실측(겨울_4 sh_01_06): 다가온 수인이 용족 MCU 의 오른쪽 절반을 가렸다.
-    if (tight && !isOts && !isPov) {
+    // 시야 가림: 피사체가 아닌 인물이 렌즈 바로 앞을 막으면(피사체보다 가깝고 크게) 카메라 방향을 이웃 나침반으로 돌린다
+    //   (씬 축 안쪽 방향만). 타이트 샷만이 아니라 넓은 샷에서도 건다(#stage 2026-09-17 — MS·MFS 전경 인물이 피사체를 가림).
+    //   실측(겨울_4 sh_01_06): 다가온 수인이 용족 MCU 의 오른쪽 절반을 가렸다. lineOfSightObstructions 가 비면 무동작이라 안전.
+    if (!isOts && !isPov) {
       const blockers = lineOfSightObstructions(startSolve.camera, states.start, subjectsForSight, aspect, startSolve.subjectDistance)
       if (blockers.length) {
         const order = COMPASS_DIRS
@@ -566,6 +572,14 @@ export function applyStageToShots(
       }
       const visible = start.in_frame || !!end?.in_frame
       const isSubject = subjects.has(id)
+      // 피사체가 시작·끝 어느 프레임에서든 밖이면 나간 방향을 담아 경고한다(#stage 2026-09-17) — 끝에서만 빠져도 잡는다.
+      if (isSubject && (!start.in_frame || (end && !end.in_frame))) {
+        const parts = [
+          !start.in_frame ? `시작 ${offDirKo(start.position_in_frame)}` : null,
+          end && !end.in_frame ? `끝 ${offDirKo(end.position_in_frame)}` : null,
+        ].filter(Boolean)
+        push('WARNING', `피사체 ${nameOf(id)} 가 프레임 밖이다(${parts.join(' · ')}) — 샷 사이즈·렌즈·방향·자세를 확인`, 'camera_setup 을 바꾸거나 무대 위치를 조정')
+      }
       const existing = listedById.get(id)
       if (!visible && !isSubject) {
         if (existing) push('INFO', `${id} 는 이 카메라에서 프레임 밖 — blocking 에서 뺐다`)
@@ -589,7 +603,6 @@ export function applyStageToShots(
         layoutChars.push({ character_id: id, start, ...(end ? { end } : {}), distant: true })
         continue
       }
-      if (!visible && isSubject) push('WARNING', `피사체 ${id} 가 프레임 밖이다 — 샷 사이즈·렌즈·방향을 확인`, 'camera_setup 을 바꾸거나 무대 위치를 조정')
       const state = states.start.find((s) => s.character_id === id)!
       if (existing) {
         blocking.push({ ...existing, position_in_frame: start.position_in_frame })

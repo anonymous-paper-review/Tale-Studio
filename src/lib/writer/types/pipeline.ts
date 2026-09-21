@@ -221,6 +221,11 @@ export interface PipelineInput {
   skip?: {
     validation1?: boolean;
   };
+  /**
+   * #script-preserve 2026-09-17: 입력 글이 대본(촬영용·무대·라디오)이고 사용자가 채팅에서 "그대로 보존"을 골랐을 때 true.
+   * 씬·인물·대사를 대본에서 그대로 만들고(재생성 없음), 대본에 없는 칸만 채워 "추가됨"으로 표시한다.
+   */
+  preserveScript?: boolean;
 }
 
 export interface WriterRerunContext {
@@ -397,6 +402,10 @@ export interface StoryScene {
   info_asymmetry: string; // "audience=character" | "audience>character" | "character>audience"
   estimated_seconds: number;
   scene_actions: string[]; // 씬에서 일어나는 주요 액션들 (분할 전)
+  /** #script-preserve 2026-09-17: 대본 보존 모드로 만든 씬의 출처. generated_fields 는 대본에 없어 새로 채운 칸("추가됨"). */
+  provenance?: { source: 'script'; generated_fields: string[] };
+  /** #script-preserve: 대본 원문의 카메라·편집·화면 문자·소리 지시(순서대로). 비트에는 섞지 않는다 — V축이 다시 정하는 영역. */
+  source_directions?: string[];
 }
 
 // 오픈 캐스트 (producer-story-gate §4): s3_scenes 가 전개상 새 인물이 필요할 때만 분리 반환.
@@ -688,7 +697,8 @@ export interface ShotCameraSetup {
 }
 
 export type ScreenPositionWord =
-  | 'off_left' | 'frame_edge_left' | 'left_third' | 'center_third' | 'right_third' | 'frame_edge_right' | 'off_right';
+  | 'off_left' | 'frame_edge_left' | 'left_third' | 'center_third' | 'right_third' | 'frame_edge_right' | 'off_right'
+  | 'off_top' | 'off_bottom';
 export type DepthBand = 'foreground' | 'midground' | 'background';
 export type FacingWord =
   | 'front' | 'three_quarter_front_left' | 'three_quarter_front_right'

@@ -18,6 +18,20 @@ import type {
 
 export const DEFAULT_CHARACTER_HEIGHT_M = 1.75
 export const DEFAULT_EYE_HEIGHT_M = 1.5
+
+/** 자세별 실효 키 배율 — 누움·앉음·무릎·웅크림은 서 있을 때보다 낮다(프레임 점유·시선 높이 공통 기준). */
+export function postureHeightFactor(posture: string | undefined | null): number {
+  return posture === 'lying'
+    ? 0.35
+    : posture === 'sitting' || posture === 'kneeling' || posture === 'crouching'
+      ? 0.65
+      : 1
+}
+
+/** 인물의 실효 키(m) — height_m 에 자세 배율을 곱한다. */
+export function effectiveCharacterHeight(state: { height_m?: number | null; posture?: string | null }): number {
+  return (state.height_m ?? DEFAULT_CHARACTER_HEIGHT_M) * postureHeightFactor(state.posture)
+}
 const SENSOR_HALF_WIDTH_MM = 18
 const EPS = 1e-6
 /** 축을 넘도록 물러설 때의 여유 — 축 위 인물이 프레임 가장자리에 들어올 만한 거리. */
@@ -229,6 +243,17 @@ export function solveCamera(input: SolveCameraInput): SolvedCamera {
     ? { x: pts.reduce((a, p) => a + p.x, 0) / pts.length, y: pts.reduce((a, p) => a + p.y, 0) / pts.length }
     : { x: 0, y: 0 }
   const subjectHeight = pts.length ? pts.reduce((a, p) => a + p.height, 0) / pts.length : DEFAULT_CHARACTER_HEIGHT_M
+  // 자세 반영 시선 높이(#stage 2026-09-17): 웅크림·앉음·누움 피사체는 실효 키가 낮다 — 시선(look_at)과 눈높이를
+  //   그 키에 맞춰 프레임 아래로 빠지지 않게 한다. 피사체가 프레임을 많이 채우는 미디엄 이상(ratio≥0.7: MS·MCU·CU·ECU)
+  //   에서만 건다 — 풀·와이드는 인물을 머리부터 발끝까지 담아 안 빠지고, 자세로 시선을 내리면 도약(derive_end) 여유가 준다.
+  //   서 있는 피사체는 배율 1 이라 값·거동이 그대로다(표지는 자기 높이 유지, 실측 30/31 이 ratio≥0.7 샷).
+  const tightAim = lookAtHeightRatio(input.shotType) >= 0.7
+  const aimHeight = pts.length
+    ? pts.reduce((a, p) => {
+        const st = states.find((s) => s.character_id === p.id)
+        return a + (st ? (st.height_m ?? DEFAULT_CHARACTER_HEIGHT_M) * (tightAim ? postureHeightFactor(st.posture) : 1) : p.height)
+      }, 0) / pts.length
+    : DEFAULT_CHARACTER_HEIGHT_M
   // 여러 피사체(그룹)는 서로 벌어진 만큼 더 물러선다 — 가로 폭을 프레임에 담는다.
   const spread = pts.length > 1 ? Math.max(...pts.map((p) => Math.hypot(p.x - center.x, p.y - center.y))) : 0
   const scale = input.distanceScale ?? 1
@@ -237,7 +262,7 @@ export function solveCamera(input: SolveCameraInput): SolvedCamera {
 
   let cam: Vec2
   let camZ: number
-  const lookZ = subjectHeight * lookAtHeightRatio(input.shotType)
+  const lookZ = aimHeight * lookAtHeightRatio(input.shotType)
   const ots = setup.over_shoulder_of ? states.find((s) => s.character_id === setup.over_shoulder_of) : null
   if (setup.over_shoulder_of && !ots) issues.push(`over_shoulder_of "${setup.over_shoulder_of}" 가 무대에 없어 무시했다`)
   const axis = resolveAxisPoints(stage, states)
@@ -262,7 +287,7 @@ export function solveCamera(input: SolveCameraInput): SolvedCamera {
       setup.height === 'low' ? 0.5
       : setup.height === 'high' ? 2.8
       : setup.height === 'overhead' ? Math.max(6, dist)
-      : Math.max(0.9, subjectHeight * 0.88)
+      : Math.max(0.9, aimHeight * 0.88)
   }
 
   // 180° 축 — 반대편이면 축 안쪽으로 되돌린다(동기 없는 축 넘기 금지).
@@ -418,8 +443,8 @@ export function facingWordOf(state: StageCharacterState, cam: StageCamera): Faci
 /** 무대 위 인물 하나의 화면 배치. */
 export function placeCharacter(cam: StageCamera, state: StageCharacterState, aspect: number, subjectDistance: number): ScreenPlacement {
   const h = state.height_m ?? DEFAULT_CHARACTER_HEIGHT_M
-  // 누움·앉음은 실효 높이가 낮다 — 프레임 점유·잘림 판정에 반영.
-  const effH = state.posture === 'lying' ? h * 0.35 : state.posture === 'sitting' || state.posture === 'kneeling' || state.posture === 'crouching' ? h * 0.65 : h
+  // 누움·앉음·웅크림은 실효 높이가 낮다 — 프레임 점유·잘림 판정에 반영(솔버 시선 높이와 같은 기준).
+  const effH = effectiveCharacterHeight(state)
   // 지면 위 높이(#derived-end): 도약·비행 END 추정만 0 보다 크다 — 발 위치가 그만큼 떠오른다.
   const z0 = Math.max(0, state.z ?? 0)
   const base = project(cam, { x: state.x, y: state.y, z: z0 }, aspect)
@@ -448,7 +473,12 @@ export function placeCharacter(cam: StageCamera, state: StageCharacterState, asp
     screen_y: round(base.v),
     distance_m: round(distance),
     apparent_height: round(apparent),
-    position_in_frame: inFrame ? positionWord(u) : u < 0 ? 'off_left' : 'off_right',
+    // 프레임 밖이면 나간 방향을 적는다 — 가로로 벗어났으면 좌/우, 세로로만 벗어났으면 위/아래(#stage 2026-09-17).
+    position_in_frame: inFrame
+      ? positionWord(u)
+      : Math.abs(u) > 1.05
+        ? u < 0 ? 'off_left' : 'off_right'
+        : top.v <= -1 ? 'off_bottom' : 'off_top',
     depth_band: depthBandOf(distance, subjectDistance),
     facing: facingWordOf(state, cam),
     posture: state.posture,
