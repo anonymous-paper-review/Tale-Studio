@@ -82,3 +82,69 @@ describe('startStageViewTransition — 화면 움직임을 지원하지 않을 �
     expect(navigate).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('startStageViewTransition — 전환 연출 실패 뒤 복구', () => {
+  afterEach(() => {
+    resolveStageCommit()
+    stageNavMemory.viaViewTransition = false
+    vi.unstubAllGlobals()
+  })
+
+  it('전환 연출이 시간 초과로 거절돼도 미처리 오류를 남기지 않고 다음 화면 이동을 계속한다', async () => {
+    const dataset: Record<string, string> = {}
+    const rejectors: Array<(error: unknown) => void> = []
+    const rejected = () => new Promise<void>((_resolve, reject) => { rejectors.push(reject) })
+    const start = vi.fn((update: () => void) => {
+      update()
+      return { ready: rejected(), updateCallbackDone: rejected(), finished: rejected() }
+    })
+    vi.stubGlobal('document', { documentElement: { dataset }, startViewTransition: start })
+    const navigate = vi.fn()
+    startStageViewTransition('forward', navigate)
+    rejectors.forEach(reject => reject(new DOMException('Transition was aborted because of timeout in DOM update', 'TimeoutError')))
+    // 실제 Promise 거절을 한 턴 처리한다. 미처리 거절이면 Vitest 자체가 실행을 실패로 판정한다.
+    await new Promise<void>(resolve => setImmediate(resolve))
+    expect(navigate).toHaveBeenCalledTimes(1)
+    expect(dataset.stageNav).toBeUndefined()
+    expect(stageNavMemory.viaViewTransition).toBe(false)
+    expect(stageNavMemory.resolveCommit).toBeNull()
+    start.mockImplementation(update => { update(); return { ready: Promise.resolve(), updateCallbackDone: Promise.resolve(), finished: Promise.resolve() } })
+    startStageViewTransition('back', navigate)
+    await Promise.resolve()
+    expect(navigate).toHaveBeenCalledTimes(2)
+    expect(stageNavMemory.viaViewTransition).toBe(false)
+  })
+
+  it('브라우저가 전환 연출 시작을 거절해도 화면 이동은 한 번 실행한다', () => {
+    const dataset: Record<string, string> = {}
+    vi.stubGlobal('document', { documentElement: { dataset }, startViewTransition: () => { throw new Error('Transition unavailable') } })
+    const navigate = vi.fn()
+    expect(() => startStageViewTransition('forward', navigate)).not.toThrow()
+    expect(navigate).toHaveBeenCalledTimes(1)
+    expect(dataset.stageNav).toBeUndefined()
+    expect(stageNavMemory.viaViewTransition).toBe(false)
+  })
+
+  it('이전 화면의 전환 종료가 뒤이어 시작한 전환의 임시 상태를 지우지 않는다', async () => {
+    const dataset: Record<string, string> = {}
+    const finish: Array<() => void> = []
+    vi.stubGlobal('document', { documentElement: { dataset }, startViewTransition: (update: () => void) => {
+      update()
+      return { ready: Promise.resolve(), updateCallbackDone: Promise.resolve(), finished: new Promise<void>(resolve => { finish.push(resolve) }) }
+    } })
+    const navigate = vi.fn()
+    startStageViewTransition('forward', navigate)
+    startStageViewTransition('back', navigate)
+    const currentCommit = stageNavMemory.resolveCommit
+    finish[0]()
+    await Promise.resolve()
+    expect(dataset.stageNav).toBe('back')
+    expect(stageNavMemory.viaViewTransition).toBe(true)
+    expect(stageNavMemory.resolveCommit).toBe(currentCommit)
+    finish[1]()
+    await Promise.resolve()
+    expect(dataset.stageNav).toBeUndefined()
+    expect(stageNavMemory.resolveCommit).toBeNull()
+    expect(navigate).toHaveBeenCalledTimes(2)
+  })
+})

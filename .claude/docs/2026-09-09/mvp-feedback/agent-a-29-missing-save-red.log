@@ -1,0 +1,40 @@
+
+ RUN  v4.1.6 /Users/xcape/projects/tale-studio
+
+(node:5609) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ tests/writer/dialogue-handoff-completion.test.ts (11 tests | 1 failed) 136ms
+   × 저장할 샷이 도중에 사라졌으면 응답이 성공이어도 전체 저장 완료로 판단하지 않는다 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/writer/dialogue-handoff-completion.test.ts > 저장할 샷이 도중에 사라졌으면 응답이 성공이어도 전체 저장 완료로 판단하지 않는다
+AssertionError: expected "vi.fn()" to not be called at all, but actually been called 1 times
+
+Received:
+
+  1st vi.fn() call:
+
+    Array [
+      "director",
+    ]
+
+
+Number of calls: 1
+
+ ❯ tests/writer/dialogue-handoff-completion.test.ts:166:23
+    164|   respond([[update(1),update(2),update(3),update(4),update(5)]])
+    165|   await useGlobalChatStore.getState().sendMessage('전체 한국어로 맞추고 넘겨줘')
+    166|   expect(handoff).not.toHaveBeenCalled()
+       |                       ^
+    167|   expect(useGlobalChatStore.getState().messages.at(-1)?.content).toMat…
+    168| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 10 passed (11)
+   Start at  23:55:27
+   Duration  448ms (transform 188ms, setup 9ms, import 222ms, tests 136ms, environment 0ms)
+

@@ -42,7 +42,7 @@ export function ShareButton() {
       disabled={!projectId || loading}
       aria-label={t('Create share link')}
       title={t('Create share link (read-only preview)')}
-      className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-secondary-foreground shadow-sm transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+      className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary text-secondary-foreground shadow-sm transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
     >
       {loading ? (
         <Loader2 className="h-5 w-5 animate-spin" />

@@ -1,0 +1,85 @@
+{
+  "verifiedOn": "2026-09-09",
+  "scope": "Local Next.js development runtime using the exact isolated rollout application source, with production Paddle selection and purchases disabled. This is not a production build or deployed-site verification.",
+  "worktree": "/Users/xcape/orca/workspaces/tale-studio/paddle-checkout-rollout",
+  "baseCommit": "a399530bf461aeb8b7c079cda47a4604dddf49de",
+  "origin": "http://127.0.0.1:3001",
+  "environment": {
+    "paddleMode": "production",
+    "liveCheckoutEnabled": false,
+    "catalogSellerId": "419628",
+    "configuredLivePrices": 13,
+    "supabase": "development URL and public anonymous key only",
+    "realServiceRoleKeyPassed": false,
+    "serviceRoleInitializationPlaceholder": "invalid non-credential string; never a real admin key",
+    "paddleApiKeyPassed": false,
+    "webhookSecretPassed": false,
+    "productionDatabaseCredentialsPassed": false
+  },
+  "http": [
+    { "path": "/pricing", "method": "GET", "status": 200, "redirect": null },
+    { "path": "/checkout", "method": "GET", "status": 200, "redirect": null },
+    { "path": "/checkout?_ptxn=txn_guard_simulation_only", "method": "GET", "status": 200, "redirect": null },
+    {
+      "path": "/api/billing/catalog-status",
+      "method": "GET",
+      "status": 200,
+      "body": { "checkoutEnabled": false, "configured": 13, "purchasable": 0, "plans": 9, "packs": 4, "total": 13, "env": "production" }
+    },
+    { "path": "/api/billing/checkout", "method": "POST", "status": 503, "body": { "error": "payments_not_open" } },
+    { "path": "/api/billing/change-plan", "method": "POST", "status": 401, "body": { "ok": false, "error": "unauthorized" }, "note": "Anonymous request: authorization precedes the paid-plan-change guard; no claim of authenticated change-plan runtime testing." }
+  ],
+  "browser": {
+    "pageId": "66476675-8188-44d4-b19c-d3718160bb1a",
+    "authCookiePresent": false,
+    "familyCards": ["Starter", "Production", "Take"],
+    "optionComparisons": [
+      { "family": "Starter", "from": "S-1 / USD 15 / 16 monthly Takes", "to": "S-5 / USD 60 / 60 monthly Takes", "selectedRangeValue": 2, "singlePressedOption": "프로젝트당 5분", "purchaseDisabled": true },
+      { "family": "Production", "from": "P-10 / USD 199", "to": "P-30 / USD 1299 / 710 monthly Takes", "selectedRangeValue": 4, "purchaseDisabled": true },
+      { "family": "Take", "from": "Mini / USD 29 / 50 Takes", "to": "Standard / USD 109 / 200 Takes", "interaction": "next-option arrow button", "selectedRangeValue": 1, "purchaseDisabled": true }
+    ],
+    "paddleResourceRequestsDuringComparisons": 0,
+    "dummyPaymentLink": { "preparingMessageShown": true, "paddleScripts": 0, "paddleFrames": 0, "paddleResourceRequests": 0 },
+    "mobile": { "width": 390, "height": 844, "measuredPageWidth": 390, "horizontalPageOverflow": false },
+    "keyboardOnlyRangeInteractionVerified": false,
+    "keyboardNote": "Orca focus/ArrowRight calls did not change the selected value; option buttons and next-option arrows were verified. No assertion that native keyboard range interaction passed.",
+    "languageSwitchWarning": {
+      "message": "AuthSessionMissingError: Auth session missing!",
+      "source": "src/stores/locale-store.ts:57",
+      "cause": "The existing locale setter attempts auth.updateUser for an anonymous non-demo visitor.",
+      "sourceUnchangedFromBase": true,
+      "displayLanguageChanged": true,
+      "issueBadgeClearedAfterFullReload": true,
+      "changedInThisTask": false
+    }
+  },
+  "screenshots": [
+    "paddle-guard-desktop-pricing.png",
+    "paddle-guard-desktop-starter.png",
+    "paddle-guard-mobile-starter.png",
+    "paddle-guard-desktop-production.png",
+    "paddle-guard-desktop-take.png",
+    "paddle-guard-desktop-checkout.png"
+  ],
+  "screenshotNotes": "Pricing and Starter screenshots were refreshed after the full reload cleared the language-save issue badge. Earlier Production/Take screenshots retain that diagnosed development badge.",
+  "setupRecovery": {
+    "webpackAttempt": "Existing instrumentation -> undici -> node:console compilation error; not fixed in application source.",
+    "initialTurbopackAttempt": "Existing node_modules symlink pointed outside the Turbopack filesystem root.",
+    "successfulRuntime": "Default Turbopack with a physical APFS clone of already-installed, unchanged dependencies. No dependency additions or version changes."
+  },
+  "cleanup": {
+    "serverPid": 97109,
+    "serverExited": true,
+    "port3001ListenerRemaining": false,
+    "ownedBrowserTabClosed": true,
+    "parentPort3000Touched": false,
+    "parentBrowserTabTouched": false,
+    "nodeModulesSymlinkRestored": true,
+    "restoredTarget": "/Users/xcape/projects/tale-studio/node_modules",
+    "dependencyClonePreservedAt": "/private/tmp/tale-paddle-qa-deps-YZimMG/cloned-node_modules",
+    "allowlistedFiles": 30,
+    "changedFiles": 30,
+    "changesOutsideAllowlist": [],
+    "applicationFilesModifiedByThisVerification": 0
+  }
+}

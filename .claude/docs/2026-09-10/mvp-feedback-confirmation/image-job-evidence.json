@@ -1,0 +1,433 @@
+{
+  "candidates": [
+    {
+      "id": "30919181-d696-41fb-8695-5c2aee20eddf",
+      "location_id": "location_2",
+      "variant_key": null,
+      "url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/locations/v1-7a491a7afcbffb36ab684b293af806d138e045eeb2b6db4ab97b92e9a8751019_wide_shot.png?v=1788959327963",
+      "generated_at": "2026-09-09T13:08:48.747595+00:00",
+      "is_selected": true,
+      "job_id": "6cc4dcc5-2a93-421c-979d-1a32afc751a5"
+    }
+  ],
+  "jobs": [
+    {
+      "id": "6cc4dcc5-2a93-421c-979d-1a32afc751a5",
+      "kind": "world_shot",
+      "status": "completed",
+      "target": {
+        "column": "wide_shot",
+        "locationId": "location_2",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b"
+      },
+      "actor": "writer",
+      "created_at": "2026-09-09T13:07:12.566775+00:00",
+      "submitted_at": "2026-09-09T13:07:12.413+00:00",
+      "completed_at": "2026-09-09T13:08:49.216+00:00",
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/locations/v1-7a491a7afcbffb36ab684b293af806d138e045eeb2b6db4ab97b92e9a8751019_wide_shot.png?v=1788959327963",
+      "inputKeys": [
+        "model",
+        "prompt",
+        "image_model",
+        "source_hash",
+        "aspect_ratio",
+        "appearance_hash",
+        "style_anchor_key",
+        "reference_image_urls"
+      ],
+      "promptExcerpts": [
+        {
+          "field": "prompt",
+          "text": "STYLE REFERENCE — the FIRST reference image sets the visual style ONLY: match its art medium, rendering technique, linework, shading, lighting mood and color grade exactly. Do NOT reproduce its subject or objects.\nGrade the whole image in this look: soft diffuse light, low contrast, with soft, bright, gently lifted shadows; a muted low-to-medium saturation pastel palette; delicate romantic bloom and halation on the highlights; fine soft film grain. Mood: a tender, wistful flutter. Rendered in photorealistic live-action cinematography, shot on a digital cinema camera with a 35mm lens - true-to-life skin texture with visible pores, real fabric weave and true material response. A real photograph, not an illustration, painting or anime.\nA concrete rooftop enclosed by chain-link railings, with a residential neighborhood and open sky visible in the distance, bathed in warm midday sunlight, 녹슨 철망 난간과 콘크리트 바닥, 탁 트인 하늘이 펼쳐진 옥상. 하이키 햇살과 역광이 아날로그 렌즈 플레어를 유발하는 감정 고조의 핵심 공간., lighting direction: 눈부신 하이키 직사광, 카메라 렌즈 너머로 비치는 드라마틱한 아날로그 역광, key props: 안전용 철망 난간, 콘크리트 벤치, 필름 카메라 뷰파인더, 옥상 철제 출입문, story purpose: 점심시간 도시락을 함께 먹는 둘만의 아지트, 학교 옥상, producer background purpose: 점심시간 도시락을 함께 먹는 둘만의 아지트, no people or characters, empty environment, wide shot, panoramic"
+        }
+      ]
+    },
+    {
+      "id": "0a096f90-2fff-4d0e-9b9f-465aed0dd7ce",
+      "kind": "character_view",
+      "status": "completed",
+      "target": {
+        "view": "main",
+        "column": "view_main",
+        "characterId": "char",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "appearanceKey": "current"
+      },
+      "actor": "writer",
+      "created_at": "2026-09-09T13:07:12.757697+00:00",
+      "submitted_at": "2026-09-09T13:07:12.613+00:00",
+      "completed_at": "2026-09-09T13:07:53.886+00:00",
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634/v1-97b0560280ed60a5a1eaa1bc45492543c8a986ad5a25b468c427eb83c3e88191_main.png?v=1788959269950",
+      "inputKeys": [
+        "model",
+        "prompt",
+        "source_hash",
+        "aspect_ratio",
+        "look_present",
+        "appearance_hash",
+        "style_anchor_key",
+        "reference_image_urls"
+      ],
+      "promptExcerpts": [
+        {
+          "field": "prompt",
+          "text": "STYLE REFERENCE — the FIRST reference image sets the visual style ONLY: match its art medium, rendering technique, linework, shading, lighting mood and color grade exactly. Do NOT reproduce its subject or objects.\nThe SECOND reference image is a layout template: keep its section boxes, dividers, labels and headings exactly in place. It is NOT a style reference — take the visual style ONLY from the first image.\nGrade the whole image in this look: soft diffuse light, low contrast, with soft, bright, gently lifted shadows; a muted low-to-medium saturation pastel palette; delicate romantic bloom and halation on the highlights; fine soft film grain. Mood: a tender, wistful flutter. Rendered in photorealistic live-action cinematography, shot on a digital cinema camera with a 35mm lens - true-to-life skin texture with visible pores, real fabric weave and true material response. A real photograph, not an illustration, painting or anime.\nFill in this character reference-sheet template with 쿄타로. protagonist. 17–18-year-old Japanese male high school student, black two-block haircut, very fair white skin, sharp defined eyes, white dress shirt, black slacks, necktie, white sneakers. wearing 흰색 교복 셔츠, 검은색 슬랙스 팬츠, 다크 네이비 넥타이, 깨끗한 흰색 스니커즈. line quality: not_applicable. shape language: soft_organic. character proportions: 7.5:1 head-to-body ratio. palette: #3A506B, #D97724, #F26419. keep the template EXACTLY as-is — every tile border, divider and small label stays in place; draw only INSIDE the tiles and never add any extra text. PORTRAIT tile: waist-up front portrait of the character, facing camera. TURNAROUND tile: four full-body views of the same standing character in its labeled slots — FRONT, 3/4 FRONT, SIDE, BACK — same height and same neutral standing pose across all four. EXPRESSION tiles (JOY, SORROW, ANGER, SURPRISE): the same face as a close-up with that labeled expression, one per tile. POSE tiles: two different full-body personality poses that fit this character (a dynamic action and a characteristic idle). DETAIL tiles: two close-up callouts of signature costume or prop details. PALETTE strip: fill the five swatches with the character's actual key colors, flat color only. identical character design, outfit, colors and proportions across every tile, consistent art style. follow the declared art style exactly — never fall back to a generic anime, chibi or mascot "
+        }
+      ]
+    },
+    {
+      "id": "d398927f-ab8e-449d-bb6a-99221bf2ea30",
+      "kind": "world_shot",
+      "status": "completed",
+      "target": {
+        "column": "wide_shot",
+        "locationId": "location_4",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b"
+      },
+      "actor": "writer",
+      "created_at": "2026-09-09T13:07:15.230209+00:00",
+      "submitted_at": "2026-09-09T13:07:15.017+00:00",
+      "completed_at": "2026-09-09T13:08:50.654+00:00",
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/locations/v1-a9ea8a83a076d4bd42e8b802fc1f0de0b6a8ef6d81bdac86569aa8d491727a3c_wide_shot.png?v=1788959329389",
+      "inputKeys": [
+        "model",
+        "prompt",
+        "image_model",
+        "source_hash",
+        "aspect_ratio",
+        "appearance_hash",
+        "style_anchor_key",
+        "reference_image_urls"
+      ],
+      "promptExcerpts": [
+        {
+          "field": "prompt",
+          "text": "STYLE REFERENCE — the FIRST reference image sets the visual style ONLY: match its art medium, rendering technique, linework, shading, lighting mood and color grade exactly. Do NOT reproduce its subject or objects.\nGrade the whole image in this look: soft diffuse light, low contrast, with soft, bright, gently lifted shadows; a muted low-to-medium saturation pastel palette; delicate romantic bloom and halation on the highlights; fine soft film grain. Mood: a tender, wistful flutter. Rendered in photorealistic live-action cinematography, shot on a digital cinema camera with a 35mm lens - true-to-life skin texture with visible pores, real fabric weave and true material response. A real photograph, not an illustration, painting or anime.\nA cozy, modest Japanese student's bedroom, a figure lying under a futon in the warm glow of a desk lamp, looking at a smartphone screen, 어두운 밤의 깊은 차분함 속에 스마트폰 디스플레이의 오렌지 앰버 톤과 은은한 탁상 스탠드가 고요하고 사적인 감정을 극대화하는 아늑한 개인 공간., lighting direction: 스마트폰 화면이 반사되는 오렌지 앰버 톤 포인트 광원, 침대 밑 은은한 스탠드 조명, key props: 아늑한 침구류, 스마트폰, 작은 나무 탁상 스탠드, 벽면에 붙은 필름 사진들, story purpose: 헤어진 뒤 폰으로 연락하다 잠드는 하루의 마지막 장면, 각자의 방, producer background purpose: 헤어진 뒤 폰으로 연락하다 잠드는 하루의 마지막 장면, no people or characters, empty environment, wide shot, panoramic"
+        }
+      ]
+    },
+    {
+      "id": "9150d624-44b9-4b15-a1ab-e6ddb7a04f72",
+      "kind": "character_view",
+      "status": "completed",
+      "target": {
+        "view": "main",
+        "column": "view_main",
+        "characterId": "char_2",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "appearanceKey": "current"
+      },
+      "actor": "writer",
+      "created_at": "2026-09-09T13:07:15.433088+00:00",
+      "submitted_at": "2026-09-09T13:07:15.265+00:00",
+      "completed_at": "2026-09-09T13:07:38.413+00:00",
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/characters/v1-c50f938b516a0c463fd8f294753aa219811679c3267f33f227edd6bcf5abad2a/v1-97b0560280ed60a5a1eaa1bc45492543c8a986ad5a25b468c427eb83c3e88191_main.png?v=1788959254986",
+      "inputKeys": [
+        "model",
+        "prompt",
+        "source_hash",
+        "aspect_ratio",
+        "look_present",
+        "appearance_hash",
+        "style_anchor_key",
+        "reference_image_urls"
+      ],
+      "promptExcerpts": [
+        {
+          "field": "prompt",
+          "text": "STYLE REFERENCE — the FIRST reference image sets the visual style ONLY: match its art medium, rendering technique, linework, shading, lighting mood and color grade exactly. Do NOT reproduce its subject or objects.\nThe SECOND reference image is a layout template: keep its section boxes, dividers, labels and headings exactly in place. It is NOT a style reference — take the visual style ONLY from the first image.\nGrade the whole image in this look: soft diffuse light, low contrast, with soft, bright, gently lifted shadows; a muted low-to-medium saturation pastel palette; delicate romantic bloom and halation on the highlights; fine soft film grain. Mood: a tender, wistful flutter. Rendered in photorealistic live-action cinematography, shot on a digital cinema camera with a 35mm lens - true-to-life skin texture with visible pores, real fabric weave and true material response. A real photograph, not an illustration, painting or anime.\nFill in this character reference-sheet template with 코마츠. protagonist. 17–18-year-old Japanese female high school student, black hair with thick neat bangs, mysterious and pure impression, white dress shirt, ribbon tie, plaid skirt, white sneakers. wearing 흰색 교복 세일러 셔츠, 체크 패턴 스쿨 스커트, 버건디 레드 리본 타이, 흰색 스니커즈 및 단정한 삭스. line quality: not_applicable. shape language: soft_organic. character proportions: 7.5:1 head-to-body ratio. palette: #3A506B, #D97724, #F26419. keep the template EXACTLY as-is — every tile border, divider and small label stays in place; draw only INSIDE the tiles and never add any extra text. PORTRAIT tile: waist-up front portrait of the character, facing camera. TURNAROUND tile: four full-body views of the same standing character in its labeled slots — FRONT, 3/4 FRONT, SIDE, BACK — same height and same neutral standing pose across all four. EXPRESSION tiles (JOY, SORROW, ANGER, SURPRISE): the same face as a close-up with that labeled expression, one per tile. POSE tiles: two different full-body personality poses that fit this character (a dynamic action and a characteristic idle). DETAIL tiles: two close-up callouts of signature costume or prop details. PALETTE strip: fill the five swatches with the character's actual key colors, flat color only. identical character design, outfit, colors and proportions across every tile, consistent art style. follow the declared art style exactly — never fall back to a generic anime, "
+        }
+      ]
+    },
+    {
+      "id": "3b4fa39a-9e4c-4f92-8a60-282ae0a5c753",
+      "kind": "world_shot",
+      "status": "completed",
+      "target": {
+        "column": "wide_shot",
+        "locationId": "location_3",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b"
+      },
+      "actor": "writer",
+      "created_at": "2026-09-09T13:07:17.634987+00:00",
+      "submitted_at": "2026-09-09T13:07:17.475+00:00",
+      "completed_at": "2026-09-09T13:09:02.962+00:00",
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/locations/v1-9818da74a0a32167880f4d6fcc05d0a8aa9005b47205fe70de06a91c01b1a07b_wide_shot.png?v=1788959341710",
+      "inputKeys": [
+        "model",
+        "prompt",
+        "image_model",
+        "source_hash",
+        "aspect_ratio",
+        "appearance_hash",
+        "style_anchor_key",
+        "reference_image_urls"
+      ],
+      "promptExcerpts": [
+        {
+          "field": "prompt",
+          "text": "STYLE REFERENCE — the FIRST reference image sets the visual style ONLY: match its art medium, rendering technique, linework, shading, lighting mood and color grade exactly. Do NOT reproduce its subject or objects.\nGrade the whole image in this look: soft diffuse light, low contrast, with soft, bright, gently lifted shadows; a muted low-to-medium saturation pastel palette; delicate romantic bloom and halation on the highlights; fine soft film grain. Mood: a tender, wistful flutter. Rendered in photorealistic live-action cinematography, shot on a digital cinema camera with a 35mm lens - true-to-life skin texture with visible pores, real fabric weave and true material response. A real photograph, not an illustration, painting or anime.\nA narrow residential alley at dusk, washed in orange light, with utility poles, a slim sidewalk, and a bicycle passing by — a distinctly Japanese neighborhood scene, 해질녘 붉고 주황빛으로 물드는 정겨운 일본 주택가 골목길. 길게 늘어진 전깃줄과 감성적인 그림자가 교차하는 아날로그 감성의 풍경., lighting direction: 석양이 만들어내는 따뜻한 골든 아워 주황빛, 길가 가로등의 은은한 점광원, key props: 전봇대와 전깃줄, 일본식 아기자기한 주택 담장, 주차된 자전거, 아스팔트 골목길, story purpose: 하루를 마무리하며 나란히 걷는 두 사람의 이별 직전 공간, 귀갓길, producer background purpose: 하루를 마무리하며 나란히 걷는 두 사람의 이별 직전 공간, no people or characters, empty environment, wide shot, panoramic"
+        }
+      ]
+    },
+    {
+      "id": "85ddfe10-ada1-419c-b17a-44522136f3a8",
+      "kind": "world_shot",
+      "status": "completed",
+      "target": {
+        "column": "wide_shot",
+        "locationId": "neighborhood_park_pond",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b"
+      },
+      "actor": "writer",
+      "created_at": "2026-09-09T13:07:21.119014+00:00",
+      "submitted_at": "2026-09-09T13:07:20.43+00:00",
+      "completed_at": "2026-09-09T13:09:16.541+00:00",
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/locations/v1-e1d525569691083e416028b0a92509c89c0527cb67ef9c8a70b98cd37f5580fa_wide_shot.png?v=1788959354814",
+      "inputKeys": [
+        "model",
+        "prompt",
+        "image_model",
+        "source_hash",
+        "aspect_ratio",
+        "appearance_hash",
+        "style_anchor_key",
+        "reference_image_urls"
+      ],
+      "promptExcerpts": [
+        {
+          "field": "prompt",
+          "text": "STYLE REFERENCE — the FIRST reference image sets the visual style ONLY: match its art medium, rendering technique, linework, shading, lighting mood and color grade exactly. Do NOT reproduce its subject or objects.\nGrade the whole image in this look: soft diffuse light, low contrast, with soft, bright, gently lifted shadows; a muted low-to-medium saturation pastel palette; delicate romantic bloom and halation on the highlights; fine soft film grain. Mood: a tender, wistful flutter. Rendered in photorealistic live-action cinematography, shot on a digital cinema camera with a 35mm lens - true-to-life skin texture with visible pores, real fabric weave and true material response. A real photograph, not an illustration, painting or anime.\n늘어진 버드나무 가지와 잔 잔한 수면이 평온함을 전하는 하교길 공원 연못가. 잔물결에 반사되는 은은한 빛과 한적한 벤치가 아련한 분위기를 자아냄., lighting direction: 버드나무 사이로 부드럽게 들어오는 나뭇잎 틈새 햇살, 연못 수면에 반사되는 은은한 하이라이트, key props: 세월의 흔적이 느껴지는 목재 벤치, 늘어진 버드나무, 작은 연못과 잔물결, 하교길 책가방, 동네 공원 연못가, no people or characters, empty environment, wide shot, panoramic"
+        }
+      ]
+    },
+    {
+      "id": "9b2504eb-a656-4b12-a162-62e621c52eae",
+      "kind": "world_shot",
+      "status": "completed",
+      "target": {
+        "column": "wide_shot",
+        "locationId": "location",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b"
+      },
+      "actor": "writer",
+      "created_at": "2026-09-09T13:07:23.121335+00:00",
+      "submitted_at": "2026-09-09T13:07:22.978+00:00",
+      "completed_at": "2026-09-09T13:08:57.59+00:00",
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/locations/v1-e6eaea18e885e1078829b56df34896be5ab51439e8f0ba00cb1624b2c572c10e_wide_shot.png?v=1788959336394",
+      "inputKeys": [
+        "model",
+        "prompt",
+        "image_model",
+        "source_hash",
+        "aspect_ratio",
+        "appearance_hash",
+        "style_anchor_key",
+        "reference_image_urls"
+      ],
+      "promptExcerpts": [
+        {
+          "field": "prompt",
+          "text": "STYLE REFERENCE — the FIRST reference image sets the visual style ONLY: match its art medium, rendering technique, linework, shading, lighting mood and color grade exactly. Do NOT reproduce its subject or objects.\nGrade the whole image in this look: soft diffuse light, low contrast, with soft, bright, gently lifted shadows; a muted low-to-medium saturation pastel palette; delicate romantic bloom and halation on the highlights; fine soft film grain. Mood: a tender, wistful flutter. Rendered in photorealistic live-action cinematography, shot on a digital cinema camera with a 35mm lens - true-to-life skin texture with visible pores, real fabric weave and true material response. A real photograph, not an illustration, painting or anime.\nA Japanese high school classroom with sunlight streaming through the windows, wooden desks and a chalkboard, curtains gently swaying in the breeze, 나무 책상과 칠판이 유기적으로 어우러진 일본 고등학교 교실. 부드럽게 나부끼는 하얀 커튼과 창가를 가득 채우는 차분한 쿨톤 광원이 평온한 일상을 연출함., lighting direction: 창문을 통해 부드럽게 확산되는 쿨톤 실내 자연광, 그늘진 은은한 실내 디퓨스 조명, key props: 나무 학생 책상과 의자, 바람에 흔들리는 하얀 커튼, 분필 가루가 남아있는 칠판, 교과서와 노트, story purpose: 두 사람이 수업 중 몰래 장난을 치는 일상 공간, 교실, producer background purpose: 두 사람이 수업 중 몰래 장난을 치는 일상 공간, no people or characters, empty environment, wide shot, panoramic"
+        }
+      ]
+    },
+    {
+      "id": "54b460dc-7696-493a-9a15-9e044a859e4b",
+      "kind": "world_shot",
+      "status": "completed",
+      "target": {
+        "column": "wide_shot",
+        "locationId": "location_5",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b"
+      },
+      "actor": "writer",
+      "created_at": "2026-09-09T13:07:24.970393+00:00",
+      "submitted_at": "2026-09-09T13:07:24.816+00:00",
+      "completed_at": "2026-09-09T13:09:07.862+00:00",
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/locations/v1-360f4c7559e4ecac4692d7c77d02c5a4c611b88278c879eb9ea190d7f83df13d_wide_shot.png?v=1788959346695",
+      "inputKeys": [
+        "model",
+        "prompt",
+        "image_model",
+        "source_hash",
+        "aspect_ratio",
+        "appearance_hash",
+        "style_anchor_key",
+        "reference_image_urls"
+      ],
+      "promptExcerpts": [
+        {
+          "field": "prompt",
+          "text": "STYLE REFERENCE — the FIRST reference image sets the visual style ONLY: match its art medium, rendering technique, linework, shading, lighting mood and color grade exactly. Do NOT reproduce its subject or objects.\nGrade the whole image in this look: soft diffuse light, low contrast, with soft, bright, gently lifted shadows; a muted low-to-medium saturation pastel palette; delicate romantic bloom and halation on the highlights; fine soft film grain. Mood: a tender, wistful flutter. Rendered in photorealistic live-action cinematography, shot on a digital cinema camera with a 35mm lens - true-to-life skin texture with visible pores, real fabric weave and true material response. A real photograph, not an illustration, painting or anime.\nA cozy club room with film photographs hanging on a string by the window, an old wooden desk holding a camera and darkroom development tools, warm afternoon sunlight slanting in at an angle, 창가 줄에 필름 사진들이 걸려 있고, 비스듬히 들어오는 따스한 사광이 낡은 나무 책상과 현상 도구를 감싸는 감성적인 사진부 동아리실., lighting direction: 창문으로 비스듬히 들어오는 따뜻한 오후 사광, 공기 중 먼지 입자를 비추는 소프트 확산광, key props: 줄에 집게로 걸린 필름 사진들, 클래식 필름 카메라, 현상용 인화지 및 용액 트레이, 낡은 목재 작업대, story purpose: 두 사람이 방과 후 함께 시간을 보내는 동아리 활동 공간, 사진부 동아리실, producer background purpose: 두 사람이 방과 후 함께 시간을 보내는 동아리 활동 공간, no people or characters, empty environment, wide shot, panoramic"
+        }
+      ]
+    },
+    {
+      "id": "5eadbaa9-72d2-4a69-abfb-4f12d1323ae6",
+      "kind": "world_shot",
+      "status": "completed",
+      "target": {
+        "column": "wide_shot",
+        "locationId": "location_2",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "appearanceKey": "appearance"
+      },
+      "actor": "chat",
+      "created_at": "2026-09-09T13:20:18.953626+00:00",
+      "submitted_at": "2026-09-09T13:20:18.783+00:00",
+      "completed_at": "2026-09-09T13:22:01.952+00:00",
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/locations/v1-7a491a7afcbffb36ab684b293af806d138e045eeb2b6db4ab97b92e9a8751019_v1-6d1622d0f2bc1a5dba81addf168d43afb5a0d0d0d86973bff39a546062f35301_wide_shot.png?v=1788960120827",
+      "inputKeys": [
+        "model",
+        "prompt",
+        "image_model",
+        "source_hash",
+        "aspect_ratio",
+        "appearance_hash",
+        "style_anchor_key",
+        "reference_image_urls"
+      ],
+      "promptExcerpts": [
+        {
+          "field": "prompt",
+          "text": "STYLE REFERENCE — the FIRST reference image sets the visual style ONLY: match its art medium, rendering technique, linework, shading, lighting mood and color grade exactly. Do NOT reproduce its subject or objects.\nThe remaining reference images are the character(s) and the location: keep their identity, design and outfit; only re-render them in the style reference's look.\nGrade the whole image in this look: soft diffuse light, low contrast, with soft, bright, gently lifted shadows; a muted low-to-medium saturation pastel palette; delicate romantic bloom and halation on the highlights; fine soft film grain. Mood: a tender, wistful flutter. Rendered in photorealistic live-action cinematography, shot on a digital cinema camera with a 35mm lens - true-to-life skin texture with visible pores, real fabric weave and true material response. A real photograph, not an illustration, painting or anime.\nRooftop of a Japanese high school at night. The city's night skyline stretches far in the distance, with streetlights and building windows glimmering softly. The sky is deep navy blue, scattered stars faintly visible, moonlight dimly illuminating the rooftop floor. Iron railings and a water tower silhouette stand out sharply against the darkness. The atmosphere is quiet, lonely, yet beautiful., 녹슨 철망 난간과 콘크리트 바닥, 탁 트인 하늘이 펼쳐진 옥상. 하이키 햇살과 역광이 아날로그 렌즈 플레어를 유발하는 감정 고조의 핵심 공간., lighting direction: 눈부신 하이키 직사광, 카메라 렌즈 너머로 비치는 드라마틱한 아날로그 역광, key props: 안전용 철망 난간, 콘크리트 벤치, 필름 카메라 뷰파인더, 옥상 철제 출입문, story purpose: 점심시간 도시락을 함께 먹는 둘만의 아지트, 학교 옥상, during 낮, light playful enjoyment → subtle undercurrent of tension, scene context: Sharing vending machine drink preferences and lunchbox side dishes, no people or characters, empty environment, wide shot, panoramic"
+        }
+      ]
+    },
+    {
+      "id": "2adef1ca-0245-49ed-8dc2-96dd1a79c25a",
+      "kind": "character_view",
+      "status": "completed",
+      "target": {
+        "view": "main",
+        "column": "view_main",
+        "characterId": "char",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "appearanceKey": "appearance"
+      },
+      "actor": "chat",
+      "created_at": "2026-09-09T13:22:39.475636+00:00",
+      "submitted_at": "2026-09-09T13:22:39.29+00:00",
+      "completed_at": "2026-09-09T13:23:11.371+00:00",
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634/v1-6d1622d0f2bc1a5dba81addf168d43afb5a0d0d0d86973bff39a546062f35301_main.png?v=1788960184712",
+      "inputKeys": [
+        "model",
+        "prompt",
+        "safe_mode",
+        "source_hash",
+        "aspect_ratio",
+        "look_present",
+        "appearance_key",
+        "appearance_hash",
+        "style_anchor_key",
+        "reference_image_urls"
+      ],
+      "promptExcerpts": [
+        {
+          "field": "prompt",
+          "text": "STYLE REFERENCE — the FIRST reference image sets the visual style ONLY: match its art medium, rendering technique, linework, shading, lighting mood and color grade exactly. Do NOT reproduce its subject or objects.\nThe SECOND reference image is a layout template: keep its section boxes, dividers, labels and headings exactly in place. It is NOT a style reference — take the visual style ONLY from the first image.\nGrade the whole image in this look: soft diffuse light, low contrast, with soft, bright, gently lifted shadows; a muted low-to-medium saturation pastel palette; delicate romantic bloom and halation on the highlights; fine soft film grain. Mood: a tender, wistful flutter. Rendered in photorealistic live-action cinematography, shot on a digital cinema camera with a 35mm lens - true-to-life skin texture with visible pores, real fabric weave and true material response. A real photograph, not an illustration, painting or anime.\nFill in this character reference-sheet template with 쿄타로. the SECOND reference image is the same person at a different point in their life — carry over the identity markers (face structure, eye shape, nose bridge, distinguishing marks) so viewers recognise them as one person. do NOT copy that face verbatim: this sheet shows them at the age and condition described above, so skin, hairline, weight and bearing must match THIS description, not the reference. protagonist. 17–18-year-old Japanese male high school student, black two-block haircut, very fair skin, sharp and defined eyes, relaxed casual pajamas (loose-fitting T-shirt and long pants), lying in his room looking at a smartphone, natural and comfortable expression. line quality: not_applicable. shape language: soft_organic. character proportions: 7.5:1 head-to-body ratio. palette: #3A506B, #D97724, #F26419. keep the template EXACTLY as-is — every tile border, divider and small label stays in place; draw only INSIDE the tiles and never add any extra text. PORTRAIT tile: waist-up front portrait of the character, facing camera. TURNAROUND tile: four full-body views of the same standing character in its labeled slots — FRONT, 3/4 FRONT, SIDE, BACK — same height and same neutral standing pose across all four. EXPRESSION tiles (JOY, SORROW, ANGER, SURPRISE): the same face as a close-up with that labeled expression, one per tile. POSE tiles: two different full-body personality poses tha"
+        }
+      ]
+    },
+    {
+      "id": "d79017c6-55cf-447f-bfbf-a30a77cf4954",
+      "kind": "world_shot",
+      "status": "completed",
+      "target": {
+        "column": "wide_shot",
+        "locationId": "location_2",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "appearanceKey": "appearance"
+      },
+      "actor": "ui",
+      "created_at": "2026-09-09T13:24:52.633472+00:00",
+      "submitted_at": "2026-09-09T13:24:52.438+00:00",
+      "completed_at": "2026-09-09T13:25:08.793+00:00",
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/locations/v1-7a491a7afcbffb36ab684b293af806d138e045eeb2b6db4ab97b92e9a8751019_v1-6d1622d0f2bc1a5dba81addf168d43afb5a0d0d0d86973bff39a546062f35301_wide_shot.png?v=1788960307734",
+      "inputKeys": [
+        "model",
+        "prompt",
+        "image_model",
+        "source_hash",
+        "aspect_ratio",
+        "appearance_hash",
+        "style_anchor_key",
+        "reference_image_urls"
+      ],
+      "promptExcerpts": [
+        {
+          "field": "prompt",
+          "text": "STYLE REFERENCE — the FIRST reference image sets the visual style ONLY: match its art medium, rendering technique, linework, shading, lighting mood and color grade exactly. Do NOT reproduce its subject or objects.\nThe remaining reference images are the character(s) and the location: keep their identity, design and outfit; only re-render them in the style reference's look.\nGrade the whole image in this look: soft diffuse light, low contrast, with soft, bright, gently lifted shadows; a muted low-to-medium saturation pastel palette; delicate romantic bloom and halation on the highlights; fine soft film grain. Mood: a tender, wistful flutter. Rendered in photorealistic live-action cinematography, shot on a digital cinema camera with a 35mm lens - true-to-life skin texture with visible pores, real fabric weave and true material response. A real photograph, not an illustration, painting or anime.\nRooftop of a Japanese high school at night. The city's night skyline stretches far in the distance, with streetlights and building windows glimmering softly. The sky is deep navy blue, scattered stars faintly visible, moonlight dimly illuminating the rooftop floor. Iron railings and a water tower silhouette stand out sharply against the darkness. The atmosphere is quiet, lonely, yet beautiful., 녹슨 철망 난간과 콘크리트 바닥, 탁 트인 하늘이 펼쳐진 옥상. 하이키 햇살과 역광이 아날로그 렌즈 플레어를 유발하는 감정 고조의 핵심 공간., lighting direction: 눈부신 하이키 직사광, 카메라 렌즈 너머로 비치는 드라마틱한 아날로그 역광, key props: 안전용 철망 난간, 콘크리트 벤치, 필름 카메라 뷰파인더, 옥상 철제 출입문, story purpose: 점심시간 도시락을 함께 먹는 둘만의 아지트, 학교 옥상, during 낮, light playful enjoyment → subtle undercurrent of tension, scene context: Sharing vending machine drink preferences and lunchbox side dishes, no people or characters, empty environment, wide shot, panoramic"
+        }
+      ]
+    },
+    {
+      "id": "5676dc80-cb40-4914-bb58-07888c18333f",
+      "kind": "character_view",
+      "status": "completed",
+      "target": {
+        "view": "main",
+        "column": "view_main",
+        "characterId": "char_2",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "appearanceKey": "appearance"
+      },
+      "actor": "chat",
+      "created_at": "2026-09-09T13:27:06.019861+00:00",
+      "submitted_at": "2026-09-09T13:27:05.85+00:00",
+      "completed_at": "2026-09-09T13:28:59.982+00:00",
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/characters/v1-c50f938b516a0c463fd8f294753aa219811679c3267f33f227edd6bcf5abad2a/v1-6d1622d0f2bc1a5dba81addf168d43afb5a0d0d0d86973bff39a546062f35301_main.png?v=1788960536489",
+      "inputKeys": [
+        "model",
+        "prompt",
+        "safe_mode",
+        "source_hash",
+        "aspect_ratio",
+        "look_present",
+        "appearance_key",
+        "appearance_hash",
+        "style_anchor_key",
+        "reference_image_urls"
+      ],
+      "promptExcerpts": [
+        {
+          "field": "prompt",
+          "text": "STYLE REFERENCE — the FIRST reference image sets the visual style ONLY: match its art medium, rendering technique, linework, shading, lighting mood and color grade exactly. Do NOT reproduce its subject or objects.\nThe SECOND reference image is a layout template: keep its section boxes, dividers, labels and headings exactly in place. It is NOT a style reference — take the visual style ONLY from the first image.\nGrade the whole image in this look: soft diffuse light, low contrast, with soft, bright, gently lifted shadows; a muted low-to-medium saturation pastel palette; delicate romantic bloom and halation on the highlights; fine soft film grain. Mood: a tender, wistful flutter. Rendered in photorealistic live-action cinematography, shot on a digital cinema camera with a 35mm lens - true-to-life skin texture with visible pores, real fabric weave and true material response. A real photograph, not an illustration, painting or anime.\nFill in this character reference-sheet template with 코마츠. the SECOND reference image is the same person at a different point in their life — carry over the identity markers (face structure, eye shape, nose bridge, distinguishing marks) so viewers recognise them as one person. do NOT copy that face verbatim: this sheet shows them at the age and condition described above, so skin, hairline, weight and bearing must match THIS description, not the reference. protagonist. 17–18 year old Japanese high school girl named Komatsu, black hair with thick, neat bangs, mysterious and pure impression, wearing comfortable pajamas in pastel tones, style. line quality: not_applicable. shape language: soft_organic. character proportions: 7.5:1 head-to-body ratio. palette: #3A506B, #D97724, #F26419. keep the template EXACTLY as-is — every tile border, divider and small label stays in place; draw only INSIDE the tiles and never add any extra text. PORTRAIT tile: waist-up front portrait of the character, facing camera. TURNAROUND tile: four full-body views of the same standing character in its labeled slots — FRONT, 3/4 FRONT, SIDE, BACK — same height and same neutral standing pose across all four. EXPRESSION tiles (JOY, SORROW, ANGER, SURPRISE): the same face as a close-up with that labeled expression, one per tile. POSE tiles: two different full-body personality poses that fit this character (a dynamic action and a characteristic idle). DETAIL tiles: t"
+        }
+      ]
+    },
+    {
+      "id": "630b6700-3a55-4067-91c1-e90444183bc5",
+      "kind": "world_shot",
+      "status": "completed",
+      "target": {
+        "column": "wide_shot",
+        "locationId": "neighborhood_park_pond",
+        "workspaceId": "ce053575-62d5-4c8d-898f-34a1a5c6b40b",
+        "appearanceKey": "appearance"
+      },
+      "actor": "chat",
+      "created_at": "2026-09-09T13:28:33.386198+00:00",
+      "submitted_at": "2026-09-09T13:28:33.218+00:00",
+      "completed_at": "2026-09-09T13:30:20.061+00:00",
+      "result_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/locations/v1-e1d525569691083e416028b0a92509c89c0527cb67ef9c8a70b98cd37f5580fa_v1-6d1622d0f2bc1a5dba81addf168d43afb5a0d0d0d86973bff39a546062f35301_wide_shot.png?v=1788960618476",
+      "inputKeys": [
+        "model",
+        "prompt",
+        "image_model",
+        "source_hash",
+        "aspect_ratio",
+        "appearance_hash",
+        "style_anchor_key",
+        "reference_image_urls"
+      ],
+      "promptExcerpts": [
+        {
+          "field": "prompt",
+          "text": "STYLE REFERENCE — the FIRST reference image sets the visual style ONLY: match its art medium, rendering technique, linework, shading, lighting mood and color grade exactly. Do NOT reproduce its subject or objects.\nThe remaining reference images are the character(s) and the location: keep their identity, design and outfit; only re-render them in the style reference's look.\nGrade the whole image in this look: soft diffuse light, low contrast, with soft, bright, gently lifted shadows; a muted low-to-medium saturation pastel palette; delicate romantic bloom and halation on the highlights; fine soft film grain. Mood: a tender, wistful flutter. Rendered in photorealistic live-action cinematography, shot on a digital cinema camera with a 35mm lens - true-to-life skin texture with visible pores, real fabric weave and true material response. A real photograph, not an illustration, painting or anime.\nJapanese neighborhood park pond at dusk, sunset sky casting orange and red hues reflected on the still water surface, warm and emotionally evocative twilight atmosphere, style, 늘어진 버드나무 가지와 잔 잔한 수면이 평온함을 전하는 하교길 공원 연못가. 잔물결에 반사되는 은은한 빛과 한적한 벤치가 아련한 분위기를 자아냄., lighting direction: 버드나무 사이로 부드럽게 들어오는 나뭇잎 틈새 햇살, 연못 수면에 반사되는 은은한 하이라이트, key props: 세월의 흔적이 느껴지는 목재 벤치, 늘어진 버드나무, 작은 연못과 잔물결, 하교길 책가방, 동네 공원 연못가, during 오후, quiet observation → heart-quickening anticipation, scene context: Discovering each other's true feelings during a photo shoot, no people or characters, empty environment, wide shot, panoramic"
+        }
+      ]
+    }
+  ]
+}

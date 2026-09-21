@@ -11,9 +11,9 @@ export function FooterIconItem({
   children: ReactNode
 }) {
   return (
-    <div className="flex flex-col items-center gap-1.5">
+    <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center gap-1">
       {children}
-      <span className="text-[10px] font-medium leading-none tracking-tight text-muted-foreground">
+      <span className="text-xs font-medium leading-none text-muted-foreground">
         {label}
       </span>
     </div>

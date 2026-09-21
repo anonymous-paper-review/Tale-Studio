@@ -3,14 +3,21 @@
 //   finalize(storyboard_real_grid)가 크롭 분배. 빈칸 채우기 전용(storyboard 미생성 샷만 —
 //   architecture §5: 차 있는 것 교체는 사람의 개별 재생성=단일 스트립). 검증: 실험 시트 통과(011fd4bd).
 import { NextResponse } from 'next/server'
+import { existingStoryboardJobId } from '@/lib/director/storyboard-active-job'
 import type { NextRequest } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { requireProjectAccess } from '@/lib/api/guard'
 import { checkGenerationCapacity } from '@/lib/generation-quota'
-import { quotaRejectionResponse } from '@/lib/api/quota'
-import { createGenerationJob } from '@/lib/generation-jobs'
+import { capacityReservationRejection, quotaRejectionResponse } from '@/lib/api/quota'
+import {
+  confirmGenerationJobReceipt,
+  reserveGenerationJob,
+  rejectGenerationJobReservation,
+  type GenerationJob,
+} from '@/lib/generation-jobs'
 import { falImageSubmit } from '@/lib/writer/llm/fal'
+import { isDefiniteSubmitRejection } from '@/lib/fal/submit-rejection'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { resolveStyleAnchor } from '@/lib/style-anchor'
 import { resolveImageEndpoint, resolveSheetImageModel } from '@/lib/image-models'
@@ -247,7 +254,11 @@ export async function POST(req: NextRequest) {
 
     const webhookUrl = resolveWebhookUrl()
     const submitted: Array<{ jobId: string; shotIds: string[] }> = []
-    for (const group of readyPlanned) {
+    // #generation-capacity-trigger(2026-09-14): 자리가 없어 이번에 못 낸 시트의 샷 수 — 잔량(remaining)으로
+    //   되돌려 다음 라운드가 다시 잡게 한다. 이미 낸 시트는 그대로 진행한다.
+    let capacitySkippedShots = 0
+    for (let groupIndex = 0; groupIndex < readyPlanned.length; groupIndex++) {
+      const group = readyPlanned[groupIndex]
       // #sheet-formats: 레퍼런스 시트는 프레임 AR 매칭(왜곡 방지 — 레거시 프레임이면 레거시 시트),
       //   출력 캔버스·크롭은 포맷 스펙 — 가로 레퍼런스+세로 캔버스는 T2 실측 검증 경로.
       const refGrid = await composeRoughReferenceGrid(
@@ -329,56 +340,110 @@ export async function POST(req: NextRequest) {
       ]
 
       // 이 배치 경로는 모델 선택 UI 가 없다 — 기본 모델의 edit 갈래로 고정(#owner-default 2026-08-31).
-      const { request_id, model, fal_key_id } = await falImageSubmit({
-        // #sheet-model-guard: 그리드는 시트 계약 경로 — 기본 모델이 무엇이든 시트 가능 모델로 강제.
-        model: resolveImageEndpoint(resolveSheetImageModel(null), true).endpoint,
-        prompt,
-        reference_image_urls: referenceImageUrls,
-        // 포맷 파생 캔버스 — finalize 방향 가드가 snapshot.image_size 로 같은 계약을 검사한다.
-        //   (ed5bd4a 전까지 이 필드는 타입에 없어 버려지고 'auto'가 전송되고 있었다 — #fal-canvas)
-        image_size: sheetCanvas,
-        webhookUrl,
-      })
+      // #sheet-model-guard: 그리드는 시트 계약 경로 — 기본 모델이 무엇이든 시트 가능 모델로 강제.
+      const gridModel = resolveImageEndpoint(resolveSheetImageModel(null), true).endpoint
 
-      const job = await createGenerationJob({
-        projectId,
-        requestId: request_id,
-        model,
-        falKeyId: fal_key_id,
-        kind: 'storyboard_real_grid',
-        userId: access.userId!,
-        workspaceId: project.workspace_id as string,
-        provider: 'fal',
-        chatTraceId: traceId ?? null,
-        // #B9(2026-08-12): 이 경로가 최종 프레임 전량을 만드는데도 프롬프트가 어디에도 안 남아
-        //   사고 역추적이 코드 재구성에 의존했다(실측: sh_04_18 조사). prompt/refs/칸 배정을
-        //   스냅샷에 남긴다 — 디버그 프롬프트 트레이스(PROMPT_TRACE_KINDS)도 이제 표시 가능.
-        inputSnapshot: {
-          shotIds: group.map((s) => s.shot_id),
-          ref_grid_url: refUrl,
-          style_anchor_key: anchor?.key ?? null,
-          prompt,
-          reference_image_urls: referenceImageUrls,
-          column_characters: columnCharacters.map((col) => col.map((c) => c.name)),
-          scene_time_of_day: sceneLighting,
-          image_size: sheetCanvas, // finalize 방향 가드 + 사고 역추적용 (#fal-canvas)
-          sheet_format: projectFormat, // finalize 크롭이 포맷 시트 좌표를 복원 (#sheet-formats)
-        },
-        target: {
+      // #generation-capacity-trigger(2026-09-14): 제출마다 자리를 먼저 예약한다 — fal 에 먼저 내면
+      //   트리거가 자리 넘는 기록을 거절해도 돈은 이미 나간 뒤다(감사 2026-09-11). 자동 재시도 없음.
+      let job: GenerationJob
+      try {
+        job = await reserveGenerationJob({
+          projectId,
+          model: gridModel,
+          kind: 'storyboard_real_grid',
+          userId: access.userId!,
           workspaceId: project.workspace_id as string,
-          writerShotIds: group.map((s) => s.shot_id),
-          gridVariant: 'grid4',
-          roughGeneratedAtByShot: Object.fromEntries(
-            group.filter((s) => typeof s.roughGeneratedAt === 'number').map((s) => [s.shot_id, s.roughGeneratedAt as number]),
-          ),
-        },
-      })
+          provider: 'fal',
+          chatTraceId: traceId ?? null,
+          // #B9(2026-08-12): 이 경로가 최종 프레임 전량을 만드는데도 프롬프트가 어디에도 안 남아
+          //   사고 역추적이 코드 재구성에 의존했다(실측: sh_04_18 조사). prompt/refs/칸 배정을
+          //   스냅샷에 남긴다 — 디버그 프롬프트 트레이스(PROMPT_TRACE_KINDS)도 이제 표시 가능.
+          inputSnapshot: {
+            shotIds: group.map((s) => s.shot_id),
+            ref_grid_url: refUrl,
+            style_anchor_key: anchor?.key ?? null,
+            prompt,
+            reference_image_urls: referenceImageUrls,
+            column_characters: columnCharacters.map((col) => col.map((c) => c.name)),
+            scene_time_of_day: sceneLighting,
+            image_size: sheetCanvas, // finalize 방향 가드 + 사고 역추적용 (#fal-canvas)
+            sheet_format: projectFormat, // finalize 크롭이 포맷 시트 좌표를 복원 (#sheet-formats)
+          },
+          target: {
+            workspaceId: project.workspace_id as string,
+            writerShotIds: group.map((s) => s.shot_id),
+            gridVariant: 'grid4',
+            roughGeneratedAtByShot: Object.fromEntries(
+              group.filter((s) => typeof s.roughGeneratedAt === 'number').map((s) => [s.shot_id, s.roughGeneratedAt as number]),
+            ),
+          },
+        })
+      } catch (err) {
+        if (existingStoryboardJobId(err)) {
+          // 다른 탭의 개별/일괄 작업이 먼저 예약했다. 남은 장은 보존하고 새 제출 없이 멈춘다.
+          capacitySkippedShots = readyPlanned.slice(groupIndex).reduce((n, g) => n + g.length, 0)
+          break
+        }
+        const rejected = capacityReservationRejection(err, { projectId, kind: 'storyboard_real_grid', userId: access.userId })
+        if (!rejected) throw err
+        // 첫 장부터 자리가 없으면 아무것도 접수하지 않았으니 종전대로 자리 없음(429)으로 답한다.
+        if (!submitted.length) return rejected
+        // 이미 낸 시트는 그대로 진행시키고 남은 장만 건너뛴다 — 그 수를 잔량에 담아 돌려준다.
+        capacitySkippedShots = readyPlanned.slice(groupIndex).reduce((n, g) => n + g.length, 0)
+        break
+      }
+
+      try {
+        // 외부 접수는 한 번뿐이다. 응답을 잃은 호출을 SDK 재시도로 복제하지 않는다(러프와 같은 이유 —
+        //   예약이 이미 자리를 잡고 있으니 재시도는 이중 발주다).
+        const receipt = await falImageSubmit(
+          {
+            model: gridModel,
+            prompt,
+            reference_image_urls: referenceImageUrls,
+            // 포맷 파생 캔버스 — finalize 방향 가드가 snapshot.image_size 로 같은 계약을 검사한다.
+            //   (ed5bd4a 전까지 이 필드는 타입에 없어 버려지고 'auto'가 전송되고 있었다 — #fal-canvas)
+            image_size: sheetCanvas,
+            webhookUrl,
+          },
+          // 트리거가 여유 있는 계정으로 바꿔 넣었을 수 있어 반드시 예약 행의 키로 제출한다.
+          { retry: false, falKeyId: job.fal_key_id },
+        )
+        try {
+          await confirmGenerationJobReceipt(job.id, projectId, receipt)
+        } catch (err) {
+          // 이미 접수됐다 — 새 번호로 다시 내지 않는다. 기록 실패는 로그로만 남긴다.
+          console.error(
+            '[director/generate-storyboard-batch] accepted receipt could not be saved:',
+            job.id,
+            err instanceof Error ? err.message : String(err),
+          )
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
+        if (isDefiniteSubmitRejection(err)) {
+          // 확정 거절(4xx) — 자리를 물고 있을 이유가 없다. 닫기 실패는 원래 실패 이유를 가리지 않게 로그만.
+          try {
+            await rejectGenerationJobReservation(job.id, projectId, message)
+          } catch (closeError) {
+            console.error(
+              '[director/generate-storyboard-batch] rejected reservation could not be closed:',
+              job.id,
+              closeError instanceof Error ? closeError.message : String(closeError),
+            )
+          }
+          throw err
+        }
+        // 접수 여부 불명(통신 오류·5xx·408/425/429): 예약(queued)을 남기고 예약 id 로 돌려준다 —
+        //   이미 접수됐을 수 있어 같은 시트를 새 번호로 다시 내지 않는다.
+        console.error('[director/generate-storyboard-batch] submit outcome unknown, reservation kept:', job.id, message)
+      }
       submitted.push({ jobId: job.id, shotIds: group.map((s) => s.shot_id) })
     }
 
     return NextResponse.json({
       ok: true,
-      data: { submitted, remaining: eligible.length - plannedShots, skipped },
+      data: { submitted, remaining: eligible.length - plannedShots + capacitySkippedShots, skipped },
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

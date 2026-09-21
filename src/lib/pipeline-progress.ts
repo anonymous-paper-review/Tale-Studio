@@ -134,6 +134,7 @@ interface WriterPipelineStatusLike {
   pipeline_failed: boolean
   current_status: string | null
   current_stage: string | null
+  engine?: 'v1' | 'v2'
   completed_units?: number
   total_units?: number
 }
@@ -423,7 +424,7 @@ export function directorVideoWork(
 
 /** 잡 종류별 표시 문구 — 화면 상태 없이 큐만으로 알림바를 세울 때의 단일 source.
  *  labelKey 는 영어 원문 = i18n 키, {agent} 를 translate() 가 치환한다. */
-const KIND_WORK: Record<GenerationJobKind, { labelKey: string; agent: string; stage: StageId }> = {
+const KIND_WORK: Record<GenerationJobKind, { labelKey: string; agent: string; stage: StageId } | null> = {
   character_view: {
     labelKey: '{agent} is generating character images',
     agent: STAGE_AGENT_NAME.artist,
@@ -444,6 +445,7 @@ const KIND_WORK: Record<GenerationJobKind, { labelKey: string; agent: string; st
     agent: STAGE_AGENT_NAME.director,
     stage: 'director',
   },
+  image_generation: null,
   storyboard_real_grid: {
     labelKey: '{agent} is batch-generating shooting-ready images',
     agent: STAGE_AGENT_NAME.director,
@@ -475,7 +477,7 @@ export function queueWorks(
   >) {
     if (!count || count <= 0) continue
     const spec = KIND_WORK[kind]
-    if (!spec) continue
+    if (spec === null) continue
     const label = translate(locale, spec.labelKey, { agent: spec.agent })
     out.push({ key: `queue-${kind}`, label, total: count, stage: spec.stage })
   }

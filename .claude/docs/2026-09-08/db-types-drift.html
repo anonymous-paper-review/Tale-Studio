@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>타입 파일 어긋남</title>
+<style>
+  :root {
+    --bg:#F1F3F5; --surface:#FFFFFF; --surface-2:#E8EBEF;
+    --ink:#16181D; --ink-2:#3B4048; --muted:#676D77;
+    --line:#D6DBE1; --line-2:#BFC6CE;
+    --accent:#1F5F7A; --accent-soft:#DCEAF1;
+    --pass:#2E7350; --pass-soft:#DFEDE5;
+    --fail:#A33A38; --fail-soft:#F6E2E1;
+    --gate:#6A579E; --gate-soft:#EAE4F5;
+    --warn:#8A6412; --warn-soft:#F4EBD6;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI","Malgun Gothic",sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+      --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+      --line:#2B3038; --line-2:#3C434D;
+      --accent:#74B4D0; --accent-soft:#17303C;
+      --pass:#5FB98A; --pass-soft:#17301F;
+      --fail:#E0817D; --fail-soft:#3A2321;
+      --gate:#A794D8; --gate-soft:#272040;
+      --warn:#D2A64F; --warn-soft:#33290F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+    --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+    --line:#2B3038; --line-2:#3C434D;
+    --accent:#74B4D0; --accent-soft:#17303C;
+    --pass:#5FB98A; --pass-soft:#17301F;
+    --fail:#E0817D; --fail-soft:#3A2321;
+    --gate:#A794D8; --gate-soft:#272040;
+    --warn:#D2A64F; --warn-soft:#33290F;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:0 20px 110px;background:var(--bg);color:var(--ink);
+    font-family:var(--sans);font-size:16px;line-height:1.82;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto}
+
+  header.page{padding:56px 0 20px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 14px;font-weight:600}
+  h1{font-size:clamp(27px,5vw,40px);font-weight:800;letter-spacing:-.028em;line-height:1.22;
+    margin:0 0 18px;text-wrap:balance}
+  .bluf{font-size:17.5px;color:var(--ink);margin:0 0 6px;max-width:64ch}
+  .bluf b{color:var(--gate)}
+  .asof{font-family:var(--mono);font-size:12px;color:var(--muted);margin:10px 0 0}
+  header.page::after{content:"";display:block;height:3px;background:var(--ink);margin-top:26px;opacity:.9}
+
+  section{margin:58px 0 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .sec-num{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);
+    border:1.5px solid var(--accent);border-radius:3px;padding:0 7px;line-height:1.7}
+  h2{font-size:23px;font-weight:800;letter-spacing:-.018em;margin:0;text-wrap:balance}
+  .sec-lede{color:var(--muted);font-size:15px;margin:0 0 24px;max-width:62ch}
+  p{margin:0 0 16px;max-width:64ch}
+  h3{font-size:17px;font-weight:750;margin:28px 0 10px;letter-spacing:-.01em}
+  h3:first-child{margin-top:0}
+  ul.plain{margin:0 0 16px;padding-left:22px;max-width:64ch}
+  ul.plain li{margin-bottom:8px}
+  strong,b{font-weight:750}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    padding:24px 26px 20px;margin:0 0 18px}
+  .card.same{border-left:3px solid var(--pass)}
+  .card.diff{border-left:3px solid var(--warn)}
+  .card > :last-child{margin-bottom:0}
+  .card-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:12px}
+  .card-head h3{flex:1 1 240px;margin:0}
+  .agreed{font-size:15px;color:var(--ink-2);margin:0 0 12px}
+  .agreed b{color:var(--ink);font-weight:750}
+
+  .note{background:var(--accent-soft);border:1px solid var(--line);border-left:3px solid var(--accent);
+    border-radius:0 8px 8px 0;padding:14px 18px;margin:0 0 20px;font-size:15px;color:var(--ink-2);max-width:64ch}
+  .note b{color:var(--ink)}
+
+  .chip{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.03em;
+    border-radius:3px;padding:2px 8px;white-space:nowrap}
+  .c-pass{background:var(--pass-soft);color:var(--pass)}
+  .c-fail{background:var(--fail-soft);color:var(--fail)}
+  .c-warn{background:var(--warn-soft);color:var(--warn)}
+  .c-gate{background:var(--gate-soft);color:var(--gate)}
+  .c-acc{background:var(--accent-soft);color:var(--accent)}
+
+  pre{background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--line-2);
+    border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+    font-family:var(--mono);font-size:12px;line-height:1.68;margin:8px 0;color:var(--ink-2);
+    white-space:pre;tab-size:2}
+  pre b{color:var(--ink);font-weight:700}
+  pre .path{display:block;color:var(--muted);margin-bottom:8px;font-size:11.5px}
+  code{font-family:var(--mono);font-size:.87em;background:var(--surface-2);padding:1px 6px;border-radius:3px}
+  .code-what{font-size:14.5px;color:var(--ink-2);margin:0 0 4px}
+  .code-diff{font-size:14.5px;margin:8px 0 0}
+  .code-diff .chip{margin-right:8px}
+
+  .tbl{overflow-x:auto;margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}
+  th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:700;
+    padding:10px 12px;border-bottom:2px solid var(--line-2);vertical-align:bottom}
+  td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+  td .path{font-family:var(--mono);font-size:11.5px;color:var(--muted);display:block;margin-top:3px}
+  .gate-cell{color:var(--gate);font-weight:750}
+  .gate-empty{display:inline-block;min-width:60px;border-bottom:1.5px dashed var(--gate);opacity:.7}
+
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);
+    border-radius:10px;overflow:hidden;margin:16px 0}
+  @media (max-width:640px){.split{grid-template-columns:1fr}}
+  .split > div{padding:18px 20px}
+  .split .yes{background:var(--pass-soft);border-right:1px solid var(--line)}
+  .split .no{background:var(--fail-soft)}
+  .split h4{margin:0 0 10px;font-size:14.5px;font-weight:800}
+  .split .yes h4{color:var(--pass)}
+  .split .no h4{color:var(--fail)}
+  .split ul{margin:0;padding-left:20px;font-size:14px;line-height:1.7}
+  .split li{margin-bottom:7px}
+
+  .fr{border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:14px 0;background:var(--surface)}
+  .fr img{display:block;width:100%;height:auto}
+  .fr figcaption{font-size:13px;color:var(--muted);padding:10px 14px;border-top:1px solid var(--line)}
+  footer{margin-top:66px;padding-top:20px;border-top:2px solid var(--ink);font-size:13.5px;color:var(--muted)}
+  footer b{color:var(--ink)}
+  footer p{max-width:none}
+  a{color:var(--accent)}
+  a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <p class="eyebrow">세션 보고서 · 2026-09-08</p>
+  <h1>타입 파일 어긋남</h1>
+  <p class="bluf"><code>src/types/database.ts</code>가 실제 DB 구조와 어긋나 있었다. 표 9개가 빠져 있었고, 그 파일이 쿼리 검사에 물려 있지 않아 아무도 어긋남을 느끼지 못했다. 다시 만드는 명령과 커밋 전 검사를 넣었다.</p>
+  <p class="bluf"><b>결정할 것 2개</b>: 프로젝트 목록 썸네일 버그 처리, 타입 연결 범위. <b>알아둘 것 4개</b>. 오너 질문 3개는 3.5절에 답했고, 그중 하나가 이 문서의 오류를 잡았다.</p>
+  <p class="asof">근거 커밋 ae904ca6 · 미커밋 변경 7개 · 원장 .claude/docs/2026-09-08/</p>
+</header>
+
+<section>
+  <div class="sec-head"><span class="sec-num">0</span><h2>먼저 알아둘 것</h2></div>
+  <p class="sec-lede">이 문서의 결론이 기대는 사실 셋. 코드·스펙에 없던 것이라 먼저 깐다.</p>
+
+  <div class="note">
+    <p><b>타입은 실행되지 않는다.</b> TypeScript 는 코드를 실행하기 전에 검사만 하고, 검사가 끝나면 타입 정보를 전부 지운 뒤 JavaScript 로 바꿔 돌린다. 그래서 타입 파일이 틀려도 프로그램은 그냥 돈다. 틀린 것을 알려주는 시점이 <b>커밋 전</b>뿐이다.</p>
+  </div>
+
+  <div class="note">
+    <p><b>타입 파일은 손으로 쓰는 게 아니다.</b> <code>src/types/database.ts</code> 2208줄은 Supabase 가 실제 DB 를 읽어 자동으로 만든 것이다. 사람이 고치면 다음에 다시 만들 때 지워진다. 그래서 "고친다"가 아니라 "다시 만든다"가 맞는 동작이다.</p>
+  </div>
+
+  <div class="note">
+    <p><b>연결하지 않으면 아무 일도 안 한다.</b> 타입 파일이 있는 것과 그것을 DB 접속에 물리는 것은 별개다. 물리지 않으면 파일은 그냥 문서로 남고, 쿼리는 검사 없이 통과한다. 이번에 발견한 것이 이 상태였다.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">1</span><h2>혼자 정한 것</h2></div>
+  <p class="sec-lede">묻지 않고 정했다. 되돌리기가 <span class="gate-cell">비쌈</span> 이상인 항목은 오너 확인 칸을 비워 뒀다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>결정</th><th>왜</th><th>버린 선택지</th><th>되돌리기</th><th>오너 확인</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>타입 재생성 기준은 <b>개발 DB</b><span class="path">scripts/db-types.mjs</span></td>
+        <td>live 로 뽑았더니 어제 만든 <code>take_expire_due</code> 가 빠졌다. live 에 아직 안 올라갔기 때문이다. 코드(dev 브랜치)는 개발 DB 를 보므로 기준도 개발 DB 여야 한다</td>
+        <td>live 기준(<code>supabase/config.toml</code> 의 <code>project_id</code>)</td>
+        <td>쉬움</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td>어긋남 검사를 <code>tests/ops/</code> 에 둔다<span class="path">tests/ops/db-types-drift.test.ts</span></td>
+        <td><code>pnpm test</code> 에 자동으로 들어가고, 커밋 훅이 그걸 돌린다. 새 명령을 외울 필요가 없다</td>
+        <td>별도 명령으로만 두기</td>
+        <td>쉬움</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td>재생성을 한 줄 명령이 아니라 스크립트 파일로<span class="path">scripts/db-types.mjs</span></td>
+        <td>환경변수를 읽고 결과가 정상 형식인지 확인한 뒤에만 덮어쓴다. 한 줄 명령은 접속이 실패해도 빈 파일로 덮어쓴다</td>
+        <td><code>package.json</code> 에 한 줄</td>
+        <td>쉬움</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><code>config.toml</code> 은 건드리지 않았다</td>
+        <td>그 파일의 <code>project_id</code> 는 배포에 쓰이는 값이라 타입 생성과 목적이 다르다. 고치면 다른 곳이 깨질 수 있다</td>
+        <td>dev 로 바꾸기</td>
+        <td>쉬움</td>
+        <td></td>
+      </tr>
+      <tr>
+        <td>타입을 DB 접속에 물리는 것은 <b>하지 않고 되돌렸다</b><span class="path">src/lib/supabase/admin.ts</span></td>
+        <td>물려 봤더니 타입 오류 31개가 나왔다. 그중 하나는 진짜 버그였다(4절). 31개를 지금 다 고치는 것은 범위가 다르고 오너 판단이 필요하다</td>
+        <td>지금 전부 고치기</td>
+        <td>쉬움<span class="path">실험 후 원복함</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">2</span><h2>발견한 것이 코드에 어떻게 들어갔나</h2></div>
+  <p class="sec-lede">이번 세션은 논의 없이 조사에서 시작했다. 각 발견과 대응을 코드로 대조한다.</p>
+
+  <div class="card diff">
+    <div class="card-head"><h3>표 9개가 타입 파일에 없었다</h3><span class="chip c-fail">어긋남</span></div>
+    <p class="agreed"><b>측정:</b> 마이그레이션 파일이 만든 표와 타입 파일에 있는 표를 대조했다. 빠진 것 9개 중 4개가 결제 관련이다.</p>
+    <p class="code-what">빠져 있던 표 전부.</p>
+<pre><span class="path">측정 명령: 마이그레이션의 create table 과 타입 파일의 표 이름 대조</span><b>billing_customers</b>
+<b>billing_events</b>
+character_appearances
+location_appearances
+props
+scene_character_appearance_overrides
+server_errors
+<b>subscriptions</b>
+<b>take_ledger</b></pre>
+    <p class="code-diff"><span class="chip c-fail">굵은 4개가 결제</span> 어제 만든 Take 원장(<code>take_ledger</code>)이 타입에 없었다. 결제 코드 7개 파일이 이 표를 쓴다.</p>
+  </div>
+
+  <div class="card diff">
+    <div class="card-head"><h3>어긋남을 아무도 못 느낀 이유</h3><span class="chip c-warn">근본 원인</span></div>
+    <p class="agreed"><b>발견:</b> 타입 파일이 DB 접속에 물려 있지 않다. 그래서 없는 표를 써도 검사에 안 걸린다.</p>
+    <p class="note" style="max-width:none"><b>이전 판 정정(오너 09-08 지적).</b> 이 문서 첫 판은 "그 파일은 어디에서도 쓰이지 않는다"고 썼다. <b>틀렸다.</b> 10개 파일이 실제로 import 한다(아래 3절 다음 표). 정확한 서술은 "타입 파일의 일부만 쓰이고, 쿼리를 검사하는 데는 안 쓰인다"이다.</p>
+    <p class="code-what">DB 접속을 만드는 줄. 괄호 앞에 타입 이름이 없다.</p>
+<pre><span class="path">src/lib/supabase/admin.ts:10-13</span>export const supabaseAdmin = <b>createClient(</b>
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+)</pre>
+    <div class="tbl"><table>
+      <thead><tr><th>이름</th><th>뭐가 들어가나</th><th>실제 값</th></tr></thead>
+      <tbody>
+        <tr><td><code>createClient</code></td><td>DB 접속을 만드는 함수</td><td>Supabase 가 제공</td></tr>
+        <tr><td><code>&lt;Database&gt;</code></td><td>이 자리에 타입 이름을 넣으면 이후 모든 쿼리를 검사한다</td><td class="gate-cell">비어 있음</td></tr>
+        <tr><td>첫 번째 값</td><td>DB 주소</td><td><code>https://pbiumddivadgbzxuymak.supabase.co</code></td></tr>
+        <tr><td>두 번째 값</td><td>전권 열쇠</td><td>SERVICE_ROLE 키</td></tr>
+        <tr><td><code>!</code></td><td>"이 값은 반드시 있다"고 검사를 끄는 표시</td><td>없으면 실행 중에 터진다</td></tr>
+      </tbody>
+    </table></div>
+    <p class="code-diff"><span class="chip c-warn">그대로 뒀다</span> <code>&lt;Database&gt;</code> 를 넣으면 오류 31개가 난다(4절 결정 2).</p>
+  </div>
+
+  <div class="card same">
+    <div class="card-head"><h3>다시 만드는 명령</h3><span class="chip c-pass">넣음</span></div>
+    <p class="agreed"><b>대응:</b> <code>pnpm db:types</code> 하나로 개발 DB 에서 타입을 다시 만든다.</p>
+    <p class="code-what">개발 DB 주소에서 프로젝트 이름을 뽑고, 결과가 정상 형식일 때만 파일을 덮어쓴다.</p>
+<pre><span class="path">scripts/db-types.mjs:35-56</span>const env = { ...loadEnvLocal(), ...process.env }
+const ref = projectRef(env.SUPABASE_DEV_URL)
+
+if (!ref) { ... process.exit(1) }
+if (!env.SUPABASE_ACCESS_TOKEN) { ... process.exit(1) }
+
+const generated = execFileSync('npx', ['supabase','gen','types', ...])
+
+if (!generated.includes('__InternalSupabase')) {
+  console.error('[db:types] 생성 결과가 Supabase 타입 파일 형식이 아니다 — 반영하지 않는다')
+  process.exit(1)
+}</pre>
+    <div class="tbl"><table>
+      <thead><tr><th>순서</th><th>줄</th><th>일어나는 일</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1</td><td>35</td><td><code>.env.local</code> 을 읽어 환경변수를 모은다</td></tr>
+        <tr><td class="num">2</td><td>36</td><td><code>SUPABASE_DEV_URL</code> 에서 <code>pbiumddivadgbzxuymak</code> 를 뽑는다</td></tr>
+        <tr><td class="num">3</td><td>38-39</td><td>주소나 열쇠가 없으면 <b>여기서 끝낸다</b>. 파일을 건드리지 않는다</td></tr>
+        <tr><td class="num">4</td><td>41</td><td>Supabase 에 접속해 타입을 받는다. 여기서 몇 초 걸린다</td></tr>
+        <tr><td class="num">5</td><td>43</td><td>받은 내용에 자동 생성 표식이 있는지 확인한다</td></tr>
+        <tr><td class="num">6</td><td>44-45</td><td>없으면 <b>덮어쓰지 않고 끝낸다</b>. 접속 실패로 빈 파일이 되는 것을 막는다</td></tr>
+      </tbody>
+    </table></div>
+    <p class="code-diff"><span class="chip c-pass">실행 확인</span> 1748줄 → 2208줄. 빠져 있던 표 9개와 DB 함수 정의가 채워졌다.</p>
+  </div>
+
+  <div class="card same">
+    <div class="card-head"><h3>커밋 전 검사</h3><span class="chip c-pass">넣음</span></div>
+    <p class="agreed"><b>약속 문장:</b> DB 구조를 바꾸고 타입 파일을 다시 만들지 않으면 커밋 전에 걸린다.</p>
+    <p class="code-what">마이그레이션이 만든 표 중 타입 파일에 없는 것을 찾아 이름을 찍는다.</p>
+<pre><span class="path">tests/ops/db-types-drift.test.ts:57-69</span>it('마이그레이션이 만든 표는 모두 타입 파일에 있다', () =&gt; {
+  const missing = [...tablesCreatedByMigrations()]
+    .filter((table) =&gt; !tablesInGeneratedTypes().has(table))
+    .sort()
+
+  expect(
+    missing,
+    missing.length === 0 ? '' :
+      `타입 파일에 없는 표 ${missing.length}개: ${missing.join(', ')}\n` +
+      `→ pnpm db:types 로 다시 만들어라.`,
+  ).toEqual([])
+})</pre>
+    <p class="code-diff"><span class="chip c-pass">실제로 잡히는 것 확인</span> 가짜 마이그레이션을 넣고 돌렸더니 <code>타입 파일에 없는 표 1개: drift_probe_table</code> 로 막았다. 제거 후 다시 통과.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">3</span><h2>확인한 것 / 안 한 것</h2></div>
+  <div class="split">
+    <div class="yes">
+      <h4>실제로 돌려서 본 것</h4>
+      <ul>
+        <li><code>pnpm test</code> — 261파일 2168개 통과, 22개 건너뜀</li>
+        <li><code>pnpm typecheck</code> — 오류 0</li>
+        <li><code>pnpm lint:design</code> — 통과</li>
+        <li><code>pnpm db:types</code> — 개발 DB 접속 성공, 2208줄 생성</li>
+        <li>어긋남 검사가 실제로 막는지 — 가짜 마이그레이션으로 재현</li>
+        <li>live 와 dev 타입 대조 — <code>take_expire_due</code> 가 dev 에만 있음을 확인</li>
+        <li><code>&lt;Database&gt;</code> 를 물렸을 때 오류 수 — 31개, 파일별 분포까지</li>
+      </ul>
+    </div>
+    <div class="no">
+      <h4>안 본 것</h4>
+      <ul>
+        <li>실제 화면에서 프로젝트 목록 썸네일이 어떻게 보이는지 — <b>브라우저로 안 열어 봤다</b></li>
+        <li>31개 오류 중 <code>portrait_url</code> 외 30개가 진짜 버그인지 개별 확인</li>
+        <li>live DB 의 실제 스키마 — dev 만 조회했다</li>
+        <li>이 보고서를 브라우저로 열어 본 렌더</li>
+        <li>커밋 — 전부 미커밋 상태다</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">3.5</span><h2>오너 질문 3개</h2></div>
+  <p class="sec-lede">2026-09-08 보고서를 읽고 나온 질문. 하나는 이 문서의 오류를 잡았다.</p>
+
+  <div class="card diff">
+    <div class="card-head"><h3>이 파일 지워도 되지 않나</h3><span class="chip c-fail">지우면 깨진다</span></div>
+    <p class="agreed"><b>질문:</b> 어긋나도 아무도 못 느낀다면 삭제해도 되는 것 아닌가.</p>
+    <p>맞는 방향의 질문이고, 답을 찾다가 <b>이 문서의 오류를 발견했다</b>. 첫 판에 "어디에서도 쓰이지 않는다"고 썼는데 전수 조사하니 <b>10개 파일이 import 하고 있었다</b>. 지우면 빌드가 깨진다.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>쓰는 것</th><th>어디서</th><th>지우면</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><code>Json</code><span class="path">DB 에 넣는 자유 형식 값의 타입</span></td>
+          <td>9개 파일<span class="path">generation-jobs.ts · director-store.ts · producer-store.ts · run-store.ts 등</span></td>
+          <td>9개 파일이 컴파일 실패</td>
+        </tr>
+        <tr>
+          <td><code>Database['public']['Tables']['shots']['Row']</code></td>
+          <td><code>src/lib/shots-cache.ts:25</code> 에서 <code>ShotRow</code> 를 만든다</td>
+          <td><code>ShotRow</code> 를 쓰는 <b>39곳</b>이 전부 깨진다</td>
+        </tr>
+        <tr>
+          <td><code>Tables&lt;'video_clips'&gt;</code></td>
+          <td><code>src/lib/director-video-takes.ts:13</code> 에서 <code>DirectorVideoTake</code> 를 만든다</td>
+          <td>영상 테이크 코드 5개 파일이 깨진다</td>
+        </tr>
+      </tbody>
+    </table></div>
+    <p class="code-what">샷 목록의 타입을 DB 표 구조에서 그대로 가져오는 줄.</p>
+<pre><span class="path">src/lib/shots-cache.ts:23-25</span>import type { Database } from '@/types/database'
+
+export type <b>ShotRow</b> = Database['public']['Tables']['shots']['Row']</pre>
+    <p class="code-diff"><span class="chip c-acc">읽는 법</span> <code>Database</code> 안의 <code>public</code> 안의 <code>Tables</code> 안의 <code>shots</code> 안의 <code>Row</code> 를 꺼내 <code>ShotRow</code> 라는 이름을 붙인다. 샷 표에 컬럼이 하나 늘면 <b>이 이름도 자동으로 따라 늘어난다</b>. 손으로 적었다면 따로 고쳐야 한다.</p>
+    <p>정확한 상태는 "안 쓰인다"가 아니라 <b>절반만 쓰인다</b>이다. 타입 이름을 빌려 쓰는 데는 쓰이고, 쿼리가 맞는지 검사하는 데는 안 쓰인다. 오늘 찾은 썸네일 버그가 후자에서 샜다.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>타입이 왜 필요한가</h3></div>
+    <p class="agreed"><b>질문:</b> 타입이 필요한 이유가 뭔가. 무엇을 막아 주나.</p>
+    <p>이 저장소에서 오늘 실제로 일어난 일로 답한다. 가정이 아니라 측정된 사례다.</p>
+    <div class="tbl"><table>
+      <thead><tr><th></th><th>타입 없을 때(현재)</th><th>타입 물렸을 때</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>없는 컬럼을 뽑으면</td>
+          <td>그냥 통과. 값이 비어 온다</td>
+          <td><b>커밋 전에 걸린다</b></td>
+        </tr>
+        <tr>
+          <td>오늘 찾은 것</td>
+          <td><code>characters</code> 에 없는 <code>portrait_url</code> 을 뽑는 코드가 살아 있었다</td>
+          <td>타입을 물리자마자 <b>31개 중 하나로 즉시 나왔다</b></td>
+        </tr>
+        <tr>
+          <td>언제 알게 되나</td>
+          <td>화면에서 값이 비어 보일 때. 오늘까지 아무도 몰랐다</td>
+          <td><code>pnpm typecheck</code> 실행 직후</td>
+        </tr>
+        <tr>
+          <td>표 이름 오타</td>
+          <td>실행 중에 실패</td>
+          <td>커밋 전에 걸린다</td>
+        </tr>
+      </tbody>
+    </table></div>
+    <p>타입이 막는 것은 <b>DB 구조와 코드가 어긋난 채로 배포되는 것</b>이다. 지금은 그 어긋남이 화면에 나타날 때까지 아무 신호가 없다.</p>
+    <p>다만 <b>공짜가 아니다.</b> 물리는 순간 31개가 한꺼번에 나오고, 그중 몇 개가 진짜 버그이고 몇 개가 타입 표기만 고치면 되는 것인지는 아직 안 세어 봤다. 그래서 결정 2 에서 범위를 묻는다.</p>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h3>프로젝트 목록 화면</h3><span class="chip c-acc">판정 재료</span></div>
+    <p class="agreed"><b>질문:</b> 화면 보고 정해야 할 듯. 캡처 필요함.</p>
+    <p>dev 배포(<code>tale-git-dev-talestudio.vercel.app/projects</code>)에서 찍었다. 2026-09-08 12:57.</p>
+    <figure class="fr">
+      <img alt="프로젝트 카드 하나. 이미지 자리에 그라디언트 배경과 흰색 글자 U 만 있고 사진은 없다. 아래에 제목 Untitled, 단계 Editor, 수정 시각 표시." src="data:image/jpeg;base64,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pmnSxX+qXMYt0nh6mKIxMxk3FQVGOSAOtfhZd6/rt/rB8Q317cTX7MHN08jNMWUAA7yd2QAADntXQ+IviZ8RPF1kmm+Kdc1HULePG2G5uJJEGOnysSOKAP1zk+HniX9rL/gm34H8LfBXy7/WfBuqS/2po6SKkhyZxkBiBnbKrrnggnByMVf8e/CjxT8Gf+CVWq+BvG0kf9rQ+JoZ7u0jkWX7E000TLbuykqHClXYA8F6/Gvw1418X+DJpLjwlql5pryjbI1pM0RYeh2kZpt14x8XX2nz6Re6peTWtzN9ongkmdo5JTj52UnBbgcnnigDm6KKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAp83/ACCL3/cT/wBGLTKfN/yCL3/cT/0YtAHEUUUUAf/V/n/rs7D/AJAUP/XaX+SVxldnYf8AICh/67S/ySgBaKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKKKKACiiigAooooAKfN/yCL3/cT/ANGLTKfN/wAgi9/3E/8ARi0AcRRRRQB//9b+f+uzsP8AkBQ/9dpf5JXGV2dh/wAgKH/rtL/JKAFooooAfGjSuI0GWY4A9zXb23hm0SMfaSXbvg4ArmNGAOqQZ/vf0Nem0AYX/CO6Z/db/vo0f8I7pn91v++jXqXgnwReeN7q8t7W5t7RLC0e9nmuSwRYo2VWPygn+Idqq+JfDNnoAh+x6rZamZiwIszIdmMY3b1XrnjHpTs7XC55v/wjumf3W/76NH/CO6Z/db/vo16lZeB9VuPDWr+I7oNajSRal4Zo2V5BdOyKVzjgbfTmr3/CudX1G/1K38LFtRg0u0F5NN5TxEptUsqow3FgWwB1OMjijlYrnj//AAjumf3W/wC+jR/wjumf3W/76NdRBp+oXRkFrBLKYsmTYjNsA67sDj8aS3sr27/49IZZfmC/u0ZvmboOAeT2HekM5j/hHdM/ut/30a57WNE+wp9otyTHnBB6ivQHR43McgKs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">
+      <figcaption>카드 이미지 자리에 사진이 없다. 제목 첫 글자 <code>U</code> 와 그라디언트만 뜬다.</figcaption>
+    </figure>
+    <p>화면을 열어 확인한 것: 카드 영역에 <code>&lt;img&gt;</code> 요소가 <b>0개</b>다. <code>/api/project/list</code> 응답의 <code>thumbnail_url</code> 이 <code>null</code> 이라 폴백으로 떨어졌다.</p>
+    <p class="note" style="max-width:none"><b>이 계정으로는 A/B 판정이 안 된다.</b> 이 프로젝트에는 인물 이미지 자체가 없어서 <code>portrait_url</code> 이든 <code>view_main</code> 이든 결과가 같다(둘 다 없음). 버그가 화면에 어떻게 나타나는지 보려면 <b>인물 이미지가 있는 프로젝트</b>가 필요하다. 오너 계정의 목록 화면 캡처 한 장이면 된다.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">4</span><h2>결정이 필요한 것</h2></div>
+  <p class="sec-lede">오늘 답할 수 있는 것 2개.</p>
+
+  <h3>결정 1 — 프로젝트 목록 썸네일</h3>
+  <p>타입을 물려 봤을 때 나온 오류 중 하나가 실제 버그였다. 존재하지 않는 컬럼을 뽑고 있다.</p>
+  <p class="code-what">프로젝트 목록의 대표 이미지를 고르는 쿼리. <code>characters</code> 표에서 <code>portrait_url</code> 을 뽑는다.</p>
+<pre><span class="path">src/app/api/project/list/route.ts:60-63</span>supabaseAdmin
+  .from('characters')
+  .select('project_id, <b>portrait_url</b>, view_main')
+  .in('project_id', ids),</pre>
+  <div class="tbl"><table>
+    <thead><tr><th>이름</th><th>뭐가 들어가나</th><th>실제 값</th></tr></thead>
+    <tbody>
+      <tr><td><code>characters</code></td><td>인물 표</td><td>컬럼에 <code>portrait</code> 는 있고 <code>portrait_url</code> 은 <b>없다</b></td></tr>
+      <tr><td><code>portrait_url</code></td><td>얼굴 이미지 주소</td><td><code>character_appearances</code> 표의 컬럼이다</td></tr>
+      <tr><td><code>view_main</code></td><td>정면 이미지 주소</td><td><code>characters</code> 에 있다</td></tr>
+    </tbody>
+  </table></div>
+  <p>없는 컬럼을 뽑으면 Supabase 는 그 값을 비워 돌려준다. 다음 줄(<code>:82</code>)이 <code>portrait_url ?? view_main</code> 이라 <b>항상 <code>view_main</code> 으로 넘어간다</b>. 오류 없이 조용히 동작한다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>질문</th><th>안 정하면 무엇이 달라지나</th><th>선택지</th><th>추천</th><th>언제까지</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>프로젝트 목록 카드에 어떤 얼굴이 떠야 하나</td>
+        <td>지금은 정면 전신(<code>view_main</code>)이 뜬다. 의도가 얼굴 크롭(<code>portrait_url</code>)이었다면 카드가 계속 다른 그림을 보여준다. 언제부터인지는 확인 안 했다</td>
+        <td><b>A</b> 지금이 맞다 — 코드에서 <code>portrait_url</code> 만 지운다<br><b>B</b> 얼굴 크롭이 맞다 — <code>character_appearances</code> 에서 가져오게 고친다<br><b>C</b> 인물 이미지가 있는 프로젝트 화면을 보고 정한다</td>
+        <td class="gate-cell">C</td>
+        <td>다음 세션</td>
+      </tr>
+    </tbody>
+  </table></div>
+  <p class="note" style="max-width:none"><b>화면을 확인했다(3.5절).</b> dev 배포 계정의 프로젝트에는 인물 이미지가 없어 카드가 글자 폴백으로 뜬다. 그 계정으로는 A 와 B 의 결과가 같아 판정이 안 된다. <b>인물 이미지가 있는 프로젝트의 목록 화면 캡처 한 장</b>이면 A/B 를 바로 고를 수 있다.</p>
+
+  <h3>결정 2 — 타입을 DB 접속에 물릴 것인가</h3>
+  <p>물리면 이후 모든 쿼리가 검사를 받는다. 지금 물리면 오류 31개가 한꺼번에 나온다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>범위</th><th>오류 수</th><th>드러나는 것</th><th>드는 시간</th></tr></thead>
+    <tbody>
+      <tr><td>안 물린다(현재)</td><td class="num">0</td><td>없다. 오타·없는 컬럼이 그대로 통과</td><td class="num">0</td></tr>
+      <tr><td><code>admin.ts</code> 하나만</td><td class="num">31</td><td>서버 쿼리 전부. <code>portrait_url</code> 같은 실제 버그 포함</td><td>측정 안 함</td></tr>
+      <tr><td>세 접속 전부</td><td>측정 안 함</td><td>브라우저 쿼리까지</td><td>측정 안 함</td></tr>
+    </tbody>
+  </table></div>
+  <div class="tbl"><table>
+    <thead><tr><th>질문</th><th>안 정하면 무엇이 달라지나</th><th>선택지</th><th>추천</th><th>언제까지</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>타입 검사를 쿼리까지 켤 것인가</td>
+        <td>지금 상태로는 없는 컬럼을 써도 커밋·배포가 통과한다. 화면에서 값이 비어 보일 때까지 모른다. 오늘 찾은 썸네일 버그가 그 사례다</td>
+        <td><b>A</b> 지금은 여기까지 — 어긋남 감지만<br><b>B</b> 버그 하나만 고친다<br><b>C</b> 전면 적용 — 31개를 다 고친다</td>
+        <td class="gate-cell">B</td>
+        <td>이번 주</td>
+      </tr>
+    </tbody>
+  </table></div>
+  <p>C 는 별도 슬라이스로 잡는 편이 낫다. 31개 중 몇 개가 진짜 버그인지 아직 안 세어 봤고, 고치는 중에 동작이 바뀌면 오너 확인이 필요한 것이 섞여 나올 수 있다.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">5</span><h2>알고만 있으면 되는 것</h2></div>
+  <div class="tbl"><table>
+    <thead><tr><th>가정</th><th>틀리면 무엇이 깨지나</th><th>확인 방법</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>개발 DB 스키마가 live 보다 앞서 있다</td>
+        <td>타입에는 있는데 live 에 없는 함수를 부르면 배포 후 실행 중에 실패한다. 지금 <code>take_expire_due</code> 가 그 상태다</td>
+        <td>마이그레이션을 live 에 올린 뒤 <code>pnpm db:types</code> 재실행</td>
+      </tr>
+      <tr>
+        <td>어긋남 검사는 <b>표</b>만 본다</td>
+        <td>컬럼을 추가·삭제하는 마이그레이션은 안 잡힌다. <code>alter table add column</code> 은 표 이름이 안 바뀌기 때문</td>
+        <td>컬럼 대조까지 넣으려면 검사를 늘려야 한다</td>
+      </tr>
+      <tr>
+        <td>타입 파일을 손으로 고치지 않는다</td>
+        <td>고쳐도 다음 <code>pnpm db:types</code> 에서 지워진다</td>
+        <td>검사가 자동 생성 표식을 확인한다</td>
+      </tr>
+      <tr>
+        <td><code>server-only</code> 는 이미 <code>package.json</code> 에 올라갔다</td>
+        <td>의존성만 있고 <code>admin.ts</code> 의 <code>import</code> 는 아직 미커밋이다. 그 상태로는 아무것도 막지 않는다</td>
+        <td>같이 커밋하면 해소된다</td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <h3>지뢰</h3>
+  <ul class="plain">
+    <li><b>이번 세션의 변경이 다른 커밋에 딸려 올라갔다.</b> <code>server-only</code> 가 <code>8a11209f</code>(결제 게이트 검사) 에 섞여 들어갔고, lock 파일이 빠져 dev 배포가 <code>ERR_PNPM_OUTDATED_LOCKFILE</code> 로 깨졌다. <code>ae904ca6</code> 에서 고쳤다. <code>git add -A</code> 로 묶으면 같은 일이 또 난다.</li>
+    <li><code>vitest.config.ts</code> 에 <code>server-only</code> 를 빈 파일로 바꾸는 줄을 넣었다. 테스트에서만 적용되고 실제 빌드는 그대로 막는다. 이 줄을 지우면 서버 모듈을 쓰는 테스트가 전부 실패한다.</li>
+    <li>타입 파일 2208줄 중 실제로 쓰이는 것은 아직 없다. 결정 2 에서 A 를 고르면 <b>계속 그 상태로 남는다</b>.</li>
+  </ul>
+</section>
+
+<footer>
+  <p><b>근거로 쓴 것</b> — 커밋 <code>ae904ca6</code> 기준. 미커밋 변경 7개: <code>CLAUDE.md</code>, <code>package.json</code>, <code>src/lib/supabase/admin.ts</code>, <code>src/types/database.ts</code>, <code>vitest.config.ts</code>, <code>tests/ops/db-types-drift.test.ts</code>(새 파일), <code>tests/permission/server-only-key-boundary.test.ts</code>(새 파일), <code>scripts/db-types.mjs</code>(새 파일).</p>
+  <p><b>이 문서가 하지 않는 것</b> — 인물 이미지가 있는 프로젝트의 목록 화면을 보지 않았다. 확인한 것은 이미지가 없는 계정 한 곳뿐이고, 거기서는 A 와 B 의 결과가 같다. 타입 오류 31개 중 30개는 종류만 세었고 개별 판정하지 않았다. live DB 스키마를 조회하지 않았다. 썸네일 버그가 언제 들어왔는지 git 이력을 추적하지 않았다.</p>
+  <p><b>정정 이력</b> — 첫 판의 "타입 파일이 어디에서도 쓰이지 않는다"는 틀렸다(오너 09-08 지적). 10개 파일이 import 하고 있었고 지우면 39곳이 깨진다. 3.5절에 근거를 실었다.</p>
+</footer>
+
+</div>
+</body>
+</html>

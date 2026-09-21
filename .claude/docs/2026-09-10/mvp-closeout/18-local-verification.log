@@ -1,0 +1,10 @@
+
+ RUN  v4.1.6 /Users/xcape/orca/workspaces/tale-studio/mvp-feedback-release-20260910
+
+(node:50918) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+ Test Files  4 passed (4)
+      Tests  14 passed (14)
+   Start at  15:16:30
+   Duration  289ms (transform 205ms, setup 32ms, import 268ms, tests 54ms, environment 0ms)

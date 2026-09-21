@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import { ImageIcon, Loader2, Trash2, Upload, X } from 'lucide-react'
+import { Trash2, Upload, X } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -28,6 +28,8 @@ import {
   normalizeImageModelKey,
 } from '@/lib/image-models'
 import { useT } from '@/lib/i18n'
+import { useImageUploadConsent } from '@/components/upload/image-upload-consent'
+import { StoryboardImageButton } from '@/features/director/storyboard-image-button'
 
 type Props = {
   nodeId: string
@@ -36,22 +38,17 @@ type Props = {
 
 export function ShotNodePopup({ nodeId, data }: Props) {
   const t = useT()
+  const { requestImageUploadConsent, imageUploadConsentDialog } = useImageUploadConsent(nodeId)
   const closePopup = useDirectorCanvasStore((s) => s.closePopup)
   // #debug-prompts: 관리자 소유 프로젝트에서만 원본 생성 풀 프롬프트(shots.prompt) 노출.
   const debugProjectId = useDirectorCanvasStore((s) => s.projectId)
   const debugPrompts = useDebugPrompts(debugProjectId)
   const updateNodeData = useDirectorCanvasStore((s) => s.updateNodeData)
-  const generateStoryboardImage = useDirectorCanvasStore(
-    (s) => s.generateStoryboardImage,
-  )
   const openDeleteConfirm = useDirectorCanvasStore(
     (s) => s.openDeleteConfirm,
   )
-  const isGenerating = useDirectorCanvasStore(
-    (s) => !!s.generatingNodeIds[nodeId],
-  )
   const generationError = useDirectorCanvasStore(
-    (s) => s.generationErrors[nodeId],
+    (s) => data.storyboardImage?.errorMessage || s.generationErrors[nodeId],
   )
 
 
@@ -82,13 +79,6 @@ export function ShotNodePopup({ nodeId, data }: Props) {
   }
 
   const currentPrompt = effectivePrompt(data)
-  const hasImage = data.storyboardImage?.status === 'completed'
-
-  // #ui-cleanup: 이미지 노드의 주 액션은 이미지 생성/재생성 — 영상 테이크 버튼은
-  //   Video 노드(캔버스 Branch·우클릭)가 담당한다.
-  const handleGenerateImage = () => {
-    void generateStoryboardImage(nodeId)
-  }
 
   const handleDelete = () => {
     closePopup()
@@ -96,7 +86,8 @@ export function ShotNodePopup({ nodeId, data }: Props) {
   }
 
   // 현재 카메라/조명/렌즈 셋업을 프리셋으로 저장 (D-6, 결정 #46)
-  const handleAddReferenceImage = (file: File) => {
+  const handleAddReferenceImage = async (file: File) => {
+    if (!await requestImageUploadConsent([file])) return
     const reader = new FileReader()
     reader.onload = () => {
       const url = String(reader.result)
@@ -119,6 +110,7 @@ export function ShotNodePopup({ nodeId, data }: Props) {
   return (
     <Dialog open onOpenChange={(o) => !o && closePopup()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        {imageUploadConsentDialog}
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span className="inline-block h-2 w-2 rounded-full bg-chart-4" />
@@ -199,7 +191,7 @@ export function ShotNodePopup({ nodeId, data }: Props) {
                   aria-label={t('Upload reference image')}
                   onChange={(e) => {
                     const file = e.target.files?.[0]
-                    if (file) handleAddReferenceImage(file)
+                    if (file) void handleAddReferenceImage(file)
                     e.target.value = ''
                   }}
                 />
@@ -318,24 +310,7 @@ export function ShotNodePopup({ nodeId, data }: Props) {
         <Separator />
 
         <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            onClick={handleGenerateImage}
-            className="gap-1.5"
-            disabled={isGenerating}
-          >
-            {isGenerating ? (
-              <>
-                <Loader2 className="size-3.5 animate-spin" />
-                Generating…
-              </>
-            ) : (
-              <>
-                <ImageIcon className="size-3.5" />
-                {hasImage ? t('Regenerate image') : t('Generate image')}
-              </>
-            )}
-          </Button>
+          <StoryboardImageButton nodeId={nodeId} data={data} />
           <div className="ml-auto" />
           <Button
             size="sm"

@@ -18,7 +18,7 @@ import { isImageModelKey, type ImageModelKey } from '@/lib/image-models'
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
 import { applyWorldSafeMode, ensureNoPeopleClause } from '@/lib/artist/world-prompt'
 import { checkGenerationCapacity } from '@/lib/generation-quota'
-import { quotaRejectionResponse } from '@/lib/api/quota'
+import { capacityReservationRejection, quotaRejectionResponse } from '@/lib/api/quota'
 import { resolveStyleAnchor } from '@/lib/style-anchor'
 import { submitWorldShotJob } from '@/lib/artist/world-submit'
 import { isChatTraceId } from '@/lib/chat-trace'
@@ -144,24 +144,33 @@ export async function POST(req: Request) {
       if (baseUrl) referenceImageUrls = [baseUrl]
     }
 
-    const job = await submitWorldShotJob({
-      projectId,
-      locationId,
-      column: column as 'wide_shot',
-      prompt: finalPrompt,
-      aspectRatio: aspectRatio ?? '16:9',
-      actor: jobActor,
-      userId: access.userId!,
-      workspaceId: project.workspace_id,
-      sourceHash: sourceHash ?? null,
-      anchor,
-      chatTraceId: traceId ?? null,
-      model,
-      safeMode: effectiveSafeMode,
-      descriptionHash: typeof descriptionHash === 'string' ? descriptionHash : null,
-      appearanceKey,
-      referenceImageUrls,
-    })
+    // 제출은 자리 예약 뒤에만 일어난다(world-submit.ts) — 트리거가 자리 없음으로 거절하면 그 예외를
+    //   사전 검사와 같은 429 + 축 관측으로 옮긴다(#generation-capacity-trigger 2026-09-14).
+    let job: Awaited<ReturnType<typeof submitWorldShotJob>>
+    try {
+      job = await submitWorldShotJob({
+        projectId,
+        locationId,
+        column: column as 'wide_shot',
+        prompt: finalPrompt,
+        aspectRatio: aspectRatio ?? '16:9',
+        actor: jobActor,
+        userId: access.userId!,
+        workspaceId: project.workspace_id,
+        sourceHash: sourceHash ?? null,
+        anchor,
+        chatTraceId: traceId ?? null,
+        model,
+        safeMode: effectiveSafeMode,
+        descriptionHash: typeof descriptionHash === 'string' ? descriptionHash : null,
+        appearanceKey,
+        referenceImageUrls,
+      })
+    } catch (e) {
+      const rejected = capacityReservationRejection(e, { projectId, kind: 'world_shot', userId: access.userId })
+      if (rejected) return rejected
+      throw e
+    }
 
     return NextResponse.json({ ok: true, jobId: job.id, status: 'queued' })
   } catch (e) {

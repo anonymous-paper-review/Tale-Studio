@@ -2,7 +2,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  createGenerationJob: vi.fn<(...a: unknown[]) => Promise<{ id: string }>>(async () => ({ id: 'job-1' })),
+  // #generation-capacity-trigger(2026-09-14): 이미지 경로는 자리 예약 → 제출 → 접수 번호 채움 순서다.
+  //   목 대상만 그 순서의 함수로 옮겼고, 각 케이스가 검사하는 동작은 그대로다.
+  reserveGenerationJob: vi.fn<(...a: unknown[]) => Promise<{ id: string; fal_key_id: string }>>(async () => ({ id: 'job-1', fal_key_id: 'prod-2000' })),
+  confirmGenerationJobReceipt: vi.fn<(...a: unknown[]) => Promise<void>>(async () => {}),
+  rejectGenerationJobReservation: vi.fn<(...a: unknown[]) => Promise<void>>(async () => {}),
   hasQueuedCharacterViewJob: vi.fn<(...a: unknown[]) => Promise<boolean>>(async () => false),
   hasQueuedWorldShotJob: vi.fn<(...a: unknown[]) => Promise<boolean>>(async () => false),
   countFailedJobsForTarget: vi.fn<(...a: unknown[]) => Promise<number>>(async () => 0),
@@ -34,7 +38,9 @@ vi.mock('@/lib/writer/llm/fal', () => ({
   isImageEditModel: (model: string) => /\/edit$/.test(model),
 }))
 vi.mock('@/lib/generation-jobs', () => ({
-  createGenerationJob: (...a: unknown[]) => mocks.createGenerationJob(...a),
+  reserveGenerationJob: (...a: unknown[]) => mocks.reserveGenerationJob(...a),
+  confirmGenerationJobReceipt: (...a: unknown[]) => mocks.confirmGenerationJobReceipt(...a),
+  rejectGenerationJobReservation: (...a: unknown[]) => mocks.rejectGenerationJobReservation(...a),
   hasQueuedCharacterViewJob: (...a: unknown[]) => mocks.hasQueuedCharacterViewJob(...a),
   hasQueuedWorldShotJob: (...a: unknown[]) => mocks.hasQueuedWorldShotJob(...a),
   countFailedJobsForTarget: (...a: unknown[]) => mocks.countFailedJobsForTarget(...a),
@@ -151,8 +157,12 @@ beforeEach(() => {
   dbState.locations = []
   dbState.candidates = []
 
-  mocks.createGenerationJob.mockReset()
-  mocks.createGenerationJob.mockResolvedValue({ id: 'job-1' })
+  mocks.reserveGenerationJob.mockReset()
+  mocks.reserveGenerationJob.mockResolvedValue({ id: 'job-1', fal_key_id: 'prod-2000' })
+  mocks.confirmGenerationJobReceipt.mockReset()
+  mocks.confirmGenerationJobReceipt.mockResolvedValue(undefined)
+  mocks.rejectGenerationJobReservation.mockReset()
+  mocks.rejectGenerationJobReservation.mockResolvedValue(undefined)
   mocks.hasQueuedCharacterViewJob.mockReset()
   mocks.hasQueuedCharacterViewJob.mockResolvedValue(false)
   mocks.hasQueuedWorldShotJob.mockReset()
@@ -185,9 +195,9 @@ describe('그림 초안 생성 — 그림체가 없거나 설정을 읽지 못�
       worlds: { submitted: 0, skipped: 0, failed: 0 },
     })
     expect(mocks.falImageSubmit).not.toHaveBeenCalled()
-    expect(mocks.createGenerationJob).not.toHaveBeenCalled()
+    expect(mocks.reserveGenerationJob).not.toHaveBeenCalled()
     expect(
-      mocks.createGenerationJob.mock.calls.some(
+      mocks.reserveGenerationJob.mock.calls.some(
         ([arg]) => (arg as { inputSnapshot?: { look_present?: boolean } }).inputSnapshot?.look_present === false,
       ),
     ).toBe(false)
@@ -211,7 +221,7 @@ describe('그림 초안 생성 — 그림체가 없거나 설정을 읽지 못�
 
     expect(result.skipped_no_look).toBe(true)
     expect(mocks.falImageSubmit).not.toHaveBeenCalled()
-    expect(mocks.createGenerationJob).not.toHaveBeenCalled()
+    expect(mocks.reserveGenerationJob).not.toHaveBeenCalled()
   })
 
   it('그림체가 있으면 캐릭터 그림 초안을 만들고 작업 공간 정보를 함께 기록한다', async () => {
@@ -225,8 +235,8 @@ describe('그림 초안 생성 — 그림체가 없거나 설정을 읽지 못�
     const result = await triggerAssetDrafts(PROJECT_ID)
 
     expect(result.characters).toEqual({ submitted: 1, skipped: 0, failed: 0 })
-    expect(mocks.createGenerationJob).toHaveBeenCalledTimes(1)
-    const arg = mocks.createGenerationJob.mock.calls[0][0] as {
+    expect(mocks.reserveGenerationJob).toHaveBeenCalledTimes(1)
+    const arg = mocks.reserveGenerationJob.mock.calls[0][0] as {
       kind: string
       inputSnapshot: Record<string, unknown>
       target: { workspaceId?: string; characterId?: string; appearanceKey?: string; view?: string; column?: string }
@@ -252,8 +262,8 @@ describe('그림 초안 생성 — 그림체가 없거나 설정을 읽지 못�
     const result = await triggerCharacterDrafts(PROJECT_ID)
 
     expect(result).toEqual({ submitted: 2, skipped: 0, failed: 0 })
-    expect(mocks.createGenerationJob).toHaveBeenCalledTimes(2)
-    const ids = mocks.createGenerationJob.mock.calls.map((c) => (c[0] as { target: { characterId: string } }).target.characterId).sort()
+    expect(mocks.reserveGenerationJob).toHaveBeenCalledTimes(2)
+    const ids = mocks.reserveGenerationJob.mock.calls.map((c) => (c[0] as { target: { characterId: string } }).target.characterId).sort()
     expect(ids).toEqual(['char_producer', 'char_writer'])
   })
 
@@ -268,14 +278,14 @@ describe('그림 초안 생성 — 그림체가 없거나 설정을 읽지 못�
     )
 
     const worldResult = await triggerWorldDrafts(PROJECT_ID)
-    const triggerArg = mocks.createGenerationJob.mock.calls[0][0] as {
+    const triggerArg = mocks.reserveGenerationJob.mock.calls[0][0] as {
       kind: string
       actor: string
       inputSnapshot: Record<string, unknown>
       target: { workspaceId?: string; locationId?: string; column?: string }
     }
 
-    mocks.createGenerationJob.mockClear()
+    mocks.reserveGenerationJob.mockClear()
     mocks.falImageSubmit.mockClear()
     const routeResponse = await generateWorldPOST(
       new Request('http://localhost/api/artist/generate-world', {
@@ -293,7 +303,7 @@ describe('그림 초안 생성 — 그림체가 없거나 설정을 읽지 못�
         }),
       }),
     )
-    const routeArg = mocks.createGenerationJob.mock.calls[0][0] as {
+    const routeArg = mocks.reserveGenerationJob.mock.calls[0][0] as {
       inputSnapshot: Record<string, unknown>
       target: { workspaceId?: string; locationId?: string; column?: string }
     }
@@ -317,7 +327,7 @@ describe('그림 초안 생성 — 그림체가 없거나 설정을 읽지 못�
 
     expect(result).toEqual({ submitted: 0, skipped: 1, failed: 0 })
     expect(mocks.falImageSubmit).not.toHaveBeenCalled()
-    expect(mocks.createGenerationJob).not.toHaveBeenCalled()
+    expect(mocks.reserveGenerationJob).not.toHaveBeenCalled()
   })
 
   it('일부 대상에서 생성에 실패해도 전체 결과에 실패 수로 반영한다', async () => {
@@ -325,7 +335,8 @@ describe('그림 초안 생성 — 그림체가 없거나 설정을 읽지 못�
     mocks.falImageSubmit.mockRejectedValueOnce(new Error('fal unavailable'))
 
     await expect(triggerWorldDrafts(PROJECT_ID)).resolves.toEqual({ submitted: 0, skipped: 0, failed: 1 })
-    expect(mocks.createGenerationJob).not.toHaveBeenCalled()
+    // 예약은 제출보다 먼저다 — 접수되지 않았다는 증거는 접수 번호가 채워지지 않은 것이다.
+    expect(mocks.confirmGenerationJobReceipt).not.toHaveBeenCalled()
   })
 
   // #B(2026-09-02 용량 사전 점검) — design_tokens 확인 직후 owner 쿼터가 랬으부타마면 제출 전역 스킵.
@@ -344,7 +355,7 @@ describe('그림 초안 생성 — 그림체가 없거나 설정을 읽지 못�
 
     expect(result).toEqual({ characters: { submitted: 0, skipped: 0, failed: 0 }, worlds: { submitted: 0, skipped: 0, failed: 0 } })
     expect(mocks.falImageSubmit).not.toHaveBeenCalled()
-    expect(mocks.createGenerationJob).not.toHaveBeenCalled()
+    expect(mocks.reserveGenerationJob).not.toHaveBeenCalled()
     expect(mocks.checkGenerationCapacity).toHaveBeenCalledWith(OWNER_ID, 'image')
   })
 

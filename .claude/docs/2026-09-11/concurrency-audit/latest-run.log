@@ -1,0 +1,171 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/private/var/folders/t6/snw_y0p96b5dhcbclfksgldm0000gn/T/tale-concurrency-main-TA7GGC[39m
+
+ [32m✓[39m tests/job/fal-keys.test.ts[2m > [22mfalKeys — 설정이 잘못된 경우[2m > [22m설정값이 없으면 오류를 알려준다[32m 19[2mms[22m[39m
+ [32m✓[39m tests/job/fal-keys.test.ts[2m > [22mfalKeys — 설정이 잘못된 경우[2m > [22m설정 형식을 읽을 수 없으면 오류를 알려준다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/job/fal-keys.test.ts[2m > [22mfalKeys — 설정이 잘못된 경우[2m > [22m사용할 연결 목록이 비어 있으면 오류를 알려준다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/job/fal-keys.test.ts[2m > [22mfalKeys — 설정이 잘못된 경우[2m > [22m연결 이름이 중복되면 오류를 알려준다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/job/fal-keys.test.ts[2m > [22mfalKeys — 설정이 잘못된 경우[2m > [22m설정 오류는 실제 사용 시점에만 알려준다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/job/fal-keys.test.ts[2m > [22mpickFalKey — 가장 여유 있는 연결 선택[2m > [22m처리 여유가 가장 큰 연결로 새 요청을 보낸다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/job/fal-keys.test.ts[2m > [22mpickFalKey — 가장 여유 있는 연결 선택[2m > [22m여유가 같으면 먼저 등록된 연결을 선택한다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/job/fal-keys.test.ts[2m > [22mpickFalKey — 가장 여유 있는 연결 선택[2m > [22m모든 연결이 한도에 닿아도 가장 덜 바쁜 연결을 고른다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/job/fal-keys.test.ts[2m > [22mfalKeyById[2m > [22m등록되지 않은 연결 이름을 찾으면 없다고 알려준다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/job/fal-keys.test.ts[2m > [22mfalKeyById[2m > [22m등록된 연결 이름을 찾으면 해당 연결을 돌려준다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/job/fal-keys.test.ts[2m > [22mtotalMaxInflight[2m > [22m등록된 모든 연결의 처리 한도를 합산한다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/billing/generation-quota-split-pools.test.ts[2m > [22mcheckGenerationCapacity — 영상·이미지 한도 분리[2m > [22m영상 작업은 영상 한도 3개만 계산한다[32m 2[2mms[22m[39m
+ [32m✓[39m tests/billing/generation-quota-split-pools.test.ts[2m > [22mcheckGenerationCapacity — 영상·이미지 한도 분리[2m > [22m이미지 작업은 이미지 한도 6개만 계산한다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/billing/generation-quota-split-pools.test.ts[2m > [22mcheckGenerationCapacity — 영상·이미지 한도 분리[2m > [22m이미지 한도가 가득 차도 영상 작업은 계속할 수 있다 (C1 회귀)[32m 0[2mms[22m[39m
+ [32m✓[39m tests/billing/generation-quota-split-pools.test.ts[2m > [22mcheckGenerationCapacity — 관리자 개인 한도 면제[2m > [22m관리자는 개인별 생성 한도에 걸리지 않는다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/billing/generation-quota-split-pools.test.ts[2m > [22mcheckGenerationCapacity — 관리자 개인 한도 면제[2m > [22m관리자도 전체 동시 작업 한도는 지킨다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/billing/generation-quota-split-pools.test.ts[2m > [22mcheckGenerationCapacity — 관리자 개인 한도 면제[2m > [22m관리자 확인에 실패하면 일반 사용자 한도를 적용한다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/billing/generation-quota-split-pools.test.ts[2m > [22mcheckGenerationCapacity — admin 면제 표 동기화 (신규 게이트)[2m > [22m관리자 video 검사는 면제 표에 user_id 를 upsert 한다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/billing/generation-quota-split-pools.test.ts[2m > [22mcheckGenerationCapacity — admin 면제 표 동기화 (신규 게이트)[2m > [22m일반 사용자 video 검사는 기존 면제 행을 삭제한다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/billing/generation-quota-split-pools.test.ts[2m > [22mcheckGenerationCapacity — admin 면제 표 동기화 (신규 게이트)[2m > [22m영상 면제 동기화 실패는 안전하게 throw 하고, image 검사는 면제 표를 건드리지 않는다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/billing/generation-quota-split-pools.test.ts[2m > [22mcheckGenerationCapacity — admin 면제 표 동기화 (신규 게이트)[2m > [22m작업 수 조회가 실패해도 일반 사용자의 오래된 관리자 면제를 남기지 않는다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/billing/generation-quota-split-pools.test.ts[2m > [22mquotaExceededBody — 종류별 한도 안내[2m > [22m가득 찬 종류를 알려 영상과 이미지를 구분해 안내한다[32m 0[2mms[22m[39m
+[90mstderr[2m | tests/job/batch-recovery.test.ts[2m > [22m[2m서버가 놓친 일괄을 다시 확인한다[2m > [22m[2m한 작업의 복구 오류가 다른 작업의 수집을 막지 않는다
+[22m[39m[video-batches] job recovery failed: job-a temporary database failure
+
+ [32m✓[39m tests/job/batch-recovery.test.ts[2m > [22m서버가 놓친 일괄을 다시 확인한다[2m > [22m첫 작업이 아직 없어도 저장한 일괄을 이어간다[32m 3[2mms[22m[39m
+ [32m✓[39m tests/job/batch-recovery.test.ts[2m > [22m서버가 놓친 일괄을 다시 확인한다[2m > [22m중단한 일괄의 접수된 영상도 완료를 수집하되 남은 샷은 제출하지 않는다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/job/batch-recovery.test.ts[2m > [22m서버가 놓친 일괄을 다시 확인한다[2m > [22m한 작업의 복구 오류가 다른 작업의 수집을 막지 않는다[32m 6[2mms[22m[39m
+ [32m✓[39m tests/job/batch-recovery.test.ts[2m > [22m서버가 놓친 일괄을 다시 확인한다[2m > [22m저장한 복구 증표로 기존 작업을 연결한 뒤 완료를 확인한다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/job/batch-recovery.test.ts[2m > [22m서버가 놓친 일괄을 다시 확인한다[2m > [22m연결 저장을 다시 실패해도 새 복구 증표를 잃지 않는다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/job/batch-recovery.test.ts[2m > [22m서버가 놓친 일괄을 다시 확인한다[2m > [22m결과를 모르고 복구 증표도 없으면 생성 서비스에 다시 제출하지 않는다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/job/batch-recovery.test.ts[2m > [22m서버가 놓친 일괄을 다시 확인한다[2m > [22m조회 상한을 넘는 기록이 있어도 가장 오래 기다린 중단 묶음부터 확인한다[32m 10[2mms[22m[39m
+ [32m✓[39m tests/job/batch-recovery.test.ts[2m > [22m정기 확인은 서버 인증을 거친다[2m > [22m비밀 값이 없거나 다르면 DB와 생성 서비스를 호출하지 않는다[32m 2[2mms[22m[39m
+ [32m✓[39m tests/job/batch-recovery.test.ts[2m > [22m정기 확인은 서버 인증을 거친다[2m > [22m인증된 정기 확인은 놓친 일괄을 깨운다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/job/batch-continue-submission.test.ts[2m > [22m일괄 이어가기의 실제 제출 배선(#batch-resume 빨강 확인)[2m > [22m저장한 항목의 처음 입력으로 영상을 실제 제출한다[32m 24[2mms[22m[39m
+ [32m✓[39m tests/job/batch-continue-submission.test.ts[2m > [22m일괄 이어가기의 실제 제출 배선(#batch-resume 빨강 확인)[2m > [22m같은 일괄을 겹쳐 깨워도 임대받은 실행만 제출한다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/job/batch-continue-submission.test.ts[2m > [22m일괄 이어가기의 실제 제출 배선(#batch-resume 빨강 확인)[2m > [22m중단된 일괄에서는 남은 것을 내지 않는다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/job/batch-continue-submission.test.ts[2m > [22m일괄 이어가기의 실제 제출 배선(#batch-resume 빨강 확인)[2m > [22m한 샷의 실패가 다음 샷을 막지 않는다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/job/batch-continue-submission.test.ts[2m > [22m일괄 이어가기의 실제 제출 배선(#batch-resume 빨강 확인)[2m > [22m중단을 확인한 뒤에는 남은 샷을 추가로 제출하지 않는다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/job/batch-continue-submission.test.ts[2m > [22m일괄 이어가기의 실제 제출 배선(#batch-resume 빨강 확인)[2m > [22m잔액이 모자라면 멈추되 이미 예약한 작업의 기록을 잃지 않는다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/job/batch-continue-submission.test.ts[2m > [22m일괄 이어가기의 실제 제출 배선(#batch-resume 빨강 확인)[2m > [22m잔액 부족 응답이 늦어져도 멈춘 이유를 남기고 사용자의 중단은 덮지 않는다 (expired)[32m 1[2mms[22m[39m
+ [32m✓[39m tests/job/batch-continue-submission.test.ts[2m > [22m일괄 이어가기의 실제 제출 배선(#batch-resume 빨강 확인)[2m > [22m잔액 부족 응답이 늦어져도 멈춘 이유를 남기고 사용자의 중단은 덮지 않는다 (reclaimed)[32m 0[2mms[22m[39m
+ [32m✓[39m tests/job/batch-continue-submission.test.ts[2m > [22m일괄 이어가기의 실제 제출 배선(#batch-resume 빨강 확인)[2m > [22m잔액 부족 응답이 늦어져도 멈춘 이유를 남기고 사용자의 중단은 덮지 않는다 (cancelled)[32m 0[2mms[22m[39m
+ [32m✓[39m tests/job/batch-continue-submission.test.ts[2m > [22m일괄 이어가기의 실제 제출 배선(#batch-resume 빨강 확인)[2m > [22m사용자 전체 동시 한도가 차면 실패로 세지 않고 다음 기회를 기다린다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/job/batch-continue-submission.test.ts[2m > [22m일괄 이어가기의 실제 제출 배선(#batch-resume 빨강 확인)[2m > [22m접수 결과가 불명확한 작업은 실패로 단정하거나 다른 키로 다시 내지 않는다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/job/batch-continue-submission.test.ts[2m > [22m일괄 이어가기의 실제 제출 배선(#batch-resume 빨강 확인)[2m > [22m개별 생성과 경쟁해 공통 예약 한도에 막혀도 일괄 항목은 다음 기회를 기다린다[32m 0[2mms[22m[39m
+[90mstderr[2m | tests/billing/previz-record-before-submit.test.ts[2m > [22m[2m미리보기 영상 만들기 순서[2m > [22m[2m보내기가 실패하면 잡아둔 Take 를 돌려준다
+[22m[39m[director/generate-previz-video] fal unavailable
+
+ [32m✓[39m tests/billing/previz-record-before-submit.test.ts[2m > [22m미리보기 영상 만들기 순서[2m > [22m작업을 먼저 기록하고 Take 를 잡은 뒤에 서비스로 보낸다[32m 5[2mms[22m[39m
+ [32m✓[39m tests/billing/previz-record-before-submit.test.ts[2m > [22m미리보기 영상 만들기 순서[2m > [22m잔액이 모자라면 서비스로 보내지 않는다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/billing/previz-record-before-submit.test.ts[2m > [22m미리보기 영상 만들기 순서[2m > [22m보내기가 실패하면 잡아둔 Take 를 돌려준다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/billing/previz-record-before-submit.test.ts[2m > [22m예약 경쟁에서 한도에 걸리면 Take 를 잡거나 제출하지 않고 대기 안내를 보내는 약속[2m > [22mcreateGenerationJob 이 DB trigger 로 한도 거절되면 429 를 돌려주고 hold/provider 를 부르지 않는다[32m 1[2mms[22m[39m
+[90mstderr[2m | tests/writer/rough-submit-reservation.test.ts[2m > [22m[2m러프 외부 접수 앞의 예약[2m > [22m[2m서비스가 러프 접수를 거절했다고 확인되면 예약을 해제하고 실패를 알린다
+[22m[39m[writer/rough-storyboard] invalid input
+
+[90mstderr[2m | tests/writer/rough-submit-reservation.test.ts[2m > [22m[2m러프 외부 접수 앞의 예약[2m > [22m[2m접수된 러프의 기록 저장이 실패해도 작업 번호를 바꾸어 다시 접수하지 않는다
+[22m[39m[rough-submit] accepted receipt could not be saved: reserved-1 ack database unavailable
+
+[90mstderr[2m | tests/writer/rough-submit-reservation.test.ts[2m > [22m[2m러프 외부 접수 앞의 예약[2m > [22m[2m접수된 러프의 기록 저장이 실패해도 작업 번호를 바꾸어 다시 접수하지 않는다
+[22m[39m[rough-submit] accepted receipt could not be saved: reserved-2 ack database unavailable
+
+[90mstderr[2m | tests/writer/rough-submit-reservation.test.ts[2m > [22m[2m러프 외부 접수 앞의 예약[2m > [22m[2m러프 진행 작업 조회가 실패하면 빈 목록으로 간주해 새로 접수하지 않는다
+[22m[39m[writer/rough-storyboard] queued query failed
+
+ [32m✓[39m tests/writer/rough-submit-reservation.test.ts[2m > [22m러프 외부 접수 앞의 예약[2m > [22m같은 러프 샷을 동시에 요청해도 서비스에는 한 번만 접수한다[32m 7[2mms[22m[39m
+ [32m✓[39m tests/writer/rough-submit-reservation.test.ts[2m > [22m러프 외부 접수 앞의 예약[2m > [22m러프 접수 응답을 잃으면 같은 샷을 다시 보내지 않고 접수 확인 대기로 남긴다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/writer/rough-submit-reservation.test.ts[2m > [22m러프 외부 접수 앞의 예약[2m > [22m서비스가 러프 접수를 거절했다고 확인되면 예약을 해제하고 실패를 알린다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/writer/rough-submit-reservation.test.ts[2m > [22m러프 외부 접수 앞의 예약[2m > [22m화면에 다시 들어와도 진행 목록의 러프 접수 확인 대기 상태를 유지한다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/writer/rough-submit-reservation.test.ts[2m > [22m러프 외부 접수 앞의 예약[2m > [22m접수된 러프의 기록 저장이 실패해도 작업 번호를 바꾸어 다시 접수하지 않는다[32m 3[2mms[22m[39m
+ [32m✓[39m tests/writer/rough-submit-reservation.test.ts[2m > [22m러프 외부 접수 앞의 예약[2m > [22m러프 진행 작업 조회가 실패하면 빈 목록으로 간주해 새로 접수하지 않는다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/writer/rough-storyboard-quota-gate.test.ts[2m > [22m러프 스토리보드는 생성 한도를 먼저 확인한다[2m > [22m생성 한도를 넘으면 프로젝트를 확인하기 전에 한도 초과를 알린다[32m 4[2mms[22m[39m
+ [32m✓[39m tests/writer/rough-storyboard-quota-gate.test.ts[2m > [22m러프 스토리보드는 생성 한도를 먼저 확인한다[2m > [22m모든 생성 자리가 차도 한도 초과로 알린다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/writer/rough-storyboard-quota-gate.test.ts[2m > [22m러프 스토리보드는 생성 한도를 먼저 확인한다[2m > [22m생성 여유가 있으면 프로젝트를 찾지 못했다는 결과를 알린다[32m 0[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m7 passed[39m[22m[90m (7)[39m
+[2m      Tests [22m [1m[32m56 passed[39m[22m[90m (56)[39m
+[2m   Start at [22m 16:03:31
+[2m   Duration [22m 344ms[2m (transform 508ms, setup 84ms, import 787ms, tests 108ms, environment 0ms)[22m
+
+JSON report written to /Users/xcape/projects/tale-studio/.claude/docs/2026-09-11/concurrency-audit/regression-vitest.json
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.6 [39m[90m/private/var/folders/t6/snw_y0p96b5dhcbclfksgldm0000gn/T/tale-concurrency-main-TA7GGC[39m
+
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 한 사람당 1개를 차례로 요청하면 전체 한도까지만 접수한다[32m 30[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 한 사람당 2개를 차례로 요청하면 전체 한도까지만 접수한다[32m 2[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 한 사람당 3개를 차례로 요청하면 전체 한도까지만 접수한다[32m 2[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 한 사람당 4개를 차례로 요청하면 전체 한도까지만 접수한다[32m 2[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 한 사람당 6개를 차례로 요청하면 전체 한도까지만 접수한다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 한 사람당 9개를 차례로 요청하면 전체 한도까지만 접수한다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 한 사용자의 영상 세 개와 이미지 여섯 개는 허용하고 각각 다음 작업은 거절한다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸을 이미지가 모두 사용하면 새로운 사용자의 영상도 전체 한도에 걸린다[32m 0[2mms[22m[39m
+ [31m×[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 이미지 다섯 개를 진행 중인 사용자가 동시에 열두 번 요청해도 개인 한도를 넘지 않는다[32m 2[2mms[22m[39m
+[31m   → expected 17 to be less than or equal to 6[39m
+ [31m×[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸의 마지막 한 자리에 여러 사용자가 동시에 요청해도 전체 접수 한도를 넘지 않는다[32m 1[2mms[22m[39m
+[31m   → expected 79 to be less than or equal to 68[39m
+ [31m×[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 새 요청 쉰 개가 동시에 연결을 골라도 한 연결의 설정 한도를 넘지 않는다[32m 1[2mms[22m[39m
+[31m   → expected 50 to be less than or equal to 34[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸이 찬 뒤 빈자리를 먼저 재신청하는 기존 사용자와 새 사용자의 접수 순서를 관측한다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸이 찬 뒤 새 사용자가 빈자리에 먼저 요청하면 그 사용자의 작업이 접수된다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 작업 수 조회가 실패할 때 새 접수를 허용하는지 관측한다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 삼십 분을 넘긴 미완료 작업이 집계에서 제외되는지 관측한다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 관리자는 개인 한도를 넘을 수 있지만 전체가 차면 멈춘다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 한 사람당 1개를 차례로 요청하면 전체 한도까지만 접수한다[32m 2[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 한 사람당 2개를 차례로 요청하면 전체 한도까지만 접수한다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 한 사람당 3개를 차례로 요청하면 전체 한도까지만 접수한다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 한 사람당 4개를 차례로 요청하면 전체 한도까지만 접수한다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 한 사람당 6개를 차례로 요청하면 전체 한도까지만 접수한다[32m 2[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 한 사람당 9개를 차례로 요청하면 전체 한도까지만 접수한다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 한 사용자의 영상 세 개와 이미지 여섯 개는 허용하고 각각 다음 작업은 거절한다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸을 이미지가 모두 사용하면 새로운 사용자의 영상도 전체 한도에 걸린다[32m 0[2mms[22m[39m
+ [31m×[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 이미지 다섯 개를 진행 중인 사용자가 동시에 열두 번 요청해도 개인 한도를 넘지 않는다[32m 0[2mms[22m[39m
+[31m   → expected 17 to be less than or equal to 6[39m
+ [31m×[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸의 마지막 한 자리에 여러 사용자가 동시에 요청해도 전체 접수 한도를 넘지 않는다[32m 1[2mms[22m[39m
+[31m   → expected 91 to be less than or equal to 80[39m
+ [31m×[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 새 요청 쉰 개가 동시에 연결을 골라도 한 연결의 설정 한도를 넘지 않는다[32m 1[2mms[22m[39m
+[31m   → expected 50 to be less than or equal to 40[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸이 찬 뒤 빈자리를 먼저 재신청하는 기존 사용자와 새 사용자의 접수 순서를 관측한다[32m 1[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸이 찬 뒤 새 사용자가 빈자리에 먼저 요청하면 그 사용자의 작업이 접수된다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 작업 수 조회가 실패할 때 새 접수를 허용하는지 관측한다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 삼십 분을 넘긴 미완료 작업이 집계에서 제외되는지 관측한다[32m 0[2mms[22m[39m
+ [32m✓[39m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 관리자는 개인 한도를 넘을 수 있지만 전체가 차면 멈춘다[32m 2[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 6 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 이미지 다섯 개를 진행 중인 사용자가 동시에 열두 번 요청해도 개인 한도를 넘지 않는다
+[41m[1m FAIL [22m[49m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 이미지 다섯 개를 진행 중인 사용자가 동시에 열두 번 요청해도 개인 한도를 넘지 않는다
+[31m[1mAssertionError[22m: expected 17 to be less than or equal to 6[39m
+[36m [2m❯[22m tests/manual/concurrency-capacity.manual.test.ts:[2m154:27[22m[39m
+
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸의 마지막 한 자리에 여러 사용자가 동시에 요청해도 전체 접수 한도를 넘지 않는다
+[31m[1mAssertionError[22m: expected 79 to be less than or equal to 68[39m
+[36m [2m❯[22m tests/manual/concurrency-capacity.manual.test.ts:[2m167:27[22m[39m
+
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m68칸에서 새 요청 쉰 개가 동시에 연결을 골라도 한 연결의 설정 한도를 넘지 않는다
+[31m[1mAssertionError[22m: expected 50 to be less than or equal to 34[39m
+[36m [2m❯[22m tests/manual/concurrency-capacity.manual.test.ts:[2m179:49[22m[39m
+
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸의 마지막 한 자리에 여러 사용자가 동시에 요청해도 전체 접수 한도를 넘지 않는다
+[31m[1mAssertionError[22m: expected 91 to be less than or equal to 80[39m
+[36m [2m❯[22m tests/manual/concurrency-capacity.manual.test.ts:[2m167:27[22m[39m
+
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/manual/concurrency-capacity.manual.test.ts[2m > [22m68칸·80칸 메인 함수 동시성 검사[2m > [22m80칸에서 새 요청 쉰 개가 동시에 연결을 골라도 한 연결의 설정 한도를 넘지 않는다
+[31m[1mAssertionError[22m: expected 50 to be less than or equal to 40[39m
+[36m [2m❯[22m tests/manual/concurrency-capacity.manual.test.ts:[2m179:49[22m[39m
+
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m6 failed[39m[22m[2m | [22m[1m[32m26 passed[39m[22m[90m (32)[39m
+[2m   Start at [22m 16:03:32
+[2m   Duration [22m 169ms[2m (transform 42ms, setup 9ms, import 18ms, tests 62ms, environment 0ms)[22m
+
+JSON report written to /Users/xcape/projects/tale-studio/.claude/docs/2026-09-11/concurrency-audit/capacity-vitest.json

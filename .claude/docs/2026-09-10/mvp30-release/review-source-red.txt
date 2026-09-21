@@ -1,0 +1,37 @@
+
+ RUN  v4.1.6 /Users/xcape/projects/tale-studio
+
+(node:27843) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ tests/writer/director-handoff-intent.test.ts (7 tests | 1 failed) 5ms
+   × Writer에서 Director로 넘겨 달라고 하면 바로 옆 단계가 아니어도 이동 요청으로 알아듣는다. 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/writer/director-handoff-intent.test.ts > Writer에서 Director로 넘겨 달라고 하면 바로 옆 단계가 아니어도 이동 요청으로 알아듣는다.
+AssertionError: expected null to deeply equal { mode: 'move' }
+
+- Expected:
+{
+  "mode": "move",
+}
+
++ Received:
+null
+
+ ❯ tests/writer/director-handoff-intent.test.ts:7:80
+      5| it('Writer에서 Director로 넘겨 달라고 하면 바로 옆 단계가 아니어도 이동 요청으로 알아듣는다.', () => {
+      6|   expect(resolveDirectorHandoffIntent('디렉터로 넘겨줘', 'writer', [])).toEqu…
+      7|   expect(resolveDirectorHandoffIntent('Writer에서 Director로 넘겨줘', 'write…
+       |                                                                                ^
+      8|   expect(resolveDirectorHandoffIntent('Director로 Writer에서 넘겨줘', 'write…
+      9| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed | 1 passed (2)
+      Tests  1 failed | 16 passed (17)
+   Start at  14:23:04
+   Duration  546ms (transform 296ms, setup 28ms, import 372ms, tests 31ms, environment 0ms)
+

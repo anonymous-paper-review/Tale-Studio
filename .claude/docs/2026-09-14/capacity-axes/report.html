@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>dev 프리뷰 실제 생성 결과 — 추가 검증 필요</title>
+<style>
+  :root {
+    --bg:#F1F3F5; --surface:#FFFFFF; --surface-2:#E8EBEF;
+    --ink:#16181D; --ink-2:#3B4048; --muted:#676D77;
+    --line:#D6DBE1; --line-2:#BFC6CE;
+    --accent:#1F5F7A; --accent-soft:#DCEAF1;
+    --pass:#2E7350; --pass-soft:#DFEDE5;
+    --fail:#A33A38; --fail-soft:#F6E2E1;
+    --gate:#6A579E; --gate-soft:#EAE4F5;
+    --warn:#8A6412; --warn-soft:#F4EBD6;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI","Malgun Gothic",sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+      --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+      --line:#2B3038; --line-2:#3C434D;
+      --accent:#74B4D0; --accent-soft:#17303C;
+      --pass:#5FB98A; --pass-soft:#17301F;
+      --fail:#E0817D; --fail-soft:#3A2321;
+      --gate:#A794D8; --gate-soft:#272040;
+      --warn:#D2A64F; --warn-soft:#33290F;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:0 20px 110px;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.82;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto}
+  header.page{padding:56px 0 20px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:0 0 14px;font-weight:600}
+  h1{font-size:clamp(27px,5vw,40px);font-weight:800;letter-spacing:-.028em;line-height:1.22;margin:0 0 18px;text-wrap:balance}
+  .bluf{font-size:17.5px;color:var(--ink);margin:0 0 6px;max-width:64ch}
+  .bluf b{color:var(--gate)}
+  .asof{font-family:var(--mono);font-size:12px;color:var(--muted);margin:10px 0 0}
+  header.page::after{content:"";display:block;height:3px;background:var(--ink);margin-top:26px;opacity:.9}
+  section{margin:58px 0 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .sec-num{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);border:1.5px solid var(--accent);border-radius:3px;padding:0 7px;line-height:1.7}
+  h2{font-size:23px;font-weight:800;letter-spacing:-.018em;margin:0;text-wrap:balance}
+  .sec-lede{color:var(--muted);font-size:15px;margin:0 0 24px;max-width:62ch}
+  p{margin:0 0 16px;max-width:64ch}
+  h3{font-size:17px;font-weight:750;margin:28px 0 10px;letter-spacing:-.01em}
+  h3:first-child{margin-top:0}
+  ul.plain{margin:0 0 16px;padding-left:22px;max-width:64ch}
+  ul.plain li{margin-bottom:8px}
+  strong,b{font-weight:750}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:24px 26px 20px;margin:0 0 18px}
+  .card.same{border-left:3px solid var(--pass)}
+  .card.diff{border-left:3px solid var(--warn)}
+  .card > :last-child{margin-bottom:0}
+  .card-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:12px}
+  .card-head h3{flex:1 1 240px;margin:0}
+  .agreed{font-size:15px;color:var(--ink-2);margin:0 0 12px}
+  .agreed b{color:var(--ink);font-weight:750}
+  .chip{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.03em;border-radius:3px;padding:2px 8px;white-space:nowrap}
+  .c-pass{background:var(--pass-soft);color:var(--pass)}
+  .c-fail{background:var(--fail-soft);color:var(--fail)}
+  .c-warn{background:var(--warn-soft);color:var(--warn)}
+  .c-gate{background:var(--gate-soft);color:var(--gate)}
+  .c-acc{background:var(--accent-soft);color:var(--accent)}
+  pre{background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--line-2);border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;font-family:var(--mono);font-size:12px;line-height:1.68;margin:8px 0;color:var(--ink-2);white-space:pre;tab-size:2}
+  pre .path{display:block;color:var(--muted);margin-bottom:8px;font-size:11.5px}
+  code{font-family:var(--mono);font-size:.87em;background:var(--surface-2);padding:1px 6px;border-radius:3px}
+  .code-what{font-size:14.5px;color:var(--ink-2);margin:0 0 4px}
+  .tbl{overflow-x:auto;margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}
+  th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:700;padding:10px 12px;border-bottom:2px solid var(--line-2);vertical-align:bottom}
+  td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+  td .path{font-family:var(--mono);font-size:11.5px;color:var(--muted);display:block;margin-top:3px}
+  .gate-cell{color:var(--gate);font-weight:750}
+  .gate-empty{display:inline-block;min-width:60px;border-bottom:1.5px dashed var(--gate);opacity:.7}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:16px 0}
+  @media (max-width:640px){.split{grid-template-columns:1fr}}
+  .split > div{padding:18px 20px}
+  .split .yes{background:var(--pass-soft);border-right:1px solid var(--line)}
+  .split .no{background:var(--fail-soft)}
+  .split h4{margin:0 0 10px;font-size:14.5px;font-weight:800}
+  .split .yes h4{color:var(--pass)}
+  .split .no h4{color:var(--fail)}
+  .split ul{margin:0;padding-left:20px;font-size:14px;line-height:1.7}
+  .split li{margin-bottom:7px}
+  figure{margin:14px 0 6px}
+  figure img{width:100%;height:auto;border:1px solid var(--line);border-radius:8px;display:block}
+  figcaption{font-size:13px;color:var(--muted);margin-top:6px}
+  .shots{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:640px){.shots{grid-template-columns:1fr}}
+  footer{margin-top:66px;padding-top:20px;border-top:2px solid var(--ink);font-size:13.5px;color:var(--muted)}
+  footer b{color:var(--ink)}
+  footer p{max-width:none}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <p class="eyebrow">검증 보고서 · 2026-09-14</p>
+  <h1>dev 프리뷰 실제 생성 결과 — 추가 검증 필요</h1>
+  <p class="bluf">DB 최종 기록에서 <code>shot_storyboard</code> 20건, <code>storyboard_real_grid</code> 4건, rough jobs 7건(25 panels 생성), <code>character_view</code> 3건, <code>world_shot</code> 4건, <code>shot_video</code> 8건의 완료를 확인했다. 총 이미지 job은 38건, 영상 job은 8건이다.</p>
+  <p class="bluf">스토리보드는 최종 22/25로 미완료 3건의 원인은 확인하지 못했다. 일괄은 최초 1시트 뒤 멈췄다가 재클릭 후 추가 완료됐으며, 개인 이미지 거절은 <code>user_image</code> 기록 4건과 DOM 문구만 관찰했다. 영상 일괄은 개인 3개 한도 거절 4건과 총 8건 완료를 확인했지만 개별 4번째 UI는 검증하지 않았다.</p>
+  <p class="bluf"><b>현재 상태</b>: 사용자는 누락 경로 수정·2계정 검증 후 main 배포를 승인했지만 운영은 아직 변경하지 않았다. 추가 검증 전에는 배포를 보류한다.</p>
+  <p class="asof">대상 커밋 8dcbd07b(dev) · dev 프리뷰 tale-git-dev-talestudio.vercel.app · 개발 DB pbiumddivadgbzxuymak · 테스트 계정 test-d4fd109f@tale.studio · 프로젝트 77dfa43c</p>
+</header>
+
+<section>
+  <div class="sec-head"><span class="sec-num">1</span><h2>혼자 정한 것</h2></div>
+  <p class="sec-lede">가이드대로 하되 도중에 내가 정한 것. 전부 되돌리기 쉬움이라 오너 확인 칸은 비어 있다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>결정</th><th>왜</th><th>버린 선택지</th><th>되돌리기</th></tr></thead>
+    <tbody>
+      <tr><td>Producer 단계는 픽스처로 채우고(모델 호출 없음) Writer부터 실제로 돌렸다<span class="path">tests/fixtures/producer-complete.ts</span></td><td>이번 변경은 Writer 이후 생성 경로만 건드린다. Producer 채팅까지 실제로 돌리면 시간·비용만 든다</td><td>Producer 채팅부터 실제로</td><td>쉬움</td></tr>
+      <tr><td>영상 개별 4번째 거절(가이드 3-A)은 UI에서 확인하지 않았다 — 영상 일괄의 개인 한도 기록으로 범위를 제한했다</td><td>영상 배치에서 개인 3개 한도 거절 4건과 총 8건 완료는 확인했지만, 개별 4번째 화면은 검증하지 않았다</td><td>개별 버튼 직접 확인</td><td>쉬움 — 오너가 직접 눌러 보면 됨</td></tr>
+      <tr><td>영상 일괄은 25개가 아니라 확인된 8개만 돌렸다</td><td>영상 완료 기록은 8건이다. 일괄 이어가기·탭 닫기 동작은 이 보고서에서 단정하지 않는다</td><td>25개 전부</td><td>쉬움</td></tr>
+      <tr><td>거절 토스트는 화면 캡처 대신 화면 안 글자(DOM)와 서버 기록으로 증거를 남겼다</td><td>화면 문구는 DOM 관찰이고 캡처는 없다. 개인 이미지·영상 거절 기록은 각 4건이다</td><td>캡처될 때까지 유료 요청 반복</td><td>쉬움 — 오너가 눌러 보면 바로 보임</td></tr>
+      <tr><td>테스트 계정을 개발 DB에 새로 만들었다<span class="path">test-d4fd109f@tale.studio</span></td><td>오너 계정은 관리자라 개인 한도가 면제된다. 한도 검사에는 일반 계정이 필요하다</td><td>기존 운영 테스트 계정</td><td>쉬움</td></tr>
+      <tr><td>스크린샷은 jpg로 줄여 넣었다(14장 2.2MB)</td><td>png 그대로면 28MB. 지난번 71MB 지적</td><td>png 원본</td><td>쉬움</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">2</span><h2>가이드의 판정 기준과 실제 결과</h2></div>
+  <p class="sec-lede">가이드(dev-test-guide.md)에서 "통과"로 정한 조건 하나하나를 실제 화면·DB와 대조했다.</p>
+
+  <div class="card diff">
+    <div class="card-head"><h3>1. 정상 생성 — 다섯 경로가 끝까지 되는가</h3><span class="chip c-warn">부분 확인</span></div>
+    <p class="agreed"><b>기준:</b> 각 경로에서 완성 이미지/영상이 카드에 뜨는지 확인한다. 30분 넘게 "생성 중"인지 보는 대기 시험은 하지 않고 최종 큐 상태만 확인했다.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>경로</th><th>실제</th><th>DB 기록</th></tr></thead>
+      <tbody>
+        <tr><td>Writer 러프 전체 생성</td><td>rough jobs 7건이 완료되어 25 panels를 생성한 기록을 확인했다</td><td class="num">rough jobs 완료 7건 · panels 25</td></tr>
+        <tr><td>Artist 인물·배경 생성</td><td>최종 완료 수치만 확인했으며, 초안·재생성별 구분은 이 기록으로 판정하지 않는다</td><td class="num">character_view 3 · world_shot 4 완료</td></tr>
+        <tr><td>Artist 인물 시트 재생성</td><td>최종 <code>character_view</code> 3건에 포함된 사실만 확인했다. 개별 재생성 여부는 미확인</td><td class="num">character_view 완료 3건(최종)</td></tr>
+        <tr><td>Artist 배경 재생성</td><td>최종 <code>world_shot</code> 4건에 포함된 사실만 확인했다. 개별 재생성 여부는 미확인</td><td class="num">world_shot 완료 4건(최종)</td></tr>
+        <tr><td>Director 실사 단건</td><td>최종 완료 기록 20건을 확인했다</td><td class="num">shot_storyboard 완료 20건</td></tr>
+        <tr><td>Director 실사 그리드 일괄</td><td>그리드 4건 완료 및 스토리보드 최종 22/25를 확인했다. 미완료 3건의 원인은 미확인이다. 일괄은 최초 1시트 뒤 멈췄다가 재클릭 후 추가 완료됐다</td><td class="num">storyboard_real_grid 완료 4건</td></tr>
+        <tr><td>Director 영상</td><td>완료 기록 8건을 확인했다</td><td class="num">shot_video 완료 8건</td></tr>
+      </tbody>
+    </table></div>
+    <div class="shots">
+      <figure><img src="browser/02-writer-rough-complete-25.jpg" alt="러프 25패널"><figcaption>rough jobs 7건 완료, 25 panels 생성</figcaption></figure>
+      <figure><img src="browser/03-artist-drafts-characters.jpg" alt="인물 생성 화면"><figcaption>Artist 인물 생성 화면(DB 최종 character_view 3건)</figcaption></figure>
+      <figure><img src="browser/06-artist-background-regenerated.jpg" alt="배경 생성 화면"><figcaption>Artist 배경 생성 화면(DB 최종 world_shot 4건)</figcaption></figure>
+      <figure><img src="browser/14-director-storyboard-real-grid.jpg" alt="실사 스토리보드"><figcaption>실사 스토리보드 최종 22/25(미완료 3건, 원인 미확인)</figcaption></figure>
+    </div>
+  </div>
+
+  <div class="card diff">
+    <div class="card-head"><h3>2. 내 이미지 6개 한도 — 거절 기록과 문구를 어디까지 확인했나</h3><span class="chip c-warn">부분 확인</span></div>
+    <p class="agreed"><b>기준:</b> 개인 이미지 한도 초과 안내와 서버 거절 기록을 대조한다. 이번에는 <code>user_image</code> 거절 기록 4건과 DOM 문구만 확인했으며, 정확한 순번 대응과 자동 재시도 여부는 판정하지 않는다.</p>
+    <p class="code-what">서버에서 <code>user_image</code> 축의 <code>generation_submit_rejected_quota</code> 4건을 확인했고, 화면에서는 아래 문구를 DOM으로 관찰했다. 이 자료만으로 거절이 정확히 7·8·9번째 요청과 대응하는지, 거절 뒤 자동 재시도가 0건인지 확인할 수 없다.</p>
+<pre><span class="path">화면 토스트 (DOM 텍스트 관찰)</span>이미지는 동시에 6개까지 생성할 수 있어요. 진행 중인 생성이 끝나면 다시 시도해 주세요.</pre>
+    <p class="code-what">서버가 남긴 거절 기록 — 개인 이미지 축과 한도 값은 확인되지만 개별 요청 순번은 확인되지 않는다.</p>
+<pre><span class="path">writer_observability_events · generation_submit_rejected_quota</span>axis=user_image  kind=shot_storyboard  queued=6  limit=6  (4건)</pre>
+    <p>개인 이미지 한도 거절의 정확한 요청 순번과 자동 재시도 여부는 미확인이다.</p>
+    <figure><img src="browser/07-director-7-individual-requests.jpg" alt="개인 이미지 한도 요청 화면"><figcaption>개인 이미지 한도 시험 화면 — 요청 순번과 DB 대응은 미확인</figcaption></figure>
+  </div>
+
+  <div class="card diff">
+    <div class="card-head"><h3>3. 내 영상 3개 한도 + 일괄 완료</h3><span class="chip c-warn">부분 확인</span></div>
+    <p class="agreed"><b>기준:</b> 개인 영상 한도와 일괄 완료를 확인한다. 이번에는 개인 3개 한도 거절 4건과 총 8건 완료를 확인했지만, 개별 4번째 거절 UI는 검증하지 않았다.</p>
+    <p class="code-what">영상 배치에서 <code>user_video</code> 축의 개인 3개 한도 거절 4건과 <code>shot_video</code> 완료 8건을 확인했다. 개별 버튼으로 네 번째 요청을 눌렀을 때의 UI는 확인하지 않았으므로 그 화면 동작을 단정할 수 없다.</p>
+<pre><span class="path">writer_observability_events · generation_submit_rejected_quota</span>axis=user_video  kind=shot_video  queued=3  limit=3  (4건)</pre>
+    <div class="shots">
+      <figure><img src="browser/10-video-batch-3-running-before-close.jpg" alt="영상 배치 화면"><figcaption>영상 배치 화면 스크린샷</figcaption></figure>
+      <figure><img src="browser/11-video-batch-restored-after-reopen.jpg" alt="영상 배치 재접속 화면"><figcaption>영상 배치 재접속 화면 스크린샷(개별 4번째 UI 검증 아님)</figcaption></figure>
+    </div>
+  </div>
+
+  <div class="card diff">
+    <div class="card-head"><h3>4. 모두의 자리가 찼을 때</h3><span class="chip c-warn">안 함(선택)</span></div>
+    <p class="agreed"><b>기준:</b> dev 전체 칸을 넘기면 "지금 생성 자리가 모두 사용 중이에요" 안내.</p>
+    <p>전체 칸 초과 브라우저 시험은 하지 않았다. 확인된 FAL 구성은 dev 1계정·10칸, 운영 2계정·34+34칸이며 legacy 키는 실제로 공유된다.</p>
+  </div>
+
+  <div class="card diff">
+    <div class="card-head"><h3>5. 끝난 뒤 멈춘 카드가 없는가</h3><span class="chip c-warn">부분 확인</span></div>
+    <p class="agreed"><b>기준:</b> "생성 중"에 멈춘 것 0개인지 확인한다. 30분 대기 후 재확인하는 시험은 이번에 하지 않았다.</p>
+    <p>최종 큐 화면에서 "진행 중 0"만 확인했다. 따라서 30분 경과 뒤에도 멈춘 카드가 없었다고 판정할 수 없다.</p>
+    <figure><img src="browser/15-queue-final.jpg" alt="최종 큐 화면"><figcaption>최종 큐 화면 — 진행 중 0</figcaption></figure>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">3</span><h2>확인한 것 / 안 한 것</h2></div>
+  <div class="split">
+    <div class="yes"><h4>실제로 확인한 것</h4><ul>
+      <li>DB 최종 완료: <code>shot_storyboard</code> 20건, <code>storyboard_real_grid</code> 4건, rough jobs 7건(25 panels), <code>character_view</code> 3건, <code>world_shot</code> 4건, <code>shot_video</code> 8건. 총 이미지 job 38건·영상 job 8건</li>
+      <li>스토리보드 최종 22/25와 미완료 3건(원인 미확인), 일괄 최초 1시트 뒤 멈춤 및 재클릭 후 추가 완료</li>
+      <li>개인 이미지 <code>user_image</code> 거절 기록 4건과 DOM 문구</li>
+      <li>영상 배치의 개인 3개 한도 거절 기록 4건과 총 8건 완료</li>
+      <li>dev FAL 1계정·10칸, 운영 2계정·34+34칸, legacy 키 실제 공유</li>
+      <li>rough/director 예약의 null key per-key 우회, previz DB key 변경 무시, generic-image/directing-edit 무예약</li>
+      <li>최종 큐 화면 "진행 중 0"</li>
+    </ul></div>
+    <div class="no"><h4>확인하지 않은 것</h4><ul>
+      <li>영상 개별 버튼으로 4번째 거절 UI</li>
+      <li>전체 칸 초과를 브라우저에서 재현</li>
+      <li>개인 이미지 거절의 정확한 7·8·9번째 요청 대응과 자동 재시도 여부</li>
+      <li>거절 토스트의 화면 캡처 — DOM 문구와 서버 기록만 확인</li>
+      <li>30분 경과 후 재확인 — 최종 큐 0만 확인</li>
+      <li>운영 환경 변경 결과 — 누락 경로 수정·2계정 검증과 main 배포는 아직 남아 있고 운영은 미변경</li>
+      <li>이미지·영상 품질 — 이번 변경 범위 밖</li>
+    </ul></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">4</span><h2>결정이 필요한 것</h2></div>
+  <div class="tbl"><table>
+    <thead><tr><th>질문</th><th>안 정하면 뭐가 막히나</th><th>선택지</th><th>추천</th><th>언제까지</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>운영 DB에 4축 트리거를 언제 올릴까</td>
+        <td>누락 경로와 계정 구성을 추가 검증하기 전에는 운영 변경 범위를 확정할 근거가 부족하다. 운영은 아직 변경하지 않았다</td>
+        <td>기존 (a) "지금 운영" 추천은 철회한다. 누락 경로 수정·2계정 검증 후 main 배포 승인 상태이며, 그 전에는 배포하지 않는다</td>
+        <td class="gate-cell">추가 검증 전 배포 보류</td>
+        <td>추가 검증 후</td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">5</span><h2>알고만 있으면 되는 것</h2></div>
+  <div class="tbl"><table>
+    <thead><tr><th>상황</th><th>틀리면 뭐가 깨지나</th><th>확인 방법</th></tr></thead>
+    <tbody>
+      <tr><td>① 실사 그리드 일괄은 최초 1시트(4샷) 뒤 멈췄고, 재클릭 후 추가 완료되어 최종 22/25가 됐다. 미완료 3건의 원인은 미확인이며 전부 통과가 아니다</td><td>사용자가 "일괄인데 4장만 됐네"를 한 번 겪고 다시 눌러야 한다. 재현 1회, 원인은 미확인</td><td>실사 일괄을 다시 눌러 첫 실행 뒤 이어가는지 확인하고, 라우트 응답으로 원인을 조사한다</td></tr>
+      <tr><td>② 개인 이미지 거절은 <code>user_image</code> 기록 4건과 DOM 문구만 확인했다. 정확한 7·8·9번째 요청 대응과 자동 재시도 여부는 미확인이다</td><td>요청 순번별 거절과 자동 재시도 상태를 이 기록만으로 단정할 수 없다</td><td>개별 요청 식별자와 서버 이벤트를 대조하고 자동 재시도 로그를 별도로 확인한다</td></tr>
+      <tr><td>③ 영상 일괄의 개인 3개 한도 거절 4건과 총 8건 완료는 확인했지만, 개별 4번째 거절 UI는 검증하지 않았다</td><td>개별 버튼에서 보이는 네 번째 거절 안내는 판정할 수 없다</td><td>개별 영상 네 번째 요청을 화면에서 직접 확인한다</td></tr>
+      <tr><td>④ dev FAL은 1계정·10칸, 운영은 2계정·34+34칸이며 legacy 키가 실제 공유된다. rough/director는 null key로 per-key 우회하고, previz는 DB key 변경을 무시하며, generic-image/directing-edit는 무예약이다</td><td>누락 경로와 공유 키가 남으면 환경별 동시성 한도가 다르게 적용될 수 있다</td><td>누락 경로 수정 후 dev·운영 2계정으로 예약·한도 동작을 검증한다</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<footer>
+  <p><b>근거로 쓴 것</b> — dev 커밋 8dcbd07b · 개발 DB generation_jobs·writer_observability_events·fal_key_limits 조회 · 스크린샷 14장 <code>browser/</code> · 가이드 <code>dev-test-guide.md</code>.</p>
+  <p><b>이 문서가 하지 않는 것</b> — 운영 환경 변경 검증, 이미지·영상 품질 판정, 전체 칸 초과 브라우저 재현, 영상 개별 버튼 4번째 거절, 실제 30분 대기 시험. 테스트 계정·프로젝트는 개발 DB에 남겨 뒀다.</p>
+</footer>
+
+</div>
+</body>
+</html>

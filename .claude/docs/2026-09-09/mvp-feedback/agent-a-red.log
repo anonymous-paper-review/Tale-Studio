@@ -1,0 +1,156 @@
+
+ RUN  v4.1.6 /Users/xcape/projects/tale-studio
+
+(node:84000) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ tests/chat/request-preservation.test.ts (8 tests | 8 failed) 27ms
+     × 여러 인물의 새 모습을 요청하면 승인 목록에 요청한 모든 인물과 모습이 표시된다 22ms
+     × 일부 작업이 끝나고 일부가 남으면 완료한 작업을 유지하면서 남은 대상만 이어서 처리한다 2ms
+     × 다른 유료 제안이 떠 있어도 새 요청의 모든 대상을 보류 목록에 남긴다 0ms
+     × 요청한 항목은 완료·진행 중·시작 실패·미처리 중 어느 상태인지 이름과 함께 알려준다 0ms
+     × 나중에를 누른 작업은 접어둔 목록에 남고, 다시 펼치면 이어서 처리할 수 있다 0ms
+     × Writer와 Artist 사이를 이동해도 이미 나온 대화와 안내는 같은 기록에서 확인할 수 있다 0ms
+     × 러프 스토리보드 완료 안내는 트리트먼트 탭에 들어가도 이전 대화 기록에 남는다 1ms
+     × 다른 탭에서 승인해도 요청한 작업은 원래 담당 단계에서 실행된다 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/chat/request-preservation.test.ts > 요청 대상과 실제 실행 결과 보존 > 여러 인물의 새 모습을 요청하면 승인 목록에 요청한 모든 인물과 모습이 표시된다
+AssertionError: expected '쿄타로' to contain '코마츠'
+
+Expected: "코마츠"
+Received: "쿄타로"
+
+ ❯ tests/chat/request-preservation.test.ts:45:29
+     43|     const proposal = useGlobalChatStore.getState().pendingProposal!
+     44|     expect(proposal.target).toContain('쿄타로')
+     45|     expect(proposal.target).toContain('코마츠')
+       |                             ^
+     46|     expect(create).not.toHaveBeenCalled()
+     47|     await Promise.all([useGlobalChatStore.getState().approvePendingPro…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  tests/chat/request-preservation.test.ts > 요청 대상과 실제 실행 결과 보존 > 일부 작업이 끝나고 일부가 남으면 완료한 작업을 유지하면서 남은 대상만 이어서 처리한다
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ tests/chat/request-preservation.test.ts:55:72
+     53|     useArtistStore.setState({ createAppearance: create })
+     54|     await useGlobalChatStore.getState().sendMessage('두 사람의 잠옷 모습을 추가해줘…
+     55|     await expect(useGlobalChatStore.getState().approvePendingProposal(…
+       |                                                                        ^
+     56|     const deferred = useGlobalChatStore.getState().deferredProposals
+     57|     expect(deferred).toHaveLength(1)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  tests/chat/request-preservation.test.ts > 요청 대상과 실제 실행 결과 보존 > 다른 유료 제안이 떠 있어도 새 요청의 모든 대상을 보류 목록에 남긴다
+AssertionError: Target cannot be null or undefined.
+ ❯ tests/chat/request-preservation.test.ts:68:61
+     66|     await useGlobalChatStore.getState().sendMessage('두 사람의 잠옷 모습을 추가해줘…
+     67|     expect(useGlobalChatStore.getState().pendingProposal?.id).toBe('oc…
+     68|     expect(useGlobalChatStore.getState().deferredProposals).toHaveLeng…
+       |                                                             ^
+     69|     expect(useGlobalChatStore.getState().deferredProposals[0].target).…
+     70|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  tests/chat/request-preservation.test.ts > 요청 대상과 실제 실행 결과 보존 > 요청한 항목은 완료·진행 중·시작 실패·미처리 중 어느 상태인지 이름과 함께 알려준다
+AssertionError: expected '두 사람의 잠옷 모습을 추가해줘\n두 사람의 잠옷 모습을 확인해 주…' to contain '쿄타로'
+
+- Expected
++ Received
+
+- 쿄타로
++ 두 사람의 잠옷 모습을 추가해줘
++ 두 사람의 잠옷 모습을 확인해 주세요.
+
+ ❯ tests/chat/request-preservation.test.ts:77:21
+     75|     await useGlobalChatStore.getState().approvePendingProposal()
+     76|     const reports = useGlobalChatStore.getState().messages.map(message…
+     77|     expect(reports).toContain('쿄타로')
+       |                     ^
+     78|     expect(reports).toContain('코마츠')
+     79|     expect(reports).toMatch(/시작 실패|미처리/)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+ FAIL  tests/chat/request-preservation.test.ts > 보류와 글로벌 대화 > 나중에를 누른 작업은 접어둔 목록에 남고, 다시 펼치면 이어서 처리할 수 있다
+TypeError: useGlobalChatStore.getState(...).deferPendingProposal is not a function
+ ❯ tests/chat/request-preservation.test.ts:89:35
+     87|     await useGlobalChatStore.getState().sendMessage('두 사람의 잠옷 모습을 추가해줘…
+     88|     const id = useGlobalChatStore.getState().pendingProposal!.id
+     89|     useGlobalChatStore.getState().deferPendingProposal(id)
+       |                                   ^
+     90|     expect(create).not.toHaveBeenCalled()
+     91|     useGlobalChatStore.getState().reset()
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/8]⎯
+
+ FAIL  tests/chat/request-preservation.test.ts > 보류와 글로벌 대화 > Writer와 Artist 사이를 이동해도 이미 나온 대화와 안내는 같은 기록에서 확인할 수 있다
+AssertionError: expected [] to have a length of 1 but got +0
+
+- Expected
++ Received
+
+- 1
++ 0
+
+ ❯ tests/chat/request-preservation.test.ts:104:20
+    102|     useProjectStore.setState({ currentStage: 'writer' })
+    103|     useProjectStore.setState({ currentStage: 'artist' })
+    104|     expect(before).toHaveLength(1)
+       |                    ^
+    105|     expect(useGlobalChatStore.getState().messages).toEqual(before)
+    106|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/8]⎯
+
+ FAIL  tests/chat/request-preservation.test.ts > 보류와 글로벌 대화 > 러프 스토리보드 완료 안내는 트리트먼트 탭에 들어가도 이전 대화 기록에 남는다
+AssertionError: expected [ '다음은?', '트리트먼트를 확인하세요.' ] to deeply equal [ '러프 스토리보드가 완성됐어요.', '다음은?', …(2) ]
+
+- Expected
++ Received
+
+  [
+-   "러프 스토리보드가 완성됐어요.",
+    "다음은?",
+    "트리트먼트를 확인하세요.",
+-   "트리트먼트 사용법",
+  ]
+
+ ❯ tests/chat/request-preservation.test.ts:116:84
+    114|     useGlobalChatStore.getState().dismissSuggestion({ implicit: true })
+    115|     useGlobalChatStore.getState().offerSuggestion(rough)
+    116|     expect(useGlobalChatStore.getState().messages.map(message => messa…
+       |                                                                                    ^
+    117|   })
+    118|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/8]⎯
+
+ FAIL  tests/chat/request-preservation.test.ts > 보류와 글로벌 대화 > 다른 탭에서 승인해도 요청한 작업은 원래 담당 단계에서 실행된다
+AssertionError: expected "vi.fn()" to be called 2 times, but got 0 times
+ ❯ tests/chat/request-preservation.test.ts:125:20
+    123|     useProjectStore.setState({ currentStage: 'writer' })
+    124|     await useGlobalChatStore.getState().sendMessage('승인')
+    125|     expect(create).toHaveBeenCalledTimes(2)
+       |                    ^
+    126|   })
+    127| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/8]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  8 failed (8)
+   Start at  23:26:32
+   Duration  368ms (transform 198ms, setup 9ms, import 247ms, tests 27ms, environment 0ms)
+

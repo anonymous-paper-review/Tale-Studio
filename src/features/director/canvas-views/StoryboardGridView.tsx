@@ -28,7 +28,8 @@ import {
 } from '@/stores/director-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
-import { useActiveGenerationJobs, activeShotIds } from '@/lib/generation-queue'
+import { useActiveGenerationJobs, activeShotIds, useGenerationQueueStatus, type GenerationQueueStatus } from '@/lib/generation-queue'
+import { checkStoryboardImageStatus, storyboardImageGenerationState } from '@/features/director/hooks/use-storyboard-image-generation'
 import { useRoughStoryboard, useShotActionDescription } from '@/features/director/hooks/use-rough-storyboard'
 import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
 import { classifyRoughChanged } from '@/lib/image-provenance'
@@ -175,6 +176,7 @@ function ShotCell({
   sceneLabel,
   queuedImageShots,
   queuedVideoShots,
+  queueStatus,
   descriptionFontSize,
   shotMention,
 }: {
@@ -186,6 +188,7 @@ function ShotCell({
   /** 지금 큐에 떠 있는 잡의 대상 샷들(#queue-restore) — 탭을 떠났다 와도 진행 표시를 되살린다. */
   queuedImageShots: ReadonlySet<string>
   queuedVideoShots: ReadonlySet<string>
+  queueStatus: GenerationQueueStatus
   /** 큐 원본 — 경과시간 durable 기준점(activeStartedAt) 계산용. */
   descriptionFontSize: string
   shotMention?: CardMention
@@ -209,7 +212,7 @@ function ShotCell({
   const [videoBusy, setVideoBusy] = useState(false)
   const [videoError, setVideoError] = useState<string | null>(null)
   // 재생성 확인 팝업(#regen-confirm) / Previz 편집 팝업(#e6)
-  const [confirm, setConfirm] = useState<null | 'image' | 'video' | 'previz'>(null)
+  const [confirm, setConfirm] = useState<null | 'image' | 'video' | 'previz' | 'manual-retry'>(null)
   // #f10(2026-08-26 오너): previz 호버에 '진짜 재생성'이 없었다(연출 화살표 팝업뿐) — 카드에서
   //   writer 러프 재생성을 직접 쏜다. 완료 반영은 writer finalize → 재수화 경로 그대로.
   const cardProjectId = useDirectorCanvasStore((s) => s.projectId)
@@ -279,7 +282,7 @@ function ShotCell({
   const data: ShotNodeData = node.data
   const img = data.storyboardImage
   const status = img?.status ?? null
-  const hasImage = status === 'completed' && !!img?.url
+  const hasImage = !!img?.url
   const roughUrl = rough?.status === 'completed' ? rough.url : null
   const roughStartUrl = rough?.frames?.start ?? roughUrl
   // 약속 I4(2026-09-04): 러프 3장 중 하나라도 바뀌면 실사 카드에 "러프 바뀜" — 자동 재생성은 하지 않는다(오너 I5).
@@ -308,10 +311,7 @@ function ShotCell({
           : { label: t('Image needed'), cls: 'border-warning/50 text-warning', video: false }
 
   const runImage = async () => {
-    if (realBatchBusy) {
-      setVideoError(t('Batch live-action generation is running. Try again after it finishes.'))
-      return
-    }
+    if (imageGeneration.disabled) return
     try {
       await generateStoryboardImage(node.id)
     } catch (error) {
@@ -352,12 +352,19 @@ function ShotCell({
   //   탭 재진입 시 DB 재수화로 덮이므로, 잡이 떠 있으면 그쪽이 맞다.
   const queuedImage = !!writerShotId && queuedImageShots.has(writerShotId)
   const queuedVideo = !!writerShotId && queuedVideoShots.has(writerShotId)
+  const imageGeneration = storyboardImageGenerationState({
+    image: img,
+    queued: queuedImage,
+    batchBusy: realBatchBusy,
+    queueStatus,
+  })
+  const manualUncertain = imageGeneration.phase === 'uncertain' && !writerShotId
   // 진입 자동 채움 대기(#e6 2026-08-11) — 일괄 러너가 돌기 시작했는데 아직 이 샷의 잡이 큐에
   //   안 앉은 구간. "생성이 필요합니다"를 보여주면 뭔가 해야 할 것 같은 잘못된 신호가 되므로
   //   (곧 자동으로 생성된다) 이 구간도 생성 중으로 취급해 스피너를 돌린다.
   const autoFillPending =
     mediaMode === 'real' && realBatchBusy && !hasImage && status !== 'failed' && !!roughUrl
-  const imageGenerating = status === 'generating' || queuedImage || autoFillPending
+  const imageGenerating = imageGeneration.generating || autoFillPending
   const generating = imageGenerating || videoBusy || childVideoGenerating || queuedVideo
   // 대기 vs 실작업(#e4 2026-08-12) — DB 큐(generation_jobs queued)에 앉았으면 fal 이 실제로
   //   돌리는 중이라 타이머가 의미 있고, 아직 큐에 없으면(일괄 러너가 순번 대기) 시간은
@@ -407,15 +414,22 @@ function ShotCell({
       : [
           {
             key: 'image',
-            label: hasImage ? t('Regenerate image') : t('Generate image'),
+            label: imageGeneration.phase === 'error' ? t('Retry')
+              : imageGeneration.label ? t(imageGeneration.label)
+                : hasImage ? t('Regenerate image') : t('Generate image'),
             title:
-              status === 'failed' && img?.errorMessage
+              imageGeneration.phase === 'error'
+                ? t('Could not check image generation.')
+                : status === 'failed' && img?.errorMessage
                 ? img.errorMessage
                 : hasImage
                   ? t('Create a new shooting image (replaces the existing one)')
                   : t('Only generates the shooting image'),
             primary: false,
+            disabled: imageGeneration.disabled && imageGeneration.phase !== 'error',
             onClick: () => {
+              if (imageGeneration.phase === 'error') { refreshGenerationQueue(); return }
+              if (imageGeneration.disabled) return
               if (hasImage) setConfirm('image')
               else void runImage()
             },
@@ -425,6 +439,7 @@ function ShotCell({
             label: completedVideoUrl ? t('Regenerate video') : t('Generate video'),
             title: t('Generate video: creates the shooting image first if missing, then the video'),
             primary: true,
+            disabled: generating || realBatchBusy || queueStatus !== 'ready',
             onClick: () => {
               if (completedVideoUrl) setConfirm('video')
               else void runVideo()
@@ -603,13 +618,29 @@ function ShotCell({
             imageWaitingOnly
               ? t('Waiting to generate image')
               : imageGenerating
-                ? mediaMode === 'previz'
-                  ? t('Regenerating previz')
-                  : t('Generating image')
+                ? imageGeneration.phase === 'submitting' || imageGeneration.phase === 'uncertain'
+                  ? t(imageGeneration.label!)
+                  : mediaMode === 'previz'
+                    ? t('Regenerating previz')
+                    : t('Generating image')
                 : t('Generating video')
           }
           beamColor={imageGenerating ? 'success' : 'primary'}
         />
+        {imageGeneration.phase === 'uncertain' && (
+          <button
+            type="button"
+            className="absolute right-2 top-2 z-20 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={manualUncertain && realBatchBusy}
+            onClick={(event) => {
+              event.stopPropagation()
+              if (manualUncertain) setConfirm('manual-retry')
+              else checkStoryboardImageStatus()
+            }}
+          >
+            {manualUncertain ? t('Generate again') : t('Check image status')}
+          </button>
+        )}
         {childVideoFailure && (
           <span
             title={childVideoFailure}
@@ -641,24 +672,28 @@ function ShotCell({
               : t('Regenerate the image?')
         }
         description={
-          confirm === 'video'
+          confirm === 'manual-retry'
+            ? t('The previous request may still be running. Generating again sends a new request.')
+            : confirm === 'video'
             ? t('Creates a new take based on the current shooting image.')
             : confirm === 'previz'
               ? t('Redraws this shot\'s rough 3-frame set (start/directing/end).')
               : t('Generates a new shooting image for this shot.')
         }
         impact={
-          confirm === 'video'
+          confirm === 'manual-retry' ? [] : confirm === 'video'
             ? [t('Costs money to generate the video.'), t('Adds a new take. The card shows the latest successful one.')]
             : confirm === 'previz'
               ? [t('Costs money to generate the previz.'), t('Replaces the existing rough frames with the new result.')]
-              : [t('Costs money to generate the image.'), t('Replaces the existing shooting image with the new result.')]
+              : [t('Replaces the existing shooting image with the new result.')]
         }
-        confirmLabel={t('Regenerate')}
+        confirmLabel={confirm === 'manual-retry' ? t('Generate again') : t('Regenerate')}
+        busy={confirm === 'manual-retry' ? !manualUncertain || realBatchBusy : confirm === 'image' && imageGeneration.disabled}
         onConfirm={() => {
           const which = confirm
           setConfirm(null)
-          if (which === 'video') void runVideo()
+          if (which === 'manual-retry') void useDirectorCanvasStore.getState().retryUnconfirmedManualStoryboardImage(node.id)
+          else if (which === 'video') void runVideo()
           else if (which === 'previz') void runPrevizRegen()
           else void runImage()
         }}
@@ -753,6 +788,7 @@ export function StoryboardGridView({
   // 진행 중 잡 (#queue-restore) — 셀마다 훅을 걸면 폴링은 공유돼도 리렌더가 카드 수만큼 늘어난다.
   //   여기서 한 번 읽어 집합으로 내려보낸다.
   const activeJobs = useActiveGenerationJobs(projectId)
+  const queueStatus = useGenerationQueueStatus(projectId)
   // #f10: 러프 재생성 잡이 활성 목록에서 빠지는 순간(=완료/실패) 캔버스를 재수화해 새 프레임을
   //   바로 반영한다 — 종전엔 탭을 떠났다 와야 보였다. 마운트 첫 렌더(prev 빈 집합)는 발화 없음.
   const activeRoughShots = useMemo(
@@ -791,23 +827,11 @@ export function StoryboardGridView({
     [activeJobs],
   )
 
-  // 진행 중인 산출물이 있으면 해당 Storyboard 화면을 우선 보여준다.
-  // 큐가 사라질 때 사용자가 고른 마지막 미디어 모드로 되돌리지 않는다(마지막 탭 기억은 store가 담당).
-  const hasQueuedRealWork = activeJobs.some(
-    (job) =>
-      job.kind === 'storyboard_real_grid' ||
-      job.kind === 'shot_storyboard' ||
-      job.kind === 'shot_video',
-  )
-  const hasQueuedPrevizWork = activeJobs.some(
-    (job) => job.kind === 'shot_rough_storyboard',
-  )
-  useEffect(() => {
-    if (hasQueuedRealWork && mediaMode !== 'real') setStoryboardMediaMode('real')
-    else if (!hasQueuedRealWork && hasQueuedPrevizWork && mediaMode !== 'previz') {
-      setStoryboardMediaMode('previz')
-    }
-  }, [hasQueuedPrevizWork, hasQueuedRealWork, mediaMode, setStoryboardMediaMode])
+  // 진행 중인 작업을 보고 Previz/Real 을 대신 바꾸던 effect 를 제거했다
+  //   (#view-not-forced 2026-09-08 오너 판정). 진입 시 한 번이 아니라 작업이 도는 내내
+  //   되돌려서, 사용자가 Previz 를 눌러도 다음 렌더에 Real 로 다시 튕겼다.
+  //   같은 판정으로 store 의 restoreActiveGenerationView 도 함께 없앴다 —
+  //   탭·미디어 모드는 사용자가 고르고, 진행 표시는 카드 스피너·배지가 담당한다.
 
   // 완료 즉시 반영(#live-refresh) — 페이지 레벨 훅(use-queue-rehydrate)으로 승격돼 Node 뷰와
   //   공유한다(2026-08-12). 여기서 중복 구독하지 않는다.
@@ -950,6 +974,7 @@ export function StoryboardGridView({
                     sceneLabel={group.key === '__orphan__' ? null : prettyNodeLabel(group.label)}
                     queuedImageShots={queuedImageShots}
                     queuedVideoShots={queuedVideoShots}
+                    queueStatus={queueStatus}
                     descriptionFontSize={descriptionFontSize}
                     shotMention={mentionFor('shot', shot.id, mediaMode)}
                   />

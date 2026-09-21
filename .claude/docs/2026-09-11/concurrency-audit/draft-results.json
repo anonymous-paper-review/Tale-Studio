@@ -1,0 +1,132 @@
+{
+  "basis": "origin/main 867cda835195315e6a73cb4f8d262ef736302ff9",
+  "executedAt": "2026-09-11T07:06:22.171Z",
+  "method": "Actual triggerAssetDrafts, triggerCharacterDrafts, triggerWorldDrafts, submitWorldShotJob, checkGenerationCapacity; mocked in-memory DB/provider boundaries; no external generation",
+  "limitation": "Final queued is an in-memory application-job count; it is not a live fal running-request measurement. This tests one multi-submit request, not SQL concurrency.",
+  "observations": [
+    {
+      "globalLimit": 68,
+      "initialQueued": 67,
+      "requestedCharacters": 2,
+      "requestedWorlds": 2,
+      "capacityReads": 1,
+      "mockProviderAccepted": 4,
+      "recordedJobs": 4,
+      "simulatedFinalQueued": 71,
+      "overConfiguredLimitBy": 3,
+      "networkAttempts": 0,
+      "result": {
+        "characters": {
+          "submitted": 2,
+          "skipped": 0,
+          "failed": 0
+        },
+        "worlds": {
+          "submitted": 2,
+          "skipped": 0,
+          "failed": 0
+        }
+      },
+      "targets": [
+        {
+          "kind": "world_shot",
+          "target": {
+            "workspaceId": "concurrency-draft-workspace",
+            "locationId": "location-1",
+            "column": "wide_shot"
+          }
+        },
+        {
+          "kind": "character_view",
+          "target": {
+            "workspaceId": "concurrency-draft-workspace",
+            "characterId": "character-1",
+            "appearanceKey": "current",
+            "view": "main",
+            "column": "view_main"
+          }
+        },
+        {
+          "kind": "world_shot",
+          "target": {
+            "workspaceId": "concurrency-draft-workspace",
+            "locationId": "location-2",
+            "column": "wide_shot"
+          }
+        },
+        {
+          "kind": "character_view",
+          "target": {
+            "workspaceId": "concurrency-draft-workspace",
+            "characterId": "character-2",
+            "appearanceKey": "current",
+            "view": "main",
+            "column": "view_main"
+          }
+        }
+      ]
+    },
+    {
+      "globalLimit": 80,
+      "initialQueued": 79,
+      "requestedCharacters": 2,
+      "requestedWorlds": 2,
+      "capacityReads": 1,
+      "mockProviderAccepted": 4,
+      "recordedJobs": 4,
+      "simulatedFinalQueued": 83,
+      "overConfiguredLimitBy": 3,
+      "networkAttempts": 0,
+      "result": {
+        "characters": {
+          "submitted": 2,
+          "skipped": 0,
+          "failed": 0
+        },
+        "worlds": {
+          "submitted": 2,
+          "skipped": 0,
+          "failed": 0
+        }
+      },
+      "targets": [
+        {
+          "kind": "world_shot",
+          "target": {
+            "workspaceId": "concurrency-draft-workspace",
+            "locationId": "location-1",
+            "column": "wide_shot"
+          }
+        },
+        {
+          "kind": "character_view",
+          "target": {
+            "workspaceId": "concurrency-draft-workspace",
+            "characterId": "character-1",
+            "appearanceKey": "current",
+            "view": "main",
+            "column": "view_main"
+          }
+        },
+        {
+          "kind": "world_shot",
+          "target": {
+            "workspaceId": "concurrency-draft-workspace",
+            "locationId": "location-2",
+            "column": "wide_shot"
+          }
+        },
+        {
+          "kind": "character_view",
+          "target": {
+            "workspaceId": "concurrency-draft-workspace",
+            "characterId": "character-2",
+            "appearanceKey": "current",
+            "view": "main",
+            "column": "view_main"
+          }
+        }
+      ]
+    }
+  ]
+}

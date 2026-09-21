@@ -1,0 +1,11 @@
+{
+  "id": "79741e2d-4c65-437e-b247-a48b71b04deb",
+  "ok": true,
+  "result": {
+    "result": "{\"first\":false,\"jobs\":[[\"artist-sample-1\",{\"characterId\":\"kyotaro\",\"error\":null,\"resultUrl\":null,\"status\":\"queued\"}],[\"artist-sample-2\",{\"characterId\":\"komatsu\",\"error\":null,\"resultUrl\":\"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22640%22%20height%3D%22360%22%3E%3Crect%20width%3D%22640%22%20height%3D%22360%22%20fill%3D%22%236b7280%22%2F%3E%3Ctext%20x%3D%22320%22%20y%3D%22190%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-size%3D%2228%22%3E%EC%BD%94%EB%A7%88%EC%B8%A0%20%C2%B7%20%EA%B2%80%EC%A6%9D%EC%9A%A9%20%EC%9E%A0%EC%98%B7%20%EC%9D%B4%EB%AF%B8%EC%A7%80%3C%2Ftext%3E%3C%2Fsvg%3E\",\"status\":\"completed\"}]],\"messages\":[\"쿄타로와 코마츠의 잠옷입은 모습도 추가해줘\",\"두 인물의 다른 시간대 모습을 추가할게요. 아래 내용을 확인해 주세요.\",\"쿄타로: 시작 실패 — Failed to fetch\",\"⚠ 캐릭터 이미지 — 이미지 생성에 실패했어요: Failed to fetch 다시 시도해 주세요. 반복되면 묘사를 조금 바꿔 보세요.\",\"코마츠: 진행 중\",\"코마츠: 완료\",\"쿄타로: 시작 실패 — 접수 상태를 확인할 수 없어요. 기존 작업을 확인한 뒤 다시 시도해 주세요.\"],\"remaining\":[{\"action\":\"\\\"잠옷\\\" 모습을 추가하고 이미지를 만듭니다\",\"createdAt\":\"2026-09-10T06:22:16.665Z\",\"id\":\"proposal_mtv5421l_o98uac\",\"impact\":[\"캐릭터에 새 모습 탭이 생겨요. 기본 모습은 그대로예요.\",\"기본 모습의 얼굴을 참조해 이미지를 바로 만들어요(생성 비용).\"],\"kind\":\"artistRegenerateCharacterView\",\"payload\":{\"appearanceKey\":\"pajamas\",\"characterId\":\"kyotaro\",\"view\":\"main\"},\"projectId\":\"mvp-local-fixture\",\"stage\":\"artist\",\"submissionUncertain\":true,\"target\":\"쿄타로\",\"traceId\":\"4b8528d8-9eb3-4ff8-b237-ee36b32b474d\"}],\"retry\":false,\"submissions\":[\"kyotaro\",\"komatsu\"]}",
+    "origin": "http://127.0.0.1:3073/playground/mvp-artist"
+  },
+  "_meta": {
+    "runtimeId": "da993342-3f2f-4d76-bbf0-e447825a810b"
+  }
+}

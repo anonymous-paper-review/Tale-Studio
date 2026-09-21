@@ -81,7 +81,22 @@ export async function POST(req: Request) {
     )
     if (error) throw error
 
-    return NextResponse.json({ characterId: data?.character_id ?? characterId })
+    // RPC가 함께 만든 기본 모습을 반환한다. 생성 직후에도 재조회 없이 그 모습을 선택할 수 있다.
+    // label·시점은 create_person_with_default_appearance의 신규 행과 동일하다.
+    return NextResponse.json({
+      characterId: data?.character_id ?? characterId,
+      defaultAppearance: {
+        appearanceKey: data.appearance_key,
+        label: '현재', // i18n-ok: RPC가 저장한 기본 모습의 원본 label을 그대로 반환한다.
+        isDefault: true,
+        narrativeTime: 'present',
+        appearance: i18n.appearance,
+        appearanceNative: i18n.appearance_native,
+        sheetUrl: null,
+        portraitUrl: null,
+        viewCandidates: {},
+      },
+    })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[artist/character POST]', message)

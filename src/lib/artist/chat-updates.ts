@@ -72,6 +72,8 @@ export function validateUpdates(raw: unknown[]): unknown[] {
             ...(asString(rec.instruction) ? { instruction: rec.instruction } : {}),
             // 이미지 모델 지정(선택) — 유효한 image-models 키만 통과, 미지정은 라우트 기본 모델.
             ...(isImageModelKey(rec.model) ? { model: rec.model } : {}),
+            // 정책 거절 뒤 안전 모드 재시도 — UI의 retryCharacterViewSafe와 같은 플래그. true일 때만 남긴다.
+            ...(rec.safeMode === true ? { safeMode: true } : {}),
           })
         }
         break
@@ -82,6 +84,9 @@ export function validateUpdates(raw: unknown[]): unknown[] {
             locationId: rec.locationId,
             // 약속 C10: 특정 배경 모습(변형)만 다시 그린다. 없으면 기본 모습.
             ...(asString(rec.appearanceKey)?.trim() ? { appearanceKey: (rec.appearanceKey as string).trim() } : {}),
+            // 배경 팝업의 이미지 모델 선택과 같다. 유효한 키만 통과.
+            ...(isImageModelKey(rec.model) ? { model: rec.model } : {}),
+            ...(rec.safeMode === true ? { safeMode: true } : {}),
           })
         }
         break
@@ -172,6 +177,37 @@ export function extractLocationAppearanceCreations(raw: unknown[]): LocationAppe
       visualDescription,
       ...(typeof rec.narrativeTime === 'string' && VALID_NARRATIVE_TIMES.has(rec.narrativeTime) ? { narrativeTime: rec.narrativeTime } : {}),
     })
+  }
+  return out
+}
+
+export interface AppearanceDeletion { characterId: string; appearanceKey: string }
+export interface LocationAppearanceDeletion { locationId: string; appearanceKey: string }
+
+/** cc가 emit한 "모습 삭제"(deleteAppearance) 의도. 자동 실행되지 않고 승인 카드('artistDeleteAppearance')로만 흐른다. 기본 모습 여부는 스토어가 확인한다. */
+export function extractAppearanceDeletions(raw: unknown[]): AppearanceDeletion[] {
+  const out: AppearanceDeletion[] = []
+  for (const u of raw) {
+    if (!u || typeof u !== 'object') continue
+    const rec = u as Record<string, unknown>
+    if (rec.type !== 'deleteAppearance') continue
+    const characterId = asString(rec.characterId)?.trim()
+    const appearanceKey = asString(rec.appearanceKey)?.trim()
+    if (characterId && appearanceKey) out.push({ characterId, appearanceKey })
+  }
+  return out
+}
+
+/** 배경 변형 모습 삭제(deleteLocationAppearance). 기본 배경('default')은 행이 아니라 삭제 대상이 아니다. */
+export function extractLocationAppearanceDeletions(raw: unknown[]): LocationAppearanceDeletion[] {
+  const out: LocationAppearanceDeletion[] = []
+  for (const u of raw) {
+    if (!u || typeof u !== 'object') continue
+    const rec = u as Record<string, unknown>
+    if (rec.type !== 'deleteLocationAppearance') continue
+    const locationId = asString(rec.locationId)?.trim()
+    const appearanceKey = asString(rec.appearanceKey)?.trim()
+    if (locationId && appearanceKey && appearanceKey !== 'default') out.push({ locationId, appearanceKey })
   }
   return out
 }

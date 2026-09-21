@@ -1,0 +1,539 @@
+{
+  "project": [
+    {
+      "id": "7112d31e-70ce-4743-9562-057f7beac002",
+      "title": "mvp_test1",
+      "created_at": "2026-09-09T11:42:01.58936+00:00",
+      "updated_at": "2026-09-09T11:42:01.58936+00:00",
+      "fields": {
+        "story_text": {
+          "chars": 201,
+          "sha256": "19faa36572fcd868bb9f94b463d52e9065506d91f0d545e79b4d1d1698149645",
+          "matches": []
+        },
+        "expanded_story": {
+          "chars": 2,
+          "sha256": "12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+          "matches": []
+        },
+        "producer_draft": {
+          "chars": 2412,
+          "sha256": "e4017322ac6d45c6a9be786cc268d67b6c2c7f09191c352eb3e0abddeebf1464",
+          "matches": []
+        }
+      }
+    }
+  ],
+  "calls": [
+    {
+      "id": "2dc98d0f-fbe5-4fed-9cb1-aa1d99b440b7",
+      "called_at": "2026-09-09T13:03:02.447+00:00",
+      "stage": "dramaturgy",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "seq": 1,
+      "run_id": null
+    },
+    {
+      "id": "6b68a0f5-7ed6-40b3-b4b1-e87c790c0bb4",
+      "called_at": "2026-09-09T13:03:10.974+00:00",
+      "stage": "narrativeStructure",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "seq": 2,
+      "run_id": null
+    },
+    {
+      "id": "a3c9931d-944e-40a2-86fd-398333f49f9b",
+      "called_at": "2026-09-09T13:03:40.053+00:00",
+      "stage": "scenes",
+      "provider": "gemini",
+      "model": "gemini-3-flash-preview",
+      "seq": 3,
+      "run_id": null
+    },
+    {
+      "id": "78502ed7-c9f3-4cf4-b800-c0b5de0daf34",
+      "called_at": "2026-09-09T13:06:13.327+00:00",
+      "stage": "visualIdentity",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 4,
+      "run_id": null
+    },
+    {
+      "id": "61f06f9d-79be-40eb-8090-27db63e79c95",
+      "called_at": "2026-09-09T13:06:25.735+00:00",
+      "stage": "actVisualArc",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 5,
+      "run_id": null
+    },
+    {
+      "id": "e1fd670d-46a8-4df6-bff8-b982e52234d6",
+      "called_at": "2026-09-09T13:06:49.294+00:00",
+      "stage": "v2Design",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 6,
+      "run_id": null
+    },
+    {
+      "id": "1cf2d0ca-4bc1-4269-9d70-82b8ba0651fa",
+      "called_at": "2026-09-09T13:07:42.978+00:00",
+      "stage": "sceneCinematography",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 7,
+      "run_id": null
+    },
+    {
+      "id": "0ccc12bb-03db-45bd-968a-b020767eeba9",
+      "called_at": "2026-09-09T13:08:04.702+00:00",
+      "stage": "sceneCinematography",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 8,
+      "run_id": null
+    },
+    {
+      "id": "c5e84064-2c69-457b-a6f4-7af6231c9696",
+      "called_at": "2026-09-09T13:08:27.01+00:00",
+      "stage": "decoupage",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 9,
+      "run_id": null
+    },
+    {
+      "id": "7af26293-230d-4b1a-9985-d2f4650a531a",
+      "called_at": "2026-09-09T13:08:30.735+00:00",
+      "stage": "decoupage",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 10,
+      "run_id": null
+    },
+    {
+      "id": "34a4db87-1cb7-46cc-84d7-e45f0b731f90",
+      "called_at": "2026-09-09T13:08:32.964+00:00",
+      "stage": "decoupage",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 11,
+      "run_id": null
+    },
+    {
+      "id": "372bb6a5-9874-42d7-be51-eff505561a11",
+      "called_at": "2026-09-09T13:08:39.021+00:00",
+      "stage": "decoupage",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 12,
+      "run_id": null
+    },
+    {
+      "id": "b78201fb-9faf-4eaf-9ff0-de5853c59203",
+      "called_at": "2026-09-09T13:08:50.465+00:00",
+      "stage": "decoupage",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 13,
+      "run_id": null
+    },
+    {
+      "id": "ae7550d3-8c64-42c3-bb85-0308026c5fa3",
+      "called_at": "2026-09-09T13:09:11.514+00:00",
+      "stage": "sceneStage",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 14,
+      "run_id": null
+    },
+    {
+      "id": "103c3901-4590-47f0-8f44-f9e191d11edd",
+      "called_at": "2026-09-09T13:09:17.791+00:00",
+      "stage": "sceneStage",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 15,
+      "run_id": null
+    },
+    {
+      "id": "05a9edf8-de26-4b21-9059-686708990044",
+      "called_at": "2026-09-09T13:09:22.19+00:00",
+      "stage": "sceneStage",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 16,
+      "run_id": null
+    },
+    {
+      "id": "3caa6168-c8dd-451b-94ad-788e4d3c30f6",
+      "called_at": "2026-09-09T13:09:22.461+00:00",
+      "stage": "sceneStage",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 17,
+      "run_id": null
+    },
+    {
+      "id": "9097a1aa-eaea-46d6-9b4e-6c4d9ae3a48d",
+      "called_at": "2026-09-09T13:09:26.392+00:00",
+      "stage": "sceneStage",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 18,
+      "run_id": null
+    },
+    {
+      "id": "c5b757d3-2e5f-4261-a09a-2e340ea932d4",
+      "called_at": "2026-09-09T13:09:43.596+00:00",
+      "stage": "dialogue",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 19,
+      "run_id": null
+    },
+    {
+      "id": "6e7939e5-a7a6-414c-be31-19077360dd3b",
+      "called_at": "2026-09-09T13:09:52.582+00:00",
+      "stage": "dialogue",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 20,
+      "run_id": null
+    },
+    {
+      "id": "f587dcc3-c06d-40f2-88bc-47ecc84e00fe",
+      "called_at": "2026-09-09T13:10:05.15+00:00",
+      "stage": "shotDesign",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 21,
+      "run_id": null
+    },
+    {
+      "id": "65799a14-fcf2-4a00-ad5d-9a4b462a007a",
+      "called_at": "2026-09-09T13:10:33.347+00:00",
+      "stage": "shotDesign",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 22,
+      "run_id": null
+    },
+    {
+      "id": "8910180f-6c74-4ec0-8244-c60f72eed887",
+      "called_at": "2026-09-09T13:10:47.406+00:00",
+      "stage": "dialogue",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 23,
+      "run_id": null
+    },
+    {
+      "id": "535f5a76-b396-426b-97c3-7bc59811970d",
+      "called_at": "2026-09-09T13:10:47.447+00:00",
+      "stage": "dialogue",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 24,
+      "run_id": null
+    },
+    {
+      "id": "90c9e0fa-b767-4b1e-a23f-1379b6f64395",
+      "called_at": "2026-09-09T13:10:50.489+00:00",
+      "stage": "dialogue",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 25,
+      "run_id": null
+    },
+    {
+      "id": "93eae9c1-b4cb-4795-8af3-234008b3670e",
+      "called_at": "2026-09-09T13:10:54.615+00:00",
+      "stage": "dialogue",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 26,
+      "run_id": null
+    },
+    {
+      "id": "c20f26fd-b654-4227-ac2c-7b34673d68c4",
+      "called_at": "2026-09-09T13:11:06.943+00:00",
+      "stage": "shotDesign",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 27,
+      "run_id": null
+    },
+    {
+      "id": "23b7a094-ff33-4f0a-aaf4-7979603f1d0f",
+      "called_at": "2026-09-09T13:11:07.362+00:00",
+      "stage": "shotDesign",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 28,
+      "run_id": null
+    },
+    {
+      "id": "65afd158-d7e6-4707-adbb-b48a32bac8f6",
+      "called_at": "2026-09-09T13:11:07.406+00:00",
+      "stage": "shotDesign",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 29,
+      "run_id": null
+    },
+    {
+      "id": "693267c2-c9ff-4c6b-b8af-ec57bdc313ad",
+      "called_at": "2026-09-09T13:11:25.165+00:00",
+      "stage": "shotDesign",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 30,
+      "run_id": null
+    },
+    {
+      "id": "c1e6afd2-76d1-4d6b-aba5-1f6ec771c633",
+      "called_at": "2026-09-09T13:11:32.066+00:00",
+      "stage": "shotDesign",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 31,
+      "run_id": null
+    },
+    {
+      "id": "fa079217-b3dc-470f-bdc6-9332aa882c79",
+      "called_at": "2026-09-09T13:11:40.464+00:00",
+      "stage": "shotDesign",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 32,
+      "run_id": null
+    },
+    {
+      "id": "23efc51a-d90c-493c-a859-ce01452f8af9",
+      "called_at": "2026-09-09T13:11:41.256+00:00",
+      "stage": "shotDesign",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 33,
+      "run_id": null
+    },
+    {
+      "id": "0429dec5-f99e-46d8-a2ae-cdbff47dd180",
+      "called_at": "2026-09-09T13:11:56.752+00:00",
+      "stage": "shotDesign",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 34,
+      "run_id": null
+    },
+    {
+      "id": "25e2168a-09ff-4767-8598-c5548e9b960e",
+      "called_at": "2026-09-09T13:12:08.566+00:00",
+      "stage": "shotDesign",
+      "provider": "gemini",
+      "model": "gemini-3.6-flash",
+      "seq": 35,
+      "run_id": null
+    },
+    {
+      "id": "0ae47667-c536-473f-b47b-b4e96405f0e6",
+      "called_at": "2026-09-09T13:12:17.499+00:00",
+      "stage": "shotCheck",
+      "provider": "claude",
+      "model": "claude-sonnet-4-6",
+      "seq": 1,
+      "run_id": null
+    }
+  ],
+  "runs": [
+    {
+      "id": "7ece6db5-b87d-4f40-be33-5d093d9c9eb6",
+      "created_at": "2026-09-09T13:02:40.50054+00:00",
+      "updated_at": "2026-09-09T13:13:05.51+00:00",
+      "stateKeys": [
+        "genre",
+        "input",
+        "world",
+        "scenes",
+        "compact",
+        "_timings",
+        "dialogue",
+        "decoupage",
+        "shotCheck",
+        "characters",
+        "dramaturgy",
+        "sceneStage",
+        "shotDesign",
+        "storyCheck",
+        "sceneLedger",
+        "worldVisual",
+        "actVisualArc",
+        "shotSequence",
+        "renderPrompts",
+        "_gateConfirmed",
+        "visualIdentity",
+        "_shotsPersisted",
+        "characterVisual",
+        "shotDesignIssues",
+        "sceneBudgetIssues",
+        "narrativeStructure",
+        "sceneCinematography"
+      ],
+      "matches": [
+        {
+          "path": "scenes.scenes.1.scene_actions.0",
+          "term": "vending_machine_corner",
+          "excerpt": "쿄타로가 체육관 옆 vending_machine_corner에서 음료수를 뽑고 있다.",
+          "chars": 47
+        },
+        {
+          "path": "dramaturgy.world_inventory.2.id",
+          "term": "vending_machine_corner",
+          "excerpt": "vending_machine_corner",
+          "chars": 22
+        }
+      ]
+    }
+  ],
+  "characters": [
+    {
+      "character_id": "char",
+      "name": "쿄타로",
+      "appearance": null,
+      "appearance_native": null
+    },
+    {
+      "character_id": "char_2",
+      "name": "코마츠",
+      "appearance": null,
+      "appearance_native": null
+    }
+  ],
+  "characterAppearances": [
+    {
+      "character_id": "char",
+      "appearance_key": "current",
+      "label": "현재",
+      "narrative_time": "present",
+      "is_default": true,
+      "appearance": "17–18-year-old Japanese male high school student, black two-block haircut, very fair white skin, sharp defined eyes, white dress shirt, black slacks, necktie, white sneakers",
+      "appearance_native": "17~18세 일본 남고생, 흑발 투블럭 헤어, 새하얀 피부, 또렷한 눈매, 흰 셔츠 + 검은 슬랙스 + 넥타이 + 흰 스니커즈",
+      "sheet_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634/v1-97b0560280ed60a5a1eaa1bc45492543c8a986ad5a25b468c427eb83c3e88191_main.png?v=1788959269950",
+      "portrait_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634/v1-97b0560280ed60a5a1eaa1bc45492543c8a986ad5a25b468c427eb83c3e88191_portrait.png?v=1788959273557",
+      "created_at": "2026-09-09T13:02:17.676229+00:00",
+      "updated_at": "2026-09-09T13:07:53.743261+00:00"
+    },
+    {
+      "character_id": "char_2",
+      "appearance_key": "current",
+      "label": "현재",
+      "narrative_time": "present",
+      "is_default": true,
+      "appearance": "17–18-year-old Japanese female high school student, black hair with thick neat bangs, mysterious and pure impression, white dress shirt, ribbon tie, plaid skirt, white sneakers",
+      "appearance_native": "17~18세 일본 여고생, 흑발에 숱 많은 단정한 앞머리, 신비롭고 청초한 인상, 흰 셔츠 + 리본 타이 + 체크 스커트 + 흰 스니커즈",
+      "sheet_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/characters/v1-c50f938b516a0c463fd8f294753aa219811679c3267f33f227edd6bcf5abad2a/v1-97b0560280ed60a5a1eaa1bc45492543c8a986ad5a25b468c427eb83c3e88191_main.png?v=1788959254986",
+      "portrait_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/characters/v1-c50f938b516a0c463fd8f294753aa219811679c3267f33f227edd6bcf5abad2a/v1-97b0560280ed60a5a1eaa1bc45492543c8a986ad5a25b468c427eb83c3e88191_portrait.png?v=1788959258132",
+      "created_at": "2026-09-09T13:02:17.676229+00:00",
+      "updated_at": "2026-09-09T13:07:38.270811+00:00"
+    },
+    {
+      "character_id": "char",
+      "appearance_key": "appearance",
+      "label": "잠옷 모습",
+      "narrative_time": "present",
+      "is_default": false,
+      "appearance": "17–18-year-old Japanese male high school student, black two-block haircut, very fair skin, sharp and defined eyes, relaxed casual pajamas (loose-fitting T-shirt and long pants), lying in his room looking at a smartphone, natural and comfortable expression",
+      "appearance_native": "17-18세 일본 남고생, 흑발 투블럭 헤어, 새하얀 피부, 또렷한 눈매, 편안한 캐주얼 잠옷 차림 (헐렁한 티셔츠 + 긴 바지), 방에 누워 스마트폰을 보는 자연스럽고 편안한 표정",
+      "sheet_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634/v1-6d1622d0f2bc1a5dba81addf168d43afb5a0d0d0d86973bff39a546062f35301_main.png?v=1788960191247",
+      "portrait_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/characters/v1-411b0496da5eeced5314a3b5e9532bac97008d09ce9969ab4fa6a52b8c7ef634/v1-6d1622d0f2bc1a5dba81addf168d43afb5a0d0d0d86973bff39a546062f35301_portrait.png?v=1788960194324",
+      "created_at": "2026-09-09T13:22:34.852406+00:00",
+      "updated_at": "2026-09-09T13:23:14.692709+00:00"
+    },
+    {
+      "character_id": "char_2",
+      "appearance_key": "appearance",
+      "label": "잠옷 모습",
+      "narrative_time": "present",
+      "is_default": false,
+      "appearance": "17–18 year old Japanese high school girl named Komatsu, black hair with thick, neat bangs, mysterious and pure impression, wearing comfortable pajamas in pastel tones, photorealistic style",
+      "appearance_native": "17~18세 일본 여고생 코마츠, 흑발에 숱 많은 단정한 앞머리, 신비롭고 청초한 인상, 편안한 잠옷 차림, 파스텔톤 잠옷, 실사풍",
+      "sheet_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/characters/v1-c50f938b516a0c463fd8f294753aa219811679c3267f33f227edd6bcf5abad2a/v1-6d1622d0f2bc1a5dba81addf168d43afb5a0d0d0d86973bff39a546062f35301_main.png?v=1788960536864",
+      "portrait_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/characters/v1-c50f938b516a0c463fd8f294753aa219811679c3267f33f227edd6bcf5abad2a/v1-6d1622d0f2bc1a5dba81addf168d43afb5a0d0d0d86973bff39a546062f35301_portrait.png?v=1788960539913",
+      "created_at": "2026-09-09T13:27:02.136474+00:00",
+      "updated_at": "2026-09-09T13:29:00.027807+00:00"
+    }
+  ],
+  "locations": [
+    {
+      "location_id": "location_4",
+      "name": "각자의 방",
+      "visual_description": "A cozy, modest Japanese student's bedroom, a figure lying under a futon in the warm glow of a desk lamp, looking at a smartphone screen",
+      "visual_description_native": "아늑하고 소박한 일본 학생 방, 스탠드 불빛 아래 이불 속에 누워 스마트폰 화면을 보는 장면",
+      "wide_shot": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/locations/v1-a9ea8a83a076d4bd42e8b802fc1f0de0b6a8ef6d81bdac86569aa8d491727a3c_wide_shot.png?v=1788959329389"
+    },
+    {
+      "location_id": "location_3",
+      "name": "귀갓길",
+      "visual_description": "A narrow residential alley at dusk, washed in orange light, with utility poles, a slim sidewalk, and a bicycle passing by — a distinctly Japanese neighborhood scene",
+      "visual_description_native": "해질 무렵 주황빛으로 물든 주택가 골목길, 전봇대와 좁은 인도, 자전거가 지나치는 일본 특유의 동네 풍경",
+      "wide_shot": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/locations/v1-9818da74a0a32167880f4d6fcc05d0a8aa9005b47205fe70de06a91c01b1a07b_wide_shot.png?v=1788959341710"
+    },
+    {
+      "location_id": "location",
+      "name": "교실",
+      "visual_description": "A Japanese high school classroom with sunlight streaming through the windows, wooden desks and a chalkboard, curtains gently swaying in the breeze",
+      "visual_description_native": "햇살이 창문으로 비치는 일본 고등학교 교실, 나무 책상과 칠판, 커튼이 바람에 살짝 흔들리는 분위기",
+      "wide_shot": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/locations/v1-e6eaea18e885e1078829b56df34896be5ab51439e8f0ba00cb1624b2c572c10e_wide_shot.png?v=1788959336394"
+    },
+    {
+      "location_id": "location_5",
+      "name": "사진부 동아리실",
+      "visual_description": "A cozy club room with film photographs hanging on a string by the window, an old wooden desk holding a camera and darkroom development tools, warm afternoon sunlight slanting in at an angle",
+      "visual_description_native": "창가에 필름 사진들이 줄에 걸려 있고, 낡은 나무 책상 위에 카메라와 현상 도구들이 놓인 아늑한 동아리실. 오후 햇살이 비스듬히 들어오는 따뜻한 공간.",
+      "wide_shot": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/locations/v1-360f4c7559e4ecac4692d7c77d02c5a4c611b88278c879eb9ea190d7f83df13d_wide_shot.png?v=1788959346695"
+    },
+    {
+      "location_id": "neighborhood_park_pond",
+      "name": "동네 공원 연못가",
+      "visual_description": "늘어진 버드나무 가지와 잔 잔한 수면이 평온함을 전하는 하교길 공원 연못가. 잔물결에 반사되는 은은한 빛과 한적한 벤치가 아련한 분위기를 자아냄.",
+      "visual_description_native": "늘어진 버드나무 가지와 잔 잔한 수면이 평온함을 전하는 하교길 공원 연못가. 잔물결에 반사되는 은은한 빛과 한적한 벤치가 아련한 분위기를 자아냄.",
+      "wide_shot": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/locations/v1-e1d525569691083e416028b0a92509c89c0527cb67ef9c8a70b98cd37f5580fa_wide_shot.png?v=1788959354814"
+    },
+    {
+      "location_id": "location_2",
+      "name": "학교 옥상",
+      "visual_description": "A concrete rooftop enclosed by chain-link railings, with a residential neighborhood and open sky visible in the distance, bathed in warm midday sunlight",
+      "visual_description_native": "철망 난간이 둘러진 콘크리트 옥상, 멀리 주택가와 하늘이 보이고 따뜻한 낮 햇살이 내리쬐는 공간",
+      "wide_shot": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/locations/v1-7a491a7afcbffb36ab684b293af806d138e045eeb2b6db4ab97b92e9a8751019_wide_shot.png?v=1788959327963"
+    }
+  ],
+  "locationAppearances": [
+    {
+      "location_id": "location_2",
+      "appearance_key": "appearance",
+      "label": "밤",
+      "narrative_time": "present",
+      "visual_description": "Rooftop of a Japanese high school at night. The city's night skyline stretches far in the distance, with streetlights and building windows glimmering softly. The sky is deep navy blue, scattered stars faintly visible, moonlight dimly illuminating the rooftop floor. Iron railings and a water tower silhouette stand out sharply against the darkness. The atmosphere is quiet, lonely, yet beautiful.",
+      "visual_description_native": "일본 고등학교 옥상, 밤 시간대. 도시의 야경이 멀리 펼쳐지고 가로등과 건물 불빛이 은은하게 반짝인다. 하늘은 짙은 남색, 별이 드문드문 보이고 달빛이 옥상 바닥을 희미하게 비춘다. 철제 난간과 급수탑 실루엣이 어둠 속에 선명하게 드러나며 조용하고 쓸쓸하면서도 아름다운 분위기.",
+      "wide_shot": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/locations/v1-7a491a7afcbffb36ab684b293af806d138e045eeb2b6db4ab97b92e9a8751019_v1-6d1622d0f2bc1a5dba81addf168d43afb5a0d0d0d86973bff39a546062f35301_wide_shot.png?v=1788960311972",
+      "created_at": "2026-09-09T13:20:14.664262+00:00",
+      "updated_at": "2026-09-09T13:25:11.972+00:00"
+    },
+    {
+      "location_id": "neighborhood_park_pond",
+      "appearance_key": "appearance",
+      "label": "노을",
+      "narrative_time": "present",
+      "visual_description": "Japanese neighborhood park pond at dusk, sunset sky casting orange and red hues reflected on the still water surface, warm and emotionally evocative twilight atmosphere, photorealistic style",
+      "visual_description_native": "일본 동네 공원 연못가, 해질 무렵 노을이 지는 풍경, 연못 수면에 주황빛과 붉은빛이 반사되고 있음, 따뜻하고 감성적인 황혼 분위기, 실사풍",
+      "wide_shot": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/ce053575-62d5-4c8d-898f-34a1a5c6b40b/7112d31e-70ce-4743-9562-057f7beac002/locations/v1-e1d525569691083e416028b0a92509c89c0527cb67ef9c8a70b98cd37f5580fa_v1-6d1622d0f2bc1a5dba81addf168d43afb5a0d0d0d86973bff39a546062f35301_wide_shot.png?v=1788960621034",
+      "created_at": "2026-09-09T13:28:27.521067+00:00",
+      "updated_at": "2026-09-09T13:30:21.034+00:00"
+    }
+  ]
+}

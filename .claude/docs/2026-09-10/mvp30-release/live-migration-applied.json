@@ -1,0 +1,17 @@
+{
+  "appliedAt": "2026-09-10T05:35:29.050Z",
+  "environment": "production",
+  "projectRef": "qnjnrihfpqkdhjuzvepy",
+  "codeCommit": "3970a3c0d75b11bfa851aa595a5b3d166c21ee07",
+  "migrationVersion": "20260910001500",
+  "migrationName": "reserve_rough_storyboard_jobs",
+  "validatedSha256": "70933289f5965631cd44445b098732a493157b370dbe1f95e1e83fa59b6f750f",
+  "checks": {
+    "signature": "reserve_rough_storyboard_grid(uuid,uuid,uuid,text[],text,text,jsonb,boolean)",
+    "anon": false,
+    "authenticated": false,
+    "service_role": true,
+    "recorded": 1
+  },
+  "applicationDataChanged": false
+}

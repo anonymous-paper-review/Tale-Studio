@@ -95,9 +95,13 @@ export async function onRequestError(
   }
 
   // Edge 런타임엔 service-role Supabase 클라이언트가 없다(Node 전용 API 의존) — nodejs 런타임만 기록.
+  //   런타임 가드만으로는 부족하다: 번들러는 정적 분석으로 이 import 를 Edge 번들에도 넣고,
+  //   admin.ts 의 `import 'server-only'` 가 그 순간 빌드를 깬다(2026-09-08 프로덕션 빌드 실패).
+  //   경로를 변수로 감싸 정적 분석이 따라오지 못하게 한다 — 실제 로딩은 nodejs 에서만 일어난다.
   if (context.runtime !== 'nodejs') return
   try {
-    const { supabaseAdmin } = await import('@/lib/supabase/admin')
+    const adminPath = '@/lib/supabase/admin'
+    const { supabaseAdmin } = (await import(/* webpackIgnore: false */ adminPath)) as typeof import('@/lib/supabase/admin')
     const message = err instanceof Error ? err.message : String(err)
     const stack = err instanceof Error ? err.stack ?? null : null
     const { error } = await supabaseAdmin.from('server_errors').insert({

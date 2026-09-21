@@ -113,7 +113,7 @@ export function CharacterViewDialog({ charId, appearanceKey, view, onClose }: Pr
   const isSheet = !isObject && view === 'main'
 
   const initialPrompt = appearance.appearanceNative || appearance.appearance || ''
-  const key = `${charId}:${appearanceKey}:${view}`
+  const key = `${charId}:${appearanceKey}:${view}:${initialPrompt}`
   if (promptKey !== key) {
     setPromptKey(key)
     setPrompt(initialPrompt)

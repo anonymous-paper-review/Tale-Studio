@@ -33,6 +33,7 @@ describe('applyStyleAnchorKeyFromChat', () => {
       styleAnchors: catalog,
       setStyleAnchor: async (key) => {
         applied.push(key)
+        return true
       },
     })
 
@@ -48,6 +49,7 @@ describe('applyStyleAnchorKeyFromChat', () => {
       styleAnchors: catalog,
       setStyleAnchor: async (key) => {
         applied.push(key)
+        return true
       },
       // 카탈로그가 이미 실려 있으므로 loadStyleAnchors 는 호출되지 않아야 한다.
       loadStyleAnchors: async () => {

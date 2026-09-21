@@ -1,0 +1,11 @@
+
+ RUN  v4.1.6 /Users/xcape/projects/tale-studio
+
+(node:12244) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+ Test Files  2 passed (2)
+      Tests  33 passed (33)
+   Start at  00:03:09
+   Duration  525ms (transform 366ms, setup 19ms, import 488ms, tests 217ms, environment 0ms)
+

@@ -1,0 +1,49 @@
+{
+  "url": "http://127.0.0.1:3073/studio/artist?projectId=18140f42-309e-4845-b97a-3c54d6fc2d0f",
+  "body": "Producer\nWriter\nArtist\nDirector\nEditor\n289\nTake\n공유\n내보내기\nHelp\nT\n프로필\nThe Visual Studio\n등장인물\n배경\n학교 옥상\n기본\n밤 · 달빛 아래 옥상\n+ 모습 추가\n생성 중\n에이전트 채팅\nArtist\n모든 단계가 이어지는 하나의 대화\nDirector로 넘기기\nConcept Artist가 이미지를 생성하고 있습니다\n0/1\n\n내용을 확인하며 씬을 구성하고 있어요.\n\nArtist\n학교 옥상의 모습 추가\n모습 이름\n이야기 속 시점\n과거\n현재\n미래\n\n같은 시점의 모습이 이미 있어요. 그 시점의 씬은 이미지가 있는 첫 모습을 써요.\n\n배경 설명 (기본 모습과 달라지는 점)\n\n저장하면 탭이 생기고 기본 배경을 참조해 이미지를 바로 만들어요.\n\n모습 추가하고 이미지 만들기\nClose",
+  "events": [
+    {
+      "at": "2026-09-10T06:19:53.829Z",
+      "url": "/api/artist/location-appearance",
+      "request": {
+        "projectId": "18140f42-309e-4845-b97a-3c54d6fc2d0f",
+        "locationId": "loc_alley",
+        "label": "밤 · 달빛 아래 옥상",
+        "visualDescription": "기본 이미지와 같은 학교 옥상. 철제 울타리, 벤치, 계단실, 실외기와 건물 배치를 유지한다. 시간이 깊은 밤으로 바뀌었다. 어두운 남색 밤하늘, 차가운 달빛, 먼 건물 창문의 희미한 불빛만 있으며 햇빛과 낮의 밝은 하늘은 없다. 인물은 없다.",
+        "narrativeTime": "present"
+      },
+      "status": 200,
+      "response": {
+        "ok": true,
+        "locationId": "loc_alley",
+        "appearanceKey": "appearance",
+        "label": "밤 · 달빛 아래 옥상",
+        "narrativeTime": "present",
+        "visualDescription": "A school rooftop matching the base image layout: iron safety fence, benches, stairwell access structure, outdoor AC units, and surrounding building arrangement preserved. Time has shifted to deep night. Dark navy night sky, cold moonlight casting pale shadows, only faint glows from distant building windows visible. No sunlight, no bright daytime sky. No people present.",
+        "visualDescriptionNative": "기본 이미지와 같은 학교 옥상. 철제 울타리, 벤치, 계단실, 실외기와 건물 배치를 유지한다. 시간이 깊은 밤으로 바뀌었다. 어두운 남색 밤하늘, 차가운 달빛, 먼 건물 창문의 희미한 불빛만 있으며 햇빛과 낮의 밝은 하늘은 없다. 인물은 없다.",
+        "wideShot": null
+      }
+    },
+    {
+      "at": "2026-09-10T06:19:58.158Z",
+      "url": "/api/artist/generate-world",
+      "request": {
+        "projectId": "18140f42-309e-4845-b97a-3c54d6fc2d0f",
+        "locationId": "loc_alley",
+        "column": "wide_shot",
+        "prompt": "A school rooftop matching the base image layout: iron safety fence, benches, stairwell access structure, outdoor AC units, and surrounding building arrangement preserved. Time has shifted to deep night. Dark navy night sky, cold moonlight casting pale shadows, only faint glows from distant building windows visible. No sunlight, no bright daytime sky. No people present., 학교 옥상, Use the reference image for spatial layout and architecture only; apply the time of day, lighting, weather and condition specified in this appearance description, no people or characters, empty environment, wide shot, panoramic",
+        "aspectRatio": "16:9",
+        "actor": "ui",
+        "sourceHash": "c9c2001d",
+        "descriptionHash": "92266072",
+        "appearanceKey": "appearance"
+      },
+      "status": 200,
+      "response": {
+        "ok": true,
+        "jobId": "452be7f4-c164-4d91-8185-5a0cf730e586",
+        "status": "queued"
+      }
+    }
+  ]
+}

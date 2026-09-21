@@ -1,6 +1,7 @@
 // V2: 비주얼 디자인 (인물/월드) — native 생성 [v0 스타일]+[v1 아크]+[s2 chars/world]+[seed.v2].
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
+import { VisualDesignSchema } from '@/lib/writer/pipeline/schemas';
 import type {
   Characters,
   VisualIdentity,
@@ -90,7 +91,19 @@ locations=${JSON.stringify(locations, null, 2)}
   const result = await generateJson<{ characterVisual: CharacterVisual; worldVisual: WorldVisual }>(userPrompt, axisConfig, {
     systemInstruction,
     temperature: 0.6,
+    schema: VisualDesignSchema,
   });
+
+  const knownCharacters = new Set(characters.characters.map((c) => c.id));
+  const knownLocations = new Set(locations.map((l) => l.id));
+  const referenceIssues = [
+    ...result.characterVisual.characters.filter((c) => !knownCharacters.has(c.character_id)).map((c) => `unknown_character: ${c.character_id}`),
+    ...result.worldVisual.locations.filter((l) => !knownLocations.has(l.id)).map((l) => `unknown_location: ${l.id}`),
+  ];
+  if (referenceIssues.length) {
+    await logger.markStage('v2Design', 'failed', { validation_issues: referenceIssues });
+    throw new Error(`화면 구성 참조 검증 실패: ${referenceIssues.join(' | ')}`);
+  }
 
   await logger.saveLlmCall('v2Design', {
     prompt: userPrompt,
@@ -122,6 +135,7 @@ locations=${JSON.stringify(locations, null, 2)}
           const m = wlById.get(wl.id);
           return {
             id: wl.id,
+            name: wl.name,
             style_description: m?.style_description ?? wl.description ?? '',
             lighting_sources: m?.lighting_sources ?? [],
             props: m?.props ?? [],

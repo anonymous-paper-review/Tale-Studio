@@ -1,0 +1,22 @@
+{
+  "verifiedAt": "2026-09-14T05:49:25Z",
+  "typecheck": "passed",
+  "designLint": "passed",
+  "diffWhitespace": "passed",
+  "coreTests": { "filesPassed": 405, "filesSkipped": 2, "testsPassed": 3152, "testsSkipped": 22, "failed": 0, "durationSeconds": 12.93 },
+  "isolatedDevelopmentDatabaseTests": { "passed": 28, "scenarios": 14, "failed": 0, "applicationRowsWritten": 0, "paidFalRequests": 0 },
+  "developmentMigration": "20260914150000_generation_capacity_key_assignment.sql applied",
+  "generatedDatabaseTypes": "unchanged after pnpm db:types",
+  "productionMigrated": false,
+  "productionDeployed": false,
+  "productionPaidGenerations": 0,
+  "ownerDecision": "접수 여부가 확인될 때까지 예약과 사용량을 유지한다. 중복 비용을 막는 대신 확인이 늦으면 사용량이 묶인다.",
+  "retainedLimitations": [
+    "Capacity counting retains the existing 30-minute window.",
+    "The aggregate capacity count still includes local-provider jobs; this existing policy was not changed.",
+    "Development and production share the legacy FAL account; simultaneous load tests are prohibited.",
+    "The previous real-image batch interruption and final 22/25 progress result remain unverified in production."
+  ],
+  "warnings": ["Node DEP0205 deprecation warning; expected error-path logs remain visible in the full test output."],
+  "unrelatedWorkExcluded": [".claude/docs/2026-09-14/chat-owner-test-guide.html"]
+}

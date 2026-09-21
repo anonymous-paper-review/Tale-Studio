@@ -1,0 +1,11 @@
+$ eslint -c eslint.design.config.mjs src/components src/app
+
+/Users/xcape/orca/workspaces/tale-studio/mvp-feedback-release-20260910/src/app/playground/mvp-feedback/page.tsx
+  64:195  error  raw 색 금지 — globals.css 토큰(var(--…))을 쓴다. 의도적 예외는 eslint-disable-next-line + 사유. (specs/design.md hard rules)  no-restricted-syntax
+  88:254  error  raw 색 금지 — globals.css 토큰(var(--…))을 쓴다. 의도적 예외는 eslint-disable-next-line + 사유. (specs/design.md hard rules)  no-restricted-syntax
+  91:433  error  raw 색 금지 — globals.css 토큰(var(--…))을 쓴다. 의도적 예외는 eslint-disable-next-line + 사유. (specs/design.md hard rules)  no-restricted-syntax
+  91:723  error  raw 색 금지 — globals.css 토큰(var(--…))을 쓴다. 의도적 예외는 eslint-disable-next-line + 사유. (specs/design.md hard rules)  no-restricted-syntax
+
+✖ 4 problems (4 errors, 0 warnings)
+
+[ELIFECYCLE] Command failed with exit code 1.

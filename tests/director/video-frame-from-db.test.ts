@@ -110,7 +110,8 @@ describe('승인된 스토리보드 화면을 영상에 쓰는 약속 (Director 
   })
 
   it('영상 생성은 먼저 그림을 확인하고 연결한 그림인지 구분해 사용한다', () => {
-    const route = read('src/app/api/director/generate-video/route.ts')
+    expect(read('src/app/api/director/generate-video/route.ts')).toMatch(/submitDirectorVideoRequest\(req\)/)
+    const route = read('src/lib/director/video-submit.ts')
     expect(route).toMatch(/resolveVideoReferenceFrames\(\{/)
     expect(route).toMatch(/storyboardImage: standalone \? null : shot!\.storyboard_image/)
     const store = read('src/stores/director-store.ts')

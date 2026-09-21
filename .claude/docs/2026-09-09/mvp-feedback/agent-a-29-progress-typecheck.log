@@ -1,0 +1,2 @@
+src/app/playground/mvp-feedback/page.tsx(43,100): error TS18048: 's.sortOrder' is possibly 'undefined'.
+tests/fixtures/mvp-feedback-page.tsx(43,100): error TS18048: 's.sortOrder' is possibly 'undefined'.

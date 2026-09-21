@@ -1,0 +1,383 @@
+{
+  "verifiedOn": "2026-09-09",
+  "ownerAccountDecision": {
+    "recordedOn": "2026-09-09",
+    "sandbox": {
+      "account": "A",
+      "ownedByUs": true,
+      "differentRegisteredNameFromLive": true,
+      "noDeletionPlannedForNow": true,
+      "approvedForContinuedTesting": true
+    },
+    "live": {
+      "account": "B",
+      "registeredName": "윤대원",
+      "purpose": "actual sales, merchant approval and payouts"
+    },
+    "boundary": "A sandbox results verify application behavior, not B merchant approval or live configuration; never mix credentials, product IDs, webhook secrets or development/production databases",
+    "latestInstruction": "Complete only currently available preapproval settings without real charges or purchase enablement; deliver concise executive checklist HTML artifact.",
+    "executionPausedByOwner": false,
+    "refundExpiryAndStaleTestFixApproved": true,
+    "currentBlocker": "Launch only: domain pending_review; authenticated Paddle dashboard needed for account/identity/payout and final checkout settings. Development deployment and webhook connection are complete."
+  },
+  "sandboxTestPreparation": {
+    "developmentTestUserAndWorkspaceCreated": true,
+    "existingUsersModified": false,
+    "testLoginCompleted": true,
+    "testLoginBlocker": null,
+    "paddleTransactionsCreated": 3,
+    "completedPurchases": 2,
+    "unpaidPaymentLinkProbeDrafts": 1,
+    "ownerEnteredOfficialSandboxCard": true,
+    "planGrantVerified": 16,
+    "packGrantVerified": 50,
+    "planRefundRevokeVerified": 16,
+    "packRefundAwaitingAutomaticApproval": false,
+    "packRefundRevokeVerified": 50,
+    "finalTakeBalance": 0,
+    "scheduledAndImmediateCancellationVerified": true,
+    "duplicateEventNoAdditionalGrantVerified": true,
+    "endToEndCompleted": true,
+    "completedAt": "2026-09-09T09:20:27.396Z",
+    "scope": "S1 and Mini Sandbox purchase, actual webhook grants, approved full refunds and Take revokes, scheduled and immediate cancellation, duplicate event replay, payment-link initialization, customer portal link creation; not Live selling approval",
+    "evidenceFile": "paddle-sandbox-e2e-result.json"
+  },
+  "statusReport": {
+    "updatedOn": "2026-09-09",
+    "currentStage": "Major billing development, production deployment and Live B webhook activation/delivery verification complete. Domain remains pending_review; default URL, dashboard card-only settings, final account approval/payout confirmation and authorized real-card tests remain pending.",
+    "freshChecks": [
+      "Domain talestudio.art pending_review confirmed via Paddle API",
+      "Production API key/client token/webhook secret match Live B",
+      "Current production deployment remains READY 31d6edc7; checkout remains disabled",
+      "Existing Live Paddle transactions and subscriptions: zero",
+      "Live webhook active and official Paddle-sent single failure notification received HTTP 200 card_declined_noted",
+      "Production billing_events 0 -> 1; Paddle ledger rows/subscriptions/paid workspaces unchanged at zero",
+      "Final destination restored active, platform-only, original URL/secret/event list retained"
+    ],
+    "productionCheckoutCheckedAt": "2026-09-09T20:09:00+09:00",
+    "paddleDashboardRecheckedThisUpdate": false,
+    "payoneerRecheckedThisUpdate": false,
+    "approvalRecordsAreLastObserved": true,
+    "applicationTestsRerunThisUpdate": false,
+    "productionMutatedThisUpdate": true,
+    "productionMutationScope": "Paddle Live B notification destination activated. Temporarily allowed simulations for one safe failure-event delivery, then restored platform-only. One production receipt log recorded, zero payment/Take/subscription/paid-plan changes. No new deployment or DB schema change.",
+    "deploymentEvidenceFile": "paddle-production-rollout.json",
+    "priorVerification": [
+      "Sandbox ledger projected after expiry: 0, 0, 0",
+      "15 development PostgreSQL isolated regression cases passed; not rerun in production",
+      "268 targeted billing tests passed in earlier billing-only verification"
+    ],
+    "paddleApiRecheckedThisUpdate": true,
+    "paddleDashboardAccess": "Login required; no credentials entered or account settings changed through browser.",
+    "executiveReportFile": "paddle-executive-report.html",
+    "preflightEvidenceFile": "paddle-live-preflight-result.json"
+  },
+  "sellerId": "419628",
+  "clientToken": {
+    "id": "ctkn_01m22epkxdd7zjt8vgcww7sg1q",
+    "status": "active",
+    "environment": "live",
+    "localEnvKey": "NEXT_PUBLIC_PADDLE_LIVE_CLIENT_TOKEN",
+    "saved": true,
+    "productionApplied": true,
+    "productionEnvironmentStoredAndVerified": true
+  },
+  "webhook": {
+    "id": "ntfset_01m22f1d8tevjvf14064acb97d",
+    "destination": "https://talestudio.art/api/billing/paddle/webhook",
+    "active": true,
+    "trafficSource": "platform",
+    "subscribedEvents": [
+      "transaction.completed",
+      "transaction.payment_failed",
+      "subscription.activated",
+      "subscription.updated",
+      "subscription.past_due",
+      "subscription.canceled",
+      "subscription.paused",
+      "subscription.resumed",
+      "subscription.trialing",
+      "adjustment.created",
+      "adjustment.updated"
+    ],
+    "localSecretEnvKey": "PADDLE_LIVE_WEBHOOK_SECRET",
+    "secretSaved": true,
+    "productionApplied": true,
+    "productionEnvironmentStoredAndVerified": true,
+    "productionAppliedMeaning": "Live B signature secret deployed; destination activated and official Paddle-sent single transaction.payment_failed simulation verified HTTP 200. Traffic restored to platform-only.",
+    "signedDeliveryVerified": true,
+    "signedDeliveryVerificationAt": "2026-09-09T11:29:13.059Z",
+    "verificationEvidenceFile": "paddle-live-preflight-result.json",
+    "verifiedEventType": "transaction.payment_failed",
+    "verificationScope": "One simulated failure event received from Paddle; no real charge, Take grant, subscription or paid workspace change. One billing_events receipt row retained."
+  },
+  "currencies": {
+    "balance": "USD",
+    "activeConversions": 0,
+    "changed": false
+  },
+  "checkoutSettings": {
+    "defaultPaymentUrl": null,
+    "chosenDefaultPaymentUrl": "https://talestudio.art/checkout",
+    "defaultPaymentUrlSaved": false,
+    "enabledOptionalMethods": [
+      "paypal",
+      "apple_pay",
+      "bancontact"
+    ],
+    "disableAttemptSaved": false,
+    "saveBlocker": "Live default URL requires approved domain; domain is pending_review. Dashboard login also needed. This update did not try to override domain approval.",
+    "unsavedDraftDiscarded": true
+  },
+  "checkoutDomain": {
+    "domain": "talestudio.art",
+    "status": "pending_review",
+    "verifiedAt": "2026-09-09T11:29:12.826Z"
+  },
+  "vercelProduction": {
+    "projectId": "prj_x0fGmBO62EJVmEZAhlUiOGZVHwnF",
+    "checkedPaddleVariableCount": 18,
+    "environmentModeMatches": true,
+    "clientTokenMissing": false,
+    "apiKeyMatches": true,
+    "webhookSecretMatches": true,
+    "priceIdsMatching": 13,
+    "priceIdsChecked": 13,
+    "settingsUpdated": true,
+    "deploymentUpdated": true,
+    "liveCheckoutEnabled": false,
+    "previewEnvironmentUnchanged": true,
+    "databaseVariablesUnchanged": true,
+    "productionCommit": "31d6edc7bd11f42cd4c7c704c57612ce3793cdb7",
+    "deploymentId": "dpl_4KNVUuq1vEMSyF5n7LWVvmeiyVu7"
+  },
+  "localSandboxUnchanged": true,
+  "localSandboxUnchangedMeaning": "Sandbox account A credentials/configuration unchanged; development database functions were updated under the approved fix, without rewriting existing ledger rows",
+  "refundExpiryDefect": {
+    "verifiedOn": "2026-09-09",
+    "existingInProductionBase": true,
+    "causedByCurrentPricingOrPurchaseGuardChanges": false,
+    "actualTestLedgerGrantIdsRechecked": true,
+    "refundGrantIds": null,
+    "reproduction": [
+      {
+        "at": "immediately after two unused full refunds",
+        "previousTotal": 0,
+        "fixedTotal": 0
+      },
+      {
+        "at": "after original S1 expiry",
+        "previousTotal": -16,
+        "fixedTotal": 0
+      },
+      {
+        "at": "after original Mini expiry",
+        "previousTotal": -66,
+        "fixedTotal": 0
+      }
+    ],
+    "databaseAndGenerationBalanceAffected": true,
+    "fixed": true,
+    "fixedScope": "application, development database, and production database",
+    "productionFixed": true,
+    "legacyLedgerRewritten": false,
+    "developmentMigrationApplied": true,
+    "databaseRegressionCasesPassed": 15,
+    "evidenceFile": "paddle-refund-verification.json",
+    "blocksLiveSellingReadiness": false,
+    "proposedPromise": "Take already revoked for a refund must not be deducted again at the original expiry; debt for Takes actually used before refund remains negative under the existing promise",
+    "ownerConfirmationPending": false,
+    "productionMigrationApplied": true,
+    "productionEvidenceFile": "paddle-refund-apply-live.json",
+    "productionAuditFile": "paddle-refund-audit-live.json"
+  },
+  "policySection4Unchanged": true,
+  "policySection4Sha256": "e50e0f7f2d41ae539ecd23251c6ed846e9d04f23e98577e8b1289b7aebdc945f",
+  "pricingUi": {
+    "implementedLocally": true,
+    "families": [
+      "starter",
+      "production",
+      "take"
+    ],
+    "optionPlacement": "horizontal stepped slider inside modal opened from family card",
+    "catalogOptionCount": 13,
+    "pricesAndEntitlementsUnchanged": true,
+    "browserRegressionPassed": true,
+    "keyboardAndFocusReturnVerified": true,
+    "mobileViewportVerified": "390x844",
+    "loginSelectionReturnVerifiedWithMock401": true,
+    "realTransactionsCreatedByBrowserTest": 0,
+    "productionApplied": true
+  },
+  "paymentLinkPage": {
+    "path": "/checkout",
+    "implementedLocally": true,
+    "localUnauthenticatedStatus": 200,
+    "productionUnauthenticatedStatus": 200,
+    "productionRedirect": null,
+    "noFallbackTransaction": true,
+    "noindex": true,
+    "productionApplied": true,
+    "realTransactionLinkVerified": true,
+    "realTransactionLinkEnvironment": "sandbox local; initialized recorded unpaid S2 transaction without submitting payment",
+    "customerPortalLinkVerified": true
+  },
+  "targetedTestsPassed": 268,
+  "verification": {
+    "scopedLint": "passed",
+    "designLint": "passed",
+    "diffCheck": "passed",
+    "fullTypecheck": "isolated rollout workspace passed",
+    "fullCoreRemainingFailures": null,
+    "fullCorePassed": 2495,
+    "fullCoreExistingSkipped": 27,
+    "databaseRegressionPassed": 15,
+    "normalPreCommitHooksPassed": true,
+    "testExpectationsOrSkipsWeakened": false,
+    "screenshots": [
+      "pricing-regression-main.png",
+      "pricing-regression-s5.png",
+      "pricing-regression-take.png",
+      "pricing-regression-mobile-s5.png",
+      "pricing-regression-checkout-missing.png",
+      "paddle-sandbox-mini-success.png",
+      "paddle-sandbox-payment-link-open.png",
+      "paddle-sandbox-account-canceled.png",
+      "paddle-sandbox-refunds-complete.png",
+      "paddle-guard-desktop-starter.png",
+      "paddle-guard-mobile-starter.png",
+      "paddle-production-pricing.png",
+      "paddle-production-starter.png",
+      "paddle-production-checkout.png"
+    ],
+    "ciRun": "https://github.com/anonymous-paper-review/Tale-Studio/actions/runs/34343159554",
+    "productionBuild": "Vercel Production READY for exact reviewed merge commit",
+    "alternativeLocalWebpackBuild": "Failed: existing undici node: module scheme errors in writer import chain. Noncanonical --webpack path; no dependency or video changes made. Actual Vercel default build succeeded."
+  },
+  "rolloutPreparation": {
+    "ownerRequestedBillingOnlyDeployment": true,
+    "worktree": "/Users/xcape/orca/workspaces/tale-studio/paddle-checkout-rollout",
+    "baseCommit": "54455bc4dad73e49ce5505a4c21abf5963c36bce",
+    "isolatedFileCount": 40,
+    "targetedTestsPassed": 268,
+    "commit": "31d6edc7bd11f42cd4c7c704c57612ce3793cdb7",
+    "commitAuthor": "jxcape <j@xcape.run>",
+    "uncommittedRolloutChanges": 0,
+    "typecheckPassed": true,
+    "videoChangesExcluded": true,
+    "finalBuildVerified": true,
+    "fullRegressionVerified": true,
+    "productionDeployed": true,
+    "liveChargingEnabled": false,
+    "liveChargingEnabledMeaning": "Production flag remains false and deployed UI/API verified inactive. Separate from Paddle account approval; approval alone will not enable site purchases. This does not claim to stop Paddle-managed recurring charges or dashboard actions.",
+    "uploadDryRun": {
+      "fileCount": 591,
+      "privatePaths": 0,
+      "internalDocumentsAndKeysExcluded": true,
+      "scope": "CLI dry run for same merge commit; final successful deployment used Git integration"
+    },
+    "isolatedLiveLockSimulation": {
+      "verified": true,
+      "environment": "local Next development server with production Paddle mode and checkout disabled; no real Paddle API key or DB service key",
+      "publicPricingStatus": 200,
+      "publicCheckoutStatus": 200,
+      "publicCheckoutWithPaymentLinkStatus": 200,
+      "configuredProducts": 13,
+      "purchasableProducts": 0,
+      "checkoutPostStatus": 503,
+      "anonymousPlanChangeStatus": 401,
+      "paddleResourcesLoaded": 0,
+      "optionSelectionWithoutPurchase": true,
+      "mobileViewportWidth": 390,
+      "mobileDialogWidth": 358,
+      "notCloudProductionBuildVerification": true,
+      "evidenceFile": "paddle-guard-runtime-verification.json",
+      "keyboardOnlyRangeInteractionVerifiedInThisRun": false,
+      "existingAnonymousLanguageSaveWarning": {
+        "displayLanguageStillChanges": true,
+        "clearsAfterFullReload": true,
+        "sourceUnchangedFromProductionBase": true,
+        "fixed": false
+      },
+      "cleanup": {
+        "temporaryServerAndTabClosed": true,
+        "originalDependencySymlinkRestored": true,
+        "existingDevelopmentServerAndTestTabUntouched": true,
+        "applicationChangesOutsideAllowlist": 0
+      }
+    },
+    "preLaunchPurchaseGuard": {
+      "recommended": true,
+      "implemented": true,
+      "implementationScope": "original and isolated rollout workspaces",
+      "copiedToRolloutWorkspace": true,
+      "productionApplied": true,
+      "targetedTestsPassed": 11,
+      "testEvidence": "11 purchase guard tests present in merged full suite with 2495 passes, plus production UI/HTTP verification",
+      "reason": "publish public pages before selling approval without permitting purchase or immediate-charge requests"
+    },
+    "initialBillingOnlyPreparation": {
+      "baseCommit": "a399530bf461aeb8b7c079cda47a4604dddf49de",
+      "commit": "6ed72c3a3447f8ea56dd5aca95ad36e2715f804d",
+      "isolatedFileCount": 41
+    },
+    "videoChangesExcludedMeaning": "No unreviewed dirty-worktree video work added; already-shipped latest-main video files, tests, two migrations and cron preserved byte-for-byte.",
+    "stagedDeploymentHistorical": {
+      "id": "dpl_3BBBx5eAx6WCFw5GU8Sf9TNUSRCR",
+      "state": "BLOCKED",
+      "domainChanged": false,
+      "buildSkipped": true,
+      "blockCode": "TEAM_ACCESS_REQUIRED",
+      "authorVerified": false,
+      "commit": "6ed72c3a3447f8ea56dd5aca95ad36e2715f804d",
+      "reason": "Vercel recognizes current jxcape <j@xcape.run> commit but rejects its author/team permission; first old-author attempt retained in deployment history"
+    },
+    "lastCliAttempt": {
+      "id": "dpl_7CHGETNTL16jYJLdJjkfVE3u35mc",
+      "state": "BLOCKED",
+      "commit": "31d6edc7bd11f42cd4c7c704c57612ce3793cdb7",
+      "blockCode": "TEAM_ACCESS_REQUIRED",
+      "domainChanged": false,
+      "currentProduction": false
+    },
+    "productionDeployment": {
+      "id": "dpl_4KNVUuq1vEMSyF5n7LWVvmeiyVu7",
+      "state": "READY",
+      "commit": "31d6edc7bd11f42cd4c7c704c57612ce3793cdb7",
+      "url": "https://tale-lwrts7y6w-talestudio.vercel.app",
+      "alias": "https://talestudio.art",
+      "aliasVerified": true,
+      "via": "normal GitHub integration",
+      "evidenceFile": "paddle-production-rollout.json"
+    }
+  },
+  "testStages": {
+    "preApproval": "public page and configuration preparation; sandbox integration testing without real money",
+    "paddleApproval": "domain review and applicable business/identity verification; SaaS classification is separate",
+    "postApproval": "real-card charge and refund validation only after live selling is approved and cardholder authorizes the charge",
+    "sandboxEndToEndCompleted": true,
+    "sellingApprovalConfirmedComplete": false,
+    "liveCardChargePerformed": false,
+    "liveRefundVerified": false
+  },
+  "recommendedNextActions": [
+    "Review assignee supplies completed policy/approval supplements and account verification outcome.",
+    "Sign into Live B dashboard to confirm business/identity review and payout/Payoneer status; do not mark these complete based on API connectivity.",
+    "After domain approval, save https://talestudio.art/checkout and confirm only card payments enabled in dashboard.",
+    "After Live selling approval, owner authorizes test amount/time, temporarily enables purchasing and verifies real purchase -> Take grant -> refund before general sales.",
+    "Keep site purchasing disabled until explicitly opening; webhook is now active and verified.",
+    "Review concurrent partial refund handling before offering partial refund operations.",
+    "Other session continues GitHub Private conversion and manual Vercel release gate."
+  ],
+  "ownerDecisionsPending": [
+    "Review assignee completion and authenticated Live account/payout status confirmation",
+    "After Paddle approval: live test amount, timing/cardholder authorization and general sales opening time"
+  ],
+  "knownAdditionalRisks": [
+    "Existing race between distinct simultaneous partial refund notifications and cumulative revoke cap remains outside the expiry fix; review before partial refund operations",
+    "Earlier local anonymous language-save console warning remains outside scope; mobile and keyboard-only interactions were not rerun in current production smoke",
+    "Alternative local --webpack build failed in existing undici node: module handling; canonical Vercel build succeeded",
+    "Vercel autoAssignCustomDomains remains true; future manual release gate not implemented in this session"
+  ]
+}

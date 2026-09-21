@@ -40,6 +40,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { clearLastProjectId, readLastProjectId } from '@/lib/session-restore'
 import { ContactPopover } from '@/components/contact-popover'
+import { LegalFooter } from '@/components/legal/legal-footer'
 import { toast } from 'sonner'
 
 interface ProjectItem {
@@ -368,7 +369,13 @@ export default function HomePage() {
               Tale Studio
             </span>
           </div>
-          <div className="hidden items-center gap-10 text-sm font-medium md:flex">
+          <a
+            href="/pricing"
+            className="flex min-h-11 items-center rounded-sm px-2 text-sm font-medium text-gray-300 transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring md:hidden"
+          >
+            Pricing
+          </a>
+          <div className="hidden items-center gap-4 text-sm font-medium md:flex lg:gap-10">
             <a
               href="#services"
               className="text-gray-300 transition-colors hover:text-primary"
@@ -380,6 +387,12 @@ export default function HomePage() {
               className="text-gray-300 transition-colors hover:text-primary"
             >
               Projects
+            </a>
+            <a
+              href="/pricing"
+              className="rounded-sm text-gray-300 transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+            >
+              Pricing
             </a>
             <button
               onClick={handleNew}
@@ -455,11 +468,12 @@ export default function HomePage() {
           </div>
 
           {/* Title */}
-          <h1 className="mb-8 text-6xl font-semibold leading-[1.05] tracking-tighter text-white md:text-[5.5rem] lg:text-9xl">
-            Create Beyond <br className="hidden md:block" />
+          <h1 className="mb-8 text-3xl font-semibold leading-[1.05] tracking-tighter text-white sm:text-5xl md:text-6xl lg:text-7xl">
+            Your Tale Deserves a Take <br className="hidden md:block" />
+            by{' '}
             <span className="relative inline-block">
               <span className="relative z-10 bg-gradient-to-r from-primary via-red-500 to-orange-500 bg-clip-text text-transparent">
-                Human Limits
+                Pre-visualization.
               </span>
               <span className="pointer-events-none absolute -inset-2 z-0 animate-pulse rounded-full bg-primary/20 opacity-50 blur-2xl" />
             </span>
@@ -711,7 +725,7 @@ export default function HomePage() {
             <p id="home-reference-project-help" className="text-xs text-gray-500">
               {canUseReference
                 ? 'Optionally copy assets from an existing project in this workspace.'
-                : 'Reference projects are available on P-10+ plans.'}
+                : 'Reference projects are available on Producer10 and above.'}
             </p>
             {referenceProjectId && canUseReference && (
               <label
@@ -810,17 +824,12 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 border-t border-gray-800 pt-8 md:flex-row">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 border-t border-gray-800 pt-8">
           <p className="text-sm font-light text-gray-500">
             &copy; {new Date().getFullYear()} Tale Studio. All rights reserved.
           </p>
-          <div className="flex gap-6 text-sm font-light text-gray-500">
-            <a href="#" className="transition-colors hover:text-white">
-              Privacy Policy
-            </a>
-            <a href="#" className="transition-colors hover:text-white">
-              Terms of Service
-            </a>
+          <div className="text-sm text-gray-500">
+            <LegalFooter />
           </div>
         </div>
       </footer>

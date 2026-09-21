@@ -1,0 +1,7 @@
+
+/Users/xcape/projects/tale-studio/src/app/playground/mvp-feedback/page.tsx
+  64:433  error  raw 색 금지 — globals.css 토큰(var(--…))을 쓴다. 의도적 예외는 eslint-disable-next-line + 사유. (specs/design.md hard rules)  no-restricted-syntax
+  64:723  error  raw 색 금지 — globals.css 토큰(var(--…))을 쓴다. 의도적 예외는 eslint-disable-next-line + 사유. (specs/design.md hard rules)  no-restricted-syntax
+
+✖ 2 problems (2 errors, 0 warnings)
+

@@ -15,6 +15,7 @@ import {
   normalizeImageModelKey,
 } from '@/lib/image-models'
 import { useT } from '@/lib/i18n'
+import { useImageUploadConsent } from '@/components/upload/image-upload-consent'
 
 export function AssetDetailPanel({
   nodeId,
@@ -24,6 +25,7 @@ export function AssetDetailPanel({
   data: AssetNodeData
 }) {
   const t = useT()
+  const { requestImageUploadConsent, imageUploadConsentDialog } = useImageUploadConsent(nodeId)
   const updateNodeData = useDirectorCanvasStore((state) => state.updateNodeData)
   const generateAssetImage = useDirectorCanvasStore(
     (state) => state.generateAssetImage,
@@ -31,7 +33,8 @@ export function AssetDetailPanel({
   const role = data.assetKind === 'character' ? t('Character') : t('Background')
   const isGenerating = data.generationStatus === 'generating'
 
-  const addReference = (file: File) => {
+  const addReference = async (file: File) => {
+    if (!await requestImageUploadConsent([file])) return
     const reader = new FileReader()
     reader.onload = () => {
       const current = useDirectorCanvasStore
@@ -57,6 +60,7 @@ export function AssetDetailPanel({
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
+      {imageUploadConsentDialog}
       <header className="space-y-2">
         <div className="flex items-center gap-2">
           <span className="inline-block size-2 rounded-full bg-chart-4" />
@@ -171,7 +175,7 @@ export function AssetDetailPanel({
               aria-label={t('Upload reference image')}
               onChange={(event) => {
                 const file = event.target.files?.[0]
-                if (file) addReference(file)
+                if (file) void addReference(file)
                 event.target.value = ''
               }}
             />

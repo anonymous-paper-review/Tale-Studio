@@ -1,0 +1,66 @@
+
+ RUN  v4.1.6 /Users/xcape/orca/workspaces/tale-studio/mvp-feedback-release-20260910
+
+(node:49650) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+stderr | tests/artist/two-appearance-queue.test.ts > 채팅에서 두 모습이 실제 생성 접수까지 이어진다 > 첫 인물의 접수 응답이 유실되어도 둘째는 완성하고 접수 여부가 불확실한 첫 인물은 완료 처리하거나 다시 발주하지 않는다
+[autogen] char kyotaro:appearance:main ✗ failed in 0.0s: Failed to fetch
+
+stdout | tests/artist/two-appearance-queue.test.ts > 채팅에서 두 모습이 실제 생성 접수까지 이어진다 > 첫 인물의 접수 응답이 유실되어도 둘째는 완성하고 접수 여부가 불확실한 첫 인물은 완료 처리하거나 다시 발주하지 않는다
+[artist timing] char komatsu:appearance:main 0.1s
+
+stderr | tests/artist/two-appearance-queue.test.ts > 채팅에서 두 모습이 실제 생성 접수까지 이어진다 > 첫 인물의 완료 확인이 끊겨도 둘째 결과를 유지하고 다시 확인할 때 기존 첫 작업만 조회한다
+[autogen] char kyotaro:appearance:main ✗ failed in 0.0s: Failed to fetch
+
+stdout | tests/artist/two-appearance-queue.test.ts > 채팅에서 두 모습이 실제 생성 접수까지 이어진다 > 첫 인물의 완료 확인이 끊겨도 둘째 결과를 유지하고 다시 확인할 때 기존 첫 작업만 조회한다
+[artist timing] char komatsu:appearance:main 0.1s
+
+ ❯ tests/artist/two-appearance-queue.test.ts (10 tests | 2 failed) 495ms
+     × 첫 인물의 접수 응답이 유실되어도 둘째는 완성하고 접수 여부가 불확실한 첫 인물은 완료 처리하거나 다시 발주하지 않는다 69ms
+     × 첫 인물의 완료 확인이 끊겨도 둘째 결과를 유지하고 다시 확인할 때 기존 첫 작업만 조회한다 58ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/artist/two-appearance-queue.test.ts > 채팅에서 두 모습이 실제 생성 접수까지 이어진다 > 첫 인물의 접수 응답이 유실되어도 둘째는 완성하고 접수 여부가 불확실한 첫 인물은 완료 처리하거나 다시 발주하지 않는다
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ tests/artist/two-appearance-queue.test.ts:261:27
+    259|     await vi.waitFor(() => expect(pollWaiters.size).toBe(1))
+    260|     finishAll()
+    261|     await expect(activeRun).resolves.toBe(false)
+       |                           ^
+    262|     expect(providerCalls).toHaveLength(2)
+    263|     expect(useArtistStore.getState().characterAssets[1].appearances.at…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/artist/two-appearance-queue.test.ts > 채팅에서 두 모습이 실제 생성 접수까지 이어진다 > 첫 인물의 완료 확인이 끊겨도 둘째 결과를 유지하고 다시 확인할 때 기존 첫 작업만 조회한다
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ tests/artist/two-appearance-queue.test.ts:281:27
+    279|     await vi.waitFor(() => expect(pollWaiters.size).toBe(1))
+    280|     finishAll()
+    281|     await expect(activeRun).resolves.toBe(false)
+       |                           ^
+    282|     const remaining = useGlobalChatStore.getState().deferredProposals[…
+    283|     expect(remaining.target).toContain('쿄타로')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 8 passed (10)
+   Start at  15:15:14
+   Duration  936ms (transform 252ms, setup 10ms, import 345ms, tests 495ms, environment 0ms)

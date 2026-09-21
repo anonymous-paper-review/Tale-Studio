@@ -1,0 +1,156 @@
+{
+  "testedAt": "2026-09-14T07:45:11.536Z",
+  "observations": [
+    {
+      "targets": [
+        {
+          "kind": "shot_storyboard",
+          "target": {
+            "writerShotId": "shot-1"
+          }
+        },
+        {
+          "kind": "shot_storyboard",
+          "target": {
+            "writerShotId": "shot-1"
+          }
+        },
+        {
+          "kind": "shot_storyboard",
+          "target": {
+            "writerShotId": "shot-1"
+          }
+        },
+        {
+          "kind": "shot_storyboard",
+          "target": {
+            "writerShotId": "shot-1"
+          }
+        },
+        {
+          "kind": "shot_storyboard",
+          "target": {
+            "writerShotId": "shot-1"
+          }
+        },
+        {
+          "kind": "shot_storyboard",
+          "target": {
+            "writerShotId": "shot-1"
+          }
+        }
+      ],
+      "outcomes": [
+        {
+          "inserted": false,
+          "message": "storyboard_already_generating",
+          "jobId": "b1590a16-0342-427d-b1c6-bda537aa5154"
+        },
+        {
+          "inserted": true,
+          "jobId": "b1590a16-0342-427d-b1c6-bda537aa5154"
+        },
+        {
+          "inserted": false,
+          "message": "storyboard_already_generating",
+          "jobId": "b1590a16-0342-427d-b1c6-bda537aa5154"
+        },
+        {
+          "inserted": false,
+          "message": "storyboard_already_generating",
+          "jobId": "b1590a16-0342-427d-b1c6-bda537aa5154"
+        },
+        {
+          "inserted": false,
+          "message": "storyboard_already_generating",
+          "jobId": "b1590a16-0342-427d-b1c6-bda537aa5154"
+        },
+        {
+          "inserted": false,
+          "message": "storyboard_already_generating",
+          "jobId": "b1590a16-0342-427d-b1c6-bda537aa5154"
+        }
+      ],
+      "jobs": 1
+    },
+    {
+      "targets": [
+        {
+          "kind": "shot_storyboard",
+          "target": {
+            "writerShotId": "shot-1"
+          }
+        },
+        {
+          "kind": "storyboard_real_grid",
+          "target": {
+            "writerShotIds": [
+              "shot-1",
+              "shot-2"
+            ]
+          }
+        }
+      ],
+      "outcomes": [
+        {
+          "inserted": true,
+          "jobId": "fdb0be23-f701-4cd4-b349-d05d108a19d6"
+        },
+        {
+          "inserted": false,
+          "message": "storyboard_already_generating",
+          "jobId": "fdb0be23-f701-4cd4-b349-d05d108a19d6"
+        }
+      ],
+      "jobs": 1
+    },
+    {
+      "targets": [
+        {
+          "kind": "shot_storyboard",
+          "target": {
+            "writerShotId": "shot-1"
+          }
+        },
+        {
+          "kind": "shot_storyboard",
+          "target": {
+            "writerShotId": "shot-2"
+          }
+        }
+      ],
+      "outcomes": [
+        {
+          "inserted": true,
+          "jobId": "3a7d67e7-9470-467c-85eb-5b4cf419f1f3"
+        },
+        {
+          "inserted": true,
+          "jobId": "7001f246-9651-4233-86e2-50dc7f1c28a2"
+        }
+      ],
+      "jobs": 2
+    },
+    {
+      "targets": [
+        {
+          "kind": "shot_storyboard",
+          "target": {
+            "writerShotId": "shot-1"
+          }
+        }
+      ],
+      "outcomes": [
+        {
+          "inserted": true,
+          "jobId": "3b762275-db05-45e3-941f-b52d2fd130fd"
+        }
+      ],
+      "jobs": 1
+    }
+  ],
+  "paidRequests": 0,
+  "publicRowsWritten": 0,
+  "migrationPresent": true,
+  "temporarySchemaRemoved": true
+}

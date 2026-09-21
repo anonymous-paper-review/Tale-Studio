@@ -1,0 +1,126 @@
+{
+  "verifiedAt": "2026-09-09T20:12:00+09:00",
+  "scope": "Owner-authorized main integration and production deployment; no Paddle approval mutation or real card charge",
+  "git": {
+    "previousMain": "54455bc4dad73e49ce5505a4c21abf5963c36bce",
+    "commit": "31d6edc7bd11f42cd4c7c704c57612ce3793cdb7",
+    "author": "jxcape <j@xcape.run>",
+    "mainPush": "normal fast-forward",
+    "forcePush": false,
+    "featureBranch": "jxcape/paddle-checkout-rollout",
+    "isolatedWorktreeClean": true,
+    "latestMainVideoFilesPreserved": true,
+    "billingDeltaFiles": 40
+  },
+  "verification": {
+    "fullCorePassed": 2495,
+    "existingSkipped": 27,
+    "failed": 0,
+    "typecheck": true,
+    "designLint": true,
+    "normalCommitHooks": true,
+    "ci": {
+      "id": 34343159554,
+      "conclusion": "success",
+      "commit": "31d6edc7bd11f42cd4c7c704c57612ce3793cdb7",
+      "url": "https://github.com/anonymous-paper-review/Tale-Studio/actions/runs/34343159554"
+    },
+    "localAlternativeWebpackBuild": {
+      "success": false,
+      "reason": "Existing undici node: scheme handling via writer imports; --webpack is not canonical project build",
+      "canonicalCloudBuildPassed": true
+    }
+  },
+  "production": {
+    "id": "dpl_4KNVUuq1vEMSyF5n7LWVvmeiyVu7",
+    "state": "READY",
+    "commit": "31d6edc7bd11f42cd4c7c704c57612ce3793cdb7",
+    "url": "https://tale-lwrts7y6w-talestudio.vercel.app",
+    "dashboard": "https://vercel.com/talestudio/tale/4KNVUuq1vEMSyF5n7LWVvmeiyVu7",
+    "alias": "talestudio.art",
+    "exactAliasDeploymentIdVerified": true,
+    "autoAssignCustomDomains": true,
+    "accountOrPaidSeatChanges": false
+  },
+  "preview": {
+    "id": "dpl_2iNGYUHeK3fyUsmzPx5iYJ3BV5jz",
+    "state": "READY",
+    "commit": "31d6edc7bd11f42cd4c7c704c57612ce3793cdb7",
+    "url": "https://tale-7b0nkwhmu-talestudio.vercel.app"
+  },
+  "historicalCliAttempt": {
+    "id": "dpl_7CHGETNTL16jYJLdJjkfVE3u35mc",
+    "state": "BLOCKED",
+    "reason": "TEAM_ACCESS_REQUIRED",
+    "currentProduction": false
+  },
+  "database": {
+    "liveRefundMigrationApplied": true,
+    "migration": "supabase/migrations/20260909130000_fix_refund_expiry.sql",
+    "sha256": "70216f4a8dc239b6fe42dec57b8e86ee14d5be28de01b2b43e4c3d3c38318c67",
+    "applyEvidence": "paddle-refund-apply-live.json",
+    "postApplyAudit": "paddle-refund-audit-live.json",
+    "existingLedgerRowsRewritten": 0,
+    "videoMigrationsAppliedByThisSession": 0,
+    "helperPermissions": {
+      "anon": false,
+      "authenticated": false,
+      "service_role": true
+    },
+    "priorDevelopmentRegressionCasesPassed": 15,
+    "livePurchaseRefundE2ePerformed": false
+  },
+  "publicSmoke": {
+    "anonymousPricing": 200,
+    "anonymousCheckout": 200,
+    "anonymousPaymentLinkWithFakeFormatId": 200,
+    "checkoutNoindex": true,
+    "checkoutPost": {
+      "status": 503,
+      "error": "payments_not_open",
+      "authenticated": false
+    },
+    "changePlanPost": {
+      "status": 401,
+      "authenticated": false
+    },
+    "catalog": {
+      "checkoutEnabled": false,
+      "configured": 13,
+      "purchasable": 0,
+      "plans": 9,
+      "packs": 4,
+      "total": 13,
+      "env": "production"
+    },
+    "browser": {
+      "starterPopupOpened": true,
+      "nextArrowChanged": "S-1 $15 -> S-2 $30",
+      "purchaseButtonDisabled": true,
+      "paddleResourcesOnPricing": 0,
+      "paddleResourcesOnGuardedPaymentLink": 0,
+      "realTransactionsCreated": 0,
+      "mobileRerun": false,
+      "keyboardOnlyRerun": false
+    },
+    "screenshots": [
+      "paddle-production-pricing.png",
+      "paddle-production-starter.png",
+      "paddle-production-checkout.png"
+    ]
+  },
+  "pending": [
+    "Paddle domain/account selling approval confirmation",
+    "Default checkout URL save and dashboard card-only settings",
+    "Live B webhook activation and signature/event verification",
+    "After approval, cardholder-authorized real purchase, Take grant and refund validation",
+    "Owner-directed site purchase enablement",
+    "Other session: private repository and manual deployment gates"
+  ],
+  "notModified": [
+    "review supplementary documents / policy section 4",
+    "Paddle and Payoneer dashboard settings in this update",
+    "existing dirty original-worktree video work",
+    "Git author identity / Vercel membership / paid seats"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "cliReadOnlyIdentity": true,
+  "distinctEnvironments": true,
+  "projects": [
+    {
+      "environment": "production",
+      "ref": "qnjnrihfpqkdhjuzvepy",
+      "status": "ACTIVE_HEALTHY"
+    },
+    {
+      "environment": "development",
+      "ref": "pbiumddivadgbzxuymak",
+      "status": "ACTIVE_HEALTHY"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "checkedAt": "2026-09-10T06:39:01.585Z",
+  "sha": "7d609a2871cfae11b20fce4267702339ce314941",
+  "deploymentId": "dpl_32B4a2Bs3BQRxQWTW8rb4RYGmVVU",
+  "state": "READY",
+  "checks": [
+    {
+      "url": "https://talestudio.art/",
+      "status": 200,
+      "location": null,
+      "hasHtml": true
+    },
+    {
+      "url": "https://talestudio.art/studio/artist",
+      "status": 307,
+      "location": "/login?next=%2Fstudio%2Fartist",
+      "hasHtml": false
+    }
+  ],
+  "scope": "Production HTTP reachability and deployed commit verified. Feature scenarios were exercised in isolated DEV fixtures; not repeated against historical production projects."
+}

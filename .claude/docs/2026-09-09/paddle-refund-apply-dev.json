@@ -1,0 +1,43 @@
+{
+  "at": "2026-09-09T09:55:35.303Z",
+  "environment": "development",
+  "ref": "pbiumddivadgbzxuymak",
+  "migration": "supabase/migrations/20260909130000_fix_refund_expiry.sql",
+  "sha256": "70216f4a8dc239b6fe42dec57b8e86ee14d5be28de01b2b43e4c3d3c38318c67",
+  "ledger": {
+    "rows": 15,
+    "refunds": 2,
+    "linked_refunds": 0
+  },
+  "refunds_without_unique_source": 0,
+  "functionsBefore": [
+    {
+      "proname": "take_expire_due",
+      "prosecdef": true,
+      "proconfig": [
+        "search_path=public, pg_temp"
+      ],
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "bodySha256": "7d9ad25c8d124cfa35ae4aa0426611f67d5cc3e09bfa92cb70fa40c89e89b1b6"
+    },
+    {
+      "proname": "take_hold",
+      "prosecdef": true,
+      "proconfig": [
+        "search_path=public, pg_temp"
+      ],
+      "anon_execute": false,
+      "authenticated_execute": false,
+      "bodySha256": "5b3e83a186c4741a8c81b8c9b61cc28d753ecc963ece07bdaae01b1c62282741"
+    }
+  ],
+  "applied": true,
+  "appliedSha256": "70216f4a8dc239b6fe42dec57b8e86ee14d5be28de01b2b43e4c3d3c38318c67",
+  "ledgerRowsRewritten": 0,
+  "helperPermissions": {
+    "anon": false,
+    "authenticated": false,
+    "service_role": true
+  }
+}

@@ -3,6 +3,18 @@
     {
       "path": "/api/writer/watchdog",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/take-expire",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/billing-reconcile",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/video-batches",
+      "schedule": "*/2 * * * *"
     }
   ]
 }

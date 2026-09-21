@@ -1,5 +1,7 @@
 'use client'
 
+import { writerInputRoute } from '@/lib/chat-harness'
+
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import {
@@ -24,12 +26,14 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { useImageUploadConsent } from '@/components/upload/image-upload-consent'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { AgentFace } from '@/components/agent-face'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore } from '@/stores/producer-store'
+import { stylePromptDecision } from '@/lib/producer-style-prompt'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useArtistStore } from '@/stores/artist-store'
 import { useWriterStore } from '@/stores/writer-store'
@@ -42,6 +46,7 @@ import { MarkdownText } from '@/components/layout/markdown-text'
 import { scrubInternalIdsInProse } from '@/lib/display-names'
 import { MentionTextarea, type MentionItem } from '@/components/layout/mention-textarea'
 import { ChatProgressPin } from '@/components/layout/chat-progress-pin'
+import { ChatModelControls } from '@/components/layout/chat-model-controls'
 import {
   castMentions,
   backgroundMentions,
@@ -52,6 +57,7 @@ import {
   type SceneShotMentionTarget,
 } from '@/lib/card-mention'
 import { StyleAnchorPicker } from '@/features/producer/style-anchor-picker'
+import { selectStyleAnchorFromPicker } from '@/features/producer/select-style-anchor'
 import { SceneGateControls, sendSceneGate } from '@/features/writer/scene-gate-panel'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import {
@@ -81,7 +87,6 @@ import { buildChatSections } from '@/lib/chat-sections'
 import { buildChatBlocks, groupStatusStacks, parseAttachmentMarker, parseHandoffMarker } from '@/lib/chat-blocks'
 import {
   CASCADE_STEP_MS,
-  EPHEMERAL_SETTLE_MS,
   navigateWithStageSlide,
 } from '@/lib/stage-transition'
 import { useT } from '@/lib/i18n'
@@ -123,42 +128,6 @@ function defaultUtterance(texts: Attachment[], images: Attachment[], t: ReturnTy
     parts.push(t('Uploaded {names}. Please read them and put together a story.', { names }))
   }
   return parts.join(' ') || t('Please check the attached files.')
-}
-
-// 이 세션에서 이미 타이핑 연출을 재생한 suggestion id — 재렌더/스테이지 왕복 시 재생 방지(#b1).
-const typedSuggestionIds = new Set<string>()
-
-/** 에이전트 제안 말풍선의 타이핑(캐스케이드) 연출 — 전체 출력 5초 미만 보장(#b1). */
-function TypewriterMarkdown({ id, text }: { id: string; text: string }) {
-  const [shown, setShown] = useState(() =>
-    typedSuggestionIds.has(id) ? text.length : 0,
-  )
-  useEffect(() => {
-    if (typedSuggestionIds.has(id)) return
-    typedSuggestionIds.add(id)
-    // 글자당 ~14ms, 최소 600ms·최대 4.5초(5초 미만). rAF로 진행률 기반 부드럽게.
-    const total = text.length
-    const duration = Math.min(4500, Math.max(600, total * 14))
-    const start = performance.now()
-    let raf = 0
-    let done = false
-    const tick = (now: number) => {
-      const p = Math.min(1, (now - start) / duration)
-      setShown(Math.ceil(p * total))
-      if (p < 1) raf = requestAnimationFrame(tick)
-      else done = true
-    }
-    raf = requestAnimationFrame(tick)
-    return () => {
-      cancelAnimationFrame(raf)
-      // 완주 전에 정리되면(StrictMode 이중 실행·중도 unmount) 가드를 되돌려 재생 가능하게.
-      //   없으면 dev StrictMode에서 2번째 effect가 가드에 걸려 0자에서 멈춘다.
-      if (!done) typedSuggestionIds.delete(id)
-    }
-  }, [id, text])
-  return (
-    <MarkdownText className="whitespace-pre-wrap" text={text.slice(0, shown)} />
-  )
 }
 
 /**
@@ -425,6 +394,8 @@ function ChatTraceFooter({
         </span>
       </summary>
       <div className="mt-1.5 space-y-0.5 pl-[18px] leading-4">
+        <p>{trace.model}{trace.effort ? ` · ${trace.effort}` : ''}{trace.thinking ? ` · ${t('Model thinking')}: ${t(trace.thinking === 'adaptive' ? 'Automatic' : 'Off')}` : ''}</p>
+        {trace.requestUsage && <p>{t('Request total: {calls} model calls · {input} input · {output} output · {ms} ms', { calls: trace.requestUsage.modelCalls, input: formatTraceNumber(trace.requestUsage.inputTokens + trace.requestUsage.cacheReadInputTokens + trace.requestUsage.cacheCreationInputTokens), output: formatTraceNumber(trace.requestUsage.outputTokens), ms: trace.requestUsage.durationMs.toLocaleString() })}</p>}
         <p>
           {t('History {count} · {chars} chars', {
             count: trace.historyCount,
@@ -470,11 +441,21 @@ export function GlobalChat() {
   const loadMessages = useGlobalChatStore((s) => s.loadMessages)
   const suggestion = useGlobalChatStore((s) => s.suggestion)
   const pendingNavigatePath = useGlobalChatStore((s) => s.pendingNavigatePath)
+  const directorHandoff = useGlobalChatStore((s) => s.directorHandoff)
+  const workflowNavigation = useGlobalChatStore((s) => s.workflowNavigation)
   const dismissSuggestion = useGlobalChatStore((s) => s.dismissSuggestion)
   const pendingProposal = useGlobalChatStore((s) => s.pendingProposal)
   const approvePendingProposal = useGlobalChatStore((s) => s.approvePendingProposal)
   const dismissPendingProposal = useGlobalChatStore((s) => s.dismissPendingProposal)
   const declineScriptPreserve = useGlobalChatStore((s) => s.declineScriptPreserve)
+  const deferPendingProposal = useGlobalChatStore((s) => s.deferPendingProposal)
+  const deferSuggestion = useGlobalChatStore((s) => s.deferSuggestion)
+  const deferredProposals = useGlobalChatStore((s) => s.deferredProposals)
+  const deferredSuggestions = useGlobalChatStore((s) => s.deferredSuggestions)
+  const executingProposalIds = useGlobalChatStore((s) => s.executingProposalIds)
+  const restorePendingProposal = useGlobalChatStore((s) => s.restorePendingProposal)
+  const cancelDeferredProposal = useGlobalChatStore((s) => s.cancelDeferredProposal)
+  const restoreSuggestion = useGlobalChatStore((s) => s.restoreSuggestion)
   const t = useT()
 
   const router = useRouter()
@@ -488,22 +469,8 @@ export function GlobalChat() {
     (STAGES.find((s) => pathname.startsWith(s.path))?.id as StageId | undefined) ??
     storeStage
   const projectId = useProjectStore((s) => s.projectId)
+  const { requestImageUploadConsent, imageUploadConsentDialog } = useImageUploadConsent(projectId)
 
-  // 탭 전환 직후엔 임시 요소(제안·승인 카드·워밍 팁)를 숨겼다가 1초 뒤 계단식으로 등장
-  //   (#chat-settle 2026-08-03). 진입 즉시 이들이 그려지면 스레드가 밀리며 "채팅방이 다시
-  //   조립된다"로 읽힌다 — 잠깐의 정적 후 순서대로 나타나면 방은 그대로 있고 에이전트가
-  //   말을 거는 것으로 읽힌다. (stage 전환 감지는 set-state-in-render 패턴)
-  const [stageSettled, setStageSettled] = useState(false)
-  const [settledStage, setSettledStage] = useState(currentStage)
-  if (currentStage !== settledStage) {
-    setSettledStage(currentStage)
-    setStageSettled(false)
-  }
-  useEffect(() => {
-    if (stageSettled) return
-    const t = setTimeout(() => setStageSettled(true), EPHEMERAL_SETTLE_MS)
-    return () => clearTimeout(t)
-  }, [stageSettled, settledStage])
   // 폭 리사이즈 + 접기 (chat-ui-store, persist)
   const chatWidth = useChatUiStore((s) => s.chatWidth)
   const collapsed = useChatUiStore((s) => s.collapsed)
@@ -618,20 +585,47 @@ export function GlobalChat() {
   useEffect(() => {
     if (!pendingNavigatePath) return
     useGlobalChatStore.setState({ pendingNavigatePath: null })
-    navigateWithStageSlide(pathname, pendingNavigatePath, () => router.push(pendingNavigatePath))
+    const navigationProject = useProjectStore.getState().projectId
+    try {
+      navigateWithStageSlide(pathname, pendingNavigatePath, () => {
+        if (useProjectStore.getState().projectId === navigationProject) router.push(pendingNavigatePath)
+      })
+    } catch {
+      useGlobalChatStore.getState().failDirectorHandoff()
+      useGlobalChatStore.getState().finishWorkflowNavigation(false)
+    }
   }, [pendingNavigatePath, router, pathname])
 
-  // 새 메시지·stage 이동 시 스레드 끝으로. stage 를 넣는 이유는 이동하면 끝에 "지금" 구간
-  //   구분선이 새로 붙기 때문 — 같은 방이 이어졌다는 표식이 화면 안에 들어와야 의미가 있다.
   useEffect(() => {
-    // 에이전트가 말을 걸었으면 사용자가 위로 올려 읽던 중이어도 끝으로 다시 붙인다(아래 stick 참조).
-    stickRef.current = true
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-    // stageSettled: 1초 뒤 계단식으로 등장하는 제안/승인 카드(#chat-settle)가 스레드 끝에
-    //   붙으므로, 나타나는 순간 끝까지 따라가야 화면 밖에서 조용히 뜨지 않는다.
-    // suggestion/proposal id(2026-08-06): 핸드오프 등 제안은 messages 에 안 실려 이 effect 가
-    //   안 돌았다 — 위로 스크롤해 둔 상태에서 제안이 화면 밖(아래)에 조용히 떠 놓치는 문제.
-  }, [messages.length, loading, currentStage, stageSettled, suggestion?.id, pendingProposal?.id])
+    if (!workflowNavigation) return
+    if (workflowNavigation.projectId !== projectId) {
+      useGlobalChatStore.setState({ workflowNavigation: null })
+      return
+    }
+    if (pathname === `/studio/${workflowNavigation.stage}`) {
+      useGlobalChatStore.getState().finishWorkflowNavigation(true)
+      return
+    }
+    const timer = setTimeout(() => useGlobalChatStore.getState().finishWorkflowNavigation(false), 15_000)
+    return () => clearTimeout(timer)
+  }, [workflowNavigation, pathname, projectId])
+
+  useEffect(() => {
+    if (!directorHandoff || directorHandoff.projectId !== projectId) return
+    if (directorHandoff.phase === 'waiting') {
+      if (loading) return
+      const timer = setTimeout(() => { void useGlobalChatStore.getState().resumeDirectorHandoff() }, 4_000)
+      return () => clearTimeout(timer)
+    }
+    if (directorHandoff.phase !== 'navigating') return
+    const timer = setTimeout(() => useGlobalChatStore.getState().failDirectorHandoff(), 15_000)
+    return () => clearTimeout(timer)
+  }, [directorHandoff, pathname, projectId, loading])
+
+  // 새 대화는 하단을 보고 있을 때만 따라간다. 탭 이동은 읽던 위치를 바꾸지 않는다.
+  useEffect(() => {
+    if (stickRef.current) chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages.length, loading, suggestion?.id, pendingProposal?.id])
 
   // 끝에 붙어 따라가기 (#chat-autoscroll 2026-08-11).
   //   위 effect 는 "블록이 추가된 순간" 한 번만 스크롤한다. 그런데 핸드오프·제안 말풍선은
@@ -753,13 +747,12 @@ export function GlobalChat() {
     return () => window.removeEventListener('keydown', handler)
   }, [collapsed, currentStage])
 
-  // #p4-choices v3 (#choices-freeform 2026-08-07): 활성 선택지는 입력창 바로 위에 앵커하고,
-  //   떠 있는 동안 채팅 입력은 잠근다 — 답하는 곳이 두 군데면 눈이 갈리기 때문이다.
-  //   새로고침으로 복원된 선택지는 display-only라 입력을 막지 않는다.
-  //   자유 입력("기타" 답변)은 선택지 안의 "직접 입력" 행이 담당한다(Claude AskUserQuestion 의 Type my own answer 대응).
+  // 선택지는 입력창 위에 두되 일반 채팅으로도 답할 수 있다.
+  // 복원된 선택지는 과거 동작을 실행하지 않고 답변 문구를 입력하는 데만 쓴다.
   const choices =
     suggestion &&
     suggestion.stage === currentStage &&
+    !(currentStage === 'producer' && pendingProposal?.stage === 'producer') &&
     (suggestion.action?.kind === 'choices' || suggestion.restoredChoices)
       ? {
           stage: suggestion.stage,
@@ -776,12 +769,8 @@ export function GlobalChat() {
       : null
 
   const stageSupported = CHAT_SUPPORTED_STAGES.has(currentStage)
-  // 타이핑 잠금과 전송 잠금을 가른다 (#type-while-thinking 2026-08-11).
-  //   응답을 기다리는 동안 입력창까지 잠그면 "다음에 할 말"을 미리 적어둘 수 없다 — 생각은
-  //   기다리는 동안 하는 것이라 그게 제일 자연스러운 타이밍이다. 그래서 loading 은 **제출만**
-  //   막는다. 활성 선택지가 떠 있을 때는 타이핑도 잠근다 — 답하는 곳이 두 군데면 눈이
-  //   갈리기 때문이다(#choices-freeform). 복원된 display-only 선택지는 입력을 허용한다.
-  const inputLocked = !stageSupported || (!!choices && !choices.displayOnly)
+  // 응답 대기 중에도 다음 답변을 적을 수 있고, 중복 전송만 막는다.
+  const inputLocked = !stageSupported
   const sendDisabled = inputLocked || loading
   // (loading 중 disabled 해제 시 재포커스하던 #b3 effect 제거 — 이제 입력창이 잠기지 않아
   //  포커스를 잃을 일이 없다. 남겨두면 다른 곳으로 옮긴 포커스를 도로 뺏는다.)
@@ -795,7 +784,6 @@ export function GlobalChat() {
   //   빨간 빔(회전)과 모션·색을 갈라 "안내"와 "호버 반응"이 섞이지 않게 한다(#feedback v2).
   const styleAnchors = useProducerStore((s) => s.styleAnchors)
   const styleAnchorKey = useProducerStore((s) => s.styleAnchorKey)
-  const setStyleAnchor = useProducerStore((s) => s.setStyleAnchor)
   const loadStyleAnchors = useProducerStore((s) => s.loadStyleAnchors)
   const [stylePressed, setStylePressed] = useState(false)
   useEffect(() => {
@@ -805,21 +793,26 @@ export function GlobalChat() {
   }, [currentStage, projectId, loadStyleAnchors])
   const stylePingOn = !stylePressed && !styleAnchorKey
 
-  // 스타일을 정할 타이밍에 팝업을 연다 (#style-timing 2026-08-11).
-  //   스토리가 확정되면(storyReady) 다음 결정은 "어떤 그림으로 만들 것인가"다. 그런데 스타일은
-  //   문장으로 답하는 질문이 아니라 **고르는 폼**이라, 채팅이 물어도 답할 곳이 없었다 — 그 순간
-  //   이미 만들어져 있는 픽커를 한 번 자동으로 연다. 세션당 1회(닫으면 팔레트 버튼의 레이더 핑이
-  //   이어받는다). 응답 대기 중에는 열지 않는다 — 읽고 있던 답을 모달이 덮는다.
-  const storyReady = useProducerStore((s) => s.storyReady)
-  const [stylePickerOpen, setStylePickerOpen] = useState(false)
-  const styleAutoOpenedRef = useRef(false)
+  // 새 기획의 준비 전환 또는 명시적인 Writer 요청이 만든 이벤트만 소비한다.
+  const [stylePickerProjectId, setStylePickerProjectId] = useState<string | null>(null)
+  const stylePickerOpen = !!projectId && stylePickerProjectId === projectId && currentStage === 'producer'
+  useEffect(() => { setStylePickerProjectId(null) }, [projectId, currentStage])
+  const stylePickerRequest = useChatUiStore((s) => s.stylePickerRequest)
+  const consumeStylePicker = useChatUiStore((s) => s.consumeStylePicker)
   useEffect(() => {
-    if (currentStage !== 'producer' || styleAutoOpenedRef.current) return
-    if (loading || !storyReady || styleAnchorKey || styleAnchors.length === 0) return
-    styleAutoOpenedRef.current = true
-    setStylePickerOpen(true)
-    setStylePressed(true) // 자동으로 보여줬으니 온보딩 핑은 소등
-  }, [currentStage, loading, storyReady, styleAnchorKey, styleAnchors.length])
+    if (!stylePickerRequest) return
+    const decision = stylePromptDecision(stylePickerRequest.projectId, {
+      projectId, stage: currentStage, loading,
+      approvalBusy: !!pendingProposal || executingProposalIds.length > 0,
+      hasStyle: !!styleAnchorKey, catalogReady: styleAnchors.length > 0,
+    })
+    if (decision === 'wait') return
+    consumeStylePicker(stylePickerRequest.id)
+    if (decision === 'open') {
+      setStylePickerProjectId(projectId)
+      setStylePressed(true)
+    }
+  }, [stylePickerRequest, projectId, currentStage, loading, pendingProposal, executingProposalIds, styleAnchorKey, styleAnchors.length, consumeStylePicker])
   // 프리셋 클릭 = 입력창에 삽입(자동 전송 금지 — 과금/전이 발화를 원클릭으로 쏘지 않는다).
   const insertPreset = (text: string) => {
     setPresetOpen(false)
@@ -894,13 +887,14 @@ export function GlobalChat() {
 
     setInput('')
     // 씬 게이트 중의 입력 = 수정 피드백 (#gate-main-input) — 일반 채팅이 아니라 revise 로 간다.
-    if (sceneGateActive) {
+    const inputRoute = writerInputRoute(msg, { sceneGate: sceneGateActive, running: writerRunning })
+    if (inputRoute === 'revise') {
       dismissSuggestion()
       await sendSceneGate('revise', msg)
       return
     }
     // 실행 중 가드(#run-chat-gate) — 유저 발화는 남기고, 로컬 즉답으로 상황을 알린다.
-    if (writerRunning) {
+    if (inputRoute === 'blocked') {
       useGlobalChatStore.getState().appendLocalExchange(
         'writer',
         msg,
@@ -943,7 +937,7 @@ export function GlobalChat() {
     await sendMessage(msg, {
       imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
       thumbUrls,
-    })
+    }, { stageOverride: currentStage })
     // #attach-loud-fail(2026-08-24): 이미지 턴이 응답 없이 실패하면(모델 말풍선 미증가 + error)
     //   첨부를 복원한다 — 슬라이스는 이미 스토리지에 있으니 파일부터 다시 올리게 하지 않는다.
     const after = useGlobalChatStore.getState()
@@ -990,7 +984,7 @@ export function GlobalChat() {
     if (action.kind === 'handoff') {
       dismissSuggestion()
       // D12(2026-08-31 오너): 명시 버튼("Writer 호출하기")이 곳 동의다 — 승인 카드를 또 띄우지 않는다.
-      await sendMessage(action.utterance, undefined, { consentedHandoff: true })
+      await sendMessage(action.utterance, undefined, { consentedHandoff: true, stageOverride: suggestion?.stage })
       return
     }
     const path = await handoffToStage(action.targetStage)
@@ -1036,6 +1030,10 @@ export function GlobalChat() {
       accepted.push(file)
     }
     if (accepted.length === 0) return
+
+    const images = accepted.filter((file) => kindOf(file.name) === 'image')
+    if (images.length > 0 && !(await requestImageUploadConsent(images))) return
+    if (useProjectStore.getState().projectId !== projectId) return
 
     // 2) 칩을 먼저 세우고 한 장씩 올린다 — 진행이 눈에 보여야 하고, 요청 하나당 파일 하나여야
     //    본문 크기 한도에 안 걸린다(기존 assets/upload-image 와 같은 패턴).
@@ -1153,8 +1151,7 @@ export function GlobalChat() {
   //   하이라이트하고 [계속하기]로 확정한다. 선택지 세트가 바뀌면 선택 초기화(렌더 중 조정 패턴).
   const [selectedChoice, setSelectedChoice] = useState<string | null>(null)
   const [choiceSetId, setChoiceSetId] = useState<string | null>(null)
-  // #choices-freeform: '직접 입력' 행 — 선택지 마지막 행. 클릭 즉시(키보드는 Enter 확정) 인라인
-  //   인풋으로 펼쳐진다. 채팅 입력이 잠기는 동안 여기가 '기타' 답변의 유일한 통로.
+  // '직접 입력' 행은 선택지 안에서 답을 쓰는 보조 통로다.
   const FREEFORM = '__freeform__'
   const [freeformOpen, setFreeformOpen] = useState(false)
   const [freeformText, setFreeformText] = useState('')
@@ -1180,24 +1177,24 @@ export function GlobalChat() {
     const opt = choices.options.find((o) => o.label === selectedChoice)
     if (!opt) return
     dismissSuggestion()
-    void sendMessage(opt.utterance)
+    void sendMessage(opt.utterance, undefined, { stageOverride: currentStage })
   }
   const handleFreeformSend = () => {
     const text = freeformText.trim()
-    if (!text || loading) return
+    if (!text || useGlobalChatStore.getState().loading) return
     dismissSuggestion()
-    void sendMessage(text)
+    void sendMessage(text, undefined, { stageOverride: currentStage })
   }
 
   // 선택지 키보드 조작 (#choices-keys 2026-08-07) — Claude Code CLI 의 AskUserQuestion 문법 차용:
   //   ↑/↓ 이동, 숫자키 바로 선택, Enter 확정('직접 입력' 행이면 인풋 열기), Esc 닫기.
-  //   #choices-freeform: 채팅 입력이 잠기므로 타이핑 우선 규칙은 폐기 — 대신 캡처 단계에서 듣되,
-  //   다른 입력 요소(인라인 '직접 입력' 인풋·뱃지 popover 인풋 등)에 포커스가 있으면 양보한다.
+  //   일반 채팅이나 인라인 입력에 포커스가 있으면 타이핑과 전송에 양보한다.
   useEffect(() => {
     if (!choices || choices.displayOnly || freeformOpen) return
     const labels = [...choices.options.map((o) => o.label), FREEFORM]
     const handler = (e: KeyboardEvent) => {
       if (loading || e.isComposing) return
+      if (document.querySelector('[role="dialog"][data-state="open"]')) return
       const target = e.target as HTMLElement | null
       if (target) {
         const tag = target.tagName
@@ -1253,8 +1250,8 @@ export function GlobalChat() {
   // 계단식 등장(#chat-settle) — settle 후 보이는 임시 블록이 위에서부터 CASCADE_STEP_MS 간격으로
   //   나타난다. fill-mode backwards: 자기 차례 전까지 첫 키프레임(투명)에 머문다.
   const showSuggestion =
-    stageSettled && !!suggestion && suggestion.stage === currentStage && !choices
-  const showProposal = stageSettled && !!pendingProposal && pendingProposal.stage === currentStage
+    !!suggestion?.action && suggestion.action.kind !== 'choices' && !choices
+  const showProposal = !!pendingProposal
   let cascadeSlots = 0
   const suggestionSlot = showSuggestion ? cascadeSlots++ : 0
   const proposalSlot = showProposal ? cascadeSlots++ : 0
@@ -1284,6 +1281,8 @@ export function GlobalChat() {
       //   열린 다이얼로그의 존재 자체로 판정한다 — 모달 뒤의 조작은 없다.
       if (document.querySelector('[role="dialog"][data-state="open"]')) return
       const target = e.target as HTMLElement | null
+      // 선택지 버튼의 Enter는 그 버튼의 동작이다. 함께 복원된 승인 카드를 실행하지 않는다.
+      if (target?.closest('[data-chat-choices]')) return
       const inChatInput = !!target && target === textareaRef.current
       // 다른 입력 요소(인라인 '직접 입력', 이름 변경 등)에 있으면 그쪽 몫.
       if (
@@ -1300,8 +1299,8 @@ export function GlobalChat() {
       e.preventDefault()
       e.stopPropagation()
       if (e.key === 'Escape') {
-        if (proposalOpen && pendingProposal) dismissPendingProposal(pendingProposal.id)
-        else if (suggestion?.dismissible !== false) dismissSuggestion()
+        if (proposalOpen && pendingProposal) deferPendingProposal(pendingProposal.id)
+        else if (suggestion?.dismissible !== false) deferSuggestion()
         return
       }
       if (proposalOpen) void handlePendingProposalApprove()
@@ -1412,7 +1411,7 @@ export function GlobalChat() {
         <ScrollArea className="min-h-0 flex-1 px-4 py-3">
           <div className="space-y-2">
 
-            {sections.map((section, si) => (
+            {sections.filter(section => section.messages.length > 0).map((section, si) => (
               <section
                 key={`${section.stage}-${si}`}
                 className={cn('space-y-2', si > 0 && 'pt-2')}
@@ -1544,14 +1543,6 @@ export function GlobalChat() {
                     className="tale-beam-once pointer-events-none absolute inset-0 rounded-2xl"
                   />
                 )}
-                <RolePlate stage={suggestion.stage} />
-                <div className="px-1 text-xs leading-relaxed text-foreground">
-                  <TypewriterMarkdown
-                    key={suggestion.id}
-                    id={suggestion.id}
-                    text={scrubProse(suggestion.content)}
-                  />
-                </div>
                 {/* 씬 게이트(#gate-to-chat) — 확정 한 번으로 안 끝나는 결정이라 캡슐 버튼 대신
                     피드백 입력 + 확정/수정 두 갈래를 여기서 렌더한다(생성 화면 하단 바에서 이사). */}
                 {suggestion.action?.kind === 'confirmScenes' ? (
@@ -1575,7 +1566,7 @@ export function GlobalChat() {
                       </Button>
                     ) : null}
                     {suggestion.dismissible !== false && (
-                      <Button size="sm" variant="ghost" className="rounded-full" onClick={() => dismissSuggestion()}>
+                      <Button size="sm" variant="ghost" className="rounded-full" onClick={deferSuggestion}>
                         {t('Later')}
                       </Button>
                     )}
@@ -1629,10 +1620,13 @@ export function GlobalChat() {
                     onClick={() =>
                       pendingProposal.kind === 'producerPreserveScript'
                         ? declineScriptPreserve()
-                        : dismissPendingProposal(pendingProposal.id)
+                        : deferPendingProposal(pendingProposal.id)
                     }
                   >
                     {pendingProposal.kind === 'producerPreserveScript' ? t('Use as reference only') : t('Later')}
+                  </Button>
+                  <Button size="sm" variant="ghost" className="w-full rounded-full" onClick={() => dismissPendingProposal(pendingProposal.id)}>
+                    {t('Cancel request')}
                   </Button>
                   <div className="flex justify-center">
                     <KeyHint dismissible />
@@ -1643,6 +1637,29 @@ export function GlobalChat() {
             <div ref={chatEndRef} />
           </div>
         </ScrollArea>
+
+        {(deferredProposals.length > 0 || deferredSuggestions.length > 0) && (
+          <details className="shrink-0 border-t border-border px-4 py-2 text-xs">
+            <summary className="cursor-pointer text-muted-foreground">{t('Saved for later')} ({deferredProposals.length + deferredSuggestions.length})</summary>
+            <div className="mt-2 max-h-36 space-y-2 overflow-auto">
+              {deferredProposals.map(proposal => (
+                <div key={proposal.id} className="flex items-start justify-between gap-2">
+                  <span className="min-w-0 whitespace-pre-wrap">{proposal.target}<br /><span className="text-muted-foreground">{proposal.action}</span></span>
+                  <div className="flex shrink-0 flex-col gap-1">
+                    <Button size="sm" variant="outline" disabled={!!pendingProposal || executingProposalIds.includes(proposal.id)} onClick={() => restorePendingProposal(proposal.id)}>{t('Reopen')}</Button>
+                    <Button size="sm" variant="ghost" onClick={() => cancelDeferredProposal(proposal.id)}>{t('Cancel remaining tasks')}</Button>
+                  </div>
+                </div>
+              ))}
+              {deferredSuggestions.map(item => (
+                <div key={item.id} className="flex items-start justify-between gap-2">
+                  <span className="min-w-0">{item.content}</span>
+                  <Button size="sm" variant="outline" disabled={suggestion?.dismissible === false} onClick={() => restoreSuggestion(item.id)}>{t('Reopen')}</Button>
+                </div>
+              ))}
+            </div>
+          </details>
+        )}
 
         {error && (
           <button
@@ -1661,11 +1678,10 @@ export function GlobalChat() {
             MentionTextarea 의 ^/v 버튼으로 안내(#a3). Enter 전송 / Shift+Enter 개행.
             툴바: + 업로드 · 에이전트 필(빠른 요청) · four-dot(@멘션) · 우측 원형 send→Stop. */}
         <div className="shrink-0 p-3 pt-1">
-          {/* 선택지 (#p4-choices v3 + #oiioii-chat) — 입력창 위 앵커는 유지(고르는 곳 = 답하는
-              곳), 모양은 oiioii choice 행 리스트. 떠 있는 동안 채팅 입력은 잠기고(#choices-freeform),
-              자유 입력은 마지막 '직접 입력' 행이 담당한다. */}
+          {/* 선택지를 고르거나 바로 아래 채팅창에 직접 답한다. */}
           {choices && (
             <div
+              data-chat-choices=""
               className={cn(
                 'mb-2 flex flex-col gap-1.5 px-1',
                 'animate-in fade-in-0 slide-in-from-bottom-1 duration-150 ease-out motion-reduce:animate-none',
@@ -1677,16 +1693,25 @@ export function GlobalChat() {
                   <p className="min-w-0 text-xs text-foreground">{choices.question}</p>
                 </div>
               )}
+              {choices.displayOnly && (
+                <p className="text-xs text-muted-foreground">
+                  {t('Click an option to put it in your message, then send.')}
+                </p>
+              )}
               {choices.options.map((opt, oi) => {
                 if (choices.displayOnly) {
                   return (
-                    <div
+                    <button
                       key={opt.label}
-                      role="note"
-                      className="w-full rounded-xl border border-border-subtle bg-muted/40 px-3 py-2 text-center text-xs text-muted-foreground"
+                      type="button"
+                      onClick={() => {
+                        setInput(opt.label)
+                        requestAnimationFrame(() => textareaRef.current?.focus())
+                      }}
+                      className="w-full rounded-xl border border-border-subtle bg-muted/40 px-3 py-2 text-center text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     >
                       {opt.label}
-                    </div>
+                    </button>
                   )
                 }
                 const selected = selectedChoice === opt.label
@@ -1722,8 +1747,7 @@ export function GlobalChat() {
               })}
               {!choices.displayOnly && (
                 <>
-              {/* 직접 입력 (#choices-freeform) — 마지막 행. 클릭 즉시(키보드는 선택 후 Enter)
-                  인라인 인풋으로 펼쳐진다. 잠긴 채팅 입력 대신 여기가 '기타' 답변 통로. */}
+              {/* 직접 입력 행을 누르면 선택지 안에서 답을 쓸 수 있다. */}
               {freeformOpen ? (
                 <div className="relative w-full rounded-xl border-2 border-border-strong bg-accent px-9 py-2">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[10px] text-foreground/70">
@@ -1773,13 +1797,12 @@ export function GlobalChat() {
                   {t('Type my own answer…')}
                 </button>
               )}
-              {/* 확정 CTA (#oiioii-chat v2) — 고르고 [계속하기]. '직접 입력' 행을 골랐으면 전송
-                  대신 인풋을 연다. */}
+              {/* 직접 입력이 열려 있으면 입력한 답을, 아니면 고른 선택지를 전송한다. */}
               <Button
                 size="sm"
                 className="w-full rounded-full"
-                disabled={!selectedChoice || loading}
-                onClick={handleChoiceContinue}
+                disabled={loading || (freeformOpen ? !freeformText.trim() : !selectedChoice)}
+                onClick={freeformOpen ? handleFreeformSend : handleChoiceContinue}
               >
                 {t('Continue')}
               </Button>
@@ -1879,8 +1902,8 @@ export function GlobalChat() {
                 disabled={inputLocked}
                 ghost={composeHint && input === composeHint.token && composeHint.hint ? composeHint.hint : undefined}
                 placeholder={
-                  choices && !choices.displayOnly
-                    ? t('Answer using the choices above')
+                  choices
+                    ? t('Choose above or type your answer…')
                     : sceneGateActive
                       ? t('Type your changes, or press Enter as-is to confirm the scenes')
                       : canSendAttachments
@@ -1894,6 +1917,7 @@ export function GlobalChat() {
                 )}
               />
               {/* 하단 툴바 (#oiioii-chat spec §10 매핑) */}
+              {['producer', 'writer', 'artist'].includes(currentStage) && <ChatModelControls disabled={loading} />}
               <div className="flex items-center gap-1">
                 {currentStage === 'producer' && (
                   <>
@@ -1979,9 +2003,9 @@ export function GlobalChat() {
                   <StyleAnchorPicker
                     anchors={styleAnchors}
                     value={styleAnchorKey}
-                    onSelect={(k) => void setStyleAnchor(k)}
+                    onSelect={(k) => void selectStyleAnchorFromPicker(k)}
                     open={stylePickerOpen}
-                    onOpenChange={setStylePickerOpen}
+                    onOpenChange={(open) => setStylePickerProjectId(open ? projectId : null)}
                   >
                     <Button
                       size="icon-sm"
@@ -2105,6 +2129,7 @@ export function GlobalChat() {
           </Button>
         </aside>
       )}
+      {imageUploadConsentDialog}
     </>
   )
 }

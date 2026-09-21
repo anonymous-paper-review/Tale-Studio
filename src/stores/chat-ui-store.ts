@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { DEFAULT_CHAT_MODEL_SETTINGS, parseChatModelSettings, type ChatModelSettings } from '@/lib/chat-model-settings'
 import {
   CHAT_DEFAULT_WIDTH,
   CHAT_MIN_WIDTH,
@@ -21,6 +22,8 @@ interface MentionInsertRequest {
 }
 
 interface ChatUiState {
+  modelSettings: ChatModelSettings
+  setModelSettings: (value: ChatModelSettings) => void
   chatWidth: number
   collapsed: boolean
   setChatWidth: (w: number) => void
@@ -38,6 +41,9 @@ interface ChatUiState {
   requestMentionCompose: (label: string, hint: string) => void
   consumeMentionInsert: (id: number) => void
   // 채팅 입력창 포커스(+빔) 요청 브리지 — 첫 진입 웰컴 등에서 set, GlobalChat이 소비.
+  stylePickerRequest: { id: number; projectId: string } | null
+  requestStylePicker: (projectId: string) => void
+  consumeStylePicker: (id: number) => void
   focusRequest: number | null
   requestChatFocus: () => void
   consumeChatFocus: () => void
@@ -49,6 +55,8 @@ const clampWidth = (w: number) =>
 export const useChatUiStore = create<ChatUiState>()(
   persist(
     (set) => ({
+      modelSettings: { ...DEFAULT_CHAT_MODEL_SETTINGS },
+      setModelSettings: (value) => { const parsed = parseChatModelSettings(value); if (parsed) set({ modelSettings: parsed }) },
       chatWidth: CHAT_DEFAULT_WIDTH,
       collapsed: false,
 
@@ -71,13 +79,20 @@ export const useChatUiStore = create<ChatUiState>()(
         set({ mentionInsert: { id: Date.now(), label, mode: 'compose', hint } }),
       consumeMentionInsert: (id) =>
         set((s) => (s.mentionInsert?.id === id ? { mentionInsert: null } : s)),
+      stylePickerRequest: null,
+      requestStylePicker: (projectId) => set({ stylePickerRequest: { id: Date.now(), projectId } }),
+      consumeStylePicker: (id) => set((s) => s.stylePickerRequest?.id === id ? { stylePickerRequest: null } : s),
       focusRequest: null,
       requestChatFocus: () => set({ focusRequest: Date.now() }),
       consumeChatFocus: () => set({ focusRequest: null }),
     }),
     {
       name: 'tale-chat-ui',
-      partialize: (s) => ({ chatWidth: s.chatWidth, collapsed: s.collapsed }),
+      partialize: (s) => ({ chatWidth: s.chatWidth, collapsed: s.collapsed, modelSettings: s.modelSettings }),
+      merge: (persisted, current) => {
+        const saved = persisted as Partial<ChatUiState> | undefined
+        return { ...current, ...saved, modelSettings: parseChatModelSettings(saved?.modelSettings) ?? { ...DEFAULT_CHAT_MODEL_SETTINGS } }
+      },
     },
   ),
 )

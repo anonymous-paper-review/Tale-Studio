@@ -4,13 +4,18 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { pickActiveSubscription, type SubscriptionRow } from '@/lib/billing/subscription-state'
+import { decidePlanChange } from '@/lib/billing/plan-change'
+import { takeBalance } from '@/lib/billing/take-ledger'
 import { summarizeSubscription } from '@/lib/billing/account-summary'
 import { createPaddleTransaction, decideCheckout, type CheckoutKind } from '@/lib/billing/checkout'
 import { sendOpsAlert } from '@/lib/ops-alert'
+import { isCheckoutEnabled } from '@/lib/billing/checkout-availability'
 
 export const runtime = 'nodejs'
 
 export async function POST(req: NextRequest) {
+  if (!isCheckoutEnabled()) return NextResponse.json({ error: 'payments_not_open' }, { status: 503 })
   try {
     const supabase = await createClient()
     const {
@@ -35,11 +40,13 @@ export async function POST(req: NextRequest) {
     const workspaceId = workspace.id as string
     const plan = typeof workspace.plan === 'string' ? workspace.plan : 'free'
 
-    const [{ data: subscription }, { data: purchases }, { data: customer }] = await Promise.all([
-      supabaseAdmin.from('subscriptions').select('plan, status, current_period_end').eq('workspace_id', workspaceId).maybeSingle(),
+    const [{ data: subscriptions }, { data: purchases }, { data: customer }] = await Promise.all([
+      supabaseAdmin.from('subscriptions').select('*').eq('workspace_id', workspaceId),
       supabaseAdmin.from('take_ledger').select('id').eq('workspace_id', workspaceId).eq('kind', 'grant_purchase').limit(1),
       supabaseAdmin.from('billing_customers').select('mor_customer_id').eq('workspace_id', workspaceId).maybeSingle(),
     ])
+
+    const subscription = pickActiveSubscription(subscriptions as SubscriptionRow[] | null)
 
     const decision = decideCheckout({
       kind,
@@ -48,7 +55,36 @@ export async function POST(req: NextRequest) {
       packPurchasedBefore: (purchases?.length ?? 0) > 0,
       subscriptionStatus: summarizeSubscription(plan, subscription ?? null).status,
     })
-    if (!decision.ok) return NextResponse.json({ error: decision.reason }, { status: 409 })
+    if (!decision.ok) {
+      // 구독 중인데 다른 플랜을 눌렀다 = 플랜 변경이다(P15). 거절만 하지 말고 판정을 실어 보내
+      //   화면이 확인창을 띄우게 한다. 금액·갱신일·합산 Take 를 서버가 계산해야 화면과 청구가 안 어긋난다.
+      if (decision.reason === 'already_subscribed' && kind === 'plan') {
+        const change = decidePlanChange({
+          currentPlan: plan,
+          targetPlan: id,
+          subscriptionId: subscription?.mor_subscription_id ?? null,
+          now: new Date(),
+        })
+        if (change.ok) {
+          const balance = await takeBalance(workspaceId).catch(() => null)
+          return NextResponse.json(
+            {
+              error: decision.reason,
+              planChange: {
+                targetPlan: id,
+                direction: change.direction,
+                chargeTodayUsd: change.chargeTodayUsd,
+                nextBilledAt: change.nextBilledAt,
+                takesAdded: change.takesAdded,
+                currentBalance: balance,
+              },
+            },
+            { status: 409 },
+          )
+        }
+      }
+      return NextResponse.json({ error: decision.reason }, { status: 409 })
+    }
 
     const existingCustomerId = typeof customer?.mor_customer_id === 'string' ? customer.mor_customer_id : null
     const { transactionId, customerId } = await createPaddleTransaction({

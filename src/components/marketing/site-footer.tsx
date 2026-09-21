@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Film } from 'lucide-react'
 import { ContactPopover } from '@/components/contact-popover'
+import { LegalFooter } from '@/components/legal/legal-footer'
 
 /** 공개(마케팅) 페이지 공용 푸터 (#landing-v2 2026-08-03). */
 export function SiteFooter() {
@@ -30,7 +31,8 @@ export function SiteFooter() {
           <ContactPopover />
         </div>
       </div>
-      <div className="mx-auto mt-10 flex max-w-7xl items-center justify-between border-t border-white/10 pt-6 text-xs text-gray-500">
+      <div className="mx-auto mt-10 flex max-w-7xl flex-col gap-4 border-t border-white/10 pt-6 text-xs text-gray-500">
+        <LegalFooter />
         <span>&copy; {new Date().getFullYear()} Tale Studio. All rights reserved.</span>
       </div>
     </footer>

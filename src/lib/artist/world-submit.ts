@@ -1,7 +1,14 @@
-import { createGenerationJob, type GenerationJob, type GenerationJobActor } from '@/lib/generation-jobs'
+import {
+  confirmGenerationJobReceipt,
+  rejectGenerationJobReservation,
+  reserveGenerationJob,
+  type GenerationJob,
+  type GenerationJobActor,
+} from '@/lib/generation-jobs'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { applyStyleAnchor, type AnchorableSubmit, type ResolvedStyleAnchor } from '@/lib/style-anchor'
 import { falImageSubmit } from '@/lib/writer/llm/fal'
+import { isDefiniteSubmitRejection } from '@/lib/fal/submit-rejection'
 import { DEFAULT_WORLD_IMAGE_MODEL, resolveImageEndpoint, type ImageModelKey } from '@/lib/image-models'
 
 export interface SubmitWorldShotJobInput {
@@ -40,21 +47,14 @@ export async function submitWorldShotJob(
   }
   const anchored = input.anchor ? applyStyleAnchor(input.anchor, baseOpts, refs.length ? 'multiref' : 'single') : baseOpts
   // 모델은 참조(앵커 이미지) 유무에 따라 t2i/edit 엔드포인트를 고른다 — 캐릭터 시트 라우트와 같은 규칙.
-  const finalOpts: AnchorableSubmit = {
-    ...anchored,
-    model: resolveImageEndpoint(modelKey, !!anchored.reference_image_urls?.length).endpoint,
-  }
+  const endpointModel = resolveImageEndpoint(modelKey, !!anchored.reference_image_urls?.length).endpoint
+  const finalOpts: AnchorableSubmit = { ...anchored, model: endpointModel }
 
-  const { request_id, model, fal_key_id } = await falImageSubmit({
-    ...finalOpts,
-    webhookUrl: resolveWebhookUrl(),
-  })
-
-  return createGenerationJob({
+  // 자리 예약이 먼저다(#generation-capacity-trigger 2026-09-14): 트리거가 네 축을 원자적으로 판정하므로
+  //   제출을 먼저 하면 거절된 순간 이미 유료 요청이 나간 뒤다(감사 2026-09-11). 접수 번호는 제출 뒤 채운다.
+  const job = await reserveGenerationJob({
     projectId: input.projectId,
-    requestId: request_id,
-    model,
-    falKeyId: fal_key_id,
+    model: endpointModel,
     kind: 'world_shot',
     actor: input.actor,
     userId: input.userId,
@@ -79,4 +79,33 @@ export async function submitWorldShotJob(
       ...(input.appearanceKey && input.appearanceKey !== 'default' ? { appearanceKey: input.appearanceKey } : {}),
     },
   })
+
+  try {
+    // 외부 접수는 한 번뿐이다. 응답을 잃은 호출을 SDK 재시도로 복제하지 않는다(러프와 같은 이유 —
+    //   예약이 이미 자리를 잡고 있으니 재시도는 같은 그림의 이중 발주다).
+    // falKeyId: 트리거가 여유 있는 계정으로 바꿔 넣었을 수 있어 반드시 예약 행의 값으로 제출한다.
+    const receipt = await falImageSubmit(
+      { ...finalOpts, webhookUrl: resolveWebhookUrl() },
+      { retry: false, falKeyId: job.fal_key_id },
+    )
+    try {
+      await confirmGenerationJobReceipt(job.id, input.projectId, receipt)
+    } catch (error) {
+      // 이미 접수됐다 — 연결 저장 실패는 새 번호로 다시 발주할 근거가 아니다.
+      console.error(
+        '[world-submit] accepted receipt could not be saved:',
+        job.id,
+        error instanceof Error ? error.message : String(error),
+      )
+    }
+    return { ...job, request_id: receipt.request_id, model: receipt.model, fal_key_id: receipt.fal_key_id }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    // 확정 거절(4xx)만 예약을 닫는다. 통신 오류·5xx 는 이미 접수됐을 수 있어 queued 예약을 남긴다 —
+    //   실패로 굳히면 같은 그림이 다시 발주된다(submit-rejection.ts 참고).
+    if (isDefiniteSubmitRejection(error)) {
+      await rejectGenerationJobReservation(job.id, input.projectId, message)
+    }
+    throw error
+  }
 }

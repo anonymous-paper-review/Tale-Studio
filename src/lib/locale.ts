@@ -16,6 +16,12 @@ export function parseAppLocale(v: unknown): AppLocale | null {
   return v === 'en' || v === 'ko' ? v : null
 }
 
+/** 잠긴 프로젝트는 콘텐츠 언어, 아직 잠기지 않았으면 현재 화면 언어를 따른다. */
+export function pickContentLocale(input: { projectLocale: AppLocale | null; locked: boolean | null; uiLocale: AppLocale }): AppLocale {
+  if (input.projectLocale && input.locked !== false) return input.projectLocale
+  return input.uiLocale
+}
+
 /**
  * writer/start 1.6 의 출력 언어 결정 (#i18n-s5) — 순수 로직 분리(유닛 검증 대상).
  * 잠긴 프로젝트는 잠긴 값이 곧 출력 언어. 레거시(unlocked)는 스토리 감지값을 쓰고 잠근다 —

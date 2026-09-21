@@ -253,22 +253,26 @@ function extractImageUrlFromData(raw: unknown): { url: string; width?: number; h
 /** submit only — request_id 반환 즉시 리턴. polling은 별도. */
 export async function falImageSubmit(
   opts: FalImageOptions,
+  /** falKeyId: 자리 예약이 이미 키를 정해둔 호출자용(#generation-capacity-trigger 2026-09-14) — 작업 행에
+   *  기록된 키로 제출해야 조회 경로가 그 키를 쓴다. 예약 행의 fal_key_id 는 트리거가 여유 있는
+   *  계정으로 바꿔둔 값일 수 있다. 생략하면 종전대로 여기서 고른다. */
+  submission: { retry?: boolean; falKeyId?: string } = {},
 ): Promise<FalSubmitReceipt> {
   const model = resolveImageModel(opts);
   const input = buildFalImageInput(opts, model);
-  const k = await pickFalKey();
+  const k = submission.falKeyId ? falKeyById(submission.falKeyId) : await pickFalKey();
+  if (!k) throw new FalUnknownKeyError(submission.falKeyId);
   try {
-    const { request_id } = await withLlmRetry(
-      () =>
-        k.client.queue.submit(model, opts.webhookUrl ? { input, webhookUrl: opts.webhookUrl } : { input }),
-      'fal-image-submit',
-    );
+    const submit = () => k.client.queue.submit(model, opts.webhookUrl ? { input, webhookUrl: opts.webhookUrl } : { input });
+    const { request_id } = submission.retry === false
+      ? await k.submitQueueOnce(model, input, opts.webhookUrl)
+      : await withLlmRetry(submit, 'fal-image-submit');
     return { request_id, model, fal_request: input, fal_key_id: k.id };
   } catch (e) {
     // fal 실패 상세를 표면화 — 라우트(500 body.error)→client(✗ failed)까지 진짜 이유가 전파된다.
     const detail = falErrorDetail(e);
     console.error(`[fal-image-submit] model=${model} failed: ${detail}`);
-    throw new Error(`fal submit (${model}): ${detail}`);
+    throw new Error(`fal submit (${model}): ${detail}`, { cause: e });
   }
 }
 
@@ -451,16 +455,25 @@ function extractVideoUrlFromData(raw: unknown): { url: string; duration?: number
 }
 
 /** submit only */
+// 재시도하지 않는다(#fal-submit-no-retry 2026-09-08). 제출은 과금이 발생하는 동작이라
+//   503·타임아웃은 "안 들어갔다"가 아니라 "들어갔는지 모른다"이다. fal 이 이미 큐에
+//   넣고 응답만 못 준 경우 withLlmRetry 는 같은 영상을 최대 4번 만들고 4번 과금했다.
+//   게다가 기록되는 request_id 는 마지막 시도 하나뿐이라 앞선 제출들은 webhook 매칭에도
+//   실패해 결과 없이 돈만 나간다. 본 영상 라우트는 이미 재시도 없이 모호한 실패를
+//   별도 처리한다(generate-video/route.ts:224, isAmbiguousSubmitError) — 여기도 같은 규칙을 따른다.
+//   조회(falVideoFetch)는 과금이 없으므로 그쪽 재시도는 그대로 둔다.
 export async function falVideoSubmit(
   opts: FalVideoOptions,
+  /** 제출 전에 키를 미리 정해야 하는 호출자용(#previz-record-before-submit) — 작업 행에 fal_key_id 를
+   *  먼저 기록해야 조회 경로가 그 키를 쓸 수 있다. 생략하면 종전대로 여기서 고른다. */
+  presetKey?: Awaited<ReturnType<typeof pickFalKey>>,
 ): Promise<FalSubmitReceipt> {
   const model = opts.model ?? DEFAULT_VIDEO_MODEL;
   const input = buildFalVideoInput(opts, model);
-  const k = await pickFalKey();
-  const { request_id } = await withLlmRetry(
-    () =>
-      k.client.queue.submit(model, opts.webhookUrl ? { input, webhookUrl: opts.webhookUrl } : { input }),
-    'fal-video-submit',
+  const k = presetKey ?? await pickFalKey();
+  const { request_id } = await k.client.queue.submit(
+    model,
+    opts.webhookUrl ? { input, webhookUrl: opts.webhookUrl } : { input },
   );
   return { request_id, model, fal_request: input, fal_key_id: k.id };
 }

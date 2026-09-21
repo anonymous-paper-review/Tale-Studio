@@ -1,0 +1,10 @@
+{
+  "environment": "development",
+  "project": "pbiumddivadgbzxuymak",
+  "migration": "20260914150000_generation_capacity_key_assignment.sql",
+  "sha256": "5ec5c5b93a686b75b8abf04e1a810ae83fd8d91b3fb1f59c231767192221274e",
+  "appliedAt": "2026-09-14T05:17:12.130Z",
+  "databaseTypes": "pnpm db:types: unchanged",
+  "isolatedDatabaseTests": { "passed": 28, "failed": 0, "applicationRowsWritten": 0, "paidFalRequests": 0 },
+  "productionChanged": false
+}

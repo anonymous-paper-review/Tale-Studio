@@ -1,0 +1,36 @@
+{
+  "codeCommit": "3970a3c0d75b11bfa851aa595a5b3d166c21ee07",
+  "tests": {
+    "passed": 2754,
+    "failed": 0,
+    "skipped": 27,
+    "filesPassed": 346,
+    "filesSkipped": 2
+  },
+  "typecheck": "passed",
+  "designLint": "passed",
+  "sourceLint": {
+    "errors": 0,
+    "existingWarnings": 24
+  },
+  "build": "passed",
+  "githubCI": "https://github.com/anonymous-paper-review/Tale-Studio/actions/runs/34441665388",
+  "browser": {
+    "savedBlockerAndAction": true,
+    "questionOnlyMoveRequests": 0,
+    "moveRequests": 1,
+    "completionMessagesAdded": 1,
+    "directorRendered": true,
+    "reloadRetainedDirector": true,
+    "finalUnhandledErrors": 0,
+    "whenReadyAutoTransition": true,
+    "paidGenerationCalls": 0,
+    "fixtureUsesStaticTemplates": true
+  },
+  "remaining": [
+    18,
+    23,
+    27,
+    29
+  ]
+}

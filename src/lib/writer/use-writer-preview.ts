@@ -6,6 +6,9 @@
 import { useEffect, useRef, useState } from 'react'
 import type { WriterEngine } from '@/lib/writer/engine'
 import type { WriterV2Package } from '@/lib/writer/v2/semantic-unit'
+import { useLocaleStore } from '@/stores/locale-store'
+import { useProjectStore } from '@/stores/project-store'
+import { pickContentLocale } from '@/lib/locale'
 
 export interface PreviewScene {
   sceneId: string
@@ -21,6 +24,7 @@ export interface PreviewCharacter {
   role: string
   /** 네이티브 설명(characters 테이블). 이른 시점엔 빈 문자열일 수 있음. */
   description: string
+  descriptionFallback?: boolean
   /** 카드용 정면샷(portrait) — 생성 완료 전엔 null. */
   portraitUrl: string | null
   /** 클릭 팝업용 캐릭터 템플릿(턴어라운드 시트, view_main). */
@@ -31,6 +35,7 @@ export interface PreviewWorld {
   id: string
   name: string
   description: string
+  descriptionFallback?: boolean
 }
 
 export interface WriterPreview {
@@ -59,6 +64,10 @@ export function useWriterPreview(
 ): { preview: WriterPreview | null; loading: boolean } {
   const interval = opts.intervalMs ?? 4000
   const enabled = opts.enabled ?? true
+  const projectLocale = useProjectStore((s) => s.projectLocale)
+  const locked = useProjectStore((s) => s.projectLocaleLocked)
+  const uiLocale = useLocaleStore((s) => s.locale)
+  const displayLocale = pickContentLocale({ projectLocale, locked, uiLocale })
 
   const [preview, setPreview] = useState<WriterPreview | null>(null)
   const [loading, setLoading] = useState(false)
@@ -73,7 +82,7 @@ export function useWriterPreview(
       setLoading(true)
       let stop = false
       try {
-        const r = await fetch(`/api/writer/preview/${projectId}`)
+        const r = await fetch(`/api/writer/preview/${projectId}?locale=${displayLocale}`)
         if (r.ok) {
           const j = (await r.json()) as WriterPreview
           if (!cancelled) setPreview(j)
@@ -94,7 +103,7 @@ export function useWriterPreview(
       cancelled = true
       if (timerRef.current) clearTimeout(timerRef.current)
     }
-  }, [projectId, interval, enabled])
+  }, [projectId, interval, enabled, displayLocale])
 
   return { preview, loading }
 }

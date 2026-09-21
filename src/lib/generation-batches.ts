@@ -9,11 +9,12 @@ import type { StageId } from '@/types'
 
 export type GenerationLane = 'artist' | 'writer-rough' | 'director-storyboard' | 'director-video' | 'director-previz'
 
-export const LANE_OF_KIND: Record<GenerationJobKind, GenerationLane> = {
+export const LANE_OF_KIND: Record<GenerationJobKind, GenerationLane | null> = {
   character_view: 'artist',
   world_shot: 'artist',
   shot_rough_storyboard: 'writer-rough',
   shot_storyboard: 'director-storyboard',
+  image_generation: null,
   storyboard_real_grid: 'director-storyboard',
   shot_video: 'director-video',
   shot_previz_video: 'director-previz',
@@ -41,6 +42,8 @@ export interface GenerationBatchRow {
   created_at: string
   /** ISO — 완료·실패 시각의 근사(finalize 가 갱신). */
   updated_at?: string | null
+  /** ISO — 성공 완료 시각. 완료 뒤 메타데이터 수정 시각과 구분한다. */
+  completed_at?: string | null
 }
 
 export interface GenerationBatch {
@@ -58,7 +61,7 @@ export interface GenerationBatch {
 export function unitsOf(row: Pick<GenerationBatchRow, 'kind' | 'target'>): number {
   const ids = row.target?.writerShotIds
   if ((row.kind === 'storyboard_real_grid' || row.kind === 'shot_rough_storyboard') && Array.isArray(ids) && ids.length > 0) {
-    return ids.length
+    return new Set(ids).size
   }
   return 1
 }
@@ -76,7 +79,7 @@ export function summarizeGenerationBatches(rows: readonly GenerationBatchRow[], 
   const byLane = new Map<GenerationLane, GenerationBatchRow[]>()
   for (const row of rows) {
     const lane = LANE_OF_KIND[row.kind]
-    if (!lane) continue
+    if (lane === null) continue
     ;(byLane.get(lane) ?? byLane.set(lane, []).get(lane)!).push(row)
   }
   const out: GenerationBatch[] = []
@@ -111,11 +114,14 @@ export interface GenerationCompletion {
 /** 순수: 완료(성공) 잡 행 → 완료 기록(스테이지 배지의 근거). */
 export function completionsOf(rows: readonly GenerationBatchRow[]): GenerationCompletion[] {
   const out: GenerationCompletion[] = []
+  const seen = new Set<string>()
   for (const row of rows) {
+    if (seen.has(row.id)) continue
+    seen.add(row.id)
     if (row.status !== 'completed') continue
     const lane = LANE_OF_KIND[row.kind]
-    if (!lane) continue
-    out.push({ stage: LANE_STAGE[lane], lane, at: ms(row.updated_at ?? row.created_at), units: unitsOf(row) })
+    if (lane === null) continue
+    out.push({ stage: LANE_STAGE[lane], lane, at: ms(row.completed_at ?? row.updated_at ?? row.created_at), units: unitsOf(row) })
   }
   return out.sort((a, b) => a.at - b.at)
 }

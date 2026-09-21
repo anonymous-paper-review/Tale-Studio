@@ -1,0 +1,28 @@
+
+ RUN  v4.1.6 /Users/xcape/projects/tale-studio
+
+(node:91100) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ tests/chat/request-preservation.test.ts (19 tests | 1 failed) 31ms
+     × 일부 작업을 시작한 뒤 남은 요청을 취소하면 이미 시작한 작업을 중복 실행하지 않고 나머지는 시작하지 않는다 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/chat/request-preservation.test.ts > 남은 요청의 취소 > 일부 작업을 시작한 뒤 남은 요청을 취소하면 이미 시작한 작업을 중복 실행하지 않고 나머지는 시작하지 않는다
+TypeError: useGlobalChatStore.getState(...).cancelDeferredProposal is not a function
+ ❯ tests/chat/request-preservation.test.ts:287:35
+    285|     const id = useGlobalChatStore.getState().pendingProposal!.id
+    286|     const approval = useGlobalChatStore.getState().approvePendingPropo…
+    287|     useGlobalChatStore.getState().cancelDeferredProposal(id)
+       |                                   ^
+    288|     complete('first')
+    289|     await approval
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 18 passed (19)
+   Start at  23:37:45
+   Duration  376ms (transform 202ms, setup 9ms, import 253ms, tests 31ms, environment 0ms)
+

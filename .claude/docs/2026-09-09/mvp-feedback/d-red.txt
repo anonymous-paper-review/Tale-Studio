@@ -1,0 +1,54 @@
+
+ RUN  v4.1.6 /Users/xcape/projects/tale-studio
+
+(node:84371) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ tests/writer/progress-scope.test.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/writer/progress-scope.test.ts [ tests/writer/progress-scope.test.ts ]
+Error: Cannot find package '@/lib/writer/progress-view' imported from /Users/xcape/projects/tale-studio/tests/writer/progress-scope.test.ts
+ ❯ tests/writer/progress-scope.test.ts:3:1
+      1| // 초안·검토·후속 작업을 구분하고 근거가 없는 남은 시간은 표시하지 않는다.
+      2| import { describe, expect, it } from 'vitest'
+      3| import { writerProgressView } from '@/lib/writer/progress-view'
+       | ^
+      4| const base = { started: true, pipeline_completed: false, pipeline_fail…
+      5| describe('Writer 진행 범위', () => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  23:27:20
+   Duration  97ms (transform 11ms, setup 9ms, import 0ms, tests 0ms, environment 0ms)
+
+
+ RUN  v4.1.6 /Users/xcape/projects/tale-studio
+
+(node:84583) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ tests/writer/status-sharing.test.ts (0 test)
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/writer/status-sharing.test.ts [ tests/writer/status-sharing.test.ts ]
+Error: Cannot find package '@/lib/writer/status-client' imported from /Users/xcape/projects/tale-studio/tests/writer/status-sharing.test.ts
+ ❯ tests/writer/status-sharing.test.ts:3:1
+      1| // 중앙 진행창과 채팅은 같은 상태 응답을 공유하고 늦은 응답은 다른 프로젝트에 섞이지 않는다.
+      2| import { afterEach, expect, it, vi } from 'vitest'
+      3| import { subscribeWriterStatus, readWriterStatus, restartWriterStatus …
+       | ^
+      4| afterEach(() => { vi.unstubAllGlobals(); vi.useRealTimers() })
+      5| it('같은 작업의 중앙 진행 표시와 채팅 진행 표시는 같은 단계와 진행 상태를 보여준다.', async () => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  no tests
+   Start at  23:27:49
+   Duration  108ms (transform 12ms, setup 10ms, import 0ms, tests 0ms, environment 0ms)
+

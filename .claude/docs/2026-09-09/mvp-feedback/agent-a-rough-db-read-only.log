@@ -1,0 +1,3 @@
+{"check":"read-only development connection","passed":true,"developmentProject":"pbiumddivadgbzxuymak","liveScopeSeparate":true,"verifiedTls":true,"applicationRowsRead":0}
+{"check":"existing public installation","publicFunctionCount":0,"migrationVersion":"20260910001500","migrationHistoryPresent":true,"versionRecorded":false}
+{"check":"public rough function fingerprint","unchanged":true,"publicMigrationsApplied":0}

@@ -1,0 +1,85 @@
+{
+  "url": "http://127.0.0.1:3071/studio/writer?projectId=a5f06aea-9b14-434a-a60b-21b95ed6919b",
+  "body": "Producer\nWriter\nArtist\nDirector\nEditor\n289\nTake\n공유\n내보내기\nHelp\nT\n프로필\nWriters' Room\n\n씬 스토리 초안이 준비됐어요. 검토 후 수정을 요청하거나 확정하면 다음 단계를 진행해요.\n\n이야기를 쓰고 있어요…\n\n완성되는 대로 이야기가 여기에 줄글로 이어집니다. 편하게 기다리며 읽어보세요.\n\n등장인물\n도윤\n주인공\n\n서른 살 남성, 검은 머리, 노란 우비, 갈색 배달 가방\n\n배경\n\n빗속 골목\n\n비가 내리는 밤의 좁은 골목, 젖은 아스팔트, 붉은 간판과 가로등\n\n에이전트 채팅\nWriter\n모든 단계가 이어지는 하나의 대화\nArtist로 넘기기\nWriter\n· 지금\nWriter\n씬·샷 작업이 완료됐어요.\n\n· 씬 1개, 샷 2개로 나눴어요\n· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n\"@\"를 누르면 씬·샷을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요).\n러프 스토리보드가 모두 준비됐어요. Artist로 넘어가 캐릭터·배경 컨셉을 잡아볼까요?\n씬 스토리 초안이 준비됐어요. 화면에서 검토해 주세요.\n고치고 싶은 부분이 있으면 아래 입력창에 적어 주시고, 없으시면 비어 있는 상태로 Enter를 입력해 주세요. 바로 확정하고 다음 단계로 넘어갈게요.\n디렉터러 넘길수잇어?\nWriter\n아직 Director로 넘어갈 수 없어요. 먼저 이것들을 채워 주세요:\n씬 초안 검토·확정 대기, 초안을 확인한 뒤 확정해 주세요.\n다되면 넘겨줘\nWriter\n아직 Director로 넘어갈 수 없어요. 먼저 이것들을 채워 주세요:\n씬 초안 검토·확정 대기, 초안을 확인한 뒤 확정해 주세요.\n\n준비 상태를 다시 확인하고 완료되면 Director를 열게요. 기다리지 않으려면 취소라고 말씀해 주세요.\nWriter",
+  "events": [
+    {
+      "at": 1789017932661,
+      "url": "/api/project/a5f06aea-9b14-434a-a60b-21b95ed6919b/handoff",
+      "request": {
+        "targetStage": "director",
+        "action": "check",
+        "locale": "ko"
+      },
+      "status": 409,
+      "response": {
+        "ready": false,
+        "blockers": [
+          {
+            "code": "writer:confirmation",
+            "label": "씬 초안 검토·확정 대기",
+            "stage": "writer",
+            "action": "초안을 확인한 뒤 확정해 주세요."
+          }
+        ],
+        "warnings": [],
+        "counts": {
+          "scenes": 1,
+          "shots": 2
+        }
+      }
+    },
+    {
+      "at": 1789017959870,
+      "url": "/api/project/a5f06aea-9b14-434a-a60b-21b95ed6919b/handoff",
+      "request": {
+        "targetStage": "director",
+        "action": "move",
+        "locale": "ko"
+      },
+      "status": 409,
+      "response": {
+        "ready": false,
+        "blockers": [
+          {
+            "code": "writer:confirmation",
+            "label": "씬 초안 검토·확정 대기",
+            "stage": "writer",
+            "action": "초안을 확인한 뒤 확정해 주세요."
+          }
+        ],
+        "warnings": [],
+        "counts": {
+          "scenes": 1,
+          "shots": 2
+        }
+      }
+    },
+    {
+      "at": 1789017964277,
+      "url": "/api/project/a5f06aea-9b14-434a-a60b-21b95ed6919b/handoff",
+      "request": {
+        "targetStage": "director",
+        "action": "move",
+        "locale": "ko"
+      },
+      "status": 409,
+      "response": {
+        "ready": false,
+        "blockers": [
+          {
+            "code": "writer:confirmation",
+            "label": "씬 초안 검토·확정 대기",
+            "stage": "writer",
+            "action": "초안을 확인한 뒤 확정해 주세요."
+          }
+        ],
+        "warnings": [],
+        "counts": {
+          "scenes": 1,
+          "shots": 2
+        }
+      }
+    }
+  ],
+  "errors": []
+}

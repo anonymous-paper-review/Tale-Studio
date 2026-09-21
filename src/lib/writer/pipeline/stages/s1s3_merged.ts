@@ -27,6 +27,7 @@ import { VISUAL_BEAT_DOCTRINE } from '@/lib/writer/pipeline/visual-doctrine';
 import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
 import { normalizeSceneLocations, uncoveredActs } from '@/lib/writer/pipeline/stages/s3_scenes';
 import { PROSE_NAME_RULE, cleanSceneProse } from '@/lib/writer/pipeline/util/prose_names';
+import { assertSceneContent } from '@/lib/writer/pipeline/validators/scene_content';
 import type { Genre, NarrativeStructure, Characters, Scenes, PipelineInput, BackgroundContract, StoryScene, NewCharacter } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 import { MergedRawSchema } from '@/lib/writer/pipeline/schemas';
@@ -197,7 +198,7 @@ export async function runStructureScenesMerged(
  다음 막에 씬이 없다: ${uncovered.join(', ')}. 각 막에 최소 1개 씬(act_ref = 해당 act_id)을 포함하도록 동일 JSON 형식으로 다시 출력하라. 씬 수가 늘어도 된다.]
 [고정 구조]
 ${JSON.stringify(narrativeStructure, null, 2)}`;
-    const repaired = await generateJson<MergedRaw>(repairUser, axisConfig, { systemInstruction: system, temperature: 0.6 });
+    const repaired = await generateJson<MergedRaw>(repairUser, axisConfig, { systemInstruction: system, temperature: 0.6, schema: MergedRawSchema });
     await logger.saveLlmCall('structureScenesMerged_coverage_repair', {
       prompt: repairUser,
       response: JSON.stringify(repaired, null, 2),
@@ -222,7 +223,7 @@ ${renderBudgetBlock(budget)}]
 ${budgetViolations.map((x) => `- ${x.scene_id ?? '(전체)'}: ${x.message}`).join('\n')}
 [고정 구조]
 ${JSON.stringify(narrativeStructure, null, 2)}`;
-    const budgetRepaired = await generateJson<MergedRaw>(budgetRepairUser, axisConfig, { systemInstruction: system, temperature: 0.5 });
+    const budgetRepaired = await generateJson<MergedRaw>(budgetRepairUser, axisConfig, { systemInstruction: system, temperature: 0.5, schema: MergedRawSchema });
     await logger.saveLlmCall('structureScenesMerged_budget_repair', {
       prompt: budgetRepairUser,
       response: JSON.stringify(budgetRepaired, null, 2),
@@ -243,7 +244,8 @@ ${JSON.stringify(narrativeStructure, null, 2)}`;
   // coverage_mode는 코드가 설정(LLM 출력 아님) — 하류가 대표 스토리보드 여부를 판별하는 근거.
   scenes = { ...scenes, coverage_mode: budget.mode };
   // #names-in-prose: 문장에 남은 id 는 이름으로.
-  scenes = cleanSceneProse(scenes, characters);
+  scenes = cleanSceneProse(scenes, characters, world);
+  await assertSceneContent(scenes, characters, world, input.outputLocale, logger, 'structureScenesMerged');
 
   // 체크포인트 재설계: 병합 1콜 산출을 기존 구조/장면 저장 슬롯 양쪽에 기록 — 하류 스테이지와
   //   재실행 단위가 2콜 때와 동일하게 보인다.

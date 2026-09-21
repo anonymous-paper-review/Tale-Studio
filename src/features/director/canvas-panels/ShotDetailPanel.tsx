@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import { ImageIcon, Loader2, Trash2, Upload, X } from 'lucide-react'
+import { Trash2, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { HoverBeam } from '@/components/hover-beam'
 import { Input } from '@/components/ui/input'
@@ -17,6 +17,8 @@ import {
   normalizeImageModelKey,
 } from '@/lib/image-models'
 import { useT } from '@/lib/i18n'
+import { useImageUploadConsent } from '@/components/upload/image-upload-consent'
+import { StoryboardImageButton } from '@/features/director/storyboard-image-button'
 
 type Props = {
   nodeId: string
@@ -25,10 +27,8 @@ type Props = {
 
 export function ShotDetailPanel({ nodeId, data }: Props) {
   const t = useT()
+  const { requestImageUploadConsent, imageUploadConsentDialog } = useImageUploadConsent(nodeId)
   const updateNodeData = useDirectorCanvasStore((s) => s.updateNodeData)
-  const generateStoryboardImage = useDirectorCanvasStore(
-    (s) => s.generateStoryboardImage,
-  )
   const openDeleteConfirm = useDirectorCanvasStore(
     (s) => s.openDeleteConfirm,
   )
@@ -45,11 +45,8 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
     [worldRecords, projectId],
   )
 
-  const isGenerating = useDirectorCanvasStore(
-    (s) => !!s.generatingNodeIds[nodeId],
-  )
   const generationError = useDirectorCanvasStore(
-    (s) => s.generationErrors[nodeId],
+    (s) => data.storyboardImage?.errorMessage || s.generationErrors[nodeId],
   )
 
   const toggleCharacter = (id: string) => {
@@ -66,7 +63,8 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
     updateNodeData<'shot'>(nodeId, { worldAssetIds: next, referenceOverride: true })
   }
 
-  const handleAddReferenceImage = (file: File) => {
+  const handleAddReferenceImage = async (file: File) => {
+    if (!await requestImageUploadConsent([file])) return
     const reader = new FileReader()
     reader.onload = () => {
       const url = String(reader.result)
@@ -88,6 +86,7 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
 
   return (
     <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
+      {imageUploadConsentDialog}
       <header className="space-y-2">
         <div className="flex items-center gap-2">
           <span className="inline-block size-2 rounded-full bg-chart-4" />
@@ -195,7 +194,7 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
                 aria-label={t('Upload reference image')}
                 onChange={(e) => {
                   const file = e.target.files?.[0]
-                  if (file) handleAddReferenceImage(file)
+                  if (file) void handleAddReferenceImage(file)
                   e.target.value = ''
                 }}
               />
@@ -283,27 +282,7 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
       )}
 
       <div className="mt-auto flex flex-col gap-2 border-t border-border pt-3">
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => void generateStoryboardImage(nodeId)}
-          disabled={isGenerating}
-          className="w-full gap-1.5"
-        >
-          {isGenerating ? (
-            <>
-              <Loader2 className="size-3.5 animate-spin" />
-              Generating…
-            </>
-          ) : (
-            <>
-              <ImageIcon className="size-3.5" />
-              {data.storyboardImage?.status === 'completed'
-                ? t('Regenerate image')
-                : t('Generate image')}
-            </>
-          )}
-        </Button>
+        <StoryboardImageButton nodeId={nodeId} data={data} className="w-full" />
         <div className="grid grid-cols-2 gap-2">
           <Button
             type="button"

@@ -1,0 +1,15 @@
+{
+  "appliedAt": "2026-09-09T15:26:40.318Z",
+  "environment": "development",
+  "migrationVersion": "20260910001500",
+  "migrationName": "reserve_rough_storyboard_jobs",
+  "validatedSha256": "70933289f5965631cd44445b098732a493157b370dbe1f95e1e83fa59b6f750f",
+  "checks": {
+    "installed": true,
+    "anon": false,
+    "authenticated": false,
+    "service_role": true
+  },
+  "applicationDataChanged": false,
+  "productionChanged": false
+}

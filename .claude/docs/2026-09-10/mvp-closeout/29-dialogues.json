@@ -1,0 +1,71 @@
+{
+  "projectId": "f48923c5-c98d-40ca-a30a-000446af6ea9",
+  "rows": [
+    {
+      "scene": 1,
+      "shot": "sh_01_01",
+      "before": "雨が強くなってきた。",
+      "after": "비가 점점 세지고 있어.",
+      "source": "controlled first response",
+      "speaker": "char_doyun",
+      "emotion": "차분함",
+      "delivery": "낮은 목소리",
+      "durationHint": 2
+    },
+    {
+      "scene": 2,
+      "shot": "sh_02_01",
+      "before": "この箱は誰のものだろう。",
+      "after": "이 상자는 누구의 것일까.",
+      "source": "controlled first response",
+      "speaker": "char_doyun",
+      "emotion": "차분함",
+      "delivery": "낮은 목소리",
+      "durationHint": 2
+    },
+    {
+      "scene": 3,
+      "shot": "sh_03_01",
+      "before": "どうして僕の名前がここにあるんだ。",
+      "after": "왜 내 이름이 여기 있는 거지.",
+      "source": "controlled first response",
+      "speaker": "char_doyun",
+      "emotion": "차분함",
+      "delivery": "낮은 목소리",
+      "durationHint": 2
+    },
+    {
+      "scene": 4,
+      "shot": "sh_04_01",
+      "before": "約束の時間まで、あと五分だ。",
+      "after": "약속 시간까지 5분 남았어.",
+      "source": "actual Writer chat API",
+      "speaker": "char_doyun",
+      "emotion": "차분함",
+      "delivery": "낮은 목소리",
+      "durationHint": 2
+    },
+    {
+      "scene": 5,
+      "shot": "sh_05_01",
+      "before": "一緒に行こう。もう一人にはしない。",
+      "after": "같이 가자. 더 이상 혼자 두지 않을게.",
+      "source": "actual Writer chat API",
+      "speaker": "char_doyun",
+      "emotion": "차분함",
+      "delivery": "낮은 목소리",
+      "durationHint": 2
+    },
+    {
+      "scene": 6,
+      "shot": "sh_06_01",
+      "before": "모두 준비됐어. 이제 출발하자.",
+      "after": "모두 준비됐어. 이제 출발하자.",
+      "source": "unchanged Korean",
+      "speaker": "char_doyun",
+      "emotion": "차분함",
+      "delivery": "낮은 목소리",
+      "durationHint": 2
+    }
+  ]
+}

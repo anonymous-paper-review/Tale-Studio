@@ -1,0 +1,243 @@
+{
+  "checkedAt": "2026-09-10T05:28:13.040Z",
+  "projectRef": "qnjnrihfpqkdhjuzvepy",
+  "projectId": "7112d31e-70ce-4743-9562-057f7beac002",
+  "mutations": 0,
+  "checks": {
+    "roughFunction": [],
+    "migrationTablePresent": true,
+    "roughMigration": [],
+    "project": {
+      "id": "7112d31e-70ce-4743-9562-057f7beac002",
+      "current_stage": "artist",
+      "updated_at": "2026-09-09T11:42:01.58936+00:00"
+    },
+    "writerRun": {
+      "id": "7ece6db5-b87d-4f40-be33-5d093d9c9eb6",
+      "status": "completed",
+      "current_stage": "persistShots",
+      "completed_units": 15,
+      "total_units": 15,
+      "error": null,
+      "created_at": "2026-09-09T13:02:40.50054+00:00",
+      "updated_at": "2026-09-09T13:13:05.51+00:00"
+    },
+    "savedContent": {
+      "sceneCount": 6,
+      "shotCount": 61,
+      "dialogue": {
+        "shots": 61,
+        "dialogueLines": 20,
+        "nonempty": 20,
+        "koreanOnly": 20,
+        "japaneseKanaOnly": 0,
+        "koreanAndJapaneseKana": 0,
+        "hanWithoutKanaOrKorean": 0,
+        "other": 0,
+        "empty": 0,
+        "malformed": 0
+      },
+      "byScene": [
+        {
+          "sceneId": "sc_01",
+          "order": 0,
+          "shots": 9,
+          "dialogueLines": 3,
+          "nonempty": 3,
+          "koreanOnly": 3,
+          "japaneseKanaOnly": 0,
+          "koreanAndJapaneseKana": 0,
+          "hanWithoutKanaOrKorean": 0,
+          "other": 0,
+          "empty": 0,
+          "malformed": 0
+        },
+        {
+          "sceneId": "sc_02",
+          "order": 1,
+          "shots": 10,
+          "dialogueLines": 3,
+          "nonempty": 3,
+          "koreanOnly": 3,
+          "japaneseKanaOnly": 0,
+          "koreanAndJapaneseKana": 0,
+          "hanWithoutKanaOrKorean": 0,
+          "other": 0,
+          "empty": 0,
+          "malformed": 0
+        },
+        {
+          "sceneId": "sc_03",
+          "order": 2,
+          "shots": 11,
+          "dialogueLines": 5,
+          "nonempty": 5,
+          "koreanOnly": 5,
+          "japaneseKanaOnly": 0,
+          "koreanAndJapaneseKana": 0,
+          "hanWithoutKanaOrKorean": 0,
+          "other": 0,
+          "empty": 0,
+          "malformed": 0
+        },
+        {
+          "sceneId": "sc_04",
+          "order": 3,
+          "shots": 9,
+          "dialogueLines": 3,
+          "nonempty": 3,
+          "koreanOnly": 3,
+          "japaneseKanaOnly": 0,
+          "koreanAndJapaneseKana": 0,
+          "hanWithoutKanaOrKorean": 0,
+          "other": 0,
+          "empty": 0,
+          "malformed": 0
+        },
+        {
+          "sceneId": "sc_05",
+          "order": 4,
+          "shots": 8,
+          "dialogueLines": 2,
+          "nonempty": 2,
+          "koreanOnly": 2,
+          "japaneseKanaOnly": 0,
+          "koreanAndJapaneseKana": 0,
+          "hanWithoutKanaOrKorean": 0,
+          "other": 0,
+          "empty": 0,
+          "malformed": 0
+        },
+        {
+          "sceneId": "sc_06",
+          "order": 5,
+          "shots": 14,
+          "dialogueLines": 4,
+          "nonempty": 4,
+          "koreanOnly": 4,
+          "japaneseKanaOnly": 0,
+          "koreanAndJapaneseKana": 0,
+          "hanWithoutKanaOrKorean": 0,
+          "other": 0,
+          "empty": 0,
+          "malformed": 0
+        }
+      ],
+      "languageMethod": "Unicode presence only: Korean Hangul, Japanese kana, CJK-only, other. No dialogue text retained."
+    },
+    "characters": [
+      {
+        "characterId": "char",
+        "name": "쿄타로",
+        "entityType": "person",
+        "hasName": true,
+        "hasAppearanceDescription": false,
+        "appearanceCount": 2,
+        "defaultAppearanceCount": 1,
+        "defaultSheetPresent": true,
+        "anySheetPresent": true,
+        "legacyMainPresent": false,
+        "mainImagePresent": true,
+        "portraitPresent": true
+      },
+      {
+        "characterId": "char_2",
+        "name": "코마츠",
+        "entityType": "person",
+        "hasName": true,
+        "hasAppearanceDescription": false,
+        "appearanceCount": 2,
+        "defaultAppearanceCount": 1,
+        "defaultSheetPresent": true,
+        "anySheetPresent": true,
+        "legacyMainPresent": false,
+        "mainImagePresent": true,
+        "portraitPresent": true
+      }
+    ],
+    "locations": [
+      {
+        "locationId": "location_4",
+        "name": "각자의 방",
+        "mainImagePresent": true
+      },
+      {
+        "locationId": "location_3",
+        "name": "귀갓길",
+        "mainImagePresent": true
+      },
+      {
+        "locationId": "location",
+        "name": "교실",
+        "mainImagePresent": true
+      },
+      {
+        "locationId": "location_5",
+        "name": "사진부 동아리실",
+        "mainImagePresent": true
+      },
+      {
+        "locationId": "neighborhood_park_pond",
+        "name": "동네 공원 연못가",
+        "mainImagePresent": true
+      },
+      {
+        "locationId": "location_2",
+        "name": "학교 옥상",
+        "mainImagePresent": true
+      }
+    ],
+    "vercel": {
+      "projectId": "prj_x0fGmBO62EJVmEZAhlUiOGZVHwnF",
+      "name": "tale",
+      "framework": "nextjs",
+      "gitProvider": "github",
+      "gitRepo": "Tale-Studio",
+      "gitOrg": "anonymous-paper-review",
+      "productionBranch": "main",
+      "productionTarget": {
+        "id": "dpl_H3Xeu3nMC6uK3uZBH9Fz55rU8jFs",
+        "url": "tale-e8j74fyn6-talestudio.vercel.app",
+        "readyState": "READY",
+        "createdAt": 1789016671262,
+        "gitBranch": "main",
+        "gitCommit": "a5d8dc183339d4f5ab22fa40f4e2a3e735743363"
+      },
+      "recentProduction": [
+        {
+          "id": "dpl_H3Xeu3nMC6uK3uZBH9Fz55rU8jFs",
+          "url": "tale-e8j74fyn6-talestudio.vercel.app",
+          "state": "READY",
+          "target": "production",
+          "createdAt": 1789016671262,
+          "gitBranch": "main",
+          "gitCommit": "a5d8dc183339d4f5ab22fa40f4e2a3e735743363"
+        },
+        {
+          "id": "dpl_7BGXq7ZYgPYJoucRYVkwXkRiZrFn",
+          "url": "tale-icsrg7xga-talestudio.vercel.app",
+          "state": "READY",
+          "target": "production",
+          "createdAt": 1788958578306,
+          "gitBranch": "main",
+          "gitCommit": "7f201cb9062bed3fedbb66646d9e3ebdadebe04d"
+        },
+        {
+          "id": "dpl_55Y1E4qgTR4148YWzFSdw1t4Z8Qt",
+          "url": "tale-pui13uv6c-talestudio.vercel.app",
+          "state": "READY",
+          "target": "production",
+          "createdAt": 1788956152431,
+          "gitBranch": "main",
+          "gitCommit": "bd871bf64ee2d5f0f97f25613ede8a9fe647be06"
+        }
+      ]
+    }
+  },
+  "gaps": [
+    {
+      "check": "scope",
+      "error": "No production mutation, application handoff request, paid model run, image retrieval, or deployment was performed. URL presence does not verify image accessibility or visual quality."
+    }
+  ]
+}

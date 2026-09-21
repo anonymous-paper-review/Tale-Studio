@@ -1,0 +1,161 @@
+{
+  "checked": {
+    "at": "2026-09-09T11:29:12.826Z",
+    "domains": [
+      {
+        "id": "chedom_01m22a3j79eej5p25v1twqz84m",
+        "domain": "talestudio.art",
+        "status": "pending_review"
+      }
+    ],
+    "setting": {
+      "id": "ntfset_01m22f1d8tevjvf14064acb97d",
+      "destination": "https://talestudio.art/api/billing/paddle/webhook",
+      "active": true,
+      "trafficSource": "platform",
+      "secretMatches": true,
+      "subscribedEvents": [
+        "transaction.completed",
+        "transaction.payment_failed",
+        "subscription.activated",
+        "subscription.canceled",
+        "subscription.past_due",
+        "subscription.paused",
+        "subscription.resumed",
+        "subscription.trialing",
+        "subscription.updated",
+        "adjustment.created",
+        "adjustment.updated"
+      ]
+    },
+    "productionCredentialsMatchLiveB": true,
+    "checkoutEnabled": false,
+    "liveTransactions": 0,
+    "liveSubscriptions": 0,
+    "database": {
+      "subscriptions": 0,
+      "billing_events": 0,
+      "paddle_ledger_rows": 0,
+      "paid_workspaces": 0
+    },
+    "productionDeployment": "dpl_4KNVUuq1vEMSyF5n7LWVvmeiyVu7"
+  },
+  "enabled": {
+    "at": "2026-09-09T11:26:29.182Z",
+    "setting": {
+      "id": "ntfset_01m22f1d8tevjvf14064acb97d",
+      "destination": "https://talestudio.art/api/billing/paddle/webhook",
+      "active": true,
+      "trafficSource": "platform",
+      "secretMatches": true,
+      "subscribedEvents": [
+        "transaction.completed",
+        "transaction.payment_failed",
+        "subscription.activated",
+        "subscription.canceled",
+        "subscription.past_due",
+        "subscription.paused",
+        "subscription.resumed",
+        "subscription.trialing",
+        "subscription.updated",
+        "adjustment.created",
+        "adjustment.updated"
+      ]
+    },
+    "changedOnlyActive": true
+  },
+  "simulation": {
+    "at": "2026-09-09T11:29:13.059Z",
+    "before": {
+      "subscriptions": 0,
+      "billing_events": 0,
+      "paddle_ledger_rows": 0,
+      "paid_workspaces": 0
+    },
+    "eventType": "transaction.payment_failed",
+    "realCharge": false,
+    "exampleSource": "https://developer.paddle.com/webhooks/transactions/transaction-payment-failed.md",
+    "id": "ntfsim_01m22yvqas2q9sg1jst8041304",
+    "runId": "ntfsimrun_01m22yvqmfw2a881qqgdwzm4d3",
+    "events": [
+      {
+        "id": "ntfsimevt_01m22yvqmx3qrm0n61qrcvb76b",
+        "status": "success",
+        "eventType": "transaction.payment_failed",
+        "response": {
+          "body": "{\"ok\":true,\"result\":\"card_declined_noted\"}",
+          "status_code": 200
+        },
+        "requestKeys": [
+          "body"
+        ]
+      }
+    ],
+    "after": {
+      "subscriptions": 0,
+      "billing_events": 1,
+      "paddle_ledger_rows": 0,
+      "paid_workspaces": 0
+    },
+    "noCreditPlanOrSubscriptionChange": true,
+    "success": true,
+    "restoredPlatformOnly": true
+  },
+  "finalSetting": {
+    "id": "ntfset_01m22f1d8tevjvf14064acb97d",
+    "destination": "https://talestudio.art/api/billing/paddle/webhook",
+    "active": true,
+    "trafficSource": "platform",
+    "secretMatches": true,
+    "subscribedEvents": [
+      "transaction.completed",
+      "transaction.payment_failed",
+      "subscription.activated",
+      "subscription.canceled",
+      "subscription.past_due",
+      "subscription.paused",
+      "subscription.resumed",
+      "subscription.trialing",
+      "subscription.updated",
+      "adjustment.created",
+      "adjustment.updated"
+    ]
+  },
+  "previousSimulationAttempts": [
+    {
+      "at": "2026-09-09T11:26:53.325Z",
+      "before": {
+        "subscriptions": 0,
+        "billing_events": 0,
+        "paddle_ledger_rows": 0,
+        "paid_workspaces": 0
+      },
+      "eventType": "transaction.payment_failed",
+      "realCharge": false,
+      "restoredPlatformOnly": true,
+      "error": {
+        "at": "2026-09-09T11:26:55.233Z",
+        "action": "simulate",
+        "message": "Paddle POST /simulations: HTTP 400 invalid_field"
+      }
+    },
+    {
+      "at": "2026-09-09T11:28:33.842Z",
+      "before": {
+        "subscriptions": 0,
+        "billing_events": 0,
+        "paddle_ledger_rows": 0,
+        "paid_workspaces": 0
+      },
+      "eventType": "transaction.payment_failed",
+      "realCharge": false,
+      "exampleSource": "https://developer.paddle.com/webhooks/transactions/transaction-payment-failed.md",
+      "restoredPlatformOnly": true,
+      "error": {
+        "at": "2026-09-09T11:28:35.198Z",
+        "action": "simulate",
+        "message": "Paddle POST /simulations: HTTP 400 invalid_field name: The name must not be greater than 50 characters."
+      }
+    }
+  ]
+}

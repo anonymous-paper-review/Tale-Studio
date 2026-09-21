@@ -1,0 +1,220 @@
+{
+  "url": "http://127.0.0.1:3073/studio/director?projectId=f48923c5-c98d-40ca-a30a-000446af6ea9",
+  "body": "Producer\nWriter\nArtist\nDirector\nEditor\n289\nTake\n공유\n내보내기\nHelp\nT\n프로필\nThe Set\n노드\n스토리보드\n스토리보드 생성\n0/6\n영상 생성\n생성 가능 6개\n미사용 에셋 불러오기\n자동 정렬\n프롬프트 노드\nImage\nShot 1\nPROMPT\nIMAGE\n\nMedium shot of a courier looking at a parcel in a rainy alley.\n\n목각\n대기 중\n0/6\nleft\nImage\n도윤\n캐릭터\nNano Banana 2\n캐릭터\nImage\n빗속 골목\n배경\nNano Banana 2\n배경\n미니맵\n에이전트 채팅\nDirector\n모든 단계가 이어지는 하나의 대화\nEditor로 넘기기\nWriter\nWriter\n러프 스토리보드가 모두 준비됐어요. Artist로 넘어가 캐릭터·배경 컨셉을 잡아볼까요?\n씬·샷 작업이 완료됐어요.\n\n· 씬 6개, 샷 6개로 나눴어요\n· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n\"@\"를 누르면 씬·샷을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요).\n모든 대사를 확인하고, 저장이 끝난 씬 다음으로 이어서 처리할게요.\n전체 한국어로 맞추고 Director로 넘겨줘\nWriter\n대사 3/5개 샷을 저장했어요.\n모든 대사를 완료하지 못했어요. 남은 씬: 씬 4, 씬 5. 남은 씬의 전체 대사 수정 결과를 받지 못했어요. 다음 단계로 넘기지 않았어요.\n전체 한국어로 맞추고 Director로 넘겨줘\nWriter\n모든 대사를 확인하고, 저장이 끝난 씬 다음으로 이어서 처리할게요.\n대사 2/2개 샷을 저장했어요.\n모든 대사 변경을 저장했어요.\n저장된 씬과 샷, 이동 조건을 확인했어요. Director 화면을 여는 중이에요.\nDirector\n· 지금\nDirector\n여기는 The Set, 촬영장이에요. 씬 → 샷 → 영상이 노드로 이어져 있어요.\n\n· 카드를 더블클릭하면 상세 편집이 열려요\n· 샷 카드를 선택하면 위에 이미지 생성 버튼이 떠요\n· 상단 \"스토리보드 생성\"으로 모든 샷을 한 번에 실사화할 수 있어요\n채워두면 좋을 항목이 6건 있어요:\n• Scene 1 · Shot 1: 스토리보드 미생성\n• Scene 2 · Shot 1: 스토리보드 미생성\n• Scene 3 · Shot 1: 스토리보드 미생성\n…외 3건\nWriter · 컨텍스트 5.0k · 출력 234\nDirector",
+  "events": [
+    {
+      "at": "2026-09-10T06:19:58.894Z",
+      "url": "/api/writer/chat",
+      "request": {
+        "message": "전체 한국어로 맞추고 Director로 넘겨줘",
+        "history": [
+          {
+            "stage": "writer",
+            "role": "model",
+            "content": "러프 스토리보드가 모두 준비됐어요. Artist로 넘어가 캐릭터·배경 컨셉을 잡아볼까요?"
+          },
+          {
+            "stage": "writer",
+            "role": "model",
+            "content": "씬·샷 작업이 완료됐어요.\n\n· 씬 6개, 샷 6개로 나눴어요\n· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n\"@\"를 누르면 씬·샷을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요)."
+          },
+          {
+            "stage": "writer",
+            "role": "model",
+            "content": "모든 대사를 확인하고, 저장이 끝난 씬 다음으로 이어서 처리할게요."
+          },
+          {
+            "stage": "writer",
+            "role": "user",
+            "content": "전체 한국어로 맞추고 Director로 넘겨줘"
+          },
+          {
+            "stage": "writer",
+            "role": "model",
+            "content": "대사 3/5개 샷을 저장했어요."
+          },
+          {
+            "stage": "writer",
+            "role": "model",
+            "content": "모든 대사를 완료하지 못했어요. 남은 씬: 씬 4, 씬 5. 남은 씬의 전체 대사 수정 결과를 받지 못했어요. 다음 단계로 넘기지 않았어요."
+          }
+        ],
+        "uiLocale": "ko",
+        "projectId": "f48923c5-c98d-40ca-a30a-000446af6ea9",
+        "writerContext": "## 현재 씬/샷 (scene_id·shot_id 를 그대로 사용, [L#] = 스크립트 라인 번호)\n위치 별칭: 사용자가 \"씬N의 M번째 샷\"처럼 위치로 지칭하면, 아래 씬 순서(### 표기의 씬N)와 그 씬 안 샷 나열 순서로 대응하는 shot_id 를 찾아 사용한다.\n\n## 등장인물 (dialogueLines[].characterId·characters[]·charactersPresent[] 에는 이름이 아니라 이 characterId 를 쓴다)\n- char_doyun — 도윤\n\n### [L1] sc_01 (씬1) — 장소:loc_alley / night / 분위기:긴장 (등장: char_doyun(도윤))\n  요약: 빗속 골목에서 상자를 발견한 도윤, 장면 1\n  - [L2] sh_01_01 [MS] 도윤이 빗속 골목에서 상자를 바라본다. (등장: char_doyun(도윤), 6s)\n    [L3] 대사[0] char_doyun(도윤): \"비가 점점 세지고 있어.\" {emotion: 차분함 · delivery: 낮은 목소리 · durationHint: 2}\n\n### [L4] sc_02 (씬2) — 장소:loc_alley / night / 분위기:긴장 (등장: char_doyun(도윤))\n  요약: 빗속 골목에서 상자를 발견한 도윤, 장면 2\n  - [L5] sh_02_01 [MS] 도윤이 빗속 골목에서 상자를 바라본다. (등장: char_doyun(도윤), 6s)\n    [L6] 대사[0] char_doyun(도윤): \"이 상자는 누구의 것일까.\" {emotion: 차분함 · delivery: 낮은 목소리 · durationHint: 2}\n\n### [L7] sc_03 (씬3) — 장소:loc_alley / night / 분위기:긴장 (등장: char_doyun(도윤))\n  요약: 빗속 골목에서 상자를 발견한 도윤, 장면 3\n  - [L8] sh_03_01 [MS] 도윤이 빗속 골목에서 상자를 바라본다. (등장: char_doyun(도윤), 6s)\n    [L9] 대사[0] char_doyun(도윤): \"왜 내 이름이 여기 있는 거지.\" {emotion: 차분함 · delivery: 낮은 목소리 · durationHint: 2}\n\n### [L10] sc_04 (씬4) — 장소:loc_alley / night / 분위기:긴장 (등장: char_doyun(도윤))\n  요약: 빗속 골목에서 상자를 발견한 도윤, 장면 4\n  - [L11] sh_04_01 [MS] 도윤이 빗속 골목에서 상자를 바라본다. (등장: char_doyun(도윤), 6s)\n    [L12] 대사[0] char_doyun(도윤): \"約束の時間まで、あと五分だ。\" {emotion: 차분함 · delivery: 낮은 목소리 · durationHint: 2}\n\n### [L13] sc_05 (씬5) — 장소:loc_alley / night / 분위기:긴장 (등장: char_doyun(도윤))\n  요약: 빗속 골목에서 상자를 발견한 도윤, 장면 5\n  - [L14] sh_05_01 [MS] 도윤이 빗속 골목에서 상자를 바라본다. (등장: char_doyun(도윤), 6s)\n    [L15] 대사[0] char_doyun(도윤): \"一緒に行こう。もう一人にはしない。\" {emotion: 차분함 · delivery: 낮은 목소리 · durationHint: 2}\n\n### [L16] sc_06 (씬6) — 장소:loc_alley / night / 분위기:긴장 (등장: char_doyun(도윤))\n  요약: 빗속 골목에서 상자를 발견한 도윤, 장면 6\n  - [L17] sh_06_01 [MS] 도윤이 빗속 골목에서 상자를 바라본다. (등장: char_doyun(도윤), 6s)\n    [L18] 대사[0] char_doyun(도윤): \"모두 준비됐어. 이제 출발하자.\" {emotion: 차분함 · delivery: 낮은 목소리 · durationHint: 2}",
+        "traceId": "89736863-7a4a-45b9-ad48-66d3459905c4"
+      },
+      "state": "waiting-for-test-release"
+    },
+    {
+      "at": "2026-09-10T06:19:58.894Z",
+      "url": "/api/writer/chat",
+      "request": {
+        "message": "전체 한국어로 맞추고 Director로 넘겨줘",
+        "history": [
+          {
+            "stage": "writer",
+            "role": "model",
+            "content": "러프 스토리보드가 모두 준비됐어요. Artist로 넘어가 캐릭터·배경 컨셉을 잡아볼까요?"
+          },
+          {
+            "stage": "writer",
+            "role": "model",
+            "content": "씬·샷 작업이 완료됐어요.\n\n· 씬 6개, 샷 6개로 나눴어요\n· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n\"@\"를 누르면 씬·샷을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요)."
+          },
+          {
+            "stage": "writer",
+            "role": "model",
+            "content": "모든 대사를 확인하고, 저장이 끝난 씬 다음으로 이어서 처리할게요."
+          },
+          {
+            "stage": "writer",
+            "role": "user",
+            "content": "전체 한국어로 맞추고 Director로 넘겨줘"
+          },
+          {
+            "stage": "writer",
+            "role": "model",
+            "content": "대사 3/5개 샷을 저장했어요."
+          },
+          {
+            "stage": "writer",
+            "role": "model",
+            "content": "모든 대사를 완료하지 못했어요. 남은 씬: 씬 4, 씬 5. 남은 씬의 전체 대사 수정 결과를 받지 못했어요. 다음 단계로 넘기지 않았어요."
+          }
+        ],
+        "uiLocale": "ko",
+        "projectId": "f48923c5-c98d-40ca-a30a-000446af6ea9",
+        "writerContext": "## 현재 씬/샷 (scene_id·shot_id 를 그대로 사용, [L#] = 스크립트 라인 번호)\n위치 별칭: 사용자가 \"씬N의 M번째 샷\"처럼 위치로 지칭하면, 아래 씬 순서(### 표기의 씬N)와 그 씬 안 샷 나열 순서로 대응하는 shot_id 를 찾아 사용한다.\n\n## 등장인물 (dialogueLines[].characterId·characters[]·charactersPresent[] 에는 이름이 아니라 이 characterId 를 쓴다)\n- char_doyun — 도윤\n\n### [L1] sc_01 (씬1) — 장소:loc_alley / night / 분위기:긴장 (등장: char_doyun(도윤))\n  요약: 빗속 골목에서 상자를 발견한 도윤, 장면 1\n  - [L2] sh_01_01 [MS] 도윤이 빗속 골목에서 상자를 바라본다. (등장: char_doyun(도윤), 6s)\n    [L3] 대사[0] char_doyun(도윤): \"비가 점점 세지고 있어.\" {emotion: 차분함 · delivery: 낮은 목소리 · durationHint: 2}\n\n### [L4] sc_02 (씬2) — 장소:loc_alley / night / 분위기:긴장 (등장: char_doyun(도윤))\n  요약: 빗속 골목에서 상자를 발견한 도윤, 장면 2\n  - [L5] sh_02_01 [MS] 도윤이 빗속 골목에서 상자를 바라본다. (등장: char_doyun(도윤), 6s)\n    [L6] 대사[0] char_doyun(도윤): \"이 상자는 누구의 것일까.\" {emotion: 차분함 · delivery: 낮은 목소리 · durationHint: 2}\n\n### [L7] sc_03 (씬3) — 장소:loc_alley / night / 분위기:긴장 (등장: char_doyun(도윤))\n  요약: 빗속 골목에서 상자를 발견한 도윤, 장면 3\n  - [L8] sh_03_01 [MS] 도윤이 빗속 골목에서 상자를 바라본다. (등장: char_doyun(도윤), 6s)\n    [L9] 대사[0] char_doyun(도윤): \"왜 내 이름이 여기 있는 거지.\" {emotion: 차분함 · delivery: 낮은 목소리 · durationHint: 2}\n\n### [L10] sc_04 (씬4) — 장소:loc_alley / night / 분위기:긴장 (등장: char_doyun(도윤))\n  요약: 빗속 골목에서 상자를 발견한 도윤, 장면 4\n  - [L11] sh_04_01 [MS] 도윤이 빗속 골목에서 상자를 바라본다. (등장: char_doyun(도윤), 6s)\n    [L12] 대사[0] char_doyun(도윤): \"約束の時間まで、あと五分だ。\" {emotion: 차분함 · delivery: 낮은 목소리 · durationHint: 2}\n\n### [L13] sc_05 (씬5) — 장소:loc_alley / night / 분위기:긴장 (등장: char_doyun(도윤))\n  요약: 빗속 골목에서 상자를 발견한 도윤, 장면 5\n  - [L14] sh_05_01 [MS] 도윤이 빗속 골목에서 상자를 바라본다. (등장: char_doyun(도윤), 6s)\n    [L15] 대사[0] char_doyun(도윤): \"一緒に行こう。もう一人にはしない。\" {emotion: 차분함 · delivery: 낮은 목소리 · durationHint: 2}\n\n### [L16] sc_06 (씬6) — 장소:loc_alley / night / 분위기:긴장 (등장: char_doyun(도윤))\n  요약: 빗속 골목에서 상자를 발견한 도윤, 장면 6\n  - [L17] sh_06_01 [MS] 도윤이 빗속 골목에서 상자를 바라본다. (등장: char_doyun(도윤), 6s)\n    [L18] 대사[0] char_doyun(도윤): \"모두 준비됐어. 이제 출발하자.\" {emotion: 차분함 · delivery: 낮은 목소리 · durationHint: 2}",
+        "traceId": "89736863-7a4a-45b9-ad48-66d3459905c4"
+      },
+      "status": 200,
+      "response": {
+        "contentLocale": "ko",
+        "localeSwitched": null,
+        "reply": "Scene 4와 Scene 5의 대사가 일본어로 되어 있어서 한국어로 바꿔드릴게요.",
+        "updates": [
+          {
+            "type": "updateShot",
+            "id": "sh_04_01",
+            "patch": {
+              "dialogueLines": [
+                {
+                  "characterId": "char_doyun",
+                  "text": "약속 시간까지 5분밖에 안 남았어.",
+                  "emotion": "차분함",
+                  "delivery": "낮은 목소리",
+                  "durationHint": 2
+                }
+              ]
+            }
+          },
+          {
+            "type": "updateShot",
+            "id": "sh_05_01",
+            "patch": {
+              "dialogueLines": [
+                {
+                  "characterId": "char_doyun",
+                  "text": "같이 가자. 더 이상 혼자 두지 않을게.",
+                  "emotion": "차분함",
+                  "delivery": "낮은 목소리",
+                  "durationHint": 2
+                }
+              ]
+            }
+          }
+        ],
+        "trace": {
+          "model": "claude-sonnet-4-6",
+          "durationMs": 5292.581791000033,
+          "inputTokens": 3,
+          "outputTokens": 234,
+          "cacheReadInputTokens": 0,
+          "cacheCreationInputTokens": 5012,
+          "stopReason": "end_turn",
+          "traceId": "89736863-7a4a-45b9-ad48-66d3459905c4",
+          "stage": "writer",
+          "route": "writer/chat",
+          "historyCount": 6,
+          "historyChars": 353,
+          "contextChars": 1971,
+          "promptChars": 8646,
+          "parseStatus": "ok",
+          "rawUpdateCount": 2,
+          "validUpdateCount": 2,
+          "choicesMarkerFound": null,
+          "choicesCount": null,
+          "appliedCount": null,
+          "skippedCount": null,
+          "pendingProposal": null,
+          "generationHttpStatus": null,
+          "jobId": null,
+          "generationStatus": null,
+          "generationJobs": [],
+          "requestStatus": null,
+          "error": null
+        }
+      }
+    },
+    {
+      "at": "2026-09-10T06:20:05.117Z",
+      "url": "https://pbiumddivadgbzxuymak.supabase.co/rest/v1/shots?project_id=eq.f48923c5-c98d-40ca-a30a-000446af6ea9&shot_id=eq.sh_04_01&select=shot_id",
+      "request": {
+        "dialogue_lines": [
+          {
+            "text": "약속 시간까지 5분밖에 안 남았어.",
+            "emotion": "차분함",
+            "delivery": "낮은 목소리",
+            "characterId": "char_doyun",
+            "durationHint": 2
+          }
+        ]
+      },
+      "status": 200,
+      "response": {
+        "shot_id": "sh_04_01"
+      }
+    },
+    {
+      "at": "2026-09-10T06:20:05.303Z",
+      "url": "https://pbiumddivadgbzxuymak.supabase.co/rest/v1/shots?project_id=eq.f48923c5-c98d-40ca-a30a-000446af6ea9&shot_id=eq.sh_05_01&select=shot_id",
+      "request": {
+        "dialogue_lines": [
+          {
+            "text": "같이 가자. 더 이상 혼자 두지 않을게.",
+            "emotion": "차분함",
+            "delivery": "낮은 목소리",
+            "characterId": "char_doyun",
+            "durationHint": 2
+          }
+        ]
+      },
+      "status": 200,
+      "response": {
+        "shot_id": "sh_05_01"
+      }
+    },
+    {
+      "at": "2026-09-10T06:20:05.468Z",
+      "url": "/api/project/f48923c5-c98d-40ca-a30a-000446af6ea9/handoff",
+      "request": {
+        "targetStage": "director",
+        "action": "move",
+        "locale": "ko"
+      },
+      "status": 200,
+      "response": {
+        "ready": true,
+        "blockers": [],
+        "warnings": [],
+        "counts": {
+          "scenes": 6,
+          "shots": 6
+        },
+        "path": "/studio/director"
+      }
+    }
+  ],
+  "errors": []
+}

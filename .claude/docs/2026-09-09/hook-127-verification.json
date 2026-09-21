@@ -1,0 +1,63 @@
+{
+  "registered_hooks": 15,
+  "warp_registered": 0,
+  "omx_tests": [
+    {
+      "event": "SessionStart",
+      "exit": 0,
+      "stdout": "{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"[Execution environment]\\n- surface: native-hook / Codex App outside tmux\\n- omx runtime surfaces: omx team, omx hud, and omx question need an attached tmux OMX CLI shell or preserved question bridge from this surface\\n- omx question: not available from this outside-tmux surface; use native structured input when available or ask one concise plain-text question\"}}",
+      "stderr": ""
+    },
+    {
+      "event": "UserPromptSubmit",
+      "exit": 0,
+      "stdout": "{}",
+      "stderr": ""
+    },
+    {
+      "event": "PreToolUse",
+      "exit": 0,
+      "stdout": "{}",
+      "stderr": ""
+    },
+    {
+      "event": "PostToolUse",
+      "exit": 0,
+      "stdout": "{}",
+      "stderr": ""
+    },
+    {
+      "event": "PreCompact",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "event": "PostCompact",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "event": "Stop",
+      "exit": 0,
+      "stdout": "{}",
+      "stderr": ""
+    }
+  ],
+  "warp_uninstalled_scopes": [
+    "current Orca account",
+    "default ~/.codex"
+  ],
+  "doctor": {
+    "passed": 18,
+    "warnings": 1,
+    "failed": 1,
+    "native_hooks": "OK",
+    "native_hook_dist_smoke": "OK",
+    "remaining": [
+      "architect and critic roles missing",
+      "explore role routing warning"
+    ]
+  }
+}

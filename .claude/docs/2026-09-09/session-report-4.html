@@ -1,0 +1,123 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>채팅 안정성 · 다음 구현 계획</title><style>
+  :root {
+    --bg:#F1F3F5; --surface:#FFFFFF; --surface-2:#E8EBEF;
+    --ink:#16181D; --ink-2:#3B4048; --muted:#676D77;
+    --line:#D6DBE1; --line-2:#BFC6CE;
+    --accent:#1F5F7A; --accent-soft:#DCEAF1;
+    --pass:#2E7350; --pass-soft:#DFEDE5;
+    --fail:#A33A38; --fail-soft:#F6E2E1;
+    --gate:#6A579E; --gate-soft:#EAE4F5;
+    --warn:#8A6412; --warn-soft:#F4EBD6;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI","Malgun Gothic",sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+      --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+      --line:#2B3038; --line-2:#3C434D;
+      --accent:#74B4D0; --accent-soft:#17303C;
+      --pass:#5FB98A; --pass-soft:#17301F;
+      --fail:#E0817D; --fail-soft:#3A2321;
+      --gate:#A794D8; --gate-soft:#272040;
+      --warn:#D2A64F; --warn-soft:#33290F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+    --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+    --line:#2B3038; --line-2:#3C434D;
+    --accent:#74B4D0; --accent-soft:#17303C;
+    --pass:#5FB98A; --pass-soft:#17301F;
+    --fail:#E0817D; --fail-soft:#3A2321;
+    --gate:#A794D8; --gate-soft:#272040;
+    --warn:#D2A64F; --warn-soft:#33290F;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:0 20px 110px;background:var(--bg);color:var(--ink);
+    font-family:var(--sans);font-size:16px;line-height:1.82;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto}
+
+  header.page{padding:56px 0 20px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 14px;font-weight:600}
+  h1{font-size:clamp(27px,5vw,40px);font-weight:800;letter-spacing:-.028em;line-height:1.22;
+    margin:0 0 18px;text-wrap:balance}
+  .bluf{font-size:17.5px;color:var(--ink);margin:0 0 6px;max-width:64ch}
+  .bluf b{color:var(--gate)}
+  .asof{font-family:var(--mono);font-size:12px;color:var(--muted);margin:10px 0 0}
+  header.page::after{content:"";display:block;height:3px;background:var(--ink);margin-top:26px;opacity:.9}
+
+  section{margin:58px 0 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .sec-num{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);
+    border:1.5px solid var(--accent);border-radius:3px;padding:0 7px;line-height:1.7}
+  h2{font-size:23px;font-weight:800;letter-spacing:-.018em;margin:0;text-wrap:balance}
+  .sec-lede{color:var(--muted);font-size:15px;margin:0 0 24px;max-width:62ch}
+  p{margin:0 0 16px;max-width:64ch}
+  h3{font-size:17px;font-weight:750;margin:28px 0 10px;letter-spacing:-.01em}
+  h3:first-child{margin-top:0}
+  ul.plain{margin:0 0 16px;padding-left:22px;max-width:64ch}
+  ul.plain li{margin-bottom:8px}
+  strong,b{font-weight:750}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    padding:24px 26px 20px;margin:0 0 18px}
+  .card.same{border-left:3px solid var(--pass)}
+  .card.diff{border-left:3px solid var(--warn)}
+  .card > :last-child{margin-bottom:0}
+  .card-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:12px}
+  .card-head h3{flex:1 1 240px;margin:0}
+  .agreed{font-size:15px;color:var(--ink-2);margin:0 0 12px}
+  .agreed b{color:var(--ink);font-weight:750}
+
+  .chip{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.03em;
+    border-radius:3px;padding:2px 8px;white-space:nowrap}
+  .c-pass{background:var(--pass-soft);color:var(--pass)}
+  .c-fail{background:var(--fail-soft);color:var(--fail)}
+  .c-warn{background:var(--warn-soft);color:var(--warn)}
+  .c-gate{background:var(--gate-soft);color:var(--gate)}
+  .c-acc{background:var(--accent-soft);color:var(--accent)}
+
+  pre{background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--line-2);
+    border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+    font-family:var(--mono);font-size:12px;line-height:1.68;margin:8px 0;color:var(--ink-2);
+    white-space:pre;tab-size:2}
+  pre b{color:var(--ink);font-weight:700}
+  pre .path{display:block;color:var(--muted);margin-bottom:8px;font-size:11.5px}
+  code{font-family:var(--mono);font-size:.87em;background:var(--surface-2);padding:1px 6px;border-radius:3px}
+  .code-what{font-size:14.5px;color:var(--ink-2);margin:0 0 4px}
+  .code-diff{font-size:14.5px;margin:8px 0 0}
+  .code-diff .chip{margin-right:8px}
+
+  .tbl{overflow-x:auto;margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}
+  th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:700;
+    padding:10px 12px;border-bottom:2px solid var(--line-2);vertical-align:bottom}
+  td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+  td .path{font-family:var(--mono);font-size:11.5px;color:var(--muted);display:block;margin-top:3px}
+  .gate-cell{color:var(--gate);font-weight:750}
+  .gate-empty{display:inline-block;min-width:60px;border-bottom:1.5px dashed var(--gate);opacity:.7}
+
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);
+    border-radius:10px;overflow:hidden;margin:16px 0}
+  @media (max-width:640px){.split{grid-template-columns:1fr}}
+  .split > div{padding:18px 20px}
+  .split .yes{background:var(--pass-soft);border-right:1px solid var(--line)}
+  .split .no{background:var(--fail-soft)}
+  .split h4{margin:0 0 10px;font-size:14.5px;font-weight:800}
+  .split .yes h4{color:var(--pass)}
+  .split .no h4{color:var(--fail)}
+  .split ul{margin:0;padding-left:20px;font-size:14px;line-height:1.7}
+  .split li{margin-bottom:7px}
+
+  footer{margin-top:66px;padding-top:20px;border-top:2px solid var(--ink);font-size:13.5px;color:var(--muted)}
+  footer b{color:var(--ink)}
+  footer p{max-width:none}
+  a{color:var(--accent)}
+  a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+
+.wrap{max-width:1050px}header.page{padding-top:36px}section{margin-top:32px}p{max-width:80ch}.tbl{background:var(--surface);border:1px solid var(--line);border-radius:8px}table{font-size:14px;min-width:630px;line-height:1.75}td:first-child{width:17%;font-weight:650}.note{font-size:13px;color:var(--muted)}.nav{display:flex;flex-wrap:wrap;gap:10px;margin:18px 0}.nav a{border:1px solid var(--line-2);border-radius:5px;padding:5px 10px;font-size:14px;text-decoration:none}.flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:20px 0}.flow span{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 12px;font-size:14px}.flow b{color:var(--accent)}.callout{padding:14px 16px;border-left:3px solid var(--accent);background:var(--accent-soft)}summary{cursor:pointer;color:var(--accent)}details{margin:16px 0}.result{color:var(--pass);font-weight:700}@media(max-width:680px){body{padding:0 14px 60px}.bluf{font-size:16px}}@media print{.nav{display:none}.tbl{overflow:visible}table{min-width:0}tr{break-inside:avoid}}
+</style></head><body><main class="wrap"><header class="page"><p class="eyebrow">우선순위 보완안 · 2026-09-09</p><h1>채팅 안정성: 다음 구현 계획</h1><p class="bluf"><b>다음 작업은 앱 조작용 tool call과 실패 복구 루프다.</b> 현재의 저장 결과 확인을, 실행 결과를 받은 LLM이 조회·수정·재시도·질문 중 다음 행동을 선택하는 구조로 확장한다.</p><p class="asof">상태: 구현 제안 · 이번 문서 보완 중 제품 코드 변경 0 · 기존 1차 수정 결과 유지</p></header><nav class="nav"><a href="#next">바로 할 작업</a><a href="#recovery">실패별 동작</a><a href="#acceptance">완료 기준</a><a href="https://share.onorca.dev/a/hNaQBJMoC0bo">1차 구현·검증 결과</a></nav><section><div class="sec-head"><span class="sec-num">1</span><h2>현재 상태와 다음 차이</h2></div><div class="tbl"><table><thead><tr><th>항목</th><th>현재</th><th>다음 구현</th></tr></thead><tbody><tr><td>사용 가능한 기능</td><td>프롬프트와 JSON 명령 목록에 분산되어 있다. 웹 검색 도구는 이미 있다.</td><td>프로젝트 상태와 가능한 앱 조작을 조회하고, UI와 같은 실행 함수를 도구로 제공한다.</td></tr><tr><td>실행</td><td>LLM 응답의 JSON을 앱이 처리한다. 언어 변경은 저장 결과까지 확인한다.</td><td>앱이 도구 호출을 검증·실행하고 성공·실패·승인 필요·부분 성공을 돌려준다.</td></tr><tr><td>실패 후 행동</td><td>대사 언어 저장 실패를 알리는 단계까지 구현했다. 모델이 그 결과를 받고 다시 계획하지는 않는다.</td><td>LLM이 실제 결과를 읽고 다음 조회·입력 수정·재시도를 선택한다. 앱은 허용된 범위와 상한을 지킨다.</td></tr><tr><td>완료</td><td>모델의 일반 답변과 일부 실행 결과가 함께 보인다.</td><td>실행 요청의 완료 표시는 실제 변경·저장 확인에 연결한다. 미완료 대상과 이유도 남긴다.</td></tr></tbody></table></div><div class="flow" aria-label="제안한 실행 흐름"><span>요청 이해</span><b>→</b><span>상태·가능한 기능 조회</span><b>→</b><span>도구 실행</span><b>→</b><span>결과 확인</span><b>→</b><span>완료 / 복구 / 질문 / 중단</span></div><p class="note">복구가 필요하면 실제 오류와 최신 상태를 모델에게 전달해 다음 행동을 고른다. 같은 요청의 남은 목표를 유지한다. 단순 성공은 추가 추론 없이 저장된 결과로 안내할 수 있다.</p></section><div id="next"><section><div class="sec-head"><span class="sec-num">2</span><h2>바로 할 작업</h2></div><div class="tbl"><table><thead><tr><th>순서</th><th>구현 범위</th><th>완료 시 확인할 것</th></tr></thead><tbody><tr><td>1 · 공통 실행 계약</td><td>도구 이름·대상·입력 검증·승인 조건·실행 결과를 한 경로로 연결한다. UI와 채팅은 같은 도메인 실행 함수를 사용한다. 기존 코드는 재사용한다.</td><td>명령 선택 실패, 실행 실패, 결과 안내 실패를 서로 구분할 수 있다.</td></tr><tr><td>2 · tool call + 반복</td><td>현재 모델·SDK에 앱 조작 도구와 결과 반환을 연결한다. 실행 오류를 모델에게 전달하고, 허용된 후속 행동을 수행한다.</td><td>첫 시도가 틀려도 한 요청 안에서 재조회·수정·재시도할 수 있다.</td></tr><tr><td>3 · 작은 교차 단계 검증</td><td>Producer 설정 조회·변경과 Writer 대사 조회·편집을 첫 대상으로 삼는다. 기능을 늘리기 전에 공통 복구 방식이 두 단계에서 작동하는지 확인한다.</td><td>잘못된 언어 판단, 잘못된 대사 대상, 일시 저장 실패를 주입해 복구를 확인한다. 이미지·영상 생성 불필요.</td></tr><tr><td>4 · 나머지 UI 연결</td><td>최초 113개 기능표를 UI 실행 함수·채팅 도구·검증 상태로 매핑한다. 단계 담당이 미노출 조작을 병렬로 연결한다.</td><td>지원하는 기능을 도구가 없어 못 하는 항목이 명확해지고, 연결한 항목의 실제 결과가 UI와 같다.</td></tr><tr><td>5 · 생성 작업 확장</td><td>Artist·Director 생성은 기존 작업 ID·승인·비용·완료 조회에 연결한다. 기존 미디어로 검증 후 대표 생성만 실행한다.</td><td>접수와 완료를 구분하고, 응답 유실 시 상태를 조회하며, 같은 요청을 중복 발주하지 않는다.</td></tr></tbody></table></div><p class="note">기존 개별 버그 목록은 유지한다. 해당 실행 함수를 도구로 연결할 때 필요한 수정부터 묶는다. 전 기능을 연결하기 전에도 3번 결과를 먼저 검수할 수 있게 한다.</p></section></div><div id="recovery"><section><div class="sec-head"><span class="sec-num">3</span><h2>실패별 다음 행동</h2></div><div class="tbl"><table><thead><tr><th>발생 상황</th><th>채팅이 할 일</th><th>중단·질문 기준</th></tr></thead><tbody><tr><td>지원 기능인데 “못 한다”고 답함</td><td>가능한 기능과 현재 상태를 조회해 근거를 확인하고, 실행 가능한 경로로 재판단한다. 근거 없는 미지원 판정을 실행 결과로 확정하지 않는다.</td><td>조회 후에도 대상·의도가 모호하면 한 가지 필요한 정보를 묻는다. 모든 자연어 거절의 자동 교정을 보장하지는 않는다.</td></tr><tr><td>도구 미선택·잘못된 입력</td><td>작업 요청에 실행 명령이 없거나 입력 검증에 실패하면 구체적인 누락·허용값을 돌려줘 계획을 수정한다. 일반 대화·질문은 실행을 강제하지 않는다.</td><td>복구 상한에 도달하면 미완료 사실과 필요한 정보를 남긴다.</td></tr><tr><td>샷·인물 대상 불일치</td><td>최신 목록을 다시 조회하고 사용자의 원래 요청과 맞는 대상을 찾는다.</td><td>후보가 여러 개면 임의 선택하지 않고 묻는다.</td></tr><tr><td>저장 일시 실패</td><td>재시도 가능한 오류를 구분해 같은 작업 식별자로 제한 재시도한다. 저장 결과를 다시 확인한다.</td><td>권한 부족·입력 오류는 같은 요청을 그대로 반복하지 않는다.</td></tr><tr><td>저장·생성 응답 유실</td><td>먼저 해당 작업의 저장·접수 상태를 조회한다. 이미 적용·접수된 작업은 이어서 결과를 확인한다.</td><td>상태를 확정할 수 없으면 미확인으로 남긴다. 유료 작업을 새 요청으로 재발주하지 않는다.</td></tr><tr><td>일부 작업만 성공</td><td>완료·실패·아직 안 한 대상을 기록하고 남은 대상만 처리한다.</td><td>새 대상·모델·수량·비용으로 바뀌면 기존 승인을 재사용하지 않는다.</td></tr><tr><td>선행 이미지·설정 부족</td><td>무엇이 필요한지 확인하고 가능한 해결 순서를 제시한다. 이미 요청 범위 안인 안전한 준비 작업은 이어서 수행한다.</td><td>추가 유료 생성·명시적 확정이 필요하면 해당 승인에서 기다린다.</td></tr><tr><td>실행 경로 자체가 없음</td><td>어느 부분을 못 했는지와 가능한 기능·UI 경로를 안내한다. 해당 항목은 도구 연결 작업으로 남긴다.</td><td>모델에게 프롬프트를 반복한다고 없는 제품 기능이 생기는 것은 아니다.</td></tr></tbody></table></div></section></div><div id="acceptance"><section><div class="sec-head"><span class="sec-num">4</span><h2>안정성의 완료 기준</h2></div><div class="tbl"><table><thead><tr><th>구분</th><th>통과 기준</th><th>검증 방법</th></tr></thead><tbody><tr><td>성공 판단</td><td>저장·실행 결과가 없는 작업을 완료로 표시하지 않는다.</td><td>가짜 성공 발화·빈 도구 호출·저장값 불일치를 주입한다.</td></tr><tr><td>복구</td><td>잘못된 인자·낡은 대상·일시 저장 실패에서 올바른 다음 행동으로 진행한다.</td><td>결정적 실패 주입 + 실제 LLM 표현 변형을 분리해 확인한다.</td></tr><tr><td>중복·부분 성공</td><td>재시도해도 성공한 변경·접수된 생성을 중복 실행하지 않는다. 남은 대상을 확인할 수 있다.</td><td>응답 유실·부분 성공·다시 접속한 상황을 검증한다.</td></tr><tr><td>승인·중단</td><td>승인 범위를 유지하고, 사용자 취소·프로젝트 전환·실행 상한에서 중단한다.</td><td>승인 전후 변경, 요청 중 취소, 프로젝트 전환을 검증한다.</td></tr><tr><td>실제 이해도</td><td>첫 성공률과 복구 후 성공률, 잘못된 완료·불가 안내, 필요한 질문, 지연·비용을 따로 기록한다.</td><td>첫 표본 제안: 대표 발화 10개 × 3회. 같은 빌드·초기 상태로 비교. 목표 수치는 초기 측정 후 확정한다.</td></tr></tbody></table></div><p class="callout">보장할 대상은 <b>결과 확인·승인·중복 방지·중단 절차</b>다. 사용자의 모든 표현을 정확히 이해하거나 모든 외부 장애를 해결한다는 보장은 하지 않는다. 자동 복구 가능한 범위를 테스트와 실제 발화로 넓힌다.</p></section></div><section><div class="sec-head"><span class="sec-num">5</span><h2>시작 범위와 오너 역할</h2></div><div class="tbl"><table><thead><tr><th>항목</th><th>제안</th></tr></thead><tbody><tr><td>첫 구현의 상한</td><td>일반 편집은 요청당 모델 판단 최대 4회·총 60초, 같은 실패의 복구 시도 최대 2회를 시작값으로 제안한다. 처음의 상태 조회와 도구 실행을 포함한다. 실제 지연을 보고 조정하며, 아직 제품 기본값으로 확정된 수치는 아니다.</td></tr><tr><td>장기 생성</td><td>60초 안에 영상을 완성시키려는 제한이 아니다. 승인된 생성은 작업 ID로 추적하고 “접수됨/진행 중/완료”로 구분한다. 모델이 기다리며 계속 호출되지 않는다.</td></tr><tr><td>tool call 채택</td><td>앱 조작을 네이티브 tool call로 연결하는 방식을 추천한다. 기존 JSON 명령의 실행 함수를 재사용하고, 결과를 모델에 돌려주는 반복을 함께 구현한다. 모델 교체나 Agent SDK 도입을 선행 조건으로 두지 않는다.</td></tr><tr><td>에이전트 역할</td><td>도구 연결·실패 주입·회귀 검사·실제 LLM 평가·DB/화면 확인·보고를 담당한다.</td></tr><tr><td>오너 역할</td><td>평소 표현, 기대한 결과, 허용할 대안의 예시를 제공한다. 구현 설명이나 수동 장애 재현을 맡길 필요는 없다. 첫 교차 단계 표본에서 의도 이해와 질문의 적절성을 확인한다.</td></tr></tbody></table></div></section><footer><p>근거: 현재 <code>src/lib/claude.ts</code>는 웹 검색을 제외한 앱 조작용 tool loop를 제공하지 않고 텍스트를 반환한다. Producer 라우트는 변경 JSON을 추출해 클라이언트로 반환한다. 1차 수정은 대사 언어의 저장 확인까지다. <code>src/lib/llm.ts</code>의 기존 모델 연동과 도메인 실행 코드를 재사용한다.</p><p>도구 실행 결과를 모델에 보내 최종 답변 또는 추가 도구 호출을 받는 표준 흐름은 <a href="https://developers.openai.com/api/docs/guides/function-calling">OpenAI 공식 Function calling 문서</a>로 대조했다. 이 문서의 앱 적용 방식·순서·상한은 이번 제안이며, Codex나 Claude Code의 내부 구현을 그대로 설명한 것은 아니다.</p><p>이번 문서는 다음 구현의 범위와 완료 기준을 보완했다. 제품 코드·테스트·DB 변경 및 신규 LLM·이미지·영상 실행은 하지 않았다.</p></footer></main></body></html>

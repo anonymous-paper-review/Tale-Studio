@@ -543,7 +543,7 @@ export interface CharacterVisual {
 export interface WorldVisual {
   global_palette: { primary: string; secondary: string; accent: string; forbidden: string[] };
   color_meaning: Record<string, string>; // color → meaning
-  locations: Array<{ id: string; style_description: string; lighting_sources: string[]; props: string[] }>;
+  locations: Array<{ id: string; name?: string; style_description: string; lighting_sources: string[]; props: string[] }>;
   vfx_approach: string;
 }
 
@@ -1162,4 +1162,3 @@ export interface PipelineResult {
     };
   };
 }
-

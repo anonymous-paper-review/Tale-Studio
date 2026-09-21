@@ -350,7 +350,7 @@ async function decoupageForScene(
     await logger.saveText(`decoupage_motivation_repair_${scene.scene_id}.txt`, motivationRepairs.join('\n'));
   }
   // #names-in-prose: beat_summary(_native)·목적 문장의 id → 이름 (camera_target 은 그대로).
-  const cleanShots = cleanDecoupageProse(shots, castEntities(characters));
+  const cleanShots = cleanDecoupageProse(shots, castEntities(characters, worldVisual.locations.flatMap((l) => l.name ? [{ id: l.id, name: l.name }] : [])));
 
   if (shots.length === 0) {
     throw new Error(`Découpage empty shots (scene=${scene.scene_id})`);

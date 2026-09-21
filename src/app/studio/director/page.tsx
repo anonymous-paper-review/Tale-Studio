@@ -21,13 +21,15 @@ import {
   type OnConnectStart,
   type OnConnectEnd,
 } from '@xyflow/react'
-import { Loader2, ImageIcon, ChevronDown, ChevronUp, LayoutGrid, Boxes, Map as MapIcon, Lock, Unlock, Type } from 'lucide-react'
+import { Loader2,
+  Square, ImageIcon, ChevronDown, ChevronUp, LayoutGrid, Boxes, Map as MapIcon, Lock, Unlock, Type } from 'lucide-react'
 
 import { toast } from 'sonner'
 import { runRealBatch } from '@/lib/director/real-batch-client'
 import {
   eligibleVideoBatchShotIds,
   runVideoBatch,
+  restoreVideoBatch,
 } from '@/lib/director/video-batch-client'
 import { describeVideoBatchPlan, planVideoBatch, videoBatchTakeCosts } from '@/lib/director/video-batch-plan'
 import { refetchTakeBalance, useTakeBalance } from '@/lib/billing/use-take-balance'
@@ -793,6 +795,7 @@ function PaletteBar({
   // #real-grid: 일괄 생성은 4샷 시트 러너(runRealBatch)로 통합 — 진행 플래그는 스토어 공유.
   const realBatchBusy = useDirectorCanvasStore((s) => s.realBatchBusy)
   const videoBatchBusy = useDirectorCanvasStore((s) => s.videoBatchBusy)
+  const videoBatchCancelled = useDirectorCanvasStore((s) => s.videoBatchCancelled)
   const videoBatchProgress = useDirectorCanvasStore((s) => s.videoBatchProgress)
   // 약속 D7(2026-09-04): 버튼 숫자는 핀과 같은 서버 배치에서 온다 — 배치가 도는 동안은 그 done/total, 아니면 화면 집계.
   const projectId = useProjectStore((s) => s.projectId)
@@ -924,8 +927,25 @@ function PaletteBar({
         <button
           type="button"
           title={t('Generate videos for every eligible shot')}
-          onClick={() => {
-            if (videoBatchBusy) return
+          onClick={async () => {
+            // 도는 중이면 같은 자리가 중단 버튼이다(#batch-resume 2026-09-09 오너 결정 ①).
+            //   예전에는 진행 중에 비활성이라 멈출 방법이 창을 닫는 것뿐이었다.
+            if (videoBatchBusy) {
+              if (videoBatchCancelled) return
+              const run = useDirectorCanvasStore.getState()
+              const stillCurrent = () => {
+                const current = useDirectorCanvasStore.getState()
+                return current.projectId === run.projectId && current.videoBatchRunId === run.videoBatchRunId
+              }
+              try {
+                await run.cancelVideoBatch()
+                if (stillCurrent()) toast.info(t('Stop after current videos finish.'))
+              } catch (error) {
+                console.error('[video-batches] cancel failed:', error)
+                if (stillCurrent()) toast.error(t('Please try again in a moment.'))
+              }
+              return
+            }
             const eligible = eligibleVideoBatchShotIds(
               useDirectorCanvasStore.getState().nodes,
             )
@@ -936,22 +956,32 @@ function PaletteBar({
             refetchTakeBalance()
             setConfirmVideoBatch(true)
           }}
-          disabled={videoBatchBusy}
+          disabled={videoBatchBusy && videoBatchCancelled}
           aria-busy={videoBatchBusy}
           className={cn(
             'flex h-8 items-center gap-2 rounded-md border border-border px-3',
             'text-xs font-medium text-foreground',
             'transition-colors duration-100 hover:bg-accent',
-            videoBatchBusy && 'cursor-not-allowed opacity-70',
+            videoBatchBusy && videoBatchCancelled && 'cursor-not-allowed opacity-70',
             'hover-red-beam',
           )}
         >
           {videoBatchBusy ? (
-            <Loader2 className="size-4 animate-spin" />
+            videoBatchCancelled ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Square className="size-4" />
+            )
           ) : (
             <ImageIcon className="size-4" />
           )}
-          <span>{t('Generate videos')}</span>
+          <span>
+            {videoBatchBusy
+              ? videoBatchCancelled
+                ? t('Stopping')
+                : t('Stop generating')
+              : t('Generate videos')}
+          </span>
           {videoBatch ? (
             <>
               <span className="font-mono tabular-nums text-muted-foreground">
@@ -1108,6 +1138,11 @@ function PaletteBar({
 // ────────────────────────────────────────────────────────────────────────────
 
 export default function DirectorCanvasPage() {
+  const handoffProjectId = useProjectStore((s) => s.projectId)
+  // 라우터 요청이 아닌 실제 Director 화면의 mount가 이동 완료를 확인한다.
+  useEffect(() => {
+    if (handoffProjectId) useGlobalChatStore.getState().confirmDirectorHandoff(handoffProjectId, '/studio/director')
+  }, [handoffProjectId])
   const t = useT()
   const viewMode = useDirectorCanvasStore((s) => s.viewMode)
   // 스토리보드 축척 — PaletteBar(컨트롤)와 StoryboardGridView(그리드·단축키)가 공유(#e-zoom-merge)
@@ -1139,6 +1174,19 @@ export default function DirectorCanvasPage() {
 
   // 큐 축소 → 재수화(#live-refresh) — Node/Storyboard 어느 뷰든 생성 완료가 즉시 보인다.
   useQueueRehydrate(guideProjectId && guideProjectId !== 'default' ? guideProjectId : null)
+
+  useEffect(() => {
+    if (!stageReady || !guideProjectId || guideProjectId === 'default') return
+    const restore = () => {
+      if (document.hidden) return
+      void restoreVideoBatch(guideProjectId).catch((error) => {
+        console.error('[video-batches] restore failed:', error)
+      })
+    }
+    restore()
+    document.addEventListener('visibilitychange', restore)
+    return () => document.removeEventListener('visibilitychange', restore)
+  }, [guideProjectId, stageReady])
 
   // SHOT VIDEO 재생 상태(#video-pause 2026-08-12) — playingNodeId 가 스토어에 남아 탭을
   //   떠났다 오면 <video autoPlay> 가 재마운트되며 저절로 재생됐다. 떠날 때(unmount)와

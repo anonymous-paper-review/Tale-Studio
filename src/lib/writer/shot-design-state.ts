@@ -24,22 +24,27 @@ export function resolveShotDesign<T>(
   return projectUsesDesignRefs ? null : (byId.get(shot.shotId) ?? null)
 }
 
+export interface ShotDesignRunSource { id: string; status: string; createdAt: string }
+
 export async function loadShotDesignByMainId(
   projectId: string,
+  options: { strict?: boolean; onSource?: (source: ShotDesignRunSource) => void } = {},
 ): Promise<Map<string, RoughStoryboardSpec>> {
   const byId = new Map<string, RoughStoryboardSpec>()
   try {
-    const { data: runs } = await supabaseAdmin
+    const { data: runs, error } = await supabaseAdmin
       .from('writer_runs')
-      .select('status, shotDesign:state->shotDesign')
+      .select(options.onSource ? 'id,status,created_at,shotDesign:state->shotDesign' : 'status, shotDesign:state->shotDesign')
       .eq('project_id', projectId)
       .order('created_at', { ascending: false })
       .limit(5)
-    const rows = (runs ?? []) as Array<{ status: string; shotDesign: unknown }>
+    if (options.strict && error) throw new Error('Writer design state could not be read')
+    const rows = (runs ?? []) as unknown as Array<{ id: string; created_at: string; status: string; shotDesign: unknown }>
     const row =
       rows.find((r) => r.status === 'completed' && Array.isArray(r.shotDesign)) ??
       rows.find((r) => Array.isArray(r.shotDesign))
     if (!row) return byId
+    options.onSource?.({ id: row.id, status: row.status, createdAt: row.created_at })
     for (const d of row.shotDesign as ShotDesign[]) {
       const writerShotId = d?.static_spec?.shot_id ?? d?.intent?.shot_id
       const writerSceneId = d?.intent?.scene_id
@@ -56,6 +61,7 @@ export async function loadShotDesignByMainId(
       byId.set(writerShotId, spec)
     }
   } catch (e) {
+    if (options.strict) throw e
     console.error('[shot-design-state] shotDesign state load failed:', e)
   }
   return byId

@@ -1,0 +1,21 @@
+{
+  "checkedAt": "2026-09-14T08:48:51.627Z",
+  "provider": "Vercel",
+  "projectId": "prj_x0fGmBO62EJVmEZAhlUiOGZVHwnF",
+  "key": "TAKE_BILLING_MODE",
+  "readOnly": true,
+  "changed": false,
+  "settings": [
+    {
+      "target": "preview",
+      "gitBranch": null,
+      "mode": "shadow"
+    },
+    {
+      "target": "production",
+      "gitBranch": null,
+      "mode": "shadow"
+    }
+  ],
+  "otherEnvironmentValuesIncluded": false
+}

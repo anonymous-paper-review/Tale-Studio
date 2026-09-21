@@ -1,0 +1,130 @@
+{
+  "id": "c8ce52ec-0980-4fb9-b4be-e889c16d6197",
+  "ok": true,
+  "result": {
+    "origin": "http://127.0.0.1:3001/playground/mvp-feedback",
+    "refs": {
+      "e1": {
+        "name": "Notifications alt+T",
+        "role": "region"
+      },
+      "e10": {
+        "name": "내보내기",
+        "role": "button"
+      },
+      "e11": {
+        "name": "문의 / Help",
+        "role": "button"
+      },
+      "e12": {
+        "name": "U",
+        "role": "button"
+      },
+      "e13": {
+        "name": "현재대로 확정",
+        "role": "button"
+      },
+      "e14": {
+        "name": "Artist 호출",
+        "role": "button"
+      },
+      "e15": {
+        "name": "생성 승인",
+        "role": "button"
+      },
+      "e16": {
+        "name": "승인 대기",
+        "role": "button"
+      },
+      "e17": {
+        "name": "삭제",
+        "role": "button"
+      },
+      "e18": {
+        "name": "Writers' Room",
+        "role": "heading"
+      },
+      "e19": {
+        "name": "Artist로 넘기기",
+        "role": "button"
+      },
+      "e2": {
+        "name": "Back to Projects",
+        "role": "button"
+      },
+      "e20": {
+        "name": "채팅 접기",
+        "role": "button"
+      },
+      "e21": {
+        "name": "등장인물",
+        "role": "heading"
+      },
+      "e22": {
+        "name": "배경",
+        "role": "heading"
+      },
+      "e23": {
+        "name": "쿄타로",
+        "role": "button"
+      },
+      "e24": {
+        "name": "코마츠",
+        "role": "button"
+      },
+      "e25": {
+        "name": "Writer",
+        "role": "button"
+      },
+      "e26": {
+        "name": "에셋 멘션",
+        "role": "button"
+      },
+      "e27": {
+        "name": "보내기",
+        "role": "button"
+      },
+      "e28": {
+        "name": "Open Next.js Dev Tools",
+        "role": "button"
+      },
+      "e29": {
+        "name": "예: 씬2 샷3을 더 어둡게 바꿔줘",
+        "role": "textbox"
+      },
+      "e3": {
+        "name": "Producer",
+        "role": "button"
+      },
+      "e4": {
+        "name": "Writer",
+        "role": "button"
+      },
+      "e5": {
+        "name": "Artist",
+        "role": "button"
+      },
+      "e6": {
+        "name": "Director",
+        "role": "button"
+      },
+      "e7": {
+        "name": "Editor",
+        "role": "button"
+      },
+      "e8": {
+        "name": "계정·결제 열기",
+        "role": "button"
+      },
+      "e9": {
+        "name": "공유 링크 만들기",
+        "role": "button"
+      }
+    },
+    "snapshot": "- complementary\n  - button \"Back to Projects\" [ref=e2]\n  - button \"Producer\" [ref=e3]\n    - StaticText \"Producer\"\n  - button \"Writer\" [ref=e4]\n    - StaticText \"Writer\"\n  - button \"Artist\" [ref=e5]\n    - StaticText \"Artist\"\n  - button \"Director\" [ref=e6]\n    - StaticText \"Director\"\n  - button \"Editor\" [ref=e7]\n    - StaticText \"Editor\"\n  - button \"계정·결제 열기\" [ref=e8]\n    - StaticText \"100\"\n  - StaticText \"Take\"\n  - button \"공유 링크 만들기\" [ref=e9]\n  - StaticText \"공유\"\n  - button \"내보내기\" [expanded=false, ref=e10]\n  - StaticText \"내보내기\"\n  - button \"문의 / Help\" [expanded=false, ref=e11]\n  - StaticText \"Help\"\n  - button \"U\" [expanded=false, ref=e12]\n  - StaticText \"프로필\"\n- main\n  - button \"현재대로 확정\" [ref=e13]\n  - button \"Artist 호출\" [ref=e14]\n  - button \"생성 승인\" [ref=e15]\n  - button \"승인 대기\" [disabled, ref=e16]\n  - button \"삭제\" [ref=e17]\n  - sectionheader\n    - heading \"Writers' Room\" [level=1, ref=e18]\n    - paragraph\n      - StaticText \"이야기를 생성하는 중이에요. 완성되는 씬부터 아래에서 바로 읽어볼 수 있어요.\"\n  - generic\n    - generic\n      - image\n      - StaticText \"씬 초안 준비\"\n      - paragraph\n        - StaticText \"Writer가 씬과 배경, 인물을 만들고 있습니다\"\n      - progressbar \"씬 초안 준비\": 50\n      - StaticText \"단계 2/4\"\n      - paragraph\n        - StaticText \"단계별 작업량은 다릅니다. 이미지 생성은 이후 별도로 진행됩니다.\"\n    - article\n      - paragraph\n        - StaticText \"학교 옥상에서 쿄타로와 코마츠가 서로를 바라본다. 바람이 불고 두 사람은 잠시 말을 멈춘다.\"\n    - paragraph\n      - StaticText \"이야기가 계속 생성되고 있어요. 새 내용이 준비되면 자동으로 이어집니다.\"\n    - complementary\n      - heading \"등장인물\" [level=2, ref=e21]\n      - generic\n        - button \"쿄타로\" [disabled, ref=e23]\n          - StaticText \"쿄타로\"\n          - StaticText \"주인공\"\n          - paragraph\n            - StaticText \"교복을 입은 학생. 검은 머리와 차분한 눈빛.\"\n        - button \"코마츠\" [disabled, ref=e24]\n          - StaticText \"코마츠\"\n          - StaticText \"친구\"\n          - paragraph\n            - StaticText \"밝은 표정의 학생. 단정한 교복 차림.\"\n      - heading \"배경\" [level=2, ref=e22]\n      - paragraph\n        - StaticText \"학교 옥상\"\n      - paragraph\n        - StaticText \"난간 너머로 학교와 도시가 보이는 옥상.\"\n  - complementary\n    - separator\n    - StaticText \"에이전트 채팅\"\n    - StaticText \"Writer\"\n    - StaticText \"모든 단계가 이어지는 하나의 대화\"\n    - button \"Artist로 넘기기\" [ref=e19]\n    - button \"채팅 접기\" [ref=e20]\n    - LayoutTable\n    - progressbar \"씬 초안 준비\": 50\n      - StaticText \"씬 초안 준비\"\n      - StaticText \"단계 2/4\"\n    - paragraph\n      - StaticText \"Writer가 씬과 배경, 인물을 만들고 있습니다\"\n    - textbox \"예: 씬2 샷3을 더 어둡게 바꿔줘\" [ref=e29]\n    - button \"Writer\" [expanded=false, ref=e25]\n      - StaticText \"Writer\"\n    - button \"에셋 멘션\" [expanded=false, ref=e26]\n    - button \"보내기\" [disabled, ref=e27]\n- region \"Notifications alt+T\" [ref=e1]\n- button \"Open Next.js Dev Tools\" [expanded=false, ref=e28]\n  - image\n- alert",
+    "browserPageId": "4abe4614-da11-4bea-88f4-49ac0584369f"
+  },
+  "_meta": {
+    "runtimeId": "da993342-3f2f-4d76-bbf0-e447825a810b"
+  }
+}

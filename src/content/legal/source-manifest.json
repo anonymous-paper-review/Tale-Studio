@@ -1,0 +1,23 @@
+{
+  "source": "Owner-provided files in Downloads/ref",
+  "importedOn": "2026-09-14",
+  "policyLastUpdated": "15 September 2026",
+  "files": {
+    "terms-of-service.md": {
+      "sha256": "fc543eee9f0230feb7cbf31c5bb537658f477190345be2cf416e33d6396ae30c",
+      "characters": 12996
+    },
+    "refund-policy.md": {
+      "sha256": "a12e28eb2c04cff5e7a66a44a1ae158ff70cccd79cf465f96590004a60c77e0b",
+      "characters": 5340
+    },
+    "privacy-policy.md": {
+      "sha256": "fd8565b407c1ce46d0527bee68406586e2472b65028e3637bb1ddf35574fd03f",
+      "characters": 10885
+    },
+    "footer.md": {
+      "sha256": "eae36a59792b56909f5c8e926584a7188327e25f95b59915eb235128efddde49",
+      "characters": 266
+    }
+  }
+}

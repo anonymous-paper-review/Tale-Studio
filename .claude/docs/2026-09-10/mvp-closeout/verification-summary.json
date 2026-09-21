@@ -1,0 +1,18 @@
+{
+  "checkedAt": "2026-09-10T06:33:40.660Z",
+  "baseCommit": "39fe2081a64a09d33d34caf2d8eb0f6c16da40c1",
+  "passed": 2756,
+  "failed": 0,
+  "skipped": 27,
+  "testFilesPassed": 346,
+  "testFilesSkipped": 2,
+  "checks": "모두 통과",
+  "lintErrors": 0,
+  "lintWarnings": 24,
+  "productChanges": [
+    "src/stores/artist-store.ts"
+  ],
+  "newRegressionTests": 2,
+  "artifacts": "report.html",
+  "scope": "Current reproduction and verification; historical project recovery excluded by user instruction."
+}

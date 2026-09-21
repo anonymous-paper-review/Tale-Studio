@@ -1,0 +1,26 @@
+{"check":"read-only development connection","passed":true,"developmentProject":"pbiumddivadgbzxuymak","liveScopeSeparate":true,"verifiedTls":true,"applicationRowsRead":0}
+{"check":"existing public installation","publicFunctionCount":0,"migrationVersion":"20260910001500","migrationHistoryPresent":true,"versionRecorded":false}
+{"check":"isolated migration test","testSchema":"mvp_rough_d8ee5c741d5443238de75894faf1560b","migrationSha256":"70933289f5965631cd44445b098732a493157b370dbe1f95e1e83fa59b6f750f","fixture":"new users, projects, shots and jobs only; no application rows copied"}
+
+ RUN  v4.1.6 /Users/xcape/projects/tale-studio
+
+(node:26681) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ✓ tests/manual/rough-reservation-dev-db.manual.test.ts > 개발 DB의 격리된 러프 예약 > 동시에 같은 러프를 요청하면 앞선 예약이 끝날 때까지 기다리고 같은 작업을 돌려준다 1829ms
+ ✓ tests/manual/rough-reservation-dev-db.manual.test.ts > 개발 DB의 격리된 러프 예약 > 동시에 일부 샷이 겹치면 기존 작업을 공유하고 겹치지 않은 샷은 별도로 예약할 수 있다 1982ms
+ ✓ tests/manual/rough-reservation-dev-db.manual.test.ts > 개발 DB의 격리된 러프 예약 > 앞선 예약이 저장되지 않고 취소되면 기다리던 요청만 새 작업을 예약한다 1819ms
+ ✓ tests/manual/rough-reservation-dev-db.manual.test.ts > 개발 DB의 격리된 러프 예약 > 다른 소유자의 프로젝트나 다른 프로젝트의 샷으로는 러프를 예약하지 못한다 1274ms
+ ✓ tests/manual/rough-reservation-dev-db.manual.test.ts > 개발 DB의 격리된 러프 예약 > 접수 응답을 잃은 예약은 오래되어도 유지하고 다시 조회할 때 확인 중 상태를 돌려준다 1262ms
+ ✓ tests/manual/rough-reservation-dev-db.manual.test.ts > 개발 DB의 격리된 러프 예약 > 이미 완성된 러프는 자동 생성에서 재사용하고 명시적으로 다시 만들 때만 새 작업을 예약한다 1338ms
+ ✓ tests/manual/rough-reservation-dev-db.manual.test.ts > 개발 DB의 격리된 러프 예약 > 일부 러프만 이미 완성되어 있으면 그 샷만 완료로 반환하고 나머지 예약 기회를 남긴다 1102ms
+ ✓ tests/manual/rough-reservation-dev-db.manual.test.ts > 개발 DB의 격리된 러프 예약 > 접수 거절로 끝난 작업은 새 시도를 허용하고 뒤늦은 접수 기록으로 다시 진행 중이 되지 않는다 1102ms
+ ✓ tests/manual/rough-reservation-dev-db.manual.test.ts > 개발 DB의 격리된 러프 예약 > 러프 예약 함수는 방문자와 로그인 고객에게 직접 열리지 않는다 868ms
+ ✓ tests/manual/rough-reservation-dev-db.manual.test.ts > 개발 DB의 격리된 러프 예약 > 접수 확인 중인 러프를 삭제하려 해도 기록을 유지하고 같은 예약을 다시 돌려준다 1190ms
+
+ Test Files  1 passed (1)
+      Tests  10 passed (10)
+   Start at  00:24:51
+   Duration  15.46s (transform 232ms, setup 63ms, import 269ms, tests 14.97s, environment 0ms)
+
+{"check":"test schema cleanup","removedTestSchema":"mvp_rough_d8ee5c741d5443238de75894faf1560b","remaining":0}
+{"check":"public rough function fingerprint","unchanged":true,"publicMigrationsApplied":0}

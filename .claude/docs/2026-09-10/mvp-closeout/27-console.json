@@ -1,0 +1,481 @@
+{
+  "id": "403fd09e-c75a-4ebd-9b9e-b621aa1d5990",
+  "ok": true,
+  "result": {
+    "messages": [
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "[Fast Refresh] rebuilding"
+          }
+        ],
+        "text": "[Fast Refresh] rebuilding",
+        "type": "log"
+      },
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "[Fast Refresh] done in 46ms"
+          }
+        ],
+        "text": "[Fast Refresh] done in 46ms",
+        "type": "log"
+      },
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools"
+          },
+          {
+            "type": "string",
+            "value": "font-weight:bold"
+          }
+        ],
+        "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold",
+        "type": "info"
+      },
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "[HMR] connected"
+          }
+        ],
+        "text": "[HMR] connected",
+        "type": "log"
+      },
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "%c[Vercel Web Analytics]%c Debug mode is enabled by default in development. No requests will be sent to the server."
+          },
+          {
+            "type": "string",
+            "value": "color: rgb(120, 120, 120)"
+          },
+          {
+            "type": "string",
+            "value": "color: inherit"
+          }
+        ],
+        "text": "%c[Vercel Web Analytics]%c Debug mode is enabled by default in development. No requests will be sent to the server. color: rgb(120, 120, 120) color: inherit",
+        "type": "log"
+      },
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "%c[Vercel Web Analytics]%c Running queued event"
+          },
+          {
+            "type": "string",
+            "value": "color: rgb(120, 120, 120)"
+          },
+          {
+            "type": "string",
+            "value": "color: inherit"
+          },
+          {
+            "type": "string",
+            "value": "pageview"
+          },
+          {
+            "className": "Object",
+            "description": "Object",
+            "objectId": "-7008127567706769457.5.1",
+            "preview": {
+              "description": "Object",
+              "overflow": false,
+              "properties": [
+                {
+                  "name": "route",
+                  "type": "string",
+                  "value": "/playground/mvp-artist"
+                },
+                {
+                  "name": "path",
+                  "type": "string",
+                  "value": "/playground/mvp-artist"
+                }
+              ],
+              "type": "object"
+            },
+            "type": "object"
+          }
+        ],
+        "text": "%c[Vercel Web Analytics]%c Running queued event color: rgb(120, 120, 120) color: inherit pageview {route: \"/playground/mvp-artist\", path: \"/playground/mvp-artist\"}",
+        "type": "log"
+      },
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "%c[Vercel Web Analytics]%c [view] http://127.0.0.1:3073/playground/mvp-artist"
+          },
+          {
+            "type": "string",
+            "value": "color: rgb(120, 120, 120)"
+          },
+          {
+            "type": "string",
+            "value": "color: inherit"
+          },
+          {
+            "className": "Object",
+            "description": "Object",
+            "objectId": "-7008127567706769457.5.2",
+            "preview": {
+              "description": "Object",
+              "overflow": true,
+              "properties": [
+                {
+                  "name": "o",
+                  "type": "string",
+                  "value": "http://127.0.0.1:3073/playground/mvp-artist"
+                },
+                {
+                  "name": "sv",
+                  "type": "string",
+                  "value": "0.1.3"
+                },
+                {
+                  "name": "sdkn",
+                  "type": "string",
+                  "value": "@vercel/analytics/next"
+                },
+                {
+                  "name": "sdkv",
+                  "type": "string",
+                  "value": "2.0.1"
+                },
+                {
+                  "name": "ts",
+                  "type": "number",
+                  "value": "1789021121335"
+                }
+              ],
+              "type": "object"
+            },
+            "type": "object"
+          },
+          {
+            "type": "string",
+            "value": "/_vercel/insights/view"
+          }
+        ],
+        "text": "%c[Vercel Web Analytics]%c [view] http://127.0.0.1:3073/playground/mvp-artist color: rgb(120, 120, 120) color: inherit {o: \"http://127.0.0.1:3073/playground/mvp-artist\", sv: \"0.1.3\", sdkn: \"@vercel/analytics/next\", sdkv: \"2.0.1\", ts: 1789021121335, ...} /_vercel/insights/view",
+        "type": "log"
+      },
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "[Fast Refresh] rebuilding"
+          }
+        ],
+        "text": "[Fast Refresh] rebuilding",
+        "type": "log"
+      },
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "[Fast Refresh] done in 55ms"
+          }
+        ],
+        "text": "[Fast Refresh] done in 55ms",
+        "type": "log"
+      },
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools"
+          },
+          {
+            "type": "string",
+            "value": "font-weight:bold"
+          }
+        ],
+        "text": "%cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold",
+        "type": "info"
+      },
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "[HMR] connected"
+          }
+        ],
+        "text": "[HMR] connected",
+        "type": "log"
+      },
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "%c[Vercel Web Analytics]%c Debug mode is enabled by default in development. No requests will be sent to the server."
+          },
+          {
+            "type": "string",
+            "value": "color: rgb(120, 120, 120)"
+          },
+          {
+            "type": "string",
+            "value": "color: inherit"
+          }
+        ],
+        "text": "%c[Vercel Web Analytics]%c Debug mode is enabled by default in development. No requests will be sent to the server. color: rgb(120, 120, 120) color: inherit",
+        "type": "log"
+      },
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "%c[Vercel Web Analytics]%c Running queued event"
+          },
+          {
+            "type": "string",
+            "value": "color: rgb(120, 120, 120)"
+          },
+          {
+            "type": "string",
+            "value": "color: inherit"
+          },
+          {
+            "type": "string",
+            "value": "pageview"
+          },
+          {
+            "className": "Object",
+            "description": "Object",
+            "objectId": "-7008127567706769457.9.1",
+            "preview": {
+              "description": "Object",
+              "overflow": false,
+              "properties": [
+                {
+                  "name": "route",
+                  "type": "string",
+                  "value": "/playground/mvp-artist"
+                },
+                {
+                  "name": "path",
+                  "type": "string",
+                  "value": "/playground/mvp-artist"
+                }
+              ],
+              "type": "object"
+            },
+            "type": "object"
+          }
+        ],
+        "text": "%c[Vercel Web Analytics]%c Running queued event color: rgb(120, 120, 120) color: inherit pageview {route: \"/playground/mvp-artist\", path: \"/playground/mvp-artist\"}",
+        "type": "log"
+      },
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "%c[Vercel Web Analytics]%c [view] http://127.0.0.1:3073/playground/mvp-artist"
+          },
+          {
+            "type": "string",
+            "value": "color: rgb(120, 120, 120)"
+          },
+          {
+            "type": "string",
+            "value": "color: inherit"
+          },
+          {
+            "className": "Object",
+            "description": "Object",
+            "objectId": "-7008127567706769457.9.2",
+            "preview": {
+              "description": "Object",
+              "overflow": true,
+              "properties": [
+                {
+                  "name": "o",
+                  "type": "string",
+                  "value": "http://127.0.0.1:3073/playground/mvp-artist"
+                },
+                {
+                  "name": "sv",
+                  "type": "string",
+                  "value": "0.1.3"
+                },
+                {
+                  "name": "sdkn",
+                  "type": "string",
+                  "value": "@vercel/analytics/next"
+                },
+                {
+                  "name": "sdkv",
+                  "type": "string",
+                  "value": "2.0.1"
+                },
+                {
+                  "name": "ts",
+                  "type": "number",
+                  "value": "1789021179393"
+                }
+              ],
+              "type": "object"
+            },
+            "type": "object"
+          },
+          {
+            "type": "string",
+            "value": "/_vercel/insights/view"
+          }
+        ],
+        "text": "%c[Vercel Web Analytics]%c [view] http://127.0.0.1:3073/playground/mvp-artist color: rgb(120, 120, 120) color: inherit {o: \"http://127.0.0.1:3073/playground/mvp-artist\", sv: \"0.1.3\", sdkn: \"@vercel/analytics/next\", sdkv: \"2.0.1\", ts: 1789021179393, ...} /_vercel/insights/view",
+        "type": "log"
+      },
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "[Fast Refresh] rebuilding"
+          }
+        ],
+        "text": "[Fast Refresh] rebuilding",
+        "type": "log"
+      },
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "[Fast Refresh] done in 134ms"
+          }
+        ],
+        "text": "[Fast Refresh] done in 134ms",
+        "type": "log"
+      },
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "[Fast Refresh] rebuilding"
+          }
+        ],
+        "text": "[Fast Refresh] rebuilding",
+        "type": "log"
+      },
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "[Fast Refresh] done in 209ms"
+          }
+        ],
+        "text": "[Fast Refresh] done in 209ms",
+        "type": "log"
+      },
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "[Fast Refresh] rebuilding"
+          }
+        ],
+        "text": "[Fast Refresh] rebuilding",
+        "type": "log"
+      },
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "[Fast Refresh] done in 135ms"
+          }
+        ],
+        "text": "[Fast Refresh] done in 135ms",
+        "type": "log"
+      },
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "[Fast Refresh] rebuilding"
+          }
+        ],
+        "text": "[Fast Refresh] rebuilding",
+        "type": "log"
+      },
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "[Fast Refresh] done in 131ms"
+          }
+        ],
+        "text": "[Fast Refresh] done in 131ms",
+        "type": "log"
+      },
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "[autogen] char kyotaro:pajamas:main ✗ failed in 32.8s:"
+          },
+          {
+            "type": "string",
+            "value": "검증 표본: 생성 실패"
+          }
+        ],
+        "text": "[autogen] char kyotaro:pajamas:main ✗ failed in 32.8s: 검증 표본: 생성 실패",
+        "type": "warning"
+      },
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "[artist timing] char komatsu:pajamas:main 32.7s"
+          },
+          {
+            "type": "string",
+            "value": ""
+          }
+        ],
+        "text": "[artist timing] char komatsu:pajamas:main 32.7s ",
+        "type": "log"
+      },
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "[autogen] char kyotaro:pajamas:main ✗ failed in 0.0s:"
+          },
+          {
+            "type": "string",
+            "value": "Failed to fetch"
+          }
+        ],
+        "text": "[autogen] char kyotaro:pajamas:main ✗ failed in 0.0s: Failed to fetch",
+        "type": "warning"
+      },
+      {
+        "args": [
+          {
+            "type": "string",
+            "value": "[artist timing] char komatsu:pajamas:main 0.1s"
+          },
+          {
+            "type": "string",
+            "value": ""
+          }
+        ],
+        "text": "[artist timing] char komatsu:pajamas:main 0.1s ",
+        "type": "log"
+      }
+    ]
+  },
+  "_meta": {
+    "runtimeId": "da993342-3f2f-4d76-bbf0-e447825a810b"
+  }
+}

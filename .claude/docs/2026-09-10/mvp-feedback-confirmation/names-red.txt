@@ -1,0 +1,37 @@
+
+ RUN  v4.1.6 /Users/xcape/projects/tale-studio
+
+(node:72825) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ tests/writer/legacy-preview-candidate-names.test.ts (3 tests | 1 failed) 7ms
+   × 과거 씬에 남은 장소 식별자는 같은 실행에 보존된 장소 이름으로 보여준다. 6ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/writer/legacy-preview-candidate-names.test.ts > 과거 씬에 남은 장소 식별자는 같은 실행에 보존된 장소 이름으로 보여준다.
+AssertionError: expected [ Array(1) ] to deeply equal [ Array(1) ]
+
+- Expected
++ Received
+
+  [
+-   "쿄타로가 체육관 옆 교내 자판기 코너에서 음료수를 뽑고 있다.",
++   "쿄타로가 체육관 옆 vending_machine_corner에서 음료수를 뽑고 있다.",
+  ]
+
+ ❯ tests/writer/legacy-preview-candidate-names.test.ts:36:34
+     34|   const original = structuredClone(saved)
+     35|   const result = await preview(saved)
+     36|   expect(result.scenes[0].beats).toEqual(['쿄타로가 체육관 옆 교내 자판기 코너에서 음료수를…
+       |                                  ^
+     37|   expect(result.roster).toContainEqual({ slug: 'vending_machine_corner…
+     38|   expect(saved).toEqual(original)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 2 passed (3)
+   Start at  11:31:00
+   Duration  142ms (transform 23ms, setup 9ms, import 44ms, tests 7ms, environment 0ms)
+

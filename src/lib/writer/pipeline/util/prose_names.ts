@@ -5,7 +5,7 @@
 //   규칙: 산문 필드는 표시 이름, 구조 칸(characters_in_scene·character_id·gaze_arc·camera_target·prop id)은 id 그대로.
 //   지시서(1차 방어)가 규칙을 말하고, 여기(2차 방어)가 남은 id 를 이름으로 바꾼다 — 모르는 id 는 지어내지 않는다.
 import { resolveEntityNames } from '@/lib/writer/resolve-entity-names'
-import type { Characters, DecoupageShot, Scenes, ShotDesign } from '@/lib/writer/types/pipeline'
+import type { BackgroundContract, Characters, DecoupageShot, Scenes, ShotDesign } from '@/lib/writer/types/pipeline'
 
 export interface ProseEntity {
   id: string
@@ -26,15 +26,15 @@ const fix = (text: string | undefined | null, entities: readonly ProseEntity[]):
   typeof text === 'string' ? resolveEntityNames(text, entities) : text ?? undefined
 
 /** 씬 스토리 — scene_actions·요약·대사 문장. characters_in_scene·character_id 는 그대로. new_characters 의 이름도 로스터에 든다. */
-export function cleanSceneProse(scenes: Scenes, characters: Characters): Scenes {
-  const entities = castEntities(characters, scenes.new_characters?.map((n) => ({ id: n.id, name: n.name })))
+export function cleanSceneProse(scenes: Scenes, characters: Characters, world?: BackgroundContract): Scenes {
+  const entities = castEntities(characters, [...(scenes.new_characters ?? []), ...(world?.locations ?? [])])
   if (entities.length === 0) return scenes
   return {
     ...scenes,
     scenes: scenes.scenes.map((sc) => ({
       ...sc,
       dialogue_summary: fix(sc.dialogue_summary, entities) ?? sc.dialogue_summary,
-      ...(sc.key_dialogue ? { key_dialogue: sc.key_dialogue.map((d) => ({ ...d, line: fix(d.line, entities) ?? d.line })) } : {}),
+      ...(sc.key_dialogue ? { key_dialogue: sc.key_dialogue.map((d) => ({ ...d, line: fix(d.line, entities) ?? d.line, delivery: fix(d.delivery, entities) ?? d.delivery })) } : {}),
       scene_actions: (sc.scene_actions ?? []).map((a) => (typeof a === 'string' ? resolveEntityNames(a, entities) : a)),
     })),
   }

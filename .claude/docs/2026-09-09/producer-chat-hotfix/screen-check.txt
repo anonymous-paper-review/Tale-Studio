@@ -1,0 +1,122 @@
+- main
+  - paragraph
+    - StaticText "수정 확인 · 일본풍 요청 / 대사 언어는 답변 전 미정 · 고정 응답으로 재현"
+  - heading "Meeting Room" [level=1, ref=e2]
+  - button "도움말: 스토리·설정·캐스트를 채우는 기획 회의실이에요. 프로듀서와 대화하면 보드가 함께 채워지고, 필수 항목이 모두 차면 Writer로 넘길 수 있어요." [ref=e3]
+  - complementary
+    - heading "제작 여정" [level=2, ref=e12]
+    - generic
+      - generic
+        - StaticText "1"
+        - heading "이야기 씨앗" [level=3, ref=e28]
+        - paragraph
+          - StaticText "장면 하나, 기분 하나면 충분해요. 채팅에 던져 보세요."
+      - generic
+        - StaticText "2"
+        - heading "설정 확정" [level=3, ref=e29]
+        - paragraph
+          - StaticText "이야기하다 보면 채워져요: 러닝타임·장르·포맷·언어."
+      - generic
+        - StaticText "3"
+        - heading "주인공 등장" [level=3, ref=e30]
+        - paragraph
+          - StaticText "아직 인물이 없어요. 채팅에서 한 명 묘사해 보세요."
+      - generic
+        - StaticText "4"
+        - heading "무대 완성" [level=3, ref=e31]
+        - paragraph
+          - StaticText "이름·모습·용도가 있는 배경 1개가 필요해요."
+      - generic
+        - StaticText "5"
+        - heading "Writer 호출" [level=3, ref=e32]
+        - paragraph
+          - StaticText "마일스톤을 채우면 Writer를 호출할 수 있어요."
+  - generic
+    - StaticText "⌘/Ctrl+클릭 멘션"
+    - StaticText "NOW ASSEMBLING"
+    - button "아직 제목이 없는 이야기" [ref=e17]
+      - heading "아직 제목이 없는 이야기" [level=1, ref=e33]
+    - paragraph
+      - StaticText "채팅에 이야기를 던지면 Producer가 여기로 계속 정리해요. 장면 하나, 기분 하나면 충분해요."
+    - button "러닝타임 300초" [expanded=false, ref=e18]
+      - StaticText "러닝타임"
+      - StaticText "300초"
+    - button "장르 비어 있음" [expanded=false, ref=e19]
+      - StaticText "장르"
+      - StaticText "비어 있음"
+    - StaticText "스타일"
+    - StaticText "일본 멜로"
+    - button "포맷 16:9 Horizontal" [expanded=false, ref=e20]
+      - StaticText "포맷"
+      - StaticText "16:9 Horizontal"
+    - button "톤 비어 있음" [expanded=false, ref=e21]
+      - StaticText "톤"
+      - StaticText "비어 있음"
+    - button "대사 언어 비어 있음" [expanded=false, ref=e22]
+      - StaticText "대사 언어"
+      - StaticText "비어 있음"
+    - button "채팅 언어 한국어" [expanded=false, ref=e23]
+      - StaticText "채팅 언어"
+      - StaticText "한국어"
+  - generic
+    - heading "Casting" [level=2, ref=e13]
+    - StaticText "인물 0"
+    - button "인물" [ref=e14]
+    - paragraph
+      - StaticText "아직 캐스트가 없어요"
+    - paragraph
+      - StaticText "추가하고 싶은 인물과 사물에 대한 묘사를 AI Producer에게 알려주세요"
+  - generic
+    - heading "Background" [level=2, ref=e15]
+    - StaticText "준비됨 0 / 전체 0"
+    - button "배경" [ref=e16]
+    - paragraph
+      - StaticText "아직 배경 설정이 없어요"
+    - paragraph
+      - StaticText "추가하고 싶은 배경이나 세계관에 대한 묘사를 AI Producer에게 알려주세요"
+- complementary
+  - separator
+  - StaticText "에이전트 채팅"
+  - StaticText "Producer"
+  - StaticText "모든 단계가 이어지는 하나의 대화"
+  - button "Writer로 넘기기" [ref=e4]
+  - button "채팅 접기" [ref=e5]
+  - LayoutTable
+    - generic
+      - separator "Producer 구간"
+        - StaticText "Producer"
+        - StaticText "· "
+        - StaticText "지금"
+      - generic
+        - StaticText "일본 배경 학교의 일상물을 만들고 싶어. 실사풍이면 좋겠어. 시간은 한 5분 정도면 좋을 것 같아.\n\n남자주인공, 여자주인공이 수업 중 몰래 장난치고 학교 옥상에서 밥 먹고, 해질 무렵 집에 같이 가는 내용. 일본 특유의 분위기가 잘 보이면 좋겠어."
+        - button "메시지 복사" [ref=e36]
+      - StaticText "Producer"
+      - generic
+        - StaticText "일본 학원 일상물의 잔잔하고 따뜻한 분위기로 잡았어요.\n\n스타일은 실사풍의 일본 멜로로 설정했어요.\n\n장르는 일상과 로맨스 중 어느 쪽에 더 가까운가요?"
+        - button "메시지 복사" [ref=e37]
+  - button "1 잔잔한 일상 중심" [ref=e6]
+    - StaticText "1"
+    - StaticText "잔잔한 일상 중심"
+  - button "2 설레는 로맨스 중심" [ref=e7]
+    - StaticText "2"
+    - StaticText "설레는 로맨스 중심"
+  - button "3 둘 다 균형 있게" [ref=e8]
+    - StaticText "3"
+    - StaticText "둘 다 균형 있게"
+  - button "4 직접 입력…" [ref=e9]
+    - StaticText "4"
+    - StaticText "직접 입력…"
+  - button "계속하기" [disabled, ref=e10]
+  - paragraph
+    - StaticText "↑↓·1-4 선택 (2회=확정) · Enter 확정 · Esc 닫기"
+  - button "선택지 닫기" [ref=e11]
+  - textbox "위 선택지에서 답해 주세요" [disabled, ref=e34]
+  - button "파일 첨부" [ref=e24]
+  - button "Producer" [expanded=false, ref=e25]
+    - StaticText "Producer"
+  - button "스타일 선택" [expanded=false, ref=e26]
+  - button "보내기" [disabled, ref=e27]
+- region "Notifications alt+T" [ref=e1]
+- button "Open Next.js Dev Tools" [expanded=false, ref=e35]
+  - image
+- alert

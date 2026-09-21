@@ -5,7 +5,7 @@
 // → 사용자가 브라우저를 닫아도 결과가 유실되지 않는다(동기/클라폴링 대비 핵심 이점).
 //
 // 멱등: 같은 request_id 재전송 대비 status==='queued'일 때만 처리. 빠르게 2xx 반환(FAL 15s 타임아웃).
-import { NextResponse } from 'next/server'
+import { NextResponse, after } from 'next/server'
 import {
   readFalWebhookHeaders,
   verifyFalWebhook,
@@ -24,6 +24,7 @@ import {
 import { reconcileJobFromFal } from '@/lib/fal/reconcile'
 import { describeFinalizeError } from '@/lib/fal/error-evidence'
 import { releaseTakesForJob } from '@/lib/billing/take-hold'
+import { continueVideoBatch } from '@/lib/director/batch-continue'
 
 // #payments-phase-2 #gen-quota-atomic-gate: 영상 잍(shot_video 레거시 unlinked 포함/shot_previz_video)이
 //   failGenerationJob 경로로 종결될 때만 hold 반환을 함께 부른다. markDirectorVideoAttemptFailed 는 자체적으로
@@ -54,6 +55,20 @@ function extractImageUrl(payload: unknown): string {
 function extractVideoUrl(payload: unknown): string {
   const data = payload as { video?: { url?: string } }
   return data?.video?.url ?? ''
+}
+
+/**
+ * 응답을 보낸 뒤 실행한다(#webhook-answers-fast 2026-09-08).
+ *
+ * after() 는 요청 컨텍스트 안에서만 쓸 수 있다 — 테스트처럼 컨텍스트 밖이면 던진다.
+ *   그때는 그냥 그 자리에서 실행한다. 프로덕션에서는 after() 가 잡아 응답 뒤로 미룬다.
+ */
+async function runAfterResponse(work: () => Promise<void>): Promise<void> {
+  try {
+    after(work)
+  } catch {
+    await work()
+  }
 }
 
 export async function POST(req: Request) {
@@ -119,23 +134,57 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: true })
   }
 
+  // 여기서부터는 접수 완료 — 무거운 저장은 응답을 보낸 뒤에 한다(#webhook-answers-fast 2026-09-08).
+  //   예전에는 finalize 를 응답 전에 await 했다. 영상 다운로드(최대 128MiB, 제한 45초) + 스토리지
+  //   업로드 + DB 갱신이 fal 의 15초 대기(위 주석)를 넘기면 fal 이 실패로 보고 같은 알림을 다시 보냈고,
+  //   그러면 128MiB 를 또 내려받았다. maxDuration 60 초마저 넘기면 함수가 죽어 잡은 queued 로 남고
+  //   또 재전송 — 루프가 됐다. 게다가 위 멱등 가드(status==='queued')와 실제 상태 변경 사이가
+  //   그만큼 벌어져 재전송 둘이 함께 통과할 수 있었다.
+  //
+  //   after() 는 응답을 보낸 뒤 같은 요청 컨텍스트에서 계속 실행한다(Next.js 16). fal 은 즉시 2xx 를
+  //   받아 재전송하지 않고, 실패해도 잡은 queued 로 남아 폴링·유령 청소부가 회수한다.
+  const result = job.kind === 'shot_video' || job.kind === 'shot_previz_video'
+    ? { media: 'video' as const, url: extractVideoUrl(body.payload), payload: body.payload }
+    : { media: 'image' as const, url: extractImageUrl(body.payload), payload: body.payload }
+  if (!result.url) {
+    const msg = `no ${result.media} url in webhook payload`
+    console.error('[fal/webhook]', msg, job.id)
+    // 결과 주소가 없으면 저장할 게 없다 — 그대로 실패 처리하고 잡아둔 Take 를 돌려준다.
+    if (job.video_clip_id) {
+      await markDirectorVideoAttemptFailed(job.project_id, job.id, msg)
+    } else {
+      await failGenerationJob(job.id, msg)
+      if (isTakeBilledVideoKind(job.kind)) {
+        try {
+          await releaseTakesForJob(job.id)
+        } catch (releaseError) {
+          console.error('[fal/webhook] take release failed:', releaseError instanceof Error ? releaseError.message : releaseError)
+        }
+      }
+    }
+    return NextResponse.json({ ok: true })
+  }
+
+  await runAfterResponse(async () => {
+  let saved = false
   try {
-    const result = job.kind === 'shot_video' || job.kind === 'shot_previz_video'
-      ? { media: 'video' as const, url: extractVideoUrl(body.payload), payload: body.payload }
-      : { media: 'image' as const, url: extractImageUrl(body.payload), payload: body.payload }
-    if (!result.url) throw new Error(`no ${result.media} url in webhook payload`)
     await finalizeGenerationJob(job, result)
+    saved = true
   } catch (e) {
     const msg = `[finalize] ${describeFinalizeError(e)}`
     if (e instanceof GenerationJobTerminalTransitionError) {
       // 중복 finalize 경쟁(webhook ↔ 폴링 reconcile) — 다른 경로가 이미 종결한 잡.
       //   실패 아님: fail 마킹을 시도하면 같은 에러가 또 나서 500 이 됐다(2026-07-22 previz 실측).
       console.warn('[fal/webhook] duplicate finalize ignored (already terminal):', job.id)
-      return NextResponse.json({ ok: true, deduped: true })
+      return
     }
     if (e instanceof DirectorVideoCompletionPersistenceError) {
-      console.error('[fal/webhook] video persistence failed; retaining queued attempt:', msg)
-      throw e
+      // 영상·이미지 공통(#image-persist-retryable 2026-09-08) — 일시적 저장 실패는 queued 로 두어
+      //   다음 webhook·폴링이 다시 시도하게 한다. 결과는 fal 큐에 남아 있으므로 재시도가 공짜다.
+      //   응답은 이미 나갔으므로 던져도 fal 에 전달되지 않는다 — 잡을 queued 로 남기는 것이 목적이고
+      //   그건 finalize 가 이미 했다. 여기서는 기록만 남기고 끝낸다.
+      console.error('[fal/webhook] media persistence failed; retaining queued attempt:', msg)
+      return
     }
     console.error('[fal/webhook] finalize failed:', msg)
     if (job.video_clip_id) {
@@ -151,6 +200,18 @@ export async function POST(req: Request) {
       }
     }
   }
+
+  // 저장이 끝났으면 같은 묶음의 다음 것을 낸다(#batch-resume 슬라이스 B 2026-09-09).
+  //   저장이 실패했으면 이 영상은 아직 안 끝난 것이다 — 이어가면 남은 개수 계산이 틀어진다.
+  if (!saved || !job.batch_id) return
+  try {
+    await continueVideoBatch({ batchId: job.batch_id, projectId: job.project_id })
+  } catch (err) {
+    // 이어가기 실패를 위 catch 로 흘리면 안 된다 — 거기 가면 방금 저장에 성공한 영상을
+    //   실패로 마킹하고 Take 까지 돌려준다. 여기서 삼키고 주기 점검(약속 10)에 맡긴다.
+    console.error('[fal/webhook] batch continue failed:', job.batch_id, err instanceof Error ? err.message : err)
+  }
+  })
 
   return NextResponse.json({ ok: true })
 }

@@ -1,0 +1,288 @@
+{
+  "environment": "sandbox",
+  "email": "paddle-sandbox-20260909-01@talestudio.art",
+  "page": "1d316599-658b-474c-b6e0-05f89545f85f",
+  "createdAt": "2026-09-09T08:26:22.886Z",
+  "transactions": [
+    {
+      "id": "txn_01m22qc6at7dpe47xnwnwwynve",
+      "status": "draft",
+      "subscriptionId": null,
+      "total": "3000",
+      "currency": "USD",
+      "priceIds": [
+        "pri_01m1xnrtwzk22vrchsgsjxcx51"
+      ]
+    },
+    {
+      "id": "txn_01m22phzd3xcs93r2g3m9nyyzj",
+      "status": "completed",
+      "subscriptionId": null,
+      "total": "2900",
+      "currency": "USD",
+      "priceIds": [
+        "pri_01m1xnrzs83k1tmkyyfsak7v16"
+      ]
+    },
+    {
+      "id": "txn_01m22n0brb6h60e2gxrp0e1jrn",
+      "status": "completed",
+      "subscriptionId": "sub_01m22pe4h4873c1kg6c6p0ref1",
+      "total": "1500",
+      "currency": "USD",
+      "priceIds": [
+        "pri_01m1xnrtbf38ccvwak0kq9rb65"
+      ]
+    }
+  ],
+  "userId": "2b8d0ef9-94d2-49bc-ad0f-4851c69a43bd",
+  "workspaceId": "b2e9300a-9eaa-4020-b288-b1a1dbc37529",
+  "replays": {
+    "ntf_01m22pty1b25b6zr9k239by4hd": {
+      "sourceId": "ntf_01m22pe65vkb1k5bvqnk2e5nwz",
+      "transactionId": "txn_01m22n0brb6h60e2gxrp0e1jrn",
+      "eventId": "evt_01m22pe5nb3xqag9ywydg0a6bg",
+      "beforeLedger": [
+        {
+          "id": "e7f38591-226c-46e4-9869-bec041990c41",
+          "kind": "grant_plan",
+          "delta": 16,
+          "ref_id": "txn_01m22n0brb6h60e2gxrp0e1jrn"
+        }
+      ],
+      "recoveredFrom": "Replay command response and pre-replay notifications evidence at 2026-09-09T09:08:25.031Z; parallel helper save had overwritten this record",
+      "duplicateGrantVerified": true,
+      "verifiedAt": "2026-09-09T09:10:14.984Z"
+    }
+  },
+  "lastObserved": {
+    "at": "2026-09-09T09:58:35.745Z",
+    "workspace": {
+      "id": "b2e9300a-9eaa-4020-b288-b1a1dbc37529",
+      "plan": "free"
+    },
+    "ledger": [
+      {
+        "id": "e7f38591-226c-46e4-9869-bec041990c41",
+        "kind": "grant_plan",
+        "delta": 16,
+        "grant_id": null,
+        "ref_id": "txn_01m22n0brb6h60e2gxrp0e1jrn",
+        "ref_kind": "paddle_transaction",
+        "reason": "paddle plan s1 (api)",
+        "expires_at": "2026-10-09T09:01:59.21613+00:00",
+        "created_at": "2026-09-09T09:02:07.863366+00:00"
+      },
+      {
+        "id": "048a0b6d-a31e-4995-9f24-129a9edb8109",
+        "kind": "grant_purchase",
+        "delta": 50,
+        "grant_id": null,
+        "ref_id": "txn_01m22phzd3xcs93r2g3m9nyyzj",
+        "ref_kind": "paddle_transaction",
+        "reason": "paddle pack mini",
+        "expires_at": "2027-09-09T09:09:51.336+00:00",
+        "created_at": "2026-09-09T09:09:56.071289+00:00"
+      },
+      {
+        "id": "7b9e9e4d-d00f-48bb-b852-f90be190091f",
+        "kind": "refund_revoke",
+        "delta": -16,
+        "grant_id": null,
+        "ref_id": "adj_01m22ph60d3z458p3gfts63dxw",
+        "ref_kind": "paddle_adjustment",
+        "reason": "paddle refund of txn_01m22n0brb6h60e2gxrp0e1jrn (100%)",
+        "expires_at": null,
+        "created_at": "2026-09-09T09:10:04.88475+00:00"
+      },
+      {
+        "id": "34b29cf8-c9e0-4431-bd94-0cd93fc7529f",
+        "kind": "refund_revoke",
+        "delta": -50,
+        "grant_id": null,
+        "ref_id": "adj_01m22pyw1vn47zg50c8a5913vg",
+        "ref_kind": "paddle_adjustment",
+        "reason": "paddle refund of txn_01m22phzd3xcs93r2g3m9nyyzj (100%)",
+        "expires_at": null,
+        "created_at": "2026-09-09T09:20:06.598127+00:00"
+      }
+    ],
+    "subscriptions": [
+      {
+        "mor_subscription_id": "sub_01m22pe4h4873c1kg6c6p0ref1",
+        "status": "canceled",
+        "plan": "s1",
+        "current_period_end": "2026-10-09T09:11:34.843+00:00"
+      }
+    ],
+    "events": [
+      {
+        "mor_event_id": "evt_01m22pwjkscpe4qbb6rcf34sbv",
+        "type": "transaction.completed",
+        "processed_at": "2026-09-09T09:09:56.219+00:00",
+        "received_at": "2026-09-09T09:09:54.11606+00:00"
+      },
+      {
+        "mor_event_id": "evt_01m22pe5nb3xqag9ywydg0a6bg",
+        "type": "transaction.completed",
+        "processed_at": "2026-09-09T09:02:08.02+00:00",
+        "received_at": "2026-09-09T09:02:03.536313+00:00"
+      },
+      {
+        "mor_event_id": "evt_01m22pe4p8v4wm2d5g6s468acv",
+        "type": "subscription.activated",
+        "processed_at": "2026-09-09T09:02:05.802+00:00",
+        "received_at": "2026-09-09T09:02:02.903334+00:00"
+      },
+      {
+        "mor_event_id": "evt_01m22ptzbe79z4s3nnqrn232sq",
+        "type": "subscription.updated",
+        "processed_at": "2026-09-09T09:09:03.172+00:00",
+        "received_at": "2026-09-09T09:09:01.6467+00:00"
+      },
+      {
+        "mor_event_id": "evt_01m22pzp5ve5g6gw1z5mtmznkb",
+        "type": "subscription.canceled",
+        "processed_at": "2026-09-09T09:11:37.486+00:00",
+        "received_at": "2026-09-09T09:11:36.002955+00:00"
+      },
+      {
+        "mor_event_id": "evt_01m22pzp5vpgqyhd9nvn9s2x7b",
+        "type": "subscription.updated",
+        "processed_at": "2026-09-09T09:11:38.074+00:00",
+        "received_at": "2026-09-09T09:11:35.99442+00:00"
+      },
+      {
+        "mor_event_id": "evt_01m22ph619v98ykjcd1bp20jrz",
+        "type": "adjustment.created",
+        "processed_at": "2026-09-09T09:03:40.947+00:00",
+        "received_at": "2026-09-09T09:03:40.808807+00:00"
+      },
+      {
+        "mor_event_id": "evt_01m22pwv7gdvpk0qn7b86zmr3n",
+        "type": "adjustment.updated",
+        "processed_at": "2026-09-09T09:10:05.186+00:00",
+        "received_at": "2026-09-09T09:10:02.425374+00:00"
+      },
+      {
+        "mor_event_id": "evt_01m22pyw29e41p2t5n2z75d5rh",
+        "type": "adjustment.created",
+        "processed_at": "2026-09-09T09:11:09.838+00:00",
+        "received_at": "2026-09-09T09:11:09.698354+00:00"
+      },
+      {
+        "mor_event_id": "evt_01m22qf4rv0bf5bkywwkvj9jwb",
+        "type": "adjustment.updated",
+        "processed_at": "2026-09-09T09:20:07.113+00:00",
+        "received_at": "2026-09-09T09:20:03.521002+00:00"
+      }
+    ]
+  },
+  "refunds": {
+    "txn_01m22n0brb6h60e2gxrp0e1jrn": [
+      {
+        "id": "adj_01m22ph60d3z458p3gfts63dxw",
+        "status": "approved"
+      }
+    ],
+    "txn_01m22phzd3xcs93r2g3m9nyyzj": [
+      {
+        "id": "adj_01m22pyw1vn47zg50c8a5913vg",
+        "status": "approved"
+      }
+    ]
+  },
+  "notifications": {
+    "txn_01m22n0brb6h60e2gxrp0e1jrn": [
+      {
+        "id": "ntf_01m22ph6dd2n6zmpj3zg1v4djw",
+        "type": "adjustment.created",
+        "status": "delivered",
+        "origin": "event",
+        "eventId": "evt_01m22ph619v98ykjcd1bp20jrz",
+        "settingId": "ntfset_01m1x9ykr2t1k432f4d39shff9",
+        "deliveredAt": "2026-09-09T09:03:41.255353Z",
+        "timesAttempted": 1
+      },
+      {
+        "id": "ntf_01m22pe65vkb1k5bvqnk2e5nwz",
+        "type": "transaction.completed",
+        "status": "delivered",
+        "origin": "event",
+        "eventId": "evt_01m22pe5nb3xqag9ywydg0a6bg",
+        "settingId": "ntfset_01m1x9ykr2t1k432f4d39shff9",
+        "deliveredAt": "2026-09-09T09:02:27.328273Z",
+        "timesAttempted": 2
+      }
+    ]
+  },
+  "cancellations": {
+    "sub_01m22pe4h4873c1kg6c6p0ref1": {
+      "requested": "immediately",
+      "status": "canceled",
+      "scheduledChange": null,
+      "at": "2026-09-09T09:11:34.913Z"
+    }
+  },
+  "cancellationHistory": [
+    {
+      "subscriptionId": "sub_01m22pe4h4873c1kg6c6p0ref1",
+      "requested": "next_billing_period",
+      "status": "active",
+      "scheduledChange": {
+        "action": "cancel",
+        "effective_at": "2026-10-09T09:01:59.21613Z",
+        "resume_at": null,
+        "items": null
+      },
+      "at": "2026-09-09T09:09:00.477Z"
+    },
+    {
+      "subscriptionId": "sub_01m22pe4h4873c1kg6c6p0ref1",
+      "requested": "immediately",
+      "status": "canceled",
+      "scheduledChange": null,
+      "at": "2026-09-09T09:11:34.913Z"
+    }
+  ],
+  "notificationLogs": {
+    "ntf_01m22pty1b25b6zr9k239by4hd": [
+      {
+        "id": "ntflog_01m22ptzbyjqfmk49abc9b3hbn",
+        "responseCode": 200,
+        "attemptedAt": "2026-09-09T09:09:00.414297Z",
+        "result": "duplicate"
+      }
+    ]
+  },
+  "portalCheck": {
+    "at": "2026-09-09T09:18:22.463Z",
+    "status": 200,
+    "origins": {
+      "cancelUrl": null,
+      "overviewUrl": "https://sandbox-customer-portal.paddle.com",
+      "updatePaymentMethodUrl": null
+    },
+    "sessionUrlsStored": false,
+    "portalOpened": false,
+    "verified": true
+  },
+  "paymentLinkProbe": {
+    "creationStartedAt": "2026-09-09T09:18:23.537Z",
+    "product": "s2",
+    "purchaseSubmitted": false,
+    "responseStatus": 200,
+    "transactionId": "txn_01m22qc6at7dpe47xnwnwwynve",
+    "scopeVerifiedAt": "2026-09-09T09:18:25.302Z",
+    "lastObserved": {
+      "at": "2026-09-09T09:18:36.617Z",
+      "heading": "Paddle 결제창에서 계속하세요",
+      "liveIframePresent": false,
+      "origin": "http://localhost:3000",
+      "path": "/checkout",
+      "sandboxIframePresent": true,
+      "transactionMatches": true,
+      "verified": true
+    }
+  }
+}

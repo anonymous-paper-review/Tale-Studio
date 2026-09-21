@@ -1,10 +1,14 @@
+import { CHAT_AGENT_GUIDE, buildChatTaskContext, normalizeChatHistory } from '@/lib/chat-harness'
+import { parseChatModelSettings } from '@/lib/chat-model-settings'
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
+import { prepareChatTools } from '@/lib/chat-tools/protocol'
 import { buildProducerSystem } from './system-prompt'
 import { imageCardFillDirective, preservedScriptDirective } from './preserve-context'
 import { parseExtractedSettings } from '@/lib/parse-extracted-settings'
+import { resolveProducerDialogueLanguage } from '@/lib/producer-dialogue-language'
 import { parseChatChoices } from '@/lib/chat-choices'
 import { castMentions, backgroundMentions } from '@/lib/card-mention'
 import {
@@ -21,28 +25,15 @@ import { buildReferenceDigest, getProjectReferenceId } from '@/lib/reference-imp
 import { buildChatTrace, createChatTraceId, type ChatLlmUsage } from '@/lib/chat-trace'
 import { persistChatTraceBestEffort } from '@/lib/chat-trace-server'
 
-interface ChatMessage {
-  role: 'user' | 'model'
-  content: string
-}
 
-interface IncomingHistoryItem {
-  role: 'user' | 'model'
-  content: string
-}
 
-function normalizeHistory(history: unknown): ChatMessage[] {
-  if (!Array.isArray(history)) return []
-  return (history as IncomingHistoryItem[]).map((m) => ({
-    role: m.role,
-    content: m.content,
-  }))
-}
+const normalizeHistory = normalizeChatHistory
 
 
 export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
+  let llmUsage: ChatLlmUsage | null = null
   try {
     const user = await getUser()
     if (!user) {
@@ -51,6 +42,7 @@ export async function POST(req: Request) {
 
     const {
       message,
+      modelSettings: rawModelSettings, taskContext,
       history,
       uiLocale,
       currentSettings,
@@ -60,10 +52,15 @@ export async function POST(req: Request) {
       gate,
       attachmentImageUrls,
       projectId,
+      chatTools: toolsEnabled,
+      chatWorkflow,
+      toolMessages,
       traceId: requestedTraceId,
       preserveScript,
       cardFill,
     } = await req.json()
+    const modelSettings = parseChatModelSettings(rawModelSettings)
+    if (!modelSettings) return NextResponse.json({ error: 'Invalid chat model settings' }, { status: 400 })
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json(
@@ -116,7 +113,15 @@ export async function POST(req: Request) {
       )
     }
 
+    const dialogueLanguage = resolveProducerDialogueLanguage({
+      message,
+      history,
+      currentLanguage: currentSettings?.dialogueLanguage,
+    })
     const contextParts: string[] = []
+    contextParts.push(dialogueLanguage
+      ? `[Dialogue Language Decision]\n${dialogueLanguage}\nThe user confirmed this dialogue language. Use this exact code for dialogueLanguage. Never infer a different language from the setting, country, names, visual style, or chat language.`
+      : '[Dialogue Language Decision]\nUNDECIDED\nThe user has not confirmed a dialogue language. Omit dialogueLanguage from extractedSettings. Ask the user in the ongoing conversation before confirming it; at most one focused question per reply. If this reply already asks about another missing detail, leave dialogue language unresolved for a later turn.')
     if (storyText) {
       contextParts.push(`[Current Story Text]\n${storyText}`)
       // #script-preserve: 보존 중인 대본은 다시 쓰지 말라고 알린다(클라 가드가 최종 방어).
@@ -212,6 +217,7 @@ export async function POST(req: Request) {
       const hard = Array.isArray(g.hardMissing) ? g.hardMissing : []
       const soft = Array.isArray(g.softMissing) ? g.softMissing : []
       const lines = [
+        'This checklist blocks Writer handoff; it is not a request to fill missing fields during every query/edit. Missing visual style is handled by the app picker.',
         `canHandoff: ${g.canHandoff === true}`,
         hard.length ? `남은 필수 항목(hard, 핸드오프 차단): ${hard.join(' / ')}` : '남은 필수 항목: 없음',
         soft.length ? `권장 항목(soft, 차단 안 함): ${soft.join(' / ')}` : null,
@@ -223,14 +229,17 @@ export async function POST(req: Request) {
       ? contextParts.join('\n\n') + '\n\n'
       : ''
 
+    if (toolsEnabled === true && (!ownsCurrentProject)) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+    const appTools = prepareChatTools('producer', toolsEnabled, toolMessages, chatWorkflow)
+
     const normalizedHistory = normalizeHistory(history)
     const traceId = createChatTraceId(requestedTraceId)
-    let llmUsage: ChatLlmUsage | null = null
     const systemPrompt =
+      CHAT_AGENT_GUIDE +
       buildProducerSystem(projectLocale ?? 'ko') +
       CHAT_OUTPUT_FORMAT_GUIDE +
       responseLanguageDirective(projectLocale)
-    const userPrompt = `${contextPrefix}${message}`
+    const userPrompt = `${contextPrefix}${buildChatTaskContext(taskContext)}${message}`
 
     let text: string
     try {
@@ -244,6 +253,9 @@ export async function POST(req: Request) {
         {
           webSearch: true,
           imageUrls: attachments.urls,
+          appTools,
+          modelSettings,
+          signal: req.signal,
           onUsage: (usage) => {
             llmUsage = usage
           },
@@ -267,7 +279,13 @@ export async function POST(req: Request) {
       throw err
     }
 
-    const { reply: replyRaw, extractedSettings } = parseExtractedSettings(text)
+    if (appTools?.turn) return NextResponse.json({ toolTurn: appTools.turn, toolSupport: true, toolUsage: llmUsage, contentLocale: projectLocale, localeSwitched })
+
+    const { reply: replyRaw, extractedSettings: proposedSettings } = parseExtractedSettings(text)
+    // 모델은 배경/그림체에서 발화 언어를 추측할 수 있다. 제품이 결정한 값만 보드에 적용한다.
+    const extractedSettings = { ...proposedSettings }
+    if (dialogueLanguage) extractedSettings.dialogueLanguage = dialogueLanguage
+    else delete extractedSettings.dialogueLanguage
     // #p4-choices: Foundation 빈칸을 되묻기 대신 선택지 버튼으로 — [CHOICES] 라인 추출.
     const { reply, choices, markerFound } = parseChatChoices(replyRaw)
     const trace = buildChatTrace({
@@ -284,6 +302,7 @@ export async function POST(req: Request) {
     await persistChatTraceBestEffort(projectId, trace)
 
     return NextResponse.json({
+      toolSupport: !!appTools,
       reply,
       extractedSettings,
       choices,
@@ -297,6 +316,6 @@ export async function POST(req: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[produce/chat]', message)
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: message, ...(llmUsage ? { toolUsage: llmUsage } : {}) }, { status: 500 })
   }
 }

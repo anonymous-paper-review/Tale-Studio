@@ -9,13 +9,13 @@
 //
 // 모양: 떠 있는 둥근 알림바. 배경은 그 일을 하는 에이전트 색, 진행 분량은 알림바 자체가 차오른다.
 
-import { useEffect, useState } from 'react'
+
 import { Loader2 } from 'lucide-react'
 import { useLocale, useT } from '@/lib/i18n'
 import { useProjectStore } from '@/stores/project-store'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
-import { formatRemaining } from '@/lib/writer/stage-labels'
+import { writerProgressView } from '@/lib/writer/progress-view'
 import { STAGE_FACE_COLOR } from '@/lib/constants'
 import { useGenerationBatches } from '@/lib/generation-queue'
 import { batchWorks, writerPipelineWork, type PipelineWork } from '@/lib/pipeline-progress'
@@ -29,7 +29,7 @@ function WorkPill({ work, fallbackStage }: { work: PipelineWork; fallbackStage: 
   const color = STAGE_FACE_COLOR[stage]
   const pct =
     work.total != null && work.total > 0 && work.done != null
-      ? Math.round((work.done / work.total) * 100)
+      ? Math.min(work.key === 'writer-pipeline' ? 99 : 100, Math.round((work.done / work.total) * 100))
       : null
   return (
     <div
@@ -60,7 +60,7 @@ function WorkPill({ work, fallbackStage }: { work: PipelineWork; fallbackStage: 
         aria-hidden
       />
       <span className="relative min-w-0 flex-1 truncate text-foreground">{work.label}</span>
-      {work.total != null && (
+      {work.total != null && work.key !== 'writer-pipeline' && (
         <span className="relative shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">
           {work.done != null ? `${work.done}/${work.total}` : t('{count} items', { count: work.total })}
           {work.failed ? <span className="text-destructive"> · {t('Failed {count}', { count: work.failed })}</span> : null}
@@ -80,29 +80,17 @@ function UnifiedPin({ projectId, stage }: { projectId: string; stage: StageId })
 
   const works: PipelineWork[] = []
   // writer 텍스트 파이프라인(writer_runs 폴링) — 잡 큐 밖의 진실.
-  const running = !!(
-    status?.started &&
-    !status.pipeline_completed &&
-    !status.pipeline_failed &&
-    status.current_status !== 'awaiting_confirmation'
-  )
   const writerPipeline = writerPipelineWork(status, locale)
-  if (writerPipeline) works.push(writerPipeline)
+  if (writerPipeline) {
+    const scoped = writerProgressView(status, locale)
+    works.push({ ...writerPipeline, label: scoped.label, done: scoped.done, total: scoped.total })
+  }
   // 나머지는 전부 서버 배치(약속 D1·D3·D6): 레인마다 done/total(+실패).
   works.push(...batchWorks(withStoryboardBacklog(batches, realBatchRemaining ?? 0), locale))
 
-  // 남은 예상 시간 — 과거 완료 run 실측이 있을 때만(#c4). 렌더 순수성 때문에 벽시계는 1s 틱 상태로.
-  const [nowMs, setNowMs] = useState(0)
-  useEffect(() => {
-    if (!running) return
-    const t = setInterval(() => setNowMs(Date.now()), 1000)
-    return () => clearInterval(t)
-  }, [running])
-  let footer: string | null = null
-  if (running && nowMs > 0 && status?.eta_total_ms != null && status.timings?.pipeline_started_at) {
-    const elapsed = nowMs - Date.parse(status.timings.pipeline_started_at)
-    if (!Number.isNaN(elapsed)) footer = formatRemaining(status.eta_total_ms - elapsed, locale)
-  }
+  const progress = status ? writerProgressView(status, locale) : null
+  const footer = progress && !status?.pipeline_completed && !status?.pipeline_failed
+    ? progress.detail : null
 
   if (works.length === 0) return null
   return (

@@ -26,7 +26,13 @@ vi.mock('@/lib/generation-jobs', () => ({
 vi.mock('@/lib/writer/debug-events', () => ({
   recordWriterObservabilityEvent: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: { from: mocks.from } }))
+vi.mock('@/lib/supabase/admin', () => ({
+  supabaseAdmin: {
+    from: (table: string) => table === 'generation_capacity_exempt_users'
+      ? { delete: () => ({ eq: async () => ({ error: null }) }) }
+      : mocks.from(table),
+  },
+}))
 
 import { POST } from '@/app/api/artist/retry-drafts/route'
 
@@ -119,6 +125,7 @@ describe('POST /api/artist/retry-drafts', () => {
       'character_view',
       'world_shot',
       'shot_storyboard',
+      'image_generation',
       'storyboard_real_grid',
       'shot_rough_storyboard',
     ])

@@ -5,6 +5,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { pickActiveSubscription, type SubscriptionRow } from '@/lib/billing/subscription-state'
 import { isAdminWorkspaceOwner } from '@/lib/admin'
 import { takeBillingMode } from '@/lib/billing/take-hold'
 import {
@@ -70,12 +71,8 @@ export async function GET() {
     const plan = typeof workspace.plan === 'string' ? workspace.plan : 'free'
     const isAdmin = isAdminWorkspaceOwner(user, workspace.owner_id)
 
-    const [{ data: subscription, error: subError }, { data: ledger, error: ledgerError }, { data: customer }] = await Promise.all([
-      supabaseAdmin
-        .from('subscriptions')
-        .select('plan, status, current_period_end')
-        .eq('workspace_id', workspaceId)
-        .maybeSingle(),
+    const [{ data: subscriptions, error: subError }, { data: ledger, error: ledgerError }, { data: customer }] = await Promise.all([
+      supabaseAdmin.from('subscriptions').select('*').eq('workspace_id', workspaceId),
       supabaseAdmin
         .from('take_ledger')
         .select('id, kind, delta, grant_id, expires_at, ref_kind, ref_id, reason, created_at')
@@ -84,6 +81,7 @@ export async function GET() {
       supabaseAdmin.from('billing_customers').select('mor_customer_id').eq('workspace_id', workspaceId).maybeSingle(),
     ])
     if (subError) throw subError
+    const subscription = pickActiveSubscription(subscriptions as SubscriptionRow[] | null)
     if (ledgerError) throw ledgerError
 
     const rows = (ledger ?? []) as LedgerRow[]

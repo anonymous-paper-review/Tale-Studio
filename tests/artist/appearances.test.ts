@@ -3,7 +3,7 @@
 //   오너 결정: C4 새 모습은 만든 직후 이미지를 자동 생성한다(2안). C8 지우기·이름 바꾸기·기본 지정까지(1안).
 //   탭 모양은 같은 카드 안 탭(1안). 문장 하나 = 테스트 하나. 화면 모양은 스크린샷으로 검수한다.
 //   열 번째(배경도 같은 모습 탭)는 별도 파일(promise-c-location-appearances)에서 다룬다.
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { NextRequest } from 'next/server'
@@ -17,6 +17,7 @@ vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: { from: mocks.from } }))
 vi.mock('@/lib/demo/guard-server', () => ({ demoWriteBlock: () => null }))
 vi.mock('@/lib/api/guard', () => ({ requireProjectAccess: mocks.requireProjectAccess }))
 vi.mock('@/lib/writer/i18n/derive-en', () => ({ appearanceI18nFields: mocks.appearanceI18nFields }))
+vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTrace: vi.fn(), saveChatTracePatch: vi.fn(), loadLatestChatTrace: vi.fn() }))
 // 스토어가 끌어오는 브라우저 supabase 클라이언트 — 이 파일의 스토어 테스트는 fetch 만 쓴다.
 vi.mock('@/lib/supabase/client', () => {
   const chain: Record<string, unknown> = {}
@@ -25,15 +26,19 @@ vi.mock('@/lib/supabase/client', () => {
   return { createClient: () => chain }
 })
 
-import { PATCH, DELETE } from '@/app/api/artist/character-appearance/route'
+import { POST, PATCH, DELETE } from '@/app/api/artist/character-appearance/route'
 import { AUTO_APPLY_UPDATE_TYPES, extractAppearanceCreations, validateUpdates } from '@/lib/artist/chat-updates'
-import { createPendingProposal } from '@/lib/pending-proposal'
 import { useArtistStore } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
+import { useGlobalChatStore } from '@/stores/global-chat-store'
 import type { CharacterAsset } from '@/types/asset'
 
 const ROOT = process.cwd()
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
+const originalArtistActions = {
+  generateCharacterView: useArtistStore.getState().generateCharacterView,
+  generateCharacterAllViews: useArtistStore.getState().generateCharacterAllViews,
+}
 
 function chain(result: unknown, single?: unknown) {
   const value: Record<string, unknown> = {}
@@ -70,8 +75,14 @@ beforeEach(() => {
   vi.resetAllMocks()
   mocks.requireProjectAccess.mockResolvedValue({ ok: true, userId: 'user-1' })
   mocks.appearanceI18nFields.mockImplementation(async (_id: string, native: string) => ({ appearance: native, appearance_native: native, i18n_provenance: {} }))
-  useProjectStore.setState({ projectId: 'project-1' })
-  useArtistStore.setState({ characterAssets: [character()], generatingViews: [], error: null })
+  useGlobalChatStore.getState().reset()
+  useProjectStore.setState({ projectId: 'project-1', currentStage: 'artist', projectLocale: 'ko', projectLocaleLocked: true })
+  useArtistStore.setState({ ...originalArtistActions, characterAssets: [character()], generatingViews: [], error: null })
+})
+afterEach(() => {
+  useArtistStore.setState(originalArtistActions)
+  useGlobalChatStore.getState().reset()
+  vi.unstubAllGlobals()
 })
 
 describe('약속 C — 모습 만들기: 화면과 채팅', () => {
@@ -93,19 +104,49 @@ describe('약속 C — 모습 만들기: 화면과 채팅', () => {
     expect(dialog).toMatch(/createAppearance\(char\.characterId, label\.trim\(\), appearance\.trim\(\), time, \{ generate: true, actor: 'ui' \}\)/)
   })
 
-  it('채팅에서 새 모습을 만들어 달라고 하면 승인 뒤 그 캐릭터에 그 모습이 추가된다', () => {
+  it('채팅에서 새 모습을 만들어 달라고 하면 승인 뒤 그 캐릭터에 그 모습이 추가된다', async () => {
     // 자동 실행 화이트리스트에서 빠졌다(과금이 생기므로) → 승인 채널로만 흐른다.
     expect(AUTO_APPLY_UPDATE_TYPES.has('createAppearance')).toBe(false)
     const raw = [{ type: 'createAppearance', characterId: 'char_3', label: '늙은 모습', appearance: '흰 머리', narrativeTime: 'future' }]
     expect(validateUpdates(raw)).toEqual([])
     expect(extractAppearanceCreations(raw)).toEqual([{ characterId: 'char_3', label: '늙은 모습', appearance: '흰 머리', narrativeTime: 'future' }])
-    const proposal = createPendingProposal({ stage: 'artist', kind: 'artistCreateAppearance', target: '옥화', action: 'add', impact: [], payload: raw[0] })
-    expect(JSON.parse(JSON.stringify(proposal)).kind).toBe('artistCreateAppearance')
-    const store = read('src/stores/global-chat-store.ts')
-    expect(store).toMatch(/kind: 'artistCreateAppearance'/)
-    expect(store).toMatch(/proposal\.kind === 'artistCreateAppearance'/)
-    expect(store).toMatch(/createAppearance\(characterId, label, appearance, time, \{ generate: true, actor: 'chat' \}\)/)
-    expect(read('src/app/api/artist/chat/route.ts')).toMatch(/appearanceCreations: extractAppearanceCreations\(raw\)/)
+    // 왜: 승인 전 생성 방지와 승인 후 정확한 인물·모습 저장을 호출문장의 철자 대신 실제 실행으로 검사한다.
+    const rows = chain({ data: [{ appearance_key: 'current' }, { appearance_key: 'young' }], error: null })
+    mocks.from.mockImplementation((table: string) => table === 'characters'
+      ? chain({ data: { entity_type: 'person' }, error: null })
+      : rows)
+    const createdRequests: unknown[] = []
+    const generationRequests: unknown[] = []
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      if (url === '/api/artist/chat') return Response.json({ reply: '옥화의 늙은 모습을 확인해 주세요.', updates: validateUpdates(raw), appearanceCreations: extractAppearanceCreations(raw) })
+      if (url === '/api/artist/character-appearance') {
+        const body = JSON.parse(String(init?.body))
+        createdRequests.push(body)
+        return POST(req(body, 'POST'))
+      }
+      if (url === '/api/artist/generate-sheet') {
+        generationRequests.push(JSON.parse(String(init?.body)))
+        return Response.json({ jobId: 'character-appearance-job', status: 'queued' })
+      }
+      if (url === '/api/generation-jobs/character-appearance-job') return Response.json({ data: { status: 'completed', resultUrl: 'https://images.test/old.png', error: null } })
+      if (url.startsWith('/api/artist/generation-status')) return Response.json({ failures: [], worldFailures: [] })
+      throw new Error(`Unexpected request: ${url}`)
+    }))
+    await useGlobalChatStore.getState().sendMessage('옥화의 늙은 모습을 만들어줘')
+    const proposal = useGlobalChatStore.getState().pendingProposal!
+    expect(proposal).toMatchObject({ stage: 'artist', kind: 'artistCreateAppearance', target: '옥화', payload: extractAppearanceCreations(raw)[0] })
+    expect(createdRequests).toHaveLength(0)
+    expect(generationRequests).toHaveLength(0)
+    expect(useArtistStore.getState().characterAssets[0].appearances).toHaveLength(2)
+
+    await expect(useGlobalChatStore.getState().approvePendingProposal(proposal.id)).resolves.toBe(true)
+    expect(createdRequests).toEqual([{ projectId: 'project-1', characterId: 'char_3', label: '늙은 모습', appearance: '흰 머리', narrativeTime: 'future' }])
+    expect((rows.insert as ReturnType<typeof vi.fn>).mock.calls.map(call => call[0])).toEqual([expect.objectContaining({ project_id: 'project-1', character_id: 'char_3', label: '늙은 모습', narrative_time: 'future', is_default: false })])
+    expect(generationRequests).toEqual([expect.objectContaining({ projectId: 'project-1', characterId: 'char_3', appearanceKey: 'appearance', view: 'main', actor: 'chat' })])
+    const appearances = useArtistStore.getState().characterAssets[0].appearances
+    expect(appearances[0]).toEqual(character().appearances[0])
+    expect(appearances[1]).toEqual(character().appearances[1])
+    expect(appearances[2]).toMatchObject({ appearanceKey: 'appearance', label: '늙은 모습', narrativeTime: 'future', appearance: '흰 머리', sheetUrl: 'https://images.test/old.png', isDefault: false })
   })
 
   it('새 모습은 만든 직후 자동으로 이미지가 만들어진다', async () => {

@@ -28,6 +28,7 @@ const TABS = [
   { key: 'playground', label: 'Playground', href: '/playground' },
   // #queue-console: 전 프로젝트 생성 잡 운영 콘솔 — 좀비·실패를 보는 유일한 전역 창구.
   { key: 'queue', label: 'Queue', href: '/queue' },
+  { key: 'pricing', label: 'Pricing', href: '/pricing' },
   // #payments-phase-3 P9a: 계정·결제(플랜·Take·구매 내역).
   { key: 'account', label: 'Account', href: '/account' },
 ] as const
@@ -75,13 +76,13 @@ export function DashboardHeader({
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-black/80 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
-        <div className="flex items-center gap-8">
+      <div className="mx-auto flex min-h-16 max-w-7xl flex-wrap items-center justify-between gap-3 px-6 py-3 lg:h-16 lg:flex-nowrap lg:py-0">
+        <div className="flex min-w-0 flex-wrap items-center gap-3 lg:flex-nowrap lg:gap-8">
           <Link href="/projects" className="flex items-center gap-2">
             <Film className="size-6 text-primary" />
             <span className="text-lg font-bold tracking-tight text-white">Tale Studio</span>
           </Link>
-          <nav className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 text-sm font-medium">
+          <nav className="flex max-w-full flex-wrap items-center gap-1 rounded-2xl border border-white/10 bg-white/5 p-1 text-sm font-medium sm:rounded-full">
             {TABS.map((tab) =>
               tab.key === active ? (
                 <span key={tab.key} className="rounded-full bg-white px-4 py-1.5 text-black">
@@ -91,7 +92,7 @@ export function DashboardHeader({
                 <Link
                   key={tab.key}
                   href={tab.href}
-                  className="rounded-full px-4 py-1.5 text-gray-300 transition-colors hover:text-white"
+                  className="rounded-full px-4 py-1.5 text-gray-300 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
                   {t(tab.label)}
                 </Link>

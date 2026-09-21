@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { ensureWorkspace } from '@/lib/supabase/workspace'
 import { NextResponse } from 'next/server'
 
 export async function POST(req: Request) {
@@ -16,37 +17,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // 2. Find or create workspace for this user
-    const { data: workspace } = await supabaseAdmin
-      .from('workspaces')
-      .select('id')
-      .eq('owner_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-
-    let workspaceId: string
-
-    if (workspace) {
-      workspaceId = workspace.id
-    } else {
-      const name = user.user_metadata?.full_name || user.email || 'My Studio'
-      const slug = user.id.slice(0, 8)
-
-      const { data: created, error: wsErr } = await supabaseAdmin
-        .from('workspaces')
-        .insert({ name, slug, owner_id: user.id })
-        .select('id')
-        .single()
-
-      if (wsErr || !created) {
-        return NextResponse.json(
-          { error: wsErr?.message ?? 'Failed to create workspace' },
-          { status: 500 },
-        )
-      }
-      workspaceId = created.id
-    }
+    const { id: workspaceId } = await ensureWorkspace(user)
 
     // 3a. URL ?projectId 힌트가 있으면 워크스페이스 범위로 그 프로젝트 복원
     if (requestedId) {

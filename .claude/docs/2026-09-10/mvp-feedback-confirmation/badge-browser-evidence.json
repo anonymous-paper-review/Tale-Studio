@@ -1,0 +1,74 @@
+[
+  {
+    "name": "첫 4샷 이미지 완료 → 미확인 4",
+    "expected": 4,
+    "actual": {
+      "text": "Writer\n4",
+      "label": "Writer · 아직 확인하지 않은 완료 4개"
+    }
+  },
+  {
+    "name": "추가 5샷 완료 → 미확인 9",
+    "expected": 9,
+    "actual": {
+      "text": "Writer\n9",
+      "label": "Writer · 아직 확인하지 않은 완료 9개"
+    }
+  },
+  {
+    "name": "추가 5샷 완료 → 9+ 축약 없이 14",
+    "expected": 14,
+    "actual": {
+      "text": "Writer\n14",
+      "label": "Writer · 아직 확인하지 않은 완료 14개"
+    }
+  },
+  {
+    "name": "동일 완료 재수신에도 14 유지",
+    "expected": 14,
+    "actual": {
+      "text": "Writer\n14",
+      "label": "Writer · 아직 확인하지 않은 완료 14개"
+    }
+  },
+  {
+    "name": "Director 완료는 Writer 이미지 수에 더하지 않음",
+    "expected": 14,
+    "actual": {
+      "text": "Writer\n14",
+      "label": "Writer · 아직 확인하지 않은 완료 14개"
+    }
+  },
+  {
+    "name": "실제 Writer 내비게이션 클릭 → 미확인 해제",
+    "expected": 0,
+    "actual": {
+      "text": "Writer",
+      "label": "Writer"
+    }
+  },
+  {
+    "name": "다시 떠나도 읽은 이미지가 되살아나지 않음",
+    "expected": 0,
+    "actual": {
+      "text": "Writer",
+      "label": "Writer"
+    }
+  },
+  {
+    "name": "떠난 뒤 새 이미지 한 개 완료 → 미확인 1",
+    "expected": 1,
+    "actual": {
+      "text": "Writer\n1",
+      "label": "Writer · 아직 확인하지 않은 완료 1개"
+    }
+  },
+  {
+    "name": "새 프로젝트에서 완료 0개일 때 Writer를 방문해도 떠난 뒤 첫 완료 1 표시",
+    "expected": 1,
+    "actual": {
+      "text": "Writer\n1",
+      "label": "Writer · 아직 확인하지 않은 완료 1개"
+    }
+  }
+]

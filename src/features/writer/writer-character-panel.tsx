@@ -83,6 +83,11 @@ function CharacterCard({
           {character.description}
         </p>
       ) : null}
+      {character.descriptionFallback ? (
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          {t('Translation is not available yet. Showing the original description.')}
+        </p>
+      ) : null}
     </button>
   )
 }
@@ -136,6 +141,11 @@ export function WriterCharacterPanel({
                 {w.description ? (
                   <p className="mt-1 line-clamp-4 text-xs leading-relaxed text-muted-foreground">
                     {w.description}
+                  </p>
+                ) : null}
+                {w.descriptionFallback ? (
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    {t('Translation is not available yet. Showing the original description.')}
                   </p>
                 ) : null}
               </div>

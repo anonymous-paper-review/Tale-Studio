@@ -1,0 +1,457 @@
+{
+  "fixture": "Actual RoughStoryboardView; fixed local saved shots/queue; no paid provider requests",
+  "observations": [
+    {
+      "recordedAt": "2026-09-10T06:26:10.715Z",
+      "screenshot": "18-eight.png",
+      "sample": "eight",
+      "viewport": [
+        1511,
+        1000
+      ],
+      "summary": "보드 전체 47샷\n완료 0\n생성 중 8\n대기 중 39\n실패 0",
+      "counts": [
+        47,
+        0,
+        8,
+        39,
+        0
+      ],
+      "grids": [
+        [
+          "rough-1",
+          "rough-2",
+          "rough-3",
+          "rough-4"
+        ],
+        [
+          "rough-5",
+          "rough-6",
+          "rough-7",
+          "rough-8"
+        ]
+      ],
+      "totalShots": 47,
+      "scenes": [
+        9,
+        8,
+        30
+      ],
+      "summaryLabels": [
+        {
+          "text": "보드 전체 47샷",
+          "left": 133,
+          "right": 206.9140625,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        },
+        {
+          "text": "완료 0",
+          "left": 222.9140625,
+          "right": 254.6171875,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        },
+        {
+          "text": "생성 중 8",
+          "left": 270.6171875,
+          "right": 332.0703125,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        },
+        {
+          "text": "대기 중 39",
+          "left": 348.0703125,
+          "right": 401.078125,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        },
+        {
+          "text": "실패 0",
+          "left": 417.078125,
+          "right": 448.78125,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        }
+      ],
+      "summaryInsideViewport": true,
+      "errors": [],
+      "retrySubmissions": []
+    },
+    {
+      "recordedAt": "2026-09-10T06:26:11.978Z",
+      "screenshot": "18-five.png",
+      "sample": "five",
+      "viewport": [
+        1511,
+        1000
+      ],
+      "summary": "보드 전체 47샷\n완료 8\n생성 중 5\n대기 중 34\n실패 0",
+      "counts": [
+        47,
+        8,
+        5,
+        34,
+        0
+      ],
+      "grids": [
+        [
+          "rough-9"
+        ],
+        [
+          "rough-10",
+          "rough-11",
+          "rough-12",
+          "rough-13"
+        ]
+      ],
+      "totalShots": 47,
+      "scenes": [
+        9,
+        8,
+        30
+      ],
+      "summaryLabels": [
+        {
+          "text": "보드 전체 47샷",
+          "left": 133,
+          "right": 206.9140625,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        },
+        {
+          "text": "완료 8",
+          "left": 222.9140625,
+          "right": 254.6171875,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        },
+        {
+          "text": "생성 중 5",
+          "left": 270.6171875,
+          "right": 332.0703125,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        },
+        {
+          "text": "대기 중 34",
+          "left": 348.0703125,
+          "right": 401.078125,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        },
+        {
+          "text": "실패 0",
+          "left": 417.078125,
+          "right": 448.78125,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        }
+      ],
+      "summaryInsideViewport": true,
+      "errors": [],
+      "retrySubmissions": []
+    },
+    {
+      "recordedAt": "2026-09-10T06:26:13.254Z",
+      "screenshot": "18-four.png",
+      "sample": "four",
+      "viewport": [
+        1511,
+        1000
+      ],
+      "summary": "보드 전체 47샷\n완료 9\n생성 중 4\n대기 중 34\n실패 0",
+      "counts": [
+        47,
+        9,
+        4,
+        34,
+        0
+      ],
+      "grids": [
+        [
+          "rough-10",
+          "rough-11",
+          "rough-12",
+          "rough-13"
+        ]
+      ],
+      "totalShots": 47,
+      "scenes": [
+        9,
+        8,
+        30
+      ],
+      "summaryLabels": [
+        {
+          "text": "보드 전체 47샷",
+          "left": 133,
+          "right": 206.9140625,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        },
+        {
+          "text": "완료 9",
+          "left": 222.9140625,
+          "right": 254.6171875,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        },
+        {
+          "text": "생성 중 4",
+          "left": 270.6171875,
+          "right": 332.0703125,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        },
+        {
+          "text": "대기 중 34",
+          "left": 348.0703125,
+          "right": 401.078125,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        },
+        {
+          "text": "실패 0",
+          "left": 417.078125,
+          "right": 448.78125,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        }
+      ],
+      "summaryInsideViewport": true,
+      "errors": [],
+      "retrySubmissions": []
+    },
+    {
+      "recordedAt": "2026-09-10T06:26:15.533Z",
+      "screenshot": "18-failed.png",
+      "sample": "failed",
+      "viewport": [
+        1511,
+        1000
+      ],
+      "summary": "보드 전체 47샷\n완료 13\n생성 중 0\n대기 중 33\n실패 1",
+      "counts": [
+        47,
+        13,
+        0,
+        33,
+        1
+      ],
+      "grids": [],
+      "totalShots": 47,
+      "scenes": [
+        9,
+        8,
+        30
+      ],
+      "summaryLabels": [
+        {
+          "text": "보드 전체 47샷",
+          "left": 133,
+          "right": 206.9140625,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        },
+        {
+          "text": "완료 13",
+          "left": 222.9140625,
+          "right": 262.171875,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        },
+        {
+          "text": "생성 중 0",
+          "left": 278.171875,
+          "right": 323.625,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        },
+        {
+          "text": "대기 중 33",
+          "left": 339.625,
+          "right": 392.6328125,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        },
+        {
+          "text": "실패 1",
+          "left": 408.6328125,
+          "right": 440.3359375,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        }
+      ],
+      "summaryInsideViewport": true,
+      "errors": [],
+      "retrySubmissions": []
+    },
+    {
+      "recordedAt": "2026-09-10T06:26:17.445Z",
+      "screenshot": "18-retry.png",
+      "sample": "retry",
+      "viewport": [
+        1511,
+        1000
+      ],
+      "summary": "보드 전체 47샷\n완료 13\n생성 중 1\n대기 중 33\n실패 0",
+      "counts": [
+        47,
+        13,
+        1,
+        33,
+        0
+      ],
+      "grids": [
+        [
+          "rough-14"
+        ]
+      ],
+      "totalShots": 47,
+      "scenes": [
+        9,
+        8,
+        30
+      ],
+      "summaryLabels": [
+        {
+          "text": "보드 전체 47샷",
+          "left": 133,
+          "right": 206.9140625,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        },
+        {
+          "text": "완료 13",
+          "left": 222.9140625,
+          "right": 262.171875,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        },
+        {
+          "text": "생성 중 1",
+          "left": 278.171875,
+          "right": 339.625,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        },
+        {
+          "text": "대기 중 33",
+          "left": 355.625,
+          "right": 408.6328125,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        },
+        {
+          "text": "실패 0",
+          "left": 424.6328125,
+          "right": 456.3359375,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        }
+      ],
+      "summaryInsideViewport": true,
+      "errors": [],
+      "retrySubmissions": [
+        "rough-14"
+      ]
+    },
+    {
+      "recordedAt": "2026-09-10T06:26:21.266Z",
+      "screenshot": "18-retry-complete.png",
+      "sample": "retry-complete",
+      "viewport": [
+        1511,
+        1000
+      ],
+      "summary": "보드 전체 47샷\n완료 14\n생성 중 0\n대기 중 33\n실패 0",
+      "counts": [
+        47,
+        14,
+        0,
+        33,
+        0
+      ],
+      "grids": [],
+      "totalShots": 47,
+      "scenes": [
+        9,
+        8,
+        30
+      ],
+      "summaryLabels": [
+        {
+          "text": "보드 전체 47샷",
+          "left": 133,
+          "right": 206.9140625,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        },
+        {
+          "text": "완료 14",
+          "left": 222.9140625,
+          "right": 262.171875,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        },
+        {
+          "text": "생성 중 0",
+          "left": 278.171875,
+          "right": 323.625,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        },
+        {
+          "text": "대기 중 33",
+          "left": 339.625,
+          "right": 392.6328125,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        },
+        {
+          "text": "실패 0",
+          "left": 408.6328125,
+          "right": 440.3359375,
+          "top": 122,
+          "bottom": 138,
+          "unobscured": true
+        }
+      ],
+      "summaryInsideViewport": true,
+      "errors": [],
+      "retrySubmissions": [
+        "rough-14"
+      ]
+    }
+  ]
+}

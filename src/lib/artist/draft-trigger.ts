@@ -11,7 +11,16 @@
 //   프롬프트 입력도 라우트와 같은 조립(의상·디자인 토큰·팔레트 포함, sheet-prompt-input.ts).
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { falImageSubmit, type FalImageOptions } from '@/lib/writer/llm/fal'
-import { createGenerationJob, hasQueuedCharacterViewJob, hasQueuedWorldShotJob } from '@/lib/generation-jobs'
+import {
+  confirmGenerationJobReceipt,
+  hasQueuedCharacterViewJob,
+  hasQueuedWorldShotJob,
+  rejectGenerationJobReservation,
+  reserveGenerationJob,
+  type GenerationCapacityError,
+  type GenerationJob,
+} from '@/lib/generation-jobs'
+import { isDefiniteSubmitRejection } from '@/lib/fal/submit-rejection'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { buildCharacterTurnaroundPrompt } from '@/lib/artist/turnaround'
 import { sheetIdentityReferences } from '@/lib/artist/source-image'
@@ -71,6 +80,18 @@ export interface DraftTriggerResult {
   submitted: number
   skipped: number
   failed: number
+}
+
+/**
+ * 트리거 자리 거절(#generation-capacity-trigger 2026-09-14)인지 — 예약 선행이라 초안마다 개별 판정을
+ *   받는다. 거절된 초안은 실패가 아니라 "혼잡으로 건너뜀"이다(다음 자율 경로가 같은 빈칸을 다시 채운다).
+ *   instanceof 대신 name 으로 보는 이유: 예약을 목으로 바꾼 테스트 경계를 넘어도 같은 판정이어야 한다
+ *   (api/quota.ts 가 트리거 예외를 message 로 읽는 것과 같은 이유).
+ */
+function capacityRejectionOf(error: unknown): GenerationCapacityError | null {
+  return error instanceof Error && error.name === 'GenerationCapacityError'
+    ? (error as GenerationCapacityError)
+    : null
 }
 
 export interface AssetDraftTriggerResult {
@@ -204,6 +225,56 @@ export async function triggerCharacterDrafts(
             : applyStyleAnchor(anchor, anchorable, 'single')
           submitOpts = { ...anchored, webhookUrl: wh }
         }
+        // 자리 예약이 먼저다(#generation-capacity-trigger 2026-09-14) — 제출을 먼저 하면 트리거가 기록을
+        //   거절하는 순간 이미 유료 요청이 나간 뒤다. 묶음 전에 한 번 보는 사전 검사만으로는
+        //   초안 4장이 한 칸에 들어가는 것을 막지 못했다(감사 2026-09-11) — 이제 초안마다 개별 판정이다.
+        let job: GenerationJob
+        try {
+          job = await reserveGenerationJob({
+            projectId,
+            // 확정 모델은 예약 시점에 이미 정해져 있다. confirm 이 receipt.model 로 덮는다.
+            model: submitOpts.model ?? 'pending',
+            kind: 'character_view',
+            actor: 'writer',
+            provider: 'fal',
+            inputSnapshot: {
+              model: submitOpts.model ?? 'pending',
+              prompt: submitOpts.prompt,
+              ...(submitOpts.reference_image_urls
+                ? { reference_image_urls: submitOpts.reference_image_urls }
+                : {}),
+              ...(submitOpts.aspect_ratio ? { aspect_ratio: submitOpts.aspect_ratio } : {}),
+              source_hash: computeImageSourceHash(defaultAppearance.appearance, lookFingerprint),
+              // 외형만의 지문(룩 무관) — look-pending vs edited 구분용(027).
+              appearance_hash: computeImageSourceHash(defaultAppearance.appearance, null),
+              look_present: lookFingerprint != null,
+              style_anchor_key: anchor?.key ?? null,
+            },
+            target: {
+              workspaceId: project?.workspace_id ?? undefined,
+              characterId: c.character_id,
+              appearanceKey: defaultAppearance.appearance_key,
+              view: 'main',
+              column: CHARACTER_VIEW_COLUMNS.main,
+            },
+          })
+        } catch (error) {
+          const capacity = capacityRejectionOf(error)
+          if (!capacity) throw error
+          // 혼잡으로 건너뜀 — 자동 재시도는 없다. 다른 초안은 그대로 진행한다.
+          result.skipped++
+          await recordWriterObservabilityEvent(projectId, 'asset_trigger_blocked', {
+            source: 'writer_v2_design',
+            reason: 'capacity',
+            axis: capacity.axis,
+            queued: capacity.queued,
+            limit: capacity.limit,
+            kind: 'character_view',
+            characterId: c.character_id,
+            view: 'main',
+          })
+          continue
+        }
         await recordWriterObservabilityEvent(projectId, 'fal_submit_started', {
           source: 'writer_v2_design',
           kind: 'character_view',
@@ -212,47 +283,34 @@ export async function triggerCharacterDrafts(
         })
         let falResult: { request_id: string; model: string; fal_key_id: string }
         try {
-          falResult = await falImageSubmit(submitOpts)
+          // 외부 접수는 한 번뿐 — 예약이 자리를 잡고 있으니 재시도는 같은 그림의 이중 발주다.
+          //   falKeyId 는 반드시 예약 행의 값 — 트리거가 여유 있는 계정으로 바꿔 넣었을 수 있다.
+          falResult = await falImageSubmit(submitOpts, { retry: false, falKeyId: job.fal_key_id })
         } catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          const rejected = isDefiniteSubmitRejection(error)
           await recordWriterObservabilityEvent(projectId, 'fal_submit_failed', {
             source: 'writer_v2_design',
             kind: 'character_view',
             characterId: c.character_id,
             view: 'main',
-            error: error instanceof Error ? error.message : String(error),
+            error: message,
+            confirmationPending: !rejected,
           })
+          // 확정 거절(4xx)만 예약을 닫는다. 통신 오류·5xx 는 이미 접수됐을 수 있어 queued 로 남긴다.
+          if (rejected) await rejectGenerationJobReservation(job.id, projectId, message)
           throw error
         }
         const { request_id, model, fal_key_id } = falResult
-        const job = await createGenerationJob({
-          projectId,
-          requestId: request_id,
-          model,
-          falKeyId: fal_key_id,
-          kind: 'character_view',
-          actor: 'writer',
-          provider: 'fal',
-          inputSnapshot: {
-            model,
-            prompt: submitOpts.prompt,
-            ...(submitOpts.reference_image_urls
-              ? { reference_image_urls: submitOpts.reference_image_urls }
-              : {}),
-            ...(submitOpts.aspect_ratio ? { aspect_ratio: submitOpts.aspect_ratio } : {}),
-            source_hash: computeImageSourceHash(defaultAppearance.appearance, lookFingerprint),
-            // 외형만의 지문(룩 무관) — look-pending vs edited 구분용(027).
-            appearance_hash: computeImageSourceHash(defaultAppearance.appearance, null),
-            look_present: lookFingerprint != null,
-            style_anchor_key: anchor?.key ?? null,
-          },
-          target: {
-            workspaceId: project?.workspace_id ?? undefined,
-            characterId: c.character_id,
-            appearanceKey: defaultAppearance.appearance_key,
-            view: 'main',
-            column: CHARACTER_VIEW_COLUMNS.main,
-          },
-        })
+        try {
+          await confirmGenerationJobReceipt(job.id, projectId, { request_id, model, fal_key_id })
+        } catch (error) {
+          // 이미 접수됐다 — 연결 저장 실패는 새 번호로 다시 발주할 근거가 아니다.
+          console.error(
+            `[draft-trigger] ${projectId}/${c.character_id}:main accepted receipt could not be saved:`,
+            error instanceof Error ? error.message : String(error),
+          )
+        }
         await recordWriterObservabilityEvent(
           projectId,
           'fal_submit_accepted',
@@ -363,6 +421,22 @@ export async function triggerWorldDrafts(
             anchor,
           })
         } catch (error) {
+          const capacity = capacityRejectionOf(error)
+          if (capacity) {
+            // 자리가 없어 예약이 거절됐다 — 이 배경은 혼잡으로 건너뛰고 다른 초안은 계속한다.
+            result.skipped++
+            await recordWriterObservabilityEvent(projectId, 'asset_trigger_blocked', {
+              source: 'writer_v2_design',
+              reason: 'capacity',
+              axis: capacity.axis,
+              queued: capacity.queued,
+              limit: capacity.limit,
+              kind: 'world_shot',
+              locationId: location.location_id,
+              view: 'wide_shot',
+            })
+            continue
+          }
           await recordWriterObservabilityEvent(projectId, 'fal_submit_failed', {
             source: 'writer_v2_design',
             kind: 'world_shot',

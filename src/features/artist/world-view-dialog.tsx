@@ -60,7 +60,7 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
   const variantKey = appearanceKeyProp && appearanceKeyProp !== DEFAULT_LOCATION_APPEARANCE_KEY ? appearanceKeyProp : null
   const failure = useArtistStore((s) => (locationId ? s.worldFailures[worldFailureKey(locationId, variantKey)] : undefined))
   const isGenerating = useArtistStore((s) =>
-    locationId ? s.generatingLocations.includes(locationId) : false,
+    locationId ? s.generatingLocations.includes(worldFailureKey(locationId, variantKey)) : false,
   )
 
   // 설명(원천) 편집 — 대상 전환 시 초기화. 캐릭터 팝업의 외형 프롬프트와 같은 계약.
@@ -75,7 +75,7 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
   const [imageModel, setImageModel] = useState<ImageModelKey>(DEFAULT_WORLD_IMAGE_MODEL)
 
   const generate = useGuardedAction({
-    actionKey: `artist:world:${locationId}:${shot}`,
+    actionKey: `artist:world:${locationId}:${variantKey ?? 'default'}:${shot}`,
     stage: 'artist',
     label: t('Background image'),
     busy: isGenerating,
@@ -93,7 +93,7 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
     },
   })
   const safeRetry = useGuardedAction({
-    actionKey: `artist:world-safe:${locationId}:${shot}`,
+    actionKey: `artist:world-safe:${locationId}:${variantKey ?? 'default'}:${shot}`,
     stage: 'artist',
     label: t('Background image (bypass retry)'),
     busy: isGenerating,

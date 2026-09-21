@@ -1,0 +1,45 @@
+
+ RUN  v4.1.6 /Users/xcape/projects/tale-studio
+
+(node:22097) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ tests/project/director-handoff.test.ts (20 tests | 1 failed) 106ms
+   × Writer 초안 확인을 기다리는 중이면 기다리라는 말 대신 초안을 확인하고 확정할 일을 알려준다. 2ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/project/director-handoff.test.ts > Writer 초안 확인을 기다리는 중이면 기다리라는 말 대신 초안을 확인하고 확정할 일을 알려준다.
+AssertionError: expected [ { code: 'writer:active', …(3) } ] to deep equally contain ObjectContaining{…}
+
+- Expected:
+ObjectContaining {
+  "action": "초안을 확인한 뒤 확정해 주세요.",
+  "code": "writer:confirmation",
+}
+
++ Received:
+[
+  {
+    "action": "Writer 작업이 끝난 뒤 다시 넘겨주세요.",
+    "code": "writer:active",
+    "label": "씬과 샷을 만들고 있어요.",
+    "stage": "writer",
+  },
+]
+
+ ❯ tests/project/director-handoff.test.ts:135:32
+    133|   const result = await request('move')
+    134|   expect(result.status).toBe(409)
+    135|   expect(result.body.blockers).toContainEqual(expect.objectContaining({
+       |                                ^
+    136|     code: 'writer:confirmation', action: '초안을 확인한 뒤 확정해 주세요.',
+    137|   }))
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 19 passed (20)
+   Start at  14:14:03
+   Duration  221ms (transform 65ms, setup 10ms, import 17ms, tests 106ms, environment 0ms)
+

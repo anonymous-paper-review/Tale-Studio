@@ -62,6 +62,21 @@ export const ScenesSchema = z.looseObject({
   total_estimated_seconds: z.number().optional(),
 });
 
+// V2 디자인은 일부 누락을 원천으로 보완할 수 있지만 잘못된 컨테이너·필드 타입은 저장하지 않는다.
+export const VisualDesignSchema = z.looseObject({
+  characterVisual: z.looseObject({
+    characters: z.array(z.looseObject({
+      character_id: z.string(), appearance: z.string(), costume: z.array(z.string()), palette: z.array(z.string()),
+    })),
+  }),
+  worldVisual: z.looseObject({
+    global_palette: z.looseObject({ primary: z.string(), secondary: z.string(), accent: z.string(), forbidden: z.array(z.string()) }),
+    color_meaning: z.record(z.string(), z.string()),
+    locations: z.array(z.looseObject({ id: z.string(), style_description: z.string(), lighting_sources: z.array(z.string()), props: z.array(z.string()) })),
+    vfx_approach: z.string(),
+  }),
+});
+
 // ── s1s3 병합 1콜 (validate 전용) ──
 export const MergedRawSchema = z.looseObject({
   narrative_structure: NarrativeStructureSchema,

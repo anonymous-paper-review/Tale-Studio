@@ -72,7 +72,8 @@ async function completeOrTerminalizeJob(
       return (await getGenerationJobById(job.id)) ?? { ...job, status: 'completed' }
     }
     if (error instanceof DirectorVideoCompletionPersistenceError) {
-      console.error('[fal/reconcile] video persistence failed; retaining queued attempt:', error.message)
+      // 영상·이미지 공통(#image-persist-retryable 2026-09-08).
+      console.error('[fal/reconcile] media persistence failed; retaining queued attempt:', error.message)
       throw error
     }
     const message = `[finalize] ${describeFinalizeError(error)}`
@@ -125,6 +126,11 @@ function isPermanentProviderLookupFailure(error: unknown): boolean {
 
 /** queued job을 persisted provider의 진실로 reconcile한다. Provider 조회 오류만 queued로 남긴다. */
 export async function reconcileJobFromFal(job: GenerationJob): Promise<GenerationJob> {
+  // 접수 여부가 확인될 때까지 예약과 사용량을 유지한다.
+  //   request_id='reserved:<id>' 는 어떤 kind·일괄 작업이든 제공자 요청이 접수됐을 수 있는 상태다.
+  //   확인이 늦으면 사용량이 묶이지만, 시간만으로 미제출이라 단정해 실패·환급하거나 재제출하면
+  //   같은 생성의 중복 비용이 발생할 수 있다. 접수 기록 복구는 호출자의 범위를 벗어나므로
+  //   현재 확인할 수 없는 상태를 queued 그대로 보존한다.
   if (job.request_id.startsWith('reserved:')) return job
 
   if (job.provider === 'local') {
@@ -176,9 +182,9 @@ export async function reconcileJobFromFal(job: GenerationJob): Promise<Generatio
 // 숨기기만 하면 제출 탭의 폴링이 죽은 잡은 아무도 fal 진실을 회수하지 않는다 — 과금은 끝났고
 // 결과가 fal 큐에 있는데 화면은 영영 무반응(실측: rough 잡 5시간 queued 방치). webhook 없는
 // 로컬(resolveWebhookUrl()=undefined)에선 폴링이 유일한 완결 경로라 특히 잘 갇힌다.
-// active 라우트가 목록 조회 전에 이 스윕을 호출해, 유령을 fal 진실로 종결시킨다
-// (완료→finalize 회수, 실패→failed 배지, 진행 중→그대로). 자동 재생성이 아니라 이미 지불한
-// 결과의 회수이므로 과금 원칙(빈칸 자율 채움 금지 대상 아님)과 충돌하지 않는다.
+// active 라우트가 목록 조회 전에 이 스윕을 호출해, 접수된 유령을 fal 진실로 종결시킨다
+// (완료→finalize 회수, 실패→failed 배지, 진행 중→그대로). 접수 여부를 확인할 수 없는
+// reserved: 행은 여기서도 queued 그대로 보존해 시간만으로 실패·환급하지 않는다.
 
 const GHOST_SWEEP_THROTTLE_MS = 60_000
 const GHOST_SWEEP_MAX_JOBS = 5

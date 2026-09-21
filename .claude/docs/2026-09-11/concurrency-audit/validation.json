@@ -1,0 +1,34 @@
+{
+  "checkedAt": "2026-09-11T07:08:31.101Z",
+  "targetedTypecheckExitCode": 0,
+  "lintExitCode": 0,
+  "reports": [
+    {
+      "name": "regression",
+      "passed": 56,
+      "failed": 0,
+      "total": 56
+    },
+    {
+      "name": "capacity",
+      "passed": 26,
+      "failed": 6,
+      "total": 32
+    },
+    {
+      "name": "draft",
+      "passed": 0,
+      "failed": 2,
+      "total": 2
+    }
+  ],
+  "database": {
+    "observations": 5,
+    "validObservations": 5,
+    "policyPassed": 2,
+    "policyFailed": 3,
+    "cleaned": true,
+    "publicFunctionsUnchanged": true
+  },
+  "reportExists": true
+}

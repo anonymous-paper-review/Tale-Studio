@@ -8,7 +8,11 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('@/lib/supabase/auth', () => ({ getUser: mocks.getUser }))
-vi.mock('@/lib/generation-jobs', () => ({ userOwnsProject: mocks.userOwnsProject }))
+vi.mock('@/lib/generation-jobs', () => ({
+  userOwnsProject: mocks.userOwnsProject,
+  // director-store 가 폴링 상한을 이 상수에서 파생시킨다(#poll-timeout-align).
+  STALE_QUEUED_MS: 10 * 60 * 1000,
+}))
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: { from: mocks.from } }))
 
 import { GET } from '@/app/api/writer/export/[projectId]/route'

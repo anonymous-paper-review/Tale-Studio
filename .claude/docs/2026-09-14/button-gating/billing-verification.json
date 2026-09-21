@@ -1,0 +1,359 @@
+{
+  "startedAt": "2026-09-14T07:44:35.406Z",
+  "developmentProject": "pbiumddivadgbzxuymak",
+  "schema": "director_charge_9bbe7eb34e99447ebd356b846af8dc51",
+  "safety": {
+    "paidProviderRequests": 0,
+    "applicationRowsRead": 0,
+    "applicationRowsWritten": 0,
+    "productionWrites": 0,
+    "publicFunctionsBefore": {
+      "count": 28,
+      "hash": "562453b89c2eb88b8d8714930e6e20a4"
+    },
+    "verifiedTls": true,
+    "isolation": "Random schema, no application rows copied; original SQL qualified to schema; unique synthetic user/project/workspace ids; capacity advisory namespace isolated; no public/auth writes.",
+    "temporarySchemaRemoved": true,
+    "publicFunctionsAfter": {
+      "count": 28,
+      "hash": "562453b89c2eb88b8d8714930e6e20a4"
+    },
+    "publicFunctionsUnchanged": true
+  },
+  "scope": "Original SQL in isolated PostgreSQL schema; API replay-to-hold guard is separately source-inspected, not simulated here.",
+  "observations": [
+    {
+      "id": "split-grants",
+      "behavior": "지급분 두 곳에서 한 번 차감하면 총 차감은 요청량과 같다",
+      "reply": {
+        "ok": true,
+        "held": 5,
+        "balance": 100,
+        "insufficient": false
+      },
+      "balance": 95,
+      "charged": 5,
+      "hold_rows": 2,
+      "charged_jobs": 1,
+      "jobs": 0,
+      "safe": true
+    },
+    {
+      "id": "same-job-repeat",
+      "behavior": "같은 작업 차감을 두 번 요청하면 실제 차감 합계로 중복 여부를 확인한다",
+      "replies": [
+        {
+          "ok": true,
+          "held": 5,
+          "balance": 100,
+          "insufficient": false
+        },
+        {
+          "ok": true,
+          "held": 5,
+          "balance": 95,
+          "insufficient": false
+        }
+      ],
+      "balance": 90,
+      "charged": 10,
+      "hold_rows": 2,
+      "charged_jobs": 1,
+      "jobs": 0,
+      "safe": false,
+      "duplicateChargeObserved": true
+    },
+    {
+      "id": "same-job-concurrent",
+      "behavior": "같은 작업 차감을 동시에 요청하면 잠금 이후의 실제 차감 합계를 기록한다",
+      "participants": [
+        {
+          "pid": 1462783,
+          "transaction_id": "7366"
+        },
+        {
+          "pid": 1462786,
+          "transaction_id": "7365"
+        }
+      ],
+      "observedAdvisoryWaiters": 2,
+      "outcomes": [
+        {
+          "accepted": true,
+          "value": {
+            "ok": true,
+            "held": 5,
+            "balance": 95,
+            "insufficient": false
+          }
+        },
+        {
+          "accepted": true,
+          "value": {
+            "ok": true,
+            "held": 5,
+            "balance": 100,
+            "insufficient": false
+          }
+        }
+      ],
+      "balance": 90,
+      "charged": 10,
+      "hold_rows": 2,
+      "charged_jobs": 1,
+      "jobs": 0,
+      "safe": false,
+      "duplicateChargeObserved": true
+    },
+    {
+      "id": "same-key-new-take",
+      "behavior": "같은 영상 생성 요청을 동시에 다시 보내면 기존 작업을 재사용한다",
+      "participants": [
+        {
+          "pid": 1462784,
+          "transaction_id": "7380"
+        },
+        {
+          "pid": 1462786,
+          "transaction_id": "7379"
+        }
+      ],
+      "observedAdvisoryWaiters": 2,
+      "outcomes": [
+        {
+          "accepted": true,
+          "value": {
+            "video_clip_id": "e7c18441-b3bb-4105-b4d7-00f42c6c875e",
+            "job_id": "90e250ee-bfb6-4af4-82b7-59518f4134b1",
+            "take_number": 1,
+            "replayed": true
+          }
+        },
+        {
+          "accepted": true,
+          "value": {
+            "video_clip_id": "e7c18441-b3bb-4105-b4d7-00f42c6c875e",
+            "job_id": "90e250ee-bfb6-4af4-82b7-59518f4134b1",
+            "take_number": 1,
+            "replayed": false
+          }
+        }
+      ],
+      "balance": 100,
+      "charged": 0,
+      "hold_rows": 0,
+      "charged_jobs": 0,
+      "jobs": 1,
+      "safe": true,
+      "scope": "Reservation RPC only; hold is not part of reservation RPC."
+    },
+    {
+      "id": "different-key-new-take",
+      "behavior": "다른 요청키로 같은 샷의 새 테이크를 동시에 만들면 작업 수와 각 작업의 차감을 기록한다",
+      "participants": [
+        {
+          "pid": 1462783,
+          "transaction_id": "7387"
+        },
+        {
+          "pid": 1462786,
+          "transaction_id": "7386"
+        }
+      ],
+      "observedAdvisoryWaiters": 2,
+      "outcomes": [
+        {
+          "accepted": true,
+          "value": {
+            "video_clip_id": "5ec907d0-2b28-40d0-a1ab-905cf9bf2e83",
+            "job_id": "d99e11d0-863e-47b4-b245-65aabf0790df",
+            "take_number": 2,
+            "replayed": false
+          }
+        },
+        {
+          "accepted": true,
+          "value": {
+            "video_clip_id": "2e1e290b-795f-44e3-ade2-ac34e982c297",
+            "job_id": "6587ba5e-6edf-440f-a6ad-9415e1ba7146",
+            "take_number": 1,
+            "replayed": false
+          }
+        }
+      ],
+      "holds": [
+        {
+          "ok": true,
+          "held": 5,
+          "balance": 100,
+          "insufficient": false
+        },
+        {
+          "ok": true,
+          "held": 5,
+          "balance": 95,
+          "insufficient": false
+        }
+      ],
+      "balance": 90,
+      "charged": 10,
+      "hold_rows": 2,
+      "charged_jobs": 2,
+      "jobs": 2,
+      "sameShotDeduplicated": false,
+      "scope": "Original reservation RPCs plus explicit take_hold calls per returned distinct job; no paid provider or API route invocation."
+    },
+    {
+      "id": "same-clip-regeneration",
+      "behavior": "같은 기존 영상을 동시에 다시 만들면 진행 중인 시도는 하나만 허용한다",
+      "participants": [
+        {
+          "pid": 1462784,
+          "transaction_id": "7398"
+        },
+        {
+          "pid": 1462786,
+          "transaction_id": "7397"
+        }
+      ],
+      "observedAdvisoryWaiters": 2,
+      "outcomes": [
+        {
+          "accepted": false,
+          "error": "clip already has a queued attempt"
+        },
+        {
+          "accepted": true,
+          "value": {
+            "video_clip_id": "d1313666-4c70-4822-af60-4b43a9b17333",
+            "job_id": "147f70f7-6407-4ff7-a517-006507c713b4",
+            "take_number": 1,
+            "replayed": false
+          }
+        }
+      ],
+      "safe": true
+    },
+    {
+      "id": "batch-replay",
+      "behavior": "같은 일괄 항목을 다시 제출하면 기존 작업을 재사용한다",
+      "creations": [
+        "11acd7dd-cfba-44a6-b9ee-2750bdf0c309",
+        "11acd7dd-cfba-44a6-b9ee-2750bdf0c309"
+      ],
+      "first": {
+        "video_clip_id": "34b35c82-6a28-4416-985a-f44289aa9837",
+        "job_id": "a06204d3-8ae2-4da0-a0f7-8da44a9222a4",
+        "take_number": 1,
+        "replayed": false
+      },
+      "replay": {
+        "video_clip_id": "34b35c82-6a28-4416-985a-f44289aa9837",
+        "job_id": "a06204d3-8ae2-4da0-a0f7-8da44a9222a4",
+        "take_number": 1,
+        "replayed": true
+      },
+      "balance": 100,
+      "charged": 0,
+      "hold_rows": 0,
+      "charged_jobs": 0,
+      "jobs": 1,
+      "safe": true
+    },
+    {
+      "id": "enforced-balance-race",
+      "behavior": "일반 계정의 남은 잔액을 동시에 요청하면 잔액을 넘는 차감을 거절한다",
+      "participants": [
+        {
+          "pid": 1462783,
+          "transaction_id": "7414"
+        },
+        {
+          "pid": 1462786,
+          "transaction_id": "7413"
+        }
+      ],
+      "observedAdvisoryWaiters": 2,
+      "outcomes": [
+        {
+          "accepted": true,
+          "value": {
+            "ok": false,
+            "held": 0,
+            "balance": 0,
+            "insufficient": true
+          }
+        },
+        {
+          "accepted": true,
+          "value": {
+            "ok": true,
+            "held": 5,
+            "balance": 5,
+            "insufficient": false
+          }
+        }
+      ],
+      "balance": 0,
+      "charged": 5,
+      "hold_rows": 1,
+      "charged_jobs": 1,
+      "jobs": 0,
+      "safe": true,
+      "enforce": true,
+      "adminExempt": false
+    }
+  ],
+  "functions": [
+    {
+      "name": "reserve_director_video_take",
+      "source": "supabase/migrations/20260720044000_director_video_metadata_identity.sql",
+      "sqlSha256": "a9f6da6094f7b62050fd601f184337d66530bf76f3cb3a6cc5b46d9916c32a97",
+      "developmentBodyMatches": true
+    },
+    {
+      "name": "reserve_director_video_regeneration",
+      "source": "supabase/migrations/20260720043600_director_video_retakes_scoped_replay.sql",
+      "sqlSha256": "9a7cbdb32a8fe91559831b95697f6e5544c02bf9526ace42f2372a4adbf25780",
+      "developmentBodyMatches": true
+    },
+    {
+      "name": "create_director_video_batch",
+      "source": "supabase/migrations/20260909110000_director_video_batches.sql",
+      "sqlSha256": "23568c473212afd6f36f8d9516d6d581296210c50c98ede34de03d5e4d5d7697",
+      "developmentBodyMatches": true
+    },
+    {
+      "name": "claim_director_video_batch",
+      "source": "supabase/migrations/20260909110000_director_video_batches.sql",
+      "sqlSha256": "e99d5117c5d9026f7bea7bd0a27393bb45b21c0af1abf13c96683f5506b6e87f",
+      "developmentBodyMatches": true
+    },
+    {
+      "name": "reserve_director_video_batch_item",
+      "source": "supabase/migrations/20260909110000_director_video_batches.sql",
+      "sqlSha256": "cfca4d54aebf067cbc7f765c8de8c14707bbd63a3066d1339f1f9f2fc80750ba",
+      "developmentBodyMatches": true
+    },
+    {
+      "name": "take_resolved_ledger",
+      "source": "supabase/migrations/20260909130000_fix_refund_expiry.sql",
+      "sqlSha256": "4d3ae3baa3bc3e0273100a01a47017877011d7fa585e23de5254ef4386ea9178",
+      "developmentBodyMatches": true
+    },
+    {
+      "name": "take_hold",
+      "source": "supabase/migrations/20260909130000_fix_refund_expiry.sql",
+      "sqlSha256": "86f897406fac3691ba9ed7a97b8f3fb7013a9afdc9f68b3ac4e3c415e85e947d",
+      "developmentBodyMatches": true
+    },
+    {
+      "name": "enforce_generation_capacity",
+      "source": "supabase/migrations/20260914150000_generation_capacity_key_assignment.sql",
+      "sqlSha256": "362ea567fc157c2f96b8ded00b23563faf417d4f6f146239febe59524c3e62b4",
+      "developmentBodyMatches": true
+    }
+  ],
+  "testProcessExitCode": 0,
+  "finishedAt": "2026-09-14T07:44:50.248Z"
+}

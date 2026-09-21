@@ -1,0 +1,25 @@
+{
+  "checkedAt": "2026-09-10T05:38:10.573Z",
+  "origin": "https://talestudio.art",
+  "status": 409,
+  "result": {
+    "ready": false,
+    "blockers": [
+      {
+        "code": "writer:missing",
+        "label": "완료된 씬·샷 작성 기록이 없어요.",
+        "stage": "writer",
+        "action": "Writer에서 씬과 샷을 작성하고 저장해 주세요."
+      }
+    ],
+    "warnings": [],
+    "counts": {
+      "scenes": 1,
+      "shots": 7
+    }
+  },
+  "projectId": "0f4bae97-81b7-47b2-8c11-85dc82b94bb4",
+  "originalReportedProject": false,
+  "summary": "인증된 운영 요청 HTTP 409 · 준비 조건 안내 · 저장 1씬·7샷",
+  "mutations": 0
+}

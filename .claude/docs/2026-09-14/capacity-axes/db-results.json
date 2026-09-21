@@ -1,0 +1,454 @@
+{
+  "startedAt": "2026-09-14T02:42:17.849Z",
+  "developmentProject": "pbiumddivadgbzxuymak",
+  "schema": "capacity_axes_2a6dc7e968dc423e8e6ab8ab6481a14c",
+  "migration": "20260914110000_generation_capacity_all_axes.sql",
+  "migrationPath": "supabase/migrations/20260914110000_generation_capacity_all_axes.sql",
+  "migrationSha256": "318b18f8bf373cca56bf64604f37dccf8627d887ee9ef90d70c58ba77cade22c",
+  "safety": {
+    "applicationRowsRead": 0,
+    "applicationRowsWritten": 0,
+    "paidFalRequests": 0,
+    "publicMigrationsApplied": 0,
+    "verifiedTls": true,
+    "developmentIdentityVerified": true,
+    "publicFunctionsBefore": {
+      "function_count": 28,
+      "fingerprint": "a3c360f95b253b1469c58b0ff0a092f0"
+    },
+    "temporarySchemaRemoved": true,
+    "publicFunctionsAfter": {
+      "function_count": 28,
+      "fingerprint": "a3c360f95b253b1469c58b0ff0a092f0"
+    },
+    "publicFunctionsUnchanged": true
+  },
+  "observations": [
+    {
+      "id": "user_video_3",
+      "promise": "영상이 2개 진행 중일 때 12건을 동시에 요청해도 진행 영상은 3개를 넘지 않는다",
+      "expectedLimit": 3,
+      "expectedAccepted": 1,
+      "baseline": 2,
+      "requested": 12,
+      "accepted": 1,
+      "rejected": 11,
+      "finalActive": 3,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1438273,
+        1438278,
+        1438275,
+        1438279,
+        1438280,
+        1438274,
+        1438284,
+        1438276,
+        1438281,
+        1438283,
+        1438277,
+        1438282
+      ],
+      "transactionIds": [
+        "3948",
+        "3954",
+        "3952",
+        "3953",
+        "3956",
+        "3949",
+        "3959",
+        "3951",
+        "3957",
+        "3958",
+        "3950",
+        "3955"
+      ],
+      "preReadCounts": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "observedAdvisoryWaiters": 12,
+      "reassignedTo": null,
+      "allowedErrors": [
+        "video_user_at_capacity"
+      ],
+      "errors": [
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity"
+      ],
+      "observationValid": true,
+      "policyPassed": true
+    },
+    {
+      "id": "user_image_6",
+      "promise": "이미지가 5개 진행 중일 때 12건을 동시에 요청해도 진행 이미지 작업은 6개를 넘지 않는다",
+      "expectedLimit": 6,
+      "expectedAccepted": 1,
+      "baseline": 5,
+      "requested": 12,
+      "accepted": 1,
+      "rejected": 11,
+      "finalActive": 6,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1438278,
+        1438277,
+        1438275,
+        1438280,
+        1438283,
+        1438279,
+        1438273,
+        1438276,
+        1438282,
+        1438281,
+        1438284,
+        1438274
+      ],
+      "transactionIds": [
+        "3970",
+        "3969",
+        "3971",
+        "3975",
+        "3972",
+        "3967",
+        "3978",
+        "3973",
+        "3974",
+        "3976",
+        "3968",
+        "3977"
+      ],
+      "preReadCounts": [
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5
+      ],
+      "observedAdvisoryWaiters": null,
+      "reassignedTo": null,
+      "allowedErrors": [
+        "image_user_at_capacity"
+      ],
+      "errors": [
+        "image_user_at_capacity",
+        "image_user_at_capacity",
+        "image_user_at_capacity",
+        "image_user_at_capacity",
+        "image_user_at_capacity",
+        "image_user_at_capacity",
+        "image_user_at_capacity",
+        "image_user_at_capacity",
+        "image_user_at_capacity",
+        "image_user_at_capacity",
+        "image_user_at_capacity"
+      ],
+      "observationValid": true,
+      "policyPassed": true
+    },
+    {
+      "id": "global_68",
+      "promise": "전체 68칸(34+34) 중 1칸이 남았을 때 서로 다른 12명이 동시에 요청해도 전체 진행 작업은 68개를 넘지 않는다",
+      "expectedLimit": 68,
+      "expectedAccepted": 1,
+      "baseline": 67,
+      "requested": 12,
+      "accepted": 1,
+      "rejected": 11,
+      "finalActive": 68,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1438275,
+        1438278,
+        1438282,
+        1438283,
+        1438281,
+        1438273,
+        1438279,
+        1438284,
+        1438280,
+        1438276,
+        1438277,
+        1438274
+      ],
+      "transactionIds": [
+        "3992",
+        "3990",
+        "3991",
+        "3987",
+        "3988",
+        "3984",
+        "3995",
+        "3985",
+        "3993",
+        "3994",
+        "3986",
+        "3989"
+      ],
+      "preReadCounts": [
+        67,
+        67,
+        67,
+        67,
+        67,
+        67,
+        67,
+        67,
+        67,
+        67,
+        67,
+        67
+      ],
+      "observedAdvisoryWaiters": null,
+      "reassignedTo": null,
+      "allowedErrors": [
+        "global_at_capacity",
+        "key_at_capacity"
+      ],
+      "errors": [
+        "key_at_capacity",
+        "key_at_capacity",
+        "key_at_capacity",
+        "key_at_capacity",
+        "key_at_capacity",
+        "key_at_capacity",
+        "key_at_capacity",
+        "key_at_capacity",
+        "key_at_capacity",
+        "key_at_capacity",
+        "key_at_capacity"
+      ],
+      "observationValid": true,
+      "policyPassed": true
+    },
+    {
+      "id": "key_spillover",
+      "promise": "내가 고른 계정이 찼어도 옆 계정에 자리가 있으면 거절하지 않고 그 계정으로 넣는다",
+      "expectedLimit": 68,
+      "expectedAccepted": 5,
+      "baseline": 34,
+      "requested": 5,
+      "accepted": 5,
+      "rejected": 0,
+      "finalActive": 39,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1438278,
+        1438282,
+        1438274,
+        1438276,
+        1438277
+      ],
+      "transactionIds": [
+        "4002",
+        "4000",
+        "4004",
+        "4003",
+        "4001"
+      ],
+      "preReadCounts": [
+        34,
+        34,
+        34,
+        34,
+        34
+      ],
+      "observedAdvisoryWaiters": null,
+      "reassignedTo": [
+        "key-b"
+      ],
+      "allowedErrors": [],
+      "errors": [],
+      "observationValid": true,
+      "policyPassed": true
+    },
+    {
+      "id": "exempt_global_block",
+      "promise": "두 계정이 모두 찼으면 관리자도 거절된다",
+      "expectedLimit": 68,
+      "expectedAccepted": 0,
+      "baseline": 68,
+      "requested": 1,
+      "accepted": 0,
+      "rejected": 1,
+      "finalActive": 68,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1438276
+      ],
+      "transactionIds": [
+        "4011"
+      ],
+      "preReadCounts": [
+        68
+      ],
+      "observedAdvisoryWaiters": null,
+      "reassignedTo": null,
+      "allowedErrors": [
+        "global_at_capacity",
+        "key_at_capacity"
+      ],
+      "errors": [
+        "key_at_capacity"
+      ],
+      "observationValid": true,
+      "policyPassed": true
+    },
+    {
+      "id": "exempt_video_over_limit",
+      "promise": "관리자는 내 영상 3개를 넘어도 전체 자리가 남아 있으면 수용된다",
+      "expectedLimit": 4,
+      "expectedAccepted": 1,
+      "baseline": 3,
+      "requested": 1,
+      "accepted": 1,
+      "rejected": 0,
+      "finalActive": 4,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1438276
+      ],
+      "transactionIds": [
+        "4019"
+      ],
+      "preReadCounts": [
+        3
+      ],
+      "observedAdvisoryWaiters": null,
+      "reassignedTo": null,
+      "allowedErrors": [],
+      "errors": [],
+      "observationValid": true,
+      "policyPassed": true
+    },
+    {
+      "id": "completed_video_releases_slot",
+      "promise": "진행 영상 3개 중 1개가 끝나면 다음 영상 1개를 시작할 수 있다",
+      "expectedLimit": 3,
+      "expectedAccepted": 1,
+      "baseline": 2,
+      "requested": 1,
+      "accepted": 1,
+      "rejected": 0,
+      "finalActive": 3,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1438276
+      ],
+      "transactionIds": [
+        "4026"
+      ],
+      "preReadCounts": [
+        2
+      ],
+      "observedAdvisoryWaiters": null,
+      "reassignedTo": null,
+      "allowedErrors": [],
+      "errors": [],
+      "observationValid": true,
+      "policyPassed": true
+    }
+  ],
+  "policyResults": [
+    {
+      "id": "user_video_3",
+      "promise": "영상이 2개 진행 중일 때 12건을 동시에 요청해도 진행 영상은 3개를 넘지 않는다",
+      "expectedLimit": 3,
+      "expectedAccepted": 1,
+      "accepted": 1,
+      "observedActive": 3,
+      "reassignedTo": null,
+      "passed": true
+    },
+    {
+      "id": "user_image_6",
+      "promise": "이미지가 5개 진행 중일 때 12건을 동시에 요청해도 진행 이미지 작업은 6개를 넘지 않는다",
+      "expectedLimit": 6,
+      "expectedAccepted": 1,
+      "accepted": 1,
+      "observedActive": 6,
+      "reassignedTo": null,
+      "passed": true
+    },
+    {
+      "id": "global_68",
+      "promise": "전체 68칸(34+34) 중 1칸이 남았을 때 서로 다른 12명이 동시에 요청해도 전체 진행 작업은 68개를 넘지 않는다",
+      "expectedLimit": 68,
+      "expectedAccepted": 1,
+      "accepted": 1,
+      "observedActive": 68,
+      "reassignedTo": null,
+      "passed": true
+    },
+    {
+      "id": "key_spillover",
+      "promise": "내가 고른 계정이 찼어도 옆 계정에 자리가 있으면 거절하지 않고 그 계정으로 넣는다",
+      "expectedLimit": 68,
+      "expectedAccepted": 5,
+      "accepted": 5,
+      "observedActive": 39,
+      "reassignedTo": [
+        "key-b"
+      ],
+      "passed": true
+    },
+    {
+      "id": "exempt_global_block",
+      "promise": "두 계정이 모두 찼으면 관리자도 거절된다",
+      "expectedLimit": 68,
+      "expectedAccepted": 0,
+      "accepted": 0,
+      "observedActive": 68,
+      "reassignedTo": null,
+      "passed": true
+    },
+    {
+      "id": "exempt_video_over_limit",
+      "promise": "관리자는 내 영상 3개를 넘어도 전체 자리가 남아 있으면 수용된다",
+      "expectedLimit": 4,
+      "expectedAccepted": 1,
+      "accepted": 1,
+      "observedActive": 4,
+      "reassignedTo": null,
+      "passed": true
+    },
+    {
+      "id": "completed_video_releases_slot",
+      "promise": "진행 영상 3개 중 1개가 끝나면 다음 영상 1개를 시작할 수 있다",
+      "expectedLimit": 3,
+      "expectedAccepted": 1,
+      "accepted": 1,
+      "observedActive": 3,
+      "reassignedTo": null,
+      "passed": true
+    }
+  ],
+  "testProcessExitCode": 0,
+  "finishedAt": "2026-09-14T02:42:30.438Z"
+}

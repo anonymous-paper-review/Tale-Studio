@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>빨간 약속 하나</title>
+<style>
+  :root {
+    --bg:#F1F3F5; --surface:#FFFFFF; --surface-2:#E8EBEF;
+    --ink:#16181D; --ink-2:#3B4048; --muted:#676D77;
+    --line:#D6DBE1; --line-2:#BFC6CE;
+    --accent:#1F5F7A; --accent-soft:#DCEAF1;
+    --pass:#2E7350; --pass-soft:#DFEDE5;
+    --fail:#A33A38; --fail-soft:#F6E2E1;
+    --gate:#6A579E; --gate-soft:#EAE4F5;
+    --warn:#8A6412; --warn-soft:#F4EBD6;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI","Malgun Gothic",sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+      --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+      --line:#2B3038; --line-2:#3C434D;
+      --accent:#74B4D0; --accent-soft:#17303C;
+      --pass:#5FB98A; --pass-soft:#17301F;
+      --fail:#E0817D; --fail-soft:#3A2321;
+      --gate:#A794D8; --gate-soft:#272040;
+      --warn:#D2A64F; --warn-soft:#33290F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+    --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+    --line:#2B3038; --line-2:#3C434D;
+    --accent:#74B4D0; --accent-soft:#17303C;
+    --pass:#5FB98A; --pass-soft:#17301F;
+    --fail:#E0817D; --fail-soft:#3A2321;
+    --gate:#A794D8; --gate-soft:#272040;
+    --warn:#D2A64F; --warn-soft:#33290F;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:0 20px 110px;background:var(--bg);color:var(--ink);
+    font-family:var(--sans);font-size:16px;line-height:1.82;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto}
+  header.page{padding:56px 0 20px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--fail);margin:0 0 14px;font-weight:600}
+  h1{font-size:clamp(27px,5vw,40px);font-weight:800;letter-spacing:-.028em;line-height:1.22;
+    margin:0 0 18px;text-wrap:balance}
+  .bluf{font-size:17.5px;color:var(--ink);margin:0 0 6px;max-width:64ch}
+  .bluf b{color:var(--gate)}
+  .asof{font-family:var(--mono);font-size:12px;color:var(--muted);margin:10px 0 0}
+  header.page::after{content:"";display:block;height:3px;background:var(--fail);margin-top:26px;opacity:.9}
+  section{margin:58px 0 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .sec-num{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);
+    border:1.5px solid var(--accent);border-radius:3px;padding:0 7px;line-height:1.7}
+  h2{font-size:23px;font-weight:800;letter-spacing:-.018em;margin:0;text-wrap:balance}
+  .sec-lede{color:var(--muted);font-size:15px;margin:0 0 24px;max-width:62ch}
+  p{margin:0 0 16px;max-width:64ch}
+  h3{font-size:17px;font-weight:750;margin:28px 0 10px;letter-spacing:-.01em}
+  h3:first-child{margin-top:0}
+  ul.plain{margin:0 0 16px;padding-left:22px;max-width:64ch}
+  ul.plain li{margin-bottom:8px}
+  strong,b{font-weight:750}
+  .note{background:var(--accent-soft);border:1px solid var(--line);border-left:3px solid var(--accent);
+    border-radius:0 8px 8px 0;padding:14px 18px;margin:0 0 20px;font-size:15px;color:var(--ink-2);max-width:64ch}
+  .note b{color:var(--ink)}
+  .note.warn{background:var(--fail-soft);border-left-color:var(--fail)}
+  pre{background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--line-2);
+    border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+    font-family:var(--mono);font-size:12px;line-height:1.68;margin:8px 0;color:var(--ink-2);
+    white-space:pre;tab-size:2}
+  pre b{color:var(--ink);font-weight:700}
+  pre .path{display:block;color:var(--muted);margin-bottom:8px;font-size:11.5px}
+  code{font-family:var(--mono);font-size:.87em;background:var(--surface-2);padding:1px 6px;border-radius:3px}
+  .code-what{font-size:14.5px;color:var(--ink-2);margin:0 0 4px}
+  .tbl{overflow-x:auto;margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}
+  th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:700;
+    padding:10px 12px;border-bottom:2px solid var(--line-2);vertical-align:bottom}
+  td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .gate-cell{color:var(--gate);font-weight:750}
+  footer{margin-top:66px;padding-top:20px;border-top:2px solid var(--ink);font-size:13.5px;color:var(--muted)}
+  footer b{color:var(--ink)}
+  footer p{max-width:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <p class="eyebrow">판정 필요 · 2026-09-08</p>
+  <h1>빨간 약속 하나</h1>
+  <p class="bluf">webhook을 "받고 바로 답하기"로 고쳤더니 <b>기존 약속 하나가 빨개졌다</b>. 그 약속은 "예외를 던진다"를 요구하는데, 응답을 먼저 보내면 던질 곳이 없다.</p>
+  <p class="bluf"><b>결정할 것 1개</b>: 이 약속을 어떻게 할지. 코드는 <b>커밋하지 않고 대기 중</b>이다.</p>
+  <p class="asof">테스트 2230개 통과 · 1개 실패 · 기준 커밋 2862952d</p>
+</header>
+
+<section>
+  <div class="sec-head"><span class="sec-num">0</span><h2>빨간 약속</h2></div>
+
+  <div class="note warn">
+    <p><b>파일</b> <code>tests/director/video-webhook.test.ts</code><br>
+    <b>약속</b> "파일을 올린 뒤 완료 정보 저장에 실패하면 다시 시도할 수 있게 남긴다"<br>
+    <b>실패</b> 예외가 던져지길 기대하는데 던져지지 않는다</p>
+  </div>
+
+  <p class="code-what">약속이 요구하는 것.</p>
+<pre><span class="path">tests/director/video-webhook.test.ts:74-76</span>    await expect(POST(request())).<b>rejects</b>.toBeInstanceOf(
+      DirectorVideoCompletionPersistenceError,
+    )</pre>
+
+  <p><b>왜 못 지키나</b>: 이제 응답을 먼저 보내고 저장을 그 뒤에 한다. <b>이미 나간 응답을 되돌릴 수 없다</b> — 저장이 나중에 실패해도 던질 대상이 없다.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">1</span><h2>약속이 지키려던 것은 무엇인가</h2></div>
+  <p class="sec-lede">문장을 그대로 읽으면 답이 나온다.</p>
+
+  <div class="tbl"><table>
+    <thead><tr><th></th><th>내용</th><th>지금도 되나</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>목적</b></td>
+        <td>"저장에 실패하면 <b>다시 시도할 수 있게 남긴다</b>"</td>
+        <td class="gate-cell">된다</td>
+      </tr>
+      <tr>
+        <td><b>수단</b></td>
+        <td>예외를 던져 작업을 실패로 굳히지 않는다</td>
+        <td>던지지 않는다</td>
+      </tr>
+      <tr>
+        <td><b>확인 방법</b></td>
+        <td><code>rejects.toBeInstanceOf(...)</code></td>
+        <td>못 쓴다</td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <p><b>목적은 그대로 지켜진다.</b> 저장이 실패해도 작업은 대기 상태로 남고, 화면 폴링·유령 청소부가 다시 시도한다. 같은 파일의 다른 약속 두 개가 그걸 확인하고 있고 <b>둘 다 통과한다</b>:</p>
+  <ul class="plain">
+    <li>"연결된 영상 결과 반영에 실패하면 처리를 끝내고 실패로 남긴다" — 통과</li>
+    <li>"확인된 결과만 반영한다" 계열 5개 — 전부 통과</li>
+  </ul>
+
+  <div class="note">
+    <p><b>즉 깨진 것은 "결과"가 아니라 "확인 방법"이다.</b> 예외를 던지는 건 목적이 아니라 그때 쓴 수단이었다.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">2</span><h2>결정이 필요한 것</h2></div>
+
+  <div class="tbl"><table>
+    <thead><tr><th>선택지</th><th>무엇을 한다는 것인가</th><th>결과</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>①</b> 코드가 틀렸다<br><span style="color:var(--muted);font-size:13px">약속 유지, 코드를 되돌린다</span></td>
+        <td>webhook 수정을 접는다. 예전처럼 응답 전에 저장을 다 한다</td>
+        <td>재전송 루프 문제가 그대로 남는다</td>
+      </tr>
+      <tr>
+        <td><b>②</b> 약속이 바뀌었다<br><span style="color:var(--muted);font-size:13px">문장은 그대로, 확인 방법만 고친다</span></td>
+        <td>"예외가 던져진다" 대신 "작업이 대기 상태로 남는다"를 확인한다. <b>약속 문장은 한 글자도 안 바뀐다</b></td>
+        <td>목적은 그대로 지켜지고 재전송 루프도 없어진다</td>
+      </tr>
+      <tr>
+        <td><b>③</b> 약속이 없어졌다<br><span style="color:var(--muted);font-size:13px">지운다</span></td>
+        <td>—</td>
+        <td><b>권하지 않는다.</b> 저장 실패 시 되살리는 것은 여전히 중요하다</td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <div class="tbl"><table>
+    <thead><tr><th>질문</th><th>안 정하면 무엇이 달라지나</th><th>추천</th><th>언제까지</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>이 약속을 어떻게 할까</td>
+        <td>webhook 수정을 커밋할 수 없다. 큰 영상이 늘수록 같은 알림을 반복해서 받고 매번 128MB를 다시 내려받는 상태가 유지된다</td>
+        <td class="gate-cell">②</td>
+        <td>지금</td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <p><b>②를 추천하는 이유</b>: 약속 문장("다시 시도할 수 있게 남긴다")이 <b>지금도 참</b>이다. 바뀐 건 그걸 어떻게 확인하느냐뿐이다. 문장을 안 바꾸고 확인만 바꾸는 것이라 약속이 약해지지 않는다.</p>
+
+  <p class="asof">②를 고르면 확인 방법을 이렇게 바꾼다 — 응답은 200이고, 작업을 실패로 굳히는 함수(<code>failLinked</code>·<code>failLegacy</code>)가 <b>불리지 않는지</b>를 본다. 그게 "다시 시도할 수 있게 남긴다"의 직접 증거다.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">3</span><h2>알고만 있으면 되는 것</h2></div>
+
+  <div class="tbl"><table>
+    <thead><tr><th>사실</th><th>왜 중요한가</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>after()</code>는 요청 안에서만 쓸 수 있다</td>
+        <td>테스트는 요청 밖이라 그대로 쓰면 던진다. 못 쓰면 그 자리에서 실행하도록 감쌌다 — 프로덕션 동작은 그대로다</td>
+      </tr>
+      <tr>
+        <td>15초는 우리 값이 아니다</td>
+        <td>생성 서비스가 정한 대기 시간이고 <b>주석 한 줄이 유일한 기록</b>이다. 상대가 바꿔도 우리는 모른다. 다만 이 수정은 "몇 초든 응답 전에 무거운 일을 안 한다"라서 그 값에 안 기댄다</td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<footer>
+  <p><b>근거로 쓴 것</b> — <code>src/app/api/fal/webhook/route.ts</code>(수정본, 미커밋), <code>tests/director/video-webhook.test.ts:65-79</code>(빨간 약속), <code>tests/job/webhook-answers-fast.test.ts</code>(새 약속 5개, 전부 통과). 전체 <code>pnpm test</code> 2230개 통과 · 1개 실패.</p>
+  <p><b>이 문서가 하지 않는 것</b> — 판정 없이 약속을 고치지 않았다. 코드도 커밋하지 않았다. 실제 서비스에서 응답 시간이 얼마나 줄어드는지 측정하지 않았다.</p>
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,331 @@
+{
+  "startedAt": "2026-09-11T07:00:52.316Z",
+  "developmentProject": "pbiumddivadgbzxuymak",
+  "schema": "capacity_audit_7f8a1cc504114d7a8fe42c3485796644",
+  "codeSource": "/var/folders/t6/snw_y0p96b5dhcbclfksgldm0000gn/T/tale-concurrency-main-867cda83-z2mrtesd",
+  "migration": "20260909120000_generation_video_capacity_gate.sql",
+  "migrationSha256": "4e73f397d7a7e732275df7f8e2728cef452e9aff4e4e053d006fa1a7cf4af4a6",
+  "safety": {
+    "applicationRowsRead": 0,
+    "applicationRowsWritten": 0,
+    "paidFalRequests": 0,
+    "publicMigrationsApplied": 0,
+    "verifiedTls": true,
+    "developmentIdentityVerified": true,
+    "publicFunctionsBefore": {
+      "function_count": 28,
+      "fingerprint": "202afba5a2139cea0fb0da649373815e"
+    },
+    "temporarySchemaRemoved": true,
+    "publicFunctionsAfter": {
+      "function_count": 28,
+      "fingerprint": "202afba5a2139cea0fb0da649373815e"
+    },
+    "publicFunctionsUnchanged": true
+  },
+  "observations": [
+    {
+      "id": "user_video_3",
+      "promise": "영상이 2개 진행 중일 때 12건을 동시에 요청해도 진행 영상은 3개를 넘지 않는다",
+      "expectedLimit": 3,
+      "baseline": 2,
+      "requested": 12,
+      "accepted": 1,
+      "rejected": 11,
+      "finalActive": 3,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1119550,
+        1119554,
+        1119557,
+        1119561,
+        1119553,
+        1119551,
+        1119560,
+        1119559,
+        1119552,
+        1119555,
+        1119556,
+        1119558
+      ],
+      "transactionIds": [
+        "3579",
+        "3578",
+        "3581",
+        "3587",
+        "3577",
+        "3576",
+        "3586",
+        "3583",
+        "3580",
+        "3582",
+        "3584",
+        "3585"
+      ],
+      "preReadCounts": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "observedAdvisoryWaiters": 12,
+      "errors": [
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity",
+        "video_user_at_capacity"
+      ],
+      "observationValid": true,
+      "policyPassed": true
+    },
+    {
+      "id": "user_image_6",
+      "promise": "이미지가 5개 진행 중일 때 12건을 동시에 요청해도 진행 이미지 작업은 6개를 넘지 않는다",
+      "expectedLimit": 6,
+      "baseline": 5,
+      "requested": 12,
+      "accepted": 12,
+      "rejected": 0,
+      "finalActive": 17,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1119557,
+        1119558,
+        1119561,
+        1119559,
+        1119552,
+        1119560,
+        1119555,
+        1119556,
+        1119553,
+        1119551,
+        1119554,
+        1119550
+      ],
+      "transactionIds": [
+        "3603",
+        "3597",
+        "3599",
+        "3606",
+        "3600",
+        "3595",
+        "3604",
+        "3605",
+        "3596",
+        "3598",
+        "3602",
+        "3601"
+      ],
+      "preReadCounts": [
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5,
+        5
+      ],
+      "observedAdvisoryWaiters": null,
+      "errors": [],
+      "observationValid": true,
+      "policyPassed": false
+    },
+    {
+      "id": "global_68",
+      "promise": "전체 68칸 중 1칸이 남았을 때 서로 다른 12명이 동시에 요청해도 전체 진행 작업은 68개를 넘지 않는다",
+      "expectedLimit": 68,
+      "baseline": 67,
+      "requested": 12,
+      "accepted": 12,
+      "rejected": 0,
+      "finalActive": 79,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1119551,
+        1119561,
+        1119552,
+        1119555,
+        1119557,
+        1119553,
+        1119554,
+        1119556,
+        1119558,
+        1119550,
+        1119559,
+        1119560
+      ],
+      "transactionIds": [
+        "3620",
+        "3612",
+        "3613",
+        "3616",
+        "3617",
+        "3610",
+        "3615",
+        "3621",
+        "3611",
+        "3618",
+        "3619",
+        "3614"
+      ],
+      "preReadCounts": [
+        67,
+        67,
+        67,
+        67,
+        67,
+        67,
+        67,
+        67,
+        67,
+        67,
+        67,
+        67
+      ],
+      "observedAdvisoryWaiters": null,
+      "errors": [],
+      "observationValid": true,
+      "policyPassed": false
+    },
+    {
+      "id": "global_80",
+      "promise": "전체 80칸 중 1칸이 남았을 때 서로 다른 12명이 동시에 요청해도 전체 진행 작업은 80개를 넘지 않는다",
+      "expectedLimit": 80,
+      "baseline": 79,
+      "requested": 12,
+      "accepted": 12,
+      "rejected": 0,
+      "finalActive": 91,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1119552,
+        1119551,
+        1119555,
+        1119558,
+        1119554,
+        1119559,
+        1119560,
+        1119550,
+        1119561,
+        1119553,
+        1119557,
+        1119556
+      ],
+      "transactionIds": [
+        "3634",
+        "3627",
+        "3629",
+        "3636",
+        "3631",
+        "3626",
+        "3630",
+        "3635",
+        "3625",
+        "3632",
+        "3633",
+        "3628"
+      ],
+      "preReadCounts": [
+        79,
+        79,
+        79,
+        79,
+        79,
+        79,
+        79,
+        79,
+        79,
+        79,
+        79,
+        79
+      ],
+      "observedAdvisoryWaiters": null,
+      "errors": [],
+      "observationValid": true,
+      "policyPassed": false
+    },
+    {
+      "id": "completed_video_releases_slot",
+      "promise": "진행 영상 3개 중 1개가 끝나면 다음 영상 1개를 시작할 수 있다",
+      "expectedLimit": 3,
+      "baseline": 2,
+      "requested": 1,
+      "accepted": 1,
+      "rejected": 0,
+      "finalActive": 3,
+      "sameReadBarrier": true,
+      "backendPids": [
+        1119553
+      ],
+      "transactionIds": [
+        "3643"
+      ],
+      "preReadCounts": [
+        2
+      ],
+      "observedAdvisoryWaiters": null,
+      "errors": [],
+      "observationValid": true,
+      "policyPassed": true
+    }
+  ],
+  "policyResults": [
+    {
+      "id": "user_video_3",
+      "promise": "영상이 2개 진행 중일 때 12건을 동시에 요청해도 진행 영상은 3개를 넘지 않는다",
+      "expectedLimit": 3,
+      "observedActive": 3,
+      "passed": true
+    },
+    {
+      "id": "user_image_6",
+      "promise": "이미지가 5개 진행 중일 때 12건을 동시에 요청해도 진행 이미지 작업은 6개를 넘지 않는다",
+      "expectedLimit": 6,
+      "observedActive": 17,
+      "passed": false
+    },
+    {
+      "id": "global_68",
+      "promise": "전체 68칸 중 1칸이 남았을 때 서로 다른 12명이 동시에 요청해도 전체 진행 작업은 68개를 넘지 않는다",
+      "expectedLimit": 68,
+      "observedActive": 79,
+      "passed": false
+    },
+    {
+      "id": "global_80",
+      "promise": "전체 80칸 중 1칸이 남았을 때 서로 다른 12명이 동시에 요청해도 전체 진행 작업은 80개를 넘지 않는다",
+      "expectedLimit": 80,
+      "observedActive": 91,
+      "passed": false
+    },
+    {
+      "id": "completed_video_releases_slot",
+      "promise": "진행 영상 3개 중 1개가 끝나면 다음 영상 1개를 시작할 수 있다",
+      "expectedLimit": 3,
+      "observedActive": 3,
+      "passed": true
+    }
+  ],
+  "testProcessExitCode": 1,
+  "finishedAt": "2026-09-11T07:01:01.600Z"
+}

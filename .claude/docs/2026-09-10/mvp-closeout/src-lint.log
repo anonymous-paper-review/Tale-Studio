@@ -1,0 +1,53 @@
+
+/Users/xcape/orca/workspaces/tale-studio/mvp-feedback-release-20260910/src/app/api/produce/ingest/route.ts
+  8:3  warning  'IMAGE_TYPES' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/xcape/orca/workspaces/tale-studio/mvp-feedback-release-20260910/src/app/page.tsx
+  136:7   warning  Unused eslint-disable directive (no problems were reported from 'no-restricted-syntax')
+  396:23  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  478:15  warning  Unused eslint-disable directive (no problems were reported from 'no-restricted-syntax')
+  490:15  warning  Unused eslint-disable directive (no problems were reported from 'no-restricted-syntax')
+  536:15  warning  Unused eslint-disable directive (no problems were reported from 'no-restricted-syntax')
+  539:15  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+  594:15  warning  Unused eslint-disable directive (no problems were reported from 'no-restricted-syntax')
+
+/Users/xcape/orca/workspaces/tale-studio/mvp-feedback-release-20260910/src/app/projects/page.tsx
+  129:7  warning  Unused eslint-disable directive (no problems were reported from 'no-restricted-syntax')
+
+/Users/xcape/orca/workspaces/tale-studio/mvp-feedback-release-20260910/src/app/studio/artist/page.tsx
+    6:10  warning  'Badge' is defined but never used                                                                                                                                                                            @typescript-eslint/no-unused-vars
+  136:9   warning  The 'writerGateStatus' conditional could make the dependencies of useEffect Hook (at line 260) change on every render. To fix this, wrap the initialization of 'writerGateStatus' in its own useMemo() Hook  react-hooks/exhaustive-deps
+
+/Users/xcape/orca/workspaces/tale-studio/mvp-feedback-release-20260910/src/components/layout/global-chat.tsx
+  1791:25  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/Users/xcape/orca/workspaces/tale-studio/mvp-feedback-release-20260910/src/components/layout/user-menu.tsx
+  152:13  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/Users/xcape/orca/workspaces/tale-studio/mvp-feedback-release-20260910/src/features/director/canvas-views/StoryboardGridView.tsx
+  720:9  warning  'setStoryboardMediaMode' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+/Users/xcape/orca/workspaces/tale-studio/mvp-feedback-release-20260910/src/features/editor/shot-timeline.tsx
+  136:17  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/Users/xcape/orca/workspaces/tale-studio/mvp-feedback-release-20260910/src/features/editor/timeline.tsx
+  414:3  warning  'onUpdateVideoClip' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/xcape/orca/workspaces/tale-studio/mvp-feedback-release-20260910/src/features/editor/video-source-panel.tsx
+  154:29  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` or a custom image loader to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/Users/xcape/orca/workspaces/tale-studio/mvp-feedback-release-20260910/src/lib/demo/supabase-shim.ts
+  30:10  warning  '_cols' is defined but never used    @typescript-eslint/no-unused-vars
+  67:10  warning  '_values' is defined but never used  @typescript-eslint/no-unused-vars
+  71:10  warning  '_values' is defined but never used  @typescript-eslint/no-unused-vars
+  75:10  warning  '_values' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/xcape/orca/workspaces/tale-studio/mvp-feedback-release-20260910/src/lib/lifecycle.ts
+  245:23  warning  '_stableId' is defined but never used  @typescript-eslint/no-unused-vars
+  249:23  warning  '_stableId' is defined but never used  @typescript-eslint/no-unused-vars
+
+/Users/xcape/orca/workspaces/tale-studio/mvp-feedback-release-20260910/src/lib/writer/pipeline/validators/action_budget.ts
+  5:7  warning  'SHOT_DURATION' is assigned a value but never used  @typescript-eslint/no-unused-vars
+
+✖ 24 problems (0 errors, 24 warnings)
+  0 errors and 6 warnings potentially fixable with the `--fix` option.

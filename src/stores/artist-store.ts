@@ -1,3 +1,4 @@
+import { inspectionImageRevision } from '@/lib/chat-tools/inspect'
 import { create } from 'zustand'
 import { mainImageFromAppearances } from '@/lib/artist/main-image'
 import { displayNameOf } from '@/lib/display-name'
@@ -8,6 +9,7 @@ import type { ImageModelKey } from '@/lib/image-models'
 import { candidateViewToViewKey, classifyImageStale, computeLookFingerprint, computeWorldDescriptionHash, computeWorldImageSourceHash, type CandidateImage, type LookTokens } from '@/lib/image-provenance'
 import {
   buildWorldShotPromptForLocation,
+  buildWorldShotPromptForAppearance,
   WORLD_SHOT_COLUMN,
   WORLD_SHOT_LABELS,
   type WorldShotKey,
@@ -98,10 +100,16 @@ export type ArtistUpdate =
       instruction?: string
       /** 이미지 생성 모델 선택(image-models 키). 미지정 = 기본 모델. */
       model?: ImageModelKey
+      /** 정책 거절 뒤 안전 모드 재시도(UI retryCharacterViewSafe와 같음). */
+      safeMode?: boolean
     }
   | { type: 'regenerateWorldAsset'
       /** 약속 C10: 다시 그릴 배경 모습(변형). 없으면 기본 모습. */
-      appearanceKey?: string; locationId: string }
+      appearanceKey?: string; locationId: string
+      /** 배경 팝업의 이미지 모델 선택과 같다. 미지정 = 서버 기본. */
+      model?: ImageModelKey
+      /** 정책 거절 뒤 안전 모드 재시도(UI retryWorldShotSafe와 같음). */
+      safeMode?: boolean }
   | ({ type: 'createCharacter' } & NewCharacterInput)
   | {
       type: 'createAppearance'
@@ -116,6 +124,12 @@ export type GenerationActor = 'ui' | 'chat' | 'auto'
 export type GenerationRequestOptions = {
   traceId?: string
   onJob?: GenerationJobObserver
+}
+export type AppearanceCreationOptions = GenerationRequestOptions & {
+  generate?: boolean
+  actor?: GenerationActor
+  model?: ImageModelKey
+  onCreated?: (appearanceKey: string) => void
 }
 
 // fal 계정 concurrent limit을 여러 유저가 공유하므로, dispatcher 전 단계에서는 화면별 submit 풀을
@@ -143,13 +157,17 @@ async function markLocationUserEdited(projectId: string, locationId: string): Pr
 
 async function generateImage(
   prompt: string,
+  projectId: string | null,
   aspectRatio: '1:1' | '16:9' = '1:1',
   provider: ImageProvider = 'fal',
 ): Promise<string> {
+  if (provider === 'fal' && !projectId) {
+    throw new Error('A project is required for FAL image generation')
+  }
   const res = await fetch('/api/generate/image', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt, aspectRatio, provider }),
+    body: JSON.stringify({ prompt, aspectRatio, provider, projectId }),
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({}))
@@ -191,7 +209,7 @@ async function persistImage(
 /**
  * 월드 샷 1장 생성 + 영속화 → 최종 URL.
  *   fal + projectId → webhook job 경로 (서버사이드 storage+DB, 탭 닫혀도 보존).
- *   그 외(gemini/tailscale 또는 projectId 없음) → 기존 동기 blob + 클라 persist.
+ *   gemini/tailscale → 기존 동기 blob + 클라 persist. FAL은 projectId 없이 동기 경로로 우회하지 않는다.
  */
 async function generateAndPersistWorldShot(
   projectId: string | null,
@@ -251,8 +269,8 @@ async function generateAndPersistWorldShot(
     options?.onJob?.({ jobId: body.jobId, status: 'queued', httpStatus: res.status })
     return await pollGenerationJob(body.jobId, { onStatus: options?.onJob })
   }
-  // 비-fal provider 또는 projectId 없음 → 기존 동기 blob + 클라 persist
-  const blobUrl = await generateImage(prompt, '16:9', provider)
+  // 비-fal provider → 기존 동기 blob + 클라 persist. FAL은 projectId 없이 우회하지 않는다.
+  const blobUrl = await generateImage(prompt, projectId, '16:9', provider)
   if (projectId) {
     const persisted = await persistImage(projectId, 'location', locationId, column, blobUrl)
     options?.onJob?.({ jobId: null, status: 'completed', resultUrl: persisted ?? blobUrl })
@@ -423,6 +441,20 @@ function keepSelection(current: string | null, ids: readonly string[]): string |
   return ids[0] ?? null
 }
 
+function readLocationAppearanceSelection(projectId: string, worlds: WorldAsset[], current: Record<string, string>): Record<string, string> {
+  try {
+    const saved = typeof localStorage === 'undefined' ? null : localStorage.getItem(`tale:artist-appearances:${projectId}`)
+    const parsed = { ...(saved ? JSON.parse(saved) as Record<string, unknown> : {}), ...current }
+    return Object.fromEntries(worlds.flatMap((world) => {
+      const key = parsed?.[world.locationId]
+      return typeof key === 'string' && (key === DEFAULT_LOCATION_APPEARANCE_KEY || world.appearances?.some((a) => a.appearanceKey === key))
+        ? [[world.locationId, key]] : []
+    }))
+  } catch {
+    return {}
+  }
+}
+
 /** 새 캐릭터의 character_id 생성 — 이름 슬러그 + 짧은 난수 (프로젝트 내 충돌 회피) */
 function makeCharacterId(name: string): string {
   const slug = name
@@ -504,7 +536,18 @@ async function runPool(
   await Promise.all(workers)
 }
 
+export interface ArtistChatSelection {
+  projectId: string
+  target: 'character' | 'background'
+  id: string
+  appearanceKey: string
+  source: 'card' | 'appearance' | 'image'
+  imageRevision?: string
+}
+
 interface ArtistState {
+  chatSelection: ArtistChatSelection | null
+  setChatSelection: (selection: ArtistChatSelection | null) => void
   sceneManifest: SceneManifest | null
   characterAssets: CharacterAsset[]
   /** per-character/per-view 생성 실패(콘텐츠정책/일반). G001은 채우기만 — 소비는 G002(배지·우회)·G003(온보딩). */
@@ -514,9 +557,11 @@ interface ArtistState {
   worldAssets: WorldAsset[]
   selectedCharacterId: string | null
   selectedLocationId: string | null
+  selectedLocationAppearances: Record<string, string>
+  selectLocationAppearance: (locationId: string, appearanceKey: string) => void
   /** 생성 중인 모습별 캐릭터 뷰 슬롯. */
   generatingViews: CharacterAppearanceSlot[]
-  /** 생성 중인 로케이션 id 들 (병렬 생성 추적) */
+  /** 생성 중인 배경 모습 슬롯(worldFailureKey). 기본 모습은 locationId, 변형은 locationId:appearanceKey. */
   generatingLocations: string[]
   selectedBoostPreset: string | null
   imageProvider: ImageProvider
@@ -572,7 +617,7 @@ interface ArtistState {
     actor?: GenerationActor,
     model?: ImageModelKey,
     /** safeMode = 우회 재시도(B9). appearanceKey = 배경 모습 변형(C10, 없거나 'default' 면 기본 모습). */
-    extra?: { safeMode?: boolean; appearanceKey?: string | null },
+    extra?: GenerationRequestOptions & { safeMode?: boolean; appearanceKey?: string | null },
   ) => Promise<void>
   /** 약속 C10: 배경 모습(변형) 만들기(만든 직후 이미지 자동 생성) / 이름·시점 바꾸기 / 설명 편집 / 지우기. */
   createLocationAppearance: (
@@ -580,7 +625,7 @@ interface ArtistState {
     label: string,
     visualDescription: string,
     narrativeTime?: NarrativeTime,
-    options?: { generate?: boolean; actor?: GenerationActor; model?: ImageModelKey },
+    options?: AppearanceCreationOptions,
   ) => Promise<string>
   renameLocationAppearance: (locationId: string, appearanceKey: string, label: string, narrativeTime?: NarrativeTime | null) => Promise<void>
   updateLocationAppearanceDescription: (locationId: string, appearanceKey: string, visualDescription: string) => Promise<void>
@@ -603,7 +648,7 @@ interface ArtistState {
   uiTab: 'characters' | 'world'
   setUiTab: (tab: 'characters' | 'world') => void
   /** 승인된 원천 외형 변경을 로컬 반영(C3 F6) — fixedPrompt 갱신 → 기존 파생 이미지가 stale 로 표시(자동 재생성 없음). */
-  applyAppearancePatch: (characterId: string, appearance: string) => void
+  applyAppearancePatch: (characterId: string, appearance: string, appearanceNative?: string | null) => void
   updateCharacterAppearance: (
     characterId: string,
     appearanceKey: string,
@@ -616,7 +661,7 @@ interface ArtistState {
     appearance: string,
     narrativeTime?: NarrativeTime,
     /** 약속 C4(2026-09-04 오너): 새 모습은 만든 직후 이미지를 자동 생성한다. actor 는 잡 귀속용. */
-    options?: { generate?: boolean; actor?: GenerationActor; model?: ImageModelKey },
+    options?: AppearanceCreationOptions,
   ) => Promise<string>
   /** 약속 C8: 모습 이름·시점 바꾸기 / 기본 모습 지정 / 지우기. */
   renameAppearance: (characterId: string, appearanceKey: string, label: string, narrativeTime?: NarrativeTime | null) => Promise<void>
@@ -640,7 +685,33 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   lookSummary: null,
   worldAssets: [],
   selectedCharacterId: null,
+  chatSelection: null,
+  setChatSelection: selection => {
+    if (selection === null) { set({ chatSelection: null });return }
+    if (selection.projectId !== useProjectStore.getState().projectId) return
+    const exists = selection.target === 'character'
+      ? get().characterAssets.some(c => c.characterId === selection.id && c.appearances.some(a => a.appearanceKey === selection.appearanceKey))
+      : get().worldAssets.some(w => w.locationId === selection.id && (selection.appearanceKey === DEFAULT_LOCATION_APPEARANCE_KEY || w.appearances?.some(a => a.appearanceKey === selection.appearanceKey)))
+    if (exists) {
+      const world = get().worldAssets.find(w => w.locationId === selection.id)
+      const url = selection.target === 'character'
+        ? get().characterAssets.find(c => c.characterId === selection.id)?.appearances.find(a => a.appearanceKey === selection.appearanceKey)?.sheetUrl
+        : selection.appearanceKey === DEFAULT_LOCATION_APPEARANCE_KEY ? world?.wideShot : world?.appearances?.find(a => a.appearanceKey === selection.appearanceKey)?.wideShot
+      set({ chatSelection: { ...selection, imageRevision: inspectionImageRevision(url) } })
+    }
+  },
   selectedLocationId: null,
+  selectedLocationAppearances: {},
+  selectLocationAppearance: (locationId, appearanceKey) => {
+    const world = get().worldAssets.find((item) => item.locationId === locationId)
+    if (!world || (appearanceKey !== DEFAULT_LOCATION_APPEARANCE_KEY && !world.appearances?.some((a) => a.appearanceKey === appearanceKey))) return
+    const selectedLocationAppearances = { ...get().selectedLocationAppearances, [locationId]: appearanceKey }
+    set({ selectedLocationAppearances })
+    const projectId = useProjectStore.getState().projectId
+    try {
+      if (projectId && typeof localStorage !== 'undefined') localStorage.setItem(`tale:artist-appearances:${projectId}`, JSON.stringify(selectedLocationAppearances))
+    } catch { /* 브라우저 저장소가 막혀도 현재 선택은 유지한다. */ }
+  },
   generatingViews: [],
   generatingLocations: [],
   selectedBoostPreset: null,
@@ -705,6 +776,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             .eq('project_id', projectId)
             .order('created_at'),
         ])
+        if (useProjectStore.getState().projectId !== projectId) return
         const locCandidatesByLocation = groupLocationCandidates(dbLocCandidates ?? [])
         const locAppearancesByLocation = groupLocationAppearances(dbLocAppearances ?? [], dbLocCandidates ?? [])
 
@@ -856,6 +928,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
               : null,
             selectedCharacterId: keepSelection(get().selectedCharacterId, characterAssets.map((c) => c.characterId)),
             selectedLocationId: keepSelection(get().selectedLocationId, worldAssets.map((w) => w.locationId)),
+            selectedLocationAppearances: readLocationAppearanceSelection(projectId, worldAssets, get().selectedLocationAppearances),
           })
 
           // 생성 상태(실패/대기) 조회 — generation_jobs 는 RLS 로 클라 직접 불가 → owner-checked 엔드포인트 1회.
@@ -867,7 +940,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
                 `/api/artist/generation-status?projectId=${encodeURIComponent(projectId)}`,
               )
               if (!res.ok) return
-              const { failures, queuedMain, worldFailures } = (await res.json()) as {
+              const { failures, queuedMain, worldFailures, queuedWorld } = (await res.json()) as {
                 failures: Array<{
                   characterId: string
                   appearanceKey: string
@@ -878,6 +951,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
                   moderation: boolean
                 }>
                 queuedMain: Array<{ characterId: string; appearanceKey: string; jobId: string }>
+                queuedWorld?: Array<{ locationId: string; appearanceKey: string | null; jobId: string }>
                 worldFailures?: Array<{
                   locationId: string
                   column: string
@@ -887,6 +961,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
                   moderation: boolean
                 }>
               }
+              if (useProjectStore.getState().projectId !== projectId) return
               set({ worldFailures: worldFailuresFromStatus(worldFailures) })
               const vf: ViewFailures = {}
               for (const f of failures) {
@@ -899,6 +974,28 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
                 }
               }
               set({ viewFailures: vf })
+              for (const { locationId, appearanceKey, jobId } of queuedWorld ?? []) {
+                const slotKey = worldFailureKey(locationId, appearanceKey)
+                if (get().generatingLocations.includes(slotKey)) continue
+                set((state) => ({ generatingLocations: [...state.generatingLocations, slotKey] }))
+                void pollGenerationJob(jobId)
+                  .then((url) => {
+                    if (useProjectStore.getState().projectId !== projectId) return
+                    set((state) => ({ worldAssets: state.worldAssets.map((world) =>
+                      world.locationId !== locationId ? world : appearanceKey && appearanceKey !== DEFAULT_LOCATION_APPEARANCE_KEY
+                        ? { ...world, appearances: (world.appearances ?? []).map((appearance) => appearance.appearanceKey === appearanceKey ? { ...appearance, wideShot: url } : appearance) }
+                        : { ...world, wideShot: url },
+                    ) }))
+                    return refreshLocationCandidates(projectId, locationId, set)
+                  })
+                  .catch(() => {
+                    if (useProjectStore.getState().projectId === projectId) void refreshWorldFailures(projectId, set)
+                  })
+                  .finally(() => {
+                    if (useProjectStore.getState().projectId !== projectId) return
+                    set((state) => ({ generatingLocations: state.generatingLocations.filter((key) => key !== slotKey) }))
+                  })
+              }
               for (const { characterId, appearanceKey, jobId } of queuedMain) {
                 void pollGenerationJob(jobId)
                   .then((url) => {
@@ -1045,6 +1142,34 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           const body = await res.json().catch(() => ({}))
           throw new Error(body.error ?? `HTTP ${res.status}`)
         }
+        if (entityType === 'person') {
+          const { defaultAppearance } = (await res.json()) as { defaultAppearance?: CharacterAppearance }
+          if (!defaultAppearance?.appearanceKey || !defaultAppearance.isDefault) {
+            throw new Error('Saved character default appearance is missing')
+          }
+          set((state) => ({
+            characterAssets: state.characterAssets.map((character) =>
+              character.characterId === characterId
+                ? {
+                    ...character,
+                    fixedPrompt: defaultAppearance.appearance ?? '',
+                    appearanceNative: defaultAppearance.appearanceNative ?? undefined,
+                    appearances: [defaultAppearance],
+                  }
+                : character,
+            ),
+            sceneManifest: state.sceneManifest
+              ? {
+                  ...state.sceneManifest,
+                  characters: state.sceneManifest.characters.map((character) =>
+                    character.characterId === characterId
+                      ? { ...character, fixedPrompt: defaultAppearance.appearance ?? '' }
+                      : character,
+                  ),
+                }
+              : state.sceneManifest,
+          }))
+        }
       } catch (err) {
         set({
           error:
@@ -1143,6 +1268,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     }))
     const t0 = Date.now()
     let activeJobId: string | null = null
+    let lastReceipt: GenerationJobReceipt | null = null
+    const onJob: GenerationJobObserver = (receipt) => {
+      lastReceipt = receipt
+      options?.onJob?.(receipt)
+    }
     alog(`[autogen] char ${key} → submitting…`)
     try {
       const res = await fetch('/api/artist/generate-sheet', {
@@ -1163,7 +1293,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
         const error = body.error ?? `HTTP ${res.status}`
-        options?.onJob?.({ jobId: null, status: 'failed', httpStatus: res.status, error })
+        onJob({ jobId: null, status: 'failed', httpStatus: res.status, error })
         if (notifyIfQuotaExceeded(res.status, body)) {
           return { jobId: null, status: 'failed', httpStatus: res.status, error }
         }
@@ -1174,7 +1304,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       // 서버 dedupe(이미 같은 슬롯에 queued 잡 존재) → 새 fal 제출 없이 종료. 에러/재시도 아님(중복 방지).
       if (body.deduped) {
         alog(`[autogen] char ${key} — 이미 큐에 있음(서버 dedupe), 제출 생략`)
-        options?.onJob?.({ jobId: null, status: 'deduped', httpStatus: res.status })
+        onJob({ jobId: null, status: 'deduped', httpStatus: res.status })
         return { jobId: null, status: 'deduped', httpStatus: res.status }
       }
       // 서버 give-up 게이트(반복 실패 슬롯의 자율 재생성 차단) → jobId 없음.
@@ -1184,20 +1314,20 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       //   정상 상태이므로 조용히 끝낸다(give-up 안내와 다르다).
       if (body.skipped && (body as { reason?: string }).reason === 'exists') {
         alog(`[autogen] char ${key} — sheet already exists, server skipped (no submit)`)
-        options?.onJob?.({ jobId: null, status: 'skipped', httpStatus: res.status })
+        onJob({ jobId: null, status: 'skipped', httpStatus: res.status })
         return { jobId: null, status: 'skipped', httpStatus: res.status }
       }
       if (body.skipped || !body.jobId) {
         alog(`[autogen] char ${key} — give-up 게이트로 자동 생성 skip`)
         notifyGenerationGaveUp('artist', translate(useLocaleStore.getState().locale, 'Character image'))
-        options?.onJob?.({ jobId: null, status: 'skipped', httpStatus: res.status })
+        onJob({ jobId: null, status: 'skipped', httpStatus: res.status })
         return { jobId: null, status: 'skipped', httpStatus: res.status }
       }
       const jobId = body.jobId
       activeJobId = jobId
       alog(`[autogen] char ${key} job ${jobId} queued, polling…`)
-      options?.onJob?.({ jobId, status: 'queued', httpStatus: res.status })
-      const url = await pollGenerationJob(jobId, { onStatus: options?.onJob })
+      onJob({ jobId, status: 'queued', httpStatus: res.status })
+      const url = await pollGenerationJob(jobId, { onStatus: onJob })
       alog(`[autogen] char ${key} ✓ done in ${((Date.now() - t0) / 1000).toFixed(1)}s`)
       atime(`char ${key}`, Date.now() - t0)
       set((state) => {
@@ -1236,6 +1366,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         err instanceof Error ? err.message : err,
       )
       const raw = err instanceof Error ? err.message : String(err)
+      const receipt = lastReceipt as GenerationJobReceipt | null
+      if (!receipt || !['failed', 'timed_out'].includes(receipt.status)) onJob({ jobId: activeJobId, status: 'failed', error: raw })
       set({ error: raw || 'Character view generation failed' })
       // 카드의 작은 배지는 스크롤하면 사라진다 — 채팅은 stage 를 옮겨도 남는 기록이다.
       notifyGenerationFailed('artist', translate(useLocaleStore.getState().locale, 'Character image'), raw)
@@ -1372,9 +1504,14 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
 
   generateWorldShot: async (locationId, shot, promptOverride, actor = 'ui', model, extra) => {
     if (isDemoSession()) return
-    // 연타 방어(#double-fire) — 사람이 누른 경로만. 키는 로케이션+샷이라 같은 로케이션의
-    //   wide/establishing 병렬 생성은 그대로 통과한다(아래 주석의 기존 정책 유지).
-    if (actor === 'ui' && !claimAction(`artist:world:${locationId}:${shot}`)) return
+    const pid = useProjectStore.getState().projectId
+    const variantKey = extra?.appearanceKey && extra.appearanceKey !== DEFAULT_LOCATION_APPEARANCE_KEY ? extra.appearanceKey : null
+    const slotKey = worldFailureKey(locationId, variantKey)
+    if (actor === 'ui' && !claimAction(`artist:world:${pid}:${slotKey}:${shot}`)) return
+    if (get().generatingLocations.includes(slotKey)) {
+      extra?.onJob?.({ jobId: null, status: 'deduped' })
+      return
+    }
     const { sceneManifest, selectedBoostPreset, imageProvider } = get()
     const location = sceneManifest?.locations.find(
       (l) => l.locationId === locationId,
@@ -1382,31 +1519,38 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     const scene = sceneManifest?.scenes.find((s) => s.location === locationId) ?? null
     if (!location) {
       console.warn(`[autogen] world ${locationId}:${shot} SKIPPED — no matching location in sceneManifest`)
+      extra?.onJob?.({ jobId: null, status: 'failed', error: 'Background not found' })
       return
     }
 
     // location 단위 가드를 두지 않음 — 같은 로케이션의 wide/establishing 을 병렬 생성할 수 있어야 함.
     set((state) => ({
-      generatingLocations: [...state.generatingLocations, locationId],
+      generatingLocations: [...state.generatingLocations, slotKey],
       error: null,
     }))
 
     const t0 = Date.now()
+    let lastReceipt: GenerationJobReceipt | null = null
+    const onJob: GenerationJobObserver = (receipt) => {
+      lastReceipt = receipt
+      extra?.onJob?.(receipt)
+    }
     alog(`[autogen] world ${locationId}:${shot} → submitting…`)
     try {
-      // 약속 C10: 변형(모습)은 그 변형의 설명으로 프롬프트를 짓는다(장소 이름·씬 맥락은 그대로).
-      const variantKey = extra?.appearanceKey && extra.appearanceKey !== DEFAULT_LOCATION_APPEARANCE_KEY ? extra.appearanceKey : null
+      // 모습의 환경 조건은 그 모습 설명에서만 읽는다. 기존 씬의 낮/조명이 섞이지 않게 한다.
       const variant = variantKey
         ? get().worldAssets.find((w) => w.locationId === locationId)?.appearances?.find((a) => a.appearanceKey === variantKey) ?? null
         : null
-      const promptLocation = variant?.visualDescription ? { ...location, visualDescription: variant.visualDescription } : location
+      if (variantKey && !variant) throw new Error('Background appearance not found')
       // 사용자 편집 프롬프트 우선, 없으면 Producer-only 또는 Writer scene context 를 포함한 기본 프롬프트.
       const prompt =
         promptOverride ??
-        buildWorldShotPromptForLocation(promptLocation, scene, selectedBoostPreset, shot)
-      const pid = useProjectStore.getState().projectId
+        (variant
+          ? buildWorldShotPromptForAppearance(location, variant.visualDescription ?? '', selectedBoostPreset, shot)
+          : buildWorldShotPromptForLocation(location, scene, selectedBoostPreset, shot))
       if (pid && shouldMarkWorldGenerationUserEdited(actor)) {
         await markLocationUserEdited(pid, locationId)
+        if (useProjectStore.getState().projectId !== pid) return
         set((state) => ({
           worldAssets: state.worldAssets.map((w) =>
             w.locationId === locationId ? { ...w, userEdited: true } : w,
@@ -1428,7 +1572,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         prompt,
         imageProvider,
         actor,
-        undefined,
+        { traceId: extra?.traceId, onJob },
         {
           model,
           safeMode: extra?.safeMode,
@@ -1436,6 +1580,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           appearanceKey: variantKey,
         },
       )
+      if (useProjectStore.getState().projectId !== pid) return
       if (pid) void refreshWorldFailures(pid, set)
       if (!url) {
         // 서버 give-up 게이트로 자동 생성 skip — 에러는 아니지만 사용자에게는 알려야 한다(캐릭터 경로와 동일 이유).
@@ -1462,12 +1607,23 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         err instanceof Error ? err.message : err,
       )
       const raw = err instanceof Error ? err.message : String(err)
-      set({ error: raw || 'World generation failed' })
+      const receipt = lastReceipt as GenerationJobReceipt | null
+      if (!receipt || !['failed', 'timed_out'].includes(receipt.status)) onJob({ jobId: receipt?.jobId ?? null, status: 'failed', error: raw })
+      if (useProjectStore.getState().projectId !== pid) return
+      set((state) => ({
+        error: raw || 'World generation failed',
+        worldFailures: { ...state.worldFailures, [slotKey]: {
+          error: raw, moderation: false,
+          failCount: (state.worldFailures[slotKey]?.failCount ?? 0) + 1,
+          safeFailCount: state.worldFailures[slotKey]?.safeFailCount ?? 0,
+        } },
+      }))
       notifyGenerationFailed('artist', translate(useLocaleStore.getState().locale, 'Background image'), raw)
     } finally {
       // 같은 locationId 가 중복될 수 있으므로 한 건만 제거. startedAt 은 마지막 작업이 끝날 때만 정리.
       set((state) => {
-        const idx = state.generatingLocations.indexOf(locationId)
+        if (useProjectStore.getState().projectId !== pid) return {}
+        const idx = state.generatingLocations.indexOf(slotKey)
         if (idx === -1) return {}
         const next = state.generatingLocations.slice()
         next.splice(idx, 1)
@@ -1490,6 +1646,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       throw new Error(body.error ?? `HTTP ${res.status}`)
     }
     const body = (await res.json()) as { visualDescription?: string | null; visualDescriptionNative?: string | null }
+    if (projectId !== useProjectStore.getState().projectId) return
     const en = body.visualDescription ?? visualDescription
     const native = body.visualDescriptionNative ?? visualDescription
     set((state) => ({
@@ -1559,6 +1716,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       visualDescription: string | null
       visualDescriptionNative: string | null
     }
+    if (useProjectStore.getState().projectId !== projectId) {
+      options?.onCreated?.(created.appearanceKey)
+      options?.onJob?.({ jobId: null, status: 'skipped', error: 'Project changed before image generation' })
+      return created.appearanceKey
+    }
     set((state) => ({
       worldAssets: state.worldAssets.map((w) =>
         w.locationId === locationId
@@ -1580,9 +1742,15 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           : w,
       ),
     }))
+    get().selectLocationAppearance(locationId, created.appearanceKey)
+    options?.onCreated?.(created.appearanceKey)
     // 약속 C4·C10: 만든 직후 이미지 자동 생성 — 기본 모습 wide_shot 을 연속성 참조로(서버가 붙인다).
     if (options?.generate) {
-      await get().generateWorldShot(locationId, 'wideShot', undefined, options.actor ?? 'ui', options.model, { appearanceKey: created.appearanceKey })
+      await get().generateWorldShot(locationId, 'wideShot', undefined, options.actor ?? 'ui', options.model, {
+        appearanceKey: created.appearanceKey,
+        ...(options.traceId ? { traceId: options.traceId } : {}),
+        ...(options.onJob ? { onJob: options.onJob } : {}),
+      })
     }
     return created.appearanceKey
   },
@@ -1843,13 +2011,21 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       const body = await res.json().catch(() => ({}))
       throw new Error(body.error ?? `HTTP ${res.status}`)
     }
+    const saved = (await res.json()) as { appearance?: string | null; appearanceNative?: string | null }
+    const en = saved.appearance ?? appearance
+    const native = saved.appearanceNative ?? appearance
+    const character = get().characterAssets.find((item) => item.characterId === characterId)
+    if (character?.appearances.some((item) => item.appearanceKey === appearanceKey && item.isDefault)) {
+      get().applyAppearancePatch(characterId, en, native)
+      return
+    }
     set((state) => ({
       characterAssets: state.characterAssets.map((character) =>
         character.characterId === characterId
           ? {
               ...character,
               appearances: character.appearances.map((item) =>
-                item.appearanceKey === appearanceKey ? { ...item, appearance } : item,
+                item.appearanceKey === appearanceKey ? { ...item, appearance: en, appearanceNative: native } : item,
               ),
             }
           : character,
@@ -1857,12 +2033,28 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     }))
   },
 
-  applyAppearancePatch: (characterId, appearance) =>
+  applyAppearancePatch: (characterId, appearance, appearanceNative = appearance) =>
     set((state) => ({
-      characterAssets: state.characterAssets.map((a) =>
-        // appearance = 유저 언어 패치 → 카드 표시(appearanceNative) 즉시 갱신. fixedPrompt(EN)는 reload 시 동기화.
-        a.characterId === characterId ? { ...a, fixedPrompt: appearance, appearanceNative: appearance } : a,
+      characterAssets: state.characterAssets.map((character) =>
+        character.characterId === characterId
+          ? {
+              ...character,
+              fixedPrompt: appearance,
+              appearanceNative: appearanceNative ?? undefined,
+              appearances: character.appearances.map((item) =>
+                item.isDefault ? { ...item, appearance, appearanceNative } : item,
+              ),
+            }
+          : character,
       ),
+      sceneManifest: state.sceneManifest
+        ? {
+            ...state.sceneManifest,
+            characters: state.sceneManifest.characters.map((character) =>
+              character.characterId === characterId ? { ...character, fixedPrompt: appearance } : character,
+            ),
+          }
+        : state.sceneManifest,
     })),
 
   // 채팅 createAppearance(#g4-chat 2026-08-31) 배선 — 새 서사 시점 모습 "행"만 만든다. 이미지 생성은
@@ -1885,6 +2077,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       narrativeTime: NarrativeTime | null
       appearance: string | null
       appearanceNative: string | null
+    }
+    if (useProjectStore.getState().projectId !== projectId) {
+      options?.onCreated?.(created.appearanceKey)
+      options?.onJob?.({ jobId: null, status: 'skipped', error: 'Project changed before image generation' })
+      return created.appearanceKey
     }
     set((state) => ({
       characterAssets: state.characterAssets.map((c) =>
@@ -1909,9 +2106,14 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           : c,
       ),
     }))
+    options?.onCreated?.(created.appearanceKey)
     // 약속 C4: 만든 직후 이미지 자동 생성(기본 모습 얼굴을 참조) — 호출자가 켤 때만(승인·버튼 뒤).
     if (options?.generate) {
-      await get().generateCharacterView(characterId, created.appearanceKey, 'main', options.actor ?? 'ui', undefined, undefined, options.model)
+      if (options.traceId || options.onJob) {
+        await get().generateCharacterView(characterId, created.appearanceKey, 'main', options.actor ?? 'ui', undefined, undefined, options.model, { traceId: options.traceId, onJob: options.onJob })
+      } else {
+        await get().generateCharacterView(characterId, created.appearanceKey, 'main', options.actor ?? 'ui', undefined, undefined, options.model)
+      }
     }
     return created.appearanceKey
   },
@@ -2035,6 +2237,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
 
   reset: () =>
     set({
+      chatSelection: null,
       sceneManifest: null,
       characterAssets: [],
       viewFailures: {},
@@ -2042,6 +2245,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       worldAssets: [],
       selectedCharacterId: null,
       selectedLocationId: null,
+      selectedLocationAppearances: {},
       generatingViews: [],
       generatingLocations: [],
       selectedBoostPreset: null,

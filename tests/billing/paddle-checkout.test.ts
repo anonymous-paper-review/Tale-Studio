@@ -21,7 +21,7 @@ describe('결제창을 열지 판정', () => {
     expect(decideCheckout({ kind: 'pack', id: 'mini', workspacePlan: 'free', packPurchasedBefore: false, subscriptionStatus: 'none' })).toEqual({ ok: true, priceId: 'pri_mini', label: 'Mini' })
   })
   it('무료 플랜이 구독을 시작하면 결제창이 열린다', () => {
-    expect(decideCheckout({ kind: 'plan', id: 's5', workspacePlan: 'free', packPurchasedBefore: false, subscriptionStatus: 'none' })).toEqual({ ok: true, priceId: 'pri_s5', label: 'S-5' })
+    expect(decideCheckout({ kind: 'plan', id: 's5', workspacePlan: 'free', packPurchasedBefore: false, subscriptionStatus: 'none' })).toEqual({ ok: true, priceId: 'pri_s5', label: 'Starter5' })
   })
   // 왜: v4 충전 상한. 무료는 Mini 1회. 이게 앞문이고 웹훅의 경보는 이 문이 뚫렸을 때의 안전망이다.
   it('무료 플랜이 이미 팩을 샀으면 팩 결제창이 열리지 않고 정액 가입을 권한다', () => {
@@ -77,6 +77,14 @@ describe('Paddle 거래 만들기', () => {
     expect(body.custom_data).toEqual({ workspace_id: 'ws-1' })
     expect(body.customer_id).toBe('ctm_1')
     expect(body.items).toEqual([{ price_id: 'pri_mini', quantity: 1 }])
+  })
+
+  // 왜: 오너는 한국 고객도 USD로 결제받는다. 거래 생성 시 통화를 생략해 결제 설정에 맡기지 않는다.
+  it('한국 고객을 제외하지 않고 USD 카드결제를 받는다', async () => {
+    const calls = stubPaddle({ '/transactions': () => ({ body: { id: 'txn_usd' } }) })
+    await createPaddleTransaction({ priceId: 'pri_mini', workspaceId: 'ws-1', email: 'buyer@example.co.kr', existingCustomerId: 'ctm_existing' })
+    const body = JSON.parse(String(calls[0].init?.body))
+    expect(body.currency_code).toBe('USD')
   })
 
   // 왜: 같은 사람이 팩을 두 번 사면 Paddle 에 고객이 둘 생기고 영수증·포털이 갈라진다.

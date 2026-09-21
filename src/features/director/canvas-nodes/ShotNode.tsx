@@ -4,12 +4,10 @@ import { memo } from 'react'
 import { cn } from '@/lib/utils'
 import { classifyRoughChanged } from '@/lib/image-provenance'
 import { NodeToolbar, Position, type NodeProps } from '@xyflow/react'
-import { Camera, Lightbulb, ImageIcon, ChevronRight } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Camera, Lightbulb, Loader2 } from 'lucide-react'
 import { BaseNode } from './BaseNode'
 import { LabeledTargetHandle } from './LabeledHandle'
 import {
-  getShotStage,
   effectivePrompt,
   useDirectorCanvasStore,
 } from '@/stores/director-store'
@@ -20,18 +18,18 @@ import { IMAGE_MODELS, normalizeImageModelKey } from '@/lib/image-models'
 import { prettyNodeLabel } from '@/features/director/node-label'
 import { ThumbImage } from '@/components/thumb-image'
 import { useT } from '@/lib/i18n'
+import { useActiveGenerationJobs, activeShotIds } from '@/lib/generation-queue'
 import { useEntityNames } from '@/lib/writer/use-entity-names'
 import { resolveEntityNames } from '@/lib/writer/resolve-entity-names'
+import { useStoryboardImageGeneration } from '@/features/director/hooks/use-storyboard-image-generation'
+import { StoryboardImageButton } from '@/features/director/storyboard-image-button'
 
 
 function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const t = useT()
   const entityNames = useEntityNames()
-  const stage = useDirectorCanvasStore((s) => getShotStage(s, id))
-  const isGenerating = useDirectorCanvasStore((s) => !!s.generatingNodeIds[id])
-  const generateStoryboardImage = useDirectorCanvasStore(
-    (s) => s.generateStoryboardImage,
-  )
+  const generation = useStoryboardImageGeneration(isShotData(data) ? data : null)
+  const isGenerating = generation.generating
   const generateVideoForShot = useDirectorCanvasStore(
     (s) => s.generateVideoForShot,
   )
@@ -41,6 +39,13 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   // 목각(rough) 단계 이미지는 writer-store roughStoryboard에서 (writerShotId 스코프 구독)
   const writerShotId = isShotData(data) ? data.writerShotId : null
   const rough = useRoughStoryboard(writerShotId)
+  // 만드는 중 판정은 서버 큐가 근거다(#shot-node-video-lock 2026-09-08).
+  //   예전엔 브라우저 메모리의 잠금(generationLocks)뿐이라 새로고침·새 탭이면 사라져 같은 샷을
+  //   또 만들 수 있었다 — 영상 1건은 최대 5 Take. 같은 화면의 그리드 뷰는 이 근거를 이미 쓴다
+  //   (StoryboardGridView: queuedVideoShots). Node 뷰도 같은 것을 본다.
+  const projectId = useDirectorCanvasStore((s) => s.projectId)
+  const activeJobs = useActiveGenerationJobs(projectId)
+  const videoQueued = !!writerShotId && activeShotIds(activeJobs, ['shot_video']).has(writerShotId)
   // #payments-phase-2 v4 #2: 생성 전 소모량 표시 — mode==='off'면 배지를 숨긴다(현재 기본값).
 
   if (!isShotData(data)) return null
@@ -50,14 +55,13 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   ).filter((k) => data.camera[k] !== 0).length
 
   // #node-merge(2026-08-31): 파생 SHOT IMAGE 카드 제거 — 이 카드가 실사 이미지를 직접
-  //   표시한다. 실사(storyboardImage 완료) 우선, 없으면 previz(rough) 폴백.
+  //   표시한다. 새 이미지가 도착하기 전에는 기존 실사를 유지하고, 없으면 previz로 폴백한다.
   const roughUrl =
     rough?.status === 'completed' ? (rough.frames?.start ?? rough.url) : null
-  const realImage =
-    data.storyboardImage?.status === 'completed' ? data.storyboardImage : null
+  const realImage = data.storyboardImage?.url ? data.storyboardImage : null
   const stageImageUrl = realImage?.url ?? roughUrl
 
-  const failed = data.storyboardImage?.status === 'failed'
+  const failed = !isGenerating && data.storyboardImage?.status === 'failed'
   // #names-in-prose: 카드 문구는 이름으로(id 는 구동값, 표시는 이름).
   const prompt = resolveEntityNames(effectivePrompt(data), entityNames)
 
@@ -68,19 +72,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           영상 테이크 버튼은 SHOT VIDEO 카드('영상 리테이크')로 이동. */}
       <NodeToolbar isVisible={selected} position={Position.Top} offset={8}>
         <div className="flex items-center gap-1 rounded-md border border-border bg-popover p-1 shadow-md">
-          <Button
-            size="sm"
-            className="h-7 gap-1 px-2 text-xs"
-            disabled={isGenerating}
-            onClick={(e) => {
-              e.stopPropagation()
-              void generateStoryboardImage(id)
-            }}
-          >
-            <ImageIcon className="size-3" />
-            {stage === 'rough' ? t('Generate image') : t('Retouch image')}
-            <ChevronRight className="size-3" />
-          </Button>
+          <StoryboardImageButton nodeId={id} data={data} className="h-7 gap-1 px-2 text-xs" />
           {/* 선택된 이미지 모델명 — 변경은 편집 패널/팝업에서. */}
           <span className="rounded-sm border border-primary/50 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-foreground">
             {IMAGE_MODELS[normalizeImageModelKey(data.imageModel)].label}
@@ -95,15 +87,10 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         selected={selected}
         width={280}
         stale={data.stale}
-        // 빔은 로컬 플래그(즉시 반응) + DB status(재진입/웹훅 경로) 둘 다에서 켜진다.
-        //   #previz-chain: 체인 샷의 실사 생성 빔은 SHOT IMAGE 파생 노드가 담당.
-        beam={
-          isGenerating || data.storyboardImage?.status === 'generating'
-            ? 'success'
-            : null
-        }
-        canBranch
+        beam={isGenerating ? 'success' : null}
+        canBranch={!videoQueued}
         onBranch={() => {
+          if (videoQueued) return
           void generateVideoForShot(id)
         }}
       >
@@ -197,20 +184,21 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         {/* 약속 H3(2026-09-04, 오너 1안): 이미지 카드에도 영상 카드와 같은 큰 상태 글자. */}
         <div
           className={cn(
-            'mt-2 text-sm font-semibold',
+            'mt-2 flex items-center gap-1.5 text-sm font-semibold',
             failed
               ? 'text-destructive'
-              : isGenerating || data.storyboardImage?.status === 'generating'
+              : isGenerating
                 ? 'text-primary'
                 : realImage
                   ? 'text-success'
                   : 'text-muted-foreground',
           )}
         >
+          {isGenerating && <Loader2 className="size-3.5 animate-spin" />}
           {failed
             ? t('Failed')
-            : isGenerating || data.storyboardImage?.status === 'generating'
-              ? t('Generating')
+            : isGenerating && generation.label
+              ? t(generation.label)
               : realImage
                 ? t('Completed')
                 : t('Waiting')}

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { toast } from 'sonner'
 import type { SceneLedger } from '@/lib/writer/types/pipeline'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { XYPosition } from '@xyflow/react'
@@ -75,6 +76,7 @@ import {
 } from '@/lib/director/wiring-persistence'
 import { runVideoAdherence } from '@/lib/director/video-adherence-client'
 import { refreshGenerationQueue } from '@/lib/generation-queue'
+import { STALE_QUEUED_MS } from '@/lib/generation-job-timing'
 import { isDemoSession } from '@/lib/demo/context'
 import {
   pollGenerationJob,
@@ -94,6 +96,19 @@ import {
   beginPipelineProgressBatch,
   resetPipelineProgressBatches,
 } from '@/lib/pipeline-progress'
+import {
+  EMPTY_FRAME_INPUTS,
+  chainFrameMatchesSource,
+  effectivePromptOf,
+  isFrameSourceNode,
+  isImageSourceNode,
+  normalizeFrameInputs,
+  normalizeImageInputs,
+  resolveFrameInputImageUrl,
+  resolveImageInputImageUrl,
+  resolveShotFrameImageUrl,
+  usableFrameImageUrl,
+} from '@/lib/director/video-frame-inputs'
 
 // ============================================================================
 // Defaults
@@ -198,133 +213,13 @@ type HydratedVideoTake = {
 type VideoGenerationResponse = {
   error?: string
   code?: string
+  existingJobId?: string
   jobId?: string
   videoClipId?: string
   takeNumber?: number
   status?: DirectorVideoStatus | 'queued'
   retryable?: boolean
   recoveryReceipt?: string
-}
-
-const EMPTY_FRAME_INPUTS = (): VideoNodeData['frameInputs'] => ({
-  start: null,
-  end: null,
-  refs: [],
-})
-
-/**
- * Persisted Director snapshots can predate frame wiring. Normalize that payload
- * at every rebuild boundary so old cached Video nodes remain usable.
- */
-function normalizeFrameInputs(value: unknown): VideoNodeData['frameInputs'] {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return EMPTY_FRAME_INPUTS()
-  }
-  const row = value as Record<string, unknown>
-  const refs = Array.isArray(row.refs)
-    ? row.refs.filter(
-        (id): id is string => typeof id === 'string' && id.length > 0,
-      )
-    : []
-  return {
-    start: typeof row.start === 'string' && row.start.length > 0 ? row.start : null,
-    end: typeof row.end === 'string' && row.end.length > 0 ? row.end : null,
-    refs: [...new Set(refs)],
-  }
-}
-
-/** Persisted Shot image-reference IDs may be absent or malformed in old caches. */
-function normalizeImageInputs(value: unknown): string[] {
-  if (!Array.isArray(value)) return []
-  return [
-    ...new Set(
-      value.filter(
-        (id): id is string => typeof id === 'string' && id.length > 0,
-      ),
-    ),
-  ]
-}
-
-function isFrameSourceNode(node: DirectorNode): boolean {
-  // #node-merge: 파생 shotImage 카드 제거 — 이미지 출처는 Shot/Asset 노드뿐.
-  return isShotData(node.data) || isAssetData(node.data)
-}
-
-function isImageSourceNode(node: DirectorNode): boolean {
-  return isFrameSourceNode(node)
-}
-
-type FrameInputSlot = 'start' | 'end' | 'ref'
-
-function usableFrameImageUrl(value: unknown): string | null {
-  return typeof value === 'string' && value.trim() ? value : null
-}
-
-function firstUploadedReferenceImageUrl(value: unknown): string | null {
-  if (!Array.isArray(value)) return null
-  for (const image of value) {
-    if (!image || typeof image !== 'object' || Array.isArray(image)) continue
-    const url = usableFrameImageUrl((image as { url?: unknown }).url)
-    if (url) return url
-  }
-  return null
-}
-
-function resolveShotFrameImageUrl(
-  data: ShotNodeData,
-  slot: FrameInputSlot,
-): string | null {
-  const storyboard = data.storyboardImage
-  if (storyboard?.status === 'completed') {
-    const frame =
-      slot === 'start'
-        ? storyboard.frames?.start
-        : slot === 'end'
-          ? storyboard.frames?.end
-          : undefined
-    const storyboardUrl = usableFrameImageUrl(frame) ?? usableFrameImageUrl(storyboard.url)
-    if (storyboardUrl) return storyboardUrl
-  }
-  return firstUploadedReferenceImageUrl(data.referenceImages)
-}
-
-/**
- * Resolve a persisted frame-input source node ID to an image URL. Frame inputs
- * intentionally store Director IDs, so unsupported or not-yet-generated nodes
- * must resolve to null rather than leaking an ID into the generation request.
- */
-function resolveFrameInputImageUrl(
-  nodes: DirectorNode[],
-  sourceNodeId: string,
-  slot: FrameInputSlot,
-): string | null {
-  const source = nodes.find((node) => node.id === sourceNodeId)
-  if (!source || !isFrameSourceNode(source)) return null
-  if (isAssetData(source.data)) return usableFrameImageUrl(source.data.imageUrl)
-  return isShotData(source.data)
-    ? resolveShotFrameImageUrl(source.data, slot)
-    : null
-}
-
-function resolveStoryboardImageUrl(data: ShotNodeData): string | null {
-  const storyboard = data.storyboardImage
-  if (!storyboard || storyboard.status !== 'completed') return null
-  return (
-    usableFrameImageUrl(storyboard.url) ??
-    usableFrameImageUrl(storyboard.frames?.start)
-  )
-}
-
-function resolveImageInputImageUrl(
-  nodes: DirectorNode[],
-  sourceNodeId: string,
-): string | null {
-  const source = nodes.find((node) => node.id === sourceNodeId)
-  if (!source || !isImageSourceNode(source)) return null
-  if (isAssetData(source.data)) return usableFrameImageUrl(source.data.imageUrl)
-  return isShotData(source.data)
-    ? resolveStoryboardImageUrl(source.data)
-    : null
 }
 
 function frameEdgeId(
@@ -403,20 +298,6 @@ function videoChainWouldCycle(
     currentId = current.data.videoChainInputId
   }
   return false
-}
-
-function chainFrameMatchesSource(
-  frameUrl: string | null,
-  source: VideoNodeData,
-): boolean {
-  const frame = usableFrameImageUrl(frameUrl)
-  if (!frame || !source.videoClipId || !source.generationJobId) {
-    return false
-  }
-  return (
-    frame.includes(source.videoClipId) &&
-    frame.includes(source.generationJobId)
-  )
 }
 
 function isHydratedVideoTake(value: unknown): value is HydratedVideoTake {
@@ -656,7 +537,10 @@ async function persistDirectorAssetImage(
 // ============================================================================
 
 const VIDEO_POLL_INTERVAL_MS = 5_000
-const VIDEO_POLL_TIMEOUT_MS = 300_000
+// 서버가 "유령"으로 보는 시각과 맞춘다(#poll-timeout-align 2026-09-08).
+//   따로 적어 5분이었고, 그 탓에 5~10분 구간은 "화면은 실패 · DB 는 진행 중 · 자동 회수도
+//   안 도는" 사각지대였다(ghost sweep 은 STALE_QUEUED_MS 를 넘긴 것만 본다).
+const VIDEO_POLL_TIMEOUT_MS = STALE_QUEUED_MS
 type GenerationLock = { key: string; token: symbol }
 
 const generationLocks = new Map<string, symbol>()
@@ -1209,6 +1093,15 @@ interface DirectorCanvasState {
   /** Explicit full-video batch progress. Ephemeral UI state; never persisted. */
   videoBatchBusy: boolean
   videoBatchProgress: { done: number; total: number; failed: number } | null
+  /** #batch-resume: 이전 실행의 완료 처리와 선행조건 대기를 구별하는 임시 식별자. */
+  videoBatchRunId: string | null
+  /**
+   * 사용자가 일괄을 그만뒀나(#batch-resume 2026-09-09 오너 결정 ①).
+   *   예전에는 창을 닫는 것이 곧 중단이었다 — 브라우저가 순번을 들고 돌았기 때문이다.
+   *   서버가 이어받으면 창을 닫아도 계속 만들어지므로 명시적인 중단 수단이 필요하다.
+   *   "더 내지 않는다" 는 뜻이지 도는 것을 죽이지는 않는다 — 제출된 영상은 이미 과금됐다.
+   */
+  videoBatchCancelled: boolean
 
   // popup/modal
   popupNodeId: string | null
@@ -1241,6 +1134,10 @@ interface DirectorCanvasState {
   setViewport: (vp: { x: number; y: number; zoom: number }) => void
   setViewMode: (m: 'node' | 'storyboard') => void
   setStoryboardMediaMode: (m: 'previz' | 'real') => void
+  /** 일괄 시작 — 중단 표시를 풀고 진행 상태를 연다. */
+  beginVideoBatch: (total: number) => void
+  /** 일괄 중단 — 도는 중일 때만 먹는다. 서버 DELETE로 중단을 확인한 뒤 반환한다. */
+  cancelVideoBatch: () => Promise<void>
 
   // Step 2 (unify-director-store-db): DB 일원화
   /** 노드 이동 후 canvas_position을 해당 테이블에 debounce write (drag end에서 호출) */
@@ -1317,6 +1214,8 @@ interface DirectorCanvasState {
   applyVideoOverride: (videoNodeId: string, override: VideoOverride) => void
 
   // storyboard image (ST-2, I2I)
+  /** 직접 추가한 샷의 접수 여부가 불명확할 때 사용자 확인 후 새 요청을 보낸다. */
+  retryUnconfirmedManualStoryboardImage: (shotNodeId: string) => Promise<GenerationJobReceipt | null>
   /** 단일 Shot의 storyboardImage를 I2I로 생성 (asset 자동 결합 + prompt) */
   generateStoryboardImage: (
     shotNodeId: string,
@@ -1489,6 +1388,7 @@ export type DirectorCanvasUpdate =
 export type DirectorCanvasUpdateResult = {
   applied: number
   skipped: { update: DirectorCanvasUpdate; reason: string }[]
+  resolvedIds?: Record<string, string>
 }
 
 // ============================================================================
@@ -1531,7 +1431,7 @@ export function getFinalVideo(
 export function effectivePrompt(
   data: Pick<ShotNodeData, 'prompt' | 'derivedPrompt' | 'promptOverride'>,
 ): string {
-  return data.promptOverride ?? data.derivedPrompt ?? data.prompt ?? ''
+  return effectivePromptOf(data)
 }
 
 /** Video 노드의 최종 생성 설정. Shot-backed는 상속, standalone은 자체 설정을 쓴다. */
@@ -1647,7 +1547,15 @@ function collectCascadeIds(
 const initialNodes: DirectorNode[] = []
 const initialEdges: DirectorEdge[] = []
 
-/** 진입 시 진행 중인 잡이 있으면 마지막 탭보다 생성 화면을 우선 복원한다. */
+/**
+ * 프로젝트를 이 브라우저에서 **처음 열 때**, 만들고 있는 게 있으면 그 결과가 보이는 화면으로 연다.
+ *
+ * 호출부가 "처음 보는 프로젝트" 가지 안에만 있다(#view-first-entry-only 2026-09-08 오너 판정).
+ *   재진입(새로고침 포함)에서는 부르지 않는다 — 배선 작업 중 새로고침하면 하던 화면을 잃었기 때문.
+ *   판별은 #first-entry-node 가 쓰는 viewportInitializedProjects 를 그대로 쓴다.
+ *
+ * shot_previz_video 는 목록에 없다(도입 시부터). 의도인지 누락인지 확인되지 않았다.
+ */
 async function restoreActiveGenerationView(projectId: string): Promise<void> {
   if (typeof window === 'undefined' || !projectId || projectId === 'default') return
   try {
@@ -1703,6 +1611,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       realBatchRemaining: null,
       videoBatchBusy: false,
       videoBatchProgress: null,
+      videoBatchRunId: null,
+      videoBatchCancelled: false,
       popupNodeId: null,
       deleteConfirmInfo: null,
       relationModal: null,
@@ -1749,6 +1659,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             relationModal: null,
             videoBatchBusy: false,
             videoBatchProgress: null,
+            videoBatchRunId: null,
+            videoBatchCancelled: false,
             generatingNodeIds: {},
             generationErrors: {},
             playingNodeId: null,
@@ -1757,14 +1669,53 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             historyFuture: [],
             lastSavedAt: Date.now(),
           })
+          // 이 브라우저가 처음 보는 프로젝트에 한해, 만들고 있는 게 있으면 그 결과가 보이는
+          //   화면으로 연다(#view-first-entry-only 2026-09-08 오너 판정).
+          //   재진입(새로고침 포함)에서는 부르지 않는다 — 예전에는 진입할 때마다 불려서
+          //   배선 작업(Node 탭) 중 새로고침하면 하던 화면을 잃었다.
+          //   위 #first-entry-node 가 Node 뷰를 기본으로 깔고, 만들고 있는 게 있을 때만
+          //   이 비동기 확인이 그 위를 덮는다. 없으면 Node 뷰 그대로다.
+          if (viewportInitializedProjects[projectId] !== true) {
+            void restoreActiveGenerationView(projectId)
+          }
         } else {
           set({ projectId })
         }
-        void restoreActiveGenerationView(projectId)
       },
       setViewport: (vp) => set({ viewport: vp }),
       setViewMode: (m) => set({ viewMode: m }),
       setStoryboardMediaMode: (m) => set({ storyboardMediaMode: m }),
+
+      beginVideoBatch: (total) =>
+        set({
+          videoBatchBusy: true,
+          videoBatchRunId: crypto.randomUUID(),
+          // 안 풀면 다음 일괄이 시작하자마자 멈춘다.
+          videoBatchCancelled: false,
+          videoBatchProgress: { done: 0, total, failed: 0 },
+        }),
+
+      cancelVideoBatch: async () => {
+        // 돌지 않을 때 눌러도 아무 일이 없어야 한다 — 다음 일괄에 중단이 새면 안 된다.
+        if (!get().videoBatchBusy) return
+        const runProjectId = get().projectId
+        const batchId = get().videoBatchRunId
+        // 즉시 설정 — 중복 클릭을 막는다(#batch-resume). 이미 접수된 작업의 수집은 멈추지 않는다.
+        set({ videoBatchCancelled: true })
+        if (!batchId) return
+        // 늘었거나 다른 실행으로 바뀌면 이 취소에 한해서만 되돌린다.
+        const ownsRun = () => get().projectId === runProjectId && get().videoBatchRunId === batchId
+        try {
+          const response = await fetch(
+            `/api/director/video-batches?projectId=${encodeURIComponent(runProjectId)}&batchId=${encodeURIComponent(batchId)}`,
+            { method: 'DELETE' },
+          )
+          if (!response.ok) throw new Error(`cancel failed: ${response.status}`)
+        } catch (err) {
+          if (ownsRun()) set({ videoBatchCancelled: false })
+          throw err
+        }
+      },
 
       // ─── Step 2: DB 일원화 (position write-back + hydrate) ──────────────
 
@@ -3936,6 +3887,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+              projectId: get().projectId,
               prompt,
               aspectRatio:
                 node.data.assetKind === 'character' ? '1:1' : '16:9',
@@ -3950,6 +3902,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             const body = (await response.json().catch(() => ({}))) as {
               error?: string
             }
+            notifyIfQuotaExceeded(response.status, body)
             throw new Error(body.error ?? `HTTP ${response.status}`)
           }
           blobUrl = URL.createObjectURL(await response.blob())
@@ -3996,6 +3949,19 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
 
       // ─── storyboard image (ST-2, I2I) ──────────────────────────────────
 
+      retryUnconfirmedManualStoryboardImage: async (shotNodeId) => {
+        const api = get()
+        const node = api.nodes.find((candidate) => candidate.id === shotNodeId)
+        if (!node || !isShotData(node.data) || node.data.writerShotId || api.realBatchBusy) return null
+        const image = node.data.storyboardImage
+        if (image?.status !== 'generating' || !image.errorMessage) return null
+        api.updateNodeData<'shot'>(shotNodeId, {
+          storyboardImage: { ...image, status: 'pending', errorMessage: null },
+        })
+        releaseAction(`director:storyboard:${shotNodeId}`)
+        return get().generateStoryboardImage(shotNodeId)
+      },
+
       generateStoryboardImage: async (shotNodeId, options) => {
         // #real-grid-auto: 일괄 시트 생성 중 개별 생성 차단 — 같은 샷이 시트와 단일 잡에서
         //   동시에 그려지는 충돌 방지. UI 버튼도 disabled 지만 스토어가 최종 방어선.
@@ -4019,6 +3985,11 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         const node = api.nodes.find((n) => n.id === shotNodeId)
         if (!node || !isShotData(node.data)) return null
         const data = node.data
+        // 버튼이 여러 화면에 있거나 1초가 지나도 같은 샷의 진행 중 작업은 다시 제출하지 않는다.
+        if (data.storyboardImage?.status === 'generating') {
+          options?.onJob?.({ jobId: null, status: 'deduped' })
+          return { jobId: null, status: 'deduped' }
+        }
         const prevUrl = data.storyboardImage?.url ?? ''
         const prompt = effectivePrompt(data) || data.label
 
@@ -4057,7 +4028,15 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         const writerShotId = data.writerShotId
         const projectId = get().projectId
         let activeJobId: string | null = null
+        const markUncertain = () => {
+          refreshGenerationQueue()
+          const notice = translate(useLocaleStore.getState().locale, 'Checking the image request. It may still be running.')
+          get().updateNodeData<'shot'>(shotNodeId, {
+            storyboardImage: { url: prevUrl, status: 'generating', errorMessage: notice, generatedAt: data.storyboardImage?.generatedAt ?? 0 },
+          })
+        }
         if (writerShotId && projectId) {
+          let definitivelyFailed = false
           try {
             const res = await fetch('/api/director/generate-storyboard', {
               method: 'POST',
@@ -4076,8 +4055,10 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 ...(options?.traceId ? { traceId: options.traceId } : {}),
               }),
             })
+            if (get().projectId !== projectId) return { jobId: null, status: 'skipped' }
             if (!res.ok) {
               const body = await res.json().catch(() => ({}))
+              definitivelyFailed = res.status >= 400 && res.status < 500 && ![408, 425, 429].includes(res.status)
               options?.onJob?.({
                 jobId: null,
                 status: 'failed',
@@ -4092,9 +4073,13 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 const outcome = await waitForPrerequisite(projectId, body, {
                   isCancelled: () => get().projectId !== projectId,
                 })
+                if (get().projectId !== projectId) return { jobId: null, status: 'skipped' }
                 const depth = options?.resumeDepth ?? 0
                 if (outcome === 'ready' && depth < 3) {
                   notifyPrerequisiteResumed(body)
+                  get().updateNodeData<'shot'>(shotNodeId, {
+                    storyboardImage: { ...data.storyboardImage, url: prevUrl, status: 'pending', errorMessage: null, generatedAt: data.storyboardImage?.generatedAt ?? 0 },
+                  })
                   return get().generateStoryboardImage(shotNodeId, { ...options, resumeDepth: depth + 1 })
                 }
                 if (outcome === 'timeout') notifyPrerequisiteTimeout('director', body)
@@ -4122,29 +4107,55 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               }
               throw new Error(body.error ?? `HTTP ${res.status}`)
             }
+            const replayed = ((await res.clone().json()) as { replayed?: boolean }).replayed === true
             const { jobId } = (await res.json()) as { jobId: string }
             activeJobId = jobId
             refreshGenerationQueue() // Director 배선 4: 큐 훅이 이 잡의 정산(완료 뒤 재수화)을 보게 한다.
             options?.onJob?.({ jobId, status: 'queued', httpStatus: res.status })
-            const url = await pollGenerationJob(jobId, { onStatus: options?.onJob })
-            get().updateNodeData<'shot'>(shotNodeId, {
-              storyboardImage: {
-                url,
-                status: 'completed',
-                errorMessage: null,
-                generatedAt: Date.now(),
-              },
-            })
+            let url = await pollGenerationJob(jobId, { onStatus: (receipt) => {
+              // HTTP 오류나 시간 초과는 작업 실패가 아니다. DB의 최종 실패만 재생성을 허용한다.
+              if (receipt.status === 'failed' && !receipt.httpStatus) definitivelyFailed = true
+              // 재사용한 일괄 잡의 대표 URL은 다른 샷일 수 있다. 요청한 샷의 DB 결과를 확인한 뒤 알린다.
+              if (replayed && receipt.status === 'completed') return
+              options?.onJob?.(receipt)
+            } })
+            if (get().projectId !== projectId) return { jobId, status: 'skipped' }
+            let completedImage: NonNullable<ShotNodeData['storyboardImage']> = {
+              url, status: 'completed', errorMessage: null, generatedAt: Date.now(),
+            }
+            if (replayed) {
+              // hydrateFromDb는 조회 오류를 내부에서 처리한다. 이전 로컬 이미지가 남은 것을
+              // 이번 작업의 완료로 오인하지 않도록 새 조회의 성공과 대상 샷의 완료를 직접 확인한다.
+              await invalidateShots(projectId)
+              const fresh = await loadShotsResult(projectId)
+              if (fresh.error) throw new Error(fresh.error.message)
+              const image = fresh.data?.find((shot) => shot.shot_id === writerShotId)?.storyboard_image as ShotNodeData['storyboardImage'] | undefined
+              if (!image || image.status !== 'completed' || typeof image.url !== 'string' || !image.url.trim()) {
+                throw new Error('The completed image for this shot could not be confirmed')
+              }
+              if (get().projectId !== projectId) return { jobId, status: 'skipped' }
+              completedImage = image
+              url = image.url
+            }
+            get().updateNodeData<'shot'>(shotNodeId, { storyboardImage: completedImage })
+            if (replayed) options?.onJob?.({ jobId, status: 'completed', resultUrl: url })
             // 생성 완료 확정 — 사물함을 먼저 낡음으로 표시해야 바로 아래 hydrateFromDb 의 재수화도,
             //   writer/editor 의 다음 읽기도 이 화면 완료를 반영한 새 행을 받는다(#shots-cache-invalidate).
-            void invalidateShots(projectId)
+            if (!replayed) void invalidateShots(projectId)
             // 스트립 모드(#real-strip)의 frames{start,direction,end}는 잡 result_url(=start)에
             //   실리지 않는다 — DB 진실 재수화로 회수(로컬이 방금 쓴 완료값 그대로면 DB 값 채택).
             await get().hydrateFromDb(projectId).catch(() => {})
             notifyGenerationComplete('director', translate(useLocaleStore.getState().locale, 'Storyboard')) // 다른 stage에 있을 때만 알림
             return { jobId, status: 'completed', resultUrl: url, httpStatus: res.status }
           } catch (err) {
+            if (get().projectId !== projectId) return { jobId: activeJobId, status: 'skipped' }
             const message = err instanceof Error ? err.message : 'Unknown error'
+            if (!definitivelyFailed) {
+              // 응답 유실은 이미 접수됐을 수 있다. 서버 큐 재조회로 복구하고 새 요청은 보내지 않는다.
+              markUncertain()
+              options?.onJob?.({ jobId: activeJobId, status: 'queued', error: message })
+              return { jobId: activeJobId, status: 'queued', error: message }
+            }
             get().updateNodeData<'shot'>(shotNodeId, {
               storyboardImage: {
                 url: prevUrl,
@@ -4163,6 +4174,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
 
         // 수동 노드(writerShotId 없음) → 기존 동기 경로 (canvas-local, DB 미반영).
         // 단일 시도 — 90s 타임아웃(fal 행 방지). 실패/타임아웃 시 throw.
+        let definitivelyFailed = false
         const attempt = async (): Promise<string> => {
           const controller = new AbortController()
           const timer = setTimeout(() => controller.abort(), 90_000)
@@ -4171,6 +4183,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
+                projectId: get().projectId,
                 prompt,
                 aspectRatio: '16:9',
                 referenceImageUrls,
@@ -4179,6 +4192,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             })
             if (!res.ok) {
               const body = await res.json().catch(() => ({}))
+              definitivelyFailed = res.status >= 400 && res.status < 500 && ![408, 425].includes(res.status)
+              notifyIfQuotaExceeded(res.status, body)
               throw new Error(body.error ?? `HTTP ${res.status}`)
             }
             const blob = await res.blob()
@@ -4189,20 +4204,17 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         }
 
         try {
-          // 실패 시 1회 재시도 후 최종 실패 처리.
-          let blobUrl: string
-          try {
-            blobUrl = await attempt()
-          } catch {
-            blobUrl = await attempt()
-          }
+          // 접수 응답 유실 뒤 자동 재제출하면 같은 이미지 비용이 두 번 발생할 수 있다.
+          const blobUrl = await attempt()
+          if (get().projectId !== projectId) return { jobId: null, status: 'skipped' }
           const publicUrl =
             (await persistStoryboardImage(
-              get().projectId,
+              projectId,
               shotNodeId,
               blobUrl,
             )) ?? blobUrl
 
+          if (get().projectId !== projectId) return { jobId: null, status: 'completed', resultUrl: publicUrl }
           get().updateNodeData<'shot'>(shotNodeId, {
             storyboardImage: {
               url: publicUrl,
@@ -4213,6 +4225,12 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           })
           return { jobId: null, status: 'completed', resultUrl: publicUrl }
         } catch (err) {
+          if (get().projectId !== projectId) return { jobId: null, status: 'skipped' }
+          if (!definitivelyFailed) {
+            markUncertain()
+            return { jobId: null, status: 'queued', error: err instanceof Error ? err.message : 'Unknown error' }
+          }
+          releaseAction(`director:storyboard:${shotNodeId}`)
           const message =
             err instanceof Error
               ? err.name === 'AbortError'
@@ -4274,6 +4292,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       //   잠그므로 더 강하다. 여기에 창을 덧대면 앞 시도가 *끝난 뒤*의 정당한 재시도까지 막힌다.
       generateVideoForShot: async (shotNodeId, options) => {
         if (get().videoBatchBusy && options?.batch !== true) return null
+        if (options?.batch === true && get().videoBatchCancelled) return null
         if (isDemoSession()) return null
         // #c4 (2026-08-27): Node 뷰에서 영상 생성을 눌렀는데 Storyboard 로 튀던 것 — 화면을
         //   빼앗지 않는다. 스토리보드 뷰일 때만 실사 모드로 맞춘다.
@@ -4331,6 +4350,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       // generateVideoForShot 과 같은 이유로 창을 두지 않는다 — 아래 lock 이 전 구간을 덮는다.
       regenerateVideo: async (videoNodeId, heldLock, options) => {
         if (isDemoSession()) return true
+        if (options?.batch === true && get().videoBatchCancelled) return false
+        const batchRunId = get().videoBatchRunId
         const initialVideoNode = get().nodes.find((n) => n.id === videoNodeId)
         if (!initialVideoNode || !isVideoData(initialVideoNode.data)) return true
         let videoNode = initialVideoNode as DirectorNode & {
@@ -4624,6 +4645,21 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             currentAttemptNode.data.generationJobId !== idempotencyKey
           ) return true
           if (!res.ok) {
+            if (res.status === 409 && body.code === 'director_video_shot_busy') {
+              // 다른 요청의 영상은 이 카드의 새 결과가 아니다. 원래 상태를 복원하고 서버 목록을 읽는다.
+              get().updateNodeData<'video'>(videoNodeId, {
+                status: videoNode.data.status,
+                errorMessage: videoNode.data.errorMessage,
+                generationJobId: videoNode.data.generationJobId,
+                lastAttemptStatus: videoNode.data.lastAttemptStatus,
+                lastAttemptError: videoNode.data.lastAttemptError,
+                lastAttemptAt: videoNode.data.lastAttemptAt,
+              })
+              refreshGenerationQueue()
+              toast.info(translate(useLocaleStore.getState().locale, 'A video is already being generated for this shot.'))
+              await get().hydrateFreshFromDb().catch(() => {})
+              return false
+            }
             if (body.jobId || body.videoClipId) {
               get().updateNodeData<'video'>(videoNodeId, {
                 videoClipId: body.videoClipId ?? videoNode.data.videoClipId,
@@ -4649,11 +4685,17 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               if (!preserveSuccess) get().setVideoStatus(videoNodeId, 'pending')
               const depth = options?.resumeDepth ?? 0
               const resumeShotNodeId = shotNode && isShotData(shotNode.data) ? shotNode.id : null
-              if (resumeShotNodeId && depth < 3) {
+              // #batch-resume: 중단하거나 새 실행으로 바뀐 뒤에는 예전 그림 대기가 영상을 내지 않는다.
+              const isCancelled = () =>
+                get().projectId !== projectId ||
+                (options?.batch === true &&
+                  (get().videoBatchCancelled || get().videoBatchRunId !== batchRunId))
+              if (resumeShotNodeId && depth < 3 && !isCancelled()) {
                 const resumeBody = body
                 void waitForPrerequisite(projectId, resumeBody, {
-                  isCancelled: () => get().projectId !== projectId,
+                  isCancelled,
                 }).then((outcome) => {
+                  if (isCancelled()) return
                   if (outcome === 'ready') {
                     notifyPrerequisiteResumed(resumeBody)
                     void get().generateVideoForShot(resumeShotNodeId, { ...options, resumeDepth: depth + 1 })
@@ -4771,7 +4813,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             }
             await new Promise((resolve) => setTimeout(resolve, VIDEO_POLL_INTERVAL_MS))
           }
-          throw new Error(translate(useLocaleStore.getState().locale, 'Video generation timed out (5 min)'))
+          throw new Error(translate(useLocaleStore.getState().locale, 'Video is taking longer than expected. It may still finish in the background.'))
         } catch (err) {
           const message = err instanceof Error ? err.message : 'Unknown error'
           if (message.startsWith('Canonical video-take hydration failed:')) throw err
@@ -5040,7 +5082,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       applyUpdates: (updates, options) => {
         const tempIdMap = new Map<string, string>()
         const resolveId = (id: string): string => tempIdMap.get(id) ?? id
-        const result: DirectorCanvasUpdateResult = { applied: 0, skipped: [] }
+        const result: DirectorCanvasUpdateResult = { applied: 0, skipped: [], resolvedIds: {} }
         const api = get()
 
         const findNodeOrSkip = (id: string, u: DirectorCanvasUpdate): boolean => {
@@ -5502,6 +5544,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             })
           }
         }
+        result.resolvedIds = Object.fromEntries(tempIdMap)
         return result
       },
 
@@ -5520,6 +5563,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           relationModal: null,
           videoBatchBusy: false,
           videoBatchProgress: null,
+          videoBatchRunId: null,
+          videoBatchCancelled: false,
           generatingNodeIds: {},
           generationErrors: {},
           playingNodeId: null,

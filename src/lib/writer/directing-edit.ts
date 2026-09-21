@@ -8,7 +8,7 @@
 //   2) saveDirectingFrame — 편집기가 평탄화한 PNG 를 기존 direction 경로에 upsert 하고
 //      generatedAt 을 올려 캐시버스트(rough-frame-cycle.withCacheBust 가 새 프레임을 집는다).
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { falImageGenerate } from '@/lib/writer/llm/fal'
+import { generateReservedImage } from '@/lib/fal/generate-image'
 import { mediaPathFromUrl, mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 import { translate } from '@/lib/i18n'
 import type { AppLocale } from '@/lib/locale'
@@ -78,11 +78,14 @@ export async function separateArrowLayer(
     return { cleanUrl: rb.cleanDirection.url, cached: true }
   }
 
-  const result = await falImageGenerate({
-    model: GROK_EDIT_MODEL,
-    prompt: STRIP_ARROWS_PROMPT,
-    reference_image_urls: [rb.frames.direction],
-  })
+  const result = await generateReservedImage(
+    {
+      model: GROK_EDIT_MODEL,
+      prompt: STRIP_ARROWS_PROMPT,
+      reference_image_urls: [rb.frames.direction],
+    },
+    { projectId },
+  )
   const res = await fetch(result.url)
   if (!res.ok)
     throw new Error(
@@ -198,11 +201,14 @@ export async function regenerateRoughFrame(
     action = typeof data?.action_description === 'string' ? data.action_description : null
   }
   const { prompt, refs } = promptForFrame(frame, action)
-  const result = await falImageGenerate({
-    model: GROK_EDIT_MODEL,
-    prompt,
-    reference_image_urls: refs(rb.frames),
-  })
+  const result = await generateReservedImage(
+    {
+      model: GROK_EDIT_MODEL,
+      prompt,
+      reference_image_urls: refs(rb.frames),
+    },
+    { projectId },
+  )
   const res = await fetch(result.url)
   if (!res.ok)
     throw new Error(

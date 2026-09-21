@@ -1,0 +1,128 @@
+
+ RUN  v4.1.6 /Users/xcape/projects/tale-studio
+
+(node:69919) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ❯ tests/job/writer-image-completion.test.ts (5 tests | 2 failed) 5ms
+   × 한 러프 결과의 같은 샷이 중복 기재되거나 같은 완료를 다시 받아도 이미지 수를 중복으로 올리지 않는다. 2ms
+   × 이미 확인한 러프 완료에 나중에 추적 정보가 붙어도 새 이미지 완료로 다시 알리지 않는다. 0ms
+ ❯ tests/job/completion-snapshot-updates.test.ts (2 tests | 2 failed) 29ms
+   × 전체 완료 기록 수와 마지막 시각이 같아도 Writer 완료 이미지 수가 바뀌면 숫자를 갱신한다. 28ms
+   × 같은 완료 기록을 순서만 바꿔 다시 받아도 숫자를 다시 올리거나 변경 알림을 보내지 않는다. 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 4 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/job/completion-snapshot-updates.test.ts > 전체 완료 기록 수와 마지막 시각이 같아도 Writer 완료 이미지 수가 바뀌면 숫자를 갱신한다.
+AssertionError: expected [ { stage: 'writer', …(3) }, …(1) ] to deeply equal [ { stage: 'writer', …(3) }, …(1) ]
+
+- Expected
++ Received
+
+@@ -1,11 +1,11 @@
+  [
+    {
+-     "at": 3000,
++     "at": 2000,
+      "lane": "writer-rough",
+      "stage": "writer",
+-     "units": 4,
++     "units": 1,
+    },
+    {
+      "at": 5000,
+      "lane": "artist",
+      "stage": "artist",
+
+ ❯ tests/job/completion-snapshot-updates.test.ts:40:60
+     38|   queue.refreshGenerationQueue()
+     39|   await vi.advanceTimersByTimeAsync(1)
+     40|   expect(queue.useGenerationCompletions('writer-updates')).toEqual(nex…
+       |                                                            ^
+     41|   expect(changed).toHaveBeenCalledTimes(1)
+     42| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯
+
+ FAIL  tests/job/completion-snapshot-updates.test.ts > 같은 완료 기록을 순서만 바꿔 다시 받아도 숫자를 다시 올리거나 변경 알림을 보내지 않는다.
+AssertionError: expected [ { stage: 'writer', …(3) }, …(1) ] to be [ { stage: 'writer', …(3) }, …(1) ] // Object.is equality
+
+- Expected
++ Received
+
+  [
+    {
+-     "at": 2000,
++     "at": 3000,
+      "lane": "writer-rough",
+      "stage": "writer",
+-     "units": 1,
++     "units": 4,
+    },
+    {
+-     "at": 3000,
++     "at": 2000,
+      "lane": "writer-rough",
+      "stage": "writer",
+-     "units": 4,
++     "units": 1,
+    },
+  ]
+
+ ❯ tests/job/completion-snapshot-updates.test.ts:59:65
+     57|   queue.refreshGenerationQueue()
+     58|   await vi.advanceTimersByTimeAsync(1)
+     59|   expect(queue.useGenerationCompletions('same-writer-results')).toBe(s…
+       |                                                                 ^
+     60|   expect(changed).not.toHaveBeenCalled()
+     61| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/4]⎯
+
+ FAIL  tests/job/writer-image-completion.test.ts > 한 러프 결과의 같은 샷이 중복 기재되거나 같은 완료를 다시 받아도 이미지 수를 중복으로 올리지 않는다.
+AssertionError: expected { writer: 3 } to deeply equal { writer: 2 }
+
+- Expected
++ Received
+
+  {
+-   "writer": 2,
++   "writer": 3,
+  }
+
+ ❯ tests/job/writer-image-completion.test.ts:29:86
+     27| it('한 러프 결과의 같은 샷이 중복 기재되거나 같은 완료를 다시 받아도 이미지 수를 중복으로 올리지 않는다.', () =>…
+     28|   const done = rough('same-result', ['one', 'one', 'two'])
+     29|   expect(deriveStageBadges(completionsOf([done, done]), { writer: 1000…
+       |                                                                                      ^
+     30| })
+     31|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/4]⎯
+
+ FAIL  tests/job/writer-image-completion.test.ts > 이미 확인한 러프 완료에 나중에 추적 정보가 붙어도 새 이미지 완료로 다시 알리지 않는다.
+AssertionError: expected { writer: 1 } to deeply equal {}
+
+- Expected
++ Received
+
+- {}
++ {
++   "writer": 1,
++ }
+
+ ❯ tests/job/writer-image-completion.test.ts:34:80
+     32| it('이미 확인한 러프 완료에 나중에 추적 정보가 붙어도 새 이미지 완료로 다시 알리지 않는다.', () => {
+     33|   const done = { ...rough('seen-before', ['one']), completed_at: iso(2…
+     34|   expect(deriveStageBadges(completionsOf([done]), { writer: 3000 }, 'a…
+       |                                                                                ^
+     35| })
+     36|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/4]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  4 failed | 3 passed (7)
+   Start at  11:26:55
+   Duration  166ms (transform 44ms, setup 28ms, import 28ms, tests 34ms, environment 0ms)
+
