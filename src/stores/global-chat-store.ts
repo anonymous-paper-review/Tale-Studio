@@ -4,6 +4,7 @@ import { runChatToolLoop } from '@/lib/chat-tools/loop'
 import { writerInputRoute } from '@/lib/chat-harness'
 import { executeProjectInspection } from '@/lib/chat-tools/inspect'
 import { createChatToolExecutor, sameToolValue, type ToolResource } from '@/lib/chat-tools/executor'
+import type { ArtistSourceSnapshot } from '@/lib/artist/source-snapshot'
 import { createStudioToolResources } from '@/stores/chat-tool-bindings'
 import { createStudioWorkflow } from '@/stores/chat-workflow-bindings'
 import { chatToolReceipt, guardChatToolReply, latestEdits, omitRepeatedToolEdits, requestsImageInspection, requestsSupportedChatEdit } from '@/lib/chat-tools/receipt'
@@ -1411,10 +1412,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           if (!adapter) throw new Error('The verified editor is unavailable.')
           const rows = await adapter.read()
           if (!isCurrentSession()) throw new DOMException('Chat stopped', 'AbortError')
-          const before = rows.find(row => row.id === id)?.values
+          const row = rows.find(row => row.id === id)
+          const before = row?.values
           if (!before) throw new Error('The requested target was not found.')
           const validated = adapter.validate(patch)
-          proposal.payload = { ...proposal.payload, toolEdit: { resource, id, patch: validated, before } }
+          proposal.payload = { ...proposal.payload, toolEdit: {
+            resource, id, patch: validated, before,
+            ...(row?.sourceSnapshot ? { sourceSnapshot: row.sourceSnapshot } : {}),
+          } }
           proposal.projectId = projectId ?? undefined
           recordJsonResult(resource, id, patch, { status: 'approval_required', proposalId: proposal.id })
           return proposal
@@ -2655,16 +2660,28 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     }
     const execute = async (proposal: PendingProposal, observeGeneration: GenerationJobObserver): Promise<boolean> => {
     try {
+      if (
+        ['artistSourceAppearancePatch', 'artistSourceLocationPatch'].includes(proposal.kind) &&
+        !(proposal.payload.toolEdit as { sourceSnapshot?: ArtistSourceSnapshot } | undefined)?.sourceSnapshot
+      ) {
+        throw new Error('승인에 필요한 원천 확인 정보가 없습니다. 다시 읽어 변경을 요청해 주세요.')
+      }
       if (proposal.payload.toolEdit && projectId) {
-        const approved = proposal.payload.toolEdit as { resource: string; id: string; patch: Record<string, unknown>; before: Record<string, unknown> }
+        const approved = proposal.payload.toolEdit as { resource: string; id: string; patch: Record<string, unknown>; before: Record<string, unknown>; sourceSnapshot?: ArtistSourceSnapshot }
         const resources = createStudioToolResources({ stage: proposal.stage, projectId, traceId: proposal.traceId ?? createChatTraceId(), isCurrent: isCurrentSession, signal: new AbortController().signal, approved })
         const resource = resources[approved.resource]
         if (!resource) throw new Error('This approved edit is no longer supported')
         const current = (await resource.read()).find(row => row.id === approved.id)
         if (!isCurrentSession()) return false
-        if (!current || !sameToolValue(current.values, approved.before)) throw new Error('승인 요청 후 대상이 변경되었습니다. 다시 조회해 변경을 요청해 주세요.')
+        if (!current ||
+          !sameToolValue(current.values, approved.before) ||
+          !sameToolValue(current.sourceSnapshot, approved.sourceSnapshot)) {
+          throw new Error('승인 요청 후 대상이 변경되었습니다. 다시 읽어 변경을 요청해 주세요.')
+        }
         const patch = resource.validate(approved.patch)
-        const result = await resource.write(approved.id, patch, current.values)
+        const result = approved.sourceSnapshot
+          ? await resource.write(approved.id, patch, current.values, approved.sourceSnapshot)
+          : await resource.write(approved.id, patch, current.values)
         if (!isCurrentSession()) return false
         if (result.status !== 'ok') throw new Error(result.message ?? result.status)
         const saved = (await (resource.readSaved ?? resource.read)()).find(row => row.id === approved.id)
@@ -2901,29 +2918,6 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         speak(`${proposal.target}: ${translate(contentLocale(), 'Deleted the appearance "{label}".', { label: String(proposal.payload.label ?? appearanceKey) })}`)
         patchTrace({ appliedCount: 1, pendingProposal: false })
         return true
-      } else if (proposal.kind === 'artistSourceAppearancePatch') {
-        const characterId = proposal.payload.characterId
-        const appearance = proposal.payload.appearance
-        if (typeof characterId !== 'string' || typeof appearance !== 'string') {
-          throw new Error('appearance patch payload missing')
-        }
-        const projectId = useProjectStore.getState().projectId
-        const res = await fetch('/api/artist/appearance', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ projectId, characterId, appearance }),
-        })
-        if (!res.ok) {
-          const b = await res.json().catch(() => ({}))
-          throw new Error(b.error ?? `appearance patch failed HTTP ${res.status}`)
-        }
-        // 로컬 외형 갱신 → 기존 파생 이미지가 즉시 stale 로 표시(자동 재생성 없음, #57). 이후 cc 가 재생성 제안.
-        const saved = await res.json()
-        useArtistStore.getState().applyAppearancePatch(
-          characterId,
-          typeof saved.appearance === 'string' ? saved.appearance : appearance,
-          typeof saved.appearanceNative === 'string' || saved.appearanceNative === null ? saved.appearanceNative : undefined,
-        )
       } else if (proposal.kind === 'artistCreateAppearance') {
         const { characterId, label, appearance, narrativeTime } = proposal.payload as {
           characterId?: unknown
@@ -2965,14 +2959,6 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           },
         })
         if (!key) { proposal.submissionUncertain = false; throw new Error(translate(contentLocale(), 'Could not start')) }
-      } else if (proposal.kind === 'artistSourceLocationPatch') {
-        const locationId = proposal.payload.locationId
-        const visualDescription = proposal.payload.visualDescription
-        if (typeof locationId !== 'string' || typeof visualDescription !== 'string') {
-          throw new Error('location patch payload missing')
-        }
-        // 승인 뒤에만 원천이 바뀐다 — 서버 라우트가 EN base 파생·저장, 스토어는 표시값 갱신(이미지는 "설명 바뀜" 표시).
-        await useArtistStore.getState().updateLocationDescription(locationId, visualDescription)
       } else if (proposal.kind === 'directorGenerateStoryboardImage') {
         if (proposal.payload.projectId && proposal.payload.projectId !== useProjectStore.getState().projectId) {
           throw new Error(translate(contentLocale(), 'This approval belongs to a different project. Please request it again.'))

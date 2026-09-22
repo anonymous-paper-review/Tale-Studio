@@ -37,6 +37,9 @@ function seed() {
       { id: 'lc-past', project_id: 'p', location_id: 'loc_alley', variant_key: 'past', view: 'wide_shot', is_selected: true, url: 'https://owned/alley-past.png', generated_at: '2026-09-11T00:00:00Z' },
     ],
   }
+  for (const table of ['character_appearances', 'locations']) {
+    for (const row of db.rows[table]) row.updated_at = '2026-09-14T00:00:00Z'
+  }
 }
 function installDb() {
   db.from.mockImplementation((table: string) => {
@@ -154,7 +157,12 @@ describe('Artist 채팅의 모습 관리', () => {
     const f = fixture()
     const patch = { appearance: '젊은 남성, 붉은 코트' }
     expect(await f.edit('appearances', 'char_doyun/young', await revision(f, 'appearances', 'char_doyun/young'), patch)).toMatchObject({ status: 'ok', saved: patch })
-    expect(api.calls).toEqual([{ path: '/api/artist/character-appearance', method: 'PATCH', body: { projectId: 'p', characterId: 'char_doyun', appearanceKey: 'young', appearance: patch.appearance } }])
+    expect(api.calls).toEqual([{ path: '/api/artist/character-appearance', method: 'PATCH', body: {
+      projectId: 'p', characterId: 'char_doyun', appearanceKey: 'young', appearance: patch.appearance,
+      sourceSnapshot: { table: 'character_appearances', values: {
+        appearance_key: 'young', is_default: false, appearance: 'young', appearance_native: '젊은 남성', updated_at: '2026-09-14T00:00:00Z',
+      } },
+    } }])
     expect(db.rows.character_appearances[0].appearance_native).toBe('노란 우비')
     expect(db.rows.character_appearances[2].appearance_native).toBe('x')
     expect(useArtistStore.getState().characterAssets[0].appearances[1].appearanceNative).toBe(patch.appearance)

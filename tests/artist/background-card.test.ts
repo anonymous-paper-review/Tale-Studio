@@ -214,10 +214,11 @@ describe('약속 B — 배경 카드는 캐릭터 카드와 같다', () => {
       payload: { locationId: LOCATION, visualDescription: '비 오는 밤의 네온 시장' },
     })
     expect(JSON.parse(JSON.stringify(proposal)).kind).toBe('artistSourceLocationPatch')
-    // 승인 경로가 원천 저장 액션을 부른다.
+    // 오너 승인(2026-09-14): 이전 무조건 저장 호출 대신 원천 확인 조건까지 전달하는지 검사한다.
     const store = read('src/stores/global-chat-store.ts')
-    expect(store).toMatch(/proposal\.kind === 'artistSourceLocationPatch'/)
-    expect(store).toMatch(/updateLocationDescription\(locationId, visualDescription\)/)
+    expect(store).toContain('sameToolValue(current.sourceSnapshot, approved.sourceSnapshot)')
+    expect(store).toContain('resource.write(approved.id, patch, current.values, approved.sourceSnapshot)')
+    expect(read('src/stores/chat-tool-bindings.ts')).toContain('updateLocationDescription(id, String(patch.visualDescription), source)')
     // 채팅 라우트가 제안을 응답에 싣고, 안내문이 모델에게 그 형식을 알려 준다.
     const route = read('src/app/api/artist/chat/route.ts')
     expect(route).toMatch(/locationProposals: extractLocationProposals\(raw\)/)

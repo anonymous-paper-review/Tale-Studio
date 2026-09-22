@@ -5,6 +5,7 @@ import { requireProjectAccess } from '@/lib/api/guard'
 import { validateAppearancePatch } from '@/lib/artist/appearance-patch'
 import { appearanceI18nFields } from '@/lib/writer/i18n/derive-en'
 import { slugifyIdentifier } from '@/lib/cast-slug'
+import { parseArtistSourceSnapshot } from '@/lib/artist/source-snapshot'
 
 export const runtime = 'nodejs'
 
@@ -125,6 +126,7 @@ export async function PATCH(req: Request) {
       label?: unknown
       narrativeTime?: unknown
       isDefault?: unknown
+      sourceSnapshot?: unknown
     }
     const { projectId, characterId, appearanceKey } = body
     if (
@@ -160,6 +162,12 @@ export async function PATCH(req: Request) {
     }
     if (hasDefault && body.isDefault !== true) {
       return NextResponse.json({ error: 'Invalid request: isDefault can only be set to true (pick another appearance to change the default)' }, { status: 400 })
+    }
+    const source = parseArtistSourceSnapshot(body.sourceSnapshot, ['character_appearances'])
+    if (!source.ok) return NextResponse.json({ error: source.error }, { status: 400 })
+    const snapshot = source.snapshot
+    if (snapshot && (!hasAppearance || hasLabel || hasTime || hasDefault)) {
+      return NextResponse.json({ error: 'A source snapshot only approves an appearance description change' }, { status: 400 })
     }
 
     const access = await requireProjectAccess(req, projectId)
@@ -200,16 +208,24 @@ export async function PATCH(req: Request) {
       if (clearError) throw clearError
     }
 
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('character_appearances')
       .update(patch)
       .eq('project_id', projectId)
       .eq('character_id', characterId)
       .eq('appearance_key', appearanceKey)
-      .select('appearance_key, label, narrative_time, is_default')
+    if (snapshot) {
+      for (const [field, value] of Object.entries(snapshot.values)) {
+        query = value === null ? query.is(field, null) : query.eq(field, value)
+      }
+    }
+    const { data, error } = await query.select('appearance_key, label, narrative_time, is_default')
 
     if (error) throw error
     if (!data || data.length !== 1) {
+      if (snapshot) {
+        return NextResponse.json({ error: 'The target changed. Read it again before editing.' }, { status: 409 })
+      }
       return NextResponse.json({ error: 'Appearance not found' }, { status: 404 })
     }
     const row = data[0] as { label: string; narrative_time: string | null; is_default: boolean }

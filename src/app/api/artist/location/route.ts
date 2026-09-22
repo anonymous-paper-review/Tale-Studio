@@ -7,6 +7,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { requireProjectAccess } from '@/lib/api/guard'
 import { locationI18nFields } from '@/lib/writer/i18n/derive-en'
+import { parseArtistSourceSnapshot } from '@/lib/artist/source-snapshot'
 
 export const runtime = 'nodejs'
 
@@ -21,6 +22,7 @@ export async function PATCH(req: Request) {
       projectId?: string
       locationId?: string
       visualDescription?: unknown
+      sourceSnapshot?: unknown
     }
     const { projectId, locationId } = body
     if (typeof projectId !== 'string' || !projectId.trim() || typeof locationId !== 'string' || !locationId.trim()) {
@@ -39,21 +41,33 @@ export async function PATCH(req: Request) {
 
     const access = await requireProjectAccess(req, projectId)
     if (!access.ok) return access.response
+    const source = parseArtistSourceSnapshot(body.sourceSnapshot, ['locations'])
+    if (!source.ok) return NextResponse.json({ error: source.error }, { status: 400 })
+    const snapshot = source.snapshot
 
     const i18n = await locationI18nFields(locationId, visualDescription)
-    const { data, error } = await supabaseAdmin
+    let query = supabaseAdmin
       .from('locations')
       .update({
         visual_description: i18n.visual_description,
         visual_description_native: i18n.visual_description_native,
         i18n_provenance: i18n.i18n_provenance,
         user_edited: true,
+        updated_at: new Date().toISOString(),
       })
       .eq('project_id', projectId)
       .eq('location_id', locationId)
-      .select('location_id')
+    if (snapshot) {
+      for (const [field, value] of Object.entries(snapshot.values)) {
+        query = value === null ? query.is(field, null) : query.eq(field, value)
+      }
+    }
+    const { data, error } = await query.select('location_id')
     if (error) throw error
     if (!data || data.length !== 1) {
+      if (snapshot) {
+        return NextResponse.json({ error: 'The target changed. Read it again before editing.' }, { status: 409 })
+      }
       return NextResponse.json({ error: 'Location not found' }, { status: 404 })
     }
 

@@ -1,12 +1,13 @@
 import type { ToolCall, ToolResult } from './protocol'
+import type { ArtistSourceSnapshot } from '@/lib/artist/source-snapshot'
 
-export type ToolRecord = { id: string; values: Record<string, unknown> }
+export type ToolRecord = { id: string; values: Record<string, unknown>; sourceSnapshot?: ArtistSourceSnapshot }
 export interface ToolResource {
   read: () => Promise<ToolRecord[]>
   readSaved?: () => Promise<ToolRecord[]>
   reconcileUnchanged?: boolean
   validate: (patch: unknown) => Record<string, unknown>
-  write: (id: string, patch: Record<string, unknown>, before: Record<string, unknown>) => Promise<ToolResult>
+  write: (id: string, patch: Record<string, unknown>, before: Record<string, unknown>, sourceSnapshot?: ArtistSourceSnapshot) => Promise<ToolResult>
 }
 // Stable key ordering prevents a JSON object's key order from looking like an edit.
 export function toolValueKey(value: unknown): string {
@@ -52,7 +53,10 @@ export function createChatToolExecutor(options: { resources: Record<string, Tool
       const current = (await resource.read()).find(r => r.id === input.id)
       check()
       if (!current) return { status: 'not_found', resource: key, id: input.id }
-      if (!sameToolValue(current.values, snapshot.record.values)) return { status: 'stale_state', message: 'The target changed. Read it again before editing.' }
+      if (!sameToolValue(current.values, snapshot.record.values) ||
+        !sameToolValue(current.sourceSnapshot, snapshot.record.sourceSnapshot)) {
+        return { status: 'stale_state', message: 'The target changed. Read it again before editing.' }
+      }
       // Converged desired state is already complete; never issue a duplicate write.
       const matches = (record?: ToolRecord) => !!record && Object.entries(patch).every(([k, v]) => sameToolValue(record.values[k], v))
       const readSaved = resource.readSaved ?? resource.read
@@ -63,7 +67,9 @@ export function createChatToolExecutor(options: { resources: Record<string, Tool
       }
       let writeResult: ToolResult
       try {
-        writeResult = await resource.write(current.id, patch, current.values)
+        writeResult = snapshot.record.sourceSnapshot
+          ? await resource.write(current.id, patch, current.values, snapshot.record.sourceSnapshot)
+          : await resource.write(current.id, patch, current.values)
       } catch (error) {
         check()
         let saved: ToolRecord | undefined

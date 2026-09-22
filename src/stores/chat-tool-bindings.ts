@@ -12,8 +12,12 @@ import { useWriterStore, hasPendingWriterEdit } from './writer-store'
 import { useArtistStore } from './artist-store'
 import type { Scene, Shot } from '@/types'
 import { parseProjectFormat } from '@/types/project'
+import { parseArtistSourceSnapshot, type ArtistSourceSnapshot } from '@/lib/artist/source-snapshot'
 
 const SETTINGS_FIELDS = ['playtime', 'genre', 'subGenre', 'format', 'tone', 'dialogueLanguage'] as const
+const CHARACTER_APPEARANCE_SOURCE_FIELDS = ['appearance_key', 'is_default', 'appearance', 'appearance_native', 'updated_at'] as const
+const PROP_SOURCE_FIELDS = ['appearance', 'appearance_native', 'updated_at'] as const
+const LOCATION_SOURCE_FIELDS = ['visual_description', 'visual_description_native', 'updated_at'] as const
 const pickSettings = (value: object) => Object.fromEntries(SETTINGS_FIELDS.map(key => [key, (value as Record<string, unknown>)[key]]))
 function objectPatch(value: unknown, keys: string[]): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('patch must be an object')
@@ -25,12 +29,23 @@ function objectPatch(value: unknown, keys: string[]): Record<string, unknown> {
 const requireText = (value: unknown, key: string, allowEmpty = false) => {
   if (typeof value !== 'string' || (!allowEmpty && !value.trim()) || value.length > 2000) throw new Error(`${key} must be text of 1–2000 characters`)
 }
+function sourceSnapshot<T extends string>(
+  table: ArtistSourceSnapshot['table'],
+  fields: readonly T[],
+  row: Record<string, unknown>,
+): ArtistSourceSnapshot {
+  const parsed = parseArtistSourceSnapshot({
+    table, values: Object.fromEntries(fields.map(field => [field, row[field]])),
+  }, [table])
+  if (!parsed.ok || !parsed.snapshot) throw new Error('The source fields could not be read. Read the target again before editing.')
+  return parsed.snapshot
+}
 
 export function createStudioToolResources(options: {
   stage: string; projectId: string; traceId: string; signal: AbortSignal; isCurrent: () => boolean
   offerProposal?: (proposal: PendingProposal) => void
   markProducerApproval?: () => void
-  approved?: { resource: string; id: string; patch: Record<string, unknown>; before: Record<string, unknown> }
+  approved?: { resource: string; id: string; patch: Record<string, unknown>; before: Record<string, unknown>; sourceSnapshot?: ArtistSourceSnapshot }
 }): Record<string, ToolResource> {
   const check = () => { if (options.signal.aborted || !options.isCurrent()) throw new DOMException('Chat stopped', 'AbortError') }
   const readTable = async (table: string, columns: string) => {
@@ -40,13 +55,16 @@ export function createStudioToolResources(options: {
     if (error) throw new Error(error.message)
     return (data ?? []) as unknown as Record<string, unknown>[]
   }
-  const requestApproval = (resource: string, id: string, patch: Record<string, unknown>, before: Record<string, unknown>, kind: PendingProposal['kind'], payload: Record<string, unknown>): ToolResult | null => {
+  const requestApproval = (resource: string, id: string, patch: Record<string, unknown>, before: Record<string, unknown>, kind: PendingProposal['kind'], payload: Record<string, unknown>, source?: ArtistSourceSnapshot): ToolResult | null => {
+    if (['characters', 'appearances', 'backgrounds', 'background_appearances'].includes(resource) && !source) {
+      return { status: 'read_failed', message: 'The source fields could not be read. Read the target again before editing.' }
+    }
     const approved = options.approved
-    if (approved && approved.resource === resource && approved.id === id && sameToolValue(approved.patch, patch) && sameToolValue(approved.before, before)) return null
+    if (approved && approved.resource === resource && approved.id === id && sameToolValue(approved.patch, patch) && sameToolValue(approved.before, before) && sameToolValue(approved.sourceSnapshot, source)) return null
     if (!options.offerProposal) return { status: 'approval_required', message: 'User approval is required; no edit was executed.' }
     const proposal = createPendingProposal({ traceId: options.traceId, stage: ['scenes', 'shots', 'dialogue'].includes(resource) ? 'writer' : 'artist', kind,
       target: String(before.name ?? id), action: translate(contentLocale(), 'Apply the requested change'), impact: [translate(contentLocale(), 'Approval saves the description or dialogue. No image or video will be generated.')],
-      payload: { ...payload, toolEdit: { resource, id, patch, before } },
+      payload: { ...payload, toolEdit: { resource, id, patch, before, ...(source ? { sourceSnapshot: source } : {}) } },
     })
     proposal.projectId = options.projectId
     options.offerProposal(proposal)
@@ -153,13 +171,21 @@ export function createStudioToolResources(options: {
     read: async () => {
       const [people, appearances, props] = await Promise.all([
         readTable('characters', 'character_id,name,role,description,entity_type'),
-        readTable('character_appearances', 'character_id,is_default,appearance,appearance_native'),
-        readTable('props', 'prop_id,name,description,appearance,appearance_native'),
+        readTable('character_appearances', 'character_id,appearance_key,is_default,appearance,appearance_native,updated_at'),
+        readTable('props', 'prop_id,name,description,appearance,appearance_native,updated_at'),
       ])
       return [...people.filter(row => row.entity_type === 'person').map(row => {
         const appearance = appearances.find(a => a.character_id === row.character_id && a.is_default)
-        return { id: String(row.character_id), values: { name: row.name, role: row.role, description: row.description ?? '', appearance: appearance?.appearance_native ?? appearance?.appearance ?? '' } }
-      }), ...props.map(row => ({ id: String(row.prop_id), values: { name: row.name, description: row.description ?? '', appearance: row.appearance_native ?? row.appearance ?? '' } }))]
+        const snapshot = appearance && sourceSnapshot('character_appearances', CHARACTER_APPEARANCE_SOURCE_FIELDS, appearance)
+        return { id: String(row.character_id), values: { name: row.name, role: row.role, description: row.description ?? '', appearance: appearance?.appearance_native ?? appearance?.appearance ?? '' },
+          ...(snapshot ? { sourceSnapshot: snapshot } : {}),
+        }
+      }), ...props.map(row => {
+        const snapshot = sourceSnapshot('props', PROP_SOURCE_FIELDS, row)
+        return { id: String(row.prop_id), values: { name: row.name, description: row.description ?? '', appearance: row.appearance_native ?? row.appearance ?? '' },
+          ...(snapshot ? { sourceSnapshot: snapshot } : {}),
+        }
+      })]
     },
     validate: value => {
       const patch = objectPatch(value, ['name', 'role', 'description', 'appearance'])
@@ -168,14 +194,14 @@ export function createStudioToolResources(options: {
       if ('appearance' in patch && Object.keys(patch).length > 1) throw new Error('Request appearance separately from identity edits so source approval is preserved.')
       return patch
     },
-    write: async (id, patch, before) => {
+    write: async (id, patch, before, source) => {
       check()
       if ('role' in patch && !('role' in before)) return { status: 'invalid_input', message: 'Props do not have a character role. Edit their name, description or appearance instead.' }
       if ('appearance' in patch) {
-        const pending = requestApproval('characters', id, patch, before, 'artistSourceAppearancePatch', { characterId: id, appearance: patch.appearance })
+        const pending = requestApproval('characters', id, patch, before, 'artistSourceAppearancePatch', { characterId: id, appearance: patch.appearance }, source)
         if (pending) return pending
       }
-      const res = await fetch('appearance' in patch ? '/api/artist/appearance' : '/api/artist/character', { method: 'appearance' in patch ? 'POST' : 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: options.projectId, characterId: id, ...patch }), signal: options.signal })
+      const res = await fetch('appearance' in patch ? '/api/artist/appearance' : '/api/artist/character', { method: 'appearance' in patch ? 'POST' : 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId: options.projectId, characterId: id, ...patch, ...('appearance' in patch && source ? { sourceSnapshot: source } : {}) }), signal: options.signal })
       const body = await res.json()
       check()
       if (!res.ok) return { status: res.status === 403 ? 'forbidden' : 'failed', message: body.error ?? `HTTP ${res.status}`, retryable: res.status === 429 || res.status >= 500 }
@@ -188,13 +214,16 @@ export function createStudioToolResources(options: {
     },
   }
   const backgrounds: ToolResource = {
-    read: async () => (await readTable('locations', 'location_id,name,visual_description,visual_description_native')).map(row => ({ id: String(row.location_id), values: { name: row.name, visualDescription: row.visual_description_native ?? row.visual_description ?? '' } })),
+    read: async () => (await readTable('locations', 'location_id,name,visual_description,visual_description_native,updated_at')).map(row => {
+      const snapshot = sourceSnapshot('locations', LOCATION_SOURCE_FIELDS, row)
+      return { id: String(row.location_id), values: { name: row.name, visualDescription: row.visual_description_native ?? row.visual_description ?? '' }, ...(snapshot ? { sourceSnapshot: snapshot } : {}) }
+    }),
     validate: value => { const patch = objectPatch(value, ['visualDescription']); requireText(patch.visualDescription, 'visualDescription'); return patch },
-    write: async (id, patch, before) => {
+    write: async (id, patch, before, source) => {
       check()
-      const pending = requestApproval('backgrounds', id, patch, before, 'artistSourceLocationPatch', { locationId: id, visualDescription: patch.visualDescription })
+      const pending = requestApproval('backgrounds', id, patch, before, 'artistSourceLocationPatch', { locationId: id, visualDescription: patch.visualDescription }, source)
       if (pending) return pending
-      await useArtistStore.getState().updateLocationDescription(id, String(patch.visualDescription))
+      await useArtistStore.getState().updateLocationDescription(id, String(patch.visualDescription), source)
       check()
       useWriterStore.setState(state => ({ sceneManifest: state.sceneManifest ? { ...state.sceneManifest, locations: state.sceneManifest.locations.map(location => location.locationId === id ? { ...location, visualDescription: String(patch.visualDescription) } : location) } : null }))
       return { status: 'ok' }
@@ -221,16 +250,17 @@ export function createStudioToolResources(options: {
   const appearances: ToolResource = {
     read: async () => {
       const [rows, candidates] = await Promise.all([
-        readTable('character_appearances', 'character_id,appearance_key,label,is_default,narrative_time,appearance,appearance_native,sheet_url'),
+        readTable('character_appearances', 'character_id,appearance_key,label,is_default,narrative_time,appearance,appearance_native,sheet_url,updated_at'),
         readTable('character_image_candidates', 'id,character_id,appearance_key,view,is_selected,generated_at'),
       ])
       return rows.map(row => {
         const slot = candidates.filter(c => c.character_id === row.character_id && c.appearance_key === row.appearance_key && c.view === 'main')
+        const snapshot = sourceSnapshot('character_appearances', CHARACTER_APPEARANCE_SOURCE_FIELDS, row)
         return { id: `${row.character_id}/${row.appearance_key}`, values: {
           characterId: row.character_id, appearanceKey: row.appearance_key, label: row.label ?? '', narrativeTime: row.narrative_time ?? null, isDefault: !!row.is_default,
           appearance: row.appearance_native ?? row.appearance ?? '', hasImage: typeof row.sheet_url === 'string' && !!row.sheet_url,
           selectedCandidateId: slot.find(c => c.is_selected)?.id ?? null, candidateIds: candidateIds(slot),
-        } }
+        }, ...(snapshot ? { sourceSnapshot: snapshot } : {}) }
       })
     },
     validate: value => {
@@ -242,7 +272,7 @@ export function createStudioToolResources(options: {
       if ('selectedCandidateId' in patch) requireText(patch.selectedCandidateId, 'selectedCandidateId')
       return patch
     },
-    write: async (id, patch, before) => {
+    write: async (id, patch, before, source) => {
       check()
       const [characterId, appearanceKey] = splitAppearanceId(id)
       const candidateError = requireCandidate(patch, before)
@@ -255,11 +285,11 @@ export function createStudioToolResources(options: {
         return { status: 'ok' }
       }
       if ('appearance' in patch && before.isDefault === true) {
-        const pending = requestApproval('appearances', id, patch, before, 'artistSourceAppearancePatch', { characterId, appearanceKey, appearance: patch.appearance })
+        const pending = requestApproval('appearances', id, patch, before, 'artistSourceAppearancePatch', { characterId, appearanceKey, appearance: patch.appearance }, source)
         if (pending) return pending
       }
       if ('appearance' in patch) {
-        await useArtistStore.getState().updateCharacterAppearance(characterId, appearanceKey, String(patch.appearance))
+        await useArtistStore.getState().updateCharacterAppearance(characterId, appearanceKey, String(patch.appearance), source)
         check()
         return { status: 'ok' }
       }
@@ -276,18 +306,19 @@ export function createStudioToolResources(options: {
   const backgroundAppearances: ToolResource = {
     read: async () => {
       const [locations, variants, candidates] = await Promise.all([
-        readTable('locations', 'location_id,name,visual_description,visual_description_native,wide_shot'),
+        readTable('locations', 'location_id,name,visual_description,visual_description_native,wide_shot,updated_at'),
         readTable('location_appearances', 'location_id,appearance_key,label,narrative_time,visual_description,visual_description_native,wide_shot'),
         readTable('location_image_candidates', 'id,location_id,variant_key,view,is_selected,generated_at'),
       ])
       const slotOf = (locationId: unknown, variant: string | null) => candidates.filter(c => c.location_id === locationId && (c.variant_key ?? null) === variant && c.view === 'wide_shot')
       return locations.flatMap(location => {
         const base = slotOf(location.location_id, null)
+        const snapshot = sourceSnapshot('locations', LOCATION_SOURCE_FIELDS, location)
         return [{ id: `${location.location_id}/default`, values: {
           locationId: location.location_id, appearanceKey: 'default', label: String(location.name ?? ''), narrativeTime: null, isDefault: true,
           visualDescription: location.visual_description_native ?? location.visual_description ?? '', hasImage: typeof location.wide_shot === 'string' && !!location.wide_shot,
           selectedCandidateId: base.find(c => c.is_selected)?.id ?? null, candidateIds: candidateIds(base),
-        } }, ...variants.filter(v => v.location_id === location.location_id).map(v => {
+        }, ...(snapshot ? { sourceSnapshot: snapshot } : {}) }, ...variants.filter(v => v.location_id === location.location_id).map(v => {
           const slot = slotOf(location.location_id, String(v.appearance_key))
           return { id: `${location.location_id}/${v.appearance_key}`, values: {
             locationId: location.location_id, appearanceKey: v.appearance_key, label: v.label ?? '', narrativeTime: v.narrative_time ?? null, isDefault: false,
@@ -305,7 +336,7 @@ export function createStudioToolResources(options: {
       if ('selectedCandidateId' in patch) requireText(patch.selectedCandidateId, 'selectedCandidateId')
       return patch
     },
-    write: async (id, patch, before) => {
+    write: async (id, patch, before, source) => {
       check()
       const [locationId, appearanceKey] = splitAppearanceId(id)
       const candidateError = requireCandidate(patch, before)
@@ -317,9 +348,9 @@ export function createStudioToolResources(options: {
       }
       if (before.isDefault === true) {
         if ('label' in patch || 'narrativeTime' in patch) return { status: 'invalid_input', message: 'The base background has no label or narrativeTime; edit its name through the backgrounds resource or a variant appearance instead.' }
-        const pending = requestApproval('background_appearances', id, patch, before, 'artistSourceLocationPatch', { locationId, visualDescription: patch.visualDescription })
+        const pending = requestApproval('background_appearances', id, patch, before, 'artistSourceLocationPatch', { locationId, visualDescription: patch.visualDescription }, source)
         if (pending) return pending
-        await useArtistStore.getState().updateLocationDescription(locationId, String(patch.visualDescription))
+        await useArtistStore.getState().updateLocationDescription(locationId, String(patch.visualDescription), source)
         check()
         useWriterStore.setState(state => ({ sceneManifest: state.sceneManifest ? { ...state.sceneManifest, locations: state.sceneManifest.locations.map(location => location.locationId === locationId ? { ...location, visualDescription: String(patch.visualDescription) } : location) } : null }))
         return { status: 'ok' }

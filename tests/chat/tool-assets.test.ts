@@ -59,6 +59,9 @@ function seed() {
       { project_id: 'other', location_id: 'loc-1', name: '다른 교실', visual_description_native: '다른 프로젝트 교실' },
     ],
   }
+  for (const table of ['character_appearances', 'props', 'locations']) {
+    for (const row of db.rows[table]) row.updated_at = '2026-09-14T00:00:00Z'
+  }
 }
 
 function installDb() {
@@ -82,6 +85,7 @@ function installDb() {
     const query = {
       select: (value: string) => { columns = value; return query },
       eq: (key: string, value: unknown) => { filters[key] = value; return query },
+      is: (key: string, value: unknown) => { filters[key] = value; return query },
       update: (value: Row) => { patch = value; return query },
       maybeSingle: () => execute(true),
       then: (resolve: (result: Awaited<ReturnType<typeof execute>>) => unknown) => execute().then(resolve),
@@ -193,9 +197,15 @@ describe('채팅 도구의 인물과 배경 원천', () => {
       const approved = await pending(fixture('writer'), 'characters', id, patch)
       const f = fixture('writer', approved)
       expect(await f.edit('characters', id, await revision(f, 'characters', id), patch)).toMatchObject({ status: 'ok', saved: patch })
-      expect(api.calls).toEqual([{ path: '/api/artist/appearance', method: 'POST', body: { projectId: 'p', characterId: id, ...patch } }])
+      const sourceSnapshot = id === 'person-1'
+        ? { table: 'character_appearances', values: { appearance_key: 'current', is_default: true, appearance: 'black hair', appearance_native: '검은 머리', updated_at: '2026-09-14T00:00:00Z' } }
+        : { table: 'props', values: { appearance: 'blue umbrella', appearance_native: '파란 우산', updated_at: '2026-09-14T00:00:00Z' } }
+      expect(api.calls).toEqual([{ path: '/api/artist/appearance', method: 'POST', body: { projectId: 'p', characterId: id, ...patch, sourceSnapshot } }])
       expect(db.writes).toHaveLength(1)
-      expect(db.writes[0].filters).toEqual(id === 'person-1' ? { project_id: 'p', character_id: id, appearance_key: 'current' } : { project_id: 'p', prop_id: id })
+      expect(db.writes[0].filters).toEqual({
+        ...(id === 'person-1' ? { project_id: 'p', character_id: id, appearance_key: 'current' } : { project_id: 'p', prop_id: id }),
+        ...sourceSnapshot.values,
+      })
       expect(db.rows.character_appearances.filter(row => !(id === 'person-1' && row.project_id === 'p' && row.character_id === id && row.is_default)))
         .toEqual(before.character_appearances.filter(row => !(id === 'person-1' && row.project_id === 'p' && row.character_id === id && row.is_default)))
       if (id === 'person-1') expect(db.rows.props).toEqual(before.props)
@@ -210,11 +220,13 @@ describe('채팅 도구의 인물과 배경 원천', () => {
     const approved = await pending(fixture('artist'), 'backgrounds', 'loc-1', patch)
     const f = fixture('artist', approved)
     expect(await f.edit('backgrounds', 'loc-1', await revision(f, 'backgrounds', 'loc-1'), patch)).toMatchObject({ status: 'ok', saved: patch })
-    expect(db.writes).toEqual([{ table: 'locations', filters: { project_id: 'p', location_id: 'loc-1' }, patch: {
-      visual_description: `English: ${patch.visualDescription}`, visual_description_native: patch.visualDescription, i18n_provenance: {}, user_edited: true,
+    const sourceSnapshot = { table: 'locations', values: { visual_description: 'old classroom', visual_description_native: '오래된 교실', updated_at: '2026-09-14T00:00:00Z' } }
+    expect(db.writes).toEqual([{ table: 'locations', filters: { project_id: 'p', location_id: 'loc-1', ...sourceSnapshot.values }, patch: {
+      visual_description: `English: ${patch.visualDescription}`, visual_description_native: patch.visualDescription, i18n_provenance: {}, user_edited: true, updated_at: expect.any(String),
     } }])
+    expect(db.writes[0].patch.updated_at).not.toBe(sourceSnapshot.values.updated_at)
     expect(db.rows.locations.slice(1)).toEqual(old.slice(1))
-    expect(api.calls).toEqual([{ path: '/api/artist/location', method: 'PATCH', body: { projectId: 'p', locationId: 'loc-1', ...patch } }])
+    expect(api.calls).toEqual([{ path: '/api/artist/location', method: 'PATCH', body: { projectId: 'p', locationId: 'loc-1', ...patch, sourceSnapshot } }])
   })
 
   it('원천 저장 API가 실패하면 저장 완료로 알리지 않고 원래 값을 유지한다', async () => {

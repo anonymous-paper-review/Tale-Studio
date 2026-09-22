@@ -33,6 +33,7 @@ import { useLocaleStore } from '@/stores/locale-store'
 import { notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
 import { registerCharacterCard } from '@/stores/asset-storage-store'
 import { isDemoSession } from '@/lib/demo/context'
+import type { ArtistSourceSnapshot } from '@/lib/artist/source-snapshot'
 // 최종 룩 요약(design_tokens 파생) — 옛 온보딩 버블 카피용으로 태어났지만(2026-08-06 제거)
 //   "지금 룩이 뭔지"의 파생 상태로 남긴다. 채팅 컨텍스트·향후 UI가 소비.
 export interface ArtistLookSummary {
@@ -183,27 +184,26 @@ async function persistImage(
   entityId: string,
   field: string,
   blobUrl: string,
-): Promise<string | null> {
-  try {
-    const r = await fetch(blobUrl)
-    const blob = await r.blob()
-    const form = new FormData()
-    form.append('projectId', projectId)
-    form.append('type', type)
-    form.append('entityId', entityId)
-    form.append('field', field)
-    form.append('file', blob, `${entityId}_${field}.png`)
-    const res = await fetch('/api/assets/upload-image', { method: 'POST', body: form })
-    if (!res.ok) {
-      console.error(`[artist-store] persistImage HTTP ${res.status} for ${entityId}/${field}`)
-      return null
-    }
-    const { publicUrl } = await res.json()
-    return publicUrl ?? null
-  } catch (err) {
-    console.error(`[artist-store] persistImage failed for ${entityId}/${field}:`, err)
-    return null
+): Promise<string> {
+  const r = await fetch(blobUrl)
+  if (!r.ok) throw new Error(`HTTP ${r.status}`)
+  const blob = await r.blob()
+  const form = new FormData()
+  form.append('projectId', projectId)
+  form.append('type', type)
+  form.append('entityId', entityId)
+  form.append('field', field)
+  form.append('file', blob, `${entityId}_${field}.png`)
+  const res = await fetch('/api/assets/upload-image', { method: 'POST', body: form })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error ?? `HTTP ${res.status}`)
   }
+  const { publicUrl } = (await res.json()) as { publicUrl?: unknown }
+  if (typeof publicUrl !== 'string' || !publicUrl.trim()) {
+    throw new Error('Image upload did not return a public URL')
+  }
+  return publicUrl
 }
 
 /**
@@ -273,8 +273,8 @@ async function generateAndPersistWorldShot(
   const blobUrl = await generateImage(prompt, projectId, '16:9', provider)
   if (projectId) {
     const persisted = await persistImage(projectId, 'location', locationId, column, blobUrl)
-    options?.onJob?.({ jobId: null, status: 'completed', resultUrl: persisted ?? blobUrl })
-    return persisted ?? blobUrl
+    options?.onJob?.({ jobId: null, status: 'completed', resultUrl: persisted })
+    return persisted
   }
   options?.onJob?.({ jobId: null, status: 'completed', resultUrl: blobUrl })
   return blobUrl
@@ -633,7 +633,7 @@ interface ArtistState {
   /** 배경(locationId) 생성 실패(reload-survivable) — 약속 B8. 캐릭터 viewFailures 와 같은 모양. */
   worldFailures: Record<string, ViewFailure>
   /** 배경 설명(원천) 편집 — 약속 B3·B6. 서버가 EN base 파생·저장, Writer 씬이 읽는 값이 바뀐다. */
-  updateLocationDescription: (locationId: string, visualDescription: string) => Promise<void>
+  updateLocationDescription: (locationId: string, visualDescription: string, sourceSnapshot?: ArtistSourceSnapshot) => Promise<void>
   /** 배경 후보 히스토리에서 직전 이미지로 되돌리기 — 약속 B4. appearanceKey 는 변형(C10). */
   selectLocationCandidate: (locationId: string, candidateId: string, appearanceKey?: string | null) => Promise<void>
   /** 콘텐츠 정책 거절 뒤 우회(safe) 재시도 — 약속 B9. */
@@ -653,6 +653,7 @@ interface ArtistState {
     characterId: string,
     appearanceKey: string,
     appearance: string,
+    sourceSnapshot?: ArtistSourceSnapshot,
   ) => Promise<void>
   /** 새 외형 타임라인 행 생성(#g4-chat 2026-08-31) — 무과금. 채팅 createAppearance / 향후 UI 공용. */
   createAppearance: (
@@ -1633,13 +1634,13 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   },
 
   // 약속 B3·B6(2026-09-04): 배경 설명(원천) 편집 — 팝업 프롬프트 편집과 채팅 승인이 함께 쓴다.
-  updateLocationDescription: async (locationId, visualDescription) => {
+  updateLocationDescription: async (locationId, visualDescription, sourceSnapshot) => {
     const projectId = useProjectStore.getState().projectId
     if (!projectId) throw new Error('A project is required to update a background')
     const res = await fetch('/api/artist/location', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId, locationId, visualDescription }),
+      body: JSON.stringify({ projectId, locationId, visualDescription, ...(sourceSnapshot ? { sourceSnapshot } : {}) }),
     })
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
@@ -1999,13 +2000,13 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   uiTab: 'characters',
   setUiTab: (tab) => set({ uiTab: tab }),
 
-  updateCharacterAppearance: async (characterId, appearanceKey, appearance) => {
+  updateCharacterAppearance: async (characterId, appearanceKey, appearance, sourceSnapshot) => {
     const projectId = useProjectStore.getState().projectId
     if (!projectId) throw new Error('A project is required to update an appearance')
     const res = await fetch('/api/artist/character-appearance', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId, characterId, appearanceKey, appearance }),
+      body: JSON.stringify({ projectId, characterId, appearanceKey, appearance, ...(sourceSnapshot ? { sourceSnapshot } : {}) }),
     })
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))

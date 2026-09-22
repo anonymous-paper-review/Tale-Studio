@@ -299,7 +299,12 @@ describe('설명 저장과 생성 상태 구별', () => {
     // 저장 재조회 계약에 맞는 데이터 어댑터 대역. 기존 완료/생성 판정은 그대로 검증한다.
     let appearance = 'old appearance'
     const adapter = vi.spyOn(toolBindings, 'createStudioToolResources').mockReturnValue({ characters: {
-      read: async () => [{ id: 'kyotaro', values: { appearance } }],
+      read: async () => [{
+        id: 'kyotaro', values: { appearance },
+        sourceSnapshot: { table: 'character_appearances', values: {
+          appearance_key: 'current', is_default: true, appearance, appearance_native: null, updated_at: '2026-09-14T00:00:00Z',
+        } },
+      }],
       validate: patch => patch as Record<string, unknown>,
       write: async (_id, patch) => { appearance = String(patch.appearance);return { status: 'ok' } },
     } })
