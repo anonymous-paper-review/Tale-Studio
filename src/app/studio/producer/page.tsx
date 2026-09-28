@@ -40,6 +40,9 @@ export default function MeetingPage() {
   const loadProject = useProducerStore((s) => s.loadProject)
   // saveAndHandoff 는 더 이상 이 페이지가 부르지 않는다 — 핸드오프는 채팅이 맡는다(#handoff-to-chat).
   const { syncing, projectSettings, error, clearError } = useProducerStore()
+  // 그룹1 P9 — 잠긴 항목을 고치려 했을 때의 안내. 고장이 아니므로 빨간 오류 배너가 아닌 warning 톤.
+  const lockNotice = useProducerStore((s) => s.lockNotice)
+  const clearLockNotice = useProducerStore((s) => s.clearLockNotice)
 
   // loadProject 완료 후에만 웰컴을 판단(초기 storyReady=false 윈도우에서 기존 프로젝트가 오탐되지 않게).
   const [loadedProjectId, setLoadedProjectId] = useState<string | null>(null)
@@ -250,6 +253,15 @@ export default function MeetingPage() {
             <X className="size-3.5" />
           </button>
         </div>
+      )}
+      {lockNotice && (
+        <button
+          type="button"
+          className="w-full border-t border-warning/30 bg-warning/10 px-6 py-2 text-left text-sm text-foreground"
+          onClick={clearLockNotice}
+        >
+          {lockNotice}
+        </button>
       )}
       {/* Error bar */}
       {error && (

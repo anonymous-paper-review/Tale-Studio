@@ -103,6 +103,30 @@ export interface WriterApplyChatUpdatesResult {
   skipped: Array<{ type: string; id?: string; reason: string }>
 }
 
+// 그룹1 W3: 채팅이 고친 샷·씬 한 개의 이전 값. patch 로 덮인 칸만 담아 되돌릴 때 그대로 되쓴다.
+export interface WriterChatUndoEntry {
+  kind: 'shot' | 'scene'
+  id: string
+  prev: Record<string, unknown>
+}
+
+// 그룹1 W1~W7: 마지막 채팅 한 묶음의 변경 기록. 새 묶음이 오면 덮어쓴다(W6).
+//   추가·삭제는 같은 id 로 되살릴 수 없어 수만 센다(W7) — 띠가 "되돌릴 수 없어요"로 알린다.
+export interface WriterChatUndo {
+  batchId: string
+  entries: WriterChatUndoEntry[]
+  changedIds: string[]
+  addedOrDeleted: number
+}
+
+function nextChatUndoBatchId(): string {
+  try {
+    return crypto.randomUUID()
+  } catch {
+    return `undo_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+  }
+}
+
 // applyChatUpdates 보조 — update 에서 Scene/Shot 칸만 추린다(route 가 1차 검증, 여기선 타입 좁힘 + 잉여 키 제거).
 function pickSceneFields(u: WriterChatUpdate): Partial<Scene> {
   const o = u as Record<string, unknown>
@@ -156,6 +180,8 @@ interface WriterState {
   sceneManifest: SceneManifest | null
   shots: Shot[]
   error: string | null
+  /** 그룹1 W1~W7 — 마지막 채팅 묶음이 고친 것과 그 이전 값. 러프 보드의 띠·카드 표시가 이것만 읽는다. */
+  chatUndo: WriterChatUndo | null
 
   loadProject: () => Promise<void>
   /** Director 배선 2 (2026-09-06): 러프·previz 두 칸만 DB 로 다시 채운다 — 잡이 큐에서 빠진 순간 큐 훅이 부른다.
@@ -181,6 +207,10 @@ interface WriterState {
   deleteScene: (sceneId: string) => Promise<void>
   saveDialogueTranslation: (projectId: string, shot: Shot, lines: DialogueLine[]) => Promise<void>
   applyChatUpdates: (updates: WriterChatUpdate[], options?: { executeEdit: (resource: 'scenes' | 'shots', id: string, patch: Record<string, unknown>) => Promise<ToolResult> }) => Promise<WriterApplyChatUpdatesResult>
+  /** 마지막 채팅 묶음을 바꾸기 전 내용으로 되돌린다(W3). 추가·삭제는 대상이 아니다(W7). */
+  undoChatBatch: () => Promise<void>
+  /** 띠만 치우고 고친 내용은 그대로 둔다(W4). */
+  acknowledgeChatBatch: () => void
   clearError: () => void
   reset: () => void
 }
@@ -189,6 +219,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
   sceneManifest: null,
   shots: [],
   error: null,
+  chatUndo: null,
 
   updateScene: (id, changes) => {
     if (isDemoSession()) return
@@ -604,6 +635,30 @@ export const useWriterStore = create<WriterState>((set, get) => ({
     }
     const tempMap = new Map<string, string>() // tempId → 실제 id
     const pendingDialogueShrinks: WriterDialogueShrinkProposal[] = []
+    // 되돌리기 재료(그룹1 W3) — 고치기 직전 값만 모은다. 추가·삭제는 수만 센다(W7).
+    const undoEntries: WriterChatUndoEntry[] = []
+    const changedIds: string[] = []
+    let addedOrDeleted = 0
+    const shotSnapshot = (id: string) => get().shots.find((s) => s.shotId === id)
+    const sceneSnapshot = (id: string) => get().sceneManifest?.scenes.find((s) => s.sceneId === id)
+    // before = 고치기 직전 값. 같은 항목이 한 묶음에 두 번 나와도 먼저 담은 값을 유지한다(W5).
+    const recordUndo = (
+      kind: 'shot' | 'scene',
+      id: string,
+      patch: Record<string, unknown>,
+      before: Shot | Scene | undefined,
+    ) => {
+      const keys = Object.keys(patch)
+      if (!before || keys.length === 0) return
+      const prevValues = before as unknown as Record<string, unknown>
+      let entry = undoEntries.find((e) => e.kind === kind && e.id === id)
+      if (!entry) {
+        entry = { kind, id, prev: {} }
+        undoEntries.push(entry)
+        changedIds.push(id)
+      }
+      for (const key of keys) if (!(key in entry.prev)) entry.prev[key] = prevValues[key]
+    }
     // #p4-understand: 침묵 no-op 제거 — 적용/건너뜀을 집계해 호출자(채팅)가 표면화한다.
     let applied = 0
     const skipped: Array<{ type: string; id?: string; reason: string }> = []
@@ -665,6 +720,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           const newId = await get().addScene({ afterSceneId, fields: pickSceneFields(u) })
           if (!newId) continue
           if (u.tempId) tempMap.set(u.tempId, newId)
+          addedOrDeleted += 1
           applied += 1
         } else if (u.type === 'addShot') {
           const realSceneId = tempMap.get(u.sceneId) ?? u.sceneId
@@ -676,15 +732,22 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           const newId = await get().addShot(realSceneId, { afterShotId, fields: pickShotFields(u) })
           if (!newId) continue
           if (u.tempId) tempMap.set(u.tempId, newId)
+          addedOrDeleted += 1
           applied += 1
         } else if (u.type === 'updateScene') {
+          const sceneId = tempMap.get(u.id) ?? u.id
+          const beforeScene = sceneSnapshot(sceneId)
           if (options) {
-            const result = await options.executeEdit('scenes', tempMap.get(u.id) ?? u.id, u.patch)
-            if (result.status === 'ok') applied += 1
-            else if (result.status !== 'approval_required') skipped.push({ type: u.type, id: u.id, reason: result.message ?? result.status })
+            const result = await options.executeEdit('scenes', sceneId, u.patch)
+            if (result.status === 'ok') {
+              // 저장이 확인된 변경만 되돌리기 대상이다 — 막힌 변경은 되돌릴 것이 없다.
+              recordUndo('scene', sceneId, u.patch, beforeScene)
+              applied += 1
+            } else if (result.status !== 'approval_required') skipped.push({ type: u.type, id: u.id, reason: result.message ?? result.status })
             continue
           }
-          get().updateScene(tempMap.get(u.id) ?? u.id, u.patch)
+          get().updateScene(sceneId, u.patch)
+          recordUndo('scene', sceneId, u.patch, beforeScene)
           applied += 1
         } else if (u.type === 'updateShot') {
           const shotId = resolveShot(u.id)
@@ -699,6 +762,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
             continue
           }
           const nextDialogueLines = u.patch.dialogueLines
+          const beforeShot = shotSnapshot(shotId)
           if (options) {
             const currentShot = get().shots.find(shot => shot.shotId === shotId)
             const shrinking = Array.isArray(nextDialogueLines) && currentShot && classifyDialoguePatch(currentShot.dialogueLines, nextDialogueLines) === 'confirm'
@@ -707,8 +771,10 @@ export const useWriterStore = create<WriterState>((set, get) => ({
             const patches = [rest, ...(shrinking ? [{ dialogueLines: nextDialogueLines }] : [])].filter(patch => Object.keys(patch).length)
             for (const patch of patches) {
               const result = await options.executeEdit('shots', shotId, patch)
-              if (result.status === 'ok') applied += 1
-              else if (result.status !== 'approval_required') skipped.push({ type: u.type, id: shotId, reason: result.message ?? result.status })
+              if (result.status === 'ok') {
+                recordUndo('shot', shotId, patch, beforeShot)
+                applied += 1
+              } else if (result.status !== 'approval_required') skipped.push({ type: u.type, id: shotId, reason: result.message ?? result.status })
             }
             continue
           }
@@ -720,7 +786,11 @@ export const useWriterStore = create<WriterState>((set, get) => ({
             ) {
               const restPatch = { ...u.patch }
               delete restPatch.dialogueLines
-              if (Object.keys(restPatch).length > 0) get().updateShot(shotId, restPatch)
+              if (Object.keys(restPatch).length > 0) {
+                get().updateShot(shotId, restPatch)
+                // 대사 축소는 아직 승인 대기라 적용되지 않았다 — 되돌릴 대상은 나머지 칸뿐이다.
+                recordUndo('shot', shotId, restPatch, beforeShot)
+              }
               pendingDialogueShrinks.push({
                 shotId,
                 currentDialogueLines: currentShot.dialogueLines,
@@ -728,9 +798,11 @@ export const useWriterStore = create<WriterState>((set, get) => ({
               })
             } else {
               get().updateShot(shotId, u.patch)
+              recordUndo('shot', shotId, u.patch, beforeShot)
             }
           } else {
             get().updateShot(shotId, u.patch)
+            recordUndo('shot', shotId, u.patch, beforeShot)
           }
           applied += 1
         } else if (u.type === 'deleteShot') {
@@ -746,9 +818,11 @@ export const useWriterStore = create<WriterState>((set, get) => ({
             continue
           }
           await get().deleteShot(delId)
+          addedOrDeleted += 1
           applied += 1
         } else if (u.type === 'deleteScene') {
           await get().deleteScene(tempMap.get(u.id) ?? u.id)
+          addedOrDeleted += 1
           applied += 1
         }
       } catch (e) {
@@ -756,7 +830,29 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         set({ error: e instanceof Error ? e.message : 'chat update failed' })
       }
     }
+    // 고친 것도 추가·삭제도 없으면 남아 있는 띠를 건드리지 않는다(W6 — 새 변경이 왔을 때만 덮어쓴다).
+    if (!isDemoSession() && (undoEntries.length > 0 || addedOrDeleted > 0)) {
+      set({ chatUndo: { batchId: nextChatUndoBatchId(), entries: undoEntries, changedIds, addedOrDeleted } })
+    }
     return { pendingDialogueShrinks, applied, skipped }
+  },
+
+  undoChatBatch: async () => {
+    if (isDemoSession()) return
+    const undo = get().chatUndo
+    if (!undo) return
+    // 역순 — 뒤에 담긴 변경부터 걷어내 묶음 시작 시점으로 수렴한다. 저장은 updateShot/updateScene 이
+    //   화면 편집과 같은 경로(500ms 디바운스 → shots/scenes update)로 처리한다.
+    for (const entry of [...undo.entries].reverse()) {
+      if (entry.kind === 'shot') get().updateShot(entry.id, entry.prev as Partial<Shot>)
+      else get().updateScene(entry.id, entry.prev as Partial<Scene>)
+    }
+    set({ chatUndo: null })
+  },
+
+  acknowledgeChatBatch: () => {
+    if (isDemoSession()) return
+    set({ chatUndo: null })
   },
 
   clearError: () => set({ error: null }),
@@ -766,6 +862,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       sceneManifest: null,
       shots: [],
       error: null,
+      chatUndo: null,
     }),
 
   generatePrevizVideo: async (shotId) => {

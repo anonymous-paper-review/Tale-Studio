@@ -58,6 +58,7 @@ import {
 } from '@/lib/card-mention'
 import { StyleAnchorPicker } from '@/features/producer/style-anchor-picker'
 import { selectStyleAnchorFromPicker } from '@/features/producer/select-style-anchor'
+import { readStoryReview } from '@/lib/producer/story-diff'
 import { SceneGateControls, sendSceneGate } from '@/features/writer/scene-gate-panel'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import {
@@ -1299,7 +1300,9 @@ export function GlobalChat() {
       e.preventDefault()
       e.stopPropagation()
       if (e.key === 'Escape') {
-        if (proposalOpen && pendingProposal) deferPendingProposal(pendingProposal.id)
+        // 그룹1 P10: 산문 검토 카드에는 '나중에'가 없다 — Esc 는 되돌리기(원문 유지).
+        if (proposalOpen && pendingProposal && readStoryReview(pendingProposal.payload)) dismissPendingProposal(pendingProposal.id)
+        else if (proposalOpen && pendingProposal) deferPendingProposal(pendingProposal.id)
         else if (suggestion?.dismissible !== false) deferSuggestion()
         return
       }
@@ -1311,13 +1314,13 @@ export function GlobalChat() {
   })
 
   /** 캡슐 버튼 옆 키 안내 — 있는 키만 적는다(없는 단축키를 광고하지 않는다). */
-  const KeyHint = ({ dismissible }: { dismissible: boolean }) => (
+  const KeyHint = ({ dismissible, escLabel }: { dismissible: boolean; escLabel?: string }) => (
     <span className="text-[10px] text-muted-foreground">
       <kbd className="rounded border border-border bg-muted px-1">Enter</kbd> {t('Accept')}
       {dismissible && (
         <>
           {' · '}
-          <kbd className="rounded border border-border bg-muted px-1">Esc</kbd> {t('Later')}
+          <kbd className="rounded border border-border bg-muted px-1">Esc</kbd> {escLabel ?? t('Later')}
         </>
       )}
     </span>
@@ -1609,27 +1612,42 @@ export function GlobalChat() {
                 </div>
                 {/* CTA — oiioii form 카드의 캡슐 버튼 매핑(Confirm & Continue). 승인은 전폭 캡슐. */}
                 <div className="mt-3 flex flex-col gap-1.5">
-                  <Button size="sm" className="w-full rounded-full" onClick={handlePendingProposalApprove}>
-                    {pendingProposal.kind === 'producerPreserveScript' ? t('Keep as written') : t('Approve')}
-                  </Button>
-                  {/* #script-preserve: 두 번째 버튼은 "나중에"가 아니라 명시적 거절(참고 자료로 각색) — 결정 없이 넘기면 조용히 각색된다. */}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="w-full rounded-full"
-                    onClick={() =>
-                      pendingProposal.kind === 'producerPreserveScript'
-                        ? declineScriptPreserve()
-                        : deferPendingProposal(pendingProposal.id)
-                    }
-                  >
-                    {pendingProposal.kind === 'producerPreserveScript' ? t('Use as reference only') : t('Later')}
-                  </Button>
-                  <Button size="sm" variant="ghost" className="w-full rounded-full" onClick={() => dismissPendingProposal(pendingProposal.id)}>
-                    {t('Cancel request')}
-                  </Button>
+                  {/* 그룹1 P10: 산문 검토 카드는 '적용'과 '되돌리기' 둘뿐 — 검토 중엔 포맷이 잠겨
+                      미루면 보드가 멈춘다. 다른 제안은 종전대로 세 버튼. */}
+                  {readStoryReview(pendingProposal.payload) ? (
+                    <>
+                      <Button size="sm" className="w-full rounded-full" onClick={handlePendingProposalApprove}>
+                        {t('Apply')}
+                      </Button>
+                      <Button size="sm" variant="ghost" className="w-full rounded-full" onClick={() => dismissPendingProposal(pendingProposal.id)}>
+                        {t('Revert')}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button size="sm" className="w-full rounded-full" onClick={handlePendingProposalApprove}>
+                        {pendingProposal.kind === 'producerPreserveScript' ? t('Keep as written') : t('Approve')}
+                      </Button>
+                      {/* #script-preserve: 두 번째 버튼은 "나중에"가 아니라 명시적 거절(참고 자료로 각색) — 결정 없이 넘기면 조용히 각색된다. */}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="w-full rounded-full"
+                        onClick={() =>
+                          pendingProposal.kind === 'producerPreserveScript'
+                            ? declineScriptPreserve()
+                            : deferPendingProposal(pendingProposal.id)
+                        }
+                      >
+                        {pendingProposal.kind === 'producerPreserveScript' ? t('Use as reference only') : t('Later')}
+                      </Button>
+                      <Button size="sm" variant="ghost" className="w-full rounded-full" onClick={() => dismissPendingProposal(pendingProposal.id)}>
+                        {t('Cancel request')}
+                      </Button>
+                    </>
+                  )}
                   <div className="flex justify-center">
-                    <KeyHint dismissible />
+                    <KeyHint dismissible escLabel={readStoryReview(pendingProposal.payload) ? t('Revert') : undefined} />
                   </div>
                 </div>
               </div>

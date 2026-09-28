@@ -34,6 +34,7 @@ import { notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
 import { registerCharacterCard } from '@/stores/asset-storage-store'
 import { isDemoSession } from '@/lib/demo/context'
 import type { ArtistSourceSnapshot } from '@/lib/artist/source-snapshot'
+import { splitArtistRowId as splitAppearanceRowId } from '@/lib/artist/proposal-target'
 // 최종 룩 요약(design_tokens 파생) — 옛 온보딩 버블 카피용으로 태어났지만(2026-08-06 제거)
 //   "지금 룩이 뭔지"의 파생 상태로 남긴다. 채팅 컨텍스트·향후 UI가 소비.
 export interface ArtistLookSummary {
@@ -41,6 +42,23 @@ export interface ArtistLookSummary {
   /** design_tokens.color_meaning(top-level) — 색→의미. 1-2개만 요약 노출. */
   colorMeaning?: Record<string, string> | null
 }
+
+/**
+ * A2·A3(2026-09-28): 승인해 저장된 글 변경 한 건의 이전 값. 화면이 "에이전트 변경을 적용했어요 · 되돌리기"를 보이는 근거다.
+ *   새 DB 컬럼 없이 클라이언트 스토어에만 둘어보므로 직렬화 가능한 값만 담는다.
+ *   resource 는 승인 경로의 payload.toolEdit.resource 그대로다(chat-tool-bindings 의 이름).
+ */
+export interface ArtistProposalUndo {
+  kind: 'artistSourceAppearancePatch' | 'artistSourceLocationPatch'
+  resource: 'characters' | 'appearances' | 'backgrounds' | 'background_appearances'
+  id: string
+  before: Record<string, unknown>
+  patch: Record<string, unknown>
+}
+
+/** 되돌릴 수 있는 승인 — 글 변경만. 모습 삭제·재생성은 서버에서 지워지거나 과금되므로 제외한다(A4). */
+const UNDOABLE_PROPOSAL_KINDS: ArtistProposalUndo['kind'][] = ['artistSourceAppearancePatch', 'artistSourceLocationPatch']
+const UNDOABLE_PROPOSAL_RESOURCES: ArtistProposalUndo['resource'][] = ['characters', 'appearances', 'backgrounds', 'background_appearances']
 
 export type ImageProvider = 'fal' | 'gemini' | 'tailscale'
 
@@ -649,6 +667,19 @@ interface ArtistState {
   setUiTab: (tab: 'characters' | 'world') => void
   /** 승인된 원천 외형 변경을 로컬 반영(C3 F6) — fixedPrompt 갱신 → 기존 파생 이미지가 stale 로 표시(자동 재생성 없음). */
   applyAppearancePatch: (characterId: string, appearance: string, appearanceNative?: string | null) => void
+  /** A2·A3(2026-09-28): 되돌릴 수 있는 마지막 승인 한 건. 새 승인이 오면 덮어쓴다. */
+  proposalUndo: ArtistProposalUndo | null
+  recordProposalUndo: (entry: {
+    kind: string
+    resource: string
+    id: string
+    before: Record<string, unknown>
+    patch: Record<string, unknown>
+  }) => void
+  /** 기록해 둔 이전 문장을 승인 경로와 같은 저장 경로로 다시 쓴다. 성공하면 기록을 비운다. */
+  undoLastProposal: () => Promise<boolean>
+  /** '확인'을 누르면 되돌리기 줄만 접는다(저장은 그대로). */
+  clearProposalUndo: () => void
   updateCharacterAppearance: (
     characterId: string,
     appearanceKey: string,
@@ -2058,6 +2089,57 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         : state.sceneManifest,
     })),
 
+  // A2·A3·A4(2026-09-28): 승인해 저장까지 끝난 글 변경 한 건을 되돌리기용으로 기억한다.
+  //   새 승인이 오면 덮어쓴다(A3 — 되돌리기는 마지막 한 건만). 삭제·재생성은 들어오지 않는다(A4).
+  proposalUndo: null,
+  recordProposalUndo: (entry) => {
+    if (isDemoSession()) return
+    const kind = UNDOABLE_PROPOSAL_KINDS.find((item) => item === entry.kind)
+    const resource = UNDOABLE_PROPOSAL_RESOURCES.find((item) => item === entry.resource)
+    if (!kind || !resource || !entry.id) return
+    // 되돌릴 문장이 없으면 되돌리기 줄을 보여줄 근거가 없다.
+    const field = resource === 'characters' || resource === 'appearances' ? 'appearance' : 'visualDescription'
+    if (typeof entry.before?.[field] !== 'string') return
+    set({ proposalUndo: { kind, resource, id: entry.id, before: entry.before, patch: entry.patch } })
+  },
+  clearProposalUndo: () => set({ proposalUndo: null }),
+  undoLastProposal: async () => {
+    const undo = get().proposalUndo
+    if (!undo || isDemoSession()) return false
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) return false
+    try {
+      if (undo.resource === 'characters') {
+        // 승인 경로와 같은 라우트(chat-tool-bindings 의 characters.write)로 이전 문장을 다시 쓴다.
+        const res = await fetch('/api/artist/appearance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId, characterId: undo.id, appearance: String(undo.before.appearance) }),
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const body = (await res.json()) as { appearance?: string | null; appearanceNative?: string | null }
+        if (projectId !== useProjectStore.getState().projectId) return false
+        get().applyAppearancePatch(
+          undo.id,
+          body.appearance ?? String(undo.before.appearance),
+          body.appearanceNative ?? String(undo.before.appearance),
+        )
+      } else if (undo.resource === 'appearances') {
+        const [characterId, appearanceKey] = splitAppearanceRowId(undo.id)
+        await get().updateCharacterAppearance(characterId, appearanceKey, String(undo.before.appearance))
+      } else {
+        const locationId = undo.resource === 'backgrounds' ? undo.id : splitAppearanceRowId(undo.id)[0]
+        await get().updateLocationDescription(locationId, String(undo.before.visualDescription))
+      }
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : String(error) })
+      return false
+    }
+    if (get().proposalUndo !== undo) return true
+    set({ proposalUndo: null })
+    return true
+  },
+
   // 채팅 createAppearance(#g4-chat 2026-08-31) 배선 — 새 서사 시점 모습 "행"만 만든다. 이미지 생성은
   //   트리거하지 않는다(무과금 원칙). 서버가 appearance_key(label 슬러그 + 중복 suffix)를 정해 반환.
   createAppearance: async (characterId, label, appearance, narrativeTime, options) => {
@@ -2253,6 +2335,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       imageProvider: 'fal' as ImageProvider,
       error: null,
       enteredProjects: {},
+      proposalUndo: null,
     }),
 }))
 

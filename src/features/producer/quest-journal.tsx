@@ -21,6 +21,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { TagInput } from './tag-input'
 import { useProducerStore } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
+import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { producerLock, type ProducerEditableField } from '@/lib/producer/lock'
+import { readStoryReview } from '@/lib/producer/story-diff'
 import type { GateResult } from '@/lib/producer-gate'
 import type { ProjectFormat } from '@/types'
 import { cn } from '@/lib/utils'
@@ -56,6 +59,8 @@ const BADGE_FILLED =
   'border-transparent bg-stage-producer/20 font-medium text-foreground hover:bg-stage-producer/30 animate-in fade-in-0 zoom-in-90 duration-300 motion-reduce:animate-none'
 const BADGE_EMPTY =
   'border-dashed border-border-strong text-muted-foreground hover:border-stage-producer/60 hover:text-foreground'
+// 그룹1 P9 — 잠긴 붯지는 닫힌 것처럼 보이되, 누르면 왜 못 고치는지 답한다(조용한 무시 금지).
+const BADGE_LOCKED = 'cursor-not-allowed opacity-60'
 
 function BadgeFace({ k, value }: { k: string; value: string | null }) {
   const t = useT()
@@ -67,16 +72,31 @@ function BadgeFace({ k, value }: { k: string; value: string | null }) {
   )
 }
 
-/** popover 편집이 붙은 설정 뱃지 — 편집은 이 팝업 안에만(#quest-journal). */
+/** popover 편집이 붙은 설정 붯지 — 편집은 이 팝업 안에만(#quest-journal).
+ *  onLocked 가 오면 팝업을 열지 않고 그 안내를 낸다(그룹1 P1·P6·P9). */
 function SettingBadge({
   k,
   value,
+  onLocked,
   children,
 }: {
   k: string
   value: string | null
+  onLocked?: () => void
   children: ReactNode
 }) {
+  if (onLocked) {
+    return (
+      <button
+        type="button"
+        onClick={onLocked}
+        aria-disabled
+        className={cn(BADGE_BASE, value ? BADGE_FILLED : BADGE_EMPTY, BADGE_LOCKED)}
+      >
+        <BadgeFace k={k} value={value} />
+      </button>
+    )
+  }
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -150,9 +170,25 @@ export function StoryFoundationBadges({ className }: { className?: string }) {
     CONTENT_LOCALE_OPTIONS.find((o) => o.value === projectLocale)?.label ?? null
   const localeMismatch = projectLocale !== null && projectLocale !== uiLocale
 
+  // 그룹1 P1·P6·P7 — 넘긴 뒤에는 러닝타임·채팅 언어만 열려 있고, 산문 검토 중에는 설정 붯지가
+  //   잠시 잠긴다(채팅 언어는 만들어진 결과에 영향이 없어 그대로 둔다).
+  const reachedStage = useProjectStore((s) => s.reachedStage)
+  const pendingProposal = useGlobalChatStore((s) => s.pendingProposal)
+  const noticeLock = useProducerStore((s) => s.noticeLock)
+  const lock = producerLock(reachedStage)
+  const storyReviewing = readStoryReview(pendingProposal?.payload) !== null
+  const lockOf = (field: ProducerEditableField): (() => void) | undefined => {
+    if (storyReviewing && field !== 'chatLanguage') return () => noticeLock('storyReview')
+    return lock.editable.has(field) ? undefined : () => noticeLock('handoff')
+  }
+
   return (
     <div className={cn('flex flex-wrap gap-1.5', className)}>
-      <SettingBadge k={t('Runtime')} value={settings.playtime ? t('{sec}s', { sec: settings.playtime }) : null}>
+      <SettingBadge
+        k={t('Runtime')}
+        value={settings.playtime ? t('{sec}s', { sec: settings.playtime }) : null}
+        onLocked={lockOf('playtime')}
+      >
         <label className="mb-1.5 block text-[11px] font-medium text-muted-foreground">
           {t('Runtime (sec)')}
         </label>
@@ -166,7 +202,7 @@ export function StoryFoundationBadges({ className }: { className?: string }) {
         />
       </SettingBadge>
 
-      <SettingBadge k={t('Genre')} value={settings.genre || null}>
+      <SettingBadge k={t('Genre')} value={settings.genre || null} onLocked={lockOf('genre')}>
         <label className="mb-1.5 block text-[11px] font-medium text-muted-foreground">{t('Genre')}</label>
         <Input
           value={settings.genre}
@@ -190,7 +226,7 @@ export function StoryFoundationBadges({ className }: { className?: string }) {
         <BadgeFace k={t('Style')} value={styleLabel} />
       </span>
 
-      <SettingBadge k={t('Format')} value={formatLabel}>
+      <SettingBadge k={t('Format')} value={formatLabel} onLocked={lockOf('format')}>
         <OptionList
           options={FORMAT_OPTIONS}
           value={settings.format}
@@ -198,7 +234,11 @@ export function StoryFoundationBadges({ className }: { className?: string }) {
         />
       </SettingBadge>
 
-      <SettingBadge k={t('Tone')} value={settings.tone.length ? settings.tone.join(', ') : null}>
+      <SettingBadge
+        k={t('Tone')}
+        value={settings.tone.length ? settings.tone.join(', ') : null}
+        onLocked={lockOf('tone')}
+      >
         <label className="mb-1.5 block text-[11px] font-medium text-muted-foreground">
           {t('Tone: fill this in for a better script')}
         </label>
@@ -209,7 +249,11 @@ export function StoryFoundationBadges({ className }: { className?: string }) {
         />
       </SettingBadge>
 
-      <SettingBadge k={t('Dialogue language')} value={langLabel}>
+      <SettingBadge
+        k={t('Dialogue language')}
+        value={langLabel}
+        onLocked={lockOf('dialogueLanguage')}
+      >
         <OptionList
           options={LANGUAGE_OPTIONS}
           value={settings.dialogueLanguage || ''}

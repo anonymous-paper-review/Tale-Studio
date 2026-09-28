@@ -10,12 +10,17 @@ import {
   type ElementType,
   type ReactNode,
 } from 'react'
+import Link from 'next/link'
+import { toast } from 'sonner'
 import {
   AlertCircle,
   AtSign,
   Box,
+  Check,
   CheckCircle2,
   ChevronDown,
+  Copy,
+  Lock,
   Mountain,
   Pencil,
   Trash2,
@@ -25,6 +30,16 @@ import {
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { StageHelpBadge } from '@/components/stage-help-badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -34,6 +49,9 @@ import { castMentions, backgroundMentions } from '@/lib/card-mention'
 import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
 import { useProducerStore } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
+import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { producerLock } from '@/lib/producer/lock'
+import { diffStoryParagraphs, readStoryReview } from '@/lib/producer/story-diff'
 import type { BackgroundSource, CastArc, CastMember, CastMotivation, GateIssue, GateResult } from '@/lib/producer-gate'
 import { isProducerBackgroundComplete } from '@/lib/producer-gate'
 import { depthLevelFromRuntime } from '@/lib/depth'
@@ -82,6 +100,14 @@ const ROW_LIST = 'divide-y divide-border overflow-hidden rounded-xl border borde
 const QUIET_CONTROL =
   'border-transparent bg-transparent shadow-none dark:bg-transparent hover:border-input focus-visible:border-ring data-[state=open]:border-input group-data-[needs=true]/field:border-input'
 
+// 그룹1 P9 — 넘긴 뒤 잠긴 조작은 닫힌 것처럼 보이되, 누르면 왜 못 고치는지 답한다(조용한 무시 금지).
+const LOCKED_CONTROL = 'cursor-not-allowed opacity-60'
+
+/** 잠긴 입력 칸 공통 — 읽기전용으로 두고 누르면 이유를 알린다. */
+function lockedFieldProps(locked: boolean, onLocked: () => void) {
+  return locked ? { readOnly: true, 'aria-disabled': true, onClick: onLocked } : {}
+}
+
 /** 컨트롤 슬롯 — 아직 채워야 하는 필드면 조용한 컨트롤의 테두리를 드러낸다(group-data). */
 function FieldSlot({
   needs,
@@ -105,11 +131,14 @@ function RowIconButton({
   label,
   onClick,
   destructive = false,
+  locked = false,
 }: {
   icon: ElementType
   label: string
   onClick: () => void
   destructive?: boolean
+  /** 넘긴 뒤 잠긴 조작 — 닫힌 모양으로 보이고 onClick 은 안내를 낸다(그룹1 P9). */
+  locked?: boolean
 }) {
   return (
     <Tooltip delayDuration={150}>
@@ -118,11 +147,14 @@ function RowIconButton({
           type="button"
           onClick={onClick}
           aria-label={label}
+          aria-disabled={locked || undefined}
           className={cn(
             'flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors',
-            destructive
-              ? 'hover:bg-destructive/10 hover:text-destructive'
-              : 'hover:bg-accent hover:text-foreground',
+            locked
+              ? LOCKED_CONTROL
+              : destructive
+                ? 'hover:bg-destructive/10 hover:text-destructive'
+                : 'hover:bg-accent hover:text-foreground',
           )}
         >
           <Icon className="size-3.5" />
@@ -252,6 +284,8 @@ function CastRow({
   onDelete,
   runtimeSeconds,
   mentionLabel,
+  locked,
+  onLocked,
 }: {
   member: CastMember
   issues: GateIssue[]
@@ -259,8 +293,12 @@ function CastRow({
   onDelete: (localId: string) => void
   runtimeSeconds: number
   mentionLabel: string
+  /** 넘긴 뒤에는 보기·복사만 — 칸·삭제·완드가 잠긴다(그룹1 P1). */
+  locked: boolean
+  onLocked: () => void
 }) {
   const t = useT()
+  const lockedField = lockedFieldProps(locked, onLocked)
   const isPerson = member.entityType === 'person'
   // 약속 M: 완드는 보내지 않고 입력창에 "@카드이름 "을 넣는다(오너 2안).
   const requestMentionCompose = useChatUiStore((s) => s.requestMentionCompose)
@@ -322,7 +360,8 @@ function CastRow({
           icon={Trash2}
           label={t('Delete')}
           destructive
-          onClick={() => onDelete(member.localId)}
+          locked={locked}
+          onClick={() => (locked ? onLocked() : onDelete(member.localId))}
         />
         {/* 인물 아이콘 — hover 로 상세 안내, 미완료면 빨간 점(#b3) */}
         {isPerson ? (
@@ -348,8 +387,9 @@ function CastRow({
             <Input
               value={member.name}
               placeholder={isPerson ? t('Name (e.g. Jia)') : t('Name (e.g. Silver Ring)')}
-              className={cn(QUIET_CONTROL, 'h-8')}
+              className={cn(QUIET_CONTROL, 'h-8', locked && LOCKED_CONTROL)}
               onChange={(e) => onPatch(member.localId, { name: e.target.value })}
+              {...lockedField}
             />
           </HoverBeam>
         </FieldSlot>
@@ -358,9 +398,10 @@ function CastRow({
             <Textarea
               value={member.appearance}
               rows={1}
-              className={cn(CARD_TEXTAREA, QUIET_CONTROL, 'min-h-8 py-1.5')}
+              className={cn(CARD_TEXTAREA, QUIET_CONTROL, 'min-h-8 py-1.5', locked && LOCKED_CONTROL)}
               placeholder={isPerson ? t('Appearance: clothing, age, features') : t('Shape, material, features')}
               onChange={(e) => onPatch(member.localId, { appearance: e.target.value })}
+              {...lockedField}
             />
           </HoverBeam>
         </FieldSlot>
@@ -398,7 +439,10 @@ function CastRow({
         <RowIconButton
           icon={Wand2}
           label={t('Ask Producer to fill this in')}
-          onClick={() => requestMentionCompose(mentionLabel, t('Fill in this card'))}
+          locked={locked}
+          onClick={() =>
+            locked ? onLocked() : requestMentionCompose(mentionLabel, t('Fill in this card'))
+          }
         />
         {/* 상세 펼침/접힘 전용 버튼(2026-08-06) — 빈 공간 클릭 토글(#b3)은 줄이 입력창으로
             가득 차 닫을 자리가 거의 없었다. 명시적 chevron 이 항상 열고 닫는다. */}
@@ -443,12 +487,15 @@ function CastRow({
                       key={value}
                       type="button"
                       tabIndex={detailsOpen ? 0 : -1}
-                      onClick={() => onPatch(member.localId, { role: value })}
-                      className={`rounded-md border px-3 py-1.5 text-xs ${
+                      aria-disabled={locked || undefined}
+                      onClick={() => (locked ? onLocked() : onPatch(member.localId, { role: value }))}
+                      className={cn(
+                        'rounded-md border px-3 py-1.5 text-xs',
                         active
                           ? 'border-primary bg-primary/10 text-foreground'
-                          : `border-border text-muted-foreground ${HOVER_RED_BORDER}`
-                      }`}
+                          : `border-border text-muted-foreground ${HOVER_RED_BORDER}`,
+                        locked && LOCKED_CONTROL,
+                      )}
                     >
                       {t(label)}
                     </button>
@@ -462,9 +509,9 @@ function CastRow({
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground">{t('Arc (start / end / type)')}</label>
                   <div className="grid grid-cols-3 gap-2">
-                    <HoverBeam><Input value={member.arc?.start_state ?? ''} placeholder={t('Start state')} tabIndex={detailsOpen ? 0 : -1} onChange={(e) => patchArc({ start_state: e.target.value })} /></HoverBeam>
-                    <HoverBeam><Input value={member.arc?.end_state ?? ''} placeholder={t('End state')} tabIndex={detailsOpen ? 0 : -1} onChange={(e) => patchArc({ end_state: e.target.value })} /></HoverBeam>
-                    <HoverBeam><Input value={member.arc?.arc_type ?? ''} placeholder={t('Type')} tabIndex={detailsOpen ? 0 : -1} onChange={(e) => patchArc({ arc_type: e.target.value })} /></HoverBeam>
+                    <HoverBeam><Input value={member.arc?.start_state ?? ''} placeholder={t('Start state')} tabIndex={detailsOpen ? 0 : -1} className={cn(locked && LOCKED_CONTROL)} onChange={(e) => patchArc({ start_state: e.target.value })} {...lockedField} /></HoverBeam>
+                    <HoverBeam><Input value={member.arc?.end_state ?? ''} placeholder={t('End state')} tabIndex={detailsOpen ? 0 : -1} className={cn(locked && LOCKED_CONTROL)} onChange={(e) => patchArc({ end_state: e.target.value })} {...lockedField} /></HoverBeam>
+                    <HoverBeam><Input value={member.arc?.arc_type ?? ''} placeholder={t('Type')} tabIndex={detailsOpen ? 0 : -1} className={cn(locked && LOCKED_CONTROL)} onChange={(e) => patchArc({ arc_type: e.target.value })} {...lockedField} /></HoverBeam>
                   </div>
                   {/* arcIssue.label 은 producer-gate.ts(범위 밖) 하드코딩 한국어 — 그대로 통과. */}
                   {arcIssue ? <p className="text-xs text-destructive">{arcIssue.label}</p> : null}
@@ -472,8 +519,8 @@ function CastRow({
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground">{t('Motivation (want / need)')}</label>
                   <div className="grid grid-cols-2 gap-2">
-                    <HoverBeam><Input value={member.motivation?.want ?? ''} placeholder={t('Want (required)')} tabIndex={detailsOpen ? 0 : -1} onChange={(e) => patchMot({ want: e.target.value })} /></HoverBeam>
-                    <HoverBeam><Input value={member.motivation?.need ?? ''} placeholder={t('Need (optional)')} tabIndex={detailsOpen ? 0 : -1} onChange={(e) => patchMot({ need: e.target.value })} /></HoverBeam>
+                    <HoverBeam><Input value={member.motivation?.want ?? ''} placeholder={t('Want (required)')} tabIndex={detailsOpen ? 0 : -1} className={cn(locked && LOCKED_CONTROL)} onChange={(e) => patchMot({ want: e.target.value })} {...lockedField} /></HoverBeam>
+                    <HoverBeam><Input value={member.motivation?.need ?? ''} placeholder={t('Need (optional)')} tabIndex={detailsOpen ? 0 : -1} className={cn(locked && LOCKED_CONTROL)} onChange={(e) => patchMot({ need: e.target.value })} {...lockedField} /></HoverBeam>
                   </div>
                   {motivationIssue ? <p className="text-xs text-destructive">{motivationIssue.label}</p> : null}
                 </div>
@@ -499,13 +546,19 @@ function BackgroundRow({
   onPatch,
   onDelete,
   mentionLabel,
+  locked,
+  onLocked,
 }: {
   background: BackgroundSource
   onPatch: (localId: string, patch: Partial<BackgroundSource>) => void
   onDelete: (localId: string) => void
   mentionLabel: string
+  /** 넘긴 뒤에는 보기·복사만 — 칸·삭제·완드가 잠긴다(그룹1 P1). */
+  locked: boolean
+  onLocked: () => void
 }) {
   const t = useT()
+  const lockedField = lockedFieldProps(locked, onLocked)
   const requestMentionCompose = useChatUiStore((s) => s.requestMentionCompose)
   const ready = backgroundReady(background)
   // 내부 식별은 영어 키로 고정(includes 비교용) — 표시는 t() 로 별도 감싼다.
@@ -522,7 +575,8 @@ function BackgroundRow({
           icon={Trash2}
           label={t('Delete')}
           destructive
-          onClick={() => onDelete(background.localId)}
+          locked={locked}
+          onClick={() => (locked ? onLocked() : onDelete(background.localId))}
         />
         <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
           <Mountain className="size-4" />
@@ -533,8 +587,9 @@ function BackgroundRow({
             <Input
               value={background.name}
               placeholder={t('Name (e.g. Neon back alley)')}
-              className={cn(QUIET_CONTROL, 'h-8')}
+              className={cn(QUIET_CONTROL, 'h-8', locked && LOCKED_CONTROL)}
               onChange={(e) => onPatch(background.localId, { name: e.target.value })}
+              {...lockedField}
             />
           </HoverBeam>
         </FieldSlot>
@@ -546,9 +601,10 @@ function BackgroundRow({
             <Textarea
               value={background.visualDescription}
               rows={1}
-              className={cn(CARD_TEXTAREA, QUIET_CONTROL, 'min-h-8 py-1.5')}
+              className={cn(CARD_TEXTAREA, QUIET_CONTROL, 'min-h-8 py-1.5', locked && LOCKED_CONTROL)}
               placeholder={t('Color palette, structure, props, mood')}
               onChange={(e) => onPatch(background.localId, { visualDescription: e.target.value })}
+              {...lockedField}
             />
           </HoverBeam>
         </FieldSlot>
@@ -580,10 +636,13 @@ function BackgroundRow({
         <RowIconButton
           icon={Wand2}
           label={t('Ask Producer to fill this in')}
-          onClick={() => requestMentionCompose(mentionLabel, t('Fill in this card'))}
+          locked={locked}
+          onClick={() =>
+            locked ? onLocked() : requestMentionCompose(mentionLabel, t('Fill in this card'))
+          }
         />
       </div>
-      {/* 목적 — 둘째 줄. 들여쓰기는 첫 줄 "묘사" head 의 x 위치에 맞춘다(#b1 2026-08-03):
+      {/* 목적 — 둘째 줄. 들여쓰기는 첫 줄 "묘사" head 의 x 위치에 맞쭱다(#b1 2026-08-03):
           삭제(28)+gap(8)+아이콘(28)+gap(8)+이름(144)+gap(8) = 224px = pl-56. */}
       <div className="mt-1.5 flex items-center gap-2 pl-56 pr-2">
         <span className="shrink-0 text-[11px] font-medium text-muted-foreground">{t('Purpose')}</span>
@@ -592,13 +651,76 @@ function BackgroundRow({
             <Input
               value={background.purpose}
               placeholder={t('E.g. Where the chase begins')}
-              className={cn(QUIET_CONTROL, 'h-8')}
+              className={cn(QUIET_CONTROL, 'h-8', locked && LOCKED_CONTROL)}
               onChange={(e) => onPatch(background.localId, { purpose: e.target.value })}
+              {...lockedField}
             />
           </HoverBeam>
         </FieldSlot>
       </div>
     </MentionableCard>
+  )
+}
+
+/** 산문 복사 — 잠김 여부와 무관하게 항상 있다. 넘긴 뒤에는 이 버튼이 산문을 가지고 나가는 유일한 길이다. */
+function StoryCopyButton({ storyText, label }: { storyText: string; label: string }) {
+  const t = useT()
+  const [copied, setCopied] = useState(false)
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(storyText)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      toast.error(t('Copy failed.'))
+    }
+  }
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      className="shrink-0 gap-1.5 text-xs text-muted-foreground"
+      disabled={!storyText.trim()}
+      onClick={() => void copy()}
+    >
+      {copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
+      {label}
+    </Button>
+  )
+}
+
+/** 그룹1 P3 — 넘긴 뒤에도 다시 만들 길은 있다: 새 프로젝트로 산문을 옮기는 방법을 안내한다. */
+function StartOverDialog({ storyText }: { storyText: string }) {
+  const t = useT()
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button size="sm" variant="outline" className="shrink-0 gap-1.5">
+          {t('Start over?')}
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t('Start over in a new project')}</DialogTitle>
+          <DialogDescription>
+            {t(
+              'Create a new project from home and paste this story into it. This project stays as it is.',
+            )}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <StoryCopyButton storyText={storyText} label={t('Copy story')} />
+          <Button size="sm" variant="outline" asChild>
+            <Link href="/projects">{t('Go to projects')}</Link>
+          </Button>
+          <DialogClose asChild>
+            <Button size="sm" variant="ghost">
+              {t('Close')}
+            </Button>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -621,6 +743,16 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   const projectId = useProjectStore((s) => s.projectId)
   const untitled = !projectTitle?.trim() || projectTitle.trim().toLowerCase() === 'untitled'
   const renameProject = useProjectStore((s) => s.renameProject)
+  // 그룹1 P1·P2·P4 — 넘긴 뒤에는 보기·복사만, 산문 검토 중이면 바뀐 문단을 산문 카드에 그린다.
+  const reachedStage = useProjectStore((s) => s.reachedStage)
+  const locked = producerLock(reachedStage).locked
+  const noticeLock = useProducerStore((s) => s.noticeLock)
+  const notifyHandoffLock = useCallback(() => noticeLock('handoff'), [noticeLock])
+  const pendingProposal = useGlobalChatStore((s) => s.pendingProposal)
+  const storyParts = useMemo(() => {
+    const review = readStoryReview(pendingProposal?.payload)
+    return review ? diffStoryParagraphs(review.prev, review.next) : null
+  }, [pendingProposal])
   // 인라인 제목 편집 상태 — null = 보기 모드. Esc 취소는 blur 커밋보다 먼저 ref 로 알린다
   //   (Esc → setTitleDraft(null) → 인풋 언마운트 blur 가 stale 값으로 커밋하는 것 방지).
   const [titleDraft, setTitleDraft] = useState<string | null>(null)
@@ -702,9 +834,23 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                 'This is the planning room where you fill in story, settings, and cast. Talk with Producer and the board fills in together. Once every required item is complete, you can hand off to Writer.',
               )}
             />
+            {/* P6: 산문 검토 중에는 넘기기 칩도 잠시 잠긴다 — 어느 산문을 넘기는지 흐려지기 때문. */}
             {gate.canHandoff ? (
-              <Badge variant="outline" className="gap-1 border-success/40 text-success">
+              <Badge
+                variant="outline"
+                aria-disabled={!!storyParts || undefined}
+                className={cn(
+                  'gap-1 border-success/40 text-success',
+                  storyParts && 'border-border text-muted-foreground opacity-60',
+                )}
+              >
                 <CheckCircle2 className="size-3" /> {t('Ready to hand off to Writer')}
+              </Badge>
+            ) : null}
+            {storyParts ? (
+              <Badge variant="outline" className="gap-1 border-warning/40 text-warning">
+                <Lock className="size-3" />{' '}
+                {t('Format is locked while a story change is under review.')}
               </Badge>
             ) : null}
           </div>
@@ -715,6 +861,19 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
           {/* 헤더 CTA "Producer와 스토리 만들기" 는 약속 N(2026-09-04)으로 제거 — 채팅에 직접 말하는 것과 같은 경로였다. */}
         </div>
       </div>
+
+      {/* 그룹1 P2 — 넘긴 뒤 보드 상단: "지금 누가 이 값을 기준으로 일하고 있는가"를 먼저 말한다. */}
+      {locked && (
+        <div className="flex shrink-0 items-center gap-3 border-b border-warning/30 bg-warning/10 px-6 py-3 text-sm">
+          <Lock className="size-4 shrink-0 text-warning" />
+          <p className="flex-1 text-foreground">
+            {t(
+              'Writer and Artist are working from this format and story. They can no longer be edited, only viewed and copied.',
+            )}
+          </p>
+          <StartOverDialog storyText={storyText} />
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {/* 좌 퀘스트 저널(제작 여정, 순수 뷰어) / 우 기존 리스트 (#quest-journal 2026-08-07).
@@ -728,17 +887,27 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
               한 카드 안에. "내 영화의 타이틀 페이지가 채워져 간다"가 이 화면의 심장. */}
           <section>
             <MentionableCard refId="story" label="스토리" pulse={storyPulse} className="rounded-2xl p-7">
-              <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-stage-producer">
-                Now assembling
+              <div className="flex items-start justify-between gap-2">
+                <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-stage-producer">
+                  Now assembling
+                </div>
+                {/* 복사는 잠김과 무관하게 항상 — 다른 프로젝트로 산문을 옮길 수 있어야 한다(그룹1 P1·P3). */}
+                <StoryCopyButton storyText={storyText} label={t('Copy')} />
               </div>
               {/* 제목 인라인 편집(#feedback 2026-08-07 v3) — 히어로 제목 = 프로젝트 제목.
                   클릭 → 인풋, Enter/blur 확정(renameProject), Esc 취소. */}
               {titleDraft === null ? (
                 <button
                   type="button"
-                  onClick={() => setTitleDraft(untitled ? '' : projectTitle)}
+                  onClick={() =>
+                    locked ? notifyHandoffLock() : setTitleDraft(untitled ? '' : projectTitle)
+                  }
+                  aria-disabled={locked || undefined}
                   title={t('Edit title')}
-                  className="group/title mt-2 flex max-w-full items-center gap-2 text-left"
+                  className={cn(
+                    'group/title mt-2 flex max-w-full items-center gap-2 text-left',
+                    locked && LOCKED_CONTROL,
+                  )}
                 >
                   <h1
                     className={cn(
@@ -777,7 +946,26 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                 />
               )}
               <div className="mt-2 max-w-2xl">
-                {storyText ? (
+                {storyParts ? (
+                  // P4: 바뀐 문단만 노랑게(추가) / 줄 긋기로(삭제) — 적용 전에는 원문이 그대로 산다.
+                  <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                    {storyParts.map((part, i) => (
+                      <p
+                        key={`${part.kind}-${i}`}
+                        className={cn(
+                          'text-sm leading-relaxed whitespace-pre-wrap',
+                          part.kind === 'added'
+                            ? 'rounded-md bg-warning/10 px-2 py-1 text-foreground'
+                            : part.kind === 'removed'
+                              ? 'px-2 py-1 text-muted-foreground line-through decoration-muted-foreground/50'
+                              : 'text-muted-foreground',
+                        )}
+                      >
+                        {part.text}
+                      </p>
+                    ))}
+                  </div>
+                ) : storyText ? (
                   <>
                     {storyExpanded ? (
                       <p className="max-h-72 overflow-y-auto pr-1 text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">
@@ -849,7 +1037,13 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
               </div>
               {/* 사물 추가 제거(#feedback 2026-08-07 v3) — producer 는 인물/배경만.
                   기존 사물 카드(레거시/모델 추출)는 데이터 보존 차원에서 계속 표시된다. */}
-              <Button size="sm" variant="outline" className={HOVER_RED_BORDER} onClick={addPerson}>
+              <Button
+                size="sm"
+                variant="outline"
+                aria-disabled={locked || undefined}
+                className={cn(HOVER_RED_BORDER, locked && LOCKED_CONTROL)}
+                onClick={locked ? notifyHandoffLock : addPerson}
+              >
                 <Plus className="size-4" /> {t('Add person')}
               </Button>
             </div>
@@ -874,6 +1068,8 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                     onDelete={removeCastMember}
                     runtimeSeconds={projectSettings.playtime || 0}
                     mentionLabel={castMentionList[i]?.label ?? member.name}
+                    locked={locked}
+                    onLocked={notifyHandoffLock}
                   />
                 ))}
               </div>
@@ -888,7 +1084,13 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                   {t('{ready} / {total} ready', { ready: readyBackgrounds.length, total: backgrounds.length })}
                 </span>
               </div>
-              <Button size="sm" variant="outline" className={HOVER_RED_BORDER} onClick={addBg}>
+              <Button
+                size="sm"
+                variant="outline"
+                aria-disabled={locked || undefined}
+                className={cn(HOVER_RED_BORDER, locked && LOCKED_CONTROL)}
+                onClick={locked ? notifyHandoffLock : addBg}
+              >
                 <Plus className="size-4" /> {t('Add background')}
               </Button>
             </div>
@@ -911,6 +1113,8 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                     onPatch={updateBackground}
                     onDelete={removeBackground}
                     mentionLabel={bgMentionList[i]?.label ?? background.name}
+                    locked={locked}
+                    onLocked={notifyHandoffLock}
                   />
                 ))}
               </div>

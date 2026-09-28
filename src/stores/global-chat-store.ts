@@ -2687,6 +2687,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         const saved = (await (resource.readSaved ?? resource.read)()).find(row => row.id === approved.id)
         if (!isCurrentSession()) return false
         if (!saved || !Object.entries(patch).every(([key, value]) => sameToolValue(saved.values[key], value))) throw new Error('요청한 값의 저장을 확인하지 못했습니다.')
+        // A2(2026-09-28): 저장까지 확인된 Artist 글 변경만 되돌리기용으로 기억한다(삭제·재생성은 스토어가 걸러낸다).
+        useArtistStore.getState().recordProposalUndo({ kind: proposal.kind, resource: approved.resource, id: approved.id, before: approved.before, patch })
         speak(`${proposal.target}: ${contentLocale() === 'ko' ? '저장을 확인했습니다.' : 'Saved and verified.'}`)
         patchTrace({ appliedCount: 1, pendingProposal: false })
         return true
