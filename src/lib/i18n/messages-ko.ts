@@ -1825,36 +1825,4 @@ export const KO: Record<string, string> = {
   "Arranging the scenes.": "내용을 확인하며 씬을 구성하고 있어요.",
   "Creating shots and dialogue.": "샷과 대사를 만들고 있어요.",
   "Saving shots and dialogue.": "샷과 대사를 저장하고 있어요.",
-
-  // 그룹1 · Writer 점유와 잠금 (2026-09-28)
-  // 'Revert'(되돌리기)는 아래 Artist 묶음에 이번 그룹에서 이미 들어있어 그대로 쓴다.
-  "The agent changed {count} items.": "에이전트가 {count}개를 고쳤어요",
-  " Added or deleted items can't be reverted.": " 추가·삭제는 되돌릴 수 없어요",
-  "Keep": "적용",
-
-  // 그룹1 · Artist 점유와 잠금 (2026-09-28)
-  "Agent proposal under review": "에이전트 제안 확인 중",
-  "Decide on the proposal in chat first.": "채팅에서 제안을 먼저 결정해 주세요",
-  "Applied the agent's change.": "에이전트 변경을 적용했어요",
-  "Revert": "되돌리기",
-  "OK": "확인",
-
-  // 그룹1 · Producer 점유와 잠금 (2026-09-28)
-  // 'Revert'(되돌리기)는 위 Artist 묶음에 이미 들어있어 그대로 쓴다.
-  'Locked after handoff. Start a new project to change it.':
-    '넘긴 뒤에는 고칠 수 없어요 · 바꾸려면 새 프로젝트를 만드세요',
-  'Format is locked while a story change is under review.':
-    '산문 변경을 검토하는 동안 포맷은 잠시 잠겨요',
-  'Writer and Artist are working from this format and story. They can no longer be edited, only viewed and copied.':
-    'Writer와 Artist가 이 포맷과 산문을 기준으로 작업하고 있어요. 포맷과 산문은 더 이상 고칠 수 없고, 확인과 복사만 됩니다.',
-  'Start over?': '새로 만들려면?',
-  'Start over in a new project': '새 프로젝트로 다시 만들기',
-  'Create a new project from home and paste this story into it. This project stays as it is.':
-    '홈에서 새 프로젝트를 만들고 이 산문을 붙여 넣으세요. 지금 프로젝트는 그대로 남아요.',
-  'Go to projects': '프로젝트 목록으로',
-  'Copy story': '산문 복사',
-  'Copy': '복사',
-  'The changed paragraphs are shown on the board. Nothing is overwritten until you apply.':
-    '바뀐 문단을 보드에 표시했어요. 적용하기 전에는 덮어쓰지 않아요.',
-  'Apply': '적용',
 }

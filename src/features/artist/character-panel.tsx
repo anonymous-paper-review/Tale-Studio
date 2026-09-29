@@ -14,10 +14,7 @@ import { AppearanceCreateDialog } from '@/features/artist/appearance-create-dial
 import { TurnaroundRegionCycle } from '@/features/artist/turnaround-region-cycle'
 import { sameCharacterAppearanceSlot, useArtistStore } from '@/stores/artist-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
-import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
-import { proposalTargetsCard, proposalUndoTargetsCard } from '@/lib/artist/proposal-target'
-import { useIsDemo } from '@/hooks/use-is-demo'
 import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
 import { type CharacterViewKey } from '@/types/asset'
 
@@ -70,14 +67,7 @@ export function CharacterPanel({
     appearanceKey: string
     view: CharacterViewKey
   } | null>(null)
-  // A1(2026-09-28): 에이전트 제안이 대기 중인 카드는 사람과 에이전트가 같은 것을 동시에 잡는 순간이라
-  //   모습 추가와 팝업 열기를 잠그고 표시를 붙인다. 결정은 채팅의 승인 카드에서 한다.
-  const pendingProposal = useGlobalChatStore((s) => s.pendingProposal)
-  const proposalUndo = useArtistStore((s) => s.proposalUndo)
-  const isDemo = useIsDemo()
-  const proposalLocked = (charId: string) => proposalTargetsCard(pendingProposal, { characterId: charId })
   const openImage = (charId: string, appearanceKey: string) => {
-    if (proposalLocked(charId)) return
     noteSelection(charId, appearanceKey, 'image')
     setViewDialog({ charId, appearanceKey, view: 'main' })
   }
@@ -129,9 +119,6 @@ export function CharacterPanel({
               : false
           const isObject = char.entityType === 'object'
           const bgScenes = getBackgroundScenes(char.characterId)
-          // A1: 이 카드를 가리키는 승인 카드가 대기 중인가. A2: 방금 적용된 변경을 되돌릴 수 있는가.
-          const proposalPending = proposalLocked(char.characterId)
-          const undoHere = !isDemo && proposalUndoTargetsCard(proposalUndo, { characterId: char.characterId })
 
 
           // hover 정보 본문 — 4개 뷰 이미지의 개별 Tooltip 에 공유(같은 캐릭터 정보).
@@ -227,7 +214,6 @@ export function CharacterPanel({
                   : 'border-border hover:bg-accent/50',
                 mentionedNames.has(char.name) &&
                   'mention-flash ring-2 ring-sky-400/70 border-sky-400/50 bg-sky-400/10',
-                proposalPending && 'ring-2 ring-warning',
               )}
             >
               {/* Header: 편집 가능한 이름만(#f8 2026-08-31 오너) — 역할·필수 배지는 카드 얼굴에서
@@ -242,11 +228,6 @@ export function CharacterPanel({
                     {char.name || (isObject ? t('Object') : t('Character'))}
                   </span>
                   {isObject ? <Badge variant="secondary">{t('Object')}</Badge> : null}
-                  {proposalPending && (
-                    <Badge variant="outline" className="border-warning/50 bg-warning/10 text-[10px] text-warning">
-                      {t('Agent proposal under review')}
-                    </Badge>
-                  )}
                   {viewFailures[char.characterId] &&
                     Object.keys(viewFailures[char.characterId]).length > 0 && (
                       <Badge variant="destructive" className="text-[10px]">
@@ -290,13 +271,9 @@ export function CharacterPanel({
                   })}
                   <button
                     type="button"
-                    disabled={proposalPending}
                     onClick={() => setCreateFor(char.characterId)}
-                    className={cn(
-                      'rounded-md border border-dashed border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors',
-                      proposalPending ? 'cursor-not-allowed opacity-50' : 'hover:bg-accent',
-                    )}
-                    title={proposalPending ? t('Decide on the proposal in chat first.') : t('Add appearance')}
+                    className="rounded-md border border-dashed border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent"
+                    title={t('Add appearance')}
                   >
                     {t('+ Add appearance')}
                   </button>
@@ -309,17 +286,11 @@ export function CharacterPanel({
                 <TooltipTrigger asChild>
                   <button
                     type="button"
-                    disabled={proposalPending}
-                    // disabled 버튼은 Radix 툴팁이 hover 를 못 받으므로 안내는 브라우저 title 로도 남긴다.
-                    title={proposalPending ? t('Decide on the proposal in chat first.') : undefined}
                     onClick={(e) => {
                       e.stopPropagation()
                       if (appearance) openImage(char.characterId, appearance.appearanceKey)
                     }}
-                    className={cn(
-                      'relative block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                      proposalPending ? 'cursor-not-allowed' : 'hover-red-beam',
-                    )}
+                    className="relative block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
                   >
                     {/* 사람 시트는 hover 리전 순환(#d2) — 컨셉→디테일→스케치→표정을 잘라 옮겨
                         다닌다. 생성 중·이미지 없음·사물은 기존 placeholder 경로 그대로. */}
@@ -346,34 +317,9 @@ export function CharacterPanel({
                   collisionPadding={12}
                   className="max-w-[260px] space-y-1.5 whitespace-normal text-left"
                 >
-                  {proposalPending ? <p>{t('Decide on the proposal in chat first.')}</p> : charTooltipBody}
+                  {charTooltipBody}
                 </TooltipContent>
               </Tooltip>
-              {/* A2(2026-09-28): 승인해 저장된 글 변경 한 건은 이전 문장으로 돌릴 수 있다. */}
-              {undoHere && (
-                <div
-                  className="mt-2 flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2 py-1"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
-                    {t("Applied the agent's change.")}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => { void useArtistStore.getState().undoLastProposal() }}
-                    className="rounded-md border border-border px-2 py-0.5 text-[11px] font-medium transition-colors hover:bg-accent"
-                  >
-                    {t('Revert')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => useArtistStore.getState().clearProposalUndo()}
-                    className="rounded-md px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent"
-                  >
-                    {t('OK')}
-                  </button>
-                </div>
-              )}
               {/* #image-to-artist(2026-09-17, 오너 결정): 사용자가 올린 원본은 시트와 별개로 그대로 남는다 — 시트는 이 원본을
                   참조해 만들어졌다는 뜻이다. 원본이 있는 모습에서만 시트 아래에 작게 보인다. */}
               {appearance?.sourceImageUrl && (

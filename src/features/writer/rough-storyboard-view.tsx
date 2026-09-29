@@ -114,12 +114,6 @@ export function RoughStoryboardView() {
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
   const shots = useWriterStore((s) => s.shots)
   const loadProject = useWriterStore((s) => s.loadProject)
-  // 그룹1 W1~W4 — 채팅이 고친 샷·씬을 띠와 카드 테두리로 알리고, 적용·되돌리기를 그 자리에서 받는다.
-  const chatUndo = useWriterStore((s) => s.chatUndo)
-  const undoChatBatch = useWriterStore((s) => s.undoChatBatch)
-  const acknowledgeChatBatch = useWriterStore((s) => s.acknowledgeChatBatch)
-  const [reverting, setReverting] = useState(false)
-  const chatChangedIds = useMemo(() => new Set(chatUndo?.changedIds ?? []), [chatUndo])
   const requestMentionToggle = useChatUiStore((s) => s.requestMentionToggle)
   const sceneShotMentionItems = useMemo(
     () => writerSceneShotMentions(sceneManifest, shots),
@@ -897,47 +891,6 @@ export function RoughStoryboardView() {
         <span className={roughProgress.failed > 0 ? 'text-destructive' : undefined}>{t('Failed')} {roughProgress.failed}</span>
       </div>
 
-      {/* 그룹1 W2 — 마지막 채팅 한 묶음의 변경 띠. 적용을 누를 때까지 바뀐 카드가 노랗게 남는다.
-          수는 고친 것 + 추가·삭제를 합친 것 — 추가만 한 묶음에서 "0개를 고쳤어요"가 나오지 않게. */}
-      {chatUndo && (
-        <div
-          role="status"
-          className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-warning/40 bg-warning/10 px-6 py-2.5 text-sm"
-        >
-          <span>
-            {t('The agent changed {count} items.', {
-              count: chatUndo.changedIds.length + chatUndo.addedOrDeleted,
-            })}
-            {chatUndo.addedOrDeleted > 0 ? t(" Added or deleted items can't be reverted.") : null}
-          </span>
-          <div className="ml-auto flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              disabled={reverting}
-              onClick={() => acknowledgeChatBatch()}
-            >
-              {t('Keep')}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={reverting}
-              onClick={async () => {
-                setReverting(true)
-                try {
-                  await undoChatBatch()
-                } finally {
-                  setReverting(false)
-                }
-              }}
-            >
-              {t('Revert')}
-            </Button>
-          </div>
-        </div>
-      )}
-
       {/* #coverage-first(2026-09-02 오너): 연출 점검 — 영상으로 넘어가기 전에 커버리지 결함
           (반응 없는 다인 비트·리빌 없는 시선 비트·감정 연쇄 단절·급전환)을 보여준다.
           위치 표기는 파이프라인 샷 순번(오너의 "Shot2~3" 셈법과 동일). 메시지는 점검기 산출 데이터. */}
@@ -992,11 +945,7 @@ export function RoughStoryboardView() {
                       toggleSceneCollapsed(scene.sceneId)
                     }}
                     aria-expanded={!sceneCollapsed}
-                    className={cn(
-                      'flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground',
-                      // 그룹1 W1 — 채팅이 고친 씬은 띠를 닫기 전까지 표시를 달고 있는다.
-                      chatChangedIds.has(scene.sceneId) && 'rounded-md px-1.5 py-0.5 ring-2 ring-warning',
-                    )}
+                    className="flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
                   >
                     <ChevronDown
                       className={cn('size-3.5 transition-transform', sceneCollapsed && '-rotate-90')}
@@ -1075,11 +1024,7 @@ export function RoughStoryboardView() {
                             openDetail(shot.shotId)
                           }
                         }}
-                        className={cn(
-                          'group cursor-pointer rounded-xl border bg-card p-2.5 transition-colors duration-100 hover:bg-accent/40 hover-red-beam focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring/50',
-                          // 그룹1 W1 — 채팅이 고친 샷 카드.
-                          chatChangedIds.has(shot.shotId) && 'ring-2 ring-warning',
-                        )}
+                        className="group cursor-pointer rounded-xl border bg-card p-2.5 transition-colors duration-100 hover:bg-accent/40 hover-red-beam focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring/50"
                       >
                         {/* 그림은 카드에 '담긴' 사각형이다(#card-inset 2026-08-11) — 카드 모서리에
                             물려 깎이지 않게 여백을 두르고, 그림 자체엔 라운드를 주지 않는다.

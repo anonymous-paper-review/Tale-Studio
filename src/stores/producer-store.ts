@@ -11,8 +11,6 @@ import { claimAction, releaseAction } from '@/lib/action-guard'
 import { computeProducerSourceHash } from '@/lib/lifecycle'
 import { createPendingProposal } from '@/lib/pending-proposal'
 import { evaluateProducerGate } from '@/lib/producer-gate'
-import { editableSettingPatch, lockedSettingKeys, producerLock } from '@/lib/producer/lock'
-import { readStoryReview } from '@/lib/producer/story-diff'
 import { getWriterEnginePreference } from '@/lib/writer/engine'
 // store 액션·순수 함수는 훅을 못 쓴다 — translate() + 현재 locale 직접 조회로 번역
 //   (writer 배치의 #i18n-s5-batch3 패턴).
@@ -210,8 +208,6 @@ interface ProducerState {
   customStyleAnchor: { url: string; label: string; medium: string | null } | null
   syncing: boolean
   error: string | null
-  /** 그룹1 P9: 잠긴 항목을 고치려 했을 때 남기는 안내. 고장이 아니므로 error(빨간 배너)와 따로 둔다. */
-  lockNotice: string | null
 
   setStoryText: (text: string) => void
   setPreserveScript: (value: boolean | null) => void
@@ -251,9 +247,6 @@ interface ProducerState {
   saveAndHandoff: (options?: { rerun?: boolean }) => Promise<boolean>
   loadProject: () => Promise<void>
   clearError: () => void
-  /** 그룹1 P9: 스토어 쓰기 경로가 없는 조작(완드·제목·붯지 팝업)이 잠겼을 때 이유를 남긴다. */
-  noticeLock: (kind: 'handoff' | 'storyReview') => void
-  clearLockNotice: () => void
   reset: () => void
 }
 
@@ -589,31 +582,6 @@ function persistDraft(projectId: string, draft: ProducerDraft): Promise<void> {
   return pending
 }
 
-// 그룹1 P9 — 잠금 안내는 보드(크롬) 문구라 UI 언어를 따른다. 고장이 아니므로 error 와 따로 둔다.
-function handoffLockNotice(): string {
-  return translate(
-    useLocaleStore.getState().locale,
-    'Locked after handoff. Start a new project to change it.',
-  )
-}
-
-function storyReviewLockNotice(): string {
-  return translate(
-    useLocaleStore.getState().locale,
-    'Format is locked while a story change is under review.',
-  )
-}
-
-/** 그룹1 P6: 지금 산문 변경을 검토 중인가 — 승인 카드에 storyReview 가 실려 있으면 참. */
-function storyReviewPending(): boolean {
-  return readStoryReview(useGlobalChatStore.getState().pendingProposal?.payload) !== null
-}
-
-/** 그룹1 P1: 넘긴 뒤에는 보드의 직접 편집(산문·인물·배경·스타일)이 잠긴다. */
-function boardEditLocked(): boolean {
-  return producerLock(useProjectStore.getState().reachedStage).locked
-}
-
 export const useProducerStore = create<ProducerState>((set, get) => ({
   storyText: '',
   storyReady: false,
@@ -626,14 +594,9 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   customStyleAnchor: null,
   syncing: false,
   error: null,
-  lockNotice: null,
 
   setStoryText: (text) => {
     if (isDemoSession()) return
-    if (boardEditLocked()) {
-      set({ lockNotice: handoffLockNotice() })
-      return
-    }
     // 글이 바뀌면 보존 결정은 그 글에 대한 것이 아니다 — 다시 묻는다(#script-preserve).
     set((s) => ({ storyText: text, preserveScript: s.storyText === text ? s.preserveScript : null }))
     scheduleDraftSave()
@@ -687,11 +650,6 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
 
   setStyleAnchor: async (key) => {
     if (isDemoSession()) return false
-    // P1: Artist 가 이미 이 화풍으로 그림을 만들었다 — 넘긴 뒤에는 바꿀 수 없다.
-    if (boardEditLocked()) {
-      set({ lockNotice: handoffLockNotice() })
-      return false
-    }
     const projectId = useProjectStore.getState().projectId
     const prev = get().styleAnchorKey
     const prevCustom = get().customStyleAnchor
@@ -746,19 +704,8 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
 
   updateSettings: (partial) => {
     if (isDemoSession()) return
-    // P6: 산문 변경을 검토하는 동안에는 포맷 뭃지가 잠긴다 — 어느 산문에 맞춘 포맷인지 흐려진다.
-    if (storyReviewPending()) {
-      set({ lockNotice: storyReviewLockNotice() })
-      return
-    }
-    // P7·P9: 넘긴 뒤에는 러닝타임만 열려 있다. 잠긴 값은 조용히 버리지 않고 이유를 남긴다.
-    const lock = producerLock(useProjectStore.getState().reachedStage)
-    const blocked = lockedSettingKeys(lock, partial)
-    const allowed = editableSettingPatch(lock, partial)
-    if (blocked.length > 0) set({ lockNotice: handoffLockNotice() })
-    if (Object.keys(allowed).length === 0) return
     set((state) => ({
-      projectSettings: { ...state.projectSettings, ...allowed },
+      projectSettings: { ...state.projectSettings, ...partial },
     }))
     scheduleDraftSave()
   },
@@ -781,17 +728,10 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     const afterHandoff = project.reachedStage !== 'producer'
     const affected = extractedAffectsExisting(current, extracted)
     const protectedConflicts = extractedClobbersUserEdited(current, extracted)
-    // 그룹1 P4·P8: 산문이 확정된(storyReady) 뒤에 오는 산문 변경은 넘기기 전이라도 먼저 묻는다.
-    //   살아있는 초안(storyReady 거짓)은 종전대로 바로 반영 — 매 턴 물으면 첫 대화가 멈춘다.
-    const storyUnderReview =
-      current.storyReady === true &&
-      typeof extracted.storyText === 'string' &&
-      extracted.storyText.trim().length > 0 &&
-      extracted.storyText !== current.storyText
-    // 게이트: (핸드오프 후 원천 변경) 또는 (사용자가 직접 손댑 카드 값 덮어쓰기/삭제) 또는 (확정된 산문 변경).
+    // 게이트: (핸드오프 후 원천 변경) 또는 (사용자가 직접 손댄 카드 값 덮어쓰기/삭제).
     //   그 외(빈 칸 채우기·신규 추가·미정 갱신·핸드오프 전 변경)는 즉시 반영해 보드와 동기화한다.
     const needsApproval =
-      (afterHandoff && affected.length > 0) || protectedConflicts.length > 0 || storyUnderReview
+      (afterHandoff && affected.length > 0) || protectedConflicts.length > 0
 
     if (needsApproval) {
       // createPendingProposal/offerPendingProposal 은 범위 밖(global-chat-store.ts) — 그쪽
@@ -799,9 +739,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       //   실측), 여기서 미리 translate() 로 완역해 넘긴다(#i18n-s5-batch3).
       //   제안 카드는 챗 스트림 발화 → 콘텐츠 언어(#i18n-content-voice). error 배너는 크롬 → UI 언어.
       const locale = contentLocale()
-      const impactFields = Array.from(
-        new Set([...affected, ...protectedConflicts, ...(storyUnderReview ? ['storyText'] : [])]),
-      )
+      const impactFields = Array.from(new Set([...affected, ...protectedConflicts]))
       const accepted = useGlobalChatStore.getState().offerPendingProposal(
         createPendingProposal({
           traceId: traceId ?? undefined,
@@ -811,23 +749,12 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
           action: translate(locale, 'Apply story/settings/card changes suggested by chat'),
           impact: [
             translate(locale, 'Changed fields: {fields}', { fields: impactFields.join(', ') }),
-            storyUnderReview
-              ? translate(
-                  locale,
-                  'The changed paragraphs are shown on the board. Nothing is overwritten until you apply.',
-                )
-              : protectedConflicts.length > 0
-                ? translate(locale, 'This overwrites or deletes card values you edited directly.')
-                : translate(locale, 'Existing Writer/Artist output may become stale.'),
+            protectedConflicts.length > 0
+              ? translate(locale, 'This overwrites or deletes card values you edited directly.')
+              : translate(locale, 'Existing Writer/Artist output may become stale.'),
             translate(locale, 'Current Producer values stay in place until you approve.'),
           ],
-          // storyReview 가 실리면 보드는 바뀐 문단을 그리고 승인 카드는 적용·되돌리기 두 버튼만 낸다(P10).
-          payload: storyUnderReview
-            ? {
-                patch: extracted,
-                storyReview: { prev: current.storyText, next: extracted.storyText as string },
-              }
-            : { patch: extracted },
+          payload: { patch: extracted },
         }),
       )
       if (!accepted) {
@@ -878,10 +805,6 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   addCastMember: (entityType) => {
     // 데모(공유) 세션: 읽기전용 — 카드 추가/편집/삭제 무시(로컬 상태도 안 바꿔 "삭제된 척" 방지).
     if (isDemoSession()) return ''
-    if (boardEditLocked()) {
-      set({ lockNotice: handoffLockNotice() })
-      return ''
-    }
     const localId = newLocalId()
     set((state) => ({
       cast: [
@@ -895,10 +818,6 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
 
   updateCastMember: (localId, patch) => {
     if (isDemoSession()) return
-    if (boardEditLocked()) {
-      set({ lockNotice: handoffLockNotice() })
-      return
-    }
     set((state) => ({
       cast: state.cast.map((m) => (m.localId === localId ? { ...m, ...patch, userEdited: true } : m)),
     }))
@@ -907,10 +826,6 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
 
   removeCastMember: (localId) => {
     if (isDemoSession()) return
-    if (boardEditLocked()) {
-      set({ lockNotice: handoffLockNotice() })
-      return
-    }
     set((state) => ({
       cast: state.cast.filter((m) => m.localId !== localId),
     }))
@@ -940,10 +855,6 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
 
   addBackground: () => {
     if (isDemoSession()) return ''
-    if (boardEditLocked()) {
-      set({ lockNotice: handoffLockNotice() })
-      return ''
-    }
     const localId = newLocalId('background')
     set((state) => ({
       backgrounds: [
@@ -957,10 +868,6 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
 
   updateBackground: (localId, patch) => {
     if (isDemoSession()) return
-    if (boardEditLocked()) {
-      set({ lockNotice: handoffLockNotice() })
-      return
-    }
     set((state) => ({
       backgrounds: state.backgrounds.map((background) =>
         background.localId === localId
@@ -973,10 +880,6 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
 
   removeBackground: (localId) => {
     if (isDemoSession()) return
-    if (boardEditLocked()) {
-      set({ lockNotice: handoffLockNotice() })
-      return
-    }
     set((state) => ({
       backgrounds: state.backgrounds.filter((background) => background.localId !== localId),
     }))
@@ -985,11 +888,6 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
 
   saveAndHandoff: async (options) => {
     if (isDemoSession()) return false
-    // P6: 산문 검토가 끝나기 전에 넘기면 Writer 가 어느 산문을 받았는지 알 수 없어진다.
-    if (storyReviewPending()) {
-      set({ lockNotice: storyReviewLockNotice() })
-      return false
-    }
     const { storyText, projectSettings, cast, backgrounds } = get()
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return false
@@ -1294,11 +1192,6 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
 
   clearError: () => set({ error: null }),
 
-  noticeLock: (kind) =>
-    set({ lockNotice: kind === 'storyReview' ? storyReviewLockNotice() : handoffLockNotice() }),
-
-  clearLockNotice: () => set({ lockNotice: null }),
-
   reset: () => {
     cancelDraftSave()
     set({
@@ -1312,7 +1205,6 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       customStyleAnchor: null, // 프로젝트 소속 — 반드시 비운다
       syncing: false,
       error: null,
-      lockNotice: null,
     })
   },
 }))

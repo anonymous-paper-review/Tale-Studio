@@ -10,10 +10,7 @@ import { LocationAppearanceCreateDialog } from '@/features/artist/location-appea
 import { useArtistStore, worldFailureKey, type WorldShotKey } from '@/stores/artist-store'
 import { DEFAULT_LOCATION_APPEARANCE_KEY } from '@/types/asset'
 import { useChatUiStore } from '@/stores/chat-ui-store'
-import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
-import { proposalTargetsCard, proposalUndoTargetsCard } from '@/lib/artist/proposal-target'
-import { useIsDemo } from '@/hooks/use-is-demo'
 import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
 import { cn } from '@/lib/utils'
 import { createWheelNotchStepper } from '@/lib/wheel-notch'
@@ -49,10 +46,6 @@ export function WorldPanel({
     shot: WorldShotKey
     appearanceKey: string | null
   } | null>(null)
-  // A1(2026-09-28): 에이전트 제안이 대기 중인 배경 카드는 모습 추가와 팝업 열기를 잠그고 표시를 붙인다.
-  const pendingProposal = useGlobalChatStore((s) => s.pendingProposal)
-  const proposalUndo = useArtistStore((s) => s.proposalUndo)
-  const isDemo = useIsDemo()
   // 약속 C10: 카드 안에서 고른 모습(기본 = 'default'). 캐릭터 카드의 pickedAppearance 와 같다.
   const [createFor, setCreateFor] = useState<string | null>(null)
 
@@ -105,9 +98,6 @@ export function WorldPanel({
             const selectedCandidate = candidates.find((c) => c.isSelected)
             const descriptionChanged = classifyWorldImageStale(variant ? variant.visualDescription : world.visualDescription, selectedCandidate) !== 'fresh'
             const failed = !!worldFailures[worldFailureKey(world.locationId, variantKey)]
-            // A1: 이 카드를 가리키는 승인 카드가 대기 중인가. A2: 방금 적용된 변경을 되돌릴 수 있는가.
-            const proposalPending = proposalTargetsCard(pendingProposal, { locationId: world.locationId })
-            const undoHere = !isDemo && proposalUndoTargetsCard(proposalUndo, { locationId: world.locationId })
 
             return (
               <div
@@ -137,7 +127,6 @@ export function WorldPanel({
                 }}
                 // 더블 클릭 = 사진 클릭과 동일(#d5 2026-08-03) — 프롬프트/재생성 팝업
                 onDoubleClick={() => {
-                  if (proposalPending) return
                   noteSelection(world.locationId, variantKey ?? DEFAULT_LOCATION_APPEARANCE_KEY, 'image')
                   setViewDialog({ locationId: world.locationId, shot: 'wideShot', appearanceKey: variantKey })
                 }}
@@ -154,16 +143,10 @@ export function WorldPanel({
                     : 'border-border hover:bg-accent/50',
                   mentionedLocationIds.has(world.locationId) &&
                     'mention-flash ring-2 ring-sky-400/70 border-sky-400/50 bg-sky-400/10',
-                  proposalPending && 'ring-2 ring-warning',
                 )}
               >
                 <div className="mb-3 flex items-center gap-2">
                   <span className="min-w-0 flex-1 truncate font-medium">{world.name}</span>
-                  {proposalPending && (
-                    <Badge variant="outline" className="border-warning/50 bg-warning/10 text-[10px] text-warning">
-                      {t('Agent proposal under review')}
-                    </Badge>
-                  )}
                   {failed && (
                     <Badge variant="destructive" className="text-[10px]">
                       {t('Image failed')}
@@ -202,13 +185,9 @@ export function WorldPanel({
                   })}
                   <button
                     type="button"
-                    disabled={proposalPending}
                     onClick={() => setCreateFor(world.locationId)}
-                    className={cn(
-                      'rounded-md border border-dashed border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors',
-                      proposalPending ? 'cursor-not-allowed opacity-50' : 'hover:bg-accent',
-                    )}
-                    title={proposalPending ? t('Decide on the proposal in chat first.') : t('Add appearance')}
+                    className="rounded-md border border-dashed border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent"
+                    title={t('Add appearance')}
                   >
                     {t('+ Add appearance')}
                   </button>
@@ -217,18 +196,13 @@ export function WorldPanel({
                 {/* 배경 = 이미지 1장(#6·#9): establishing 셀 제거, wide 1컷만. 클릭 → 프롬프트/재생성 Dialog. */}
                 <button
                   type="button"
-                  disabled={proposalPending}
-                  title={proposalPending ? t('Decide on the proposal in chat first.') : t('Background: click to view or regenerate the prompt')}
+                  title={t('Background: click to view or regenerate the prompt')}
                   onClick={(e) => {
                     e.stopPropagation()
-                    if (proposalPending) return
                     noteSelection(world.locationId, variantKey ?? DEFAULT_LOCATION_APPEARANCE_KEY, 'image')
                     setViewDialog({ locationId: world.locationId, shot: 'wideShot', appearanceKey: variantKey })
                   }}
-                  className={cn(
-                    'block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                    proposalPending ? 'cursor-not-allowed' : 'hover-red-beam',
-                  )}
+                  className="block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
                 >
                   <ImagePlaceholder
                     label={t('Background')}
@@ -238,32 +212,6 @@ export function WorldPanel({
                     hideCaption
                   />
                 </button>
-
-                {/* A2(2026-09-28): 승인해 저장된 글 변경 한 건은 이전 문장으로 돌릴 수 있다. */}
-                {undoHere && (
-                  <div
-                    className="mt-2 flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2 py-1"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <span className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
-                      {t("Applied the agent's change.")}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => { void useArtistStore.getState().undoLastProposal() }}
-                      className="rounded-md border border-border px-2 py-0.5 text-[11px] font-medium transition-colors hover:bg-accent"
-                    >
-                      {t('Revert')}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => useArtistStore.getState().clearProposalUndo()}
-                      className="rounded-md px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent"
-                    >
-                      {t('OK')}
-                    </button>
-                  </div>
-                )}
 
                 {/* 카드 생성 버튼 제거(약속 B2, 2026-09-04) — 캐릭터 카드와 같이 생성/재생성은 팝업과 채팅으로만. */}
               </div>
