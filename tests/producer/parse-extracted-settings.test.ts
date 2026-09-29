@@ -7,6 +7,35 @@ const hasJsonLeak = (reply: string) =>
   /extractedSettings/.test(reply) || /```/.test(reply) || /\{\s*"/.test(reply)
 
 describe('parseExtractedSettings (C8 답변에는 설정 형식이 보이지 않음)', () => {
+  it('채팅에서 스타일을 선택하면 단독 형식으로 온 선택도 읽는다', () => {
+    // 왜: 스타일 안내 예시를 따라 답한 모델의 선택이 버려져 팝업과 미정 뱃지가 남았다.
+    const result = parseExtractedSettings('실사로 설정했어요.\n```json\n{"styleAnchorKey":"real"}\n```')
+    expect(result).toEqual({ reply: '실사로 설정했어요.', extractedSettings: { styleAnchorKey: 'real' } })
+  })
+
+  it('첨부 그림체를 선택하면 단독 형식으로 온 선택도 읽는다', () => {
+    // 왜: 첨부 스타일 예시도 선택을 감싸지 않는 형식이어서 저장되지 않았다.
+    const styleAnchorFromAttachment = { imageIndex: 0, label: '수채화', medium: 'watercolor' }
+    const result = parseExtractedSettings(`이 그림체로 설정했어요.\n${JSON.stringify({ styleAnchorFromAttachment })}`)
+    expect(result).toEqual({ reply: '이 그림체로 설정했어요.', extractedSettings: { styleAnchorFromAttachment } })
+  })
+
+  it('단독 스타일 선택에 다른 항목이 섞이면 스타일 항목만 읽는다', () => {
+    // 왜: 스타일 형식 호환을 이유로 별개 명령이나 임의 설정까지 받아들이면 안 된다.
+    expect(parseExtractedSettings('```json\n{"styleAnchorKey":"real","deleteProject":true,"genre":"horror"}\n```').extractedSettings)
+      .toEqual({ styleAnchorKey: 'real' })
+  })
+
+  it('정상 설정 뒤에 잘못된 설정이 오면 앞서 읽은 선택을 유지한다', () => {
+    // 왜: 여러 설정 블록 중 잘못된 마지막 블록이 저장할 스타일을 지우면 안 된다.
+    for (const invalid of [null, 'real', []]) {
+      const valid = '실사로 설정했어요.\n```json\n{"extractedSettings":{"styleAnchorKey":"real"}}\n```'
+      for (const suffix of [JSON.stringify({ extractedSettings: invalid }), `\n\`\`\`json\n${JSON.stringify({ extractedSettings: invalid })}\n\`\`\``]) {
+        expect(parseExtractedSettings(valid + '\n' + suffix)).toEqual({ reply: '실사로 설정했어요.', extractedSettings: { styleAnchorKey: 'real' } })
+      }
+    }
+  })
+
   it('답변 뒤에 설정 형식이 붙어도 사용자에게는 자연스러운 문장만 보여준다', () => {
     const text = '좋아요! 설정할게요.\n\n```json\n{"extractedSettings": {"genre": "thriller"}}\n```'
     const { reply, extractedSettings } = parseExtractedSettings(text)

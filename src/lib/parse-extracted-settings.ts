@@ -9,12 +9,24 @@
 
 type Parsed = { reply: string; extractedSettings: Record<string, unknown> }
 
+function extractedFromObject(parsed: unknown): Record<string, unknown> | null {
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+  const record = parsed as Record<string, unknown>
+  if ('extractedSettings' in record) {
+    const settings = record.extractedSettings
+    return settings && typeof settings === 'object' && !Array.isArray(settings)
+      ? settings as Record<string, unknown>
+      : null
+  }
+  // 이전 스타일 예시는 이 두 필드를 최상위에 두었다. 다른 항목까지 설정으로 해석하지 않는다.
+  const style = Object.fromEntries(Object.entries(record).filter(([key]) =>
+    key === 'styleAnchorKey' || key === 'styleAnchorFromAttachment'))
+  return Object.keys(style).length ? style : null
+}
+
 function takeExtracted(body: string, current: Record<string, unknown>): Record<string, unknown> {
   try {
-    const parsed = JSON.parse(body.trim()) as { extractedSettings?: unknown }
-    if (parsed && typeof parsed === 'object' && parsed.extractedSettings && typeof parsed.extractedSettings === 'object') {
-      return parsed.extractedSettings as Record<string, unknown>
-    }
+    return extractedFromObject(JSON.parse(body.trim())) ?? current
   } catch {
     /* 깨진 JSON: 무시(추출 안 함). reply에서는 아래에서 제거된다. */
   }
@@ -45,11 +57,10 @@ export function parseExtractedSettings(text: string): Parsed {
     const tail = reply.slice(i).trim()
     if (!tail.endsWith('}')) continue
     try {
-      const parsed = JSON.parse(tail) as { extractedSettings?: unknown }
-      if (parsed && typeof parsed === 'object' && 'extractedSettings' in parsed) {
-        if (parsed.extractedSettings && typeof parsed.extractedSettings === 'object') {
-          extractedSettings = parsed.extractedSettings as Record<string, unknown>
-        }
+      const object: unknown = JSON.parse(tail)
+      const parsed = extractedFromObject(object)
+      if (parsed || (object && typeof object === 'object' && 'extractedSettings' in object)) {
+        extractedSettings = parsed ?? extractedSettings
         reply = reply.slice(0, i).trim()
         break
       }

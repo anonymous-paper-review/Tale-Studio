@@ -492,6 +492,7 @@ async function applyStyleAnchorIntent(
       body: JSON.stringify({ projectId, imageUrl, label, medium }),
     })
     const body = await res.json().catch(() => ({}))
+    if (useProjectStore.getState().projectId !== projectId) return null
     if (!res.ok) return typeof body.error === 'string' ? body.error : `HTTP ${res.status}`
 
     useProducerStore.getState().applyCustomStyleAnchor({
@@ -1581,7 +1582,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
 
       if (dialogueTarget) reply = translate(contentLocale(), 'Checking all dialogue and saving each completed scene before continuing.')
       set((state) => ({
-        loading: !!dialogueTarget || !!waitForLegacy,
+        loading: stage === 'producer' || !!dialogueTarget || !!waitForLegacy,
         lastTrace: trace,
         messages: [
           ...state.messages,
@@ -1624,6 +1625,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
               attachmentImageUrls ?? [],
               projectId,
             )
+        if (!isCurrentSession()) return
         if (anchorError) {
           patchTrace({ skippedCount: 1 })
           // 모델은 이미 "이 화풍으로 잡았어요"라고 답했다. 저장이 실패했는데 조용하면 거짓말이 된다.
@@ -2303,6 +2305,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         })
       }
     } finally {
+      if (stage === 'producer' && isCurrentSession()) set({ loading: false })
       if (activeGeneration === controller) activeGeneration = null
     }
   },

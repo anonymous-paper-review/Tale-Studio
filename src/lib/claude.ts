@@ -4,9 +4,13 @@ import { CHAT_COMPACTION_TRIGGER_TOKENS } from './constants'
 import type { ChatLlmUsage } from './chat-trace'
 import { parseChatModelSettings, type ChatModelSettings } from './chat-model-settings'
 import { CHAT_TOOL_GUIDE, type ChatToolContext } from './chat-tools/protocol'
-import type { BetaMessageParam } from '@anthropic-ai/sdk/resources/beta/messages/messages'
+import type { BetaMessageParam, MessageCreateParamsNonStreaming } from '@anthropic-ai/sdk/resources/beta/messages/messages'
 
-const MODEL = 'claude-sonnet-4-6'
+const MODEL = 'claude-sonnet-5-5'
+const MAX_OUTPUT_TOKENS = 32000
+// 도구 후 최신 프로젝트/이미지 문맥을 재조립하므로 이전 문맥에 묶인 사고만 API에서 제외한다.
+// SDK 0.80 타입에는 block_binding이 없지만 원본 블록은 그대로 전달하는 공식 beta 필드다.
+const CHAT_THINKING = { type: 'adaptive', block_binding: { prefix_mismatch_behavior: 'drop_block' } } as const
 
 let _client: Anthropic | null = null
 function getClient(): Anthropic {
@@ -45,7 +49,7 @@ export async function claudeChat(
   system: string,
   history: HistoryMessage[],
   userMessage: string,
-  temperature = 0.7,
+  _temperature = 0.7,
   label = 'chat',
   // #p4-websearch(2026-08-06): 서버 웹서치 툴 — 오마쥬/레퍼런스 요청("기생충 계단 씬처럼")을
   //   실제 검색으로 접지. 서버 실행 툴이라 tool loop 불필요, 응답에 검색 블록이 끼어도
@@ -62,6 +66,8 @@ export async function claudeChat(
     modelSettings?: ChatModelSettings
   },
 ): Promise<string> {
+  // 기존 호출 순서는 유지하지만 Claude 5.5가 지원하지 않는 temperature는 보내지 않는다.
+  void _temperature
   const modelSettings = parseChatModelSettings(opts?.modelSettings)
   if (!modelSettings) throw new Error('Invalid chat model settings')
   const imageUrls = opts?.imageUrls ?? []
@@ -85,19 +91,14 @@ export async function claudeChat(
   ]
 
   const t0 = performance.now()
-  const response = await getClient().beta.messages.create({
+  const request: MessageCreateParamsNonStreaming = {
     model: modelSettings.model,
-    // #p4-json-guard(2026-08-11): 4096 → 8192. 채팅은 답변 산문과 변경(updates) 블록이 이 한 장을
-    //   나눠 쓰는데, 변경 1건이 약 83tok(실측)이라 4096 에서는 48건 근처에서 잘렸다(76샷 일괄
-    //   요청 유실 사고의 원인). 한도는 상한일 뿐이라 짧은 답변의 비용·지연은 그대로다.
-    max_tokens: 8192,
+    // 사고 토큰도 출력 한도를 쓰므로 사고와 답변을 위한 여유를 둔다. 실제 생성한 토큰만 청구된다.
+    max_tokens: MAX_OUTPUT_TOKENS,
     system: system + (opts?.appTools ? CHAT_TOOL_GUIDE : ''),
     messages,
-    ...(opts?.modelSettings ? {
-      output_config: { effort: modelSettings.effort },
-      thinking: { type: modelSettings.thinking === 'adaptive' ? 'adaptive' as const : 'disabled' as const },
-    } : {}),
-    ...(modelSettings.thinking === 'adaptive' ? {} : { temperature }),
+    output_config: { effort: modelSettings.effort },
+    thinking: CHAT_THINKING,
     ...(opts?.webSearch || opts?.appTools
       ? { tools: [
           ...(opts?.webSearch ? [{ type: 'web_search_20250305' as const, name: 'web_search' as const, max_uses: 3 }] : []),
@@ -108,15 +109,14 @@ export async function claudeChat(
     //   마지막 cacheable block(= 마지막 user 턴)에 breakpoint를 둔다. 다음 턴에는 그 이전
     //   prefix(system + 이전 히스토리)가 캐시 read 대상이 되어 2턴째부터 입력 비용/지연이 준다.
     //   캐시 무효 방지: volatile 컨텍스트(canvasContext/currentSettings/에셋 요약)는 라우트에서
-    //   이미 마지막 user 턴에 prepend하므로 system prefix는 안정적이다. Sonnet 4.6 최소 캐시
-    //   prefix 2048 토큰 — 짧은 초기 대화는 silent 미캐시(에러 아님).
+    //   이미 마지막 user 턴에 prepend하므로 system prefix는 안정적이다.
     cache_control: { type: 'ephemeral' },
     // 서버사이드 compaction 안전망 (chat-context-management Phase 2) — 단일 요청 입력이
     //   600K 토큰(1M 창의 60%)에 닿으면 API가 과거 이력을 요약 블록으로 압축해 brick(컨텍스트
     //   한도 400)을 막는다. 평소엔 윈도잉으로 입력이 수만 토큰이라 트리거에 안 닿는 — 병리적
     //   장기 세션 전용 보험. 캐리오버(블록 영속화)는 안전망 용도엔 불필요해 미적용(매 턴 history는
     //   DB에서 윈도잉 재조립 → 압축 요약을 재전송하지 않으나, 그 경로에선 트리거에 닿지 않음).
-    betas: ['compact-2026-01-12'],
+    betas: ['compact-2026-01-12', 'thinking-binding-controls-2026-08-01'],
     context_management: {
       edits: [
         {
@@ -128,7 +128,9 @@ export async function claudeChat(
         },
       ],
     },
-  }, { signal: opts?.signal })
+  }
+  // 32k 요청은 SDK가 비스트리밍으로 받지 않는다. 완성된 메시지까지 모아 기존 반환 계약을 유지한다.
+  const response = await getClient().beta.messages.stream(request, { signal: opts?.signal }).finalMessage()
   const u = response.usage
   const durationMs = performance.now() - t0
   logTiming(
@@ -143,10 +145,6 @@ export async function claudeChat(
     .map((b) => b.text)
     .join('')
   const hasToolTurn = opts?.appTools && (response.content.some(b => b.type === 'tool_use') || response.stop_reason === 'pause_turn')
-  if (hasToolTurn) {
-    opts.appTools!.turn = { content: response.content as unknown as import('./chat-tools/protocol').ToolBlock[], stopReason: response.stop_reason ?? '' }
-  }
-
   const usage: ChatLlmUsage = {
     model: response.model,
     durationMs,
@@ -165,7 +163,10 @@ export async function claudeChat(
     // Usage reporting must never turn a successful chat response into a failure.
   }
 
-  if (response.stop_reason === 'max_tokens' && !hasToolTurn) throw new Error('Chat response reached its output limit. The response was not completed; retry with lower effort or thinking off.')
+  if (response.stop_reason === 'max_tokens') throw new Error('Chat response reached its output limit. The response was not completed; retry with lower effort.')
+  if (hasToolTurn) {
+    opts.appTools!.turn = { content: response.content as unknown as import('./chat-tools/protocol').ToolBlock[], stopReason: response.stop_reason ?? '' }
+  }
   if (!text && !hasToolTurn) throw new Error('Unexpected response type')
   return text
 }
@@ -174,28 +175,33 @@ export async function claudeChat(
 export async function claudeJSON<T = unknown>(
   system: string,
   userMessage: string,
-  temperature = 0.3,
+  _temperature = 0.3,
   label = 'json',
 ): Promise<T> {
+  void _temperature
   const t0 = performance.now()
-  const response = await getClient().messages.create({
+  const response = await getClient().messages.stream({
     model: MODEL,
-    max_tokens: 8192,
+    max_tokens: MAX_OUTPUT_TOKENS,
     system: `${system}\n\nIMPORTANT: Output ONLY valid JSON. No markdown fences, no explanation.`,
     messages: [{ role: 'user', content: userMessage }],
-    temperature,
-  })
+    thinking: { type: 'adaptive' },
+  }).finalMessage()
   const u = response.usage
   logTiming(
     'llm',
     `${label} model=${MODEL} in=${u.input_tokens} out=${u.output_tokens} ${(performance.now() - t0).toFixed(0)}ms`,
   )
 
-  const block = response.content[0]
-  if (block.type !== 'text') throw new Error('Unexpected response type')
+  if (response.stop_reason === 'max_tokens') throw new Error('JSON response reached its output limit. The response was not completed.')
+  const body = response.content
+    .filter((block): block is Extract<(typeof response.content)[number], { type: 'text' }> => block.type === 'text')
+    .map((block) => block.text)
+    .join('')
+  if (!body) throw new Error('Unexpected response type')
 
   // Strip markdown fences if present
-  const text = block.text
+  const text = body
     .replace(/^```json\s*/m, '')
     .replace(/^```\s*/m, '')
     .replace(/\s*```\s*$/m, '')

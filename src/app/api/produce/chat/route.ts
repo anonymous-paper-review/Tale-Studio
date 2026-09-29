@@ -120,7 +120,7 @@ export async function POST(req: Request) {
     })
     const contextParts: string[] = []
     contextParts.push(dialogueLanguage
-      ? `[Dialogue Language Decision]\n${dialogueLanguage}\nThe user confirmed this dialogue language. Use this exact code for dialogueLanguage. Never infer a different language from the setting, country, names, visual style, or chat language.`
+      ? `[Dialogue Language Decision]\n${dialogueLanguage}\nThe user confirmed this dialogue language. Use this exact code for dialogueLanguage. Do not ask the user to confirm this language again. Never infer a different language from the setting, country, names, visual style, or chat language.`
       : '[Dialogue Language Decision]\nUNDECIDED\nThe user has not confirmed a dialogue language. Omit dialogueLanguage from extractedSettings. Ask the user in the ongoing conversation before confirming it; at most one focused question per reply. If this reply already asks about another missing detail, leave dialogue language unresolved for a later turn.')
     if (storyText) {
       contextParts.push(`[Current Story Text]\n${storyText}`)

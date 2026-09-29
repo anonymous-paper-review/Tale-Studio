@@ -797,6 +797,9 @@ export function GlobalChat() {
   const [stylePickerProjectId, setStylePickerProjectId] = useState<string | null>(null)
   const stylePickerOpen = !!projectId && stylePickerProjectId === projectId && currentStage === 'producer'
   useEffect(() => { setStylePickerProjectId(null) }, [projectId, currentStage])
+  useEffect(() => {
+    if (styleAnchorKey) setStylePickerProjectId(null)
+  }, [styleAnchorKey])
   const stylePickerRequest = useChatUiStore((s) => s.stylePickerRequest)
   const consumeStylePicker = useChatUiStore((s) => s.consumeStylePicker)
   useEffect(() => {

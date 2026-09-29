@@ -6,12 +6,15 @@ import type { ChatModelSettings } from '@/lib/chat-model-settings'
 
 const sdk = vi.hoisted(() => ({ chat: vi.fn(), json: vi.fn() }))
 vi.mock('@anthropic-ai/sdk', () => ({ default: class {
-  beta = { messages: { create: sdk.chat } }
-  messages = { create: sdk.json }
+  beta = { messages: {
+    create: sdk.chat,
+    stream: (...args: unknown[]) => ({ finalMessage: () => sdk.chat(...args) }),
+  } }
+  messages = { create: sdk.json, stream: (...args: unknown[]) => ({ finalMessage: () => sdk.json(...args) }) }
 } }))
 vi.mock('@/lib/timing', () => ({ logTiming: vi.fn() }))
 const answer = (content: unknown[], stop_reason = 'end_turn') => ({
-  model: 'claude-sonnet-4-6', content, stop_reason,
+  model: 'claude-sonnet-5-5', content, stop_reason,
   usage: { input_tokens: 10, output_tokens: 20, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
 })
 beforeEach(() => {
@@ -20,18 +23,17 @@ beforeEach(() => {
 })
 
 describe('채팅 모델 설정의 실제 호출', () => {
-  it('모든 지원 조합을 그대로 보내고 thinking 자동에서는 temperature를 보내지 않는다', async () => {
-    // 왜: 모델 선택 UI가 실제 요청을 바꾸며 자동 사고와 충돌하는 샘플링 설정을 제거해야 한다.
-    for (const model of ['claude-sonnet-4-6', 'claude-opus-4-6'] as const)
+  it('5.5 모델을 선택하면 자동 사고와 선택한 effort를 보내고 temperature는 보내지 않는다', async () => {
+    // 왜: 5.5는 사고 끄기와 temperature를 지원하지 않아 이전 설정을 보내면 요청이 거절된다.
+    for (const model of ['claude-sonnet-5-5', 'claude-opus-5-5'] as const)
       for (const effort of ['low', 'medium', 'high', 'max'] as const)
-        for (const thinking of ['off', 'adaptive'] as const) {
+        for (const thinking of ['adaptive'] as const) {
           const modelSettings: ChatModelSettings = { model, effort, thinking }
           const onUsage = vi.fn()
           await claudeChat('도와주세요', [], '현재 설정을 알려줘', 0.7, 'test', { modelSettings, onUsage })
           const request = sdk.chat.mock.calls.at(-1)![0]
-          expect(request).toMatchObject({ model, output_config: { effort }, thinking: { type: thinking === 'off' ? 'disabled' : 'adaptive' } })
-          if (thinking === 'adaptive') expect(request).not.toHaveProperty('temperature')
-          else expect(request.temperature).toBe(0.7)
+          expect(request).toMatchObject({ model, output_config: { effort }, thinking: { type: 'adaptive' } })
+          expect(request).not.toHaveProperty('temperature')
           expect(onUsage).toHaveBeenCalledWith(expect.objectContaining({ effort, thinking }))
         }
   })
@@ -41,7 +43,7 @@ describe('채팅 모델 설정의 실제 호출', () => {
       { type: 'redacted_thinking', data: 'opaque-data' },
       { type: 'tool_use', id: 'read', name: 'read_project', input: { resource: 'settings' } }]
     sdk.chat.mockResolvedValueOnce(answer(content, 'tool_use'))
-    const modelSettings: ChatModelSettings = { model: 'claude-opus-4-6', effort: 'high', thinking: 'adaptive' }
+    const modelSettings: ChatModelSettings = { model: 'claude-opus-5-5', effort: 'high', thinking: 'adaptive' }
     const appTools = prepareChatTools('producer', true, [])!
     await claudeChat('도와주세요', [], '언어를 알려줘', 0.7, 'test', { modelSettings, appTools })
     expect(appTools.turn?.content).toEqual(content)
@@ -55,11 +57,48 @@ describe('채팅 모델 설정의 실제 호출', () => {
     sdk.chat.mockResolvedValueOnce(answer([{ type: 'text', text: '{"reply":"변경했어요"' }], 'max_tokens'))
     await expect(claudeChat('도와주세요', [], '고쳐줘')).rejects.toThrow(/output limit/i)
   })
-  it('채팅에서 Opus를 선택해도 별도 JSON 생성 모델은 기존 Sonnet을 유지한다', async () => {
-    // 왜: 채팅 실험이 Writer 생성 등 다른 모델 호출에 영향을 주면 안 된다.
-    await claudeChat('도와주세요', [], '안녕', 0.7, 'test', { modelSettings: { model: 'claude-opus-4-6', effort: 'high', thinking: 'adaptive' } })
+  it('도구 실행 뒤 프로젝트 문맥이 바뀌면 원본 응답을 보존하고 호환되지 않는 사고만 제외하도록 요청한다', async () => {
+    // 왜: 도구 실행 후 최신 설정과 이미지를 다시 읽으면 5.5의 이전 사고 서명이 거절되어 대화가 끊길 수 있다.
+    for (const model of ['claude-sonnet-5-5', 'claude-opus-5-5'] as const) {
+      const content = [
+        { type: 'thinking', thinking: '', signature: 'opaque-signature' },
+        { type: 'tool_use', id: 'read', name: 'read_project', input: { resource: 'settings' } },
+      ]
+      const original = structuredClone(content)
+      const modelSettings: ChatModelSettings = { model, effort: 'high', thinking: 'adaptive' }
+      sdk.chat.mockResolvedValueOnce(answer(content, 'tool_use'))
+      const appTools = prepareChatTools('producer', true, [])!
+      await claudeChat('현재 설정을 읽으세요.', [], '대사 언어: 미정', 0.7, 'test', { modelSettings, appTools })
+      const messages = [
+        { role: 'assistant', content: appTools.turn!.content },
+        { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'read', content: '{"dialogueLanguage":"ko"}' }] },
+      ]
+      await claudeChat('갱신된 설정을 읽으세요.', [], '대사 언어: 한국어', 0.7, 'test', {
+        modelSettings, appTools: prepareChatTools('producer', true, messages),
+      })
+      const request = sdk.chat.mock.calls.at(-1)![0]
+      expect(request.thinking).toEqual({ type: 'adaptive', block_binding: { prefix_mismatch_behavior: 'drop_block' } })
+      expect(request.betas).toEqual(expect.arrayContaining(['compact-2026-01-12', 'thinking-binding-controls-2026-08-01']))
+      expect(request.messages.slice(-2)).toEqual(messages)
+      expect(content).toEqual(original)
+    }
+  })
+  it('채팅에서 Opus를 선택해도 별도 JSON 생성은 Sonnet 5.5를 사용한다', async () => {
+    // 왜: 내부 문서 생성도 5.5로 옮기되 채팅 선택값으로 모델 계열이 바뀌면 안 된다.
+    await claudeChat('도와주세요', [], '안녕', 0.7, 'test', { modelSettings: { model: 'claude-opus-5-5', effort: 'high', thinking: 'adaptive' } })
     await claudeJSON('JSON', '생성')
-    expect(sdk.json.mock.calls[0][0].model).toBe('claude-sonnet-4-6')
-    expect(sdk.json.mock.calls[0][0]).not.toHaveProperty('thinking')
+    expect(sdk.json.mock.calls[0][0].model).toBe('claude-sonnet-5-5')
+    expect(sdk.json.mock.calls[0][0]).toMatchObject({ thinking: { type: 'adaptive' }, max_tokens: 32000 })
+    expect(sdk.json.mock.calls[0][0]).not.toHaveProperty('temperature')
+  })
+  it('JSON 생성에 사고 블록이 있으면 본문만 해석하고 잘린 결과는 거절한다', async () => {
+    // 왜: 5.5의 사고 블록을 JSON으로 해석하거나 한도에서 잘린 문서를 완성본으로 쓰면 안 된다.
+    sdk.json.mockResolvedValueOnce(answer([
+      { type: 'thinking', thinking: 'test only', signature: 'opaque' },
+      { type: 'text', text: '{"ok":' }, { type: 'text', text: 'true}' },
+    ]))
+    await expect(claudeJSON('JSON', '생성')).resolves.toEqual({ ok: true })
+    sdk.json.mockResolvedValueOnce(answer([{ type: 'text', text: '{"ok":true}' }], 'max_tokens'))
+    await expect(claudeJSON('JSON', '생성')).rejects.toThrow(/output limit/i)
   })
 })

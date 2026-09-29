@@ -608,6 +608,8 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   loadStyleAnchors: async () => {
+    const selectedKey = get().styleAnchorKey
+    const selectedCustom = get().customStyleAnchor
     const projectId = useProjectStore.getState().projectId
     try {
       // style_anchors 는 전역 공개 카탈로그 → 데모(공유) 세션에서도 실 anon 으로 읽는다(스냅샷 미포함,
@@ -637,11 +639,13 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
           previewUrl: a.preview_url ?? null,
           subtitle: a.subtitle ?? null,
         })),
-        styleAnchorKey:
-          (projRes.data as { style_anchor_key?: string | null } | null)?.style_anchor_key || null,
-        customStyleAnchor: parseCustomAnchorRow(
-          (projRes.data as { custom_style_anchor?: unknown } | null)?.custom_style_anchor,
-        ),
+        ...(useProjectStore.getState().projectId === projectId && get().styleAnchorKey === selectedKey && get().customStyleAnchor === selectedCustom ? {
+          styleAnchorKey:
+            (projRes.data as { style_anchor_key?: string | null } | null)?.style_anchor_key || null,
+          customStyleAnchor: parseCustomAnchorRow(
+            (projRes.data as { custom_style_anchor?: unknown } | null)?.custom_style_anchor,
+          ),
+        } : {}),
       })
     } catch (err) {
       console.error('[producer-store] style anchors load failed:', err)

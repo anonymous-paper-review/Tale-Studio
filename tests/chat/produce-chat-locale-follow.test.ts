@@ -150,4 +150,29 @@ describe('Producer 채팅과 언어 규칙', () => {
     }))
     expect((await response.json()).extractedSettings.dialogueLanguage).toBe('ja')
   })
+
+  it('대사 언어 질문에 한국어(ko)라고 답하면 다시 묻지 않도록 확정하고 화면에 반영한다', async () => {
+    // 왜: 사용자의 명시적 답변을 놓치면 서버가 모델의 한국어 설정까지 지워 뱃지가 미정으로 남는다.
+    const response = await POST(request({
+      projectId: 'p1', message: '한국어(ko)', currentSettings: { dialogueLanguage: '' },
+      history: [{ role: 'model', content: '대사 언어는 어떤 언어로 할까요?' }],
+    }))
+    expect((await response.json()).extractedSettings.dialogueLanguage).toBe('ko')
+    expect(mocks.llmChat.mock.calls[0][2]).toContain('[Dialogue Language Decision]\nko\n')
+    expect(mocks.llmChat.mock.calls[0][2]).toContain('Do not ask the user to confirm this language again.')
+  })
+
+  it('앞서 답한 대사 언어가 누락됐으면 다음 대화에서도 확정한 언어를 화면에 돌려준다', async () => {
+    // 왜: 고장 전에 선택한 한국어도 새 질문에 다시 답하지 않고 현재 대화에서 복구되어야 한다.
+    const response = await POST(request({
+      projectId: 'p1', message: '실사로 해줘', currentSettings: { dialogueLanguage: '' },
+      history: [
+        { role: 'model', content: '대사 언어는 어떤 언어로 할까요?' },
+        { role: 'user', content: '한국어(ko)' },
+        { role: 'model', content: '어떤 스타일로 할까요?' },
+      ],
+    }))
+    expect((await response.json()).extractedSettings.dialogueLanguage).toBe('ko')
+    expect(mocks.llmChat.mock.calls[0][2]).not.toContain('[Dialogue Language Decision]\nUNDECIDED')
+  })
 })

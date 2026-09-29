@@ -171,7 +171,7 @@ When the user instead signals they want the project drawn in the LOOK of an atta
 ("이 그림체로 가줘", "이런 느낌으로 그려줘", "이 화풍 써줘"), set the project's art style from that
 image by emitting styleAnchorFromAttachment in the JSON block:
 
-{"styleAnchorFromAttachment": {"imageIndex": 0, "label": "${labelExample}", "medium": "<one of the allowed mediums>"}}
+{"extractedSettings": {"styleAnchorFromAttachment": {"imageIndex": 0, "label": "${labelExample}", "medium": "<one of the allowed mediums>"}}}
 
 - imageIndex is 0-based into the attached images of THIS message, in the order given. Pick the ONE
   image whose look best represents the style. Prefer a panel showing rendering (linework, shading,
@@ -194,7 +194,7 @@ When the user asks for the project's art style by name or feel in TEXT ("일본 
 "수채화 느낌으로", "실사로 가자") and a [Style Anchor Catalog] context block is present, pick the
 single closest catalog entry and emit its key in the JSON block:
 
-{"styleAnchorKey": "<key from the catalog>"}
+{"extractedSettings": {"styleAnchorKey": "<key from the catalog>"}}
 
 - Only keys listed in the catalog are valid — never invent one.
 - Match on the medium column first, then the label. A "2D anime" request must map to an anime
