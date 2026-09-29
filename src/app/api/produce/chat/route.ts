@@ -1,5 +1,6 @@
 import { CHAT_AGENT_GUIDE, buildChatTaskContext, normalizeChatHistory } from '@/lib/chat-harness'
 import { parseChatModelSettings } from '@/lib/chat-model-settings'
+import { withChatRecovery, chatRecoveryErrorPayload, type ChatRecoveryContext } from '@/lib/chat-response-server'
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
@@ -30,7 +31,13 @@ import { persistChatTraceBestEffort } from '@/lib/chat-trace-server'
 const normalizeHistory = normalizeChatHistory
 
 
+export const maxDuration = 300
+
 export async function POST(req: Request) {
+  return withChatRecovery(req, (context) => handlePost(req, context))
+}
+
+async function handlePost(req: Request, context: ChatRecoveryContext) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
   let llmUsage: ChatLlmUsage | null = null
@@ -243,6 +250,7 @@ export async function POST(req: Request) {
 
     let text: string
     try {
+      context.start()
       text = await llmChat(
         systemPrompt,
         normalizedHistory,
@@ -255,9 +263,11 @@ export async function POST(req: Request) {
           imageUrls: attachments.urls,
           appTools,
           modelSettings,
-          signal: req.signal,
+          signal: context.signal,
+          recovery: context.recovery,
           onUsage: (usage) => {
             llmUsage = usage
+            context.onUsage(usage)
           },
         },
       )
@@ -316,6 +326,6 @@ export async function POST(req: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[produce/chat]', message)
-    return NextResponse.json({ error: message, ...(llmUsage ? { toolUsage: llmUsage } : {}) }, { status: 500 })
+    return NextResponse.json({ error: message, ...chatRecoveryErrorPayload(err), ...(llmUsage ? { toolUsage: llmUsage } : {}) }, { status: 500 })
   }
 }

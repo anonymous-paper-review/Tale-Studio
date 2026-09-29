@@ -4,7 +4,8 @@ import { CHAT_COMPACTION_TRIGGER_TOKENS } from './constants'
 import type { ChatLlmUsage } from './chat-trace'
 import { parseChatModelSettings, type ChatModelSettings } from './chat-model-settings'
 import { CHAT_TOOL_GUIDE, type ChatToolContext } from './chat-tools/protocol'
-import type { BetaMessageParam, MessageCreateParamsNonStreaming } from '@anthropic-ai/sdk/resources/beta/messages/messages'
+import { CHAT_OUTPUT_BUDGET, CHAT_RECOVERY_ATTEMPTS, ChatOutputRecoveryError, type ChatOutputRecoveryOptions } from './chat-output-recovery'
+import type { BetaMessage, BetaMessageParam, MessageCreateParamsNonStreaming } from '@anthropic-ai/sdk/resources/beta/messages/messages'
 
 const MODEL = 'claude-sonnet-5-5'
 const MAX_OUTPUT_TOKENS = 32000
@@ -44,6 +45,18 @@ function toClaudeRole(role: string): 'user' | 'assistant' {
   return role === 'user' ? 'user' : 'assistant'
 }
 
+function boundedRecoveryValue(value: number, maximum: number): number {
+  return Number.isFinite(value) ? Math.max(0, Math.min(maximum, Math.floor(value))) : 0
+}
+
+/** Keep action payloads out of both continuation concatenation and unfinished display text. */
+function recoveryProse(text: string): string {
+  // Fences, JSON objects/arrays, and XML tool markers can be cut before their identifying key.
+  // A conservative boundary also covers legacy root-level Producer settings.
+  const boundary = text.search(/[`{<]|\[\s*(?:[\[{"]|$)/m)
+  return boundary < 0 ? text : text.slice(0, boundary)
+}
+
 /** Multi-turn chat — returns assistant text */
 export async function claudeChat(
   system: string,
@@ -64,6 +77,7 @@ export async function claudeChat(
     appTools?: ChatToolContext
     signal?: AbortSignal
     modelSettings?: ChatModelSettings
+    recovery?: ChatOutputRecoveryOptions
   },
 ): Promise<string> {
   // 기존 호출 순서는 유지하지만 Claude 5.5가 지원하지 않는 temperature는 보내지 않는다.
@@ -90,7 +104,6 @@ export async function claudeChat(
     ...(opts?.appTools?.messages ?? []),
   ]
 
-  const t0 = performance.now()
   const request: MessageCreateParamsNonStreaming = {
     model: modelSettings.model,
     // 사고 토큰도 출력 한도를 쓰므로 사고와 답변을 위한 여유를 둔다. 실제 생성한 토큰만 청구된다.
@@ -129,46 +142,115 @@ export async function claudeChat(
       ],
     },
   }
-  // 32k 요청은 SDK가 비스트리밍으로 받지 않는다. 완성된 메시지까지 모아 기존 반환 계약을 유지한다.
-  const response = await getClient().beta.messages.stream(request, { signal: opts?.signal }).finalMessage()
-  const u = response.usage
-  const durationMs = performance.now() - t0
-  logTiming(
-    'llm',
-    `${label} model=${response.model} effort=${modelSettings.effort} thinking=${modelSettings.thinking} in=${u.input_tokens} out=${u.output_tokens} cache_read=${u.cache_read_input_tokens ?? 0} cache_write=${u.cache_creation_input_tokens ?? 0} stop_reason=${response.stop_reason ?? 'null'}${imageUrls.length ? ` img=${imageUrls.length}` : ''} ${durationMs.toFixed(0)}ms`,
-  )
-
-  // compaction/웹서치가 켜지면 응답 content에 비텍스트 블록이 끼고, 검색 시엔 텍스트가
-  //   여러 블록으로 나뉠 수 있다(검색 전 서두 + 검색 후 본문) — 전 텍스트 블록을 이어붙인다.
-  const text = response.content
-    .filter((b): b is Extract<(typeof response.content)[number], { type: 'text' }> => b.type === 'text')
-    .map((b) => b.text)
-    .join('')
-  const hasToolTurn = opts?.appTools && (response.content.some(b => b.type === 'tool_use') || response.stop_reason === 'pause_turn')
-  const usage: ChatLlmUsage = {
-    model: response.model,
-    durationMs,
-    inputTokens: u.input_tokens,
-    outputTokens: u.output_tokens,
-    cacheReadInputTokens: u.cache_read_input_tokens ?? 0,
-    cacheCreationInputTokens: u.cache_creation_input_tokens ?? 0,
-    stopReason: response.stop_reason,
-    effort: modelSettings.effort,
-    thinking: modelSettings.thinking,
-  }
-  try {
-    const callbackResult = opts?.onUsage?.(usage)
-    if (callbackResult !== undefined) await Promise.resolve(callbackResult).catch(() => undefined)
-  } catch {
-    // Usage reporting must never turn a successful chat response into a failure.
+  const recovery = opts?.recovery
+  const maxAttempts = recovery ? boundedRecoveryValue(recovery.maxAttempts, CHAT_RECOVERY_ATTEMPTS) : 0
+  let remainingOutput = recovery ? boundedRecoveryValue(recovery.maxOutputTokens, CHAT_OUTPUT_BUDGET) : MAX_OUTPUT_TOKENS
+  let requestMessages = messages
+  let continuedText = ''
+  let lastSafePartialText = ''
+  const throwIfAborted = () => {
+    if (recovery && lastSafePartialText && opts?.signal?.aborted && opts.signal.reason?.name === 'TimeoutError') {
+      throw new ChatOutputRecoveryError(lastSafePartialText, 'request_failed', { cause: opts.signal.reason })
+    }
+    opts?.signal?.throwIfAborted()
   }
 
-  if (response.stop_reason === 'max_tokens') throw new Error('Chat response reached its output limit. The response was not completed; retry with lower effort.')
-  if (hasToolTurn) {
-    opts.appTools!.turn = { content: response.content as unknown as import('./chat-tools/protocol').ToolBlock[], stopReason: response.stop_reason ?? '' }
+  for (let attempt = 0; ; attempt++) {
+    throwIfAborted()
+    if (recovery && remainingOutput <= 0) throw new ChatOutputRecoveryError(lastSafePartialText, 'output_budget')
+    const t0 = performance.now()
+    // Stream transport supports large output limits; callers still receive only a finished answer.
+    let response: BetaMessage
+    try {
+      response = await getClient().beta.messages.stream({
+        ...request,
+        messages: requestMessages,
+        max_tokens: recovery ? Math.min(attempt === 0 ? 64000 : 128000, remainingOutput) : MAX_OUTPUT_TOKENS,
+      }, { signal: opts?.signal }).finalMessage()
+    } catch (error) {
+      const timeout = opts?.signal?.aborted && opts.signal.reason?.name === 'TimeoutError'
+      const aborted = !timeout && (opts?.signal?.aborted || (error instanceof Error && ['AbortError', 'APIUserAbortError'].includes(error.name)))
+      if (recovery && lastSafePartialText && !aborted) {
+        throw new ChatOutputRecoveryError(lastSafePartialText, 'request_failed', { cause: error })
+      }
+      throw error
+    }
+    const u = response.usage
+    const durationMs = performance.now() - t0
+    logTiming(
+      'llm',
+      `${label} model=${response.model} effort=${modelSettings.effort} thinking=${modelSettings.thinking} in=${u.input_tokens} out=${u.output_tokens} cache_read=${u.cache_read_input_tokens ?? 0} cache_write=${u.cache_creation_input_tokens ?? 0} stop_reason=${response.stop_reason ?? 'null'}${imageUrls.length ? ` img=${imageUrls.length}` : ''} ${durationMs.toFixed(0)}ms`,
+    )
+
+    // Compaction and server tools include non-text blocks; never expose thinking as prose.
+    const text = response.content
+      .filter((b): b is Extract<(typeof response.content)[number], { type: 'text' }> => b.type === 'text')
+      .map((b) => b.text)
+      .join('')
+    const hasToolTurn = opts?.appTools && (response.content.some(b => b.type === 'tool_use') || response.stop_reason === 'pause_turn')
+    const usage: ChatLlmUsage = {
+      model: response.model,
+      durationMs,
+      inputTokens: u.input_tokens,
+      outputTokens: u.output_tokens,
+      cacheReadInputTokens: u.cache_read_input_tokens ?? 0,
+      cacheCreationInputTokens: u.cache_creation_input_tokens ?? 0,
+      stopReason: response.stop_reason,
+      effort: modelSettings.effort,
+      thinking: modelSettings.thinking,
+    }
+    remainingOutput -= u.output_tokens
+    try {
+      const callbackResult = opts?.onUsage?.(usage)
+      if (callbackResult !== undefined) await Promise.resolve(callbackResult).catch(() => undefined)
+    } catch {
+      // Usage reporting must never turn a successful chat response into a failure.
+    }
+    throwIfAborted()
+
+    const safeText = recoveryProse(text)
+    const partialText = continuedText + safeText
+    // The installed SDK predates this documented stop reason, so retain the runtime check.
+    if (recovery && String(response.stop_reason) === 'model_context_window_exceeded') {
+      throw new ChatOutputRecoveryError(partialText || lastSafePartialText, 'output_limit')
+    }
+    const proseOnly = safeText === text && response.content.every(block =>
+      block.type === 'text' || block.type === 'thinking' || block.type === 'redacted_thinking',
+    )
+    const continuationChangedFormat = continuedText.length > 0 && !proseOnly
+    if (response.stop_reason === 'max_tokens' || continuationChangedFormat) {
+      if (!recovery) throw new Error('Chat response reached its output limit. The response was not completed; retry with lower effort.')
+      lastSafePartialText = partialText || lastSafePartialText
+      if (remainingOutput <= 0) throw new ChatOutputRecoveryError(lastSafePartialText, 'output_budget')
+      if (attempt >= maxAttempts) throw new ChatOutputRecoveryError(lastSafePartialText, 'output_limit')
+      const canContinue = !continuationChangedFormat && text.trim().length > 0 && proseOnly
+      const mode = canContinue ? 'continue' : 'retry'
+      await recovery.onRecovery?.({ attempt: attempt + 1, mode })
+      throwIfAborted()
+      if (canContinue) {
+        continuedText += text
+        requestMessages = [
+          ...requestMessages,
+          // Signed thinking blocks must be forwarded in their original order and form.
+          { role: 'assistant', content: response.content as BetaMessageParam['content'] },
+          { role: 'user', content: 'Please continue exactly where the interrupted response stopped. Do not repeat the existing text or restart the answer. Complete only the original request; do not repeat any completed actions.' },
+        ]
+      } else if (continuationChangedFormat) {
+        // A tool turn must carry the complete original-step message and its signed thinking.
+        // Never hand a joined partial explanation plus an isolated final tool block to callers.
+        requestMessages = messages
+        continuedText = ''
+      }
+      // Retry preserves completed tool history. Partial actions are never returned to the
+      // parser or tool loop, even when some arguments look complete.
+      continue
+    }
+    if (hasToolTurn) {
+      opts.appTools!.turn = { content: response.content as unknown as import('./chat-tools/protocol').ToolBlock[], stopReason: response.stop_reason ?? '' }
+    }
+    if (!text && !hasToolTurn) throw new Error('Unexpected response type')
+    return continuedText + text
   }
-  if (!text && !hasToolTurn) throw new Error('Unexpected response type')
-  return text
 }
 
 /** Single-turn JSON generation — parses and returns typed result */

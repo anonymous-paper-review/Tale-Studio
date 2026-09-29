@@ -186,6 +186,7 @@ function RolePlate({ stage }: { stage: StageId }) {
  */
 function ThinkingIndicator({ stage }: { stage: StageId }) {
   const t = useT()
+  const recoveryProgress = useGlobalChatStore(state => state.recoveryProgress)
   const phrases = STAGE_THINKING_PHRASES[stage]
   const [idx, setIdx] = useState(0)
   useEffect(() => {
@@ -201,7 +202,7 @@ function ThinkingIndicator({ stage }: { stage: StageId }) {
         key={idx}
         className="animate-in fade-in-0 slide-in-from-bottom-1 duration-300 ease-out motion-reduce:animate-none"
       >
-        {t(phrases[idx % phrases.length] ?? 'Thinking')}
+        {t(recoveryProgress === 'continue' ? 'Continuing the reply…' : recoveryProgress === 'retry' ? 'Completing the interrupted response…' : phrases[idx % phrases.length] ?? 'Thinking')}
       </span>
       <span className="chat-thinking-dots" aria-hidden>
         <span />

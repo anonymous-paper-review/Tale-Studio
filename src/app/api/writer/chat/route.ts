@@ -1,5 +1,6 @@
 import { CHAT_AGENT_GUIDE, buildChatTaskContext, normalizeChatHistory } from '@/lib/chat-harness'
 import { parseChatModelSettings } from '@/lib/chat-model-settings'
+import { withChatRecovery, chatRecoveryErrorPayload, type ChatRecoveryContext } from '@/lib/chat-response-server'
 import { WRITER_DOMAIN_GUIDE } from '@/lib/chat-tools/inspect'
 // POST /api/writer/chat — Writers' Room 채팅 (러프 스토리보드 검토 단계의 씬/샷 CRUD).
 //
@@ -188,7 +189,13 @@ function parseAgenticResponse(
   }
 }
 
+export const maxDuration = 300
+
 export async function POST(req: Request) {
+  return withChatRecovery(req, (context) => handlePost(req, context))
+}
+
+async function handlePost(req: Request, context: ChatRecoveryContext) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
   let llmUsage: ChatLlmUsage | null = null
@@ -270,6 +277,7 @@ export async function POST(req: Request) {
       dialogueLanguageChatDirective(dialogueLanguage)
     const userPrompt = `${ctx}${buildChatTaskContext(taskContext)}${message}`
 
+    context.start()
     const text = await llmChat(
       systemPrompt,
       normalizedHistory,
@@ -279,9 +287,11 @@ export async function POST(req: Request) {
       {
         appTools,
         modelSettings,
-          signal: req.signal,
-          onUsage: (usage) => {
+        signal: context.signal,
+        recovery: context.recovery,
+        onUsage: (usage) => {
           llmUsage = usage
+          context.onUsage(usage)
         },
       },
     )
@@ -327,6 +337,6 @@ export async function POST(req: Request) {
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : 'Unknown error'
     console.error('[writer/chat]', errMsg)
-    return NextResponse.json({ error: errMsg, ...(llmUsage ? { toolUsage: llmUsage } : {}) }, { status: 500 })
+    return NextResponse.json({ error: errMsg, ...chatRecoveryErrorPayload(err), ...(llmUsage ? { toolUsage: llmUsage } : {}) }, { status: 500 })
   }
 }

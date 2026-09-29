@@ -9,6 +9,13 @@ function failureKeyFor(call: ToolCall): string {
   return toolValueKey([call.name, input])
 }
 
+function editIdentity(call: ToolCall) {
+  if (call.name !== 'edit_project' || !call.input || typeof call.input !== 'object' || Array.isArray(call.input)) return null
+  const { resource, id, patch } = call.input as Record<string, unknown>
+  if (typeof resource !== 'string' || typeof id !== 'string' || !patch || typeof patch !== 'object' || Array.isArray(patch)) return null
+  return { resource, id, patch: patch as Record<string, unknown>, target: toolValueKey([resource, id]), signature: toolValueKey([resource, id, patch]) }
+}
+
 export async function runChatToolLoop(options: {
   request: (messages: ToolMessage[]) => Promise<ChatToolResponse>
   execute: (call: ToolCall) => Promise<ToolResult>
@@ -26,6 +33,7 @@ export async function runChatToolLoop(options: {
   const messages: ToolMessage[] = []
   const results: ToolOutcome[] = []
   const cached = new Map<string, { signature: string; result: ToolResult }>()
+  const savedEdits = new Map<string, NonNullable<ReturnType<typeof editIdentity>> & { result: ToolResult }>()
   const failures = new Map<string, number>()
   const check = () => {
     if (options.signal.aborted || !options.isCurrent()) throw new DOMException('Chat stopped', 'AbortError')
@@ -40,7 +48,8 @@ export async function runChatToolLoop(options: {
     try { data = await options.request(messages) } catch (error) {
       check()
       if (!results.length) throw error
-      return { data: { reply: translate(options.locale ?? 'ko', 'The follow-up reply failed. Completed operations are listed below.') }, results, stopped: 'model_error' }
+      const partialReply = error instanceof Error && 'partialReply' in error && typeof error.partialReply === 'string' ? error.partialReply : ''
+      return { data: { reply: [translate(options.locale ?? 'ko', 'The follow-up reply failed. Completed operations are listed below.'), partialReply].filter(Boolean).join('\n\n'), partialReply }, results, stopped: 'model_error' }
     }
     check()
     const turn = data.toolTurn
@@ -107,26 +116,43 @@ export async function runChatToolLoop(options: {
       const signature = toolValueKey([call.name, call.input])
       const failureKey = failureKeyFor(call)
       const prior = cached.get(call.id)
+      const edit = editIdentity(call)
+      const savedEdit = edit ? savedEdits.get(edit.target) : undefined
       let result: ToolResult
       if (prior) {
         result = prior.signature === signature ? prior.result : { status: 'invalid_input', message: 'A tool ID was reused with different arguments.' }
+      } else if (savedEdit && savedEdit.signature === edit?.signature) {
+        result = savedEdit.result
+        cached.set(call.id, { signature, result })
       } else if (limited || calls >= (options.maxCalls ?? 16) || (failures.get(failureKey) ?? 0) >= (options.maxSameFailure ?? 2)) {
         limited = true
         result = { status: 'limit', message: 'This operation reached its recovery limit. Report the remaining target and stop.' }
       } else {
         calls++
+        // A different attempted write may change this target even if its response is lost.
+        if (edit) savedEdits.delete(edit.target)
         try { result = await options.execute(call) } catch (error) {
           if ((call.name === 'edit_project' || (call.name === 'project_workflow' && (call.input as Record<string, unknown>)?.action === 'resume')) && (options.signal.aborted || !options.isCurrent())) {
             options.onResult?.({ call, result: { status: 'unknown_result', message: call.name === 'edit_project' ? 'The request stopped while saving. Read the target to confirm whether that save completed.' : 'The request stopped during execution submission. The server may still be running. Query project status before resubmitting.' } })
           }
           throw error
         }
-        check()
         cached.set(call.id, { signature, result })
+        if (edit && result.status === 'ok') savedEdits.set(edit.target, { ...edit, result })
+        // Fresh reads must remain fresh: external edits invalidate an earlier success.
+        if (call.name === 'read_project' && result.status === 'ok' && Array.isArray(result.records)) {
+          const input = call.input as Record<string, unknown>
+          for (const [target, saved] of savedEdits) {
+            if (saved.resource !== input.resource || (input.id !== undefined && saved.id !== input.id)) continue
+            const row = result.records.find((record: { id?: unknown }) => record?.id === saved.id)
+            if (!row?.values || !Object.entries(saved.patch).every(([key, value]) => toolValueKey(row.values[key]) === toolValueKey(value))) savedEdits.delete(target)
+          }
+        }
         if (!['ok', 'approval_required', 'navigation_requested', 'queued'].includes(result.status)) failures.set(failureKey, (failures.get(failureKey) ?? 0) + 1)
       }
       results.push({ call, result })
       options.onResult?.({ call, result })
+      check()
       returned.push({ type: 'tool_result', tool_use_id: call.id, content: JSON.stringify(result), is_error: !['ok', 'approval_required', 'navigation_requested', 'queued'].includes(result.status) })
     }
     messages.push({ role: 'user', content: returned })

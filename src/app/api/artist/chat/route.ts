@@ -1,5 +1,6 @@
 import { CHAT_AGENT_GUIDE, buildChatTaskContext, normalizeChatHistory } from '@/lib/chat-harness'
 import { parseChatModelSettings } from '@/lib/chat-model-settings'
+import { withChatRecovery, chatRecoveryErrorPayload, type ChatRecoveryContext } from '@/lib/chat-response-server'
 import { ARTIST_DOMAIN_GUIDE } from '@/lib/chat-tools/inspect'
 import { hydrateInspectionImages } from '@/lib/chat-tools/inspect-images'
 // Artist 카드 스튜디오 채팅 에이전트 (카드 모델, 2026-06-06 재작성)
@@ -202,7 +203,13 @@ function parseUpdates(text: string): {
   }
 }
 
+export const maxDuration = 300
+
 export async function POST(req: Request) {
+  return withChatRecovery(req, (context) => handlePost(req, context))
+}
+
+async function handlePost(req: Request, context: ChatRecoveryContext) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
   let llmUsage: ChatLlmUsage | null = null
@@ -282,6 +289,7 @@ export async function POST(req: Request) {
       responseLanguageDirective(projectLocale)
     const userPrompt = `${contextPrefix}${buildChatTaskContext(taskContext)}${message}`
 
+    context.start()
     const text = await llmChat(
       systemPrompt,
       normalizedHistory,
@@ -291,9 +299,11 @@ export async function POST(req: Request) {
       {
         appTools,
         modelSettings,
-          signal: req.signal,
-          onUsage: (usage) => {
+        signal: context.signal,
+        recovery: context.recovery,
+        onUsage: (usage) => {
           llmUsage = usage
+          context.onUsage(usage)
         },
       },
     )
@@ -367,6 +377,6 @@ export async function POST(req: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[artist/chat]', message)
-    return NextResponse.json({ error: message, ...(llmUsage ? { toolUsage: llmUsage } : {}) }, { status: 500 })
+    return NextResponse.json({ error: message, ...chatRecoveryErrorPayload(err), ...(llmUsage ? { toolUsage: llmUsage } : {}) }, { status: 500 })
   }
 }

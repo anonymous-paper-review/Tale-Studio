@@ -1,5 +1,6 @@
 import { summarizeChatUsage, type ChatLlmUsage } from '@/lib/chat-trace'
 import { create } from 'zustand'
+import { createChatRequestSession, ChatResponseError } from '@/lib/chat-response'
 import { runChatToolLoop } from '@/lib/chat-tools/loop'
 import { writerInputRoute } from '@/lib/chat-harness'
 import { executeProjectInspection } from '@/lib/chat-tools/inspect'
@@ -123,6 +124,7 @@ export interface ChatSuggestion {
 interface GlobalChatState {
   messages: GlobalChatMessage[]
   loading: boolean
+  recoveryProgress: 'continue' | 'retry' | null
   error: string | null
   /** 마지막 채팅 요청의 입력·출력·적용 경계 계측. 화면 하단에 표시한다. */
   lastTrace: ChatTrace | null
@@ -622,6 +624,7 @@ async function runHandoff(spec: HandoffSpec): Promise<{ ok: boolean; path: strin
 export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   messages: [],
   loading: false,
+  recoveryProgress: null,
   error: null,
   lastTrace: null,
   suggestion: null,
@@ -1323,6 +1326,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     set((state) => ({
       messages: silentUser ? state.messages : [...state.messages, userMsg],
       loading: true,
+      recoveryProgress: null,
       error: null,
       lastTrace: requestTrace,
     }))
@@ -1339,17 +1343,22 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     let pendingReplyId: string | null = null
     try {
       const toolsEnabled = !!projectId && ['producer', 'writer', 'artist'].includes(stage) && !dialogueTarget
+      const requestSession = createChatRequestSession({
+        signal: controller.signal,
+        onStatus: status => { responseStatus = status },
+        onUsage: usage => { modelUsages.push(usage) },
+        onRecovery: event => { if (isCurrentSession()) set({ recoveryProgress: event.mode }) },
+      })
       const request = async (toolMessages: ToolMessage[]) => {
-        const res = await fetch(endpoint, {
-          signal: controller.signal, method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...body, ...(toolsEnabled ? { chatTools: true, chatWorkflow: true, chatDomain: stage === 'writer' || stage === 'artist', toolMessages } : {}) }),
-        })
-        responseStatus = res.status
-        const payload = await res.json().catch(() => ({}))
-        const usage = payload.toolUsage ?? payload.trace
-        if (usage && typeof usage.model === 'string' && typeof usage.inputTokens === 'number') modelUsages.push(usage)
-        if (!res.ok) throw new Error(translate(contentLocale(), payload.error ?? `HTTP ${res.status}`))
-        return payload
+        try {
+          return await requestSession(endpoint, { ...body, ...(toolsEnabled ? { chatTools: true, chatWorkflow: true, chatDomain: stage === 'writer' || stage === 'artist', toolMessages } : {}) })
+        } catch (error) {
+          if (error instanceof ChatResponseError) {
+            const partial = error.partialReply ? `${translate(contentLocale(), 'Unfinished reply:')}\n${error.partialReply}` : ''
+            throw new ChatResponseError(translate(contentLocale(), error.message), partial)
+          }
+          throw error
+        } finally { if (isCurrentSession()) set({ recoveryProgress: null }) }
       }
       let data: Awaited<ReturnType<Response['json']>>
       let toolOutcomes: ToolOutcome[] = []
@@ -1577,6 +1586,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       const replyBeforeReceipt = reply
       const waitForLegacy = !dialogueTarget && toolsEnabled && ((requestedHandoff && requestsSupportedChatEdit(stage, trimmed)) || (stage === 'writer' && data.updates?.length) || (stage === 'artist' && (data.proposals?.length || data.locationProposals?.length)))
       reply = guardChatToolReply(reply, toolOutcomes, contentLocale() === 'ko')
+      // Unfinished prose is display-only and must survive the guard that removes unverified completion claims.
+      if (typeof data.partialReply === 'string' && data.partialReply && !reply.includes(data.partialReply)) reply = [reply, data.partialReply].filter(Boolean).join('\n\n')
       const replyId = makeId()
       if (waitForLegacy) pendingReplyId = replyId
 
@@ -2277,9 +2288,13 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         return
       }
       const error = err instanceof Error ? err.message : 'Chat failed'
-      if (pendingReplyId) {
-        const content = [error, chatToolReceipt(completedTools, contentLocale() === 'ko')].filter(Boolean).join('\n\n')
-        set(state => ({ messages: state.messages.map(message => message.id === pendingReplyId ? { ...message, content } : message) }))
+      const receipt = chatToolReceipt(completedTools, contentLocale() === 'ko')
+      const partialReply = err instanceof ChatResponseError ? err.partialReply : ''
+      if (pendingReplyId || receipt || partialReply) {
+        const content = [error, partialReply, receipt].filter(Boolean).join('\n\n')
+        set(state => ({ messages: pendingReplyId
+          ? state.messages.map(message => message.id === pendingReplyId ? { ...message, content } : message)
+          : [...state.messages, { id: makeId(), stage, role: 'model', content }] }))
         if (projectId) saveChatMessage(projectId, stage, 'model', content)
       }
       set({
@@ -2305,6 +2320,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         })
       }
     } finally {
+      if (isCurrentSession()) set({ recoveryProgress: null })
       if (stage === 'producer' && isCurrentSession()) set({ loading: false })
       if (activeGeneration === controller) activeGeneration = null
     }
@@ -3170,6 +3186,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     set({
       messages: [],
       loading: false,
+      recoveryProgress: null,
       error: null,
       lastTrace: null,
       suggestion: null,
