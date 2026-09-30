@@ -3,6 +3,7 @@ import type { ProjectSettings, ProjectFormat } from '@/types'
 import type { Json } from '@/types/database'
 import { createClient, createCatalogClient } from '@/lib/supabase/client'
 import { useProjectStore } from '@/stores/project-store'
+import { useProjectFormatStore } from '@/stores/project-format-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { depthLevelFromRuntime } from '@/lib/depth'
 import { isDemoSession } from '@/lib/demo/context'
@@ -953,6 +954,8 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
         .eq('id', projectId)
 
       if (error) throw error
+      // Director 의 이미지·영상 틀이 새로고침 없이 이 포맷을 따르게(2026-09-30).
+      useProjectFormatStore.getState().setFormat(producerSettings.format ?? null)
 
       // writer 파이프라인 백그라운드 시작 — 단일 생산자(§3 일원화). S0~L5 텍스트 단계가
       //   DB scenes/characters/locations/shots 를 채워 artist/director 가 읽는다(persist_manifest).

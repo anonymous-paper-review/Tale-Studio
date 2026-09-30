@@ -1,4 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
+import { videoAspectRatioFromFormat } from '@/lib/project-aspect'
+import { parseProjectFormat } from '@/types/project'
 import { NextResponse } from 'next/server'
 import { resolveStyleAnchorByKey } from '@/lib/style-anchor'
 import { getUser } from '@/lib/supabase/auth'
@@ -167,7 +169,7 @@ function buildFalT2VFallbackRequest(
       prompt,
       negative_prompt: 'blurry, low quality, distorted, deformed',
       duration: durationSeconds >= 10 ? '10' : '5',
-      aspect_ratio: aspectRatio ?? '16:9',
+      aspect_ratio: aspectRatio,
     },
   }
 }
@@ -214,7 +216,7 @@ function buildFalReferenceToVideoRequest(
 
   // aspect_ratio: kling-o3는 미노출(확실치 않아 omit), 그 외 전달
   if (modelKey !== 'kling-o3') {
-    input.aspect_ratio = aspectRatio ?? '16:9'
+    input.aspect_ratio = aspectRatio
   }
 
   return { model: spec.endpoint, input }
@@ -580,7 +582,7 @@ async function prepareVideoRequest(
     }
 
     const [{ data: project, error: projectError }, { data: shot, error: shotError }] = await Promise.all([
-      supabaseAdmin.from('projects').select('workspace_id, style_anchor_key').eq('id', projectId).maybeSingle(),
+      supabaseAdmin.from('projects').select('workspace_id, style_anchor_key, settings').eq('id', projectId).maybeSingle(),
       // #motion-contract: dynamic_spec(모션 계약 소스) + design_ref(구버전 state 폴백 조인 키) 동봉.
       standalone
         ? Promise.resolve({ data: null, error: null })
@@ -589,6 +591,12 @@ async function prepareVideoRequest(
     if (projectError) throw projectError
     if (shotError) throw shotError
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    // 화면비의 기준은 Producer 포맷(2026-09-30 오너 지시, 실측: 세로 프로젝트 영상이 1280×720). 화면이 보낸 값은
+    //   포맷이 없는 옛 프로젝트의 대비값일 뿐이다 — 이미지 경로(generate-storyboard, #fal-canvas)와 같은 규칙.
+    const effectiveAspectRatio =
+      videoAspectRatioFromFormat(parseProjectFormat((project as { settings?: { format?: unknown } | null }).settings?.format)) ??
+      aspectRatio ??
+      '16:9'
     if (!standalone && !shot) return NextResponse.json({ error: 'Invalid request: writerShotId does not belong to project' }, { status: 400 })
     // #ref-gate(2026-09-02 오너 결정): writer 샷의 실사 영상은 실사 스토리보드(시작 프레임)가 있어야 한다 —
     //   클라가 준 프레임을 검사 없이 받던 무음 폴백 폐지. 409 code 로 막고 클라가 실사 완성을 기다렸다가 자동 재개.
@@ -819,8 +827,8 @@ async function prepareVideoRequest(
     const falSubmitRequest = isLocal
       ? null
       : submitRefUrls
-        ? buildFalReferenceToVideoRequest(modelKey, fullPrompt, submitRefUrls, dur, aspectRatio ?? '16:9')
-        : buildFalT2VFallbackRequest(fullPrompt, dur, aspectRatio ?? '16:9')
+        ? buildFalReferenceToVideoRequest(modelKey, fullPrompt, submitRefUrls, dur, effectiveAspectRatio)
+        : buildFalT2VFallbackRequest(fullPrompt, dur, effectiveAspectRatio)
     const falCapture = falSubmitRequest
       ? buildBestEffortFalRequestCapturePatch(falSubmitRequest.input, falSubmitRequest.model)
       : {}
@@ -835,7 +843,7 @@ async function prepareVideoRequest(
       prompt_parts: promptParts,
       camera: camera ?? null,
       duration_seconds: dur,
-      aspect_ratio: aspectRatio ?? '16:9',
+      aspect_ratio: effectiveAspectRatio,
       generation_method: generationMethod,
       provider: provider ?? null,
       model: model ?? null,

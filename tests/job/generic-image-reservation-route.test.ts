@@ -140,3 +140,18 @@ describe('/api/generate/image FAL 예약 경로', () => {
     expect(fetchMock).toHaveBeenCalledWith('https://fal.example/image.png')
   })
 })
+
+// 2026-09-30 오너 지시: 세로 프로젝트의 Director 수동 샷 실사 이미지가 16:9 로 나갔다. 화면이 표시를 보내면 서버가 Producer 포맷을 읽는다.
+describe('/api/generate/image 프로젝트 비율', () => {
+  // 왜: 실측(script_test) "New Shot" 이미지가 16:9 로 나갔다 — 화면이 16:9 를 박아 보냈다.
+  it('프로젝트 비율로 만들라는 표시가 오면 Producer 포맷(세로면 9:16)으로 이미지를 만든다', async () => {
+    const { supabaseAdmin } = await import('@/lib/supabase/admin')
+    const chain = { select: () => chain, eq: () => chain, maybeSingle: async () => ({ data: { settings: { format: 'vertical_9:16' } }, error: null }) }
+    vi.spyOn(supabaseAdmin, 'from').mockReturnValue(chain as never)
+    mocks.generateReservedImage.mockResolvedValue({ url: 'https://fal.test/i.png' })
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { 'content-type': 'image/png' } }))
+    const res = await POST(request({ prompt: 'New Shot', projectId: PROJECT_ID, aspectFromProject: true }))
+    expect(res.status).toBe(200)
+    expect(mocks.generateReservedImage.mock.calls[0][0]).toMatchObject({ aspect_ratio: '9:16' })
+  })
+})

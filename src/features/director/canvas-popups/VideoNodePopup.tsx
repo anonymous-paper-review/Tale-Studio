@@ -15,6 +15,8 @@ import { Separator } from '@/components/ui/separator'
 import { DebugPromptTrace } from '@/components/debug-prompt-trace'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { mediaFrameStyle } from '@/lib/project-aspect'
+import { useProjectFormatStore } from '@/stores/project-format-store'
 import {
   getEffectiveVideoConfig,
   effectivePrompt,
@@ -27,6 +29,9 @@ import {
 import { FAL_VIDEO_MODEL_ORDER, VIDEO_MODELS } from '@/lib/video-models'
 import { useT } from '@/lib/i18n'
 
+/** 영상 미리보기 틀의 높이 상한(세로·정사각 포맷) — 패널·팝업 안에서 스크롤 없이 보이게. */
+const PREVIEW_MEDIA_MAX_H = 440
+
 type Props = {
   nodeId: string
   data: VideoNodeData
@@ -34,6 +39,9 @@ type Props = {
 
 export function VideoNodePopup({ nodeId, data }: Props) {
   const t = useT()
+  // Producer 포맷이 틀의 기준(2026-09-30). 가로 프로젝트는 종전 16:9 틀.
+  const projectFormat = useProjectFormatStore((s) => s.format)
+  const previewFrame = mediaFrameStyle(projectFormat, PREVIEW_MEDIA_MAX_H)
   const closePopup = useDirectorCanvasStore((s) => s.closePopup)
   const updateNodeData = useDirectorCanvasStore((s) => s.updateNodeData)
   const applyVideoOverride = useDirectorCanvasStore(
@@ -254,7 +262,10 @@ export function VideoNodePopup({ nodeId, data }: Props) {
 
         <div className="space-y-4">
           {/* Video preview */}
-          <div className="flex aspect-video w-full items-center justify-center overflow-hidden rounded-md border border-border bg-muted/40">
+          <div
+            className={cn('flex items-center justify-center overflow-hidden rounded-md border border-border bg-muted/40', !previewFrame && 'aspect-video w-full')}
+            style={previewFrame ?? undefined}
+          >
             {data.videoUrl ? (
               <video
                 src={data.videoUrl}

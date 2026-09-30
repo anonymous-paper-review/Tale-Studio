@@ -214,7 +214,7 @@ export function buildVideoBatchInputs(
       camera,
       lighting,
       cameraPreset,
-      aspectRatio: '16:9',
+      // 화면비는 서버가 프로젝트 포맷에서 정한다(2026-09-30) — 여기서 16:9 를 박지 않는다.
       generationMethod: referenceImageUrl ? 'I2V' : 'T2V',
       model: normalizeProvider(provider),
       provider: toRouteProvider(provider),

@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input'
 import { ThumbImage } from '@/components/thumb-image'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
+import { useProjectFormatStore } from '@/stores/project-format-store'
+import { aspectRatioFromFormat } from '@/types/project'
 import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import { newDirectorId, type ShotNodeData } from '@/types/director'
@@ -27,6 +29,8 @@ type Props = {
 
 export function ShotDetailPanel({ nodeId, data }: Props) {
   const t = useT()
+  // 화면비 칸은 보여 주기만 한다 — 훅 없이 지금 값을 읽는다(패널은 열 때마다 새로 그린다).
+  const projectFormat = useProjectFormatStore.getState().format
   const { requestImageUploadConsent, imageUploadConsentDialog } = useImageUploadConsent(nodeId)
   const updateNodeData = useDirectorCanvasStore((s) => s.updateNodeData)
   const openDeleteConfirm = useDirectorCanvasStore(
@@ -148,7 +152,8 @@ export function ShotDetailPanel({ nodeId, data }: Props) {
           <Field label="Aspect Ratio">
             {/* 추후 영속 필요 */}
             <HoverBeam>
-              <Input value="16:9" disabled readOnly />
+              {/* Producer 포맷을 그대로 보여 준다(2026-09-30) — 고정 "16:9" 는 세로 프로젝트에서 틀린 정보였다. */}
+              <Input value={projectFormat ? aspectRatioFromFormat(projectFormat) : '16:9'} disabled readOnly />
             </HoverBeam>
           </Field>
           <Field label="Resolution">

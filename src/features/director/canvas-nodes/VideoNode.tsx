@@ -10,12 +10,20 @@ import { LabeledTargetHandle } from './LabeledHandle'
 import { getEffectiveVideoConfig, useDirectorCanvasStore } from '@/stores/director-store'
 import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
 import { cn } from '@/lib/utils'
+import { mediaFrameStyle } from '@/lib/project-aspect'
+import { useProjectFormatStore } from '@/stores/project-format-store'
 import { useT } from '@/lib/i18n'
 import { useTakeBalance } from '@/lib/billing/use-take-balance'
 import { takeCostForVideo } from '@/lib/billing/take-cost'
 
+/** 영상 노드 틀의 높이 상한(세로·정사각 포맷) — 테이크 간격(VIDEO_OFFSET_Y 260px) 안에서 겹치지 않게. */
+const VIDEO_NODE_MEDIA_MAX_H = 150
+
 function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const t = useT()
+  // Producer 포맷이 틀의 기준(2026-09-30). 가로 프로젝트는 종전 틀(h-24) 그대로.
+  const projectFormat = useProjectFormatStore((s) => s.format)
+  const mediaFrame = mediaFrameStyle(projectFormat, VIDEO_NODE_MEDIA_MAX_H)
   const setVideoFinal = useDirectorCanvasStore((s) => s.setVideoFinal)
   const playingNodeId = useDirectorCanvasStore((s) => s.playingNodeId)
   const setPlayingNode = useDirectorCanvasStore((s) => s.setPlayingNode)
@@ -225,7 +233,10 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       />
       {/* 영상 재생 / 썸네일 / 상태 — single-play: playingNodeId===id 일 때만 <video> 마운트.
           nodrag·nopan: React Flow 가 영상/버튼 상호작용을 노드 드래그·팬으로 가로채지 않게. */}
-      <div className="relative mt-1 flex h-24 w-full items-center justify-center overflow-hidden rounded-sm border border-border/40 bg-muted/40">
+      <div
+        className={cn('relative mt-1 flex items-center justify-center overflow-hidden rounded-sm border border-border/40 bg-muted/40', !mediaFrame && 'h-24 w-full')}
+        style={mediaFrame ?? undefined}
+      >
         {data.status === 'failed' && !data.videoUrl ? (
           <span className="px-2 text-center text-[10px] text-destructive">
             {data.lastAttemptError ?? data.errorMessage ?? t('Failed')}

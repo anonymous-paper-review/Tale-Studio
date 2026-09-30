@@ -1,4 +1,6 @@
 import { create } from 'zustand'
+import { parseProjectFormat } from '@/types/project'
+import { useProjectFormatStore } from '@/stores/project-format-store'
 import type { StageId } from '@/types'
 import { STAGES } from '@/lib/constants'
 import type { LifecycleStatus } from '@/lib/lifecycle'
@@ -255,7 +257,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         }
       }
       const p = snap?.project as
-        | { title?: string; current_stage?: StageId; locale?: unknown; locale_locked?: unknown }
+        | { title?: string; current_stage?: StageId; locale?: unknown; locale_locked?: unknown; settings?: { format?: unknown } | null }
         | null
         | undefined
       if (snap && p) {
@@ -271,6 +273,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           lifecycleStatus: EMPTY_LIFECYCLE_STATUS,
           ...DEFAULT_ARTIST_ASSET_GATE,
         })
+        // 화면 포맷(2026-09-30) — Director 이미지·영상 틀의 기준. 보관 장소는 project-format-store 한 곳.
+        useProjectFormatStore.getState().setFormat(parseProjectFormat(p.settings?.format))
         const { useDirectorCanvasStore } = require('@/stores/director-store')
         useDirectorCanvasStore.getState().setProjectId(snap.projectId)
       } else {
@@ -300,6 +304,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         lifecycleStatus: EMPTY_LIFECYCLE_STATUS,
         ...DEFAULT_ARTIST_ASSET_GATE,
       })
+      // 화면 포맷(2026-09-30) — Director 이미지·영상 틀의 기준. 보관 장소는 project-format-store 한 곳.
+      useProjectFormatStore.getState().setFormat(parseProjectFormat(project.settings?.format))
       const { useDirectorCanvasStore } = await import('@/stores/director-store')
       useDirectorCanvasStore.getState().setProjectId(projectId)
     } catch (err) {
@@ -357,6 +363,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         lifecycleStatus: EMPTY_LIFECYCLE_STATUS,
         ...DEFAULT_ARTIST_ASSET_GATE,
       })
+      // 화면 포맷(2026-09-30) — Director 이미지·영상 틀의 기준. 보관 장소는 project-format-store 한 곳.
+      useProjectFormatStore.getState().setFormat(parseProjectFormat(project?.settings?.format))
       const { useDirectorCanvasStore } = await import('@/stores/director-store')
       useDirectorCanvasStore.getState().setProjectId(projectId)
       return {
@@ -392,18 +400,25 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       lifecycleStatus: EMPTY_LIFECYCLE_STATUS,
       ...DEFAULT_ARTIST_ASSET_GATE,
     })
+    // 화면 포맷(2026-09-30) — Director 이미지·영상 틀의 기준. 보관 장소는 project-format-store 한 곳.
+    useProjectFormatStore.getState().setFormat(null)
     // 호출부(대시보드 카드·유저 메뉴)는 locale 을 안 들고 다닌다 — 여기서 1쿼리로 싣는다.
     //   실패는 무해(null 유지 = UI 언어 폴백). 응답 도착 전에 또 전환됐으면 버린다.
     void (async () => {
       try {
         const { data } = await createClient()
           .from('projects')
-          .select('locale, locale_locked')
+          .select('locale, locale_locked, settings')
           .eq('id', id)
           .maybeSingle()
         if (get().projectId === id) {
-          const row = data as { locale?: unknown; locale_locked?: unknown } | null
-          set({ projectLocale: parseAppLocale(row?.locale), projectLocaleLocked: parseLocked(row?.locale_locked) })
+          const row = data as { locale?: unknown; locale_locked?: unknown; settings?: { format?: unknown } | null } | null
+          set({
+            projectLocale: parseAppLocale(row?.locale),
+            projectLocaleLocked: parseLocked(row?.locale_locked),
+          })
+          // 화면 포맷(2026-09-30) — Director 이미지·영상 틀의 기준. 보관 장소는 project-format-store 한 곳.
+          useProjectFormatStore.getState().setFormat(parseProjectFormat(row?.settings?.format))
         }
       } catch {
         /* 폴백: UI 언어 */
@@ -535,5 +550,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       lifecycleStatus: EMPTY_LIFECYCLE_STATUS,
       ...DEFAULT_ARTIST_ASSET_GATE,
     })
+    useProjectFormatStore.getState().setFormat(null)
   },
 }))

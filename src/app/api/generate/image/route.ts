@@ -10,6 +10,14 @@ import {
   resolveImageEndpoint,
   type ImageModelKey,
 } from '@/lib/image-models'
+import { supabaseAdmin } from '@/lib/supabase/admin'
+import { shotImageAspectRatio } from '@/lib/project-aspect'
+import { parseProjectFormat, type ProjectFormat } from '@/types/project'
+
+async function projectFormatOf(projectId: string): Promise<ProjectFormat | null> {
+  const { data } = await supabaseAdmin.from('projects').select('settings').eq('id', projectId).maybeSingle()
+  return parseProjectFormat((data as { settings?: { format?: unknown } | null } | null)?.settings?.format)
+}
 
 function getApiKey(): string {
   const keys = process.env.GOOGLE_API_KEYS ?? ''
@@ -167,6 +175,7 @@ export async function POST(req: Request) {
       referenceImageUrls,
       imageModel,
       projectId,
+      aspectFromProject,
     } = await req.json()
 
     if (!prompt || typeof prompt !== 'string') {
@@ -201,10 +210,14 @@ export async function POST(req: Request) {
     if (!(await userOwnsProject(projectId, user.id))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+    // Director 수동 샷 실사 이미지(2026-09-30): 화면은 비율을 계산하지 않고 표시만 보낸다 — 서버가 Producer 포맷을 읽는다
+    //   (영상·Writer 샷 이미지 경로와 같은 규칙). 표시가 없는 호출(에셋 노드 등)은 종전대로 요청 값.
+    const effectiveAspectRatio =
+      aspectFromProject === true ? shotImageAspectRatio(await projectFormatOf(projectId)) : aspectRatio
     try {
       return await generateViaFal(
         prompt,
-        aspectRatio,
+        effectiveAspectRatio,
         referenceImageUrls,
         imageModel,
         { projectId, userId: user.id },

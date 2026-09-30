@@ -4185,7 +4185,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               body: JSON.stringify({
                 projectId: get().projectId,
                 prompt,
-                aspectRatio: '16:9',
+                // 수동 샷 실사 이미지도 Producer 포맷의 비율(2026-09-30, 실측: "New Shot" 이 16:9 로 나감) — 서버가 포맷을 읽는다.
+                aspectFromProject: true,
                 referenceImageUrls,
               }),
               signal: controller.signal,
@@ -4579,7 +4580,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           prompt: eff.prompt,
           camera: eff.camera,
           cameraPreset: eff.cameraPreset,
-          aspectRatio: '16:9',
+          // 화면비는 서버가 프로젝트 포맷에서 정한다(2026-09-30) — 여기서 16:9 를 박지 않는다.
           generationMethod: referenceImageUrl ? 'I2V' : 'T2V',
           model: normalizeProvider(eff.provider),
           provider: toRouteProvider(eff.provider),
