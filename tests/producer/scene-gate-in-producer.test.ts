@@ -151,15 +151,20 @@ describe('씬 스토리 확정 단계 다듬기 (검토 지적)', () => {
     expect(useProjectStore.getState().currentStage).toBe('producer')
   })
 
-  it('씬 스토리를 확정하거나 고쳐 달라고 하면 Writer 상태를 바로 다시 읽는다', async () => {
-    // 왜: 3초 폴링을 기다리는 사이 옛 초안에 "이대로 확정"이 다시 떠 409 오류가 났다.
+  it('씬 스토리 수정을 요청하면 수정안을 먼저 처리한 뒤 확정할 수 있다', async () => {
+    // 왜: AI 수정안이 원문을 덮어쓰지 않으므로, 버리거나 적용하기 전에는 이전 원문을 확정하지 않는다.
     useProjectStore.setState({ producerLocked: true, reachedStage: 'artist' })
     statusRestart.mockClear()
-    expect(await useGlobalChatStore.getState().reviseSceneGate('S2를 줄여줘')).toBe(true)
+    const chat = useGlobalChatStore.getState()
+    expect(await chat.reviseSceneGate('S2를 줄여줘')).toBe(true)
     expect(JSON.parse(String((calls('/api/writer/scene-gate')[0][1] as RequestInit).body))).toEqual({ projectId: 'proj-1', action: 'revise', feedback: 'S2를 줄여줘' })
-    expect(statusRestart).toHaveBeenCalledWith('proj-1')
+    expect(useGlobalChatStore.getState().sceneStoryRefresh).toBe(1)
+    expect(statusRestart).not.toHaveBeenCalled()
+    expect(await chat.confirmSceneGate()).toBeNull()
+    expect(await chat.resolveSceneStoryProposal('discard', 'proposal-1')).toBe(true)
+    expect(useGlobalChatStore.getState().sceneStoryRefresh).toBe(2)
     statusRestart.mockClear()
-    expect(await useGlobalChatStore.getState().confirmSceneGate()).toBe(true)
+    expect(await chat.confirmSceneGate()).toBe(true)
     expect(statusRestart).toHaveBeenCalledWith('proj-1')
   })
 

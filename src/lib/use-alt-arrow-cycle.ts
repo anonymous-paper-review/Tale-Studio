@@ -3,7 +3,7 @@
 // Alt(Option) + ←/→ 로 스테이지 안 뷰를 넘기는 공용 훅 (#keyboard-only 2026-08-11).
 //
 // Alt+QWERT(스테이지 간)와 짝을 이루는 스테이지 **안** 이동이다:
-//   writer  러프 스토리보드 ↔ 트리트먼트 ↔ 대사
+//   writer  러프 스토리보드 ↔ 대사 ↔ 마스터 시트
 //   artist  인물 ↔ 배경
 //   director Node ↔ Storyboard(Previz) ↔ Storyboard(Real)
 //

@@ -95,6 +95,11 @@ export interface WriterRunState extends WriterRunStateBase {
   // #s3-gate: 씬 게이트 확정 플래그 + 수정 요청 누적(개정 시 scenes/storyCheck 를 지워 s3 재실행).
   _gateConfirmed?: boolean;
   _sceneRevisionNotes?: string[];
+  /** 개정 요청 당시의 씬 초안. 재시도에도 같은 본문을 다듬기 위한 실행 입력이며 다음 개정에서 교체한다. */
+  _sceneRevisionSource?: Scenes;
+  _sceneStoryProposal?: import('@/lib/producer/scene-story-proposal').SceneStoryProposal;
+  /** 원문 저장 때만 바뀌는 버전. AI 수정안의 상태 변화와 직접 편집을 분리한다. */
+  _sceneStoryVersion?: string;
 
   // Story 축
   genre?: Genre;
@@ -402,7 +407,7 @@ export const WRITER_STEPS: WriterStep[] = [
         await logger.flushRawLlm('scenes');
         return { scenes };
       }
-      const scenes = await runScenes(s.input, s.genre!, s.narrativeStructure!, s.characters!, s.world, logger, models.S, s._sceneRevisionNotes, s.dramaturgy ?? null);
+      const scenes = await runScenes(s.input, s.genre!, s.narrativeStructure!, s.characters!, s.world, logger, models.S, s._sceneRevisionNotes, s.dramaturgy ?? null, s._sceneRevisionSource);
       await logger.flushRawLlm('scenes');
       // 오픈 캐스트(§4 + V축 재설계): 전개상 필요한 인물/월드를 producer 베이스라인에 append.
       //   producer 전달값(원천)은 불변 — mergeOpen* 가 append-only(아키텍처 §5#2).

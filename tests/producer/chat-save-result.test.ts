@@ -30,6 +30,44 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('대사 언어 변경의 실제 결과', () => {
+  it('이미 저장된 대사 언어가 다음 질문 응답에 다시 포함되면 재저장 안내 없이 질문과 선택지를 유지한다', async () => {
+    // 왜: 부족한 인물 정보를 묻는 답변 끝에 이미 끝난 언어 저장 안내가 다시 붙어 대화가 끝난 것처럼 보였다.
+    useProducerStore.setState({ projectSettings: { ...useProducerStore.getState().projectSettings, dialogueLanguage: 'ko' } })
+    const apply = vi.spyOn(useProducerStore.getState(), 'applyExtractedSettings')
+    vi.mocked(fetch).mockResolvedValue(Response.json({
+      reply: '전사는 엘프가 찾아오기 전 어떤 마음으로 지내다가, 마지막 순간을 어떻게 맞을까요?',
+      extractedSettings: { dialogueLanguage: 'ko' },
+      choices: ['기다리던 친구를 만나 안심한다', '외로웠다가 함께한 시간을 떠올린다'],
+    }))
+    await useGlobalChatStore.getState().sendMessage('이제뭐함?')
+    const state = useGlobalChatStore.getState()
+    expect(state.messages.at(-1)?.content).toContain('마지막 순간을 어떻게 맞을까요?')
+    expect(state.messages.at(-1)?.content).not.toContain('대사 언어')
+    expect(state.messages.at(-1)?.content).not.toContain('실행 결과')
+    expect(state.suggestion?.action).toMatchObject({ kind: 'choices', options: [{ label: '기다리던 친구를 만나 안심한다' }, { label: '외로웠다가 함께한 시간을 떠올린다' }] })
+    expect(db.save).not.toHaveBeenCalled()
+    expect(apply).not.toHaveBeenCalled()
+    apply.mockRestore()
+  })
+  it('인물 정보를 채우면서 기존 대사 언어가 다시 포함되면 인물만 반영하고 언어 저장 안내를 붙이지 않는다', async () => {
+    // 왜: 언어 재저장을 거르면서 같은 응답의 실제 인물 수정까지 잃으면 안 된다.
+    useProducerStore.setState({ projectSettings: { ...useProducerStore.getState().projectSettings, dialogueLanguage: 'ko' } })
+    vi.mocked(fetch).mockResolvedValue(Response.json({
+      reply: '늙은 전사는 친구가 자신을 기억해 주길 바라요.',
+      extractedSettings: { dialogueLanguage: 'ko', characters: [{ name: '늙은 전사', entityType: 'person', motivation: { want: '친구가 자신을 기억해 주길 바란다' } }] },
+    }))
+    await useGlobalChatStore.getState().sendMessage('친구가 기억해주길 바라다가 안심하고 떠난다')
+    expect(useProducerStore.getState().cast[0]?.motivation?.want).toBe('친구가 자신을 기억해 주길 바란다')
+    expect(useGlobalChatStore.getState().messages.at(-1)?.content).not.toContain('대사 언어')
+    expect(useGlobalChatStore.getState().messages.at(-1)?.content).not.toContain('실행 결과')
+  })
+  it('사용자가 같은 대사 언어로 다시 저장해 달라고 명시하면 저장을 재시도한다', async () => {
+    // 왜: 이전 저장 실패 뒤 보드에만 남은 값을 같은 값이라는 이유로 저장하지 않으면 복구할 수 없다.
+    useProducerStore.setState({ projectSettings: { ...useProducerStore.getState().projectSettings, dialogueLanguage: 'ko' }, error: '이전 저장 실패' })
+    await useGlobalChatStore.getState().sendMessage('대사 언어를 한국어로 바꿔줘')
+    expect(db.save).toHaveBeenCalledOnce()
+    expect(useGlobalChatStore.getState().messages.at(-1)?.content).toContain('저장')
+  })
   it('대사 언어를 한국어로 바꾸면 저장된 설정을 확인한 뒤 완료를 알린다', async () => {
     // 왜: 모델이 변경했다고 말해도 실제 저장이 안 됐으면 재접속 시 일본어로 돌아간다.
     await useGlobalChatStore.getState().sendMessage('대사 언어를 한국어로 바꿔줘')

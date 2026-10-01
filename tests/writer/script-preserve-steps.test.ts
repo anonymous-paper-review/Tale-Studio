@@ -123,6 +123,17 @@ beforeEach(() => {
 })
 
 describe('대본 보존 — 씬 단계', () => {
+  // 같이 정한 것. 왜: 씬을 다시 쓰는 단계에 직접 수정한 최신 초안이 빠지면 저장한 문장이 사라진다.
+  it('AI가 씬을 다듬을 때 최신 초안과 누적 수정 요청을 그대로 전달한다', async () => {
+    const latest = { scenes: [{ scene_id: 'scene_1', scene_actions: ['미라가 문 앞에 찻잔을 놓는다.'] }], total_estimated_seconds: 10 }
+    const notes = ['장소는 그대로 두세요.', '문장만 다듬어 주세요.']
+    await step('scenes').run(state({ input: { story: PROSE }, _sceneRevisionSource: latest, _sceneRevisionNotes: notes }), { logger: logger(), projectId: 'p1' })
+    const args = mocks.runScenes.mock.calls[0]
+    expect(args[0]).toEqual({ story: PROSE })
+    expect(args[7]).toEqual(notes)
+    expect(args[9]).toEqual(latest)
+  })
+
   // 왜: 정상 경로 고정 — 보존의 첫 관문. 씬을 LLM 이 다시 나누면 그 뒤는 전부 각색이다.
   it('대본을 보존하면 씬 단계는 씬을 다시 만들지 않고 대본의 씬을 쓰며, 대본에 없는 칸만 주석기로 채운다', async () => {
     const patch = (await step('scenes').run(state(), { logger: logger(), projectId: 'p1' })) as unknown as { scenes: { scenes: Array<Record<string, unknown>> } }

@@ -93,6 +93,139 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('Producer 채팅의 실제 도구 왕복', () => {
+  const preparePlanning = () => {
+    producer.setState({
+      projectSettings: { playtime: 120, genre: 'fantasy', format: 'horizontal_16:9', tone: ['quiet'], dialogueLanguage: '' },
+      storyReady: true,
+      storyText: '엘프는 오랜 친구를 찾아간다. 늙은 전사는 친구를 맞이한다. 둘은 마지막 밤을 함께 보낸다.',
+      styleAnchorKey: 'watercolor',
+      cast: [{ localId: 'warrior', name: '늙은 전사', entityType: 'person', appearance: '낡은 갑옷을 입은 노인' }],
+      backgrounds: [{ localId: 'cabin', name: '전사의 집', visualDescription: '난롯불이 비추는 작은 통나무집', purpose: '두 친구의 재회' }],
+    })
+    chat.setState({ messages: [{ id: 'question', stage: 'producer', role: 'model', content: '인물들은 어떤 언어로 말할까요?' }] })
+  }
+
+  it('기획 답변을 저장하면 다음 응답은 갱신된 설정과 남은 필수 항목을 보고 이어간다', async () => {
+    // 왜: 처음 요청의 체크리스트를 계속 보내면 방금 저장한 언어를 다시 묻게 된다.
+    preparePlanning()
+    const requests = responses([readTurn(), editTurn(), {
+      reply: '전사는 마지막 시간을 어떻게 보내고 싶어 하나요?',
+      choices: ['친구와 옛 추억을 나누고 싶어 해', '화해하지 못한 일을 털어놓고 싶어 해'],
+    }])
+    await chat.getState().sendMessage('대사는 한국어로', undefined, { answeringProducerQuestion: true })
+    expect(requests[2]).toMatchObject({ answeringProducerQuestion: true, currentSettings: { dialogueLanguage: 'ko' } })
+    const remaining = (requests[2].gate as { hardMissing: string[] }).hardMissing.join(' ')
+    expect(remaining).not.toContain('대사 언어')
+    expect(remaining).toContain('늙은 전사')
+    expect(db.save).toHaveBeenCalledTimes(1)
+    expect(chat.getState().suggestion?.action).toMatchObject({ kind: 'choices' })
+  })
+
+  it('기획 선택지에 답한 뒤 저장 안내만 나오면 남은 필수 항목을 함께 채울 수 있는 제안을 남긴다', async () => {
+    // 왜: 모델이 다음 질문을 빠뜨려도 사용자가 무엇을 해야 하는지 찾느라 대화를 다시 시작하지 않아야 한다.
+    preparePlanning()
+    const requests = responses([readTurn(), editTurn(), { reply: '대사 언어를 한국어로 저장했어요.' }])
+    await chat.getState().sendMessage('대사는 한국어로', undefined, { answeringProducerQuestion: true })
+    expect(requests).toHaveLength(3)
+    expect(chat.getState().suggestion).toMatchObject({
+      stage: 'producer',
+      content: expect.stringContaining('늙은 전사'),
+      action: { kind: 'message', utterance: expect.stringContaining('늙은 전사') },
+    })
+    expect(producer.getState().cast[0].arc).toBeUndefined()
+    expect(chat.getState().pendingProposal).toBeNull()
+    expect(chat.getState().pendingNavigatePath).toBeNull()
+  })
+
+  it('별도로 요청한 설정 변경을 마치면 남은 기획 항목이 있어도 새 제안을 강제로 붙이지 않는다', async () => {
+    // 왜: 저장 뒤 기획을 이어가는 동작은 사용자가 답하고 있던 기획 질문에만 적용한다.
+    preparePlanning()
+    responses([readTurn(), editTurn(), { reply: '대사 언어를 한국어로 저장했어요.' }])
+    await chat.getState().sendMessage('대사 언어를 한국어로 바꿔줘')
+    expect(chat.getState().suggestion).toBeNull()
+  })
+
+  it('기획 답변을 저장하려면 승인이 필요한 경우 다른 필수 항목 제안을 함께 띄우지 않는다', async () => {
+    // 왜: 저장 승인이 끝나기 전에 다른 질문이 끼어들면 무엇에 답해야 하는지 모호해진다.
+    preparePlanning()
+    project.setState({ reachedStage: 'writer' })
+    producer.setState({ projectSettings: { ...producer.getState().projectSettings, dialogueLanguage: 'ja' } })
+    responses([readTurn(), editTurn(), { reply: '변경 승인이 필요해요.' }])
+    await chat.getState().sendMessage('대사는 한국어로', undefined, { answeringProducerQuestion: true })
+    expect(chat.getState().pendingProposal).not.toBeNull()
+    expect(chat.getState().suggestion).toBeNull()
+  })
+
+  it('기획의 필수 항목이 모두 채워졌으면 부족한 항목 제안을 만들지 않는다', async () => {
+    // 왜: 준비가 끝난 프로젝트는 기존 Writer 초대가 안내하며 또 다른 기획 질문을 붙이지 않아야 한다.
+    preparePlanning()
+    producer.setState({ cast: [{ ...producer.getState().cast[0], arc: { start_state: '외로움', end_state: '안도', arc_type: '수용' }, motivation: { want: '친구와 마지막 시간을 보내기' } }] })
+    responses([readTurn(), editTurn(), { reply: '대사 언어를 한국어로 저장했어요.' }])
+    await chat.getState().sendMessage('대사는 한국어로', undefined, { answeringProducerQuestion: true })
+    expect(chat.getState().suggestion).toBeNull()
+  })
+
+  it('기획 답변 저장 뒤 후속 응답이 실패하면 새 기획 제안으로 실패 안내를 가리지 않는다', async () => {
+    // 왜: 저장은 됐어도 다음 답변을 받지 못한 상황을 새 질문이 완료된 것처럼 보이면 안 된다.
+    preparePlanning()
+    responses([readTurn(), editTurn(), () => Promise.reject(new Error('connection lost'))])
+    await chat.getState().sendMessage('대사는 한국어로', undefined, { answeringProducerQuestion: true })
+    expect(db.save).toHaveBeenCalledTimes(1)
+    expect(chat.getState().suggestion).toBeNull()
+    expect(chat.getState().messages.at(-1)?.content).toContain('후속 응답을 받지 못해')
+  })
+
+  it('독립적인 설정 변경을 위한 선택지에 답하면 다른 기획 질문을 시작하지 않는다', async () => {
+    // 왜: 설정 변경을 위해 언어를 고르는 것은 전체 기획을 계속해 달라는 요청이 아니다.
+    preparePlanning()
+    const requests = responses([
+      { reply: '대사 언어는 어떤 언어로 바꿀까요?', choices: ['한국어로', '일본어로'] },
+      { reply: '한국어로 저장했어요.', extractedSettings: { dialogueLanguage: 'ko' } },
+    ])
+    await chat.getState().sendMessage('대사 언어를 바꿔줘')
+    expect(chat.getState().suggestion?.action).toMatchObject({ kind: 'choices' })
+    expect(chat.getState().suggestion?.action).not.toHaveProperty('answeringProducerQuestion', true)
+    await chat.getState().sendMessage('한국어로')
+    expect(requests[1]).not.toHaveProperty('answeringProducerQuestion')
+    expect(chat.getState().suggestion).toBeNull()
+  })
+
+  it.each(['한국어 대사로', '한국어'])('기획 선택지의 답을 일반 입력창에 %s라고 입력해도 다음 필수 항목으로 이어간다', async (answer) => {
+    // 왜: 선택지 버튼과 일반 입력창으로 같은 답을 전달했을 때 다음 안내가 달라지면 안 된다.
+    preparePlanning()
+    const requests = responses([
+      { reply: '대사 언어는 어떤 언어로 할까요?', choices: ['한국어 대사로', '일본어 대사로'] },
+      { reply: '한국어로 저장했어요.', extractedSettings: { dialogueLanguage: 'ko' } },
+    ])
+    await chat.getState().sendMessage('다음에 필요한 것을 같이 정하자')
+    expect(chat.getState().suggestion?.action).toMatchObject({ kind: 'choices', answeringProducerQuestion: true })
+    await chat.getState().sendMessage(answer)
+    expect(requests[1]).toHaveProperty('answeringProducerQuestion', true)
+    expect(chat.getState().suggestion?.action).toMatchObject({ kind: 'message' })
+  })
+
+  it.each(['영상의 포맷이 뭐야?', '대사 언어를 일본어로 바꿔줘'])('기획 선택지가 떠 있어도 다른 요청인 %s에는 기획 답변 표시를 붙이지 않는다', async (message) => {
+    // 왜: 선택지를 무시하고 다른 일을 물은 사용자의 새 요청을 기획 답변으로 바꾸면 안 된다.
+    preparePlanning()
+    const requests = responses([
+      { reply: '대사 언어는 어떤 언어로 할까요?', choices: ['한국어 대사로', '일본어 대사로'] },
+      { reply: '요청하신 내용을 확인했어요.' },
+    ])
+    await chat.getState().sendMessage('다음에 필요한 것을 같이 정하자')
+    await chat.getState().sendMessage(message)
+    expect(requests[1]).not.toHaveProperty('answeringProducerQuestion')
+    expect(chat.getState().suggestion).toBeNull()
+  })
+
+  it.each(['전사는 마지막에 무엇을 원하나요?', '전사가 마지막에 원하는 것을 알려주세요.'])('기획 답변 뒤 모델이 %s라고 물었으면 같은 차례에 다른 질문을 덧붙이지 않는다', async (reply) => {
+    // 왜: 자연어 질문이 이미 있는데 보충 카드까지 나오면 두 질문에 동시에 답하게 된다.
+    preparePlanning()
+    responses([readTurn(), editTurn(), { reply }])
+    await chat.getState().sendMessage('대사는 한국어로', undefined, { answeringProducerQuestion: true })
+    expect(chat.getState().messages.at(-1)?.content).toContain(reply)
+    expect(chat.getState().suggestion).toBeNull()
+  })
+
   it.each(['approve', 'cancel'] as const)('언어 변경 승인 중에는 다른 주제의 선택지를 띄우지 않고 처리 뒤에도 되살리지 않는다 (%s)', async (action) => {
     // 왜: 언어 변경 승인 카드와 스타일 선택지가 동시에 떠 채팅 입력까지 잠긴 실제 사례.
     project.setState({ reachedStage: 'artist' })

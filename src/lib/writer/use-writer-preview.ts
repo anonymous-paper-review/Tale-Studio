@@ -9,6 +9,7 @@ import type { WriterV2Package } from '@/lib/writer/v2/semantic-unit'
 import { useLocaleStore } from '@/stores/locale-store'
 import { useProjectStore } from '@/stores/project-store'
 import { pickContentLocale } from '@/lib/locale'
+import type { SceneStoryProposalView } from '@/lib/producer/scene-story-proposal'
 
 export interface PreviewScene {
   sceneId: string
@@ -44,6 +45,10 @@ export interface WriterPreview {
   running: boolean
   completed: boolean
   failed: boolean
+  /** 직접 수정 저장 시 이전 초안으로 덮어쓰지 않도록 비교하는 실행 갱신 시각. */
+  updatedAt?: string | null
+  storyVersion?: string
+  sceneStoryProposal?: SceneStoryProposalView | null
   roster: { slug: string; name: string }[]
   scenes: PreviewScene[]
   characters: PreviewCharacter[]
@@ -54,6 +59,8 @@ export interface WriterPreview {
 
 interface Options {
   intervalMs?: number
+  /** 직접 저장한 본문을 다음 폴링을 기다리지 않고 다시 읽는다. */
+  refreshKey?: number
   /** false 면 폴링하지 않는다(완료 후 언마운트 전 정지 등). 기본 true. */
   enabled?: boolean
 }
@@ -64,12 +71,13 @@ export function useWriterPreview(
 ): { preview: WriterPreview | null; loading: boolean } {
   const interval = opts.intervalMs ?? 4000
   const enabled = opts.enabled ?? true
+  const refreshKey = opts.refreshKey ?? 0
   const projectLocale = useProjectStore((s) => s.projectLocale)
   const locked = useProjectStore((s) => s.projectLocaleLocked)
   const uiLocale = useLocaleStore((s) => s.locale)
   const displayLocale = pickContentLocale({ projectLocale, locked, uiLocale })
 
-  const [preview, setPreview] = useState<WriterPreview | null>(null)
+  const [previewState, setPreviewState] = useState<{ projectId: string; preview: WriterPreview } | null>(null)
   const [loading, setLoading] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -85,7 +93,7 @@ export function useWriterPreview(
         const r = await fetch(`/api/writer/preview/${projectId}?locale=${displayLocale}`)
         if (r.ok) {
           const j = (await r.json()) as WriterPreview
-          if (!cancelled) setPreview(j)
+          if (!cancelled) setPreviewState({ projectId, preview: j })
           // 완료/실패면 한 번 더 받고 폴링 중단(마지막 산출물 반영).
           stop = !!(j.completed || j.failed)
         }
@@ -103,7 +111,7 @@ export function useWriterPreview(
       cancelled = true
       if (timerRef.current) clearTimeout(timerRef.current)
     }
-  }, [projectId, interval, enabled, displayLocale])
+  }, [projectId, interval, enabled, displayLocale, refreshKey])
 
-  return { preview, loading }
+  return { preview: previewState && previewState.projectId === projectId ? previewState.preview : null, loading }
 }

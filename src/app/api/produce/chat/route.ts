@@ -66,6 +66,7 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
       preserveScript,
       cardFill,
       producerLocked,
+      answeringProducerQuestion,
     } = await req.json()
     const modelSettings = parseChatModelSettings(rawModelSettings)
     if (!modelSettings) return NextResponse.json({ error: 'Invalid chat model settings' }, { status: 400 })
@@ -127,6 +128,9 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
       currentLanguage: currentSettings?.dialogueLanguage,
     })
     const contextParts: string[] = []
+    if (answeringProducerQuestion === true && producerLocked !== true && !cardFill) {
+      contextParts.push('[Current Planning Answer]\nThe user is answering a Producer planning question using its choices or free-input answer. Continue that existing planning goal after saving their answer: acknowledge the result, then help with one remaining required item from the updated checklist. This is conversation context, not permission to invent card values or execute Writer. If the message changes topic, respect the new request instead.')
+    }
     contextParts.push(dialogueLanguage
       ? `[Dialogue Language Decision]\n${dialogueLanguage}\nThe user confirmed this dialogue language. Use this exact code for dialogueLanguage. Do not ask the user to confirm this language again. Never infer a different language from the setting, country, names, visual style, or chat language.`
       : '[Dialogue Language Decision]\nUNDECIDED\nThe user has not confirmed a dialogue language. Omit dialogueLanguage from extractedSettings. Ask the user in the ongoing conversation before confirming it; at most one focused question per reply. If this reply already asks about another missing detail, leave dialogue language unresolved for a later turn.')

@@ -37,6 +37,20 @@ beforeEach(() => {
 })
 
 describe('이름을 정리한 이야기만 다음 단계에 넘긴다', () => {
+  // 같이 정한 것. 왜: 모델이 처음 입력한 이야기만 보고 다시 쓰면 직접 수정한 문장을 복원할 수 없다.
+  it('AI에 문장을 다듬어 달라고 하면 최신 씬 본문과 수정 요청을 함께 읽는다', async () => {
+    const latest = sceneResult()
+    latest.scenes[0].scene_actions = ['쿄타로가 자판기 앞에서 코마츠에게 따뜻한 차를 건넨다.']
+    const notes = ['두 사람의 장소는 유지해 주세요.', '문장만 매끄럽게 다듬어 주세요.']
+    mocks.generate.mockResolvedValue(latest)
+    await runScenes(input, genre, structure, cast, world, logger as unknown as PipelineLogger, { provider: 'local', baseUrl: 'http://fixture.invalid' }, notes, undefined, latest)
+    const prompt = mocks.generate.mock.calls[0][0] as string
+    expect(prompt).toContain(JSON.stringify(latest, null, 2))
+    expect(prompt).toContain(notes[0])
+    expect(prompt).toContain(notes[1])
+    expect(prompt).toContain(input.story)
+  })
+
   it('이야기 문장에 등록된 장소의 내부 식별자가 있으면 그 장소의 표시 이름으로 보여준다.', async () => {
     const result = await execute(sceneResult())
     expect(result.scenes[0].scene_actions).toEqual(['쿄타로가 자판기 앞에서 코마츠를 만난다.'])

@@ -60,6 +60,8 @@ import { StyleAnchorPicker } from '@/features/producer/style-anchor-picker'
 import { selectStyleAnchorFromPicker } from '@/features/producer/select-style-anchor'
 import { SceneGateControls } from '@/features/writer/scene-gate-panel'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
+import { useWriterPreview } from '@/lib/writer/use-writer-preview'
+import { SceneStoryProposalCard } from '@/components/layout/scene-story-proposal-card'
 import {
   buildScriptLines,
   scriptLineMentions,
@@ -434,6 +436,9 @@ function ChatTraceFooter({
 export function GlobalChat() {
   const messages = useGlobalChatStore((s) => s.messages)
   const loading = useGlobalChatStore((s) => s.loading)
+  const sceneStoryEdit = useGlobalChatStore((s) => s.sceneStoryEdit)
+  const sceneStoryRefresh = useGlobalChatStore((s) => s.sceneStoryRefresh)
+  const sceneStoryProposalPending = useGlobalChatStore((s) => s.sceneStoryProposalPending)
   const error = useGlobalChatStore((s) => s.error)
   const lastTrace = useGlobalChatStore((s) => s.lastTrace)
   const sendMessage = useGlobalChatStore((s) => s.sendMessage)
@@ -473,6 +478,12 @@ export function GlobalChat() {
     storeStage
   const projectId = useProjectStore((s) => s.projectId)
   const { requestImageUploadConsent, imageUploadConsentDialog } = useImageUploadConsent(projectId)
+  const producerLocked = useProjectStore((s) => s.producerLocked)
+  const { preview: sceneStoryPreview } = useWriterPreview(projectId, { enabled: currentStage === 'producer' && producerLocked, refreshKey: sceneStoryRefresh })
+  const sceneStoryProposal = currentStage === 'producer' && producerLocked ? sceneStoryPreview?.sceneStoryProposal : null
+  useEffect(() => {
+    if (projectId && currentStage === 'producer' && producerLocked && sceneStoryPreview) useGlobalChatStore.getState().syncSceneStoryProposal(projectId, sceneStoryPreview.sceneStoryProposal?.id ?? null)
+  }, [projectId, currentStage, producerLocked, sceneStoryPreview])
 
   // 폭 리사이즈 + 접기 (chat-ui-store, persist)
   const chatWidth = useChatUiStore((s) => s.chatWidth)
@@ -722,6 +733,7 @@ export function GlobalChat() {
   useEffect(() => {
     if (collapsed || !CHAT_SUPPORTED_STAGES.has(currentStage)) return
     const handler = (e: KeyboardEvent) => {
+      if (useGlobalChatStore.getState().sceneStoryEdit?.mode === 'manual') return
       if (e.ctrlKey || e.metaKey || e.altKey) return
       // 글자 키만 — 화살표/펑션/Enter/Space(버튼 활성화 키) 제외. IME 첫 타(key='Process')는
       //   물리 코드로 판정한다.
@@ -773,7 +785,8 @@ export function GlobalChat() {
 
   const stageSupported = CHAT_SUPPORTED_STAGES.has(currentStage)
   // 응답 대기 중에도 다음 답변을 적을 수 있고, 중복 전송만 막는다.
-  const inputLocked = !stageSupported
+  const sceneEditActive = sceneStoryEdit?.projectId === projectId ? sceneStoryEdit : null
+  const inputLocked = !stageSupported || sceneEditActive?.mode === 'manual'
   const sendDisabled = inputLocked || loading
   // (loading 중 disabled 해제 시 재포커스하던 #b3 effect 제거 — 이제 입력창이 잠기지 않아
   //  포커스를 잃을 일이 없다. 남겨두면 다른 곳으로 옮긴 포커스를 도로 뺏는다.)
@@ -849,7 +862,7 @@ export function GlobalChat() {
   // 씬 게이트 활성 여부(#gate-main-input 2026-08-12) — 피드백은 별도 텍스트박스가 아니라
   //   이 입력창으로 받는다. 비어 있는 Enter = 확정(전역 Enter 핸들러가 처리).
   const sceneGateActive =
-    suggestion?.action?.kind === 'confirmScenes' && suggestion.stage === currentStage
+    suggestion?.action?.kind === 'confirmScenes' && suggestion.stage === currentStage && !sceneStoryProposal && sceneStoryProposalPending?.projectId !== projectId
 
   // writer 파이프라인이 도는 동안(게이트 대기 제외)의 채팅 (#run-chat-gate 2026-08-12) —
   //   씬·샷이 아직 없어서 수정 요청을 실행할 수 없고, 실측 사고로 "초안 만들어줘" 발화가
@@ -895,12 +908,9 @@ export function GlobalChat() {
 
     setInput('')
     // 씬 게이트 중의 입력 = 수정 피드백 (#gate-main-input) — 일반 채팅이 아니라 revise 로 간다.
-    const inputRoute = writerInputRoute(msg, { sceneGate: sceneGateActive, running: writerRunning, gateElsewhere: writerGateElsewhere && !sceneGateActive })
+    const inputRoute = writerInputRoute(msg, { sceneGate: sceneGateActive, running: writerRunning, explicitRevision: currentStage === 'producer', gateElsewhere: writerGateElsewhere && !sceneGateActive })
     if (inputRoute === 'revise') {
-      dismissSuggestion()
-      const ok = await useGlobalChatStore.getState().reviseSceneGate(msg)
-      if (ok) toast.success(t('Applying your feedback and rewriting the scene story…'))
-      else toast.error(t('Could not send the change request. Please try again.'))
+      await sendMessage(msg, undefined, { stageOverride: 'producer' })
       return
     }
     if (inputRoute === 'elsewhere') {
@@ -966,6 +976,7 @@ export function GlobalChat() {
 
   // 프로액티브 제안 승인 — 'navigate'(stage 이동) / 'artist-refresh-look'(초안 일괄 재생성, 유저 클릭).
   const handleSuggestionAction = async () => {
+    if (useGlobalChatStore.getState().sceneStoryEdit) return
     const action = suggestion?.action
     if (!action) {
       dismissSuggestion()
@@ -978,6 +989,11 @@ export function GlobalChat() {
     }
     // #p4-choices 는 렌더에서 버튼별 인라인 처리 — 이 핸들러엔 도달하지 않는다(타입 내로잉용).
     if (action.kind === 'choices') return
+    if (action.kind === 'message') {
+      dismissSuggestion()
+      await sendMessage(action.utterance, undefined, { stageOverride: suggestion?.stage, ...(action.answeringProducerQuestion ? { answeringProducerQuestion: true } : {}) })
+      return
+    }
     // 씬 게이트 확정(#s3-gate P3b) — 게이트 패널의 [이대로 확정]과 같은 API. 성공 전환은
     //   writer 화면의 상태 폴링이 집어간다.
     if (action.kind === 'confirmScenes') {
@@ -1006,6 +1022,7 @@ export function GlobalChat() {
   }
 
   const handlePendingProposalApprove = async () => {
+    if (useGlobalChatStore.getState().sceneStoryEdit) return
     if (!pendingProposal) return
     // Writer 첫 넘김 카드의 승인 = Producer 잠금 — 확정 창에서 값과 잠금을 한 번 더 보여 준다(2026-10-01 오너).
     if (pendingProposal.kind === 'producerWriterInitialHandoff') {
@@ -1020,6 +1037,7 @@ export function GlobalChat() {
   }
 
   const handleFiles = async (picked: File[]) => {
+    if (useGlobalChatStore.getState().sceneStoryEdit) return
     // 같은 파일을 다시 고를 수 있게 즉시 비운다.
     if (picked.length === 0) return
 
@@ -1187,21 +1205,24 @@ export function GlobalChat() {
     requestAnimationFrame(() => freeformInputRef.current?.focus())
   }
   const handleChoiceContinue = () => {
-    if (!choices || choices.displayOnly || !selectedChoice) return
+    if (inputLocked || loading || !choices || choices.displayOnly || !selectedChoice) return
     if (selectedChoice === FREEFORM) {
       openFreeform()
       return
     }
     const opt = choices.options.find((o) => o.label === selectedChoice)
     if (!opt) return
-    dismissSuggestion()
-    void sendMessage(opt.utterance, undefined, { stageOverride: currentStage })
+    const answeringProducerQuestion = suggestion?.stage === 'producer' && suggestion.action?.kind === 'choices' && suggestion.action.answeringProducerQuestion === true
+    // 전송 경로가 현재 질문의 출처를 먼저 읽게 한다. 동기 처리 중 새 제안이 생겼으면 지우지 않는다.
+    void sendMessage(opt.utterance, undefined, { stageOverride: currentStage, ...(answeringProducerQuestion ? { answeringProducerQuestion: true } : {}) })
+    if (suggestion?.id !== `scene-story-edit:${projectId}` && useGlobalChatStore.getState().suggestion?.id === suggestion?.id) dismissSuggestion()
   }
   const handleFreeformSend = () => {
     const text = freeformText.trim()
-    if (!text || useGlobalChatStore.getState().loading) return
-    dismissSuggestion()
-    void sendMessage(text, undefined, { stageOverride: currentStage })
+    if (inputLocked || !text || useGlobalChatStore.getState().loading) return
+    const answeringProducerQuestion = suggestion?.stage === 'producer' && suggestion.action?.kind === 'choices' && suggestion.action.answeringProducerQuestion === true
+    void sendMessage(text, undefined, { stageOverride: currentStage, ...(answeringProducerQuestion ? { answeringProducerQuestion: true } : {}) })
+    if (suggestion?.id !== `scene-story-edit:${projectId}` && useGlobalChatStore.getState().suggestion?.id === suggestion?.id) dismissSuggestion()
   }
 
   // 선택지 키보드 조작 (#choices-keys 2026-08-07) — Claude Code CLI 의 AskUserQuestion 문법 차용:
@@ -1211,7 +1232,7 @@ export function GlobalChat() {
     if (!choices || choices.displayOnly || freeformOpen) return
     const labels = [...choices.options.map((o) => o.label), FREEFORM]
     const handler = (e: KeyboardEvent) => {
-      if (loading || e.isComposing) return
+      if (inputLocked || loading || e.isComposing) return
       if (document.querySelector('[role="dialog"][data-state="open"]')) return
       const target = e.target as HTMLElement | null
       if (target) {
@@ -1268,7 +1289,7 @@ export function GlobalChat() {
   // 계단식 등장(#chat-settle) — settle 후 보이는 임시 블록이 위에서부터 CASCADE_STEP_MS 간격으로
   //   나타난다. fill-mode backwards: 자기 차례 전까지 첫 키프레임(투명)에 머문다.
   const showSuggestion =
-    !!suggestion?.action && suggestion.action.kind !== 'choices' && !choices
+    !!suggestion?.action && suggestion.action.kind !== 'choices' && !choices && !(suggestion.action.kind === 'confirmScenes' && (sceneStoryProposal || sceneStoryProposalPending?.projectId === projectId))
   const showProposal = !!pendingProposal
   let cascadeSlots = 0
   const suggestionSlot = showSuggestion ? cascadeSlots++ : 0
@@ -1291,7 +1312,7 @@ export function GlobalChat() {
   useEffect(() => {
     if (!proposalOpen && !suggestionOpen) return
     const handler = (e: KeyboardEvent) => {
-      if (loading || e.isComposing) return
+      if (sceneEditActive || loading || e.isComposing) return
       if (e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return
       if (e.key !== 'Enter' && e.key !== 'Escape') return
       // 모달이 열려 있으면 전부 양보(#style-timing 실측 사고: 스타일 픽커가 떠 있는데 Enter 가
@@ -1300,7 +1321,7 @@ export function GlobalChat() {
       if (document.querySelector('[role="dialog"][data-state="open"]')) return
       const target = e.target as HTMLElement | null
       // 선택지 버튼의 Enter는 그 버튼의 동작이다. 함께 복원된 승인 카드를 실행하지 않는다.
-      if (target?.closest('[data-chat-choices]')) return
+      if (target?.closest('[data-chat-choices], [data-testid="scene-story-proposal"]')) return
       const inChatInput = !!target && target === textareaRef.current
       // 다른 입력 요소(인라인 '직접 입력', 이름 변경 등)에 있으면 그쪽 몫.
       if (
@@ -1524,6 +1545,7 @@ export function GlobalChat() {
             ))}
 
             {loading && <ThinkingIndicator stage={currentStage} />}
+            {projectId && sceneStoryProposal ? <SceneStoryProposalCard key={`${projectId}:${sceneStoryProposal.id}`} projectId={projectId} proposal={sceneStoryProposal} /> : null}
 
             {/* 프로액티브 제안 (chat-proactive-copilot Phase 1) — 시스템이 먼저 거는 actionable 넛지.
                 탭 전환 후 1초 정적을 두고 계단식 등장(#chat-settle).
@@ -1678,6 +1700,11 @@ export function GlobalChat() {
             MentionTextarea 의 ^/v 버튼으로 안내(#a3). Enter 전송 / Shift+Enter 개행.
             툴바: + 업로드 · 에이전트 필(빠른 요청) · four-dot(@멘션) · 우측 원형 send→Stop. */}
         <div className="shrink-0 p-3 pt-1">
+          {sceneEditActive?.mode === 'manual' ? (
+            <div className="mb-3 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2" data-testid="scene-story-chat-edit">
+              <p className="text-xs leading-5 text-muted-foreground">{t('Editing in the window. Save or cancel to use chat again.')}</p>
+            </div>
+          ) : null}
           {/* 선택지를 고르거나 바로 아래 채팅창에 직접 답한다. */}
           {choices && (
             <div
@@ -1719,7 +1746,7 @@ export function GlobalChat() {
                   <button
                     key={opt.label}
                     type="button"
-                    disabled={loading}
+                    disabled={sendDisabled}
                     aria-pressed={selected}
                     onClick={() => {
                       setFreeformOpen(false)
@@ -1774,7 +1801,7 @@ export function GlobalChat() {
               ) : (
                 <button
                   type="button"
-                  disabled={loading}
+                  disabled={sendDisabled}
                   aria-pressed={selectedChoice === FREEFORM}
                   onClick={openFreeform}
                   className={cn(
@@ -1801,7 +1828,7 @@ export function GlobalChat() {
               <Button
                 size="sm"
                 className="w-full rounded-full"
-                disabled={loading || (freeformOpen ? !freeformText.trim() : !selectedChoice)}
+                disabled={sendDisabled || (freeformOpen ? !freeformText.trim() : !selectedChoice)}
                 onClick={freeformOpen ? handleFreeformSend : handleChoiceContinue}
               >
                 {t('Continue')}

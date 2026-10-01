@@ -116,7 +116,6 @@ beforeEach(() => {
 describe('normalizeWriterTab — 대사탭 활성화 회귀 가드', () => {
   it('대사 화면을 선택하면 해당 화면으로 이동한다 (준비 중 시절 탭 클릭 무시 사고)', () => {
     expect(normalizeWriterTab('dialogue')).toBe('dialogue')
-    expect(normalizeWriterTab('script')).toBe('script')
     expect(normalizeWriterTab('unknown')).toBe('storyboard')
   })
 })

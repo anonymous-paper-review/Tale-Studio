@@ -169,3 +169,22 @@ it('한글을 조합 중이면 Enter로 전송하지 않는다', () => {
   pressEnter(input)
   expect(send).toHaveBeenCalledExactlyOnceWith('한국어', undefined, { stageOverride: 'producer' })
 })
+
+it('기획 질문의 직접 입력을 보내면 질문의 출처를 전달하고 전송 전에 선택지를 지우지 않는다', () => {
+  // 왜: 설정 변경의 확인 질문과 기획 질문은 답변을 저장한 뒤 이어갈 범위가 다르다.
+  const suggestion = useGlobalChatStore.getState().suggestion!
+  useGlobalChatStore.setState({ suggestion: {
+    ...suggestion,
+    action: { kind: 'choices', options: [{ label: '한국어 대사로', utterance: '한국어 대사로' }], answeringProducerQuestion: true },
+  } })
+  let questionPresentAtSend = false
+  const send = vi.fn(async () => {
+    questionPresentAtSend = useGlobalChatStore.getState().suggestion?.id === suggestion.id
+    useGlobalChatStore.setState({ loading: true })
+  })
+  useGlobalChatStore.setState({ sendMessage: send })
+  const { button } = typeAnswer('한국어')
+  button.onClick()
+  expect(send).toHaveBeenCalledExactlyOnceWith('한국어', undefined, { stageOverride: 'producer', answeringProducerQuestion: true })
+  expect(questionPresentAtSend).toBe(true)
+})

@@ -13,8 +13,9 @@ import { getActiveRun } from '@/lib/writer/run-store';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { parseAppLocale, pickContentLocale, type AppLocale } from '@/lib/locale';
 import { resolveEntityNames } from '@/lib/writer/resolve-entity-names';
-import type { StoryScene, DecoupagePlan } from '@/lib/writer/types/pipeline';
+import type { Scenes, DecoupagePlan } from '@/lib/writer/types/pipeline';
 import type { WriterV2Package } from '@/lib/writer/v2/semantic-unit';
+import { sceneStoryProposalView, type SceneStoryProposal } from '@/lib/producer/scene-story-proposal';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,7 +23,9 @@ export const dynamic = 'force-dynamic';
 // state 에서 필요한 필드만 구조적으로 읽는다(steps.ts 의 무거운 import 회피).
 interface PreviewState {
   input?: { writerEngine?: unknown };
-  scenes?: { scenes?: StoryScene[] };
+  scenes?: Scenes;
+  _sceneStoryVersion?: string;
+  _sceneStoryProposal?: SceneStoryProposal;
   decoupage?: DecoupagePlan;
   characters?: { characters?: Array<{ id?: string; name?: string; role?: string }> };
   dramaturgy?: { world_inventory?: Array<{ id?: string; name?: string }> };
@@ -90,6 +93,7 @@ export async function GET(
         running: false,
         completed: false,
         failed: false,
+        updatedAt: null,
         roster: [],
         scenes: [],
         characters: [],
@@ -110,6 +114,7 @@ export async function GET(
           running,
           completed,
           failed,
+          updatedAt: run.updated_at,
           roster: [],
           scenes: [],
           characters: [],
@@ -239,6 +244,13 @@ export async function GET(
     pushRoster(roster, seen, state.dramaturgy?.world_inventory);
     const entities = roster.map((entry) => ({ id: entry.slug, name: entry.name }));
     for (const scene of scenes) scene.beats = scene.beats.map((beat) => resolveEntityNames(beat, entities));
+    const sceneStoryProposal = sceneStoryProposalView(state._sceneStoryProposal, state.scenes);
+    if (sceneStoryProposal) {
+      const proposalEntities = [...entities, ...(state._sceneStoryProposal?.scenes?.new_characters ?? [])];
+      for (const scene of [...sceneStoryProposal.before, ...sceneStoryProposal.after]) {
+        scene.beats = scene.beats.map((beat) => resolveEntityNames(beat, proposalEntities));
+      }
+    }
 
     return NextResponse.json(
       {
@@ -247,6 +259,9 @@ export async function GET(
         running,
         completed,
         failed,
+        updatedAt: run.updated_at,
+        storyVersion: state._sceneStoryVersion ?? run.updated_at,
+        sceneStoryProposal,
         roster,
         scenes,
         characters,

@@ -1,12 +1,10 @@
 'use client'
 
 import {
-  useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type ElementType,
   type ReactNode,
 } from 'react'
@@ -56,12 +54,6 @@ import { useLocale, useT } from '@/lib/i18n'
 //   max-h로 카드 폭주를 막고, 넘치면 얇은 썸만 보이게.
 const CARD_TEXTAREA =
   'max-h-40 resize-none [scrollbar-width:thin] [scrollbar-color:var(--color-border)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border'
-
-// Brief Story 접힘 상태(#b1 2026-07-31) — 4줄(text-sm 20px × 4)만 보이고, 마우스를 올리면
-//   넘친 만큼 일정한 속도로 천천히 올라온다. 속도를 고정했으므로 글이 길수록 오래 흐른다.
-const STORY_PEEK_VIEW_PX = 80
-const STORY_PEEK_SPEED_PX_PER_SEC = 26
-const STORY_PEEK_RETURN_MS = 240
 
 // 모듈 상수는 영어 키, 번역은 렌더 지점에서 t() (writer 배치의 STAGE_LABELS 패턴).
 //   writer-character-panel.tsx 의 ROLE_LABEL 과 같은 값·같은 사전 키를 공유(Protagonist/
@@ -612,7 +604,6 @@ function BackgroundRow({
 export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   const t = useT()
   const projectSettings = useProducerStore((s) => s.projectSettings)
-  const storyText = useProducerStore((s) => s.storyText)
   const cast = useProducerStore((s) => s.cast)
   const syncing = useProducerStore((s) => s.syncing)
   const addCastMember = useProducerStore((s) => s.addCastMember)
@@ -648,26 +639,6 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
     void renameProject(next)
   }
 
-  // Brief Story 전체보기 토글 — 길면 4줄로 클램프, "더 보기"로 스크롤 박스 펼침.
-  const [storyExpanded, setStoryExpanded] = useState(false)
-  // 접힘 상태에서 hover 하면 잘린 뒷부분이 천천히 올라온다(#b1). 이동 거리는 실제로 넘친
-  //   높이라 렌더 후 측정해야 하고, 텍스트·패널 폭이 바뀌면 다시 재야 해서 ResizeObserver 로 본다.
-  const [storyPeek, setStoryPeek] = useState(0)
-  const [storyHover, setStoryHover] = useState(false)
-  const storyPeekRo = useRef<ResizeObserver | null>(null)
-  const storyBodyRef = useCallback((el: HTMLParagraphElement | null) => {
-    storyPeekRo.current?.disconnect()
-    storyPeekRo.current = null
-    if (!el) {
-      setStoryPeek(0)
-      return
-    }
-    const measure = () => setStoryPeek(Math.max(0, el.scrollHeight - STORY_PEEK_VIEW_PX))
-    measure()
-    const ro = new ResizeObserver(measure)
-    ro.observe(el)
-    storyPeekRo.current = ro
-  }, [])
   const persons = cast.filter((m) => m.entityType === 'person')
   const objects = cast.filter((m) => m.entityType === 'object')
   // 저널의 "주인공 등장" 판정에 쓰는 인물 수 — 게이트와 같은 범위(producer 원천)로 센다.
@@ -735,7 +706,8 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   }))
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col" data-testid="producer-edit-surface">
       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-6 py-4">
         <div>
           <div className="flex items-center gap-2">
@@ -841,61 +813,6 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                   className="mt-2 w-full max-w-xl border-b border-border-strong bg-transparent text-3xl font-extrabold tracking-tight outline-none placeholder:text-foreground/25 focus:border-stage-producer"
                 />
               )}
-              <div className="mt-2 max-w-2xl">
-                {storyText ? (
-                  <>
-                    {storyExpanded ? (
-                      <p className="max-h-72 overflow-y-auto pr-1 text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">
-                        {storyText}
-                      </p>
-                    ) : (
-                      <div
-                        onMouseEnter={() => setStoryHover(true)}
-                        onMouseLeave={() => setStoryHover(false)}
-                        className={cn(
-                          'max-h-20 overflow-hidden',
-                          // 아래를 흐리게 — 아직 더 남았다는 신호(line-clamp 말줄임의 대체).
-                          storyPeek > 0 &&
-                            '[mask-image:linear-gradient(to_bottom,#000_72%,transparent)]',
-                        )}
-                      >
-                        <p
-                          ref={storyBodyRef}
-                          style={
-                            {
-                              '--peek-shift': storyHover ? `-${storyPeek}px` : '0px',
-                              transitionDuration: storyHover
-                                ? `${Math.round((storyPeek / STORY_PEEK_SPEED_PX_PER_SEC) * 1000)}ms`
-                                : `${STORY_PEEK_RETURN_MS}ms`,
-                            } as CSSProperties
-                          }
-                          className="translate-y-[var(--peek-shift)] text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground transition-transform ease-linear motion-reduce:translate-y-0 motion-reduce:transition-none"
-                        >
-                          {storyText}
-                        </p>
-                      </div>
-                    )}
-                    {(storyExpanded || storyPeek > 0) && (
-                      <button
-                        type="button"
-                        onClick={() => setStoryExpanded((v) => !v)}
-                        className="mt-2 flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-                      >
-                        {storyExpanded ? t('Collapse') : t('See more')}
-                        <ChevronDown
-                          className={cn('size-3.5 transition-transform', storyExpanded && 'rotate-180')}
-                        />
-                      </button>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-sm italic text-muted-foreground/70">
-                    {t(
-                      'Drop your story into chat and Producer will keep organizing it here. One scene, one feeling is enough.',
-                    )}
-                  </p>
-                )}
-              </div>
               {/* 설정 뱃지 — 히어로의 pills 자리(목업과 동일 위치). 편집은 popover 안에서만. */}
               <div className="mt-5">
                 <StoryFoundationBadges />
@@ -1020,6 +937,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
         </div>
       </div>
 
+      </div>
     </div>
   )
 }
