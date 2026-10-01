@@ -1101,7 +1101,6 @@ export const KO: Record<string, string> = {
   "The current Writer scene/shot story and chat history go into the new Writer input.": '현재 Writer의 씬·샷 스토리와 채팅 내역을 새 Writer 입력에 담아요.',
   'The current Producer story, settings, cast, and background decisions are passed along too.': '현재 Producer의 스토리·설정·캐스트·배경 결정도 함께 전달해요.',
   'Re-running can take a long time. Nothing generates until you approve.': '다시 실행하면 시간이 오래 걸릴 수 있어요. 승인 전에는 아무 생성도 시작하지 않아요.',
-  'The current scene story draft is ready. In the Writer tab, confirm it or request changes to run again.': '현재 씬 스토리 초안이 준비됐어요. Writer 화면에서 확정하거나 수정 요청으로 다시 실행할지 선택해 주세요.',
   'Writer is already running. Check progress in the Writer tab.': 'Writer가 이미 실행 중이에요. 현재 Writer 화면에서 진행 상황을 확인해 주세요.',
   'Writer start was rejected (HTTP 409)': 'Writer 시작이 거부됐어요 (HTTP 409)',
   // ── producer: 첨부 실맹 방지(#attach-loud-fail) ──
@@ -1255,6 +1254,9 @@ export const KO: Record<string, string> = {
   'The scene story draft is ready. Review and confirm it on the Producer screen to continue.': '씬 스토리 초안이 준비됐어요. Producer 화면에서 확인하고 확정하면 이어서 진행돼요.',
   'Review the scene story on the Producer screen and confirm it. Generation continues here after that.': 'Producer 화면에서 씬 스토리를 확인하고 확정해 주세요. 그다음 이 화면에서 생성이 이어져요.',
   'Go to Producer': 'Producer로 가기',
+  'The current scene story draft is ready. Confirm it or request changes in the scene story on the Producer screen.': '현재 씬 스토리 초안이 준비됐어요. Producer 화면의 씬 스토리에서 확정하거나 수정을 요청해 주세요.',
+  'The scene story draft is waiting on the Producer screen. Ask for changes or confirm it there.': '씬 스토리 초안이 Producer 화면에서 기다리고 있어요. 수정 요청이나 확정은 거기서 해 주세요.',
+  'Could not send the change request. Please try again.': '수정 요청을 보내지 못했어요. 다시 시도해 주세요.',
   'Writer first drafts the scene story on this screen. You review it and confirm before the rest is made. These values are confirmed when you hand over.': 'Writer가 먼저 이 화면에 씬 스토리 초안을 써요. 확인하고 확정하면 나머지가 만들어져요. 넘기는 순간 아래 값이 확정돼요.',
   "Writer started drafting the scene story. It appears on this Producer screen as it's written. Ask for changes in chat, or confirm it to continue.": 'Writer가 씬 스토리 초안을 쓰기 시작했어요. 이 Producer 화면에 쓰이는 대로 보여요. 고칠 점은 채팅으로 말하고, 괜찮으면 확정하면 나머지 작업이 이어져요.',
   'Check the values in the window, then confirm to hand over.': '창에서 값을 확인하고 확정하면 넘길게요.',

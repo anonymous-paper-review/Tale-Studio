@@ -12,6 +12,8 @@ vi.mock('@/lib/supabase/client', () => ({
   }),
 }))
 vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTrace: vi.fn(), saveChatTracePatch: vi.fn(), loadLatestChatTrace: vi.fn() }))
+const statusRestart = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/writer/use-writer-status', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/writer/use-writer-status')>()), restartWriterStatus: statusRestart }))
 
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProducerStore } from '@/stores/producer-store'
@@ -124,5 +126,58 @@ describe('씬 스토리 단계 읽기', () => {
 
   it('확정 단계가 없는 V2 실행은 씬 스토리를 쓰는 중에도 이어서 진행 중으로 본다', () => {
     expect(sceneGatePhase(status({ engine: 'v2', current_stage: 'scenes' }))).toBe('continuing')
+  })
+})
+
+describe('씬 스토리 확정 단계 다듬기 (검토 지적)', () => {
+  it('다시 실행을 승인해도 씬 스토리 확정 단계로 시작하면 Producer 화면에 머문다', async () => {
+    // 왜: Writer 가 실패해 다시 실행하면 확정 단계가 Producer 에 있는데도 Writer 화면으로 보냈다.
+    let starts = 0
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === '/api/writer/start') {
+        starts += 1
+        return starts === 1
+          ? Response.json({ code: 'writer_rerun_confirmation_required' }, { status: 409 })
+          : Response.json({ projectId: 'proj-1', runId: 'run-2', status: 'started', sceneGate: true })
+      }
+      return Response.json({})
+    })
+    await useProducerStore.getState().saveAndHandoff()
+    const card = useGlobalChatStore.getState().pendingProposal
+    expect(card?.kind).toBe('producerWriterRerunRequest')
+    expect(await useGlobalChatStore.getState().approvePendingProposal(card?.id)).toBe(true)
+    await new Promise((r) => setTimeout(r, 1200))
+    expect(useGlobalChatStore.getState().pendingNavigatePath).toBeNull()
+    expect(useProjectStore.getState().currentStage).toBe('producer')
+  })
+
+  it('씬 스토리를 확정하거나 고쳐 달라고 하면 Writer 상태를 바로 다시 읽는다', async () => {
+    // 왜: 3초 폴링을 기다리는 사이 옛 초안에 "이대로 확정"이 다시 떠 409 오류가 났다.
+    useProjectStore.setState({ producerLocked: true, reachedStage: 'artist' })
+    statusRestart.mockClear()
+    expect(await useGlobalChatStore.getState().reviseSceneGate('S2를 줄여줘')).toBe(true)
+    expect(JSON.parse(String((calls('/api/writer/scene-gate')[0][1] as RequestInit).body))).toEqual({ projectId: 'proj-1', action: 'revise', feedback: 'S2를 줄여줘' })
+    expect(statusRestart).toHaveBeenCalledWith('proj-1')
+    statusRestart.mockClear()
+    expect(await useGlobalChatStore.getState().confirmSceneGate()).toBe(true)
+    expect(statusRestart).toHaveBeenCalledWith('proj-1')
+  })
+
+  it('확정을 두 번 눌러도 한 번만 보낸다', async () => {
+    // 왜: Enter 와 버튼을 연달아 누르면 두 번째 확정이 409 로 돌아와 성공 직후 오류 안내가 떴다.
+    useProjectStore.setState({ producerLocked: true, reachedStage: 'artist' })
+    const [first, second] = await Promise.all([useGlobalChatStore.getState().confirmSceneGate(), useGlobalChatStore.getState().confirmSceneGate()])
+    expect(first).toBe(true)
+    expect(second).toBeNull()
+    expect(calls('/api/writer/scene-gate')).toHaveLength(1)
+  })
+
+  it('확정 대기 중에 Producer 채팅으로 질문해도 확정 안내는 그대로 남는다', async () => {
+    // 왜: 질문 하나에 확정 안내가 내려가, 그 사이 보낸 수정 요청이 잠긴 Producer 채팅으로 가서 거절됐다.
+    useProjectStore.setState({ producerLocked: true, reachedStage: 'artist' })
+    useGlobalChatStore.getState().offerSuggestion(sceneGateSuggestion('proj-1', '확인해 주세요', '이대로 확정'), { preempt: true })
+    fetchMock.mockImplementation(async () => Response.json({ reply: '지금 씬 초안을 확인할 차례예요.' }))
+    await useGlobalChatStore.getState().sendMessage('진행 상황 알려줘')
+    expect(useGlobalChatStore.getState().suggestion?.id).toBe('scene-gate:proj-1')
   })
 })

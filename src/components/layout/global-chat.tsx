@@ -58,7 +58,7 @@ import {
 } from '@/lib/card-mention'
 import { StyleAnchorPicker } from '@/features/producer/style-anchor-picker'
 import { selectStyleAnchorFromPicker } from '@/features/producer/select-style-anchor'
-import { SceneGateControls, sendSceneGate } from '@/features/writer/scene-gate-panel'
+import { SceneGateControls } from '@/features/writer/scene-gate-panel'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import {
   buildScriptLines,
@@ -864,6 +864,8 @@ export function GlobalChat() {
     !writerRunStatus.pipeline_failed &&
     writerRunStatus.current_status !== 'awaiting_confirmation'
   )
+  // 씬 스토리 확정은 Producer 메인에서 기다린다(2026-10-01) — Writer 채팅의 수정 요청은 거기로 안내한다.
+  const writerGateElsewhere = currentStage === 'writer' && writerRunStatus?.current_status === 'awaiting_confirmation'
 
   const handleSend = async () => {
     if (sendDisabled || uploading) return
@@ -893,10 +895,20 @@ export function GlobalChat() {
 
     setInput('')
     // 씬 게이트 중의 입력 = 수정 피드백 (#gate-main-input) — 일반 채팅이 아니라 revise 로 간다.
-    const inputRoute = writerInputRoute(msg, { sceneGate: sceneGateActive, running: writerRunning })
+    const inputRoute = writerInputRoute(msg, { sceneGate: sceneGateActive, running: writerRunning, gateElsewhere: writerGateElsewhere && !sceneGateActive })
     if (inputRoute === 'revise') {
       dismissSuggestion()
-      await sendSceneGate('revise', msg)
+      const ok = await useGlobalChatStore.getState().reviseSceneGate(msg)
+      if (ok) toast.success(t('Applying your feedback and rewriting the scene story…'))
+      else toast.error(t('Could not send the change request. Please try again.'))
+      return
+    }
+    if (inputRoute === 'elsewhere') {
+      useGlobalChatStore.getState().appendLocalExchange(
+        'writer',
+        msg,
+        t('The scene story draft is waiting on the Producer screen. Ask for changes or confirm it there.'),
+      )
       return
     }
     // 실행 중 가드(#run-chat-gate) — 유저 발화는 남기고, 로컬 즉답으로 상황을 알린다.
@@ -971,8 +983,8 @@ export function GlobalChat() {
     if (action.kind === 'confirmScenes') {
       // 확정은 Producer 메인의 씬 스토리와 같은 경로(2026-10-01) — 성공하면 Writer 화면으로 간다. 실패하면 안내가 남아 다시 누를 수 있다.
       const ok = await useGlobalChatStore.getState().confirmSceneGate()
-      if (ok) toast.success(t('Scenes confirmed. Starting character, visual, and shot design'))
-      else toast.error(t('Could not confirm the scene story. Please try again.'))
+      if (ok === true) toast.success(t('Scenes confirmed. Starting character, visual, and shot design'))
+      else if (ok === false) toast.error(t('Could not confirm the scene story. Please try again.'))
       return
     }
     // 핸드오프(#handoff-to-chat) — 버튼이 직접 이동시키지 않는다. 문장을 채팅에 입력해 보내고,

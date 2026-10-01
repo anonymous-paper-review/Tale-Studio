@@ -97,8 +97,8 @@ export function SceneStorySection() {
     setConfirming(true)
     try {
       const ok = await confirmSceneGate()
-      if (ok) toast.success(t('Scenes confirmed. Starting character, visual, and shot design'))
-      else toast.error(t('Could not confirm the scene story. Please try again.'))
+      if (ok === true) toast.success(t('Scenes confirmed. Starting character, visual, and shot design'))
+      else if (ok === false) toast.error(t('Could not confirm the scene story. Please try again.'))
     } finally {
       setConfirming(false)
     }

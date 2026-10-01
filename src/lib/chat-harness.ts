@@ -10,12 +10,14 @@ If recent history does not contain an earlier agreement and saved project data d
 </request-handling>`
 
 /** This only routes a message; execution permission remains in the tools and domain gates. */
-export function writerInputRoute(message: string, state: { running: boolean; sceneGate: boolean }): 'chat' | 'revise' | 'blocked' {
+/** gateElsewhere: 씬 스토리 확정을 Producer 메인에서 기다리는 중(2026-10-01) — Writer 채팅의 수정 요청은 거기로 안내한다. */
+export function writerInputRoute(message: string, state: { running: boolean; sceneGate: boolean; gateElsewhere?: boolean }): 'chat' | 'revise' | 'blocked' | 'elsewhere' {
   // An edit verb keeps the message on the gated path even when a query verb follows it
   // ("split it and tell me"); a pure explanation or status question goes to chat.
   const editRequest = /나눠|나누고|바꿔|바꾸고|줄여|줄이고|늘려|늘리고|지워|지우고|고쳐|고치고|넣어|합쳐|합치고|빼\s*줘|빼고|(?:추가|삭제|수정|제거|생성|변경)\s*(?:해|하고|해서)|다시\s*써|만들어|\b(?:change|edit|add|remove|delete|split|merge|rewrite|shorten|make)\b/i.test(message) // i18n-ok: 한국어 사용자 입력을 인식하는 정규식.
   const workflowQuestion = /상태|진행\s*(?:상황|현황|률)|막혔|못\s*(?:넘어|가|넘기)|새로고침|재개|실행.*재시도|조회|알려|보여|가능\s*여부|설명해|요약해|어떤\s*내용|무슨\s*내용|(?:^|[.!?。？]\s*)\s*(?:왜\s|지금\s*몇)|\b(?:status|progress|blocked|refresh|reload|resume|show|explain|summarize)\b/i.test(message) // i18n-ok: 조회·설명·복구 입력을 일반 채팅으로 전달하며 실행 허락은 아님.
   if (workflowQuestion && !editRequest) return 'chat'
+  if (state.gateElsewhere) return 'elsewhere'
   if (state.sceneGate) return 'revise'
   return state.running ? 'blocked' : 'chat'
 }

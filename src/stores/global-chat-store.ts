@@ -44,6 +44,7 @@ import { matchHandoffIntent, nextStepAction, resolveDirectorHandoffIntent, type 
 import { loadDirectorReadiness } from '@/lib/director-readiness-loader'
 import type { DirectorReadinessReport } from '@/lib/director-readiness'
 import { sceneGatePhase } from '@/lib/writer/scene-gate'
+import { restartWriterStatus } from '@/lib/writer/use-writer-status'
 import { completeKoreanDialogue, dialogueHandoffTarget } from '@/lib/writer/dialogue-handoff'
 import { handoffToStage } from '@/lib/stage-nav'
 import {
@@ -163,8 +164,11 @@ interface GlobalChatState {
   proceedToDirectorAnyway: () => Promise<void>
   /** 확인 창 닫기("더 고칠게요"·"채우러 가기") — 아무것도 넘기지 않는다. */
   closeHandoffConfirm: () => void
-  /** 씬 스토리 확정(2026-10-01 오너 — 확정 단계는 Producer 메인). 성공하면 나머지 생성이 이어지고 Writer 화면으로 간다. */
-  confirmSceneGate: () => Promise<boolean>
+  /** 씬 스토리 확정(2026-10-01 오너 — 확정 단계는 Producer 메인). 성공하면 나머지 생성이 이어지고 Writer 화면으로 간다.
+   *  null = 이미 보내는 중(두 번 누름) — 아무 안내도 하지 않는다. */
+  confirmSceneGate: () => Promise<boolean | null>
+  /** 씬 스토리 수정 요청 — 초안을 다시 쓰고 다시 확정을 기다린다. */
+  reviseSceneGate: (feedback: string) => Promise<boolean>
   requestDirectorHandoff: (mode: 'check' | 'move' | 'whenReady', resumeId?: string) => Promise<void>
   resumeDirectorHandoff: () => Promise<void>
   confirmDirectorHandoff: (projectId: string, pathname: string) => void
@@ -530,6 +534,9 @@ async function applyStyleAnchorIntent(
   }
 }
 
+/** 씬 스토리 확정을 보내는 중인 프로젝트 — 두 번 누름 방지(2026-10-01). */
+const sceneGateInFlight = new Set<string>()
+
 /** 넘김 확인 창(2026-10-01 오너). via = 창을 연 곳 — 채팅에서 연 창은 진행할 때 넘김 문장을 다시 남기지 않는다. */
 export type HandoffConfirm =
   | { kind: 'producerLock'; projectId: string; proposalId?: string }
@@ -664,6 +671,8 @@ async function runHandoff(spec: HandoffSpec): Promise<{ ok: boolean; path: strin
         if (response.ok && status.started === true && useProjectStore.getState().projectId === projectId) {
           useProjectStore.getState().unlockThrough('writer')
           useProjectStore.getState().lockProducer()
+          const phase = sceneGatePhase(status)
+          if (phase === 'writing' || phase === 'gate') return { ok: true, path: null, existing: true, gated: true }
           return { ok: true, path: await handoffToStage('writer', { verify: true }), existing: true }
         }
       } catch { /* Keep the original failure when the execution cannot be confirmed. */ }
@@ -990,6 +999,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   confirmSceneGate: async () => {
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return false
+    // 두 번 누름(Enter + 버튼 등) — 두 번째 확정은 409 로 돌아와 성공 직후 오류처럼 보인다.
+    if (sceneGateInFlight.has(projectId)) return null
+    sceneGateInFlight.add(projectId)
+    // 확정 안내를 먼저 내린다 — 보내는 동안 Enter 가 다시 확정을 누르지 않게(실패하면 Producer 가 3초 안에 다시 띄운다).
+    if (get().suggestion?.action?.kind === 'confirmScenes') get().dismissSuggestion({ implicit: true })
     try {
       const response = await fetch('/api/writer/scene-gate', {
         method: 'POST',
@@ -999,14 +1013,36 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (!response.ok) return false
     } catch {
       return false
+    } finally {
+      sceneGateInFlight.delete(projectId)
     }
+    // 상태를 바로 다시 읽는다 — 3초 폴링 사이 옛 "확정 대기"가 화면에 남지 않게.
+    restartWriterStatus(projectId)
     if (useProjectStore.getState().projectId !== projectId) return false
-    if (get().suggestion?.action?.kind === 'confirmScenes') get().dismissSuggestion({ implicit: true })
     // 확정은 Producer 메인에서 한다 — 확정하면 나머지 생성이 도는 Writer 화면으로 간다(그 화면은 조작 없이 진행만 보여 준다).
     if (useProjectStore.getState().currentStage === 'producer') {
       useProjectStore.getState().unlockThrough('writer')
       set({ pendingNavigatePath: withDemoShare('/studio/writer') })
     }
+    return true
+  },
+
+  reviseSceneGate: async (feedback) => {
+    const projectId = useProjectStore.getState().projectId
+    const text = feedback.trim()
+    if (!projectId || !text) return false
+    try {
+      const response = await fetch('/api/writer/scene-gate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ projectId, action: 'revise', feedback: text }),
+      })
+      if (!response.ok) return false
+    } catch {
+      return false
+    }
+    // 다시 쓰기가 시작됐다 — 상태를 바로 다시 읽어 옛 초안의 확정 버튼을 내린다.
+    restartWriterStatus(projectId)
     return true
   },
 
@@ -1045,7 +1081,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const activeSuggestion = get().suggestion
     if (
       activeSuggestion &&
-      !(stage === 'writer' && activeSuggestion.action?.kind === 'confirmScenes' && writerInputRoute(trimmed, { sceneGate: true, running: false }) === 'chat') &&
+      !(activeSuggestion.action?.kind === 'confirmScenes' && writerInputRoute(trimmed, { sceneGate: true, running: false }) === 'chat') &&
       (activeSuggestion.stage === stage || activeSuggestion.dismissible === false)
     ) {
       get().dismissSuggestion({ implicit: true })
@@ -3044,6 +3080,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
               : translate(voice, 'Handoff failed. Please try again in a moment.'),
           )
           return false
+        }
+        // 씬 스토리 확정 단계로 다시 시작했으면 Producer 메인에 머문다(2026-10-01) — 확정 뒤에 Writer 로 간다.
+        if (useProducerStore.getState().lastHandoffGated) {
+          speak(translate(voice, "Writer started drafting the scene story. It appears on this Producer screen as it's written. Ask for changes in chat, or confirm it to continue."))
+          return true
         }
         // 승인된 rerun도 최초 핸드오프와 같은 Writer 생성 화면으로 이동한다.
         const path = await handoffToStage('writer')

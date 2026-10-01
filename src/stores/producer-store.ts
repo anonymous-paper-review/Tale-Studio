@@ -1095,7 +1095,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
           const uiLocale = useLocaleStore.getState().locale
           const status =
             body?.code === 'writer_gate_pending'
-              ? translate(uiLocale, 'The current scene story draft is ready. In the Writer tab, confirm it or request changes to run again.')
+              ? translate(uiLocale, 'The current scene story draft is ready. Confirm it or request changes in the scene story on the Producer screen.')
               : body?.code === 'writer_run_active'
                 ? translate(uiLocale, 'Writer is already running. Check progress in the Writer tab.')
                 : translate(uiLocale, 'Writer start was rejected (HTTP 409)')
