@@ -71,6 +71,8 @@ export function createStudioWorkflow(options: {
     useProjectStore.getState().setArtistAssetGate(state.artist as unknown as WriterStatusAssets)
     if (stages.includes(state.reachedStage)) useProjectStore.getState().unlockThrough(state.reachedStage as StageId)
     if (state.writer.started) useProjectStore.getState().unlockThrough('writer')
+    // Writer 가 시작됐거나 DB 단계가 producer 를 넘었으면 Producer 는 잠긴다(2026-10-01).
+    if (state.writer.started || stages.indexOf(state.reachedStage) > stages.indexOf('producer')) useProjectStore.getState().lockProducer()
   }
   return createProjectWorkflow({
     read, refresh, isCurrent: () => options.isCurrent() && !options.signal.aborted,

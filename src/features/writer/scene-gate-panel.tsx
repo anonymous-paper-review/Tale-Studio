@@ -66,9 +66,11 @@ export function SceneGateControls() {
         onClick={() => {
           if (busy) return
           setBusy(true)
-          void sendSceneGate('confirm')
+          // Producer 메인의 확정과 같은 경로 — 성공하면 Writer 화면으로 간다(2026-10-01).
+          void useGlobalChatStore.getState().confirmSceneGate()
             .then((ok) => {
-              if (ok) useGlobalChatStore.getState().dismissSuggestion()
+              if (ok) toast.success(t('Scenes confirmed. Starting character, visual, and shot design'))
+              else toast.error(t('Could not confirm the scene story. Please try again.'))
             })
             .finally(() => setBusy(false))
         }}

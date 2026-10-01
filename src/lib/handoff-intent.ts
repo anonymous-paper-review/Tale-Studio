@@ -54,6 +54,18 @@ export function handoffFrom(stage: StageId): HandoffSpec | null {
   return HANDOFFS.find((h) => h.from === stage) ?? null
 }
 
+/** 단계 화면 오른쪽 위 "다음 단계" 버튼(2026-10-01 오너 — 채팅 위 버튼을 옮김). 누르면 넘김 문장이 채팅에
+ *  그대로 입력된다(버튼 = 타이핑). 잠긴 Producer 는 다시 넘기지 않고 Writer 화면으로 가기만 한다. */
+export type NextStepAction =
+  | ({ kind: 'handoff' } & HandoffSpec)
+  | { kind: 'open'; stage: StageId; label: string }
+
+export function nextStepAction(stage: StageId, opts: { producerLocked: boolean }): NextStepAction | null {
+  if (stage === 'producer' && opts.producerLocked) return { kind: 'open', stage: 'writer', label: 'Go to Writer' }
+  const spec = handoffFrom(stage)
+  return spec ? { kind: 'handoff', ...spec } : null
+}
+
 /** 대상 스테이지를 가리키는 말 — 한/영 모두. */
 const STAGE_WORDS: Record<StageId, readonly string[]> = {
   producer: ['producer', '프로듀서'],

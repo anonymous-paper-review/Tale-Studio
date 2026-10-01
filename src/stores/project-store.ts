@@ -71,6 +71,10 @@ interface ProjectState {
   writerNeedsRerun: boolean
   /** Producer/Artist lifecycle gate 상태. Writer 계약이 없으면 unknown으로 둔다. */
   lifecycleStatus: LifecycleStatus
+  /** Producer 잠금(2026-10-01 오너 — "잠금을 풀 수 없게, 새 프로젝트를 열지 않는 이상"). 진실은 DB current_stage 가
+   *  producer 를 넘었는가(Writer 시작 성공 때만 넘는다) — 여기는 그 캐시다. verifyWriterGate 의 게이트백(reachedStage 하향)과
+   *  무관하게 유지되고, 다른 프로젝트를 열 때만 다시 읽는다. 잠금은 Producer 화면·채팅만 막는다(다른 단계는 그대로). */
+  producerLocked: boolean
 
   /** Artist 초기 이미지 생성 게이트 — 검증 전 기본 true(플래시 방지). */
   artistImagesReady: boolean
@@ -81,6 +85,8 @@ interface ProjectState {
   setStage: (stage: StageId) => void
   /** reachedStage만 전진시켜 현재 보고 있는 stage는 바꾸지 않는다. */
   unlockThrough: (stage: StageId) => void
+  /** Writer 시작에 성공한 순간 Producer 를 잠근다. 푸는 함수는 없다(새 프로젝트만 새로 시작한다). */
+  lockProducer: () => void
   canNavigateTo: (stage: StageId) => boolean
   initProject: (projectId?: string) => Promise<void>
   createNewProject: (
@@ -183,6 +189,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   writerActive: false,
   writerNeedsRerun: false,
   lifecycleStatus: EMPTY_LIFECYCLE_STATUS,
+  producerLocked: false,
 
   // Artist도 기본 true — assets 검증 전 플래시 잠금을 막는다.
   artistImagesReady: true,
@@ -202,6 +209,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set((s) => ({
       reachedStage: furtherStage(s.reachedStage, stage),
     })),
+
+  lockProducer: () => set({ producerLocked: true }),
 
   canNavigateTo: (stage) => {
     // 순차 잠금: producer→artist→director→editor 순으로 하나씩 열린다.
@@ -270,6 +279,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           initLoading: false,
           currentStage: p.current_stage ?? 'producer',
           reachedStage: p.current_stage ?? 'producer',
+          producerLocked: (p.current_stage ?? 'producer') !== 'producer',
           lifecycleStatus: EMPTY_LIFECYCLE_STATUS,
           ...DEFAULT_ARTIST_ASSET_GATE,
         })
@@ -301,6 +311,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         currentStage: project.current_stage ?? 'producer',
         // DB current_stage = 지금까지 진행한 최고 단계 → 새로고침/복원 시 그만큼 열어둔다
         reachedStage: project.current_stage ?? 'producer',
+        // DB current_stage 가 producer 를 넘었으면 Writer 를 시작한 프로젝트다 — Producer 잠금.
+        producerLocked: (project.current_stage ?? 'producer') !== 'producer',
         lifecycleStatus: EMPTY_LIFECYCLE_STATUS,
         ...DEFAULT_ARTIST_ASSET_GATE,
       })
@@ -357,6 +369,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         initLoading: false,
         currentStage: 'producer',
         reachedStage: 'producer',
+        producerLocked: false,
         writerComplete: true,
         writerActive: false,
         writerNeedsRerun: false,
@@ -393,6 +406,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       projectLocaleLocked: null,
       currentStage: stage ?? 'producer',
       reachedStage: stage ?? 'producer',
+      // 호출부가 넘긴 DB 단계로 먼저 잠그고, 아래 조회가 DB current_stage 로 확정한다.
+      producerLocked: (stage ?? 'producer') !== 'producer',
       // 새 프로젝트 진입 — 게이트 플래그 초기화 (verifyWriterGate 가 곧 재계산).
       writerComplete: true,
       writerActive: false,
@@ -422,6 +437,17 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         }
       } catch {
         /* 폴백: UI 언어 */
+      }
+    })()
+    // Producer 잠금의 진실은 DB current_stage 다 — 단계를 안 넘기는 호출부(유저 메뉴)도 있어 따로 확정한다.
+    //   잠그기만 하고 풀지는 않는다(응답 도착 전에 또 전환됐으면 버린다).
+    void (async () => {
+      try {
+        const { data } = await createClient().from('projects').select('current_stage').eq('id', id).maybeSingle()
+        const stageNow = (data as { current_stage?: unknown } | null)?.current_stage
+        if (get().projectId === id && typeof stageNow === 'string' && stageNow !== 'producer') set({ producerLocked: true })
+      } catch {
+        /* 폴백: 호출부가 넘긴 단계 */
       }
     })()
     const { useDirectorCanvasStore } = require('@/stores/director-store')
@@ -505,6 +531,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         if (r.ok) {
           const s = await r.json()
           writerActive = !!(s?.started && !s?.pipeline_completed && !s?.pipeline_failed)
+          // Writer 가 한 번이라도 시작됐으면 Producer 는 잠긴다 — 단계 저장만 실패해 DB 단계가 producer 에 남은 경우까지.
+          if (s?.started === true && get().projectId === projectId) set({ producerLocked: true })
           writerFailed = !!s?.pipeline_failed
           assets = (s?.assets ?? null) as WriterStatusAssets | null
         }
@@ -543,6 +571,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       projectLocale: null,
       currentStage: 'producer',
       reachedStage: 'producer',
+      producerLocked: false,
       initLoading: false,
       writerComplete: true,
       writerActive: false,

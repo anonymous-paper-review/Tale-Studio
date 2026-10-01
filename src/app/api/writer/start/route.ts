@@ -590,7 +590,8 @@ export async function POST(req: NextRequest) {
       await triggerWriterStep(req.nextUrl.origin, projectId);
     });
 
-    return NextResponse.json({ projectId, runId: run.id, status: 'started' });
+    // sceneGate: 씬 스토리 확정 단계로 시작했는가 — 화면은 이 값으로 확정 전까지 Producer 메인에 머문다(2026-10-01).
+    return NextResponse.json({ projectId, runId: run.id, status: 'started', sceneGate: input.sceneGate === true });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error('[writer/start]', msg);

@@ -18,7 +18,7 @@ import { createPendingProposal, combinePendingProposals, isApprovalUtterance, is
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { detectScript, parseScript } from '@/lib/writer/script/parse'
 import { useProjectStore } from '@/stores/project-store'
-import { useProducerStore, type ExtractedSettings } from '@/stores/producer-store'
+import { extractedChangesProducer, useProducerStore, type ExtractedSettings } from '@/stores/producer-store'
 import { evaluateProducerGate } from '@/lib/producer-gate'
 import { fixKoreanParticles } from '@/lib/korean-particles'
 import { coerceCardFill, matchImageRoleAnswer, matchImageRoleInText, type CardFill, type ImageRole } from '@/lib/producer/image-role'
@@ -40,7 +40,10 @@ import {
   resolveLineRefs,
   serializeWriterScriptContext,
 } from '@/lib/script-lines'
-import { matchHandoffIntent, resolveDirectorHandoffIntent, type HandoffSpec } from '@/lib/handoff-intent'
+import { matchHandoffIntent, nextStepAction, resolveDirectorHandoffIntent, type HandoffSpec } from '@/lib/handoff-intent'
+import { loadDirectorReadiness } from '@/lib/director-readiness-loader'
+import type { DirectorReadinessReport } from '@/lib/director-readiness'
+import { sceneGatePhase } from '@/lib/writer/scene-gate'
 import { completeKoreanDialogue, dialogueHandoffTarget } from '@/lib/writer/dialogue-handoff'
 import { handoffToStage } from '@/lib/stage-nav'
 import {
@@ -147,6 +150,21 @@ interface GlobalChatState {
   workflowNavigation: { projectId: string; stage: StageId } | null
   finishWorkflowNavigation: (arrived: boolean) => void
   directorHandoff: { id: string; projectId: string; phase: 'checking' | 'waiting' | 'navigating'; notice?: string } | null
+  /** 다음 단계 버튼·채팅 넘김이 연 확인 창(2026-10-01 오너). producerLock = Writer 로 넘기기 전 확정(넘기면 Producer 잠금),
+   *  directorReadiness = 준비가 덜 된 샷 목록과 "그래도 진행". Writer→Artist·Director→Editor 는 창이 없다. */
+  handoffConfirm: HandoffConfirm | null
+  /** 단계 화면 오른쪽 위 "다음 단계" 버튼 — 버튼 = 넘김 문장 타이핑. 확인 창이 필요한 넘김은 창을 먼저 연다. */
+  requestNextStep: () => Promise<void>
+  /** 채팅 승인 카드(Writer 첫 넘김)의 승인 버튼 — 바로 승인하지 않고 같은 확정 창을 연다. */
+  openProducerLock: (proposalId?: string) => void
+  /** Producer 확정 창의 "확정하고 넘기기" — 넘김 문장을 채팅에 남기고 Writer 를 시작한다(카드에서 열었으면 그 카드를 승인). */
+  confirmProducerLock: () => Promise<void>
+  /** Director 준비 창의 "그래도 진행" — 준비가 덜 된 샷이 있어도 Director 로 넘긴다. */
+  proceedToDirectorAnyway: () => Promise<void>
+  /** 확인 창 닫기("더 고칠게요"·"채우러 가기") — 아무것도 넘기지 않는다. */
+  closeHandoffConfirm: () => void
+  /** 씬 스토리 확정(2026-10-01 오너 — 확정 단계는 Producer 메인). 성공하면 나머지 생성이 이어지고 Writer 화면으로 간다. */
+  confirmSceneGate: () => Promise<boolean>
   requestDirectorHandoff: (mode: 'check' | 'move' | 'whenReady', resumeId?: string) => Promise<void>
   resumeDirectorHandoff: () => Promise<void>
   confirmDirectorHandoff: (projectId: string, pathname: string) => void
@@ -168,7 +186,8 @@ interface GlobalChatState {
     attachments?: { imageUrls?: string[]; thumbUrls?: string[] },
     /** consentedHandoff: 명시적 핸드오프 버튼("Writer 호출하기")에서 온 호출 — 버튼이 곳 동의라
      *  승인 카드를 다시 띄우지 않고 바로 실행한다(D12, 2026-08-31 오너). */
-    opts?: { consentedHandoff?: boolean; stageOverride?: StageId; silentUser?: boolean; cardFill?: CardFill },
+    /** acceptIncomplete: Director 준비 창에서 "그래도 진행"을 고른 넘김 — 준비가 덜 된 샷이 있어도 막지 않는다(Writer 미완료는 그대로 막는다). */
+    opts?: { consentedHandoff?: boolean; stageOverride?: StageId; silentUser?: boolean; cardFill?: CardFill; acceptIncomplete?: boolean },
   ) => Promise<void>
   /** 진행 중인 LLM 응답 중단 (#oiioii-chat) — Stop 버튼. 대기 중이 아니면 no-op. */
   stopGeneration: () => void
@@ -511,6 +530,35 @@ async function applyStyleAnchorIntent(
   }
 }
 
+/** 넘김 확인 창(2026-10-01 오너). via = 창을 연 곳 — 채팅에서 연 창은 진행할 때 넘김 문장을 다시 남기지 않는다. */
+export type HandoffConfirm =
+  | { kind: 'producerLock'; projectId: string; proposalId?: string }
+  | { kind: 'directorReadiness'; projectId: string; report: DirectorReadinessReport; gateGaps: string[]; via: 'button' | 'chat' }
+
+/** Director 게이트 막힘 중 Writer 쪽(씬·샷 미완성) — "그래도 진행"으로도 넘기지 않는다. 나머지(Artist 이미지)는 창에서 고른다. */
+function writerSideBlockers(): string[] {
+  const gate = useProjectStore.getState().lifecycleStatus.director
+  if (gate?.ready !== false) return []
+  return gate.blockers.filter((b) => b.field.startsWith('writer:')).map((b) => b.label)
+}
+
+function artistSideBlockers(): string[] {
+  const gate = useProjectStore.getState().lifecycleStatus.director
+  if (gate?.ready !== false) return []
+  return gate.blockers.filter((b) => !b.field.startsWith('writer:')).map((b) => b.label)
+}
+
+/** 샷별 준비 판정. 재료를 못 읽으면(네트워크 등) 단계 게이트의 Artist 막힘만으로 판정한다. */
+async function directorReadinessOf(projectId: string): Promise<{ report: DirectorReadinessReport; gateGaps: string[]; incomplete: boolean }> {
+  const gateGaps = artistSideBlockers()
+  try {
+    const report = await loadDirectorReadiness(projectId)
+    return { report, gateGaps, incomplete: report.incompleteCount > 0 || gateGaps.length > 0 }
+  } catch {
+    return { report: { scenes: [], readyCount: 0, incompleteCount: 0 }, gateGaps, incomplete: gateGaps.length > 0 }
+  }
+}
+
 interface HandoffBlockers {
   /** 비워있으면 핸드오프를 차단한다 (기존 동작 불변). */
   hard: string[]
@@ -518,7 +566,7 @@ interface HandoffBlockers {
   soft: string[]
 }
 
-function handoffBlockers(spec: HandoffSpec): HandoffBlockers {
+function handoffBlockers(spec: HandoffSpec, opts?: { acceptIncomplete?: boolean }): HandoffBlockers {
   const locale = contentLocale()
   if (spec.from === 'producer') {
     const p = useProducerStore.getState()
@@ -552,10 +600,13 @@ function handoffBlockers(spec: HandoffSpec): HandoffBlockers {
   }
   if (spec.from === 'artist') {
     const gate = useProjectStore.getState().lifecycleStatus.director
-    const hard = gate?.ready === false ? gate.blockers.map((b) => b.label) : []
+    // "그래도 진행"(acceptIncomplete)은 Artist 쪽 빈 곳만 넘어간다 — Writer 가 안 끝났으면 넘길 샷이 없다.
+    const hard = opts?.acceptIncomplete ? writerSideBlockers() : gate?.ready === false ? gate.blockers.map((b) => b.label) : []
+    // 넘어간 뒤에도 무엇이 비어 있는지는 남긴다(품질 경고 줄).
+    const incomplete = opts?.acceptIncomplete ? artistSideBlockers() : []
     // artist → director soft: 옛 "뒷모습·측면 없음" 경고는 약속 C9(2026-09-04)로 뺐다 — 시트 1장에 모든 각도가 있어
     //   따로 만들 뒷모습·측면이 없다(개별 방향 뷰 생성은 2026-07-11 폐기).
-    const soft: string[] = []
+    const soft: string[] = [...incomplete]
     return { hard, soft }
   }
   if (spec.from === 'director') {
@@ -579,7 +630,7 @@ function handoffBlockers(spec: HandoffSpec): HandoffBlockers {
 }
 
 /** 게이트 통과 후 실제 전이. producer 는 writer 파이프라인 발사까지 포함한다. */
-async function runHandoff(spec: HandoffSpec): Promise<{ ok: boolean; path: string | null; error?: string; existing?: boolean }> {
+async function runHandoff(spec: HandoffSpec): Promise<{ ok: boolean; path: string | null; error?: string; existing?: boolean; gated?: boolean }> {
   const projectId = useProjectStore.getState().projectId
   if (projectId && ['producer', 'writer'].includes(spec.from)) {
     try {
@@ -593,6 +644,11 @@ async function runHandoff(spec: HandoffSpec): Promise<{ ok: boolean; path: strin
       }
       if (spec.from === 'producer' && status.started) {
         useProjectStore.getState().unlockThrough('writer')
+        // Writer 가 이미 시작됐다 — 이어 가는 넘김도 Producer 를 잠근다(단계 저장만 실패했던 경우 포함).
+        useProjectStore.getState().lockProducer()
+        // 씬 스토리를 쓰는 중이거나 확정을 기다리면 그 일은 Producer 메인에서 한다 — Writer 로 보내지 않는다.
+        const phase = sceneGatePhase(status)
+        if (phase === 'writing' || phase === 'gate') return { ok: true, path: null, existing: true, gated: true }
         return { ok: true, path: await handoffToStage('writer', { verify: true }), existing: true }
       }
     } catch (error) { return { ok: false, path: null, error: translate(contentLocale(), error instanceof Error ? error.message : 'Could not check the handoff requirements. Please try again.') } }
@@ -607,10 +663,13 @@ async function runHandoff(spec: HandoffSpec): Promise<{ ok: boolean; path: strin
         const status = await response.json()
         if (response.ok && status.started === true && useProjectStore.getState().projectId === projectId) {
           useProjectStore.getState().unlockThrough('writer')
+          useProjectStore.getState().lockProducer()
           return { ok: true, path: await handoffToStage('writer', { verify: true }), existing: true }
         }
       } catch { /* Keep the original failure when the execution cannot be confirmed. */ }
     }
+    // 서버가 씬 스토리 확정 단계로 시작했다고 알리면(2026-10-01 오너) Producer 메인에 머문다 — 확정 뒤에 Writer 로 간다.
+    if (ok && useProducerStore.getState().lastHandoffGated) return { ok: true, path: null, gated: true }
     const path = ok ? await handoffToStage(spec.to, { verify: true }) : null
     return { ok: ok && !!path, path }
   }
@@ -648,6 +707,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     get().notifyIssue(pending.stage, translate(contentLocale(), arrived ? '{stage} is now open.' : 'Could not open {stage}. Your saved work is preserved.', { stage: STAGE_LABEL[pending.stage] }))
   },
   directorHandoff: null,
+  handoffConfirm: null,
   messagesLoadedProjectId: null,
 
   loadMessages: async (projectId) => {
@@ -838,6 +898,118 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     get().notifyIssue('writer', translate(contentLocale(), 'Could not open Director. Your work is saved. Select Director on the left or ask me to try again.'))
   },
 
+  requestNextStep: async () => {
+    const project = useProjectStore.getState()
+    const { projectId, currentStage } = project
+    if (!projectId || get().loading || get().handoffConfirm) return
+    const action = nextStepAction(currentStage, { producerLocked: project.producerLocked })
+    if (!action) return
+    if (action.kind === 'open') {
+      // 잠긴 Producer: 다시 넘기지 않고 Writer 화면으로 간다. Writer 가 결과 없이 끝나 되돌아온 경우만 같은 내용으로 다시 넘긴다.
+      if (project.canNavigateTo(action.stage)) {
+        const path = await handoffToStage(action.stage)
+        if (path && useProjectStore.getState().projectId === projectId) set({ pendingNavigatePath: path })
+        return
+      }
+      await get().sendMessage(translate(useLocaleStore.getState().locale, 'Please hand over to Writer'), undefined, { consentedHandoff: true })
+      return
+    }
+    // 버튼 = 그 문장을 타이핑한 것(#handoff-to-chat). 버튼의 언어는 화면(UI) 언어다 — 예전 채팅 위 칩과 같다.
+    const utterance = translate(useLocaleStore.getState().locale, action.utterance)
+    if (action.from === 'producer') {
+      // 그림 쓰임새 질문이 남아 있으면 확정 창을 열지 않는다 — 채팅이 먼저 고르라고 답한다(확정 뒤 넘김이 삼켜지지 않게).
+      if (get().imageRoleGate) {
+        await get().sendMessage(utterance, undefined, { consentedHandoff: true })
+        return
+      }
+      // 필수 칸이 비었으면 확정할 것이 없다 — 창 대신 채팅이 빈 곳을 알려 준다(타이핑했을 때와 같은 답).
+      if (handoffBlockers(action).hard.length > 0) {
+        await get().sendMessage(utterance, undefined, { consentedHandoff: true })
+        return
+      }
+      // Writer 로 넘기면 Producer 가 잠긴다 — 확정 창을 먼저 연다(2026-10-01 오너 "writer로 넘어갈 때 경고 팝업").
+      set({ handoffConfirm: { kind: 'producerLock', projectId } })
+      return
+    }
+    if (action.from === 'artist' && writerSideBlockers().length === 0) {
+      // 준비가 덜 된 샷이 있으면 넘기지 않고 목록 창을 연다(2026-10-01 오너 "director 넘어갈 때 미완성 팝업").
+      const readiness = await directorReadinessOf(projectId)
+      if (useProjectStore.getState().projectId !== projectId) return
+      if (readiness.incomplete) {
+        set({ handoffConfirm: { kind: 'directorReadiness', projectId, report: readiness.report, gateGaps: readiness.gateGaps, via: 'button' } })
+        return
+      }
+      await get().sendMessage(utterance, undefined, { consentedHandoff: true, acceptIncomplete: true })
+      return
+    }
+    // Writer→Artist · Director→Editor 는 창 없이 바로(2026-10-01 오너 "그 2구간은 일단 없이").
+    await get().sendMessage(utterance, undefined, { consentedHandoff: true })
+  },
+
+  openProducerLock: (proposalId) => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) return
+    if (useProjectStore.getState().producerLocked) {
+      // 이미 잠긴 프로젝트의 다시 넘기기 — 바뀌는 것이 없으니 확인 창 없이 그 카드를 승인한다.
+      if (proposalId) void get().approvePendingProposal(proposalId)
+      return
+    }
+    set({ handoffConfirm: { kind: 'producerLock', projectId, ...(proposalId ? { proposalId } : {}) } })
+  },
+
+  confirmProducerLock: async () => {
+    const confirm = get().handoffConfirm
+    if (confirm?.kind !== 'producerLock' || confirm.projectId !== useProjectStore.getState().projectId) return
+    set({ handoffConfirm: null })
+    const card = get().pendingProposal
+    // 채팅 카드에서 연 창이면 그 카드를 승인한다(카드 승인 경로가 넘김·⇄ 연출·이동을 그대로 한다).
+    if (confirm.proposalId && card?.id === confirm.proposalId) {
+      await get().approvePendingProposal(confirm.proposalId)
+      return
+    }
+    // 버튼에서 열었는데 예전 카드가 남아 있으면 내린다 — 같은 넘김이 두 번 남지 않게.
+    if (card?.kind === 'producerWriterInitialHandoff') get().dismissPendingProposal(card.id)
+    await get().sendMessage(translate(useLocaleStore.getState().locale, 'Please hand over to Writer'), undefined, { consentedHandoff: true })
+  },
+
+  proceedToDirectorAnyway: async () => {
+    const confirm = get().handoffConfirm
+    if (confirm?.kind !== 'directorReadiness' || confirm.projectId !== useProjectStore.getState().projectId) return
+    set({ handoffConfirm: null })
+    await get().sendMessage(translate(useLocaleStore.getState().locale, 'Please hand over to Director'), undefined, {
+      consentedHandoff: true,
+      acceptIncomplete: true,
+      // 채팅에서 연 창이면 사용자의 넘김 말이 이미 스레드에 있다 — 다시 남기지 않는다.
+      silentUser: confirm.via === 'chat',
+      stageOverride: 'artist',
+    })
+  },
+
+  closeHandoffConfirm: () => set({ handoffConfirm: null }),
+
+  confirmSceneGate: async () => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) return false
+    try {
+      const response = await fetch('/api/writer/scene-gate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ projectId, action: 'confirm' }),
+      })
+      if (!response.ok) return false
+    } catch {
+      return false
+    }
+    if (useProjectStore.getState().projectId !== projectId) return false
+    if (get().suggestion?.action?.kind === 'confirmScenes') get().dismissSuggestion({ implicit: true })
+    // 확정은 Producer 메인에서 한다 — 확정하면 나머지 생성이 도는 Writer 화면으로 간다(그 화면은 조작 없이 진행만 보여 준다).
+    if (useProjectStore.getState().currentStage === 'producer') {
+      useProjectStore.getState().unlockThrough('writer')
+      set({ pendingNavigatePath: withDemoShare('/studio/writer') })
+    }
+    return true
+  },
+
   sendMessage: async (content, attachments, opts) => {
     const trimmed = content.trim()
     if (!trimmed || get().loading) return
@@ -927,6 +1099,12 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       }
       return
     }
+    if (pendingProposal && isApprovalUtterance(trimmed) && pendingProposal.kind === 'producerWriterInitialHandoff' && !useProjectStore.getState().producerLocked) {
+      // Writer 첫 넘김 = Producer 잠금(2026-10-01) — 말로 승인해도 버튼과 같은 확정 창을 거친다.
+      get().appendLocalExchange(stage, trimmed, translate(contentLocale(), 'Check the values in the window, then confirm to hand over.'))
+      get().openProducerLock(pendingProposal.id)
+      return
+    }
     if (pendingProposal && isApprovalUtterance(trimmed)) {
       const userMsg: GlobalChatMessage = {
         id: makeId(),
@@ -967,11 +1145,34 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const compoundWorkflow = requestedHandoff && ['writer', 'artist'].includes(requestedHandoff.to) && requestsSupportedChatEdit(stage, trimmed)
     const handoffSpec = requestedHandoff && !compoundWorkflow && !(stage === 'producer' && useProjectStore.getState().reachedStage !== 'producer' && !opts?.consentedHandoff) ? requestedHandoff : null
     if (handoffSpec) {
-      const userMsg: GlobalChatMessage = { id: makeId(), stage, role: 'user', content: trimmed }
-      set((state) => ({ messages: [...state.messages, userMsg], loading: true, error: null }))
-      if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
+      // silentUser: 채팅에서 연 확인 창의 "그래도 진행" — 사용자의 넘김 말은 이미 스레드에 있다.
+      if (opts?.silentUser) set({ loading: true, error: null })
+      else {
+        const userMsg: GlobalChatMessage = { id: makeId(), stage, role: 'user', content: trimmed }
+        set((state) => ({ messages: [...state.messages, userMsg], loading: true, error: null }))
+        if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
+      }
 
-      const { hard, soft } = handoffBlockers(handoffSpec)
+      // Director 준비 창(2026-10-01 오너 "director 넘어갈 때 미완성 팝업", "그래도 진행을 줘야해") — Artist 에서 넘길 때
+      //   준비가 덜 된 샷이 있으면 넘기지 않고 창을 연다. Writer 가 안 끝난 경우는 아래 게이트가 종전대로 막는다.
+      let acceptIncomplete = opts?.acceptIncomplete === true
+      if (handoffSpec.from === 'artist' && handoffSpec.to === 'director' && !acceptIncomplete && projectId && writerSideBlockers().length === 0) {
+        const readiness = await directorReadinessOf(projectId)
+        if (!isCurrentSession()) return
+        if (readiness.incomplete) {
+          const notice = translate(contentLocale(), "Some shots aren't ready yet. Check the list in the window, then proceed anyway or fill them in first.")
+          set((state) => ({
+            loading: false,
+            handoffConfirm: { kind: 'directorReadiness', projectId, report: readiness.report, gateGaps: readiness.gateGaps, via: 'chat' },
+            messages: [...state.messages, { id: makeId(), stage, role: 'model' as const, content: notice }],
+          }))
+          saveChatMessage(projectId, stage, 'model', notice)
+          return
+        }
+        acceptIncomplete = true
+      }
+
+      const { hard, soft } = handoffBlockers(handoffSpec, { acceptIncomplete })
       const locale = contentLocale()
       // hard 가 비어야만 진행한다 — soft 가 있어도 차단하지 않는다(오너 확정 2026-08-28). soft 경고 문구는
       //   아래 각 분기점에서 reply 뒤에 붙인다.
@@ -996,7 +1197,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           })
           + '\n'
           + hard.map((b) => `· ${b}`).join('\n')
-      } else if (handoffSpec.from === 'producer' && handoffSpec.to === 'writer' && !opts?.consentedHandoff) {
+      } else if (handoffSpec.from === 'producer' && handoffSpec.to === 'writer' && !opts?.consentedHandoff && !useProjectStore.getState().producerLocked) {
+        // 잠긴 Producer 의 다시 넘기기(Writer 가 결과 없이 끝나 되돌아온 경우)는 바뀌는 것이 없어 카드 없이 아래에서 바로 넘긴다.
         const accepted = get().offerPendingProposal(
           createPendingProposal({
             stage: 'producer',
@@ -1005,6 +1207,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             action: translate(locale, 'Invite Writer'),
             impact: [
               translate(locale, 'Nothing runs until you approve.'),
+              // 2026-10-01 오너 "producer 완성 시 잠그기" — 카드로 승인해도 잠금을 미리 알린다.
+              translate(locale, 'Once handed over, Producer is locked. Changes after that need a new project.'),
               ...(soft.length > 0
                 ? [
                     translate(locale, 'Quality may suffer because these are empty: {items}', {
@@ -1050,7 +1254,12 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         const result = await runHandoff(handoffSpec)
         if (!isCurrentSession()) return
         path = result.path
-        if (result.ok) {
+        if (result.ok && result.gated) {
+          reply = translate(
+            locale,
+            "Writer started drafting the scene story. It appears on this Producer screen as it's written. Ask for changes in chat, or confirm it to continue.",
+          )
+        } else if (result.ok) {
           reply = softWarning(
             handoffSpec.from === 'producer' && !result.existing
               ? translate(
@@ -1182,6 +1391,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           storyText: p.storyText,
           // #script-preserve: 보존 중이면 서버가 모델에 "다시 쓰지 말 것"을 알린다(최종 방어는 producer-store 가드).
           preserveScript: p.preserveScript === true,
+          // 잠긴 Producer(2026-10-01) — 서버가 모델에 "바꾸지 말 것"을 알린다(최종 방어는 producer-store 가드).
+          ...(useProjectStore.getState().producerLocked ? { producerLocked: true } : {}),
           // #image-to-artist: 카드 채우기 턴 — 서버가 모델에 "그 카드만" 을 알린다(최종 방어는 coerceCardFill).
           ...(opts?.cardFill ? { cardFill: opts.cardFill } : {}),
           currentCast: p.cast,
@@ -1391,7 +1602,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             return { status: 'navigation_requested', targetStage: target }
           },
           handoff: async () => {
-            const proposal = createPendingProposal({ traceId, stage: 'producer', kind: 'producerWriterInitialHandoff', target: STAGE_LABEL.writer, action: translate(contentLocale(), 'Invite Writer'), impact: [translate(contentLocale(), 'Nothing runs until you approve.')], payload: {} })
+            const proposal = createPendingProposal({ traceId, stage: 'producer', kind: 'producerWriterInitialHandoff', target: STAGE_LABEL.writer, action: translate(contentLocale(), 'Invite Writer'), impact: [translate(contentLocale(), 'Nothing runs until you approve.'), translate(contentLocale(), 'Once handed over, Producer is locked. Changes after that need a new project.')], payload: {} })
             proposal.projectId = projectId
             if (!get().offerPendingProposal(proposal)) return { status: 'blocked', message: 'Another approval is pending. Finish or defer it before starting Writer.' }
             return { status: 'approval_required', proposalId: proposal.id, message: 'Initial Writer generation is waiting for user approval.' }
@@ -1456,6 +1667,10 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       let reply = stripLegacyStageMarkers(
         typeof replyValue === 'string' ? replyValue : String(replyValue),
       )
+      // 잠긴 Producer(2026-10-01 오너 "잠금을 풀 수 없게") — 모델이 바꾸자고 한 것은 적용하지 않는다(producer-store 가드).
+      //   바꾸는 제안이었으면 아래에서 모델 답 대신 "바꾸지 않았다"를 남기고, 질문 답은 그대로 둔다.
+      const producerLockedTurn = stage === 'producer' && useProjectStore.getState().producerLocked
+      const lockedChangeAttempt = producerLockedTurn && extractedChangesProducer(useProducerStore.getState(), data.extractedSettings)
       const trace: ChatTrace = {
         ...(data.trace && typeof data.trace === 'object' ? data.trace as ChatTrace : requestTrace),
         ...modelUsages.at(-1),
@@ -1502,7 +1717,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       // #image-to-artist: 카드 채우기 턴은 모델 제안을 그 카드 하나로 좁힌다(줄거리·설정·다른 카드·화풍 제안은 버린다).
       //   아래 대사 언어 경로와 일반 적용 경로가 같은 값을 써야 우회가 없다.
       const extractedForApply: ExtractedSettings | undefined =
-        stage === 'producer' && data.extractedSettings
+        stage === 'producer' && data.extractedSettings && !producerLockedTurn
           ? opts?.cardFill
             ? (coerceCardFill(data.extractedSettings as ExtractedSettings, opts.cardFill) as ExtractedSettings)
             : (data.extractedSettings as ExtractedSettings)
@@ -1583,9 +1798,19 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           }
         }
       }
+      // 잠긴 Producer 에 바꿔 달라고 했을 때의 답(2026-10-01 오너 "잠금을 풀 수 없게 해줘"). 바꾸면서 넘겨 달라는 말(뒤늦게 확정되는
+      //   답)도 같은 문장이어야 하므로 확정 전 사본(replyBeforeReceipt)보다 먼저 정한다.
+      const lockedReply = producerLockedTurn && (lockedChangeAttempt || toolOutcomes.some((o) => o.call.name === 'edit_project' && o.result.reason === 'producer_locked'))
+        ? translate(
+            contentLocale(),
+            "Producer was confirmed when it went to Writer, so I didn't change it. To change it, start a new project. You can still edit scenes and dialogue in Writer, and character and background pictures in Artist.",
+          )
+        : null
+      if (lockedReply) reply = lockedReply
       const replyBeforeReceipt = reply
       const waitForLegacy = !dialogueTarget && toolsEnabled && ((requestedHandoff && requestsSupportedChatEdit(stage, trimmed)) || (stage === 'writer' && data.updates?.length) || (stage === 'artist' && (data.proposals?.length || data.locationProposals?.length)))
       reply = guardChatToolReply(reply, toolOutcomes, contentLocale() === 'ko')
+      if (lockedReply) reply = lockedReply
       // Unfinished prose is display-only and must survive the guard that removes unverified completion claims.
       if (typeof data.partialReply === 'string' && data.partialReply && !reply.includes(data.partialReply)) reply = [reply, data.partialReply].filter(Boolean).join('\n\n')
       const replyId = makeId()
@@ -1610,7 +1835,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (projectId && !waitForLegacy) saveChatMessage(projectId, stage, 'model', reply)
       if (projectId && localeNotice) saveChatMessage(projectId, stage, 'model', localeNotice)
 
-      if (stage === 'producer' && data.extractedSettings) {
+      if (lockedChangeAttempt) patchTrace({ skippedCount: 1 })
+      if (stage === 'producer' && data.extractedSettings && !producerLockedTurn) {
         // 영수증은 실제 결과를 기록한다 — 승인 카드로 간 것을 applied로 적으면 거짓 영수증이 된다.
         //   제안에 traceId를 실어 승인/거절이 같은 trace로 이어지게 한다.
         const extractOutcome = producerExtractOutcome ?? useProducerStore
@@ -1652,7 +1878,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         }
       }
       // #p4-choices: 에이전트가 낸 선택지를 버튼 제안으로 — 클릭 = 채팅 입력.
-      if (stage === 'producer' && Array.isArray(data.choices) && data.choices.length >= 2) {
+      if (stage === 'producer' && !lockedChangeAttempt && Array.isArray(data.choices) && data.choices.length >= 2) {
         get().offerSuggestion({
           id: `choices:${makeId()}`,
           stage: 'producer',
@@ -2244,7 +2470,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       }
       if (waitForLegacy) {
         if (!isCurrentSession()) return
-        const finalReply = guardChatToolReply(replyBeforeReceipt, toolOutcomes, contentLocale() === 'ko')
+        const finalReply = lockedReply ?? guardChatToolReply(replyBeforeReceipt, toolOutcomes, contentLocale() === 'ko')
         set(state => ({ loading: false, messages: state.messages.map(message => message.id === replyId ? { ...message, content: finalReply } : message) }))
         if (projectId) saveChatMessage(projectId, stage, 'model', finalReply)
         pendingReplyId = null
@@ -2463,6 +2689,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   },
 
   offerScriptPreserve: (text, opts) => {
+    // 잠긴 Producer 는 이야기를 바꾸지 않는다 — 보존 여부도 묻지 않고 종전 경로(채팅 답)로 보낸다.
+    if (useProjectStore.getState().producerLocked) return false
     const det = detectScript(text)
     if (det.kind === 'none') return false
     const doc = parseScript(text)
@@ -2529,6 +2757,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   },
 
   offerImageRoles: (images, opts) => {
+    // 잠긴 Producer 에는 인물·배경 카드를 만들 수 없다 — 묻지 않고 종전 경로(참고 자료)로 보낸다.
+    if (useProjectStore.getState().producerLocked) return false
     const ready = images.filter((img) => img && img.thumbUrl)
     if (ready.length === 0) return false
     const typed = opts.typed.trim()
@@ -2724,6 +2954,12 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         proposal.submissionUncertain = true
         saveRemaining()
       }
+      // 잠기기 전에 떠 있던 Producer 변경 카드를 잠긴 뒤 승인한 경우(2026-10-01) — 저장 실패가 아니라 잠금을 알린다.
+      if ((proposal.kind === 'producerPreserveScript' || proposal.kind === 'producerSourcePatch') && useProjectStore.getState().producerLocked) {
+        speak(translate(contentLocale(), "Producer was confirmed when it went to Writer, so I didn't change it. To change it, start a new project. You can still edit scenes and dialogue in Writer, and character and background pictures in Artist."))
+        patchTrace({ skippedCount: 1, pendingProposal: false })
+        return false
+      }
       if (proposal.kind === 'producerPreserveScript') {
         // #script-preserve: 보존 결정 — Writer 시작 요청에 preserveScript 로 실린다(producer-store.saveAndHandoff).
         useProducerStore.getState().setPreserveScript(true)
@@ -2778,6 +3014,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           return false
         }
         const path = handoff.path
+        if (handoff.gated) {
+          // 씬 스토리 확정 단계는 Producer 메인에서 한다(2026-10-01 오너) — Writer 로 이동하지 않는다.
+          speak(translate(voice, "Writer started drafting the scene story. It appears on this Producer screen as it's written. Ask for changes in chat, or confirm it to continue."))
+          return true
+        }
         // ⇄ 초대 연출(#oiioii-handoff)을 승인 경로에도 — 멈칫 대신 전이 애니메이션이 보인다(D11).
         speak(handoffMarker('producer', 'writer'))
         if (path) {
@@ -3106,7 +3347,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       const workflow = createStudioWorkflow({ projectId: projectId!, stage: proposal.stage, message: continuation.message, signal: new AbortController().signal, isCurrent: isCurrentSession, requiresEdit: false, outcomes: () => [],
         navigate: async target => { set({ workflowNavigation: { projectId: projectId!, stage: target }, pendingNavigatePath: withDemoShare(`/studio/${target}?projectId=${encodeURIComponent(projectId!)}`) });return { status: 'navigation_requested' } },
         handoff: async () => {
-          const next = createPendingProposal({ stage: 'producer', kind: 'producerWriterInitialHandoff', target: 'Writer', action: translate(contentLocale(), 'Invite Writer'), impact: [translate(contentLocale(), 'Nothing runs until you approve.')], payload: {} })
+          const next = createPendingProposal({ stage: 'producer', kind: 'producerWriterInitialHandoff', target: 'Writer', action: translate(contentLocale(), 'Invite Writer'), impact: [translate(contentLocale(), 'Nothing runs until you approve.'), translate(contentLocale(), 'Once handed over, Producer is locked. Changes after that need a new project.')], payload: {} })
           next.projectId = projectId!
           return get().offerPendingProposal(next) ? { status: 'approval_required' } : { status: 'blocked' }
         },
@@ -3201,6 +3442,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       dismissedSuggestionIds: [],
       stageBadges: {},
       directorHandoff: null,
+      handoffConfirm: null,
       pendingNavigatePath: null,
       workflowNavigation: null,
       messagesLoadedProjectId: null,

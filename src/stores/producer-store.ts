@@ -209,6 +209,8 @@ interface ProducerState {
   customStyleAnchor: { url: string; label: string; medium: string | null } | null
   syncing: boolean
   error: string | null
+  /** 마지막 Writer 시작이 씬 스토리 확정 단계로 시작했는가(서버 응답 sceneGate) — 그렇다면 Producer 메인에 머문다(2026-10-01). */
+  lastHandoffGated: boolean
 
   setStoryText: (text: string) => void
   setPreserveScript: (value: boolean | null) => void
@@ -229,11 +231,11 @@ interface ProducerState {
   updateSettings: (partial: Partial<ProjectSettings>) => void
   /** 현재 작업 초안을 저장하고 서버가 반환한 저장본을 확인한다. */
   saveDraftNow: () => Promise<boolean>
-  /** 반환값은 trace 영수증용 실제 결과 — applied·pending(승인 카드)·rejected(카드 자리 점유됨)·noop. */
+  /** 반환값은 trace 영수증용 실제 결과 — applied·pending(승인 카드)·rejected(카드 자리 점유됨)·noop·locked(Writer 로 넘겨 잠김). */
   applyExtractedSettings: (
     extracted: ExtractedSettings,
     traceId?: string | null,
-  ) => 'applied' | 'pending' | 'rejected' | 'noop'
+  ) => 'applied' | 'pending' | 'rejected' | 'noop' | 'locked'
   applyProducerSourcePatch: (patch: ExtractedSettings) => void
   addCastMember: (entityType: EntityType) => string
   /** #image-to-artist: 채팅에 올린 그림으로 인물 카드를 만든다(그림만 붙고 글 칸은 채팅이 채운다). localId 를 돌려준다. */
@@ -393,6 +395,25 @@ function extractedAffectsExisting(
   }
 
   return overwritten
+}
+
+/** 잠긴 Producer 의 채팅 답 판정(2026-10-01) — 이 제안이 지금 보드를 바꾸는가(빈 칸 채우기·덮어쓰기·카드 추가·삭제·화풍 포함).
+ *  바꾸는 제안이면 채팅은 모델 답 대신 "바꾸지 않았다"를 남긴다. 같은 값을 되읊는 질문 답은 바꾸는 제안이 아니다. */
+export function extractedChangesProducer(
+  state: Pick<ProducerState, 'storyText' | 'projectSettings' | 'cast' | 'backgrounds' | 'styleAnchorKey'>,
+  extracted: unknown,
+): boolean {
+  if (!extracted || typeof extracted !== 'object') return false
+  const e = extracted as ExtractedSettings & { styleAnchorFromAttachment?: unknown }
+  if (isMeaningfulExtractedValue(e.storyText) && normalizedComparable(e.storyText) !== normalizedComparable(state.storyText)) return true
+  for (const key of SOURCE_SETTING_KEYS) {
+    const next = e[key]
+    if (isMeaningfulExtractedValue(next) && normalizedComparable(next) !== normalizedComparable(state.projectSettings[key])) return true
+  }
+  if (Array.isArray(e.characters) && e.characters.some((c) => castEntryAffects(findForEntry(state.cast, c), c))) return true
+  if (Array.isArray(e.backgrounds) && e.backgrounds.some((b) => backgroundEntryAffects(findForEntry(state.backgrounds, b), b))) return true
+  if (typeof e.styleAnchorKey === 'string' && e.styleAnchorKey && e.styleAnchorKey !== state.styleAnchorKey) return true
+  return !!e.styleAnchorFromAttachment
 }
 
 // 항상 적용되는 보호 게이트 — 채팅 제안이 사용자가 직접 손댄 카드 값을 덮어쓰거나 삭제하는가.
@@ -583,6 +604,11 @@ function persistDraft(projectId: string, draft: ProducerDraft): Promise<void> {
   return pending
 }
 
+/** Writer 로 넘긴 프로젝트의 Producer 는 읽기 전용이다(2026-10-01 오너). 진실은 project-store.producerLocked(DB current_stage). */
+function producerLocked(): boolean {
+  return useProjectStore.getState().producerLocked
+}
+
 export const useProducerStore = create<ProducerState>((set, get) => ({
   storyText: '',
   storyReady: false,
@@ -595,14 +621,16 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   customStyleAnchor: null,
   syncing: false,
   error: null,
+  lastHandoffGated: false,
 
   setStoryText: (text) => {
-    if (isDemoSession()) return
+    if (isDemoSession() || producerLocked()) return
     // 글이 바뀌면 보존 결정은 그 글에 대한 것이 아니다 — 다시 묻는다(#script-preserve).
     set((s) => ({ storyText: text, preserveScript: s.storyText === text ? s.preserveScript : null }))
     scheduleDraftSave()
   },
   setPreserveScript: (value) => {
+    if (producerLocked()) return
     // 보존을 고르면 대본 전체가 곧 이야기다 — "스토리 준비"를 채팅 판단 없이 켠다(#script-preserve).
     set((s) => ({ preserveScript: value, storyReady: value === true ? true : s.storyReady }))
     scheduleDraftSave()
@@ -654,7 +682,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   setStyleAnchor: async (key) => {
-    if (isDemoSession()) return false
+    if (isDemoSession() || producerLocked()) return false
     const projectId = useProjectStore.getState().projectId
     const prev = get().styleAnchorKey
     const prevCustom = get().customStyleAnchor
@@ -685,13 +713,15 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   applyCustomStyleAnchor: ({ key, url, label, medium }) => {
+    if (producerLocked()) return
     set({ styleAnchorKey: key, customStyleAnchor: { url, label, medium } })
   },
 
   saveDraftNow: async () => {
     cancelDraftSave()
     const projectId = useProjectStore.getState().projectId
-    if (!projectId || isDemoSession()) return false
+    // 잠긴 Producer 는 바뀐 것이 없다 — 초안을 다시 쓰지 않는다.
+    if (!projectId || isDemoSession() || producerLocked()) return false
     const draft = buildProducerDraft(boardOf(get()))
     try {
       await persistDraft(projectId, draft)
@@ -708,7 +738,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   updateSettings: (partial) => {
-    if (isDemoSession()) return
+    if (isDemoSession() || producerLocked()) return
     set((state) => ({
       projectSettings: { ...state.projectSettings, ...partial },
     }))
@@ -725,6 +755,8 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
 
   applyExtractedSettings: (incoming, traceId) => {
     if (!incoming) return 'noop'
+    // 모델이 무엇을 제안했든 잠긴 Producer 에는 적용하지 않는다 — 호출부가 잠겨 있다고 답한다.
+    if (producerLocked()) return 'locked'
     const project = useProjectStore.getState()
     const current = get()
     // #script-preserve: 보존 중인 대본은 채팅이 제안한 줄거리로 덮지 않는다 — 모델은 제안만 하고
@@ -779,6 +811,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   applyProducerSourcePatch: (patch) => {
+    if (producerLocked()) return
     set((state) => {
       const {
         storyText: nextStory,
@@ -809,7 +842,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
 
   addCastMember: (entityType) => {
     // 데모(공유) 세션: 읽기전용 — 카드 추가/편집/삭제 무시(로컬 상태도 안 바꿔 "삭제된 척" 방지).
-    if (isDemoSession()) return ''
+    if (isDemoSession() || producerLocked()) return ''
     const localId = newLocalId()
     set((state) => ({
       cast: [
@@ -822,7 +855,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   updateCastMember: (localId, patch) => {
-    if (isDemoSession()) return
+    if (isDemoSession() || producerLocked()) return
     set((state) => ({
       cast: state.cast.map((m) => (m.localId === localId ? { ...m, ...patch, userEdited: true } : m)),
     }))
@@ -830,7 +863,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   removeCastMember: (localId) => {
-    if (isDemoSession()) return
+    if (isDemoSession() || producerLocked()) return
     set((state) => ({
       cast: state.cast.filter((m) => m.localId !== localId),
     }))
@@ -838,7 +871,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   addCastFromImage: (sourceImageUrl) => {
-    if (isDemoSession()) return ''
+    if (isDemoSession() || producerLocked()) return ''
     const localId = newLocalId()
     // userEdited 는 false — 글 칸이 비어 있으니 채팅이 바로 채운다(승인 게이트 없이).
     set((state) => ({
@@ -849,7 +882,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   addBackgroundFromImage: (sourceImageUrl) => {
-    if (isDemoSession()) return ''
+    if (isDemoSession() || producerLocked()) return ''
     const localId = newLocalId('background')
     set((state) => ({
       backgrounds: [...state.backgrounds, { localId, name: '', visualDescription: '', purpose: '', origin: 'producer', userEdited: false, sourceImageUrl }],
@@ -859,7 +892,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   addBackground: () => {
-    if (isDemoSession()) return ''
+    if (isDemoSession() || producerLocked()) return ''
     const localId = newLocalId('background')
     set((state) => ({
       backgrounds: [
@@ -872,7 +905,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   updateBackground: (localId, patch) => {
-    if (isDemoSession()) return
+    if (isDemoSession() || producerLocked()) return
     set((state) => ({
       backgrounds: state.backgrounds.map((background) =>
         background.localId === localId
@@ -884,7 +917,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   removeBackground: (localId) => {
-    if (isDemoSession()) return
+    if (isDemoSession() || producerLocked()) return
     set((state) => ({
       backgrounds: state.backgrounds.filter((background) => background.localId !== localId),
     }))
@@ -927,7 +960,8 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     const actionKey = `producer:handoff:${projectId}`
     if (!claimAction(actionKey)) return false
 
-    set({ syncing: true, error: null })
+    set({ syncing: true, error: null, lastHandoffGated: false })
+    let gated = false
 
     // 시간측정: 핸드오프 클릭 시각을 기록 → artist 가 "이미지 생성 가능"까지의 end-to-end 를 계산.
     if (typeof window !== 'undefined') {
@@ -1075,6 +1109,9 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
           } catch {}
           throw new Error(`writer start failed: ${detail}`)
         }
+        // 서버가 씬 스토리 확정 단계(#s3-gate)로 시작했으면 확정은 Producer 메인에서 한다(2026-10-01 오너).
+        const started = (await writerResponse.json().catch(() => null)) as { sceneGate?: unknown } | null
+        gated = started?.sceneGate === true
       } catch (writerErr) {
         throw writerErr
       }
@@ -1091,8 +1128,11 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       if (useProjectStore.getState().projectId !== projectId) return false
 
       useProjectStore.getState().unlockThrough('artist')
-      useProjectStore.getState().setStage('writer')
-      set({ syncing: false })
+      // Writer 가 시작됐고 DB 단계도 넘어갔다 — 이 순간부터 Producer 는 잠긴다(새 프로젝트만 새로 시작).
+      useProjectStore.getState().lockProducer()
+      // 확정 단계가 있으면 Producer 화면에 머문다(씬 스토리 확인·수정·확정 뒤 Writer 로).
+      if (!gated) useProjectStore.getState().setStage('writer')
+      set({ syncing: false, lastHandoffGated: gated })
       return true
     } catch (err) {
       if (useProjectStore.getState().projectId !== projectId) return false
@@ -1212,6 +1252,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       customStyleAnchor: null, // 프로젝트 소속 — 반드시 비운다
       syncing: false,
       error: null,
+      lastHandoffGated: false,
     })
   },
 }))

@@ -7,7 +7,7 @@ import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
 import { prepareChatTools } from '@/lib/chat-tools/protocol'
 import { buildProducerSystem } from './system-prompt'
-import { imageCardFillDirective, preservedScriptDirective } from './preserve-context'
+import { imageCardFillDirective, lockedProducerDirective, preservedScriptDirective } from './preserve-context'
 import { parseExtractedSettings } from '@/lib/parse-extracted-settings'
 import { resolveProducerDialogueLanguage } from '@/lib/producer-dialogue-language'
 import { parseChatChoices } from '@/lib/chat-choices'
@@ -65,6 +65,7 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
       traceId: requestedTraceId,
       preserveScript,
       cardFill,
+      producerLocked,
     } = await req.json()
     const modelSettings = parseChatModelSettings(rawModelSettings)
     if (!modelSettings) return NextResponse.json({ error: 'Invalid chat model settings' }, { status: 400 })
@@ -154,6 +155,9 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
     // #image-to-artist: 카드 채우기 턴 — 그 카드 하나만(클라 coerceCardFill 이 최종 방어).
     const cardDirective = imageCardFillDirective(cardFill)
     if (cardDirective) contextParts.push(cardDirective)
+    // 잠긴 Producer(2026-10-01) — 바꾸자는 제안을 내지 않는다(클라 producer-store 가드가 최종 방어).
+    const lockedDirective = lockedProducerDirective(producerLocked)
+    if (lockedDirective) contextParts.push(lockedDirective)
     if (currentSettings) {
       contextParts.push(
         `[Current Project Settings]\n${JSON.stringify(currentSettings)}`,

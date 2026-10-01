@@ -8,9 +8,9 @@ import { useAltArrowCycle } from '@/lib/use-alt-arrow-cycle'
 import { AltArrowHint } from '@/components/alt-arrow-hint'
 import { useT } from '@/lib/i18n'
 
-const TAB_ORDER: readonly WriterTab[] = ['storyboard', 'script', 'dialogue']
+const TAB_ORDER: readonly WriterTab[] = ['storyboard', 'script', 'dialogue', 'sheet']
 // V2 run 프로젝트: 프리뷰 탭이 맨 앞 (#v2-tab — 진입 기본 탭이자 리뷰 표면).
-const TAB_ORDER_V2: readonly WriterTab[] = ['v2', 'storyboard', 'script', 'dialogue']
+const TAB_ORDER_V2: readonly WriterTab[] = ['v2', 'storyboard', 'script', 'dialogue', 'sheet']
 
 export function WriterTabs() {
   const activeTab = useWriterUiStore((state) => state.activeTab)
@@ -35,6 +35,7 @@ export function WriterTabs() {
           <TabsTrigger value="storyboard">{t('Rough storyboard')}</TabsTrigger>
           <TabsTrigger value="script">{t('Treatment')}</TabsTrigger>
           <TabsTrigger value="dialogue">{t('Dialogue')}</TabsTrigger>
+          <TabsTrigger value="sheet">{t('Master sheet')}</TabsTrigger>
         </TabsList>
       </Tabs>
     </AltArrowHint>

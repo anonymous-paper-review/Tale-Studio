@@ -6,19 +6,17 @@
 //   상태(단계/진행률/ETA + keepalive)는 useWriterStatus, 콘텐츠는 useWriterPreview 가 담당.
 
 import { useEffect, useRef, useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Loader2, ScrollText } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { WriterStoryStream } from '@/features/writer/writer-story-stream'
+import { withDemoShare } from '@/lib/demo/context'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { WriterCharacterPanel } from '@/features/writer/writer-character-panel'
 import type { WriterStatus } from '@/lib/writer/use-writer-status'
 import { useWriterPreview } from '@/lib/writer/use-writer-preview'
 import { writerProgressView } from '@/lib/writer/progress-view'
 import { useLocale, useT } from '@/lib/i18n'
-
-// 확정 게이트 재등록 주기(#fix-scene-gate-suggestion-resurface 2026-08-25) — status 폴링(3s)과
-//   맞물려, 닫힘/선점/implicit dismiss 로 사라진 게이트를 한 틱 안에 되살린다. offerSuggestion 이
-//   idempotent(같은 id 가 떠 있으면 no-op)라 매 틱 호출해도 상태를 흔들지 않는다.
-const SCENE_GATE_REOFFER_MS = 3000
 
 // status 는 상위(WriterWorkspace)가 폴링해 내려준다 — 중복 status 폴링 방지.
 //   debug: admin 디버그 진입(#gen-debug) — 실행 중이 아닌데 강제 렌더된 상태 표시.
@@ -93,46 +91,15 @@ export function WriterGenerationView({
   // #s3-gate: storyCheck 후 씬 확정 대기 — 진행 바 대신 게이트 패널.
   const awaiting = status?.current_status === 'awaiting_confirmation'
 
-  // #s3-gate P3b → #gate-to-chat(2026-08-11): 확정/수정은 채팅 제안 블록이 **유일한** 자리다.
-  //   화면 하단 바에도 같은 버튼을 두면 답할 곳이 둘로 갈린다. 다른 단계의 "다음으로 넘어갈까요"가
-  //   전부 채팅에 있으므로 여기도 채팅으로 모았다(하단 바는 진행률 전용). 선점(preempt): 러프보드
-  //   브리핑 등 다른 제안이 떠 있어도 게이트는 사용자를 기다리게 하는 결정이라 먼저 보여야 한다.
-  // content/label 은 global-chat(범위 밖)이 t() 없이 그대로 렌더하므로, 여기서 미리 t() 로
-  //   번역해 넘긴다(#i18n-s5-batch3) — 문자열 값 비교라 로케일이 안 바뀌면 effect 재실행 없음.
-  const sceneGateMessage = t(
-    "The scene story draft is ready. Please review it on the screen.\nIf there's anything you'd like to change, type it in the input box below, or press Enter with it empty to confirm and move to the next step.",
-  )
-  const confirmAsIsLabel = t('Confirm as-is')
-  // 확정 게이트는 blocking 제안(dismissible:false) — 파이프라인이 멈춰 사용자 확정을 반드시
-  //   받아야 진행된다. 그래서 Esc·다른 제안 선점으로 닫히지 않고(store 가 dismissible:false 를
-  //   존중), 어떤 경로로 사라져도(수정 피드백 전송의 implicit dismiss·확정 실패) 서버가 awaiting
-  //   인 한 되살아나야 한다. useEffect 는 awaiting 전이 때 1회만 도므로, awaiting 동안 폴링 주기로
-  //   재등록해 self-heal 한다(#fix-scene-gate-suggestion-resurface 2026-08-25).
+  // 씬 스토리 확정은 Producer 메인에서 한다(2026-10-01 오너 "writer 생성 중 페이지에서는 상호 작용 없이 진행").
+  //   예전에는 여기서 채팅에 확정 안내(confirmScenes)를 띄웠다 — 이제 이 화면은 진행만 보여 주고,
+  //   확정을 기다리는 동안에는 Producer 로 가라는 안내만 둔다. 안내는 Producer 의 씬 스토리가 띄운다.
+  const router = useRouter()
+  // 새로고침 등으로 이 화면에 남은 확정 안내는 내린다 — 확정은 Producer 메인에서만 받는다(Producer 가 다시 띄운다).
+  const gateSuggestionShown = useGlobalChatStore((s) => s.suggestion?.action?.kind === 'confirmScenes')
   useEffect(() => {
-    if (!awaiting || !projectId) return
-    const offer = () =>
-      useGlobalChatStore.getState().offerSuggestion(
-        {
-          id: `scene-gate:${projectId}`,
-          stage: 'writer',
-          dismissible: false,
-          content: sceneGateMessage,
-          action: { kind: 'confirmScenes', label: confirmAsIsLabel },
-        },
-        { preempt: true },
-      )
-    offer()
-    const iv = setInterval(offer, SCENE_GATE_REOFFER_MS)
-    return () => {
-      clearInterval(iv)
-      // 확정 성공 후 상태 폴링이 이 컴포넌트를 내릴 때, 마지막으로 남은 게이트 제안도 함께 제거한다.
-      // 성공 응답과 다음 폴링이 거의 동시에 도착해 재등록된 경우까지 정리한다.
-      const current = useGlobalChatStore.getState().suggestion
-      if (current?.id === `scene-gate:${projectId}`) {
-        useGlobalChatStore.getState().dismissSuggestion({ implicit: true })
-      }
-    }
-  }, [awaiting, projectId, sceneGateMessage, confirmAsIsLabel])
+    if (gateSuggestionShown) useGlobalChatStore.getState().dismissSuggestion({ implicit: true })
+  }, [gateSuggestionShown])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -150,9 +117,7 @@ export function WriterGenerationView({
           {debug
             ? t('Debug preview: showing the generation screen using output from the last run.')
             : awaiting
-              ? t(
-                  'The scene story draft is ready. Review it, then request changes or confirm to move on.',
-                )
+              ? t('The scene story draft is ready. Review and confirm it on the Producer screen to continue.')
               : t("Generating the story. Read finished scenes below as they're ready.")}
         </p>
       </header>
@@ -162,7 +127,22 @@ export function WriterGenerationView({
         {/* 진행 카드(#f2 2026-08-26 → 2026-08-27 오너): 기본은 대시보드 중앙, 카드를 잡아 끌면
             원하는 자리로 이동(가려지는 글을 유저가 치울 수 있게). 위치는 localStorage 에 기억.
             게이트 대기 중엔 채팅이 조작을 맡으므로 숨김. */}
-        {awaiting ? null : (
+        {awaiting ? (
+          <div className="absolute left-1/2 top-1/2 z-10 w-full max-w-md -translate-x-1/2 -translate-y-1/2" data-testid="scene-gate-producer-notice">
+            <div className="rounded-2xl border border-border bg-background/95 px-5 py-4 shadow-lg">
+              <div className="flex items-center gap-2">
+                <ScrollText className="size-4 shrink-0 text-warning" aria-hidden />
+                <span className="text-sm font-medium">{t('Waiting for scene draft confirmation')}</span>
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {t('Review the scene story on the Producer screen and confirm it. Generation continues here after that.')}
+              </p>
+              <Button size="sm" className="mt-3" onClick={() => router.push(withDemoShare('/studio/producer'))}>
+                {t('Go to Producer')}
+              </Button>
+            </div>
+          </div>
+        ) : (
           <div
             className={cardPos ? 'absolute z-10 w-full max-w-md' : 'absolute left-1/2 top-1/2 z-10 w-full max-w-md -translate-x-1/2 -translate-y-1/2'}
             style={cardPos ? { left: cardPos.x, top: cardPos.y } : undefined}
