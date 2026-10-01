@@ -24,6 +24,7 @@ import type { StageId } from '@/types'
 import { installDemoFetchGuard } from '@/lib/demo/fetch-guard'
 import { isDemoSession, readDemoToken, withDemoShare } from '@/lib/demo/context'
 import { DemoBanner } from '@/components/demo/demo-banner'
+import { HandoffConfirmDialogs } from '@/components/handoff/handoff-confirm-dialogs'
 
 // 데모(공유) 세션이면 첫 클라 진입 시 window.fetch 를 가드로 교체(멱등, 내부에서 isDemoSession 판정).
 //   초기 effect fetch(verifyWriterGate 등)보다 먼저 걸리도록 모듈 로드 시점에 설치.
@@ -180,6 +181,7 @@ export default function StudioLayout({
         </div>
       </main>
       <GlobalChat />
+      <HandoffConfirmDialogs />
     </>
   )
 }

@@ -6,7 +6,7 @@ import { prepareChatTools, type ToolBlock } from '@/lib/chat-tools/protocol'
 const sdk = vi.hoisted(() => ({ chat: vi.fn(), json: vi.fn() }))
 vi.mock('@anthropic-ai/sdk', () => ({
   default: class {
-    beta = { messages: { create: sdk.chat } }
+    beta = { messages: { create: sdk.chat, stream: (...args: unknown[]) => ({ finalMessage: () => sdk.chat(...args) }) } }
     messages = { create: sdk.json }
   },
 }))
@@ -14,7 +14,7 @@ vi.mock('@/lib/timing', () => ({ logTiming: vi.fn() }))
 
 function response(content: ToolBlock[], stopReason = 'end_turn') {
   return {
-    model: 'claude-sonnet-4-6', content, stop_reason: stopReason,
+    model: 'claude-sonnet-5-5', content, stop_reason: stopReason,
     usage: { input_tokens: 31, output_tokens: 12, cache_read_input_tokens: 7, cache_creation_input_tokens: 0 },
   }
 }
@@ -41,7 +41,7 @@ describe('모델과 채팅 도구의 연결', () => {
     expect(appTools.turn).toEqual({ content, stopReason: 'tool_use' })
     expect(sdk.chat).toHaveBeenCalledTimes(1)
     expect(onUsage).toHaveBeenCalledWith(expect.objectContaining({
-      model: 'claude-sonnet-4-6', inputTokens: 31, outputTokens: 12, stopReason: 'tool_use',
+      model: 'claude-sonnet-5-5', inputTokens: 31, outputTokens: 12, stopReason: 'tool_use',
     }))
   })
 

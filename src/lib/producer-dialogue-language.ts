@@ -12,6 +12,13 @@ const DIALOGUE_TOPIC = /대사|내레이션|나레이션|더빙|dialogue|dialog|
 const ANY_LANGUAGE = `(?:${Object.values(LANGUAGE_NAMES).join('|')})`
 const KO_SELECTION = `${KO_DIALOGUE}(?:는|은|를|을|도)?\\s*(?:(?:모두|전부|전체|꼭|다|이제|앞으로|오직)\\s*)*(?:${ANY_LANGUAGE}(?:로|으로)?\\s*(?:하지\\s*말고|쓰지\\s*말고|말고|아니라|대신)\\s*)?` // i18n-ok: 사용자 언어 지정 구문 판별용 정규식, 화면 문구 아님
 
+function normalizeLanguageLabels(message: string): string {
+  for (const [language, name] of Object.entries(LANGUAGE_NAMES)) {
+    message = message.replace(new RegExp(`(${name})\\s*\\(\\s*${language}\\s*\\)`, 'gi'), '$1')
+  }
+  return message
+}
+
 function affirmativeKoreanSelection(clause: string, name: string): boolean {
   const patterns = [
     new RegExp(`${KO_SELECTION}${name}(?=\\s*(?:으로|로|$))`, 'i'), // i18n-ok: 사용자 언어 지정 구문 판별용 정규식, 화면 문구 아님
@@ -24,14 +31,14 @@ function affirmativeKoreanSelection(clause: string, name: string): boolean {
     if (!match) return false
     const tail = clause.slice(match.index + match[0].length).trim()
     if (/(?:하지|쓰지)\s*(?:마|말)|안\s*(?:돼|되|해|하)|필요\s*없|말고|아니|대신|않/.test(tail)) return false // i18n-ok: 사용자 언어 지정 구문 판별용 정규식, 화면 문구 아님
-    return /^(?:(?:으로|로)(?:만|는)?\s*)?(?:$|해|하|할|써|쓰|쓸|부탁|바꿔|바꾸|진행|설정|말|대화)/.test(tail) // i18n-ok: 사용자 언어 지정 구문 판별용 정규식, 화면 문구 아님
+    return /^(?:(?:으로|로)(?:만|는)?\s*)?(?:$|해|하|할|써|쓰|쓸|부탁|바꿔|바꾸|바꿀|진행|설정|말|대화)/.test(tail) // i18n-ok: 사용자 언어 지정 구문 판별용 정규식, 화면 문구 아님
   })
 }
 
 /** 배경·국적·그림체는 근거가 아니다. 대사 언어를 직접 지정하는 문장만 받는다. */
 function explicitDialogueLanguage(message: string): DialogueLanguage | null {
   const requested = new Set<DialogueLanguage>()
-  for (const part of message.split(/[,，.!?\n]+/)) {
+  for (const part of normalizeLanguageLabels(message).split(/[,，.!?\n]+/)) {
     const clause = part.trim()
     // 부정하거나 적합성을 묻는 말은 언어를 선택한 것이 아니다.
     if (/어울릴까|좋을까|\b(?:don't|do not|never|avoid|without)\b/i.test(clause)) continue // i18n-ok: 사용자 언어 지정 구문 판별용 정규식, 화면 문구 아님
@@ -58,14 +65,30 @@ function languageAnswer(message: string, history: unknown): DialogueLanguage | n
   const questions = question.match(/[^.!?。！？\n]*[?？]/g)
   const lastQuestion = questions?.[questions.length - 1]
   if (!lastQuestion || !DIALOGUE_TOPIC.test(lastQuestion)) return null
+  const answer = normalizeLanguageLabels(message)
   for (const [language, name] of Object.entries(LANGUAGE_NAMES)) {
-    if (new RegExp(`^\\s*${name}(?:로|으로)?(?:\\s*(?:해\\s*줘|해주세요|부탁해(?:요)?|please))?[.!]?\\s*$`, 'i').test(message)) return language as DialogueLanguage // i18n-ok: 사용자 언어 지정 구문 판별용 정규식, 화면 문구 아님
+    if (new RegExp(`^\\s*(?:${name}|${language})(?:로|으로)?(?:\\s*(?:해\\s*줘|해주세요|부탁해(?:요)?|please))?[.!]?\\s*$`, 'i').test(answer)) return language as DialogueLanguage // i18n-ok: 사용자 언어 지정 구문 판별용 정규식, 화면 문구 아님
   }
   if (/^\s*(?:응|네|예|좋아(?:요)?|그래(?:요)?|맞아(?:요)?|yes|yep|yeah|ok(?:ay)?|sure|sounds good)[.!]?\s*$/i.test(message)) { // i18n-ok: 사용자 언어 지정 구문 판별용 정규식, 화면 문구 아님
     const options = Object.entries(LANGUAGE_NAMES).filter(([, name]) => new RegExp(name, 'i').test(lastQuestion))
     if (options.length !== 1) return null
     const proposal = lastQuestion.replace(/^\s*(?:should|shall|can)\s+we\s+/i, '')
     return explicitDialogueLanguage(proposal)
+  }
+  return null
+}
+
+function confirmedLanguageFromHistory(history: unknown): DialogueLanguage | null {
+  if (!Array.isArray(history)) return null
+  // 현재 대화창이 보내는 최근 기록 안에서만 누락된 선택을 복구한다.
+  for (let index = history.length - 1; index >= 0; index--) {
+    const turn = history[index]
+    if (!turn || typeof turn !== 'object' || turn.role !== 'user') continue
+    const message = turn.content ?? turn.text
+    if (typeof message !== 'string') continue
+    const language = explicitDialogueLanguage(message)
+      ?? languageAnswer(message, history.slice(Math.max(0, index - 1), index))
+    if (language) return language
   }
   return null
 }
@@ -79,5 +102,6 @@ export function resolveProducerDialogueLanguage(input: {
   return explicitDialogueLanguage(input.message)
     ?? languageAnswer(input.message, input.history)
     ?? parseDialogueLanguage(input.currentLanguage)
+    ?? confirmedLanguageFromHistory(input.history)
     ?? null
 }

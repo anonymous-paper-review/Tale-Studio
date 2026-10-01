@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ImageIcon, MapPin, Clock, Pause, Play } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { mediaFrameStyle } from '@/lib/project-aspect'
+import { useProjectFormatStore } from '@/stores/project-format-store'
 import { toast } from 'sonner'
 import { refreshGenerationQueue } from '@/lib/generation-queue'
 import { notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
@@ -278,6 +280,9 @@ function ShotCell({
   const { generating: childVideoGenerating, failure: childVideoFailure } =
     selectGridVideoAttemptState(takeRecords, t)
 
+  // 화면 포맷(2026-09-30) — 훅은 조기 반환보다 앞에 둔다(React 훅 순서 규칙).
+  const projectFormat = useProjectFormatStore((s) => s.format)
+  const gridFrame = mediaFrameStyle(projectFormat)
   if (!isShotData(node.data)) return null
   const data: ShotNodeData = node.data
   const img = data.storyboardImage
@@ -447,8 +452,9 @@ function ShotCell({
           },
         ]
 
+  // 그 밖(영상·단일 이미지·자리표시·생성 중)의 상자는 Producer 포맷의 비율(2026-09-30) — 가로 프로젝트만 종전 16:9.
   // 3프레임 세트(previz/실사 스트립)는 상자가 그림 비율을 따라간다(#fit-tight) — 띠도 크롭도
-  //   없다. 그 외(영상·단일 이미지·플레이스홀더)는 16:9 고정. 배지·오버레이·액션은 이 상자에 앵커.
+  //   없다. 배지·오버레이·액션은 이 상자에 앵커.
   //   real 뷰에서 완성 영상이 있으면 영상이 우선(#e3 2026-08-12 회귀 수정 — 지난 개편이 3프레임을
   //   영상 위로 올려, 영상 단계 카드가 스트립 순환으로 보였다). 호버 재생·클릭 일시정지는 HoverPlayVideo.
   const framePanel =
@@ -489,8 +495,10 @@ function ShotCell({
       <div
         className={cn(
           'relative overflow-hidden',
-          !(framePanel && !generating) && 'aspect-video',
+          // 영상·단일 이미지·자리표시·생성 중 상자는 Producer 포맷의 비율(2026-09-30) — 가로 프로젝트만 종전 16:9.
+          !(framePanel && !generating) && !gridFrame && 'aspect-video',
         )}
+        style={!(framePanel && !generating) && gridFrame ? gridFrame : undefined}
       >
         {framePanel && !generating ? (
           <RoughFrameCycle

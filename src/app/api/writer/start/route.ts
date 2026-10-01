@@ -346,7 +346,7 @@ export async function POST(req: NextRequest) {
           code: 'writer_gate_pending',
           projectId,
           status: existing.status,
-          message: '현재 씬 스토리 초안이 준비됐어요. Writer 화면에서 확정하거나 수정 요청으로 다시 실행할지 선택해 주세요.',
+          message: '현재 씬 스토리 초안이 준비됐어요. Producer 화면의 씬 스토리에서 확정하거나 수정을 요청해 주세요.',
         },
         { status: 409 },
       );
@@ -590,7 +590,8 @@ export async function POST(req: NextRequest) {
       await triggerWriterStep(req.nextUrl.origin, projectId);
     });
 
-    return NextResponse.json({ projectId, runId: run.id, status: 'started' });
+    // sceneGate: 씬 스토리 확정 단계로 시작했는가 — 화면은 이 값으로 확정 전까지 Producer 메인에 머문다(2026-10-01).
+    return NextResponse.json({ projectId, runId: run.id, status: 'started', sceneGate: input.sceneGate === true });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error('[writer/start]', msg);

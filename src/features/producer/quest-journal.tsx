@@ -27,7 +27,7 @@ import { cn } from '@/lib/utils'
 import { useT, useLocale } from '@/lib/i18n'
 import { parseAppLocale, type AppLocale } from '@/lib/locale'
 
-const FORMAT_OPTIONS: { value: ProjectFormat; label: string }[] = [
+export const FORMAT_OPTIONS: { value: ProjectFormat; label: string }[] = [
   { value: 'horizontal_16:9', label: '16:9 Horizontal' },
   { value: 'vertical_9:16', label: '9:16 Vertical' },
   { value: 'cinema_2.39:1', label: '2.39:1 Cinema' },
@@ -36,7 +36,7 @@ const FORMAT_OPTIONS: { value: ProjectFormat; label: string }[] = [
 
 // 언어명은 각 언어의 자국어 표기(endonym) — 앱 UI 로케일과 무관하게 고정.
 //   copy-style.md 의 고유명사 예외와 동일 취급, 사전화 대상 아님.
-const LANGUAGE_OPTIONS: { value: string; label: string }[] = [
+export const LANGUAGE_OPTIONS: { value: string; label: string }[] = [
   { value: 'ko', label: '한국어' }, // i18n-ok: 언어 자국어 표기(endonym), 번역 대상 아님
   { value: 'en', label: 'English' },
   { value: 'ja', label: '日本語' },
@@ -72,11 +72,23 @@ function SettingBadge({
   k,
   value,
   children,
+  editableWhenLocked = false,
 }: {
   k: string
   value: string | null
   children: ReactNode
+  /** 잠긴 Producer 에서도 고칠 수 있는 배지(채팅 언어 — Producer 원천이 아니다). */
+  editableWhenLocked?: boolean
 }) {
+  // Writer 로 넘긴 프로젝트(2026-10-01 오너)는 값만 보여준다 — 고치는 팝업을 열지 않는다.
+  const locked = useProjectStore((s) => s.producerLocked)
+  if (locked && !editableWhenLocked) {
+    return (
+      <span className={cn(BADGE_BASE, 'cursor-default', value ? BADGE_FILLED : BADGE_EMPTY)}>
+        <BadgeFace k={k} value={value} />
+      </span>
+    )
+  }
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -219,7 +231,7 @@ export function StoryFoundationBadges({ className }: { className?: string }) {
 
       {/* 채팅 언어 배지 (#chat-locale-follow 2026-08-31) — 숨은 상태(projects.locale)가 화면 언어와
           몰래 갈렸던 게 사고의 뿌리였다. 보이게 하고, 명시 전환 입구를 준다. */}
-      <SettingBadge k={t('Chat language')} value={contentLocaleLabel}>
+      <SettingBadge k={t('Chat language')} value={contentLocaleLabel} editableWhenLocked>
         <p className="mb-1.5 text-[11px] leading-relaxed text-muted-foreground">
           {t('Chat replies and the generated story follow this language.')}
           {localeMismatch ? ` ${t('It currently differs from your UI language.')}` : ''}
@@ -254,6 +266,7 @@ export function ProducerQuestJournal({
   className?: string
 }) {
   const t = useT()
+  const producerLocked = useProjectStore((s) => s.producerLocked)
   const hard = new Set(gate.hardMissing.map((i) => i.field))
   const castIssues = gate.hardMissing.filter((i) => i.field.startsWith('cast'))
   const settingsDone = !['playtime', 'genre', 'format', 'dialogueLanguage'].some((f) => hard.has(f))
@@ -293,10 +306,13 @@ export function ProducerQuestJournal({
     },
     {
       title: t('Call Writer'),
-      desc: gate.canHandoff
-        ? t("Everything's ready. Call Writer from the chat.")
-        : t('Complete the milestones to call Writer.'),
-      done: false,
+      // 2026-10-01: 넘김 입구가 채팅 위 칩에서 화면 오른쪽 위 버튼으로 옮겨졌다. 넘긴 뒤(잠김)에는 끝난 단계다.
+      desc: producerLocked
+        ? t('Handed over to Writer. Producer is now read only.')
+        : gate.canHandoff
+          ? t("Everything's ready. Hand over with the button at the top right.")
+          : t('Complete the milestones to call Writer.'),
+      done: producerLocked,
     },
   ]
   const nowIdx = nodes.findIndex((n) => !n.done)

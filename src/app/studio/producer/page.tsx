@@ -111,8 +111,15 @@ export default function MeetingPage() {
     'Everything needed is filled in. Calling Writer will start scene/shot design right away.',
   )
   const inviteWriterLabel = translate(contentLoc, 'Invite Writer')
+  // 넘긴 뒤(잠김)에는 "Writer 호출하기" 제안을 띄우지 않고, 남아 있으면 내린다 — 다음 할 일은 씬 스토리 확정이다.
+  const producerLocked = useProjectStore((s) => s.producerLocked)
   useEffect(() => {
-    if (!projectId || !canHandoff) return
+    if (!projectId || !producerLocked) return
+    const current = useGlobalChatStore.getState().suggestion
+    if (current?.id === `handoff:producer:${projectId}`) useGlobalChatStore.getState().dismissSuggestion({ implicit: true })
+  }, [projectId, producerLocked, activeSuggestion])
+  useEffect(() => {
+    if (!projectId || !canHandoff || producerLocked) return
     if (!shouldOfferHandoffNudge('producer', reachedStage)) return
     const spec = handoffFrom('producer')
     if (!spec) return
@@ -134,6 +141,7 @@ export default function MeetingPage() {
   }, [
     projectId,
     canHandoff,
+    producerLocked,
     activeSuggestion,
     offerSuggestion,
     reachedStage,

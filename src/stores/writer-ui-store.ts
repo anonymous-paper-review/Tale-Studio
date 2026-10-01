@@ -5,7 +5,7 @@ import { persist } from 'zustand/middleware'
 
 // 'v2' = V2 의미 단위 프리뷰 탭 (#v2-tab 2026-08-17): V2 run 프로젝트에서만 노출.
 //   이전엔 워크스페이스가 engine=v2 면 프리뷰를 전면 강점유해 러프 보드가 영영 닫혔다.
-export type WriterTab = 'v2' | 'storyboard' | 'script' | 'dialogue'
+export type WriterTab = 'v2' | 'storyboard' | 'script' | 'dialogue' | 'sheet'
 
 interface WriterUiState {
   activeTab: WriterTab
@@ -18,7 +18,7 @@ interface WriterUiState {
 export function normalizeWriterTab(value: unknown): WriterTab {
   // 'dialogue'는 #dialogue-v4(2026-07-23)에서 활성화 — "준비 중" 시절 가드에 남아있으면
   //   setActiveTab이 대사탭 클릭을 조용히 무시한다(탭 전환 불가 실사고). 'v2'도 동일 함정 주의.
-  return value === 'v2' || value === 'storyboard' || value === 'script' || value === 'dialogue'
+  return value === 'v2' || value === 'storyboard' || value === 'script' || value === 'dialogue' || value === 'sheet'
     ? value
     : 'storyboard'
 }

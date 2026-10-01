@@ -19,12 +19,12 @@ beforeEach(() => { mocks.chat.mockReset().mockResolvedValue('{"reply":"안녕하
 describe.each([['Producer', producer], ['Writer', writer], ['Artist', artist]] as const)('%s 모델 옵션', (_stage, post) => {
   it('선택한 모델과 사고 설정을 채팅 호출에 전달한다', async () => {
     // 왜: 화면에 선택값만 보이고 실제 모델은 바뀌지 않는 경우를 막는다.
-    const modelSettings = { model: 'claude-opus-4-6', effort: 'medium', thinking: 'adaptive' }
+    const modelSettings = { model: 'claude-opus-5-5', effort: 'medium', thinking: 'adaptive' }
     const result = await post(new Request('http://localhost/api/chat', { method: 'POST', body: JSON.stringify({ message: '안녕', modelSettings }) }))
     expect(result.status).toBe(200)
     expect(mocks.chat.mock.calls[0][5]).toMatchObject({ modelSettings })
   })
-  it.each([null, { model: 'unknown', effort: 'high', thinking: 'off' }, { model: 'claude-sonnet-4-6', effort: 4, thinking: false }])('지원하지 않는 옵션이면 모델을 호출하지 않는다 (%j)', async modelSettings => {
+  it.each([null, { model: 'unknown', effort: 'high', thinking: 'off' }, { model: 'claude-sonnet-5-5', effort: 4, thinking: false }])('지원하지 않는 옵션이면 모델을 호출하지 않는다 (%j)', async modelSettings => {
     // 왜: 잘못된 클라이언트 입력을 비용이 발생하는 공급자에게 넘기지 않는다.
     const result = await post(new Request('http://localhost/api/chat', { method: 'POST', body: JSON.stringify({ message: '안녕', modelSettings }) }))
     expect(result.status).toBe(400)

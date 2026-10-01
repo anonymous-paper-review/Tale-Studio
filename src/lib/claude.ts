@@ -4,9 +4,14 @@ import { CHAT_COMPACTION_TRIGGER_TOKENS } from './constants'
 import type { ChatLlmUsage } from './chat-trace'
 import { parseChatModelSettings, type ChatModelSettings } from './chat-model-settings'
 import { CHAT_TOOL_GUIDE, type ChatToolContext } from './chat-tools/protocol'
-import type { BetaMessageParam } from '@anthropic-ai/sdk/resources/beta/messages/messages'
+import { CHAT_OUTPUT_BUDGET, CHAT_RECOVERY_ATTEMPTS, ChatOutputRecoveryError, type ChatOutputRecoveryOptions } from './chat-output-recovery'
+import type { BetaMessage, BetaMessageParam, MessageCreateParamsNonStreaming } from '@anthropic-ai/sdk/resources/beta/messages/messages'
 
-const MODEL = 'claude-sonnet-4-6'
+const MODEL = 'claude-sonnet-5-5'
+const MAX_OUTPUT_TOKENS = 32000
+// 도구 후 최신 프로젝트/이미지 문맥을 재조립하므로 이전 문맥에 묶인 사고만 API에서 제외한다.
+// SDK 0.80 타입에는 block_binding이 없지만 원본 블록은 그대로 전달하는 공식 beta 필드다.
+const CHAT_THINKING = { type: 'adaptive', block_binding: { prefix_mismatch_behavior: 'drop_block' } } as const
 
 let _client: Anthropic | null = null
 function getClient(): Anthropic {
@@ -40,12 +45,24 @@ function toClaudeRole(role: string): 'user' | 'assistant' {
   return role === 'user' ? 'user' : 'assistant'
 }
 
+function boundedRecoveryValue(value: number, maximum: number): number {
+  return Number.isFinite(value) ? Math.max(0, Math.min(maximum, Math.floor(value))) : 0
+}
+
+/** Keep action payloads out of both continuation concatenation and unfinished display text. */
+function recoveryProse(text: string): string {
+  // Fences, JSON objects/arrays, and XML tool markers can be cut before their identifying key.
+  // A conservative boundary also covers legacy root-level Producer settings.
+  const boundary = text.search(/[`{<]|\[\s*(?:[\[{"]|$)/m)
+  return boundary < 0 ? text : text.slice(0, boundary)
+}
+
 /** Multi-turn chat — returns assistant text */
 export async function claudeChat(
   system: string,
   history: HistoryMessage[],
   userMessage: string,
-  temperature = 0.7,
+  _temperature = 0.7,
   label = 'chat',
   // #p4-websearch(2026-08-06): 서버 웹서치 툴 — 오마쥬/레퍼런스 요청("기생충 계단 씬처럼")을
   //   실제 검색으로 접지. 서버 실행 툴이라 tool loop 불필요, 응답에 검색 블록이 끼어도
@@ -60,8 +77,11 @@ export async function claudeChat(
     appTools?: ChatToolContext
     signal?: AbortSignal
     modelSettings?: ChatModelSettings
+    recovery?: ChatOutputRecoveryOptions
   },
 ): Promise<string> {
+  // 기존 호출 순서는 유지하지만 Claude 5.5가 지원하지 않는 temperature는 보내지 않는다.
+  void _temperature
   const modelSettings = parseChatModelSettings(opts?.modelSettings)
   if (!modelSettings) throw new Error('Invalid chat model settings')
   const imageUrls = opts?.imageUrls ?? []
@@ -84,20 +104,14 @@ export async function claudeChat(
     ...(opts?.appTools?.messages ?? []),
   ]
 
-  const t0 = performance.now()
-  const response = await getClient().beta.messages.create({
+  const request: MessageCreateParamsNonStreaming = {
     model: modelSettings.model,
-    // #p4-json-guard(2026-08-11): 4096 → 8192. 채팅은 답변 산문과 변경(updates) 블록이 이 한 장을
-    //   나눠 쓰는데, 변경 1건이 약 83tok(실측)이라 4096 에서는 48건 근처에서 잘렸다(76샷 일괄
-    //   요청 유실 사고의 원인). 한도는 상한일 뿐이라 짧은 답변의 비용·지연은 그대로다.
-    max_tokens: 8192,
+    // 사고 토큰도 출력 한도를 쓰므로 사고와 답변을 위한 여유를 둔다. 실제 생성한 토큰만 청구된다.
+    max_tokens: MAX_OUTPUT_TOKENS,
     system: system + (opts?.appTools ? CHAT_TOOL_GUIDE : ''),
     messages,
-    ...(opts?.modelSettings ? {
-      output_config: { effort: modelSettings.effort },
-      thinking: { type: modelSettings.thinking === 'adaptive' ? 'adaptive' as const : 'disabled' as const },
-    } : {}),
-    ...(modelSettings.thinking === 'adaptive' ? {} : { temperature }),
+    output_config: { effort: modelSettings.effort },
+    thinking: CHAT_THINKING,
     ...(opts?.webSearch || opts?.appTools
       ? { tools: [
           ...(opts?.webSearch ? [{ type: 'web_search_20250305' as const, name: 'web_search' as const, max_uses: 3 }] : []),
@@ -108,15 +122,14 @@ export async function claudeChat(
     //   마지막 cacheable block(= 마지막 user 턴)에 breakpoint를 둔다. 다음 턴에는 그 이전
     //   prefix(system + 이전 히스토리)가 캐시 read 대상이 되어 2턴째부터 입력 비용/지연이 준다.
     //   캐시 무효 방지: volatile 컨텍스트(canvasContext/currentSettings/에셋 요약)는 라우트에서
-    //   이미 마지막 user 턴에 prepend하므로 system prefix는 안정적이다. Sonnet 4.6 최소 캐시
-    //   prefix 2048 토큰 — 짧은 초기 대화는 silent 미캐시(에러 아님).
+    //   이미 마지막 user 턴에 prepend하므로 system prefix는 안정적이다.
     cache_control: { type: 'ephemeral' },
     // 서버사이드 compaction 안전망 (chat-context-management Phase 2) — 단일 요청 입력이
     //   600K 토큰(1M 창의 60%)에 닿으면 API가 과거 이력을 요약 블록으로 압축해 brick(컨텍스트
     //   한도 400)을 막는다. 평소엔 윈도잉으로 입력이 수만 토큰이라 트리거에 안 닿는 — 병리적
     //   장기 세션 전용 보험. 캐리오버(블록 영속화)는 안전망 용도엔 불필요해 미적용(매 턴 history는
     //   DB에서 윈도잉 재조립 → 압축 요약을 재전송하지 않으나, 그 경로에선 트리거에 닿지 않음).
-    betas: ['compact-2026-01-12'],
+    betas: ['compact-2026-01-12', 'thinking-binding-controls-2026-08-01'],
     context_management: {
       edits: [
         {
@@ -128,74 +141,149 @@ export async function claudeChat(
         },
       ],
     },
-  }, { signal: opts?.signal })
-  const u = response.usage
-  const durationMs = performance.now() - t0
-  logTiming(
-    'llm',
-    `${label} model=${response.model} effort=${modelSettings.effort} thinking=${modelSettings.thinking} in=${u.input_tokens} out=${u.output_tokens} cache_read=${u.cache_read_input_tokens ?? 0} cache_write=${u.cache_creation_input_tokens ?? 0} stop_reason=${response.stop_reason ?? 'null'}${imageUrls.length ? ` img=${imageUrls.length}` : ''} ${durationMs.toFixed(0)}ms`,
-  )
-
-  // compaction/웹서치가 켜지면 응답 content에 비텍스트 블록이 끼고, 검색 시엔 텍스트가
-  //   여러 블록으로 나뉠 수 있다(검색 전 서두 + 검색 후 본문) — 전 텍스트 블록을 이어붙인다.
-  const text = response.content
-    .filter((b): b is Extract<(typeof response.content)[number], { type: 'text' }> => b.type === 'text')
-    .map((b) => b.text)
-    .join('')
-  const hasToolTurn = opts?.appTools && (response.content.some(b => b.type === 'tool_use') || response.stop_reason === 'pause_turn')
-  if (hasToolTurn) {
-    opts.appTools!.turn = { content: response.content as unknown as import('./chat-tools/protocol').ToolBlock[], stopReason: response.stop_reason ?? '' }
+  }
+  const recovery = opts?.recovery
+  const maxAttempts = recovery ? boundedRecoveryValue(recovery.maxAttempts, CHAT_RECOVERY_ATTEMPTS) : 0
+  let remainingOutput = recovery ? boundedRecoveryValue(recovery.maxOutputTokens, CHAT_OUTPUT_BUDGET) : MAX_OUTPUT_TOKENS
+  let requestMessages = messages
+  let continuedText = ''
+  let lastSafePartialText = ''
+  const throwIfAborted = () => {
+    if (recovery && lastSafePartialText && opts?.signal?.aborted && opts.signal.reason?.name === 'TimeoutError') {
+      throw new ChatOutputRecoveryError(lastSafePartialText, 'request_failed', { cause: opts.signal.reason })
+    }
+    opts?.signal?.throwIfAborted()
   }
 
-  const usage: ChatLlmUsage = {
-    model: response.model,
-    durationMs,
-    inputTokens: u.input_tokens,
-    outputTokens: u.output_tokens,
-    cacheReadInputTokens: u.cache_read_input_tokens ?? 0,
-    cacheCreationInputTokens: u.cache_creation_input_tokens ?? 0,
-    stopReason: response.stop_reason,
-    effort: modelSettings.effort,
-    thinking: modelSettings.thinking,
-  }
-  try {
-    const callbackResult = opts?.onUsage?.(usage)
-    if (callbackResult !== undefined) await Promise.resolve(callbackResult).catch(() => undefined)
-  } catch {
-    // Usage reporting must never turn a successful chat response into a failure.
-  }
+  for (let attempt = 0; ; attempt++) {
+    throwIfAborted()
+    if (recovery && remainingOutput <= 0) throw new ChatOutputRecoveryError(lastSafePartialText, 'output_budget')
+    const t0 = performance.now()
+    // Stream transport supports large output limits; callers still receive only a finished answer.
+    let response: BetaMessage
+    try {
+      response = await getClient().beta.messages.stream({
+        ...request,
+        messages: requestMessages,
+        max_tokens: recovery ? Math.min(attempt === 0 ? 64000 : 128000, remainingOutput) : MAX_OUTPUT_TOKENS,
+      }, { signal: opts?.signal }).finalMessage()
+    } catch (error) {
+      const timeout = opts?.signal?.aborted && opts.signal.reason?.name === 'TimeoutError'
+      const aborted = !timeout && (opts?.signal?.aborted || (error instanceof Error && ['AbortError', 'APIUserAbortError'].includes(error.name)))
+      if (recovery && lastSafePartialText && !aborted) {
+        throw new ChatOutputRecoveryError(lastSafePartialText, 'request_failed', { cause: error })
+      }
+      throw error
+    }
+    const u = response.usage
+    const durationMs = performance.now() - t0
+    logTiming(
+      'llm',
+      `${label} model=${response.model} effort=${modelSettings.effort} thinking=${modelSettings.thinking} in=${u.input_tokens} out=${u.output_tokens} cache_read=${u.cache_read_input_tokens ?? 0} cache_write=${u.cache_creation_input_tokens ?? 0} stop_reason=${response.stop_reason ?? 'null'}${imageUrls.length ? ` img=${imageUrls.length}` : ''} ${durationMs.toFixed(0)}ms`,
+    )
 
-  if (response.stop_reason === 'max_tokens' && !hasToolTurn) throw new Error('Chat response reached its output limit. The response was not completed; retry with lower effort or thinking off.')
-  if (!text && !hasToolTurn) throw new Error('Unexpected response type')
-  return text
+    // Compaction and server tools include non-text blocks; never expose thinking as prose.
+    const text = response.content
+      .filter((b): b is Extract<(typeof response.content)[number], { type: 'text' }> => b.type === 'text')
+      .map((b) => b.text)
+      .join('')
+    const hasToolTurn = opts?.appTools && (response.content.some(b => b.type === 'tool_use') || response.stop_reason === 'pause_turn')
+    const usage: ChatLlmUsage = {
+      model: response.model,
+      durationMs,
+      inputTokens: u.input_tokens,
+      outputTokens: u.output_tokens,
+      cacheReadInputTokens: u.cache_read_input_tokens ?? 0,
+      cacheCreationInputTokens: u.cache_creation_input_tokens ?? 0,
+      stopReason: response.stop_reason,
+      effort: modelSettings.effort,
+      thinking: modelSettings.thinking,
+    }
+    remainingOutput -= u.output_tokens
+    try {
+      const callbackResult = opts?.onUsage?.(usage)
+      if (callbackResult !== undefined) await Promise.resolve(callbackResult).catch(() => undefined)
+    } catch {
+      // Usage reporting must never turn a successful chat response into a failure.
+    }
+    throwIfAborted()
+
+    const safeText = recoveryProse(text)
+    const partialText = continuedText + safeText
+    // The installed SDK predates this documented stop reason, so retain the runtime check.
+    if (recovery && String(response.stop_reason) === 'model_context_window_exceeded') {
+      throw new ChatOutputRecoveryError(partialText || lastSafePartialText, 'output_limit')
+    }
+    const proseOnly = safeText === text && response.content.every(block =>
+      block.type === 'text' || block.type === 'thinking' || block.type === 'redacted_thinking',
+    )
+    const continuationChangedFormat = continuedText.length > 0 && !proseOnly
+    if (response.stop_reason === 'max_tokens' || continuationChangedFormat) {
+      if (!recovery) throw new Error('Chat response reached its output limit. The response was not completed; retry with lower effort.')
+      lastSafePartialText = partialText || lastSafePartialText
+      if (remainingOutput <= 0) throw new ChatOutputRecoveryError(lastSafePartialText, 'output_budget')
+      if (attempt >= maxAttempts) throw new ChatOutputRecoveryError(lastSafePartialText, 'output_limit')
+      const canContinue = !continuationChangedFormat && text.trim().length > 0 && proseOnly
+      const mode = canContinue ? 'continue' : 'retry'
+      await recovery.onRecovery?.({ attempt: attempt + 1, mode })
+      throwIfAborted()
+      if (canContinue) {
+        continuedText += text
+        requestMessages = [
+          ...requestMessages,
+          // Signed thinking blocks must be forwarded in their original order and form.
+          { role: 'assistant', content: response.content as BetaMessageParam['content'] },
+          { role: 'user', content: 'Please continue exactly where the interrupted response stopped. Do not repeat the existing text or restart the answer. Complete only the original request; do not repeat any completed actions.' },
+        ]
+      } else if (continuationChangedFormat) {
+        // A tool turn must carry the complete original-step message and its signed thinking.
+        // Never hand a joined partial explanation plus an isolated final tool block to callers.
+        requestMessages = messages
+        continuedText = ''
+      }
+      // Retry preserves completed tool history. Partial actions are never returned to the
+      // parser or tool loop, even when some arguments look complete.
+      continue
+    }
+    if (hasToolTurn) {
+      opts.appTools!.turn = { content: response.content as unknown as import('./chat-tools/protocol').ToolBlock[], stopReason: response.stop_reason ?? '' }
+    }
+    if (!text && !hasToolTurn) throw new Error('Unexpected response type')
+    return continuedText + text
+  }
 }
 
 /** Single-turn JSON generation — parses and returns typed result */
 export async function claudeJSON<T = unknown>(
   system: string,
   userMessage: string,
-  temperature = 0.3,
+  _temperature = 0.3,
   label = 'json',
 ): Promise<T> {
+  void _temperature
   const t0 = performance.now()
-  const response = await getClient().messages.create({
+  const response = await getClient().messages.stream({
     model: MODEL,
-    max_tokens: 8192,
+    max_tokens: MAX_OUTPUT_TOKENS,
     system: `${system}\n\nIMPORTANT: Output ONLY valid JSON. No markdown fences, no explanation.`,
     messages: [{ role: 'user', content: userMessage }],
-    temperature,
-  })
+    thinking: { type: 'adaptive' },
+  }).finalMessage()
   const u = response.usage
   logTiming(
     'llm',
     `${label} model=${MODEL} in=${u.input_tokens} out=${u.output_tokens} ${(performance.now() - t0).toFixed(0)}ms`,
   )
 
-  const block = response.content[0]
-  if (block.type !== 'text') throw new Error('Unexpected response type')
+  if (response.stop_reason === 'max_tokens') throw new Error('JSON response reached its output limit. The response was not completed.')
+  const body = response.content
+    .filter((block): block is Extract<(typeof response.content)[number], { type: 'text' }> => block.type === 'text')
+    .map((block) => block.text)
+    .join('')
+  if (!body) throw new Error('Unexpected response type')
 
   // Strip markdown fences if present
-  const text = block.text
+  const text = body
     .replace(/^```json\s*/m, '')
     .replace(/^```\s*/m, '')
     .replace(/\s*```\s*$/m, '')

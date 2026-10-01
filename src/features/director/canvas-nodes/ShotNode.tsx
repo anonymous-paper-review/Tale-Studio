@@ -2,6 +2,9 @@
 
 import { memo } from 'react'
 import { cn } from '@/lib/utils'
+import { mediaFrameStyle } from '@/lib/project-aspect'
+import { useProjectFormatStore } from '@/stores/project-format-store'
+
 import { classifyRoughChanged } from '@/lib/image-provenance'
 import { NodeToolbar, Position, type NodeProps } from '@xyflow/react'
 import { Camera, Lightbulb, Loader2 } from 'lucide-react'
@@ -24,9 +27,15 @@ import { resolveEntityNames } from '@/lib/writer/resolve-entity-names'
 import { useStoryboardImageGeneration } from '@/features/director/hooks/use-storyboard-image-generation'
 import { StoryboardImageButton } from '@/features/director/storyboard-image-button'
 
+/** 노드 뷰 미디어 틀의 높이 상한 — 샷 행 간격(SHOT_OFFSET_Y 560px)의 절반 아래로 둬 아래 샷과 겹치지 않는다. */
+const SHOT_NODE_MEDIA_MAX_H = 240
+
 
 function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const t = useT()
+  // Producer 포맷이 틀의 기준(2026-09-30) — 세로면 세로 틀, 높이는 캔버스 줄 간격(560px) 안에서 제한.
+  const projectFormat = useProjectFormatStore((s) => s.format)
+  const mediaFrame = mediaFrameStyle(projectFormat, SHOT_NODE_MEDIA_MAX_H)
   const entityNames = useEntityNames()
   const generation = useStoryboardImageGeneration(isShotData(data) ? data : null)
   const isGenerating = generation.generating
@@ -118,7 +127,10 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             옛 hover 디밍+프로비넌스 오버레이는 순환을 가리는 회색 화면이라 제거 — 프롬프트는
             카드 본문·팝업에서 이미 보인다. 3프레임 없는 이미지(구버전/수동 노드)는 정적 표시. */}
         {stageImageUrl && (
-          <div className="relative mt-2 aspect-video w-full overflow-hidden rounded-sm border border-border/40">
+          <div
+            className={cn('relative mt-2 overflow-hidden rounded-sm border border-border/40', !mediaFrame && 'aspect-video w-full')}
+            style={mediaFrame ?? undefined}
+          >
             {realImage ? (
               realImage.frames ? (
                 <RoughFrameCycle panel={realImage} alt={`${data.label} storyboard`} />
@@ -151,7 +163,10 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         )}
 
         {failed && (
-          <div className="mt-2 flex aspect-video w-full flex-col items-center justify-center gap-0.5 rounded-sm border border-destructive/50 bg-destructive/10 p-1.5 text-center">
+          <div
+            style={mediaFrame ?? undefined}
+            className={cn('mt-2 flex flex-col items-center justify-center gap-0.5 rounded-sm border border-destructive/50 bg-destructive/10 p-1.5 text-center', !mediaFrame && 'aspect-video w-full')}
+          >
             <span className="text-[10px] font-medium text-destructive">
               {t('Generation failed')}
             </span>

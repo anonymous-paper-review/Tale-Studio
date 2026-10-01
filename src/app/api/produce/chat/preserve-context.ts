@@ -37,3 +37,19 @@ export function imageCardFillDirective(cardFill: unknown): string | null {
     'Do not invent a story. Reply with one short sentence saying what you filled in.',
   ].join('\n')
 }
+
+/**
+ * 잠긴 Producer 안내문(2026-10-01 오너 "producer 완성 시 잠그기", "잠금을 풀 수 없게") — Writer 로 넘긴 프로젝트의 채팅 턴.
+ * 모델은 질문에는 답하되 이야기·설정·인물·배경·화풍을 바꾸자고 제안하지 않는다. 최종 방어는 클라이언트
+ * (producer-store 가드 + 바꾸는 제안이면 모델 답 대신 "바꾸지 않았다"를 남긴다).
+ */
+export function lockedProducerDirective(producerLocked: unknown): string | null {
+  if (producerLocked !== true) return null
+  return [
+    '[Locked Producer]',
+    'This project was handed over to Writer, so the Producer materials (story, settings, cast cards, background cards, art style) are confirmed and cannot change.',
+    'Answer questions about them, summarize or explain them, but do not emit extractedSettings, choices or proposals that change them.',
+    'If the user asks for a change, say plainly that Producer is confirmed and cannot be changed, that a new project is needed to change it,',
+    'and that scenes and dialogue can still be edited in Writer and character and background pictures in Artist.',
+  ].join('\n')
+}

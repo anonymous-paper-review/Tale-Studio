@@ -37,6 +37,7 @@ import { RegenerateConfirmDialog } from '@/features/director/regenerate-confirm-
 import { useAltArrowCycle } from '@/lib/use-alt-arrow-cycle'
 import { AltArrowHint } from '@/components/alt-arrow-hint'
 import { StageHelpBadge } from '@/components/stage-help-badge'
+import { NextStepButton } from '@/components/handoff/next-step-button'
 
 import { handoffFrom } from '@/lib/handoff-intent'
 import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
@@ -1261,6 +1262,8 @@ export default function DirectorCanvasPage() {
             'Start shooting real images/videos based on the rough storyboard, characters, and world.',
           )}
         />
+        {/* 다음 단계 버튼(2026-10-01 오너 — 채팅 위 버튼을 각 단계 오른쪽 위로 옮김). */}
+        <NextStepButton className="ml-auto" />
       </div>
       <div className="flex flex-1 overflow-hidden">
         {/* Center: top Palette bar(#e1 — 하단→상단 이동) + Canvas (Node/Storyboard) */}

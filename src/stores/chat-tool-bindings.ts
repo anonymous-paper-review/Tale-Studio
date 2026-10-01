@@ -97,6 +97,8 @@ export function createStudioToolResources(options: {
         options.markProducerApproval?.()
         return { status: 'approval_required', message: 'Producer source approval is required.' }
       }
+      // 잠긴 Producer(2026-10-01) — 모델에게 사실대로 돌려준다. 채팅은 이 결과를 보고 "바꾸지 않았다"고 답한다.
+      if (result === 'locked') return { status: 'blocked', reason: 'producer_locked', message: 'Producer is locked because the project was handed over to Writer. Nothing was changed; a new project is needed to change it.' }
       if (result !== 'applied') return { status: 'invalid_input', message: 'The Producer change could not be applied.' }
       const saved = await useProducerStore.getState().saveDraftNow()
       check()

@@ -12,41 +12,9 @@ import { Check, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
-import { useProjectStore } from '@/stores/project-store'
-import { translate, useT } from '@/lib/i18n'
-import { useLocaleStore } from '@/stores/locale-store'
+import { useT } from '@/lib/i18n'
 
-/** 씬 게이트 API 호출 — 채팅 입력창 가로채기(global-chat)와 확정 버튼이 공유하는 단일 경로. */
-export async function sendSceneGate(
-  action: 'confirm' | 'revise',
-  feedback?: string,
-): Promise<boolean> {
-  const projectId = useProjectStore.getState().projectId
-  if (!projectId) return false
-  try {
-    const res = await fetch('/api/writer/scene-gate', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ projectId, action, feedback: feedback?.trim() || undefined }),
-    })
-    const j = (await res.json().catch(() => null)) as { error?: string } | null
-    if (!res.ok) throw new Error(j?.error ?? `HTTP ${res.status}`)
-    // sendSceneGate 는 컴포넌트 밖(global-chat 의 revise 경로 포함)에서도 호출되어 useT() 훅을
-    //   못 쓴다 — translate() + 현재 locale 직접 조회로 훅 없이 번역(#i18n-s5-batch3).
-    const locale = useLocaleStore.getState().locale
-    if (action === 'revise')
-      toast.success(translate(locale, 'Applying your feedback and rewriting the scene story…'))
-    else
-      toast.success(
-        translate(locale, 'Scenes confirmed. Starting character, visual, and shot design'),
-      )
-    return true
-  } catch (e) {
-    const locale = useLocaleStore.getState().locale
-    toast.error(e instanceof Error ? e.message : translate(locale, 'Request failed'))
-    return false
-  }
-}
+// 수정 요청·확정 호출은 global-chat-store(reviseSceneGate·confirmSceneGate) 한 곳이 맡는다(2026-10-01).
 
 export function SceneGateControls() {
   const [busy, setBusy] = useState(false)
@@ -66,9 +34,11 @@ export function SceneGateControls() {
         onClick={() => {
           if (busy) return
           setBusy(true)
-          void sendSceneGate('confirm')
+          // Producer 메인의 확정과 같은 경로 — 성공하면 Writer 화면으로 간다(2026-10-01).
+          void useGlobalChatStore.getState().confirmSceneGate()
             .then((ok) => {
-              if (ok) useGlobalChatStore.getState().dismissSuggestion()
+              if (ok === true) toast.success(t('Scenes confirmed. Starting character, visual, and shot design'))
+              else if (ok === false) toast.error(t('Could not confirm the scene story. Please try again.'))
             })
             .finally(() => setBusy(false))
         }}

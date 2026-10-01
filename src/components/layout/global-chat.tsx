@@ -58,7 +58,7 @@ import {
 } from '@/lib/card-mention'
 import { StyleAnchorPicker } from '@/features/producer/style-anchor-picker'
 import { selectStyleAnchorFromPicker } from '@/features/producer/select-style-anchor'
-import { SceneGateControls, sendSceneGate } from '@/features/writer/scene-gate-panel'
+import { SceneGateControls } from '@/features/writer/scene-gate-panel'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import {
   buildScriptLines,
@@ -186,6 +186,7 @@ function RolePlate({ stage }: { stage: StageId }) {
  */
 function ThinkingIndicator({ stage }: { stage: StageId }) {
   const t = useT()
+  const recoveryProgress = useGlobalChatStore(state => state.recoveryProgress)
   const phrases = STAGE_THINKING_PHRASES[stage]
   const [idx, setIdx] = useState(0)
   useEffect(() => {
@@ -201,7 +202,7 @@ function ThinkingIndicator({ stage }: { stage: StageId }) {
         key={idx}
         className="animate-in fade-in-0 slide-in-from-bottom-1 duration-300 ease-out motion-reduce:animate-none"
       >
-        {t(phrases[idx % phrases.length] ?? 'Thinking')}
+        {t(recoveryProgress === 'continue' ? 'Continuing the reply…' : recoveryProgress === 'retry' ? 'Completing the interrupted response…' : phrases[idx % phrases.length] ?? 'Thinking')}
       </span>
       <span className="chat-thinking-dots" aria-hidden>
         <span />
@@ -446,6 +447,8 @@ export function GlobalChat() {
   const dismissSuggestion = useGlobalChatStore((s) => s.dismissSuggestion)
   const pendingProposal = useGlobalChatStore((s) => s.pendingProposal)
   const approvePendingProposal = useGlobalChatStore((s) => s.approvePendingProposal)
+  const openProducerLock = useGlobalChatStore((s) => s.openProducerLock)
+  const requestNextStep = useGlobalChatStore((s) => s.requestNextStep)
   const dismissPendingProposal = useGlobalChatStore((s) => s.dismissPendingProposal)
   const declineScriptPreserve = useGlobalChatStore((s) => s.declineScriptPreserve)
   const deferPendingProposal = useGlobalChatStore((s) => s.deferPendingProposal)
@@ -797,6 +800,9 @@ export function GlobalChat() {
   const [stylePickerProjectId, setStylePickerProjectId] = useState<string | null>(null)
   const stylePickerOpen = !!projectId && stylePickerProjectId === projectId && currentStage === 'producer'
   useEffect(() => { setStylePickerProjectId(null) }, [projectId, currentStage])
+  useEffect(() => {
+    if (styleAnchorKey) setStylePickerProjectId(null)
+  }, [styleAnchorKey])
   const stylePickerRequest = useChatUiStore((s) => s.stylePickerRequest)
   const consumeStylePicker = useChatUiStore((s) => s.consumeStylePicker)
   useEffect(() => {
@@ -858,6 +864,8 @@ export function GlobalChat() {
     !writerRunStatus.pipeline_failed &&
     writerRunStatus.current_status !== 'awaiting_confirmation'
   )
+  // 씬 스토리 확정은 Producer 메인에서 기다린다(2026-10-01) — Writer 채팅의 수정 요청은 거기로 안내한다.
+  const writerGateElsewhere = currentStage === 'writer' && writerRunStatus?.current_status === 'awaiting_confirmation'
 
   const handleSend = async () => {
     if (sendDisabled || uploading) return
@@ -887,10 +895,20 @@ export function GlobalChat() {
 
     setInput('')
     // 씬 게이트 중의 입력 = 수정 피드백 (#gate-main-input) — 일반 채팅이 아니라 revise 로 간다.
-    const inputRoute = writerInputRoute(msg, { sceneGate: sceneGateActive, running: writerRunning })
+    const inputRoute = writerInputRoute(msg, { sceneGate: sceneGateActive, running: writerRunning, gateElsewhere: writerGateElsewhere && !sceneGateActive })
     if (inputRoute === 'revise') {
       dismissSuggestion()
-      await sendSceneGate('revise', msg)
+      const ok = await useGlobalChatStore.getState().reviseSceneGate(msg)
+      if (ok) toast.success(t('Applying your feedback and rewriting the scene story…'))
+      else toast.error(t('Could not send the change request. Please try again.'))
+      return
+    }
+    if (inputRoute === 'elsewhere') {
+      useGlobalChatStore.getState().appendLocalExchange(
+        'writer',
+        msg,
+        t('The scene story draft is waiting on the Producer screen. Ask for changes or confirm it there.'),
+      )
       return
     }
     // 실행 중 가드(#run-chat-gate) — 유저 발화는 남기고, 로컬 즉답으로 상황을 알린다.
@@ -963,26 +981,21 @@ export function GlobalChat() {
     // 씬 게이트 확정(#s3-gate P3b) — 게이트 패널의 [이대로 확정]과 같은 API. 성공 전환은
     //   writer 화면의 상태 폴링이 집어간다.
     if (action.kind === 'confirmScenes') {
-      dismissSuggestion()
-      const pid = useProjectStore.getState().projectId
-      if (!pid) return
-      try {
-        const res = await fetch('/api/writer/scene-gate', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ projectId: pid, action: 'confirm' }),
-        })
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        toast.success(t('Scenes confirmed. Starting character, visual, and shot design'))
-      } catch {
-        toast.error(t('Confirmation failed. Try again from the gate panel in the Writer screen'))
-      }
+      // 확정은 Producer 메인의 씬 스토리와 같은 경로(2026-10-01) — 성공하면 Writer 화면으로 간다. 실패하면 안내가 남아 다시 누를 수 있다.
+      const ok = await useGlobalChatStore.getState().confirmSceneGate()
+      if (ok === true) toast.success(t('Scenes confirmed. Starting character, visual, and shot design'))
+      else if (ok === false) toast.error(t('Could not confirm the scene story. Please try again.'))
       return
     }
     // 핸드오프(#handoff-to-chat) — 버튼이 직접 이동시키지 않는다. 문장을 채팅에 입력해 보내고,
     //   게이트 판정·전이·이동은 타이핑했을 때와 똑같이 sendMessage 안에서 일어난다.
     if (action.kind === 'handoff') {
       dismissSuggestion()
+      // Writer 첫 넘김 = Producer 잠금(2026-10-01 오너) — 오른쪽 위 다음 단계 버튼과 같은 확정 창을 거친다.
+      if (suggestion?.stage === 'producer' && useProjectStore.getState().currentStage === 'producer') {
+        await requestNextStep()
+        return
+      }
       // D12(2026-08-31 오너): 명시 버튼("Writer 호출하기")이 곳 동의다 — 승인 카드를 또 띄우지 않는다.
       await sendMessage(action.utterance, undefined, { consentedHandoff: true, stageOverride: suggestion?.stage })
       return
@@ -994,6 +1007,11 @@ export function GlobalChat() {
 
   const handlePendingProposalApprove = async () => {
     if (!pendingProposal) return
+    // Writer 첫 넘김 카드의 승인 = Producer 잠금 — 확정 창에서 값과 잠금을 한 번 더 보여 준다(2026-10-01 오너).
+    if (pendingProposal.kind === 'producerWriterInitialHandoff') {
+      openProducerLock(pendingProposal.id)
+      return
+    }
     await approvePendingProposal(pendingProposal.id)
   }
 
@@ -1376,26 +1394,8 @@ export function GlobalChat() {
               {t('One conversation that continues across every stage')}
             </span>
           </div>
-          {/* 다음 단계 호출 칩(#owner-handoff-reentry 2026-08-31) — 제안 카드를 '나중에'로
-              내리면 다시 열 진입점이 사라진다는 오너 실측. 헤더에 상시 노출해 언제든 같은
-              수렴 경로(버튼=타이핑)로 재개할 수 있게 한다. */}
-          {(() => {
-            const handoff = handoffFrom(currentStage)
-            if (!handoff) return null
-            return (
-              <button
-                type="button"
-                disabled={loading}
-                onClick={() =>
-                  void sendMessage(t(handoff.utterance), undefined, { consentedHandoff: true })
-                }
-                title={t(handoff.label)}
-                className="shrink-0 rounded-full border border-border px-2 text-[10px] font-medium leading-5 text-foreground transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
-              >
-                {t(handoff.label)}
-              </button>
-            )
-          })()}
+          {/* 다음 단계 호출 칩(#owner-handoff-reentry 2026-08-31)은 2026-10-01 오너 지시("채팅 위의 버튼은 없애줘")로
+              각 단계 화면 오른쪽 위 NextStepButton 으로 옮겼다 — 같은 문장을 채팅에 입력해 넘긴다. */}
           <Button
             size="icon-sm"
             variant="ghost"

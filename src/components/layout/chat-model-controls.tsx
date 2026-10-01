@@ -13,7 +13,6 @@ export function ChatModelControls({ disabled }: { disabled: boolean }) {
   const fields = [
     { key: 'model', label: 'Chat model', values: CHAT_MODELS.map(model => ({ value: model.id, label: model.label })) },
     { key: 'effort', label: 'Effort', values: CHAT_EFFORTS.map(value => ({ value, label: value })) },
-    { key: 'thinking', label: 'Model thinking', values: [{ value: 'off', label: 'Off' }, { value: 'adaptive', label: 'Automatic' }] },
   ] as const
   return (
     <div className="flex justify-end px-1 pb-1">
@@ -40,6 +39,7 @@ export function ChatModelControls({ disabled }: { disabled: boolean }) {
               </select>
             </label>
           ))}
+          <p className="text-xs text-muted-foreground">{t('Model thinking')}: {t('Automatic')}</p>
           <p className="text-xs leading-relaxed text-muted-foreground">{t('Applies to chat replies. More effort or thinking can increase response time and usage.')}</p>
         </PopoverContent>
       </Popover>

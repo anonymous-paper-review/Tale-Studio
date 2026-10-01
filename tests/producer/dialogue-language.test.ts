@@ -104,4 +104,86 @@ describe('Producer 대사 언어', () => {
     // 왜: 여러 언어 중 하나를 고르거나 다른 질문에 답한 말은 대사 언어 승인이 아니다.
     expect(resolveProducerDialogueLanguage({ message: '응', history: [{ role: 'model', content: question }] })).toBeNull()
   })
+
+  it.each([
+    ['한국어(ko)', 'ko'],
+    ['한국어 (ko)로 해주세요', 'ko'],
+    ['ko', 'ko'],
+    ['English (en)', 'en'],
+    ['일본어(ja)', 'ja'],
+    ['中文(zh)', 'zh'],
+  ])('대사 언어 질문에 “%s”라고 답하면 해당 언어를 확정한다', (message, language) => {
+    // 왜: 선택지에 표시된 언어 이름과 코드를 함께 답하면 기존 판별이 놓쳐 다시 물었다.
+    expect(resolveProducerDialogueLanguage({
+      message,
+      history: [{ role: 'model', content: '대사 언어는 어떤 언어로 할까요?' }],
+    })).toBe(language)
+  })
+
+  it('대사 언어를 이름과 코드로 지정하면 그 언어를 확정한다', () => {
+    // 왜: 질문에 대한 짧은 답변뿐 아니라 직접 지정하는 문장에도 같은 표기를 쓴다.
+    expect(resolveProducerDialogueLanguage({ message: '대사 언어는 한국어(ko)로 해줘' })).toBe('ko')
+  })
+
+  it.each(['한국어(ja)', 'en', '한국어(ko)'])('대사 언어 질문이 아닌 곳에 “%s”라고 답하면 언어를 추측하지 않는다', (message) => {
+    // 왜: 코드가 포함되어도 간판의 언어를 고른 답변은 대사 설정이 아니다.
+    expect(resolveProducerDialogueLanguage({
+      message,
+      history: [{ role: 'model', content: '간판에 쓸 언어는 무엇인가요?' }],
+    })).toBeNull()
+  })
+
+  it('대사 언어 이름과 코드가 서로 다르면 임의 확정하지 않는다', () => {
+    // 왜: 상충하는 선택을 한쪽으로 해석해 저장하지 않는다.
+    expect(resolveProducerDialogueLanguage({
+      message: '한국어(ja)',
+      history: [{ role: 'model', content: '대사 언어는 어떤 언어로 할까요?' }],
+    })).toBeNull()
+  })
+
+  it('앞서 답한 대사 언어가 비어 있으면 확인된 사용자 답변에서 복구한다', () => {
+    // 왜: 한국어(ko)라는 답을 놓친 다음 턴에도 미정으로 돌아가 같은 질문을 반복했다.
+    expect(resolveProducerDialogueLanguage({
+      message: '실사로 해줘',
+      currentLanguage: '',
+      history: [
+        { role: 'model', content: '대사 언어는 어떤 언어로 할까요?' },
+        { role: 'user', content: '한국어(ko)' },
+        { role: 'model', content: '스타일은 실사로 할까요?' },
+      ],
+    })).toBe('ko')
+  })
+
+  it('과거에 대사 언어를 여러 번 지정했으면 가장 최근 선택에서 복구한다', () => {
+    // 왜: 저장이 누락된 이력을 복구할 때도 사용자가 나중에 바꾼 언어가 우선이다.
+    expect(resolveProducerDialogueLanguage({
+      message: '이야기를 계속 정리해줘',
+      history: [
+        { role: 'user', content: '대사는 일본어로 해줘' },
+        { role: 'model', content: '대사는 한국어로 바꿀까요?' },
+        { role: 'user', content: '응' },
+      ],
+    })).toBe('ko')
+  })
+
+  it('저장된 대사 언어가 있으면 과거 답변으로 덮어쓰지 않는다', () => {
+    // 왜: 사용자가 설정 화면에서 바꾼 최신 값은 예전 대화보다 우선한다.
+    expect(resolveProducerDialogueLanguage({
+      message: '이야기를 계속 정리해줘',
+      currentLanguage: 'ja',
+      history: [{ role: 'user', content: '대사는 한국어로 해줘' }],
+    })).toBe('ja')
+  })
+
+  it('과거에 모델만 언어를 선언했으면 사용자 선택으로 복구하지 않는다', () => {
+    // 왜: 사용자가 선택하지 않은 언어를 모델의 응답만 보고 확정하면 안 된다.
+    expect(resolveProducerDialogueLanguage({
+      message: '실사로 해줘',
+      history: [
+        { role: 'user', content: '일본 학교를 배경으로 할게' },
+        { role: 'model', content: '대사는 일본어로 할게요. 실사로 만들까요?' },
+        { role: 'user', content: '응' },
+      ],
+    })).toBeNull()
+  })
 })

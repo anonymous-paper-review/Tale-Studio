@@ -1,12 +1,13 @@
 import { CHAT_AGENT_GUIDE, buildChatTaskContext, normalizeChatHistory } from '@/lib/chat-harness'
 import { parseChatModelSettings } from '@/lib/chat-model-settings'
+import { withChatRecovery, chatRecoveryErrorPayload, type ChatRecoveryContext } from '@/lib/chat-response-server'
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
 import { prepareChatTools } from '@/lib/chat-tools/protocol'
 import { buildProducerSystem } from './system-prompt'
-import { imageCardFillDirective, preservedScriptDirective } from './preserve-context'
+import { imageCardFillDirective, lockedProducerDirective, preservedScriptDirective } from './preserve-context'
 import { parseExtractedSettings } from '@/lib/parse-extracted-settings'
 import { resolveProducerDialogueLanguage } from '@/lib/producer-dialogue-language'
 import { parseChatChoices } from '@/lib/chat-choices'
@@ -30,7 +31,13 @@ import { persistChatTraceBestEffort } from '@/lib/chat-trace-server'
 const normalizeHistory = normalizeChatHistory
 
 
+export const maxDuration = 300
+
 export async function POST(req: Request) {
+  return withChatRecovery(req, (context) => handlePost(req, context))
+}
+
+async function handlePost(req: Request, context: ChatRecoveryContext) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
   let llmUsage: ChatLlmUsage | null = null
@@ -58,6 +65,7 @@ export async function POST(req: Request) {
       traceId: requestedTraceId,
       preserveScript,
       cardFill,
+      producerLocked,
     } = await req.json()
     const modelSettings = parseChatModelSettings(rawModelSettings)
     if (!modelSettings) return NextResponse.json({ error: 'Invalid chat model settings' }, { status: 400 })
@@ -120,7 +128,7 @@ export async function POST(req: Request) {
     })
     const contextParts: string[] = []
     contextParts.push(dialogueLanguage
-      ? `[Dialogue Language Decision]\n${dialogueLanguage}\nThe user confirmed this dialogue language. Use this exact code for dialogueLanguage. Never infer a different language from the setting, country, names, visual style, or chat language.`
+      ? `[Dialogue Language Decision]\n${dialogueLanguage}\nThe user confirmed this dialogue language. Use this exact code for dialogueLanguage. Do not ask the user to confirm this language again. Never infer a different language from the setting, country, names, visual style, or chat language.`
       : '[Dialogue Language Decision]\nUNDECIDED\nThe user has not confirmed a dialogue language. Omit dialogueLanguage from extractedSettings. Ask the user in the ongoing conversation before confirming it; at most one focused question per reply. If this reply already asks about another missing detail, leave dialogue language unresolved for a later turn.')
     if (storyText) {
       contextParts.push(`[Current Story Text]\n${storyText}`)
@@ -147,6 +155,9 @@ export async function POST(req: Request) {
     // #image-to-artist: 카드 채우기 턴 — 그 카드 하나만(클라 coerceCardFill 이 최종 방어).
     const cardDirective = imageCardFillDirective(cardFill)
     if (cardDirective) contextParts.push(cardDirective)
+    // 잠긴 Producer(2026-10-01) — 바꾸자는 제안을 내지 않는다(클라 producer-store 가드가 최종 방어).
+    const lockedDirective = lockedProducerDirective(producerLocked)
+    if (lockedDirective) contextParts.push(lockedDirective)
     if (currentSettings) {
       contextParts.push(
         `[Current Project Settings]\n${JSON.stringify(currentSettings)}`,
@@ -243,6 +254,7 @@ export async function POST(req: Request) {
 
     let text: string
     try {
+      context.start()
       text = await llmChat(
         systemPrompt,
         normalizedHistory,
@@ -255,9 +267,11 @@ export async function POST(req: Request) {
           imageUrls: attachments.urls,
           appTools,
           modelSettings,
-          signal: req.signal,
+          signal: context.signal,
+          recovery: context.recovery,
           onUsage: (usage) => {
             llmUsage = usage
+            context.onUsage(usage)
           },
         },
       )
@@ -316,6 +330,6 @@ export async function POST(req: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[produce/chat]', message)
-    return NextResponse.json({ error: message, ...(llmUsage ? { toolUsage: llmUsage } : {}) }, { status: 500 })
+    return NextResponse.json({ error: message, ...chatRecoveryErrorPayload(err), ...(llmUsage ? { toolUsage: llmUsage } : {}) }, { status: 500 })
   }
 }

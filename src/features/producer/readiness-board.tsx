@@ -16,6 +16,7 @@ import {
   Box,
   CheckCircle2,
   ChevronDown,
+  Lock,
   Mountain,
   Pencil,
   Trash2,
@@ -43,6 +44,12 @@ import { cn } from '@/lib/utils'
 import { useModifierHeld } from '@/hooks/use-modifier-held'
 import { ProducerQuestJournal, StoryFoundationBadges } from './quest-journal'
 import { WriterEnginePicker } from '@/features/writer/writer-engine-picker'
+import { NextStepButton } from '@/components/handoff/next-step-button'
+import { useRouter } from 'next/navigation'
+import { CompactRoster, type RosterItem } from './compact-roster'
+import { SceneStorySection } from './scene-story-section'
+import { useWriterStatus } from '@/lib/writer/use-writer-status'
+import { sceneGatePhase } from '@/lib/writer/scene-gate'
 import { useLocale, useT } from '@/lib/i18n'
 
 // 카드 안 자동확장 textarea(외모/시각 설명)용 — 네이티브 스크롤바 대신 얇은 테마 스크롤바(#b5).
@@ -621,6 +628,15 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   const projectId = useProjectStore((s) => s.projectId)
   const untitled = !projectTitle?.trim() || projectTitle.trim().toLowerCase() === 'untitled'
   const renameProject = useProjectStore((s) => s.renameProject)
+  // Writer 로 넘긴 프로젝트(2026-10-01 오너) — 읽기 전용. 바꾸려면 새 프로젝트.
+  const producerLocked = useProjectStore((s) => s.producerLocked)
+  // 씬 스토리를 쓰는 중이거나 확정을 기다리면 다음 할 일은 아래 씬 스토리의 확정이다 — 오른쪽 위 "Writer로 가기"는 숨긴다.
+  const { status: writerRunStatus } = useWriterStatus(producerLocked ? projectId : null)
+  const sceneGateBusy = producerLocked && ['writing', 'gate'].includes(sceneGatePhase(writerRunStatus))
+  const router = useRouter()
+  // 인물·배경 압축 표시에서 펼친 카드(한 번에 하나씩).
+  const [openCastId, setOpenCastId] = useState<string | null>(null)
+  const [openBackgroundId, setOpenBackgroundId] = useState<string | null>(null)
   // 인라인 제목 편집 상태 — null = 보기 모드. Esc 취소는 blur 커밋보다 먼저 ref 로 알린다
   //   (Esc → setTitleDraft(null) → 인풋 언마운트 blur 가 stale 값으로 커밋하는 것 방지).
   const [titleDraft, setTitleDraft] = useState<string | null>(null)
@@ -685,11 +701,38 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   }, [storyPulse])
 
   const addPerson = () => {
-    addCastMember('person')
+    const id = addCastMember('person')
+    if (id) setOpenCastId(id)
   }
   const addBg = () => {
-    addBackground()
+    const id = addBackground()
+    if (id) setOpenBackgroundId(id)
   }
+  const castItems: RosterItem[] = cast.map((member) => ({
+    id: member.localId,
+    name: member.name,
+    sub: member.entityType === 'object' ? t('Object') : t(ROLE_LABEL[member.role ?? 'supporting'] ?? 'Supporting'),
+    imageUrl: member.sourceImageUrl,
+    missing: castIssuesFor(gate, member.localId).length,
+    detail: [
+      { label: t('Name'), value: member.name },
+      { label: t('Role'), value: member.role ? t(ROLE_LABEL[member.role] ?? 'Supporting') : '' },
+      { label: t('Appearance'), value: member.appearance },
+      { label: t('Arc'), value: [member.arc?.start_state, member.arc?.end_state].filter(Boolean).join(' → ') },
+      { label: t('Want'), value: member.motivation?.want ?? '' },
+    ],
+  }))
+  const backgroundItems: RosterItem[] = backgrounds.map((background) => ({
+    id: background.localId,
+    name: background.name,
+    imageUrl: background.sourceImageUrl,
+    missing: [background.name, background.visualDescription, background.purpose].filter((v) => !v?.trim()).length,
+    detail: [
+      { label: t('Name'), value: background.name },
+      { label: t('Visual description'), value: background.visualDescription },
+      { label: t('Purpose'), value: background.purpose },
+    ],
+  }))
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -702,7 +745,11 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                 'This is the planning room where you fill in story, settings, and cast. Talk with Producer and the board fills in together. Once every required item is complete, you can hand off to Writer.',
               )}
             />
-            {gate.canHandoff ? (
+            {producerLocked ? (
+              <Badge variant="outline" className="gap-1 border-warning/40 text-warning">
+                <Lock className="size-3" /> {t('Confirmed, used by the next stages')}
+              </Badge>
+            ) : gate.canHandoff ? (
               <Badge variant="outline" className="gap-1 border-success/40 text-success">
                 <CheckCircle2 className="size-3" /> {t('Ready to hand off to Writer')}
               </Badge>
@@ -713,6 +760,8 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
           {syncing ? <Badge variant="outline">{t('Saving…')}</Badge> : null}
           <WriterEnginePicker projectId={projectId} />
           {/* 헤더 CTA "Producer와 스토리 만들기" 는 약속 N(2026-09-04)으로 제거 — 채팅에 직접 말하는 것과 같은 경로였다. */}
+          {/* 다음 단계 버튼(2026-10-01 오너) — Writer 로 넘기기 전 확정 창, 잠긴 뒤에는 Writer 로 가기. */}
+          <NextStepButton hidden={sceneGateBusy} />
         </div>
       </div>
 
@@ -722,6 +771,18 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
         <div className="mx-auto grid max-w-6xl items-start gap-8 lg:grid-cols-[260px_minmax(0,1fr)]">
           <ProducerQuestJournal gate={gate} personCount={gatedPersonCount} />
           <div className="min-w-0 space-y-5">
+          {producerLocked ? (
+            // 잠금 안내(2026-10-01 오너 "잠금을 풀 수 없게 해줘. 새로운 프로젝트를 열지 않는 이상").
+            <div className="flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm" data-testid="producer-lock-banner">
+              <Lock className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
+              <p className="flex-1 leading-relaxed">
+                {t('Writer and Artist are working from this Producer content, so it can no longer be changed. You can still read and copy it. To change it, start a new project.')}
+              </p>
+              <Button size="sm" variant="outline" className="shrink-0" onClick={() => router.push('/')}>
+                {t('New project')}
+              </Button>
+            </div>
+          ) : null}
           {/* Brief Story 히어로(#feedback 2026-08-07 v2) — 목업 타이틀 페이지 형태 차용
               (research/ui-references/producer-viewer-mock.html .hero, 그라데이션만 제외):
               kicker + 큰 제목 + 로그라인(살아있는 초안, 프롬프트 living draft) + 설정 뱃지가
@@ -736,9 +797,11 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
               {titleDraft === null ? (
                 <button
                   type="button"
-                  onClick={() => setTitleDraft(untitled ? '' : projectTitle)}
-                  title={t('Edit title')}
-                  className="group/title mt-2 flex max-w-full items-center gap-2 text-left"
+                  onClick={() => {
+                    if (!producerLocked) setTitleDraft(untitled ? '' : projectTitle)
+                  }}
+                  title={producerLocked ? undefined : t('Edit title')}
+                  className={cn('group/title mt-2 flex max-w-full items-center gap-2 text-left', producerLocked && 'cursor-default')}
                 >
                   <h1
                     className={cn(
@@ -748,7 +811,9 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                   >
                     {untitled ? t('A story without a title yet') : projectTitle}
                   </h1>
-                  <Pencil className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/title:opacity-60" />
+                  {producerLocked ? null : (
+                    <Pencil className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover/title:opacity-60" />
+                  )}
                 </button>
               ) : (
                 <input
@@ -838,6 +903,9 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
             </MentionableCard>
           </section>
 
+          {/* 트리트먼트 문서(2026-10-01 오너) — Writer 생성 화면의 씬 스토리 줄글, 보존 대본은 원본. 읽기 전용. */}
+          <SceneStorySection />
+
           <section className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -849,9 +917,11 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
               </div>
               {/* 사물 추가 제거(#feedback 2026-08-07 v3) — producer 는 인물/배경만.
                   기존 사물 카드(레거시/모델 추출)는 데이터 보존 차원에서 계속 표시된다. */}
-              <Button size="sm" variant="outline" className={HOVER_RED_BORDER} onClick={addPerson}>
-                <Plus className="size-4" /> {t('Add person')}
-              </Button>
+              {producerLocked ? null : (
+                <Button size="sm" variant="outline" className={HOVER_RED_BORDER} onClick={addPerson}>
+                  <Plus className="size-4" /> {t('Add person')}
+                </Button>
+              )}
             </div>
 
             {cast.length === 0 ? (
@@ -863,20 +933,34 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                 </p>
               </div>
             ) : (
-              // 줄 목록(#b-rows) — 카드 격자의 높이 동기화 문제가 애초에 생기지 않는다.
-              <div className={ROW_LIST}>
-                {cast.map((member, i) => (
-                  <CastRow
-                    key={member.localId}
-                    member={member}
-                    issues={castIssuesFor(gate, member.localId)}
-                    onPatch={updateCastMember}
-                    onDelete={removeCastMember}
-                    runtimeSeconds={projectSettings.playtime || 0}
-                    mentionLabel={castMentionList[i]?.label ?? member.name}
-                  />
-                ))}
-              </div>
+              // 압축 표시(2026-10-01 오너) — 칩 한 줄, 누르면 그 인물만 펼친다(잠기기 전엔 편집 줄, 뒤엔 읽기 전용).
+              <CompactRoster
+                items={castItems}
+                openId={openCastId}
+                onOpenChange={setOpenCastId}
+                locked={producerLocked}
+                unnamedLabel={t('Unnamed person')}
+                renderEditor={(id) => {
+                  const i = cast.findIndex((m) => m.localId === id)
+                  const member = cast[i]
+                  if (!member) return null
+                  return (
+                    <div className={ROW_LIST}>
+                      <CastRow
+                        member={member}
+                        issues={castIssuesFor(gate, member.localId)}
+                        onPatch={updateCastMember}
+                        onDelete={(localId) => {
+                          removeCastMember(localId)
+                          setOpenCastId(null)
+                        }}
+                        runtimeSeconds={projectSettings.playtime || 0}
+                        mentionLabel={castMentionList[i]?.label ?? member.name}
+                      />
+                    </div>
+                  )
+                }}
+              />
             )}
           </section>
 
@@ -888,9 +972,11 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                   {t('{ready} / {total} ready', { ready: readyBackgrounds.length, total: backgrounds.length })}
                 </span>
               </div>
-              <Button size="sm" variant="outline" className={HOVER_RED_BORDER} onClick={addBg}>
-                <Plus className="size-4" /> {t('Add background')}
-              </Button>
+              {producerLocked ? null : (
+                <Button size="sm" variant="outline" className={HOVER_RED_BORDER} onClick={addBg}>
+                  <Plus className="size-4" /> {t('Add background')}
+                </Button>
+              )}
             </div>
 
 
@@ -903,17 +989,31 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                 </p>
               </div>
             ) : (
-              <div className={ROW_LIST}>
-                {backgrounds.map((background, i) => (
-                  <BackgroundRow
-                    key={background.localId}
-                    background={background}
-                    onPatch={updateBackground}
-                    onDelete={removeBackground}
-                    mentionLabel={bgMentionList[i]?.label ?? background.name}
-                  />
-                ))}
-              </div>
+              <CompactRoster
+                items={backgroundItems}
+                openId={openBackgroundId}
+                onOpenChange={setOpenBackgroundId}
+                locked={producerLocked}
+                unnamedLabel={t('Unnamed background')}
+                renderEditor={(id) => {
+                  const i = backgrounds.findIndex((b) => b.localId === id)
+                  const background = backgrounds[i]
+                  if (!background) return null
+                  return (
+                    <div className={ROW_LIST}>
+                      <BackgroundRow
+                        background={background}
+                        onPatch={updateBackground}
+                        onDelete={(localId) => {
+                          removeBackground(localId)
+                          setOpenBackgroundId(null)
+                        }}
+                        mentionLabel={bgMentionList[i]?.label ?? background.name}
+                      />
+                    </div>
+                  )
+                }}
+              />
             )}
           </section>
           </div>

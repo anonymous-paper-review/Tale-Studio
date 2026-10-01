@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import { StageHelpBadge } from '@/components/stage-help-badge'
+import { NextStepButton } from '@/components/handoff/next-step-button'
 import { handoffFrom } from '@/lib/handoff-intent'
 import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
 import { CharacterPanel } from '@/features/artist/character-panel'
@@ -434,6 +435,8 @@ export default function VisualPage() {
           text={t('Create and refine concept images for characters and worlds, then hand off to the next stage.')}
         />
       </div>
+      {/* 다음 단계 버튼(2026-10-01 오너) — 준비가 덜 된 샷이 있으면 목록 창을 먼저 연다. */}
+      <NextStepButton />
     </div>
   )
 

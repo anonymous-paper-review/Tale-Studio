@@ -6,6 +6,7 @@ import type { ReactNode } from 'react'
 import { StageHelpBadge } from '@/components/stage-help-badge'
 import { WriterTabs } from '@/features/writer/writer-tabs'
 import { WriterEnginePicker } from '@/features/writer/writer-engine-picker'
+import { NextStepButton } from '@/components/handoff/next-step-button'
 import { useProjectStore } from '@/stores/project-store'
 
 interface WriterHeaderProps {
@@ -30,6 +31,8 @@ export function WriterHeader({ description, actions }: WriterHeaderProps) {
         <div className="flex shrink-0 items-center gap-3">
           <WriterEnginePicker projectId={projectId} />
           {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
+          {/* 다음 단계 버튼(2026-10-01 오너) — Artist 로는 창 없이 바로 넘긴다. */}
+          <NextStepButton />
         </div>
       </div>
     </header>
