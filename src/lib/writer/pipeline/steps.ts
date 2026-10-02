@@ -100,6 +100,19 @@ export interface WriterRunState extends WriterRunStateBase {
   _sceneStoryProposal?: import('@/lib/producer/scene-story-proposal').SceneStoryProposal;
   /** 원문 저장 때만 바뀌는 버전. AI 수정안의 상태 변화와 직접 편집을 분리한다. */
   _sceneStoryVersion?: string;
+  /** 다시 쓰기 안을 적용하기 직전의 트리트먼트(2026-10-02 시안 v04 "되돌리기 · 이전 산문으로").
+   *  storyVersion 이 지금 원문 버전과 같을 때만 되돌린다 — 적용 뒤 직접 고쳤으면 되돌리지 않는다. */
+  _sceneStoryUndo?: {
+    id: string;
+    label: string;
+    storyVersion: string;
+    scenes: Scenes;
+    dramaturgy?: Dramaturgy | null;
+    narrativeStructure?: NarrativeStructure;
+    characters?: Characters;
+    world?: BackgroundContract;
+    revisionNotes?: string[];
+  };
 
   // Story 축
   genre?: Genre;

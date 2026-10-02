@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { FORMAT_OPTIONS, LANGUAGE_OPTIONS } from '@/features/producer/quest-journal'
 import { useT } from '@/lib/i18n'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore } from '@/stores/producer-store'
 
 function Row({ label, value }: { label: string; value: string | null }) {
@@ -37,6 +38,8 @@ export function ProducerLockDialog({ open }: { open: boolean }) {
   const confirmProducerLock = useGlobalChatStore((s) => s.confirmProducerLock)
   const closeHandoffConfirm = useGlobalChatStore((s) => s.closeHandoffConfirm)
   const [agreed, setAgreed] = useState(false)
+  // 넘기기 전 트리트먼트 초안(2026-10-02 시안 v04) — 이미 쓴 트리트먼트를 확정하고 나머지를 이어 간다.
+  const treatmentDraft = useProjectStore((s) => s.treatmentDraft)
 
   const styleLabel = styleAnchors.find((a) => a.key === styleAnchorKey)?.label ?? customStyleAnchor?.label ?? null
   const genre = [settings.genre, settings.subGenre].filter(Boolean).join(' · ')
@@ -58,7 +61,9 @@ export function ProducerLockDialog({ open }: { open: boolean }) {
         <DialogHeader>
           <DialogTitle>{t('Confirm before handing over to Writer')}</DialogTitle>
           <DialogDescription>
-            {t('Writer first drafts the scene story on this screen. You review it and confirm before the rest is made. These values are confirmed when you hand over.')}
+            {treatmentDraft
+              ? t('The treatment on this screen is confirmed as it is, and Writer makes the rest from it. These values are confirmed when you hand over.')
+              : t('Writer first drafts the scene story on this screen. You review it and confirm before the rest is made. These values are confirmed when you hand over.')}
           </DialogDescription>
         </DialogHeader>
 

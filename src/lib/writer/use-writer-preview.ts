@@ -10,6 +10,8 @@ import { useLocaleStore } from '@/stores/locale-store'
 import { useProjectStore } from '@/stores/project-store'
 import { pickContentLocale } from '@/lib/locale'
 import type { SceneStoryProposalView } from '@/lib/producer/scene-story-proposal'
+import type { TreatmentCast } from '@/lib/producer/treatment-cast-sync'
+import type { DraftBasis } from '@/lib/writer/treatment-draft'
 
 export interface PreviewScene {
   sceneId: string
@@ -49,6 +51,14 @@ export interface WriterPreview {
   updatedAt?: string | null
   storyVersion?: string
   sceneStoryProposal?: SceneStoryProposalView | null
+  /** 아직 넘기지 않은 트리트먼트 초안인가(2026-10-02 시안 v04). */
+  draft?: boolean
+  /** 트리트먼트가 만든 인물 · 장소 — Producer 카드로 옮긴다. version 이 같으면 다시 옮기지 않는다. */
+  treatmentCast?: (TreatmentCast & { version: string }) | null
+  /** 다시 쓰기 안을 적용한 직후의 되돌리기(그 뒤에 고쳤으면 없다). */
+  sceneStoryUndo?: { id: string; label: string } | null
+  /** 트리트먼트 초안을 쓴 바탕 — 지금 Producer 값과 견준다. */
+  draftBasis?: DraftBasis | null
   roster: { slug: string; name: string }[]
   scenes: PreviewScene[]
   characters: PreviewCharacter[]

@@ -38,3 +38,24 @@ export function sceneGateSuggestion(projectId: string, content: string, label: s
     action: { kind: 'confirmScenes', label },
   }
 }
+
+/** 확정(넘기기) 안내를 띄우는 방식. 넘긴 뒤에는 Producer 채팅이 잠겨 있어 다른 안내보다 앞세운다(preempt).
+ *  넘기기 전 트리트먼트 초안(2026-10-02 시안 v04)은 띄우지 않는다(skip) — Producer 채팅이 살아 있어, 닫을 수 없는 확정 안내가
+ *  고쳐 달라는 말을 전부 트리트먼트 수정안으로 끌어가고 다른 질문 · 선택지를 막았다. 넘기기는 오른쪽 위 버튼, 트리트먼트 고치기는 다시 쓰기. */
+/** 트리트먼트를 다 썼다는 채팅 한 줄(시안 v04 "아이디어로 트리트먼트를 만들었어요")을 남길 때 — 넘기기 전 초안을
+ *  쓰는 것을 이 화면이 지켜보다가 확정 대기로 넘어간 순간뿐이다. 다 쓴 트리트먼트를 다시 열기만 하면 남기지 않는다. */
+export function shouldAnnounceTreatmentReady(input: {
+  previous: SceneGatePhase | null
+  phase: SceneGatePhase
+  draftLive: boolean
+}): boolean {
+  return input.draftLive && input.previous === 'writing' && input.phase === 'gate'
+}
+
+export function sceneGateOfferMode(input: {
+  draftLive: boolean
+  current: { id: string } | null
+  projectId: string
+}): 'preempt' | 'skip' {
+  return input.draftLive ? 'skip' : 'preempt'
+}

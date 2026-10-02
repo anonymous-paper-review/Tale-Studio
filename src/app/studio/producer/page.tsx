@@ -14,6 +14,7 @@ import { createPendingProposal } from '@/lib/pending-proposal'
 import { handoffFrom } from '@/lib/handoff-intent'
 import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
 import { useChatUiStore } from '@/stores/chat-ui-store'
+import { usePendingCreationStore } from '@/stores/pending-creation-store'
 import { translate, useLocale, useT } from '@/lib/i18n'
 import { useContentLocale } from '@/lib/i18n/content'
 
@@ -182,6 +183,19 @@ export default function MeetingPage() {
     requestChatFocus,
     producerWelcome,
   ])
+
+  // 새 프로젝트 화면에서 올린 그림(2026-10-02 시안 v04 0.1.2) — 채팅에 넘겨 쓰임새(인물 · 배경 · 참고)를 묻는다.
+  //   채팅 이력이 실린 뒤에만(실리는 동안 띄우면 덮인다), 한 번만(꺼내면 비운다).
+  useEffect(() => {
+    if (!projectId || !producerLoaded || !chatReady) return
+    const images = usePendingCreationStore.getState().take(projectId)
+    if (!images.length) return
+    const names = images.map((image) => image.name).join(', ')
+    useGlobalChatStore.getState().offerImageRoles(images, {
+      typed: '',
+      msg: translate(contentLoc, 'Uploaded {names}. Please read them and put together a story.', { names }),
+    })
+  }, [projectId, producerLoaded, chatReady, contentLoc])
 
   // 배너 닫기 상태 — writer 재실행: 실제 문제 상태 기반 → 세션 한정, 문제 재발 시 재노출.
   //   (stale 경고 상주 배너는 2026-07-13 제거 — 문구 박스 정리.)

@@ -18,6 +18,8 @@ export function NextStepButton({ className, hidden = false }: { className?: stri
   const projectId = useProjectStore((s) => s.projectId)
   const chatBusy = useGlobalChatStore((s) => s.loading)
   const confirmOpen = useGlobalChatStore((s) => s.handoffConfirm !== null)
+  // 트리트먼트 수정안 · 다시 쓰기 안을 정하기 전에는 넘기지 않는다(2026-10-02 시안 v04 — 고르는 동안 넘기기 잠김).
+  const proposalPending = useGlobalChatStore((s) => !!projectId && s.sceneStoryProposalPending?.projectId === projectId)
   const requestNextStep = useGlobalChatStore((s) => s.requestNextStep)
   const [checking, setChecking] = useState(false)
   const action = nextStepAction(stage, { producerLocked })
@@ -36,7 +38,7 @@ export function NextStepButton({ className, hidden = false }: { className?: stri
     <Button
       size="sm"
       variant={action.kind === 'open' ? 'outline' : 'default'}
-      disabled={chatBusy || confirmOpen || checking}
+      disabled={chatBusy || confirmOpen || checking || (stage === 'producer' && proposalPending)}
       onClick={() => void run()}
       className={className}
       data-testid="next-step-button"

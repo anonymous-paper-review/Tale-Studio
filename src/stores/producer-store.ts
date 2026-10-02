@@ -12,9 +12,14 @@ import { claimAction, releaseAction } from '@/lib/action-guard'
 import { computeProducerSourceHash } from '@/lib/lifecycle'
 import { createPendingProposal } from '@/lib/pending-proposal'
 import { evaluateProducerGate } from '@/lib/producer-gate'
+import { cardsForHandoff, syncTreatmentCast, type TreatmentCast } from '@/lib/producer/treatment-cast-sync'
+
+// 트리트먼트를 쓴 바탕 이름(넘길 때 낡았다는 안내) — 영어 원문 = 사전 키.
+const DRAFT_BASIS_LABEL: Record<string, string> = { story: 'the story', runtime: 'the runtime', preserveScript: 'the keep-as-written choice' }
 import { getWriterEnginePreference } from '@/lib/writer/engine'
 // store 액션·순수 함수는 훅을 못 쓴다 — translate() + 현재 locale 직접 조회로 번역
 //   (writer 배치의 #i18n-s5-batch3 패턴).
+import { fixKoreanParticles } from '@/lib/korean-particles'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 import { contentLocale } from '@/lib/i18n/content'
@@ -211,6 +216,14 @@ interface ProducerState {
   error: string | null
   /** 마지막 Writer 시작이 씬 스토리 확정 단계로 시작했는가(서버 응답 sceneGate) — 그렇다면 Producer 메인에 머문다(2026-10-01). */
   lastHandoffGated: boolean
+  /** 트리트먼트 인물 · 장소를 카드로 맞춘 마지막 트리트먼트 버전(2026-10-02 시안 v04). 같은 버전은 다시 맞추지 않는다 —
+   *  사람이 지운 카드가 되살아나지 않게. 초안(producer_draft)에 함께 저장한다. */
+  treatmentSyncedVersion: string | null
+  syncTreatmentCast: (treatment: TreatmentCast, version: string) => void
+  /** 트리트먼트 초안 시작(새 프로젝트 · 다시 시도) — 넘기지 않고 Writer 앞단만 돌린다. Producer 는 잠그지 않는다.
+   *  restart: 지금 값으로 다시 쓴다 — 확정을 기다리던 초안은 서버가 내려놓는다. */
+  startTreatment: (opts?: { restart?: boolean }) => Promise<boolean>
+  restartTreatment: () => Promise<boolean>
 
   setStoryText: (text: string) => void
   setPreserveScript: (value: boolean | null) => void
@@ -466,6 +479,46 @@ function normalizeProducerSettings(settings: Partial<ProjectSettings> | null | u
 
 const PRODUCER_DRAFT_VERSION = 1
 
+// Writer 시작 계약(producer-story-gate §3) — 넘길 때와 트리트먼트 초안을 시작할 때(2026-10-02 시안 v04) 같은 모양을 쓴다.
+function castContractOf(cast: CastMember[]) {
+  return {
+    characters: assignCastSlugs(cast).map((m) => ({
+      character_id: m.character_id,
+      name: m.name,
+      entity_type: m.entityType,
+      role: m.role,
+      appearance: m.appearance,
+      arc: m.arc,
+      motivation: m.motivation,
+      // #image-to-artist: 카드에 붙은 그림 — 서버가 대표 사진·시트 출처로 적는다(파이프라인 시드에서는 서버가 뗀다).
+      ...(m.sourceImageUrl ? { source_image_url: m.sourceImageUrl } : {}),
+    })),
+  }
+}
+function backgroundContractOf(backgrounds: BackgroundSource[]) {
+  return {
+    locations: assignLocationSlugs(backgrounds).map((background) => ({
+      location_id: background.location_id,
+      name: background.name,
+      visual_description: background.visualDescription,
+      purpose: background.purpose,
+      user_edited: background.userEdited === true,
+      ...(background.sourceImageUrl ? { source_image_url: background.sourceImageUrl } : {}),
+    })),
+  }
+}
+function genreContractOf(projectSettings: ProjectSettings) {
+  return {
+    genre: projectSettings.genre,
+    subGenre: projectSettings.subGenre || undefined,
+    tone: projectSettings.tone,
+    targetEmotion: [],
+    runtime_seconds: projectSettings.playtime,
+    depth_level: depthLevelFromRuntime(projectSettings.playtime || 0),
+    format: projectSettings.format,
+  }
+}
+
 // 핸드오프 전 프로듀서 보드의 working-copy 스냅샷 (projects.producer_draft 에 자동저장).
 export interface ProducerDraft {
   version: number
@@ -477,6 +530,8 @@ export interface ProducerDraft {
   backgrounds: BackgroundSource[]
   /** #script-preserve: 대본 보존 결정(true 보존 · false 참고 자료 · null 아직 안 물음). 옛 초안엔 없다 → null. */
   preserveScript?: boolean | null
+  /** 트리트먼트 카드 맞춤 버전(2026-10-02 시안 v04). 옛 초안엔 없다 → null. */
+  treatmentSyncedVersion?: string | null
 }
 
 export interface ProducerBoardState {
@@ -486,6 +541,7 @@ export interface ProducerBoardState {
   cast: CastMember[]
   backgrounds: BackgroundSource[]
   preserveScript?: boolean | null
+  treatmentSyncedVersion?: string | null
 }
 
 // jsonb 값을 안전하게 ProducerDraft 로 파싱 (형태가 안 맞으면 null).
@@ -503,6 +559,7 @@ export function parseProducerDraft(raw: unknown): ProducerDraft | null {
     cast: d.cast as CastMember[],
     backgrounds: d.backgrounds as BackgroundSource[],
     preserveScript: typeof d.preserveScript === 'boolean' ? d.preserveScript : null,
+    treatmentSyncedVersion: typeof d.treatmentSyncedVersion === 'string' ? d.treatmentSyncedVersion : null,
   }
 }
 
@@ -532,6 +589,7 @@ export function mergeDraftWithDb(
     backgrounds: [...draft.backgrounds, ...extraBackgrounds],
     // 결정은 초안의 그 글에 대한 것이다 — 초안 글이 비어 DB 글로 복원되면 결정도 없다.
     preserveScript: draft.storyText ? (draft.preserveScript ?? null) : null,
+    treatmentSyncedVersion: draft.treatmentSyncedVersion ?? null,
   }
 }
 
@@ -545,10 +603,11 @@ function buildProducerDraft(state: ProducerBoardState): ProducerDraft {
     cast: state.cast,
     backgrounds: state.backgrounds,
     preserveScript: state.preserveScript ?? null,
+    treatmentSyncedVersion: state.treatmentSyncedVersion ?? null,
   }
 }
 function boardOf(
-  s: Pick<ProducerState, 'storyText' | 'storyReady' | 'projectSettings' | 'cast' | 'backgrounds' | 'preserveScript'>,
+  s: Pick<ProducerState, 'storyText' | 'storyReady' | 'projectSettings' | 'cast' | 'backgrounds' | 'preserveScript' | 'treatmentSyncedVersion'>,
 ): ProducerBoardState {
   return {
     storyText: s.storyText,
@@ -557,6 +616,7 @@ function boardOf(
     cast: s.cast,
     backgrounds: s.backgrounds,
     preserveScript: s.preserveScript,
+    treatmentSyncedVersion: s.treatmentSyncedVersion,
   }
 }
 
@@ -622,6 +682,62 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   syncing: false,
   error: null,
   lastHandoffGated: false,
+  treatmentSyncedVersion: null,
+
+  syncTreatmentCast: (treatment, version) => {
+    if (isDemoSession() || producerLocked()) return
+    const current = get()
+    if (current.treatmentSyncedVersion === version) return
+    const next = syncTreatmentCast(
+      { cast: current.cast, backgrounds: current.backgrounds, syncedVersion: current.treatmentSyncedVersion },
+      treatment,
+      version,
+    )
+    set({ cast: next.cast, backgrounds: next.backgrounds, treatmentSyncedVersion: next.syncedVersion })
+    scheduleDraftSave()
+  },
+
+  restartTreatment: () => get().startTreatment({ restart: true }),
+
+  startTreatment: async (opts) => {
+    if (isDemoSession() || producerLocked()) return false
+    const projectId = useProjectStore.getState().projectId
+    const { storyText, projectSettings, cast, backgrounds, preserveScript } = get()
+    if (!projectId || !storyText.trim()) return false
+    const actionKey = `producer:treatment:${projectId}`
+    if (!claimAction(actionKey)) return false
+    try {
+      const settings = normalizeProducerSettings(projectSettings)
+      // 서버는 대사 언어 · 출력 언어를 DB 설정에서 읽는다 — 먼저 저장한다.
+      const { error } = await createClient().from('projects').update({ story_text: storyText, settings }).eq('id', projectId)
+      if (error) throw error
+      const response = await fetch('/api/writer/start', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          story: storyText,
+          treatmentDraft: true,
+          ...(opts?.restart ? { restartDraft: true } : {}),
+          writerEngine: 'v1',
+          ...(preserveScript === true ? { preserveScript: true } : {}),
+          runtimeSeconds: settings.playtime > 0 ? settings.playtime : undefined,
+          genre: genreContractOf(settings),
+          cast: castContractOf(cardsForHandoff({ cast, backgrounds }).cast),
+          backgrounds: backgroundContractOf(cardsForHandoff({ cast, backgrounds }).backgrounds),
+        }),
+      })
+      if (!response.ok) return false
+      if (useProjectStore.getState().projectId !== projectId) return false
+      useProjectStore.getState().setTreatmentDraft(true)
+      return true
+    } catch (err) {
+      console.error('[producer-store] startTreatment failed:', err)
+      return false
+    } finally {
+      releaseAction(actionKey)
+    }
+  },
 
   setStoryText: (text) => {
     if (isDemoSession() || producerLocked()) return
@@ -1001,46 +1117,20 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
 
         // producer-story-gate §3: 확정 장르(완성형) + 캐스트 계약 조립.
         //   slug 는 producer 가 부여(생성 후 불변). writer 는 이를 seed 로 받아 s0/s2 를 생략한다.
-        const slugged = assignCastSlugs(cast)
-        const castContract = {
-          characters: slugged.map((m) => ({
-            character_id: m.character_id,
-            name: m.name,
-            entity_type: m.entityType,
-            role: m.role,
-            appearance: m.appearance,
-            arc: m.arc,
-            motivation: m.motivation,
-            // #image-to-artist: 카드에 붙은 그림 — 서버가 대표 사진·시트 출처로 적는다(파이프라인 시드에서는 서버가 뗀다).
-            ...(m.sourceImageUrl ? { source_image_url: m.sourceImageUrl } : {}),
-          })),
-        }
-        const backgroundSlugged = assignLocationSlugs(backgrounds)
-        const backgroundContract = {
-          locations: backgroundSlugged.map((background) => ({
-            location_id: background.location_id,
-            name: background.name,
-            visual_description: background.visualDescription,
-            purpose: background.purpose,
-            user_edited: background.userEdited === true,
-            ...(background.sourceImageUrl ? { source_image_url: background.sourceImageUrl } : {}),
-          })),
-        }
-        const genre = {
-          genre: projectSettings.genre,
-          subGenre: projectSettings.subGenre || undefined,
-          tone: projectSettings.tone,
-          targetEmotion: [],
-          runtime_seconds: projectSettings.playtime,
-          depth_level: depthLevelFromRuntime(projectSettings.playtime || 0),
-          format: projectSettings.format,
-        }
+        // 손대지 않은 트리트먼트 카드는 싣지 않는다 — Writer 가 자기 인물 · 장소로 채운다(2026-10-02 시안 v04).
+        const handoffCards = cardsForHandoff({ cast, backgrounds })
+        const castContract = castContractOf(handoffCards.cast)
+        const backgroundContract = backgroundContractOf(handoffCards.backgrounds)
+        const genre = genreContractOf(projectSettings)
 
-        const writerResponse = await fetch('/api/writer/start', {
+        // 트리트먼트 초안(2026-10-02 시안 v04) — 만들 때 이미 앞단을 돌려 확정을 기다리는 실행이 있으면 새로 시작하지 않고
+        //   그 실행에 지금 Producer 값을 실어 이어 간다(넘김 = 트리트먼트 확정). 초안이 실패해 사라졌으면 처음부터 시작한다.
+        const requestStart = (continueDraft: boolean) => fetch('/api/writer/start', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
             projectId,
+            ...(continueDraft ? { continueDraft: true } : {}),
             story: storyText,
             // #script-preserve: 사람이 고른 보존 결정(true 일 때만 실린다).
             ...(get().preserveScript === true ? { preserveScript: true } : {}),
@@ -1066,6 +1156,12 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
             backgrounds: backgroundContract,
           }),
         })
+        const continueDraft = useProjectStore.getState().treatmentDraft && options?.rerun !== true
+        let writerResponse = await requestStart(continueDraft)
+        if (continueDraft && writerResponse.status === 409) {
+          const body = await writerResponse.clone().json().catch(() => ({}))
+          if (body?.code === 'writer_draft_missing' && body?.status !== 'running') writerResponse = await requestStart(false)
+        }
         if (writerResponse.status === 409) {
           const body = await writerResponse.json().catch(() => ({}))
           // 완료된 Writer 재실행은 반드시 별도 동의 후에만 허용한다. 첫 409에서
@@ -1093,8 +1189,15 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
           }
           // throw 는 error 배너(크롬)로 흐른다 → UI 언어.
           const uiLocale = useLocaleStore.getState().locale
+          const staleFields = (Array.isArray(body?.changed) ? body.changed : []).map((field: string) => translate(uiLocale, DRAFT_BASIS_LABEL[field] ?? field)).join(', ')
           const status =
-            body?.code === 'writer_gate_pending'
+            body?.code === 'treatment_draft_stale'
+              ? fixKoreanParticles(translate(uiLocale, 'The treatment was written before {fields} changed. Rewrite it with the current values in the scene story, or change them back, then hand over.', { fields: staleFields }), [staleFields])
+              : body?.code === 'scene_story_proposal_pending'
+              ? translate(uiLocale, 'Apply or discard the rewrite versions or the AI proposal before handing over to Writer.')
+              : body?.code === 'writer_draft_missing'
+                ? translate(uiLocale, 'Writer is still writing the treatment. You can hand over once it is ready.')
+                : body?.code === 'writer_gate_pending'
               ? translate(uiLocale, 'The current scene story draft is ready. Confirm it or request changes in the scene story on the Producer screen.')
               : body?.code === 'writer_run_active'
                 ? translate(uiLocale, 'Writer is already running. Check progress in the Writer tab.')
@@ -1222,6 +1325,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
           storyText: restored.storyText,
           storyReady: restored.storyReady,
           preserveScript: restored.preserveScript ?? null,
+          treatmentSyncedVersion: restored.treatmentSyncedVersion ?? null,
           projectSettings: restored.settings,
           cast: restored.cast,
           backgrounds: restored.backgrounds,
@@ -1253,6 +1357,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       syncing: false,
       error: null,
       lastHandoffGated: false,
+      treatmentSyncedVersion: null,
     })
   },
 }))

@@ -1,4 +1,5 @@
 import type { Scenes } from '@/lib/writer/types/pipeline'
+import { rewriteStatus, type RewriteLevel, type SceneStoryRewriteVariant } from '@/lib/producer/scene-story-rewrite'
 
 export interface SceneStoryProposal {
   id: string
@@ -8,6 +9,9 @@ export interface SceneStoryProposal {
   baseScenes: Scenes
   scenes?: Scenes
   error?: string
+  /** 다시 쓰기(2026-10-02 시안 v04) — 정도 하나에 세 가지 안. 있으면 scenes 대신 안마다 결과가 있다. */
+  level?: RewriteLevel
+  variants?: SceneStoryRewriteVariant[]
 }
 
 export interface SceneStoryProposalView {
@@ -19,6 +23,15 @@ export interface SceneStoryProposalView {
   after: Array<{ sceneId: string; index: number; beats: string[] }>
   stale: boolean
   error?: string
+  level?: RewriteLevel
+  variants?: Array<{
+    id: SceneStoryRewriteVariant['id']
+    direction: SceneStoryRewriteVariant['direction']
+    status: SceneStoryRewriteVariant['status']
+    after: Array<{ sceneId: string; index: number; beats: string[] }>
+    stale: boolean
+    error?: string
+  }>
 }
 
 export const SCENE_STORY_PROPOSAL_TIMEOUT_MS = 300_000
@@ -62,6 +75,33 @@ export function sceneStoryProposalView(
   const scenes = (value: Scenes | undefined) => (value?.scenes ?? []).map((scene, index) => ({
     sceneId: scene.scene_id, index, beats: scene.scene_actions,
   }))
+  if (proposal.variants?.length) {
+    // 오래 걸려 끝나지 않은 안은 실패로 본다 — 나온 안은 그대로 고를 수 있다.
+    const variants = proposal.variants.map((variant) => {
+      const status = expired && variant.status === 'generating' ? 'failed' as const : variant.status
+      const asProposal = status === 'ready' && variant.scenes ? { ...proposal, status, scenes: variant.scenes, variants: undefined } : null
+      return {
+        id: variant.id,
+        direction: variant.direction,
+        status,
+        after: scenes(variant.scenes),
+        stale: !current || (asProposal ? mergeSceneStoryProposal(asProposal, current) === null : !equal(proposal.baseScenes, current)),
+        ...(status === 'failed' ? { error: variant.error ?? 'scene_story_rewrite_timed_out' } : {}),
+      }
+    })
+    const status = rewriteStatus(variants)
+    return {
+      id: proposal.id,
+      status,
+      feedback: proposal.feedback,
+      createdAt: proposal.createdAt,
+      before: scenes(proposal.baseScenes),
+      after: [],
+      stale: !current || !equal(proposal.baseScenes, current),
+      level: proposal.level,
+      variants,
+    }
+  }
   return {
     id: proposal.id,
     status: expired ? 'failed' : proposal.status,

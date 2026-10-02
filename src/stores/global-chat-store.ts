@@ -45,6 +45,7 @@ import { matchHandoffIntent, nextStepAction, resolveDirectorHandoffIntent, type 
 import { loadDirectorReadiness } from '@/lib/director-readiness-loader'
 import type { DirectorReadinessReport } from '@/lib/director-readiness'
 import { sceneGatePhase } from '@/lib/writer/scene-gate'
+import { REWRITE_LEVELS, rewriteLevelOf, type RewriteLevel } from '@/lib/producer/scene-story-rewrite'
 import { restartWriterStatus } from '@/lib/writer/use-writer-status'
 import { completeKoreanDialogue, dialogueHandoffTarget } from '@/lib/writer/dialogue-handoff'
 import { handoffToStage } from '@/lib/stage-nav'
@@ -139,7 +140,19 @@ interface GlobalChatState {
   refreshSceneStory: () => void
   sceneStoryProposalPending: { projectId: string; id: string | null } | null
   syncSceneStoryProposal: (projectId: string, id: string | null) => void
-  resolveSceneStoryProposal: (action: 'apply' | 'discard', proposalId: string) => Promise<boolean>
+  /** variantId — 다시 쓰기의 세 안 중 고른 안(2026-10-02 시안 v04). AI 수정안 하나면 비운다. */
+  resolveSceneStoryProposal: (action: 'apply' | 'discard', proposalId: string, variantId?: string) => Promise<boolean>
+  /** 다시 쓰기(시안 v04) — 정도 하나로 세 가지 안을 요청한다. */
+  rewriteSceneStory: (level: RewriteLevel) => Promise<boolean>
+  /** 셋 다 별로 · 다시 만들기 — 지금 안들을 버리고 같은 정도로 다시 요청한다. */
+  regenerateSceneStoryRewrite: (proposalId: string, level: RewriteLevel) => Promise<boolean>
+  /** 트리트먼트 초안을 다 썼다고 채팅에 한 줄 남긴다(시안 v04). runKey(실행) 하나에 한 번, 넘기기 단추 없이. */
+  announceTreatmentReady: (projectId: string, runKey: string) => boolean
+  /** 트리트먼트에 미리 보이는 안(v1 · v2 · v3). 채팅 카드와 트리트먼트가 같은 값을 읽는다. */
+  sceneStoryVariantPreview: { projectId: string; proposalId: string; variantId: string } | null
+  previewSceneStoryVariant: (proposalId: string, variantId: string) => void
+  /** 적용한 안 되돌리기 · 그대로 두기. */
+  resolveSceneStoryUndo: (action: 'undo' | 'keep', undoId: string) => Promise<boolean>
   recoveryProgress: 'continue' | 'retry' | null
   error: string | null
   /** 마지막 채팅 요청의 입력·출력·적용 경계 계측. 화면 하단에 표시한다. */
@@ -549,6 +562,8 @@ async function applyStyleAnchorIntent(
 /** 씬 스토리 확정을 보내는 중인 프로젝트 — 두 번 누름 방지(2026-10-01). */
 const sceneGateInFlight = new Set<string>()
 const sceneStoryRequests = new Map<string, symbol>()
+// 트리트먼트를 다 썼다고 알린 실행(프로젝트:실행) — 화면이 다시 그려져도 같은 말을 두 번 남기지 않는다.
+const announcedTreatments = new Set<string>()
 
 /** 넘김 확인 창(2026-10-01 오너). via = 창을 연 곳 — 채팅에서 연 창은 진행할 때 넘김 문장을 다시 남기지 않는다. */
 export type HandoffConfirm =
@@ -685,7 +700,8 @@ async function runHandoff(spec: HandoffSpec): Promise<{ ok: boolean; path: strin
         if (status.assets?.images_ready !== true) return { ok: false, path: null, error: translate(contentLocale(), 'Artist images are not ready. Check project status for the remaining work.') }
         useProjectStore.getState().setArtistAssetGate(status.assets)
       }
-      if (spec.from === 'producer' && status.started) {
+      // 트리트먼트 초안(아직 넘기지 않은 실행)은 이어 가는 넘김이 아니다 — 아래 saveAndHandoff 가 그 초안을 Producer 값으로 이어 간다.
+      if (spec.from === 'producer' && status.started && status.draft !== true) {
         useProjectStore.getState().unlockThrough('writer')
         // Writer 가 이미 시작됐다 — 이어 가는 넘김도 Producer 를 잠근다(단계 저장만 실패했던 경우 포함).
         useProjectStore.getState().lockProducer()
@@ -704,7 +720,7 @@ async function runHandoff(spec: HandoffSpec): Promise<{ ok: boolean; path: strin
       try {
         const response = await fetch(`/api/writer/status/${projectId}`, { cache: 'no-store' })
         const status = await response.json()
-        if (response.ok && status.started === true && useProjectStore.getState().projectId === projectId) {
+        if (response.ok && status.started === true && status.draft !== true && useProjectStore.getState().projectId === projectId) {
           useProjectStore.getState().unlockThrough('writer')
           useProjectStore.getState().lockProducer()
           const phase = sceneGatePhase(status)
@@ -757,7 +773,13 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   sceneStoryEdit: null,
   sceneStoryRefresh: 0,
   sceneStoryProposalPending: null,
+  sceneStoryVariantPreview: null,
   refreshSceneStory: () => set((state) => ({ sceneStoryRefresh: state.sceneStoryRefresh + 1 })),
+  previewSceneStoryVariant: (proposalId, variantId) => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) return
+    set({ sceneStoryVariantPreview: { projectId, proposalId, variantId } })
+  },
   syncSceneStoryProposal: (projectId, id) => {
     if (projectId !== useProjectStore.getState().projectId || sceneStoryRequests.has(projectId)) return
     const current = get().sceneStoryProposalPending
@@ -811,7 +833,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   loadMessages: async (projectId) => {
     // #welcome-race: 아래 hydrate 의 set 은 suggestion 을 (복원 선택지 또는 null 로) 덮어쓴다.
     //   완료 마커를 로드 전 비우고 모든 종료 경로에서 세워, 제안 발사측이 로드 뒤에만 쏘게 한다.
-    set({ messagesLoadedProjectId: null, lastTrace: null, suggestion: null, pendingProposal: null, deferredProposals: [], deferredSuggestions: [], recordedSuggestionIds: [], dismissedSuggestionIds: [], cancelledProposalIds: [], sceneStoryEdit: null, sceneStoryProposalPending: null, ...loadConversationState(projectId) })
+    set({ messagesLoadedProjectId: null, lastTrace: null, suggestion: null, pendingProposal: null, deferredProposals: [], deferredSuggestions: [], recordedSuggestionIds: [], dismissedSuggestionIds: [], cancelledProposalIds: [], sceneStoryEdit: null, sceneStoryProposalPending: null, sceneStoryVariantPreview: null, ...loadConversationState(projectId) })
     if (get().pendingProposal?.stage === 'producer' && isProducerChoice(get().suggestion)) get().dismissSuggestion()
     const hadProducerApproval = get().pendingProposal?.stage === 'producer'
     const loadSession = chatSession
@@ -1089,6 +1111,13 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return false
     if (get().sceneStoryEdit || get().sceneStoryProposalPending?.projectId === projectId) return null
+    // 넘기기 전 트리트먼트 초안(2026-10-02 시안 v04)의 확정 = Writer 로 넘기기 — 같은 확인 창을 거친다(빈 칸이 있으면 채팅이 알려 준다).
+    const project = useProjectStore.getState()
+    if (!project.producerLocked && project.treatmentDraft) {
+      if (get().suggestion?.action?.kind === 'confirmScenes') get().dismissSuggestion({ implicit: true })
+      await get().requestNextStep()
+      return null
+    }
     // 두 번 누름(Enter + 버튼 등) — 두 번째 확정은 409 로 돌아와 성공 직후 오류처럼 보인다.
     if (sceneGateInFlight.has(projectId)) return null
     sceneGateInFlight.add(projectId)
@@ -1100,7 +1129,17 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ projectId, action: 'confirm' }),
       })
-      if (!response.ok) return false
+      if (!response.ok) {
+        // 화면이 아직 초안인 줄 몰랐다 — 서버가 넘기기를 거치라고 하면 그 확인 창을 연다.
+        const refused = await response.json().catch(() => null) as { code?: string } | null
+        if (refused?.code === 'treatment_draft_handoff_required' && useProjectStore.getState().projectId === projectId) {
+          useProjectStore.getState().setTreatmentDraft(true)
+          sceneGateInFlight.delete(projectId)
+          await get().requestNextStep()
+          return null
+        }
+        return false
+      }
     } catch {
       return false
     } finally {
@@ -1158,7 +1197,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     }
   },
 
-  resolveSceneStoryProposal: async (action, proposalId) => {
+  resolveSceneStoryProposal: async (action, proposalId, variantId) => {
     const projectId = useProjectStore.getState().projectId
     if (!projectId || !proposalId || get().sceneStoryEdit || sceneGateInFlight.has(projectId) || sceneStoryRequests.has(projectId)) return false
     const session = chatSession
@@ -1169,7 +1208,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       const response = await fetch('/api/writer/scene-gate', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ projectId, action, proposalId }),
+        body: JSON.stringify({ projectId, action, proposalId, ...(action === 'apply' && variantId ? { variantId } : {}) }),
       })
       const result = await response.json() as { code?: string }
       if (!isCurrent()) return false
@@ -1180,12 +1219,103 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         get().refreshSceneStory()
         return false
       }
-      set({ sceneStoryProposalPending: null })
+      set({ sceneStoryProposalPending: null, sceneStoryVariantPreview: null })
       get().refreshSceneStory()
       restartWriterStatus(projectId)
       return true
     } catch {
       if (isCurrent()) set({ error: translate(contentLocale(), 'Could not update the scene story proposal. Please try again.') })
+      return false
+    } finally {
+      sceneGateInFlight.delete(projectId)
+    }
+  },
+
+  rewriteSceneStory: async (level) => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId || get().sceneStoryEdit) return false
+    if (sceneGateInFlight.has(projectId) || sceneStoryRequests.has(projectId) || get().sceneStoryProposalPending?.projectId === projectId) {
+      set({ error: translate(contentLocale(), 'Apply or discard the current scene story proposal before requesting another.') })
+      return false
+    }
+    const session = chatSession
+    const requestId = Symbol()
+    const isCurrent = () => session === chatSession && projectId === useProjectStore.getState().projectId
+    sceneStoryRequests.set(projectId, requestId)
+    set({ sceneStoryProposalPending: { projectId, id: null }, sceneStoryVariantPreview: null, error: null })
+    let success = false
+    try {
+      const response = await fetch('/api/writer/scene-gate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ projectId, action: 'rewrite', level }),
+      })
+      const accepted = await response.json() as { proposalId?: string; code?: string }
+      if (!isCurrent()) return false
+      if (!response.ok) {
+        if (accepted.code === 'scene_story_proposal_pending') set({ error: translate(contentLocale(), 'Apply or discard the current scene story proposal before requesting another.') })
+        return false
+      }
+      set({ sceneStoryProposalPending: { projectId, id: accepted.proposalId ?? null } })
+      success = true
+      get().refreshSceneStory()
+      return true
+    } catch {
+      return false
+    } finally {
+      if (sceneStoryRequests.get(projectId) === requestId) sceneStoryRequests.delete(projectId)
+      if (!success && isCurrent()) {
+        set({ sceneStoryProposalPending: null, error: get().error ?? translate(contentLocale(), 'Could not start the rewrite. Please try again.') })
+        get().refreshSceneStory()
+      }
+    }
+  },
+
+  regenerateSceneStoryRewrite: async (proposalId, level) => {
+    const discarded = await get().resolveSceneStoryProposal('discard', proposalId)
+    if (!discarded) return false
+    return get().rewriteSceneStory(level)
+  },
+
+  // 시안 v04 "아이디어로 트리트먼트를 만들었어요" — 확정 안내(단추)는 넘기기 전 초안에 띄우지 않으므로(sceneGateOfferMode)
+  //   다 썼다는 사실과 다음 할 일만 평범한 말 한 줄로 남긴다. Producer 채팅은 그대로 쓰인다.
+  announceTreatmentReady: (projectId, runKey) => {
+    if (useProjectStore.getState().projectId !== projectId) return false
+    const key = `${projectId}:${runKey}`
+    if (announcedTreatments.has(key)) return false
+    announcedTreatments.add(key)
+    const content = translate(contentLocale(), 'The treatment is ready. Edit it on the screen, or use Rewrite to get three versions. When it looks right, press Hand over to Writer at the top right.')
+    set((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'producer', role: 'model', content }] }))
+    saveChatMessage(projectId, 'producer', 'model', content)
+    return true
+  },
+
+  resolveSceneStoryUndo: async (action, undoId) => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId || !undoId || get().sceneStoryEdit || sceneGateInFlight.has(projectId) || sceneStoryRequests.has(projectId)) return false
+    const session = chatSession
+    const isCurrent = () => session === chatSession && projectId === useProjectStore.getState().projectId
+    sceneGateInFlight.add(projectId)
+    set({ error: null })
+    try {
+      const response = await fetch('/api/writer/scene-gate', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ projectId, action, undoId }),
+      })
+      if (!isCurrent()) return false
+      if (!response.ok) {
+        set({ error: translate(contentLocale(), action === 'undo'
+          ? 'Could not go back. The treatment changed after the version was applied.'
+          : 'Could not update the treatment. Please try again.') })
+        get().refreshSceneStory()
+        return false
+      }
+      get().refreshSceneStory()
+      restartWriterStatus(projectId)
+      return true
+    } catch {
+      if (isCurrent()) set({ error: translate(contentLocale(), 'Could not update the treatment. Please try again.') })
       return false
     } finally {
       sceneGateInFlight.delete(projectId)
@@ -1212,7 +1342,26 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
 
     const sceneSuggestion = get().suggestion
     const sceneChoices = sceneSuggestion?.id === `scene-story-edit:${projectId}`
-    const sceneGate = sceneSuggestion?.action?.kind === 'confirmScenes' || get().sceneStoryProposalPending?.projectId === projectId
+    // 넘기기 전 트리트먼트 초안(2026-10-02 시안 v04)은 Producer 채팅이 살아 있다 — 다시 쓰기를 연 때(선택지)만 트리트먼트로 보낸다.
+    const draftLive = !useProjectStore.getState().producerLocked && useProjectStore.getState().treatmentDraft
+    const sceneGate = !draftLive && (sceneSuggestion?.action?.kind === 'confirmScenes' || get().sceneStoryProposalPending?.projectId === projectId)
+    // 다시 쓰기 정도(시안 v04) — 선택지나 그 이름을 말하면 세 가지 안을 만든다. 다른 말은 아래처럼 수정안 하나로 간다.
+    const rewriteLevel = stage === 'producer' && (sceneChoices || sceneGate)
+      ? rewriteLevelOf(trimmed, contentLocale()) ?? rewriteLevelOf(trimmed, useLocaleStore.getState().locale)
+      : null
+    if (rewriteLevel) {
+      get().dismissSuggestion({ implicit: true })
+      set({ error: null })
+      const ok = await get().rewriteSceneStory(rewriteLevel)
+      if (!isCurrentSession()) return
+      const levelLabel = translate(contentLocale(), REWRITE_LEVELS.find((option) => option.level === rewriteLevel)!.label)
+      const reply = ok
+        ? fixKoreanParticles(translate(contentLocale(), 'Writing three versions with {level}. Compare the changes in the treatment, then pick one here and apply it.', { level: levelLabel }), [levelLabel])
+        : get().error ?? translate(contentLocale(), 'Could not start the rewrite. Please try again.')
+      get().appendLocalExchange('producer', trimmed, reply)
+      if (!ok) set({ error: reply })
+      return
+    }
     if (stage === 'producer' && (sceneChoices || sceneGate) && writerInputRoute(trimmed, { sceneGate: true, running: false, explicitRevision: !sceneChoices }) === 'revise') {
       if (isCancellationUtterance(trimmed) && sceneChoices) { get().dismissSuggestion({ implicit: true }); return }
       get().dismissSuggestion({ implicit: true })
@@ -1592,6 +1741,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           ...producerChatContext(),
           // 잠긴 Producer(2026-10-01) — 서버가 모델에 "바꾸지 말 것"을 알린다(최종 방어는 producer-store 가드).
           ...(useProjectStore.getState().producerLocked ? { producerLocked: true } : {}),
+          // 넘기기 전 트리트먼트 초안(2026-10-02) — 서버가 모델에 "씬 고치기는 다시 쓰기로 안내할 것"을 알린다.
+          ...(!useProjectStore.getState().producerLocked && useProjectStore.getState().treatmentDraft ? { treatmentDraft: true } : {}),
           // #image-to-artist: 카드 채우기 턴 — 서버가 모델에 "그 카드만" 을 알린다(최종 방어는 coerceCardFill).
           ...(opts?.cardFill ? { cardFill: opts.cardFill } : {}),
           ...(answeringProducerQuestion ? { answeringProducerQuestion: true } : {}),
@@ -3651,6 +3802,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   reset: () => {
     chatSession += 1
     sceneStoryRequests.clear()
+    announcedTreatments.clear()
     // 프로젝트 전환 시 진행 중인 완료-코얼레싱 타이머/누적도 비운다.
     for (const k of Object.keys(pendingCompletions)) {
       clearTimeout(pendingCompletions[k].timer)
@@ -3665,6 +3817,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       sceneStoryEdit: null,
       sceneStoryRefresh: 0,
       sceneStoryProposalPending: null,
+      sceneStoryVariantPreview: null,
       recoveryProgress: null,
       error: null,
       lastTrace: null,

@@ -16,14 +16,16 @@ import { useT } from '@/lib/i18n'
 
 // 수정 요청·확정 호출은 global-chat-store(reviseSceneGate·confirmSceneGate) 한 곳이 맡는다(2026-10-01).
 
-export function SceneGateControls() {
+// label · handoff: 넘기기 전 트리트먼트 초안(2026-10-02 시안 v04)은 확정이 곧 Writer 로 넘기기다 — 버튼은 "Writer로 넘기기"이고 확인 창을 연다.
+export function SceneGateControls({ label, handoff = false }: { label?: string; handoff?: boolean } = {}) {
   const [busy, setBusy] = useState(false)
   const t = useT()
   // 캡션 중간에 <kbd> 엘리먼트가 끼어들어야 해서 {kbd} 토큰으로 번역문을 받은 뒤 직접 split
   //   (sidebar.tsx 의 {credit} 스플릿과 동일 패턴).
-  const [kbdPre, kbdPost] = t('{kbd} to confirm · edits go in the input box below').split(
-    '{kbd}',
-  )
+  const [kbdPre, kbdPost] = (handoff
+    ? t('{kbd} to hand over to Writer · edits go in the input box below')
+    : t('{kbd} to confirm · edits go in the input box below')
+  ).split('{kbd}')
 
   return (
     <div className="mt-2 flex flex-col gap-1.5 px-1">
@@ -44,7 +46,7 @@ export function SceneGateControls() {
         }}
       >
         {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
-        {t('Confirm as-is')}
+        {label ?? t('Confirm as-is')}
       </Button>
       <p className="text-center text-[10px] text-muted-foreground">
         {kbdPre}

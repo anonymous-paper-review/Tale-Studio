@@ -622,8 +622,13 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   // Writer 로 넘긴 프로젝트(2026-10-01 오너) — 읽기 전용. 바꾸려면 새 프로젝트.
   const producerLocked = useProjectStore((s) => s.producerLocked)
   // 씬 스토리를 쓰는 중이거나 확정을 기다리면 다음 할 일은 아래 씬 스토리의 확정이다 — 오른쪽 위 "Writer로 가기"는 숨긴다.
-  const { status: writerRunStatus } = useWriterStatus(producerLocked ? projectId : null)
-  const sceneGateBusy = producerLocked && ['writing', 'gate'].includes(sceneGatePhase(writerRunStatus))
+  //   새 프로젝트의 트리트먼트 초안(2026-10-02 시안 v04)은 넘기기가 곧 확정이다 — 다 쓰기 전에만 숨긴다.
+  const treatmentDraft = useProjectStore((s) => s.treatmentDraft)
+  const { status: writerRunStatus } = useWriterStatus(producerLocked || treatmentDraft ? projectId : null)
+  const writerPhase = sceneGatePhase(writerRunStatus)
+  const sceneGateBusy = producerLocked
+    ? ['writing', 'gate'].includes(writerPhase)
+    : treatmentDraft && writerPhase === 'writing'
   const router = useRouter()
   // 인물·배경 압축 표시에서 펼친 카드(한 번에 하나씩).
   const [openCastId, setOpenCastId] = useState<string | null>(null)
@@ -684,7 +689,9 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
     name: member.name,
     sub: member.entityType === 'object' ? t('Object') : t(ROLE_LABEL[member.role ?? 'supporting'] ?? 'Supporting'),
     imageUrl: member.sourceImageUrl,
-    missing: castIssuesFor(gate, member.localId).length,
+    // 트리트먼트가 만든 카드의 빈 칸은 넘기기를 막지 않는다 — 그래도 채우면 좋은 칸 수는 보인다.
+    missing: castIssuesFor(gate, member.localId).length
+      + (member.origin === 'treatment' ? gate.softMissing.filter((i) => i.field.startsWith(`cast:${member.localId}:`)).length : 0),
     detail: [
       { label: t('Name'), value: member.name },
       { label: t('Role'), value: member.role ? t(ROLE_LABEL[member.role] ?? 'Supporting') : '' },
@@ -820,9 +827,6 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
             </MentionableCard>
           </section>
 
-          {/* 트리트먼트 문서(2026-10-01 오너) — Writer 생성 화면의 씬 스토리 줄글, 보존 대본은 원본. 읽기 전용. */}
-          <SceneStorySection />
-
           <section className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -933,6 +937,10 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
               />
             )}
           </section>
+
+          {/* 트리트먼트 문서(2026-10-01 오너) — Writer 생성 화면의 씬 스토리 줄글, 보존 대본은 원본.
+              캐스팅 · 배경 아래에 둔다(2026-10-02 오너 "casting, background가 씬 스토리 위에"). */}
+          <SceneStorySection />
           </div>
         </div>
       </div>

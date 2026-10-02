@@ -37,11 +37,14 @@ export interface CastMember {
   role?: string
   arc?: CastArc
   motivation?: CastMotivation
-  origin?: 'producer' | 'writer'
+  // 'treatment' — 새 프로젝트 트리트먼트가 만든 인물(2026-10-02 시안 v04). 빈 칸은 넘기기를 막지 않는다.
+  origin?: 'producer' | 'writer' | 'treatment'
   // 사용자가 카드 UI 로 직접 손댄 값인지. true 면 채팅이 덮어쓰기 전에 승인 게이트를 거친다.
   userEdited?: boolean
   /** #image-to-artist: 채팅에 올려 이 카드에 붙인 그림(원본 업로드 주소). 넘길 때 Artist 의 대표 사진·시트 출처가 된다. */
   sourceImageUrl?: string
+  /** 트리트먼트에서 맞춘 때의 내용 지문(2026-10-02 시안 v04) — 지금 내용과 다르면 사람이 고친 카드다. */
+  treatmentHash?: string
 }
 
 export interface BackgroundSource {
@@ -50,11 +53,13 @@ export interface BackgroundSource {
   name: string
   visualDescription: string
   purpose: string
-  origin?: 'producer' | 'writer'
+  origin?: 'producer' | 'writer' | 'treatment'
   userEdited?: boolean
   stale?: boolean
   /** #image-to-artist: 채팅에 올려 이 카드에 붙인 그림. 넘길 때 그대로 그 배경의 와이드샷이 된다. */
   sourceImageUrl?: string
+  /** 트리트먼트에서 맞춘 때의 내용 지문(2026-10-02 시안 v04) — 지금 내용과 다르면 사람이 고친 카드다. */
+  treatmentHash?: string
 }
 
 export interface GateIssue {
@@ -215,7 +220,10 @@ export function evaluateProducerGate({
   // 핸드오프 하드게이트는 producer 원천 카드만 평가한다 — writer 파이프라인이 (부분/실패 run 중)
   //   추가한 writer-origin 카드(미완성일 수 있음)가 producer 의 재핸드오프/재실행을 막지 않도록.
   //   origin 미지정(레거시)은 producer 로 간주해 포함한다.
-  const isProducerOrigin = (c: { origin?: 'producer' | 'writer' }) => c.origin !== 'writer'
+  const isProducerOrigin = (c: { origin?: CastMember['origin'] }) => c.origin !== 'writer'
+  // 트리트먼트가 만든 카드(2026-10-02 시안 v04 "비어 있는 곳은 Writer에서 채웁니다")는 인원 · 배경 수에는 들지만
+  //   빈 칸은 채우면 좋은 것(soft)으로만 싣는다 — 넘기기를 막지 않는다.
+  const gapsOf = (c: { origin?: CastMember['origin'] }) => (c.origin === 'treatment' ? softMissing : hardMissing)
   const producerCast = cast.filter(isProducerOrigin)
   const persons = producerCast.filter((c) => c.entityType === 'person')
 
@@ -237,14 +245,14 @@ export function evaluateProducerGate({
 
   // 정의된 인물의 필수 필드 (object는 name+appearance만 — person 전용 필드 면제).
   for (const p of persons) {
-    hardMissing.push(...evaluatePersonFields(p, depth, locale))
+    gapsOf(p).push(...evaluatePersonFields(p, depth, locale))
   }
   for (const o of producerCast.filter((c) => c.entityType === 'object')) {
     const who = o.name || t('Unnamed object')
     if (!isFilled(o.name))
-      hardMissing.push({ field: `cast:${o.localId}:name`, label: t('{who}: name needed', { who }) })
+      gapsOf(o).push({ field: `cast:${o.localId}:name`, label: t('{who}: name needed', { who }) })
     if (!isFilled(o.appearance))
-      hardMissing.push({
+      gapsOf(o).push({
         field: `cast:${o.localId}:appearance`,
         label: t('{who}: appearance needed', { who }),
       })
@@ -266,7 +274,7 @@ export function evaluateProducerGate({
   for (const b of producerBackgrounds) {
     const issues = evaluateBackgroundFields(b, locale)
     if (!issues.length) continue
-    ;(hasCompleteBackground ? softMissing : hardMissing).push(...issues)
+    ;(hasCompleteBackground || b.origin === 'treatment' ? softMissing : hardMissing).push(...issues)
   }
 
   return {

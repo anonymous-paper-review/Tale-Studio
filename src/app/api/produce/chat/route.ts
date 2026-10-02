@@ -7,7 +7,7 @@ import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
 import { prepareChatTools } from '@/lib/chat-tools/protocol'
 import { buildProducerSystem } from './system-prompt'
-import { imageCardFillDirective, lockedProducerDirective, preservedScriptDirective } from './preserve-context'
+import { imageCardFillDirective, lockedProducerDirective, preservedScriptDirective, treatmentDraftDirective } from './preserve-context'
 import { parseExtractedSettings } from '@/lib/parse-extracted-settings'
 import { resolveProducerDialogueLanguage } from '@/lib/producer-dialogue-language'
 import { parseChatChoices } from '@/lib/chat-choices'
@@ -66,6 +66,7 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
       preserveScript,
       cardFill,
       producerLocked,
+      treatmentDraft,
       answeringProducerQuestion,
     } = await req.json()
     const modelSettings = parseChatModelSettings(rawModelSettings)
@@ -162,6 +163,9 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
     // 잠긴 Producer(2026-10-01) — 바꾸자는 제안을 내지 않는다(클라 producer-store 가드가 최종 방어).
     const lockedDirective = lockedProducerDirective(producerLocked)
     if (lockedDirective) contextParts.push(lockedDirective)
+    // 넘기기 전 트리트먼트 초안(2026-10-02) — 씬 고치기는 다시 쓰기 · 직접 고치기로 안내한다.
+    const draftDirective = treatmentDraftDirective(treatmentDraft)
+    if (draftDirective) contextParts.push(draftDirective)
     if (currentSettings) {
       contextParts.push(
         `[Current Project Settings]\n${JSON.stringify(currentSettings)}`,

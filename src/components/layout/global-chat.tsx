@@ -62,6 +62,7 @@ import { SceneGateControls } from '@/features/writer/scene-gate-panel'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { useWriterPreview } from '@/lib/writer/use-writer-preview'
 import { SceneStoryProposalCard } from '@/components/layout/scene-story-proposal-card'
+import { SceneStoryRewriteCard, SceneStoryUndoCard } from '@/components/layout/scene-story-rewrite-card'
 import {
   buildScriptLines,
   scriptLineMentions,
@@ -479,11 +480,15 @@ export function GlobalChat() {
   const projectId = useProjectStore((s) => s.projectId)
   const { requestImageUploadConsent, imageUploadConsentDialog } = useImageUploadConsent(projectId)
   const producerLocked = useProjectStore((s) => s.producerLocked)
-  const { preview: sceneStoryPreview } = useWriterPreview(projectId, { enabled: currentStage === 'producer' && producerLocked, refreshKey: sceneStoryRefresh })
-  const sceneStoryProposal = currentStage === 'producer' && producerLocked ? sceneStoryPreview?.sceneStoryProposal : null
+  // 넘기기 전 트리트먼트 초안(2026-10-02 시안 v04)도 같은 씬 스토리 수정안 · 다시 쓰기를 쓴다.
+  const treatmentDraft = useProjectStore((s) => s.treatmentDraft)
+  const sceneStoryLive = currentStage === 'producer' && (producerLocked || treatmentDraft)
+  const { preview: sceneStoryPreview } = useWriterPreview(projectId, { enabled: sceneStoryLive, refreshKey: sceneStoryRefresh })
+  const sceneStoryProposal = sceneStoryLive ? sceneStoryPreview?.sceneStoryProposal : null
+  const sceneStoryUndo = sceneStoryLive && !sceneStoryProposal ? sceneStoryPreview?.sceneStoryUndo ?? null : null
   useEffect(() => {
-    if (projectId && currentStage === 'producer' && producerLocked && sceneStoryPreview) useGlobalChatStore.getState().syncSceneStoryProposal(projectId, sceneStoryPreview.sceneStoryProposal?.id ?? null)
-  }, [projectId, currentStage, producerLocked, sceneStoryPreview])
+    if (projectId && sceneStoryLive && sceneStoryPreview) useGlobalChatStore.getState().syncSceneStoryProposal(projectId, sceneStoryPreview.sceneStoryProposal?.id ?? null)
+  }, [projectId, sceneStoryLive, sceneStoryPreview])
 
   // 폭 리사이즈 + 접기 (chat-ui-store, persist)
   const chatWidth = useChatUiStore((s) => s.chatWidth)
@@ -1545,7 +1550,12 @@ export function GlobalChat() {
             ))}
 
             {loading && <ThinkingIndicator stage={currentStage} />}
-            {projectId && sceneStoryProposal ? <SceneStoryProposalCard key={`${projectId}:${sceneStoryProposal.id}`} projectId={projectId} proposal={sceneStoryProposal} /> : null}
+            {projectId && sceneStoryProposal ? (
+              sceneStoryProposal.variants?.length
+                ? <SceneStoryRewriteCard key={`${projectId}:${sceneStoryProposal.id}`} projectId={projectId} proposal={sceneStoryProposal} />
+                : <SceneStoryProposalCard key={`${projectId}:${sceneStoryProposal.id}`} projectId={projectId} proposal={sceneStoryProposal} />
+            ) : null}
+            {projectId && sceneStoryUndo ? <SceneStoryUndoCard key={`${projectId}:${sceneStoryUndo.id}`} projectId={projectId} undo={sceneStoryUndo} /> : null}
 
             {/* 프로액티브 제안 (chat-proactive-copilot Phase 1) — 시스템이 먼저 거는 actionable 넛지.
                 탭 전환 후 1초 정적을 두고 계단식 등장(#chat-settle).
@@ -1568,7 +1578,7 @@ export function GlobalChat() {
                 {/* 씬 게이트(#gate-to-chat) — 확정 한 번으로 안 끝나는 결정이라 캡슐 버튼 대신
                     피드백 입력 + 확정/수정 두 갈래를 여기서 렌더한다(생성 화면 하단 바에서 이사). */}
                 {suggestion.action?.kind === 'confirmScenes' ? (
-                  <SceneGateControls />
+                  <SceneGateControls label={suggestion.action.label} handoff={treatmentDraft && !producerLocked} />
                 ) : (suggestion.action || suggestion.dismissible !== false) && (
                   <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
                     {/* kind: 'choices' 는 여기 오지 않는다 — 입력창 앵커 선택지(#p4-choices v2) */}
@@ -1932,7 +1942,9 @@ export function GlobalChat() {
                   choices
                     ? t('Choose above or type your answer…')
                     : sceneGateActive
-                      ? t('Type your changes, or press Enter as-is to confirm the scenes')
+                      ? treatmentDraft && !producerLocked
+                        ? t('Type your changes, or press Enter as-is to hand over to Writer')
+                        : t('Type your changes, or press Enter as-is to confirm the scenes')
                       : canSendAttachments
                         ? t("Tell us how to use it, or leave it blank and we'll fold it into the story")
                         : t(STAGE_PLACEHOLDER[currentStage])
