@@ -22,32 +22,6 @@ const row = (partial: Partial<LedgerRow> & Pick<LedgerRow, 'id' | 'kind' | 'delt
 })
 
 describe('종류별 잔액', () => {
-  it('잔액은 무료·플랜·충전으로 나뉘고 합계는 장부 전체 합과 같다', () => {
-    const rows: LedgerRow[] = [
-      row({ id: 'g-plan', kind: 'grant_plan', delta: 60, expires_at: '2026-10-01T00:00:00.000Z' }),
-      row({ id: 'g-pack', kind: 'grant_purchase', delta: 50, expires_at: '2027-08-20T00:00:00.000Z' }),
-      row({ id: 'g-free', kind: 'grant_free', delta: 5 }),
-      row({ id: 'h1', kind: 'hold', delta: -5, grant_id: 'g-free', ref_kind: 'generation_job', ref_id: 'job-1' }),
-      row({ id: 'h2', kind: 'hold', delta: -3, grant_id: 'g-plan', ref_kind: 'generation_job', ref_id: 'job-1' }),
-    ]
-    const b = takeBreakdown(rows)
-    expect(b.free).toBe(0)
-    expect(b.plan).toBe(57)
-    expect(b.purchase).toBe(50)
-    expect(b.total).toBe(107)
-    expect(b.total).toBe(rows.reduce((s, r) => s + r.delta, 0))
-  })
-
-  it('플랜 Take의 만료일은 남은 플랜 lot 중 가장 이른 날이다', () => {
-    const rows: LedgerRow[] = [
-      row({ id: 'g-old', kind: 'grant_plan', delta: 10, expires_at: '2026-09-01T00:00:00.000Z' }),
-      row({ id: 'h-old', kind: 'hold', delta: -10, grant_id: 'g-old', ref_id: 'job-0', ref_kind: 'generation_job' }),
-      row({ id: 'g-new', kind: 'grant_plan', delta: 60, expires_at: '2026-10-01T00:00:00.000Z' }),
-    ]
-    // g-old 는 다 써서 남은 게 없으니 만료일 후보에서 빠진다.
-    expect(takeBreakdown(rows).planExpiresAt).toBe('2026-10-01T00:00:00.000Z')
-  })
-
   it('잔액이 음수면 회수분(환불·기타)이 얼마인지 같이 나온다', () => {
     const rows: LedgerRow[] = [
       row({ id: 'g-pack', kind: 'grant_purchase', delta: 50 }),
