@@ -24,3 +24,9 @@ export function sceneStoryView(input: {
   if (input.saved.length > 0) return { kind: 'scenes', paragraphs: input.saved }
   return { kind: 'writing' }
 }
+
+/** 씬 스토리 칸이 트리트먼트 미리 보기를 불러올지. 보존 대본은 원본을 보여 주지만, 넘기기 전 초안이면
+ *  트리트먼트가 만든 인물 · 장소를 카드로 옮기고 바탕이 바뀌었는지 견주려고 불러온다(2026-10-06 운영 제보). */
+export function sceneStoryNeedsPreview(input: { hasTreatment: boolean; showOriginal: boolean; draftLive: boolean }): boolean {
+  return input.hasTreatment && (input.draftLive || !input.showOriginal)
+}

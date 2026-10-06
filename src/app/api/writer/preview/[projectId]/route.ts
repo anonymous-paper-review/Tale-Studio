@@ -18,6 +18,7 @@ import type { WriterV2Package } from '@/lib/writer/v2/semantic-unit';
 import { sceneStoryProposalView, type SceneStoryProposal } from '@/lib/producer/scene-story-proposal';
 import { stableHash } from '@/lib/stable-hash';
 import { draftBasisOf } from '@/lib/writer/treatment-draft';
+import { mergeOpenWorld } from '@/lib/writer/pipeline/stages/s3_scenes';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -284,8 +285,14 @@ export async function GET(
             want: c.motivation?.want ?? '',
           }] : []))
       : [];
+    // 보존 모드 초안은 씬을 대본에서 그대로 옮겨 장소 목록을 만들지 않는다 — 씬에 적힌 장소로 대신한다(2026-10-06 운영 제보).
+    //   대본이 기준이라 이야기 엔진이 지어낸 장소 후보는 싣지 않는다. 장소 목록이 있으면 그대로 쓴다.
+    //   이미 있는 배경 카드는 카드 맞추기가 이름으로 이어 붙여 겹치지 않는다.
+    const draftLocations = state.world?.locations?.length
+      ? state.world.locations
+      : state.scenes ? mergeOpenWorld(undefined, state.scenes).locations : [];
     const treatmentLocations = draft
-      ? (state.world?.locations ?? []).flatMap((l) => (l.id && l.name ? [{ id: l.id, name: displayNameOf(l.name, l.id), description: l.description ?? '' }] : []))
+      ? draftLocations.flatMap((l) => (l.id && l.name ? [{ id: l.id, name: displayNameOf(l.name, l.id), description: l.description ?? '' }] : []))
       : [];
     // 카드 맞춤 버전 = 인물 · 장소 내용의 지문 — 수정안 진행 · 원문 버전 같은 상태 변화로는 바뀌지 않는다(지운 카드가 되살아나지 않게).
     const treatmentCast = draft

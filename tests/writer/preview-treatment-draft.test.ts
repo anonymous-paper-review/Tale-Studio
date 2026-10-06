@@ -66,6 +66,32 @@ describe('카드 맞춤 버전 (검토 지적)', () => {
   })
 })
 
+describe('대본을 그대로 보존한 초안의 장소 (2026-10-06 운영 제보)', () => {
+  const preserved = {
+    input: { story: '대본', treatmentDraft: true, preserveScript: true },
+    characters: { characters: [{ id: 'char_1', name: '미나코', role: 'supporting' }] },
+    scenes: { scenes: [
+      { scene_id: 'scene_1', scene_actions: ['미나코가 걷는다.'], location: '북적이는 인도', characters_in_scene: ['char_1'] },
+      { scene_id: 'scene_2', scene_actions: ['미나코가 앉는다.'], location: '붐비는 카페', characters_in_scene: ['char_1'] },
+      { scene_id: 'scene_3', scene_actions: ['미나코가 돌아온다.'], location: '북적이는 인도', characters_in_scene: ['char_1'] },
+    ], total_estimated_seconds: 30 },
+  }
+
+  it('장소 목록이 없는 보존 대본 초안은 씬에 적힌 장소로 배경 목록을 만든다', async () => {
+    // 왜: 보존 모드 초안은 씬을 대본에서 그대로 옮겨 장소 목록을 만들지 않는다. 배경 카드가 0장이면 넘기기가 막힌다.
+    mocks.run.mockResolvedValue(run(preserved))
+    expect((await preview()).treatmentCast.locations).toEqual([
+      { id: '북적이는 인도', name: '북적이는 인도', description: '' },
+      { id: '붐비는 카페', name: '붐비는 카페', description: '' },
+    ])
+  })
+
+  it('장소 목록이 이미 있으면 씬에서 장소를 더 만들지 않는다', async () => {
+    mocks.run.mockResolvedValue(run({ ...preserved, world: { locations: [{ id: 'cafe', name: '붐비는 카페', description: '창가 자리' }] } }))
+    expect((await preview()).treatmentCast.locations).toEqual([{ id: 'cafe', name: '붐비는 카페', description: '창가 자리' }])
+  })
+})
+
 describe('트리트먼트를 쓴 바탕 (검토 지적)', () => {
   it('트리트먼트 초안은 무엇을 바탕으로 썼는지 함께 알려 준다', async () => {
     const { fnv1a } = await import('@/lib/stable-hash')

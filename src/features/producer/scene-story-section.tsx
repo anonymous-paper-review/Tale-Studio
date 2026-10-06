@@ -20,7 +20,7 @@ import { useWriterPreview } from '@/lib/writer/use-writer-preview'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { writerProgressView } from '@/lib/writer/progress-view'
 import { sceneGateOfferMode, sceneGatePhase, sceneGateSuggestion, shouldAnnounceTreatmentReady } from '@/lib/writer/scene-gate'
-import { sceneStoryView } from '@/lib/producer/scene-story'
+import { sceneStoryNeedsPreview, sceneStoryView } from '@/lib/producer/scene-story'
 import { useLocale, useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
@@ -56,7 +56,7 @@ export function SceneStorySection() {
   const phase = hasTreatment ? sceneGatePhase(status) : 'before'
   const showOriginal = preserveScript === true && storyText.trim().length > 0
   const refreshKey = useGlobalChatStore((s) => s.sceneStoryRefresh)
-  const { preview } = useWriterPreview(projectId, { enabled: hasTreatment && !showOriginal, refreshKey })
+  const { preview } = useWriterPreview(projectId, { enabled: sceneStoryNeedsPreview({ hasTreatment, showOriginal, draftLive }), refreshKey })
   const variantPick = useGlobalChatStore((s) => s.sceneStoryVariantPreview)
   const storyReady = useProducerStore((s) => s.storyReady)
   const playtime = useProducerStore((s) => s.projectSettings.playtime)
