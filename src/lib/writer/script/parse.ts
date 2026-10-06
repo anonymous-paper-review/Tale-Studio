@@ -65,6 +65,11 @@ const KO_SCENE_RE = /^\s*(?:S#|씬|장면|Scene)\s*(\d+)\s*[.:\-–—)]?\s*(.*)
 const ACT_RE = /^\s*(?:제\s*)?(\d+)\s*(막|장|경)\s*[.:]?\s*(.*)$|^\s*(프롤로그|에필로그|서막|종막)\s*$|^\s*(ACT|SCENE)\s+([IVX]+|\d+)\s*[.:]?\s*(.*)$/i;
 const TRANSITION_RE = /^\s*(CUT TO|SMASH CUT(?: TO)?|MATCH CUT(?: TO)?|HARD CUT(?: TO)?|JUMP CUT(?: TO)?|DISSOLVE(?: TO)?|FADE (?:IN|OUT|TO BLACK|TO WHITE|TO \w+)|CUT TO BLACK|BACK TO SCENE|BACK TO|INTERCUT(?: WITH)?|END OF PLAY|THE END|END|BLACK SCREEN|OVER BLACK|BLACKOUT|CURTAIN|끝|막|암전|검은 화면|흰 화면|페이드 ?(?:인|아웃)|컷 ?투|디졸브)\s*[:.]?\s*$/i;
 const CAMERA_RE = /^\s*(PUSH IN|PULL BACK|PULL OUT|CLOSE ON|CLOSE UP|CLOSE-UP|C\.U\.|C\/U|ECU|EXTREME CLOSE|WIDE (?:SHOT|ON)|ANGLE ON|REVERSE ANGLE|INSERT(?!\s*[-–—:]?\s*TEXT)|POV|TILT (?:UP|DOWN)|PAN (?:LEFT|RIGHT|TO|UP|DOWN)|TRACKING|DOLLY|ZOOM|CRANE|HOLD ON|HOLD\b|RACK FOCUS|SLOW MOTION|SLOW-MO|THE CAMERA|CAMERA|카메라|클로즈업|푸시 ?인|틸트|팬|트래킹|줌)\b/i;
+// 카메라 지시가 "이름: 대사" 꼴로 들어온 줄(2026-10-06 운영 제보 — 번역 대본의 "메모장으로 푸시 인: …").
+//   이름 자리가 카메라 움직임으로 끝나면 대사가 아니라 카메라 지시다. 팬 · 줌 · 틸트처럼 이름일 수도 있는 한 낱말은
+//   "왼쪽으로 팬"처럼 방향 말(~로 · ~으로 · ~에 · ~쪽) 뒤에 올 때만 본다("피터 팬: …"은 대사).
+const CAMERA_TAIL_RE = /(?:^|\s)(?:푸시 ?인|풀 ?백|풀 ?아웃|줌 ?인|줌 ?아웃|(?:익스트림 ?)?클로즈 ?업|틸트 ?업|틸트 ?다운|트래킹(?: ?숏)?|인서트(?: ?숏)?|달리 ?인|달리 ?아웃|크레인 ?업|크레인 ?다운|와이드 ?숏|POV|PUSH IN|PULL BACK|PULL OUT|CLOSE ON|CLOSE UP|CLOSE-UP|ZOOM IN|ZOOM OUT|TILT UP|TILT DOWN|TRACKING|DOLLY IN|DOLLY OUT|INSERT)$/i;
+const CAMERA_WORD_AFTER_DIRECTION_RE = /\S(?:으로|로|에|쪽)\s+(?:팬|패닝|줌|틸트)$/;
 const ON_SCREEN_RE = /^\s*(SUPER|ON SCREEN|TITLE CARD|CHYRON|TEXT ON SCREEN|INSERT\s*[-–—:]?\s*TEXT|자막|화면 ?문자|타이틀 ?카드|화면)\b\s*[:\-–—]?\s*(.*)$/i;
 const SOUND_LABEL_RE = /^\s*(SFX|SOUND(?: EFFECT)?|MUSIC|효과음|음악|소리)\b\s*[:\-–—.]?\s*(.*)$/i;
 const RADIO_CUE_RE = /^\s*\(\s*(MUSIC|SOUND|SFX|음악|효과음)\b[^)]*\)\s*$/i;
@@ -84,6 +89,18 @@ const FRONT_LABELS: Array<{ re: RegExp; kind: 'characters' | 'time' | 'location'
 ];
 const META_LABEL_RE = /^(핵심 성격|성격|감정 아크|이야기 속 기능|외형|역할|나이|관계|동기|좋아하는 말|말투|비고|자막|화면|장르|형식|분량|출처|초안|작가|원제|제목|core traits|traits|emotional arc|function in story|appearance|role|age|motivation|arc|note|notes|logline|genre|format)$/i;
 const BYLINE_RE = /^\s*(?:written\s+by|screenplay\s+by|story\s+by|by|지은이|작가|글)\s*[:：]?\s*(.*)$/i;
+
+function cameraCueName(name: string): boolean {
+  const n = name.trim();
+  return CAMERA_TAIL_RE.test(n) || CAMERA_WORD_AFTER_DIRECTION_RE.test(n);
+}
+/** "메모장으로 푸시 인: …" / "**얼굴 클로즈업:** …" — 대사 꼴이지만 이름 자리가 카메라 지시인 줄. */
+function cameraCueLine(s: string): boolean {
+  const m = s.match(COLON_CUE_RE);
+  if (m && cameraCueName(m[1])) return true;
+  const b = s.match(BOLD_CUE_RE);
+  return !!b && cameraCueName(b[1].replace(/[:：]\s*$/, ''));
+}
 
 function isBlank(s: string): boolean {
   return !s.trim();
@@ -164,14 +181,14 @@ function matchColonCue(line: string): CueMatch | null {
   if (b) {
     const name = b[1].replace(/[:：]\s*$/, '').trim();
     const rest = b[2].replace(/^[:：]\s*/, '');
-    if (FRONT_LABELS.some((f) => f.re.test(name)) || META_LABEL_RE.test(name)) return null;
+    if (FRONT_LABELS.some((f) => f.re.test(name)) || META_LABEL_RE.test(name) || cameraCueName(name)) return null;
     const { parenthetical, text } = splitLeadingParenthetical(rest);
     return { name, parenthetical, inlineText: text };
   }
   const m = line.match(COLON_CUE_RE);
   if (!m) return null;
   const name = m[1].trim();
-  if (FRONT_LABELS.some((f) => f.re.test(name)) || META_LABEL_RE.test(name)) return null;
+  if (FRONT_LABELS.some((f) => f.re.test(name)) || META_LABEL_RE.test(name) || cameraCueName(name)) return null;
   if (/^(https?|ftp)$/i.test(name)) return null;
   if (parseHeading(line) || ON_SCREEN_RE.test(line) || SOUND_LABEL_RE.test(line)) return null;
   const exts = [...(m[2] ?? '').matchAll(/\(([^)]{1,40})\)/g)].map((x) => x[1].trim());
@@ -527,7 +544,7 @@ export function parseScript(text: string): ScriptDocument | null {
     const sl = s.match(SOUND_LABEL_RE);
     if (sl && !hasLower(sl[1])) { pushEl({ type: 'sound', text: sl[2]?.trim() || s }); i++; continue; }
     const cm = s.match(CAMERA_RE);
-    if (cm && !hasLower(cm[1])) { pushEl({ type: 'camera', text: s }); i++; continue; } // 지시어 자체가 대문자일 때만("the camera pulls back" 같은 지문은 제외)
+    if ((cm && !hasLower(cm[1])) || cameraCueLine(s)) { pushEl({ type: 'camera', text: s }); i++; continue; } // 지시어 자체가 대문자일 때만("the camera pulls back" 같은 지문은 제외)
     // 대사: "이름: 대사" 꼴. 촬영용 대본의 첫 씬 헤딩 앞(앞머리)에서는 대사로 보지 않는다 — 번역 메모("번역 표기: …")가
     //   가짜 인물·가짜 첫 대사가 됐던 실측(2026-09-21 script_test_2). 그 줄은 아래 지문 경로로 떨어져 앞머리 노트가 된다.
     const colon = kind === 'screenplay' && !cur ? null : matchColonCue(s);
@@ -540,7 +557,7 @@ export function parseScript(text: string): ScriptDocument | null {
         segBody(segs, colon.inlineText);
       } else {
         // 같은 줄에 대사가 없으면(라디오 "NAME:" 꼴) 다음 줄들이 대사
-        while (j < lines.length && !isBlank(lines[j]) && !parseHeading(stripMd(lines[j])) && !matchColonCue(stripMd(lines[j])) && !TRANSITION_RE.test(stripMd(lines[j])) && !RADIO_CUE_RE.test(stripMd(lines[j]))) {
+        while (j < lines.length && !isBlank(lines[j]) && !parseHeading(stripMd(lines[j])) && !matchColonCue(stripMd(lines[j])) && !cameraCueLine(stripMd(lines[j])) && !TRANSITION_RE.test(stripMd(lines[j])) && !RADIO_CUE_RE.test(stripMd(lines[j]))) {
           const t = stripMd(lines[j]);
           const p = t.match(PARENTHETICAL_RE);
           if (p) segNote(segs, p[1].trim()); else segBody(segs, t);
@@ -626,7 +643,7 @@ export function parseScript(text: string): ScriptDocument | null {
     const block: string[] = [];
     while (j < lines.length && !isBlank(lines[j])) {
       const t = stripMd(lines[j]);
-      if (j > i && (parseHeading(t) || isActHeading(t) || TRANSITION_RE.test(t) || matchColonCue(t) || matchPeriodCue(t) || matchKoreanNameCue(t, lines[j + 1], knownForCue) || matchCapsCue(t, lines[j + 1]) || FRONT_LABELS.some((f) => f.re.test(t) && t.length <= 40))) break;
+      if (j > i && (parseHeading(t) || isActHeading(t) || TRANSITION_RE.test(t) || matchColonCue(t) || cameraCueLine(t) || matchPeriodCue(t) || matchKoreanNameCue(t, lines[j + 1], knownForCue) || matchCapsCue(t, lines[j + 1]) || FRONT_LABELS.some((f) => f.re.test(t) && t.length <= 40))) break;
       block.push(t);
       j++;
     }
