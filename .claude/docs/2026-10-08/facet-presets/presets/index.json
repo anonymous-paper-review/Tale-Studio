@@ -1,0 +1,746 @@
+{
+ "jp_anime": {
+  "label": "2D 일본 애니",
+  "subtitle": null,
+  "medium": "2d_anime",
+  "anchor_kind": "media",
+  "image_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/jp_anime.png",
+  "use_preview_ref": false,
+  "style_clause_current": "Carry how the style reference draws figures. Any figures have slender naturalistic animated proportions, about seven and a half heads tall, with long limbs and small refined hands; tall almond eyes with a thick dark upper lash line drawn as one solid band, a dark iris carrying one small bright highlight and a lighter lower half, and no hard eyeliner beyond the lash band; a tiny sharp nose indicated by a short stroke and a small simply drawn mouth; hair is drawn as a few large clumps breaking into pointed strand tips; skin and cloth are cel shaded with one soft-edged shadow tone in a cool violet-blue, and shapes are held by thin colored outlines rather than heavy black ink.",
+  "facets": {
+   "version": "hp-v1.2.3",
+   "extracted_at": "2026-10-08",
+   "probe_anchors": "Use linear perspective from a slightly elevated viewpoint. Use material colored lines at 0.098% of image width (1 px at 1024 px); neutral outlines use #1e3745, with no hatching. Keep two or three value groups, gentle gradients, curved or wedge shadows, and flattened cast shadows. Daylight averages about 56% luminance and 4% near black, never mostly black; nights keep palette roles, only darker. Objects retain assigned colors; accent #fbb230 ≤ 3% on one rounded fruit plane, never walls or cloth. Preserve 25% low density upper space, crop foreground naturally, and join objects through shared shadow receiving surfaces. Detail budget: low, grade 2; about five structural lines, three value groups, six uneven reflection bands, no pattern or decorative marks.",
+   "figure": "",
+   "figure_extrapolated": false,
+   "priority": "Priority order: flat, simplified object masses with compressed structure-line detail and broad value groups → very thin material-colored lines → hard-edged shadows with gentle within-plane gradients → stretched directional reflection bands on metal and glass.",
+   "negative": "Avoid photorealism, glossy 3D rendering, flat vector illustration, low poly art, moire, compression blocks, sensor noise, thick black outlines, uniform flat fills, plastic gloss on cloth, speed lines, copied still life arrangement, copied window framing, copied tabletop layout, bokeh particle fields, repeated tiles, wet floor reflections, crosshatching, readable text, logos, watermarks.",
+   "capsule": "Digital painting combines lines, cel shadows, and gentle gradients without bloom. Use one material colored line tier about 0.098% of image width (1 px at 1024 px), #1e3745 on neutrals; no hatching or auxiliary contour. Use two or three tone masses with curved or wedge shadows; cast shadows are flattened #515255 forms about 70.7% of object height, with 0.195% width penumbrae. Daylight averages about 56% luminance and 4% near black, never mostly black; nights keep palette roles, only darker; broad planes stay desaturated. Palette: #7f7f75 13.6%, #f7e7cc 13.2%, #ccb189 11.4%, #1f353d 13.5%, highlights #fbf9f4 and #ffffff; no hue is background only; objects retain assigned colors. Accent #fbb230 ≤ 3% of the image, one connected rounded fruit plane, never walls or cloth. Detail budget: low, grade 2; a glass has about five structure lines, three value groups, six uneven reflection bands, no protrusions or patterns; no decorative marks across the frame.",
+   "scene": "An indoor still life sets one sphere and one cloth on a wooden table beside a window. One metal cup and one glass are central; one fruit and one potted plant are right, while the window and sphere are left. From slightly above, the cloth crosses the foreground and hangs over the edge; vessel tops show, with no people.",
+   "words": {
+    "probe_anchors": 118,
+    "figure": 0,
+    "priority": 35,
+    "negative": 51
+   },
+   "timing": {
+    "fill": {
+     "seconds": 894,
+     "model": "gpt-6-astra",
+     "effort": "high"
+    },
+    "compile": {
+     "seconds": 756,
+     "model": "gpt-5.6-sol",
+     "effort": "high"
+    },
+    "priority": {
+     "seconds": 73,
+     "model": "gpt-5.6-sol",
+     "effort": "medium"
+    }
+   }
+  },
+  "lite": {
+   "probe_anchors": "Digital painting with hard-edged cel shadows as line-free color fields, in linear perspective from a gentle high angle above the table. No outlines, single tier, few structural lines. Painterly gradients with flat areas, high-key: in daylight scenes mostly bright planes with little near-black, about four tonal steps, mostly hard form shadows as crescent planes, one or two planes, flat offset cast shadows in cool blue-gray. Palette: #d8d5cb primary, #c9a77c secondary, #f0961e accent at ≤ 5%, low saturation. Rounded forms dominate, curves with wavy edges. No pattern fill. Wall backdrop, unless the scene specifies its own backdrop. Detail budget: level 3, about 8 garment lines.",
+   "figure": "No figure sample exists, so any figure is simplified in the same grammar: line-free color planes with hard-edged blue-gray shadows and no outlines. Eyes and mouth are reduced to minimal marks. When the scene specifies an action, the action comes first.",
+   "figure_extrapolated": true,
+   "priority": "Priority order: hard-edged cast shadows from diagonal light → line-free color shapes → warm wood against cool shadows → bright low-saturation palette → reflective mug and glass.",
+   "negative": "Avoid photorealistic photographs, flat vector icons, 3D renders, oil painting brushstrokes, black outlines, soft blob shadows, glossy plastic highlights, oversaturation, extra props, cloth patterns, particles, lens flare, no speed lines, readable text, logos.",
+   "words": {
+    "probe_anchors": 104,
+    "figure": 41,
+    "priority": 27,
+    "negative": 33,
+    "scene": 37
+   },
+   "timing_seconds": {
+    "fill": 54.8,
+    "compile": 30.2
+   },
+   "model": "claude-sonnet-5-5"
+  }
+ },
+ "real": {
+  "label": "실사",
+  "subtitle": null,
+  "medium": "live_action",
+  "anchor_kind": "media",
+  "image_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real.png",
+  "use_preview_ref": false,
+  "style_clause_current": "Carry the style reference's scene language as well: its color energy, its pattern and decoration language, its density of set dressing and background detail, and the way it stages depth.",
+  "facets": {
+   "version": "hp-v1.2.3",
+   "extracted_at": "2026-10-08",
+   "probe_anchors": "Use lens perspective from above, without wide angle bending, preserving three depth planes. No outlines: 0% width or 0 px at 1024 px; retain about six glass boundaries and no hatching. Rounded sections taper into continuous curves with sharp organic tips beside right angled architecture; no silhouette holes. Use continuous photographic tones, soft curved shading, material specific highlights, and soft contact shadows. Daylight mean luminance is about 51%, near black about 3%, not mostly black; large planes stay low saturation. Night keeps these roles and shallow shading, only darker. Objects and environment share #ccc6bf, #56523e, #342d21, and #e5dfd9, with no ground exclusive color. Natural accent #1f3405 ≤ 6.2% of the image and accent #6c3119 ≤ 6.2% of the image stay on organic surfaces, not neutral planes. Keep subjects around 19.53% of frame height, an open upper center, asymmetrical balance, shared supports, and scene crops. Detail budget: sparse; about six glass boundaries, no glass protrusions, repeated lines, or decorative marks.",
+   "figure": "",
+   "figure_extrapolated": false,
+   "priority": "Priority order: compressed object structure with very sparse boundaries → stretched continuous photographic shading → oversized material-specific reflection, transmission, and surface texture → broad, flat side-diffused lighting and stretched natural depth",
+   "negative": "Avoid oil painting, watercolor illustration, stylized 3D, vector illustration, moire, compression blocks, ink outlines, cel shading, plastic sheen, uniform sharpness, copied object arrangement, copied window layout, bokeh particles, tiled patterns, wet floor reflections, geometric linework, readable text, logos.",
+   "capsule": "Still life photography: continuous tones, texture, refraction, reflection, and focus falloff. Detail budget: sparse; no outlines, 0% width or 0 px at 1024 px width, about six glass boundaries, no protrusions or hatching. Use gradients, one soft form shadow, material specific highlights, and blurred #2b200a contact shadows fading rightward toward #9d9487 for about half object height. Mid key: daylight mean luminance about 51%, near black about 3%, not mostly black; objects and ground share primary #ccc6bf 17.4%, secondary #56523e 15.5%, shadow #342d21 9.2%, and highlight #e5dfd9 11.2%; night keeps the palette and shallow shading, only darker. Muted accent #1f3405 ≤ 6.2% of the image and accent #6c3119 ≤ 6.2% of the image stay on organic surfaces, not muted neutral planes. Tapered forms have sharp tips beside rectilinear architecture and no holes; use upper left diffuse light, lens perspective, no bloom or pattern fill, unless the scene specifies its own backdrop.",
+   "scene": "On an indoor table beside a window are one spherical object, one cloth, and two containers; one fruit and one potted plant stand on the right. The cloth spreads toward the foreground, viewed from slightly above the table, with no people.",
+   "words": {
+    "probe_anchors": 159,
+    "figure": 0,
+    "priority": 31,
+    "negative": 38
+   },
+   "timing": {
+    "fill": {
+     "seconds": 968,
+     "model": "gpt-6-astra",
+     "effort": "high"
+    },
+    "compile": {
+     "seconds": 933,
+     "model": "gpt-5.6-sol",
+     "effort": "high"
+    },
+    "priority": {
+     "seconds": 64,
+     "model": "gpt-5.6-sol",
+     "effort": "medium"
+    }
+   }
+  },
+  "lite": {
+   "probe_anchors": "Indoor still life photograph in natural light, lens perspective from a low, nearly horizontal eye level. No outlines, no interior lines. Lineless tonal planes with continuous gradation in about four to five large value masses, soft elliptical form shadows over curved surfaces in about one to two planes, soft contact cast shadows. Palette: #7f7b76 warm gray wall, #cfc8bd table, #ebe5d8 cream, accents #3f6b34 and #b5683e ≤ 10%, low saturation. Simple rounded forms with smooth curves, bends only in cloth folds, no pattern fills. Backdrop: plain wall with pillar and window divisions, unless the scene specifies its own backdrop. Detail budget: level 2, about 6 main objects.",
+   "figure": "No figure sample exists. If a person is needed, match the same window light, warm gray low saturation tone and photographic texture, rendered photographically with no line art or comic conventions.",
+   "figure_extrapolated": true,
+   "priority": "Priority order: warm gray low saturation palette → soft window light and gradation → sparse spaced still life → material contrast → lineless tonal form.",
+   "negative": "Avoid 3D product render, flat vector illustration, hyper-saturated food photography, stock flat-lay, black outlines, cel shading, saturated colors, hard drop shadows, extra props, patterned fabric, window highlight clipping, strong background blur, no speed lines, readable text, logos.",
+   "words": {
+    "probe_anchors": 106,
+    "figure": 31,
+    "priority": 25,
+    "negative": 37,
+    "scene": 39
+   },
+   "timing_seconds": {
+    "fill": 64.4,
+    "compile": 25.5
+   },
+   "model": "claude-sonnet-5-5"
+  }
+ },
+ "real_3d": {
+  "label": "3D 애니메이션",
+  "subtitle": null,
+  "medium": "3d",
+  "anchor_kind": "media",
+  "image_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real_3d_v2.png",
+  "use_preview_ref": false,
+  "style_clause_current": "Carry the style reference's scene language as well: its color energy, its pattern and decoration language, its density of set dressing and background detail, and the way it stages depth.",
+  "facets": {
+   "version": "hp-v1.2.3",
+   "extracted_at": "2026-10-08",
+   "probe_anchors": "Gentle lens perspective. No outlines, hierarchy, or auxiliary contours: edges 0.20% to 0.29% wide carry form. Continuous gradients, no cel steps, one connected soft shadow field, and contact shadows about 22.2% of object width. Daylight averages 64% luminance and 2% near black, never mostly black; night retains roles, only darker. Low saturation anchors: #51555f, #c1bcb6, #f1efeb, and #34363c; content assigns colours; moderately saturated accent #536330 ≤ 3% of the image stays on natural surfaces. Ellipsoids blend into gentle cylinders and rounded trapezoids; leaves taper, contours flow, and limb gaps remain on a neutral stage unless the scene specifies its own backdrop. Frame figures at 58% to 74% height with 40% blank ground; separate figures; group objects. Detail budget: moderate — about six garment grooves per figure regardless of size, hair texture, about five eye elements, no patterns or decorative marks.",
+   "figure": "A cartoon face with large rounded eyes, smooth cheeks, and simplified nose and mouth volumes sits on a semi realistic body whose torso remains near observed human proportions while the lower leg segment is longer than the thigh; render the whole figure as 3D animation with outline free volume, continuous light, microtexture, and material reflections. The head is a rounded egg shape, broader above and gently narrowing to an unpointed chin. The figure is about 6.98 heads tall when measured from the skull top, measured to the top of the hair or hat, so keep the skull itself small, with a head to torso ratio of about 1:2.36; the torso occupies about 33.85% of standing height and the legs about 46.80%. The stretched lower legs including the sole are about 1.56 times the thigh, the forearm about 0.82 times the upper arm, and the full arm about 39.67% of height; shoulders span about 1.87 head widths. Upper and lower arm widths are about 0.48 and 0.39 of the head width, and clothed legs taper from 46 px at the thigh through 36 px at the knee to 34 px above the ankle at 1024 px image width. Joints turn gently without deep muscular division. Neutral outer corners, a wide open default with roughly the upper 10% of the iris covered, and a rounded opening about 1.48 times as wide as high define the relaxed eyes; the eye width is about 25.32% of face width. Use the standard eye treatment: a continuous two tone iris value transition, one distinct pupil value, and a thin dark iris rim, with no lower reflected band. Keep one small oval catchlight at the upper left, about 13% of visible iris width, with no secondary catchlight and no glow. Lashes merge into the thick upper lid band, with no separate lower lashes; the upper lid is about 0.29% of image width and tapers toward each end, there is no lower lid line, and the local eye outline is brown to reddish brown rather than a global body outline. Use a softly shaded neutral sclera with broad side exposure and narrow exposure above and below. Oversized hands are about 0.83 face heights and separate the fingers while keeping joints and nails subdued. Oversized shoes have rounded toes and are about 0.64 head heights by 0.70 head lengths, with an 8 px sole at 1024 px image width; use two seam boundaries, one sole boundary, and about five horizontal lace lines in one row. Form the hair first as large curved flowing clumps with tapered tips, then organize it into about five major masses with about four silhouette protrusions; preserve fine irregular strand texture without inventing a strand count, and use soft reflections distributed along the flow rather than a closed highlight band. Garments taper gently with rounded sleeves and hems; use about six structural grooves per figure, comprising about two seam boundaries and about four broad shaded fold grooves, with no repeated garment pattern and no ornament. Poses tend to stand naturally with the limbs slightly away from the torso, shoulders and hips nearly level, the body rhythm nearly vertical, and the centre of weight between both feet; keep readable gaps between the limbs and torso and use no default foreshortening exaggeration. When the scene specifies an action, the action comes first and this rhythm is applied to it. Expressions stay calm and friendly, ranging through slight closed mouth smiles; expression comes through coordinated changes in brow arch, lid opening, and mouth corners over continuous cheek shading, with no comic emotion marks. Skin keeps the character assigned base colour under continuous shading, soft local warmth, low satin sheen, and fine surface texture; use no sharp white skin highlights and no hard glossy plastic finish. Detail budget: moderate — about six structural garment grooves per figure regardless of its size on screen, fine hair texture without a numerical strand count, about five readable eye elements, no repeated garment lines, no decorative marks, and no hatching.",
+   "figure_extrapolated": false,
+   "priority": "Priority order: outline-free rounded volume with continuous shading → oversized round eyes and simplified facial volumes → strongly grouped, large-flow hair texture → pronounced differences among matte cloth, transparent glass, and metallic reflections.",
+   "negative": "Avoid photorealism, cel anime, clay animation, low-poly art, moire, compression blocks, sensor noise, screen glare, black outlines, hard cel shading, uniformly glossy surfaces, exaggerated fashion proportions, copied character identity, duplicated portrait layout, copied blue outfit, copied still-life arrangement, bokeh particle fields, geometric hatching, wet floor reflections, ornamental garment patterns, readable text, logos, watermarks.",
+   "capsule": "A 3D digital render uses continuous light, fibres, grain, blurred metal reflections, and thick transparent glass. No outlines, hierarchy, or auxiliary contours; grooves are 0.20–0.29% of image width, or 2–3 px at 1024 px, carrying form without hatching. Continuous gradients cover every surface without cel steps; use one connected soft shadow field, no sharp skin or cloth highlights, and #2c250f contact shadows about 22.2% of object width blurred across 0.59%. Daylight averages 64% luminance with 2% near black, never dominant; night keeps roles and shading, only darker. Low saturation: #51555f 15.6%, #c1bcb6 14.2%, #f1efeb 14.1%, #34363c 10.6%; neutral ground frames content colours; moderately saturated accent #536330 ≤ 3% of the image stays on natural surfaces, never backgrounds or luminous edges. Ellipsoids blend into gentle cylinders and rounded trapezoids; leaves taper, contours flow, and gaps remain under left diffusion and lens perspective on a grained stage unless the scene specifies its own backdrop. Detail budget: moderate — about six garment grooves per figure at any size, hair texture, about five eye elements, no garment patterns, decorative marks, pattern fill, or bloom.",
+   "scene": "A board with a bright backing and wooden support shows two matching casual figures beside still life objects. Left is a cropped upper body and centre a standing full figure, while the right holds cloth, one sphere, and two cups. Fruit and a planter join the right group; figures are nearly frontal, while the objects are viewed slightly from above.",
+   "words": {
+    "probe_anchors": 140,
+    "figure": 667,
+    "priority": 33,
+    "negative": 53
+   },
+   "timing": {
+    "fill": {
+     "seconds": 998,
+     "model": "gpt-6-astra",
+     "effort": "high"
+    },
+    "compile": {
+     "seconds": 1452,
+     "model": "gpt-5.6-sol",
+     "effort": "high"
+    },
+    "priority": {
+     "seconds": 99,
+     "model": "gpt-5.6-sol",
+     "effort": "medium"
+    }
+   }
+  },
+  "lite": {
+   "probe_anchors": "3D CG render with soft studio lighting, photographic lens perspective from slightly above eye level. No outlines and no interior lines, features come from shading. Painterly gradient fills, high key: in daylight scenes mostly bright planes with little near-black. Continuous tones, soft form shadows with no hard shapes, soft contact cast shadows. Palette: gray #dedede to #f2f2f2 about 50%, wood #c9b49c about 25%, green accent #8aa83a ≤ 5%, low to medium saturation. Rounded simple masses, gentle curves, no sharp breaks. Smooth polish with fine cloth fiber, no patterns. Plain gray gradient studio backdrop, unless the scene specifies its own backdrop. Detail budget: level 3, about 4 garment lines.",
+   "figure": "Western 3D feature-animation faces and bodies, rendered with physically based soft lighting and continuous shading. About six to seven heads tall, with ordinary torso, legs and shoulders, and thin tube-like limbs of nearly constant width. Large round eyes with standard gradient and a single highlight, neutral tilt, ordinary openness and aspect ratio, no eyelashes, no separate eye outline, lid edges formed by darker skin shading. Thick expressive brows, a modeled nose, a small closed mouth made of lip volume. Ordinary hands, thin rounded ordinary shoes, short hair in about four large blunt clumps with fine strand texture. Poses tend to be stiff, frontal and upright with arms hanging naturally; when the scene specifies an action, the action comes first. Default expression is a faint smile, made through brow angle, mouth corners and eye size. Skin is one warm medium tone in a soft gradient, no palette quantization, with faint blush on cheeks and nose tip.",
+   "figure_extrapolated": false,
+   "priority": "Priority order: soft studio lit 3D render → photographic perspective → no outlines → continuous gradient shading → muted neutral palette with few accents.",
+   "negative": "Avoid photorealistic portrait, toy-like plastic figure, 2D cel-shaded anime, clay stop motion, black outlines, flat cel shading, hard-edged shadows, skin pores, flyaway hair, lens flare, readable text, logos, with no speed lines.",
+   "words": {
+    "probe_anchors": 108,
+    "figure": 155,
+    "priority": 24,
+    "negative": 32,
+    "scene": 44
+   },
+   "timing_seconds": {
+    "fill": 75.9,
+    "compile": 27.7
+   },
+   "model": "claude-sonnet-5-5"
+  }
+ },
+ "real_desert_fantasy": {
+  "label": "사막 판타지",
+  "subtitle": "Desert Fantasy",
+  "medium": "live_action",
+  "anchor_kind": "sublook",
+  "image_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real_desert_fantasy.png",
+  "use_preview_ref": false,
+  "style_clause_current": "Render this as a finished example of that look applied to a whole shot - a sun-bleached desert grade: a low-saturation palette of sand, ochre, bone and pale dust-grey with no clean or vivid color anywhere in it; hard, low, raking key light that carves hot, heavy, sharp-edged shadows and bleaches its highlights; fine airborne dust hanging in every beam of light and a pale haze swallowing the far distance; gritty porous weathered stone, dust-filmed thick glass, pitted patinated brass and coarse rough-woven linen wherever such materials appear; monumental scale, heavy grain, a filmic grade, and a mood of solemn grandeur. This is a color, light and material treatment only - keep the scene exactly as described, with its own stated time of day and light source, and do not relocate it or add desert scenery. Expose it high-key and bright: the whole frame is light, pale and sun-washed, with a luminous pale haze, only a few small deep shadows, and no large dark areas anywhere in the frame.",
+  "facets": {
+   "version": "hp-v1.2.3",
+   "extracted_at": "2026-10-08",
+   "probe_anchors": "Use slight overhead photographic perspective without wide angle bending. Use no outlines or hatching; value, depth and contact define boundaries, with about two structural edges on a vessel. Use continuous gradients without planar steps or cell fragments; #6b5138 shadows run lower left, hard at contact, softer outward. Daylight mean luminance is about 32%, near black about 25% but never most, and #dbcbb7 bright tones about 13.1%; night keeps palette roles, only darker. Primary #483522 is 13.9%, secondary #a98e70 11.9%; shadows are #34271a, #3e2d1d, #2c2015 and #201810, bodies favor #664e36 and #483522, no color is background only, and no saturated accent. Ground objects on rough matte support without reflections or repeated patterns, unless the scene specifies its own backdrop. Keep object height about 16.5%, detail low, broad upper quiet space, partial overlap and edge cropping. Detail budget: maximal; about two structural boundaries and no protrusions, repeated pattern lines or decorative marks.",
+   "figure": "",
+   "figure_extrapolated": false,
+   "priority": "Priority order: fully lineless, deeply continuous volumetric shading → strongly irregular, surface-bound microtexture → overwhelmingly warm yellow-browns with deep brown shadows → hard-edged grounding under strongly directional light",
+   "negative": "Avoid vector illustration, cel animation, low poly art, watercolor illustration, moire, compression blocks, black outlines, flat cel shading, glossy plastic, copied still life arrangement, copied stone room, bokeh dots, tiled patterns, wet floor reflections, geometric linework, readable text, logos.",
+   "capsule": "Photoreal photographic still life rendering shows rough stone, coarse cloth fibers, warm mottled metal, uneven glass refraction, and dry fruit and plant texture. Use no linework or hatching; value, depth and contact define boundaries, with about two vessel edges; shapes span spheres to truncated cones, elliptical openings and worn rectangular architecture, tapering and rounding at bases without sharp bends or through gaps, under continuous gradients, never planar steps. Low key daylight has 32% mean luminance, 25% near black but never most, and 13.1% #dbcbb7 highlights; night keeps roles and shading, only darker. Primary #483522 13.9%, secondary #a98e70 11.9%; shadows #34271a and #3e2d1d each 13.7%, #2c2015 13.0%, #201810 9.8%; highlight #dbcbb7 13.1%; bodies use #664e36 37.0%, #483522 27.3%; no color is background only; no saturated accent. Warm upper right daylight casts #6b5138 shadows lower left, hard at contact, softer outward, never flat ovals; metal and glass highlights stay irregular, matte surfaces diffuse; no bloom. Use slight overhead photographic perspective without wide angle bending; focus near, blur far, keep detail low and upper area quiet, overlap, crop edges on rough matte support without reflections or patterns, unless the scene specifies its own backdrop. Detail budget: maximal; about two structural boundaries and no protrusions, separated value steps, repeated pattern lines or decorative marks.",
+   "scene": "A still life occupies a table inside a stone room with a window: a cloth and a spherical object are on the left, two vessels are in the center, and one fruit and one potted plant are on the right. The tabletop is visible from a slight overhead view, with no people.",
+   "words": {
+    "probe_anchors": 150,
+    "figure": 0,
+    "priority": 28,
+    "negative": 39
+   },
+   "timing": {
+    "fill": {
+     "seconds": 772,
+     "model": "gpt-6-astra",
+     "effort": "high"
+    },
+    "compile": {
+     "seconds": 781,
+     "model": "gpt-5.6-sol",
+     "effort": "high"
+    },
+    "priority": {
+     "seconds": 92,
+     "model": "gpt-5.6-sol",
+     "effort": "medium"
+    }
+   }
+  },
+  "lite": {
+   "probe_anchors": "Natural-light still life photograph, shallow depth of field, low three-quarter perspective just above the shelf. No outlines, no interior lines. Continuous soft gradients, mostly dark planes in daylight scenes, about 4 to 5 tonal steps, soft crescent form shadows on about 1 to 2 planes, soft contact cast shadows. Palette: sand beige #a89272 about 55%, dark brown #4a3a2a about 25%, accents #8c6a2b and #9a5f25 at ≤ 5%, low saturation, warm shadows near #3b2d20. Rounded volumes against angular stone blocks. Fiber and noise finish, no pattern fills. Stone seams and a rectangular window, unless the scene specifies its own backdrop. Detail budget: level 3, about 6 main objects.",
+   "figure": "No figure was observed. If a person is required, use photographic real proportions, the same natural daylight, earthy palette and low saturation, and photographic skin and hair texture, with no outlines and no cartoon simplification. Poses stay still and quiet; when the scene specifies an action, the action comes first. Mood is carried by the warmth of the light and calm placement.",
+   "figure_extrapolated": true,
+   "priority": "Priority order: window light with dappled shadows → earthy beige monochrome palette → rough stone and linen tactile texture → shallow-depth photographic still life composition → natural material contrast.",
+   "negative": "Avoid commercial product photography, 3D render, flat vector or oil-painting still life, black outlines, flat cel fill, saturated accents, even studio light, ornate patterns, warm cast, grain, dust specks, readable text, logos, with no speed lines.",
+   "words": {
+    "probe_anchors": 107,
+    "figure": 62,
+    "priority": 29,
+    "negative": 36,
+    "scene": 33
+   },
+   "timing_seconds": {
+    "fill": 63.3,
+    "compile": 30.6
+   },
+   "model": "claude-sonnet-5-5"
+  }
+ },
+ "real_euro_period": {
+  "label": "유럽 역사극",
+  "subtitle": "European Period Drama",
+  "medium": "live_action",
+  "anchor_kind": "sublook",
+  "image_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real_euro_period.png",
+  "use_preview_ref": false,
+  "style_clause_current": "Apply this period look to the whole scene: warm candlelight around 3000K mixed with a soft window glow, low-to-medium contrast, with soft painterly shadows falling off like an old-master oil painting. A muted low-saturation palette of aged gold, umber and deep green. Metal reads as tarnished silver and old brass, glass as antique cut crystal, fabric as fine lace over rich brocade, foliage as dark olive-green. Gentle film grain and a painterly period-drama grade. Mood: dignity and solitude.",
+  "facets": {
+   "version": "hp-v1.2.3",
+   "extracted_at": "2026-10-08",
+   "probe_anchors": "Use photographic perspective from the specified viewpoint, warm upper left light, foreground focus, a soft background, and no wide angle distortion. No outlines: value and reflection define contours; keep edges soft, glass hard, and dark leaves lost; a glass vessel has about seven structural boundaries and two front bands, with no hatching. Use continuous gradients, one soft shadow region per rounded form, and soft #100b05 contact shadows without separable length; highlights stay on reflective materials. In daylight, target mean luminance about 19%, near black about 58% without a featureless black image, and #998662 bright planes about 10.9%; at night keep roles darker. Palette: #251b0d 13.9%, #614e2e 13.6%, #1d170b 13.8%, #100b05 9.6%, #171309 13.3%; dark saturated accent #431d15 ≤ 2% of the image in one rounded plane, never walls or leaves. Keep grounded asymmetry in a dark indoor setting without white voids; the subject group fills about 59.1% of frame height, with edge cropping, unless the scene specifies its own backdrop. Detail budget: medium, about seven structural boundaries, two front bands, no decorative marks, and no overall pattern fill.",
+   "figure": "",
+   "figure_extrapolated": false,
+   "priority": "Priority order: continuous volumetric shading with outline-free edges → very dark brown ground with strong side lighting → heavily weathered surfaces and pronounced fiber texture → sharply differentiated transparent-glass and rough-metal reflections.",
+   "negative": "Avoid cartoon illustration, impressionist painting, watercolor illustration, stylized 3D rendering, moire, compression blocks, black outlines, flat cel shading, white studio backdrop, glossy plastic surfaces, copied still life arrangement, copied glass engraving, copied wall molding, copied candle placement, floating bokeh particles, wet floor reflections, geometric ink hatching, decorative speed lines, readable text, logos, watermarks.",
+   "capsule": "Photorealistic still life uses continuous tones and optics; materials: grainy matte, rough metal, refracting glass, woven cloth, waxy organics, veined leaves, flame glow, and worn walls. No outlines: value separates soft forms, hard glass, lost leaves; reflected planes replace hatching and auxiliary contours. Use curved gradients, one soft shadow region per rounded form; soft #100b05 contact shadows lack separable length, highlights stay reflective. Daylight averages 19% luminance, 58% near black, and 10.9% #998662 without featureless black; night keeps roles darker. Content sets colors; none is backdrop only: #251b0d 13.9%, #614e2e 13.6%, #1d170b 13.8%, #100b05 9.6%, #171309 13.3%; dark saturated accent #431d15 ≤ 2% of the image, on one rounded plane, never walls or leaves; brightest #f8f6ef. Warm upper left light and shallow focus frame an asymmetric group 59.1% high; one vessel, 21.5% high, is 0.36 of main height; keep upper darkness, edge cropping, no white void; ellipses, cylinders, spheres, and leaf lenses mix straight and curved contours. Detail budget: medium, about seven glass boundaries, two bands, no decorative marks or overall pattern fill, unless the scene specifies its own backdrop.",
+   "scene": "An indoor table holds one spherical object, two vessels, and one fruit. A cloth covers the table; behind them stand one leafy potted plant and one candleholder, with a window and wall farther back. The view faces forward from slightly above table height, and no people are present.",
+   "words": {
+    "probe_anchors": 178,
+    "figure": 0,
+    "priority": 32,
+    "negative": 53
+   },
+   "timing": {
+    "fill": {
+     "seconds": 939,
+     "model": "gpt-6-astra",
+     "effort": "high"
+    },
+    "compile": {
+     "seconds": 878,
+     "model": "gpt-5.6-sol",
+     "effort": "high"
+    },
+    "priority": {
+     "seconds": 59,
+     "model": "gpt-5.6-sol",
+     "effort": "medium"
+    }
+   }
+  },
+  "lite": {
+   "probe_anchors": "Photographic still-life render in low-key window and candle light, frontal lens perspective slightly above table height. No outlines or interior lines; tone alone shapes forms. Continuous gradients, about five to six steps, in daylight scenes mostly dark planes; night scenes keep the same palette roles, only darker. Soft form shadows wrap curved surfaces in about one to two planes; cast shadows soft contact only. Palette: #2f2c1d about 50%, #8a7648 about 25%, accent #6a2634 ≤ 5%, low saturation. Round forms, soft curves against long verticals. Faint film grain, aged metal polish. Dark wall, gold molding panels, unless the scene specifies its own backdrop. Detail budget: level 4, about 7 main objects.",
+   "figure": "No figure appears in the source, so nothing about faces, eyes, or body proportions is specified. If a person is requested, the content decides proportions, pose, clothing, and hair. Style adds only the same low-key side lighting and a line-free continuous tone render. Skin receives warm window light on one side, while the opposite side sinks into olive-brown shadow. Clothing keeps its type and structure, with only the texture of aged metal, fabric, or glass and the lighting applied. Hair keeps its shape, with sheen on lit parts and soft clumping in dark parts. When the scene specifies an action, the action comes first.",
+   "figure_extrapolated": true,
+   "priority": "Priority order: low-key window and candle contrast → low saturation olive ochre palette → lineless continuous tone forms → material contrast",
+   "negative": "Avoid classical oil painting, studio product photography, moody 3D render, vintage sepia filter, flat vector fills, black outlines, bright high-key lighting, saturated colors, extra props, bokeh, lens flare, heavy film grain, strong vignette, readable text, logos, and no speed lines.",
+   "words": {
+    "probe_anchors": 110,
+    "figure": 104,
+    "priority": 21,
+    "negative": 40,
+    "scene": 40
+   },
+   "timing_seconds": {
+    "fill": 66.2,
+    "compile": 34.9
+   },
+   "model": "claude-sonnet-5-5"
+  }
+ },
+ "real_hitech_sf": {
+  "label": "하이테크 SF",
+  "subtitle": "Hi-Tech Sci-Fi",
+  "medium": "live_action",
+  "anchor_kind": "sublook",
+  "image_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real_hitech_sf.png",
+  "use_preview_ref": false,
+  "style_clause_current": "Render it in this look: cool clinical lighting around 7000K, very high contrast, with clean, sharp-edged, precise shadows. A restrained cool near-monochrome palette of greys and blue-blacks carrying only a few controlled high-saturation electric cyan accents. Metal reads as flawless high-polish chrome; glass is precision-cut with a faint luminous edge-lit glow; fabric is fine woven technical performance material. Ultra-sharp detail. Do not add a city skyline or distant cityscape unless the scene itself calls for one.",
+  "facets": {
+   "version": "hp-v1.2.3",
+   "extracted_at": "2026-10-08",
+   "probe_anchors": "Use photographic lens perspective from slightly above, with straight verticals and blurred distance. Draw no ink outlines; separate forms by value and reflection, with structural edges about 0.15% of width, 3 px at 2048 px width, and no hatching. Use continuous gradients and connected soft form shadows; projected #10161d shadows extend lower right, sharp at contact, then soften. In night scenes mean luminance is about 31%, near black about 26% and not most of the frame; broad planes stay low saturation. Gray bodies and ground share #3b424a and #565c62, never a background only color; neon saturated accent #01eafd ≤ 4% of the image, as reflective bands, refractive rims, or lit organic spots, never broad matte or cloth fill. Keep an asymmetric foreground beneath quiet upper wall; one object is about 21.78% frame height. Detail budget: maximal — the sampled organic form has about 2 structural boundaries, about 5 protrusions, and no repeated lines; no decorative marks cross the whole frame.",
+   "figure": "",
+   "figure_extrapolated": false,
+   "priority": "Priority order: fully outline-free realistic continuous tones → very dark blue-gray low-key lighting with tightly concentrated cyan reflections → strong material-specific gloss and fine grain → extremely bright reflections against very deep shadows",
+   "negative": "Avoid cel animation, vector illustration, low poly art, moire, compression blocks, ink outlines, flat cel shading, uniform gloss, copied still life arrangement, copied skyline, geometric linework, tiled patterns, decorative particles, readable text, logos.",
+   "capsule": "Realistic digital render appearance uses continuous shading without brush marks: metal mirrors in long bands, glass refracts along narrow ridges; cloth weaves, matte forms grain, organics gleam, plants catch rim light, and emitters bloom white into cyan. No outlines: value and reflection define forms; edges, about 0.15% of width or 3 px at 2048 px width, mark folds, with no hatching or auxiliary contours. Painterly gradient mixed fills cross forms and walls, with no pattern fill. Night scenes average 31% luminance, 26% near black but never most of frame, and 10.8% light planes; curved forms carry one soft shadow; projected #10161d shadows fall lower right, sharp at contact, then soften. Primary #3b424a 13.7%, secondary #565c62 13.5%, shadow #04090e 12.8%, highlight #a7bec5 10.8%; bodies use #40464a, #2c323c, or #0c1a2b; gray is shared with ground, never background only; neon saturated accent #01eafd ≤ 4% of the image, as reflective bands, refractive rims, or organic spots, never broad matte or cloth planes. Rounded forms meet pointed tips and straight architecture; an elevated lens under upper left white and cyan light keeps straight verticals, cropped connected foreground, and quiet upper space. Detail budget: maximal — sampled organics have about 2 boundaries, about 5 protrusions, and no repeated lines; no frame decorations; texture fills surfaces.",
+   "scene": "In a room with a window, a table holds one sphere, two containers, one fruit, one cloth, and one potted plant. Viewed gently downward from slightly above the table, the cloth and fruit sit in front, the containers and plant sit behind them, and buildings appear beyond the window; no people are present.",
+   "words": {
+    "probe_anchors": 160,
+    "figure": 0,
+    "priority": 33,
+    "negative": 33
+   },
+   "timing": {
+    "fill": {
+     "seconds": 653,
+     "model": "gpt-6-astra",
+     "effort": "high"
+    },
+    "compile": {
+     "seconds": 1366,
+     "model": "gpt-5.6-sol",
+     "effort": "high"
+    },
+    "priority": {
+     "seconds": 80,
+     "model": "gpt-5.6-sol",
+     "effort": "medium"
+    }
+   }
+  },
+  "lite": {
+   "probe_anchors": "Physically based 3D render, photographic lens perspective from a slightly raised viewpoint. No outlines or interior lines; surfaces and light alone define form. Continuous gradient shading, soft form shadows on one to two planes, soft contact shadows; in daylight scenes mostly dark planes, night scenes keep the same palette roles, only darker. Palette: #7b7f85 mid gray about 50%, #2c3442 deep blue-gray about 20%, #1fa5e6 cyan accent ≤ 5% as rim light, low saturation, darks tinted blue, not pure black. Simple round masses, smooth curves. Polished finish, no pattern fills. Soft vertical wall panels, unless the scene specifies its own backdrop. Detail budget: level 3, about 6 main objects.",
+   "figure": "No figure samples exist for this style, so proportions, pose, costume and hair are decided by the content. If a figure is required, draw it without outlines, using photographic continuous shading, a blue rim light, and a low-saturation gray-blue tone. Keep costume and hair shapes as requested, applying only material contrast, low-key lighting and cyan rim light.",
+   "figure_extrapolated": true,
+   "priority": "Priority order: low-key blue-gray palette → material contrast → small cyan rim light → photographic perspective with shallow depth → lineless gradient shading.",
+   "negative": "Avoid flat vector illustration, anime background art, generic stock product photo, clay-style 3D icon, black outlines, flat cel shading, bright high-key lighting, extra props, lens flares, decorative surface patterns, oversharpening, excessive grain, banding, readable text, logos, no speed lines.",
+   "words": {
+    "probe_anchors": 108,
+    "figure": 57,
+    "priority": 23,
+    "negative": 39,
+    "scene": 42
+   },
+   "timing_seconds": {
+    "fill": 52.5,
+    "compile": 32.0
+   },
+   "model": "claude-sonnet-5-5"
+  }
+ },
+ "real_jp_melo": {
+  "label": "일본 멜로",
+  "subtitle": "Japanese Melodrama",
+  "medium": "live_action",
+  "anchor_kind": "sublook",
+  "image_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real_jp_melo.png",
+  "use_preview_ref": false,
+  "style_clause_current": "Grade the whole image in this look: soft diffuse light, low contrast, with soft, bright, gently lifted shadows; a muted low-to-medium saturation pastel palette; delicate romantic bloom and halation on the highlights; fine soft film grain. Mood: a tender, wistful flutter. Rendered in photorealistic live-action cinematography, shot on a digital cinema camera with a 35mm lens - true-to-life skin texture with visible pores, real fabric weave and true material response. A real photograph, not an illustration, painting or anime.",
+  "facets": {
+   "version": "hp-v1.2.3",
+   "extracted_at": "2026-10-08",
+   "probe_anchors": "Use lens perspective, slight overhead view and soft background focus. No outlines or internal lines; glass and metal remain sharper than cloth and matte edges. Continuous gradients form about one soft shadow per matte form, with #f0ece1 metal and #ddd4c6 glass highlights; soft contact shadows #6a5638 spread lower right. In daylight, target 68% mean luminance, 0% near black and 26.5% bright clusters, never mostly black; at night retain palette roles and soft shading, only darker. Objects use #886552, #a18878 and #d0bdb8; no hue is ground only. Muted accent #d1bbb5 and moderately saturated accent #b5bb67 together occupy ≤20% of the image, on cloth, fruit or leaves, never on walls or matte spheres. Make an object about 18% of frame height and a vessel about 26%; leave the upper 45% open, allow foreground surfaces to continue beyond the frame, and keep major masses readable through partial overlap. Detail budget: minimal, grade 1; no internal lines, protrusions, decorative marks or pattern lines.",
+   "figure": "",
+   "figure_extrapolated": false,
+   "priority": "Priority order: extremely simplified spherical forms without internal lines or protrusions → very warm, high-key low contrast → oversized diffuse light with very soft grounding → strongly material-specific reflection and transmission",
+   "negative": "Avoid cel animation, vector illustration, watercolor painting, glossy 3D rendering, moire, compression blocks, black outlines, hard cel shading, neon saturation, crushed blacks, copied arrangement, identical folds, identical branches, bokeh particles, tiled patterns, wet floors, geometric linework, readable text, logos.",
+   "capsule": "Photoreal still life photography uses continuous diffusion, reflection and transmission; no outlines, hatching or auxiliary contours. Gradients form about one soft shadow per matte form, with #f0ece1 metal and #ddd4c6 glass highlights; soft contact shadows #6a5638 spread lower right. In daylight, target 68% mean luminance, 0% near black and 26.5% bright clusters, never mostly black; at night retain palette roles and shading, only darker. Objects use #886552, #a18878 and #d0bdb8; none is ground only. Muted accent #d1bbb5 ≤20% and moderately saturated accent #b5bb67 ≤20% of the image, combined on cloth, fruit or leaves, never on walls or matte spheres. Use round masses, ellipses, tapering cylinders and long curves with continuous contours, no corners or enclosed gaps. Detail budget: minimal, grade 1; no internal lines, protrusions, decorative marks or pattern lines.",
+   "scene": "An indoor tabletop still life beside a window and curtain contains one cloth, one sphere, two vessels, one fruit and one potted plant, with no people. The cloth spreads across the front left, the sphere and fruit sit forward, the vessels occupy the center, and the plant stands at the rear right; the table and vessel tops are visible.",
+   "words": {
+    "probe_anchors": 159,
+    "figure": 0,
+    "priority": 31,
+    "negative": 39
+   },
+   "timing": {
+    "fill": {
+     "seconds": 928,
+     "model": "gpt-6-astra",
+     "effort": "high"
+    },
+    "compile": {
+     "seconds": 502,
+     "model": "gpt-5.6-sol",
+     "effort": "high"
+    },
+    "priority": {
+     "seconds": 48,
+     "model": "gpt-5.6-sol",
+     "effort": "medium"
+    }
+   }
+  },
+  "lite": {
+   "probe_anchors": "Natural-light indoor still-life photograph, lens perspective from slightly above the tabletop, shallow depth of field. No outlines, no interior lines, one uniform tier. Continuous-tone fill with smooth gradients, no tonal steps; in daylight scenes mostly bright planes with little near-black. Soft form shadows as gradients on curved surfaces; soft contact cast shadows. Off-white #eeece6, grey-beige #c9c5bd, light wood #e3cfb0, accents #dba1a0, #92c060, #e8a58a at ≤ 10%, low saturation. Rounded forms, smooth curves, irregular leaf and cloth folds. Soft-focus finish with bloom and fine grain, no pattern fills. Background: sheer curtain and wall unless the scene specifies its own backdrop. Detail budget: level 2, about 5 main objects.",
+   "figure": "No figure sample exists. If a person is needed, render face, body and rendering in a photographic realistic family, with natural skin tones under soft diffuse window light. Proportions, pose, hands, shoes and hair follow the scene content, and the style adds only light and tone. Use no comic-style dot eyes, no drawn eye outlines, and no symbolic marks.",
+   "figure_extrapolated": true,
+   "priority": "Priority order: photographic lens perspective → continuous soft high-key tone → low-saturation neutral palette → rounded simple forms → soft-focus finish.",
+   "negative": "Avoid commercial product photography, glossy 3D render, flat vector illustration, hyper-detailed stock photo, hard black outlines, flat cel shading, neon colors, extra props, dramatic cast shadows, window overexposure, bloom haze, readable text, logos, with no speed lines.",
+   "words": {
+    "probe_anchors": 107,
+    "figure": 59,
+    "priority": 21,
+    "negative": 37,
+    "scene": 39
+   },
+   "timing_seconds": {
+    "fill": 53.4,
+    "compile": 29.0
+   },
+   "model": "claude-sonnet-5-5"
+  }
+ },
+ "real_psy_horror": {
+  "label": "심리 공포",
+  "subtitle": "Psychological Horror",
+  "medium": "live_action",
+  "anchor_kind": "sublook",
+  "image_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real_psy_horror.png",
+  "use_preview_ref": true,
+  "style_clause_current": "Carry HOW the style references render a scene and its figures - their color energy, their pattern and decoration language, their density of set dressing and background detail, and the way they stage depth. Do NOT reproduce their subjects, characters, places or props.",
+  "facets": {
+   "version": "hp-v1.2.3",
+   "extracted_at": "2026-10-08",
+   "probe_anchors": "Use elevated undistorted perspective, foreground focus, and softened background. No outlines; soft transitions define forms, without hatching or secondary contours. Use continuous gradients with no value steps, one soft shadow mass, no cell shapes, and soft irregular #07090a contact shadows merge outward. Low light means 12% luminance and 73% near black, not bright; large planes average 24% saturation. No hue is backdrop only: muted #343029 and #5f5649 lead; #fbfaf7 marks tiny cores. Accent #6c4f32 ≤ 0% of the image and accent #3c5769 ≤ 0% of the image as saturated spots; form two broad diffuse lit areas, never dark folds. Use matte ground without tiles or reflections, asymmetrical overlap, and no decorative marks, unless the scene specifies its own backdrop. Keep foreground forms near 34.13% and 15.77% of image height. Detail budget: maximal; texture fills surfaces, with about six broad folds and three large hem protrusions, and no printed repeats.",
+   "figure": "",
+   "figure_extrapolated": false,
+   "priority": "Priority order: very low-key continuous shading → intensely rough, material-specific textures → strongly muted warm-cool lighting contrast → outline-free silhouettes merging deeply into shadow.",
+   "negative": "Avoid clean product photography, glossy 3D rendering, flat vector illustration, anime cel animation, screen borders, moire, high key lighting, cel shading, ink outlines, plastic gloss, copied still life arrangement, identical window layout, identical wall lamp, repeated wilted plant, bokeh dot fields, tiled patterns, wet floor reflections, geometric linework, readable text, logos.",
+   "capsule": "Photorealistic shading renders rough fiber and corrosion without brush marks or contours. Use spheres and folded surfaces, plus elliptical cylinders tapering into truncated cones; alternate straight and curved soft edges around irregular gaps, without hatching or secondary outlines. Gradients and radial falloff model curves; architecture stays matte, corroded metal reflects diffusely, stained glass distorts transmission, cloth shows fiber, organics and plants stay opaque, and cores bloom without aerial light cones. Low light means 12% luminance and 73% near black, not bright; use one continuous soft shadow mass, no cell shapes, and soft irregular #07090a contact shadows merge outward. Use #343029 at 14.1%, #5f5649 at 10.9%, and #121210, #090a0a, and #0c0d0c at 13.7% each; no hue is backdrop only, no object plane is uniform, and large planes average 24% saturation. Accent #6c4f32 ≤ 0% of the image and accent #3c5769 ≤ 0% of the image as saturated spots; form two broad diffuse lit areas, never dark folds, keep #fbfaf7 in tiny cores, with undistorted lens perspective, shallow focus, and matte supports without tiles or reflections, unless the scene specifies its own backdrop. Detail budget: maximal; texture fills surfaces; cloth carries about six broad fold boundaries and about three large hem protrusions, with no discrete value steps, printed repeats, or decorative marks.",
+   "scene": "An indoor still life with a window contains a spherical object, folded cloth, two containers, one fruit, and one potted plant on a table. The objects overlap from front to back, part of the cloth hangs below the front edge, the viewpoint is slightly above the objects, and no people are present.",
+   "words": {
+    "probe_anchors": 149,
+    "figure": 0,
+    "priority": 24,
+    "negative": 51
+   },
+   "timing": {
+    "fill": {
+     "seconds": 719,
+     "model": "gpt-6-astra",
+     "effort": "high"
+    },
+    "compile": {
+     "seconds": 1269,
+     "model": "gpt-5.6-sol",
+     "effort": "high"
+    },
+    "priority": {
+     "seconds": 60,
+     "model": "gpt-5.6-sol",
+     "effort": "medium"
+    }
+   }
+  },
+  "lite": {
+   "probe_anchors": "Realistic low-light still-life render, photographic lens perspective, low frontal eye level. No outlines or interior lines; forms separate by value only. Continuous gradients, about four tonal regions, low key: in daylight scenes mostly dark planes. Night scenes keep the same palette roles, only darker. Soft form shadows, no shadow shapes, soft contact cast shadows. Palette: #1f1c19 dominant, #4a4439 and #3a4a5a secondary, #e0a24a accent ≤ 5%, low saturation. Round forms, few right angles, smooth contours with frayed edges. Film grain, fiber texture, no repeating patterns. Plain backdrop unless the scene specifies its own backdrop. Detail budget: level 4, about six main objects.",
+   "figure": "The sample contains no figure. If a person is requested, render a photographic realist person with natural proportions, lit by the same low-light amber and blue-gray dual sources with film grain, and no exaggeration of skin or eyes. Poses tend to follow natural photographic stance; when the scene specifies an action, the action comes first. Clothing and hair keep their structure, with worn, desaturated, weathered texture.",
+   "figure_extrapolated": true,
+   "priority": "Priority order: low-key dual-source lighting → weathered surface texture → continuous gradients with soft contact shadows → low-saturation brown-gray palette with small amber accent → photographic perspective.",
+   "negative": "Avoid glossy commercial product photography, bright pastel flat-lay, clean 3D render, painterly oil still life, horror-game concept art, bright even lighting, saturated colors, black outlines, cel shading, extra props, cobwebs, fog, heavy grain, readable text, logos, no speed lines.",
+   "words": {
+    "probe_anchors": 101,
+    "figure": 66,
+    "priority": 27,
+    "negative": 39,
+    "scene": 38
+   },
+   "timing_seconds": {
+    "fill": 68.5,
+    "compile": 28.8
+   },
+   "model": "claude-sonnet-5-5"
+  }
+ },
+ "real_urban_hero": {
+  "label": "도심 히어로",
+  "subtitle": "Urban Hero",
+  "medium": "live_action",
+  "anchor_kind": "sublook",
+  "image_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/real_urban_hero.png",
+  "use_preview_ref": false,
+  "style_clause_current": "LOOK - render this in a bold modern big-city blockbuster look: mixed metropolitan light with several differently colored light sources in the same frame, medium-high contrast with open, information-rich shadows that stay full of bounced detail instead of crushing to black, a high-saturation palette in which vivid saturated colors sit against desaturated concrete, glass and asphalt, punchy clarity and crisp HDR-like micro-contrast holding detail in both highlights and shadows, and a sense of monumental big-city scale.",
+  "facets": {
+   "version": "hp-v1.2.3",
+   "extracted_at": "2026-10-08",
+   "probe_anchors": "Avoid anime, cartoon, low poly art, vector illustration, bokeh particle fields, ornamental engraving, repeated tiled floors, and geometric line overlays. Use low overhead lens perspective, sharp foreground, blurred distance. Draw no outlines, auxiliary contours, hatching, or internal lines; value edges define forms. Use continuous gradients, one soft shadow per rounded form, and projected plus contact shadows. Daylight keeps mean luminance about 31%, near black about 28% but never most, and full saturation on planes; nights keep roles darker. #75837d and #305462 are cool masses; bodies retain content colors, warm light, and cool reflections. Accent #c5272c, #ae4805, and #14d7f4 have no transferable cap, stay localized, and never coat neutral walls. Use overlapping asymmetry, largest form at 23.44% frame height, ground contact, cropped edges, and no geometric ground pattern. Detail budget: medium; no structural lines, protrusions, separated tone boundaries, marks, or motifs.",
+   "figure": "",
+   "figure_extrapolated": false,
+   "priority": "Priority order: photoreal material microtexture and optical response → continuous shading with deep shadows → warm key light against cool environmental reflections → sharp foreground against blurred distance",
+   "negative": "Avoid anime, cartoon, low-poly art, vector illustration, moire, compression blocks, chromatic fringing, black outlines, flat cel shading, uniform ambient lighting, plastic surfaces, copied still-life arrangement, duplicated skyline, copied object reflections, bokeh particle fields, ornamental engraving, repeated floor tiles, geometric line overlays, readable text, logos, watermarks.",
+   "capsule": "Photoreal tones render matte, fibrous, refractive, glossy, veined, and architectural surfaces. No outlines, hierarchy, auxiliary contours, hatching, internal lines, or shadow borders; edges soften with distance, while round solids, ellipses, and acute tips meet rectangular architecture without closed gaps. Continuous gradients model curves; one soft shadow wraps forms; rightward #1a262b projections and contact shadows fade; matte highlights are broad, metal reflections curve, glass ones vertical, organic ones small. Daylight averages about 31% luminance, with about 28% near black but not most; nights preserve darker roles, warm upper left light, cool fill, and no bloom. Use cool #75837d 16.5% and #305462 14.4%, dark #140607 14.5% and #1a262b 11.8%, highlights #e5d2bb and #14d7f4; bodies keep content hues, warm light, and cool reflections; no background only hue. Localize accent #c5272c, #ae4805, and #14d7f4 on broad surfaces or reflections, never neutral walls; no transferable cap; full saturation allowed. Use low overhead lens perspective, sharp foreground, blurred upper distance, asymmetric overlap, largest form at 23.44% frame height, ground contact, and cropped edges; medium detail budget: no internal lines, protrusions, tone steps, decorative marks, or patterns.",
+   "scene": "A still life sits on a table by a window overlooking city buildings, with one sphere on the left, one spread cloth at the front, one metal cup and one glass in the center, one round fruit at the front right, and one potted plant at the rear right. The view looks slightly down onto the tabletop, with no people.",
+   "words": {
+    "probe_anchors": 140,
+    "figure": 0,
+    "priority": 28,
+    "negative": 45
+   },
+   "timing": {
+    "fill": {
+     "seconds": 658,
+     "model": "gpt-6-astra",
+     "effort": "high"
+    },
+    "compile": {
+     "seconds": 965,
+     "model": "gpt-5.6-sol",
+     "effort": "high"
+    },
+    "priority": {
+     "seconds": 63,
+     "model": "gpt-5.6-sol",
+     "effort": "medium"
+    }
+   }
+  },
+  "lite": {
+   "probe_anchors": "A photorealistic studio still-life photograph, window backlight, lens perspective, low three-quarter view slightly above tabletop. No outlines or interior lines, forms separate by value and color. Continuous gradients on every surface, about five tonal steps, soft form shadows along curved surfaces in one or two planes, soft contact shadows. Palette: #2a2f38 blue-black stone, #a8141f crimson cloth, #f28a1c orange accent ≤ 10%, medium to high saturation. Round forms dominate, smooth curves, soft S folds, angles only in window frames. Polished metal, glass, stone, fibrous cloth, no pattern fill. Window city view, unless the scene specifies its own backdrop. Detail budget: level 4, about six objects.",
+   "figure": "No figure sample exists. If a person is requested, use realistic photographic proportions, with face, body and rendering all photographic, under the same lens perspective and backlight. Skin and clothing take photographic textures, with no line art and no flat fills. Poses follow the scene, so when the scene specifies an action, the action comes first. Clothing and props keep their type and structure with a realistic material feel. Hair keeps its shape with realistic sheen and strands.",
+   "figure_extrapolated": true,
+   "priority": "Priority order: lens perspective still-life composition → material texture contrast → blue-orange complementary backlight → saturated crimson cloth folds → city window backdrop.",
+   "negative": "Avoid glossy 3D product render, generic stock still-life photo, cinematic cyberpunk city, flat vector fills, black outlines, cartoon shading, extra props, dust, fingerprints, water droplets, lens flare, HDR halos, oversharpening, color banding, readable text, logos, no speed lines.",
+   "words": {
+    "probe_anchors": 104,
+    "figure": 78,
+    "priority": 23,
+    "negative": 38,
+    "scene": 31
+   },
+   "timing_seconds": {
+    "fill": 60.8,
+    "compile": 31.1
+   },
+   "model": "claude-sonnet-5-5"
+  }
+ },
+ "stop_motion": {
+  "label": "스톱모션",
+  "subtitle": null,
+  "medium": "stop_motion",
+  "anchor_kind": "media",
+  "image_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/stop_motion.png",
+  "use_preview_ref": false,
+  "style_clause_current": "Everything is rendered as handmade stop-motion photography of a physical tabletop miniature set. Any figures are handmade physical puppets built from needle-felted wool and sculpted clay over an armature - matte felted-fibre skin, wool-roving hair, real miniature knitted and felted fabric with visible fibre, seams and fraying, and small glossy bead eyes set into the sculpted face. Not a drawing, and not a live-action photograph of real people.",
+  "facets": {
+   "version": "hp-v1.2.3",
+   "extracted_at": "2026-10-08",
+   "probe_anchors": "Use elevated perspective. Draw no outlines; light and reflection create edges. Rounded masses taper into cylinders with elliptical openings and curved bands. Use continuous gradients, one connected soft shadow, and soft #1e1207 contact shadows down right. Daylight luminance is about 39.97%, with 16.10% near black but no dominance and 9.5% bright planes; night keeps roles darker. Use #6d5641 and #b39c81, #191512 shadows, and #d1bd9e highlights; accent #1b2330 ≤ 9% of the image on cloth, not walls or matte spheres; #823e25 stays object bound. Keep worn wood ground, objects about 26.66% high, and upper breathing room, unless the scene specifies its own backdrop. Detail budget: sparse, with about four edges, about six compressed grooves, no hatching, protrusions, decorations, or patterns.",
+   "figure": "",
+   "figure_extrapolated": false,
+   "priority": "Priority order: simple container silhouettes with structural edges and compressed grooves → hand-pressed matte surfaces and fibres → warm continuous shading with soft grounding → outline-free volume with material-specific reflections",
+   "negative": "Avoid clean vector illustration, cel animation, glossy 3D rendering, watercolor illustration, ink outlines, flat cel shading, uniformly polished surfaces, copied still life arrangement, copied window layout, geometric hatching, tiled patterns, wet floor reflections, floating glitter, readable text, logos.",
+   "capsule": "Photographed stop motion craft models use pressed matte fibres for cloth, plants, and fruit; metal reflects, glass refracts, without outlines. Detail budget: sparse, about four boundaries, about six grooves, no hatching. Continuous gradients make one connected soft shadow; sharp highlights stay on metal and glass. Soft #1e1207 contact shadows extend down right about 38.5% of object height, blurred roughly 1.17%. Daylight averages 39.97% luminance, 16.10% nondominant near black, and 9.5% bright planes; night preserves roles darker. Use #6d5641 and #b39c81 with #191512 shadows and #d1bd9e highlights; accent #1b2330 ≤ 9% of the image on cloth, never walls or spheres; keep #823e25 object bound, never backdrop. Rounded masses taper into cylinders with elliptical openings and curved bands; contours use rounded turns without enclosed gaps; use elevated perspective, overlap, 26.66% high objects, top space, crops, wood, background blur, without graphic additions, rim light, or bloom, unless the scene specifies its own backdrop.",
+   "scene": "Six still life objects sit on a table in an interior with a window. A sphere and fruit are in front; a metal cup and glass are behind. A potted plant stands behind as cloth spreads from the centre toward the left; the view looks down from above table height, with no people.",
+   "words": {
+    "probe_anchors": 119,
+    "figure": 0,
+    "priority": 30,
+    "negative": 38
+   },
+   "timing": {
+    "fill": {
+     "seconds": 723,
+     "model": "gpt-6-astra",
+     "effort": "high"
+    },
+    "compile": {
+     "seconds": 1320,
+     "model": "gpt-5.6-sol",
+     "effort": "high"
+    },
+    "priority": {
+     "seconds": 53,
+     "model": "gpt-5.6-sol",
+     "effort": "medium"
+    }
+   }
+  },
+  "lite": {
+   "probe_anchors": "A photographed physical diorama of felt, clay and miniature props, in lens perspective from a slightly high viewpoint. No outlines and no interior lines; edges read by value contrast. Tonal gradation in three to four steps, soft form shadows in about one to two curved shapes, soft contact cast shadows. Sand beige #b99a72 about 60%, faded gray-blue #55637f about 12%, apricot #d9704a and muted green #6f8f5a accents ≤ 5%, low to medium saturation. Rounded spheres, cylinders, thin slabs; smooth curves, straight runs only at table and frame. Fiber finish, no pattern fills. Wall and table backdrop unless the scene specifies its own backdrop. Detail budget: level 3, about 6 objects.",
+   "figure": "No figure sample exists. If a figure is required, render it as a handmade felt and clay doll with simple proportions, formed by material planes without lines, with eyes, nose and mouth as minimal dots or omitted. Hair is a wool felt mass that keeps the scene's hairstyle. Poses and clothing follow the scene; when the scene specifies an action, the action comes first, and style only adds wool felt, matte clay and rough cloth texture.",
+   "figure_extrapolated": true,
+   "priority": "Priority order: photographed felt and clay diorama look → forms by value, no outlines → warm window light with soft contact shadows → muted sand and gray blue palette → material contrast.",
+   "negative": "Avoid stop-motion clay animation, glossy 3D product renders, vector or oil painting still lifes, black outlines, cel shading, plastic sheen, over-sharpened HDR, extra props, ornate patterns, heavy background blur, warm color cast, vignette, no speed lines, readable text, logos.",
+   "words": {
+    "probe_anchors": 110,
+    "figure": 76,
+    "priority": 32,
+    "negative": 39,
+    "scene": 36
+   },
+   "timing_seconds": {
+    "fill": 68.9,
+    "compile": 27.4
+   },
+   "model": "claude-sonnet-5-5"
+  }
+ },
+ "us_cartoon": {
+  "label": "미국 카툰",
+  "subtitle": null,
+  "medium": "2d_cartoon",
+  "anchor_kind": "media",
+  "image_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/us_cartoon.png",
+  "use_preview_ref": false,
+  "style_clause_current": "Carry how the style reference draws figures. Any figures are drawn in flat television-cartoon proportions, roughly five and a half heads tall, with simplified tubular limbs and small simple hands; large round white eyes with a small dark round pupil and a thin dark upper lid line, no visible iris coloring and no eyelashes; a small simple curved nose with no nostrils and a simple mouth drawn as one outlined shape; hair reads as one solid flat color mass with a few pointed clumps at the silhouette; skin and garments are filled with flat unmodulated color, shaded with at most one darker step, and every form is bounded by a heavy black contour of even weight.",
+  "facets": {
+   "version": "hp-v1.2.3",
+   "extracted_at": "2026-10-08",
+   "probe_anchors": "Use weak linear perspective, a slightly elevated frontal view, shallow space, fully focused. Use #070403 outlines at 0.29% of width, 3 px at 1024 px; interiors are 0.20%, absent on round forms, about eight on cloth, with no hatching. Use broad flat planes, gentle gradients on broad or curved forms, and material dependent shadows. Daylight mean luminance is 57%, near black 1%, never mostly black; night keeps palette roles, only darker. Vivid object colors contrast environmental #fadf81 and #529fc4; accent #c72125 ≤ 10% of the image as a few large cloth planes, never on round forms, glass, or metal reflections. Detail budget: minimal — round forms have one value level, no protrusions or repeated lines; frame has no decorative marks.",
+   "figure": "",
+   "figure_extrapolated": false,
+   "priority": "Priority order: broad flat color planes with clean contours → flat, minimally detailed round forms → very thin near-black lines → vivid multicolor contrast → limited material-specific cel shading with gentle gradients",
+   "negative": "Avoid photorealism, glossy 3D animation, watercolor illustration, flat vector iconography, moire, photographic glare, sensor noise, color fringing, heavy outlines, realistic reflections, elliptical drop shadows, depth of field, copied still life arrangement, copied window layout, copied plant silhouette, crosshatching, fabric weave, wood grain, decorative particles, readable text, logos, watermarks.",
+   "capsule": "Digital cartoons use broad flat cel planes and gentle gradients. #070403 outlines are about 0.29% of width, 3 px at 1024 px, with 20% variation; two weights divide contours and 0.20% interiors, with no auxiliary contours or hatching. Shapes combine ellipses, tapering trapezoids, and pointed leaf forms; silhouettes are hole free, with limited soft or hard material shadows. Daylight mean luminance is 57% and near black 1%, never mostly black; night keeps palette roles, only darker. Vivid object colors contrast #fadf81 and #529fc4 environmental planes; #9f1418 shadows; #fdf8e6 highlights; accent #c72125 ≤ 10% of the image, in a few large flexible planes, never on round forms, glass, or metal reflections. Detail budget: minimal — round forms have no interior lines, one value level, no protrusions; frame has no decorative marks.",
+   "scene": "A still life on an indoor table by a window contains one sphere, one spread cloth, two vessels, one fruit, and one potted plant. The vessels stand behind the cloth and sphere, the plant rises to one side, and the view is slightly elevated from the front; no people are present.",
+   "words": {
+    "probe_anchors": 120,
+    "figure": 0,
+    "priority": 32,
+    "negative": 48
+   },
+   "timing": {
+    "fill": {
+     "seconds": 750,
+     "model": "gpt-6-astra",
+     "effort": "high"
+    },
+    "compile": {
+     "seconds": 975,
+     "model": "gpt-5.6-sol",
+     "effort": "high"
+    },
+    "priority": {
+     "seconds": 67,
+     "model": "gpt-5.6-sol",
+     "effort": "medium"
+    }
+   }
+  },
+  "lite": {
+   "probe_anchors": "Digital vector ink outlines with flat cel fills, frontal view slightly above eye level. Medium-weight #1a1a1a outlines in two tiers, medium amount of structural inner lines. Flat fills, no gradients, two to three tone steps, hard form shadows in about three to five shapes, no cast shadows. Wall #f9dd7c, table #4488d2 with front bands #1f5da0 and #12467f, very saturated accents #c9232a and #ff8c0a at ≤ 20%, shadows darker, same hue. Rounded forms, smooth curves with straight segments, gentle waves. Flat digital finish, no pattern fills. Yellow wall with one vertical seam, banded table, unless the scene specifies its own backdrop. Detail budget: level 3, about 4 fold lines.",
+   "figure": "No figure was sampled. Render any character in a Western TV cartoon manner, using only the observed line and fill grammar: even medium-weight near-black outlines, flat cel fills, rounded simplified shapes, and hard one-step shadows in a darker tone of the same hue. Proportions, eyes, mouth, hands, shoes, and hair were not sampled, so keep them simple and follow the request. Hair is a few large flat masses with hard-edged shading. Poses tend to follow the scene; when the scene specifies an action, the action comes first. Skin is a flat fill with a single hard-edged shadow shape.",
+   "figure_extrapolated": true,
+   "priority": "Priority order: even medium near-black outlines → flat cel fills → saturated primary color planes → hard-edged darker-hue shadows → rounded simplified forms.",
+   "negative": "Avoid glossy 3D renders, outline-free vector icons, watercolor picture-book art, realistic still-life painting, anime background art, photographic lighting, soft gradients, drop shadows, sketchy outlines, pastel desaturation, reflections, extra fold lines, condensation droplets, hatching, no speed lines, readable text, logos.",
+   "words": {
+    "probe_anchors": 108,
+    "figure": 98,
+    "priority": 23,
+    "negative": 39,
+    "scene": 37
+   },
+   "timing_seconds": {
+    "fill": 67.6,
+    "compile": 35.0
+   },
+   "model": "claude-sonnet-5-5"
+  }
+ },
+ "watercolor": {
+  "label": "수채",
+  "subtitle": null,
+  "medium": "watercolor",
+  "anchor_kind": "media",
+  "image_url": "https://qnjnrihfpqkdhjuzvepy.supabase.co/storage/v1/object/public/media/style-anchors/watercolor.png",
+  "use_preview_ref": true,
+  "style_clause_current": "Carry HOW the style references render scenes and figures: the watercolor medium, its washes, pigment blooms and paper texture, its figure proportions and facial shape language. Do NOT reproduce their subjects, characters, places or props.",
+  "facets": {
+   "version": "hp-v1.2.3",
+   "extracted_at": "2026-10-08",
+   "probe_anchors": "Use gentle linear perspective from slightly above, without blur or wide angle distortion. Omit outlines; use same hue darker pooling and about three vessel structure marks at 0.20–0.29% width, or 2–3 px at 1024 px, with no hatching. Build transparent continuous washes and soft contact shadows, with gradients for volume, folds, reflections, and walls. In daylight, mean luminance is 57% and near black 2%; night keeps roles, only darker. Keep broad planes low in saturation; no hue is backdrop only, and saturated accent #7e5431 ≤ 4% of the image, on two connected fruit or metal regions, never walls or cloth. Use physical washed ground, upper left diffuse light, main subject height 27.93%, companions 0.79 as tall, complete forms, and broad upper breathing space. No decorative marks. Detail budget: medium — about three structural lines and about one protrusion per vessel at every screen size, with no repeated pattern lines.",
+   "figure": "",
+   "figure_extrapolated": false,
+   "priority": "Priority order: highly transparent paper-revealing washes → continuous pigment-grained, bleeding tonal gradients → completely outline-free plane boundaries → strongly differentiated material reflection and absorption.",
+   "negative": "Avoid oil painting, gouache painting, vector illustration, photorealism, moire, sensor noise, photographic glare, black outlines, flat cel fills, airbrushed surfaces, plastic gloss, copied windowsill arrangement, copied tabletop layout, copied still life grouping, bokeh fields, geometric hatching, repeated tile patterns, decorative sparkles, readable text, logos, watermarks.",
+   "capsule": "Transparent watercolor washes reveal light paper; continuous gradients shape volumes, folds, reflections, and walls amid pigment pooling, bleeding, and paper grain. No outlines: darkening and fading structure marks at 0.20–0.29% width, 2–3 px at 1024 px, define forms; backgrounds use contrast, without hatching or auxiliary contours. Use diffuse upper left light; daylight mean luminance is 57%; near black stays under 2%, never dominant; night keeps roles, only darker. Materials vary absorption; matte volumes use about one connected soft shadow, reflective surfaces use irregular highlight bands, and #48341c or #4b473c oval soft contact shadows run 71.2% of object height with 1.17% width blur. Palette: #cfc3a6 14.3% primary; #a28865 13.6%, #e1d8c0 12.5%, #c2a985 12.0% secondary; #6b5d44 13.2%, #453726 11.2% shadow; content sets colors, none is background only, and saturated accent #7e5431 ≤ 4% of the image forms two connected fruit or metal regions, never walls or cloth. Washed ground stays unpatterned unless the scene specifies its own backdrop; omit decorative marks and bloom. Detail budget: medium — about three lines and one protrusion per vessel at any size; no repeated pattern lines.",
+   "scene": "A tabletop beside a window holds one matte sphere, one metal cup, one glass of water, and one apple, with one spread cloth and one potted plant behind them. The sphere sits at left foreground, the vessels at center, and the apple at right foreground; a slightly elevated viewpoint reveals the tabletop and vessel openings. No people.",
+   "words": {
+    "probe_anchors": 149,
+    "figure": 0,
+    "priority": 24,
+    "negative": 45
+   },
+   "timing": {
+    "fill": {
+     "seconds": 689,
+     "model": "gpt-6-astra",
+     "effort": "high"
+    },
+    "compile": {
+     "seconds": 1028,
+     "model": "gpt-5.6-sol",
+     "effort": "high"
+    },
+    "priority": {
+     "seconds": 59,
+     "model": "gpt-5.6-sol",
+     "effort": "medium"
+    }
+   }
+  },
+  "lite": {
+   "probe_anchors": "Digital transparent watercolor wash with bare paper, in linear perspective from a low overhead viewpoint. No outlines and no interior lines, forms separate by color shifts. Painterly gradient fill, about four to five value steps, soft form shadows as gentle crescents on one or two planes, soft contact cast shadows. Palette: cream #d8cdb6 primary, tan #b99a70 secondary, red-orange #d9482f accent ≤ 5%, low to medium saturation, warm gray-brown darks. Round smooth forms, irregular breaks only in cloth and leaves. Cold-press paper grain with pigment pooling, no pattern fills. Soft blurred background washes, unless the scene specifies its own backdrop. Detail budget: level 3, about six main objects.",
+   "figure": "No figure sample exists, so any figure takes its proportions, pose and hair from the scene's content, and the style supplies only the wash treatment. Face, body and rendering all follow the transparent watercolor still-life treatment. Forms come from wash planes and value differences, without outlines or strand lines. Eyes, nose and mouth are minimal dots or pale color stains. Clothing keeps its type and structure but is simplified into large lineless wash planes. Skin is a warm, low-saturation wash. When the scene specifies an action, the action comes first.",
+   "figure_extrapolated": true,
+   "priority": "Priority order: transparent watercolor wash → lineless color-edge forms → bare paper grain → warm muted palette → single small red accent.",
+   "negative": "Avoid gouache, ink-and-wash line art, photorealistic still life, black outlines, flat cel fills, hard drop shadows, extra hatching, fine leaf veins, extra props, photographic noise, readable text or logos, no speed lines.",
+   "words": {
+    "probe_anchors": 107,
+    "figure": 90,
+    "priority": 22,
+    "negative": 32,
+    "scene": 31
+   },
+   "timing_seconds": {
+    "fill": 57.3,
+    "compile": 25.2
+   },
+   "model": "claude-sonnet-5-5"
+  }
+ }
+}

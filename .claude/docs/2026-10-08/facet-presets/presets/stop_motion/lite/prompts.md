@@ -1,0 +1,14 @@
+## PROBE_ANCHORS
+A photographed physical diorama of felt, clay and miniature props, in lens perspective from a slightly high viewpoint. No outlines and no interior lines; edges read by value contrast. Tonal gradation in three to four steps, soft form shadows in about one to two curved shapes, soft contact cast shadows. Sand beige #b99a72 about 60%, faded gray-blue #55637f about 12%, apricot #d9704a and muted green #6f8f5a accents ≤ 5%, low to medium saturation. Rounded spheres, cylinders, thin slabs; smooth curves, straight runs only at table and frame. Fiber finish, no pattern fills. Wall and table backdrop unless the scene specifies its own backdrop. Detail budget: level 3, about 6 objects.
+
+## FIGURE
+[EXTRAPOLATED] No figure sample exists. If a figure is required, render it as a handmade felt and clay doll with simple proportions, formed by material planes without lines, with eyes, nose and mouth as minimal dots or omitted. Hair is a wool felt mass that keeps the scene's hairstyle. Poses and clothing follow the scene; when the scene specifies an action, the action comes first, and style only adds wool felt, matte clay and rough cloth texture.
+
+## PRIORITY
+Priority order: photographed felt and clay diorama look → forms by value, no outlines → warm window light with soft contact shadows → muted sand and gray blue palette → material contrast.
+
+## NEGATIVE
+Avoid stop-motion clay animation, glossy 3D product renders, vector or oil painting still lifes, black outlines, cel shading, plastic sheen, over-sharpened HDR, extra props, ornate patterns, heavy background blur, warm color cast, vignette, no speed lines, readable text, logos.
+
+## SCENE
+A miniature still life photographed on a low wooden table in a window corner: a folded gray-blue cloth, a clay ball, a metal cup, a drinking glass, a small potted plant and an apple. No people.
