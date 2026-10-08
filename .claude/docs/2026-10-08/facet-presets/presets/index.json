@@ -9,6 +9,49 @@
   "style_clause_current": "Carry how the style reference draws figures. Any figures have slender naturalistic animated proportions, about seven and a half heads tall, with long limbs and small refined hands; tall almond eyes with a thick dark upper lash line drawn as one solid band, a dark iris carrying one small bright highlight and a lighter lower half, and no hard eyeliner beyond the lash band; a tiny sharp nose indicated by a short stroke and a small simply drawn mouth; hair is drawn as a few large clumps breaking into pointed strand tips; skin and cloth are cel shaded with one soft-edged shadow tone in a cool violet-blue, and shapes are held by thin colored outlines rather than heavy black ink.",
   "assembly": "both",
   "facets": {
+   "version": "hp-v1.2.3+figure-board+compile-v3",
+   "extracted_at": "2026-10-08",
+   "probe_anchors": "Colored fine outlines of one weight, about 0.1% of image width: #18282d on objects, dark green on plants, brown grey on skin, hair in a darker tint of its own color; no lines on shadow edges; interior lines for seams and folds, no hatching. Hard cel shadows, warm cream lights, cool blue grey darks: curved planes on spheres, wedges on cloth; gradients only on lit sphere sides, walls and wood. Metal shows curved vertical reflection bands, glass thin arcs; thin painterly grain stays inside cels. Figures are about 8.4 heads tall, torso about 30% of height, lower legs about twice the thighs; anime faces with two iris tones, one catchlight, small nose, narrow pointed chin. In daylight, mean luminance about 56%, near-black about 4%, not a dark image; accent orange #f7a327 ≤ 3%, rounded organic surfaces; planar single tone cast shadows. Detail budget: dense, about 34 garment lines and 14 hair strand lines per figure, no decorative marks.",
+   "figure": "The figure combines an anime style face with enlarged eyes, a reduced nose and a thin narrowing jaw line, set on an anime body with a small head, narrow shoulders, a slightly compressed torso and lengthened lower legs. It is drawn as digital colored line art and cel coloring with a thin painterly surface grain, with high density eyes, thin colored lines and large cel planes whose grain stays lower in contrast and smoother than on still-life objects. Figures are about 8.4 heads tall, measured from the top of the skull rather than the hair, measured to the top of the hair or hat, so keep the skull itself small, with a head to torso ratio of about 1 to 2.5. The torso is a compressed torso about 30% of the height, and the legs, soles included, are about 54% of the height. The lower leg is, as stretched lower legs, about twice as long as the thigh, while the forearm and upper arm are about equal. The whole arm is about 38% of the height, so the fingertips reach mid thigh. The shoulder joints sit about 1.6 skull widths apart. The upper arm is about a third of the head width and the wrist about a fifth, and the limbs taper gently, with garments narrowing from thigh to ankle. The skull is round and narrows along the cheeks to a small curved chin. The eyes have a neutral corner tilt of about 3 degrees and a normal lid opening, with the upper lid covering about the top 15% of the iris. They are horizontally long almonds about 1.7 times as wide as tall, about 29% of the face width, centred slightly below the middle of the head, and their pointed outer corners extend the upper lid band into a short wedge. They are high density eyes rendered as two iris tones, darker above and lighter below, with a thin dark iris rim and one pupil plane darker than the iris. The iris is about 45% of the eye width and cut at the top by the lid, with no ring texture, no radial texture, no multiple reflections and no lower reflection crescent. Each eye has one small vertical oval catchlight in the upper iris, slightly to the screen left, about a fifth of the iris width, with no secondary catchlights and no glow. Two outer lash clumps are fused into a thick upper lid band about 0.2% of image width that tapers to a point outward, and there are no separate lower lashes. The lower lid is only a short, faint, broken line about 0.05% of image width, with no full dark rim and no tear duct mark. The eye outlines use the same dark colored line as the style, with the upper band the darkest. The sclera is yellowish white at both sides, with a faint shadow under the upper lid. Brows are thin gentle arcs filled as shapes with tapered ends, in a dark tone close to their own color, and are hidden where hair overlaps them. The nose is a short vertical line with a small side shadow and no realistic nostrils. The mouth is a short horizontal stroke, never lips closed by a heavy outline. Hands have separated fingers with thin joint lines and no tendons or detailed nails. Elbows get a short line and wrists a gentle curve, with no muscle hatching. Shoes are rounded wedges about 0.86 head long and oversized 0.73 head tall, with thin soles about a ninth of the shoe height and about 5 construction lines each, and there is no extreme enlargement of hands or feet. Hair is built from long curved clumps that gather into thin pointed tips: about 7 large clumps holding about 14 low-contrast strand lines, with about 8 outer points, the longest about a sixth of the face height. Hair highlights are short, broken, angular patches shaped like wedges and trapezoids that follow the flow at low contrast, and the hair outline is a darker tint of its own color; hairstyle and color follow the content. Clothing is matte color planes in which large fold shading dominates small texture, with long fold lines paired with wedge-shaped shadow planes. Garments follow the body with some ease, bend gently at sleeve ends and knees, and carry no added ornaments. Poses tend to be relaxed and upright, with the weight between both feet, shoulders and hips nearly level, and a straight central axis without a strong S-curve. Arms tend to hang almost straight, leaving small gaps beside the torso and a gap between the legs. Joints are expressed with restraint and no foreshortening exaggeration; when the scene specifies an action, the action comes first and this rhythm is applied to it. Expressions are made with the brow arcs, the lid opening and the mouth corners, with no comic expression marks. Skin keeps the character's own color with low-saturation shadow planes in about two cel steps, a base plus an under-chin shadow. It stays matte, with only a light plane near the nose, no glossy highlights, a faint broad cheek color change, no diagonal blush marks and no pores. Detail budget: dense — each figure, regardless of its size on screen, carries about 34 structural garment lines (about 8 on the top, 16 on the bottoms and 10 on the shoes) plus about 20 repeated lines on functional eyelets and laces, tops in three value steps, hair as described with about 14 strand lines, each eye about eight elements in total, no decorative marks and no speed lines.",
+   "figure_extrapolated": false,
+   "priority": "Priority order: thin colored lines with hard-edged cel shadows → metal reflection bands → compressed torso, stretched lower legs → large eyes, small nose, pointed chin",
+   "negative": "Avoid chibi anime, glossy game illustration, semi-realistic portraiture, flat vector cartoon, moire, sensor noise, compression halos, photographic glare, thick black outlines, uniform plastic gloss, giant shoes, extreme body compression, copied still-life arrangement, copied two-person lineup, copied outfits, copied hairstyles, bokeh particle fields, intricate radial irises, wet floor reflections, ornamental filigree, readable text, logos, watermarks, signatures.",
+   "capsule": "Digital cel shaded illustration: colored fine line art over flat cels with a thin painterly grain on walls, wood and matte forms. Lines are one uniform weight about 0.1% of image width, #18282d, tapering to points: blue grey on objects, dark green on plants, brown grey on skin, hair edged in a darker tint of its own color, no line on shadow edges, interior lines only for seams and folds, no hatching. Shading is hard cels, warm cream lights, cool blue grey darks, curved planes on spheres and wedges on cloth; metal shows vertical reflection bands; gentle gradients only on lit sides of spheres, broad walls and wood; no gloss on skin or cloth. In daylight scenes mean luminance about 56% and near-black about 4%, not a dark image; night keeps these roles, only darker; planar cast shadows #404444 extend about three quarters of object height, single tone. Neutrals #7f7f75, #60706d, #929c8c, #dadbc4, #ccb189, shadows #1f353d, #4a4b45, highlight #f7e7cc; objects keep their own colors, no backdrop color; accent saturated orange #f7a327 ≤ 3% of the image as one rounded organic plane, never on walls or cloth. Detail budget: dense, about 34 garment lines per figure, no decorative marks.",
+   "scene": "Six still-life objects (a sphere, a metal cup, a glass, a cloth, a fruit and a potted plant) sit on a table by a window, seen slightly from above, with the front cloth partly overlapping the plant behind; there are no people. Separately, two casually dressed people stand side by side before a plain backdrop, seen frontally head to toe with neutral faces.",
+   "words": {
+    "probe_anchors": 158,
+    "figure": 929,
+    "priority": 26,
+    "negative": 55
+   },
+   "timing": {
+    "fill": {
+     "seconds": 948,
+     "model": "gpt-6-astra",
+     "effort": "high"
+    },
+    "compile": {
+     "seconds": 223.4,
+     "model": "claude-opus-5-5",
+     "effort": null
+    },
+    "priority": {
+     "seconds": 32.0,
+     "model": "claude-sonnet-5-5",
+     "effort": null
+    }
+   },
+   "figure_source": "figure_board",
+   "board_image": "presets/jp_anime/board.jpg",
+   "board_prompt": "presets/jp_anime/board_prompt.txt",
+   "compile_rules": [
+    "no expression default or distribution in FIGURE (expression means only)",
+    "PROBE_ANCHORS absolute cap = grade cap + 40 (this style: 160)"
+   ],
+   "compile_model": "claude-opus-5-5",
+   "priority_model": "claude-sonnet-5-5"
+  },
+  "facets_v2": {
    "version": "hp-v1.2.3+figure-board",
    "extracted_at": "2026-10-08",
    "probe_anchors": "Use linear perspective from above. Keep uniform 0.098% of image width outlines, 1 px at 1024 px, in #18282d; taper ends without hatching. Use hard cel boundaries, two or three planes, gradients only in curved light or reflections, and one or two hard shadows. Daylight mean luminance is 56%, near black 4%, never dominant. Mute large planes under warm light and cool shadows; highly saturated accent #f7a327 ≤ 3% of the image stays on few large organic planes, never walls or cloth. Rightward planar shadows span 74% of height; reflections form curved bands and planes keep grain. Subjects occupy one fifth of frame height with cropped foregrounds and 20% low density upper space. Detail budget: grade 4, dense: about 34 structural lines and about 20 repeats per figure regardless of screen size, about 14 hair strands in about 7 masses, two iris tones, one catchlight, and no decorative marks.",
@@ -40,10 +83,7 @@
      "model": "gpt-5.6-sol",
      "effort": "medium"
     }
-   },
-   "figure_source": "figure_board",
-   "board_image": "presets/jp_anime/board.jpg",
-   "board_prompt": "presets/jp_anime/board_prompt.txt"
+   }
   },
   "facets_v1": {
    "version": "hp-v1.2.3",
@@ -109,6 +149,49 @@
   "style_clause_current": "Carry the style reference's scene language as well: its color energy, its pattern and decoration language, its density of set dressing and background detail, and the way it stages depth.",
   "assembly": "both",
   "facets": {
+   "version": "hp-v1.2.3+figure-board+compile-v3",
+   "extracted_at": "2026-10-08",
+   "probe_anchors": "No outlines (0% of image width): edges are soft value transitions, and folds read only through shading, no hatching. Shading blends continuously with one soft shadow region per form, never cels; sharp highlights only on metal, glass rims and leaves; soft contact cast shadow #50473a about 58% of object height. Broad soft light from upper left over warm neutrals, mean saturation about 20%; in daylight scenes mean luminance about 51%, near-black under 3%, night scenes only darker. No color is reserved for the background; leaf #373a18 stays on organic surfaces. Figures are lineless anatomical volumes about 7.9 heads tall, horizontally long eyes about 18.6% of face width, natural skin and hair grain. Lens perspective from slightly above, real physical surroundings unless the scene specifies its own backdrop. Main subject about 18% of frame height. Detail budget: rich — about 24 garment features as shading, one textured hair mass, eyes about 5 elements, no decorative marks.",
+   "figure": "Realistic figures throughout: a realistic face with horizontally long eyes, a dimensional nose and continuous skin shading, on a realistic body, rendered lineless with continuous shading and fine material texture like the rest of the image. Figures stand about 7.9 heads tall, measured from the top of the skull rather than the hair, measured to the top of the hair or hat, so keep the skull itself small, with a head to torso ratio of about 1 to 3.1; measured at the trouser fork the torso is about 39% of the height and the legs about 43%, so keep anatomical proportions and do not copy a sagging crotch into the body; the arms reach about 41% of the height with the fingertips at the upper thigh, the lower leg is stretched lower legs about 1.6 times the thigh, the forearm about 0.8 of the upper arm, and the shoulders about 2.2 head widths across. The head tapers gently from forehead and cheekbones to the chin, the nose is modeled with a softly bright bridge and shadowed nostrils, and the mouth is a continuous lip color with a narrow dark central gap that fades at the corners. The eyes are standard eyes: almond shaped and horizontally long, about 3.2 to 1, with level outer corners and narrow pointed corners without ink tails, a normal relaxed lid opening in which the upper lid covers the top of the iris and sclera shows on both sides, each eye about 18.6% of the face width and centered about 47% of the way down the head; there is one tiny catchlight at the upper left of the iris, about 0.1% of image width, with no secondary catchlight and no glow; the lashes are merged into the upper lid shadow band, with no separately drawn lashes; a thin upper lid shading band about 0.1% of image width tapers at both ends, and a faint, broken lower lid edge about 0.05% of image width is never a closed dark contour; the lid edges take a natural brown to reddish brown shadow tone, the sclera carries pale gray shading rather than flat white, and a small flesh-toned tear duct sits at the inner corner. Eyebrows are natural hair grain in gentle curves that taper toward the ends. Hands are anatomical, about 0.75 face heights long, with fingers separated by real segments and overlaps and with tendons and knuckles in soft shading, never mitten shapes; shoes are rounded solid volumes about 0.8 face heights long and about 0.54 head heights tall, with a front sole about 10% of their height. Hair is one large connected mass with curved directional grain and a softly graded sheen that follows the flow, its edge softened into natural ends with about 4 broad contour bulges and no separate polygonal pieces. Garments sit on the body with real thickness and slack, drape with gravity, show fine weave in continuous shading and carry no added ornament. Poses tend to stand stable and upright with relaxed limbs, shoulders nearly level, the weight between both feet, a nearly straight line from head to feet, joints barely bent and clear gaps between each arm and the torso and between the legs, with neutral, ungestured acting; when the scene specifies an action, the action comes first and this rhythm is applied to it. Expression is carried by eyebrow angle, lid opening and the tension of the mouth corners and lips, with no cartoon emotion symbols. Skin is a natural skin color with continuous shading and gentle color changes on the cheeks and lips, matte with only slight brightening on the forehead and nose, with no round blush patches and no cel boundaries, and there are no outline strokes on the body, hair or garments. Detail budget: rich — each figure's clothing carries about 24 structural features, about 12 seams and 12 folds, drawn as shading rather than lines and kept per figure regardless of its size on screen; the hair shows directional grain without individually drawn strands; each open eye has about 5 readable elements including one catchlight; shoes carry about 4 lace segments; and there are no decorative marks.",
+   "figure_extrapolated": false,
+   "priority": "Priority order: lineless photographic continuous shading with material-specific reflections → soft side light with warm, low-saturation neutrals → realistic anatomical volumes without outlines → horizontally long eyes with natural skin and hair grain.",
+   "negative": "Avoid semi-realistic illustration, anime, stylized 3D animation, fashion illustration, compression blocking, sharpening halos, ink outlines, cel shading, exaggerated fashion proportions, plastic skin, copied still-life arrangement, copied outfits, copied hairstyles, compulsory frontal lineup, bokeh particle fields, wet mirror floors, geometric hatching, ornamental embroidery, readable text, logos, watermarks.",
+   "capsule": "Photographic digital rendering: continuous optical shading and fine material grain, no ink. No outlines (0% of image width); edges are soft value transitions, crisp only on metal and glass reflections, and folds read through shading, with no hatching. Shading blends continuously, never in stepped cels: one soft shadow region per form, sharp highlights only on metal, glass rims and leaves, and a soft contact cast shadow in #50473a about 58% of the object height. Mid key: in daylight scenes mean luminance about 51%, near-black under 3%; night scenes only darker. Warm neutrals, mean saturation about 20%: #ccc6bf, #56523e, #695e4f, highlight #f0ede9; objects are #aea294, #d3ccc7 and #665a4c bodies, no color is reserved for the background, and leaf #373a18 stays on leaves and fruit, never on cloth. Broad soft light from the upper left, no bloom; lens perspective from slightly above; forms are spheres, cylinders and tapering organic curves. Detail budget: rich — about 24 garment features per figure as shading, hair one finely grained mass, eyes about 5 elements, no decorative marks or pattern fills.",
+   "scene": "A still life on a table by an interior window: a sphere, a folded cloth, a metal cup, a glass of water, fruit and a potted plant arranged front to back, seen from slightly above, with no people. Separately, two adults in casual clothes stand apart facing forward before a plain wall and floor, neutral faces, shown head to toe.",
+   "words": {
+    "probe_anchors": 155,
+    "figure": 691,
+    "priority": 33,
+    "negative": 46
+   },
+   "timing": {
+    "fill": {
+     "seconds": 900,
+     "model": "gpt-6-astra",
+     "effort": "high"
+    },
+    "compile": {
+     "seconds": 160.5,
+     "model": "claude-opus-5-5",
+     "effort": null
+    },
+    "priority": {
+     "seconds": 20.6,
+     "model": "claude-sonnet-5-5",
+     "effort": null
+    }
+   },
+   "figure_source": "figure_board",
+   "board_image": "presets/real/board.jpg",
+   "board_prompt": "presets/real/board_prompt.txt",
+   "compile_rules": [
+    "no expression default or distribution in FIGURE (expression means only)",
+    "PROBE_ANCHORS absolute cap = grade cap + 40 (this style: 160)"
+   ],
+   "compile_model": "claude-opus-5-5",
+   "priority_model": "claude-sonnet-5-5"
+  },
+  "facets_v2": {
    "version": "hp-v1.2.3+figure-board",
    "extracted_at": "2026-10-08",
    "probe_anchors": "Use natural lens perspective with slight downward views and selective focus. Use no outlines; material values separate forms, reflective boundaries are about 0.20% of width, 2 px at 1024 px width, and garments carry about 24 shaded boundaries. Use continuous gradients, soft form shading and soft #50473a contact shadows about 57.6% of object height toward the right and back, never cel steps. Daylight has mean luminance about 51%, near black under 3%, not mostly black, bright planes about 11.2% and large planes around 20% saturation; nights keep roles darker. No colour is background only; objects keep warm natural colours; #373a18 stays on plants and fruit, never as a graphic spot. Keep the object about 18.36% of frame height, open space, grounding and natural crops. Detail budget: high; about 24 garment boundaries per figure regardless of size, unquantified hair, about 5 eye elements, about 4 lace segments, no decorations or hatching.",
@@ -140,10 +223,7 @@
      "model": "claude-sonnet-5-5",
      "effort": null
     }
-   },
-   "figure_source": "figure_board",
-   "board_image": "presets/real/board.jpg",
-   "board_prompt": "presets/real/board_prompt.txt"
+   }
   },
   "facets_v1": {
    "version": "hp-v1.2.3",
@@ -209,6 +289,49 @@
   "style_clause_current": "Carry the style reference's scene language as well: its color energy, its pattern and decoration language, its density of set dressing and background detail, and the way it stages depth.",
   "assembly": "both",
   "facets": {
+   "version": "hp-v1.2.3+figure-board+compile-v3",
+   "extracted_at": "2026-10-08",
+   "probe_anchors": "No outlines and no secondary contour; interior structure appears as soft shading seams about 0.1 to 0.2% of image width. Shading is lineless and continuous, no tone steps, no hatching; one connected soft shadow per form; soft contact shadows darkest at contact, never separate ellipses. Matte surfaces keep fine grain, cloth shows short fibers, metal soft vertical reflection bands, glass a clear rim and thick base. Gentle perspective, slightly from above, all in focus. In daylight scenes mean luminance about 64%, near-black about 2%, mean saturation about 16%; objects keep own colors over warm neutral #efede9; accent #aaa34d ≤ 0.65% on one small surface. Warm wall over fine wood grain unless the scene specifies its own backdrop; subject about 74% of frame height, about 43% empty margin. Detail budget: extreme, about 32 seams and folds per figure, hair as large clumps with strand texture, eyes with five shading elements, no decorative marks, no speed lines.",
+   "figure": "The figure has a cartoon face with round enlarged eyes, a small tidy nose and a rounded chin. It sits on a semi-realistic body whose only stretch is in the lower legs. Everything is rendered as 3D animation, with no outline strokes, curved volume shading, and diffusion and reflection that differ by material. The figure is about 7.4 heads tall, measured to the top of the hair or hat, so keep the skull itself small, with the head measured to the top of the skull under the hair rather than to the top of the hair. Head to torso is about 1 to 2.55. The torso, from the shoulder line to the crotch, is about 34% of the height, and the legs are about 47% of the height including the soles. The lower leg from knee to sole is stretched lower legs about 1.63 times the thigh, while the upper arm and forearm are about equal in length. The arms are about 39% of the height, so hanging fingertips reach the upper thigh just below the crotch. Shoulders span about 2.2 skull widths. Hands are about 0.73 face heights long. Shoes seen from the side are about 0.9 head lengths long and 0.56 head lengths high, with rounded toes, a gentle wedge and a front sole about 14% of the shoe height. Limbs are round in section with a gentle taper: the upper arm is about 0.37 face widths thick, the forearm about 0.30, and the legs narrow steadily toward the ankle. Elbows, wrists and knees are soft bends without muscle bundles or joint lines. Clear gaps separate each arm from the torso, about a tenth of a head height wide, and the legs stand about half a head height apart. The head is rounded on top and narrows gently to a rounded chin. The eyes have a neutral, nearly level corner tilt. They are opened wide, so the upper lid covers only about a tenth of the iris. They are horizontally long at about 1.7 to 1 and round in form, with short rounded corners and no trailing tail line. Each eye is about 24% of the face width, centered near the middle of the head height. Eye treatment is standard: a continuous iris gradient, darker above and lighter below, with a thin dark rim and a distinct pupil. There is no separate lower reflection, and the iris fills about 60% of the eye width. There is one small oval catchlight toward the upper left at about a fifth of the iris height, in the same direction in both eyes, with no secondary catchlight and no glow. The white shows at the sides, with a faint shadow under the upper lid. Lashes are fused into the upper lid band, with no individual lashes. The upper lid is a thin shading line about 0.1% of image width, strongest in the middle and tapering at the ends. There is no lower lid line, and the lid shading is a brown to reddish brown local tone. Eyebrows are wide curved masses with fine texture, tapering at the ends and never drawn over the hair. The nose is a small solid form whose rounded tip and nostrils are separated only by shading. The mouth is a short thin shading gap with faint lip volume and no dark rim. Hands have separated fingers, rounded backs and tapering fingertips. Hair is built from large curved clumps that start round at the root and narrow toward short tips. It carries surface strand texture and soft gradient highlights that follow each clump, with no separate hair lines and no outline. A short hairstyle like the sample has about 8 large clumps and about 8 short tufts along its outline, but the hairstyle itself sets the count. Garments show fine fiber texture and follow the body in soft volumes with gentle gravity sag. Functional ties keep their form, and no decoration is added. Poses tend toward a stable upright stance with level shoulders and hips and the weight centered between both feet. The line from head to pelvis stays nearly straight, and relaxed limbs hang almost straight, leaving clear gaps between the limbs. There is no exaggerated foreshortening, and the acting is neutral. When the scene specifies an action, the action comes first and this rhythm is applied to it. Expressions are made with the gentle curve of the brows, the lid opening, the mouth corners and the curve of the cheeks, with no cartoon emotion symbols. Skin keeps its own surface color with continuous curved shading and soft, borderless blush on the cheeks and ears. It has a near-matte, light satin sheen with a small soft highlight on the nose tip, and no cel boundaries, no pores and no plastic gloss. Detail budget: extreme. Each figure carries about 32 structural lines regardless of its size on screen: about 13 on the top, 13 on the bottom and 6 on the shoes. These are drawn as soft shading seams, plus fine vertical ribs about 0.3% of image width apart on knit hems. Hair is large clumps with strand texture, and the eyes carry five shading elements. There is no hatching and no added decoration. Small distant figures keep face and garment volume without forcing every eye element.",
+   "figure_extrapolated": false,
+   "priority": "Priority order: lineless soft continuous volume shading → distinct matte, fabric and reflective materials → realistic torso with stretched lower legs → round enlarged eyes with soft lineless face",
+   "negative": "Avoid photorealism, anime cel animation, clay animation, low poly art, moire, sensor noise, compression halos, black contour strokes, hard cel bands, compressed torsos, giant hands and shoes, copied still life arrangement, duplicate portrait layout, copied character outfits, bokeh particle fields, wet floor reflections, dense individual eyelashes, geometric hatching, readable text, logos, watermarks.",
+   "capsule": "A 3D render look of stylized rounded volumes: matte fine grain, short fabric fibers, vertical metal reflection bands, and clear glass with thick bases. No outlines (0% of image width) and no secondary contour; interior structure shows as soft shading seams about 0.1 to 0.2% of image width, no ink strokes, no hatching. Lineless continuous shading under soft light from upper left: gradients on curved forms, folds, reflections and background light, no tone steps, one connected soft shadow per form, a soft contact shadow in darkened ground tone #8e7c66 fading within about a fifth of object height, no separate ellipse. In daylight scenes mean luminance about 64% with near-black about 2% in contact creases, not a dark image. Mean saturation about 16%: #51555f, #c1bcb6, shadow #34363c, highlight #f1efeb, metal sheen #d5c5b8; objects keep own colors on warm neutral #efede9 ground; accent moderately saturated yellow green #aaa34d ≤ 0.65% of the image as one small rounded surface, never on background or glass. Shapes are spheres, tapered cylinders and rounded folded bands with continuous curves. Detail budget: extreme, about 32 seams and folds per figure plus hem ribs about 0.3% of image width apart, hair as large masses with strand texture, no hair lines, eyes with five shading elements, no decorative marks.",
+   "scene": "A comparison board groups a sphere, folded cloth, metal cup, glass, fruit and potted plant before a light wall and wooden tabletop, seen slightly from above, with one casually dressed person shown twice: a large close view at left, a frontal full figure centered. A second board shows two people standing apart, frontal, full length, before plain wall and floor.",
+   "words": {
+    "probe_anchors": 155,
+    "figure": 879,
+    "priority": 29,
+    "negative": 52
+   },
+   "timing": {
+    "fill": {
+     "seconds": 1061,
+     "model": "gpt-6-astra",
+     "effort": "high"
+    },
+    "compile": {
+     "seconds": 227.8,
+     "model": "claude-opus-5-5",
+     "effort": null
+    },
+    "priority": {
+     "seconds": 25.1,
+     "model": "claude-sonnet-5-5",
+     "effort": null
+    }
+   },
+   "figure_source": "figure_board",
+   "board_image": "presets/real_3d/board.jpg",
+   "board_prompt": "presets/real_3d/board_prompt.txt",
+   "compile_rules": [
+    "no expression default or distribution in FIGURE (expression means only)",
+    "PROBE_ANCHORS absolute cap = grade cap + 40 (this style: 160)"
+   ],
+   "compile_model": "claude-opus-5-5",
+   "priority_model": "claude-sonnet-5-5"
+  },
+  "facets_v2": {
    "version": "hp-v1.2.3+figure-board",
    "extracted_at": "2026-10-08",
    "probe_anchors": "Use gentle linear perspective, a slight high view for objects, near eye level for figures, shallow depth, full focus, and no wide angle distortion. Render rounded 3D volumes with no drawn outlines or auxiliary contours: silhouette width is 0% of image width, or 0 px at 1024 and 2048 px widths; about 32 garment structures per figure appear only as material boundaries, with no hatching. Use continuous curved shading, gradients only on volumes, folds, reflections, and background illumination, plus short soft #8e7c66 family contact shadows around 21.9% of object height. In daylight scenes mean luminance is about 64%, high key boards may reach 74%, and near black stays around 1 to 2%, never dominant; nights keep the roles and become darker. Keep large planes near 16% saturation; #efede9 is neutral ground and reflected light, objects retain content assigned colors, and accent #aaa34d ≤ 0.65% of the image on one small continuous colored surface, never across neutral ground or transparent areas. Use a neutral wall and fine wood grain support unless the scene specifies its own backdrop. No decorative marks. Keep primary subjects around 58% to 73.7% of frame height, about 43% upper breathing room, and separated silhouettes. Detail budget: maximal: about 32 garment structures per figure regardless of screen size, no independent hair lines, five eye elements, no decorative marks, and about 16 material grooves per 100 px of hem.",
@@ -240,10 +363,7 @@
      "model": "claude-sonnet-5-5",
      "effort": null
     }
-   },
-   "figure_source": "figure_board",
-   "board_image": "presets/real_3d/board.jpg",
-   "board_prompt": "presets/real_3d/board_prompt.txt"
+   }
   },
   "facets_v1": {
    "version": "hp-v1.2.3",
@@ -309,6 +429,49 @@
   "style_clause_current": "Render this as a finished example of that look applied to a whole shot - a sun-bleached desert grade: a low-saturation palette of sand, ochre, bone and pale dust-grey with no clean or vivid color anywhere in it; hard, low, raking key light that carves hot, heavy, sharp-edged shadows and bleaches its highlights; fine airborne dust hanging in every beam of light and a pale haze swallowing the far distance; gritty porous weathered stone, dust-filmed thick glass, pitted patinated brass and coarse rough-woven linen wherever such materials appear; monumental scale, heavy grain, a filmic grade, and a mood of solemn grandeur. This is a color, light and material treatment only - keep the scene exactly as described, with its own stated time of day and light source, and do not relocate it or add desert scenery. Expose it high-key and bright: the whole frame is light, pale and sun-washed, with a luminous pale haze, only a few small deep shadows, and no large dark areas anywhere in the frame.",
   "assembly": "both",
   "facets": {
+   "version": "hp-v1.2.3+figure-board+compile-v3",
+   "extracted_at": "2026-10-08",
+   "probe_anchors": "Photographic lens perspective, slightly from above. No drawn outlines anywhere; edges are value transitions, and seams and folds read as dark planes, not lines. Continuous gradients on curves, cloth and metal; soft form shadow, one connected shadow per form; directional cast shadow toward lower left about 73% of object height, #483522, softening with distance. Warm directional light from upper right; in daylight mean luminance about 32%, near-black about 25%, not mostly black, night only darker. Mean saturation about 44%; #dbcbb7 and browns serve walls and objects alike, no color is backdrop only, no accent hue. Dry porous grain, woven fibre, rough oxidized metal and refracting glass; arc highlights on metal, diffuse light on matte surfaces. Figures stay anatomically realistic. Main object about 18% of frame height, quiet upper wall. Detail budget: dense — about 26 garment lines per figure, about 6 tapering hair tips, no drawn strands, eyes of 6 parts, no decorative marks.",
+   "figure": "A realistic face with small natural eyes, a modeled nose and a natural jawline, on a realistic adult body, rendered as continuous photographic shading with skin and weave texture, no cel boundaries and no outlines on body, garments or hair; no period graphic markers. Proportions are measured to the top of the skull: about 8 heads tall, measured to the top of the hair or hat, so keep the skull itself small, with head to torso about 1:3.2, the torso from shoulder line to crotch about 39% of the height and the legs about 44% including the shoe soles; the lower leg is stretched lower legs about 1.7 times the thigh including the shoe, and the forearm about 0.9 times the upper arm; arms are about 41% of the height and hang so the fingertips reach the upper thighs; shoulders are about 2.25 head widths across; forearms are about a quarter of a head width thick and taper toward the wrist; do not add torso compression or calf stretching. Hands are about 0.65 face heights long, about 7% of the height, and shoes stand oversized about 0.63 head heights tall as rounded volumes on thin layered soles about one eighth of the shoe height. The head is an anatomical oval narrowing gently from cheek to a rounded chin. Standard eyes: neutral outer corners, a normal opening with the upper lid covering about the top quarter of the iris, horizontally long almond eyes about 3:1 and about a fifth of the face width, set near the middle of the head height, with pointed corners that meet without trailing tails; the iris has two value zones, darker above and lighter below, with a thin dark rim and no lower reflection crescent; one small round catchlight at the upper right of the iris, about a seventh of its diameter, no secondary catchlight and no glow; a narrow grey-white sclera shows on both sides of the iris; lashes are fused into the dark upper lid band; the upper lid line is a thin soft shading about 0.1% of image width rather than an ink stroke, the lower lid line is partial and faint, and eye outlines are brown to reddish brown; the tear duct is a small skin-colored form. Eyebrows are natural bands of short hairs shaped by density without an outline; the nose is modeled through bridge, wings and nostrils in continuous shading, and the lips show volume and a central parting rather than a single line. Hands have separate fingers with gentle joint bends and small nail planes, never mittens. Hair is one large outer mass filled with strand-direction texture and broken reflections along the strands, not a single highlight band, ending in about 6 small tapering tips with no large spikes; no added accessories. Garments are matte woven shells that fall naturally with the body, with seams and large folds as value changes and no added trims or ornaments; keep clear gaps between the arms and torso and between the legs. Poses tend to stand upright and stable, with head and torso nearly vertical, shoulders level, weight centered between both feet, arms hanging almost straight and legs straight, no S-curve and no theatrical gesture, with no exaggerated foreshortening; when the scene specifies an action, the action comes first and this rhythm is applied to it. Expression is made with eyelid opening, the gentle angle of the eyebrows, and the lips and mouth corners, with no cartoon emotion symbols. Skin keeps its own color with continuous shading and slight local color variation, low gloss with a broad faint sheen on forehead and nose, gradual warmth around cheeks and mouth with no round blush patches, no cel steps and no wax or plastic look. Detail budget: dense — about 26 structural lines per figure regardless of its size on screen (about 10 on the top, 12 on the bottom, 4 on the shoes) read as value changes, plus a fine ribbed hem of about 64 vertical columns, hair textured throughout with about 6 tapering tips and no drawn strand lines, eyes of 6 parts with one catchlight, no hatching and no decorative marks.",
+   "figure_extrapolated": false,
+   "priority": "Priority order: outline-free realistic volume with continuous shading → warm directional light with wide brown darks → dry fine grain with material-specific reflections → realistic body proportions, small natural eyes, unlined skin.",
+   "negative": "Avoid anime, cartoon, hyperreal beauty photography, stylized 3D animation, screen moire, compression blocks, color fringing, ink outlines, cel shading, plastic skin, exaggerated fashion proportions, copied still life arrangement, duplicated faces, copied outfits, copied hairstyles, bokeh fields, wet floor reflections, ornamental linework, decorative particles, readable text, logos, watermarks.",
+   "capsule": "Photographic digital realism, no linework: volume from continuous shading and dry grain, woven fibre, oxidized metal and thick refracting glass. No drawn outlines anywhere; edges are value changes, sharp in focus, seams and creases are dark planes, no hatching, no rim lines. Smooth gradients on curves, cloth and metal; soft form shadow, one connected per form; thin arc highlights on metal, broad diffuse light on matte surfaces; directional cast shadows toward lower left about 73% of object height, #483522, softening with distance. In daylight mean luminance about 32%, near-black about 25%, not mostly black; night keeps these roles, only darker. Warm palette: #483522 14%, neutral #dbcbb7 13%, darks #34271a, #3e2d1d, #2c2015, saturation about 44%; no color kept for the ground alone, no accent (0%). Unexaggerated spheres, cylinders, thin leaves and folds, straight edges against curves; warm light from upper right, no bloom; slight downward lens perspective. Detail budget: dense — about 26 garment lines per figure plus fine hem ribbing, about 6 tapering hair tips, no drawn strands, eyes of 6 parts, no decorative marks.",
+   "scene": "An indoor still life on a table by a window: a cloth, a sphere, two containers, a fruit and a small potted plant overlap front to back, seen from slightly above, with a wall and the outside beyond; no people. A separate board shows two adults in casual clothes standing apart, facing front, fully visible from head to shoes against a plain backdrop.",
+   "words": {
+    "probe_anchors": 154,
+    "figure": 690,
+    "priority": 32,
+    "negative": 47
+   },
+   "timing": {
+    "fill": {
+     "seconds": 1006,
+     "model": "gpt-6-astra",
+     "effort": "high"
+    },
+    "compile": {
+     "seconds": 135.7,
+     "model": "claude-opus-5-5",
+     "effort": null
+    },
+    "priority": {
+     "seconds": 18.0,
+     "model": "claude-sonnet-5-5",
+     "effort": null
+    }
+   },
+   "figure_source": "figure_board",
+   "board_image": "presets/real_desert_fantasy/board.jpg",
+   "board_prompt": "presets/real_desert_fantasy/board_prompt.txt",
+   "compile_rules": [
+    "no expression default or distribution in FIGURE (expression means only)",
+    "PROBE_ANCHORS absolute cap = grade cap + 40 (this style: 160)"
+   ],
+   "compile_model": "claude-opus-5-5",
+   "priority_model": "claude-sonnet-5-5"
+  },
+  "facets_v2": {
    "version": "hp-v1.2.3+figure-board",
    "extracted_at": "2026-10-08",
    "probe_anchors": "Use natural lens perspective without wide angle swelling; overlap depth and soften distance. No outlines; structural and contact transitions are about 0.15% and 0.24% of width, or 3 px and 5 px at 2048 px; no hatching. Use continuous gradients and soft form shadows; lower left #483522 cast shadows match objects, reach 73% of height, and soften from 0.20%. Daylight averages about 32% luminance, with near black about 25%, not mostly black, and broad lights moderately desaturated; night keeps roles, only darker. Use #483522 for dark and #dbcbb7 for lit surfaces, neither ground only; no independent accents. Keep textured ground and low information upper space unless the scene specifies its own backdrop. Detail budget: maximal; each figure, regardless of screen size, has about 22 garment and 4 shoe boundaries, about 64 ribs only in a comparable hem sample, hair texture, 6 outer tips, 6 eye elements, and no decorative marks.",
@@ -340,10 +503,7 @@
      "model": "claude-sonnet-5-5",
      "effort": null
     }
-   },
-   "figure_source": "figure_board",
-   "board_image": "presets/real_desert_fantasy/board.jpg",
-   "board_prompt": "presets/real_desert_fantasy/board_prompt.txt"
+   }
   },
   "facets_v1": {
    "version": "hp-v1.2.3",
@@ -409,6 +569,49 @@
   "style_clause_current": "Apply this period look to the whole scene: warm candlelight around 3000K mixed with a soft window glow, low-to-medium contrast, with soft painterly shadows falling off like an old-master oil painting. A muted low-saturation palette of aged gold, umber and deep green. Metal reads as tarnished silver and old brass, glass as antique cut crystal, fabric as fine lace over rich brocade, foliage as dark olive-green. Gentle film grain and a painterly period-drama grade. Mood: dignity and solitude.",
   "assembly": "both",
   "facets": {
+   "version": "hp-v1.2.3+figure-board+compile-v3",
+   "extracted_at": "2026-10-08",
+   "probe_anchors": "Lens perspective from slightly above, background softly out of focus. No outlines on any layer; edges come from light and value contrast, interior structure is shading only. Smooth continuous gradients on curves, cloth and metal, one soft connected shadow mass per form, no cel shapes; soft dark brown #171309 contact shadows. Warm low key: mean luminance about 19% in window light, near-black about 58% as deep brown, not pure black; night scenes only darker. Fine grain and fiber on surfaces. Shared brown palette with no colour reserved for the backdrop; muted russet accent #35140e ≤ 3.3%, on one small organic surface. Figures keep uncompressed adult proportions, about 7.7 heads, natural hands. Small horizontally long eyes, one tiny catchlight, no ink lines on faces. Main subject about 59% of frame height. Detail budget: extreme — about 34 shaded garment boundaries per figure, about 6 eye elements, no decorative marks.",
+   "figure": "Realistic throughout, with standard eyes: a realistic adult face with a horizontally long eye opening, a dimensional nose and finely uneven skin, on a realistic adult body with no torso compression, rendered photographically with no outlines and shading attached to each material. Figures are about 7.7 heads tall, measured from the top of the skull rather than the hair. Measured to the top of the hair or hat, so keep the skull itself small. Head to torso is about 1 to 3, and the torso from shoulder line to crotch is about 39% of the height. The legs from crotch to sole, including shoes, are about 43% of the height. The arm from shoulder to fingertip is about 40% of the height and reaches the upper thigh, with the forearm about 0.77 of the upper arm. The lower leg is, as stretched lower legs, about 1.5 times the thigh, but that ratio was taken over clothing and shoes and is not a stretch to exaggerate. The shoulders are about 2.3 head widths, and the limbs are about a third of a head width thick, tapering anatomically rather than as even tubes; a trouser leg narrows from about 134 to 110 to 99 units from thigh to knee to ankle. Hands are about 0.69 face heights long. Shoes have rounded dimensional toes and thin soles, are about 0.6 head tall in front view, and the sole is about a tenth of the shoe height. The eyes come next. Their outer corners tilt very slightly upward, about 3 degrees, and the lids sit at an ordinary opening, with the upper lid covering about the top fifth of the iris and narrow side whites visible. They are almond eyes about three times as wide as tall, each about a fifth of the face width, centred on the head's midline. These are standard eyes rendered in continuous shading: a soft two-zone iris, darker above and lighter below, with a thin dark rim and a soft-edged pupil. There is one small round catchlight in the upper iris, about a seventh of the iris width, with no secondary catchlight and no glow. Lashes are fused into the upper lid edge, with no separate lash strands. The upper lid edge is a thin soft arc about 0.1% of image width, the lower lid line is faint and broken, and the outer corners meet in a point without wing lines. Eye contours are brown and russet shading, never black ink, and the whites are shaded warm grey rather than pure white. Brows are narrow soft areas of hair texture, not single strokes. The face narrows gently from cheek to chin, and the nose and lips are modelled in continuous shading rather than reduced to symbols. Hands have separated fingers, with knuckles and the back of the hand modelled in shading, never mitten shapes. Hair is one connected mass wrapping the round skull, with fine low-contrast texture, about 4 larger tips separating at the outline, softly fading edges and scattered low-contrast sheen along the texture. It has no graphic highlight band and no countable strand lines, and its colour and length follow the character. Clothes hang naturally over the body with woven fiber texture and matte surfaces. Poses tend toward natural, restrained upright stances: shoulders and hips are level, the weight is centred between the feet and the body follows a straight vertical rhythm. Limbs are nearly straight, with slim gaps between arms and torso and a wider gap between the legs. Hands and feet are not foreshortened toward the camera, and there is no theatrical gesture. When the scene specifies an action, the action comes first and this rhythm is applied to it, keeping natural weight and anatomical joints. Expressions are made with the eye region (lid opening and brow shape) and the mouth region (lips, mouth corners and cheek volume), never with cartoon emotion marks. Skin keeps its own tone under warm light, with continuous shading and a weak diffuse sheen on forehead and nose. Lips and cheeks get low-contrast colour shifts, with no blush lines, no cel steps and no plastic gloss. Detail budget: extreme — about 34 structural garment boundaries per figure regardless of its size on screen (about 14 on the top, 14 on the trousers and 6 on the shoes), all shown as shading. Add fine repeated weave ridges about 5 px apart at 2048 px width, such as about 10 ridges across a cuff. Hair stays one mass with about 4 tips, and each eye has about 6 separated elements. There are no attached ornaments, no hatching and no decorative marks.",
+   "figure_extrapolated": false,
+   "priority": "Priority order: outline-free realistic volumes, soft continuous shading → warm low-key, fine material grain → uncompressed adult proportions, natural hands → small horizontally long eyes, no ink face lines.",
+   "negative": "Avoid anime, semi-realistic fantasy illustration, glossy three-dimensional cartoon, fashion illustration, thick black outlines, plastic skin, elongated fashion proportions, flat cel shading, copied still-life arrangement, copied garment design, copied hairstyle, copied ornamental motifs, bokeh particle fields, wet floor reflections, geometric hatching, decorative eyelashes, readable text, logos, watermarks.",
+   "capsule": "Photographically realistic digital rendering built from continuous shading and material reflections; worn, mostly matte surfaces with fine grain, only metal and glass glinting. No outlines anywhere: edges come from light and value contrast, soft on matte forms, crisp on metal and cut glass, and interior structure is shading, never lines. Smooth gradients over curves, cloth folds, metal and background; one soft connected shadow mass per form, no cel shapes; sharp highlights on metal and glass, none on matte forms or cloth; soft dark brown #171309 contact shadows fade toward lower right. Low key: in window light mean luminance about 19%, near-black about 58% as deep brown, not pure black, bright planes about 11%; night scenes only darker. Bodies #251b0d and #614e2e, shadows #1d170b, #171309 and #100b05, lit planes #998662; no colour is reserved for the backdrop; muted dark russet accent #35140e ≤ 3.3% of the image, on one small organic surface, never the background. Rounded volumes, sharp only at leaf tips and cut glass; soft upper left light, lens perspective from slightly above, blurred dark interior depth; no halftone or brushstrokes. Detail budget: extreme — about 34 structural garment boundaries per figure plus weave ridges about 5 px apart at 2048 px width, textured hair, about 6 eye elements, no decorative marks.",
+   "scene": "Board one: an indoor still life of about six kinds of objects at varied heights on a cloth-covered table by a window, seen from slightly above, no people. Board two: two adults in casual clothes stand apart side by side before a plain backdrop and floor, facing front with neutral faces, visible head to shoes.",
+   "words": {
+    "probe_anchors": 148,
+    "figure": 769,
+    "priority": 29,
+    "negative": 46
+   },
+   "timing": {
+    "fill": {
+     "seconds": 957,
+     "model": "gpt-6-astra",
+     "effort": "high"
+    },
+    "compile": {
+     "seconds": 162.4,
+     "model": "claude-opus-5-5",
+     "effort": null
+    },
+    "priority": {
+     "seconds": 24.5,
+     "model": "claude-sonnet-5-5",
+     "effort": null
+    }
+   },
+   "figure_source": "figure_board",
+   "board_image": "presets/real_euro_period/board.jpg",
+   "board_prompt": "presets/real_euro_period/board_prompt.txt",
+   "compile_rules": [
+    "no expression default or distribution in FIGURE (expression means only)",
+    "PROBE_ANCHORS absolute cap = grade cap + 40 (this style: 160)"
+   ],
+   "compile_model": "claude-opus-5-5",
+   "priority_model": "claude-sonnet-5-5"
+  },
+  "facets_v2": {
    "version": "hp-v1.2.3+figure-board",
    "extracted_at": "2026-10-08",
    "probe_anchors": "Use undistorted lens perspective above support. Draw no outlines, 0% width at 2048 px; model soft contours and structural boundaries by value; keep reflections sharp. Use continuous gradients, one soft form shadow, and soft #171309 contact shadows. In daylight, mean luminance is about 19%, near black about 58%, and bright planes about 10.9%; night keeps these roles, only darker. Keep large planes restrained: #251b0d and #614e2e dominate, shadows use #1d170b, #171309, and #100b05, and highlights use #998662; retain content colours, while dark restrained accent #35140e ≤ 3.3% appears only on small organic surfaces, never across the backdrop or every object. Use a dimensional interior, physical ground, and shallow background focus without pattern fill, unless the scene specifies its own backdrop. Compose a main mass about 59.38% of frame height, with smaller masses about 0.35 and 0.31 as large, overlap, low detail above, and peripheral cropping. No decorative marks or speed lines. Detail budget: extreme, grade 5 — about 34 structural boundaries per figure regardless of screen size, hair without an invented strand count, about four outer tips, about six elements per open eye, about 10 cuff ridges, and no hatching.",
@@ -440,10 +643,7 @@
      "model": "claude-sonnet-5-5",
      "effort": null
     }
-   },
-   "figure_source": "figure_board",
-   "board_image": "presets/real_euro_period/board.jpg",
-   "board_prompt": "presets/real_euro_period/board_prompt.txt"
+   }
   },
   "facets_v1": {
    "version": "hp-v1.2.3",
@@ -509,6 +709,49 @@
   "style_clause_current": "Render it in this look: cool clinical lighting around 7000K, very high contrast, with clean, sharp-edged, precise shadows. A restrained cool near-monochrome palette of greys and blue-blacks carrying only a few controlled high-saturation electric cyan accents. Metal reads as flawless high-polish chrome; glass is precision-cut with a faint luminous edge-lit glow; fabric is fine woven technical performance material. Ultra-sharp detail. Do not add a city skyline or distant cityscape unless the scene itself calls for one.",
   "assembly": "both",
   "facets": {
+   "version": "hp-v1.2.3+figure-board+compile-v3",
+   "extracted_at": "2026-10-08",
+   "probe_anchors": "There are no outlines; forms separate by value edges and reflections, and there is no hatching. Gradients are continuous, with soft form shadow and no cel shapes. Metal mirrors its surroundings in long bands, and glass refracts. Dim scenes run about 31% mean luminance with near black about 26%, not a mostly black image; evenly lit scenes run about 68%. Objects share the blue gray ground colors. The neon saturated cyan accent #17ccea stays ≤ 2%, only on glowing edges and rims, never on cloth or skin. Figures have realistic adult proportions with jointed volume. Eyes are long horizontal almonds with one small catchlight and soft shaded rims. Lens perspective, viewed from slightly above. The main object is about 26% of frame height. Detail budget: dense, with about 40 seam edges per figure and no decorative marks.",
+   "figure": "A realistic face with a three-dimensional nose and lips and small almond eyes, on a realistic adult body, rendered as realistic digital rendering with no outlines, continuous shading, woven cloth texture and hair sheen. The figure stands about 7.85 heads tall, measured to the top of the hair or hat, so keep the skull itself small, measured from the top of the skull rather than the hair. The head to torso ratio is about 1 to 2.88, with the torso about 37% of the height, legs about 45% of the height including shoe heels, and the lower legs about 1.32 times the thighs. The arms are about 40% of the height, with fingertips reaching the upper thigh and the forearm about 0.85 of the upper arm. The shoulders are about 2.2 skull widths across, the upper arm about 0.36 head widths thick and the wrist about 0.19, and the limbs taper gently toward the ankles. Hands are about 0.63 face heights. Shoes have rounded toes, stand about half a head tall, project about 0.68 head in length and sit on soles about a sixth of their height. The standard eyes have slightly upturned outer corners at about 5 degrees and a normal opening, with the upper lid covering the top fifth of the iris and no sclera showing above. They are long horizontal almonds about 2.8 times wider than tall, each about a fifth of the face width, set at mid head height. The iris shows two soft value zones, darker above and lighter below, with a thin soft rim, a soft edged pupil and no lower reflection. There is one small round catchlight toward the upper right, about a seventh of the iris width, with no secondary catchlight and no glow. Lashes merge into the upper lid band, with no separate strands. The upper lid is a thin gentle arc about 0.1% of image width, and the lower lid is only a faint broken edge. The eye outlines are local brown and reddish brown contact shading, never an ink line. The sclera is a narrow neutral plane, shaded at the top and not pure white, and the inner corner is a small modeled plane. Eyebrows are soft hair textured bands that taper at the ends. Hands have separate fingers and nail planes modeled in volume, with some fingers overlapping. Hair is built from rounded overlapping clumps that thin toward the tips, arranged in about 4 large flows with about 12 separable strand lines and about 7 small tufts breaking the silhouette, carrying a broken sheen that follows the strand direction rather than a single band. Clothing wraps the body and hangs with gravity, showing fold shading and woven texture, never stiff geometric blocks. Poses tend to stand upright, with shoulders and hips nearly level, the weight between both feet, arms almost straight and low gesture intensity, with no exaggerated foreshortening; when the scene specifies an action, the action comes first and this rhythm is applied to it. Expressions are made with eyelid opening, brow shape, lip tension and cheek volume, with no emotion symbols. Skin keeps its natural local color with continuous diffuse shading, a faint satin sheen on the forehead and nose, and slight warmth around the cheeks and mouth, with no blush marks, no plastic gloss and no cel steps. Detail budget: dense, with about 40 structural garment edges per figure regardless of its size on screen (about 20 on the top, 14 on the bottom and 6 on the shoes) plus about 5 lace cross lines per shoe. Eyes carry about 6 separable elements: two iris tones, one pupil, one catchlight and two lids. There are no decorative marks, no hatching and no ink lines anywhere.",
+   "figure_extrapolated": false,
+   "priority": "Priority order: no outlines, continuous soft shading, mirror-like reflection and refraction → dark blue ground with small cyan glints → realistic adult proportions → long horizontal eyes with soft shaded rims.",
+   "negative": "Avoid anime, cartoon, semi-realistic illustration, doll photography, ink outlines, flat cel shading, exaggerated fashion proportions, plastic skin, copied still-life arrangement, copied skyline layout, copied outfits, copied hairstyles, holographic interfaces, ornamental circuit lines, floating particles, decorative embroidery, readable text, logos, watermarks.",
+   "capsule": "Realistic digital rendering with continuous shading, optical reflection and refraction, fine weave and matte grain, and no brush marks. There are no drawn outlines; forms separate by value edges and reflections, seams and folds appear only as soft shading, and there is no hatching. Gradients blend across every surface, and form shadow is soft and continuous with no cel shapes. Sharp highlights appear only as long bands on metal and thin ridges on glass. Cast shadows are #29333b, directional, about 57% of object height, and soften with distance. Dim interiors run about 31% mean luminance with near black about 26%, not a mostly black image, while evenly lit scenes rise to about 68%. The wall grays also tint the objects: blue grays #3b424a and #687982, dark #04090e, highlights #a7bec5 to #eafaff. The neon saturated cyan accent #17ccea is ≤ 2% of the image and appears as small reflection fragments on glowing edges and rims, never filling cloth, matte objects or skin. Upper left key light, cyan rim light, lens perspective, shallow depth of field. Detail budget: dense, with about 40 seam edges per figure plus about 10 lace lines, hair as about 4 flows with about 12 strand lines, and no decorative marks.",
+   "scene": "An interior tabletop still life with buildings visible through a window: a sphere, a metal vessel, a glass, fruit, a potted plant and cloth, with no people. It is seen from slightly above, with the front cloth partly overlapping the objects behind. Separately, two casually dressed adults stand apart, facing front against a plain background, with neutral faces, visible from head to toe.",
+   "words": {
+    "probe_anchors": 137,
+    "figure": 620,
+    "priority": 31,
+    "negative": 40
+   },
+   "timing": {
+    "fill": {
+     "seconds": 1314,
+     "model": "gpt-6-astra",
+     "effort": "high"
+    },
+    "compile": {
+     "seconds": 133.6,
+     "model": "claude-opus-5-5",
+     "effort": null
+    },
+    "priority": {
+     "seconds": 21.4,
+     "model": "claude-sonnet-5-5",
+     "effort": null
+    }
+   },
+   "figure_source": "figure_board",
+   "board_image": "presets/real_hitech_sf/board.jpg",
+   "board_prompt": "presets/real_hitech_sf/board_prompt.txt",
+   "compile_rules": [
+    "no expression default or distribution in FIGURE (expression means only)",
+    "PROBE_ANCHORS absolute cap = grade cap + 40 (this style: 160)"
+   ],
+   "compile_model": "claude-opus-5-5",
+   "priority_model": "claude-sonnet-5-5"
+  },
+  "facets_v2": {
    "version": "hp-v1.2.3+figure-board",
    "extracted_at": "2026-10-08",
    "probe_anchors": "Use lens perspective with slight downward tabletop views, mild foreground enlargement, and distant blur. No ink contours; value and reflection define forms, with 0.098–0.146% interior boundaries, or 2–3 px at 2048 px, and no hatching. Use continuous gradients, one soft form shadow, and directional #29333b cast shadows reaching 56.7% of source height with 0.293% blur. Daylight averages 68% luminance and 8% near black; night averages 31% and 26%, never mostly black; large planes stay muted. Greys may serve objects or ground, never a locked backdrop; objects retain local color; accent #17ccea ≤ 2% of the image on luminous edges and reflections, never broad matte, cloth, or skin planes. Keep physical ground, asymmetry, 25% quiet space, form heights near 25.83% and 20.46%, cropping, and no pattern fills. Detail budget: rich — per figure regardless of screen size, about 40 garment boundaries, 10 shoelace lines, four hair masses, 12 flow lines, six eye elements, seven hair projections, no decorative marks, and no hatching.",
@@ -540,10 +783,7 @@
      "model": "claude-sonnet-5-5",
      "effort": null
     }
-   },
-   "figure_source": "figure_board",
-   "board_image": "presets/real_hitech_sf/board.jpg",
-   "board_prompt": "presets/real_hitech_sf/board_prompt.txt"
+   }
   },
   "facets_v1": {
    "version": "hp-v1.2.3",
@@ -609,6 +849,49 @@
   "style_clause_current": "Grade the whole image in this look: soft diffuse light, low contrast, with soft, bright, gently lifted shadows; a muted low-to-medium saturation pastel palette; delicate romantic bloom and halation on the highlights; fine soft film grain. Mood: a tender, wistful flutter. Rendered in photorealistic live-action cinematography, shot on a digital cinema camera with a 35mm lens - true-to-life skin texture with visible pores, real fabric weave and true material response. A real photograph, not an illustration, painting or anime.",
   "assembly": "both",
   "facets": {
+   "version": "hp-v1.2.3+figure-board+compile-v3",
+   "extracted_at": "2026-10-08",
+   "probe_anchors": "Photographic realism with no drawn outlines, 0% of image width. Edges are soft value differences, and seams, creases and eyelids are shading, not lines. Curved forms carry continuous diffuse gradients, with one soft shadow region per form and no cel steps; soft warm contact shadows #897057 spread toward the lower right. In daylight scenes the key is high: mean luminance about 68%, near-black 0%, never a dark image. Saturation is about 16%, with warm greys #a59786 and light neutrals #f1f4f0, and shadows stay light. Metal shows blurred vertical reflection bands, glass stays transparent, and matte surfaces and cloth stay diffuse, with rims slightly crisper. Figures use realistic proportions, about 7.7 heads tall, with horizontally long almond eyes and lineless skin edges. Lens perspective is from slightly above, with about 45% low detail space. Detail budget: very high — about 24 structural garment lines as shading, fine hair grain in one mass, one iris mass with one highlight, no decorative marks.",
+   "figure": "Realistic face with real volume in the eyes, nose and lips and a softly tapering jaw, on a realistic body without cartoon compression, rendered as photographic realism with lineless edges and continuous diffuse shading; standard eyes. Figures stand about 7.7 heads tall, measured from the skull crown to the soles including shoes. Measured to the top of the hair or hat, so keep the skull itself small. The head to torso ratio is about 1 to 2.9, with the torso from shoulder line to crotch about 38% of the height and the legs from crotch to sole about 43.5%. The lower legs are about 1.4 times the thighs, and the forearms about 0.9 times the upper arms. Hanging arms are about 40% of the height, with fingertips reaching the upper thighs. The shoulders are about twice the head width. Hands are about 0.72 face heights long. Shoes are oversized, about 0.65 head heights tall and 0.75 head lengths long, with rounded toes and low soles about 11% of the shoe height. The figure has narrow wedge gaps between the legs and beside the sleeves. Eyes have neutral, level outer corners and are normally open, with the upper lid covering about the top fifth of the iris. They are horizontally long almond shapes about 2.9 times wider than tall, each about a fifth of the face width, with pointed corners and a small shaded tear duct. Each eye has one iris mass and one small round soft catchlight at the upper left of the iris, with no secondary highlight and no glow. Narrow sclera that is lighter than skin but not pure white shows at the sides. Lashes are fused into the thin upper lid edge, about 0.1% of image width. The lower lid is a faint partial edge that fades into the skin outward. Eye contours are brown and reddish brown local shading, never black lines. The nose is built from continuous shading with nostrils as small dark areas, and the lips keep their thickness with a low-contrast parting. Hands show separated fingers and knuckle and tendon volumes in continuous shading. Hair is one connected mass with fine curving grain, diffuse low-contrast sheen following its direction and softly fraying tips. It has no geometric clumps, no separate highlight bands and no outline stroke. Clothing drapes naturally over the body volume, and the fabric shows low-contrast fibre grain. Poses tend to be a relaxed upright stance with level shoulders and hips, weight on both feet and limbs hanging nearly straight, with neutral acting and no exaggerated foreshortening. When the scene specifies an action, the action comes first and this rhythm is applied to it. Expressions are made by gentle eyebrow curves, eyelid opening and lip contact, with no comic emotion symbols. Skin is soft continuous tone over its own local color, with a weak diffuse sheen and low-contrast warmth in the cheeks and lips. It has no blush hatching, no cel steps and no emphasized pores. Detail budget: very high — about 24 structural garment lines per figure regardless of its size on screen, about 12 seams and 12 folds, all drawn as narrow shading. Knit hems carry fine vertical ribbing spaced about 0.2% of image width. Eyes have one iris mass and one catchlight, and there are no added ornaments or decorative marks.",
+   "figure_extrapolated": false,
+   "priority": "Priority order: lineless photographic look with continuous soft shading → muted warm high-key with light shadows → distinct material reflections with soft edges → realistic body proportions, long almond eyes, lineless skin.",
+   "negative": "Avoid anime, cartoon, fashion illustration, glamour photography, black outlines, hard cel shading, fashion illustration proportions, oversized eyes, copied still life arrangement, copied identities, copied outfits, copied hairstyles, bokeh particle fields, wet floor reflections, geometric ink hatching, ornamental iris patterns, readable text, logos.",
+   "capsule": "Photographic digital image: realistic continuous tone, soft diffuse light, muted warm color, fine low-contrast surface grain, no brush marks, no halftone patterns. There are no drawn outlines, 0% of image width. Edges are soft value differences, slightly crisper on metal and glass rims; seams and creases are shading, never lines; no hatching. Continuous gradients run over curved forms, folds and reflections, with no cel steps. In daylight scenes the key is high: mean luminance about 68%, near-black 0%, never a dark image. Contrast is low and shadows stay light, with one soft shadow region per form; soft warm contact shadows #897057 fall toward the lower right; sharp highlights appear only on metal and glass. Palette: warm greys #a59786 and #9b9583 about 30%, light neutrals #e2e2dc and #f1f4f0 about 26%, shadow #80634e, mean saturation about 16%; muted leaf green #b3bd6a and dusty red #9b7c72 stay local to their materials, with no added accents. Shapes are round volumes and elliptical openings, long curves alternating with straight edges, no exaggeration. Light comes from a large soft source upper left; lens perspective from slightly above with soft background blur. Metal shows about three blurred vertical reflection bands, and glass stays transparent. Detail budget: very high — about 24 structural garment lines as shading, hair one fine grained mass, eyes one iris mass and one highlight, no decorative marks.",
+   "scene": "An indoor still life by a window with curtains: six main objects on a table, namely a sphere, a cloth, a metal cup, a glass of water, fruit and a potted plant. The scene is seen from slightly above, with front objects partly overlapping the rear plant and no people. A separate board shows two adults in casual clothes standing side by side, full body and facing front, before a plain backdrop and floor.",
+   "words": {
+    "probe_anchors": 160,
+    "figure": 553,
+    "priority": 32,
+    "negative": 42
+   },
+   "timing": {
+    "fill": {
+     "seconds": 997,
+     "model": "gpt-6-astra",
+     "effort": "high"
+    },
+    "compile": {
+     "seconds": 115.6,
+     "model": "claude-opus-5-5",
+     "effort": null
+    },
+    "priority": {
+     "seconds": 18.8,
+     "model": "claude-sonnet-5-5",
+     "effort": null
+    }
+   },
+   "figure_source": "figure_board",
+   "board_image": "presets/real_jp_melo/board.jpg",
+   "board_prompt": "presets/real_jp_melo/board_prompt.txt",
+   "compile_rules": [
+    "no expression default or distribution in FIGURE (expression means only)",
+    "PROBE_ANCHORS absolute cap = grade cap + 40 (this style: 160)"
+   ],
+   "compile_model": "claude-opus-5-5",
+   "priority_model": "claude-sonnet-5-5"
+  },
+  "facets_v2": {
    "version": "hp-v1.2.3+figure-board",
    "extracted_at": "2026-10-08",
    "probe_anchors": "Use photographic lens perspective from the scene viewpoint, mild depth, and no obvious wide angle distortion. No outlines or auxiliary contours; tonal boundaries are 0.15% of image width, or 3 px at 2048 px, only for structure. Use continuous gradients, one connected soft form shadow, and warm #897057 soft contact shadows. In daylight, keep mean luminance about 68%, near black 0%, bright neutrals 26.5%, and low saturation; nights retain palette roles, only darker. Use #a59786, #9b9583, #e2e2dc, and #f1f4f0 as warm neutrals; #b3bd6a and #9b7c72 stay local material colors, never graphic accents, while #9a9484 and #eaeae6 are not background locks. Use physical ground, overlap, cropping, and 45% low information space unless the scene backdrop overrides; no decorative marks. Detail budget: maximal, grade 5; per figure use about 24 shaded garment structures, about 60 hem ribs, one iris mass, one catchlight, two lid boundaries, and dense hair texture without invented counts.",
@@ -640,10 +923,7 @@
      "model": "claude-sonnet-5-5",
      "effort": null
     }
-   },
-   "figure_source": "figure_board",
-   "board_image": "presets/real_jp_melo/board.jpg",
-   "board_prompt": "presets/real_jp_melo/board_prompt.txt"
+   }
   },
   "facets_v1": {
    "version": "hp-v1.2.3",
@@ -709,6 +989,49 @@
   "style_clause_current": "Carry HOW the style references render a scene and its figures - their color energy, their pattern and decoration language, their density of set dressing and background detail, and the way they stage depth. Do NOT reproduce their subjects, characters, places or props.",
   "assembly": "both",
   "facets": {
+   "version": "hp-v1.2.3+figure-board+compile-v3",
+   "extracted_at": "2026-10-08",
+   "probe_anchors": "No outlines anywhere; edges are soft value transitions, seams and folds read as tonal shifts, and continuous soft shading gives one connected shadow per form, with soft contact shadows #0c0d0c merging into nearby darks. In dim lamp lit scenes mean luminance about 12% with about 73% near-black; evenly lit scenes about 26% with 15% near-black; saturation 24%. Muted neutrals and earth tones serve objects and walls alike; accent #a2784b ≤ 7% of the image, only as one soft wall glow around a lamp, with cool light from the opposite side. Figures keep adult proportions and small horizontal eyes with one small catchlight. Lens perspective from slightly above. No decorative marks. Main objects about 41% of frame height, full figures about 88%. Detail budget: medium — per figure about 24 tonal garment boundaries plus 8 on shoes, hair one mass with about 8 strand lines, eyes five elements.",
+   "figure": "Realistic adult figures in every part: a realistic face with deep eye sockets, a volumetric nose and a softly rounded jaw, on a realistic adult body, rendered with continuous shading and surface grain and no outlines. Bodies stand about 8 heads tall, counted from the top of the skull rather than the hair, measured to the top of the hair or hat, so keep the skull itself small, with a head to torso ratio of about 1 to 3. The torso, from shoulder line to crotch, takes about 37% of the height, and the legs, soles included, take about 45%. The lower leg is about 1.3 times as long as the thigh, and the forearm is about as long as the upper arm. The whole arm, from shoulder to fingertips, is about 41% of the height, so the fingertips hang a little below the crotch. Shoulders are about 2.25 head widths across. Limbs taper naturally: the upper arm is about 0.37 of the head width, the forearm about 0.29 and the wrist about 0.2. Hands measure about 0.73 face heights from wrist to fingertip. Shoes stand oversized about two thirds of a head tall seen from the front, with rounded toes and soles about an eighth of their height. Nothing is compressed or enlarged for effect. Standard eyes: the corners sit level, and the opening is normal, with the upper lid covering about the top fifth of the iris and no white showing above it. The eyes are horizontal almonds about 2.2 times as wide as tall, with pointed corners; each is about a fifth of the face width and set at about the middle of the head height. Each eye shows one visible iris tone with a soft edged pupil, and the iris is about half the eye width. There is one small round catchlight at the upper center, about a fifth of the iris width, with no secondary catchlights and no glow. The sclera is a dimmed grey, shaded under the upper lid, never pure white. Lashes merge into a thin dark upper lid boundary about 0.1% of image width (2 px at 2048 px width), and the lower lid is a broken low contrast edge. There is no ink outline colour: eye edges are darker, low saturation tones of the surrounding skin. Brows are hair textured masses in soft shading. The nose is modeled by continuous shading with small dark nostrils, and the lips are thin volumes with contact shadow, never a single dark line. Hands show separated fingers of differing length with knuckles in soft volume shading, never mittens. Hair is one large connected mass of overlapping curved bundles with a faint sheen running along them. Its soft edge breaks into about 12 small tips, each up to about a tenth of the face height, with about 8 separable strand lines and no triangular spikes. Clothing shows visible fiber grain, sits loosely over the body volume and folds gently at the joints, with folds only at overlaps and tension points. Where a knit is ribbed, its ribs sit about 0.2% of image width apart (about 4 px at 2048 px width). Poses tend to stand upright and balanced, with the weight shared between both feet and the shoulders and hips nearly level. A straight vertical line runs from head through pelvis with no strong S curve, and the arms hang almost straight at the sides, leaving a narrow gap beside each hand and one between the legs. Gesture intensity stays quiet and low, with no exaggerated foreshortening. When the scene specifies an action, the action comes first and this rhythm is applied to it, keeping real body weight and joints. Expression is carried by brow curvature, lid opening and lip tension, with no comic emotion symbols. Skin keeps its own colour as low saturation continuous tone, diffuse and semi matte, with a small highlight only on the nose and faint warm shifts on the lips and parts of the face. It shows slight tonal unevenness, no blush circles, no hatching and no cel boundaries, and it is never plastic or porcelain smooth. Detail budget: medium — per figure, regardless of its size on screen, there are about 24 tonal garment boundaries (about 12 structural and 12 folds) plus about 4 on each shoe. Hair is one mass with about 8 strand lines and about 12 tips, the eyes have five separate elements, and there are no decorative marks.",
+   "figure_extrapolated": false,
+   "priority": "Priority order: outline-free continuous soft shading with surface grain → wide near-black, low-saturation cool and warm light → natural unexaggerated adult proportions → small horizontal eyes with one tiny catchlight.",
+   "negative": "Avoid beauty photography, fashion illustration, semi realistic anime, glossy 3D character art, ink outlines, flat cel shading, beauty skin smoothing, exaggerated fashion proportions, copied still life arrangement, copied facial identities, copied outfits, copied hairstyles, decorative bokeh fields, wet floor reflections, geometric hatching, oversized eyelash fans, readable text, logos, watermarks.",
+   "capsule": "Digital realistic rendering with continuous photographic shading and fine grain; no outlines anywhere: edges are soft value transitions, hard only at thin metal and glass rim reflections, lost in deep shadow; seams and folds are tonal shifts, no hatching. Shading blends continuously, one connected soft shadow per form; soft contact shadows #0c0d0c spread about 0.9% of image width. In dim lamp lit scenes mean luminance about 12%, about 73% near-black, under 1% bright area; evenly lit scenes about 26% and 15% near-black. Muted palette #343029, #22201b, #5f5649, darks #121210, #090a0a, #050708, glow core #fbfaf8, saturation 24%, shared by objects and walls. Tan accent #a2784b ≤ 7% of the image, moderately saturated, only as one soft wall glow around a lamp, never on dark cloth or matte spheres. Spheres, cylinders, elliptical rims and folded curves; cool light upper left, warm light upper right; surfaces rough, dry and worn, glossy only on metal, glass and fruit. Detail budget: medium — per figure about 24 tonal garment boundaries, hair one mass with about 8 strand lines, eyes five elements; no decorative marks or pattern fills.",
+   "scene": "On a table in a windowed room sit a sphere, a cloth, two containers, a fruit and a potted plant, overlapping front to back beneath a wall lamp; no people, near frontal view from slightly above the tabletop. Separately, two casually dressed adults stand apart side by side before a plain wall and floor, full body, facing front, arms lowered.",
+   "words": {
+    "probe_anchors": 147,
+    "figure": 742,
+    "priority": 30,
+    "negative": 49
+   },
+   "timing": {
+    "fill": {
+     "seconds": 1227,
+     "model": "gpt-6-astra",
+     "effort": "high"
+    },
+    "compile": {
+     "seconds": 221.2,
+     "model": "claude-opus-5-5",
+     "effort": null
+    },
+    "priority": {
+     "seconds": 18.7,
+     "model": "claude-sonnet-5-5",
+     "effort": null
+    }
+   },
+   "figure_source": "figure_board",
+   "board_image": "presets/real_psy_horror/board.jpg",
+   "board_prompt": "presets/real_psy_horror/board_prompt.txt",
+   "compile_rules": [
+    "no expression default or distribution in FIGURE (expression means only)",
+    "PROBE_ANCHORS absolute cap = grade cap + 40 (this style: 150)"
+   ],
+   "compile_model": "claude-opus-5-5",
+   "priority_model": "claude-sonnet-5-5"
+  },
+  "facets_v2": {
    "version": "hp-v1.2.3+figure-board",
    "extracted_at": "2026-10-08",
    "probe_anchors": "Avoid beauty photography, fashion illustration, semi realistic anime, glossy 3D character art, decorative bokeh, wet floor reflections, geometric hatching, oversized eyelash fans, and speed lines. Use natural lens perspective without wide angle swelling. There are no ink outlines: surface structure uses 0.15% to 0.20% wide value transitions, equal to 3 to 4 px at 2048 px width, with no hatching. Continuous gradients form soft volume; contact shadows merge into darkness. In similarly dim scenes, keep mean luminance about 12%, near black about 73%, planes above 65% about 0.19%, and large areas muted. No color is backdrop only; bodies keep content assigned subdued colors. Accent #a2784b ≤ 7% of the image on one broad soft light area only, never dark cloth or matte bodies. Keep surface variation and contact unless the scene specifies its own backdrop. In object scenes the largest form is about 41.50% of frame height; full figures are about 88.28%, fully contained. Detail budget: medium; each figure at any screen size has about 32 internal value boundaries, 8 hair lines, 12 outer hair tips, five eye elements, and no decorative marks.",
@@ -740,10 +1063,7 @@
      "model": "claude-sonnet-5-5",
      "effort": null
     }
-   },
-   "figure_source": "figure_board",
-   "board_image": "presets/real_psy_horror/board.jpg",
-   "board_prompt": "presets/real_psy_horror/board_prompt.txt"
+   }
   },
   "facets_v1": {
    "version": "hp-v1.2.3",
@@ -809,6 +1129,49 @@
   "style_clause_current": "LOOK - render this in a bold modern big-city blockbuster look: mixed metropolitan light with several differently colored light sources in the same frame, medium-high contrast with open, information-rich shadows that stay full of bounced detail instead of crushing to black, a high-saturation palette in which vivid saturated colors sit against desaturated concrete, glass and asphalt, punchy clarity and crisp HDR-like micro-contrast holding detail in both highlights and shadows, and a sense of monumental big-city scale.",
   "assembly": "both",
   "facets": {
+   "version": "hp-v1.2.3+figure-board+compile-v3",
+   "extracted_at": "2026-10-08",
+   "probe_anchors": "No outlines on objects or figures: realistic volume comes only from continuous shading, edges are value changes, hard on metal and glass, soft on skin and hair, and seams are shading about 0.1% of image width, no hatching. Under upper-left window sun, matte grain, mirror metal with about 3 highlight areas and refraction through clear glass stay distinct; form shadow is soft, one region per form; directional cast shadows are sharp at contact and spread with distance. Figures keep adult anatomy with an uncompressed torso and small horizontal eyes joined to a modeled face without ink. Lens perspective from slightly above. Low key, mean luminance about 31%, near-black about 28%, not a mostly black image. No color is backdrop only; saturated accent red #9f1b1a ≤ 22% on one large cloth plane and its reflection. Keep room depth unless the scene specifies its own backdrop. Detail budget: maximal, about 43 shaded garment boundaries per figure, 6 eye elements, no decorative marks.",
+   "figure": "Realistic throughout: an anatomically realistic face with a modeled nose and lips and naturally sized eyes, on a realistic adult body that is not compressed, rendered as line-free continuous realistic shading with visible surface material grain. The figure stands about 8 heads tall, measured from the top of the skull rather than the hair, measured to the top of the hair or hat, so keep the skull itself small, with a head to torso ratio of about 1 to 3; the torso, from the shoulder line to the crotch, is about 37% of the height, and the legs including shoes are about 45% of the height, with the lower legs including shoes stretched lower legs about 1.4 times as long as the thighs. The arms are about 41% of the height with the fingertips reaching the upper thighs, the forearm about 0.86 times the upper arm, and the shoulders about 2.25 skull widths across; limbs taper anatomically, with the upper arm about 0.4 and the wrist about 0.22 of the head width, and garments narrow gradually from thigh to ankle. Hands are oversized hands about 0.8 face heights long, and shoes are rounded volumetric forms oversized about 0.69 head heights tall and about as wide, with a thin front sole about 9% of the shoe height and no geometric block exaggeration. The eyes use standard treatment: slightly upturned outer corners at about 7 degrees, a normal opening in which the upper lid covers about the top 20% of the iris with narrow sclera showing on both sides, and wide almond openings about 2.8 times as wide as tall, each about 19% of the face width, set near the vertical middle of the head, with short pointed corners and no extended eyeliner tail. The iris spans about 38% of the eye width and is a soft gradient of two tones, darker above and lighter below, ringed by a thin dark rim, with a softly bounded darker center; there is one tiny catchlight above the iris center toward the right side, no secondary catchlights, no glow and no lower reflection band. Lashes merge into the upper lid as a fine dark edge. The upper lid is a thin natural dark boundary about 0.1% of image width in a gentle curve, the lower lid is a broken skin shading boundary of similar width rather than a full dark rim, and the eye outlines are brown to reddish brown, darker where hair overlaps them. The sclera is a narrow grayish white with soft lid shading rather than flat pure white, and the inner corners are small flesh-colored planes. Eyebrows are bands of short hair grain that taper gradually at the edges. The nose is modeled through continuous shading along the bridge and wings with small dark nostrils, and the lips show upper and lower volume with a central contact edge. Hands have separate fingers with anatomical volume and knuckle shading, and nails are small light planes, with no ink around them. Hair is built from large curling flow clumps that wind round with continuous inner grain, about 6 clumps on the sample head, ending in fine curved strand bundles, with about 8 small curved projections along the outer edge and an occasional tiny gap where the background shows through. Its highlights are thin, broken, curved glints that follow the strands, never a single band or an angular cel patch, and no line surrounds the hair. Any small accessory is rendered as a tiny bright point of material, about 0.35% of the figure height, without internal lines. Garments show weave grain and seam thickness, with natural ease and gravity sag that follow the body rather than uniform tubes or trapezoid shapes. Poses tend to be upright and frontal, with nearly level shoulders and hips and the weight carried between both feet, a straight vertical body line without an S-curve, and elbows and knees almost straight. The arms hang slightly away from the body, leaving narrow gaps between arms and torso about 0.06 head heights wide and a gap between the legs of up to about 0.8 head heights, and the figure's acting stays neutral, without exaggerated gestures. When the scene specifies an action, the action comes first and this rhythm is applied to it. Expression is made through lid opening, brow angle, lip contact and subtle changes in cheek volume, never with cartoon emotion marks. Skin keeps its base color with continuous diffuse shading and slight local color shifts, with small soft reflections on the nose and forehead and a broad soft sheen on the cheeks. A gentle flush appears around the cheeks and mouth, with no graphic blush lines, no cel steps and no glossy plastic look. Detail budget: maximal. Each figure carries about 43 structural garment boundaries regardless of its size on screen, roughly 23 on the top (about 8 seams and 15 folds) and 20 on the bottoms (about 8 seams and 12 folds), all rendered as shading rather than lines. Ribbed parts carry fine ribs at a pitch of about 0.24% of image width, and each shoe has about 5 lace lines. Hair grain fills about 6 clumps, and each eye has 6 separable elements. There are no decorative marks, no speed lines and no hatching.",
+   "figure_extrapolated": false,
+   "priority": "Priority order: outline-free continuous shading → distinct matte, mirror and clear-glass materials under directional light → uncompressed adult torso → small horizontal eyes on a modeled face.",
+   "negative": "Avoid semi-realistic anime, stylized cartoon realism, doll photography, painterly realism, screen moire, scan borders, compression blocks, ink outlines, hard cel shading, oversized anime eyes, compressed cartoon torsos, copied still-life arrangement, duplicated wardrobe, copied personal accessories, decorative bokeh fields, halftone overlays, geometric hatching, ornamental iris rings, readable text, logos, watermarks.",
+   "capsule": "Digital realistic rendering with a photographic look: continuous tone, fine material grain, mirror metal and refracting clear glass, no brush marks. No drawn lines, outlines 0% of image width; forms part by value edges, hard on metal and glass, soft on skin, hair and cloth; seams are shading, about 0.1% of image width, never ink, no hatching. Gradients on spheres, folds, metal and walls shift value and color temperature together; low key in window light, mean luminance about 31%, near-black about 28%, not a mostly black image; night scenes keep the same palette roles, only darker. Soft form shadow, one region per form; hard highlights only on metal, glass rims and fruit, none on cloth; directional cast shadows #243032, contacts #010103, sharp at contact, softening with distance. Palette #75837d, #305462, shadows #140607 and #1a262b, light #acb3a9, none reserved for background; accent saturated red #9f1b1a ≤ 22% of the image, one large cloth plane and its reflection, never dots or matte neutrals. Shapes are spheres, cylinders and thin pointed leaves, with continuous curves, acute leaf tips and right-angled frames, under lens perspective and upper-left sun. Detail budget: maximal, about 43 shaded garment boundaries per figure, hair grain in about 6 clumps, no decorative marks.",
+   "scene": "An indoor table before a window with high-rise buildings holds six objects: sphere, spread cloth, metal vessel, glass, fruit and potted plant, seen slightly from above, front objects partly overlapping; no people. Separately, two casually dressed adults stand side by side without overlapping on a plain background, frontal full body to the feet, neutral faces.",
+   "words": {
+    "probe_anchors": 160,
+    "figure": 875,
+    "priority": 27,
+    "negative": 49
+   },
+   "timing": {
+    "fill": {
+     "seconds": 973,
+     "model": "gpt-6-astra",
+     "effort": "high"
+    },
+    "compile": {
+     "seconds": 179.2,
+     "model": "claude-opus-5-5",
+     "effort": null
+    },
+    "priority": {
+     "seconds": 24.2,
+     "model": "claude-sonnet-5-5",
+     "effort": null
+    }
+   },
+   "figure_source": "figure_board",
+   "board_image": "presets/real_urban_hero/board.jpg",
+   "board_prompt": "presets/real_urban_hero/board_prompt.txt",
+   "compile_rules": [
+    "no expression default or distribution in FIGURE (expression means only)",
+    "PROBE_ANCHORS absolute cap = grade cap + 40 (this style: 160)"
+   ],
+   "compile_model": "claude-opus-5-5",
+   "priority_model": "claude-sonnet-5-5"
+  },
+  "facets_v2": {
    "version": "hp-v1.2.3+figure-board",
    "extracted_at": "2026-10-08",
    "probe_anchors": "Use continuous realistic volume with no ink outlines; colour and value define forms, with about 43 shaded garment boundaries per figure at 0.10–0.15% width, or 2–3 px at 2048 px, and no hatching. Preserve grain, mirroring, refraction, and fibres. Figures retain uncompressed adult anatomy and small horizontal volumetric eyes. Use photo lens perspective without wide angle expansion, focused foregrounds, and softened depth. Use continuous gradients, one connected soft form shadow, and directional casts that soften away from contact. In daylight, mean luminance is about 31%, near black about 28%, not mostly black, and bright planes about 10.3%; nights keep these roles darker. Keep content colours; #75837d and #305462 are midtones, #140607 and #1a262b shadows, #acb3a9 highlights, and no hue is backdrop only. Accent #9f1b1a ≤ 22.18% of the image, with bright #d42b2c, only on a few broad cloth or reflected planes. Ground forms through contact and reflection unless the scene specifies its own backdrop. No decorative marks. Detail budget: maximal; use about 43 garment boundaries, about six hair groups with about eight outer protrusions, and about six eye elements per figure regardless of screen size, with no decorative marks.",
@@ -840,10 +1203,7 @@
      "model": "claude-sonnet-5-5",
      "effort": null
     }
-   },
-   "figure_source": "figure_board",
-   "board_image": "presets/real_urban_hero/board.jpg",
-   "board_prompt": "presets/real_urban_hero/board_prompt.txt"
+   }
   },
   "facets_v1": {
    "version": "hp-v1.2.3",
@@ -909,6 +1269,49 @@
   "style_clause_current": "Everything is rendered as handmade stop-motion photography of a physical tabletop miniature set. Any figures are handmade physical puppets built from needle-felted wool and sculpted clay over an armature - matte felted-fibre skin, wool-roving hair, real miniature knitted and felted fabric with visible fibre, seams and fraying, and small glossy bead eyes set into the sculpted face. Not a drawing, and not a live-action photograph of real people.",
   "assembly": "both",
   "facets": {
+   "version": "hp-v1.2.3+figure-board+compile-v3",
+   "extracted_at": "2026-10-08",
+   "probe_anchors": "Handmade craft models photographed with a real lens at a slight high angle; fuzzy fabric and molded matte surfaces sit beside metal and glass optics. No drawn outlines; forms separate by continuous wrapping shading with no cel steps and sit on real surfaces with soft tinted contact shadows. Figures are about 6 heads tall, torso about 37% of height, with simple bead eyes holding one catchlight and softly fraying fiber edges. In daylight, mean luminance about 40%, near-black about 16%, not mostly black; saturation about 40%. Muted accent #2f3743 and #773720 ≤ 11%, on fabric and fruit only. Tallest object about 42% of frame height. Detail budget: about 18 structural lines per figure, hair one fiber mass, no decorative marks.",
+   "figure": "Cartoon face with round bead eyes, a rounded protruding nose and a short mouth groove, on a semi-realistic doll body without a squashed torso, rendered as stop-motion craft with fiber-covered surfaces and no drawn lines. The figure is about 6.1 heads tall, measured from the top of the skull rather than the top of the hair, measured to the top of the hair or hat, so keep the skull itself small. Head to torso is about 1 to 2.2. The torso, from shoulder line to crotch, is about 37% of the height. The legs, from crotch to sole, are about 42% of the height including the soles, with the lower leg, stretched lower legs about 1.45 times as long as the thigh. The arm is about 42% of the height, the forearm about 0.9 times the upper arm, and the relaxed fingertips reach the upper thigh. Shoulders are about 1.8 head widths across. Limbs are soft cylinders about 0.3 of the head width thick, and joints are gentle bends with no bony points or muscle splits. The head is a rounded oval with a soft jaw and no pointed chin or angular cheekbones. The eyes have level, rounded outer corners and are fully open, nearly round at about 1.07 to 1, about 14% of the face width, and centered at about mid head height. They are simple eyes: a dark bead surface, one catchlight and an upper boundary, with no inner iris detail. Each eye has one small soft oval catchlight in the upper left, about a fifth of the bead diameter, with no secondary catchlight and no glow. There are no lashes, no white sclera band and no tear dot. The upper lid is a thin shaded arc about 0.1% of image width, and there is no lower lid line and no ink eye outline. Eyebrows are short fiber masses in gentle arches. The nose is a rounded volume with soft shade below and no nostril dots, and the mouth is a single short curved groove about 0.15% of image width with no teeth. Hands are rounded molded forms about 0.58 of the face height, about 8% of the body height, with the thumb separated and the other fingers split only by faint grooves, and no nails or knuckle creases. Shoes have rounded toes and thin soles; each is about 0.54 head heights tall and 0.8 head heights long, with the sole about 13% of the shoe height. Each shoe carries about 3 structural seams and about 4 lacing bars. Hair is one connected fiber shell forming a rounded cap with continuous undulations and large rounded ridges, about 7 on the measured head. Its fiber ends fray softly into the background, with no blade-like spikes, no dark rim and no graphic highlight bands; the shape, length and color of the hair follow the content. Clothing is a thick fiber-covered shell held slightly away from the body, with rounded hems and cuffs, no fine wrinkle bundles and no trims or ornaments. Poses tend to be a stable upright stance with the weight on both legs, shoulders and hips nearly level, and a straight line from head to pelvis. Elbows are only slightly bent and knees are almost straight, with neutral, unshowy acting and no enlarged hands or feet thrust toward the camera. When the scene specifies an action, the action comes first and this rhythm is applied to it. Expressions are made with the eyebrow arches and the curvature of the short mouth, with no cartoon emotion symbols. Skin keeps the character's own color under a fine, compressed fiber texture with continuous shading and no cel boundaries. It has a faint warm shift on the nose and cheeks but no blush marks, and it stays matte, with no sharp highlights, pores or wet shine. Detail budget: dense surface texture but few marks. Each figure, regardless of its size on screen, carries about 12 structural garment lines, about 6 on the shoes and about 8 lacing bars. The hair is one connected fiber mass, each eye has three elements, and there are no decorative marks.",
+   "figure_extrapolated": false,
+   "priority": "Priority order: handmade material texture with distinct reflections → lineless continuous shading, real contact grounding → round doll proportions → simple bead eyes, fraying fiber edges",
+   "negative": "Avoid cel animation, photorealistic portraiture, glossy CGI cartoon, flat vector illustration, moire, compression blocks, color fringing, black ink outlines, smooth plastic skin, elongated fashion proportions, flat cel shading, copied still-life arrangement, copied character pairing, copied outfits, copied hairstyles, intricate iris patterns, individual eyelashes, ornamental costume trim, wet reflective floors, readable text, logos, watermarks.",
+   "capsule": "Stop-motion craft look: handmade models photographed with a real lens, rough molded surfaces and fuzzy fabric beside true metal and glass optics. No drawn outlines; forms separate by material change, continuous wrapping shading and contact shadow; interior marks are only shaded grooves and seams about 0.1% of image width, no hatching. Shapes are spheres, gentle cones and thick oval plates with thick rounded ends; no cel steps, one soft shadow per rounded form, soft contact cast shadows tinted by the surface below, never flat ellipses. In daylight, mean luminance about 40%, near-black about 16%, not mostly black, about 10% bright planes; night keeps these palette roles, only darker. Warm browns #6d5641 and #b39c81, shadows #3a2717 and #191512, lit planes #d1bd9e; objects keep their material colors; muted accent #2f3743 and #773720 ≤ 11% of the image, few large planes on fabric and fruit, never walls or metal rims, no neon. Warm soft light from the upper left, slight high angle, blurred background, matte rough walls and wood, no bloom. Detail budget: dense — about 18 structural lines per clothed figure plus about 8 shoelace bars, hair one connected fiber mass, eyes three elements, no decorative marks.",
+   "scene": "An interior still life: a sphere, a folded cloth, two cups, fruit and a potted plant sit on a table near a window, seen from a slight high angle showing the tabletop and vessel openings; no people. A separate board shows two people in casual clothes standing side by side, facing front, full body, against a plain backdrop.",
+   "words": {
+    "probe_anchors": 120,
+    "figure": 684,
+    "priority": 26,
+    "negative": 53
+   },
+   "timing": {
+    "fill": {
+     "seconds": 1184,
+     "model": "gpt-6-astra",
+     "effort": "high"
+    },
+    "compile": {
+     "seconds": 131.2,
+     "model": "claude-opus-5-5",
+     "effort": null
+    },
+    "priority": {
+     "seconds": 21.1,
+     "model": "claude-sonnet-5-5",
+     "effort": null
+    }
+   },
+   "figure_source": "figure_board",
+   "board_image": "presets/stop_motion/board.jpg",
+   "board_prompt": "presets/stop_motion/board_prompt.txt",
+   "compile_rules": [
+    "no expression default or distribution in FIGURE (expression means only)",
+    "PROBE_ANCHORS absolute cap = grade cap + 40 (this style: 160)"
+   ],
+   "compile_model": "claude-opus-5-5",
+   "priority_model": "claude-sonnet-5-5"
+  },
+  "facets_v2": {
    "version": "hp-v1.2.3+figure-board",
    "extracted_at": "2026-10-08",
    "probe_anchors": "Use natural lens perspective and keep camera height. Draw no outlines; materials and shading define boundaries, while joins stay about 0.10% to 0.15% of image width, or 2 to 3 px at 2048 px, with about 12 garment joins and 6 shoe joins per figure. Use continuous gradients without cel steps, one soft shadow region, diffuse #3a2717 casts darkest at contact, and sharp highlights only on reflective materials and bead eyes. In daylight, mean luminance is about 40%, near black about 16% and not most of the frame, with about 9.5% bright planes. Keep assigned body colors with no backdrop only color; accent #2f3743 ≤ 10.73% and accent #773720 ≤ 10.73%, together in few large material planes, never walls or rims. Environmental scenes keep tallest forms at 42.2% height, smaller forms 0.45 as tall, upper low density space 35%, uncropped, with no decorative marks; use matte grounding and soft background depth with no patterned fill unless the scene specifies its own backdrop. Detail budget: grade 4, high; use about 8 lace cross lines per figure regardless of size, one hair shell, strands unresolved, three eye elements, and no decorative marks.",
@@ -940,10 +1343,7 @@
      "model": "gpt-5.6-sol",
      "effort": "medium"
     }
-   },
-   "figure_source": "figure_board",
-   "board_image": "presets/stop_motion/board.jpg",
-   "board_prompt": "presets/stop_motion/board_prompt.txt"
+   }
   },
   "facets_v1": {
    "version": "hp-v1.2.3",
@@ -1009,6 +1409,49 @@
   "style_clause_current": "Carry how the style reference draws figures. Any figures are drawn in flat television-cartoon proportions, roughly five and a half heads tall, with simplified tubular limbs and small simple hands; large round white eyes with a small dark round pupil and a thin dark upper lid line, no visible iris coloring and no eyelashes; a small simple curved nose with no nostrils and a simple mouth drawn as one outlined shape; hair reads as one solid flat color mass with a few pointed clumps at the silhouette; skin and garments are filled with flat unmodulated color, shaded with at most one darker step, and every form is bounded by a heavy black contour of even weight.",
   "assembly": "both",
   "facets": {
+   "version": "hp-v1.2.3+figure-board+compile-v3",
+   "extracted_at": "2026-10-08",
+   "probe_anchors": "Simple large flat color fields; hair is one connected mass with no strands. Closed near-black #080703 outlines about 0.25% of image width, interior lines about 0.15%, no hatching. Limited shading: one hard curved shadow shape per form, soft gradients only inside matte curves, flat unblurred cast bands only under ledges. Figures about 5.6 heads tall, torso about a third of the height. Eyes are large round open whites with one flat dark center, no catchlights. Frontal staging, shallow depth. Daylight mean luminance about 57%, near-black under 2%, never a dark image. Objects keep local colors; yellow #fadf81 is mostly ground; accent red #c72125 ≤ 9.4% of the image, one large flexible surface. Detail budget: minimal — about 20 structural garment lines per figure, no decorative marks.",
+   "figure": "The figure has a cartoon face with large round open eyes, a flat single tone center, a curved nose and a curved mouth. It sits on a simplified cartoon body whose torso is not compressed and whose limbs are smooth tubes. It is rendered as cartoon cel coloring with near-black outlines, broad matte planes and only weak continuous shading, a little flatter than the objects. Figures stand about 5.6 heads tall, counting from the top of the skull rather than the top of the hair, measured to the top of the hair or hat, so keep the skull itself small, with a head to torso ratio of about 1 to 1.85. The torso runs about 33% of the height from the shoulder line to the crotch, the legs about 44% of the height including the shoes, and the arms about 39% of the height, so the fingertips hang a little below the crotch. The forearm is about 0.84 times the upper arm. The knees are hidden in the clothing, so the lower legs are not stretched. Shoulders are about 2.06 head widths across with a gentle rounded arc. Arms are smooth tubes about 30% of the face width thick, with no muscle or bone landmarks, and trouser legs taper gently toward the hem. Hands are about 0.56 face heights from wrist to fingertip. Shoes are about 0.46 head tall and 0.69 head long, with rounded toes and soles about 15% of the shoe height. The face is a tall rounded oval ending in a broad arc at the chin. The eyes have a neutral corner slant with level corners. They are wide open, so the upper lid covers none of the center and white shows above and below it. They are nearly circular at about 1.08 to 1, each about 30% of the face width, and centered at mid head height. They are simple eyes: an outline plus one flat dark center that merges iris and pupil, about a third of the eye width, with no iris ring and no gradient. There are no catchlights and no lashes. A thin, uniform upper lid line about 0.15% of image width (3 px at 2048 px width) joins a complete lower lid line into a closed round loop, and the eye outlines use the same near-black as the style outline. Eyebrows are filled dark arches, each one smooth shape with no hairs. The nose is one long open curve turning at its tip, with no nostrils. The mouth is one gentle open curve with no filled lips or teeth. Hands have separate fingers simplified to long rounded tips, with no nails or knuckle creases. Hair is built as one large connected mass with a rounded cap outline. It splits only at its edge into short wedge tips, about 7 on a short cut, adapted to whatever hairstyle the scene gives. It is edged with the same near-black line and has no strand lines and no highlight shapes. Garments are broad matte fills with no weave, wrapping the body as simple masses with long side lines, with no plaid grid and no decorative trims. Body and garment outlines are about 0.2% of image width (4 px at 2048 px width), and interior garment lines are about 0.1% (2 px at 2048 px width). Poses tend to stand upright and frontal, with shoulders and hips nearly level and the weight centered between the feet. The rhythm line runs straight and vertical, with no S-curve. The arms hang almost straight, elbows near 178°, held slightly away from the torso. This leaves two gaps between arms and body and one narrow wedge of a gap between the legs about 2.5 head heights tall. Acting stays neutral with no showy gestures, and there is no foreshortening exaggeration. When the scene specifies an action, the action comes first and this rhythm is applied to it. Expressions are made with the eyebrow arch, the lid opening and the curve of the mouth corners, with no cheek emotion marks. Skin keeps its own local color as one large matte plane, darkened one step only under the chin and beneath folds. The face front stays a single tone, with no gloss shapes, no blush and no pores. Detail budget: minimal. Each figure carries about 20 structural garment lines (about 6 on the top, 8 on the bottoms and 6 across the shoes) plus about 8 repeated lace lines per shoe, regardless of the figure's size on screen. Hair is one mass with no strand lines. Each eye is three elements, one flat center plus the upper and lower lid lines, with no catchlight. The top's large plane is a single tone, and there are no decorative marks.",
+   "figure_extrapolated": false,
+   "priority": "Priority order: flat simple color fields with strandless hair masses → hard-edged closed near-black outlines with limited cel shading → unstretched figure proportions → large round open eyes with flat centers.",
+   "negative": "Avoid modern anime, chibi, semi-realistic portraiture, 3D animation, moire, photographic glare, compression ringing, tiny realistic eyes, elongated fashion proportions, thick sticker borders, oversized platform shoes, copied still-life arrangement, copied window layout, copied outfit combinations, intricate iris rings, hair strand engraving, skin pores, wet floor reflections, readable text, logos, watermarks.",
+   "capsule": "Digital ink cartoon with cel fills and weak continuous shading. Closed near-black #080703 outlines about 0.25% of image width; interior lines about 0.15%, structure and folds only; no hatching. Flat planes, soft gradients only inside matte curves, one hard shadow shape per form, thin flat unblurred cast bands only under ledges. Daylight mean luminance about 57%, near-black under 2%, never a dark image; night only darker. Objects keep distinct local colors; yellow #fadf81 is mostly ground; accent saturated red #c72125 ≤ 9.4% of the image, one large contiguous flexible surface, never on glass. Shapes are ovals, soft trapezoids, drops and long arcs; colored backdrop planes unless the scene specifies its own backdrop. Detail budget: minimal — about 20 structural garment lines per figure, hair one strandless mass, no catchlights, no decorative marks.",
+   "scene": "On a table by a window sit six objects: a sphere, a spread cloth, a metal cup, a glass, a fruit and a leafy potted plant; the front cloth overlaps some, seen slightly from above, no people. Separately, two people in casual clothes stand side by side facing front before a plain backdrop and floor, shown head to shoes.",
+   "words": {
+    "probe_anchors": 126,
+    "figure": 786,
+    "priority": 31,
+    "negative": 49
+   },
+   "timing": {
+    "fill": {
+     "seconds": 1103,
+     "model": "gpt-6-astra",
+     "effort": "high"
+    },
+    "compile": {
+     "seconds": 210.6,
+     "model": "claude-opus-5-5",
+     "effort": null
+    },
+    "priority": {
+     "seconds": 20.2,
+     "model": "claude-sonnet-5-5",
+     "effort": null
+    }
+   },
+   "figure_source": "figure_board",
+   "board_image": "presets/us_cartoon/board.jpg",
+   "board_prompt": "presets/us_cartoon/board_prompt.txt",
+   "compile_rules": [
+    "no expression default or distribution in FIGURE (expression means only)",
+    "PROBE_ANCHORS absolute cap = grade cap + 40 (this style: 130)"
+   ],
+   "compile_model": "claude-opus-5-5",
+   "priority_model": "claude-sonnet-5-5"
+  },
+  "facets_v2": {
    "version": "hp-v1.2.3+figure-board",
    "extracted_at": "2026-10-08",
    "probe_anchors": "Favor large planes and strandless masses. Use frontal planar staging, shallow overlap depth, and no lens distortion. Make closed #080703 outlines about 1.73 times structural lines; use flat cel fills, broad plane gradients, one hard curved or wedge shadow where shading appears, and hard unblurred local offset shadows. Daylight luminance stays 57% to 66%, near black under 2%. Keep #fadf81 for backdrop only; saturated accent #c72125 ≤ 9.4% of the image on broad flexible planes. Major forms occupy 21.9% to 50.8% of frame height; preserve open upper center and separate silhouettes on broad contact surfaces without ground shadows. Detail budget: minimal; use about 20 structural lines per figure, no hair strand lines, about three eye elements, and no decorative marks.",
@@ -1040,10 +1483,7 @@
      "model": "gpt-5.6-sol",
      "effort": "medium"
     }
-   },
-   "figure_source": "figure_board",
-   "board_image": "presets/us_cartoon/board.jpg",
-   "board_prompt": "presets/us_cartoon/board_prompt.txt"
+   }
   },
   "facets_v1": {
    "version": "hp-v1.2.3",
@@ -1109,6 +1549,49 @@
   "style_clause_current": "Carry HOW the style references render scenes and figures: the watercolor medium, its washes, pigment blooms and paper texture, its figure proportions and facial shape language. Do NOT reproduce their subjects, characters, places or props.",
   "assembly": "both",
   "facets": {
+   "version": "hp-v1.2.3+figure-board+compile-v3",
+   "extracted_at": "2026-10-08",
+   "probe_anchors": "Watercolor appearance: transparent washes pooling at dry edges in paper grain, light ground showing. Continuous uneven washes build volume, one connected soft shadow per form, no cel steps; metal keeps broken vertical reflections, glass thin bright arcs, cloth and matte forms no specular dots. Figures keep realistic proportions with restrained hands and feet; eyes are small almonds with one soft catchlight, contours melting into darker local colour. Lines only at some edges, about 0.2% of image width, in darker local colour like #7a7564, no hatching. Linear perspective from slightly above; soft contact shadows #615545 fade lower right. In daylight mean luminance about 57%, near-black about 2%, saturation low; accent #8e4c22 ≤ 3% on round forms and metal reflections, never broad walls or cloth. Foreground objects about a quarter of frame height. Detail budget: medium — about 27 garment lines per figure, hair one mass without strand lines, no decorative marks.",
+   "figure": "Realistic face with anatomical placement, small eyes and a volumetric nose, on a realistic body, rendered as a transparent watercolor painting with continuous tonal washes and paper grain. Figures stand about 7.7 heads tall, measured to the top of the hair or hat, so keep the skull itself small, with a head to torso ratio of about 1 to 2.8. The torso, from shoulder line to crotch, is about 36% of the height. The legs, from crotch to sole, are about 45% of the height, and the lower leg is, as stretched lower legs, about 1.6 times the thigh. The forearm is about 0.86 of the upper arm, and the arms are about 40% of the height, so the fingertips reach the upper thigh. Shoulders are about 2.1 times the width of the skull. Hands are about 0.75 of the face height, or about 8% of the body height. Limbs are natural cylinders, the forearm about 0.28 of the head width, tapering from upper arm to wrist; elbows and wrists bend gently, and knees show only through garment folds. The head is a rounded cranium narrowing to a short rounded chin. The eyes have neutral outer corners tilted only about 3 degrees upward and an ordinary opening in which the upper lid covers about the top fifth of the iris. They form a horizontal almond about 2.4 times as wide as tall; each eye is about 22% of the face width and sits at the vertical middle of the head. These are standard eyes: small, with restrained tonal modelling. The iris is two tones, darker above and lighter below, with a thin darker rim, the pupil melting softly into the upper tone and no separate lower reflection. There is one small soft round catchlight on the upper left of the iris, about a fifth of its diameter, with no secondary catchlight and no glow. Lashes are fused into the darker upper lid edge, with no separate lashes. The upper lid is a thin, gently arched line about 0.15% of image width that tapers at both ends, and the lower lid is only a short, faint, broken line about 0.10%. The inner corner is a small dark dot, and the narrow visible sclera is a pale greyish yellow rather than pure white. All eye outlines are brown to reddish brown, a darker tone of the local skin. Eyebrows are soft masses of short brush strokes tapering outward in the dark tone of the hair, and they stop where hair covers them. The nose is built from a lit bridge and washes on either side with small dark nostril dots, never outlined. The mouth is a short central line between pale lip planes with small dark corners. Hands are realistic with separated fingers, nails and knuckles merged into small lights and tones, never mittens. Shoes have rounded toes and low thin soles, about 0.75 head lengths long and oversized about 0.6 head heights tall. Hair is one large connected mass over a round head, with short curved brush marks inside it and an edge broken into about 8 short tufts, the longest about 0.06 of the face height. There are no strand lines and no dark outline around the hair, and its highlights are short, irregular, diffuse wash patches rather than a continuous shine band. Garments are matte and follow the body with some ease, breaking gently at cuffs and hems. Poses tend to stay upright and restrained, with the weight centred between both feet and the shoulders and hips level. The body forms a straight line from head to pelvis without an S curve, and the arms hang nearly straight, so thin wedge gaps open between arms and torso. Acting stays neutral, without showy gestures; when the scene specifies an action, the action comes first and this rhythm is applied to it. Expression is made with the eyebrow angle, the curve of the eyelids and the mouth corners, with no comic emotion marks. Skin is the character's own local colour laid with transparent shading washes that leave the light ground showing. It is matte with diffuse light, has a soft borderless warm flush on the cheeks and around the mouth, shows no cel steps, and carries paper grain throughout. Body and garment edges are darker local colour boundaries about 0.15% of image width (3 px at 2048 px width), about 0.10% beside the hands, never a separate black outline. Detail budget: medium — each figure carries about 27 structural garment lines, roughly 14 on the top, 9 on the bottom and 4 on the shoes. On top of these come about 40 short repeated grooves only at the neckline, waistband and cuffs, about 18 at most in one row, unevenly spaced about 1% of image width apart. Hair is one mass with no strand lines, each eye has about 6 elements, and there are no added ornaments or decorative marks.",
+   "figure_extrapolated": false,
+   "priority": "Priority order: transparent pooling washes in paper grain → continuous soft volume with material reflections → realistic proportions, restrained hands and feet → small almond eyes, one catchlight, contours melting into local colour",
+   "negative": "Avoid anime, cartoon, photorealism, oil painting, uniform black outlines, flat cel shading, compressed torsos, oversized hands and feet, copied still life arrangement, copied figure lineup, copied character outfits, copied hairstyles, bokeh fields, geometric hatching, intricate iris filaments, wet floor reflections, readable text, logos, watermarks.",
+   "capsule": "Digital painting with a watercolor appearance: transparent layered washes, pigment pooling at dry edges and granulating in paper grain, light ground showing. Lines appear only on some metal and glass edges, about 0.2% of image width (2 px at 1024 px width), in darker local colour such as #7a7564, swelling then dissolving into wash; elsewhere colour edges, no hatching. Uneven continuous washes model volume, one connected soft shadow per form, no cel steps; metal keeps broken vertical reflections, glass thin bright arcs, no specular dots on cloth or matte forms. In daylight scenes mean luminance about 57%, near-black about 2%, never broad pure black; soft contact shadows #615545 fade lower right about 70% of object height. Objects are muted earth bodies in #a28865 and #453726 darks with #e1d8c0 lit planes, sharing #cfc3a6 wall tone; saturated reddish brown accent #8e4c22 ≤ 3% of the image, two large pieces on round forms and metal reflections, never broad wall or cloth. Detail budget: medium — about 27 garment lines and 40 short hem grooves per figure, hair one mass, no strand lines, no decorative marks.",
+   "scene": "An interior by a window: a sphere, folded cloth, metal cup, glass of water, fruit and potted plant stand front to back on a table, no people, seen from slightly above so the tabletop and vessel openings show. Two adults in casual clothes stand side by side against a plain wall and floor, full length, facing front, with neutral faces.",
+   "words": {
+    "probe_anchors": 150,
+    "figure": 819,
+    "priority": 33,
+    "negative": 44
+   },
+   "timing": {
+    "fill": {
+     "seconds": 1150,
+     "model": "gpt-6-astra",
+     "effort": "high"
+    },
+    "compile": {
+     "seconds": 212.2,
+     "model": "claude-opus-5-5",
+     "effort": null
+    },
+    "priority": {
+     "seconds": 26.1,
+     "model": "claude-sonnet-5-5",
+     "effort": null
+    }
+   },
+   "figure_source": "figure_board",
+   "board_image": "presets/watercolor/board.jpg",
+   "board_prompt": "presets/watercolor/board_prompt.txt",
+   "compile_rules": [
+    "no expression default or distribution in FIGURE (expression means only)",
+    "PROBE_ANCHORS absolute cap = grade cap + 40 (this style: 150)"
+   ],
+   "compile_model": "claude-opus-5-5",
+   "priority_model": "claude-sonnet-5-5"
+  },
+  "facets_v2": {
    "version": "hp-v1.2.3+figure-board",
    "extracted_at": "2026-10-08",
    "probe_anchors": "Use slightly high linear perspective. Local colour boundaries, including #7a7564, are 0.10–0.39% of width and dissolve into washes; use structural lines but no hatching. Build continuous washes, reflections, one soft connected rounded or wedged shadow, and a soft contact shadow 70% of object height. In daylight, target mean luminance 57%, near black under 2%, and light planes 12.5%; keep fields low saturation. Keep local colours; none is ground only. High saturation accent #8e4c22 ≤ 3% of the image, only on rounded planes or metal reflections, never broad walls or cloth. Ground subjects in environments unless the scene specifies its own backdrop. Keep forms 22–29% of frame height, an upper field, and edge cropping. No decorative marks. Detail budget: medium — about 27 structural lines per figure, about one hair mass without strand lines, about six eye elements, and no decoration.",
@@ -1140,10 +1623,7 @@
      "model": "gpt-5.6-sol",
      "effort": "medium"
     }
-   },
-   "figure_source": "figure_board",
-   "board_image": "presets/watercolor/board.jpg",
-   "board_prompt": "presets/watercolor/board_prompt.txt"
+   }
   },
   "facets_v1": {
    "version": "hp-v1.2.3",

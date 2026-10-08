@@ -2,7 +2,7 @@
 
 > 누가 읽나: 제품을 고치는 **다른 세션**(facet을 제품에 넣는 일)과 오너. 이 폴더는 추출 세션의 산출물과 그 산출물을 제품이 쓰는 방법을 적은 인계 패키지다. 추출 세션은 제품 코드(`src/`)를 건드리지 않았다.
 >
-> 한 줄 요약: 제품이 제공하는 스타일 12종(`style_anchors` 활성 행 12개) 전부에 대해 **고성능 판 facet**(리프 309, VLM = gpt-6-astra)을 뽑아 `presets/<key>/`에 두었고, 같은 콘텐츠로 **현행 제품 프롬프트 · facet 프롬프트 · 둘을 합친 프롬프트**를 생성 비교한 페이지를 발행했다(https://claude.ai/artifact/3ASfQfpBFkAi6SoKpSdsra). 1차 기계 판정의 결론: **facet 조각은 현행 손글씨 절을 대체하지 못하고 보강한다 — 캐릭터는 '둘 다'가 최선(4.25 vs 현행 4.0 vs facet 3.4)**, 액션은 현행이 8/12로 더 가까웠다. **오너 결정: 제품은 '둘 다'로 간다.** 12종 전부 인물 보조 보드를 만들어 다시 뽑았다(v2 — 둘 다가 캐릭터 최선 10/12 · 액션 7/12; §7.1). 제품은 v2 산출물을 쓴다. 유저가 올린 이미지는 **경량 판**(Sonnet 직접 호출, 추출 1.5분 + 생성 2분)으로 같은 조각을 만들 수 있고 참조 구현은 `lite/facet_lite_extract.py`다(같은 12장으로 검증).
+> 한 줄 요약: 제품이 제공하는 스타일 12종(`style_anchors` 활성 행 12개) 전부에 대해 **고성능 판 facet**(리프 309, VLM = gpt-6-astra)을 뽑아 `presets/<key>/`에 두었고, 같은 콘텐츠로 **현행 제품 프롬프트 · facet 프롬프트 · 둘을 합친 프롬프트**를 생성 비교한 페이지를 발행했다(https://claude.ai/artifact/3ASfQfpBFkAi6SoKpSdsra). 1차 기계 판정의 결론: **facet 조각은 현행 손글씨 절을 대체하지 못하고 보강한다 — 캐릭터는 '둘 다'가 최선(4.25 vs 현행 4.0 vs facet 3.4)**, 액션은 현행이 8/12로 더 가까웠다. **오너 결정: 제품은 '둘 다'로 간다.** 12종 전부 인물 보조 보드를 만들어 다시 뽑았고(v2 — 둘 다가 캐릭터 최선 10/12 · 액션 7/12; §7.1), 표정 기본값을 빼고 앵커 캡슐 상한을 넣어 다시 컴파일했다(v3; §7.2). **제품은 v3 산출물을 쓴다.** 유저가 올린 이미지는 **경량 판**(Sonnet 직접 호출, 추출 1.5분 + 생성 2분)으로 같은 조각을 만들 수 있고 참조 구현은 `lite/facet_lite_extract.py`다(같은 12장으로 검증).
 
 ## 0. 읽는 순서
 
@@ -15,8 +15,8 @@
 |---|---|---|
 | 서식 | `scaffolds/facet-template-v1.2.jsonc` (리프 309, 수치 측정) | `scaffolds/facet-template-lite-v0.1.jsonc` (리프 96, 수치 대신 등급) |
 | 언제 | 프리셋 12종 — **미리** 뽑아 DB에 넣는다(이번에 완료) | 유저가 올린 이미지 — **동의가 있을 때 그때** 뽑는다 |
-| 모델 | 채움 gpt-6-astra high(Codex, 그림 첨부) · 컴파일 gpt-5.6-sol high · 우선순위 줄 gpt-5.6-sol medium | Claude Sonnet 5.5 API 직접 호출 2번(채움 + 컴파일, 우선순위 줄은 컴파일에 포함) |
-| 시간 | 스타일당 추출 25~42분, 평균 32분(채움 11~17 + 컴파일 8~24 + 우선순위 1) | 채움 52~76초 + 컴파일 25~35초 = **약 1.5분**, 생성 2분을 더해 끝까지 3~4분 |
+| 모델 | 채움 gpt-6-astra high(Codex, 그림 첨부) · 컴파일 gpt-5.6-sol high(v3는 Claude Opus 5.5 — Codex 지출 한도) · 우선순위 줄 gpt-5.6-sol medium(v3는 Claude Sonnet 5.5) | Claude Sonnet 5.5 API 직접 호출 2번(채움 + 컴파일, 우선순위 줄은 컴파일에 포함) |
+| 시간 | 스타일당 추출 25~43분(2장 채움 15~22 + 컴파일 7~24 + 우선순위 1; Claude 컴파일은 2~4분) | 채움 52~76초 + 컴파일 25~35초 = **약 1.5분**, 생성 2분을 더해 끝까지 3~4분 |
 | 비용 | Codex 구독(크레딧 0) | 토큰 — 채움 입력 1.4만·출력 0.5~1만, 컴파일 입력 0.7만·출력 0.1~0.5만 (이미지당 합계 약 2.2만 입력 · 1~1.5만 출력) |
 | 산출 | `filled.json` + `prompts.md`(CAPSULE·NEGATIVE·SCENE·PROBE_ANCHORS·COVERAGE·FIGURE) + `priority.md`(PRIORITY + 방향어 FIGURE) | `filled.json` + `prompts.md`(PROBE_ANCHORS·FIGURE·PRIORITY·NEGATIVE·SCENE) + `fragments.json` |
 | 인물 표본이 없을 때 | 인물 가지 `[해당 없음]` → 컴파일 FIGURE = `none`(인물 절 없음) | `[EXTRAPOLATED]` 외삽 문단(관찰된 선·채움 문법만, 41~104단어) + `figure_extrapolated: true` |
@@ -29,14 +29,14 @@
 
 ```
 README.md                      ← 이 문서
-presets/index.json             ← 12종 한 파일: key → assembly('both') + facets(v2 = 인물 보드 판: 조각 4개·단어 수·인물 출처·시간·모델) + facets_v1 + style_clause_current + lite (제품 시드용)
+presets/index.json             ← 12종 한 파일: key → assembly('both') + facets(v3 = 인물 보드 + 재컴파일: 조각 4개·단어 수·인물 출처·compile_rules·모델·시간) + facets_v2 + facets_v1 + style_clause_current + lite (제품 시드용)
 presets/<key>/filled.json      ← 고성능 facet 전문(리프 309, 한국어 값 + 신뢰도 태그)
 presets/<key>/scene_summary.md ← 앵커 그림의 내용 요약(스타일 아님, 기록용)
 presets/<key>/prompts.md       ← 컴파일 산출(CAPSULE / NEGATIVE / SCENE / PROBE_ANCHORS / COVERAGE / FIGURE)
 presets/<key>/priority.md      ← PRIORITY 줄 + 방향어를 붙인 FIGURE (제품은 prompts.md의 FIGURE 대신 이것을 쓴다)
 presets/<key>/assembled/{facet_character,facet_action,both_character,prod_character,prod_action}.txt ← 생성 테스트에 실제로 보낸 프롬프트 전문(both = 현행 절 + facet 조각)
 presets/<key>/lite/{filled.json,prompts.md,fragments.json} ← 같은 앵커를 경량 판으로 뽑은 것(비교용)
-presets/<key>/board.jpg · board_prompt.txt · v1/ ← (12종 전부) 인물 보조 보드(1024px 축소본, 원본은 로컬 2048px) · 보드를 만든 제품 경로 프롬프트 · 보드 없이 뽑은 첫 결과
+presets/<key>/board.jpg · board_prompt.txt · v2/ · v1/ ← (12종 전부) 인물 보조 보드(1024px 축소본, 원본은 로컬 2048px) · 보드를 만든 제품 경로 프롬프트 · v2(보드, 재컴파일 전) · v1(보드 없음)
 lite/facet_lite_extract.py     ← 경량 판 참조 구현(Python, API 직접 호출). 제품(TS)으로 옮길 때 프롬프트 구성·파싱·검증을 그대로 따른다
 lite/README.md                 ← 경량 판 호출 계약(입출력·검증·실패 처리) 요약
 ```
@@ -55,8 +55,8 @@ lite/README.md                 ← 경량 판 호출 계약(입출력·검증·�
 
 | 조각 | 출처 | 단어 상한 | 역할 |
 |---|---|---|---|
-| `probe_anchors` | prompts.md `## PROBE_ANCHORS` | 등급별 70~150 | "Style anchors: …" 로 앵커 이미지 바로 뒤에 싣는 압축 캡슐. 이미지가 못 나르는 값만(투영·선 굵기와 색·채움/그림자·키·팔레트 역할·지면 문법·장식 개수·묘사 예산) |
-| `figure` | **priority.md** `## FIGURE` | 상한 없음(고성능) / 150(경량) | "Figure rules: …" — 계열·비례(수치 + 방향어)·눈 절·손/신발/헤어·포즈 경향·표정·피부. 인물이 있는 장면에만 |
+| `probe_anchors` | prompts.md `## PROBE_ANCHORS` | 등급별 70~150, 절대 상한 130/150/160(v3) | "Style anchors: …" 로 앵커 이미지 바로 뒤에 싣는 압축 캡슐. 이미지가 못 나르는 값만(투영·선 굵기와 색·채움/그림자·키·팔레트 역할·지면 문법·장식 개수·묘사 예산) |
+| `figure` | **priority.md** `## FIGURE` | 상한 없음(고성능) / 150(경량) | "Figure rules: …" — 계열·비례(수치 + 방향어)·눈 절·손/신발/헤어·포즈 경향·표정 수단(기본값 없음, v3)·피부. 인물이 있는 장면에만 |
 | `priority` | priority.md `## PRIORITY` | 35 | "Priority order: a → b → c" 한 줄, 부정 절 바로 앞 |
 | `negative` | filled.json `생성 규칙.부정 절` 6항을 하네스가 합친 것(`assembled/*.txt`의 "Avoid …" 줄) | 55 | 인접 계열 → 아티팩트 → 충돌 기본값 → 장면 종속 → 정교화 → 텍스트/로고 순 |
 
@@ -167,6 +167,28 @@ API 함정(실측): `thinking.type: "disabled"`는 이 모델이 거부한다 �
 - 비용·시간: 보드 24장 156 + 생성 48장 312 = 468크레딧(누계 858). 2장 첨부 채움 15~22분, 컴파일 6.5~21분(인물 절 487~745단어), 우선순위 Codex 1~3분 / Claude 15~25초, 판정 Opus 55~67초. 8종 동시 추출 28~29분/장.
 - **제품은 12종 모두 v2 산출물을 쓴다**(`presets/<key>/` 루트 = v2, `index.json`의 `facets.version = "hp-v1.2.3+figure-board"`, `figure_source = "figure_board"`, `assembly = "both"`). v1은 `v1/`·`facets_v1`로 남겼다.
 
+### 7.2 v3 — 재컴파일: 표정 기본값 제외 · 앵커 캡슐 절대 상한 (오너 결정, 같은 날 밤)
+
+그림은 다시 보지 않고 v2 채움(앵커 + 인물 보드)만 바뀐 규칙으로 다시 컴파일했다(`spec/spec-compile-v3.md`): ① FIGURE에 표정 기본값·표정 분포를 싣지 않는다 — 표정 수단만("expressions are made with the brow arcs, the lid opening and the mouth corners") ② PROBE_ANCHORS 절대 상한 = 등급 상한 + 40(1~2 → 130 · 3 → 150 · 4~5 → 160단어). Codex 지출 한도가 그대로라 컴파일은 **Claude Opus 5.5**(`bin/run_compile_claude.py`, 2~4분/장, 출력 1.3~2.7만 토큰 — 16k 한도에서 7종이 비거나 잘려 32k 스트리밍 + FIGURE를 COVERAGE 앞으로), 우선순위 줄은 Claude Sonnet 5.5. 확인용으로 제품 구성('둘 다') 캐릭터를 스타일당 1장 다시 만들었다(12장 78크레딧, 기계 판정 없음 — 페이지 v3 절에서 v2와 나란히 본다).
+
+| 스타일 | 등급 | 앵커 캡슐 단어 v2 → v3 / 절대 상한 | 인물 절 단어 v2 → v3 | 컴파일 · 우선순위 | 수치 불변 | 남은 표정 기본값 문장 |
+|---|---|---|---|---|---|---|
+| jp_anime | 4 | 149 → **158** / 160 | 663 → 929 | 3.7분 · 32초 | 예 | 0 |
+| real | 4 | 150 → **155** / 160 | 745 → 691 | 2.7분 · 21초 | 예 | 0 |
+| real_3d | 5 | 230 → **155** / 160 | 691 → 879 | 3.8분 · 25초 | 예 | 0 |
+| real_desert_fantasy | 5 | 150 → **154** / 160 | 589 → 690 | 2.3분 · 18초 | 예 | 0 |
+| real_euro_period | 5 | 190 → **148** / 160 | 596 → 769 | 2.7분 · 24초 | 예 | 0 |
+| real_hitech_sf | 4 | 161 → **137** / 160 | 646 → 620 | 2.2분 · 21초 | 예 | 0 |
+| real_jp_melo | 5 | 150 → **160** / 160 | 656 → 553 | 1.9분 · 19초 | 예 | 0 |
+| real_psy_horror | 3 | 183 → **147** / 150 | 620 → 742 | 3.7분 · 19초 | 예 | 0 |
+| real_urban_hero | 5 | 189 → **160** / 160 | 623 → 875 | 3.0분 · 24초 | 예 | 0 |
+| stop_motion | 4 | 190 → **120** / 160 | 487 → 684 | 2.2분 · 21초 | 예 | 0 |
+| us_cartoon | 1 | 120 → **126** / 130 | 522 → 786 | 3.5분 · 20초 | 예 | 0 |
+| watercolor | 3 | 140 → **150** / 150 | 688 → 819 | 3.5분 · 26초 | 예 | 0 |
+
+- 12종 모두 상한 안(v2에서 6종 초과 → 0), 표정 기본값 문장 0, 우선순위 단계의 수치 불변 검사 12/12. 인물 절은 Opus가 항목을 더 빠짐없이 실어 v2보다 길어진 스타일이 많다(상한 없음 규칙 그대로).
+- **제품은 v3 산출물을 쓴다** — `presets/<key>/` 루트 = v3(`facets.version = "hp-v1.2.3+figure-board+compile-v3"`, `compile_rules`·`compile_model`·`priority_model` 기록), v2는 `v2/`·`facets_v2`, v1은 `v1/`·`facets_v1`.
+
 ## 8. 같이 정한 것 / 혼자 정한 것 / 결정이 필요한 것
 
 **같이 정한 것(오너 지시, 2026-10-08)**: 12종 프리셋은 고성능 판으로 미리 추출한다 · VLM은 astra(gpt-6-astra) · 추출 뒤 생성 테스트를 아티팩트로 · 유저 이미지는 동의가 있을 때 경량 판으로 추출해 이후 생성에 쓴다 · 제품 수정은 다른 세션.
@@ -190,12 +212,14 @@ API 함정(실측): `thinking.type: "disabled"`는 이 모델이 거부한다 �
 1. **style_clause와 facet 조각은 "둘 다"** — 역할 문장 바로 뒤에 현행 `style_clause`, 그다음 `Style anchors: …` 이하 facet 조각(§4의 조립에 2번 앞에 style_clause 한 줄이 들어간다; 실행례 `presets/<key>/assembled/both_*.txt`). 제품은 이 구성으로 간다.
 2. **인물 보조 보드를 만들어 다시 추출 — 12종 전부**(먼저 그림 계열 4종, 이어서 나머지 8종). 보드 = 제품 경로(현행 문장)로 만든 원작 인물 2명 전신 정면(§7.1), 고성능 채움에 앵커 ①과 보드 ② 2장을 함께 첨부해 인물 가지를 ②에서 측정(다중 입력 첫 실행). 결과는 §7.1, 산출물은 `presets/<key>/`(v2가 정본, v1은 `v1/`).
 
+3. **재컴파일 — 표정 기본값 제외 · 앵커 캡슐 절대 상한**(§7.2). 12종 v3가 정본.
+
 **아직 결정이 필요한 것(오너)**:
 
 1. **역할 문장**: 현행 `STYLE_ANCHOR_CLAUSE` 유지 vs facet 테스트의 긴 금지 목록 문장. 누출 차이는 없었다(뚜렷 1/132, 문장과 무관). 정하지 않으면 현행 유지.
 2. **유저 이미지 동의 문구·범위**: "이 이미지를 스타일 분석에 쓴다(외부 모델에 전송)"를 업로드 권리 동의 대화상자에 합칠지 따로 둘지, 동의 시각·버전을 프로젝트에 어떻게 남길지.
 3. **경량 판 실패 시 동작**: 재시도 1회 뒤 facets 없이 진행(제안) vs 유저에게 알림.
-4. **재컴파일 여부**: 앵커 캡슐 절대 상한(등급 상한+40) · 환경 팔레트 조건문 · 표정 기본값 처리(§7.1 대가 ①)를 컴파일 규칙에 넣고 12종을 다시 컴파일할지(크레딧 0, 장당 7~21분, 그림은 다시 보지 않는다).
+4. **환경 팔레트 조건문**: 앵커 캡슐의 환경색 역할 문장에 "unless the scene specifies its own backdrop"를 붙이는 규칙(us_cartoon·real_3d 배경 누출)은 이번 재컴파일에 넣지 않았다 — 넣을지.
 5. **과장 상한**: 방향어가 보드보다 큰 눈·신발을 만드는 경우(jp_anime)에 우선순위·방향어의 'slightly' 상한 변형(사이클 9부터 미검증)을 시험할지.
 6. **Codex 지출 한도**: 워크스페이스 spend cap에 걸려 8종의 우선순위·판정을 Claude로 돌렸다. 다음 사이클에 Codex를 쓰려면 한도를 올려야 한다(대체 경로는 스크립트로 남아 있다).
 
