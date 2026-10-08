@@ -229,6 +229,7 @@ API 함정(실측): `thinking.type: "disabled"`는 이 모델이 거부한다 �
 ## 9. 참고
 
 - 결과 페이지(아티팩트): https://claude.ai/artifact/3ASfQfpBFkAi6SoKpSdsra (비공개 — 오너 계정; 다른 사람에게는 공유 메뉴로 열어야 보인다)
+- 다음 사이클(11) 계획: `next-cycle-plan.md` — 트랙 D·C·A1·A2·A3·B·F(·E), 약 480크레딧, 하루
 - 로컬 실험 폴더(git 밖): `dev/Image_Style/facet_presets/` — `bin/pipeline.sh`(v1 추출 사슬) · `bin/pipeline_v2.sh`(앵커 + 보드 2장 채움) · `bin/make_board.py` + `bin/gen_board.sh`(보드) · `bin/run_priority_claude.py` · `bin/run_judge_v2_claude.py`(Codex 한도 대체) · `bin/post_chain.sh`(조립 → 생성 → 판정) · `bin/build_prompts.py` · `bin/gen.sh` · `bin/run_judge.sh` + `spec/spec-judge.md` · `bin/summarize.py` · `build_report.py` · `bin/export_handoff.py`(이 폴더로 내보내기) · `<key>/fill/comms/transcript.md`(Codex 통신 원문) · `<key>/gen/*.png`(원본 2048px) · `judge/<key>.md`(1차 판정 전문)
 - 지난 사이클: `dev/Image_Style/facet_cycle_9/`(R1c 확정 근거) · `facet_cycle_10/`(경량 판 검증, Sonnet 직접 호출 시간)
 - 메모리: `~/.claude/projects/-home-user-Downloads-Tale-Studio/memory/facet-template-program.md`
