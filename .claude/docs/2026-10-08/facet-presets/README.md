@@ -6,7 +6,7 @@
 
 ## 0. 읽는 순서
 
-1. §1 두 모드가 무엇인지 → 2. §3 산출물 형식 → 3. §4 조립 규칙(제품이 구현할 것) → 4. §5 저장 제안 → 5. §6 경량 모드 절차 → 6. §8 결정이 필요한 것.
+1. §1 두 모드가 무엇인지 → 2. §3 산출물 형식 → 3. §4 조립 규칙(제품이 구현할 것) → 4. §5 저장 제안 → 5. §6 경량 모드 절차 → 6. §8 결정된 것과 남은 것 → 7. **§10 이식 체크리스트와 동작 목록 초안**(제품 세션은 여기서 시작).
 결과 페이지(그림 포함): §7의 링크. 로컬 실험 폴더(`dev/Image_Style/facet_presets/`, git 밖)에는 원본 Codex 통신 기록·검사 보고·생성 로그가 전부 남아 있다.
 
 ## 1. 두 모드
@@ -19,7 +19,7 @@
 | 시간 | 스타일당 추출 25~43분(2장 채움 15~22 + 컴파일 7~24 + 우선순위 1; Claude 컴파일은 2~4분) | 채움 52~76초 + 컴파일 25~35초 = **약 1.5분**, 생성 2분을 더해 끝까지 3~4분 |
 | 비용 | Codex 구독(크레딧 0) | 토큰 — 채움 입력 1.4만·출력 0.5~1만, 컴파일 입력 0.7만·출력 0.1~0.5만 (이미지당 합계 약 2.2만 입력 · 1~1.5만 출력) |
 | 산출 | `filled.json` + `prompts.md`(CAPSULE·NEGATIVE·SCENE·PROBE_ANCHORS·COVERAGE·FIGURE) + `priority.md`(PRIORITY + 방향어 FIGURE) | `filled.json` + `prompts.md`(PROBE_ANCHORS·FIGURE·PRIORITY·NEGATIVE·SCENE) + `fragments.json` |
-| 인물 표본이 없을 때 | 인물 가지 `[해당 없음]` → 컴파일 FIGURE = `none`(인물 절 없음) | `[EXTRAPOLATED]` 외삽 문단(관찰된 선·채움 문법만, 41~104단어) + `figure_extrapolated: true` |
+| 인물 표본이 없을 때 | 인물 가지 `[해당 없음]` → 컴파일 FIGURE = `none`(인물 절 없음). 프리셋은 v2부터 인물 보조 보드를 함께 채워 12종 전부 인물 절이 있다 | `[EXTRAPOLATED]` 외삽 문단(관찰된 선·채움 문법만, 41~104단어) + `figure_extrapolated: true` |
 
 두 판 모두 제품이 실제로 쓰는 것은 **조각 4개**다: `probe_anchors`(앵커 이미지가 못 나르는 값만 담은 압축 캡슐), `figure`(이 스타일이 인물을 그리는 법, 방향어 포함), `priority`(Core 순서의 우선순위 한 줄), `negative`(Avoid 한 문장). 확정 레시피(R1c, 2026-10-02 오너 확정)는 **앵커 이미지 참조 + 이 조각들**이다. 템플릿만으로 재생성하는 길(T 장면)은 폐지됐으므로 CAPSULE·SCENE은 제품에 싣지 않는다(기록용).
 
@@ -60,7 +60,7 @@ lite/README.md                 ← 경량 판 호출 계약(입출력·검증·�
 | `priority` | priority.md `## PRIORITY` | 35 | "Priority order: a → b → c" 한 줄, 부정 절 바로 앞 |
 | `negative` | filled.json `생성 규칙.부정 절` 6항을 하네스가 합친 것(`assembled/*.txt`의 "Avoid …" 줄) | 55 | 인접 계열 → 아티팩트 → 충돌 기본값 → 장면 종속 → 정교화 → 텍스트/로고 순 |
 
-`presets/index.json`에 네 조각이 이미 조립된 문자열로 들어 있다(`figure`가 빈 문자열이면 인물 절 없음 — 12종 중 real_3d만 667단어의 인물 절이 있다; 경량 판 조각은 `lite` 아래, `[EXTRAPOLATED]` 토큰은 뺐고 `figure_extrapolated`로 표시). `style_clause_current`에 현행 손글씨 절을 함께 넣었다.
+`presets/index.json`에 네 조각이 이미 조립된 문자열로 들어 있다(v3: 12종 전부 인물 절 553~929단어, `figure_source = "figure_board"`; 경량 판 조각은 `lite` 아래, `[EXTRAPOLATED]` 토큰은 뺐고 `figure_extrapolated`로 표시). `style_clause_current`에 현행 손글씨 절을, `assembly: "both"`에 오너 결정을 함께 넣었다. 조각 문자열은 그대로 싣는다 — 제품이 다시 다듬지 않는다.
 
 ## 4. 조립 규칙 — 제품이 구현할 것
 
@@ -80,9 +80,9 @@ lite/README.md                 ← 경량 판 호출 계약(입출력·검증·�
 
 - 5·6은 **인물이 있는 장면에만**(캐릭터 시트·인물 컷). 배경·사물만 있는 장면은 1·1b·2·3·4·7·8. 1b는 현행 `style_clause`가 있는 스타일(12종 중 10종)에만 들어간다. 사이클 실측: 무인물 장면에 인물 절을 넣어도 인물이 소환되진 않지만 효과도 없다.
 - 5의 표정 우선 문장은 조각 `figure`에 이미 "expression … priority" 문장이 들어 있으면 붙이지 않는다(중복 금지).
-- 1의 역할 문장은 현행 `STYLE_ANCHOR_CLAUSE`보다 금지 목록이 길다("faces, hairstyles, costumes, logos, text, layout or any identifiable motif"). 이번 테스트는 이 문장으로 돌렸다. 현행 문장을 유지할지, 이 문장으로 바꿀지는 §8 ③.
+- 1의 역할 문장은 현행 `STYLE_ANCHOR_CLAUSE`보다 금지 목록이 길다("faces, hairstyles, costumes, logos, text, layout or any identifiable motif"). 이번 테스트는 이 문장으로 돌렸다. 현행 문장을 유지할지, 이 문장으로 바꿀지는 §8 남은 것 1 — **정해지지 않으면 현행 `STYLE_ANCHOR_CLAUSE` 유지**(누출 차이 없음).
 - 2-ref 앵커(`use_preview_ref`: watercolor·real_psy_horror)는 현행대로 프리뷰를 두 번째 참조로 두고 1을 2-ref 변형으로 바꾼다. 이번 facet 조건은 앵커 1장만 참조했다(확정 레시피 R1 = 원작 1장). 어느 쪽이 나은지는 페이지의 두 스타일에서 오너가 본다.
-- `style_clause`(현행 손글씨 절)와 facet 조각을 **함께** 실을지 **대체**할지는 §8 ①. 이번 테스트는 세 조건을 다 돌렸다 — 현행(style_clause만) · facet(조각만) · 둘 다(역할 문장 바로 뒤에 style_clause, 그다음 `Style anchors: …`; `presets/<key>/assembled/both_character.txt`). 1차 판정은 둘 다를 권한다.
+- `style_clause`(현행 손글씨 절)와 facet 조각은 **함께** 싣는다(오너 결정 "둘 다", §8). 테스트는 세 조건을 다 돌렸다 — 현행(style_clause만) · facet(조각만) · 둘 다(역할 문장 바로 뒤에 style_clause, 그다음 `Style anchors: …`; `presets/<key>/assembled/both_character.txt`가 제품이 보낼 형태의 실행례).
 - 턴어라운드 시트(2번째 참조 = 레이아웃 템플릿)에서는 2-ref 변형을 쓰지 않는 현행 규칙이 그대로다. facet 조각은 텍스트라 템플릿 참조와 충돌하지 않는다.
 - 매체어: 조각 안의 매체어("photographic", "live-action")는 앵커 쪽 진실이므로 `scrubMediaWords` 대상이 아니다(현행 `style_clause`와 같은 취급). 본문 스크럽은 그대로.
 
@@ -92,9 +92,12 @@ lite/README.md                 ← 경량 판 호출 계약(입출력·검증·�
 
 ```sql
 alter table public.style_anchors add column if not exists facets jsonb;
--- facets = { "version": "hp-v1.2.3", "extracted_at": "...", "models": {...},
---            "probe_anchors": "...", "figure": "...", "figure_extrapolated": true|false, "priority": "...", "negative": "...",
---            "filled": {...filled.json 전문...} }
+-- facets = { "version": "hp-v1.2.3+figure-board+compile-v3", "extracted_at": "2026-10-08",
+--            "probe_anchors": "...", "figure": "...", "figure_extrapolated": false, "figure_source": "figure_board",
+--            "priority": "Priority order: ...", "negative": "Avoid ...",
+--            "compile_rules": [...], "compile_model": "...", "priority_model": "...", "timing": {...},
+--            "filled": {...filled.json 전문(선택)...} }
+-- 값은 presets/index.json 의 <key>.facets 를 그대로(capsule·scene 은 빼도 된다). style_clause 는 지금 칸 그대로 둔다(둘 다 싣는다).
 ```
 
 - 조각 4개는 **문자열로 평탄하게**(런타임이 JSON 깊이를 타지 않도록), `filled`는 재컴파일용 보관.
@@ -113,7 +116,7 @@ alter table public.style_anchors add column if not exists facets jsonb;
 3. 컴파일 호출: 텍스트만 = 부록 B 스펙 + 가이드 §2 + filled.json + scene_summary.md, `max_tokens 6000`(4000이면 생각이 다 먹어 본문이 빈다), 생각 기본. 응답 = `## PROBE_ANCHORS / FIGURE / PRIORITY / NEGATIVE / SCENE` 다섯 문단.
 4. 검증(기계): 리프 96개 · 값의 첫 토큰이 태그 4종 중 하나 · 헤더 5개 존재 · 단어 상한(110/150/30/40/40) · PRIORITY가 "Priority order:"로 시작 · 고유명사(작가·작품·브랜드) 없음은 모델 규칙에 맡기되 로그로 남긴다. 실패하면 **1회 재시도**, 그래도 실패하면 facets 없이 저장하고 현행 경로로 생성(기능 저하이지 오류 아님).
 5. 저장: §5의 `facets` 객체(`version: "lite-v0.1"`, 모델·시각·토큰 사용량 포함).
-6. 이후 그 프로젝트의 생성은 §4 조립. 인물 표본이 없는 이미지는 `figure_extrapolated: true`이고 인물 절이 "관찰된 선·채움 문법만 적용하라"는 외삽 문단이다 — 약한 근거이므로 빼는 쪽을 권한다(고성능 판은 같은 경우 인물 절을 내지 않는다, §8 ②). 유저 앵커에는 손글씨 style_clause가 없으므로 인물 처리는 앵커 이미지와 외삽 문단에만 기댄다 — 인물이 든 이미지를 올리도록 안내 문구로 유도할 수 있다.
+6. 이후 그 프로젝트의 생성은 §4 조립(유저 앵커는 style_clause가 없으므로 1b 없이). 인물 표본이 없는 이미지는 `figure_extrapolated: true`이고 인물 절이 "관찰된 선·채움 문법만 적용하라"는 외삽 문단이다 — 약한 근거이므로 빼는 쪽을 권한다(고성능 판은 같은 경우 인물 절을 내지 않는다). 유저 앵커에는 손글씨 style_clause가 없으므로 인물 처리는 앵커 이미지와 외삽 문단에만 기댄다 — 인물이 든 이미지를 올리도록 안내 문구로 유도할 수 있다.
 
 API 함정(실측): `thinking.type: "disabled"`는 이 모델이 거부한다 — 끄려면 `{"type": "between_tools"}`. 생각을 끄면 7~8초로 빨라지지만 컴파일이 단어 상한을 넘기므로(앵커 151·인물 170) 기본(adaptive)을 권한다.
 
@@ -229,3 +232,34 @@ API 함정(실측): `thinking.type: "disabled"`는 이 모델이 거부한다 �
 - 로컬 실험 폴더(git 밖): `dev/Image_Style/facet_presets/` — `bin/pipeline.sh`(v1 추출 사슬) · `bin/pipeline_v2.sh`(앵커 + 보드 2장 채움) · `bin/make_board.py` + `bin/gen_board.sh`(보드) · `bin/run_priority_claude.py` · `bin/run_judge_v2_claude.py`(Codex 한도 대체) · `bin/post_chain.sh`(조립 → 생성 → 판정) · `bin/build_prompts.py` · `bin/gen.sh` · `bin/run_judge.sh` + `spec/spec-judge.md` · `bin/summarize.py` · `build_report.py` · `bin/export_handoff.py`(이 폴더로 내보내기) · `<key>/fill/comms/transcript.md`(Codex 통신 원문) · `<key>/gen/*.png`(원본 2048px) · `judge/<key>.md`(1차 판정 전문)
 - 지난 사이클: `dev/Image_Style/facet_cycle_9/`(R1c 확정 근거) · `facet_cycle_10/`(경량 판 검증, Sonnet 직접 호출 시간)
 - 메모리: `~/.claude/projects/-home-user-Downloads-Tale-Studio/memory/facet-template-program.md`
+
+## 10. 이식 체크리스트와 동작 목록 초안 (제품 세션용, 2026-10-08 오너 "여기까지 해서 프로덕트에 이식")
+
+순서 제안(저장소 규칙: 테스트 먼저 — `.claude/rules/tdd.md`, 동작 목록을 오너에게 먼저 보인다):
+
+1. **마이그레이션** `supabase/migrations/<ts>_style_anchor_facets.sql` — `style_anchors.facets jsonb`(§5). 개발 DB 먼저 → `pnpm db:types` → `tests/ops/db-types-drift` 통과.
+2. **시드** — `presets/index.json`의 12종 `facets`를 `style_anchors.facets`에 넣는 스크립트(`scripts/`), live는 main 배포 뒤.
+3. **해석** — `ResolvedStyleAnchor.facets?`(`src/lib/style-anchor.ts`): `resolveStyleAnchorByKey`가 `facets` 칸을 읽고, 커스텀 앵커는 `custom_style_anchor.facets`를 읽는다.
+4. **조립** — `applyStyleAnchor`에 §4(1·1b·2·3·4·[5·6]·7·8). 인물 장면 여부는 호출부가 안다(`generate-sheet`·`draft-trigger` = 인물, `world-submit`·`generate-storyboard` = 장면이면 5·6 생략; 스토리보드에 인물이 있으면 포함). 표정 우선 문장 중복 금지.
+5. **경량 추출 작업** — `POST /api/produce/style-anchor`에서 동의가 있으면 비동기 작업(§6 절차, `lite/README.md` 계약)으로 `custom_style_anchor.facets` 채움; 실패 시 재시도 1회 뒤 facets 없이(§8 남은 것 3가 정해지면 그에 따라).
+6. **동의** — 업로드 동의 대화상자에 "스타일 분석에 쓴다(외부 모델에 전송)" 항목 또는 별도 대화상자(§8 남은 것 2); 동의 시각·문구 버전을 `custom_style_anchor`에 남긴다.
+7. **검증 표면** — 정책 문장 diff(`owner-gates.md`) + 스크린샷(픽커·동의 대화상자) + 생성 1~2장(오너 육안).
+
+**동작 목록 초안** — 같이 정한 것(오너가 이 세션에서 정했거나 이미 아는 것; 제품 세션이 테스트 이름으로 쓴다):
+
+- 프리셋 앵커에 facet 조각이 있으면 생성 프롬프트에 역할 문장 → style_clause → "Style anchors:" 조각 순으로 싣는다.
+- 인물이 있는 생성(캐릭터 시트·인물 컷)에는 "Figure rules:" 조각과 "Priority order:" 줄을 싣고, 배경·사물만 있는 생성에는 싣지 않는다.
+- facet 조각이 없는 앵커(시드 전·유저 앵커 추출 전)는 지금과 같은 프롬프트로 생성한다.
+- 유저가 올린 이미지는 분석 동의가 있을 때만 facet 추출 모델에 보낸다.
+- 경량 추출이 실패해도 생성은 멈추지 않고 facet 없이 진행한다.
+- 조각 안의 매체어는 걷어내지 않고, 본문의 매체어는 지금처럼 걷어낸다.
+
+혼자 정한 것 후보(제품 세션이 유도하게 될 것 — 되돌리기 `쉬움`은 구현하고 보고, `비쌈` 이상은 오너 확인):
+
+| 동작 | 되돌리기 |
+|---|---|
+| facets 저장 위치 = `style_anchors.facets` jsonb(새 표 아님) | 쉬움 |
+| 2-ref 앵커(watercolor·real_psy_horror)는 현행대로 프리뷰 2번째 참조 유지 + facet 조각 | 쉬움 |
+| 턴어라운드 시트(템플릿 2번째 참조)에도 Figure rules를 싣는다 | 쉬움 |
+| 경량 추출은 앵커 확정 요청 안에서 기다리지 않고 비동기 작업으로 | 비쌈(큐·상태 표시가 생긴다) |
+| 추출 동의를 업로드 권리 동의와 한 대화상자에 합친다 | 비쌈(문구·법무) |
