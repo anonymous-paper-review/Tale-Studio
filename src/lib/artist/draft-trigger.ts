@@ -220,9 +220,10 @@ export async function triggerCharacterDrafts(
           : { model: resolveImageEndpoint(DEFAULT_IMAGE_MODEL, false).endpoint, prompt, aspect_ratio: '3:2', webhookUrl }
         if (anchor) {
           const { webhookUrl: wh, ...anchorable } = submitOpts
+          // 사람 시트(사물은 위에서 건너뛴다) — facet 인물 조각을 싣는다(2026-10-08).
           const anchored = templateUrl
-            ? applyStyleAnchor(anchor, anchorable, 'turnaround', { pinAspectRatio: '16:9' })
-            : applyStyleAnchor(anchor, anchorable, 'single')
+            ? applyStyleAnchor(anchor, anchorable, 'turnaround', { pinAspectRatio: '16:9', people: true })
+            : applyStyleAnchor(anchor, anchorable, 'single', { people: true })
           submitOpts = { ...anchored, webhookUrl: wh }
         }
         // 자리 예약이 먼저다(#generation-capacity-trigger 2026-09-14) — 제출을 먼저 하면 트리거가 기록을

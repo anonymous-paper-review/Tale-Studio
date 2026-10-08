@@ -861,3 +861,90 @@ describe('generate-sheet — 자율 생성은 빈칸만 채운다', () => {
     expect(mocks.falImageSubmit).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('facet 조각을 생성 경로마다 알맞게 싣는다 (2026-10-08 오너 · facet 인계)', () => {
+  const FACETS = {
+    version: 'hp-test',
+    probe_anchors: 'No outlines; photographic soft light.',
+    figure: 'Realistic figures throughout.',
+    priority: 'Priority order: photographic shading → soft light.',
+    negative: 'Avoid anime, logos.',
+  }
+  beforeEach(() => {
+    dbState.styleAnchors = [{ ...styleAnchorFixture(), facets: FACETS } as StyleAnchorRow]
+  })
+
+  it('스타일에 facet 조각이 있으면 인물 시트에 Style anchors 조각과 Figure rules 조각과 Priority order 줄을 함께 싣는다', async () => {
+    const character = characterFixture({ view_main: null, entity_type: 'person' })
+    setCharacters(character)
+    const response = await generateSheetPOST(
+      postRequest('/api/artist/generate-sheet', { projectId: PROJECT_ID, characterId: CHARACTER_ID, appearanceKey: 'current', view: 'main' }),
+    )
+    expect(response.status).toBe(200)
+    const prompt = firstFalOpts().prompt
+    expect(prompt.split('\n').slice(0, 3)).toEqual([STYLE_ANCHOR_CLAUSE, STYLE_ANCHOR_TEMPLATE_CLAUSE, 'Style anchors: No outlines; photographic soft light.'])
+    expect(prompt).toContain('Figure rules: Realistic figures throughout.')
+    expect(prompt).toContain('Priority order: photographic shading → soft light.')
+    expect(prompt).toContain('Avoid anime, logos.')
+    expect(firstFalOpts().reference_image_urls).toEqual([ANCHOR_URL, TEMPLATE_URL])
+  })
+
+  it('사물 시트에는 facet 조각을 싣되 Figure rules 조각과 Priority order 줄은 싣지 않는다', async () => {
+    const prop = characterFixture({ view_main: null, entity_type: 'object' as unknown as 'person' })
+    setCharacters(prop)
+    const response = await generateSheetPOST(
+      postRequest('/api/artist/generate-sheet', { projectId: PROJECT_ID, characterId: CHARACTER_ID, appearanceKey: 'current', view: 'main' }),
+    )
+    expect(response.status).toBe(200)
+    const prompt = firstFalOpts().prompt
+    expect(prompt).toContain('Style anchors: No outlines; photographic soft light.')
+    expect(prompt).not.toContain('Figure rules:')
+    expect(prompt).not.toContain('Priority order:')
+  })
+
+  it('배경 그림에는 facet 조각을 싣되 Figure rules 조각과 Priority order 줄은 싣지 않는다', async () => {
+    dbState.projects = [projectFixture({ design_tokens: null, style_anchor_key: ANCHOR_KEY })]
+    const response = await generateWorldPOST(
+      postRequest('/api/artist/generate-world', { projectId: PROJECT_ID, locationId: LOCATION_ID, column: 'wide_shot', prompt: 'WORLD PROMPT', aspectRatio: '16:9' }),
+    )
+    expect(response.status).toBe(200)
+    const prompt = firstFalOpts().prompt
+    expect(prompt).toContain('Style anchors: No outlines; photographic soft light.')
+    expect(prompt).toContain('Avoid anime, logos.')
+    expect(prompt).not.toContain('Figure rules:')
+    expect(prompt).not.toContain('Priority order:')
+  })
+
+  it('캐릭터 초안도 인물 시트처럼 Figure rules 조각과 Priority order 줄을 싣는다', async () => {
+    dbState.projects = [projectFixture({ design_tokens: designTokens, style_anchor_key: ANCHOR_KEY })]
+    setCharacters(draftCharacter({ character_id: 'draft-person', name: 'Draft Person', appearance: 'courier in a blue raincoat', entity_type: 'person' }))
+    const result = await triggerCharacterDrafts(PROJECT_ID)
+    expect(result).toEqual({ submitted: 1, skipped: 0, failed: 0 })
+    const prompt = firstFalOpts().prompt
+    expect(prompt).toContain('Style anchors: No outlines; photographic soft light.')
+    expect(prompt).toContain('Figure rules: Realistic figures throughout.')
+    expect(prompt).toContain('Priority order: photographic shading → soft light.')
+  })
+
+  it('스토리보드 그림은 인물 시트를 참조할 때만 Figure rules 조각과 Priority order 줄을 싣는다', async () => {
+    dbState.projects = [projectFixture({ design_tokens: null, style_anchor_key: ANCHOR_KEY })]
+    await generateStoryboardPOST(
+      postRequest('/api/director/generate-storyboard', {
+        projectId: PROJECT_ID, writerShotId: 'shot-with-person', prompt: 'SHOT PROMPT',
+        referenceImageUrls: ['person-sheet', 'location-shot'], characterRefCount: 1, worldRefCount: 1, aspectRatio: '16:9',
+      }),
+    )
+    await generateStoryboardPOST(
+      postRequest('/api/director/generate-storyboard', {
+        projectId: PROJECT_ID, writerShotId: 'shot-without-person', prompt: 'SHOT PROMPT',
+        referenceImageUrls: ['location-a', 'location-b'], characterRefCount: 0, worldRefCount: 2, aspectRatio: '16:9',
+      }),
+    )
+    expect(mocks.falImageSubmit).toHaveBeenCalledTimes(2)
+    expect(falOptsAt(0).prompt).toContain('Figure rules: Realistic figures throughout.')
+    expect(falOptsAt(0).prompt).toContain('Priority order: photographic shading → soft light.')
+    expect(falOptsAt(1).prompt).toContain('Style anchors: No outlines; photographic soft light.')
+    expect(falOptsAt(1).prompt).not.toContain('Figure rules:')
+    expect(falOptsAt(1).prompt).not.toContain('Priority order:')
+  })
+})

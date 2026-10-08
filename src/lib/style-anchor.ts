@@ -13,6 +13,46 @@ export const STYLE_ANCHOR_TEMPLATE_CLAUSE = 'The SECOND reference image is a lay
 
 export type StyleAnchorMode = 'single' | 'turnaround' | 'multiref'
 
+// ── facet 조각(2026-10-08 오너 · facet 인계 .claude/docs/2026-10-08/facet-presets/README.md §4) ──────────
+// 앵커 그림이 못 나르는 값(선·명암·팔레트 역할·인물 비례·우선순위)을 텍스트 조각으로 함께 싣는다. 오너 결정 "둘 다":
+//   역할 문장 → 현행 style_clause → "Style anchors:" → 본문 → 표면 문장 → [인물이면 Figure rules · Priority] → Avoid → 글자 금지.
+//   조각 문자열은 인계 산출물 그대로다(제품이 다듬지 않는다). 조각이 없으면 종전 조립 그대로.
+export const FACET_SURFACE_GUARD = 'Plain, fully specified surfaces: flat ground and backdrop as described, no borrowed patterns; accessories, footwear and sky or backdrop marks only as described.'
+export const FACET_EXPRESSION_PRIORITY = 'These eye traits describe the relaxed face; when the scene calls for an expression, the expression sets the lid opening and corner angle and takes priority over these defaults, while the iris rendering, the single catchlight (kept even when the eye is narrowed or angry) and the outline colour stay as described.'
+export const FACET_NO_TEXT = 'No text, no letters, no logo, no watermark.'
+
+export interface StyleAnchorFacets {
+  version: string | null
+  /** "Style anchors: …" — 앵커 이미지 바로 뒤의 압축 캡슐. 이것이 없으면 facet 없음으로 본다. */
+  probeAnchors: string
+  /** "Figure rules: …" — 인물이 있는 장면에만. */
+  figure: string | null
+  /** "Priority order: …" 한 줄 — 인물이 있는 장면에만. */
+  priority: string | null
+  /** "Avoid …" 한 문장. */
+  negative: string | null
+}
+
+const text = (value: unknown): string | null => (typeof value === 'string' && value.trim() ? value.trim() : null)
+
+/** style_anchors.facets / custom_style_anchor.facets(jsonb) → 조각. 캡슐이 문자열이 아니면 facet 없음(종전 조립). */
+export function parseStyleAnchorFacets(raw: unknown): StyleAnchorFacets | null {
+  if (!raw || typeof raw !== 'object') return null
+  const record = raw as Record<string, unknown>
+  const probeAnchors = text(record.probe_anchors)
+  if (!probeAnchors) return null
+  return {
+    version: text(record.version),
+    probeAnchors,
+    figure: text(record.figure),
+    priority: text(record.priority),
+    negative: text(record.negative),
+  }
+}
+
+// 조각에 표정 우선 문장이 이미 있으면 다시 붙이지 않는다(인계 §4 — 중복 금지).
+const EXPRESSION_PRIORITY_RE = /expression[^.]*\bpriority\b|\bpriority\b[^.]*expression/i
+
 // ── 매체어 스크럽(#F-004 B4/B5 2026-08-12) ────────────────────────────────────
 // 앵커가 있으면 앵커 이미지가 매체의 유일한 권위다. 그런데 실측(dc531572)에서 프롬프트에 실린
 // 매체어("texture: photorealistic", "포토리얼리스틱 식생 지대")가 앵커를 이겨 매체 전이를 깨뜨렸다
@@ -63,6 +103,8 @@ export interface ResolvedStyleAnchor {
   /** #anchor-wiring Rule 6: 'media' | 'sublook' — 서브룩은 그레이드가 상품이라 씬 조명 절의
    *  권위 이관("앵커 그레이드 베끼지 말 것")에서 그레이드·팔레트를 앵커에 남긴다. */
   anchorKind?: string | null
+  /** facet 조각(2026-10-08) — 있으면 applyStyleAnchor 가 인계 §4 순서로 함께 싣는다. */
+  facets?: StyleAnchorFacets | null
 }
 
 export interface AnchorableSubmit {
@@ -93,19 +135,20 @@ export function applyStyleAnchor(
   anchor: ResolvedStyleAnchor | null,
   base: AnchorableSubmit,
   mode: 'turnaround',
-  opts: { pinAspectRatio: string },
+  opts: { pinAspectRatio: string; people?: boolean },
 ): AnchorableSubmit
 export function applyStyleAnchor(
   anchor: ResolvedStyleAnchor | null,
   base: AnchorableSubmit,
   mode: 'single' | 'multiref',
-  opts?: { pinAspectRatio?: string },
+  opts?: { pinAspectRatio?: string; people?: boolean },
 ): AnchorableSubmit
+/** opts.people — 인물이 있는 장면(인물 시트 · 인물이 든 컷)이면 facet 의 Figure rules · Priority 를 싣는다. */
 export function applyStyleAnchor(
   anchor: ResolvedStyleAnchor | null,
   base: AnchorableSubmit,
   mode: StyleAnchorMode,
-  opts?: { pinAspectRatio?: string },
+  opts?: { pinAspectRatio?: string; people?: boolean },
 ): AnchorableSubmit {
   if (anchor == null) return base
 
@@ -123,11 +166,31 @@ export function applyStyleAnchor(
   //   포함 가능: stop_motion 매체 절, melo 매체 절 등). base.prompt 스크럽 뒤에 별도 줄로 얹는다.
   const styleClauseLine = anchor.styleClause?.trim() ? `\n${anchor.styleClause.trim()}` : ''
 
+  // 앵커 존재 시 본문 산문에서 매체어 제거(#F-004 B5) — 산문의 "포토리얼리스틱" 류가 앵커
+  //   이미지를 이기는 실측 재발 방지. 앵커 없으면 이 함수 자체가 no-op(위 early return).
+  //   facet 조각은 앵커 쪽 진실이라 style_clause 처럼 스크럽하지 않는다(인계 §4).
+  const body = scrubMediaWords(base.prompt)
+  const facets = anchor.facets ?? null
+  const prompt = facets
+    ? [
+        `${headClause}${modeClause}${styleClauseLine}`,
+        `Style anchors: ${facets.probeAnchors}`,
+        body,
+        FACET_SURFACE_GUARD,
+        ...(opts?.people && facets.figure
+          ? [`Figure rules: ${facets.figure}${EXPRESSION_PRIORITY_RE.test(facets.figure) ? '' : ` ${FACET_EXPRESSION_PRIORITY}`}`]
+          : []),
+        ...(opts?.people && facets.priority ? [facets.priority] : []),
+        ...(facets.negative ? [facets.negative] : []),
+        // 인물 시트는 양식(2번째 참조)의 칸 이름을 지켜야 한다 — 본문이 이미 "never add any extra text"를 갖고 있어
+        //   전면 글자 금지 줄은 싣지 않는다. 비율은 요청 값(aspect_ratio)으로 정해 문장으로 넣지 않는다.
+        ...(mode === 'turnaround' ? [] : [FACET_NO_TEXT]),
+      ].join('\n')
+    : `${headClause}${modeClause}${styleClauseLine}\n${body}`
+
   const next: AnchorableSubmit = {
     ...base,
-    // 앵커 존재 시 본문 산문에서 매체어 제거(#F-004 B5) — 산문의 "포토리얼리스틱" 류가 앵커
-    //   이미지를 이기는 실측 재발 방지. 앵커 없으면 이 함수 자체가 no-op(위 early return).
-    prompt: `${headClause}${modeClause}${styleClauseLine}\n${scrubMediaWords(base.prompt)}`,
+    prompt,
     reference_image_urls: [
       anchor.imageUrl,
       ...(twoRef ? [anchor.previewUrl as string] : []),
@@ -158,6 +221,8 @@ export interface CustomStyleAnchor {
   url: string
   label: string | null
   medium: string | null
+  /** 유저 이미지의 경량 facet(인계 §6) — 추출 전이거나 실패했으면 없다(앵커 이미지 + 역할 문장만). */
+  facets?: StyleAnchorFacets
 }
 
 /** jsonb 는 무엇이든 들어올 수 있다 — url 이 문자열일 때만 앵커로 인정한다. */
@@ -170,8 +235,11 @@ export function parseCustomStyleAnchor(raw: unknown): CustomStyleAnchor | null {
     url,
     label: typeof record.label === 'string' ? record.label : null,
     medium: typeof record.medium === 'string' ? record.medium : null,
+    ...withFacets(parseStyleAnchorFacets(record.facets)),
   }
 }
+
+const withFacets = (facets: StyleAnchorFacets | null) => (facets ? { facets } : {})
 
 /** 앵커 해석에 필요한 projects 컬럼만. 호출부는 이 두 칸을 select 해야 한다. */
 export interface AnchorSourceProject {
@@ -192,10 +260,34 @@ export async function resolveStyleAnchor(
 
   const custom = parseCustomStyleAnchor(project.custom_style_anchor)
   if (custom) {
-    return { key: project.style_anchor_key ?? 'custom', imageUrl: custom.url }
+    return { key: project.style_anchor_key ?? 'custom', imageUrl: custom.url, ...withFacets(custom.facets ?? null) }
   }
 
-  return resolveStyleAnchorByKey(project.style_anchor_key)
+  const anchor = await resolveStyleAnchorByKey(project.style_anchor_key)
+  if (!anchor) return null
+  return { ...anchor, ...withFacets(await loadStyleAnchorFacets(anchor.key)) }
+}
+
+const facetsCache = new Map<string, { facets: StyleAnchorFacets | null; expires: number }>()
+
+/**
+ * 프리셋 앵커의 facet 조각(style_anchors.facets, 2026-10-08). 키 해석과 따로 읽는다 — 키 해석(영상 매체 판정 등
+ *   여러 곳이 쓰는 조회)은 칸 목록 · 결과 모양을 바꾸지 않는다. 칸이 아직 없는 DB(live 마이그레이션 전)나 조회 실패는
+ *   facet 없음 = 종전 조립으로 진행한다(기능 저하이지 오류가 아니다).
+ */
+export async function loadStyleAnchorFacets(key: string): Promise<StyleAnchorFacets | null> {
+  const now = Date.now()
+  const cached = facetsCache.get(key)
+  if (cached && cached.expires > now) return cached.facets
+  try {
+    const { data, error } = await supabaseAdmin.from('style_anchors').select('facets').eq('key', key).maybeSingle()
+    if (error) return null
+    const facets = parseStyleAnchorFacets((data as { facets?: unknown } | null)?.facets)
+    facetsCache.set(key, { facets, expires: now + STYLE_ANCHOR_CACHE_TTL_MS })
+    return facets
+  } catch {
+    return null
+  }
 }
 
 export async function resolveStyleAnchorByKey(
@@ -325,6 +417,7 @@ export async function listStyleAnchorCatalog(): Promise<StyleAnchorCatalogEntry[
 
 export function _clearStyleAnchorCacheForTest(): void {
   styleAnchorCache.clear()
+  facetsCache.clear()
   mediumsCache = null
   catalogCache = null
 }

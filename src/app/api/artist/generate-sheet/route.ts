@@ -310,10 +310,12 @@ export async function POST(req: Request) {
     }
     if (anchor && styleAnchorMode) {
       const { webhookUrl: wh, ...anchorable } = submitOpts
+      // facet 인물 조각(Figure rules · Priority)은 사람 시트에만 — 사물(소품) 시트는 인물이 없다(2026-10-08).
+      const people = character.entity_type !== 'object'
       const anchored =
         styleAnchorMode === 'turnaround'
-          ? applyStyleAnchor(anchor, anchorable, 'turnaround', { pinAspectRatio: '16:9' })
-          : applyStyleAnchor(anchor, anchorable, 'single')
+          ? applyStyleAnchor(anchor, anchorable, 'turnaround', { pinAspectRatio: '16:9', people })
+          : applyStyleAnchor(anchor, anchorable, 'single', { people })
       submitOpts = { ...anchored, webhookUrl: wh }
     }
 
