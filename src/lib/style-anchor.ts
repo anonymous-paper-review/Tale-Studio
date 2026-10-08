@@ -20,6 +20,9 @@ export type StyleAnchorMode = 'single' | 'turnaround' | 'multiref'
 export const FACET_SURFACE_GUARD = 'Plain, fully specified surfaces: flat ground and backdrop as described, no borrowed patterns; accessories, footwear and sky or backdrop marks only as described.'
 export const FACET_EXPRESSION_PRIORITY = 'These eye traits describe the relaxed face; when the scene calls for an expression, the expression sets the lid opening and corner angle and takes priority over these defaults, while the iris rendering, the single catchlight (kept even when the eye is narrowed or angry) and the outline colour stay as described.'
 export const FACET_NO_TEXT = 'No text, no letters, no logo, no watermark.'
+// 인물 조각의 비례 수치(약 7.9등신 등)는 그 스타일의 평균적인 성인 기준이다 — 아이 · 노인에게 어른 비례가 실리지 않게(2026-10-08 오너 결정 4).
+//   조각 문자열은 인계 산출물 그대로 두고, 스타일마다 숫자가 달라 숫자 없이 어느 스타일에나 맞게 붙인다.
+export const FACET_ADULT_PROPORTIONS = 'In this style, the proportions above are those of an average adult; children, elderly people and other body types keep their own natural proportions in the same rendering.'
 
 export interface StyleAnchorFacets {
   version: string | null
@@ -178,7 +181,7 @@ export function applyStyleAnchor(
         body,
         FACET_SURFACE_GUARD,
         ...(opts?.people && facets.figure
-          ? [`Figure rules: ${facets.figure}${EXPRESSION_PRIORITY_RE.test(facets.figure) ? '' : ` ${FACET_EXPRESSION_PRIORITY}`}`]
+          ? [`Figure rules: ${facets.figure} ${FACET_ADULT_PROPORTIONS}${EXPRESSION_PRIORITY_RE.test(facets.figure) ? '' : ` ${FACET_EXPRESSION_PRIORITY}`}`]
           : []),
         ...(opts?.people && facets.priority ? [facets.priority] : []),
         ...(facets.negative ? [facets.negative] : []),

@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
+  FACET_ADULT_PROPORTIONS,
   FACET_EXPRESSION_PRIORITY,
   FACET_NO_TEXT,
   FACET_SURFACE_GUARD,
@@ -47,7 +48,7 @@ describe('facet 조각 조립 순서', () => {
     const out = applyStyleAnchor(anchor(), { prompt: 'A courier stands.', aspect_ratio: '1:1' }, 'single', { people: true })
     expect(lines(out.prompt).slice(4)).toEqual([
       FACET_SURFACE_GUARD,
-      `Figure rules: Realistic figures throughout, about 7.9 heads tall. ${FACET_EXPRESSION_PRIORITY}`,
+      `Figure rules: Realistic figures throughout, about 7.9 heads tall. ${FACET_ADULT_PROPORTIONS} ${FACET_EXPRESSION_PRIORITY}`,
       'Priority order: photographic shading → soft light.',
       'Avoid anime, cel shading, logos.',
       FACET_NO_TEXT,
@@ -72,6 +73,15 @@ describe('facet 조각 조립 순서', () => {
     expect(out.prompt).toContain('Style anchors: No outlines; photographic soft light.')
     expect(out.prompt).toContain('\nA courier stands.\n')
     expect(out.prompt).not.toContain('photorealistic courier')
+  })
+
+  it('Figure rules 조각 뒤에 그 비례가 이 스타일의 평균적인 성인 기준이라는 첨언을 붙여 아이 인물이 어른 비례로 그려지지 않게 한다', () => {
+    // 왜: 실사 인물 조각의 "약 7.9등신" 같은 어른 비례가 아이 인물에게도 실렸다(2026-10-08 오너 결정 4 — 첨언).
+    const out = applyStyleAnchor(anchor(), { prompt: 'A five-year-old girl stands.', aspect_ratio: '1:1' }, 'single', { people: true })
+    const figureLine = lines(out.prompt).find((line) => line.startsWith('Figure rules: '))
+    expect(figureLine).toBe(`Figure rules: Realistic figures throughout, about 7.9 heads tall. ${FACET_ADULT_PROPORTIONS} ${FACET_EXPRESSION_PRIORITY}`)
+    expect(FACET_ADULT_PROPORTIONS).toMatch(/average adult/)
+    expect(FACET_ADULT_PROPORTIONS).toMatch(/children/)
   })
 
   it('Figure rules 조각에 표정 우선 문장이 이미 있으면 다시 붙이지 않는다', () => {
