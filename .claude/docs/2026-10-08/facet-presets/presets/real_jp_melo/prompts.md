@@ -1,61 +1,60 @@
 ## CAPSULE
-Photoreal still life photography uses continuous diffusion, reflection and transmission; no outlines, hatching or auxiliary contours. Gradients form about one soft shadow per matte form, with #f0ece1 metal and #ddd4c6 glass highlights; soft contact shadows #6a5638 spread lower right. In daylight, target 68% mean luminance, 0% near black and 26.5% bright clusters, never mostly black; at night retain palette roles and shading, only darker. Objects use #886552, #a18878 and #d0bdb8; none is ground only. Muted accent #d1bbb5 ≤20% and moderately saturated accent #b5bb67 ≤20% of the image, combined on cloth, fruit or leaves, never on walls or matte spheres. Use round masses, ellipses, tapering cylinders and long curves with continuous contours, no corners or enclosed gaps. Detail budget: minimal, grade 1; no internal lines, protrusions, decorative marks or pattern lines.
+Photographic digital image uses continuous tone, diffuse light, low contrast texture, gradients, and no brush marks. No outlines or auxiliary contours; tonal bands are 0.15% of width, or 3 px at 2048 px; no hatching. Elliptical openings meet frustums and rounded volumes meet folded surfaces; contours mix curves and straights, joins follow material, and limb gaps form narrow wedges. Continuous gradients cover curves, cloth, reflections, and interiors; use one connected soft form shadow, no cel fragments, and warm #897057 contact shadows flowing lower right. Daylight mean luminance is 68%, near black 0%, and bright neutrals 26.5%; nights retain palette roles and shading, only darker; highlights stay on metal and glass, with no bloom. Warm low saturation palette: #a59786 16.1%, #9b9583 14.2%, #e2e2dc 14.0%, and #f1f4f0 12.5%; #b3bd6a and #9b7c72 stay local material colors, never luminous or graphic; do not lock colors to object categories. Use photographic lens perspective, mild depth, physical ground, 45% low information space, cropping, and overlap; comparable still lifes use 17.92% to 24.90% object heights and a 0.72 ratio; preserve observed material behavior with no printed pattern; Detail budget: maximal, grade 5, with about 24 garment structures per figure, about 60 hem ribs, each eye using one iris mass, one catchlight and two lid boundaries, hair texture with uncounted strands, and no decorative marks.
 
 ## NEGATIVE
-Avoid cel animation, vector illustration, watercolor painting and glossy 3D rendering; moire, compression blocks, black outlines, hard cel shading, neon saturation, crushed blacks, copied arrangements, identical folds or branches, readable text, logos, bokeh particles, tiled patterns, wet floors, geometric linework, bloom and halation rings; no speed lines.
+Avoid anime, cartoon, fashion illustration, and glamour photography; black outlines, hard cel shading, fashion proportions, oversized eyes, copied still life arrangements or identities, copied outfits or hairstyles, readable text, logos, bokeh particle fields, wet floor reflections, geometric ink hatching, ornamental iris patterns, decorative signs, speed lines, and bloom.
 
 ## SCENE
-An indoor tabletop still life beside a window and curtain contains one cloth, one sphere, two vessels, one fruit and one potted plant, with no people. The cloth spreads across the front left, the sphere and fruit sit forward, the vessels occupy the center, and the plant stands at the rear right; the table and vessel tops are visible.
+Inside a room with a window and curtains, six subjects rest on a table. A sphere, cloth, and metal cup accompany a water glass, fruit, and potted plant; foreground items overlap the rear plant, upper surfaces show, and no people appear. Before plain background and floor, two casually dressed adults stand side by side, fully visible and facing front with neutral expressions.
 
 ## PROBE_ANCHORS
-Use lens perspective, slight overhead view and soft background focus. No outlines or internal lines; glass and metal remain sharper than cloth and matte edges. Continuous gradients form about one soft shadow per matte form, with #f0ece1 metal and #ddd4c6 glass highlights; soft contact shadows #6a5638 spread lower right. In daylight, target 68% mean luminance, 0% near black and 26.5% bright clusters, never mostly black; at night retain palette roles and soft shading, only darker. Objects use #886552, #a18878 and #d0bdb8; no hue is ground only. Muted accent #d1bbb5 and moderately saturated accent #b5bb67 together occupy ≤20% of the image, on cloth, fruit or leaves, never on walls or matte spheres. Make an object about 18% of frame height and a vessel about 26%; leave the upper 45% open, allow foreground surfaces to continue beyond the frame, and keep major masses readable through partial overlap. Detail budget: minimal, grade 1; no internal lines, protrusions, decorative marks or pattern lines.
+Use photographic lens perspective from the scene viewpoint, mild depth, and no obvious wide angle distortion. No outlines or auxiliary contours; tonal boundaries are 0.15% of image width, or 3 px at 2048 px, only for structure. Use continuous gradients, one connected soft form shadow, and warm #897057 soft contact shadows. In daylight, keep mean luminance about 68%, near black 0%, bright neutrals 26.5%, and low saturation; nights retain palette roles, only darker. Use #a59786, #9b9583, #e2e2dc, and #f1f4f0 as warm neutrals; #b3bd6a and #9b7c72 stay local material colors, never graphic accents, while #9a9484 and #eaeae6 are not background locks. Use physical ground, overlap, cropping, and 45% low information space unless the scene backdrop overrides; no decorative marks. Detail budget: maximal, grade 5; per figure use about 24 shaded garment structures, about 60 hem ribs, one iris mass, one catchlight, two lid boundaries, and dense hair texture without invented counts.
 
 ## FIGURE
-none
+Use a realistic face with actual eye and nose volume, natural lip thickness, and a softly narrowing jaw on a realistic body with anatomical contours, rendered as photographic realism with no drawn outlines and continuous diffuse shading. The figure is about 7.66 heads tall, measured from the obscured skull top rather than the hair, and the head to torso ratio is about 1:2.88. The torso occupies about 37.56% of total height, while the legs including the shoes occupy about 43.50%. The lower leg including the shoe is about 1.39 times the thigh, while the forearm is about 0.89 times the upper arm. An arm from shoulder to fingertip is about 39.65% of height, and shoulders span about 2.03 head widths. Hands measure about 0.72 face heights. Shoes have rounded toes and low soles; each shoe is about 0.65 head heights tall and about 0.75 head lengths along its projected long axis, while the sole is about 11.32% of shoe height. Eyes have neutral outer corners and a normal opening that covers about the upper 20% of the iris; their opening is a long almond about 2.92 times as wide as high. Use standard eyes with one visible iris mass and continuous tonal detail whose finer internal stages remain unspecified. Keep one soft round catchlight in the upper left, about 3 px at 2048 px width, or 0.15% of image width and about 25% of the visible iris width; use no secondary catchlight and no glow. Lashes blend into the thin upper lid boundary rather than becoming countable graphic strands. The upper lid boundary is about 2 px at 2048 px width, or 0.10% of image width, while the partial lower lid boundary is about 1 px, or 0.05%, and fades into skin; eye boundaries are brown to reddish brown local shading, never pure black. Narrow sclera remains visible at both sides and is brighter than skin but not pure white. The inner eye corner has small volumetric shading, and the pointed outer closure has no extended tail line. Render separated fingers, joint bends, and subtle hand tendons with continuous shading without inventing a finger count. Hair first forms one connected region with curved internal flow, diffuse strand highlights, and softly released tips; it has no independent geometric pieces, while strand and flyaway counts remain unspecified, and scene content sets its length, shape, and color. Do not add independent accessories from the style sample, but retain any props required by the scene and render them by their specified material. Poses tend to use relaxed upright posture, nearly level shoulder, pelvis, and head axes around 0 degrees, stable support on both feet, a straight body rhythm without a strong S curve, and nearly straight limbs, with sampled inner angles about 172.2 degrees at the arm and 169.7 degrees at the leg. Do not exaggerate foreshortening; when the scene specifies an action, the action comes first and this rhythm is applied to it. Expressions tend to be calm and neutral, conveyed through gentle brow curvature, lid opening, and softly closed lips, with no comic emotion signs; scene specified emotion takes priority. Skin uses continuous intrinsic color and soft shading, a weak diffuse sheen, and low contrast cheek and lip variation, with no cel bands, hard gloss patches, emphasized pore dots, or diagonal blush signs. Clothing falls naturally over body volume and keeps low contrast fiber texture; its seams and folds appear as narrow shading, not ink. Detail budget: maximal, grade 5; use about 24 shaded garment structures per figure, comprising about 12 seam boundaries and about 12 folds, plus about 60 fine vertical ribs only across the sampled hem regardless of figure size on screen; keep one iris mass, one catchlight and two lid boundaries per eye, dense hair texture without an invented strand count, no ornamental garment additions, and no decorative marks.
 
 ## COVERAGE
 | 항목 | 출처 key | 실린 섹션 | 실린 절(영문 원문 발췌) |
 |---|---|---|---|
-| Core: 내부선과 돌기가 없는 단순 구형 표본의 연속 음영 | 분류.Core | CAPSULE, PROBE_ANCHORS | “Gradients form about one soft shadow per matte form” / “no internal lines, protrusions” |
-| Core: 낮은 대비의 따뜻한 하이키 | 분류.Core | CAPSULE, PROBE_ANCHORS | “In daylight, target 68% mean luminance, 0% near black and 26.5% bright clusters, never mostly black” |
-| Core: 큰 확산광과 부드러운 접지 | 분류.Core | CAPSULE, PROBE_ANCHORS | “continuous diffusion” / “soft contact shadows #6a5638 spread lower right” |
-| Core: 재료별 반사와 투과 | 분류.Core | CAPSULE, PROBE_ANCHORS | “continuous diffusion, reflection and transmission” / “#f0ece1 metal and #ddd4c6 glass highlights” |
-| Supporting: 배경의 완만한 초점 흐림 | 분류.Supporting | PROBE_ANCHORS | “soft background focus” |
-| Supporting: 국소 섬유 결 | 분류.Supporting | — | CAPSULE 절대 상한 130단어에서 비 Core 국소 결을 생략함 |
-| Supporting: 저채도 분홍과 황록 | 분류.Supporting | CAPSULE, PROBE_ANCHORS | “Muted accent #d1bbb5” / “moderately saturated accent #b5bb67” |
-| Supporting: 환경으로 열린 여백 | 분류.Supporting | PROBE_ANCHORS | “leave the upper 45% open” |
-| §6 1 선 굵기 상대값 | 그림체.선.외곽선.유무·굵기 | CAPSULE, PROBE_ANCHORS | “no outlines” — 그어진 선이 없어 굵기 수치는 해당 없음 |
-| §6 2 역할 배분 | 그림체.색.역할 배분 | CAPSULE, PROBE_ANCHORS | “Objects use #886552, #a18878 and #d0bdb8; none is ground only.” |
-| §6 3 액센트 전부 | 그림체.색.액센트 규칙 | CAPSULE, PROBE_ANCHORS | “Muted accent #d1bbb5 ≤20% and moderately saturated accent #b5bb67 ≤20% of the image, combined on cloth, fruit or leaves, never on walls or matte spheres.” |
-| §6 4 구도 | 공간.구도 | PROBE_ANCHORS | “Make an object about 18% of frame height and a vessel about 26%; leave the upper 45% open, allow foreground surfaces to continue beyond the frame, and keep major masses readable through partial overlap.” |
-| §6 5 장식 | 장식.어휘·개수·운동 부호 | CAPSULE, NEGATIVE, PROBE_ANCHORS | “no decorative marks” / “no speed lines” |
-| §6 6 모노크롬 | 생성 규칙.게이트 판정.생략 | — | strict monochrome 게이트가 생략되어 해당 없음 |
-| §6 7 재질 사전 | 그림체.매체.재료 외관·재질 | CAPSULE | “continuous diffusion, reflection and transmission” / “#f0ece1 metal and #ddd4c6 glass highlights” — 비 Core 재질별 세부 나열은 130단어 절대 상한 때문에 생략함 |
-| §6 8 곡면·면분할 | 그림체.채움.토폴로지·형태.곡면 처리 | CAPSULE, PROBE_ANCHORS | “Gradients form about one soft shadow per matte form” / “Continuous gradients” |
-| §6 9 캐스트 섀도 | 그림체.명암.캐스트 섀도 | CAPSULE, PROBE_ANCHORS | “soft contact shadows #6a5638 spread lower right” |
-| §6 10 인물 | 인물 | FIGURE | “none” — 장면 인물 0명 |
-| §6 11 부정 절 | 생성 규칙.부정 절 | NEGATIVE | “Avoid cel animation, vector illustration, watercolor painting and glossy 3D rendering” 이하 한 문장 |
-| §6 12 과정·고유명사 금지 | 입력·전체 템플릿 | 전체 | 과정 서술과 고유명사를 싣지 않음 |
-| §6 13 폼 섀도 경도 | 그림체.명암.폼 섀도 | CAPSULE, PROBE_ANCHORS | “about one soft shadow per matte form” |
-| §6 14 하이라이트·액센트 hex | 그림체.명암.하이라이트·색.팔레트 | CAPSULE, PROBE_ANCHORS | “#f0ece1 metal and #ddd4c6 glass highlights” / “accent #d1bbb5” / “accent #b5bb67” |
-| §6 15 Core 장식·배경 기하 | 분류.Core·공간.배경·지면.그래픽 구성 | — | Core 장식과 그래픽 패널 값이 없으므로 해당 없음 |
-| §6 16 선의 층별 문장 | 그림체.선.적용 범위 | CAPSULE, PROBE_ANCHORS | “no outlines, hatching or auxiliary contours” / “No outlines or internal lines” |
-| §6 17 내부선 양·역할 | 그림체.선.내부선 | CAPSULE, PROBE_ANCHORS | “no internal lines” |
-| §6 18 묘사 예산 | 디테일.묘사 밀도 | CAPSULE, PROBE_ANCHORS | “Detail budget: minimal, grade 1; no internal lines, protrusions, decorative marks or pattern lines.” FIGURE는 인물 0명이라 none |
-| §6 19 수치 신뢰도 | 입력 신뢰도 태그 전반 | 전체 | 실측 개수만 장면·그림자·묘사 예산에 수치로 옮기고, 비율과 크기는 원값을 유지함 |
-| §6 20 종류 나열 금지 | 필수 컴파일 규칙 20 | 전체 | 재질과 내부선의 세부 종류를 네 가지 이상 열거하지 않음 |
-| §6 21 결속형 부호 제외 | 장식.어휘.결속 유형 | — | 장식 부호가 없어 해당 없음 |
-| §6 22 액센트 입도와 장식 개수 분리 | 그림체.색.액센트 규칙.입도·장식.개수 | CAPSULE, PROBE_ANCHORS | “accent #d1bbb5”와 “accent #b5bb67”은 색 면적으로, “no decorative marks”는 장식 개수로 분리함 |
-| §6 23 자연문·단어 예산 | 디테일.묘사 밀도.등급 | CAPSULE, PROBE_ANCHORS | CAPSULE 130단어, PROBE_ANCHORS 160단어의 절대 상한 안에서 자연문으로 작성함 |
-| §6 24 키 절 | 그림체.명암.키·색.팔레트.Highlight | CAPSULE, PROBE_ANCHORS | “In daylight, target 68% mean luminance, 0% near black and 26.5% bright clusters, never mostly black; at night retain palette roles and shading, only darker.” |
-| §6 25 장면 요약 정제 | scene_summary.md | SCENE | “An indoor tabletop still life beside a window and curtain” — 문자·로고 자리는 없음 |
-| §6 26 없음의 전달 | 선·장식·패턴·조명 부재값 | CAPSULE, NEGATIVE, PROBE_ANCHORS | “no outlines, hatching or auxiliary contours” / “no internal lines, protrusions, decorative marks or pattern lines” / “no speed lines” |
-| §6 27 눈 처리·매체 선택값 | 그림체.매체.엔진·인물.눈.처리 | CAPSULE, FIGURE | “Photoreal still life photography” / 인물 눈은 해당 없음 |
-| §6 28 눈 절 | 인물.눈 | FIGURE | “none” — 인물 표본과 장면 인물이 없음 |
-| §6 29 비례 절 | 인물.비례·체형 | FIGURE | “none” — 인물 표본과 장면 인물이 없음 |
-| §6 30 계열 혼합 절 | 인물.계열 혼합 | FIGURE | “none” — 인물 표본과 장면 인물이 없음 |
-| §6 31 형태 어휘·선 위계 | 그림체.형태.도형 어휘·윤곽 리듬·네거티브 스페이스·선.위계 단수·보조 윤곽 | CAPSULE | “Use round masses, ellipses, tapering cylinders and long curves with continuous contours, no corners or enclosed gaps.” 선 위계는 무선이라 해당 없음 |
-| §6 32 포즈 절 | 인물.포즈 문법 | FIGURE | “none” — 인물 표본과 장면 인물이 없음 |
-| §6 33 명암 면·그래픽 구성 | 그림체.명암.폼 섀도·하이라이트·질감·마감.패턴 채움·공간.배경·지면.그래픽 구성 | CAPSULE, NEGATIVE, PROBE_ANCHORS | “about one soft shadow per matte form” / “#f0ece1 metal and #ddd4c6 glass highlights” / “no pattern lines” / “tiled patterns” |
-| §6 34 인접 계열 부정 | 생성 규칙.부정 절.인접 계열·장식.운동 부호 | NEGATIVE | “Avoid cel animation, vector illustration, watercolor painting and glossy 3D rendering” / “no speed lines” |
-| §6 35 FIGURE 순서와 상한 | 인물·scene_summary.md | FIGURE | “none” — 장면 인물 0명 |
+| Core 1. 무선 사진 외관과 곡면의 연속 확산 명암 | `분류.Core` | CAPSULE, PROBE_ANCHORS, FIGURE | “Photographic digital image uses continuous tone” / “rendered as photographic realism with no drawn outlines and continuous diffuse shading” |
+| Core 2. 저채도 웜 하이키와 밝게 남는 암부 | `분류.Core` | CAPSULE, PROBE_ANCHORS | “Daylight mean luminance is 68%, near black 0%, and bright neutrals 26.5%” |
+| Core 3. 재질별 반사 차이와 부드러운 경계 | `분류.Core` | CAPSULE, PROBE_ANCHORS | “preserve observed material behavior” / “Use continuous gradients, one connected soft form shadow, and warm #897057 soft contact shadows” |
+| Core 4. 사실 인체 비례·가로로 긴 눈·무선 피부 | `분류.Core` | FIGURE | “The figure is about 7.66 heads tall” / “their opening is a long almond about 2.92 times as wide as high” |
+| Supporting 1. 얕은 배경 흐림과 소프트 접지 | `분류.Supporting` | CAPSULE, PROBE_ANCHORS | “photographic lens perspective, mild depth, physical ground” / “soft contact shadows” |
+| Supporting 2. 국소 섬유 결 | `분류.Supporting` | CAPSULE, FIGURE | “low contrast texture” / “keeps low contrast fiber texture” |
+| Supporting 3. 헤어 결과 약한 피부 색차 | `분류.Supporting` | FIGURE | “diffuse strand highlights” / “low contrast cheek and lip variation” |
+| §6 1. 선 굵기의 상대값과 px 기준 폭 | `그림체.선.내부선.굵기` | CAPSULE, PROBE_ANCHORS | “tonal bands are 0.15% of width, or 3 px at 2048 px” |
+| §6 2. 역할 배분 | `그림체.색.역할 배분` | CAPSULE, PROBE_ANCHORS | “without locking any color to an object category” / “#9a9484 or #eaeae6 are not locked to backgrounds” |
+| §6 3. 액센트 전체·허용·금지·입도 | `그림체.색.팔레트.Accent`, `액센트 규칙` | CAPSULE, PROBE_ANCHORS | “#b3bd6a and #9b7c72 stay local material colors, never luminous or graphic”; 액센트 상한·조각 수는 `[해당 없음]`이라 수치를 만들지 않음 |
+| §6 4. 구도 | `공간.구도` | CAPSULE, PROBE_ANCHORS | “45% low information space, cropping, and overlap; comparable still lifes use 17.92% to 24.90% object heights and a 0.72 ratio” |
+| §6 5. 장식 | `장식` | CAPSULE, PROBE_ANCHORS, NEGATIVE | “no decorative marks” / “decorative signs” |
+| §6 6. 모노크롬 게이트 | `생성 규칙.게이트 판정.생략` | — | `strict_monochrome_board`, `strict_monochrome_transfer`가 생략 게이트이며 원문도 엄격한 단색이 아님 |
+| §6 7. 등장 재질 사전 | `재질` | CAPSULE | “preserve observed material behavior” |
+| §6 8. 곡면·면분할 | `그림체.채움`, `그림체.형태.곡면 처리` | CAPSULE, PROBE_ANCHORS | “Continuous gradients cover curves, cloth, reflections, and interiors” |
+| §6 9. 캐스트 섬도 | `그림체.명암.캐스트 섬도` | CAPSULE, PROBE_ANCHORS | “warm #897057 contact shadows flowing lower right” |
+| §6 10. 인물 비례·눈매·표정·피부 | `인물` | FIGURE | “Expressions tend to be calm and neutral” / “Skin uses continuous intrinsic color and soft shading” |
+| §6 11. 부정 절과 장면 종속 | `생성 규칙.부정 절` | NEGATIVE | “copied still life arrangements or identities, copied outfits or hairstyles” |
+| §6 12. 과정 서술·고유명사·해당 없음 처리 | 전체 | 전 섹션 | —; 과정 서술과 고유명사를 쓰지 않고 `[해당 없음]` 축은 지시문에서 생략 |
+| §6 13. 폼 섬도 유무와 경도 | `그림체.명암.폼 섬도` | CAPSULE, PROBE_ANCHORS | “one connected soft form shadow, no cel fragments” |
+| §6 14. 하이라이트·소면적 색 | `그림체.명암.하이라이트`, `그림체.색.팔레트` | CAPSULE | “clear highlights only on metal and glass” / “#f1f4f0 12.5%” |
+| §6 15. Core 장식·배경 기하 | `분류.Core`, `장식` | CAPSULE, PROBE_ANCHORS | “no decorative marks”; 그래픽 패널·무대막은 `[해당 없음]` |
+| §6 16. 선의 층별 문장 | `그림체.선.적용 범위` | CAPSULE | “Use no drawn outlines or auxiliary contours on any layer” |
+| §6 17. 내부선의 양·역할 | `그림체.선.내부선`, `인물.의상.주름` | CAPSULE, FIGURE | “show interior structure with narrow tonal bands” / “about 24 shaded garment structures per figure” |
+| §6 18. 묘사 예산 | `디테일.묘사 밀도` | CAPSULE, PROBE_ANCHORS, FIGURE | “Detail budget: maximal, grade 5” |
+| §6 19. 수치 신뢰도 | 수치가 있는 각 key | CAPSULE, PROBE_ANCHORS, FIGURE | “dense hair texture without invented counts”; 비례 추정치는 FIGURE에 그대로 실음 |
+| §6 20. 종류 열거 금지 | 전체 | 전 섹션 | “Elliptical openings meet frustums and rounded volumes meet folded surfaces”; 개수와 역할 중심으로 문장화 |
+| §6 21. 결속형 부호 | `장식.어휘.결속 유형` | — | `[해당 없음]` 부호 0개로 위치 서술도 생략 |
+| §6 22. 액센트 입도≠장식 개수 | `그림체.색.액센트 규칙.입도`, `장식.개수` | CAPSULE | “local material colors #b3bd6a and #9b7c72” / “no decorative marks”; 액센트 조각 수는 `[해당 없음]` |
+| §6 23. 자연문·단어 예산 | `디테일.묘사 밀도.등급` | CAPSULE, PROBE_ANCHORS | “Use photographic lens perspective, mild depth, physical ground”; 압축 하이픈 없는 자연문으로 작성 |
+| §6 24. 키 | `그림체.명암.키`, `그림체.색.팔레트.Secondary` | CAPSULE, PROBE_ANCHORS | “Daylight mean luminance is 68%, near black 0%, and bright neutrals 26.5%; nights retain palette roles and shading, only darker” |
+| §6 25. 장면 요약 정제 | `scene_summary.md` | SCENE | “six main subjects rest on a table” / “two casually dressed adults stand side by side” |
+| §6 26. 없음의 전달 | `그림체.선`, `장식`, `질감·마감.패턴 채움`, `조명.블룸·할레이션` | CAPSULE, NEGATIVE | “no drawn outlines or auxiliary contours” / “no hatching” / “no printed pattern” / “no decorative marks” / “bloom” |
+| §6 27. 눈 처리·매체 선택값 | `인물.눈.처리`, `그림체.매체.엔진`, `인물.계열` | CAPSULE, FIGURE | “Photographic digital image rendering” / “Use a realistic face” / “Use standard eyes” |
+| §6 28. 눈 절 | `인물.눈` | FIGURE | “Eyes have neutral outer corners and a normal opening that covers about the upper 20% of the iris; their opening is a long almond about 2.92 times as wide as high” |
+| §6 29. 비례 절 | `인물.비례`, `인물.체형.손발 크기`, `신발 형태` | FIGURE | “The torso occupies about 37.56% of total height, while the legs including the shoes occupy about 43.50%” |
+| §6 30. 계열 혼합 절 | `인물.계열 혼합` | FIGURE | “Use a realistic face … on a realistic body … rendered as photographic realism” |
+| §6 31. 형태 어휘·선 위계 | `그림체.형태.도형 어휘`, `윤곽 리듬`, `네거티브 스페이스`, `그림체.선.위계 단수`, `보조 윤곽` | CAPSULE | “Elliptical openings meet frustums and rounded volumes meet folded surfaces; contours mix curves and straights, joins follow material, and limb gaps form narrow wedges”; 선 위계는 `[해당 없음]` |
+| §6 32. 포즈 절 | `인물.포즈 문법` | FIGURE | “Poses tend to use relaxed upright posture … when the scene specifies an action, the action comes first and this rhythm is applied to it” |
+| §6 33. 명암 면·그래픽 구성 | `그림체.명암.폼 섬도`, `하이라이트`, `질감·마감.패턴 채움`, `공간.배경·지면.그래픽 구성` | CAPSULE, PROBE_ANCHORS | “one connected soft form shadow, no cel fragments” / “no printed pattern”; 그래픽 구성은 `[해당 없음]` |
+| §6 34. 인접 계열 부정·운동 부호 | `생성 규칙.부정 절.인접 계열`, `장식.운동 부호` | NEGATIVE | “Avoid anime, cartoon, fashion illustration, and glamour photography” / “speed lines” |
+| §6 35. FIGURE 순서·상한 없음 | `인물`, `디테일.묘사 밀도` | FIGURE | “Use a realistic face” 다음에 비례, 눈, 손·신발·헤어·소품, 포즈, 표정, 피부·묘사 예산 순으로 작성 |
