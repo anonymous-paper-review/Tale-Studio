@@ -80,3 +80,4 @@
 - 채움은 그림 1장을 첨부해 LLM 한 번 호출(Codex: `codex exec -m <모델> -c model_reasoning_effort=medium -i <그림>`; Claude: 에이전트가 Read로 그림을 봄). 컴파일은 `filled.json` + `scene_summary.md`만 주고 한 번 호출. 우선순위 줄은 컴파일이 함께 만든다.
 - 조립은 고성능 판과 같다: 첫 참조 문장 + "Style anchors: " PROBE_ANCHORS + 표준 콘텐츠 + 가드 + "Figure rules: " FIGURE + 표정 우선 문장 + PRIORITY 줄 + NEGATIVE + 꼬리. 생성은 `[원작]` 1장 참조, GPT Image 2 2k.
 - 경량 판 검사: 리프 수와 첫 토큰 태그만 본다(`check_fill.py`는 고성능 판 전용).
+- **직접 호출 시간(2026-10-08)**: Claude Sonnet 5.5를 API로 도구 없이 호출하면 채움 44~72초, 컴파일 8~26초(생각 끔 / 생각 기본) — 생성 2분을 더해 끝에서 끝까지 3~4분. 생각을 끄면 컴파일이 단어 상한을 넘기므로 기본(adaptive)으로 두는 편이 낫다. 이 모델은 `thinking.type: disabled`를 받지 않는다(`between_tools`로 끈다). 하네스 스크립트: `dev/Image_Style/facet_cycle_10/bin/run_lite_claude_api.py`(로컬).
