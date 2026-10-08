@@ -219,17 +219,19 @@ API 함정(실측): `thinking.type: "disabled"`는 이 모델이 거부한다 �
 
 **아직 결정이 필요한 것(오너)**:
 
-1. **역할 문장**: 현행 `STYLE_ANCHOR_CLAUSE` 유지 vs facet 테스트의 긴 금지 목록 문장. 누출 차이는 없었다(뚜렷 1/132, 문장과 무관). 정하지 않으면 현행 유지.
+1. **역할 문장**: 사이클 11 A3에서 차이 없음(뚜렷 누출 양쪽 0, 현행 문장 우세 16/24) → **현행 `STYLE_ANCHOR_CLAUSE` 유지로 정리됨**(§4 1번 줄).
 2. **유저 이미지 동의 문구·범위**: "이 이미지를 스타일 분석에 쓴다(외부 모델에 전송)"를 업로드 권리 동의 대화상자에 합칠지 따로 둘지, 동의 시각·버전을 프로젝트에 어떻게 남길지.
 3. **경량 판 실패 시 동작**: 재시도 1회 뒤 facets 없이 진행(제안) vs 유저에게 알림.
-4. **환경 팔레트 조건문**: 앵커 캡슐의 환경색 역할 문장에 "unless the scene specifies its own backdrop"를 붙이는 규칙(us_cartoon·real_3d 배경 누출)은 이번 재컴파일에 넣지 않았다 — 넣을지.
-5. **과장 상한**: 방향어가 보드보다 큰 눈·신발을 만드는 경우(jp_anime)에 우선순위·방향어의 'slightly' 상한 변형(사이클 9부터 미검증)을 시험할지.
+4. **환경 팔레트 조건문**: 사이클 11 A1에서 효과 없음(끌림은 참조 이미지 채널) → **기각으로 정리됨**. v3 유지.
+5. **과장 상한**: 사이클 11 A2에서 약하지만 한결같은 우세(19/24, 점수 차 0) → **채택 권고**, 오너 결정 대기. 채택 시 §6 36 개정 + 프리셋 우선순위 줄만 재생성(v4).
+7. **style_clause 비례 구절 제거(jp_anime·us_cartoon)**: 사이클 11 D에서 4/4 근소 우위 → 적용 권고, 제품 데이터 변경이라 오너 결정.
+8. **경량 판 제품 규칙 4개**(`cycle-11-results.md`): max_tokens 12000 + 검증·재시도(참조 구현 반영됨), 인물 절 상한 초과는 그대로 싣기, 작은 인물 외삽 취급, 저해상 안내.
 6. **Codex 지출 한도**: 워크스페이스 spend cap에 걸려 8종의 우선순위·판정을 Claude로 돌렸다. 다음 사이클에 Codex를 쓰려면 한도를 올려야 한다(대체 경로는 스크립트로 남아 있다).
 
 ## 9. 참고
 
 - 결과 페이지(아티팩트): https://claude.ai/artifact/3ASfQfpBFkAi6SoKpSdsra (비공개 — 오너 계정; 다른 사람에게는 공유 메뉴로 열어야 보인다)
-- 다음 사이클(11) 계획: `next-cycle-plan.md` — 트랙 D·C·A1·A2·A3·B·F(·E), 약 480크레딧, 하루
+- 사이클 11 계획·결과: `next-cycle-plan.md` → **`cycle-11-results.md`**(A1 기각 · A2 채택 권고 · A3 현행 유지 · D1 적용 권고 · 경량 판 제품 규칙 4개 · 다음 사이클 핵심 = 유저 경로 R0 대조군) + 트랙 노트 `cycle-11-notes-{A,B,C,D}.md`
 - 로컬 실험 폴더(git 밖): `dev/Image_Style/facet_presets/` — `bin/pipeline.sh`(v1 추출 사슬) · `bin/pipeline_v2.sh`(앵커 + 보드 2장 채움) · `bin/make_board.py` + `bin/gen_board.sh`(보드) · `bin/run_priority_claude.py` · `bin/run_judge_v2_claude.py`(Codex 한도 대체) · `bin/post_chain.sh`(조립 → 생성 → 판정) · `bin/build_prompts.py` · `bin/gen.sh` · `bin/run_judge.sh` + `spec/spec-judge.md` · `bin/summarize.py` · `build_report.py` · `bin/export_handoff.py`(이 폴더로 내보내기) · `<key>/fill/comms/transcript.md`(Codex 통신 원문) · `<key>/gen/*.png`(원본 2048px) · `judge/<key>.md`(1차 판정 전문)
 - 지난 사이클: `dev/Image_Style/facet_cycle_9/`(R1c 확정 근거) · `facet_cycle_10/`(경량 판 검증, Sonnet 직접 호출 시간)
 - 메모리: `~/.claude/projects/-home-user-Downloads-Tale-Studio/memory/facet-template-program.md`

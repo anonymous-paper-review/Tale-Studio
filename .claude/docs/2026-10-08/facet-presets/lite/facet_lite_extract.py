@@ -6,7 +6,7 @@
 키: 환경변수 ANTHROPIC_API_KEY, 없으면 저장소 .env.local 에서 읽는다(출력하지 않는다).
 정본: 서식 `.claude/skills/artist-style-anchor/scaffolds/facet-template-lite-v0.1.jsonc`, 규칙·스펙은 같은 폴더의 `facet-template-lite-v0.1.guide.md`(§1 채우기 · §2 컴파일 · 부록 A/B 스펙).
 실측(2026-10-08, refer9 1장): 채움 72초 · 컴파일 26초(생각 기본) / 44초 · 8초(생각 끔 — 컴파일이 단어 상한을 넘김). 제품에는 생각 기본을 권한다.
-API 메모: claude-sonnet-5-5 는 thinking.type "disabled" 를 받지 않는다 — 끄려면 {"type": "between_tools"}. 컴파일 max_tokens 는 6000 이상(4000 이면 생각이 다 먹어 본문이 빈다)."""
+API 메모: claude-sonnet-5-5 는 thinking.type "disabled" 를 받지 않는다 — 끄려면 {"type": "between_tools"}. 컴파일 max_tokens 는 12000(사이클 11: 6000 이면 유저 이미지 6장 중 3장에서 생각이 다 먹어 응답이 비거나 잘렸다); 헤더 5개·조각 비지 않음을 검사해 실패하면 1.5배로 1회 재시도."""
 import argparse, base64, json, mimetypes, os, re, sys, time
 from pathlib import Path
 
@@ -64,7 +64,7 @@ def leaves(d): return sum(leaves(v) for v in d.values()) if isinstance(d, dict) 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument('--image', required=True); ap.add_argument('--out', required=True)
     ap.add_argument('--model', default='claude-sonnet-5-5'); ap.add_argument('--thinking', default='adaptive', choices=['adaptive', 'off'])
-    ap.add_argument('--max-fill-tokens', type=int, default=16000); ap.add_argument('--max-compile-tokens', type=int, default=6000)
+    ap.add_argument('--max-fill-tokens', type=int, default=16000); ap.add_argument('--max-compile-tokens', type=int, default=12000)
     a = ap.parse_args()
     import anthropic
     client = anthropic.Anthropic(api_key=api_key()); out = Path(a.out); out.mkdir(parents=True, exist_ok=True)
@@ -86,13 +86,17 @@ def main():
     (out / 'filled.json').write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     (out / 'scene_summary.md').write_text(md.strip() + '\n', encoding='utf-8')
 
-    # 2. 컴파일 (채움만 → prompts.md; 우선순위 줄 포함)
-    text, t_comp, u_comp = call([{'type': 'text', 'text': compile_prompt((out / 'filled.json').read_text(encoding='utf-8'), md)}], a.max_compile_tokens)
+    # 2. 컴파일 (채움만 → prompts.md; 우선순위 줄 포함). 검증: 헤더 5개·조각 비지 않음 — 실패하면 토큰을 늘려 1회 재시도(사이클 11 트랙 C: 6000 토큰이 6장 중 3장에서 모자라 빈 캡슐이 나왔다)
+    comp_in = compile_prompt((out / 'filled.json').read_text(encoding='utf-8'), md); attempts = []
+    for mt in (a.max_compile_tokens, int(a.max_compile_tokens * 1.5)):
+        text, t_comp, u_comp = call([{'type': 'text', 'text': comp_in}], mt); frag = {k.lower(): section(text, k) for k in SECTIONS}
+        ok = all(re.search(rf'^## {k}', text, re.M) for k in SECTIONS) and all(frag[k] for k in ('probe_anchors', 'priority', 'negative')); attempts.append({'max_tokens': mt, 'stop': u_comp['stop'], 'ok': ok})
+        if ok: break
     (out / 'response-compile.md').write_text(text, encoding='utf-8'); (out / 'prompts.md').write_text(text.strip() + '\n', encoding='utf-8')
-    frag = {k.lower(): section(text, k) for k in SECTIONS}
+    if not ok: print('경고: 컴파일 응답이 불완전(헤더·조각 비어 있음) — facets 없이 진행할 것', file=sys.stderr)
     frag['figure_extrapolated'] = frag['figure'].startswith('[EXTRAPOLATED]'); frag['figure'] = frag['figure'].replace('[EXTRAPOLATED]', '').strip()
     if frag['figure'].lower().rstrip('.') == 'none': frag['figure'] = ''
-    frag.update({'template': 'lite-v0.1', 'model': a.model, 'thinking': a.thinking, 'leaves': leaves(data),
+    frag.update({'template': 'lite-v0.1', 'model': a.model, 'thinking': a.thinking, 'leaves': leaves(data), 'compile_ok': ok, 'compile_attempts': attempts,
                  'words': {k.lower(): len(frag[k.lower()].split()) for k in SECTIONS},
                  'timing_seconds': {'fill': t_fill, 'compile': t_comp}, 'usage': {'fill': u_fill, 'compile': u_comp}})
     (out / 'fragments.json').write_text(json.dumps(frag, ensure_ascii=False, indent=1) + '\n', encoding='utf-8')
