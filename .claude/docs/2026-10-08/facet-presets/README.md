@@ -2,7 +2,7 @@
 
 > 누가 읽나: 제품을 고치는 **다른 세션**(facet을 제품에 넣는 일)과 오너. 이 폴더는 추출 세션의 산출물과 그 산출물을 제품이 쓰는 방법을 적은 인계 패키지다. 추출 세션은 제품 코드(`src/`)를 건드리지 않았다.
 >
-> 한 줄 요약: 제품이 제공하는 스타일 12종(`style_anchors` 활성 행 12개) 전부에 대해 **고성능 판 facet**(리프 309, VLM = gpt-6-astra)을 뽑아 `presets/<key>/`에 두었고, 같은 콘텐츠로 **현행 제품 프롬프트 · facet 프롬프트 · 둘을 합친 프롬프트**를 생성 비교한 페이지를 발행했다(https://claude.ai/artifact/3ASfQfpBFkAi6SoKpSdsra). 1차 기계 판정의 결론: **facet 조각은 현행 손글씨 절을 대체하지 못하고 보강한다 — 캐릭터는 '둘 다'가 최선(4.25 vs 현행 4.0 vs facet 3.4)**, 액션은 현행이 8/12로 더 가까웠다. 유저가 올린 이미지는 **경량 판**(Sonnet 직접 호출, 추출 1.5분 + 생성 2분)으로 같은 조각을 만들 수 있고 참조 구현은 `lite/facet_lite_extract.py`다(같은 12장으로 검증).
+> 한 줄 요약: 제품이 제공하는 스타일 12종(`style_anchors` 활성 행 12개) 전부에 대해 **고성능 판 facet**(리프 309, VLM = gpt-6-astra)을 뽑아 `presets/<key>/`에 두었고, 같은 콘텐츠로 **현행 제품 프롬프트 · facet 프롬프트 · 둘을 합친 프롬프트**를 생성 비교한 페이지를 발행했다(https://claude.ai/artifact/3ASfQfpBFkAi6SoKpSdsra). 1차 기계 판정의 결론: **facet 조각은 현행 손글씨 절을 대체하지 못하고 보강한다 — 캐릭터는 '둘 다'가 최선(4.25 vs 현행 4.0 vs facet 3.4)**, 액션은 현행이 8/12로 더 가까웠다. **오너 결정: 제품은 '둘 다'로 간다.** 그림 계열 4종은 인물 보조 보드를 만들어 다시 뽑았다(v2 — 둘 다 캐릭터 4.25 → 4.75, 액션 4.75; §7.1). 유저가 올린 이미지는 **경량 판**(Sonnet 직접 호출, 추출 1.5분 + 생성 2분)으로 같은 조각을 만들 수 있고 참조 구현은 `lite/facet_lite_extract.py`다(같은 12장으로 검증).
 
 ## 0. 읽는 순서
 
@@ -29,13 +29,14 @@
 
 ```
 README.md                      ← 이 문서
-presets/index.json             ← 12종 한 파일: key → 조각 4개 + 단어 수 + 인물 표본 유무 + 시간 + 모델 (제품 시드용)
+presets/index.json             ← 12종 한 파일: key → assembly('both') + facets(조각 4개·단어 수·인물 출처·시간·모델; 그림 계열 4종은 v2 = 인물 보드 판) + facets_v1 + style_clause_current + lite (제품 시드용)
 presets/<key>/filled.json      ← 고성능 facet 전문(리프 309, 한국어 값 + 신뢰도 태그)
 presets/<key>/scene_summary.md ← 앵커 그림의 내용 요약(스타일 아님, 기록용)
 presets/<key>/prompts.md       ← 컴파일 산출(CAPSULE / NEGATIVE / SCENE / PROBE_ANCHORS / COVERAGE / FIGURE)
 presets/<key>/priority.md      ← PRIORITY 줄 + 방향어를 붙인 FIGURE (제품은 prompts.md의 FIGURE 대신 이것을 쓴다)
 presets/<key>/assembled/{facet_character,facet_action,both_character,prod_character,prod_action}.txt ← 생성 테스트에 실제로 보낸 프롬프트 전문(both = 현행 절 + facet 조각)
 presets/<key>/lite/{filled.json,prompts.md,fragments.json} ← 같은 앵커를 경량 판으로 뽑은 것(비교용)
+presets/<key>/board.jpg · board_prompt.txt · v1/ ← (그림 계열 4종만) 인물 보조 보드(1024px 축소본, 원본은 로컬 2048px) · 보드를 만든 제품 경로 프롬프트 · 보드 없이 뽑은 첫 결과
 lite/facet_lite_extract.py     ← 경량 판 참조 구현(Python, API 직접 호출). 제품(TS)으로 옮길 때 프롬프트 구성·파싱·검증을 그대로 따른다
 lite/README.md                 ← 경량 판 호출 계약(입출력·검증·실패 처리) 요약
 ```
@@ -67,6 +68,7 @@ lite/README.md                 ← 경량 판 호출 계약(입출력·검증·�
 
 ```
 1  STYLE REFERENCE — the reference image sets the visual style ONLY: match its art medium, rendering technique, linework, shading, lighting mood and color grade exactly. Do NOT reproduce its subjects, characters, faces, hairstyles, costumes, logos, text, layout or any identifiable motif.
+1b {style_clause — 현행 손글씨 절, 있으면 그대로 (오너 결정 "둘 다")}
 2  Style anchors: {probe_anchors}
 3  {본문 — 장면·인물 콘텐츠. 매체어 스크럽은 지금처럼}
 4  Plain, fully specified surfaces: flat ground and backdrop as described, no borrowed patterns; accessories, footwear and sky or backdrop marks only as described.
@@ -76,7 +78,7 @@ lite/README.md                 ← 경량 판 호출 계약(입출력·검증·�
 8  No text, no letters, no logo, no watermark. {비율}
 ```
 
-- 5·6은 **인물이 있는 장면에만**(캐릭터 시트·인물 컷). 배경·사물만 있는 장면은 1·2·3·4·7·8. 사이클 실측: 무인물 장면에 인물 절을 넣어도 인물이 소환되진 않지만 효과도 없다.
+- 5·6은 **인물이 있는 장면에만**(캐릭터 시트·인물 컷). 배경·사물만 있는 장면은 1·1b·2·3·4·7·8. 1b는 현행 `style_clause`가 있는 스타일(12종 중 10종)에만 들어간다. 사이클 실측: 무인물 장면에 인물 절을 넣어도 인물이 소환되진 않지만 효과도 없다.
 - 5의 표정 우선 문장은 조각 `figure`에 이미 "expression … priority" 문장이 들어 있으면 붙이지 않는다(중복 금지).
 - 1의 역할 문장은 현행 `STYLE_ANCHOR_CLAUSE`보다 금지 목록이 길다("faces, hairstyles, costumes, logos, text, layout or any identifiable motif"). 이번 테스트는 이 문장으로 돌렸다. 현행 문장을 유지할지, 이 문장으로 바꿀지는 §8 ③.
 - 2-ref 앵커(`use_preview_ref`: watercolor·real_psy_horror)는 현행대로 프리뷰를 두 번째 참조로 두고 1을 2-ref 변형으로 바꾼다. 이번 facet 조건은 앵커 1장만 참조했다(확정 레시피 R1 = 원작 1장). 어느 쪽이 나은지는 페이지의 두 스타일에서 오너가 본다.
@@ -138,6 +140,24 @@ API 함정(실측): `thinking.type: "disabled"`는 이 모델이 거부한다 �
 - 검사(`check_fill.py`, 추측 허용 규약) 위반 0/12 — astra 채움은 재채움 없이 통과. 생성 60장(GPT Image 2 2k, 390크레딧), 장당 중앙값 2.3분. 1차 판정 = Codex gpt-5.6-sol high, 장당 2~4분. 누출 뚜렷 0 · 경미 11/60.
 - **핵심 관찰**: ① 11종의 앵커가 정물 보드라 고성능 채움은 인물 가지를 `[해당 없음]`으로 적었고 컴파일은 인물 절을 내지 않았다 → facet 단독 캐릭터는 매체의 인물 처리(스톱모션 인형·TV 카툰 비례)를 잃었다(stop_motion 2, us_cartoon 3). 현행 style_clause가 그 자리를 메워 둘 다가 5·5. ② 인물 표본이 있는 real_3d는 반대로 667단어 수치 인물 절이 큰 눈·큰 머리를 과장해 현행보다 낮았다. ③ facet이 보탠 것은 앵커 이미지가 못 나르는 조명·명암·팔레트 역할, 대가는 12종 중 9종에서 과장(짙은 암부·스포트라이트·비와 젖은 노면·강한 청색 야경)과 요청에 없던 요소(장갑·배달 상자·복장 변경). ④ 앵커 캡슐의 환경색 역할 문장이 콘텐츠의 배경 지정을 이긴 경미 누출 1건(us_cartoon 둘 다) → 컴파일 규칙 후보(환경 팔레트 문장에 "unless the scene specifies its own backdrop"). ⑤ 컴파일이 앵커 캡슐 상한을 5/12에서 넘김(최대 178단어) → 절대 상한(등급 상한+40) 복귀 후보. ⑥ 판정 반복 오차(사이클 9 실측 평균 6.5%p)를 감안하면 0.5점 안의 차이는 잡음이다 — 방향만 읽는다.
 
+### 7.1 v2 — 인물 보조 보드 4종 (오너 결정 뒤, 같은 날 저녁)
+
+보드 = 제품 경로(현행 문장)로 만든 원작 인물 2명 전신 정면·중립 표정·무지 배경(후보 2장 중 얼굴이 큰 쪽 선택; `presets/<key>/board.jpg`, 프롬프트 `board_prompt.txt`). 고성능 채움에 앵커 ①과 보드 ② **2장을 함께 첨부**(`spec/spec-fill-v2.md`): 렌더링 가지는 ①, `인물` 가지·인물 묘사 밀도·오버라이드·인접 계열은 ②에서 측정, `분류.Core`는 ① 렌더링 Core 뒤에 ② 인물 Core. 다중 입력은 이번이 첫 실행 — 검사 위반 0/4, 채움이 두 장의 역할과 갈리는 축(②가 더 밝고 평평함)을 `입력.표본`에 적었다. 그다음 같은 컴파일·우선순위 → facet v2 · 둘 다 v2 × 캐릭터·액션 16장 → 8장(앵커 · 현행 2 · facet v2 2 · 둘 다 v2 2 · 보드)을 붙인 1차 판정.
+
+| 스타일 | 채움(2장) | 컴파일 | 추출 합계 | 인물 절 | v1 캐릭터 현행/facet/둘 다 | v2 캐릭터 현행/facet/둘 다 | v2 액션 현행/facet/둘 다 | v2 최선 | 인물 방언 facet/둘 다 (보드 대비) |
+|---|---|---|---|---|---|---|---|---|---|
+| jp_anime | 15.8분 | 21.4분 | 40분 | 663단어 | 4/4/4 | 5/4/4 | 5/4/4 | 현행·현행 | 부분·부분 (눈·신발·하퇴가 보드보다 큼) |
+| us_cartoon | 18.4 | 13.2 | 33 | 522 | 4/3/5 | 4/4/5 | 4/4/5 | 둘 다·둘 다 | 맞음·맞음 |
+| watercolor | 19.2 | 15.0 | 37 | 688 | 3/4/3 | 4/4/5 | 4/4/5 | 둘 다·둘 다 | 맞음·맞음 |
+| stop_motion | 19.7 | 19.8 | 43 | 487 | 5/2/5 | 4/4/5 | 4/4/5 | 둘 다·둘 다 | 부분·맞음 |
+| **평균(4종)** | 18.3 | 17.4 | 38 | | 4.0 / 3.25 / 4.25 | **4.25 / 4.0 / 4.75** | **4.25 / 4.0 / 4.75** | 둘 다 3 · 현행 1 | 맞음 6/8 |
+
+- 보드에서 잰 인물 절이 매체의 인물 처리를 되살렸다: stop_motion 큰 유리눈 계열 → 작은 구슬눈·무윤곽 섬유 채움(facet 단독 2 → 4), us_cartoon 5~6등신·큰 원형 눈·단색 머리 덩어리(3 → 4). 둘 다 v2는 캐릭터·액션 모두 4.75로 액션에서도 현행(4.25)을 넘었다. 누출 0/24.
+- jp_anime만 현행이 최선 — 보드에서 잰 수치에 방향어가 붙자 눈·신발·하퇴가 보드보다 커졌다(사이클 9부터 아는 과장 비용, §8 ⑦). stop_motion은 머리·헤어 덩어리가 커져 인물이 더 어린 인형처럼 읽혔다. watercolor는 보드식 차분한 얼굴이 강해져 표정 강도가 낮아졌다.
+- 같은 현행 이미지에 v1·v2 판정 점수가 1점씩 다른 칸이 있다(jp_anime 현행 캐릭터 4 → 5, stop_motion 5 → 4) — 판정 잡음의 크기. 0.5점 차이는 읽지 않는다.
+- 비용: 보드 8장 52 + 생성 16장 104 = 156크레딧(합계 546). 시간: 2장 첨부 채움 16~20분(1장 11~17), 컴파일 13~21분(인물 절 487~688단어).
+- **제품은 v2 산출물을 쓴다**(`presets/<key>/` 루트 = v2, `index.json`의 `facets.version = "hp-v1.2.3+figure-board"`, `figure_source = "figure_board"`). v1은 `v1/`·`facets_v1`로 남겼다.
+
 ## 8. 같이 정한 것 / 혼자 정한 것 / 결정이 필요한 것
 
 **같이 정한 것(오너 지시, 2026-10-08)**: 12종 프리셋은 고성능 판으로 미리 추출한다 · VLM은 astra(gpt-6-astra) · 추출 뒤 생성 테스트를 아티팩트로 · 유저 이미지는 동의가 있을 때 경량 판으로 추출해 이후 생성에 쓴다 · 제품 수정은 다른 세션.
@@ -153,15 +173,21 @@ API 함정(실측): `thinking.type: "disabled"`는 이 모델이 거부한다 �
 | 1차 기계 판정을 Codex 1명으로 | 오너의 눈이 최종이므로 선별용 1차만. 두 판정자 교차는 지난 사이클 방식이나 시간이 2배 | Claude 판정 추가 | 쉬움 — `bin/run_judge.sh` 재실행 |
 | 경량 판 참조 구현은 Python으로 이 폴더에 | 제품(TS)은 다른 세션이 쓴다. 호출 계약만 정확히 넘기면 된다 | TS 스크립트를 `scripts/`에 | 쉬움 |
 | 저장 제안 = `style_anchors.facets` jsonb + `custom_style_anchor.facets` | 가장 작은 변경, 앵커 정체성 한 곳 유지 | 새 표 `style_anchor_facets` | 쉬움(제안일 뿐) |
+| v2 보드는 제품 경로(현행 문장)로 만들고, 채움은 앵커 + 보드 2장을 한 번에(인물 가지는 보드에서) | 보드가 제품이 지금 그리는 인물의 진실이고, 2장 동시 채움이 두 파일을 기계로 합치는 것보다 일관된다 | 보드만 따로 채워 인물 가지만 붙여넣기 | 쉬움 — 재채움 20분 |
+| 보드 후보 2장 중 얼굴이 큰 쪽을 내가 골랐다 | 눈 판독(눈 폭 px)에 유리. 둘 다 결함(눈 감음·잘림·문자) 없음 | 오너 선택 | 쉬움 — 다른 후보로 재채움 |
 
-**결정이 필요한 것(오너)**:
+**오너가 정한 것(2026-10-08 저녁, 1차 결과를 본 뒤)**:
 
-1. **style_clause와 facet 조각을 어떻게 실을지**: 1차 판정은 '둘 다'(현행 절 + facet 조각)를 권한다(캐릭터 4.25 vs 4.0 vs 3.4). 액션은 현행이 8/12로 더 가까웠으므로 장면 생성에서 facet 캡슐이 과장을 보태지 않는지 페이지의 액션 쌍으로 본다. (a) 둘 다, 전 스타일 (b) 둘 다, 인물 컷만 (c) 스타일별(real_3d·real_euro_period·real_urban_hero는 현행 유지) (d) 보류.
-2. **인물 절의 출처**: 정물 앵커에서는 facet이 인물을 그리는 법을 알 수 없다. (a) 현행 style_clause를 인물 절로 계속 쓴다(지금 결과) (b) 그림 계열 4종(jp_anime·us_cartoon·watercolor·stop_motion)에 인물이 든 보조 보드를 만들어 인물 가지만 다시 뽑는다(스타일당 보드 1장 6.5크레딧 + 추출 30분) (c) real_3d처럼 표본이 있어도 과장이 나므로 고성능 인물 절에 상한이나 '수치만, 방향어 없이' 변형을 시험한다.
-3. **역할 문장**: 현행 `STYLE_ANCHOR_CLAUSE` 유지 vs facet 테스트의 긴 금지 목록 문장. 누출 차이는 없었다(뚜렷 0).
-4. **유저 이미지 동의 문구·범위**: "이 이미지를 스타일 분석에 쓴다(외부 모델에 전송)"를 업로드 권리 동의 대화상자에 합칠지 따로 둘지, 동의 시각·버전을 프로젝트에 어떻게 남길지.
-5. **경량 판 실패 시 동작**: 재시도 1회 뒤 facets 없이 진행(제안) vs 유저에게 알림.
-6. **재컴파일 여부**: 앵커 캡슐 절대 상한(등급 상한+40)과 환경 팔레트 조건문을 컴파일 규칙에 넣고 12종을 다시 컴파일할지(크레딧 0, 약 20분/장, 그림은 다시 보지 않는다).
+1. **style_clause와 facet 조각은 "둘 다"** — 역할 문장 바로 뒤에 현행 `style_clause`, 그다음 `Style anchors: …` 이하 facet 조각(§4의 조립에 2번 앞에 style_clause 한 줄이 들어간다; 실행례 `presets/<key>/assembled/both_*.txt`). 제품은 이 구성으로 간다.
+2. **인물 보조 보드 4종을 만들어 다시 추출** — jp_anime · us_cartoon · watercolor · stop_motion. 보드 = 제품 경로(현행 문장)로 만든 원작 인물 2명 전신 정면(§7.1), 고성능 채움에 앵커 ①과 보드 ② 2장을 함께 첨부해 인물 가지를 ②에서 측정(다중 입력 첫 실행). 결과는 §7.1, 산출물은 `presets/<key>/`(v2가 정본, v1은 `v1/`).
+
+**아직 결정이 필요한 것(오너)**:
+
+1. **역할 문장**: 현행 `STYLE_ANCHOR_CLAUSE` 유지 vs facet 테스트의 긴 금지 목록 문장. 누출 차이는 없었다(뚜렷 0). 정하지 않으면 현행 유지.
+2. **유저 이미지 동의 문구·범위**: "이 이미지를 스타일 분석에 쓴다(외부 모델에 전송)"를 업로드 권리 동의 대화상자에 합칠지 따로 둘지, 동의 시각·버전을 프로젝트에 어떻게 남길지.
+3. **경량 판 실패 시 동작**: 재시도 1회 뒤 facets 없이 진행(제안) vs 유저에게 알림.
+4. **재컴파일 여부**: 앵커 캡슐 절대 상한(등급 상한+40)과 환경 팔레트 조건문을 컴파일 규칙에 넣고 12종을 다시 컴파일할지(크레딧 0, 약 20분/장).
+5. **나머지 8종(실사 계열·3D)의 인물 절**: 이번 보드는 그림 계열 4종만이다. real_3d는 앵커에 인물이 있고(667단어 인물 절, 과장 경향), 실사 서브룩 7종은 인물 절 없이 현행 절 + facet 캡슐로 간다 — 그대로 둘지, 보드를 더 만들지.
 
 ## 9. 참고
 
