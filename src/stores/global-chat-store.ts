@@ -488,6 +488,11 @@ async function runStyleFromImage(image: ChatImageInput, kind: 'comic' | 'picture
   const speak = producerSpeaker(projectId)
   const sameProject = () => useProjectStore.getState().projectId === projectId
   const comic = kind === 'comic'
+  // 고정된 그림체(그림체 추출로 정함)는 바꾸지 않는다 — 분석 모델도 부르지 않는다(2026-10-09 오너).
+  if (useProducerStore.getState().customStyleAnchor?.locked === true) {
+    speak(translate(voice, 'The art style is fixed to the picture you chose, so I kept it.'))
+    return
+  }
   const label = translate(voice, comic ? 'Comic art style' : 'My art style')
   const notSet = comic ? translate(voice, "Couldn't set the comic as the art style.") : translate(voice, "Couldn't set {name} as the art style.", { name: image.name })
   const analysisFailed = translate(voice, comic
@@ -501,14 +506,15 @@ async function runStyleFromImage(image: ChatImageInput, kind: 'comic' | 'picture
       speak(notSet)
       return
     }
-    const anchorRes = await postJson('/api/produce/style-anchor', { projectId, imageUrl: image.thumbUrl, label, medium: picked.medium })
-    const anchor = (await anchorRes.json().catch(() => ({}))) as { key?: string; imageUrl?: string; label?: string; medium?: string | null }
+    // 사용자가 그림을 "그림체"로 골랐으면(그림체 추출) 고정한다. 만화 첫 쪽으로 저절로 정한 그림체는 고정하지 않는다(실사로 옮길 수도 있다).
+    const anchorRes = await postJson('/api/produce/style-anchor', { projectId, imageUrl: image.thumbUrl, label, medium: picked.medium, ...(comic ? {} : { lock: true }) })
+    const anchor = (await anchorRes.json().catch(() => ({}))) as { key?: string; imageUrl?: string; label?: string; medium?: string | null; locked?: boolean }
     if (!sameProject()) return
     if (!anchorRes.ok || !anchor.key || !anchor.imageUrl) {
       speak(notSet)
       return
     }
-    useProducerStore.getState().applyCustomStyleAnchor({ key: anchor.key, url: anchor.imageUrl, label: anchor.label ?? label, medium: anchor.medium ?? null })
+    useProducerStore.getState().applyCustomStyleAnchor({ key: anchor.key, url: anchor.imageUrl, label: anchor.label ?? label, medium: anchor.medium ?? null, locked: anchor.locked === true })
     speak(comic
       ? translate(voice, 'Set the art style to this comic. Analyzing the art style now.')
       : translate(voice, 'Set the art style to {name}. Analyzing the art style now.', { name: image.name }))
@@ -774,6 +780,8 @@ async function applyStyleAnchorIntent(
 
   const { imageIndex, label, medium } = intent as Record<string, unknown>
   if (typeof imageIndex !== 'number' || !Number.isInteger(imageIndex)) return null
+  // 고정된 그림체(2026-10-09 오너)는 다른 그림으로 바꾸지 않는다 — 저장 창구도 409 로 막는다.
+  if (useProducerStore.getState().customStyleAnchor?.locked === true) return translate(contentLocale(), "The art style comes from the picture you chose, so it can't be changed.")
 
   const imageUrl = attachmentImageUrls[imageIndex]
   if (!imageUrl) {
@@ -1583,6 +1591,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
 
     const stage = opts?.stageOverride ?? useProjectStore.getState().currentStage
     const projectId = useProjectStore.getState().projectId
+    // 고정된 그림체(2026-10-09 오너) — 이 턴에 스타일을 바꾸자는 결과가 와도 바꾸지 않고 그렇다고 답한다.
+    const styleLockedTurn = stage === 'producer' && useProducerStore.getState().customStyleAnchor?.locked === true
     const history = get().messages
     const session = chatSession
     const isCurrentSession = () => session === chatSession && projectId === useProjectStore.getState().projectId
@@ -2040,6 +2050,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           ...producerChatContext(),
           // 잠긴 Producer(2026-10-01) — 서버가 모델에 "바꾸지 말 것"을 알린다(최종 방어는 producer-store 가드).
           ...(useProjectStore.getState().producerLocked ? { producerLocked: true } : {}),
+          // 고정된 그림체(2026-10-09 오너) — 서버가 모델에 다른 스타일을 고르거나 권하지 말라고 알린다(최종 방어는 producer-store 가드).
+          ...(styleLockedTurn ? { styleLocked: true } : {}),
           // 넘기기 전 트리트먼트 초안(2026-10-02) — 서버가 모델에 "씬 고치기는 다시 쓰기로 안내할 것"을 알린다.
           ...(!useProjectStore.getState().producerLocked && useProjectStore.getState().treatmentDraft ? { treatmentDraft: true } : {}),
           // #image-to-artist: 카드 채우기 턴 — 서버가 모델에 "그 카드만" 을 알린다(최종 방어는 coerceCardFill).
@@ -2423,7 +2435,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             producerLanguageSaved === false ? (extractedForApply.dialogueLanguage ? reply : translate(contentLocale(), 'Could not verify the saved changes.')) : undefined)
         }
         const key = extractedForApply.styleAnchorKey
-        if (typeof key === 'string' && key) {
+        if (typeof key === 'string' && key && !styleLockedTurn) {
           const outcome = await useProducerStore.getState().applyStyleAnchorKeyFromChat(key)
           if (!isCurrentSession()) return
           const styleError =
@@ -2460,10 +2472,19 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           )
         : null
       if (lockedReply) reply = lockedReply
+      // 고정된 그림체에 스타일을 바꾸자는 결과가 왔다 — 바꾸지 않았으니 모델 답("바꿨어요") 대신 바꿀 수 없다고 답한다.
+      const styleLockedReply = styleLockedTurn && (
+        (typeof extractedForApply?.styleAnchorKey === 'string' && !!extractedForApply.styleAnchorKey) ||
+        !!(data.extractedSettings as { styleAnchorFromAttachment?: unknown } | undefined)?.styleAnchorFromAttachment
+      )
+        ? translate(contentLocale(), "The art style comes from the picture you chose, so it can't be changed.")
+        : null
+      if (styleLockedReply) reply = styleLockedReply
       const replyBeforeReceipt = reply
       const waitForLegacy = !dialogueTarget && toolsEnabled && ((requestedHandoff && requestsSupportedChatEdit(stage, trimmed)) || (stage === 'writer' && data.updates?.length) || (stage === 'artist' && (data.proposals?.length || data.locationProposals?.length)))
       reply = guardChatToolReply(reply, toolOutcomes, contentLocale() === 'ko')
       if (lockedReply) reply = lockedReply
+      if (styleLockedReply) reply = styleLockedReply
       // Unfinished prose is display-only and must survive the guard that removes unverified completion claims.
       if (typeof data.partialReply === 'string' && data.partialReply && !reply.includes(data.partialReply)) reply = [reply, data.partialReply].filter(Boolean).join('\n\n')
       const replyId = makeId()
@@ -2508,7 +2529,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         // #p1-attach: 채팅이 "이 그림체로" 의도를 읽었으면 앵커로 확정한다.
         //   모델은 인덱스만 주고 URL 은 우리가 이번 턴 첨부에서 꺼낸다 — 모델이 뱉은 URL 은
         //   나중에 이미지 생성 프로바이더가 직접 가져가므로 신뢰하면 안 된다.
-        const anchorError = opts?.cardFill
+        const anchorError = opts?.cardFill || styleLockedReply
           ? null
           : await applyStyleAnchorIntent(
               data.extractedSettings.styleAnchorFromAttachment,

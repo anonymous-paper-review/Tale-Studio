@@ -2100,4 +2100,7 @@ export const KO: Record<string, string> = {
   "Read the comic again": "다시 옮기기",
   "Turn the comic into a script again": "만화를 다시 대본으로 옮겨 줘",
   "Reading the {n} comic pages again.": "만화 {n}쪽을 다시 읽고 있어요.",
+  // 고정된 그림체 (2026-10-09)
+  "The art style comes from the picture you chose, so it can't be changed.": "그림체는 고르신 그림에서 뽑아 정해져 있어 바꿀 수 없어요.",
+  "The art style is fixed to the picture you chose, so I kept it.": "그림체는 고르신 그림으로 정해져 있어 그대로 둘게요.",
 }

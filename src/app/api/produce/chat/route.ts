@@ -7,7 +7,7 @@ import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
 import { prepareChatTools } from '@/lib/chat-tools/protocol'
 import { buildProducerSystem } from './system-prompt'
-import { imageCardFillDirective, lockedProducerDirective, preservedScriptDirective, treatmentDraftDirective } from './preserve-context'
+import { fixedStyleDirective, imageCardFillDirective, lockedProducerDirective, preservedScriptDirective, treatmentDraftDirective } from './preserve-context'
 import { parseExtractedSettings } from '@/lib/parse-extracted-settings'
 import { resolveProducerDialogueLanguage } from '@/lib/producer-dialogue-language'
 import { parseChatChoices } from '@/lib/chat-choices'
@@ -68,6 +68,7 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
       producerLocked,
       treatmentDraft,
       answeringProducerQuestion,
+      styleLocked,
     } = await req.json()
     const modelSettings = parseChatModelSettings(rawModelSettings)
     if (!modelSettings) return NextResponse.json({ error: 'Invalid chat model settings' }, { status: 400 })
@@ -143,8 +144,8 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
     }
     if (attachments.urls.length > 0) {
       // 모델이 고를 medium 후보 — 저장 라우트가 검증에 쓰는 목록과 같은 출처여야 한다.
-      //   이미지가 붙은 턴에서만 조회한다(평소 채팅에 DB 왕복을 더하지 않는다).
-      const mediums = await listStyleAnchorMediums()
+      //   이미지가 붙은 턴에서만 조회한다(평소 채팅에 DB 왕복을 더하지 않는다). 고정된 그림체면 고를 일이 없다.
+      const mediums = styleLocked === true ? [] : await listStyleAnchorMediums()
       if (mediums.length > 0) {
         contextParts.push(`[Allowed Style Mediums]\n${mediums.join(', ')}`)
       }
@@ -163,6 +164,9 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
     // 잠긴 Producer(2026-10-01) — 바꾸자는 제안을 내지 않는다(클라 producer-store 가드가 최종 방어).
     const lockedDirective = lockedProducerDirective(producerLocked)
     if (lockedDirective) contextParts.push(lockedDirective)
+    // 고정된 그림체(2026-10-09 오너) — 다른 스타일을 고르거나 권하지 않는다(클라 producer-store 가드가 최종 방어).
+    const fixedStyle = fixedStyleDirective(styleLocked)
+    if (fixedStyle) contextParts.push(fixedStyle)
     // 넘기기 전 트리트먼트 초안(2026-10-02) — 씬 고치기는 다시 쓰기 · 직접 고치기로 안내한다.
     const draftDirective = treatmentDraftDirective(treatmentDraft)
     if (draftDirective) contextParts.push(draftDirective)
@@ -217,7 +221,8 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
     }
     // D12(2026-08-31 오너): 유저가 이름/느낌으로 그림체를 말하면 모델이 여기서 키를 고른다 —
     //   "피커에서 골라달라"고 되돌려보내지 않기 위한 재료. 캐시(TTL)라 턴마다 DB 왕복 아님.
-    const anchorCatalog = await listStyleAnchorCatalog()
+    //   고정된 그림체면 목록을 주지 않는다 — 보면 바꾸자고 권한다.
+    const anchorCatalog = styleLocked !== true ? await listStyleAnchorCatalog() : []
     if (anchorCatalog.length > 0) {
       contextParts.push(
         `[Style Anchor Catalog]\n${anchorCatalog

@@ -185,7 +185,7 @@ export interface StyleAnchor {
  *  클라 번들에 들일 수 없다 — 그래서 여기 별도로 둔다. */
 function parseCustomAnchorRow(
   raw: unknown,
-): { url: string; label: string; medium: string | null } | null {
+): { url: string; label: string; medium: string | null; locked?: boolean } | null {
   if (!raw || typeof raw !== 'object') return null
   const record = raw as Record<string, unknown>
   if (typeof record.url !== 'string' || !record.url) return null
@@ -196,6 +196,8 @@ function parseCustomAnchorRow(
         ? record.label
         : translate(useLocaleStore.getState().locale, 'My reference'),
     medium: typeof record.medium === 'string' ? record.medium : null,
+    // 고정(2026-10-09 오너) — 사용자가 올린 그림을 "그림체"로 골라 정한 그림체. 바꾸지 못한다.
+    ...(record.locked === true ? { locked: true } : {}),
   }
 }
 
@@ -212,7 +214,7 @@ interface ProducerState {
   styleAnchorKey: string | null
   /** 유저가 올린 이미지로 만든 앵커(projects.custom_style_anchor). 있으면 카탈로그보다 우선한다.
    *  styleAnchorKey 는 custom_<uuid> 라 카탈로그에서 라벨을 못 찾는다 — 표시는 여기서 온다. */
-  customStyleAnchor: { url: string; label: string; medium: string | null } | null
+  customStyleAnchor: { url: string; label: string; medium: string | null; locked?: boolean } | null
   syncing: boolean
   error: string | null
   /** 마지막 Writer 시작이 씬 스토리 확정 단계로 시작했는가(서버 응답 sceneGate) — 그렇다면 Producer 메인에 머문다(2026-10-01). */
@@ -234,13 +236,15 @@ interface ProducerState {
   setStyleAnchor: (key: string | null) => Promise<boolean>
   /** D12: 채팅이 이름/느낌으로 고른 카탈로그 앵커 키 적용 — 카탈로그 검증 후 setStyleAnchor.
    *  모델이 발명한 키는 unknown_key로 되돌려 호출부가 정직하게 말하게 한다. */
-  applyStyleAnchorKeyFromChat: (key: string) => Promise<'applied' | 'unknown_key' | 'failed'>
+  applyStyleAnchorKeyFromChat: (key: string) => Promise<'applied' | 'unknown_key' | 'failed' | 'locked'>
   /** 채팅이 해석한 화풍 의도를 반영 — 저장은 서버(api/produce/style-anchor)가 검증 후 한다. */
   applyCustomStyleAnchor: (anchor: {
     key: string
     url: string
     label: string
     medium: string | null
+    /** 사용자가 올린 그림을 "그림체"로 골라 정한 그림체 — 이 뒤로는 바꾸지 못한다(2026-10-09 오너). */
+    locked?: boolean
   }) => void
   updateSettings: (partial: Partial<ProjectSettings>) => void
   /** 현재 작업 초안을 저장하고 서버가 반환한 저장본을 확인한다. */
@@ -800,6 +804,8 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
 
   setStyleAnchor: async (key) => {
     if (isDemoSession() || producerLocked()) return false
+    // 고정된 그림체(그림체 추출로 정함, 2026-10-09 오너)는 다른 스타일로 바꾸지 않는다 — 화면 단추를 막아도 여기서 한 번 더 막는다.
+    if (get().customStyleAnchor?.locked === true) return false
     const projectId = useProjectStore.getState().projectId
     const prev = get().styleAnchorKey
     const prevCustom = get().customStyleAnchor
@@ -829,9 +835,10 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     }
   },
 
-  applyCustomStyleAnchor: ({ key, url, label, medium }) => {
+  applyCustomStyleAnchor: ({ key, url, label, medium, locked }) => {
     if (producerLocked()) return
-    set({ styleAnchorKey: key, customStyleAnchor: { url, label, medium } })
+    if (get().customStyleAnchor?.locked === true) return
+    set({ styleAnchorKey: key, customStyleAnchor: { url, label, medium, ...(locked === true ? { locked: true } : {}) } })
   },
 
   saveDraftNow: async () => {
@@ -863,6 +870,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   applyStyleAnchorKeyFromChat: async (key) => {
+    if (get().customStyleAnchor?.locked === true) return 'locked'
     // 카탈로그가 아직 안 실렸으면(새로고침 직후 등) 먼저 불러서 검증 근거를 만든다.
     if (get().styleAnchors.length === 0) await get().loadStyleAnchors()
     const anchor = get().styleAnchors.find((a) => a.key === key)

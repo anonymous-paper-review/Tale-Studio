@@ -15,7 +15,7 @@
 //   스토리 텍스트 옆에 있어야 맥락이 맞는다(#feedback 2026-08-07).
 
 import { useEffect, type ReactNode } from 'react'
-import { Check } from 'lucide-react'
+import { Check, Lock } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { TagInput } from './tag-input'
@@ -155,6 +155,8 @@ export function StoryFoundationBadges({ className }: { className?: string }) {
   // 커스텀 앵커(custom_<uuid>)는 카탈로그에 행이 없어 위 조회가 비어 온다 — 라벨은 store 가 든다.
   const styleLabel =
     styleAnchors.find((a) => a.key === styleAnchorKey)?.label ?? customStyleAnchor?.label ?? null
+  // 고정된 그림체(2026-10-09 오너) — 사용자가 올린 그림을 "그림체"로 골라 정했다. 자물쇠로 바꿀 수 없음을 보인다.
+  const styleLocked = customStyleAnchor?.locked === true
   const formatLabel = FORMAT_OPTIONS.find((o) => o.value === settings.format)?.label ?? null
   const langLabel = LANGUAGE_OPTIONS.find((o) => o.value === settings.dialogueLanguage)?.label ?? null
   const projectLocale = useProjectStore((s) => s.projectLocale)
@@ -209,6 +211,9 @@ export function StoryFoundationBadges({ className }: { className?: string }) {
         )}
       >
         <BadgeFace k={t('Style')} value={styleLabel} />
+        {styleLocked ? (
+          <Lock className="size-3 shrink-0 opacity-70" aria-label={t("The art style comes from the picture you chose, so it can't be changed.")} data-testid="style-badge-locked" />
+        ) : null}
       </span>
 
       <SettingBadge k={t('Format')} value={formatLabel}>

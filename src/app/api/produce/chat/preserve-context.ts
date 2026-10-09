@@ -20,6 +20,20 @@ export function preservedScriptDirective(preserveScript: unknown): string | null
 }
 
 /**
+ * 고정된 그림체 안내문(2026-10-09 오너 "그림체 추출을 고르면 Producer 에서 스타일 선택을 막아줘") — 사용자가 올린 그림을
+ * "그림체"로 고른 프로젝트의 채팅 턴. 모델은 다른 스타일을 고르거나 권하지 않는다. 최종 방어는 클라이언트(producer-store 가드).
+ */
+export function fixedStyleDirective(styleLocked: unknown): string | null {
+  if (styleLocked !== true) return null
+  return [
+    '[Fixed Art Style]',
+    "The project's art style was extracted from a picture the user uploaded and chose as the art style. It is fixed for this project.",
+    'Do not emit styleAnchorKey or styleAnchorFromAttachment, and do not suggest choosing another style or the palette icon.',
+    "If the user asks to change the art style, say plainly that it comes from the picture they chose and can't be changed in this project.",
+  ].join('\n')
+}
+
+/**
  * 카드 채우기 안내문(#image-to-artist 2026-09-17) — 사용자가 올린 그림을 인물·배경 카드로 쓰기로 해서 오는 숨은 턴.
  * 모델은 그 카드 하나만 채운다(줄거리·설정·다른 카드·화풍 제안 금지). 최종 방어는 클라이언트(coerceCardFill).
  */

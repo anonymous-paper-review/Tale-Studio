@@ -19,6 +19,7 @@ import {
   LayoutGrid,
   Loader2,
   MoveRight,
+  Lock,
   Palette,
   Plus,
   Square,
@@ -805,6 +806,8 @@ export function GlobalChat() {
   //   빨간 빔(회전)과 모션·색을 갈라 "안내"와 "호버 반응"이 섞이지 않게 한다(#feedback v2).
   const styleAnchors = useProducerStore((s) => s.styleAnchors)
   const styleAnchorKey = useProducerStore((s) => s.styleAnchorKey)
+  // 고정된 그림체(2026-10-09 오너) — 사용자가 올린 그림을 "그림체"로 골라 정했으면 스타일 단추를 막고 이유를 보인다.
+  const styleLocked = useProducerStore((s) => s.customStyleAnchor?.locked === true)
   const loadStyleAnchors = useProducerStore((s) => s.loadStyleAnchors)
   const [stylePressed, setStylePressed] = useState(false)
   useEffect(() => {
@@ -2038,7 +2041,21 @@ export function GlobalChat() {
                 {/* 스타일 픽커 (#style-entry #feedback 2026-08-07) — producer 에선 four-dot 자리를
                     스타일 버튼이 차지한다(에셋 멘션은 @ 타이핑·Ctrl+카드 클릭이 대체). 첫 클릭 전
                     + 스타일 미선택이면 빔 상시 점등. 다른 스테이지는 기존 에셋 팔레트 유지. */}
-                {currentStage === 'producer' ? (
+                {currentStage === 'producer' && styleLocked ? (
+                  <span className="inline-flex" title={t("The art style comes from the picture you chose, so it can't be changed.")}>
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      className="relative rounded-full"
+                      disabled
+                      aria-label={t("The art style comes from the picture you chose, so it can't be changed.")}
+                      data-testid="style-locked"
+                    >
+                      <Palette className="size-4" />
+                      <Lock className="absolute -bottom-0.5 -right-0.5 size-2.5" aria-hidden />
+                    </Button>
+                  </span>
+                ) : currentStage === 'producer' ? (
                   <StyleAnchorPicker
                     anchors={styleAnchors}
                     value={styleAnchorKey}
