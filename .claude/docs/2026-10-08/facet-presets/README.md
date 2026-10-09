@@ -251,11 +251,14 @@ API 함정(실측): `thinking.type: "disabled"`는 이 모델이 거부한다 �
 5. **과장 상한**: 사이클 11 A2에서 약하지만 한결같은 우세(19/24, 점수 차 0) → 2026-10-09 **채택됨**(§7.3 v4, 가이드 §6 36 개정). 남은 것은 live 시드 갱신(§10 2b, 제품 세션).
 7. **style_clause 비례 구절 제거(jp_anime·us_cartoon)**: 사이클 11 D에서 4/4 근소 우위 → 적용 권고, 제품 데이터 변경이라 오너 결정.
 8. **경량 판 제품 규칙 4개**(`cycle-11-results.md`): max_tokens 12000 + 검증·재시도(참조 구현 반영됨), 인물 절 상한 초과는 그대로 싣기, 작은 인물 외삽 취급, 저해상 안내.
+9. **경량 LOOK 한 줄(사이클 12, 2026-10-09)**: 유저 경로 정식 대조군에서 경량 조각이 참조만보다 18:2 우세(경량 추출은 할 가치가 있음 — 사이클 11 결과 2 철회), LOOK 한 줄을 더하면 12:2로 더 좋아짐(사진·액션에서 크고 그림 캐릭터는 비슷; 대가 = 콘텐츠 준수 하락, 풍경 입력은 장면 복제라 LOOK 제외). **조건부 채택 권고 — 제품에 넣기 전 v2 스펙 12장 정식 검증(사이클 13) 승인 대기.** `cycle-12-results.md`.
+10. **트랙 L(비례 % 직접 지정)은 미채택** — 프리셋 v4 유지(가이드 §6 36 기록). 실사 계열 긴 하퇴는 텍스트로 더 시도하지 않는다.
 6. **Codex 지출 한도**: 워크스페이스 spend cap에 걸려 8종의 우선순위·판정을 Claude로 돌렸다. 다음 사이클에 Codex를 쓰려면 한도를 올려야 한다(대체 경로는 스크립트로 남아 있다).
 
 ## 9. 참고
 
 - 결과 페이지(아티팩트): https://claude.ai/artifact/3ASfQfpBFkAi6SoKpSdsra (비공개 — 오너 계정; 다른 사람에게는 공유 메뉴로 열어야 보인다)
+- 사이클 12 결과(2026-10-09 오후): **`cycle-12-results.md`**(U 유저 경로 R0 대조군 — 조각 > 참조만 18:2 · LOOK 한 줄 12:2(조건부 채택 권고) · L 비례 % 직접 지정 효과 없음 11:13 → v4 유지) + 노트 `cycle-12-notes-{U,L}.md`, 페이지 https://claude.ai/artifact/MNNNKsyNqUKh6tycuHAz3B
 - 사이클 11 계획·결과: `next-cycle-plan.md` → **`cycle-11-results.md`**(A1 기각 · A2 채택(2026-10-09 오너, v4) · A3 현행 유지 · D1 적용 권고 · 경량 판 제품 규칙 4개 · 다음 사이클 핵심 = 유저 경로 R0 대조군) + 트랙 노트 `cycle-11-notes-{A,B,C,D}.md`. 사이클 11 페이지(v3·v4a·v4b·v4c 쌍 비교 그림): https://claude.ai/artifact/Yadog9sLuw3Uk9xM67xVGW
 - 로컬 실험 폴더(git 밖): `dev/Image_Style/facet_presets/` — `bin/pipeline.sh`(v1 추출 사슬) · `bin/pipeline_v2.sh`(앵커 + 보드 2장 채움) · `bin/make_board.py` + `bin/gen_board.sh`(보드) · `bin/run_priority_claude.py` · `bin/run_judge_v2_claude.py`(Codex 한도 대체) · `bin/post_chain.sh`(조립 → 생성 → 판정) · `bin/build_prompts.py` · `bin/gen.sh` · `bin/run_judge.sh` + `spec/spec-judge.md` · `bin/summarize.py` · `build_report.py` · `bin/export_handoff.py`(이 폴더로 내보내기) · `<key>/fill/comms/transcript.md`(Codex 통신 원문) · `<key>/gen/*.png`(원본 2048px) · `judge/<key>.md`(1차 판정 전문)
 - 지난 사이클: `dev/Image_Style/facet_cycle_9/`(R1c 확정 근거) · `facet_cycle_10/`(경량 판 검증, Sonnet 직접 호출 시간)
