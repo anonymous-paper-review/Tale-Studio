@@ -43,7 +43,10 @@ const calls = (spy: { mock: { calls: ReadonlyArray<ReadonlyArray<unknown>> } }, 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status })
 const comicRoutes = (over: Partial<Routes> = {}): Routes => ({
   '/api/produce/comic-script': () => json({ script: SCRIPT, stats: { scenes: 1, dialogue_lines: 2, action_blocks: 2, characters: 2 } }),
-  '/api/produce/style-anchor': (b) => json({ key: 'custom_abc', imageUrl: b.imageUrl, label: b.label, medium: null }),
+  '/api/produce/anchor-medium': () => json({ medium: '2d_anime' }),
+  // 실제 창구처럼 매체가 허용 목록에 없으면 거절한다(10/9 로컬 시험: 매체 없이 보내 400 으로 그림체가 안 정해졌다).
+  '/api/produce/style-anchor': (b) =>
+    typeof b.medium === 'string' && b.medium ? json({ key: 'custom_abc', imageUrl: b.imageUrl, label: b.label, medium: b.medium }) : json({ error: 'Unsupported medium' }, 400),
   '/api/produce/style-facets': () => json({ ok: true, facets: true, figure: true }),
   '/api/produce/chat': () => json({ reply: '카드를 채웠어요.' }),
   ...over,
@@ -159,6 +162,26 @@ describe('만화 원고로 그대로 영상화', () => {
     expect(calls(spy, '/api/produce/style-anchor')[0].imageUrl).toBe(p1.thumbUrl)
     expect(calls(spy, '/api/produce/style-facets')[0]).toMatchObject({ projectId: 'proj-1', consent: 'comic-choice-v1' })
     expect(useProducerStore.getState().styleAnchorKey).toBe('custom_abc')
+  })
+
+  it('그림체를 정하기 전에 첫 쪽 그림으로 매체를 고르고, 그 매체로 그림체를 정한다', async () => {
+    // 왜: 그림체 등록은 매체(애니 · 카툰 · 실사 등)가 있어야 받는다. 10/9 로컬 시험에서 매체 없이 보내 그림체가 안 정해졌다.
+    const spy = mockApi(comicRoutes())
+    useGlobalChatStore.getState().offerImageRoles([p2, p1], { typed: '내 만화를 영상화해 줘', msg: '내 만화를 영상화해 줘' })
+    await vi.waitFor(() => expect(calls(spy, '/api/produce/style-anchor')).toHaveLength(1))
+    expect(calls(spy, '/api/produce/anchor-medium')[0]).toEqual({ projectId: 'proj-1', imageUrl: p1.thumbUrl, consent: 'comic-choice-v1' })
+    expect(calls(spy, '/api/produce/style-anchor')[0].medium).toBe('2d_anime')
+    await vi.waitFor(() => expect(useProducerStore.getState().styleAnchorKey).toBe('custom_abc'))
+  })
+
+  it('매체를 고르지 못하면 그림체를 정하지 않고 채팅에 알린다', async () => {
+    // 왜: 매체 없이 정하면 실사로 흘러간다 — 정하지 않고 알리면 사용자가 스타일을 직접 고를 수 있다.
+    const spy = mockApi(comicRoutes({ '/api/produce/anchor-medium': () => json({ error: 'medium_pick_failed' }, 502) }))
+    useGlobalChatStore.getState().offerImageRoles([p1, p2], { typed: '내 만화를 영상화해 줘', msg: '내 만화를 영상화해 줘' })
+    await vi.waitFor(() => expect(useGlobalChatStore.getState().messages.some((m) => /그림체로 정하지 못했어요/.test(m.content))).toBe(true))
+    expect(calls(spy, '/api/produce/style-anchor')).toHaveLength(0)
+    expect(calls(spy, '/api/produce/style-facets')).toHaveLength(0)
+    expect(useProducerStore.getState().styleAnchorKey).toBeFalsy()
   })
 
   it('그림마다 묻는 질문에 스토리라고 답해도 만화 원고로 받는다', async () => {

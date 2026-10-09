@@ -12,6 +12,9 @@ export function preservedScriptDirective(preserveScript: unknown): string | null
     'Do not rewrite, summarize, adapt or translate it, and do not emit storyText in extractedSettings.',
     'Treat the story as ready (storyReady: true). Read the script and fill only what it supports:',
     'project settings, cast cards (characters as written) and background cards (locations as written).',
+    // 2026-10-09 오너 "영상 길이 제한을 없애줘" — 그대로 쓰기는 길이 설정을 쓰지 않는다(/api/writer/start → preserveRuntime).
+    'The video runs as long as the script: the runtime setting is not used, so do not set playtime,',
+    'never state a runtime in seconds, and if asked, say the length follows the original.',
     'Answer the user in the response language, and never claim you rewrote or tidied the story.',
   ].join('\n')
 }

@@ -24,6 +24,7 @@ import { selectedProducerDialogueLanguage } from '@/lib/producer-dialogue-langua
 import { fixKoreanParticles } from '@/lib/korean-particles'
 import { coerceCardFill, matchImageRoleAnswer, matchImageRoleInText, type CardFill, type ImageRole } from '@/lib/producer/image-role'
 import { MAX_COMIC_PAGES, imageBatchQuestion, matchBatchImageAnswer, matchComicAnswer, matchComicIntentInText, sortComicPages } from '@/lib/producer/comic-intake'
+import { COMIC_ANALYSIS_CONSENT } from '@/lib/style-facets/consent'
 import { backgroundMentions, castMentions } from '@/lib/card-mention'
 import {
   requireDefaultAppearanceKey,
@@ -462,16 +463,25 @@ async function runComicAdaptation(get: () => GlobalChatState, images: ChatImageI
   const style = (async () => {
     const analysisFailed = translate(voice, "The art style analysis didn't work, so new pictures follow the comic page image only.")
     try {
-      const anchorRes = await post('/api/produce/style-anchor', { projectId, imageUrl: pages[0].thumbUrl, label: translate(voice, 'Comic art style'), medium: null })
+      // 그림체 등록은 매체(애니 · 카툰 · 실사 등)가 있어야 받는다 — 첫 쪽을 보고 허용 목록에서 먼저 고른다. 못 고르면 정하지 않는다.
+      const notSet = translate(voice, "Couldn't set the comic as the art style.")
+      const mediumRes = await post('/api/produce/anchor-medium', { projectId, imageUrl: pages[0].thumbUrl, consent: COMIC_ANALYSIS_CONSENT })
+      const picked = (await mediumRes.json().catch(() => ({}))) as { medium?: string }
+      if (!sameProject()) return
+      if (!mediumRes.ok || !picked.medium) {
+        speak(notSet)
+        return
+      }
+      const anchorRes = await post('/api/produce/style-anchor', { projectId, imageUrl: pages[0].thumbUrl, label: translate(voice, 'Comic art style'), medium: picked.medium })
       const anchor = (await anchorRes.json().catch(() => ({}))) as { key?: string; imageUrl?: string; label?: string; medium?: string | null }
       if (!sameProject()) return
       if (!anchorRes.ok || !anchor.key || !anchor.imageUrl) {
-        speak(translate(voice, "Couldn't set the comic as the art style."))
+        speak(notSet)
         return
       }
       useProducerStore.getState().applyCustomStyleAnchor({ key: anchor.key, url: anchor.imageUrl, label: anchor.label ?? translate(voice, 'Comic art style'), medium: anchor.medium ?? null })
       speak(translate(voice, 'Set the art style to this comic. Analyzing the art style now.'))
-      const facetRes = await post('/api/produce/style-facets', { projectId, consent: 'comic-choice-v1' })
+      const facetRes = await post('/api/produce/style-facets', { projectId, consent: COMIC_ANALYSIS_CONSENT })
       const facet = (await facetRes.json().catch(() => ({}))) as { facets?: boolean }
       if (!sameProject()) return
       speak(facetRes.ok && facet.facets ? translate(voice, 'Finished analyzing the art style. New pictures will follow the comic art style description too.') : analysisFailed)

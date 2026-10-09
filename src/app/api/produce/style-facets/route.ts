@@ -12,12 +12,10 @@ import { userOwnsProject } from '@/lib/generation-jobs'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { isOwnMediaUrl } from '@/lib/upload/attachment'
 import { extractLiteFacets } from '@/lib/style-facets/lite-llm'
+import { isAnalysisConsent } from '@/lib/style-facets/consent'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
-
-/** 받는 분석 동의 문구 판. */
-const ANALYSIS_CONSENTS = new Set(['comic-choice-v1'])
 
 type RawAnchor = Record<string, unknown> & { url: string }
 
@@ -39,7 +37,7 @@ export async function POST(req: Request) {
   const projectId = typeof body?.projectId === 'string' ? body.projectId : ''
   const consent = typeof body?.consent === 'string' ? body.consent : ''
   if (!projectId) return NextResponse.json({ error: 'Invalid request: projectId is required' }, { status: 400 })
-  if (!ANALYSIS_CONSENTS.has(consent)) return NextResponse.json({ error: 'analysis_consent_required' }, { status: 400 })
+  if (!isAnalysisConsent(consent)) return NextResponse.json({ error: 'analysis_consent_required' }, { status: 400 })
   if (!(await userOwnsProject(projectId, user.id))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   try {

@@ -7,6 +7,7 @@ import { preservedRuntimeSeconds } from '@/lib/writer/script/preserve'
 import { depthLevelFromRuntime } from '@/lib/depth'
 import { staleDraftFields } from '@/lib/writer/treatment-draft'
 import { runtimeSettingLabel, writerRuntimeSeconds } from '@/lib/producer/runtime'
+import { preservedScriptDirective } from '@/app/api/produce/chat/preserve-context'
 import type { ProjectSettings } from '@/types'
 
 // 이 시험을 위해 새로 지은 대본 — 실제 작품의 글이 아니다.
@@ -67,5 +68,13 @@ describe('대본 그대로 쓰기의 영상 길이', () => {
     expect(runtimeSettingLabel('ko', 300, false)).toBe('300초')
     expect(runtimeSettingLabel('ko', 0, false)).toBeNull()
     expect(readFileSync('src/features/producer/quest-journal.tsx', 'utf8')).toMatch(/runtimeSettingLabel\(/)
+  })
+
+  it('대본 그대로 쓰기 채팅에서는 영상 길이가 원작 길이를 따른다고 모델에게 알려 몇 초라고 말하지 않게 한다', () => {
+    // 왜: 10/9 로컬 시험에서 길이 칸은 "원작 길이대로"인데 채팅 답이 "러닝타임 300초"라고 적었다 — 쓰이지 않는 설정값을 읽어 준 것.
+    const directive = preservedScriptDirective(true)!
+    expect(directive).toMatch(/runtime/i)
+    expect(directive).toMatch(/as long as the script/i)
+    expect(directive).toMatch(/never state a runtime in seconds/i)
   })
 })
