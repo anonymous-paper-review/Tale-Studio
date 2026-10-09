@@ -42,3 +42,5 @@
 ## 산출물
 
 - 로컬 `dev/Image_Style/facet_cycle_11/`(기록 전부), 결과 페이지 1개(트랙별 절), 이 폴더에 `cycle-11-results.md` + 채택된 규칙은 가이드 §6·`facet-compile-priority.md`·lite 가이드에 반영, 제품용 v4가 나오면 `presets/`를 갱신하고 `index.json`의 `facets.version`을 올린다.
+
+**실행 결과(2026-10-09)**: 기록은 실제로 `dev/Image_Style/facet_presets/cycle11/`에 남았다(계획의 `facet_cycle_11/` 대신 — 프리셋 폴더의 v3 산출물을 그대로 읽어야 해서). 결과 `cycle-11-results.md`; A2 채택 → `presets/` v4(`facets.version = hp-v1.2.3+figure-board+compile-v3+priority-cap`), A1·A3는 규칙 변경 없음.
