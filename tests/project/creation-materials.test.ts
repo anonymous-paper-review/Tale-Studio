@@ -13,6 +13,7 @@ import {
   materialNextStep,
   materialProblems,
   needsAnalysisNotice,
+  needsComicStyle,
   planCreation,
   type MaterialImage,
   type MaterialText,
@@ -68,14 +69,33 @@ describe('자료 쓰임새 고르기', () => {
   it('대본 그대로와 만화 원고를 함께 고르면 그대로 쓸 원작을 하나만 고르라고 알린다', () => {
     // 왜: 대본과 만화를 한 이야기로 섞는 규칙이 없다 — 어느 쪽이 원작인지 사용자가 정한다.
     expect(materialProblems([text('t1', SCRIPT, 'script_keep')], [image('p1', 'comic')])).toContain('two_originals')
-    expect(materialProblems([text('t1', SCRIPT, 'memo')], [image('p1', 'comic')])).toEqual([])
+    // 2026-10-09 오너 결정(만화 그림체를 묻는다) 뒤로는 만화 원고에 그림체 답이 있어야 문제가 없다.
+    expect(materialProblems([text('t1', SCRIPT, 'memo')], [image('p1', 'comic')], 'lock')).toEqual([])
   })
 
   it('만화 원고는 한 번에 20쪽까지 고를 수 있고, 넘으면 다음으로 넘어가지 않는다', () => {
     // 왜: 21쪽부터는 Producer 가 읽지 못하고 멈춘다 — 그대로 시작하면 대본도 그림체도 트리트먼트도 없이 끝났다(10/9 검토).
     const pages = (n: number) => Array.from({ length: n }, (_, i) => image(`c${i}`, 'comic'))
-    expect(materialProblems([], pages(20))).toEqual([])
-    expect(materialProblems([], pages(21))).toContain('too_many_comic_pages')
+    // 2026-10-09 오너 결정(만화 그림체를 묻는다) 뒤로는 만화 원고에 그림체 답이 있어야 문제가 없다.
+    expect(materialProblems([], pages(20), 'lock')).toEqual([])
+    expect(materialProblems([], pages(21), 'lock')).toContain('too_many_comic_pages')
+  })
+
+  it('만화 원고를 고르면 만화 그림체를 고정할지 실사 등으로 각색할지 고르기 전에는 다음으로 넘어가지 않는다', () => {
+    // 왜: 만화를 그대로 옮길지 다른 그림으로 각색할지는 사용자가 정한다(10/9 오너 "그림체로 고정할지 실사와 같은 각색을 할지 물어봐줘").
+    const pages = [image('c1', 'comic'), image('c2', 'comic')]
+    expect(needsComicStyle(pages)).toBe(true)
+    expect(materialProblems([], pages)).toContain('comic_style_unchosen')
+    expect(materialProblems([], pages, 'lock')).toEqual([])
+    expect(planCreation({ idea: '', texts: [], images: pages, comicStyle: 'adapt' }).comicStyle).toBe('adapt')
+  })
+
+  it('그림체 그림을 따로 골랐으면 만화 그림체는 묻지 않는다', () => {
+    // 왜: 그 그림이 그림체다 — 만화 그림체를 물을 필요가 없다.
+    const images = [image('c1', 'comic'), image('look', 'style')]
+    expect(needsComicStyle(images)).toBe(false)
+    expect(materialProblems([], images)).toEqual([])
+    expect(planCreation({ idea: '', texts: [], images, comicStyle: 'lock' }).comicStyle).toBeNull()
   })
 
   it('만화 원고나 그림체를 고르면 그림을 분석 모델로 보낸다는 안내가 나온다', () => {

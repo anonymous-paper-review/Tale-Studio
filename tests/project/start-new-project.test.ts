@@ -19,6 +19,7 @@ vi.mock('@/lib/supabase/client', () => ({
 import { beginTreatment, createProjectForNewFlow, ingestCreationFile } from '@/lib/project/start-new-project'
 import { usePendingCreationStore } from '@/stores/pending-creation-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore } from '@/stores/producer-store'
 import { useLocaleStore } from '@/stores/locale-store'
@@ -225,7 +226,7 @@ describe('Producer에서 이어서 하기', () => {
   it('만화 원고는 대본으로 옮긴 뒤 트리트먼트를 시작한다', async () => {
     // 왜: 만화는 대본으로 옮기기 전에는 이야기가 없다 — 옮긴 대본을 그대로 쓰기로 트리트먼트에 넘긴다.
     await createProjectForNewFlow({ title: '만화' })
-    expect(await beginTreatment({ projectId: 'proj-new', format: 'horizontal_16:9', idea: '', files: [img('comic_2.webp', 'comic'), img('comic_1.webp', 'comic')] as never })).toEqual({ started: false })
+    expect(await beginTreatment({ projectId: 'proj-new', format: 'horizontal_16:9', idea: '', comicStyle: 'lock', files: [img('comic_2.webp', 'comic'), img('comic_1.webp', 'comic')] as never })).toEqual({ started: false })
     await runPending()
     const order = urlOrder()
     expect(order.indexOf('/api/produce/comic-script')).toBeLessThan(order.indexOf('/api/writer/start'))
@@ -245,7 +246,7 @@ describe('Producer에서 이어서 하기', () => {
       return base(url, init)
     })
     await createProjectForNewFlow({ title: '만화' })
-    await beginTreatment({ projectId: 'proj-new', format: 'horizontal_16:9', idea: '', files: [img('comic_1.webp', 'comic')] as never })
+    await beginTreatment({ projectId: 'proj-new', format: 'horizontal_16:9', idea: '', comicStyle: 'lock', files: [img('comic_1.webp', 'comic')] as never })
     const run = runPending()
     await vi.waitFor(() => expect(calls('/api/writer/start')).toHaveLength(1))
     releaseFacets()
@@ -315,7 +316,7 @@ describe('Producer에서 이어서 하기', () => {
       return base(url, init)
     })
     await createProjectForNewFlow({ title: '만화' })
-    await beginTreatment({ projectId: 'proj-new', format: 'horizontal_16:9', idea: '', files: [img('comic_1.webp', 'comic'), img('comic_2.webp', 'comic')] as never })
+    await beginTreatment({ projectId: 'proj-new', format: 'horizontal_16:9', idea: '', comicStyle: 'lock', files: [img('comic_1.webp', 'comic'), img('comic_2.webp', 'comic')] as never })
     await runPending()
     expect(calls('/api/writer/start')).toHaveLength(0)
     const s = useGlobalChatStore.getState().suggestion
@@ -327,6 +328,17 @@ describe('Producer에서 이어서 하기', () => {
     const bodies = calls('/api/produce/comic-script').map(([, init]) => JSON.parse(String((init as RequestInit).body)))
     expect(bodies).toHaveLength(2)
     expect(bodies[1].pages).toEqual(bodies[0].pages)
+    expect(startBody()).toMatchObject({ preserveScript: true, story: SCRIPT })
+  })
+
+  it('새 프로젝트에서 만화 원고의 각색을 고르면 만화 그림을 그림체로 쓰지 않고 스타일 고르기 창을 띄운 뒤 대본을 옮겨 트리트먼트를 쓴다', async () => {
+    // 왜: 각색은 만화 그림체를 쓰지 않는다 — 실사 등 만들 스타일은 사용자가 고른다(10/9 오너).
+    await createProjectForNewFlow({ title: '만화' })
+    await beginTreatment({ projectId: 'proj-new', format: 'horizontal_16:9', idea: '', comicStyle: 'adapt', files: [img('comic_1.webp', 'comic')] as never })
+    await runPending()
+    expect(calls('/api/produce/anchor-medium')).toHaveLength(0)
+    expect(calls('/api/produce/style-anchor')).toHaveLength(0)
+    expect(useChatUiStore.getState().stylePickerRequest?.projectId).toBe('proj-new')
     expect(startBody()).toMatchObject({ preserveScript: true, story: SCRIPT })
   })
 

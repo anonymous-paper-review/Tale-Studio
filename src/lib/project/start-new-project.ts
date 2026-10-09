@@ -17,6 +17,7 @@ import {
   type TextUse,
 } from '@/lib/project/creation-materials'
 import type { ProjectFormat } from '@/types/project'
+import type { ComicStyle } from '@/lib/producer/comic-intake'
 import { rejectReason } from '@/lib/upload/limits'
 import { useLocaleStore } from '@/stores/locale-store'
 import { translate } from '@/lib/i18n'
@@ -80,6 +81,8 @@ export async function beginTreatment(input: {
   purposeId?: ProjectPurposeId | null
   /** 원작을 그대로 쓸 때 마지막 단계에서 고른 화면 비율. */
   format?: ProjectFormat | null
+  /** 만화 원고의 그림체(고정 · 각색) — 그림체 그림을 따로 골랐으면 쓰지 않는다. */
+  comicStyle?: ComicStyle | null
   /** 시작할 때의 아이디어 · 자료로 정한 제목 — 자료를 올리느라 프로젝트를 먼저 만들었으면 그때 제목과 다를 수 있다. */
   title?: string
 }): Promise<{ started: boolean }> {
@@ -93,8 +96,8 @@ export async function beginTreatment(input: {
     file.kind === 'image' ? [{ id: file.id, name: file.name, thumbUrl: file.thumbUrl, sliceUrls: file.sliceUrls, use: file.use ?? null }] : [],
   )
   // 쓰임새를 안 고른 그림 · 원작 둘은 화면이 막는다 — 여기까지 왔으면 아무것도 하지 않는다.
-  if (materialProblems(texts, images).length) return { started: false }
-  const plan = planCreation({ idea: input.idea, texts, images })
+  if (materialProblems(texts, images, input.comicStyle ?? null).length) return { started: false }
+  const plan = planCreation({ idea: input.idea, texts, images, comicStyle: input.comicStyle ?? null })
   // 언어는 트리트먼트가 쓰일 언어를 따른다(writer/start resolveOutputLocale 와 같은 규칙):
   //   계정 언어로 잠긴 프로젝트는 그 언어, 잠기지 않았으면 Writer 가 이야기 언어로 잠그므로 이야기(없으면 메모) 언어.
   const languageSource = plan.story || plan.note || ''
@@ -127,6 +130,7 @@ export async function beginTreatment(input: {
       locale,
       original: plan.original,
       comicPages: plan.comicPages,
+      comicStyle: plan.comicStyle,
       styleImage: plan.styleImage,
       cards: plan.cards,
       references: plan.references,

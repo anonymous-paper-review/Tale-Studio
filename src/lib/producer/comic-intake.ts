@@ -73,3 +73,31 @@ export function imageBatchQuestion(voice: AppLocale, count: number): { content: 
     ],
   }
 }
+
+/** 만화 그림체(2026-10-09 오너 "그림체로 고정할지 실사와 같은 각색을 할지 물어봐줘") —
+ *  lock = 만화 그림체로 고정(첫 쪽 그림체로 만들고 나중에 바꿀 수 없다), adapt = 실사 등 다른 스타일로 각색(만화 그림을 그림체로 쓰지 않는다). */
+export type ComicStyle = 'lock' | 'adapt'
+
+const STYLE_LOCK_RE = /고정|그대로|유지|keep|fix/i // i18n-ok: 답 낱말 규칙 자체
+const STYLE_ADAPT_RE = /각색|실사|다른 스타일|다른 그림체|바꿔|adapt|live action|another style/i // i18n-ok: 답 낱말 규칙 자체
+
+/** 그림체 질문의 답(버튼 문구 · 직접 입력). 둘 다 들었거나 아무것도 없으면 null — 다시 묻는다. */
+export function matchComicStyleAnswer(text: string): ComicStyle | null {
+  const t = (text ?? '').trim()
+  if (!t || t.length > 60) return null
+  const lock = STYLE_LOCK_RE.test(t)
+  const adapt = STYLE_ADAPT_RE.test(t)
+  if (lock === adapt) return null
+  return lock ? 'lock' : 'adapt'
+}
+
+/** 만화를 고른 뒤 대본을 옮기기 전에 묻는 그림체 질문. */
+export function comicStyleQuestion(voice: AppLocale): { content: string; options: Array<{ label: string; utterance: string }> } {
+  return {
+    content: translate(voice, 'How should the art style work? If you keep the comic art style, it is fixed and cannot be changed later.'),
+    options: [
+      { label: translate(voice, 'Fix the comic art style'), utterance: translate(voice, 'Keep the comic art style and fix it') },
+      { label: translate(voice, 'Adapt to another style like live action'), utterance: translate(voice, 'Adapt it to another style like live action') },
+    ],
+  }
+}

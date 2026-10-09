@@ -23,7 +23,7 @@ import { evaluateProducerGate } from '@/lib/producer-gate'
 import { selectedProducerDialogueLanguage } from '@/lib/producer-dialogue-language'
 import { fixKoreanParticles } from '@/lib/korean-particles'
 import { coerceCardFill, matchImageRoleAnswer, matchImageRoleInText, type CardFill, type ImageRole } from '@/lib/producer/image-role'
-import { MAX_COMIC_PAGES, imageBatchQuestion, matchBatchImageAnswer, matchComicAnswer, matchComicIntentInText, sortComicPages } from '@/lib/producer/comic-intake'
+import { MAX_COMIC_PAGES, comicStyleQuestion, imageBatchQuestion, matchBatchImageAnswer, matchComicAnswer, matchComicIntentInText, matchComicStyleAnswer, sortComicPages } from '@/lib/producer/comic-intake'
 import { COMIC_ANALYSIS_CONSENT, CREATION_ANALYSIS_CONSENT } from '@/lib/style-facets/consent'
 import type { PendingCreation } from '@/stores/pending-creation-store'
 import { backgroundMentions, castMentions } from '@/lib/card-mention'
@@ -173,6 +173,8 @@ interface GlobalChatState {
   creationPlanFor: string | null
   /** 만화를 대본으로 옮기지 못했을 때 다시 옮길 거리(같은 쪽 · 같은 동의 · 이어서 할 일). */
   comicRetry: ComicRetry | null
+  /** 만화를 고른 뒤 그림체(만화 그림체로 고정 · 실사 등으로 각색)를 묻는 중 — 답하면 옮기기를 시작한다(2026-10-09 오너). */
+  comicStyleGate: { images: ChatImageInput[] } | null
   deferredProposals: PendingProposal[]
   deferredSuggestions: ChatSuggestion[]
   recordedSuggestionIds: string[]
@@ -462,6 +464,23 @@ async function retryComicScript(get: () => GlobalChatState, retry: ComicRetry): 
   if (comic.scriptSet && retry.then?.startTreatment) await startCreationTreatment(retry.then.locale)
 }
 
+/**
+ * 만화를 고르면 대본을 옮기기 전에 그림체를 묻는다(2026-10-09 오너 "그림체로 고정할지 실사와 같은 각색을 할지 물어봐줘").
+ *   닫을 수 없는 선택지다. 이미 그림체가 고정된 프로젝트면 물을 것이 없어 대본만 옮긴다.
+ */
+function askComicStyle(get: () => GlobalChatState, images: ChatImageInput[]): void {
+  if (useProducerStore.getState().customStyleAnchor?.locked === true) {
+    void runComicAdaptation(get, images, { styleMode: 'keep' })
+    return
+  }
+  useGlobalChatStore.setState({ comicStyleGate: { images } })
+  const question = comicStyleQuestion(contentLocale())
+  get().offerSuggestion(
+    { id: `comic-style:${images[0]?.id ?? 'pages'}`, stage: 'producer', content: question.content, dismissible: false, action: { kind: 'choices', options: question.options } },
+    { preempt: true },
+  )
+}
+
 const postJson = (url: string, body: unknown) =>
   fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
 
@@ -506,8 +525,8 @@ async function runStyleFromImage(image: ChatImageInput, kind: 'comic' | 'picture
       speak(notSet)
       return
     }
-    // 사용자가 그림을 "그림체"로 골랐으면(그림체 추출) 고정한다. 만화 첫 쪽으로 저절로 정한 그림체는 고정하지 않는다(실사로 옮길 수도 있다).
-    const anchorRes = await postJson('/api/produce/style-anchor', { projectId, imageUrl: image.thumbUrl, label, medium: picked.medium, ...(comic ? {} : { lock: true }) })
+    // 그림에서 그림체를 뽑는 것은 언제나 사용자가 고른 일이다(그림을 "그림체"로 고름 · 만화 그림체로 고정을 고름) — 고정한다.
+    const anchorRes = await postJson('/api/produce/style-anchor', { projectId, imageUrl: image.thumbUrl, label, medium: picked.medium, lock: true })
     const anchor = (await anchorRes.json().catch(() => ({}))) as { key?: string; imageUrl?: string; label?: string; medium?: string | null; locked?: boolean }
     if (!sameProject()) return
     if (!anchorRes.ok || !anchor.key || !anchor.imageUrl) {
@@ -541,6 +560,9 @@ interface ComicAdaptationOptions {
   beforeFill?: Promise<unknown>
   /** 다시 옮기기 — 그림체는 이미 정했으니 대본만 옮긴다. */
   skipStyle?: boolean
+  /** 만화 그림체 — lock = 첫 쪽 그림체로 고정, adapt = 만화 그림을 그림체로 쓰지 않고 스타일을 고르게 한다,
+   *  keep = 그림체를 건드리지 않는다(이미 고정됨). 그림체 그림(styleImage)이 있으면 그 그림이 그림체다. */
+  styleMode?: 'lock' | 'adapt' | 'keep'
   /** 옮기기에 실패해 다시 옮길 때 이어서 할 일(새 프로젝트의 트리트먼트). */
   then?: ComicRetry['then']
 }
@@ -568,9 +590,12 @@ async function runComicAdaptation(
     speak(translate(voice, 'I can read up to {max} comic pages at once. Please upload {max} pages or fewer.', { max: String(MAX_COMIC_PAGES) }))
     return { scriptSet: false, styleDone: Promise.resolve() }
   }
+  const styleMode = opts.styleImage ? 'lock' : opts.styleMode ?? 'lock'
   speak(opts.skipStyle
     ? translate(voice, 'Reading the {n} comic pages again.', { n: String(pages.length) })
-    : translate(voice, 'Reading the {n} comic pages. I will turn them into a script and analyze the art style. This takes a minute or two.', { n: String(pages.length) }))
+    : styleMode === 'lock'
+      ? translate(voice, 'Reading the {n} comic pages. I will turn them into a script and analyze the art style. This takes a minute or two.', { n: String(pages.length) })
+      : translate(voice, 'Reading the {n} comic pages. I will turn them into a script. This takes about a minute.', { n: String(pages.length) }))
   const sameProject = () => useProjectStore.getState().projectId === projectId
   const consent = opts.consent ?? COMIC_ANALYSIS_CONSENT
 
@@ -616,9 +641,14 @@ async function runComicAdaptation(
     }
   })()
 
-  const styleDone = opts.skipStyle
-    ? Promise.resolve()
-    : opts.styleImage ? runStyleFromImage(opts.styleImage, 'picture', consent) : runStyleFromImage(pages[0], 'comic', consent)
+  let styleDone: Promise<void> = Promise.resolve()
+  if (!opts.skipStyle && opts.styleImage) styleDone = runStyleFromImage(opts.styleImage, 'picture', consent)
+  else if (!opts.skipStyle && styleMode === 'lock') styleDone = runStyleFromImage(pages[0], 'comic', consent)
+  else if (!opts.skipStyle && styleMode === 'adapt') {
+    // 각색: 만화 그림을 그림체로 쓰지 않는다 — 만들 스타일(실사 등)을 사용자가 고르게 스타일 고르기 창을 띄운다.
+    speak(translate(voice, "I won't use the comic art style. Choose the style to make it in."))
+    useChatUiStore.getState().requestStylePicker(projectId)
+  }
   return { scriptSet: await script, styleDone }
 }
 
@@ -1013,6 +1043,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   imageBatchGate: null,
   creationPlanFor: null,
   comicRetry: null,
+  comicStyleGate: null,
   deferredProposals: [],
   deferredSuggestions: [],
   recordedSuggestionIds: [],
@@ -1299,7 +1330,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const utterance = translate(useLocaleStore.getState().locale, action.utterance)
     if (action.from === 'producer') {
       // 그림 쓰임새 질문이 남아 있으면 확정 창을 열지 않는다 — 채팅이 먼저 고르라고 답한다(확정 뒤 넘김이 삼켜지지 않게).
-      if (get().imageRoleGate || get().imageBatchGate) {
+      if (get().imageRoleGate || get().imageBatchGate || get().comicStyleGate) {
         await get().sendMessage(utterance, undefined, { consentedHandoff: true })
         return
       }
@@ -1678,6 +1709,25 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       get().dismissSuggestion({ implicit: true })
     }
 
+    // 만화 그림체(2026-10-09 오너): 만화를 고른 뒤 그림체를 고정할지 각색할지 묻는 중 — 답이면 옮기기를 시작하고, 아니면 다시 묻는다.
+    const styleGate = get().comicStyleGate
+    if (styleGate && stage === 'producer' && !opts?.silentUser) {
+      const mode = matchComicStyleAnswer(trimmed)
+      if (!mode) {
+        get().appendLocalExchange(
+          'producer',
+          trimmed,
+          translate(contentLocale(), 'Please choose first how the art style should work: fix the comic art style, or adapt to another style like live action.'),
+        )
+        askComicStyle(get, styleGate.images)
+        return
+      }
+      set((state) => ({ comicStyleGate: null, messages: [...state.messages, { id: makeId(), stage, role: 'user' as const, content: trimmed }] }))
+      if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
+      void runComicAdaptation(get, styleGate.images, { styleMode: mode })
+      return
+    }
+
     // 만화 다시 옮기기(2026-10-09 검토): 옮기기에 실패하고 "다시 옮기기"를 골랐다 — 같은 쪽으로 다시 옮긴다.
     const comicRetry = get().comicRetry
     if (comicRetry && stage === 'producer' && !opts?.silentUser && isComicRetryAnswer(trimmed, contentLocale())) {
@@ -1704,7 +1754,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
       set({ imageBatchGate: null })
       if (choice === 'comic') {
-        void runComicAdaptation(get, batchGate.images)
+        askComicStyle(get, batchGate.images)
         return
       }
       if (choice === 'reference') {
@@ -1725,7 +1775,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         set((state) => ({ messages: [...state.messages, { id: makeId(), stage, role: 'user' as const, content: trimmed }] }))
         if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
         set({ imageRoleGate: null })
-        void runComicAdaptation(get, imageGate.items.map((it) => it.image))
+        askComicStyle(get, imageGate.items.map((it) => it.image))
         return
       }
       if (!answer) {
@@ -3466,7 +3516,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     // 만화 원고라고 분명히 말했으면 묻지 않고 만화 원고로 받는다(2026-10-09 오너 "이 만화를 그대로 영상화하고 싶어").
     if (matchComicIntentInText(typed)) {
       recordImageTurn(set, msg, ready)
-      void runComicAdaptation(get, ready)
+      askComicStyle(get, ready)
       return true
     }
     // 말이 분명하면 묻지 않는다 — 모든 그림에 같은 역할.
@@ -3533,6 +3583,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (plan.original === 'comic') {
         const comic = await runComicAdaptation(get, plan.comicPages, {
           styleImage: plan.styleImage,
+          styleMode: plan.comicStyle ?? 'lock',
           consent: CREATION_ANALYSIS_CONSENT,
           beforeFill: cardsDone,
           then: { startTreatment: plan.startTreatment, locale: plan.locale },
@@ -4220,6 +4271,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       imageBatchGate: null,
       creationPlanFor: null,
       comicRetry: null,
+      comicStyleGate: null,
       deferredProposals: [],
       deferredSuggestions: [],
       recordedSuggestionIds: [],

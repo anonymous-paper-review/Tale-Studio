@@ -2103,4 +2103,17 @@ export const KO: Record<string, string> = {
   // 고정된 그림체 (2026-10-09)
   "The art style comes from the picture you chose, so it can't be changed.": "그림체는 고르신 그림에서 뽑아 정해져 있어 바꿀 수 없어요.",
   "The art style is fixed to the picture you chose, so I kept it.": "그림체는 고르신 그림으로 정해져 있어 그대로 둘게요.",
+  // 만화 그림체 묻기: 고정 · 각색 (2026-10-09)
+  "How should the art style work? If you keep the comic art style, it is fixed and cannot be changed later.": "그림체는 어떻게 할까요? 만화 그림체로 고정하면 나중에 바꿀 수 없어요.",
+  "Fix the comic art style": "만화 그림체로 고정",
+  "Keep the comic art style and fix it": "만화 그림체 그대로 고정해 줘",
+  "Adapt to another style like live action": "실사 등 다른 스타일로 각색",
+  "Adapt it to another style like live action": "실사 같은 다른 스타일로 각색해 줘",
+  "Please choose first how the art style should work: fix the comic art style, or adapt to another style like live action.": "먼저 그림체를 골라 주세요: 만화 그림체로 고정, 또는 실사 등 다른 스타일로 각색.",
+  "Reading the {n} comic pages. I will turn them into a script. This takes about a minute.": "만화 {n}쪽을 읽고 있어요. 대본으로 옮길게요. 1분쯤 걸려요.",
+  "I won't use the comic art style. Choose the style to make it in.": "만화 그림체는 쓰지 않을게요. 만들 스타일을 골라 주세요.",
+  "How should the comic art style work?": "만화 그림체는 어떻게 할까요?",
+  "Keep it and fix it": "그대로 고정",
+  "A fixed art style cannot be changed in Producer later.": "고정하면 나중에 Producer에서 스타일을 바꿀 수 없어요.",
+  "Choose how the comic art style should work.": "만화 그림체를 어떻게 할지 골라 주세요.",
 }

@@ -31,6 +31,7 @@ import {
   materialNextStep,
   materialProblems,
   needsAnalysisNotice,
+  needsComicStyle,
   planCreation,
   type ImageUse,
   type MaterialImage,
@@ -38,7 +39,7 @@ import {
   type TextUse,
 } from '@/lib/project/creation-materials'
 import { newProjectInputError, newProjectTitle } from '@/lib/project/new-project-input'
-import { MAX_COMIC_PAGES } from '@/lib/producer/comic-intake'
+import { MAX_COMIC_PAGES, type ComicStyle } from '@/lib/producer/comic-intake'
 import { beginTreatment, checkCreationFile, createProjectForNewFlow, ingestCreationFile, type CreationUpload } from '@/lib/project/start-new-project'
 import { UPLOAD_ACCEPT, kindOf } from '@/lib/upload/limits'
 import { useLocaleStore } from '@/stores/locale-store'
@@ -72,6 +73,8 @@ export function NewProjectFlow() {
   const [idea, setIdea] = useState('')
   const [files, setFiles] = useState<PickedFile[]>([])
   const [imageMode, setImageMode] = useState<'group' | 'each'>('group')
+  // 만화 원고의 그림체 — 만화 그림체로 고정 · 실사 등으로 각색(2026-10-09 오너). 그림체 그림을 따로 골랐으면 묻지 않는다.
+  const [comicStyle, setComicStyle] = useState<ComicStyle | null>(null)
   const [inputError, setInputError] = useState(false)
   const [stepError, setStepError] = useState<string | null>(null)
   const [busy, setBusy] = useState<'uploading' | 'starting' | null>(null)
@@ -121,8 +124,8 @@ export function NewProjectFlow() {
       : [])),
     [files],
   )
-  const problems = materialProblems(texts, images)
-  const lengthStep = creationLengthStep(planCreation({ idea, texts, images }))
+  const problems = materialProblems(texts, images, comicStyle)
+  const lengthStep = creationLengthStep(planCreation({ idea, texts, images, comicStyle }))
 
   const addFiles = async (picked: File[]) => {
     if (busy || !picked.length) return
@@ -226,6 +229,7 @@ export function NewProjectFlow() {
         idea,
         title: newProjectTitle(idea, files.map((item) => item.file.name), 'Untitled'),
         files: uploaded,
+        comicStyle,
         purposeId: lengthStep === 'purpose' ? purpose : null,
         format: lengthStep === 'format' ? format : null,
       })
@@ -446,6 +450,19 @@ export function NewProjectFlow() {
             <button type="button" className="mt-2 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline" onClick={() => setImageMode('group')}>
               {t('Decide all at once')}
             </button>
+          ) : null}
+
+          {needsComicStyle(images) ? (
+            <div className="mt-2.5 rounded-xl border border-border bg-card p-3" data-testid="new-project-comic-style">
+              <p className="text-sm">{t('How should the comic art style work?')}</p>
+              <UseChoices label={t('How should the comic art style work?')}>
+                <UseChip selected={comicStyle === 'lock'} onClick={() => setComicStyle('lock')}>{t('Keep it and fix it')}</UseChip>
+                <UseChip selected={comicStyle === 'adapt'} onClick={() => setComicStyle('adapt')}>{t('Adapt to another style like live action')}</UseChip>
+              </UseChoices>
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                {comicStyle === 'lock' ? t('A fixed art style cannot be changed in Producer later.') : comicStyle === null ? t('Choose how the comic art style should work.') : null}
+              </p>
+            </div>
           ) : null}
 
           {needsAnalysisNotice(images) ? (

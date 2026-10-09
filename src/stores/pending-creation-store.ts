@@ -4,6 +4,7 @@
 import { create } from 'zustand'
 import type { AppLocale } from '@/lib/locale'
 import type { CreationImage } from '@/lib/project/creation-materials'
+import type { ComicStyle } from '@/lib/producer/comic-intake'
 
 export type PendingCreationImage = CreationImage
 
@@ -13,6 +14,8 @@ export interface PendingCreation {
   /** 그대로 쓰는 원작 — 대본(이야기에 이미 들어 있다) 또는 만화(옮겨서 넣는다). */
   original: 'script' | 'comic' | null
   comicPages: PendingCreationImage[]
+  /** 만화 원고의 그림체 — lock = 첫 쪽 그림체로 고정, adapt = 실사 등 다른 스타일로(만화 그림을 그림체로 쓰지 않는다). */
+  comicStyle: ComicStyle | null
   styleImage: PendingCreationImage | null
   cards: Array<{ image: PendingCreationImage; role: 'character' | 'background' }>
   references: PendingCreationImage[]

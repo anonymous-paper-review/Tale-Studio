@@ -4,7 +4,7 @@
 //   마지막 길이 · 화면 질문(creationLengthStep)이 정해진다.
 import { translate } from '@/lib/i18n'
 import type { AppLocale } from '@/lib/locale'
-import { MAX_COMIC_PAGES } from '@/lib/producer/comic-intake'
+import { MAX_COMIC_PAGES, type ComicStyle } from '@/lib/producer/comic-intake'
 import { detectScript, parseScript } from '@/lib/writer/script/parse'
 import type { ProjectFormat } from '@/types/project'
 
@@ -51,8 +51,9 @@ export interface MaterialImage extends CreationImage {
 }
 
 /** image_unchosen = 쓰임새를 고르지 않은 그림이 있다. two_originals = 대본 그대로와 만화 원고를 함께 골랐다.
- *  too_many_comic_pages = 만화 원고가 한 번에 읽는 쪽 수(MAX_COMIC_PAGES)를 넘는다 — Producer 가 읽지 못하고 멈춘다. */
-export type MaterialProblem = 'image_unchosen' | 'two_originals' | 'too_many_comic_pages'
+ *  too_many_comic_pages = 만화 원고가 한 번에 읽는 쪽 수(MAX_COMIC_PAGES)를 넘는다 — Producer 가 읽지 못하고 멈춘다.
+ *  comic_style_unchosen = 만화 원고의 그림체(고정 · 각색)를 고르지 않았다. */
+export type MaterialProblem = 'image_unchosen' | 'two_originals' | 'too_many_comic_pages' | 'comic_style_unchosen'
 
 /** 자료를 올렸으면 쓰임새 고르기로, 아이디어만 있으면 바로 길이 · 화면으로. */
 export function materialNextStep(fileCount: number): 'uses' | 'length' {
@@ -79,11 +80,21 @@ export function chooseGroupUse<T extends MaterialImage>(images: readonly T[], us
   return images.map((image) => ({ ...image, use }))
 }
 
-export function materialProblems(texts: ReadonlyArray<Pick<MaterialText, 'use'>>, images: ReadonlyArray<Pick<MaterialImage, 'use'>>): MaterialProblem[] {
+/** 만화 원고를 골랐고 그림체 그림을 따로 고르지 않았으면 만화 그림체를 묻는다(10/9 오너 "그림체로 고정할지 실사와 같은 각색을 할지 물어봐줘"). */
+export function needsComicStyle(images: ReadonlyArray<Pick<MaterialImage, 'use'>>): boolean {
+  return images.some((image) => image.use === 'comic') && !images.some((image) => image.use === 'style')
+}
+
+export function materialProblems(
+  texts: ReadonlyArray<Pick<MaterialText, 'use'>>,
+  images: ReadonlyArray<Pick<MaterialImage, 'use'>>,
+  comicStyle: ComicStyle | null = null,
+): MaterialProblem[] {
   const problems: MaterialProblem[] = []
   if (images.some((image) => image.use === null)) problems.push('image_unchosen')
   if (texts.some((text) => text.use === 'script_keep') && images.some((image) => image.use === 'comic')) problems.push('two_originals')
   if (images.filter((image) => image.use === 'comic').length > MAX_COMIC_PAGES) problems.push('too_many_comic_pages')
+  if (needsComicStyle(images) && !comicStyle) problems.push('comic_style_unchosen')
   return problems
 }
 
@@ -106,6 +117,8 @@ export interface CreationPlan {
   /** 원작이 있을 때 아이디어 칸 글과 메모 — 대본에 합치지 않고 채팅에 사용자의 메모로 남긴다. */
   note: string | null
   comicPages: CreationImage[]
+  /** 만화 원고의 그림체 — 그림체 그림을 따로 골랐거나 만화가 없으면 null. */
+  comicStyle: ComicStyle | null
   styleImage: CreationImage | null
   cards: Array<{ image: CreationImage; role: 'character' | 'background' }>
   references: CreationImage[]
@@ -113,7 +126,7 @@ export interface CreationPlan {
 
 const bareImage = ({ id, name, thumbUrl, sliceUrls }: CreationImage): CreationImage => ({ id, name, thumbUrl, sliceUrls })
 
-export function planCreation(input: { idea: string; texts: readonly MaterialText[]; images: readonly MaterialImage[] }): CreationPlan {
+export function planCreation(input: { idea: string; texts: readonly MaterialText[]; images: readonly MaterialImage[]; comicStyle?: ComicStyle | null }): CreationPlan {
   const keep = input.texts.filter((text) => text.use === 'script_keep')
   const others = input.texts.filter((text) => text.use !== 'script_keep')
   const comicPages = input.images.filter((image) => image.use === 'comic').map(bareImage)
@@ -129,6 +142,7 @@ export function planCreation(input: { idea: string; texts: readonly MaterialText
     original,
     note: original && merged ? merged : null,
     comicPages,
+    comicStyle: needsComicStyle(input.images) ? (input.comicStyle ?? null) : null,
     styleImage: style ? bareImage(style) : null,
     cards: input.images.flatMap((image) => (image.use === 'character' || image.use === 'background' ? [{ image: bareImage(image), role: image.use }] : [])),
     references: input.images.filter((image) => image.use === 'reference').map(bareImage),

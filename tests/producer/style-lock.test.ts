@@ -30,7 +30,7 @@ const PAGE = { id: 'p1', name: 'comic_1.webp', thumbUrl: 'https://img.test/p1.we
 const LOCKED = { url: LOOK.thumbUrl, label: '내 그림체', medium: '2d_anime', locked: true }
 const REASON = /바꿀 수 없어요/
 const plan = (over: Partial<PendingCreation>): PendingCreation => ({
-  locale: 'ko', original: null, comicPages: [], styleImage: null, cards: [], references: [], note: null, startTreatment: false, ...over,
+  locale: 'ko', original: null, comicPages: [], comicStyle: null, styleImage: null, cards: [], references: [], note: null, startTreatment: false, ...over,
 })
 
 type Routes = Record<string, (body: Record<string, unknown>) => Response>
@@ -81,13 +81,14 @@ describe('그림체 추출로 정한 그림체는 고정된다', () => {
     expect(producer.getState().customStyleAnchor?.locked).toBe(true)
   })
 
-  it('만화 원고의 첫 쪽으로 저절로 정해진 그림체는 고정하지 않는다', async () => {
-    // 왜: 그림체 추출을 고른 것이 아니다 — 만화를 실사로 옮기는 것처럼 다른 스타일로 만들 수도 있다.
+  // 2026-10-09 오너 결정 "그림체로 고정할지 실사와 같은 각색을 할지 물어봐줘" — 앞 문장: "만화 원고의 첫 쪽으로 저절로 정해진 그림체는 고정하지 않는다".
+  //   이제 저절로 정해지는 그림체가 없다: 고정을 고르면 고정, 각색을 고르면 만화 그림을 그림체로 쓰지 않는다.
+  it('만화 원고에서 그림체 고정을 고르면 첫 쪽 그림체로 고정된다', async () => {
     stub()
-    await chat.getState().runCreationPlan(plan({ original: 'comic', comicPages: [PAGE] }))
+    await chat.getState().runCreationPlan(plan({ original: 'comic', comicPages: [PAGE], comicStyle: 'lock' }))
     await vi.waitFor(() => expect(calls('/api/produce/style-facets')).toHaveLength(1))
-    expect(calls('/api/produce/style-anchor')[0].lock).toBeUndefined()
-    expect(producer.getState().customStyleAnchor?.locked).toBeFalsy()
+    expect(calls('/api/produce/style-anchor')[0]).toMatchObject({ imageUrl: PAGE.thumbUrl, lock: true })
+    expect(producer.getState().customStyleAnchor?.locked).toBe(true)
   })
 })
 
@@ -139,7 +140,7 @@ describe('고정된 그림체는 Producer 에서 바꿀 수 없다', () => {
   it('만화를 새로 올려 그대로 영상화해도 그림체는 바꾸지 않고 분석 모델도 부르지 않는다', async () => {
     // 왜: 만화 흐름은 첫 쪽을 그림체로 정한다 — 고정된 그림체를 덮으면 안 된다.
     stub()
-    await chat.getState().runCreationPlan(plan({ original: 'comic', comicPages: [PAGE] }))
+    await chat.getState().runCreationPlan(plan({ original: 'comic', comicPages: [PAGE], comicStyle: 'lock' }))
     expect(calls('/api/produce/anchor-medium')).toHaveLength(0)
     expect(calls('/api/produce/style-anchor')).toHaveLength(0)
     expect(producer.getState().customStyleAnchor).toEqual(LOCKED)
