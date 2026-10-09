@@ -23,6 +23,7 @@ import { evaluateProducerGate } from '@/lib/producer-gate'
 import { selectedProducerDialogueLanguage } from '@/lib/producer-dialogue-language'
 import { fixKoreanParticles } from '@/lib/korean-particles'
 import { coerceCardFill, matchImageRoleAnswer, matchImageRoleInText, type CardFill, type ImageRole } from '@/lib/producer/image-role'
+import { MAX_COMIC_PAGES, imageBatchQuestion, matchBatchImageAnswer, matchComicAnswer, matchComicIntentInText, sortComicPages } from '@/lib/producer/comic-intake'
 import { backgroundMentions, castMentions } from '@/lib/card-mention'
 import {
   requireDefaultAppearanceKey,
@@ -164,6 +165,8 @@ interface GlobalChatState {
   scriptPreserveHeld: ScriptPreserveHeld | null
   /** #image-to-artist: 올린 그림의 쓰임새(인물·배경·참고)를 답하기 전까지 붙들어 둔 턴. 장마다 묻고 다 답하면 한꺼번에 처리한다. */
   imageRoleGate: ImageRoleGate | null
+  /** 만화 원고 받기(2026-10-09): 여러 장을 올렸을 때 한 번에 묻는 질문(만화 그대로 · 그림마다 · 모두 참고)에 답하기 전까지 붙들어 둔 턴. */
+  imageBatchGate: ImageBatchGate | null
   deferredProposals: PendingProposal[]
   deferredSuggestions: ChatSuggestion[]
   recordedSuggestionIds: string[]
@@ -365,6 +368,120 @@ interface ImageRoleGate {
   items: Array<{ image: ChatImageInput; role: ImageRole | null }>
   typed: string
   msg: string
+}
+
+interface ImageBatchGate {
+  images: ChatImageInput[]
+  typed: string
+  msg: string
+}
+
+/** 여러 장을 한 번에 묻는 질문을 세운다 — 닫을 수 없다(올린 그림이 조용히 사라지면 안 된다). */
+function askImageBatch(get: () => GlobalChatState): void {
+  const gate = get().imageBatchGate
+  if (!gate || gate.images.length === 0) return
+  const question = imageBatchQuestion(contentLocale(), gate.images.length)
+  get().offerSuggestion(
+    { id: `image-batch:${gate.images[0].id}`, stage: 'producer', content: question.content, dismissible: false, action: { kind: 'choices', options: question.options } },
+    { preempt: true },
+  )
+}
+
+/** 사용자 말풍선을 그림과 함께 남긴다(질문을 세우기 전 · 묻지 않고 바로 쓸 때). */
+function recordImageTurn(set: (fn: (state: GlobalChatState) => Partial<GlobalChatState>) => void, msg: string, images: ChatImageInput[]): void {
+  const projectId = useProjectStore.getState().projectId
+  const content = withAttachmentMarker(msg, images.map((image) => image.thumbUrl))
+  set((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'producer' as const, role: 'user' as const, content }] }))
+  if (projectId) saveChatMessage(projectId, 'producer', 'user', content)
+}
+
+const comicPageUrls = (page: ChatImageInput) => (page.sliceUrls.length ? page.sliceUrls : [page.thumbUrl])
+
+/**
+ * 만화 원고로 그대로 영상화(2026-10-09 오너) — 두 일을 함께 돌린다.
+ *   ① 대본: 쪽 순서(파일 이름 숫자 순)대로 /api/produce/comic-script 에 읽혀 대본으로 옮기고, 이야기에 넣은 뒤 대본 그대로 쓰기를 켠다.
+ *      이어서 그대로 쓰기와 같은 숨은 요청으로 인물 · 배경 · 설정 카드를 채우되 만화 그림도 함께 보낸다(모습은 그림이 정확하다).
+ *   ② 그림체: 첫 쪽을 이 프로젝트 그림체(사용자 앵커)로 정하고 /api/produce/style-facets 로 분석해 facet 조각을 싣는다.
+ *   어느 쪽이 실패해도 다른 쪽은 이어 가고, 실패는 채팅에 한 줄로 알린다.
+ */
+async function runComicAdaptation(get: () => GlobalChatState, images: ChatImageInput[]): Promise<void> {
+  const projectId = useProjectStore.getState().projectId
+  if (!projectId) return
+  const voice = contentLocale()
+  const speak = (content: string) => {
+    if (useProjectStore.getState().projectId !== projectId) return
+    useGlobalChatStore.setState((state) => ({
+      messages: [...state.messages, { id: makeId(), stage: 'producer' as const, role: 'model' as const, content }],
+    }))
+    saveChatMessage(projectId, 'producer', 'model', content)
+  }
+  const pages = sortComicPages(images)
+  if (pages.length > MAX_COMIC_PAGES) {
+    speak(translate(voice, 'I can read up to {max} comic pages at once. Please upload {max} pages or fewer.', { max: String(MAX_COMIC_PAGES) }))
+    return
+  }
+  speak(translate(voice, 'Reading the {n} comic pages. I will turn them into a script and analyze the art style. This takes a minute or two.', { n: String(pages.length) }))
+  const sameProject = () => useProjectStore.getState().projectId === projectId
+  const post = (url: string, body: unknown) =>
+    fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+
+  const script = (async () => {
+    const failed = translate(voice, "Couldn't turn the comic into a script. Please try again in a moment.")
+    try {
+      const res = await post('/api/produce/comic-script', {
+        projectId,
+        pages: pages.map((page) => ({ name: page.name, urls: comicPageUrls(page) })),
+        actionLanguage: voice === 'en' ? 'en' : 'ko',
+      })
+      const body = (await res.json().catch(() => ({}))) as { script?: unknown; stats?: { scenes?: number; dialogue_lines?: number } }
+      if (!sameProject()) return
+      if (!res.ok || typeof body.script !== 'string' || !body.script.trim()) {
+        speak(failed)
+        return
+      }
+      const producer = useProducerStore.getState()
+      producer.setStoryText(body.script)
+      producer.setPreserveScript(true)
+      speak(
+        translate(voice, 'Turned the comic into a script: {scenes} scenes and {lines} lines of dialogue. I will keep it exactly as written.', {
+          scenes: String(body.stats?.scenes ?? 0),
+          lines: String(body.stats?.dialogue_lines ?? 0),
+        }),
+      )
+      await get().sendMessage(
+        translate(voice, 'Keep my comic script exactly as written. Do not rewrite or summarize it. The attached pictures are the comic pages it came from. Fill in only the cast, background and project setting cards, and use the pictures for how the characters and places look.'),
+        { imageUrls: pages.flatMap(comicPageUrls) },
+        { silentUser: true },
+      )
+    } catch (error) {
+      console.error('[comic] script failed:', error)
+      speak(failed)
+    }
+  })()
+
+  const style = (async () => {
+    const analysisFailed = translate(voice, "The art style analysis didn't work, so new pictures follow the comic page image only.")
+    try {
+      const anchorRes = await post('/api/produce/style-anchor', { projectId, imageUrl: pages[0].thumbUrl, label: translate(voice, 'Comic art style'), medium: null })
+      const anchor = (await anchorRes.json().catch(() => ({}))) as { key?: string; imageUrl?: string; label?: string; medium?: string | null }
+      if (!sameProject()) return
+      if (!anchorRes.ok || !anchor.key || !anchor.imageUrl) {
+        speak(translate(voice, "Couldn't set the comic as the art style."))
+        return
+      }
+      useProducerStore.getState().applyCustomStyleAnchor({ key: anchor.key, url: anchor.imageUrl, label: anchor.label ?? translate(voice, 'Comic art style'), medium: anchor.medium ?? null })
+      speak(translate(voice, 'Set the art style to this comic. Analyzing the art style now.'))
+      const facetRes = await post('/api/produce/style-facets', { projectId, consent: 'comic-choice-v1' })
+      const facet = (await facetRes.json().catch(() => ({}))) as { facets?: boolean }
+      if (!sameProject()) return
+      speak(facetRes.ok && facet.facets ? translate(voice, 'Finished analyzing the art style. New pictures will follow the comic art style description too.') : analysisFailed)
+    } catch (error) {
+      console.error('[comic] style failed:', error)
+      speak(analysisFailed)
+    }
+  })()
+
+  await Promise.all([script, style])
 }
 
 function imageRoleOptions(voice: AppLocale): Array<{ label: string; utterance: string }> {
@@ -603,7 +720,7 @@ interface HandoffBlockers {
 
 function currentProducerGate() {
   const p = useProducerStore.getState()
-  return evaluateProducerGate({ settings: p.projectSettings, storyReady: p.storyReady, cast: p.cast, backgrounds: p.backgrounds, styleAnchorKey: p.styleAnchorKey, locale: contentLocale() })
+  return evaluateProducerGate({ settings: p.projectSettings, storyReady: p.storyReady, cast: p.cast, backgrounds: p.backgrounds, styleAnchorKey: p.styleAnchorKey, locale: contentLocale(), preserveScript: p.preserveScript })
 }
 
 /** 도구 저장 뒤 다음 응답도 최신 보드와 같은 필수 항목을 보도록 매 호출마다 만든다. */
@@ -636,6 +753,7 @@ function handoffBlockers(spec: HandoffSpec, opts?: { acceptIncomplete?: boolean 
       styleAnchorKey: p.styleAnchorKey,
       // label/detail 은 게이트가 완역해 돌려준다(#i18n-s5-batch4) — 여기서 다시 번역하지 않는다.
       locale,
+      preserveScript: p.preserveScript,
     })
     return {
       hard: gate.canHandoff
@@ -752,6 +870,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   pendingProposal: null,
   scriptPreserveHeld: null,
   imageRoleGate: null,
+  imageBatchGate: null,
   deferredProposals: [],
   deferredSuggestions: [],
   recordedSuggestionIds: [],
@@ -1038,7 +1157,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const utterance = translate(useLocaleStore.getState().locale, action.utterance)
     if (action.from === 'producer') {
       // 그림 쓰임새 질문이 남아 있으면 확정 창을 열지 않는다 — 채팅이 먼저 고르라고 답한다(확정 뒤 넘김이 삼켜지지 않게).
-      if (get().imageRoleGate) {
+      if (get().imageRoleGate || get().imageBatchGate) {
         await get().sendMessage(utterance, undefined, { consentedHandoff: true })
         return
       }
@@ -1415,10 +1534,47 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       get().dismissSuggestion({ implicit: true })
     }
 
+    // 만화 원고 받기(2026-10-09): 여러 장을 한 번에 묻는 질문에 답하는 중 — 만화 그대로 · 그림마다 정하기 · 모두 참고.
+    const batchGate = get().imageBatchGate
+    if (batchGate && stage === 'producer' && !opts?.silentUser) {
+      const choice = matchBatchImageAnswer(trimmed)
+      if (!choice) {
+        get().appendLocalExchange(
+          'producer',
+          trimmed,
+          translate(contentLocale(), 'Please choose first how to use the pictures: turn the comic into video as drawn, decide for each picture, or use them all as reference.'),
+        )
+        askImageBatch(get)
+        return
+      }
+      set((state) => ({ messages: [...state.messages, { id: makeId(), stage, role: 'user' as const, content: trimmed }] }))
+      if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
+      set({ imageBatchGate: null })
+      if (choice === 'comic') {
+        void runComicAdaptation(get, batchGate.images)
+        return
+      }
+      if (choice === 'reference') {
+        await runImageRolePlan(get, { items: batchGate.images.map((image) => ({ image, role: 'reference' as const })), typed: batchGate.typed, msg: batchGate.msg })
+        return
+      }
+      set({ imageRoleGate: { items: batchGate.images.map((image) => ({ image, role: null })), typed: batchGate.typed, msg: batchGate.msg } })
+      askImageRole(get)
+      return
+    }
+
     // #image-to-artist: 그림 쓰임새 질문에 답하는 중 — 답이면 기록하고 다음 그림을 묻거나 다 답했으면 실행, 답이 아니면 다시 묻는다.
     const imageGate = get().imageRoleGate
     if (imageGate && stage === 'producer' && !opts?.silentUser) {
       const answer = matchImageRoleAnswer(trimmed)
+      // "스토리" · "만화를 영상화하고 싶어"처럼 이야기 원작으로 답하면 만화 원고로 받는다(2026-10-09 — 같은 질문만 되풀이하던 것).
+      if (!answer && matchComicAnswer(trimmed)) {
+        set((state) => ({ messages: [...state.messages, { id: makeId(), stage, role: 'user' as const, content: trimmed }] }))
+        if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
+        set({ imageRoleGate: null })
+        void runComicAdaptation(get, imageGate.items.map((it) => it.image))
+        return
+      }
       if (!answer) {
         get().appendLocalExchange(
           'producer',
@@ -3143,6 +3299,12 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     if (ready.length === 0) return false
     const typed = opts.typed.trim()
     const msg = opts.msg.trim() || typed
+    // 만화 원고라고 분명히 말했으면 묻지 않고 만화 원고로 받는다(2026-10-09 오너 "이 만화를 그대로 영상화하고 싶어").
+    if (matchComicIntentInText(typed)) {
+      recordImageTurn(set, msg, ready)
+      void runComicAdaptation(get, ready)
+      return true
+    }
     // 말이 분명하면 묻지 않는다 — 모든 그림에 같은 역할.
     const direct = matchImageRoleInText(typed)
     if (direct) {
@@ -3154,6 +3316,13 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         if (projectId) saveChatMessage(projectId, 'producer', 'user', content)
       }
       void runImageRolePlan(get, { items: ready.map((image) => ({ image, role: direct })), typed, msg })
+      return true
+    }
+    // 여러 장이면 장마다 묻기 전에 한 번에 묻는다 — 만화 원고로 그대로 영상화 · 그림마다 정하기 · 모두 참고 자료(2026-10-09 오너).
+    if (ready.length >= 2) {
+      recordImageTurn(set, msg, ready)
+      set({ imageBatchGate: { images: ready, typed, msg } })
+      askImageBatch(get)
       return true
     }
     // 묻는다 — 사용자 말풍선(그림 포함)을 먼저 남기고 첫 그림의 질문을 세운다.
@@ -3825,6 +3994,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       pendingProposal: null,
       scriptPreserveHeld: null,
       imageRoleGate: null,
+      imageBatchGate: null,
       deferredProposals: [],
       deferredSuggestions: [],
       recordedSuggestionIds: [],

@@ -48,7 +48,7 @@ export function createStudioWorkflow(options: {
     if (typeof status.started !== 'boolean' || typeof status.assets?.images_ready !== 'boolean' || ['chars_ready', 'chars_total', 'worlds_ready', 'worlds_total', 'queued_count', 'failed_count'].some(key => typeof status.assets[key] !== 'number')) throw new Error('Writer readiness response is incomplete.')
     const saved = parseProducerDraft(project.data.producer_draft)
     const working = useProducerStore.getState()
-    const board = options.stage === 'producer' ? { settings: working.projectSettings, storyReady: working.storyReady, cast: working.cast, backgrounds: working.backgrounds } : saved
+    const board = options.stage === 'producer' ? { settings: working.projectSettings, storyReady: working.storyReady, cast: working.cast, backgrounds: working.backgrounds, preserveScript: working.preserveScript } : saved
     const gate = board ? evaluateProducerGate({ ...board, styleAnchorKey: project.data.style_anchor_key, locale: contentLocale() }) : null
     const reached = String(project.data.current_stage ?? 'producer')
     // 새 프로젝트의 트리트먼트 초안(2026-10-02 시안 v04)은 아직 넘기지 않은 실행이다 — 넘긴 Writer 로 치지 않는다.

@@ -154,9 +154,12 @@ describe('그림 역할 관문 — 채팅', () => {
   })
 
   // 왜: 인물 둘과 배경 하나를 한 번에 올려도 장마다 답이 다르다. 다 답한 뒤에 한꺼번에 처리한다.
-  it('그림이 여러 장이면 한 장씩 차례로 묻고, 다 답한 뒤 장마다 정한 대로 쓴다', async () => {
+  //   2026-10-09 오너 결정 "여러 장을 한 번에 묻기"(만화 원고 받기) — 앞 문장: "그림이 여러 장이면 한 장씩 차례로 묻고, 다 답한 뒤 장마다 정한 대로 쓴다".
+  it('그림이 여러 장이면 먼저 한 번에 묻고, 그림마다 정하기를 고르면 한 장씩 차례로 물어 장마다 정한 대로 쓴다', async () => {
     const fetchSpy = okChat()
     useGlobalChatStore.getState().offerImageRoles([komatsu, classroom, chibi], { typed: '', msg: '그림을 올렸어요' })
+    expect(useGlobalChatStore.getState().imageBatchGate?.images).toHaveLength(3)
+    await useGlobalChatStore.getState().sendMessage('그림마다 정할게')
     const q1 = useGlobalChatStore.getState().suggestion
     expect(q1?.content).toContain('komatsu.png')
     await useGlobalChatStore.getState().sendMessage('인물')

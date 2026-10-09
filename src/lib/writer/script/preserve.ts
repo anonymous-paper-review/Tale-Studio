@@ -266,7 +266,20 @@ export function reconcileCastWithScript(doc: ScriptDocument, cast?: CastContract
 /** 입력이 보존 모드이고 글이 대본이면 캐스트와 정합된 문서를 돌려준다. 아니면 null(종전 경로). */
 export function preservedScript(input: Pick<PipelineInput, 'story' | 'preserveScript' | 'cast'>): { doc: ScriptDocument; cast: CastContract } | null {
   if (!input.preserveScript) return null;
-  const doc = parseScript(input.story ?? '');
+  // 그대로 쓰기는 사용자가 고른 것이다 — 짧아도 대본으로 읽는다(만화 대본 · 2026-10-09).
+  const doc = parseScript(input.story ?? '', { assumeScript: true });
   if (!doc) return null;
   return reconcileCastWithScript(doc, input.cast ?? null);
 }
+
+/**
+ * 그대로 쓰기 대본의 길이(초) — 씬마다 대사 3초 · 지문 4초(최소 8초)의 합(scenesFromScript 의 estimated_seconds 와 같은 셈).
+ *   그대로 쓰기에서는 설정한 영상 길이 대신 이 값으로 장르의 길이 · 깊이를 정한다(2026-10-09 오너 "영상 길이 제한을 없애줘").
+ *   대본으로 읽히지 않으면 null.
+ */
+export function preservedRuntimeSeconds(story: string): number | null {
+  const doc = parseScript(story ?? '', { assumeScript: true });
+  if (!doc || doc.scenes.length === 0) return null;
+  return doc.scenes.reduce((sum, sc) => sum + estimateSeconds(sc), 0);
+}
+

@@ -84,6 +84,8 @@ export interface GateInput {
   styleAnchorKey?: string | null
   /** GateIssue.label/detail 번역에 쓰는 로케일. 미지정이면 기존 동작(한국어) 유지. */
   locale?: AppLocale
+  /** 대본 그대로 쓰기(그대로 영상화) — 영상 길이는 원작 길이대로라 필수 칸이 아니다(2026-10-09 오너). */
+  preserveScript?: boolean | null
 }
 
 function isFilled(v: unknown): boolean {
@@ -177,6 +179,7 @@ export function evaluateProducerGate({
   backgrounds,
   styleAnchorKey,
   locale = UNSPECIFIED_LOCALE_FALLBACK,
+  preserveScript = null,
 }: GateInput): GateResult {
   const hardMissing: GateIssue[] = []
   const softMissing: GateIssue[] = []
@@ -190,7 +193,7 @@ export function evaluateProducerGate({
   //   경합했다. 게이트에 넣으면 순서가 강제된다: 스타일을 골라야 핸드오프 제안이 뜬다.
   if (!isFilled(styleAnchorKey))
     hardMissing.push({ field: 'styleAnchor', label: t('Video style needed') })
-  if (!(typeof settings.playtime === 'number' && settings.playtime >= 5 && settings.playtime <= 1800 + 600))
+  if (preserveScript !== true && !(typeof settings.playtime === 'number' && settings.playtime >= 5 && settings.playtime <= 1800 + 600))
     hardMissing.push({ field: 'playtime', label: t('Runtime needed (5 sec to 30 min+)') })
   if (!isFilled(settings.format))
     hardMissing.push({ field: 'format', label: t('Format needed') })

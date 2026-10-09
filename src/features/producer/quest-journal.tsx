@@ -26,6 +26,7 @@ import type { ProjectFormat } from '@/types'
 import { cn } from '@/lib/utils'
 import { useT, useLocale } from '@/lib/i18n'
 import { parseAppLocale, type AppLocale } from '@/lib/locale'
+import { runtimeSettingLabel } from '@/lib/producer/runtime'
 
 export const FORMAT_OPTIONS: { value: ProjectFormat; label: string }[] = [
   { value: 'horizontal_16:9', label: '16:9 Horizontal' },
@@ -145,6 +146,7 @@ export function StoryFoundationBadges({ className }: { className?: string }) {
   const styleAnchorKey = useProducerStore((s) => s.styleAnchorKey)
   const customStyleAnchor = useProducerStore((s) => s.customStyleAnchor)
   const loadStyleAnchors = useProducerStore((s) => s.loadStyleAnchors)
+  const preserveScript = useProducerStore((s) => s.preserveScript)
   const projectId = useProjectStore((s) => s.projectId)
   useEffect(() => {
     if (projectId) void loadStyleAnchors()
@@ -164,18 +166,25 @@ export function StoryFoundationBadges({ className }: { className?: string }) {
 
   return (
     <div className={cn('flex flex-wrap gap-1.5', className)}>
-      <SettingBadge k={t('Runtime')} value={settings.playtime ? t('{sec}s', { sec: settings.playtime }) : null}>
-        <label className="mb-1.5 block text-[11px] font-medium text-muted-foreground">
-          {t('Runtime (sec)')}
-        </label>
-        <Input
-          type="number"
-          min={5}
-          value={settings.playtime || ''}
-          placeholder={t('E.g. 120')}
-          onChange={(e) => updateSettings({ playtime: Number(e.target.value) || 0 })}
-          className="number-spin h-8 font-mono tabular-nums"
-        />
+      {/* 대본 그대로 쓰기(그대로 영상화)는 원작 길이대로 만든다 — 길이를 정하지 않는다(2026-10-09 오너). */}
+      <SettingBadge k={t('Runtime')} value={runtimeSettingLabel(uiLocale, settings.playtime, preserveScript)}>
+        {preserveScript === true ? (
+          <p className="text-[11px] text-muted-foreground">{t('Kept as written, so the video runs as long as the original.')}</p>
+        ) : (
+          <>
+            <label className="mb-1.5 block text-[11px] font-medium text-muted-foreground">
+              {t('Runtime (sec)')}
+            </label>
+            <Input
+              type="number"
+              min={5}
+              value={settings.playtime || ''}
+              placeholder={t('E.g. 120')}
+              onChange={(e) => updateSettings({ playtime: Number(e.target.value) || 0 })}
+              className="number-spin h-8 font-mono tabular-nums"
+            />
+          </>
+        )}
       </SettingBadge>
 
       <SettingBadge k={t('Genre')} value={settings.genre || null}>

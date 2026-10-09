@@ -112,7 +112,9 @@ export function staleDraftFields(
 ): DraftBasisField[] {
   const changed: DraftBasisField[] = []
   if (basis.storyHash !== fnv1a(producer.storyText.trim())) changed.push('story')
-  if (basis.runtimeSeconds !== (producer.playtime > 0 ? producer.playtime : null)) changed.push('runtime')
+  // 대본 그대로 쓰기는 영상 길이를 쓰지 않는다 — 길이 칸을 만져도 낡았다고 하지 않는다(2026-10-09, /api/writer/start → preserveRuntime).
+  const producerRuntime = producer.preserveScript === true ? null : producer.playtime > 0 ? producer.playtime : null
+  if (basis.runtimeSeconds !== producerRuntime) changed.push('runtime')
   if (basis.preserveScript !== (producer.preserveScript === true)) changed.push('preserveScript')
   return changed
 }

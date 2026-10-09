@@ -70,9 +70,11 @@ const CAMERA_RE = /^\s*(PUSH IN|PULL BACK|PULL OUT|CLOSE ON|CLOSE UP|CLOSE-UP|C\
 //   "왼쪽으로 팬"처럼 방향 말(~로 · ~으로 · ~에 · ~쪽) 뒤에 올 때만 본다("피터 팬: …"은 대사).
 const CAMERA_TAIL_RE = /(?:^|\s)(?:푸시 ?인|풀 ?백|풀 ?아웃|줌 ?인|줌 ?아웃|(?:익스트림 ?)?클로즈 ?업|틸트 ?업|틸트 ?다운|트래킹(?: ?숏)?|인서트(?: ?숏)?|달리 ?인|달리 ?아웃|크레인 ?업|크레인 ?다운|와이드 ?숏|POV|PUSH IN|PULL BACK|PULL OUT|CLOSE ON|CLOSE UP|CLOSE-UP|ZOOM IN|ZOOM OUT|TILT UP|TILT DOWN|TRACKING|DOLLY IN|DOLLY OUT|INSERT)$/i;
 const CAMERA_WORD_AFTER_DIRECTION_RE = /\S(?:으로|로|에|쪽)\s+(?:팬|패닝|줌|틸트)$/;
-const ON_SCREEN_RE = /^\s*(SUPER|ON SCREEN|TITLE CARD|CHYRON|TEXT ON SCREEN|INSERT\s*[-–—:]?\s*TEXT|자막|화면 ?문자|타이틀 ?카드|화면)\b\s*[:\-–—]?\s*(.*)$/i;
-const SOUND_LABEL_RE = /^\s*(SFX|SOUND(?: EFFECT)?|MUSIC|효과음|음악|소리)\b\s*[:\-–—.]?\s*(.*)$/i;
-const RADIO_CUE_RE = /^\s*\(\s*(MUSIC|SOUND|SFX|음악|효과음)\b[^)]*\)\s*$/i;
+// 한국어 표시(자막·화면 문자·효과음…)는 쌍점이 붙을 때만 받는다 — \b 는 한글을 낱말 글자로 치지 않아 한글 표시 뒤에서 늘 실패했다(2026-10-09).
+const KO_LABEL_END = '(?:\\b|(?<=[가-힣])(?=\\s*[:：]))';
+const ON_SCREEN_RE = new RegExp(`^\\s*(SUPER|ON SCREEN|TITLE CARD|CHYRON|TEXT ON SCREEN|INSERT\\s*[-–—:]?\\s*TEXT|자막|화면 ?문자|타이틀 ?카드|화면)${KO_LABEL_END}\\s*[:：\\-–—]?\\s*(.*)$`, 'i');
+const SOUND_LABEL_RE = new RegExp(`^\\s*(SFX|SOUND(?: EFFECT)?|MUSIC|효과음|음악|소리)${KO_LABEL_END}\\s*[:：\\-–—.]?\\s*(.*)$`, 'i');
+const RADIO_CUE_RE = /^\s*\(\s*(MUSIC|SOUND|SFX|음악|효과음)(?:\b|(?<=[가-힣])(?=[\s:：)]))[^)]*\)\s*$/i;
 const SOUND_WORD_RE = /\b(DING|BANG|SLAM|CRASH|THUD|BUZZ|RING|KNOCK|BEEP|CLICK|SCREECH|SIREN|HONK|GUNSHOT|THUNDER|SPLASH|SCREAM|CLANG|BOOM|CLATTER|BZ+Z+)\b/g;
 const PARENTHETICAL_RE = /^\s*\((.*)\)\s*$/;
 const STRUCTURAL_CAPS_RE = /^(INT|EXT|I\/E|CUT TO|FADE|MONTAGE|SERIES OF SHOTS|INTERCUT|FLASHBACK|TIME JUMP|BLACK SCREEN|TITLE CARD|SUPER|ON SCREEN|THE END|END|CONTINUED|MORE|BACK TO|LATER|SAME|CONTINUOUS|END OF PLAY|CURTAIN|SCENE|ACT|CONTENT WARNING|DRAFT|CAST|CHARACTERS|PERSONS|PLACE|TIME|SETTING|NOTE|NOTES|CHARACTER BREAKDOWN)\b/;
@@ -104,6 +106,16 @@ function cameraCueLine(s: string): boolean {
 
 function isBlank(s: string): boolean {
   return !s.trim();
+}
+
+/** 앞 단락(지문·대사)에 이어 붙이지 않는 표시 줄 — 표시 낱말 바로 뒤에 쌍점이 오는 줄("효과음: 쾅" · "화면 문자: 영업 중" · "SFX: thud").
+ *  쌍점 없는 줄("화면이 꺼진다" · "SUPER!")은 문장의 줄바꿈일 수 있어 그대로 잇는다. 괄호 소리 줄은 큐 아래 지시일 수 있어 여기서 끊지 않는다.
+ *  2026-10-09 만화 옮겨 적기 실측: 칸 안에서 지문 바로 아랫줄에 붙은 표시 줄이 지문에 묻혔다. */
+function isLabelBreak(t: string): boolean {
+  const on = t.match(ON_SCREEN_RE);
+  const sl = on ? null : t.match(SOUND_LABEL_RE);
+  const label = on?.[1] ?? (sl && !hasLower(sl[1]) ? sl[1] : null);
+  return !!label && /^\s*[:：]/.test(t.trimStart().slice(label.length));
 }
 function hasLower(s: string): boolean {
   return /[a-z]/.test(s);
@@ -353,10 +365,16 @@ function linkName(cue: string, drafts: CharacterDraft[]): CharacterDraft | null 
   return null;
 }
 
-export function parseScript(text: string): ScriptDocument | null {
+/**
+ * opts.assumeScript — 사용자가 이미 대본이라고 정한 글(대본 그대로 쓰기 · 만화를 옮긴 대본)은 판별 기준에 못 미쳐도
+ *   장면 머리가 하나라도 있으면 촬영용 대본 꼴로 읽는다(2026-10-09: 한두 쪽 만화 대본은 장면 머리 1개 · 대사 몇 줄이라
+ *   판별에서 떨어졌다). 장면 머리가 없는 글(줄거리)은 종전대로 대본이 아니다 — 보존을 골랐어도 씬을 새로 만든다.
+ */
+export function parseScript(text: string, opts?: { assumeScript?: boolean }): ScriptDocument | null {
   const det = detectScript(text);
-  if (det.kind === 'none') return null;
-  const kind = det.kind;
+  const assumed = det.kind === 'none' && opts?.assumeScript === true && (det.signals.headings ?? 0) >= 1;
+  if (det.kind === 'none' && !assumed) return null;
+  const kind = det.kind === 'none' ? 'screenplay' : det.kind;
   const lines = (text ?? '').replace(/\r\n?/g, '\n').split('\n');
 
   const drafts: CharacterDraft[] = [];
@@ -539,7 +557,7 @@ export function parseScript(text: string): ScriptDocument | null {
     // 트랜지션 / 화면 문자 / 카메라 / 소리 라벨 / 라디오 큐
     if (TRANSITION_RE.test(s)) { pushEl({ type: 'transition', text: s }); i++; continue; }
     const on = s.match(ON_SCREEN_RE);
-    if (on && !/^화면(?!\s*[:：])/.test(s)) { pushEl({ type: 'on_screen', text: on[2]?.trim() || s }); i++; continue; }
+    if (on && !(on[1] === '화면' && !/^\s*화면\s*[:：]/.test(s))) { pushEl({ type: 'on_screen', text: on[2]?.trim() || s }); i++; continue; }
     if (RADIO_CUE_RE.test(s)) { pushEl({ type: 'sound', text: s.replace(/^\(|\)$/g, '').trim() }); i++; continue; }
     const sl = s.match(SOUND_LABEL_RE);
     if (sl && !hasLower(sl[1])) { pushEl({ type: 'sound', text: sl[2]?.trim() || s }); i++; continue; }
@@ -557,7 +575,7 @@ export function parseScript(text: string): ScriptDocument | null {
         segBody(segs, colon.inlineText);
       } else {
         // 같은 줄에 대사가 없으면(라디오 "NAME:" 꼴) 다음 줄들이 대사
-        while (j < lines.length && !isBlank(lines[j]) && !parseHeading(stripMd(lines[j])) && !matchColonCue(stripMd(lines[j])) && !cameraCueLine(stripMd(lines[j])) && !TRANSITION_RE.test(stripMd(lines[j])) && !RADIO_CUE_RE.test(stripMd(lines[j]))) {
+        while (j < lines.length && !isBlank(lines[j]) && !parseHeading(stripMd(lines[j])) && !matchColonCue(stripMd(lines[j])) && !cameraCueLine(stripMd(lines[j])) && !TRANSITION_RE.test(stripMd(lines[j])) && !RADIO_CUE_RE.test(stripMd(lines[j])) && !isLabelBreak(stripMd(lines[j]))) {
           const t = stripMd(lines[j]);
           const p = t.match(PARENTHETICAL_RE);
           if (p) segNote(segs, p[1].trim()); else segBody(segs, t);
@@ -575,7 +593,7 @@ export function parseScript(text: string): ScriptDocument | null {
       const d = ensureChar(period.name);
       let j = i + 1;
       const extra: string[] = [];
-      while (j < lines.length && !isBlank(lines[j]) && !parseHeading(stripMd(lines[j])) && !matchPeriodCue(stripMd(lines[j])) && !TRANSITION_RE.test(stripMd(lines[j]))) { extra.push(stripMd(lines[j])); j++; }
+      while (j < lines.length && !isBlank(lines[j]) && !parseHeading(stripMd(lines[j])) && !matchPeriodCue(stripMd(lines[j])) && !TRANSITION_RE.test(stripMd(lines[j])) && !isLabelBreak(stripMd(lines[j]))) { extra.push(stripMd(lines[j])); j++; }
       pushEl({ type: 'dialogue', character: d.name, character_id: '', text: [period.inlineText ?? '', ...extra].filter(Boolean).join('\n'), parenthetical: period.parenthetical });
       d.line_count++;
       i = j;
@@ -590,7 +608,7 @@ export function parseScript(text: string): ScriptDocument | null {
       const segs = newSegs();
       while (j < lines.length && !isBlank(lines[j])) {
         const t = stripMd(lines[j]);
-        if (parseHeading(t) || TRANSITION_RE.test(t) || matchKoreanNameCue(t, lines[j + 1], knownForCue)) break;
+        if (parseHeading(t) || TRANSITION_RE.test(t) || isLabelBreak(t) || matchKoreanNameCue(t, lines[j + 1], knownForCue)) break;
         const p = t.match(PARENTHETICAL_RE);
         if (p) segNote(segs, p[1].trim()); else segBody(segs, t);
         j++;
@@ -620,7 +638,7 @@ export function parseScript(text: string): ScriptDocument | null {
           break;
         }
         const t = stripMd(lines[j]);
-        if (parseHeading(t) || TRANSITION_RE.test(t)) break;
+        if (parseHeading(t) || TRANSITION_RE.test(t) || isLabelBreak(t)) break;
         if (openParen) {
           const last = segs[segs.length - 1].pars;
           const end = t.match(/^(.*?)\)\s*$/);
@@ -643,7 +661,7 @@ export function parseScript(text: string): ScriptDocument | null {
     const block: string[] = [];
     while (j < lines.length && !isBlank(lines[j])) {
       const t = stripMd(lines[j]);
-      if (j > i && (parseHeading(t) || isActHeading(t) || TRANSITION_RE.test(t) || matchColonCue(t) || cameraCueLine(t) || matchPeriodCue(t) || matchKoreanNameCue(t, lines[j + 1], knownForCue) || matchCapsCue(t, lines[j + 1]) || FRONT_LABELS.some((f) => f.re.test(t) && t.length <= 40))) break;
+      if (j > i && (parseHeading(t) || isActHeading(t) || TRANSITION_RE.test(t) || isLabelBreak(t) || matchColonCue(t) || cameraCueLine(t) || matchPeriodCue(t) || matchKoreanNameCue(t, lines[j + 1], knownForCue) || matchCapsCue(t, lines[j + 1]) || FRONT_LABELS.some((f) => f.re.test(t) && t.length <= 40))) break;
       block.push(t);
       j++;
     }

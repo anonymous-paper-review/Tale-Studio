@@ -13,7 +13,14 @@ const MAX_OUTPUT_TOKENS = 32000
 // SDK 0.80 타입에는 block_binding이 없지만 원본 블록은 그대로 전달하는 공식 beta 필드다.
 const CHAT_THINKING = { type: 'adaptive', block_binding: { prefix_mismatch_behavior: 'drop_block' } } as const
 
+/** 채팅 · JSON 과 같은 기본 모델 — 만화 대본 옮기기 · 그림체 분석(2026-10-09)도 이 모델을 쓴다. */
+export const CLAUDE_MODEL = MODEL
+
 let _client: Anthropic | null = null
+/** 같은 키 · 같은 클라이언트로 도구 없는 단발 호출을 하는 곳(만화 대본 · 그림체 분석)이 쓴다. */
+export function getAnthropicClient(): Anthropic {
+  return getClient()
+}
 function getClient(): Anthropic {
   // TALE_ 우선 — 표준 이름(ANTHROPIC_API_KEY)은 cwd에서 실행되는 Bun 기반 CLI(gjc 등)가
   //   .env.local에서 크리덴셜로 오인 수집하므로 로컬은 TALE_ 이름만 둔다(프로덕션은 표준 이름 폴백).

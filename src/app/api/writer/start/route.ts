@@ -7,7 +7,7 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { getUser } from '@/lib/supabase/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { createRun, getActiveRun } from '@/lib/writer/run-store';
-import { readPreserveScript } from './preserve-flag';
+import { preserveRuntime, readPreserveScript } from './preserve-flag';
 import {
   WRITER_TOTAL_UNITS,
   WRITER_V2_TOTAL_UNITS,
@@ -302,6 +302,13 @@ export async function POST(req: NextRequest) {
     const cast: CastContract | undefined = castWithImages ? stripSourceImages(castWithImages) : undefined;
     // #script-preserve: producer 채팅에서 "그대로 보존"을 고른 대본. 명시적 true 만.
     const preserveScript = readPreserveScript(body);
+    // 그대로 쓰기는 설정한 영상 길이 대신 대본 길이로 장르의 길이 · 깊이를 정하고 길이 값은 보내지 않는다(2026-10-09 오너 "영상 길이 제한을 없애줘").
+    const { runtimeSeconds: effectiveRuntimeSeconds, genre: effectiveGenre } = preserveRuntime({
+      preserveScript,
+      story: typeof story === 'string' ? story : '',
+      runtimeSeconds,
+      genre,
+    });
 
     if (!projectId || typeof projectId !== 'string') {
       return NextResponse.json({ error: 'Invalid request: projectId required' }, { status: 400 });
@@ -368,7 +375,7 @@ export async function POST(req: NextRequest) {
       // 트리트먼트를 쓴 바탕(이야기 · 러닝타임 · 대본 보존)이 바뀌었으면 그 트리트먼트로 넘기지 않는다 — 지금 값으로 다시 쓰게 한다.
       const changed = draftBasisChanges((existing!.state as WriterRunState).input, {
         story,
-        runtimeSeconds,
+        runtimeSeconds: effectiveRuntimeSeconds,
         ...(preserveScript ? { preserveScript: true } : {}),
       } as PipelineInput);
       if (changed.length) {
@@ -503,7 +510,7 @@ export async function POST(req: NextRequest) {
     const input: PipelineInput = {
       story,
       writerEngine,
-      runtimeSeconds,
+      runtimeSeconds: effectiveRuntimeSeconds,
       styleAnchor,
       models,
       outputLocale,
@@ -513,7 +520,7 @@ export async function POST(req: NextRequest) {
       // 중복 적용하지 않는다. V1은 기존 사용자 씬 검토 흐름을 그대로 유지한다.
       sceneGate: writerEngine === 'v1',
       ...(treatmentDraft ? { treatmentDraft: true } : {}),
-      genre,
+      genre: effectiveGenre,
       cast,
       ...(preserveScript ? { preserveScript: true } : {}),
       background: backgrounds?.locations?.length
@@ -601,7 +608,7 @@ export async function POST(req: NextRequest) {
         {
           story,
           settings: projectResult.data?.settings ?? null,
-          genre: genre ?? previousInput.genre ?? null,
+          genre: effectiveGenre ?? previousInput.genre ?? null,
           cast: cast ?? previousInput.cast ?? null,
           background:
             input.background ??

@@ -62,6 +62,7 @@ export default function MeetingPage() {
   const backgrounds = useProducerStore((s) => s.backgrounds)
   // 핸드오프 가부는 결정적 게이트가 판정 (architecture §3 — 채팅은 제안일 뿐).
   const styleAnchorKey = useProducerStore((s) => s.styleAnchorKey)
+  const preserveScript = useProducerStore((s) => s.preserveScript)
   const gate = evaluateProducerGate({
     settings: projectSettings,
     storyReady,
@@ -69,6 +70,7 @@ export default function MeetingPage() {
     backgrounds,
     styleAnchorKey,
     locale,
+    preserveScript,
   })
   const canHandoff = gate.canHandoff
 

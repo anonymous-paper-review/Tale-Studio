@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { writerRuntimeSeconds } from '@/lib/producer/runtime'
 import type { ProjectSettings, ProjectFormat } from '@/types'
 import type { Json } from '@/types/database'
 import { createClient, createCatalogClient } from '@/lib/supabase/client'
@@ -721,7 +722,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
           ...(opts?.restart ? { restartDraft: true } : {}),
           writerEngine: 'v1',
           ...(preserveScript === true ? { preserveScript: true } : {}),
-          runtimeSeconds: settings.playtime > 0 ? settings.playtime : undefined,
+          runtimeSeconds: writerRuntimeSeconds(settings.playtime, preserveScript),
           genre: genreContractOf(settings),
           cast: castContractOf(cardsForHandoff({ cast, backgrounds }).cast),
           backgrounds: backgroundContractOf(cardsForHandoff({ cast, backgrounds }).backgrounds),
@@ -1055,6 +1056,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       backgrounds,
       styleAnchorKey: get().styleAnchorKey,
       locale: useLocaleStore.getState().locale,
+      preserveScript: get().preserveScript,
     })
     if (!gate.canHandoff) {
       // gate.hardMissing[].label 은 src/lib/producer-gate.ts(범위 밖)가 하드코딩한 한국어 —
@@ -1111,9 +1113,8 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       //   DB scenes/characters/locations/shots 를 채워 artist/director 가 읽는다(persist_manifest).
       //   옛 generate-scenes 는 제거됨. 2분 가량 걸리므로 await 하지 않음(fire-and-forget).
       try {
-        const runtimeSeconds = typeof projectSettings.playtime === 'number' && projectSettings.playtime > 0
-          ? projectSettings.playtime
-          : undefined
+        // 대본 그대로 쓰기는 길이를 보내지 않는다 — Writer 가 대본 길이로 정한다(2026-10-09 오너 "영상 길이 제한을 없애줘").
+        const runtimeSeconds = writerRuntimeSeconds(projectSettings.playtime, get().preserveScript)
 
         // producer-story-gate §3: 확정 장르(완성형) + 캐스트 계약 조립.
         //   slug 는 producer 가 부여(생성 후 불변). writer 는 이를 seed 로 받아 s0/s2 를 생략한다.

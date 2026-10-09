@@ -2,7 +2,7 @@
 //   근거: 2026-09-17 오너 — 창작자의 대본은 각색되지 않고 writer·artist 까지 담겨야 한다. 요소 분석: research/seeds/scripts/summer-2025/00-분류.md §4.
 import { describe, it, expect } from 'vitest'
 import { parseScript } from '@/lib/writer/script/parse'
-import { castFromScript, scenesFromScript, dialogueTrackFromScript, annotateScriptScenes, SCRIPT_GENERATED_FIELDS } from '@/lib/writer/script/preserve'
+import { castFromScript, scenesFromScript, dialogueTrackFromScript, annotateScriptScenes, SCRIPT_GENERATED_FIELDS, preservedScript } from '@/lib/writer/script/preserve'
 import type { DecoupagePlan, DecoupageShot, NarrativeStructure } from '@/lib/writer/types/pipeline'
 
 const SCRIPT = `AND COUNTING
@@ -205,3 +205,17 @@ describe('대본에서 옮긴 씬의 화면 요약', () => {
     expect(readFileSync('src/lib/writer/pipeline/util/persist_manifest.ts', 'utf8')).toMatch(/sceneSummaryText\(/)
   })
 })
+
+describe('대본 보존 — 짧은 대본 (2026-10-09)', () => {
+  it('대본 그대로 쓰기를 고른 글은 짧아도(장면 머리 하나 · 대사 몇 줄) 대본으로 읽는다', () => {
+    // 왜: 한두 쪽짜리 만화를 옮긴 대본은 대본 판별 기준(장면 머리 1개면 대사 8줄)에 못 미친다 — 그대로 쓰기가 꺼지면 각색 경로로 넘어간다.
+    //   그대로 쓰기는 사용자가 고른 것이라(글 대본은 판별을 통과해야 묻고, 만화는 옮긴 대본) 판별 없이 대본으로 읽는다.
+    const short = ['S#1. 옥상 - 저녁', '여자가 난간에 기댄다.', '여자: 바람 좋다.', '', '남자가 캔 커피를 건넨다.', '남자: 마셔.'].join('\n')
+    expect(parseScript(short)).toBeNull()
+    const preserved = preservedScript({ story: short, preserveScript: true, cast: undefined })
+    expect(preserved?.doc.scenes).toHaveLength(1)
+    expect(preserved?.doc.stats.dialogue_lines).toBe(2)
+    expect(preservedScript({ story: short, preserveScript: false, cast: undefined })).toBeNull()
+  })
+})
+
