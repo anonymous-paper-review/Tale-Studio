@@ -24,7 +24,8 @@ import { selectedProducerDialogueLanguage } from '@/lib/producer-dialogue-langua
 import { fixKoreanParticles } from '@/lib/korean-particles'
 import { coerceCardFill, matchImageRoleAnswer, matchImageRoleInText, type CardFill, type ImageRole } from '@/lib/producer/image-role'
 import { MAX_COMIC_PAGES, imageBatchQuestion, matchBatchImageAnswer, matchComicAnswer, matchComicIntentInText, sortComicPages } from '@/lib/producer/comic-intake'
-import { COMIC_ANALYSIS_CONSENT } from '@/lib/style-facets/consent'
+import { COMIC_ANALYSIS_CONSENT, CREATION_ANALYSIS_CONSENT } from '@/lib/style-facets/consent'
+import type { PendingCreation } from '@/stores/pending-creation-store'
 import { backgroundMentions, castMentions } from '@/lib/card-mention'
 import {
   requireDefaultAppearanceKey,
@@ -168,6 +169,10 @@ interface GlobalChatState {
   imageRoleGate: ImageRoleGate | null
   /** 만화 원고 받기(2026-10-09): 여러 장을 올렸을 때 한 번에 묻는 질문(만화 그대로 · 그림마다 · 모두 참고)에 답하기 전까지 붙들어 둔 턴. */
   imageBatchGate: ImageBatchGate | null
+  /** 새 프로젝트가 넘긴 일을 하는 중인 프로젝트 — 그동안 보드의 트리트먼트 쓰기 단추를 숨긴다(카드를 채운 뒤 바로 쓴다). */
+  creationPlanFor: string | null
+  /** 만화를 대본으로 옮기지 못했을 때 다시 옮길 거리(같은 쪽 · 같은 동의 · 이어서 할 일). */
+  comicRetry: ComicRetry | null
   deferredProposals: PendingProposal[]
   deferredSuggestions: ChatSuggestion[]
   recordedSuggestionIds: string[]
@@ -243,6 +248,8 @@ interface GlobalChatState {
   declineScriptPreserve: () => void
   /** #image-to-artist: 올린 그림의 쓰임새를 정한다 — 말이 분명하면 바로, 아니면 장마다 선택지로 묻는다. 그림이 없으면 false. */
   offerImageRoles: (images: ChatImageInput[], opts: { typed: string; msg: string }) => boolean
+  /** 새 프로젝트 화면에서 고른 대로 이어서 한다 — 그림 카드 · 그림체 · 원작(대본 · 만화) 채우기 뒤 트리트먼트(2026-10-09 오너). 묻지 않는다. */
+  runCreationPlan: (plan: PendingCreation) => Promise<void>
   approvePendingProposal: (id?: string) => Promise<boolean>
   /** 백그라운드 생성 완료 통지 — 다른 stage에 있을 때만 배지 bump + 스로틀된 채팅 메시지. */
   notifyCompletion: (stage: StageId, label: string) => void
@@ -377,6 +384,13 @@ interface ImageBatchGate {
   msg: string
 }
 
+interface ComicRetry {
+  pages: ChatImageInput[]
+  consent: string
+  /** 새 프로젝트에서 왔으면 다시 옮긴 뒤 이어서 트리트먼트를 쓴다. */
+  then: { startTreatment: boolean; locale: AppLocale } | null
+}
+
 /** 여러 장을 한 번에 묻는 질문을 세운다 — 닫을 수 없다(올린 그림이 조용히 사라지면 안 된다). */
 function askImageBatch(get: () => GlobalChatState): void {
   const gate = get().imageBatchGate
@@ -399,46 +413,175 @@ function recordImageTurn(set: (fn: (state: GlobalChatState) => Partial<GlobalCha
 const comicPageUrls = (page: ChatImageInput) => (page.sliceUrls.length ? page.sliceUrls : [page.thumbUrl])
 
 /**
- * 만화 원고로 그대로 영상화(2026-10-09 오너) — 두 일을 함께 돌린다.
- *   ① 대본: 쪽 순서(파일 이름 숫자 순)대로 /api/produce/comic-script 에 읽혀 대본으로 옮기고, 이야기에 넣은 뒤 대본 그대로 쓰기를 켠다.
- *      이어서 그대로 쓰기와 같은 숨은 요청으로 인물 · 배경 · 설정 카드를 채우되 만화 그림도 함께 보낸다(모습은 그림이 정확하다).
- *   ② 그림체: 첫 쪽을 이 프로젝트 그림체(사용자 앵커)로 정하고 /api/produce/style-facets 로 분석해 facet 조각을 싣는다.
- *   어느 쪽이 실패해도 다른 쪽은 이어 가고, 실패는 채팅에 한 줄로 알린다.
+ * 채팅이 다른 요청을 처리하는 중이면 끝날 때까지 기다렸다가 보낸다 — sendMessage 는 바쁘면 보내지 않고 돌아가서,
+ *   사용자 말과 겹친 숨은 요청(카드 채우기 등)이 조용히 버려졌다(10/9 검토).
  */
-async function runComicAdaptation(get: () => GlobalChatState, images: ChatImageInput[]): Promise<void> {
-  const projectId = useProjectStore.getState().projectId
-  if (!projectId) return
+async function sendWhenIdle(get: () => GlobalChatState, ...args: Parameters<GlobalChatState['sendMessage']>): Promise<void> {
+  for (;;) {
+    if (!get().loading) return get().sendMessage(...args)
+    await new Promise<void>((resolve) => {
+      const unsubscribe = useGlobalChatStore.subscribe((state) => {
+        if (!state.loading) {
+          unsubscribe()
+          resolve()
+        }
+      })
+    })
+  }
+}
+
+/** 새 프로젝트가 넘긴 일 끝에 트리트먼트를 쓴다 — Writer 가 언어를 잠그면 화면도 맞춘다(beginTreatment 와 같은 규칙). */
+async function startCreationTreatment(locale: AppLocale): Promise<void> {
+  const started = await useProducerStore.getState().startTreatment()
+  if (started && !useProjectStore.getState().projectLocaleLocked) useProjectStore.getState().adoptProjectLocale(locale, true)
+}
+
+/** 만화를 대본으로 옮기지 못했으면 "다시 옮기기"를 고를 수 있게 한다 — 만화 전부를 다시 올리지 않아도 된다(10/9 검토). */
+function offerComicRetry(get: () => GlobalChatState, retry: ComicRetry): void {
   const voice = contentLocale()
-  const speak = (content: string) => {
+  useGlobalChatStore.setState({ comicRetry: retry })
+  get().offerSuggestion(
+    {
+      id: `comic-retry:${retry.pages[0]?.id ?? 'pages'}:${Date.now()}`,
+      stage: 'producer',
+      content: translate(voice, 'Try reading the comic again?'),
+      dismissible: true,
+      action: { kind: 'choices', options: [{ label: translate(voice, 'Read the comic again'), utterance: translate(voice, 'Turn the comic into a script again') }] },
+    },
+    { preempt: true },
+  )
+}
+
+function isComicRetryAnswer(text: string, voice: AppLocale): boolean {
+  return text === translate(voice, 'Turn the comic into a script again') || text === translate(voice, 'Read the comic again')
+}
+
+/** 같은 쪽으로 다시 옮긴다(그림체는 이미 정했으니 다시 하지 않는다). 새 프로젝트에서 왔으면 이어서 트리트먼트. */
+async function retryComicScript(get: () => GlobalChatState, retry: ComicRetry): Promise<void> {
+  const comic = await runComicAdaptation(get, retry.pages, { consent: retry.consent, skipStyle: true, then: retry.then })
+  if (comic.scriptSet && retry.then?.startTreatment) await startCreationTreatment(retry.then.locale)
+}
+
+const postJson = (url: string, body: unknown) =>
+  fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+
+/** Producer 한 줄을 채팅에 남긴다 — 보던 프로젝트가 바뀌었으면 남기지 않는다. */
+function producerSpeaker(projectId: string): (content: string) => void {
+  return (content) => {
     if (useProjectStore.getState().projectId !== projectId) return
     useGlobalChatStore.setState((state) => ({
       messages: [...state.messages, { id: makeId(), stage: 'producer' as const, role: 'model' as const, content }],
     }))
     saveChatMessage(projectId, 'producer', 'model', content)
   }
+}
+
+/**
+ * 그림 한 장을 이 프로젝트 그림체(사용자 앵커)로 정하고 그림체 분석기로 분석한다(2026-10-09 — 만화 원고 · 새 프로젝트의 그림체 그림).
+ *   그림체 등록은 매체(애니 · 카툰 · 실사 등)가 있어야 받는다 — 먼저 허용 목록에서 고르고, 못 고르면 정하지 않는다.
+ *   분석이 실패해도 그림은 그림체로 남는다. consent = 사용자가 읽고 고른 분석 안내의 판.
+ */
+async function runStyleFromImage(image: ChatImageInput, kind: 'comic' | 'picture', consent: string): Promise<void> {
+  const projectId = useProjectStore.getState().projectId
+  if (!projectId) return
+  const voice = contentLocale()
+  const speak = producerSpeaker(projectId)
+  const sameProject = () => useProjectStore.getState().projectId === projectId
+  const comic = kind === 'comic'
+  const label = translate(voice, comic ? 'Comic art style' : 'My art style')
+  const notSet = comic ? translate(voice, "Couldn't set the comic as the art style.") : translate(voice, "Couldn't set {name} as the art style.", { name: image.name })
+  const analysisFailed = translate(voice, comic
+    ? "The art style analysis didn't work, so new pictures follow the comic page image only."
+    : "The art style analysis didn't work, so new pictures follow the picture only.")
+  try {
+    const mediumRes = await postJson('/api/produce/anchor-medium', { projectId, imageUrl: image.thumbUrl, consent })
+    const picked = (await mediumRes.json().catch(() => ({}))) as { medium?: string }
+    if (!sameProject()) return
+    if (!mediumRes.ok || !picked.medium) {
+      speak(notSet)
+      return
+    }
+    const anchorRes = await postJson('/api/produce/style-anchor', { projectId, imageUrl: image.thumbUrl, label, medium: picked.medium })
+    const anchor = (await anchorRes.json().catch(() => ({}))) as { key?: string; imageUrl?: string; label?: string; medium?: string | null }
+    if (!sameProject()) return
+    if (!anchorRes.ok || !anchor.key || !anchor.imageUrl) {
+      speak(notSet)
+      return
+    }
+    useProducerStore.getState().applyCustomStyleAnchor({ key: anchor.key, url: anchor.imageUrl, label: anchor.label ?? label, medium: anchor.medium ?? null })
+    speak(comic
+      ? translate(voice, 'Set the art style to this comic. Analyzing the art style now.')
+      : translate(voice, 'Set the art style to {name}. Analyzing the art style now.', { name: image.name }))
+    const facetRes = await postJson('/api/produce/style-facets', { projectId, consent })
+    const facet = (await facetRes.json().catch(() => ({}))) as { facets?: boolean }
+    if (!sameProject()) return
+    speak(facetRes.ok && facet.facets
+      ? translate(voice, comic
+        ? 'Finished analyzing the art style. New pictures will follow the comic art style description too.'
+        : 'Finished analyzing the art style. New pictures will follow the art style description too.')
+      : analysisFailed)
+  } catch (error) {
+    console.error('[style] failed:', error)
+    speak(analysisFailed)
+  }
+}
+
+interface ComicAdaptationOptions {
+  /** 그림체로 따로 고른 그림 — 있으면 첫 쪽 대신 이 그림이 그림체가 된다(새 프로젝트). */
+  styleImage?: ChatImageInput | null
+  /** 사용자가 읽고 고른 분석 안내의 판 — 채팅 질문(comic-choice-v1) · 새 프로젝트(creation-choice-v1). */
+  consent?: string
+  /** 대본을 넣은 뒤 카드 채우기 요청 전에 기다릴 일(새 프로젝트의 그림 카드 채우기 — 채팅은 한 번에 한 요청). */
+  beforeFill?: Promise<unknown>
+  /** 다시 옮기기 — 그림체는 이미 정했으니 대본만 옮긴다. */
+  skipStyle?: boolean
+  /** 옮기기에 실패해 다시 옮길 때 이어서 할 일(새 프로젝트의 트리트먼트). */
+  then?: ComicRetry['then']
+}
+
+/**
+ * 만화 원고로 그대로 영상화(2026-10-09 오너) — 두 일을 함께 돌린다.
+ *   ① 대본: 쪽 순서(파일 이름 숫자 순)대로 /api/produce/comic-script 에 읽혀 대본으로 옮기고, 이야기에 넣은 뒤 대본 그대로 쓰기를 켠다.
+ *      이어서 그대로 쓰기와 같은 숨은 요청으로 인물 · 배경 · 설정 카드를 채우되 만화 그림도 함께 보낸다(모습은 그림이 정확하다).
+ *   ② 그림체: 첫 쪽(따로 고른 그림체 그림이 있으면 그 그림)을 그림체로 정하고 분석한다(runStyleFromImage).
+ *   어느 쪽이 실패해도 다른 쪽은 이어 가고, 실패는 채팅에 한 줄로 알린다.
+ *   대본 쪽이 끝나면 돌아온다(scriptSet = 대본을 넣었는가). 그림체 분석은 1~2분 더 걸려 styleDone 으로 따로 기다린다 —
+ *   트리트먼트는 분석 결과를 쓰지 않으므로 기다리지 않는다(10/9 로컬 시험).
+ */
+async function runComicAdaptation(
+  get: () => GlobalChatState,
+  images: ChatImageInput[],
+  opts: ComicAdaptationOptions = {},
+): Promise<{ scriptSet: boolean; styleDone: Promise<void> }> {
+  const projectId = useProjectStore.getState().projectId
+  if (!projectId) return { scriptSet: false, styleDone: Promise.resolve() }
+  const voice = contentLocale()
+  const speak = producerSpeaker(projectId)
   const pages = sortComicPages(images)
   if (pages.length > MAX_COMIC_PAGES) {
     speak(translate(voice, 'I can read up to {max} comic pages at once. Please upload {max} pages or fewer.', { max: String(MAX_COMIC_PAGES) }))
-    return
+    return { scriptSet: false, styleDone: Promise.resolve() }
   }
-  speak(translate(voice, 'Reading the {n} comic pages. I will turn them into a script and analyze the art style. This takes a minute or two.', { n: String(pages.length) }))
+  speak(opts.skipStyle
+    ? translate(voice, 'Reading the {n} comic pages again.', { n: String(pages.length) })
+    : translate(voice, 'Reading the {n} comic pages. I will turn them into a script and analyze the art style. This takes a minute or two.', { n: String(pages.length) }))
   const sameProject = () => useProjectStore.getState().projectId === projectId
-  const post = (url: string, body: unknown) =>
-    fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  const consent = opts.consent ?? COMIC_ANALYSIS_CONSENT
 
-  const script = (async () => {
+  const script = (async (): Promise<boolean> => {
     const failed = translate(voice, "Couldn't turn the comic into a script. Please try again in a moment.")
     try {
-      const res = await post('/api/produce/comic-script', {
+      const res = await postJson('/api/produce/comic-script', {
         projectId,
         pages: pages.map((page) => ({ name: page.name, urls: comicPageUrls(page) })),
         actionLanguage: voice === 'en' ? 'en' : 'ko',
       })
       const body = (await res.json().catch(() => ({}))) as { script?: unknown; stats?: { scenes?: number; dialogue_lines?: number } }
-      if (!sameProject()) return
+      if (!sameProject()) return false
       if (!res.ok || typeof body.script !== 'string' || !body.script.trim()) {
         speak(failed)
-        return
+        offerComicRetry(get, { pages, consent, then: opts.then ?? null })
+        return false
       }
       const producer = useProducerStore.getState()
       producer.setStoryText(body.script)
@@ -449,49 +592,28 @@ async function runComicAdaptation(get: () => GlobalChatState, images: ChatImageI
           lines: String(body.stats?.dialogue_lines ?? 0),
         }),
       )
-      await get().sendMessage(
+      if (opts.beforeFill) await opts.beforeFill.catch(() => null)
+      if (!sameProject()) return true
+      await sendWhenIdle(
+        get,
         translate(voice, 'Keep my comic script exactly as written. Do not rewrite or summarize it. The attached pictures are the comic pages it came from. Fill in only the cast, background and project setting cards, and use the pictures for how the characters and places look.'),
         { imageUrls: pages.flatMap(comicPageUrls) },
         { silentUser: true },
       )
+      return true
     } catch (error) {
       console.error('[comic] script failed:', error)
+      if (!sameProject()) return false
       speak(failed)
+      offerComicRetry(get, { pages, consent, then: opts.then ?? null })
+      return false
     }
   })()
 
-  const style = (async () => {
-    const analysisFailed = translate(voice, "The art style analysis didn't work, so new pictures follow the comic page image only.")
-    try {
-      // 그림체 등록은 매체(애니 · 카툰 · 실사 등)가 있어야 받는다 — 첫 쪽을 보고 허용 목록에서 먼저 고른다. 못 고르면 정하지 않는다.
-      const notSet = translate(voice, "Couldn't set the comic as the art style.")
-      const mediumRes = await post('/api/produce/anchor-medium', { projectId, imageUrl: pages[0].thumbUrl, consent: COMIC_ANALYSIS_CONSENT })
-      const picked = (await mediumRes.json().catch(() => ({}))) as { medium?: string }
-      if (!sameProject()) return
-      if (!mediumRes.ok || !picked.medium) {
-        speak(notSet)
-        return
-      }
-      const anchorRes = await post('/api/produce/style-anchor', { projectId, imageUrl: pages[0].thumbUrl, label: translate(voice, 'Comic art style'), medium: picked.medium })
-      const anchor = (await anchorRes.json().catch(() => ({}))) as { key?: string; imageUrl?: string; label?: string; medium?: string | null }
-      if (!sameProject()) return
-      if (!anchorRes.ok || !anchor.key || !anchor.imageUrl) {
-        speak(notSet)
-        return
-      }
-      useProducerStore.getState().applyCustomStyleAnchor({ key: anchor.key, url: anchor.imageUrl, label: anchor.label ?? translate(voice, 'Comic art style'), medium: anchor.medium ?? null })
-      speak(translate(voice, 'Set the art style to this comic. Analyzing the art style now.'))
-      const facetRes = await post('/api/produce/style-facets', { projectId, consent: COMIC_ANALYSIS_CONSENT })
-      const facet = (await facetRes.json().catch(() => ({}))) as { facets?: boolean }
-      if (!sameProject()) return
-      speak(facetRes.ok && facet.facets ? translate(voice, 'Finished analyzing the art style. New pictures will follow the comic art style description too.') : analysisFailed)
-    } catch (error) {
-      console.error('[comic] style failed:', error)
-      speak(analysisFailed)
-    }
-  })()
-
-  await Promise.all([script, style])
+  const styleDone = opts.skipStyle
+    ? Promise.resolve()
+    : opts.styleImage ? runStyleFromImage(opts.styleImage, 'picture', consent) : runStyleFromImage(pages[0], 'comic', consent)
+  return { scriptSet: await script, styleDone }
 }
 
 function imageRoleOptions(voice: AppLocale): Array<{ label: string; utterance: string }> {
@@ -543,7 +665,7 @@ async function runImageRolePlan(get: () => GlobalChatState, plan: ImageRoleGate)
         'The attached picture is the character on card @{label}. Look at it and fill in only that card: a detailed appearance, and the name if it is obvious from the picture. Do not write a story.',
         { label },
       )
-      await get().sendMessage(`${ask}${userSaid}`, { imageUrls: it.image.sliceUrls }, { silentUser: true, cardFill: { kind: 'character', ref: localId } })
+      await sendWhenIdle(get, `${ask}${userSaid}`, { imageUrls: it.image.sliceUrls }, { silentUser: true, cardFill: { kind: 'character', ref: localId } })
     } else if (it.role === 'background') {
       const localId = useProducerStore.getState().addBackgroundFromImage(it.image.thumbUrl)
       if (!localId) continue
@@ -554,12 +676,12 @@ async function runImageRolePlan(get: () => GlobalChatState, plan: ImageRoleGate)
         'The attached picture is the background on card @{label}. Look at it and fill in only that card: a name for the place, a detailed visual description, and its purpose in a story. Do not write a story.',
         { label },
       )
-      await get().sendMessage(`${ask}${userSaid}`, { imageUrls: it.image.sliceUrls }, { silentUser: true, cardFill: { kind: 'background', ref: localId } })
+      await sendWhenIdle(get, `${ask}${userSaid}`, { imageUrls: it.image.sliceUrls }, { silentUser: true, cardFill: { kind: 'background', ref: localId } })
     }
   }
   const refs = plan.items.filter((it) => it.role === 'reference')
   if (refs.length > 0) {
-    await get().sendMessage(plan.msg, {
+    await sendWhenIdle(get, plan.msg, {
       imageUrls: refs.flatMap((r) => r.image.sliceUrls),
       thumbUrls: refs.map((r) => r.image.thumbUrl),
     })
@@ -881,6 +1003,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   scriptPreserveHeld: null,
   imageRoleGate: null,
   imageBatchGate: null,
+  creationPlanFor: null,
+  comicRetry: null,
   deferredProposals: [],
   deferredSuggestions: [],
   recordedSuggestionIds: [],
@@ -1542,6 +1666,15 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       (activeSuggestion.stage === stage || activeSuggestion.dismissible === false)
     ) {
       get().dismissSuggestion({ implicit: true })
+    }
+
+    // 만화 다시 옮기기(2026-10-09 검토): 옮기기에 실패하고 "다시 옮기기"를 골랐다 — 같은 쪽으로 다시 옮긴다.
+    const comicRetry = get().comicRetry
+    if (comicRetry && stage === 'producer' && !opts?.silentUser && isComicRetryAnswer(trimmed, contentLocale())) {
+      set((state) => ({ comicRetry: null, messages: [...state.messages, { id: makeId(), stage, role: 'user' as const, content: trimmed }] }))
+      if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
+      void retryComicScript(get, comicRetry)
+      return
     }
 
     // 만화 원고 받기(2026-10-09): 여러 장을 한 번에 묻는 질문에 답하는 중 — 만화 그대로 · 그림마다 정하기 · 모두 참고.
@@ -3347,6 +3480,65 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     return true
   },
 
+  runCreationPlan: async (plan) => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) return
+    const voice = contentLocale()
+    const sameProject = () => useProjectStore.getState().projectId === projectId
+    set({ creationPlanFor: projectId })
+    const endPlan = () => {
+      if (get().creationPlanFor === projectId) set({ creationPlanFor: null })
+    }
+    // 내 메모(원작이 있을 때 아이디어 칸 글 · 메모): 원작에 합치지 않고 사용자의 말로 남긴다 — 이어지는 채팅 요청이 이력으로 읽는다.
+    if (plan.note) {
+      const note = plan.note
+      set((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'producer' as const, role: 'user' as const, content: note }] }))
+      saveChatMessage(projectId, 'producer', 'user', note)
+    }
+    // 그림 카드 · 참고 자료는 고른 대로 쓴다(묻지 않는다). 채팅은 한 번에 한 요청이라 차례로 돈다.
+    const items = [
+      ...plan.cards.map((card) => ({ image: card.image, role: card.role })),
+      ...plan.references.map((image) => ({ image, role: 'reference' as const })),
+    ]
+    const referenceNames = plan.references.map((image) => image.name).join(', ')
+    const cardsDone = items.length
+      ? runImageRolePlan(get, { items, typed: '', msg: translate(voice, 'Uploaded {names} as reference pictures.', { names: referenceNames }) })
+      : Promise.resolve()
+    // 그림체 그림(만화와 함께면 만화 흐름이 쓴다) — 채팅을 쓰지 않으므로 함께 돌린다.
+    const style = plan.styleImage && plan.original !== 'comic' ? runStyleFromImage(plan.styleImage, 'picture', CREATION_ANALYSIS_CONSENT) : Promise.resolve()
+    let storyReady = useProducerStore.getState().storyText.trim().length > 0
+    let comicStyle: Promise<void> = Promise.resolve()
+    try {
+      if (plan.original === 'comic') {
+        const comic = await runComicAdaptation(get, plan.comicPages, {
+          styleImage: plan.styleImage,
+          consent: CREATION_ANALYSIS_CONSENT,
+          beforeFill: cardsDone,
+          then: { startTreatment: plan.startTreatment, locale: plan.locale },
+        })
+        storyReady = comic.scriptSet
+        comicStyle = comic.styleDone
+        await cardsDone
+      } else {
+        await cardsDone
+        // 원작 대본: 채팅이 대본을 읽고 설정 · 인물 · 배경 카드를 채운다(장르가 비어 있다) — 대본은 건드리지 않는다.
+        if (plan.original === 'script' && sameProject()) {
+          await sendWhenIdle(
+            get,
+            translate(voice, 'Keep my script exactly as written. Do not rewrite or summarize it. Read it and fill in only the cast, background and project setting cards.'),
+            undefined,
+            { silentUser: true },
+          )
+        }
+      }
+      // 카드 · 원작을 채운 뒤에 트리트먼트를 쓴다 — 그림 속 인물 · 원작의 장르가 빠지지 않게. 그림체 분석은 기다리지 않는다.
+      if (plan.startTreatment && storyReady && sameProject()) await startCreationTreatment(plan.locale)
+    } finally {
+      endPlan()
+    }
+    await Promise.all([style, comicStyle])
+  },
+
   dismissPendingProposal: (id) => {
     const proposal = get().pendingProposal
     if (!proposal || (id && proposal.id !== id)) return
@@ -4005,6 +4197,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       scriptPreserveHeld: null,
       imageRoleGate: null,
       imageBatchGate: null,
+      creationPlanFor: null,
+      comicRetry: null,
       deferredProposals: [],
       deferredSuggestions: [],
       recordedSuggestionIds: [],

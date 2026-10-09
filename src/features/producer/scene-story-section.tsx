@@ -48,6 +48,8 @@ export function SceneStorySection() {
   const storyText = useProducerStore((s) => s.storyText)
   const savedScenes = useWriterStore((s) => s.sceneManifest?.scenes)
   const confirmSceneGate = useGlobalChatStore((s) => s.confirmSceneGate)
+  // 새 프로젝트가 넘긴 일(그림 카드 · 원작 채우기)을 하는 중이면 그 뒤에 트리트먼트를 바로 쓴다 — 단추 대신 안내(10/9 검토).
+  const creationPlanRunning = useGlobalChatStore((s) => !!projectId && s.creationPlanFor === projectId)
   // 넘기기 전 트리트먼트 초안(시안 v04) — 실행 기록이 있어도 Producer 는 열려 있다.
   const treatmentDraft = useProjectStore((s) => s.treatmentDraft)
   const draftLive = !locked && treatmentDraft
@@ -393,7 +395,11 @@ export function SceneStorySection() {
           <div className="flex flex-col items-center gap-2 py-8 text-center">
             <FileText className="size-8 text-muted-foreground" aria-hidden />
             <p className="text-sm font-medium">{t('No scene story yet')}</p>
-            {!locked && storyReady ? (
+            {!locked && storyReady && creationPlanRunning ? (
+              <p className="max-w-md text-xs text-muted-foreground" data-testid="treatment-after-plan">
+                {t('I will write the treatment as soon as the cards are filled in.')}
+              </p>
+            ) : !locked && storyReady ? (
               <>
                 <p className="max-w-md text-xs text-muted-foreground">
                   {t('Your story is ready. Write the treatment first, polish it, then hand it over to Writer.')}

@@ -1,11 +1,15 @@
 // 새 프로젝트에서 무엇을 만들지 고르면 포맷 초안이 정해지고, 아이디어나 자료가 있어야 시작한다 (2026-10-02 오너 · 시안 v04 0.1)
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { PROJECT_PURPOSES, purposeSettings, purposeSummary } from '@/lib/project/purpose'
+import { PROJECT_PURPOSES, purposeSettings } from '@/lib/project/purpose'
+import { creationLengthStep, planCreation } from '@/lib/project/creation-materials'
 import { newProjectInputError, newProjectTitle } from '@/lib/project/new-project-input'
 
 describe('무엇을 만들까요', () => {
-  it('새 프로젝트는 여섯 가지 만들 것 중에서 고른다', () => {
+  // 2026-10-09 오너 결정 "자료를 먼저 받고 길이는 마지막에" — 앞 문장: "새 프로젝트는 여섯 가지 만들 것 중에서 고른다".
+  it('원작을 그대로 쓰지 않으면 마지막 단계에서 여섯 가지 만들 것 중에서 고른다', () => {
     expect(PROJECT_PURPOSES.map((p) => p.id)).toEqual(['short_film', 'drama_pilot', 'ad', 'adaptation', 'music_video', 'custom'])
+    expect(creationLengthStep(planCreation({ idea: '두 아이 이야기', texts: [], images: [] }))).toBe('purpose')
   })
 
   it('만들 것을 고르면 화면 비율과 러닝타임과 장르 초안이 정해진다', () => {
@@ -28,16 +32,20 @@ describe('무엇을 만들까요', () => {
     expect(purposeSettings('short_film', 'en')).toMatchObject({ dialogueLanguage: 'en', genre: 'Drama' })
   })
 
-  it('고른 것은 두 번째 화면 위에 이름과 비율과 러닝타임으로 보인다', () => {
-    expect(purposeSummary('short_film', 'ko')).toBe('단편 영화 · 16:9 · 5분')
-    expect(purposeSummary('ad', 'ko')).toBe('광고 · 브랜드 · 9:16 · 30초')
-  })
+  // 2026-10-09 오너 결정으로 지움 — "고른 것은 두 번째 화면 위에 이름과 비율과 러닝타임으로 보인다".
+  //   만들 것을 마지막 단계에서 고르게 되어, 다음 화면에서 되새겨 보일 자리가 없다.
 })
 
 describe('자료와 아이디어', () => {
   it('아이디어나 자료 중 하나만 있어도 시작할 수 있다', () => {
     expect(newProjectInputError({ idea: '두 아이가 다투고 화해하는 이야기', fileCount: 0 })).toBeNull()
     expect(newProjectInputError({ idea: '  ', fileCount: 1 })).toBeNull()
+  })
+
+  it('자료를 올리는 동안 끌어다 놓은 파일은 받지 않는다', () => {
+    // 왜: 올리는 동안 놓은 파일은 올릴 목록에 들어가지 않아 다음 화면에도, 시작한 프로젝트에도 조용히 빠졌다(10/9 검토).
+    const flow = readFileSync('src/features/project-new/new-project-flow.tsx', 'utf8')
+    expect(flow).toMatch(/const addFiles = async \(picked: File\[\]\) => \{\n\s+if \(busy \|\| !picked\.length\) return/)
   })
 
   it('아이디어도 자료도 없으면 시작하지 않는다', () => {

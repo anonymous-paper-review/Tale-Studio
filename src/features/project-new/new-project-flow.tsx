@@ -1,22 +1,48 @@
 'use client'
 
-// 새 프로젝트 0.1(2026-10-02 오너 — tale-proto-v04). 한 화면 한 질문: ① 무엇을 만들까요 → ② 자료 · 아이디어.
-//   시작하면 Producer 로 가면서 트리트먼트를 바로 쓴다(Writer 앞단). 오류는 채팅이 아니라 입력창 바로 아래에 붙인다.
-//   자료를 올리지 못하면 그 파일만 실패로 두고 다시 올리기를 준다 — 적어 둔 아이디어는 그대로 남는다.
-import { useEffect, useRef, useState } from 'react'
+// 새 프로젝트(2026-10-09 오너 "업로드를 먼저 받고, 무엇인지 고르게 하자" · 처음은 2026-10-02 시안 v04 0.1).
+//   ① 자료 · 아이디어 → ② 쓰임새(자료를 올렸을 때만) → ③ 길이 · 화면. 길이는 마지막에 남은 것만 묻는다 —
+//   원작(대본 그대로 · 만화 원고)을 그대로 쓰면 원작 길이대로라 화면 비율만, 아니면 만들 것 카드.
+//   자료가 있으면 ①에서 "다음"을 누를 때 프로젝트를 만들고 올린다(docx 글은 서버에서만 꺼낼 수 있어 대본인지 알려면 먼저 올려야 한다).
+//   만들어 두고 시작하지 못한 채 떠나면 빈 프로젝트를 지운다. 오류는 채팅이 아니라 그 자리 바로 아래에 붙인다.
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertCircle, ImageIcon, Loader2, Lock, RotateCcw, Upload, X } from 'lucide-react'
+import { AlertCircle, FileText, ImageIcon, Loader2, Lock, RotateCcw, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { useImageUploadConsent } from '@/components/upload/image-upload-consent'
+import { FORMAT_OPTIONS } from '@/features/producer/quest-journal'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
-import { PROJECT_PURPOSES, purposeSummary, type ProjectPurposeId } from '@/lib/project/purpose'
+import { PROJECT_PURPOSES, type ProjectPurposeId } from '@/lib/project/purpose'
+import {
+  DEFAULT_ORIGINAL_FORMAT,
+  IMAGE_GROUP_USES,
+  IMAGE_USES,
+  IMAGE_USE_LABEL,
+  TEXT_USES,
+  TEXT_USE_LABEL,
+  analysisNotice,
+  chooseGroupUse,
+  chooseImageUse,
+  creationLengthStep,
+  defaultTextUse,
+  materialNextStep,
+  materialProblems,
+  needsAnalysisNotice,
+  planCreation,
+  type ImageUse,
+  type MaterialImage,
+  type MaterialText,
+  type TextUse,
+} from '@/lib/project/creation-materials'
 import { newProjectInputError, newProjectTitle } from '@/lib/project/new-project-input'
+import { MAX_COMIC_PAGES } from '@/lib/producer/comic-intake'
 import { beginTreatment, checkCreationFile, createProjectForNewFlow, ingestCreationFile, type CreationUpload } from '@/lib/project/start-new-project'
 import { UPLOAD_ACCEPT, kindOf } from '@/lib/upload/limits'
 import { useLocaleStore } from '@/stores/locale-store'
+import type { ProjectFormat } from '@/types/project'
 
 interface PickedFile {
   id: string
@@ -25,6 +51,8 @@ interface PickedFile {
   status: 'ready' | 'uploading' | 'done' | 'failed' | 'rejected'
   error?: string
   result?: CreationUpload
+  /** 고른 쓰임새 — 글은 올린 뒤 꼴로 미리 골라 두고, 그림은 사용자가 고르기 전까지 null. */
+  use?: TextUse | ImageUse | null
 }
 
 interface ReferenceOption {
@@ -32,17 +60,21 @@ interface ReferenceOption {
   title: string
 }
 
+type Step = 1 | 2 | 3
+
 export function NewProjectFlow() {
   const t = useT()
   const router = useRouter()
   const locale = useLocaleStore((s) => s.locale)
-  const [step, setStep] = useState<1 | 2>(1)
+  const [step, setStep] = useState<Step>(1)
   const [purpose, setPurpose] = useState<ProjectPurposeId | null>(null)
+  const [format, setFormat] = useState<ProjectFormat>(DEFAULT_ORIGINAL_FORMAT)
   const [idea, setIdea] = useState('')
   const [files, setFiles] = useState<PickedFile[]>([])
+  const [imageMode, setImageMode] = useState<'group' | 'each'>('group')
   const [inputError, setInputError] = useState(false)
-  const [startError, setStartError] = useState<string | null>(null)
-  const [starting, setStarting] = useState(false)
+  const [stepError, setStepError] = useState<string | null>(null)
+  const [busy, setBusy] = useState<'uploading' | 'starting' | null>(null)
   const [dragging, setDragging] = useState(false)
   const [references, setReferences] = useState<ReferenceOption[]>([])
   const [canUseReference, setCanUseReference] = useState(false)
@@ -78,14 +110,29 @@ export function NewProjectFlow() {
       .catch(() => {})
   }, [])
 
+  // 올린 자료 → 쓰임새 규칙의 입력(lib/project/creation-materials).
+  const texts: MaterialText[] = useMemo(
+    () => files.flatMap((item) => (item.result?.kind === 'text' ? [{ id: item.id, name: item.file.name, text: item.result.text, use: (item.use as TextUse | undefined) ?? defaultTextUse(item.result.text) }] : [])),
+    [files],
+  )
+  const images: MaterialImage[] = useMemo(
+    () => files.flatMap((item) => (item.result?.kind === 'image'
+      ? [{ id: item.id, name: item.file.name, thumbUrl: item.result.thumbUrl, sliceUrls: item.result.sliceUrls, use: (item.use as ImageUse | null | undefined) ?? null }]
+      : [])),
+    [files],
+  )
+  const problems = materialProblems(texts, images)
+  const lengthStep = creationLengthStep(planCreation({ idea, texts, images }))
+
   const addFiles = async (picked: File[]) => {
-    if (!picked.length) return
-    const images = picked.filter((file) => kindOf(file.name) === 'image')
+    if (busy || !picked.length) return
+    const pickedImages = picked.filter((file) => kindOf(file.name) === 'image')
     // 그림은 쓸 권리를 먼저 확인한다(채팅에 올릴 때와 같은 창).
-    const allowImages = images.length === 0 || (await requestImageUploadConsent(images))
+    const allowImages = pickedImages.length === 0 || (await requestImageUploadConsent(pickedImages))
     const accepted = picked.filter((file) => allowImages || kindOf(file.name) !== 'image')
     if (!accepted.length) return
     setInputError(false)
+    setStepError(null)
     // 받을 수 없는 형식 · 크기는 고르는 즉시 이유를 보인다 — 프로젝트를 만들기 전에 거른다.
     setFiles((prev) => [...prev, ...accepted.map((file): PickedFile => {
       const rejected = checkCreationFile(file)
@@ -103,110 +150,114 @@ export function NewProjectFlow() {
     router.push('/projects')
   }
 
-  const start = async () => {
-    if (!purpose || starting) return
+  /** 프로젝트가 없으면 만든다(한 번만). */
+  const ensureProject = async (): Promise<string | null> => {
+    if (createdProjectId.current) return createdProjectId.current
+    const created = await createProjectForNewFlow({
+      title: newProjectTitle(idea, files.map((item) => item.file.name), 'Untitled'),
+      ...(referenceProjectId && canUseReference ? { referenceProjectId, includeLastShotFrame } : {}),
+    })
+    if (!created.ok) {
+      setStepError(created.error || t('Failed to create project'))
+      return null
+    }
+    for (const warning of created.warnings) toast.warning(warning.detail ?? warning.code ?? t('Some reference assets could not be copied to the new project.'))
+    createdProjectId.current = created.projectId
+    return created.projectId
+  }
+
+  /** ① → ② (자료가 있으면 만들고 올린 뒤) 또는 ③(아이디어만). */
+  const nextFromMaterial = async () => {
+    if (busy) return
     if (newProjectInputError({ idea, fileCount: files.length })) {
       setInputError(true)
       return
     }
     if (files.some((item) => item.status === 'rejected')) {
-      setStartError(t('Remove the files that cannot be uploaded, then start again.'))
+      setStepError(t('Remove the files that cannot be uploaded, then start again.'))
       return
     }
-    setStarting(true)
-    setStartError(null)
+    setStepError(null)
+    if (materialNextStep(files.length) === 'length') {
+      setStep(3)
+      return
+    }
+    setBusy('uploading')
     try {
-      let projectId = createdProjectId.current
-      if (!projectId) {
-        const created = await createProjectForNewFlow({
-          title: newProjectTitle(idea, files.map((item) => item.file.name), 'Untitled'),
-          ...(referenceProjectId && canUseReference ? { referenceProjectId, includeLastShotFrame } : {}),
-        })
-        if (!created.ok) {
-          setStartError(created.error || t('Failed to create project'))
-          return
-        }
-        for (const warning of created.warnings) toast.warning(warning.detail ?? warning.code ?? t('Some reference assets could not be copied to the new project.'))
-        projectId = created.projectId
-        createdProjectId.current = projectId
-      }
-
-      // 아직 못 올린 파일만 차례로 올린다(진행이 파일마다 보인다).
-      const uploaded: CreationUpload[] = []
+      const projectId = await ensureProject()
+      if (!projectId) return
+      // 아직 못 올린 파일만 차례로 올린다(진행이 파일마다 보인다). 글은 올린 뒤 꼴로 쓰임새를 미리 골라 둔다.
       let failed = false
       for (const item of files) {
-        if (item.status === 'done' && item.result) {
-          uploaded.push(item.result)
-          continue
-        }
+        if (item.status === 'done') continue
         setFiles((prev) => prev.map((f) => (f.id === item.id ? { ...f, status: 'uploading', error: undefined } : f)))
         const result = await ingestCreationFile(projectId, item.file)
         if ('error' in result) {
           failed = true
           setFiles((prev) => prev.map((f) => (f.id === item.id ? { ...f, status: 'failed', error: result.error } : f)))
         } else {
-          uploaded.push(result)
-          setFiles((prev) => prev.map((f) => (f.id === item.id ? { ...f, status: 'done', result } : f)))
+          const use = result.kind === 'text' ? defaultTextUse(result.text) : null
+          setFiles((prev) => prev.map((f) => (f.id === item.id ? { ...f, status: 'done', result, use } : f)))
         }
       }
-      if (failed) return
-
-      await beginTreatment({ projectId, purposeId: purpose, idea, files: uploaded })
-      startedRef.current = true
-      router.push(`/studio/producer?projectId=${projectId}`)
+      if (!failed) setStep(2)
     } finally {
-      setStarting(false)
+      setBusy(null)
     }
   }
 
-  const summary = purpose ? purposeSummary(purpose, locale) : ''
+  const setTextUse = (id: string, use: TextUse) => setFiles((prev) => prev.map((f) => (f.id === id ? { ...f, use } : f)))
+  const applyImageUses = (next: MaterialImage[]) => {
+    const byId = new Map(next.map((image) => [image.id, image.use]))
+    setFiles((prev) => prev.map((f) => (byId.has(f.id) ? { ...f, use: byId.get(f.id) ?? null } : f)))
+  }
+
+  const start = async () => {
+    if (busy) return
+    if (lengthStep === 'purpose' && !purpose) return
+    setBusy('starting')
+    setStepError(null)
+    try {
+      const projectId = await ensureProject()
+      if (!projectId) return
+      const uploaded: CreationUpload[] = files.flatMap((item) => (item.result ? [{ ...item.result, use: item.use ?? undefined } as CreationUpload] : []))
+      await beginTreatment({
+        projectId,
+        idea,
+        title: newProjectTitle(idea, files.map((item) => item.file.name), 'Untitled'),
+        files: uploaded,
+        purposeId: lengthStep === 'purpose' ? purpose : null,
+        format: lengthStep === 'format' ? format : null,
+      })
+      startedRef.current = true
+      router.push(`/studio/producer?projectId=${projectId}`)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const stepLabels: Array<{ n: Step; label: string; skipped?: boolean }> = [
+    { n: 1, label: t('Material and idea') },
+    { n: 2, label: t('How to use'), skipped: step === 3 && files.length === 0 },
+    { n: 3, label: t('Length and screen') },
+  ]
 
   return (
     <main className="mx-auto w-full max-w-[640px] px-6 py-10">
       <ol className="mb-6 flex items-center gap-2 text-xs text-muted-foreground" aria-label={t('New project')}>
-        <li className={cn(step === 1 && 'font-semibold text-foreground')} aria-current={step === 1 ? 'step' : undefined}>1 {t('What to make')}</li>
-        <li aria-hidden className="h-px w-6 bg-border" />
-        <li className={cn(step === 2 && 'font-semibold text-foreground')} aria-current={step === 2 ? 'step' : undefined}>2 {t('Material and idea')}</li>
-        <li aria-hidden className="h-px w-6 bg-border" />
+        {stepLabels.map(({ n, label, skipped }) => (
+          <li key={n} className="flex items-center gap-2">
+            <span className={cn(step === n && 'font-semibold text-foreground', skipped && 'opacity-50')} aria-current={step === n ? 'step' : undefined}>
+              {n} {label}
+            </span>
+            <span aria-hidden className="h-px w-6 bg-border" />
+          </li>
+        ))}
         <li>Producer</li>
       </ol>
 
       {step === 1 ? (
-        <section data-testid="new-project-what">
-          <h1 className="text-2xl font-bold tracking-tight">{t('What do you want to make?')}</h1>
-          <p className="mt-1.5 text-sm text-muted-foreground">{t('We will fill in the screen ratio and runtime to match. You can change them in Producer.')}</p>
-          <div className="mt-5 grid grid-cols-1 gap-2.5 sm:grid-cols-3" role="radiogroup" aria-label={t('What do you want to make?')}>
-            {PROJECT_PURPOSES.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                role="radio"
-                aria-checked={purpose === option.id}
-                data-testid="new-project-purpose"
-                onClick={() => setPurpose(option.id)}
-                className={cn(
-                  'rounded-xl border bg-card p-3.5 text-left transition-colors hover:border-border-strong focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-                  purpose === option.id ? 'border-primary bg-primary/10' : 'border-border',
-                )}
-              >
-                <span className="block text-sm font-semibold">{t(option.label)}</span>
-                <span className="mt-0.5 block text-xs text-muted-foreground">{t(option.description)}</span>
-              </button>
-            ))}
-          </div>
-          <div className="mt-6 flex items-center justify-between">
-            <Button variant="ghost" onClick={() => router.push('/projects')}>{t('Cancel')}</Button>
-            <Button disabled={!purpose} onClick={() => setStep(2)} data-testid="new-project-next">{t('Next')}</Button>
-          </div>
-        </section>
-      ) : (
         <section data-testid="new-project-material">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 py-1 pl-3 pr-1.5 text-xs">
-            <span>{summary}</span>
-            <button type="button" className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground hover:text-foreground" onClick={() => setStep(1)} disabled={starting}>
-              {t('Change')}
-            </button>
-          </div>
           <h1 className="text-2xl font-bold tracking-tight">{t('Add your material or idea')}</h1>
           <p className="mt-1.5 text-sm text-muted-foreground">{t('Either one is enough.')}</p>
 
@@ -219,7 +270,7 @@ export function NewProjectFlow() {
             placeholder={t('E.g. Two kids playing hopscotch in the schoolyard argue, then make up with a little help from a friend')}
             aria-invalid={inputError || undefined}
             aria-describedby={inputError ? 'new-project-input-error' : undefined}
-            disabled={starting}
+            disabled={!!busy}
             rows={6}
             className={cn('mt-5 resize-y text-sm leading-6', inputError && 'border-destructive')}
             data-testid="new-project-idea"
@@ -237,11 +288,12 @@ export function NewProjectFlow() {
             onDrop={(e) => {
               e.preventDefault()
               setDragging(false)
+              // 올리는 동안 놓은 파일은 받지 않는다 — 올릴 목록은 "다음"을 누를 때 정해져 조용히 빠진다(addFiles 가 거른다).
               void addFiles(Array.from(e.dataTransfer.files))
             }}
           >
             <span>{t('Story, script, planning notes, character or background images')}</span>
-            <Button size="sm" variant="outline" onClick={() => fileInput.current?.click()} disabled={starting}>
+            <Button size="sm" variant="outline" onClick={() => fileInput.current?.click()} disabled={!!busy}>
               <Upload className="size-4" /> {t('Upload files')}
             </Button>
             <input
@@ -274,11 +326,11 @@ export function NewProjectFlow() {
                   {item.status === 'failed' ? <span title={item.error}>· {t('Could not upload')}</span> : null}
                   {item.status === 'rejected' ? <span>· {item.error}</span> : null}
                   {item.status === 'failed' ? (
-                    <button type="button" className="inline-flex items-center gap-0.5 underline-offset-2 hover:underline" onClick={() => void start()} disabled={starting}>
+                    <button type="button" className="inline-flex items-center gap-0.5 underline-offset-2 hover:underline" onClick={() => void nextFromMaterial()} disabled={!!busy}>
                       <RotateCcw className="size-3" aria-hidden /> {t('Upload again')}
                     </button>
                   ) : null}
-                  <button type="button" aria-label={t('Remove')} className="text-muted-foreground hover:text-foreground" onClick={() => removeFile(item.id)} disabled={starting}>
+                  <button type="button" aria-label={t('Remove')} className="text-muted-foreground hover:text-foreground" onClick={() => removeFile(item.id)} disabled={!!busy}>
                     <X className="size-3.5" />
                   </button>
                 </li>
@@ -287,7 +339,7 @@ export function NewProjectFlow() {
           ) : null}
 
           <p className="mt-3.5 rounded-r-md border-l-2 border-primary bg-muted/40 px-3 py-2 text-xs leading-5 text-muted-foreground">
-            {t('Scripts and images you upload are used as they are. If you only have an idea or a story, Producer writes the treatment for you.')}
+            {t('Next, you choose how to use each file. If you only have an idea, Producer writes the treatment for you.')}
           </p>
 
           <div className="mt-4 space-y-1.5">
@@ -300,7 +352,7 @@ export function NewProjectFlow() {
                   setReferenceProjectId(e.target.value)
                   if (!e.target.value) setIncludeLastShotFrame(false)
                 }}
-                disabled={starting || !canUseReference || !!createdProjectId.current}
+                disabled={!!busy || !canUseReference || !!createdProjectId.current}
                 className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <option value="">{t('No reference project')}</option>
@@ -317,26 +369,203 @@ export function NewProjectFlow() {
             </p>
             {referenceProjectId && canUseReference ? (
               <label className="flex items-center gap-2 text-xs">
-                <input type="checkbox" checked={includeLastShotFrame} onChange={(e) => setIncludeLastShotFrame(e.target.checked)} disabled={starting} className="size-4" />
+                <input type="checkbox" checked={includeLastShotFrame} onChange={(e) => setIncludeLastShotFrame(e.target.checked)} disabled={!!busy || !!createdProjectId.current} className="size-4" />
                 {t('Include the last shot frame')}
               </label>
             ) : null}
           </div>
 
-          {startError ? <p role="alert" className="mt-4 text-sm text-destructive">{startError}</p> : null}
+          {stepError ? <p role="alert" className="mt-4 text-sm text-destructive">{stepError}</p> : null}
 
           <div className="mt-6 flex items-center justify-between">
-            <Button variant="ghost" onClick={() => (createdProjectId.current ? void cancel() : setStep(1))} disabled={starting}>
-              {createdProjectId.current ? t('Cancel') : t('Back')}
+            <Button variant="ghost" onClick={() => void cancel()} disabled={!!busy}>{t('Cancel')}</Button>
+            <Button onClick={() => void nextFromMaterial()} disabled={!!busy} data-testid="new-project-next">
+              {busy === 'uploading' ? <Loader2 className="size-4 animate-spin" /> : null}
+              {busy === 'uploading' ? t('Uploading your files…') : t('Next')}
             </Button>
-            <Button onClick={() => void start()} disabled={starting} data-testid="new-project-start">
-              {starting ? <Loader2 className="size-4 animate-spin" /> : null}
-              {starting ? t('Starting…') : t('Start with Producer')}
+          </div>
+        </section>
+      ) : step === 2 ? (
+        <section data-testid="new-project-uses">
+          <h1 className="text-2xl font-bold tracking-tight">{t('How should we use what you uploaded?')}</h1>
+          {images.length ? <p className="mt-1.5 text-sm text-muted-foreground">{t('Choose a use for every picture before you go on.')}</p> : null}
+
+          <ul className="mt-5 space-y-2.5">
+            {texts.map((text) => (
+              <li key={text.id} className="rounded-xl border border-border bg-card p-3" data-testid="new-project-use-row">
+                <div className="flex items-center gap-2 text-sm">
+                  <FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                  <span className="truncate">{text.name}</span>
+                </div>
+                <UseChoices label={text.name}>
+                  {TEXT_USES.map((use) => (
+                    <UseChip key={use} selected={text.use === use} onClick={() => setTextUse(text.id, use)}>{t(TEXT_USE_LABEL[use])}</UseChip>
+                  ))}
+                </UseChoices>
+              </li>
+            ))}
+
+            {images.length >= 2 && imageMode === 'group' ? (
+              <li className="rounded-xl border border-border bg-card p-3" data-testid="new-project-use-group">
+                <div className="flex items-center justify-between gap-2 text-sm">
+                  <span>{t('{n} pictures', { n: images.length })}</span>
+                  <button type="button" className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline" onClick={() => setImageMode('each')}>
+                    {t('Decide one by one')}
+                  </button>
+                </div>
+                <div className="mt-2 flex gap-1 overflow-x-auto">
+                  {images.map((image) => <Thumb key={image.id} image={image} />)}
+                </div>
+                <UseChoices label={t('{n} pictures', { n: images.length })}>
+                  {IMAGE_GROUP_USES.map((use) => (
+                    <UseChip key={use} selected={images.every((image) => image.use === use)} onClick={() => applyImageUses(chooseGroupUse(images, use))}>
+                      {t(IMAGE_USE_LABEL[use])}
+                    </UseChip>
+                  ))}
+                </UseChoices>
+              </li>
+            ) : (
+              images.map((image) => (
+                <li key={image.id} className="rounded-xl border border-border bg-card p-3" data-testid="new-project-use-row">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Thumb image={image} />
+                    <span className="truncate">{image.name}</span>
+                  </div>
+                  <UseChoices label={image.name}>
+                    {IMAGE_USES.map((use) => (
+                      <UseChip key={use} selected={image.use === use} onClick={() => applyImageUses(chooseImageUse(images, image.id, use))}>
+                        {t(IMAGE_USE_LABEL[use])}
+                      </UseChip>
+                    ))}
+                  </UseChoices>
+                </li>
+              ))
+            )}
+          </ul>
+          {images.length >= 2 && imageMode === 'each' ? (
+            <button type="button" className="mt-2 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline" onClick={() => setImageMode('group')}>
+              {t('Decide all at once')}
+            </button>
+          ) : null}
+
+          {needsAnalysisNotice(images) ? (
+            <p className="mt-3.5 rounded-r-md border-l-2 border-primary bg-muted/40 px-3 py-2 text-xs leading-5 text-muted-foreground" data-testid="new-project-analysis-notice">
+              {analysisNotice(locale)}
+            </p>
+          ) : null}
+          {problems.includes('too_many_comic_pages') ? (
+            <p role="alert" className="mt-3 flex items-center gap-1.5 text-xs text-destructive">
+              <AlertCircle className="size-3.5" aria-hidden /> {t('Comic pages can be up to {max} at a time.', { max: MAX_COMIC_PAGES })}
+            </p>
+          ) : null}
+          {problems.includes('two_originals') ? (
+            <p role="alert" className="mt-3 flex items-center gap-1.5 text-xs text-destructive">
+              <AlertCircle className="size-3.5" aria-hidden /> {t('Keep only one original as written: the script or the comic pages.')}
+            </p>
+          ) : null}
+
+          <div className="mt-6 flex items-center justify-between">
+            <Button variant="ghost" onClick={() => setStep(1)}>{t('Back')}</Button>
+            <Button onClick={() => setStep(3)} disabled={problems.length > 0} data-testid="new-project-next">{t('Next')}</Button>
+          </div>
+        </section>
+      ) : (
+        <section data-testid="new-project-length">
+          {lengthStep === 'format' ? (
+            <>
+              <h1 className="text-2xl font-bold tracking-tight">{t('Choose the screen ratio')}</h1>
+              <p className="mt-1.5 text-sm text-muted-foreground">{t('The video runs as long as the original, so only the screen ratio is left.')}</p>
+              <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4" role="radiogroup" aria-label={t('Choose the screen ratio')}>
+                {FORMAT_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    role="radio"
+                    aria-checked={format === option.value}
+                    data-testid="new-project-format"
+                    onClick={() => setFormat(option.value)}
+                    className={cn(
+                      'rounded-xl border bg-card p-3.5 text-left text-sm font-semibold transition-colors hover:border-border-strong focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                      format === option.value ? 'border-primary bg-primary/10' : 'border-border',
+                    )}
+                  >
+                    {/* Producer 보드의 포맷 칸과 같은 이름 */}
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <h1 className="text-2xl font-bold tracking-tight">{t('What do you want to make?')}</h1>
+              <p className="mt-1.5 text-sm text-muted-foreground">{t('We will fill in the screen ratio and runtime to match. You can change them in Producer.')}</p>
+              <div className="mt-5 grid grid-cols-1 gap-2.5 sm:grid-cols-3" role="radiogroup" aria-label={t('What do you want to make?')}>
+                {PROJECT_PURPOSES.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={purpose === option.id}
+                    data-testid="new-project-purpose"
+                    onClick={() => setPurpose(option.id)}
+                    className={cn(
+                      'rounded-xl border bg-card p-3.5 text-left transition-colors hover:border-border-strong focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                      purpose === option.id ? 'border-primary bg-primary/10' : 'border-border',
+                    )}
+                  >
+                    <span className="block text-sm font-semibold">{t(option.label)}</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">{t(option.description)}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {stepError ? <p role="alert" className="mt-4 text-sm text-destructive">{stepError}</p> : null}
+
+          <div className="mt-6 flex items-center justify-between">
+            <Button variant="ghost" onClick={() => setStep(files.length ? 2 : 1)} disabled={!!busy}>{t('Back')}</Button>
+            <Button onClick={() => void start()} disabled={!!busy || (lengthStep === 'purpose' && !purpose)} data-testid="new-project-start">
+              {busy === 'starting' ? <Loader2 className="size-4 animate-spin" /> : null}
+              {busy === 'starting' ? t('Starting…') : t('Start with Producer')}
             </Button>
           </div>
         </section>
       )}
       {imageUploadConsentDialog}
     </main>
+  )
+}
+
+function UseChoices({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div role="radiogroup" aria-label={label} className="mt-2 flex flex-wrap gap-1.5">
+      {children}
+    </div>
+  )
+}
+
+function UseChip({ selected, onClick, children }: { selected: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      onClick={onClick}
+      data-testid="new-project-use"
+      className={cn(
+        'rounded-lg border px-2.5 py-1 text-xs transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+        selected ? 'border-primary bg-primary/10 font-medium text-foreground' : 'border-border text-muted-foreground hover:border-border-strong hover:text-foreground',
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
+function Thumb({ image }: { image: Pick<MaterialImage, 'thumbUrl' | 'name'> }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- 올린 원본(우리 저장소)을 작게 보이는 확인용 썸네일이다.
+    <img src={image.thumbUrl} alt="" title={image.name} className="size-10 shrink-0 rounded-md border border-border object-cover" />
   )
 }

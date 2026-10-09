@@ -2,7 +2,7 @@
 //   고른 것이 Producer 포맷 초안(화면 비율 · 러닝타임 · 장르)이 된다. Producer 에서 언제든 바꿀 수 있다.
 import { translate } from '@/lib/i18n'
 import type { AppLocale } from '@/lib/locale'
-import { aspectRatioFromFormat, type ProjectFormat, type ProjectSettings } from '@/types/project'
+import type { ProjectFormat, ProjectSettings } from '@/types/project'
 
 export type ProjectPurposeId = 'short_film' | 'drama_pilot' | 'ad' | 'adaptation' | 'music_video' | 'custom'
 
@@ -45,14 +45,8 @@ export function purposeSettings(id: ProjectPurposeId, locale: AppLocale): Projec
   }
 }
 
-/** 30초 · 5분 처럼 짧게. */
-export function runtimeLabel(seconds: number, locale: AppLocale): string {
-  if (seconds < 60 || seconds % 60 !== 0) return translate(locale, '{sec}s', { sec: seconds })
-  return translate(locale, '{min} min', { min: seconds / 60 })
-}
-
-/** 두 번째 화면 위 "단편 영화 · 16:9 · 5분". */
-export function purposeSummary(id: ProjectPurposeId, locale: AppLocale): string {
-  const purpose = projectPurpose(id) ?? PROJECT_PURPOSES[0]
-  return [translate(locale, purpose.label), aspectRatioFromFormat(purpose.format), runtimeLabel(purpose.playtime, locale)].join(' · ')
+/** 원작을 그대로 쓸 때의 설정 초안(2026-10-09 오너) — 만들 것 카드를 거치지 않는다. 길이는 원작 길이대로라 비우고(0),
+ *  장르는 채팅이 원작을 읽고 채우도록 비운다(아무 장르나 넣어 두면 채팅이 그 값을 그대로 둔다). */
+export function originalSettings(format: ProjectFormat, locale: AppLocale): ProjectSettings {
+  return { playtime: 0, genre: '', format, tone: [], dialogueLanguage: locale }
 }
