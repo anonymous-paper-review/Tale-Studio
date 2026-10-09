@@ -2116,4 +2116,9 @@ export const KO: Record<string, string> = {
   "Keep it and fix it": "그대로 고정",
   "A fixed art style cannot be changed in Producer later.": "고정하면 나중에 Producer에서 스타일을 바꿀 수 없어요.",
   "Choose how the comic art style should work.": "만화 그림체를 어떻게 할지 골라 주세요.",
+  // Producer 본문 로딩 표시 (2026-10-09)
+  "Reading the comic": "만화를 읽고 있어요",
+  "Turning it into a script and filling in the cards. This takes a minute or two.": "대본으로 옮기고 카드를 채우는 중이에요. 1~2분쯤 걸려요.",
+  "Setting up your materials": "올린 자료로 준비하고 있어요",
+  "Filling in the cards from your files. This takes a moment.": "자료를 읽고 카드를 채우는 중이에요. 잠시만 기다려 주세요.",
 }

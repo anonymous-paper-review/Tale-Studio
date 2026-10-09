@@ -14,6 +14,7 @@ import {
   Box,
   CheckCircle2,
   ChevronDown,
+  Loader2,
   Lock,
   Mountain,
   Pencil,
@@ -33,6 +34,9 @@ import { castMentions, backgroundMentions } from '@/lib/card-mention'
 import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
 import { useProducerStore } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
+import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { usePendingCreationStore } from '@/stores/pending-creation-store'
+import { producerBusyKind } from '@/lib/producer/busy'
 import type { BackgroundSource, CastArc, CastMember, CastMotivation, GateIssue, GateResult } from '@/lib/producer-gate'
 import { isProducerBackgroundComplete } from '@/lib/producer-gate'
 import { depthLevelFromRuntime } from '@/lib/depth'
@@ -617,6 +621,10 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   //   "아직 제목이 없는 이야기"로 흐리게 — 채워질 자리를 보여주는 목업 히어로의 빈 상태.
   const projectTitle = useProjectStore((s) => s.projectTitle)
   const projectId = useProjectStore((s) => s.projectId)
+  // 새 프로젝트가 넘긴 일 · 만화 옮기기 동안 본문을 막고 로딩 원을 보인다(2026-10-09 오너 — 들어오자마자 일하는 중인지 알기 어려웠다).
+  const pendingCreation = usePendingCreationStore((s) => (projectId ? s.byProject[projectId] ?? null : null))
+  const boardBusy = useGlobalChatStore((s) => s.boardBusy)
+  const busyKind = producerBusyKind(projectId, { pending: pendingCreation, busy: boardBusy })
   const untitled = !projectTitle?.trim() || projectTitle.trim().toLowerCase() === 'untitled'
   const renameProject = useProjectStore((s) => s.renameProject)
   // Writer 로 넘긴 프로젝트(2026-10-01 오너) — 읽기 전용. 바꾸려면 새 프로젝트.
@@ -744,7 +752,11 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="relative flex min-h-0 flex-1 flex-col">
+      <div
+        className={cn('flex-1 overflow-y-auto p-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden', busyKind && 'pointer-events-none select-none opacity-40')}
+        aria-busy={busyKind ? true : undefined}
+      >
         {/* 좌 퀘스트 저널(제작 여정, 순수 뷰어) / 우 기존 리스트 (#quest-journal 2026-08-07).
             옛 Story Foundation 폼 섹션은 Brief Story 아래 뱃지로 흡수 — 기본 동선은 채팅. */}
         <div className="mx-auto grid max-w-6xl items-start gap-8 lg:grid-cols-[260px_minmax(0,1fr)]">
@@ -943,6 +955,22 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
           <SceneStorySection />
           </div>
         </div>
+      </div>
+      {busyKind ? (
+        <div className="absolute inset-0 z-10 flex items-center justify-center p-6" role="status" aria-live="polite" data-testid="producer-busy">
+          <div className="flex max-w-sm items-center gap-3 rounded-xl border border-border bg-card px-5 py-4 shadow-sm">
+            <Loader2 className="size-6 shrink-0 animate-spin text-stage-producer" aria-hidden />
+            <div className="min-w-0">
+              <p className="text-sm font-medium">{busyKind === 'comic' ? t('Reading the comic') : t('Setting up your materials')}</p>
+              <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                {busyKind === 'comic'
+                  ? t('Turning it into a script and filling in the cards. This takes a minute or two.')
+                  : t('Filling in the cards from your files. This takes a moment.')}
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
       </div>
 
       </div>

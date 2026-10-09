@@ -26,6 +26,7 @@ import { coerceCardFill, matchImageRoleAnswer, matchImageRoleInText, type CardFi
 import { MAX_COMIC_PAGES, comicStyleQuestion, imageBatchQuestion, matchBatchImageAnswer, matchComicAnswer, matchComicIntentInText, matchComicStyleAnswer, sortComicPages } from '@/lib/producer/comic-intake'
 import { COMIC_ANALYSIS_CONSENT, CREATION_ANALYSIS_CONSENT } from '@/lib/style-facets/consent'
 import type { PendingCreation } from '@/stores/pending-creation-store'
+import type { BoardBusy } from '@/lib/producer/busy'
 import { backgroundMentions, castMentions } from '@/lib/card-mention'
 import {
   requireDefaultAppearanceKey,
@@ -175,6 +176,8 @@ interface GlobalChatState {
   comicRetry: ComicRetry | null
   /** 만화를 고른 뒤 그림체(만화 그림체로 고정 · 실사 등으로 각색)를 묻는 중 — 답하면 옮기기를 시작한다(2026-10-09 오너). */
   comicStyleGate: { images: ChatImageInput[] } | null
+  /** Producer 본문을 막고 로딩 원을 보일 일 — 새 프로젝트가 넘긴 일 · 만화 옮기기(2026-10-09 오너, lib/producer/busy.ts). */
+  boardBusy: BoardBusy | null
   deferredProposals: PendingProposal[]
   deferredSuggestions: ChatSuggestion[]
   recordedSuggestionIds: string[]
@@ -598,6 +601,12 @@ async function runComicAdaptation(
       : translate(voice, 'Reading the {n} comic pages. I will turn them into a script. This takes about a minute.', { n: String(pages.length) }))
   const sameProject = () => useProjectStore.getState().projectId === projectId
   const consent = opts.consent ?? COMIC_ANALYSIS_CONSENT
+  // 대본을 옮기는 동안 Producer 본문을 막는다 — 새 프로젝트의 일(runCreationPlan)이 이미 막았으면 그쪽이 걷는다.
+  const ownsBusy = !useGlobalChatStore.getState().boardBusy
+  if (ownsBusy) useGlobalChatStore.setState({ boardBusy: { projectId, kind: 'comic' } })
+  const releaseBusy = () => {
+    if (ownsBusy && useGlobalChatStore.getState().boardBusy?.projectId === projectId) useGlobalChatStore.setState({ boardBusy: null })
+  }
 
   const script = (async (): Promise<boolean> => {
     const failed = translate(voice, "Couldn't turn the comic into a script. Please try again in a moment.")
@@ -638,6 +647,8 @@ async function runComicAdaptation(
       speak(failed)
       offerComicRetry(get, { pages, consent, then: opts.then ?? null })
       return false
+    } finally {
+      releaseBusy()
     }
   })()
 
@@ -1044,6 +1055,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   creationPlanFor: null,
   comicRetry: null,
   comicStyleGate: null,
+  boardBusy: null,
   deferredProposals: [],
   deferredSuggestions: [],
   recordedSuggestionIds: [],
@@ -3556,9 +3568,10 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     if (!projectId) return
     const voice = contentLocale()
     const sameProject = () => useProjectStore.getState().projectId === projectId
-    set({ creationPlanFor: projectId })
+    set({ creationPlanFor: projectId, boardBusy: { projectId, kind: plan.original === 'comic' ? 'comic' : 'materials' } })
     const endPlan = () => {
       if (get().creationPlanFor === projectId) set({ creationPlanFor: null })
+      if (get().boardBusy?.projectId === projectId) set({ boardBusy: null })
     }
     // 내 메모(원작이 있을 때 아이디어 칸 글 · 메모): 원작에 합치지 않고 사용자의 말로 남긴다 — 이어지는 채팅 요청이 이력으로 읽는다.
     if (plan.note) {
@@ -4272,6 +4285,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       creationPlanFor: null,
       comicRetry: null,
       comicStyleGate: null,
+      boardBusy: null,
       deferredProposals: [],
       deferredSuggestions: [],
       recordedSuggestionIds: [],

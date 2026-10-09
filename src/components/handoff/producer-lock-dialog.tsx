@@ -8,7 +8,8 @@ import { Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { FORMAT_OPTIONS, LANGUAGE_OPTIONS } from '@/features/producer/quest-journal'
-import { useT } from '@/lib/i18n'
+import { useLocale, useT } from '@/lib/i18n'
+import { runtimeSettingLabel } from '@/lib/producer/runtime'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore } from '@/stores/producer-store'
@@ -27,6 +28,7 @@ function Row({ label, value }: { label: string; value: string | null }) {
 
 export function ProducerLockDialog({ open }: { open: boolean }) {
   const t = useT()
+  const locale = useLocale()
   const settings = useProducerStore((s) => s.projectSettings)
   const storyText = useProducerStore((s) => s.storyText)
   const preserveScript = useProducerStore((s) => s.preserveScript)
@@ -77,7 +79,8 @@ export function ProducerLockDialog({ open }: { open: boolean }) {
             value={LANGUAGE_OPTIONS.find((o) => o.value === settings.dialogueLanguage)?.label ?? null}
           />
           <Row label={t('Format')} value={FORMAT_OPTIONS.find((o) => o.value === settings.format)?.label ?? null} />
-          <Row label={t('Runtime')} value={settings.playtime ? t('{sec}s', { sec: settings.playtime }) : null} />
+          {/* 대본 그대로 쓰기는 영상 길이가 원작을 따른다 — 보드의 길이 칸과 같은 표시(2026-10-09 오너: 여기만 "비어 있음"이었다). */}
+          <Row label={t('Runtime')} value={runtimeSettingLabel(locale, settings.playtime, preserveScript)} />
           <Row
             label={t('Cast and backgrounds')}
             value={t('{people} people · {backgrounds} backgrounds', { people: persons, backgrounds: backgrounds.length })}

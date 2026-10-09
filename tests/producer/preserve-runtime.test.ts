@@ -70,6 +70,13 @@ describe('대본 그대로 쓰기의 영상 길이', () => {
     expect(readFileSync('src/features/producer/quest-journal.tsx', 'utf8')).toMatch(/runtimeSettingLabel\(/)
   })
 
+  it('대본 그대로 쓰기 프로젝트를 Writer로 넘길 때 확인 창의 영상 길이는 원작 길이대로라고 보인다', () => {
+    // 왜: 10/9 오너 — 넘김 확인 창에 영상 길이가 "비어 있음"으로 나왔다. 보드의 길이 칸과 같은 표시를 쓴다.
+    const dialog = readFileSync('src/components/handoff/producer-lock-dialog.tsx', 'utf8')
+    expect(dialog).toMatch(/runtimeSettingLabel\(/)
+    expect(runtimeSettingLabel('ko', 0, true)).toBe('원작 길이대로')
+  })
+
   it('대본 그대로 쓰기 채팅에서는 영상 길이가 원작 길이를 따른다고 모델에게 알려 몇 초라고 말하지 않게 한다', () => {
     // 왜: 10/9 로컬 시험에서 길이 칸은 "원작 길이대로"인데 채팅 답이 "러닝타임 300초"라고 적었다 — 쓰이지 않는 설정값을 읽어 준 것.
     const directive = preservedScriptDirective(true)!
