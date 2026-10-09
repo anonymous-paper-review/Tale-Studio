@@ -2121,4 +2121,10 @@ export const KO: Record<string, string> = {
   "Turning it into a script and filling in the cards. This takes a minute or two.": "대본으로 옮기고 카드를 채우는 중이에요. 1~2분쯤 걸려요.",
   "Setting up your materials": "올린 자료로 준비하고 있어요",
   "Filling in the cards from your files. This takes a moment.": "자료를 읽고 카드를 채우는 중이에요. 잠시만 기다려 주세요.",
+  // 채팅 그림마다 질문: 만화 원고 · 그림체 (2026-10-10)
+  "Use it as a comic page": "만화 원고로 써 주세요",
+  "Use it as the art style": "그림체로 써 주세요",
+  "Picture {i} of {n}: {name}. How should I use it? If you choose art style or comic page, the picture goes to an analysis model.": "그림 {i}/{n}: {name}. 어떻게 쓸까요? 그림체나 만화 원고를 고르면 그림을 분석 모델로 보내요.",
+  "How should I use this picture? ({name}) If you choose art style or comic page, the picture goes to an analysis model.": "이 그림을 어떻게 쓸까요? ({name}) 그림체나 만화 원고를 고르면 그림을 분석 모델로 보내요.",
+  "Please choose first how to use the picture: comic page, character, background, art style or reference.": "먼저 그림을 어떻게 쓸지 골라 주세요: 만화 원고, 인물, 배경, 그림체, 참고 자료.",
 }

@@ -22,9 +22,9 @@ import { extractedChangesProducer, useProducerStore, type ExtractedSettings } fr
 import { evaluateProducerGate } from '@/lib/producer-gate'
 import { selectedProducerDialogueLanguage } from '@/lib/producer-dialogue-language'
 import { fixKoreanParticles } from '@/lib/korean-particles'
-import { coerceCardFill, matchImageRoleAnswer, matchImageRoleInText, type CardFill, type ImageRole } from '@/lib/producer/image-role'
+import { coerceCardFill, matchImageUseAnswer, matchImageUseInText, type CardFill, type ImageUseAnswer } from '@/lib/producer/image-role'
 import { MAX_COMIC_PAGES, comicStyleQuestion, imageBatchQuestion, matchBatchImageAnswer, matchComicAnswer, matchComicIntentInText, matchComicStyleAnswer, sortComicPages } from '@/lib/producer/comic-intake'
-import { COMIC_ANALYSIS_CONSENT, CREATION_ANALYSIS_CONSENT } from '@/lib/style-facets/consent'
+import { CHAT_IMAGE_ROLE_CONSENT, COMIC_ANALYSIS_CONSENT, CREATION_ANALYSIS_CONSENT } from '@/lib/style-facets/consent'
 import type { PendingCreation } from '@/stores/pending-creation-store'
 import type { BoardBusy } from '@/lib/producer/busy'
 import { backgroundMentions, castMentions } from '@/lib/card-mention'
@@ -175,7 +175,7 @@ interface GlobalChatState {
   /** 만화를 대본으로 옮기지 못했을 때 다시 옮길 거리(같은 쪽 · 같은 동의 · 이어서 할 일). */
   comicRetry: ComicRetry | null
   /** 만화를 고른 뒤 그림체(만화 그림체로 고정 · 실사 등으로 각색)를 묻는 중 — 답하면 옮기기를 시작한다(2026-10-09 오너). */
-  comicStyleGate: { images: ChatImageInput[] } | null
+  comicStyleGate: { images: ChatImageInput[]; plan?: ImageRoleGate } | null
   /** Producer 본문을 막고 로딩 원을 보일 일 — 새 프로젝트가 넘긴 일 · 만화 옮기기(2026-10-09 오너, lib/producer/busy.ts). */
   boardBusy: BoardBusy | null
   deferredProposals: PendingProposal[]
@@ -378,7 +378,7 @@ export interface ChatImageInput {
   sliceUrls: string[]
 }
 interface ImageRoleGate {
-  items: Array<{ image: ChatImageInput; role: ImageRole | null }>
+  items: Array<{ image: ChatImageInput; role: ImageUseAnswer | null }>
   typed: string
   msg: string
 }
@@ -471,12 +471,13 @@ async function retryComicScript(get: () => GlobalChatState, retry: ComicRetry): 
  * 만화를 고르면 대본을 옮기기 전에 그림체를 묻는다(2026-10-09 오너 "그림체로 고정할지 실사와 같은 각색을 할지 물어봐줘").
  *   닫을 수 없는 선택지다. 이미 그림체가 고정된 프로젝트면 물을 것이 없어 대본만 옮긴다.
  */
-function askComicStyle(get: () => GlobalChatState, images: ChatImageInput[]): void {
+function askComicStyle(get: () => GlobalChatState, images: ChatImageInput[], plan?: ImageRoleGate): void {
   if (useProducerStore.getState().customStyleAnchor?.locked === true) {
-    void runComicAdaptation(get, images, { styleMode: 'keep' })
+    if (plan) void runChatImagePlan(get, plan, null)
+    else void runComicAdaptation(get, images, { styleMode: 'keep' })
     return
   }
-  useGlobalChatStore.setState({ comicStyleGate: { images } })
+  useGlobalChatStore.setState({ comicStyleGate: { images, ...(plan ? { plan } : {}) } })
   const question = comicStyleQuestion(contentLocale())
   get().offerSuggestion(
     { id: `comic-style:${images[0]?.id ?? 'pages'}`, stage: 'producer', content: question.content, dismissible: false, action: { kind: 'choices', options: question.options } },
@@ -663,10 +664,13 @@ async function runComicAdaptation(
   return { scriptSet: await script, styleDone }
 }
 
+// 그림마다 묻는 선택지 — 새 프로젝트 화면과 같은 다섯 가지(2026-10-10 오너 "채팅으로 올린 그림에도 그림체 선택지 넣어줘").
 function imageRoleOptions(voice: AppLocale): Array<{ label: string; utterance: string }> {
   return [
-    { label: translate(voice, 'Character'), utterance: translate(voice, 'Use it as a character') },
-    { label: translate(voice, 'Background'), utterance: translate(voice, 'Use it as a background') },
+    { label: translate(voice, 'Comic pages'), utterance: translate(voice, 'Use it as a comic page') },
+    { label: translate(voice, 'Character card'), utterance: translate(voice, 'Use it as a character') },
+    { label: translate(voice, 'Background card'), utterance: translate(voice, 'Use it as a background') },
+    { label: translate(voice, 'Art style'), utterance: translate(voice, 'Use it as the art style') },
     { label: translate(voice, 'Reference only'), utterance: translate(voice, 'Use it as reference only') },
   ]
 }
@@ -681,8 +685,8 @@ function askImageRole(get: () => GlobalChatState): void {
   const item = gate.items[idx]
   const content =
     gate.items.length > 1
-      ? translate(voice, 'Picture {i} of {n}: {name}. How should I use it?', { i: String(idx + 1), n: String(gate.items.length), name: item.image.name })
-      : translate(voice, 'How should I use this picture? ({name})', { name: item.image.name })
+      ? translate(voice, 'Picture {i} of {n}: {name}. How should I use it? If you choose art style or comic page, the picture goes to an analysis model.', { i: String(idx + 1), n: String(gate.items.length), name: item.image.name })
+      : translate(voice, 'How should I use this picture? ({name}) If you choose art style or comic page, the picture goes to an analysis model.', { name: item.image.name })
   get().offerSuggestion(
     { id: `image-role:${item.image.id}`, stage: 'producer', content, dismissible: false, action: { kind: 'choices', options: imageRoleOptions(voice) } },
     { preempt: true },
@@ -733,6 +737,43 @@ async function runImageRolePlan(get: () => GlobalChatState, plan: ImageRoleGate)
       thumbUrls: refs.map((r) => r.image.thumbUrl),
     })
   }
+}
+
+/**
+ * 그림마다 다 답했다(2026-10-10 오너) — 만화 원고가 있고 그림체 그림이 없으면 그림체(고정 · 각색)부터 묻고,
+ *   아니면 바로 쓴다. 웹툰 원고 + 다른 그림체 그림이면 대본은 원고에서, 그림체는 그 그림으로.
+ */
+async function finishImageRoles(get: () => GlobalChatState, plan: ImageRoleGate): Promise<void> {
+  const hasComic = plan.items.some((it) => it.role === 'comic')
+  const hasStyle = plan.items.some((it) => it.role === 'style')
+  if (hasComic && !hasStyle && useProducerStore.getState().customStyleAnchor?.locked !== true) {
+    askComicStyle(get, plan.items.filter((it) => it.role === 'comic').map((it) => it.image), plan)
+    return
+  }
+  await runChatImagePlan(get, plan, null)
+}
+
+/** 그림마다 고른 대로 쓴다 — 인물 · 배경 · 참고는 종전대로(runImageRolePlan), 그림체 그림은 그림체로, 만화 원고는 대본으로. */
+async function runChatImagePlan(get: () => GlobalChatState, plan: ImageRoleGate, comicStyle: 'lock' | 'adapt' | null): Promise<void> {
+  const pages = plan.items.filter((it) => it.role === 'comic').map((it) => it.image)
+  const styleImage = plan.items.find((it) => it.role === 'style')?.image ?? null
+  const roleItems = plan.items.filter((it) => it.role === 'character' || it.role === 'background' || it.role === 'reference')
+  const cardsDone = roleItems.length ? runImageRolePlan(get, { ...plan, items: roleItems }) : Promise.resolve()
+  if (pages.length) {
+    const locked = useProducerStore.getState().customStyleAnchor?.locked === true
+    const comic = await runComicAdaptation(get, pages, {
+      styleImage,
+      styleMode: locked ? 'keep' : comicStyle ?? 'lock',
+      consent: CHAT_IMAGE_ROLE_CONSENT,
+      beforeFill: cardsDone,
+    })
+    await cardsDone
+    await comic.styleDone
+    return
+  }
+  const style = styleImage ? runStyleFromImage(styleImage, 'picture', CHAT_IMAGE_ROLE_CONSENT) : Promise.resolve()
+  await cardsDone
+  await style
 }
 
 function projectChatStage(): { projectId: string | null; stage: StageId } {
@@ -1736,7 +1777,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       }
       set((state) => ({ comicStyleGate: null, messages: [...state.messages, { id: makeId(), stage, role: 'user' as const, content: trimmed }] }))
       if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
-      void runComicAdaptation(get, styleGate.images, { styleMode: mode })
+      if (styleGate.plan) void runChatImagePlan(get, styleGate.plan, mode)
+      else void runComicAdaptation(get, styleGate.images, { styleMode: mode })
       return
     }
 
@@ -1781,7 +1823,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     // #image-to-artist: 그림 쓰임새 질문에 답하는 중 — 답이면 기록하고 다음 그림을 묻거나 다 답했으면 실행, 답이 아니면 다시 묻는다.
     const imageGate = get().imageRoleGate
     if (imageGate && stage === 'producer' && !opts?.silentUser) {
-      const answer = matchImageRoleAnswer(trimmed)
+      const answer = matchImageUseAnswer(trimmed)
       // "스토리" · "만화를 영상화하고 싶어"처럼 이야기 원작으로 답하면 만화 원고로 받는다(2026-10-09 — 같은 질문만 되풀이하던 것).
       if (!answer && matchComicAnswer(trimmed)) {
         set((state) => ({ messages: [...state.messages, { id: makeId(), stage, role: 'user' as const, content: trimmed }] }))
@@ -1794,7 +1836,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         get().appendLocalExchange(
           'producer',
           trimmed,
-          translate(contentLocale(), 'Please choose first how to use the picture: character, background or reference.'),
+          translate(contentLocale(), 'Please choose first how to use the picture: comic page, character, background, art style or reference.'),
         )
         askImageRole(get)
         return
@@ -1803,14 +1845,15 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       set((state) => ({ messages: [...state.messages, userMsg] }))
       if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
       const idx = imageGate.items.findIndex((it) => it.role === null)
-      const items = imageGate.items.map((it, i) => (i === idx ? { ...it, role: answer } : it))
+      // 그림체는 한 장만 — 다른 그림을 그림체로 고르면 앞의 그림체 그림은 참고 자료로 바뀐다(새 프로젝트 화면과 같은 규칙).
+      const items = imageGate.items.map((it, i) => (i === idx ? { ...it, role: answer } : answer === 'style' && it.role === 'style' ? { ...it, role: 'reference' as const } : it))
       if (items.some((it) => it.role === null)) {
         set({ imageRoleGate: { ...imageGate, items } })
         askImageRole(get)
         return
       }
       set({ imageRoleGate: null })
-      await runImageRolePlan(get, { ...imageGate, items })
+      await finishImageRoles(get, { ...imageGate, items })
       return
     }
 
@@ -3359,8 +3402,10 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       //   "Writer 호출하기" 가 나타나지 못했다. 명시적으로 선점을 요청한 제안만 기존 것을 밀어낸다
       //   (암묵 교체는 금지 — 사용자가 답하려던 질문이 소리 없이 사라지면 안 된다).
       if (!opts?.preempt) return
-      // 내릴 수 없는 제안(웰컴 등)은 못 민다.
-      if (current.dismissible === false) return
+      // 내릴 수 없는 제안은 못 민다. 다만 버튼 없는 안내(웰컴 등 — 문장은 이미 채팅에 남았다)는 사용자가 답해야 하는
+      //   질문(닫을 수 없는 선택지)이 밀어낸다 — 빈 새 프로젝트에서 그림을 올렸는데 쓰임새 질문이 안 뜨던 것(2026-10-10 로컬 시험).
+      const questionOverNotice = current.action == null && suggestion.dismissible === false && suggestion.action?.kind === 'choices'
+      if (current.dismissible === false && !questionOverNotice) return
       if (
         (current.action?.kind === 'choices' || current.restoredChoices) &&
         suggestion.action?.kind !== 'choices'
@@ -3531,9 +3576,15 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       askComicStyle(get, ready)
       return true
     }
-    // 말이 분명하면 묻지 않는다 — 모든 그림에 같은 역할.
-    const direct = matchImageRoleInText(typed)
-    if (direct) {
+    // 말이 분명하면 묻지 않는다 — 모든 그림에 같은 역할. 그림체는 한 장만이라 여러 장이면 묻는다.
+    const used = matchImageUseInText(typed)
+    const direct = used === 'style' && ready.length > 1 ? null : used
+    if (direct === 'style') {
+      recordImageTurn(set, msg, ready)
+      void finishImageRoles(get, { items: [{ image: ready[0], role: 'style' }], typed, msg })
+      return true
+    }
+    if (direct && direct !== 'comic') {
       // 사용자 말풍선은 그림과 함께 남긴다(참고 자료는 sendMessage 가 자기 말풍선을 만든다).
       if (direct !== 'reference') {
         const projectId = useProjectStore.getState().projectId

@@ -13,7 +13,7 @@ vi.mock('@/lib/supabase/client', () => ({
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProducerStore, mergeDraftWithDb, parseProducerDraft } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
-import { matchImageRoleAnswer, matchImageRoleInText } from '@/lib/producer/image-role'
+import { matchImageRoleAnswer, matchImageRoleInText, matchImageUseAnswer } from '@/lib/producer/image-role'
 
 const MEDIA = 'https://example.supabase.co/storage/v1/object/public/media/ws-1/proj-1/uploads'
 const komatsu = { id: 'att-1', name: 'komatsu.png', thumbUrl: `${MEDIA}/u1/original.png`, sliceUrls: [`${MEDIA}/u1/s000.jpg`] }
@@ -40,7 +40,8 @@ afterEach(() => {
 
 describe('그림 역할 관문 — 채팅', () => {
   // 왜: 종전엔 올린 그림이 바로 채팅 모델로 가서 이야기 시드로 각색됐다. 쓰임새를 먼저 정해야 원본이 산다.
-  it('그림을 올리면 그 턴은 모델로 보내지 않고 "이 그림을 어떻게 쓸까요" 선택지(인물·배경·참고 자료)를 먼저 띄운다', () => {
+  // 2026-10-10 오너 결정 "채팅으로 올린 그림에도 그림체 선택지 넣어줘" — 앞 문장: "그림을 올리면 그 턴은 모델로 보내지 않고 "이 그림을 어떻게 쓸까요" 선택지(인물·배경·참고 자료)를 먼저 띄운다".
+  it('그림을 올리면 그 턴은 모델로 보내지 않고 "이 그림을 어떻게 쓸까요" 선택지(만화 원고·인물·배경·그림체·참고 자료)를 먼저 띄운다', () => {
     const fetchSpy = okChat()
     const offered = useGlobalChatStore.getState().offerImageRoles([komatsu], { typed: '', msg: '그림을 올렸어요' })
     expect(offered).toBe(true)
@@ -50,10 +51,7 @@ describe('그림 역할 관문 — 채팅', () => {
     expect(s?.dismissible).toBe(false)
     expect(s?.action?.kind).toBe('choices')
     const labels = s?.action?.kind === 'choices' ? s.action.options.map((o) => o.label) : []
-    expect(labels).toHaveLength(3)
-    expect(matchImageRoleAnswer(labels[0])).toBe('character')
-    expect(matchImageRoleAnswer(labels[1])).toBe('background')
-    expect(matchImageRoleAnswer(labels[2])).toBe('reference')
+    expect(labels.map((label) => matchImageUseAnswer(label))).toEqual(['comic', 'character', 'background', 'style', 'reference'])
   })
 
   // 왜: "이 인물로 해줘"처럼 뜻이 분명한데 또 물으면 성가시다. 짧고 분명한 말만 받는다.
