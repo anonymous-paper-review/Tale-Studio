@@ -1,0 +1,55 @@
+## CAPSULE
+Photographic digital image: realistic continuous tone, soft diffuse light, muted warm color, fine low-contrast surface grain, no brush marks, no halftone patterns. There are no drawn outlines, 0% of image width. Edges are soft value differences, slightly crisper on metal and glass rims; seams and creases are shading, never lines; no hatching. Continuous gradients run over curved forms, folds and reflections, with no cel steps. In daylight scenes the key is high: mean luminance about 68%, near-black 0%, never a dark image. Contrast is low and shadows stay light, with one soft shadow region per form; soft warm contact shadows #897057 fall toward the lower right; sharp highlights appear only on metal and glass. Palette: warm greys #a59786 and #9b9583 about 30%, light neutrals #e2e2dc and #f1f4f0 about 26%, shadow #80634e, mean saturation about 16%; muted leaf green #b3bd6a and dusty red #9b7c72 stay local to their materials, with no added accents. Shapes are round volumes and elliptical openings, long curves alternating with straight edges, no exaggeration. Light comes from a large soft source upper left; lens perspective from slightly above with soft background blur. Metal shows about three blurred vertical reflection bands, and glass stays transparent. Detail budget: very high — about 24 structural garment lines as shading, hair one fine grained mass, eyes one iris mass and one highlight, no decorative marks.
+
+## NEGATIVE
+Avoid anime, cartoon, fashion illustration and glamour photography, black outlines, hard cel shading, fashion illustration proportions, oversized eyes, speed lines, copied still life arrangement, copied identities, outfits and hairstyles, bokeh particle fields, wet floor reflections, geometric ink hatching, ornamental iris patterns, readable text and logos.
+
+## SCENE
+An indoor still life by a window with curtains: six main objects on a table, namely a sphere, a cloth, a metal cup, a glass of water, fruit and a potted plant. The scene is seen from slightly above, with front objects partly overlapping the rear plant and no people. A separate board shows two adults in casual clothes standing side by side, full body and facing front, before a plain backdrop and floor.
+
+## PROBE_ANCHORS
+Photographic realism with no drawn outlines, 0% of image width. Edges are soft value differences, and seams, creases and eyelids are shading, not lines. Curved forms carry continuous diffuse gradients, with one soft shadow region per form and no cel steps; soft warm contact shadows #897057 spread toward the lower right. In daylight scenes the key is high: mean luminance about 68%, near-black 0%, never a dark image. Saturation is about 16%, with warm greys #a59786 and light neutrals #f1f4f0, and shadows stay light. Metal shows blurred vertical reflection bands, glass stays transparent, and matte surfaces and cloth stay diffuse, with rims slightly crisper. Figures use realistic proportions, about 7.7 heads tall, with horizontally long almond eyes and lineless skin edges. Lens perspective is from slightly above, with about 45% low detail space. Detail budget: very high — about 24 structural garment lines as shading, fine hair grain in one mass, one iris mass with one highlight, no decorative marks.
+
+## COVERAGE
+| 항목 | 출처 key | 실린 섹션 | 실린 절(영문 원문 발췌) |
+|---|---|---|---|
+| Core: 무선 사진 외관과 연속 확산 명암 | 분류.Core / 매체.엔진 / 선.외곽선 | CAPSULE, PROBE_ANCHORS | "Photographic digital image: realistic continuous tone, soft diffuse light"; "no drawn outlines, 0% of image width" |
+| Core: 저채도 웜 하이키, 밝게 남는 암부 | 분류.Core / 명암.키 / 색.채도 수준 | CAPSULE, PROBE_ANCHORS | "In daylight scenes the key is high: mean luminance about 68%, near-black 0%, never a dark image"; "shadows stay light" |
+| Core: 재질별 반사 차이와 부드러운 경계 | 분류.Core / 재질.금속·유리 / 가장자리 | CAPSULE, PROBE_ANCHORS | "Metal shows about three blurred vertical reflection bands, and glass stays transparent"; "slightly crisper on metal and glass rims" |
+| Core: 사실 인체 비례, 가로로 긴 눈, 무선 피부 윤곽 | 분류.Core / 인물.비례 / 인물.눈 | PROBE_ANCHORS, FIGURE | "realistic proportions, about 7.7 heads tall, with horizontally long almond eyes and lineless skin edges" |
+| Supporting: 얕은 배경 흐림과 소프트 접지 | 분류.Supporting / 공간.심도 / 캐스트 섀도 | CAPSULE | "lens perspective from slightly above with soft background blur"; "soft warm contact shadows #897057" |
+| Supporting: 국소 섬유 결 | 분류.Supporting / 질감·마감 | CAPSULE, FIGURE | "fine low-contrast surface grain"; "fabric shows low-contrast fibre grain" |
+| Supporting: 헤어 결과 약한 피부 색차 | 분류.Supporting / 재질.헤어·피부 | FIGURE | "one connected mass with fine curving grain"; "low-contrast warmth in the cheeks and lips" |
+| §6 1 선 굵기 상대값 | 선.외곽선.굵기 | CAPSULE, PROBE_ANCHORS | "no drawn outlines, 0% of image width" |
+| §6 2 역할 배분 | 색.역할 배분 | — | 배경 전용색을 잠그지 않음(배경색이 주체에도 나타남), 바디색은 장면 관측값 |
+| §6 3·14 액센트·하이라이트 hex | 색.팔레트.Accent·Highlight | CAPSULE | "muted leaf green #b3bd6a and dusty red #9b7c72 stay local to their materials, with no added accents"; "#f1f4f0" |
+| §6 4 구도 | 공간.구도.여백 방향 | PROBE_ANCHORS | "about 45% low detail space"; 개체 스케일은 인물에 적용하지 않는 장면 값이라 생략 |
+| §6 5·15·21·22 장식 | 장식.개수 / 장식.어휘 | CAPSULE, PROBE_ANCHORS | "no decorative marks"; 결속 유형 [해당 없음] |
+| §6 6 모노크롬 | 색.모노크롬 엄격도 / 게이트 생략 | — | 게이트 strict_monochrome 생략, 엄격한 단색 아님 |
+| §6 7 재질 사전 | 재질.금속·유리·천·무광 | CAPSULE, PROBE_ANCHORS | "Metal shows about three blurred vertical reflection bands, and glass stays transparent"; "matte surfaces and cloth stay diffuse" |
+| §6 8 곡면 처리 | 형태.곡면 처리 / 채움.토폴로지 | CAPSULE, PROBE_ANCHORS | "Continuous gradients run over curved forms, folds and reflections, with no cel steps" |
+| §6 9 캐스트 섀도 | 명암.캐스트 섀도 | CAPSULE, PROBE_ANCHORS | "soft warm contact shadows #897057 fall toward the lower right"; 길이는 [추정] 판정 불가라 생략 |
+| §6 10 인물 | 인물 | FIGURE | 비례·눈·피부·포즈 절; 표정 기본값은 머리말 규칙 1로 제외 |
+| §6 11 부정 절 | 생성 규칙.부정 절 | NEGATIVE | "copied still life arrangement, copied identities, outfits and hairstyles" |
+| §6 13 폼 섀도 | 명암.폼 섀도 | CAPSULE, PROBE_ANCHORS | "one soft shadow region per form" |
+| §6 16 선의 층별 문장 | 선.적용 범위 | CAPSULE, FIGURE | "no drawn outlines"; "hair edges fray softly with no outline stroke" |
+| §6 17 내부선 양·역할 | 선.내부선 | CAPSULE, FIGURE | "seams and creases are shading, never lines; no hatching" |
+| §6 18 묘사 예산 | 디테일.묘사 밀도 | CAPSULE, PROBE_ANCHORS, FIGURE | "Detail budget: very high — about 24 structural garment lines as shading" |
+| §6 18 반복 무늬 | 디테일.반복 요소 | FIGURE | "fine vertical knit ribbing spaced about 0.2% of image width" |
+| §6 19 수치 신뢰도 | 각 [실측]/[추정] | 전 섹션 | 개수는 [실측]만 수치("about 24", "about three") |
+| §6 23 단어 예산 | 디테일.묘사 밀도.등급 5 | CAPSULE, PROBE_ANCHORS | 절대 상한 이내 |
+| §6 24 키 절 | 명암.키 | CAPSULE, PROBE_ANCHORS | "mean luminance about 68%, near-black 0%, never a dark image" |
+| §6 25 장면 정제 | scene_summary | SCENE | 고유 소품·문자 없음 |
+| §6 26 없음 전달 | 선·해칭·장식·패턴 채움 | CAPSULE, NEGATIVE | "no hatching"; "no halftone patterns"; "speed lines" |
+| §6 27 토큰 | 매체.엔진 / 인물.눈.처리 / 인물.계열 | CAPSULE, FIGURE | "Photographic digital image"; "standard eyes" |
+| §6 28 눈 절 | 인물.눈 | FIGURE | "neutral, level outer corners, normally open with the upper lid covering about the top fifth of the iris" |
+| §6 29 비례 절 | 인물.비례 / 체형 | FIGURE | "about 7.7 heads tall"; "torso about 38% of the height" |
+| §6 30 계열 혼합 | 인물.계열 혼합 | FIGURE | "realistic face with real volume … on a realistic body … rendered as photographic realism" |
+| §6 31 형태 어휘·선 위계 | 형태.도형 어휘·윤곽 리듬 / 선.위계 단수 | CAPSULE | "round volumes and elliptical openings, long curves alternating with straight edges"; 선 위계 [해당 없음] |
+| §6 32 포즈 | 인물.포즈 문법 | FIGURE | "poses tend to be a relaxed upright stance … the action comes first" |
+| §6 33 그림자 면·하이라이트·패턴 | 명암.폼 섀도·하이라이트 / 패턴 채움 | CAPSULE | "sharp highlights appear only on metal and glass"; "no halftone patterns"; 문자 요소 0개라 lettering 문장 불필요 |
+| §6 34 인접 계열 | 부정 절.인접 계열 / 장식.운동 부호 | NEGATIVE | "Avoid anime, cartoon, fashion illustration and glamour photography"; "speed lines" |
+| §6 35 FIGURE 순서 | 인물 | FIGURE | 계열 → 비례 → 눈 → 손·신발·헤어 → 포즈 → 표정 수단 → 피부·예산 순 |
+
+## FIGURE
+Realistic face with real volume in the eyes, nose and lips and a softly tapering jaw, on a realistic body without cartoon compression, rendered as photographic realism with lineless edges and continuous diffuse shading; standard eyes. Figures stand about 7.7 heads tall, measured from the skull crown to the soles including shoes. The head to torso ratio is about 1 to 2.9, with the torso from shoulder line to crotch about 38% of the height and the legs from crotch to sole about 43.5%. The lower legs are about 1.4 times the thighs, and the forearms about 0.9 times the upper arms. Hanging arms are about 40% of the height, with fingertips reaching the upper thighs. The shoulders are about twice the head width. Hands are about 0.72 face heights long. Shoes are about 0.65 head heights tall and 0.75 head lengths long, with rounded toes and low soles about 11% of the shoe height. The figure has narrow wedge gaps between the legs and beside the sleeves. Eyes have neutral, level outer corners and are normally open, with the upper lid covering about the top fifth of the iris. They are horizontally long almond shapes about 2.9 times wider than tall, each about a fifth of the face width, with pointed corners and a small shaded tear duct. Each eye has one iris mass and one small round soft catchlight at the upper left of the iris, with no secondary highlight and no glow. Narrow sclera that is lighter than skin but not pure white shows at the sides. Lashes are fused into the thin upper lid edge, about 0.1% of image width. The lower lid is a faint partial edge that fades into the skin outward. Eye contours are brown and reddish brown local shading, never black lines. The nose is built from continuous shading with nostrils as small dark areas, and the lips keep their thickness with a low-contrast parting. Hands show separated fingers and knuckle and tendon volumes in continuous shading. Hair is one connected mass with fine curving grain, diffuse low-contrast sheen following its direction and softly fraying tips. It has no geometric clumps, no separate highlight bands and no outline stroke. Clothing drapes naturally over the body volume, and the fabric shows low-contrast fibre grain. Poses tend to be a relaxed upright stance with level shoulders and hips, weight on both feet and limbs hanging nearly straight, with neutral acting and no exaggerated foreshortening. When the scene specifies an action, the action comes first and this rhythm is applied to it. Expressions are made by gentle eyebrow curves, eyelid opening and lip contact, with no comic emotion symbols. Skin is soft continuous tone over its own local color, with a weak diffuse sheen and low-contrast warmth in the cheeks and lips. It has no blush hatching, no cel steps and no emphasized pores. Detail budget: very high — about 24 structural garment lines per figure regardless of its size on screen, about 12 seams and 12 folds, all drawn as narrow shading. Knit hems carry fine vertical ribbing spaced about 0.2% of image width. Eyes have one iris mass and one catchlight, and there are no added ornaments or decorative marks.

@@ -2,7 +2,7 @@
 
 > 누가 읽나: 제품을 고치는 **다른 세션**(facet을 제품에 넣는 일)과 오너. 이 폴더는 추출 세션의 산출물과 그 산출물을 제품이 쓰는 방법을 적은 인계 패키지다. 추출 세션은 제품 코드(`src/`)를 건드리지 않았다.
 >
-> 한 줄 요약: 제품이 제공하는 스타일 12종(`style_anchors` 활성 행 12개) 전부에 대해 **고성능 판 facet**(리프 309, VLM = gpt-6-astra)을 뽑아 `presets/<key>/`에 두었고, 같은 콘텐츠로 **현행 제품 프롬프트 · facet 프롬프트 · 둘을 합친 프롬프트**를 생성 비교한 페이지를 발행했다(https://claude.ai/artifact/3ASfQfpBFkAi6SoKpSdsra). 1차 기계 판정의 결론: **facet 조각은 현행 손글씨 절을 대체하지 못하고 보강한다 — 캐릭터는 '둘 다'가 최선(4.25 vs 현행 4.0 vs facet 3.4)**, 액션은 현행이 8/12로 더 가까웠다. **오너 결정: 제품은 '둘 다'로 간다.** 12종 전부 인물 보조 보드를 만들어 다시 뽑았고(v2 — 둘 다가 캐릭터 최선 10/12 · 액션 7/12; §7.1), 표정 기본값을 빼고 앵커 캡슐 상한을 넣어 다시 컴파일했다(v3; §7.2). 사이클 11(`cycle-11-results.md`) 뒤 오너 결정으로 우선순위 줄에 방향어 상한을 넣었다(v4; §7.3). **제품은 v4 산출물을 쓴다**(v3는 2026-10-08 live 시드됨 → v4로 갱신 필요, §10 2b). 유저가 올린 이미지는 **경량 판**(Sonnet 직접 호출, 추출 1.5분 + 생성 2분)으로 같은 조각을 만들 수 있고 참조 구현은 `lite/facet_lite_extract.py`다(같은 12장으로 검증).
+> 한 줄 요약: 제품이 제공하는 스타일 12종(`style_anchors` 활성 행 12개) 전부에 대해 **고성능 판 facet**(리프 309, VLM = gpt-6-astra)을 뽑아 `presets/<key>/`에 두었고, 같은 콘텐츠로 **현행 제품 프롬프트 · facet 프롬프트 · 둘을 합친 프롬프트**를 생성 비교한 페이지를 발행했다(https://claude.ai/artifact/3ASfQfpBFkAi6SoKpSdsra). 1차 기계 판정의 결론: **facet 조각은 현행 손글씨 절을 대체하지 못하고 보강한다 — 캐릭터는 '둘 다'가 최선(4.25 vs 현행 4.0 vs facet 3.4)**, 액션은 현행이 8/12로 더 가까웠다. **오너 결정: 제품은 '둘 다'로 간다.** 12종 전부 인물 보조 보드를 만들어 다시 뽑았고(v2 — 둘 다가 캐릭터 최선 10/12 · 액션 7/12; §7.1), 표정 기본값을 빼고 앵커 캡슐 상한을 넣어 다시 컴파일했다(v3; §7.2). 사이클 11(`cycle-11-results.md`) 뒤 오너 결정으로 우선순위 줄에 방향어 상한을 넣었다(v4; §7.3). 사이클 12(`cycle-12-results.md`) 뒤 오너 결정으로 인물 절에 신장 % 비례 문장 한 줄을 더했다(v5; §7.4). **제품은 v5 산출물을 쓴다**(v3는 2026-10-08 live 시드됨 → v5로 갱신 필요, §10 2b). 유저가 올린 이미지는 **경량 판**(Sonnet 직접 호출, 추출 1.5분 + 생성 2분)으로 같은 조각을 만들 수 있고 참조 구현은 `lite/facet_lite_extract.py`다(같은 12장으로 검증).
 
 ## 0. 읽는 순서
 
@@ -29,14 +29,14 @@
 
 ```
 README.md                      ← 이 문서
-presets/index.json             ← 12종 한 파일: key → assembly('both') + facets(v4 = 인물 보드 + 재컴파일 + 방향어 상한: 조각 4개·단어 수·인물 출처·compile_rules·모델·시간) + facets_v3 + facets_v2 + facets_v1 + style_clause_current + lite (제품 시드용)
+presets/index.json             ← 12종 한 파일: key → assembly('both') + facets(v5 = 인물 보드 + 재컴파일 + 방향어 상한 + 신장 % 문장: 조각 4개·단어 수·인물 출처·compile_rules·모델·시간) + facets_v4 + facets_v3 + facets_v2 + facets_v1 + style_clause_current + lite (제품 시드용)
 presets/<key>/filled.json      ← 고성능 facet 전문(리프 309, 한국어 값 + 신뢰도 태그)
 presets/<key>/scene_summary.md ← 앵커 그림의 내용 요약(스타일 아님, 기록용)
 presets/<key>/prompts.md       ← 컴파일 산출(CAPSULE / NEGATIVE / SCENE / PROBE_ANCHORS / COVERAGE / FIGURE)
 presets/<key>/priority.md      ← PRIORITY 줄 + 방향어를 붙인 FIGURE (제품은 prompts.md의 FIGURE 대신 이것을 쓴다)
 presets/<key>/assembled/{facet_character,facet_action,both_character,prod_character,prod_action}.txt ← 생성 테스트에 실제로 보낸 프롬프트 전문(both = 현행 절 + facet 조각)
 presets/<key>/lite/{filled.json,prompts.md,fragments.json} ← 같은 앵커를 경량 판으로 뽑은 것(비교용)
-presets/<key>/board.jpg · board_prompt.txt · v3/ · v2/ · v1/ ← (12종 전부) 인물 보조 보드(1024px 축소본, 원본은 로컬 2048px) · 보드를 만든 제품 경로 프롬프트 · v3(방향어 상한 전) · v2(보드, 재컴파일 전) · v1(보드 없음)
+presets/<key>/board.jpg · board_prompt.txt · v4/ · v3/ · v2/ · v1/ ← (12종 전부) 인물 보조 보드(1024px 축소본, 원본은 로컬 2048px) · 보드를 만든 제품 경로 프롬프트 · v4(신장 % 문장 전) · v3(방향어 상한 전) · v2(보드, 재컴파일 전) · v1(보드 없음)
 lite/facet_lite_extract.py     ← 경량 판 참조 구현(Python, API 직접 호출). 제품(TS)으로 옮길 때 프롬프트 구성·파싱·검증을 그대로 따른다
 lite/README.md                 ← 경량 판 호출 계약(입출력·검증·실패 처리) 요약
 ```
@@ -56,11 +56,11 @@ lite/README.md                 ← 경량 판 호출 계약(입출력·검증·�
 | 조각 | 출처 | 단어 상한 | 역할 |
 |---|---|---|---|
 | `probe_anchors` | prompts.md `## PROBE_ANCHORS` | 등급별 70~150, 절대 상한 130/150/160(v3) | "Style anchors: …" 로 앵커 이미지 바로 뒤에 싣는 압축 캡슐. 이미지가 못 나르는 값만(투영·선 굵기와 색·채움/그림자·키·팔레트 역할·지면 문법·장식 개수·묘사 예산) |
-| `figure` | **priority.md** `## FIGURE` | 상한 없음(고성능) / 150(경량) | "Figure rules: …" — 계열·비례(수치 + 방향어, 문턱을 겨우 넘으면 "slightly" — v4)·눈 절·손/신발/헤어·포즈 경향·표정 수단(기본값 없음, v3)·피부, 끝에 과장 상한 문장(v4). 인물이 있는 장면에만 |
+| `figure` | **priority.md** `## FIGURE` | 상한 없음(고성능) / 150(경량) | "Figure rules: …" — 계열·비례(수치 + 방향어, 문턱을 겨우 넘으면 "slightly" — v4; 등신 문장 바로 뒤에 신장 % 비례 한 문장 — v5)·눈 절·손/신발/헤어·포즈 경향·표정 수단(기본값 없음, v3)·피부, 끝에 과장 상한 문장(v4). 인물이 있는 장면에만 |
 | `priority` | priority.md `## PRIORITY` | 35 | "Priority order: a → b → c" 한 줄, 부정 절 바로 앞 |
 | `negative` | filled.json `생성 규칙.부정 절` 6항을 하네스가 합친 것(`assembled/*.txt`의 "Avoid …" 줄) | 55 | 인접 계열 → 아티팩트 → 충돌 기본값 → 장면 종속 → 정교화 → 텍스트/로고 순 |
 
-`presets/index.json`에 네 조각이 이미 조립된 문자열로 들어 있다(v4: 12종 전부 인물 절 567~943단어, `figure_source = "figure_board"`; 경량 판 조각은 `lite` 아래, `[EXTRAPOLATED]` 토큰은 뺐고 `figure_extrapolated`로 표시). `style_clause_current`에 현행 손글씨 절을, `assembly: "both"`에 오너 결정을 함께 넣었다. 조각 문자열은 그대로 싣는다 — 제품이 다시 다듬지 않는다.
+`presets/index.json`에 네 조각이 이미 조립된 문자열로 들어 있다(v5: 12종 전부 인물 절 628~1004단어, `figure_source = "figure_board"`; 경량 판 조각은 `lite` 아래, `[EXTRAPOLATED]` 토큰은 뺐고 `figure_extrapolated`로 표시). `style_clause_current`에 현행 손글씨 절을, `assembly: "both"`에 오너 결정을 함께 넣었다. 조각 문자열은 그대로 싣는다 — 제품이 다시 다듬지 않는다.
 
 ## 4. 조립 규칙 — 제품이 구현할 것
 
@@ -92,7 +92,7 @@ lite/README.md                 ← 경량 판 호출 계약(입출력·검증·�
 
 ```sql
 alter table public.style_anchors add column if not exists facets jsonb;
--- facets = { "version": "hp-v1.2.3+figure-board+compile-v3+priority-cap", "extracted_at": "2026-10-09",
+-- facets = { "version": "hp-v1.2.3+figure-board+compile-v3+priority-cap+height-pct", "extracted_at": "2026-10-09",
 --            "probe_anchors": "...", "figure": "...", "figure_extrapolated": false, "figure_source": "figure_board",
 --            "priority": "Priority order: ...", "negative": "Avoid ...",
 --            "compile_rules": [...], "compile_model": "...", "priority_model": "...", "timing": {...},
@@ -190,7 +190,7 @@ API 함정(실측): `thinking.type: "disabled"`는 이 모델이 거부한다 �
 | watercolor | 3 | 140 → **150** / 150 | 688 → 819 | 3.5분 · 26초 | 예 | 0 |
 
 - 12종 모두 상한 안(v2에서 6종 초과 → 0), 표정 기본값 문장 0, 우선순위 단계의 수치 불변 검사 12/12. 인물 절은 Opus가 항목을 더 빠짐없이 실어 v2보다 길어진 스타일이 많다(상한 없음 규칙 그대로).
-- v3는 2026-10-08 밤 live에 시드됐다(제품 세션, `scripts/style-anchor-facets-seed.mjs`). **2026-10-09부터 정본은 v4(§7.3)** — v3는 `v3/`·`facets_v3`로 내려갔다.
+- v3는 2026-10-08 밤 live에 시드됐다(제품 세션, `scripts/style-anchor-facets-seed.mjs`). 2026-10-09 낮 정본은 v4(§7.3), **같은 날 저녁부터 정본은 v5(§7.4)** — v4는 `v4/`·`facets_v4`, v3는 `v3/`·`facets_v3`로 내려갔다.
 
 ### 7.3 v4 — 방향어 상한 (2026-10-09 오너 결정, 사이클 11 A2 "v4a나 v4b가 괜찮아 보여")
 
@@ -211,9 +211,36 @@ API 함정(실측): `thinking.type: "disabled"`는 이 모델이 거부한다 �
 | us_cartoon | 31 → 27 | 786 → 799 | 0 | 0 → 0 |
 | watercolor | 33 → 35 | 819 → 832 | 2 | 2 → 0 |
 
-- **제품은 v4 산출물을 쓴다** — `presets/<key>/` 루트 = v4(`facets.version = "hp-v1.2.3+figure-board+compile-v3+priority-cap"`, `compile_rules` 3번째 항목이 이 규칙), v3는 `v3/`·`facets_v3`, v2는 `v2/`·`facets_v2`, v1은 `v1/`·`facets_v1`. **live 갱신 = 같은 시드 스크립트 재실행**(§10 2b) — `CARRIED` 칸 중 바뀌는 것은 `version`·`extracted_at`·`figure`·`priority`·`compile_rules`.
-- 알려진 흠(v3와 같음, v4에서 고치지 않음): 등신 주석 "measured to the top of the hair or hat, so keep the skull itself small"이 12종 중 10종에 들어 있는데, 채움은 모발을 제외하고 두개골 정수리를 추정했으므로 가이드 §6 36 ③의 뜻으로는 붙지 않아야 한다(스펙 문구 탓 — 2026-10-09 스펙을 고쳤다). 바로 앞 문장 "measured from the top of the skull rather than the hair"와 어긋나지만 방향은 같고(두개골 작게), 오너가 본 그림과 텍스트를 같게 두려고 이번엔 그대로 싣는다. 다음 우선순위 재생성 때 빠진다.
+- v4는 2026-10-09 저녁 v5(§7.4)에 자리를 내줬다 — `presets/<key>/v4/`·`facets_v4`(`version = "hp-v1.2.3+figure-board+compile-v3+priority-cap"`). v4 자체는 live에 시드된 적이 없다(v3 → v5로 바로 간다).
+- 알려진 흠(v3와 같음, v4·v5에서 고치지 않음): 등신 주석 "measured to the top of the hair or hat, so keep the skull itself small"이 12종 중 10종에 들어 있는데, 채움은 모발을 제외하고 두개골 정수리를 추정했으므로 가이드 §6 36 ③의 뜻으로는 붙지 않아야 한다(스펙 문구 탓 — 2026-10-09 스펙을 고쳤다). 바로 앞 문장 "measured from the top of the skull rather than the hair"와 어긋나지만 방향은 같고(두개골 작게), 오너가 본 그림과 텍스트를 같게 두려고 이번엔 그대로 싣는다. 다음 우선순위 재생성 때 빠진다.
 - 채택하지 않은 것: A1 환경색 조건문(v4a). 오너 눈에도 괜찮았으나 판정에서 v3와 차이가 없었고(Opus 8:4 v3 · Codex 7:5 v4a) 카페 장면의 앵커 색 끌림은 참조 이미지 채널이라 규칙을 늘리지 않는다. 원하면 12종 재컴파일(Opus, 크레딧 0, 약 20분)로 넣을 수 있다 — `cycle11/spec/spec-compile-v4a.md`.
+
+### 7.4 v5 — 신장 % 비례 문장 (2026-10-09 저녁 오너 결정, 사이클 12 L "v5으로 사용해주고")
+
+v4 인물 절의 **등신 문장 바로 뒤에 한 문장**을 끼운 것이다 — 모델 호출 없이 채움값(`filled.json` 인물.비례)에서 계산한다: 머리 % = 100 ÷ 등신, 가랑이 높이 % = 다리 비율, 무릎 높이 % = 다리 비율 × r ÷ (1 + r)(r = 하퇴 : 허벅지, 밑창 포함), 분절 비가 대리값이면 무릎 구절은 뺀다. 문장: "Measured on the standing height from the ground up: the knee (top of the lower leg, shoe included) is at about N% of the height, the crotch at about N%, and the head from chin to skull top is about N% of the height; draw the knee and the crotch at these heights, not higher, and the head at this size." 그 밖의 글자는 v4와 같다(12/12 확인). 바뀌는 조각은 `figure`뿐이고 `priority`·`probe_anchors`·`negative`는 v4와 글자 하나 다르지 않다. 스펙은 `scaffolds/facet-compile-priority.md`(신장 % 문장 절), 가이드 §6 36 ①.
+
+근거와 한계를 그대로 적는다: 사이클 12 L(12종 × 판정자 2, 앵커 ① + 인물 보드 ② 대비)에서 v5는 v4와 **차이가 없었다**(최선 11:13, 비례 집중 11:12:1, 평균 차 0 — 잡음 안; 생성기는 수치를 읽되 정밀하지 않고 머리 크기는 거의 안 움직인다). 채택은 그 결과를 본 오너의 판정이다(수치가 적혀 있는 쪽을 쓴다). 사이클 12 페이지 L 절에 12종 × v4·v5 쌍이 있다.
+
+**시험본 결함과 정정**: 사이클 12 L에 보낸 v5 텍스트는 12종 중 6종(jp_anime · real · real_desert_fantasy · real_urban_hero · us_cartoon · watercolor)에서 문장이 등신 문장 끝이 아니라 **그 안의 소수점 뒤**에 끼어 있었다(예: "head to torso ratio of about 1 to 2.5"가 "1 to 2." + 문장 + "5."로 — 비율이 달라지고 끝에 "5." 같은 조각이 남았다; real_urban_hero는 "1.4 times as long as the thighs"가 "1." + 문장 + "4 times as long as the thighs"가 됐다). 2026-10-09 저녁에 찾아 삽입 위치를 진짜 문장 경계로 고쳤고(`cycle12/bin/make_v5.py`, 소수점 개수 12/12 불변 확인), **정정판이 정본이다**(로컬 `priority_v5r/`). 결함 없는 6종은 정정판이 시험본과 글자까지 같다. 결함이 있던 6종은 정정판으로 캐릭터 1장씩 다시 만들어 사이클 12 페이지에 "v5 정정" 절로 붙였다(오너 육안용, 39크레딧). 시험 결과의 재해석: 결함 없는 6종만 보아도 v5 4 : v4 8(비례 집중 5:6:1, Δ −0.25), 결함 있던 6종은 7:5(6:6, Δ +0.17) — 어느 쪽도 잡음 밖이 아니어서 "차이 없음" 결론은 그대로다.
+
+| 스타일 | 등신(채움) | 무릎 % | 가랑이 % | 머리 % | 인물 절 단어 v4 → v5 | 시험본 결함 |
+|---|---|---|---|---|---|---|
+| jp_anime | 8.36 | 36 | 54 | 12 | 943 → 1004 | 있음(1 to 2.5) |
+| real | 7.9 | 27 | 43 | 13 | 703 → 764 | 있음(1 to 3.1) |
+| real_3d | 7.4 | 29 | 47 | 14 | 895 → 956 | 없음 |
+| real_desert_fantasy | 8.13 | 27 | 44 | 12 | 705 → 766 | 있음(1:3.2) |
+| real_euro_period | 7.7 | 25 | 43 | 13 | 783 → 844 | 없음 |
+| real_hitech_sf | 7.85 | 25 | 45 | 13 | 633 → 694 | 없음 |
+| real_jp_melo | 7.66 | 25 | 44 | 13 | 567 → 628 | 없음 |
+| real_psy_horror | 7.97 | 25 | 45 | 13 | 756 → 817 | 없음 |
+| real_urban_hero | 8.03 | 26 | 45 | 12 | 888 → 949 | 있음(1.4 times) |
+| stop_motion | 6.08 | 25 | 42 | 16 | 695 → 756 | 없음 |
+| us_cartoon | 5.58 | —(대리값, 무릎 구절 없음) | 44 | 18 | 799 → 845 | 있음(1 to 1.85) |
+| watercolor | 7.72 | 28 | 45 | 13 | 832 → 893 | 있음(1 to 2.8) |
+
+- **제품은 v5 산출물을 쓴다** — `presets/<key>/` 루트 = v5(`facets.version = "hp-v1.2.3+figure-board+compile-v3+priority-cap+height-pct"`, `compile_rules` 4번째 항목이 이 규칙, `timing.height_pct.numbers`에 쓴 수치), v4는 `v4/`·`facets_v4`, v3는 `v3/`·`facets_v3`, v2는 `v2/`·`facets_v2`, v1은 `v1/`·`facets_v1`. **live 갱신 = 같은 시드 스크립트 재실행**(§10 2b) — `CARRIED` 칸 중 v3(live)에서 바뀌는 것은 `version`·`extracted_at`·`figure`·`priority`·`compile_rules`.
+- 알려진 흠(기록): 사이클 12 L에서 무릎이 수치를 지나쳐 보드보다 더 짧아진 스타일 2종(real_desert_fantasy 25 → 20%, stop_motion 가랑이 44 → 40%) — 생성기가 "not higher"를 과하게 읽는 경우. 등신 주석 misfire(§7.3)는 그대로.
+- 비례는 이것으로 텍스트 시도를 끝낸다(수치만 · 방향어 + 상한 · 신장 % 세 종류 모두 실사 계열의 "머리 작고 하퇴 긴" 편향을 못 잡았다). 다음은 참조 채널·모델 설정, 측정은 자세 추정기.
 
 ## 8. 같이 정한 것 / 혼자 정한 것 / 결정이 필요한 것
 
@@ -240,7 +267,9 @@ API 함정(실측): `thinking.type: "disabled"`는 이 모델이 거부한다 �
 
 3. **재컴파일 — 표정 기본값 제외 · 앵커 캡슐 절대 상한**(§7.2). 12종 v3.
 
-4. **방향어 상한 채택(2026-10-09, 사이클 11 결과를 본 뒤 "v4a나 v4b가 괜찮아 보여")** — 우선순위 줄·인물 절만 다시 만든 12종 **v4가 정본**(§7.3). 환경색 조건문(v4a)은 효과가 없어 넣지 않았다.
+4. **방향어 상한 채택(2026-10-09, 사이클 11 결과를 본 뒤 "v4a나 v4b가 괜찮아 보여")** — 우선순위 줄·인물 절만 다시 만든 12종 v4(§7.3). 환경색 조건문(v4a)은 효과가 없어 넣지 않았다.
+
+5. **신장 % 비례 문장 채택(2026-10-09 저녁, 사이클 12 결과를 본 뒤 "v5으로 사용해주고")** — 12종 **v5가 정본**(§7.4; 판정에서는 v4와 차이가 없었고 채택은 오너 판정). 같은 지시로 **유저 경로(K1 참조만 · K2 경량 조각 · K3 LOOK 한 줄)는 이 세션에서 더 손대지 않는다** — 제품은 지금 구성(경량 조각, 실패 시 조각 없이) 그대로 쓰고, 제품 사용 중 문제가 생기면 그때 갱신한다(LOOK 한 줄은 후보로 보관, 사이클 13은 열지 않는다).
 
 **아직 결정이 필요한 것(오너)**:
 
@@ -248,17 +277,17 @@ API 함정(실측): `thinking.type: "disabled"`는 이 모델이 거부한다 �
 2. **유저 이미지 동의 문구·범위**: "이 이미지를 스타일 분석에 쓴다(외부 모델에 전송)"를 업로드 권리 동의 대화상자에 합칠지 따로 둘지, 동의 시각·버전을 프로젝트에 어떻게 남길지.
 3. **경량 판 실패 시 동작**: 재시도 1회 뒤 facets 없이 진행(제안) vs 유저에게 알림.
 4. **환경 팔레트 조건문**: 사이클 11 A1에서 효과 없음(끌림은 참조 이미지 채널) → **기각으로 정리됨**. v3 유지.
-5. **과장 상한**: 사이클 11 A2에서 약하지만 한결같은 우세(19/24, 점수 차 0) → 2026-10-09 **채택됨**(§7.3 v4, 가이드 §6 36 개정). 남은 것은 live 시드 갱신(§10 2b, 제품 세션).
+5. **과장 상한**: 사이클 11 A2에서 약하지만 한결같은 우세(19/24, 점수 차 0) → 2026-10-09 **채택됨**(§7.3 v4 → 같은 날 저녁 v5에 포함, 가이드 §6 36 개정). 남은 것은 live 시드 갱신(§10 2b, 제품 세션 — v3에서 v5로 바로).
 7. **style_clause 비례 구절 제거(jp_anime·us_cartoon)**: 사이클 11 D에서 4/4 근소 우위 → 적용 권고, 제품 데이터 변경이라 오너 결정.
 8. **경량 판 제품 규칙 4개**(`cycle-11-results.md`): max_tokens 12000 + 검증·재시도(참조 구현 반영됨), 인물 절 상한 초과는 그대로 싣기, 작은 인물 외삽 취급, 저해상 안내.
-9. **경량 LOOK 한 줄(사이클 12, 2026-10-09)**: 유저 경로 정식 대조군에서 경량 조각이 참조만보다 18:2 우세(경량 추출은 할 가치가 있음 — 사이클 11 결과 2 철회), LOOK 한 줄을 더하면 12:2로 더 좋아짐(사진·액션에서 크고 그림 캐릭터는 비슷; 대가 = 콘텐츠 준수 하락, 풍경 입력은 장면 복제라 LOOK 제외). **조건부 채택 권고 — 제품에 넣기 전 v2 스펙 12장 정식 검증(사이클 13) 승인 대기.** `cycle-12-results.md`.
-10. **트랙 L(비례 % 직접 지정)은 미채택** — 프리셋 v4 유지(가이드 §6 36 기록). 실사 계열 긴 하퇴는 텍스트로 더 시도하지 않는다.
+9. **경량 LOOK 한 줄(사이클 12, 2026-10-09)**: 유저 경로 정식 대조군에서 경량 조각이 참조만보다 18:2 우세(경량 추출은 할 가치가 있음 — 사이클 11 결과 2 철회), LOOK 한 줄을 더하면 12:2로 더 좋아짐(사진·액션에서 크고 그림 캐릭터는 비슷; 대가 = 콘텐츠 준수 하락, 풍경 입력은 장면 복제라 LOOK 제외). 조건부 채택 권고였으나 **2026-10-09 저녁 오너 결정으로 보류** — 유저 경로는 이 세션에서 더 갱신하지 않고 제품 사용 중 문제가 생기면 그때(그때의 첫 단계 = v2 스펙 12장 검증, ≈ 80크레딧). 스펙·스크립트는 `cycle12/spec/spec-look-lite-v2.md`, `cycle12/bin/run_look_claude_v2.py`에 그대로. `cycle-12-results.md`.
+10. **트랙 L(비례 % 직접 지정)**: 판정에서는 차이 없음(11:13)이었으나 **2026-10-09 저녁 오너 결정으로 채택 — 프리셋 v5(§7.4)**. 실사 계열 긴 하퇴는 텍스트로 더 시도하지 않는다(가이드 §6 36 기록).
 6. **Codex 지출 한도**: 워크스페이스 spend cap에 걸려 8종의 우선순위·판정을 Claude로 돌렸다. 다음 사이클에 Codex를 쓰려면 한도를 올려야 한다(대체 경로는 스크립트로 남아 있다).
 
 ## 9. 참고
 
 - 결과 페이지(아티팩트): https://claude.ai/artifact/3ASfQfpBFkAi6SoKpSdsra (비공개 — 오너 계정; 다른 사람에게는 공유 메뉴로 열어야 보인다)
-- 사이클 12 결과(2026-10-09 오후): **`cycle-12-results.md`**(U 유저 경로 R0 대조군 — 조각 > 참조만 18:2 · LOOK 한 줄 12:2(조건부 채택 권고) · L 비례 % 직접 지정 효과 없음 11:13 → v4 유지) + 노트 `cycle-12-notes-{U,L}.md`, 페이지 https://claude.ai/artifact/MNNNKsyNqUKh6tycuHAz3B
+- 사이클 12 결과(2026-10-09 오후): **`cycle-12-results.md`**(U 유저 경로 R0 대조군 — 조각 > 참조만 18:2 · LOOK 한 줄 12:2(조건부 채택 권고 → 오너 보류) · L 비례 % 직접 지정 효과 없음 11:13 → 오너 채택 v5(§7.4, 시험본 결함 6종 정정 + 재생성 6장은 페이지 "v5 정정" 절)) + 노트 `cycle-12-notes-{U,L}.md`, 페이지 https://claude.ai/artifact/MNNNKsyNqUKh6tycuHAz3B
 - 사이클 11 계획·결과: `next-cycle-plan.md` → **`cycle-11-results.md`**(A1 기각 · A2 채택(2026-10-09 오너, v4) · A3 현행 유지 · D1 적용 권고 · 경량 판 제품 규칙 4개 · 다음 사이클 핵심 = 유저 경로 R0 대조군) + 트랙 노트 `cycle-11-notes-{A,B,C,D}.md`. 사이클 11 페이지(v3·v4a·v4b·v4c 쌍 비교 그림): https://claude.ai/artifact/Yadog9sLuw3Uk9xM67xVGW
 - 로컬 실험 폴더(git 밖): `dev/Image_Style/facet_presets/` — `bin/pipeline.sh`(v1 추출 사슬) · `bin/pipeline_v2.sh`(앵커 + 보드 2장 채움) · `bin/make_board.py` + `bin/gen_board.sh`(보드) · `bin/run_priority_claude.py` · `bin/run_judge_v2_claude.py`(Codex 한도 대체) · `bin/post_chain.sh`(조립 → 생성 → 판정) · `bin/build_prompts.py` · `bin/gen.sh` · `bin/run_judge.sh` + `spec/spec-judge.md` · `bin/summarize.py` · `build_report.py` · `bin/export_handoff.py`(이 폴더로 내보내기) · `<key>/fill/comms/transcript.md`(Codex 통신 원문) · `<key>/gen/*.png`(원본 2048px) · `judge/<key>.md`(1차 판정 전문)
 - 지난 사이클: `dev/Image_Style/facet_cycle_9/`(R1c 확정 근거) · `facet_cycle_10/`(경량 판 검증, Sonnet 직접 호출 시간)
@@ -270,7 +299,7 @@ API 함정(실측): `thinking.type: "disabled"`는 이 모델이 거부한다 �
 
 1. **마이그레이션** `supabase/migrations/<ts>_style_anchor_facets.sql` — `style_anchors.facets jsonb`(§5). 개발 DB 먼저 → `pnpm db:types` → `tests/ops/db-types-drift` 통과.
 2. **시드** — `presets/index.json`의 12종 `facets`를 `style_anchors.facets`에 넣는 스크립트(`scripts/`), live는 main 배포 뒤. (2026-10-08 밤 완료 — `scripts/style-anchor-facets-seed.mjs`, v3)
-   2b. **v4 시드 갱신(2026-10-09, 오너 결정 4)** — `index.json`의 `facets`가 v4로 바뀌었다. 같은 스크립트를 다시 돌리면 된다(`--dry-run`으로 12종 확인 → 개발 DB → live). 바뀌는 칸은 `version`·`extracted_at`·`figure`·`priority`·`compile_rules`뿐이고 `probe_anchors`·`negative`는 같다. 확인 쿼리: 활성 12종의 `facets->>'version'`이 `hp-v1.2.3+figure-board+compile-v3+priority-cap`. 코드 변경 없음(`parseStyleAnchorFacets`가 읽는 칸은 그대로).
+   2b. **v5 시드 갱신(2026-10-09, 오너 결정 4·5 — v4를 건너뛰고 v3 → v5)** — `index.json`의 `facets`가 v5로 바뀌었다. 같은 스크립트를 다시 돌리면 된다(`--dry-run`으로 12종 확인 → 개발 DB → live). v3(live)에서 바뀌는 칸은 `version`·`extracted_at`·`figure`·`priority`·`compile_rules`뿐이고 `probe_anchors`·`negative`는 같다. 확인 쿼리: 활성 12종의 `facets->>'version'`이 `hp-v1.2.3+figure-board+compile-v3+priority-cap+height-pct`, 12종 모두 `facets->>'figure'`에 "Measured on the standing height from the ground up"가 한 번. 코드 변경 없음(`parseStyleAnchorFacets`가 읽는 칸은 그대로). 테스트 `tests/artist/style-anchor-facets.test.ts`는 v5 문장으로 바꿔 두었다(2026-10-09 저녁, 오너 결정의 결과).
 3. **해석** — `ResolvedStyleAnchor.facets?`(`src/lib/style-anchor.ts`): `resolveStyleAnchorByKey`가 `facets` 칸을 읽고, 커스텀 앵커는 `custom_style_anchor.facets`를 읽는다.
 4. **조립** — `applyStyleAnchor`에 §4(1·1b·2·3·4·[5·6]·7·8). 인물 장면 여부는 호출부가 안다(`generate-sheet`·`draft-trigger` = 인물, `world-submit`·`generate-storyboard` = 장면이면 5·6 생략; 스토리보드에 인물이 있으면 포함). 표정 우선 문장 중복 금지.
 5. **경량 추출 작업** — `POST /api/produce/style-anchor`에서 동의가 있으면 비동기 작업(§6 절차, `lite/README.md` 계약)으로 `custom_style_anchor.facets` 채움; 실패 시 재시도 1회 뒤 facets 없이(§8 남은 것 3가 정해지면 그에 따라).

@@ -142,14 +142,17 @@ describe('프리셋 12종 facet 시드', () => {
   const index = JSON.parse(readFileSync(FACETS_SOURCE, 'utf8'))
   const seed = buildFacetsSeed(index) as Record<string, Record<string, unknown>>
 
-  it('프리셋 12종 모두 인계 파일의 v4 조각(방향어 상한, 2026-10-09 오너 결정) 그대로 시드에 들어간다', () => {
+  it('프리셋 12종 모두 인계 파일의 v5 조각(방향어 상한 + 신장 % 비례 문장, 2026-10-09 오너 결정) 그대로 시드에 들어간다', () => {
     expect(Object.keys(seed).sort()).toEqual([
       'jp_anime', 'real', 'real_3d', 'real_desert_fantasy', 'real_euro_period', 'real_hitech_sf',
       'real_jp_melo', 'real_psy_horror', 'real_urban_hero', 'stop_motion', 'us_cartoon', 'watercolor',
     ])
-    for (const [key, entry] of Object.entries(index) as Array<[string, { facets: Record<string, unknown> }]>) {
-      expect(entry.facets.version).toBe('hp-v1.2.3+figure-board+compile-v3+priority-cap')
+    for (const [key, entry] of Object.entries(index) as Array<[string, { facets: Record<string, string> }]>) {
+      expect(entry.facets.version).toBe('hp-v1.2.3+figure-board+compile-v3+priority-cap+height-pct')
       expect(entry.facets.figure, `${key}.figure`).toMatch(/Keep every proportion close to the stated values; do not exaggerate beyond them\.$/)
+      // 신장 % 문장은 등신 문장 바로 뒤에 한 번 — 소수점 안에 끼어 숫자를 가르면 안 된다(사이클 12 시험본 결함)
+      expect(entry.facets.figure.match(/Measured on the standing height from the ground up:/g), `${key}.figure`).toHaveLength(1)
+      expect(entry.facets.figure, `${key}.figure`).toMatch(/\. Measured on the standing height from the ground up: .*?and the head at this size\. [A-Z]/)
       for (const field of ['probe_anchors', 'figure', 'priority', 'negative']) {
         expect(seed[key][field], `${key}.${field}`).toBe(entry.facets[field])
       }

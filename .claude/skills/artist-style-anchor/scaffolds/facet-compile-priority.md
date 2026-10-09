@@ -1,6 +1,7 @@
 <!-- 확정 레시피 R1의 "방향어 + 우선순위 줄" 조립 스펙 (2026-10-02 오너 확정, 가이드 §6 36). facet 사이클 9의 R1c 조건에서 쓴 스펙에
      2026-10-09 오너 결정(사이클 11 A2, 프리셋 v4)으로 **방향어 상한**("slightly" + 끝 문장)을 넣었고, 등신 주석 조건을 가이드 §6 36 ③의 뜻대로 고쳤다
      (모발을 제외하고 두개골 정수리를 추정한 값에는 붙이지 않는다 — 이전 문구는 프리셋 12종 중 10종에 주석을 잘못 붙였다).
+     2026-10-09 저녁 오너 결정(사이클 12 L, 프리셋 v5)으로 **신장 % 문장**을 더했다 — 모델이 아니라 하네스(스크립트)가 모델 산출 뒤에 끼운다(맨 아래 절).
      컴파일이 끝난 폴더(filled.json + prompts.md)에서 priority.md를 만든다. 손 항목 보강은 들어 있지 않다(다음 사이클 검증 후보). -->
 
 # 작업: 우선순위 줄과 방향어 보강 (가이드 §6 36 — 방향어 상한 포함)
@@ -19,3 +20,6 @@
 - 비례 수치마다 사실 비례 대비 방향어를 그 수치 바로 앞에 붙인다: 몸통 길이가 신장의 30% 미만이면 "a compressed torso"; 종아리(무릎~발바닥) : 허벅지가 1.4 : 1 이상이면 "stretched lower legs"; 다리 비율이 55% 이상이면 "long legs"; 신발 높이가 머리 높이의 0.6배 이상이거나 길이가 0.9배 이상이면 "oversized"; 손이 얼굴 높이의 0.8배 이상이면 "oversized hands"; 어깨 폭이 머리 폭의 1.5배 이하이면 "narrow shoulders". 문턱에 못 미치는 수치에는 방향어를 붙이지 않는다.
 - **방향어 상한**: 방향어는 수치가 문턱을 넘은 정도에 따라 둘 중 하나로 쓴다 — 문턱을 20% 미만으로 넘으면 "slightly"를 앞에 붙인다("a slightly compressed torso", "slightly stretched lower legs", "slightly oversized"); 20% 이상 넘으면 방향어만. 그리고 FIGURE 문단 끝에 이 문장을 그대로 한 번 붙인다: "Keep every proportion close to the stated values; do not exaggerate beyond them."
 - **등신 주석**: `filled.json`의 `인물.비례.등신` 값이 머리카락이나 모자의 꼭대기를 머리 높이에 **포함해** 쟀다고 적혀 있거나 등신이 6 미만이면, 등신 구절 뒤에 "measured to the top of the hair or hat, so keep the skull itself small"을 붙인다. 모발에 가린 두개골 정수리를 추정해 모발을 제외하고 쟀다고 적혀 있으면 붙이지 않는다(그 값은 이미 두개골 기준이다).
+
+## 신장 % 문장 — 하네스가 붙인다 (모델 작업 아님; 프리셋 v5, 2026-10-09 오너 결정)
+모델이 낸 FIGURE에 스크립트가 **등신 문장 바로 뒤**(마침표 + 공백 + 대문자로 시작하는 진짜 문장 경계 — 소수점은 경계가 아니다)에 한 문장을 끼운다. 수치는 `filled.json` `인물.비례`에서 계산한다: 머리 % = 100 ÷ 등신(반올림), 가랑이 높이 % = `다리 비율`의 %, 무릎 높이 % = 다리 비율 × r ÷ (1 + r)(r = `분절 비`의 하퇴 : 허벅지, 밑창 포함; '팔' 앞에 적힌 다리 비만 본다). 문장(글자 그대로, N만 바꾼다): "Measured on the standing height from the ground up: the knee (top of the lower leg, shoe included) is at about N% of the height, the crotch at about N%, and the head from chin to skull top is about N% of the height; draw the knee and the crotch at these heights, not higher, and the head at this size." `분절 비`가 대리값(무릎 표식 없음)이면 무릎 구절을 뺀 꼴로: "Measured on the standing height from the ground up: the crotch is at about N% of the height and the head from chin to skull top is about N% of the height; draw the crotch at this height, not higher, and the head at this size." 그 밖의 글자는 바꾸지 않는다. 참조 구현 `dev/Image_Style/facet_presets/cycle12/bin/make_v5.py`(로컬). 측정 근거: 사이클 12 L에서 v4 대비 차이 없음(11:13, 점수 차 0) — 채택은 오너 판정이고, 비례는 이것으로 텍스트 시도를 끝낸다(가이드 §6 36 ①).
