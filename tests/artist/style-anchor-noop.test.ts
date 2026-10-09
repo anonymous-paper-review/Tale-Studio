@@ -81,9 +81,9 @@ const WRITER_SHOT_ID = 'writer-shot-1'
 const WEBHOOK_URL = 'https://hook.test/webhook'
 const BASE_URL = 'https://base.test'
 const TEMPLATE_URL = `${BASE_URL}/character-template.png`
-// #owner-default(2026-09-02): generate-sheet 는 image-models.ts 의 DEFAULT_IMAGE_MODEL(nano-banana-2) 로 엔드포인트를 고른다.
-const DEFAULT_IMAGE_MODEL = 'fal-ai/nano-banana-2'
-const DEFAULT_EDIT_IMAGE_MODEL = 'fal-ai/nano-banana-2/edit'
+// #owner-default(2026-10-09): generate-sheet 는 image-models.ts 의 DEFAULT_IMAGE_MODEL(gpt-image-2) 로 엔드포인트를 고른다(앞: 2026-09-02 nano-banana-2).
+const DEFAULT_IMAGE_MODEL = 'openai/gpt-image-2'
+const DEFAULT_EDIT_IMAGE_MODEL = 'openai/gpt-image-2/edit'
 
 interface DesignTokens {
   l1?: {
@@ -405,7 +405,7 @@ describe('스타일을 따로 덧붙이지 않는 기본 동작을 확인한다'
 
     expect(result).toEqual({ submitted: 2, skipped: 0, failed: 0 })
     expect(mocks.falImageSubmit).toHaveBeenCalledTimes(2)
-    // #ref-gate(2026-09-02): 서버 초안은 Artist 와 같은 레지스트리 기본(nano-banana-2)과 같은 입력 조립
+    // #ref-gate(2026-09-02): 서버 초안은 Artist 와 같은 레지스트리 기본(2026-10-09 부터 gpt-image-2)과 같은 입력 조립
     //   (의상·디자인 토큰·팔레트; 앵커 없으면 토큰 원문 그대로)을 쓴다 — 옛 자체 DRAFT_MODEL 상수 폐기.
     const noAnchorInput = (character: CharacterRow) =>
       resolveCharacterPromptInput({
@@ -415,7 +415,7 @@ describe('스타일을 따로 덧붙이지 않는 기본 동작을 확인한다'
         hasAnchor: false,
       })
     expect(falOptsAt(0)).toEqual({
-      model: 'fal-ai/nano-banana-2/edit',
+      model: 'openai/gpt-image-2/edit',
       prompt: buildCharacterTurnaroundPrompt(noAnchorInput(templatePerson)),
       reference_image_urls: [TEMPLATE_URL],
       webhookUrl: WEBHOOK_URL,
@@ -428,7 +428,7 @@ describe('스타일을 따로 덧붙이지 않는 기본 동작을 확인한다'
     })
     expect(falOptsAt(0).prompt).not.toContain('STYLE REFERENCE')
     expect(falOptsAt(1)).toEqual({
-      model: 'fal-ai/nano-banana-2',
+      model: 'openai/gpt-image-2',
       prompt: buildCharacterTurnaroundPrompt(noAnchorInput(fallbackPerson)),
       aspect_ratio: '3:2',
       webhookUrl: WEBHOOK_URL,

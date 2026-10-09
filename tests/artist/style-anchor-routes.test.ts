@@ -21,9 +21,9 @@ const mocks = vi.hoisted(() => ({
   templateAssetUrl: vi.fn(),
   from: vi.fn(),
   webhookBaseUrl: 'https://base.test' as string | null,
-  // #owner-default(2026-09-02): generate-sheet 는 image-models.ts 의 DEFAULT_IMAGE_MODEL(nano-banana-2) 를 쓴다.
+  // #owner-default(2026-10-09): generate-sheet 는 image-models.ts 의 DEFAULT_IMAGE_MODEL(gpt-image-2) 를 쓴다(앞: 2026-09-02 nano-banana-2).
   //   generate-storyboard 는 여전히 @/lib/writer/llm/fal 의 DEFAULT_EDIT_IMAGE_MODEL(gpt-image-2/edit) 를 쓰므로 둘 다 유지.
-  DEFAULT_IMAGE_MODEL: 'fal-ai/nano-banana-2',
+  DEFAULT_IMAGE_MODEL: 'openai/gpt-image-2',
   DEFAULT_EDIT_IMAGE_MODEL: 'openai/gpt-image-2/edit',
 }))
 
@@ -253,14 +253,14 @@ describe('선택한 스타일을 그림 만들기에 반영한다', () => {
     const expectedPrompt = `${STYLE_ANCHOR_CLAUSE}\n${STYLE_ANCHOR_TEMPLATE_CLAUSE}\n${buildCharacterTurnaroundPrompt(sheetPromptInput(character, designTokens))}`
     expect(response.status).toBe(200)
     expect(firstFalOpts()).toEqual({
-      model: 'fal-ai/nano-banana-2/edit',
+      model: 'openai/gpt-image-2/edit',
       prompt: expectedPrompt,
       reference_image_urls: [ANCHOR_URL, TEMPLATE_URL],
       webhookUrl: WEBHOOK_URL,
       aspect_ratio: '16:9',
     })
     expect(firstGenerationJobArg().inputSnapshot).toMatchObject({
-      model: 'fal-ai/nano-banana-2/edit',
+      model: 'openai/gpt-image-2/edit',
       prompt: expectedPrompt,
       reference_image_urls: [ANCHOR_URL, TEMPLATE_URL],
       aspect_ratio: '16:9',
@@ -371,8 +371,8 @@ describe('선택한 스타일을 그림 만들기에 반영한다', () => {
 
     expect(response.status).toBe(200)
     expect(firstFalOpts()).toEqual({
-      // #owner-default(2026-08-31): 이 경로는 image-models.ts 의 resolveImageEndpoint 를 거치므로 DEFAULT_IMAGE_MODEL(nano-banana-2)의 edit 갈래.
-      model: 'fal-ai/nano-banana-2/edit',
+      // #owner-default(2026-10-09): 이 경로는 image-models.ts 의 resolveImageEndpoint 를 거치므로 DEFAULT_IMAGE_MODEL(gpt-image-2)의 edit 갈래.
+      model: 'openai/gpt-image-2/edit',
       prompt: buildCharacterViewPrompt(sheetPromptInput(character, designTokens), 'back'),
       reference_image_urls: ['https://img/main.png'],
       webhookUrl: WEBHOOK_URL,
@@ -506,16 +506,16 @@ describe('선택한 스타일을 그림 만들기에 반영한다', () => {
     expect(result).toEqual({ submitted: 2, skipped: 0, failed: 0 })
     expect(mocks.falImageSubmit).toHaveBeenCalledTimes(2)
     expect(mocks.reserveGenerationJob).toHaveBeenCalledTimes(2)
-    // 모델 = Artist 와 같은 레지스트리 기본(#owner-default 2026-09-02: nano-banana-2)의 edit 갈래.
+    // 모델 = Artist 와 같은 레지스트리 기본(#owner-default 2026-10-09: gpt-image-2)의 edit 갈래.
     expect(falOptsAt(0)).toEqual({
-      model: 'fal-ai/nano-banana-2/edit',
+      model: 'openai/gpt-image-2/edit',
       prompt: expectedTemplatePrompt,
       reference_image_urls: [ANCHOR_URL, TEMPLATE_URL],
       aspect_ratio: '16:9',
       webhookUrl: WEBHOOK_URL,
     })
     expect(generationJobArgAt(0).inputSnapshot).toMatchObject({
-      model: 'fal-ai/nano-banana-2/edit',
+      model: 'openai/gpt-image-2/edit',
       prompt: expectedTemplatePrompt,
       reference_image_urls: [ANCHOR_URL, TEMPLATE_URL],
       aspect_ratio: '16:9',
@@ -543,7 +543,7 @@ describe('선택한 스타일을 그림 만들기에 반영한다', () => {
         computeLookFingerprint(null, templatePerson.costume, null),
       ),
     )
-    // 템플릿 없는 폴백은 T2I 갈래(fal-ai/nano-banana-2)로 제출되지만, 앵커가 참조를 붙이면 Rule M 이 edit 로 되돌린다.
+    // 템플릿 없는 폴백은 T2I 갈래(openai/gpt-image-2)로 제출되지만, 앵커가 참조를 붙이면 Rule M 이 edit 로 되돌린다.
     expect(falOptsAt(1)).toEqual({
       model: DEFAULT_EDIT_IMAGE_MODEL,
       prompt: expectedFallbackPrompt,
@@ -596,7 +596,7 @@ describe('선택한 스타일을 그림 만들기에 반영한다', () => {
         hasAnchor: false,
       })
     expect(falOptsAt(0)).toEqual({
-      model: 'fal-ai/nano-banana-2/edit',
+      model: 'openai/gpt-image-2/edit',
       prompt: buildCharacterTurnaroundPrompt(noAnchorInput(templatePerson)),
       reference_image_urls: [TEMPLATE_URL],
       webhookUrl: WEBHOOK_URL,
@@ -605,7 +605,7 @@ describe('선택한 스타일을 그림 만들기에 반영한다', () => {
     expect(falOptsAt(0).prompt).not.toContain(STYLE_ANCHOR_CLAUSE)
     // 서버 초안도 image-models.ts 레지스트리 기본을 따른다(#ref-gate 2026-09-02 — 옛 자체 DRAFT_MODEL 상수 폐기).
     expect(falOptsAt(1)).toEqual({
-      model: 'fal-ai/nano-banana-2',
+      model: 'openai/gpt-image-2',
       prompt: buildCharacterTurnaroundPrompt(noAnchorInput(fallbackPerson)),
       aspect_ratio: '3:2',
       webhookUrl: WEBHOOK_URL,

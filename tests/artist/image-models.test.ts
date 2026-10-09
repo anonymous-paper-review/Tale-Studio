@@ -37,10 +37,13 @@ describe('이미지 모델 선택 약속', () => {
     expect(IMAGE_MODEL_ORDER[0]).toBe(DEFAULT_IMAGE_MODEL)
   })
 
-  it('#owner-default(2026-09-02): 기본 모델은 nano-banana-2, 1세대는 선택지로 남는다', () => {
-    expect(DEFAULT_IMAGE_MODEL).toBe('nano-banana-2')
+  it('기본 그림 모델은 gpt-image-2이고 nano-banana-2와 1세대는 선택지로 남는다 (#owner-default 2026-10-09)', () => {
+    // 2026-10-09 오너: "기본 모델 gpt-image-2으로 변경해줘" — 앞 문장은 "#owner-default(2026-09-02): 기본 모델은 nano-banana-2, 1세대는 선택지로 남는다".
+    expect(DEFAULT_IMAGE_MODEL).toBe('gpt-image-2')
+    expect(IMAGE_MODEL_ORDER).toContain('nano-banana-2')
     expect(IMAGE_MODELS['nano-banana-2'].t2iEndpoint).toBe('fal-ai/nano-banana-2')
     expect(IMAGE_MODELS['nano-banana-2'].editEndpoint).toBe('fal-ai/nano-banana-2/edit')
+    expect(isImageModelKey('nano-banana-2')).toBe(true)
     expect(isImageModelKey('nano-banana')).toBe(true)
   })
 
