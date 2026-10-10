@@ -81,7 +81,7 @@ function deltaClause(input: CharacterPromptInput): string[] {
   return d ? [`apply requested changes (override defaults where conflicting): ${d}`] : []
 }
 
-function describe(input: CharacterPromptInput): string[] {
+function describeParts(input: CharacterPromptInput): { lead: string[]; appearance: string; costumes: string[] } {
   const safe = input.safeMode === true
   const appearance = safe ? safeScrub(input.appearance) : input.appearance
   const costumeList = safe
@@ -98,31 +98,60 @@ function describe(input: CharacterPromptInput): string[] {
   const anchorCostumes = costumeList.filter((c) => !ALT_OUTFIT.test(c))
   const finalCostumes = anchorCostumes.length ? anchorCostumes : costumeList
   const costumes = finalCostumes.length ? `wearing ${finalCostumes.join(', ')}` : ''
-  return [
-    // safe-mode: 명시 나이 토큰 제거(age-ambiguous 로 대체).
-    safe ? '' : input.age ? `age ${input.age}` : '',
-    input.role,
-    appearance,
-    costumes,
-  ].filter((x): x is string => !!x)
+  return {
+    lead: [
+      // safe-mode: 명시 나이 토큰 제거(age-ambiguous 로 대체).
+      safe ? '' : input.age ? `age ${input.age}` : '',
+      input.role ?? '',
+    ].filter((x): x is string => !!x),
+    appearance: appearance ?? '',
+    costumes: costumes ? [costumes] : [],
+  }
 }
+
+/**
+ * 상한 안에 맞춘다(2026-10-10 오너) — 넘치면 앞뒤 지시문 · 이름 · 역할 · 의상 · 그림체 값 · 요청은 그대로 두고
+ *   인물 외형 설명만 뒤 문장부터 줄인다. 종전엔 통째로 잘라 끝의 지시문(디테일 · 팔레트 칸, "흔한 애니로 돌아가지
+ *   말 것" 등)이 빠졌다(운영 806e2cc2 소녀). 상한 안이면 종전과 글자 하나 다르지 않다.
+ */
+function fitToCap(before: string[], appearance: string, after: string[], cap: number): string {
+  const join = (text: string) => [...before, text, ...after].filter(Boolean).join('. ')
+  const full = join(appearance)
+  if (full.length <= cap) return full
+  const sentences = appearance.split(/(?<=[.!?。])\s+/).filter(Boolean)
+  for (let n = sentences.length - 1; n >= 1; n--) {
+    const text = join(sentences.slice(0, n).join(' '))
+    if (text.length <= cap) return text
+  }
+  // 첫 문장만으로도 넘치면 낱말 경계에서 자른다. 설명 없이도 넘치면(지시문만으로 상한) 종전처럼 자른다.
+  const budget = cap - join('').length - 3
+  if (budget >= 20 && sentences[0]) return join(`${sentences[0].slice(0, budget).replace(/\s+\S*$/, '')}…`)
+  return join('').slice(0, cap)
+}
+
+/** 인물 시트 프롬프트 상한 — 시트 지시문(약 950자)과 참조 절을 빼고도 설명이 들어가게(2026-10-10, 종전 1,500자에서는 설명이 200자도 안 남았다). */
+const SHEET_PROMPT_CAP = 2400
+/** 대표 그림 · 방향 뷰 프롬프트 상한(종전 그대로). */
+const SINGLE_PROMPT_CAP = 900
 
 /**
  * main(대표 포트레이트) 프롬프트 — 풀바디·정면·중립배경·단일 캐릭터.
  * reference 없이 깨끗하게 생성하는 T2I 용.
  */
 export function buildCharacterMainPrompt(input: CharacterPromptInput): string {
-  return [
-    `Character reference portrait of ${input.name}`,
-    ...describe(input),
-    ...styleTokens(input),
-    ...deltaClause(input),
-    ...(input.safeMode ? [SAFE_TOKENS] : []),
-    'full body, single character, front view, neutral grey background, even studio lighting, clean composition, no text, no logo',
-  ]
-    .filter(Boolean)
-    .join('. ')
-    .slice(0, 900)
+  const d = describeParts(input)
+  return fitToCap(
+    [`Character reference portrait of ${input.name}`, ...d.lead],
+    d.appearance,
+    [
+      ...d.costumes,
+      ...styleTokens(input),
+      ...deltaClause(input),
+      ...(input.safeMode ? [SAFE_TOKENS] : []),
+      'full body, single character, front view, neutral grey background, even studio lighting, clean composition, no text, no logo',
+    ],
+    SINGLE_PROMPT_CAP,
+  )
 }
 
 /**
@@ -135,7 +164,8 @@ export function buildCharacterTurnaroundPrompt(
   input: CharacterPromptInput,
   opts?: { hasBaseFace?: boolean; hasPriorRender?: boolean; hasSourceImage?: boolean },
 ): string {
-  return [
+  const d = describeParts(input)
+  const head = [
     `Fill in this character reference-sheet template with ${input.name}`,
     // #image-to-artist(2026-09-17): 사용자가 올린 원본이 참조로 붙어 있으면 그 사람을 그대로 그린다 —
     //   얼굴·머리·피부·체형·옷·색. 원본의 배경·구도는 시트로 가져오지 않는다(템플릿 레이아웃이 우선).
@@ -163,7 +193,9 @@ export function buildCharacterTurnaroundPrompt(
           'one of the reference images is the PREVIOUS render of this exact character — keep the same face, identity, design and proportions so it stays recognisably the same person; apply ONLY the adjustments described above and never drift into a different face',
         ]
       : []),
-    ...describe(input),
+  ]
+  const tail = [
+    ...d.costumes,
     ...styleTokens(input),
     ...deltaClause(input),
     ...(input.safeMode ? [SAFE_TOKENS] : []),
@@ -181,9 +213,7 @@ export function buildCharacterTurnaroundPrompt(
     //   표현이라 아트 스타일 자체가 애니인 프로젝트와는 충돌하지 않는다(디폴트 회귀만 금지).
     'follow the declared art style exactly — never fall back to a generic anime, chibi or mascot look',
   ]
-    .filter(Boolean)
-    .join('. ')
-    .slice(0, 1500)
+  return fitToCap([...head, ...d.lead], d.appearance, tail, SHEET_PROMPT_CAP)
 }
 
 /**
@@ -194,16 +224,17 @@ export function buildCharacterViewPrompt(
   input: CharacterPromptInput,
   view: DirectionalView,
 ): string {
-  return [
-    `The same character as the reference image, ${input.name}`,
-    VIEW_ANGLE[view],
-    ...describe(input),
-    ...styleTokens(input),
-    ...deltaClause(input),
-    ...(input.safeMode ? [SAFE_TOKENS] : []),
-    'identical character, identical outfit and proportions to the reference, full body, single character, neutral grey background, even studio lighting, no text, no logo',
-  ]
-    .filter(Boolean)
-    .join('. ')
-    .slice(0, 900)
+  const d = describeParts(input)
+  return fitToCap(
+    [`The same character as the reference image, ${input.name}`, VIEW_ANGLE[view], ...d.lead],
+    d.appearance,
+    [
+      ...d.costumes,
+      ...styleTokens(input),
+      ...deltaClause(input),
+      ...(input.safeMode ? [SAFE_TOKENS] : []),
+      'identical character, identical outfit and proportions to the reference, full body, single character, neutral grey background, even studio lighting, no text, no logo',
+    ],
+    SINGLE_PROMPT_CAP,
+  )
 }

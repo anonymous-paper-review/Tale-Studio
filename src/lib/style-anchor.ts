@@ -53,6 +53,29 @@ export function parseStyleAnchorFacets(raw: unknown): StyleAnchorFacets | null {
   }
 }
 
+// 카메라 각도(2026-10-10 오너) — 사용자 그림 분석은 그 그림 한 장의 구도(높은 부감 등)를 그림체로 담는다(운영 806e2cc2:
+//   그림체 핵심 첫 문장 "High bird's-eye linear perspective", 우선순위 1번 "high-angle perspective"가 정면 시트 · 배경에도 실렸다).
+//   그림 프롬프트에 실을 때 그림체 핵심 · 우선순위에서 카메라 각도 문장 · 항목을 뺀다. 저장된 분석은 그대로 두고, 투영 방식이
+//   그림체인 문장(아이소메트릭 등)은 남긴다. 프리셋 조각은 오너가 다듬은 것이라 손대지 않는다.
+const CAMERA_ANGLE_RE =
+  /\b(?:bird'?s[- ]eye|worm'?s[- ]eye|high[- ]angle|low[- ]angle|eye[- ]level|dutch[- ]angle|vantage point|viewpoint)\b|\b(?:overhead|top[- ]down|aerial)\s+(?:view|shot|angle|perspective|camera)\b|\b(?:high|low)\s+(?:3\/4|three[- ]quarter)/i
+const PROJECTION_STYLE_RE = /\b(?:isometric|axonometric|orthographic|parallel projection|oblique projection)\b/i
+const isCameraAngleOnly = (text: string) => CAMERA_ANGLE_RE.test(text) && !PROJECTION_STYLE_RE.test(text)
+
+/** 사용자 그림 분석 조각에서 카메라 각도를 뺀 사본 — 그림체 핵심은 문장 단위, 우선순위는 항목 단위. 다 빠지면 원문 그대로. */
+export function withoutCameraAngle(facets: StyleAnchorFacets): StyleAnchorFacets {
+  const kept = facets.probeAnchors.split(/(?<=\.)\s+/).filter((sentence) => !isCameraAngleOnly(sentence))
+  const probeAnchors = kept.join(' ').trim() || facets.probeAnchors
+  let priority = facets.priority
+  const parts = priority?.match(/^(Priority order:\s*)([\s\S]*?)(\.?)$/)
+  if (priority && parts) {
+    const items = parts[2].split(/\s*→\s*/)
+    const keptItems = items.filter((item) => !isCameraAngleOnly(item))
+    if (keptItems.length > 0 && keptItems.length < items.length) priority = `${parts[1]}${keptItems.join(' → ')}${parts[3]}`
+  }
+  return { ...facets, probeAnchors, priority }
+}
+
 // 조각에 표정 우선 문장이 이미 있으면 다시 붙이지 않는다(인계 §4 — 중복 금지).
 const EXPRESSION_PRIORITY_RE = /expression[^.]*\bpriority\b|\bpriority\b[^.]*expression/i
 
@@ -263,7 +286,8 @@ export async function resolveStyleAnchor(
 
   const custom = parseCustomStyleAnchor(project.custom_style_anchor)
   if (custom) {
-    return { key: project.style_anchor_key ?? 'custom', imageUrl: custom.url, ...withFacets(custom.facets ?? null) }
+    // 사용자 그림 분석은 카메라 각도를 빼고 싣는다(2026-10-10 오너) — 프리셋은 아래 경로 그대로.
+    return { key: project.style_anchor_key ?? 'custom', imageUrl: custom.url, ...withFacets(custom.facets ? withoutCameraAngle(custom.facets) : null) }
   }
 
   const anchor = await resolveStyleAnchorByKey(project.style_anchor_key)
