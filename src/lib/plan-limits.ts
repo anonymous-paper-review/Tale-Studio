@@ -59,6 +59,8 @@ export function getPlanEntitlements(plan: unknown): PlanEntitlements {
 }
 
 // #f4(2026-08-27 오너 확정): 프로젝트당 영상 생성 한도 — 전 요금제 공통 고정 100회.
-//   '생성 시도' 기준(영상 kind 잡 행 수) — 실패도 fal 과금이 발생할 수 있어 차감으로 센다.
-//   현재는 표시용 진실(사이드바 게이지)이며 하드 블록은 별도 결정 전까지 없다.
+//   '결과물이 나왔거나 나올 생성' 기준이다 — 결과물 없이 실패한 잡(status='failed')은 세지 않고
+//   진행 중(queued)과 완료만 센다(환불 정책 §5 ② — 모델 제공자 필터 거절·시스템 오류로 결과물이
+//   없으면 Take 와 함께 플랜 포함 한도도 돌려준다). 집계는 generation-quota.countProjectVideoGenerations —
+//   사이드바 게이지와 생성 하드 블록(429)이 그 함수 하나를 공유한다.
 export const PROJECT_VIDEO_GENERATION_LIMIT = 100

@@ -7,7 +7,7 @@ import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { listActiveGenerationJobs, listGenerationCompletionRows, listRecentGenerationJobRows, userOwnsProject } from '@/lib/generation-jobs'
 import { completionsOf, summarizeGenerationBatches } from '@/lib/generation-batches'
-import { VIDEO_JOB_KINDS } from '@/lib/generation-quota'
+import { countProjectVideoGenerations } from '@/lib/generation-quota'
 import { PROJECT_VIDEO_GENERATION_LIMIT } from '@/lib/plan-limits'
 import { reconcileGhostQueuedJobs } from '@/lib/fal/reconcile'
 import { supabaseAdmin } from '@/lib/supabase/admin'
@@ -44,12 +44,11 @@ export async function GET(req: Request) {
   const jobs = await listActiveGenerationJobs(projectId)
   // #f4: 프로젝트당 영상 생성 사용량 — 이 라우트는 이미 모든 탭이 공유 폴링하므로(4s/15s),
   //   여기 실어 보내면 사이드바 게이지가 추가 폴러 없이 실시간이 된다. count(head) 라 가볍다.
-  const { count: videoUsed } = await supabaseAdmin
-    .from('generation_jobs')
-    .select('id', { count: 'exact', head: true })
-    .eq('project_id', projectId)
-    .in('kind', VIDEO_JOB_KINDS as unknown as string[])
-  const videoUsage = { used: videoUsed ?? 0, limit: PROJECT_VIDEO_GENERATION_LIMIT }
+  //   집계 자실은 게이트와 공용 함수다 — 게이지와 게이트가 다른 수를 보면 "다 썼다"와 "생성된다"가 엇갈린다.
+  const videoUsage = {
+    used: await countProjectVideoGenerations(projectId),
+    limit: PROJECT_VIDEO_GENERATION_LIMIT,
+  }
   // 약속 D(2026-09-04): 핀 "n/N"·왼쪽 탭 숫자·Director 버튼 숫자의 단일 근거 — 서버 큐에서 파생한 배치와 완료 기록.
   const recentRows = await listRecentGenerationJobRows(projectId)
   const batches = summarizeGenerationBatches(recentRows)

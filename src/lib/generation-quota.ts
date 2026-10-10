@@ -228,12 +228,31 @@ export function quotaExceededBody(check: QuotaCheck) {
 }
 
 // ── #f4 하드 블록(2026-08-27 오너 확정): 프로젝트당 영상 생성 총량 게이트 ──
-// 사이드바 게이지와 같은 집계(영상 kind 잡 행 수 — 실패 포함)를 진실로 쓴다. admin 은 면제
-//   (운영·QA), 집계 실패는 fail-open — 동시성 게이트와 같은 규약.
+// 사이드바 게이지와 같은 집계를 진실로 쓴다. admin 은 면제(운영·QA), 집계 실패는 fail-open —
+//   동시성 게이트와 같은 규약.
 export interface ProjectVideoBudget {
   ok: boolean
   used: number
   limit: number
+}
+
+/**
+ * 프로젝트의 영상 생성 차감 수 — 게이트(checkProjectVideoBudget)와 사이드바 게이지가 같은 수를 본다.
+ *
+ * 결과물이 없는 실패(status='failed')는 세지 않는다 — 환불 정책 §5 ②: 모델 제공자 필터 거절이나
+ *   시스템 오류로 결과물이 없으면 Take 와 함께 플랜 포함 생성 한도도 돌려준다. Take 반환은
+ *   release 경로(director-video-takes.markDirectorVideoAttemptFailed)가, 한도 반환은 이 집계가 한다.
+ * 진행 중(queued)은 계속 센다 — 아직 결과물이 없지만 곧 생기고, 동시 제출로 한도를 넘기는 길을
+ *   열어 두면 안 된다.
+ */
+export async function countProjectVideoGenerations(projectId: string): Promise<number> {
+  const { count } = await supabaseAdmin
+    .from('generation_jobs')
+    .select('id', { count: 'exact', head: true })
+    .eq('project_id', projectId)
+    .in('kind', VIDEO_JOB_KINDS as unknown as string[])
+    .neq('status', 'failed')
+  return count ?? 0
 }
 
 export async function checkProjectVideoBudget(
@@ -243,12 +262,7 @@ export async function checkProjectVideoBudget(
   const limit = PROJECT_VIDEO_GENERATION_LIMIT
   try {
     if (await isAdminUserId(userId)) return { ok: true, used: 0, limit }
-    const { count } = await supabaseAdmin
-      .from('generation_jobs')
-      .select('id', { count: 'exact', head: true })
-      .eq('project_id', projectId)
-      .in('kind', VIDEO_JOB_KINDS as unknown as string[])
-    const used = count ?? 0
+    const used = await countProjectVideoGenerations(projectId)
     return { ok: used < limit, used, limit }
   } catch {
     return { ok: true, used: 0, limit }

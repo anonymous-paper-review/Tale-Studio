@@ -8,7 +8,8 @@ vi.mock('@/lib/generation-jobs', () => ({
 }))
 vi.mock('@/lib/supabase/auth', () => ({ getUser: async () => ({ id: 'user' }) }))
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: {
-  from: () => ({ select: () => ({ eq: () => ({ in: async () => ({ count: 0 }) }) }) }),
+  // 영상 사용량 집계는 결과물 없이 실패한 잡을 뺀다(neq status failed) — generation-quota.countProjectVideoGenerations.
+  from: () => ({ select: () => ({ eq: () => ({ in: () => ({ neq: async () => ({ count: 0 }) }) }) }) }),
 } }))
 vi.mock('@/lib/fal/reconcile', () => ({ reconcileGhostQueuedJobs: async () => {} }))
 import { GET } from '@/app/api/generation/active/route'
