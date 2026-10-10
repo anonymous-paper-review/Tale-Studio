@@ -2132,4 +2132,10 @@ export const KO: Record<string, string> = {
   "The picture goes to an analysis model to describe its art style, and the style is then fixed.": "그림을 분석 모델로 보내 그림체 설명을 만들어요. 올린 그림체로 고정돼요.",
   "Uploading the picture…": "그림을 올리고 있어요…",
   "Choose a picture file.": "그림 파일을 골라 주세요.",
+  // 채팅 모델이 첨부 그림을 그림체로 쓰자고 할 때 묻는 질문 (2026-10-10)
+  "Use this picture as the art style? If you do, the picture goes to an analysis model and the art style is then fixed.": "이 그림을 그림체로 쓸까요? 고르면 그림을 분석 모델로 보내고, 그 그림체로 고정돼요.",
+  "Use as the art style": "그림체로 쓰기",
+  "Keep as reference": "참고 자료로 두기",
+  "Kept it as reference only.": "참고 자료로 둘게요.",
+  "this picture": "이 그림", // copy-ok: fragment
 }

@@ -170,8 +170,8 @@ MATERIAL to adapt. That means:
 - Extract characters[] and backgrounds[] you can actually see. Describe appearance from the art.
 
 When the user instead signals they want the project drawn in the LOOK of an attached image
-("이 그림체로 가줘", "이런 느낌으로 그려줘", "이 화풍 써줘"), set the project's art style from that
-image by emitting styleAnchorFromAttachment in the JSON block:
+("이 그림체로 가줘", "이런 느낌으로 그려줘", "이 화풍 써줘"), propose that image as the project's art
+style by emitting styleAnchorFromAttachment in the JSON block:
 
 {"extractedSettings": {"styleAnchorFromAttachment": {"imageIndex": 0, "label": "${labelExample}", "medium": "<one of the allowed mediums>"}}}
 
@@ -182,8 +182,11 @@ image by emitting styleAnchorFromAttachment in the JSON block:
   Choose the closest match. Getting this wrong makes the script pipeline fight the art direction.
 - label is what the user will see as their style name. Describe the look, not the source work
   (write "거친 선 수채" — never a title, franchise or creator name).
-- Also describe the style concretely in your reply (medium, linework, shading, palette, mood) so
-  the user can tell you got it right, and say they can change it any time using the palette icon below the chat input.
+- Emitting this does NOT set the style. The app then asks the user whether to use the picture as the
+  art style: if they agree, the picture goes to an analysis model and the art style is fixed for this
+  project, so it cannot be changed later. Describe the look concretely in your reply (medium,
+  linework, shading, palette, mood) and say you will ask whether to use it as the art style. Never
+  say the style is set, and never say it can be changed later.
 - Emit this ONLY when the user wants the project rendered that way. A user who attached a webtoon
   to adapt its story is not asking for this — read it as source material instead.
 

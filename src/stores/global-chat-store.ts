@@ -22,9 +22,9 @@ import { extractedChangesProducer, useProducerStore, type ExtractedSettings } fr
 import { evaluateProducerGate } from '@/lib/producer-gate'
 import { selectedProducerDialogueLanguage } from '@/lib/producer-dialogue-language'
 import { fixKoreanParticles } from '@/lib/korean-particles'
-import { coerceCardFill, matchImageUseAnswer, matchImageUseInText, type CardFill, type ImageUseAnswer } from '@/lib/producer/image-role'
+import { coerceCardFill, matchImageUseAnswer, matchImageUseInText, matchYesNo, type CardFill, type ImageUseAnswer } from '@/lib/producer/image-role'
 import { MAX_COMIC_PAGES, comicStyleQuestion, imageBatchQuestion, matchBatchImageAnswer, matchComicAnswer, matchComicIntentInText, matchComicStyleAnswer, sortComicPages } from '@/lib/producer/comic-intake'
-import { CHAT_IMAGE_ROLE_CONSENT, CHAT_STYLE_REQUEST_CONSENT, COMIC_ANALYSIS_CONSENT, CREATION_ANALYSIS_CONSENT, STYLE_PICKER_CONSENT } from '@/lib/style-facets/consent'
+import { CHAT_IMAGE_ROLE_CONSENT, CHAT_STYLE_CONFIRM_CONSENT, CHAT_STYLE_REQUEST_CONSENT, COMIC_ANALYSIS_CONSENT, CREATION_ANALYSIS_CONSENT, STYLE_PICKER_CONSENT } from '@/lib/style-facets/consent'
 import type { PendingCreation } from '@/stores/pending-creation-store'
 import type { BoardBusy } from '@/lib/producer/busy'
 import { backgroundMentions, castMentions } from '@/lib/card-mention'
@@ -176,6 +176,10 @@ interface GlobalChatState {
   comicRetry: ComicRetry | null
   /** 만화를 고른 뒤 그림체(만화 그림체로 고정 · 실사 등으로 각색)를 묻는 중 — 답하면 옮기기를 시작한다(2026-10-09 오너). */
   comicStyleGate: { images: ChatImageInput[]; plan?: ImageRoleGate } | null
+  /** 채팅 모델이 첨부 그림을 그림체로 쓰자고 해 묻는 중(2026-10-10 오너 결정) — 답하면 같은 길(runMaterialPlan)로 정하고, 다른 말이면 내린다. */
+  styleAttachmentGate: { projectId: string; image: ChatImageInput } | null
+  /** 그림에서 그림체를 정하는 중인 프로젝트(매체 고르기 · 저장) — 그동안 스타일 선택 창을 자동으로 띄우지 않는다. */
+  styleSettingFor: string | null
   /** Producer 본문을 막고 로딩 원을 보일 일 — 새 프로젝트가 넘긴 일 · 만화 옮기기(2026-10-09 오너, lib/producer/busy.ts). */
   boardBusy: BoardBusy | null
   deferredProposals: PendingProposal[]
@@ -226,7 +230,8 @@ interface GlobalChatState {
    */
   sendMessage: (
     content: string,
-    attachments?: { imageUrls?: string[]; thumbUrls?: string[] },
+    /** images: 보낸 그림(조각 · 원본) — 모델이 짚은 조각을 그 그림의 원본으로 되돌릴 때 쓴다. */
+    attachments?: { imageUrls?: string[]; thumbUrls?: string[]; images?: ChatImageInput[] },
     /** consentedHandoff: 명시적 핸드오프 버튼("Writer 호출하기")에서 온 호출 — 버튼이 곳 동의라
      *  승인 카드를 다시 띄우지 않고 바로 실행한다(D12, 2026-08-31 오너). */
     /** acceptIncomplete: Director 준비 창에서 "그래도 진행"을 고른 넘김 — 준비가 덜 된 샷이 있어도 막지 않는다(Writer 미완료는 그대로 막는다). */
@@ -379,6 +384,11 @@ export interface ChatImageInput {
   thumbUrl: string
   sliceUrls: string[]
 }
+
+/** 그림체를 묻거나 정하는 중인가(2026-10-10) — 그동안 스타일 선택 창을 자동으로 띄우지 않고 기다린다. */
+export function styleChoiceBusy(state: { styleAttachmentGate: { projectId: string } | null; styleSettingFor: string | null }, projectId: string | null): boolean {
+  return !!projectId && (state.styleAttachmentGate?.projectId === projectId || state.styleSettingFor === projectId)
+}
 interface ImageRoleGate {
   items: Array<{ image: ChatImageInput; role: ImageUseAnswer | null }>
   typed: string
@@ -525,6 +535,11 @@ async function runStyleFromImage(image: ChatImageInput, kind: 'comic' | 'picture
   const analysisFailed = translate(voice, comic
     ? "The art style analysis didn't work, so new pictures follow the comic page image only."
     : "The art style analysis didn't work, so new pictures follow the picture only.")
+  // 매체를 고르고 저장하는 동안은 스타일 선택 창을 자동으로 띄우지 않는다(2026-10-10) — 그림체가 서면 풀린다.
+  useGlobalChatStore.setState({ styleSettingFor: projectId })
+  const settled = () => {
+    if (useGlobalChatStore.getState().styleSettingFor === projectId) useGlobalChatStore.setState({ styleSettingFor: null })
+  }
   try {
     const mediumRes = await postJson('/api/produce/anchor-medium', { projectId, imageUrl: image.thumbUrl, consent })
     const picked = (await mediumRes.json().catch(() => ({}))) as { medium?: string }
@@ -542,6 +557,7 @@ async function runStyleFromImage(image: ChatImageInput, kind: 'comic' | 'picture
       return
     }
     useProducerStore.getState().applyCustomStyleAnchor({ key: anchor.key, url: anchor.imageUrl, label: anchor.label ?? label, medium: anchor.medium ?? null, locked: anchor.locked === true })
+    settled()
     speak(comic
       ? translate(voice, 'Set the art style to this comic. Analyzing the art style now.')
       : translate(voice, 'Set the art style to {name}. Analyzing the art style now.', { name: image.name }))
@@ -556,6 +572,8 @@ async function runStyleFromImage(image: ChatImageInput, kind: 'comic' | 'picture
   } catch (error) {
     console.error('[style] failed:', error)
     speak(analysisFailed)
+  } finally {
+    settled()
   }
 }
 
@@ -739,6 +757,7 @@ async function runImageRolePlan(get: () => GlobalChatState, plan: ImageRoleGate)
     await sendWhenIdle(get, plan.msg, {
       imageUrls: refs.flatMap((r) => r.image.sliceUrls),
       thumbUrls: refs.map((r) => r.image.thumbUrl),
+      images: refs.map((r) => r.image),
     })
   }
 }
@@ -903,50 +922,60 @@ function flushCompletion(stage: StageId, label: string): void {
  *
  * 반환: 실패 사유(사용자에게 보일 문장) 또는 null(적용했거나 의도가 없었음).
  */
-async function applyStyleAnchorIntent(
-  intent: unknown,
-  attachmentImageUrls: string[],
-  projectId: string | null,
-): Promise<string | null> {
-  if (!intent || typeof intent !== 'object') return null
-  if (!projectId) return null
+/** 이번 턴 첨부에서 모델이 짚은 그림 — 조각이면 그 그림의 원본으로(긴 그림은 조각으로 잘려 모델에 간다). */
+function attachmentImageAt(attachments: { imageUrls?: string[]; thumbUrls?: string[]; images?: ChatImageInput[] } | undefined, index: number): ChatImageInput | null {
+  const url = attachments?.imageUrls?.[index]
+  if (!url) return null
+  const owner = attachments?.images?.find((image) => image.thumbUrl === url || image.sliceUrls.includes(url))
+  if (owner) return owner
+  const name = translate(contentLocale(), 'this picture') // copy-ok: fragment
+  const thumbs = attachments?.thumbUrls ?? []
+  // 그림마다 조각이 하나면 순서가 같다 — 원본 주소를 쓴다.
+  if (thumbs.length === (attachments?.imageUrls?.length ?? 0) && thumbs[index]) return { id: thumbs[index], name, thumbUrl: thumbs[index], sliceUrls: [url] }
+  return { id: url, name, thumbUrl: url, sliceUrls: [url] }
+}
 
-  const { imageIndex, label, medium } = intent as Record<string, unknown>
+/**
+ * #p1-attach: 채팅 모델이 첨부 그림을 그림체로 쓰자고 했다 — 바로 정하지 않고 묻는다(2026-10-10 오너 결정 "묻고 정한다").
+ *   고르면 새 프로젝트 · 채팅과 같은 길(runMaterialPlan → 매체 고르기 · 고정 · 분석)로 정한다. 모델은 인덱스만 주고 그림은
+ *   이번 턴 첨부에서 꺼낸다 — 모델이 뱉은 주소는 나중에 이미지 생성 프로바이더가 직접 가져가므로 믿지 않는다.
+ *   돌려주는 값 = 사용자에게 알릴 문제(어느 그림인지 모름 · 고정된 그림체), 없으면 null.
+ */
+function offerStyleFromAttachment(
+  get: () => GlobalChatState,
+  intent: unknown,
+  attachments: { imageUrls?: string[]; thumbUrls?: string[]; images?: ChatImageInput[] } | undefined,
+  projectId: string | null,
+): string | null {
+  if (!intent || typeof intent !== 'object' || !projectId) return null
+  const { imageIndex } = intent as Record<string, unknown>
   if (typeof imageIndex !== 'number' || !Number.isInteger(imageIndex)) return null
   // 고정된 그림체(2026-10-09 오너)는 다른 그림으로 바꾸지 않는다 — 저장 창구도 409 로 막는다.
   if (useProducerStore.getState().customStyleAnchor?.locked === true) return translate(contentLocale(), "The art style comes from the picture you chose, so it can't be changed.")
-
-  const imageUrl = attachmentImageUrls[imageIndex]
-  if (!imageUrl) {
-    // 모델이 없는 인덱스를 짚었다. 조용히 넘기면 "화풍 잡았어요"만 남는다.
-    return translate(
-      contentLocale(),
-      "I couldn't tell which image you meant. Please tell me again.",
-    )
-  }
-
-  try {
-    const res = await fetch('/api/produce/style-anchor', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ projectId, imageUrl, label, medium }),
-    })
-    const body = await res.json().catch(() => ({}))
-    if (useProjectStore.getState().projectId !== projectId) return null
-    if (!res.ok) return typeof body.error === 'string' ? body.error : `HTTP ${res.status}`
-
-    useProducerStore.getState().applyCustomStyleAnchor({
-      key: body.key,
-      url: body.imageUrl,
-      label: body.label,
-      medium: body.medium ?? null,
-    })
-    return null
-  } catch (error) {
-    return error instanceof Error
-      ? error.message
-      : translate(contentLocale(), 'Unknown error')
-  }
+  const image = attachmentImageAt(attachments, imageIndex)
+  // 모델이 없는 인덱스를 짚었다. 조용히 넘기면 "화풍 잡았어요"만 남는다.
+  if (!image) return translate(contentLocale(), "I couldn't tell which image you meant. Please tell me again.")
+  const voice = contentLocale()
+  const id = `style-attachment:${makeId()}`
+  get().offerSuggestion(
+    {
+      id,
+      stage: 'producer',
+      content: translate(voice, 'Use this picture as the art style? If you do, the picture goes to an analysis model and the art style is then fixed.'),
+      dismissible: true,
+      action: {
+        kind: 'choices',
+        options: [
+          { label: translate(voice, 'Use as the art style'), utterance: translate(voice, 'Use it as the art style') },
+          { label: translate(voice, 'Keep as reference'), utterance: translate(voice, 'Use it as reference only') },
+        ],
+      },
+    },
+    { preempt: true },
+  )
+  // 질문이 떠야 답을 기다린다 — 내릴 수 없는 다른 단계가 떠 있으면 묻지 않는다(그림은 참고 자료로 남는다).
+  if (get().suggestion?.id === id) useGlobalChatStore.setState({ styleAttachmentGate: { projectId, image } })
+  return null
 }
 
 /** 씬 스토리 확정을 보내는 중인 프로젝트 — 두 번 누름 방지(2026-10-01). */
@@ -1147,6 +1176,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   creationPlanFor: null,
   comicRetry: null,
   comicStyleGate: null,
+  styleAttachmentGate: null,
+  styleSettingFor: null,
   boardBusy: null,
   deferredProposals: [],
   deferredSuggestions: [],
@@ -1811,6 +1842,26 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       (activeSuggestion.stage === stage || activeSuggestion.dismissible === false)
     ) {
       get().dismissSuggestion({ implicit: true })
+    }
+
+    // 채팅 모델이 첨부 그림을 그림체로 쓰자고 해 묻는 중(2026-10-10 오너 결정) — 그림체 · 참고 자료(예 · 아니오)로 답하면 그대로 하고,
+    //   다른 말이면 그림체를 정하지 않고 그 말을 이어서 처리한다(그림은 이미 참고 자료로 갔다). 정하는 일은 새 프로젝트 · 채팅과 같은 곳.
+    const styleAsk = get().styleAttachmentGate
+    if (styleAsk && stage === 'producer' && !opts?.silentUser) {
+      set({ styleAttachmentGate: null })
+      const yesNo = matchYesNo(trimmed)
+      const use = styleAsk.projectId !== projectId ? null : matchImageUseAnswer(trimmed) ?? (yesNo === 'yes' ? 'style' : yesNo === 'no' ? 'reference' : null)
+      if (use === 'style' || use === 'reference') {
+        set((state) => ({ messages: [...state.messages, { id: makeId(), stage, role: 'user' as const, content: trimmed }] }))
+        if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
+        if (use === 'reference') {
+          producerSpeaker(styleAsk.projectId)(translate(contentLocale(), 'Kept it as reference only.'))
+          return
+        }
+        const used = await runMaterialPlan(get, { ...NO_MATERIALS, styleImage: styleAsk.image, consent: CHAT_STYLE_CONFIRM_CONSENT })
+        await used.styleDone
+        return
+      }
     }
 
     // 만화 그림체(2026-10-09 오너): 만화를 고른 뒤 그림체를 고정할지 각색할지 묻는 중 — 답이면 옮기기를 시작하고, 아니면 다시 묻는다.
@@ -2682,16 +2733,10 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
                 : { appliedCount: extractOutcome === 'applied' ? 1 : 0 },
         )
 
-        // #p1-attach: 채팅이 "이 그림체로" 의도를 읽었으면 앵커로 확정한다.
-        //   모델은 인덱스만 주고 URL 은 우리가 이번 턴 첨부에서 꺼낸다 — 모델이 뱉은 URL 은
-        //   나중에 이미지 생성 프로바이더가 직접 가져가므로 신뢰하면 안 된다.
+        // #p1-attach: 채팅이 "이 그림체로" 의도를 읽었으면 그 그림을 그림체로 쓸지 묻는다(2026-10-10 오너 결정 — 바로 정하지 않는다).
         const anchorError = opts?.cardFill || styleLockedReply
           ? null
-          : await applyStyleAnchorIntent(
-              data.extractedSettings.styleAnchorFromAttachment,
-              attachmentImageUrls ?? [],
-              projectId,
-            )
+          : offerStyleFromAttachment(get, data.extractedSettings.styleAnchorFromAttachment, attachments, projectId)
         if (!isCurrentSession()) return
         if (anchorError) {
           patchTrace({ skippedCount: 1 })
@@ -4388,6 +4433,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       creationPlanFor: null,
       comicRetry: null,
       comicStyleGate: null,
+      styleAttachmentGate: null,
+      styleSettingFor: null,
       boardBusy: null,
       deferredProposals: [],
       deferredSuggestions: [],

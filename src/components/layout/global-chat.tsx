@@ -31,7 +31,7 @@ import { useImageUploadConsent } from '@/components/upload/image-upload-consent'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { AgentFace } from '@/components/agent-face'
-import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { styleChoiceBusy, useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore } from '@/stores/producer-store'
 import { stylePromptDecision } from '@/lib/producer-style-prompt'
@@ -827,10 +827,12 @@ export function GlobalChat() {
   }, [styleAnchorKey])
   const stylePickerRequest = useChatUiStore((s) => s.stylePickerRequest)
   const consumeStylePicker = useChatUiStore((s) => s.consumeStylePicker)
+  // 그림체를 묻거나 정하는 중이면(2026-10-10) 자동 스타일 선택 창은 기다린다.
+  const styleBusy = useGlobalChatStore((s) => styleChoiceBusy(s, projectId))
   useEffect(() => {
     if (!stylePickerRequest) return
     const decision = stylePromptDecision(stylePickerRequest.projectId, {
-      projectId, stage: currentStage, loading,
+      projectId, stage: currentStage, loading: loading || styleBusy,
       approvalBusy: !!pendingProposal || executingProposalIds.length > 0,
       hasStyle: !!styleAnchorKey, catalogReady: styleAnchors.length > 0,
     })
@@ -840,7 +842,7 @@ export function GlobalChat() {
       setStylePickerProjectId(projectId)
       setStylePressed(true)
     }
-  }, [stylePickerRequest, projectId, currentStage, loading, pendingProposal, executingProposalIds, styleAnchorKey, styleAnchors.length, consumeStylePicker])
+  }, [stylePickerRequest, projectId, currentStage, loading, styleBusy, pendingProposal, executingProposalIds, styleAnchorKey, styleAnchors.length, consumeStylePicker])
   // 스타일 선택 창의 "내 그림체 올리기"(2026-10-10 오너) — 권리 확인 → 올리기 → 채팅에서 그림을 "그림체"로 고른 것과 같은 고정 · 분석.
   const [styleUpload, setStyleUpload] = useState<{ projectId: string; busy: boolean; error: string | null } | null>(null)
   const styleUploadNow = styleUpload && styleUpload.projectId === projectId ? styleUpload : null

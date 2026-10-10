@@ -57,7 +57,10 @@ export async function extractLiteFacets(imageUrl: string): Promise<{ facets: Lit
       attempts.push({ step: 'fill', ok: false, reason: error instanceof Error ? error.message.slice(0, 200) : 'error', max_tokens: FILL_MAX_TOKENS, ms: Date.now() - t0 })
     }
   }
-  if (!fill) return { facets: null, attempts }
+  if (!fill) {
+    console.warn('[style-facets] lite fill failed:', JSON.stringify(attempts))
+    return { facets: null, attempts }
+  }
 
   const prompt = buildLiteCompilePrompt(fill.filledJson, fill.sceneSummary)
   for (const maxTokens of [COMPILE_MAX_TOKENS, Math.round(COMPILE_MAX_TOKENS * 1.5)]) {

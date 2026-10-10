@@ -109,7 +109,20 @@ export type LiteFillCheck =
   | { ok: true; filledJson: string; sceneSummary: string }
   | { ok: false; reason: 'no_json' | 'bad_json' | 'leaves' | 'tags' }
 
-/** 호출 1의 답 확인 — json 블록 · 96칸 · 모든 값의 첫 토큰이 태그. */
+/** 태그 없이 받는 칸 — "피할 것" 목록(생성 규칙.부정 절 여섯 칸)은 관찰값이 아니라 피할 것의 목록이라 태그가 뜻이 없고, 모델이 자주 빠뜨린다
+ *  (2026-10-10 실측: 교실 그림 5번 중 4번이 이 여섯 칸 때문에 통째 실패). 오너 결정 2026-10-10 "느슨하게". 다른 칸은 그대로 태그가 있어야 한다. */
+const LITE_UNTAGGED_OK = ['생성 규칙', '부정 절'] // i18n-ok: 분석기 서식의 칸 이름
+
+/** 태그가 없는 값이 모두 "피할 것" 칸 안에 있는가. */
+function untaggedOnlyInAvoid(value: unknown, path: string[] = []): boolean {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return Object.entries(value as Record<string, unknown>).every(([key, child]) => untaggedOnlyInAvoid(child, [...path, key]))
+  }
+  if (typeof value === 'string' && LITE_TAGS.some((tag) => value.trimStart().startsWith(tag))) return true
+  return LITE_UNTAGGED_OK.every((key, i) => path[i] === key)
+}
+
+/** 호출 1의 답 확인 — json 블록 · 96칸 · 모든 값의 첫 토큰이 태그("피할 것" 여섯 칸은 태그 없이도 받는다). */
 export function checkLiteFill(text: string): LiteFillCheck {
   const js = liteFence(text, 'json')
   if (!js) return { ok: false, reason: 'no_json' }
@@ -121,7 +134,7 @@ export function checkLiteFill(text: string): LiteFillCheck {
   }
   const { leaves, tagged } = countFilledLeaves(data)
   if (leaves !== LITE_LEAVES) return { ok: false, reason: 'leaves' }
-  if (tagged !== leaves) return { ok: false, reason: 'tags' }
+  if (tagged !== leaves && !untaggedOnlyInAvoid(data)) return { ok: false, reason: 'tags' }
   const md = liteFence(text, 'md') ?? liteFence(text, 'markdown') ?? ''
   return { ok: true, filledJson: JSON.stringify(data, null, 2), sceneSummary: md.trim() }
 }

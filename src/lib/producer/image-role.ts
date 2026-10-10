@@ -63,6 +63,17 @@ export function matchImageUseInText(text: string): ImageUseAnswer | null {
   return matchImageRoleInText(t)
 }
 
+// 예 · 아니오로 묻는 말(채팅 모델이 첨부 그림을 그림체로 쓰자고 할 때 등)에 짧게 답한 것.
+const YES_RE = /^(?:응|어|네|예|넹|그래|그래요|좋아|좋아요|ㅇㅇ|ㅇㅋ|오케이|yes|yeah|yep|sure|ok|okay)[\s.!~]*$/i // i18n-ok: 답 낱말 규칙 자체
+const NO_RE = /^(?:아니|아니요|아뇨|아니야|싫어|ㄴㄴ|no|nope)[\s.!~]*$/i // i18n-ok: 답 낱말 규칙 자체
+
+export function matchYesNo(text: string): 'yes' | 'no' | null {
+  const t = (text ?? '').trim()
+  if (YES_RE.test(t)) return 'yes'
+  if (NO_RE.test(t)) return 'no'
+  return null
+}
+
 /** 카드 채우기 턴의 대상(#image-to-artist) — 숨은 요청이 어느 카드를 채우는지. */
 export interface CardFill {
   kind: 'character' | 'background'
