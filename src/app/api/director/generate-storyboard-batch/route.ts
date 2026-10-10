@@ -33,11 +33,16 @@ import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 import { storageKeySegment } from '@/lib/storage/key-segment'
 import { isChatTraceId } from '@/lib/chat-trace'
 import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
+import { STALE_QUEUED_MS } from '@/lib/generation-job-timing'
 
 export const runtime = 'nodejs'
-export const maxDuration = 60
+// 시트 2장(러프 12장씩 합성 · 업로드 · 예약 · 제출)이 60초를 넘겨 끊겼다 — 10/9 · 10/10 운영 6번 중 4번 504,
+//   끊기면 클라 러너가 판 전체를 멈췄다(오너 제보 2026-10-10). 다른 긴 라우트와 같은 5분.
+export const maxDuration = 300
 
 const MAX_GRID_JOBS_PER_CALL = 2 // 러프 보드와 동일 관행 — 잔여는 응답 remaining 으로 반복 호출
+/** 이번 판에 이미 낸 샷 목록(skipShotIds)의 상한 — 프로젝트 샷 수보다 넉넉하게. */
+const MAX_SKIP_SHOT_IDS = 5000
 
 interface EligibleShot {
   shot_id: string
@@ -71,10 +76,13 @@ export async function POST(req: NextRequest) {
   if (demoBlocked) return demoBlocked
   try {
     // force: 이미 생성된 샷도 다시 만든다(#c3 2026-08-27 오너 — "전체 재생성"). 기본은 빈칸만.
-    const { projectId, force, traceId } = (await req.json()) as {
+    // skipShotIds: 이번 판(클라 러너 한 번)에 이미 내거나 기다린 샷 — 같은 판에서 두 번 그리지 않는다(2026-10-10).
+    //   실패한 샷이 요청마다 다시 나갔고(운영 9/1 3e0169eb 같은 시트 10번), force 는 요청마다 맨 앞 샷들을 다시 골랐다.
+    const { projectId, force, traceId, skipShotIds } = (await req.json()) as {
       projectId?: string
       force?: boolean
       traceId?: string
+      skipShotIds?: unknown
     }
     if (!projectId) return NextResponse.json({ error: 'Invalid request: projectId required' }, { status: 400 })
 
@@ -87,6 +95,17 @@ export async function POST(req: NextRequest) {
     if (traceId && !(await chatTraceBelongsToProject(projectId, traceId))) {
       return NextResponse.json({ error: 'Invalid request: traceId does not belong to project' }, { status: 409 })
     }
+    if (
+      skipShotIds !== undefined &&
+      !(
+        Array.isArray(skipShotIds) &&
+        skipShotIds.length <= MAX_SKIP_SHOT_IDS &&
+        skipShotIds.every((id) => typeof id === 'string' && id.length > 0 && id.length <= 200)
+      )
+    ) {
+      return NextResponse.json({ error: 'Invalid request: skipShotIds must be a list of shot ids' }, { status: 400 })
+    }
+    const skipThisRun = new Set<string>((skipShotIds as string[] | undefined) ?? [])
 
     const quota = await checkGenerationCapacity(access.userId!, 'image')
     if (!quota.ok) return quotaRejectionResponse(quota, { projectId, kind: 'storyboard_real_grid', userId: access.userId })
@@ -110,6 +129,30 @@ export async function POST(req: NextRequest) {
       .eq('project_id', projectId)
       .order('sort_order')
 
+    // 이미 그리는 중인 샷(오너 제보 2026-10-10 "중간에 끊김"): 같은 샷은 한 작업만 받으므로(DB 트리거) 앞쪽 샷이 아직
+    //   그려지는 중이면 그 시트 예약이 막혀 판 전체가 그 자리에서 끝났다 — 시간 초과 뒤 다시 누를 때 · 다른 탭 · 오래 걸리는 그림.
+    //   그 샷은 건너뛰고 다음 샷을 낸다. 막 시작한 작업(STALE_QUEUED_MS 안)은 클라가 끝나기를 기다리게 inProgress 로 알려 주고,
+    //   그보다 오래된 작업(접수 확인이 끝내 안 된 예약 등)은 기다려도 끝나지 않을 수 있어 건너뛰기만 한다.
+    const { data: queuedJobs, error: queuedError } = await supabaseAdmin
+      .from('generation_jobs')
+      .select('id, target, created_at')
+      .eq('project_id', projectId)
+      .eq('status', 'queued')
+      .in('kind', ['shot_storyboard', 'storyboard_real_grid'])
+    if (queuedError) throw queuedError
+    const busyJobByShot = new Map<string, { jobId: string; fresh: boolean }>()
+    for (const j of queuedJobs ?? []) {
+      const t = j.target as { writerShotId?: string; writerShotIds?: string[] } | null
+      const fresh = Date.now() - new Date(j.created_at as string).getTime() < STALE_QUEUED_MS
+      for (const id of [...(t?.writerShotIds ?? []), ...(t?.writerShotId ? [t.writerShotId] : [])]) {
+        if (!busyJobByShot.has(id)) busyJobByShot.set(id, { jobId: j.id as string, fresh })
+      }
+    }
+    /** 클라가 끝나기를 기다릴 작업 → 그 작업이 그리는 (이번 판 대상) 샷 */
+    const inProgress = new Map<string, string[]>()
+    const waitFor = (jobId: string, shotIds: string[]) => inProgress.set(jobId, [...(inProgress.get(jobId) ?? []), ...shotIds])
+    const inProgressList = () => [...inProgress].map(([jobId, shotIds]) => ({ jobId, shotIds }))
+
     const eligible: EligibleShot[] = []
     // #ref-gate(2026-09-02): 건너뛴 샷은 이유와 함께 돌려준다 — 클라가 선행 산출물을 기다렸다가 자동 재개한다.
     const skipped: Array<{
@@ -121,6 +164,12 @@ export async function POST(req: NextRequest) {
       // 기본은 빈칸만(교체는 개별 재생성 소관). force 면 이미 있는 것도 다시 만든다 —
       //   오너가 "하나씩 하는 거 짜쳐서" 전체 재생성을 원한 경로(#c3).
       if (!force && s.storyboard_image) continue
+      if (skipThisRun.has(s.shot_id as string)) continue
+      const busy = busyJobByShot.get(s.shot_id as string)
+      if (busy) {
+        if (busy.fresh) waitFor(busy.jobId, [s.shot_id as string])
+        continue
+      }
       const f = (s.rough_storyboard as { frames?: Record<string, string> } | null)?.frames
       if (!f?.start || !f?.direction || !f?.end) {
         skipped.push({ shotId: s.shot_id as string, reason: 'missing_rough_storyboard' })
@@ -162,7 +211,7 @@ export async function POST(req: NextRequest) {
     const planned = groups.slice(0, MAX_GRID_JOBS_PER_CALL)
     const plannedShots = planned.reduce((n, g) => n + g.length, 0)
     if (!planned.length) {
-      return NextResponse.json({ ok: true, data: { submitted: [], remaining: 0, skipped } })
+      return NextResponse.json({ ok: true, data: { submitted: [], remaining: 0, skipped, inProgress: inProgressList() } })
     }
 
     const anchor = await resolveStyleAnchor(project)
@@ -249,7 +298,7 @@ export async function POST(req: NextRequest) {
       .map((group) => group.filter((s) => !sheetMissingByShot.has(s.shot_id)))
       .filter((group) => group.length > 0)
     if (!readyPlanned.length) {
-      return NextResponse.json({ ok: true, data: { submitted: [], remaining: eligible.length - plannedShots, skipped } })
+      return NextResponse.json({ ok: true, data: { submitted: [], remaining: eligible.length - plannedShots, skipped, inProgress: inProgressList() } })
     }
 
     const webhookUrl = resolveWebhookUrl()
@@ -379,8 +428,11 @@ export async function POST(req: NextRequest) {
           },
         })
       } catch (err) {
-        if (existingStoryboardJobId(err)) {
+        const existingJobId = existingStoryboardJobId(err)
+        if (existingJobId) {
           // 다른 탭의 개별/일괄 작업이 먼저 예약했다. 남은 장은 보존하고 새 제출 없이 멈춘다.
+          //   그 작업은 클라가 끝나기를 기다린 뒤 다음 차례를 묻게 알려 준다(2026-10-10).
+          waitFor(existingJobId, group.map((s) => s.shot_id))
           capacitySkippedShots = readyPlanned.slice(groupIndex).reduce((n, g) => n + g.length, 0)
           break
         }
@@ -443,7 +495,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      data: { submitted, remaining: eligible.length - plannedShots + capacitySkippedShots, skipped },
+      data: { submitted, remaining: eligible.length - plannedShots + capacitySkippedShots, skipped, inProgress: inProgressList() },
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

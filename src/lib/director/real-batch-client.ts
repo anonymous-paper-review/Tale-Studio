@@ -52,6 +52,16 @@ function scheduleRealBatchResume(projectId: string, skipped: BatchSkipped[], opt
   })
 }
 
+// 한 판(버튼 한 번)이 끝까지 가게(2026-10-10 오너 제보 "중간에 끊김"):
+//   - 요청 하나가 시간 초과(504) · 서버 오류 · 통신 끊김으로 실패해도 이미 낸 그림은 그려지고 있다 — 잠시 뒤 다시 묻는다.
+//     거절(4xx)은 다시 물어도 같아서 바로 멈춘다.
+//   - 이번 판에 내거나 기다린 샷은 다음 요청에서 빼 달라고 알린다(skipShotIds) — 같은 판에서 한 샷은 한 번만 그린다.
+//     실패한 샷은 버튼을 다시 누르면 다시 그린다. 요청마다 새 샷만 나가므로 요청 수 상한은 안전장치일 뿐이다
+//     (옛 10번 상한은 시트 20장 = 많아야 80샷이라 운영 7ad4d3a2 72샷도 마지막 시트에 못 닿았다).
+const MAX_ROUNDS = 200
+const MAX_ROUND_RETRIES = 2
+const ROUND_RETRY_DELAY_MS = 5000
+
 /** 라운드 반복 일괄 생성 — 완료 시 캔버스 rehydrate. 이미 진행 중이면 no-op. */
 export async function runRealBatch(
   projectId: string,
@@ -68,16 +78,39 @@ export async function runRealBatch(
   let generated = 0
   let quotaBlocked = false
   let lastSkipped: BatchSkipped[] = []
+  /** 이번 판에 내거나 끝나기를 기다린 샷 · 작업 */
+  const handledShots = new Set<string>()
+  const waitedJobs = new Set<string>()
+  let failedRounds = 0
   try {
-    for (let round = 0; round < 10; round++) {
-      const requestBody: { projectId: string; force?: boolean; traceId?: string } =
+    for (let round = 0; round < MAX_ROUNDS; round++) {
+      const requestBody: { projectId: string; force?: boolean; traceId?: string; skipShotIds?: string[] } =
         opts?.force ? { projectId, force: true } : { projectId }
       if (opts?.traceId) requestBody.traceId = opts.traceId
-      const res = await fetch('/api/director/generate-storyboard-batch', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(requestBody),
-      })
+      if (handledShots.size) requestBody.skipShotIds = [...handledShots]
+      let res: Response | null = null
+      let networkError: unknown = null
+      try {
+        res = await fetch('/api/director/generate-storyboard-batch', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(requestBody),
+        })
+      } catch (e) {
+        networkError = e
+      }
+      if (res && !res.ok && res.status !== 429 && res.status < 500 && res.status !== 408) {
+        const rejected = (await res.json().catch(() => null)) as { error?: string } | null
+        throw new Error(rejected?.error ?? `HTTP ${res.status}`)
+      }
+      if (!res || res.status >= 500 || res.status === 408) {
+        if (failedRounds >= MAX_ROUND_RETRIES) {
+          throw networkError ?? new Error(((await res?.json().catch(() => null)) as { error?: string } | null)?.error ?? `HTTP ${res?.status}`)
+        }
+        failedRounds += 1
+        await new Promise((r) => setTimeout(r, ROUND_RETRY_DELAY_MS))
+        continue
+      }
       if (res.status === 429) {
         quotaBlocked = true
         // 한도 안내는 공용 헬퍼로 — 문구·중복억제·locale 을 7개 진입점이 공유한다(#quota-toast).
@@ -88,35 +121,51 @@ export async function runRealBatch(
         break
       }
       const j = (await res.json().catch(() => null)) as {
-        data?: { submitted: Array<{ jobId: string; shotIds: string[] }>; remaining: number; skipped?: BatchSkipped[] }
+        data?: {
+          submitted: Array<{ jobId: string; shotIds: string[] }>
+          remaining: number
+          skipped?: BatchSkipped[]
+          inProgress?: Array<{ jobId: string; shotIds: string[] }>
+        }
         error?: string
       } | null
-      if (!res.ok || !j?.data) throw new Error(j?.error ?? `HTTP ${res.status}`)
+      if (!j?.data) throw new Error(j?.error ?? `HTTP ${res.status}`)
+      failedRounds = 0
       const { submitted, remaining } = j.data
+      // 서버가 알려 준 그리는 중인 작업(다른 탭 · 앞서 끊긴 요청 · 오래 걸리는 그림) — 이번 판에서 한 번만 기다린다.
+      const inProgress = (j.data.inProgress ?? []).filter(
+        (p) => !waitedJobs.has(p.jobId) && !submitted.some((s) => s.jobId === p.jobId),
+      )
       lastSkipped = j.data.skipped ?? []
       // #batch-backlog: 아직 제출 안 된 잔량을 알림바 분모에 태운다 — "fal 큐 수만 보인다"(오너
       //   2026-08-25)의 수리. 라운드마다 갱신되고 러너 종료 시 finally 가 지운다.
       store.setState({ realBatchRemaining: remaining })
-      if (!submitted.length) break
+      if (!submitted.length && !inProgress.length) break
       generated += submitted.reduce((n, s) => n + s.shotIds.length, 0)
       // 잡이 큐에 앉는 즉시 진행 표시(알림바·카드 스피너)가 켜지게 — 폴링 틱을 기다리지 않는다.
       refreshGenerationQueue()
-      for (const s of submitted) {
-        opts?.onJob?.({ jobId: s.jobId, status: 'queued', httpStatus: res.status })
+      for (const s of [...submitted, ...inProgress]) {
+        const ours = submitted.includes(s)
+        waitedJobs.add(s.jobId)
+        for (const id of s.shotIds) handledShots.add(id)
+        if (ours) opts?.onJob?.({ jobId: s.jobId, status: 'queued', httpStatus: res.status })
         for (let i = 0; i < 60; i++) {
           // 응답은 {ok, data:{status}} 봉투(#real-grid-fix 실측: 최상위 status 읽기로 8잡×300s 헛대기)
-          const envelope = (await (
-            await fetch(`/api/generation-jobs/${encodeURIComponent(s.jobId)}`)
-          ).json().catch(() => null)) as { data?: { status?: string } } | null
+          //   조회가 한 번 끊겨도 판을 멈추지 않고 다음 틱에 다시 묻는다.
+          const envelope = (await fetch(`/api/generation-jobs/${encodeURIComponent(s.jobId)}`)
+            .then((r) => r.json())
+            .catch(() => null)) as { data?: { status?: string } } | null
           const status = envelope?.data?.status
           if (status === 'completed' || status === 'failed') {
             const resultUrl =
               (envelope?.data as { resultUrl?: unknown } | undefined)?.resultUrl
-            opts?.onJob?.({
-              jobId: s.jobId,
-              status,
-              resultUrl: typeof resultUrl === 'string' ? resultUrl : null,
-            })
+            if (ours) {
+              opts?.onJob?.({
+                jobId: s.jobId,
+                status,
+                resultUrl: typeof resultUrl === 'string' ? resultUrl : null,
+              })
+            }
             break
           }
           await new Promise((r) => setTimeout(r, 5000))
@@ -157,7 +206,8 @@ export async function runRealBatch(
           count: generated,
         }),
       )
-    } else if (!opts?.silent && !quotaBlocked && lastSkipped.length === 0) {
+    } else if (!opts?.silent && !quotaBlocked && lastSkipped.length === 0 && waitedJobs.size === 0) {
+      // 남이 그리던 그림만 기다렸으면 "낼 샷 없음"이 아니다 — 그 그림은 큐 알림이 알린다.
       toast.info(
         translate(
           useLocaleStore.getState().locale,
