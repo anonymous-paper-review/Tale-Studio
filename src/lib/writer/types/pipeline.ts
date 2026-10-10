@@ -25,7 +25,7 @@ export function isCompactDepth(d: DepthLevel): boolean {
 }
 
 // S/V/C 축별 LLM 설정 (없으면 DEFAULT_MODELS 사용)
-export type LlmProviderName = 'gemini' | 'claude' | 'openai' | 'local';
+export type LlmProviderName = 'gemini' | 'claude' | 'local';
 export interface PipelineAxisModel {
   provider: LlmProviderName;
   model?: string;
@@ -1162,7 +1162,6 @@ export interface PipelineResult {
     llm_calls: {
       gemini: number;
       claude: number;
-      openai: number;
       local: number;
     };
   };

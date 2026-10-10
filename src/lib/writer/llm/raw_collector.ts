@@ -1,7 +1,7 @@
 // LLM 호출의 모든 input/output을 자동 기록하는 컬렉터
 // 호출 측에서 flush해서 파일로 저장
 
-export type LlmProvider = 'gemini' | 'claude' | 'openai' | 'local';
+export type LlmProvider = 'gemini' | 'claude' | 'local';
 
 export interface RawLlmCall {
   seq: number;

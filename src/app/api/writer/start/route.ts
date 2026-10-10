@@ -284,7 +284,6 @@ export async function POST(req: NextRequest) {
       rerun?: boolean;
       writerEngine?: unknown;
       runtimeSeconds?: number;
-      models?: PipelineInput['models'];
       genre?: Genre;
       cast?: CastContractWithImages;
       backgrounds?: ProducerBackgrounds;
@@ -296,7 +295,10 @@ export async function POST(req: NextRequest) {
       /** 지금 값으로 트리트먼트를 다시 쓴다 — 확정을 기다리던 초안은 내려놓는다(treatmentDraft 와 함께). */
       restartDraft?: boolean;
     };
-    const { projectId, story, runtimeSeconds, models, genre, cast: castWithImages, backgrounds } = body;
+    // models(축별 LLM 제공자·주소)는 본문에서 받지 않는다 — 제공자를 고를 수 있으면 서버가
+    //   사용자가 준 주소로 원고를 보내고(SSRF), 개인정보처리방침에 적지 않은 업체로 글이 나간다.
+    //   파이프라인 입력의 models 는 서버 내부(스크립트·하네스)만 쓴다.
+    const { projectId, story, runtimeSeconds, genre, cast: castWithImages, backgrounds } = body;
     // #image-to-artist: 캐스트 계약의 그림 주소는 DB(대표 사진·시트 출처)에만 쓰고 파이프라인 시드에서는 뗀다 —
     //   글 프롬프트에 URL 이 섞이면 안 된다.
     const cast: CastContract | undefined = castWithImages ? stripSourceImages(castWithImages) : undefined;
@@ -512,7 +514,6 @@ export async function POST(req: NextRequest) {
       writerEngine,
       runtimeSeconds: effectiveRuntimeSeconds,
       styleAnchor,
-      models,
       outputLocale,
       dialogueLanguage,
       // #s3-gate: UI 핸드오프는 씬 스토리 확정 게이트를 켠다 — storyCheck 후 유저 검토·확정.

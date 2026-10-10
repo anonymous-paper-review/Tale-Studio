@@ -1,7 +1,6 @@
 // 다중 provider dispatcher (S/V/C 축별로 다른 모델 사용 가능)
 import { geminiGenerateJson } from './gemini';
 import { claudeGenerateJson } from './claude';
-import { openaiGenerateJson } from './openai';
 import { localGenerateJson } from './local';
 import { LossyRepairError } from './json_repair';
 import type { LlmProvider } from './raw_collector';
@@ -32,7 +31,7 @@ export interface DispatchOptions {
   temperature?: number;
   maxTokens?: number;
   // #p4-websearch: 프로바이더별 웹 검색 접지 — gemini(googleSearch)/claude(web_search 툴).
-  //   openai 는 후속(추론 계열의 검색 파라미터 계약 미확정). 스토리 축(s1/s3)부터 단계 확대.
+  //   스토리 축(s1/s3)부터 단계 확대.
   webSearch?: boolean;
   // #p4-json-guard(2026-08-11): 파싱 후 구조 단언(zod) — 실패는 throw 로 표면화(무신호 금지),
   //   성공 시 산출물은 "원본 그대로" 반환한다(safeParse 는 게이트일 뿐, 변형/키 스트립 없음).
@@ -155,13 +154,6 @@ async function dispatchOnce<T>(
         webSearch: opts.webSearch,
         zodSchema: opts.enforceSchema ? opts.schema : undefined,
       });
-    case 'openai':
-      return openaiGenerateJson<T>(prompt, {
-        model: cfg.model,
-        systemInstruction: opts.systemInstruction,
-        temperature: opts.temperature,
-        maxTokens: opts.maxTokens,
-      });
     case 'local':
       if (!cfg.baseUrl) throw new Error('local provider requires baseUrl');
       return localGenerateJson<T>(prompt, {
@@ -171,6 +163,11 @@ async function dispatchOnce<T>(
         temperature: opts.temperature,
         maxTokens: opts.maxTokens,
       });
+    default:
+      // resolveModels 는 서버 내부 입력(스크립트·하네스)의 provider 문자열을 그대로 담아 온다.
+      //   모르는 이름을 조용히 undefined 로 흘리지 않고 여기서 멈춘다 — 지운 openai 같은 이름이
+      //   다시 들어와도 어느 업체에도 원고를 보내지 않는다.
+      throw new Error(`지원하지 않는 LLM 제공자: ${String((cfg as LlmAxisConfig).provider)}`);
   }
 }
 

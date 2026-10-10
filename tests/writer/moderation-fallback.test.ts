@@ -11,12 +11,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const mocks = vi.hoisted(() => ({
   gemini: vi.fn(),
   claude: vi.fn(),
-  openai: vi.fn(),
   local: vi.fn(),
 }))
 vi.mock('@/lib/writer/llm/gemini', () => ({ geminiGenerateJson: mocks.gemini }))
 vi.mock('@/lib/writer/llm/claude', () => ({ claudeGenerateJson: mocks.claude }))
-vi.mock('@/lib/writer/llm/openai', () => ({ openaiGenerateJson: mocks.openai }))
 vi.mock('@/lib/writer/llm/local', () => ({ localGenerateJson: mocks.local }))
 
 import { generateJson, DEFAULT_MODELS } from '@/lib/writer/llm/dispatch'

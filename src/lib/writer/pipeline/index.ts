@@ -26,7 +26,6 @@ import { isCompactDepth } from '@/lib/writer/types/pipeline';
 import { analyzeSceneActionBudget } from '@/lib/writer/pipeline/validators/action_budget';
 import { resetGeminiCallCount, getGeminiCallCount } from '@/lib/writer/llm/gemini';
 import { resetClaudeCallCount, getClaudeCallCount } from '@/lib/writer/llm/claude';
-import { resetOpenAICallCount, getOpenAICallCount } from '@/lib/writer/llm/openai';
 import { resetLocalCallCount, getLocalCallCount } from '@/lib/writer/llm/local';
 import { resetRawSeq } from '@/lib/writer/llm/raw_collector';
 import { DEFAULT_MODELS, type PipelineModelsConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
@@ -114,7 +113,6 @@ export async function runPipeline(
 
   resetGeminiCallCount();
   resetClaudeCallCount();
-  resetOpenAICallCount();
   resetLocalCallCount();
   resetRawSeq();
   const models = resolveModels(input);
@@ -505,7 +503,6 @@ async function _runPipelineInner(
       llm_calls: {
         gemini: getGeminiCallCount(),
         claude: getClaudeCallCount(),
-        openai: getOpenAICallCount(),
         local: getLocalCallCount(),
       },
     },
