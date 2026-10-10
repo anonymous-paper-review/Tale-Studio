@@ -1,5 +1,6 @@
 // 러프 접수는 서비스 오류에도 HTTP 요청을 한 번만 보내며 영수증을 보존한다
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { moderated } from '../fixtures/_moderation.ts'
 vi.mock('@/lib/generation-jobs', () => ({ countQueuedJobsByKey: async () => 0 }))
 vi.mock('@/lib/writer/llm/raw_collector', () => ({ recordRawCall: vi.fn(), noteRateLimitHit: vi.fn() }))
 
@@ -14,7 +15,7 @@ it('서비스가 503을 반환해도 러프 HTTP 접수는 한 번만 보내고 
     .mockResolvedValue(new Response(JSON.stringify({ request_id: 'duplicate-request' }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
   vi.stubGlobal('fetch', fetch)
   const { falImageSubmit } = await import('@/lib/writer/llm/fal')
-  await expect(falImageSubmit({ prompt: 'empty room' }, { retry: false })).rejects.toMatchObject({ cause: { status: 503 } })
+  await expect(falImageSubmit(moderated({ prompt: 'empty room' }), { retry: false })).rejects.toMatchObject({ cause: { status: 503 } })
   expect(fetch).toHaveBeenCalledTimes(1)
 })
 
@@ -22,7 +23,7 @@ it('러프 HTTP 접수는 같은 입력과 웹훅을 보내고 요청 번호와 
   const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ request_id: 'request-1' }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
   vi.stubGlobal('fetch', fetch)
   const { falImageSubmit } = await import('@/lib/writer/llm/fal')
-  const receipt = await falImageSubmit({ prompt: 'empty room', model: 'openai/gpt-image-2', webhookUrl: 'https://example.test/hook?a=1&b=2' }, { retry: false })
+  const receipt = await falImageSubmit(moderated({ prompt: 'empty room', model: 'openai/gpt-image-2', webhookUrl: 'https://example.test/hook?a=1&b=2' }), { retry: false })
   expect(receipt).toMatchObject({ request_id: 'request-1', model: 'openai/gpt-image-2', fal_key_id: 'test-key', fal_request: { prompt: 'empty room' } })
   expect(fetch).toHaveBeenCalledTimes(1)
   const [address, init] = fetch.mock.calls[0]
@@ -43,7 +44,7 @@ it('예약에서 지정한 fal 키로 HTTP 접수를 한 번만 보낸다', asyn
   vi.stubGlobal('fetch', fetch)
   const { falImageSubmit } = await import('@/lib/writer/llm/fal')
   const receipt = await falImageSubmit(
-    { prompt: 'empty room', model: 'openai/gpt-image-2' },
+    moderated({ prompt: 'empty room', model: 'openai/gpt-image-2' }),
     { retry: false, falKeyId: 'key-b' },
   )
   expect(receipt).toMatchObject({ request_id: 'request-b', fal_key_id: 'key-b' })

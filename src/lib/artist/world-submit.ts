@@ -10,6 +10,8 @@ import { applyStyleAnchor, type AnchorableSubmit, type ResolvedStyleAnchor } fro
 import { falImageSubmit } from '@/lib/writer/llm/fal'
 import { isDefiniteSubmitRejection } from '@/lib/fal/submit-rejection'
 import { DEFAULT_WORLD_IMAGE_MODEL, resolveImageEndpoint, type ImageModelKey } from '@/lib/image-models'
+import { moderatedSubmitInput, type ModerationReceipt } from '@/lib/moderation/creem'
+import { recordModerationPass } from '@/lib/api/moderation'
 
 export interface SubmitWorldShotJobInput {
   projectId: string
@@ -31,6 +33,8 @@ export interface SubmitWorldShotJobInput {
   descriptionHash?: string | null
   /** 배경 모습(약속 C10) — 변형 키. 없거나 'default' 면 locations 행(기본 모습)이 대상. */
   appearanceKey?: string | null
+  /** Creem 검사 통과 영수증(#creem-moderation 2026-10-11) — 호출부가 예약 전에 사용자 설명만 검사해 받아 넣는다. */
+  moderation: ModerationReceipt
   /** 변형 생성의 연속성 참조(기본 모습 wide_shot) — 캐릭터가 기본 얼굴을 참조하는 것과 같다. */
   referenceImageUrls?: string[] | null
 }
@@ -79,13 +83,21 @@ export async function submitWorldShotJob(
       ...(input.appearanceKey && input.appearanceKey !== 'default' ? { appearanceKey: input.appearanceKey } : {}),
     },
   })
+  // #creem-moderation(2026-10-11): 통과한 검사는 작업 기록(관측 이벤트)에만 남긴다 — 생성 입력 스냅샷은
+  //   같은 요구면 같은 내용이어야 해서 시각·검사 id 를 넣지 않는다.
+  recordModerationPass(input.moderation, {
+    projectId: input.projectId,
+    kind: 'world_shot',
+    userId: input.userId ?? null,
+    jobId: job.id,
+  })
 
   try {
     // 외부 접수는 한 번뿐이다. 응답을 잃은 호출을 SDK 재시도로 복제하지 않는다(러프와 같은 이유 —
     //   예약이 이미 자리를 잡고 있으니 재시도는 같은 그림의 이중 발주다).
     // falKeyId: 트리거가 여유 있는 계정으로 바꿔 넣었을 수 있어 반드시 예약 행의 값으로 제출한다.
     const receipt = await falImageSubmit(
-      { ...finalOpts, webhookUrl: resolveWebhookUrl() },
+      moderatedSubmitInput({ ...finalOpts, webhookUrl: resolveWebhookUrl() }, input.moderation),
       { retry: false, falKeyId: job.fal_key_id },
     )
     try {

@@ -9,6 +9,7 @@
 //      generatedAt 을 올려 캐시버스트(rough-frame-cycle.withCacheBust 가 새 프레임을 집는다).
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { generateReservedImage } from '@/lib/fal/generate-image'
+import { assertUserTextAllowed } from '@/lib/moderation/creem'
 import { mediaPathFromUrl, mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 import { translate } from '@/lib/i18n'
 import type { AppLocale } from '@/lib/locale'
@@ -78,11 +79,15 @@ export async function separateArrowLayer(
     return { cleanUrl: rb.cleanDirection.url, cached: true }
   }
 
+  // #creem-moderation(2026-10-11): 이 경로의 프롬프트는 전부 우리 고정 템플릿이다 — 사용자가 쓴 글이
+  //   없으므로 검사할 대상이 없고(건너뜀 영수증), 그래도 제출은 영수증 없이 못 나간다.
+  const moderation = await assertUserTextAllowed([], { projectId, kind: 'image_generation' })
   const result = await generateReservedImage(
     {
       model: GROK_EDIT_MODEL,
       prompt: STRIP_ARROWS_PROMPT,
       reference_image_urls: [rb.frames.direction],
+      moderation,
     },
     { projectId },
   )
@@ -201,11 +206,15 @@ export async function regenerateRoughFrame(
     action = typeof data?.action_description === 'string' ? data.action_description : null
   }
   const { prompt, refs } = promptForFrame(frame, action)
+  // #creem-moderation(2026-10-11): 자리 예약 전에 검사한다 — DIRECTING 재생성에만 실리는 사용자
+  //   액션 설명이 검사 대상이고, 프레임 지시문(START/END/DIRECTION 템플릿)은 우리 문구라 보내지 않는다.
+  const moderation = await assertUserTextAllowed([action], { projectId, kind: 'image_generation' })
   const result = await generateReservedImage(
     {
       model: GROK_EDIT_MODEL,
       prompt,
       reference_image_urls: refs(rb.frames),
+      moderation,
     },
     { projectId },
   )

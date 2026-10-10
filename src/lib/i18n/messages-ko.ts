@@ -957,7 +957,7 @@ export const KO: Record<string, string> = {
   '{count} available': '생성 가능 {count}개',
   '{agent} is generating videos': '{agent}가 영상을 만들고 있어요',
   '{agent} is generating previz videos': '{agent}가 previz 영상을 만들고 있어요',
-  'Background image (bypass retry)': '배경 이미지(우회 재시도)',
+  'Background image (softer prompt retry)': '배경 이미지(문구 완화 재시도)',
   'Change the background description (source): {description}': '배경 설명(원천)을 바꿉니다: {description}',
   "The background's description (source) changes, and Writer scenes read the new one.": '배경의 설명(원천)이 바뀌고 Writer 씬이 새 설명을 읽어요.',
   'After approval the existing image of that background is marked "description changed". It is not regenerated automatically.': '승인 후 그 배경의 기존 이미지에 "설명 바뀜"이 표시돼요. 자동 재생성은 하지 않아요.',
@@ -974,12 +974,12 @@ export const KO: Record<string, string> = {
   '{name} turnaround sheet': '{name} 턴어라운드 시트',
   'Turnaround (all views)': '턴어라운드 (모든 뷰)',
   'Character image': '캐릭터 이미지',
-  'Character image (bypass retry)': '캐릭터 이미지(우회 재시도)',
+  'Character image (softer prompt retry)': '캐릭터 이미지(문구 완화 재시도)',
   'This is a draft from before the final look. Regenerating remakes it in the final art style':
     '최종 룩 반영 전 초안이에요. 재생성하면 최종 그림체로 다시 만들어요',
   'The appearance changed. Regenerating will apply the new appearance': '외형이 수정됐어요. 재생성하면 새 외형이 반영돼요',
-  'Generation was declined by content policy. You can retry below with "Redo with bypass (safe)."':
-    '콘텐츠 정책으로 생성이 거부됐어요. 아래 "우회(safe)로 다시 만들기"로 재시도할 수 있어요.',
+  'Generation was declined by content policy. You can retry below with "Retry with a softer prompt."':
+    '콘텐츠 정책으로 생성이 거부됐어요. 아래 "문구를 완화해 다시 만들기"로 재시도할 수 있어요.',
   'Generation failed. Please try again.': '생성에 실패했어요. 다시 시도해 주세요.',
   'Regenerating creates a new image.': '재생성하면 새 이미지를 만듭니다.',
   'This generates the image.': '이미지를 생성합니다.',
@@ -991,8 +991,14 @@ export const KO: Record<string, string> = {
   "This character's appearance description": '이 캐릭터의 외형 묘사',
   'Regenerate {label}': '{label} 재생성',
   'Generate {label}': '{label} 생성',
-  'Bypass retry limit reached': '우회 재시도 한도 도달',
-  'Redo with bypass (safe)': '우회(safe)로 다시 만들기',
+  'Softer prompt retry limit reached': '문구 완화 재시도 한도 도달',
+  'Retry with a softer prompt': '문구를 완화해 다시 만들기',
+  // #creem-moderation(2026-10-11): 생성 전 내용 검사 — 막힘·검사 장애 안내(generation-quota-toast.ts).
+  'This request breaks the content rules, so nothing was generated. Edit the description and try again.':
+    '내용 규칙에 어긋나는 요청이어서 아무것도 만들지 않았어요. 설명을 고쳐 다시 시도해 주세요.',
+  'Content rules': '내용 규칙',
+  'The content check is unavailable right now, so nothing was generated. Please try again in a moment.':
+    '지금은 내용 검사를 할 수 없어서 아무것도 만들지 않았어요. 잠시 후 다시 시도해 주세요.',
   'History': '히스토리',
   'Candidate image': '후보 이미지',
   'Pre-look': '룩 이전',
@@ -1836,6 +1842,7 @@ export const KO: Record<string, string> = {
   'Click to open account & billing.': '누르면 계정·결제로 갑니다.',
   'No Takes yet.': '아직 Take가 없어요.',
   'Plan Takes expire at the end of the billing period. Pack Takes last 12 months.': '플랜 Take는 결제 주기가 끝나면 사라지고, 충전 Take는 12개월 갑니다.',
+
   // ── 계정 삭제 (약관 §9 · 개인정보 처리방침 §1, 2026-10-11) ──
   'Delete this account': '이 계정 지우기',
   'Your projects and generated output go away, and remaining Takes are forfeited.': '프로젝트와 만든 결과물이 사라지고, 남은 Take도 소멸해요.',

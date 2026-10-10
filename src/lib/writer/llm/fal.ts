@@ -7,6 +7,9 @@
 import { recordRawCall } from './raw_collector';
 import { withLlmRetry } from './retry';
 import { pickFalKey, falKeyById, FalUnknownKeyError } from '@/lib/fal/keys';
+// 제출 함수는 검사를 통과한 입력만 받는다(#creem-moderation 2026-10-11) — 타입 표식이라 런타임
+// 의존도, 요청 본문도 늘지 않는다. 표식은 moderatedSubmitInput() 만 붙일 수 있다.
+import type { ModerationProof } from '@/lib/moderation/creem';
 
 let imageCallCount = 0;
 let videoCallCount = 0;
@@ -252,7 +255,8 @@ function extractImageUrlFromData(raw: unknown): { url: string; width?: number; h
 
 /** submit only — request_id 반환 즉시 리턴. polling은 별도. */
 export async function falImageSubmit(
-  opts: FalImageOptions,
+  /** 검사를 통과한 입력만 받는다(#creem-moderation) — moderatedSubmitInput() 으로 표식을 붙인다. */
+  opts: FalImageOptions & ModerationProof,
   /** falKeyId: 자리 예약이 이미 키를 정해둔 호출자용(#generation-capacity-trigger 2026-09-14) — 작업 행에
    *  기록된 키로 제출해야 조회 경로가 그 키를 쓴다. 예약 행의 fal_key_id 는 트리거가 여유 있는
    *  계정으로 바꿔둔 값일 수 있다. 생략하면 종전대로 여기서 고른다. */
@@ -463,7 +467,8 @@ function extractVideoUrlFromData(raw: unknown): { url: string; duration?: number
 //   별도 처리한다(generate-video/route.ts:224, isAmbiguousSubmitError) — 여기도 같은 규칙을 따른다.
 //   조회(falVideoFetch)는 과금이 없으므로 그쪽 재시도는 그대로 둔다.
 export async function falVideoSubmit(
-  opts: FalVideoOptions,
+  /** 검사를 통과한 입력만 받는다(#creem-moderation) — moderatedSubmitInput() 으로 표식을 붙인다. */
+  opts: FalVideoOptions & ModerationProof,
   /** 제출 전에 키를 미리 정해야 하는 호출자용(#previz-record-before-submit) — 작업 행에 fal_key_id 를
    *  먼저 기록해야 조회 경로가 그 키를 쓸 수 있다. 생략하면 종전대로 여기서 고른다. */
   presetKey?: Awaited<ReturnType<typeof pickFalKey>>,

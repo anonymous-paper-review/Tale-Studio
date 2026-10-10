@@ -45,6 +45,8 @@ import { submitWorldShotJob } from '@/lib/artist/world-submit'
 import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events'
 import { checkGenerationCapacity } from '@/lib/generation-quota'
 import { styleAnalysisPending } from '@/lib/style-facets/analysis-wait'
+import { assertUserTextAllowed, moderatedSubmitInput } from '@/lib/moderation/creem'
+import { recordModerationPass } from '@/lib/api/moderation'
 
 interface DraftCharacterRow {
   character_id: string
@@ -230,6 +232,12 @@ export async function triggerCharacterDrafts(
             : applyStyleAnchor(anchor, anchorable, 'single', { people: true })
           submitOpts = { ...anchored, webhookUrl: wh }
         }
+        // #creem-moderation(2026-10-11): 자동 초안도 사람이 누른 것과 같은 검사를 거친다 — 사용자가 쓴 칸만
+        //   보내고, 막히면 이 초안은 자리 예약 없이 실패로 닫는다(자동 재시도 없음).
+        const moderation = await assertUserTextAllowed(
+          [promptInput.name, promptInput.appearance, promptInput.age, promptInput.role, ...(promptInput.costumes ?? [])],
+          { projectId, kind: 'character_view', userId: null },
+        )
         // 자리 예약이 먼저다(#generation-capacity-trigger 2026-09-14) — 제출을 먼저 하면 트리거가 기록을
         //   거절하는 순간 이미 유료 요청이 나간 뒤다. 묶음 전에 한 번 보는 사전 검사만으로는
         //   초안 4장이 한 칸에 들어가는 것을 막지 못했다(감사 2026-09-11) — 이제 초안마다 개별 판정이다.
@@ -263,6 +271,11 @@ export async function triggerCharacterDrafts(
               column: CHARACTER_VIEW_COLUMNS.main,
             },
           })
+          // #creem-moderation(2026-10-11): 통과한 검사는 작업 기록(관측 이벤트)에만 남긴다 — 스냅샷은
+          //   같은 요구면 같은 내용이어야 해서(채팅·화면 동일성) 시각·검사 id 를 넣지 않는다.
+          recordModerationPass(moderation, {
+            projectId, kind: 'character_view', userId: null, jobId: job.id,
+          })
         } catch (error) {
           const capacity = capacityRejectionOf(error)
           if (!capacity) throw error
@@ -290,7 +303,10 @@ export async function triggerCharacterDrafts(
         try {
           // 외부 접수는 한 번뿐 — 예약이 자리를 잡고 있으니 재시도는 같은 그림의 이중 발주다.
           //   falKeyId 는 반드시 예약 행의 값 — 트리거가 여유 있는 계정으로 바꿔 넣었을 수 있다.
-          falResult = await falImageSubmit(submitOpts, { retry: false, falKeyId: job.fal_key_id })
+          falResult = await falImageSubmit(
+            moderatedSubmitInput(submitOpts, moderation),
+            { retry: false, falKeyId: job.fal_key_id },
+          )
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error)
           const rejected = isDefiniteSubmitRejection(error)
@@ -404,6 +420,18 @@ export async function triggerWorldDrafts(
           null,
           'wideShot',
         )
+        // #creem-moderation(2026-10-11): 검사는 이야기에서 나온 배경 설명만 본다 — 사람 금지 절·샷 종류
+        //   꼬리말(wide shot, panoramic)은 우리 문구라 보내지 않는다.
+        const moderation = await assertUserTextAllowed(
+          [
+            location.name,
+            location.visual_description,
+            location.style_description,
+            location.purpose,
+            ...(location.props ?? []),
+          ],
+          { projectId, kind: 'world_shot', userId: null },
+        )
         await recordWriterObservabilityEvent(projectId, 'fal_submit_started', {
           source: 'writer_v2_design',
           kind: 'world_shot',
@@ -424,6 +452,7 @@ export async function triggerWorldDrafts(
             actor: 'writer',
             workspaceId: project?.workspace_id ?? undefined,
             anchor,
+            moderation,
           })
         } catch (error) {
           const capacity = capacityRejectionOf(error)

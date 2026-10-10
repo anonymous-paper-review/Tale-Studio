@@ -62,6 +62,7 @@ vi.mock('@/lib/style-anchor', () => ({
 import { POST as generateSheetPOST } from '@/app/api/artist/generate-sheet/route'
 import { triggerCharacterDrafts } from '@/lib/artist/draft-trigger'
 import { submitWorldShotJob } from '@/lib/artist/world-submit'
+import { MODERATION_FIXTURE } from '../fixtures/_moderation.ts'
 import { GenerationCapacityError, type GenerationJob } from '@/lib/generation-jobs'
 
 const PROJECT_ID = 'project-1'
@@ -114,6 +115,8 @@ function worldInput() {
     actor: 'ui' as const,
     userId: 'user-1',
     workspaceId: WORKSPACE_ID,
+    // #creem-moderation(2026-10-11): 제출 입력은 검사 통과 영수증과 함께 온다(검사 없는 제출 금지).
+    moderation: MODERATION_FIXTURE,
   }
 }
 

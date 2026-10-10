@@ -137,13 +137,86 @@ export function notifyInsufficientTakes(body: InsufficientTakesBody | null | und
   )
 }
 
+/** #creem-moderation(2026-10-11): 내용 규칙 막힘(400) — 서버 src/lib/api/moderation.ts 의 code 와 짝이다. */
+export interface ContentPolicyBlockedBody {
+  code?: string
+  policyUrl?: string
+}
+
+export function isContentPolicyBlocked(status: number, body: unknown): body is ContentPolicyBlockedBody {
+  return (
+    status === 400 &&
+    typeof body === 'object' &&
+    body !== null &&
+    (body as { code?: unknown }).code === 'content_policy_blocked'
+  )
+}
+
 /**
- * 429/402 면 안내하고 true. 호출부 관용구: `if (await notifyIfQuotaExceeded(res, body)) return`.
- * 안내 대상이 아니면 아무 것도 하지 않고 false — 나머지 오류 처리는 호출부 몷이다.
+ * 막힘 안내 — 사용자가 할 수 있는 일은 "설명을 고쳐 다시"다. 다시 눌러도 같은 결과라 재시도를 권하지 않는다.
+ * 어떤 내용이 안 되는지는 콘텐츠 이용정책에 적혀 있다 — 토스트에 다 옮기는 대신 그 페이지로 보낸다.
+ */
+export function notifyContentPolicyBlocked(body: ContentPolicyBlockedBody | null | undefined): void {
+  const locale = useLocaleStore.getState().locale
+  toast.error(
+    translate(
+      locale,
+      'This request breaks the content rules, so nothing was generated. Edit the description and try again.',
+    ),
+    {
+      id: 'generation-content-policy',
+      action: {
+        label: translate(locale, 'Content rules'),
+        onClick: () => {
+          if (typeof window !== 'undefined') window.open(body?.policyUrl ?? '/acceptable-use', '_blank')
+        },
+      },
+    },
+  )
+}
+
+/** #creem-moderation: 검사 장애(503) — 통과로 해석하지 않았기 때문에 아무것도 생성되지 않았다. */
+export interface ModerationUnavailableBody {
+  code?: string
+}
+
+export function isModerationUnavailable(status: number, body: unknown): body is ModerationUnavailableBody {
+  return (
+    status === 503 &&
+    typeof body === 'object' &&
+    body !== null &&
+    (body as { code?: unknown }).code === 'moderation_unavailable'
+  )
+}
+
+export function notifyModerationUnavailable(): void {
+  const locale = useLocaleStore.getState().locale
+  toast.error(
+    translate(
+      locale,
+      'The content check is unavailable right now, so nothing was generated. Please try again in a moment.',
+    ),
+    { id: 'generation-content-policy' },
+  )
+}
+
+/**
+ * 429/402/내용 규칙 거절이면 안내하고 true. 호출부 관용구: `if (await notifyIfQuotaExceeded(res, body)) return`.
+ * 안내 대상이 아니면 아무 것도 하지 않고 false — 나머지 오류 처리는 호출부 몫이다.
  * 동시성 한도와 프로젝트 영상 예산(#f4)에 이어 Take 부족(#payments-phase-2)도 여기서 갈라 안내한다 —
  * 진입점들은 이 함수 하나만 안다.
  */
 export function notifyIfQuotaExceeded(status: number, body: unknown): boolean {
+  // #creem-moderation(2026-10-11): 생성 진입점은 이 함수 하나만 알고 있다 — 내용 규칙 막힘·검사 장애도
+  //   여기서 갈라 안내해야 7개 입구가 같은 문구를 보여 준다(한도 안내와 같은 이유).
+  if (isContentPolicyBlocked(status, body)) {
+    notifyContentPolicyBlocked(body)
+    return true
+  }
+  if (isModerationUnavailable(status, body)) {
+    notifyModerationUnavailable()
+    return true
+  }
   if (isVideoBudgetExceeded(status, body)) {
     notifyVideoBudgetExceeded(body)
     return true

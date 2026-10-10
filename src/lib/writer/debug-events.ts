@@ -38,6 +38,16 @@ export const WRITER_OBSERVABILITY_EVENTS = [
   //   하지만 "왜 거부였는지"(필요·잔액)를 공유하는 공용 429 이벤트에 대응하는 짝이 없어
   //   거절 사유를 상세히 남길 도구가 없었다. 거절 순간 범위(required·balance·jobId)만 단독 이벤트로 남긴다.
   'generation_submit_rejected_takes',
+  // Creem 프롬프트 검사 거절(2026-10-11) — 검사는 자리 예약·Take hold 전에 끝나므로 거절이면
+  //   generation_jobs 행이 아예 없다. 프롬프트 본문은 남기지 않는다(payload scrubber 가 'prompt' 키를
+  //   지우고, 여기 싣는 값은 판정·사유뿐이다).
+  'generation_submit_rejected_content_policy',
+  'generation_submit_rejected_moderation_unavailable',
+  // 통과한 검사도 남긴다(2026-10-11) — "이 작업은 무엇으로 통과했나"를 나중에 답할 수 있어야 하고
+  //   (생산 요구의 스냅샷은 같은 요구면 같은 내용이어야 해 생산별 영수증을 거기 넣지 않는다),
+  //   사심사가 "모든 프롬프트를 보는가"를 물으면 이 이벤트 하나로 보여줄 수 있다.
+  //   실는 것: 작업 id · Creem 검사 id · 판정 · 시각 · 글자 수 · 해시. 프롬프트 본문은 싱지 않는다.
+  'generation_submit_moderation_passed',
   // Coordinate (4) of the generation lifecycle: the client actually folded a settled job's
   // result into visible UI state (store rehydrate after the job left the active queue).
   // A completed job with no ui_reflected row = "finished but the screen never showed it".

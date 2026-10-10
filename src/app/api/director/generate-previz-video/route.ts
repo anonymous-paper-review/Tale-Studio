@@ -12,6 +12,8 @@ import { falKeyById, pickFalKey } from '@/lib/fal/keys'
 import { createGenerationJob, failGenerationJob, STALE_QUEUED_MS } from '@/lib/generation-jobs'
 import { checkGenerationCapacity, checkProjectVideoBudget, syncFalKeyLimits } from '@/lib/generation-quota'
 import { quotaRejectionResponse, videoBudgetRejectionResponse, capacityReservationRejection } from '@/lib/api/quota'
+import { assertUserTextAllowed, moderatedSubmitInput } from '@/lib/moderation/creem'
+import { moderationRejectionResponse, recordModerationPass } from '@/lib/api/moderation'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
 import { holdTakesForVideoJob, releaseTakesForJob } from '@/lib/billing/take-hold'
@@ -96,6 +98,25 @@ export async function POST(req: Request) {
 
     const prompt = buildPrevizVideoPrompt(actionEn, duration)
 
+    // #creem-moderation(2026-10-11): 작업 기록·Take hold·제출 전에 사용자 글만 검사한다 — 목각 previz
+    //   템플릿(스타일 유지 절)은 우리 고정 문구라 보내지 않고, 샷의 액션 설명만 보낸다.
+    let moderation
+    try {
+      moderation = await assertUserTextAllowed([actionEn], {
+        projectId,
+        kind: 'shot_previz_video',
+        userId: access.userId,
+      })
+    } catch (error) {
+      const rejected = moderationRejectionResponse(error, {
+        projectId,
+        kind: 'shot_previz_video',
+        userId: access.userId,
+      })
+      if (rejected) return rejected
+      throw error
+    }
+
     // 기록 → Take → 제출 순서다(#previz-record-before-submit 2026-09-08).
     //   예전에는 제출이 맨 앞이라 두 가지가 샜다. (1) 제출과 행 생성 사이에 요청이 죽으면 fal 은
     //   만들고 과금하는데 추적 행이 없어 webhook 이 와도 버려졌다. (2) 잔액 0 인 사용자도 제출이
@@ -130,6 +151,11 @@ export async function POST(req: Request) {
       if (rejection) return rejection
       throw createError
     }
+    // #creem-moderation(2026-10-11): 통과한 검사는 작업 기록(관측 이벤트)에만 남긴다 — 이 경로는 같은
+    //   요구 안에서 바로 제출하므로 스냅샷에 영수증을 들고 다닐 이유가 없다.
+    recordModerationPass(moderation, {
+      projectId, kind: 'shot_previz_video', userId: access.userId, jobId: job.id,
+    })
 
     // #payments-phase-2 #gen-quota-atomic-gate: Take hold — 제출 앞이므로 부족이면 아직 되돌릴 수 있다.
     const holdAmount = takeCostForPreviz()
@@ -162,14 +188,14 @@ export async function POST(req: Request) {
       if (!submitFalKey) {
         throw Object.assign(new Error(`unknown fal key id: ${job.fal_key_id ?? '(missing)'}`), { status: 400 })
       }
-      ;({ request_id, model, fal_key_id } = await falVideoSubmit({
+      ;({ request_id, model, fal_key_id } = await falVideoSubmit(moderatedSubmitInput({
         prompt,
         image_url: frames.start,
         image_urls: [frames.start, frames.end],
         duration,
         aspect_ratio: '16:9',
         webhookUrl: resolveWebhookUrl(),
-      }, submitFalKey))
+      }, moderation), submitFalKey))
     } catch (submitError) {
       const message = submitError instanceof Error ? submitError.message : String(submitError)
       if (isDefiniteSubmitRejection(submitError)) {

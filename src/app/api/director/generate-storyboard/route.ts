@@ -25,7 +25,9 @@ import { isDefiniteSubmitRejection } from '@/lib/fal/submit-rejection'
 import { buildBestEffortFalRequestCapturePatch } from '@/lib/fal/observability'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { applyStyleAnchor, resolveStyleAnchor, type AnchorableSubmit } from '@/lib/style-anchor'
-import { appendCheckConstraints } from '@/lib/writer/check-notes'
+import { appendCheckConstraints, parseCheckConstraints } from '@/lib/writer/check-notes'
+import { assertUserTextAllowed, moderatedSubmitInput } from '@/lib/moderation/creem'
+import { moderationRejectionResponse, recordModerationPass } from '@/lib/api/moderation'
 import { composeRoughReferenceStrip, buildRealStripPrompt } from '@/lib/director/storyboard-strip'
 import {
   loadShotReferencePlans,
@@ -204,6 +206,8 @@ export async function POST(req: Request) {
     // #n-1(2026-08-05): 같은 씬 직전 샷의 종료 상태를 서버측 첨부 — 샷별 독립 잡이던 실사의
     //   연속성 봉합. DB pull 이라 잡 간 의존이 생기지 않는다 (architecture §0: 둘 다 진실을 읽는다).
     let continuityLine = ''
+    // 검사에 보낼 원본(사용자·작가 AI 가 쓴 직전 샷 문장) — 우리가 감은 Continuity 템플릿 문구는 보내지 않는다.
+    let continuityPrevText = ''
     const shotMeta = shot as { scene_id?: string; sort_order?: number } | null
     if (typeof shotMeta?.sort_order === 'number' && shotMeta.sort_order > 0) {
       const { data: prev } = await supabaseAdmin
@@ -214,6 +218,7 @@ export async function POST(req: Request) {
         .maybeSingle()
       const prevText = (((prev?.prompt as string) || (prev?.action_description as string)) ?? '').trim()
       if (prev?.scene_id === shotMeta.scene_id && prevText) {
+        continuityPrevText = prevText.slice(0, 110)
         continuityLine = `\nContinuity: moments earlier the previous shot showed "${prevText.slice(0, 110)}". Carry over the character's wardrobe, props, lighting and surrounding environment from it, while depicting this shot's own moment.`
       }
     }
@@ -336,6 +341,24 @@ export async function POST(req: Request) {
       fal_request: {},
       ignored_fields: [],
     }
+    // #creem-moderation(2026-10-11): 프롬프트 확정 뒤·자리 예약 전에 사용자 글만 검사한다 — 샷 문장·검증 제약·
+    //   직전 샷 문장. 스트립 지시문·앵커 절·무인물 절은 우리 고정 문구라 보내지 않는다.
+    let moderation
+    try {
+      moderation = await assertUserTextAllowed(
+        [
+          promptEn,
+          ...parseCheckConstraints((shot as { check_notes?: unknown } | null)?.check_notes),
+          continuityPrevText,
+          ...(characterRefLabels ?? []).flatMap((r) => [r.name, r.pose]),
+        ],
+        { projectId, kind: 'shot_storyboard', userId: access.userId },
+      )
+    } catch (e) {
+      const rejected = moderationRejectionResponse(e, { projectId, kind: 'shot_storyboard', userId: access.userId })
+      if (rejected) return rejected
+      throw e
+    }
     let job: GenerationJob
     try {
       job = await reserveGenerationJob({
@@ -363,16 +386,21 @@ export async function POST(req: Request) {
       if (rejected) return rejected
       throw err
     }
+    // #creem-moderation(2026-10-11): 통과한 검사는 작업 기록(관측 이벤트)에만 남긴다 — 예약 스냅샷은
+    //   같은 요구면 같은 내용이어야 해서(리플레이 대조·동일성 테스트) 시각·검사 id 를 넣지 않는다.
+    recordModerationPass(moderation, {
+      projectId, kind: 'shot_storyboard', userId: access.userId, jobId: job.id,
+    })
 
     try {
       // 외부 접수는 한 번뿐이다. 응답을 잃은 호출을 SDK 재시도로 복제하지 않는다(러프와 같은 이유 —
       //   예약이 이미 자리를 잡고 있으니 재시도는 이중 발주다).
       const receipt = await falImageSubmit(
-        {
+        moderatedSubmitInput({
           ...finalOpts,
           ...(requestedImageModel ? { model: requestedImageModel } : {}),
           webhookUrl: resolveWebhookUrl(),
-        },
+        }, moderation),
         // 트리거가 여유 있는 계정으로 바꿔 넣었을 수 있어 반드시 예약 행의 키로 제출한다.
         { retry: false, falKeyId: job.fal_key_id },
       )

@@ -43,6 +43,7 @@ import {
 } from '@/lib/generation-jobs'
 import { syncGenerationCapacityExemption } from '@/lib/generation-quota'
 import { capacityReservationRejection } from '@/lib/api/quota'
+import { moderated } from '../fixtures/_moderation.ts'
 
 const FAL_KEYS = JSON.stringify([
   { id: 'key-1', key: 'secret-1', maxInflight: 8 },
@@ -78,7 +79,7 @@ function reserveInput() {
 /** 실제 호출 순서(예약 → 제출 → 접수 번호 기록)를 그대로 흉내 낸 최소 흐름. */
 async function reserveThenSubmit() {
   const job = await reserveGenerationJob(reserveInput())
-  await falImageSubmit({ prompt: 'a portrait' }, { retry: false, falKeyId: job.fal_key_id })
+  await falImageSubmit(moderated({ prompt: 'a portrait' }), { retry: false, falKeyId: job.fal_key_id })
   return job
 }
 

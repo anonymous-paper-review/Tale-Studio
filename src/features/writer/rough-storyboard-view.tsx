@@ -41,7 +41,11 @@ import { WriterResumeButton } from '@/components/layout/writer-resume-button'
 import { writerProgressView } from '@/lib/writer/progress-view'
 import { summarizeRoughProgress } from '@/lib/writer/rough-progress'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
-import { notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
+import {
+  isContentPolicyBlocked,
+  isModerationUnavailable,
+  notifyIfQuotaExceeded,
+} from '@/lib/generation-quota-toast'
 import { runRoughPump } from '@/lib/writer/rough-pump-client'
 import { resolveEntityNames, manifestEntities } from '@/lib/writer/resolve-entity-names'
 import {
@@ -313,6 +317,20 @@ export function RoughStoryboardView() {
           body: JSON.stringify({ projectId, shotIds, force, styleHints }),
         })
         const j = await res.json().catch(() => null)
+        // #creem-moderation(2026-10-11): 내용 규칙 차단(400)·검사 장애(503)도 자리 부족과 같은 모양의 멈춤이다 —
+        //   안내 문구는 공용 토스트가 진다. 이 분기가 없으면 아래 throw 로 가 "HTTP 400" 만 보인다
+        //   (이 라우트의 오류 봉투는 j.error.message 이라 공용 거절 봉투와 모양이 다르다).
+        if (isContentPolicyBlocked(res.status, j) || isModerationUnavailable(res.status, j)) {
+          notifyIfQuotaExceeded(res.status, j)
+          if (shotIds?.length) {
+            setPanelJobs((prev) => {
+              const next = { ...prev }
+              for (const id of shotIds) delete next[id]
+              return next
+            })
+          }
+          return { submitted: 0, remaining: 0, quota: true, done: Promise.resolve() }
+        }
         // 자리 부족(429)은 멈춤이다 — 자동 재시도 없음(2026-09-11 오너 결정). 어느 경로든(전체 펌프·자동 진입·
         //   개별 패널 버튼) 공용 토스트로 한 번 알린다. 예전에는 펌프가 "큐가 빌 때까지 대기" 신호로 재시도했고
         //   개별 버튼은 무음으로 끝났다(2026-09-11 동시성 감사). 토스트 id 가 고정이라 여러 장이 동시에 429 를 받아도 하나만 보인다.

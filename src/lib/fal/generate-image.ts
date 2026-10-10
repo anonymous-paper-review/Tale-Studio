@@ -14,6 +14,8 @@ import {
   type FalImageOptions,
   type FalImageResult,
 } from '@/lib/writer/llm/fal'
+import { moderatedSubmitInput, type ModerationReceipt } from '@/lib/moderation/creem'
+import { recordModerationPass } from '@/lib/api/moderation'
 
 const IMAGE_POLL_INTERVAL_MS = 1_000
 const IMAGE_POLL_TIMEOUT_MS = 90_000
@@ -23,6 +25,14 @@ type ImageGenerationContext = {
   userId?: string
   workspaceId?: string
 }
+
+/**
+ * 프롬프트와 그 프롬프트의 검사 영수증은 함께 다닌다(#creem-moderation 2026-10-11) — 영수증이 필수라
+ * 검사를 건너뛴 호출은 타입 오류가 난다. 영수증은 fal 요청에도 작업 스냅샷에도 들어가지 않는다
+ * (아래에서 떼어내고, 통과 사실은 관측 이벤트가 남긴다). 인자로 따로 받지 않는 이유: 이 helper 의
+ * 인자 개수는 기존 라우트 계약(테스트가 고정한 호출 모양)이라 늘리지 않는다.
+ */
+export type ModeratedImageOptions = FalImageOptions & { moderation: ModerationReceipt }
 
 function timeoutError(model: string, requestId: string): Error {
   return new Error(`fal image generation timed out (${model}/${requestId})`)
@@ -60,23 +70,34 @@ async function fetchUntilDeadline(
  * callers own the resulting URL and decide where the bytes belong.
  */
 export async function generateReservedImage(
-  opts: FalImageOptions,
+  opts: ModeratedImageOptions,
   context: ImageGenerationContext,
 ): Promise<FalImageResult> {
+  // 영수증은 여기서 떼어낸다 — fal 요청도, 작업 스냅샷도 "보낼 입력"만 담는다.
+  const { moderation, ...falOpts } = opts
   const job = await reserveGenerationJob({
     projectId: context.projectId,
     userId: context.userId,
     workspaceId: context.workspaceId,
-    model: opts.model ?? DEFAULT_IMAGE_MODEL,
+    model: falOpts.model ?? DEFAULT_IMAGE_MODEL,
     kind: 'image_generation',
     provider: 'fal',
-    inputSnapshot: opts,
+    inputSnapshot: { ...falOpts },
     target: {},
+  })
+  recordModerationPass(moderation, {
+    projectId: context.projectId,
+    kind: 'image_generation',
+    userId: context.userId ?? null,
+    jobId: job.id,
   })
 
   let receipt: Awaited<ReturnType<typeof falImageSubmit>>
   try {
-    receipt = await falImageSubmit(opts, { retry: false, falKeyId: job.fal_key_id })
+    receipt = await falImageSubmit(
+      moderatedSubmitInput(falOpts, moderation),
+      { retry: false, falKeyId: job.fal_key_id },
+    )
   } catch (error) {
     // Only an explicit, definitive provider rejection can close the reservation.
     // A missing response may still mean the provider accepted and queued the job.

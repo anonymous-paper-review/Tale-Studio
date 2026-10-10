@@ -17,6 +17,8 @@ import {
   type GenerationJob,
 } from '@/lib/generation-jobs'
 import { falImageSubmit } from '@/lib/writer/llm/fal'
+import { assertUserTextAllowed, moderatedSubmitInput } from '@/lib/moderation/creem'
+import { moderationRejectionResponse, recordModerationPass } from '@/lib/api/moderation'
 import { isDefiniteSubmitRejection } from '@/lib/fal/submit-rejection'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { resolveStyleAnchor } from '@/lib/style-anchor'
@@ -406,6 +408,27 @@ export async function POST(req: NextRequest) {
         ...(anchorTwoRef ? [anchor!.previewUrl as string] : []),
       ]
 
+      // #creem-moderation(2026-10-11): 자리 예약 전에 이 시트에 실릴 사용자 글만 검사한다 — 인물 이름·칸별
+      //   포즈(러프 배치)·샷 문장. 그리드 지시문·앵커 절은 우리 고정 문구라 보내지 않는다.
+      //   막힌 시트는 이 호출에서 예약도 제출도 하지 않는다 — 이미 낸 시트가 없으면 그대로 거절해 답하고,
+      //   이미 낸 것이 있으면 그것만 진행시키고 멈춘다(자리 부족 처리와 같은 모양).
+      let moderation
+      try {
+        moderation = await assertUserTextAllowed(
+          [
+            ...columnCharacters.flatMap((column) => column.flatMap((c) => [c.name, c.pose, c.position])),
+            sceneLighting,
+          ],
+          { projectId, kind: 'storyboard_real_grid', userId: access.userId },
+        )
+      } catch (e) {
+        const rejected = moderationRejectionResponse(e, { projectId, kind: 'storyboard_real_grid', userId: access.userId })
+        if (!rejected) throw e
+        if (!submitted.length) return rejected
+        capacitySkippedShots = planned.slice(groupIndex).reduce((n, g) => n + g.length, 0)
+        break
+      }
+
       // 이 배치 경로는 모델 선택 UI 가 없다 — 기본 모델의 edit 갈래로 고정(#owner-default 2026-08-31).
       // #sheet-model-guard: 그리드는 시트 계약 경로 — 기본 모델이 무엇이든 시트 가능 모델로 강제.
       const gridModel = resolveImageEndpoint(resolveSheetImageModel(null), true).endpoint
@@ -476,12 +499,17 @@ export async function POST(req: NextRequest) {
         capacitySkippedShots = planned.slice(groupIndex).reduce((n, g) => n + g.length, 0)
         break
       }
+      // #creem-moderation(2026-10-11): 통과한 검사는 작업 기록(관측 이벤트)에만 남긴다 — 예약 스냅샷은
+      //   같은 요구면 같은 내용이어야 해서 시각·검사 id 를 넣지 않는다.
+      recordModerationPass(moderation, {
+        projectId, kind: 'storyboard_real_grid', userId: access.userId, jobId: job.id,
+      })
 
       try {
         // 외부 접수는 한 번뿐이다. 응답을 잃은 호출을 SDK 재시도로 복제하지 않는다(러프와 같은 이유 —
         //   예약이 이미 자리를 잡고 있으니 재시도는 이중 발주다).
         const receipt = await falImageSubmit(
-          {
+          moderatedSubmitInput({
             model: gridModel,
             prompt,
             reference_image_urls: referenceImageUrls,
@@ -489,7 +517,7 @@ export async function POST(req: NextRequest) {
             //   (ed5bd4a 전까지 이 필드는 타입에 없어 버려지고 'auto'가 전송되고 있었다 — #fal-canvas)
             image_size: sheetCanvas,
             webhookUrl,
-          },
+          }, moderation),
           // 트리거가 여유 있는 계정으로 바꿔 넣었을 수 있어 반드시 예약 행의 키로 제출한다.
           { retry: false, falKeyId: job.fal_key_id },
         )

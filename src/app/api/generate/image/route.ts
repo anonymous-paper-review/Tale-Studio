@@ -1,10 +1,11 @@
-import { GoogleGenAI } from '@google/genai'
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { generateReservedImage } from '@/lib/fal/generate-image'
 import { capacityReservationRejection } from '@/lib/api/quota'
+import { assertUserTextAllowed, type ModerationReceipt } from '@/lib/moderation/creem'
+import { moderationRejectionResponse } from '@/lib/api/moderation'
 import {
   isImageModelKey,
   resolveImageEndpoint,
@@ -19,98 +20,8 @@ async function projectFormatOf(projectId: string): Promise<ProjectFormat | null>
   return parseProjectFormat((data as { settings?: { format?: unknown } | null } | null)?.settings?.format)
 }
 
-function getApiKey(): string {
-  const keys = process.env.GOOGLE_API_KEYS ?? ''
-  const first = keys.split(',')[0]?.split(':')[0]?.trim()
-  if (!first) throw new Error('GOOGLE_API_KEYS is not configured')
-  return first
-}
-
 // Vercel serverless function timeout (seconds) — 60s for Pro, 10s for Hobby
 export const maxDuration = 300
-
-/* ── Tailscale self-hosted image gen (Qwen/FLUX etc.) ── */
-async function generateViaTailscale(
-  prompt: string,
-  aspectRatio: string,
-): Promise<Response> {
-  const baseUrl = process.env.TAILSCALE_IMAGE_API_URL
-  if (!baseUrl) {
-    throw new Error('TAILSCALE_IMAGE_API_URL is not configured')
-  }
-
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 300_000) // 5min for self-hosted image gen
-
-  const res = await fetch(`${baseUrl}/generate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      prompt,
-      negative_prompt: '',
-      aspect_ratio: aspectRatio,
-      num_inference_steps: 50,
-      true_cfg_scale: 4.0,
-      seed: -1,
-    }),
-    signal: controller.signal,
-  })
-
-  clearTimeout(timeout)
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`Tailscale image API error (${res.status}): ${text}`)
-  }
-
-  const buffer = Buffer.from(await res.arrayBuffer())
-  return new Response(buffer, {
-    headers: {
-      'Content-Type': 'image/png',
-      'Content-Length': String(buffer.length),
-    },
-  })
-}
-
-/* ── Gemini 2.5 Flash Image (Nano Banana, free tier) ──
- * Imagen 은 paid plan 전용이라 검증용으로 무료 Nano Banana 사용.
- * paid plan 확보 후 imagen-4.0-generate-001 복원 가능.
- */
-async function generateViaGemini(
-  prompt: string,
-  aspectRatio: string,
-): Promise<Response> {
-  const ai = new GoogleGenAI({ apiKey: getApiKey() })
-
-  const aspectHint =
-    aspectRatio === '16:9'
-      ? ' Compose as widescreen 16:9 aspect ratio.'
-      : ' Compose as square 1:1 aspect ratio.'
-
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-image',
-    contents: `${prompt}${aspectHint}`,
-    config: {
-      responseModalities: ['Text', 'Image'],
-    },
-  })
-
-  const parts = response.candidates?.[0]?.content?.parts ?? []
-  const imagePart = parts.find((p) => p.inlineData?.data)
-  if (!imagePart?.inlineData?.data) {
-    throw new Error('Nano Banana response has no image')
-  }
-
-  const buffer = Buffer.from(imagePart.inlineData.data, 'base64')
-  const mimeType = imagePart.inlineData.mimeType ?? 'image/png'
-
-  return new Response(buffer, {
-    headers: {
-      'Content-Type': mimeType,
-      'Content-Length': String(buffer.length),
-    },
-  })
-}
 
 /* ── fal.ai (default) ──
  * T2I: openai/gpt-image-2. I2I: referenceImageUrls 있으면 fal 래퍼가 자동으로
@@ -123,6 +34,7 @@ async function generateViaFal(
   aspectRatio: string,
   referenceImageUrls: string[] | undefined,
   imageModel: ImageModelKey | undefined,
+  moderation: ModerationReceipt,
   context: { projectId: string; userId?: string },
 ): Promise<Response> {
   const resolvedModel = imageModel
@@ -139,6 +51,7 @@ async function generateViaFal(
       reference_image_urls: referenceImageUrls?.length
         ? referenceImageUrls
         : undefined,
+      moderation,
     },
     context,
   )
@@ -161,7 +74,6 @@ async function generateViaFal(
 export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
-  let providerUsed: 'fal' | 'tailscale' | 'gemini' = 'fal'
   try {
     const user = await getUser()
     if (!user) {
@@ -171,7 +83,6 @@ export async function POST(req: Request) {
     const {
       prompt,
       aspectRatio = '1:1',
-      provider,
       referenceImageUrls,
       imageModel,
       projectId,
@@ -191,19 +102,9 @@ export async function POST(req: Request) {
       )
     }
 
-    // provider: 'fal' (default, T2I+I2I) | 'tailscale' | 'gemini'
-    providerUsed =
-      provider === 'tailscale'
-        ? 'tailscale'
-        : provider === 'gemini'
-          ? 'gemini'
-          : 'fal'
-    if (providerUsed === 'tailscale') {
-      return await generateViaTailscale(prompt, aspectRatio)
-    }
-    if (providerUsed === 'gemini') {
-      return await generateViaGemini(prompt, aspectRatio)
-    }
+    // 생성기는 fal 하나다(#creem-moderation 2026-10-11): 예전 tailscale·gemini 갈래는 작업 기록도
+    //   자리 예약도 Creem 검사도 없이 모델로 바로 나가는 구멍이었다(실측: 두 갈래 모두 UI 스위치 없음).
+    //   갈래를 지우는 것이 "검사 없는 경로가 없다"의 가장 확실한 보장이다.
     if (typeof projectId !== 'string' || !projectId.trim()) {
       return NextResponse.json({ error: 'Project ID is required' }, { status: 400 })
     }
@@ -214,12 +115,31 @@ export async function POST(req: Request) {
     //   (영상·Writer 샷 이미지 경로와 같은 규칙). 표시가 없는 호출(에셋 노드 등)은 종전대로 요청 값.
     const effectiveAspectRatio =
       aspectFromProject === true ? shotImageAspectRatio(await projectFormatOf(projectId)) : aspectRatio
+    // #creem-moderation: 자리 예약(generateReservedImage) 전에 사용자가 보낸 프롬프트를 검사한다 —
+    //   이 라우트의 프롬프트는 호출부가 조립한 값이지만 사용자 글이 그 안에 그대로 실린다.
+    let moderation
+    try {
+      moderation = await assertUserTextAllowed([prompt], {
+        projectId,
+        kind: 'image_generation',
+        userId: user.id,
+      })
+    } catch (error) {
+      const rejected = moderationRejectionResponse(error, {
+        projectId,
+        kind: 'image_generation',
+        userId: user.id,
+      })
+      if (rejected) return rejected
+      throw error
+    }
     try {
       return await generateViaFal(
         prompt,
         effectiveAspectRatio,
         referenceImageUrls,
         imageModel,
+        moderation,
         { projectId, userId: user.id },
       )
     } catch (error) {
@@ -234,14 +154,11 @@ export async function POST(req: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[generate/image]', {
-      provider: providerUsed,
       hasFalKeys: !!process.env.FAL_KEYS,
-      hasGoogleKey: !!process.env.GOOGLE_API_KEYS,
-      hasTailscaleUrl: !!process.env.TAILSCALE_IMAGE_API_URL,
       message,
     })
     return NextResponse.json(
-      { error: `[${providerUsed}] ${message}` },
+      { error: `[fal] ${message}` },
       { status: 500 },
     )
   }

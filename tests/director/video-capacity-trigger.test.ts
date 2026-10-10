@@ -90,6 +90,15 @@ const falSnapshot = {
     model: 'fal-model',
     input: { prompt: 'scene' },
   },
+  // #creem-moderation(2026-10-11): 준비된 영상 입력에는 검사 영수증이 함께 저장된다 — 없으면
+  //   제출 직전 검문이 멈춘다(검사 없는 제출 금지).
+  moderation: {
+    decision: 'allow',
+    id: 'mod-fixture',
+    checked_at: '2026-10-11T00:00:00.000Z',
+    chars: 5,
+    text_sha256: 'f'.repeat(64),
+  },
 }
 const { new_take_metadata: _regenerationMetadata, ...regenerationSnapshot } = falSnapshot
 void _regenerationMetadata

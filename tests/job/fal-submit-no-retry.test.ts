@@ -13,6 +13,7 @@ vi.mock('@/lib/fal/keys', () => ({
 }))
 
 import { falVideoSubmit } from '@/lib/writer/llm/fal'
+import { moderated } from '../fixtures/_moderation.ts'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -26,7 +27,7 @@ describe('영상 만들기 요청 보내기', () => {
   it('한 번 성공하면 한 번만 보낸다', async () => {
     mocks.submit.mockResolvedValue({ request_id: 'req-1' })
 
-    const receipt = await falVideoSubmit({ prompt: '바다', image_url: 'https://cdn/start.png', duration: 5 })
+    const receipt = await falVideoSubmit(moderated({ prompt: '바다', image_url: 'https://cdn/start.png', duration: 5 }))
 
     expect(receipt.request_id).toBe('req-1')
     expect(mocks.submit).toHaveBeenCalledTimes(1)
@@ -37,7 +38,7 @@ describe('영상 만들기 요청 보내기', () => {
     // 다시 보내면 같은 영상을 두 번 만들고 두 번 청구된다.
     mocks.submit.mockRejectedValue(new Error('503 service unavailable'))
 
-    await expect(falVideoSubmit({ prompt: '바다', image_url: 'https://cdn/start.png', duration: 5 })).rejects.toThrow(
+    await expect(falVideoSubmit(moderated({ prompt: '바다', image_url: 'https://cdn/start.png', duration: 5 }))).rejects.toThrow(
       '503 service unavailable',
     )
     expect(mocks.submit).toHaveBeenCalledTimes(1)
@@ -46,7 +47,7 @@ describe('영상 만들기 요청 보내기', () => {
   it('응답을 기다리다 끊겨도 다시 보내지 않는다', async () => {
     mocks.submit.mockRejectedValue(new Error('fetch failed'))
 
-    await expect(falVideoSubmit({ prompt: '바다', image_url: 'https://cdn/start.png', duration: 5 })).rejects.toThrow('fetch failed')
+    await expect(falVideoSubmit(moderated({ prompt: '바다', image_url: 'https://cdn/start.png', duration: 5 }))).rejects.toThrow('fetch failed')
     expect(mocks.submit).toHaveBeenCalledTimes(1)
   })
 })

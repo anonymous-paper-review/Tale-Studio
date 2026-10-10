@@ -19,6 +19,8 @@ import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
 import { applyWorldSafeMode, ensureNoPeopleClause } from '@/lib/artist/world-prompt'
 import { checkGenerationCapacity } from '@/lib/generation-quota'
 import { capacityReservationRejection, quotaRejectionResponse } from '@/lib/api/quota'
+import { assertUserTextAllowed } from '@/lib/moderation/creem'
+import { moderationRejectionResponse } from '@/lib/api/moderation'
 import { resolveStyleAnchor } from '@/lib/style-anchor'
 import { styleAnalysisPending } from '@/lib/style-facets/analysis-wait'
 import { submitWorldShotJob } from '@/lib/artist/world-submit'
@@ -149,6 +151,17 @@ export async function POST(req: Request) {
       if (baseUrl) referenceImageUrls = [baseUrl]
     }
 
+    // #creem-moderation(2026-10-11): 자리 예약(world-submit.ts) 전에 사용자가 보낸 설명만 검사한다 —
+    //   사람 금지 절(NO_PEOPLE_CLAUSE)·앵커 절은 우리 문구라 보내지 않는다.
+    let moderation
+    try {
+      moderation = await assertUserTextAllowed([prompt], { projectId, kind: 'world_shot', userId: access.userId })
+    } catch (e) {
+      const rejected = moderationRejectionResponse(e, { projectId, kind: 'world_shot', userId: access.userId })
+      if (rejected) return rejected
+      throw e
+    }
+
     // 제출은 자리 예약 뒤에만 일어난다(world-submit.ts) — 트리거가 자리 없음으로 거절하면 그 예외를
     //   사전 검사와 같은 429 + 축 관측으로 옮긴다(#generation-capacity-trigger 2026-09-14).
     let job: Awaited<ReturnType<typeof submitWorldShotJob>>
@@ -170,6 +183,7 @@ export async function POST(req: Request) {
         descriptionHash: typeof descriptionHash === 'string' ? descriptionHash : null,
         appearanceKey,
         referenceImageUrls,
+        moderation,
       })
     } catch (e) {
       const rejected = capacityReservationRejection(e, { projectId, kind: 'world_shot', userId: access.userId })

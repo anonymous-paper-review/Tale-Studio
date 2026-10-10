@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { writeFile, mkdir } from 'node:fs/promises'
 import path from 'node:path'
 import sharp from 'sharp'
+import { moderated } from '../fixtures/_moderation.ts'
 import type { ProjectFormat } from '@/types/project'
 import type { RoughStoryboardSpec, RoughStoryboardPromptInput } from '@/lib/writer/rough-storyboard'
 
@@ -225,12 +226,12 @@ describe.runIf(LIVE)('화면 비율별 러프 시트를 만들고 장면 칸을 
       const prompt = buildRoughGridPrompt(cells, 'grid4', { frameAxis: geom.frameAxis })
 
       const submittedAt = new Date().toISOString()
-      const { request_id, model, fal_key_id } = await falImageSubmit({
+      const { request_id, model, fal_key_id } = await falImageSubmit(moderated({
         model: DEFAULT_EDIT_IMAGE_MODEL,
         prompt,
         reference_image_urls: [templateUrl!],
         image_size: geom.roughImageSize ?? undefined,
-      })
+      }))
 
       let url: string | null = null
       for (let i = 0; i < 90 && !url; i++) {

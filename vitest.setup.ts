@@ -43,6 +43,14 @@ process.env.SUPABASE_SERVICE_ROLE_KEY ??= 'test-service-role-key'
 // paddle-checkout "상품 ID 없으면 결제창 안 열림" 1건이 로컬에서만 빨개 떴다. 가격 ID 를 검증하는 파일은 자기가 직접 켠다.
 // 2026-10-11: 셸의 DISCORD_ALERT_WEBHOOK_URL 이 올라와 테스트가 실제 디스코드 #webhook 채널에 알림을 보냈다
 // ('[tale · local] 즉시 재조회로 결제를 복구했다'). 알림 전송을 검증하는 파일은 vi.stubEnv 로 가짜 주소를 직접 켠다.
+// 2026-10-11: Creem 프롬프트 검사 키·스위치도 같은 이유로 지운다 — 셸에 키가 있으면 생성 라우트 테스트가
+// 실제 Creem 검사 API 를 부른다(유료 호출 + 외부 의존). 검사를 검증하는 파일은 vi.stubEnv 로 가짜 키를 직접 켠다.
 for (const key of Object.keys(process.env)) {
-  if (key === 'TAKE_BILLING_MODE' || key === 'DISCORD_ALERT_WEBHOOK_URL' || key.startsWith('NEXT_PUBLIC_PADDLE_PRICE_')) delete process.env[key]
+  if (key === 'TAKE_BILLING_MODE' || key === 'DISCORD_ALERT_WEBHOOK_URL' || key === 'CREEM_API_KEY' || key === 'CREEM_MODERATION_MODE' || key.startsWith('NEXT_PUBLIC_PADDLE_PRICE_')) delete process.env[key]
 }
+
+// 2026-10-11(#creem-moderation): 검사는 기본 '끄기'로 시작한다 — 켜져 있으면 키가 없어 모든 생성 라우트
+// 테스트가 fail closed(503)로 떨어진다. 검사 동작을 검증하는 파일은 vi.stubEnv 로 켜거나
+// vi.mock('@/lib/moderation/creem') 으로 판정을 직접 정한다(tests/moderation/*).
+// 운영(VERCEL_ENV=production)에서는 이 스위치가 무시되므로 심사 약속은 그대로다.
+process.env.CREEM_MODERATION_MODE = 'off'

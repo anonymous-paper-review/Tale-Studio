@@ -23,6 +23,8 @@ import {
 } from '@/lib/generation-jobs'
 import { checkGenerationCapacity } from '@/lib/generation-quota'
 import { capacityReservationRejection, quotaRejectionResponse } from '@/lib/api/quota'
+import { assertUserTextAllowed, moderatedSubmitInput } from '@/lib/moderation/creem'
+import { moderationRejectionResponse, recordModerationPass } from '@/lib/api/moderation'
 import { isDefiniteSubmitRejection } from '@/lib/fal/submit-rejection'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import {
@@ -341,6 +343,20 @@ export async function POST(req: Request) {
     }
     delete inputSnapshot.webhookUrl
 
+    // #creem-moderation(2026-10-11): 프롬프트 확정 뒤·자리 예약 전에 사용자가 쓴 칸만 검사한다 — 막히면
+    //   작업 행도 모델 제출도 없다. 시트 지시문·스타일 앵커 절은 보내지 않는다(우리 문구가 오탐을 만든다).
+    let moderation
+    try {
+      moderation = await assertUserTextAllowed(
+        [input.name, input.appearance, input.age, input.role, ...(input.costumes ?? []), input.delta],
+        { projectId, kind: 'character_view', userId: access.userId },
+      )
+    } catch (e) {
+      const rejected = moderationRejectionResponse(e, { projectId, kind: 'character_view', userId: access.userId })
+      if (rejected) return rejected
+      throw e
+    }
+
     // 3. 자리 예약 — 완료 시 무엇을 갱신할지(target) 기록하고, 그 insert 로 자리를 확보한다.
     //   순서가 뒤집힌 이유(#generation-capacity-trigger 2026-09-14): 자리 판정은 DB 트리거가 네 축을
     //   원자적으로 한다. 제출이 먼저면 트리거가 거절하는 순간 이미 유료 요청이 나간 뒤다(감사 2026-09-11).
@@ -372,12 +388,20 @@ export async function POST(req: Request) {
       if (rejected) return rejected
       throw e
     }
+    // #creem-moderation(2026-10-11): 통과한 검사는 작업 기록(관측 이벤트)에만 남긴다 — 생성 입력 스냅샷은
+    //   같은 요구면 같은 내용이어야 해서 시각·검사 id 를 넣지 않는다.
+    recordModerationPass(moderation, {
+      projectId, kind: 'character_view', userId: access.userId, jobId: job.id,
+    })
 
     // 4. fal 큐에 submit (비동기). 완료는 webhook(/poll reconcile)이 storage 업로드 + DB 갱신.
     try {
       // 외부 접수는 한 번뿐이다 — 응답을 잃은 호출을 SDK 재시도로 복제하면 같은 그림을 두 번 결제한다.
       // falKeyId: 트리거가 여유 있는 계정으로 바꿔 넣었을 수 있어 반드시 예약 행의 값으로 제출한다.
-      const receipt = await falImageSubmit(submitOpts, { retry: false, falKeyId: job.fal_key_id })
+      const receipt = await falImageSubmit(
+        moderatedSubmitInput(submitOpts, moderation),
+        { retry: false, falKeyId: job.fal_key_id },
+      )
       try {
         await confirmGenerationJobReceipt(job.id, projectId, receipt)
       } catch (e) {

@@ -95,7 +95,7 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
   const safeRetry = useGuardedAction({
     actionKey: `artist:world-safe:${locationId}:${variantKey ?? 'default'}:${shot}`,
     stage: 'artist',
-    label: t('Background image (bypass retry)'),
+    label: t('Background image (softer prompt retry)'),
     busy: isGenerating,
     action: async () => {
       if (!world) return
@@ -205,7 +205,7 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
               <AlertTriangle className="size-3.5 shrink-0" />
               <span>
                 {failure.moderation
-                  ? t('Generation was declined by content policy. You can retry below with "Redo with bypass (safe)."')
+                  ? t('Generation was declined by content policy. You can retry below with "Retry with a softer prompt."')
                   : t('Generation failed. Please try again.')}
               </span>
             </div>
@@ -320,7 +320,7 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
               ) : (
                 <RefreshCw className="size-4" />
               )}
-              {capReached ? t('Bypass retry limit reached') : t('Redo with bypass (safe)')}
+              {capReached ? t('Softer prompt retry limit reached') : t('Retry with a softer prompt')}
             </Button>
           )}
         </div>

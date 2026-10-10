@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { getUser } from '@/lib/supabase/auth'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { capacityReservationRejection } from '@/lib/api/quota'
+import { moderationRejectionResponse } from '@/lib/api/moderation'
 import {
   separateArrowLayer,
   saveDirectingFrame,
@@ -73,6 +74,9 @@ export async function POST(req: Request) {
     const data = await saveDirectingFrame(body.projectId, body.shotId, body.image)
     return NextResponse.json({ data })
   } catch (e) {
+    // 내용 규칙 거절·검사 장애도 자리 부족과 같은 자리에서 표준 상황코드로 바꾼다(#creem-moderation).
+    const blocked = capacityContext && moderationRejectionResponse(e, capacityContext)
+    if (blocked) return blocked
     const rejected = capacityContext && capacityReservationRejection(e, capacityContext)
     if (rejected) return rejected
     const msg = e instanceof Error ? e.message : String(e)

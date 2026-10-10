@@ -4,6 +4,8 @@ import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events'
 import { isDefiniteSubmitRejection } from '@/lib/fal/submit-rejection'
 import { getGenerationJobById } from '@/lib/generation-jobs'
 import { syncFalKeyLimits } from '@/lib/generation-quota'
+import { moderatedSubmitInput, type ModerationReceipt } from '@/lib/moderation/creem'
+import { recordModerationPass } from '@/lib/api/moderation'
 
 type Reservation = { job_id: string | null; shot_ids: string[]; state: 'reserved' | 'existing' | 'exists'; confirmation_pending?: boolean }
 export type RoughSubmission = { shotId: string; jobId: string; confirmationPending?: boolean }
@@ -25,12 +27,15 @@ export async function submitRoughStoryboardGrid(input: {
   force?: boolean
   snapshot: Record<string, unknown>
   options: FalImageOptions & { model: string }
+  /** Creem 검사 통과 영수증(#creem-moderation 2026-10-11) — 호출부가 예약 RPC 전에 샷 설명만 검사해 받아 넣는다. */
+  moderation: ModerationReceipt
 }): Promise<{ submitted: RoughSubmission[]; exists: string[] }> {
   await syncFalKeyLimits()
+  const snapshot = input.snapshot
   const { data, error } = await supabaseAdmin.rpc('reserve_rough_storyboard_grid', {
     p_project_id: input.projectId, p_workspace_id: input.workspaceId, p_user_id: input.userId,
     p_shot_ids: input.shotIds, p_grid_variant: input.gridVariant, p_model: input.options.model,
-    p_input_snapshot: input.snapshot, p_force: input.force ?? false,
+    p_input_snapshot: snapshot, p_force: input.force ?? false,
   })
   if (error) throw error
   const reservations = data as Reservation[] | null
@@ -55,10 +60,18 @@ export async function submitRoughStoryboardGrid(input: {
       throw new Error('Rough reservation job has no final fal key')
     }
     await recordWriterObservabilityEvent(input.projectId, 'fal_submit_started', { jobId, shotCount: reservation.shot_ids.length })
+    // #creem-moderation(2026-10-11): 통과한 검사는 작업 기록(관측 이벤트)에만 남긴다 — 예약 스냅샷은
+    //   같은 요구면 같은 내용이어야 해서 시각·검사 id 를 넣지 않는다.
+    recordModerationPass(input.moderation, {
+      projectId: input.projectId, kind: 'shot_rough_storyboard', userId: input.userId, jobId,
+    })
     let confirmationPending = false
     try {
       // 외부 접수는 한 번뿐이다. 응답을 잃은 호출을 SDK 재시도로 복제하지 않는다.
-      const receipt = await falImageSubmit(input.options, { retry: false, falKeyId })
+      const receipt = await falImageSubmit(
+        moderatedSubmitInput(input.options, input.moderation),
+        { retry: false, falKeyId },
+      )
       await recordWriterObservabilityEvent(input.projectId, 'fal_submit_accepted', {
         jobId, requestId: receipt.request_id, model: receipt.model, shotCount: reservation.shot_ids.length,
       })
@@ -66,7 +79,7 @@ export async function submitRoughStoryboardGrid(input: {
         await patchReservation(input.projectId, jobId, {
           request_id: receipt.request_id, model: receipt.model, fal_key_id: receipt.fal_key_id,
           submitted_at: new Date().toISOString(), updated_at: new Date().toISOString(), attempts: 1,
-          input_snapshot: { ...input.snapshot, rough_submit_state: 'submitted' },
+          input_snapshot: { ...snapshot, rough_submit_state: 'submitted' },
         })
       } catch (error) {
         confirmationPending = true
@@ -82,14 +95,14 @@ export async function submitRoughStoryboardGrid(input: {
       if (rejected) {
         await patchReservation(input.projectId, jobId, {
           status: 'failed', error: message, last_error: message, completed_at: new Date().toISOString(),
-          input_snapshot: { ...input.snapshot, rough_submit_state: 'rejected' },
+          input_snapshot: { ...snapshot, rough_submit_state: 'rejected' },
         })
         throw error
       }
       confirmationPending = true
       try {
         await patchReservation(input.projectId, jobId, {
-          last_error: message, input_snapshot: { ...input.snapshot, rough_submit_state: 'confirmation_pending' },
+          last_error: message, input_snapshot: { ...snapshot, rough_submit_state: 'confirmation_pending' },
         })
       } catch { /* 예약 자체는 남아 중복 접수를 막는다. */ }
     }

@@ -20,6 +20,13 @@ import { isChatTraceId } from '@/lib/chat-trace'
 import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
 import { checkGenerationCapacity, checkProjectVideoBudget, syncFalKeyLimits } from '@/lib/generation-quota'
 import { quotaRejectionResponse, videoBudgetRejectionResponse, capacityReservationRejection } from '@/lib/api/quota'
+import {
+  assertUserTextAllowed,
+  assertModerationReceipt,
+  reusableModerationReceipt,
+  type ModerationReceipt,
+} from '@/lib/moderation/creem'
+import { moderationRejectionResponse } from '@/lib/api/moderation'
 import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { buildBestEffortFalRequestCapturePatch } from '@/lib/fal/observability'
@@ -157,6 +164,26 @@ function requireReservedVideoSnapshot(job: { input_snapshot?: Json; provider?: s
   return { input, provider: 'fal' as const, model: request.model, falRequest: request }
 }
 
+/**
+ * 준비된 입력에서 검사 영수증을 꺼낸다(#creem-moderation 2026-10-11). 영수증이 없는 입력은 제출하지
+ * 않는다 — 묶음처럼 저장했다 다시 내는 경로에서도 "검사 없는 제출"이 생기지 않게 하는 자리다.
+ * (이 배포 전에 저장된 묶음 항목은 영수증이 없어 여기서 멈춘다. 사용자가 다시 담으면 새 영수증이 생긴다.)
+ * 영수증에는 검사한 글의 해시가 들어 있어야 한다 — 그 해시가 "이 영수증이 어떤 글의 것이냐"를 말해주고,
+ * prepare 가 재생 요청의 글과 대조해 다르면 새로 검사한다.
+ */
+function requireModerationReceipt(input: Record<string, Json | undefined>): ModerationReceipt {
+  const value = input.moderation
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Video submission has no content-moderation receipt')
+  }
+  const receipt = value as unknown as ModerationReceipt
+  assertModerationReceipt(receipt, 'Video submission')
+  if (receipt.decision === 'allow' && typeof receipt.text_sha256 !== 'string') {
+    throw new Error('Video submission has an invalid content-moderation receipt')
+  }
+  return receipt
+}
+
 /* ── FAL.ai T2V fallback (레퍼런스 이미지 없음) ── */
 function buildFalT2VFallbackRequest(
   prompt: string,
@@ -226,7 +253,11 @@ async function submitFalReferenceToVideo(
   request: FalVideoSubmitRequest,
   webhookUrl: string | undefined,
   falKeyId: unknown,
+  /** Creem 검사 통과 영수증(#creem-moderation 2026-10-11) — 필수 인자라 검사 없는 제출은 타입 오류다. */
+  moderation: ModerationReceipt,
 ) {
+  // 제출 직전 마지막 검문 — 저장된 스냅샷에서 꺼낸 값이라 타입만으로는 모양을 보장할 수 없다.
+  assertModerationReceipt(moderation, 'Video submission')
   const normalizedFalKeyId = typeof falKeyId === 'string' && falKeyId.trim() ? falKeyId : null
   const k = normalizedFalKeyId ? falKeyById(normalizedFalKeyId) : null
   if (!k || k.id !== normalizedFalKeyId) throw new FalUnknownKeyError(normalizedFalKeyId)
@@ -278,7 +309,10 @@ async function submitLocalVideo(
   path: '/hunyuan/t2v' | '/hunyuan/i2v',
   body: Record<string, unknown>,
   model: LocalVideoModel,
+  /** Creem 검사 통과 영수증(#creem-moderation 2026-10-11) — 필수 인자라 검사 없는 제출은 타입 오류다. */
+  moderation: ModerationReceipt,
 ): Promise<VideoSubmission> {
+  assertModerationReceipt(moderation, 'Video submission')
   const baseUrl = process.env.TAILSCALE_VIDEO_API_URL
   if (!baseUrl) throw new Error('TAILSCALE_VIDEO_API_URL is not configured')
   const controller = new AbortController()
@@ -422,7 +456,7 @@ async function readVideoReplay(
 ) {
   const query = supabaseAdmin
     .from('generation_jobs')
-    .select('id, video_clip_id, target')
+    .select('id, video_clip_id, target, input_snapshot')
     .eq('project_id', projectId)
     .eq('kind', 'shot_video')
     .eq('idempotency_key', idempotencyKey)
@@ -824,6 +858,32 @@ async function prepareVideoRequest(
       dialogueSpeakers, // #g7-speakers
       characterNames: motivationTargetNames, // #camera-motivation
     })
+    // #creem-moderation(2026-10-11): 최종 프롬프트가 확정된 직후·자리 예약(submitPreparedVideo) 전에
+    //   사용자 글만 검사한다 — 샷 산문(모션 프롬프트 포함)과 대사. 모션 계약·카메라 기재·negative_prompt
+    //   같은 우리 고정 문구는 보내지 않는다. 이 경로는 지금 요청이 아니라 나중 요청(묶음 이어가기)이
+    //   저장된 스냅샷을 그대로 다시 내므로, 영수증을 input_snapshot 에 남긴다(해시 포함) — 이 경로는
+    //   작업 행 자체가 영수증을 들고 있어 별도 관측 이벤트를 더 쓰지 않는다(이미지·previz 는 반대).
+    const moderationParts = [promptForVideo, ...(dialogueLines ?? []).map((line) => line?.text)]
+    // 재생(exactReplay)은 이미 통과한 예약을 다시 내는 것이다 — 저장된 영수증의 해시가 지금 글의
+    //   해시와 같을 때만 그 영수증을 다시 쓴다. 다르면 새로 검사한다(예전 영수증이 다른 글을 통과시키지 못하게).
+    let moderation = exactReplay
+      ? await reusableModerationReceipt(
+          (existingReplay?.input_snapshot as { moderation?: unknown } | null | undefined)?.moderation,
+          moderationParts,
+        )
+      : null
+    if (!moderation) {
+      try {
+        moderation = await assertUserTextAllowed(
+          moderationParts,
+          { projectId, kind: 'shot_video', userId: user.id },
+        )
+      } catch (error) {
+        const rejected = moderationRejectionResponse(error, { projectId, kind: 'shot_video', userId: user.id })
+        if (rejected) return rejected
+        throw error
+      }
+    }
     const falSubmitRequest = isLocal
       ? null
       : submitRefUrls
@@ -857,6 +917,7 @@ async function prepareVideoRequest(
       ...(videoClipId ? {} : { new_take_metadata: normalizedNewTakeMetadata }),
       ...falCapture,
       ...(falSubmitRequest ? { fal_model: falSubmitRequest.model, fal_request: falSubmitRequest } : {}),
+      moderation,
     } as unknown as Record<string, Json | undefined>
 
     return JSON.parse(JSON.stringify({
@@ -924,6 +985,9 @@ async function submitPreparedVideo(
         if (!quota.ok) return quotaRejectionResponse(quota, { projectId, kind: 'shot_video', userId: user.id })
       }
     }
+
+    // 영수증 확인은 예약·과금보다 먼저다 — 검사 없는 입력으로는 자리도 잡지 않는다.
+    const moderation = requireModerationReceipt(inputSnapshot)
 
     // FAL 예약 트리거가 계정별 상한을 판정할 수 있도록 환경의 키 한도를 먼저 동기화한다.
     // local 제출은 FAL 키가 없으므로 이 동기화와 키 조회를 건너뛴다.
@@ -1052,13 +1116,14 @@ async function submitPreparedVideo(
         result = reservedSubmission.provider === 'local'
           ? snapshotMethod === 'I2V'
             ? typeof snapshotReferenceImageUrl === 'string'
-              ? await submitLocalVideo('/hunyuan/i2v', { prompt: snapshotPrompt, image_url: snapshotReferenceImageUrl }, 'hunyuan-i2v')
+              ? await submitLocalVideo('/hunyuan/i2v', { prompt: snapshotPrompt, image_url: snapshotReferenceImageUrl }, 'hunyuan-i2v', moderation)
               : await Promise.reject(new Error('Reserved I2V video job has no reference image'))
-            : await submitLocalVideo('/hunyuan/t2v', { prompt: snapshotPrompt, enable_step_distill: false }, 'hunyuan-t2v')
+            : await submitLocalVideo('/hunyuan/t2v', { prompt: snapshotPrompt, enable_step_distill: false }, 'hunyuan-t2v', moderation)
           : await submitFalReferenceToVideo(
               reservedSubmission.falRequest,
               resolveWebhookUrl(),
               reservedJob.fal_key_id,
+              moderation,
             )
       } catch (error) {
         if (error instanceof AmbiguousVideoSubmissionError || isAmbiguousSubmitError(error)) {

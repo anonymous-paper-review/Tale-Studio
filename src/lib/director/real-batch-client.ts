@@ -9,7 +9,7 @@ import { toast } from 'sonner'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { refreshGenerationQueue } from '@/lib/generation-queue'
 import { invalidateShots } from '@/lib/shots-cache'
-import { notifyQuotaExceeded } from '@/lib/generation-quota-toast'
+import { notifyIfQuotaExceeded, notifyQuotaExceeded } from '@/lib/generation-quota-toast'
 import { prerequisiteWaitKey, waitForPrerequisite, type PrerequisiteBody, type PrerequisiteCode } from '@/lib/generation-prerequisite-toast'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
@@ -104,6 +104,17 @@ export async function runRealBatch(
         })
       } catch (e) {
         networkError = e
+      }
+      // #creem-moderation(2026-10-11): 내용 규칙 차단(400)·검사 장애(503)는 다시 물어도 같은 답이다 —
+      //   공용 안내를 띄우고 판을 멈춘다(자리 부족과 같은 모양). 503 을 5xx 재시도로 보내면 장애
+      //   구간에서 같은 거절을 세 번 더 받는다.
+      if (res && (res.status === 400 || res.status === 503)) {
+        const rejected = (await res.json().catch(() => null)) as { error?: string } | null
+        if (notifyIfQuotaExceeded(res.status, rejected)) {
+          quotaBlocked = true
+          break
+        }
+        if (res.status === 400) throw new Error(rejected?.error ?? `HTTP ${res.status}`)
       }
       if (res && !res.ok && res.status !== 429 && res.status < 500 && res.status !== 408) {
         const rejected = (await res.json().catch(() => null)) as { error?: string } | null

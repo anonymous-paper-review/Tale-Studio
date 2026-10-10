@@ -31,6 +31,7 @@ vi.mock('@/lib/fal/observability', () => ({ buildFalResponseSnapshot: vi.fn(() =
 
 import { finalizeGenerationJob } from '@/lib/fal/finalize'
 import { generateReservedImage } from '@/lib/fal/generate-image'
+import { MODERATION_FIXTURE } from '../fixtures/_moderation.ts'
 
 const options = {
   model: 'xai/grok-imagine-image/edit',
@@ -92,7 +93,7 @@ afterEach(() => {
 
 describe('예약된 동기 이미지 생성', () => {
   it('예약→제출→접수 확인→조회→완료 순서를 지킨다', async () => {
-    const result = await generateReservedImage(options, context)
+    const result = await generateReservedImage({ ...options, moderation: MODERATION_FIXTURE }, context)
 
     expect(result).toEqual({
       url: completed.url,
@@ -119,7 +120,7 @@ describe('예약된 동기 이미지 생성', () => {
   })
 
   it('예약 행이 고른 B 키를 제출과 모든 조회에 사용한다', async () => {
-    await generateReservedImage({ prompt: 'one image' }, { projectId: context.projectId })
+    await generateReservedImage({ prompt: 'one image', moderation: MODERATION_FIXTURE }, { projectId: context.projectId })
 
     expect(mocks.submit).toHaveBeenCalledWith(
       { prompt: 'one image' },
@@ -132,7 +133,7 @@ describe('예약된 동기 이미지 생성', () => {
     const error = new Error('image_user_at_capacity')
     mocks.reserve.mockRejectedValue(error)
 
-    await expect(generateReservedImage(options, context)).rejects.toBe(error)
+    await expect(generateReservedImage({ ...options, moderation: MODERATION_FIXTURE }, context)).rejects.toBe(error)
     expect(mocks.submit).not.toHaveBeenCalled()
     expect(mocks.complete).not.toHaveBeenCalled()
   })
@@ -141,7 +142,7 @@ describe('예약된 동기 이미지 생성', () => {
     const error = new Error('fal key lookup failed')
     mocks.submit.mockRejectedValue(error)
 
-    await expect(generateReservedImage(options, context)).rejects.toBe(error)
+    await expect(generateReservedImage({ ...options, moderation: MODERATION_FIXTURE }, context)).rejects.toBe(error)
     expect(mocks.reject).not.toHaveBeenCalled()
     expect(mocks.submit).toHaveBeenCalledTimes(1)
   })
@@ -150,7 +151,7 @@ describe('예약된 동기 이미지 생성', () => {
     const error = new Error('receipt persistence failed')
     mocks.confirm.mockRejectedValue(error)
 
-    await expect(generateReservedImage(options, context)).rejects.toBe(error)
+    await expect(generateReservedImage({ ...options, moderation: MODERATION_FIXTURE }, context)).rejects.toBe(error)
     expect(mocks.fetch).not.toHaveBeenCalled()
     expect(mocks.reject).not.toHaveBeenCalled()
     expect(mocks.submit).toHaveBeenCalledTimes(1)
@@ -160,7 +161,7 @@ describe('예약된 동기 이미지 생성', () => {
     const error = Object.assign(new Error('bad request'), { status: 400 })
     mocks.submit.mockRejectedValue(error)
 
-    await expect(generateReservedImage(options, context)).rejects.toBe(error)
+    await expect(generateReservedImage({ ...options, moderation: MODERATION_FIXTURE }, context)).rejects.toBe(error)
     expect(mocks.reject).toHaveBeenCalledWith(job.id, context.projectId, error.message)
   })
 
@@ -168,7 +169,7 @@ describe('예약된 동기 이미지 생성', () => {
     const error = Object.assign(new Error('provider unavailable'), { status: 503 })
     mocks.fetch.mockRejectedValue(error)
 
-    await expect(generateReservedImage(options, context)).rejects.toBe(error)
+    await expect(generateReservedImage({ ...options, moderation: MODERATION_FIXTURE }, context)).rejects.toBe(error)
     expect(mocks.fail).not.toHaveBeenCalled()
     expect(mocks.reject).not.toHaveBeenCalled()
     expect(mocks.complete).not.toHaveBeenCalled()
@@ -178,7 +179,7 @@ describe('예약된 동기 이미지 생성', () => {
     vi.useFakeTimers()
     mocks.fetch.mockResolvedValue({ status: 'IN_PROGRESS' as const })
 
-    const pending = generateReservedImage(options, context)
+    const pending = generateReservedImage({ ...options, moderation: MODERATION_FIXTURE }, context)
     const rejected = expect(pending).rejects.toThrow(/timed out/i)
     await vi.advanceTimersByTimeAsync(90 * 1000 + 1)
 
@@ -191,7 +192,7 @@ describe('예약된 동기 이미지 생성', () => {
   it('제공자가 명시적으로 FAILED를 반환할 때만 실패 전이하고 유료 호출은 한 번이다', async () => {
     mocks.fetch.mockResolvedValue({ status: 'FAILED' as const, error: 'provider rejected image' })
 
-    await expect(generateReservedImage(options, context)).rejects.toThrow('provider rejected image')
+    await expect(generateReservedImage({ ...options, moderation: MODERATION_FIXTURE }, context)).rejects.toThrow('provider rejected image')
     expect(mocks.fail).toHaveBeenCalledWith(job.id, 'provider rejected image')
     expect(mocks.complete).not.toHaveBeenCalled()
     expect(mocks.submit).toHaveBeenCalledTimes(1)

@@ -18,6 +18,8 @@ import {
 } from '@/lib/generation-jobs'
 import { checkGenerationCapacity } from '@/lib/generation-quota'
 import { quotaRejectionResponse } from '@/lib/api/quota'
+import { assertUserTextAllowed } from '@/lib/moderation/creem'
+import { moderationRejectionResponse } from '@/lib/api/moderation'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { reconcileJobFromFal } from '@/lib/fal/reconcile'
 import { isRichStaticSpec, type RoughStoryboardSpec } from '@/lib/writer/rough-storyboard'
@@ -540,6 +542,30 @@ export async function POST(req: Request) {
     const templateUrl = await templateAssetUrl(sheetGeom.templatePath.replace(/^\//, ''))
     const webhookUrl = resolveWebhookUrl()
 
+    // #creem-moderation(2026-10-11): 예약 RPC(rough-submit.ts) 전에 이번 호출이 쓸 사용자 글을 한 번에 검사한다 —
+    //   샷 설명(EN 파생본)·연속성 제약·방향 칩만 보낸다. 그리드 템플릿(GRID_STYLE 의 'No clothing'·'no face' 등)은
+    //   우리 고정 문구라 보내지 않는다(전송하면 우리 문구가 오탐을 만들고 글자 수만큼 단가가 붙는다).
+    let moderation
+    try {
+      moderation = await assertUserTextAllowed(
+        [
+          ...targets.flatMap((s) => {
+            const shotId = s.shot_id as string
+            return [
+              actionEnByShot.get(shotId) ?? (s.action_description as string) ?? '',
+              ...parseCheckConstraints(s.check_notes),
+            ]
+          }),
+          ...(styleHints ?? []),
+        ],
+        { projectId, kind: 'shot_rough_storyboard', userId: access.userId },
+      )
+    } catch (e) {
+      const rejected = moderationRejectionResponse(e, { projectId, kind: 'shot_rough_storyboard', userId: access.userId })
+      if (rejected) return rejected
+      throw e
+    }
+
     for (const chunk of cappedChunks) {
       const cells = chunk.map((s, ci) => {
         const shotId = s.shot_id as string
@@ -668,6 +694,7 @@ export async function POST(req: Request) {
               })(),
               webhookUrl,
             },
+        moderation,
       })
       for (const receipt of result.submitted) {
         if (submitted.some((item) => item.shotId === receipt.shotId)) continue
