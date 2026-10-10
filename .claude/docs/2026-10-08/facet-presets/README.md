@@ -287,6 +287,7 @@ v4 인물 절의 **등신 문장 바로 뒤에 한 문장**을 끼운 것이다 
 ## 9. 참고
 
 - 결과 페이지(아티팩트): https://claude.ai/artifact/3ASfQfpBFkAi6SoKpSdsra (비공개 — 오너 계정; 다른 사람에게는 공유 메뉴로 열어야 보인다)
+- **그림체 분석기 작동 방식(오너용 설명 페이지, 2026-10-10)**: https://claude.ai/artifact/RUX6z8k5Xcg6vLDdyMwojA — 두 판 · 단계 · 조각 4개 · 조립 순서 · 제품에서 도는 때 · 버전 · 배운 것. 빌더는 로컬 `facet_presets/explainer/build_explainer.py`(조각·수치는 `presets/index.json`에서 읽는다).
 - 사이클 12 결과(2026-10-09 오후): **`cycle-12-results.md`**(U 유저 경로 R0 대조군 — 조각 > 참조만 18:2 · LOOK 한 줄 12:2(조건부 채택 권고 → 오너 보류) · L 비례 % 직접 지정 효과 없음 11:13 → 오너 채택 v5(§7.4, 시험본 결함 6종 정정 + 재생성 6장은 페이지 "v5 정정" 절)) + 노트 `cycle-12-notes-{U,L}.md`, 페이지 https://claude.ai/artifact/MNNNKsyNqUKh6tycuHAz3B
 - 사이클 11 계획·결과: `next-cycle-plan.md` → **`cycle-11-results.md`**(A1 기각 · A2 채택(2026-10-09 오너, v4) · A3 현행 유지 · D1 적용 권고 · 경량 판 제품 규칙 4개 · 다음 사이클 핵심 = 유저 경로 R0 대조군) + 트랙 노트 `cycle-11-notes-{A,B,C,D}.md`. 사이클 11 페이지(v3·v4a·v4b·v4c 쌍 비교 그림): https://claude.ai/artifact/Yadog9sLuw3Uk9xM67xVGW
 - 로컬 실험 폴더(git 밖): `dev/Image_Style/facet_presets/` — `bin/pipeline.sh`(v1 추출 사슬) · `bin/pipeline_v2.sh`(앵커 + 보드 2장 채움) · `bin/make_board.py` + `bin/gen_board.sh`(보드) · `bin/run_priority_claude.py` · `bin/run_judge_v2_claude.py`(Codex 한도 대체) · `bin/post_chain.sh`(조립 → 생성 → 판정) · `bin/build_prompts.py` · `bin/gen.sh` · `bin/run_judge.sh` + `spec/spec-judge.md` · `bin/summarize.py` · `build_report.py` · `bin/export_handoff.py`(이 폴더로 내보내기) · `<key>/fill/comms/transcript.md`(Codex 통신 원문) · `<key>/gen/*.png`(원본 2048px) · `judge/<key>.md`(1차 판정 전문)
