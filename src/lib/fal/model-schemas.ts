@@ -2,9 +2,7 @@ import type { VideoModelKey } from '@/lib/video-models'
 
 // fal OpenAPI sources: /api/openapi/queue/openapi.json?endpoint_id=<model>.
 // This registry intentionally tracks accepted input keys only; type/range validation stays at submit builders.
-type FalVideoModelKey = Exclude<VideoModelKey, 'local'>
-
-const FAL_VIDEO_MODEL_ENDPOINTS: Record<FalVideoModelKey, string> = {
+const FAL_VIDEO_MODEL_ENDPOINTS: Record<VideoModelKey, string> = {
   'happy-horse': 'alibaba/happy-horse/reference-to-video',
   seedance: 'bytedance/seedance-2.0/reference-to-video',
   'kling-o3': 'fal-ai/kling-video/o3/pro/reference-to-video',

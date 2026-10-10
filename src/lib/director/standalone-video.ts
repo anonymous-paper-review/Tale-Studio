@@ -80,7 +80,11 @@ export function normalizeStandaloneVideoConfig(value: unknown): StandaloneVideoC
     || !isFiniteNumberInRange(cameraPreset.aperture, 0.1, 64)
     || !isFiniteNumberInRange(cameraPreset.whiteBalance, 1_000, 20_000)
   ) return null
-  if (typeof value.provider !== 'string' || !(value.provider in VIDEO_MODELS)) return null
+  if (typeof value.provider !== 'string') return null
+  // 지운 자체 호스팅 이름('local', 2026-10-11 제거)은 기본 모델로 읽는다 — 그렇게 저장된
+  //   예전 독립 영상 설정이 "잘못된 설정"으로 거절되면 사용자가 다시 만들 수 없다.
+  const provider = value.provider === 'local' ? DEFAULT_VIDEO_MODEL : value.provider
+  if (!(provider in VIDEO_MODELS)) return null
   if (!isFiniteNumberInRange(value.durationSeconds, 1, 60)) return null
 
   return {
@@ -104,7 +108,7 @@ export function normalizeStandaloneVideoConfig(value: unknown): StandaloneVideoC
       aperture: cameraPreset.aperture,
       whiteBalance: cameraPreset.whiteBalance,
     },
-    provider: value.provider as StandaloneVideoConfig['provider'],
+    provider: provider as StandaloneVideoConfig['provider'],
     durationSeconds: value.durationSeconds,
   }
 }

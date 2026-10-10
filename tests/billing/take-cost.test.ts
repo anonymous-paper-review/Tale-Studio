@@ -9,7 +9,6 @@ describe('Take 사용량 계산', () => {
     expect(TAKE_COST_BY_MODEL.seedance).toBe(5)
     expect(TAKE_COST_BY_MODEL['kling-o3']).toBe(5)
     expect(TAKE_COST_BY_MODEL.veo).toBe(5)
-    expect(TAKE_COST_BY_MODEL.local).toBe(1)
   })
 
   describe('takeCostForVideo', () => {

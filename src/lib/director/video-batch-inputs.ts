@@ -36,11 +36,6 @@ export type VideoBatchInputsResult = {
   skipped: VideoBatchInputSkip[]
 }
 
-/** director provider(kling/veo/local) → generate-video 라우트 provider(fal/local) 매핑. store와 동일 계약. */
-function toRouteProvider(p: string): 'fal' | 'local' {
-  return p === 'local' ? 'local' : 'fal'
-}
-
 function getChildVideos(nodes: readonly DirectorNode[], shotNodeId: string): DirectorNode[] {
   return nodes.filter(
     (n) => isVideoData(n.data) && n.data.parentShotNodeId === shotNodeId,
@@ -217,7 +212,8 @@ export function buildVideoBatchInputs(
       // 화면비는 서버가 프로젝트 포맷에서 정한다(2026-09-30) — 여기서 16:9 를 박지 않는다.
       generationMethod: referenceImageUrl ? 'I2V' : 'T2V',
       model: normalizeProvider(provider),
-      provider: toRouteProvider(provider),
+      // 제공자는 fal 하나다(2026-10-11 자체 호스팅 경로 제거). store 의 요청 조립과 동일 계약.
+      provider: 'fal',
       durationSeconds: mother.durationSeconds,
       referenceImageUrl,
       // Director 배선 5: 배선하지 않은 일반 샷은 auto로 남겨 서버가 시작 시 DB 참조를 확정한다.

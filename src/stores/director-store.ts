@@ -562,11 +562,6 @@ function releaseGenerationLock(lock: GenerationLock | null) {
 }
 
 
-/** director provider(kling/veo/local) → generate-video 라우트 provider(fal/local) 매핑 */
-function toRouteProvider(p: DirectorVideoProvider): 'fal' | 'local' {
-  return p === 'local' ? 'local' : 'fal'
-}
-
 // ============================================================================
 // Thumbnail capture (Node 탭 영상 카드용)
 // 서버 ffmpeg 불가(Vercel Hobby) → 클라이언트에서 <video>+<canvas>로 첫 프레임 캡처.
@@ -4583,7 +4578,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           // 화면비는 서버가 프로젝트 포맷에서 정한다(2026-09-30) — 여기서 16:9 를 박지 않는다.
           generationMethod: referenceImageUrl ? 'I2V' : 'T2V',
           model: normalizeProvider(eff.provider),
-          provider: toRouteProvider(eff.provider),
+          // 제공자는 fal 하나다(2026-10-11 자체 호스팅 경로 제거).
+          provider: 'fal',
           durationSeconds: eff.durationSeconds,
           referenceImageUrl,
           // Director 배선 5: 서버가 DB 프레임으로 정한다 — 사람이 배선한 프레임·영상 체인만 'manual'.

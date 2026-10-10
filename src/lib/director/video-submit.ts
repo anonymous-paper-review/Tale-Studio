@@ -47,10 +47,6 @@ import {
   isStandaloneVideoOwnerKey,
   normalizeStandaloneVideoConfig,
 } from '@/lib/director/standalone-video'
-import {
-  DirectorVideoCompletionPersistenceError,
-  finalizeShotVideoJob,
-} from '@/lib/fal/finalize'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { holdTakesForVideoJob } from '@/lib/billing/take-hold'
 import { takeCostForVideo } from '@/lib/billing/take-cost'
@@ -63,7 +59,10 @@ import type { StandaloneVideoConfig } from '@/types/director'
 // reference-to-video는 레퍼런스 이미지가 필수. 레퍼런스 없는 T2V는 이 Kling 엔드포인트로 폴백.
 const FAL_T2V_FALLBACK_MODEL = 'fal-ai/kling-video/v2.1/master/text-to-video'
 
-type VideoProvider = 'fal' | 'local'
+// 2026-10-11: 자체 호스팅('local') 제공자를 지웠다 — 결제 심사용 정책 문서가 밝힌 처리 업체(fal) 밖으로
+//   사용자 글·그림이 나가는 길을 남기지 않는다. 요청 본문이 예전 'local' 을 보내도 거절하지 않고
+//   fal 기본 모델로 정규화한다(예전 저장 데이터 보호).
+type VideoProvider = 'fal'
 type GenerationMethod = 'T2V' | 'I2V'
 
 type FalVideoSubmitRequest = {
@@ -74,7 +73,7 @@ type VideoSubmission = {
   taskId: string
   provider: VideoProvider
   model: string
-  /** fal 제출에만 존재(#fal-key-pool) — local 제출은 키 개념이 없다. */
+  /** #fal-key-pool — 어떤 fal 키로 나갔는지. */
   falKeyId?: string
 }
 
@@ -138,13 +137,6 @@ function requireReservedVideoSnapshot(job: { input_snapshot?: Json; provider?: s
   const input = snapshot as Record<string, unknown>
   if (typeof input.full_prompt !== 'string' || (input.generation_method !== 'T2V' && input.generation_method !== 'I2V')) {
     throw new Error('Reserved video job has an invalid immutable input snapshot')
-  }
-  if (job.provider === 'local') {
-    return {
-      input,
-      provider: 'local' as const,
-      model: input.generation_method === 'I2V' ? 'hunyuan-i2v' : 'hunyuan-t2v',
-    }
   }
   const falRequest = input.fal_request
   if (
@@ -273,8 +265,6 @@ async function submitFalReferenceToVideo(
   }
 }
 
-type LocalVideoModel = 'hunyuan-t2v' | 'hunyuan-i2v'
-
 class AmbiguousVideoSubmissionError extends Error {
   constructor(
     readonly requestId?: string,
@@ -304,58 +294,6 @@ function providerRequestIdFromError(error: unknown): string | undefined {
     ?? (error as { requestId?: unknown }).requestId
   return typeof value === 'string' && value ? value : undefined
 }
-
-async function submitLocalVideo(
-  path: '/hunyuan/t2v' | '/hunyuan/i2v',
-  body: Record<string, unknown>,
-  model: LocalVideoModel,
-  /** Creem 검사 통과 영수증(#creem-moderation 2026-10-11) — 필수 인자라 검사 없는 제출은 타입 오류다. */
-  moderation: ModerationReceipt,
-): Promise<VideoSubmission> {
-  assertModerationReceipt(moderation, 'Video submission')
-  const baseUrl = process.env.TAILSCALE_VIDEO_API_URL
-  if (!baseUrl) throw new Error('TAILSCALE_VIDEO_API_URL is not configured')
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 290_000)
-  try {
-    let response: Response
-    try {
-      response = await fetch(new URL(path, `${baseUrl.replace(/\/$/, '')}/`).toString(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      })
-    } catch (error) {
-      const status = typeof error === 'object' && error !== null && 'status' in error
-        ? (error as { status?: unknown }).status
-        : undefined
-      throw new AmbiguousVideoSubmissionError(undefined, typeof status === 'number' ? status : undefined, error)
-    }
-    if (!response.ok) {
-      const text = await response.text().catch(() => '')
-      if (isTransientStatus(response.status)) {
-        throw new AmbiguousVideoSubmissionError(undefined, response.status, new Error(text))
-      }
-      throw new Error(`Local ${model} error (${response.status}): ${text}`)
-    }
-    const data = await response.json() as { output_url?: string }
-    if (typeof data.output_url !== 'string' || !data.output_url) throw new Error('output_url missing from server response')
-    const taskId = new URL(data.output_url, baseUrl).toString()
-    try {
-      assertTrustedLocalTaskUrl(taskId)
-    } catch (error) {
-      if (error instanceof RecoveryInputError) {
-        throw new Error(`Local provider returned invalid output URL: ${error.message}`)
-      }
-      throw error
-    }
-    return { taskId, provider: 'local', model }
-  } finally {
-    clearTimeout(timeout)
-  }
-}
-
 
 class RecoveryInputError extends Error {
   constructor(readonly status: 400 | 409, message: string) {
@@ -397,24 +335,12 @@ function decodeReceipt(receipt: unknown, storedBatchRecovery = false): RecoveryR
   if (!payload || typeof payload !== 'object') throw new RecoveryInputError(400, 'Invalid recovery receipt')
   const value = payload as RecoveryReceiptPayload
   if (typeof value.projectId !== 'string' || typeof value.jobId !== 'string' ||
-    (value.provider !== 'fal' && value.provider !== 'local') || typeof value.taskId !== 'string' ||
+    value.provider !== 'fal' || typeof value.taskId !== 'string' ||
     !value.taskId || typeof value.model !== 'string') throw new RecoveryInputError(400, 'Invalid recovery receipt')
   if (typeof value.exp !== 'number' || !Number.isFinite(value.exp) || (!storedBatchRecovery && value.exp < Date.now())) {
     throw new RecoveryInputError(409, 'Recovery receipt has expired')
   }
   return value
-}
-
-function assertTrustedLocalTaskUrl(taskId: string): void {
-  const configured = process.env.TAILSCALE_VIDEO_API_URL
-  if (!configured) throw new RecoveryInputError(400, 'TAILSCALE_VIDEO_API_URL is not configured')
-  let task: URL
-  let base: URL
-  try { task = new URL(taskId); base = new URL(configured) } catch { throw new RecoveryInputError(400, 'Invalid local recovery task URL') }
-  const basePath = base.pathname.endsWith('/') ? base.pathname : `${base.pathname}/`
-  if (task.origin !== base.origin || !(task.pathname === base.pathname || task.pathname.startsWith(basePath))) {
-    throw new RecoveryInputError(400, 'Local recovery task URL is outside the configured provider')
-  }
 }
 
 function sanitizeProviderEvidence(error: unknown, providerStatus: number | undefined): { cause: string; code: string } {
@@ -686,7 +612,7 @@ async function prepareVideoRequest(
       prompt = standaloneConfig.prompt
       camera = standaloneConfig.camera
       durationSeconds = standaloneConfig.durationSeconds
-      provider = standaloneConfig.provider === 'local' ? 'local' : 'fal'
+      provider = 'fal'
       model = standaloneConfig.provider
       cameraPreset = standaloneConfig.cameraPreset
     }
@@ -719,8 +645,8 @@ async function prepareVideoRequest(
       if (!quota.ok) return quotaRejectionResponse(quota, { projectId, kind: 'shot_video', userId: user.id })
     }
 
-    const modelKey: VideoModelKey = model != null ? normalizeProvider(model) : provider === 'local' ? 'local' : normalizeProvider('')
-    const isLocal = modelKey === 'local'
+    // 모델 이름은 무엇이 와도 fal 카탈로그 키로만 정규화된다 — 지운 'local' 은 기본 모델로.
+    const modelKey: VideoModelKey = normalizeProvider(model ?? '')
     const dur = durationSeconds ?? 5
 
     // #motion-contract: 모션 계약 소스 해석 — shots.dynamic_spec(신규 persist) 우선,
@@ -884,14 +810,10 @@ async function prepareVideoRequest(
         throw error
       }
     }
-    const falSubmitRequest = isLocal
-      ? null
-      : submitRefUrls
-        ? buildFalReferenceToVideoRequest(modelKey, fullPrompt, submitRefUrls, dur, effectiveAspectRatio)
-        : buildFalT2VFallbackRequest(fullPrompt, dur, effectiveAspectRatio)
-    const falCapture = falSubmitRequest
-      ? buildBestEffortFalRequestCapturePatch(falSubmitRequest.input, falSubmitRequest.model)
-      : {}
+    const falSubmitRequest = submitRefUrls
+      ? buildFalReferenceToVideoRequest(modelKey, fullPrompt, submitRefUrls, dur, effectiveAspectRatio)
+      : buildFalT2VFallbackRequest(fullPrompt, dur, effectiveAspectRatio)
+    const falCapture = buildBestEffortFalRequestCapturePatch(falSubmitRequest.input, falSubmitRequest.model)
     const normalizedNewTakeMetadata = {
       take_label: takeLabel ?? null,
       override: override ?? {},
@@ -916,7 +838,8 @@ async function prepareVideoRequest(
       camera_preset: cameraPreset ?? null,
       ...(videoClipId ? {} : { new_take_metadata: normalizedNewTakeMetadata }),
       ...falCapture,
-      ...(falSubmitRequest ? { fal_model: falSubmitRequest.model, fal_request: falSubmitRequest } : {}),
+      fal_model: falSubmitRequest.model,
+      fal_request: falSubmitRequest,
       moderation,
     } as unknown as Record<string, Json | undefined>
 
@@ -930,7 +853,7 @@ async function prepareVideoRequest(
       standaloneConfig,
       modelKey,
       takeAmount: takeCostForVideo(modelKey),
-      provider: isLocal ? 'local' : 'fal',
+      provider: 'fal',
       idempotencyKey,
       traceId: traceId ?? null,
       jobActor,
@@ -958,7 +881,6 @@ async function submitPreparedVideo(
   const { projectId, writerShotId, videoClipId, modelKey, idempotencyKey, inputSnapshot, traceId, jobActor, standaloneConfig } = prepared
   const user = { id: prepared.ownerId }
   const project = { workspace_id: prepared.workspaceId }
-  const isLocal = prepared.provider === 'local'
   const recoveryReceipt = options.recoveryReceipt ?? prepared.recoveryReceipt
   const normalizedNewTakeMetadata = {
     take_label: prepared.takeLabel,
@@ -990,16 +912,15 @@ async function submitPreparedVideo(
     const moderation = requireModerationReceipt(inputSnapshot)
 
     // FAL 예약 트리거가 계정별 상한을 판정할 수 있도록 환경의 키 한도를 먼저 동기화한다.
-    // local 제출은 FAL 키가 없으므로 이 동기화와 키 조회를 건너뛴다.
-    if (!isLocal) await syncFalKeyLimits()
+    await syncFalKeyLimits()
 
     // #video-capacity-trigger: 예약 RPC 자체가 동시 경쟁 한도 거절을 던질 수 있다 — 이 예외만 이 자리에서
     //   429 로 전환한다(hold/provider 는 아직 불리지 않았다). 다른 예외는 그대로 바깥 층의 기존
     //   catch 로 전파된다.
     try {
       reservation = videoClipId
-        ? await reserveDirectorVideoRegeneration({ projectId, videoClipId, model: modelKey, target: { workspaceId: project.workspace_id, shotId: writerShotId, writerShotId, videoClipId, retakeMode: 'regeneration' }, idempotencyKey, inputSnapshot, userId: user.id, workspaceId: project.workspace_id, provider: isLocal ? 'local' : 'fal', actor: jobActor })
-        : await (options.reserve ?? reserveDirectorVideoTake)({ projectId, shotId: writerShotId, model: modelKey, target: { workspaceId: project.workspace_id, shotId: writerShotId, writerShotId, retakeMode: 'new_take' }, idempotencyKey, inputSnapshot, userId: user.id, workspaceId: project.workspace_id, provider: isLocal ? 'local' : 'fal', actor: jobActor, takeLabel: normalizedNewTakeMetadata.take_label as string | null, override: normalizedNewTakeMetadata.override, canvasPosition: normalizedNewTakeMetadata.canvas_position })
+        ? await reserveDirectorVideoRegeneration({ projectId, videoClipId, model: modelKey, target: { workspaceId: project.workspace_id, shotId: writerShotId, writerShotId, videoClipId, retakeMode: 'regeneration' }, idempotencyKey, inputSnapshot, userId: user.id, workspaceId: project.workspace_id, provider: 'fal', actor: jobActor })
+        : await (options.reserve ?? reserveDirectorVideoTake)({ projectId, shotId: writerShotId, model: modelKey, target: { workspaceId: project.workspace_id, shotId: writerShotId, writerShotId, retakeMode: 'new_take' }, idempotencyKey, inputSnapshot, userId: user.id, workspaceId: project.workspace_id, provider: 'fal', actor: jobActor, takeLabel: normalizedNewTakeMetadata.take_label as string | null, override: normalizedNewTakeMetadata.override, canvasPosition: normalizedNewTakeMetadata.canvas_position })
     } catch (reserveError) {
       // 다른 요청키의 진행 작업은 재생(replay)으로 가장하지 않는다. 새 예약/차감 없이 현재 작업을 안내한다.
       const busy = reserveError as { code?: unknown; message?: unknown; details?: unknown } | null
@@ -1049,7 +970,7 @@ async function submitPreparedVideo(
     }
     const reservedJob = await getGenerationJobById(reservation.job_id)
     if (!reservedJob) throw new Error('Reserved video job not found')
-    const response = { shotId: writerShotId, jobId: reservation.job_id, videoClipId: reservation.video_clip_id, takeNumber: reservation.take_number, replayed: reservation.replayed, provider: reservedJob.provider ?? (isLocal ? 'local' : 'fal'), model: reservedJob.model, taskId: reservedJob.request_id.startsWith('reserved:') ? undefined : reservedJob.request_id }
+    const response = { shotId: writerShotId, jobId: reservation.job_id, videoClipId: reservation.video_clip_id, takeNumber: reservation.take_number, replayed: reservation.replayed, provider: reservedJob.provider ?? 'fal', model: reservedJob.model, taskId: reservedJob.request_id.startsWith('reserved:') ? undefined : reservedJob.request_id }
     if (reservedJob.status !== 'queued') {
       return NextResponse.json({ ...response, status: reservedJob.status })
     }
@@ -1086,7 +1007,6 @@ async function submitPreparedVideo(
       ) {
         return NextResponse.json({ error: 'Recovery receipt does not match this reserved job' }, { status: 409 })
       }
-      if (receipt.provider === 'local') assertTrustedLocalTaskUrl(receipt.taskId)
       result = { taskId: receipt.taskId, provider: receipt.provider, model: receipt.model }
     } else {
       if (reservation.replayed) {
@@ -1109,22 +1029,13 @@ async function submitPreparedVideo(
           { status: 409 },
         )
       }
-      const snapshotMethod = reservedSubmission.input.generation_method as GenerationMethod
-      const snapshotPrompt = reservedSubmission.input.full_prompt as string
-      const snapshotReferenceImageUrl = reservedSubmission.input.reference_image_url
       try {
-        result = reservedSubmission.provider === 'local'
-          ? snapshotMethod === 'I2V'
-            ? typeof snapshotReferenceImageUrl === 'string'
-              ? await submitLocalVideo('/hunyuan/i2v', { prompt: snapshotPrompt, image_url: snapshotReferenceImageUrl }, 'hunyuan-i2v', moderation)
-              : await Promise.reject(new Error('Reserved I2V video job has no reference image'))
-            : await submitLocalVideo('/hunyuan/t2v', { prompt: snapshotPrompt, enable_step_distill: false }, 'hunyuan-t2v', moderation)
-          : await submitFalReferenceToVideo(
-              reservedSubmission.falRequest,
-              resolveWebhookUrl(),
-              reservedJob.fal_key_id,
-              moderation,
-            )
+        result = await submitFalReferenceToVideo(
+          reservedSubmission.falRequest,
+          resolveWebhookUrl(),
+          reservedJob.fal_key_id,
+          moderation,
+        )
       } catch (error) {
         if (error instanceof AmbiguousVideoSubmissionError || isAmbiguousSubmitError(error)) {
           const requestId = error instanceof AmbiguousVideoSubmissionError
@@ -1207,29 +1118,12 @@ async function submitPreparedVideo(
         retryable: true,
       }, { status: 500 })
     }
-    if (result.provider === 'local') {
-      const job = await getGenerationJobById(reservation.job_id)
-      if (!job) throw new Error('Submitted local video job not found')
-      const url = await finalizeShotVideoJob(job, result.taskId)
-      return NextResponse.json({ ...response, taskId: result.taskId, provider: result.provider, model: result.model, status: 'completed', url })
-    }
     return NextResponse.json({ ...response, taskId: result.taskId, provider: result.provider, model: result.model, status: 'generating' })
   } catch (err) {
     if (err instanceof RecoveryInputError) return NextResponse.json({ error: err.message }, { status: err.status })
     if (err instanceof CharacterAppearanceContractError) return NextResponse.json({ error: err.message }, { status: 409 })
     const errMsg = err && typeof err === 'object' && 'message' in err && typeof err.message === 'string'
       ? err.message : String(err)
-    if (err instanceof DirectorVideoCompletionPersistenceError && reservation && projectId) {
-      console.error('[director/generate-video] completion persistence failed:', errMsg)
-      return NextResponse.json({
-        error: errMsg,
-        jobId: reservation.job_id,
-        videoClipId: reservation.video_clip_id,
-        takeNumber: reservation.take_number,
-        status: 'generating',
-        retryable: true,
-      }, { status: 500 })
-    }
     if (reservation && projectId) {
       try {
         await markDirectorVideoAttemptFailed(projectId, reservation.job_id, errMsg)

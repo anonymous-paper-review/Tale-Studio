@@ -89,25 +89,6 @@ async function completeOrTerminalizeJob(
   }
 }
 
-function resolveLocalVideoResultUrl(job: GenerationJob): string {
-  try {
-    const result = new URL(job.request_id)
-    const configured = new URL(process.env.TAILSCALE_VIDEO_API_URL ?? '')
-    if (
-      result.username
-      || result.password
-      || configured.username
-      || configured.password
-      || (result.protocol !== 'http:' && result.protocol !== 'https:')
-      || (configured.protocol !== 'http:' && configured.protocol !== 'https:')
-      || result.origin !== configured.origin
-    ) throw new Error('untrusted local video result URL')
-    return result.toString()
-  } catch {
-    throw new Error('local video job has no valid result URL')
-  }
-}
-
 function isPermanentProviderLookupFailure(error: unknown): boolean {
   const statusValue = typeof error === 'object' && error !== null
     ? (error as { status?: unknown; statusCode?: unknown }).status
@@ -133,16 +114,10 @@ export async function reconcileJobFromFal(job: GenerationJob): Promise<Generatio
   //   현재 확인할 수 없는 상태를 queued 그대로 보존한다.
   if (job.request_id.startsWith('reserved:')) return job
 
-  if (job.provider === 'local') {
-    if (job.kind !== 'shot_video') return job
-    return completeOrTerminalizeJob(job, () => ({
-      media: 'video',
-      url: resolveLocalVideoResultUrl(job),
-    }))
-  }
-
   // 키 미지정(null) 또는 레지스트리에 없는 id 는 조회 불가능한 영구 상태다(#fal-key-pool) — 404 분기와
   //   동일하게 터미널 처리한다(재시도해도 어느 키로 조회할지 모른다).
+  //   2026-10-11 에 지운 자체 호스팅(provider 'local') 예전 작업도 키가 없으니 이 경로로
+  //   들어와 대기 상태로 방치되지 않는다.
   let result: Awaited<ReturnType<typeof falImageFetch | typeof falVideoFetch>>
   try {
     if (!job.fal_key_id) throw new FalUnknownKeyError(job.fal_key_id)

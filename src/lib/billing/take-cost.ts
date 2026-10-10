@@ -6,8 +6,7 @@
 //
 // ⚠ 계수 확정 상태: seedance(Seedance 2.0)=5 만 v4 확정값. kling-o3/veo=5 는 **잠정**(기획 확정
 //   대상) — 오너가 v4 시트에 최종 숫자를 박으면 이 표만 갱신하면 된다(호출부 변경 불필요).
-//   happy-horse=1 은 저해상도 드래프트 모델 기준. local(self-hosted 실험 경로)은 과금 카탈로그
-//   밖이라 드래프트 단가(1)로 취급 — 선택 UI에도 노출되지 않는다(FAL_VIDEO_MODEL_ORDER 제외).
+//   happy-horse=1 은 저해상도 드래프트 모델 기준.
 //
 // server-only 의존성 금지 — 클라(Director 배지 등)에서도 그대로 import 하는 순수 함수·상수만 둔다.
 import type { VideoModelKey } from '@/lib/video-models'
@@ -17,7 +16,6 @@ export const TAKE_COST_BY_MODEL: Record<VideoModelKey, number> = {
   seedance: 5, // v4 확정
   'kling-o3': 5, // 잠정 — 기획 확정 대상
   veo: 5, // 잠정 — 기획 확정 대상
-  local: 1, // 과금 카탈로그 밖(self-hosted 실험) — 드래프트 단가로 취급
 }
 
 /** 영상 모델의 Take 소모량. 미지/null 모델은 드래프트 기준(1)으로 폴백 — 과소청구보다 안전한 방향. */

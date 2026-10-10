@@ -1,9 +1,13 @@
 // ============================================================================
 // Video model registry — Director 영상 생성 모델 카탈로그.
 //
-// FAL reference-to-video 모델 4종 + self-hosted(local) 1종을 단일 레지스트리로
-// 묶는다. generate-video 라우트가 이 spec으로 input(duration/audio/resolution)을
-// 구성하고, store/popup이 model key·label·가격 힌트를 소비한다.
+// FAL reference-to-video 모델 4종을 단일 레지스트리로 묶는다. generate-video
+// 라우트가 이 spec으로 input(duration/audio/resolution)을 구성하고, store/popup이
+// model key·label·가격 힌트를 소비한다.
+//
+// 2026-10-11: self-hosted('local') 모델을 지웠다 — 결제 심사용 정책 문서가 밝힌
+// 처리 업체(fal 등) 밖으로 사용자 글·그림이 나가는 길을 남기지 않는다. 예전에
+// 저장된 'local' 이름은 normalizeProvider 가 기본 모델로 바꿔 읽는다.
 //
 // duration 처리(#4):
 //   - flexible 모델(happy-horse/seedance/kling-o3): shot durationSeconds를 그대로
@@ -17,7 +21,6 @@ export type VideoModelKey =
   | 'seedance'
   | 'kling-o3'
   | 'veo'
-  | 'local'
 
 /** duration 파라미터 처리 방식 */
 export type VideoModelDuration =
@@ -28,7 +31,7 @@ export interface VideoModelSpec {
   key: VideoModelKey
   /** 사람이 읽는 라벨 (UI 표기) */
   label: string
-  /** FAL 엔드포인트. local은 '' (hunyuan 경로) */
+  /** FAL 엔드포인트 */
   endpoint: string
   /** duration 파라미터 처리 (flexible=정수 초, fixed=8s 고정) */
   duration: VideoModelDuration
@@ -47,7 +50,7 @@ export interface VideoModelSpec {
   resolutions: string[]
   /** 기본 해상도 */
   defaultResolution: string
-  /** 오디오 없을 때 초당 대략 가격 (UI 힌트, USD). 0 = 미표기/local */
+  /** 오디오 없을 때 초당 대략 가격 (UI 힌트, USD). 0 = 미표기 */
   pricePerSecNoAudio: number
 }
 
@@ -56,11 +59,7 @@ export interface VideoModelSpec {
 //   초과분(죽은 꼬리)을 실측 길이 기준으로 잘라낸다.
 export const DEFAULT_VIDEO_MODEL: VideoModelKey = 'seedance'
 
-/**
- * UI 모델 선택지 순서(#ui-cleanup 2026-08-31) — fal.ai 카탈로그 모델만.
- * 'local'(Self-hosted)은 fal 밖 실험 경로라 선택 UI에서 제외한다 —
- * 기존 provider='local' 노드는 normalizeProvider 가 계속 받아준다(기능 유지).
- */
+/** UI 모델 선택지 순서(#ui-cleanup 2026-08-31) — fal.ai 카탈로그 모델만. */
 export const FAL_VIDEO_MODEL_ORDER: VideoModelKey[] = [
   'seedance',
   'happy-horse',
@@ -117,18 +116,6 @@ export const VIDEO_MODELS: Record<VideoModelKey, VideoModelSpec> = {
     defaultResolution: '720p',
     pricePerSecNoAudio: 0.2,
   },
-  local: {
-    key: 'local',
-    label: 'Self-hosted',
-    endpoint: '',
-    duration: { mode: 'flexible', min: 1, max: 15 },
-    refParam: 'image_urls',
-    audioParam: null,
-    audioDefault: true,
-    resolutions: [],
-    defaultResolution: '720p',
-    pricePerSecNoAudio: 0,
-  },
 }
 
 /** flexible 모델의 duration을 spec 범위(min~max)로 가두고 정수로 반올림. fixed는 seconds 반환. */
@@ -139,7 +126,11 @@ export function clampDuration(spec: VideoModelSpec, seconds: number): number {
   return Math.min(max, Math.max(min, v))
 }
 
-/** legacy provider('kling'/'veo'/'local') 및 임의 문자열 → VideoModelKey 정규화. */
+/**
+ * legacy provider('kling') 및 임의 문자열 → VideoModelKey 정규화.
+ * 지워진 self-hosted 이름('local')과 모르는 이름은 기본 모델로 떨어진다 —
+ * 거절이 아니라 기본 모델로 읽어 예전 저장 데이터가 깨지지 않게 한다.
+ */
 export function normalizeProvider(p: string): VideoModelKey {
   if (p === 'kling') return 'kling-o3' // legacy alias
   if (p in VIDEO_MODELS) return p as VideoModelKey

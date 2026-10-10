@@ -25,6 +25,13 @@ describe('영상 모델 선택 기준', () => {
     expect(normalizeProvider('')).toBe(DEFAULT_VIDEO_MODEL)
   })
 
+  // 왜: 예전에 저장된 노드·요청이 자체 호스팅('local') 모델 이름을 들고 들어와도, 만드는 것은
+  //   결제 심사 문서가 밝힌 처리 업체(fal) 카탈로그 모델뿐이어야 한다(2026-10-11 로컬 경로 제거).
+  it('예전 로컬 모델 이름은 기본 영상 모델로 바꾼다', () => {
+    expect(normalizeProvider('local')).toBe(DEFAULT_VIDEO_MODEL)
+    expect(Object.keys(VIDEO_MODELS)).not.toContain('local')
+  })
+
   it('영상 길이를 넣으면 모델이 허용하는 범위 안으로 맞추고 고정 길이 모델은 정해진 길이를 쓴다', () => {
     const spec = VIDEO_MODELS[DEFAULT_VIDEO_MODEL]
     expect(spec.duration.mode).toBe('flexible')

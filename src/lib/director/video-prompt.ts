@@ -1,4 +1,4 @@
-import { cameraToText } from '@/lib/kling'
+import { cameraToText } from '@/lib/director/camera-text'
 import { compileMotionContract, type MotionContract } from '@/lib/director/motion-contract'
 import { findCameraBrand, findCameraMovement } from '@/lib/knowledge'
 import type { ShotDynamicSpec } from '@/lib/writer/types/pipeline'

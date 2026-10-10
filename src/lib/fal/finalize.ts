@@ -471,32 +471,17 @@ function assertValidProviderVideoUrl(videoUrl: string, provider: GenerationJob['
   }
   if (parsed.username || parsed.password) return invalidProviderVideoUrl()
 
-  if (provider === 'fal') {
-    // 호스트는 개별 이름이 아니라 fal.media 도메인 소속으로 판정한다(#fal-cdn-host 2026-08-01) —
-    //   fal 이 v3b.fal.media 같은 새 CDN 호스트를 추가할 때마다 정상 영상이 죽던 문제.
-    const host = parsed.hostname.toLowerCase()
-    if (
-      parsed.protocol !== 'https:'
-      || parsed.port
-      || !(isFalMediaHost(host) || extraAllowedFalHosts().has(host))
-    ) {
-      return invalidProviderVideoUrl()
-    }
-    return parsed
-  }
+  // fal 밖 제공자는 없다(2026-10-11 자체 호스팅 경로 제거) — 그 전에 저장된 예전 작업 행이
+  //   뒤늦게 들어오면 기존 '잘못된 결과' 처리로 끝낸다.
+  if (provider !== 'fal') return invalidProviderVideoUrl()
 
-  let configured: URL
-  try {
-    configured = new URL(process.env.TAILSCALE_VIDEO_API_URL ?? '')
-  } catch {
-    return invalidProviderVideoUrl()
-  }
+  // 호스트는 개별 이름이 아니라 fal.media 도메인 소속으로 판정한다(#fal-cdn-host 2026-08-01) —
+  //   fal 이 v3b.fal.media 같은 새 CDN 호스트를 추가할 때마다 정상 영상이 죽던 문제.
+  const host = parsed.hostname.toLowerCase()
   if (
-    configured.username
-    || configured.password
-    || (configured.protocol !== 'http:' && configured.protocol !== 'https:')
-    || (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
-    || parsed.origin !== configured.origin
+    parsed.protocol !== 'https:'
+    || parsed.port
+    || !(isFalMediaHost(host) || extraAllowedFalHosts().has(host))
   ) {
     return invalidProviderVideoUrl()
   }

@@ -15,6 +15,7 @@ import { useProjectFormatStore } from '@/stores/project-format-store'
 import { useT } from '@/lib/i18n'
 import { useTakeBalance } from '@/lib/billing/use-take-balance'
 import { takeCostForVideo } from '@/lib/billing/take-cost'
+import { normalizeProvider } from '@/lib/video-models'
 
 /** 영상 노드 틀의 높이 상한(세로·정사각 포맷) — 테이크 간격(VIDEO_OFFSET_Y 260px) 안에서 겹치지 않게. */
 const VIDEO_NODE_MEDIA_MAX_H = 150
@@ -172,7 +173,9 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           {/* #payments-phase-2 v4 #2: 생성 전 소모량 표시 — mode==='off'면 배지 숨김. */}
           {takeBalance.mode !== 'off' && (
             <span className="rounded-sm border border-primary/40 bg-primary/10 px-1.5 py-1 text-[10px] font-medium text-foreground">
-              {t('{count} Take', { count: takeCostForVideo(effectiveProvider) })}
+              {/* 표시는 서버가 실제로 쓰는 모델 기준이어야 한다 — 설정에 남은 옛 모델 이름은
+                  제출 전에 기본 모델로 바뀐다(video-batch-plan 의 승인 카드와 같은 계산). */}
+              {t('{count} Take', { count: takeCostForVideo(effectiveProvider ? normalizeProvider(effectiveProvider) : null) })}
             </span>
           )}
         </div>

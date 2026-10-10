@@ -1,28 +1,12 @@
-import jwt from 'jsonwebtoken'
+// 6축 카메라 설정을 영상 모델이 읽는 자연어로 옮긴다.
+//
+// 2026-10-11: 이 함수는 Kling 직접 호출 모듈에 함께 들어 있었다. 그 모듈에서 이 함수만 떼어 왔고,
+//   아무도 쓰지 않던 직접 호출 주소·토큰 발급 잔재는 모듈과 함께 지웠다 — 지금 영상은
+//   전부 fal 카탈로그 모델로 나간다.
 import type { CameraConfig } from '@/types'
 
-const KLING_API_BASE = 'https://api.klingai.com/v1'
-
-export { KLING_API_BASE }
-
-export function createKlingToken(): string {
-  const accessKey = process.env.KLING_ACCESS_KEY
-  const secretKey = process.env.KLING_SECRET_KEY
-  if (!accessKey || !secretKey) {
-    throw new Error('Kling API keys not configured (KLING_ACCESS_KEY / KLING_SECRET_KEY)')
-  }
-
-  const now = Math.floor(Date.now() / 1000)
-  return jwt.sign(
-    { iss: accessKey, exp: now + 1800, iat: now },
-    secretKey,
-    { algorithm: 'HS256', header: { alg: 'HS256', typ: 'JWT' } },
-  )
-}
-
 /**
- * Convert 6-axis camera config to natural language for kling-v2-master.
- * Intensity mapping: <=3 "slowly", <=6 "steadily", >6 "dramatically"
+ * 6축 카메라 설정 → 자연어. 세기 대응: <=3 "slowly", <=6 "steadily", >6 "dramatically".
  */
 export function cameraToText(camera: CameraConfig): string {
   const intensity = (val: number) => {

@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(), userOwnsProject: vi.fn(), checkGenerationCapacity: vi.fn(),
   reserveTake: vi.fn(), reserveRegeneration: vi.fn(), getJob: vi.fn(), attach: vi.fn(), fail: vi.fn(),
-  updateMetadata: vi.fn(), from: vi.fn(), rpc: vi.fn(), submit: vi.fn(), finalize: vi.fn(), reconcile: vi.fn(), buildPrompt: vi.fn(),
+  updateMetadata: vi.fn(), from: vi.fn(), rpc: vi.fn(), submit: vi.fn(), reconcile: vi.fn(), buildPrompt: vi.fn(),
   syncFalKeyLimits: vi.fn(), falKeyById: vi.fn(),
 }))
 vi.mock('@/lib/supabase/auth', () => ({ getUser: mocks.getUser }))
@@ -16,10 +16,6 @@ vi.mock('@/lib/director-video-takes', () => ({ reserveDirectorVideoTake: mocks.r
 vi.mock('@/lib/director/video-prompt', () => ({ buildVideoPrompt: mocks.buildPrompt }))
 vi.mock('@/lib/fal/webhook-url', () => ({ resolveWebhookUrl: () => 'https://webhook.test' }))
 vi.mock('@/lib/fal/observability', () => ({ buildBestEffortFalRequestCapturePatch: () => ({}) }))
-vi.mock('@/lib/fal/finalize', async (importOriginal) => ({
-  ...await importOriginal<typeof import('@/lib/fal/finalize')>(),
-  finalizeShotVideoJob: mocks.finalize,
-}))
 vi.mock('@/lib/fal/reconcile', () => ({ reconcileJobFromFal: mocks.reconcile }))
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: { from: mocks.from, rpc: mocks.rpc } }))
 vi.mock('@/lib/fal/keys', () => ({
@@ -119,18 +115,12 @@ function reservedRegenerationFalJob(overrides: Record<string, unknown> = {}) {
   return { ...job, input_snapshot: inputSnapshot }
 }
 
-function reservedLocalJob(overrides: Record<string, unknown> = {}) {
-  const { fal_request: _falRequest, ...snapshot } = reservedFalJob().input_snapshot
-  void _falRequest
+// 요청 본문이 예전 자체 호스팅 모델('local')을 들고 올 때 생기는 예약 행 — provider/model 칸은 요청을
+//   그대로 적고, 실제로 쓰는 모델(resolved_model_key)과 제출 요청(fal_request)은 fal 기본 모델이다.
+function localModelRequestFalJob(overrides: Record<string, unknown> = {}) {
+  const snapshot = reservedFalJob().input_snapshot
   return reservedFalJob({
-    provider: 'local',
-    model: 'local',
-    input_snapshot: {
-      ...snapshot,
-      provider: 'local',
-      model: 'local',
-      resolved_model_key: 'local',
-    },
+    input_snapshot: { ...snapshot, provider: 'local', model: 'local' },
     ...overrides,
   })
 }
@@ -711,48 +701,37 @@ describe('예약된 요청을 다시 이어가는 약속', () => {
     expect(mocks.attach).not.toHaveBeenCalled()
   })
 
-  it('영상 파일은 올라갔지만 완료 기록 저장이 실패하면 작업을 대기 상태로 둔다', async () => {
-    const { DirectorVideoCompletionPersistenceError } = await import('@/lib/fal/finalize')
-    mocks.reserveTake.mockResolvedValue({
-      video_clip_id: 'clip-1',
-      job_id: 'job-1',
-      take_number: 1,
-      replayed: false,
-    })
-    mocks.getJob
-      .mockResolvedValueOnce(reservedLocalJob())
-      .mockResolvedValueOnce({
-        id: 'job-1',
-        request_id: 'http://local.test/video.mp4',
-        provider: 'local',
-        model: 'hunyuan-t2v',
-      })
-    mocks.finalize.mockRejectedValue(
-      new DirectorVideoCompletionPersistenceError(
-        'provider_fetch_retryable',
-        new Error('database temporarily unavailable'),
-      ),
-    )
+  // 왜: 예전 노드·일괄 스냅샷·직접 호출이 자체 호스팅 모델을 고르는 요청을 보내도, 결제 심사 문서가
+  //   밝힌 처리 업체(fal) 카탈로그 모델로만 만든다. 거절이 아니라 기본 모델로 바꿔 예전 저장 데이터를 살린다.
+  it('요청이 로컬 영상 모델을 고르면 fal 기본 모델로 만든다', async () => {
+    mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: false })
+    mocks.getJob.mockResolvedValue(localModelRequestFalJob())
+    mocks.submit.mockResolvedValue({ request_id: 'fal-1' })
+
+    const response = await POST(request({ provider: 'local', model: 'local' }))
+
+    expect(response.status).toBe(200)
+    expect(mocks.reserveTake).toHaveBeenCalledWith(expect.objectContaining({ provider: 'fal', model: 'seedance' }))
+    expect(mocks.submit).toHaveBeenCalledWith('fal-ai/kling-video/v2.1/master/text-to-video', expect.anything())
+    expect(mocks.attach).toHaveBeenCalledWith('project-1', 'job-1', 'fal-1', expect.objectContaining({ provider: 'fal' }))
+    await expect(response.json()).resolves.toMatchObject({ provider: 'fal', status: 'generating' })
+  })
+
+  // 왜: 운영 환경에 자체 서버 주소 설정(TAILSCALE_VIDEO_API_URL)이 아직 남아 있어도, 사용자 글·그림이
+  //   그 주소로 나가는 길이 없어야 한다 — 이 경로가 심사 문서 밖 처리 업체였다.
+  it('영상 생성은 내 컴퓨터 주소로 요청을 보내지 않는다', async () => {
+    mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: false })
+    mocks.getJob.mockResolvedValue(localModelRequestFalJob())
+    mocks.submit.mockResolvedValue({ request_id: 'fal-1' })
     vi.stubEnv('TAILSCALE_VIDEO_API_URL', 'http://local.test')
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ output_url: '/video.mp4' }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        }),
-      ),
-    )
+    const directFetch = vi.fn()
+    vi.stubGlobal('fetch', directFetch)
     try {
-      const response = await POST(request({ provider: 'local', model: 'local' }))
-      expect(response.status).toBe(500)
-      await expect(response.json()).resolves.toMatchObject({
-        status: 'generating',
-        retryable: true,
-        jobId: 'job-1',
-        videoClipId: 'clip-1',
-      })
-      expect(mocks.fail).not.toHaveBeenCalled()
+      const response = await POST(request({ provider: 'local', model: 'local', generationMethod: 'T2V' }))
+
+      expect(response.status).toBe(200)
+      expect(directFetch).not.toHaveBeenCalled()
+      expect(mocks.submit).toHaveBeenCalledTimes(1)
     } finally {
       vi.unstubAllEnvs()
       vi.unstubAllGlobals()
@@ -769,27 +748,6 @@ describe('복구 입력을 안전하게 확인하는 약속', () => {
     expect([400, 409]).toContain(response.status)
     expect(mocks.fail).not.toHaveBeenCalled()
     expect(mocks.attach).not.toHaveBeenCalled()
-  })
-
-  it('허용되지 않은 영상 주소가 오면 작업을 실패로 끝내고 방치하지 않는다', async () => {
-    mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: false })
-    mocks.getJob.mockResolvedValue(reservedLocalJob())
-    vi.stubEnv('TAILSCALE_VIDEO_API_URL', 'http://local.test/api')
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ output_url: 'http://evil.test/video.mp4' }), { headers: { 'content-type': 'application/json' } })))
-    try {
-      const response = await POST(request({ provider: 'local', model: 'local' }))
-      expect(response.status).toBe(500)
-      await expect(response.json()).resolves.toMatchObject({ status: 'failed' })
-      expect(mocks.fail).toHaveBeenCalledWith(
-        'project-1',
-        'job-1',
-        expect.stringContaining('Local provider returned invalid output URL'),
-      )
-      expect(mocks.attach).not.toHaveBeenCalled()
-    } finally {
-      vi.unstubAllEnvs()
-      vi.unstubAllGlobals()
-    }
   })
 })
 describe('영상 생성 결과를 확인하는 약속', () => {
@@ -854,81 +812,64 @@ describe('서명된 복구 증표를 확인하는 약속', () => {
     return `${encoded}.${signature}`
   }
 
-  function replayedLocalReservation() {
+  // 예약된 fal 제출의 재생 상황 — 복구 증표는 이미 나간 제출에 연결만 한다.
+  const FAL_SNAPSHOT_MODEL = 'fal-ai/kling-video/v2.1/master/text-to-video'
+  function replayedFalReservation() {
     mocks.from.mockReset()
     mocks.from
       .mockReturnValueOnce(query({ workspace_id: 'workspace-1' }))
       .mockReturnValueOnce(query({ shot_id: 'shot-1' }))
       .mockReturnValueOnce(query({ id: 'job-1', video_clip_id: 'clip-1', target: { retakeMode: 'new_take', writerShotId: 'shot-1' } }))
     mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: true })
-    mocks.getJob.mockResolvedValue(reservedLocalJob())
+    mocks.getJob.mockResolvedValue(reservedFalJob())
   }
 
   it('조건에 맞는 복구 증표만 연결하고 작업을 다시 제출하지 않는다', async () => {
-    replayedLocalReservation()
-    vi.stubEnv('TAILSCALE_VIDEO_API_URL', 'http://local.test/api')
-    try {
-      const response = await POST(request({
-        provider: 'local',
-        model: 'local',
-        recoveryReceipt: receipt({
-          projectId: 'project-1', jobId: 'job-1', provider: 'local', model: 'hunyuan-t2v',
-          taskId: 'http://local.test/api/tasks/1', exp: Date.now() + 60_000,
-        }),
-      }))
-      expect(response.status).toBe(200)
-      expect(mocks.attach).toHaveBeenCalledWith('project-1', 'job-1', 'http://local.test/api/tasks/1', expect.objectContaining({ provider: 'local', model: 'hunyuan-t2v' }))
-      expect(mocks.submit).not.toHaveBeenCalled()
-    } finally {
-      vi.unstubAllEnvs()
-    }
+    replayedFalReservation()
+    const response = await POST(request({
+      recoveryReceipt: receipt({
+        projectId: 'project-1', jobId: 'job-1', provider: 'fal', model: FAL_SNAPSHOT_MODEL,
+        taskId: 'fal-live', exp: Date.now() + 60_000,
+      }),
+    }))
+    expect(response.status).toBe(200)
+    expect(mocks.attach).toHaveBeenCalledWith('project-1', 'job-1', 'fal-live', expect.objectContaining({ provider: 'fal', model: FAL_SNAPSHOT_MODEL }))
+    expect(mocks.submit).not.toHaveBeenCalled()
   })
 
   it.each([
     ['tampered', (value: string) => `${value}x`, 400],
-    ['expired', () => receipt({ projectId: 'project-1', jobId: 'job-1', provider: 'local', model: 'hunyuan-t2v', taskId: 'http://local.test/api/tasks/1', exp: Date.now() - 1 }), 409],
+    ['expired', () => receipt({ projectId: 'project-1', jobId: 'job-1', provider: 'fal', model: FAL_SNAPSHOT_MODEL, taskId: 'fal-live', exp: Date.now() - 1 }), 409],
   ])('유효하지 않은 %s 복구 증표는 연결하거나 제출하지 않는다', async (_name, mutate, expectedStatus) => {
-    replayedLocalReservation()
-    vi.stubEnv('TAILSCALE_VIDEO_API_URL', 'http://local.test/api')
-    try {
-      const valid = receipt({ projectId: 'project-1', jobId: 'job-1', provider: 'local', model: 'hunyuan-t2v', taskId: 'http://local.test/api/tasks/1', exp: Date.now() + 60_000 })
-      const response = await POST(request({ provider: 'local', model: 'local', recoveryReceipt: mutate(valid) }))
-      expect(response.status).toBe(expectedStatus)
-      expect(mocks.attach).not.toHaveBeenCalled()
-      expect(mocks.submit).not.toHaveBeenCalled()
-    } finally {
-      vi.unstubAllEnvs()
-    }
+    replayedFalReservation()
+    const valid = receipt({ projectId: 'project-1', jobId: 'job-1', provider: 'fal', model: FAL_SNAPSHOT_MODEL, taskId: 'fal-live', exp: Date.now() + 60_000 })
+    const response = await POST(request({ recoveryReceipt: mutate(valid) }))
+    expect(response.status).toBe(expectedStatus)
+    expect(mocks.attach).not.toHaveBeenCalled()
+    expect(mocks.submit).not.toHaveBeenCalled()
   })
 
   it.each([
     ['project', { projectId: 'project-2' }, 409],
     ['job', { jobId: 'job-2' }, 409],
-    ['provider', { provider: 'fal', model: 'hunyuan-t2v', taskId: 'fal-1' }, 409],
-    ['model', { provider: 'local', model: 'other', taskId: 'http://local.test/api/tasks/1' }, 409],
-    ['off-origin local task', { provider: 'local', model: 'hunyuan-t2v', taskId: 'http://evil.test/api/tasks/1' }, 400],
+    // provider 'local'(지운 자체 호스팅 경로)은 증표 해독 단계에서 읽지 않는다 — 400.
+    ['provider', { provider: 'local' }, 400],
+    ['model', { model: 'other' }, 409],
   ])('복구 증표의 %s가 다르면 연결하거나 제출하지 않는다', async (_name, override, expectedStatus) => {
-    replayedLocalReservation()
-    vi.stubEnv('TAILSCALE_VIDEO_API_URL', 'http://local.test/api')
-    try {
-      const response = await POST(request({
-        provider: 'local',
-        model: 'local',
-        recoveryReceipt: receipt({
-          projectId: 'project-1',
-          jobId: 'job-1',
-          provider: 'local',
-          model: 'hunyuan-t2v',
-          taskId: 'http://local.test/api/tasks/1',
-          exp: Date.now() + 60_000,
-          ...override,
-        }),
-      }))
-      expect(response.status).toBe(expectedStatus)
-      expect(mocks.attach).not.toHaveBeenCalled()
-      expect(mocks.submit).not.toHaveBeenCalled()
-    } finally {
-      vi.unstubAllEnvs()
-    }
+    replayedFalReservation()
+    const response = await POST(request({
+      recoveryReceipt: receipt({
+        projectId: 'project-1',
+        jobId: 'job-1',
+        provider: 'fal',
+        model: FAL_SNAPSHOT_MODEL,
+        taskId: 'fal-live',
+        exp: Date.now() + 60_000,
+        ...override,
+      }),
+    }))
+    expect(response.status).toBe(expectedStatus)
+    expect(mocks.attach).not.toHaveBeenCalled()
+    expect(mocks.submit).not.toHaveBeenCalled()
   })
 })

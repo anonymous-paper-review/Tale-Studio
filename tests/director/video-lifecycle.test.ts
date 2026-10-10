@@ -105,7 +105,6 @@ const job = {
   fal_key_id: 'prod-2000',
 } as never
 beforeEach(() => {
-  vi.stubEnv('TAILSCALE_VIDEO_API_URL', 'http://local.test/api')
   vi.stubEnv('FAL_MEDIA_ALLOWED_HOSTS', '')
   vi.resetAllMocks()
   mocks.from.mockReturnValue({ getPublicUrl: vi.fn(() => ({ data: { publicUrl: 'https://media.test/video.mp4' } })) })
@@ -252,9 +251,7 @@ describe('연결된 영상 결과는 안전하게 저장하고 완료 처리한�
       .rejects.toMatchObject({ code: 'invalid_provider_result' })
     expect(mocks.uploadImmutableObject).not.toHaveBeenCalled()
   })
-  it('허용된 내 컴퓨터와 FAL 주소의 영상은 저장한다', async () => {
-    const localJob = { ...(job as object), provider: 'local', request_id: 'http://local.test/api/tasks/1' } as never
-    await expect(finalizeShotVideoJob(localJob, 'http://local.test/api/tasks/1/output.mp4')).resolves.toBe(LINKED_VIDEO_URL)
+  it('허용된 FAL 주소의 영상은 저장한다', async () => {
     await expect(finalizeShotVideoJob(job, 'https://v3.fal.media/video.mp4')).resolves.toBe(LINKED_VIDEO_URL)
 
     vi.stubEnv('FAL_MEDIA_ALLOWED_HOSTS', 'media.example.test')
@@ -272,9 +269,11 @@ describe('연결된 영상 결과는 안전하게 저장하고 완료 처리한�
     expect(fetch).not.toHaveBeenCalled()
   })
 
-  it('허용한 내 컴퓨터 주소가 아니면 영상을 가져오지 않는다', async () => {
-    const localJob = { ...(job as object), provider: 'local', request_id: 'http://local.test/api/tasks/1' } as never
-    await expect(finalizeShotVideoJob(localJob, 'https://local.test/api/tasks/1/output.mp4'))
+  // 왜: 2026-10-11 에 자체 호스팅(provider 'local') 영상 경로를 지웠다 — 그 전에 저장된 작업 행이
+  //   뒤늦게 들어와도 fal 밖 주소에서 영상을 가져오지 않는다(기존 '잘못된 결과' 경로 그대로).
+  it('fal 이 아닌 예전 영상 작업의 결과 주소는 가져오지 않는다', async () => {
+    const legacyLocalJob = { ...(job as object), provider: 'local', request_id: 'http://local.test/api/tasks/1' } as never
+    await expect(finalizeShotVideoJob(legacyLocalJob, 'http://local.test/api/tasks/1/output.mp4'))
       .rejects.toMatchObject({ code: 'invalid_provider_result' })
     expect(fetch).not.toHaveBeenCalled()
   })
@@ -417,65 +416,19 @@ describe('연결된 영상 결과를 상태에 맞게 반영한다', () => {
     await expect(reconcileJobFromFal(job)).resolves.toMatchObject({ status: 'failed', error: 'provider failed' })
     expect(mocks.fail).toHaveBeenCalledWith('project-1', 'job-1', 'provider failed')
   })
-  it('연결된 내 컴퓨터 영상은 Director 결과로 완료한다', async () => {
+  // 왜: 자체 호스팅 경로를 지운 뒤 들어오는 옛 작업 행은 새 동작을 발명하지 않고 기존 '알 수 없는
+  //   제공자' 처리(조회할 키가 없음 → 영구 실패)를 그대로 탄다 — 대기 상태로 영원히 남지 않게.
+  it('fal 이 아닌 예전 영상 작업은 알 수 없는 제공자로 보고 실패로 끝낸다', async () => {
     const { reconcileJobFromFal } = await import('@/lib/fal/reconcile')
-    const localJob = { ...(job as object), provider: 'local', request_id: 'http://local.test/api/output.mp4' } as never
-    await expect(reconcileJobFromFal(localJob)).resolves.toMatchObject({
-      status: 'completed',
-      result_url: LINKED_VIDEO_URL,
-    })
-    expect(mocks.complete).toHaveBeenCalledWith(
-      'project-1',
-      'job-1',
-      'clip-1',
-      LINKED_VIDEO_URL,
-      LINKED_VIDEO_KEY,
-    )
-  })
-  it('연결되지 않은 내 컴퓨터 영상도 완료 결과로 기록한다', async () => {
-    const { reconcileJobFromFal } = await import('@/lib/fal/reconcile')
-    const localJob = {
+    const legacyLocalJob = {
       ...(job as object),
       provider: 'local',
       request_id: 'http://local.test/api/output.mp4',
-      video_clip_id: null,
-      target: {},
+      fal_key_id: null,
     } as never
-    await expect(reconcileJobFromFal(localJob)).resolves.toMatchObject({
-      status: 'completed',
-      result_url: 'http://local.test/api/output.mp4',
-    })
-    expect(mocks.completeJob).toHaveBeenCalledWith('job-1', 'http://local.test/api/output.mp4')
-  })
-  it('연결되지 않은 영상 주소가 잘못되면 실패로 기록한다', async () => {
-    const { reconcileJobFromFal } = await import('@/lib/fal/reconcile')
-    const localJob = {
-      ...(job as object),
-      provider: 'local',
-      request_id: 'not a URL',
-      video_clip_id: null,
-      target: {},
-    } as never
-    await expect(reconcileJobFromFal(localJob)).resolves.toMatchObject({ status: 'failed' })
-    // [finalize] prefix marks the failing stage (#a2-observability 2026-08-26)
-    expect(mocks.failJob).toHaveBeenCalledWith('job-1', '[finalize] local video job has no valid result URL')
-  })
-  it.each([
-    'https://evil.test/output.mp4',
-    'ftp://local.test/output.mp4',
-    'http://user@local.test/output.mp4',
-  ])('허용하지 않은 내 컴퓨터 영상 주소 %s는 실패로 기록한다', async (requestId) => {
-    const { reconcileJobFromFal } = await import('@/lib/fal/reconcile')
-    const localJob = {
-      ...(job as object),
-      provider: 'local',
-      request_id: requestId,
-      video_clip_id: null,
-      target: {},
-    } as never
-    await expect(reconcileJobFromFal(localJob)).resolves.toMatchObject({ status: 'failed' })
-    // [finalize] prefix marks the failing stage (#a2-observability 2026-08-26)
-    expect(mocks.failJob).toHaveBeenCalledWith('job-1', '[finalize] local video job has no valid result URL')
+    await expect(reconcileJobFromFal(legacyLocalJob)).resolves.toMatchObject({ status: 'failed' })
+    expect(mocks.falVideoFetch).not.toHaveBeenCalled()
+    expect(mocks.fail).toHaveBeenCalledWith('project-1', 'job-1', 'FalUnknownKeyError: unknown fal key id: (missing)')
   })
   it('연결된 영상 제공처의 영구 오류는 실패로 기록한다', async () => {
     const { reconcileJobFromFal } = await import('@/lib/fal/reconcile')

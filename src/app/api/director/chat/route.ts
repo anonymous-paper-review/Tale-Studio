@@ -84,7 +84,7 @@ Non-destructive (direct execution):
 1. {"type":"addScene","label":"...","location":"...","timeOfDay":"...","mood":"...","description":"...","tempId":"S1"}
 2. {"type":"addShot","sceneId":"<sceneId|tempId>","label":"...","prompt":"...","tempId":"H1"}
 3. {"type":"updateScene","id":"<id>","patch":{"label":"...","location":"...","timeOfDay":"...","mood":"...","description":"..."}}
-4. {"type":"updateShot","id":"<id>","patch":{"label":"...","prompt":"...","provider":"happy-horse"|"seedance"|"kling-o3"|"veo"|"local"}}
+4. {"type":"updateShot","id":"<id>","patch":{"label":"...","prompt":"...","provider":"happy-horse"|"seedance"|"kling-o3"|"veo"}}
 5. {"type":"addVideoTake","shotId":"<id>","override":{"prompt":"...","camera":{...},"lighting":{...},"cameraPreset":{...}},"tempId":"V1"}
 6. {"type":"setCamera","id":"<shotOrVideoId>","camera":{"horizontal":0,"vertical":0,"pan":0,"tilt":0,"roll":0,"zoom":0}}
 7. {"type":"setLighting","id":"<shotOrVideoId>","lighting":{"position":"left|top|right|front","brightness":50,"colorTemp":5600}}
@@ -215,12 +215,12 @@ const VALID_UPDATE_TYPES = new Set([
   'selectNode',
 ])
 // 새 모델 키 + legacy alias('kling') 허용. 저장 시 normalizeProvider로 canonical 키화.
+//   fal 카탈로그 밖 이름(지운 'local' 포함)은 받지 않는다 — patch 에서 통째로 떨어진다.
 const VALID_PROVIDERS = new Set([
   'happy-horse',
   'seedance',
   'kling-o3',
   'veo',
-  'local',
   'kling', // legacy → normalizeProvider가 'kling-o3'로
 ])
 const VALID_LIGHT_POSITIONS = new Set(['left', 'top', 'right', 'front'])
