@@ -16,6 +16,8 @@ const eslintConfig = defineConfig([
     "dev/**",
     // .worktrees/: 링크된 git 워크트리 (같은 소스의 다른 브랜치 사본 — 중복 검사)
     ".worktrees/**",
+    // research/: 로컬 전용 실험 공간 (Git 미추적 — 앱 빌드와 무관)
+    "research/**",
   ]),
 ]);
 

@@ -51,5 +51,5 @@
   그 문장을 이름으로 한 테스트 → 구현 순서로만 간다. 목록은 같이 정한 것 / 혼자 정한 것으로 나눠 내고,
   혼자 정한 것 중 되돌리기 `비쌄` 이상은 오너 확인 전 구현 시작 금지. 실패한 테스트는 에이전트가
   고치거나 지우지 않고 "결정이 필요한 것"으로 오너에게 낸다 — `.claude/rules/tdd.md`.
-- `research/`는 선택적인 로컬 실험 공간이다. 실험 규칙은 `.claude/rules/experiments.md`를 따르며,
-  `map:dev`·`map:build`가 사용하는 `research/tools/writer-map`은 유지한다.
+- `research/`는 선택적인 로컬 실험 공간이다. 실험 규칙은 `.claude/rules/experiments.md`를 따른다.
+  Git 추적·타입 검사 대상이 아니다(2026-10-11). `research/tools/writer-map`도 로컬에서 `node research/tools/writer-map/serve.mjs`로 직접 실행한다.
