@@ -41,6 +41,8 @@ process.env.SUPABASE_SERVICE_ROLE_KEY ??= 'test-service-role-key'
 // 로컬에서만 빨개 떴다(CI 는 초록). 같은 스위트가 사람마다 다르게 나오면 믿을 수 없다.
 // 2026-09-07 재발: Paddle 샌드박스 상품 등록 뒤 .env.local 의 NEXT_PUBLIC_PADDLE_PRICE_* 13개가 올라와
 // paddle-checkout "상품 ID 없으면 결제창 안 열림" 1건이 로컬에서만 빨개 떴다. 가격 ID 를 검증하는 파일은 자기가 직접 켠다.
+// 2026-10-11: 셸의 DISCORD_ALERT_WEBHOOK_URL 이 올라와 테스트가 실제 디스코드 #webhook 채널에 알림을 보냈다
+// ('[tale · local] 즉시 재조회로 결제를 복구했다'). 알림 전송을 검증하는 파일은 vi.stubEnv 로 가짜 주소를 직접 켠다.
 for (const key of Object.keys(process.env)) {
-  if (key === 'TAKE_BILLING_MODE' || key.startsWith('NEXT_PUBLIC_PADDLE_PRICE_')) delete process.env[key]
+  if (key === 'TAKE_BILLING_MODE' || key === 'DISCORD_ALERT_WEBHOOK_URL' || key.startsWith('NEXT_PUBLIC_PADDLE_PRICE_')) delete process.env[key]
 }
