@@ -1,4 +1,4 @@
-// 약관·환불·개인정보 페이지는 로그인 없이 열고, 다른 보호 페이지의 로그인 요구는 유지한다.
+// 약관·환불·개인정보·콘텐츠 이용정책 페이지는 로그인 없이 열고, 다른 보호 페이지의 로그인 요구는 유지한다.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 import { middleware } from '@/middleware'
@@ -14,7 +14,7 @@ beforeEach(() => {
   mocks.getUser.mockResolvedValue({ data: { user: null } })
 })
 
-describe.each(['/terms', '/refund', '/privacy'])('공개 정책 페이지 %s', (path) => {
+describe.each(['/terms', '/refund', '/privacy', '/acceptable-use'])('공개 정책 페이지 %s', (path) => {
   // 왜: 정상 경로 고정. 가입·결제 전에 고객과 심사 담당자가 정책을 읽을 수 있어야 한다.
   it('로그인하지 않은 방문자이면 정책 페이지를 그대로 연다', async () => {
     const response = await middleware(new NextRequest(`https://example.test${path}`))
@@ -62,6 +62,8 @@ describe.each([
   '/refunds/admin',
   '/privacy-private',
   '/privacy/admin',
+  '/acceptable-use-private',
+  '/acceptable-use/admin',
   '/account',
 ])('보호 페이지 %s', (path) => {
   // 왜: 정책 주소와 이름이 비슷한 내부 페이지나 계정 정보까지 공개되는 일을 막는다.

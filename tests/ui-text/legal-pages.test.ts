@@ -39,13 +39,13 @@ describe('공개 정책 문서', () => {
     const privacy = renderToStaticMarkup(createElement(LegalMarkdown, { markdown: LEGAL_DOCUMENTS.privacy.markdown }))
     expect(privacy.match(/<table/g)).toHaveLength(3)
     expect(privacy).toContain('scope="col"')
-    expect(privacy).toContain('href="https://www.paddle.com/legal/privacy"')
+    expect(privacy).toContain('href="https://www.creem.io/privacy"')
   })
 
   // 왜: 정상 경로 고정. 방문자가 약관과 가격을 왕복하며 확인할 수 있어야 한다.
   it('정책 페이지를 열면 다른 정책과 요금표로 이동할 수 있다', async () => {
     const { LEGAL_DOCUMENTS } = await import('@/lib/legal/documents')
-    for (const key of ['terms', 'refund', 'privacy'] as const) {
+    for (const key of ['terms', 'refund', 'privacy', 'acceptable-use'] as const) {
       const { default: Page, metadata } = await import(`../../src/app/${key}/page`)
       const html = renderToStaticMarkup(createElement(Page))
       for (const path of ['/terms', '/refund', '/privacy', '/pricing']) expect(html).toContain(`href="${path}"`)
@@ -63,7 +63,7 @@ describe('공개 정책 문서', () => {
     const { SiteFooter } = await import('@/components/marketing/site-footer')
     const html = renderToStaticMarkup(createElement(LegalFooter))
     expect(plain(html)).toBe(markdownText(footerMarkdown))
-    for (const path of ['/terms', '/refunds', '/privacy']) {
+    for (const path of ['/terms', '/refund', '/privacy', '/acceptable-use']) {
       expect(html).toContain(`href="${path}"`)
       expect(renderToStaticMarkup(createElement(SiteFooter))).toContain(`href="${path}"`)
     }
@@ -71,6 +71,15 @@ describe('공개 정책 문서', () => {
     expect(home).toContain('<LegalFooter')
     expect(home).not.toMatch(/href="#"[^>]*>\s*(Privacy Policy|Terms of Service)/)
     expect(readFileSync('src/components/billing/pricing-page.tsx', 'utf8')).toContain('<SiteFooter')
+  })
+
+  // 왜: 정상 경로 고정. Creem 심사 요건상 금지 콘텐츠와 신고 방법을 가입 전에 찾을 수 있어야 한다.
+  it('로그인 전 홈 하단을 보면 콘텐츠 이용정책 링크가 보인다', async () => {
+    const { LegalFooter } = await import('@/components/legal/legal-footer')
+    const { SiteFooter } = await import('@/components/marketing/site-footer')
+    expect(renderToStaticMarkup(createElement(LegalFooter))).toContain('href="/acceptable-use"')
+    expect(renderToStaticMarkup(createElement(SiteFooter))).toContain('href="/acceptable-use"')
+    expect(readFileSync('src/app/page.tsx', 'utf8')).toContain('<LegalFooter')
   })
 
   // 왜: 문서의 표시가 스크립트 실행이나 숨겨진 링크가 되면 안 된다.

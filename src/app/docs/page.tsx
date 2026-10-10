@@ -47,7 +47,7 @@ const STAGE_GUIDE = [
 const FAQ = [
   {
     q: 'Can I use what I generate commercially?',
-    a: 'During the beta, usage rights to generated output belong to the person who created it. That said, third-party model policies apply too, so please reach out before using anything in a commercial project.',
+    a: 'Yes. You may use your output commercially. You must have the rights to any material you upload, follow our content rules and the applicable AI model terms, and stay within your plan’s export limits.',
   },
   {
     q: 'How long does it take to make a video?',
@@ -78,7 +78,7 @@ export default function DocsPage() {
           <ol className="space-y-3 text-sm leading-relaxed text-gray-300">
             <li>
               1. <Link href="/login" className="text-primary underline-offset-4 hover:underline">Log in</Link>{' '}
-              and create a new project. // copy-ok: fragment
+              and create a new project. {/* copy-ok: fragment */}
             </li>
             <li>2. Tell the Producer chat your story idea in one line.</li>
             <li>3. Once the required fields are filled in, say &ldquo;Hand this to the Writer&rdquo; in the chat.</li>
