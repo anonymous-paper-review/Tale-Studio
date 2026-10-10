@@ -48,6 +48,8 @@ export interface GenerationJobTarget {
   roughGeneratedAt?: number
   /** 배치(그리드) 잡: 샷별 러프 generatedAt. */
   roughGeneratedAtByShot?: Record<string, number>
+  /** 실사 일괄(storyboard_real_grid): 이 작업을 낸 판(클라 러너 한 번)의 표시 — 같은 판은 이 작업의 샷을 다시 내지 않는다(2026-10-10). */
+  batchRunId?: string
 }
 
 export interface GenerationJob {

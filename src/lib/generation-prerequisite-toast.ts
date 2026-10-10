@@ -174,7 +174,8 @@ export async function fetchPrerequisiteState(
 
 const activeWaits = new Map<string, () => void>()
 
-function waitKey(projectId: string, body: PrerequisiteBody & { code: PrerequisiteCode }): string {
+/** 같은 자료를 기다리는지 가르는 열쇠 — 시트는 빠진 인물 이름, 러프 · 실사는 샷. */
+export function prerequisiteWaitKey(projectId: string, body: PrerequisiteBody & { code: PrerequisiteCode }): string {
   const target = body.code === 'missing_character_sheets' ? missingNames(body) : (body.shotId ?? '')
   return `${projectId}:${body.code}:${target}`
 }
@@ -197,7 +198,7 @@ export async function waitForPrerequisite(
     sleep?: (ms: number) => Promise<void>
   },
 ): Promise<PrerequisiteWaitOutcome> {
-  const key = waitKey(projectId, body)
+  const key = prerequisiteWaitKey(projectId, body)
   activeWaits.get(key)?.()
   let cancelled = false
   activeWaits.set(key, () => { cancelled = true })
