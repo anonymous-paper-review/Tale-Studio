@@ -194,6 +194,9 @@ export interface PipelineInput {
   // #s3-gate 2026-08-05: true 면 storyCheck 후 일시정지(awaiting_confirmation) — 씬 스토리를
   //   유저가 검토·수정 요청·확정한 뒤에만 뒷단(v0~)을 돌린다. UI 핸드오프만 켠다(하네스 무영향).
   sceneGate?: boolean;
+  // 트리트먼트 초안(2026-10-02 시안 v04): 새 프로젝트를 만들자마자 앞단만 돌려 Producer 에 트리트먼트를 보인다.
+  //   true 인 동안은 아직 넘기지 않은 실행이다 — Producer 는 잠기지 않고, Writer 로 넘길 때(continueDraft) 지운다.
+  treatmentDraft?: boolean;
   models?: PipelineModelsInput; // S/V/C 축별 모델 선택 (선택)
   // producer-story-gate §3: producer가 확정한 장르(완성형)·캐스트 seed.
   //   있으면 createRun이 state.genre/state.characters를 seed → s0(genre)/s2(characters) step이

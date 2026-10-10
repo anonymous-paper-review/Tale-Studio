@@ -14,6 +14,7 @@ import { createPendingProposal } from '@/lib/pending-proposal'
 import { handoffFrom } from '@/lib/handoff-intent'
 import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
 import { useChatUiStore } from '@/stores/chat-ui-store'
+import { usePendingCreationStore } from '@/stores/pending-creation-store'
 import { translate, useLocale, useT } from '@/lib/i18n'
 import { useContentLocale } from '@/lib/i18n/content'
 
@@ -61,6 +62,7 @@ export default function MeetingPage() {
   const backgrounds = useProducerStore((s) => s.backgrounds)
   // 핸드오프 가부는 결정적 게이트가 판정 (architecture §3 — 채팅은 제안일 뿐).
   const styleAnchorKey = useProducerStore((s) => s.styleAnchorKey)
+  const preserveScript = useProducerStore((s) => s.preserveScript)
   const gate = evaluateProducerGate({
     settings: projectSettings,
     storyReady,
@@ -68,6 +70,7 @@ export default function MeetingPage() {
     backgrounds,
     styleAnchorKey,
     locale,
+    preserveScript,
   })
   const canHandoff = gate.canHandoff
 
@@ -182,6 +185,16 @@ export default function MeetingPage() {
     requestChatFocus,
     producerWelcome,
   ])
+
+  // 새 프로젝트 화면에서 고른 대로 이어서 한다(2026-10-09 오너 "자료마다 쓰임새를 고른다" · 처음은 2026-10-02 시안 v04 0.1.2) —
+  //   그림 카드 · 그림체 · 원작(대본 · 만화) 채우기 뒤 트리트먼트. 다시 묻지 않는다.
+  //   채팅 이력이 실린 뒤에만(실리는 동안 남기면 덮인다), 한 번만(꺼내면 비운다).
+  useEffect(() => {
+    if (!projectId || !producerLoaded || !chatReady) return
+    const pending = usePendingCreationStore.getState().take(projectId)
+    if (!pending) return
+    void useGlobalChatStore.getState().runCreationPlan(pending)
+  }, [projectId, producerLoaded, chatReady])
 
   // 배너 닫기 상태 — writer 재실행: 실제 문제 상태 기반 → 세션 한정, 문제 재발 시 재노출.
   //   (stale 경고 상주 배너는 2026-07-13 제거 — 문구 박스 정리.)

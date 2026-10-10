@@ -79,17 +79,10 @@ export function UserMenu() {
     router.push('/login')
   }
 
-  const handleNewProject = async () => {
-    const result = await createNewProject()
-    if (!result.ok) {
-      toast.error(result.error ?? t('Failed to create project'))
-      return
-    }
+  // 새 프로젝트는 무엇을 만들지 · 자료 · 아이디어를 먼저 묻는 화면에서 만든다(2026-10-02 시안 v04 0.1).
+  const handleNewProject = () => {
     setOpen(false)
-    // createNewProject가 set한 새 projectId를 URL 쿼리에 직접 실어 push.
-    // (쿼리 없이 push하면 layout의 replaceState 보정이 push에 덮여 URL이 안 바뀜)
-    const newId = result.projectId ?? useProjectStore.getState().projectId
-    router.push(newId ? `/studio/producer?projectId=${newId}` : '/studio/producer')
+    router.push('/projects/new')
   }
 
   const handleSwitch = (p: ProjectItem) => {

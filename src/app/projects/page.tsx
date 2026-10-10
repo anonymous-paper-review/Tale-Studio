@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Clock, Film, Loader2, Lock, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Clock, Film, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
 import {
   useProjectStore,
 } from '@/stores/project-store'
@@ -25,7 +25,6 @@ import type { StageId } from '@/types'
 import { DashboardHeader } from '@/components/dashboard/dashboard-header'
 import { useT } from '@/lib/i18n'
 import { clearLastProjectId, readLastProjectId } from '@/lib/session-restore'
-import { toast } from 'sonner'
 
 interface ProjectItem {
   id: string
@@ -216,19 +215,9 @@ export default function ProjectsPage() {
   const router = useRouter()
   const t = useT()
   const switchProject = useProjectStore((s) => s.switchProject)
-  const createNewProject = useProjectStore((s) => s.createNewProject)
 
   const [projects, setProjects] = useState<ProjectItem[]>([])
-  const [plan, setPlan] = useState('free')
-  const [slotLimit, setSlotLimit] = useState(1)
-  const [unlimitedProjects, setUnlimitedProjects] = useState(false)
-  const [canUseReference, setCanUseReference] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [creating, setCreating] = useState(false)
-  const [nameOpen, setNameOpen] = useState(false)
-  const [nameValue, setNameValue] = useState('')
-  const [referenceProjectId, setReferenceProjectId] = useState('')
-  const [includeLastShotFrame, setIncludeLastShotFrame] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<ProjectItem | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -239,14 +228,6 @@ export default function ProjectsPage() {
       .then((r) => r.json())
       .then((data) => {
         setProjects(Array.isArray(data?.projects) ? data.projects : [])
-        setPlan(typeof data?.plan === 'string' ? data.plan : 'free')
-        setSlotLimit(
-          typeof data?.slotLimit === 'number' && Number.isFinite(data.slotLimit)
-            ? data.slotLimit
-            : 1,
-        )
-        setUnlimitedProjects(data?.unlimitedProjects === true)
-        setCanUseReference(data?.canUseReference === true)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -258,38 +239,9 @@ export default function ProjectsPage() {
     router.push(`/studio/${stage}?projectId=${project.id}`)
   }
 
-  const handleNew = () => {
-    setNameValue('')
-    setReferenceProjectId('')
-    setIncludeLastShotFrame(false)
-    setNameOpen(true)
-  }
-
-  const handleCreate = async () => {
-    const name = nameValue.trim()
-    if (!name || creating) return
-    setCreating(true)
-    const result = await createNewProject(
-      name,
-      referenceProjectId
-        ? { referenceProjectId, includeLastShotFrame }
-        : undefined,
-    )
-    if (!result.ok) {
-      toast.error(result.error ?? t('Failed to create project'))
-      setCreating(false)
-      return
-    }
-    for (const warning of result.warnings) {
-      toast.warning(
-        warning.detail ??
-          warning.code ??
-          t('Some reference assets could not be copied to the new project.'),
-      )
-    }
-    const newId = result.projectId ?? useProjectStore.getState().projectId
-    router.push(newId ? `/studio/producer?projectId=${newId}` : '/studio/producer')
-  }
+  // 새 프로젝트는 무엇을 만들지 · 자료 · 아이디어를 묻는 화면에서 만든다(2026-10-02 오너 — 시안 v04 0.1).
+  //   참고 작품 고르기도 그 화면의 두 번째 단계로 옮겼다.
+  const handleNew = () => router.push('/projects/new')
 
   const handleDelete = async () => {
     if (!deleteTarget || deleting) return
@@ -317,10 +269,10 @@ export default function ProjectsPage() {
       <DashboardHeader active="projects">
         <button
           onClick={handleNew}
-          disabled={creating}
           className="flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary/90"
+          data-testid="projects-new"
         >
-          {creating ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+          <Plus className="size-4" />
           {t('New project')}
         </button>
       </DashboardHeader>
@@ -337,7 +289,6 @@ export default function ProjectsPage() {
             <p className="mt-4 text-sm text-gray-500">{t('No projects yet')}</p>
             <button
               onClick={handleNew}
-              disabled={creating}
               className="mt-6 flex items-center gap-2 rounded-full border border-white/20 px-6 py-3 text-sm font-medium transition-all hover:border-primary hover:text-primary"
             >
               <Plus className="size-4" />
@@ -363,105 +314,6 @@ export default function ProjectsPage() {
           </div>
         )}
       </main>
-
-      {/* ── 새 프로젝트 이름 지정 팝업 ── */}
-      <Dialog open={nameOpen} onOpenChange={(o) => !creating && setNameOpen(o)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{t('New project')}</DialogTitle>
-            <DialogDescription>
-              {t('Name your project. You can rename it anytime.')}
-            </DialogDescription>
-          </DialogHeader>
-          <Input
-            value={nameValue}
-            onChange={(e) => setNameValue(e.target.value)}
-            placeholder={t('E.g. One rainy night in the city')}
-            autoFocus
-            maxLength={120}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-                e.preventDefault()
-                void handleCreate()
-              }
-            }}
-          />
-          <div className="space-y-2">
-            <label
-              htmlFor="projects-reference-project"
-              className="text-sm font-medium text-white"
-            >
-              {t('Reference project')}
-            </label>
-            <div className="flex items-center gap-2">
-              <select
-                id="projects-reference-project"
-                value={referenceProjectId}
-                onChange={(e) => {
-                  setReferenceProjectId(e.target.value)
-                  if (!e.target.value) setIncludeLastShotFrame(false)
-                }}
-                disabled={creating || !canUseReference}
-                aria-describedby="projects-reference-project-help"
-                aria-label={
-                  canUseReference
-                    ? `${t('Reference project')} (${plan}, ${
-                        unlimitedProjects ? 'unlimited' : `${projects.length} of ${slotLimit}`
-                      } slots used)`
-                    : `${t('Reference project')} locked on the ${plan} plan`
-                }
-                className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm text-white outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="">{t('No reference project')}</option>
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.title || t('Untitled')}
-                  </option>
-                ))}
-              </select>
-              {!canUseReference && (
-                <span
-                  className="flex shrink-0 items-center gap-1 text-xs text-gray-400"
-                  aria-label={t('Reference project locked')}
-                >
-                  <Lock className="size-4" aria-hidden="true" />
-                  {t('Locked')}
-                </span>
-              )}
-            </div>
-            <p id="projects-reference-project-help" className="text-xs text-gray-400">
-              {canUseReference
-                ? t('Optionally copy assets from an existing project in this workspace.')
-                : t('Reference projects are available on Producer10 and above.')}
-            </p>
-            {referenceProjectId && canUseReference && (
-              <label
-                htmlFor="projects-include-last-shot-frame"
-                className="flex items-center gap-2 text-sm text-white"
-              >
-                <input
-                  id="projects-include-last-shot-frame"
-                  type="checkbox"
-                  checked={includeLastShotFrame}
-                  onChange={(e) => setIncludeLastShotFrame(e.target.checked)}
-                  disabled={creating}
-                  className="size-4 rounded border-gray-300"
-                />
-                {t('Include the last shot frame')}
-              </label>
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" disabled={creating} onClick={() => setNameOpen(false)}>
-              {t('Cancel')}
-            </Button>
-            <Button disabled={creating || !nameValue.trim()} onClick={() => void handleCreate()}>
-              {creating ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-              {t('Create')}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* ── 프로젝트 삭제 확인 팝업 ── */}
       <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}>

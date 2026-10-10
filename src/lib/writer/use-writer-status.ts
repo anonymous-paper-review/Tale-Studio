@@ -8,6 +8,8 @@ export interface WriterStatus {
   projectId: string
   engine?: WriterEngine
   started: boolean
+  /** 새 프로젝트의 트리트먼트 초안 — 아직 Writer 로 넘기지 않은 실행(2026-10-02 시안 v04). */
+  draft?: boolean
   pipeline_completed: boolean
   pipeline_failed: boolean
   progress_percent: number

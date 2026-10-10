@@ -21,9 +21,9 @@ const mocks = vi.hoisted(() => ({
   templateAssetUrl: vi.fn(),
   from: vi.fn(),
   webhookBaseUrl: 'https://base.test' as string | null,
-  // #owner-default(2026-09-02): generate-sheet 는 image-models.ts 의 DEFAULT_IMAGE_MODEL(nano-banana-2) 를 쓴다.
+  // #owner-default(2026-10-09): generate-sheet 는 image-models.ts 의 DEFAULT_IMAGE_MODEL(gpt-image-2) 를 쓴다(앞: 2026-09-02 nano-banana-2).
   //   generate-storyboard 는 여전히 @/lib/writer/llm/fal 의 DEFAULT_EDIT_IMAGE_MODEL(gpt-image-2/edit) 를 쓰므로 둘 다 유지.
-  DEFAULT_IMAGE_MODEL: 'fal-ai/nano-banana-2',
+  DEFAULT_IMAGE_MODEL: 'openai/gpt-image-2',
   DEFAULT_EDIT_IMAGE_MODEL: 'openai/gpt-image-2/edit',
 }))
 
@@ -253,14 +253,14 @@ describe('선택한 스타일을 그림 만들기에 반영한다', () => {
     const expectedPrompt = `${STYLE_ANCHOR_CLAUSE}\n${STYLE_ANCHOR_TEMPLATE_CLAUSE}\n${buildCharacterTurnaroundPrompt(sheetPromptInput(character, designTokens))}`
     expect(response.status).toBe(200)
     expect(firstFalOpts()).toEqual({
-      model: 'fal-ai/nano-banana-2/edit',
+      model: 'openai/gpt-image-2/edit',
       prompt: expectedPrompt,
       reference_image_urls: [ANCHOR_URL, TEMPLATE_URL],
       webhookUrl: WEBHOOK_URL,
       aspect_ratio: '16:9',
     })
     expect(firstGenerationJobArg().inputSnapshot).toMatchObject({
-      model: 'fal-ai/nano-banana-2/edit',
+      model: 'openai/gpt-image-2/edit',
       prompt: expectedPrompt,
       reference_image_urls: [ANCHOR_URL, TEMPLATE_URL],
       aspect_ratio: '16:9',
@@ -371,8 +371,8 @@ describe('선택한 스타일을 그림 만들기에 반영한다', () => {
 
     expect(response.status).toBe(200)
     expect(firstFalOpts()).toEqual({
-      // #owner-default(2026-08-31): 이 경로는 image-models.ts 의 resolveImageEndpoint 를 거치므로 DEFAULT_IMAGE_MODEL(nano-banana-2)의 edit 갈래.
-      model: 'fal-ai/nano-banana-2/edit',
+      // #owner-default(2026-10-09): 이 경로는 image-models.ts 의 resolveImageEndpoint 를 거치므로 DEFAULT_IMAGE_MODEL(gpt-image-2)의 edit 갈래.
+      model: 'openai/gpt-image-2/edit',
       prompt: buildCharacterViewPrompt(sheetPromptInput(character, designTokens), 'back'),
       reference_image_urls: ['https://img/main.png'],
       webhookUrl: WEBHOOK_URL,
@@ -506,16 +506,16 @@ describe('선택한 스타일을 그림 만들기에 반영한다', () => {
     expect(result).toEqual({ submitted: 2, skipped: 0, failed: 0 })
     expect(mocks.falImageSubmit).toHaveBeenCalledTimes(2)
     expect(mocks.reserveGenerationJob).toHaveBeenCalledTimes(2)
-    // 모델 = Artist 와 같은 레지스트리 기본(#owner-default 2026-09-02: nano-banana-2)의 edit 갈래.
+    // 모델 = Artist 와 같은 레지스트리 기본(#owner-default 2026-10-09: gpt-image-2)의 edit 갈래.
     expect(falOptsAt(0)).toEqual({
-      model: 'fal-ai/nano-banana-2/edit',
+      model: 'openai/gpt-image-2/edit',
       prompt: expectedTemplatePrompt,
       reference_image_urls: [ANCHOR_URL, TEMPLATE_URL],
       aspect_ratio: '16:9',
       webhookUrl: WEBHOOK_URL,
     })
     expect(generationJobArgAt(0).inputSnapshot).toMatchObject({
-      model: 'fal-ai/nano-banana-2/edit',
+      model: 'openai/gpt-image-2/edit',
       prompt: expectedTemplatePrompt,
       reference_image_urls: [ANCHOR_URL, TEMPLATE_URL],
       aspect_ratio: '16:9',
@@ -543,7 +543,7 @@ describe('선택한 스타일을 그림 만들기에 반영한다', () => {
         computeLookFingerprint(null, templatePerson.costume, null),
       ),
     )
-    // 템플릿 없는 폴백은 T2I 갈래(fal-ai/nano-banana-2)로 제출되지만, 앵커가 참조를 붙이면 Rule M 이 edit 로 되돌린다.
+    // 템플릿 없는 폴백은 T2I 갈래(openai/gpt-image-2)로 제출되지만, 앵커가 참조를 붙이면 Rule M 이 edit 로 되돌린다.
     expect(falOptsAt(1)).toEqual({
       model: DEFAULT_EDIT_IMAGE_MODEL,
       prompt: expectedFallbackPrompt,
@@ -596,7 +596,7 @@ describe('선택한 스타일을 그림 만들기에 반영한다', () => {
         hasAnchor: false,
       })
     expect(falOptsAt(0)).toEqual({
-      model: 'fal-ai/nano-banana-2/edit',
+      model: 'openai/gpt-image-2/edit',
       prompt: buildCharacterTurnaroundPrompt(noAnchorInput(templatePerson)),
       reference_image_urls: [TEMPLATE_URL],
       webhookUrl: WEBHOOK_URL,
@@ -605,7 +605,7 @@ describe('선택한 스타일을 그림 만들기에 반영한다', () => {
     expect(falOptsAt(0).prompt).not.toContain(STYLE_ANCHOR_CLAUSE)
     // 서버 초안도 image-models.ts 레지스트리 기본을 따른다(#ref-gate 2026-09-02 — 옛 자체 DRAFT_MODEL 상수 폐기).
     expect(falOptsAt(1)).toEqual({
-      model: 'fal-ai/nano-banana-2',
+      model: 'openai/gpt-image-2',
       prompt: buildCharacterTurnaroundPrompt(noAnchorInput(fallbackPerson)),
       aspect_ratio: '3:2',
       webhookUrl: WEBHOOK_URL,
@@ -859,5 +859,92 @@ describe('generate-sheet — 자율 생성은 빈칸만 채운다', () => {
 
     expect(response.status).toBe(200)
     expect(mocks.falImageSubmit).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('facet 조각을 생성 경로마다 알맞게 싣는다 (2026-10-08 오너 · facet 인계)', () => {
+  const FACETS = {
+    version: 'hp-test',
+    probe_anchors: 'No outlines; photographic soft light.',
+    figure: 'Realistic figures throughout.',
+    priority: 'Priority order: photographic shading → soft light.',
+    negative: 'Avoid anime, logos.',
+  }
+  beforeEach(() => {
+    dbState.styleAnchors = [{ ...styleAnchorFixture(), facets: FACETS } as StyleAnchorRow]
+  })
+
+  it('스타일에 facet 조각이 있으면 인물 시트에 Style anchors 조각과 Figure rules 조각과 Priority order 줄을 함께 싣는다', async () => {
+    const character = characterFixture({ view_main: null, entity_type: 'person' })
+    setCharacters(character)
+    const response = await generateSheetPOST(
+      postRequest('/api/artist/generate-sheet', { projectId: PROJECT_ID, characterId: CHARACTER_ID, appearanceKey: 'current', view: 'main' }),
+    )
+    expect(response.status).toBe(200)
+    const prompt = firstFalOpts().prompt
+    expect(prompt.split('\n').slice(0, 3)).toEqual([STYLE_ANCHOR_CLAUSE, STYLE_ANCHOR_TEMPLATE_CLAUSE, 'Style anchors: No outlines; photographic soft light.'])
+    expect(prompt).toContain('Figure rules: Realistic figures throughout.')
+    expect(prompt).toContain('Priority order: photographic shading → soft light.')
+    expect(prompt).toContain('Avoid anime, logos.')
+    expect(firstFalOpts().reference_image_urls).toEqual([ANCHOR_URL, TEMPLATE_URL])
+  })
+
+  it('사물 시트에는 facet 조각을 싣되 Figure rules 조각과 Priority order 줄은 싣지 않는다', async () => {
+    const prop = characterFixture({ view_main: null, entity_type: 'object' as unknown as 'person' })
+    setCharacters(prop)
+    const response = await generateSheetPOST(
+      postRequest('/api/artist/generate-sheet', { projectId: PROJECT_ID, characterId: CHARACTER_ID, appearanceKey: 'current', view: 'main' }),
+    )
+    expect(response.status).toBe(200)
+    const prompt = firstFalOpts().prompt
+    expect(prompt).toContain('Style anchors: No outlines; photographic soft light.')
+    expect(prompt).not.toContain('Figure rules:')
+    expect(prompt).not.toContain('Priority order:')
+  })
+
+  it('배경 그림에는 facet 조각을 싣되 Figure rules 조각과 Priority order 줄은 싣지 않는다', async () => {
+    dbState.projects = [projectFixture({ design_tokens: null, style_anchor_key: ANCHOR_KEY })]
+    const response = await generateWorldPOST(
+      postRequest('/api/artist/generate-world', { projectId: PROJECT_ID, locationId: LOCATION_ID, column: 'wide_shot', prompt: 'WORLD PROMPT', aspectRatio: '16:9' }),
+    )
+    expect(response.status).toBe(200)
+    const prompt = firstFalOpts().prompt
+    expect(prompt).toContain('Style anchors: No outlines; photographic soft light.')
+    expect(prompt).toContain('Avoid anime, logos.')
+    expect(prompt).not.toContain('Figure rules:')
+    expect(prompt).not.toContain('Priority order:')
+  })
+
+  it('캐릭터 초안도 인물 시트처럼 Figure rules 조각과 Priority order 줄을 싣는다', async () => {
+    dbState.projects = [projectFixture({ design_tokens: designTokens, style_anchor_key: ANCHOR_KEY })]
+    setCharacters(draftCharacter({ character_id: 'draft-person', name: 'Draft Person', appearance: 'courier in a blue raincoat', entity_type: 'person' }))
+    const result = await triggerCharacterDrafts(PROJECT_ID)
+    expect(result).toEqual({ submitted: 1, skipped: 0, failed: 0 })
+    const prompt = firstFalOpts().prompt
+    expect(prompt).toContain('Style anchors: No outlines; photographic soft light.')
+    expect(prompt).toContain('Figure rules: Realistic figures throughout.')
+    expect(prompt).toContain('Priority order: photographic shading → soft light.')
+  })
+
+  it('스토리보드 그림은 인물 시트를 참조할 때만 Figure rules 조각과 Priority order 줄을 싣는다', async () => {
+    dbState.projects = [projectFixture({ design_tokens: null, style_anchor_key: ANCHOR_KEY })]
+    await generateStoryboardPOST(
+      postRequest('/api/director/generate-storyboard', {
+        projectId: PROJECT_ID, writerShotId: 'shot-with-person', prompt: 'SHOT PROMPT',
+        referenceImageUrls: ['person-sheet', 'location-shot'], characterRefCount: 1, worldRefCount: 1, aspectRatio: '16:9',
+      }),
+    )
+    await generateStoryboardPOST(
+      postRequest('/api/director/generate-storyboard', {
+        projectId: PROJECT_ID, writerShotId: 'shot-without-person', prompt: 'SHOT PROMPT',
+        referenceImageUrls: ['location-a', 'location-b'], characterRefCount: 0, worldRefCount: 2, aspectRatio: '16:9',
+      }),
+    )
+    expect(mocks.falImageSubmit).toHaveBeenCalledTimes(2)
+    expect(falOptsAt(0).prompt).toContain('Figure rules: Realistic figures throughout.')
+    expect(falOptsAt(0).prompt).toContain('Priority order: photographic shading → soft light.')
+    expect(falOptsAt(1).prompt).toContain('Style anchors: No outlines; photographic soft light.')
+    expect(falOptsAt(1).prompt).not.toContain('Figure rules:')
+    expect(falOptsAt(1).prompt).not.toContain('Priority order:')
   })
 })

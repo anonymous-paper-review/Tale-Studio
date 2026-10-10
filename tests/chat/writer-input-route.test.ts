@@ -35,3 +35,11 @@ it.each(['첫 씬을 두 개로 나눠줘?', '첫 씬을 두 개로 나눠줄래
   expect(writerInputRoute(message, { running: false, sceneGate: true })).toBe('revise')
   expect(writerInputRoute(message, { running: true, sceneGate: false })).toBe('blocked')
 })
+
+it.each(['안녕', '이 장면은 어떤 분위기야?', '인물의 동기는 뭐야?', 'What do you think of this scene?'])('수정안을 기다리는 중에도 일반 대화이면 채팅으로 보낸다: %s', (message) => {
+  expect(writerInputRoute(message, { running: false, sceneGate: true, explicitRevision: true })).toBe('chat')
+})
+
+it.each(['마지막 장면을 다듬어줘', '결말을 새로 써줘', '씬의 긴장감을 높여줘', 'Polish the scene story sentences'])('수정안을 기다리는 중에 명확한 수정 요청이면 수정안 경로로 보낸다: %s', (message) => {
+  expect(writerInputRoute(message, { running: false, sceneGate: true, explicitRevision: true })).toBe('revise')
+})

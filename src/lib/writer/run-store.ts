@@ -57,10 +57,12 @@ export interface WriterRunStatusLight {
   timings: Record<string, StageTiming> | null;
   // state.shotCheck.issues (jsonb) — #coverage-first 연출 점검 노출용. 미완주면 null.
   shot_issues: Array<{ category?: string; severity?: string; location?: string; message?: string; suggestion?: string }> | null;
+  // state.input.treatmentDraft (text) — 새 프로젝트의 트리트먼트 초안(아직 넘기지 않음, 2026-10-02 시안 v04). 넘기면 지워진다.
+  draft?: string | null;
 }
 
 const STATUS_LIGHT_COLUMNS =
-  'status,current_stage,completed_units,total_units,error,updated_at,created_at,engine:state->input->>writerEngine,timings:state->_timings,shot_issues:state->shotCheck->issues';
+  'status,current_stage,completed_units,total_units,error,updated_at,created_at,engine:state->input->>writerEngine,timings:state->_timings,shot_issues:state->shotCheck->issues,draft:state->input->>treatmentDraft';
 
 /**
  * 새 run 행 삽입 (status 'running', state={input}, completed_units 0).

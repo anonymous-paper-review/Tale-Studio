@@ -1,0 +1,14 @@
+## PROBE_ANCHORS
+3D CG render with soft studio lighting, photographic lens perspective from slightly above eye level. No outlines and no interior lines, features come from shading. Painterly gradient fills, high key: in daylight scenes mostly bright planes with little near-black. Continuous tones, soft form shadows with no hard shapes, soft contact cast shadows. Palette: gray #dedede to #f2f2f2 about 50%, wood #c9b49c about 25%, green accent #8aa83a ≤ 5%, low to medium saturation. Rounded simple masses, gentle curves, no sharp breaks. Smooth polish with fine cloth fiber, no patterns. Plain gray gradient studio backdrop, unless the scene specifies its own backdrop. Detail budget: level 3, about 4 garment lines.
+
+## FIGURE
+Western 3D feature-animation faces and bodies, rendered with physically based soft lighting and continuous shading. About six to seven heads tall, with ordinary torso, legs and shoulders, and thin tube-like limbs of nearly constant width. Large round eyes with standard gradient and a single highlight, neutral tilt, ordinary openness and aspect ratio, no eyelashes, no separate eye outline, lid edges formed by darker skin shading. Thick expressive brows, a modeled nose, a small closed mouth made of lip volume. Ordinary hands, thin rounded ordinary shoes, short hair in about four large blunt clumps with fine strand texture. Poses tend to be stiff, frontal and upright with arms hanging naturally; when the scene specifies an action, the action comes first. Default expression is a faint smile, made through brow angle, mouth corners and eye size. Skin is one warm medium tone in a soft gradient, no palette quantization, with faint blush on cheeks and nose tip.
+
+## PRIORITY
+Priority order: soft studio lit 3D render → photographic perspective → no outlines → continuous gradient shading → muted neutral palette with few accents.
+
+## NEGATIVE
+Avoid photorealistic portrait, toy-like plastic figure, 2D cel-shaded anime, clay stop motion, black outlines, flat cel shading, hard-edged shadows, skin pores, flyaway hair, lens flare, readable text, logos, with no speed lines.
+
+## SCENE
+A studio scene on a gray gradient backdrop with a wooden floor: an enlarged bust of one person in the foreground, a full-length person in the midground, and six still-life objects at right, including a sphere, a potted plant and an apple. No text.

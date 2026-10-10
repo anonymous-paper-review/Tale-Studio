@@ -20,38 +20,14 @@ import { TURNAROUND_PORTRAIT_REGION } from '@/lib/artist/portrait'
 
 const PUB = path.join(process.cwd(), 'public')
 const TEMPLATE_PATH = path.join(PUB, 'character-template.png')
-const PAPER = '#FAF8F2'
+// 바탕은 흰색(2026-10-08 오너) — 그림 종이 같은 크림색 질감이 인물을 그림체 쪽으로 끄는 것 같다.
+//   종전에는 러프 템플릿과 같은 종이 질감(레거시 시트 패치 미러 타일링, #FAF8F2)을 깔았다.
+const BACKGROUND = '#FFFFFF'
 const BORDER = '#5B5A59'
 const LABEL = '#6A6965'
 
-/** 러프 템플릿과 같은 종이 질감 — 레거시 시트 패치를 미러 타일링(이음선 은폐). */
-async function paperBase(width: number, height: number): Promise<Buffer> {
-  const legacy = path.join(PUB, 'rough-storyboard-grid.png')
-  const patch = await sharp(legacy).extract({ left: 68, top: 80, width: 352, height: 224 }).png().toBuffer()
-  const [flipH, flipV, flipHV] = await Promise.all([
-    sharp(patch).flop().png().toBuffer(),
-    sharp(patch).flip().png().toBuffer(),
-    sharp(patch).flop().flip().png().toBuffer(),
-  ])
-  const block = await sharp({ create: { width: 704, height: 448, channels: 3, background: PAPER } })
-    .composite([
-      { input: patch, left: 0, top: 0 },
-      { input: flipH, left: 352, top: 0 },
-      { input: flipV, left: 0, top: 224 },
-      { input: flipHV, left: 352, top: 224 },
-    ])
-    .png()
-    .toBuffer()
-  const tiles: sharp.OverlayOptions[] = []
-  for (let y = 0; y < height + 448; y += 448)
-    for (let x = 0; x < width + 704; x += 704) tiles.push({ input: block, left: x, top: y })
-  const full = await sharp({
-    create: { width: width + 704, height: height + 448, channels: 3, background: PAPER },
-  })
-    .composite(tiles)
-    .png()
-    .toBuffer()
-  return sharp(full).extract({ left: 0, top: 0, width, height }).png().toBuffer()
+async function whiteBase(width: number, height: number): Promise<Buffer> {
+  return sharp({ create: { width, height, channels: 3, background: BACKGROUND } }).png().toBuffer()
 }
 
 function boxSvg(b: SheetBox): string {
@@ -98,7 +74,7 @@ async function renderTemplate(): Promise<Buffer> {
     )
   }
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${canvas.width}" height="${canvas.height}">${svgParts.join('\n')}</svg>`
-  const base = await paperBase(canvas.width, canvas.height)
+  const base = await whiteBase(canvas.width, canvas.height)
   return sharp(base).composite([{ input: Buffer.from(svg), left: 0, top: 0 }]).png().toBuffer()
 }
 
@@ -110,6 +86,24 @@ describe('캐릭터 양식 v3 그림이 정해진 모습과 맞는다 (#f8)', ()
     },
     60_000,
   )
+
+  it('캐릭터 양식 그림의 바탕은 흰색이다', async () => {
+    // 왜: 그림 종이 같은 크림색 바탕이 인물을 그림체 쪽으로 끄는 것 같다(2026-10-08 오너).
+    const { data, info } = await sharp(await readFile(TEMPLATE_PATH)).removeAlpha().raw().toBuffer({ resolveWithObject: true })
+    const at = (x: number, y: number) => {
+      const i = (Math.round(y) * info.width + Math.round(x)) * info.channels
+      return [data[i], data[i + 1], data[i + 2]]
+    }
+    const { portrait, turnaround, poses } = CHARACTER_SHEET_SPEC
+    const samples: Array<[number, number]> = [
+      [4, 4],
+      [info.width - 5, info.height - 5],
+      [portrait.x + portrait.w / 2, portrait.y + portrait.h / 2],
+      [turnaround.x + 60, turnaround.y + 200],
+      [poses[0].x + poses[0].w / 2, poses[0].y + poses[0].h / 2],
+    ]
+    for (const [x, y] of samples) expect(at(x, y), `${x},${y}`).toEqual([255, 255, 255])
+  })
 
   it('캐릭터 양식 그림이 있고 정해진 크기와 일치한다', async () => {
     expect(existsSync(TEMPLATE_PATH)).toBe(true)

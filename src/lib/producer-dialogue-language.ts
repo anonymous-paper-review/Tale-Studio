@@ -8,7 +8,7 @@ const LANGUAGE_NAMES: Record<DialogueLanguage, string> = {
 }
 const KO_DIALOGUE = '(?:대사(?:\\s*언어)?|내레이션|나레이션|더빙)' // i18n-ok: 사용자 언어 지정 구문 판별용 정규식, 화면 문구 아님
 const EN_DIALOGUE = '(?:dialogue|dialog|narration|voiceover|spoken language)'
-const DIALOGUE_TOPIC = /대사|내레이션|나레이션|더빙|dialogue|dialog|narration|voiceover|spoken language/i // i18n-ok: 사용자 언어 지정 구문 판별용 정규식, 화면 문구 아님
+const DIALOGUE_TOPIC = /대사|내레이션|나레이션|더빙|(?:어떤|무슨)\s*언어로\s*(?:말|대화)|dialogue|dialog|narration|voiceover|spoken language/i // i18n-ok: 사용자 언어 지정 구문 판별용 정규식, 화면 문구 아님
 const ANY_LANGUAGE = `(?:${Object.values(LANGUAGE_NAMES).join('|')})`
 const KO_SELECTION = `${KO_DIALOGUE}(?:는|은|를|을|도)?\\s*(?:(?:모두|전부|전체|꼭|다|이제|앞으로|오직)\\s*)*(?:${ANY_LANGUAGE}(?:로|으로)?\\s*(?:하지\\s*말고|쓰지\\s*말고|말고|아니라|대신)\\s*)?` // i18n-ok: 사용자 언어 지정 구문 판별용 정규식, 화면 문구 아님
 
@@ -93,14 +93,18 @@ function confirmedLanguageFromHistory(history: unknown): DialogueLanguage | null
   return null
 }
 
+/** 이번 발화에서 직접 고른 언어만 반환한다. 기존 설정·과거 선택은 새 저장 요청이 아니다. */
+export function selectedProducerDialogueLanguage(message: string, history?: unknown): DialogueLanguage | null {
+  return explicitDialogueLanguage(message) ?? languageAnswer(message, history)
+}
+
 /** 모델 호출 전에 정해 컨텍스트와 응답에 함께 쓴다. 모델이 추측한 언어는 적용하지 않는다. */
 export function resolveProducerDialogueLanguage(input: {
   message: string
   history?: unknown
   currentLanguage?: unknown
 }): DialogueLanguage | null {
-  return explicitDialogueLanguage(input.message)
-    ?? languageAnswer(input.message, input.history)
+  return selectedProducerDialogueLanguage(input.message, input.history)
     ?? parseDialogueLanguage(input.currentLanguage)
     ?? confirmedLanguageFromHistory(input.history)
     ?? null

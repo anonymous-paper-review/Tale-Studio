@@ -31,6 +31,7 @@ export async function selectStyleAnchorFromPicker(key: string | null): Promise<v
     backgrounds: producer.backgrounds,
     styleAnchorKey: key,
     locale,
+    preserveScript: producer.preserveScript,
   })
   if (gate.canHandoff) return
   const items = gate.hardMissing.map((item) => item.label).join(' · ')

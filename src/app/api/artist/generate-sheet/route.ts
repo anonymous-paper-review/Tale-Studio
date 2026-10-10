@@ -40,8 +40,9 @@ import {
 import { computeImageSourceHash, computeLookFingerprint } from '@/lib/image-provenance'
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
 import { applyStyleAnchor, resolveStyleAnchor } from '@/lib/style-anchor'
+import { styleAnalysisPending } from '@/lib/style-facets/analysis-wait'
 import { sheetIdentityReferences } from '@/lib/artist/source-image'
-import { resolveCharacterPromptInput } from '@/lib/artist/sheet-prompt-input'
+import { resolveCharacterPromptInput, styleFromUserAnalysis } from '@/lib/artist/sheet-prompt-input'
 import { templateAssetUrl } from '@/lib/storage/template-asset'
 import { normalizeImageModelKey, resolveImageEndpoint } from '@/lib/image-models'
 import { isChatTraceId } from '@/lib/chat-trace'
@@ -79,7 +80,7 @@ export async function POST(req: Request) {
         traceId?: string
         model?: string // 이미지 생성 모델 선택(image-models 레지스트리 키). 미지정/미상은 기본 모델.
       }
-    // 선택 모델 정규화 — 유효하지 않으면 기본(DEFAULT_IMAGE_MODEL, #owner-default 2026-09-02: nano-banana-2).
+    // 선택 모델 정규화 — 유효하지 않으면 기본(DEFAULT_IMAGE_MODEL, #owner-default 2026-10-09: gpt-image-2).
     //   reference 유무에 따라 아래에서 t2i/edit 갈래를 고른다.
     const modelKey = normalizeImageModelKey(modelInput)
     if (!projectId || !characterId || !appearanceKey || !view) {
@@ -197,6 +198,10 @@ export async function POST(req: Request) {
           .maybeSingle(),
       ])
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    // 그림체 분석이 도는 동안은 그리지 않는다(2026-10-10 오너) — 분석이 끝나면 서버가 빈칸을 그린다. 화면은 대기 중인 요청처럼 조용히 끝낸다.
+    if (styleAnalysisPending(project.custom_style_anchor)) {
+      return NextResponse.json({ ok: true, status: 'queued', deduped: true, waitingForStyle: true, appearanceKey, view })
+    }
     if (!character) return NextResponse.json({ error: 'Character not found' }, { status: 404 })
     if (!appearance) return NextResponse.json({ error: 'Appearance not found' }, { status: 404 })
     if (!defaultAppearance) {
@@ -218,6 +223,7 @@ export async function POST(req: Request) {
         appearance: { appearance: appearance.appearance, costume: appearance.costume },
         designTokens: dt,
         hasAnchor: !!anchor,
+        styleFromAnalysis: styleFromUserAnalysis(project.custom_style_anchor),
       }),
       delta: typeof instruction === 'string' ? instruction : undefined,
       safeMode: effectiveSafeMode,
@@ -310,10 +316,12 @@ export async function POST(req: Request) {
     }
     if (anchor && styleAnchorMode) {
       const { webhookUrl: wh, ...anchorable } = submitOpts
+      // facet 인물 조각(Figure rules · Priority)은 사람 시트에만 — 사물(소품) 시트는 인물이 없다(2026-10-08).
+      const people = character.entity_type !== 'object'
       const anchored =
         styleAnchorMode === 'turnaround'
-          ? applyStyleAnchor(anchor, anchorable, 'turnaround', { pinAspectRatio: '16:9' })
-          : applyStyleAnchor(anchor, anchorable, 'single')
+          ? applyStyleAnchor(anchor, anchorable, 'turnaround', { pinAspectRatio: '16:9', people })
+          : applyStyleAnchor(anchor, anchorable, 'single', { people })
       submitOpts = { ...anchored, webhookUrl: wh }
     }
 

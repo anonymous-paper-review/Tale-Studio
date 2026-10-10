@@ -1697,6 +1697,7 @@ export type Database = {
         Row: {
           anchor_kind: string
           created_at: string | null
+          facets: Json | null
           id: string
           image_url: string
           is_active: boolean
@@ -1712,6 +1713,7 @@ export type Database = {
         Insert: {
           anchor_kind?: string
           created_at?: string | null
+          facets?: Json | null
           id?: string
           image_url: string
           is_active?: boolean
@@ -1727,6 +1729,7 @@ export type Database = {
         Update: {
           anchor_kind?: string
           created_at?: string | null
+          facets?: Json | null
           id?: string
           image_url?: string
           is_active?: boolean

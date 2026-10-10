@@ -166,30 +166,34 @@ export async function composeRoughReferenceGrid(
   format: ProjectFormat | null = null,
 ): Promise<Buffer> {
   if (!shotFrames.length || shotFrames.length > 4) throw new Error(`grid frames 1~4 필요 (${shotFrames.length})`)
-  const firstFrame = await fetchImage(shotFrames[0].start)
-  const { geometry, template } = await pickGeometryByFrameAr('grid4', format, firstFrame)
+  // 러프 12장은 한꺼번에 받는다(2026-10-10 오너 제보 "중간에 끊김"): 한 장씩 받으면 시트마다 10초 넘게 걸려
+  //   시트 2장을 내는 일괄 요청이 60초 제한에 걸렸다. 칸 위치는 좌표로 정해져 받는 순서와 상관없다.
+  const frames = await Promise.all(
+    shotFrames.map((f) => Promise.all([fetchImage(f.start), fetchImage(f.direction), fetchImage(f.end)])),
+  )
+  const { geometry, template } = await pickGeometryByFrameAr('grid4', format, frames[0][0])
   const meta = await sharp(template).metadata()
   const W = meta.width
   const H = meta.height
   if (!W || !H) throw new Error('grid template metadata missing')
   const { cols, rows } = geometry
-  const overlays: sharp.OverlayOptions[] = []
+  const cells: Array<Promise<sharp.OverlayOptions>> = []
   for (let c = 0; c < shotFrames.length; c++) {
-    const urls = [shotFrames[c].start, shotFrames[c].direction, shotFrames[c].end]
     for (let r = 0; r < rows.length; r++) {
       const [c0, c1] = cols[c]
       const [r0, r1] = rows[r]
       const w = Math.max(1, Math.round((c1 - c0) * W))
       const h = Math.max(1, Math.round((r1 - r0) * H))
-      const buf = await insetFrame(c === 0 && r === 0 ? firstFrame : await fetchImage(urls[r]))
-      overlays.push({
-        input: await sharp(buf).resize(w, h, { fit: 'fill' }).png().toBuffer(),
-        left: Math.round(c0 * W),
-        top: Math.round(r0 * H),
-      })
+      cells.push(
+        insetFrame(frames[c][r]).then(async (buf) => ({
+          input: await sharp(buf).resize(w, h, { fit: 'fill' }).png().toBuffer(),
+          left: Math.round(c0 * W),
+          top: Math.round(r0 * H),
+        })),
+      )
     }
   }
-  return sharp(template).composite(overlays).png().toBuffer()
+  return sharp(template).composite(await Promise.all(cells)).png().toBuffer()
 }
 
 /** 4샷 그리드 일괄 리페인트 프롬프트 — strip 문안의 grid 일반화 (#real-grid 실험 문안 그대로). */

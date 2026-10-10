@@ -1,12 +1,10 @@
 'use client'
 
 import {
-  useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
   type ElementType,
   type ReactNode,
 } from 'react'
@@ -16,6 +14,7 @@ import {
   Box,
   CheckCircle2,
   ChevronDown,
+  Loader2,
   Lock,
   Mountain,
   Pencil,
@@ -35,6 +34,9 @@ import { castMentions, backgroundMentions } from '@/lib/card-mention'
 import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
 import { useProducerStore } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
+import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { usePendingCreationStore } from '@/stores/pending-creation-store'
+import { producerBusyKind } from '@/lib/producer/busy'
 import type { BackgroundSource, CastArc, CastMember, CastMotivation, GateIssue, GateResult } from '@/lib/producer-gate'
 import { isProducerBackgroundComplete } from '@/lib/producer-gate'
 import { depthLevelFromRuntime } from '@/lib/depth'
@@ -56,12 +58,6 @@ import { useLocale, useT } from '@/lib/i18n'
 //   max-h로 카드 폭주를 막고, 넘치면 얇은 썸만 보이게.
 const CARD_TEXTAREA =
   'max-h-40 resize-none [scrollbar-width:thin] [scrollbar-color:var(--color-border)_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border'
-
-// Brief Story 접힘 상태(#b1 2026-07-31) — 4줄(text-sm 20px × 4)만 보이고, 마우스를 올리면
-//   넘친 만큼 일정한 속도로 천천히 올라온다. 속도를 고정했으므로 글이 길수록 오래 흐른다.
-const STORY_PEEK_VIEW_PX = 80
-const STORY_PEEK_SPEED_PX_PER_SEC = 26
-const STORY_PEEK_RETURN_MS = 240
 
 // 모듈 상수는 영어 키, 번역은 렌더 지점에서 t() (writer 배치의 STAGE_LABELS 패턴).
 //   writer-character-panel.tsx 의 ROLE_LABEL 과 같은 값·같은 사전 키를 공유(Protagonist/
@@ -612,7 +608,6 @@ function BackgroundRow({
 export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   const t = useT()
   const projectSettings = useProducerStore((s) => s.projectSettings)
-  const storyText = useProducerStore((s) => s.storyText)
   const cast = useProducerStore((s) => s.cast)
   const syncing = useProducerStore((s) => s.syncing)
   const addCastMember = useProducerStore((s) => s.addCastMember)
@@ -626,13 +621,22 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   //   "아직 제목이 없는 이야기"로 흐리게 — 채워질 자리를 보여주는 목업 히어로의 빈 상태.
   const projectTitle = useProjectStore((s) => s.projectTitle)
   const projectId = useProjectStore((s) => s.projectId)
+  // 새 프로젝트가 넘긴 일 · 만화 옮기기 동안 본문을 막고 로딩 원을 보인다(2026-10-09 오너 — 들어오자마자 일하는 중인지 알기 어려웠다).
+  const pendingCreation = usePendingCreationStore((s) => (projectId ? s.byProject[projectId] ?? null : null))
+  const boardBusy = useGlobalChatStore((s) => s.boardBusy)
+  const busyKind = producerBusyKind(projectId, { pending: pendingCreation, busy: boardBusy })
   const untitled = !projectTitle?.trim() || projectTitle.trim().toLowerCase() === 'untitled'
   const renameProject = useProjectStore((s) => s.renameProject)
   // Writer 로 넘긴 프로젝트(2026-10-01 오너) — 읽기 전용. 바꾸려면 새 프로젝트.
   const producerLocked = useProjectStore((s) => s.producerLocked)
   // 씬 스토리를 쓰는 중이거나 확정을 기다리면 다음 할 일은 아래 씬 스토리의 확정이다 — 오른쪽 위 "Writer로 가기"는 숨긴다.
-  const { status: writerRunStatus } = useWriterStatus(producerLocked ? projectId : null)
-  const sceneGateBusy = producerLocked && ['writing', 'gate'].includes(sceneGatePhase(writerRunStatus))
+  //   새 프로젝트의 트리트먼트 초안(2026-10-02 시안 v04)은 넘기기가 곧 확정이다 — 다 쓰기 전에만 숨긴다.
+  const treatmentDraft = useProjectStore((s) => s.treatmentDraft)
+  const { status: writerRunStatus } = useWriterStatus(producerLocked || treatmentDraft ? projectId : null)
+  const writerPhase = sceneGatePhase(writerRunStatus)
+  const sceneGateBusy = producerLocked
+    ? ['writing', 'gate'].includes(writerPhase)
+    : treatmentDraft && writerPhase === 'writing'
   const router = useRouter()
   // 인물·배경 압축 표시에서 펼친 카드(한 번에 하나씩).
   const [openCastId, setOpenCastId] = useState<string | null>(null)
@@ -648,26 +652,6 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
     void renameProject(next)
   }
 
-  // Brief Story 전체보기 토글 — 길면 4줄로 클램프, "더 보기"로 스크롤 박스 펼침.
-  const [storyExpanded, setStoryExpanded] = useState(false)
-  // 접힘 상태에서 hover 하면 잘린 뒷부분이 천천히 올라온다(#b1). 이동 거리는 실제로 넘친
-  //   높이라 렌더 후 측정해야 하고, 텍스트·패널 폭이 바뀌면 다시 재야 해서 ResizeObserver 로 본다.
-  const [storyPeek, setStoryPeek] = useState(0)
-  const [storyHover, setStoryHover] = useState(false)
-  const storyPeekRo = useRef<ResizeObserver | null>(null)
-  const storyBodyRef = useCallback((el: HTMLParagraphElement | null) => {
-    storyPeekRo.current?.disconnect()
-    storyPeekRo.current = null
-    if (!el) {
-      setStoryPeek(0)
-      return
-    }
-    const measure = () => setStoryPeek(Math.max(0, el.scrollHeight - STORY_PEEK_VIEW_PX))
-    measure()
-    const ro = new ResizeObserver(measure)
-    ro.observe(el)
-    storyPeekRo.current = ro
-  }, [])
   const persons = cast.filter((m) => m.entityType === 'person')
   const objects = cast.filter((m) => m.entityType === 'object')
   // 저널의 "주인공 등장" 판정에 쓰는 인물 수 — 게이트와 같은 범위(producer 원천)로 센다.
@@ -713,7 +697,9 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
     name: member.name,
     sub: member.entityType === 'object' ? t('Object') : t(ROLE_LABEL[member.role ?? 'supporting'] ?? 'Supporting'),
     imageUrl: member.sourceImageUrl,
-    missing: castIssuesFor(gate, member.localId).length,
+    // 트리트먼트가 만든 카드의 빈 칸은 넘기기를 막지 않는다 — 그래도 채우면 좋은 칸 수는 보인다.
+    missing: castIssuesFor(gate, member.localId).length
+      + (member.origin === 'treatment' ? gate.softMissing.filter((i) => i.field.startsWith(`cast:${member.localId}:`)).length : 0),
     detail: [
       { label: t('Name'), value: member.name },
       { label: t('Role'), value: member.role ? t(ROLE_LABEL[member.role] ?? 'Supporting') : '' },
@@ -735,7 +721,8 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   }))
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col" data-testid="producer-edit-surface">
       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-6 py-4">
         <div>
           <div className="flex items-center gap-2">
@@ -765,7 +752,11 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="relative flex min-h-0 flex-1 flex-col">
+      <div
+        className={cn('flex-1 overflow-y-auto p-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden', busyKind && 'pointer-events-none select-none opacity-40')}
+        aria-busy={busyKind ? true : undefined}
+      >
         {/* 좌 퀘스트 저널(제작 여정, 순수 뷰어) / 우 기존 리스트 (#quest-journal 2026-08-07).
             옛 Story Foundation 폼 섹션은 Brief Story 아래 뱃지로 흡수 — 기본 동선은 채팅. */}
         <div className="mx-auto grid max-w-6xl items-start gap-8 lg:grid-cols-[260px_minmax(0,1fr)]">
@@ -841,70 +832,12 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
                   className="mt-2 w-full max-w-xl border-b border-border-strong bg-transparent text-3xl font-extrabold tracking-tight outline-none placeholder:text-foreground/25 focus:border-stage-producer"
                 />
               )}
-              <div className="mt-2 max-w-2xl">
-                {storyText ? (
-                  <>
-                    {storyExpanded ? (
-                      <p className="max-h-72 overflow-y-auto pr-1 text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">
-                        {storyText}
-                      </p>
-                    ) : (
-                      <div
-                        onMouseEnter={() => setStoryHover(true)}
-                        onMouseLeave={() => setStoryHover(false)}
-                        className={cn(
-                          'max-h-20 overflow-hidden',
-                          // 아래를 흐리게 — 아직 더 남았다는 신호(line-clamp 말줄임의 대체).
-                          storyPeek > 0 &&
-                            '[mask-image:linear-gradient(to_bottom,#000_72%,transparent)]',
-                        )}
-                      >
-                        <p
-                          ref={storyBodyRef}
-                          style={
-                            {
-                              '--peek-shift': storyHover ? `-${storyPeek}px` : '0px',
-                              transitionDuration: storyHover
-                                ? `${Math.round((storyPeek / STORY_PEEK_SPEED_PX_PER_SEC) * 1000)}ms`
-                                : `${STORY_PEEK_RETURN_MS}ms`,
-                            } as CSSProperties
-                          }
-                          className="translate-y-[var(--peek-shift)] text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground transition-transform ease-linear motion-reduce:translate-y-0 motion-reduce:transition-none"
-                        >
-                          {storyText}
-                        </p>
-                      </div>
-                    )}
-                    {(storyExpanded || storyPeek > 0) && (
-                      <button
-                        type="button"
-                        onClick={() => setStoryExpanded((v) => !v)}
-                        className="mt-2 flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-                      >
-                        {storyExpanded ? t('Collapse') : t('See more')}
-                        <ChevronDown
-                          className={cn('size-3.5 transition-transform', storyExpanded && 'rotate-180')}
-                        />
-                      </button>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-sm italic text-muted-foreground/70">
-                    {t(
-                      'Drop your story into chat and Producer will keep organizing it here. One scene, one feeling is enough.',
-                    )}
-                  </p>
-                )}
-              </div>
               {/* 설정 뱃지 — 히어로의 pills 자리(목업과 동일 위치). 편집은 popover 안에서만. */}
               <div className="mt-5">
                 <StoryFoundationBadges />
               </div>
             </MentionableCard>
           </section>
-
-          {/* 트리트먼트 문서(2026-10-01 오너) — Writer 생성 화면의 씬 스토리 줄글, 보존 대본은 원본. 읽기 전용. */}
-          <SceneStorySection />
 
           <section className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1016,10 +949,31 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
               />
             )}
           </section>
+
+          {/* 트리트먼트 문서(2026-10-01 오너) — Writer 생성 화면의 씬 스토리 줄글, 보존 대본은 원본.
+              캐스팅 · 배경 아래에 둔다(2026-10-02 오너 "casting, background가 씬 스토리 위에"). */}
+          <SceneStorySection />
           </div>
         </div>
       </div>
+      {busyKind ? (
+        <div className="absolute inset-0 z-10 flex items-center justify-center p-6" role="status" aria-live="polite" data-testid="producer-busy">
+          <div className="flex max-w-sm items-center gap-3 rounded-xl border border-border bg-card px-5 py-4 shadow-sm">
+            <Loader2 className="size-6 shrink-0 animate-spin text-stage-producer" aria-hidden />
+            <div className="min-w-0">
+              <p className="text-sm font-medium">{busyKind === 'comic' ? t('Reading the comic') : t('Setting up your materials')}</p>
+              <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                {busyKind === 'comic'
+                  ? t('Turning it into a script and filling in the cards. This takes a minute or two.')
+                  : t('Filling in the cards from your files. This takes a moment.')}
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      </div>
 
+      </div>
     </div>
   )
 }

@@ -22,7 +22,7 @@ const STAGE_GUIDE = [
     id: 'writer',
     name: "Writer — The Writers' Room",
     color: 'text-stage-writer',
-    body: 'The Writer breaks the story into scenes and shots, sketching a rough storyboard for each one. Edit the prose in the Treatment tab, and write character-by-character dialogue in the Dialogue tab.',
+    body: 'The Writer breaks the story into scenes and shots, sketching a rough storyboard for each one. Edit scene stories in the Producer, and write character-by-character dialogue in the Dialogue tab.',
   },
   {
     id: 'artist',

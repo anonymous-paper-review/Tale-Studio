@@ -40,6 +40,7 @@ For approval_required, explain the pending approval and stop editing that target
 For permission failures, unsupported operations or ambiguous targets, explain or ask a concise question.
 Successful targets are already done: preserve them and continue only the remaining requested targets.
 Do not introduce unrelated planning questions or choices after a tool result.
+An answer to an ongoing planning question is not a standalone settings edit. When the conversation or [Current Planning Answer] identifies that continuation, saving the answer completes only that part of the planning goal: acknowledge the verified result, then ask about one remaining required item using the updated project context. Do not repeat a field already saved. Approval-required or failed saves must be resolved before another planning question; a separate settings query/edit still ends after its own result.
 Once the original request is answered, saved, or awaiting approval, summarize those results and end the turn. Only ask questions needed to resolve remaining requested work.
 An approval card is already the user's next action for that target; do not add choice buttons for it or begin a new interview.
 Consultation is allowed without tools. Never claim an edit succeeded from a text-only answer.

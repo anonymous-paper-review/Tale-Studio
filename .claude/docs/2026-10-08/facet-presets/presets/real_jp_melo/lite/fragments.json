@@ -1,0 +1,35 @@
+{
+ "probe_anchors": "Natural-light indoor still-life photograph, lens perspective from slightly above the tabletop, shallow depth of field. No outlines, no interior lines, one uniform tier. Continuous-tone fill with smooth gradients, no tonal steps; in daylight scenes mostly bright planes with little near-black. Soft form shadows as gradients on curved surfaces; soft contact cast shadows. Off-white #eeece6, grey-beige #c9c5bd, light wood #e3cfb0, accents #dba1a0, #92c060, #e8a58a at ≤ 10%, low saturation. Rounded forms, smooth curves, irregular leaf and cloth folds. Soft-focus finish with bloom and fine grain, no pattern fills. Background: sheer curtain and wall unless the scene specifies its own backdrop. Detail budget: level 2, about 5 main objects.",
+ "figure": "No figure sample exists. If a person is needed, render face, body and rendering in a photographic realistic family, with natural skin tones under soft diffuse window light. Proportions, pose, hands, shoes and hair follow the scene content, and the style adds only light and tone. Use no comic-style dot eyes, no drawn eye outlines, and no symbolic marks.",
+ "priority": "Priority order: photographic lens perspective → continuous soft high-key tone → low-saturation neutral palette → rounded simple forms → soft-focus finish.",
+ "negative": "Avoid commercial product photography, glossy 3D render, flat vector illustration, hyper-detailed stock photo, hard black outlines, flat cel shading, neon colors, extra props, dramatic cast shadows, window overexposure, bloom haze, readable text, logos, with no speed lines.",
+ "scene": "A window-lit still life on a light wood table: a brushed metal tumbler, a glass of pale pink water, an apple, a matte white sphere, a potted plant and crumpled pink cloth, before a sheer curtain and grey-beige wall.",
+ "figure_extrapolated": true,
+ "template": "lite-v0.1",
+ "model": "claude-sonnet-5-5",
+ "thinking": "adaptive",
+ "leaves": 96,
+ "words": {
+  "probe_anchors": 107,
+  "figure": 59,
+  "priority": 21,
+  "negative": 37,
+  "scene": 39
+ },
+ "timing_seconds": {
+  "fill": 53.4,
+  "compile": 29.0
+ },
+ "usage": {
+  "fill": {
+   "in": 17064,
+   "out": 6916,
+   "stop": "end_turn"
+  },
+  "compile": {
+   "in": 7293,
+   "out": 4492,
+   "stop": "end_turn"
+  }
+ }
+}

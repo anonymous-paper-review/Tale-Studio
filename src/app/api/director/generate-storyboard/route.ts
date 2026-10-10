@@ -297,7 +297,8 @@ export async function POST(req: Request) {
         ...(assembledRefs.length ? { reference_image_urls: assembledRefs } : {}),
       }
       const mode = assembledRefs.length ? 'multiref' : 'single'
-      finalOpts = anchor ? applyStyleAnchor(anchor, baseOpts, mode) : baseOpts
+      // facet 인물 조각은 인물 시트를 참조하는 컷에만(2026-10-08) — 배경만 있는 컷은 인물 절이 효과가 없다(인계 §4).
+      finalOpts = anchor ? applyStyleAnchor(anchor, baseOpts, mode, { people: refCounts.characterRefCount > 0 }) : baseOpts
     }
 
     // 명시 모델이 있으면 reference 유무로 t2i/edit 갈래를 고른다(#registry-merge).

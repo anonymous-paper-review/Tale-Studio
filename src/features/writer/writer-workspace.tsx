@@ -6,7 +6,6 @@ import { useEffect, useRef, useState } from 'react'
 import { DialogueView } from '@/features/writer/dialogue-view'
 import { MasterSheetView } from '@/features/writer/master-sheet-view'
 import { RoughStoryboardView } from '@/features/writer/rough-storyboard-view'
-import { ScriptView } from '@/features/writer/script-view'
 import { WriterGenerationView } from '@/features/writer/writer-generation-view'
 import { WriterV2Preview } from '@/features/writer/writer-v2-preview'
 import { createClient } from '@/lib/supabase/client'
@@ -45,7 +44,7 @@ function useGenerationDebug(): boolean {
 }
 
 // 탭 순서 — 슬라이드 방향의 기준 (#c1 2026-08-03). 'v2'는 V2 프로젝트에서 맨 앞(#v2-tab).
-const TAB_ORDER = ['v2', 'storyboard', 'script', 'dialogue', 'sheet'] as const
+const TAB_ORDER = ['v2', 'storyboard', 'dialogue', 'sheet'] as const
 
 export function WriterWorkspace() {
   const activeTab = useWriterUiStore((state) => state.activeTab)
@@ -124,14 +123,6 @@ export function WriterWorkspace() {
         )}
       >
         <RoughStoryboardView />
-      </div>
-      <div
-        aria-hidden={visibleTab !== 'script'}
-        className={cn(
-          visibleTab === 'script' ? cn('flex min-h-0 flex-1 flex-col', slideClass) : 'hidden',
-        )}
-      >
-        <ScriptView />
       </div>
       <div
         aria-hidden={visibleTab !== 'dialogue'}

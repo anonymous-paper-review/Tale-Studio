@@ -347,3 +347,46 @@ Come with me.`)!
     expect(ko.characters.find((c) => c.name === '제프')!.notes).toEqual(['보안요원'])
   })
 })
+
+describe('한국어 표시 줄 — 효과음 · 자막 · 화면 문자 (2026-10-09)', () => {
+  it('한국어 대본의 "효과음:" · "자막:" · "화면 문자:" 줄은 대사가 아니라 소리 · 화면 글자로 읽고 인물로 만들지 않는다', () => {
+    // 왜: 정규식의 낱말 경계(\b)가 한글을 낱말 글자로 치지 않아 "효과음: 똑똑"이 대사가 되고 "효과음"이 인물로 생겼다(만화 대본 옮기기에서 발견).
+    const doc = parseScript(['S#1. 원룸 - 낮', '남자가 문을 연다.', '남자: 왔어.', '여자: 누구세요?', '효과음: 똑똑', '화면 문자: 영업 중', '자막: 그날 밤은 길었다.', '', 'S#2. 골목 - 밤', '남자: 가자.', '여자: 그래.'].join('\n'))!
+    expect(doc.characters.map((c) => c.name)).toEqual(['남자', '여자'])
+    const els = doc.scenes[0].elements
+    expect(els).toContainEqual({ type: 'sound', text: '똑똑' })
+    expect(els).toContainEqual({ type: 'on_screen', text: '영업 중' })
+    expect(els).toContainEqual({ type: 'on_screen', text: '그날 밤은 길었다.' })
+  })
+
+  it('"소리가 들린다" · "화면이 어두워진다" · "자막 없이" 같은 지문은 그대로 지문이다', () => {
+    // 왜: 표시 낱말로 시작하는 보통 문장까지 소리 · 화면 글자로 빼면 지문이 사라진다 — 한국어 표시는 쌍점(:)이 붙을 때만 받는다.
+    const doc = parseScript(['S#1. 원룸 - 밤', '남자: 들려?', '여자: 아니.', '', '소리가 들린다.', '', '화면이 어두워진다.', '', '자막 없이 장면이 끝난다.', '', 'S#2. 골목 - 밤', '남자: 가자.', '여자: 그래.'].join('\n'))!
+    const types = doc.scenes[0].elements.map((e) => e.type)
+    expect(types.filter((t) => t === 'sound' || t === 'on_screen')).toHaveLength(0)
+    expect(types.filter((t) => t === 'action')).toHaveLength(3)
+  })
+
+  it('지문이나 대사 바로 아랫줄에 빈 줄 없이 붙은 "효과음:" · "화면 문자:" · "자막:" 줄도 앞 단락에 묻히지 않고 따로 소리 · 화면 글자로 읽는다', () => {
+    // 왜: 만화를 대본으로 옮기면 칸 안에서 지문 다음 줄에 효과음 · 간판 글자가 바로 붙는다. 실측(2026-10-09 만화 8쪽): 지문 3곳에 표시 줄이 묻혀 소리 · 화면 글자가 사라졌다.
+    const doc = parseScript(['S#1. 원룸 - 낮', '남자가 문을 연다.', '효과음: 끼익', '여자가 돌아본다.', '화면 문자: 영업 중', '자막: 그날 밤.', '', '남자:', '누구야?', '효과음: 쾅', '', 'S#2. 골목 - 밤', '남자: 가자.', '여자: 그래.'].join('\n'))!
+    const els = doc.scenes[0].elements
+    expect(els).toContainEqual({ type: 'action', text: '남자가 문을 연다.' })
+    expect(els).toContainEqual({ type: 'action', text: '여자가 돌아본다.' })
+    expect(els).toContainEqual({ type: 'sound', text: '끼익' })
+    expect(els).toContainEqual({ type: 'sound', text: '쾅' })
+    expect(els).toContainEqual({ type: 'on_screen', text: '영업 중' })
+    expect(els).toContainEqual({ type: 'on_screen', text: '그날 밤.' })
+    const said = els.filter((e) => e.type === 'dialogue').map((e) => e.type === 'dialogue' && e.text)
+    expect(said).toEqual(['누구야?'])
+  })
+
+  it('쌍점 없이 표시 낱말로 시작하는 줄("화면이 꺼진다" · "SUPER!")은 문장의 줄바꿈이라 앞 지문에 그대로 이어진다', () => {
+    // 왜: 표시 줄로 끊는 것은 쌍점이 붙은 꼴뿐이다 — 긴 지문을 여러 줄로 나눠 쓴 대본에서 문장 중간이 잘려 나가면 안 된다.
+    const doc = parseScript(['S#1. 원룸 - 밤', '남자가 리모컨을 누르자', '화면이 꺼진다.', '', 'INT. GYM - DAY', 'The coach claps and yells', 'SUPER! as the kids run.', '', 'S#2. 골목 - 밤', '남자: 가자.', '여자: 그래.', '남자: 응.'].join('\n'))!
+    const all = doc.scenes.flatMap((s) => s.elements)
+    expect(all).toContainEqual({ type: 'action', text: '남자가 리모컨을 누르자 화면이 꺼진다.' })
+    expect(all).toContainEqual({ type: 'action', text: 'The coach claps and yells SUPER! as the kids run.' })
+    expect(all.filter((e) => e.type === 'sound' || e.type === 'on_screen')).toHaveLength(0)
+  })
+})

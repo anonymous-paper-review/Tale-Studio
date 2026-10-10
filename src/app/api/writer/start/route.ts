@@ -7,7 +7,7 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { getUser } from '@/lib/supabase/auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { createRun, getActiveRun } from '@/lib/writer/run-store';
-import { readPreserveScript } from './preserve-flag';
+import { preserveRuntime, readPreserveScript } from './preserve-flag';
 import {
   WRITER_TOTAL_UNITS,
   WRITER_V2_TOTAL_UNITS,
@@ -30,6 +30,9 @@ import { parseDialogueLanguage } from '@/lib/writer/pipeline/util/output-languag
 import { assessContentSafetyRisk } from '@/lib/writer/content-safety-hint';
 import { parseCustomStyleAnchor } from '@/lib/style-anchor';
 import { planSourceImageWrites, stripSourceImages } from '@/lib/producer/source-image';
+import { userOwnsProject } from '@/lib/generation-jobs';
+import { continueDraftState, draftBasisChanges, draftContinueBlock } from '@/lib/writer/treatment-draft';
+import type { WriterRunState } from '@/lib/writer/pipeline/steps';
 
 // producer 핸드오프 배경 페이로드(원천 rich shape). writer 내부 BackgroundContract 와 분리 —
 //   locations 테이블엔 full 필드로 즉시 upsert 하고, 파이프라인엔 BackgroundContract 로 매핑해 전달한다.
@@ -286,6 +289,12 @@ export async function POST(req: NextRequest) {
       cast?: CastContractWithImages;
       backgrounds?: ProducerBackgrounds;
       chatHistory?: RerunMessageRow[];
+      /** 새 프로젝트를 만들자마자 앞단만 돌리는 트리트먼트 초안(2026-10-02 시안 v04). */
+      treatmentDraft?: boolean;
+      /** Writer 로 넘길 때 확정을 기다리는 트리트먼트 초안을 Producer 값으로 이어 간다. */
+      continueDraft?: boolean;
+      /** 지금 값으로 트리트먼트를 다시 쓴다 — 확정을 기다리던 초안은 내려놓는다(treatmentDraft 와 함께). */
+      restartDraft?: boolean;
     };
     const { projectId, story, runtimeSeconds, models, genre, cast: castWithImages, backgrounds } = body;
     // #image-to-artist: 캐스트 계약의 그림 주소는 DB(대표 사진·시트 출처)에만 쓰고 파이프라인 시드에서는 뗀다 —
@@ -293,6 +302,13 @@ export async function POST(req: NextRequest) {
     const cast: CastContract | undefined = castWithImages ? stripSourceImages(castWithImages) : undefined;
     // #script-preserve: producer 채팅에서 "그대로 보존"을 고른 대본. 명시적 true 만.
     const preserveScript = readPreserveScript(body);
+    // 그대로 쓰기는 설정한 영상 길이 대신 대본 길이로 장르의 길이 · 깊이를 정하고 길이 값은 보내지 않는다(2026-10-09 오너 "영상 길이 제한을 없애줘").
+    const { runtimeSeconds: effectiveRuntimeSeconds, genre: effectiveGenre } = preserveRuntime({
+      preserveScript,
+      story: typeof story === 'string' ? story : '',
+      runtimeSeconds,
+      genre,
+    });
 
     if (!projectId || typeof projectId !== 'string') {
       return NextResponse.json({ error: 'Invalid request: projectId required' }, { status: 400 });
@@ -301,9 +317,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid request: story required' }, { status: 400 });
     }
 
-    const writerEngine: WriterEngine = isWriterEngine(body.writerEngine)
-      ? body.writerEngine
-      : 'v1';
+    const treatmentDraft = body.treatmentDraft === true;
+    const continueDraft = body.continueDraft === true;
+    const restartDraft = treatmentDraft && body.restartDraft === true;
+    // 트리트먼트 초안은 이미 있는 실행을 고치거나 만든다 — 프로젝트 주인만(일반 시작의 로그인 확인보다 좁게).
+    if ((treatmentDraft || continueDraft) && !(await userOwnsProject(projectId, user.id))) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // 트리트먼트 초안은 확정 단계가 있는 V1 로만 돈다(V2 는 확정 단계가 없다).
+    const writerEngine: WriterEngine = treatmentDraft || continueDraft
+      ? 'v1'
+      : isWriterEngine(body.writerEngine)
+        ? body.writerEngine
+        : 'v1';
     if (writerEngine === 'v2' && !(await isAdminOwnedProject(user, projectId))) {
       return NextResponse.json({ error: 'Writer V2 is admin-only' }, { status: 403 });
     }
@@ -333,13 +360,37 @@ export async function POST(req: NextRequest) {
 
     // 이미 실행 중이거나 씬 게이트 대기 중이면 거부 (중복 시작 방지 — 게이트는 확정/수정으로만 진행).
     const existing = await getActiveRun(projectId);
-    if (existing?.status === 'running') {
+    // 이어 가기는 확정을 기다리는 트리트먼트 초안에만 — 수정안 · 다시 쓰기 안이 남아 있으면 먼저 정해야 한다.
+    // 다시 쓸 초안 — 확정을 기다리는 트리트먼트 초안만 내려놓는다(넘긴 실행 · 아직 쓰는 실행은 건드리지 않는다).
+    const replacingDraft = restartDraft && existing?.status === 'awaiting_confirmation'
+      && (existing.state as WriterRunState | undefined)?.input?.treatmentDraft === true;
+    if (continueDraft) {
+      const blocked = draftContinueBlock(existing);
+      if (blocked) {
+        return NextResponse.json(
+          { error: 'Writer treatment draft cannot continue', code: blocked, projectId, status: existing?.status ?? null },
+          { status: 409 },
+        );
+      }
+      // 트리트먼트를 쓴 바탕(이야기 · 러닝타임 · 대본 보존)이 바뀌었으면 그 트리트먼트로 넘기지 않는다 — 지금 값으로 다시 쓰게 한다.
+      const changed = draftBasisChanges((existing!.state as WriterRunState).input, {
+        story,
+        runtimeSeconds: effectiveRuntimeSeconds,
+        ...(preserveScript ? { preserveScript: true } : {}),
+      } as PipelineInput);
+      if (changed.length) {
+        return NextResponse.json(
+          { error: 'The treatment draft was written from different values', code: 'treatment_draft_stale', changed, projectId },
+          { status: 409 },
+        );
+      }
+    } else if (existing?.status === 'running') {
       return NextResponse.json(
         { error: 'Already running', code: 'writer_run_active', projectId, status: existing.status },
         { status: 409 },
       );
     }
-    if (existing?.status === 'awaiting_confirmation') {
+    if (!continueDraft && !replacingDraft && existing?.status === 'awaiting_confirmation') {
       return NextResponse.json(
         {
           error: 'Writer scene gate is awaiting confirmation',
@@ -367,25 +418,29 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. 캐스트 즉시 기록 (run 시작 전 — artist가 writer 완료를 안 기다리고 카드 작업 가능).
-    if (cast?.characters?.length) {
-      await upsertProducerCast(projectId, cast);
-    }
-    if (backgrounds?.locations?.length) {
-      await upsertProducerBackgrounds(projectId, backgrounds);
-      await applyProducerI18n(projectId, undefined, backgrounds).catch((e) => {
-        console.error('[writer/start] location i18n derive failed (proceeding):', e);
+    //   트리트먼트 초안(2026-10-02 시안 v04)은 넘기기 전이라 Producer 가 열려 있다 — 카드를 표에 미리 쓰지 않는다
+    //   (쓰면 지우거나 이름을 바꾼 카드가 다시 살아난다). 넘길 때(continueDraft) 그때의 카드로 쓴다.
+    if (!treatmentDraft) {
+      if (cast?.characters?.length) {
+        await upsertProducerCast(projectId, cast);
+      }
+      if (backgrounds?.locations?.length) {
+        await upsertProducerBackgrounds(projectId, backgrounds);
+        await applyProducerI18n(projectId, undefined, backgrounds).catch((e) => {
+          console.error('[writer/start] location i18n derive failed (proceeding):', e);
+        });
+      }
+      // #image-to-artist(2026-09-17): 카드에 붙은 그림 — 배경은 그대로 와이드샷, 인물은 기본 모습의 대표 사진이자 시트의 출처.
+      //   우리 보관함 주소만 받는다(planSourceImageWrites 가 거른다). 실패해도 핸드오프는 진행한다(그림 없이 종전 경로).
+      await applySourceImages(projectId, castWithImages, backgrounds).catch((e) => {
+        console.error('[writer/start] source image apply failed (proceeding):', e);
+      });
+      // #name-en(2026-09-08, 오너 지시): 인물·배경 이름의 영어 표기를 핸드오프 때 한 번 정해 둔다 — 러프·프롬프트가 저장값을 쓴다.
+      //   best-effort(실패해도 러프 라우트가 처음 필요할 때 한 번 정한다).
+      await ensureEntityNamesEn(projectId).catch((e) => {
+        console.error('[writer/start] name_en derive failed (proceeding):', e);
       });
     }
-    // #image-to-artist(2026-09-17): 카드에 붙은 그림 — 배경은 그대로 와이드샷, 인물은 기본 모습의 대표 사진이자 시트의 출처.
-    //   우리 보관함 주소만 받는다(planSourceImageWrites 가 거른다). 실패해도 핸드오프는 진행한다(그림 없이 종전 경로).
-    await applySourceImages(projectId, castWithImages, backgrounds).catch((e) => {
-      console.error('[writer/start] source image apply failed (proceeding):', e);
-    });
-    // #name-en(2026-09-08, 오너 지시): 인물·배경 이름의 영어 표기를 핸드오프 때 한 번 정해 둔다 — 러프·프롬프트가 저장값을 쓴다.
-    //   best-effort(실패해도 러프 라우트가 처음 필요할 때 한 번 정한다).
-    await ensureEntityNamesEn(projectId).catch((e) => {
-      console.error('[writer/start] name_en derive failed (proceeding):', e);
-    });
 
     // 1.6 언어 경계(S4→S5): projects.locale 확정 + 파이프라인 출력 언어로 전달 (#i18n-s5).
     //   신규 프로젝트는 생성 시 사용자 설정으로 잠겨 온다(project/new). 잠긴 값이 곧 출력 언어.
@@ -455,7 +510,7 @@ export async function POST(req: NextRequest) {
     const input: PipelineInput = {
       story,
       writerEngine,
-      runtimeSeconds,
+      runtimeSeconds: effectiveRuntimeSeconds,
       styleAnchor,
       models,
       outputLocale,
@@ -464,7 +519,8 @@ export async function POST(req: NextRequest) {
       // V2는 의미 단위 결과와 자체 검토 메타를 한 번에 만들므로 기존 씬 확인 게이트를
       // 중복 적용하지 않는다. V1은 기존 사용자 씬 검토 흐름을 그대로 유지한다.
       sceneGate: writerEngine === 'v1',
-      genre,
+      ...(treatmentDraft ? { treatmentDraft: true } : {}),
+      genre: effectiveGenre,
       cast,
       ...(preserveScript ? { preserveScript: true } : {}),
       background: backgrounds?.locations?.length
@@ -552,7 +608,7 @@ export async function POST(req: NextRequest) {
         {
           story,
           settings: projectResult.data?.settings ?? null,
-          genre: genre ?? previousInput.genre ?? null,
+          genre: effectiveGenre ?? previousInput.genre ?? null,
           cast: cast ?? previousInput.cast ?? null,
           background:
             input.background ??
@@ -578,6 +634,57 @@ export async function POST(req: NextRequest) {
       );
     }
     }
+    if (continueDraft && existing) {
+      // 넘김 = 트리트먼트 확정. 같은 실행에 Producer 값을 싣고 확정 단계를 넘긴다(씬 · 구조는 그대로).
+      //   읽은 뒤 다른 요청(수정안 · 직접 저장)이 끼어들었으면 조건부 저장이 지고, 최신으로 다시 판단한다.
+      let latest = existing;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { data, error } = await supabaseAdmin
+          .from('writer_runs')
+          .update({
+            state: continueDraftState(latest.state as WriterRunState, input),
+            status: 'running',
+            updated_at: new Date(Math.max(Date.now(), new Date(latest.updated_at).getTime() + 1)).toISOString(),
+          })
+          .eq('id', latest.id)
+          .eq('status', 'awaiting_confirmation')
+          .eq('updated_at', latest.updated_at)
+          .select('id');
+        if (error) throw new Error(`continue treatment draft failed: ${error.message}`);
+        if (data?.length) {
+          after(async () => {
+            await triggerWriterStep(req.nextUrl.origin, projectId);
+          });
+          return NextResponse.json({ projectId, runId: latest.id, status: 'started', sceneGate: false, continued: true });
+        }
+        const reread = await getActiveRun(projectId);
+        const blocked = draftContinueBlock(reread);
+        if (blocked || !reread || reread.id !== latest.id) {
+          return NextResponse.json(
+            { error: 'Writer treatment draft cannot continue', code: blocked ?? 'writer_draft_missing', projectId, status: reread?.status ?? null },
+            { status: 409 },
+          );
+        }
+        latest = reread;
+      }
+      return NextResponse.json({ error: 'Scene story changed; try again', code: 'scene_story_changed', projectId }, { status: 409 });
+    }
+
+    if (replacingDraft && existing) {
+      // 기다리던 초안을 내려놓는다 — 그 사이 수정안 · 직접 저장이 끼어들었으면(조건부 저장 실패) 다시 판단하게 한다.
+      const { data: retired, error: retireError } = await supabaseAdmin
+        .from('writer_runs')
+        .update({ status: 'failed', error: 'treatment_draft_replaced', updated_at: new Date().toISOString() })
+        .eq('id', existing.id)
+        .eq('status', 'awaiting_confirmation')
+        .eq('updated_at', existing.updated_at)
+        .select('id');
+      if (retireError) throw new Error(`retire treatment draft failed: ${retireError.message}`);
+      if (!retired?.length) {
+        return NextResponse.json({ error: 'Scene story changed; try again', code: 'scene_story_changed', projectId }, { status: 409 });
+      }
+    }
+
     const run = await createRun(
       projectId,
       input,
@@ -591,7 +698,7 @@ export async function POST(req: NextRequest) {
     });
 
     // sceneGate: 씬 스토리 확정 단계로 시작했는가 — 화면은 이 값으로 확정 전까지 Producer 메인에 머문다(2026-10-01).
-    return NextResponse.json({ projectId, runId: run.id, status: 'started', sceneGate: input.sceneGate === true });
+    return NextResponse.json({ projectId, runId: run.id, status: 'started', sceneGate: input.sceneGate === true, ...(treatmentDraft ? { draft: true } : {}) });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error('[writer/start]', msg);

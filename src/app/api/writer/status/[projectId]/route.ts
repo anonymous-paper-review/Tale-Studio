@@ -213,6 +213,8 @@ export async function GET(
       projectId: string;
       engine: 'v1' | 'v2';
       started: boolean;
+      /** 새 프로젝트의 트리트먼트 초안 — 아직 Writer 로 넘기지 않은 실행(Producer 는 잠기지 않는다). */
+      draft: boolean;
       pipeline_completed: boolean;
       pipeline_failed: boolean;
       progress_percent: number;
@@ -238,6 +240,7 @@ export async function GET(
       projectId,
       engine: row?.engine ?? 'v1',
       started: !!row,
+      draft: row?.draft === 'true',
       pipeline_completed: row?.status === 'completed',
       pipeline_failed: row?.status === 'failed',
       progress_percent: progressPercent,

@@ -46,6 +46,17 @@ describe('Producer 대사 언어', () => {
     })).toBe('ja')
   })
 
+  it.each([
+    '이제 대사 언어를 정해야 해요. 영상 속 인물들이 어떤 언어로 말할까요?',
+    '영상 속 인물들이 어떤 언어로 말할까요?',
+  ])('인물이 말할 언어를 묻는 질문 “%s”에는 짧은 언어 답변을 적용한다', (question) => {
+    // 왜: 대사라는 단어가 앞 문장에 있거나 생략되어도 인물이 말할 언어를 고른 답은 유효하다.
+    expect(resolveProducerDialogueLanguage({
+      message: '한국어',
+      history: [{ role: 'model', content: question }],
+    })).toBe('ko')
+  })
+
   it.each(['한국어로 해줘', '일본어로 부탁해'])('대사 언어 질문에 “%s”라고 답하면 사용자의 언어 선택을 적용한다', (message) => {
     // 왜: 언어 이름에 자연스럽게 붙이는 부탁도 직전 질문에 대한 명시적 답변이다.
     expect(resolveProducerDialogueLanguage({

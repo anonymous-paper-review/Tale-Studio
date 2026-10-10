@@ -13,20 +13,30 @@ import { getActiveRun } from '@/lib/writer/run-store';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { parseAppLocale, pickContentLocale, type AppLocale } from '@/lib/locale';
 import { resolveEntityNames } from '@/lib/writer/resolve-entity-names';
-import type { StoryScene, DecoupagePlan } from '@/lib/writer/types/pipeline';
+import type { Scenes, DecoupagePlan } from '@/lib/writer/types/pipeline';
 import type { WriterV2Package } from '@/lib/writer/v2/semantic-unit';
+import { sceneStoryProposalView, type SceneStoryProposal } from '@/lib/producer/scene-story-proposal';
+import { stableHash } from '@/lib/stable-hash';
+import { draftBasisOf } from '@/lib/writer/treatment-draft';
+import { mergeOpenWorld } from '@/lib/writer/pipeline/stages/s3_scenes';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 // state 에서 필요한 필드만 구조적으로 읽는다(steps.ts 의 무거운 import 회피).
 interface PreviewState {
-  input?: { writerEngine?: unknown };
-  scenes?: { scenes?: StoryScene[] };
+  input?: { writerEngine?: unknown; treatmentDraft?: unknown; story?: string; runtimeSeconds?: number; preserveScript?: boolean };
+  scenes?: Scenes;
+  _sceneStoryVersion?: string;
+  _sceneStoryProposal?: SceneStoryProposal;
+  _sceneStoryUndo?: { id?: string; label?: string; storyVersion?: string };
   decoupage?: DecoupagePlan;
-  characters?: { characters?: Array<{ id?: string; name?: string; role?: string }> };
+  characters?: { characters?: Array<{
+    id?: string; name?: string; role?: string; entity_type?: string; appearance_description?: string;
+    arc?: { start_state?: string; end_state?: string; arc_type?: string }; motivation?: { want?: string };
+  }> };
   dramaturgy?: { world_inventory?: Array<{ id?: string; name?: string }> };
-  world?: { locations?: Array<{ id?: string; name?: string }> };
+  world?: { locations?: Array<{ id?: string; name?: string; description?: string }> };
   worldVisual?: { locations?: Array<{ id?: string; name?: string }> };
   v2Package?: WriterV2Package;
 }
@@ -90,6 +100,7 @@ export async function GET(
         running: false,
         completed: false,
         failed: false,
+        updatedAt: null,
         roster: [],
         scenes: [],
         characters: [],
@@ -110,6 +121,7 @@ export async function GET(
           running,
           completed,
           failed,
+          updatedAt: run.updated_at,
           roster: [],
           scenes: [],
           characters: [],
@@ -239,6 +251,55 @@ export async function GET(
     pushRoster(roster, seen, state.dramaturgy?.world_inventory);
     const entities = roster.map((entry) => ({ id: entry.slug, name: entry.name }));
     for (const scene of scenes) scene.beats = scene.beats.map((beat) => resolveEntityNames(beat, entities));
+    const sceneStoryProposal = sceneStoryProposalView(state._sceneStoryProposal, state.scenes);
+    if (sceneStoryProposal) {
+      const proposalEntities = [...entities, ...(state._sceneStoryProposal?.scenes?.new_characters ?? [])];
+      for (const scene of [...sceneStoryProposal.before, ...sceneStoryProposal.after]) {
+        scene.beats = scene.beats.map((beat) => resolveEntityNames(beat, proposalEntities));
+      }
+      // 다시 쓰기 안마다 그 안이 새로 만든 인물 · 장소 이름으로 바꾼다(아이디어부터 다시는 인물이 바뀐다).
+      for (const variant of sceneStoryProposal.variants ?? []) {
+        const raw = state._sceneStoryProposal?.variants?.find((item) => item.id === variant.id);
+        const variantEntities = [
+          ...entities,
+          ...(raw?.scenes?.new_characters ?? []),
+          ...(raw?.characters?.characters ?? []).flatMap((c) => (c.id ? [{ id: c.id, name: c.name }] : [])),
+          ...(raw?.world?.locations ?? []),
+        ];
+        for (const scene of variant.after) scene.beats = scene.beats.map((beat) => resolveEntityNames(beat, variantEntities));
+      }
+    }
+    // 트리트먼트 초안(2026-10-02 시안 v04) — 아직 넘기지 않은 실행. 이 트리트먼트가 만든 인물 · 장소를 Producer 카드로 옮길 수 있게 싣는다.
+    const draft = state.input?.treatmentDraft === true;
+    const storyVersion = state._sceneStoryVersion ?? run.updated_at;
+    const undo = state._sceneStoryUndo;
+    const sceneStoryUndo = undo?.id && undo.storyVersion === storyVersion ? { id: undo.id, label: undo.label ?? '' } : null;
+    const treatmentCharacters = draft
+      ? (state.characters?.characters ?? []).flatMap((c) => (c.id && c.name ? [{
+            id: c.id,
+            name: displayNameOf(c.name, c.id),
+            role: c.role ?? 'supporting',
+            entityType: c.entity_type === 'object' ? 'object' : 'person',
+            appearance: c.appearance_description ?? '',
+            arc: c.arc,
+            want: c.motivation?.want ?? '',
+          }] : []))
+      : [];
+    // 보존 모드 초안은 씬을 대본에서 그대로 옮겨 장소 목록을 만들지 않는다 — 씬에 적힌 장소로 대신한다(2026-10-06 운영 제보).
+    //   대본이 기준이라 이야기 엔진이 지어낸 장소 후보는 싣지 않는다. 장소 목록이 있으면 그대로 쓴다.
+    //   이미 있는 배경 카드는 카드 맞추기가 이름으로 이어 붙여 겹치지 않는다.
+    const draftLocations = state.world?.locations?.length
+      ? state.world.locations
+      : state.scenes ? mergeOpenWorld(undefined, state.scenes).locations : [];
+    const treatmentLocations = draft
+      ? draftLocations.flatMap((l) => (l.id && l.name ? [{ id: l.id, name: displayNameOf(l.name, l.id), description: l.description ?? '' }] : []))
+      : [];
+    // 카드 맞춤 버전 = 인물 · 장소 내용의 지문 — 수정안 진행 · 원문 버전 같은 상태 변화로는 바뀌지 않는다(지운 카드가 되살아나지 않게).
+    const treatmentCast = draft
+      ? { version: stableHash({ characters: treatmentCharacters, locations: treatmentLocations }), characters: treatmentCharacters, locations: treatmentLocations }
+      : null;
+    // 이 초안을 쓴 바탕 — 화면이 지금 Producer 값과 달라졌는지 견준다(넘길 때는 서버가 같은 규칙으로 막는다).
+    const draftBasis = draft ? draftBasisOf({ story: state.input?.story ?? '', runtimeSeconds: state.input?.runtimeSeconds, preserveScript: state.input?.preserveScript }) : null;
 
     return NextResponse.json(
       {
@@ -247,6 +308,13 @@ export async function GET(
         running,
         completed,
         failed,
+        updatedAt: run.updated_at,
+        storyVersion,
+        sceneStoryProposal,
+        sceneStoryUndo,
+        draft,
+        treatmentCast,
+        draftBasis,
         roster,
         scenes,
         characters,

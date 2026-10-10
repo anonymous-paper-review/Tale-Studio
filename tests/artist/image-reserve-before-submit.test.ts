@@ -340,3 +340,24 @@ function rowsForTable(table: string): Array<Record<string, unknown>> {
   if (table === 'character_image_candidates') return dbState.candidates
   return []
 }
+
+// 2026-10-10 오너 "그림체 분석이 진행 중에는 artist 생성이 안 되게 막아두고 끝나면 진행" — 화면의 요청도 분석을 기다린다.
+describe('그림체 분석이 도는 동안의 인물 시트', () => {
+  it('그림체 분석이 도는 동안 Artist 화면에서 인물 시트를 만들려 하면 그리지 않고 넘긴다', async () => {
+    // 왜: Writer 가 씬을 저장하면 Artist 화면이 열려 자동 채움이 돈다 — 분석 전에 그리면 그림체 설명이 빠진다. 분석이 끝나면 서버가 빈칸을 그린다.
+    dbState.projects[0].custom_style_anchor = {
+      url: 'https://example.supabase.co/storage/v1/object/public/media/workspace-1/project-1/uploads/look/original.webp',
+      label: '내 그림체',
+      medium: '2d_anime',
+      locked: true,
+      analysis_pending_at: new Date().toISOString(),
+    }
+
+    const response = await generateSheetPOST(sheetRequest())
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toMatchObject({ deduped: true, waitingForStyle: true })
+    expect(mocks.reserveGenerationJob).not.toHaveBeenCalled()
+    expect(mocks.falImageSubmit).not.toHaveBeenCalled()
+  })
+})

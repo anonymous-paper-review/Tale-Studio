@@ -48,11 +48,13 @@ export function createStudioWorkflow(options: {
     if (typeof status.started !== 'boolean' || typeof status.assets?.images_ready !== 'boolean' || ['chars_ready', 'chars_total', 'worlds_ready', 'worlds_total', 'queued_count', 'failed_count'].some(key => typeof status.assets[key] !== 'number')) throw new Error('Writer readiness response is incomplete.')
     const saved = parseProducerDraft(project.data.producer_draft)
     const working = useProducerStore.getState()
-    const board = options.stage === 'producer' ? { settings: working.projectSettings, storyReady: working.storyReady, cast: working.cast, backgrounds: working.backgrounds } : saved
+    const board = options.stage === 'producer' ? { settings: working.projectSettings, storyReady: working.storyReady, cast: working.cast, backgrounds: working.backgrounds, preserveScript: working.preserveScript } : saved
     const gate = board ? evaluateProducerGate({ ...board, styleAnchorKey: project.data.style_anchor_key, locale: contentLocale() }) : null
     const reached = String(project.data.current_stage ?? 'producer')
+    // 새 프로젝트의 트리트먼트 초안(2026-10-02 시안 v04)은 아직 넘기지 않은 실행이다 — 넘긴 Writer 로 치지 않는다.
+    const handedOff = status.started === true && status.draft !== true
     const allowed = ['producer']
-    if (status.started || stages.indexOf(reached) >= stages.indexOf('writer')) allowed.push('writer')
+    if (handedOff || stages.indexOf(reached) >= stages.indexOf('writer')) allowed.push('writer')
     if (stages.indexOf(reached) >= stages.indexOf('artist') && status.assets.images_ready) allowed.push('artist')
     last = {
       projectId: options.projectId, currentStage: useProjectStore.getState().currentStage, reachedStage: reached, allowedStages: allowed,
@@ -60,7 +62,7 @@ export function createStudioWorkflow(options: {
         working: options.stage === 'producer' ? { settings: working.projectSettings, storyReady: working.storyReady } : undefined,
         savedDraft: saved ? { settings: saved.settings, storyReady: saved.storyReady, savedAt: saved.savedAt } : null,
         committed: { settings: project.data.settings, storyPresent: !!project.data.story_text }, styleAnchorKey: project.data.style_anchor_key },
-      writer: { started: status.started, status: status.current_status, stage: status.current_stage, error: status.error, completed: status.pipeline_completed, progress: status.progress_percent, savedScenes: scenes.count, savedShots: shots.count, note: 'No execution record does not imply missing script. Saved scene and shot counts are independent of the execution history.' },
+      writer: { started: handedOff, treatmentDraft: status.draft === true, status: status.current_status, stage: status.current_stage, error: status.error, completed: status.pipeline_completed, progress: status.progress_percent, savedScenes: scenes.count, savedShots: shots.count, note: 'No execution record does not imply missing script. Saved scene and shot counts are independent of the execution history.' },
       artist: status.assets,
     }
     return last

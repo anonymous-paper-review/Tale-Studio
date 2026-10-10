@@ -19,6 +19,7 @@ import {
   LayoutGrid,
   Loader2,
   MoveRight,
+  Lock,
   Palette,
   Plus,
   Square,
@@ -30,7 +31,7 @@ import { useImageUploadConsent } from '@/components/upload/image-upload-consent'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { AgentFace } from '@/components/agent-face'
-import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { styleChoiceBusy, useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore } from '@/stores/producer-store'
 import { stylePromptDecision } from '@/lib/producer-style-prompt'
@@ -58,8 +59,12 @@ import {
 } from '@/lib/card-mention'
 import { StyleAnchorPicker } from '@/features/producer/style-anchor-picker'
 import { selectStyleAnchorFromPicker } from '@/features/producer/select-style-anchor'
+import { ingestCreationFile } from '@/lib/project/start-new-project'
 import { SceneGateControls } from '@/features/writer/scene-gate-panel'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
+import { useWriterPreview } from '@/lib/writer/use-writer-preview'
+import { SceneStoryProposalCard } from '@/components/layout/scene-story-proposal-card'
+import { SceneStoryRewriteCard, SceneStoryUndoCard } from '@/components/layout/scene-story-rewrite-card'
 import {
   buildScriptLines,
   scriptLineMentions,
@@ -434,6 +439,9 @@ function ChatTraceFooter({
 export function GlobalChat() {
   const messages = useGlobalChatStore((s) => s.messages)
   const loading = useGlobalChatStore((s) => s.loading)
+  const sceneStoryEdit = useGlobalChatStore((s) => s.sceneStoryEdit)
+  const sceneStoryRefresh = useGlobalChatStore((s) => s.sceneStoryRefresh)
+  const sceneStoryProposalPending = useGlobalChatStore((s) => s.sceneStoryProposalPending)
   const error = useGlobalChatStore((s) => s.error)
   const lastTrace = useGlobalChatStore((s) => s.lastTrace)
   const sendMessage = useGlobalChatStore((s) => s.sendMessage)
@@ -473,6 +481,16 @@ export function GlobalChat() {
     storeStage
   const projectId = useProjectStore((s) => s.projectId)
   const { requestImageUploadConsent, imageUploadConsentDialog } = useImageUploadConsent(projectId)
+  const producerLocked = useProjectStore((s) => s.producerLocked)
+  // 넘기기 전 트리트먼트 초안(2026-10-02 시안 v04)도 같은 씬 스토리 수정안 · 다시 쓰기를 쓴다.
+  const treatmentDraft = useProjectStore((s) => s.treatmentDraft)
+  const sceneStoryLive = currentStage === 'producer' && (producerLocked || treatmentDraft)
+  const { preview: sceneStoryPreview } = useWriterPreview(projectId, { enabled: sceneStoryLive, refreshKey: sceneStoryRefresh })
+  const sceneStoryProposal = sceneStoryLive ? sceneStoryPreview?.sceneStoryProposal : null
+  const sceneStoryUndo = sceneStoryLive && !sceneStoryProposal ? sceneStoryPreview?.sceneStoryUndo ?? null : null
+  useEffect(() => {
+    if (projectId && sceneStoryLive && sceneStoryPreview) useGlobalChatStore.getState().syncSceneStoryProposal(projectId, sceneStoryPreview.sceneStoryProposal?.id ?? null)
+  }, [projectId, sceneStoryLive, sceneStoryPreview])
 
   // 폭 리사이즈 + 접기 (chat-ui-store, persist)
   const chatWidth = useChatUiStore((s) => s.chatWidth)
@@ -722,6 +740,7 @@ export function GlobalChat() {
   useEffect(() => {
     if (collapsed || !CHAT_SUPPORTED_STAGES.has(currentStage)) return
     const handler = (e: KeyboardEvent) => {
+      if (useGlobalChatStore.getState().sceneStoryEdit?.mode === 'manual') return
       if (e.ctrlKey || e.metaKey || e.altKey) return
       // 글자 키만 — 화살표/펑션/Enter/Space(버튼 활성화 키) 제외. IME 첫 타(key='Process')는
       //   물리 코드로 판정한다.
@@ -773,7 +792,8 @@ export function GlobalChat() {
 
   const stageSupported = CHAT_SUPPORTED_STAGES.has(currentStage)
   // 응답 대기 중에도 다음 답변을 적을 수 있고, 중복 전송만 막는다.
-  const inputLocked = !stageSupported
+  const sceneEditActive = sceneStoryEdit?.projectId === projectId ? sceneStoryEdit : null
+  const inputLocked = !stageSupported || sceneEditActive?.mode === 'manual'
   const sendDisabled = inputLocked || loading
   // (loading 중 disabled 해제 시 재포커스하던 #b3 effect 제거 — 이제 입력창이 잠기지 않아
   //  포커스를 잃을 일이 없다. 남겨두면 다른 곳으로 옮긴 포커스를 도로 뺏는다.)
@@ -787,6 +807,8 @@ export function GlobalChat() {
   //   빨간 빔(회전)과 모션·색을 갈라 "안내"와 "호버 반응"이 섞이지 않게 한다(#feedback v2).
   const styleAnchors = useProducerStore((s) => s.styleAnchors)
   const styleAnchorKey = useProducerStore((s) => s.styleAnchorKey)
+  // 고정된 그림체(2026-10-09 오너) — 사용자가 올린 그림을 "그림체"로 골라 정했으면 스타일 단추를 막고 이유를 보인다.
+  const styleLocked = useProducerStore((s) => s.customStyleAnchor?.locked === true)
   const loadStyleAnchors = useProducerStore((s) => s.loadStyleAnchors)
   const [stylePressed, setStylePressed] = useState(false)
   useEffect(() => {
@@ -805,10 +827,12 @@ export function GlobalChat() {
   }, [styleAnchorKey])
   const stylePickerRequest = useChatUiStore((s) => s.stylePickerRequest)
   const consumeStylePicker = useChatUiStore((s) => s.consumeStylePicker)
+  // 그림체를 묻거나 정하는 중이면(2026-10-10) 자동 스타일 선택 창은 기다린다.
+  const styleBusy = useGlobalChatStore((s) => styleChoiceBusy(s, projectId))
   useEffect(() => {
     if (!stylePickerRequest) return
     const decision = stylePromptDecision(stylePickerRequest.projectId, {
-      projectId, stage: currentStage, loading,
+      projectId, stage: currentStage, loading: loading || styleBusy,
       approvalBusy: !!pendingProposal || executingProposalIds.length > 0,
       hasStyle: !!styleAnchorKey, catalogReady: styleAnchors.length > 0,
     })
@@ -818,7 +842,30 @@ export function GlobalChat() {
       setStylePickerProjectId(projectId)
       setStylePressed(true)
     }
-  }, [stylePickerRequest, projectId, currentStage, loading, pendingProposal, executingProposalIds, styleAnchorKey, styleAnchors.length, consumeStylePicker])
+  }, [stylePickerRequest, projectId, currentStage, loading, styleBusy, pendingProposal, executingProposalIds, styleAnchorKey, styleAnchors.length, consumeStylePicker])
+  // 스타일 선택 창의 "내 그림체 올리기"(2026-10-10 오너) — 권리 확인 → 올리기 → 채팅에서 그림을 "그림체"로 고른 것과 같은 고정 · 분석.
+  const [styleUpload, setStyleUpload] = useState<{ projectId: string; busy: boolean; error: string | null } | null>(null)
+  const styleUploadNow = styleUpload && styleUpload.projectId === projectId ? styleUpload : null
+  const uploadStyleImage = async (file: File) => {
+    if (!projectId || styleUploadNow?.busy) return
+    const pid = projectId
+    if (kindOf(file.name) !== 'image') {
+      setStyleUpload({ projectId: pid, busy: false, error: t('Choose a picture file.') })
+      return
+    }
+    if (!(await requestImageUploadConsent([file]))) return
+    if (useProjectStore.getState().projectId !== pid) return
+    setStyleUpload({ projectId: pid, busy: true, error: null })
+    const uploaded = await ingestCreationFile(pid, file)
+    if (useProjectStore.getState().projectId !== pid) return
+    if ('error' in uploaded || uploaded.kind !== 'image') {
+      setStyleUpload({ projectId: pid, busy: false, error: 'error' in uploaded ? uploaded.error : t('Choose a picture file.') })
+      return
+    }
+    setStyleUpload(null)
+    setStylePickerProjectId(null)
+    void useGlobalChatStore.getState().applyUploadedStyle({ id: uploaded.id, name: uploaded.name, thumbUrl: uploaded.thumbUrl, sliceUrls: uploaded.sliceUrls })
+  }
   // 프리셋 클릭 = 입력창에 삽입(자동 전송 금지 — 과금/전이 발화를 원클릭으로 쏘지 않는다).
   const insertPreset = (text: string) => {
     setPresetOpen(false)
@@ -849,7 +896,7 @@ export function GlobalChat() {
   // 씬 게이트 활성 여부(#gate-main-input 2026-08-12) — 피드백은 별도 텍스트박스가 아니라
   //   이 입력창으로 받는다. 비어 있는 Enter = 확정(전역 Enter 핸들러가 처리).
   const sceneGateActive =
-    suggestion?.action?.kind === 'confirmScenes' && suggestion.stage === currentStage
+    suggestion?.action?.kind === 'confirmScenes' && suggestion.stage === currentStage && !sceneStoryProposal && sceneStoryProposalPending?.projectId !== projectId
 
   // writer 파이프라인이 도는 동안(게이트 대기 제외)의 채팅 (#run-chat-gate 2026-08-12) —
   //   씬·샷이 아직 없어서 수정 요청을 실행할 수 없고, 실측 사고로 "초안 만들어줘" 발화가
@@ -895,12 +942,9 @@ export function GlobalChat() {
 
     setInput('')
     // 씬 게이트 중의 입력 = 수정 피드백 (#gate-main-input) — 일반 채팅이 아니라 revise 로 간다.
-    const inputRoute = writerInputRoute(msg, { sceneGate: sceneGateActive, running: writerRunning, gateElsewhere: writerGateElsewhere && !sceneGateActive })
+    const inputRoute = writerInputRoute(msg, { sceneGate: sceneGateActive, running: writerRunning, explicitRevision: currentStage === 'producer', gateElsewhere: writerGateElsewhere && !sceneGateActive })
     if (inputRoute === 'revise') {
-      dismissSuggestion()
-      const ok = await useGlobalChatStore.getState().reviseSceneGate(msg)
-      if (ok) toast.success(t('Applying your feedback and rewriting the scene story…'))
-      else toast.error(t('Could not send the change request. Please try again.'))
+      await sendMessage(msg, undefined, { stageOverride: 'producer' })
       return
     }
     if (inputRoute === 'elsewhere') {
@@ -966,6 +1010,7 @@ export function GlobalChat() {
 
   // 프로액티브 제안 승인 — 'navigate'(stage 이동) / 'artist-refresh-look'(초안 일괄 재생성, 유저 클릭).
   const handleSuggestionAction = async () => {
+    if (useGlobalChatStore.getState().sceneStoryEdit) return
     const action = suggestion?.action
     if (!action) {
       dismissSuggestion()
@@ -978,6 +1023,11 @@ export function GlobalChat() {
     }
     // #p4-choices 는 렌더에서 버튼별 인라인 처리 — 이 핸들러엔 도달하지 않는다(타입 내로잉용).
     if (action.kind === 'choices') return
+    if (action.kind === 'message') {
+      dismissSuggestion()
+      await sendMessage(action.utterance, undefined, { stageOverride: suggestion?.stage, ...(action.answeringProducerQuestion ? { answeringProducerQuestion: true } : {}) })
+      return
+    }
     // 씬 게이트 확정(#s3-gate P3b) — 게이트 패널의 [이대로 확정]과 같은 API. 성공 전환은
     //   writer 화면의 상태 폴링이 집어간다.
     if (action.kind === 'confirmScenes') {
@@ -1006,6 +1056,7 @@ export function GlobalChat() {
   }
 
   const handlePendingProposalApprove = async () => {
+    if (useGlobalChatStore.getState().sceneStoryEdit) return
     if (!pendingProposal) return
     // Writer 첫 넘김 카드의 승인 = Producer 잠금 — 확정 창에서 값과 잠금을 한 번 더 보여 준다(2026-10-01 오너).
     if (pendingProposal.kind === 'producerWriterInitialHandoff') {
@@ -1020,6 +1071,7 @@ export function GlobalChat() {
   }
 
   const handleFiles = async (picked: File[]) => {
+    if (useGlobalChatStore.getState().sceneStoryEdit) return
     // 같은 파일을 다시 고를 수 있게 즉시 비운다.
     if (picked.length === 0) return
 
@@ -1187,21 +1239,24 @@ export function GlobalChat() {
     requestAnimationFrame(() => freeformInputRef.current?.focus())
   }
   const handleChoiceContinue = () => {
-    if (!choices || choices.displayOnly || !selectedChoice) return
+    if (inputLocked || loading || !choices || choices.displayOnly || !selectedChoice) return
     if (selectedChoice === FREEFORM) {
       openFreeform()
       return
     }
     const opt = choices.options.find((o) => o.label === selectedChoice)
     if (!opt) return
-    dismissSuggestion()
-    void sendMessage(opt.utterance, undefined, { stageOverride: currentStage })
+    const answeringProducerQuestion = suggestion?.stage === 'producer' && suggestion.action?.kind === 'choices' && suggestion.action.answeringProducerQuestion === true
+    // 전송 경로가 현재 질문의 출처를 먼저 읽게 한다. 동기 처리 중 새 제안이 생겼으면 지우지 않는다.
+    void sendMessage(opt.utterance, undefined, { stageOverride: currentStage, ...(answeringProducerQuestion ? { answeringProducerQuestion: true } : {}) })
+    if (suggestion?.id !== `scene-story-edit:${projectId}` && useGlobalChatStore.getState().suggestion?.id === suggestion?.id) dismissSuggestion()
   }
   const handleFreeformSend = () => {
     const text = freeformText.trim()
-    if (!text || useGlobalChatStore.getState().loading) return
-    dismissSuggestion()
-    void sendMessage(text, undefined, { stageOverride: currentStage })
+    if (inputLocked || !text || useGlobalChatStore.getState().loading) return
+    const answeringProducerQuestion = suggestion?.stage === 'producer' && suggestion.action?.kind === 'choices' && suggestion.action.answeringProducerQuestion === true
+    void sendMessage(text, undefined, { stageOverride: currentStage, ...(answeringProducerQuestion ? { answeringProducerQuestion: true } : {}) })
+    if (suggestion?.id !== `scene-story-edit:${projectId}` && useGlobalChatStore.getState().suggestion?.id === suggestion?.id) dismissSuggestion()
   }
 
   // 선택지 키보드 조작 (#choices-keys 2026-08-07) — Claude Code CLI 의 AskUserQuestion 문법 차용:
@@ -1211,7 +1266,7 @@ export function GlobalChat() {
     if (!choices || choices.displayOnly || freeformOpen) return
     const labels = [...choices.options.map((o) => o.label), FREEFORM]
     const handler = (e: KeyboardEvent) => {
-      if (loading || e.isComposing) return
+      if (inputLocked || loading || e.isComposing) return
       if (document.querySelector('[role="dialog"][data-state="open"]')) return
       const target = e.target as HTMLElement | null
       if (target) {
@@ -1268,7 +1323,7 @@ export function GlobalChat() {
   // 계단식 등장(#chat-settle) — settle 후 보이는 임시 블록이 위에서부터 CASCADE_STEP_MS 간격으로
   //   나타난다. fill-mode backwards: 자기 차례 전까지 첫 키프레임(투명)에 머문다.
   const showSuggestion =
-    !!suggestion?.action && suggestion.action.kind !== 'choices' && !choices
+    !!suggestion?.action && suggestion.action.kind !== 'choices' && !choices && !(suggestion.action.kind === 'confirmScenes' && (sceneStoryProposal || sceneStoryProposalPending?.projectId === projectId))
   const showProposal = !!pendingProposal
   let cascadeSlots = 0
   const suggestionSlot = showSuggestion ? cascadeSlots++ : 0
@@ -1291,7 +1346,7 @@ export function GlobalChat() {
   useEffect(() => {
     if (!proposalOpen && !suggestionOpen) return
     const handler = (e: KeyboardEvent) => {
-      if (loading || e.isComposing) return
+      if (sceneEditActive || loading || e.isComposing) return
       if (e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return
       if (e.key !== 'Enter' && e.key !== 'Escape') return
       // 모달이 열려 있으면 전부 양보(#style-timing 실측 사고: 스타일 픽커가 떠 있는데 Enter 가
@@ -1300,7 +1355,7 @@ export function GlobalChat() {
       if (document.querySelector('[role="dialog"][data-state="open"]')) return
       const target = e.target as HTMLElement | null
       // 선택지 버튼의 Enter는 그 버튼의 동작이다. 함께 복원된 승인 카드를 실행하지 않는다.
-      if (target?.closest('[data-chat-choices]')) return
+      if (target?.closest('[data-chat-choices], [data-testid="scene-story-proposal"]')) return
       const inChatInput = !!target && target === textareaRef.current
       // 다른 입력 요소(인라인 '직접 입력', 이름 변경 등)에 있으면 그쪽 몫.
       if (
@@ -1524,6 +1579,12 @@ export function GlobalChat() {
             ))}
 
             {loading && <ThinkingIndicator stage={currentStage} />}
+            {projectId && sceneStoryProposal ? (
+              sceneStoryProposal.variants?.length
+                ? <SceneStoryRewriteCard key={`${projectId}:${sceneStoryProposal.id}`} projectId={projectId} proposal={sceneStoryProposal} />
+                : <SceneStoryProposalCard key={`${projectId}:${sceneStoryProposal.id}`} projectId={projectId} proposal={sceneStoryProposal} />
+            ) : null}
+            {projectId && sceneStoryUndo ? <SceneStoryUndoCard key={`${projectId}:${sceneStoryUndo.id}`} projectId={projectId} undo={sceneStoryUndo} /> : null}
 
             {/* 프로액티브 제안 (chat-proactive-copilot Phase 1) — 시스템이 먼저 거는 actionable 넛지.
                 탭 전환 후 1초 정적을 두고 계단식 등장(#chat-settle).
@@ -1546,7 +1607,7 @@ export function GlobalChat() {
                 {/* 씬 게이트(#gate-to-chat) — 확정 한 번으로 안 끝나는 결정이라 캡슐 버튼 대신
                     피드백 입력 + 확정/수정 두 갈래를 여기서 렌더한다(생성 화면 하단 바에서 이사). */}
                 {suggestion.action?.kind === 'confirmScenes' ? (
-                  <SceneGateControls />
+                  <SceneGateControls label={suggestion.action.label} handoff={treatmentDraft && !producerLocked} />
                 ) : (suggestion.action || suggestion.dismissible !== false) && (
                   <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
                     {/* kind: 'choices' 는 여기 오지 않는다 — 입력창 앵커 선택지(#p4-choices v2) */}
@@ -1678,6 +1739,11 @@ export function GlobalChat() {
             MentionTextarea 의 ^/v 버튼으로 안내(#a3). Enter 전송 / Shift+Enter 개행.
             툴바: + 업로드 · 에이전트 필(빠른 요청) · four-dot(@멘션) · 우측 원형 send→Stop. */}
         <div className="shrink-0 p-3 pt-1">
+          {sceneEditActive?.mode === 'manual' ? (
+            <div className="mb-3 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2" data-testid="scene-story-chat-edit">
+              <p className="text-xs leading-5 text-muted-foreground">{t('Editing in the window. Save or cancel to use chat again.')}</p>
+            </div>
+          ) : null}
           {/* 선택지를 고르거나 바로 아래 채팅창에 직접 답한다. */}
           {choices && (
             <div
@@ -1719,7 +1785,7 @@ export function GlobalChat() {
                   <button
                     key={opt.label}
                     type="button"
-                    disabled={loading}
+                    disabled={sendDisabled}
                     aria-pressed={selected}
                     onClick={() => {
                       setFreeformOpen(false)
@@ -1774,7 +1840,7 @@ export function GlobalChat() {
               ) : (
                 <button
                   type="button"
-                  disabled={loading}
+                  disabled={sendDisabled}
                   aria-pressed={selectedChoice === FREEFORM}
                   onClick={openFreeform}
                   className={cn(
@@ -1801,7 +1867,7 @@ export function GlobalChat() {
               <Button
                 size="sm"
                 className="w-full rounded-full"
-                disabled={loading || (freeformOpen ? !freeformText.trim() : !selectedChoice)}
+                disabled={sendDisabled || (freeformOpen ? !freeformText.trim() : !selectedChoice)}
                 onClick={freeformOpen ? handleFreeformSend : handleChoiceContinue}
               >
                 {t('Continue')}
@@ -1905,7 +1971,9 @@ export function GlobalChat() {
                   choices
                     ? t('Choose above or type your answer…')
                     : sceneGateActive
-                      ? t('Type your changes, or press Enter as-is to confirm the scenes')
+                      ? treatmentDraft && !producerLocked
+                        ? t('Type your changes, or press Enter as-is to hand over to Writer')
+                        : t('Type your changes, or press Enter as-is to confirm the scenes')
                       : canSendAttachments
                         ? t("Tell us how to use it, or leave it blank and we'll fold it into the story")
                         : t(STAGE_PLACEHOLDER[currentStage])
@@ -1999,13 +2067,31 @@ export function GlobalChat() {
                 {/* 스타일 픽커 (#style-entry #feedback 2026-08-07) — producer 에선 four-dot 자리를
                     스타일 버튼이 차지한다(에셋 멘션은 @ 타이핑·Ctrl+카드 클릭이 대체). 첫 클릭 전
                     + 스타일 미선택이면 빔 상시 점등. 다른 스테이지는 기존 에셋 팔레트 유지. */}
-                {currentStage === 'producer' ? (
+                {currentStage === 'producer' && styleLocked ? (
+                  <span className="inline-flex" title={t("The art style comes from the picture you chose, so it can't be changed.")}>
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      className="relative rounded-full"
+                      disabled
+                      aria-label={t("The art style comes from the picture you chose, so it can't be changed.")}
+                      data-testid="style-locked"
+                    >
+                      <Palette className="size-4" />
+                      <Lock className="absolute -bottom-0.5 -right-0.5 size-2.5" aria-hidden />
+                    </Button>
+                  </span>
+                ) : currentStage === 'producer' ? (
                   <StyleAnchorPicker
                     anchors={styleAnchors}
                     value={styleAnchorKey}
                     onSelect={(k) => void selectStyleAnchorFromPicker(k)}
                     open={stylePickerOpen}
-                    onOpenChange={(open) => setStylePickerProjectId(open ? projectId : null)}
+                    onOpenChange={(open) => {
+                      setStylePickerProjectId(open ? projectId : null)
+                      if (!open) setStyleUpload((prev) => (prev?.busy ? prev : null))
+                    }}
+                    upload={{ onPick: (file) => void uploadStyleImage(file), busy: !!styleUploadNow?.busy, error: styleUploadNow?.error ?? null }}
                   >
                     <Button
                       size="icon-sm"

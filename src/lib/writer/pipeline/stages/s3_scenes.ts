@@ -140,6 +140,8 @@ export async function runScenes(
   revisionNotes?: string[],
   // s0.5 무대 후보 — *선택적 재료*. 미전달(기본)이면 프롬프트는 배선 전과 완전히 동일하다.
   dramaturgy?: Dramaturgy | null,
+  // 개정 시작 시 저장된 최신 초안. Producer의 원래 이야기와 별개인 이번 수정의 실행 입력이다.
+  revisionSource?: Scenes,
 ): Promise<Scenes> {
   await logger.markStage('scenes', 'started');
 
@@ -216,6 +218,16 @@ ${revisionNotes.map((n, i) => `${i + 1}. ${n}`).join('\n')}
 `
     : '';
 
+  const revisionSourceBlock = revisionSource
+    ? `[수정 기준 씬 초안]
+아래는 유저가 직접 고친 내용과 이전 AI 수정 결과까지 포함한 최신 초안이다. 이 초안을 기준으로 가장 최근 수정 요청을 반영하라.
+요청하지 않은 내용은 유지하고, 문장만 다듬는 요청이면 사건·씬 순서·인물·장소를 바꾸지 마라.
+누적 요청 중 이미 반영된 수정은 다시 반복하지 마라. 뒤의 [스토리]는 원래 기획의 참고 자료이며, 최신 초안을 그 옛 내용으로 되돌리지 마라.
+${JSON.stringify(revisionSource, null, 2)}
+
+`
+    : '';
+
   // 무대 후보 블록 — 오픈 로케이션 규칙(보수성)은 그대로 두고, 후보를 "이미 있는 재료"로 얹는다.
   //   새 장소를 발명하라는 압력이 아니라, 이미 유도된 무대를 *골라 쓸 수 있게* 하는 선택지다.
   const stageCandidates = dramaturgy?.world_inventory ?? [];
@@ -236,7 +248,7 @@ ${stageCandidates
 `
     : '';
 
-  const userPrompt = `${revisionBlock}${stageCandidateBlock}[스토리]
+  const userPrompt = `${revisionBlock}${revisionSourceBlock}${stageCandidateBlock}[스토리]
 ${input.story}
 
 [genre]

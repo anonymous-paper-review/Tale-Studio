@@ -180,12 +180,12 @@ describe('약속 B — 배경 카드는 캐릭터 카드와 같다', () => {
   })
 
   it('배경 팝업에서 모델을 고를 수 있고 기본은 지금 것(GPT Image 2)이다', async () => {
-    // 오너 B5: 배경은 종전대로 GPT Image 2 로 첫 생성한다(캐릭터 기본은 nano-banana-2 — 같은 것은 "고를 수 있다"는 기능).
+    // 오너 B5: 배경은 종전대로 GPT Image 2 로 첫 생성한다. 캐릭터 기본도 2026-10-09 부터 gpt-image-2(앞: nano-banana-2) — 다른 모델은 "고를 수 있다"는 기능.
     const dialog = read('src/features/artist/world-view-dialog.tsx')
     expect(dialog).toMatch(/useState<ImageModelKey>\(DEFAULT_WORLD_IMAGE_MODEL\)/)
     expect(dialog).toMatch(/IMAGE_MODEL_ORDER\.map/)
     expect(DEFAULT_WORLD_IMAGE_MODEL).toBe('gpt-image-2')
-    expect(DEFAULT_IMAGE_MODEL).toBe('nano-banana-2')
+    expect(DEFAULT_IMAGE_MODEL).toBe('gpt-image-2')
     // 라우트: model 을 안 보내면 기본값(null → submit 이 DEFAULT_WORLD_IMAGE_MODEL 로), 보내면 그대로, 모르는 값은 무시.
     await generateWorld(post('/api/artist/generate-world', { projectId: PROJECT, locationId: LOCATION, column: 'wide_shot', prompt: 'p' }))
     expect(mocks.submitWorldShotJob.mock.calls[0][0].model).toBeNull()

@@ -34,6 +34,7 @@ import { notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
 import { registerCharacterCard } from '@/stores/asset-storage-store'
 import { isDemoSession } from '@/lib/demo/context'
 import type { ArtistSourceSnapshot } from '@/lib/artist/source-snapshot'
+import { fetchArtistGenerationLimit, runAdaptivePool } from '@/lib/artist/generation-slots'
 // 최종 룩 요약(design_tokens 파생) — 옛 온보딩 버블 카피용으로 태어났지만(2026-08-06 제거)
 //   "지금 룩이 뭔지"의 파생 상태로 남긴다. 채팅 컨텍스트·향후 UI가 소비.
 export interface ArtistLookSummary {
@@ -135,9 +136,10 @@ export type AppearanceCreationOptions = GenerationRequestOptions & {
 
 // fal 계정 concurrent limit을 여러 유저가 공유하므로, dispatcher 전 단계에서는 화면별 submit 풀을
 // 보수적으로 유지한다. 계정 전역 공정성은 generation_jobs dispatcher 도입 시 중앙화한다.
-// 1로 하향(#c1 2026-07-15): artist 턴어라운드(장당 1~2분)가 동시 2개면 유저 쿼터(8)·fal 슬롯을
+// 1로 하향(#c1 2026-07-15): artist 턴어라운드(장당 1~2분)가 동시 2개면 유저 쿼터·fal 슬롯을
 //   길게 점유해 러프 스토리보드 첫 일괄 생성이 굶는다 — artist 는 하나씩, 나머지는 러프보드 몫.
-const ARTIST_GENERATION_CONCURRENCY = 1
+// 가변(2026-10-09 오너): 그 유저의 러프 스토리보드가 만들어지는 중일 때만 1장, 없거나 끝났으면 3장까지 —
+//   runAdaptivePool + fetchArtistGenerationLimit(src/lib/artist/generation-slots.ts)가 보낼 때마다 다시 묻는다.
 
 export { WORLD_SHOT_LABELS }
 export type { WorldShotKey }
@@ -519,23 +521,6 @@ function scheduleCharacterPatch(
 
 
 /** 작업 배열을 동시 N개 제한으로 실행 (캐릭터/월드 병렬 생성용). */
-async function runPool(
-  tasks: Array<() => Promise<void>>,
-  concurrency: number,
-): Promise<void> {
-  let cursor = 0
-  const workers = Array.from(
-    { length: Math.min(concurrency, tasks.length) },
-    async () => {
-      while (cursor < tasks.length) {
-        const task = tasks[cursor++]
-        await task()
-      }
-    },
-  )
-  await Promise.all(workers)
-}
-
 export interface ArtistChatSelection {
   projectId: string
   target: 'character' | 'background'
@@ -1840,8 +1825,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   autoGenerateBaseImages: async () => {
     const { characterAssets, worldAssets } = get()
     const projectId = useProjectStore.getState().projectId
-    // 동시 in-flight 상한 (fal 한도가 아니라 클라 폴링/부하 상한 — fal 은 초과분을 큐 대기시킴).
-    const CONCURRENCY = ARTIST_GENERATION_CONCURRENCY
+    // 동시 in-flight 상한은 가변이다 — 러프 스토리보드가 도는 동안 1장, 아니면 3장(runAdaptivePool).
 
     // 방향뷰(main reference i2i) + 월드 빈칸 보강. main 은 서버 초안이 채우므로 client 는 main 제출 안 함.
     const restTasks: Array<() => Promise<void>> = []
@@ -1916,11 +1900,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     }
 
     console.log(
-      `[autogen] start — rest:${restTasks.length} @ concurrency ${CONCURRENCY} (producer main=서버 초안 / writer main=자율)`,
+      `[autogen] start — rest:${restTasks.length} @ 가변 동시 장수(러프 생성 중 1 · 아니면 3) (producer main=서버 초안 / writer main=자율)`,
       { then: queuedRest, skipped },
     )
     const t0 = Date.now()
-    await runPool(restTasks, CONCURRENCY)
+    await runAdaptivePool(restTasks, fetchArtistGenerationLimit)
     atime('autogen total', Date.now() - t0, { rest: restTasks.length })
   },
 
@@ -1944,11 +1928,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       return lookPending || writerNoMain
     })
     if (targets.length === 0) return
-    await runPool(
+    await runAdaptivePool(
       targets.map((c) => async () => {
         await get().generateCharacterView(c.characterId, requireDefaultAppearanceKey(c), 'main', 'ui')
       }),
-      ARTIST_GENERATION_CONCURRENCY,
+      fetchArtistGenerationLimit,
     )
   },
 
@@ -1971,11 +1955,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         const appearanceKey = requested ?? requireDefaultAppearanceKey(character)
         // 채팅발 재생성 — generation_jobs.actor='chat' 귀속 (chat-aware-regeneration).
         if (u.views?.length) {
-          await runPool(
+          await runAdaptivePool(
             u.views.map((v) => async () => {
               await get().generateCharacterView(u.characterId, appearanceKey, v, 'chat', u.instruction, undefined, u.model)
             }),
-            ARTIST_GENERATION_CONCURRENCY,
+            fetchArtistGenerationLimit,
           )
         } else {
           await get().generateCharacterAllViews(u.characterId, appearanceKey, 'chat', u.instruction, u.model)

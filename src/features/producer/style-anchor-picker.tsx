@@ -13,6 +13,8 @@ import {
   GalleryHorizontal,
   ImageIcon,
   LayoutGrid,
+  Loader2,
+  Plus,
 } from 'lucide-react'
 import {
   Dialog,
@@ -70,6 +72,29 @@ function StyleAnchorCardBody({ anchor, active }: { anchor: StyleAnchor; active: 
   )
 }
 
+/** "내 그림체 올리기" 카드 내용(그리드 · 슬라이더 공용, 2026-10-10 오너) — 점선 테두리 + "+" 모양. 올린 그림은 분석 모델로 가고 그림체로 고정된다. */
+function StyleUploadCardBody({ busy, error }: { busy: boolean; error: string | null }) {
+  const t = useT()
+  return (
+    <>
+      <div className="flex aspect-square items-center justify-center bg-muted/30">
+        <span className="flex size-12 items-center justify-center rounded-full border border-dashed border-border-strong text-muted-foreground transition-colors group-hover:border-primary/60 group-hover:text-foreground">
+          {busy ? <Loader2 className="size-5 animate-spin" aria-hidden /> : <Plus className="size-5" aria-hidden />}
+        </span>
+      </div>
+      <div className="flex flex-col gap-0.5 px-3 py-2">
+        <span className="line-clamp-1 text-sm font-medium text-foreground">{busy ? t('Uploading the picture…') : t('Upload my art style')}</span>
+        <span className={cn('line-clamp-3 text-xs', error ? 'text-destructive' : 'text-muted-foreground')}>
+          {error ?? t('The picture goes to an analysis model to describe its art style, and the style is then fixed.')}
+        </span>
+      </div>
+    </>
+  )
+}
+
+/** 슬라이더 덱의 한 장 — 올리기 카드 또는 프리셋. */
+type DeckItem = { kind: 'upload' } | { kind: 'anchor'; anchor: StyleAnchor }
+
 type StyleView = 'grid' | 'slider'
 
 export function StyleAnchorPicker({
@@ -79,6 +104,7 @@ export function StyleAnchorPicker({
   children,
   open: openProp,
   onOpenChange,
+  upload,
 }: {
   anchors: StyleAnchor[]
   value: string | null
@@ -88,8 +114,17 @@ export function StyleAnchorPicker({
   /** 제어 모드 — 호출자가 열림을 소유한다(스토리 확정 시 자동 오픈, #style-timing). 미지정이면 내부 상태. */
   open?: boolean
   onOpenChange?: (open: boolean) => void
+  /** "내 그림체 올리기" 카드(2026-10-10 오너) — 고른 파일을 넘긴다. 올리기 · 그림체 정하기는 호출자가 한다. */
+  upload?: { onPick: (file: File) => void; busy: boolean; error: string | null }
 }) {
   const t = useT()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const pickFile = () => {
+    if (upload && !upload.busy) fileRef.current?.click()
+  }
+  // 슬라이더 덱 — 올리기 카드를 맨 앞에 둔다. 고른 스타일이 없으면 첫 프리셋을 앞에 보이고 올리기 카드는 바로 왼쪽에 보인다.
+  const deck: DeckItem[] = [...(upload ? [{ kind: 'upload' } as const] : []), ...anchors.map((anchor) => ({ kind: 'anchor', anchor }) as const)]
+  const firstAnchorIdx = upload && anchors.length ? 1 : 0
   const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
   const open = openProp ?? uncontrolledOpen
   const setOpen = (o: boolean) => {
@@ -99,7 +134,8 @@ export function StyleAnchorPicker({
   // stacked deck(slider)를 기본 뷰로(#b1 2026-07-18).
   const [view, setView] = useState<StyleView>('slider')
   const [slide, setSlide] = useState(0)
-  const selectedIdx = Math.max(0, anchors.findIndex((a) => a.key === value))
+  const selectedDeckIdx = deck.findIndex((item) => item.kind === 'anchor' && item.anchor.key === value)
+  const selectedIdx = selectedDeckIdx >= 0 ? selectedDeckIdx : firstAnchorIdx
 
   // 슬라이더로 전환하거나 팝업을 열 때 현재 선택 카드로 위치를 맞춘다.
   const syncSlideToSelected = () => setSlide(selectedIdx)
@@ -129,7 +165,7 @@ export function StyleAnchorPicker({
     setOpen(false)
   }
   const move = (dir: 1 | -1) =>
-    setSlide((i) => (i + dir + anchors.length) % anchors.length)
+    setSlide((i) => (i + dir + deck.length) % deck.length)
 
   return (
     <Dialog
@@ -159,8 +195,9 @@ export function StyleAnchorPicker({
           }
           if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
             e.preventDefault()
-            const front = anchors[((slide % anchors.length) + anchors.length) % anchors.length]
-            if (front) choose(front.key)
+            const front = deck[((slide % deck.length) + deck.length) % deck.length]
+            if (front?.kind === 'upload') pickFile()
+            else if (front) choose(front.anchor.key)
           }
         }}
       >
@@ -202,6 +239,19 @@ export function StyleAnchorPicker({
             </div>
           ) : null}
         </DialogHeader>
+        {upload ? (
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".jpg,.jpeg,.png,.webp"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              e.target.value = ''
+              if (file) upload.onPick(file)
+            }}
+          />
+        ) : null}
         {/* 뷰 전환 시 팝업 높이가 부드럽게 변하도록, 내용 높이를 측정해 래퍼 height 를 트랜지션. */}
         <div
           className="overflow-hidden transition-[height] duration-300 ease-out"
@@ -209,15 +259,34 @@ export function StyleAnchorPicker({
         >
         <div ref={bodyRef}>
         {anchors.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">
-            {t('No styles registered yet.')}
-          </p>
+          upload ? (
+            <div className="mx-auto w-56 p-0.5">
+              <button type="button" data-testid="style-upload-card" onClick={pickFile} disabled={upload.busy} className="group flex w-full flex-col overflow-hidden rounded-xl border-2 border-dashed border-border text-left transition-colors hover:border-primary/60">
+                <StyleUploadCardBody busy={upload.busy} error={upload.error} />
+              </button>
+            </div>
+          ) : (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              {t('No styles registered yet.')}
+            </p>
+          )
         ) : view === 'grid' ? (
           // 그리드 진입 시 카드가 아래에서 살짝 확대되며 순차로 날아든다(#b1).
           <div
             key="grid"
             className="scrollbar-thin grid max-h-[60vh] grid-cols-2 gap-3 overflow-y-auto p-0.5 sm:grid-cols-3"
           >
+            {upload ? (
+              <button
+                type="button"
+                data-testid="style-upload-card"
+                onClick={pickFile}
+                disabled={upload.busy}
+                className="group flex flex-col overflow-hidden rounded-lg border-2 border-dashed border-border text-left transition-colors hover:border-primary/60 animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2 duration-300"
+              >
+                <StyleUploadCardBody busy={upload.busy} error={upload.error} />
+              </button>
+            ) : null}
             {anchors.map((anchor, i) => (
               <button
                 key={anchor.key}
@@ -242,8 +311,8 @@ export function StyleAnchorPicker({
                 각 카드 위치를 활성 인덱스와의 wrap-around 거리(offset)로 계산 → 마지막→첫 카드로
                 넘어가도 offset 이 1씩 밀릴 뿐이라 트랙 리셋 없는 자연스러운 무한 루프. */}
             <div className="relative flex h-[19rem] items-center justify-center overflow-hidden">
-              {anchors.map((anchor, i) => {
-                const n = anchors.length
+              {deck.map((item, i) => {
+                const n = deck.length
                 // 활성(slide)로부터의 최단 부호 거리 — 무한 루프의 핵심.
                 let off = i - slide
                 if (off > n / 2) off -= n
@@ -251,9 +320,10 @@ export function StyleAnchorPicker({
                 const abs = Math.abs(off)
                 const hidden = abs > 2
                 const isFront = off === 0
+                const anchor = item.kind === 'anchor' ? item.anchor : null
                 return (
                   <div
-                    key={anchor.key}
+                    key={anchor ? anchor.key : 'upload'}
                     // 숨은 카드는 transition 없이 순간이동(opacity 0이라 안 보임) → 마지막↔첫 카드
                     //   전환 시 반대편 카드가 화면을 가로질러 슬라이드하는 어색함을 없앤다(무한 루프).
                     className={cn(
@@ -268,6 +338,7 @@ export function StyleAnchorPicker({
                     }}
                     aria-hidden={hidden}
                   >
+                    {anchor ? (
                     <button
                       type="button"
                       // 앞 카드 클릭 = 선택, 옆 카드 클릭 = 그 카드를 앞으로.
@@ -288,6 +359,24 @@ export function StyleAnchorPicker({
                     >
                       <StyleAnchorCardBody anchor={anchor} active={anchor.key === value} />
                     </button>
+                    ) : (
+                    <button
+                      type="button"
+                      data-testid="style-upload-card"
+                      // 앞에 있으면 파일 고르기, 옆에 있으면 앞으로.
+                      onClick={() => (isFront ? pickFile() : setSlide(i))}
+                      disabled={upload?.busy}
+                      tabIndex={hidden ? -1 : 0}
+                      style={{ animationDelay: `${abs * 55}ms`, animationFillMode: 'backwards' }}
+                      className={cn(
+                        'group flex w-56 flex-col overflow-hidden rounded-xl border-2 border-dashed bg-card text-left shadow-lg transition-colors',
+                        'animate-in fade-in-0 zoom-in-50 duration-500',
+                        isFront ? 'border-border hover:border-primary/60' : 'border-border',
+                      )}
+                    >
+                      <StyleUploadCardBody busy={!!upload?.busy} error={upload?.error ?? null} />
+                    </button>
+                    )}
                   </div>
                 )
               })}
@@ -311,11 +400,11 @@ export function StyleAnchorPicker({
             </div>
             {/* 도트 인디케이터 — 클릭 시 해당 카드로 이동 */}
             <div className="mt-3 flex items-center justify-center gap-1.5">
-              {anchors.map((anchor, i) => (
+              {deck.map((item, i) => (
                 <button
-                  key={anchor.key}
+                  key={item.kind === 'anchor' ? item.anchor.key : 'upload'}
                   type="button"
-                  aria-label={t('Go to {label}', { label: anchor.label })}
+                  aria-label={t('Go to {label}', { label: item.kind === 'anchor' ? item.anchor.label : t('Upload my art style') })}
                   onClick={() => setSlide(i)}
                   className={cn(
                     'h-1.5 rounded-full transition-all',

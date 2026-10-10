@@ -8,8 +8,10 @@ import { Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { FORMAT_OPTIONS, LANGUAGE_OPTIONS } from '@/features/producer/quest-journal'
-import { useT } from '@/lib/i18n'
+import { useLocale, useT } from '@/lib/i18n'
+import { runtimeSettingLabel } from '@/lib/producer/runtime'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore } from '@/stores/producer-store'
 
 function Row({ label, value }: { label: string; value: string | null }) {
@@ -26,6 +28,7 @@ function Row({ label, value }: { label: string; value: string | null }) {
 
 export function ProducerLockDialog({ open }: { open: boolean }) {
   const t = useT()
+  const locale = useLocale()
   const settings = useProducerStore((s) => s.projectSettings)
   const storyText = useProducerStore((s) => s.storyText)
   const preserveScript = useProducerStore((s) => s.preserveScript)
@@ -37,6 +40,8 @@ export function ProducerLockDialog({ open }: { open: boolean }) {
   const confirmProducerLock = useGlobalChatStore((s) => s.confirmProducerLock)
   const closeHandoffConfirm = useGlobalChatStore((s) => s.closeHandoffConfirm)
   const [agreed, setAgreed] = useState(false)
+  // 넘기기 전 트리트먼트 초안(2026-10-02 시안 v04) — 이미 쓴 트리트먼트를 확정하고 나머지를 이어 간다.
+  const treatmentDraft = useProjectStore((s) => s.treatmentDraft)
 
   const styleLabel = styleAnchors.find((a) => a.key === styleAnchorKey)?.label ?? customStyleAnchor?.label ?? null
   const genre = [settings.genre, settings.subGenre].filter(Boolean).join(' · ')
@@ -58,7 +63,9 @@ export function ProducerLockDialog({ open }: { open: boolean }) {
         <DialogHeader>
           <DialogTitle>{t('Confirm before handing over to Writer')}</DialogTitle>
           <DialogDescription>
-            {t('Writer first drafts the scene story on this screen. You review it and confirm before the rest is made. These values are confirmed when you hand over.')}
+            {treatmentDraft
+              ? t('The treatment on this screen is confirmed as it is, and Writer makes the rest from it. These values are confirmed when you hand over.')
+              : t('Writer first drafts the scene story on this screen. You review it and confirm before the rest is made. These values are confirmed when you hand over.')}
           </DialogDescription>
         </DialogHeader>
 
@@ -72,7 +79,8 @@ export function ProducerLockDialog({ open }: { open: boolean }) {
             value={LANGUAGE_OPTIONS.find((o) => o.value === settings.dialogueLanguage)?.label ?? null}
           />
           <Row label={t('Format')} value={FORMAT_OPTIONS.find((o) => o.value === settings.format)?.label ?? null} />
-          <Row label={t('Runtime')} value={settings.playtime ? t('{sec}s', { sec: settings.playtime }) : null} />
+          {/* 대본 그대로 쓰기는 영상 길이가 원작을 따른다 — 보드의 길이 칸과 같은 표시(2026-10-09 오너: 여기만 "비어 있음"이었다). */}
+          <Row label={t('Runtime')} value={runtimeSettingLabel(locale, settings.playtime, preserveScript)} />
           <Row
             label={t('Cast and backgrounds')}
             value={t('{people} people · {backgrounds} backgrounds', { people: persons, backgrounds: backgrounds.length })}

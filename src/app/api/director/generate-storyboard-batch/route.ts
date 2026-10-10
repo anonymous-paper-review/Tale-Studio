@@ -33,11 +33,27 @@ import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 import { storageKeySegment } from '@/lib/storage/key-segment'
 import { isChatTraceId } from '@/lib/chat-trace'
 import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
+import { STALE_QUEUED_MS } from '@/lib/generation-job-timing'
 
 export const runtime = 'nodejs'
-export const maxDuration = 60
+// 시트 2장(러프 12장씩 합성 · 업로드 · 예약 · 제출)이 60초를 넘겨 끊겼다 — 10/9 · 10/10 운영 6번 중 4번 504,
+//   끊기면 클라 러너가 판 전체를 멈췄다(오너 제보 2026-10-10). 다른 긴 라우트와 같은 5분.
+export const maxDuration = 300
 
 const MAX_GRID_JOBS_PER_CALL = 2 // 러프 보드와 동일 관행 — 잔여는 응답 remaining 으로 반복 호출
+const RUN_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** 작업이 맡은 샷 — 그리드(writerShotIds)와 단건(writerShotId) 모두. 모양이 어긋난 행은 빈 목록. */
+function shotsOfTarget(target: unknown): string[] {
+  const t = (target && typeof target === 'object' ? target : {}) as { writerShotId?: unknown; writerShotIds?: unknown }
+  const many = Array.isArray(t.writerShotIds) ? t.writerShotIds.filter((id): id is string => typeof id === 'string') : []
+  return typeof t.writerShotId === 'string' && t.writerShotId ? [...many, t.writerShotId] : many
+}
+
+function runIdOfTarget(target: unknown): string | null {
+  const runId = (target && typeof target === 'object' ? target : {}) as { batchRunId?: unknown }
+  return typeof runId.batchRunId === 'string' ? runId.batchRunId : null
+}
 
 interface EligibleShot {
   shot_id: string
@@ -71,10 +87,14 @@ export async function POST(req: NextRequest) {
   if (demoBlocked) return demoBlocked
   try {
     // force: 이미 생성된 샷도 다시 만든다(#c3 2026-08-27 오너 — "전체 재생성"). 기본은 빈칸만.
-    const { projectId, force, traceId } = (await req.json()) as {
+    // runId: 한 판(클라 러너 한 번)의 표시(2026-10-10). 이 판의 시트 작업은 target.batchRunId 에 남고, 같은 판의 요청은
+    //   그 작업들이 맡은 샷을 끝났든 실패했든 다시 내지 않는다 — 앞 요청의 답을 잃어도(시간 초과 · 통신 끊김) DB 가 기억한다.
+    //   실패한 샷이 요청마다 다시 나갔고(운영 9/1 3e0169eb 같은 시트 10번), force 는 요청마다 맨 앞 샷들을 다시 골랐다.
+    const { projectId, force, traceId, runId } = (await req.json()) as {
       projectId?: string
       force?: boolean
       traceId?: string
+      runId?: unknown
     }
     if (!projectId) return NextResponse.json({ error: 'Invalid request: projectId required' }, { status: 400 })
 
@@ -87,6 +107,10 @@ export async function POST(req: NextRequest) {
     if (traceId && !(await chatTraceBelongsToProject(projectId, traceId))) {
       return NextResponse.json({ error: 'Invalid request: traceId does not belong to project' }, { status: 409 })
     }
+    if (runId !== undefined && (typeof runId !== 'string' || !RUN_ID_RE.test(runId))) {
+      return NextResponse.json({ error: 'Invalid request: runId must be a UUID' }, { status: 400 })
+    }
+    const batchRunId = typeof runId === 'string' ? runId : null
 
     const quota = await checkGenerationCapacity(access.userId!, 'image')
     if (!quota.ok) return quotaRejectionResponse(quota, { projectId, kind: 'storyboard_real_grid', userId: access.userId })
@@ -110,6 +134,46 @@ export async function POST(req: NextRequest) {
       .eq('project_id', projectId)
       .order('sort_order')
 
+    // 이미 그리는 중인 샷(오너 제보 2026-10-10 "중간에 끊김"): 같은 샷은 한 작업만 받으므로(DB 트리거) 앞쪽 샷이 아직
+    //   그려지는 중이면 그 시트 예약이 막혀 판 전체가 그 자리에서 끝났다 — 시간 초과 뒤 다시 누를 때 · 다른 탭 · 오래 걸리는 그림.
+    //   그 샷은 건너뛰고 다음 샷을 낸다. 막 시작한 작업(STALE_QUEUED_MS 안)은 클라가 끝나기를 기다리게 inProgress 로 알려 주고,
+    //   그보다 오래된 작업(접수 확인이 끝내 안 된 예약 등)은 기다려도 끝나지 않을 수 있어 건너뛰기만 한다.
+    const { data: queuedJobs, error: queuedError } = await supabaseAdmin
+      .from('generation_jobs')
+      .select('id, target, created_at')
+      .eq('project_id', projectId)
+      .eq('status', 'queued')
+      .in('kind', ['shot_storyboard', 'storyboard_real_grid'])
+    if (queuedError) throw queuedError
+    const busyJobByShot = new Map<string, { jobId: string; fresh: boolean; sameRun: boolean }>()
+    for (const j of queuedJobs ?? []) {
+      const fresh = Date.now() - new Date(j.created_at as string).getTime() < STALE_QUEUED_MS
+      const sameRun = !!batchRunId && runIdOfTarget(j.target) === batchRunId
+      for (const id of shotsOfTarget(j.target)) {
+        if (!busyJobByShot.has(id)) busyJobByShot.set(id, { jobId: j.id as string, fresh, sameRun })
+      }
+    }
+    // 같은 판이 이미 낸 샷 — 끝났든 실패했든 이 판에서는 다시 내지 않는다(실패한 샷은 버튼을 다시 누르면 = 새 판에서 다시 그린다).
+    const { data: runJobs, error: runJobsError } = batchRunId
+      ? await supabaseAdmin
+          .from('generation_jobs')
+          .select('id, target')
+          .eq('project_id', projectId)
+          .eq('kind', 'storyboard_real_grid')
+          .eq('target->>batchRunId', batchRunId)
+      : { data: [] as Array<{ id: string; target: unknown }>, error: null }
+    if (runJobsError) throw runJobsError
+    const doneThisRun = new Set((runJobs ?? []).flatMap((j) => shotsOfTarget(j.target)))
+    /** 클라가 끝나기를 기다릴 작업 → 그 작업이 그리는 (이번 요청 대상) 샷 · 이 판이 낸 작업인지 */
+    const inProgress = new Map<string, { shotIds: string[]; sameRun: boolean }>()
+    const waitFor = (jobId: string, shotIds: string[], sameRun: boolean) => {
+      const entry = inProgress.get(jobId) ?? { shotIds: [], sameRun }
+      entry.shotIds.push(...shotIds)
+      inProgress.set(jobId, entry)
+    }
+    const inProgressList = () =>
+      [...inProgress].map(([jobId, e]) => ({ jobId, shotIds: e.shotIds, ...(e.sameRun ? { sameRun: true } : {}) }))
+
     const eligible: EligibleShot[] = []
     // #ref-gate(2026-09-02): 건너뛴 샷은 이유와 함께 돌려준다 — 클라가 선행 산출물을 기다렸다가 자동 재개한다.
     const skipped: Array<{
@@ -121,6 +185,12 @@ export async function POST(req: NextRequest) {
       // 기본은 빈칸만(교체는 개별 재생성 소관). force 면 이미 있는 것도 다시 만든다 —
       //   오너가 "하나씩 하는 거 짜쳐서" 전체 재생성을 원한 경로(#c3).
       if (!force && s.storyboard_image) continue
+      const busy = busyJobByShot.get(s.shot_id as string)
+      if (busy) {
+        if (busy.fresh) waitFor(busy.jobId, [s.shot_id as string], busy.sameRun)
+        continue
+      }
+      if (doneThisRun.has(s.shot_id as string)) continue
       const f = (s.rough_storyboard as { frames?: Record<string, string> } | null)?.frames
       if (!f?.start || !f?.direction || !f?.end) {
         skipped.push({ shotId: s.shot_id as string, reason: 'missing_rough_storyboard' })
@@ -150,11 +220,72 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    // 인물 조회는 호출 전체 1회(쿼리 절약)로 두되 맵으로 보관 — 레퍼런스는 **시트별로** 꺼낸다
+    //   (#real-grid-identity 2026-08-12): 옛 코드는 호출 전체(최대 2시트)의 합집합을 익명 URL
+    //   배열로 모든 시트에 실었다. 그 시트에 안 나오는 인물의 레퍼런스가 오염원으로 첨부되고,
+    //   어느 URL 이 누구인지도 잃어버려 프롬프트가 대응을 지시할 수 없었다 — 실측 a5cb2cae
+    //   sh_04_18: 추적자 단독 칸이 소녀로 바꿔치기된 시트가 그대로 저장됐다.
+    const appearancePairs = [...new Map(
+      eligible
+        .flatMap((s) => s.characters.map((characterId) => ({
+          characterId,
+          appearanceKey: s.characterAppearanceKeys[characterId],
+        })))
+        .map(({ characterId, appearanceKey }) => [`${characterId}\u0000${appearanceKey}`, { characterId, appearanceKey }]),
+    ).values()].sort((a, b) =>
+      a.characterId.localeCompare(b.characterId) || a.appearanceKey.localeCompare(b.appearanceKey),
+    )
+    const allCharIds = [...new Set(appearancePairs.map(({ characterId }) => characterId))]
+    const { data: chars } = allCharIds.length
+      ? await supabaseAdmin
+          .from('characters')
+          .select('character_id, name')
+          .eq('project_id', projectId)
+          .in('character_id', allCharIds)
+      : { data: [] as Array<Record<string, unknown>> }
+    const charById = new Map((chars ?? []).map((c) => [c.character_id as string, c]))
+    const { data: appearanceRows } = appearancePairs.length
+      ? await supabaseAdmin
+          .from('character_appearances')
+          .select('character_id, appearance_key, sheet_url')
+          .eq('project_id', projectId)
+          .in('character_id', allCharIds)
+          .in('appearance_key', [...new Set(appearancePairs.map(({ appearanceKey }) => appearanceKey))])
+      : { data: [] as Array<Record<string, unknown>> }
+    const appearanceByPair = new Map(
+      (appearanceRows ?? []).map((appearance) => [
+        `${appearance.character_id as string}\u0000${appearance.appearance_key as string}`,
+        appearance,
+      ]),
+    )
+    // #ref-gate: 시트 없는 인물이 있는 샷은 이번 배치에서 빼고 이유(이름)와 함께 돌려준다 — 전체를 409 로
+    //   죽이던 종전 동작 대신 준비된 샷은 진행하고, 클라가 시트 완성을 기다렸다가 자동 재개한다.
+    //   묶기 전에 모든 대상 샷을 본다(2026-10-10): 묶은 뒤 앞 두 장만 보면 앞쪽 샷들에 시트 없는 인물이 있을 때
+    //   준비된 뒤쪽 샷을 두고 "낼 것 없음"으로 판이 멈췄다. 없는 인물은 아래 계약 검사가 종전대로 409 로 알린다.
+    const sheetMissingByShot = new Map<string, Array<{ characterId: string; appearanceKey: string; name: string }>>()
+    for (const s of eligible) {
+      const missing = s.characters
+        .filter((characterId) => charById.has(characterId))
+        .map((characterId) => ({ characterId, appearanceKey: s.characterAppearanceKeys[characterId] }))
+        .filter(({ characterId, appearanceKey }) => {
+          const sheetUrl = appearanceByPair.get(`${characterId}\u0000${appearanceKey}`)?.sheet_url
+          return typeof sheetUrl !== 'string' || !sheetUrl.trim()
+        })
+        .map(({ characterId, appearanceKey }) => ({
+          characterId,
+          appearanceKey,
+          name: (((charById.get(characterId)?.name as string) || characterId).trim()) || characterId,
+        }))
+      if (missing.length) sheetMissingByShot.set(s.shot_id, missing)
+    }
+    for (const [shotId, missing] of sheetMissingByShot) skipped.push({ shotId, reason: 'missing_character_sheets', missing })
+    const ready = eligible.filter((s) => !sheetMissingByShot.has(s.shot_id))
+
     // 그룹핑: 같은 씬(#grid-shift 교훈)만 키 — 캐릭터 세트는 시트 내 혼재 허용(#real-grid-fix):
     //   세트를 키에 넣으면 시트가 잘게 쪼개져 배칭 이득이 반감(실측 8시트/12샷). 레퍼런스는
     //   합집합으로 전달되고 프롬프트가 칸별 대응("corresponding character")을 지시하므로 안전.
     const groups: EligibleShot[][] = []
-    for (const s of eligible) {
+    for (const s of ready) {
       const last = groups[groups.length - 1]
       if (!last || last.length >= 4 || last[0].scene_id !== s.scene_id) groups.push([s])
       else last.push(s)
@@ -162,7 +293,10 @@ export async function POST(req: NextRequest) {
     const planned = groups.slice(0, MAX_GRID_JOBS_PER_CALL)
     const plannedShots = planned.reduce((n, g) => n + g.length, 0)
     if (!planned.length) {
-      return NextResponse.json({ ok: true, data: { submitted: [], remaining: 0, skipped } })
+      return NextResponse.json({ ok: true, data: { submitted: [], remaining: 0, skipped, inProgress: inProgressList() } })
+    }
+    if (planned.some((g) => g.some((s) => s.characters.some((characterId) => !charById.has(characterId))))) {
+      throw new CharacterAppearanceContractError('Character appearance contract error: a shot snapshot references a missing character identity')
     }
 
     const anchor = await resolveStyleAnchor(project)
@@ -184,81 +318,14 @@ export async function POST(req: NextRequest) {
     //   #ref-gate 수정: 씬→로케이션은 scenes.location(location_id) 이 진실 — locations.scene_id 만 보던 첫 배선은
     //   실측 전 프로젝트에서 null 이라 배경을 한 번도 못 붙였다. 공용 헬퍼(scenes.location 우선, scene_id 폴백).
     const worldRefByScene = await loadSceneWorldRefs(projectId, sceneIds)
-    // 인물 조회는 호출 전체 1회(쿼리 절약)로 두되 맵으로 보관 — 레퍼런스는 **시트별로** 꺼낸다
-    //   (#real-grid-identity 2026-08-12): 옛 코드는 호출 전체(최대 2시트)의 합집합을 익명 URL
-    //   배열로 모든 시트에 실었다. 그 시트에 안 나오는 인물의 레퍼런스가 오염원으로 첨부되고,
-    //   어느 URL 이 누구인지도 잃어버려 프롬프트가 대응을 지시할 수 없었다 — 실측 a5cb2cae
-    //   sh_04_18: 추적자 단독 칸이 소녀로 바꿔치기된 시트가 그대로 저장됐다.
-    const appearancePairs = [...new Map(
-      planned
-        .flatMap((g) => g.flatMap((s) => s.characters.map((characterId) => ({
-          characterId,
-          appearanceKey: s.characterAppearanceKeys[characterId],
-        }))))
-        .map(({ characterId, appearanceKey }) => [`${characterId}\u0000${appearanceKey}`, { characterId, appearanceKey }]),
-    ).values()].sort((a, b) =>
-      a.characterId.localeCompare(b.characterId) || a.appearanceKey.localeCompare(b.appearanceKey),
-    )
-    const allCharIds = appearancePairs.map(({ characterId }) => characterId)
-    const { data: chars } = allCharIds.length
-      ? await supabaseAdmin
-          .from('characters')
-          .select('character_id, name')
-          .eq('project_id', projectId)
-          .in('character_id', allCharIds)
-      : { data: [] as Array<Record<string, unknown>> }
-    const charById = new Map((chars ?? []).map((c) => [c.character_id as string, c]))
-    if (appearancePairs.some(({ characterId }) => !charById.has(characterId))) {
-      throw new CharacterAppearanceContractError('Character appearance contract error: a shot snapshot references a missing character identity')
-    }
-    const { data: appearanceRows } = appearancePairs.length
-      ? await supabaseAdmin
-          .from('character_appearances')
-          .select('character_id, appearance_key, sheet_url')
-          .eq('project_id', projectId)
-          .in('character_id', allCharIds)
-          .in('appearance_key', [...new Set(appearancePairs.map(({ appearanceKey }) => appearanceKey))])
-      : { data: [] as Array<Record<string, unknown>> }
-    const appearanceByPair = new Map(
-      (appearanceRows ?? []).map((appearance) => [
-        `${appearance.character_id as string}\u0000${appearance.appearance_key as string}`,
-        appearance,
-      ]),
-    )
-    // #ref-gate: 시트 없는 인물이 있는 샷은 이번 배치에서 빼고 이유(이름)와 함께 돌려준다 — 전체를 409 로
-    //   죽이던 종전 동작 대신 준비된 샷은 진행하고, 클라가 시트 완성을 기다렸다가 자동 재개한다.
-    const sheetMissingByShot = new Map<string, Array<{ characterId: string; appearanceKey: string; name: string }>>()
-    for (const group of planned) {
-      for (const s of group) {
-        const missing = s.characters
-          .map((characterId) => ({ characterId, appearanceKey: s.characterAppearanceKeys[characterId] }))
-          .filter(({ characterId, appearanceKey }) => {
-            const sheetUrl = appearanceByPair.get(`${characterId}\u0000${appearanceKey}`)?.sheet_url
-            return typeof sheetUrl !== 'string' || !sheetUrl.trim()
-          })
-          .map(({ characterId, appearanceKey }) => ({
-            characterId,
-            appearanceKey,
-            name: (((charById.get(characterId)?.name as string) || characterId).trim()) || characterId,
-          }))
-        if (missing.length) sheetMissingByShot.set(s.shot_id, missing)
-      }
-    }
-    for (const [shotId, missing] of sheetMissingByShot) skipped.push({ shotId, reason: 'missing_character_sheets', missing })
-    const readyPlanned = planned
-      .map((group) => group.filter((s) => !sheetMissingByShot.has(s.shot_id)))
-      .filter((group) => group.length > 0)
-    if (!readyPlanned.length) {
-      return NextResponse.json({ ok: true, data: { submitted: [], remaining: eligible.length - plannedShots, skipped } })
-    }
 
     const webhookUrl = resolveWebhookUrl()
     const submitted: Array<{ jobId: string; shotIds: string[] }> = []
     // #generation-capacity-trigger(2026-09-14): 자리가 없어 이번에 못 낸 시트의 샷 수 — 잔량(remaining)으로
     //   되돌려 다음 라운드가 다시 잡게 한다. 이미 낸 시트는 그대로 진행한다.
     let capacitySkippedShots = 0
-    for (let groupIndex = 0; groupIndex < readyPlanned.length; groupIndex++) {
-      const group = readyPlanned[groupIndex]
+    for (let groupIndex = 0; groupIndex < planned.length; groupIndex++) {
+      const group = planned[groupIndex]
       // #sheet-formats: 레퍼런스 시트는 프레임 AR 매칭(왜곡 방지 — 레거시 프레임이면 레거시 시트),
       //   출력 캔버스·크롭은 포맷 스펙 — 가로 레퍼런스+세로 캔버스는 T2 실측 검증 경로.
       const refGrid = await composeRoughReferenceGrid(
@@ -373,15 +440,32 @@ export async function POST(req: NextRequest) {
             workspaceId: project.workspace_id as string,
             writerShotIds: group.map((s) => s.shot_id),
             gridVariant: 'grid4',
+            // 이 시트를 낸 뒤 이 판에서 아직 낼 샷 — 이번 요청의 뒤 시트 몫도 포함(곧 나간다). 진행 표시의 전체 수 근거.
+            ...(batchRunId
+              ? { batchRunId, batchRunRemaining: ready.length - planned.slice(0, groupIndex + 1).reduce((n, g) => n + g.length, 0) }
+              : {}),
             roughGeneratedAtByShot: Object.fromEntries(
               group.filter((s) => typeof s.roughGeneratedAt === 'number').map((s) => [s.shot_id, s.roughGeneratedAt as number]),
             ),
           },
         })
       } catch (err) {
-        if (existingStoryboardJobId(err)) {
+        const existingJobId = existingStoryboardJobId(err)
+        if (existingJobId) {
           // 다른 탭의 개별/일괄 작업이 먼저 예약했다. 남은 장은 보존하고 새 제출 없이 멈춘다.
-          capacitySkippedShots = readyPlanned.slice(groupIndex).reduce((n, g) => n + g.length, 0)
+          //   그 작업은 클라가 끝나기를 기다린 뒤 다음 차례를 묻게 알려 준다 — 그 작업이 맡은 샷만(2026-10-10).
+          const { data: existing } = await supabaseAdmin
+            .from('generation_jobs')
+            .select('target')
+            .eq('id', existingJobId)
+            .maybeSingle()
+          const covered = new Set(shotsOfTarget(existing?.target))
+          waitFor(
+            existingJobId,
+            group.map((s) => s.shot_id).filter((id) => covered.has(id)),
+            !!batchRunId && runIdOfTarget(existing?.target) === batchRunId,
+          )
+          capacitySkippedShots = planned.slice(groupIndex).reduce((n, g) => n + g.length, 0)
           break
         }
         const rejected = capacityReservationRejection(err, { projectId, kind: 'storyboard_real_grid', userId: access.userId })
@@ -389,7 +473,7 @@ export async function POST(req: NextRequest) {
         // 첫 장부터 자리가 없으면 아무것도 접수하지 않았으니 종전대로 자리 없음(429)으로 답한다.
         if (!submitted.length) return rejected
         // 이미 낸 시트는 그대로 진행시키고 남은 장만 건너뛴다 — 그 수를 잔량에 담아 돌려준다.
-        capacitySkippedShots = readyPlanned.slice(groupIndex).reduce((n, g) => n + g.length, 0)
+        capacitySkippedShots = planned.slice(groupIndex).reduce((n, g) => n + g.length, 0)
         break
       }
 
@@ -443,7 +527,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      data: { submitted, remaining: eligible.length - plannedShots + capacitySkippedShots, skipped },
+      data: { submitted, remaining: ready.length - plannedShots + capacitySkippedShots, skipped, inProgress: inProgressList() },
     })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

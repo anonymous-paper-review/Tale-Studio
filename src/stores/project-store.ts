@@ -75,6 +75,10 @@ interface ProjectState {
    *  producer 를 넘었는가(Writer 시작 성공 때만 넘는다) — 여기는 그 캐시다. verifyWriterGate 의 게이트백(reachedStage 하향)과
    *  무관하게 유지되고, 다른 프로젝트를 열 때만 다시 읽는다. 잠금은 Producer 화면·채팅만 막는다(다른 단계는 그대로). */
   producerLocked: boolean
+  /** 아직 넘기지 않은 트리트먼트 초안이 있다(2026-10-02 시안 v04 — 새 프로젝트는 만들자마자 Writer 앞단을 돌린다).
+   *  Writer 실행 기록이 있어도 이 동안은 Producer 를 잠그지 않는다. Writer 로 넘기면(lockProducer) 내려간다. */
+  treatmentDraft: boolean
+  setTreatmentDraft: (draft: boolean) => void
 
   /** Artist 초기 이미지 생성 게이트 — 검증 전 기본 true(플래시 방지). */
   artistImagesReady: boolean
@@ -190,6 +194,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   writerNeedsRerun: false,
   lifecycleStatus: EMPTY_LIFECYCLE_STATUS,
   producerLocked: false,
+  treatmentDraft: false,
 
   // Artist도 기본 true — assets 검증 전 플래시 잠금을 막는다.
   artistImagesReady: true,
@@ -210,7 +215,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       reachedStage: furtherStage(s.reachedStage, stage),
     })),
 
-  lockProducer: () => set({ producerLocked: true }),
+  lockProducer: () => set({ producerLocked: true, treatmentDraft: false }),
+  setTreatmentDraft: (draft) => set({ treatmentDraft: draft }),
 
   canNavigateTo: (stage) => {
     // 순차 잠금: producer→artist→director→editor 순으로 하나씩 열린다.
@@ -280,6 +286,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           currentStage: p.current_stage ?? 'producer',
           reachedStage: p.current_stage ?? 'producer',
           producerLocked: (p.current_stage ?? 'producer') !== 'producer',
+          treatmentDraft: false,
           lifecycleStatus: EMPTY_LIFECYCLE_STATUS,
           ...DEFAULT_ARTIST_ASSET_GATE,
         })
@@ -313,6 +320,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         reachedStage: project.current_stage ?? 'producer',
         // DB current_stage 가 producer 를 넘었으면 Writer 를 시작한 프로젝트다 — Producer 잠금.
         producerLocked: (project.current_stage ?? 'producer') !== 'producer',
+        treatmentDraft: false,
         lifecycleStatus: EMPTY_LIFECYCLE_STATUS,
         ...DEFAULT_ARTIST_ASSET_GATE,
       })
@@ -370,6 +378,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         currentStage: 'producer',
         reachedStage: 'producer',
         producerLocked: false,
+        treatmentDraft: false,
         writerComplete: true,
         writerActive: false,
         writerNeedsRerun: false,
@@ -408,6 +417,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       reachedStage: stage ?? 'producer',
       // 호출부가 넘긴 DB 단계로 먼저 잠그고, 아래 조회가 DB current_stage 로 확정한다.
       producerLocked: (stage ?? 'producer') !== 'producer',
+      treatmentDraft: false,
       // 새 프로젝트 진입 — 게이트 플래그 초기화 (verifyWriterGate 가 곧 재계산).
       writerComplete: true,
       writerActive: false,
@@ -525,6 +535,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       // writer_runs 는 RLS(service-role only)라 클라이언트가 못 읽음 → 서버 status 라우트 사용.
       let writerActive = false
       let writerFailed = false
+      let treatmentDraftRun = false
       let assets: WriterStatusAssets | null = null
       try {
         const r = await fetch(`/api/writer/status/${projectId}?assets=1`)
@@ -532,7 +543,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           const s = await r.json()
           writerActive = !!(s?.started && !s?.pipeline_completed && !s?.pipeline_failed)
           // Writer 가 한 번이라도 시작됐으면 Producer 는 잠긴다 — 단계 저장만 실패해 DB 단계가 producer 에 남은 경우까지.
-          if (s?.started === true && get().projectId === projectId) set({ producerLocked: true })
+          // 단, 새 프로젝트의 트리트먼트 초안(draft)은 아직 넘기지 않은 실행이다 — 잠그지 않는다(2026-10-02 시안 v04).
+          const draft = s?.draft === true
+          if (get().projectId === projectId) set({ treatmentDraft: draft })
+          if (s?.started === true && !draft && get().projectId === projectId) set({ producerLocked: true })
+          treatmentDraftRun = draft
           writerFailed = !!s?.pipeline_failed
           assets = (s?.assets ?? null) as WriterStatusAssets | null
         }
@@ -543,7 +558,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const incomplete = !hasScenes && !writerActive
       // 예전 producer-origin location 예외는 폐기됐다. source location 만으로 Artist를
       // 열지 않고, writer 산출물 게이트 뒤에서도 status.assets.images_ready 가 최종 이미지 잠금 권한이다.
-      const needsRerun = incomplete && (origStage !== 'producer' || writerFailed)
+      // 트리트먼트 초안이 실패했으면 Producer 의 씬 스토리에서 다시 시도한다 — Writer 다시 실행 안내를 띄우지 않는다.
+      const needsRerun = incomplete && !treatmentDraftRun && (origStage !== 'producer' || writerFailed)
       const shouldGateBack = needsRerun
 
       set({
@@ -572,6 +588,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       currentStage: 'producer',
       reachedStage: 'producer',
       producerLocked: false,
+      treatmentDraft: false,
       initLoading: false,
       writerComplete: true,
       writerActive: false,
