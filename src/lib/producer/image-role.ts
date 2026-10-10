@@ -39,9 +39,12 @@ export function matchImageRoleAnswer(text: string): ImageRole | null {
  *  만화 원고 · 인물 · 배경 · 그림체 · 참고 자료만. 그림체는 예전 규칙에서 참고 낱말이라 여기서 먼저 읽는다. */
 export type ImageUseAnswer = ImageRole | 'style' | 'comic'
 
-const STYLE_USE_RE = /그림체|화풍|art style|drawing style/i // i18n-ok: 역할 낱말 규칙 자체
+// "스타일"도 그림체다(2026-10-10 오너 — 운영 806e2cc2 "스타일로 반영해줘"가 참고 자료로 읽혀 고정 · 분석이 빠졌다).
+const STYLE_USE_RE = /그림체|화풍|스타일|art style|drawing style|\bstyle\b/i // i18n-ok: 역할 낱말 규칙 자체
 const COMIC_PAGE_RE = /만화 원고|웹툰 원고|comic page|manga page/i // i18n-ok: 역할 낱말 규칙 자체
 const REFERENCE_ONLY_RE = /참고|레퍼런스|reference/i // i18n-ok: 역할 낱말 규칙 자체
+// 의견을 묻는 말 — "이 스타일 어때?"는 고른 것이 아니다. 그림체로 고르면 고정돼 되돌릴 수 없어 말로 고를 때만 따진다.
+const ASKING_RE = /어때|어떨까|어떤가|어떻게 생각|괜찮(?:아|을까|나|니)|좋아\s*[?？]|좋을까|what do you think|how about|do you like/i // i18n-ok: 답 낱말 규칙 자체
 
 /** 그림마다 묻는 질문의 답 — 만화 원고 · 그림체를 먼저 보고("그림체 참고만"은 참고), 나머지는 종전 역할 규칙. */
 export function matchImageUseAnswer(text: string): ImageUseAnswer | null {
@@ -52,11 +55,11 @@ export function matchImageUseAnswer(text: string): ImageUseAnswer | null {
   return matchImageRoleAnswer(t)
 }
 
-/** 그림과 함께 쓴 말 — "이 그림체로"처럼 짧고 그림체 낱말만 있으면 그림체, 아니면 종전 역할 규칙. */
+/** 그림과 함께 쓴 말 — "이 그림체로" · "스타일로 반영해줘"처럼 짧고 그림체 낱말만 있으면 그림체(묻는 말은 빼고), 아니면 종전 역할 규칙. */
 export function matchImageUseInText(text: string): ImageUseAnswer | null {
   const t = (text ?? '').trim()
   if (!t || t.length > SHORT_TEXT_MAX) return null
-  if (STYLE_USE_RE.test(t) && !REFERENCE_ONLY_RE.test(t) && !CHARACTER_RE.test(t) && !BACKGROUND_RE.test(t)) return 'style'
+  if (STYLE_USE_RE.test(t) && !ASKING_RE.test(t) && !REFERENCE_ONLY_RE.test(t) && !CHARACTER_RE.test(t) && !BACKGROUND_RE.test(t)) return 'style'
   return matchImageRoleInText(t)
 }
 

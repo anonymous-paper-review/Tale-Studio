@@ -12,7 +12,10 @@ export const CHAT_IMAGE_ROLE_CONSENT = 'chat-image-role-v1'
 /** 스타일 선택 창의 "내 그림체 올리기" 카드 안내 문구 판(2026-10-10) — 카드의 분석 모델 안내를 바꾸면 판도 올린다. */
 export const STYLE_PICKER_CONSENT = 'style-picker-v1'
 
-const ANALYSIS_CONSENTS = new Set([COMIC_ANALYSIS_CONSENT, CREATION_ANALYSIS_CONSENT, CHAT_IMAGE_ROLE_CONSENT, STYLE_PICKER_CONSENT])
+/** 채팅에서 그림을 붙이고 "그림체로 · 스타일로 써 줘"라고 말해 고름(2026-10-10) — 질문의 안내를 보지 않았다. 분석한다는 말은 진행 문장으로 알린다. */
+export const CHAT_STYLE_REQUEST_CONSENT = 'chat-style-request-v1'
+
+const ANALYSIS_CONSENTS = new Set([COMIC_ANALYSIS_CONSENT, CREATION_ANALYSIS_CONSENT, CHAT_IMAGE_ROLE_CONSENT, STYLE_PICKER_CONSENT, CHAT_STYLE_REQUEST_CONSENT])
 
 export function isAnalysisConsent(consent: unknown): consent is string {
   return typeof consent === 'string' && ANALYSIS_CONSENTS.has(consent)

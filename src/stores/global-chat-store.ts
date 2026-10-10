@@ -24,7 +24,7 @@ import { selectedProducerDialogueLanguage } from '@/lib/producer-dialogue-langua
 import { fixKoreanParticles } from '@/lib/korean-particles'
 import { coerceCardFill, matchImageUseAnswer, matchImageUseInText, type CardFill, type ImageUseAnswer } from '@/lib/producer/image-role'
 import { MAX_COMIC_PAGES, comicStyleQuestion, imageBatchQuestion, matchBatchImageAnswer, matchComicAnswer, matchComicIntentInText, matchComicStyleAnswer, sortComicPages } from '@/lib/producer/comic-intake'
-import { CHAT_IMAGE_ROLE_CONSENT, COMIC_ANALYSIS_CONSENT, CREATION_ANALYSIS_CONSENT, STYLE_PICKER_CONSENT } from '@/lib/style-facets/consent'
+import { CHAT_IMAGE_ROLE_CONSENT, CHAT_STYLE_REQUEST_CONSENT, COMIC_ANALYSIS_CONSENT, CREATION_ANALYSIS_CONSENT, STYLE_PICKER_CONSENT } from '@/lib/style-facets/consent'
 import type { PendingCreation } from '@/stores/pending-creation-store'
 import type { BoardBusy } from '@/lib/producer/busy'
 import { backgroundMentions, castMentions } from '@/lib/card-mention'
@@ -478,7 +478,7 @@ async function retryComicScript(get: () => GlobalChatState, retry: ComicRetry): 
 function askComicStyle(get: () => GlobalChatState, images: ChatImageInput[], plan?: ImageRoleGate): void {
   if (useProducerStore.getState().customStyleAnchor?.locked === true) {
     if (plan) void runChatImagePlan(get, plan, null)
-    else void runComicAdaptation(get, images, { styleMode: 'keep' })
+    else void runMaterialPlan(get, comicOnlyPlan(images, null))
     return
   }
   useGlobalChatStore.setState({ comicStyleGate: { images, ...(plan ? { plan } : {}) } })
@@ -757,28 +757,74 @@ async function finishImageRoles(get: () => GlobalChatState, plan: ImageRoleGate)
   await runChatImagePlan(get, plan, null)
 }
 
-/** 그림마다 고른 대로 쓴다 — 인물 · 배경 · 참고는 종전대로(runImageRolePlan), 그림체 그림은 그림체로, 만화 원고는 대본으로. */
-async function runChatImagePlan(get: () => GlobalChatState, plan: ImageRoleGate, comicStyle: 'lock' | 'adapt' | null): Promise<void> {
-  const pages = plan.items.filter((it) => it.role === 'comic').map((it) => it.image)
-  const styleImage = plan.items.find((it) => it.role === 'style')?.image ?? null
-  const consent = plan.consent ?? CHAT_IMAGE_ROLE_CONSENT
-  const roleItems = plan.items.filter((it) => it.role === 'character' || it.role === 'background' || it.role === 'reference')
-  const cardsDone = roleItems.length ? runImageRolePlan(get, { ...plan, items: roleItems }) : Promise.resolve()
-  if (pages.length) {
+/**
+ * 고른 쓰임새대로 그림을 쓰는 한 곳(2026-10-10 오너 "프로젝트 생성 시 입력하는 플로우랑 채팅으로 나중에 입력하는 플로우 모두
+ *   똑같은 기능으로 관리해줘") — 새 프로젝트 · 채팅(그림마다 질문 · 말로 고름 · 여러 장 한 번에) · 스타일 선택 창이 모두 이리로 온다.
+ *   만화 원고 → 대본으로 옮기고 그림체(고정이면 첫 쪽, 그림체 그림이 있으면 그 그림 · 각색이면 스타일 고르기),
+ *   그림체 그림 → 매체 고르기 · 고정 · 분석, 인물 · 배경 → 카드를 만들고 그림으로 채우기, 참고 자료 → 사용자의 말과 함께 채팅으로.
+ *   카드 · 대본이 끝나면 돌아온다. 그림체 분석은 1~2분 더 걸려 styleDone 으로 따로 기다린다.
+ */
+interface MaterialPlan {
+  comicPages: ChatImageInput[]
+  /** 만화 원고의 그림체 — lock(첫 쪽으로 고정) · adapt(다른 스타일로) · null(lock). 이미 고정된 그림체면 그대로 둔다. */
+  comicStyle: 'lock' | 'adapt' | null
+  styleImage: ChatImageInput | null
+  cards: Array<{ image: ChatImageInput; role: 'character' | 'background' }>
+  references: ChatImageInput[]
+  /** 사용자가 그림과 함께 쓴 말 — 카드 채우기 요청에 덧붙인다. */
+  typed: string
+  /** 참고 자료와 함께 채팅으로 보낼 말. */
+  referenceMsg: string
+  /** 사용자가 읽고 고른 분석 안내의 판. */
+  consent: string
+  /** 만화를 다시 옮길 때 이어서 할 일(새 프로젝트의 트리트먼트). */
+  then?: ComicRetry['then']
+}
+
+async function runMaterialPlan(get: () => GlobalChatState, plan: MaterialPlan): Promise<{ scriptSet: boolean; styleDone: Promise<void> }> {
+  const items = [...plan.cards, ...plan.references.map((image) => ({ image, role: 'reference' as const }))]
+  // 카드 · 참고 자료와 그림체는 함께 돌린다(채팅은 한 번에 한 요청이라 카드끼리는 차례로).
+  const cardsDone = items.length ? runImageRolePlan(get, { items, typed: plan.typed, msg: plan.referenceMsg }) : Promise.resolve()
+  if (plan.comicPages.length) {
     const locked = useProducerStore.getState().customStyleAnchor?.locked === true
-    const comic = await runComicAdaptation(get, pages, {
-      styleImage,
-      styleMode: locked ? 'keep' : comicStyle ?? 'lock',
-      consent,
+    const comic = await runComicAdaptation(get, plan.comicPages, {
+      styleImage: plan.styleImage,
+      styleMode: locked ? 'keep' : plan.comicStyle ?? 'lock',
+      consent: plan.consent,
       beforeFill: cardsDone,
+      then: plan.then ?? null,
     })
     await cardsDone
-    await comic.styleDone
-    return
+    return { scriptSet: comic.scriptSet, styleDone: comic.styleDone }
   }
-  const style = styleImage ? runStyleFromImage(styleImage, 'picture', consent) : Promise.resolve()
+  const styleDone = plan.styleImage ? runStyleFromImage(plan.styleImage, 'picture', plan.consent) : Promise.resolve()
   await cardsDone
-  await style
+  return { scriptSet: false, styleDone }
+}
+
+const NO_MATERIALS: MaterialPlan = { comicPages: [], comicStyle: null, styleImage: null, cards: [], references: [], typed: '', referenceMsg: '', consent: CHAT_IMAGE_ROLE_CONSENT }
+
+/** 그림마다 고른 쓰임새(채팅 질문 · 말 · 스타일 선택 창)를 한 계획으로. */
+function materialPlanFromRoles(plan: ImageRoleGate, comicStyle: 'lock' | 'adapt' | null): MaterialPlan {
+  return {
+    comicPages: plan.items.filter((it) => it.role === 'comic').map((it) => it.image),
+    comicStyle,
+    styleImage: plan.items.find((it) => it.role === 'style')?.image ?? null,
+    cards: plan.items.flatMap((it) => (it.role === 'character' || it.role === 'background' ? [{ image: it.image, role: it.role }] : [])),
+    references: plan.items.filter((it) => it.role === 'reference').map((it) => it.image),
+    typed: plan.typed,
+    referenceMsg: plan.msg,
+    consent: plan.consent ?? CHAT_IMAGE_ROLE_CONSENT,
+  }
+}
+
+/** 만화 원고만 — 여러 장을 "만화 그대로"로 골랐거나 말로 만화라고 했을 때(안내는 만화 질문의 판). */
+const comicOnlyPlan = (pages: ChatImageInput[], comicStyle: 'lock' | 'adapt' | null): MaterialPlan => ({ ...NO_MATERIALS, comicPages: pages, comicStyle, consent: COMIC_ANALYSIS_CONSENT })
+
+/** 채팅에서 그림마다 고른 대로 쓴다 — 쓰는 일은 새 프로젝트와 같은 곳(runMaterialPlan)이 한다. */
+async function runChatImagePlan(get: () => GlobalChatState, plan: ImageRoleGate, comicStyle: 'lock' | 'adapt' | null): Promise<void> {
+  const result = await runMaterialPlan(get, materialPlanFromRoles(plan, comicStyle))
+  await result.styleDone
 }
 
 function projectChatStage(): { projectId: string | null; stage: StageId } {
@@ -1783,7 +1829,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       set((state) => ({ comicStyleGate: null, messages: [...state.messages, { id: makeId(), stage, role: 'user' as const, content: trimmed }] }))
       if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
       if (styleGate.plan) void runChatImagePlan(get, styleGate.plan, mode)
-      else void runComicAdaptation(get, styleGate.images, { styleMode: mode })
+      else void runMaterialPlan(get, comicOnlyPlan(styleGate.images, mode))
       return
     }
 
@@ -1817,7 +1863,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         return
       }
       if (choice === 'reference') {
-        await runImageRolePlan(get, { items: batchGate.images.map((image) => ({ image, role: 'reference' as const })), typed: batchGate.typed, msg: batchGate.msg })
+        await runMaterialPlan(get, { ...NO_MATERIALS, references: batchGate.images, typed: batchGate.typed, referenceMsg: batchGate.msg })
         return
       }
       set({ imageRoleGate: { items: batchGate.images.map((image) => ({ image, role: null })), typed: batchGate.typed, msg: batchGate.msg } })
@@ -3586,7 +3632,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const direct = used === 'style' && ready.length > 1 ? null : used
     if (direct === 'style') {
       recordImageTurn(set, msg, ready)
-      void finishImageRoles(get, { items: [{ image: ready[0], role: 'style' }], typed, msg })
+      void finishImageRoles(get, { items: [{ image: ready[0], role: 'style' }], typed, msg, consent: CHAT_STYLE_REQUEST_CONSENT })
       return true
     }
     if (direct && direct !== 'comic') {
@@ -3597,7 +3643,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         set((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'producer' as const, role: 'user' as const, content }] }))
         if (projectId) saveChatMessage(projectId, 'producer', 'user', content)
       }
-      void runImageRolePlan(get, { items: ready.map((image) => ({ image, role: direct })), typed, msg })
+      void runMaterialPlan(get, materialPlanFromRoles({ items: ready.map((image) => ({ image, role: direct })), typed, msg }, null))
       return true
     }
     // 여러 장이면 장마다 묻기 전에 한 번에 묻는다 — 만화 원고로 그대로 영상화 · 그림마다 정하기 · 모두 참고 자료(2026-10-09 오너).
@@ -3642,33 +3688,27 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       set((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'producer' as const, role: 'user' as const, content: note }] }))
       saveChatMessage(projectId, 'producer', 'user', note)
     }
-    // 그림 카드 · 참고 자료는 고른 대로 쓴다(묻지 않는다). 채팅은 한 번에 한 요청이라 차례로 돈다.
-    const items = [
-      ...plan.cards.map((card) => ({ image: card.image, role: card.role })),
-      ...plan.references.map((image) => ({ image, role: 'reference' as const })),
-    ]
+    // 고른 쓰임새는 채팅에서 고른 것과 같은 곳(runMaterialPlan)이 쓴다(묻지 않는다). 그림체 분석은 기다리지 않는다.
     const referenceNames = plan.references.map((image) => image.name).join(', ')
-    const cardsDone = items.length
-      ? runImageRolePlan(get, { items, typed: '', msg: translate(voice, 'Uploaded {names} as reference pictures.', { names: referenceNames }) })
-      : Promise.resolve()
-    // 그림체 그림(만화와 함께면 만화 흐름이 쓴다) — 채팅을 쓰지 않으므로 함께 돌린다.
-    const style = plan.styleImage && plan.original !== 'comic' ? runStyleFromImage(plan.styleImage, 'picture', CREATION_ANALYSIS_CONSENT) : Promise.resolve()
     let storyReady = useProducerStore.getState().storyText.trim().length > 0
-    let comicStyle: Promise<void> = Promise.resolve()
+    let styleDone: Promise<void> = Promise.resolve()
     try {
-      if (plan.original === 'comic') {
-        const comic = await runComicAdaptation(get, plan.comicPages, {
-          styleImage: plan.styleImage,
-          styleMode: plan.comicStyle ?? 'lock',
-          consent: CREATION_ANALYSIS_CONSENT,
-          beforeFill: cardsDone,
-          then: { startTreatment: plan.startTreatment, locale: plan.locale },
-        })
-        storyReady = comic.scriptSet
-        comicStyle = comic.styleDone
-        await cardsDone
+      const comic = plan.original === 'comic'
+      const used = await runMaterialPlan(get, {
+        comicPages: comic ? plan.comicPages : [],
+        comicStyle: plan.comicStyle,
+        styleImage: plan.styleImage,
+        cards: plan.cards,
+        references: plan.references,
+        typed: '',
+        referenceMsg: translate(voice, 'Uploaded {names} as reference pictures.', { names: referenceNames }),
+        consent: CREATION_ANALYSIS_CONSENT,
+        then: { startTreatment: plan.startTreatment, locale: plan.locale },
+      })
+      styleDone = used.styleDone
+      if (comic) {
+        storyReady = used.scriptSet
       } else {
-        await cardsDone
         // 원작 대본: 채팅이 대본을 읽고 설정 · 인물 · 배경 카드를 채운다(장르가 비어 있다) — 대본은 건드리지 않는다.
         if (plan.original === 'script' && sameProject()) {
           await sendWhenIdle(
@@ -3684,7 +3724,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     } finally {
       endPlan()
     }
-    await Promise.all([style, comicStyle])
+    await styleDone
   },
 
   dismissPendingProposal: (id) => {
