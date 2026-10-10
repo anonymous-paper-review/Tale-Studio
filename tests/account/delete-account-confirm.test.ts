@@ -101,6 +101,13 @@ it('확인 입력이 비어 있으면 삭제 버튼이 꺼져 있다', () => {
   expect(confirmButton(renderDialog()).props.disabled).toBe(true)
 })
 
+// 왜: 빈 칸에 이메일이 흐리게 적혀 있으면 이미 입력된 것처럼 보여 왜 버튼이 꺼졌는지 헷갈린다(미리보기 화면 확인, 2026-10-11).
+it('확인 입력이 비어 있으면 칸에 계정 이메일을 미리 보여 주지 않는다', () => {
+  const input = renderDialog().find((node) => node.type === Input)!
+
+  expect(input.props.placeholder ?? '').not.toContain(EMAIL)
+})
+
 // 왜: 비슷한 글자를 넣고 눌러도 삭제되면 실수 방지 장치가 없는 것과 같다.
 it('확인 입력이 계정 이메일과 다르면 삭제 버튼이 꺼져 있다', () => {
   typeConfirmation(renderDialog(), 'owner@example.tes')

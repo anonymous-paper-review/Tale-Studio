@@ -106,7 +106,6 @@ export function DeleteAccountDialog({
             onChange={(event) => setTyped(event.target.value)}
             autoComplete="off"
             spellCheck={false}
-            placeholder={email}
           />
         </label>
 
