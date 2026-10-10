@@ -447,6 +447,43 @@ describe('그림체 분석이 도는 동안 Artist 그림은 미룬다', () => {
   })
 })
 
+// 2026-10-10 오너(제안대로) — 올린 그림의 분석 결과가 있으면 인물 시트 본문은 Writer 그림체 값 대신 그림과 분석 결과만 따른다.
+//   Writer 값은 분석을 보지 못한 채(분석보다 먼저) 장르 · 그림체 이름만으로 정해져 분석과 부딪혔다(운영 806e2cc2: 6등신 · 다른 색 조합).
+describe('올린 그림의 분석 결과가 있을 때 인물 시트 본문', () => {
+  const analyzed = (facets: Record<string, unknown> | null) => ({
+    url: 'https://example.supabase.co/storage/v1/object/public/media/ws-1/proj-1/uploads/look/original.webp',
+    label: '내 그림체', medium: '2d_anime', locked: true,
+    ...(facets ? { facets } : {}),
+  })
+  const FACETS = { probe_anchors: 'Digital color line art with flat cel fills.', figure: 'Big round eyes.', priority: 'Priority order: dark outlines → cel shading.', negative: 'Avoid 3D render.' }
+  const promptOf = () => (mocks.reserveGenerationJob.mock.calls[0][0] as { inputSnapshot: { prompt: string } }).inputSnapshot.prompt
+
+  it('올린 그림의 분석 결과가 있으면 인물 시트 본문에 Writer가 정한 그림체 값(그림체 · 선 · 형태 · 질감 · 등신 · 색)을 싣지 않는다', async () => {
+    // 왜: Writer 값은 분석 결과를 보지 못하고 정해져 "6등신 · 다른 색"처럼 분석과 반대로 말했다 — 그림체는 올린 그림과 분석이 정한다.
+    dbState.projects = [projectFixture({ style_anchor_key: 'custom_1', custom_style_anchor: analyzed(FACETS) })]
+    await triggerCharacterDrafts(PROJECT_ID)
+    const prompt = promptOf()
+    expect(prompt).toContain('Style anchors: Digital color line art with flat cel fills.')
+    expect(prompt).not.toMatch(/art style: |line quality: |shape language: |texture: |head-to-body ratio|palette: /)
+  })
+
+  it('올린 그림의 분석 결과가 있으면 "흔한 애니 · 치비 · 마스코트풍으로 돌아가지 마라" 문장을 싣지 않는다', async () => {
+    // 왜: 분석 기능 전(7월)에 넣은 고정 문장이라 애니 · 치비 그림체를 올리면 그림과 정면으로 부딪친다.
+    dbState.projects = [projectFixture({ style_anchor_key: 'custom_1', custom_style_anchor: analyzed(FACETS) })]
+    await triggerCharacterDrafts(PROJECT_ID)
+    expect(promptOf()).not.toContain('never fall back to a generic anime, chibi or mascot look')
+  })
+
+  it('분석 결과가 없는 그림체(프리셋 · 분석 실패)는 지금처럼 Writer 그림체 값과 그 문장을 싣는다', async () => {
+    // 정상 경로 고정 — 기댈 분석이 없으면 Writer 값이 유일한 그림체 글이다.
+    dbState.projects = [projectFixture({ style_anchor_key: 'custom_1', custom_style_anchor: analyzed(null) })]
+    await triggerCharacterDrafts(PROJECT_ID)
+    const prompt = promptOf()
+    expect(prompt).toContain('art style: ink storybook')
+    expect(prompt).toContain('never fall back to a generic anime, chibi or mascot look')
+  })
+})
+
 function projectFixture(overrides: Partial<ProjectRow> = {}): ProjectRow {
   return {
     id: PROJECT_ID,

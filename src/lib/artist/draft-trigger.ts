@@ -24,7 +24,7 @@ import { isDefiniteSubmitRejection } from '@/lib/fal/submit-rejection'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { buildCharacterTurnaroundPrompt } from '@/lib/artist/turnaround'
 import { sheetIdentityReferences } from '@/lib/artist/source-image'
-import { resolveCharacterPromptInput, type SheetDesignTokens } from '@/lib/artist/sheet-prompt-input'
+import { resolveCharacterPromptInput, styleFromUserAnalysis, type SheetDesignTokens } from '@/lib/artist/sheet-prompt-input'
 import { DEFAULT_IMAGE_MODEL, resolveImageEndpoint } from '@/lib/image-models'
 import { CHARACTER_VIEW_COLUMNS } from '@/types/asset'
 import {
@@ -204,6 +204,7 @@ export async function triggerCharacterDrafts(
           },
           designTokens: designTokens as unknown as SheetDesignTokens,
           hasAnchor: !!anchor,
+          styleFromAnalysis: styleFromUserAnalysis(project?.custom_style_anchor),
         })
         // #image-to-artist: 사용자가 올린 원본(derived_from_url)이 있으면 시트의 정체성 참조로 넣는다(버튼 경로와 같은 규칙).
         const sourceImageUrl =

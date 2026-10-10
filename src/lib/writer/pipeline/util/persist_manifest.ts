@@ -366,7 +366,9 @@ export async function persistAssetsToDb(
       return { appearance: en, appearance_native: native, i18n_provenance: prov }
     }
 
-    const people = characters.characters.map((c) => {
+    // 사람만 사람 전용 저장 창구로 보낸다(2026-10-10 오너 · 운영 806e2cc2) — 사물은 8월부터 사물 목록(props) 자리다.
+    //   넘길 때(writer/start) 사물은 이미 사물 목록에 들어갔다. 섞어 보내면 사물이 사람 행으로 한 번 더 생겨 Artist 가 사람 시트로 그린다.
+    const people = characters.characters.filter((c) => c.entity_type !== 'object').map((c) => {
       const af = appearFields(c.id)
       return {
         character_id: c.id,
@@ -375,16 +377,40 @@ export async function persistAssetsToDb(
         description: null,
         arc: c.arc && (c.arc.start_state || c.arc.end_state || c.arc.arc_type) ? c.arc : null,
         motivation: c.motivation && (c.motivation.want || c.motivation.need) ? c.motivation : null,
-        origin: 'writer',
+        // 출처는 보내지 않는다(2026-10-10 오너 · 운영 806e2cc2) — 보내면 Producer 에서 온 인물의 출처가 writer 로 덮인다.
+        //   새 인물은 저장 창구(upsert_people_with_default_appearances)가 writer 로 넣고, 있는 인물은 출처를 그대로 둔다.
         ...af,
         costume: costumes[c.id] ?? null,
       }
     })
-    const { error } = await supabaseAdmin.rpc('upsert_people_with_default_appearances', {
-      p_project_id: projectId,
-      p_people: people,
-    })
-    assertDbOk('people with default appearances upsert', error)
+    if (people.length) {
+      const { error } = await supabaseAdmin.rpc('upsert_people_with_default_appearances', {
+        p_project_id: projectId,
+        p_people: people,
+      })
+      assertDbOk('people with default appearances upsert', error)
+    }
+    // Writer 가 이야기에서 새로 찾은 사물은 사물 목록에 넣는다 — 이미 있는 사물(넘길 때 들어간 것 · 사람이 고친 것)은 그대로 둔다.
+    const props = characters.characters
+      .filter((c) => c.entity_type === 'object')
+      .map((c) => {
+        const af = appearFields(c.id)
+        return {
+          project_id: projectId,
+          prop_id: c.id,
+          name: c.name,
+          description: null,
+          appearance: af.appearance,
+          appearance_native: af.appearance_native,
+          origin: 'writer',
+        }
+      })
+    if (props.length) {
+      const { error } = await supabaseAdmin
+        .from('props')
+        .upsert(props, { onConflict: 'project_id,prop_id', ignoreDuplicates: true })
+      assertDbOk('props upsert', error)
+    }
   }
 }
 

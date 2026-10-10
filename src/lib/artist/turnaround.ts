@@ -43,6 +43,9 @@ export interface CharacterPromptInput {
   palette?: string[]
   /** 재생성 시 유저 요청 델타(merge) — 룩 토대 위에 덮어쓰는 명시 지시(AC13). 룩(스타일/팔레트/의상)은 토대로 유지. */
   delta?: string
+  /** 그림체를 올린 그림과 그 분석 결과가 정한다(2026-10-10 오너) — "흔한 애니 · 치비로 돌아가지 마라" 고정 문장을 싣지 않는다
+   *  (분석 기능 전에 넣은 문장이라 애니 · 치비 그림체를 올리면 그림과 부딪친다). */
+  followAnchorStyle?: boolean
   /** safe-mode(모더레이션 우회 재시도, #A): 명시 미성년 나이/그래픽 묘사를 제거하고 adult·stylized·non-graphic 토큰을 더한다.
    *   합법 픽션 false-positive 회피용. safeMode 미지정/false면 출력은 기존과 byte-identical. */
   safeMode?: boolean
@@ -211,7 +214,8 @@ export function buildCharacterTurnaroundPrompt(
     'identical character design, outfit, colors and proportions across every tile, consistent art style',
     // #B: 옛 "clean line art"(애니 토큰) 삭제 + 애니 디폴트 차단. "declared art style"을 따르라는 조건부
     //   표현이라 아트 스타일 자체가 애니인 프로젝트와는 충돌하지 않는다(디폴트 회귀만 금지).
-    'follow the declared art style exactly — never fall back to a generic anime, chibi or mascot look',
+    //   올린 그림의 분석 결과가 그림체를 정하면 싣지 않는다(2026-10-10 — 애니 · 치비 그림체와 정면으로 부딪쳤다).
+    ...(input.followAnchorStyle ? [] : ['follow the declared art style exactly — never fall back to a generic anime, chibi or mascot look']),
   ]
   return fitToCap([...head, ...d.lead], d.appearance, tail, SHEET_PROMPT_CAP)
 }

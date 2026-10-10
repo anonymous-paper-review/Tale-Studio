@@ -42,7 +42,7 @@ import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
 import { applyStyleAnchor, resolveStyleAnchor } from '@/lib/style-anchor'
 import { styleAnalysisPending } from '@/lib/style-facets/analysis-wait'
 import { sheetIdentityReferences } from '@/lib/artist/source-image'
-import { resolveCharacterPromptInput } from '@/lib/artist/sheet-prompt-input'
+import { resolveCharacterPromptInput, styleFromUserAnalysis } from '@/lib/artist/sheet-prompt-input'
 import { templateAssetUrl } from '@/lib/storage/template-asset'
 import { normalizeImageModelKey, resolveImageEndpoint } from '@/lib/image-models'
 import { isChatTraceId } from '@/lib/chat-trace'
@@ -223,6 +223,7 @@ export async function POST(req: Request) {
         appearance: { appearance: appearance.appearance, costume: appearance.costume },
         designTokens: dt,
         hasAnchor: !!anchor,
+        styleFromAnalysis: styleFromUserAnalysis(project.custom_style_anchor),
       }),
       delta: typeof instruction === 'string' ? instruction : undefined,
       safeMode: effectiveSafeMode,
