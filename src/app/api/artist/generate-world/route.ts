@@ -20,6 +20,7 @@ import { applyWorldSafeMode, ensureNoPeopleClause } from '@/lib/artist/world-pro
 import { checkGenerationCapacity } from '@/lib/generation-quota'
 import { capacityReservationRejection, quotaRejectionResponse } from '@/lib/api/quota'
 import { resolveStyleAnchor } from '@/lib/style-anchor'
+import { styleAnalysisPending } from '@/lib/style-facets/analysis-wait'
 import { submitWorldShotJob } from '@/lib/artist/world-submit'
 import { isChatTraceId } from '@/lib/chat-trace'
 import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
@@ -124,6 +125,10 @@ export async function POST(req: Request) {
       .eq('id', projectId)
       .maybeSingle()
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    // 그림체 분석이 도는 동안은 그리지 않는다(2026-10-10 오너) — 분석이 끝나면 서버가 빈칸을 그린다. 화면은 대기 중인 요청처럼 조용히 끝낸다.
+    if (styleAnalysisPending(project.custom_style_anchor)) {
+      return NextResponse.json({ ok: true, status: 'queued', deduped: true, waitingForStyle: true, locationId, column })
+    }
     const anchor = await resolveStyleAnchor(project)
 
     // 약속 C10: 변형(모습)은 존재해야 하고, 기본 모습의 wide_shot 을 연속성 참조로 붙인다(캐릭터의 기본 얼굴 참조와 같다).

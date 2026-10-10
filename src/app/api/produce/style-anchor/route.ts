@@ -80,7 +80,8 @@ export async function POST(req: Request) {
           url: imageUrl,
           label: normalizedLabel,
           medium: normalizedMedium || null,
-          ...(lock === true ? { locked: true } : {}),
+          // 고정 = 그림에서 그림체를 뽑는다 — 곧 분석기가 돈다(2026-10-10). 분석 중에는 Artist 그림을 미룬다(style-facets/analysis-wait).
+          ...(lock === true ? { locked: true, analysis_pending_at: new Date().toISOString() } : {}),
         },
       })
       .eq('id', projectId)

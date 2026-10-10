@@ -12,6 +12,8 @@ export const WRITER_OBSERVABILITY_EVENTS = [
   'route_failed',
   'asset_trigger_started',
   'asset_trigger_blocked',
+  // 그림체 분석이 도는 동안 Artist 초안을 미룸(2026-10-10) — 분석 창구가 끝날 때 다시 부른다.
+  'asset_trigger_deferred',
   'asset_trigger_completed',
   'fal_submit_started',
   'fal_submit_accepted',

@@ -94,6 +94,8 @@ export interface WriterRunState extends WriterRunStateBase {
 
   // #s3-gate: 씬 게이트 확정 플래그 + 수정 요청 누적(개정 시 scenes/storyCheck 를 지워 s3 재실행).
   _gateConfirmed?: boolean;
+  /** 그림체 분석이 도는 동안이라 v2Design 의 Artist 초안을 미뤘다(2026-10-10) — Writer 가 끝날 때 한 번 더 챙긴다. */
+  _artistDeferred?: boolean;
   _sceneRevisionNotes?: string[];
   /** 개정 요청 당시의 씬 초안. 재시도에도 같은 본문을 다듬기 위한 실행 입력이며 다음 개정에서 교체한다. */
   _sceneRevisionSource?: Scenes;
@@ -503,14 +505,15 @@ export const WRITER_STEPS: WriterStep[] = [
       });
       // #C(2026-09-02 observability-audit): 생성 제출 자신는 best-effort 유지(v2Design 핵심경로를 막지 않는다)
       //   하지만 실패 사실은 적어도 route_failed 관측 이벤트로 되살린다(이전에는 그대로 무흔적으로 삼켜졌다).
-      await triggerAssetDrafts(projectId).catch((e) => {
+      const drafts = await triggerAssetDrafts(projectId).catch((e) => {
         void recordWriterObservabilityEvent(projectId, 'route_failed', {
           source: 'writer_v2_design',
           kind: 'asset_trigger',
           error: e instanceof Error ? e.message : String(e),
         });
       });
-      return { characterVisual, worldVisual };
+      // 그림체 분석이 도는 중이라 미뤘다 — 기다리지 않고 다음 단계로 간다(분석 창구가 끝날 때 그린다, Writer 가 끝날 때 한 번 더 챙긴다).
+      return { characterVisual, worldVisual, ...(drafts?.deferred_style_analysis ? { _artistDeferred: true } : {}) };
     },
   },
   {
@@ -782,6 +785,7 @@ export async function runWriterSteps(
     if (!step) {
       await markCompleted(run.id);
       await advanceProjectStageAfterWriter(projectId);
+      await drawDeferredArtistDrafts(projectId, state);
       return { done: true };
     }
 
@@ -1021,5 +1025,22 @@ export async function runWriterSteps(
   if (remaining) return { paused: true };
   await markCompleted(run.id);
   await advanceProjectStageAfterWriter(projectId);
+  await drawDeferredArtistDrafts(projectId, state);
   return { done: true };
+}
+
+/**
+ * Writer 가 끝날 때 — 그림체 분석 때문에 미룬 Artist 초안이 있으면 그린다(빈칸만, 멱등 · 2026-10-10).
+ *   분석이 Writer 의 Artist 단계보다 먼저 실패했으면(대기 표시가 남음) 분석 창구가 부를 때 아직 그릴 준비가 안 됐다 — 여기서 챙긴다.
+ *   미루지 않았으면 부르지 않는다(실패한 초안을 자동으로 다시 내지 않는다).
+ */
+export async function drawDeferredArtistDrafts(projectId: string, state: WriterRunState): Promise<void> {
+  if (!state._artistDeferred) return;
+  await triggerAssetDrafts(projectId, { afterStyleAnalysis: true }).catch((e) => {
+    void recordWriterObservabilityEvent(projectId, 'route_failed', {
+      source: 'writer_completed',
+      kind: 'asset_trigger',
+      error: e instanceof Error ? e.message : String(e),
+    });
+  });
 }

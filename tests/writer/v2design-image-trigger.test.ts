@@ -50,7 +50,7 @@ vi.mock('@/lib/writer/run-store', () => ({
 vi.mock('@/lib/writer/llm/raw_collector', () => ({ getPendingRawCalls: vi.fn(() => []) }))
 vi.mock('@/lib/artist/draft-trigger', () => ({ triggerAssetDrafts: mocks.triggerAssetDrafts }))
 
-import { WRITER_STEPS } from '@/lib/writer/pipeline/steps'
+import { WRITER_STEPS, drawDeferredArtistDrafts } from '@/lib/writer/pipeline/steps'
 
 const CHARACTER_VISUAL = { characters: [] }
 const WORLD_VISUAL = { locations: [] }
@@ -132,3 +132,28 @@ function baseState() {
     scenes: { scenes: [] },
   } as never
 }
+
+// 2026-10-10 오너 "writer 생성 파이프라인과 그림체 분석을 병렬로" — Writer 는 기다리지 않고, 미룬 Artist 그림은 끝날 때 한 번 더 챙긴다.
+describe('그림체 분석 때문에 미룬 Artist 그림', () => {
+  it('그림체 분석 때문에 Artist 그림을 미뤘으면 Writer 실행에 미뤘다고 적어 두고 기다리지 않고 다음 단계로 간다', async () => {
+    // 왜: 분석이 실패해 대기 표시가 남으면 분석 창구가 부를 때 아직 그릴 준비(디자인 토큰)가 안 됐을 수 있다 — Writer 가 끝날 때 챙길 근거다.
+    mocks.triggerAssetDrafts.mockImplementationOnce(async () => {
+      mocks.events.push('trigger')
+      return { deferred_style_analysis: true, characters: { submitted: 0, skipped: 0, failed: 0 }, worlds: { submitted: 0, skipped: 0, failed: 0 } }
+    })
+
+    const patch = await runV2DesignStep()
+
+    expect(patch).toEqual({ characterVisual: CHARACTER_VISUAL, worldVisual: WORLD_VISUAL, _artistDeferred: true })
+    expect(mocks.events).toEqual(['designTokens', 'assets', 'trigger'])
+  })
+
+  it('Writer가 끝날 때 미뤄 둔 Artist 그림이 있으면 그때 그리고, 없으면 다시 부르지 않는다', async () => {
+    // 왜: 분석이 Writer 의 Artist 단계보다 먼저 실패했으면 아무도 다시 부르지 않는다 — 끝날 때 한 번 더 챙긴다. 미루지 않았으면 그대로 둔다(자동 재시도 아님).
+    await drawDeferredArtistDrafts('project-1', { _artistDeferred: true } as never)
+    expect(mocks.triggerAssetDrafts).toHaveBeenCalledWith('project-1', { afterStyleAnalysis: true })
+    mocks.triggerAssetDrafts.mockClear()
+    await drawDeferredArtistDrafts('project-1', {} as never)
+    expect(mocks.triggerAssetDrafts).not.toHaveBeenCalled()
+  })
+})

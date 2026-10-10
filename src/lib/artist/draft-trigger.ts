@@ -44,6 +44,7 @@ import {
 import { submitWorldShotJob } from '@/lib/artist/world-submit'
 import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events'
 import { checkGenerationCapacity } from '@/lib/generation-quota'
+import { styleAnalysisPending } from '@/lib/style-facets/analysis-wait'
 
 interface DraftCharacterRow {
   character_id: string
@@ -96,6 +97,8 @@ function capacityRejectionOf(error: unknown): GenerationCapacityError | null {
 
 export interface AssetDraftTriggerResult {
   skipped_no_look?: true
+  /** 그림체 분석이 도는 중이라 미뤘다(2026-10-10) — 분석 창구가 끝날 때 다시 부른다. */
+  deferred_style_analysis?: true
   characters: DraftTriggerResult
   worlds: DraftTriggerResult
 }
@@ -530,18 +533,23 @@ async function checkAssetDraftCapacity(
   }
 }
 
+/**
+ * opts.afterStyleAnalysis — 그림체 분석 창구가 끝(성공 · 실패)을 알리며 부른 것(2026-10-10 오너). 분석 대기 표시가 남아 있어도 그린다.
+ *   그 밖의 부름(Writer v2Design · 재시도 버튼)은 분석이 도는 동안 미루고 기다리지 않고 돌아간다 — Writer 는 멈추지 않는다.
+ */
 export async function triggerAssetDrafts(
   projectId: string,
+  opts: { afterStyleAnalysis?: boolean } = {},
 ): Promise<AssetDraftTriggerResult> {
   const zero = () => zeroDraftResult()
-  await recordWriterObservabilityEvent(projectId, 'asset_trigger_started', {
-    source: 'writer_v2_design',
-  })
+  const source = opts.afterStyleAnalysis ? 'style_analysis_done' : 'writer_v2_design'
+  await recordWriterObservabilityEvent(projectId, 'asset_trigger_started', { source })
   let workspaceId: string | null = null
+  let customStyleAnchor: unknown = null
   try {
     const { data: project, error } = await supabaseAdmin
       .from('projects')
-      .select('design_tokens, workspace_id')
+      .select('design_tokens, workspace_id, custom_style_anchor')
       .eq('id', projectId)
       .maybeSingle()
 
@@ -549,22 +557,30 @@ export async function triggerAssetDrafts(
     if (project?.design_tokens == null) {
       console.warn('[v2design-trigger] design_tokens absent — skipping (stalled path)')
       await recordWriterObservabilityEvent(projectId, 'asset_trigger_blocked', {
-        source: 'writer_v2_design',
+        source,
         reason: 'design_tokens_absent',
       })
       return { skipped_no_look: true, characters: zero(), worlds: zero() }
     }
     workspaceId = (project.workspace_id as string | undefined) ?? null
+    customStyleAnchor = (project as { custom_style_anchor?: unknown }).custom_style_anchor ?? null
   } catch (e) {
     console.warn(
       '[v2design-trigger] design_tokens absent — skipping (stalled path)',
       e instanceof Error ? e.message : e,
     )
     await recordWriterObservabilityEvent(projectId, 'asset_trigger_blocked', {
-      source: 'writer_v2_design',
+      source,
       reason: 'design_tokens_lookup_failed',
     })
     return { skipped_no_look: true, characters: zero(), worlds: zero() }
+  }
+
+  // 그림체 분석이 도는 동안은 미룬다(2026-10-10 오너 "분석이 진행 중에는 artist 생성이 안 되게 막아두고 끝나면 진행") —
+  //   분석보다 먼저 그리면 그림체 설명 없이 그림만 보고 그린다. 분석 창구가 끝날 때 afterStyleAnalysis 로 다시 부른다.
+  if (!opts.afterStyleAnalysis && styleAnalysisPending(customStyleAnchor)) {
+    await recordWriterObservabilityEvent(projectId, 'asset_trigger_deferred', { source, reason: 'style_analysis_running' })
+    return { deferred_style_analysis: true, characters: zero(), worlds: zero() }
   }
 
   // #B(2026-09-02): design_tokens 확인 직후, 제출 전에 1회 용량 사전 체크. 막히면 제출 전체
@@ -594,7 +610,7 @@ export async function triggerAssetDrafts(
     `[v2design-trigger] ${projectId} — chars ${characters.submitted}/${characters.skipped}/${characters.failed}, worlds ${worlds.submitted}/${worlds.skipped}/${worlds.failed}`,
   )
   await recordWriterObservabilityEvent(projectId, 'asset_trigger_completed', {
-    source: 'writer_v2_design',
+    source,
     characters,
     worlds,
   })

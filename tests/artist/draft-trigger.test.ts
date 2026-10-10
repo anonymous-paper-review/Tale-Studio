@@ -81,6 +81,7 @@ interface ProjectRow {
   workspace_id: string
   design_tokens: typeof DESIGN_TOKENS | null
   style_anchor_key?: string | null
+  custom_style_anchor?: Record<string, unknown> | null
 }
 
 interface WorkspaceRow {
@@ -373,6 +374,76 @@ describe('그림 초안 생성 — 그림체가 없거나 설정을 읽지 못�
 
     expect(result.characters).toEqual({ submitted: 1, skipped: 0, failed: 0 })
     expect(mocks.checkGenerationCapacity).toHaveBeenCalledWith(OWNER_ID, 'image')
+  })
+})
+
+// 2026-10-10 오너 "writer 생성 파이프라인과 그림체 분석을 병렬로 돌리고, 분석이 진행 중에는 artist 생성이 안 되게 막아두고 끝나면 진행" —
+//   Writer 는 기다리지 않는다. Artist 그림만 미루고, 분석 창구가 끝을 알리며 다시 부른다.
+describe('그림체 분석이 도는 동안 Artist 그림은 미룬다', () => {
+  const ANCHOR_URL = 'https://example.supabase.co/storage/v1/object/public/media/ws-1/proj-1/uploads/look/original.webp'
+  const pendingAnchor = (minutesAgo: number) => ({
+    url: ANCHOR_URL, label: '내 그림체', medium: '2d_anime', locked: true,
+    analysis_pending_at: new Date(Date.now() - minutesAgo * 60_000).toISOString(),
+  })
+
+  it('그림체 분석이 도는 동안 Writer가 Artist 그림 초안을 시작하면 그리지 않고 미룬다', async () => {
+    // 왜: 10/10 운영 806e2cc2 — 분석보다 Artist 가 먼저 그리면 그림체 설명 없이 그림만 보고 그린다(이번엔 28초 차이로 피했다).
+    dbState.projects = [projectFixture({ custom_style_anchor: pendingAnchor(1) })]
+    dbState.locations = [locationFixture()]
+
+    const result = await triggerAssetDrafts(PROJECT_ID)
+
+    expect(result.deferred_style_analysis).toBe(true)
+    expect(mocks.reserveGenerationJob).not.toHaveBeenCalled()
+    expect(mocks.falImageSubmit).not.toHaveBeenCalled()
+  })
+
+  it('그림체 분석이 끝났다고 알리며 부르면 분석 대기 표시가 남아 있어도 미뤄 둔 그림을 그린다', async () => {
+    // 왜: 분석이 실패하면 대기 표시를 지우지 않는다 — 분석 창구가 끝을 알리며 부르면 그림만 보고라도 그린다.
+    dbState.projects = [projectFixture({ custom_style_anchor: pendingAnchor(1) })]
+
+    const result = await triggerAssetDrafts(PROJECT_ID, { afterStyleAnalysis: true })
+
+    expect(result.deferred_style_analysis).toBeUndefined()
+    expect(result.characters).toEqual({ submitted: 1, skipped: 0, failed: 0 })
+  })
+
+  it('분석 대기 표시가 5분 넘게 지났으면 기다리지 않고 그린다', async () => {
+    // 왜: 분석 창구는 서버 한도(5분) 안에 끝난다 — 그보다 오래된 표시는 멈춘 분석이라 Artist 를 막지 않는다.
+    dbState.projects = [projectFixture({ custom_style_anchor: pendingAnchor(6) })]
+
+    const result = await triggerAssetDrafts(PROJECT_ID)
+
+    expect(result.deferred_style_analysis).toBeUndefined()
+    expect(result.characters).toEqual({ submitted: 1, skipped: 0, failed: 0 })
+  })
+
+  it('그림체 분석이 도는 동안 Artist 화면에서 배경 그림을 만들려 하면 그리지 않고 넘긴다', async () => {
+    // 왜: Writer 가 씬을 저장하면 Artist 화면이 열린다 — 화면의 자동 채움도 분석을 기다린다. 분석이 끝나면 서버가 빈칸을 그린다.
+    dbState.projects = [projectFixture({ custom_style_anchor: pendingAnchor(1) })]
+    const location = locationFixture()
+    dbState.locations = [location]
+    const prompt = buildWorldShotPromptForLocation(mapLocationRowToManifestLocation(location), null, null, 'wideShot')
+
+    const res = await generateWorldPOST(
+      new Request('http://localhost/api/artist/generate-world', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: PROJECT_ID,
+          locationId: location.location_id,
+          column: 'wide_shot',
+          prompt,
+          aspectRatio: '16:9',
+          sourceHash: computeWorldImageSourceHash(prompt),
+          descriptionHash: computeWorldDescriptionHash(location.visual_description),
+        }),
+      }),
+    )
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ deduped: true, waitingForStyle: true })
+    expect(mocks.reserveGenerationJob).not.toHaveBeenCalled()
   })
 })
 

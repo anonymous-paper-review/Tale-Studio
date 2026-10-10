@@ -40,6 +40,7 @@ import {
 import { computeImageSourceHash, computeLookFingerprint } from '@/lib/image-provenance'
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
 import { applyStyleAnchor, resolveStyleAnchor } from '@/lib/style-anchor'
+import { styleAnalysisPending } from '@/lib/style-facets/analysis-wait'
 import { sheetIdentityReferences } from '@/lib/artist/source-image'
 import { resolveCharacterPromptInput } from '@/lib/artist/sheet-prompt-input'
 import { templateAssetUrl } from '@/lib/storage/template-asset'
@@ -197,6 +198,10 @@ export async function POST(req: Request) {
           .maybeSingle(),
       ])
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    // 그림체 분석이 도는 동안은 그리지 않는다(2026-10-10 오너) — 분석이 끝나면 서버가 빈칸을 그린다. 화면은 대기 중인 요청처럼 조용히 끝낸다.
+    if (styleAnalysisPending(project.custom_style_anchor)) {
+      return NextResponse.json({ ok: true, status: 'queued', deduped: true, waitingForStyle: true, appearanceKey, view })
+    }
     if (!character) return NextResponse.json({ error: 'Character not found' }, { status: 404 })
     if (!appearance) return NextResponse.json({ error: 'Appearance not found' }, { status: 404 })
     if (!defaultAppearance) {
