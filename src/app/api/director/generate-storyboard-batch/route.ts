@@ -440,7 +440,10 @@ export async function POST(req: NextRequest) {
             workspaceId: project.workspace_id as string,
             writerShotIds: group.map((s) => s.shot_id),
             gridVariant: 'grid4',
-            ...(batchRunId ? { batchRunId } : {}),
+            // 이 시트를 낸 뒤 이 판에서 아직 낼 샷 — 이번 요청의 뒤 시트 몫도 포함(곧 나간다). 진행 표시의 전체 수 근거.
+            ...(batchRunId
+              ? { batchRunId, batchRunRemaining: ready.length - planned.slice(0, groupIndex + 1).reduce((n, g) => n + g.length, 0) }
+              : {}),
             roughGeneratedAtByShot: Object.fromEntries(
               group.filter((s) => typeof s.roughGeneratedAt === 'number').map((s) => [s.shot_id, s.roughGeneratedAt as number]),
             ),

@@ -181,6 +181,14 @@ describe('스토리보드 일괄 요청이 고르는 샷', () => {
     expect(body.data.remaining).toBe(0)
   })
 
+  it('시트를 낼 때마다 이 판에서 아직 낼 샷 수를 그 작업에 남긴다', async () => {
+    // 왜: 채팅 진행 표시가 판 전체 수를 서버 기록만으로 센다 — 화면이 답을 받기 전에 새 시트가 보여도 전체 수가 흔들리지 않는다.
+    db.shots = shots(12)
+    await POST(request({ runId: RUN }))
+    expect(mocks.reserveGenerationJob.mock.calls.map(([input]) => (input as { target: Record<string, unknown> }).target))
+      .toMatchObject([{ batchRunId: RUN, batchRunRemaining: 8 }, { batchRunId: RUN, batchRunRemaining: 4 }])
+  })
+
   it('같은 판이 냈는데 답을 못 받은 작업이 아직 그리는 중이면 이 판의 작업이라고 알려 준다', async () => {
     // 왜: 화면이 그 그림을 이 판이 만든 것으로 세고(만든 수 · 채팅 기록) 끝날 때까지 기다린다.
     db.shots = shots(8)

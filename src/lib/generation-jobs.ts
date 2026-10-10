@@ -50,6 +50,8 @@ export interface GenerationJobTarget {
   roughGeneratedAtByShot?: Record<string, number>
   /** 실사 일괄(storyboard_real_grid): 이 작업을 낸 판(클라 러너 한 번)의 표시 — 같은 판은 이 작업의 샷을 다시 내지 않는다(2026-10-10). */
   batchRunId?: string
+  /** 실사 일괄: 이 시트를 낸 뒤 그 판에서 아직 낼 샷 수 — 진행 표시가 판 전체 수를 서버 기록만으로 센다(2026-10-10). */
+  batchRunRemaining?: number
 }
 
 export interface GenerationJob {
