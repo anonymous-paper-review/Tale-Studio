@@ -5,18 +5,24 @@ import { NextRequest } from 'next/server'
 // DELETE /api/project/[id] — delete_project_deep RPC 계약 (#project-lifecycle-rpc 2026-09-01)
 //   삭제 전체(소유권 확인 + 자식 14테이블 + 본체)가 DB 함수 한 번으로 옮겨갔다.
 //   라우트에 남은 책임은 인증과 상태→HTTP 매핑뿐이므로 그 경계를 고정한다.
+//   보관함 파일 삭제가 붙은 뒤(개인정보 §1)로는 src/lib/project/delete-project.ts 가 그 앞에서
+//   소유권을 먼저 확인하고 파일을 지운다 — 그래서 목이 프로젝트·작업공간 행과 보관함까지 대신한다.
+//   파일 삭제 자체의 약속은 tests/project/project-storage-cleanup.test.ts 가 본다.
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   getUser: vi.fn(),
   from: vi.fn(),
   rpc: vi.fn(),
+  list: vi.fn(),
+  remove: vi.fn(),
 }))
 
 vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: { from: mocks.from, rpc: mocks.rpc },
 }))
+vi.mock('@/lib/storage/media', () => ({ mediaList: mocks.list, mediaRemove: mocks.remove }))
 
 import { DELETE } from '@/app/api/project/[id]/route'
 
@@ -31,11 +37,30 @@ function call() {
   )
 }
 
+function row(data: unknown) {
+  const result = { data, error: null }
+  const chain = {
+    select: () => chain,
+    insert: async () => ({ data: null, error: null }),
+    eq: () => chain,
+    maybeSingle: async () => result,
+    delete: () => ({ eq: async () => ({ data: null, error: null }) }),
+  }
+  return chain
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.createClient.mockResolvedValue({ auth: { getUser: mocks.getUser } })
   mocks.getUser.mockResolvedValue({ data: { user: { id: 'user-1' } } })
+  mocks.from.mockImplementation((table: string) =>
+    table === 'projects'
+      ? row({ id: PROJECT_ID, workspace_id: 'workspace-1' })
+      : row({ owner_id: 'user-1' }),
+  )
   mocks.rpc.mockResolvedValue({ data: 'ok', error: null })
+  mocks.list.mockResolvedValue({ data: [], error: null })
+  mocks.remove.mockResolvedValue({ data: [], error: null })
 })
 
 describe('프로젝트 삭제 요청의 결과를 사용자에게 정확히 알린다', () => {

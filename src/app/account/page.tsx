@@ -7,13 +7,15 @@
 //   구조는 Claude 설정 > Billing 을 따랐다(오너 09-07): 플랜 → Take → 구매 → 내역 → 계정.
 //   약속: tests/billing-account.test.ts (숫자·상태) + 스크린샷(생김새).
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, Check, LogOut, RefreshCw, X } from 'lucide-react'
 import { DashboardHeader } from '@/components/dashboard/dashboard-header'
 import { CheckoutButton } from '@/components/billing/checkout-button'
 import { PortalButton } from '@/components/billing/portal-button'
+import { DeleteAccountDialog } from '@/components/account/delete-account-dialog'
+import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
 import { clearLastProjectId } from '@/lib/session-restore'
 import { useT } from '@/lib/i18n'
@@ -69,6 +71,7 @@ export default function AccountPage() {
   const router = useRouter()
   const fmt = useDateFormat()
   const { data, error } = useBillingAccount(true)
+  const [deleteOpen, setDeleteOpen] = useState(false)
 
   useEffect(() => {
     void refetchBillingAccount()
@@ -309,7 +312,24 @@ export default function AccountPage() {
               {t('Log out')}
             </button>
           </div>
+
+          {/* 위험 구역 (약관 §9 — 계정 설정에서 언제든 지울 수 있어야 한다).
+              되돌릴 수 없는 단추라 로그아웃 아래 줄 하나를 건너뛴 자리에 둔다.
+              실제 삭제는 확인창이 받는다. */}
+          <div className="mt-6 flex items-center justify-between gap-4 border-t border-white/10 pt-6">
+            <div>
+              <p className="text-sm text-gray-300">{t('Delete this account')}</p>
+              <p className="mt-1 text-xs text-gray-500">
+                {t('Your projects and generated output go away, and remaining Takes are forfeited.')}
+              </p>
+            </div>
+            <Button variant="destructive" disabled={!data?.email} onClick={() => setDeleteOpen(true)}>
+              {t('Delete account')}
+            </Button>
+          </div>
         </Card>
+
+        <DeleteAccountDialog email={data?.email ?? ''} open={deleteOpen} onOpenChange={setDeleteOpen} />
       </main>
     </div>
   )

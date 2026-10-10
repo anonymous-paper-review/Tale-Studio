@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
+import { deleteProjectDeep } from '@/lib/project/delete-project'
 import { parseAppLocale } from '@/lib/locale'
 import { NextResponse, type NextRequest } from 'next/server'
 
@@ -93,31 +94,16 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // 삭제 전체(소유권 확인 + FK-safe 순서의 자식 14테이블 + 본체)를 DB 함수 하나로
-    // (#project-lifecycle-rpc 2026-09-01). 왕복 18회→1회, 함수가 단일 트랜잭션이라
-    // 중간 실패 시 부분 삭제도 안 남는다. 삭제 순서·cascade 근거는
-    // supabase/migrations/20260901113500_project_lifecycle_rpcs.sql 에 있다.
-    // Storage 파일(버킷 이미지/영상)은 기존과 동일하게 남는다 — 경로가 projectId 기반이라
-    // 재사용 충돌 없음.
-    const { data: status, error } = await supabaseAdmin.rpc('delete_project_deep', {
-      p_project_id: id,
-      p_user_id: user.id,
-    })
+    // 보관함 파일 + 자식 14테이블 + 본체를 함께 지운다(개인정보 처리방침 §1 — 프로젝트를 지우면
+    // 그 자료도 지운다). 규칙은 src/lib/project/delete-project.ts 한 곳에 있고, 계정 삭제
+    // (/api/account/delete)가 같은 함수를 사용자의 모든 프로젝트에 반복한다.
+    const result = await deleteProjectDeep({ projectId: id, userId: user.id })
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-    if (status === 'not_found') {
+    if (result.status === 'not_found') {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     }
-    if (status === 'forbidden') {
+    if (result.status === 'forbidden') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-    if (status !== 'ok') {
-      return NextResponse.json(
-        { error: `Unexpected delete status: ${String(status)}` },
-        { status: 500 },
-      )
     }
 
     return NextResponse.json({ ok: true })

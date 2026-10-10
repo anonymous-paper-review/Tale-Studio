@@ -1836,6 +1836,24 @@ export const KO: Record<string, string> = {
   'Click to open account & billing.': '누르면 계정·결제로 갑니다.',
   'No Takes yet.': '아직 Take가 없어요.',
   'Plan Takes expire at the end of the billing period. Pack Takes last 12 months.': '플랜 Take는 결제 주기가 끝나면 사라지고, 충전 Take는 12개월 갑니다.',
+  // ── 계정 삭제 (약관 §9 · 개인정보 처리방침 §1, 2026-10-11) ──
+  'Delete this account': '이 계정 지우기',
+  'Your projects and generated output go away, and remaining Takes are forfeited.': '프로젝트와 만든 결과물이 사라지고, 남은 Take도 소멸해요.',
+  'Delete account': '계정 삭제',
+  'Delete your account?': '계정을 지울까요?',
+  'This cannot be undone.': '한번 지우면 되돌릴 수 없어요.',
+  'Your projects, generated output, and uploaded material are deleted. Export anything you want to keep before you continue.':
+    '프로젝트와 만든 결과물, 올린 자료를 모두 지워요. 남기고 싶은 것은 먼저 내보내세요.',
+  'Any Take left in your balance, including purchased Take, and the unused remainder of a paid period are forfeited.':
+    '남은 Take는 충전한 것까지 모두 사라지고, 결제한 기간의 남은 날도 소멸해요.',
+  'Any auto-renewing subscription is canceled first. If we cannot cancel it, nothing is deleted.':
+    '자동갱신 구독을 먼저 해지해요. 해지가 안 되면 아무것도 지우지 않아요.',
+  'Payment and transaction records are kept for the periods the law requires.': '결제·거래 기록은 법에서 정한 기간만큼 보관해요.',
+  'Type {email} to confirm': '확인을 위해 {email} 을 그대로 적어주세요',
+  'Delete account permanently': '계정 영구 삭제',
+  'We could not cancel your subscription, so nothing was deleted. Please try again in a moment.':
+    '구독을 해지하지 못해서 아무것도 지우지 않았어요. 잠시 뒤 다시 시도해주세요.',
+  'Could not delete your account. Please try again in a moment.': '계정을 지우지 못했어요. 잠시 뒤 다시 시도해주세요.',
   // 결제창 (P7·P8)
   'That product is not available.': '그 상품은 살 수 없어요.',
   'Payments for this product open soon.': '이 상품의 결제는 곧 열려요.',
