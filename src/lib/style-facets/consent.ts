@@ -9,7 +9,10 @@ export const CREATION_ANALYSIS_CONSENT = 'creation-choice-v1'
 /** 채팅의 그림마다 질문 안내 문구 판(2026-10-10) — 그림체 · 만화 원고를 고르면 분석 모델로 보낸다는 안내를 바꾸면 판도 올린다. */
 export const CHAT_IMAGE_ROLE_CONSENT = 'chat-image-role-v1'
 
-const ANALYSIS_CONSENTS = new Set([COMIC_ANALYSIS_CONSENT, CREATION_ANALYSIS_CONSENT, CHAT_IMAGE_ROLE_CONSENT])
+/** 스타일 선택 창의 "내 그림체 올리기" 카드 안내 문구 판(2026-10-10) — 카드의 분석 모델 안내를 바꾸면 판도 올린다. */
+export const STYLE_PICKER_CONSENT = 'style-picker-v1'
+
+const ANALYSIS_CONSENTS = new Set([COMIC_ANALYSIS_CONSENT, CREATION_ANALYSIS_CONSENT, CHAT_IMAGE_ROLE_CONSENT, STYLE_PICKER_CONSENT])
 
 export function isAnalysisConsent(consent: unknown): consent is string {
   return typeof consent === 'string' && ANALYSIS_CONSENTS.has(consent)

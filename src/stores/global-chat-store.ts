@@ -24,7 +24,7 @@ import { selectedProducerDialogueLanguage } from '@/lib/producer-dialogue-langua
 import { fixKoreanParticles } from '@/lib/korean-particles'
 import { coerceCardFill, matchImageUseAnswer, matchImageUseInText, type CardFill, type ImageUseAnswer } from '@/lib/producer/image-role'
 import { MAX_COMIC_PAGES, comicStyleQuestion, imageBatchQuestion, matchBatchImageAnswer, matchComicAnswer, matchComicIntentInText, matchComicStyleAnswer, sortComicPages } from '@/lib/producer/comic-intake'
-import { CHAT_IMAGE_ROLE_CONSENT, COMIC_ANALYSIS_CONSENT, CREATION_ANALYSIS_CONSENT } from '@/lib/style-facets/consent'
+import { CHAT_IMAGE_ROLE_CONSENT, COMIC_ANALYSIS_CONSENT, CREATION_ANALYSIS_CONSENT, STYLE_PICKER_CONSENT } from '@/lib/style-facets/consent'
 import type { PendingCreation } from '@/stores/pending-creation-store'
 import type { BoardBusy } from '@/lib/producer/busy'
 import { backgroundMentions, castMentions } from '@/lib/card-mention'
@@ -255,6 +255,8 @@ interface GlobalChatState {
   offerImageRoles: (images: ChatImageInput[], opts: { typed: string; msg: string }) => boolean
   /** 새 프로젝트 화면에서 고른 대로 이어서 한다 — 그림 카드 · 그림체 · 원작(대본 · 만화) 채우기 뒤 트리트먼트(2026-10-09 오너). 묻지 않는다. */
   runCreationPlan: (plan: PendingCreation) => Promise<void>
+  /** 스타일 선택 창의 "내 그림체 올리기"로 올린 그림을 그림체로 쓴다 — 채팅의 "그림체"와 같은 규칙(2026-10-10 오너). */
+  applyUploadedStyle: (image: ChatImageInput) => Promise<void>
   approvePendingProposal: (id?: string) => Promise<boolean>
   /** 백그라운드 생성 완료 통지 — 다른 stage에 있을 때만 배지 bump + 스로틀된 채팅 메시지. */
   notifyCompletion: (stage: StageId, label: string) => void
@@ -381,6 +383,8 @@ interface ImageRoleGate {
   items: Array<{ image: ChatImageInput; role: ImageUseAnswer | null }>
   typed: string
   msg: string
+  /** 사용자가 읽고 고른 분석 안내의 판 — 없으면 채팅 그림마다 질문(chat-image-role-v1). */
+  consent?: string
 }
 
 interface ImageBatchGate {
@@ -757,6 +761,7 @@ async function finishImageRoles(get: () => GlobalChatState, plan: ImageRoleGate)
 async function runChatImagePlan(get: () => GlobalChatState, plan: ImageRoleGate, comicStyle: 'lock' | 'adapt' | null): Promise<void> {
   const pages = plan.items.filter((it) => it.role === 'comic').map((it) => it.image)
   const styleImage = plan.items.find((it) => it.role === 'style')?.image ?? null
+  const consent = plan.consent ?? CHAT_IMAGE_ROLE_CONSENT
   const roleItems = plan.items.filter((it) => it.role === 'character' || it.role === 'background' || it.role === 'reference')
   const cardsDone = roleItems.length ? runImageRolePlan(get, { ...plan, items: roleItems }) : Promise.resolve()
   if (pages.length) {
@@ -764,14 +769,14 @@ async function runChatImagePlan(get: () => GlobalChatState, plan: ImageRoleGate,
     const comic = await runComicAdaptation(get, pages, {
       styleImage,
       styleMode: locked ? 'keep' : comicStyle ?? 'lock',
-      consent: CHAT_IMAGE_ROLE_CONSENT,
+      consent,
       beforeFill: cardsDone,
     })
     await cardsDone
     await comic.styleDone
     return
   }
-  const style = styleImage ? runStyleFromImage(styleImage, 'picture', CHAT_IMAGE_ROLE_CONSENT) : Promise.resolve()
+  const style = styleImage ? runStyleFromImage(styleImage, 'picture', consent) : Promise.resolve()
   await cardsDone
   await style
 }
@@ -3612,6 +3617,13 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     if (projectId) saveChatMessage(projectId, 'producer', 'user', content)
     askImageRole(get)
     return true
+  },
+
+  applyUploadedStyle: async (image) => {
+    if (!useProjectStore.getState().projectId) return
+    // 어떤 그림을 그림체로 골랐는지 채팅 기록에 남긴다(내 말풍선 + 그림).
+    recordImageTurn(set, translate(contentLocale(), 'Use it as the art style'), [image])
+    await finishImageRoles(get, { items: [{ image, role: 'style' }], typed: '', msg: '', consent: STYLE_PICKER_CONSENT })
   },
 
   runCreationPlan: async (plan) => {

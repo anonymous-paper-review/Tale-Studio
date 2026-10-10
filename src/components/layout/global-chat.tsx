@@ -59,6 +59,7 @@ import {
 } from '@/lib/card-mention'
 import { StyleAnchorPicker } from '@/features/producer/style-anchor-picker'
 import { selectStyleAnchorFromPicker } from '@/features/producer/select-style-anchor'
+import { ingestCreationFile } from '@/lib/project/start-new-project'
 import { SceneGateControls } from '@/features/writer/scene-gate-panel'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { useWriterPreview } from '@/lib/writer/use-writer-preview'
@@ -840,6 +841,29 @@ export function GlobalChat() {
       setStylePressed(true)
     }
   }, [stylePickerRequest, projectId, currentStage, loading, pendingProposal, executingProposalIds, styleAnchorKey, styleAnchors.length, consumeStylePicker])
+  // 스타일 선택 창의 "내 그림체 올리기"(2026-10-10 오너) — 권리 확인 → 올리기 → 채팅에서 그림을 "그림체"로 고른 것과 같은 고정 · 분석.
+  const [styleUpload, setStyleUpload] = useState<{ projectId: string; busy: boolean; error: string | null } | null>(null)
+  const styleUploadNow = styleUpload && styleUpload.projectId === projectId ? styleUpload : null
+  const uploadStyleImage = async (file: File) => {
+    if (!projectId || styleUploadNow?.busy) return
+    const pid = projectId
+    if (kindOf(file.name) !== 'image') {
+      setStyleUpload({ projectId: pid, busy: false, error: t('Choose a picture file.') })
+      return
+    }
+    if (!(await requestImageUploadConsent([file]))) return
+    if (useProjectStore.getState().projectId !== pid) return
+    setStyleUpload({ projectId: pid, busy: true, error: null })
+    const uploaded = await ingestCreationFile(pid, file)
+    if (useProjectStore.getState().projectId !== pid) return
+    if ('error' in uploaded || uploaded.kind !== 'image') {
+      setStyleUpload({ projectId: pid, busy: false, error: 'error' in uploaded ? uploaded.error : t('Choose a picture file.') })
+      return
+    }
+    setStyleUpload(null)
+    setStylePickerProjectId(null)
+    void useGlobalChatStore.getState().applyUploadedStyle({ id: uploaded.id, name: uploaded.name, thumbUrl: uploaded.thumbUrl, sliceUrls: uploaded.sliceUrls })
+  }
   // 프리셋 클릭 = 입력창에 삽입(자동 전송 금지 — 과금/전이 발화를 원클릭으로 쏘지 않는다).
   const insertPreset = (text: string) => {
     setPresetOpen(false)
@@ -2061,7 +2085,11 @@ export function GlobalChat() {
                     value={styleAnchorKey}
                     onSelect={(k) => void selectStyleAnchorFromPicker(k)}
                     open={stylePickerOpen}
-                    onOpenChange={(open) => setStylePickerProjectId(open ? projectId : null)}
+                    onOpenChange={(open) => {
+                      setStylePickerProjectId(open ? projectId : null)
+                      if (!open) setStyleUpload((prev) => (prev?.busy ? prev : null))
+                    }}
+                    upload={{ onPick: (file) => void uploadStyleImage(file), busy: !!styleUploadNow?.busy, error: styleUploadNow?.error ?? null }}
                   >
                     <Button
                       size="icon-sm"

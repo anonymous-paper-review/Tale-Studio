@@ -2127,4 +2127,9 @@ export const KO: Record<string, string> = {
   "Picture {i} of {n}: {name}. How should I use it? If you choose art style or comic page, the picture goes to an analysis model.": "그림 {i}/{n}: {name}. 어떻게 쓸까요? 그림체나 만화 원고를 고르면 그림을 분석 모델로 보내요.",
   "How should I use this picture? ({name}) If you choose art style or comic page, the picture goes to an analysis model.": "이 그림을 어떻게 쓸까요? ({name}) 그림체나 만화 원고를 고르면 그림을 분석 모델로 보내요.",
   "Please choose first how to use the picture: comic page, character, background, art style or reference.": "먼저 그림을 어떻게 쓸지 골라 주세요: 만화 원고, 인물, 배경, 그림체, 참고 자료.",
+  // 스타일 선택 창의 내 그림체 올리기 카드 (2026-10-10)
+  "Upload my art style": "내 그림체 올리기",
+  "The picture goes to an analysis model to describe its art style, and the style is then fixed.": "그림을 분석 모델로 보내 그림체 설명을 만들어요. 올린 그림체로 고정돼요.",
+  "Uploading the picture…": "그림을 올리고 있어요…",
+  "Choose a picture file.": "그림 파일을 골라 주세요.",
 }
