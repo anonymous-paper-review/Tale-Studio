@@ -20,6 +20,7 @@ import { falImageSubmit } from '@/lib/writer/llm/fal'
 import { isDefiniteSubmitRejection } from '@/lib/fal/submit-rejection'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { resolveStyleAnchor } from '@/lib/style-anchor'
+import { styleFromUserAnalysis } from '@/lib/artist/sheet-prompt-input'
 import { resolveImageEndpoint, resolveSheetImageModel } from '@/lib/image-models'
 import {
   composeRoughReferenceGrid,
@@ -300,6 +301,8 @@ export async function POST(req: NextRequest) {
     }
 
     const anchor = await resolveStyleAnchor(project)
+    // 올린 그림체의 분석 결과(2026-10-10 오너) — 시트에도 그림체 앵커와 피할 것을 싣는다. 프리셋은 손으로 쓴 그림체 문장만 그대로.
+    const userStyleFacets = styleFromUserAnalysis(project.custom_style_anchor) ? anchor?.facets ?? null : null
     // #F-006(2026-08-13): 시트 프롬프트에 씬 정보가 전무해 시트마다 시간대를 지어냈다(실측 1e166e55
     //   sc_04 Night — 21~24/25~27 시트가 서로 다른 시간대로 갈라짐). scenes.time_of_day 를 시트 전역
     //   조명 한 줄로 배선한다. 그룹은 씬 경계에서 끊기므로(위 그룹핑) 시트당 씬은 정확히 1개.
@@ -397,6 +400,8 @@ export async function POST(req: NextRequest) {
         styleClause: anchor?.styleClause ?? null,
         anchorKeepsGrade: anchor?.anchorKind === 'sublook',
         styleRefCount: anchorTwoRef ? 2 : 1,
+        styleAnchors: userStyleFacets?.probeAnchors ?? null,
+        styleAvoid: userStyleFacets?.negative ?? null,
       })
       const referenceImageUrls = [
         refUrl,
