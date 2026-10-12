@@ -229,6 +229,10 @@ export function buildRealGridPrompt(
     anchorKeepsGrade?: boolean
     /** #anchor-wiring watercolor A안: 스타일 레퍼런스가 마지막 1장인가 2장인가. 기본 1. */
     styleRefCount?: 1 | 2
+    /** 올린 그림체의 분석 조각(2026-10-10 오너) — "Style anchors" 와 "Avoid …" 한 문장. 시트는 러프 4장을 한 번에 다시 그리는
+     *  형식이라 긴 인물 조각과 우선순위 줄은 싣지 않는다. 프리셋은 손으로 쓴 그림체 문장(styleClause)만 그대로. */
+    styleAnchors?: string | null
+    styleAvoid?: string | null
   },
 ): string {
   const { characterRefCount, hasStyleRef, cineLines, characterRefs, columnCharacters } = opts
@@ -293,12 +297,14 @@ export function buildRealGridPrompt(
         ]
       : []),
     ...(hasStyleRef && styleClause ? [`- ${styleClause}`] : []),
+    ...(hasStyleRef && opts.styleAnchors?.trim() ? [`- Style anchors: ${opts.styleAnchors.trim()}`] : []),
     ...(sceneLine
       ? [
           `- Scene lighting — the whole sheet is ONE scene, time of day: ${sceneLine}. Render that time of day's light${opts.anchorKeepsGrade ? '' : ' and color grade'} in every panel, identical across all columns; never drift to a different time of day in any column.`,
         ]
       : []),
     ...renderGridCineBlock(cineLines),
+    ...(hasStyleRef && opts.styleAvoid?.trim() ? [`- ${opts.styleAvoid.trim()}`] : []),
     `- No text anywhere except row 2's arrow labels.`,
   ].join('\n')
 }

@@ -14,7 +14,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/lib/supabase/auth', () => ({ getUser: mocks.getUser }))
 vi.mock('@/lib/generation-jobs', () => ({ userOwnsProject: mocks.userOwnsProject }))
 vi.mock('@/lib/demo/guard-server', () => ({ demoWriteBlock: () => null }))
-vi.mock('@/lib/style-facets/lite-llm', () => ({ extractLiteFacets: mocks.extractLiteFacets }))
+// 분석기는 2026-10-10 오너 결정으로 고성능 판(309칸, hp-llm)으로 바뀌었다 — 이 파일은 라우트가 분석기 결과를 다루는 법만 본다.
+vi.mock('@/lib/style-facets/hp-llm', () => ({ extractHpFacets: mocks.extractLiteFacets }))
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: {
     from: () => ({
