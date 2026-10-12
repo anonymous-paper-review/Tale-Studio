@@ -7,6 +7,8 @@ export async function POST(req: Request): Promise<Response> {
     const body = await req.json()
     const message: string | undefined = body?.message
     // Contact 문의·피드백 모두 talestudio24 단일 수신(2026-07-12 개인 주소 제거) — 제목으로만 구분.
+    //   발신이 onboarding@resend.dev(Resend 시험용 주소)라 받는 곳은 Resend 계정 주인 메일만 된다.
+    //   support@talestudio.art 로 바꾸려면 Resend 에 talestudio.art 도메인 인증부터 해야 한다.
     const isContact = body?.kind === 'contact'
     const recipient = 'talestudio24@gmail.com'
     const subject = isContact ? '[TaleStudio] Contact 문의' : '[TaleStudio] 사용자 피드백'

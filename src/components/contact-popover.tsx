@@ -1,13 +1,14 @@
 'use client'
 
-// 랜딩 footer의 Contact (L3). 클릭하면 메신저형 팝업이 떠서 이메일 주소를 보여주고,
-// 작성한 메시지를 /api/feedback (kind:'contact') 로 보내 talestudio24@gmail.com 으로 포워딩한다.
+// 랜딩 footer의 Contact (L3). 클릭하면 메신저형 팝업이 떠서 지원 이메일 주소를 보여주고,
+// 작성한 메시지를 /api/feedback (kind:'contact') 로 보내 운영팀 메일로 포워딩한다.
+// 지원 주소는 정책 문서·Creem 사업자 정보와 같아야 한다(Creem 심사, 2026-10-12 메일 개설).
 import { useState, type ReactNode } from 'react'
 import { Loader2, Send } from 'lucide-react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useT } from '@/lib/i18n'
 
-const CONTACT_EMAIL = 'talestudio24@gmail.com'
+const CONTACT_EMAIL = 'support@talestudio.art'
 
 export function ContactPopover({
   trigger,
