@@ -1,6 +1,6 @@
 // 영상과 미리보기 생성에 필요한 Take 수를 모델별로 일관되게 계산한다 (#payments-phase-2)
 import { describe, expect, it } from 'vitest'
-import { TAKE_COST_BY_MODEL, takeCostForPreviz, takeCostForVideo } from '@/lib/billing/take-cost'
+import { TAKE_COST_BY_MODEL, takeCostForPreviz, takeCostForVideo, takeCostForVideoFallback } from '@/lib/billing/take-cost'
 
 // Take 소모량 계산기 (#payments-phase-2) — 계수 표와 미지 모델 폴백을 고정한다.
 describe('Take 사용량 계산', () => {
@@ -32,6 +32,16 @@ describe('Take 사용량 계산', () => {
   describe('takeCostForPreviz', () => {
     it('미리보기 영상은 언제나 Take 1을 사용한다', () => {
       expect(takeCostForPreviz()).toBe(1)
+    })
+  })
+
+  describe('takeCostForVideoFallback', () => {
+    it('실패 후 해피홀스가 만든 영상은 해피홀스 값(Take 1)으로 계산한다', () => {
+      expect(takeCostForVideoFallback('happy-horse')).toBe(TAKE_COST_BY_MODEL['happy-horse'])
+    })
+
+    it('실패 후 미니맥스가 만든 영상은 Take 1로 계산한다', () => {
+      expect(takeCostForVideoFallback('minimax')).toBe(1)
     })
   })
 })

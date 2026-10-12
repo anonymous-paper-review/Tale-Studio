@@ -3,9 +3,10 @@
 // 왜: 최근 30일 영상 실패 17건이 전부 Seedance 2.0 의 "실제 사람과 닮았다" 거절이었다(실사 그림체).
 //   실패로 끝내는 대신 미니맥스 → 해피홀스 순서로 다시 만든다. 이미 시도한 모델은 건너뛴다.
 //
-// 같은 작업 행을 그대로 쓴다 — 새 테이크·새 작업을 만들지 않는다. 화면은 같은 작업을 계속 기다리고,
-//   잡아둔 이용권도 그대로 둔다(돌려주지도 더 잡지도 않는다). 마지막 모델까지 실패해야
-//   markDirectorVideoAttemptFailed 로 실패 처리하고 그때 이용권을 돌려준다.
+// 같은 작업 행을 그대로 쓴다 — 새 테이크·새 작업을 만들지 않는다. 화면은 같은 작업을 계속 기다린다.
+//   이용권: 대체 요청을 보내면 잡아둔 Take 를 대체 모델 값까지 낮추고 차액을 돌려준다(차액은 우리가
+//   감당 — 오너 결정 2026-10-12). 더 받지는 않는다. 마지막 모델까지 실패해야
+//   markDirectorVideoAttemptFailed 로 실패 처리하고 그때 남은 Take 를 전부 돌려준다.
 //
 // 차지(claim): 실패한 요청 id 를 들고 있는 queued 작업만 'reserved:' 로 바꿔 차지한다. 웹훅과 폴링이
 //   같은 실패를 동시에 보더라도 한 쪽만 다음 모델을 보낸다. 'reserved:' 상태는 폴링·청소가 손대지 않는
@@ -17,6 +18,8 @@ import {
 } from '@/lib/director-video-takes'
 import { getGenerationJobById, type GenerationJob } from '@/lib/generation-jobs'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
+import { settleTakesForJob } from '@/lib/billing/take-hold'
+import { takeCostForVideoFallback } from '@/lib/billing/take-cost'
 import type { ModerationReceipt } from '@/lib/moderation/creem'
 import {
   type FalVideoSubmitRequest,
@@ -215,6 +218,13 @@ export async function failDirectorVideoAttemptOrFallback(job: GenerationJob, evi
         falKeyId: submission.falKeyId,
       })
       console.warn('[director/video-fallback] video attempt moved to next model:', job.id, next)
+      // 차액 반환이 실패해도 생성은 이미 넘어갔다 — 처음 값이 그대로 남을 뿐(이 기능 전과 같은 청구)이라
+      //   로그만 남긴다. take_settle_for_job 은 멱등이라 나중에 다시 불러도 안전하다.
+      try {
+        await settleTakesForJob(job.id, takeCostForVideoFallback(next))
+      } catch (settleError) {
+        console.error('[director/video-fallback] take settle failed:', job.id, settleError instanceof Error ? settleError.message : settleError)
+      }
       return {
         ...job,
         status: 'queued',

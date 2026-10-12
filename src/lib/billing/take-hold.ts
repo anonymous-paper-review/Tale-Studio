@@ -99,3 +99,14 @@ export async function releaseTakesForJob(jobId: string): Promise<number> {
   if (error) throw error
   return (data as number | null) ?? 0
 }
+
+/**
+ * 작업에 잡아둔 Take 를 amount 까지 줄이고 남는 만큼 돌려준다(take_settle_for_job, 20261012210000).
+ * 실패 후 더 싼 대체 모델이 만들 때 차액을 돌려주는 데 쓴다. 줄이기만 하고 멱등이라, 잡은 양이 이미
+ * amount 이하이거나 hold 가 없는 작업(admin·mode=off)은 0 을 돌려준다.
+ */
+export async function settleTakesForJob(jobId: string, amount: number): Promise<number> {
+  const { data, error } = await supabaseAdmin.rpc('take_settle_for_job', { p_job: jobId, p_amount: amount })
+  if (error) throw error
+  return (data as number | null) ?? 0
+}

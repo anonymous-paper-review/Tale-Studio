@@ -2298,6 +2298,10 @@ export type Database = {
           kind: string
         }[]
       }
+      take_settle_for_job: {
+        Args: { p_amount: number; p_job: string }
+        Returns: number
+      }
       update_person_with_default_appearance: {
         Args: {
           p_appearance_patch: Json
