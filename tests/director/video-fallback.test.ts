@@ -9,7 +9,6 @@ const mocks = vi.hoisted(() => ({
   getJob: vi.fn(),
   release: vi.fn(),
   hold: vi.fn(),
-  settle: vi.fn(),
   claimResult: vi.fn(),
   claims: [] as Array<{ patch: Record<string, unknown>; filters: Array<[string, unknown]> }>,
 }))
@@ -28,11 +27,7 @@ vi.mock('@/lib/director-video-takes', () => ({
   attachProviderRequestToReservedVideoJob: mocks.attach,
 }))
 vi.mock('@/lib/generation-jobs', () => ({ getGenerationJobById: mocks.getJob }))
-vi.mock('@/lib/billing/take-hold', () => ({
-  releaseTakesForJob: mocks.release,
-  holdTakesForVideoJob: mocks.hold,
-  settleTakesForJob: mocks.settle,
-}))
+vi.mock('@/lib/billing/take-hold', () => ({ releaseTakesForJob: mocks.release, holdTakesForVideoJob: mocks.hold }))
 vi.mock('@/lib/fal/webhook-url', () => ({ resolveWebhookUrl: () => 'https://app.test/api/fal/webhook' }))
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: {
@@ -113,7 +108,6 @@ beforeEach(() => {
   mocks.claimResult.mockReturnValue({ data: [{ id: 'job-1' }], error: null })
   mocks.attach.mockResolvedValue(undefined)
   mocks.markFailed.mockResolvedValue(undefined)
-  mocks.settle.mockResolvedValue(4)
 })
 
 describe('같이 정한 것', () => {
@@ -130,16 +124,30 @@ describe('같이 정한 것', () => {
     expect(result).toMatchObject({ id: 'job-1', status: 'queued', request_id: 'fallback-request-1' })
   })
 
-  it('대체 모델로 넘기면 처음 모델 값과의 차액을 돌려주고 대체 모델 값만 받는다', async () => {
+  it('대체 모델로 넘어가면 처음 낸 Take를 그대로 두고 돌려주지 않는다', async () => {
     await failDirectorVideoAttemptOrFallback(seedanceJob(), LIKENESS)
-    expect(mocks.settle).toHaveBeenCalledWith('job-1', 1)
-
-    vi.clearAllMocks()
     await failDirectorVideoAttemptOrFallback(seedanceJob({
       video_fallback: { steps: [{ model: 'minimax', endpoint: 'minimax/h3-max/image-to-video', reason: LIKENESS, started_at: '2026-10-12T10:03:03.000Z' }] },
     }), 'minimax failed')
-    expect(submittedEndpoints()).toEqual(['alibaba/happy-horse/reference-to-video'])
-    expect(mocks.settle).toHaveBeenCalledWith('job-1', 1)
+
+    expect(submittedEndpoints()).toEqual(['minimax/h3-max/image-to-video', 'alibaba/happy-horse/reference-to-video'])
+    expect(mocks.release).not.toHaveBeenCalled()
+    expect(mocks.markFailed).not.toHaveBeenCalled()
+  })
+
+  it('마지막 대체 모델까지 실패해야 실패로 끝내고 낸 Take를 돌려준다', async () => {
+    await failDirectorVideoAttemptOrFallback(seedanceJob({
+      video_fallback: {
+        steps: [
+          { model: 'minimax', endpoint: 'minimax/h3-max/image-to-video', reason: LIKENESS, started_at: '2026-10-12T10:03:03.000Z' },
+          { model: 'happy-horse', endpoint: 'alibaba/happy-horse/reference-to-video', reason: 'minimax failed', started_at: '2026-10-12T10:06:00.000Z' },
+        ],
+      },
+    }), 'happy horse failed')
+
+    expect(mocks.submit).not.toHaveBeenCalled()
+    // markDirectorVideoAttemptFailed 가 실패 처리와 함께 잡아둔 Take 를 전부 돌려준다.
+    expect(mocks.markFailed).toHaveBeenCalledWith('project-1', 'job-1', 'happy horse failed')
   })
 
   it('미니맥스도 실패하면 해피홀스로 다시 만든다', async () => {
@@ -280,33 +288,6 @@ describe('혼자 정한 것', () => {
     await failDirectorVideoAttemptOrFallback(afterMinimax, 'minimax failed')
     expect(mocks.submit).not.toHaveBeenCalled()
     expect(mocks.markFailed).toHaveBeenCalledWith('project-1', 'job-1', 'minimax failed')
-  })
-
-  it('차액은 대체 요청을 실제로 보낸 뒤에 돌려준다', async () => {
-    mocks.attach.mockImplementation(async () => {
-      expect(mocks.settle).not.toHaveBeenCalled()
-    })
-    await failDirectorVideoAttemptOrFallback(seedanceJob(), LIKENESS)
-    expect(mocks.attach).toHaveBeenCalledTimes(1)
-    expect(mocks.settle).toHaveBeenCalledTimes(1)
-  })
-
-  it('대체 요청을 하나도 보내지 못하면 차액이 아니라 잡아둔 Take를 전부 돌려준다', async () => {
-    mocks.submit.mockRejectedValue(Object.assign(new Error('Unprocessable Entity'), { status: 422 }))
-
-    await failDirectorVideoAttemptOrFallback(seedanceJob(), LIKENESS)
-
-    expect(mocks.settle).not.toHaveBeenCalled()
-    expect(mocks.markFailed).toHaveBeenCalledTimes(1)
-  })
-
-  it('차액 반환에 실패해도 대체 생성은 계속한다', async () => {
-    mocks.settle.mockRejectedValue(new Error('db down'))
-
-    const result = await failDirectorVideoAttemptOrFallback(seedanceJob(), LIKENESS)
-
-    expect(result).toMatchObject({ status: 'queued', request_id: 'fallback-request-1' })
-    expect(mocks.markFailed).not.toHaveBeenCalled()
   })
 
   it('내용 검사 영수증이 없는 예전 작업은 다른 모델로 넘기지 않고 실패로 끝낸다', async () => {

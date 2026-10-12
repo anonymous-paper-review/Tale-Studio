@@ -28,12 +28,3 @@ export function takeCostForVideo(modelKey: VideoModelKey | null | undefined): nu
 export function takeCostForPreviz(): number {
   return 1
 }
-
-/**
- * 실패 후 대체 모델이 만든 영상의 Take 값 — 처음 고른 모델 값과의 차액은 우리가 감당한다(오너 결정 2026-10-12).
- * 미니맥스는 판매하는 모델이 아니라 자기 값이 없다. 생성 원가가 해피홀스보다 낮아서 드래프트 값(1)을 따른다
- * (fal 단가 2026-10-12: 미니맥스 H3 Max $0.03~0.05/초, 해피홀스 $0.14/초).
- */
-export function takeCostForVideoFallback(model: 'minimax' | 'happy-horse'): number {
-  return model === 'happy-horse' ? TAKE_COST_BY_MODEL['happy-horse'] : 1
-}

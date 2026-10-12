@@ -12,7 +12,7 @@ vi.mock('@/lib/writer/debug-events', () => ({
   recordWriterObservabilityEvent: (...a: unknown[]) => mocks.recordWriterObservabilityEvent(...a),
 }))
 
-import { holdTakesForVideoJob, releaseTakesForJob, settleTakesForJob, takeBillingMode } from '@/lib/billing/take-hold'
+import { holdTakesForVideoJob, releaseTakesForJob, takeBillingMode } from '@/lib/billing/take-hold'
 
 beforeEach(() => {
   vi.resetAllMocks()
@@ -139,23 +139,5 @@ describe('releaseTakesForJob', () => {
   it('사용량 반환에 실패하면 오류를 알린다', async () => {
     mocks.rpc.mockResolvedValue({ data: null, error: { message: 'db down' } })
     await expect(releaseTakesForJob('job-1')).rejects.toMatchObject({ message: 'db down' })
-  })
-})
-
-describe('settleTakesForJob', () => {
-  it('작업에 잡아둔 Take를 정한 값까지 줄이고 돌려준 양을 알려준다', async () => {
-    mocks.rpc.mockResolvedValue({ data: 4, error: null })
-    await expect(settleTakesForJob('job-1', 1)).resolves.toBe(4)
-    expect(mocks.rpc).toHaveBeenCalledWith('take_settle_for_job', { p_job: 'job-1', p_amount: 1 })
-  })
-
-  it('돌려줄 차액이 없으면 0으로 처리한다', async () => {
-    mocks.rpc.mockResolvedValue({ data: null, error: null })
-    await expect(settleTakesForJob('job-1', 1)).resolves.toBe(0)
-  })
-
-  it('차액 반환에 실패하면 오류를 알린다', async () => {
-    mocks.rpc.mockResolvedValue({ data: null, error: { message: 'db down' } })
-    await expect(settleTakesForJob('job-1', 1)).rejects.toMatchObject({ message: 'db down' })
   })
 })
