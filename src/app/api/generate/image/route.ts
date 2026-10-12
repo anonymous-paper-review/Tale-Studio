@@ -43,11 +43,14 @@ async function generateViaFal(
   if (!context?.projectId) {
     throw new Error('Project ID is required')
   }
+  // Grok 은 모델 고르기 창에서 "입력 구도를 지킨다"로 안내한다 — 참고 그림(고칠 그림)이 있으면 비율을 싣지 않아 그 구도를 따르게 한다.
+  //   fal.ts 가 정한 비율을 Grok 에도 보내게 바뀐 뒤(2026-10-12)에도 Director 에셋 노드의 종전 동작이 그대로이게 한다.
+  const keepInputFraming = imageModel === 'grok-imagine' && !!referenceImageUrls?.length
   const { url } = await generateReservedImage(
     {
       ...(resolvedModel ? { model: resolvedModel } : {}),
       prompt,
-      aspect_ratio: aspectRatio,
+      ...(keepInputFraming ? {} : { aspect_ratio: aspectRatio }),
       reference_image_urls: referenceImageUrls?.length
         ? referenceImageUrls
         : undefined,

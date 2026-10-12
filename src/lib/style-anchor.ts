@@ -1,6 +1,11 @@
 import { DEFAULT_EDIT_IMAGE_MODEL, isImageEditModel } from '@/lib/writer/llm/fal'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { FACET_ADULT_PROPORTIONS, FACET_EXPRESSION_PRIORITY, FIGURE_RULES_PREFIX } from '@/lib/style-facets/figure-line'
+import {
+  EXPRESSION_PRIORITY_RE,
+  FACET_ADULT_PROPORTIONS,
+  FACET_EXPRESSION_PRIORITY,
+  FIGURE_RULES_PREFIX,
+} from '@/lib/style-facets/figure-line'
 
 export const STYLE_ANCHOR_CLAUSE = 'STYLE REFERENCE — the FIRST reference image sets the visual style ONLY: match its art medium, rendering technique, linework, shading, lighting mood and color grade exactly. Do NOT reproduce its subject or objects.'
 export const STYLE_ANCHOR_MULTIREF_CLAUSE = 'The remaining reference images are the character(s) and the location: keep their identity, design and outfit; only re-render them in the style reference\'s look.'
@@ -75,8 +80,7 @@ export function withoutCameraAngle(facets: StyleAnchorFacets): StyleAnchorFacets
   return { ...facets, probeAnchors, priority }
 }
 
-// 조각에 표정 우선 문장이 이미 있으면 다시 붙이지 않는다(인계 §4 — 중복 금지).
-const EXPRESSION_PRIORITY_RE = /expression[^.]*\bpriority\b|\bpriority\b[^.]*expression/i
+// 조각에 표정 우선 문장이 이미 있으면 다시 붙이지 않는다(인계 §4 — 중복 금지). 판별식은 style-facets/figure-line.ts.
 
 // ── 매체어 스크럽(#F-004 B4/B5 2026-08-12) ────────────────────────────────────
 // 앵커가 있으면 앵커 이미지가 매체의 유일한 권위다. 그런데 실측(dc531572)에서 프롬프트에 실린

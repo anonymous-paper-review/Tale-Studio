@@ -224,8 +224,9 @@ function grokAspectRatio(ar?: string): string | undefined {
 /** export 는 테스트 전용 — 순수 조립 함수라 네트워크 없이 스키마 계약을 검증할 수 있다. */
 export function buildFalImageInput(opts: FalImageOptions, model: string): Record<string, unknown> {
   // xai Grok Imagine(#arrow-layer 2026-08-09): image_size·negative_prompt·seed 는 스키마에 없다 — 알려진 키만 보낸다(422 방어).
-  //   비율(2026-10-12 오너 "고친다"): 호출자가 비율을 정했을 때만 보낸다. 안 보내면 고쳐 그리기는 첫 입력 그림 비율(그림체 그림이면
-  //   정사각형), 새로 그리기는 1:1 로 나왔다. 화살표 지우기처럼 비율을 안 정한 편집은 종전대로 입력 비율('auto')을 따른다.
+  //   비율(2026-10-12 오너 "고친다"): 호출자가 비율을 정했으면 Grok 이 받는 가장 가까운 비율로 보낸다. 안 보내면 새로 그리기는 1:1,
+  //   그림체 그림이 첫 참고인 배경 · 시트는 그 그림 비율(정사각형)로 나왔다. 고칠 그림의 구도를 지켜야 하는 편집은 호출자가 비율을
+  //   싣지 않는다 — 화살표 지우기는 원래 싣지 않고, Director 에셋 노드(/api/generate/image)는 Grok 이면 빼고 보낸다.
   //   글은 Grok 한도(8,000자)에 맞춘다 — 실사 그림체 인물 시트 요청이 9,000자를 넘어 통째로 거절됐다(prompt-limit.ts).
   //   작업 기록(input_snapshot)에는 줄이기 전 글이 남는다 — 같은 글은 언제나 같은 글로 줄어든다.
   if (model.startsWith('xai/grok-imagine-image')) {

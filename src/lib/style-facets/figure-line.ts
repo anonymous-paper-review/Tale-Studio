@@ -9,3 +9,6 @@ export const FACET_EXPRESSION_PRIORITY = 'These eye traits describe the relaxed 
 // 인물 조각의 비례 수치(약 7.9등신 등)는 그 스타일의 평균적인 성인 기준이다 — 아이 · 노인에게 어른 비례가 실리지 않게(2026-10-08 오너 결정 4).
 //   조각 문자열은 인계 산출물 그대로 두고, 스타일마다 숫자가 달라 숫자 없이 어느 스타일에나 맞게 붙인다.
 export const FACET_ADULT_PROPORTIONS = 'In this style, the proportions above are those of an average adult; children, elderly people and other body types keep their own natural proportions in the same rendering.'
+
+// 조각에 표정 우선 문장이 이미 있는가(인계 §4 — 있으면 FACET_EXPRESSION_PRIORITY 를 다시 붙이지 않는다). 글 한도를 맞출 때도 이 문장은 남긴다.
+export const EXPRESSION_PRIORITY_RE = /expression[^.]*\bpriority\b|\bpriority\b[^.]*expression/i

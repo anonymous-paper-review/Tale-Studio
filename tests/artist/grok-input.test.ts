@@ -13,15 +13,27 @@ const GROK = 'xai/grok-imagine-image'
 const GROK_EDIT = 'xai/grok-imagine-image/edit'
 
 describe('Grok 화면 비율', () => {
-  it('Grok 으로 고쳐 그릴 때 요청에 화면 비율이 있으면 그 비율을 함께 보낸다 — 그림체 그림이 정사각형이어도 배경은 16:9 로 나온다', () => {
+  it('Grok 으로 고쳐 그릴 때 첫 참고가 그림체 그림이면 요청한 화면 비율을 보낸다 — 그림체 그림이 정사각형이어도 배경은 16:9 로 나온다', () => {
     // 왜: 그림체 그림(정사각형)이 첫 참고라 비율을 안 보내면 Grok 이 입력 비율을 따라 정사각형 배경을 냈다(2026-10-12 시험 4/4).
-    const input = buildFalImageInput({ prompt: 'p', aspect_ratio: '16:9', reference_image_urls: ['anchor.png'] }, GROK_EDIT)
-    expect(input).toEqual({ prompt: 'p', image_urls: ['anchor.png'], aspect_ratio: '16:9' })
+    const anchored = applyStyleAnchor(
+      { key: 'real', imageUrl: 'anchor.png' },
+      { prompt: 'An empty office.', aspect_ratio: '16:9' },
+      'single',
+    )
+    const input = buildFalImageInput(anchored, GROK_EDIT)
+    expect(input.image_urls).toEqual(['anchor.png'])
+    expect(input.aspect_ratio).toBe('16:9')
   })
 
-  it('Grok 으로 새로 그릴 때도 화면 비율을 보낸다 — 보내지 않으면 정사각형으로 나온다', () => {
-    // 왜: 새로 그리기의 기본 비율이 1:1 이라 그림체가 없는 프로젝트의 배경도 정사각형이 된다.
-    expect(buildFalImageInput({ prompt: 'p', aspect_ratio: '16:9' }, GROK)).toEqual({ prompt: 'p', aspect_ratio: '16:9' })
+  it('그림체 그림이 첫 참고인 인물 시트도 Grok 에 16:9 를 보낸다', () => {
+    // 왜: 시트 양식(16:9)이 둘째 참고라 첫 참고(그림체 그림)의 비율을 따르면 시트 칸이 찌그러진다.
+    const anchored = applyStyleAnchor(
+      { key: 'real', imageUrl: 'anchor.png' },
+      { prompt: 'Fill in this character reference-sheet template.', reference_image_urls: ['template.png'] },
+      'turnaround',
+      { pinAspectRatio: '16:9', people: true },
+    )
+    expect(buildFalImageInput(anchored, GROK_EDIT).aspect_ratio).toBe('16:9')
   })
 
   it('화면 비율이 없으면 Grok 에 비율을 보내지 않아 입력 그림의 비율을 지킨다', () => {
@@ -102,6 +114,48 @@ describe('Grok 글 길이', () => {
     expect(sent.length).toBeLessThanOrEqual(GROK_PROMPT_MAX_CHARS)
     expect(sent.startsWith('Wide empty room.')).toBe(true)
     expect(sent.endsWith('word')).toBe(true)
+  })
+
+  it('글 한도를 맞출 때 그림체 조각에 원래 들어 있던 표정 우선 문장도 남긴다', () => {
+    // 왜: 사용자 그림 분석 조각은 표정 우선 문장을 스스로 가질 수 있고, 그때 제품은 같은 문장을 다시 붙이지 않는다(style-anchor) — 그 문장이 맨 끝이라 먼저 잘리면 표정 규칙이 사라진다.
+    const own = 'When the scene calls for an expression, the expression takes priority over these eye defaults.'
+    const withOwn: ResolvedStyleAnchor = {
+      key: 'custom_x',
+      imageUrl: 'anchor.png',
+      facets: parseStyleAnchorFacets({ probe_anchors: 'No outlines.', figure: `Realistic figures throughout. ${longFigure} ${own}` }),
+    }
+    const out = applyStyleAnchor(withOwn, { prompt: body, reference_image_urls: ['template.png'] }, 'turnaround', { pinAspectRatio: '16:9', people: true })
+    const padded = `${out.prompt}\n${'Extra scene detail. '.repeat(Math.ceil((GROK_PROMPT_MAX_CHARS - out.prompt.length + 500) / 20))}`
+    const sent = String(buildFalImageInput({ prompt: padded, reference_image_urls: out.reference_image_urls }, GROK_EDIT).prompt)
+    expect(sent.length).toBeLessThanOrEqual(GROK_PROMPT_MAX_CHARS)
+    const figureLine = sent.split('\n').find((line) => line.startsWith('Figure rules: '))!
+    expect(figureLine).toContain(own)
+    expect(figureLine.endsWith(FACET_ADULT_PROPORTIONS)).toBe(true)
+  })
+
+  it('본문에 "Figure rules:" 로 시작하는 줄이 있어도 제품이 붙인 마지막 인물 규칙 줄을 줄인다', () => {
+    // 왜: 사용자가 쓴 설명이 같은 머리로 시작하면 그 줄을 줄이고 진짜 인물 규칙은 남은 채 마지막 수단(자르기)으로 넘어가 피할 것 줄이 잘렸다.
+    const longBody = `${body}${'Extra scene detail. '.repeat(160)}`
+    const tricky = applyStyleAnchor(anchor, { prompt: `Figure rules: written by the user.\n${longBody}`, reference_image_urls: ['template.png'] }, 'turnaround', { pinAspectRatio: '16:9', people: true })
+    expect(tricky.prompt.length).toBeGreaterThan(GROK_PROMPT_MAX_CHARS)
+    const sent = String(buildFalImageInput({ prompt: tricky.prompt, reference_image_urls: tricky.reference_image_urls }, GROK_EDIT).prompt)
+    expect(sent.length).toBeLessThanOrEqual(GROK_PROMPT_MAX_CHARS)
+    expect(sent).toContain('Figure rules: written by the user.')
+    expect(sent.endsWith('Avoid anime, cel shading, logos.')).toBe(true)
+    expect(sent.split('\n').length).toBe(tricky.prompt.split('\n').length)
+  })
+
+  it('마지막 수단으로 자를 때 빈 글을 보내지 않고, 자르는 자리가 낱말 사이면 그 낱말을 남긴다', () => {
+    // 왜: 공백 없는 긴 글은 낱말 경계를 찾다 통째로 지워졌고, 경계에 딱 맞는 낱말은 하나 더 잘렸다(검토 2026-10-12).
+    const unbroken = `\n${'x'.repeat(GROK_PROMPT_MAX_CHARS + 1000)}`
+    const sentA = String(buildFalImageInput({ prompt: unbroken }, GROK).prompt)
+    expect(sentA.length).toBeGreaterThan(0)
+    expect(sentA.length).toBeLessThanOrEqual(GROK_PROMPT_MAX_CHARS)
+    // 8,000번째 글자에서 낱말 하나가 딱 끝나고 다음 글자가 띄어쓰기다 — 그 낱말까지 남아야 한다.
+    const words = `abcde${' abcd'.repeat(2000)}`
+    const sentB = String(buildFalImageInput({ prompt: words }, GROK).prompt)
+    expect(sentB.length).toBe(GROK_PROMPT_MAX_CHARS)
+    expect(sentB.endsWith('abcd')).toBe(true)
   })
 
   it('다른 모델에는 글을 줄이지 않는다', () => {

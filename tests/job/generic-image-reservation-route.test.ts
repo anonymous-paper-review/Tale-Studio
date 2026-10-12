@@ -155,3 +155,36 @@ describe('/api/generate/image 프로젝트 비율', () => {
     expect(mocks.generateReservedImage.mock.calls[0][0]).toMatchObject({ aspect_ratio: '9:16' })
   })
 })
+
+// 2026-10-12 오너 "고친다": fal 입력이 정한 비율을 Grok 에도 보내게 바뀐 뒤에도, 모델 고르기 창이 Grok 을 "입력 구도를 지킨다"로
+//   안내하는 Director 에셋 노드는 고칠 그림의 구도를 그대로 따른다.
+describe('/api/generate/image Grok 구도', () => {
+  function stubResult() {
+    mocks.generateReservedImage.mockResolvedValue({ url: 'https://fal.test/g.png' })
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(new Uint8Array([1, 2, 3]), { status: 200, headers: { 'content-type': 'image/png' } }))
+  }
+
+  it('Grok 으로 참고 그림을 고쳐 그리면 화면 비율을 싣지 않아 그 그림의 구도를 지킨다 (Director 에셋 노드)', async () => {
+    // 왜: 에셋 노드는 비율(인물 1:1 · 그 밖 16:9)을 늘 실어 보낸다 — Grok 을 고른 사용자는 원본 구도를 기대한다.
+    stubResult()
+    const res = await POST(request({ projectId: PROJECT_ID, prompt: 'retouch', aspectRatio: '1:1', referenceImageUrls: ['https://x/source.png'], imageModel: 'grok-imagine' }))
+    expect(res.status).toBe(200)
+    const opts = mocks.generateReservedImage.mock.calls[0][0]
+    expect(opts.model).toBe('xai/grok-imagine-image/edit')
+    expect('aspect_ratio' in opts).toBe(false)
+  })
+
+  it('Grok 으로 참고 그림 없이 새로 그리면 요청한 화면 비율을 싣는다', async () => {
+    // 왜: 고칠 그림이 없으면 지킬 구도도 없다 — 비율을 안 실으면 Grok 기본값(정사각형)으로 나온다.
+    stubResult()
+    await POST(request({ projectId: PROJECT_ID, prompt: 'a street', aspectRatio: '16:9', imageModel: 'grok-imagine' }))
+    expect(mocks.generateReservedImage.mock.calls[0][0]).toMatchObject({ model: 'xai/grok-imagine-image', aspect_ratio: '16:9' })
+  })
+
+  it('다른 모델은 참고 그림이 있어도 화면 비율을 그대로 싣는다', async () => {
+    // 왜: 구도를 따르는 약속은 Grok 만의 것이다(정상 경로 고정).
+    stubResult()
+    await POST(request({ projectId: PROJECT_ID, prompt: 'retouch', aspectRatio: '1:1', referenceImageUrls: ['https://x/source.png'], imageModel: 'gpt-image-2' }))
+    expect(mocks.generateReservedImage.mock.calls[0][0]).toMatchObject({ aspect_ratio: '1:1' })
+  })
+})

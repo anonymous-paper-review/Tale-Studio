@@ -21,7 +21,8 @@
 //     nano-banana(t2i·edit), openai/gpt-image-2(레거시 — 실제로는 image_size지만
 //     기존 라우트가 aspect_ratio 를 넘겨도 무해히 무시되는 검증된 경로라 그대로 둔다).
 //   - image_size 계열: seedream v4(t2i·edit), flux-2 klein.
-//   - grok-imagine 은 fal.ts 가 prompt+image_urls 만 보내는 전용 분기라 canvas 값을 쓰지 않는다.
+//   - grok-imagine 은 fal.ts 전용 분기다 — 호출자가 정한 비율을 Grok 이 받는 가장 가까운 aspect_ratio 로 보내고(2026-10-12),
+//     비율이 없으면 입력 그림 비율을 따른다. Director 에셋 노드는 Grok 이면 비율을 빼서 입력 구도를 지킨다. 크기(image_size)는 받지 않는다.
 //
 // 새 모델은 fal.ts 의 입력 분기가 그 스키마를 알고 model-schemas.ts 에 필드가 등록됐을 때만
 //   추가한다 — 모르는 모델을 나열하면 422 로 죽는 가짜 선택지가 된다(tests/image-models.test.ts 가 잠근다).
@@ -117,7 +118,7 @@ export const IMAGE_MODELS: Record<ImageModelKey, ImageModelSpec> = {
     description: 'xAI · keeps the input framing',
     t2iEndpoint: 'xai/grok-imagine-image',
     editEndpoint: 'xai/grok-imagine-image/edit',
-    // fal.ts 가 prompt+image_urls 만 보내는 전용 분기라 실제로는 안 쓰인다(표기상 기본값).
+    // fal.ts 전용 분기가 비율을 직접 정한다(정한 비율은 가장 가까운 Grok 비율로, 없으면 입력 그림 비율).
     canvas: 'aspect_ratio',
     pricePerImage: null,
   },
