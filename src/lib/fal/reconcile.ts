@@ -17,6 +17,7 @@ import {
 import { describeFinalizeError, normalizeFailureEvidence } from '@/lib/fal/error-evidence'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { markDirectorVideoAttemptFailed } from '@/lib/director-video-takes'
+import { failDirectorVideoAttemptOrFallback } from '@/lib/director/video-fallback'
 import { falImageFetch, falVideoFetch } from '@/lib/writer/llm/fal'
 import { FalUnknownKeyError } from '@/lib/fal/keys'
 import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events'
@@ -139,6 +140,10 @@ export async function reconcileJobFromFal(job: GenerationJob): Promise<Generatio
   if (result.status === 'IN_QUEUE' || result.status === 'IN_PROGRESS') return job
 
   if (result.status === 'FAILED') {
+    // 생성처가 실패한 연결된 영상은 다음 모델로 넘긴다(2026-10-12). 저장 실패·조회 불가는 여기로 오지 않는다.
+    if (job.kind === 'shot_video' && job.video_clip_id) {
+      return failDirectorVideoAttemptOrFallback(job, normalizeFailureEvidence(result.error, job.kind))
+    }
     return terminalizeJob(job, result.error)
   }
   if (result.status !== 'COMPLETED') return job

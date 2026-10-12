@@ -17,6 +17,7 @@ import {
   GenerationJobTerminalTransitionError,
 } from '@/lib/generation-jobs'
 import { markDirectorVideoAttemptFailed } from '@/lib/director-video-takes'
+import { failDirectorVideoAttemptOrFallback } from '@/lib/director/video-fallback'
 import {
   DirectorVideoCompletionPersistenceError,
   finalizeGenerationJob,
@@ -110,10 +111,11 @@ export async function POST(req: Request) {
   if (body.status !== 'OK') {
     const raw = body.payload_error ?? 'fal webhook reported ERROR'
     const cls = classifyFalFailure(raw)
-    // moderation(콘텐츠 차단)은 결정론적 실패 → 그대로 터미널 처리 (#A 태그로 generation-status 가 구분, 원본 보존).
+    // moderation(콘텐츠 차단)은 결정론적 실패 → 같은 모델로 다시 묻지 않는다 (#A 태그로 generation-status 가 구분, 원본 보존).
+    //   연결된 영상은 다음 모델(미니맥스 → 해피홀스)로 넘기고, 더 넘길 모델이 없을 때만 실패로 끝난다(2026-10-12).
     if (cls === 'moderation') {
       if (job.video_clip_id) {
-        await markDirectorVideoAttemptFailed(job.project_id, job.id, `[moderation] ${raw}`)
+        await failDirectorVideoAttemptOrFallback(job, `[moderation] ${raw}`)
       } else {
         await failGenerationJob(job.id, `[moderation] ${raw}`)
         if (isTakeBilledVideoKind(job.kind)) {

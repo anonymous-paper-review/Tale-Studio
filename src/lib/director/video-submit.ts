@@ -6,7 +6,11 @@ import { resolveStyleAnchorByKey } from '@/lib/style-anchor'
 import { getUser } from '@/lib/supabase/auth'
 import { resolveSubmitIdentity } from '@/lib/director/video-submit-identity'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
-import { FalUnknownKeyError, falKeyById } from '@/lib/fal/keys'
+import {
+  type FalVideoSubmitRequest,
+  buildFalReferenceToVideoRequest,
+  submitFalReferenceToVideo,
+} from '@/lib/director/fal-video-request'
 import {
   type DialogueLine,
   type DialogueSpeaker,
@@ -30,12 +34,7 @@ import { moderationRejectionResponse } from '@/lib/api/moderation'
 import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { buildBestEffortFalRequestCapturePatch } from '@/lib/fal/observability'
-import {
-  VIDEO_MODELS,
-  clampDuration,
-  normalizeProvider,
-  type VideoModelKey,
-} from '@/lib/video-models'
+import { normalizeProvider, type VideoModelKey } from '@/lib/video-models'
 import {
   attachProviderRequestToReservedVideoJob,
   markDirectorVideoAttemptFailed,
@@ -65,10 +64,6 @@ const FAL_T2V_FALLBACK_MODEL = 'fal-ai/kling-video/v2.1/master/text-to-video'
 type VideoProvider = 'fal'
 type GenerationMethod = 'T2V' | 'I2V'
 
-type FalVideoSubmitRequest = {
-  model: string
-  input: Record<string, unknown>
-}
 type VideoSubmission = {
   taskId: string
   provider: VideoProvider
@@ -190,78 +185,6 @@ function buildFalT2VFallbackRequest(
       duration: durationSeconds >= 10 ? '10' : '5',
       aspect_ratio: aspectRatio,
     },
-  }
-}
-
-/* ── FAL.ai reference-to-video (레지스트리 기반, #5) ──
-   V2 refs(#real-strip 2026-07-22): imageUrls 가 [START, END] 2장이면 시작·끝 구도 고정 —
-   전 모델 refParam 이 image_urls 배열이라 스키마 변경 없이 원소만 늘어난다. */
-function buildFalReferenceToVideoRequest(
-  modelKey: VideoModelKey,
-  prompt: string,
-  imageUrls: string[],
-  durationSeconds: number,
-  aspectRatio: string,
-): FalVideoSubmitRequest {
-  const spec = VIDEO_MODELS[modelKey]
-  if (!spec.endpoint) throw new Error('FAL reference-to-video endpoint missing')
-  const input: Record<string, unknown> = {
-    prompt,
-    [spec.refParam]: imageUrls,
-  }
-  // happy-horse는 negative_prompt 미지원(모델 스키마) — 헛송신 제거(#tfix-fal-wiring 2026-08-11).
-  //   고정 negative_prompt 계약 자체는 타 모델에서 유지(존폐는 별도 논의 — 카탈로그 B12).
-  if (modelKey !== 'happy-horse') {
-    input.negative_prompt = 'blurry, low quality, distorted, deformed'
-  }
-
-  // duration: flexible=정수(clamp), fixed(veo)='8s'
-  if (spec.duration.mode === 'fixed') {
-    input.duration = spec.duration.value
-  } else {
-    input.duration = clampDuration(spec, durationSeconds)
-  }
-
-  // audio: 토글 있는 모델만 — 현재 전 모델 audioDefault=true(91b83f6, 음성은 영상 생성기에
-  //   맡긴다는 방침의 전제). 대사 절(#g7)이 가청 대사를 요구하므로 여기가 꺼지면 반쪽이 된다.
-  if (spec.audioParam) {
-    input[spec.audioParam] = spec.audioDefault
-  }
-
-  // resolution: 노출하는 모델만 기본 해상도
-  if (spec.resolutions.length > 0) {
-    input.resolution = spec.defaultResolution
-  }
-
-  // aspect_ratio: kling-o3는 미노출(확실치 않아 omit), 그 외 전달
-  if (modelKey !== 'kling-o3') {
-    input.aspect_ratio = aspectRatio
-  }
-
-  return { model: spec.endpoint, input }
-}
-
-async function submitFalReferenceToVideo(
-  request: FalVideoSubmitRequest,
-  webhookUrl: string | undefined,
-  falKeyId: unknown,
-  /** Creem 검사 통과 영수증(#creem-moderation 2026-10-11) — 필수 인자라 검사 없는 제출은 타입 오류다. */
-  moderation: ModerationReceipt,
-) {
-  // 제출 직전 마지막 검문 — 저장된 스냅샷에서 꺼낸 값이라 타입만으로는 모양을 보장할 수 없다.
-  assertModerationReceipt(moderation, 'Video submission')
-  const normalizedFalKeyId = typeof falKeyId === 'string' && falKeyId.trim() ? falKeyId : null
-  const k = normalizedFalKeyId ? falKeyById(normalizedFalKeyId) : null
-  if (!k || k.id !== normalizedFalKeyId) throw new FalUnknownKeyError(normalizedFalKeyId)
-  const { request_id } = await k.client.queue.submit(
-    request.model,
-    webhookUrl ? { input: request.input, webhookUrl } : { input: request.input },
-  )
-  return {
-    taskId: request_id,
-    provider: 'fal' as const,
-    model: request.model,
-    falKeyId: k.id,
   }
 }
 
