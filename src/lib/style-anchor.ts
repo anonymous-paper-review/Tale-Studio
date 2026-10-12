@@ -1,5 +1,6 @@
 import { DEFAULT_EDIT_IMAGE_MODEL, isImageEditModel } from '@/lib/writer/llm/fal'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { FACET_ADULT_PROPORTIONS, FACET_EXPRESSION_PRIORITY, FIGURE_RULES_PREFIX } from '@/lib/style-facets/figure-line'
 
 export const STYLE_ANCHOR_CLAUSE = 'STYLE REFERENCE — the FIRST reference image sets the visual style ONLY: match its art medium, rendering technique, linework, shading, lighting mood and color grade exactly. Do NOT reproduce its subject or objects.'
 export const STYLE_ANCHOR_MULTIREF_CLAUSE = 'The remaining reference images are the character(s) and the location: keep their identity, design and outfit; only re-render them in the style reference\'s look.'
@@ -18,11 +19,9 @@ export type StyleAnchorMode = 'single' | 'turnaround' | 'multiref'
 //   역할 문장 → 현행 style_clause → "Style anchors:" → 본문 → 표면 문장 → [인물이면 Figure rules · Priority] → Avoid → 글자 금지.
 //   조각 문자열은 인계 산출물 그대로다(제품이 다듬지 않는다). 조각이 없으면 종전 조립 그대로.
 export const FACET_SURFACE_GUARD = 'Plain, fully specified surfaces: flat ground and backdrop as described, no borrowed patterns; accessories, footwear and sky or backdrop marks only as described.'
-export const FACET_EXPRESSION_PRIORITY = 'These eye traits describe the relaxed face; when the scene calls for an expression, the expression sets the lid opening and corner angle and takes priority over these defaults, while the iris rendering, the single catchlight (kept even when the eye is narrowed or angry) and the outline colour stay as described.'
 export const FACET_NO_TEXT = 'No text, no letters, no logo, no watermark.'
-// 인물 조각의 비례 수치(약 7.9등신 등)는 그 스타일의 평균적인 성인 기준이다 — 아이 · 노인에게 어른 비례가 실리지 않게(2026-10-08 오너 결정 4).
-//   조각 문자열은 인계 산출물 그대로 두고, 스타일마다 숫자가 달라 숫자 없이 어느 스타일에나 맞게 붙인다.
-export const FACET_ADULT_PROPORTIONS = 'In this style, the proportions above are those of an average adult; children, elderly people and other body types keep their own natural proportions in the same rendering.'
+// 인물 규칙 줄의 고정 문구(표정 우선 · 어른 비례 첨언)는 모델 글 한도 맞추기도 함께 써서 따로 둔다(style-facets/figure-line.ts).
+export { FACET_ADULT_PROPORTIONS, FACET_EXPRESSION_PRIORITY, FIGURE_RULES_PREFIX }
 
 export interface StyleAnchorFacets {
   version: string | null
@@ -204,7 +203,7 @@ export function applyStyleAnchor(
         body,
         FACET_SURFACE_GUARD,
         ...(opts?.people && facets.figure
-          ? [`Figure rules: ${facets.figure} ${FACET_ADULT_PROPORTIONS}${EXPRESSION_PRIORITY_RE.test(facets.figure) ? '' : ` ${FACET_EXPRESSION_PRIORITY}`}`]
+          ? [`${FIGURE_RULES_PREFIX}${facets.figure} ${FACET_ADULT_PROPORTIONS}${EXPRESSION_PRIORITY_RE.test(facets.figure) ? '' : ` ${FACET_EXPRESSION_PRIORITY}`}`]
           : []),
         ...(opts?.people && facets.priority ? [facets.priority] : []),
         ...(facets.negative ? [facets.negative] : []),

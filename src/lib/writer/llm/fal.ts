@@ -10,6 +10,7 @@ import { pickFalKey, falKeyById, FalUnknownKeyError } from '@/lib/fal/keys';
 // 제출 함수는 검사를 통과한 입력만 받는다(#creem-moderation 2026-10-11) — 타입 표식이라 런타임
 // 의존도, 요청 본문도 늘지 않는다. 표식은 moderatedSubmitInput() 만 붙일 수 있다.
 import type { ModerationProof } from '@/lib/moderation/creem';
+import { fitPromptToLimit } from '@/lib/fal/prompt-limit';
 
 let imageCallCount = 0;
 let videoCallCount = 0;
@@ -193,13 +194,45 @@ function normalizeImageSize(
   return m ? { width: Number(m[1]), height: Number(m[2]) } : size;
 }
 
+/** Grok Imagine 글 한도 — fal 스키마 prompt maxLength(2026-10-12 확인). */
+export const GROK_PROMPT_MAX_CHARS = 8000;
+// Grok Imagine 이 받는 비율 — fal 스키마 aspect_ratio 목록(2026-10-12 확인). 이 밖의 값은 거절한다.
+const GROK_ASPECT_RATIOS = ['2:1', '20:9', '19.5:9', '16:9', '4:3', '3:2', '1:1', '2:3', '3:4', '9:16', '9:19.5', '9:20', '1:2'];
+
+/** 'horizontal_16:9' · 'cinema_2.39:1' · '5:4' → Grok 이 받는 가장 가까운 비율. 비율이 없거나 'auto' 면 undefined(보내지 않음). */
+function grokAspectRatio(ar?: string): string | undefined {
+  if (!ar) return undefined;
+  const cleaned = ar.replace(/^(horizontal_|vertical_|cinema_|square_)/, '');
+  if (cleaned === 'auto') return undefined;
+  if (GROK_ASPECT_RATIOS.includes(cleaned)) return cleaned;
+  const m = /^([\d.]+):([\d.]+)$/.exec(cleaned);
+  if (!m) return undefined;
+  const want = Math.log(parseFloat(m[1]) / parseFloat(m[2]));
+  let best = GROK_ASPECT_RATIOS[0];
+  let bestGap = Infinity;
+  for (const ratio of GROK_ASPECT_RATIOS) {
+    const [w, h] = ratio.split(':').map(Number);
+    const gap = Math.abs(Math.log(w / h) - want);
+    if (gap < bestGap) {
+      best = ratio;
+      bestGap = gap;
+    }
+  }
+  return best;
+}
+
 /** export 는 테스트 전용 — 순수 조립 함수라 네트워크 없이 스키마 계약을 검증할 수 있다. */
 export function buildFalImageInput(opts: FalImageOptions, model: string): Record<string, unknown> {
-  // xai Grok Imagine(#arrow-layer 2026-08-09): aspect_ratio 기본 'auto'(입력 비율 유지)라 생략하고,
-  //   image_size·negative_prompt·seed 는 스키마에 없다 — 알려진 키만 보낸다(422 방어).
+  // xai Grok Imagine(#arrow-layer 2026-08-09): image_size·negative_prompt·seed 는 스키마에 없다 — 알려진 키만 보낸다(422 방어).
+  //   비율(2026-10-12 오너 "고친다"): 호출자가 비율을 정했을 때만 보낸다. 안 보내면 고쳐 그리기는 첫 입력 그림 비율(그림체 그림이면
+  //   정사각형), 새로 그리기는 1:1 로 나왔다. 화살표 지우기처럼 비율을 안 정한 편집은 종전대로 입력 비율('auto')을 따른다.
+  //   글은 Grok 한도(8,000자)에 맞춘다 — 실사 그림체 인물 시트 요청이 9,000자를 넘어 통째로 거절됐다(prompt-limit.ts).
+  //   작업 기록(input_snapshot)에는 줄이기 전 글이 남는다 — 같은 글은 언제나 같은 글로 줄어든다.
   if (model.startsWith('xai/grok-imagine-image')) {
-    const grokInput: Record<string, unknown> = { prompt: opts.prompt };
+    const grokInput: Record<string, unknown> = { prompt: fitPromptToLimit(opts.prompt, GROK_PROMPT_MAX_CHARS) };
     if (opts.reference_image_urls?.length) grokInput.image_urls = opts.reference_image_urls;
+    const ratio = grokAspectRatio(opts.aspect_ratio);
+    if (ratio) grokInput.aspect_ratio = ratio;
     return grokInput;
   }
   // nano-banana(#nano-banana): T2I=prompt+aspect_ratio / edit=prompt+image_urls — 그 외 키 전송 금지.
