@@ -403,8 +403,8 @@ export async function triggerWorldDrafts(
     if (!locations?.length) return result
 
     const anchor = await resolveStyleAnchor(project)
-    // 기준 그림 없이 그리는 그림체(실사, 2026-10-13 오너)의 배경은 글자 금지 줄을 붙인다(generate-world 와 같은 규칙).
-    const noTextLine = !anchor && (await styleDrawsWithoutReference(project))
+    // 기준 그림 없이 그리는 그림체(실사, 2026-10-13 오너)의 배경은 글자 금지 줄과 16:9 크기로 그린다(generate-world 와 같은 규칙).
+    const styleWithoutReference = !anchor && (await styleDrawsWithoutReference(project))
 
     for (const location of locations as DraftLocationRow[]) {
       if (location.wide_shot) {
@@ -455,7 +455,7 @@ export async function triggerWorldDrafts(
             actor: 'writer',
             workspaceId: project?.workspace_id ?? undefined,
             anchor,
-            noTextLine,
+            styleWithoutReference,
             moderation,
           })
         } catch (error) {

@@ -8,6 +8,7 @@ import {
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { applyStyleAnchor, type AnchorableSubmit, type ResolvedStyleAnchor } from '@/lib/style-anchor'
 import { FACET_NO_TEXT } from '@/lib/style-facets/no-text'
+import { imageSizeForAspect } from '@/lib/fal/aspect-size'
 import { falImageSubmit } from '@/lib/writer/llm/fal'
 import { isDefiniteSubmitRejection } from '@/lib/fal/submit-rejection'
 import { DEFAULT_WORLD_IMAGE_MODEL, resolveImageEndpoint, type ImageModelKey } from '@/lib/image-models'
@@ -38,9 +39,10 @@ export interface SubmitWorldShotJobInput {
   moderation: ModerationReceipt
   /** 변형 생성의 연속성 참조(기본 모습 wide_shot) — 캐릭터가 기본 얼굴을 참조하는 것과 같다. */
   referenceImageUrls?: string[] | null
-  /** 그림체가 기준 그림 없이 그리게 정해졌다(styleDrawsWithoutReference, 2026-10-13 오너: 실사) — 기준 그림이 있을 때 그림체 글이
-   *  막던 글자를 배경 요청 끝의 글자 금지 줄로 막는다. 그림체가 없는 프로젝트는 종전대로 붙이지 않는다. */
-  noTextLine?: boolean
+  /** 그림체가 기준 그림 없이 그리게 정해졌다(styleDrawsWithoutReference, 2026-10-13 오너: 실사). 그러면 배경 요청 끝에 글자 금지 줄을
+   *  붙이고(기준 그림이 있을 때는 그림체 글이 막던 글자), 화면 비율을 크기(image_size)로 정해 보낸다(새로 그리기 모델은 비율을 무시해
+   *  4:3 으로 나왔다). 그림체가 없는 프로젝트는 종전 그대로. */
+  styleWithoutReference?: boolean
 }
 
 export async function submitWorldShotJob(
@@ -48,9 +50,11 @@ export async function submitWorldShotJob(
 ): Promise<GenerationJob> {
   const modelKey: ImageModelKey = input.model ?? DEFAULT_WORLD_IMAGE_MODEL
   const refs = (input.referenceImageUrls ?? []).filter((u) => typeof u === 'string' && !!u)
+  const withoutReference = !input.anchor && input.styleWithoutReference === true
   const baseOpts: AnchorableSubmit = {
-    prompt: !input.anchor && input.noTextLine ? `${input.prompt}\n${FACET_NO_TEXT}` : input.prompt,
+    prompt: withoutReference ? `${input.prompt}\n${FACET_NO_TEXT}` : input.prompt,
     aspect_ratio: input.aspectRatio ?? '16:9',
+    ...(withoutReference ? { image_size: imageSizeForAspect(input.aspectRatio ?? '16:9') } : {}),
     ...(refs.length ? { reference_image_urls: refs } : {}),
   }
   const anchored = input.anchor ? applyStyleAnchor(input.anchor, baseOpts, refs.length ? 'multiref' : 'single') : baseOpts

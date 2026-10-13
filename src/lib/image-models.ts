@@ -19,7 +19,8 @@
 // canvas 파라미터(모델 스키마 실측, fal llms.txt 기준):
 //   - aspect_ratio 계열: nano-banana-2(t2i·edit, resolution 0.5K~4K 등급만 있고 정확한 픽셀 캔버스는 없음),
 //     nano-banana(t2i·edit), openai/gpt-image-2(레거시 — 실제로는 image_size지만
-//     기존 라우트가 aspect_ratio 를 넘겨도 무해히 무시되는 검증된 경로라 그대로 둔다).
+//     기존 라우트가 aspect_ratio 를 넘겨도 무해히 무시되는 검증된 경로라 그대로 둔다. 무시되면 기본 4:3(1024x768)이다.
+//     예외(2026-10-13): 기준 그림 없이 그리는 그림체(실사)의 배경은 world-submit 이 image_size 를 직접 정해 보낸다).
 //   - image_size 계열: seedream v4(t2i·edit), flux-2 klein.
 //   - grok-imagine 은 fal.ts 전용 분기다 — 호출자가 정한 비율을 Grok 이 받는 가장 가까운 aspect_ratio 로 보내고(2026-10-12),
 //     비율이 없으면 입력 그림 비율을 따른다. Director 에셋 노드는 Grok 이면 비율을 빼서 입력 구도를 지킨다. 크기(image_size)는 받지 않는다.

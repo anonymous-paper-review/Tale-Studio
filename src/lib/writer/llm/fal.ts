@@ -11,6 +11,7 @@ import { pickFalKey, falKeyById, FalUnknownKeyError } from '@/lib/fal/keys';
 // 의존도, 요청 본문도 늘지 않는다. 표식은 moderatedSubmitInput() 만 붙일 수 있다.
 import type { ModerationProof } from '@/lib/moderation/creem';
 import { fitPromptToLimit } from '@/lib/fal/prompt-limit';
+import { imageSizeForAspect } from '@/lib/fal/aspect-size';
 
 let imageCallCount = 0;
 let videoCallCount = 0;
@@ -144,31 +145,9 @@ export function isImageEditModel(model: string): boolean {
   return /\/edit$/.test(model) || /redux/.test(model) || /ip-adapter/.test(model);
 }
 
-// aspect_ratio 'W:H' → openai/gpt-image-2/edit이 받는 image_size preset 매핑
+// aspect_ratio 'W:H' → openai/gpt-image-2/edit이 받는 image_size preset 매핑(fal/aspect-size.ts)
 //   미스매치 시 'auto' fallback (모델이 첫 reference 이미지 비율 따라감)
-function arToImageSize(ar?: string): string {
-  if (!ar) return 'auto';
-  const cleaned = ar.replace(/^(horizontal_|vertical_|cinema_)/, '');
-  const map: Record<string, string> = {
-    '16:9': 'landscape_16_9',
-    '4:3': 'landscape_4_3',
-    '1:1': 'square_hd',
-    '3:4': 'portrait_4_3',
-    '9:16': 'portrait_16_9',
-  };
-  if (map[cleaned]) return map[cleaned];
-  // 숫자 비율 → 가까운 preset
-  const m = /^([\d.]+):([\d.]+)$/.exec(cleaned);
-  if (m) {
-    const ratio = parseFloat(m[1]) / parseFloat(m[2]);
-    if (ratio > 1.6) return 'landscape_16_9';      // 1.78, 2.39 등
-    if (ratio > 1.2) return 'landscape_4_3';
-    if (Math.abs(ratio - 1) < 0.05) return 'square_hd';
-    if (ratio > 0.65) return 'portrait_4_3';
-    return 'portrait_16_9';
-  }
-  return 'auto';
-}
+const arToImageSize = imageSizeForAspect;
 
 // reference 있으면 자동으로 edit 모델로 라우팅 (요청한 모델이 순수 T2I일 때만)
 function resolveImageModel(opts: FalImageOptions): string {
@@ -270,14 +249,12 @@ export function buildFalImageInput(opts: FalImageOptions, model: string): Record
     const size = normalizeImageSize(opts.image_size) ?? arToImageSize(opts.aspect_ratio);
     input.image_size = size === 'auto' ? 'landscape_16_9' : size;
     if (opts.reference_image_urls?.length) input.image_urls = opts.reference_image_urls;
-  } else if (model === DEFAULT_IMAGE_MODEL) {
-    // GPT Image 2 새로 그리기(openai/gpt-image-2)는 비율이 아니라 크기(image_size)만 받는다 — 비율로 보내면 무시되고 기본 4:3(1024x768)로
-    //   나왔다(2026-10-13, 기준 그림 없이 그리는 실사 배경). 정한 크기가 있으면 그 크기, 없으면 비율을 크기 이름으로, 둘 다 없으면 보내지 않는다.
-    const size = normalizeImageSize(opts.image_size) ?? arToImageSize(opts.aspect_ratio);
-    if (size !== 'auto') input.image_size = size;
   } else {
     // 순수 T2I: aspect_ratio. reference 있어도 모델이 받으면 함께 보냄
     if (opts.aspect_ratio) input.aspect_ratio = opts.aspect_ratio;
+    // GPT Image 2 새로 그리기(openai/gpt-image-2)는 비율이 아니라 크기(image_size)만 받는다 — 비율은 무시되어 기본 4:3(1024x768)로 나온다.
+    //   호출자가 크기를 정했을 때만 보낸다(2026-10-13: 기준 그림 없이 그리는 실사 배경이 16:9 를 정해 보낸다). 다른 요청은 종전 그대로.
+    if (model === DEFAULT_IMAGE_MODEL && opts.image_size) input.image_size = normalizeImageSize(opts.image_size);
     if (opts.reference_image_urls?.length) input.reference_image_urls = opts.reference_image_urls;
   }
   return input;

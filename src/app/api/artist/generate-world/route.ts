@@ -133,8 +133,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, status: 'queued', deduped: true, waitingForStyle: true, locationId, column })
     }
     const anchor = await resolveStyleAnchor(project)
-    // 기준 그림 없이 그리는 그림체(실사, 2026-10-13 오너)의 배경은 글자 금지 줄을 붙인다 — 기준 그림이 있으면 그림체 글이 막던 것.
-    const noTextLine = !anchor && (await styleDrawsWithoutReference(project))
+    // 기준 그림 없이 그리는 그림체(실사, 2026-10-13 오너)의 배경은 글자 금지 줄과 16:9 크기로 그린다 — 기준 그림이 있으면 그림체 글이 막던 글자.
+    const styleWithoutReference = !anchor && (await styleDrawsWithoutReference(project))
 
     // 약속 C10: 변형(모습)은 존재해야 하고, 기본 모습의 wide_shot 을 연속성 참조로 붙인다(캐릭터의 기본 얼굴 참조와 같다).
     let referenceImageUrls: string[] = []
@@ -180,7 +180,7 @@ export async function POST(req: Request) {
         workspaceId: project.workspace_id,
         sourceHash: sourceHash ?? null,
         anchor,
-        noTextLine,
+        styleWithoutReference,
         chatTraceId: traceId ?? null,
         model,
         safeMode: effectiveSafeMode,

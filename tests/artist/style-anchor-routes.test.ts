@@ -986,7 +986,7 @@ describe('기준 그림을 쓰지 않는 그림체', () => {
     expect(firstGenerationJobArg().inputSnapshot).toMatchObject({ style_anchor_key: null, reference_image_urls: [TEMPLATE_URL] })
   })
 
-  it('기준 그림을 쓰지 않게 정한 그림체의 배경은 기준 그림 없이 새로 그리고 글자 금지 줄을 붙인다', async () => {
+  it('기준 그림을 쓰지 않게 정한 그림체의 배경은 기준 그림 없이 새로 그리고 글자 금지 줄과 16:9 크기를 붙인다', async () => {
     // 왜: 기준 그림 없이 그린 실사 배경 7장 중 3장에 이름 · 간판 글자가 들어갔다(2026-10-12 시험) — 기준 그림이 있을 때는 그림체 글이 막던 것.
     dbState.projects = [projectFixture({ design_tokens: null, style_anchor_key: ANCHOR_KEY })]
 
@@ -998,6 +998,7 @@ describe('기준 그림을 쓰지 않는 그림체', () => {
     expect(firstFalOpts()).toEqual({
       prompt: 'WORLD PROMPT, no people or characters, empty environment\nNo text, no letters, no logo, no watermark.',
       aspect_ratio: '16:9',
+      image_size: 'landscape_16_9',
       model: DEFAULT_IMAGE_MODEL,
       webhookUrl: WEBHOOK_URL,
     })
