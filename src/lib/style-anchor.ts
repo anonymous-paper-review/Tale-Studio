@@ -1,5 +1,7 @@
 import { DEFAULT_EDIT_IMAGE_MODEL, isImageEditModel } from '@/lib/writer/llm/fal'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { FACET_NO_TEXT } from '@/lib/style-facets/no-text'
+import { presetUsesReferenceImage, _clearReferenceImageCacheForTest } from '@/lib/style-facets/reference-image'
 import {
   EXPRESSION_PRIORITY_RE,
   FACET_ADULT_PROPORTIONS,
@@ -24,7 +26,8 @@ export type StyleAnchorMode = 'single' | 'turnaround' | 'multiref'
 //   역할 문장 → 현행 style_clause → "Style anchors:" → 본문 → 표면 문장 → [인물이면 Figure rules · Priority] → Avoid → 글자 금지.
 //   조각 문자열은 인계 산출물 그대로다(제품이 다듬지 않는다). 조각이 없으면 종전 조립 그대로.
 export const FACET_SURFACE_GUARD = 'Plain, fully specified surfaces: flat ground and backdrop as described, no borrowed patterns; accessories, footwear and sky or backdrop marks only as described.'
-export const FACET_NO_TEXT = 'No text, no letters, no logo, no watermark.'
+// 글자 금지 줄은 기준 그림 없이 그리는 배경도 함께 써서 따로 둔다(style-facets/no-text.ts).
+export { FACET_NO_TEXT }
 // 인물 규칙 줄의 고정 문구(표정 우선 · 어른 비례 첨언)는 모델 글 한도 맞추기도 함께 써서 따로 둔다(style-facets/figure-line.ts).
 export { FACET_ADULT_PROPORTIONS, FACET_EXPRESSION_PRIORITY, FIGURE_RULES_PREFIX }
 
@@ -295,6 +298,9 @@ export async function resolveStyleAnchor(
 
   const anchor = await resolveStyleAnchorByKey(project.style_anchor_key)
   if (!anchor) return null
+  // 기준 그림을 쓰지 않게 정한 그림체(2026-10-13 오너 "실사는 기준 그림 없이로만 생성")는 그림체가 없는 프로젝트와 같은 길로 그린다 —
+  //   기준 그림 · 그 그림을 가리키는 문장 · 그림체 글을 싣지 않는다. 영상의 매체 판정은 키로 따로 읽어(resolveStyleAnchorByKey) 그대로다.
+  if (!(await presetUsesReferenceImage(anchor.key))) return null
   return { ...anchor, ...withFacets(await loadStyleAnchorFacets(anchor.key)) }
 }
 
@@ -448,6 +454,7 @@ export async function listStyleAnchorCatalog(): Promise<StyleAnchorCatalogEntry[
 export function _clearStyleAnchorCacheForTest(): void {
   styleAnchorCache.clear()
   facetsCache.clear()
+  _clearReferenceImageCacheForTest()
   mediumsCache = null
   catalogCache = null
 }

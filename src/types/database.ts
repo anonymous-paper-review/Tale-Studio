@@ -1709,6 +1709,7 @@ export type Database = {
           style_clause: string | null
           subtitle: string | null
           use_preview_ref: boolean
+          use_reference_image: boolean
         }
         Insert: {
           anchor_kind?: string
@@ -1725,6 +1726,7 @@ export type Database = {
           style_clause?: string | null
           subtitle?: string | null
           use_preview_ref?: boolean
+          use_reference_image?: boolean
         }
         Update: {
           anchor_kind?: string
@@ -1741,6 +1743,7 @@ export type Database = {
           style_clause?: string | null
           subtitle?: string | null
           use_preview_ref?: boolean
+          use_reference_image?: boolean
         }
         Relationships: []
       }

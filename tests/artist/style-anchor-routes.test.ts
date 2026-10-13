@@ -948,3 +948,59 @@ describe('facet 조각을 생성 경로마다 알맞게 싣는다 (2026-10-08 �
     expect(falOptsAt(1).prompt).not.toContain('Priority order:')
   })
 })
+
+// 2026-10-13 오너 "실사는 기준 그림 없이로만 생성": 기준 그림을 쓰지 않게 정한 그림체(style_anchors.use_reference_image = false)는
+//   그림체가 없는 프로젝트와 같은 길로 그린다 — 기준 그림 · 그 그림을 가리키는 문장 · 그림체 글을 싣지 않는다.
+describe('기준 그림을 쓰지 않는 그림체', () => {
+  beforeEach(() => {
+    dbState.styleAnchors = [{ ...styleAnchorFixture(), use_reference_image: false } as StyleAnchorRow]
+  })
+
+  it('실사처럼 기준 그림을 쓰지 않게 정한 그림체는 인물 시트를 기준 그림 없이 시트 양식만 참고로 그린다', async () => {
+    // 왜: 실사 시험에서 기준 그림이 없어도 인물은 같은 점수였고(3.7), 오너가 실사는 기준 그림 없이 그리기로 정했다.
+    const character = characterFixture({ view_main: null, entity_type: 'person' })
+    setCharacters(character)
+
+    const response = await generateSheetPOST(
+      postRequest('/api/artist/generate-sheet', { projectId: PROJECT_ID, characterId: CHARACTER_ID, appearanceKey: 'current', view: 'main' }),
+    )
+
+    const input = {
+      ...resolveCharacterPromptInput({
+        character: { name: character.name, role: character.role },
+        appearance: { appearance: character.appearance, costume: character.costume },
+        designTokens,
+        hasAnchor: false,
+      }),
+      delta: undefined,
+      safeMode: false,
+    }
+    expect(response.status).toBe(200)
+    expect(firstFalOpts()).toEqual({
+      model: DEFAULT_EDIT_IMAGE_MODEL,
+      prompt: buildCharacterTurnaroundPrompt(input),
+      reference_image_urls: [TEMPLATE_URL],
+      webhookUrl: WEBHOOK_URL,
+    })
+    expect(firstFalOpts().prompt).not.toContain('STYLE REFERENCE')
+    expect(firstGenerationJobArg().inputSnapshot).toMatchObject({ style_anchor_key: null, reference_image_urls: [TEMPLATE_URL] })
+  })
+
+  it('기준 그림을 쓰지 않게 정한 그림체의 배경은 기준 그림 없이 새로 그리고 글자 금지 줄을 붙인다', async () => {
+    // 왜: 기준 그림 없이 그린 실사 배경 7장 중 3장에 이름 · 간판 글자가 들어갔다(2026-10-12 시험) — 기준 그림이 있을 때는 그림체 글이 막던 것.
+    dbState.projects = [projectFixture({ design_tokens: null, style_anchor_key: ANCHOR_KEY })]
+
+    const response = await generateWorldPOST(
+      postRequest('/api/artist/generate-world', { projectId: PROJECT_ID, locationId: LOCATION_ID, column: 'wide_shot', prompt: 'WORLD PROMPT', aspectRatio: '16:9' }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(firstFalOpts()).toEqual({
+      prompt: 'WORLD PROMPT, no people or characters, empty environment\nNo text, no letters, no logo, no watermark.',
+      aspect_ratio: '16:9',
+      model: DEFAULT_IMAGE_MODEL,
+      webhookUrl: WEBHOOK_URL,
+    })
+    expect(firstGenerationJobArg().inputSnapshot).toMatchObject({ style_anchor_key: null })
+  })
+})

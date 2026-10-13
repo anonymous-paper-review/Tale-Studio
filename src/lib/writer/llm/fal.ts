@@ -270,6 +270,11 @@ export function buildFalImageInput(opts: FalImageOptions, model: string): Record
     const size = normalizeImageSize(opts.image_size) ?? arToImageSize(opts.aspect_ratio);
     input.image_size = size === 'auto' ? 'landscape_16_9' : size;
     if (opts.reference_image_urls?.length) input.image_urls = opts.reference_image_urls;
+  } else if (model === DEFAULT_IMAGE_MODEL) {
+    // GPT Image 2 새로 그리기(openai/gpt-image-2)는 비율이 아니라 크기(image_size)만 받는다 — 비율로 보내면 무시되고 기본 4:3(1024x768)로
+    //   나왔다(2026-10-13, 기준 그림 없이 그리는 실사 배경). 정한 크기가 있으면 그 크기, 없으면 비율을 크기 이름으로, 둘 다 없으면 보내지 않는다.
+    const size = normalizeImageSize(opts.image_size) ?? arToImageSize(opts.aspect_ratio);
+    if (size !== 'auto') input.image_size = size;
   } else {
     // 순수 T2I: aspect_ratio. reference 있어도 모델이 받으면 함께 보냄
     if (opts.aspect_ratio) input.aspect_ratio = opts.aspect_ratio;
