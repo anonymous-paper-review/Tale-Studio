@@ -12,6 +12,8 @@ export interface SceneStoryProposal {
   /** 다시 쓰기(2026-10-02 시안 v04) — 정도 하나에 세 가지 안. 있으면 scenes 대신 안마다 결과가 있다. */
   level?: RewriteLevel
   variants?: SceneStoryRewriteVariant[]
+  /** 조건으로 다시 쓰기(리뉴얼 1차 2026-10-19) — 세 안이 쓰인 러닝타임 · 장르·분위기 · 소재. 안을 적용할 때 지금 산문의 조건이 된다. */
+  conditions?: import('@/lib/writer/prose-conditions').ProseConditions
 }
 
 export interface SceneStoryProposalView {
@@ -24,6 +26,8 @@ export interface SceneStoryProposalView {
   stale: boolean
   error?: string
   level?: RewriteLevel
+  /** 조건으로 다시 쓴 세 안이면 그 조건(리뉴얼 1차). */
+  conditions?: SceneStoryProposal['conditions']
   variants?: Array<{
     id: SceneStoryRewriteVariant['id']
     direction: SceneStoryRewriteVariant['direction']
@@ -99,6 +103,7 @@ export function sceneStoryProposalView(
       after: [],
       stale: !current || !equal(proposal.baseScenes, current),
       level: proposal.level,
+      ...(proposal.conditions ? { conditions: proposal.conditions } : {}),
       variants,
     }
   }

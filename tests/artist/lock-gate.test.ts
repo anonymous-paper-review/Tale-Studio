@@ -1,4 +1,4 @@
-// 작가 이미지 준비가 끝난 프로젝트만 Artist 단계로 들어가며, 실패하면 다시 시도할 수 있다
+// Artist 는 산문을 확정하면 그림 준비와 상관없이 열리고(리뉴얼 1차 2026-10-19), 그림 준비 · 실패 · 멈춤은 안내 정보로 남아 다시 시도할 수 있다
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { sceneRows } = vi.hoisted(() => ({
@@ -53,19 +53,17 @@ afterEach(() => {
 })
 
 describe('project-store 작가 이미지 진입 잠금 확인', () => {
-  it('작가 이미지가 준비되기 전에는 Artist로 이동하지 못하게 한다', () => {
+  // 왜: 프로토타입 — 산문을 확정하면 Artist 가 브레이크다운 글 목록부터 연다(그림은 그 뒤 [만들기]로 만든다).
+  it('그림이 아직 없어도 Artist가 열린 프로젝트는 Artist로 이동할 수 있다', () => {
     useProjectStore.setState({ reachedStage: 'director', artistImagesReady: false })
 
     const store = useProjectStore.getState()
 
     expect(store.canNavigateTo('producer')).toBe(true)
+    expect(store.canNavigateTo('artist')).toBe(true)
     expect(store.canNavigateTo('writer')).toBe(true)
-    expect(store.canNavigateTo('artist')).toBe(false)
     expect(store.canNavigateTo('director')).toBe(true)
     expect(store.canNavigateTo('editor')).toBe(false)
-
-    useProjectStore.setState({ artistImagesReady: true })
-    expect(useProjectStore.getState().canNavigateTo('artist')).toBe(true)
   })
 
   it('기존 프로젝트의 준비된 이미지 정보가 있으면 Artist 진입을 허용한다', async () => {
@@ -116,7 +114,6 @@ describe('project-store 작가 이미지 진입 잠금 확인', () => {
     expect(useProjectStore.getState().artistAssetProgress).toEqual({ ready: 2, total: 5 })
     expect(useProjectStore.getState().artistImagesFailed).toBe(true)
     expect(useProjectStore.getState().artistImagesStalled).toBe(true)
-    expect(useProjectStore.getState().canNavigateTo('artist')).toBe(false)
   })
 
   it('예전 Producer 준비 정보만으로는 Artist 진입을 허용하지 않는다', async () => {

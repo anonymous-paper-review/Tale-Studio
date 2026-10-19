@@ -1,4 +1,4 @@
-// 단계 화면 오른쪽 위의 다음 단계 버튼은 넘김 문장을 채팅에 남기며 넘기고, Producer에서 Writer로 넘길 때만 확정 팝업을 먼저 연다
+// 단계 화면 오른쪽 위의 다음 단계 버튼은 넘김 문장을 채팅에 남기며 넘기고, Writer 에서는 산문 확정 창을 먼저 연다 (리뉴얼 1차 2026-10-19 문장으로 고침)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ProjectSettings } from '@/types'
 import type { BackgroundSource } from '@/lib/producer-gate'
@@ -21,6 +21,7 @@ import { useProjectStore } from '@/stores/project-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { resetActionGuard } from '@/lib/action-guard'
 import { nextStepAction } from '@/lib/handoff-intent'
+import { useWriterRoomStore } from '@/stores/writer-room-store'
 
 const settings: ProjectSettings = {
   playtime: 30, genre: 'SF 스릴러', subGenre: '사이버펑크', format: 'horizontal_16:9', tone: ['dark'], targetEmotion: [], dialogueLanguage: 'ko',
@@ -39,6 +40,7 @@ beforeEach(() => {
   useGlobalChatStore.getState().reset()
   useProducerStore.getState().reset()
   useProjectStore.getState().resetProject()
+  useWriterRoomStore.setState({ confirmOpen: false, rewriteOpen: false })
   useProjectStore.setState({ projectId: 'proj-1', currentStage: 'producer', reachedStage: 'producer' })
   useProducerStore.setState({ storyText: '스토리', storyReady: true, styleAnchorKey: 'style_a', projectSettings: settings, cast: [], backgrounds: [background] })
   fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: RequestInfo | URL) => {
@@ -54,25 +56,19 @@ afterEach(() => {
 })
 
 describe('다음 단계 버튼은 단계마다 다음 단계를 가리킨다', () => {
-  it('다음 단계 버튼의 이름은 단계마다 다음 단계를 가리키고, 잠긴 Producer에서는 Writer로 가기가 된다', () => {
-    expect(nextStepAction('producer', { producerLocked: false })).toMatchObject({ kind: 'handoff', label: 'Hand over to Writer', utterance: 'Please hand over to Writer' })
-    expect(nextStepAction('writer', { producerLocked: true })).toMatchObject({ kind: 'handoff', label: 'Hand over to Artist' })
-    expect(nextStepAction('artist', { producerLocked: true })).toMatchObject({ kind: 'handoff', label: 'Hand over to Director' })
+  // 왜: 리뉴얼 단계 순서(Writer = id producer → Artist → Storyboard = id writer → Director → Editor)를 버튼 이름이 따른다.
+  //   Storyboard → Director 는 보드의 [다음: Director로] 확인 창이 맡아 이 표에 없다(tests/writer/board-director-handoff).
+  it('다음 단계 버튼의 이름은 단계마다 다음 단계를 가리키고, 확정한 Writer에서는 Artist로 가기가 된다', () => {
+    expect(nextStepAction('producer', { producerLocked: false })).toMatchObject({ kind: 'handoff', label: 'Hand over to Artist', utterance: 'Please hand over to Artist' })
+    expect(nextStepAction('artist', { producerLocked: true })).toMatchObject({ kind: 'handoff', label: 'Hand over to Storyboard' })
+    expect(nextStepAction('writer', { producerLocked: true })).toBeNull()
     expect(nextStepAction('director', { producerLocked: true })).toMatchObject({ kind: 'handoff', label: 'Hand over to Editor' })
     expect(nextStepAction('editor', { producerLocked: true })).toBeNull()
-    expect(nextStepAction('producer', { producerLocked: true })).toMatchObject({ kind: 'open', label: 'Go to Writer', stage: 'writer' })
+    expect(nextStepAction('producer', { producerLocked: true })).toMatchObject({ kind: 'open', label: 'Go to Artist', stage: 'artist' })
   })
 })
 
-describe('Writer→Artist, Director→Editor 는 팝업 없이 넘긴다', () => {
-  it('Writer에서 다음 단계 버튼을 누르면 넘김 문장이 채팅에 남고 팝업 없이 Artist로 넘어간다', async () => {
-    useProjectStore.setState({ currentStage: 'writer', reachedStage: 'artist' })
-    await useGlobalChatStore.getState().requestNextStep()
-    expect(useGlobalChatStore.getState().handoffConfirm).toBeNull()
-    expect(userLines()).toEqual(['Artist로 넘겨주세요'])
-    expect(nav.handoffToStage).toHaveBeenCalledWith('artist', { verify: true })
-  })
-
+describe('Director→Editor 는 팝업 없이 넘긴다', () => {
   it('Director에서 다음 단계 버튼을 누르면 넘김 문장이 채팅에 남고 팝업 없이 Editor로 넘어간다', async () => {
     useProjectStore.setState({ currentStage: 'director', reachedStage: 'director' })
     await useGlobalChatStore.getState().requestNextStep()
@@ -82,81 +78,53 @@ describe('Writer→Artist, Director→Editor 는 팝업 없이 넘긴다', () =>
   })
 })
 
-describe('Producer에서 Writer로 넘길 때는 확정 팝업을 먼저 연다', () => {
-  it('Producer에서 다음 단계 버튼을 누르면 바로 넘기지 않고 확정 팝업을 먼저 연다', async () => {
+describe('Writer에서 넘길 때는 산문 확정 창을 먼저 연다', () => {
+  // 왜: 프로토타입 W6 — 확정하면 산문이 잠긴다. 버튼은 바로 넘기지 않고 확정 창부터 연다(예전 Producer 확정 팝업 대신).
+  it('Writer에서 다음 단계 버튼을 누르면 바로 넘기지 않고 산문 확정 창을 먼저 연다', async () => {
     await useGlobalChatStore.getState().requestNextStep()
-    expect(useGlobalChatStore.getState().handoffConfirm?.kind).toBe('producerLock')
+    expect(useWriterRoomStore.getState().confirmOpen).toBe(true)
+    expect(useGlobalChatStore.getState().handoffConfirm).toBeNull()
     expect(writerStarts()).toHaveLength(0)
     expect(userLines()).toEqual([])
   })
 
-  it('Producer의 필수 정보가 비어 있으면 확정 팝업 대신 채팅이 빈 곳을 알려준다', async () => {
-    useProducerStore.setState({ backgrounds: [] })
+  // 왜: [아니오]면 아무것도 잠그거나 넘기지 않는다.
+  it('산문 확정 창에서 아니오를 누르면 아무것도 넘기지 않고 채팅에도 남기지 않는다', async () => {
     await useGlobalChatStore.getState().requestNextStep()
-    expect(useGlobalChatStore.getState().handoffConfirm).toBeNull()
-    expect(userLines()).toEqual(['Writer로 넘겨주세요'])
-    expect(writerStarts()).toHaveLength(0)
-    expect(useGlobalChatStore.getState().messages.at(-1)?.role).toBe('model')
-  })
-
-  it('확정 팝업에서 확정하면 넘김 문장이 채팅에 남고 Writer가 시작되며 Producer가 잠긴다', async () => {
-    await useGlobalChatStore.getState().requestNextStep()
-    await useGlobalChatStore.getState().confirmProducerLock()
-    expect(useGlobalChatStore.getState().handoffConfirm).toBeNull()
-    expect(useGlobalChatStore.getState().pendingProposal).toBeNull()
-    expect(userLines()).toEqual(['Writer로 넘겨주세요'])
-    expect(writerStarts()).toHaveLength(1)
-    expect(useProjectStore.getState().producerLocked).toBe(true)
-  })
-
-  it('확정 팝업에서 더 고칠게요를 누르면 아무것도 넘기지 않고 채팅에도 남기지 않는다', async () => {
-    await useGlobalChatStore.getState().requestNextStep()
-    useGlobalChatStore.getState().closeHandoffConfirm()
-    expect(useGlobalChatStore.getState().handoffConfirm).toBeNull()
+    useWriterRoomStore.getState().closeConfirm()
+    expect(useWriterRoomStore.getState().confirmOpen).toBe(false)
+    expect(fetchSpy.mock.calls.some(([url]) => String(url) === '/api/writer/prose-confirm')).toBe(false)
     expect(writerStarts()).toHaveLength(0)
     expect(userLines()).toEqual([])
     expect(useProjectStore.getState().producerLocked).toBe(false)
   })
 
-  it('잠긴 Producer의 다음 단계 버튼은 다시 넘기지 않고 Writer 화면으로 이동만 한다', async () => {
+  // 왜: 확정한 산문은 다시 확정하지 않는다 — 다음 단계(Artist) 화면으로 가기만 한다.
+  it('확정한 Writer의 다음 단계 버튼은 다시 확정하지 않고 Artist 화면으로 이동만 한다', async () => {
     useProjectStore.setState({ producerLocked: true, reachedStage: 'artist' })
     await useGlobalChatStore.getState().requestNextStep()
     expect(useGlobalChatStore.getState().handoffConfirm).toBeNull()
-    expect(nav.handoffToStage).toHaveBeenCalledWith('writer')
-    expect(useGlobalChatStore.getState().pendingNavigatePath).toBe('/studio/writer')
+    expect(useWriterRoomStore.getState().confirmOpen).toBe(false)
+    expect(nav.handoffToStage).toHaveBeenCalledWith('artist')
+    expect(useGlobalChatStore.getState().pendingNavigatePath).toBe('/studio/artist')
     expect(writerStarts()).toHaveLength(0)
     expect(userLines()).toEqual([])
   })
 
-  it('채팅으로 승인한다고 답해도 Writer 첫 넘김은 확정 팝업을 거친다', async () => {
-    // 왜: 카드의 승인 버튼만 팝업을 열고 "승인"·"ok" 같은 말은 바로 넘겨, 잠금 경고를 건너뛰었다(검토 지적).
-    await useGlobalChatStore.getState().sendMessage('Writer로 넘겨줘')
-    const card = useGlobalChatStore.getState().pendingProposal
-    expect(card?.kind).toBe('producerWriterInitialHandoff')
-    await useGlobalChatStore.getState().sendMessage('승인')
-    expect(useGlobalChatStore.getState().handoffConfirm?.kind).toBe('producerLock')
-    expect(writerStarts()).toHaveLength(0)
-    await useGlobalChatStore.getState().confirmProducerLock()
-    expect(writerStarts()).toHaveLength(1)
-    expect(useProjectStore.getState().producerLocked).toBe(true)
-  })
-
-  it('그림 쓰임새 질문에 답하기 전에는 확정 팝업을 열지 않고 먼저 고르라고 알린다', async () => {
-    // 왜: 확정하고 넘기기를 눌러도 그림 질문이 말을 가로채 아무것도 넘어가지 않았다(검토 지적).
-    useGlobalChatStore.setState({
-      imageRoleGate: { items: [{ image: { id: 'img-1', name: 'a.png', thumbUrl: 'https://img.test/a.png', sliceUrls: ['https://img.test/a.png'] }, role: null }], typed: '', msg: '' },
-    })
+  // 왜: 산문 초안이 아직 없는 예전 프로젝트도 예전 Producer 넘김(설정 칩 · 캐스팅 검사 · Writer 시작)으로 가지 않는다.
+  it('산문 초안이 없는 예전 프로젝트도 다음 단계 버튼은 예전 Producer 넘김을 하지 않는다', async () => {
+    useProducerStore.setState({ backgrounds: [] })
     await useGlobalChatStore.getState().requestNextStep()
     expect(useGlobalChatStore.getState().handoffConfirm).toBeNull()
     expect(writerStarts()).toHaveLength(0)
-    expect(useGlobalChatStore.getState().messages.at(-1)?.role).toBe('model')
+    expect(useWriterRoomStore.getState().confirmOpen).toBe(true)
   })
 
-  it('채팅으로 Writer 넘김을 요청하면 승인 카드에 넘긴 뒤 Producer를 고칠 수 없다는 안내가 붙는다', async () => {
-    useLocaleStore.setState({ locale: 'en' })
-    await useGlobalChatStore.getState().sendMessage('Please hand over to Writer')
-    const proposal = useGlobalChatStore.getState().pendingProposal
-    expect(proposal?.kind).toBe('producerWriterInitialHandoff')
-    expect(proposal?.impact.some((line) => line.includes('Producer is locked'))).toBe(true)
+  // 왜: 채팅으로 넘겨 달라고 해도 승인 카드 · 바로 넘기기가 아니라 같은 확정 창을 연다.
+  it('Writer 채팅으로 Artist로 넘겨 달라고 하면 승인 카드 없이 산문 확정 창을 연다', async () => {
+    await useGlobalChatStore.getState().sendMessage('Artist로 넘겨줘')
+    expect(useGlobalChatStore.getState().pendingProposal).toBeNull()
+    expect(useWriterRoomStore.getState().confirmOpen).toBe(true)
+    expect(writerStarts()).toHaveLength(0)
   })
 })

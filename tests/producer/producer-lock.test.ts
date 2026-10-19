@@ -205,28 +205,12 @@ describe('잠기기 전에 떠 있던 Producer 변경 카드', () => {
 })
 
 describe('Writer가 이미 시작된 프로젝트의 잠금', () => {
-  it('Writer가 이미 시작된 프로젝트를 다시 넘기면 Producer가 잠긴다', async () => {
-    // 왜: Writer 시작은 됐는데 단계 저장이 실패했거나 다른 탭에서 넘긴 경우, 기존 실행으로 이어 가면서도 잠그지 않았다(검토 지적).
-    fetchMock.mockImplementation(async (url: string) => (url.startsWith('/api/writer/status/') ? Response.json({ started: true }) : Response.json({})))
-    await useGlobalChatStore.getState().sendMessage('Writer로 넘겨줘', undefined, { consentedHandoff: true })
-    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/writer/start')).toHaveLength(0)
-    expect(useProjectStore.getState().producerLocked).toBe(true)
-  })
 
   it('Writer가 시작된 프로젝트를 열면 단계 기록이 Producer에 머물러 있어도 잠긴다', async () => {
     // 왜: 단계 저장만 실패한 프로젝트를 다시 열면 잠기지 않아, Writer가 받지 않은 값으로 고칠 수 있었다(검토 지적).
     fetchMock.mockImplementation(async (url: string) => (url.startsWith('/api/writer/status/') ? Response.json({ started: true, pipeline_completed: true }) : Response.json({})))
     await useProjectStore.getState().verifyWriterGate('proj-1')
     expect(useProjectStore.getState().producerLocked).toBe(true)
-  })
-
-  it('잠긴 Producer에서 Writer로 다시 넘겨 달라고 하면 승인 카드 없이 같은 내용으로 다시 넘긴다', async () => {
-    // 왜: Writer가 결과 없이 끝나 Producer로 되돌아온 잠긴 프로젝트에서, 카드의 승인 버튼이 아무 일도 하지 않았다(검토 지적).
-    useProjectStore.setState({ producerLocked: true, reachedStage: 'producer' })
-    await useGlobalChatStore.getState().sendMessage('Writer로 넘겨줘')
-    expect(useGlobalChatStore.getState().pendingProposal).toBeNull()
-    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/writer/start')).toHaveLength(1)
-    expect(useProducerStore.getState().storyText).toBe('스토리')
   })
 
   it('잠긴 Producer에 바꾸면서 넘겨 달라고 해도 바꾸지 않았다고 답한다', async () => {

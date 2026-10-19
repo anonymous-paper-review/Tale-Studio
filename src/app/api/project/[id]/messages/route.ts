@@ -1,7 +1,10 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
-import { getUser } from '@/lib/supabase/auth'
+import { requireProjectAccess } from '@/lib/api/guard'
 import { CHAT_MESSAGES_LOAD_LIMIT } from '@/lib/constants'
+
+// 프로젝트 주인만 읽고 남긴다(2026-10-19) — 로그인만 확인해 남의 프로젝트 채팅을 읽고 쓸 수 있던 구멍을 막는다.
+//   읽기는 유효한 공유 링크로 여는 사람에게도 열고, 남기기는 주인만.
 
 // GET: Load messages for a project + stage
 export async function GET(
@@ -9,10 +12,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
     const { id } = await params
+    const access = await requireProjectAccess(req, id, { allowShare: true })
+    if (!access.ok) return access.response
     const { searchParams } = new URL(req.url)
     const stage = searchParams.get('stage')
 
@@ -21,7 +23,7 @@ export async function GET(
     let query = supabaseAdmin
       .from('messages')
       .select('stage, role, content')
-      .eq('project_id', id)
+      .eq('project_id', access.projectId)
       .order('created_at', { ascending: false })
       .limit(CHAT_MESSAGES_LOAD_LIMIT)
 
@@ -44,10 +46,9 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
     const { id } = await params
+    const access = await requireProjectAccess(req, id)
+    if (!access.ok) return access.response
     const { stage, role, content } = await req.json()
 
     if (!stage || !role || !content) {
@@ -56,7 +57,7 @@ export async function POST(
 
     await supabaseAdmin
       .from('messages')
-      .insert({ project_id: id, stage, role, content })
+      .insert({ project_id: access.projectId, stage, role, content })
 
     return NextResponse.json({ ok: true })
   } catch (err) {

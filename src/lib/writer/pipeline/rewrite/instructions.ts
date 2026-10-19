@@ -2,6 +2,7 @@
 //   정도는 무엇을 지키고 무엇을 바꿀지, 방향(v1 · v2 · v3)은 세 안이 서로 다른 쪽으로 가게 한다.
 import type { RewriteDirection, RewriteLevel } from '@/lib/producer/scene-story-rewrite'
 import type { Scenes } from '@/lib/writer/types/pipeline'
+import type { ProseConditions } from '@/lib/writer/prose-conditions'
 
 const LEVEL_NOTE: Record<RewriteLevel, string> = {
   polish:
@@ -22,6 +23,11 @@ const DIRECTION_NOTE: Record<RewriteDirection, string> = {
 /** 씬 단계 수정 요청 칸에 들어가는 한 줄 묶음. */
 export function rewriteNote(level: RewriteLevel, direction: RewriteDirection): string {
   return `${LEVEL_NOTE[level]}\n${DIRECTION_NOTE[direction]}`
+}
+
+/** 조건으로 다시 쓰기(리뉴얼 1차 2026-10-19) — 유저가 고른 러닝타임 · 장르·분위기를 수정 요청 칸에 한 줄로 싣는다. */
+export function conditionNote(conditions: ProseConditions): string {
+  return `[다시 쓰기 조건] 러닝타임 ${conditions.runtimeSeconds}초 · 장르·분위기 ${conditions.genre}. 이 길이와 분위기에 맞게 쓴다.`
 }
 
 /** 아이디어부터 다시 — 이야기 엔진 · 구조 단계는 수정 요청 칸이 없어 기획 글 뒤에 방향을 붙인다. 지금 초안은 피할 대상으로만 준다. */

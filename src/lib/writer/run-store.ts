@@ -12,7 +12,8 @@ import { preservedScript } from '@/lib/writer/script/preserve';
 import { castContractToCharacters } from '@/lib/writer/cast-contract';
 import type { WriterEngine } from '@/lib/writer/engine';
 
-export type WriterRunStatus = 'running' | 'completed' | 'failed' | 'awaiting_confirmation';
+// awaiting_artist(리뉴얼 1차 2026-10-19): Artist 의 [완료하기]를 기다린다 — 인물 · 배경 디자인 뒤, 씬 · 샷 나누기 앞.
+export type WriterRunStatus = 'running' | 'completed' | 'failed' | 'awaiting_confirmation' | 'awaiting_artist';
 
 // state jsonb 의 최소 보장 형태. 구체 필드(genre/scenes/...)는 steps.ts 의 WriterRunState 가 정의.
 // run-store ↔ steps 순환 import 를 피하려고 여기선 input 만 알고 나머지는 통과시킨다.
@@ -174,10 +175,13 @@ export async function saveRunState(
  * run 을 씬 게이트 대기(awaiting_confirmation)로 마킹 — running 일 때만(#s3-gate).
  *   awaiting 은 keepalive/watchdog 의 stalled-running 재발사 대상에서 자연히 빠진다(status 필터).
  */
-export async function markAwaiting(id: string): Promise<void> {
+export async function markAwaiting(
+  id: string,
+  status: 'awaiting_confirmation' | 'awaiting_artist' = 'awaiting_confirmation',
+): Promise<void> {
   const { data, error } = await supabaseAdmin
     .from('writer_runs')
-    .update({ status: 'awaiting_confirmation', updated_at: new Date().toISOString() })
+    .update({ status, updated_at: new Date().toISOString() })
     .eq('id', id)
     .eq('status', 'running')
     .select('id');

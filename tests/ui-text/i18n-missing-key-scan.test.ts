@@ -187,13 +187,13 @@ describe('한국어 번역 사전의 누락 점검', () => {
     expect(staticConstants("const NAME = makeKey()").has('NAME')).toBe(false)
   })
 
-  it('한국어 프로젝트의 첫 Producer 안내는 한국어로 나온다', () => {
-    const producerPage = readFileSync(path.join(SRC, 'app/studio/producer/page.tsx'), 'utf8')
-    const welcomeKey = staticConstants(producerPage).get('PRODUCER_WELCOME_KEY')
+  // 리뉴얼 1차(2026-10-19): 예전 Meeting Room 첫 인사는 없다 — Writer 를 처음 열면 Writer 가 산문을 썼다고 먼저 말한다.
+  it('한국어 프로젝트의 Writer 첫 안내는 한국어로 나온다', () => {
+    const store = readFileSync(path.join(SRC, 'stores/global-chat-store.ts'), 'utf8')
+    const firstLine = 'I wrote the prose in {count} scenes. If you do not like it, say "Rewrite it" or change the conditions and rewrite it.'
 
-    expect(welcomeKey).toBeTypeOf('string')
-    if (!welcomeKey) throw new Error('PRODUCER_WELCOME_KEY 정적 문자열 상수를 찾지 못했습니다.')
-    expect(welcomeKey in KO).toBe(true)
-    expect(translate('ko', welcomeKey)).toMatch(/[가-힣]/)
+    expect(store.includes(firstLine)).toBe(true)
+    expect(firstLine in KO).toBe(true)
+    expect(translate('ko', firstLine, { count: 3 })).toMatch(/씬 3개로 산문을 썼어요/)
   })
 })

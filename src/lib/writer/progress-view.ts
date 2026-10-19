@@ -12,6 +12,8 @@ const PRODUCTION_BEFORE: Record<string, number> = {
 }
 export function writerProgressView(status: Partial<WriterStatus> | null | undefined, locale: AppLocale = 'ko') {
   const awaiting = status?.current_status === 'awaiting_confirmation'
+  // 리뉴얼 1차: Artist [완료하기]를 기다리는 정지 — 씬 · 샷은 아직 나누지 않았다.
+  const waitingArtist = status?.current_status === 'awaiting_artist'
   const v2 = status?.engine === 'v2'
   const draft = !v2 && !status?.pipeline_completed && (awaiting || !status?.current_stage || DRAFT_STAGES.includes(status.current_stage))
   const scope = awaiting ? 'review' : draft ? 'draft' : 'production'
@@ -27,9 +29,11 @@ export function writerProgressView(status: Partial<WriterStatus> | null | undefi
   const rawPercent = total ? Math.round(done / total * 100) : 0
   const percent = awaiting || status?.pipeline_completed ? 100 : Math.min(99, rawPercent)
   const label = translate(locale, awaiting ? 'Waiting for scene draft confirmation'
+    : waitingArtist ? 'Waiting for Artist to complete'
     : draft ? 'Preparing the scene draft' : 'Preparing and saving shots and dialogue')
   const detail = status?.pipeline_failed ? translate(locale, 'Work stopped. Review the error before continuing.')
     : awaiting ? translate(locale, 'Review and confirm the draft to continue.')
+    : waitingArtist ? translate(locale, 'Finish the character and background images in Artist, then press Complete.')
     : translate(locale, draft ? 'Arranging the scenes.'
       : status?.current_stage === 'persistShots' ? 'Saving shots and dialogue.' : 'Creating shots and dialogue.')
   const countLabel = translate(locale, 'Steps {done}/{total}', { done, total })

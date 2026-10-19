@@ -1,15 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ZoomIn, ZoomOut } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { ArrowRight, ZoomIn, ZoomOut } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
-import { StageHelpBadge } from '@/components/stage-help-badge'
 import { NextStepButton } from '@/components/handoff/next-step-button'
-import { handoffFrom } from '@/lib/handoff-intent'
-import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
 import { CharacterPanel } from '@/features/artist/character-panel'
 import { WorldPanel } from '@/features/artist/world-panel'
 import { useArtistStore } from '@/stores/artist-store'
@@ -28,6 +25,14 @@ import { cn } from '@/lib/utils'
 import { useAltArrowCycle } from '@/lib/use-alt-arrow-cycle'
 import { AltArrowHint } from '@/components/alt-arrow-hint'
 import { useT } from '@/lib/i18n'
+import { AiBusyOverlay } from '@/components/ai-busy-overlay'
+import { artistPhase, assetCompletionGaps, makingProgress } from '@/lib/artist/breakdown'
+import { withDemoShare } from '@/lib/demo/context'
+import { stageIndex } from '@/lib/stage-gate'
+import { useProducerStore } from '@/stores/producer-store'
+import { BreakdownList } from '@/features/artist-room/breakdown-list'
+import { StyleMakeDialog } from '@/features/artist-room/style-make-dialog'
+import { ArtistCompleteDialog } from '@/features/artist-room/artist-complete-dialog'
 
 type ArtistTab = 'characters' | 'world'
 
@@ -260,106 +265,9 @@ export default function VisualPage() {
     })
   }, [setLifecycleStatus, writerGateStatus, artistGate, directorGate])
 
-  // 프로액티브 넛지 (chat-proactive-copilot Phase 1): 자동생성이 모두 끝나고(생성 중 0 + main 준비)
-  //   1.5s 안정되면 채팅에 "Director로 넘어갈까요?" 다음-단계 제안을 띄운다.
-  //   debounce 로 생성 시작 전 조기발사 + 생성 중 깜빡임을 방지. 비용 지출 없는 넛지(자동생성은 별도 진행).
+  // 리뉴얼 1차(2026-10-19): "Director로 넘어갈까요?" 준비 완료 넛지는 없다 — Artist 다음은 [완료하기]로 여는 Storyboard 다.
   const generatingCount = generatingViews.length + generatingLocations.length
   const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
-  // 재시도 이력(#handoff-starved 8/11 → #handoff-suggestion-drop 8/25): 원샷 래치는 두 번의
-  //   기아를 만들었다 — ① 슬롯 점유 중 offer 유실(8/11, ref 선소모), ② 유저 발화로 암묵
-  //   dismiss 된 뒤 재발사 불가(8/25). 래치를 걷어내고 슬롯이 바뀔 때마다(activeSuggestion dep)
-  //   재시도한다 — 중복·거절 방어는 offerSuggestion 의 id 가드가 전담한다.
-  const activeSuggestion = useGlobalChatStore((s) => s.suggestion)
-  // 이미 수락된 핸드오프는 다시 권하지 않는다(#handoff-once) — 진실은 DB 의 reachedStage.
-  const reachedStageForNudge = useProjectStore((s) => s.reachedStage)
-  // effect 안에서 t() 를 직접 부르지 않는다 — t 는 매 렌더 새 참조라 deps 에 넣으면 1500ms
-  //   디바운스가 렌더마다 리셋된다(#i18n-s5-batch4). 문자열 값으로 미리 뽑아 deps 에 넣는다.
-  const artistReadyContentWithWorlds = t(
-    '{count} characters and {worldCount} backgrounds are all ready. If you like them, shall we move to Director and start the storyboard?',
-    { count: characterAssets.length, worldCount: worldAssets.length },
-  )
-  const artistReadyContentNoWorlds = t(
-    '{count} characters are all ready. If you like them, shall we move to Director and start the storyboard?',
-    { count: characterAssets.length },
-  )
-  // handoffFrom() 은 정적 배열 .find() 라 렌더 본문에서 불러도 안전 — spec.utterance/label 도
-  //   여기서 미리 번역해 문자열 상수로 뽑는다. effect 안에서 t() 를 부르거나 t 자체를 deps 에
-  //   넣으면 1500ms 디바운스가 렌더마다 리셋된다(#i18n-s5-batch4, 위 content 상수와 동일 이유).
-  const artistHandoffSpec = handoffFrom('artist')
-  const artistHandoffUtterance = artistHandoffSpec ? t(artistHandoffSpec.utterance) : null
-  const artistHandoffLabel = artistHandoffSpec ? t(artistHandoffSpec.label) : null
-  // 게이트 차단 사유를 안정 문자열로 — deps 에 객체(artistGate, 매 렌더 새 참조)를 넣으면
-  //   1500ms 타이머가 렌더마다 리셋돼 멘트가 영영 못 뜬다. 문자열 값은 내용이 같으면 dep 안정.
-  const artistGateBlockSummary = artistGate.blockers.map((b) => b.field).join(',')
-  useEffect(() => {
-    if (!projectId) return
-    const timer = setTimeout(() => {
-      // #nudge-diagnosis(2026-08-26, 화개장터_3 실측): 서버 진실(런 완료·뷰 완비·stage=artist)이
-      //   전부 충족인데 멘트가 침묵 — 어느 클라 플래그가 막았는지 관측 수단이 없었다. 판정을
-      //   발사 시점으로 옮기고(휘발성 값은 스토어에서 라이브로 읽는다), 막히면 사유를 콘솔에
-      //   남긴다. 조건 충족을 기다리는 재시도는 종전대로 deps 재실행이 맡는다.
-      const artistLive = useArtistStore.getState()
-      const liveGenerating =
-        artistLive.generatingViews.length + artistLive.generatingLocations.length
-      const liveReached = useProjectStore.getState().reachedStage
-      const blocked = !ready
-        ? 'enter-not-ready'
-        : !writerReady
-          ? 'writer-not-ready'
-          : !artistGate.ready
-            ? `artist-gate:${artistGateBlockSummary}`
-            : characterAssets.length === 0
-              ? 'no-character-assets'
-              : liveGenerating > 0
-                ? `generating:${liveGenerating}`
-                : !shouldOfferHandoffNudge('artist', liveReached)
-                  ? `handoff-once:reached=${liveReached}`
-                  : null
-      if (blocked) {
-        console.info('[artist-ready-nudge] blocked:', blocked)
-        return
-      }
-      // 탭 하단의 'Approve & Direct' 버튼을 걷어내고 이 제안이 그 자리를 대신한다(#handoff-to-chat).
-      //   버튼은 직접 이동하지 않고 문장을 채팅에 입력해 보낸다 — 직접 타이핑과 같은 경로.
-      // #handoff-suggestion-drop(2026-08-25, producer 8/7 수리의 artist 판): 옛 원샷 래치
-      //   (nudgeOfferedRef)는 버그였다 — 유저가 아티스트 챗에 아무 말이나 하면 제안이 암묵
-      //   dismiss(id 미기록)되는데 래치는 이미 잠겨, 그 세션에선 준비 완료 멘트가 영영 다시
-      //   안 떴다(웹툰 테스트 실측). 슬롯이 빌 때마다(activeSuggestion dep) 재시도한다.
-      //   스팸 방지는 offerSuggestion 의 가드 몫 — 같은 id 표시 중이면 no-op, 명시적
-      //   "나중에"(dismissedSuggestionIds)면 재발사 안 함, 자동 내림 뒤에는 다시 뜬다.
-      const id = `artist-ready-${projectId}`
-      offerSuggestion(
-        {
-          id,
-          stage: 'artist',
-          content: worldAssets.length > 0 ? artistReadyContentWithWorlds : artistReadyContentNoWorlds,
-          action:
-            artistHandoffUtterance && artistHandoffLabel
-              ? { kind: 'handoff', utterance: artistHandoffUtterance, label: artistHandoffLabel }
-              : null,
-        },
-        { preempt: true },
-      )
-    }, 1500)
-    return () => clearTimeout(timer)
-  }, [
-    projectId,
-    ready,
-    mainReady,
-    generatingCount,
-    characterAssets.length,
-    worldAssets.length,
-    offerSuggestion,
-    writerReady,
-    artistGate.ready,
-    artistGateBlockSummary,
-    activeSuggestion,
-    reachedStageForNudge,
-    artistReadyContentWithWorlds,
-    artistReadyContentNoWorlds,
-    artistHandoffUtterance,
-    artistHandoffLabel,
-  ])
 
   // 첫 진입 브리핑(2026-08-06 간소화) — "최종 룩으로 정리" 상태 온보딩 제안은 제거(피드백:
   //   긴 버블이 채팅을 점유하고, 초안이 남아 있는 동안 Director 핸드오프 제안을 가렸다).
@@ -394,9 +302,80 @@ export default function VisualPage() {
     }
   }, [projectId, ready, offerSuggestion, characterAssets.length, worldAssets.length, artistBriefContent])
 
+  // 리뉴얼 1차(2026-10-19, 프로토타입 A1 · A2 · A4 · A5 · A9): 확정 산문의 글 목록 → [만들기] → 디자인 · 그림 → 카드 → [완료하기].
+  const router = useRouter()
+  const proseLocked = useProjectStore((s) => s.producerLocked)
+  const treatmentDraftFlag = useProjectStore((s) => s.treatmentDraft)
+  const reachedStage = useProjectStore((s) => s.reachedStage)
+  const draftRun = writerStatus ? writerStatus.draft === true : treatmentDraftFlag
+  const hasAssets = characterAssets.length > 0 || worldAssets.length > 0
+  const phase = artistPhase({ proseLocked, draftRun, status: writerStatus, hasAssets })
+  const gaps = assetCompletionGaps(characterAssets, worldAssets)
+  const personTotal = characterAssets.filter((c) => c.entityType === 'person').length
+  const progress = makingProgress(writerStatus, {
+    charsReady: personTotal - gaps.characters.length,
+    charsTotal: personTotal,
+    worldsReady: worldAssets.length - gaps.locations.length,
+    worldsTotal: worldAssets.length,
+  })
+  const [styleOpen, setStyleOpen] = useState(false)
+  const [completeOpen, setCompleteOpen] = useState(false)
+  const [makingDismissed, setMakingDismissed] = useState<string | null>(null)
+  const styleAnchors = useProducerStore((s) => s.styleAnchors)
+  const styleKey = useProducerStore((s) => s.styleAnchorKey)
+  const customStyle = useProducerStore((s) => s.customStyleAnchor)
+  const styleLabel = customStyle?.label ?? styleAnchors.find((anchor) => anchor.key === styleKey)?.label ?? null
+  const loadProducer = useProducerStore((s) => s.loadProject)
+  useEffect(() => {
+    // 브레이크다운 목록 · 스타일은 Producer 값이다(산문이 만든 인물 · 장소) — Artist 에서도 읽는다.
+    if (projectId) void loadProducer()
+  }, [projectId, loadProducer])
+  useEffect(() => {
+    if (styleAnchors.length === 0) void useProducerStore.getState().loadStyleAnchors()
+  }, [styleAnchors.length])
+  // 만드는 동안은 디자인 · 그림이 들어오는 대로 다시 읽는다.
+  const making = phase === 'making' || (phase === 'cards' && !progress.done)
+  useEffect(() => {
+    if (!projectId || !making) return
+    const id = setInterval(() => void loadData(), 4000)
+    return () => clearInterval(id)
+  }, [projectId, making, loadData])
+  const overlayOpen = making && makingDismissed !== projectId
+  const stuck = progress.step === 2 && !progress.done && generatingCount === 0
+  const makingOverlay = (
+    <AiBusyOverlay
+      open={overlayOpen}
+      title={t('Making the images')}
+      steps={[
+        { label: t('Designing the characters and backgrounds'), state: progress.step > 0 ? 'done' : 'current' },
+        { label: t('Starting to draw'), state: progress.step > 1 ? 'done' : progress.step === 1 ? 'current' : 'todo' },
+        { label: progress.total > 0 ? t('Drawing images {drawn}/{total}', { drawn: progress.drawn, total: progress.total }) : t('Drawing images'), state: progress.step === 2 ? 'current' : 'todo' },
+      ]}
+      progress={progress.total > 0 && progress.step === 2 ? (progress.drawn / progress.total) * 100 : null}
+      footer={stuck ? (
+        <>
+          <Button size="sm" variant="outline" onClick={() => setMakingDismissed(projectId)}>{t('Close')}</Button>
+          <Button size="sm" onClick={() => void autoGenerateBaseImages()}>{t('Draw the remaining images')}</Button>
+        </>
+      ) : undefined}
+    />
+  )
+
+  if (phase === 'list') {
+    return (
+      <>
+        <BreakdownList onMake={() => setStyleOpen(true)} />
+        <StyleMakeDialog open={styleOpen} onOpenChange={setStyleOpen} onStarted={() => restartWriterStatus()} />
+      </>
+    )
+  }
+  if (phase === 'making' && !hasAssets) {
+    return <div className="flex-1" data-testid="artist-making">{makingOverlay}</div>
+  }
+
   // 진입 전 = 백그라운드 생성/ main 준비 진행 중 → progress bar 블로킹.
   //   단, 한 번이라도 진입한 프로젝트면(gateOpen) 탭 전환 후에도 다시 막지 않는다.
-  if (!gateOpen) {
+  if (!gateOpen && phase === 'done') {
     return (
       <div className="flex flex-1 items-center justify-center p-8">
         {writerStatus?.pipeline_failed ? (
@@ -423,20 +402,33 @@ export default function VisualPage() {
     )
   }
 
-  // 메인 헤더 — 사이드바 호버에 뜨는 스테이지 이름(STAGES.artist.name)을 여기 노출(#1).
-  //   오른쪽 New UI 버튼 = 실험 에셋·샷 보드 토글(#12). 두 모드가 같은 헤더를 공유한다.
+  // 메인 헤더(리뉴얼 1차, 프로토타입 A5) — "Artist · 인물 N · 배경 M", 작품 스타일, 오른쪽 [완료하기 →].
+  //   완료한 뒤(또는 예전 흐름으로 끝까지 만든 프로젝트)는 다시 완료하지 않고 Storyboard 로 가기만 한다.
+  const completeBlocked = gaps.characters.length + gaps.locations.length > 0
   const headerRow = (
-    <div className="mb-3 flex items-start justify-between gap-3">
-      <div className="flex items-center gap-1.5">
-        {/* writer 헤더(Writers' Room)와 타이포 통일(#d7 2026-08-03) — semibold.
-            설명문은 "?" 뱃지 호버로 이관(2026-08-06). */}
-        <h1 className="text-lg font-semibold">The Visual Studio</h1>
-        <StageHelpBadge
-          text={t('Create and refine concept images for characters and worlds, then hand off to the next stage.')}
-        />
+    <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+        <h1 className="text-lg font-semibold">Artist</h1>
+        <span className="text-xs text-muted-foreground">{t('Characters {persons} · backgrounds {places}', { persons: personTotal, places: worldAssets.length })}</span>
+        {styleLabel ? (
+          <span className="rounded-md border border-border px-2 py-0.5 text-xs" data-testid="artist-style-bar">
+            <span className="text-muted-foreground">{t('Work style')}</span> · <b className="font-medium">{styleLabel}</b>
+          </span>
+        ) : null}
       </div>
-      {/* 다음 단계 버튼(2026-10-01 오너) — 준비가 덜 된 샷이 있으면 목록 창을 먼저 연다. */}
-      <NextStepButton />
+      {phase === 'cards' ? (
+        <span title={completeBlocked ? t('Make the images for the characters and backgrounds that have none first.') : undefined}>
+          <Button onClick={() => setCompleteOpen(true)} disabled={completeBlocked} data-testid="artist-complete-open">
+            {t('Complete')}<ArrowRight className="size-4" />
+          </Button>
+        </span>
+      ) : stageIndex(reachedStage) >= stageIndex('writer') ? (
+        <Button variant="outline" onClick={() => router.push(withDemoShare('/studio/writer'))} data-testid="artist-go-storyboard">
+          {t('Go to Storyboard')}<ArrowRight className="size-4" />
+        </Button>
+      ) : (
+        <NextStepButton />
+      )}
     </div>
   )
 
@@ -526,6 +518,8 @@ export default function VisualPage() {
       )}
       {/* 게이트 상태 푸터는 제거(#d5 2026-08-11 오너 지시) — 게이트 판정 자체는 그대로 살아
           Director 핸드오프 제안(#handoff-starved)과 사이드바 잠금이 쓴다. 개발용 세부는 콘솔로. */}
+      <ArtistCompleteDialog open={completeOpen} onOpenChange={setCompleteOpen} summary={{ persons: personTotal, places: worldAssets.length, style: styleLabel }} />
+      {makingOverlay}
     </>
   )
 }

@@ -109,12 +109,13 @@ describe('고정된 그림체는 Producer 에서 바꿀 수 없다', () => {
     expect(db.writes).toHaveLength(0)
   })
 
-  it('채팅 입력창의 스타일 단추는 누를 수 없고 바꿀 수 없는 이유를 보인다', () => {
+  it('Artist 스타일 팝업은 고정된 그림체면 다른 스타일을 고를 수 없고 이유를 보인다', () => {
     // 왜: 단추가 눌리면 고른 스타일이 조용히 무시된 것처럼 보인다 — 처음부터 막고 이유를 보인다.
-    const ui = readFileSync('src/components/layout/global-chat.tsx', 'utf8')
-    expect(ui).toMatch(/styleLocked \?/)
-    expect(ui).toMatch(/data-testid="style-locked"/)
-    expect(translate('ko', "The art style comes from the picture you chose, so it can't be changed.")).toMatch(REASON)
+    //   리뉴얼 1차(2026-10-19): 스타일은 Writer 채팅 단추가 아니라 Artist [만들기]의 스타일 팝업에서 고른다.
+    const ui = readFileSync('src/features/artist-room/style-make-dialog.tsx', 'utf8')
+    expect(ui).toMatch(/disabled=\{locked \|\| !!custom\}/)
+    expect(ui).toMatch(/The art style is fixed to the picture you uploaded\./)
+    expect(translate('ko', 'The art style is fixed to the picture you uploaded.')).toMatch(REASON)
   })
 
   it('채팅으로 스타일을 바꿔 달라고 하면 바꾸지 않고 이유를 말한다', async () => {

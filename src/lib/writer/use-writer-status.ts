@@ -108,7 +108,7 @@ async function tick(id: string, entry: Entry) {
     publish(entry, { status, error: null })
     // 기존 회복 간격 유지. 검토 대기에는 자동 재개하지 않는다.
     const age = status.last_timestamp ? Date.now() - Date.parse(status.last_timestamp) : 0
-    if (status.started && !status.pipeline_completed && !status.pipeline_failed && status.current_status !== 'awaiting_confirmation'
+    if (status.started && !status.pipeline_completed && !status.pipeline_failed && status.current_status !== 'awaiting_confirmation' && status.current_status !== 'awaiting_artist'
       && age >= 180_000 && Date.now() - entry.keepaliveAt >= 60_000) {
       entry.keepaliveAt = Date.now()
       void fetch('/api/writer/resume', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ projectId: id }) }).catch(() => {})

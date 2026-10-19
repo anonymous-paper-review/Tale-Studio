@@ -19,8 +19,6 @@ import {
   LayoutGrid,
   Loader2,
   MoveRight,
-  Lock,
-  Palette,
   Plus,
   Square,
   X,
@@ -31,10 +29,9 @@ import { useImageUploadConsent } from '@/components/upload/image-upload-consent'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { AgentFace } from '@/components/agent-face'
-import { styleChoiceBusy, useGlobalChatStore } from '@/stores/global-chat-store'
+import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore } from '@/stores/producer-store'
-import { stylePromptDecision } from '@/lib/producer-style-prompt'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useArtistStore } from '@/stores/artist-store'
 import { useWriterStore } from '@/stores/writer-store'
@@ -57,14 +54,12 @@ import {
   FOUNDATION_MENTIONS,
   type SceneShotMentionTarget,
 } from '@/lib/card-mention'
-import { StyleAnchorPicker } from '@/features/producer/style-anchor-picker'
-import { selectStyleAnchorFromPicker } from '@/features/producer/select-style-anchor'
-import { ingestCreationFile } from '@/lib/project/start-new-project'
 import { SceneGateControls } from '@/features/writer/scene-gate-panel'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { useWriterPreview } from '@/lib/writer/use-writer-preview'
 import { SceneStoryProposalCard } from '@/components/layout/scene-story-proposal-card'
 import { SceneStoryRewriteCard, SceneStoryUndoCard } from '@/components/layout/scene-story-rewrite-card'
+import { WriterNextCard } from '@/features/prose/writer-next-card'
 import {
   buildScriptLines,
   scriptLineMentions,
@@ -801,71 +796,7 @@ export function GlobalChat() {
   // 입력창 하단 툴바 popover (#oiioii-chat) — 에이전트 필(빠른 요청) / four-dot(@멘션 팔레트).
   const [presetOpen, setPresetOpen] = useState(false)
   const [assetsOpen, setAssetsOpen] = useState(false)
-  // #style-entry(#feedback 2026-08-07): producer 에선 four-dot 자리가 스타일 픽커 버튼.
-  //   스타일 미선택 + 아직 안 눌러봤으면 레이더 핑(producer 보라 확산 링)으로 온보딩 유도 —
-  //   첫 클릭에 소등(세션 로컬. 미선택이면 다음 세션에 다시 유도가 온보딩상 맞다). 호버의
-  //   빨간 빔(회전)과 모션·색을 갈라 "안내"와 "호버 반응"이 섞이지 않게 한다(#feedback v2).
-  const styleAnchors = useProducerStore((s) => s.styleAnchors)
-  const styleAnchorKey = useProducerStore((s) => s.styleAnchorKey)
-  // 고정된 그림체(2026-10-09 오너) — 사용자가 올린 그림을 "그림체"로 골라 정했으면 스타일 단추를 막고 이유를 보인다.
-  const styleLocked = useProducerStore((s) => s.customStyleAnchor?.locked === true)
-  const loadStyleAnchors = useProducerStore((s) => s.loadStyleAnchors)
-  const [stylePressed, setStylePressed] = useState(false)
-  useEffect(() => {
-    if (currentStage !== 'producer' || !projectId) return
-    if (useProducerStore.getState().styleAnchors.length > 0) return
-    void loadStyleAnchors()
-  }, [currentStage, projectId, loadStyleAnchors])
-  const stylePingOn = !stylePressed && !styleAnchorKey
-
-  // 새 기획의 준비 전환 또는 명시적인 Writer 요청이 만든 이벤트만 소비한다.
-  const [stylePickerProjectId, setStylePickerProjectId] = useState<string | null>(null)
-  const stylePickerOpen = !!projectId && stylePickerProjectId === projectId && currentStage === 'producer'
-  useEffect(() => { setStylePickerProjectId(null) }, [projectId, currentStage])
-  useEffect(() => {
-    if (styleAnchorKey) setStylePickerProjectId(null)
-  }, [styleAnchorKey])
-  const stylePickerRequest = useChatUiStore((s) => s.stylePickerRequest)
-  const consumeStylePicker = useChatUiStore((s) => s.consumeStylePicker)
-  // 그림체를 묻거나 정하는 중이면(2026-10-10) 자동 스타일 선택 창은 기다린다.
-  const styleBusy = useGlobalChatStore((s) => styleChoiceBusy(s, projectId))
-  useEffect(() => {
-    if (!stylePickerRequest) return
-    const decision = stylePromptDecision(stylePickerRequest.projectId, {
-      projectId, stage: currentStage, loading: loading || styleBusy,
-      approvalBusy: !!pendingProposal || executingProposalIds.length > 0,
-      hasStyle: !!styleAnchorKey, catalogReady: styleAnchors.length > 0,
-    })
-    if (decision === 'wait') return
-    consumeStylePicker(stylePickerRequest.id)
-    if (decision === 'open') {
-      setStylePickerProjectId(projectId)
-      setStylePressed(true)
-    }
-  }, [stylePickerRequest, projectId, currentStage, loading, styleBusy, pendingProposal, executingProposalIds, styleAnchorKey, styleAnchors.length, consumeStylePicker])
-  // 스타일 선택 창의 "내 그림체 올리기"(2026-10-10 오너) — 권리 확인 → 올리기 → 채팅에서 그림을 "그림체"로 고른 것과 같은 고정 · 분석.
-  const [styleUpload, setStyleUpload] = useState<{ projectId: string; busy: boolean; error: string | null } | null>(null)
-  const styleUploadNow = styleUpload && styleUpload.projectId === projectId ? styleUpload : null
-  const uploadStyleImage = async (file: File) => {
-    if (!projectId || styleUploadNow?.busy) return
-    const pid = projectId
-    if (kindOf(file.name) !== 'image') {
-      setStyleUpload({ projectId: pid, busy: false, error: t('Choose a picture file.') })
-      return
-    }
-    if (!(await requestImageUploadConsent([file]))) return
-    if (useProjectStore.getState().projectId !== pid) return
-    setStyleUpload({ projectId: pid, busy: true, error: null })
-    const uploaded = await ingestCreationFile(pid, file)
-    if (useProjectStore.getState().projectId !== pid) return
-    if ('error' in uploaded || uploaded.kind !== 'image') {
-      setStyleUpload({ projectId: pid, busy: false, error: 'error' in uploaded ? uploaded.error : t('Choose a picture file.') })
-      return
-    }
-    setStyleUpload(null)
-    setStylePickerProjectId(null)
-    void useGlobalChatStore.getState().applyUploadedStyle({ id: uploaded.id, name: uploaded.name, thumbUrl: uploaded.thumbUrl, sliceUrls: uploaded.sliceUrls })
-  }
+  // 리뉴얼 1차: 채팅의 스타일 단추 · 자동 스타일 선택 창은 없다 — 스타일은 Artist [만들기]의 스타일 팝업에서 고른다.
   // 프리셋 클릭 = 입력창에 삽입(자동 전송 금지 — 과금/전이 발화를 원클릭으로 쏘지 않는다).
   const insertPreset = (text: string) => {
     setPresetOpen(false)
@@ -909,7 +840,8 @@ export function GlobalChat() {
     writerRunStatus?.started &&
     !writerRunStatus.pipeline_completed &&
     !writerRunStatus.pipeline_failed &&
-    writerRunStatus.current_status !== 'awaiting_confirmation'
+    writerRunStatus.current_status !== 'awaiting_confirmation' &&
+    writerRunStatus.current_status !== 'awaiting_artist'
   )
   // 씬 스토리 확정은 Producer 메인에서 기다린다(2026-10-01) — Writer 채팅의 수정 요청은 거기로 안내한다.
   const writerGateElsewhere = currentStage === 'writer' && writerRunStatus?.current_status === 'awaiting_confirmation'
@@ -1023,6 +955,8 @@ export function GlobalChat() {
     }
     // #p4-choices 는 렌더에서 버튼별 인라인 처리 — 이 핸들러엔 도달하지 않는다(타입 내로잉용).
     if (action.kind === 'choices') return
+    // Writer 다음 단계 카드(리뉴얼 1차)는 카드 안 버튼이 각자 일을 한다.
+    if (action.kind === 'writerNext') return
     if (action.kind === 'message') {
       dismissSuggestion()
       await sendMessage(action.utterance, undefined, { stageOverride: suggestion?.stage, ...(action.answeringProducerQuestion ? { answeringProducerQuestion: true } : {}) })
@@ -1579,12 +1513,13 @@ export function GlobalChat() {
             ))}
 
             {loading && <ThinkingIndicator stage={currentStage} />}
+            {/* 리뉴얼 1차 Writer(id producer)는 세 가지 안을 산문 위 팝업에서 고르고, 적용 뒤에는 다음 단계를 묻는다(되돌리기 카드 없음). */}
             {projectId && sceneStoryProposal ? (
               sceneStoryProposal.variants?.length
-                ? <SceneStoryRewriteCard key={`${projectId}:${sceneStoryProposal.id}`} projectId={projectId} proposal={sceneStoryProposal} />
+                ? currentStage === 'producer' ? null : <SceneStoryRewriteCard key={`${projectId}:${sceneStoryProposal.id}`} projectId={projectId} proposal={sceneStoryProposal} />
                 : <SceneStoryProposalCard key={`${projectId}:${sceneStoryProposal.id}`} projectId={projectId} proposal={sceneStoryProposal} />
             ) : null}
-            {projectId && sceneStoryUndo ? <SceneStoryUndoCard key={`${projectId}:${sceneStoryUndo.id}`} projectId={projectId} undo={sceneStoryUndo} /> : null}
+            {projectId && sceneStoryUndo && currentStage !== 'producer' ? <SceneStoryUndoCard key={`${projectId}:${sceneStoryUndo.id}`} projectId={projectId} undo={sceneStoryUndo} /> : null}
 
             {/* 프로액티브 제안 (chat-proactive-copilot Phase 1) — 시스템이 먼저 거는 actionable 넛지.
                 탭 전환 후 1초 정적을 두고 계단식 등장(#chat-settle).
@@ -1608,6 +1543,8 @@ export function GlobalChat() {
                     피드백 입력 + 확정/수정 두 갈래를 여기서 렌더한다(생성 화면 하단 바에서 이사). */}
                 {suggestion.action?.kind === 'confirmScenes' ? (
                   <SceneGateControls label={suggestion.action.label} handoff={treatmentDraft && !producerLocked} />
+                ) : suggestion.action?.kind === 'writerNext' ? (
+                  <WriterNextCard step={suggestion.action.step} />
                 ) : (suggestion.action || suggestion.dismissible !== false) && (
                   <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
                     {/* kind: 'choices' 는 여기 오지 않는다 — 입력창 앵커 선택지(#p4-choices v2) */}
@@ -2067,52 +2004,8 @@ export function GlobalChat() {
                 {/* 스타일 픽커 (#style-entry #feedback 2026-08-07) — producer 에선 four-dot 자리를
                     스타일 버튼이 차지한다(에셋 멘션은 @ 타이핑·Ctrl+카드 클릭이 대체). 첫 클릭 전
                     + 스타일 미선택이면 빔 상시 점등. 다른 스테이지는 기존 에셋 팔레트 유지. */}
-                {currentStage === 'producer' && styleLocked ? (
-                  <span className="inline-flex" title={t("The art style comes from the picture you chose, so it can't be changed.")}>
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
-                      className="relative rounded-full"
-                      disabled
-                      aria-label={t("The art style comes from the picture you chose, so it can't be changed.")}
-                      data-testid="style-locked"
-                    >
-                      <Palette className="size-4" />
-                      <Lock className="absolute -bottom-0.5 -right-0.5 size-2.5" aria-hidden />
-                    </Button>
-                  </span>
-                ) : currentStage === 'producer' ? (
-                  <StyleAnchorPicker
-                    anchors={styleAnchors}
-                    value={styleAnchorKey}
-                    onSelect={(k) => void selectStyleAnchorFromPicker(k)}
-                    open={stylePickerOpen}
-                    onOpenChange={(open) => {
-                      setStylePickerProjectId(open ? projectId : null)
-                      if (!open) setStyleUpload((prev) => (prev?.busy ? prev : null))
-                    }}
-                    upload={{ onPick: (file) => void uploadStyleImage(file), busy: !!styleUploadNow?.busy, error: styleUploadNow?.error ?? null }}
-                  >
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
-                      className="hover-red-beam rounded-full"
-                      title={t('Select style')}
-                      aria-label={t('Select style')}
-                      onClick={() => setStylePressed(true)}
-                    >
-                      {/* 레이더 핑 — agent-face 의 ping 과 같은 문법, producer 색. 2s 주기로
-                          느긋하게(기본 1s 는 다급해 보인다). reduced-motion 은 정적 보라 링. */}
-                      {stylePingOn && (
-                        <span
-                          aria-hidden
-                          className="absolute inset-0 animate-ping rounded-full bg-stage-producer opacity-30 [animation-duration:2s] motion-reduce:animate-none"
-                        />
-                      )}
-                      <Palette className="size-4" />
-                    </Button>
-                  </StyleAnchorPicker>
-                ) : (
+                {/* 리뉴얼 1차: Writer(id producer)는 산문만 다룬다 — 스타일은 Artist [만들기]의 스타일 팝업에서 고른다(채팅 스타일 단추 없음). */}
+                {currentStage === 'producer' ? null : (
                 <Popover open={assetsOpen} onOpenChange={setAssetsOpen}>
                   <PopoverTrigger asChild>
                     <Button

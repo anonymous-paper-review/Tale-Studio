@@ -4,7 +4,7 @@
 //   AI 에이전트가 일을 시작하면 단계 화면과 채팅을 덮고 입력을 막는다 — 끝나야 고칠 수 있고, 동시 작업은 없다.
 //   왼쪽 단계 레일은 덮지 않는다(다른 단계로 나가는 것은 막지 않는다 — 작업은 서버에서 계속 돈다).
 import { useEffect } from 'react'
-import { Check, Loader2 } from 'lucide-react'
+import { AlertCircle, Check, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SHELL_INSET, SHELL_RAIL_WIDTH } from '@/lib/constants'
 import { useT } from '@/lib/i18n'
@@ -27,9 +27,11 @@ interface AiBusyOverlayProps {
   progressLabel?: string
   /** 실패 시 다시 하기 같은 버튼 자리. */
   footer?: React.ReactNode
+  /** false = 일이 멈췄다(실패 안내) — 도는 원 대신 경고 표시를 두고 aria-busy 를 끈다. 기본 true. */
+  busy?: boolean
 }
 
-export function AiBusyOverlay({ open, title, description, steps, progress, progressLabel, footer }: AiBusyOverlayProps) {
+export function AiBusyOverlay({ open, title, description, steps, progress, progressLabel, footer, busy = true }: AiBusyOverlayProps) {
   const t = useT()
 
   // 덮는 동안 단계 화면과 채팅을 inert 로 — 키보드 포커스도 뒤로 들어가지 못한다.
@@ -51,12 +53,16 @@ export function AiBusyOverlay({ open, title, description, steps, progress, progr
       style={{ left: SHELL_INSET * 2 + SHELL_RAIL_WIDTH }}
       role="status"
       aria-live="polite"
-      aria-busy="true"
+      aria-busy={busy}
       data-testid="ai-busy-overlay"
     >
       <div className="flex w-full max-w-md flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-lg">
         <div className="flex items-start gap-3">
-          <Loader2 className="mt-0.5 size-5 shrink-0 animate-spin text-muted-foreground motion-reduce:animate-none" aria-hidden />
+          {busy ? (
+            <Loader2 className="mt-0.5 size-5 shrink-0 animate-spin text-muted-foreground motion-reduce:animate-none" aria-hidden />
+          ) : (
+            <AlertCircle className="mt-0.5 size-5 shrink-0 text-destructive" aria-hidden />
+          )}
           <div className="flex flex-col gap-1">
             <h2 className="text-lg font-medium leading-7">{title}</h2>
             <p className="text-sm text-muted-foreground">

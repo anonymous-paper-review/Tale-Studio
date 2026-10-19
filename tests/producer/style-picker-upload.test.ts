@@ -41,13 +41,14 @@ afterEach(() => {
 })
 
 describe('스타일 선택 창의 내 그림체 올리기', () => {
-  it('스타일 선택 창에는 그리드와 슬라이드 모두 첫 자리에 점선 테두리의 + 카드가 있고, 분석 모델로 보낸다는 안내가 있다', () => {
-    // 왜: 10/10 오너 — Producer 로 넘어오면 스타일 선택이 바로 뜨는데, 내 그림을 그림체로 올릴 길이 그 창에 없었다.
-    const picker = readFileSync('src/features/producer/style-anchor-picker.tsx', 'utf8')
-    expect(picker).toMatch(/data-testid="style-upload-card"/)
-    expect(picker).toMatch(/border-dashed/)
-    expect(picker).toMatch(/<Plus /)
-    expect(readFileSync('src/components/layout/global-chat.tsx', 'utf8')).toMatch(/upload=\{/)
+  it('Artist 스타일 팝업의 첫 자리에 점선 테두리의 + 카드가 있고, 분석 모델로 보낸다는 안내가 있다', () => {
+    // 왜: 10/10 오너 — 스타일을 고르는 창에 내 그림을 그림체로 올릴 길이 있어야 한다.
+    //   리뉴얼 1차(2026-10-19): 스타일 고르기는 Artist [만들기]의 스타일 팝업으로 옮겼다(채팅 스타일 단추 없음).
+    const dialog = readFileSync('src/features/artist-room/style-make-dialog.tsx', 'utf8')
+    expect(dialog).toMatch(/data-testid="artist-style-upload"/)
+    expect(dialog).toMatch(/border-dashed/)
+    expect(dialog).toMatch(/<Plus /)
+    expect(dialog).toMatch(/The picture goes to an analysis model to describe its art style, and the style is then fixed\./)
     expect(translate('ko', 'The picture goes to an analysis model to describe its art style, and the style is then fixed.')).toMatch(/분석 모델/)
   })
 

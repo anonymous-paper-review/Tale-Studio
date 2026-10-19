@@ -18,6 +18,7 @@ import type { WriterV2Package } from '@/lib/writer/v2/semantic-unit';
 import { sceneStoryProposalView, type SceneStoryProposal } from '@/lib/producer/scene-story-proposal';
 import { stableHash } from '@/lib/stable-hash';
 import { draftBasisOf } from '@/lib/writer/treatment-draft';
+import { proseConditionsOf, type ProseSeed } from '@/lib/writer/prose-conditions';
 import { mergeOpenWorld } from '@/lib/writer/pipeline/stages/s3_scenes';
 
 export const runtime = 'nodejs';
@@ -25,7 +26,10 @@ export const dynamic = 'force-dynamic';
 
 // state 에서 필요한 필드만 구조적으로 읽는다(steps.ts 의 무거운 import 회피).
 interface PreviewState {
-  input?: { writerEngine?: unknown; treatmentDraft?: unknown; story?: string; runtimeSeconds?: number; preserveScript?: boolean };
+  input?: { writerEngine?: unknown; treatmentDraft?: unknown; story?: string; runtimeSeconds?: number; preserveScript?: boolean; genre?: { genre?: string; runtime_seconds?: number }; changeLevel?: 'keep' | 'polish' | 'grow' };
+  genre?: { genre?: string; runtime_seconds?: number };
+  _proseSeed?: ProseSeed;
+  _proseLocked?: boolean;
   scenes?: Scenes;
   _sceneStoryVersion?: string;
   _sceneStoryProposal?: SceneStoryProposal;
@@ -300,6 +304,9 @@ export async function GET(
       : null;
     // 이 초안을 쓴 바탕 — 화면이 지금 Producer 값과 달라졌는지 견준다(넘길 때는 서버가 같은 규칙으로 막는다).
     const draftBasis = draft ? draftBasisOf({ story: state.input?.story ?? '', runtimeSeconds: state.input?.runtimeSeconds, preserveScript: state.input?.preserveScript }) : null;
+    // 지금 산문이 쓰인 조건(리뉴얼 1차) — 산문 위 "지금 산문" 줄과 다시 쓰기 옵션이 읽는다. 확정해 잠갔는지도 함께.
+    const proseConditions = draft ? proseConditionsOf(state as never) : null;
+    const proseLocked = state._proseLocked === true;
 
     return NextResponse.json(
       {
@@ -315,6 +322,9 @@ export async function GET(
         draft,
         treatmentCast,
         draftBasis,
+        proseConditions,
+        proseLocked,
+        changeLevel: state.input?.changeLevel ?? null,
         roster,
         scenes,
         characters,

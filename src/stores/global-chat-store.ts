@@ -50,6 +50,9 @@ import { loadDirectorReadiness } from '@/lib/director-readiness-loader'
 import type { DirectorReadinessReport } from '@/lib/director-readiness'
 import { sceneGatePhase } from '@/lib/writer/scene-gate'
 import { REWRITE_LEVELS, rewriteLevelOf, type RewriteLevel } from '@/lib/producer/scene-story-rewrite'
+import type { ProseConditions } from '@/lib/writer/prose-conditions'
+import { writerChatIntent } from '@/lib/prose/writer-chat'
+import { useWriterRoomStore } from '@/stores/writer-room-store'
 import { restartWriterStatus } from '@/lib/writer/use-writer-status'
 import { completeKoreanDialogue, dialogueHandoffTarget } from '@/lib/writer/dialogue-handoff'
 import { handoffToStage } from '@/lib/stage-nav'
@@ -127,6 +130,8 @@ export interface ChatSuggestion {
     | { kind: 'confirmScenes'; label: string }
     // #p4-choices: 다중 선택지 — 클릭 = 그 문구를 채팅 입력(핸드오프 패턴, 직접 입력과 동일 경로)
     | { kind: 'choices'; options: Array<{ label: string; utterance: string }>; answeringProducerQuestion?: true }
+    // 리뉴얼 1차 Writer — 적용 · 저장 뒤 "다음 단계로 넘어갈까요?"(ask) / "무엇을 더 해 볼까요?"(more) 카드(프로토타입 WP · WN).
+    | { kind: 'writerNext'; step: 'ask' | 'more' }
     | null
   /** 새로고침으로 복원한 선택지는 표시 전용이며 action을 복원하지 않는다. */
   restoredChoices?: { options: string[] }
@@ -146,12 +151,18 @@ interface GlobalChatState {
   syncSceneStoryProposal: (projectId: string, id: string | null) => void
   /** variantId — 다시 쓰기의 세 안 중 고른 안(2026-10-02 시안 v04). AI 수정안 하나면 비운다. */
   resolveSceneStoryProposal: (action: 'apply' | 'discard', proposalId: string, variantId?: string) => Promise<boolean>
-  /** 다시 쓰기(시안 v04) — 정도 하나로 세 가지 안을 요청한다. */
-  rewriteSceneStory: (level: RewriteLevel) => Promise<boolean>
+  /** 다시 쓰기(시안 v04) — 정도 하나로 세 가지 안을 요청한다. 조건(리뉴얼 1차 Writer)을 주면 그 길이 · 장르 · 소재로 쓴다. */
+  rewriteSceneStory: (level: RewriteLevel | null, conditions?: ProseConditions) => Promise<boolean>
+  /** 리뉴얼 1차 Writer — 적용 · 저장 뒤 다음 단계를 묻는 카드(ask), 아니요면 할 일 버튼(more). */
+  offerWriterNext: (step: 'ask' | 'more') => void
+  /** 리뉴얼 1차 Writer [브레이크다운하기] 확정 — 산문을 잠그고 Artist 를 연다. 이동은 부른 쪽이 한다. */
+  confirmProse: () => Promise<{ ok: boolean; code?: string }>
   /** 셋 다 별로 · 다시 만들기 — 지금 안들을 버리고 같은 정도로 다시 요청한다. */
   regenerateSceneStoryRewrite: (proposalId: string, level: RewriteLevel) => Promise<boolean>
   /** 트리트먼트 초안을 다 썼다고 채팅에 한 줄 남긴다(시안 v04). runKey(실행) 하나에 한 번, 넘기기 단추 없이. */
   announceTreatmentReady: (projectId: string, runKey: string) => boolean
+  /** 리뉴얼 1차 Writer — 산문을 처음 열 때 Writer 의 첫 한 줄. 이 프로젝트 Writer 채팅이 비어 있을 때만 남긴다. */
+  announceProseReady: (projectId: string, sceneCount: number, preserved: boolean) => boolean
   /** 트리트먼트에 미리 보이는 안(v1 · v2 · v3). 채팅 카드와 트리트먼트가 같은 값을 읽는다. */
   sceneStoryVariantPreview: { projectId: string; proposalId: string; variantId: string } | null
   previewSceneStoryVariant: (proposalId: string, variantId: string) => void
@@ -980,6 +991,12 @@ function offerStyleFromAttachment(
 
 /** 씬 스토리 확정을 보내는 중인 프로젝트 — 두 번 누름 방지(2026-10-01). */
 const sceneGateInFlight = new Set<string>()
+
+/** 리뉴얼 1차 Writer(id producer) 산문을 고칠 수 있는 때 — 확정 전 산문 초안이 있고 지금 Writer 화면이다. */
+function writerProseLive(): boolean {
+  const project = useProjectStore.getState()
+  return project.currentStage === 'producer' && !project.producerLocked && project.treatmentDraft
+}
 const sceneStoryRequests = new Map<string, symbol>()
 // 트리트먼트를 다 썼다고 알린 실행(프로젝트:실행) — 화면이 다시 그려져도 같은 말을 두 번 남기지 않는다.
 const announcedTreatments = new Set<string>()
@@ -1461,23 +1478,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       await get().sendMessage(translate(useLocaleStore.getState().locale, 'Please hand over to Writer'), undefined, { consentedHandoff: true })
       return
     }
-    // 버튼 = 그 문장을 타이핑한 것(#handoff-to-chat). 버튼의 언어는 화면(UI) 언어다 — 예전 채팅 위 칩과 같다.
-    const utterance = translate(useLocaleStore.getState().locale, action.utterance)
+    // 리뉴얼 1차 Writer — 다음 단계는 산문 확정(브레이크다운)이다. 확정 창을 연다(확정하면 산문이 잠긴다).
+    //   산문이 아직 없는 예전 프로젝트도 예전 Producer 확정 창으로 가지 않는다 — 확정 창이 산문이 없다고 알린다.
     if (action.from === 'producer') {
-      // 그림 쓰임새 질문이 남아 있으면 확정 창을 열지 않는다 — 채팅이 먼저 고르라고 답한다(확정 뒤 넘김이 삼켜지지 않게).
-      if (get().imageRoleGate || get().imageBatchGate || get().comicStyleGate) {
-        await get().sendMessage(utterance, undefined, { consentedHandoff: true })
-        return
-      }
-      // 필수 칸이 비었으면 확정할 것이 없다 — 창 대신 채팅이 빈 곳을 알려 준다(타이핑했을 때와 같은 답).
-      if (handoffBlockers(action).hard.length > 0) {
-        await get().sendMessage(utterance, undefined, { consentedHandoff: true })
-        return
-      }
-      // Writer 로 넘기면 Producer 가 잠긴다 — 확정 창을 먼저 연다(2026-10-01 오너 "writer로 넘어갈 때 경고 팝업").
-      set({ handoffConfirm: { kind: 'producerLock', projectId } })
+      useWriterRoomStore.getState().openConfirm()
       return
     }
+    // 버튼 = 그 문장을 타이핑한 것(#handoff-to-chat). 버튼의 언어는 화면(UI) 언어다 — 예전 채팅 위 칩과 같다.
+    const utterance = translate(useLocaleStore.getState().locale, action.utterance)
     if (action.from === 'artist' && writerSideBlockers().length === 0) {
       // 준비가 덜 된 샷이 있으면 넘기지 않고 목록 창을 연다(2026-10-01 오너 "director 넘어갈 때 미완성 팝업").
       const readiness = await directorReadinessOf(projectId)
@@ -1649,6 +1657,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       set({ sceneStoryProposalPending: null, sceneStoryVariantPreview: null })
       get().refreshSceneStory()
       restartWriterStatus(projectId)
+      // 리뉴얼 1차 Writer — 고친 걸 적용하면 다음 단계(브레이크다운)를 먼저 묻는다(프로토타입 WP).
+      if (action === 'apply' && writerProseLive()) get().offerWriterNext('ask')
       return true
     } catch {
       if (isCurrent()) set({ error: translate(contentLocale(), 'Could not update the scene story proposal. Please try again.') })
@@ -1658,7 +1668,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     }
   },
 
-  rewriteSceneStory: async (level) => {
+  rewriteSceneStory: async (level, conditions) => {
     const projectId = useProjectStore.getState().projectId
     if (!projectId || get().sceneStoryEdit) return false
     if (sceneGateInFlight.has(projectId) || sceneStoryRequests.has(projectId) || get().sceneStoryProposalPending?.projectId === projectId) {
@@ -1675,7 +1685,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       const response = await fetch('/api/writer/scene-gate', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ projectId, action: 'rewrite', level }),
+        body: JSON.stringify(conditions ? { projectId, action: 'rewrite', conditions } : { projectId, action: 'rewrite', level }),
       })
       const accepted = await response.json() as { proposalId?: string; code?: string }
       if (!isCurrent()) return false
@@ -1704,6 +1714,53 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     return get().rewriteSceneStory(level)
   },
 
+  offerWriterNext: (step) => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) return
+    const locale = contentLocale()
+    // 같은 카드라도 물을 때마다 새로 남긴다(프로토타입 "고친 걸 적용하면 다시 물어볼게요") — 떠 있는 카드는 먼저 내린다.
+    const current = get().suggestion
+    if (current?.id.startsWith(`writer-next:${projectId}:`)) get().dismissSuggestion({ implicit: true })
+    get().offerSuggestion({
+      id: `writer-next:${projectId}:${step}:${makeId()}`,
+      stage: 'producer',
+      dismissible: false,
+      content: translate(locale, step === 'ask'
+        ? 'Applied. Shall we move on to the next step? Moving on locks the prose, and Artist picks the characters and backgrounds from it.'
+        : 'What would you like to do next? When you apply a change, I will ask again. You can also press Breakdown at any time.'),
+      action: { kind: 'writerNext', step },
+    }, { preempt: true })
+  },
+
+  confirmProse: async () => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) return { ok: false }
+    if (sceneGateInFlight.has(projectId)) return { ok: false, code: 'busy' }
+    sceneGateInFlight.add(projectId)
+    try {
+      // 산문이 만든 인물 · 배경 목록을 먼저 저장한다 — Artist 의 브레이크다운 목록이 이 목록이다.
+      await useProducerStore.getState().saveDraftNow()
+      const response = await fetch('/api/writer/prose-confirm', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      })
+      const result = await response.json().catch(() => ({})) as { code?: string }
+      if (!response.ok) return { ok: false, code: result.code }
+      if (useProjectStore.getState().projectId !== projectId) return { ok: false }
+      const current = get().suggestion
+      if (current?.id.startsWith(`writer-next:${projectId}`)) get().dismissSuggestion({ implicit: true })
+      // 산문만 잠근다 — 실행은 아직 산문 초안이라(Artist [만들기] 전) 브레이크다운 목록 · 스타일은 Artist 에서 고친다.
+      useProjectStore.setState({ producerLocked: true })
+      useProjectStore.getState().unlockThrough('artist')
+      return { ok: true }
+    } catch {
+      return { ok: false }
+    } finally {
+      sceneGateInFlight.delete(projectId)
+    }
+  },
+
   // 시안 v04 "아이디어로 트리트먼트를 만들었어요" — 확정 안내(단추)는 넘기기 전 초안에 띄우지 않으므로(sceneGateOfferMode)
   //   다 썼다는 사실과 다음 할 일만 평범한 말 한 줄로 남긴다. Producer 채팅은 그대로 쓰인다.
   announceTreatmentReady: (projectId, runKey) => {
@@ -1712,6 +1769,20 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     if (announcedTreatments.has(key)) return false
     announcedTreatments.add(key)
     const content = translate(contentLocale(), 'The treatment is ready. Edit it on the screen, or use Rewrite to get three versions. When it looks right, press Hand over to Writer at the top right.')
+    set((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'producer', role: 'model', content }] }))
+    saveChatMessage(projectId, 'producer', 'model', content)
+    return true
+  },
+
+  announceProseReady: (projectId, sceneCount, preserved) => {
+    if (useProjectStore.getState().projectId !== projectId || get().messagesLoadedProjectId !== projectId) return false
+    if (get().messages.some((message) => message.stage === 'producer')) return false
+    const key = `${projectId}:prose`
+    if (announcedTreatments.has(key)) return false
+    announcedTreatments.add(key)
+    const content = translate(contentLocale(), preserved
+      ? 'I carried the script over as written. Check it, then run the breakdown.'
+      : 'I wrote the prose in {count} scenes. If you do not like it, say "Rewrite it" or change the conditions and rewrite it.', { count: sceneCount })
     set((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'producer', role: 'model', content }] }))
     saveChatMessage(projectId, 'producer', 'model', content)
     return true
@@ -1773,7 +1844,23 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const sceneChoices = sceneSuggestion?.id === `scene-story-edit:${projectId}`
     // 넘기기 전 트리트먼트 초안(2026-10-02 시안 v04)은 Producer 채팅이 살아 있다 — 다시 쓰기를 연 때(선택지)만 트리트먼트로 보낸다.
     const draftLive = !useProjectStore.getState().producerLocked && useProjectStore.getState().treatmentDraft
-    const sceneGate = !draftLive && (sceneSuggestion?.action?.kind === 'confirmScenes' || get().sceneStoryProposalPending?.projectId === projectId)
+    // 리뉴얼 1차 Writer(id producer)는 산문만 다룬다 — 말은 산문 수정 요청이고, "다시 써줘"는 조건을, 넘김 말은 확정 창을 연다.
+    //   넘김 말은 확정 전이면 늘 확정 창으로 간다(산문 초안이 아직 없는 예전 프로젝트도 예전 Producer 넘김으로 가지 않는다).
+    //   초안이 없는 예전 프로젝트의 나머지 말은 예전 Producer 채팅 그대로다(이야기 · 설정 채우기).
+    const writerProse = stage === 'producer' && draftLive
+    if (stage === 'producer' && !useProjectStore.getState().producerLocked) {
+      const intent = writerChatIntent(trimmed)
+      if (intent === 'breakdown' || (intent === 'rewrite' && writerProse)) {
+        if (sceneSuggestion?.stage === 'producer') get().dismissSuggestion({ implicit: true })
+        if (intent === 'rewrite') useWriterRoomStore.getState().openRewrite()
+        else useWriterRoomStore.getState().openConfirm()
+        get().appendLocalExchange('producer', trimmed, translate(contentLocale(), intent === 'rewrite'
+          ? 'Pick the runtime, genre and mood, and idea material, then rewrite. Nothing changes until you apply a version.'
+          : 'Check the prose, then confirm it to move on. Once you confirm, the prose is locked and Artist picks the characters and backgrounds.'))
+        return
+      }
+    }
+    const sceneGate = writerProse || (!draftLive && (sceneSuggestion?.action?.kind === 'confirmScenes' || get().sceneStoryProposalPending?.projectId === projectId))
     // 다시 쓰기 정도(시안 v04) — 선택지나 그 이름을 말하면 세 가지 안을 만든다. 다른 말은 아래처럼 수정안 하나로 간다.
     const rewriteLevel = stage === 'producer' && (sceneChoices || sceneGate)
       ? rewriteLevelOf(trimmed, contentLocale()) ?? rewriteLevelOf(trimmed, useLocaleStore.getState().locale)
@@ -1791,7 +1878,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (!ok) set({ error: reply })
       return
     }
-    if (stage === 'producer' && (sceneChoices || sceneGate) && writerInputRoute(trimmed, { sceneGate: true, running: false, explicitRevision: !sceneChoices }) === 'revise') {
+    if (stage === 'producer' && (sceneChoices || sceneGate) && writerInputRoute(trimmed, { sceneGate: true, running: false, explicitRevision: !sceneChoices && !writerProse }) === 'revise') {
       if (isCancellationUtterance(trimmed) && sceneChoices) { get().dismissSuggestion({ implicit: true }); return }
       get().dismissSuggestion({ implicit: true })
       set({ error: null })

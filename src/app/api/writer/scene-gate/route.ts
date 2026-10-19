@@ -1,6 +1,8 @@
 // 씬 스토리 게이트(#s3-gate 2026-08-05) — storyCheck 후 awaiting_confirmation 으로 멈춘 run 의
 //   확정 / 직접 저장 / 원문과 분리된 AI 수정안 생성·적용·버리기.
 //   다시 쓰기(2026-10-02 시안 v04): 정도 하나에 세 가지 안 → 안 하나 적용 → 적용 직전 트리트먼트로 되돌리기 · 그대로 두기.
+//   리뉴얼 1차(2026-10-19): 조건(러닝타임 · 장르·분위기 · 소재)으로 다시 쓰기 — 조건은 안을 적용할 때만 지금 산문의 조건이 된다.
+//   [브레이크다운하기]로 확정한 산문(_proseLocked)은 고치는 요청을 받지 않는다.
 import { NextResponse, after } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { z } from 'zod'
@@ -11,6 +13,7 @@ import { triggerWriterStep } from '@/lib/writer/pipeline/steps'
 import type { WriterRunState } from '@/lib/writer/pipeline/steps'
 import { mergeSceneStoryProposal, sceneStoryProposalExpired } from '@/lib/producer/scene-story-proposal'
 import { newRewriteProposal, variantProposal } from '@/lib/producer/scene-story-rewrite'
+import { rewriteBasis, rewriteLevelForSeed } from '@/lib/writer/prose-conditions'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
@@ -19,7 +22,16 @@ const requestSchema = z.discriminatedUnion('action', [
   z.object({ projectId: z.string().min(1), action: z.literal('confirm') }),
   z.object({ projectId: z.string().min(1), action: z.literal('revise'), feedback: z.string().trim().min(1).max(10_000) }),
   z.object({ projectId: z.string().min(1), action: z.literal('apply'), proposalId: z.string().min(1), variantId: z.enum(['v1', 'v2', 'v3']).optional() }),
-  z.object({ projectId: z.string().min(1), action: z.literal('rewrite'), level: z.enum(['polish', 'reword', 'rethink']) }),
+  z.object({
+    projectId: z.string().min(1),
+    action: z.literal('rewrite'),
+    level: z.enum(['polish', 'reword', 'rethink']).optional(),
+    conditions: z.object({
+      runtimeSeconds: z.number().int().min(1).max(7200),
+      genre: z.string().trim().min(1).max(80),
+      seed: z.enum(['keep', 'new']),
+    }).optional(),
+  }),
   z.object({ projectId: z.string().min(1), action: z.literal('undo'), undoId: z.string().min(1) }),
   z.object({ projectId: z.string().min(1), action: z.literal('keep'), undoId: z.string().min(1) }),
   z.object({ projectId: z.string().min(1), action: z.literal('discard'), proposalId: z.string().min(1) }),
@@ -45,6 +57,9 @@ export async function POST(req: NextRequest) {
     }
     const body = parsed.data
     const { projectId, action } = body
+    if (body.action === 'rewrite' && !body.level && !body.conditions) {
+      return NextResponse.json({ error: 'Invalid scene gate request' }, { status: 400 })
+    }
 
     // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
     const access = await requireProjectAccess(req, projectId)
@@ -62,6 +77,10 @@ export async function POST(req: NextRequest) {
       const preserved = state.input.preserveScript === true || state.scenes?.scenes.some((scene) => scene.provenance?.source === 'script')
       if (preserved && (action === 'save' || action === 'revise' || action === 'apply' || action === 'rewrite')) {
         return NextResponse.json({ error: 'Preserved script scenes cannot be changed', code: 'preserved_script' }, { status: 409 })
+      }
+      // 확정한 산문(리뉴얼 1차) — 화면 버튼이 꺼져 있어도 고치는 요청은 여기서 막는다.
+      if (state._proseLocked === true && (action === 'save' || action === 'revise' || action === 'apply' || action === 'rewrite' || action === 'undo')) {
+        return NextResponse.json({ error: 'The prose is confirmed and locked', code: 'prose_locked' }, { status: 409 })
       }
       if (body.action === 'save') {
         if (body.expectedStoryVersion ? body.expectedStoryVersion !== storyVersion : body.expectedUpdatedAt !== run.updated_at) return changed()
@@ -95,8 +114,10 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'A scene story proposal is already generating', code: 'scene_story_proposal_pending' }, { status: 409 })
         }
         state._sceneStoryVersion = storyVersion
+        const level = body.conditions ? rewriteLevelForSeed(body.conditions.seed) : body.level!
         state._sceneStoryProposal = newRewriteProposal({
-          id: crypto.randomUUID(), level: body.level, feedback: body.level, baseScenes: state.scenes, createdAt: updatedAt,
+          id: crypto.randomUUID(), level, feedback: level, baseScenes: state.scenes, createdAt: updatedAt,
+          ...(body.conditions ? { conditions: body.conditions } : {}),
         })
       } else if (body.action === 'undo' || body.action === 'keep') {
         const undo = state._sceneStoryUndo
@@ -110,6 +131,13 @@ export async function POST(req: NextRequest) {
           if (undo.characters) state.characters = undo.characters
           if ('world' in undo) state.world = undo.world
           if (undo.revisionNotes) state._sceneRevisionNotes = undo.revisionNotes
+          // 조건으로 다시 쓴 안을 되돌리면 그 산문을 쓴 조건도 돌아간다.
+          if (undo.input) state.input = undo.input
+          if (undo.genre) state.genre = undo.genre
+          if (undo.input || undo.genre) {
+            if (undo.proseSeed) state._proseSeed = undo.proseSeed
+            else delete state._proseSeed
+          }
           state._sceneStoryVersion = updatedAt
           delete state.storyCheck
         }
@@ -138,8 +166,17 @@ export async function POST(req: NextRequest) {
             id: crypto.randomUUID(), label: variant.id, storyVersion: updatedAt, scenes: state.scenes!,
             dramaturgy: state.dramaturgy ?? null, narrativeStructure: state.narrativeStructure,
             characters: state.characters, world: state.world, revisionNotes: state._sceneRevisionNotes ?? [],
+            ...(proposal.conditions ? { input: state.input, genre: state.genre, ...(state._proseSeed ? { proseSeed: state._proseSeed } : {}) } : {}),
           }
           state.scenes = merged
+          if (proposal.conditions) {
+            // 고른 안이 쓰인 조건이 지금 산문의 조건이 된다 — 뒷단계(브레이크다운 · 샷 길이)도 이 길이 · 장르를 쓴다.
+            const basis = rewriteBasis(state, proposal.conditions)
+            state.input = basis.input
+            if (basis.genre) state.genre = basis.genre
+            if (proposal.level !== 'rethink' && variant.narrativeStructure) state.narrativeStructure = variant.narrativeStructure
+            state._proseSeed = proposal.conditions.seed
+          }
           if (proposal.level === 'rethink') {
             // 아이디어부터 다시 — 그 안의 이야기 엔진 · 구조 · 인물 · 장소로 바꾼다. 지난 초안의 수정 요청은 더 이상 맞지 않는다.
             state.dramaturgy = variant.dramaturgy ?? undefined

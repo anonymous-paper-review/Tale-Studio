@@ -80,23 +80,6 @@ describe('넘기기 전의 트리트먼트 초안', () => {
 })
 
 describe('트리트먼트 초안에서 Writer로 넘기기', () => {
-  it('넘기기 전 씬 확정 버튼은 Writer로 넘기기 확인 창을 연다', async () => {
-    expect(await useGlobalChatStore.getState().confirmSceneGate()).toBeNull()
-    expect(useGlobalChatStore.getState().handoffConfirm?.kind).toBe('producerLock')
-    expect(fetchMock.mock.calls.some(([url]) => String(url) === '/api/writer/scene-gate')).toBe(false)
-  })
-
-  it('확인 창에서 넘기면 Producer 값을 실어 트리트먼트 초안을 이어 가고 Writer 화면으로 간다', async () => {
-    useProducerStore.setState({ cast: [{ ...jia, userEdited: true }], backgrounds: [{ ...yard, userEdited: true }] })
-    await useGlobalChatStore.getState().requestNextStep()
-    expect(useGlobalChatStore.getState().handoffConfirm?.kind).toBe('producerLock')
-    await useGlobalChatStore.getState().confirmProducerLock()
-    const body = startBodies()[0]
-    expect(body).toMatchObject({ projectId: 'proj-1', continueDraft: true, story: '두 아이가 다투고 화해하는 이야기' })
-    expect(body.cast.characters[0]).toMatchObject({ character_id: 'jia', appearance: '분홍 원피스' })
-    expect(body.backgrounds.locations[0]).toMatchObject({ location_id: 'yard' })
-    expect(useProjectStore.getState()).toMatchObject({ producerLocked: true, treatmentDraft: false, currentStage: 'writer' })
-  })
 
   it('트리트먼트를 다 쓰기 전에는 넘기지 않고 Producer를 잠그지 않는다', async () => {
     startResponse = () => Response.json({ code: 'writer_draft_missing', status: 'running' }, { status: 409 })
@@ -138,8 +121,8 @@ describe('트리트먼트 초안에서 Writer로 넘기기', () => {
     )
     const suji: CastMember = { localId: 'mine', name: '수지', entityType: 'person', appearance: '단발', origin: 'producer', arc: { start_state: '방관', end_state: '중재', arc_type: 'positive_change' }, motivation: { want: '둘을 화해시키기' } }
     useProducerStore.setState({ cast: [...synced.cast, suji], backgrounds: synced.backgrounds })
-    await useGlobalChatStore.getState().requestNextStep()
-    await useGlobalChatStore.getState().confirmProducerLock()
+    // 리뉴얼 1차: 넘기기 = Artist [만들기](산문 초안을 이어 간다) — 예전 Producer 확정 창은 없다.
+    await useProducerStore.getState().saveAndHandoff({ artistGate: true })
     const body = startBodies()[0]
     expect(body.cast.characters.map((c: { name: string }) => c.name)).toEqual(['수지'])
     expect(body.backgrounds.locations).toEqual([])
@@ -177,34 +160,12 @@ describe('넘기기 안내와 Producer 채팅', () => {
     expect(sceneGateOfferMode({ draftLive: true, current: null, projectId: 'proj-1' })).toBe('skip')
   })
 
-  it('넘기기 전 트리트먼트 초안에서 수정안이 남아 있어도 채팅으로 설정을 바꿔 달라고 하면 Producer가 받는다', async () => {
-    useGlobalChatStore.setState({ sceneStoryProposalPending: { projectId: 'proj-1', id: 'p1' } })
-    fetchMock.mockImplementation(async (url: string) => (url === '/api/produce/chat' ? Response.json({ reply: '러닝타임을 1분으로 바꿨어요.' }) : Response.json(status)))
-    await useGlobalChatStore.getState().sendMessage('러닝타임을 1분으로 줄여줘')
-    const urls = fetchMock.mock.calls.map(([url]) => String(url))
-    expect(urls).toContain('/api/produce/chat')
-    expect(urls).not.toContain('/api/writer/scene-gate')
-    const body = JSON.parse(String((fetchMock.mock.calls.find(([url]) => String(url) === '/api/produce/chat')![1] as RequestInit).body))
-    expect(body.treatmentDraft).toBe(true)
-  })
-
   it('다시 쓰기를 연 뒤 직접 적은 말은 트리트먼트 수정안으로 간다', async () => {
     fetchMock.mockImplementation(async () => Response.json({ ok: true, proposalId: 'p2' }))
     expect(useGlobalChatStore.getState().beginSceneStoryEdit('ai')).toBe(true)
     await useGlobalChatStore.getState().sendMessage('2번 씬을 더 짧게 해줘')
     const call = fetchMock.mock.calls.find(([url]) => String(url) === '/api/writer/scene-gate')!
     expect(JSON.parse(String((call[1] as RequestInit).body))).toMatchObject({ action: 'revise', feedback: '2번 씬을 더 짧게 해줘' })
-  })
-
-  it('아직 초안인 줄 모르고 확정을 누르면 Writer로 넘기기 확인 창을 연다', async () => {
-    // 왜: 프로젝트를 막 연 직후에는 화면이 초안인 줄 모를 수 있다 — 서버가 넘기기를 거치라고 답하면 오류 대신 확인 창을 연다.
-    useProjectStore.setState({ treatmentDraft: false })
-    fetchMock.mockImplementation(async (url: string) => (url === '/api/writer/scene-gate'
-      ? Response.json({ code: 'treatment_draft_handoff_required' }, { status: 409 })
-      : Response.json(status)))
-    expect(await useGlobalChatStore.getState().confirmSceneGate()).toBeNull()
-    expect(useProjectStore.getState().treatmentDraft).toBe(true)
-    expect(useGlobalChatStore.getState().handoffConfirm?.kind).toBe('producerLock')
   })
 
   it('넘긴 뒤의 확정 안내는 지금처럼 다른 안내보다 앞에 띄운다', async () => {
