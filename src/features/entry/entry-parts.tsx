@@ -117,8 +117,8 @@ export function OptionGroup({
                 o.disabled && 'cursor-not-allowed opacity-50 hover:border-border hover:bg-background',
               )}
             >
-              <span className="flex w-full items-center justify-between gap-2">
-                <span className={cn('font-medium', o.mono && 'font-mono tabular-nums')}>{o.label}</span>
+              <span className="flex w-full flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                <span className={cn('whitespace-nowrap font-medium', o.mono && 'font-mono tabular-nums')}>{o.label}</span>
                 {o.value === recommended ? <RecommendedBadge /> : null}
               </span>
               {o.sub ? <span className="text-xs text-muted-foreground">{o.sub}</span> : null}

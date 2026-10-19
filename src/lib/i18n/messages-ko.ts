@@ -2313,7 +2313,7 @@ export const KO: Record<string, string> = {
   'Length': '길이',
   'Change level': '바꿈 정도',
   'Screen ratio': '화면 비율',
-  'With "Keep as is", the length follows the original.': '"그대로"를 고르면 길이는 원작 길이를 따라요.',
+  'When the original is kept as is, the length follows the original.': '원문을 그대로 쓰면 길이는 원작 길이를 따라요.',
   'Proceed with AI': 'AI로 진행',
   'Choose all the settings first.': '설정을 모두 골라 주세요.',
   // AI 추천 이유

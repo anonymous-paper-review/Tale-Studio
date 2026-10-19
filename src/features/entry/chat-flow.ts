@@ -49,7 +49,7 @@ export type ChatItem =
   | { kind: 'agent'; id: string; text: string; action?: 'show_examples' }
   | { kind: 'user'; id: string; text: string; fileName?: string }
   | { kind: 'examples'; id: string; page: number; intro: string }
-  | { kind: 'error'; id: string; text: string }
+  | { kind: 'error'; id: string; text: string; guide?: string }
   | { kind: 'card'; id: string; question: ChatQuestionKey | 'confirm' }
 
 export const CHAT_GREETING = 'What shall we make? Upload material if you have it, or write it yourself. If you have no idea yet, I can show you examples.'
@@ -140,7 +140,7 @@ export function chatTranscript(draft: EntryDraft, ui: ChatUi, t: Translator): Ch
     }
     const problem = materialProblem(draft.idea, draft.file)
     if (ui.lengthError && problem) {
-      items.push({ kind: 'error', id: 'too-short', text: `${t(TOO_SHORT_KEY, { min: MIN_IDEA_CHARS, n: problem.length })} ${t(CHAT_GUIDE)}` })
+      items.push({ kind: 'error', id: 'too-short', text: t(TOO_SHORT_KEY, { min: MIN_IDEA_CHARS, n: problem.length }), guide: t(CHAT_GUIDE) })
     }
     return items
   }

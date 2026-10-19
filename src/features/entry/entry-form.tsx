@@ -206,7 +206,7 @@ function SettingsStep() {
             className="grid-cols-2 sm:grid-cols-4"
           />
           <WhyLine text={rec?.runtimeWhy} />
-          {picks.level === 'keep' ? <p className="text-xs text-muted-foreground">{t('With "Keep as is", the length follows the original.')}</p> : null}
+          {picks.level === 'keep' ? <p className="text-xs text-muted-foreground">{t('When the original is kept as is, the length follows the original.')}</p> : null}
         </div>
 
         <div className="flex flex-col gap-3">

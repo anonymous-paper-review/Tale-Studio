@@ -5,7 +5,7 @@
 //   파일을 올린 사람은 "어떻게 쓸까요"를, 글만 쓴 사람은 장르·분위기 → 길이 → 바꿈 정도를 묻고 마지막에 화면 비율 →
 //   정리 카드의 [Writer에게 써 달라고 하기]로 시작한다(확인 창 없이 1안과 같은 시작). 말로 답해도 된다.
 //   화면에서 고르기 탭과 같은 초안을 쓴다 — 거기서 쓴 글 · 고른 값이 여기 그대로 보인다.
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { Lightbulb, Lock, Paperclip, PenLine, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -110,7 +110,14 @@ function ChipsBar({ draft, t }: { draft: EntryDraft; t: Translator }) {
 function ChatRow({ item, draft, t }: { item: ChatItem; draft: EntryDraft; t: Translator }) {
   const showExamples = useEntryStore((s) => s.showExamples)
   if (item.kind === 'user') return <UserBubble text={item.text} fileName={item.fileName} />
-  if (item.kind === 'error') return <AgentBubble alert>{<p className="text-destructive">{item.text}</p>}</AgentBubble>
+  if (item.kind === 'error') {
+    return (
+      <AgentBubble alert>
+        <p className="text-destructive">{item.text}</p>
+        {item.guide ? <p className="text-muted-foreground">{item.guide}</p> : null}
+      </AgentBubble>
+    )
+  }
   if (item.kind === 'examples') return <ExamplesBubble page={item.page} intro={item.intro} t={t} />
   if (item.kind === 'card') return <QuestionCard question={item.question} draft={draft} t={t} />
   return (
@@ -161,7 +168,7 @@ function ExamplesBubble({ page, intro, t }: { page: number; intro: string; t: Tr
 interface CardOption {
   value: string
   label: string
-  sub?: string
+  sub?: ReactNode
   disabled?: boolean
   mono?: boolean
 }
@@ -186,7 +193,7 @@ function CardOptions({ options, current, recommended, onPick, column }: { option
             <span className={cn('font-medium', o.mono && 'font-mono tabular-nums')}>{o.label}</span>
             {o.value === recommended ? <RecommendedBadge /> : null}
           </span>
-          {o.sub ? <span className="text-xs text-muted-foreground">{o.sub}</span> : null}
+          {o.sub ? <span className="flex flex-col text-xs text-muted-foreground">{o.sub}</span> : null}
         </button>
       ))}
     </div>
@@ -281,7 +288,16 @@ function QuestionCard({ question, draft, t }: { question: ChatQuestionKey | 'con
   const levelOptions = levelOptionsOf(draft).map((l, i) => ({
     value: l.key,
     label: `${i + 1} ${t(l.label)}`,
-    sub: `${t('Keeps')} ${t(l.keeps)} · ${t('Changes')} ${t(l.changes)}`,
+    sub: (
+      <>
+        <span>
+          {t('Keeps')} {t(l.keeps)}
+        </span>
+        <span>
+          {t('Changes')} {t(l.changes)}
+        </span>
+      </>
+    ),
     disabled: l.key === 'keep' && !keepOpen,
   }))
   const ocrLine = question === 'file' && draft.file?.kind === 'image' ? (draft.file.text ?? '').split('\n').find((l) => l.trim()) : null
