@@ -9,12 +9,13 @@ import { DashboardHeader } from '@/components/dashboard/dashboard-header'
 import { Button } from '@/components/ui/button'
 import { useProjectStore } from '@/stores/project-store'
 import { useT } from '@/lib/i18n'
+import { newProjectError } from '@/lib/project/new-project-error'
 
 export default function NewProjectPage() {
   const router = useRouter()
   const t = useT()
   const createNewProject = useProjectStore((s) => s.createNewProject)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<{ message: string; showPricing: boolean } | null>(null)
   // 개발 모드의 effect 두 번 실행에도 프로젝트를 한 번만 만든다.
   const started = useRef(false)
 
@@ -24,12 +25,12 @@ export default function NewProjectPage() {
     void (async () => {
       const result = await createNewProject(undefined, { entry: true })
       if (!result.ok || !result.projectId) {
-        setError(result.error ?? t('Failed to create project'))
+        setError(newProjectError(result.error))
         return
       }
       router.replace(`/studio/start?projectId=${result.projectId}`)
     })()
-  }, [createNewProject, router, t])
+  }, [createNewProject, router])
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -38,11 +39,16 @@ export default function NewProjectPage() {
         {error ? (
           <>
             <p className="text-sm text-destructive" role="alert">
-              {error}
+              {t(error.message)}
             </p>
-            <Button variant="outline" onClick={() => router.push('/projects')}>
-              {t('Back to Projects')}
-            </Button>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Button variant="outline" onClick={() => router.push('/projects')}>
+                {t('Back to Projects')}
+              </Button>
+              {error.showPricing ? (
+                <Button onClick={() => router.push('/pricing')}>{t('See plans')}</Button>
+              ) : null}
+            </div>
           </>
         ) : (
           <p className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
