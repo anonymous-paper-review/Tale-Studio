@@ -63,7 +63,8 @@ export function BreakdownList({ onMake }: { onMake: () => void }) {
   const persons = rows.filter((row) => row.kind === 'person').length
   const places = rows.length - persons
   const shown = rows.filter((row) => filter === 'all' || row.kind === filter)
-  const tabs: Array<[Filter, string, number]> = [['all', 'All', rows.length], ['person', 'Characters', persons], ['background', 'Background', places]]
+  // 프로토타입 A1 [모두 · 인물 · 배경].
+  const tabs: Array<[Filter, string, number]> = [['all', 'All items', rows.length], ['person', 'People', persons], ['background', 'Backgrounds', places]]
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden" data-testid="artist-breakdown">

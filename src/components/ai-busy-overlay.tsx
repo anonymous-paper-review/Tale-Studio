@@ -3,7 +3,9 @@
 // AI 작업 중 전체 잠금 (리뉴얼 1차 2026-10-19, 프로토타입 원칙 "AI가 일하는 동안은 전체 잠금").
 //   AI 에이전트가 일을 시작하면 단계 화면과 채팅을 덮고 입력을 막는다 — 끝나야 고칠 수 있고, 동시 작업은 없다.
 //   왼쪽 단계 레일은 덮지 않는다(다른 단계로 나가는 것은 막지 않는다 — 작업은 서버에서 계속 돈다).
-import { useEffect } from 'react'
+//   document.body 로 띄운다 — 단계 화면 안에 그리면 뒤를 inert 로 막을 때 이 창의 버튼(다시 그리기 · 닫기)까지 막힌다.
+import { useEffect, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import { AlertCircle, Check, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SHELL_INSET, SHELL_RAIL_WIDTH } from '@/lib/constants'
@@ -31,8 +33,12 @@ interface AiBusyOverlayProps {
   busy?: boolean
 }
 
+const subscribeNothing = () => () => {}
+
 export function AiBusyOverlay({ open, title, description, steps, progress, progressLabel, footer, busy = true }: AiBusyOverlayProps) {
   const t = useT()
+  // 서버 렌더에는 body 가 없다 — 브라우저에서만 띄운다(하이드레이션이 어긋나지 않게).
+  const inBrowser = useSyncExternalStore(subscribeNothing, () => true, () => false)
 
   // 덮는 동안 단계 화면과 채팅을 inert 로 — 키보드 포커스도 뒤로 들어가지 못한다.
   useEffect(() => {
@@ -44,10 +50,10 @@ export function AiBusyOverlay({ open, title, description, steps, progress, progr
     }
   }, [open])
 
-  if (!open) return null
+  if (!open || !inBrowser) return null
   const pct = typeof progress === 'number' && Number.isFinite(progress) ? Math.max(0, Math.min(100, Math.round(progress))) : null
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-y-0 right-0 z-overlay flex items-center justify-center bg-background/85 p-6"
       style={{ left: SHELL_INSET * 2 + SHELL_RAIL_WIDTH }}
@@ -105,6 +111,7 @@ export function AiBusyOverlay({ open, title, description, steps, progress, progr
         ) : null}
         {footer ? <div className="flex flex-wrap justify-end gap-2">{footer}</div> : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
