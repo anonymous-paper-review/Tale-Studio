@@ -1479,27 +1479,13 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       return
     }
     // 리뉴얼 1차 Writer — 다음 단계는 산문 확정(브레이크다운)이다. 확정 창을 연다(확정하면 산문이 잠긴다).
-    if (action.from === 'producer' && writerProseLive()) {
+    //   산문이 아직 없는 예전 프로젝트도 예전 Producer 확정 창으로 가지 않는다 — 확정 창이 산문이 없다고 알린다.
+    if (action.from === 'producer') {
       useWriterRoomStore.getState().openConfirm()
       return
     }
     // 버튼 = 그 문장을 타이핑한 것(#handoff-to-chat). 버튼의 언어는 화면(UI) 언어다 — 예전 채팅 위 칩과 같다.
     const utterance = translate(useLocaleStore.getState().locale, action.utterance)
-    if (action.from === 'producer') {
-      // 그림 쓰임새 질문이 남아 있으면 확정 창을 열지 않는다 — 채팅이 먼저 고르라고 답한다(확정 뒤 넘김이 삼켜지지 않게).
-      if (get().imageRoleGate || get().imageBatchGate || get().comicStyleGate) {
-        await get().sendMessage(utterance, undefined, { consentedHandoff: true })
-        return
-      }
-      // 필수 칸이 비었으면 확정할 것이 없다 — 창 대신 채팅이 빈 곳을 알려 준다(타이핑했을 때와 같은 답).
-      if (handoffBlockers(action).hard.length > 0) {
-        await get().sendMessage(utterance, undefined, { consentedHandoff: true })
-        return
-      }
-      // Writer 로 넘기면 Producer 가 잠긴다 — 확정 창을 먼저 연다(2026-10-01 오너 "writer로 넘어갈 때 경고 팝업").
-      set({ handoffConfirm: { kind: 'producerLock', projectId } })
-      return
-    }
     if (action.from === 'artist' && writerSideBlockers().length === 0) {
       // 준비가 덜 된 샷이 있으면 넘기지 않고 목록 창을 연다(2026-10-01 오너 "director 넘어갈 때 미완성 팝업").
       const readiness = await directorReadinessOf(projectId)
@@ -1859,10 +1845,12 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     // 넘기기 전 트리트먼트 초안(2026-10-02 시안 v04)은 Producer 채팅이 살아 있다 — 다시 쓰기를 연 때(선택지)만 트리트먼트로 보낸다.
     const draftLive = !useProjectStore.getState().producerLocked && useProjectStore.getState().treatmentDraft
     // 리뉴얼 1차 Writer(id producer)는 산문만 다룬다 — 말은 산문 수정 요청이고, "다시 써줘"는 조건을, 넘김 말은 확정 창을 연다.
+    //   넘김 말은 확정 전이면 늘 확정 창으로 간다(산문 초안이 아직 없는 예전 프로젝트도 예전 Producer 넘김으로 가지 않는다).
+    //   초안이 없는 예전 프로젝트의 나머지 말은 예전 Producer 채팅 그대로다(이야기 · 설정 채우기).
     const writerProse = stage === 'producer' && draftLive
-    if (writerProse) {
+    if (stage === 'producer' && !useProjectStore.getState().producerLocked) {
       const intent = writerChatIntent(trimmed)
-      if (intent === 'rewrite' || intent === 'breakdown') {
+      if (intent === 'breakdown' || (intent === 'rewrite' && writerProse)) {
         if (sceneSuggestion?.stage === 'producer') get().dismissSuggestion({ implicit: true })
         if (intent === 'rewrite') useWriterRoomStore.getState().openRewrite()
         else useWriterRoomStore.getState().openConfirm()

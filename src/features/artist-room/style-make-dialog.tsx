@@ -126,7 +126,13 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
                 </span>
                 <span className="px-2 py-1.5 text-xs">
                   <span className="line-clamp-1 font-medium">{custom ? custom.label : t('Upload my art style')}</span>
-                  {upload?.error ? <span className="line-clamp-2 text-destructive">{upload.error}</span> : styleSetting ? <span className="text-muted-foreground">{t('Reading the art style…')}</span> : null}
+                  {upload?.error
+                    ? <span className="line-clamp-2 text-destructive">{upload.error}</span>
+                    : styleSetting
+                      ? <span className="text-muted-foreground">{t('Reading the art style…')}</span>
+                      : !custom
+                        ? <span className="line-clamp-3 text-muted-foreground">{t('The picture goes to an analysis model to describe its art style, and the style is then fixed.')}</span>
+                        : null}
                 </span>
               </button>
               {anchors.map((anchor) => {

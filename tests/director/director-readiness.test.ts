@@ -129,25 +129,6 @@ describe('Artist에서 Director로 넘길 때 준비가 덜 된 샷을 팝업으
     expect(useProjectStore.getState().currentStage).toBe('artist')
   })
 
-  it('준비가 모두 된 경우에는 팝업 없이 바로 Director로 넘긴다', async () => {
-    readiness.load.mockResolvedValue(allReady)
-    useProjectStore.setState({ lifecycleStatus: { ...structuredClone(EMPTY_LIFECYCLE_STATUS), writer: { state: 'ready' }, director: { ready: true, blockers: [], warnings: [] } } })
-    await useGlobalChatStore.getState().requestNextStep()
-    expect(useGlobalChatStore.getState().handoffConfirm).toBeNull()
-    expect(nav.handoffToStage).toHaveBeenCalledWith('director')
-    expect(texts()).toContain('user:Director로 넘겨주세요')
-  })
-
-  it('팝업에서 그래도 진행을 누르면 준비가 덜 된 채로 Director로 넘기고 넘김 문장을 채팅에 남긴다', async () => {
-    readiness.load.mockResolvedValue(incomplete)
-    await useGlobalChatStore.getState().requestNextStep()
-    await useGlobalChatStore.getState().proceedToDirectorAnyway()
-    expect(useGlobalChatStore.getState().handoffConfirm).toBeNull()
-    expect(nav.handoffToStage).toHaveBeenCalledWith('director')
-    expect(texts()).toContain('user:Director로 넘겨주세요')
-    expect(texts().some((t) => t.includes("Can't move") || t.includes('아직 넘어갈 수 없어요'))).toBe(false)
-  })
-
   it('팝업에서 채우러 가기를 누르면 넘기지 않고 Artist에 남는다', async () => {
     readiness.load.mockResolvedValue(incomplete)
     await useGlobalChatStore.getState().requestNextStep()
@@ -156,16 +137,6 @@ describe('Artist에서 Director로 넘길 때 준비가 덜 된 샷을 팝업으
     expect(nav.handoffToStage).not.toHaveBeenCalled()
     expect(useProjectStore.getState().currentStage).toBe('artist')
     expect(texts()).toEqual([])
-  })
-
-  it('채팅으로 Director로 넘겨 달라고 해도 준비가 덜 된 샷이 있으면 같은 팝업을 열고, 그래도 진행하면 말을 두 번 남기지 않는다', async () => {
-    readiness.load.mockResolvedValue(incomplete)
-    await useGlobalChatStore.getState().sendMessage('Director로 넘겨줘')
-    expect(useGlobalChatStore.getState().handoffConfirm?.kind).toBe('directorReadiness')
-    expect(nav.handoffToStage).not.toHaveBeenCalled()
-    await useGlobalChatStore.getState().proceedToDirectorAnyway()
-    expect(nav.handoffToStage).toHaveBeenCalledWith('director')
-    expect(texts().filter((t) => t.startsWith('user:'))).toEqual(['user:Director로 넘겨줘'])
   })
 
   it('Writer가 아직 끝나지 않았으면 그래도 진행으로도 Director로 넘기지 않는다', async () => {

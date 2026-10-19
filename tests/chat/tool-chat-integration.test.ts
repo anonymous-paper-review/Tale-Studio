@@ -459,17 +459,6 @@ it('승인과 함께 복원된 옛 선택지는 취소 후 새로고침해도 �
   expect(chat.getState().suggestion).toBeNull()
 })
 
-it('스타일 없이 Writer 이동을 요청하면 생성하지 않고 스타일 선택창에 요청을 전달한다', async () => {
-  const handoff = vi.spyOn(producer.getState(), 'saveAndHandoff')
-  useChatUiStore.setState({ stylePickerRequest: null })
-  const requests = responses([])
-  await chat.getState().sendMessage('Writer로 넘겨줘')
-  expect(requests).toEqual([])
-  expect(handoff).not.toHaveBeenCalled()
-  expect(useChatUiStore.getState().stylePickerRequest?.projectId).toBe(projectId)
-  handoff.mockRestore()
-})
-
 // 왜: 늦게 온 DB 선택지 이력이 이미 취소한 승인의 질문을 다시 꺼내면 안 된다.
 it('승인 복원 중 취소해도 뒤늦게 도착한 옛 선택지를 다시 표시하지 않는다', async () => {
   const pendingProposal = createPendingProposal({ id: 'slow-approval', projectId, stage: 'producer', kind: 'producerSourcePatch', target: 'Settings', action: '언어 변경', impact: [], payload: { patch: { dialogueLanguage: 'ko' } } })

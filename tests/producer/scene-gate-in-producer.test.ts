@@ -53,25 +53,6 @@ afterEach(() => {
   useLocaleStore.setState({ locale: 'en' })
 })
 
-describe('넘긴 뒤 씬 스토리 확정까지는 Producer 화면에 머문다', () => {
-  it('Writer가 씬 스토리 확정 단계로 시작하면 Writer 화면으로 넘어가지 않고 Producer 화면에 머문다', async () => {
-    await useGlobalChatStore.getState().sendMessage('Writer로 넘겨주세요', undefined, { consentedHandoff: true })
-    expect(calls('/api/writer/start')).toHaveLength(1)
-    expect(useProjectStore.getState().currentStage).toBe('producer')
-    expect(useProjectStore.getState().producerLocked).toBe(true)
-    await new Promise((r) => setTimeout(r, 1200))
-    expect(useGlobalChatStore.getState().pendingNavigatePath).toBeNull()
-    expect(useGlobalChatStore.getState().messages.at(-1)?.content).toContain('씬 스토리')
-  })
-
-  it('확정 단계가 없는 Writer 시작은 종전처럼 Writer 화면으로 넘어간다', async () => {
-    fetchMock.mockImplementation(async (url: string) => (url === '/api/writer/start' ? Response.json({ projectId: 'proj-1', runId: 'run-1', status: 'started' }) : url.startsWith('/api/writer/status/') ? Response.json({ started: false }) : Response.json({})))
-    await useGlobalChatStore.getState().sendMessage('Writer로 넘겨주세요', undefined, { consentedHandoff: true })
-    expect(useProjectStore.getState().currentStage).toBe('writer')
-    await vi.waitFor(() => expect(useGlobalChatStore.getState().pendingNavigatePath).toBe('/studio/writer'), { timeout: 2500 })
-  })
-})
-
 describe('씬 스토리 확정', () => {
   it('씬 스토리를 확정하면 나머지 생성을 이어 가고 Writer 화면으로 넘어간다', async () => {
     useProjectStore.setState({ producerLocked: true, reachedStage: 'artist' })

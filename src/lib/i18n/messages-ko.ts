@@ -2308,7 +2308,7 @@ export const KO: Record<string, string> = {
   'Pick a style': '스타일을 골라 주세요',
   'Reading the art style…': '그림체를 읽는 중…',
   'Starting to draw': '그림 그리기 시작',
-  'The art style is fixed to the picture you uploaded.': '올린 그림의 그림체로 고정돼 있어요.',
+  'The art style is fixed to the picture you uploaded.': '올린 그림의 그림체로 고정돼 있어서 바꿀 수 없어요.',
   'The list is right · make the images': '목록이 맞아요 · 그림 만들기',
   'This work has one style. Every character and background image is made in the style you pick.': '이 작품의 스타일은 하나예요. 고른 스타일로 인물 · 배경 그림을 모두 만들어요.',
   'Unnamed': '이름 없음',

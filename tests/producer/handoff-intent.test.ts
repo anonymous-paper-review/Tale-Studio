@@ -10,11 +10,12 @@ describe('matchHandoffIntent', () => {
   })
 
   it('사용자가 자기 말로 부탁해도 알맞은 다음 단계로 넘긴다', () => {
-    expect(matchHandoffIntent('이제 writer로 넘겨줘', 'producer')?.to).toBe('writer')
-    expect(matchHandoffIntent('감독한테 넘기자', 'artist')?.to).toBe('director')
+    // 리뉴얼 1차 단계 이름표(2026-10-19): Writer = id producer → Artist → Storyboard = id writer → Director → Editor.
+    expect(matchHandoffIntent('이제 artist로 넘겨줘', 'producer')?.to).toBe('artist')
+    expect(matchHandoffIntent('스토리보드로 넘기자', 'artist')?.to).toBe('writer')
     expect(matchHandoffIntent('editor로 보내줘', 'director')?.to).toBe('editor')
-    expect(matchHandoffIntent('다음 단계로 넘어가자', 'producer')?.to).toBe('writer')
-    expect(matchHandoffIntent('Hand over to Director', 'artist')?.to).toBe('director')
+    expect(matchHandoffIntent('다음 단계로 넘어가자', 'producer')?.to).toBe('artist')
+    expect(matchHandoffIntent('Hand over to Storyboard', 'artist')?.to).toBe('writer')
   })
 
   it('넘겨 달라는 말이 없으면 일반적인 부탁으로 남긴다', () => {
@@ -46,11 +47,11 @@ describe('matchHandoffIntent', () => {
   })
 
   it('Writer에서 Artist로도 넘겨 달라는 말을 알아듣는다', () => {
-    expect(matchHandoffIntent('artist로 넘겨줘', 'writer')?.to).toBe('artist')
+    expect(matchHandoffIntent('artist로 넘겨줘', 'producer')?.to).toBe('artist')
   })
 
   it('대소문자와 불필요한 공백이 달라도 같은 뜻으로 알아듣는다', () => {
-    expect(matchHandoffIntent('  WRITER 로   넘겨 주세요 ', 'producer')?.to).toBe('writer')
+    expect(matchHandoffIntent('  ARTIST 로   넘겨 주세요 ', 'producer')?.to).toBe('artist')
   })
 
   it('다음 단계로 이동하지 말라고 하면 이동 요청으로 처리하지 않는다', () => {
@@ -97,9 +98,9 @@ describe('matchHandoffIntent', () => {
   })
 
   it('다른 말을 함께 적어도 분명한 긍정 이동 요청은 유지한다', () => {
-    expect(matchHandoffIntent('안녕하세요. 이제 Writer로 넘겨줘', 'producer')?.to).toBe('writer')
-    expect(matchHandoffIntent('Artist로 이동해줘!', 'writer')?.to).toBe('artist')
-    expect(matchHandoffIntent('이제 "Director"로 넘겨줘', 'artist')?.to).toBe('director')
+    expect(matchHandoffIntent('안녕하세요. 이제 Artist로 넘겨줘', 'producer')?.to).toBe('artist')
+    expect(matchHandoffIntent('Storyboard로 이동해줘!', 'artist')?.to).toBe('writer')
+    expect(matchHandoffIntent('이제 "Editor"로 넘겨줘', 'director')?.to).toBe('editor')
     expect(matchHandoffIntent("Let's proceed to the next stage", 'director')?.to).toBe('editor')
   })
 })
