@@ -2163,4 +2163,19 @@ export const KO: Record<string, string> = {
   "Keep as reference": "참고 자료로 두기",
   "Kept it as reference only.": "참고 자료로 둘게요.",
   "this picture": "이 그림", // copy-ok: fragment
+
+  // ── 리뉴얼 1차 (2026-10-19, 프로토타입 20261013): Producer → Writer → Artist → Storyboard ──
+  'The Storyboard Room': 'Storyboard',
+  'Start writing': '산문 쓰기 시작',
+  'Breakdown': '브레이크다운',
+  'Complete': '완료하기',
+  'Next: Director': '다음: Director로',
+  'Hand over to Storyboard': 'Storyboard로 넘기기',
+  'Please hand over to Storyboard': 'Storyboard로 넘겨주세요',
+  'E.g. rewrite it, or make the ending funnier': '예: 다시 써줘 / 결말을 더 웃기게',
+  'Rewrite it': '다시 써줘',
+  'Make it shorter': '더 짧게',
+  'Make the dialogue funnier': '대사를 더 웃기게',
+  'Go to Artist': 'Artist로 가기',
+  'Creating a new project…': '새 프로젝트를 만드는 중…',
 }

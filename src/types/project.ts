@@ -1,4 +1,11 @@
-export type StageId = 'producer' | 'writer' | 'artist' | 'director' | 'editor'
+// 리뉴얼 1차(2026-10-19, 프로토타입 20261013): 화면 이름과 순서 = Producer → Writer → Artist → Storyboard → Director → Editor.
+//   id 는 저장값(messages.stage · projects.current_stage · llm_calls.stage …)과 기존 동작을 지키려고 옛 이름 그대로다:
+//     entry    = Producer   (새로 생긴 시작 단계: 아이디어 · 산문 조건 · 화면 비율)
+//     producer = Writer     (예전 Producer 의 산문 · 씬 스토리 작업공간)
+//     artist   = Artist
+//     writer   = Storyboard (예전 Writer 의 씬 · 샷 · 러프 스토리보드)
+//   화면에 보이는 이름은 STAGE_LABEL(constants.ts) 한 곳에서만 정한다.
+export type StageId = 'entry' | 'producer' | 'writer' | 'artist' | 'director' | 'editor'
 
 export interface StageConfig {
   id: StageId

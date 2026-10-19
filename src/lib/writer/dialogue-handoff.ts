@@ -1,5 +1,5 @@
 import type { DialogueLine, Shot, StageId } from '@/types'
-import { matchHandoffIntent, resolveDirectorHandoffIntent } from '@/lib/handoff-intent'
+import { matchStoryboardToDirector, resolveDirectorHandoffIntent } from '@/lib/handoff-intent'
 import type { WriterChatUpdate } from '@/stores/writer-store'
 
 /** 대화에 명시된 목적지를 보존한다. 모델이 제안한 목적지는 사용자의 이동 지시가 아니다. */
@@ -9,15 +9,16 @@ export function dialogueHandoffTarget(
 ): Extract<StageId, 'artist' | 'director'> | null {
   if (!/(?:전체|모두|모든|all|every)/i.test(text) || !/(?:한국어|korean)/i.test(text)) return null // i18n-ok: 사용자 요청의 전체 범위와 언어를 인식한다.
   if (!/(?:맞추|통일|바꾸|번역|translate|convert|make)/i.test(text)) return null // i18n-ok: 사용자 수정 의도를 인식한다.
+  // 리뉴얼 1차(2026-10-19): Storyboard(id writer) 다음은 Director 다 — 예전 순서(Writer → Artist)의 Artist 목적지는 없다.
+  //   Director 요청 판정은 Storyboard 의 전용 길(resolveDirectorHandoffIntent)과 같은 규칙을 쓴다.
   const explicitTarget = (value: string) => {
-    if (/(?:director|디렉터|디렉타|감독)/i.test(value) && (matchHandoffIntent(value, 'artist') || resolveDirectorHandoffIntent(value, 'writer', []))) return 'director' as const // i18n-ok: 사용자 목적 단계 이름을 인식한다.
-    if (matchHandoffIntent(value, 'writer')) return 'artist' as const
+    if (/(?:director|디렉터|디렉타|감독)/i.test(value) && (matchStoryboardToDirector(value) || resolveDirectorHandoffIntent(value, 'writer', []))) return 'director' as const // i18n-ok: 사용자 목적 단계 이름을 인식한다.
     return null
   }
-  const target = explicitTarget(text) ?? [...history].reverse().filter(message => message.role === 'user').map(message => explicitTarget(message.content)).find(Boolean) ?? 'artist'
+  const target = explicitTarget(text) ?? [...history].reverse().filter(message => message.role === 'user').map(message => explicitTarget(message.content)).find(Boolean) ?? 'director'
   // 같은 부정·질문·인용 제외 규칙을 재사용한다. 목적지 생략만 앞선 요청에서 채운다.
   const request = `${text} ${target}`
-  return matchHandoffIntent(request, target === 'director' ? 'artist' : 'writer') ? target : null
+  return matchStoryboardToDirector(request) ? target : null
 }
 
 /** 문자 수준의 언어 혼재 검출이다. 번역 의미·문장 품질 판정은 아니다. */

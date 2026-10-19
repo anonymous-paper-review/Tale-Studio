@@ -293,12 +293,10 @@ export default function HomePage() {
     const name = nameValue.trim()
     if (!name || creating) return
     setCreating(true)
-    const result = await createNewProject(
-      name,
-      referenceProjectId
-        ? { referenceProjectId, includeLastShotFrame }
-        : undefined,
-    )
+    const result = await createNewProject(name, {
+      ...(referenceProjectId ? { referenceProjectId, includeLastShotFrame } : {}),
+      entry: true,
+    })
     if (!result.ok) {
       toast.error(result.error ?? 'Failed to create project')
       setCreating(false)
@@ -312,9 +310,8 @@ export default function HomePage() {
       )
     }
     const newId = result.projectId ?? useProjectStore.getState().projectId
-    router.push(
-      newId ? `/studio/producer?projectId=${newId}` : '/studio/producer',
-    )
+    // 새 프로젝트는 Producer 시작 화면(아이디어 · 조건)에서 시작한다(리뉴얼 1차).
+    router.push(newId ? `/studio/start?projectId=${newId}` : '/studio/start')
   }
 
   const handleDelete = async () => {

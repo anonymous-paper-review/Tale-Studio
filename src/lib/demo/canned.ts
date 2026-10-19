@@ -4,6 +4,7 @@
 import type { StageId } from '@/types'
 
 export const CANNED_CHAT: Record<StageId, string> = {
+  entry: '',
   producer:
     '지금은 공유 미리보기라 실제 대화는 비활성이에요. 실제 프로듀서 단계에선 여기서 스토리·캐릭터·톤을 함께 정리해요.',
   writer:
@@ -15,6 +16,9 @@ export const CANNED_CHAT: Record<StageId, string> = {
   editor:
     '공유 미리보기 모드예요. 실제로는 타임라인에서 컷 편집을 해요.',
 }
+
+// Producer 시작 화면(entry)은 채팅이 없어 공유 미리보기에서도 Producer 문구를 함께 쓴다.
+CANNED_CHAT.entry = CANNED_CHAT.producer
 
 export function cannedFor(stage: StageId): string {
   return CANNED_CHAT[stage] ?? CANNED_CHAT.producer

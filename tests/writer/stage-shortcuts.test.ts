@@ -21,7 +21,7 @@ const ev = (code: string, mods: Partial<Record<'altKey' | 'ctrlKey' | 'metaKey' 
 })
 
 describe('stageForShortcut', () => {
-  it('Alt 숫자 1~5를 누르면 해당 단계로 이동하고 숫자 키패드도 똑같이 동작한다', () => {
+  it('Alt 숫자 1~6을 누르면 해당 단계로 이동하고 숫자 키패드도 똑같이 동작한다', () => {
     const got = STAGES.map((s) => stageForShortcut(ev(`Digit${STAGE_ACCESS_KEY[s.id]}`, { altKey: true })))
     expect(got).toEqual(STAGES.map((s) => s.id))
     const numpad = STAGES.map((s) => stageForShortcut(ev(`Numpad${STAGE_ACCESS_KEY[s.id]}`, { altKey: true })))
@@ -42,12 +42,13 @@ describe('stageForShortcut', () => {
   it('지정하지 않은 키를 누르면 아무 단계도 열지 않는다', () => {
     expect(stageForShortcut(ev('KeyA', { altKey: true }))).toBeNull()
     expect(stageForShortcut(ev('KeyQ', { altKey: true }))).toBeNull() // 구 배열 폐기 확인
-    expect(stageForShortcut(ev('Digit6', { altKey: true }))).toBeNull()
+    expect(stageForShortcut(ev('Digit7', { altKey: true }))).toBeNull()
   })
 
   it('Mac에서 Option과 숫자를 눌러도 해당 단계로 이동한다', () => {
     // 실제 이벤트에서 key 는 '¡' 등으로 오지만 code 는 물리 위치라 변하지 않는다.
-    expect(stageForShortcut(ev('Digit1', { altKey: true }))).toBe('producer')
+    // 리뉴얼 1차: 1 = Producer(id entry), 3 = Artist
+    expect(stageForShortcut(ev('Digit1', { altKey: true }))).toBe('entry')
     expect(stageForShortcut(ev('Digit3', { altKey: true }))).toBe('artist')
   })
 })

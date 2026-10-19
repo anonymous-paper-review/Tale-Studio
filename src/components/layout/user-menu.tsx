@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { clearLastProjectId } from '@/lib/session-restore'
 import { useProjectStore } from '@/stores/project-store'
+import { STAGES } from '@/lib/constants'
 import { useT } from '@/lib/i18n'
 import { toast } from 'sonner'
 
@@ -120,14 +121,17 @@ export function UserMenu() {
       if (remaining.length > 0) {
         switchProject(remaining[0].id, remaining[0].title)
       } else {
-        const result = await createNewProject()
+        const result = await createNewProject(undefined, { entry: true })
         if (!result.ok) {
           toast.error(result.error ?? t('Failed to create project'))
           return
         }
       }
       const nextId = useProjectStore.getState().projectId
-      router.push(nextId ? `/studio/producer?projectId=${nextId}` : '/studio/producer')
+      // 남은 프로젝트로 옮기면 그 단계로, 새로 만들었으면 Producer 시작 화면으로(리뉴얼 1차).
+      const nextStage = useProjectStore.getState().currentStage
+      const nextPath = STAGES.find((s) => s.id === nextStage)?.path ?? '/studio/start'
+      router.push(nextId ? `${nextPath}?projectId=${nextId}` : nextPath)
     }
   }
 

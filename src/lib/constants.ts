@@ -1,22 +1,24 @@
 import type { StageConfig, StageId } from '@/types'
 
 export const STAGES = [
+  // 리뉴얼 1차(2026-10-19): 화면 이름 Producer → Writer → Artist → Storyboard → Director → Editor.
+  //   id 는 옛 이름 그대로다(types/project.ts StageId 주석): entry=Producer, producer=Writer, writer=Storyboard.
+  //   넘어간 Producer · Writer 는 잠금이 아니라 "완료" — 뒤 단계의 변화를 앞으로 다시 맞추지 않는다.
   {
-    id: 'producer',
+    id: 'entry',
     name: 'The Meeting Room',
     agent: 'Producer',
-    path: '/studio/producer',
-    handoffLabel: 'Hand over to Writer',
-    nextStage: 'writer',
+    path: '/studio/start',
+    handoffLabel: 'Start writing',
+    nextStage: 'producer',
   },
   {
-    // writer 탭 부활 (2026-06-12): 파이프라인 실행은 여전히 백엔드(producer 핸드오프가 발사).
-    // 이 탭은 파이프라인 완료 후 러프 스토리보드(목각 인형 previz + 스토리 텍스트) 검토 단계.
-    id: 'writer',
+    // 화면 이름 Writer — 산문(씬 스토리) 작업공간. 파이프라인 01~04 결과를 다룬다.
+    id: 'producer',
     name: "The Writers' Room",
     agent: 'Writer',
-    path: '/studio/writer',
-    handoffLabel: 'Hand over to Concept Artist',
+    path: '/studio/producer',
+    handoffLabel: 'Breakdown',
     nextStage: 'artist',
   },
   {
@@ -24,7 +26,16 @@ export const STAGES = [
     name: 'The Visual Studio',
     agent: 'Concept Artist',
     path: '/studio/artist',
-    handoffLabel: 'Approve & Direct',
+    handoffLabel: 'Complete',
+    nextStage: 'writer',
+  },
+  {
+    // 화면 이름 Storyboard(가칭) — 씬 · 샷 · 러프 스토리보드. 예전 Writer 화면 그대로 Artist 뒤로 옮겼다.
+    id: 'writer',
+    name: 'The Storyboard Room',
+    agent: 'Storyboard',
+    path: '/studio/writer',
+    handoffLabel: 'Next: Director',
     nextStage: 'director',
   },
   {
@@ -53,9 +64,11 @@ export const DEFAULT_SHOT_DURATION = 8
 
 // ── GlobalChat: stage 이름 + 색 (design.md §2.9). 단일 source — 컴포넌트는 import만 ──
 
+// 화면에 보이는 단계 이름 — id 와 다르다(리뉴얼 1차): producer 는 Writer, writer 는 Storyboard 로 보인다.
 export const STAGE_LABEL: Record<StageId, string> = {
-  producer: 'Producer',
-  writer: 'Writer',
+  entry: 'Producer',
+  producer: 'Writer',
+  writer: 'Storyboard',
   artist: 'Artist',
   director: 'Director',
   editor: 'Editor',
@@ -67,17 +80,20 @@ export const STAGE_LABEL: Record<StageId, string> = {
  * (진행 알림바: "Concept Artist가 캐릭터 이미지를 생성하고 있습니다").
  */
 export const STAGE_AGENT_NAME: Record<StageId, string> = {
-  producer: 'Producer',
-  writer: 'Writer',
+  entry: 'Producer',
+  producer: 'Writer',
+  writer: 'Storyboard',
   artist: 'Concept Artist',
   director: 'Director',
   editor: 'Editor',
 }
 
 /** stage 색 badge 클래스 — design.md §2.9 토큰. JIT-safe literal (face와 동일 색). */
+//   색은 화면 이름을 따른다: Producer(entry)=보라, Writer(producer)=파랑, Storyboard(writer)=청록.
 export const STAGE_BADGE_CLASS: Record<StageId, string> = {
-  producer: 'bg-stage-producer/15 text-stage-producer border-stage-producer/30',
-  writer: 'bg-stage-writer/15 text-stage-writer border-stage-writer/30',
+  entry: 'bg-stage-producer/15 text-stage-producer border-stage-producer/30',
+  producer: 'bg-stage-writer/15 text-stage-writer border-stage-writer/30',
+  writer: 'bg-stage-storyboard/15 text-stage-storyboard border-stage-storyboard/30',
   artist: 'bg-stage-artist/15 text-stage-artist border-stage-artist/30',
   director: 'bg-stage-director/15 text-stage-director border-stage-director/30',
   editor: 'bg-stage-editor/15 text-stage-editor border-stage-editor/30',
@@ -85,8 +101,9 @@ export const STAGE_BADGE_CLASS: Record<StageId, string> = {
 
 /** 스테이지 색 CSS var (badge와 동일) — 플레이트 그라데이션·강조 텍스트용. */
 export const STAGE_FACE_COLOR: Record<StageId, string> = {
-  producer: 'var(--stage-producer)',
-  writer: 'var(--stage-writer)',
+  entry: 'var(--stage-producer)',
+  producer: 'var(--stage-writer)',
+  writer: 'var(--stage-storyboard)',
   artist: 'var(--stage-artist)',
   director: 'var(--stage-director)',
   editor: 'var(--stage-editor)',
@@ -94,7 +111,8 @@ export const STAGE_FACE_COLOR: Record<StageId, string> = {
 
 // 값은 영어 원문 = i18n 키(#i18n-s5-batch4). 렌더 지점(global-chat.tsx)이 t() 로 번역한다.
 export const STAGE_PLACEHOLDER: Record<StageId, string> = {
-  producer: 'Tell us about your story…',
+  entry: 'Tell us about your story…',
+  producer: 'E.g. rewrite it, or make the ending funnier',
   writer: 'E.g. make scene 2 shot 3 darker',
   artist: 'E.g. create a character named Kai with brown hair',
   director: 'Try generating the rough storyboard into shooting-ready images.',
@@ -107,6 +125,7 @@ export const STAGE_PLACEHOLDER: Record<StageId, string> = {
 //   따온 표현만 — 존재하지 않는 작업명(가짜 툴콜)은 넣지 않는다.
 // 값은 영어 원문 = i18n 키(#i18n-s5-batch4). 렌더 지점(global-chat.tsx ThinkingIndicator)이 t() 로 번역한다.
 export const STAGE_THINKING_PHRASES: Record<StageId, readonly string[]> = {
+  entry: ['Pinpointing the heart of the story', 'Weighing genre and tone', 'Choosing the next question'],
   producer: [
     'Pinpointing the heart of the story',
     'Finding gaps in the settings',
@@ -146,11 +165,9 @@ export const HANDOFF_INVITE_NAVIGATE_MS = 1600
 //   시키는 프리셋은 실망 버튼이다). 핸드오프 문구는 handoff-intent.ts HANDOFFS 가 단일 source.
 // 값은 영어 원문 = i18n 키(#i18n-s5-batch4). 렌더 지점(global-chat.tsx 프리셋 popover)이 t() 로 번역한다.
 export const STAGE_PROMPT_PRESETS: Record<StageId, readonly string[]> = {
-  producer: [
-    'Sort out the genre and tone first',
-    'Add a protagonist character',
-    'Add a background location',
-  ],
+  // Producer(entry)는 시작 화면이라 빠른 요청이 없다. Writer(producer) 는 산문 고치기 요청.
+  entry: [],
+  producer: ['Rewrite it', 'Make it shorter', 'Make the dialogue funnier'],
   writer: [
     'Add a close-up shot to the last scene',
     'Make the dialogue more concise',

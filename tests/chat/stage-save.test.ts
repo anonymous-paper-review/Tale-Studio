@@ -4,16 +4,17 @@ const db = vi.hoisted(() => ({ error: null as unknown, saved: 'artist', onWrite:
 vi.mock('@/lib/supabase/client', () => ({ createClient: () => ({ from: () => ({ update: () => ({ eq: async () => { db.onWrite();return { error: db.error } } }), select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { current_stage: db.saved }, error: db.error }) }) }) }) }) }))
 import { handoffToStage } from '@/lib/stage-nav'
 import { useProjectStore as project } from '@/stores/project-store'
-beforeEach(() => { project.getState().resetProject();project.setState({ projectId: 'p', currentStage: 'writer', reachedStage: 'writer' });db.error = null;db.saved = 'artist';db.onWrite = () => {} })
+// 리뉴얼 1차 순서(Artist → Storyboard(id writer))로 예시 단계를 맞췄다.
+beforeEach(() => { project.getState().resetProject();project.setState({ projectId: 'p', currentStage: 'artist', reachedStage: 'artist' });db.error = null;db.saved = 'writer';db.onWrite = () => {} })
 it('단계 DB 저장 실패면 화면이 열렸다고 처리하지 않는다', async () => {
   // 왜: 서버가 거절한 단계 변경을 로컬 화면만 성공시킬 수 없다.
   db.error = { message: 'save failed' }
-  expect(await handoffToStage('artist', { verify: true })).toBeNull()
-  expect(project.getState().currentStage).toBe('writer')
+  expect(await handoffToStage('writer', { verify: true })).toBeNull()
+  expect(project.getState().currentStage).toBe('artist')
 })
 it('단계 저장 중 프로젝트가 바뀌면 새 프로젝트를 이동하지 않는다', async () => {
   // 왜: 늦게 도착한 이동 응답이 현재 프로젝트를 바꾸면 안 된다.
   db.onWrite = () => project.setState({ projectId: 'other', currentStage: 'producer' })
-  expect(await handoffToStage('artist', { verify: true })).toBeNull()
+  expect(await handoffToStage('writer', { verify: true })).toBeNull()
   expect(project.getState().currentStage).toBe('producer')
 })

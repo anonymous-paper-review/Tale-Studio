@@ -14,10 +14,11 @@ describe('shouldOfferHandoffNudge', () => {
   })
 
   it('다음 스테이지에 이미 도달했으면(수락됨) 다시 띄우지 않는다', () => {
-    expect(shouldOfferHandoffNudge('producer', 'writer')).toBe(false)
+    // 리뉴얼 1차 순서(2026-10-19): Producer(entry) → Writer(producer) → Artist → Storyboard(writer) → Director → Editor
+    expect(shouldOfferHandoffNudge('producer', 'artist')).toBe(false)
     expect(shouldOfferHandoffNudge('producer', 'editor')).toBe(false)
-    expect(shouldOfferHandoffNudge('writer', 'artist')).toBe(false)
-    expect(shouldOfferHandoffNudge('artist', 'director')).toBe(false)
+    expect(shouldOfferHandoffNudge('artist', 'writer')).toBe(false)
+    expect(shouldOfferHandoffNudge('writer', 'director')).toBe(false)
     expect(shouldOfferHandoffNudge('director', 'editor')).toBe(false)
   })
 

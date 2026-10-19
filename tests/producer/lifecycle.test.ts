@@ -155,13 +155,14 @@ describe('evaluateDirectorGate', () => {
 
 describe('프로젝트 단계 진행 규칙', () => {
   it('현재 단계는 유지하면서 완료한 단계까지만 다음 단계 접근을 연다', () => {
-    useProjectStore.setState({ currentStage: 'writer', reachedStage: 'writer' })
+    // 리뉴얼 1차 순서: Artist 다음이 Storyboard(id writer)
+    useProjectStore.setState({ currentStage: 'artist', reachedStage: 'artist' })
 
-    useProjectStore.getState().unlockThrough('artist')
+    useProjectStore.getState().unlockThrough('writer')
 
-    expect(useProjectStore.getState().currentStage).toBe('writer')
-    expect(useProjectStore.getState().reachedStage).toBe('artist')
-    expect(useProjectStore.getState().canNavigateTo('artist')).toBe(true)
+    expect(useProjectStore.getState().currentStage).toBe('artist')
+    expect(useProjectStore.getState().reachedStage).toBe('writer')
+    expect(useProjectStore.getState().canNavigateTo('writer')).toBe(true)
     expect(useProjectStore.getState().canNavigateTo('director')).toBe(false)
   })
 })

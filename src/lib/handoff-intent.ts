@@ -23,25 +23,24 @@ export interface HandoffSpec {
 //   stage page 의 handoff 넛지)이 t()/translate() 로 번역한다. utterance 는 번역된 문장 그대로
 //   채팅에 전송되므로, 번역 후에도 MOVE_WORDS(예: 'handover')·STAGE_WORDS 매칭 토큰을 포함해야
 //   matchHandoffIntent 가 여전히 인식한다 — "Please hand over to {Stage}" 형태로 고정.
+// 리뉴얼 1차(2026-10-19): 넘김 순서 = Writer(id producer) → Artist → Storyboard(id writer) → Director → Editor.
+//   Producer(id entry) → Writer 는 시작 화면의 [시작] 버튼이 맡아 채팅 넘김이 없다.
+//   Storyboard → Director 는 아래 resolveDirectorHandoffIntent 전용 길이라 이 표에 없다.
 export const HANDOFFS: readonly HandoffSpec[] = [
   {
     from: 'producer',
-    to: 'writer',
-    utterance: 'Please hand over to Writer',
-    label: 'Hand over to Writer',
-  },
-  {
-    from: 'writer',
     to: 'artist',
     utterance: 'Please hand over to Artist',
     label: 'Hand over to Artist',
   },
   {
     from: 'artist',
-    to: 'director',
-    utterance: 'Please hand over to Director',
-    label: 'Hand over to Director',
+    to: 'writer',
+    utterance: 'Please hand over to Storyboard',
+    label: 'Hand over to Storyboard',
   },
+  // Storyboard(id writer) → Director 는 일반 넘김이 아니다: 대사 저장 마무리 · 서버 준비 확인을 하는
+  //   resolveDirectorHandoffIntent 전용 길(예전부터 Writer 채팅의 Director 요청이 쓰던 길)이 맡는다.
   {
     from: 'director',
     to: 'editor',
@@ -61,15 +60,18 @@ export type NextStepAction =
   | { kind: 'open'; stage: StageId; label: string }
 
 export function nextStepAction(stage: StageId, opts: { producerLocked: boolean }): NextStepAction | null {
-  if (stage === 'producer' && opts.producerLocked) return { kind: 'open', stage: 'writer', label: 'Go to Writer' }
+  // 산문을 확정한 Writer(id producer)는 다시 넘기지 않고 Artist 화면으로 가기만 한다.
+  if (stage === 'producer' && opts.producerLocked) return { kind: 'open', stage: 'artist', label: 'Go to Artist' }
   const spec = handoffFrom(stage)
   return spec ? { kind: 'handoff', ...spec } : null
 }
 
 /** 대상 스테이지를 가리키는 말 — 한/영 모두. */
+//   화면 이름을 따른다(리뉴얼 1차): "Writer"·"작가"는 id producer, "Storyboard"·"스토리보드"는 id writer.
 const STAGE_WORDS: Record<StageId, readonly string[]> = {
-  producer: ['producer', '프로듀서'],
-  writer: ['writer', '작가', '라이터'],
+  entry: ['producer', '프로듀서'],
+  producer: ['writer', '작가', '라이터'],
+  writer: ['storyboard', '스토리보드'], // i18n-ok: 사용자 말에서 단계 이름을 알아듣는 단어
   artist: ['artist', '아티스트', '컨셉아티스트'],
   director: ['director', '디렉터', '디렉타', '감독'],
   editor: ['editor', '에디터', '편집'],
@@ -131,6 +133,21 @@ function omitQuotedRequests(text: string): string {
 export function matchHandoffIntent(text: string, stage: StageId): HandoffSpec | null {
   const spec = handoffFrom(stage)
   if (!spec) return null
+  return matchHandoffSpec(text, spec)
+}
+
+/** Storyboard(id writer) → Director 이동 요청을 일반 넘김과 같은 규칙(부정 · 인용 · 이동 말 · 목적지)으로 읽는다.
+ *  Director 넘김은 HANDOFFS 에 없는 전용 길이라(대사 저장 마무리 · 서버 준비 확인) 대사 통일 경로가 목적지를 알아낼 때 쓴다. */
+export function matchStoryboardToDirector(text: string): boolean {
+  return matchHandoffSpec(text, {
+    from: 'writer',
+    to: 'director',
+    utterance: 'Please hand over to Director',
+    label: 'Hand over to Director',
+  }) !== null
+}
+
+function matchHandoffSpec(text: string, spec: HandoffSpec): HandoffSpec | null {
   const request = omitQuotedRequests(['writer', 'artist'].includes(spec.to) ? withoutMediaGenerationProhibition(text) : text)
   if (hasNonRequestContext(request)) return null
   const t = normalize(request)

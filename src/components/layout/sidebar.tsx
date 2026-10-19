@@ -7,6 +7,7 @@ import {
   PenTool,
   Palette,
   Clapperboard,
+  LayoutGrid,
   Film,
   Home,
   Loader2,
@@ -37,9 +38,11 @@ import { FooterIconItem } from '@/components/layout/footer-icon-item'
 import { withDemoShare } from '@/lib/demo/context'
 import { useT } from '@/lib/i18n'
 
+// 아이콘은 화면 이름을 따른다(리뉴얼 1차): Producer(entry)=사람들, Writer(producer)=펜, Storyboard(writer)=칸.
 const STAGE_ICONS: Record<StageId, React.ElementType> = {
-  producer: Users,
-  writer: PenTool,
+  entry: Users,
+  producer: PenTool,
+  writer: LayoutGrid,
   artist: Palette,
   director: Clapperboard,
   editor: Film,

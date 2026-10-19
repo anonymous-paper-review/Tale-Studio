@@ -35,6 +35,10 @@ export async function POST(req: NextRequest) {
         ? body.referenceProjectId.trim()
         : ''
     const includeLastShotFrame = body?.includeLastShotFrame === true
+    // 리뉴얼 1차(2026-10-19): 새 흐름은 Producer 시작 화면(id entry)에서 시작하고, 채팅 · 대사 언어는 사이트 언어를 따른다.
+    //   두 값을 보내지 않는 기존 호출은 지금처럼(계정 언어 · 기본 단계) 동작한다.
+    const startAtEntry = body?.startAtEntry === true
+    const uiLocale = parseAppLocale(body?.uiLocale)
 
     const workspace = await ensureWorkspace(user)
 
@@ -73,7 +77,7 @@ export async function POST(req: NextRequest) {
     //   고착된다(실사고). unlocked 로 두면 producer 채팅의 발화 언어 추종과 writer/start 의
     //   스토리 감지가 사용자 실제 언어로 확정한다.
     const userLocale = parseAppLocale(user.user_metadata?.locale)
-    const locale = userLocale ?? 'en'
+    const locale = uiLocale ?? userLocale ?? 'en'
     // 슬롯 카운트+삽입을 DB 함수 하나로 원자화(#project-lifecycle-rpc 2026-09-01) —
     // 왕복 1회 제거 + 동시 생성이 카운트 게이트를 우회하는 경쟁 봉쇄(워크스페이스 행 잠금).
     // 요금제→한도 매핑은 plan-limits.ts 가 진실원이라 여기서 계산해 넘긴다(null=무제한).
@@ -85,7 +89,7 @@ export async function POST(req: NextRequest) {
         p_workspace_id: workspace.id,
         p_title: title,
         p_locale: locale,
-        p_locale_locked: userLocale !== null,
+        p_locale_locked: uiLocale !== null || userLocale !== null,
         p_reference_project_id: referenceProjectId || null,
         p_slot_limit: isAdmin ? null : limit,
       },
@@ -112,6 +116,16 @@ export async function POST(req: NextRequest) {
         { error: `Failed to create project (${String(creation.status)})` },
         { status: 500 },
       )
+    }
+    if (startAtEntry) {
+      const { error: stageError } = await supabaseAdmin
+        .from('projects')
+        .update({ current_stage: 'entry' })
+        .eq('id', projectId)
+      if (stageError) {
+        return NextResponse.json({ error: stageError.message }, { status: 500 })
+      }
+      project.current_stage = 'entry'
     }
 
     let warnings: ReferenceImportWarning[] = []

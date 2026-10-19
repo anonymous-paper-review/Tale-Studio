@@ -54,7 +54,7 @@ export async function resolveProjectId(db: SupabaseClient, explicit?: string): P
   return projects[0].id as string
 }
 
-export const STAGES = ['producer', 'writer', 'artist', 'director', 'editor'] as const
+export const STAGES = ['entry', 'producer', 'artist', 'writer', 'director', 'editor'] as const
 
 /**
  * 두 단계 중 더 앞선(진행된) 쪽을 반환한다. 제품 코드 `src/stores/project-store.ts` 의

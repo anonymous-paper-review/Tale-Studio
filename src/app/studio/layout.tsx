@@ -40,6 +40,8 @@ export default function StudioLayout({
   installDemoFetchGuard()
   const initProject = useProjectStore((s) => s.initProject)
   const canNavigateTo = useProjectStore((s) => s.canNavigateTo)
+  // 리뉴얼 1차: verifyWriterGate 가 산출물로 reachedStage 를 확정(낮추기 포함)하면 잠긴 화면에서 다시 내보낸다.
+  const reachedStage = useProjectStore((s) => s.reachedStage)
   const setStage = useProjectStore((s) => s.setStage)
   const initLoading = useProjectStore((s) => s.initLoading)
   const projectId = useProjectStore((s) => s.projectId)
@@ -140,7 +142,9 @@ export default function StudioLayout({
     const stage = STAGES.find((s) => pathname.startsWith(s.path))
     if (!stage) return
     if (!canNavigateTo(stage.id as StageId)) {
-      router.replace(withDemoShare('/studio/producer'))
+      // 잠긴 단계는 지금까지 연 최고 단계로 보낸다(시작 전이면 Producer 시작 화면).
+      const fallback = STAGES.find((s) => s.id === reachedStage)?.path ?? '/studio/start'
+      router.replace(withDemoShare(fallback))
       return
     }
     if (useProjectStore.getState().currentStage !== stage.id) {
@@ -150,7 +154,10 @@ export default function StudioLayout({
     useGlobalChatStore.getState().clearStageBadge(stage.id as StageId)
     // 약속 D3: 서버 파생 배지의 기준점 — 이 스테이지를 지금 봤다.
     if (projectId) markStageSeen(projectId, stage.id as StageId)
-  }, [pathname, canNavigateTo, initLoading, projectId, router, setStage])
+  }, [pathname, canNavigateTo, reachedStage, initLoading, projectId, router, setStage])
+
+  // Producer 시작 화면(id entry)은 오른쪽 채팅이 없다 — 1안은 화면에서 고르고, 2안은 화면 가운데가 채팅이다.
+  const onEntry = pathname.startsWith('/studio/start')
 
   return (
     <>
@@ -162,8 +169,9 @@ export default function StudioLayout({
         //   바깥 INSET + 패널폭 + 패널↔본문 INSET. 접힘 시 폭은 열기 레일(w-11) 전용.
         style={{
           marginLeft: SHELL_INSET * 2 + SHELL_RAIL_WIDTH,
-          marginRight:
-            SHELL_INSET * 2 + (chatCollapsed ? CHAT_COLLAPSED_RAIL : chatWidth),
+          marginRight: onEntry
+            ? SHELL_INSET
+            : SHELL_INSET * 2 + (chatCollapsed ? CHAT_COLLAPSED_RAIL : chatWidth),
         }}
       >
         {/* h-screen으로 높이 고정 + overflow-y-auto: 내용이 화면을 넘치면
@@ -180,7 +188,7 @@ export default function StudioLayout({
           {children}
         </div>
       </main>
-      <GlobalChat />
+      {onEntry ? null : <GlobalChat />}
       <HandoffConfirmDialogs />
     </>
   )

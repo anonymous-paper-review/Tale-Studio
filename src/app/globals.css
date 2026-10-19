@@ -80,6 +80,7 @@
   --color-stage-producer: var(--stage-producer);
   --color-stage-writer: var(--stage-writer);
   --color-stage-artist: var(--stage-artist);
+  --color-stage-storyboard: var(--stage-storyboard);
   --color-stage-director: var(--stage-director);
   --color-stage-editor: var(--stage-editor);
 
@@ -154,6 +155,7 @@
   --stage-producer: oklch(0.541 0.281 293.009); /* violet-600 */
   --stage-writer: oklch(0.546 0.245 262.881);   /* blue-600 */
   --stage-artist: oklch(0.666 0.179 58.318);     /* amber-600 */
+  --stage-storyboard: oklch(0.609 0.126 221.723); /* cyan-600 — 리뉴얼 1차 Storyboard(2026-10-19) */
   --stage-director: oklch(0.586 0.253 17.585);   /* rose-600 */
   --stage-editor: oklch(0.596 0.145 163.225);    /* emerald-600 */
 
@@ -261,6 +263,7 @@
   --stage-producer: oklch(0.606 0.25 292.717); /* violet-500 */
   --stage-writer: oklch(0.623 0.214 259.815);  /* blue-500 */
   --stage-artist: oklch(0.769 0.188 70.08);    /* amber-500 */
+  --stage-storyboard: oklch(0.715 0.143 215.221); /* cyan-500 */
   --stage-director: oklch(0.645 0.246 16.439); /* rose-500 */
   --stage-editor: oklch(0.696 0.17 162.48);    /* emerald-500 */
 

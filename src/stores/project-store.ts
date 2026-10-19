@@ -3,10 +3,12 @@ import { parseProjectFormat } from '@/types/project'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import type { StageId } from '@/types'
 import { STAGES } from '@/lib/constants'
+import { reachedStageFromFacts, proseLockedFromFacts } from '@/lib/stage-gate'
 import type { LifecycleStatus } from '@/lib/lifecycle'
 import { EMPTY_LIFECYCLE_STATUS } from '@/lib/lifecycle'
 import { createClient } from '@/lib/supabase/client'
 import { parseAppLocale, type AppLocale } from '@/lib/locale'
+import { useLocaleStore } from '@/stores/locale-store'
 
 const parseLocked = (v: unknown): boolean | null => (typeof v === 'boolean' ? v : null)
 import {
@@ -34,6 +36,8 @@ export interface WriterStatusAssets {
 export interface CreateProjectOptions {
   referenceProjectId?: string
   includeLastShotFrame?: boolean
+  /** 리뉴얼 1차: Producer 시작 화면(id entry)에서 시작하고, 채팅 · 대사 언어를 지금 사이트 언어로 잠근다. */
+  entry?: boolean
 }
 
 export interface ProjectCreationWarning {
@@ -52,6 +56,9 @@ interface ProjectState {
   currentStage: StageId
   /** 지금까지 도달한 최고 단계(순차 잠금 게이트 기준). 단조 증가 — 뒤로 가도 안 줄어든다. */
   reachedStage: StageId
+  /** DB projects.current_stage 원래 값(리뉴얼 1차) — 'producer' 는 새 프로젝트 기본값이기도 해서
+   *  verifyWriterGate 가 산출물(실행 기록 · 샷)과 함께 읽어 reachedStage 를 정한다. null = 아직 안 읽음. */
+  storedStage: string | null
   workspaceId: string | null
   projectId: string | null
   projectTitle: string
@@ -180,8 +187,10 @@ function artistAssetGateFromAssets(
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => ({
+  // 기본값은 예전 그대로 producer — 화면은 주소(/studio/...)로 단계를 맞추고, 새 프로젝트만 entry 로 시작한다.
   currentStage: 'producer',
   reachedStage: 'producer',
+  storedStage: null,
   workspaceId: null,
   projectId: null,
   projectTitle: 'Untitled',
@@ -219,12 +228,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   setTreatmentDraft: (draft) => set({ treatmentDraft: draft }),
 
   canNavigateTo: (stage) => {
-    // 순차 잠금: producer→artist→director→editor 순으로 하나씩 열린다.
-    // 도달한 최고 단계(reachedStage)까지만 진입 허용 — 다음 단계는 handoff로 열린다
-    // (producer CTA / artist·director의 HandoffButton이 setStage로 reachedStage를 전진).
-    const reached = getStageIndex(stage) <= getStageIndex(get().reachedStage)
-    if (stage !== 'artist') return reached
-    return reached && get().artistImagesReady
+    // 순차 잠금(리뉴얼 1차): Producer(entry) → Writer(producer) → Artist → Storyboard(writer) → Director → Editor.
+    //   도달한 최고 단계(reachedStage)까지만 진입 허용 — 다음 단계는 시작 · 산문 확정 · 완료하기 · 넘기기로 열린다.
+    //   Artist 는 산문을 확정하면 그림 없이 바로 열린다(브레이크다운 목록부터 본다) — 예전 이미지 준비 잠금은 없다.
+    return getStageIndex(stage) <= getStageIndex(get().reachedStage)
   },
 
   setLifecycleStatus: (status) => set({ lifecycleStatus: status }),
@@ -317,7 +324,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         initLoading: false,
         currentStage: project.current_stage ?? 'producer',
         // DB current_stage = 지금까지 진행한 최고 단계 → 새로고침/복원 시 그만큼 열어둔다
+        //   (낙관값 — verifyWriterGate 가 산출물로 확정한다. 'producer' 는 시작 전 새 프로젝트일 수도 있다.)
         reachedStage: project.current_stage ?? 'producer',
+        storedStage: project.current_stage ?? 'producer',
         // DB current_stage 가 producer 를 넘었으면 Writer 를 시작한 프로젝트다 — Producer 잠금.
         producerLocked: (project.current_stage ?? 'producer') !== 'producer',
         treatmentDraft: false,
@@ -353,6 +362,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
               includeLastShotFrame: options?.includeLastShotFrame === true,
             }
           : {}),
+        ...(options?.entry
+          ? { startAtEntry: true, uiLocale: useLocaleStore.getState().locale }
+          : {}),
       }
       const res = await fetch('/api/project/new', {
         method: 'POST',
@@ -375,8 +387,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         projectLocale: parseAppLocale(project?.locale),
         projectLocaleLocked: parseLocked(project?.locale_locked),
         initLoading: false,
-        currentStage: 'producer',
-        reachedStage: 'producer',
+        // 새 프로젝트는 Producer(시작 화면, id entry)만 열려 있다(리뉴얼 1차).
+        currentStage: options?.entry ? 'entry' : 'producer',
+        reachedStage: options?.entry ? 'entry' : 'producer',
+        storedStage: options?.entry ? 'entry' : 'producer',
         producerLocked: false,
         treatmentDraft: false,
         writerComplete: true,
@@ -415,6 +429,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       projectLocaleLocked: null,
       currentStage: stage ?? 'producer',
       reachedStage: stage ?? 'producer',
+      storedStage: stage ?? null,
       // 호출부가 넘긴 DB 단계로 먼저 잠그고, 아래 조회가 DB current_stage 로 확정한다.
       producerLocked: (stage ?? 'producer') !== 'producer',
       treatmentDraft: false,
@@ -455,7 +470,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       try {
         const { data } = await createClient().from('projects').select('current_stage').eq('id', id).maybeSingle()
         const stageNow = (data as { current_stage?: unknown } | null)?.current_stage
-        if (get().projectId === id && typeof stageNow === 'string' && stageNow !== 'producer') set({ producerLocked: true })
+        if (get().projectId === id && typeof stageNow === 'string') set({ storedStage: stageNow })
+        if (get().projectId === id && typeof stageNow === 'string' && stageNow !== 'producer' && stageNow !== 'entry') set({ producerLocked: true })
       } catch {
         /* 폴백: 호출부가 넘긴 단계 */
       }
@@ -536,11 +552,15 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       let writerActive = false
       let writerFailed = false
       let treatmentDraftRun = false
+      let writerStarted = false
+      let statusKnown = false
       let assets: WriterStatusAssets | null = null
       try {
         const r = await fetch(`/api/writer/status/${projectId}?assets=1`)
         if (r.ok) {
           const s = await r.json()
+          statusKnown = true
+          writerStarted = s?.started === true
           writerActive = !!(s?.started && !s?.pipeline_completed && !s?.pipeline_failed)
           // Writer 가 한 번이라도 시작됐으면 Producer 는 잠긴다 — 단계 저장만 실패해 DB 단계가 producer 에 남은 경우까지.
           // 단, 새 프로젝트의 트리트먼트 초안(draft)은 아직 넘기지 않은 실행이다 — 잠그지 않는다(2026-10-02 시안 v04).
@@ -559,8 +579,29 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       // 예전 producer-origin location 예외는 폐기됐다. source location 만으로 Artist를
       // 열지 않고, writer 산출물 게이트 뒤에서도 status.assets.images_ready 가 최종 이미지 잠금 권한이다.
       // 트리트먼트 초안이 실패했으면 Producer 의 씬 스토리에서 다시 시도한다 — Writer 다시 실행 안내를 띄우지 않는다.
-      const needsRerun = incomplete && !treatmentDraftRun && (origStage !== 'producer' || writerFailed)
+      //   시작 화면(entry)은 아직 실행이 없는 게 정상이다 — 되돌리지 않는다(리뉴얼 1차).
+      const needsRerun = incomplete && !treatmentDraftRun && ((origStage !== 'producer' && origStage !== 'entry') || writerFailed)
       const shouldGateBack = needsRerun
+
+      // 리뉴얼 1차: 단계 열림은 DB 단계 + 산출물(실행 기록 · 샷)로 정한다(stage-gate.ts).
+      //   DB 단계를 아직 안 읽었거나(null) 실행 상태를 못 읽었으면 낙관값을 그대로 둔다 — 모를 땐 잠그지 않는다.
+      const storedStage = get().storedStage
+      if (storedStage !== null && statusKnown && get().projectId === projectId) {
+        const { data: shotRows, error: shotsError } = await supabase
+          .from('shots')
+          .select('shot_id')
+          .eq('project_id', projectId)
+          .limit(1)
+        if (!shotsError && get().projectId === projectId) {
+          const facts = {
+            storedStage,
+            treatmentStarted: writerStarted,
+            runContinued: writerStarted && !treatmentDraftRun,
+            hasShots: !!(shotRows && shotRows.length > 0),
+          }
+          set({ reachedStage: reachedStageFromFacts(facts), producerLocked: proseLockedFromFacts(facts) })
+        }
+      }
 
       set({
         writerComplete: hasScenes,
@@ -587,6 +628,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       projectLocale: null,
       currentStage: 'producer',
       reachedStage: 'producer',
+      storedStage: null,
       producerLocked: false,
       treatmentDraft: false,
       initLoading: false,

@@ -21,7 +21,9 @@ export function agentFaceAsset(stage: StageId, expression: Expression, size: num
   // editor 는 idle 한 종뿐(채팅 에이전트가 아니라 상태 연기가 없다) — 전 상태 idle 폴백.
   const state = stage === 'editor' ? 'idle' : STATE_OF[expression]
   const variant = size > 64 ? 'full' : 'preview'
-  return `/agent-face/${variant}/${stage}_${state}.gif`
+  // 얼굴은 화면 이름을 따른다(리뉴얼 1차): Producer(entry)=producer, Writer(producer)·Storyboard(writer)=writer 얼굴.
+  const face = stage === 'entry' ? 'producer' : stage === 'producer' ? 'writer' : stage
+  return `/agent-face/${variant}/${face}_${state}.gif`
 }
 
 interface AgentFaceProps {

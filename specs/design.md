@@ -1,7 +1,7 @@
 ---
 name: tale-studio design system
 version: 0.4.0
-last_updated: 2026-06-10
+last_updated: 2026-10-19
 owner: shared
 canonical_implementation: src/app/globals.css
 source_of_truth: 토큰 값은 globals.css. design.md는 *역할 / 사용 룰 / 스케일 정량 명세*.
@@ -154,7 +154,7 @@ Tailwind 클래스: `bg-success`, `text-success-foreground`, `border-success` (w
 - Saturated 카테고리 배너 (n8n-style)
 - Glassmorphism `bg-white/N + backdrop-blur` (decoration용)
 
-### 2.9 Stage 색 (파이프라인 P1~P5)
+### 2.9 Stage 색 (파이프라인 P1~P6)
 
 GlobalChat badge + AgentFace 등 **단계 식별**용. chart 토큰(엔티티 노드, §2.2)과 의미축이 다르므로 별도 토큰.
 
@@ -163,8 +163,9 @@ GlobalChat badge + AgentFace 등 **단계 식별**용. chart 토큰(엔티티 �
 | `--stage-producer` (violet) | P1 Producer | badge, agent face |
 | `--stage-writer` (blue) | P2 Writer | badge, agent face |
 | `--stage-artist` (amber) | P3 Artist | badge, agent face |
-| `--stage-director` (rose) | P4 Director | badge, agent face |
-| `--stage-editor` (emerald) | P5 Editor | badge, agent face |
+| `--stage-storyboard` (cyan) | P4 Storyboard (리뉴얼 1차 2026-10-19, 이름 가칭) | badge, agent face |
+| `--stage-director` (rose) | P5 Director | badge, agent face |
+| `--stage-editor` (emerald) | P6 Editor | badge, agent face |
 
 Tailwind 클래스: `bg-stage-{id}`, `text-stage-{id}`, `border-stage-{id}` (+ 알파 `/15` `/30`). SVG fill/stroke는 `var(--stage-{id})` 또는 `currentColor`.
 

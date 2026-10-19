@@ -1,6 +1,6 @@
 // 스테이지 전환 액세스 키 (#keyboard-only 2026-08-11, Alt+숫자 이관 2026-08-12).
 //
-// Alt(Option) + 1~5 가 STAGES 순서와 1:1 — Producer/Writer/Concept Artist/Director/Editor.
+// Alt(Option) + 1~6 이 STAGES 순서와 1:1 — Producer/Writer/Artist/Storyboard/Director/Editor (리뉴얼 1차 2026-10-19).
 //   (구 Alt+QWERT 에서 이관 — 오너 요청 2026-08-12. 숫자가 레일의 P1~P5 배지와도 맞는다.)
 //
 // 오버라이드 조사 (2026-08-12):
@@ -17,11 +17,12 @@ import { STAGES } from '@/lib/constants'
 import type { StageId } from '@/types'
 
 export const STAGE_ACCESS_KEY: Record<StageId, string> = {
-  producer: '1',
-  writer: '2',
+  entry: '1',
+  producer: '2',
   artist: '3',
-  director: '4',
-  editor: '5',
+  writer: '4',
+  director: '5',
+  editor: '6',
 }
 
 /** 표시용 모디파이어 이름 — macOS 는 Option, 나머지는 Alt. */
