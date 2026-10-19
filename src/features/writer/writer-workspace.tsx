@@ -1,6 +1,6 @@
 'use client'
 
-// Writer 워크스페이스 — 탭 뷰를 동시에 마운트해 내부 상태를 보존한다.
+// Storyboard(id writer) 워크스페이스 — 탭 뷰를 동시에 마운트해 내부 상태를 보존한다.
 
 import { useEffect, useRef, useState } from 'react'
 import { DialogueView } from '@/features/writer/dialogue-view'
@@ -93,19 +93,20 @@ export function WriterWorkspace() {
         ? 'animate-in fade-in-25 slide-in-from-left-6 duration-500 ease-out motion-reduce:animate-none'
         : undefined
 
-  // 실행 중(생성 진행)엔 탭 뷰 대신 점진적 스토리 뷰어 + 하단 진행바(#story-stream 2026-07-21).
-  //   완료/실패/미실행이면 기존 탭 워크스페이스로 복귀한다.
-  const running = !!(
-    status?.started &&
-    !status.pipeline_completed &&
-    !status.pipeline_failed
-  )
-  if ((running || debugGeneration) && projectId) {
+  // 리뉴얼 1차(2026-10-19, 프로토타입 S0): 씬 · 샷을 나누는 동안에도 탭 워크스페이스(보드)를 그대로 두고,
+  //   러프 보드가 그 위에 잠금 표시(AiBusyOverlay)를 얹는다 — 다 그린 샷부터 뒤 보드에 보인다.
+  //   예전 전체 화면 진행 보기(점진 스토리 + 인물 서랍, #story-stream)는 관리자 디버그 진입(#gen-debug)에서만 연다.
+  if (debugGeneration && projectId) {
+    const running = !!(
+      status?.started &&
+      !status.pipeline_completed &&
+      !status.pipeline_failed
+    )
     return (
       <WriterGenerationView
         projectId={projectId}
         status={status}
-        debug={debugGeneration && !running}
+        debug={!running}
       />
     )
   }

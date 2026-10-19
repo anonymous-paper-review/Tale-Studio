@@ -71,6 +71,7 @@ export function WriterV2Preview({ projectId }: { projectId: string }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <WriterHeader
+        hideNextStep
         description={t(
           'V2 experimental previz: review story and visual together within each semantic unit',
         )}
