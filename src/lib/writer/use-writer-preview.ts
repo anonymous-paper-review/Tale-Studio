@@ -63,6 +63,8 @@ export interface WriterPreview {
   proseConditions?: { runtimeSeconds: number | null; genre: string | null; seed: 'keep' | 'new' } | null
   /** [브레이크다운하기]로 확정해 잠근 산문인가(리뉴얼 1차). */
   proseLocked?: boolean
+  /** Producer 시작 화면에서 고른 바꿈 정도(그대로 · 다듬기 · 새롭게 키우기). */
+  changeLevel?: 'keep' | 'polish' | 'grow' | null
   roster: { slug: string; name: string }[]
   scenes: PreviewScene[]
   characters: PreviewCharacter[]

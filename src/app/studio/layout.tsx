@@ -11,6 +11,8 @@ import { useWriterStore } from '@/stores/writer-store'
 import { useArtistStore } from '@/stores/artist-store'
 import { Sidebar } from '@/components/layout/sidebar'
 import { GlobalChat } from '@/components/layout/global-chat'
+import { useWriterRoomStore } from '@/stores/writer-room-store'
+import { ChatBackground } from '@/components/layout/chat-background'
 import { useIdleTimeout } from '@/hooks/use-idle-timeout'
 import { useArtistLockPoll } from '@/hooks/use-artist-lock-poll'
 import { readLastProjectId, writeLastProjectId } from '@/lib/session-restore'
@@ -157,7 +159,9 @@ export default function StudioLayout({
   }, [pathname, canNavigateTo, reachedStage, initLoading, projectId, router, setStage])
 
   // Producer 시작 화면(id entry)은 오른쪽 채팅이 없다 — 1안은 화면에서 고르고, 2안은 화면 가운데가 채팅이다.
-  const onEntry = pathname.startsWith('/studio/start')
+  //   Writer(id producer)의 채팅 탭도 화면 가운데가 채팅이라 오른쪽 채팅을 닫는다(리뉴얼 1차).
+  const proseChatTab = useWriterRoomStore((s) => s.tab === 'chat')
+  const onEntry = pathname.startsWith('/studio/start') || (pathname.startsWith('/studio/producer') && proseChatTab)
 
   return (
     <>
@@ -188,7 +192,7 @@ export default function StudioLayout({
           {children}
         </div>
       </main>
-      {onEntry ? null : <GlobalChat />}
+      {onEntry ? <ChatBackground /> : <GlobalChat />}
       <HandoffConfirmDialogs />
     </>
   )

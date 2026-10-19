@@ -26,6 +26,8 @@ export interface SceneStoryProposalView {
   stale: boolean
   error?: string
   level?: RewriteLevel
+  /** 조건으로 다시 쓴 세 안이면 그 조건(리뉴얼 1차). */
+  conditions?: SceneStoryProposal['conditions']
   variants?: Array<{
     id: SceneStoryRewriteVariant['id']
     direction: SceneStoryRewriteVariant['direction']
@@ -101,6 +103,7 @@ export function sceneStoryProposalView(
       after: [],
       stale: !current || !equal(proposal.baseScenes, current),
       level: proposal.level,
+      ...(proposal.conditions ? { conditions: proposal.conditions } : {}),
       variants,
     }
   }

@@ -65,6 +65,7 @@ import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { useWriterPreview } from '@/lib/writer/use-writer-preview'
 import { SceneStoryProposalCard } from '@/components/layout/scene-story-proposal-card'
 import { SceneStoryRewriteCard, SceneStoryUndoCard } from '@/components/layout/scene-story-rewrite-card'
+import { WriterNextCard } from '@/features/prose/writer-next-card'
 import {
   buildScriptLines,
   scriptLineMentions,
@@ -1024,6 +1025,8 @@ export function GlobalChat() {
     }
     // #p4-choices 는 렌더에서 버튼별 인라인 처리 — 이 핸들러엔 도달하지 않는다(타입 내로잉용).
     if (action.kind === 'choices') return
+    // Writer 다음 단계 카드(리뉴얼 1차)는 카드 안 버튼이 각자 일을 한다.
+    if (action.kind === 'writerNext') return
     if (action.kind === 'message') {
       dismissSuggestion()
       await sendMessage(action.utterance, undefined, { stageOverride: suggestion?.stage, ...(action.answeringProducerQuestion ? { answeringProducerQuestion: true } : {}) })
@@ -1580,12 +1583,13 @@ export function GlobalChat() {
             ))}
 
             {loading && <ThinkingIndicator stage={currentStage} />}
+            {/* 리뉴얼 1차 Writer(id producer)는 세 가지 안을 산문 위 팝업에서 고르고, 적용 뒤에는 다음 단계를 묻는다(되돌리기 카드 없음). */}
             {projectId && sceneStoryProposal ? (
               sceneStoryProposal.variants?.length
-                ? <SceneStoryRewriteCard key={`${projectId}:${sceneStoryProposal.id}`} projectId={projectId} proposal={sceneStoryProposal} />
+                ? currentStage === 'producer' ? null : <SceneStoryRewriteCard key={`${projectId}:${sceneStoryProposal.id}`} projectId={projectId} proposal={sceneStoryProposal} />
                 : <SceneStoryProposalCard key={`${projectId}:${sceneStoryProposal.id}`} projectId={projectId} proposal={sceneStoryProposal} />
             ) : null}
-            {projectId && sceneStoryUndo ? <SceneStoryUndoCard key={`${projectId}:${sceneStoryUndo.id}`} projectId={projectId} undo={sceneStoryUndo} /> : null}
+            {projectId && sceneStoryUndo && currentStage !== 'producer' ? <SceneStoryUndoCard key={`${projectId}:${sceneStoryUndo.id}`} projectId={projectId} undo={sceneStoryUndo} /> : null}
 
             {/* 프로액티브 제안 (chat-proactive-copilot Phase 1) — 시스템이 먼저 거는 actionable 넛지.
                 탭 전환 후 1초 정적을 두고 계단식 등장(#chat-settle).
@@ -1609,6 +1613,8 @@ export function GlobalChat() {
                     피드백 입력 + 확정/수정 두 갈래를 여기서 렌더한다(생성 화면 하단 바에서 이사). */}
                 {suggestion.action?.kind === 'confirmScenes' ? (
                   <SceneGateControls label={suggestion.action.label} handoff={treatmentDraft && !producerLocked} />
+                ) : suggestion.action?.kind === 'writerNext' ? (
+                  <WriterNextCard step={suggestion.action.step} />
                 ) : (suggestion.action || suggestion.dismissible !== false) && (
                   <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
                     {/* kind: 'choices' 는 여기 오지 않는다 — 입력창 앵커 선택지(#p4-choices v2) */}

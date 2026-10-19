@@ -26,7 +26,7 @@ export const dynamic = 'force-dynamic';
 
 // state 에서 필요한 필드만 구조적으로 읽는다(steps.ts 의 무거운 import 회피).
 interface PreviewState {
-  input?: { writerEngine?: unknown; treatmentDraft?: unknown; story?: string; runtimeSeconds?: number; preserveScript?: boolean; genre?: { genre?: string; runtime_seconds?: number } };
+  input?: { writerEngine?: unknown; treatmentDraft?: unknown; story?: string; runtimeSeconds?: number; preserveScript?: boolean; genre?: { genre?: string; runtime_seconds?: number }; changeLevel?: 'keep' | 'polish' | 'grow' };
   genre?: { genre?: string; runtime_seconds?: number };
   _proseSeed?: ProseSeed;
   _proseLocked?: boolean;
@@ -324,6 +324,7 @@ export async function GET(
         draftBasis,
         proseConditions,
         proseLocked,
+        changeLevel: state.input?.changeLevel ?? null,
         roster,
         scenes,
         characters,
