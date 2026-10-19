@@ -58,7 +58,17 @@ export function mergeProducerWorld(existing: BackgroundContract | undefined, bac
 
 /** 넘길 때의 실행 상태 — 새 입력으로 바꾸고 확정 단계를 넘긴다. 트리트먼트(씬 · 구조 · 이야기 엔진)는 그대로다. */
 export function continueDraftState(state: WriterRunState, input: PipelineInput): WriterRunState {
+  // 확정한 산문(_proseLocked)은 그 산문을 쓴 바탕(이야기 · 길이 · 대본 보존 · 장르)으로 이어 만든다 — 확정 뒤 Producer 값이 달라졌어도
+  //   나머지(디자인 · 장면 · 샷)가 산문과 어긋나지 않게 한다(리뉴얼 1차 검토). 인물 · 배경 · 스타일은 Artist 에서 고친 값을 싣는다.
+  const confirmed = state._proseLocked === true && !!state.input
   const nextInput: PipelineInput = { ...input, sceneGate: true }
+  if (confirmed) {
+    nextInput.story = state.input.story
+    nextInput.runtimeSeconds = state.input.runtimeSeconds
+    if (state.input.preserveScript === true) nextInput.preserveScript = true
+    else delete nextInput.preserveScript
+    if (state.input.genre) nextInput.genre = state.input.genre
+  }
   delete nextInput.treatmentDraft
   const next: WriterRunState = {
     ...state,
@@ -67,7 +77,7 @@ export function continueDraftState(state: WriterRunState, input: PipelineInput):
     world: mergeProducerWorld(state.world, input.background),
     _gateConfirmed: true,
   }
-  if (input.genre) next.genre = input.genre
+  if (input.genre && !confirmed) next.genre = input.genre
   delete next._sceneStoryUndo
   return next
 }

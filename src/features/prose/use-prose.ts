@@ -10,7 +10,7 @@ import { sceneGatePhase } from '@/lib/writer/scene-gate'
 import { sceneStoryView } from '@/lib/producer/scene-story'
 import { treatmentDiff } from '@/lib/producer/scene-story-rewrite'
 import { previewedVariant } from '@/components/layout/scene-story-rewrite-card'
-import { legacyGateWaiting, proseBusy } from '@/lib/prose/busy'
+import { handedRunStopped, legacyGateWaiting, proseBusy } from '@/lib/prose/busy'
 import { proseTools } from '@/lib/prose/conditions'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProducerStore } from '@/stores/producer-store'
@@ -27,7 +27,7 @@ export function useProse() {
   const savedScenes = useWriterStore((s) => s.sceneManifest?.scenes)
   const draftLive = !projectLocked && treatmentDraft
   const hasTreatment = projectLocked || treatmentDraft
-  const { status } = useWriterStatus(hasTreatment ? projectId : null)
+  const { status, restart: restartStatus } = useWriterStatus(hasTreatment ? projectId : null)
   const phase = hasTreatment ? sceneGatePhase(status) : 'before'
   const refreshKey = useGlobalChatStore((s) => s.sceneStoryRefresh)
   const showOriginal = preserveScript === true && storyText.trim().length > 0
@@ -98,11 +98,15 @@ export function useProse() {
 
   // 예전 방식(리뉴얼 전)으로 넘겨 씬 스토리 확정을 기다리는 프로젝트 — 새 화면에서도 확정해 이어 간다.
   const legacyGate = legacyGateWaiting({ locked, phase, draftRun: status?.draft === true })
+  // 산문을 넘긴 뒤 실행이 멈췄으면 멈춘 곳부터 이어서 다시 시도하게 한다(리뉴얼 1차 검토).
+  const runStopped = handedRunStopped({ draftLive, phase })
 
   return {
     projectId,
     status,
+    restartStatus,
     legacyGate,
+    runStopped,
     phase,
     preview,
     proposal,

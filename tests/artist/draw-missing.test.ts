@@ -53,3 +53,31 @@ describe('남은 그림 다시 그리기', () => {
     expect(shot).not.toHaveBeenCalled()
   })
 })
+
+describe('남은 그림 다시 그리기 (검토 지적)', () => {
+  // 왜: 대표 모습 정보가 깨진 인물 하나 때문에 나머지 인물 · 배경을 하나도 그리지 않고 멈췄다.
+  it('대표 모습 정보가 없는 인물이 있어도 나머지 그림은 이어서 그린다', async () => {
+    useArtistStore.setState({
+      characterAssets: [{ ...person('broken', null, 'producer'), appearances: [] }, person('minho', null, 'producer')],
+      worldAssets: [world('hall', null)],
+    })
+
+    await useArtistStore.getState().drawMissingImages()
+
+    expect(view.mock.calls.map((call) => call[0])).toEqual(['minho'])
+    expect(shot.mock.calls.map((call) => call[0])).toEqual(['hall'])
+  })
+
+  // 왜: [완료하기]는 대표 모습의 시트를 본다 — 예전 대표 그림만 있는 인물을 그린 것으로 치면, 완료하기는 막혀 있는데 다시 그리기는 아무것도 안 한다.
+  it('완료하기와 같은 기준으로, 대표 모습에 시트가 없으면 예전 대표 그림이 있어도 다시 그린다', async () => {
+    const old = person('yuna', null, 'producer')
+    useArtistStore.setState({
+      characterAssets: [{ ...old, views: { ...old.views, main: 'https://img/old-main.png' } }],
+      worldAssets: [],
+    })
+
+    await useArtistStore.getState().drawMissingImages()
+
+    expect(view.mock.calls.map((call) => [call[0], call[1], call[2]])).toEqual([['yuna', 'current', 'main']])
+  })
+})

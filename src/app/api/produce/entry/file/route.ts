@@ -6,13 +6,13 @@
 //   약속: tests/producer/entry-routes.test.ts
 import { NextResponse } from 'next/server'
 import { checkEntryFile, entryFileKind, fileExtension } from '@/features/entry/options'
-import { normalizeEntryDraft, type EntryFileMeta } from '@/lib/entry/draft'
+import { entryDraftFor, type EntryFileMeta } from '@/lib/entry/draft'
 import { extractEntryText } from '@/lib/entry/extract-text'
 import { mediaUpload } from '@/lib/storage/media'
 import { storageKeySegment } from '@/lib/storage/key-segment'
 import { decodeImage, sliceForVision } from '@/lib/upload/image'
 import { isImageMimeType } from '@/lib/upload/limits'
-import { PROJECT_ID_RE, authorizeEntry, loadEntryProject, saveEntryDraft, serverError } from '../entry-access'
+import { PROJECT_ID_RE, authorizeEntry, authorizeEntryUser, loadEntryProject, saveEntryDraft, serverError } from '../entry-access'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -20,6 +20,9 @@ export const maxDuration = 60
 const MAX_NAME = 300
 
 export async function POST(req: Request) {
+  // 로그인부터 본다 — 올린 파일(수 MB)을 풀어 읽는 일은 로그인한 사람만 시킬 수 있다(리뉴얼 1차 검토). 주인 확인은 프로젝트 번호를 읽은 뒤.
+  const signedIn = await authorizeEntryUser(req)
+  if (!signedIn.ok) return signedIn.response
   let form: FormData
   try {
     form = await req.formData()
@@ -34,9 +37,9 @@ export async function POST(req: Request) {
   if (!(file instanceof File)) return NextResponse.json({ error: 'Invalid request: file is required' }, { status: 400 })
 
   try {
-    const row = await loadEntryProject(id, 'workspace_id, current_stage, entry_draft')
+    const row = await loadEntryProject(id, 'workspace_id, current_stage, entry_draft, story_text')
     if (!row) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
-    const draft = normalizeEntryDraft(row.entry_draft)
+    const draft = entryDraftFor({ entryDraft: row.entry_draft, storyText: row.story_text, stage: row.current_stage })
     if (draft.startedAt) return NextResponse.json({ error: 'already_started' }, { status: 409 })
 
     // 확장자 · 크기는 화면에서도 걸리지만 여기가 진짜 방어선이다.

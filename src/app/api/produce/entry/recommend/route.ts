@@ -5,7 +5,7 @@
 //   약속: tests/producer/entry-routes.test.ts
 import { NextResponse } from 'next/server'
 import { RECOMMENDED_RATIO, fileHasText, materialProblem } from '@/features/entry/options'
-import { ENTRY_TEXT_MAX_BYTES, materialBasis, normalizeEntryDraft, type EntryDraft, type EntryFileMeta } from '@/lib/entry/draft'
+import { ENTRY_TEXT_MAX_BYTES, entryDraftFor, materialBasis, type EntryDraft, type EntryFileMeta } from '@/lib/entry/draft'
 import { resolveRecommendation } from '@/lib/entry/recommend'
 import { ocrImageText, recommendWithLlm } from '@/lib/entry/recommend-llm'
 import { parseAppLocale } from '@/lib/locale'
@@ -23,9 +23,9 @@ export async function POST(req: Request) {
   const projectId = body!.projectId as string
 
   try {
-    const row = await loadEntryProject(projectId, 'locale, current_stage, entry_draft')
+    const row = await loadEntryProject(projectId, 'locale, current_stage, entry_draft, story_text')
     if (!row) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
-    const draft = normalizeEntryDraft(row.entry_draft)
+    const draft = entryDraftFor({ entryDraft: row.entry_draft, storyText: row.story_text, stage: row.current_stage })
     if (draft.startedAt) return NextResponse.json({ error: 'already_started' }, { status: 409 })
     if (draft.file?.noText) return NextResponse.json({ error: 'no_text', draft }, { status: 422 })
     if (materialProblem(draft.idea, draft.file)) return NextResponse.json({ error: 'too_short' }, { status: 400 })

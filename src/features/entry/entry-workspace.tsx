@@ -14,7 +14,8 @@ import { STAGE_BADGE_CLASS, STAGE_LABEL } from '@/lib/constants'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { useProjectStore } from '@/stores/project-store'
-import { ENTRY_FILE_ACCEPT, IMAGE_EXT_LABEL, TEXT_EXT_LABEL, WRITING_STEPS, readStoredTab, readingSteps, writeStoredTab, type EntryTab } from './options'
+import { ENTRY_FILE_ACCEPT, IMAGE_EXT_LABEL, TEXT_EXT_LABEL, WRITING_STEPS, pickEntryFile, readStoredTab, readingSteps, writeStoredTab, type EntryTab } from './options'
+import { useImageUploadConsent } from '@/components/upload/image-upload-consent'
 import { entryStarted, useEntryStore } from './entry-store'
 import { BusyOverlayPortal, UploadingChip, stepsFrom, useUploadErrorMessage } from './entry-parts'
 import { writeWorkspaceTab } from '@/stores/writer-room-store'
@@ -180,74 +181,80 @@ function EntryFileDialog() {
   const upload = useEntryStore((s) => s.upload)
   const uploadFile = useEntryStore((s) => s.uploadFile)
   const close = useEntryStore((s) => s.closeFileDialog)
+  const projectId = useEntryStore((s) => s.projectId)
   const errorMessage = useUploadErrorMessage()
   const uploading = upload.status === 'uploading'
+  // 그림 파일은 사용 동의를 받은 뒤에만 올린다(다른 그림 올리기 화면과 같은 약속) — 동의는 이 프로젝트 · 이 고르기에만 쓴다.
+  const { requestImageUploadConsent, imageUploadConsentDialog } = useImageUploadConsent(projectId ? `entry:${projectId}` : null)
 
   const pick = (files: FileList | null | undefined) => {
     const file = files?.[0]
-    if (file && !uploading) void uploadFile(file)
+    if (file && !uploading) void pickEntryFile(file, { requestConsent: requestImageUploadConsent, upload: uploadFile })
   }
 
   return (
-    <Dialog open={open} onOpenChange={(next) => (next ? undefined : close())}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>{t('Attach a file')}</DialogTitle>
-          <DialogDescription>{t('One file · up to 10MB')}</DialogDescription>
-        </DialogHeader>
-        <label
-          className={cn(
-            'flex cursor-pointer flex-col items-center gap-1.5 rounded-xl border border-dashed border-border px-6 py-8 text-center transition-colors duration-100 ease-out hover:border-border-strong hover:bg-accent/40 focus-within:ring-[3px] focus-within:ring-ring/50',
-            uploading && 'pointer-events-none opacity-70',
-          )}
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault()
-            pick(e.dataTransfer.files)
-          }}
-        >
-          <input
-            type="file"
-            accept={ENTRY_FILE_ACCEPT}
-            className="sr-only"
-            disabled={uploading}
-            onChange={(e) => {
-              pick(e.target.files)
-              e.target.value = ''
+    <>
+      <Dialog open={open} onOpenChange={(next) => (next ? undefined : close())}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t('Attach a file')}</DialogTitle>
+            <DialogDescription>{t('One file · up to 10MB')}</DialogDescription>
+          </DialogHeader>
+          <label
+            className={cn(
+              'flex cursor-pointer flex-col items-center gap-1.5 rounded-xl border border-dashed border-border px-6 py-8 text-center transition-colors duration-100 ease-out hover:border-border-strong hover:bg-accent/40 focus-within:ring-[3px] focus-within:ring-ring/50',
+              uploading && 'pointer-events-none opacity-70',
+            )}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault()
+              pick(e.dataTransfer.files)
             }}
-          />
-          <Upload className="size-5 text-muted-foreground" aria-hidden />
-          <span className="text-sm font-medium">{t('Click here to choose a file')}</span>
-          <span className="text-xs text-muted-foreground">{t('Or drop it here')}</span>
-        </label>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-          <dt className="text-muted-foreground">{t('Text files')}</dt>
-          <dd className="font-mono text-xs leading-5">{TEXT_EXT_LABEL}</dd>
-          <dt className="text-muted-foreground">{t('Images with text')}</dt>
-          <dd className="flex flex-col gap-0.5">
-            <span className="font-mono text-xs leading-5">{IMAGE_EXT_LABEL}</span>
-            <span className="text-xs text-muted-foreground">{t('A photographed script or a memo screenshot')}</span>
-          </dd>
-        </dl>
-        {uploading ? (
-          <div>
-            <UploadingChip name={upload.name ?? ''} />
-          </div>
-        ) : null}
-        {upload.error ? (
-          <p role="alert" className="flex items-start gap-1.5 text-sm text-destructive">
-            <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
-            <span>{errorMessage(upload.error)}</span>
-          </p>
-        ) : null}
-        <p className="text-xs text-muted-foreground">{t('Webtoons, character sheets and reference photos will be read in a later version.')}</p>
-        <DialogFooter>
-          <Button variant="outline" onClick={close} disabled={uploading}>
-            {t('Close')}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          >
+            <input
+              type="file"
+              accept={ENTRY_FILE_ACCEPT}
+              className="sr-only"
+              disabled={uploading}
+              onChange={(e) => {
+                pick(e.target.files)
+                e.target.value = ''
+              }}
+            />
+            <Upload className="size-5 text-muted-foreground" aria-hidden />
+            <span className="text-sm font-medium">{t('Click here to choose a file')}</span>
+            <span className="text-xs text-muted-foreground">{t('Or drop it here')}</span>
+          </label>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+            <dt className="text-muted-foreground">{t('Text files')}</dt>
+            <dd className="font-mono text-xs leading-5">{TEXT_EXT_LABEL}</dd>
+            <dt className="text-muted-foreground">{t('Images with text')}</dt>
+            <dd className="flex flex-col gap-0.5">
+              <span className="font-mono text-xs leading-5">{IMAGE_EXT_LABEL}</span>
+              <span className="text-xs text-muted-foreground">{t('A photographed script or a memo screenshot')}</span>
+            </dd>
+          </dl>
+          {uploading ? (
+            <div>
+              <UploadingChip name={upload.name ?? ''} />
+            </div>
+          ) : null}
+          {upload.error ? (
+            <p role="alert" className="flex items-start gap-1.5 text-sm text-destructive">
+              <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+              <span>{errorMessage(upload.error)}</span>
+            </p>
+          ) : null}
+          <p className="text-xs text-muted-foreground">{t('Webtoons, character sheets and reference photos will be read in a later version.')}</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={close} disabled={uploading}>
+              {t('Close')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {imageUploadConsentDialog}
+    </>
   )
 }
 

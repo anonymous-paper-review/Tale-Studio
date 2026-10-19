@@ -581,7 +581,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       // 트리트먼트 초안이 실패했으면 Producer 의 씬 스토리에서 다시 시도한다 — Writer 다시 실행 안내를 띄우지 않는다.
       //   시작 화면(entry)은 아직 실행이 없는 게 정상이다 — 되돌리지 않는다(리뉴얼 1차).
       const needsRerun = incomplete && !treatmentDraftRun && ((origStage !== 'producer' && origStage !== 'entry') || writerFailed)
-      const shouldGateBack = needsRerun
+      // 리뉴얼 1차 검토: 실행을 시작한 프로젝트는 실패해 장면이 없어도 Writer 로 되돌리지 않는다 — 되돌릴 곳(예전 Producer 의 다시 실행)이
+      //   없어졌고, 잠긴 Writer 화면에서 Artist 로 가려 해도 다시 되돌아와 갇혔다. Artist · Storyboard · Writer 화면이 멈춘 이유와
+      //   [이어서 다시 시도]를 보인다. 실행을 시작한 적이 없는데 장면도 없을 때만 지금처럼 앞으로 되돌린다.
+      const shouldGateBack = needsRerun && !writerStarted
 
       // 리뉴얼 1차: 단계 열림은 DB 단계 + 산출물(실행 기록 · 샷)로 정한다(stage-gate.ts).
       //   DB 단계를 아직 안 읽었거나(null) 실행 상태를 못 읽었으면 낙관값을 그대로 둔다 — 모를 땐 잠그지 않는다.

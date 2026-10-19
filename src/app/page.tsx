@@ -42,20 +42,13 @@ import { clearLastProjectId, readLastProjectId } from '@/lib/session-restore'
 import { ContactPopover } from '@/components/contact-popover'
 import { LegalFooter } from '@/components/legal/legal-footer'
 import { toast } from 'sonner'
+import { projectOpenPath, projectStageLabel } from '@/lib/project/open-path'
 
 interface ProjectItem {
   id: string
   title: string
   current_stage: string | null
   updated_at: string | null
-}
-
-const STAGE_LABELS: Record<string, string> = {
-  producer: 'Producer',
-  writer: 'Writer',
-  artist: 'Concept Artist',
-  director: 'Director',
-  editor: 'Editor',
 }
 
 const SERVICES = [
@@ -187,7 +180,7 @@ function ProjectCard({
       </div>
       <div className="mt-4 flex items-center gap-3 text-xs text-gray-400">
         <span className="rounded-md bg-white/10 px-2.5 py-1 font-medium">
-          {STAGE_LABELS[project.current_stage ?? 'producer'] ?? 'Producer'}
+          {projectStageLabel(project.current_stage)}
         </span>
         {project.updated_at && (
           <span className="flex items-center gap-1">
@@ -274,7 +267,8 @@ export default function HomePage() {
   const handleOpen = (project: ProjectItem) => {
     const stage = project.current_stage ?? 'producer'
     switchProject(project.id, project.title, stage as StageId)
-    router.push(`/studio/${stage}?projectId=${project.id}`)
+    // 단계 값과 화면 주소가 다르다(entry = /studio/start) — 주소는 단계 표에서 찾는다(프로젝트 목록과 같은 규칙).
+    router.push(projectOpenPath(project.current_stage, project.id))
   }
 
   const handleNew = () => {

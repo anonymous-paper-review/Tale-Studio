@@ -32,6 +32,7 @@ import { parseCustomStyleAnchor } from '@/lib/style-anchor';
 import { planSourceImageWrites, stripSourceImages } from '@/lib/producer/source-image';
 import { userOwnsProject } from '@/lib/generation-jobs';
 import { continueDraftState, draftBasisChanges, draftContinueBlock } from '@/lib/writer/treatment-draft';
+import { normalizeEntryDraft } from '@/lib/entry/draft';
 import type { WriterRunState } from '@/lib/writer/pipeline/steps';
 
 // producer 핸드오프 배경 페이로드(원천 rich shape). writer 내부 BackgroundContract 와 분리 —
@@ -271,6 +272,23 @@ async function upsertProducerBackgrounds(projectId: string, backgrounds: Produce
   }
 }
 
+type ChangeLevel = NonNullable<PipelineInput['changeLevel']>;
+
+function isChangeLevel(value: unknown): value is ChangeLevel {
+  return value === 'keep' || value === 'polish' || value === 'grow';
+}
+
+/** Producer 시작 화면에서 고른 바꿈 정도(entry_draft.picks.level) — 없거나 읽지 못하면 없음. */
+async function entryChangeLevel(projectId: string): Promise<ChangeLevel | undefined> {
+  try {
+    const { data } = await supabaseAdmin.from('projects').select('entry_draft').eq('id', projectId).maybeSingle();
+    const level = normalizeEntryDraft((data as { entry_draft?: unknown } | null)?.entry_draft).picks.level;
+    return isChangeLevel(level) ? level : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const user = await getUser();
@@ -326,8 +344,10 @@ export async function POST(req: NextRequest) {
     const treatmentDraft = body.treatmentDraft === true;
     const continueDraft = body.continueDraft === true;
     const restartDraft = treatmentDraft && body.restartDraft === true;
-    // 트리트먼트 초안은 이미 있는 실행을 고치거나 만든다 — 프로젝트 주인만(일반 시작의 로그인 확인보다 좁게).
-    if ((treatmentDraft || continueDraft) && !(await userOwnsProject(projectId, user.id))) {
+    // Writer 실행은 프로젝트 주인만 시작 · 이어 가기 · 다시 실행한다(리뉴얼 1차 검토 — 예전에는 초안 · 이어 가기만 주인을 봤고
+    //   일반 시작 · 다시 실행은 로그인만 보아, 남의 프로젝트 번호로 인물 · 배경을 덮어쓰고 실행을 만들 수 있었다).
+    //   약속: tests/permission/writer-start-owner.test.ts
+    if (!(await userOwnsProject(projectId, user.id))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -379,7 +399,8 @@ export async function POST(req: NextRequest) {
         );
       }
       // 트리트먼트를 쓴 바탕(이야기 · 러닝타임 · 대본 보존)이 바뀌었으면 그 트리트먼트로 넘기지 않는다 — 지금 값으로 다시 쓰게 한다.
-      const changed = draftBasisChanges((existing!.state as WriterRunState).input, {
+      //   확정한 산문(_proseLocked)은 막지 않는다 — 고칠 수도 다시 쓸 수도 없어 영영 막히고, 이어 갈 때 산문의 바탕을 그대로 쓴다(continueDraftState).
+      const changed = (existing!.state as WriterRunState)._proseLocked === true ? [] : draftBasisChanges((existing!.state as WriterRunState).input, {
         story,
         runtimeSeconds: effectiveRuntimeSeconds,
         ...(preserveScript ? { preserveScript: true } : {}),
@@ -513,6 +534,12 @@ export async function POST(req: NextRequest) {
       console.error('[writer/start] style anchor resolve failed (proceeding):', e);
     }
 
+    // 바꿈 정도 — 산문 초안을 다시 시도할 때(Writer 화면 [다시 시도]) 빠져 있으면 Producer 시작 화면에서 고른 값을 쓴다(리뉴얼 1차 검토).
+    //   약속: tests/writer/retry-change-level.test.ts
+    const changeLevel = isChangeLevel(body.changeLevel)
+      ? body.changeLevel
+      : treatmentDraft ? await entryChangeLevel(projectId) : undefined;
+
     // 2. run 시작 (genre/cast seed → s0/s2 생략).
     const input: PipelineInput = {
       story,
@@ -527,7 +554,7 @@ export async function POST(req: NextRequest) {
       sceneGate: writerEngine === 'v1',
       ...(treatmentDraft ? { treatmentDraft: true } : {}),
       ...(body.artistGate === true ? { artistGate: true } : {}),
-      ...(body.changeLevel === 'keep' || body.changeLevel === 'polish' || body.changeLevel === 'grow' ? { changeLevel: body.changeLevel } : {}),
+      ...(changeLevel ? { changeLevel } : {}),
       genre: effectiveGenre,
       cast,
       ...(preserveScript ? { preserveScript: true } : {}),

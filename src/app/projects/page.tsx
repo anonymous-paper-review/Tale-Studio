@@ -22,7 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import type { StageId } from '@/types'
-import { STAGES, STAGE_LABEL } from '@/lib/constants'
+import { projectOpenPath, projectStageLabel } from '@/lib/project/open-path'
 import { DashboardHeader } from '@/components/dashboard/dashboard-header'
 import { useT } from '@/lib/i18n'
 import { clearLastProjectId, readLastProjectId } from '@/lib/session-restore'
@@ -36,8 +36,6 @@ interface ProjectItem {
   thumbnail_url: string | null
 }
 
-// 카드의 단계 이름 = 화면 이름(리뉴얼 1차, constants STAGE_LABEL): entry=Producer, producer=Writer, writer=Storyboard.
-const STAGE_LABELS: Record<string, string> = STAGE_LABEL
 
 function formatDate(dateStr: string | null) {
   if (!dateStr) return ''
@@ -193,7 +191,7 @@ function ProjectCard({
       </div>
       <div className="mt-3 flex items-center gap-3 text-xs text-gray-400">
         <span className="rounded-md bg-white/10 px-2.5 py-1 font-medium">
-          {STAGE_LABELS[project.current_stage ?? 'producer'] ?? 'Producer'}
+          {projectStageLabel(project.current_stage)}
         </span>
         {project.updated_at && (
           <span className="flex items-center gap-1">
@@ -232,9 +230,8 @@ export default function ProjectsPage() {
   const handleOpen = (project: ProjectItem) => {
     const stage = project.current_stage ?? 'producer'
     switchProject(project.id, project.title, stage as StageId)
-    // 단계 id 와 주소가 다를 수 있다(entry = /studio/start) — 주소는 STAGES 에서 찾는다.
-    const path = STAGES.find((s) => s.id === stage)?.path ?? '/studio/start'
-    router.push(`${path}?projectId=${project.id}`)
+    // 단계 값과 화면 주소가 다르다(entry = /studio/start) — 주소는 단계 표에서 찾는다(홈 목록과 같은 규칙).
+    router.push(projectOpenPath(project.current_stage, project.id))
   }
 
   // 새 프로젝트는 무엇을 만들지 · 자료 · 아이디어를 묻는 화면에서 만든다(2026-10-02 오너 — 시안 v04 0.1).

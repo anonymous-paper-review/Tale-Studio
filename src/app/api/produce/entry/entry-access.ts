@@ -15,6 +15,15 @@ export const ENTRY_STAGES = ['entry', 'producer'] as const
 
 export type EntryAccess = { ok: true; userId: string } | { ok: false; response: Response }
 
+/** 로그인만 — 본문을 읽기 전에 막을 때(파일 올리기). 데모(공유) 세션의 쓰기도 먼저 막는다. */
+export async function authorizeEntryUser(req: Request): Promise<EntryAccess> {
+  const blocked = demoWriteBlock(req)
+  if (blocked) return { ok: false, response: blocked }
+  const user = await getUser()
+  if (!user) return { ok: false, response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
+  return { ok: true, userId: user.id }
+}
+
 /** 로그인 · 주인 확인. write = 데모(공유) 세션의 쓰기를 먼저 막는다. */
 export async function authorizeEntry(req: Request, projectId: unknown, opts: { write: boolean }): Promise<EntryAccess> {
   if (opts.write) {
@@ -37,6 +46,7 @@ export interface EntryProjectRow {
   locale?: string | null
   current_stage?: string | null
   entry_draft?: unknown
+  story_text?: string | null
   settings?: { format?: unknown } | null
 }
 

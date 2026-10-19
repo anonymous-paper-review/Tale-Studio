@@ -3,7 +3,7 @@
 //   시작한 뒤(entry_draft.startedAt)에는 고치지 않는다(409) — 화면 비율이 잠겼고 Producer 는 완료 화면이다.
 //   약속: tests/producer/entry-routes.test.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { applyEntryPatch, normalizeEntryDraft } from '@/lib/entry/draft'
+import { applyEntryPatch, entryDraftFor } from '@/lib/entry/draft'
 import { planEntryStart } from '@/lib/entry/start-plan'
 import { parseAppLocale } from '@/lib/locale'
 import { getRunStatusLight } from '@/lib/writer/run-store'
@@ -18,9 +18,9 @@ export async function GET(req: NextRequest) {
   if (!access.ok) return access.response
   const id = projectId as string
   try {
-    const row = await loadEntryProject(id, 'title, locale, current_stage, entry_draft, settings')
+    const row = await loadEntryProject(id, 'title, locale, current_stage, entry_draft, story_text, settings')
     if (!row) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
-    const draft = normalizeEntryDraft(row.entry_draft)
+    const draft = entryDraftFor({ entryDraft: row.entry_draft, storyText: row.story_text, stage: row.current_stage })
     const locale = parseAppLocale(row.locale) ?? 'en'
     const run = await getRunStatusLight(id).catch(() => null)
     // 시작한 프로젝트는 같은 값으로 Writer 시작을 다시 할 수 있게 요청을 돌려준다(초안 쓰기가 실패했을 때).
@@ -46,9 +46,9 @@ export async function PATCH(req: NextRequest) {
   if (!access.ok) return access.response
   const projectId = body!.projectId as string
   try {
-    const row = await loadEntryProject(projectId, 'current_stage, entry_draft')
+    const row = await loadEntryProject(projectId, 'current_stage, entry_draft, story_text')
     if (!row) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
-    const draft = normalizeEntryDraft(row.entry_draft)
+    const draft = entryDraftFor({ entryDraft: row.entry_draft, storyText: row.story_text, stage: row.current_stage })
     if (draft.startedAt) return NextResponse.json({ error: 'already_started' }, { status: 409 })
     const next = applyEntryPatch(draft, body?.patch)
     await saveEntryDraft(projectId, next)

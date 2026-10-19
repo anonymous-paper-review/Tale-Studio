@@ -175,6 +175,16 @@ export function normalizeEntryDraft(raw: unknown): EntryDraft {
   }
 }
 
+/** 라우트가 읽는 초안 — 리뉴얼 전 Producer 에 이야기만 적어 두고 시작하지 않은 프로젝트(단계 producer · 시작 화면 초안 없음)는
+ *  그 이야기를 아이디어 칸에 채워 연다. [시작]은 아이디어로 이야기를 다시 저장하므로, 채우지 않으면 적어 둔 이야기를 덮어쓴다.
+ *  새 프로젝트(단계 entry)는 채우지 않는다 — 아이디어는 사람이 쓴다. 약속: tests/producer/entry-legacy-story.test.ts */
+export function entryDraftFor(row: { entryDraft: unknown; storyText?: string | null; stage?: string | null }): EntryDraft {
+  const draft = normalizeEntryDraft(row.entryDraft)
+  const story = typeof row.storyText === 'string' ? row.storyText.trim() : ''
+  if (row.entryDraft == null && row.stage === 'producer' && story) return { ...draft, idea: story.slice(0, IDEA_MAX_CHARS) }
+  return draft
+}
+
 /** 화면이 보내는 고침 — 고칠 수 있는 칸만. 파일은 빼기(null)만 여기서 하고 올리기는 파일 라우트가 한다. */
 export interface EntryDraftPatch {
   idea?: string

@@ -5,7 +5,7 @@
 //   돌려주는 writerStart 를 클라이언트가 그대로 /api/writer/start 에 보낸다(산문 초안).
 //   약속: tests/producer/entry-routes.test.ts · tests/producer/entry-start-plan.test.ts
 import { NextResponse } from 'next/server'
-import { normalizeEntryDraft, type EntryDraft } from '@/lib/entry/draft'
+import { entryDraftFor, type EntryDraft } from '@/lib/entry/draft'
 import { planEntryStart } from '@/lib/entry/start-plan'
 import { parseAppLocale } from '@/lib/locale'
 import { supabaseAdmin } from '@/lib/supabase/admin'
@@ -20,9 +20,9 @@ export async function POST(req: Request) {
   const projectId = body!.projectId as string
 
   try {
-    const row = await loadEntryProject(projectId, 'title, locale, current_stage, entry_draft')
+    const row = await loadEntryProject(projectId, 'title, locale, current_stage, entry_draft, story_text')
     if (!row) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
-    const draft = normalizeEntryDraft(row.entry_draft)
+    const draft = entryDraftFor({ entryDraft: row.entry_draft, storyText: row.story_text, stage: row.current_stage })
     if (draft.startedAt) return NextResponse.json({ error: 'already_started' }, { status: 409 })
     if (!isEntryStage(row.current_stage)) return NextResponse.json({ error: 'wrong_stage' }, { status: 409 })
 

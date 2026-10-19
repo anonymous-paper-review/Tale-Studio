@@ -1830,9 +1830,16 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     const tasks: Array<Promise<unknown>> = []
     for (const c of characterAssets) {
       if (c.entityType === 'object') continue
-      const drawn = c.appearances.some((a) => a.isDefault && a.sheetUrl) || c.views.main != null
-      if (drawn) continue
-      tasks.push(get().generateCharacterView(c.characterId, requireDefaultAppearanceKey(c), 'main', 'auto').catch(() => null))
+      // [완료하기]와 같은 기준 — 대표 모습에 시트가 있어야 그린 것이다(예전 대표 그림만 있으면 완료하기가 막힌다, completion-gaps).
+      if (c.appearances.some((a) => a.isDefault && a.sheetUrl)) continue
+      // 대표 모습 정보가 깨진 인물 하나 때문에 나머지를 멈추지 않는다.
+      let appearanceKey: string
+      try {
+        appearanceKey = requireDefaultAppearanceKey(c)
+      } catch {
+        continue
+      }
+      tasks.push(get().generateCharacterView(c.characterId, appearanceKey, 'main', 'auto').catch(() => null))
     }
     for (const w of worldAssets) {
       if (w.wideShot != null || generatingLocations.includes(w.locationId)) continue

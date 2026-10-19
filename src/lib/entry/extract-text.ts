@@ -182,15 +182,22 @@ function toBytes(content: unknown): Uint8Array {
   return new Uint8Array(0)
 }
 
-function inflateSection(data: Uint8Array): Uint8Array {
+/** 문서 하나를 풀었을 때 크기 한도 — 10MB 안쪽 파일도 풀면 수 GB 가 되게 만들 수 있다(압축 폭탄). 글은 어차피 100KB 까지만 쓴다. */
+export const MAX_UNPACKED_BYTES = 64 * 1024 * 1024
+
+const tooLarge = (error: unknown) => (error as { code?: string } | null)?.code === 'ERR_BUFFER_TOO_LARGE'
+
+/** HWP 본문 한 칸을 푼다 — 한도(maxBytes)를 넘으면 끝까지 풀지 않고 읽을 수 없는 파일로 알린다. */
+export function inflateSection(data: Uint8Array, maxBytes = MAX_UNPACKED_BYTES): Uint8Array {
   try {
-    return inflateRawSync(data)
-  } catch {
+    return inflateRawSync(data, { maxOutputLength: maxBytes })
+  } catch (error) {
+    if (tooLarge(error)) throw new EntryFileUnreadableError('too_large')
     // 일부 저장기는 zlib 머리를 붙인다.
     try {
-      return inflateSync(data)
-    } catch {
-      throw new EntryFileUnreadableError('corrupt')
+      return inflateSync(data, { maxOutputLength: maxBytes })
+    } catch (inner) {
+      throw new EntryFileUnreadableError(tooLarge(inner) ? 'too_large' : 'corrupt')
     }
   }
 }
@@ -223,9 +230,14 @@ export function extractHwpText(data: Uint8Array): string {
     .sort((a, b) => a.n - b.n)
   if (!sections.length) throw new EntryFileUnreadableError('no_body')
   const paragraphs: string[] = []
+  // 한도는 문서 전체에 건다 — 본문 칸을 여러 개로 나눠 부풀려도 막는다.
+  let left = MAX_UNPACKED_BYTES
   for (const { path } of sections) {
     const body = streams.get(path)!
-    paragraphs.push(...parseHwpSection(flags & HWP_FLAG_COMPRESSED ? inflateSection(body) : body))
+    const section = flags & HWP_FLAG_COMPRESSED ? inflateSection(body, Math.max(left, 1)) : body
+    left -= section.length
+    if (left < 0) throw new EntryFileUnreadableError('too_large')
+    paragraphs.push(...parseHwpSection(section))
   }
   return paragraphs.join('\n')
 }
@@ -262,7 +274,35 @@ export function hwpxParagraphs(xml: string): string[] {
   return out
 }
 
-export async function extractHwpxText(data: Uint8Array): Promise<string> {
+/** zip 안 파일 하나를 글로 — 푸는 동안 크기를 세어 남은 한도를 넘으면 멈추고 읽을 수 없는 파일로 알린다(압축 폭탄). */
+function readZipEntryText(file: JSZip.JSZipObject, budget: { left: number }): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = []
+    const stream = file.nodeStream('nodebuffer')
+    let settled = false
+    const fail = (reason: string) => {
+      if (settled) return
+      settled = true
+      stream.pause()
+      stream.removeAllListeners('data')
+      reject(new EntryFileUnreadableError(reason))
+    }
+    stream.on('data', (chunk: Buffer) => {
+      if (settled) return
+      budget.left -= chunk.length
+      if (budget.left < 0) return fail('too_large')
+      chunks.push(chunk)
+    })
+    stream.on('error', () => fail('corrupt'))
+    stream.on('end', () => {
+      if (settled) return
+      settled = true
+      resolve(Buffer.concat(chunks).toString('utf8'))
+    })
+  })
+}
+
+export async function extractHwpxText(data: Uint8Array, maxBytes = MAX_UNPACKED_BYTES): Promise<string> {
   let zip: JSZip
   try {
     zip = await JSZip.loadAsync(data)
@@ -275,8 +315,9 @@ export async function extractHwpxText(data: Uint8Array): Promise<string> {
     .sort((a, b) => a.n - b.n)
   if (!sections.length) throw new EntryFileUnreadableError('no_body')
   const paragraphs: string[] = []
+  const budget = { left: maxBytes }
   for (const { path } of sections) {
-    paragraphs.push(...hwpxParagraphs(await zip.file(path)!.async('string')))
+    paragraphs.push(...hwpxParagraphs(await readZipEntryText(zip.file(path)!, budget)))
   }
   return paragraphs.join('\n')
 }

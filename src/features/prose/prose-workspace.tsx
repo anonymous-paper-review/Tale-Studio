@@ -6,13 +6,14 @@
 //   AI 가 일하는 동안(초안 쓰기 · 다시 쓰기 · 수정안)은 화면 전체를 진행 표시로 덮는다.
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, Check, Loader2, Lock } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Check, Loader2, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AiBusyOverlay, type AiBusyStep } from '@/components/ai-busy-overlay'
+import { WriterResumeButton } from '@/components/layout/writer-resume-button'
 import { useT } from '@/lib/i18n'
 import { withDemoShare } from '@/lib/demo/context'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
@@ -116,6 +117,17 @@ export function ProseWorkspace() {
           <Button size="sm" onClick={() => void confirmLegacy()} disabled={legacyConfirming} data-testid="prose-legacy-confirm">
             {legacyConfirming ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}{t('Confirm as-is')}
           </Button>
+        </div>
+      ) : null}
+
+      {prose.runStopped ? (
+        <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border bg-muted/40 px-6 py-2.5 text-sm" role="alert" data-testid="prose-run-stopped">
+          <AlertTriangle className="size-4 shrink-0 text-warning" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">{t('AI generation stopped')}</p>
+            <p className="break-words text-xs text-muted-foreground">{prose.status?.error ?? t('Background generation stopped.')}</p>
+          </div>
+          <WriterResumeButton projectId={prose.projectId} onResumed={prose.restartStatus} />
         </div>
       ) : null}
 

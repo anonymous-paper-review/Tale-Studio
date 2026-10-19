@@ -35,3 +35,9 @@ export function proseBusy(input: {
 export function legacyGateWaiting(input: { locked: boolean; phase: SceneGatePhase; draftRun: boolean }): boolean {
   return input.locked && input.phase === 'gate' && !input.draftRun
 }
+
+/** 산문을 넘긴 뒤(초안이 아닌 실행) 실행이 멈췄다 — Writer 화면에 멈춘 이유와 [이어서 다시 시도]를 보인다(리뉴얼 1차 검토).
+ *  산문 초안을 쓰다 실패한 것은 산문 자리의 [다시 시도](재료 · 조건 그대로 처음부터)가 맡는다. */
+export function handedRunStopped(input: { draftLive: boolean; phase: SceneGatePhase }): boolean {
+  return !input.draftLive && input.phase === 'failed'
+}

@@ -42,6 +42,12 @@ export function artistPhase(input: {
   return 'done'
 }
 
+/** 이어 만들던 실행이 멈췄다 — 카드가 보여도 Artist 화면 위에 멈춘 이유와 [이어서 다시 시도]를 보인다(리뉴얼 1차 검토).
+ *  아직 [만들기] 전인 산문 초안 실행은 Writer 화면의 [다시 시도]가 맡는다. */
+export function artistRunStopped(input: { draftRun: boolean; status: { pipeline_failed?: boolean } | null | undefined }): boolean {
+  return !input.draftRun && input.status?.pipeline_failed === true
+}
+
 export interface AssetProgress {
   charsReady: number
   charsTotal: number

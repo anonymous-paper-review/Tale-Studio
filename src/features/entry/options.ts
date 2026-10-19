@@ -174,6 +174,17 @@ export function entryFileKind(name: string): 'text' | 'image' | null {
   return null
 }
 
+/** 시작 화면의 파일 고르기 — 그림 파일은 사용 동의를 받은 뒤에만 올린다(채팅 · Director · Editor 의 그림 올리기와 같은 약속).
+ *  약속: tests/producer/entry-image-consent.test.ts */
+export async function pickEntryFile(
+  file: File,
+  deps: { requestConsent: (files: File[]) => Promise<boolean>; upload: (file: File) => Promise<unknown> },
+): Promise<'uploaded' | 'declined'> {
+  if (entryFileKind(file.name) === 'image' && !(await deps.requestConsent([file]))) return 'declined'
+  await deps.upload(file)
+  return 'uploaded'
+}
+
 export type FileProblem = { code: 'bad_ext' } | { code: 'too_large' } | { code: 'empty' }
 
 /** 고르는 순간의 검사(서버도 같은 검사를 한다). 통과면 null. */
