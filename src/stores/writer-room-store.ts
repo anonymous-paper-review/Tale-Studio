@@ -5,12 +5,16 @@ import { create } from 'zustand'
 
 export type WorkspaceTab = 'screen' | 'chat'
 
-/** Producer 시작 화면 · Writer 가 함께 쓰는 탭 기억 칸. */
+/** Writer 탭 기억 칸. */
 export const WORKSPACE_TAB_KEY = 'tale.workspaceTab'
+/** Producer 시작 화면의 탭 기억 칸(features/entry/options.ts) — 'form' · 'chat'. 한 사람의 방식은 하나라 서로 따른다. */
+const ENTRY_TAB_KEY = 'tale.entry.tab.v1'
 
 export function readWorkspaceTab(): WorkspaceTab {
   try {
-    return window.localStorage.getItem(WORKSPACE_TAB_KEY) === 'chat' ? 'chat' : 'screen'
+    const own = window.localStorage.getItem(WORKSPACE_TAB_KEY)
+    if (own === 'chat' || own === 'screen') return own
+    return window.localStorage.getItem(ENTRY_TAB_KEY) === 'chat' ? 'chat' : 'screen'
   } catch {
     return 'screen'
   }
@@ -19,6 +23,7 @@ export function readWorkspaceTab(): WorkspaceTab {
 export function writeWorkspaceTab(tab: WorkspaceTab): void {
   try {
     window.localStorage.setItem(WORKSPACE_TAB_KEY, tab)
+    window.localStorage.setItem(ENTRY_TAB_KEY, tab === 'chat' ? 'chat' : 'form')
   } catch {
     /* 기억 못 해도 화면은 그대로 쓴다 */
   }

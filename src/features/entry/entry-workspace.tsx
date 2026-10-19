@@ -17,6 +17,7 @@ import { useProjectStore } from '@/stores/project-store'
 import { ENTRY_FILE_ACCEPT, IMAGE_EXT_LABEL, TEXT_EXT_LABEL, WRITING_STEPS, readStoredTab, readingSteps, writeStoredTab, type EntryTab } from './options'
 import { entryStarted, useEntryStore } from './entry-store'
 import { BusyOverlayPortal, UploadingChip, stepsFrom, useUploadErrorMessage } from './entry-parts'
+import { writeWorkspaceTab } from '@/stores/writer-room-store'
 import { EntryForm } from './entry-form'
 import { EntryChat } from './entry-chat'
 import { EntrySummary } from './entry-summary'
@@ -38,6 +39,8 @@ function tabSnapshot(): EntryTab {
 function setTab(tab: EntryTab) {
   tabCache = tab
   writeStoredTab(tab)
+  // Writer 도 같은 방식으로 연다(한 사람의 방식은 하나 — writer-room-store).
+  writeWorkspaceTab(tab === 'chat' ? 'chat' : 'screen')
   for (const listener of tabListeners) listener()
 }
 
