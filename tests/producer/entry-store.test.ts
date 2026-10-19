@@ -289,6 +289,15 @@ describe('시작과 산문 초안', () => {
     expect(calls.some((c) => c.url === '/api/writer/start')).toBe(false)
   })
 
+  it('산문을 확정해 Writer 가 다음 단계를 도는 프로젝트를 열면 잠금 화면 없이 완료 화면만 보여준다', async () => {
+    // 왜: 확정 뒤의 Writer 작업은 산문 초안이 아니다. 시작 화면이 그 긴 작업 내내 화면을 잠그면 안 된다.
+    routes['GET /api/produce/entry'] = () => ({ body: { draft: { ...startDraft(), startedAt: '2026-10-19T00:00:00.000Z' }, title: '자판기의 반란', startedAt: '2026-10-19T00:00:00.000Z', locale: 'ko', stage: 'producer', format: 'vertical_9:16', writer: { started: true, status: 'running', draft: false }, writerStart } })
+    await useEntryStore.getState().load(PID)
+    expect(entryStarted(useEntryStore.getState())).toBe(true)
+    expect(useEntryStore.getState().writing.status).toBe('idle')
+    expect(calls.some((c) => c.url.includes('/api/writer/status'))).toBe(false)
+  })
+
   it('이미 시작한 프로젝트를 열면 완료 화면으로 보고, Writer 가 아직 쓰는 중이면 다 될 때까지 기다린다', async () => {
     // 왜: 시작한 Producer 는 고칠 수 없는 완료 화면이다. 새로 고침해도 쓰는 중인 초안을 놓치지 않는다.
     routes['GET /api/produce/entry'] = () => ({ body: { draft: { ...startDraft(), startedAt: '2026-10-19T00:00:00.000Z' }, title: '자판기의 반란', startedAt: '2026-10-19T00:00:00.000Z', locale: 'ko', stage: 'producer', format: 'vertical_9:16', writer: { started: true, status: 'running', draft: true }, writerStart } })

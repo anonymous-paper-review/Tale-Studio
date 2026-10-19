@@ -373,8 +373,8 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
           writerStart: body.writerStart && typeof body.writerStart === 'object' ? (body.writerStart as EntryWriterStartBody) : null,
           formStep: recIsCurrent(draft) ? 2 : 1,
         })
-        // 새로 고침해도 쓰는 중인 초안을 놓치지 않는다.
-        if (draft.startedAt && writer?.started && writer.status === 'running') {
+        // 새로 고침해도 쓰는 중인 산문 초안을 놓치지 않는다. 확정 뒤의 Writer 작업(초안 아님)은 시작 화면이 잠그지 않는다.
+        if (draft.startedAt && writer?.started && writer.status === 'running' && writer.draft) {
           set({ writing: { status: 'writing', step: 0 } })
           void pollWriter(gen)
         }

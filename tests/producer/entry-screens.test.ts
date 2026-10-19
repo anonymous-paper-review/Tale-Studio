@@ -231,6 +231,14 @@ describe('완료 화면', () => {
     expect(out).not.toContain('role="radio"')
   })
 
+  it('산문을 확정한 뒤의 Writer 작업이 실패했으면 다시 시도 대신 Writer로 가기를 둔다', () => {
+    // 왜: 확정 뒤 실패는 Writer 화면에서 다시 돌린다. 시작 화면의 다시 시도는 산문 초안을 처음부터 다시 써 버린다.
+    setEntry({ draft: { ...recDraft(), startedAt: '2026-10-19T00:00:00.000Z' }, writer: { started: true, status: 'failed', draft: false }, writerStart: { projectId: 'project-1' } as never })
+    const out = html(EntrySummary)
+    expect(out).toContain('Writer로 가기')
+    expect(out).not.toContain('다시 시도')
+  })
+
   it('시작했는데 산문 초안을 아직 못 썼으면 Writer로 가기 대신 다시 시도를 둔다', () => {
     // 왜: Writer 시작이 실패하면 Writer 단계가 열리지 않는다. 그 자리에서 다시 쓰게 한다.
     setEntry({ draft: { ...recDraft(), startedAt: '2026-10-19T00:00:00.000Z' }, writer: { started: true, status: 'failed', draft: true }, writerStart: { projectId: 'project-1' } as never })

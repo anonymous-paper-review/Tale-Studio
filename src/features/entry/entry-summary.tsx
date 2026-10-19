@@ -12,7 +12,6 @@ import { useEntryStore } from './entry-store'
 import { FileChip } from './entry-parts'
 import { materialPreview, summaryRows } from './summary'
 
-const READY_STATUSES = new Set(['running', 'awaiting_confirmation', 'completed'])
 
 export function EntrySummary() {
   const t = useT()
@@ -26,8 +25,10 @@ export function EntrySummary() {
   const projectId = useEntryStore((s) => s.projectId)
 
   const fromNewFlow = !!draft.startedAt
-  // 시작했는데 Writer 실행이 없거나 실패했다 — Writer 단계가 열리지 않는다. 같은 값으로 다시 쓰게 한다.
-  const needsRetry = fromNewFlow && !!writerStart && !(writer?.started && writer.status && READY_STATUSES.has(writer.status)) && writing.status !== 'done'
+  // 시작했는데 Writer 실행이 없거나 산문 초안이 실패했다 — 같은 값으로 초안을 다시 쓰게 한다.
+  //   확정 뒤의 Writer 작업이 실패한 것은 Writer 화면에서 다시 돌린다(여기서 다시 쓰면 초안부터 새로 쓴다).
+  const draftFailed = !!writer?.started && writer.status === 'failed' && writer.draft
+  const needsRetry = fromNewFlow && !!writerStart && (!writer?.started || draftFailed) && writing.status !== 'done'
   const busy = writing.status === 'starting' || writing.status === 'writing'
   const preview = materialPreview(draft)
 
