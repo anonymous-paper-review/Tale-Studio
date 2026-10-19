@@ -624,6 +624,9 @@ interface ArtistState {
   /** 콘텐츠 정책 거절 뒤 우회(safe) 재시도 — 약속 B9. */
   retryWorldShotSafe: (locationId: string, model?: ImageModelKey, appearanceKey?: string | null) => Promise<void>
   autoGenerateBaseImages: () => Promise<void>
+  /** 리뉴얼 1차: [남은 그림 다시 그리기] — 대표 그림(인물 기본 모습 시트 · 배경 넓은 그림)이 없는 것을 모두 그린다.
+   *  자동 그리기와 달리 서버 초안을 기다리던 인물도 그린다(서버 초안이 실패했을 때 영영 비지 않게). */
+  drawMissingImages: () => Promise<void>
   /** 온보딩 "진행" 단일 진입점 — look-pending 초안 + writer-추가 무이미지 캐릭터의 main 을 재생성(유저 클릭만). */
   refreshLookPendingDrafts: () => Promise<void>
   applyUpdates: (updates: ArtistUpdate[]) => Promise<void>
@@ -1822,6 +1825,22 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   //   producer main 은 서버 초안 트리거(draft-trigger.ts)가 단일 생산자다(C1) — 여기서
   //   client 가 main 을 다시 자동 제출하지 않는다(이중 생성/과금 방지; 서버 실패는 카드 배지로 표시).
   //   여기선 writer-origin 오픈캐스트 main 과 월드 fallback 만 보강한다(자연 캐시 skip).
+  drawMissingImages: async () => {
+    const { characterAssets, worldAssets, generatingLocations } = get()
+    const tasks: Array<Promise<unknown>> = []
+    for (const c of characterAssets) {
+      if (c.entityType === 'object') continue
+      const drawn = c.appearances.some((a) => a.isDefault && a.sheetUrl) || c.views.main != null
+      if (drawn) continue
+      tasks.push(get().generateCharacterView(c.characterId, requireDefaultAppearanceKey(c), 'main', 'auto').catch(() => null))
+    }
+    for (const w of worldAssets) {
+      if (w.wideShot != null || generatingLocations.includes(w.locationId)) continue
+      tasks.push(get().generateWorldShot(w.locationId, 'wideShot', undefined, 'auto').catch(() => null))
+    }
+    await Promise.all(tasks)
+  },
+
   autoGenerateBaseImages: async () => {
     const { characterAssets, worldAssets } = get()
     const projectId = useProjectStore.getState().projectId

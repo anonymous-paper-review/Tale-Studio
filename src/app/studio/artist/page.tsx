@@ -355,7 +355,7 @@ export default function VisualPage() {
       footer={stuck ? (
         <>
           <Button size="sm" variant="outline" onClick={() => setMakingDismissed(projectId)}>{t('Close')}</Button>
-          <Button size="sm" onClick={() => void autoGenerateBaseImages()}>{t('Draw the remaining images')}</Button>
+          <Button size="sm" onClick={() => void useArtistStore.getState().drawMissingImages()}>{t('Draw the remaining images')}</Button>
         </>
       ) : undefined}
     />
