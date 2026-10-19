@@ -36,6 +36,14 @@ describe('시작할 때 만드는 이야기와 설정', () => {
     expect(ideaOnly.ok && ideaOnly.story).toBe(IDEA)
   })
 
+  it('그대로로 시작하면서 대본 파일이 있으면 파일 글만 원문으로 지키고 아이디어 글은 원문에 넣지 않는다', () => {
+    // 왜: 그대로(바로 영상화)는 대본을 그대로 쓴다 — 아이디어 칸의 설명 글이 대본 첫 장면으로 섞이면 안 된다(2026-10-19 혼자 정함).
+    const keep = plan(draftWith({ file: scriptFile, picks: { mood: 'comedy', runtime: 'r60', level: 'keep', ratio: '9:16' } }))
+    expect(keep.ok && keep.story).toBe(SCRIPT)
+    expect(keep.ok && keep.writerStart.story).toBe(SCRIPT)
+    expect(keep.ok && keep.producerDraft.storyText).toBe(SCRIPT)
+  })
+
   it('정한 값으로 설정을 만든다: 길이는 초, 장르는 프로젝트 언어의 장르·분위기 이름, 화면 비율은 화면 형식, 대사 언어는 프로젝트 언어다', () => {
     // 왜: 채팅 · 대사 언어를 고르는 칸이 없다. 사이트 언어로 잠근 프로젝트 언어가 곧 대사 언어다.
     const ko = plan(draftWith())

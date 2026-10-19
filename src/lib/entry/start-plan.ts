@@ -86,7 +86,8 @@ export function planEntryStart({ projectId, draft, locale, currentTitle }: Entry
   if (level === 'keep' && !hasOriginalText(draft.idea, draft.file)) return { ok: false, code: 'keep_needs_original' }
 
   const keep = level === 'keep'
-  const story = entryStory(draft)
+  // 그대로(대본 보존)는 대본 파일이 있으면 파일 글만 원문으로 지킨다 — 아이디어 칸의 설명이 대본에 섞이지 않게(2026-10-19).
+  const story = keep && fileHasText(draft.file) ? (draft.file!.text ?? '').trim() : entryStory(draft)
   // 그대로 영상화는 원작 길이가 영상 길이다 — 길이를 정하지 않는다(2026-10-09 오너 "영상 길이 제한을 없애줘").
   const playtime = keep ? 0 : runtimeSeconds(runtime)
   const format = formatFromRatio(ratio)

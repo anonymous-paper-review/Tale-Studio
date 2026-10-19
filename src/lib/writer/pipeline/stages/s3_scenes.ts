@@ -1,4 +1,5 @@
 // S3: 씬 브레이크다운, 감정 비트, 정보 비대칭
+import { changeLevelBlock } from '@/lib/writer/pipeline/change-level';
 import { displayNameOf, humanizeSlug } from '@/lib/display-name';
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import { ScenesSchema } from '@/lib/writer/pipeline/schemas';
@@ -248,7 +249,7 @@ ${stageCandidates
 `
     : '';
 
-  const userPrompt = `${revisionBlock}${revisionSourceBlock}${stageCandidateBlock}[스토리]
+  const userPrompt = `${revisionBlock}${revisionSourceBlock}${stageCandidateBlock}${changeLevelBlock(input)}[스토리]
 ${input.story}
 
 [genre]

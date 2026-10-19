@@ -14,6 +14,7 @@
 //     하류에 합류한다. 무대 후보는 월드에 직접 삽입하지 않는다 — s3 프롬프트의 후보 블록으로만
 //     주입하고, 씬이 실제로 채택한 무대만 mergeOpenWorld 를 타고 월드에 들어온다
 //     (미채택 후보는 v2 디자인·배경 생성 비용을 태우지 않는다).
+import { changeLevelBlock } from '@/lib/writer/pipeline/change-level';
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import { DramaturgySchema } from '@/lib/writer/pipeline/schemas';
 import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
@@ -63,7 +64,7 @@ export async function runDramaturgy(
   // #i18n-s5: 미지정(레거시)이면 종전 "스토리와 같은 언어" 관례 그대로 — 지정 시 [출력 언어] 절이 우선.
   const langHint = input.outputLocale ? '[출력 언어] 절이 정한 언어' : '스토리와 같은 언어';
 
-  const userPrompt = `[스토리 — 원문 불변]
+  const userPrompt = `${changeLevelBlock(input)}[스토리 — 원문 불변]
 ${input.story}
 
 [목표 러닝타임]
