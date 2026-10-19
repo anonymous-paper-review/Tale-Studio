@@ -293,7 +293,8 @@ export function Sidebar() {
                     <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-full bg-primary" />
                   )}
                   <Icon className="size-5" />
-                  <span className="text-xs font-medium leading-none">
+                  {/* 긴 이름(Storyboard, 리뉴얼 1차)은 레일 폭 안에 들도록 한 단계 작게 · 자간을 좁힌다. */}
+                  <span className={cn('text-xs font-medium leading-none', STAGE_LABEL[stage.id].length > 8 && 'text-[10.5px] tracking-tight')}>
                     {STAGE_LABEL[stage.id]}
                   </span>
                   {badge > 0 && (

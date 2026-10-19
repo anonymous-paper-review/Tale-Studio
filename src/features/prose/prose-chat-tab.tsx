@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { MarkdownText } from '@/components/layout/markdown-text'
 import { SceneStoryProposalCard } from '@/components/layout/scene-story-proposal-card'
-import { useLocale, useT } from '@/lib/i18n'
+import { translate, useLocale, useT } from '@/lib/i18n'
+import { useContentLocale } from '@/lib/i18n/content'
 import { cn } from '@/lib/utils'
 import { runtimeLabel } from '@/lib/prose/conditions'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
@@ -53,7 +54,10 @@ export function ProseChatTab({ prose, title }: { prose: ProseState; title: strin
   const [text, setText] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const endRef = useRef<HTMLDivElement>(null)
-  const thread = messages.filter((message) => message.stage === 'producer')
+  // Writer 첫 한 줄(announceProseReady)은 위 산문 카드가 같은 말을 하므로 채팅 탭에서는 다시 보이지 않는다.
+  const contentLocale = useContentLocale()
+  const greeting = translate(contentLocale, 'I wrote the prose in {count} scenes. If you do not like it, say "Rewrite it" or change the conditions and rewrite it.', { count: prose.paragraphs.length })
+  const thread = messages.filter((message) => message.stage === 'producer' && !(message.role === 'model' && message.content === greeting))
   const writerNext = suggestion?.stage === 'producer' && suggestion.action?.kind === 'writerNext' ? suggestion.action.step : null
   const proposal = prose.proposal
   const manualOpen = !!prose.editing
