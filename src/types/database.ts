@@ -1269,6 +1269,7 @@ export type Database = {
           current_stage: string | null
           custom_style_anchor: Json | null
           design_tokens: Json | null
+          entry_draft: Json | null
           expanded_story: string | null
           id: string
           last_writer_run_id: string | null
@@ -1289,6 +1290,7 @@ export type Database = {
           current_stage?: string | null
           custom_style_anchor?: Json | null
           design_tokens?: Json | null
+          entry_draft?: Json | null
           expanded_story?: string | null
           id?: string
           last_writer_run_id?: string | null
@@ -1309,6 +1311,7 @@ export type Database = {
           current_stage?: string | null
           custom_style_anchor?: Json | null
           design_tokens?: Json | null
+          entry_draft?: Json | null
           expanded_story?: string | null
           id?: string
           last_writer_run_id?: string | null
