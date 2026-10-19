@@ -5,6 +5,7 @@ import { translate } from '@/lib/i18n'
 import type { AppLocale } from '@/lib/locale'
 import type { BackgroundContract, Characters, Dramaturgy, NarrativeStructure, Scenes } from '@/lib/writer/types/pipeline'
 import type { SceneStoryProposal } from '@/lib/producer/scene-story-proposal'
+import type { ProseConditions } from '@/lib/writer/prose-conditions'
 
 export type RewriteLevel = 'polish' | 'reword' | 'rethink'
 export type RewriteDirection = 'tidy' | 'warmer' | 'tense' | 'brisk'
@@ -66,6 +67,7 @@ export function newRewriteProposal(input: {
   feedback: string
   baseScenes: Scenes
   createdAt: string
+  conditions?: ProseConditions
 }): SceneStoryProposal {
   const ids: RewriteVariantId[] = ['v1', 'v2', 'v3']
   return {
@@ -76,6 +78,7 @@ export function newRewriteProposal(input: {
     baseScenes: input.baseScenes,
     level: input.level,
     variants: LEVEL_DIRECTIONS[input.level].map((direction, index) => ({ id: ids[index], direction, status: 'generating' })),
+    ...(input.conditions ? { conditions: input.conditions } : {}),
   }
 }
 

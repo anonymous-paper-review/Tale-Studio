@@ -99,6 +99,10 @@ export interface WriterRunState extends WriterRunStateBase {
   _artistDeferred?: boolean;
   /** 리뉴얼 1차: Artist 에서 [완료하기]를 눌렀다 — 인물 · 배경 디자인 뒤 멈춤(awaiting_artist)을 지나 씬 · 샷을 나눈다. */
   _artistCompleted?: boolean;
+  /** 리뉴얼 1차: Writer 에서 [브레이크다운하기]로 산문을 확정했다 — 산문은 잠기고 다시 쓰기 · 직접 저장을 받지 않는다(prose-confirm). */
+  _proseLocked?: boolean;
+  /** 리뉴얼 1차: 지금 산문의 아이디어 소재(마지막으로 적용한 다시 쓰기 조건). 없으면 그대로(keep). */
+  _proseSeed?: import('@/lib/writer/prose-conditions').ProseSeed;
   _sceneRevisionNotes?: string[];
   /** 개정 요청 당시의 씬 초안. 재시도에도 같은 본문을 다듬기 위한 실행 입력이며 다음 개정에서 교체한다. */
   _sceneRevisionSource?: Scenes;
@@ -117,6 +121,10 @@ export interface WriterRunState extends WriterRunStateBase {
     characters?: Characters;
     world?: BackgroundContract;
     revisionNotes?: string[];
+    /** 조건으로 다시 쓴 안을 적용했을 때만 — 되돌리면 산문을 쓴 조건(입력 길이 · 장르 · 소재)도 돌아간다. */
+    input?: PipelineInput;
+    genre?: Genre;
+    proseSeed?: import('@/lib/writer/prose-conditions').ProseSeed;
   };
 
   // Story 축

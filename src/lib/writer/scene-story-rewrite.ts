@@ -8,7 +8,8 @@ import { rewriteStatus, type SceneStoryRewriteVariant } from '@/lib/producer/sce
 import { mergeOpenCast, mergeOpenWorld, runScenes } from '@/lib/writer/pipeline/stages/s3_scenes'
 import { runDramaturgySafe } from '@/lib/writer/pipeline/stages/s0_dramaturgy'
 import { runNarrativeStructure } from '@/lib/writer/pipeline/stages/s1_structure'
-import { rethinkStory, rewriteNote } from '@/lib/writer/pipeline/rewrite/instructions'
+import { conditionNote, rethinkStory, rewriteNote } from '@/lib/writer/pipeline/rewrite/instructions'
+import { rewriteBasis } from '@/lib/writer/prose-conditions'
 import { castContractToCharacters } from '@/lib/writer/cast-contract'
 import { resolveModels } from '@/lib/writer/pipeline'
 import { PipelineLogger } from '@/lib/writer/logger'
@@ -20,14 +21,18 @@ const SAVE_ATTEMPTS = 8
 
 async function writeVariant(state: WriterRunState, proposal: SceneStoryProposal, variant: SceneStoryRewriteVariant, logger: PipelineLogger): Promise<VariantResult> {
   const model = resolveModels(state.input).S
-  if (!state.genre) throw new Error('Missing scene generation context')
+  // 조건으로 다시 쓰기(리뉴얼 1차) — 세 안 모두 고른 길이 · 장르로 쓴다. 조건이 없으면 지금 산문 그대로.
+  const basis = rewriteBasis(state, proposal.conditions)
+  const genre = basis.genre
+  if (!genre) throw new Error('Missing scene generation context')
+  const conditionNotes = proposal.conditions ? [conditionNote(proposal.conditions)] : []
   if (proposal.level === 'rethink') {
     // 처음 아이디어로 — Producer 가 넘긴 인물 · 배경만 들고 이야기 엔진 · 구조 · 씬을 새로 돈다. 앞선 수정 요청은 지난 초안의 것이라 싣지 않는다.
-    const input = { ...state.input, story: rethinkStory(state.input.story, proposal.baseScenes, variant.direction) }
+    const input = { ...basis.input, story: rethinkStory(state.input.story, proposal.baseScenes, variant.direction) }
     const seedCharacters = castContractToCharacters(state.input.cast ?? { characters: [] })
-    const dramaturgy = await runDramaturgySafe(input, state.genre, seedCharacters, logger, model)
-    const narrativeStructure = await runNarrativeStructure(input, state.genre, logger, model, dramaturgy)
-    const scenes = await runScenes(input, state.genre, narrativeStructure, seedCharacters, state.input.background, logger, model, [rewriteNote('rethink', variant.direction)], dramaturgy, undefined)
+    const dramaturgy = await runDramaturgySafe(input, genre, seedCharacters, logger, model)
+    const narrativeStructure = await runNarrativeStructure(input, genre, logger, model, dramaturgy)
+    const scenes = await runScenes(input, genre, narrativeStructure, seedCharacters, state.input.background, logger, model, [...conditionNotes, rewriteNote('rethink', variant.direction)], dramaturgy, undefined)
     return {
       status: 'ready',
       scenes,
@@ -38,12 +43,16 @@ async function writeVariant(state: WriterRunState, proposal: SceneStoryProposal,
     }
   }
   if (!state.narrativeStructure || !state.characters) throw new Error('Missing scene generation context')
+  // 러닝타임이 바뀌면 씬 수 · 흐름이 달라진다 — 지금 이야기 엔진으로 구조부터 새 길이에 맞춰 다시 잡는다.
+  const narrativeStructure = basis.runtimeChanged
+    ? await runNarrativeStructure(basis.input, genre, logger, model, state.dramaturgy ?? null)
+    : state.narrativeStructure
   const scenes = await runScenes(
-    state.input, state.genre, state.narrativeStructure, state.characters, state.world, logger, model,
-    [...(state._sceneRevisionNotes ?? []), rewriteNote(proposal.level ?? 'reword', variant.direction)],
+    basis.input, genre, narrativeStructure, state.characters, state.world, logger, model,
+    [...(state._sceneRevisionNotes ?? []), ...conditionNotes, rewriteNote(proposal.level ?? 'reword', variant.direction)],
     state.dramaturgy ?? null, proposal.baseScenes,
   )
-  return { status: 'ready', scenes }
+  return basis.runtimeChanged ? { status: 'ready', scenes, narrativeStructure } : { status: 'ready', scenes }
 }
 
 /** 최신 실행에 안 하나의 결과만 얹는다. 같은 수정안 · 같은 실행 · 아직 만드는 중인 칸일 때만. */

@@ -59,6 +59,10 @@ export interface WriterPreview {
   sceneStoryUndo?: { id: string; label: string } | null
   /** 트리트먼트 초안을 쓴 바탕 — 지금 Producer 값과 견준다. */
   draftBasis?: DraftBasis | null
+  /** 지금 산문이 쓰인 조건(리뉴얼 1차) — 러닝타임 · 장르·분위기 · 아이디어 소재. */
+  proseConditions?: { runtimeSeconds: number | null; genre: string | null; seed: 'keep' | 'new' } | null
+  /** [브레이크다운하기]로 확정해 잠근 산문인가(리뉴얼 1차). */
+  proseLocked?: boolean
   roster: { slug: string; name: string }[]
   scenes: PreviewScene[]
   characters: PreviewCharacter[]
