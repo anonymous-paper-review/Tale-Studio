@@ -2463,6 +2463,7 @@ export const KO: Record<string, string> = {
   'The prose changed while you were editing. Copy your changes, close this window, and open the latest prose.': '편집하는 동안 산문이 바뀌었어요. 고친 내용을 복사해 두고 창을 닫은 뒤 최신 산문을 열어 주세요.',
   'Could not save the prose. Your changes are still here. Please try again.': '산문을 저장하지 못했어요. 고친 내용은 그대로 있어요. 다시 시도해 주세요.',
   // ── Artist 브레이크다운 · 만들기 · 완료하기 (리뉴얼 1차) ──
+  'This project was handed to Writer before the renewal. Confirm the scene story to make the rest (characters, backgrounds, scenes and shots).': '리뉴얼 전에 Writer로 넘긴 프로젝트예요. 씬 스토리를 확정하면 나머지(인물 · 배경 · 씬 · 샷)를 이어서 만들어요.',
   'You have used all your project slots. Upgrade your plan or delete a project you no longer need, then try again.': '프로젝트 칸을 다 썼어요. 요금제를 올리거나 쓰지 않는 프로젝트를 지운 뒤 다시 만들어 주세요.',
   'Could not create the project. Please try again.': '프로젝트를 만들지 못했어요. 다시 시도해 주세요.',
   'All items': '모두',

@@ -29,3 +29,9 @@ export function proseBusy(input: {
   if (!input.proposal && input.requestPending) return { kind: 'revise' }
   return null
 }
+
+/** 예전 방식(리뉴얼 전)으로 Writer 에 넘겨 씬 스토리 확정을 기다리는 프로젝트 — 새 Writer 화면에서도 확정해 이어 가게 한다.
+ *  새 흐름의 확정한 산문은 실행이 아직 초안(draftRun)이라 Artist [만들기]로 이어 간다 — 여기에 해당하지 않는다. */
+export function legacyGateWaiting(input: { locked: boolean; phase: SceneGatePhase; draftRun: boolean }): boolean {
+  return input.locked && input.phase === 'gate' && !input.draftRun
+}

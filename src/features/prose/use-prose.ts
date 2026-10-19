@@ -10,7 +10,7 @@ import { sceneGatePhase } from '@/lib/writer/scene-gate'
 import { sceneStoryView } from '@/lib/producer/scene-story'
 import { treatmentDiff } from '@/lib/producer/scene-story-rewrite'
 import { previewedVariant } from '@/components/layout/scene-story-rewrite-card'
-import { proseBusy } from '@/lib/prose/busy'
+import { legacyGateWaiting, proseBusy } from '@/lib/prose/busy'
 import { proseTools } from '@/lib/prose/conditions'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProducerStore } from '@/stores/producer-store'
@@ -96,9 +96,13 @@ export function useProse() {
     if (Object.keys(patch).length) useProducerStore.getState().updateSettings(patch)
   }, [draftLive, proseConditions, preserveScript, projectId])
 
+  // 예전 방식(리뉴얼 전)으로 넘겨 씬 스토리 확정을 기다리는 프로젝트 — 새 화면에서도 확정해 이어 간다.
+  const legacyGate = legacyGateWaiting({ locked, phase, draftRun: status?.draft === true })
+
   return {
     projectId,
     status,
+    legacyGate,
     phase,
     preview,
     proposal,

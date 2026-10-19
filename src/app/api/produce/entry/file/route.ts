@@ -71,9 +71,17 @@ export async function POST(req: Request) {
       const uploadId = storageKeySegment(`${id}:${file.name}:${Date.now()}`)
       const folder = `${row.workspace_id}/${id}/uploads/${uploadId}`
       const storagePath = `${folder}/original.${decoded.image.extension}`
+      // 머리말만 멀쩡하고 속이 깨진 그림은 조각 내기에서 터진다 — 올리기 전에 조각을 내 보고, 서버 오류(500) 대신
+      //   읽을 수 없는 파일로 알린다(e2e 2026-10-19). 원본도 그 뒤에 올려 깨진 파일을 저장소에 남기지 않는다.
+      let slices: Awaited<ReturnType<typeof sliceForVision>>['slices']
+      try {
+        ;({ slices } = await sliceForVision(buffer, decoded.image))
+      } catch (error) {
+        console.warn('[produce/entry/file] image unreadable', error instanceof Error ? error.message : error)
+        return NextResponse.json({ error: 'unreadable' }, { status: 400 })
+      }
       const { error: originalError } = await mediaUpload(storagePath, buffer, { contentType: mimeType, upsert: true })
       if (originalError) throw originalError
-      const { slices } = await sliceForVision(buffer, decoded.image)
       const slicePaths: string[] = []
       for (const slice of slices) {
         const slicePath = `${folder}/s${String(slice.index).padStart(3, '0')}.jpg`

@@ -4,9 +4,10 @@
 //   Writer 는 산문만 다룬다 — 제목 아래 설정 칩 · 인물 · 배경 카드 · 스타일이 없다(예전 Meeting Room 을 대신한다).
 //   두 탭이 같은 산문을 쓴다: 화면에서 고치기(1안: 조건 줄 + 오른쪽 채팅) · 채팅으로 고치기(2안: 가운데 채팅에 산문 카드).
 //   AI 가 일하는 동안(초안 쓰기 · 다시 쓰기 · 수정안)은 화면 전체를 진행 표시로 덮는다.
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowRight, Lock } from 'lucide-react'
+import { ArrowRight, Check, Loader2, Lock } from 'lucide-react'
+import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -65,6 +66,19 @@ export function ProseWorkspace() {
     ]
   }, [prose.busy, t])
 
+  // 예전 방식 프로젝트의 씬 스토리 확정(리뉴얼 전 흐름) — 확정하면 나머지를 이어 만들고 Storyboard 로 간다.
+  const [legacyConfirming, setLegacyConfirming] = useState(false)
+  const confirmLegacy = async () => {
+    if (legacyConfirming) return
+    setLegacyConfirming(true)
+    try {
+      const ok = await useGlobalChatStore.getState().confirmSceneGate()
+      if (ok === false) toast.error(t('Could not confirm the scene story. Please try again.'))
+    } finally {
+      setLegacyConfirming(false)
+    }
+  }
+
   const variantsOpen = tab === 'screen' && !!prose.proposal?.variants?.length && prose.proposal.status !== 'generating' && !prose.locked
   const currentScenes = (prose.preview?.scenes ?? []).filter((scene) => scene.beats.length > 0).map((scene) => ({ sceneId: scene.sceneId, text: prose.sceneText(scene.beats) }))
 
@@ -95,6 +109,15 @@ export function ProseWorkspace() {
           )}
         </div>
       </div>
+
+      {prose.legacyGate ? (
+        <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border bg-muted/40 px-6 py-2.5 text-sm" role="status" data-testid="prose-legacy-gate">
+          <p className="min-w-0 flex-1">{t('This project was handed to Writer before the renewal. Confirm the scene story to make the rest (characters, backgrounds, scenes and shots).')}</p>
+          <Button size="sm" onClick={() => void confirmLegacy()} disabled={legacyConfirming} data-testid="prose-legacy-confirm">
+            {legacyConfirming ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}{t('Confirm as-is')}
+          </Button>
+        </div>
+      ) : null}
 
       {tab === 'chat' ? (
         <ProseChatTab prose={prose} title={title} />

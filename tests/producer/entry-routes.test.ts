@@ -221,6 +221,17 @@ describe('파일 올리기', () => {
   })
 })
 
+describe('깨진 그림', () => {
+  it('머리말만 멀쩡하고 속이 깨진 그림을 올리면 서버 오류 대신 읽을 수 없는 파일로 알린다', async () => {
+    // 왜: e2e(2026-10-19)에서 깨진 png 가 조각 내기에서 터져 500 이 났다 — 사용자는 다른 파일을 올리라는 안내를 봐야 한다.
+    mocks.decodeImage.mockResolvedValue({ ok: true, image: { width: 64, height: 64, extension: 'png' } })
+    mocks.sliceForVision.mockRejectedValue(new Error('pngload_buffer: IDAT stream error'))
+    const res = await uploadEntryFile(fileRequest(new File([new Uint8Array([137, 80, 78, 71])], '깨진그림.png', { type: 'image/png' })))
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({ error: 'unreadable' })
+  })
+})
+
 describe('AI 추천', () => {
   it('글이 20자 미만이고 파일도 없으면 추천하지 않는다', async () => {
     // 왜: 화면 검사를 건너뛴 요청에 AI 비용을 쓰지 않는다.
