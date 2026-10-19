@@ -8,6 +8,7 @@
 //
 // runPipeline(로컬, 파일 캐시 resume)과 별개 경로 — 그쪽 로직은 건드리지 않는다.
 import { PipelineLogger } from '@/lib/writer/logger';
+import { pauseAfterStep } from './pause';
 import { runDramaturgySafe } from '@/lib/writer/pipeline/stages/s0_dramaturgy';
 import { runNarrativeStructure } from '@/lib/writer/pipeline/stages/s1_structure';
 import { runScenes, mergeOpenCast, mergeOpenWorld } from '@/lib/writer/pipeline/stages/s3_scenes';
@@ -96,6 +97,8 @@ export interface WriterRunState extends WriterRunStateBase {
   _gateConfirmed?: boolean;
   /** 그림체 분석이 도는 동안이라 v2Design 의 Artist 초안을 미뤘다(2026-10-10) — Writer 가 끝날 때 한 번 더 챙긴다. */
   _artistDeferred?: boolean;
+  /** 리뉴얼 1차: Artist 에서 [완료하기]를 눌렀다 — 인물 · 배경 디자인 뒤 멈춤(awaiting_artist)을 지나 씬 · 샷을 나눈다. */
+  _artistCompleted?: boolean;
   _sceneRevisionNotes?: string[];
   /** 개정 요청 당시의 씬 초안. 재시도에도 같은 본문을 다듬기 위한 실행 입력이며 다음 개정에서 교체한다. */
   _sceneRevisionSource?: Scenes;
@@ -1011,8 +1014,10 @@ export async function runWriterSteps(
 
     // #s3-gate: 씬 스토리 확정 게이트 — storyCheck 완료 직후 일시정지. 재개는
     //   /api/writer/scene-gate(confirm) 가 status 를 running 으로 되돌리고 step 을 재발사.
-    if (step.key === 'storyCheck' && state.input?.sceneGate === true && state._gateConfirmed !== true) {
-      await markAwaiting(run.id);
+    // 리뉴얼 1차: Artist 완료 게이트 — v2Design 뒤 멈추고 /api/writer/artist-complete 가 재개한다(pipeline/pause.ts).
+    const pause = pauseAfterStep(step.key, state);
+    if (pause) {
+      await markAwaiting(run.id, pause);
       return { gated: true };
     }
 

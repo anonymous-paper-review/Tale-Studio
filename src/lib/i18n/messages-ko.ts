@@ -2179,4 +2179,6 @@ export const KO: Record<string, string> = {
   'Go to Artist': 'Artist로 가기',
   'Creating a new project…': '새 프로젝트를 만드는 중…',
   'While AI is working, the whole screen is locked. You can edit once it finishes.': 'AI가 작업하는 동안은 화면 전체가 잠겨요. 끝나면 고칠 수 있어요.',
+  'Waiting for Artist to complete': 'Artist 완료를 기다리는 중',
+  'Finish the character and background images in Artist, then press Complete.': 'Artist에서 인물 · 배경 그림을 다 만든 뒤 [완료하기]를 눌러 주세요.',
 }

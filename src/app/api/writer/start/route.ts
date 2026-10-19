@@ -294,6 +294,10 @@ export async function POST(req: NextRequest) {
       continueDraft?: boolean;
       /** 지금 값으로 트리트먼트를 다시 쓴다 — 확정을 기다리던 초안은 내려놓는다(treatmentDraft 와 함께). */
       restartDraft?: boolean;
+      /** 리뉴얼 1차: Artist [만들기]로 이어 가는 실행 — 인물 · 배경 디자인 뒤 [완료하기]를 기다린다. */
+      artistGate?: boolean;
+      /** 리뉴얼 1차: Producer 시작 화면의 AI 바꿈 정도. */
+      changeLevel?: unknown;
     };
     // models(축별 LLM 제공자·주소)는 본문에서 받지 않는다 — 제공자를 고를 수 있으면 서버가
     //   사용자가 준 주소로 원고를 보내고(SSRF), 개인정보처리방침에 적지 않은 업체로 글이 나간다.
@@ -386,7 +390,8 @@ export async function POST(req: NextRequest) {
           { status: 409 },
         );
       }
-    } else if (existing?.status === 'running') {
+    } else if (existing?.status === 'running' || existing?.status === 'awaiting_artist') {
+      // awaiting_artist(리뉴얼 1차): Artist [완료하기]를 기다리는 실행도 진행 중이다 — 새 실행을 만들지 않는다.
       return NextResponse.json(
         { error: 'Already running', code: 'writer_run_active', projectId, status: existing.status },
         { status: 409 },
@@ -521,6 +526,8 @@ export async function POST(req: NextRequest) {
       // 중복 적용하지 않는다. V1은 기존 사용자 씬 검토 흐름을 그대로 유지한다.
       sceneGate: writerEngine === 'v1',
       ...(treatmentDraft ? { treatmentDraft: true } : {}),
+      ...(body.artistGate === true ? { artistGate: true } : {}),
+      ...(body.changeLevel === 'keep' || body.changeLevel === 'polish' || body.changeLevel === 'grow' ? { changeLevel: body.changeLevel } : {}),
       genre: effectiveGenre,
       cast,
       ...(preserveScript ? { preserveScript: true } : {}),

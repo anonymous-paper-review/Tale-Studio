@@ -909,7 +909,8 @@ export function GlobalChat() {
     writerRunStatus?.started &&
     !writerRunStatus.pipeline_completed &&
     !writerRunStatus.pipeline_failed &&
-    writerRunStatus.current_status !== 'awaiting_confirmation'
+    writerRunStatus.current_status !== 'awaiting_confirmation' &&
+    writerRunStatus.current_status !== 'awaiting_artist'
   )
   // 씬 스토리 확정은 Producer 메인에서 기다린다(2026-10-01) — Writer 채팅의 수정 요청은 거기로 안내한다.
   const writerGateElsewhere = currentStage === 'writer' && writerRunStatus?.current_status === 'awaiting_confirmation'

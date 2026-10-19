@@ -151,7 +151,8 @@ export function writerPipelineWork(
 ): PipelineWork | null {
   if (!status) return null
   if (!status.started || status.pipeline_completed || status.pipeline_failed) return null
-  if (status.current_status === 'awaiting_confirmation') return null
+  // awaiting_artist(리뉴얼 1차): Artist [완료하기]를 기다리는 정지 상태도 "생성 중"이 아니다.
+  if (status.current_status === 'awaiting_confirmation' || status.current_status === 'awaiting_artist') return null
   const total = status.total_units ?? 0
   return {
     key: 'writer-pipeline',
