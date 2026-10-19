@@ -1764,7 +1764,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (useProjectStore.getState().projectId !== projectId) return { ok: false }
       const current = get().suggestion
       if (current?.id.startsWith(`writer-next:${projectId}`)) get().dismissSuggestion({ implicit: true })
-      useProjectStore.getState().lockProducer()
+      // 산문만 잠근다 — 실행은 아직 산문 초안이라(Artist [만들기] 전) 브레이크다운 목록 · 스타일은 Artist 에서 고친다.
+      useProjectStore.setState({ producerLocked: true })
       useProjectStore.getState().unlockThrough('artist')
       return { ok: true }
     } catch {

@@ -265,7 +265,8 @@ interface ProducerState {
   addBackground: () => string
   updateBackground: (localId: string, patch: Partial<BackgroundSource>) => void
   removeBackground: (localId: string) => void
-  saveAndHandoff: (options?: { rerun?: boolean }) => Promise<boolean>
+  /** artistGate(리뉴얼 1차): Artist [만들기] — 확정 산문 초안을 이어 가되 인물 · 배경 디자인 뒤에 멈추고, Artist 화면에 머문다. */
+  saveAndHandoff: (options?: { rerun?: boolean; artistGate?: boolean }) => Promise<boolean>
   loadProject: () => Promise<void>
   clearError: () => void
   reset: () => void
@@ -674,6 +675,13 @@ function producerLocked(): boolean {
   return useProjectStore.getState().producerLocked
 }
 
+/** 리뉴얼 1차: 산문을 확정해도 Artist [만들기] 전(실행이 아직 산문 초안)에는 브레이크다운 목록(인물 · 배경 설명)과
+ *  스타일을 고칠 수 있다. 산문 · 이야기 · 길이는 producerLocked 그대로 잠긴다. */
+function castLocked(): boolean {
+  const project = useProjectStore.getState()
+  return project.producerLocked && !project.treatmentDraft
+}
+
 export const useProducerStore = create<ProducerState>((set, get) => ({
   storyText: '',
   storyReady: false,
@@ -803,7 +811,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   setStyleAnchor: async (key) => {
-    if (isDemoSession() || producerLocked()) return false
+    if (isDemoSession() || castLocked()) return false
     // 고정된 그림체(그림체 추출로 정함, 2026-10-09 오너)는 다른 스타일로 바꾸지 않는다 — 화면 단추를 막아도 여기서 한 번 더 막는다.
     if (get().customStyleAnchor?.locked === true) return false
     const projectId = useProjectStore.getState().projectId
@@ -836,7 +844,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   applyCustomStyleAnchor: ({ key, url, label, medium, locked }) => {
-    if (producerLocked()) return
+    if (castLocked()) return
     if (get().customStyleAnchor?.locked === true) return
     set({ styleAnchorKey: key, customStyleAnchor: { url, label, medium, ...(locked === true ? { locked: true } : {}) } })
   },
@@ -845,7 +853,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     cancelDraftSave()
     const projectId = useProjectStore.getState().projectId
     // 잠긴 Producer 는 바뀐 것이 없다 — 초안을 다시 쓰지 않는다.
-    if (!projectId || isDemoSession() || producerLocked()) return false
+    if (!projectId || isDemoSession() || castLocked()) return false
     const draft = buildProducerDraft(boardOf(get()))
     try {
       await persistDraft(projectId, draft)
@@ -980,7 +988,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   updateCastMember: (localId, patch) => {
-    if (isDemoSession() || producerLocked()) return
+    if (isDemoSession() || castLocked()) return
     set((state) => ({
       cast: state.cast.map((m) => (m.localId === localId ? { ...m, ...patch, userEdited: true } : m)),
     }))
@@ -1030,7 +1038,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   },
 
   updateBackground: (localId, patch) => {
-    if (isDemoSession() || producerLocked()) return
+    if (isDemoSession() || castLocked()) return
     set((state) => ({
       backgrounds: state.backgrounds.map((background) =>
         background.localId === localId
@@ -1144,6 +1152,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
             // #script-preserve: 사람이 고른 보존 결정(true 일 때만 실린다).
             ...(get().preserveScript === true ? { preserveScript: true } : {}),
             ...(options?.rerun === true ? { rerun: true } : {}),
+            ...(options?.artistGate === true ? { artistGate: true } : {}),
             ...(options?.rerun === true
               ? {
                   chatHistory: useGlobalChatStore
@@ -1165,7 +1174,8 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
             backgrounds: backgroundContract,
           }),
         })
-        const continueDraft = useProjectStore.getState().treatmentDraft && options?.rerun !== true
+        // Artist [만들기]는 확정한 산문 초안을 늘 이어 간다(산문 확정이 화면의 초안 표시를 내렸어도).
+        const continueDraft = options?.artistGate === true || (useProjectStore.getState().treatmentDraft && options?.rerun !== true)
         let writerResponse = await requestStart(continueDraft)
         if (continueDraft && writerResponse.status === 409) {
           const body = await writerResponse.clone().json().catch(() => ({}))
@@ -1243,7 +1253,8 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       // Writer 가 시작됐고 DB 단계도 넘어갔다 — 이 순간부터 Producer 는 잠긴다(새 프로젝트만 새로 시작).
       useProjectStore.getState().lockProducer()
       // 확정 단계가 있으면 Producer 화면에 머문다(씬 스토리 확인·수정·확정 뒤 Writer 로).
-      if (!gated) useProjectStore.getState().setStage('writer')
+      //   Artist [만들기](리뉴얼 1차)는 Artist 에 머문다 — Storyboard 는 [완료하기]가 연다.
+      if (!gated && options?.artistGate !== true) useProjectStore.getState().setStage('writer')
       set({ syncing: false, lastHandoffGated: gated })
       return true
     } catch (err) {
