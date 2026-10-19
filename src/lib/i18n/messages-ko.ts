@@ -2178,4 +2178,5 @@ export const KO: Record<string, string> = {
   'Make the dialogue funnier': '대사를 더 웃기게',
   'Go to Artist': 'Artist로 가기',
   'Creating a new project…': '새 프로젝트를 만드는 중…',
+  'While AI is working, the whole screen is locked. You can edit once it finishes.': 'AI가 작업하는 동안은 화면 전체가 잠겨요. 끝나면 고칠 수 있어요.',
 }
