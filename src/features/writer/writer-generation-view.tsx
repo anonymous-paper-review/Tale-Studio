@@ -1,6 +1,7 @@
 'use client'
 
 // Writer 실행 중 화면(#story-stream 2026-07-21).
+//   리뉴얼 1차(2026-10-19): Storyboard 는 실행 중에도 보드 위 잠금 표시를 쓴다 — 이 화면은 관리자 디버그 진입(#gen-debug)에서만 열린다.
 //   메인 = 점진적 스토리 뷰어(WriterStoryStream), 하단 = 진행 바(문구+진행률+남은 시간).
 //   기존엔 중앙 로더+진행바였던 것을, 대기 시간을 스토리 읽기로 채우도록 재구성.
 //   상태(단계/진행률/ETA + keepalive)는 useWriterStatus, 콘텐츠는 useWriterPreview 가 담당.
@@ -16,6 +17,7 @@ import { WriterCharacterPanel } from '@/features/writer/writer-character-panel'
 import type { WriterStatus } from '@/lib/writer/use-writer-status'
 import { useWriterPreview } from '@/lib/writer/use-writer-preview'
 import { writerProgressView } from '@/lib/writer/progress-view'
+import { STAGE_LABEL } from '@/lib/constants'
 import { useLocale, useT } from '@/lib/i18n'
 
 // status 는 상위(WriterWorkspace)가 폴링해 내려준다 — 중복 status 폴링 방지.
@@ -106,7 +108,7 @@ export function WriterGenerationView({
       {/* 슬림 헤더 (실행 중엔 탭 전환이 무의미 → 컨텍스트 문구만) */}
       <header className="shrink-0 border-b border-border px-6 py-3">
         <div className="flex items-center gap-2">
-          <h1 className="text-lg font-semibold">Writers&apos; Room</h1>
+          <h1 className="text-lg font-semibold">{STAGE_LABEL.writer}</h1>
           {debug ? (
             <span className="rounded-full border border-warning/50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-warning">
               Debug preview

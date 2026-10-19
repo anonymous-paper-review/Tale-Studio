@@ -9,8 +9,14 @@
 // 생성 흐름: 진입 시 누락 패널만 자동 1회 생성 (서버가 완료본·진행중 잡을 멱등 skip —
 // director 재생성 폭주 버그의 교훈: 판단은 DB 진실 fetch 후 + 서버 이중 가드).
 // 완료는 webhook → shots.rough_storyboard. 클라는 jobId 폴링으로 카드만 갱신.
+//
+// 리뉴얼 1차(2026-10-19, 프로토타입 S0 · S1 · S7): 이 화면은 Storyboard 단계다(Artist 뒤).
+//   씬 · 샷을 나누는 동안과 러프를 그리는 동안 보드 위에 잠금 표시(AiBusyOverlay)를 얹고 화면 · 채팅을 잠근다 —
+//   언제 잠그고 무엇을 보일지는 lib/writer/board-busy. 보드는 뒤에 그대로 그려져 다 그린 샷부터 보인다.
+//   Director 넘김 확인 창(머리의 [다음: Director로 →])도 여기서 그린다 — [남은 컷 그리기]가 이 보드의 그리기 상태를 쓴다.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import { AlertCircle, ChevronDown, ImageIcon, Loader2, Plus, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -26,20 +32,33 @@ import { fetchDebugPrompts } from '@/lib/use-debug-prompts'
 import { ADHERENCE_START_ENABLED } from '@/lib/adherence/core'
 import { handoffFrom } from '@/lib/handoff-intent'
 import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
+import { AiBusyOverlay } from '@/components/ai-busy-overlay'
 import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
 import { AddItemDialog, type AddMode } from '@/features/writer/add-item-dialog'
+import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
+import { handOverToDirector } from '@/features/writer/storyboard-director'
+import { StoryboardDirectorDialog } from '@/features/writer/storyboard-director-dialog'
 import { WriterHeader } from '@/features/writer/writer-header'
 import { useProjectStore } from '@/stores/project-store'
 import { useArtistStore } from '@/stores/artist-store'
 import { useWriterStore } from '@/stores/writer-store'
 import { useWriterUiStore } from '@/stores/writer-ui-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
-import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { WriterResumeButton } from '@/components/layout/writer-resume-button'
 import { writerProgressView } from '@/lib/writer/progress-view'
-import { summarizeRoughProgress } from '@/lib/writer/rough-progress'
+import { roughRedrawBatches, summarizeRoughProgress, undrawnRoughShotIds } from '@/lib/writer/rough-progress'
+import {
+  INITIAL_BOARD_LOCK,
+  advanceBoardLock,
+  dismissBoardFailure,
+  isBoardRunActive,
+  storyboardBusyView,
+  type BoardLockFacts,
+  type BoardLockState,
+} from '@/lib/writer/board-busy'
+import { boardShots, directorConfirmView, directorHandoffSummary, storyboardBriefing } from '@/lib/writer/board-summary'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import {
   isContentPolicyBlocked,
@@ -68,11 +87,6 @@ import {
 import type { RoughStoryboardImage, Shot } from '@/types'
 import { translate, useT } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
-import {
-  mentionLabelForModifierClick,
-  sceneShotMentionRef,
-} from '@/lib/card-mention'
-import { writerSceneShotMentions } from '@/lib/script-lines'
 import { invalidateShots } from '@/lib/shots-cache'
 import { computeSettledJobs, reportUiReflected } from '@/lib/generation-ui-reflected'
 import { recordWriterObservabilityEventClient } from '@/lib/writer/debug-events-client'
@@ -81,6 +95,10 @@ type PanelJob = { status: 'generating' | 'failed'; error?: string }
 
 // artist 백필(#writer-to-artist-backfill) 프로젝트당 1회 가드 — 탭 왕복 remount 에도 유지.
 const artistBackfillTriggered = new Set<string>()
+
+// 잠금 표시는 document.body 로 띄운다 — 단계 화면([data-stage-content])이 잠기는(inert) 동안에도 실패 안내 버튼은 눌려야 한다.
+//   서버 렌더에는 document 가 없으니 브라우저에서만 띄운다(구독할 것이 없는 외부 상태 = 브라우저 여부).
+const subscribeNothing = () => () => {}
 
 // 진실 리로드 수렴 상한(#rough-refresh 2026-07-24) — previz(5분) 대응. 정상 경로는 폴링 성공 후
 //   첫 리로드(2s 간격)에 끝나고, 이 상한은 어떤 실패 경로에서도 UI 가 스피너에 갇히지 않게 하는 백스톱.
@@ -118,11 +136,6 @@ export function RoughStoryboardView() {
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
   const shots = useWriterStore((s) => s.shots)
   const loadProject = useWriterStore((s) => s.loadProject)
-  const requestMentionToggle = useChatUiStore((s) => s.requestMentionToggle)
-  const sceneShotMentionItems = useMemo(
-    () => writerSceneShotMentions(sceneManifest, shots),
-    [sceneManifest, shots],
-  )
   const { status, restart } = useWriterStatus(projectId)
   // 진행 중 판정의 바닥 (#queue-restore 2026-08-11) — 아래 panelJobs 는 컴포넌트 로컬이라 탭을
   //   떠나면 증발하는데 잡은 fal 에서 계속 돈다. 돌아왔을 때 스피너를 되살리는 유일한 근거가 큐다.
@@ -191,37 +204,22 @@ export function RoughStoryboardView() {
   const reloadedAfterCompleteRef = useRef(false)
   // drag-to-scroll 직후의 click 이 카드 팝업을 여는 오발 방지
   const draggedRef = useRef(false)
+  // 잠금 표시(리뉴얼 1차) — 화면의 그리기가 도는 중인가 · 끝난 횟수 · 실행이 끝난 뒤 샷을 다시 읽었는가 · 순간 사이에 이어지는 잠금 상태.
+  const [pumpActive, setPumpActive] = useState(false)
+  const [pumpRuns, setPumpRuns] = useState(0)
+  const [reloadSettled, setReloadSettled] = useState(false)
+  const [lock, setLock] = useState<BoardLockState>(INITIAL_BOARD_LOCK)
+  const [lockKey, setLockKey] = useState<string | null>(null)
+  const isClient = useSyncExternalStore(subscribeNothing, () => true, () => false)
+  // Director 넘김 확인 창 — 머리의 [다음: Director로 →](모든 탭)가 열고, 이 보드가 그린다.
+  const directorConfirmOpen = useBoardUiStore((s) => s.directorConfirmOpen)
+  const setDirectorConfirmOpen = useBoardUiStore((s) => s.setDirectorConfirmOpen)
+  // 보드가 떨어지면(관리자 V2 미리보기 탭 등) 창도 닫는다 — 다시 붙을 때 저절로 열리지 않게.
+  useEffect(() => () => useBoardUiStore.getState().setDirectorConfirmOpen(false), [])
 
   useEffect(() => {
     if (projectId) void loadProject()
   }, [projectId, loadProject])
-
-  // 첫 진입 브리핑 — 씬/샷이 준비됐고 writer 채팅 기록이 없으면 Writer가 먼저 "이렇게 나눴어요"라고 알린다.
-  //   Producer 웰컴과 같은 방식: dismissible:false(넘김 버튼 없음), 유저가 말을 걸면 자동으로 사라짐.
-  useEffect(() => {
-    if (!projectId || briefedRef.current) return
-    const sceneCount = sceneManifest?.scenes.length ?? 0
-    if (sceneCount === 0) return
-    if (chatMessages.some((m) => m.stage === 'writer')) return
-    briefedRef.current = true
-    offerSuggestion({
-      id: `writer-brief:${projectId}`,
-      stage: 'writer',
-      dismissible: false,
-      action: null,
-      // #feedback 2026-08-07: "작업 완료"로 시작 + @멘션·Ctrl+클릭 조작법을 온보딩에 명시
-      //   (진행도 핀이 풀린 직후 이 브리핑이 들어오는 흐름).
-      content: translate(
-        locale,
-        'Scene and shot work is done.\n\n' +
-          '· Split into {sceneCount} scenes, {shotCount} shots\n' +
-          '· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\n' +
-          "Let me know which scene or shot you'd like to revise or add.\n" +
-          'Press "@" to pick a scene or shot (Ctrl+click a card does the same).',
-        { sceneCount, shotCount: shots.length },
-      ),
-    })
-  }, [projectId, sceneManifest, shots.length, chatMessages, offerSuggestion, locale])
 
   // Artist 핸드오프(#handoff-to-chat 2026-07-31) — 탭 하단 'Hand over to Concept Artist' 버튼을
   //   걷어내고 채팅 제안으로 옮겼다. 옛 버튼은 게이트 없이 항상 활성이었으므로 여기서도 막지 않고,
@@ -291,9 +289,18 @@ export function RoughStoryboardView() {
       // 파이프라인이 방금 shots 를 채웠다 — 사물함(30초 신선)을 낡음으로 표시해야
       //   loadProject 가 캐시가 아니라 새 행을 받는다.
       if (projectId) void invalidateShots(projectId)
+      // 다 읽을 때까지 잠금을 이어 간다(빈 보드가 번쩍이지 않게) — 실패해도 기다림은 끝낸다.
       void loadProject()
+        .catch(() => {})
+        .then(() => setReloadSettled(true))
     }
   }, [status?.pipeline_completed, loadProject, projectId])
+  // 다시 읽기가 끝나지 않아도(네트워크 멈춤 등) 잠금이 영영 남지 않게 — 15초 뒤에는 기다림을 끝낸다.
+  useEffect(() => {
+    if (!status?.pipeline_completed || reloadSettled) return
+    const timer = setTimeout(() => setReloadSettled(true), 15_000)
+    return () => clearTimeout(timer)
+  }, [status?.pipeline_completed, reloadSettled])
 
   const generate = useCallback(
     async (
@@ -590,6 +597,7 @@ export function RoughStoryboardView() {
     async (auto: boolean) => {
       if (pumpRunningRef.current) return
       pumpRunningRef.current = true
+      setPumpActive(true)
       try {
         await runRoughPump({
           // give-up 안내 토스트는 수동 1라운드에서만 (라운드마다 반복 방지). 429 안내는 generate 가 한다.
@@ -598,6 +606,34 @@ export function RoughStoryboardView() {
         })
       } finally {
         pumpRunningRef.current = false
+        setPumpActive(false)
+        setPumpRuns((n) => n + 1)
+      }
+    },
+    [generate],
+  )
+
+  // [남은 컷 (다시) 그리기](리뉴얼 1차 — 잠금 표시의 실패 안내 · Director 넘김 창) — 사람이 누른 다시 그리기라 force 로 보낸다
+  //   (카드의 다시 시도와 같다: 반복 실패로 자동 생성이 멈춘 컷도 다시 그린다). 서버 그리드 한 장 = 한 씬 넉 장이라
+  //   그 크기로 나눠 차례로 보낸다(고른 컷이 요청에서 빠지지 않게). 같은 컷을 이 안에서 두 번 보내지 않는다.
+  const drawShots = useCallback(
+    async (shotIds: readonly string[]) => {
+      if (pumpRunningRef.current || shotIds.length === 0) return
+      pumpRunningRef.current = true
+      setPumpActive(true)
+      try {
+        const sceneOf = new Map(useWriterStore.getState().shots.map((s) => [s.shotId, s.sceneId]))
+        const batches = roughRedrawBatches(shotIds.map((shotId) => ({ shotId, sceneId: sceneOf.get(shotId) ?? '' })))
+        for (const batch of batches) {
+          if (pumpAbortRef.current) break
+          const round = await generate(batch, true)
+          if (!round || round.quota || round.confirmationPending) break
+          await round.done
+        }
+      } finally {
+        pumpRunningRef.current = false
+        setPumpActive(false)
+        setPumpRuns((n) => n + 1)
       }
     },
     [generate],
@@ -623,6 +659,59 @@ export function RoughStoryboardView() {
     .map((s) => s.shotId)
   const roughProgress = summarizeRoughProgress(shots, overrides, panelJobs, queuedRoughIds)
   const generatingCount = roughProgress.generating
+
+  // ── 잠금 표시(리뉴얼 1차, 프로토타입 S0) ── 이번 순간의 사실을 모아 잠금 상태를 한 걸음 옮기고, 보일 내용을 정한다(lib/writer/board-busy).
+  //   진입 자동 그리기 직전(그리기가 아직 한 번도 안 돌았고 빠진 패널이 있다)도 그리기로 본다 — 잠금이 한 프레임 풀렸다 닫히지 않게.
+  const autoDrawPending = hasShots && !running && missingIds.length > 0 && pumpRuns === 0 && !pumpActive
+  const lockFacts: BoardLockFacts = {
+    runActive: isBoardRunActive(status),
+    reloading: !!status?.pipeline_completed && !reloadSettled,
+    hasShots,
+    generating: roughProgress.generating,
+    failed: roughProgress.failed,
+    pumpActive,
+    autoDrawPending,
+  }
+  const nextLockKey = JSON.stringify(lockFacts)
+  if (nextLockKey !== lockKey) {
+    // 사실이 바뀐 순간에만 한 걸음 옮긴다 — 렌더 중 갱신이라 화면에 그리기 전에 바로 다시 그려 옛 잠금이 남지 않는다.
+    setLockKey(nextLockKey)
+    setLock((prev) => advanceBoardLock(prev, lockFacts))
+  }
+  const busy = storyboardBusyView(
+    { status, facts: lockFacts, lock, rough: roughProgress, sceneCount: sceneManifest?.scenes.length ?? 0 },
+    locale,
+  )
+  // 남은 컷([남은 컷 (다시) 그리기]) — 보드 순서(씬 → 샷)로 고른다. Director 넘김 창은 보드가 지금 보여 주는 그림으로 센다.
+  const boardList = boardShots(sceneManifest, shots)
+  const remainingIds = undrawnRoughShotIds(
+    boardList.map((entry) => entry.shot),
+    overrides,
+    panelJobs,
+    queuedRoughIds,
+  )
+  const directorView = directorConfirmView(directorHandoffSummary(sceneManifest, shots, panelOf), locale)
+
+  // 첫 진입 브리핑 — 씬 · 샷이 준비됐고 Storyboard 채팅 기록이 없으면 먼저 "이렇게 나눴어요"라고 알린다.
+  //   Producer 웰컴과 같은 방식: dismissible:false(넘김 버튼 없음), 유저가 말을 걸면 자동으로 사라짐.
+  //   리뉴얼 1차: 씬은 인물 · 배경 디자인 때 먼저 저장되므로, 샷이 생기고 잠금이 풀린 뒤에 알린다.
+  //   카드를 Ctrl/Cmd 로 눌러 붙이는 여러 샷 선택은 없앴으니 그 조작은 안내하지 않는다.
+  const busyOpen = busy.open
+  useEffect(() => {
+    if (!projectId || briefedRef.current) return
+    if (!hasShots || busyOpen) return
+    const sceneCount = sceneManifest?.scenes.length ?? 0
+    if (sceneCount === 0) return
+    if (chatMessages.some((m) => m.stage === 'writer')) return
+    briefedRef.current = true
+    offerSuggestion({
+      id: `writer-brief:${projectId}`,
+      stage: 'writer',
+      dismissible: false,
+      action: null,
+      content: storyboardBriefing(locale, { sceneCount, shotCount: shots.length }),
+    })
+  }, [projectId, sceneManifest, shots.length, hasShots, busyOpen, chatMessages, offerSuggestion, locale])
   // 제목 아래 설명문은 제거(#c2 2026-07-14) — 카드 사용법은 첫 진입 브리핑 채팅이 안내한다.
   // 트리트먼트·대사 탭과 같은 자리의 도움말(#c4 2026-08-03) — 헤더 아래 한 줄.
   const headerDescription = t(
@@ -798,81 +887,82 @@ export function RoughStoryboardView() {
     setDetailShotId(shotId)
   }
 
-  const mentionCardOnModifierClick = (
-    event: Pick<MouseEvent, 'ctrlKey' | 'metaKey'>,
-    kind: 'scene' | 'shot',
-    id: string,
-  ): boolean => {
-    const target = sceneShotMentionItems.find(
-      (item) => item.ref === sceneShotMentionRef('writer', kind, id),
-    )
-    const label = mentionLabelForModifierClick(event, target)
-    if (!label) return false
-    requestMentionToggle(label)
-    return true
-  }
+  // ── 잠금 표시 · Director 넘김 창 ── 어느 화면(빈 보드 · 보드)이든 같이 단다.
+  //   잠금 표시는 document.body 로 띄운다 — 단계 화면이 잠기는(inert) 동안에도 실패 안내의 버튼은 눌려야 한다.
+  const busyFooter =
+    busy.phase === 'failed' && busy.actions ? (
+      <>
+        <Button variant="outline" onClick={() => setLock((prev) => dismissBoardFailure(prev))}>
+          {busy.actions.close}
+        </Button>
+        <Button disabled={remainingIds.length === 0} onClick={() => void drawShots(remainingIds)}>
+          {busy.actions.redraw}
+        </Button>
+      </>
+    ) : undefined
+  const overlays = (
+    <>
+      {isClient
+        ? createPortal(
+            <AiBusyOverlay
+              open={busy.open}
+              busy={busy.phase !== 'failed'}
+              title={busy.title}
+              description={busy.description}
+              steps={busy.steps}
+              progress={busy.progress}
+              progressLabel={busy.progressLabel}
+              footer={busyFooter}
+            />,
+            document.body,
+          )
+        : null}
+      <StoryboardDirectorDialog
+        open={directorConfirmOpen}
+        view={directorView}
+        onClose={() => setDirectorConfirmOpen(false)}
+        onDrawRemaining={() => {
+          setDirectorConfirmOpen(false)
+          void drawShots(remainingIds)
+        }}
+        onConfirm={() => {
+          setDirectorConfirmOpen(false)
+          void handOverToDirector()
+        }}
+      />
+    </>
+  )
 
-  // ── 파이프라인 진행 중 (샷이 아직 없음) ─────────────────────────────────
-  if (!hasShots && running) {
-    const progress = writerProgressView(status, locale)
-    const pct = progress.percent
-    return (
-      <div className="flex min-h-0 flex-1 flex-col">
-        <WriterHeader description={headerDescription} />
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" aria-busy="true" />
-          <p className="text-base font-medium">{progress.label}</p>
-
-          {/* 진행률 바(#c3) — 우측에 % 병기 */}
-          <div className="flex w-full max-w-md items-center gap-3">
-            <div
-              role="progressbar"
-              aria-valuenow={pct}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              className="h-2 flex-1 overflow-hidden rounded-full bg-muted"
-            >
-              <div
-                className="h-full rounded-full bg-primary transition-[width] duration-500"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-            <span className="shrink-0 text-right font-mono text-xs tabular-nums text-muted-foreground">
-              {progress.countLabel}
-            </span>
-          </div>
-
-          <p className="text-xs text-muted-foreground">{progress.detail}</p>
-          <p className="text-xs text-muted-foreground">
-            {t('Steps take different amounts of time. Image generation follows separately.')}
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  // ── 빈 상태 (파이프라인 미실행 + 산출물 없음) ───────────────────────────
+  // ── 샷이 아직 없음 ── 씬 · 샷을 나누는 중이면 잠금 표시가 덮으니 뒤는 비워 두고, 아니면 왜 비었는지 알린다.
+  //   예전 가운데 진행 막대는 잠금 표시가 대신한다(리뉴얼 1차).
   if (!hasShots) {
+    const waiting = status?.current_status === 'awaiting_artist' || status?.current_status === 'awaiting_confirmation'
+    const progress = writerProgressView(status, locale)
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         <WriterHeader description={headerDescription} />
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
-          <ImageIcon className="size-12 text-muted-foreground" />
-          <p className="text-base font-medium">{t('No scenes or shots generated yet')}</p>
-          {status?.pipeline_failed ? (
-            <>
+        {busy.open ? (
+          <div className="flex-1" aria-hidden />
+        ) : (
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
+            <ImageIcon className="size-12 text-muted-foreground" />
+            <p className="text-base font-medium">{waiting ? progress.label : t('No scenes or shots generated yet')}</p>
+            {status?.pipeline_failed ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  {t('Generation stopped')}
+                  {status.error ? ` — ${status.error}` : ''}
+                </p>
+                <WriterResumeButton projectId={projectId} onResumed={restart} />
+              </>
+            ) : (
               <p className="text-sm text-muted-foreground">
-                {t('Generation stopped')}
-                {status.error ? ` — ${status.error}` : ''}
+                {waiting ? progress.detail : t('Scenes and shots are made when you press Complete in Artist.')}
               </p>
-              <WriterResumeButton projectId={projectId} onResumed={restart} />
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              {t('Scenes and shots are generated once the story is handed off from Producer.')}
-            </p>
-          )}
-        </div>
+            )}
+          </div>
+        )}
+        {overlays}
       </div>
     )
   }
@@ -883,15 +973,8 @@ export function RoughStoryboardView() {
   const cols = storyboardColumns(zoomLevel)
   // 전역 샷 번호(#shot-global-no 2026-08-12) — 씬별 1부터 리셋하지 않고 씬 순서대로 이어 센다.
   //   샷 각각의 고유 호출 번호가 목적(오너). 위치 기준(불변 id 아님)은 기존 결정 유지.
-  const globalShotNo = new Map<string, number>()
-  {
-    let n = 0
-    for (const scene of sceneManifest?.scenes ?? []) {
-      for (const s of shots.filter((x) => x.sceneId === scene.sceneId)) {
-        globalShotNo.set(s.shotId, ++n)
-      }
-    }
-  }
+  //   셈은 Director 넘김 창 · 머리 숫자와 같은 boardShots(lib/writer/board-summary) 하나로 한다.
+  const globalShotNo = new Map(boardList.map((entry) => [entry.shot.shotId, entry.shotNo]))
   // 설명문 폰트(#zoom-desc) — 열이 늘수록(축소) 글자도 줄여 전문이 들어가게. 클램프는 제거.
   const descFontSize = storyboardDescriptionFontSize(cols)
 
@@ -952,16 +1035,7 @@ export function RoughStoryboardView() {
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={(event) => {
-                      if (
-                        mentionCardOnModifierClick(event, 'scene', scene.sceneId)
-                      ) {
-                        event.preventDefault()
-                        event.stopPropagation()
-                        return
-                      }
-                      toggleSceneCollapsed(scene.sceneId)
-                    }}
+                    onClick={() => toggleSceneCollapsed(scene.sceneId)}
                     aria-expanded={!sceneCollapsed}
                     className="flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
                   >
@@ -1024,18 +1098,8 @@ export function RoughStoryboardView() {
                         key={shot.shotId}
                         role="button"
                         tabIndex={0}
-                        onClickCapture={(event) => {
-                          if (
-                            mentionCardOnModifierClick(event, 'shot', shot.shotId)
-                          ) {
-                            event.preventDefault()
-                            event.stopPropagation()
-                          }
-                        }}
-                        onClick={(event) => {
-                          if (event.ctrlKey || event.metaKey) return
-                          openDetail(shot.shotId)
-                        }}
+                        // 카드를 Ctrl/Cmd 로 눌러 채팅에 붙이는 여러 샷 선택은 없앴다(리뉴얼 1차, 프로토타입 S1) — 누르면 언제나 상세.
+                        onClick={() => openDetail(shot.shotId)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault()
@@ -1180,6 +1244,8 @@ export function RoughStoryboardView() {
           }}
         />
       )}
+
+      {overlays}
     </div>
   )
 }
