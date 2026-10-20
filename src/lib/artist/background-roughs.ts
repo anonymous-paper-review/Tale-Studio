@@ -15,8 +15,9 @@ type RunStatusLike = {
 
 /** 러프를 미리 그려도 되나 — 샷이 다 저장됐고(실행 끝남), Artist 그림을 그리는 중이 아니고, 공유 보기가 아니다.
  *  Artist 그림을 그리는 동안 러프가 돌면 Artist 그림은 한 장씩 그린다(10/9 규칙) — 지금 기다리는 그림이 느려지지 않게 뒤로 미룬다. */
-export function backgroundRoughReady(input: { status: RunStatusLike; making: boolean; demo: boolean }): boolean {
-  if (input.demo || input.making) return false
+export function backgroundRoughReady(input: { status: RunStatusLike; making: boolean; demo: boolean; artistCompleted: boolean }): boolean {
+  // [완료하기] 뒤(예전에 끝까지 만든 프로젝트 포함)에는 Storyboard 화면이 그린다 — Artist 에서 표시 없이 그리지 않는다.
+  if (input.demo || input.making || input.artistCompleted) return false
   return !!input.status?.started && input.status.pipeline_completed === true
 }
 
@@ -60,6 +61,60 @@ export function drawRoughsInBackground(projectId: string, deps: BackgroundRoughD
       }
     },
   })
+}
+
+/** 미리 그리기 장부 — 프로젝트마다 따로 돈다. 화면이 보고 있는 프로젝트가 아니면 다음 묶음을 보내지 않고,
+ *  새 프로젝트는 앞 프로젝트가 끝나기를 기다리지 않는다(검토 지적). 같은 프로젝트를 두 번 맡기지 않고, 다 그린 프로젝트는 다시 돌지 않는다.
+ *  화면은 subscribe · version 으로 바뀔 때마다 다시 그린다. */
+export function createBackgroundRoughRuns() {
+  let active: string | null = null
+  let version = 0
+  const running = new Set<string>()
+  const done = new Set<string>()
+  const outcomes = new Map<string, RoughPumpOutcome>()
+  const listeners = new Set<() => void>()
+  const changed = () => {
+    version += 1
+    for (const listener of listeners) listener()
+  }
+  return {
+    /** 화면이 보고 있는 프로젝트(떠나면 null). */
+    show(projectId: string | null) {
+      active = projectId
+    },
+    /** 맡겨도 되면 true — 같은 프로젝트를 이미 그리는 중이거나 다 그렸으면 false. */
+    begin(projectId: string): boolean {
+      if (running.has(projectId) || done.has(projectId)) return false
+      running.add(projectId)
+      outcomes.delete(projectId)
+      changed()
+      return true
+    },
+    isRunning(projectId: string): boolean {
+      return running.has(projectId)
+    },
+    isAborted(projectId: string): boolean {
+      return active !== projectId
+    },
+    outcomeOf(projectId: string): RoughPumpOutcome | null {
+      return outcomes.get(projectId) ?? null
+    },
+    finish(projectId: string, outcome: RoughPumpOutcome) {
+      running.delete(projectId)
+      outcomes.set(projectId, outcome)
+      if (outcome === 'done') done.add(projectId)
+      changed()
+    },
+    subscribe(listener: () => void) {
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+      }
+    },
+    version(): number {
+      return version
+    },
+  }
 }
 
 export type StoryboardPrep = 'splitting' | 'drawing' | 'ready' | null

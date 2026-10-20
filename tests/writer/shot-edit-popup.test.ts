@@ -1,4 +1,4 @@
-// Storyboard 샷 고치기 팝업(프로토타입 S2): 씬 안 번호 · 바꾼 값 저장 · 다시 그리는 순서 (2026-10-20 오너 "HTML 확인해서 팝업 수정")
+// Storyboard 샷 고치기 팝업(프로토타입 S2): 씬 안 번호 · 저장 뒤 다시 그리기 (2026-10-20 오너 "HTML 확인해서 팝업 수정")
 import { describe, expect, it, vi } from 'vitest'
 import { angleOfCamera, applyStartEdit, cameraWithAngle, redrawDirectionOnly, sceneShotLabel } from '@/lib/writer/shot-edit'
 
@@ -32,22 +32,23 @@ describe('카메라 앵글', () => {
 })
 
 describe('다시 그리는 순서', () => {
-  it('[시작 적용 · 연출도 다시]는 바꾼 내용을 먼저 저장하고 시작 그림, 연출 그림 순서로 다시 그린다', async () => {
-    // 왜: 프로토타입 "시작을 고치면 연출도 따라 바뀐다" — 저장 전에 그리면 옛 내용으로 그린다.
+  it('[적용]은 바꾼 내용을 먼저 저장하고, 그 샷의 러프를 저장한 내용으로 다시 그린다', async () => {
+    // 왜: 프로토타입 "시작을 고치면 연출도 따라 바뀐다" — 저장한 스토리 · 샷 타입으로 그 샷의 러프(시작 · 연출 · 끝)를 새로 그린다.
+    //   한 장씩 다시 그리기는 지금 그림을 보고 고쳐 그려 바꾼 내용을 읽지 않는다(검토 지적).
     const order: string[] = []
     const ok = await applyStartEdit({
       save: async () => { order.push('save') },
-      regenerate: async (frame) => { order.push(frame); return true },
+      redrawShot: async () => { order.push('redraw'); return true },
     })
     expect(ok).toBe(true)
-    expect(order).toEqual(['save', 'start', 'direction'])
+    expect(order).toEqual(['save', 'redraw'])
   })
 
-  it('시작 그림을 다시 그리지 못하면 연출은 그리지 않는다', async () => {
-    // 왜: 시작이 실패했는데 연출만 바뀌면 두 장이 서로 어긋난다.
-    const regenerate = vi.fn(async (frame: string) => frame !== 'start')
-    expect(await applyStartEdit({ save: async () => {}, regenerate })).toBe(false)
-    expect(regenerate.mock.calls.map((call) => call[0])).toEqual(['start'])
+  it('저장하지 못하면 다시 그리지 않는다', async () => {
+    // 왜: 저장이 안 됐는데 그리면 옛 내용으로 그리고 비용만 든다.
+    const redrawShot = vi.fn(async () => true)
+    await expect(applyStartEdit({ save: async () => { throw new Error('save failed') }, redrawShot })).rejects.toThrow('save failed')
+    expect(redrawShot).not.toHaveBeenCalled()
   })
 
   it('[연출만 다시 만들기]는 연출 그림만 다시 그린다', async () => {

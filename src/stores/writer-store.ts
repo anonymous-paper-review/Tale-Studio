@@ -282,7 +282,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         const savedShot = useProjectStore.getState().projectId === projectId
           ? get().shots.find(current => current.shotId === id) ?? shot : shot
         const supabase = createClient()
-        await supabase
+        const { error } = await supabase
           .from('shots')
           .update({
             shot_type: savedShot.shotType,
@@ -299,10 +299,14 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           })
           .eq('project_id', projectId)
           .eq('shot_id', id)
+        // 저장 실패는 기다리던 쪽(flushShotSave — 샷 고치기의 [적용])에 알린다. 그래야 옛 내용으로 다시 그리지 않는다.
+        if (error) throw new Error(error.message)
         void invalidateShots(projectId) // 사물함 표시 — 다른 화면의 다음 읽기가 새로 받게
       })
     }
-    const timer = setTimeout(() => { void run() }, 500)
+    const timer = setTimeout(() => {
+      void run().catch((err) => console.error('[writer-store] shot save failed:', err instanceof Error ? err.message : err))
+    }, 500)
     shotSaveTimers.set(id, timer)
     shotSaveRuns.set(id, run)
   },

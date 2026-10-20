@@ -74,6 +74,8 @@ export interface CharacterAppearance {
   sourceImageUrl?: string | null
   /** 모습별 뷰 후보 히스토리. 다른 모습 후보를 표시·stale 판정에 섞지 않는다. */
   viewCandidates: Partial<Record<CharacterViewKey, CandidateImage[]>>
+  /** 이 모습의 의상으로 만든 룩 지문(모습별 다시 만들기가 남기는 지문과 같은 재료). 인물 지문과 함께 stale 판정에 쓴다. */
+  lookFingerprint?: string | null
 }
 
 export type NarrativeTime = 'present' | 'past' | 'future'

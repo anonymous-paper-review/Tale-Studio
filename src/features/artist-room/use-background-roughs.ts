@@ -4,42 +4,33 @@
 //   ready 가 켜질 때, 그리고 nudge(그린 Artist 그림 장수)가 바뀔 때 한 번씩 돈다 — 자리가 차서 멈췄으면 Artist 그림이 하나 끝나
 //   자리가 날 때 다시 돈다(타이머로 두드리지 않는다, 2026-09-11 "자리 부족은 자동 재시도 없음"과 같은 결). 다 그렸으면 다시 돌지 않는다.
 //   화면을 떠나면 다음 묶음을 보내지 않는다 — 남은 컷은 Storyboard 화면이 이어 그린다.
-import { useEffect, useRef, useState } from 'react'
-import { drawRoughsInBackground } from '@/lib/artist/background-roughs'
+import { useEffect, useState, useSyncExternalStore } from 'react'
+import { createBackgroundRoughRuns, drawRoughsInBackground } from '@/lib/artist/background-roughs'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import type { RoughPumpOutcome } from '@/lib/writer/rough-pump-client'
 
 export function useBackgroundRoughs(projectId: string | null, ready: boolean, nudge: number): { drawing: boolean; outcome: RoughPumpOutcome | null } {
-  const [state, setState] = useState<{ projectId: string | null; drawing: boolean; outcome: RoughPumpOutcome | null }>({ projectId: null, drawing: false, outcome: null })
-  const runningRef = useRef(false)
-  const abortRef = useRef(false)
-  const doneRef = useRef<string | null>(null)
+  // 프로젝트마다 따로 — 다른 프로젝트로 옮기면 앞 프로젝트는 다음 묶음을 보내지 않고, 새 프로젝트는 바로 시작한다.
+  const [runs] = useState(createBackgroundRoughRuns)
+  useSyncExternalStore(runs.subscribe, runs.version, runs.version)
 
   useEffect(() => {
-    abortRef.current = false
-    return () => {
-      abortRef.current = true
-    }
-  }, [projectId])
+    runs.show(projectId)
+    return () => runs.show(null)
+  }, [projectId, runs])
 
   useEffect(() => {
-    if (!projectId || !ready || runningRef.current || doneRef.current === projectId) return
-    runningRef.current = true
-    setState({ projectId, drawing: true, outcome: null })
+    // 같은 프로젝트를 이미 그리는 중이면(다른 프로젝트에 다녀온 경우 포함) 그 실행이 이어 그린다.
+    if (!projectId || !ready || !runs.begin(projectId)) return
     void drawRoughsInBackground(projectId, {
       fetchImpl: (input, init) => fetch(input, init),
       poll: (jobId) => pollGenerationJob(jobId),
-      isAborted: () => abortRef.current,
+      isAborted: () => runs.isAborted(projectId),
     })
-      .then((outcome) => {
-        if (outcome === 'done') doneRef.current = projectId
-        setState({ projectId, drawing: false, outcome })
-      })
-      .catch(() => setState({ projectId, drawing: false, outcome: 'request_failed' }))
-      .finally(() => {
-        runningRef.current = false
-      })
-  }, [projectId, ready, nudge])
+      .catch((): RoughPumpOutcome => 'request_failed')
+      .then((outcome) => runs.finish(projectId, outcome))
+  }, [projectId, ready, nudge, runs])
 
-  return state.projectId === projectId ? { drawing: state.drawing, outcome: state.outcome } : { drawing: false, outcome: null }
+  if (!projectId) return { drawing: false, outcome: null }
+  return { drawing: runs.isRunning(projectId), outcome: runs.outcomeOf(projectId) }
 }

@@ -20,7 +20,7 @@ export function completeError(code: string | undefined, missing?: { characters?:
     const names = [...(missing?.characters ?? []), ...(missing?.locations ?? [])].join(', ')
     return { key: 'Make the images for these first: {names}', params: { names } }
   }
-  if (code === 'artist_not_started' || code === 'artist_not_waiting') return { key: 'The images are still being designed. Try again once they are ready.' }
+  if (code === 'artist_not_started' || code === 'artist_not_waiting' || code === 'artist_design_unfinished') return { key: 'The images are still being designed. Try again once they are ready.' }
   return { key: 'Could not complete. Please try again.' }
 }
 

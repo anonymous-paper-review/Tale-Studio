@@ -6,7 +6,7 @@ import type { SceneManifest, CharacterAppearance, CharacterAsset, WorldAsset } f
 import { DEFAULT_LOCATION_APPEARANCE_KEY, type LocationAppearance } from '@/types/asset'
 import { type CharacterViewKey, type NarrativeTime } from '@/types/asset'
 import type { ImageModelKey } from '@/lib/image-models'
-import { candidateViewToViewKey, classifyImageStale, computeLookFingerprint, computeWorldDescriptionHash, computeWorldImageSourceHash, type CandidateImage, type LookTokens } from '@/lib/image-provenance'
+import { candidateViewToViewKey, classifyLookImageStale, computeLookFingerprint, computeWorldDescriptionHash, computeWorldImageSourceHash, type CandidateImage, type LookTokens } from '@/lib/image-provenance'
 import {
   buildWorldShotPromptForLocation,
   buildWorldShotPromptForAppearance,
@@ -331,6 +331,28 @@ type LocationCandidateRow = {
   generated_at: string
   variant_key?: string | null
 }
+/** 인물 한 칸(인물 × 모습 × 뷰)의 그림 기록을 다시 읽는다 — 새것부터. 읽지 못하면 null(기록은 그대로 둔다). */
+async function loadCharacterSlotCandidates(projectId: string, characterId: string, appearanceKey: string, view: CharacterViewKey): Promise<CandidateImage[] | null> {
+  const { data, error } = await createClient()
+    .from('character_image_candidates')
+    .select('id, character_id, appearance_key, view, url, source_hash, appearance_hash, is_selected, generated_at')
+    .eq('project_id', projectId)
+    .eq('character_id', characterId)
+    .eq('appearance_key', appearanceKey)
+  if (error || !data) return null
+  return data
+    .filter((row) => candidateViewToViewKey(row.view) === view)
+    .map((row) => ({
+      id: row.id,
+      url: row.url,
+      sourceHash: row.source_hash ?? null,
+      appearanceHash: row.appearance_hash ?? null,
+      isSelected: row.is_selected ?? false,
+      generatedAt: row.generated_at,
+    }))
+    .sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))
+}
+
 /** 기본 모습(variant_key 없음)의 후보만 — 변형 후보는 groupLocationAppearances 가 모습별로 나눈다. */
 function groupLocationCandidates(rows: LocationCandidateRow[], variantKey: string | null = null): Record<string, CandidateImage[]> {
   const out: Record<string, CandidateImage[]> = {}
@@ -750,7 +772,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           // #g4(2026-08-27): 캐릭터의 모습(시점·의상 변형). 기본 모습이 항상 하나 있다.
           supabase
             .from('character_appearances')
-            .select('character_id, appearance_key, label, is_default, narrative_time, sheet_url, portrait_url, appearance, appearance_native, derived_from_url')
+            .select('character_id, appearance_key, label, is_default, narrative_time, sheet_url, portrait_url, appearance, appearance_native, derived_from_url, costume')
             .eq('project_id', projectId)
             .order('is_default', { ascending: false }),
           // 배경 후보 히스토리(약속 B4) — 캐릭터 후보와 같은 소유자 SELECT 정책(20260904100000).
@@ -857,6 +879,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
               // #image-to-artist: 올린 원본 — 카드가 시트 옆에 함께 보여 준다.
               sourceImageUrl: (a.derived_from_url as string | null) ?? null,
               viewCandidates: candidatesByAppearanceView[a.character_id as string]?.[a.appearance_key as string] ?? {},
+              // 모습별 다시 만들기(generate-sheet)는 이 모습의 의상으로 지문을 남긴다 — 인물 지문과 함께 본다(classifyLookImageStale).
+              lookFingerprint: computeLookFingerprint(designTokens, a.costume as string[] | string | null, styleAnchorKey),
             })
             appearancesByChar.set(a.character_id as string, list)
           }
@@ -1345,6 +1369,24 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           viewFailures,
         }
       })
+      // 새 그림의 기록을 다시 읽는다 — 상세의 기록(시계) · "바뀜" 표시가 새 그림 기준이 되게(2026-10-20 팝업 e2e). 못 읽어도 그림은 그대로.
+      const candidates = await loadCharacterSlotCandidates(projectId, characterId, appearanceKey, view).catch(() => null)
+      if (candidates?.length && useProjectStore.getState().projectId === projectId) {
+        set((state) => ({
+          characterAssets: state.characterAssets.map((a) =>
+            a.characterId === characterId
+              ? {
+                  ...a,
+                  appearances: a.appearances.map((appearance) =>
+                    appearance.appearanceKey === appearanceKey
+                      ? { ...appearance, viewCandidates: { ...appearance.viewCandidates, [view]: candidates } }
+                      : appearance,
+                  ),
+                }
+              : a,
+          ),
+        }))
+      }
       const asset = get().characterAssets.find((a) => a.characterId === characterId)
       if (asset) registerCharacterCard(asset, projectId)
       notifyGenerationComplete('artist', translate(useLocaleStore.getState().locale, 'Character image')) // 다른 stage에 있을 때만 알림(store가 판단)
@@ -1947,10 +1989,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       const appearanceKey = requireDefaultAppearanceKey(c)
       // 콘텐츠정책/일반 실패 슬롯은 일괄 비대상 — 카드별 우회(safe) 전용(버블 카피 계약과 정합).
       if (viewFailures[c.characterId]?.[appearanceKey]?.main) return false
-      const selectedMain = (c.appearances.find((appearance) => appearance.appearanceKey === appearanceKey)?.viewCandidates.main ?? []).find((cand) => cand.isSelected)
-      // v2Design 이전에 만들어진 룩 부재 초안만 이 분기로 온다(legacy-only).
+      const defaultLook = c.appearances.find((appearance) => appearance.appearanceKey === appearanceKey)
+      const selectedMain = (defaultLook?.viewCandidates.main ?? []).find((cand) => cand.isSelected)
+      // v2Design 이전에 만들어진 룩 부재 초안만 이 분기로 온다(legacy-only). 모습별로 다시 만든 그림은 초안이 아니다.
       const lookPending =
-        classifyImageStale(c.fixedPrompt, c.lookFingerprint ?? null, {
+        classifyLookImageStale(c.fixedPrompt, [c.lookFingerprint, defaultLook?.lookFingerprint], {
           sourceHash: selectedMain?.sourceHash ?? null,
           appearanceHash: selectedMain?.appearanceHash ?? null,
         }) === 'look-pending'

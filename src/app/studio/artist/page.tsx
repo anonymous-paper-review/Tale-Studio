@@ -349,7 +349,7 @@ export default function VisualPage() {
   // 2026-10-20 오너 "Artist 만들면서 Storyboard 도 같이": 씬 · 샷이 다 나뉘고 Artist 그림을 다 그렸으면 이 화면에 있는 동안 러프를 미리 그린다.
   const roughs = useBackgroundRoughs(
     projectId,
-    backgroundRoughReady({ status: writerStatus, making: overlayOpen || phase === 'list' || phase === 'making', demo: isDemoSession() }),
+    backgroundRoughReady({ status: writerStatus, making: overlayOpen || phase === 'list' || phase === 'making', demo: isDemoSession(), artistCompleted }),
     progress.drawn,
   )
   const storyboardPrep = storyboardPrepView({ status: writerStatus, drawing: roughs.drawing, outcome: roughs.outcome, artistCompleted })

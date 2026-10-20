@@ -17,15 +17,18 @@ export const runtime = 'nodejs'
 
 const requestSchema = z.object({ projectId: z.string().min(1) })
 
-/** Storyboard 를 연다 — 이미 더 뒤(Director · Editor)면 낮추지 않는다. */
+/** Storyboard 를 연다 — 이미 더 뒤(Director · Editor)면 낮추지 않는다. 열지 못하면 던진다(됐다고 하지 않는다). */
 async function openStoryboard(projectId: string): Promise<void> {
   const { error } = await supabaseAdmin
     .from('projects')
     .update({ current_stage: 'writer' })
     .eq('id', projectId)
     .in('current_stage', ['entry', 'producer', 'artist'])
-  if (error) console.error('[artist-complete] stage update failed:', error.message)
+  if (error) throw new Error(`stage update failed: ${error.message}`)
 }
+
+/** 인물 · 배경 디자인(05~07)과 그 앞(산문 01~04) 단계 — 이 단계에서 돌거나 멈춘 실행은 아직 넘길 디자인이 없다. */
+const UNFINISHED_DESIGN_STEPS = new Set(['dramaturgy', 'narrativeStructure', 'scenes', 'storyCheck', 'visualFormat', 'actVisualArc', 'v2Design'])
 
 export async function POST(req: NextRequest) {
   try {
@@ -45,9 +48,22 @@ export async function POST(req: NextRequest) {
 
     for (let attempt = 0; attempt < 3; attempt++) {
       const run = await getActiveRun(projectId)
+      // 아직 산문 초안인 실행([만들기] 전) — 넘길 디자인이 없다.
+      if (run && (run.state as WriterRunState | undefined)?.input?.treatmentDraft === true) {
+        return NextResponse.json(
+          { error: 'Artist has not made the characters and backgrounds yet', code: 'artist_not_started', status: run.status },
+          { status: 409 },
+        )
+      }
       // [만들기]로 이어 간 실행(씬 · 샷을 나누는 중 · 다 나눔 · 그 뒤에서 멈춤) — 실행은 그대로 두고 Storyboard 를 연다.
-      //   멈췄으면 Storyboard 가 멈춘 이유와 [이어서 재시도]를 보인다.
+      //   멈췄으면 Storyboard 가 멈춘 이유와 [이어서 재시도]를 보인다. 인물 · 배경 디자인 중이거나 그 앞에서 멈췄으면 아직 받지 않는다.
       if (run && (run.status === 'running' || run.status === 'completed' || run.status === 'failed')) {
+        if (run.status !== 'completed' && UNFINISHED_DESIGN_STEPS.has(run.current_stage ?? '')) {
+          return NextResponse.json(
+            { error: 'Characters and backgrounds are still being designed', code: 'artist_design_unfinished', status: run.status },
+            { status: 409 },
+          )
+        }
         await openStoryboard(projectId)
         return NextResponse.json({ ok: true, projectId, runId: run.id, status: run.status })
       }

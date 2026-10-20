@@ -1,6 +1,6 @@
 // Artist 에서 만드는 동안 씬 · 샷이 다 나뉘면 Storyboard 러프를 미리 그리고, Artist 머리에 Storyboard 준비 상태를 보인다 (2026-10-20 오너 "시간 절약")
 import { describe, expect, it, vi } from 'vitest'
-import { backgroundRoughReady, drawRoughsInBackground, storyboardPrepView } from '@/lib/artist/background-roughs'
+import { backgroundRoughReady, createBackgroundRoughRuns, drawRoughsInBackground, storyboardPrepView } from '@/lib/artist/background-roughs'
 
 const done = { started: true, pipeline_completed: true, current_status: 'completed', current_stage: 'persistShots' }
 const splitting = { started: true, current_status: 'running', current_stage: 'decoupage' }
@@ -8,23 +8,28 @@ const splitting = { started: true, current_status: 'running', current_stage: 'de
 describe('러프를 미리 그리는 때', () => {
   it('씬 · 샷이 다 나뉘고 Artist 그림을 다 그렸으면 Artist 화면에서 러프를 미리 그린다', () => {
     // 왜: Artist 에서 카드를 보고 고치는 동안 Storyboard 를 미리 그려 두면, [완료하기] 뒤 기다리지 않는다.
-    expect(backgroundRoughReady({ status: done, making: false, demo: false })).toBe(true)
+    expect(backgroundRoughReady({ status: done, making: false, demo: false, artistCompleted: false })).toBe(true)
   })
 
   it('Artist 그림을 그리는 중에는 러프를 시작하지 않는다', () => {
     // 왜: 러프가 돌면 Artist 그림은 한 장씩 그린다(10/9 규칙) — 지금 기다리는 Artist 그림이 느려지지 않게 그림이 끝난 뒤에 시작한다.
-    expect(backgroundRoughReady({ status: done, making: true, demo: false })).toBe(false)
+    expect(backgroundRoughReady({ status: done, making: true, demo: false, artistCompleted: false })).toBe(false)
   })
 
   it('씬 · 샷을 아직 나누는 중이거나 멈췄으면 러프를 시작하지 않는다', () => {
     // 왜: 러프는 샷을 그린다 — 샷이 저장되기 전에는 그릴 것이 없다.
-    expect(backgroundRoughReady({ status: splitting, making: false, demo: false })).toBe(false)
-    expect(backgroundRoughReady({ status: { ...splitting, current_status: 'failed', pipeline_failed: true }, making: false, demo: false })).toBe(false)
+    expect(backgroundRoughReady({ status: splitting, making: false, demo: false, artistCompleted: false })).toBe(false)
+    expect(backgroundRoughReady({ status: { ...splitting, current_status: 'failed', pipeline_failed: true }, making: false, demo: false, artistCompleted: false })).toBe(false)
+  })
+
+  it('[완료하기]를 한 뒤(예전에 끝까지 만든 프로젝트 포함)에는 Artist 화면에서 그리지 않는다', () => {
+    // 왜: 그때부터는 Storyboard 화면이 그린다 — Artist 에서 머리 표시 없이 돈이 드는 그리기를 하지 않는다(검토 지적).
+    expect(backgroundRoughReady({ status: done, making: false, demo: false, artistCompleted: true })).toBe(false)
   })
 
   it('공유로 보는 화면에서는 그리지 않는다', () => {
     // 왜: 공유 보기는 읽기 전용이다.
-    expect(backgroundRoughReady({ status: done, making: false, demo: true })).toBe(false)
+    expect(backgroundRoughReady({ status: done, making: false, demo: true, artistCompleted: false })).toBe(false)
   })
 })
 
@@ -74,6 +79,46 @@ describe('러프 미리 그리기', () => {
 
     expect(outcome).toBe('aborted')
     expect(fetchImpl).toHaveBeenCalledOnce()
+  })
+})
+
+describe('프로젝트를 옮길 때', () => {
+  it('다른 프로젝트로 옮기면 앞 프로젝트의 러프는 다음 묶음을 보내지 않는다', () => {
+    // 왜: Artist 화면에서 다른 프로젝트를 열었는데 앞 프로젝트 러프를 계속 그리면 지금 보는 프로젝트의 자리를 차지한다(검토 지적).
+    const runs = createBackgroundRoughRuns()
+    runs.show('pA')
+    expect(runs.begin('pA')).toBe(true)
+    runs.show('pB')
+    expect(runs.isAborted('pA')).toBe(true)
+    expect(runs.isAborted('pB')).toBe(false)
+  })
+
+  it('다른 프로젝트로 옮기면 새 프로젝트의 러프는 앞 프로젝트가 끝나기를 기다리지 않고 시작한다', () => {
+    // 왜: 앞 프로젝트가 마지막 묶음을 기다리는 동안 새 프로젝트가 시작하지 못하면, 다음 계기가 올 때까지 아무것도 그리지 않는다(검토 지적).
+    const runs = createBackgroundRoughRuns()
+    runs.show('pA')
+    runs.begin('pA')
+    runs.show('pB')
+    expect(runs.begin('pB')).toBe(true)
+  })
+
+  it('같은 프로젝트를 이미 그리는 중이면 한 번 더 맡기지 않는다', () => {
+    // 왜: 정상 경로 고정 — 같은 컷을 두 번 맡기면 돈이 두 번 든다.
+    const runs = createBackgroundRoughRuns()
+    runs.show('pA')
+    runs.begin('pA')
+    expect(runs.begin('pA')).toBe(false)
+  })
+
+  it('다 그린 프로젝트는 다시 맡기지 않고, 자리가 차서 멈춘 프로젝트는 다음 계기에 다시 맡긴다', () => {
+    // 왜: 정상 경로 고정 — 자리가 차서 멈췄으면 Artist 그림이 하나 끝나 자리가 날 때 이어 그린다.
+    const runs = createBackgroundRoughRuns()
+    runs.show('pA')
+    runs.begin('pA')
+    runs.finish('pA', 'quota')
+    expect(runs.begin('pA')).toBe(true)
+    runs.finish('pA', 'done')
+    expect(runs.begin('pA')).toBe(false)
   })
 })
 

@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ThumbImage } from '@/components/thumb-image'
 import { AiBusyOverlay } from '@/components/ai-busy-overlay'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
-import { DescriptionBox, DetailFrame, DetailSection, HistoryButton, RegenerateDialog, artistDetailTitleKey } from '@/features/artist/detail-parts'
+import { DescriptionBox, DetailFrame, DetailSection, HistoryButton, RegenerateDialog, artistDetailTitleKey, lookAfterDelete } from '@/features/artist/detail-parts'
 import { sameCharacterAppearanceSlot, useArtistStore } from '@/stores/artist-store'
 import { useWriterStore } from '@/stores/writer-store'
 import { useProducerStore } from '@/stores/producer-store'
@@ -21,7 +21,7 @@ import {
   imageModelSupportsReference,
   type ImageModelKey,
 } from '@/lib/image-models'
-import { classifyImageStale } from '@/lib/image-provenance'
+import { classifyLookImageStale } from '@/lib/image-provenance'
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
 import { sceneShotLabel } from '@/lib/writer/shot-edit'
 import { useGuardedAction } from '@/hooks/use-guarded-action'
@@ -62,16 +62,7 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
   const styleLabel = useProducerStore((s) => s.customStyleAnchor?.label ?? s.styleAnchors.find((anchor) => anchor.key === s.styleAnchorKey)?.label ?? null)
 
   // 팝업 안에서 다른 모습으로 옮겨 볼 수 있다(모습 목록 [보기]) — 카드가 연 모습에서 시작한다.
-  const [viewing, setViewing] = useState<{ from: string | null; key: string | null }>({ from: null, key: null })
-  const appearanceKey = viewing.from === appearanceKeyProp && viewing.key ? viewing.key : appearanceKeyProp
-  const showAppearance = (key: string) => setViewing({ from: appearanceKeyProp, key })
-
-  const isGenerating = useArtistStore((s) =>
-    appearanceKey && view
-      ? s.generatingViews.some((slot) => sameCharacterAppearanceSlot(slot, charId ?? '', appearanceKey, view))
-      : false,
-  )
-
+  const [viewingKey, setViewingKey] = useState<string | null>(null)
   // 다시 만들기 창의 설명(A7r) — 대상(캐릭터 × 모습 × 뷰)이 바뀌면 초기화.
   const [prompt, setPrompt] = useState('')
   const [promptKey, setPromptKey] = useState<string | null>(null)
@@ -86,6 +77,35 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
   // 이 팝업에서 다시 만들기를 눌렀다 — 그리는 동안 화면 전체를 잠근다(프로토타입 A8).
   const [redrawing, setRedrawing] = useState(false)
 
+  // 카드가 연 대상(인물 × 모습 × 뷰)이 바뀌거나 팝업을 닫으면 팝업 안에서 옮겨 본 모습 · 이름 고치기 · 안내 · 확인 창을 버린다
+  //   (다른 인물을 열었는데 앞 인물에서 보던 모습 키가 남아 있으면 팝업이 열리지 않거나 다른 모습이 보였다, 검토 지적).
+  const target = charId && appearanceKeyProp && view ? `${charId}:${appearanceKeyProp}:${view}` : null
+  const [seenTarget, setSeenTarget] = useState<string | null>(null)
+  if (seenTarget !== target) {
+    setSeenTarget(target)
+    setViewingKey(null)
+    setRenaming(false)
+    setRenameDraft('')
+    setManageError(null)
+    setRegenOpen(false)
+  }
+  const requestedKey = viewingKey ?? appearanceKeyProp
+  // 지운 모습을 가리키면 기준 모습(없으면 첫 모습)을 보인다 — 팝업이 닫혔다 다시 열리며 깜빡이지 않게.
+  const appearanceKey = !char || !requestedKey || char.appearances.some((item) => item.appearanceKey === requestedKey)
+    ? requestedKey
+    : (char.appearances.find((item) => item.isDefault) ?? char.appearances[0])?.appearanceKey ?? requestedKey
+  const showAppearance = (key: string) => {
+    setViewingKey(key)
+    setRenaming(false)
+    setManageError(null)
+  }
+
+  const isGenerating = useArtistStore((s) =>
+    appearanceKey && view
+      ? s.generatingViews.some((slot) => sameCharacterAppearanceSlot(slot, charId ?? '', appearanceKey, view))
+      : false,
+  )
+
   const open = !!charId && !!appearanceKey && !!view
   useEffect(() => {
     // 쓰인 샷을 보이려면 Storyboard 샷 목록이 필요하다 — 팝업을 열 때 한 번 읽는다(사물함 30초 신선).
@@ -96,9 +116,10 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
   //   느린 서버에서 그 사이 버튼이 열려 있어 두 번째 클릭이 기존 중복 가드까지 통과했다.
   //   아래 훅은 store 상태를 기다리지 않고 클릭 순간 잠그고, busy 가 올라오면 잠금을 넘긴다.
   // 그림 만들기 — 다시 만들기 창에서 고친 설명은 선택한 모습의 원천에 먼저 저장한다. 그림이 다 될 때까지 기다린다.
-  const runGenerate = async () => {
+  //   text = 그릴 설명. 아래 [다시 만들기](바뀐 설명 안내)는 저장된 설명을 넘긴다 — 창에서 쓰다 만 글로 덮어쓰지 않게(검토 지적).
+  const runGenerate = async (text: string) => {
     if (!char || !appearanceKey || !view || !appearance) return
-    const next = prompt.trim()
+    const next = text.trim()
     const base = appearance.appearanceNative || appearance.appearance || ''
     if (view === 'main' && next && next !== base) {
       await updateCharacterAppearance(char.characterId, appearanceKey, next)
@@ -110,7 +131,7 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
     stage: 'artist',
     label: t('Character image'),
     busy: isGenerating,
-    action: runGenerate,
+    action: () => runGenerate(prompt),
   })
   const safeRetry = useGuardedAction({
     actionKey: `artist:character-safe:${charId}:${appearanceKey}:${view}`,
@@ -146,7 +167,7 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
   // stale 원인 분류(027): look-pending(룩만 도착) vs edited(외형 변경).
   const candidates = appearance.viewCandidates[view] ?? []
   const selectedCandidate = candidates.find((c) => c.isSelected)
-  const staleClass = classifyImageStale(appearance.appearance ?? '', char.lookFingerprint ?? null, {
+  const staleClass = classifyLookImageStale(appearance.appearance ?? '', [char.lookFingerprint, appearance.lookFingerprint], {
     sourceHash: selectedCandidate?.sourceHash ?? null,
     appearanceHash: selectedCandidate?.appearanceHash ?? null,
   })
@@ -158,15 +179,16 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
   const usedIn = shots.filter((shot) => shot.characters.includes(char.characterId))
   const usedLabels = usedIn.map((shot) => sceneShotLabel(sceneManifest, shots, shot.shotId)).filter((value): value is string => !!value)
 
-  // 모습 지우기 — 기본 모습은 지우지 못한다(약속 C8).
+  // 모습 지우기 — 기본 모습은 지우지 못한다(약속 C8). 팝업은 닫지 않는다 — 보던 모습을 지웠으면 기준 모습을 보인다(검토 지적).
+  const shownKey = appearanceKey
   const removeLook = async (appearanceKey: string, lookLabel: string) => {
     if (!window.confirm(t('Delete the appearance "{label}"? Its images are removed from the history too.', { label: lookLabel }))) return
     setManageBusy(true)
     setManageError(null)
     try {
       await deleteAppearance(char.characterId, appearanceKey)
-      if (appearanceKey === appearanceKeyProp) onClose()
-      else if (defaultAppearance) showAppearance(defaultAppearance.appearanceKey)
+      const next = lookAfterDelete({ deleted: appearanceKey, viewing: shownKey, base: defaultAppearance?.appearanceKey ?? null, remaining: char.appearances.map((item) => item.appearanceKey) })
+      if (next && next !== shownKey) showAppearance(next)
     } catch (e) {
       setManageError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -184,12 +206,17 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
       setManageBusy(false)
     }
   }
+  // 다시 만들기 창은 늘 저장된 설명에서 시작한다(앞에서 쓰다 취소한 글이 남지 않게).
+  const openRegenerate = () => {
+    setPrompt(initialPrompt)
+    setRegenOpen(true)
+  }
   // 다시 만들기 — 그림이 다 될 때까지(실패해도 끝날 때까지) 화면 전체를 잠근다(프로토타입 A8). 잠금 동안에는 다시 누를 수 없다.
-  const redraw = async () => {
+  const redraw = async (text: string) => {
     setRegenOpen(false)
     setRedrawing(true)
     try {
-      await runGenerate()
+      await runGenerate(text)
     } catch (err) {
       useGlobalChatStore.getState().notifyActionError('artist', t('Character image'), err instanceof Error ? err.message : String(err))
     } finally {
@@ -246,7 +273,7 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
             ) : null}
             <span className="ml-auto flex items-center gap-1">
               <HistoryButton candidates={candidates} onPick={(id) => selectCandidate(char.characterId, appearanceKey, view, id)} />
-              <Button size="sm" variant="outline" disabled={generate.locked || needsMain} onClick={() => setRegenOpen(true)} data-testid="detail-regenerate-open">
+              <Button size="sm" variant="outline" disabled={generate.locked || needsMain} onClick={openRegenerate} data-testid="detail-regenerate-open">
                 {generate.locked ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
                 {imageUrl ? t('Remake') : t('Make the image')}
               </Button>
@@ -377,15 +404,18 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
         </DetailSection>
       ) : null}
 
-      <DetailSection title={t('Used in shots')} hint={shots.length ? undefined : t('It shows once Storyboard splits the shots')} testId="detail-used-shots">
-        {shots.length === 0 ? null : usedLabels.length ? (
-          <div className="flex flex-wrap gap-1.5">
-            {usedLabels.map((value) => <span key={value} className="rounded-md border border-border px-2 py-0.5 font-mono text-xs">{value}</span>)}
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">{t('Not used in any shot yet')}</p>
-        )}
-      </DetailSection>
+      {/* 사물은 샷의 등장인물에 들지 않는다(Writer 는 사물을 props 로만 저장) — 늘 "안 쓰였어요"로 보여 숨긴다(검토 지적). */}
+      {!isObject ? (
+        <DetailSection title={t('Used in shots')} hint={shots.length ? undefined : t('It shows once Storyboard splits the shots')} testId="detail-used-shots">
+          {shots.length === 0 ? null : usedLabels.length ? (
+            <div className="flex flex-wrap gap-1.5">
+              {usedLabels.map((value) => <span key={value} className="rounded-md border border-border px-2 py-0.5 font-mono text-xs">{value}</span>)}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">{t('Not used in any shot yet')}</p>
+          )}
+        </DetailSection>
+      ) : null}
     </>
   )
 
@@ -395,17 +425,17 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
         <p className="mr-auto text-xs text-muted-foreground">{t('Changed description · {label}. Remake it to apply it to the image.', { label: appearance.label })}</p>
       ) : null}
       {descriptionChanged ? (
-        <Button variant="outline" disabled={generate.locked} onClick={() => void redraw()}>
+        <Button variant="outline" disabled={generate.locked} onClick={() => void redraw(initialPrompt)}>
           <RefreshCw className="size-4" />{t('Remake')}
         </Button>
       ) : null}
-      <Button onClick={onClose}>{t('Close')}</Button>
+      <Button onClick={onClose} disabled={redrawing}>{t('Close')}</Button>
     </div>
   )
 
   return (
     <>
-      <DetailFrame open={open} onClose={onClose} title={title} left={left} right={right} footer={footer} testId="artist-detail" />
+      <DetailFrame open={open} onClose={onClose} title={title} left={left} right={right} footer={footer} busy={redrawing} testId="artist-detail" />
       <RegenerateDialog
         open={regenOpen}
         onOpenChange={setRegenOpen}
@@ -438,7 +468,7 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
         notes={<p className="text-xs text-muted-foreground">{t('The earlier image stays in the history (clock).')}</p>}
         confirmLabel={imageUrl ? t('Remake') : t('Make the image')}
         busy={generate.locked}
-        onConfirm={() => void redraw()}
+        onConfirm={() => void redraw(prompt)}
       />
       <AiBusyOverlay open={redrawing} layer="dialog" title={t('Making the image')} description={t('{name} · {look}', { name: char.name, look: appearance.label })} />
     </>

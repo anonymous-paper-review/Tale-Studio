@@ -141,4 +141,39 @@ describe('Artist 완료하기', () => {
       expect(mocks.projectUpdate).not.toHaveBeenCalled()
     }
   })
+
+  // 왜: 화면은 디자인이 끝나야 [완료하기]를 보이지만, 서버도 같은 규칙으로 막는다 — 오래된 화면이나 직접 부른 요청이
+  //   디자인 중인 실행을 넘기면 인물 · 배경 행이 다 생기기 전에 Storyboard 가 열린다(검토 지적).
+  it('인물 · 배경을 디자인하는 중인 실행이면 완료하기를 받지 않는다', async () => {
+    for (const current_stage of ['visualFormat', 'v2Design']) {
+      vi.clearAllMocks()
+      mocks.getActiveRun.mockResolvedValue({ id: 'run-1', status: 'running', current_stage, state: {}, updated_at: 'x' })
+
+      const response = await completeArtist(request())
+
+      expect(response.status, current_stage).toBe(409)
+      expect(await response.json()).toMatchObject({ code: 'artist_design_unfinished' })
+      expect(mocks.projectUpdate).not.toHaveBeenCalled()
+    }
+  })
+
+  // 왜: 산문 초안(확정 전 · 만들기 전) 실행은 넘길 디자인이 없다.
+  it('아직 산문 초안인 실행은 완료하기를 받지 않는다', async () => {
+    mocks.getActiveRun.mockResolvedValue({ id: 'run-1', status: 'running', current_stage: 'scenes', state: { input: { treatmentDraft: true } }, updated_at: 'x' })
+
+    const response = await completeArtist(request())
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ code: 'artist_not_started' })
+  })
+
+  // 왜: Storyboard 를 열지 못했는데 됐다고 하면 화면은 넘어가고, 새로고침하면 다시 잠긴다.
+  it('Storyboard 를 열지 못하면 됐다고 하지 않는다', async () => {
+    mocks.getActiveRun.mockResolvedValue({ id: 'run-1', status: 'completed', current_stage: 'persistShots', state: {}, updated_at: 'x' })
+    mocks.projectUpdate.mockResolvedValue({ error: { message: 'db down' } })
+
+    const response = await completeArtist(request())
+
+    expect(response.status).toBe(500)
+  })
 })

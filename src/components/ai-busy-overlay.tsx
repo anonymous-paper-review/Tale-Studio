@@ -31,7 +31,8 @@ interface AiBusyOverlayProps {
   footer?: React.ReactNode
   /** false = 일이 멈췄다(실패 안내) — 도는 원 대신 경고 표시를 두고 aria-busy 를 끈다. 기본 true. */
   busy?: boolean
-  /** 'dialog' = 열린 팝업 위를 덮는다(팝업에서 시작한 AI 작업, 2026-10-20 Artist 상세 · 샷 고치기). 기본은 단계 화면만 덮는다. */
+  /** 'dialog' = 열린 팝업 위를 덮는다(팝업에서 시작한 AI 작업, 2026-10-20 Artist 상세 · 샷 고치기). 기본은 단계 화면만 덮는다.
+   *  팝업이 열려 있으면 body 가 클릭을 받지 않는다(Radix) — 덮개가 클릭을 직접 받아 밑의 팝업 버튼으로 새지 않게 한다. */
   layer?: 'stage' | 'dialog'
 }
 
@@ -58,7 +59,7 @@ export function AiBusyOverlay({ open, title, description, steps, progress, progr
   return createPortal(
     <div
       className={layer === 'dialog'
-        ? 'fixed inset-0 z-popover flex items-center justify-center bg-background/85 p-6'
+        ? 'pointer-events-auto fixed inset-0 z-popover flex items-center justify-center bg-background/85 p-6'
         : 'fixed inset-y-0 right-0 z-overlay flex items-center justify-center bg-background/85 p-6'}
       style={layer === 'dialog' ? undefined : { left: SHELL_INSET * 2 + SHELL_RAIL_WIDTH }}
       role="status"

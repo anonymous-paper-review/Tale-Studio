@@ -64,16 +64,8 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
   const styleLabel = useProducerStore((s) => s.customStyleAnchor?.label ?? s.styleAnchors.find((anchor) => anchor.key === s.styleAnchorKey)?.label ?? null)
 
-  // 팝업 안에서 다른 모습으로 옮겨 볼 수 있다(모습 목록 [보기]) — 카드가 연 모습에서 시작한다.
-  const [viewing, setViewing] = useState<{ from: string | null | undefined; key: string | null } | null>(null)
-  const viewedKey = viewing && viewing.from === appearanceKeyProp ? viewing.key : appearanceKeyProp ?? null
-  const variantKey = viewedKey && viewedKey !== DEFAULT_LOCATION_APPEARANCE_KEY ? viewedKey : null
-  const showLook = (key: string | null) => setViewing({ from: appearanceKeyProp, key })
-  const failure = useArtistStore((s) => (locationId ? s.worldFailures[worldFailureKey(locationId, variantKey)] : undefined))
-  const isGenerating = useArtistStore((s) =>
-    locationId ? s.generatingLocations.includes(worldFailureKey(locationId, variantKey)) : false,
-  )
-
+  // 팝업 안에서 다른 모습으로 옮겨 볼 수 있다(모습 목록 [보기]) — 카드가 연 모습에서 시작한다. null = 카드가 연 모습, { key: null } = 기본 모습.
+  const [viewing, setViewing] = useState<{ key: string | null } | null>(null)
   // 다시 만들기 창의 설명 — 대상 전환 시 초기화. 캐릭터 팝업과 같은 계약.
   const [description, setDescription] = useState('')
   const [descriptionKey, setDescriptionKey] = useState<string | null>(null)
@@ -87,6 +79,31 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
   const [regenOpen, setRegenOpen] = useState(false)
   const [redrawing, setRedrawing] = useState(false)
 
+  // 카드가 연 대상(배경 × 모습)이 바뀌거나 팝업을 닫으면 팝업 안에서 옮겨 본 모습 · 이름 고치기 · 안내 · 확인 창을 버린다(검토 지적).
+  const target = locationId && shot ? `${locationId}:${shot}:${appearanceKeyProp ?? DEFAULT_LOCATION_APPEARANCE_KEY}` : null
+  const [seenTarget, setSeenTarget] = useState<string | null>(null)
+  if (seenTarget !== target) {
+    setSeenTarget(target)
+    setViewing(null)
+    setRenaming(false)
+    setRenameDraft('')
+    setManageError(null)
+    setRegenOpen(false)
+  }
+  const viewedKey = viewing ? viewing.key : appearanceKeyProp ?? null
+  const requestedVariant = viewedKey && viewedKey !== DEFAULT_LOCATION_APPEARANCE_KEY ? viewedKey : null
+  // 지운 모습을 가리키면 기본 모습을 보인다 — 팝업이 닫혔다 다시 열리며 깜빡이지 않게.
+  const variantKey = requestedVariant && world?.appearances?.some((item) => item.appearanceKey === requestedVariant) ? requestedVariant : null
+  const showLook = (key: string | null) => {
+    setViewing({ key })
+    setRenaming(false)
+    setManageError(null)
+  }
+  const failure = useArtistStore((s) => (locationId ? s.worldFailures[worldFailureKey(locationId, variantKey)] : undefined))
+  const isGenerating = useArtistStore((s) =>
+    locationId ? s.generatingLocations.includes(worldFailureKey(locationId, variantKey)) : false,
+  )
+
   const open = !!locationId && !!shot
   useEffect(() => {
     // 쓰인 샷을 보이려면 Storyboard 샷 목록이 필요하다 — 팝업을 열 때 한 번 읽는다.
@@ -94,9 +111,10 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
   }, [open])
 
   // 그림 만들기 — 설명을 고쳤으면 원천에 먼저 저장한다(닫았다 열어도 남고 Writer 씬도 같은 설명을 읽는다). 그림이 다 될 때까지 기다린다.
-  const runGenerate = async () => {
+  //   text = 그릴 설명. 아래 [다시 만들기](바뀐 설명 안내)는 저장된 설명을 넘긴다 — 창에 남은 옛 글로 방금 적용한 설명을 되돌리지 않게(검토 지적).
+  const runGenerate = async (text: string) => {
     if (!world || !shot) return
-    const next = description.trim()
+    const next = text.trim()
     const variant = variantKey ? world.appearances?.find((a) => a.appearanceKey === variantKey) ?? null : null
     const base = variant ? worldDescriptionDraft(variant) : worldDescriptionDraft(world)
     if (next && next !== base) {
@@ -110,7 +128,7 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
     stage: 'artist',
     label: t('Background image'),
     busy: isGenerating,
-    action: runGenerate,
+    action: () => runGenerate(description),
   })
   const safeRetry = useGuardedAction({
     actionKey: `artist:world-safe:${locationId}:${variantKey ?? 'default'}:${shot}`,
@@ -127,10 +145,12 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
 
   const variant = variantKey ? world.appearances?.find((a) => a.appearanceKey === variantKey) ?? null : null
   if (variantKey && !variant) return null
-  const key = `${locationId}:${shot}:${variantKey ?? 'default'}`
+  // 저장된 설명이 바뀌면(✎ [적용]) 창의 설명도 새로 맞춘다 — 인물 팝업처럼 키에 저장된 글을 넣는다(검토 지적).
+  const savedDescription = variant ? worldDescriptionDraft(variant) : worldDescriptionDraft(world)
+  const key = `${locationId}:${shot}:${variantKey ?? 'default'}:${savedDescription}`
   if (descriptionKey !== key) {
     setDescriptionKey(key)
-    setDescription(variant ? worldDescriptionDraft(variant) : worldDescriptionDraft(world))
+    setDescription(savedDescription)
   }
 
   const imageUrl = variant ? variant.wideShot : (world[shot] ?? null)
@@ -146,12 +166,17 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
   const sceneIds = new Set((sceneManifest?.scenes ?? []).filter((scene) => scene.location === world.locationId).map((scene) => scene.sceneId))
   const usedLabels = shots.filter((item) => sceneIds.has(item.sceneId)).map((item) => sceneShotLabel(sceneManifest, shots, item.shotId)).filter((value): value is string => !!value)
 
+  // 다시 만들기 창은 늘 저장된 설명에서 시작한다(앞에서 쓰다 취소한 글이 남지 않게).
+  const openRegenerate = () => {
+    setDescription(savedDescription)
+    setRegenOpen(true)
+  }
   // 다시 만들기 — 그림이 다 될 때까지(실패해도 끝날 때까지) 화면 전체를 잠근다(프로토타입 A8).
-  const redraw = async () => {
+  const redraw = async (text: string) => {
     setRegenOpen(false)
     setRedrawing(true)
     try {
-      await runGenerate()
+      await runGenerate(text)
     } catch (err) {
       useGlobalChatStore.getState().notifyActionError('artist', t('Background image'), err instanceof Error ? err.message : String(err))
     } finally {
@@ -200,7 +225,7 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
             ) : null}
             <span className="ml-auto flex items-center gap-1">
               <HistoryButton candidates={hasHistory ? candidates : []} onPick={(id) => void selectLocationCandidate(world.locationId, id, variantKey)} />
-              <Button size="sm" variant="outline" disabled={generate.locked} onClick={() => setRegenOpen(true)} data-testid="detail-regenerate-open">
+              <Button size="sm" variant="outline" disabled={generate.locked} onClick={openRegenerate} data-testid="detail-regenerate-open">
                 {generate.locked ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
                 {imageUrl ? t('Remake') : t('Make the image')}
               </Button>
@@ -252,7 +277,7 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
         <DescriptionBox
           key={`${world.locationId}:${variantKey ?? 'default'}`}
           caption={variant ? t('Changed look · {label}', { label: variant.label }) : t('Base look · background')}
-          value={variant ? worldDescriptionDraft(variant) : worldDescriptionDraft(world)}
+          value={savedDescription}
           placeholder={t("This background's description")}
           changed={descriptionChanged}
           onApply={async (next) => {
@@ -307,8 +332,8 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
                 setManageError(null)
                 try {
                   await deleteLocationAppearance(world.locationId, variant.appearanceKey)
-                  if (variant.appearanceKey === appearanceKeyProp) onClose()
-                  else showLook(null)
+                  // 팝업은 닫지 않는다 — 지운 것은 보던 모습이라 기본 모습을 보인다(검토 지적).
+                  showLook(null)
                 } catch (e) {
                   setManageError(e instanceof Error ? e.message : String(e))
                 } finally {
@@ -340,17 +365,17 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
         <p className="mr-auto text-xs text-muted-foreground">{t('Changed description · {label}. Remake it to apply it to the image.', { label: lookLabel })}</p>
       ) : null}
       {descriptionChanged ? (
-        <Button variant="outline" disabled={generate.locked} onClick={() => void redraw()}>
+        <Button variant="outline" disabled={generate.locked} onClick={() => void redraw(savedDescription)}>
           <RefreshCw className="size-4" />{t('Remake')}
         </Button>
       ) : null}
-      <Button onClick={onClose}>{t('Close')}</Button>
+      <Button onClick={onClose} disabled={redrawing}>{t('Close')}</Button>
     </div>
   )
 
   return (
     <>
-      <DetailFrame open={open} onClose={onClose} title={t(artistDetailTitleKey('background'), { name: world.name })} left={left} right={right} footer={footer} testId="artist-detail" />
+      <DetailFrame open={open} onClose={onClose} title={t(artistDetailTitleKey('background'), { name: world.name })} left={left} right={right} footer={footer} busy={redrawing} testId="artist-detail" />
       <RegenerateDialog
         open={regenOpen}
         onOpenChange={setRegenOpen}
@@ -378,7 +403,7 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
         notes={<p className="text-xs text-muted-foreground">{t('The earlier image stays in the history (clock).')}</p>}
         confirmLabel={imageUrl ? t('Remake') : t('Make the image')}
         busy={generate.locked}
-        onConfirm={() => void redraw()}
+        onConfirm={() => void redraw(description)}
       />
       <AiBusyOverlay open={redrawing} layer="dialog" title={t('Making the image')} description={t('{name} · {look}', { name: world.name, look: lookLabel })} />
     </>

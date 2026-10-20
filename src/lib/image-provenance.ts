@@ -201,6 +201,24 @@ export function classifyImageStale(
 }
 
 /**
+ * 모습 그림의 상태 — 인물 단위 룩 지문(처음 자동으로 그린 그림 · draft-trigger)이 기준이고, 모습 단위 룩 지문(모습별 다시 만들기 ·
+ *   generate-sheet, #g4 2026-08-27)이 있으면 그것으로 맞아도 최신이다. Writer v2 저장은 인물 의상 칸을 비워 두고 모습에만 의상을 둬서,
+ *   다시 만든 그림이 늘 "룩 반영 전 초안"으로 보였다(2026-10-20 팝업 e2e). 모습 지문이 비어 있으면 대안으로 쓰지 않는다 —
+ *   룩 없이 그린 예전 초안은 그대로 초안이다. 어느 쪽도 안 맞으면 인물 지문으로 look-pending / edited 를 가린다.
+ */
+export function classifyLookImageStale(
+  currentAppearance: string | null | undefined,
+  lookFingerprints: ReadonlyArray<string | null | undefined>,
+  candidate: { sourceHash: string | null | undefined; appearanceHash?: string | null },
+): StaleClass {
+  const [primary, ...alternates] = lookFingerprints
+  const byPrimary = classifyImageStale(currentAppearance, primary ?? null, candidate)
+  if (byPrimary === 'fresh') return byPrimary
+  const freshByLook = alternates.some((fingerprint) => !!fingerprint && fingerprint !== primary && classifyImageStale(currentAppearance, fingerprint, candidate) === 'fresh')
+  return freshByLook ? 'fresh' : byPrimary
+}
+
+/**
  * 룩 버전 키 — 온보딩 해소(suggestion id) 버전키. freshness 와 동일 룩 도메인을 커버해야 하므로
  *   캐릭터별 lookFingerprint(=computeLookFingerprint(designTokens, costume))를 결정적으로 집계한다.
  *   정렬 후 결합 → reorder 불변, designTokens/costume 변경 시 키 변경(=writer 재실행 시 온보딩 재발사).

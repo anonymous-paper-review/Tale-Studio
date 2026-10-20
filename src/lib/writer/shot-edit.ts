@@ -38,22 +38,15 @@ export function cameraWithAngle(camera: CameraConfig, angle: CameraAngle): Camer
 
 export type RoughFrame = 'start' | 'direction'
 
-export interface RedrawDeps {
-  /** 바꾼 내용을 저장한다(다 끝날 때까지 기다린다). */
-  save: () => Promise<void>
-  /** 그 장만 다시 그린다 — 성공하면 true. */
-  regenerate: (frame: RoughFrame) => Promise<boolean>
-}
-
-/** [시작 적용 · 연출도 다시] — 저장 → 시작 그림 → 연출 그림. 시작을 못 그리면 연출은 그리지 않는다(두 장이 어긋나지 않게). */
-export async function applyStartEdit(deps: RedrawDeps): Promise<boolean> {
+/** [적용] — 바꾼 내용을 저장하고(실패하면 던진다 — 그리지 않는다), 그 샷의 러프를 저장한 내용으로 새로 그린다.
+ *  한 장씩 다시 그리기(regenerate-frame)는 지금 그림을 보고 고쳐 그려 바꾼 스토리 · 샷 타입을 읽지 않는다(검토 지적). */
+export async function applyStartEdit(deps: { save: () => Promise<void>; redrawShot: () => Promise<boolean> }): Promise<boolean> {
   await deps.save()
-  if (!(await deps.regenerate('start'))) return false
-  return deps.regenerate('direction')
+  return deps.redrawShot()
 }
 
 /** [연출만 다시 만들기] — 저장 → 연출 그림만(약속 I: 나머지는 그대로). */
-export async function redrawDirectionOnly(deps: RedrawDeps): Promise<boolean> {
+export async function redrawDirectionOnly(deps: { save: () => Promise<void>; regenerate: (frame: RoughFrame) => Promise<boolean> }): Promise<boolean> {
   await deps.save()
   return deps.regenerate('direction')
 }

@@ -1,14 +1,14 @@
-// Storyboard 샷 고치기에서 바꾼 조명 · 카메라 앵글은 저장하고, 손대지 않은 조명 · 카메라 값은 다시 쓰지 않는다 (2026-10-20)
+// 샷을 고칠 때 바꾼 조명 · 카메라 앵글은 저장하고, 손대지 않은 조명 · 카메라 값은 다시 쓰지 않는다 · 저장이 끝나야 다시 그린다 (2026-10-20)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Shot } from '@/types'
 
 type Write = { table: string; values: Record<string, unknown> }
-const db = vi.hoisted(() => ({ writes: [] as Write[] }))
+const db = vi.hoisted(() => ({ writes: [] as Write[], fail: false }))
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({ from: (table: string) => ({ update: (values: Record<string, unknown>) => {
     const query = {
       eq: () => query,
-      then: (resolve: (value: unknown) => unknown) => { db.writes.push({ table, values }); return Promise.resolve({ data: null, error: null }).then(resolve) },
+      then: (resolve: (value: unknown) => unknown) => { db.writes.push({ table, values }); return Promise.resolve({ data: null, error: db.fail ? { message: 'network down' } : null }).then(resolve) },
     }
     return query
   } }) }),
@@ -27,6 +27,7 @@ const shot: Shot = {
 
 beforeEach(() => {
   db.writes.length = 0
+  db.fail = false
   useWriterStore.getState().reset()
   useProjectStore.setState({ projectId: 'p1' })
   useWriterStore.setState({ shots: [structuredClone(shot)], sceneManifest: { scenes: [], characters: [], locations: [] } as never })
@@ -34,7 +35,7 @@ beforeEach(() => {
 
 describe('샷 고치기 저장', () => {
   it('바꾼 조명과 카메라 앵글을 저장한다', async () => {
-    // 왜: 프로토타입 S2 의 시작 묶음에 조명 · 앵글이 있다 — 고친 값이 저장돼야 다시 그릴 때와 Director 에 쓰인다.
+    // 왜: 프로토타입 S2 의 시작 묶음에 조명 · 앵글이 있다 — 팝업 칸은 러프가 그 값을 따르게 되는 2차에 연다. 그때 고친 값이 저장돼야 Director 에 쓰인다.
     useWriterStore.getState().updateShot('sh1', { lighting: { position: 'left', brightness: 70, colorTemp: 3200 }, camera: { ...shot.camera, pan: 5 } })
     await flushShotSave('sh1')
 
@@ -55,10 +56,17 @@ describe('샷 고치기 저장', () => {
   })
 
   it('저장을 기다렸다가 바로 쓸 수 있다', async () => {
-    // 왜: [시작 적용]은 저장이 끝난 뒤에 다시 그린다 — 저장 전에 그리면 옛 내용으로 그린다.
+    // 왜: [적용]은 저장이 끝난 뒤에 다시 그린다 — 저장 전에 그리면 옛 내용으로 그린다.
     useWriterStore.getState().updateShot('sh1', { actionDescription: '팀장이 캔을 받는다' })
     expect(db.writes).toHaveLength(0)
     await flushShotSave('sh1')
     expect(db.writes).toHaveLength(1)
+  })
+
+  it('저장에 실패하면 기다리던 쪽에 실패를 알린다', async () => {
+    // 왜: [적용]은 저장이 끝나야 다시 그린다 — 저장이 실패했는데 그리면 옛 내용으로 그린다(검토 지적).
+    db.fail = true
+    useWriterStore.getState().updateShot('sh1', { actionDescription: '민호가 넘어진다' })
+    await expect(flushShotSave('sh1')).rejects.toThrow('network down')
   })
 })

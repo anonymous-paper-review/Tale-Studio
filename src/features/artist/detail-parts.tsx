@@ -34,27 +34,43 @@ export const TRAIT_GROUPS: Record<'person' | 'background', ReadonlyArray<{ name:
   ],
 }
 
-/** 추천 칩 — 누르면 설명 끝에 "@단어"를 넣고, 다시 누르면 뺀다. */
-export function toggleTrait(text: string, word: string): string {
-  const tag = `@${word}`
-  const parts = text.split(/\s+/).filter(Boolean)
-  if (parts.includes(tag)) return parts.filter((part) => part !== tag).join(' ')
-  return text.trim() ? `${text.trim()} ${tag}` : tag
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const traitPattern = (word: string) => new RegExp(`(^|[ \\t])@${escapeRegExp(word)}(?=$|\\s)`, 'g')
+
+/** 설명에 이 추천 칩(@단어)이 들어 있나 — 띄어쓰기 있는 칩("@날카로운 눈매")도 통째로 찾는다. */
+export function hasTrait(text: string, word: string): boolean {
+  return traitPattern(word).test(text)
 }
 
-/** 상세 팝업 틀 — 두 칸(왼쪽 고정 · 오른쪽 스크롤), 좁으면 한 칸으로 쌓인다. */
-export function DetailFrame({ open, onClose, title, left, right, footer, testId }: {
+/** 추천 칩 — 누르면 설명 끝에 "@단어"를 넣고, 다시 누르면 뺀다(설명의 줄바꿈은 그대로 둔다). */
+export function toggleTrait(text: string, word: string): string {
+  if (hasTrait(text, word)) {
+    return text.replace(traitPattern(word), '').replace(/[ \t]{2,}/g, ' ').replace(/[ \t]+\n/g, '\n').trim()
+  }
+  return text.trim() ? `${text.trim()} @${word}` : `@${word}`
+}
+
+/** 모습을 지운 뒤 보일 모습 — 팝업은 닫지 않는다. 보던 모습을 지웠으면 기준 모습(없으면 남은 첫 모습), 아니면 보던 모습 그대로. */
+export function lookAfterDelete<K>(input: { deleted: K; viewing: K; base: K | null; remaining: readonly K[] }): K | null {
+  if (input.deleted !== input.viewing) return input.viewing
+  if (input.base !== null && input.base !== input.deleted) return input.base
+  return input.remaining.find((key) => key !== input.deleted) ?? null
+}
+
+/** 상세 팝업 틀 — 두 칸(왼쪽 고정 · 오른쪽 스크롤), 좁으면 한 칸으로 쌓인다. busy(그리는 중)면 닫히지 않는다. */
+export function DetailFrame({ open, onClose, title, left, right, footer, busy = false, testId }: {
   open: boolean
   onClose: () => void
   title: string
   left: ReactNode
   right: ReactNode
   footer: ReactNode
+  busy?: boolean
   testId?: string
 }) {
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="flex max-h-[92vh] flex-col gap-0 p-0 sm:max-w-[1080px]" data-testid={testId}>
+    <Dialog open={open} onOpenChange={(next) => { if (!next && !busy) onClose() }}>
+      <DialogContent className="flex max-h-[92vh] flex-col gap-0 p-0 sm:max-w-[1080px]" showCloseButton={!busy} data-testid={testId}>
         <DialogHeader className="shrink-0 border-b border-border px-6 py-4">
           <DialogTitle className="text-base">{title}</DialogTitle>
         </DialogHeader>
@@ -189,7 +205,7 @@ export function TraitChips({ kind, value, onChange }: { kind: 'person' | 'backgr
               <span className="w-20 shrink-0 text-xs text-muted-foreground">{t(group.name)}</span>
               {group.words.map((word) => {
                 const label = t(word)
-                const on = value.split(/\s+/).includes(`@${label}`)
+                const on = hasTrait(value, label)
                 return (
                   <button
                     key={word}
