@@ -215,6 +215,8 @@ export async function GET(
       started: boolean;
       /** 새 프로젝트의 트리트먼트 초안 — 아직 Writer 로 넘기지 않은 실행(Producer 는 잠기지 않는다). */
       draft: boolean;
+      /** 새 Writer 에서 산문을 확정한 실행 — 샷이 먼저 생겨도 [완료하기] 전에는 Storyboard 를 열지 않는다(stage-gate). */
+      prose_locked: boolean;
       pipeline_completed: boolean;
       pipeline_failed: boolean;
       progress_percent: number;
@@ -241,6 +243,7 @@ export async function GET(
       engine: row?.engine ?? 'v1',
       started: !!row,
       draft: row?.draft === 'true',
+      prose_locked: row?.prose_locked === 'true',
       pipeline_completed: row?.status === 'completed',
       pipeline_failed: row?.status === 'failed',
       progress_percent: progressPercent,

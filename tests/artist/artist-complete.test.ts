@@ -1,4 +1,4 @@
-// 리뉴얼 1차: Artist [완료하기]는 인물 · 배경 대표 그림이 다 있을 때만 받고, 멈춘 실행을 이어 Storyboard 를 연다 (2026-10-19)
+// 리뉴얼 1차: Artist [완료하기]는 인물 · 배경 대표 그림이 다 있을 때만 받고 Storyboard 를 연다 — 씬 · 샷은 [만들기] 때부터 이어 만들고(2026-10-20), 10/19 배포 때 멈춘 실행은 이어 간다
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 import { completionGaps } from '@/lib/artist/completion'
@@ -91,8 +91,8 @@ describe('Artist 완료하기', () => {
     expect(mocks.runUpdate).not.toHaveBeenCalled()
   })
 
-  // 왜: [완료하기]가 멈춘 실행을 이어 씬 · 샷 나누기(08~15)를 돌리고 Storyboard 를 연다.
-  it('완료하기를 누르면 멈춘 실행이 이어서 씬 · 샷을 나누고 Storyboard가 열린다', async () => {
+  // 왜: 10/19 배포 때 [만들기]로 이어 가 디자인 뒤에 멈춘 실행은 [완료하기]가 이어 씬 · 샷 나누기(08~15)를 돌리고 Storyboard 를 연다.
+  it('멈춰 기다리던 실행(10/19 배포 때 만든 것)은 완료하기를 누르면 이어서 씬 · 샷을 나누고 Storyboard가 열린다', async () => {
     const response = await completeArtist(request())
 
     expect(response.status).toBe(200)
@@ -101,14 +101,44 @@ describe('Artist 완료하기', () => {
     expect(mocks.trigger).toHaveBeenCalledWith('http://localhost', 'p1')
   })
 
-  // 왜: 두 번 누르거나 다른 화면에서 이미 이어 간 경우 새로 시작하지 않는다.
-  it('완료하기를 기다리는 실행이 없으면 이어 가지 않고 알린다', async () => {
-    mocks.getActiveRun.mockResolvedValue({ id: 'run-1', status: 'completed', state: {}, updated_at: 'x' })
+  // 왜: 2026-10-20부터 [만들기]가 씬 · 샷까지 이어 만든다 — 완료하기는 그 실행을 건드리지 않고(두 번 시작하지 않는다) Storyboard 만 연다.
+  it('씬 · 샷을 나누는 중이거나 다 나눈 실행이면 실행은 그대로 두고 Storyboard 를 연다', async () => {
+    for (const status of ['running', 'completed']) {
+      vi.clearAllMocks()
+      mocks.projectUpdate.mockResolvedValue({ error: null })
+      mocks.getActiveRun.mockResolvedValue({ id: 'run-1', status, current_stage: 'decoupage', state: {}, updated_at: 'x' })
+
+      const response = await completeArtist(request())
+
+      expect(response.status, status).toBe(200)
+      expect(mocks.runUpdate).not.toHaveBeenCalled()
+      expect(mocks.trigger).not.toHaveBeenCalled()
+      expect(mocks.projectUpdate).toHaveBeenCalledWith({ current_stage: 'writer' }, ['entry', 'producer', 'artist'])
+    }
+  })
+
+  // 왜: 씬 · 샷 나누기가 멈췄어도 Artist 일(그림)은 끝났다 — Storyboard 에서 멈춘 이유와 [이어서 재시도]를 본다.
+  it('씬 · 샷 나누기가 멈춘 실행이어도 완료하기를 받고 Storyboard 를 연다', async () => {
+    mocks.getActiveRun.mockResolvedValue({ id: 'run-1', status: 'failed', current_stage: 'shotsAndDialogue', state: {}, updated_at: 'x' })
 
     const response = await completeArtist(request())
 
-    expect(response.status).toBe(409)
-    expect(await response.json()).toMatchObject({ code: 'artist_not_waiting' })
-    expect(mocks.trigger).not.toHaveBeenCalled()
+    expect(response.status).toBe(200)
+    expect(mocks.runUpdate).not.toHaveBeenCalled()
+    expect(mocks.projectUpdate).toHaveBeenCalledWith({ current_stage: 'writer' }, ['entry', 'producer', 'artist'])
+  })
+
+  // 왜: [만들기] 전(산문 초안이 그대로)이거나 실행이 없으면 넘길 씬 · 샷이 없다.
+  it('만들기 전이거나 실행이 없으면 완료하기를 받지 않는다', async () => {
+    for (const run of [{ id: 'run-1', status: 'awaiting_confirmation', current_stage: 'storyCheck', state: { input: { treatmentDraft: true } }, updated_at: 'x' }, null]) {
+      vi.clearAllMocks()
+      mocks.getActiveRun.mockResolvedValue(run)
+
+      const response = await completeArtist(request())
+
+      expect(response.status).toBe(409)
+      expect(await response.json()).toMatchObject({ code: 'artist_not_started' })
+      expect(mocks.projectUpdate).not.toHaveBeenCalled()
+    }
   })
 })

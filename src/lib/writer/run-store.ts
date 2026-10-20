@@ -60,10 +60,12 @@ export interface WriterRunStatusLight {
   shot_issues: Array<{ category?: string; severity?: string; location?: string; message?: string; suggestion?: string }> | null;
   // state.input.treatmentDraft (text) — 새 프로젝트의 트리트먼트 초안(아직 넘기지 않음, 2026-10-02 시안 v04). 넘기면 지워진다.
   draft?: string | null;
+  // state._proseLocked (text) — 새 Writer 에서 산문을 확정한 실행(2026-10-20 단계 열림 규칙이 쓴다).
+  prose_locked?: string | null;
 }
 
 const STATUS_LIGHT_COLUMNS =
-  'status,current_stage,completed_units,total_units,error,updated_at,created_at,engine:state->input->>writerEngine,timings:state->_timings,shot_issues:state->shotCheck->issues,draft:state->input->>treatmentDraft';
+  'status,current_stage,completed_units,total_units,error,updated_at,created_at,engine:state->input->>writerEngine,timings:state->_timings,shot_issues:state->shotCheck->issues,draft:state->input->>treatmentDraft,prose_locked:state->>_proseLocked';
 
 /**
  * 새 run 행 삽입 (status 'running', state={input}, completed_units 0).

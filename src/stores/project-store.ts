@@ -552,6 +552,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       let writerActive = false
       let writerFailed = false
       let treatmentDraftRun = false
+      let proseConfirmedRun = false
       let writerStarted = false
       let statusKnown = false
       let assets: WriterStatusAssets | null = null
@@ -568,6 +569,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           if (get().projectId === projectId) set({ treatmentDraft: draft })
           if (s?.started === true && !draft && get().projectId === projectId) set({ producerLocked: true })
           treatmentDraftRun = draft
+          proseConfirmedRun = s?.prose_locked === true
           writerFailed = !!s?.pipeline_failed
           assets = (s?.assets ?? null) as WriterStatusAssets | null
         }
@@ -601,6 +603,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
             treatmentStarted: writerStarted,
             runContinued: writerStarted && !treatmentDraftRun,
             hasShots: !!(shotRows && shotRows.length > 0),
+            proseConfirmed: proseConfirmedRun,
           }
           set({ reachedStage: reachedStageFromFacts(facts), producerLocked: proseLockedFromFacts(facts) })
         }

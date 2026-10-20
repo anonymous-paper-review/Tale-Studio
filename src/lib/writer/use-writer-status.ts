@@ -10,6 +10,8 @@ export interface WriterStatus {
   started: boolean
   /** 새 프로젝트의 트리트먼트 초안 — 아직 Writer 로 넘기지 않은 실행(2026-10-02 시안 v04). */
   draft?: boolean
+  /** 새 Writer 에서 산문을 확정한 실행(단계 열림 규칙이 쓴다). */
+  prose_locked?: boolean
   pipeline_completed: boolean
   pipeline_failed: boolean
   progress_percent: number

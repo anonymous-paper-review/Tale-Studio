@@ -23,22 +23,38 @@ export function breakdownRows(
 
 export type ArtistPhase = 'list' | 'making' | 'cards' | 'done'
 
+type RunStatusLike = { started?: boolean; current_status?: string | null; current_stage?: string | null; pipeline_completed?: boolean; pipeline_failed?: boolean } | null | undefined
+
 /** 디자인 단계(Writer 05~07) — 이 동안 [만들기]가 이어 간 실행이 인물 · 배경을 디자인한다. */
 const DESIGN_STEPS = new Set(['visualFormat', 'actVisualArc', 'v2Design'])
+/** 디자인 앞(Writer 01~04, 산문 초안) — 여기서 멈춘 실행은 아직 디자인 전이다. */
+const PRE_DESIGN_STEPS = new Set(['dramaturgy', 'narrativeStructure', 'scenes', 'storyCheck'])
+
+/** 인물 · 배경 디자인이 끝났다 — 예전 멈춤(awaiting_artist) · 씬 · 샷 나누기(08~15) 중 · 다 만듦 · 그 뒤에서 멈춤. */
+export function designFinished(status: RunStatusLike): boolean {
+  if (!status?.started) return false
+  if (status.current_status === 'awaiting_artist' || status.pipeline_completed) return true
+  const stage = status.current_stage ?? ''
+  return !!stage && !DESIGN_STEPS.has(stage) && !PRE_DESIGN_STEPS.has(stage)
+}
 
 export function artistPhase(input: {
   /** 산문을 확정해 잠갔다. */
   proseLocked: boolean
   /** 실행이 아직 산문 초안이다([만들기] 전). */
   draftRun: boolean
-  status: { started?: boolean; current_status?: string | null; current_stage?: string | null; pipeline_completed?: boolean; pipeline_failed?: boolean } | null | undefined
+  status: RunStatusLike
   /** 인물 · 배경 행이 하나라도 있다(그림 카드로 보일 것). */
   hasAssets: boolean
+  /** [완료하기]를 해 Storyboard 가 열렸다(예전 흐름으로 끝까지 만든 프로젝트 포함) — 다시 완료하지 않는다. */
+  artistCompleted?: boolean
 }): ArtistPhase {
   if (input.draftRun) return 'list'
   const status = input.status
-  if (status?.current_status === 'awaiting_artist') return input.hasAssets ? 'cards' : 'making'
-  if (status?.started && !status.pipeline_completed && !status.pipeline_failed && DESIGN_STEPS.has(status.current_stage ?? '')) return 'making'
+  if (status?.started && !status.pipeline_completed && !status.pipeline_failed && DESIGN_STEPS.has(status.current_stage ?? '') && status.current_status !== 'awaiting_artist') return 'making'
+  if (input.artistCompleted) return 'done'
+  // 2026-10-20: [만들기]는 디자인 뒤에도 멈추지 않고 씬 · 샷을 나눈다 — 디자인이 끝났으면 완료하기 전까지 카드와 [완료하기]다.
+  if (designFinished(status)) return input.hasAssets ? 'cards' : 'making'
   return 'done'
 }
 
@@ -55,14 +71,15 @@ export interface AssetProgress {
   worldsTotal: number
 }
 
-/** 만드는 중 표시 — 0 인물 · 배경 디자인, 1 그림 그리기 시작, 2 그림 그리는 중(k/N). 다 그리면 done. */
+/** 만드는 중 표시 — 0 인물 · 배경 디자인, 1 그림 그리기 시작, 2 그림 그리는 중(k/N). 다 그리면 done.
+ *  디자인이 끝난 뒤(씬 · 샷을 나누는 중 · 다 만듦 포함)는 그린 장수로만 본다(2026-10-20 — [만들기]가 멈추지 않는다). */
 export function makingProgress(
-  status: { current_stage?: string | null; current_status?: string | null } | null | undefined,
+  status: RunStatusLike,
   assets: AssetProgress | null | undefined,
 ): { step: 0 | 1 | 2; drawn: number; total: number; done: boolean } {
   const total = (assets?.charsTotal ?? 0) + (assets?.worldsTotal ?? 0)
   const drawn = (assets?.charsReady ?? 0) + (assets?.worldsReady ?? 0)
-  const designed = status?.current_status === 'awaiting_artist'
+  const designed = designFinished(status ? { started: true, ...status } : status)
   if (designed && total > 0 && drawn >= total) return { step: 2, drawn, total, done: true }
   if (designed) return { step: 2, drawn, total, done: false }
   if (status?.current_stage === 'v2Design') return { step: 1, drawn, total, done: false }

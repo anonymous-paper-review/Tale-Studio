@@ -265,7 +265,8 @@ interface ProducerState {
   addBackground: () => string
   updateBackground: (localId: string, patch: Partial<BackgroundSource>) => void
   removeBackground: (localId: string) => void
-  /** artistGate(리뉴얼 1차): Artist [만들기] — 확정 산문 초안을 이어 가되 인물 · 배경 디자인 뒤에 멈추고, Artist 화면에 머문다. */
+  /** artistGate(리뉴얼 1차): Artist [만들기] — 확정 산문 초안을 이어 가며 Artist 화면에 머문다. 2026-10-20부터 디자인 뒤에도 멈추지 않고
+   *  씬 · 샷까지 이어 만든다(서버에 멈춤 표시를 보내지 않는다 — 오너 "Artist 만들면서 씬 · 샷 · Storyboard 도 같이"). */
   saveAndHandoff: (options?: { rerun?: boolean; artistGate?: boolean }) => Promise<boolean>
   loadProject: () => Promise<void>
   clearError: () => void
@@ -1152,7 +1153,6 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
             // #script-preserve: 사람이 고른 보존 결정(true 일 때만 실린다).
             ...(get().preserveScript === true ? { preserveScript: true } : {}),
             ...(options?.rerun === true ? { rerun: true } : {}),
-            ...(options?.artistGate === true ? { artistGate: true } : {}),
             ...(options?.rerun === true
               ? {
                   chatHistory: useGlobalChatStore

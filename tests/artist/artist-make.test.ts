@@ -1,4 +1,4 @@
-// 리뉴얼 1차: 산문을 확정해도 Artist [만들기] 전까지는 인물 · 배경 설명 · 스타일을 고칠 수 있고, [만들기]는 멈춤 표시를 실어 이어 간다 (2026-10-19)
+// 리뉴얼 1차: 산문을 확정해도 Artist [만들기] 전까지는 인물 · 배경 설명 · 스타일을 고칠 수 있고, [만들기]는 멈추지 않고 씬 · 샷까지 이어 간다 (2026-10-19, 2026-10-20 오너)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTrace: vi.fn(), saveChatTracePatch: vi.fn(), loadLatestChatTrace: vi.fn() }))
@@ -74,13 +74,16 @@ describe('만들기 전 브레이크다운 목록', () => {
 })
 
 describe('Artist 만들기', () => {
-  // 왜: [만들기] = 확정 산문 초안을 이어 가되, 인물 · 배경 디자인 뒤에 멈춰 [완료하기]를 기다리게 한다.
-  it('만들기를 누르면 산문 초안을 이어 가며 인물 · 배경 디자인 뒤에 멈추게 한다', async () => {
+  // 왜: 2026-10-20 오너 "Artist 만들면서 씬 · 샷과 Storyboard 도 같이(시간 절약)" — [만들기] = 확정 산문 초안을 이어 가며
+  //   인물 · 배경 디자인 뒤에도 멈추지 않고 씬 · 샷 나누기까지 만든다(예전에는 디자인 뒤 멈춰 [완료하기]를 기다렸다).
+  it('만들기를 누르면 산문 초안을 이어 가며 인물 · 배경 디자인 뒤에도 멈추지 않고 씬 · 샷까지 만든다', async () => {
     expect(await useProducerStore.getState().saveAndHandoff({ artistGate: true })).toBe(true)
 
     const [url, init] = request.mock.calls[0]
     expect(String(url)).toBe('/api/writer/start')
-    expect(JSON.parse(String((init as RequestInit).body))).toMatchObject({ projectId: 'art-project', continueDraft: true, artistGate: true })
+    const body = JSON.parse(String((init as RequestInit).body))
+    expect(body).toMatchObject({ projectId: 'art-project', continueDraft: true })
+    expect(body.artistGate).toBeUndefined()
   })
 
   // 왜: 만드는 동안과 그 뒤에도 Artist 화면에 머문다(Storyboard 는 [완료하기]로 연다).

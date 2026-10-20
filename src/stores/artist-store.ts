@@ -1572,6 +1572,10 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       if (useProjectStore.getState().projectId !== pid) return
       if (pid) void refreshWorldFailures(pid, set)
       if (!url) {
+        // 서버가 같은 배경을 이미 그리는 중이라 겹친 요청을 건너뛰었거나(deduped) 자리 부족 안내를 이미 띄웠으면 조용히 끝낸다 —
+        //   멈췄다는 안내는 서버 give-up 게이트(skipped)일 때만(캐릭터 경로와 같은 구분, 2026-10-20 e2e 의 거짓 경고).
+        const last = lastReceipt as GenerationJobReceipt | null
+        if (last?.status !== 'skipped') return
         // 서버 give-up 게이트로 자동 생성 skip — 에러는 아니지만 사용자에게는 알려야 한다(캐릭터 경로와 동일 이유).
         alog(`[autogen] world ${locationId}:${shot} — give-up 게이트로 자동 생성 skip`)
         notifyGenerationGaveUp('artist', translate(useLocaleStore.getState().locale, 'Background image'))

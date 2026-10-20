@@ -1,4 +1,4 @@
-// 리뉴얼 1차: Artist 에서 만든 실행은 인물 · 배경 디자인 뒤 멈추고, 완료하기를 눌러야 씬 · 샷을 나눈다 (2026-10-19)
+// 실행이 멈추는 자리 — 씬 스토리 확정 전, 그리고 10/19 배포 때 멈춤 표시를 싣고 이어 간 실행(2026-10-20부터 Artist [만들기]는 멈추지 않는다)
 import { describe, expect, it } from 'vitest'
 import { pauseAfterStep } from '@/lib/writer/pipeline/pause'
 import { continueDraftState } from '@/lib/writer/treatment-draft'
@@ -13,8 +13,8 @@ describe('실행이 멈추는 자리', () => {
     expect(pauseAfterStep('storyCheck', { ...base, _gateConfirmed: true } as WriterRunState)).toBeNull()
   })
 
-  // 왜: 리뉴얼에서는 Artist 가 인물 · 배경 그림을 만들고 [완료하기]를 눌러야 Storyboard(씬 · 샷 · 러프)로 간다.
-  it('Artist 넘김으로 이어 간 실행은 인물 · 배경 디자인이 끝나면 완료하기를 기다린다', () => {
+  // 왜: 10/19 배포 때 [만들기]를 눌러 멈춤 표시를 싣고 이어 간 실행은 그대로 디자인 뒤에 멈추고 [완료하기]가 이어 간다.
+  it('멈춤 표시를 싣고 이어 간 실행(10/19 배포 때 만든 것)은 인물 · 배경 디자인이 끝나면 완료하기를 기다린다', () => {
     const state = { ...base, _gateConfirmed: true, input: { ...base.input, artistGate: true } } as unknown as WriterRunState
     expect(pauseAfterStep('v2Design', state)).toBe('awaiting_artist')
     expect(pauseAfterStep('visualFormat', state)).toBeNull()
@@ -26,8 +26,8 @@ describe('실행이 멈추는 자리', () => {
     expect(pauseAfterStep('v2Design', state)).toBeNull()
   })
 
-  // 왜: 배포 전에 시작한 예전 실행은 지금처럼 끝까지 이어 간다.
-  it('Artist 넘김이 없는 예전 실행은 인물 · 배경 디자인 뒤에 멈추지 않는다', () => {
+  // 왜: 리뉴얼 전 실행과 2026-10-20부터 Artist [만들기]로 이어 간 실행은 멈추지 않고 씬 · 샷까지 간다.
+  it('멈춤 표시가 없는 실행(리뉴얼 전 실행 · 10/20부터 만들기로 이어 간 실행)은 인물 · 배경 디자인 뒤에 멈추지 않는다', () => {
     expect(pauseAfterStep('v2Design', { ...base, _gateConfirmed: true } as WriterRunState)).toBeNull()
   })
 

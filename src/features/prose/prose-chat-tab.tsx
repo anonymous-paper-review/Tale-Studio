@@ -104,7 +104,7 @@ export function ProseChatTab({ prose, title }: { prose: ProseState; title: strin
             </p>
             <div className="mt-3 rounded-lg border border-border bg-background/60 p-4">
               <h3 className="mb-3 text-base font-semibold">{title}</h3>
-              <ProseDocument prose={prose} compact />
+              <ProseDocument prose={prose} />
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               {prose.tools.rewrite ? (

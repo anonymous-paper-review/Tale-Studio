@@ -1,7 +1,8 @@
 'use client'
 
 // Artist 완료 확인(리뉴얼 1차 2026-10-19, 프로토타입 A9 "완료하고 Storyboard로 넘길까요?").
-//   [예, 완료하기]면 멈춘 실행이 씬 · 샷 나누기를 이어 가고 Storyboard 가 열린다(/api/writer/artist-complete).
+//   [예, 완료하기]면 Storyboard 가 열린다(/api/writer/artist-complete). 씬 · 샷 나누기와 러프는 [만들기] 때부터 이어서
+//   만들고 있다(2026-10-20) — 아직 덜 됐으면 Storyboard 에서 이어서 본다.
 //   완료한 뒤에도 Artist 로 돌아와 그림을 고칠 수 있다(Artist ⇄ Storyboard).
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -19,7 +20,7 @@ export function completeError(code: string | undefined, missing?: { characters?:
     const names = [...(missing?.characters ?? []), ...(missing?.locations ?? [])].join(', ')
     return { key: 'Make the images for these first: {names}', params: { names } }
   }
-  if (code === 'artist_not_waiting') return { key: 'The images are still being designed. Try again once they are ready.' }
+  if (code === 'artist_not_started' || code === 'artist_not_waiting') return { key: 'The images are still being designed. Try again once they are ready.' }
   return { key: 'Could not complete. Please try again.' }
 }
 
@@ -68,7 +69,7 @@ export function ArtistCompleteDialog({ open, onOpenChange, summary }: { open: bo
           </div>
           <div className="flex gap-3">
             <dt className="w-20 shrink-0 text-muted-foreground">{t('Next')}</dt>
-            <dd>{t('AI splits the scenes and shots and draws the roughs.')}</dd>
+            <dd>{t('Storyboard opens. Scenes, shots and roughs that are still being made continue there.')}</dd>
           </div>
           <div className="flex gap-3">
             <dt className="w-20 shrink-0 text-muted-foreground">{t('Later')}</dt>

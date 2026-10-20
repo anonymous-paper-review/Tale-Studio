@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { AlertTriangle, ArrowRight, ZoomIn, ZoomOut } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Check, Loader2, ZoomIn, ZoomOut } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
@@ -27,6 +27,9 @@ import { AltArrowHint } from '@/components/alt-arrow-hint'
 import { useT } from '@/lib/i18n'
 import { AiBusyOverlay } from '@/components/ai-busy-overlay'
 import { artistPhase, artistRunStopped, assetCompletionGaps, makingProgress } from '@/lib/artist/breakdown'
+import { backgroundRoughReady, storyboardPrepView } from '@/lib/artist/background-roughs'
+import { isDemoSession } from '@/lib/demo/context'
+import { useBackgroundRoughs } from '@/features/artist-room/use-background-roughs'
 import { withDemoShare } from '@/lib/demo/context'
 import { stageIndex } from '@/lib/stage-gate'
 import { useProducerStore } from '@/stores/producer-store'
@@ -309,7 +312,9 @@ export default function VisualPage() {
   const reachedStage = useProjectStore((s) => s.reachedStage)
   const draftRun = writerStatus ? writerStatus.draft === true : treatmentDraftFlag
   const hasAssets = characterAssets.length > 0 || worldAssets.length > 0
-  const phase = artistPhase({ proseLocked, draftRun, status: writerStatus, hasAssets })
+  // [완료하기]를 해 Storyboard 가 열렸다(예전 흐름으로 끝까지 만든 프로젝트 포함) — 다시 완료하지 않는다.
+  const artistCompleted = stageIndex(reachedStage) >= stageIndex('writer')
+  const phase = artistPhase({ proseLocked, draftRun, status: writerStatus, hasAssets, artistCompleted })
   const gaps = assetCompletionGaps(characterAssets, worldAssets)
   const personTotal = characterAssets.filter((c) => c.entityType === 'person').length
   const progress = makingProgress(writerStatus, {
@@ -341,6 +346,13 @@ export default function VisualPage() {
     return () => clearInterval(id)
   }, [projectId, making, loadData])
   const overlayOpen = making && makingDismissed !== projectId
+  // 2026-10-20 오너 "Artist 만들면서 Storyboard 도 같이": 씬 · 샷이 다 나뉘고 Artist 그림을 다 그렸으면 이 화면에 있는 동안 러프를 미리 그린다.
+  const roughs = useBackgroundRoughs(
+    projectId,
+    backgroundRoughReady({ status: writerStatus, making: overlayOpen || phase === 'list' || phase === 'making', demo: isDemoSession() }),
+    progress.drawn,
+  )
+  const storyboardPrep = storyboardPrepView({ status: writerStatus, drawing: roughs.drawing, outcome: roughs.outcome, artistCompleted })
   const stuck = progress.step === 2 && !progress.done && generatingCount === 0
   const makingOverlay = (
     <AiBusyOverlay
@@ -413,6 +425,12 @@ export default function VisualPage() {
         {styleLabel ? (
           <span className="rounded-md border border-border px-2 py-0.5 text-xs" data-testid="artist-style-bar">
             <span className="text-muted-foreground">{t('Work style')}</span> · <b className="font-medium">{styleLabel}</b>
+          </span>
+        ) : null}
+        {storyboardPrep ? (
+          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground" role="status" data-testid="artist-storyboard-prep" data-state={storyboardPrep}>
+            {storyboardPrep === 'ready' ? <Check className="size-3.5" aria-hidden /> : <Loader2 className="size-3.5 animate-spin" aria-hidden />}
+            {t(storyboardPrep === 'splitting' ? 'Getting Storyboard ready · splitting scenes and shots' : storyboardPrep === 'drawing' ? 'Getting Storyboard ready · drawing the roughs' : 'Storyboard is ready')}
           </span>
         ) : null}
       </div>

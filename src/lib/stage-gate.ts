@@ -22,6 +22,9 @@ export interface StageFacts {
   runContinued: boolean
   /** 샷 행이 있다(Storyboard 를 돌렸거나, 예전 흐름으로 샷까지 만든 프로젝트). */
   hasShots: boolean
+  /** 실행이 새 Writer 에서 산문 확정을 거쳤다(run state _proseLocked) — 2026-10-20부터 이런 실행은 [만들기]가 씬 · 샷까지 이어 만들어
+   *  샷이 [완료하기]보다 먼저 생긴다. 그래서 샷만으로 Storyboard 를 열지 않는다(저장 단계 writer = [완료하기]로만 연다). */
+  proseConfirmed?: boolean
 }
 
 export function stageIndex(id: StageId): number {
@@ -41,7 +44,7 @@ export function reachedStageFromFacts(f: StageFacts): StageId {
   let reached: StageId = isStageId(f.storedStage) && f.storedStage !== 'producer' ? f.storedStage : 'entry'
   if (f.treatmentStarted) reached = further(reached, 'producer')
   if (f.runContinued) reached = further(reached, 'artist')
-  if (f.hasShots) reached = further(reached, 'writer')
+  if (f.hasShots && !f.proseConfirmed) reached = further(reached, 'writer')
   return reached
 }
 

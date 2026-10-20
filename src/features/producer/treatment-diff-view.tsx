@@ -14,7 +14,8 @@ export function TreatmentDiffView({ rows }: { rows: TreatmentDiffRow[] }) {
         <span className="inline-flex items-center gap-1.5"><span className="inline-block size-2.5 rounded-sm bg-success/30 ring-1 ring-success/50" />{t('New text')}</span>
         <span className="inline-flex items-center gap-1.5"><span className="line-through">{t('Previous text')}</span></span>
       </div>
-      <article className="max-h-[32rem] space-y-4 overflow-y-auto pr-1">
+      {/* 안에서 따로 스크롤하지 않는다 — 글이 길면 박스가 길어지고 화면 영역이 스크롤된다(2026-10-20 오너). */}
+      <article className="space-y-4">
         {rows.map((row, index) => (
           <div key={index} className="flex gap-3" data-diff-row={row.kind}>
             <span className="w-7 shrink-0 pt-1 font-mono text-[11px] text-muted-foreground">{row.number ? `S${row.number}` : ''}</span>

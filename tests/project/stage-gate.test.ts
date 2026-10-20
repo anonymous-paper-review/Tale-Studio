@@ -51,6 +51,21 @@ describe('리뉴얼 단계 열림', () => {
     expect(canEnterStage('writer', f)).toBe(true)
   })
 
+  it('산문을 확정하고 만들기로 이어 간 프로젝트는 샷이 먼저 생겨도 완료하기 전에는 Storyboard가 열리지 않는다', () => {
+    // 왜: 2026-10-20부터 [만들기]가 씬 · 샷까지 이어 만들어 샷이 [완료하기]보다 먼저 생긴다 — 샷만 보고 열면
+    //   [완료하기](대표 그림 검사)를 건너뛰고 Storyboard 가 열린다(e2e 에서 새로고침 뒤 Artist 가 "Storyboard로 가기"로 바뀌었다).
+    const f: StageFacts = { ...fresh, storedStage: 'artist', treatmentStarted: true, runContinued: true, hasShots: true, proseConfirmed: true }
+    expect(reachedStageFromFacts(f)).toBe('artist')
+    expect(canEnterStage('writer', f)).toBe(false)
+  })
+
+  it('완료하기를 하면 샷이 먼저 있던 프로젝트도 Storyboard가 열린다', () => {
+    // 왜: 정상 경로 고정 — [완료하기]가 저장 단계를 Storyboard 로 옮긴다.
+    const f: StageFacts = { ...fresh, storedStage: 'writer', treatmentStarted: true, runContinued: true, hasShots: true, proseConfirmed: true }
+    expect(reachedStageFromFacts(f)).toBe('writer')
+    expect(canEnterStage('writer', f)).toBe(true)
+  })
+
   it('예전 방식으로 산문을 넘긴 프로젝트는 Artist까지 열린다', () => {
     const f: StageFacts = { ...fresh, treatmentStarted: true, runContinued: true }
     expect(reachedStageFromFacts(f)).toBe('artist')

@@ -7,12 +7,13 @@ import { AlertTriangle, Loader2, RotateCcw, ScrollText } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { useT } from '@/lib/i18n'
-import { cn } from '@/lib/utils'
 import { TreatmentDiffView } from '@/features/producer/treatment-diff-view'
 import { useProducerStore } from '@/stores/producer-store'
 import type { ProseState } from '@/features/prose/use-prose'
 
-export function ProseDocument({ prose, compact = false }: { prose: ProseState; compact?: boolean }) {
+// 산문 박스는 안에서 따로 스크롤하지 않는다 — 글이 길면 박스가 길어지고, 화면 영역(화면에서 고치기)이나
+//   채팅 영역(채팅으로 고치기)이 스크롤된다(2026-10-20 오너 "박스 안 스크롤 말고 메인 뷰가 스크롤").
+export function ProseDocument({ prose }: { prose: ProseState }) {
   const t = useT()
   const storyReady = useProducerStore((s) => s.storyReady)
   const [starting, setStarting] = useState(false)
@@ -43,11 +44,11 @@ export function ProseDocument({ prose, compact = false }: { prose: ProseState; c
   }
   if (diffRows) return <TreatmentDiffView rows={diffRows} />
   if (view.kind === 'original') {
-    return <pre className={cn('overflow-y-auto whitespace-pre-wrap font-mono text-[13px] leading-6 text-foreground/90', compact ? 'max-h-[24rem]' : '')} data-testid="prose-original">{view.text}</pre>
+    return <pre className="whitespace-pre-wrap font-mono text-[13px] leading-6 text-foreground/90" data-testid="prose-original">{view.text}</pre>
   }
   if (view.kind === 'scenes' && prose.paragraphs.length) {
     return (
-      <article className={cn('space-y-4', compact && 'max-h-[28rem] overflow-y-auto pr-1')} data-testid="prose-article">
+      <article className="space-y-4" data-testid="prose-article">
         {prose.paragraphs.map((paragraph, index) => (
           <div key={index} className="flex gap-3">
             <span className="w-7 shrink-0 pt-1 font-mono text-[11px] text-muted-foreground">S{index + 1}</span>
