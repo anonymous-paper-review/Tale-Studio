@@ -36,6 +36,13 @@ describe('다시 만들기 창의 추천 칩', () => {
     expect(toggleTrait(added, '날카로운 눈매')).toBe('30대 회사원.')
   })
 
+  it('줄 맨 앞에 있는 칩도 찾아서, 다시 누르면 빠진다', () => {
+    // 왜: 줄을 바꾼 바로 뒤의 칩을 못 찾아 꺼진 것으로 보이고, 누르면 같은 칩이 한 번 더 들어갔다(검토 지적).
+    const text = '키가 크다\n@날카로운 눈매'
+    expect(hasTrait(text, '날카로운 눈매')).toBe(true)
+    expect(toggleTrait(text, '날카로운 눈매')).toBe('키가 크다')
+  })
+
   it('칩을 빼도 설명의 줄바꿈은 그대로 둔다', () => {
     expect(toggleTrait('첫 줄\n둘째 줄 @밤', '밤')).toBe('첫 줄\n둘째 줄')
   })

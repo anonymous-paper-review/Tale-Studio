@@ -58,6 +58,13 @@ export async function POST(req: NextRequest) {
       // [만들기]로 이어 간 실행(씬 · 샷을 나누는 중 · 다 나눔 · 그 뒤에서 멈춤) — 실행은 그대로 두고 Storyboard 를 연다.
       //   멈췄으면 Storyboard 가 멈춘 이유와 [이어서 재시도]를 보인다. 인물 · 배경 디자인 중이거나 그 앞에서 멈췄으면 아직 받지 않는다.
       if (run && (run.status === 'running' || run.status === 'completed' || run.status === 'failed')) {
+        // 디자인에서 멈췄으면 "아직 디자인 중"이 아니라 멈췄다고 알린다 — 화면 위 [이어서 재시도]로 이어 간다(검토 지적).
+        if (run.status === 'failed' && UNFINISHED_DESIGN_STEPS.has(run.current_stage ?? '')) {
+          return NextResponse.json(
+            { error: 'Designing the characters and backgrounds stopped', code: 'artist_design_failed', status: run.status },
+            { status: 409 },
+          )
+        }
         if (run.status !== 'completed' && UNFINISHED_DESIGN_STEPS.has(run.current_stage ?? '')) {
           return NextResponse.json(
             { error: 'Characters and backgrounds are still being designed', code: 'artist_design_unfinished', status: run.status },
@@ -73,6 +80,9 @@ export async function POST(req: NextRequest) {
           { status: 409 },
         )
       }
+      // Storyboard 를 먼저 연다 — 실행만 이어 두고 열지 못하면, 다시 누를 때 "아직 디자인 중"으로 막히고
+      //   실행은 한동안 아무도 깨우지 않는다(검토 지적). 열기는 몇 번 해도 같다.
+      await openStoryboard(projectId)
       const state: WriterRunState = { ...(run.state as WriterRunState), _artistCompleted: true }
       const updatedAt = new Date(Math.max(Date.now(), new Date(run.updated_at).getTime() + 1)).toISOString()
       const { data, error } = await supabaseAdmin
@@ -84,8 +94,6 @@ export async function POST(req: NextRequest) {
         .select('id')
       if (error) throw new Error(`artist complete failed: ${error.message}`)
       if (!data?.length) continue
-
-      await openStoryboard(projectId)
 
       after(async () => {
         await triggerWriterStep(req.nextUrl.origin, projectId)

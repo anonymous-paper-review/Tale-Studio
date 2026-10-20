@@ -21,6 +21,7 @@ export function completeError(code: string | undefined, missing?: { characters?:
     return { key: 'Make the images for these first: {names}', params: { names } }
   }
   if (code === 'artist_not_started' || code === 'artist_not_waiting' || code === 'artist_design_unfinished') return { key: 'The images are still being designed. Try again once they are ready.' }
+  if (code === 'artist_design_failed') return { key: 'Designing the characters and backgrounds stopped. Continue with Resume at the top first.' }
   return { key: 'Could not complete. Please try again.' }
 }
 

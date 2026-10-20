@@ -35,7 +35,8 @@ export const TRAIT_GROUPS: Record<'person' | 'background', ReadonlyArray<{ name:
 }
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-const traitPattern = (word: string) => new RegExp(`(^|[ \\t])@${escapeRegExp(word)}(?=$|\\s)`, 'g')
+// m: 줄을 바꾼 바로 뒤(줄 맨 앞)의 칩도 찾는다(검토 지적).
+const traitPattern = (word: string) => new RegExp(`(^|[ \\t])@${escapeRegExp(word)}(?=$|\\s)`, 'gm')
 
 /** 설명에 이 추천 칩(@단어)이 들어 있나 — 띄어쓰기 있는 칩("@날카로운 눈매")도 통째로 찾는다. */
 export function hasTrait(text: string, word: string): boolean {

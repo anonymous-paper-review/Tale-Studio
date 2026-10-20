@@ -21,7 +21,8 @@ import { AiBusyOverlay, type AiBusyStep } from '@/components/ai-busy-overlay'
 import { DirectingArrowEditor } from '@/features/writer/directing-arrow-editor'
 import { RoughFramesStill } from '@/features/writer/rough-frames-still'
 import { SHOT_TYPES, SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
-import { CAMERA_ANGLES, angleOfCamera, applyStartEdit, redrawDirectionOnly, sceneShotLabel, type RoughFrame } from '@/lib/writer/shot-edit'
+import { CAMERA_ANGLES, angleOfCamera, applyStartEdit, nextApplyStep, readRedrawReply, redrawDirectionOnly, sceneShotLabel, type RoughFrame } from '@/lib/writer/shot-edit'
+import { notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { invalidateShots } from '@/lib/shots-cache'
 import { flushShotSave, useWriterStore } from '@/stores/writer-store'
@@ -67,18 +68,18 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
   // 고치는 중인 값 — 팝업을 열 때마다 저장된 샷에서 새로 시작한다(닫으면 버린다 · 채팅이 바꾼 값을 되돌리지 않게, 검토 지적).
   const [draft, setDraft] = useState<{ shotId: string | null; value: Draft | null }>({ shotId: null, value: null })
   const [busy, setBusy] = useState<{ title: string; steps: AiBusyStep[] } | null>(null)
-  // 저장은 됐는데 다시 그리기가 실패했다 — [다시 그리기]로 다시 할 수 있게 둔다.
-  const [redrawPending, setRedrawPending] = useState(false)
+  // [적용] 뒤 남은 일(nextApplyStep) — 'redraw' = 저장은 됐고 그리기만 다시, 'resave' = 저장부터 다시.
+  const [retryStep, setRetryStep] = useState<'redraw' | 'resave' | null>(null)
 
   if (!shotId && draft.shotId) {
     setDraft({ shotId: null, value: null })
-    setRedrawPending(false)
+    setRetryStep(null)
   }
   if (!shot || !projectId) return null
   if (draft.shotId !== shot.shotId) {
     setDraft({ shotId: shot.shotId, value: draftOf(shot) })
     setTab('start')
-    setRedrawPending(false)
+    setRetryStep(null)
   }
   const value = draft.shotId === shot.shotId && draft.value ? draft.value : draftOf(shot)
   const patch = (next: Partial<Draft>) => setDraft({ shotId: shot.shotId, value: { ...value, ...next } })
@@ -99,26 +100,44 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
     await invalidateShots(projectId)
     await loadProject()
   }
-  /** 그 샷의 러프를 저장한 내용(스토리 · 샷 타입)으로 새로 그린다 — 보드 카드의 [다시 시도]와 같은 길(force). 다 그릴 때까지 기다린다. */
+  /** 그 샷의 러프를 저장한 내용(스토리 · 샷 타입)으로 새로 그린다 — 보드 카드의 [다시 시도]와 같은 길(force). 다 그릴 때까지 기다린다.
+   *  안내는 보드와 같은 구분(readRedrawReply) — 접수 확인 중이면 기다리지 않는다(10분 잠김, 검토 지적). */
   const redrawShot = async (): Promise<boolean> => {
-    const res = await fetch('/api/writer/rough-storyboard', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ projectId, shotIds: [shot.shotId], force: true }),
-    })
-    const body = (await res.json().catch(() => null)) as { error?: { message?: string } | string; data?: { submitted?: Array<{ jobId: string }> } } | null
-    if (!res.ok) {
-      const message = typeof body?.error === 'string' ? body.error : body?.error?.message
-      toast.error(message ?? t('Regeneration failed'))
-      return false
-    }
-    const jobIds = [...new Set((body?.data?.submitted ?? []).map((item) => item.jobId).filter(Boolean))]
-    if (!jobIds.length) {
+    let res: Response
+    try {
+      res = await fetch('/api/writer/rough-storyboard', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ projectId, shotIds: [shot.shotId], force: true }),
+      })
+    } catch {
       toast.error(t('Regeneration failed'))
       return false
     }
-    const results = await Promise.allSettled(jobIds.map((jobId) => pollGenerationJob(jobId)))
-    return results.every((result) => result.status === 'fulfilled')
+    const body: unknown = await res.json().catch(() => null)
+    // 자리 부족 · 콘텐츠 정책 — 보드와 같은 공용 안내.
+    if (notifyIfQuotaExceeded(res.status, body)) return false
+    const reply = readRedrawReply(res.status, body)
+    if (reply.kind === 'confirming') {
+      toast.info(t('Confirming the previous rough request. It will not be submitted again.'))
+      return false
+    }
+    if (reply.kind === 'busy') {
+      toast.info(t('This shot is still being drawn. Try again in a moment.'))
+      return false
+    }
+    if (reply.kind === 'nothing') {
+      toast.error(t('There is nothing to draw yet. Write the story of this shot first.'))
+      return false
+    }
+    if (reply.kind === 'failed') {
+      toast.error(t('Regeneration failed'))
+      return false
+    }
+    const results = await Promise.allSettled(reply.jobIds.map((jobId) => pollGenerationJob(jobId)))
+    if (results.every((result) => result.status === 'fulfilled')) return true
+    toast.error(t('Regeneration failed'))
+    return false
   }
   const regenerate = async (frame: RoughFrame): Promise<boolean> => {
     try {
@@ -146,23 +165,30 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
   }
 
   const applyStart = async () => {
-    if (startDirty) updateShot(shot.shotId, changes)
+    // 저장이 실패했던 고침은 화면에 이미 고친 값이 있어 바뀐 것이 없어 보여도 다시 저장한다(저장은 그 샷의 지금 값을 통째로 쓴다).
+    if (startDirty || retryStep === 'resave') updateShot(shot.shotId, changes)
     if (!completed) {
       // 아직 러프가 없는 샷 — 저장만 한다(보드가 빠진 러프를 그릴 때 고친 내용으로 그린다).
       try {
         await flushShotSave(shot.shotId)
+        setRetryStep(null)
         onOpenChange(false)
       } catch {
+        setRetryStep('resave')
         toast.error(t('Could not save the changes. Please try again.'))
       }
       return
     }
     const drawLabel = t('Redrawing the rough of this shot')
     setBusy({ title: t('Drawing the rough'), steps: steps('save', drawLabel) })
-    let ok = false
+    let saved = false
+    let drawn = false
     try {
-      ok = await applyStartEdit({
-        save: () => flushShotSave(shot.shotId),
+      drawn = await applyStartEdit({
+        save: async () => {
+          await flushShotSave(shot.shotId)
+          saved = true
+        },
         redrawShot: async () => {
           setBusy({ title: t('Drawing the rough'), steps: steps('draw', drawLabel) })
           return redrawShot()
@@ -175,8 +201,9 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
       await refresh().catch(() => undefined)
       setBusy(null)
     }
-    setRedrawPending(!ok)
-    if (ok) {
+    const next = nextApplyStep({ saved, drawn })
+    setRetryStep(next === 'close' ? null : next)
+    if (next === 'close') {
       toast.success(t('Redrew the rough of this shot with your changes.'))
       onOpenChange(false)
     }
@@ -344,8 +371,8 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
           <DialogFooter className="shrink-0 border-t border-border px-6 py-3">
             <Button variant="outline" onClick={close} disabled={!!busy}>{t('Cancel')}</Button>
             {tab === 'start' ? (
-              <Button onClick={() => void applyStart()} disabled={!!busy || (!startDirty && !redrawPending)} data-testid="shot-edit-apply-start">
-                {redrawPending && !startDirty ? t('Redraw') : completed ? t('Apply · redraw the rough') : t('Apply')}<ArrowRight className="size-4" />
+              <Button onClick={() => void applyStart()} disabled={!!busy || (!startDirty && !retryStep)} data-testid="shot-edit-apply-start">
+                {retryStep === 'redraw' && !startDirty ? t('Redraw') : completed ? t('Apply · redraw the rough') : t('Apply')}<ArrowRight className="size-4" />
               </Button>
             ) : (
               <Button onClick={() => void saveDuration()} disabled={!!busy || !durationDirty} data-testid="shot-edit-apply-direction">

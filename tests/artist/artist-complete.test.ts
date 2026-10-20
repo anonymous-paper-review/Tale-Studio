@@ -167,6 +167,28 @@ describe('Artist 완료하기', () => {
     expect(await response.json()).toMatchObject({ code: 'artist_not_started' })
   })
 
+  // 왜: 실행만 먼저 이어 두고 Storyboard 를 열지 못하면, 다시 누를 때 "아직 디자인 중"으로 막히고 실행은 한동안 아무도 깨우지 않는다(검토 지적).
+  it('멈춰 기다리던 실행은 Storyboard 를 연 다음에 이어 가고, 열지 못하면 그대로 기다린다', async () => {
+    mocks.projectUpdate.mockResolvedValue({ error: { message: 'db down' } })
+
+    const response = await completeArtist(request())
+
+    expect(response.status).toBe(500)
+    expect(mocks.runUpdate).not.toHaveBeenCalled()
+    expect(mocks.trigger).not.toHaveBeenCalled()
+  })
+
+  // 왜: 디자인에서 멈춘 실행을 "아직 디자인 중"이라고 하면 멈춘 줄 모른다 — 화면 위 [이어서 재시도]로 이어 가야 한다(검토 지적).
+  it('인물 · 배경 디자인에서 멈춘 실행이면 완료하기를 받지 않고 멈췄다고 알린다', async () => {
+    mocks.getActiveRun.mockResolvedValue({ id: 'run-1', status: 'failed', current_stage: 'v2Design', state: {}, updated_at: 'x' })
+
+    const response = await completeArtist(request())
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ code: 'artist_design_failed' })
+    expect(mocks.projectUpdate).not.toHaveBeenCalled()
+  })
+
   // 왜: Storyboard 를 열지 못했는데 됐다고 하면 화면은 넘어가고, 새로고침하면 다시 잠긴다.
   it('Storyboard 를 열지 못하면 됐다고 하지 않는다', async () => {
     mocks.getActiveRun.mockResolvedValue({ id: 'run-1', status: 'completed', current_stage: 'persistShots', state: {}, updated_at: 'x' })
