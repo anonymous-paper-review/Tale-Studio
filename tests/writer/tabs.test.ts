@@ -27,16 +27,17 @@ describe('Writer 탭', () => {
   it('Writer를 열면 트리트먼트 탭을 표시하지 않는다', () => {
     const html = renderToStaticMarkup(createElement(WriterTabs))
     expect(html).not.toContain('Treatment')
-    expect(html.match(/role="tab"/g)).toHaveLength(3)
+    expect(html.match(/role="tab"/g)).toHaveLength(2)
     expect(html).toContain('Rough storyboard')
     expect(html).toContain('Dialogue')
-    expect(html).toContain('Master sheet')
+    // 2026-10-20 오너 "storyboard 탭에서 마스터시트 지워주고 export로 기능 빼줘" — 마스터 시트는 [내보내기] 메뉴에 있다.
+    expect(html).not.toContain('Master sheet')
   })
 
-  it('Writer에서 탭을 순환하면 러프 스토리보드·대사·마스터 시트만 이동한다', () => {
+  it('Writer에서 탭을 순환하면 러프 스토리보드·대사만 이동한다', () => {
     renderToStaticMarkup(createElement(WriterTabs))
     expect(state.cycle).toHaveBeenLastCalledWith(
-      ['storyboard', 'dialogue', 'sheet'],
+      ['storyboard', 'dialogue'],
       'storyboard',
       state.setActiveTab,
     )
@@ -46,7 +47,7 @@ describe('Writer 탭', () => {
     expect(html).not.toContain('Treatment')
     expect(html).toContain('V2 units')
     expect(state.cycle).toHaveBeenLastCalledWith(
-      ['v2', 'storyboard', 'dialogue', 'sheet'],
+      ['v2', 'storyboard', 'dialogue'],
       'storyboard',
       state.setActiveTab,
     )

@@ -1,6 +1,6 @@
 // Writer 마스터 시트 — 러프 스토리보드를 클라이언트용 촬영 시트로 정리하는 순수 모델(#master-sheet).
 //   React·DOM 의존 없음 — 페이지 나누기·이름 치환·타임코드 계산까지 여기서 끝내고, 렌더
-//   (master-sheet-render.ts)와 화면(master-sheet-view.tsx)은 이 결과를 그대로 그린다(WYSIWYG).
+//   (master-sheet-render.ts)는 이 결과를 그대로 그리고, [내보내기] 메뉴(lib/export/master-sheet.ts)가 파일로 받는다(2026-10-20 탭에서 옮김).
 //   클라이언트(외부 협업자)가 받는 문서라 shotId·sceneId·생성 방식·프롬프트는 출력 타입 자체에 없다.
 import type { DialogueLine, ProjectFormat, ShotType } from '@/types'
 import { shotImageAspectRatio } from '@/lib/project-aspect'
@@ -91,7 +91,7 @@ export interface MasterSheetResult {
   pages: MasterSheetPage[]
   shotCount: number
   missingFrameShots: number
-  /** 프로젝트 포맷에서 고정된 그림 칸 비율(예: '16:9', '9:16') — 미리보기·렌더가 같은 값을 쓴다. */
+  /** 프로젝트 포맷에서 고정된 그림 칸 비율(예: '16:9', '9:16') — 페이지 나누기와 렌더가 같은 값을 쓴다. */
   frameAspectRatio: string
   /** 전체 상영 시간(초) — 모든 샷 duration 합. 푸터의 총 러닝타임에 쓴다. */
   totalRuntimeSeconds: number

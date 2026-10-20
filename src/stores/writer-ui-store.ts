@@ -5,7 +5,9 @@ import { persist } from 'zustand/middleware'
 
 // 'v2' = V2 의미 단위 프리뷰 탭 (#v2-tab 2026-08-17): V2 run 프로젝트에서만 노출.
 //   이전엔 워크스페이스가 engine=v2 면 프리뷰를 전면 강점유해 러프 보드가 영영 닫혔다.
-export type WriterTab = 'v2' | 'storyboard' | 'dialogue' | 'sheet'
+// 마스터 시트 탭('sheet')은 2026-10-20 오너 지시로 없앴다 — 마스터 시트는 [내보내기] 메뉴에서 받는다(lib/export/master-sheet).
+//   탭 순서는 lib/writer/tab-order.ts.
+export type WriterTab = 'v2' | 'storyboard' | 'dialogue'
 
 interface WriterUiState {
   activeTab: WriterTab
@@ -18,8 +20,8 @@ interface WriterUiState {
 export function normalizeWriterTab(value: unknown): WriterTab {
   // 'dialogue'는 #dialogue-v4(2026-07-23)에서 활성화 — "준비 중" 시절 가드에 남아있으면
   //   setActiveTab이 대사탭 클릭을 조용히 무시한다(탭 전환 불가 실사고). 'v2'도 동일 함정 주의.
-  // Producer로 옮겨진 트리트먼트의 이전 선택값('script')도 기본 화면으로 복구한다.
-  return value === 'v2' || value === 'storyboard' || value === 'dialogue' || value === 'sheet'
+  // Producer로 옮겨진 트리트먼트의 이전 선택값('script')과 없어진 마스터 시트('sheet')도 기본 화면으로 복구한다.
+  return value === 'v2' || value === 'storyboard' || value === 'dialogue'
     ? value
     : 'storyboard'
 }

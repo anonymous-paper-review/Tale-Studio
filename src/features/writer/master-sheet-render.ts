@@ -1,6 +1,6 @@
 // Writer 마스터 시트 캔버스 렌더러(클라이언트 전용, React 없음).
-//   순수 모델(src/lib/writer/master-sheet.ts)의 페이지 하나를 <canvas>에 그린다. 미리보기(화면 썸네일)와
-//   내보내기(PNG)가 같은 함수를 쓰므로 둘이 어긋나지 않는다(WYSIWYG).
+//   순수 모델(src/lib/writer/master-sheet.ts)의 페이지 하나를 <canvas>에 그린다. [내보내기] 메뉴의
+//   "마스터 시트 이미지로 저장"(lib/export/master-sheet.ts)이 장마다 부른다(2026-10-20 Storyboard 탭에서 옮김).
 import type { AppLocale } from '@/lib/locale'
 import { translate } from '@/lib/i18n/translate'
 import type { MasterSheetPage, MasterSheetRow } from '@/lib/writer/master-sheet'
@@ -23,7 +23,7 @@ const FONT_FAMILY = 'system-ui, -apple-system, "Segoe UI", "Malgun Gothic", "App
 const PAGE_WIDTH = 800 // CSS px 기준 — A4 세로 비율로 높이는 내용에 맞춰 가변(아래 측정 패스).
 const MARGIN = 40
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2
-const RENDER_SCALE = 2 // 2x — 다운로드한 PNG가 화면 미리보기보다 선명하게.
+const RENDER_SCALE = 2 // 2x — 다운로드한 PNG가 인쇄 · 확대에도 선명하게.
 const FRAME_GAP = 10
 const FRAME_LABEL_HEIGHT = 18
 const ROW_GAP = 18
@@ -165,7 +165,7 @@ function drawFrameBox(
 
 /**
  * 측정과 실제 그리기를 한 함수로 — draw=false 면 높이만 계산하고(이미지 불필요, 박스 높이는 폭×비율로 정해짐),
- * draw=true 면 실제로 그린다. 레이아웃 로직이 두 곳에서 갈라지면 미리보기·내보내기가 어긋날 수 있어 하나로 묶는다.
+ * draw=true 면 실제로 그린다. 레이아웃 로직이 두 곳에서 갈라지면 잰 높이와 그린 내용이 어긋날 수 있어 하나로 묶는다.
  */
 function layoutPage(
   ctx: CanvasRenderingContext2D,
@@ -336,7 +336,7 @@ function measuringContext(): CanvasRenderingContext2D {
   return ctx
 }
 
-/** 마스터 시트 페이지 하나를 캔버스에 그린다. 미리보기·PNG 내보내기가 공유하는 단일 경로(WYSIWYG). */
+/** 마스터 시트 페이지 하나를 캔버스에 그린다. [내보내기] 메뉴가 장마다 부르는 단일 경로. */
 export async function renderMasterSheetPageCanvas(
   page: MasterSheetPage,
   render: MasterSheetRenderContext,

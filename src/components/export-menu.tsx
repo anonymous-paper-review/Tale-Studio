@@ -15,6 +15,7 @@ import {
 import { errorMessage, exportProject, exportStage } from '@/lib/export'
 import type { ExportResult, ExportStage } from '@/lib/export/types'
 import { useProjectStore } from '@/stores/project-store'
+import { useProjectFormatStore } from '@/stores/project-format-store'
 import type { StageId } from '@/types'
 import { captureScreenJpeg } from '@/lib/export/screenshot'
 import { selectHandoffTake, type VideoTakeSelectionRecord } from '@/lib/director-video-take-selection'
@@ -78,7 +79,7 @@ export function ExportMenu() {
   const projectTitle = useProjectStore((s) => s.projectTitle)
   const currentStage = useProjectStore((s) => s.currentStage)
   const [busyScope, setBusyScope] = useState<
-    ExportScope | 'screenshot' | null
+    ExportScope | 'screenshot' | 'sheet' | null
   >(null)
 
   const stage = resolveExportStage(currentStage)
@@ -151,6 +152,53 @@ export function ExportMenu() {
     }
   }
 
+  // 마스터 시트(2026-10-20 오너 "storyboard 탭에서 마스터시트 지워주고 export로 기능 빼줘") — 예전 Storyboard 탭과 같은 시트 ·
+  //   같은 파일(한 장 PNG · 여러 장 ZIP)을 미리보기 없이 바로 받는다. 어느 단계에서든 누를 수 있다. 무거운 그리기 코드는 누를 때만 읽는다.
+  const runMasterSheet = async () => {
+    if (!projectId || isBusy) return
+    setBusyScope('sheet')
+    const toastId = toast.loading(t('Preparing the master sheet…'))
+    try {
+      const [{ exportMasterSheet }, { renderMasterSheetPageCanvas, canvasToPngBlob }, { useWriterStore }, { default: JSZip }] = await Promise.all([
+        import('@/lib/export/master-sheet'),
+        import('@/features/writer/master-sheet-render'),
+        import('@/stores/writer-store'),
+        import('jszip'),
+      ])
+      const outcome = await exportMasterSheet(
+        { projectTitle: projectTitle.trim(), projectFormat: useProjectFormatStore.getState().format },
+        {
+          load: async () => {
+            await useWriterStore.getState().loadProject()
+            const { sceneManifest, shots } = useWriterStore.getState()
+            return { sceneManifest, shots }
+          },
+          projectLocale: () => fetchProjectLocale(projectId),
+          renderPage: renderMasterSheetPageCanvas,
+          toPng: canvasToPngBlob,
+          zip: async (files) => {
+            const zip = new JSZip()
+            for (const file of files) zip.file(file.name, file.data)
+            return zip.generateAsync({ type: 'blob' })
+          },
+          download: downloadBlob,
+        },
+      )
+      if (outcome.kind === 'empty') {
+        toast.error(t('No scenes or shots generated yet'), { id: toastId })
+        return
+      }
+      toast.success(t('Downloaded the master sheet.'), { id: toastId })
+      if (outcome.missingFrameShots > 0) {
+        toast.warning(t('{count} shots have no rough images yet', { count: outcome.missingFrameShots }))
+      }
+    } catch (error) {
+      toast.error(t('Master sheet export failed: {message}', { message: errorMessage(error, t('Unknown error')) }), { id: toastId })
+    } finally {
+      setBusyScope(null)
+    }
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -176,6 +224,13 @@ export function ExportMenu() {
         >
           {t('Save screen as JPEG')}
         </DropdownMenuItem>
+        <DropdownMenuItem
+          disabled={!projectId || isBusy}
+          onSelect={() => void runMasterSheet()}
+          className="cursor-pointer"
+        >
+          {t('Save master sheet as image')}
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           disabled={!projectId || isBusy || !stage}
@@ -194,6 +249,17 @@ export function ExportMenu() {
       </DropdownMenuContent>
     </DropdownMenu>
   )
+}
+
+function downloadBlob(blob: Blob, fileName: string) {
+  const href = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = href
+  a.download = fileName
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(href)
 }
 
 function exportSuccessMessage(result: ExportResult, t: ReturnType<typeof useT>): string {

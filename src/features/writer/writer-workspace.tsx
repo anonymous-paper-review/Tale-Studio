@@ -4,7 +4,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { DialogueView } from '@/features/writer/dialogue-view'
-import { MasterSheetView } from '@/features/writer/master-sheet-view'
 import { RoughStoryboardView } from '@/features/writer/rough-storyboard-view'
 import { WriterGenerationView } from '@/features/writer/writer-generation-view'
 import { WriterV2Preview } from '@/features/writer/writer-v2-preview'
@@ -13,6 +12,7 @@ import { cn } from '@/lib/utils'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterUiStore } from '@/stores/writer-ui-store'
+import { writerTabOrder } from '@/lib/writer/tab-order'
 
 // 생성 화면 디버그 진입(#gen-debug 2026-07-21): ?debug=generation + admin 계정일 때만
 //   실행 중이 아니어도 WriterGenerationView 를 강제 렌더 — 스트림/사이드바 UI 를
@@ -43,8 +43,8 @@ function useGenerationDebug(): boolean {
   return enabled
 }
 
-// 탭 순서 — 슬라이드 방향의 기준 (#c1 2026-08-03). 'v2'는 V2 프로젝트에서 맨 앞(#v2-tab).
-const TAB_ORDER = ['v2', 'storyboard', 'dialogue', 'sheet'] as const
+// 탭 순서 — 슬라이드 방향의 기준 (#c1 2026-08-03). 'v2'는 V2 프로젝트에서 맨 앞(#v2-tab). 탭 줄과 같은 순서.
+const TAB_ORDER = writerTabOrder(true)
 
 export function WriterWorkspace() {
   const activeTab = useWriterUiStore((state) => state.activeTab)
@@ -75,7 +75,7 @@ export function WriterWorkspace() {
     }
   }, [status, projectId, setActiveTab, setV2Available])
 
-  // 탭 전환 슬라이드(#c1) — 세 뷰는 상태 보존을 위해 동시 마운트라 remount 연출을 못 쓴다.
+  // 탭 전환 슬라이드(#c1) — 탭 뷰는 상태 보존을 위해 동시 마운트라 remount 연출을 못 쓴다.
   //   대신 보이는 컨테이너에만 animate-in 클래스를 얹는다: hidden → 표시로 바뀔 때 클래스가
   //   새로 적용되며 애니메이션이 재생된다. 방향은 탭 순서(왼→오른쪽 = forward) 기준.
   const [prevTab, setPrevTab] = useState(activeTab)
@@ -132,14 +132,6 @@ export function WriterWorkspace() {
         )}
       >
         <DialogueView />
-      </div>
-      <div
-        aria-hidden={visibleTab !== 'sheet'}
-        className={cn(
-          visibleTab === 'sheet' ? cn('flex min-h-0 flex-1 flex-col', slideClass) : 'hidden',
-        )}
-      >
-        <MasterSheetView />
       </div>
     </div>
   )
