@@ -1227,6 +1227,7 @@ export function RoughStoryboardView() {
 
       {/* #arrow-layer 실험(2026-08-09): 팝업 = 화살표 레이어 편집기 — panel 객체를 통째로 넘긴다. */}
       <ShotDetailDialog
+        variant="storyboard"
         shotId={detailShotId}
         panel={detailPanel}
         onOpenChange={(open) => {

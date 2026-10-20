@@ -41,6 +41,24 @@ const DEFAULT_LIGHTING = {
 const sceneSaveTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const shotSaveTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const writerSaveChains = new Map<string, Promise<void>>()
+// 샷 저장을 미뤄 둔 일(500ms 묶음) — flushShotSave 가 기다리지 않고 바로 돌린다.
+const shotSaveRuns = new Map<string, () => Promise<void>>()
+// 이번 묶음에서 사람이 바꾼 카메라 · 조명(2026-10-20 샷 고치기) — 바꾼 것만 저장한다. 손대지 않은 샷의 빈 칸을
+//   화면 기본값으로 채우면 Director 가 그 값을 사람이 정한 것으로 읽는다.
+const shotConfigDirty = new Map<string, { camera: boolean; lighting: boolean }>()
+
+/** 미뤄 둔 샷 저장을 지금 하고 끝날 때까지 기다린다(샷 고치기의 [적용] 뒤 다시 그리기 전에). 미뤄 둔 것이 없으면 진행 중인 저장만 기다린다. */
+export async function flushShotSave(id: string): Promise<void> {
+  const timer = shotSaveTimers.get(id)
+  const run = shotSaveRuns.get(id)
+  if (timer && run) {
+    clearTimeout(timer)
+    await run()
+    return
+  }
+  const pending = writerSaveChains.get(`shots:${useProjectStore.getState().projectId}:${id}`)
+  if (pending) await pending.catch(() => undefined)
+}
 
 async function serializeWriterSave(resource: string, projectId: string, id: string, save: () => Promise<void>) {
   const key = `${resource}:${projectId}:${id}`
@@ -252,8 +270,14 @@ export const useWriterStore = create<WriterState>((set, get) => ({
     const projectId = useProjectStore.getState().projectId
     const shot = get().shots.find(s => s.shotId === id)
     if (!projectId || !shot) return
-    const timer = setTimeout(async () => {
-      try { await serializeWriterSave('shots', projectId, id, async () => {
+    const dirty = shotConfigDirty.get(id) ?? { camera: false, lighting: false }
+    shotConfigDirty.set(id, { camera: dirty.camera || 'camera' in changes, lighting: dirty.lighting || 'lighting' in changes })
+    const run = async () => {
+      if (shotSaveRuns.get(id) === run) shotSaveRuns.delete(id)
+      if (shotSaveTimers.get(id) === timer) shotSaveTimers.delete(id)
+      const configs = shotConfigDirty.get(id)
+      shotConfigDirty.delete(id)
+      await serializeWriterSave('shots', projectId, id, async () => {
         // 같은 프로젝트에서는 완료된 대사 저장을 포함한 최신 보드를 읽는다.
         const savedShot = useProjectStore.getState().projectId === projectId
           ? get().shots.find(current => current.shotId === id) ?? shot : shot
@@ -269,13 +293,18 @@ export const useWriterStore = create<WriterState>((set, get) => ({
             duration_seconds: savedShot.durationSeconds,
             dialogue_lines: savedShot.dialogueLines,
             generation_method: savedShot.generationMethod,
+            // 샷 고치기(2026-10-20)에서 사람이 바꾼 카메라 · 조명만 — 불러온 값 위에 고친 값을 얹은 그대로 쓴다(addShot 과 같은 모양).
+            ...(configs?.camera ? { camera_config: savedShot.camera } : {}),
+            ...(configs?.lighting ? { lighting_config: savedShot.lighting } : {}),
           })
           .eq('project_id', projectId)
           .eq('shot_id', id)
         void invalidateShots(projectId) // 사물함 표시 — 다른 화면의 다음 읽기가 새로 받게
-      }) } finally { if (shotSaveTimers.get(id) === timer) shotSaveTimers.delete(id) }
-    }, 500)
+      })
+    }
+    const timer = setTimeout(() => { void run() }, 500)
     shotSaveTimers.set(id, timer)
+    shotSaveRuns.set(id, run)
   },
 
   addShot: async (sceneId, opts) => {

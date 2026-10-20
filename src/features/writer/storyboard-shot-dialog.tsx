@@ -1,0 +1,358 @@
+'use client'
+
+// Storyboard 샷 고치기 팝업(프로토타입 S2, 2026-10-20 오너 "HTML 확인해서 팝업 수정") — 카드를 누르면 열린다.
+//   두 묶음: 시작 고치기(스토리 · 대사 · 샷 타입 · 앵글 · 조명 — 적용하면 시작 그림, 이어서 연출 그림을 다시 그린다) /
+//   연출 고치기(왼쪽 연출 그림에 화살표 그리기 · 길이 · [연출만 다시 만들기]).
+//   약속 I(2026-09-04): 시작 · 연출 · 끝 세 장은 따로 다시 만들 수 있어 왼쪽 아래에 그대로 둔다(프로토타입은 끝을 뺐다 — 오너 결정 대기).
+//   저장할 곳이 아직 없는 카메라 무브먼트 · 방향 · 액션 · 샷별 모습, 새 러프 비교(S3c)는 2차. 등장인물은 보기만(바꾸려면 모습 표까지 함께 — 2차).
+//   Director 그리드는 예전 연출 편집 팝업을 그대로 쓴다(ShotDetailDialog 기본).
+import { useState } from 'react'
+import { ArrowRight, Minus, Plus, RefreshCw, X } from 'lucide-react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Slider } from '@/components/ui/slider'
+import { Textarea } from '@/components/ui/textarea'
+import { ThumbImage } from '@/components/thumb-image'
+import { withCacheBust } from '@/components/rough-frame-cycle'
+import { AiBusyOverlay, type AiBusyStep } from '@/components/ai-busy-overlay'
+import { DirectingArrowEditor } from '@/features/writer/directing-arrow-editor'
+import { RoughFramesStill } from '@/features/writer/rough-frames-still'
+import { SHOT_TYPES, SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
+import { CAMERA_ANGLES, angleOfCamera, applyStartEdit, cameraWithAngle, redrawDirectionOnly, sceneShotLabel, type CameraAngle, type RoughFrame } from '@/lib/writer/shot-edit'
+import { flushShotSave, useWriterStore } from '@/stores/writer-store'
+import { useProjectStore } from '@/stores/project-store'
+import { cn } from '@/lib/utils'
+import { useT } from '@/lib/i18n'
+import type { DialogueLine, LightingConfig, RoughStoryboardImage, Shot, ShotType } from '@/types'
+
+const LIGHT_POSITIONS: ReadonlyArray<{ value: LightingConfig['position']; label: string }> = [
+  { value: 'front', label: 'Front' },
+  { value: 'left', label: 'Left' },
+  { value: 'right', label: 'Right' },
+  { value: 'top', label: 'From above' },
+]
+
+interface Draft {
+  actionDescription: string
+  dialogueLines: DialogueLine[]
+  shotType: ShotType
+  durationSeconds: number
+  angle: CameraAngle
+  lighting: LightingConfig
+}
+
+function draftOf(shot: Shot): Draft {
+  return {
+    actionDescription: shot.actionDescription,
+    dialogueLines: shot.dialogueLines.map((line) => ({ ...line })),
+    shotType: shot.shotType,
+    durationSeconds: shot.durationSeconds,
+    angle: angleOfCamera(shot.camera),
+    lighting: { ...shot.lighting },
+  }
+}
+
+/** 시작 묶음에서 바뀐 것만 — 저장할 샷 고침. */
+function startChanges(shot: Shot, draft: Draft): Partial<Shot> {
+  const changes: Partial<Shot> = {}
+  if (draft.actionDescription.trim() !== shot.actionDescription) changes.actionDescription = draft.actionDescription.trim()
+  if (JSON.stringify(draft.dialogueLines) !== JSON.stringify(shot.dialogueLines)) changes.dialogueLines = draft.dialogueLines.filter((line) => line.text.trim())
+  if (draft.shotType !== shot.shotType) changes.shotType = draft.shotType
+  if (draft.angle !== angleOfCamera(shot.camera)) changes.camera = cameraWithAngle(shot.camera, draft.angle)
+  if (JSON.stringify(draft.lighting) !== JSON.stringify(shot.lighting)) changes.lighting = draft.lighting
+  return changes
+}
+
+export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: string | null; panel: RoughStoryboardImage | null; onOpenChange: (open: boolean) => void }) {
+  const t = useT()
+  const shot = useWriterStore((s) => s.shots.find((x) => x.shotId === shotId))
+  const shots = useWriterStore((s) => s.shots)
+  const sceneManifest = useWriterStore((s) => s.sceneManifest)
+  const loadProject = useWriterStore((s) => s.loadProject)
+  const updateShot = useWriterStore((s) => s.updateShot)
+  const projectId = useProjectStore((s) => s.projectId)
+  const [tab, setTab] = useState<'start' | 'direction'>('start')
+  const [draft, setDraft] = useState<{ shotId: string | null; value: Draft | null }>({ shotId: null, value: null })
+  const [busy, setBusy] = useState<{ title: string; steps: AiBusyStep[] } | null>(null)
+
+  if (!shot || !projectId) return null
+  if (draft.shotId !== shot.shotId) {
+    setDraft({ shotId: shot.shotId, value: draftOf(shot) })
+    setTab('start')
+  }
+  const value = draft.shotId === shot.shotId && draft.value ? draft.value : draftOf(shot)
+  const patch = (next: Partial<Draft>) => setDraft({ shotId: shot.shotId, value: { ...value, ...next } })
+
+  const label = sceneShotLabel(sceneManifest, shots, shot.shotId) ?? ''
+  const scene = sceneManifest?.scenes.find((item) => item.sceneId === shot.sceneId)
+  const location = sceneManifest?.locations.find((item) => item.locationId === scene?.location)
+  const castNames = shot.characters.map((id) => sceneManifest?.characters.find((c) => c.characterId === id)?.name ?? id)
+  const completed = panel?.status === 'completed' && !!panel.frames
+  const frames = completed ? panel!.frames! : null
+  const changes = startChanges(shot, value)
+  const startDirty = Object.keys(changes).length > 0
+  const durationDirty = value.durationSeconds !== shot.durationSeconds
+  const angleLabel = t(CAMERA_ANGLES.find((item) => item.value === value.angle)?.label ?? 'Eye level')
+
+  const regenerate = async (frame: RoughFrame): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/writer/rough-directing-edit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'regenerate-frame', projectId, shotId: shot.shotId, frame }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        toast.error(body?.error ?? t('Regeneration failed'))
+        return false
+      }
+      return true
+    } catch {
+      toast.error(t('Regeneration failed'))
+      return false
+    }
+  }
+  const steps = (current: 'save' | RoughFrame | 'done', withStart: boolean): AiBusyStep[] => {
+    const order: Array<'save' | RoughFrame> = withStart ? ['save', 'start', 'direction'] : ['save', 'direction']
+    const at = current === 'done' ? order.length : order.indexOf(current)
+    const labels: Record<'save' | RoughFrame, string> = { save: t('Saving the changes'), start: t('Redrawing the start frame'), direction: t('Redrawing the directing frame') }
+    return order.map((key, index) => ({ label: labels[key], state: index < at ? 'done' : index === at ? 'current' : 'todo' }))
+  }
+
+  const applyStart = async () => {
+    if (startDirty) updateShot(shot.shotId, changes)
+    if (!completed) {
+      // 아직 러프가 없는 샷 — 저장만 한다(보드가 빠진 러프를 그릴 때 고친 내용으로 그린다).
+      await flushShotSave(shot.shotId)
+      onOpenChange(false)
+      return
+    }
+    setBusy({ title: t('Drawing the rough'), steps: steps('save', true) })
+    const ok = await applyStartEdit({
+      save: () => flushShotSave(shot.shotId),
+      regenerate: async (frame) => {
+        setBusy({ title: t('Drawing the rough'), steps: steps(frame, true) })
+        return regenerate(frame)
+      },
+    })
+    setBusy(null)
+    await loadProject()
+    if (ok) {
+      toast.success(t('Redrew the start and directing frames.'))
+      onOpenChange(false)
+    }
+  }
+  const redrawDirection = async () => {
+    if (durationDirty) updateShot(shot.shotId, { durationSeconds: value.durationSeconds })
+    setBusy({ title: t('Drawing the rough'), steps: steps('save', false) })
+    const ok = await redrawDirectionOnly({
+      save: () => flushShotSave(shot.shotId),
+      regenerate: async (frame) => {
+        setBusy({ title: t('Drawing the rough'), steps: steps(frame, false) })
+        return regenerate(frame)
+      },
+    })
+    setBusy(null)
+    await loadProject()
+    if (ok) toast.success(t('Redrew the directing frame. The other two are unchanged.'))
+  }
+  const saveDuration = async () => {
+    updateShot(shot.shotId, { durationSeconds: value.durationSeconds })
+    await flushShotSave(shot.shotId)
+    onOpenChange(false)
+  }
+
+  const bigFrame = (url: string | null | undefined, caption: string) => (
+    <div className="relative overflow-hidden rounded-lg border border-border bg-muted/30">
+      {url && panel ? (
+        <ThumbImage src={withCacheBust(url, panel.generatedAt)} alt={caption} className="block h-auto w-full" />
+      ) : (
+        <div className="flex aspect-video items-center justify-center text-sm text-muted-foreground">{t('Not sketched yet')}</div>
+      )}
+      <span className="pointer-events-none absolute bottom-2 left-2 rounded-sm bg-background/70 px-1.5 text-[11px] text-muted-foreground">{caption}</span>
+    </div>
+  )
+
+  const groupCard = (key: 'start' | 'direction', title: string, sub: string) => (
+    <button
+      type="button"
+      onClick={() => setTab(key)}
+      aria-pressed={tab === key}
+      className={cn('flex-1 rounded-lg border p-3 text-left transition-colors', tab === key ? 'border-foreground bg-accent/40' : 'border-border hover:bg-accent/30')}
+      data-testid={`shot-edit-group-${key}`}
+    >
+      <span className="block text-sm font-semibold">{title}</span>
+      <span className="block text-xs text-muted-foreground">{sub}</span>
+    </button>
+  )
+
+  return (
+    <>
+      <Dialog open={!!shotId} onOpenChange={(open) => { if (!busy) onOpenChange(open) }}>
+        <DialogContent className="flex max-h-[92vh] flex-col gap-0 p-0 sm:max-w-[1080px]" data-testid="shot-edit">
+          <DialogHeader className="shrink-0 border-b border-border px-6 py-4">
+            <DialogTitle className="text-base">{t('{label} · edit', { label })}</DialogTitle>
+            <DialogDescription>{t('Edit in two groups. Editing the start also redraws the directing frame; editing the directing frame changes only that frame.')}</DialogDescription>
+          </DialogHeader>
+          <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] md:overflow-hidden">
+            <div className="flex min-w-0 flex-col gap-3 p-6 md:overflow-y-auto">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-sm font-semibold">{label}</span>
+                <span className="text-xs text-muted-foreground">{t('{seconds}s', { seconds: value.durationSeconds })} · {value.shotType} · {angleLabel}</span>
+                <span className="ml-auto inline-flex rounded-full border border-border p-0.5">
+                  {(['start', 'direction'] as const).map((key) => (
+                    <button key={key} type="button" onClick={() => setTab(key)} aria-pressed={tab === key} className={cn('rounded-full px-3 py-0.5 text-xs', tab === key ? 'bg-foreground text-background' : 'text-muted-foreground')}>
+                      {t(key === 'start' ? 'Start' : 'Directing')}
+                    </button>
+                  ))}
+                </span>
+              </div>
+              {tab === 'direction' && completed && panel ? (
+                <DirectingArrowEditor key={shot.shotId} projectId={projectId} shotId={shot.shotId} panel={panel} onSaved={() => void loadProject()} />
+              ) : (
+                bigFrame(tab === 'start' ? frames?.start : frames?.direction, t(tab === 'start' ? 'Start' : 'Directing'))
+              )}
+              {completed && panel ? (
+                <RoughFramesStill key={`still-${shot.shotId}-${panel.generatedAt}`} projectId={projectId} shotId={shot.shotId} panel={panel} onRegenerated={() => void loadProject()} />
+              ) : null}
+              <p className="text-sm text-muted-foreground">{shot.actionDescription}</p>
+            </div>
+
+            <div className="flex min-w-0 flex-col gap-5 border-t border-border p-6 md:overflow-y-auto md:border-l md:border-t-0">
+              <div className="flex items-stretch gap-2">
+                {groupCard('start', t('Edit the start'), t('Story · dialogue · shot type · angle · lighting'))}
+                <span className="self-center text-xs text-muted-foreground">{t('→ follows')}</span>
+                {groupCard('direction', t('Edit the directing'), t('Arrows · length'))}
+              </div>
+
+              {tab === 'start' ? (
+                <>
+                  <Field title={t('Story (action)')}>
+                    <Textarea value={value.actionDescription} onChange={(e) => patch({ actionDescription: e.target.value })} rows={3} placeholder={t('What happens in this shot')} data-testid="shot-edit-story" />
+                  </Field>
+                  <Field title={t('Characters')} hint={t('From the Artist list')}>
+                    {castNames.length ? (
+                      <div className="flex flex-wrap gap-1.5">{castNames.map((name) => <span key={name} className="rounded-full border border-border px-2.5 py-0.5 text-xs">{name}</span>)}</div>
+                    ) : <p className="text-xs text-muted-foreground">{t('No one appears in this shot')}</p>}
+                  </Field>
+                  <Field title={t('Background')}>
+                    <span className="self-start rounded-md border border-border px-2.5 py-1 text-xs">{location?.name ?? scene?.location ?? t('None')}</span>
+                  </Field>
+                  <Field title={t('Dialogue')} hint={t('Dialogue you write stays as written')}>
+                    <div className="flex flex-col gap-2">
+                      {value.dialogueLines.map((line, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <Select value={line.characterId ?? '__narration'} onValueChange={(next) => patch({ dialogueLines: value.dialogueLines.map((item, i) => (i === index ? { ...item, characterId: next === '__narration' ? null : next } : item)) })}>
+                            <SelectTrigger className="h-8 w-28 shrink-0 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__narration">{t('Narration')}</SelectItem>
+                              {shot.characters.map((id, i) => <SelectItem key={id} value={id}>{castNames[i]}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                          <Input value={line.text} onChange={(e) => patch({ dialogueLines: value.dialogueLines.map((item, i) => (i === index ? { ...item, text: e.target.value } : item)) })} className="h-8 text-sm" />
+                          <Button size="icon" variant="ghost" className="size-8 shrink-0" aria-label={t('Delete')} onClick={() => patch({ dialogueLines: value.dialogueLines.filter((_, i) => i !== index) })}>
+                            <X className="size-3.5" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button size="sm" variant="outline" className="self-start" onClick={() => patch({ dialogueLines: [...value.dialogueLines, { characterId: shot.characters[0] ?? null, text: '', emotion: '', delivery: '', durationHint: 0 }] })}>
+                        <Plus className="size-3.5" />{t('Dialogue')}
+                      </Button>
+                    </div>
+                  </Field>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field title={t('Shot type (camera focus)')}>
+                      <Select value={value.shotType} onValueChange={(next) => patch({ shotType: next as ShotType })}>
+                        <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {SHOT_TYPES.map((type) => <SelectItem key={type} value={type}>{type} <span className="text-muted-foreground">· {t(SHOT_TYPE_DESCRIPTIONS[type] ?? type)}</span></SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field title={t('Camera angle')}>
+                      <Select value={value.angle} onValueChange={(next) => patch({ angle: next as CameraAngle })}>
+                        <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {CAMERA_ANGLES.map((item) => <SelectItem key={item.value} value={item.value}>{t(item.label)}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  </div>
+                  <Field title={t('Lighting')}>
+                    <div className="flex flex-col gap-3">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="w-20 text-xs text-muted-foreground">{t('Light position')}</span>
+                        {LIGHT_POSITIONS.map((item) => (
+                          <button key={item.value} type="button" aria-pressed={value.lighting.position === item.value} onClick={() => patch({ lighting: { ...value.lighting, position: item.value } })} className={cn('rounded-full border px-2.5 py-0.5 text-xs', value.lighting.position === item.value ? 'border-foreground bg-foreground text-background' : 'border-border hover:bg-accent')}>
+                            {t(item.label)}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="w-20 shrink-0 text-xs text-muted-foreground">{t('Color temperature')}</span>
+                        <Slider min={2700} max={8000} step={100} value={[Math.min(8000, Math.max(2700, value.lighting.colorTemp))]} onValueChange={([next]) => patch({ lighting: { ...value.lighting, colorTemp: next } })} className="flex-1" />
+                        <span className="w-14 text-right font-mono text-xs">{value.lighting.colorTemp}K</span>
+                      </div>
+                      <p className="pl-[5.75rem] text-[11px] text-muted-foreground">{t('Lower numbers are warmer orange, higher numbers are cooler blue')}</p>
+                      <div className="flex items-center gap-3">
+                        <span className="w-20 shrink-0 text-xs text-muted-foreground">{t('Brightness')}</span>
+                        <Slider min={0} max={100} step={1} value={[value.lighting.brightness]} onValueChange={([next]) => patch({ lighting: { ...value.lighting, brightness: next } })} className="flex-1" />
+                        <span className="w-14 text-right font-mono text-xs">{value.lighting.brightness}</span>
+                      </div>
+                    </div>
+                  </Field>
+                  <p className="text-xs text-muted-foreground">{completed ? t('Applying changes the start and then redraws the directing frame too.') : t('This shot has no rough yet. It is drawn with your changes.')}</p>
+                </>
+              ) : (
+                <>
+                  <Field title={t('Length')}>
+                    <div className="flex items-center gap-2">
+                      <Button size="icon" variant="outline" className="size-8" aria-label={t('Shorter')} disabled={value.durationSeconds <= 1} onClick={() => patch({ durationSeconds: Math.max(1, value.durationSeconds - 1) })}><Minus className="size-3.5" /></Button>
+                      <span className="w-14 text-center font-mono text-sm">{t('{seconds}s', { seconds: value.durationSeconds })}</span>
+                      <Button size="icon" variant="outline" className="size-8" aria-label={t('Longer')} disabled={value.durationSeconds >= 30} onClick={() => patch({ durationSeconds: Math.min(30, value.durationSeconds + 1) })}><Plus className="size-3.5" /></Button>
+                    </div>
+                  </Field>
+                  <p className="text-xs text-muted-foreground">{completed ? t('Draw or erase arrows on the directing frame on the left, then save. The card updates right away.') : t('This shot has no rough yet.')}</p>
+                  {completed ? (
+                    <Button variant="outline" className="self-start" onClick={() => void redrawDirection()} data-testid="shot-edit-redraw-direction">
+                      <RefreshCw className="size-4" />{t('Remake only the directing frame')}
+                    </Button>
+                  ) : null}
+                </>
+              )}
+              <p className="rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">{t('✦ You can also just say it: tell the agent "close-up on this shot, warmer light" and it changes it for you.')}</p>
+            </div>
+          </div>
+          <DialogFooter className="shrink-0 border-t border-border px-6 py-3">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>{t('Cancel')}</Button>
+            {tab === 'start' ? (
+              <Button onClick={() => void applyStart()} disabled={!startDirty} data-testid="shot-edit-apply-start">
+                {completed ? t('Apply the start · redraw the directing too') : t('Apply')}<ArrowRight className="size-4" />
+              </Button>
+            ) : (
+              <Button onClick={() => void saveDuration()} disabled={!durationDirty} data-testid="shot-edit-apply-direction">
+                {t('Apply')}<ArrowRight className="size-4" />
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <AiBusyOverlay open={!!busy} layer="dialog" title={busy?.title ?? ''} steps={busy?.steps} />
+    </>
+  )
+}
+
+function Field({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <section className="flex flex-col gap-1.5">
+      <h3 className="flex flex-wrap items-baseline gap-x-2 text-sm font-semibold">
+        {title}
+        {hint ? <span className="text-xs font-normal text-muted-foreground">{hint}</span> : null}
+      </h3>
+      {children}
+    </section>
+  )
+}

@@ -224,6 +224,7 @@ export function WorldPanel({
         locationId={viewDialog?.locationId ?? null}
         shot={viewDialog?.shot ?? null}
         appearanceKey={viewDialog?.appearanceKey ?? null}
+        onAddAppearance={(id) => setCreateFor(id)}
         onClose={() => setViewDialog(null)}
       />
       <LocationAppearanceCreateDialog locationId={createFor} onClose={() => setCreateFor(null)} />

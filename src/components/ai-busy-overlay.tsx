@@ -31,11 +31,13 @@ interface AiBusyOverlayProps {
   footer?: React.ReactNode
   /** false = 일이 멈췄다(실패 안내) — 도는 원 대신 경고 표시를 두고 aria-busy 를 끈다. 기본 true. */
   busy?: boolean
+  /** 'dialog' = 열린 팝업 위를 덮는다(팝업에서 시작한 AI 작업, 2026-10-20 Artist 상세 · 샷 고치기). 기본은 단계 화면만 덮는다. */
+  layer?: 'stage' | 'dialog'
 }
 
 const subscribeNothing = () => () => {}
 
-export function AiBusyOverlay({ open, title, description, steps, progress, progressLabel, footer, busy = true }: AiBusyOverlayProps) {
+export function AiBusyOverlay({ open, title, description, steps, progress, progressLabel, footer, busy = true, layer = 'stage' }: AiBusyOverlayProps) {
   const t = useT()
   // 서버 렌더에는 body 가 없다 — 브라우저에서만 띄운다(하이드레이션이 어긋나지 않게).
   const inBrowser = useSyncExternalStore(subscribeNothing, () => true, () => false)
@@ -55,8 +57,10 @@ export function AiBusyOverlay({ open, title, description, steps, progress, progr
 
   return createPortal(
     <div
-      className="fixed inset-y-0 right-0 z-overlay flex items-center justify-center bg-background/85 p-6"
-      style={{ left: SHELL_INSET * 2 + SHELL_RAIL_WIDTH }}
+      className={layer === 'dialog'
+        ? 'fixed inset-0 z-popover flex items-center justify-center bg-background/85 p-6'
+        : 'fixed inset-y-0 right-0 z-overlay flex items-center justify-center bg-background/85 p-6'}
+      style={layer === 'dialog' ? undefined : { left: SHELL_INSET * 2 + SHELL_RAIL_WIDTH }}
       role="status"
       aria-live="polite"
       aria-busy={busy}

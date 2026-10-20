@@ -1,19 +1,18 @@
 'use client'
 
-import { useState } from 'react'
-import { Loader2, Sparkles, RefreshCw, AlertTriangle, Pencil, Star, Trash2, Check } from 'lucide-react'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { useEffect, useState } from 'react'
+import { AlertTriangle, ArrowLeft, Check, Loader2, Pencil, Plus, RefreshCw, Star, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { HoverBeam } from '@/components/hover-beam'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ThumbImage } from '@/components/thumb-image'
+import { AiBusyOverlay } from '@/components/ai-busy-overlay'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
+import { DescriptionBox, DetailFrame, DetailSection, HistoryButton, RegenerateDialog, artistDetailTitleKey } from '@/features/artist/detail-parts'
 import { sameCharacterAppearanceSlot, useArtistStore } from '@/stores/artist-store'
+import { useWriterStore } from '@/stores/writer-store'
+import { useProducerStore } from '@/stores/producer-store'
+import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { CHARACTER_VIEW_LABELS, type CharacterViewKey } from '@/types/asset'
 import {
   DEFAULT_IMAGE_MODEL,
@@ -24,6 +23,7 @@ import {
 } from '@/lib/image-models'
 import { classifyImageStale } from '@/lib/image-provenance'
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
+import { sceneShotLabel } from '@/lib/writer/shot-edit'
 import { useGuardedAction } from '@/hooks/use-guarded-action'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
@@ -33,13 +33,18 @@ type Props = {
   appearanceKey: string | null
   view: CharacterViewKey | null
   onClose: () => void
+  /** "+ 모습 추가하기" — 카드의 모습 추가 창(이름 · 시점 · 외형, 약속 C)을 연다. */
+  onAddAppearance?: (charId: string) => void
 }
 
 /**
- * 캐릭터 뷰 상세 — 선택 뷰 프리뷰 + 단일 뷰 재생성 (crop 폐기, 2026-06-05).
- * main = 대표 포트레이트(T2I), 방향 뷰 = main 을 reference 로 한 i2i. 각 뷰를 개별 재생성한다.
+ * 인물 상세 팝업(프로토타입 A7, 2026-10-20 오너 "HTML 확인해서 팝업 수정") — 두 칸.
+ *   왼쪽: 모습 이름 · 기준 · 바뀜 · 기록(시계) · [↻ 다시 만들기] / 큰 그림 / 기준 모습으로 · 이 모습을 기준으로.
+ *   오른쪽: 설명(✎ 고치고 [적용] = 바로 저장, 그림은 다시 만들기로만) · 모습 목록(보기 · 지우기 · 모습 추가) · 쓰인 샷.
+ *   [↻ 다시 만들기]는 확인 창(A7r: 설명 · 캐릭터성 추천 · 이미지 생성 도구)을 거쳐 그리고, 그리는 동안 화면 전체를 잠근다.
+ *   모습 이름 바꾸기 · 시점 · 실패 안내 · 부드러운 문구 재시도는 우리 기능이라 남긴다(프로토타입에 없음).
  */
-export function CharacterViewDialog({ charId, appearanceKey, view, onClose }: Props) {
+export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, view, onClose, onAddAppearance }: Props) {
   const t = useT()
   const char = useArtistStore((s) =>
     s.characterAssets.find((c) => c.characterId === charId),
@@ -52,13 +57,22 @@ export function CharacterViewDialog({ charId, appearanceKey, view, onClose }: Pr
   const deleteAppearance = useArtistStore((s) => s.deleteAppearance)
   const viewFailures = useArtistStore((s) => s.viewFailures)
   const retryCharacterViewSafe = useArtistStore((s) => s.retryCharacterViewSafe)
+  const shots = useWriterStore((s) => s.shots)
+  const sceneManifest = useWriterStore((s) => s.sceneManifest)
+  const styleLabel = useProducerStore((s) => s.customStyleAnchor?.label ?? s.styleAnchors.find((anchor) => anchor.key === s.styleAnchorKey)?.label ?? null)
+
+  // 팝업 안에서 다른 모습으로 옮겨 볼 수 있다(모습 목록 [보기]) — 카드가 연 모습에서 시작한다.
+  const [viewing, setViewing] = useState<{ from: string | null; key: string | null }>({ from: null, key: null })
+  const appearanceKey = viewing.from === appearanceKeyProp && viewing.key ? viewing.key : appearanceKeyProp
+  const showAppearance = (key: string) => setViewing({ from: appearanceKeyProp, key })
+
   const isGenerating = useArtistStore((s) =>
     appearanceKey && view
       ? s.generatingViews.some((slot) => sameCharacterAppearanceSlot(slot, charId ?? '', appearanceKey, view))
       : false,
   )
 
-  // 외형 프롬프트(수정 후 재생성, 월드 다이얼로그와 대칭) — 대상(캐릭터×뷰) 전환 시 초기화.
+  // 다시 만들기 창의 설명(A7r) — 대상(캐릭터 × 모습 × 뷰)이 바뀌면 초기화.
   const [prompt, setPrompt] = useState('')
   const [promptKey, setPromptKey] = useState<string | null>(null)
   // 이미지 생성 모델 선택 — 다이얼로그가 열려 있는 동안 유지(마지막 선택 기억). 기본은 DEFAULT_IMAGE_MODEL.
@@ -68,25 +82,35 @@ export function CharacterViewDialog({ charId, appearanceKey, view, onClose }: Pr
   const [renameDraft, setRenameDraft] = useState('')
   const [manageBusy, setManageBusy] = useState(false)
   const [manageError, setManageError] = useState<string | null>(null)
+  const [regenOpen, setRegenOpen] = useState(false)
+  // 이 팝업에서 다시 만들기를 눌렀다 — 그리는 동안 화면 전체를 잠근다(프로토타입 A8).
+  const [redrawing, setRedrawing] = useState(false)
+
+  const open = !!charId && !!appearanceKey && !!view
+  useEffect(() => {
+    // 쓰인 샷을 보이려면 Storyboard 샷 목록이 필요하다 — 팝업을 열 때 한 번 읽는다(사물함 30초 신선).
+    if (open) void useWriterStore.getState().loadProject()
+  }, [open])
 
   // 클릭 즉시 잠금(#double-fire) — generatingViews 는 sendCharacterPatchNow 왕복 *뒤에* 세워지므로,
   //   느린 서버에서 그 사이 버튼이 열려 있어 두 번째 클릭이 기존 중복 가드까지 통과했다.
   //   아래 훅은 store 상태를 기다리지 않고 클릭 순간 잠그고, busy 가 올라오면 잠금을 넘긴다.
+  // 그림 만들기 — 다시 만들기 창에서 고친 설명은 선택한 모습의 원천에 먼저 저장한다. 그림이 다 될 때까지 기다린다.
+  const runGenerate = async () => {
+    if (!char || !appearanceKey || !view || !appearance) return
+    const next = prompt.trim()
+    const base = appearance.appearanceNative || appearance.appearance || ''
+    if (view === 'main' && next && next !== base) {
+      await updateCharacterAppearance(char.characterId, appearanceKey, next)
+    }
+    await generateCharacterView(char.characterId, appearanceKey, view, 'ui', undefined, undefined, imageModel)
+  }
   const generate = useGuardedAction({
     actionKey: `artist:character:${charId}:${appearanceKey}:${view}`,
     stage: 'artist',
     label: t('Character image'),
     busy: isGenerating,
-    action: async () => {
-      if (!char || !appearanceKey || !view || !appearance) return
-      // 프롬프트는 선택한 모습의 원천에만 저장한다.
-      const next = prompt.trim()
-      const base = appearance.appearanceNative || appearance.appearance || ''
-      if (view === 'main' && next && next !== base) {
-        await updateCharacterAppearance(char.characterId, appearanceKey, next)
-      }
-      await generateCharacterView(char.characterId, appearanceKey, view, 'ui', undefined, undefined, imageModel)
-    },
+    action: runGenerate,
   })
   const safeRetry = useGuardedAction({
     actionKey: `artist:character-safe:${charId}:${appearanceKey}:${view}`,
@@ -99,7 +123,6 @@ export function CharacterViewDialog({ charId, appearanceKey, view, onClose }: Pr
     },
   })
 
-  const open = !!charId && !!appearanceKey && !!view
   const appearance = char?.appearances.find((item) => item.appearanceKey === appearanceKey) ?? null
   if (!open || !char || !appearance || !view || !appearanceKey) return null
 
@@ -109,8 +132,9 @@ export function CharacterViewDialog({ charId, appearanceKey, view, onClose }: Pr
   // object 캐릭터는 방향뷰 개념 없음 — isDirectional/needsMain 로직 미적용
   const isDirectional = !isObject && view !== 'main'
   const needsMain = isDirectional && !appearance.sheetUrl
-  // 사람 main = 와이드 턴어라운드 시트 → 넓은 다이얼로그 + 16:9 프레임으로 전체 표시(잘림 방지, #4).
+  // 사람 main = 와이드 턴어라운드 시트 → 16:9 프레임으로 전체 표시(잘림 방지, #4).
   const isSheet = !isObject && view === 'main'
+  const defaultAppearance = char.appearances.find((item) => item.isDefault) ?? null
 
   const initialPrompt = appearance.appearanceNative || appearance.appearance || ''
   const key = `${charId}:${appearanceKey}:${view}:${initialPrompt}`
@@ -119,309 +143,304 @@ export function CharacterViewDialog({ charId, appearanceKey, view, onClose }: Pr
     setPrompt(initialPrompt)
   }
 
-  // stale 원인 분류(027): look-pending(룩만 도착) vs edited(외형 변경). dialog 포커스에서만 표시.
+  // stale 원인 분류(027): look-pending(룩만 도착) vs edited(외형 변경).
   const candidates = appearance.viewCandidates[view] ?? []
   const selectedCandidate = candidates.find((c) => c.isSelected)
   const staleClass = classifyImageStale(appearance.appearance ?? '', char.lookFingerprint ?? null, {
     sourceHash: selectedCandidate?.sourceHash ?? null,
     appearanceHash: selectedCandidate?.appearanceHash ?? null,
   })
+  const descriptionChanged = !!imageUrl && staleClass === 'edited'
   // 생성 실패(reload-survivable) — moderation(콘텐츠정책) 이면 우회(safe) 재시도 버튼, cap 도달 시 비활성.
   const failure = charId && appearanceKey ? viewFailures[charId]?.[appearanceKey]?.[view] : undefined
   const capReached = (failure?.safeFailCount ?? 0) >= SAFE_RETRY_CAP
 
-  return (
-    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent
-        className={cn(
-          isSheet ? 'sm:max-w-3xl' : 'sm:max-w-lg',
-          'max-h-[92vh] overflow-y-auto scrollbar-thin',
-        )}
-      >
-        <DialogHeader>
-          <DialogTitle className="text-sm">
-            {/* #f6(2026-08-27 오너): 'Main' 계열 문구 전삭제 — 대표 뷰는 이름만. */}
-            {view === 'main' ? char.name : `${char.name} — ${label}`}
-          </DialogTitle>
-        </DialogHeader>
+  const usedIn = shots.filter((shot) => shot.characters.includes(char.characterId))
+  const usedLabels = usedIn.map((shot) => sceneShotLabel(sceneManifest, shots, shot.shotId)).filter((value): value is string => !!value)
 
-        <div className="space-y-3">
-          {/* 모습 관리(약속 C8) — 사람 캐릭터의 대표 뷰에서만: 이름 바꾸기 / 기본 모습으로 / 지우기(기본 모습은 못 지운다). */}
-          {!isObject && view === 'main' && (
-            <div className="flex flex-wrap items-center gap-2 rounded-md border border-border px-3 py-2 text-xs">
-              {renaming ? (
-                <>
-                  <Input
-                    value={renameDraft}
-                    onChange={(e) => setRenameDraft(e.target.value)}
-                    className="h-7 max-w-[200px] text-xs"
-                    aria-label={t('Appearance name')}
-                  />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7"
-                    disabled={manageBusy || !renameDraft.trim()}
-                    onClick={async () => {
-                      setManageBusy(true)
-                      setManageError(null)
-                      try {
-                        await renameAppearance(char.characterId, appearanceKey, renameDraft.trim())
-                        setRenaming(false)
-                      } catch (e) {
-                        setManageError(e instanceof Error ? e.message : String(e))
-                      } finally {
-                        setManageBusy(false)
-                      }
-                    }}
-                  >
-                    <Check className="size-3.5" /> {t('Save')}
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-7" onClick={() => setRenaming(false)}>
-                    {t('Cancel')}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <span className="font-medium">{appearance.label}</span>
-                  {appearance.isDefault && (
-                    <span className="rounded-sm bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">{t('Default appearance')}</span>
-                  )}
-                  <span className="text-muted-foreground">
-                    {appearance.narrativeTime ? t(appearance.narrativeTime === 'past' ? 'Past' : appearance.narrativeTime === 'future' ? 'Future' : 'Present') : ''}
-                  </span>
-                  <span className="ml-auto flex items-center gap-1">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7"
-                      onClick={() => {
-                        setRenameDraft(appearance.label)
-                        setRenaming(true)
-                      }}
-                    >
-                      <Pencil className="size-3.5" /> {t('Rename')}
-                    </Button>
-                    {!appearance.isDefault && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7"
-                        disabled={manageBusy}
-                        onClick={async () => {
-                          setManageBusy(true)
-                          setManageError(null)
-                          try {
-                            await setDefaultAppearance(char.characterId, appearanceKey)
-                          } catch (e) {
-                            setManageError(e instanceof Error ? e.message : String(e))
-                          } finally {
-                            setManageBusy(false)
-                          }
-                        }}
-                      >
-                        <Star className="size-3.5" /> {t('Set as default')}
-                      </Button>
-                    )}
-                    {!appearance.isDefault && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 text-destructive"
-                        disabled={manageBusy}
-                        onClick={async () => {
-                          if (!window.confirm(t('Delete the appearance "{label}"? Its images are removed from the history too.', { label: appearance.label }))) return
-                          setManageBusy(true)
-                          setManageError(null)
-                          try {
-                            await deleteAppearance(char.characterId, appearanceKey)
-                            onClose()
-                          } catch (e) {
-                            setManageError(e instanceof Error ? e.message : String(e))
-                          } finally {
-                            setManageBusy(false)
-                          }
-                        }}
-                      >
-                        <Trash2 className="size-3.5" /> {t('Delete')}
-                      </Button>
-                    )}
-                  </span>
-                </>
-              )}
-              {manageError && <p className="w-full text-destructive">{manageError}</p>}
-            </div>
-          )}
+  // 모습 지우기 — 기본 모습은 지우지 못한다(약속 C8).
+  const removeLook = async (appearanceKey: string, lookLabel: string) => {
+    if (!window.confirm(t('Delete the appearance "{label}"? Its images are removed from the history too.', { label: lookLabel }))) return
+    setManageBusy(true)
+    setManageError(null)
+    try {
+      await deleteAppearance(char.characterId, appearanceKey)
+      if (appearanceKey === appearanceKeyProp) onClose()
+      else if (defaultAppearance) showAppearance(defaultAppearance.appearanceKey)
+    } catch (e) {
+      setManageError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setManageBusy(false)
+    }
+  }
+  const makeDefault = async () => {
+    setManageBusy(true)
+    setManageError(null)
+    try {
+      await setDefaultAppearance(char.characterId, appearanceKey)
+    } catch (e) {
+      setManageError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setManageBusy(false)
+    }
+  }
+  // 다시 만들기 — 그림이 다 될 때까지(실패해도 끝날 때까지) 화면 전체를 잠근다(프로토타입 A8). 잠금 동안에는 다시 누를 수 없다.
+  const redraw = async () => {
+    setRegenOpen(false)
+    setRedrawing(true)
+    try {
+      await runGenerate()
+    } catch (err) {
+      useGlobalChatStore.getState().notifyActionError('artist', t('Character image'), err instanceof Error ? err.message : String(err))
+    } finally {
+      setRedrawing(false)
+    }
+  }
 
-          {staleClass !== 'fresh' && (
-            <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
-              <RefreshCw className="size-3.5 shrink-0" />
-              {staleClass === 'look-pending'
-                ? t('This is a draft from before the final look. Regenerating remakes it in the final art style')
-                : t('The appearance changed. Regenerating will apply the new appearance')}
-            </div>
-          )}
+  const title = t(artistDetailTitleKey(isObject ? 'object' : 'person'), { name: char.name })
+  const timeLabel = appearance.narrativeTime ? t(appearance.narrativeTime === 'past' ? 'Past' : appearance.narrativeTime === 'future' ? 'Future' : 'Present') : ''
 
-          {failure && (
-            <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-              <AlertTriangle className="size-3.5 shrink-0" />
-              <span>
-                {failure.moderation
-                  ? t('Generation was declined by content policy. You can retry below with "Retry with a softer prompt."')
-                  : t('Generation failed. Please try again.')}
-              </span>
-            </div>
-          )}
-
-          {/* 사람 main = 시트 전체(16:9), 그 외 = 기존 1:1 프레임 */}
-          <div className={cn('mx-auto w-full', !isSheet && 'max-w-sm')}>
-            <ImagePlaceholder
-              label={view === 'main' ? '' : label}
-              aspectRatio={isSheet ? 'video' : 'square'}
-              imageUrl={imageUrl}
-              generating={isGenerating}
+  const left = (
+    <>
+      <div className="flex flex-wrap items-center gap-2">
+        {renaming ? (
+          <>
+            <Input
+              value={renameDraft}
+              onChange={(e) => setRenameDraft(e.target.value)}
+              className="h-8 max-w-[220px] text-sm"
+              aria-label={t('Appearance name')}
             />
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8"
+              disabled={manageBusy || !renameDraft.trim()}
+              onClick={async () => {
+                setManageBusy(true)
+                setManageError(null)
+                try {
+                  await renameAppearance(char.characterId, appearanceKey, renameDraft.trim())
+                  setRenaming(false)
+                } catch (e) {
+                  setManageError(e instanceof Error ? e.message : String(e))
+                } finally {
+                  setManageBusy(false)
+                }
+              }}
+            >
+              <Check className="size-3.5" /> {t('Save')}
+            </Button>
+            <Button size="sm" variant="ghost" className="h-8" onClick={() => setRenaming(false)}>{t('Cancel')}</Button>
+          </>
+        ) : (
+          <>
+            <span className="text-sm font-semibold">{isSheet ? appearance.label : label}</span>
+            {isSheet && appearance.isDefault ? <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground">{t('Base')}</span> : null}
+            {isSheet && timeLabel && timeLabel !== appearance.label ? <span className="text-xs text-muted-foreground">{timeLabel}</span> : null}
+            {descriptionChanged ? <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground">{t('Changed · remake to apply')}</span> : null}
+            {isSheet ? (
+              <Button size="icon" variant="ghost" className="size-7" aria-label={t('Rename')} title={t('Rename')} onClick={() => { setRenameDraft(appearance.label); setRenaming(true) }}>
+                <Pencil className="size-3.5" />
+              </Button>
+            ) : null}
+            <span className="ml-auto flex items-center gap-1">
+              <HistoryButton candidates={candidates} onPick={(id) => selectCandidate(char.characterId, appearanceKey, view, id)} />
+              <Button size="sm" variant="outline" disabled={generate.locked || needsMain} onClick={() => setRegenOpen(true)} data-testid="detail-regenerate-open">
+                {generate.locked ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+                {imageUrl ? t('Remake') : t('Make the image')}
+              </Button>
+            </span>
+          </>
+        )}
+      </div>
+      {manageError ? <p className="text-xs text-destructive">{manageError}</p> : null}
+
+      <ImagePlaceholder
+        label={view === 'main' ? '' : label}
+        aspectRatio={isSheet ? 'video' : 'square'}
+        imageUrl={imageUrl}
+        generating={isGenerating}
+      />
+
+      {isSheet && !appearance.isDefault ? (
+        <div className="flex flex-wrap gap-2">
+          {defaultAppearance ? (
+            <Button size="sm" variant="ghost" onClick={() => showAppearance(defaultAppearance.appearanceKey)}>
+              <ArrowLeft className="size-3.5" />{t('Back to the base look')}
+            </Button>
+          ) : null}
+          <Button size="sm" variant="outline" disabled={manageBusy} onClick={() => void makeDefault()}>
+            <Star className="size-3.5" />{t('Make this look the base')}
+          </Button>
+        </div>
+      ) : null}
+
+      <p className="text-xs text-muted-foreground">
+        {isObject
+          ? imageUrl
+            ? t('Regenerating creates a new image.')
+            : t('This generates the image.')
+          : view === 'main'
+            ? styleLabel ? t('Turnaround sheet · style {style}', { style: styleLabel }) : t('Turnaround sheet')
+            : needsMain
+              ? t('Directional views are generated from Main. Generate Main first.')
+              : t('This view is regenerated based on the Main image.')}
+      </p>
+
+      {staleClass === 'look-pending' ? (
+        <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs">
+          <RefreshCw className="size-3.5 shrink-0" />
+          {t('This is a draft from before the final look. Regenerating remakes it in the final art style')}
+        </div>
+      ) : null}
+
+      {failure ? (
+        <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          <AlertTriangle className="size-3.5 shrink-0" />
+          <span>
+            {failure.moderation
+              ? t('Generation was declined by content policy. You can retry below with "Retry with a softer prompt."')
+              : t('Generation failed. Please try again.')}
+          </span>
+        </div>
+      ) : null}
+      {failure?.moderation ? (
+        <Button variant="outline" disabled={safeRetry.locked || capReached} onClick={safeRetry.run}>
+          {safeRetry.locked ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+          {capReached ? t('Softer prompt retry limit reached') : t('Retry with a softer prompt')}
+        </Button>
+      ) : null}
+    </>
+  )
+
+  const right = (
+    <>
+      {view === 'main' ? (
+        <DetailSection title={t('Look description')}>
+          {!appearance.isDefault && defaultAppearance ? (
+            <DescriptionBox
+              caption={t('Base look · {label}', { label: defaultAppearance.label })}
+              value={defaultAppearance.appearanceNative || defaultAppearance.appearance || ''}
+              readOnly
+            />
+          ) : null}
+          <DescriptionBox
+            key={`${char.characterId}:${appearanceKey}`}
+            caption={appearance.isDefault ? t('Base look · {label}', { label: appearance.label }) : t('Changed look · {label}', { label: appearance.label })}
+            value={initialPrompt}
+            placeholder={t("This character's appearance description")}
+            changed={descriptionChanged}
+            onApply={(next) => updateCharacterAppearance(char.characterId, appearanceKey, next)}
+            testId="detail-description"
+          />
+        </DetailSection>
+      ) : null}
+
+      {isSheet ? (
+        <DetailSection title={t('Looks')} hint={t('{count} · click View to see it large on the left', { count: char.appearances.length })} testId="detail-looks">
+          <ul className="flex flex-col gap-2">
+            {char.appearances.map((look) => {
+              const viewingThis = look.appearanceKey === appearanceKey
+              return (
+                <li key={look.appearanceKey} className={cn('flex items-center gap-3 rounded-lg border border-border p-2', viewingThis && 'bg-accent/40')}>
+                  <div className="h-12 w-20 shrink-0 overflow-hidden rounded-md border border-border bg-muted/40">
+                    {look.sheetUrl ? <ThumbImage src={look.sheetUrl} alt={look.label} className="size-full object-cover" /> : null}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
+                      {look.label}
+                      {look.isDefault ? <span className="rounded-full border border-border px-1.5 text-[10px] font-normal text-muted-foreground">{t('Base')}</span> : null}
+                      {!look.sheetUrl ? <span className="rounded-full border border-border px-1.5 text-[10px] font-normal text-muted-foreground">{t('No image')}</span> : null}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">{look.appearanceNative || look.appearance || ''}</p>
+                  </div>
+                  {viewingThis ? (
+                    <span className="shrink-0 text-xs text-muted-foreground">{t('Viewing')}</span>
+                  ) : (
+                    <Button size="sm" variant="outline" className="h-7 shrink-0" onClick={() => showAppearance(look.appearanceKey)}>{t('View')}</Button>
+                  )}
+                  {!look.isDefault ? (
+                    <Button size="icon" variant="ghost" className="size-7 shrink-0 text-destructive" disabled={manageBusy} aria-label={t('Delete')} onClick={() => void removeLook(look.appearanceKey, look.label)}>
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  ) : null}
+                </li>
+              )
+            })}
+          </ul>
+          {onAddAppearance ? (
+            <Button size="sm" variant="outline" className="self-start" onClick={() => onAddAppearance(char.characterId)}>
+              <Plus className="size-3.5" />{t('Add a look')}
+            </Button>
+          ) : null}
+        </DetailSection>
+      ) : null}
+
+      <DetailSection title={t('Used in shots')} hint={shots.length ? undefined : t('It shows once Storyboard splits the shots')} testId="detail-used-shots">
+        {shots.length === 0 ? null : usedLabels.length ? (
+          <div className="flex flex-wrap gap-1.5">
+            {usedLabels.map((value) => <span key={value} className="rounded-md border border-border px-2 py-0.5 font-mono text-xs">{value}</span>)}
           </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">{t('Not used in any shot yet')}</p>
+        )}
+      </DetailSection>
+    </>
+  )
 
-          <p className="text-xs text-muted-foreground">
-            {isObject
-              ? imageUrl
-                ? t('Regenerating creates a new image.')
-                : t('This generates the image.')
-              : view === 'main'
-                ? t('This is the turnaround sheet. Edit the appearance prompt below and regenerate to apply it.')
-                : needsMain
-                  ? t('Directional views are generated from Main. Generate Main first.')
-                  : t('This view is regenerated based on the Main image.')}
-          </p>
+  const footer = (
+    <div className="flex w-full flex-wrap items-center justify-end gap-3">
+      {descriptionChanged ? (
+        <p className="mr-auto text-xs text-muted-foreground">{t('Changed description · {label}. Remake it to apply it to the image.', { label: appearance.label })}</p>
+      ) : null}
+      {descriptionChanged ? (
+        <Button variant="outline" disabled={generate.locked} onClick={() => void redraw()}>
+          <RefreshCw className="size-4" />{t('Remake')}
+        </Button>
+      ) : null}
+      <Button onClick={onClose}>{t('Close')}</Button>
+    </div>
+  )
 
-          {/* 외형 프롬프트(#4) — 월드 다이얼로그와 대칭. 수정하면 재생성 시 캐릭터 원천(appearance)에 반영. */}
-          {view === 'main' && (
-            <div>
-              <label className="mb-1.5 block text-xs text-muted-foreground">
-                {t('Appearance prompt (edit, then regenerate)')}
-              </label>
-              <HoverBeam>
-                <Textarea
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  rows={4}
-                  placeholder={t("This character's appearance description")}
-                />
-              </HoverBeam>
-            </div>
-          )}
-
-          {/* 후보 히스토리 스트립(#owner-keep-prev 2026-08-31) — finalize 가 슬롯당 최근 N장을 보관하므로(
-              #5 단일 이미지 전량삭제 정책을 되돌림), 직전 이미지를 누르면 선택본으로 되돌릴 수 있다. 2장 이상일 때만 표시. */}
-          {candidates.length >= 2 && (
-            <div className="space-y-1.5">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                {t('History')}
-              </p>
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {candidates.map((cand) => {
-                  const candClass = classifyImageStale(appearance.appearance ?? '', char.lookFingerprint ?? null, {
-                    sourceHash: cand.sourceHash,
-                    appearanceHash: cand.appearanceHash ?? null,
-                  })
+  return (
+    <>
+      <DetailFrame open={open} onClose={onClose} title={title} left={left} right={right} footer={footer} testId="artist-detail" />
+      <RegenerateDialog
+        open={regenOpen}
+        onOpenChange={setRegenOpen}
+        title={imageUrl ? t('{name} · {look}: make it again?', { name: char.name, look: appearance.label }) : t('{name} · {look}: make it?', { name: char.name, look: appearance.label })}
+        intro={styleLabel ? t('It is made from the description below. The style ({style}) stays the same.', { style: styleLabel }) : t('It is made from the description below. The style stays the same.')}
+        kind={isObject ? null : 'person'}
+        description={prompt}
+        onDescriptionChange={setPrompt}
+        modelPicker={
+          <div className="flex flex-col gap-1.5">
+            <Select value={imageModel} onValueChange={(value) => setImageModel(value as ImageModelKey)}>
+              <SelectTrigger className="w-full" aria-label={t('Image generation tool')}><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {IMAGE_MODEL_ORDER.map((modelKey) => {
+                  const spec = IMAGE_MODELS[modelKey]
                   return (
-                    <button
-                      key={cand.id}
-                      type="button"
-                      onClick={() => selectCandidate(char.characterId, appearanceKey, view, cand.id)}
-                      className={cn(
-                        'relative shrink-0 overflow-hidden rounded-md border-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                        cand.isSelected ? 'border-primary' : 'border-transparent hover:border-border',
-                      )}
-                      style={{ width: 64, height: 64 }}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={cand.url} alt={t('Candidate image')} className="size-full object-cover" />
-                      {candClass !== 'fresh' && (
-                        <span className="absolute bottom-0 left-0 right-0 bg-amber-500/80 px-0.5 py-px text-center text-[9px] leading-tight text-white">
-                          {candClass === 'look-pending' ? t('Pre-look') : t('Pre-edit')}
-                        </span>
-                      )}
-                    </button>
+                    <SelectItem key={modelKey} value={modelKey}>
+                      {spec.label}
+                      <span className="text-muted-foreground"> · {t(spec.description)}{spec.pricePerImage != null ? ` · $${spec.pricePerImage}` : ''}</span>
+                    </SelectItem>
                   )
                 })}
-              </div>
-            </div>
-          )}
-
-          {/* 이미지 생성 모델 선택(image-models 레지스트리) — 재생성창에서만 고른다. 채팅으로도 지정 가능. */}
-          <div>
-            <label className="mb-1.5 block text-xs text-muted-foreground">
-              {t('Image generation model')}
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {IMAGE_MODEL_ORDER.map((key) => {
-                const spec = IMAGE_MODELS[key]
-                const active = imageModel === key
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setImageModel(key)}
-                    className={cn(
-                      'rounded-md border px-3 py-1.5 text-left text-xs transition-colors',
-                      active ? 'border-primary bg-primary/10' : 'border-border hover:bg-accent',
-                    )}
-                  >
-                    <span className="block font-medium">{spec.label}</span>
-                    <span className="block text-[10px] text-muted-foreground">
-                      {t(spec.description)}
-                      {spec.pricePerImage != null ? ` · $${spec.pricePerImage}` : ''}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-            {!isObject && !imageModelSupportsReference(imageModel) && (
-              <p className="mt-1 text-[10px] text-amber-600 dark:text-amber-400">
-                {t('This model has no reference support, so character identity may drift.')}
-              </p>
-            )}
+              </SelectContent>
+            </Select>
+            {!isObject && !imageModelSupportsReference(imageModel) ? (
+              <p className="text-xs text-muted-foreground">{t('This model has no reference support, so character identity may drift.')}</p>
+            ) : null}
           </div>
-
-          <Button className="w-full" disabled={generate.locked || needsMain} onClick={generate.run}>
-            {generate.locked ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                {t('Generating…')}
-              </>
-            ) : (
-              <>
-                <Sparkles className="size-4" />
-                {view === 'main'
-                  ? imageUrl
-                    ? t('Regenerate image')
-                    : t('Generate image')
-                  : imageUrl
-                    ? t('Regenerate {label}', { label })
-                    : t('Generate {label}', { label })}
-              </>
-            )}
-          </Button>
-
-          {failure?.moderation && (
-            <Button
-              variant="outline"
-              className="w-full"
-              disabled={safeRetry.locked || capReached}
-              onClick={safeRetry.run}
-            >
-              {safeRetry.locked ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <RefreshCw className="size-4" />
-              )}
-              {capReached ? t('Softer prompt retry limit reached') : t('Retry with a softer prompt')}
-            </Button>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+        }
+        notes={<p className="text-xs text-muted-foreground">{t('The earlier image stays in the history (clock).')}</p>}
+        confirmLabel={imageUrl ? t('Remake') : t('Make the image')}
+        busy={generate.locked}
+        onConfirm={() => void redraw()}
+      />
+      <AiBusyOverlay open={redrawing} layer="dialog" title={t('Making the image')} description={t('{name} · {look}', { name: char.name, look: appearance.label })} />
+    </>
   )
 }

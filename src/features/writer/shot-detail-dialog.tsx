@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { DirectingArrowEditor } from '@/features/writer/directing-arrow-editor'
 import { RoughFramesStill } from '@/features/writer/rough-frames-still'
+import { StoryboardShotDialog } from '@/features/writer/storyboard-shot-dialog'
 import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
 import type { RoughStoryboardImage } from '@/types'
@@ -23,9 +24,16 @@ interface ShotDetailDialogProps {
   shotId: string | null
   panel: RoughStoryboardImage | null
   onOpenChange: (open: boolean) => void
+  /** 'storyboard' = Storyboard 보드의 샷 고치기(프로토타입 S2, 2026-10-20). 기본(Director 그리드)은 예전 연출 편집 팝업. */
+  variant?: 'director' | 'storyboard'
 }
 
-export function ShotDetailDialog({ shotId, panel, onOpenChange }: ShotDetailDialogProps) {
+export function ShotDetailDialog({ shotId, panel, onOpenChange, variant = 'director' }: ShotDetailDialogProps) {
+  if (variant === 'storyboard') return <StoryboardShotDialog shotId={shotId} panel={panel} onOpenChange={onOpenChange} />
+  return <DirectingEditDialog shotId={shotId} panel={panel} onOpenChange={onOpenChange} />
+}
+
+function DirectingEditDialog({ shotId, panel, onOpenChange }: Omit<ShotDetailDialogProps, 'variant'>) {
   const t = useT()
   const shot = useWriterStore((s) => s.shots.find((x) => x.shotId === shotId))
   const shots = useWriterStore((s) => s.shots)

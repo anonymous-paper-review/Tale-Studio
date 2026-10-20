@@ -354,6 +354,7 @@ export function CharacterPanel({
         appearanceKey={viewDialog?.appearanceKey ?? null}
         view={viewDialog?.view ?? null}
         onClose={() => setViewDialog(null)}
+        onAddAppearance={(id) => setCreateFor(id)}
       />
       <AppearanceCreateDialog charId={createFor} onClose={() => setCreateFor(null)} />
     </div>
