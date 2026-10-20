@@ -21,6 +21,8 @@ export interface MasterSheetExportDeps<Canvas> {
   projectLocale: () => Promise<AppLocale>
   renderPage: (page: MasterSheetPage, context: MasterSheetPageContext) => Promise<Canvas>
   toPng: (canvas: Canvas) => Promise<Blob>
+  /** PNG 로 바꾼 그림판을 놓는다 — 장 수가 많아도 그림판을 한꺼번에 들고 있지 않게(검토 지적). */
+  release?: (canvas: Canvas) => void
   zip: (files: ReadonlyArray<{ name: string; data: Blob }>) => Promise<Blob>
   download: (blob: Blob, fileName: string) => void
 }
@@ -76,16 +78,19 @@ export async function exportMasterSheet<Canvas>(
     totalRuntimeSeconds: sheet.totalRuntimeSeconds,
     locale: await deps.projectLocale(),
   }
-  const canvases: Canvas[] = []
-  for (const page of sheet.pages) canvases.push(await deps.renderPage(page, context))
+  // 한 장씩 그려 바로 PNG 로 바꾸고 그림판을 놓는다 — 세로 · 씬이 많은 작품은 장이 수십 장이라 한꺼번에 들고 있으면 브라우저가 멈춘다.
+  const pngs: Blob[] = []
+  for (const page of sheet.pages) {
+    const canvas = await deps.renderPage(page, context)
+    pngs.push(await deps.toPng(canvas))
+    deps.release?.(canvas)
+  }
 
   const plan = masterSheetExportPlan(sheet.pages, input.projectTitle)
   if (plan.kind === 'png') {
-    deps.download(await deps.toPng(canvases[0]), plan.fileName)
+    deps.download(pngs[0], plan.fileName)
   } else {
-    const files: Array<{ name: string; data: Blob }> = []
-    for (let index = 0; index < canvases.length; index++) files.push({ name: plan.entries[index], data: await deps.toPng(canvases[index]) })
-    deps.download(await deps.zip(files), plan.fileName)
+    deps.download(await deps.zip(pngs.map((data, index) => ({ name: plan.entries[index], data }))), plan.fileName)
   }
   return { kind: 'saved', fileName: plan.fileName, pages: sheet.pages.length, missingFrameShots: sheet.missingFrameShots }
 }

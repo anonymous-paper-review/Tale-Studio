@@ -44,7 +44,6 @@ vi.mock('@/features/writer/writer-generation-view', async () => {
   return { WriterGenerationView: () => h('div', null, 'FULL_PAGE_GENERATION_VIEW') }
 })
 vi.mock('@/features/writer/dialogue-view', () => ({ DialogueView: () => null }))
-vi.mock('@/features/writer/master-sheet-view', () => ({ MasterSheetView: () => null }))
 vi.mock('@/features/writer/writer-v2-preview', () => ({ WriterV2Preview: () => null }))
 
 import { WriterHeader } from '@/features/writer/writer-header'

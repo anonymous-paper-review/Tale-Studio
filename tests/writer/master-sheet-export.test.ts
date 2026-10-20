@@ -24,21 +24,27 @@ function harness(board: { sceneManifest: SceneManifest | null; shots: Shot[] }, 
   const downloads: Array<{ name: string; blob: Blob }> = []
   const rendered: Array<{ page: number; locale: string }> = []
   const zipped: string[][] = []
+  const order: string[] = []
   const deps: MasterSheetExportDeps<{ page: number }> = {
     load: async () => board,
     projectLocale: async () => locale,
     renderPage: async (page, context) => {
       rendered.push({ page: page.pageIndex, locale: context.locale })
+      order.push(`render-${page.pageIndex}`)
       return { page: page.pageIndex }
     },
-    toPng: async (canvas) => new Blob([`png-${canvas.page}`]),
+    toPng: async (canvas) => {
+      order.push(`png-${canvas.page}`)
+      return new Blob([`png-${canvas.page}`])
+    },
+    release: (canvas) => { order.push(`release-${canvas.page}`) },
     zip: async (files) => {
       zipped.push(files.map((file) => file.name))
       return new Blob(['zip'])
     },
     download: (blob, name) => downloads.push({ name, blob }),
   }
-  return { deps, downloads, rendered, zipped }
+  return { deps, downloads, rendered, zipped, order }
 }
 
 describe('[내보내기]의 마스터 시트', () => {
@@ -88,6 +94,22 @@ describe('[내보내기]의 마스터 시트', () => {
     const { deps } = harness({ sceneManifest: manifest, shots: [shot('a', 'sc1', 0), shot('b', 'sc1', 1, { roughStoryboard: null } as Partial<Shot>)] })
 
     expect(await exportMasterSheet({ projectTitle: '자판기', projectFormat: null }, deps)).toMatchObject({ kind: 'saved', missingFrameShots: 1 })
+  })
+
+  it('한 장씩 그려 바로 PNG 로 바꾸고 그림판을 놓는다', async () => {
+    // 왜: 장 수가 많은 프로젝트(세로 · 씬이 많은 작품)에서 그림판을 한꺼번에 들고 있으면 브라우저가 멈추거나 그리지 못한다(검토 지적).
+    const { deps, order } = harness({ sceneManifest: manifest, shots: [shot('a', 'sc1', 0), shot('b', 'sc2', 0)] })
+
+    await exportMasterSheet({ projectTitle: '자판기', projectFormat: null }, deps)
+
+    expect(order).toEqual(['render-1', 'png-1', 'release-1', 'render-2', 'png-2', 'release-2'])
+  })
+
+  it('마스터 시트는 30초 보관본이 아니라 방금 저장된 샷으로 만든다', () => {
+    // 왜: 러프를 다 그린 직후에 받아도 빈 칸이 남았다 — 샷 목록을 30초 동안 보관본에서 읽었다(검토 지적).
+    //   고장: Artist 화면에서 러프 미리 그리기가 끝난 직후 [내보내기]를 누를 때.
+    const menu = readFileSync(path.join(process.cwd(), 'src/components/export-menu.tsx'), 'utf8')
+    expect(menu).toMatch(/await invalidateShots\(projectId\)\s*\n\s*await useWriterStore\.getState\(\)\.loadProject\(\)/)
   })
 
   it('Storyboard 탭에는 마스터 시트가 없고, [내보내기] 메뉴에 "마스터 시트 이미지로 저장"이 있다', () => {

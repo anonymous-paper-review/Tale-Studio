@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Download, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { loadShotsResult } from '@/lib/shots-cache'
+import { invalidateShots, loadShotsResult } from '@/lib/shots-cache'
 
 import {
   DropdownMenu,
@@ -169,6 +169,8 @@ export function ExportMenu() {
         { projectTitle: projectTitle.trim(), projectFormat: useProjectFormatStore.getState().format },
         {
           load: async () => {
+            // 30초 보관본을 거치지 않는다 — 러프를 다 그린 직후에 받아도 새 그림이 들어가게(검토 지적).
+            await invalidateShots(projectId)
             await useWriterStore.getState().loadProject()
             const { sceneManifest, shots } = useWriterStore.getState()
             return { sceneManifest, shots }
@@ -176,6 +178,10 @@ export function ExportMenu() {
           projectLocale: () => fetchProjectLocale(projectId),
           renderPage: renderMasterSheetPageCanvas,
           toPng: canvasToPngBlob,
+          release: (canvas) => {
+            canvas.width = 0
+            canvas.height = 0
+          },
           zip: async (files) => {
             const zip = new JSZip()
             for (const file of files) zip.file(file.name, file.data)
