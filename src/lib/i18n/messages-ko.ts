@@ -2336,7 +2336,6 @@ export const KO: Record<string, string> = {
   'When you start, the screen ratio is locked.': '시작하면 화면 비율이 잠겨요.',
   'Material': '자료',
   'Idea text only': '아이디어 글만',
-  '{language} (site language)': '{language} (사이트 언어)',
   'You can change the genre and mood and the length again in Writer.': '장르·분위기와 길이는 Writer에서 다시 바꿀 수 있어요.',
   'No, let me fix it': '아니오, 고칠래요',
   'Yes, start': '예, 시작',

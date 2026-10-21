@@ -22,6 +22,7 @@ import { writeWorkspaceTab } from '@/stores/writer-room-store'
 import { EntryForm } from './entry-form'
 import { EntryChat } from './entry-chat'
 import { EntrySummary } from './entry-summary'
+import { ProjectTitleField } from './project-title-field'
 
 // ── 탭 기억(이 브라우저) — 서버 그리기는 기본 탭, 붙은 뒤 저장된 탭 ─────────────────
 const tabListeners = new Set<() => void>()
@@ -78,13 +79,13 @@ export function EntryWorkspace() {
 
   const started = entryStarted({ draft, stage, writer }, reachedStage)
   const ready = status === 'ready' && entryProjectId === projectId
-  const title = projectTitle && projectTitle !== 'Untitled' ? projectTitle : t('Untitled')
 
   return (
     <Tabs value={tab} onValueChange={(v) => setTab(v === 'chat' ? 'chat' : 'form')} className="flex min-h-0 flex-1 flex-col gap-0">
       <header className="sticky top-0 z-sticky flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background px-6">
         <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium', STAGE_BADGE_CLASS.entry)}>{STAGE_LABEL.entry}</span>
-        <p className="min-w-0 truncate text-sm font-medium">{title}</p>
+        {/* 제목은 시작 화면에서 바로 정한다(2026-10-21 오너 "프로젝트 제목을 처음에 설정 불가능"). */}
+        <ProjectTitleField title={projectTitle} onRename={(next) => void useProjectStore.getState().renameProject(next)} />
         {saveError && !started ? (
           <p className="ml-auto flex shrink-0 items-center gap-1 text-xs text-destructive" role="status">
             <CircleAlert className="size-3.5" aria-hidden />

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { FORMAT_OPTIONS, LANGUAGE_OPTIONS } from '@/features/producer/quest-journal'
 import { useLocale, useT } from '@/lib/i18n'
+import { styleAnchorName } from '@/lib/style-anchor-name'
 import { runtimeSettingLabel } from '@/lib/producer/runtime'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
@@ -43,7 +44,9 @@ export function ProducerLockDialog({ open }: { open: boolean }) {
   // 넘기기 전 트리트먼트 초안(2026-10-02 시안 v04) — 이미 쓴 트리트먼트를 확정하고 나머지를 이어 간다.
   const treatmentDraft = useProjectStore((s) => s.treatmentDraft)
 
-  const styleLabel = styleAnchors.find((a) => a.key === styleAnchorKey)?.label ?? customStyleAnchor?.label ?? null
+  // 스타일 이름은 화면 언어로(2026-10-21).
+  const pickedStyle = styleAnchors.find((a) => a.key === styleAnchorKey)
+  const styleLabel = pickedStyle ? styleAnchorName(pickedStyle, locale) : customStyleAnchor?.label ?? null
   const genre = [settings.genre, settings.subGenre].filter(Boolean).join(' · ')
   const persons = cast.filter((m) => m.entityType === 'person').length
   const storyValue = storyText.trim()

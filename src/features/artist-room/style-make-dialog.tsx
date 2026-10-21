@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ThumbImage } from '@/components/thumb-image'
 import { useImageUploadConsent } from '@/components/upload/image-upload-consent'
-import { useT } from '@/lib/i18n'
+import { useLocale, useT } from '@/lib/i18n'
+import { styleAnchorName } from '@/lib/style-anchor-name'
 import { cn } from '@/lib/utils'
 import { kindOf } from '@/lib/upload/limits'
 import { ingestCreationFile } from '@/lib/project/start-new-project'
@@ -22,6 +23,8 @@ import { useProjectStore } from '@/stores/project-store'
 
 export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boolean; onOpenChange: (open: boolean) => void; onStarted: () => void }) {
   const t = useT()
+  // 스타일 이름은 화면 언어로(2026-10-21) — DB 이름은 한국어 하나뿐이다.
+  const locale = useLocale()
   const projectId = useProjectStore((s) => s.projectId)
   const anchors = useProducerStore((s) => s.styleAnchors)
   const savedKey = useProducerStore((s) => s.styleAnchorKey)
@@ -49,7 +52,8 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
     if (open) setPicked(savedKey)
   }
 
-  const chosenLabel = custom ? custom.label : anchors.find((anchor) => anchor.key === picked)?.label ?? null
+  const chosenAnchor = anchors.find((anchor) => anchor.key === picked)
+  const chosenLabel = custom ? custom.label : chosenAnchor ? styleAnchorName(chosenAnchor, locale) : null
   const canMake = !making && !styleSetting && !upload?.busy && (locked || !!custom || !!picked)
 
   const pickFile = () => {
@@ -137,6 +141,7 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
               </button>
               {anchors.map((anchor) => {
                 const on = !custom && picked === anchor.key
+                const name = styleAnchorName(anchor, locale)
                 return (
                   <button
                     key={anchor.key}
@@ -152,10 +157,10 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
                     data-testid="artist-style-option"
                   >
                     <span className="flex aspect-square items-center justify-center bg-muted">
-                      {anchor.previewUrl ? <ThumbImage src={anchor.previewUrl} alt={anchor.label} className="size-full object-cover" /> : <ImageIcon className="size-5 text-muted-foreground opacity-40" aria-hidden />}
+                      {anchor.previewUrl ? <ThumbImage src={anchor.previewUrl} alt={name} className="size-full object-cover" /> : <ImageIcon className="size-5 text-muted-foreground opacity-40" aria-hidden />}
                     </span>
                     {on ? <span className="absolute right-1.5 top-1.5 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground"><Check className="size-3" /></span> : null}
-                    <span className="line-clamp-1 px-2 py-1.5 text-xs font-medium">{anchor.label}</span>
+                    <span className="line-clamp-1 px-2 py-1.5 text-xs font-medium">{name}</span>
                   </button>
                 )
               })}

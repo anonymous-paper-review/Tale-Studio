@@ -5,7 +5,7 @@ import type { AppLocale } from '@/lib/locale'
 import { QUESTION_NAME, moodOf, runtimeOf } from './options'
 import { levelOptionsOf, type Translator } from './chat-flow'
 
-export type SummaryRowKey = 'ratio' | 'mood' | 'runtime' | 'level' | 'material' | 'language'
+export type SummaryRowKey = 'ratio' | 'mood' | 'runtime' | 'level' | 'material'
 
 export interface SummaryRow {
   key: SummaryRowKey
@@ -22,7 +22,7 @@ export const RATIO_LOCK_NOTE = 'It cannot be changed after you start'
  * 완료 화면(mode done)은 비율만 적는다(잠김 표시는 화면이 붙인다). 정하지 않은 값의 줄은 뺀다(예전 프로젝트).
  */
 export function summaryRows(draft: EntryDraft, opts: { t: Translator; locale: AppLocale; mode?: 'confirm' | 'done' }): SummaryRow[] {
-  const { t, locale } = opts
+  const { t } = opts
   const mode = opts.mode ?? 'confirm'
   const { mood, runtime, level, ratio } = draft.picks
   const rows: SummaryRow[] = []
@@ -35,7 +35,7 @@ export function summaryRows(draft: EntryDraft, opts: { t: Translator; locale: Ap
     rows.push({ key: 'level', label: t(QUESTION_NAME.level), value: `${index + 1} ${t(options[index].label)} · ${t(options[index].sub)}` })
   }
   rows.push({ key: 'material', label: t('Material'), value: draft.file ? draft.file.name : t('Idea text only') })
-  rows.push({ key: 'language', label: t('Chat language'), value: t('{language} (site language)', { language: t(locale === 'ko' ? 'Korean' : 'English') }) })
+  // 채팅 언어 줄은 없앴다(2026-10-21 오너 "Chat Language 삭제") — 채팅은 지금처럼 사이트 언어를 따른다.
   return rows
 }
 

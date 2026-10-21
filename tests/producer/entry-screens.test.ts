@@ -132,7 +132,7 @@ describe('화면에서 고르기', () => {
     expect(out).toContain('"그대로"는 지킬 원문이 있어야 해요. 대본 파일을 올리거나 줄거리를 60자 넘게 적으면 열려요.')
   })
 
-  it('확인 창은 정한 값 · 잠기는 화면 비율 · 자료 · 사이트 언어를 보여준다', () => {
+  it('확인 창은 정한 값 · 잠기는 화면 비율 · 자료를 보여준다', () => {
     // 왜: [예, 시작]을 누르면 화면 비율이 잠긴다. 누르기 전에 무엇으로 시작하는지 한 번 더 본다(프로토타입 E4).
     const rows = summaryRows(recDraft(), { t: ko, locale: 'ko' })
     expect(rows.map((r) => [r.label, r.value])).toEqual([
@@ -141,8 +141,8 @@ describe('화면에서 고르기', () => {
       ['길이', '15~60초'],
       ['바꿈 정도', '3 새롭게 키우기 · 재료에서 출발해 아이디어를 더해요'],
       ['자료', '아이디어 글만'],
-      ['채팅 언어', '한국어 (사이트 언어)'],
     ])
+    // 2026-10-21 오너 "Chat Language 삭제" — 채팅 언어 줄은 보이지 않는다(채팅은 지금처럼 사이트 언어를 따른다).
     expect(rows[0].locked).toBe(true)
     // 그대로로 시작하면 길이는 원작 길이를 따른다.
     const keep = withRec({ ...emptyEntryDraft(), file: scriptFile }, { kind: '1-1', level: 'keep' })

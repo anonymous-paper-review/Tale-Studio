@@ -8,7 +8,7 @@ import { SHOT_PHYSICS } from '@/lib/writer/pipeline/physics';
 import { VISUAL_BEAT_DOCTRINE } from '@/lib/writer/pipeline/visual-doctrine';
 import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
 import { PROSE_NAME_RULE, cleanSceneProse } from '@/lib/writer/pipeline/util/prose_names';
-import { assertSceneContent } from '@/lib/writer/pipeline/validators/scene_content';
+import { assertSceneContent, inventedPlaceIds, validateSceneContent } from '@/lib/writer/pipeline/validators/scene_content';
 import { containsEntityToken } from '@/lib/writer/resolve-entity-names';
 import type { Genre, NarrativeStructure, Characters, Scenes, PipelineInput, StoryCharacter, BackgroundContract, Dramaturgy, DramaturgyStageCandidate } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
@@ -209,6 +209,8 @@ ${VISUAL_BEAT_DOCTRINE}
 - 기존 로케이션만으로 전개 가능하면 새 장소를 만들지 말 것.
 - 전개상 꼭 필요한 새 장소만 새 이름으로 쓰되, **${langHint}**로 짧고 구체적인 장소명을 짓는다
   (${input.outputLocale ? '[출력 언어] 절이 정한 언어로 짓는다 — 임의로 다른 언어 이름을 만들지 않는다' : '스토리가 한국어면 한국어 지명 — 임의로 영어 이름을 만들지 않는다'}).
+- 새 장소에 id 를 지어내지 않는다: 영어 snake_case 표기(예: office_hallway)는 [기존 로케이션]·[무대 후보]에 이미 있는 것만 쓴다.
+  새 장소는 scene.location 에 장소명 자체를 쓴다(예: office_hallway 가 아니라 "회사 복도"처럼 ${langHint}의 이름).
 ${outputLanguageClause(input.outputLocale)}`;
 
   const revisionBlock = revisionNotes?.length
@@ -396,6 +398,37 @@ ${budgetViolations.map((x) => `- ${x.scene_id ?? '(전체)'}: ${x.message}`).joi
   // 알려진 장소와 채택된 후보만 이름으로 정리한다. 알 수 없는 식별자를 새 이름으로 추측하지 않는다.
   const knownWorld = { ...world, locations: [...(world?.locations ?? []), ...stageCandidates] };
   scenes = cleanSceneProse(scenes, characters, knownWorld);
+
+  // 새 장소를 영어 표기로 지어낸 것(office_hallway)은 고칠 수 있는 형식 실수다 — 장소명으로 한 번 다시 쓰게 한다
+  //   (2026-10-21 업로드한 대본을 다듬기로 시작하면 두 번 다 막혀 트리트먼트가 실패했다). 번호식 표기(location_99)는 그대로 막는다.
+  const contentIssues = validateSceneContent(scenes, characters, knownWorld, input.outputLocale);
+  const invented = inventedPlaceIds(contentIssues);
+  if (invented.length) {
+    const placeRepairPrompt = `${userPrompt}
+
+[장소 이름 규칙 위반 — 다음 새 장소를 영어 표기로 지어냈다: ${invented.join(', ')}.
+ 새 장소는 scene.location 에 ${langHint}의 장소명을 그대로 쓴다(예: office_hallway 가 아니라 "회사 복도"). id 는 [기존 로케이션]·[무대 후보]에 있는 것만 쓴다.
+ 장소 이름 말고는 그대로 두고 동일 JSON 형식으로 다시 출력하라.]`;
+    const placeRepaired = await generateJson<Scenes>(placeRepairPrompt, axisConfig, {
+      systemInstruction,
+      temperature: 0.5,
+      schema: ScenesSchema,
+    });
+    await logger.saveLlmCall('scenes_place_repair', {
+      prompt: placeRepairPrompt,
+      response: JSON.stringify(placeRepaired, null, 2),
+      model: describeAxisConfig(axisConfig),
+      provider: axisConfig.provider,
+    });
+    const repairedScenes = cleanSceneProse({ ...normalizeSceneLocations(placeRepaired, world), coverage_mode: budget.mode }, characters, knownWorld);
+    // act 커버리지가 나빠지지 않고 내용 문제가 줄어든 쪽만 채택(다른 교정과 같은 규칙).
+    if (
+      uncoveredActs(repairedScenes, narrativeStructure).length <= uncovered.length &&
+      validateSceneContent(repairedScenes, characters, knownWorld, input.outputLocale).length < contentIssues.length
+    ) {
+      scenes = repairedScenes;
+    }
+  }
   await assertSceneContent(scenes, characters, knownWorld, input.outputLocale, logger, 'scenes');
 
   await logger.saveStage('05_s3_scenes.json', scenes);

@@ -24,7 +24,8 @@ import { cn } from '@/lib/utils'
 
 import { useAltArrowCycle } from '@/lib/use-alt-arrow-cycle'
 import { AltArrowHint } from '@/components/alt-arrow-hint'
-import { useT } from '@/lib/i18n'
+import { useLocale, useT } from '@/lib/i18n'
+import { styleAnchorName } from '@/lib/style-anchor-name'
 import { AiBusyOverlay } from '@/components/ai-busy-overlay'
 import { artistPhase, artistRunStopped, assetCompletionGaps, makingProgress } from '@/lib/artist/breakdown'
 import { backgroundRoughReady, storyboardPrepView } from '@/lib/artist/background-roughs'
@@ -329,7 +330,10 @@ export default function VisualPage() {
   const styleAnchors = useProducerStore((s) => s.styleAnchors)
   const styleKey = useProducerStore((s) => s.styleAnchorKey)
   const customStyle = useProducerStore((s) => s.customStyleAnchor)
-  const styleLabel = customStyle?.label ?? styleAnchors.find((anchor) => anchor.key === styleKey)?.label ?? null
+  // 스타일 이름은 화면 언어로(2026-10-21). 직접 올린 그림체는 붙인 이름 그대로.
+  const locale = useLocale()
+  const pickedStyle = styleAnchors.find((anchor) => anchor.key === styleKey)
+  const styleLabel = customStyle?.label ?? (pickedStyle ? styleAnchorName(pickedStyle, locale) : null)
   const loadProducer = useProducerStore((s) => s.loadProject)
   useEffect(() => {
     // 브레이크다운 목록 · 스타일은 Producer 값이다(산문이 만든 인물 · 장소) — Artist 에서도 읽는다.

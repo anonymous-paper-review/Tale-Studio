@@ -26,7 +26,8 @@ import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
 import { sceneShotLabel } from '@/lib/writer/shot-edit'
 import { useGuardedAction } from '@/hooks/use-guarded-action'
 import { cn } from '@/lib/utils'
-import { useT } from '@/lib/i18n'
+import { useLocale, useT } from '@/lib/i18n'
+import { styleAnchorName } from '@/lib/style-anchor-name'
 
 type Props = {
   charId: string | null
@@ -59,7 +60,13 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
   const retryCharacterViewSafe = useArtistStore((s) => s.retryCharacterViewSafe)
   const shots = useWriterStore((s) => s.shots)
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
-  const styleLabel = useProducerStore((s) => s.customStyleAnchor?.label ?? s.styleAnchors.find((anchor) => anchor.key === s.styleAnchorKey)?.label ?? null)
+  // 스타일 이름은 화면 언어로(2026-10-21). 직접 올린 그림체는 붙인 이름 그대로.
+  const locale = useLocale()
+  const styleLabel = useProducerStore((s) => {
+    if (s.customStyleAnchor) return s.customStyleAnchor.label
+    const anchor = s.styleAnchors.find((item) => item.key === s.styleAnchorKey)
+    return anchor ? styleAnchorName(anchor, locale) : null
+  })
 
   // 팝업 안에서 다른 모습으로 옮겨 볼 수 있다(모습 목록 [보기]) — 카드가 연 모습에서 시작한다.
   const [viewingKey, setViewingKey] = useState<string | null>(null)

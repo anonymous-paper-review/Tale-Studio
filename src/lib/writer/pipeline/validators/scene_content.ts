@@ -59,6 +59,14 @@ export function validateSceneContent(scenes: Scenes, characters: Characters, wor
   return issues
 }
 
+// 번호식 내부 표기(char_1 · loc_2 · location_99) — 없는 대상을 가리키는 깨진 참조다. 다시 쓰게 하지 않고 검증에서 막는다.
+const NUMBERED_ID = /^(?:char(?:acter)?|loc(?:ation)?)_?\d+$/i
+
+/** 새 장소를 영어 표기(office_hallway)로 지어낸 것 — 이름으로 다시 쓰면 고쳐지는 형식 실수라 한 번 다시 쓰게 한다(2026-10-21). */
+export function inventedPlaceIds(issues: readonly SceneContentIssue[]): string[] {
+  return [...new Set(issues.filter((issue) => issue.code === 'unknown_location' && !NUMBERED_ID.test(issue.value)).map((issue) => issue.value))]
+}
+
 export async function assertSceneContent(scenes: Scenes, characters: Characters, world: BackgroundContract | undefined, locale: AppLocale | undefined, logger: PipelineLogger, stage: string): Promise<void> {
   const issues = validateSceneContent(scenes, characters, world, locale)
   if (!issues.length) return
