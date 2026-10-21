@@ -11,6 +11,14 @@ import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import { useLocaleStore } from '@/stores/locale-store'
 
 const parseLocked = (v: unknown): boolean | null => (typeof v === 'boolean' ? v : null)
+
+// 진행 중인 제목 저장(10/21 검토) — 시작 요청이 저장 전 제목(제목 없음)을 읽고 AI 제목을 붙이지 않게 기다릴 수 있게 한다.
+let pendingRename: Promise<unknown> | null = null
+
+/** 진행 중인 제목 저장이 끝날 때까지 기다린다(성공 · 실패 상관없이). */
+export function settleProjectRename(): Promise<void> {
+  return (pendingRename ?? Promise.resolve()).then(() => undefined, () => undefined)
+}
 import {
   isDemoSession,
   getDemoSnapshot,
@@ -105,7 +113,8 @@ interface ProjectState {
     options?: CreateProjectOptions,
   ) => Promise<ProjectCreationResult>
   switchProject: (id: string, title: string, stage?: StageId) => void
-  renameProject: (title: string) => Promise<void>
+  /** 저장했으면 true. 못 했으면 화면 제목을 되돌리고 false. */
+  renameProject: (title: string) => Promise<boolean>
   /** 서버가 채택한 콘텐츠 언어를 반영(#chat-locale-follow) — 저장 없이 상태만 동기화. locked = 채팅이 확정(잠금)했을 때. */
   adoptProjectLocale: (locale: AppLocale, locked?: boolean) => void
   /** 명시 전환(보드 배지) — PATCH /api/project/[id] 로 저장 + 잠금. 실패 시 이전 값 복원. */
@@ -481,17 +490,27 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   renameProject: async (title: string) => {
-    const { projectId } = get()
-    if (!projectId) return
+    const { projectId, projectTitle: previous } = get()
+    if (!projectId) return false
     set({ projectTitle: title })
+    const save = fetch(`/api/project/${projectId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title }),
+    }).then((res) => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    })
+    pendingRename = save
     try {
-      await fetch(`/api/project/${projectId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title }),
-      })
+      await save
+      return true
     } catch (err) {
       console.error('[project-store] rename failed:', err)
+      // 저장하지 못했으면 화면 제목도 되돌린다(10/21 검토) — 화면과 저장된 제목이 갈리면 시작할 때 AI 제목이 붙는다.
+      if (get().projectId === projectId && get().projectTitle === title) set({ projectTitle: previous })
+      return false
+    } finally {
+      if (pendingRename === save) pendingRename = null
     }
   },
 

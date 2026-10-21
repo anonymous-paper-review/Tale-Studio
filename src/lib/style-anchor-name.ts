@@ -14,6 +14,11 @@ const ENGLISH_NAMES: Readonly<Record<string, string>> = {
   watercolor: 'Watercolor',
 }
 
+/** 채팅에 주는 스타일 목록 한 줄 — 키 · 한국어 이름 · 영어 이름 · 매체(채팅이 어느 언어로 답해도 그 언어 이름을 쓰게, 10/21 검토). */
+export function styleCatalogLine(anchor: { key: string; label: string; subtitle?: string | null; medium?: string | null }): string {
+  return `${anchor.key} | ${anchor.label} | ${styleAnchorName(anchor, 'en')} | medium:${anchor.medium ?? '?'}`
+}
+
 export function styleAnchorName(anchor: { key: string; label: string; subtitle?: string | null }, locale: AppLocale): string {
   if (locale === 'ko') return anchor.label
   return ENGLISH_NAMES[anchor.key] ?? (anchor.subtitle?.trim() || anchor.label)

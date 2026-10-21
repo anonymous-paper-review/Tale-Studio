@@ -6,6 +6,7 @@
 //   오른쪽 채팅은 이 단계에 없다(layout.tsx).
 import { useEffect, useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 import { CircleAlert, LayoutList, Loader2, MessageSquare, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -85,7 +86,12 @@ export function EntryWorkspace() {
       <header className="sticky top-0 z-sticky flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background px-6">
         <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium', STAGE_BADGE_CLASS.entry)}>{STAGE_LABEL.entry}</span>
         {/* 제목은 시작 화면에서 바로 정한다(2026-10-21 오너 "프로젝트 제목을 처음에 설정 불가능"). */}
-        <ProjectTitleField title={projectTitle} onRename={(next) => void useProjectStore.getState().renameProject(next)} />
+        <ProjectTitleField
+          title={projectTitle}
+          onRename={(next) => void useProjectStore.getState().renameProject(next).then((saved) => {
+            if (!saved) toast.error(t("Couldn't save the title. Please try again."))
+          })}
+        />
         {saveError && !started ? (
           <p className="ml-auto flex shrink-0 items-center gap-1 text-xs text-destructive" role="status">
             <CircleAlert className="size-3.5" aria-hidden />

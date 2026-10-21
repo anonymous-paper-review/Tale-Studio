@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { styleAnchorName } from '@/lib/style-anchor-name'
+import { styleAnchorName, styleCatalogLine } from '@/lib/style-anchor-name'
 
 // 개발 · 운영 DB style_anchors 의 이름(label)과 부제(subtitle) 그대로 — 이름은 한국어 하나뿐이다.
 const CATALOG = [
@@ -41,6 +41,13 @@ describe('스타일 이름', () => {
   it('영어 이름을 모르는 새 스타일은 저장된 이름 그대로 보인다', () => {
     // 왜: DB 에 새 스타일을 넣었는데 영어 이름이 아직 없으면 빈칸 대신 있는 이름을 보인다.
     expect(styleAnchorName({ key: 'new_style', label: '새 스타일', subtitle: null }, 'en')).toBe('새 스타일')
+  })
+
+  it('채팅에 주는 스타일 목록에는 한국어 이름과 영어 이름을 함께 넣는다', () => {
+    // 왜: 영어로 대화하는 사람에게 채팅이 스타일을 한국어 이름으로 말했다(10/21 검토).
+    expect(styleCatalogLine({ ...CATALOG[2], medium: '2d_anime' })).toBe('jp_anime | 2D 일본 애니 | 2D Japanese Anime | medium:2d_anime')
+    expect(styleCatalogLine({ ...CATALOG[6], medium: 'live_action' })).toBe('real_jp_melo | 일본 멜로 | Japanese Melodrama | medium:live_action')
+    expect(readFileSync(path.join(process.cwd(), 'src/app/api/produce/chat/route.ts'), 'utf8')).toMatch(/styleCatalogLine\(/)
   })
 
   it('스타일 고르기 창 · Artist 머리 · 인물/배경 상세 · 확정 창이 화면 언어 이름을 쓴다', () => {

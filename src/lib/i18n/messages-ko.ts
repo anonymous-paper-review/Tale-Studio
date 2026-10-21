@@ -1486,6 +1486,7 @@ export const KO: Record<string, string> = {
   'Capture failed: {error}': '캡처 실패: {error}',
   'Save screen as JPEG': '화면 JPEG로 저장',
   'Save master sheet as image': '마스터 시트 이미지로 저장',
+  "Couldn't save the title. Please try again.": '제목을 저장하지 못했어요. 다시 시도해 주세요.',
   'Preparing the master sheet…': '마스터 시트를 만드는 중…',
   'This stage as ZIP': '이 단계 ZIP',
   'Entire project as ZIP': '전체 프로젝트 ZIP',

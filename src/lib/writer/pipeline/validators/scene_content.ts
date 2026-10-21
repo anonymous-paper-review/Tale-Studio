@@ -59,12 +59,44 @@ export function validateSceneContent(scenes: Scenes, characters: Characters, wor
   return issues
 }
 
-// 번호식 내부 표기(char_1 · loc_2 · location_99) — 없는 대상을 가리키는 깨진 참조다. 다시 쓰게 하지 않고 검증에서 막는다.
+// 번호식 내부 표기(char_1 · loc_2 · location_99) — 등록된 장소가 있는데 이 표기를 쓰면 없는 대상을 가리키는 깨진 참조다.
 const NUMBERED_ID = /^(?:char(?:acter)?|loc(?:ation)?)_?\d+$/i
+// 이름 자리에 다시 표기가 오면 받지 않는다(snake_case · 번호식).
+const ID_LIKE = /^(?:[a-z][a-z0-9]*(?:_[a-z0-9]+)+|(?:char(?:acter)?|loc(?:ation)?)_?\d+)$/i
 
-/** 새 장소를 영어 표기(office_hallway)로 지어낸 것 — 이름으로 다시 쓰면 고쳐지는 형식 실수라 한 번 다시 쓰게 한다(2026-10-21). */
-export function inventedPlaceIds(issues: readonly SceneContentIssue[]): string[] {
-  return [...new Set(issues.filter((issue) => issue.code === 'unknown_location' && !NUMBERED_ID.test(issue.value)).map((issue) => issue.value))]
+/**
+ * 새 장소를 표기로 지어낸 것(office_hallway) — 이름만 다시 받으면 고쳐지는 형식 실수라 한 번 이름을 받는다(2026-10-21).
+ * 번호식 표기는 등록된 장소가 하나도 없을 때만(가리킬 장소가 없으니 새로 지어낸 것이다) 같이 고친다.
+ */
+export function inventedPlaceIds(issues: readonly SceneContentIssue[], opts: { includeNumbered?: boolean } = {}): string[] {
+  return [...new Set(issues
+    .filter((issue) => issue.code === 'unknown_location' && (opts.includeNumbered || !NUMBERED_ID.test(issue.value)))
+    .map((issue) => issue.value))]
+}
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/** 지어낸 장소 표기를 받은 이름으로 바꾼다 — 장소 칸과 문장 속 표기만 바꾸고 씬 · 막 · 길이 · 인물은 그대로 둔다. */
+export function renameInventedPlaces(scenes: Scenes, ids: readonly string[], names: Readonly<Record<string, unknown>>): Scenes {
+  const renames = new Map<string, string>()
+  for (const id of ids) {
+    const raw = names[id]
+    const name = typeof raw === 'string' ? raw.trim() : ''
+    if (name && !ID_LIKE.test(name)) renames.set(id, name)
+  }
+  if (!renames.size) return scenes
+  const patterns = [...renames].map(([id, name]) => [new RegExp(`(?<![A-Za-z0-9_])${escapeRegExp(id)}(?![A-Za-z0-9_])`, 'g'), name] as const)
+  const rename = (text: string) => patterns.reduce((out, [pattern, name]) => out.replace(pattern, name), text)
+  return {
+    ...scenes,
+    scenes: scenes.scenes.map((scene) => ({
+      ...scene,
+      location: renames.get(scene.location) ?? scene.location,
+      ...(scene.scene_actions ? { scene_actions: scene.scene_actions.map(rename) } : {}),
+      ...(typeof scene.dialogue_summary === 'string' ? { dialogue_summary: rename(scene.dialogue_summary) } : {}),
+      ...(scene.key_dialogue ? { key_dialogue: scene.key_dialogue.map((d) => ({ ...d, line: rename(d.line), delivery: rename(d.delivery) })) } : {}),
+    })),
+  }
 }
 
 export async function assertSceneContent(scenes: Scenes, characters: Characters, world: BackgroundContract | undefined, locale: AppLocale | undefined, logger: PipelineLogger, stage: string): Promise<void> {

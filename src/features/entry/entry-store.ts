@@ -9,7 +9,8 @@ import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import { emptyEntryDraft, fileHasText, normalizeEntryDraft, recIsCurrent, type EntryDraft } from '@/lib/entry/draft'
 import type { EntryWriterStartBody } from '@/lib/entry/start-plan'
 import { useLocaleStore } from '@/stores/locale-store'
-import { useProjectStore } from '@/stores/project-store'
+import { settleProjectRename, useProjectStore } from '@/stores/project-store'
+import { isUntitled } from '@/lib/project/title'
 import { stageIndex } from '@/lib/stage-gate'
 import { parseProjectFormat, type ProjectFormat } from '@/types/project'
 import type { StageId } from '@/types'
@@ -575,6 +576,8 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
       const { projectId, writing } = get()
       if (!projectId || writing.status === 'starting' || writing.status === 'writing') return false
       await get().flushIdea()
+      // 머리에서 고친 제목이 저장된 뒤에 시작한다 — 시작이 저장 전 제목(제목 없음)을 읽고 AI 제목을 붙이지 않게(10/21 검토).
+      await settleProjectRename()
       const gen = generation
       set({ writing: { status: 'starting', step: 0 } })
       let body: Record<string, unknown>
@@ -605,7 +608,8 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
         ...(title ? { title } : {}),
       })
       const project = useProjectStore.getState()
-      if (title && project.projectId === projectId) useProjectStore.setState({ projectTitle: title })
+      // AI 제목은 아직 제목 없음일 때만 머리에 넣는다 — 직접 정한 제목을 덮지 않는다(10/21).
+      if (title && project.projectId === projectId && isUntitled(project.projectTitle)) useProjectStore.setState({ projectTitle: title })
       return startWriter(false)
     },
 

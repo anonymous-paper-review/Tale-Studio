@@ -25,6 +25,7 @@ import { userOwnsProject } from '@/lib/generation-jobs'
 import { buildReferenceDigest, getProjectReferenceId } from '@/lib/reference-import'
 import { buildChatTrace, createChatTraceId, type ChatLlmUsage } from '@/lib/chat-trace'
 import { persistChatTraceBestEffort } from '@/lib/chat-trace-server'
+import { styleCatalogLine } from '@/lib/style-anchor-name'
 
 
 
@@ -225,12 +226,8 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
     const anchorCatalog = styleLocked !== true ? await listStyleAnchorCatalog() : []
     if (anchorCatalog.length > 0) {
       contextParts.push(
-        `[Style Anchor Catalog]\n${anchorCatalog
-          .map(
-            (a) =>
-              `${a.key} | ${a.label} | medium:${a.medium ?? '?'}${a.subtitle ? ` | ${a.subtitle}` : ''}`,
-          )
-          .join('\n')}`,
+        // 키 · 한국어 이름 · 영어 이름 · 매체 — 영어로 답할 때 한국어 이름을 쓰지 않게(10/21).
+        `[Style Anchor Catalog]\n${anchorCatalog.map((a) => styleCatalogLine(a)).join('\n')}`,
       )
     }
 

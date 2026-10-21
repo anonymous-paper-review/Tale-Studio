@@ -243,6 +243,51 @@ describe('시작과 산문 초안', () => {
     useEntryStore.getState().reset()
   })
 
+  it('시작은 진행 중인 제목 저장이 끝난 뒤에 보낸다', async () => {
+    // 왜: 머리에서 제목을 고치고 바로 시작하면, 시작이 저장 전 제목(제목 없음)을 읽고 AI 제목을 붙일 수 있었다(10/21 검토).
+    //   고장: 채팅 탭에서 제목을 고친 채로 [Writer에게 써 달라고 하기]를 누를 때.
+    setDraft(startDraft())
+    let releaseRename!: () => void
+    const renameGate = new Promise<void>((resolve) => { releaseRename = resolve })
+    let renameSaved = false
+    let startSawSavedTitle: boolean | null = null
+    const harnessFetch = globalThis.fetch
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'PATCH') {
+        await renameGate
+        renameSaved = true
+      }
+      return harnessFetch(input, init)
+    }))
+    routes[`PATCH /api/project/${PID}`] = () => ({ body: { ok: true } })
+    routes['POST /api/produce/entry/start'] = () => {
+      startSawSavedTitle = renameSaved
+      return { body: { ok: true, writerStart, title: '내가 정한 제목', draft: { ...startDraft(), startedAt: '2026-10-19T00:00:00.000Z' } } }
+    }
+    routes['POST /api/writer/start'] = () => ({ body: { status: 'started', draft: true } })
+    routes[`GET /api/writer/status/${PID}`] = () => status({ current_stage: 'dramaturgy' })
+
+    void useProjectStore.getState().renameProject('내가 정한 제목')
+    const started = useEntryStore.getState().start()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    releaseRename()
+    expect(await started).toBe(true)
+    expect(startSawSavedTitle).toBe(true)
+    useEntryStore.getState().reset()
+  })
+
+  it('시작 응답의 AI 제목은 머리 제목이 아직 제목 없음일 때만 넣는다', async () => {
+    // 왜: 직접 정한 제목이 AI 제목으로 바뀌면 안 된다(10/21 검토).
+    useProjectStore.setState({ projectTitle: '내가 정한 제목' })
+    setDraft(startDraft())
+    routes['POST /api/produce/entry/start'] = () => ({ body: { ok: true, writerStart, title: '자판기의 반란', draft: { ...startDraft(), startedAt: '2026-10-19T00:00:00.000Z' } } })
+    routes['POST /api/writer/start'] = () => ({ body: { status: 'started', draft: true } })
+    routes[`GET /api/writer/status/${PID}`] = () => status({ current_stage: 'dramaturgy' })
+    await useEntryStore.getState().start()
+    expect(useProjectStore.getState().projectTitle).toBe('내가 정한 제목')
+    useEntryStore.getState().reset()
+  })
+
   it('초안을 쓰는 동안 Writer 진행 단계를 따라 잠금 화면 단계를 바꾸고, 초안이 다 되면 다 됐다고 표시한다', async () => {
     // 왜: 산문 초안은 몇 분 걸린다. 다 되면 Writer(산문 작업공간)로 넘어간다.
     vi.useFakeTimers()
