@@ -22,6 +22,8 @@ export interface GenerationJobReceipt {
   resultUrl?: string | null
   error?: string | null
   httpStatus?: number | null
+  /** 자리 없음(429) 거절이면 어느 자리였는지 — 내 한도(user) · 모두의 자리(global). 이어 그리기가 멈출지 기다릴지 고른다. */
+  quotaScope?: 'user' | 'global' | null
 }
 
 export type GenerationJobObserver = (receipt: GenerationJobReceipt) => void

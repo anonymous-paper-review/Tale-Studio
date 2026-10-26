@@ -18,28 +18,37 @@ const KO_NEXT = '다음(?:단계|스텝|챕터|탭|화면|과정)' // i18n-ok: W
 const KO_SOFT = '(?:이제|그럼|바로|그냥)?' // i18n-ok: 넘김 말 사이에 끼는 부사
 const KO_MOVE = '(?:넘어(?:가(?:자|줘|주세요|요|죠|볼까|보자)?|갑시다|갈래|갈게요?)|넘겨(?:줘|주세요|요)?|넘기자|넘깁시다|(?:이동|진행)(?:해(?:줘|주세요|요)?|하자|하죠|합시다|할래)?|가(?:자|줘|주세요|요|죠|볼까|보자)?|갑시다|갈래|고고|ㄱㄱ)' // i18n-ok: 넘어가자는 말의 끝맺음
 const KO_ACK = '(?:좋아요|좋아|좋습니다|네|넵|예|응|그래요|그래|오케이|ok|okay|yes)' // i18n-ok: "다음 단계로" 앞의 맞장구
-const KO_MOVE_TO_NEXT = new RegExp(`${KO_NEXT}(?:으로|로)?${KO_SOFT}${KO_MOVE}[.!~]*$`) // i18n-ok: "다음 챕터로 이동해줘"
-const KO_NEXT_ONLY = new RegExp(`^(?:${KO_ACK}[,.!~]*)?${KO_SOFT}${KO_NEXT}(?:으로|로)?[.!~]*$`) // i18n-ok: "좋아요, 다음 단계로"만 쓴 말
-const KO_MOVE_TO_ARTIST = new RegExp(`(?:artist|아티스트)(?:단계|화면|탭)?(?:으로|로|한테|에게)?${KO_SOFT}${KO_MOVE}[.!~]*$`) // i18n-ok: "Artist로 가줘"
+// 넘김 말은 말 전체가 넘어가자는 말일 때만 — 앞에 맞장구 · 부사만 올 수 있다. 앞에 고칠 점이 있으면 수정 요청이다(검토 지적 6).
+const KO_LEAD = `^(?:${KO_ACK}[,.!~]*)?${KO_SOFT}` // i18n-ok: 넘김 말 앞에 올 수 있는 말
+const KO_MOVE_TO_NEXT = new RegExp(`${KO_LEAD}${KO_NEXT}(?:으로|로)?${KO_SOFT}${KO_MOVE}[.!~]*$`) // i18n-ok: "다음 챕터로 이동해줘"
+const KO_NEXT_ONLY = new RegExp(`${KO_LEAD}${KO_NEXT}(?:으로|로)?[.!~]*$`) // i18n-ok: "좋아요, 다음 단계로"만 쓴 말
+const KO_MOVE_TO_ARTIST = new RegExp(`${KO_LEAD}(?:artist|아티스트)(?:단계|화면|탭)?(?:으로|로|한테|에게)?${KO_SOFT}${KO_MOVE}[.!~]*$`) // i18n-ok: "Artist로 가줘"
+// 갈 곳 없이 넘어가자는 말 · 산문을 확정하자는 말(검토 지적 7) — "다음으로 넘어가자" · "넘어가줘" · "산문 확정해줘".
+const KO_MOVE_BARE = new RegExp(`${KO_LEAD}(?:다음으로)?(?:넘어(?:가(?:자|줘|주세요|요|죠|볼까|보자)|갑시다|갈래|갈게요?)|진행(?:해(?:줘|주세요)|하자|합시다))[.!~]*$`) // i18n-ok: 갈 곳 없이 넘어가자는 말
+const KO_CONFIRM = new RegExp(`${KO_LEAD}(?:이)?(?:산문(?:을|은)?)?확정(?:해(?:줘|주세요|요)?|하자|할게요?|합시다)[.!~]*$`) // i18n-ok: "산문 확정해줘"
 const EN_NEXT = 'next\\s+(?:step|stage|chapter|tab|screen|phase)'
-const EN_MOVE_TO = new RegExp(`\\b(?:go|move|proceed|continue|jump|skip|head)\\s+(?:on\\s+)?(?:to|onto)\\s+(?:the\\s+)?(?:${EN_NEXT}|artist)(?:\\s+(?:please|now))?[\\s.!]*$`, 'i')
-const EN_NEXT_ONLY = new RegExp(`^(?:(?:ok(?:ay)?|yes|yeah|yep|sure|great|good|alright)[\\s,.!]*)?(?:the\\s+)?${EN_NEXT}(?:\\s+please)?[\\s.!]*$`, 'i')
+const EN_LEAD = `^(?:(?:ok(?:ay)?|yes|yeah|yep|sure|great|good|alright|perfect|looks\\s+good|sounds\\s+good)[\\s,.!]*)?(?:(?:let'?s|please|now|then)\\s+)*`
+const EN_MOVE_TO = new RegExp(`${EN_LEAD}(?:go|move|proceed|continue|jump|skip|head)\\s+(?:on\\s+)?(?:to|onto)\\s+(?:the\\s+)?(?:${EN_NEXT}|artist)(?:\\s+(?:please|now))?[\\s.!]*$`, 'i')
+const EN_NEXT_ONLY = new RegExp(`${EN_LEAD}(?:the\\s+)?${EN_NEXT}(?:\\s+please)?[\\s.!]*$`, 'i')
+const EN_MOVE_BARE = new RegExp(`${EN_LEAD}(?:move\\s+on|proceed|go\\s+ahead|confirm\\s+(?:it|the\\s+prose))(?:\\s+(?:please|now))?[\\s.!]*$`, 'i')
 
 function writerMoveRequest(said: string): boolean {
   if (hasNonRequestContext(said)) return false
   const compact = said.toLowerCase().replace(/\s+/g, '')
-  if (KO_MOVE_TO_NEXT.test(compact) || KO_NEXT_ONLY.test(compact) || KO_MOVE_TO_ARTIST.test(compact)) return true
+  if ([KO_MOVE_TO_NEXT, KO_NEXT_ONLY, KO_MOVE_TO_ARTIST, KO_MOVE_BARE, KO_CONFIRM].some((rule) => rule.test(compact))) return true
   const spaced = said.toLowerCase().replace(/\s+/g, ' ').trim()
-  return EN_MOVE_TO.test(spaced) || EN_NEXT_ONLY.test(spaced)
+  return [EN_MOVE_TO, EN_NEXT_ONLY, EN_MOVE_BARE].some((rule) => rule.test(spaced))
 }
 
 // "넘어가기 전에 결말을 바꿔줘"는 넘김이 아니라 고칠 점이다 — 넘김 말이 들어 있어도 수정 요청으로 읽는다(디자이너 QA 1차 #01 검토).
+// "결말 고치고 Artist로 넘겨줘"처럼 고칠 점과 넘김이 함께 있으면 고칠 점부터 — 확정 창만 열면 고칠 말이 버려지고 고치지 않은 산문이 잠긴다(검토 지적 6).
+const FIX_THEN_MOVE = /(?:고치|고쳐|바꾸|바꿔|다듬|줄이|줄여|늘리|늘려|넣|빼|살리|살려|키우|키워|밝게|어둡게|짧게|길게|웃기게|슬프게)[^\s]*(?:고|고서|고나서|한뒤|한다음|한뒤에|한다음에)\s*.*(?:넘어가|넘겨|넘기|이동|가자|가줘|진행)|\b(?:make|change|fix|rewrite|shorten|cut|add|remove|edit|tweak|revise)\b.*\b(?:then|and)\b.*\b(?:go|move|proceed|hand)\b/i // i18n-ok: 고칠 점과 넘김이 함께 있는 말
 const BEFORE_MOVING = /(?:넘어가|넘기|넘겨|이동하|진행하|가)기\s*전에|\bbefore\s+(?:we\s+|i\s+|you\s+)?(?:move|moving|go|going|proceed|proceeding|hand(?:ing)?\s+over)\b/i // i18n-ok: 사용자 말에서 "넘어가기 전에"를 알아듣는 정규식
 
 export function writerChatIntent(text: string): WriterChatIntent {
   const said = text.trim()
   if (REWRITE_ONLY.test(said)) return 'rewrite'
-  if (BEFORE_MOVING.test(said)) return 'revise'
+  if (BEFORE_MOVING.test(said) || FIX_THEN_MOVE.test(said.replace(/\s+/g, ' '))) return 'revise'
   if (matchHandoffIntent(said, 'producer')) return 'breakdown'
   if (BREAKDOWN_WORDS.test(said) && !hasNonRequestContext(said)) return 'breakdown'
   if (writerMoveRequest(said)) return 'breakdown'

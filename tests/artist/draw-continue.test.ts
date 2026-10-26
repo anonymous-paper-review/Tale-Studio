@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { completeBlockedNote, drawContinueDecision, missingDrawTargets } from '@/lib/artist/draw-continue'
+import { completeBlockedNote, drawContinueDecision, drawTargetCount, missingDrawTargets, STYLE_WAIT_RECHECK_MS, USER_LIMIT_RECHECK_MS } from '@/lib/artist/draw-continue'
 import { useArtistStore } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
 import type { GenerationJobReceipt } from '@/lib/generation-jobs-client'
@@ -48,7 +48,7 @@ describe('안 나온 그림 고르기', () => {
 })
 
 describe('이어 그리기 판단', () => {
-  const base = { step: 2 as const, done: false, drawing: 0, checkedSinceDrawingBegan: true, autoTargets: 1, stopped: false }
+  const base = { step: 2 as const, done: false, drawing: 0, checkedSinceDrawingBegan: true, autoTargets: 1, stopped: false, running: false, paused: false }
 
   it('내 그림 한도에 막혀 못 그린 그림은 앞의 그림이 다 끝나면 이어서 그린다', () => {
     // 왜: 한 번에 6장까지인데 7장을 요청해 7번째가 대기 없이 빠지고 6/7 에서 멈췄다(디자이너 QA 1차 #06 · 2026-09-11 오너 "내 한도에 막힌 건 내 것이 끝나면 이어 간다").
@@ -93,7 +93,7 @@ describe('이어 그리기 · 다시 그리기 요청', () => {
       generatingLocations: [],
       viewFailures: {},
       worldFailures: {},
-      drawContinue: { projectId: null, rounds: 0, stopped: false, running: false },
+      drawContinue: { projectId: null, rounds: 0, stopped: false, running: false, paused: false },
       generateCharacterView: view as never,
       generateWorldShot: shot as never,
     })
@@ -173,7 +173,7 @@ describe('이어 그리기 · 다시 그리기 요청', () => {
 
   it('다시 그리기 단추를 누르면 멈춘 이어 그리기도 다시 켠다', async () => {
     // 왜: 사람이 다시 그린 뒤 또 한도에 막히면 그때도 이어서 그려야 한다.
-    useArtistStore.setState({ drawContinue: { projectId: 'art-1', rounds: 3, stopped: true, running: false } })
+    useArtistStore.setState({ drawContinue: { projectId: 'art-1', rounds: 3, stopped: true, running: false, paused: false } })
 
     await useArtistStore.getState().redrawMissingImages()
 
@@ -200,5 +200,140 @@ describe('[완료하기] 안내', () => {
     expect(page).toMatch(/'Draw the \{count\} missing images'/)
     expect(page).toMatch(/drawContinueDecision\(/)
     expect(page).not.toMatch(/'Draw the remaining images'/)
+  })
+
+  it('그리기가 멈추면 그림 만드는 중 창의 제목도 멈췄다고 말한다', () => {
+    // 왜: 다시 그리기 단추가 떠 있는데 제목은 "그림을 만들고 있어요"라 아직 그리는 것처럼 읽혔다(개발 서버 확인).
+    const page = readFileSync(path.join(process.cwd(), 'src/app/studio/artist/page.tsx'), 'utf8')
+    expect(page).toMatch(/redrawButton \? t\('Some images were not drawn'\) : t\(makingTitle \?\? 'Making the images'\)/)
+  })
+})
+
+describe('검토 뒤 고친 것(디자이너 QA 1차)', () => {
+  const base = { step: 2 as const, done: false, drawing: 0, checkedSinceDrawingBegan: true, autoTargets: 1, stopped: false, running: false, paused: false }
+  let view: ReturnType<typeof vi.fn>
+  let shot: ReturnType<typeof vi.fn>
+  const answer = (receipt: Partial<GenerationJobReceipt>) => async (...args: unknown[]) => {
+    const options = (args.length > 7 ? args[7] : args[5]) as { onJob?: (receipt: GenerationJobReceipt) => void } | undefined
+    options?.onJob?.({ jobId: null, status: 'deduped', ...receipt } as GenerationJobReceipt)
+    return { jobId: null, status: receipt.status ?? 'deduped' }
+  }
+
+  beforeEach(() => {
+    vi.useRealTimers()
+    useProjectStore.setState({ projectId: 'art-1' })
+    view = vi.fn(async () => ({ jobId: 'j', status: 'queued' }))
+    shot = vi.fn(async () => undefined)
+    useArtistStore.setState({
+      characterAssets: [person('soonja', null), person('young', null)],
+      worldAssets: [],
+      generatingViews: [],
+      generatingLocations: [],
+      viewFailures: {},
+      worldFailures: {},
+      capacitySkips: {},
+      drawContinue: { projectId: null, rounds: 0, stopped: false, running: false, paused: false },
+      generateCharacterView: view as never,
+      generateWorldShot: shot as never,
+    })
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it('이어 그리는 동안에는 기다리고, 한 바퀴가 끝나면 남은 빈칸을 다시 본다', () => {
+    // 왜: 한 바퀴가 끝나도 판단이 그대로 "이어 그리기"면 다시 불리지 않아 잠금 화면이 멈춰 돌았다(검토 지적 2).
+    expect(drawContinueDecision({ ...base, running: true })).toBe('wait')
+    expect(drawContinueDecision({ ...base, paused: true })).toBe('wait')
+    expect(drawContinueDecision(base)).toBe('continue')
+  })
+
+  it('그림체를 읽는 동안 돌아온 이어 그리기는 멈추지 않고 잠시 뒤 다시 본다', async () => {
+    // 왜: 내 그림체를 읽는 동안 [만들기]를 누르면 첫 이어 그리기가 모두 "기다림"으로 돌아와 영영 멈췄다(검토 지적 4).
+    vi.useFakeTimers()
+    view.mockImplementation(answer({ status: 'deduped', error: 'waiting_for_style' }))
+
+    await useArtistStore.getState().continueMissingImages()
+    expect(useArtistStore.getState().drawContinue).toMatchObject({ projectId: 'art-1', rounds: 0, stopped: false, paused: true })
+
+    await vi.advanceTimersByTimeAsync(STYLE_WAIT_RECHECK_MS)
+    expect(useArtistStore.getState().drawContinue.paused).toBe(false)
+  })
+
+  it('모두의 자리가 차서 서버가 건너뛴 그림은 이어 그리지 않고 단추로 남긴다', () => {
+    // 왜: 2026-09-11 오너 — 모두의 자리(전역 축)가 차서 막힌 건 멈추고 알린다. 내 한도(개인 축)에 막힌 건 이어 간다.
+    const input = {
+      characters: [person('soonja', null), person('young', null)],
+      worlds: [world('shop', null)],
+      drawingViews: [],
+      drawingLocations: [],
+      capacitySkips: { 'char:soonja': 'global' as const, 'char:young': 'user' as const, 'world:shop': 'global' as const },
+    }
+    expect(missingDrawTargets(input, { skipFailed: true })).toEqual({ characters: [{ characterId: 'young', appearanceKey: 'current' }], worlds: [] })
+    expect(drawTargetCount(missingDrawTargets(input))).toBe(3)
+  })
+
+  it('내 한도 때문에 거절되면 멈추지 않고 잠시 뒤 다시 보고, 모두의 자리 때문에 거절되면 멈춘다', async () => {
+    // 왜: 2026-09-11 오너 (가) — 내 한도에 막힌 건 내 것이 끝나면 이어 가고, 모두의 자리가 찬 건 멈추고 알린다(자동 재시도 없음).
+    vi.useFakeTimers()
+    view.mockImplementation(answer({ status: 'failed', httpStatus: 429, quotaScope: 'user' }))
+    await useArtistStore.getState().continueMissingImages()
+    expect(useArtistStore.getState().drawContinue).toMatchObject({ rounds: 1, stopped: false, paused: true })
+    await vi.advanceTimersByTimeAsync(USER_LIMIT_RECHECK_MS)
+    expect(useArtistStore.getState().drawContinue.paused).toBe(false)
+
+    view.mockImplementation(answer({ status: 'failed', httpStatus: 429, quotaScope: 'global' }))
+    await useArtistStore.getState().continueMissingImages()
+    expect(useArtistStore.getState().drawContinue).toMatchObject({ rounds: 2, stopped: true, paused: false })
+  })
+
+  it('사람이 누른 다시 그리기와 이어 그리기는 동시에 돌지 않는다', async () => {
+    // 왜: 두 일이 함께 돌면 자리가 1장인데 2장이 나갔다 — 같은 그림을 두 번 요청할 수도 있다(검토 지적 9).
+    useArtistStore.setState({ characterAssets: [person('soonja', null)] })
+    let release: () => void = () => {}
+    view.mockImplementation(() => new Promise((resolve) => { release = () => resolve({ jobId: 'j', status: 'queued' }) }))
+    const manual = useArtistStore.getState().redrawMissingImages()
+    await vi.waitFor(() => expect(view).toHaveBeenCalledTimes(1))
+    expect(useArtistStore.getState().drawContinue.running).toBe(true)
+
+    await useArtistStore.getState().continueMissingImages()
+    await useArtistStore.getState().redrawMissingImages()
+
+    expect(view).toHaveBeenCalledTimes(1)
+    release()
+    await manual
+    expect(useArtistStore.getState().drawContinue.running).toBe(false)
+  })
+
+  it('이어 그리는 도중 다른 프로젝트로 옮기면 남은 그림을 그 프로젝트에 보내지 않는다', async () => {
+    // 왜: 늦게 시작하는 그림이 그때의 프로젝트를 읽어, 옮겨 간 프로젝트의 같은 이름 칸에 그림을 보내고 과금할 수 있었다(검토 지적 10).
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ limit: 1 })))
+    view.mockImplementation(async () => {
+      useProjectStore.setState({ projectId: 'art-2' })
+      return { jobId: 'j', status: 'queued' }
+    })
+
+    await useArtistStore.getState().drawMissingImages()
+
+    expect(view).toHaveBeenCalledTimes(1)
+  })
+
+  it('두 번 실패해 자동으로 멈춘 그림은 다시 그리기 장수에서 빼고 카드의 다시 만들기로 남긴다', () => {
+    // 왜: 다시 그리기 단추는 자동 경로라 두 번 실패한 칸을 서버가 거절해, 단추가 계속 떠도 눌러 봐야 소용없었다(검토 지적 11).
+    const input = {
+      characters: [person('soonja', null), person('young', null)],
+      worlds: [],
+      drawingViews: [],
+      drawingLocations: [],
+      failedViews: { soonja: { current: { main: { ...failure, failCount: 2 } } }, young: { current: { main: failure } } },
+    }
+    expect(missingDrawTargets(input)).toEqual({ characters: [{ characterId: 'young', appearanceKey: 'current' }], worlds: [] })
+  })
+
+  it('그림 만드는 중 창은 카드가 생긴 뒤에는 그리는 중에도 닫을 수 있다', () => {
+    // 왜: 오래된 대기 작업 · 상태 조회 실패 · 공유 보기에서 닫기 없이 도는 잠금 화면에 갇혔다(검토 지적 1 · 3 · 14).
+    const page = readFileSync(path.join(process.cwd(), 'src/app/studio/artist/page.tsx'), 'utf8')
+    expect(page).toMatch(/footer=\{hasAssets \? \(/)
   })
 })

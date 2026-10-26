@@ -46,4 +46,16 @@ describe('Writer 채팅 말 읽기', () => {
     // 왜: 새로 알아듣는 "다음 챕터" 넘김 말도 부정이면 넘김이 아니다(디자이너 QA 1차 #01).
     expect(writerChatIntent('아직 다음 챕터로 넘어가지 마')).not.toBe('breakdown')
   })
+
+  it('고칠 점과 넘어가자는 말이 함께 있으면 고칠 점부터 수정안으로 만든다', () => {
+    // 왜: "결말을 더 밝게 바꾸고 다음 챕터로 이동해줘"가 확정 창만 열어 고칠 점이 버려지고, 그대로 확정하면 고치지 않은 산문이 잠겼다(검토 지적 6).
+    for (const text of ['결말을 더 밝게 바꾸고 다음 챕터로 이동해줘', '결말 고치고 Artist로 가줘', '결말 고치고 Artist로 넘겨줘', '순자 대사를 줄이고 넘어가자', 'Make the ending happier, then go to the next step']) {
+      expect(writerChatIntent(text), text).toBe('revise')
+    }
+  })
+
+  it.each(['다음으로 넘어가자', '넘어가줘', '산문 확정해줘', 'Move on', 'Looks good, proceed'])('"%s"라고 해도 산문 확정 창을 연다', (text) => {
+    // 왜: 흔한 넘김 말이 산문 수정 요청으로 가서 1분 잠금 뒤 "바꿀 곳을 찾지 못했어요"만 남았다(검토 지적 7).
+    expect(writerChatIntent(text)).toBe('breakdown')
+  })
 })

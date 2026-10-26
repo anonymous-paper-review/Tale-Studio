@@ -53,3 +53,26 @@ describe('Writer에 들어온 직후 진행 상태를 읽기 전', () => {
     expect(proseBusy({ draftLive: false, phase: 'before', statusRead: false, requestPending: false })).toBeNull()
   })
 })
+
+describe('산문 상태를 읽는 동안(검토 지적 15)', () => {
+  it('진행 상태를 읽는 동안에는 잠금 화면을 띄우지 않고 단추와 입력만 막는다', async () => {
+    // 왜: 채팅 탭으로 Writer 에 들어올 때마다 다 쓴 산문인데도 "산문 초안을 쓰고 있어요" 잠금 화면이 한 번 깜빡였다.
+    const { proseBusy, proseOverlayOpen } = await import('@/lib/prose/busy')
+    const checking = proseBusy({ draftLive: true, phase: 'before', statusRead: false, requestPending: false })
+    expect(checking).not.toBeNull()
+    expect(proseOverlayOpen(checking)).toBe(false)
+    expect(proseOverlayOpen({ kind: 'draft', step: 1 })).toBe(true)
+    expect(proseOverlayOpen({ kind: 'revise' })).toBe(true)
+    expect(proseOverlayOpen(null)).toBe(false)
+  })
+
+  it('산문 본문을 읽지 못하면 저장된 씬 요약으로 대신 보인다', async () => {
+    // 왜: 미리 보기 읽기가 계속 실패하면 확정 산문이 "불러오는 중…"에 멈췄다 — 예전처럼 저장된 요약이라도 보인다.
+    const { proseRunState } = await import('@/lib/prose/busy')
+    expect(proseRunState({ preview: null, previewFailed: false })).toBe('loading')
+    expect(proseRunState({ preview: null, previewFailed: true })).toBe('none')
+    expect(proseRunState({ preview: { started: true, engine: 'v1' }, previewFailed: false })).toBe('started')
+    expect(proseRunState({ preview: { started: true, engine: 'v2' }, previewFailed: false })).toBe('none')
+    expect(proseRunState({ preview: { started: false }, previewFailed: false })).toBe('none')
+  })
+})

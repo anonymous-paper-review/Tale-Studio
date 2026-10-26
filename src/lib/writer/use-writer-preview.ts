@@ -84,7 +84,7 @@ interface Options {
 export function useWriterPreview(
   projectId: string | null | undefined,
   opts: Options = {},
-): { preview: WriterPreview | null; loading: boolean } {
+): { preview: WriterPreview | null; loading: boolean; failed: boolean } {
   const interval = opts.intervalMs ?? 4000
   const enabled = opts.enabled ?? true
   const refreshKey = opts.refreshKey ?? 0
@@ -95,6 +95,8 @@ export function useWriterPreview(
 
   const [previewState, setPreviewState] = useState<{ projectId: string; preview: WriterPreview } | null>(null)
   const [loading, setLoading] = useState(false)
+  // 마지막 읽기가 실패했고 아직 받은 미리 보기가 없다 — 화면이 "불러오는 중"에 멈추지 않고 대신할 것을 보인다.
+  const [failedFor, setFailedFor] = useState<string | null>(null)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -109,12 +111,18 @@ export function useWriterPreview(
         const r = await fetch(`/api/writer/preview/${projectId}?locale=${displayLocale}`)
         if (r.ok) {
           const j = (await r.json()) as WriterPreview
-          if (!cancelled) setPreviewState({ projectId, preview: j })
+          if (!cancelled) {
+            setPreviewState({ projectId, preview: j })
+            setFailedFor(null)
+          }
           // 완료/실패면 한 번 더 받고 폴링 중단(마지막 산출물 반영).
           stop = !!(j.completed || j.failed)
+        } else if (!cancelled) {
+          setFailedFor(projectId)
         }
       } catch {
-        // 네트워크 블립 무시 — 다음 tick 재시도.
+        // 네트워크 블립 — 다음 tick 에 다시 읽고, 그동안은 실패로 표시한다.
+        if (!cancelled) setFailedFor(projectId)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -129,5 +137,5 @@ export function useWriterPreview(
     }
   }, [projectId, interval, enabled, displayLocale, refreshKey])
 
-  return { preview: previewState && previewState.projectId === projectId ? previewState.preview : null, loading }
+  return { preview: previewState && previewState.projectId === projectId ? previewState.preview : null, loading, failed: failedFor === projectId }
 }

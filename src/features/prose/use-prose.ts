@@ -11,7 +11,7 @@ import { sceneStoryView } from '@/lib/producer/scene-story'
 import { treatmentDiff } from '@/lib/producer/scene-story-rewrite'
 import { unresolvedSceneStoryProposal } from '@/lib/producer/scene-story-proposal'
 import { previewedVariant } from '@/components/layout/scene-story-rewrite-card'
-import { handedRunStopped, legacyGateWaiting, proseBusy, proseStartOffered } from '@/lib/prose/busy'
+import { handedRunStopped, legacyGateWaiting, proseBusy, proseRunState, proseStartOffered } from '@/lib/prose/busy'
 import { proseTools } from '@/lib/prose/conditions'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProducerStore } from '@/stores/producer-store'
@@ -36,7 +36,7 @@ export function useProse() {
   const phase = hasTreatment ? sceneGatePhase(status) : 'before'
   const refreshKey = useGlobalChatStore((s) => s.sceneStoryRefresh)
   const showOriginal = preserveScript === true && storyText.trim().length > 0
-  const { preview } = useWriterPreview(projectId, { enabled: hasTreatment, refreshKey })
+  const { preview, failed: previewFailed } = useWriterPreview(projectId, { enabled: hasTreatment, refreshKey })
   const variantPick = useGlobalChatStore((s) => s.sceneStoryVariantPreview)
   const pending = useGlobalChatStore((s) => s.sceneStoryProposalPending)
   const session = useGlobalChatStore((s) => s.sceneStoryEdit)
@@ -64,7 +64,7 @@ export function useProse() {
     .filter(Boolean)
   // 실행 기록(미리 보기)을 읽기 전에는 불러오는 중 — 저장된 씬 한 줄 요약이 산문 본문보다 먼저 보였다(디자이너 QA 1차 #09).
   //   v2 실행은 기록에 산문 본문이 없어 옛 프로젝트처럼 저장된 요약으로 본다.
-  const run = !preview ? 'loading' : preview.started && preview.engine !== 'v2' ? 'started' : 'none'
+  const run = proseRunState({ preview, previewFailed })
   const view = sceneStoryView({ preserveScript, storyText, locked: hasTreatment, streamed, saved, run })
   const paragraphs = view.kind === 'scenes' ? view.paragraphs : []
   const hasProse = view.kind === 'scenes' ? paragraphs.length > 0 : view.kind === 'original'

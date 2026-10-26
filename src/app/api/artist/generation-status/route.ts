@@ -10,6 +10,7 @@ import {
   listFailedWorldShotJobs,
   listQueuedMainJobs,
   listQueuedWorldShotJobs,
+  listCapacitySkips,
   userOwnsProject,
 } from '@/lib/generation-jobs'
 
@@ -28,11 +29,14 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 })
   }
 
-  const [failures, queuedMain, worldFailures, queuedWorld] = await Promise.all([
+  const [failures, queuedMain, worldFailures, queuedWorld, capacitySkips] = await Promise.all([
     listFailedCharacterViewJobs(projectId),
     listQueuedMainJobs(projectId),
     listFailedWorldShotJobs(projectId), // 약속 B8(2026-09-04): 배경 실패 표시·우회 재시도의 근거
     listQueuedWorldShotJobs(projectId),
+    // 서버 초안이 자리 때문에 건너뛴 칸의 축 — 화면은 내 한도에 막힌 칸만 이어 그린다(2026-10-27 디자이너 QA 1차 #06).
+    //   기록을 못 읽어도 상태 조회는 막지 않는다(빈 값이면 모든 빈칸을 내 한도로 본다).
+    listCapacitySkips(projectId).catch(() => ({})),
   ])
-  return NextResponse.json({ failures, queuedMain, worldFailures, queuedWorld })
+  return NextResponse.json({ failures, queuedMain, worldFailures, queuedWorld, capacitySkips })
 }

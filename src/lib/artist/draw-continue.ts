@@ -6,10 +6,19 @@
 //   화면(브라우저)과 테스트가 함께 쓴다 — 서버 전용 모듈을 들이지 않는다.
 import type { CompletionGaps } from '@/lib/artist/completion-gaps'
 
-/** 한 화면(마운트)에서 이어 그리기를 몇 번까지 하는지 — 막히면 단추로 남긴다. */
+/** 한 프로젝트에서 이어 그리기를 몇 번까지 하는지 — 막히면 단추로 남긴다. */
 export const DRAW_CONTINUE_MAX_ROUNDS = 3
+/** 그림체를 읽는 동안 돌아온 이어 그리기를 다시 볼 때까지 — 읽기가 끝나면 서버가 빈칸을 그린다(2026-10-10 오너). */
+export const STYLE_WAIT_RECHECK_MS = 20_000
+/** 내 한도(개인 축)에 막혀 거절됐을 때 다시 볼 때까지 — 다른 프로젝트의 내 그림이 끝나기를 기다린다(2026-09-11 오너 (가)). */
+export const USER_LIMIT_RECHECK_MS = 60_000
+/** 이만큼 실패한 칸은 자동 경로(이어 그리기 · 다시 그리기 단추)가 서버에서 거절된다 — 카드의 다시 만들기로 사람이 고른다.
+ *  서버 give-up 게이트(generation-jobs AUTO_GENERATION_GIVE_UP_THRESHOLD)와 같은 값이다. */
+export const AUTO_DRAW_GIVE_UP_FAILS = 2
 
 type Failure = { failCount: number }
+/** 서버 초안이 자리 때문에 건너뛴 칸의 축 — 'char:<characterId>' · 'world:<locationId>'. */
+export type CapacitySkips = Readonly<Record<string, 'user' | 'global'>>
 
 export interface DrawTargetInput {
   characters: ReadonlyArray<{
@@ -26,6 +35,8 @@ export interface DrawTargetInput {
   failedViews?: Readonly<Record<string, Readonly<Record<string, Readonly<Record<string, Failure>>>>>>
   /** 실패 기록 — 배경: worldFailureKey(기본 모습은 locationId). */
   failedLocations?: Readonly<Record<string, Failure>>
+  /** 서버 초안이 자리 때문에 건너뛴 칸(축) — 모두의 자리(global)에 막힌 칸은 이어 그리지 않는다. */
+  capacitySkips?: CapacitySkips
 }
 
 export interface DrawTargets {
@@ -33,8 +44,13 @@ export interface DrawTargets {
   worlds: string[]
 }
 
-/** 대표 그림이 없고 그리는 중도 아닌 인물 · 배경([완료하기]와 같은 기준). skipFailed 면 실패 기록이 있는 칸은 뺀다. */
+/**
+ * 대표 그림이 없고 그리는 중도 아닌 인물 · 배경([완료하기]와 같은 기준).
+ *   늘 빼는 칸: 그리는 중 · 두 번 실패해 자동 경로가 멈춘 칸(카드의 다시 만들기로 사람이 고른다).
+ *   skipFailed(이어 그리기)면 실패 기록이 있는 칸과 모두의 자리에 막혀 건너뛴 칸도 뺀다 — 둘 다 사람이 고른다.
+ */
 export function missingDrawTargets(input: DrawTargetInput, opts: { skipFailed?: boolean } = {}): DrawTargets {
+  const gaveUp = (failure: Failure | undefined) => (failure?.failCount ?? 0) >= AUTO_DRAW_GIVE_UP_FAILS
   const characters: DrawTargets['characters'] = []
   for (const character of input.characters) {
     if (character.entityType === 'object') continue
@@ -44,13 +60,16 @@ export function missingDrawTargets(input: DrawTargetInput, opts: { skipFailed?: 
     if (!appearanceKey) continue
     const drawing = input.drawingViews.some((slot) => slot.characterId === character.characterId && slot.appearanceKey === appearanceKey && slot.view === 'main')
     if (drawing) continue
-    if (opts.skipFailed && input.failedViews?.[character.characterId]?.[appearanceKey]?.main) continue
+    const failure = input.failedViews?.[character.characterId]?.[appearanceKey]?.main
+    if (gaveUp(failure)) continue
+    if (opts.skipFailed && (failure || input.capacitySkips?.[`char:${character.characterId}`] === 'global')) continue
     characters.push({ characterId: character.characterId, appearanceKey })
   }
   const worlds = input.worlds
     .filter((world) => world.wideShot == null)
     .filter((world) => !input.drawingLocations.includes(world.locationId))
-    .filter((world) => !(opts.skipFailed && input.failedLocations?.[world.locationId]))
+    .filter((world) => !gaveUp(input.failedLocations?.[world.locationId]))
+    .filter((world) => !(opts.skipFailed && (input.failedLocations?.[world.locationId] || input.capacitySkips?.[`world:${world.locationId}`] === 'global')))
     .map((world) => world.locationId)
   return { characters, worlds }
 }
@@ -77,9 +96,13 @@ export function drawContinueDecision(input: {
   autoTargets: number
   /** 이어 그리기가 멈췄다(거절 · 보낸 것 없음 · 횟수 다 씀). */
   stopped: boolean
+  /** 이어 그리기 · 다시 그리기 한 바퀴가 도는 중 — 끝나면 판단이 바뀌어 남은 빈칸을 다시 본다. */
+  running?: boolean
+  /** 잠시 쉬는 중(그림체를 읽는 중 · 내 한도에 막힘) — 시간이 지나면 다시 본다. */
+  paused?: boolean
 }): 'continue' | 'wait' | 'stop' | 'idle' {
   if (input.step !== 2 || input.done) return 'idle'
-  if (input.drawing > 0 || !input.checkedSinceDrawingBegan) return 'wait'
+  if (input.drawing > 0 || !input.checkedSinceDrawingBegan || input.running || input.paused) return 'wait'
   if (input.stopped || input.autoTargets === 0) return 'stop'
   return 'continue'
 }

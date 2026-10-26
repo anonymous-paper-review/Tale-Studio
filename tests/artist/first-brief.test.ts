@@ -68,4 +68,27 @@ describe('Artist 첫 안내(디자이너 QA 1차 관찰 49)', () => {
     expect(translate('en', ARTIST_BRIEF_TEXT, { count: 2, worldCount: 1 })).not.toMatch(/\badd\b/i)
     expect(readFileSync('src/app/studio/artist/page.tsx', 'utf8')).not.toMatch(/revise or add/)
   })
+
+  it('Artist 스타일 창에서 그림체를 올렸어도 카드가 생기면 첫 안내를 한다', () => {
+    // 왜: 그림체를 올리면 Artist 채팅에 그림체 말풍선이 생겨 "이미 대화가 있다"로 보고 첫 안내를 영영 하지 않았다(검토 지적 13).
+    useGlobalChatStore.setState({ messages: [
+      { id: 'u1', stage: 'artist', role: 'user', content: '그림체로 써 주세요\n\n📎 https://img.test/style.png' },
+      { id: 'm1', stage: 'artist', role: 'model', content: '그림체를 style.png(으)로 정했어요. 지금 그림체를 분석하고 있어요.' },
+    ] as never })
+
+    offerArtistBrief('project-qa', ko({ count: 2, worldCount: 1 }))
+
+    expect(briefs().some((m) => m.content.startsWith('인물과 배경의 컨셉을 준비했어요'))).toBe(true)
+  })
+
+  it('Artist 채팅에서 이미 말을 나눴거나 첫 안내를 했으면 다시 하지 않는다', () => {
+    // 왜: 정상 경로 고정 — 대화 중간에 안내가 끼어들거나 같은 안내가 두 번 남지 않게.
+    useGlobalChatStore.setState({ messages: [{ id: 'u1', stage: 'artist', role: 'user', content: '민호 머리를 짧게 해줘' }] as never })
+    expect(offerArtistBrief('project-qa', ko({ count: 2, worldCount: 1 }))).toBe(true)
+    expect(briefs()).toHaveLength(1)
+
+    useGlobalChatStore.setState({ messages: [{ id: 'b0', stage: 'artist', role: 'model', content: '인물과 배경의 컨셉을 준비했어요: 캐릭터 4명 · 배경 4곳.\n수정하거나 추가하고 싶은 인물이나 배경을 알려주세요.' }] as never })
+    expect(offerArtistBrief('project-qa', ko({ count: 5, worldCount: 7 }))).toBe(true)
+    expect(briefs()).toHaveLength(1)
+  })
 })

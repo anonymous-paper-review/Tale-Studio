@@ -8,6 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const fake = vi.hoisted(() => {
   type Row = Record<string, unknown>
   const tables: Record<string, Row[]> = {}
+  /** 이 표에서 지우기를 실패시킨다(다른 표가 붙잡고 있는 경우 · 23503). */
+  const failures: { deleteOn: string | null } = { deleteOn: null }
   function query(table: string) {
     let op: 'select' | 'update' | 'delete' = 'select'
     let patch: Row = {}
@@ -38,12 +40,14 @@ const fake = vi.hoisted(() => {
         const data = run()?.[0] ?? null
         return data ? { data, error: null } : { data: null, error: { message: 'No rows' } }
       },
-      then: (resolve: (value: { data: Row[] | null; error: null }) => unknown, reject?: (reason: unknown) => unknown) =>
-        Promise.resolve({ data: run(), error: null }).then(resolve, reject),
+      then: (resolve: (value: { data: Row[] | null; error: { code: string; message: string } | null }) => unknown, reject?: (reason: unknown) => unknown) =>
+        Promise.resolve(op === 'delete' && failures.deleteOn === table
+          ? { data: null, error: { code: '23503', message: 'still referenced' } }
+          : { data: run(), error: null }).then(resolve, reject),
     }
     return builder
   }
-  return { tables, query }
+  return { tables, query, failures }
 })
 vi.mock('@/lib/demo/guard-server', () => ({ demoWriteBlock: () => null }))
 vi.mock('@/lib/api/guard', () => ({ requireProjectAccess: async (_req: Request, projectId: string) => ({ ok: true, projectId, userId: 'owner', viaShare: false }) }))
@@ -220,5 +224,23 @@ describe('채팅으로 만들어진 인물 카드 지우기(디자이너 QA 1차
     ], backgrounds: [] }, { characterId: 'char_new_police', name: '경찰관' })
     expect(cleaned.changed).toBe(true)
     expect((cleaned.draft as { cast: Array<{ localId: string }> }).cast.map((member) => member.localId)).toEqual(['b'])
+  })
+})
+
+describe('지우기 실패(검토 지적 12)', () => {
+  it('인물을 지우지 못하면 산문 목록에서 뺀 것도 되돌린다', async () => {
+    // 왜: 목록(산문 초안)에서 먼저 빼고 행 지우기가 실패하면 카드는 남고 목록에서만 사라졌다.
+    seed()
+    fake.failures.deleteOn = 'characters'
+    try {
+      const response = await DELETE(deleteRequest('char_new_police'))
+      expect(response.status).toBe(409)
+      await expect(response.json()).resolves.toMatchObject({ code: 'in_use' })
+      const draft = fake.tables.projects[0].producer_draft as { cast: Array<{ name: string }> }
+      expect(draft.cast.map((member) => member.name)).toContain('경찰관')
+      expect(fake.tables.characters.map((row) => row.character_id)).toContain('char_new_police')
+    } finally {
+      fake.failures.deleteOn = null
+    }
   })
 })

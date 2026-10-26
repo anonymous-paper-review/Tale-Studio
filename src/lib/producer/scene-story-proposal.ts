@@ -61,9 +61,26 @@ export function changedSceneRows(before: SceneRow[], after: SceneRow[]): Array<{
   })
 }
 
-/** 고친 결과가 지금 산문과 한 글자도 다르지 않다(씬 · 순서 · 글이 모두 같다) — 카드로 보일 수정안이 아니다(디자이너 QA 1차 #01). */
+/** 고친 결과가 지금 산문과 한 글자도 다르지 않다(씬 · 순서 · 글 · 대사 · 장소 · 인물이 모두 같다) — 카드로 보일 수정안이 아니다(디자이너 QA 1차 #01).
+ *  길이 숫자(estimated_seconds)만 다른 것은 같은 것으로 본다 — 보이는 글이 그대로면 "달라진 씬 0개" 카드가 된다.
+ *  적용(mergeSceneStoryProposal)은 씬 전체를 보므로, 대사 · 장소만 고친 수정안은 바뀐 것이다(검토 지적 8). */
 export function sceneStoryUnchanged(base: Scenes, after: Scenes): boolean {
-  return changedSceneRows(sceneRows(base), sceneRows(after)).length === 0
+  if (!equal(sceneIds(base), sceneIds(after))) return false
+  const content = (scene: Scenes['scenes'][number]) => {
+    const { estimated_seconds: _seconds, ...rest } = scene
+    void _seconds
+    return rest
+  }
+  return base.scenes.every((scene, index) => stableJson(content(scene)) === stableJson(content(after.scenes[index])))
+}
+
+/** 키 순서와 상관없이 같은 값이면 같은 글 — 저장 · 직접 수정을 거치며 키 순서가 바뀌어도 "바뀜"으로 보지 않는다. */
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value as Record<string, unknown>).sort().filter((key) => (value as Record<string, unknown>)[key] !== undefined).map((key) => `${JSON.stringify(key)}:${stableJson((value as Record<string, unknown>)[key])}`).join(',')}}`
+  }
+  return JSON.stringify(value) ?? 'null'
 }
 
 /** 적용 · 버리기를 마친 수정안은 미리 보기를 다시 읽기 전이라도 카드에서 내린다(디자이너 QA 1차 관찰 26).

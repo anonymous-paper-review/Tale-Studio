@@ -47,3 +47,10 @@ describe('AI가 일하는 동안 단계 이동 잠금', () => {
     expect(sidebar).toMatch(/railNavBlocked\(\{ to: 'projects'/)
   })
 })
+
+describe('일이 멈춘 잠금 화면', () => {
+  it('일이 멈춘 잠금 화면에서는 진행 중이던 줄도 돌지 않는다', () => {
+    // 왜: 그림 그리기가 멈춰 '안 나온 그림 다시 그리기'를 보이는데 "그림 그리는 중 12/13" 줄은 계속 돌아 아직 그리는 것처럼 보였다(디자이너 QA 1차 #05 · 개발 서버 확인).
+    expect(overlay).toMatch(/step\.state === 'current' && busy \?/)
+  })
+})

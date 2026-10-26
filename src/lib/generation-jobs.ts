@@ -785,21 +785,30 @@ export async function listGenerationCompletionRows(projectId: string, untilMs = 
   }
 }
 
-/** queued 인 character_view main 잡 목록(클라가 [id] reconcile 로 마무리할 대상).
- *  어느 모습인지(appearanceKey)도 함께 준다 — 빼면 화면이 다 그린 그림을 카드에 못 넣는다(2026-10-27 디자이너 QA 1차 #06). */
+/** STALE_QUEUED_MS 안에 들어온 대기 작업인가 — 시각이 없으면(예전 행 · 시험 행) 막 들어온 것으로 본다. */
+function freshQueued(row: { created_at?: unknown }, now = Date.now()): boolean {
+  if (typeof row.created_at !== 'string') return true
+  const at = Date.parse(row.created_at)
+  return !Number.isFinite(at) || now - at < STALE_QUEUED_MS
+}
+
+/** queued 인 character_view main 잡 목록(클라가 [id] reconcile 로 마무리하고 "그리는 중"으로 세는 대상).
+ *  어느 모습인지(appearanceKey)도 함께 준다 — 빼면 화면이 다 그린 그림을 카드에 못 넣는다(2026-10-27 디자이너 QA 1차 #06).
+ *  STALE_QUEUED_MS 를 넘긴 잡(웹훅을 놓친 유령 · 접수 확인이 안 된 예약)은 뺀다 — 세면 그림 만드는 중 화면이 끝없이 돈다
+ *  (listActiveGenerationJobs 와 같은 기준, 회수는 active 라우트의 ghost sweep 이 맡는다). */
 export async function listQueuedMainJobs(
   projectId: string,
 ): Promise<Array<{ characterId: string; appearanceKey: string; jobId: string }>> {
   const { data, error } = await supabaseAdmin
     .from('generation_jobs')
-    .select('id, target')
+    .select('id, target, created_at')
     .eq('project_id', projectId)
     .eq('kind', 'character_view')
     .eq('status', 'queued')
   if (error) throw error
   if (!data) throw new Error('generation job queued-main query returned no data')
   const out: Array<{ characterId: string; appearanceKey: string; jobId: string }> = []
-  for (const row of data as Array<{ id: string; target: GenerationJobTarget | null }>) {
+  for (const row of (data as Array<{ id: string; target: GenerationJobTarget | null; created_at?: string }>).filter((item) => freshQueued(item))) {
     const t = row.target ?? {}
     if (t.view === 'main' && t.characterId) {
       if (!t.appearanceKey) throw new Error('queued character_view main job missing appearanceKey')
@@ -809,24 +818,52 @@ export async function listQueuedMainJobs(
   return out
 }
 
-/** 새로고침 뒤 같은 배경 작업을 다시 발주하지 않고 확인할 모습별 작업 목록. */
+/** 새로고침 뒤 같은 배경 작업을 다시 발주하지 않고 확인할 모습별 작업 목록. STALE_QUEUED_MS 를 넘긴 잡은 뺀다(위와 같은 이유). */
 export async function listQueuedWorldShotJobs(
   projectId: string,
 ): Promise<Array<{ locationId: string; appearanceKey: string | null; jobId: string }>> {
   const { data, error } = await supabaseAdmin
     .from('generation_jobs')
-    .select('id, target')
+    .select('id, target, created_at')
     .eq('project_id', projectId)
     .eq('kind', 'world_shot')
     .eq('status', 'queued')
   if (error) throw error
   if (!data) throw new Error('generation job queued-world query returned no data')
-  return data.flatMap((row) => {
+  return (data as Array<{ id: string; target: unknown; created_at?: string }>).filter((item) => freshQueued(item)).flatMap((row) => {
     const target = (row.target ?? {}) as GenerationJobTarget
     return target.locationId && target.column === 'wide_shot'
       ? [{ locationId: target.locationId, appearanceKey: target.appearanceKey && target.appearanceKey !== 'default' ? target.appearanceKey : null, jobId: row.id as string }]
       : []
   })
+}
+
+/**
+ * 서버 초안이 자리 때문에 건너뛴 칸과 그 축(2026-10-27 디자이너 QA 1차 #06 · 2026-09-11 오너 (가)).
+ *   draft-trigger 가 남긴 asset_trigger_blocked(reason 'capacity') 기록에서 칸마다 가장 최근 것만 본다(최근 24시간).
+ *   화면은 내 한도(user)에 막힌 칸만 이어 그리고, 모두의 자리(global)에 막힌 칸은 멈추고 단추로 남긴다.
+ *   'char:<characterId>' · 'world:<locationId>'.
+ */
+export async function listCapacitySkips(projectId: string): Promise<Record<string, 'user' | 'global'>> {
+  const { data, error } = await supabaseAdmin
+    .from('writer_observability_events')
+    .select('payload, created_at')
+    .eq('project_id', projectId)
+    .eq('event', 'asset_trigger_blocked')
+    .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+    .order('created_at', { ascending: false })
+    .limit(200)
+  if (error) throw error
+  const out: Record<string, 'user' | 'global'> = {}
+  for (const row of (data ?? []) as Array<{ payload?: Record<string, unknown> | null }>) {
+    const payload = row.payload ?? {}
+    if (payload.reason !== 'capacity' || typeof payload.axis !== 'string') continue
+    // 내 이미지 · 영상 한도(user_image · user_video)는 내 축, 모두의 자리(global) · 제공처 키 자리(key)는 공용 축이다.
+    const axis = payload.axis.startsWith('user') ? 'user' : payload.axis === 'global' || payload.axis === 'key' ? 'global' : null
+    const key = typeof payload.characterId === 'string' ? `char:${payload.characterId}` : typeof payload.locationId === 'string' ? `world:${payload.locationId}` : null
+    if (axis && key && !(key in out)) out[key] = axis
+  }
+  return out
 }
 
 /**

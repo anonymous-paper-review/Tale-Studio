@@ -352,7 +352,9 @@ export default function VisualPage() {
   const serverDrawCheckedAt = useArtistStore((s) => s.serverDrawCheckedAt)
   const drawingBeganAt = useArtistStore((s) => s.drawingBeganAt)
   const drawContinue = useArtistStore((s) => s.drawContinue)
-  const drawInput = { characters: characterAssets, worlds: worldAssets, drawingViews: generatingViews, drawingLocations: generatingLocations, failedViews: viewFailures, failedLocations: worldFailures }
+  const capacitySkips = useArtistStore((s) => s.capacitySkips)
+  const drawInput = { characters: characterAssets, worlds: worldAssets, drawingViews: generatingViews, drawingLocations: generatingLocations, failedViews: viewFailures, failedLocations: worldFailures, capacitySkips }
+  const continueMine = drawContinue.projectId === projectId
   const missingCount = drawTargetCount(missingDrawTargets(drawInput))
   const drawDecision = drawContinueDecision({
     // 만드는 중(완료하기 전)에만 — 완료한 프로젝트를 열었다고 빈 칸을 저절로 그리지 않는다. 데모는 그리지 않는다.
@@ -361,7 +363,10 @@ export default function VisualPage() {
     drawing: generatingCount,
     checkedSinceDrawingBegan: !!projectId && drawingBeganAt?.projectId === projectId && serverDrawCheckedAt !== null && serverDrawCheckedAt > drawingBeganAt.at,
     autoTargets: drawTargetCount(missingDrawTargets(drawInput, { skipFailed: true })),
-    stopped: drawContinue.projectId === projectId && drawContinue.stopped,
+    stopped: continueMine && drawContinue.stopped,
+    // 한 바퀴가 도는 동안 · 잠시 쉬는 동안은 기다린다 — 끝나면 판단이 바뀌어 남은 빈칸을 다시 본다.
+    running: continueMine && drawContinue.running,
+    paused: continueMine && drawContinue.paused,
   })
   useEffect(() => {
     if (projectId && making && progress.step === 2 && !progress.done) useArtistStore.getState().markDrawingBegan(projectId)
@@ -377,17 +382,18 @@ export default function VisualPage() {
   const makingOverlay = (
     <AiBusyOverlay
       open={overlayOpen}
-      title={t(makingTitle ?? 'Making the images')}
-      // 그리는 중인 그림이 없고 안 나온 그림이 남았으면 일이 멈춘 것이다 — 도는 원 대신 멈춤 표시와 다시 그리기 단추.
+      // 그리는 중인 그림이 없고 안 나온 그림이 남았으면 일이 멈춘 것이다 — 제목 · 도는 원 대신 멈춤 표시와 다시 그리기 단추.
+      title={redrawButton ? t('Some images were not drawn') : t(makingTitle ?? 'Making the images')}
       busy={!redrawButton}
-      description={redrawButton ? t('Some images could not be drawn. Draw the missing ones again, or close this and check the cards.') : undefined}
+      description={redrawButton ? t('Draw the missing ones again, or close this and check the cards.') : undefined}
       steps={[
         { label: t('Designing the characters and backgrounds'), state: progress.step > 0 ? 'done' : 'current' },
         { label: t('Starting to draw'), state: progress.step > 1 ? 'done' : progress.step === 1 ? 'current' : 'todo' },
         { label: progress.total > 0 ? t('Drawing images {drawn}/{total}', { drawn: progress.drawn, total: progress.total }) : t('Drawing images'), state: progress.step === 2 ? 'current' : 'todo' },
       ]}
       progress={progress.total > 0 && progress.step === 2 ? (progress.drawn / progress.total) * 100 : null}
-      footer={redrawButton ? (
+      // 카드가 생긴 뒤에는 그리는 중에도 닫을 수 있다 — 오래 걸리거나 상태를 못 읽어도 이 화면에 갇히지 않게(검토 지적 1 · 3 · 14).
+      footer={hasAssets ? (
         <>
           <Button size="sm" variant="outline" onClick={() => setMakingDismissed(projectId)}>{t('Close')}</Button>
           {redrawButton}

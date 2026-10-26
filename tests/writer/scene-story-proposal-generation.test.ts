@@ -96,3 +96,21 @@ describe('씬 스토리 수정안 생성 완료', () => {
     errorLog.mockRestore()
   })
 })
+
+describe('바뀐 곳 없는 수정안 판정(검토 지적 8)', () => {
+  const scene = (over: Record<string, unknown> = {}) => ({ scene_id: 'scene_1', act_ref: 'act_1', location: '회사 복도', narrative_time: 'present', characters_in_scene: ['minho'], scene_actions: ['민호가 동전을 넣는다.'], dialogue_summary: '민호가 동전을 넣는다.', key_dialogue: [{ speaker: 'minho', line: '또야?' }], estimated_seconds: 6, ...over })
+  const scenes = (over: Record<string, unknown> = {}) => ({ scenes: [scene(over)], total_estimated_seconds: 6 }) as never
+
+  it('대사나 장소만 바꾼 수정안은 바뀐 것으로 본다', async () => {
+    // 왜: 씬 글만 비교해 대사 · 장소만 고친 수정안을 "바꿀 곳 없음"으로 버렸다 — 적용했다면 바뀌었을 내용이다.
+    const { sceneStoryUnchanged } = await import('@/lib/producer/scene-story-proposal')
+    expect(sceneStoryUnchanged(scenes(), scenes({ key_dialogue: [{ speaker: 'minho', line: '또 삼켰네.' }] }))).toBe(false)
+    expect(sceneStoryUnchanged(scenes(), scenes({ location: '휴게실' }))).toBe(false)
+  })
+
+  it('길이 숫자만 달라진 수정안은 바뀐 곳이 없는 것으로 본다', async () => {
+    // 왜: 정상 경로 고정 — 보이는 글이 그대로인데 길이 숫자만 다르면 "달라진 씬 0개" 카드가 된다.
+    const { sceneStoryUnchanged } = await import('@/lib/producer/scene-story-proposal')
+    expect(sceneStoryUnchanged(scenes(), scenes({ estimated_seconds: 9 }))).toBe(true)
+  })
+})

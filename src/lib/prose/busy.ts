@@ -36,6 +36,20 @@ export function proseBusy(input: {
   return null
 }
 
+/** 잠금 화면을 띄울 일인가 — 진행 상태를 읽는 동안(draft step null)은 띄우지 않는다. 단추 · 입력만 막는다(busy 는 그대로).
+ *  읽는 1초 남짓 사이에 다 쓴 산문 위로 "산문 초안을 쓰고 있어요"가 깜빡였다(검토 지적 15). 쓰는 중이면 상태를 읽자마자 뜬다. */
+export function proseOverlayOpen(busy: ProseBusy): boolean {
+  if (!busy) return false
+  return !(busy.kind === 'draft' && busy.step === null)
+}
+
+/** 산문 본문(Writer 실행 기록)을 읽은 결과 — 'loading' 아직 · 'none' 실행이 없거나 본문이 없는 실행(v2) · 'started' 본문이 있는 실행.
+ *  읽기가 실패하면 'none' 으로 보아 저장된 씬 요약으로 대신한다 — "불러오는 중"에 멈추지 않게(검토 지적 15). */
+export function proseRunState(input: { preview: { started?: boolean; engine?: string } | null | undefined; previewFailed: boolean }): 'loading' | 'none' | 'started' {
+  if (!input.preview) return input.previewFailed ? 'none' : 'loading'
+  return input.preview.started && input.preview.engine !== 'v2' ? 'started' : 'none'
+}
+
 /** 산문 자리의 [산문 쓰기] — 진행 상태를 읽어 Writer 가 아직 쓴 적이 없다고 안 뒤에만 둔다(디자이너 QA 1차 #07).
  *  읽기 전에 두면 쓰는 중인 초안 위로 단추가 잠깐 열려 같은 산문을 두 번 쓰게 할 수 있다. */
 export function proseStartOffered(input: { locked: boolean; storyReady: boolean; phase: SceneGatePhase; statusRead: boolean }): boolean {

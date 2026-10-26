@@ -115,8 +115,11 @@ export function AiBusyOverlay({ open, title, description, steps, progress, progr
               >
                 {step.state === 'done' ? (
                   <Check className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                ) : step.state === 'current' ? (
+                ) : step.state === 'current' && busy ? (
                   <Loader2 className="size-4 shrink-0 animate-spin motion-reduce:animate-none" aria-hidden />
+                ) : step.state === 'current' ? (
+                  // 일이 멈췄으면(busy=false) 멈춘 줄은 돌지 않는다 — 아직 하는 중처럼 보이지 않게(2026-10-27 QA).
+                  <AlertCircle className="size-4 shrink-0 text-muted-foreground" aria-hidden />
                 ) : (
                   <span className="mx-1 size-2 shrink-0 rounded-full bg-muted-foreground/40" aria-hidden />
                 )}

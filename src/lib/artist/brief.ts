@@ -3,6 +3,8 @@
 //   '캐릭터 0명 · 배경 0곳'이 채팅에 그대로 남았다. 디자인 중에는 카드가 일부만 있어 수가 틀린다.
 //   채팅으로 인물 · 배경을 더할 수 없어(디자이너 QA 1차 #04) "추가"는 말하지 않는다.
 import type { ArtistPhase } from '@/lib/artist/breakdown'
+import { parseAttachmentMarker } from '@/lib/chat-blocks'
+import { translate } from '@/lib/i18n/translate'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 
 export const ARTIST_BRIEF_TEXT =
@@ -31,7 +33,7 @@ export function offerArtistBrief(projectId: string, content: string | null): boo
   const chat = useGlobalChatStore.getState()
   // 채팅 기록을 다 읽기 전에는 말하지 않는다 — 읽기 전이면 이미 안내한 프로젝트를 처음으로 보고 한 번 더 남겼다(#welcome-race 와 같은 이유).
   if (chat.messagesLoadedProjectId !== projectId) return false
-  if (chat.messages.some((m) => m.stage === 'artist')) return true
+  if (artistChatStarted(chat.messages)) return true
   const id = `artist-brief:${projectId}`
   const dismissed = chat.dismissedSuggestionIds.includes(id)
   chat.offerSuggestion({
@@ -44,4 +46,19 @@ export function offerArtistBrief(projectId: string, content: string | null): boo
     dismissible: true,
   })
   return dismissed || useGlobalChatStore.getState().suggestion?.id === id || useGlobalChatStore.getState().messages.some((m) => m.stage === 'artist')
+}
+
+/** 첫 안내의 첫 문장(한 · 영) — 예전 문구("수정하거나 추가하고 싶은")로 남은 안내도 같은 문장으로 시작한다. */
+const BRIEF_HEADS = (['ko', 'en'] as const).map((locale) => translate(locale, ARTIST_BRIEF_TEXT, { count: 0, worldCount: 0 }).split(':')[0])
+
+/**
+ * 이 프로젝트 Artist 채팅에서 이미 안내했거나 사람이 말을 걸었나.
+ *   그림체를 올린 말풍선(그림 첨부) · 그림체 안내는 대화로 치지 않는다 — 스타일 창에서 그림체를 올리면
+ *   Artist 채팅에 말풍선이 생겨 첫 안내를 영영 하지 않았다(검토 지적 13).
+ */
+function artistChatStarted(messages: ReadonlyArray<{ stage: string; role: string; content: string }>): boolean {
+  return messages.some((message) => message.stage === 'artist' && (
+    BRIEF_HEADS.some((head) => message.content.startsWith(head))
+    || (message.role === 'user' && parseAttachmentMarker(message.content).urls.length === 0)
+  ))
 }

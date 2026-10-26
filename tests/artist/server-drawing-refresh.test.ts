@@ -4,14 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({ from: vi.fn() }))
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: { from: mocks.from } }))
 
-import { listQueuedMainJobs } from '@/lib/generation-jobs'
+import { listQueuedMainJobs, listQueuedWorldShotJobs, listCapacitySkips } from '@/lib/generation-jobs'
 import { useArtistStore } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
 import type { CharacterAsset } from '@/types/asset'
 
 function rows(data: unknown) {
   const q: Record<string, unknown> = {}
-  for (const name of ['select', 'eq', 'in', 'order']) q[name] = () => q
+  for (const name of ['select', 'eq', 'in', 'order', 'gte', 'limit']) q[name] = () => q
   q.then = (resolve: (value: unknown) => unknown) => Promise.resolve({ data, error: null }).then(resolve)
   return q
 }
@@ -68,5 +68,36 @@ describe('서버가 그리는 인물 그림', () => {
     await vi.waitFor(() => expect(useArtistStore.getState().generatingViews).toEqual([]))
 
     expect(useArtistStore.getState().characterAssets[0].appearances[0].sheetUrl).toBe('https://img/soonja.png')
+  })
+})
+
+describe('그리는 중으로 세는 대기 작업(검토 지적 1)', () => {
+  const minutesAgo = (n: number) => new Date(Date.now() - n * 60_000).toISOString()
+
+  it('그리기 시작한 지 10분이 넘은 대기 작업은 그리는 중으로 세지 않는다', async () => {
+    // 왜: 웹훅을 놓친 오래된 대기 작업 · 접수 확인이 안 된 예약을 끝없이 "그리는 중"으로 세어, 그림 만드는 중 화면이 닫기 없이 계속 돌았다.
+    mocks.from.mockReturnValueOnce(rows([
+      { id: 'fresh', created_at: minutesAgo(3), target: { characterId: 'a', appearanceKey: 'young', view: 'main' } },
+      { id: 'old', created_at: minutesAgo(25), target: { characterId: 'b', appearanceKey: 'young', view: 'main' } },
+    ]))
+    await expect(listQueuedMainJobs('art-1')).resolves.toEqual([{ characterId: 'a', appearanceKey: 'young', jobId: 'fresh' }])
+
+    mocks.from.mockReturnValueOnce(rows([
+      { id: 'w-fresh', created_at: minutesAgo(1), target: { locationId: 'shop', column: 'wide_shot' } },
+      { id: 'w-old', created_at: minutesAgo(40), target: { locationId: 'roof', column: 'wide_shot' } },
+    ]))
+    await expect(listQueuedWorldShotJobs('art-1')).resolves.toEqual([{ locationId: 'shop', appearanceKey: null, jobId: 'w-fresh' }])
+  })
+
+  it('서버가 자리 때문에 건너뛴 그림은 어느 자리(내 한도 · 모두의 자리)였는지 칸마다 알려 준다', async () => {
+    // 왜: 2026-09-11 오너 — 내 한도에 막힌 건 이어 그리고, 모두의 자리가 찬 건 멈춘다. 화면이 둘을 가려야 한다.
+    mocks.from.mockReturnValueOnce(rows([
+      { created_at: minutesAgo(1), payload: { reason: 'capacity', axis: 'global', kind: 'character_view', characterId: 'soonja' } },
+      { created_at: minutesAgo(2), payload: { reason: 'capacity', axis: 'user_image', kind: 'character_view', characterId: 'soonja' } },
+      { created_at: minutesAgo(3), payload: { reason: 'capacity', axis: 'user_image', kind: 'world_shot', locationId: 'shop' } },
+      { created_at: minutesAgo(3), payload: { reason: 'capacity', axis: 'key', kind: 'world_shot', locationId: 'roof' } },
+      { created_at: minutesAgo(4), payload: { reason: 'quota', scope: 'global' } },
+    ]))
+    await expect(listCapacitySkips('art-1')).resolves.toEqual({ 'char:soonja': 'global', 'world:shop': 'user', 'world:roof': 'global' })
   })
 })

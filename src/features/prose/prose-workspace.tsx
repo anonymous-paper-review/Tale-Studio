@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AiBusyOverlay, type AiBusyStep } from '@/components/ai-busy-overlay'
+import { proseOverlayOpen } from '@/lib/prose/busy'
 import { WriterResumeButton } from '@/components/layout/writer-resume-button'
 import { useT } from '@/lib/i18n'
 import { withDemoShare } from '@/lib/demo/context'
@@ -181,7 +182,8 @@ export function ProseWorkspace() {
       <ManualEditDialog preview={prose.preview} enabled={prose.tools.manual} />
       <ProseConfirmDialog />
       <AiBusyOverlay
-        open={!!prose.busy}
+        // 진행 상태를 읽는 동안은 띄우지 않는다(단추 · 입력만 막힌다) — 다 쓴 산문 위로 잠금이 깜빡이지 않게.
+        open={proseOverlayOpen(prose.busy)}
         title={t(prose.busy?.kind === 'draft' ? 'Writing the prose draft' : 'Revising the prose')}
         steps={busySteps}
       />

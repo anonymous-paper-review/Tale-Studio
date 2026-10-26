@@ -278,6 +278,10 @@ export async function DELETE(req: Request) {
       .eq('project_id', projectId)
       .eq('character_id', characterId)
     if (deleteError) {
+      // 지우지 못했으면 산문 목록에서 뺀 것도 되돌린다 — 카드는 남았는데 목록에서만 사라지지 않게(검토 지적 12).
+      if (cleaned.changed) {
+        await supabaseAdmin.from('projects').update({ producer_draft: (project as { producer_draft?: unknown } | null)?.producer_draft ?? null }).eq('id', projectId)
+      }
       // 다른 표(관계 · 씬별 모습)가 아직 이 인물을 붙잡고 있다 — 쓰이는 인물과 같은 까닭으로 알린다.
       if ((deleteError as { code?: string }).code === '23503') {
         return NextResponse.json({ error: 'This character is used in scenes or shots', code: 'in_use' }, { status: 409 })

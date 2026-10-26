@@ -35,7 +35,7 @@ import { registerCharacterCard } from '@/stores/asset-storage-store'
 import { isDemoSession } from '@/lib/demo/context'
 import type { ArtistSourceSnapshot } from '@/lib/artist/source-snapshot'
 import { fetchArtistGenerationLimit, runAdaptivePool } from '@/lib/artist/generation-slots'
-import { DRAW_CONTINUE_MAX_ROUNDS, missingDrawTargets } from '@/lib/artist/draw-continue'
+import { DRAW_CONTINUE_MAX_ROUNDS, STYLE_WAIT_RECHECK_MS, USER_LIMIT_RECHECK_MS, missingDrawTargets } from '@/lib/artist/draw-continue'
 // 최종 룩 요약(design_tokens 파생) — 옛 온보딩 버블 카피용으로 태어났지만(2026-08-06 제거)
 //   "지금 룩이 뭔지"의 파생 상태로 남긴다. 채팅 컨텍스트·향후 UI가 소비.
 export interface ArtistLookSummary {
@@ -78,6 +78,17 @@ export interface DrawMissingOutcome {
   requested: number
   submitted: number
   refused: boolean
+  /** 자리 없음 거절의 축 — 내 한도(user)면 잠시 뒤 다시 보고, 모두의 자리(global)면 멈춘다. 그 밖의 거절은 'other'. */
+  refusedScope: 'user' | 'global' | 'other' | null
+  /** 그림체를 읽는 중이라 서버가 기다리게 했다 — 멈춤이 아니다(읽기가 끝나면 서버가 빈칸을 그린다). */
+  waitingForStyle: boolean
+}
+
+/** 429 본문의 자리 축(api/quota.ts quotaRejectionResponse 의 scope). */
+function quotaScopeOf(status: number, body: unknown): 'user' | 'global' | null {
+  if (status !== 429 || !body || typeof body !== 'object') return null
+  const scope = (body as { scope?: unknown }).scope
+  return scope === 'user' || scope === 'global' ? scope : null
 }
 
 export function requireDefaultAppearanceKey(character: CharacterAsset): string {
@@ -256,6 +267,7 @@ async function generateAndPersistWorldShot(
         status: 'failed',
         httpStatus: res.status,
         error: body.error ?? `HTTP ${res.status}`,
+        quotaScope: quotaScopeOf(res.status, body),
     })
       if (notifyIfQuotaExceeded(res.status, body)) return null
       throw new Error(body.error ?? `HTTP ${res.status}`)
@@ -266,11 +278,13 @@ async function generateAndPersistWorldShot(
       deduped?: boolean
       status?: string
       reason?: string
+      waitingForStyle?: boolean
     }
     // 서버 give-up 게이트(반복 실패 슬롯의 자율 재생성 차단) → jobId 없음. 에러 아님: null 로 조용히 종료.
     // 서버 "이미 있음"(자동 경로가 다 그려진 배경을 다시 요청, 2026-10-27)도 겹친 요청처럼 조용히 끝낸다 — 멈췄다는 안내가 아니다.
+    // 그림체를 읽는 중이라 기다리게 한 답은 표시해 둔다 — 이어 그리기가 멈추지 않고 잠시 뒤 다시 본다.
     if (body.deduped || (body.skipped && body.reason === 'exists')) {
-      options?.onJob?.({ jobId: null, status: 'deduped' })
+      options?.onJob?.({ jobId: null, status: 'deduped', ...(body.waitingForStyle ? { error: 'waiting_for_style' } : {}) })
       return null
     }
     if (body.skipped || !body.jobId) {
@@ -667,7 +681,9 @@ interface ArtistState {
   drawingBeganAt: { projectId: string; at: number } | null
   markDrawingBegan: (projectId: string) => void
   /** 내 한도에 막혀 못 그린 그림 이어 그리기(2026-10-27 디자이너 QA 1차 #06) — 횟수 · 멈춤(거절 · 보낸 것 없음). */
-  drawContinue: { projectId: string | null; rounds: number; stopped: boolean; running: boolean }
+  drawContinue: { projectId: string | null; rounds: number; stopped: boolean; running: boolean; paused: boolean }
+  /** 서버 초안이 자리 때문에 건너뛴 칸의 축('char:<id>' · 'world:<id>') — 모두의 자리에 막힌 칸은 이어 그리지 않는다. */
+  capacitySkips: Record<string, 'user' | 'global'>
   /** 앞의 그림이 다 끝났을 때 실패 기록 없는 빈칸을 이어 그린다. 거절(자리 없음 등)되거나 새로 보낸 것이 없으면 멈춘다. */
   continueMissingImages: () => Promise<void>
   /** 사람이 누른 [안 나온 그림 n장 다시 그리기] — 실패한 칸도 다시 그리고, 멈춘 이어 그리기를 다시 켠다. */
@@ -750,7 +766,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   generatingLocations: [],
   serverDrawCheckedAt: null,
   drawingBeganAt: null,
-  drawContinue: { projectId: null, rounds: 0, stopped: false, running: false },
+  drawContinue: { projectId: null, rounds: 0, stopped: false, running: false, paused: false },
+  capacitySkips: {},
   selectedBoostPreset: null,
   imageProvider: 'fal' as ImageProvider,
   error: null,
@@ -1247,18 +1264,19 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       if (!res.ok) {
         const body = await res.json().catch(() => ({}))
         const error = body.error ?? `HTTP ${res.status}`
-        onJob({ jobId: null, status: 'failed', httpStatus: res.status, error })
+        onJob({ jobId: null, status: 'failed', httpStatus: res.status, error, quotaScope: quotaScopeOf(res.status, body) })
         if (notifyIfQuotaExceeded(res.status, body)) {
           return { jobId: null, status: 'failed', httpStatus: res.status, error }
         }
         throw new Error(body.error ?? `HTTP ${res.status}`)
       }
       // 비동기: 라우트는 jobId만 반환 — 완료까지 polling (webhook이 서버사이드로 storage+DB 갱신).
-      const body = (await res.json()) as { jobId?: string; skipped?: boolean; deduped?: boolean }
+      const body = (await res.json()) as { jobId?: string; skipped?: boolean; deduped?: boolean; waitingForStyle?: boolean }
       // 서버 dedupe(이미 같은 슬롯에 queued 잡 존재) → 새 fal 제출 없이 종료. 에러/재시도 아님(중복 방지).
+      //   그림체를 읽는 중이라 기다리게 한 답은 표시해 둔다(이어 그리기가 멈추지 않고 잠시 뒤 다시 본다).
       if (body.deduped) {
         alog(`[autogen] char ${key} — 이미 큐에 있음(서버 dedupe), 제출 생략`)
-        onJob({ jobId: null, status: 'deduped', httpStatus: res.status })
+        onJob({ jobId: null, status: 'deduped', httpStatus: res.status, ...(body.waitingForStyle ? { error: 'waiting_for_style' } : {}) })
         return { jobId: null, status: 'deduped', httpStatus: res.status }
       }
       // 서버 give-up 게이트(반복 실패 슬롯의 자율 재생성 차단) → jobId 없음.
@@ -1372,7 +1390,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         `/api/artist/generation-status?projectId=${encodeURIComponent(projectId)}`,
       )
       if (!res.ok) return
-      const { failures, queuedMain, worldFailures, queuedWorld } = (await res.json()) as {
+      const { failures, queuedMain, worldFailures, queuedWorld, capacitySkips } = (await res.json()) as {
+        capacitySkips?: Record<string, 'user' | 'global'>
         failures: Array<{
           characterId: string
           appearanceKey: string
@@ -1404,7 +1423,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           safeFailCount: f.safeFailCount,
         }
       }
-      set({ worldFailures: worldFailuresFromStatus(worldFailures), viewFailures: vf })
+      set({ worldFailures: worldFailuresFromStatus(worldFailures), viewFailures: vf, capacitySkips: capacitySkips ?? {} })
       for (const { locationId, appearanceKey, jobId } of queuedWorld ?? []) {
         const slotKey = worldFailureKey(locationId, appearanceKey)
         if (get().generatingLocations.includes(slotKey)) continue
@@ -1915,7 +1934,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   //   client 가 main 을 다시 자동 제출하지 않는다(이중 생성/과금 방지; 서버 실패는 카드 배지로 표시).
   //   여기선 writer-origin 오픈캐스트 main 과 월드 fallback 만 보강한다(자연 캐시 skip).
   drawMissingImages: async (opts = {}) => {
-    const { characterAssets, worldAssets, generatingViews, generatingLocations, viewFailures, worldFailures } = get()
+    const pid = useProjectStore.getState().projectId
+    const { characterAssets, worldAssets, generatingViews, generatingLocations, viewFailures, worldFailures, capacitySkips } = get()
     // [완료하기]와 같은 기준 — 대표 모습에 시트가 있어야 그린 것이다(completion-gaps). 그리는 중인 칸은 다시 보내지 않는다(같은 그림이 두 번 나간다).
     const targets = missingDrawTargets({
       characters: characterAssets,
@@ -1924,26 +1944,39 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       drawingLocations: generatingLocations,
       failedViews: viewFailures,
       failedLocations: worldFailures,
+      capacitySkips,
     }, { skipFailed: opts.skipFailed })
     const receipts: GenerationJobReceipt[] = []
     const onJob: GenerationJobObserver = (receipt) => { receipts.push(receipt) }
+    // 늦게 시작하는 그림은 그때의 프로젝트를 읽는다 — 다른 프로젝트로 옮겼으면 보내지 않는다(옮겨 간 프로젝트에 과금하지 않게).
+    const sameProject = () => !!pid && useProjectStore.getState().projectId === pid
     const tasks: Array<() => Promise<void>> = [
       ...targets.characters.map(({ characterId, appearanceKey }) => async () => {
+        if (!sameProject()) return
         await get().generateCharacterView(characterId, appearanceKey, 'main', 'auto', undefined, undefined, undefined, { onJob })
       }),
       ...targets.worlds.map((locationId) => async () => {
+        if (!sameProject()) return
         await get().generateWorldShot(locationId, 'wideShot', undefined, 'auto', undefined, { onJob })
       }),
     ]
     // 자동 생성과 같은 가변 동시 장수(러프 중 1 · 아니면 3) — 한꺼번에 보내면 유저 한도(6)에 막힌다(2026-10-27 디자이너 QA 1차 #05).
     //   한 장의 실패가 나머지를 막지 않는다(각 생성 함수가 실패를 스스로 알린다).
     await runAdaptivePool(tasks, fetchArtistGenerationLimit).catch(() => undefined)
+    // 접수 전에 거절됐다(자리 없음 · 이용권 · 내용 규칙) — 자리 없음이면 어느 자리였는지 함께 본다.
+    const refusals = receipts.filter((receipt) => receipt.status === 'failed' && !receipt.jobId && (receipt.httpStatus ?? 0) >= 400)
+    const refusedScope = refusals.length === 0
+      ? null
+      : refusals.some((receipt) => receipt.quotaScope === 'global') ? 'global'
+        : refusals.every((receipt) => receipt.quotaScope === 'user') ? 'user'
+          : 'other'
     return {
       requested: tasks.length,
       // 보낸 장수 — 접수 번호가 붙은 작업 수(같은 작업의 진행 알림은 한 번만 센다).
       submitted: new Set(receipts.filter((receipt) => receipt.jobId && receipt.status !== 'failed').map((receipt) => receipt.jobId)).size,
-      // 접수 전에 거절됐다(자리 없음 · 이용권 · 내용 규칙) — 이어 그리기는 여기서 멈춘다(자동 재시도 없음, 2026-09-11 오너).
-      refused: receipts.some((receipt) => receipt.status === 'failed' && !receipt.jobId && (receipt.httpStatus ?? 0) >= 400),
+      refused: refusals.length > 0,
+      refusedScope,
+      waitingForStyle: receipts.some((receipt) => receipt.error === 'waiting_for_style'),
     }
   },
 
@@ -1956,28 +1989,53 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return
     const current = get().drawContinue
-    const mine = current.projectId === projectId ? current : { projectId, rounds: 0, stopped: false, running: false }
-    if (mine.running || mine.stopped || mine.rounds >= DRAW_CONTINUE_MAX_ROUNDS) return
+    const mine = current.projectId === projectId ? current : { projectId, rounds: 0, stopped: false, running: false, paused: false }
+    if (mine.running || mine.stopped || mine.paused || mine.rounds >= DRAW_CONTINUE_MAX_ROUNDS) return
     set({ drawContinue: { ...mine, running: true } })
     const outcome = await get().drawMissingImages({ skipFailed: true })
     if (useProjectStore.getState().projectId !== projectId) return
+    // 잠시 쉬었다가 다시 본다 — 쉬는 동안 판단은 "기다림"이라 단추도 뜨지 않는다.
+    const pauseFor = (ms: number) => {
+      setTimeout(() => {
+        const now = get().drawContinue
+        if (now.projectId === projectId && now.paused) set({ drawContinue: { ...now, paused: false } })
+      }, ms)
+    }
+    // 그림체를 읽는 중이라 기다리게 했다 — 바퀴로 세지 않고 멈추지 않는다(읽기가 끝나면 서버가 빈칸을 그린다).
+    if (outcome.waitingForStyle && outcome.submitted === 0 && !outcome.refused) {
+      set({ drawContinue: { ...mine, running: false, paused: true } })
+      pauseFor(STYLE_WAIT_RECHECK_MS)
+      return
+    }
     const rounds = mine.rounds + 1
+    // 내 한도에 막혔다 — 내 다른 그림이 끝나기를 기다렸다가 다시 본다(2026-09-11 오너 (가)). 모두의 자리가 찼거나
+    //   다른 까닭으로 거절됐거나 새로 보낸 것이 없으면(겹친 요청 · 이미 있음뿐) 멈추고 단추로 남긴다(자동 재시도 없음).
+    const waitForMine = outcome.refusedScope === 'user' && rounds < DRAW_CONTINUE_MAX_ROUNDS
     set({
       drawContinue: {
         projectId,
         rounds,
-        // 거절됐거나 새로 보낸 것이 없으면(겹친 요청 · 이미 있음뿐) 같은 요청을 되풀이하지 않는다.
-        stopped: outcome.refused || outcome.submitted === 0 || rounds >= DRAW_CONTINUE_MAX_ROUNDS,
+        stopped: !waitForMine && (outcome.refused || outcome.submitted === 0 || rounds >= DRAW_CONTINUE_MAX_ROUNDS),
         running: false,
+        paused: waitForMine,
       },
     })
+    if (waitForMine) pauseFor(USER_LIMIT_RECHECK_MS)
   },
 
   redrawMissingImages: async () => {
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return
-    set({ drawContinue: { projectId, rounds: 0, stopped: false, running: false } })
-    await get().drawMissingImages()
+    // 이어 그리기와 동시에 돌지 않는다 — 함께 돌면 자리보다 많이 보내거나 같은 그림을 두 번 요청할 수 있다.
+    const current = get().drawContinue
+    if (current.projectId === projectId && current.running) return
+    set({ drawContinue: { projectId, rounds: 0, stopped: false, running: true, paused: false } })
+    try {
+      await get().drawMissingImages()
+    } finally {
+      const now = get().drawContinue
+      if (now.projectId === projectId) set({ drawContinue: { ...now, running: false } })
+    }
   },
 
   autoGenerateBaseImages: async () => {
@@ -2388,7 +2446,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       generatingLocations: [],
       serverDrawCheckedAt: null,
       drawingBeganAt: null,
-      drawContinue: { projectId: null, rounds: 0, stopped: false, running: false },
+      drawContinue: { projectId: null, rounds: 0, stopped: false, running: false, paused: false },
+      capacitySkips: {},
       selectedBoostPreset: null,
       imageProvider: 'fal' as ImageProvider,
       error: null,
