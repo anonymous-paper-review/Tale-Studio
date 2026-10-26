@@ -4,7 +4,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { isAdminWorkspaceOwner } from '@/lib/admin'
+import { isQuotaExemptWorkspaceOwner } from '@/lib/quota-exempt'
 import { takeBalance } from '@/lib/billing/take-ledger'
 import { takeBillingMode } from '@/lib/billing/take-hold'
 
@@ -28,7 +28,8 @@ export async function GET() {
     if (error) throw error
     if (!workspace) return NextResponse.json({ balance: 0, mode })
 
-    if (isAdminWorkspaceOwner(user, workspace.owner_id)) {
+    // 관리자 · 시연 계정(할당량 면제, 2026-10-27)은 무제한으로 보인다.
+    if (isQuotaExemptWorkspaceOwner(user, workspace.owner_id)) {
       return NextResponse.json({ balance: null, mode })
     }
 

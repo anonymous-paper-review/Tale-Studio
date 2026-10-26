@@ -1,7 +1,7 @@
 import { canUseReference, getPlanLimit } from '@/lib/plan-limits'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
-import { isAdminWorkspaceOwner } from '@/lib/admin'
+import { isQuotaExemptWorkspaceOwner, referenceAllowed } from '@/lib/quota-exempt'
 import { NextResponse } from 'next/server'
 import { pickProjectThumbnails, type ThumbnailCharacterRow, type ThumbnailShotRow } from '@/lib/project-thumbnail'
 import { seriesListFields } from '@/features/projects/series-list'
@@ -35,9 +35,10 @@ export async function GET() {
     }
 
     const plan = workspace.plan || 'free'
-    const isAdmin = isAdminWorkspaceOwner(user, workspace.owner_id)
-    const slotLimit = isAdmin ? null : getPlanLimit(plan)
-    const referenceEnabled = canUseReference(plan)
+    // 관리자 · 시연 계정(할당량 면제, 2026-10-27)은 프로젝트 칸이 무제한이다.
+    const unlimited = isQuotaExemptWorkspaceOwner(user, workspace.owner_id)
+    const slotLimit = unlimited ? null : getPlanLimit(plan)
+    const referenceEnabled = referenceAllowed(plan, unlimited)
 
     const { data: projects } = await supabaseAdmin
       .from('projects')
@@ -87,7 +88,7 @@ export async function GET() {
       })),
       plan,
       slotLimit,
-      unlimitedProjects: isAdmin,
+      unlimitedProjects: unlimited,
       canUseReference: referenceEnabled,
     })
   } catch (err) {

@@ -2,9 +2,9 @@
 //   순서: 로그인 → 작업 공간 → 요금제(칸 2개 이상) → 앞 화 주인 · 씬 확인 → 칸 확인 + 삽입 → 그림 복사 · 기록 저장.
 //   만든 뒤 화면은 /studio/start?projectId=<id> 로 간다(지금 새 프로젝트와 같다).
 import { randomUUID } from 'node:crypto'
-import { isAdminWorkspaceOwner } from '@/lib/admin'
+import { isQuotaExemptWorkspaceOwner, referenceAllowed } from '@/lib/quota-exempt'
 import { parseAppLocale } from '@/lib/locale'
-import { canUseReference, getPlanLimit } from '@/lib/plan-limits'
+import { getPlanLimit } from '@/lib/plan-limits'
 import { ReferenceImportValidationError } from '@/lib/reference-import'
 import {
   NextEpisodeError,
@@ -40,7 +40,8 @@ export async function POST(req: NextRequest) {
     const { user, workspace, fromProjectId } = gate
 
     const limit = getPlanLimit(workspace.plan)
-    const isAdmin = isAdminWorkspaceOwner(user, workspace.owner_id)
+    // 관리자 · 시연 계정(할당량 면제, 2026-10-27)은 프로젝트 칸 제한이 없다.
+    const unlimited = isQuotaExemptWorkspaceOwner(user, workspace.owner_id)
     const projectId = randomUUID()
 
     const prev = await loadPrevEpisode({
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
       prev,
       workspaceId: workspace.id,
       destinationProjectId: projectId,
-      slotLimit: isAdmin ? null : limit,
+      slotLimit: unlimited ? null : limit,
       locale,
       continueLastScene: body?.continueLastScene === true,
     })
@@ -105,7 +106,8 @@ async function openGate(
 
   const workspace = await ensureWorkspace(user)
   // 칸이 2개 이상인 요금제만 앞 화를 남겨 둘 수 있다 — 칸이 하나면 다음 화를 만들 자리가 없다.
-  if (!canUseReference(workspace.plan)) {
+  //   할당량 면제(관리자 · 시연 계정)는 칸이 무제한이라 요금제와 상관없이 쓴다(2026-10-27 검토).
+  if (!referenceAllowed(workspace.plan, isQuotaExemptWorkspaceOwner(user, workspace.owner_id))) {
     return {
       response: NextResponse.json(
         { error: 'reference_unavailable', plan: workspace.plan },

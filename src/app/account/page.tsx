@@ -218,7 +218,7 @@ export default function AccountPage() {
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
               <p className={cn('text-4xl font-semibold tabular-nums', negative && 'text-destructive')}>
-                {data?.isAdmin ? t('Unlimited') : balance ? balance.total.toLocaleString('en-US') : '-'}
+                {data?.unlimited ? t('Unlimited') : balance ? balance.total.toLocaleString('en-US') : '-'}
               </p>
               {negative && (
                 <p className="mt-2 max-w-md text-sm text-destructive">

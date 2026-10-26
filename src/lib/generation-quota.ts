@@ -32,7 +32,7 @@ import {
 import { falKeys, totalMaxInflight } from '@/lib/fal/keys'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { PROJECT_VIDEO_GENERATION_LIMIT } from '@/lib/plan-limits'
-import { isAdminEmail } from '@/lib/admin'
+import { isAdminUserId, isQuotaExemptUserId } from '@/lib/quota-exempt-server'
 
 /** 쿼터 카테고리 — Take 과금 축과 동일한 경계. 영상 kind 만 video, 나머지 전부 image. */
 export type QuotaCategory = 'video' | 'image'
@@ -86,24 +86,9 @@ function kindsOf(category: QuotaCategory): readonly GenerationJobKind[] {
   return category === 'video' ? VIDEO_JOB_KINDS : IMAGE_JOB_KINDS
 }
 
-// admin 판별 캐시 — 쿼터 검사는 생성마다 도는 핫패스라 auth 조회를 유저당 1회로 줄인다.
-//   admin 명단 변경은 배포/env 수준의 사건이라 프로세스 수명 캐시로 충분하다.
-const adminUserCache = new Map<string, boolean>()
-
-async function isAdminUserId(userId: string): Promise<boolean> {
-  const cached = adminUserCache.get(userId)
-  if (cached !== undefined) return cached
-  try {
-    const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId)
-    if (error) throw error
-    const admin = isAdminEmail(data?.user?.email)
-    adminUserCache.set(userId, admin)
-    return admin
-  } catch {
-    // 판별 실패는 일반 유저로 취급 — 쿼터가 admin 에게 잘못 걸리는 쪽이 뚫리는 쪽보다 안전.
-    return false
-  }
-}
+// 관리자 · 할당량 면제 판정은 quota-exempt-server(계정 이메일을 사용자당 한 번 읽음)가 한다.
+//   동시 생성 자리(개인 상한) 면제는 관리자만 — 시연 계정(외부와 비밀번호를 나눔)이 모두의 자리를 차지하지 않게(2026-10-27 검토).
+//   프로젝트당 영상 한도 면제는 관리자 · 시연 계정(할당량 면제).
 
 // 원자 예약에 관리자 예외를 전달한다. 예산 확인이 먼저 admin 캐시를 채워도
 // 생성 검사·예약마다 동기화하며, 기록에 실패하면 한도 면제를 추측하지 않고 제출을 막는다.
@@ -261,7 +246,7 @@ export async function checkProjectVideoBudget(
 ): Promise<ProjectVideoBudget> {
   const limit = PROJECT_VIDEO_GENERATION_LIMIT
   try {
-    if (await isAdminUserId(userId)) return { ok: true, used: 0, limit }
+    if (await isQuotaExemptUserId(userId)) return { ok: true, used: 0, limit }
     const used = await countProjectVideoGenerations(projectId)
     return { ok: used < limit, used, limit }
   } catch {

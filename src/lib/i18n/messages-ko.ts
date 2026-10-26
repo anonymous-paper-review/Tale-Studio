@@ -1834,6 +1834,7 @@ export const KO: Record<string, string> = {
   'Delete account permanently': '계정 영구 삭제',
   'We could not cancel your subscription, so nothing was deleted. Please try again in a moment.':
     '구독을 해지하지 못해서 아무것도 지우지 않았어요. 잠시 뒤 다시 시도해주세요.',
+  'This demo account cannot be deleted.': '시연 계정은 지울 수 없어요.',
   'Could not delete your account. Please try again in a moment.': '계정을 지우지 못했어요. 잠시 뒤 다시 시도해주세요.',
   // 결제창 (P7·P8)
   'That product is not available.': '그 상품은 살 수 없어요.',

@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { pickActiveSubscription, type SubscriptionRow } from '@/lib/billing/subscription-state'
 import { isAdminWorkspaceOwner } from '@/lib/admin'
+import { isQuotaExemptWorkspaceOwner } from '@/lib/quota-exempt'
 import { takeBillingMode } from '@/lib/billing/take-hold'
 import {
   canBuyTakePack,
@@ -22,6 +23,8 @@ import {
 export interface BillingAccountResponse {
   email: string
   isAdmin: boolean
+  /** 할당량 면제(관리자 · 시연 계정, 2026-10-27) — Take 잔액을 "무제한"으로 보인다. 관리자 권한과는 따로다. */
+  unlimited: boolean
   mode: ReturnType<typeof takeBillingMode>
   subscription: SubscriptionSummary
   balance: TakeBreakdown | null
@@ -56,6 +59,7 @@ export async function GET() {
       const body: BillingAccountResponse = {
         email,
         isAdmin: false,
+        unlimited: false,
         mode,
         subscription: summarizeSubscription('free', null),
         balance: takeBreakdown([]),
@@ -70,6 +74,7 @@ export async function GET() {
     const workspaceId = workspace.id as string
     const plan = typeof workspace.plan === 'string' ? workspace.plan : 'free'
     const isAdmin = isAdminWorkspaceOwner(user, workspace.owner_id)
+    const unlimited = isQuotaExemptWorkspaceOwner(user, workspace.owner_id)
 
     const [{ data: subscriptions, error: subError }, { data: ledger, error: ledgerError }, { data: customer }] = await Promise.all([
       supabaseAdmin.from('subscriptions').select('*').eq('workspace_id', workspaceId),
@@ -90,9 +95,10 @@ export async function GET() {
     const body: BillingAccountResponse = {
       email,
       isAdmin,
+      unlimited,
       mode,
       subscription: summarizeSubscription(plan, subscription ?? null),
-      balance: isAdmin ? null : takeBreakdown(rows),
+      balance: unlimited ? null : takeBreakdown(rows),
       recent: groupRecentActivity(rows),
       packPurchasedBefore,
       canBuyPack: canBuyTakePack({ plan, packPurchasedBefore }),

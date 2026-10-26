@@ -57,7 +57,9 @@ export function DeleteAccountDialog({
           t(
             body.error === 'subscription_cancel_failed'
               ? 'We could not cancel your subscription, so nothing was deleted. Please try again in a moment.'
-              : 'Could not delete your account. Please try again in a moment.',
+              : body.error === 'demo_account_locked'
+                ? 'This demo account cannot be deleted.'
+                : 'Could not delete your account. Please try again in a moment.',
           ),
         )
         return

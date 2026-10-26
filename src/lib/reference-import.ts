@@ -1,4 +1,5 @@
-import { canUseReference } from '@/lib/plan-limits'
+import { referenceAllowed } from '@/lib/quota-exempt'
+import { isQuotaExemptUserId } from '@/lib/quota-exempt-server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import {
   isOwnMediaUrl,
@@ -81,7 +82,7 @@ export async function buildReferenceDigest(
     .eq('id', project.workspace_id)
     .maybeSingle()
   if (workspaceError) throw workspaceError
-  if (!workspace || workspace.owner_id !== requesterUserId || !canUseReference(workspace.plan)) {
+  if (!workspace || workspace.owner_id !== requesterUserId || !referenceAllowed(workspace.plan, await isQuotaExemptUserId(requesterUserId))) {
     return null
   }
 
@@ -209,7 +210,8 @@ export async function prepareReferenceImport(
       'The reference project is not available.',
     )
   }
-  if (!canUseReference(workspace.plan)) {
+  // 할당량 면제(관리자 · 시연 계정)는 칸이 무제한이라 요금제와 상관없이 앞 화를 가져온다(2026-10-27 검토).
+  if (!referenceAllowed(workspace.plan, await isQuotaExemptUserId(input.userId))) {
     throw new ReferenceImportValidationError(
       'reference_unavailable',
       403,

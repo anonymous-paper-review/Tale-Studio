@@ -18,6 +18,8 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
+import { isAdminEmail } from '@/lib/admin'
+import { isQuotaExemptEmail } from '@/lib/quota-exempt'
 import { deleteProjectDeep } from '@/lib/project/delete-project'
 import { cancelSubscriptionNow } from '@/lib/billing/cancel-subscription'
 import { pickActiveSubscription, type SubscriptionRow } from '@/lib/billing/subscription-state'
@@ -37,6 +39,11 @@ export async function POST(req: Request) {
       data: { user },
     } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    // 시연 계정(할당량만 무제한, 비밀번호를 외부와 나눔)은 지우지 않는다 — 한 사람이 지우면 다음 시연 자료가 사라진다(2026-10-27 검토).
+    if (isQuotaExemptEmail(user.email) && !isAdminEmail(user.email)) {
+      return NextResponse.json({ error: 'demo_account_locked' }, { status: 403 })
+    }
 
     const { data: workspaces, error: workspaceError } = await supabaseAdmin
       .from('workspaces')

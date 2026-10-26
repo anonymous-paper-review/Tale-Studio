@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { ensureWorkspace } from '@/lib/supabase/workspace'
 import { parseAppLocale } from '@/lib/locale'
-import { isAdminWorkspaceOwner } from '@/lib/admin'
+import { isQuotaExemptWorkspaceOwner } from '@/lib/quota-exempt'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function POST(req: NextRequest) {
@@ -31,7 +31,8 @@ export async function POST(req: NextRequest) {
 
     const workspace = await ensureWorkspace(user)
 
-    const isAdmin = isAdminWorkspaceOwner(user, workspace.owner_id)
+    // 관리자 · 시연 계정(할당량 면제, 2026-10-27)은 프로젝트 칸 제한이 없다.
+    const unlimited = isQuotaExemptWorkspaceOwner(user, workspace.owner_id)
     const limit = getPlanLimit(workspace.plan)
     const projectId = randomUUID()
 
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
         p_locale: locale,
         p_locale_locked: uiLocale !== null || userLocale !== null,
         p_reference_project_id: null,
-        p_slot_limit: isAdmin ? null : limit,
+        p_slot_limit: unlimited ? null : limit,
       },
     )
     const creation = creationData as

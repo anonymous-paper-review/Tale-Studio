@@ -10,7 +10,7 @@
 // admin = 슈퍼계정(2026-09-02 오너 결정): admin 워크스페이스는 hold/차감/부족 차단을 전부
 //   건너뛴다. 판정은 generation-quota.ts 의 admin 면제와 같은 축(src/lib/admin.ts) 재사용.
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { isAdminEmail } from '@/lib/admin'
+import { isQuotaExemptUserId } from '@/lib/quota-exempt-server'
 import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events'
 
 export type TakeBillingMode = 'off' | 'shadow' | 'enforce'
@@ -32,24 +32,6 @@ export interface HoldResult {
   skipped: 'off' | 'admin' | null
 }
 
-// admin 판별 캐시 — generation-quota.ts 의 동일 패턴(핫패스에서 auth 조회 유저당 1회로 축소).
-const adminUserCache = new Map<string, boolean>()
-
-async function isAdminUserId(userId: string): Promise<boolean> {
-  const cached = adminUserCache.get(userId)
-  if (cached !== undefined) return cached
-  try {
-    const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId)
-    if (error) throw error
-    const admin = isAdminEmail(data?.user?.email)
-    adminUserCache.set(userId, admin)
-    return admin
-  } catch {
-    // 판별 실패는 일반 유저로 취급 — admin 면제가 잘못 걸리는 쪽(과금)이 뚫리는 쪽보다 안전.
-    return false
-  }
-}
-
 /**
  * 영상 생성 잡 제출 직전에 부르는 원자 hold 관문. mode=off 는 RPC 를 아예 타지 않고
  * 무제한 통과로 취급(ok:true, insufficient:false) — 배포해도 기존 동작이 그대로다.
@@ -66,7 +48,8 @@ export async function holdTakesForVideoJob(input: {
   if (mode === 'off') {
     return { ok: true, insufficient: false, held: 0, balance: 0, skipped: 'off' }
   }
-  if (await isAdminUserId(input.userId)) {
+  // 관리자 · 시연 계정(할당량 면제)은 Take 를 묶지 않는다. 결과 표시는 예전 이름('admin')을 그대로 쓴다(관리자 기능을 여는 판정이 아니다).
+  if (await isQuotaExemptUserId(input.userId)) {
     return { ok: true, insufficient: false, held: 0, balance: 0, skipped: 'admin' }
   }
   const { data, error } = await supabaseAdmin.rpc('take_hold', {
