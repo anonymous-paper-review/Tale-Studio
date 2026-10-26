@@ -1,4 +1,4 @@
-// 새 4축 트리거가 동시 요청에서도 개인 영상 3·개인 이미지 6·fal 계정별·전체 합계 상한을 지키는지 실제 개발 DB의 격리 공간에서 확인한다
+// 새 4축 트리거가 동시 요청에서도 개인 영상 3·개인 이미지 6(시연 계정은 각각 10)·fal 계정별·전체 합계 상한을 지키는지 실제 개발 DB의 격리 공간에서 확인한다
 import { randomUUID } from 'node:crypto'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
@@ -14,6 +14,7 @@ const migrationDir = resolve(dirname(fileURLToPath(import.meta.url)), '../../sup
 const migrationPaths = [
   resolve(migrationDir, '20260914110000_generation_capacity_all_axes.sql'),
   resolve(migrationDir, '20260914150000_generation_capacity_key_assignment.sql'),
+  resolve(migrationDir, '20261027100000_generation_capacity_per_user_limit.sql'),
 ]
 const videoKinds = ['shot_video', 'shot_previz_video']
 const clients: Client[] = []
@@ -62,6 +63,11 @@ async function addUsers(userIds: string[]) {
 
 async function addExemptUsers(userIds: string[]) {
   await primary.query(`insert into ${schema}.generation_capacity_exempt_users(user_id) select unnest($1::uuid[])`, [userIds])
+}
+
+/** 시연 계정처럼 사용자별 개인 상한(영상 · 그림 각각)을 가진 행 — 칸이 빈 행은 관리자(상한 없음)다. */
+async function addLimitedUsers(userIds: string[], limit: number) {
+  await primary.query(`insert into ${schema}.generation_capacity_exempt_users(user_id, per_user_limit) select unnest($1::uuid[]), $2`, [userIds, limit])
 }
 
 async function setKeyLimits(limits: [string, number][]) {
@@ -327,6 +333,26 @@ describe.skipIf(!connection)('실제 동시 트랜잭션으로 확인하는 새 
       userId: exemptVideoUser, category: 'video', allowedErrors: [] })
 
     await reset()
+    const promoVideoUser = randomUUID()
+    await addUsers([promoVideoUser])
+    await addLimitedUsers([promoVideoUser], 10)
+    for (let index = 0; index < 8; index++) await insert(primary, { userId: promoVideoUser, kind: 'shot_video' })
+    await runRace({ id: 'promo_video_10', promise: '시연 계정은 영상이 8개 진행 중일 때 12건을 동시에 요청해도 진행 영상은 10개를 넘지 않는다',
+      expectedLimit: 10, expectedAccepted: 2, baseline: 8,
+      requests: Array.from({ length: 12 }, (_, index) => ({ userId: promoVideoUser, kind: index % 2 ? 'shot_video' : 'shot_previz_video' })),
+      userId: promoVideoUser, category: 'video', allowedErrors: ['video_user_at_capacity'], lockCapacity: true })
+
+    await reset()
+    const promoImageUser = randomUUID()
+    await addUsers([promoImageUser])
+    await addLimitedUsers([promoImageUser], 10)
+    for (let index = 0; index < 9; index++) await insert(primary, { userId: promoImageUser, kind: 'shot_storyboard' })
+    await runRace({ id: 'promo_image_10', promise: '시연 계정은 이미지가 9개 진행 중일 때 12건을 동시에 요청해도 진행 이미지 작업은 10개를 넘지 않는다',
+      expectedLimit: 10, expectedAccepted: 1, baseline: 9,
+      requests: Array.from({ length: 12 }, () => ({ userId: promoImageUser, kind: 'shot_storyboard' })),
+      userId: promoImageUser, category: 'image', allowedErrors: ['image_user_at_capacity'], lockCapacity: true })
+
+    await reset()
     const releasedUser = randomUUID()
     await addUsers([releasedUser])
     for (let index = 0; index < 3; index++) await insert(primary, { userId: releasedUser, kind: 'shot_video' })
@@ -362,6 +388,8 @@ describe.skipIf(!connection)('실제 동시 트랜잭션으로 확인하는 새 
     ['exempt_global_block', '두 계정이 모두 찬 상태를 읽은 관리자 요청의 결과를 기록한다'],
     ['exempt_video_over_limit', '영상 3개를 읽은 관리자 요청이 저장된 결과를 기록한다'],
     ['completed_video_releases_slot', '완료된 영상이 진행 수에서 빠지고 다음 영상이 저장된 결과를 기록한다'],
+    ['promo_video_10', '영상 8개를 읽은 시연 계정의 독립 요청 12건이 저장된 결과를 기록한다'],
+    ['promo_image_10', '이미지 9개를 읽은 시연 계정의 독립 요청 12건이 저장된 결과를 기록한다'],
   ]) {
     // 왜: 모의 응답이나 순차 실행을 실제 동시 DB 경합으로 오인하면 안 된다.
     it(label, () => {
@@ -386,6 +414,8 @@ describe.skipIf(!connection)('실제 동시 트랜잭션으로 확인하는 새 
     ['exempt_global_block', '두 계정이 모두 찼으면 관리자도 거절된다'],
     ['exempt_video_over_limit', '관리자는 내 영상 3개를 넘어도 전체 자리가 남아 있으면 수용된다'],
     ['completed_video_releases_slot', '진행 영상 3개 중 1개가 끝나면 다음 영상 1개를 시작할 수 있다'],
+    ['promo_video_10', '시연 계정은 영상이 8개 진행 중일 때 12건을 동시에 요청해도 진행 영상은 10개를 넘지 않는다'],
+    ['promo_image_10', '시연 계정은 이미지가 9개 진행 중일 때 12건을 동시에 요청해도 진행 이미지 작업은 10개를 넘지 않는다'],
   ]) {
     // 왜: 새 트리거의 약속이 DB 최종 저장에서도 유지되는지 판정하며 실패를 정상 동작으로 바꾸지 않는다.
     it(promise, () => {

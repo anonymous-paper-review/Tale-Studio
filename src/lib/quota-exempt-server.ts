@@ -20,7 +20,7 @@ async function accountEmailOf(userId: string): Promise<string | null> {
   }
 }
 
-/** 관리자 — 동시 생성 자리(개인 상한) 면제는 관리자만 받는다. */
+/** 관리자 — 동시 생성 자리(개인 상한) 면제는 관리자만 받는다(시연 계정은 상한 10 — generation-quota). */
 export async function isAdminUserId(userId: string): Promise<boolean> {
   return isAdminEmail(await accountEmailOf(userId))
 }

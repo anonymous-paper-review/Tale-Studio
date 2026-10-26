@@ -15,6 +15,8 @@
 //
 // admin 면제 (2026-08-26 오너 결정): 관리자 계정(운영·QA)은 유저당 상한을 받지 않는다.
 //   전역 세마포어는 admin 도 받는다 — fal 키 풀 슬롯은 물리 한도라 면제 대상이 아니다.
+// 시연 계정 (2026-10-27 오너 "시연 계정은 동시 생성 제한 10개로 늘려줘"): 할당량 면제 시연 계정
+//   (quota-exempt — promotion@talestudio.art 등)은 유저당 상한이 영상 · 그림 각각 10이다. 전역 세마포어는 받는다.
 //
 // 공정성(유저 라운드로빈 디스패치)은 여기 없다 — 전역 상한에 닿으면 먼저 온 요청이 슬롯을 먹는다.
 //   5명 규모에서는 이 러프함이 실무상 문제가 아니고, 진짜 fair-queue 는 잡을 pending 으로 재웠다가
@@ -53,6 +55,8 @@ export const IMAGE_JOB_KINDS: readonly GenerationJobKind[] = [
 // 합산 최악 9 라도 소수 유저까지는 전역 상한(totalMaxInflight) 안이고, 그 이상은 전역 세마포어가 받는다.
 export const MAX_QUEUED_VIDEO_JOBS_PER_USER = 3
 export const MAX_QUEUED_IMAGE_JOBS_PER_USER = 6
+/** 시연 계정(할당량 면제, 관리자 아님)의 유저당 상한 — 영상 · 그림 각각(2026-10-27 오너). */
+export const QUOTA_EXEMPT_MAX_QUEUED_JOBS_PER_USER = 10
 
 // 전 유저 합계 in-flight 상한 (레벨 1). 키별 maxInflight 의 합산이다(#fal-key-pool) — 다중 키
 //   레지스트리(FAL_KEYS env)로 전환하며 단일 상수 34(계정당 40 − 마진 6)를 폐기했다. 키별 값과
@@ -78,7 +82,11 @@ export interface QuotaCheck {
   axis: GenerationCapacityAxis
 }
 
-function limitOf(category: QuotaCategory): number {
+/** 이 사용자의 유저당 상한 — 'unlimited'(관리자) · 숫자(시연 계정, 영상 · 그림 각각) · null(기본 상한). */
+type PersonalCapacity = 'unlimited' | number | null
+
+function limitOf(category: QuotaCategory, personal: PersonalCapacity = null): number {
+  if (typeof personal === 'number') return personal
   return category === 'video' ? MAX_QUEUED_VIDEO_JOBS_PER_USER : MAX_QUEUED_IMAGE_JOBS_PER_USER
 }
 
@@ -87,8 +95,14 @@ function kindsOf(category: QuotaCategory): readonly GenerationJobKind[] {
 }
 
 // 관리자 · 할당량 면제 판정은 quota-exempt-server(계정 이메일을 사용자당 한 번 읽음)가 한다.
-//   동시 생성 자리(개인 상한) 면제는 관리자만 — 시연 계정(외부와 비밀번호를 나눔)이 모두의 자리를 차지하지 않게(2026-10-27 검토).
+//   동시 생성 자리(개인 상한) 면제는 관리자만이고, 시연 계정(외부와 비밀번호를 나눔)은 상한이 10이다 —
+//   모두의 자리를 혼자 차지하지는 않게(2026-10-27 검토 → 같은 날 오너 "10개로 늘려줘").
 //   프로젝트당 영상 한도 면제는 관리자 · 시연 계정(할당량 면제).
+async function personalCapacityOf(userId: string): Promise<PersonalCapacity> {
+  if (await isAdminUserId(userId)) return 'unlimited'
+  if (await isQuotaExemptUserId(userId)) return QUOTA_EXEMPT_MAX_QUEUED_JOBS_PER_USER
+  return null
+}
 
 // 원자 예약에 관리자 예외를 전달한다. 예산 확인이 먼저 admin 캐시를 채워도
 // 생성 검사·예약마다 동기화하며, 기록에 실패하면 한도 면제를 추측하지 않고 제출을 막는다.
@@ -99,14 +113,19 @@ class GenerationCapacityExemptSyncError extends Error {
   }
 }
 
-/** 관리자 여부를 면제 표에 반영하고, 이번 판정 결과를 반환한다. */
-export async function syncGenerationCapacityExemption(userId: string): Promise<boolean> {
-  const admin = await isAdminUserId(userId)
+/** 유저당 상한 판정을 DB 예외 표에 반영하고(관리자 = 한도 칸 비움 · 시연 계정 = 10 · 그 밖 = 행 없음),
+ *  이번 판정을 돌려준다. DB 트리거 · 영상 일괄 예약이 이 표의 한도로 자리를 센다. */
+async function syncPersonalCapacity(userId: string): Promise<PersonalCapacity> {
+  const personal = await personalCapacityOf(userId)
   try {
-    if (admin) {
+    if (personal !== null) {
       const { error } = await supabaseAdmin
         .from('generation_capacity_exempt_users')
-        .upsert({ user_id: userId, updated_at: new Date().toISOString() })
+        .upsert({
+          user_id: userId,
+          per_user_limit: personal === 'unlimited' ? null : personal,
+          updated_at: new Date().toISOString(),
+        })
       if (error) throw error
     } else {
       const { error } = await supabaseAdmin
@@ -118,7 +137,12 @@ export async function syncGenerationCapacityExemption(userId: string): Promise<b
   } catch (err) {
     throw new GenerationCapacityExemptSyncError(err)
   }
-  return admin
+  return personal
+}
+
+/** 관리자 여부(유저당 상한 없음)를 돌려준다 — 동기화는 syncPersonalCapacity 가 한다. */
+export async function syncGenerationCapacityExemption(userId: string): Promise<boolean> {
+  return (await syncPersonalCapacity(userId)) === 'unlimited'
 }
 
 // fal 키 레지스트리(FAL_KEYS)의 계정별 상한을 DB 로 옮겨 적는다. 트리거는 환경변수를 읽을 수 없어
@@ -168,9 +192,10 @@ export async function checkGenerationCapacity(
   userId: string,
   category: QuotaCategory,
 ): Promise<QuotaCheck> {
-  const limit = limitOf(category)
   const userAxis: GenerationCapacityAxis = category === 'video' ? 'user_video' : 'user_image'
-  const admin = await syncGenerationCapacityExemption(userId)
+  const personal = await syncPersonalCapacity(userId)
+  const admin = personal === 'unlimited'
+  const limit = limitOf(category, personal)
   try {
     const [userQueued, globalQueued] = await Promise.all([
       countQueuedJobsByUser(userId, kindsOf(category)),

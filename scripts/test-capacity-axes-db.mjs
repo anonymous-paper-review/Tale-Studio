@@ -20,6 +20,7 @@ const outputPath = argument('--output-path', resolve(workspace, '.claude/docs/20
 const migrationNames = [
   '20260914110000_generation_capacity_all_axes.sql',
   '20260914150000_generation_capacity_key_assignment.sql',
+  '20261027100000_generation_capacity_per_user_limit.sql',
 ]
 const migrationPaths = migrationNames.map((name) => resolve(workspace, 'supabase/migrations', name))
 const migrationSha256 = migrationPaths.map((path) => createHash('sha256').update(readFileSync(path)).digest('hex'))

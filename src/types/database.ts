@@ -688,14 +688,17 @@ export type Database = {
       }
       generation_capacity_exempt_users: {
         Row: {
+          per_user_limit: number | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          per_user_limit?: number | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          per_user_limit?: number | null
           updated_at?: string
           user_id?: string
         }
