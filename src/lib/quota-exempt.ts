@@ -3,6 +3,8 @@
 //   관리자(src/lib/admin.ts)는 늘 면제다. 그 밖에 관리자 권한 없이 할당량만 푼 계정이 있다 —
 //   2026-10-27 오너: 홍콩 스튜디오 시연용 promotion@talestudio.art(외부와 비밀번호를 나누므로 관리자 결제 창구 ·
 //   디버그 프롬프트 · 내부 엔진은 열리지 않는다). 더할 계정은 운영 설정 QUOTA_EXEMPT_EMAILS(쉼표 구분)로.
+//   ⚠ 공유 시연 계정 전용이다 — 이 목록의 관리자 아닌 계정은 계정 지우기도 잠긴다(api/account/delete). 실제 고객을 넣지 않는다.
+//   코드 기본값을 끄려면 배포가 필요하다 — 급하면 Supabase 에서 비밀번호를 바꾸거나 계정을 정지한다.
 //   관리자 판정처럼 소유자 검사와 AND 로 쓴다 — 남의 작업 공간을 열어도 그 공간의 한도는 풀리지 않는다.
 import { isAdminEmail } from '@/lib/admin'
 import { canUseReference } from '@/lib/plan-limits'
