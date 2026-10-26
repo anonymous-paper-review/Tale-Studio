@@ -45,7 +45,7 @@ import { applyStyleAnchor, resolveStyleAnchor } from '@/lib/style-anchor'
 import { styleAnalysisPending } from '@/lib/style-facets/analysis-wait'
 import { sheetIdentityReferences } from '@/lib/artist/source-image'
 import { parseSeries, styleIdOf } from '@/lib/series/snapshot'
-import { seriesCharacterReference, seriesStyleSample } from '@/lib/series/redraw-reference'
+import { seriesCharacterReference, seriesStyleSample, seriesWorldLine } from '@/lib/series/redraw-reference'
 import { resolveCharacterPromptInput, styleFromUserAnalysis } from '@/lib/artist/sheet-prompt-input'
 import { templateAssetUrl } from '@/lib/storage/template-asset'
 import { normalizeImageModelKey, resolveImageEndpoint } from '@/lib/image-models'
@@ -249,6 +249,8 @@ export async function POST(req: Request) {
       anchor && appearance.is_default && !refMain && !seriesSheetUrl
         ? seriesStyleSample(series, 'character', characterId, styleIdOf(project))
         : null
+    // 새로 나온 인물(2026-10-27 오너 "가로 하자"): 앞 화 세계 한 줄을 그림 지시에 넣는다(그림체 · 참고 그림과 상관없이).
+    const seriesWorld = seriesWorldLine(series, 'character', characterId)
     const webhookUrl = resolveWebhookUrl()
     let submitOpts: FalImageOptions
     let styleAnchorMode: 'turnaround' | 'single' | null = null
@@ -283,6 +285,7 @@ export async function POST(req: Request) {
               hasSourceImage: !!sourceImageUrl,
               hasSeriesSheet: !!seriesSheetUrl,
               hasSeriesStyleSample: !!styleSampleUrl,
+              seriesWorld,
             }),
             // 템플릿이 첫 장(레이아웃 기준), 그 뒤가 정체성 이미지(기준얼굴·직전 시트).
             //   순서가 뒤바뀌면 모델이 얼굴 이미지를 레이아웃으로 오인한다.
@@ -304,7 +307,7 @@ export async function POST(req: Request) {
           styleAnchorMode = 'single'
           submitOpts = {
             model: endpoint,
-            prompt: buildCharacterTurnaroundPrompt(input),
+            prompt: buildCharacterTurnaroundPrompt(input, { seriesWorld }),
             aspect_ratio: '3:2',
             webhookUrl,
           }

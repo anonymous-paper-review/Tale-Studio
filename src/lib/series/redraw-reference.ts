@@ -55,6 +55,34 @@ export function withSeriesLocationStyleSample(prompt: string): string {
   ].join('\n')
 }
 
+/**
+ * 새로 나온 인물 · 배경의 그림 지시에 넣을 앞 화 세계 한 줄(2026-10-27 오너 "가로 하자", world-line.ts).
+ *   이어받은 인물 · 배경은 앞 화 그림이 이미 그 세계를 보여 주고, 세계 줄이 없는 화는 지금처럼 그린다 — 둘 다 null.
+ *   그림체와 상관없다(그림체 기준 그림 없이 그리는 실사도 옷차림 · 건물은 그 세계여야 한다).
+ */
+export function seriesWorldLine(
+  series: SeriesSnapshot | null | undefined,
+  kind: 'character' | 'location',
+  id: string,
+): string | null {
+  if (!series?.world || !id) return null
+  const inherited =
+    kind === 'character'
+      ? series.characters.some((c) => c.characterId === id)
+      : series.locations.some((l) => l.locationId === id)
+  return inherited ? null : series.world
+}
+
+/** 앞 화 세계 한 줄을 배경 프롬프트 끝에 더한다. 인물 시트는 turnaround.ts 의 seriesWorld 줄이 같은 규칙이다.
+ *  그림 출처 해시는 이 줄을 더하기 전 프롬프트로 만든다. */
+export function withSeriesWorld(prompt: string, world: string): string {
+  return [
+    prompt,
+    `this place belongs to the same world as the previous episodes of this series: ${world}`,
+    'its architecture, building materials and props follow that world, era and culture — never mix in another culture or period',
+  ].join('\n')
+}
+
 /** 이어받은 배경의 앞 화 와이드샷 주소. 시리즈가 아니거나 이어받지 않은 배경이거나 그림 복사에 실패했으면 null. */
 export function seriesLocationReference(
   series: SeriesSnapshot | null | undefined,

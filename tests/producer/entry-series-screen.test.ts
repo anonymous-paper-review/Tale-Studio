@@ -50,6 +50,7 @@ function snapshot(over: Partial<SeriesSnapshot> = {}): SeriesSnapshot {
     continuesLastScene: true,
     copyFailures: [],
     designTokens: null,
+    world: null,
     ...over,
   }
 }

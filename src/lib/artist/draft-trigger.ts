@@ -29,8 +29,10 @@ import {
   seriesCharacterReference,
   seriesLocationReference,
   seriesStyleSample,
+  seriesWorldLine,
   withSeriesLocationReference,
   withSeriesLocationStyleSample,
+  withSeriesWorld,
 } from '@/lib/series/redraw-reference'
 import { resolveCharacterPromptInput, styleFromUserAnalysis, type SheetDesignTokens } from '@/lib/artist/sheet-prompt-input'
 import { DEFAULT_IMAGE_MODEL, resolveImageEndpoint } from '@/lib/image-models'
@@ -234,6 +236,7 @@ export async function triggerCharacterDrafts(
           hasSourceImage: !!sourceImageUrl,
           hasSeriesSheet: !!seriesSheetUrl,
           hasSeriesStyleSample: !!styleSampleUrl,
+          seriesWorld: seriesWorldLine(series, 'character', c.character_id),
         })
         // 모델 = Artist 기본(레지스트리) — 템플릿이 있으면 edit 갈래, 없으면 T2I 폴백.
         //   템플릿이 첫 장(레이아웃 기준), 그 뒤가 정체성 이미지(출처 원본). 순서가 뒤바뀌면 모델이 원본을 레이아웃으로 오인한다.
@@ -455,6 +458,9 @@ export async function triggerWorldDrafts(
         // 같은 그림체로 새로 나온 배경(2026-10-27): 앞 화 다른 배경 한 장을 그림체 견본으로 붙인다(그림체 기준 그림이 있을 때만).
         const styleSampleUrl =
           anchor && !seriesWideShotUrl ? seriesStyleSample(series, 'location', location.location_id, styleIdOf(project ?? {})) : null
+        // 새로 나온 배경(2026-10-27 오너 "가로 하자"): 앞 화 세계 한 줄을 그림 지시 끝에 더한다(그림체와 상관없이).
+        const world = seriesWorldLine(series, 'location', location.location_id)
+        const newPlacePrompt = styleSampleUrl ? withSeriesLocationStyleSample(builtPrompt) : builtPrompt
         // #creem-moderation(2026-10-11): 검사는 이야기에서 나온 배경 설명만 본다 — 사람 금지 절·샷 종류
         //   꼬리말(wide shot, panoramic)은 우리 문구라 보내지 않는다.
         const moderation = await assertUserTextAllowed(
@@ -481,9 +487,9 @@ export async function triggerWorldDrafts(
             column: 'wide_shot',
             prompt: seriesWideShotUrl
               ? withSeriesLocationReference(builtPrompt)
-              : styleSampleUrl
-                ? withSeriesLocationStyleSample(builtPrompt)
-                : builtPrompt,
+              : world
+                ? withSeriesWorld(newPlacePrompt, world)
+                : newPlacePrompt,
             aspectRatio: '16:9',
             sourceHash: computeWorldImageSourceHash(builtPrompt),
             // 약속 B7: 자동 초안도 설명 해시를 남겨야 뒤에 설명이 바뀌었을 때 "설명 바뀜"을 판정할 수 있다.

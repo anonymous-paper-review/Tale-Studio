@@ -29,8 +29,10 @@ import { parseSeries, styleIdOf } from '@/lib/series/snapshot'
 import {
   seriesLocationReference,
   seriesStyleSample,
+  seriesWorldLine,
   withSeriesLocationReference,
   withSeriesLocationStyleSample,
+  withSeriesWorld,
 } from '@/lib/series/redraw-reference'
 import { isChatTraceId } from '@/lib/chat-trace'
 import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
@@ -204,6 +206,9 @@ export async function POST(req: Request) {
     const styleSampleUrl =
       anchor && !appearanceKey && !seriesWideShot ? seriesStyleSample(series, 'location', locationId, styleIdOf(project)) : null
     if (styleSampleUrl) submitPrompt = withSeriesLocationStyleSample(finalPrompt)
+    // 새로 나온 배경(2026-10-27 오너 "가로 하자"): 앞 화 세계 한 줄을 그림 지시 끝에 더한다(그림체 · 변형과 상관없이).
+    const world = seriesWorldLine(series, 'location', locationId)
+    if (world) submitPrompt = withSeriesWorld(submitPrompt, world)
 
     // #creem-moderation(2026-10-11): 자리 예약(world-submit.ts) 전에 사용자가 보낸 설명만 검사한다 —
     //   사람 금지 절(NO_PEOPLE_CLAUSE)·앵커 절은 우리 문구라 보내지 않는다.

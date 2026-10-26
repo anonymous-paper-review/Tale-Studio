@@ -25,6 +25,7 @@ const series = (patch: Partial<SeriesSnapshot> = {}): SeriesSnapshot => ({
   continuesLastScene: false,
   copyFailures: [],
   designTokens: null,
+  world: null,
   ...patch,
 })
 

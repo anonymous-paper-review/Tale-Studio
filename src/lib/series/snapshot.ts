@@ -1,5 +1,5 @@
 // 시리즈 다음 화가 앞 화에서 받은 것(projects.series, 2026-10-26 오너 승인 · 방향 문서 .claude/docs/2026-10-22/series-brief.html).
-//   [다음 화 만들기] 때 서버가 한 번 쓰고(앞 화 인물 · 배경 · 복사한 그림 · 말투 · 화풍 · 화면 비율 · 대사 언어), 그 뒤 Producer 시작 ·
+//   [다음 화 만들기] 때 서버가 한 번 쓰고(앞 화 인물 · 배경 · 복사한 그림 · 말투 · 화풍 · 화면 비율 · 대사 언어 · 색 설계 · 세계 한 줄), 그 뒤 Producer 시작 ·
 //   Writer · Artist 가 읽는다. 앞 화 줄거리는 여기 두지 않는다 — Writer 가 매번 앞 화에서 다시 읽는다.
 //   모양 · 읽기 · 순수 규칙의 단일 출처. 서버 · 클라이언트가 같이 쓴다 — 서버 전용 모듈을 import 하지 않는다.
 import type { DesignTokens, VoiceProfile } from '@/lib/writer/types/pipeline'
@@ -66,6 +66,12 @@ export interface SeriesSnapshot {
    *   앞 화가 Writer 그림 단계까지 가지 않았거나 모양이 틀리면 null.
    */
   designTokens: DesignTokens | null
+  /**
+   * 2026-10-27 오너 "가로 하자": 앞 화 세계를 적은 영어 한 줄(시대 · 문화권 · 건물 · 옷감, world-line.ts). [다음 화 만들기] 때
+   *   AI 가 한 번 적고, 앞 화도 시리즈였으면 그 줄을 그대로 잇는다. 새 인물 · 새 배경의 그림 지시에 들어간다 —
+   *   운영 2화 뱃사공은 "짚 모자"라는 낱말만 보고 1화(중세 유럽풍)와 다른 삿갓 차림으로 그려졌다. 적지 못했으면 null.
+   */
+  world: string | null
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -164,6 +170,7 @@ export function parseSeries(raw: unknown): SeriesSnapshot | null {
     continuesLastScene: raw.continuesLastScene === true,
     copyFailures: strList(raw.copyFailures),
     designTokens: parseSeriesDesignTokens(raw.designTokens),
+    world: strOrNull(raw.world)?.trim() ?? null,
   }
 }
 

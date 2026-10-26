@@ -31,6 +31,7 @@ const PREV: SeriesSnapshot = {
   continuesLastScene: false,
   copyFailures: [],
   designTokens: null,
+  world: null,
 }
 
 /** 이번 화 산문 — 미나와 카페만 나온다(준호는 안 나온다). null 이면 산문이 아직 없다. */

@@ -89,6 +89,7 @@ function seriesWith(over: Partial<SeriesSnapshot> = {}): SeriesSnapshot {
     continuesLastScene: false,
     copyFailures: [],
     designTokens: null,
+    world: null,
     ...over,
   }
 }

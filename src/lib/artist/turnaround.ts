@@ -165,11 +165,27 @@ export function buildCharacterMainPrompt(input: CharacterPromptInput): string {
  */
 export function buildCharacterTurnaroundPrompt(
   input: CharacterPromptInput,
-  opts?: { hasBaseFace?: boolean; hasPriorRender?: boolean; hasSourceImage?: boolean; hasSeriesSheet?: boolean; hasSeriesStyleSample?: boolean },
+  opts?: {
+    hasBaseFace?: boolean
+    hasPriorRender?: boolean
+    hasSourceImage?: boolean
+    hasSeriesSheet?: boolean
+    hasSeriesStyleSample?: boolean
+    /** 시리즈 새 인물의 앞 화 세계 한 줄(redraw-reference.ts seriesWorldLine). 없으면 싣지 않는다. */
+    seriesWorld?: string | null
+  },
 ): string {
   const d = describeParts(input)
   const head = [
     `Fill in this character reference-sheet template with ${input.name}`,
+    // 시리즈 다음 화(2026-10-27 오너 "가로 하자"): 새 인물은 앞 화 세계에 산다. 운영 2화 뱃사공은 "짚 모자 · 삼베 셔츠"만 보고
+    //   삿갓 · 매듭 단추 차림으로 그려졌다 — 옷차림 낱말을 그 세계로 읽게 한다. 머리 쪽에 두어 길이 상한에 잘리지 않는다.
+    ...(opts?.seriesWorld
+      ? [
+          `this character lives in the same world as the previous episodes of this series: ${opts.seriesWorld}`,
+          'design the outfit, headwear, footwear, materials and props for that world, era and culture, and read the costume words below in that context — never mix in another culture or period',
+        ]
+      : []),
     // #image-to-artist(2026-09-17): 사용자가 올린 원본이 참조로 붙어 있으면 그 사람을 그대로 그린다 —
     //   얼굴·머리·피부·체형·옷·색. 원본의 배경·구도는 시트로 가져오지 않는다(템플릿 레이아웃이 우선).
     //   위치 무관 표현 — 앵커·템플릿 순서에 밀려도 안전.

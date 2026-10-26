@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 import { storageKeySegment } from '@/lib/storage/key-segment'
 import type { SeriesSnapshot } from '@/lib/series/snapshot'
+import { SERIES_WORLD_MAX_CHARS, buildSeriesWorldPrompt, parseSeriesWorldLine } from '@/lib/series/world-line'
 
 const ANCHOR_URL = 'https://media.test/workspace-1/prev-episode/anchors/style.png'
 const MINHO_SHEET = 'https://media.test/workspace-1/prev-episode/characters/minho-sheet.png'
@@ -16,12 +17,14 @@ const PREV_DESIGN_TOKENS = {
   color_meaning: { gold: 'memory' },
   vfx_approach: 'soft particles',
 }
+const WORLD_LINE = 'present-day Seoul office world: glass towers, fluorescent hallways, business casual clothing'
 
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(),
   from: vi.fn(),
   rpc: vi.fn(),
   mediaCopy: vi.fn(),
+  describeWorld: vi.fn(),
   rows: {} as Record<string, unknown>,
   updates: [] as Record<string, unknown>[],
   plan: 'p10',
@@ -37,6 +40,8 @@ vi.mock('@/lib/supabase/admin', () => ({
 vi.mock('@/lib/supabase/workspace', () => ({
   ensureWorkspace: async () => ({ id: 'workspace-1', plan: mocks.plan, owner_id: 'user-1' }),
 }))
+// 세계 한 줄은 AI 한 번으로 적는다(world-line-llm.ts) — 테스트에서는 답을 직접 물린다.
+vi.mock('@/lib/series/world-line-llm', () => ({ describeSeriesWorld: mocks.describeWorld }))
 vi.mock('@/lib/storage/media', () => ({
   mediaCopy: mocks.mediaCopy,
   mediaPublicUrl: (path: string) => `https://media.test/${path}`,
@@ -71,6 +76,7 @@ beforeEach(() => {
     data: { user: { id: 'user-1', email: 'creator@example.com', user_metadata: {} } },
   })
   mocks.mediaCopy.mockResolvedValue({ data: {}, error: null })
+  mocks.describeWorld.mockResolvedValue({ world: WORLD_LINE })
   mocks.rows = {
     projects: {
       id: 'prev-episode',
@@ -509,6 +515,114 @@ describe('앞 화에서 다음 화 만들기', () => {
     expect(mocks.rpc).not.toHaveBeenCalled()
     expect(mocks.updates).toEqual([])
     expect(mocks.mediaCopy).not.toHaveBeenCalled()
+  })
+})
+
+describe('다음 화를 만들 때 앞 화 세계를 한 줄로 적어 둔다', () => {
+  // 왜: 같이 정한 것(2026-10-27 오너 "가") — 운영 2화 뱃사공은 "짚 모자"라는 낱말만 보고 삿갓 차림으로 그려졌다.
+  //   그림 지시에 세계를 낱말로 못 박으려면 다음 화를 만들 때 앞 화 세계를 적어 둬야 한다.
+  it('다음 화를 만들면 앞 화 인물 · 배경 모습으로 세계를 한 줄로 적어 시리즈 기록에 둔다', async () => {
+    const response = await POST(postRequest({ fromProjectId: 'prev-episode' }))
+    const body = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(mocks.describeWorld).toHaveBeenCalledTimes(1)
+    expect(mocks.describeWorld).toHaveBeenCalledWith(body.projectId, {
+      title: '자판기의 반란',
+      characters: [{ name: '민호', appearance: '기본 모습 20대 회사원' }],
+      locations: [{ name: '회사 복도', description: '형광등이 깜빡이는 복도' }],
+    })
+    expect(seriesOf().world).toBe(WORLD_LINE)
+    expect(body.warnings).toEqual([])
+  })
+
+  // 왜: 혼자 정한 것 — 3화는 2화가 적어 둔 1화 세계를 그대로 쓴다. 화마다 AI가 다시 적으면 세계가 조금씩 흘러가고 값도 든다.
+  it('앞 화도 시리즈이고 세계 한 줄이 있으면 AI를 부르지 않고 그 줄을 이어 쓴다', async () => {
+    const firstWorld = 'present-day Busan office world: harbor-side towers, navy suits'
+    mocks.rows.projects = {
+      ...(mocks.rows.projects as Record<string, unknown>),
+      series: {
+        version: 1,
+        prevProjectId: 'first-episode',
+        prevTitle: '1화',
+        copiedAt: '2026-10-20T00:00:00.000Z',
+        characters: [{ characterId: 'minho', name: '민호', sheetUrl: MINHO_SHEET, portraitUrl: MINHO_PORTRAIT, styleId: 'anime' }],
+        locations: [{ locationId: 'hall', name: '회사 복도', wideShotUrl: HALL_WIDE, styleId: 'anime' }],
+        voices: [],
+        styleId: 'anime',
+        format: 'vertical_9:16',
+        dialogueLanguage: 'ko',
+        continuesLastScene: false,
+        copyFailures: [],
+        world: firstWorld,
+      },
+    }
+
+    await POST(postRequest({ fromProjectId: 'prev-episode' }))
+
+    expect(mocks.describeWorld).not.toHaveBeenCalled()
+    expect(seriesOf().world).toBe(firstWorld)
+  })
+
+  // 왜: 혼자 정한 것 — 세계 한 줄은 그림을 돕는 줄이다. AI가 실패했다고 다음 화를 못 만들면 안 되고, 빠졌다는 것은 알려야 한다.
+  it('세계 한 줄을 만들지 못하면 다음 화는 만들고 세계 줄을 비운 채 알린다', async () => {
+    mocks.describeWorld.mockRejectedValueOnce(new Error('timed out'))
+    const failed = await POST(postRequest({ fromProjectId: 'prev-episode' }))
+    const failedBody = await failed.json()
+
+    expect(failed.status).toBe(200)
+    expect(seriesOf().world).toBeNull()
+    expect(failedBody.warnings.map((w: { code: string }) => w.code)).toEqual(['world_line_failed'])
+
+    mocks.updates = []
+    mocks.describeWorld.mockResolvedValueOnce({ world: '   ' })
+    const empty = await POST(postRequest({ fromProjectId: 'prev-episode' }))
+    const emptyBody = await empty.json()
+
+    expect(empty.status).toBe(200)
+    expect(seriesOf().world).toBeNull()
+    expect(emptyBody.warnings.map((w: { code: string }) => w.code)).toEqual(['world_line_failed'])
+  })
+
+  // 왜: 혼자 정한 것 — 만들기 창을 열 때마다 AI를 부르면 만들지도 않을 화에 값이 든다. 칸이 차서 못 만들 때도 같다.
+  it('미리보기거나 칸이 차서 다음 화를 만들지 못하면 세계 한 줄을 만들지 않는다', async () => {
+    await GET(getRequest('prev-episode'))
+    mocks.rpcResult = { status: 'slot_limit', count: 2 }
+    await POST(postRequest({ fromProjectId: 'prev-episode' }))
+
+    expect(mocks.describeWorld).not.toHaveBeenCalled()
+  })
+
+  // 왜: 혼자 정한 것 — 세계는 인물 생김새 · 배경 모습에서 읽는다. 이름 · 사건이 섞이면 새 인물 그림에 앞 화 인물이 끼어든다.
+  //   그림 지시가 영어라 영어 한 줄로 받는다.
+  it('세계 한 줄 지시에는 앞 화 제목과 인물 · 배경 모습을 싣고 시대 · 문화권 · 옷감을 영어 한 줄로 적게 한다', () => {
+    const { system, prompt } = buildSeriesWorldPrompt({
+      title: '프리렌 — 남겨진 마법',
+      characters: [{ name: '페른', appearance: '보라색 긴 머리, 검은 로브' }],
+      locations: [{ name: '마을 광장', description: '비에 젖은 돌바닥, 이끼 낀 석조 동상' }],
+    })
+
+    expect(prompt).toContain('프리렌 — 남겨진 마법')
+    expect(prompt).toContain('보라색 긴 머리, 검은 로브')
+    expect(prompt).toContain('비에 젖은 돌바닥, 이끼 낀 석조 동상')
+    expect(system).toMatch(/ONE English line/)
+    expect(system).toMatch(/era/)
+    expect(system).toMatch(/culture/)
+    expect(system).toMatch(/clothing/)
+    expect(system).toMatch(/never name characters/i)
+    expect(system).toContain('{"world"')
+  })
+
+  // 왜: 혼자 정한 것 — 빈 답 · 틀린 모양을 세계로 적으면 그림 지시에 빈 줄이 들어간다. 너무 긴 답은 그림 지시를 밀어낸다.
+  it('세계 한 줄 답이 비었거나 모양이 틀리면 없는 것으로 보고 너무 길면 자른다', () => {
+    expect(parseSeriesWorldLine({ world: '  medieval  European\nfantasy  ' })).toBe('medieval European fantasy')
+    expect(parseSeriesWorldLine({ world: '   ' })).toBeNull()
+    expect(parseSeriesWorldLine({ world: 3 })).toBeNull()
+    expect(parseSeriesWorldLine('medieval')).toBeNull()
+    expect(parseSeriesWorldLine(null)).toBeNull()
+    const long = parseSeriesWorldLine({ world: 'stone village '.repeat(60) })
+    expect(long).not.toBeNull()
+    expect(long!.length).toBeLessThanOrEqual(SERIES_WORLD_MAX_CHARS)
   })
 })
 

@@ -1,5 +1,6 @@
 // 앞 화에서 이어받았는데 이 화 그림이 비어 있는 인물 · 배경은 앞 화 그림을 참고 그림으로 넣어 이 화 그림체로 다시 그리고 (시리즈 2026-10-26),
-//   같은 그림체로 새로 나온 인물 · 배경은 앞 화 그림 한 장을 그림체 견본으로 붙여 그린다 (2026-10-27 오너 "제품에서 고칠 것")
+//   같은 그림체로 새로 나온 인물 · 배경은 앞 화 그림 한 장을 그림체 견본으로 붙여 그린다 (2026-10-27 오너 "제품에서 고칠 것"),
+//   새로 나온 인물 · 배경의 그림 지시에는 앞 화 세계 한 줄을 넣는다 (2026-10-27 오너 "가로 하자")
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 
@@ -62,7 +63,7 @@ vi.mock('@/lib/artist/world-submit', () => ({ submitWorldShotJob: (...a: unknown
 import { POST as generateSheetPOST } from '@/app/api/artist/generate-sheet/route'
 import { POST as generateWorldPOST } from '@/app/api/artist/generate-world/route'
 import { triggerCharacterDrafts, triggerWorldDrafts } from '@/lib/artist/draft-trigger'
-import { seriesCharacterReference, seriesLocationReference, seriesStyleSample } from '@/lib/series/redraw-reference'
+import { seriesCharacterReference, seriesLocationReference, seriesStyleSample, seriesWorldLine } from '@/lib/series/redraw-reference'
 import { keepsSourcePortrait } from '@/lib/artist/source-image'
 import { buildCharacterTurnaroundPrompt } from '@/lib/artist/turnaround'
 import { SERIES_VERSION, type SeriesSnapshot } from '@/lib/series/snapshot'
@@ -126,6 +127,7 @@ const SERIES: SeriesSnapshot = {
   continuesLastScene: false,
   copyFailures: [],
   designTokens: null,
+  world: null,
 }
 
 const read = (rel: string) => readFileSync(rel, 'utf8')
@@ -392,7 +394,7 @@ describe('같은 그림체로 새로 나온 인물 · 배경은 앞 화 그림 �
     ]
   }
 
-  // 왜: 같이 정한 것 — 운영 2화 뛰사공은 일반 견본 그림만 보고 그려 선 · 음영 · 세계관이 1화 인물과 달랐다.
+  // 왜: 같이 정한 것 — 운영 2화 뱃사공은 일반 견본 그림만 보고 그려 선 · 음영 · 세계관이 1화 인물과 달랐다.
   it('같은 그림체로 새 인물을 그리면 앞 화 인물 시트 한 장을 마지막 참고 그림으로 붙이고 다른 인물이라고 지시한다', async () => {
     sameStyleEpisode()
     expect(seriesStyleSample(SERIES, 'character', NEW_CHARACTER_ID, 'watercolor')).toBe(PREV_SHEET)
@@ -480,6 +482,109 @@ describe('같은 그림체로 새로 나온 인물 · 배경은 앞 화 그림 �
     await triggerWorldDrafts(PROJECT_ID)
     expect(worldInput().styleSampleUrl ?? null).toBeNull()
     expect(worldPrompt()).not.toContain('DIFFERENT place')
+  })
+})
+
+describe('시리즈의 새 인물 · 새 배경 그림 지시에 앞 화 세계 한 줄을 넣는다', () => {
+  const WORLD = 'medieval European high-fantasy world: stone villages, timber houses, wool and linen clothing, leather boots'
+
+  // 이어받은 카이는 앞 화 시트를 그대로 쓴다(이미 채워짐). 새 인물 뱃사공은 빈칸이다.
+  function worldEpisode(styleKey: string | null = 'watercolor', world: string | null = WORLD) {
+    dbState.projects = [projectFixture({ style_anchor_key: styleKey, series: { ...SERIES, world } })]
+    dbState.characters = [characterFixture(), characterFixture({ character_id: NEW_CHARACTER_ID, name: '뱃사공', role: 'supporting' })]
+    dbState.appearances = [
+      appearanceFixture({ sheet_url: PREV_SHEET }),
+      appearanceFixture({ character_id: NEW_CHARACTER_ID, appearance: '낡은 짚 모자를 쓴 노인' }),
+    ]
+  }
+
+  // 왜: 같이 정한 것 — 운영 2화 뱃사공은 "짚 모자 · 삼베 셔츠"라는 낱말만 보고 삿갓 · 매듭 단추 차림으로 그려졌다. 1화는 중세 유럽풍이었다.
+  it('시리즈의 새 인물 시트를 그리면 그림 지시에 앞 화 세계 한 줄을 넣고 옷차림을 그 세계로 읽으라고 지시한다', async () => {
+    worldEpisode()
+    await triggerCharacterDrafts(PROJECT_ID)
+    expect(falPrompt()).toContain(WORLD)
+    expect(falPrompt()).toMatch(/same world as the previous episodes of this series/)
+    expect(falPrompt()).toMatch(/never mix in another culture or period/)
+
+    mocks.falImageSubmit.mockClear()
+    const sheet = await generateSheetPOST(
+      postRequest('/api/artist/generate-sheet', { projectId: PROJECT_ID, characterId: NEW_CHARACTER_ID, appearanceKey: 'current', view: 'main', actor: 'ui' }),
+    )
+    expect(sheet.status).toBe(200)
+    expect(falPrompt()).toContain(WORLD)
+
+    // 템플릿을 못 구해 글로만 그리는 경로도 같다.
+    mocks.falImageSubmit.mockClear()
+    mocks.templateAssetUrl.mockResolvedValue(null)
+    await triggerCharacterDrafts(PROJECT_ID)
+    expect(falRefs() ?? []).not.toContain(TEMPLATE_URL)
+    expect(falPrompt()).toContain(WORLD)
+  })
+
+  // 왜: 같이 정한 것 — 배경도 같다. 나루터 · 나룻배가 앞 화 세계와 다른 문화권 건물 · 소품으로 그려지면 같은 이야기로 안 보인다.
+  it('시리즈의 새 배경을 그리면 그림 지시에 앞 화 세계 한 줄을 넣고 다른 문화권을 섞지 말라고 지시한다', async () => {
+    worldEpisode()
+    dbState.locations = [locationFixture({ location_id: NEW_LOCATION_ID, name: '강가 나루터' })]
+    await triggerWorldDrafts(PROJECT_ID)
+    expect(worldPrompt()).toContain(WORLD)
+    expect(worldPrompt()).toMatch(/same world as the previous episodes of this series/)
+    expect(worldPrompt()).toMatch(/never mix in another culture or period/)
+    const worldHash = worldInput().sourceHash
+
+    // 세계 줄은 그림 출처 해시에 들어가지 않는다 — 시리즈가 아닌 같은 배경과 해시가 같다.
+    dbState.projects = [projectFixture({ style_anchor_key: 'watercolor', series: null })]
+    mocks.submitWorldShotJob.mockClear()
+    await triggerWorldDrafts(PROJECT_ID)
+    expect(worldPrompt()).not.toContain(WORLD)
+    expect(worldInput().sourceHash).toBe(worldHash)
+
+    // 버튼으로 그려도 같다.
+    worldEpisode()
+    mocks.submitWorldShotJob.mockClear()
+    const world = await generateWorldPOST(
+      postRequest('/api/artist/generate-world', { projectId: PROJECT_ID, locationId: NEW_LOCATION_ID, column: 'wide_shot', prompt: 'river ferry dock in daylight', actor: 'ui' }),
+    )
+    expect(world.status).toBe(200)
+    expect(worldPrompt()).toContain(WORLD)
+  })
+
+  // 왜: 혼자 정한 것 — 이어받은 인물 · 배경은 앞 화 그림이 이미 그 세계를 보여 준다. 세계 한 줄이 없는 다음 화(만들 때 AI가 실패한 화)는 지금처럼 그린다.
+  it('이어받은 인물 · 배경이거나 세계 한 줄이 없으면 세계 줄을 넣지 않는다', async () => {
+    const withWorld = { ...SERIES, world: WORLD }
+    expect(seriesWorldLine(withWorld, 'character', NEW_CHARACTER_ID)).toBe(WORLD)
+    expect(seriesWorldLine(withWorld, 'location', NEW_LOCATION_ID)).toBe(WORLD)
+    expect(seriesWorldLine(withWorld, 'character', CHARACTER_ID)).toBeNull()
+    expect(seriesWorldLine(withWorld, 'location', LOCATION_ID)).toBeNull()
+    expect(seriesWorldLine(SERIES, 'character', NEW_CHARACTER_ID)).toBeNull()
+    expect(seriesWorldLine(null, 'character', NEW_CHARACTER_ID)).toBeNull()
+
+    // 그림체를 바꿔 이어받은 카이를 앞 화 시트로 다시 그리는 경로 — 뱃사공은 이 화 시트가 이미 있다.
+    worldEpisode('ink')
+    dbState.appearances = [
+      appearanceFixture(),
+      appearanceFixture({ character_id: NEW_CHARACTER_ID, sheet_url: 'https://media.test/ws-1/proj-2/characters/boatman-v1.png' }),
+    ]
+    await triggerCharacterDrafts(PROJECT_ID)
+    expect(falPrompt()).toContain('this same character as drawn for the PREVIOUS episode')
+    expect(falPrompt()).not.toContain(WORLD)
+
+    mocks.falImageSubmit.mockClear()
+    worldEpisode('watercolor', null)
+    await triggerCharacterDrafts(PROJECT_ID)
+    expect(falPrompt()).not.toMatch(/same world as the previous episodes/)
+  })
+
+  // 왜: 혼자 정한 것 — 세계는 그림체와 따로다. 그림체 기준 그림 없이 그리는 그림체(실사)도 옷차림 · 건물은 그 세계여야 한다.
+  it('그림체 기준 그림이 없는 그림체여도 새 인물 · 새 배경에는 세계 한 줄을 넣는다', async () => {
+    worldEpisode(null)
+    await triggerCharacterDrafts(PROJECT_ID)
+    expect(falRefs()).toEqual([TEMPLATE_URL])
+    expect(falPrompt()).toContain(WORLD)
+
+    dbState.locations = [locationFixture({ location_id: NEW_LOCATION_ID, name: '강가 나루터' })]
+    await triggerWorldDrafts(PROJECT_ID)
+    expect(worldInput().styleSampleUrl ?? null).toBeNull()
+    expect(worldPrompt()).toContain(WORLD)
   })
 })
 

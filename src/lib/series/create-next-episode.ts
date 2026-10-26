@@ -1,5 +1,6 @@
 // 앞 화에서 다음 화를 만드는 서버 작업(2026-10-26) — /api/project/next-episode 의 미리보기 · 만들기가 같이 쓴다.
-//   고르는 목록이 없다: 앞 화의 사람 인물 · 배경 · 그림 · 그림체 · 말투 · 화면 비율 · 대사 언어를 전부 이어받는다.
+//   고르는 목록이 없다: 앞 화의 사람 인물 · 배경 · 그림 · 그림체 · 말투 · 화면 비율 · 대사 언어 · 색 설계를 전부 이어받고,
+//   앞 화 세계를 한 줄로 적는다(만들 때만 AI 한 번 — 미리보기 · 칸이 찬 경우는 부르지 않는다).
 //   그림은 우리 보관함(media 버킷) 안에서만 복사한다 — 바깥 주소는 복사하지 않고 실패로 센다(fetch 금지).
 //   projects.series(SeriesSnapshot)를 쓰는 유일한 곳이다. 요금제 · 작업 공간 확인은 라우트와 prepareReferenceImport 가 한다.
 import { ratioFromFormat } from '@/features/entry/options'
@@ -23,6 +24,8 @@ import {
   type SeriesLocation,
   type SeriesSnapshot,
 } from './snapshot'
+import { parseSeriesWorldLine } from './world-line'
+import { describeSeriesWorld } from './world-line-llm'
 
 /** 다음 화 보관함 안 그림이 들어가는 칸. */
 const SERIES_DIR = 'series'
@@ -33,6 +36,7 @@ export type NextEpisodeWarningCode =
   | 'style_anchor_copy_failed'
   | 'last_scene_copy_failed'
   | 'last_scene_unavailable'
+  | 'world_line_failed'
 
 export interface NextEpisodeWarning {
   code: NextEpisodeWarningCode
@@ -222,6 +226,8 @@ export async function createNextEpisode(input: {
     throw new Error(`Failed to create the next episode (${String(creation.status)})`)
   }
 
+  // 세계 한 줄은 그림 복사와 같이 돈다 — 칸 확인을 통과한 뒤에만 부른다(못 만들 화에 AI 값이 들지 않게).
+  const worldPromise = seriesWorldOf(prev, destinationProjectId)
   const warnings: NextEpisodeWarning[] = []
   const copyFailures: string[] = []
   const prevStyleId = styleIdOf({
@@ -309,6 +315,12 @@ export async function createNextEpisode(input: {
   if (prev.dialogueLanguage) settings.dialogueLanguage = prev.dialogueLanguage
   if (Object.keys(settings).length > 0) updates.settings = settings
 
+  const world = await worldPromise
+  if (world.failure) {
+    warnings.push({ code: 'world_line_failed', detail: world.failure })
+    console.error('[project/next-episode] world line failed', world.failure)
+  }
+
   const series: SeriesSnapshot = {
     version: SERIES_VERSION,
     prevProjectId: prev.id,
@@ -323,6 +335,7 @@ export async function createNextEpisode(input: {
     continuesLastScene,
     copyFailures,
     designTokens: prev.designTokens,
+    world: world.line,
   }
   updates.series = series
 
@@ -336,6 +349,31 @@ export async function createNextEpisode(input: {
   }
 
   return { status: 'ok', project: { ...project, ...updates }, warnings, copyFailures }
+}
+
+/**
+ * 앞 화 세계 한 줄(2026-10-27 오너 "가로 하자"). 앞 화도 시리즈였고 적어 둔 줄이 있으면 그대로 잇는다 —
+ *   화마다 다시 적으면 세계가 조금씩 흘러간다. 없으면 앞 화 인물 생김새 · 배경 모습으로 AI 가 한 번 적는다.
+ *   AI 실패 · 빈 답이면 줄은 null 이고 까닭을 돌려준다 — 다음 화는 그대로 만든다.
+ */
+async function seriesWorldOf(
+  prev: PrevEpisode,
+  projectId: string,
+): Promise<{ line: string | null; failure: string | null }> {
+  const carried = prev.prevSeries?.world ?? null
+  if (carried) return { line: carried, failure: null }
+  try {
+    const line = parseSeriesWorldLine(
+      await describeSeriesWorld(projectId, {
+        title: prev.title,
+        characters: prev.characters.map((c) => ({ name: c.name, appearance: c.appearance })),
+        locations: prev.locations.map((l) => ({ name: l.name, description: l.description })),
+      }),
+    )
+    return line ? { line, failure: null } : { line: null, failure: 'the model returned no world line' }
+  } catch (error) {
+    return { line: null, failure: errorMessage(error) }
+  }
 }
 
 interface SceneRow {
