@@ -24,6 +24,37 @@ export function withSeriesLocationReference(prompt: string): string {
   ].join('\n')
 }
 
+/**
+ * 같은 그림체로 새로 나온 인물 · 배경에 붙일 그림체 견본(2026-10-27 오너 "제품에서 고칠 것") — 앞 화 그림 중 이 화 그림체로 그린
+ *   첫 장(인물은 시트, 배경은 와이드샷). 운영 2화 뱃사공 · 나루터는 일반 그림체 기준 그림만 보고 그려 선 · 색감이 1화와 달랐다.
+ *   이어받은 인물 · 배경(이미 자기 앞 화 그림이 있다)이거나 이 화 그림체와 같은 앞 화 그림이 없으면 null.
+ *   그림체 기준 그림이 없는 그림체(실사 등) 걸러내기는 호출부가 한다 — 기준 그림(anchor)이 있을 때만 부른다.
+ */
+export function seriesStyleSample(
+  series: SeriesSnapshot | null | undefined,
+  kind: 'character' | 'location',
+  id: string,
+  currentStyleId: string | null,
+): string | null {
+  if (!series || !id || !currentStyleId) return null
+  if (kind === 'character') {
+    if (series.characters.some((c) => c.characterId === id)) return null
+    return series.characters.find((c) => c.sheetUrl && c.styleId === currentStyleId)?.sheetUrl ?? null
+  }
+  if (series.locations.some((l) => l.locationId === id)) return null
+  return series.locations.find((l) => l.wideShotUrl && l.styleId === currentStyleId)?.wideShotUrl ?? null
+}
+
+/** 앞 화 다른 배경을 그림체 견본으로 붙인 배경 프롬프트 끝에 더하는 지시. 견본은 참고 그림의 마지막 장이다.
+ *  빛은 씬마다 다르니 색감은 따르지 않고 칠 방식 · 선만 따른다. 그림 출처 해시는 이 줄을 더하기 전 프롬프트로 만든다. */
+export function withSeriesLocationStyleSample(prompt: string): string {
+  return [
+    prompt,
+    'the LAST reference image shows a DIFFERENT place from the PREVIOUS episode of this series — use it ONLY as a sample of this series\' painting technique and linework',
+    'never reproduce that place: its layout, landmarks, architecture and lighting belong to another scene — draw the place described above, lit as described above',
+  ].join('\n')
+}
+
 /** 이어받은 배경의 앞 화 와이드샷 주소. 시리즈가 아니거나 이어받지 않은 배경이거나 그림 복사에 실패했으면 null. */
 export function seriesLocationReference(
   series: SeriesSnapshot | null | undefined,

@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils'
 import { kindOf } from '@/lib/upload/limits'
 import { ingestCreationFile } from '@/lib/project/start-new-project'
 import { breakdownRows } from '@/lib/artist/breakdown'
+import { seriesMakeCounts } from '@/features/series/artist-series'
 import { useSeriesInfo } from '@/features/series/use-series-info'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProducerStore } from '@/stores/producer-store'
@@ -48,6 +49,16 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
   const rows = breakdownRows(cast, backgrounds)
   const persons = rows.filter((row) => row.kind === 'person').length
   const places = rows.length - persons
+  // "만드는 것"은 정말 새로 그리는 수만 센다(2026-10-27 오너 승인) — 앞 화 그림을 그대로 쓰거나 보관하는 것은 아래 칸에 따로 보인다.
+  //   그림체는 지금 고른 값으로 본다 — 올린 그림체가 있으면 그것으로 고정된다(savedKey).
+  const makeCounts = series ? seriesMakeCounts(rows, series, custom ? savedKey : picked) : null
+  const prevImageParts = makeCounts
+    ? [
+        makeCounts.reuse > 0 ? t('Used as is {count}', { count: makeCounts.reuse }) : null,
+        makeCounts.redraw > 0 ? t('Redrawn in this style {count}', { count: makeCounts.redraw }) : null,
+        makeCounts.kept > 0 ? t('Kept {count}', { count: makeCounts.kept }) : null,
+      ].filter((part): part is string => part !== null)
+    : []
 
   useEffect(() => {
     if (open && anchors.length === 0) void useProducerStore.getState().loadStyleAnchors()
@@ -226,7 +237,10 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
               }}
             />
             <dl className="space-y-2 rounded-lg border border-border px-3 py-2.5 text-sm">
-              <div className="flex gap-3"><dt className="w-24 shrink-0 text-muted-foreground">{t('What gets made')}</dt><dd>{t('Character sheets {persons} · backgrounds {places}', { persons, places })}</dd></div>
+              <div className="flex gap-3" data-testid="artist-make-new"><dt className="w-24 shrink-0 text-muted-foreground">{t('What gets made')}</dt><dd>{makeCounts ? t('New character sheets {persons} · backgrounds {places}', { persons: makeCounts.newPersons, places: makeCounts.newPlaces }) : t('Character sheets {persons} · backgrounds {places}', { persons, places })}</dd></div>
+              {prevImageParts.length > 0 ? (
+                <div className="flex gap-3" data-testid="artist-make-prev"><dt className="w-24 shrink-0 text-muted-foreground">{t('Previous episode images')}</dt><dd>{prevImageParts.join(' · ')}</dd></div>
+              ) : null}
               <div className="flex gap-3"><dt className="w-24 shrink-0 text-muted-foreground">{t('Style')}</dt><dd>{chosenLabel ?? t('Pick a style')}</dd></div>
               <div className="flex gap-3"><dt className="w-24 shrink-0 text-muted-foreground">{t('Estimated credits')}</dt><dd>{t('Images do not use Takes.')}</dd></div>
             </dl>

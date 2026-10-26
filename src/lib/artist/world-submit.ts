@@ -43,6 +43,9 @@ export interface SubmitWorldShotJobInput {
    *  붙이고(기준 그림이 있을 때는 그림체 글이 막던 글자), 화면 비율을 크기(image_size)로 정해 보낸다(새로 그리기 모델은 비율을 무시해
    *  4:3 으로 나왔다). 그림체가 없는 프로젝트는 종전 그대로. */
   styleWithoutReference?: boolean
+  /** 시리즈 다음 화(2026-10-27): 같은 그림체로 새로 나온 배경에 붙이는 앞 화 다른 배경 한 장(그림체 견본). 참고 그림의 마지막 장이다.
+   *  같은 장소가 아니라 "장소를 지켜라"(multiref) 절을 붙이지 않는다 — 절은 referenceImageUrls 가 있을 때만. 그림체 기준 그림(anchor)이 없으면 싣지 않는다. */
+  styleSampleUrl?: string | null
 }
 
 export async function submitWorldShotJob(
@@ -50,12 +53,14 @@ export async function submitWorldShotJob(
 ): Promise<GenerationJob> {
   const modelKey: ImageModelKey = input.model ?? DEFAULT_WORLD_IMAGE_MODEL
   const refs = (input.referenceImageUrls ?? []).filter((u) => typeof u === 'string' && !!u)
+  const styleSample = input.anchor && input.styleSampleUrl ? input.styleSampleUrl : null
+  const allRefs = styleSample ? [...refs, styleSample] : refs
   const withoutReference = !input.anchor && input.styleWithoutReference === true
   const baseOpts: AnchorableSubmit = {
     prompt: withoutReference ? `${input.prompt}\n${FACET_NO_TEXT}` : input.prompt,
     aspect_ratio: input.aspectRatio ?? '16:9',
     ...(withoutReference ? { image_size: imageSizeForAspect(input.aspectRatio ?? '16:9') } : {}),
-    ...(refs.length ? { reference_image_urls: refs } : {}),
+    ...(allRefs.length ? { reference_image_urls: allRefs } : {}),
   }
   const anchored = input.anchor ? applyStyleAnchor(input.anchor, baseOpts, refs.length ? 'multiref' : 'single') : baseOpts
   // 모델은 참조(앵커 이미지) 유무에 따라 t2i/edit 엔드포인트를 고른다 — 캐릭터 시트 라우트와 같은 규칙.

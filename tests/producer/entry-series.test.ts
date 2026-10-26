@@ -88,6 +88,7 @@ function seriesWith(over: Partial<SeriesSnapshot> = {}): SeriesSnapshot {
     dialogueLanguage: 'ko',
     continuesLastScene: false,
     copyFailures: [],
+    designTokens: null,
     ...over,
   }
 }

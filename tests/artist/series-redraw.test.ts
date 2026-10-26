@@ -1,4 +1,5 @@
-// 앞 화에서 이어받았는데 이 화 그림이 비어 있는 인물 · 배경은 앞 화 그림을 참고 그림으로 넣어 이 화 그림체로 다시 그린다 (시리즈 2026-10-26)
+// 앞 화에서 이어받았는데 이 화 그림이 비어 있는 인물 · 배경은 앞 화 그림을 참고 그림으로 넣어 이 화 그림체로 다시 그리고 (시리즈 2026-10-26),
+//   같은 그림체로 새로 나온 인물 · 배경은 앞 화 그림 한 장을 그림체 견본으로 붙여 그린다 (2026-10-27 오너 "제품에서 고칠 것")
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 
@@ -61,10 +62,11 @@ vi.mock('@/lib/artist/world-submit', () => ({ submitWorldShotJob: (...a: unknown
 import { POST as generateSheetPOST } from '@/app/api/artist/generate-sheet/route'
 import { POST as generateWorldPOST } from '@/app/api/artist/generate-world/route'
 import { triggerCharacterDrafts, triggerWorldDrafts } from '@/lib/artist/draft-trigger'
-import { seriesCharacterReference, seriesLocationReference } from '@/lib/series/redraw-reference'
+import { seriesCharacterReference, seriesLocationReference, seriesStyleSample } from '@/lib/series/redraw-reference'
 import { keepsSourcePortrait } from '@/lib/artist/source-image'
 import { buildCharacterTurnaroundPrompt } from '@/lib/artist/turnaround'
 import { SERIES_VERSION, type SeriesSnapshot } from '@/lib/series/snapshot'
+import { _clearStyleAnchorCacheForTest } from '@/lib/style-anchor'
 
 const PROJECT_ID = 'proj-2'
 const WORKSPACE_ID = 'ws-1'
@@ -76,6 +78,22 @@ const TEMPLATE_URL = 'https://media.test/templates/character-template-abc1234567
 const PREV_SHEET = 'https://media.test/ws-1/proj-2/series/char_hero_sheet.png'
 const PREV_WIDE = 'https://media.test/ws-1/proj-2/series/loc_harbor_wide.png'
 const SOURCE_IMAGE = 'https://media.test/ws-1/proj-2/uploads/hero-photo.png'
+const NEW_CHARACTER_ID = 'old_boatman'
+const NEW_LOCATION_ID = 'river_ferry_dock'
+const ANCHOR_IMAGE = 'https://media.test/style-anchors/watercolor.png'
+const INK_ANCHOR_IMAGE = 'https://media.test/style-anchors/ink.png'
+const styleRow = (key: string, imageUrl: string) => ({
+  key,
+  image_url: imageUrl,
+  is_active: true,
+  medium: key,
+  style_clause: null,
+  use_preview_ref: false,
+  preview_url: null,
+  anchor_kind: 'media',
+  use_reference_image: true,
+  facets: null,
+})
 const DESIGN_TOKENS = {
   l1: { art_style: 'ink storybook', shape_language: 'clear silhouettes' },
   palette: { primary: 'cobalt', secondary: 'ochre', accent: 'red' },
@@ -107,6 +125,7 @@ const SERIES: SeriesSnapshot = {
   dialogueLanguage: 'ko',
   continuesLastScene: false,
   copyFailures: [],
+  designTokens: null,
 }
 
 const read = (rel: string) => readFileSync(rel, 'utf8')
@@ -163,15 +182,18 @@ const dbState: {
   appearances: AppearanceRow[]
   locations: LocationRow[]
   candidates: Array<Record<string, unknown>>
-} = { projects: [], workspaces: [], characters: [], appearances: [], locations: [], candidates: [] }
+  styleAnchors: Array<Record<string, unknown>>
+} = { projects: [], workspaces: [], characters: [], appearances: [], locations: [], candidates: [], styleAnchors: [] }
 
 beforeEach(() => {
+  _clearStyleAnchorCacheForTest()
   dbState.projects = [projectFixture()]
   dbState.workspaces = [{ id: WORKSPACE_ID, owner_id: OWNER_ID }]
   dbState.characters = [characterFixture()]
   dbState.appearances = [appearanceFixture()]
   dbState.locations = []
   dbState.candidates = []
+  dbState.styleAnchors = [styleRow('watercolor', ANCHOR_IMAGE), styleRow('ink', INK_ANCHOR_IMAGE)]
 
   mocks.reserveGenerationJob.mockReset()
   mocks.reserveGenerationJob.mockResolvedValue({ id: 'job-1', fal_key_id: 'prod-2000' })
@@ -359,6 +381,108 @@ describe('이어받은 인물 · 배경을 이 화 그림체로 다시 그린다
   })
 })
 
+describe('같은 그림체로 새로 나온 인물 · 배경은 앞 화 그림 한 장을 그림체 견본으로 붙인다', () => {
+  // 이어받은 카이는 같은 그림체라 앞 화 시트를 그대로 쓴다(이미 채워짐). 새 인물 뱃사공은 빈칸이다.
+  function sameStyleEpisode(styleKey: string | null = 'watercolor') {
+    dbState.projects = [projectFixture({ style_anchor_key: styleKey })]
+    dbState.characters = [characterFixture(), characterFixture({ character_id: NEW_CHARACTER_ID, name: '뱃사공', role: 'supporting' })]
+    dbState.appearances = [
+      appearanceFixture({ sheet_url: PREV_SHEET }),
+      appearanceFixture({ character_id: NEW_CHARACTER_ID, appearance: '주름진 노인' }),
+    ]
+  }
+
+  // 왜: 같이 정한 것 — 운영 2화 뛰사공은 일반 견본 그림만 보고 그려 선 · 음영 · 세계관이 1화 인물과 달랐다.
+  it('같은 그림체로 새 인물을 그리면 앞 화 인물 시트 한 장을 마지막 참고 그림으로 붙이고 다른 인물이라고 지시한다', async () => {
+    sameStyleEpisode()
+    expect(seriesStyleSample(SERIES, 'character', NEW_CHARACTER_ID, 'watercolor')).toBe(PREV_SHEET)
+
+    const result = await triggerCharacterDrafts(PROJECT_ID)
+
+    expect(result).toEqual({ submitted: 1, skipped: 1, failed: 0 })
+    expect(falRefs()).toEqual([ANCHOR_IMAGE, TEMPLATE_URL, PREV_SHEET])
+    expect(falPrompt()).toContain('DIFFERENT character from the PREVIOUS episode')
+    expect(falPrompt()).toMatch(/never copy its face, hair, outfit/)
+    expect(falPrompt()).toMatch(/same world, period and culture/)
+  })
+
+  // 왜: 같이 정한 것 — 배경도 같다. 단 견본은 다른 장소라 "그 장소를 지켜라"(정체성 참고)로 보내면 안 된다.
+  it('같은 그림체로 새 배경을 그리면 앞 화 배경 한 장을 견본으로 붙이고 그 장소를 따라 그리지 말라고 지시한다', async () => {
+    sameStyleEpisode()
+    dbState.locations = [locationFixture({ location_id: NEW_LOCATION_ID, name: '강가 나루터' })]
+    expect(seriesStyleSample(SERIES, 'location', NEW_LOCATION_ID, 'watercolor')).toBe(PREV_WIDE)
+
+    const result = await triggerWorldDrafts(PROJECT_ID)
+
+    expect(result).toEqual({ submitted: 1, skipped: 0, failed: 0 })
+    expect(worldInput().styleSampleUrl).toBe(PREV_WIDE)
+    expect(worldRefs() ?? []).toEqual([])
+    expect(worldPrompt()).toContain('DIFFERENT place from the PREVIOUS episode')
+    expect(worldPrompt()).toMatch(/never reproduce that place/)
+    const sampleHash = worldInput().sourceHash
+
+    // 지시 줄은 그림 출처 해시에 들어가지 않는다 — 시리즈가 아닌 같은 배경과 해시가 같다.
+    dbState.projects = [projectFixture({ style_anchor_key: 'watercolor', series: null })]
+    mocks.submitWorldShotJob.mockClear()
+    await triggerWorldDrafts(PROJECT_ID)
+    expect(worldInput().styleSampleUrl ?? null).toBeNull()
+    expect(worldInput().sourceHash).toBe(sampleHash)
+  })
+
+  // 왜: 혼자 정한 것 — 자동 초안이 못 채운 빈칸을 사람이 버튼으로 그려도 같은 견본이 붙어야 그림이 같은 결로 나온다.
+  it('버튼으로 새 인물을 처음 그리거나 새 배경을 그려도 같은 규칙으로 견본을 붙인다', async () => {
+    sameStyleEpisode()
+    const sheet = await generateSheetPOST(
+      postRequest('/api/artist/generate-sheet', { projectId: PROJECT_ID, characterId: NEW_CHARACTER_ID, appearanceKey: 'current', view: 'main', actor: 'ui' }),
+    )
+    expect(sheet.status).toBe(200)
+    expect(falRefs()).toEqual([ANCHOR_IMAGE, TEMPLATE_URL, PREV_SHEET])
+    expect(falPrompt()).toContain('DIFFERENT character from the PREVIOUS episode')
+
+    dbState.locations = [locationFixture({ location_id: NEW_LOCATION_ID, name: '강가 나루터', wide_shot: 'https://media.test/ws-1/proj-2/locations/dock-v1.png' })]
+    const world = await generateWorldPOST(
+      postRequest('/api/artist/generate-world', { projectId: PROJECT_ID, locationId: NEW_LOCATION_ID, column: 'wide_shot', prompt: 'misty river dock at dawn', actor: 'ui' }),
+    )
+    expect(world.status).toBe(200)
+    expect(worldInput().styleSampleUrl).toBe(PREV_WIDE)
+    expect(worldPrompt()).toContain('DIFFERENT place from the PREVIOUS episode')
+  })
+
+  // 왜: 혼자 정한 것 — 그림체를 바꾼 화의 앞 화 그림은 다른 그림체라 견본이 될 수 없다. 기준 그림 없이 그리는 그림체(실사,
+  //   10-13 오너)에 그림을 붙이지 않는다. 이 화 시트가 생긴 뒤 다시 그리기는 그 시트가 기준이다.
+  it('그림체를 바꿨거나 그림체 기준 그림이 없거나 이 화 시트가 이미 있으면 견본을 붙이지 않는다', async () => {
+    expect(seriesStyleSample(SERIES, 'character', NEW_CHARACTER_ID, 'ink')).toBeNull()
+    expect(seriesStyleSample(SERIES, 'character', CHARACTER_ID, 'watercolor')).toBeNull()
+    expect(seriesStyleSample(null, 'character', NEW_CHARACTER_ID, 'watercolor')).toBeNull()
+
+    sameStyleEpisode('ink')
+    await triggerCharacterDrafts(PROJECT_ID)
+    expect(falRefs()).toEqual([INK_ANCHOR_IMAGE, TEMPLATE_URL])
+
+    mocks.falImageSubmit.mockClear()
+    sameStyleEpisode(null)
+    await triggerCharacterDrafts(PROJECT_ID)
+    expect(falRefs()).toEqual([TEMPLATE_URL])
+
+    mocks.falImageSubmit.mockClear()
+    sameStyleEpisode()
+    const ownSheet = 'https://media.test/ws-1/proj-2/characters/boatman-v1.png'
+    dbState.appearances[1].sheet_url = ownSheet
+    const sheet = await generateSheetPOST(
+      postRequest('/api/artist/generate-sheet', { projectId: PROJECT_ID, characterId: NEW_CHARACTER_ID, appearanceKey: 'current', view: 'main', actor: 'ui' }),
+    )
+    expect(sheet.status).toBe(200)
+    expect(falRefs()).toEqual([ANCHOR_IMAGE, TEMPLATE_URL, ownSheet])
+    expect(falPrompt()).not.toContain('DIFFERENT character')
+
+    sameStyleEpisode('ink')
+    dbState.locations = [locationFixture({ location_id: NEW_LOCATION_ID, name: '강가 나루터' })]
+    await triggerWorldDrafts(PROJECT_ID)
+    expect(worldInput().styleSampleUrl ?? null).toBeNull()
+    expect(worldPrompt()).not.toContain('DIFFERENT place')
+  })
+})
+
 function projectFixture(overrides: Partial<ProjectRow> = {}): ProjectRow {
   return {
     id: PROJECT_ID,
@@ -435,8 +559,8 @@ function falPrompt(): string {
   return falOpts().prompt
 }
 
-function worldInput(): { prompt: string; sourceHash?: string | null; referenceImageUrls?: string[] | null } {
-  return mocks.submitWorldShotJob.mock.calls[0][0] as { prompt: string; sourceHash?: string | null; referenceImageUrls?: string[] | null }
+function worldInput(): { prompt: string; sourceHash?: string | null; referenceImageUrls?: string[] | null; styleSampleUrl?: string | null } {
+  return mocks.submitWorldShotJob.mock.calls[0][0] as { prompt: string; sourceHash?: string | null; referenceImageUrls?: string[] | null; styleSampleUrl?: string | null }
 }
 
 function worldRefs(): string[] | null | undefined {
@@ -490,6 +614,7 @@ function rowsForTable(table: string): Array<Record<string, unknown>> {
   if (table === 'character_appearances') return dbState.appearances as unknown as Array<Record<string, unknown>>
   if (table === 'locations') return dbState.locations as unknown as Array<Record<string, unknown>>
   if (table === 'character_image_candidates') return dbState.candidates
+  if (table === 'style_anchors') return dbState.styleAnchors
   return []
 }
 

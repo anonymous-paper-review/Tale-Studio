@@ -635,6 +635,8 @@ export async function POST(req: NextRequest) {
       // 시리즈 다음 화 — 앞 화 제목 · 앞 화 산문 · 이어받은 인물 · 배경 이름. 시리즈가 아니면 칸을 두지 않는다.
       ...(seriesInput ? { series: seriesInput.series } : {}),
       ...(seriesInput?.inheritedVoices.length ? { inheritedVoices: seriesInput.inheritedVoices } : {}),
+      // 앞 화 인물 · 배경 모습(같은 세계의 기준)과, 이 화 그림체가 같을 때 앞 화 색 설계(2026-10-27).
+      ...(seriesInput?.design ?? {}),
       background: backgrounds?.locations?.length
         ? {
             locations: backgrounds.locations.map((b) => ({

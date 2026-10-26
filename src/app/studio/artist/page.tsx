@@ -39,7 +39,7 @@ import { useProducerStore } from '@/stores/producer-store'
 import { BreakdownList } from '@/features/artist-room/breakdown-list'
 import { StyleMakeDialog } from '@/features/artist-room/style-make-dialog'
 import { ArtistCompleteDialog } from '@/features/artist-room/artist-complete-dialog'
-import { seriesMakingTitle } from '@/features/series/artist-series'
+import { groupSeriesAssets, seriesMakingTitle } from '@/features/series/artist-series'
 import { useSeriesInfo } from '@/features/series/use-series-info'
 import { styleIdOf } from '@/lib/series/snapshot'
 
@@ -321,6 +321,16 @@ export default function VisualPage() {
   // 시리즈 다음 화(2026-10-26, 프로토타입 A4s · A4r): 만드는 동안 새로 나온 것만 그리는지, 앞 화 그림을 참고해 다시 그리는지 제목으로 알린다.
   const { view: series } = useSeriesInfo(projectId)
   const makingTitle = seriesMakingTitle(series, styleIdOf({ style_anchor_key: styleKey, custom_style_anchor: customStyle }))
+  // 머리 줄은 이번 화에 그릴 카드만 센다(2026-10-27 오너 승인) — 맨 아래 "보관" 묶음 카드는 빼고 그 수를 뒤에 붙인다.
+  const seriesGroups = series
+    ? groupSeriesAssets(series, {
+        characters: characterAssets.filter((c) => c.entityType === 'person').map((c) => c.characterId),
+        locations: worldAssets.map((w) => w.locationId),
+      })
+    : null
+  const headerKept = (seriesGroups?.keptCharacters.length ?? 0) + (seriesGroups?.keptLocations.length ?? 0)
+  const headerPersons = personTotal - (seriesGroups?.keptCharacters.length ?? 0)
+  const headerPlaces = worldAssets.length - (seriesGroups?.keptLocations.length ?? 0)
   const loadProducer = useProducerStore((s) => s.loadProject)
   useEffect(() => {
     // 브레이크다운 목록 · 스타일은 Producer 값이다(산문이 만든 인물 · 장소) — Artist 에서도 읽는다.
@@ -453,7 +463,10 @@ export default function VisualPage() {
     <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
       <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
         <h1 className="text-lg font-semibold">Artist</h1>
-        <span className="text-xs text-muted-foreground">{t('Characters {persons} · backgrounds {places}', { persons: personTotal, places: worldAssets.length })}</span>
+        <span className="text-xs text-muted-foreground" data-testid="artist-header-counts">
+          {t('Characters {persons} · backgrounds {places}', { persons: headerPersons, places: headerPlaces })}
+          {headerKept > 0 ? ` · ${t('Kept {count}', { count: headerKept })}` : null}
+        </span>
         {styleLabel ? (
           <span className="rounded-md border border-border px-2 py-0.5 text-xs" data-testid="artist-style-bar">
             <span className="text-muted-foreground">{t('Work style')}</span> · <b className="font-medium">{styleLabel}</b>

@@ -87,7 +87,11 @@ async function withFreshSeries(projectId: string, state: WriterRunState): Promis
   if (!state.input.series) return state
   try {
     const fresh = await loadSeriesWriterInput(projectId)
-    return { ...state, input: { ...state.input, series: fresh?.series, inheritedVoices: fresh?.inheritedVoices } }
+    const { inheritedLooks, inheritedDesignTokens } = fresh?.design ?? {}
+    return {
+      ...state,
+      input: { ...state.input, series: fresh?.series, inheritedVoices: fresh?.inheritedVoices, inheritedLooks, inheritedDesignTokens },
+    }
   } catch (error) {
     console.warn('[writer/scene-story-rewrite] series reload failed', error)
     return state

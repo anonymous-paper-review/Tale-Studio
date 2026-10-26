@@ -97,6 +97,35 @@ export function proseTextOf(state: ProseState | null | undefined, roster: Array<
     .join('\n\n')
 }
 
+/** 앞 화 인물 외모 · 배경 설명을 Writer 지시에 실을 때의 상한(한 사람 · 한 곳당 글자). */
+export const SERIES_LOOK_MAX_CHARS = 240
+
+const clip = (text: string, max = SERIES_LOOK_MAX_CHARS): string => {
+  const clean = text.trim().replace(/\s+/g, ' ')
+  return clean.length <= max ? clean : `${clean.slice(0, max).trimEnd()}…`
+}
+
+/**
+ * 2026-10-27 오너 "제품에서 고칠 것": 앞 화 모습 · 색 설계. 모습(인물 외모 · 배경 설명)은 새로 나오는 인물 · 배경을 같은
+ *   세계로 만드는 기준이라 항상 싣는다. 색 설계는 이 화 그림체가 앞 화와 같을 때만 싣는다 — 그림체를 바꾸면 새로 정한다.
+ *   앞 화 말투(inheritedVoices)와 같이 시리즈 칸 밖의 이어받은 칸이다.
+ */
+export function seriesDesignInput(
+  series: SeriesSnapshot,
+  currentStyleId: string | null,
+): Pick<PipelineInput, 'inheritedLooks' | 'inheritedDesignTokens'> {
+  const inheritedLooks = {
+    characters: series.characters
+      .filter((c) => c.appearance.trim())
+      .map((c) => ({ name: c.name, appearance: clip(c.appearance) })),
+    locations: series.locations
+      .filter((l) => l.description.trim())
+      .map((l) => ({ name: l.name, description: clip(l.description) })),
+  }
+  const sameStyle = series.styleId === currentStyleId
+  return { inheritedLooks, ...(series.designTokens && sameStyle ? { inheritedDesignTokens: series.designTokens } : {}) }
+}
+
 /** 파이프라인 입력의 시리즈 칸. 앞 화를 읽지 못했으면 prevProse 는 null 이다. */
 export function seriesPipelineInput(series: SeriesSnapshot, prevProse: string | null): NonNullable<PipelineInput['series']> {
   return {

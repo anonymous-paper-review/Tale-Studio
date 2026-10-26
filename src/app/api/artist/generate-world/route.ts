@@ -25,8 +25,13 @@ import { resolveStyleAnchor } from '@/lib/style-anchor'
 import { styleDrawsWithoutReference } from '@/lib/style-facets/reference-image'
 import { styleAnalysisPending } from '@/lib/style-facets/analysis-wait'
 import { submitWorldShotJob } from '@/lib/artist/world-submit'
-import { parseSeries } from '@/lib/series/snapshot'
-import { seriesLocationReference, withSeriesLocationReference } from '@/lib/series/redraw-reference'
+import { parseSeries, styleIdOf } from '@/lib/series/snapshot'
+import {
+  seriesLocationReference,
+  seriesStyleSample,
+  withSeriesLocationReference,
+  withSeriesLocationStyleSample,
+} from '@/lib/series/redraw-reference'
 import { isChatTraceId } from '@/lib/chat-trace'
 import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
 
@@ -187,12 +192,18 @@ export async function POST(req: Request) {
     // 시리즈 다음 화(2026-10-26): 이어받았는데 이 화 와이드샷이 아직 비어 있는 배경만 앞 화 와이드샷을 참고 그림으로 받는다 —
     //   그림체는 이 화 것이다. 이 화 그림이 이미 있으면 그 그림이 기준이라 앞 화 그림을 싣지 않는다(변형의 기준 그림도 같다).
     //   조회는 이어받은 배경일 때만 — 시리즈가 아닌 프로젝트는 종전과 같은 질의만 돈다.
-    const seriesWideShot = seriesLocationReference(parseSeries((project as { series?: unknown }).series), locationId)
+    const series = parseSeries((project as { series?: unknown }).series)
+    const seriesWideShot = seriesLocationReference(series, locationId)
     let submitPrompt = finalPrompt
     if (seriesWideShot && !(baseWideShot ?? (await currentWideShot(projectId, locationId)))) {
       referenceImageUrls = [...referenceImageUrls, seriesWideShot]
       submitPrompt = withSeriesLocationReference(finalPrompt)
     }
+    // 같은 그림체로 새로 나온 배경(2026-10-27): 앞 화 다른 배경 한 장을 그림체 견본으로 붙인다(자동 초안과 같은 규칙).
+    //   기본 모습은 다시 그릴 때도 이 화 그림을 참고로 싣지 않아 처음과 다시 그리기 모두 견본을 붙인다. 변형은 기본 모습 그림이 기준이다.
+    const styleSampleUrl =
+      anchor && !appearanceKey && !seriesWideShot ? seriesStyleSample(series, 'location', locationId, styleIdOf(project)) : null
+    if (styleSampleUrl) submitPrompt = withSeriesLocationStyleSample(finalPrompt)
 
     // #creem-moderation(2026-10-11): 자리 예약(world-submit.ts) 전에 사용자가 보낸 설명만 검사한다 —
     //   사람 금지 절(NO_PEOPLE_CLAUSE)·앵커 절은 우리 문구라 보내지 않는다.
@@ -227,6 +238,7 @@ export async function POST(req: Request) {
         descriptionHash: typeof descriptionHash === 'string' ? descriptionHash : null,
         appearanceKey,
         referenceImageUrls,
+        styleSampleUrl,
         moderation,
       })
     } catch (e) {

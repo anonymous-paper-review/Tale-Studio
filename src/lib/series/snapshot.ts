@@ -2,7 +2,7 @@
 //   [다음 화 만들기] 때 서버가 한 번 쓰고(앞 화 인물 · 배경 · 복사한 그림 · 말투 · 화풍 · 화면 비율 · 대사 언어), 그 뒤 Producer 시작 ·
 //   Writer · Artist 가 읽는다. 앞 화 줄거리는 여기 두지 않는다 — Writer 가 매번 앞 화에서 다시 읽는다.
 //   모양 · 읽기 · 순수 규칙의 단일 출처. 서버 · 클라이언트가 같이 쓴다 — 서버 전용 모듈을 import 하지 않는다.
-import type { VoiceProfile } from '@/lib/writer/types/pipeline'
+import type { DesignTokens, VoiceProfile } from '@/lib/writer/types/pipeline'
 import type { DialogueLanguage } from '@/lib/writer/pipeline/util/output-language'
 import type { ProjectFormat } from '@/types/project'
 
@@ -60,6 +60,12 @@ export interface SeriesSnapshot {
   continuesLastScene: boolean
   /** 복사하지 못한 그림의 이름(인물 · 배경). 카드는 넘어왔고 그림은 Artist 에서 새로 그린다. */
   copyFailures: string[]
+  /**
+   * 2026-10-27: 앞 화 색 설계(projects.design_tokens 그대로). [다음 화 만들기] 때 한 번 복사한다 — 앞 화를 지워도 남는다.
+   *   이 화 그림체가 앞 화와 같으면 Writer 가 그림 양식 · 전역 팔레트를 새로 정하지 않고 이것을 쓴다.
+   *   앞 화가 Writer 그림 단계까지 가지 않았거나 모양이 틀리면 null.
+   */
+  designTokens: DesignTokens | null
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -117,6 +123,24 @@ function parseVoice(raw: unknown): VoiceProfile | null {
   }
 }
 
+/**
+ * projects.design_tokens → 이어받을 색 설계. 그림 양식(l0 · l1)과 팔레트가 빠지면 쓸 수 없어 null 이다.
+ *   안쪽 칸은 Writer 가 쓴 그대로 둔다 — 여기서 고치면 앞 화와 달라진다.
+ */
+export function parseSeriesDesignTokens(raw: unknown): DesignTokens | null {
+  if (!isObject(raw) || !isObject(raw.l0) || !isObject(raw.l1) || !isObject(raw.palette)) return null
+  if (!str(raw.l1.art_style).trim() || !str(raw.palette.primary).trim()) return null
+  return {
+    l0: raw.l0 as unknown as DesignTokens['l0'],
+    l1: raw.l1 as unknown as DesignTokens['l1'],
+    palette: { ...(raw.palette as unknown as DesignTokens['palette']), forbidden: strList(raw.palette.forbidden) },
+    color_meaning: isObject(raw.color_meaning)
+      ? Object.fromEntries(Object.entries(raw.color_meaning).filter((e): e is [string, string] => typeof e[1] === 'string'))
+      : {},
+    vfx_approach: str(raw.vfx_approach),
+  }
+}
+
 /** projects.series(jsonb) → 시리즈 정보. 시리즈가 아니거나 모양이 틀리면 null. */
 export function parseSeries(raw: unknown): SeriesSnapshot | null {
   if (!isObject(raw) || raw.version !== SERIES_VERSION) return null
@@ -139,6 +163,7 @@ export function parseSeries(raw: unknown): SeriesSnapshot | null {
     dialogueLanguage,
     continuesLastScene: raw.continuesLastScene === true,
     copyFailures: strList(raw.copyFailures),
+    designTokens: parseSeriesDesignTokens(raw.designTokens),
   }
 }
 

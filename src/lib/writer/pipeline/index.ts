@@ -238,7 +238,7 @@ async function _runPipelineInner(
   const visualIdentity = (await loadOrRun<VisualIdentity>(
     resume,
     '08_v0_visualIdentity.json',
-    () => runVisualIdentity(genre, logger, models.V, input.styleAnchor),
+    () => runVisualIdentity(genre, logger, models.V, input.styleAnchor, input.inheritedDesignTokens),
     'visualIdentity',
     logger,
   )).value;
@@ -260,7 +260,12 @@ async function _runPipelineInner(
   const { characterVisual, worldVisual } = (await loadOrRun<{ characterVisual: CharacterVisual; worldVisual: WorldVisual }>(
     resume,
     '09_v2_design.json',
-    () => runV2Design(visualIdentity, actVisualArc, characters, world, '', logger, models.V),
+    () => runV2Design(visualIdentity, actVisualArc, characters, world, '', logger, models.V, input.outputLocale, {
+      scenes: scenes.scenes,
+      series: input.series,
+      looks: input.inheritedLooks,
+      designTokens: input.inheritedDesignTokens,
+    }),
     'v2Design',
     logger,
   )).value;

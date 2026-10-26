@@ -12,11 +12,12 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import type { AppLocale } from '@/lib/locale'
 import { getActiveRun } from '@/lib/writer/run-store'
 import { parseDialogueLanguage, type DialogueLanguage } from '@/lib/writer/pipeline/util/output-language'
-import type { VoiceProfile } from '@/lib/writer/types/pipeline'
+import type { DesignTokens, VoiceProfile } from '@/lib/writer/types/pipeline'
 import { parseProjectFormat, type ProjectFormat } from '@/types/project'
 import {
   SERIES_VERSION,
   parseSeries,
+  parseSeriesDesignTokens,
   styleIdOf,
   type SeriesCharacter,
   type SeriesLocation,
@@ -80,6 +81,8 @@ export interface PrevEpisode {
   customStyleAnchor: Record<string, unknown> | null
   /** 앞 화도 시리즈였으면 그 기록 — 이어받은 그대로인 그림의 그림체를 가린다. */
   prevSeries: SeriesSnapshot | null
+  /** 앞 화 색 설계(projects.design_tokens). Writer 그림 단계 전이거나 모양이 틀리면 null. */
+  designTokens: DesignTokens | null
   characters: PrevCharacter[]
   locations: PrevLocation[]
   voices: VoiceProfile[]
@@ -124,7 +127,7 @@ export async function loadPrevEpisode(input: {
 
   const { data: project, error: projectError } = await supabaseAdmin
     .from('projects')
-    .select('id, title, locale, settings, style_anchor_key, custom_style_anchor, series')
+    .select('id, title, locale, settings, style_anchor_key, custom_style_anchor, series, design_tokens')
     .eq('id', prevProjectId)
     .maybeSingle()
   if (projectError) throw projectError
@@ -165,6 +168,7 @@ export async function loadPrevEpisode(input: {
     styleAnchorKey: text(project.style_anchor_key) || null,
     customStyleAnchor: asObject(project.custom_style_anchor),
     prevSeries: parseSeries(project.series),
+    designTokens: parseSeriesDesignTokens(project.design_tokens),
     characters: prevCharacters(characters, appearances, personalityOf),
     locations: prevLocations(locations),
     voices: inheritedVoices(run?.state),
@@ -318,6 +322,7 @@ export async function createNextEpisode(input: {
     dialogueLanguage: prev.dialogueLanguage,
     continuesLastScene,
     copyFailures,
+    designTokens: prev.designTokens,
   }
   updates.series = series
 

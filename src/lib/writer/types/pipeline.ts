@@ -248,6 +248,16 @@ export interface PipelineInput {
   };
   /** 시리즈: 앞 화 말투(앞 화가 대사까지 끝났을 때만). 같은 character_id 인물은 이 말투로 시작하고 새 인물만 말투를 새로 정한다. */
   inheritedVoices?: VoiceProfile[];
+  /**
+   * 시리즈(2026-10-27): 앞 화 인물 외모 · 배경 설명(앞부분만). 새로 나오는 인물 · 배경을 같은 세계 · 시대 · 문화권으로 만드는 기준이다.
+   *   그림체와 상관없이 싣는다 — 세계가 같은지의 문제다. 산문 단계는 seriesBlock, 디자인 단계는 v2_design 이 싣는다.
+   */
+  inheritedLooks?: {
+    characters: Array<{ name: string; appearance: string }>;
+    locations: Array<{ name: string; description: string }>;
+  };
+  /** 시리즈(2026-10-27): 이 화 그림체가 앞 화와 같을 때만 있는 앞 화 색 설계. 그림 양식 · 전역 팔레트를 새로 정하지 않고 이것을 쓴다. */
+  inheritedDesignTokens?: DesignTokens;
 }
 
 export interface WriterRerunContext {
@@ -565,11 +575,21 @@ export interface CharacterVisual {
   }>;
 }
 
-// v2 ↔ s2(world/background): 월드 비주얼 (글로벌 팔레트·컬러 의미·로케이션·VFX).
+// v2 ↔ s2(world/background): 월드 비주얼 (글로벌 팔레트·컨러 의미·로케이션·VFX).
 export interface WorldVisual {
   global_palette: { primary: string; secondary: string; accent: string; forbidden: string[] };
   color_meaning: Record<string, string>; // color → meaning
   locations: Array<{ id: string; name?: string; style_description: string; lighting_sources: string[]; props: string[] }>;
+  vfx_approach: string;
+}
+
+// projects.design_tokens — v0 VisualIdentity + v2 WorldVisual 전역부(persist_design_tokens.ts 가 기록).
+//   시리즈 다음 화는 앞 화 것을 projects.series.designTokens 로 받아 같은 그림체면 그대로 쓴다(2026-10-27).
+export interface DesignTokens {
+  l0: VisualIdentity['format'];        // = 옛 RenderFormat (DB JSONB 키는 l0 유지)
+  l1: VisualIdentity['style'];         // = 옛 ArtDirection
+  palette: WorldVisual['global_palette'];
+  color_meaning: WorldVisual['color_meaning'];
   vfx_approach: string;
 }
 

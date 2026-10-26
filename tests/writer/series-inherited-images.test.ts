@@ -24,6 +24,7 @@ const series = (patch: Partial<SeriesSnapshot> = {}): SeriesSnapshot => ({
   dialogueLanguage: 'ko',
   continuesLastScene: false,
   copyFailures: [],
+  designTokens: null,
   ...patch,
 })
 

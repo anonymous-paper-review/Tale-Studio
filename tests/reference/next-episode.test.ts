@@ -9,6 +9,13 @@ const MINHO_SHEET = 'https://media.test/workspace-1/prev-episode/characters/minh
 const MINHO_PORTRAIT = 'https://media.test/workspace-1/prev-episode/characters/minho-portrait.png'
 const HALL_WIDE = 'https://media.test/workspace-1/prev-episode/locations/hall-wide.png'
 const LAST_END = 'https://media.test/workspace-1/prev-episode/shots/scene2-end.png'
+const PREV_DESIGN_TOKENS = {
+  l0: { medium: '2d_animation', resolution: { width: 1080, height: 1920 }, fps: 24, aspect_ratio: '9:16', rendering_method: 'cel_shaded' },
+  l1: { art_style: 'watercolor', shape_language: 'round', line_quality: 'soft', character_proportion: '5:1', texture_philosophy: 'paper' },
+  palette: { primary: 'moss', secondary: 'navy', accent: 'gold', forbidden: ['neon'] },
+  color_meaning: { gold: 'memory' },
+  vfx_approach: 'soft particles',
+}
 
 const mocks = vi.hoisted(() => ({
   getUser: vi.fn(),
@@ -81,6 +88,7 @@ beforeEach(() => {
         analysis_pending_at: '2026-10-25T00:00:00.000Z',
       },
       series: null,
+      design_tokens: PREV_DESIGN_TOKENS,
     },
     workspaces: { id: 'workspace-1', owner_id: 'user-1', plan: mocks.plan },
     scenes: [
@@ -336,6 +344,17 @@ describe('앞 화에서 다음 화 만들기', () => {
     })
     expect(seriesOf().styleId).toBe('custom_abc')
     expect(body.warnings).toEqual([])
+  })
+
+  // 왜: 2026-10-27 오너 "제품에서 고칠 것" — 같은 그림체로 이어 가는 화는 앞 화 색 설계를 그대로 쓴다. 만든 뒤 앞 화를 고치거나 지워도 흔들리지 않게 만들 때 복사해 둔다.
+  it('다음 화를 만들면 앞 화 색 설계를 시리즈 기록에 복사하고, 앞 화가 색 설계 전이면 빈 칸으로 둔다', async () => {
+    await POST(postRequest({ fromProjectId: 'prev-episode' }))
+    expect(seriesOf().designTokens).toEqual(PREV_DESIGN_TOKENS)
+
+    mocks.updates = []
+    mocks.rows.projects = { ...(mocks.rows.projects as Record<string, unknown>), design_tokens: null }
+    await POST(postRequest({ fromProjectId: 'prev-episode' }))
+    expect(seriesOf().designTokens).toBeNull()
   })
 
   // 왜: 대사 전에 멈춘 화는 말투가 없다 — 빈 말투를 이어받으면 Writer 가 빈 프로필로 대사를 쓴다.

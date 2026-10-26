@@ -2734,4 +2734,10 @@ export const KO: Record<string, string> = {
     '같은 그림체면 이어받은 그림을 그대로 써요. 바꾸면 이번 화에 나오는 이어받은 인물·배경을 이 그림체로 다시 그려요.',
   'The previous episode was deleted. From now on [AI rewrite] writes without the story of the previous episode. The characters, backgrounds and art style you carried over are still here.':
     '앞 화가 지워졌어요. 이제 [AI 다시 쓰기]는 앞 화 줄거리 없이 써요. 이어받은 인물·배경 그림과 그림체는 남아 있어요.',
+  // 시리즈 다음 화의 그릴 그림 수(2026-10-27) — 만들기 창과 Artist 머리 줄
+  'New character sheets {persons} · backgrounds {places}': '새로 그리는 인물 시트 {persons} · 배경 {places}',
+  'Previous episode images': '앞 화 그림',
+  'Used as is {count}': '그대로 써요 {count}',
+  'Redrawn in this style {count}': '이 그림체로 다시 그려요 {count}',
+  'Kept {count}': '보관 {count}',
 }

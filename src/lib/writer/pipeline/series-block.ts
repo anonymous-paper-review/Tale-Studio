@@ -5,7 +5,7 @@
 //   대본을 그대로 쓰는 화(preserveScript · 바꿈 정도 그대로)는 대본이 진실이라 지시를 더하지 않는다.
 import type { PipelineInput } from '@/lib/writer/types/pipeline'
 
-export function seriesBlock(input: Pick<PipelineInput, 'series' | 'preserveScript' | 'changeLevel'>): string {
+export function seriesBlock(input: Pick<PipelineInput, 'series' | 'preserveScript' | 'changeLevel' | 'inheritedLooks'>): string {
   const series = input.series
   if (!series) return ''
   if (input.preserveScript || input.changeLevel === 'keep') return ''
@@ -25,12 +25,27 @@ export function seriesBlock(input: Pick<PipelineInput, 'series' | 'preserveScrip
   if (series.characters.length || series.locations.length) {
     lines.push('이어받은 인물 · 배경이 이번 화에 모두 나올 필요는 없다 — 이번 화 이야기에 필요한 만큼만 쓴다.')
   }
+  lines.push(...seriesLookLines(input.inheritedLooks))
   if (series.prevProse) {
     lines.push('', '[앞 화 줄거리]', series.prevProse)
   } else {
     lines.push('앞 화 줄거리는 없지만 이어받은 인물 · 배경은 앞 화와 같은 사람 · 같은 장소다.')
   }
   return `${lines.join('\n')}\n\n`
+}
+
+// 2026-10-27 오너 "제품에서 고칠 것": 운영 2화의 새 뱃사공이 삿갓 · 동양풍 작업복으로 나왔다 — 새 인물 외모 글이 처음 생기는 씬 단계에
+//   앞 화가 어느 세계인지가 없었다. 앞 화 인물 외모 · 배경 설명을 기준으로 주고 새로 나오는 것을 같은 세계로 쓰게 한다.
+//   인물 · 배경 디자인 단계(v2_design)도 같은 줄을 싣는다.
+export function seriesLookLines(looks: PipelineInput['inheritedLooks']): string[] {
+  if (!looks || (looks.characters.length === 0 && looks.locations.length === 0)) return []
+  const lines = ['', '[앞 화 인물 · 배경 모습]']
+  for (const c of looks.characters) lines.push(`- ${c.name}: ${c.appearance}`)
+  for (const l of looks.locations) lines.push(`- ${l.name}: ${l.description}`)
+  lines.push(
+    '새로 나오는 인물 · 장소는 이야기가 다르게 말하지 않는 한 위 인물 · 배경과 같은 세계 · 같은 시대 · 같은 문화권의 모습 · 옷차림 · 건축으로 쓴다.',
+  )
+  return lines
 }
 
 // 씬 대사 지시에 싣는 앞 화 줄거리(2026-10-26 오너 Q3 "대사를 만들 때도 앞 화 줄거리를 넣는다").

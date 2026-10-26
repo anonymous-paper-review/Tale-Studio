@@ -4,36 +4,39 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { getActiveRun } from '@/lib/writer/run-store'
 import type { PipelineInput, VoiceProfile } from '@/lib/writer/types/pipeline'
-import { proseTextOf, seriesPipelineInput } from './seed'
-import { parseSeries, trimSeriesProse, type SeriesSnapshot } from './snapshot'
+import { proseTextOf, seriesDesignInput, seriesPipelineInput } from './seed'
+import { parseSeries, styleIdOf, trimSeriesProse, type SeriesSnapshot } from './snapshot'
 
 export interface SeriesContext {
   series: SeriesSnapshot
   /** 지금도 있는 앞 화 번호. 앞 화를 지웠거나 다른 작업 공간이면 null. */
   prevProjectId: string | null
   prevDeleted: boolean
+  /** 이 화에 지금 저장된 그림체(styleIdOf). 앞 화와 같으면 앞 화 색 설계를 Writer 에 싣는다. */
+  currentStyleId: string | null
 }
 
 /** 이 프로젝트가 시리즈 다음 화면 그 정보와 앞 화가 아직 있는지. 시리즈가 아니면 null. */
 export async function loadSeriesContext(projectId: string): Promise<SeriesContext | null> {
   const { data: project, error } = await supabaseAdmin
     .from('projects')
-    .select('series, reference_project_id, workspace_id')
+    .select('series, reference_project_id, workspace_id, style_anchor_key, custom_style_anchor')
     .eq('id', projectId)
     .maybeSingle()
   if (error) throw new Error(`series load failed: ${error.message}`)
   const series = parseSeries(project?.series)
-  if (!series) return null
-  const refId = typeof project?.reference_project_id === 'string' ? project.reference_project_id : null
-  if (!refId) return { series, prevProjectId: null, prevDeleted: true }
+  if (!series || !project) return null
+  const currentStyleId = styleIdOf(project)
+  const refId = typeof project.reference_project_id === 'string' ? project.reference_project_id : null
+  if (!refId) return { series, prevProjectId: null, prevDeleted: true, currentStyleId }
   const { data: prev, error: prevError } = await supabaseAdmin
     .from('projects')
     .select('id, workspace_id')
     .eq('id', refId)
     .maybeSingle()
   if (prevError) throw new Error(`series previous load failed: ${prevError.message}`)
-  const alive = !!prev && prev.workspace_id === project?.workspace_id
-  return { series, prevProjectId: alive ? refId : null, prevDeleted: !alive }
+  const alive = !!prev && prev.workspace_id === project.workspace_id
+  return { series, prevProjectId: alive ? refId : null, prevDeleted: !alive, currentStyleId }
 }
 
 /** 앞 화 확정 산문(상한 안으로 줄인 것). 실행 기록이 없으면 저장된 씬 요약으로, 그것도 없으면 null. */
@@ -58,6 +61,8 @@ export interface SeriesWriterInput {
   context: SeriesContext
   series: NonNullable<PipelineInput['series']>
   inheritedVoices: VoiceProfile[]
+  /** 앞 화 모습 · 색 설계(seed.ts seriesDesignInput) — 실행 입력에 그대로 펼친다. */
+  design: Pick<PipelineInput, 'inheritedLooks' | 'inheritedDesignTokens'>
 }
 
 /** Writer 실행 입력의 시리즈 칸 — 시작 · 다시 시도 · [AI 다시 쓰기]가 매번 새로 읽는다. 시리즈가 아니면 null. */
@@ -69,5 +74,6 @@ export async function loadSeriesWriterInput(projectId: string): Promise<SeriesWr
     context,
     series: seriesPipelineInput(context.series, prose),
     inheritedVoices: context.series.voices,
+    design: seriesDesignInput(context.series, context.currentStyleId),
   }
 }

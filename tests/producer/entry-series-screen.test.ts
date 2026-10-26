@@ -49,6 +49,7 @@ function snapshot(over: Partial<SeriesSnapshot> = {}): SeriesSnapshot {
     dialogueLanguage: 'ja',
     continuesLastScene: true,
     copyFailures: [],
+    designTokens: null,
     ...over,
   }
 }

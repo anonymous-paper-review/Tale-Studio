@@ -80,6 +80,52 @@ export function splitBreakdownRows<T extends BreakdownLike>(
   return { shown, kept }
 }
 
+export interface SeriesMakeCounts {
+  /** 새로 그리는 인물 시트 · 배경 (이어받지 않은 것 + 이어받았지만 앞 화 그림이 없는 것) */
+  newPersons: number
+  newPlaces: number
+  /** 이번 화에 나오고 같은 그림체라 앞 화 그림을 그대로 쓰는 것 */
+  reuse: number
+  /** 이번 화에 나오는데 그림체가 달라 앞 화 그림을 참고해 다시 그리는 것 */
+  redraw: number
+  /** 이번 화에 안 나와 보관하는 것 */
+  kept: number
+}
+
+/** Artist [만들기] 창이 보여 줄 수(2026-10-27 오너 승인) — 정말 새로 그리는 것만 "만드는 것"으로 세고,
+ *  앞 화 그림을 그대로 쓰는 것 · 다시 그리는 것 · 보관을 따로 센다. 시리즈가 아니면(view null) 모든 줄이 새로 그리는 것이다.
+ *  그림체는 화면에서 방금 고른 값으로 본다 — 시리즈 정보는 화면을 열 때 한 번 읽어서 그 뒤 바꾼 그림체를 모른다. */
+export function seriesMakeCounts(
+  rows: readonly BreakdownLike[],
+  view: SeriesView | null,
+  pickedStyleId: string | null,
+): SeriesMakeCounts {
+  const counts: SeriesMakeCounts = { newPersons: 0, newPlaces: 0, reuse: 0, redraw: 0, kept: 0 }
+  const byId = (items: SeriesViewItem[]) => new Map(items.map((item) => [item.id, item]))
+  const inherited = { person: byId(view?.characters ?? []), background: byId(view?.locations ?? []) }
+  for (const row of rows) {
+    const addNew = () => {
+      if (row.kind === 'person') counts.newPersons += 1
+      else counts.newPlaces += 1
+    }
+    const item = row.refId ? inherited[row.kind].get(row.refId) : undefined
+    if (!item) {
+      addNew()
+      continue
+    }
+    // 산문이 아직 없으면 appearing 이 null 이다 — 안 나온다고 단정할 근거가 없어 보관으로 세지 않는다.
+    if (item.appearing === false) {
+      counts.kept += 1
+      continue
+    }
+    const use = seriesImageUse({ styleId: item.styleId, image: item.imageUrl }, { currentStyleId: pickedStyleId, appears: true })
+    if (use === 'reuse') counts.reuse += 1
+    else if (use === 'redraw') counts.redraw += 1
+    else addNew()
+  }
+  return counts
+}
+
 export type SeriesMakingTitle = 'Drawing only the new ones' | 'Redrawing from the previous episode images'
 
 /** Artist [만들기] 진행 상자 제목(프로토타입 A4s · A4r). 시리즈가 아니면 null(지금 제목 그대로).

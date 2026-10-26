@@ -24,8 +24,14 @@ import { isDefiniteSubmitRejection } from '@/lib/fal/submit-rejection'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { buildCharacterTurnaroundPrompt } from '@/lib/artist/turnaround'
 import { sheetIdentityReferences } from '@/lib/artist/source-image'
-import { parseSeries } from '@/lib/series/snapshot'
-import { seriesCharacterReference, seriesLocationReference, withSeriesLocationReference } from '@/lib/series/redraw-reference'
+import { parseSeries, styleIdOf } from '@/lib/series/snapshot'
+import {
+  seriesCharacterReference,
+  seriesLocationReference,
+  seriesStyleSample,
+  withSeriesLocationReference,
+  withSeriesLocationStyleSample,
+} from '@/lib/series/redraw-reference'
 import { resolveCharacterPromptInput, styleFromUserAnalysis, type SheetDesignTokens } from '@/lib/artist/sheet-prompt-input'
 import { DEFAULT_IMAGE_MODEL, resolveImageEndpoint } from '@/lib/image-models'
 import { CHARACTER_VIEW_COLUMNS } from '@/types/asset'
@@ -218,12 +224,17 @@ export async function triggerCharacterDrafts(
           typeof defaultAppearance.derived_from_url === 'string' && defaultAppearance.derived_from_url ? defaultAppearance.derived_from_url : null
         // 앞 화 시트는 정체성 참고의 마지막 장이다(turnaround.ts 의 'the LAST reference image' 계약) — 사용자 원본이 있으면 그 뒤에 온다.
         const seriesSheetUrl = seriesCharacterReference(series, c.character_id)
+        // 템플릿은 스토리지에서 (template-asset.ts 주석 참고).
+        const templateUrl = await templateAssetUrl('character-template.png')
+        // 같은 그림체로 새로 나온 인물(2026-10-27): 앞 화 다른 인물의 시트를 그림체 견본으로 마지막 장에 붙인다.
+        //   그림체 기준 그림이 있고(실사 제외) 템플릿이 있는 참고 그림 경로에서만 — T2I 폴백은 참고 그림이 없어 견본을 말하지 않는다.
+        const styleSampleUrl =
+          anchor && templateUrl && !seriesSheetUrl ? seriesStyleSample(series, 'character', c.character_id, styleIdOf(project ?? {})) : null
         const prompt = buildCharacterTurnaroundPrompt(promptInput, {
           hasSourceImage: !!sourceImageUrl,
           hasSeriesSheet: !!seriesSheetUrl,
+          hasSeriesStyleSample: !!styleSampleUrl,
         })
-        // 템플릿은 스토리지에서 (template-asset.ts 주석 참고).
-        const templateUrl = await templateAssetUrl('character-template.png')
         // 모델 = Artist 기본(레지스트리) — 템플릿이 있으면 edit 갈래, 없으면 T2I 폴백.
         //   템플릿이 첫 장(레이아웃 기준), 그 뒤가 정체성 이미지(출처 원본). 순서가 뒤바뀌면 모델이 원본을 레이아웃으로 오인한다.
         let submitOpts: FalImageOptions = templateUrl
@@ -234,6 +245,7 @@ export async function triggerCharacterDrafts(
                 templateUrl,
                 ...sheetIdentityReferences({ sourceImageUrl }),
                 ...(seriesSheetUrl ? [seriesSheetUrl] : []),
+                ...(styleSampleUrl ? [styleSampleUrl] : []),
               ],
               webhookUrl,
             }
@@ -440,6 +452,9 @@ export async function triggerWorldDrafts(
           'wideShot',
         )
         const seriesWideShotUrl = seriesLocationReference(series, location.location_id)
+        // 같은 그림체로 새로 나온 배경(2026-10-27): 앞 화 다른 배경 한 장을 그림체 견본으로 붙인다(그림체 기준 그림이 있을 때만).
+        const styleSampleUrl =
+          anchor && !seriesWideShotUrl ? seriesStyleSample(series, 'location', location.location_id, styleIdOf(project ?? {})) : null
         // #creem-moderation(2026-10-11): 검사는 이야기에서 나온 배경 설명만 본다 — 사람 금지 절·샷 종류
         //   꼬리말(wide shot, panoramic)은 우리 문구라 보내지 않는다.
         const moderation = await assertUserTextAllowed(
@@ -464,12 +479,17 @@ export async function triggerWorldDrafts(
             projectId,
             locationId: location.location_id,
             column: 'wide_shot',
-            prompt: seriesWideShotUrl ? withSeriesLocationReference(builtPrompt) : builtPrompt,
+            prompt: seriesWideShotUrl
+              ? withSeriesLocationReference(builtPrompt)
+              : styleSampleUrl
+                ? withSeriesLocationStyleSample(builtPrompt)
+                : builtPrompt,
             aspectRatio: '16:9',
             sourceHash: computeWorldImageSourceHash(builtPrompt),
             // 약속 B7: 자동 초안도 설명 해시를 남겨야 뒤에 설명이 바뀌었을 때 "설명 바뀜"을 판정할 수 있다.
             descriptionHash: computeWorldDescriptionHash(location.visual_description),
             referenceImageUrls: seriesWideShotUrl ? [seriesWideShotUrl] : null,
+            styleSampleUrl,
             actor: 'writer',
             workspaceId: project?.workspace_id ?? undefined,
             anchor,

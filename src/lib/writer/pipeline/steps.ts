@@ -465,7 +465,8 @@ export const WRITER_STEPS: WriterStep[] = [
     has: (s) => s.visualIdentity !== undefined,
     run: async (s, { logger }) => {
       const models = resolveModels(s.input);
-      const visualIdentity = await runVisualIdentity(s.genre!, logger, models.V, s.input.styleAnchor);
+      // 시리즈 다음 화(2026-10-27): 같은 그림체면 앞 화 색 설계가 실려 와 그림 양식을 새로 정하지 않는다(seed.ts seriesDesignInput).
+      const visualIdentity = await runVisualIdentity(s.genre!, logger, models.V, s.input.styleAnchor, s.input.inheritedDesignTokens);
       await logger.flushRawLlm('visualIdentity');
       return { visualIdentity };
     },
@@ -503,6 +504,13 @@ export const WRITER_STEPS: WriterStep[] = [
         logger,
         models.V,
         s.input.outputLocale,
+        // 로케이션 디자인이 씬의 시간대 · 날씨를 따르고, 시리즈는 앞 화와 같은 세계 · 같은 색으로(2026-10-27).
+        {
+          scenes: s.scenes?.scenes,
+          series: s.input.series,
+          looks: s.input.inheritedLooks,
+          designTokens: s.input.inheritedDesignTokens,
+        },
       );
       await logger.flushRawLlm('v2Design');
 

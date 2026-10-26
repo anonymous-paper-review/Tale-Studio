@@ -165,7 +165,7 @@ export function buildCharacterMainPrompt(input: CharacterPromptInput): string {
  */
 export function buildCharacterTurnaroundPrompt(
   input: CharacterPromptInput,
-  opts?: { hasBaseFace?: boolean; hasPriorRender?: boolean; hasSourceImage?: boolean; hasSeriesSheet?: boolean },
+  opts?: { hasBaseFace?: boolean; hasPriorRender?: boolean; hasSourceImage?: boolean; hasSeriesSheet?: boolean; hasSeriesStyleSample?: boolean },
 ): string {
   const d = describeParts(input)
   const head = [
@@ -186,6 +186,15 @@ export function buildCharacterTurnaroundPrompt(
       ? [
           'the LAST reference image is this same character as drawn for the PREVIOUS episode of this series — take ONLY the identity from it: the face, hair, build and the shape and colors of the outfit',
           'redraw that identity completely in the art style declared for THIS sheet — never copy the previous episode image\'s linework, shading, texture or medium',
+        ]
+      : []),
+    // 시리즈 다음 화(2026-10-27 오너 "제품에서 고칠 것"): 같은 그림체로 새로 나온 인물에 앞 화 다른 인물의 시트를 그림체 견본으로 붙인다 —
+    //   선 · 음영 · 색감 · 세계의 옷차림만 따르고 얼굴 · 옷은 가져오지 않는다. 호출부 계약: 견본은 참조 그림의 **마지막 장**이고
+    //   앞 화 같은 인물 시트(hasSeriesSheet) · 기준 얼굴 · 직전 시트가 있는 경로에는 싣지 않는다.
+    ...(opts?.hasSeriesStyleSample
+      ? [
+          'the LAST reference image shows a DIFFERENT character from the PREVIOUS episode of this series — use it ONLY as a sample of this series\' drawing style: linework, shading, color grade and how clothing is designed in this world',
+          'never copy its face, hair, outfit or pose — this sheet is the character described above, dressed for the same world, period and culture as that sample unless the description says otherwise',
         ]
       : []),
     // #g4(2026-08-27): 둘째 참조 이미지가 있으면 그건 "이 인물의 다른 시점 얼굴"이다.

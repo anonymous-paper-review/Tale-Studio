@@ -10,18 +10,10 @@
 // 소비측(artist 턴어라운드 시트 = writer-background-artist-progress §5)이 아직 미구현이라,
 // 여기서는 "데이터를 DB에 올려두는" 생산자 측만 담당한다.
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import type { VisualIdentity, WorldVisual } from '@/lib/writer/types/pipeline'
+import type { DesignTokens, VisualIdentity, WorldVisual } from '@/lib/writer/types/pipeline'
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-export interface DesignTokens {
-  l0: VisualIdentity['format']        // = 옛 RenderFormat (DB JSONB 키는 l0 유지)
-  l1: VisualIdentity['style']         // = 옛 ArtDirection
-  palette: WorldVisual['global_palette']
-  color_meaning: WorldVisual['color_meaning']
-  vfx_approach: string
-}
 
 /**
  * 전역 디자인 토큰을 projects.design_tokens 에 기록.
