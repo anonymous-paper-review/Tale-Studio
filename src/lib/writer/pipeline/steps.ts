@@ -346,7 +346,7 @@ async function runLaneDialogue(
     s.decoupage!,
     logger,
     models.S,
-    { resume: s.dialoguePartial ?? null, softDeadlineMs: deadlineMs, outputLocale: s.input.outputLocale, dialogueLanguage: s.input.dialogueLanguage, inheritedVoices: s.input.inheritedVoices },
+    { resume: s.dialoguePartial ?? null, softDeadlineMs: deadlineMs, outputLocale: s.input.outputLocale, dialogueLanguage: s.input.dialogueLanguage, inheritedVoices: s.input.inheritedVoices, series: s.input.series },
   );
   await logger.flushRawLlm('dialogue');
 

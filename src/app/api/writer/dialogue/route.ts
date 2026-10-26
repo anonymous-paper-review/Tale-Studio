@@ -73,8 +73,9 @@ export async function POST(req: Request) {
       state.decoupage,
       logger,
       models.S,
-      // 시리즈 다음 화(2026-10-26): 앞 화 말투는 실행을 만들 때 실린 것을 그대로 쓴다 — 이 경로에서 앞 화를 다시 읽지 않는다.
-      { inheritedVoices: state.input.inheritedVoices },
+      // 시리즈 다음 화(2026-10-26): 앞 화 말투 · 줄거리(Q3)는 실행을 만들 때 실린 것을 그대로 쓴다 — 같은 실행의 산문이
+      //   그 줄거리를 읽고 쓰였으니 대사도 같은 줄거리에 맞춘다. 이 경로에서 앞 화를 다시 읽지 않는다.
+      { inheritedVoices: state.input.inheritedVoices, series: state.input.series },
     )
 
     // shots.dialogue_lines 갱신 — persist_manifest 와 동일 매핑(화자 명시, 내레이션은 characterId null).

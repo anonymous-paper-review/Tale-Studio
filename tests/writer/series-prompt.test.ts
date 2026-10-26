@@ -1,4 +1,4 @@
-// 시리즈 다음 화는 앞 화 제목 · 줄거리 · 이어받은 인물 · 배경을 산문 지시에 싣고, 앞 화 말투가 있는 인물은 말투를 새로 정하지 않는다 (2026-10-26)
+// 시리즈 다음 화는 앞 화 제목 · 줄거리 · 이어받은 인물 · 배경을 산문 지시에 싣고, 대사에도 앞 화 줄거리를 실으며, 앞 화 말투가 있는 인물은 말투를 새로 정하지 않는다 (2026-10-26)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -29,7 +29,7 @@ vi.mock('@/lib/writer/logger', () => ({
   },
 }))
 
-import { seriesBlock } from '@/lib/writer/pipeline/series-block'
+import { seriesBlock, seriesDialogueBlock } from '@/lib/writer/pipeline/series-block'
 import { runDramaturgy } from '@/lib/writer/pipeline/stages/s0_dramaturgy'
 import { runNarrativeStructure } from '@/lib/writer/pipeline/stages/s1_structure'
 import { runScenes } from '@/lib/writer/pipeline/stages/s3_scenes'
@@ -192,12 +192,43 @@ describe('시리즈 다음 화 말투', () => {
     expect(kept).toEqual(inheritedVoices)
   })
 
-  // 왜: 혼자 정한 것 — 대사는 샷 단위라 앞 화 줄거리까지 넣으면 이번 화에 없는 사건이 대사로 샌다.
-  it('대사 단계에는 앞 화 말투만 싣고 줄거리는 싣지 않는다', async () => {
-    await runDialogue('지아가 편지를 쓴다.', genre, twoPeople, SCENES, decoupage, logger, S, { inheritedVoices })
+})
 
+describe('시리즈 다음 화 대사', () => {
+  // 왜: 같이 정한 것(10-26 Q3) — 대사 단계가 이번 화 이야기만 받으면 인물이 대사로 앞 화 일을 말할 때 산문과 어긋난다.
+  it('시리즈 다음 화는 대사를 만들 때도 앞 화 줄거리를 싣는다', async () => {
+    await runDialogue('지아가 편지를 쓴다.', genre, twoPeople, SCENES, decoupage, logger, S, { inheritedVoices, series })
+
+    const scenePrompts = prompts().filter((prompt) => prompt.includes('scene_id='))
+    expect(scenePrompts).toHaveLength(1)
+    expect(scenePrompts[0]).toContain('1화 · 운동장의 밤')
+    expect(scenePrompts[0]).toContain(PREV_PROSE)
     expect(prompts().some((prompt) => prompt.includes('앞 화에서 정한 말투'))).toBe(true)
-    for (const prompt of prompts()) expect(prompt).not.toContain(PREV_PROSE)
+  })
+
+  // 왜: 혼자 정한 것 — 대사는 샷 단위라 줄거리만 붙이면 이번 화 씬에 없는 앞 화 사건이 대사로 샌다.
+  it('대사 지시는 앞 화 일을 줄거리와 맞게 말하되 이번 화 씬에 없는 앞 화 사건은 새로 꺼내지 않게 한다', () => {
+    const block = seriesDialogueBlock(series)
+    expect(block).toContain('줄거리와 맞게')
+    expect(block).toContain('새로 꺼내지 않는다')
+  })
+
+  // 왜: 혼자 정한 것 — 앞 화가 지워졌으면 실을 줄거리가 없다. 보통 프로젝트의 대사 지시는 지금과 같아야 한다.
+  it('앞 화 줄거리가 없거나 시리즈가 아니면 대사 지시에 아무것도 더하지 않는다', async () => {
+    expect(seriesDialogueBlock({ ...series, prevProse: null })).toBe('')
+    expect(seriesDialogueBlock(undefined)).toBe('')
+
+    await runDialogue('지아가 편지를 쓴다.', genre, twoPeople, SCENES, decoupage, logger, S)
+    for (const prompt of prompts()) expect(prompt).not.toContain('앞 화')
+  })
+
+  // 왜: 혼자 정한 것 — 말투는 인물 성격으로 정한다. 앞 화 줄거리(최대 8,000자)를 말투 단계에도 실으면 비용만 는다.
+  it('말투를 정하는 단계에는 앞 화 줄거리를 싣지 않는다', async () => {
+    await runDialogue('지아가 편지를 쓴다.', genre, twoPeople, SCENES, decoupage, logger, S, { inheritedVoices, series })
+
+    const profilePrompt = prompts().find((prompt) => prompt.includes('"profiles"'))
+    expect(profilePrompt).toBeDefined()
+    expect(profilePrompt).not.toContain(PREV_PROSE)
   })
 })
 

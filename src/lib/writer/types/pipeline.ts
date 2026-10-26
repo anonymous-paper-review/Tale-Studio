@@ -236,7 +236,7 @@ export interface PipelineInput {
   preserveScript?: boolean;
   /**
    * 시리즈 다음 화(2026-10-26): 앞 화에서 이어받은 것. writer/start 가 projects.series 와 앞 화 확정 산문을 매번 다시 읽어 채운다.
-   * 산문을 쓰는 단계(이야기 엔진 · 구조 · 씬)와 대사 단계가 series-block 으로 지시에 싣는다. 없으면 보통 프로젝트다.
+   * 산문을 쓰는 단계(이야기 엔진 · 구조 · 씬)는 seriesBlock, 씬 대사는 seriesDialogueBlock(앞 화 줄거리만)으로 지시에 싣는다(series-block.ts). 없으면 보통 프로젝트다.
    */
   series?: {
     prevTitle: string;

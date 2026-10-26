@@ -22,8 +22,10 @@ import type {
   SceneShotDialogue,
   DialogueMemory,
   DialogueTrack,
+  PipelineInput,
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
+import { seriesDialogueBlock } from '@/lib/writer/pipeline/series-block';
 import type { AppLocale } from '@/lib/locale';
 
 // 씬 실행 기본 모드(#dialogue-parallel 2026-08-11 오너 채택) — 병렬 + 사전유도 원장.
@@ -303,11 +305,13 @@ export async function dialogueForScene(
   axisConfig: LlmAxisConfig,
   outputLocale?: AppLocale,
   dialogueLanguage?: DialogueLanguage,
+  /** 시리즈 다음 화(2026-10-26 Q3): seriesDialogueBlock 결과. 빈 문자열이면 지금과 같은 지시다. */
+  seriesNote = '',
 ): Promise<SceneDialogueResult> {
   const userPrompt = `[원 스토리]
 ${story}
 
-[이 씬]
+${seriesNote}[이 씬]
 scene_id=${scene.scene_id}, purpose=${scene.purpose}, location=${scene.location}
 감정 곡선: ${scene.emotion_beat?.start ?? ''} → ${scene.emotion_beat?.end ?? ''}
 등장 인물: ${(scene.characters_in_scene ?? []).join(', ')}
@@ -424,6 +428,8 @@ export async function runDialogue(
     dialogueLanguage?: DialogueLanguage;
     /** 시리즈 다음 화(2026-10-26): 앞 화 말투(PipelineInput.inheritedVoices). 미지정이면 지금과 동일하게 말투를 전부 새로 정한다. */
     inheritedVoices?: VoiceProfile[];
+    /** 시리즈 다음 화(2026-10-26 Q3): 앞 화 제목 · 줄거리(PipelineInput.series). 씬 대사 지시에만 싣는다 — 말투 단계에는 안 싣는다. */
+    series?: PipelineInput['series'];
   },
 ): Promise<RunDialogueResult> {
   const resume = opts?.resume ?? null;
@@ -431,6 +437,7 @@ export async function runDialogue(
   const useLedger = opts?.ledger !== false;
   const outputLocale = opts?.outputLocale;
   const dialogueLanguage = opts?.dialogueLanguage;
+  const seriesNote = seriesDialogueBlock(opts?.series);
   const doneSceneIds = new Set(resume?.doneSceneIds ?? []);
   const out: SceneShotDialogue[] = [...(resume?.scenes ?? [])];
   let memory: DialogueMemory = resume?.memory ?? { ...EMPTY_MEMORY };
@@ -460,7 +467,7 @@ export async function runDialogue(
   ): Promise<SceneDialogueResult | null> => {
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        return await dialogueForScene(story, scene, shots, characters, profiles, mem, logger, axisConfig, outputLocale, dialogueLanguage);
+        return await dialogueForScene(story, scene, shots, characters, profiles, mem, logger, axisConfig, outputLocale, dialogueLanguage, seriesNote);
       } catch (e) {
         console.warn(
           `[dialogue] ${scene.scene_id} 실패 (try ${attempt}/2):`,
