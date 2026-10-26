@@ -11,6 +11,7 @@ import {
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { CharacterViewDialog } from '@/features/artist/character-view-dialog'
 import { AppearanceCreateDialog } from '@/features/artist/appearance-create-dialog'
+import { CharacterDeleteButton } from '@/features/artist/character-delete-button'
 import { TurnaroundRegionCycle } from '@/features/artist/turnaround-region-cycle'
 import { sameCharacterAppearanceSlot, useArtistStore } from '@/stores/artist-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
@@ -228,8 +229,8 @@ export function CharacterPanel({
             카드에서 거뒀다. */}
         <div className="mb-3 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            {/* 이름은 채팅으로만 변경 — 수동 편집 불가(#2). */}
-            <span className="min-w-0 flex-1 truncate text-base font-medium">
+            {/* 이름은 채팅으로만 변경 — 수동 편집 불가(#2). 좁은 카드에서 잘리지 않게 두 줄까지 보인다(2026-10-27 QA). */}
+            <span className="line-clamp-2 min-w-[5rem] flex-1 break-words text-base font-medium">
               {char.name || (isObject ? t('Object') : t('Character'))}
             </span>
             {isObject ? <Badge variant="secondary">{t('Object')}</Badge> : null}
@@ -245,6 +246,8 @@ export function CharacterPanel({
                   {t('Image failed')}
                 </Badge>
               )}
+            {/* 산문 밖에서(예전 채팅) 만들어진 인물만 지우기 단추가 있다(2026-10-27 디자이너 QA 1차 #04). */}
+            <CharacterDeleteButton character={char} />
           </div>
         </div>
 

@@ -150,7 +150,8 @@ export function WorldPanel({
         )}
       >
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <span className="min-w-0 flex-1 truncate font-medium">{world.name}</span>
+          {/* 좁은 카드에서 이름이 잘리지 않게 두 줄까지 보인다(2026-10-27 QA). */}
+          <span className="line-clamp-2 min-w-[5rem] flex-1 break-words font-medium">{world.name}</span>
           {/* 시리즈 다음 화: 앞 화에서 그림까지 이어받은 배경인가. */}
           {mark.inherited ? (
             <Badge variant="outline" className="shrink-0 text-[10px]" data-testid="artist-series-inherited">
