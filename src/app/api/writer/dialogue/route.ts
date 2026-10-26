@@ -7,7 +7,7 @@
 // 얇은 라우트(architecture §2): 인증·zod 검증·소유 확인·위임. 생성 본체는 stages/dialogue.ts 공용.
 // 씬 순차(메모리 캐리)라 한 호출에서 전 씬을 돌고(3~8씬 ≈ 1~2분), 완료 후 일괄 UPDATE.
 import { NextResponse } from 'next/server'
-import { speechSecondsForText } from '@/lib/writer/pipeline/util/duration_reallocation'
+import { shotDialogueLines } from '@/lib/writer/pipeline/util/dialogue_lines'
 import { z } from 'zod'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { requireProjectAccess } from '@/lib/api/guard'
@@ -61,6 +61,14 @@ export async function POST(req: Request) {
         { status: 422 },
       )
 
+    // 등장인물 목록(모습이 있는 인물) — 1~2분 걸리는 유료 대사 생성 전에 읽는다. 뒤에서 실패하면 생성 결과를 버리게 된다.
+    const { data: castRows, error: castError } = await supabaseAdmin
+      .from('character_appearances')
+      .select('character_id')
+      .eq('project_id', projectId)
+    if (castError) throw castError
+    const castIds = new Set((castRows ?? []).map((row) => row.character_id as string))
+
     const models = resolveModels(state.input)
     const logger = new PipelineLogger(projectId)
     await logger.init()
@@ -78,24 +86,15 @@ export async function POST(req: Request) {
       { inheritedVoices: state.input.inheritedVoices, series: state.input.series },
     )
 
-    // shots.dialogue_lines 갱신 — persist_manifest 와 동일 매핑(화자 명시, 내레이션은 characterId null).
+    // shots.dialogue_lines 갱신 — 대사 줄은 persist_manifest 와 같은 규칙(shotDialogueLines): 화자 명시, 내레이션과
+    //   등장인물 목록에 없는 화자(#offscreen-speaker 2026-10-27)는 characterId null.
+    //   (샷 인물 · 모습 칸은 이 경로가 고치지 않는다 — 목록 인물이 새로 말하게 된 샷은 그대로다.)
     let updatedShots = 0
     let lineCount = 0
     for (const sc of result.scenes) {
       for (const sh of sc.shots) {
         const mainId = writerShotIdToMain(sh.shot_id, sc.scene_id)
-        const lines: DialogueLine[] = [
-          ...sh.dialogue.map((l) => ({
-            characterId: l.character_id,
-            text: l.line,
-            emotion: '',
-            delivery: l.delivery ?? '',
-            durationHint: Math.round(speechSecondsForText(l.line) * 10) / 10, // #d6
-          })),
-          ...(sh.narration
-            ? [{ characterId: null, text: sh.narration, emotion: '', delivery: 'V.O.', durationHint: Math.round(speechSecondsForText(sh.narration) * 10) / 10 }]
-            : []),
-        ]
+        const lines: DialogueLine[] = shotDialogueLines(sh, castIds)
         lineCount += sh.dialogue.length
         const { error } = await supabaseAdmin
           .from('shots')

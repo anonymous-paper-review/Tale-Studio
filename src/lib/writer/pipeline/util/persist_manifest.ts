@@ -21,8 +21,9 @@ import {
   resolveCharacterAppearance,
   type CharacterAppearanceCandidate,
 } from '@/lib/writer/appearance-selection'
-import { reallocateShotDurations, speechSecondsForText } from '@/lib/writer/pipeline/util/duration_reallocation'
+import { reallocateShotDurations } from '@/lib/writer/pipeline/util/duration_reallocation'
 import { buildShotDialogueMap } from '@/lib/writer/pipeline/util/dialogue_join'
+import { castSpeakerId, shotDialogueLines } from '@/lib/writer/pipeline/util/dialogue_lines'
 import { isFlagOn } from '@/lib/flags'
 import {
   facetsHash,
@@ -773,6 +774,8 @@ export async function persistShotsToDb(
   // appearance_key는 L4/C2가 알 수 없는 DB 이미지 슬롯이다. 샷을 행으로 매핑하기 전에
   // 씬의 서사 시점과 override, 해당 캐릭터의 DB appearance만으로 결정론적으로 해소한다.
   const { appearancesByCharacter, scenesById } = await loadShotAppearanceResolutionData(projectId)
+  // 등장인물 = 이 프로젝트에 모습이 있는 인물(Tier 1 이 인물마다 기본 모습을 만든다).
+  const castIds = new Set(appearancesByCharacter.keys())
 
   // 자신이 채우는 테이블만 정리 (shots). characters/locations/scenes 는 Tier 1 소관.
   // #F-003 R3(2026-08-13): DELETE 를 파이프라인 소유 행으로 좁힌다 — 채팅/수동 샷(source='manual')은
@@ -811,9 +814,11 @@ export async function persistShotsToDb(
       // #w-a(2026-08-31 오너 확정): characters = blocking ∪ 대사 화자. v4 blocking 은 '연기 주체'만
       //   나열하는 습성이 있어(감사 W2) 화자·원경 인물이 빠지면 캐릭터 시트 미동봉 → 익명 렌더.
       //   전 프로젝트 실측: 화자인데 characters 에 없는 샷 151건 — 결정론 합집합이 최종 방어선.
+      //   #offscreen-speaker(2026-10-27): 등장인물 목록에 없는 화자(음성 메시지 속 병원 직원 등)는 그림 · 모습이 없어
+      //   더하지 않는다 — 그 줄은 화면 밖 목소리로 저장된다(dialogue_lines.ts).
       const speakerChars = (dialogueByShotId.get(it.shot_id)?.dialogue ?? [])
-        .map((l) => l.character_id)
-        .filter((id): id is string => typeof id === 'string' && !!id)
+        .map((l) => castSpeakerId(l.character_id, castIds))
+        .filter((id): id is string => id !== null)
       const chars = [...new Set([...blockingChars, ...speakerChars])]
       const characterAppearanceKeys: Record<string, string> = {}
       const sceneMainId = writerSceneIdToMain(sceneId)
@@ -929,22 +934,8 @@ export async function persistShotsToDb(
           duration_seconds: r.duration,
           generation_method: 'I2V',
           // #dialogue-v4: 화자 명시 대사 라인 (옛 chars[0] 화자 추정·dialogue_summary 폴백 폐기).
-          //   내레이션(V.O.)은 characterId null 라인으로 — 뷰가 'V.O.'로 표기.
-          dialogue_lines: r.shotDialogue
-            ? [
-                ...r.shotDialogue.dialogue.map((l) => ({
-                  characterId: l.character_id,
-                  text: l.line,
-                  emotion: '',
-                  delivery: l.delivery ?? '',
-                  // #d6: 실발화 초(캘리브레이션 소스 SHOT_PACING) — 영상 프롬프트가 발화 길이를 알게 한다.
-                  durationHint: Math.round(speechSecondsForText(l.line) * 10) / 10,
-                })),
-                ...(r.shotDialogue.narration
-                  ? [{ characterId: null, text: r.shotDialogue.narration, emotion: '', delivery: 'V.O.', durationHint: Math.round(speechSecondsForText(r.shotDialogue.narration) * 10) / 10 }]
-                  : []),
-              ]
-            : [],
+          //   내레이션(V.O.)과 등장인물 목록에 없는 화자는 characterId null 라인으로 — 뷰가 'V.O.'로 표기(dialogue_lines.ts).
+          dialogue_lines: shotDialogueLines(r.shotDialogue, castIds),
           camera_config: { ...DEFAULT_CAMERA },
           lighting_config: { ...DEFAULT_LIGHTING },
           sort_order: r.i,
