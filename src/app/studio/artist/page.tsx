@@ -29,7 +29,7 @@ import { styleAnchorName } from '@/lib/style-anchor-name'
 import { AiBusyOverlay } from '@/components/ai-busy-overlay'
 import { artistPhase, artistRunStopped, assetCompletionGaps, makingProgress } from '@/lib/artist/breakdown'
 import { ARTIST_BRIEF_TEXT, artistBriefCounts, offerArtistBrief } from '@/lib/artist/brief'
-import { completeBlockedNote, drawContinueDecision, drawTargetCount, missingDrawTargets } from '@/lib/artist/draw-continue'
+import { completeBlockedNote, drawContinueDecision, drawTargetCount, makingOverlayCopy, missingDrawTargets } from '@/lib/artist/draw-continue'
 import { backgroundRoughReady, storyboardPrepView } from '@/lib/artist/background-roughs'
 import { isDemoSession } from '@/lib/demo/context'
 import { useBackgroundRoughs } from '@/features/artist-room/use-background-roughs'
@@ -379,13 +379,14 @@ export default function VisualPage() {
       {t('Draw the {count} missing images', { count: missingCount })}
     </Button>
   ) : null
+  const overlayCopy = makingOverlayCopy({ decision: drawDecision, gapCount: gaps.characters.length + gaps.locations.length, missingCount })
   const makingOverlay = (
     <AiBusyOverlay
       open={overlayOpen}
-      // 그리는 중인 그림이 없고 안 나온 그림이 남았으면 일이 멈춘 것이다 — 제목 · 도는 원 대신 멈춤 표시와 다시 그리기 단추.
-      title={redrawButton ? t('Some images were not drawn') : t(makingTitle ?? 'Making the images')}
-      busy={!redrawButton}
-      description={redrawButton ? t('Draw the missing ones again, or close this and check the cards.') : undefined}
+      // 그리는 중인 그림이 없고 빈칸이 남았으면 일이 멈춘 것이다 — 제목 · 도는 원 대신 멈춤 표시와 다시 그리기 단추(없으면 카드로 안내).
+      title={overlayCopy.title ? t(overlayCopy.title) : t(makingTitle ?? 'Making the images')}
+      busy={!overlayCopy.stopped}
+      description={overlayCopy.description ? t(overlayCopy.description) : undefined}
       steps={[
         { label: t('Designing the characters and backgrounds'), state: progress.step > 0 ? 'done' : 'current' },
         { label: t('Starting to draw'), state: progress.step > 1 ? 'done' : progress.step === 1 ? 'current' : 'todo' },

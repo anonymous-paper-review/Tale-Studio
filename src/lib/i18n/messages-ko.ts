@@ -2588,6 +2588,7 @@ export const KO: Record<string, string> = {
   'Draw the {count} missing images': '안 나온 그림 {count}장 다시 그리기',
   'Some images were not drawn': '그리지 못한 그림이 있어요',
   'Draw the missing ones again, or close this and check the cards.': '안 나온 그림을 다시 그리거나, 닫고 카드에서 확인해 주세요.',
+  'Remake the images that failed from each card.': '그리지 못한 그림은 카드에서 [다시 만들기]로 다시 그려 주세요.',
   'Drawing the images. You can complete once they are done.': '그림을 그리는 중이에요. 다 그리면 완료할 수 있어요.',
   'No image yet: {names}': '아직 그림이 없어요: {names}',
   'Drawing images {drawn}/{total}': '그림 그리는 중 {drawn}/{total}',

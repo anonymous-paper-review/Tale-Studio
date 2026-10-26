@@ -1904,7 +1904,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     //   초안이 없는 예전 프로젝트의 나머지 말은 예전 Producer 채팅 그대로다(이야기 · 설정 채우기).
     const writerProse = stage === 'producer' && draftLive
     if (stage === 'producer' && !useProjectStore.getState().producerLocked) {
-      const intent = writerChatIntent(trimmed)
+      const intent = writerChatIntent(trimmed, { proseDraft: writerProse })
       if (intent === 'breakdown' || (intent === 'rewrite' && writerProse)) {
         if (sceneSuggestion?.stage === 'producer') get().dismissSuggestion({ implicit: true })
         if (intent === 'rewrite') useWriterRoomStore.getState().openRewrite()

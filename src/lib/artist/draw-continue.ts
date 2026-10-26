@@ -114,3 +114,18 @@ export function completeBlockedNote(input: { gaps: CompletionGaps; drawing: numb
   if (input.drawing > 0) return { kind: 'drawing' }
   return { kind: 'missing', names }
 }
+
+/**
+ * 그림 만드는 중 창의 글 — 멈췄는데(판단 'stop') 빈칸이 남았으면 멈춤 제목 · 안내(검증 지적 3).
+ *   다시 그릴 장수가 있으면 단추로, 없으면(두 번 실패한 칸뿐) 카드의 다시 만들기로 안내한다. 멈춘 동안은 도는 원 · 레일 잠금이 없다.
+ */
+export function makingOverlayCopy(input: { decision: 'continue' | 'wait' | 'stop' | 'idle'; gapCount: number; missingCount: number }): { stopped: boolean; title: string | null; description: string | null } {
+  if (input.decision !== 'stop' || input.gapCount === 0) return { stopped: false, title: null, description: null }
+  return {
+    stopped: true,
+    title: 'Some images were not drawn',
+    description: input.missingCount > 0
+      ? 'Draw the missing ones again, or close this and check the cards.'
+      : 'Remake the images that failed from each card.',
+  }
+}

@@ -58,4 +58,26 @@ describe('Writer 채팅 말 읽기', () => {
     // 왜: 흔한 넘김 말이 산문 수정 요청으로 가서 1분 잠금 뒤 "바꿀 곳을 찾지 못했어요"만 남았다(검토 지적 7).
     expect(writerChatIntent(text)).toBe('breakdown')
   })
+
+  it('고칠 점을 말한 뒤 넘어가자고 하면 어떻게 이어 붙여도 고칠 점부터 수정안으로 만든다', () => {
+    // 왜: "결말 수정하고 다음 단계로 넘어가자"처럼 이어 붙인 말이 확정 창만 열어 고칠 말이 버려졌다(검증 지적 4).
+    for (const text of ['결말 수정하고 다음 단계로 넘어가자', '결말을 바꿔서 Artist로 넘겨줘', '결말 고쳐서 다음 단계로 넘어가자', '결말을 고친 뒤 다음 단계로 넘어가자', '결말을 밝게 해주고 다음 단계로 가자', '결말을 바꿔줘. 그리고 다음 단계로 넘어가자', 'Improve the ending and proceed to the next step', 'Polish the ending and proceed to the next step']) {
+      expect(writerChatIntent(text), text).toBe('revise')
+    }
+  })
+
+  it('고칠 게 없다며 넘어가자고 하면 산문 확정 창을 연다', () => {
+    // 왜: "고칠" 낱말이 들어 있어도 고칠 게 없다는 말이다(검증 지적 5).
+    for (const text of ['고치고 싶은 건 없어, 넘어가자', 'Nothing to fix, move on']) {
+      expect(writerChatIntent(text), text).toBe('breakdown')
+    }
+  })
+
+  it('산문 초안이 없는 예전 프로젝트에서는 "진행해줘" · "Proceed"를 확정 창으로 받지 않는다', () => {
+    // 왜: 예전 프로젝트는 "진행해줘"로 승인 카드를 승인하는데, 새 넘김 말이 그보다 먼저 확정 창을 열었다(검증 지적 6).
+    for (const text of ['진행해줘', 'Proceed', 'Go ahead']) {
+      expect(writerChatIntent(text, { proseDraft: false }), text).not.toBe('breakdown')
+    }
+    expect(writerChatIntent('Artist로 넘겨줘', { proseDraft: false })).toBe('breakdown')
+  })
 })

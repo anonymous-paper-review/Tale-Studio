@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { completeBlockedNote, drawContinueDecision, drawTargetCount, missingDrawTargets, STYLE_WAIT_RECHECK_MS, USER_LIMIT_RECHECK_MS } from '@/lib/artist/draw-continue'
+import { completeBlockedNote, drawContinueDecision, drawTargetCount, makingOverlayCopy, missingDrawTargets, STYLE_WAIT_RECHECK_MS, USER_LIMIT_RECHECK_MS } from '@/lib/artist/draw-continue'
 import { useArtistStore } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
 import type { GenerationJobReceipt } from '@/lib/generation-jobs-client'
@@ -205,7 +205,8 @@ describe('[완료하기] 안내', () => {
   it('그리기가 멈추면 그림 만드는 중 창의 제목도 멈췄다고 말한다', () => {
     // 왜: 다시 그리기 단추가 떠 있는데 제목은 "그림을 만들고 있어요"라 아직 그리는 것처럼 읽혔다(개발 서버 확인).
     const page = readFileSync(path.join(process.cwd(), 'src/app/studio/artist/page.tsx'), 'utf8')
-    expect(page).toMatch(/redrawButton \? t\('Some images were not drawn'\) : t\(makingTitle \?\? 'Making the images'\)/)
+    expect(page).toMatch(/title=\{overlayCopy\.title \? t\(overlayCopy\.title\) : t\(makingTitle \?\? 'Making the images'\)\}/)
+    expect(makingOverlayCopy({ decision: 'stop', gapCount: 1, missingCount: 1 }).title).toBe('Some images were not drawn')
   })
 })
 
@@ -335,5 +336,69 @@ describe('검토 뒤 고친 것(디자이너 QA 1차)', () => {
     // 왜: 오래된 대기 작업 · 상태 조회 실패 · 공유 보기에서 닫기 없이 도는 잠금 화면에 갇혔다(검토 지적 1 · 3 · 14).
     const page = readFileSync(path.join(process.cwd(), 'src/app/studio/artist/page.tsx'), 'utf8')
     expect(page).toMatch(/footer=\{hasAssets \? \(/)
+  })
+})
+
+describe('검증 뒤 고친 것(디자이너 QA 1차)', () => {
+  let view: ReturnType<typeof vi.fn>
+  beforeEach(() => {
+    vi.useRealTimers()
+    useProjectStore.setState({ projectId: 'art-1' })
+    view = vi.fn(async () => ({ jobId: 'j', status: 'queued' }))
+    useArtistStore.setState({
+      characterAssets: [person('soonja', null)],
+      worldAssets: [],
+      generatingViews: [],
+      generatingLocations: [],
+      viewFailures: {},
+      worldFailures: {},
+      capacitySkips: {},
+      drawContinue: { projectId: null, rounds: 0, stopped: false, running: false, paused: false },
+      generateCharacterView: view as never,
+    })
+  })
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('이어 그리기로 보낸 그림이 실패로 끝나면 보낸 것으로 세지 않고 멈춘다', async () => {
+    // 왜: 실패로 끝난 그림을 "보낸 장수"로 세어 다음 바퀴가 같은 칸을 다시 요청(과금)할 수 있었다(검증 지적 1).
+    view.mockImplementation(async (...args: unknown[]) => {
+      const options = args[7] as { onJob?: (receipt: GenerationJobReceipt) => void }
+      options.onJob?.({ jobId: 'j1', status: 'queued' })
+      options.onJob?.({ jobId: 'j1', status: 'failed', error: 'boom' })
+      return { jobId: 'j1', status: 'failed' }
+    })
+
+    await useArtistStore.getState().continueMissingImages()
+
+    expect(useArtistStore.getState().drawContinue).toMatchObject({ rounds: 1, stopped: true })
+  })
+
+  it('서버가 그리던 인물 그림이 실패하면 그리는 중에서 빠지는 그 순간 실패로 적어 다시 요청하지 않는다', async () => {
+    // 왜: 그리는 중에서 빠진 뒤 실패 기록을 다시 읽기 전 잠깐 사이에 이어 그리기가 같은 칸을 다시 요청했다(검증 지적 1, 2026-09-11 오너 — 실패는 자동으로 다시 그리지 않는다).
+    useArtistStore.setState({ characterAssets: [{ ...person('soonja', null), appearances: [{ ...person('soonja', null).appearances[0], appearanceKey: 'young' }] }] })
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url.startsWith('/api/artist/generation-status')) return Response.json({ failures: [], worldFailures: [], queuedWorld: [], queuedMain: [{ characterId: 'soonja', appearanceKey: 'young', jobId: 'job-8' }] })
+      if (url.startsWith('/api/generation-jobs/job-8')) return Response.json({ data: { status: 'failed', resultUrl: null, error: 'provider error' } })
+      return new Promise<Response>(() => {})
+    }))
+    let failedWhenFreed: boolean | null = null
+    const stop = useArtistStore.subscribe((state, before) => {
+      if (before.generatingViews.length > 0 && state.generatingViews.length === 0) failedWhenFreed = !!state.viewFailures.soonja?.young?.main
+    })
+
+    await useArtistStore.getState().syncGenerationStatus('art-1')
+    await vi.waitFor(() => expect(failedWhenFreed).not.toBeNull())
+    stop()
+
+    expect(failedWhenFreed).toBe(true)
+  })
+
+  it('남은 빈칸이 모두 두 번 실패한 칸이면 그림 만드는 중 창이 멈춤으로 바뀌고 카드에서 다시 만들라고 안내한다', () => {
+    // 왜: 다시 그릴 장수가 0이라 단추가 없는데 "그림을 만들고 있어요"로 계속 돌고 왼쪽 레일도 잠겼다(검증 지적 3).
+    expect(makingOverlayCopy({ decision: 'stop', gapCount: 1, missingCount: 0 })).toEqual({ stopped: true, title: 'Some images were not drawn', description: 'Remake the images that failed from each card.' })
+    expect(makingOverlayCopy({ decision: 'stop', gapCount: 2, missingCount: 1 })).toEqual({ stopped: true, title: 'Some images were not drawn', description: 'Draw the missing ones again, or close this and check the cards.' })
+    expect(makingOverlayCopy({ decision: 'wait', gapCount: 2, missingCount: 2 })).toEqual({ stopped: false, title: null, description: null })
+    const page = readFileSync(path.join(process.cwd(), 'src/app/studio/artist/page.tsx'), 'utf8')
+    expect(page).toMatch(/makingOverlayCopy\(/)
   })
 })

@@ -84,6 +84,18 @@ export interface DrawMissingOutcome {
   waitingForStyle: boolean
 }
 
+/** 이 칸의 실패를 적는다(이미 있으면 그대로) — 서버 실패 기록을 다시 읽으면 그 값으로 바뀐다. */
+function withViewFailure(failures: ViewFailures, characterId: string, appearanceKey: string, view: string): ViewFailures {
+  if (failures[characterId]?.[appearanceKey]?.[view]) return failures
+  return {
+    ...failures,
+    [characterId]: {
+      ...failures[characterId],
+      [appearanceKey]: { ...failures[characterId]?.[appearanceKey], [view]: { error: 'failed', moderation: false, failCount: 1, safeFailCount: 0 } },
+    },
+  }
+}
+
 /** 429 본문의 자리 축(api/quota.ts quotaRejectionResponse 의 scope). */
 function quotaScopeOf(status: number, body: unknown): 'user' | 'global' | null {
   if (status !== 429 || !body || typeof body !== 'object') return null
@@ -1358,7 +1370,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       const raw = err instanceof Error ? err.message : String(err)
       const receipt = lastReceipt as GenerationJobReceipt | null
       if (!receipt || !['failed', 'timed_out'].includes(receipt.status)) onJob({ jobId: activeJobId, status: 'failed', error: raw })
-      set({ error: raw || 'Character view generation failed' })
+      // 실패를 그 자리에서 적는다 — 그리는 중에서 빠진 뒤 실패 기록을 다시 읽기 전 사이에 이어 그리기가 다시 요청하지 않게(검증 지적 1).
+      set((state) => ({ error: raw || 'Character view generation failed', viewFailures: withViewFailure(state.viewFailures, characterId, appearanceKey, view) }))
       // 카드의 작은 배지는 스크롤하면 사라진다 — 채팅은 stage 를 옮겨도 남는 기록이다.
       notifyGenerationFailed('artist', translate(useLocaleStore.getState().locale, 'Character image'), raw)
       return { jobId: activeJobId, status: 'failed', error: raw }
@@ -1439,7 +1452,10 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             return refreshLocationCandidates(projectId, locationId, set)
           })
           .catch(() => {
-            if (useProjectStore.getState().projectId === projectId) void refreshWorldFailures(projectId, set)
+            if (useProjectStore.getState().projectId !== projectId) return
+            // 그리는 중에서 빼기 전에 실패로 먼저 적는다 — 실패 기록을 다시 읽기 전 사이에 이어 그리기가 다시 요청하지 않게(검증 지적 1).
+            set((state) => ({ worldFailures: { ...state.worldFailures, [slotKey]: state.worldFailures[slotKey] ?? { error: 'failed', moderation: false, failCount: 1, safeFailCount: 0 } } }))
+            void refreshWorldFailures(projectId, set)
           })
           .finally(() => {
             if (useProjectStore.getState().projectId !== projectId) return
@@ -1465,7 +1481,10 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             }))
           })
           .catch(() => {
-            if (useProjectStore.getState().projectId === projectId) void get().refreshViewFailures()
+            if (useProjectStore.getState().projectId !== projectId) return
+            // 그리는 중에서 빼기 전에 실패로 먼저 적는다 — 실패 기록을 다시 읽기 전 사이에 이어 그리기가 다시 요청하지 않게(검증 지적 1).
+            set((state) => ({ viewFailures: withViewFailure(state.viewFailures, characterId, appearanceKey, 'main') }))
+            void get().refreshViewFailures()
           })
           .finally(() => {
             if (useProjectStore.getState().projectId !== projectId) return
@@ -1972,8 +1991,13 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           : 'other'
     return {
       requested: tasks.length,
-      // 보낸 장수 — 접수 번호가 붙은 작업 수(같은 작업의 진행 알림은 한 번만 센다).
-      submitted: new Set(receipts.filter((receipt) => receipt.jobId && receipt.status !== 'failed').map((receipt) => receipt.jobId)).size,
+      // 보낸 장수 — 접수 번호가 붙고 실패로 끝나지 않은 작업 수(같은 작업의 진행 알림은 한 번만, 마지막 알림 기준).
+      //   실패로 끝난 그림을 보낸 것으로 세면 다음 바퀴가 같은 칸을 다시 요청(과금)한다(검증 지적 1).
+      submitted: (() => {
+        const last = new Map<string, GenerationJobReceipt['status']>()
+        for (const receipt of receipts) if (receipt.jobId) last.set(receipt.jobId, receipt.status)
+        return [...last.values()].filter((status) => status !== 'failed' && status !== 'timed_out').length
+      })(),
       refused: refusals.length > 0,
       refusedScope,
       waitingForStyle: receipts.some((receipt) => receipt.error === 'waiting_for_style'),
