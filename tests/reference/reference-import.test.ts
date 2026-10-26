@@ -1,4 +1,4 @@
-// 참고 작품을 가져올 때 권한을 확인하고 안전한 이미지 자료만 새 프로젝트에 복사한다
+// 앞 화를 가져올 때 권한을 확인하고 보관함 안의 그림만 새 프로젝트로 복사한다
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -11,17 +11,6 @@ const mocks = vi.hoisted(() => ({
   mediaPathFromUrl: vi.fn((url: string) =>
     url.startsWith('https://media.test/') ? url.slice('https://media.test/'.length) : null,
   ),
-  parseCustomStyleAnchor: vi.fn((raw: unknown) => {
-    if (!raw || typeof raw !== 'object') return null
-    const value = raw as { url?: unknown; label?: unknown; medium?: unknown }
-    return typeof value.url === 'string'
-      ? {
-          url: value.url,
-          label: typeof value.label === 'string' ? value.label : null,
-          medium: typeof value.medium === 'string' ? value.medium : null,
-        }
-      : null
-  }),
   responses: {} as Record<string, unknown[]>,
 }))
 
@@ -34,12 +23,9 @@ vi.mock('@/lib/storage/media-url', () => ({
   isOwnMediaUrl: mocks.isOwnMediaUrl,
   mediaPathFromUrl: mocks.mediaPathFromUrl,
 }))
-vi.mock('@/lib/style-anchor', () => ({
-  parseCustomStyleAnchor: mocks.parseCustomStyleAnchor,
-}))
 
 import {
-  copyReferenceAssets,
+  copyOwnMediaTo,
   prepareReferenceImport,
   ReferenceImportValidationError,
 } from '@/lib/reference-import'
@@ -105,184 +91,13 @@ describe('참고 작품 가져오기에서 권한과 자료 복사 규칙을 지
     expect(error).toMatchObject({ code: 'reference_unavailable', status: 403 })
   })
 
-  it('선택한 스타일과 마지막 쇼트 시작 화면을 안전한 내부 공간으로 복사한다', async () => {
-    const source = {
-      id: 'source',
-      workspaceId: 'workspace-1',
-      styleAnchorKey: 'custom-source',
-      customStyleAnchor: {
-        url: 'https://media.test/workspace-1/source/anchors/style.png',
-        label: 'Watercolor',
-        medium: 'watercolor',
-      },
-    }
-    mocks.responses.scenes = [
-      {
-        data: [
-          { id: 'scene-1', sort_order: 1 },
-          { id: 'scene-2', sort_order: 2 },
-        ],
-        error: null,
-      },
-    ]
-    mocks.responses.shots = [
-      {
-        data: [
-          {
-            scene_id: 'scene-1',
-            sort_order: 9,
-            storyboard_image: {
-              status: 'completed',
-              frames: { start: 'https://media.test/source/old.png' },
-            },
-            rough_storyboard: null,
-          },
-          {
-            scene_id: 'scene-2',
-            sort_order: 1,
-            storyboard_image: {
-              status: 'completed',
-              frames: { start: 'https://media.test/workspace-1/source/last.png' },
-            },
-            rough_storyboard: null,
-          },
-        ],
-        error: null,
-      },
-    ]
-    mocks.responses.projects = [{ data: null, error: null }]
+  // 왜: 혼자 정한 것 — 다음 화 그림 복사가 이 함수를 쓴다. 보관함 밖 주소를 받으면 남의 그림을 이 보관함에 들인다.
+  //   옛 참고 프로젝트 흐름의 "외부 스타일 이미지 주소" 테스트가 이 규칙을 지켰다. 그 흐름을 지워서 함수를 직접 검사한다.
+  it('보관함 밖 그림 주소는 복사하지 않고 실패로 알린다', async () => {
+    const result = await copyOwnMediaTo('https://external.test/style.png', 'workspace-1/destination/series/style-anchor-source')
 
-    const result = await copyReferenceAssets({
-      source,
-      destinationProjectId: 'destination',
-      destinationWorkspaceId: 'workspace-1',
-      includeLastShotFrame: true,
-    })
-
-    expect(result.warnings).toEqual([])
-    expect(mocks.mediaCopy).toHaveBeenCalledTimes(2)
-    expect(mocks.mediaCopy.mock.calls[0][0]).toBe(
-      'workspace-1/source/anchors/style.png',
-    )
-    expect(mocks.mediaCopy.mock.calls[1][0]).toBe(
-      'workspace-1/source/last.png',
-    )
-    expect(mocks.from).toHaveBeenLastCalledWith('projects')
-  })
-
-  it('완성된 스토리보드의 시작 화면이 없으면 러프 스토리보드의 화면을 사용한다', async () => {
-    mocks.responses.scenes = [
-      { data: [{ id: 'scene-1', sort_order: 1 }], error: null },
-    ]
-    mocks.responses.shots = [
-      {
-        data: [
-          {
-            scene_id: 'scene-1',
-            sort_order: 1,
-            storyboard_image: { status: 'completed', url: 'https://media.test/stale.png' },
-            rough_storyboard: {
-              status: 'completed',
-              frames: { start: 'https://media.test/workspace-1/source/rough.png' },
-            },
-          },
-        ],
-        error: null,
-      },
-    ]
-    mocks.responses.projects = [{ data: null, error: null }]
-
-    const result = await copyReferenceAssets({
-      source: {
-        id: 'source',
-        workspaceId: 'workspace-1',
-        styleAnchorKey: null,
-        customStyleAnchor: null,
-      },
-      destinationProjectId: 'destination',
-      destinationWorkspaceId: 'workspace-1',
-      includeLastShotFrame: true,
-    })
-
-    expect(result.warnings).toEqual([])
-    expect(mocks.mediaCopy).toHaveBeenCalledWith(
-      'workspace-1/source/rough.png',
-      expect.stringContaining('last-shot-start'),
-    )
-  })
-
-  it('외부 스타일 이미지 주소는 복사하지 않고 경고만 남긴다', async () => {
-    const result = await copyReferenceAssets({
-      source: {
-        id: 'source',
-        workspaceId: 'workspace-1',
-        styleAnchorKey: 'custom-source',
-        customStyleAnchor: {
-          url: 'http://169.254.169.254/latest/meta-data',
-          label: null,
-          medium: null,
-        },
-      },
-      destinationProjectId: 'destination',
-      destinationWorkspaceId: 'workspace-1',
-    })
-
-    expect(result.warnings).toEqual([
-      {
-        code: 'style_anchor_copy_failed',
-        detail: 'source URL is outside the media bucket',
-      },
-    ])
+    expect(result).toEqual({ ok: false, detail: 'source URL is outside the media bucket' })
     expect(mocks.mediaCopy).not.toHaveBeenCalled()
-    // The preset/custom key is still copied as metadata; only the untrusted image
-    // itself is skipped.
-    expect(mocks.from).toHaveBeenCalledWith('projects')
-  })
-
-  it('스타일 이미지를 복사하지 못해도 프로젝트를 만든 뒤 경고로 알린다', async () => {
-    mocks.mediaCopy.mockRejectedValueOnce(new Error('storage unavailable'))
-    mocks.responses.projects = [{ data: null, error: null }]
-
-    const result = await copyReferenceAssets({
-      source: {
-        id: 'source',
-        workspaceId: 'workspace-1',
-        styleAnchorKey: 'custom-source',
-        customStyleAnchor: {
-          url: 'https://media.test/workspace-1/source/anchor.png',
-          label: null,
-          medium: null,
-        },
-      },
-      destinationProjectId: 'destination',
-      destinationWorkspaceId: 'workspace-1',
-    })
-
-    expect(result.warnings).toEqual([
-      { code: 'style_anchor_copy_failed', detail: 'storage unavailable' },
-    ])
-  })
-
-  it('참고 작품의 장면을 찾지 못하면 화면 복사 경고로 알린다', async () => {
-    mocks.responses.scenes = [
-      { data: null, error: { message: 'scene lookup unavailable' } },
-    ]
-
-    const result = await copyReferenceAssets({
-      source: {
-        id: 'source',
-        workspaceId: 'workspace-1',
-        styleAnchorKey: null,
-        customStyleAnchor: null,
-      },
-      destinationProjectId: 'destination',
-      destinationWorkspaceId: 'workspace-1',
-      includeLastShotFrame: true,
-    })
-
-    expect(result.warnings).toEqual([
-      { code: 'reference_frame_copy_failed', detail: 'scene lookup unavailable' },
-    ])
   })
 })
 

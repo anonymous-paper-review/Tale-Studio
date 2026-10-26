@@ -18,12 +18,6 @@ vi.mock('@/lib/supabase/admin', () => ({
 vi.mock('@/lib/supabase/workspace', () => ({
   ensureWorkspace: async () => ({ id: 'workspace-1', plan: 'free', owner_id: 'user-1' }),
 }))
-vi.mock('@/lib/reference-import', () => ({
-  prepareReferenceImport: vi.fn(),
-  copyReferenceAssets: vi.fn(),
-  ReferenceImportValidationError: class ReferenceImportValidationError extends Error {},
-}))
-
 import { POST as createProject } from '@/app/api/project/new/route'
 
 const userWith = (locale?: string) => ({

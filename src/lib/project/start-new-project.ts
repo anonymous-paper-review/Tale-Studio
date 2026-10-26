@@ -30,15 +30,10 @@ export type CreationUpload =
 
 export async function createProjectForNewFlow(input: {
   title: string
-  referenceProjectId?: string
-  includeLastShotFrame?: boolean
-}): Promise<{ ok: true; projectId: string; warnings: Array<{ code?: string; detail?: string }> } | { ok: false; error: string }> {
-  const result = await useProjectStore.getState().createNewProject(
-    input.title,
-    input.referenceProjectId ? { referenceProjectId: input.referenceProjectId, includeLastShotFrame: input.includeLastShotFrame === true } : undefined,
-  )
+}): Promise<{ ok: true; projectId: string } | { ok: false; error: string }> {
+  const result = await useProjectStore.getState().createNewProject(input.title)
   if (!result.ok || !result.projectId) return { ok: false, error: result.error ?? 'Failed to create project' }
-  return { ok: true, projectId: result.projectId, warnings: result.warnings }
+  return { ok: true, projectId: result.projectId }
 }
 
 /** 받을 수 없는 형식 · 크기면 그 이유(없으면 null). 파일을 고르는 즉시 쓴다 — 프로젝트를 만들기 전에 거른다. */

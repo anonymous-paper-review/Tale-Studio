@@ -1,4 +1,4 @@
-// 새 프로젝트를 만들 수 있는지 먼저 알리고 성공하면 결과와 주의사항을 전한다
+// 새 프로젝트를 만들 수 있는지 먼저 알리고 성공하면 만든 프로젝트를 전한다
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -50,22 +50,19 @@ describe('새 프로젝트를 만들 때 결과와 기존 작업을 안전하게
     expect(result).toEqual({
       ok: false,
       projectId: null,
-      warnings: [],
       error: 'slot_limit',
     })
     expect(useProjectStore.getState().projectId).toBe('previous-project')
   })
 
-  it('새 프로젝트를 만들면 생성 결과와 주의사항을 알려준다', async () => {
+  // 왜: 혼자 정한 것 — 주의사항은 옛 참고 프로젝트의 그림 복사 실패에서만 나왔다. 그 흐름을 지워 만든 프로젝트 번호만 전한다.
+  it('새 프로젝트를 만들면 만든 프로젝트 번호를 알려준다', async () => {
     mocks.fetch.mockResolvedValue(
       new Response(
         JSON.stringify({
           workspaceId: 'workspace-1',
           projectId: 'created-project',
           project: { title: 'Follow-up', locale: 'en' },
-          warnings: [
-            { code: 'style_anchor_copy_failed', detail: 'copy skipped' },
-          ],
         }),
         {
           status: 200,
@@ -74,27 +71,12 @@ describe('새 프로젝트를 만들 때 결과와 기존 작업을 안전하게
       ),
     )
 
-    const result = await useProjectStore.getState().createNewProject('Follow-up', {
-      referenceProjectId: 'source-project',
-      includeLastShotFrame: true,
-    })
+    const result = await useProjectStore.getState().createNewProject('Follow-up')
 
-    expect(result).toEqual({
-      ok: true,
-      projectId: 'created-project',
-      warnings: [
-        { code: 'style_anchor_copy_failed', detail: 'copy skipped' },
-      ],
-    })
+    expect(result).toEqual({ ok: true, projectId: 'created-project' })
     expect(mocks.fetch).toHaveBeenCalledWith(
       '/api/project/new',
-      expect.objectContaining({
-        body: JSON.stringify({
-          title: 'Follow-up',
-          referenceProjectId: 'source-project',
-          includeLastShotFrame: true,
-        }),
-      }),
+      expect.objectContaining({ body: JSON.stringify({ title: 'Follow-up' }) }),
     )
   })
 })

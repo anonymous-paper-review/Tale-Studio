@@ -17,12 +17,6 @@ vi.mock('@/lib/supabase/server', () => ({
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: { from: mocks.from, rpc: mocks.rpc },
 }))
-vi.mock('@/lib/reference-import', () => ({
-  prepareReferenceImport: vi.fn(),
-  copyReferenceAssets: vi.fn(),
-  ReferenceImportValidationError: class ReferenceImportValidationError extends Error {},
-}))
-
 import { POST as createProject } from '@/app/api/project/new/route'
 import { POST as initializeProject } from '@/app/api/project/init/route'
 

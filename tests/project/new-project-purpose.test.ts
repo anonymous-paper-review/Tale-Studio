@@ -1,5 +1,4 @@
 // 새 프로젝트에서 무엇을 만들지 고르면 포맷 초안이 정해지고, 아이디어나 자료가 있어야 시작한다 (2026-10-02 오너 · 시안 v04 0.1)
-import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { PROJECT_PURPOSES, purposeSettings } from '@/lib/project/purpose'
 import { creationLengthStep, planCreation } from '@/lib/project/creation-materials'
@@ -42,11 +41,8 @@ describe('자료와 아이디어', () => {
     expect(newProjectInputError({ idea: '  ', fileCount: 1 })).toBeNull()
   })
 
-  it('자료를 올리는 동안 끌어다 놓은 파일은 받지 않는다', () => {
-    // 왜: 올리는 동안 놓은 파일은 올릴 목록에 들어가지 않아 다음 화면에도, 시작한 프로젝트에도 조용히 빠졌다(10/9 검토).
-    const flow = readFileSync('src/features/project-new/new-project-flow.tsx', 'utf8')
-    expect(flow).toMatch(/const addFiles = async \(picked: File\[\]\) => \{\n\s+if \(busy \|\| !picked\.length\) return/)
-  })
+  // 2026-10-26 오너 승인으로 지움 — "자료를 올리는 동안 끌어다 놓은 파일은 받지 않는다".
+  //   이 동작을 가진 옛 새 프로젝트 화면(new-project-flow)을 어느 화면도 열지 않아 파일을 지웠다.
 
   it('아이디어도 자료도 없으면 시작하지 않는다', () => {
     expect(newProjectInputError({ idea: ' \n ', fileCount: 0 })).toBe('empty')

@@ -1,6 +1,5 @@
 import { canUseReference } from '@/lib/plan-limits'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { parseCustomStyleAnchor } from '@/lib/style-anchor'
 import {
   isOwnMediaUrl,
   mediaPathFromUrl,
@@ -9,16 +8,6 @@ import {
   mediaCopy,
   mediaPublicUrl,
 } from '@/lib/storage/media'
-import { storageKeySegment } from '@/lib/storage/key-segment'
-
-export type ReferenceImportWarningCode =
-  | 'style_anchor_copy_failed'
-  | 'reference_frame_copy_failed'
-
-export interface ReferenceImportWarning {
-  code: ReferenceImportWarningCode
-  detail: string
-}
 
 export class ReferenceImportValidationError extends Error {
   readonly status: 400 | 403 | 404
@@ -46,26 +35,6 @@ interface PrepareReferenceImportInput {
   destinationProjectId?: string
 }
 
-interface CopyReferenceAssetsInput {
-  source: ReferenceImportSource
-  destinationProjectId: string
-  destinationWorkspaceId: string
-  includeLastShotFrame?: boolean
-}
-
-interface SceneRow {
-  id: string
-  sort_order: number | null
-}
-
-interface ShotRow {
-  scene_id: string
-  sort_order: number | null
-  storyboard_image: unknown
-  rough_storyboard: unknown
-}
-
-const REFERENCE_DIR = 'reference'
 const MAX_REFERENCE_DIGEST_CHARS = 1500
 
 /**
@@ -194,8 +163,8 @@ function pruneReferenceValue(value: unknown): unknown {
 }
 
 /**
- * 새 프로젝트를 만들기 전에 참조 프로젝트의 소유권·workspace·요금제 경계를 다시 확인한다.
- * 브라우저가 직접 쓸 수 있는 reference_project_id를 신뢰하지 않는 유일한 진입점이다.
+ * 다음 화를 만들기 전에 앞 화의 소유권·workspace·요금제 경계를 다시 확인한다(series/create-next-episode).
+ * 브라우저가 보낸 앞 화 번호를 신뢰하지 않는 유일한 진입점이다.
  */
 export async function prepareReferenceImport(
   input: PrepareReferenceImportInput,
@@ -256,111 +225,6 @@ export async function prepareReferenceImport(
   }
 }
 
-/**
- * 프로젝트 insert 뒤에만 호출한다. 복사는 media 버킷 내부의 storage copy만 사용하며,
- * 외부 주소는 절대 fetch하지 않는다. 원본 앵커·프레임이 없으면 정상적인 no-op이다.
- */
-export async function copyReferenceAssets(
-  input: CopyReferenceAssetsInput,
-): Promise<{ warnings: ReferenceImportWarning[] }> {
-  const warnings: ReferenceImportWarning[] = []
-  const updates: Record<string, unknown> = {}
-
-  if (input.source.styleAnchorKey) {
-    updates.style_anchor_key = input.source.styleAnchorKey
-  }
-
-  const custom = parseCustomStyleAnchor(input.source.customStyleAnchor)
-  if (custom) {
-    const copied = await copyOwnMedia(
-      custom.url,
-      input.destinationWorkspaceId,
-      input.destinationProjectId,
-      input.source.id,
-      'style-anchor',
-    )
-    if (copied.ok) {
-      updates.custom_style_anchor = {
-        url: copied.url,
-        label: custom.label,
-        medium: custom.medium,
-      }
-    } else {
-      warnings.push({
-        code: 'style_anchor_copy_failed',
-        detail: copied.detail,
-      })
-      console.error('[project/new] anchor copy failed', copied.detail)
-    }
-  }
-
-  if (input.includeLastShotFrame) {
-    let frameUrl: string | null = null
-    try {
-      frameUrl = await findLastShotStartFrame(input.source.id)
-    } catch (error) {
-      const detail = errorMessage(error)
-      warnings.push({ code: 'reference_frame_copy_failed', detail })
-      console.error('[project/new] reference frame lookup failed', detail)
-    }
-    if (frameUrl) {
-      const copied = await copyOwnMedia(
-        frameUrl,
-        input.destinationWorkspaceId,
-        input.destinationProjectId,
-        input.source.id,
-        'last-shot-start',
-      )
-      if (copied.ok) {
-        updates.optional_reference_frame_url = copied.url
-      } else {
-        warnings.push({
-          code: 'reference_frame_copy_failed',
-          detail: copied.detail,
-        })
-        console.error('[project/new] reference frame copy failed', copied.detail)
-      }
-    }
-  }
-
-  if (Object.keys(updates).length > 0) {
-    try {
-      const { error } = await supabaseAdmin
-        .from('projects')
-        .update(updates)
-        .eq('id', input.destinationProjectId)
-        .eq('workspace_id', input.destinationWorkspaceId)
-      if (error) {
-        throw error
-      }
-    } catch (error) {
-      const detail = errorMessage(error)
-      if (updates.custom_style_anchor || updates.style_anchor_key) {
-        warnings.push({ code: 'style_anchor_copy_failed', detail })
-      }
-      if (updates.optional_reference_frame_url) {
-        warnings.push({ code: 'reference_frame_copy_failed', detail })
-      }
-      console.error('[project/new] reference snapshot update failed', detail)
-    }
-  }
-
-  return { warnings }
-}
-
-async function copyOwnMedia(
-  url: string,
-  workspaceId: string,
-  projectId: string,
-  sourceProjectId: string,
-  kind: 'style-anchor' | 'last-shot-start',
-): Promise<MediaCopyResult> {
-  return copyOwnMediaTo(
-    url,
-    `${workspaceId}/${projectId}/${REFERENCE_DIR}/${kind}-${storageKeySegment(sourceProjectId)}`,
-  )
-}
-
 export type MediaCopyResult =
   | { ok: true; url: string }
   | { ok: false; detail: string }
@@ -397,48 +261,6 @@ export async function copyOwnMediaTo(
 function extensionFromPath(path: string): string {
   const match = path.match(/\.[a-z0-9]{1,8}$/i)
   return match?.[0] ?? '.bin'
-}
-
-async function findLastShotStartFrame(projectId: string): Promise<string | null> {
-  const { data: scenes, error: sceneError } = await supabaseAdmin
-    .from('scenes')
-    .select('id, sort_order')
-    .eq('project_id', projectId)
-  if (sceneError) throw sceneError
-
-  const { data: shots, error: shotError } = await supabaseAdmin
-    .from('shots')
-    .select('scene_id, sort_order, storyboard_image, rough_storyboard')
-    .eq('project_id', projectId)
-  if (shotError) throw shotError
-
-  const sceneRows = (scenes ?? []) as SceneRow[]
-  const sceneRank = new Map(sceneRows.map((scene) => [scene.id, scene.sort_order ?? -Infinity]))
-  const shotRows = (shots ?? []) as ShotRow[]
-  const lastShot = [...shotRows].sort((a, b) => {
-    const sceneDelta = (sceneRank.get(b.scene_id) ?? -Infinity) - (sceneRank.get(a.scene_id) ?? -Infinity)
-    if (sceneDelta !== 0) return sceneDelta
-    return (b.sort_order ?? -Infinity) - (a.sort_order ?? -Infinity)
-  })[0]
-  if (!lastShot) return null
-
-  return (
-    startFrameFromImage(lastShot.storyboard_image) ??
-    startFrameFromImage(lastShot.rough_storyboard)
-  )
-}
-
-function startFrameFromImage(raw: unknown): string | null {
-  if (!raw || typeof raw !== 'object') return null
-  const image = raw as {
-    status?: unknown
-    frames?: { start?: unknown } | null
-    url?: unknown
-  }
-  if (typeof image.status === 'string' && image.status !== 'completed') return null
-  return typeof image.frames?.start === 'string' && image.frames.start.trim()
-    ? image.frames.start.trim()
-    : null
 }
 
 function errorMessage(error: unknown): string {

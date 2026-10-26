@@ -1,12 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { canUseReference, getPlanLimit } from '@/lib/plan-limits'
-import {
-  copyReferenceAssets,
-  prepareReferenceImport,
-  ReferenceImportValidationError,
-  type ReferenceImportWarning,
-  type ReferenceImportSource,
-} from '@/lib/reference-import'
+import { getPlanLimit } from '@/lib/plan-limits'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { ensureWorkspace } from '@/lib/supabase/workspace'
@@ -30,11 +23,7 @@ export async function POST(req: NextRequest) {
     const title =
       (typeof body?.title === 'string' ? body.title.trim().slice(0, 120) : '') ||
       'Untitled'
-    const referenceProjectId =
-      typeof body?.referenceProjectId === 'string'
-        ? body.referenceProjectId.trim()
-        : ''
-    const includeLastShotFrame = body?.includeLastShotFrame === true
+    // 앞 화에 이어진 프로젝트는 [다음 화 만들기](api/project/next-episode)만 만든다. 옛 참고 프로젝트 값은 받지 않는다(2026-10-26).
     // 리뉴얼 1차(2026-10-19): 새 흐름은 Producer 시작 화면(id entry)에서 시작하고, 채팅 · 대사 언어는 사이트 언어를 따른다.
     //   두 값을 보내지 않는 기존 호출은 지금처럼(계정 언어 · 기본 단계) 동작한다.
     const startAtEntry = body?.startAtEntry === true
@@ -44,30 +33,7 @@ export async function POST(req: NextRequest) {
 
     const isAdmin = isAdminWorkspaceOwner(user, workspace.owner_id)
     const limit = getPlanLimit(workspace.plan)
-
-    if (includeLastShotFrame && !referenceProjectId) {
-      return NextResponse.json(
-        { error: 'reference_project_required' },
-        { status: 400 },
-      )
-    }
-    if (referenceProjectId && !canUseReference(workspace.plan)) {
-      return NextResponse.json(
-        { error: 'reference_unavailable', plan: workspace.plan },
-        { status: 403 },
-      )
-    }
-
     const projectId = randomUUID()
-    let referenceSource: ReferenceImportSource | null = null
-    if (referenceProjectId) {
-      referenceSource = await prepareReferenceImport({
-        userId: user.id,
-        destinationWorkspaceId: workspace.id,
-        referenceProjectId,
-        destinationProjectId: projectId,
-      })
-    }
 
     // Create new project.
     //   locale (#i18n-s5): 생성 시점의 사용자 언어 설정을 콘텐츠 언어로 박는다 —
@@ -90,7 +56,7 @@ export async function POST(req: NextRequest) {
         p_title: title,
         p_locale: locale,
         p_locale_locked: uiLocale !== null || userLocale !== null,
-        p_reference_project_id: referenceProjectId || null,
+        p_reference_project_id: null,
         p_slot_limit: isAdmin ? null : limit,
       },
     )
@@ -128,30 +94,12 @@ export async function POST(req: NextRequest) {
       project.current_stage = 'entry'
     }
 
-    let warnings: ReferenceImportWarning[] = []
-    if (referenceSource) {
-      const copied = await copyReferenceAssets({
-        source: referenceSource,
-        destinationProjectId: projectId,
-        destinationWorkspaceId: workspace.id,
-        includeLastShotFrame,
-      })
-      warnings = copied.warnings
-    }
-
     return NextResponse.json({
       workspaceId: workspace.id,
       projectId,
       project,
-      warnings,
     })
   } catch (err) {
-    if (err instanceof ReferenceImportValidationError) {
-      return NextResponse.json(
-        { error: err.code },
-        { status: err.status },
-      )
-    }
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[project/new]', message)
     return NextResponse.json({ error: message }, { status: 500 })

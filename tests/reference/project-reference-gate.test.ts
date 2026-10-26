@@ -1,4 +1,5 @@
 // 로그인한 사람이 작업 공간 한도와 참고 작품 규칙을 지키며 새 프로젝트를 만든다
+import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
@@ -7,8 +8,6 @@ const mocks = vi.hoisted(() => ({
   getUser: vi.fn(),
   from: vi.fn(),
   rpc: vi.fn(),
-  prepareReferenceImport: vi.fn(),
-  copyReferenceAssets: vi.fn(),
   workspace: {
     id: 'workspace-1',
     plan: 'free',
@@ -22,12 +21,6 @@ vi.mock('@/lib/supabase/server', () => ({ createClient: mocks.createClient }))
 vi.mock('@/lib/supabase/admin', () => ({
   supabaseAdmin: { from: mocks.from, rpc: mocks.rpc },
 }))
-vi.mock('@/lib/reference-import', () => ({
-  prepareReferenceImport: mocks.prepareReferenceImport,
-  copyReferenceAssets: mocks.copyReferenceAssets,
-  ReferenceImportValidationError: class ReferenceImportValidationError extends Error {},
-}))
-
 import { POST } from '@/app/api/project/new/route'
 
 beforeEach(() => {
@@ -47,13 +40,6 @@ beforeEach(() => {
       },
     },
   })
-  mocks.prepareReferenceImport.mockResolvedValue({
-    id: 'source-project',
-    workspaceId: 'workspace-1',
-    styleAnchorKey: null,
-    customStyleAnchor: null,
-  })
-  mocks.copyReferenceAssets.mockResolvedValue({ warnings: [] })
   mocks.from.mockImplementation((table: string) => {
     if (table === 'workspaces') return workspaceQuery()
     throw new Error(`unexpected table: ${table}`)
@@ -126,7 +112,8 @@ describe('새 프로젝트를 만들 때 작업 공간 한도와 참고 작품 �
     expect(mocks.inserted).toBeNull()
   })
 
-  it('참고 작품을 고를 수 있는 요금제에서는 선택한 작품을 새 프로젝트에 연결한다', async () => {
+  // 왜: 같이 정한 것(10-26 · 오늘 승인) — 옛 참고 프로젝트 흐름을 지웠다. 앞 화 연결은 [다음 화 만들기]만 한다.
+  it('새 프로젝트를 만들 때 참고 프로젝트를 보내도 앞 프로젝트를 연결하지 않고 그림체를 복사하지 않는다', async () => {
     mocks.workspace.plan = 'p10'
 
     const response = await POST(
@@ -138,23 +125,22 @@ describe('새 프로젝트를 만들 때 작업 공간 한도와 참고 작품 �
     )
 
     expect(response.status).toBe(200)
-    expect(mocks.inserted).toMatchObject({
-      title: 'Follow-up',
-      reference_project_id: 'source-project',
-    })
-    expect(mocks.prepareReferenceImport).toHaveBeenCalledWith(
-      expect.objectContaining({
-        userId: 'user-1',
-        destinationWorkspaceId: 'workspace-1',
-        referenceProjectId: 'source-project',
-      }),
-    )
-    expect(mocks.copyReferenceAssets).toHaveBeenCalledWith(
-      expect.objectContaining({
-        includeLastShotFrame: true,
-        source: expect.objectContaining({ id: 'source-project' }),
-      }),
-    )
+    expect(mocks.inserted).toMatchObject({ title: 'Follow-up', reference_project_id: null })
+    // 앞 프로젝트를 읽거나 새 프로젝트에 그림체를 적지 않는다.
+    expect(mocks.from.mock.calls.map(([table]) => table)).not.toContain('projects')
+  })
+
+  // 왜: 같이 정한 것(10-26 · 오늘 승인) — 화면에 참고 칸이 남으면 사용자가 서버가 버리는 값을 고른다.
+  it('새 프로젝트를 만드는 화면은 참고 프로젝트와 마지막 샷 프레임을 보내지 않는다', () => {
+    for (const file of [
+      'src/app/page.tsx',
+      'src/stores/project-store.ts',
+      'src/lib/project/start-new-project.ts',
+    ]) {
+      const source = readFileSync(file, 'utf8')
+      expect(source, file).not.toContain('referenceProjectId')
+      expect(source, file).not.toContain('includeLastShotFrame')
+    }
   })
 
   it('내용 없이 요청해도 Untitled 프로젝트를 만든다', async () => {

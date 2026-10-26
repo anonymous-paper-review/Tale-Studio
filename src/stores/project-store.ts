@@ -42,21 +42,13 @@ export interface WriterStatusAssets {
 }
 
 export interface CreateProjectOptions {
-  referenceProjectId?: string
-  includeLastShotFrame?: boolean
   /** 리뉴얼 1차: Producer 시작 화면(id entry)에서 시작하고, 채팅 · 대사 언어를 지금 사이트 언어로 잠근다. */
   entry?: boolean
-}
-
-export interface ProjectCreationWarning {
-  code?: string
-  detail?: string
 }
 
 export interface ProjectCreationResult {
   ok: boolean
   projectId: string | null
-  warnings: ProjectCreationWarning[]
   error?: string
 }
 
@@ -362,15 +354,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set({ initLoading: true })
     try {
       const trimmed = title?.trim() || 'Untitled'
-      const referenceProjectId = options?.referenceProjectId?.trim()
       const body = {
         title: trimmed,
-        ...(referenceProjectId
-          ? {
-              referenceProjectId,
-              includeLastShotFrame: options?.includeLastShotFrame === true,
-            }
-          : {}),
         ...(options?.entry
           ? { startAtEntry: true, uiLocale: useLocaleStore.getState().locale }
           : {}),
@@ -415,7 +400,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       return {
         ok: true,
         projectId: typeof projectId === 'string' ? projectId : null,
-        warnings: Array.isArray(response.warnings) ? response.warnings : [],
       }
     } catch (err) {
       console.error('[project-store] createNewProject failed:', err)
@@ -423,7 +407,6 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       return {
         ok: false,
         projectId: null,
-        warnings: [],
         error: err instanceof Error ? err.message : 'Failed to create project',
       }
     }
