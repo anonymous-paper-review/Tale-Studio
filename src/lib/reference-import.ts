@@ -272,7 +272,7 @@ export async function copyReferenceAssets(
 
   const custom = parseCustomStyleAnchor(input.source.customStyleAnchor)
   if (custom) {
-    const copied = await tryCopyOwnMedia(
+    const copied = await copyOwnMedia(
       custom.url,
       input.destinationWorkspaceId,
       input.destinationProjectId,
@@ -304,7 +304,7 @@ export async function copyReferenceAssets(
       console.error('[project/new] reference frame lookup failed', detail)
     }
     if (frameUrl) {
-      const copied = await tryCopyOwnMedia(
+      const copied = await copyOwnMedia(
         frameUrl,
         input.destinationWorkspaceId,
         input.destinationProjectId,
@@ -348,54 +348,50 @@ export async function copyReferenceAssets(
   return { warnings }
 }
 
-async function tryCopyOwnMedia(
-  url: string,
-  workspaceId: string,
-  projectId: string,
-  sourceProjectId: string,
-  kind: 'style-anchor' | 'last-shot-start',
-): Promise<{ ok: true; url: string } | { ok: false; detail: string }> {
-  try {
-    return await copyOwnMedia(
-      url,
-      workspaceId,
-      projectId,
-      sourceProjectId,
-      kind,
-    )
-  } catch (error) {
-    return {
-      ok: false,
-      detail: errorMessage(error),
-    }
-  }
-}
-
 async function copyOwnMedia(
   url: string,
   workspaceId: string,
   projectId: string,
   sourceProjectId: string,
   kind: 'style-anchor' | 'last-shot-start',
-): Promise<{ ok: true; url: string } | { ok: false; detail: string }> {
-  if (!isOwnMediaUrl(url)) {
-    return { ok: false, detail: 'source URL is outside the media bucket' }
-  }
-  const sourcePath = mediaPathFromUrl(url)
-  if (!sourcePath) {
-    return { ok: false, detail: 'source URL is not a valid media path' }
-  }
+): Promise<MediaCopyResult> {
+  return copyOwnMediaTo(
+    url,
+    `${workspaceId}/${projectId}/${REFERENCE_DIR}/${kind}-${storageKeySegment(sourceProjectId)}`,
+  )
+}
 
-  const extension = extensionFromPath(sourcePath)
-  const destinationPath = `${workspaceId}/${projectId}/${REFERENCE_DIR}/${kind}-${storageKeySegment(sourceProjectId)}${extension}`
-  const { error } = await mediaCopy(sourcePath, destinationPath)
-  if (error) {
-    return {
-      ok: false,
-      detail: errorMessage(error),
+export type MediaCopyResult =
+  | { ok: true; url: string }
+  | { ok: false; detail: string }
+
+/**
+ * media 버킷 안의 그림을 받은 경로로 복사한다(확장자는 원본에서 가져와 붙인다).
+ * 버킷 밖 주소는 복사하지 않고 실패로 돌려준다 — 외부 주소는 절대 fetch 하지 않는다.
+ * 던지지 않는다: 호출자가 경고 · 실패 목록으로 모아 쓴다(시리즈 다음 화 그림 복사가 같이 쓴다).
+ */
+export async function copyOwnMediaTo(
+  url: string,
+  destinationPathWithoutExtension: string,
+): Promise<MediaCopyResult> {
+  try {
+    if (!isOwnMediaUrl(url)) {
+      return { ok: false, detail: 'source URL is outside the media bucket' }
     }
+    const sourcePath = mediaPathFromUrl(url)
+    if (!sourcePath) {
+      return { ok: false, detail: 'source URL is not a valid media path' }
+    }
+
+    const destinationPath = `${destinationPathWithoutExtension}${extensionFromPath(sourcePath)}`
+    const { error } = await mediaCopy(sourcePath, destinationPath)
+    if (error) {
+      return { ok: false, detail: errorMessage(error) }
+    }
+    return { ok: true, url: mediaPublicUrl(destinationPath) }
+  } catch (error) {
+    return { ok: false, detail: errorMessage(error) }
   }
-  return { ok: true, url: mediaPublicUrl(destinationPath) }
 }
 
 function extensionFromPath(path: string): string {

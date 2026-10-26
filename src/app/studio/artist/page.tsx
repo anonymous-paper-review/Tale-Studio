@@ -37,6 +37,9 @@ import { useProducerStore } from '@/stores/producer-store'
 import { BreakdownList } from '@/features/artist-room/breakdown-list'
 import { StyleMakeDialog } from '@/features/artist-room/style-make-dialog'
 import { ArtistCompleteDialog } from '@/features/artist-room/artist-complete-dialog'
+import { seriesMakingTitle } from '@/features/series/artist-series'
+import { useSeriesInfo } from '@/features/series/use-series-info'
+import { styleIdOf } from '@/lib/series/snapshot'
 
 type ArtistTab = 'characters' | 'world'
 
@@ -334,6 +337,9 @@ export default function VisualPage() {
   const locale = useLocale()
   const pickedStyle = styleAnchors.find((anchor) => anchor.key === styleKey)
   const styleLabel = customStyle?.label ?? (pickedStyle ? styleAnchorName(pickedStyle, locale) : null)
+  // 시리즈 다음 화(2026-10-26, 프로토타입 A4s · A4r): 만드는 동안 새로 나온 것만 그리는지, 앞 화 그림을 참고해 다시 그리는지 제목으로 알린다.
+  const { view: series } = useSeriesInfo(projectId)
+  const makingTitle = seriesMakingTitle(series, styleIdOf({ style_anchor_key: styleKey, custom_style_anchor: customStyle }))
   const loadProducer = useProducerStore((s) => s.loadProject)
   useEffect(() => {
     // 브레이크다운 목록 · 스타일은 Producer 값이다(산문이 만든 인물 · 장소) — Artist 에서도 읽는다.
@@ -361,7 +367,7 @@ export default function VisualPage() {
   const makingOverlay = (
     <AiBusyOverlay
       open={overlayOpen}
-      title={t('Making the images')}
+      title={t(makingTitle ?? 'Making the images')}
       steps={[
         { label: t('Designing the characters and backgrounds'), state: progress.step > 0 ? 'done' : 'current' },
         { label: t('Starting to draw'), state: progress.step > 1 ? 'done' : progress.step === 1 ? 'current' : 'todo' },

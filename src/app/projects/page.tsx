@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Clock, Film, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
+import { BookOpen, Clock, Film, Loader2, Lock, Pencil, Plus, Trash2 } from 'lucide-react'
 import {
   useProjectStore,
 } from '@/stores/project-store'
@@ -26,6 +26,20 @@ import { projectOpenPath, projectStageLabel } from '@/lib/project/open-path'
 import { DashboardHeader } from '@/components/dashboard/dashboard-header'
 import { useT } from '@/lib/i18n'
 import { clearLastProjectId, readLastProjectId } from '@/lib/session-restore'
+import {
+  continuingEpisodes,
+  nextEpisodeButton,
+  prevEpisodeLink,
+  type NextEpisodeFailure,
+  type SeriesPlanState,
+} from '@/features/projects/series-list'
+import {
+  NextEpisodeDialog,
+  PrevProseDialog,
+  SeriesDeleteWarningDialog,
+  SeriesPlanDialog,
+  SeriesSlotLimitDialog,
+} from '@/features/projects/next-episode-dialog'
 
 interface ProjectItem {
   id: string
@@ -34,6 +48,12 @@ interface ProjectItem {
   updated_at: string | null
   /** 대표 이미지(실사 스토리보드 > 러프 > 캐릭터, api/project/list) — 없으면 그라디언트 폴백 */
   thumbnail_url: string | null
+  /** 시리즈(2026-10-26, api/project/list) — 앞 화 번호. 앞 화를 지우면 null 이 된다. */
+  referenceProjectId: string | null
+  /** 앞 화를 지워도 카드에 남는 앞 화 제목. 시리즈가 아니면 null. */
+  seriesPrevTitle: string | null
+  /** 이 화로 다음 화를 만들 수 있나 — Artist [만들기]를 누른 화(씬 1개 이상). */
+  canContinue: boolean
 }
 
 
@@ -90,19 +110,28 @@ function ProjectThumb({ url }: { url: string }) {
 
 function ProjectCard({
   project,
+  plan,
   onOpen,
   onRenamed,
   onDeleteRequest,
+  onNextEpisode,
+  onProse,
 }: {
   project: ProjectItem
+  plan: SeriesPlanState
   onOpen: (p: ProjectItem) => void
   onRenamed: (id: string, title: string) => void
   onDeleteRequest: (p: ProjectItem) => void
+  onNextEpisode: (p: ProjectItem) => void
+  onProse: (p: ProjectItem) => void
 }) {
   const t = useT()
   const [editing, setEditing] = useState(false)
   const [title, setTitle] = useState(project.title || 'Untitled')
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const link = prevEpisodeLink(project)
+  const next = nextEpisodeButton(project, plan)
 
   const handleSave = async () => {
     setEditing(false)
@@ -189,6 +218,17 @@ function ProjectCard({
           </>
         )}
       </div>
+      {/* 시리즈(2026-10-26, 프로토타입 L1): 다음 화 카드에는 "← 앞 화 제목". 앞 화를 지우면 연결만 끊기고 제목은 남는다. */}
+      {link ? (
+        <div
+          className={`mt-1.5 truncate text-xs ${link.deleted ? 'text-gray-500' : 'text-gray-400'}`}
+          data-testid="project-prev-episode"
+        >
+          {'← '}
+          {link.title}
+          {link.deleted ? ` · ${t('The previous episode was deleted')}` : ''}
+        </div>
+      ) : null}
       <div className="mt-3 flex items-center gap-3 text-xs text-gray-400">
         <span className="rounded-md bg-white/10 px-2.5 py-1 font-medium">
           {projectStageLabel(project.current_stage)}
@@ -200,6 +240,32 @@ function ProjectCard({
           </span>
         )}
       </div>
+
+      {/* 시리즈(2026-10-26, 프로토타입 L1 · L1n): 카드에서만 다음 화를 만들고, 못 만드는 화는 까닭을 한 줄 보여 준다. */}
+      <div className="mt-4 flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
+        {link ? (
+          <Button variant="outline" size="sm" onClick={() => onProse(project)} data-testid="project-prev-prose">
+            <BookOpen className="size-3.5" aria-hidden />
+            {t('View prose')}
+          </Button>
+        ) : null}
+        <Button
+          variant={next.action === 'create' ? 'default' : 'outline'}
+          size="sm"
+          disabled={!next.enabled}
+          title={next.locked ? t('Available on Producer10 and above') : undefined}
+          onClick={() => onNextEpisode(project)}
+          data-testid="project-next-episode"
+        >
+          {next.locked ? <Lock className="size-3.5" aria-hidden /> : null}
+          {t('Create next episode')}
+        </Button>
+      </div>
+      {next.reason ? (
+        <p className="mt-2 text-xs leading-5 text-gray-500" data-testid="project-next-episode-why">
+          {t(next.reason)}
+        </p>
+      ) : null}
       </div>
     </div>
   )
@@ -215,6 +281,12 @@ export default function ProjectsPage() {
   const [deleteTarget, setDeleteTarget] = useState<ProjectItem | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  // 시리즈(2026-10-26): 요금제 · 칸은 목록 응답이 주는 것을 그대로 쓴다(칸 수 계산은 서버가 소유).
+  const [canUseReference, setCanUseReference] = useState(false)
+  const [slotLimit, setSlotLimit] = useState<number | null>(null)
+  const [nextEpisodeTarget, setNextEpisodeTarget] = useState<ProjectItem | null>(null)
+  const [proseTarget, setProseTarget] = useState<ProjectItem | null>(null)
+  const [seriesBlock, setSeriesBlock] = useState<NextEpisodeFailure | null>(null)
 
   useEffect(() => {
     // middleware 가 비로그인은 이미 /login 으로 보냈다 — 여기서는 목록만(유저 메뉴는 헤더 담당).
@@ -222,10 +294,26 @@ export default function ProjectsPage() {
       .then((r) => r.json())
       .then((data) => {
         setProjects(Array.isArray(data?.projects) ? data.projects : [])
+        setCanUseReference(data?.canUseReference === true)
+        setSlotLimit(typeof data?.slotLimit === 'number' ? data.slotLimit : null)
       })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
+
+  const plan: SeriesPlanState = { canUseReference, slotLimit, used: projects.length }
+  // 이 화를 이어받은 다음 화가 있으면 지우기 전에 먼저 경고한다(프로토타입 LDq · LD).
+  const deleteNextEpisodes = deleteTarget ? continuingEpisodes(projects, deleteTarget.id) : []
+
+  // 버튼 단계에서 먼저 갈라 만들기 창에 닿기 전에 요금제 · 칸을 알린다. 서버 검사는 만들 때 한 번 더 한다.
+  const handleNextEpisode = (project: ProjectItem) => {
+    const state = nextEpisodeButton(project, plan)
+    if (state.action === 'create') {
+      setNextEpisodeTarget(project)
+      return
+    }
+    if (state.action === 'plan' || state.action === 'slots') setSeriesBlock(state.action)
+  }
 
   const handleOpen = (project: ProjectItem) => {
     const stage = project.current_stage ?? 'producer'
@@ -296,6 +384,7 @@ export default function ProjectsPage() {
               <ProjectCard
                 key={project.id}
                 project={project}
+                plan={plan}
                 onOpen={handleOpen}
                 onRenamed={(id, title) =>
                   setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, title } : p)))
@@ -304,14 +393,16 @@ export default function ProjectsPage() {
                   setDeleteError(null)
                   setDeleteTarget(p)
                 }}
+                onNextEpisode={handleNextEpisode}
+                onProse={setProseTarget}
               />
             ))}
           </div>
         )}
       </main>
 
-      {/* ── 프로젝트 삭제 확인 팝업 ── */}
-      <Dialog open={!!deleteTarget} onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}>
+      {/* ── 프로젝트 삭제 확인 팝업 ── 다음 화가 없는 화는 지금과 같다(프로토타입 LD0) */}
+      <Dialog open={!!deleteTarget && deleteNextEpisodes.length === 0} onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{t('Delete project')}</DialogTitle>
@@ -331,6 +422,25 @@ export default function ProjectsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── 시리즈 창들(2026-10-26) ── 다음 화가 있는 화의 지우기 경고(LD) · 만들기(N2) · 요금제(LU) · 칸(LS) · 앞 화 산문 */}
+      <SeriesDeleteWarningDialog
+        open={!!deleteTarget && deleteNextEpisodes.length > 0}
+        project={deleteTarget}
+        nextEpisodes={deleteNextEpisodes}
+        deleting={deleting}
+        error={deleteError}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => void handleDelete()}
+      />
+      <NextEpisodeDialog
+        project={nextEpisodeTarget}
+        onClose={() => setNextEpisodeTarget(null)}
+        onFailure={(failure) => setSeriesBlock(failure)}
+      />
+      <SeriesPlanDialog open={seriesBlock === 'plan'} onClose={() => setSeriesBlock(null)} />
+      <SeriesSlotLimitDialog open={seriesBlock === 'slots'} slotLimit={slotLimit} onClose={() => setSeriesBlock(null)} />
+      <PrevProseDialog project={proseTarget} onClose={() => setProseTarget(null)} />
     </div>
   )
 }

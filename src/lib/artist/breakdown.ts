@@ -5,6 +5,8 @@ import { completionGaps, type CompletionGaps } from '@/lib/artist/completion-gap
 
 export interface BreakdownRow {
   id: string
+  /** 인물 번호(characterId) · 장소 번호(locationId). 아직 없으면 null — 시리즈 다음 화가 이어받은 카드를 이 번호로 맞춘다. */
+  refId: string | null
   kind: 'person' | 'background'
   name: string
   description: string
@@ -12,12 +14,14 @@ export interface BreakdownRow {
 
 /** 확정 산문에서 뽑은 인물 · 배경(Producer 목록) → 글 목록 줄. 사물은 Artist 카드가 없어 넣지 않는다. */
 export function breakdownRows(
-  cast: ReadonlyArray<{ localId: string; name: string; entityType: 'person' | 'object'; appearance: string }>,
-  backgrounds: ReadonlyArray<{ localId: string; name: string; visualDescription: string }>,
+  cast: ReadonlyArray<{ localId: string; characterId?: string; name: string; entityType: 'person' | 'object'; appearance: string }>,
+  backgrounds: ReadonlyArray<{ localId: string; locationId?: string; name: string; visualDescription: string }>,
 ): BreakdownRow[] {
   return [
-    ...cast.filter((member) => member.entityType !== 'object').map((member) => ({ id: member.localId, kind: 'person' as const, name: member.name, description: member.appearance })),
-    ...backgrounds.map((background) => ({ id: background.localId, kind: 'background' as const, name: background.name, description: background.visualDescription })),
+    ...cast
+      .filter((member) => member.entityType !== 'object')
+      .map((member) => ({ id: member.localId, refId: member.characterId ?? null, kind: 'person' as const, name: member.name, description: member.appearance })),
+    ...backgrounds.map((background) => ({ id: background.localId, refId: background.locationId ?? null, kind: 'background' as const, name: background.name, description: background.visualDescription })),
   ]
 }
 

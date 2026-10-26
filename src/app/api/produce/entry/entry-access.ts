@@ -48,6 +48,8 @@ export interface EntryProjectRow {
   entry_draft?: unknown
   story_text?: string | null
   settings?: { format?: unknown } | null
+  /** 시리즈 다음 화가 앞 화에서 이어받은 것(projects.series jsonb) — parseSeries 로 읽는다. */
+  series?: unknown
 }
 
 export async function loadEntryProject(projectId: string, columns: string): Promise<EntryProjectRow | null> {

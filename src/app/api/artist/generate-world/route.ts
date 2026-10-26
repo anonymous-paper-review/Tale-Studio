@@ -25,6 +25,8 @@ import { resolveStyleAnchor } from '@/lib/style-anchor'
 import { styleDrawsWithoutReference } from '@/lib/style-facets/reference-image'
 import { styleAnalysisPending } from '@/lib/style-facets/analysis-wait'
 import { submitWorldShotJob } from '@/lib/artist/world-submit'
+import { parseSeries } from '@/lib/series/snapshot'
+import { seriesLocationReference, withSeriesLocationReference } from '@/lib/series/redraw-reference'
 import { isChatTraceId } from '@/lib/chat-trace'
 import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
 
@@ -32,6 +34,17 @@ export const runtime = 'nodejs'
 export const maxDuration = 60
 
 const VALID_COLUMNS = new Set(['wide_shot'])
+
+/** 이 화 기본 모습의 와이드샷 — 없으면 ''. 시리즈 참고 그림이 필요한지(이 화 그림이 비어 있는지) 볼 때만 읽는다. */
+async function currentWideShot(projectId: string, locationId: string): Promise<string> {
+  const { data } = await supabaseAdmin
+    .from('locations')
+    .select('wide_shot')
+    .eq('project_id', projectId)
+    .eq('location_id', locationId)
+    .maybeSingle()
+  return typeof data?.wide_shot === 'string' ? data.wide_shot : ''
+}
 
 export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
@@ -124,7 +137,7 @@ export async function POST(req: Request) {
 
     const { data: project } = await supabaseAdmin
       .from('projects')
-      .select('workspace_id, style_anchor_key, custom_style_anchor')
+      .select('workspace_id, style_anchor_key, custom_style_anchor, series')
       .eq('id', projectId)
       .maybeSingle()
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
@@ -138,6 +151,8 @@ export async function POST(req: Request) {
 
     // 약속 C10: 변형(모습)은 존재해야 하고, 기본 모습의 wide_shot 을 연속성 참조로 붙인다(캐릭터의 기본 얼굴 참조와 같다).
     let referenceImageUrls: string[] = []
+    /** 이 화 기본 모습 와이드샷 — 읽었을 때만 값이 있다('' = 비어 있음, null = 아직 안 읽음). */
+    let baseWideShot: string | null = null
     if (appearanceKey) {
       const [{ data: variant }, { data: base }] = await Promise.all([
         supabaseAdmin
@@ -150,8 +165,17 @@ export async function POST(req: Request) {
         supabaseAdmin.from('locations').select('wide_shot').eq('project_id', projectId).eq('location_id', locationId).maybeSingle(),
       ])
       if (!variant) return NextResponse.json({ error: 'Appearance not found' }, { status: 404 })
-      const baseUrl = typeof base?.wide_shot === 'string' ? base.wide_shot : ''
-      if (baseUrl) referenceImageUrls = [baseUrl]
+      baseWideShot = typeof base?.wide_shot === 'string' ? base.wide_shot : ''
+      if (baseWideShot) referenceImageUrls = [baseWideShot]
+    }
+    // 시리즈 다음 화(2026-10-26): 이어받았는데 이 화 와이드샷이 아직 비어 있는 배경만 앞 화 와이드샷을 참고 그림으로 받는다 —
+    //   그림체는 이 화 것이다. 이 화 그림이 이미 있으면 그 그림이 기준이라 앞 화 그림을 싣지 않는다(변형의 기준 그림도 같다).
+    //   조회는 이어받은 배경일 때만 — 시리즈가 아닌 프로젝트는 종전과 같은 질의만 돈다.
+    const seriesWideShot = seriesLocationReference(parseSeries((project as { series?: unknown }).series), locationId)
+    let submitPrompt = finalPrompt
+    if (seriesWideShot && !(baseWideShot ?? (await currentWideShot(projectId, locationId)))) {
+      referenceImageUrls = [...referenceImageUrls, seriesWideShot]
+      submitPrompt = withSeriesLocationReference(finalPrompt)
     }
 
     // #creem-moderation(2026-10-11): 자리 예약(world-submit.ts) 전에 사용자가 보낸 설명만 검사한다 —
@@ -173,7 +197,7 @@ export async function POST(req: Request) {
         projectId,
         locationId,
         column: column as 'wide_shot',
-        prompt: finalPrompt,
+        prompt: submitPrompt,
         aspectRatio: aspectRatio ?? '16:9',
         actor: jobActor,
         userId: access.userId!,

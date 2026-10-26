@@ -21,6 +21,7 @@
 //   - 예산표는 막 수를 호출 전엔 모르므로 computeSceneBudget(genre, 1) — act 하한은 프롬프트의
 //     막 커버리지 규칙으로 대체(E13 방법과 동일). 현행 S3 는 실제 막 수를 쓴다.
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
+import { seriesBlock } from '@/lib/writer/pipeline/series-block';
 import { computeSceneBudget, renderBudgetBlock, validateSceneBudget, type SceneBudget } from '@/lib/writer/pipeline/budget';
 import { SHOT_PHYSICS } from '@/lib/writer/pipeline/physics';
 import { VISUAL_BEAT_DOCTRINE } from '@/lib/writer/pipeline/visual-doctrine';
@@ -127,7 +128,8 @@ ${VISUAL_BEAT_DOCTRINE}
 
 // E13 실측 "기계적 결합" 유저프롬프트 — S1/S3 유저프롬프트를 합친 출력형식(narrative_structure + scenes).
 function buildUser(input: PipelineInput, genre: Genre, characters: Characters, world: BackgroundContract | undefined): string {
-  return `[스토리]
+  // 시리즈 다음 화(2026-10-26): 이 합친 경로도 씬 산문을 만들므로 2콜 경로와 같은 앞 화 지시를 싣는다.
+  return `${seriesBlock(input)}[스토리]
 ${input.story}
 
 [genre]

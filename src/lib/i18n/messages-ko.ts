@@ -2598,6 +2598,8 @@ export const KO: Record<string, string> = {
   'Make the images for the characters and backgrounds that have none first.': '그림 없는 인물 · 배경을 먼저 만들어 주세요.',
   'Make': '만들기',
   'Making the images': '그림을 만들고 있어요',
+  'Drawing only the new ones': '새로 나온 것만 그리고 있어요',
+  'Redrawing from the previous episode images': '앞 화 그림을 참고해 다시 그리고 있어요',
   'Moves on': '넘어가는 것',
   'No characters or backgrounds were found in the prose yet.': '산문에서 아직 인물 · 배경을 찾지 못했어요.',
   'No description yet. AI fills it in from the prose when it makes the image.': '아직 설명이 없어요. 그림을 만들 때 AI가 산문에서 채워요.',
@@ -2646,4 +2648,74 @@ export const KO: Record<string, string> = {
   'These shots have no rough and are left out this time: {shots} and {count} more.': '러프가 없는 {shots} 외 {count}컷은(는) 이번에 빠져요.',
   'Draw the remaining cuts': '남은 컷 그리기',
   'Yes, hand over': '예, 넘기기',
+  // ── 시리즈(2026-10-26) · 프로젝트 목록 · 다음 화 만들기 ──
+  'Create next episode': '다음 화 만들기',
+  'Available on Producer10 and above': 'Producer10 이상에서 쓸 수 있어요',
+  'The previous episode was deleted': '앞 화가 지워졌어요',
+  'You can create the next episode from an episode where you pressed [Create] in Artist.':
+    'Artist에서 [만들기]를 누른 화부터 다음 화를 만들 수 있어요.',
+  'View pricing': '요금제 보기',
+  // 요금제 안내(프로토타입 LU)
+  'Creating a next episode needs Producer10 or above': '다음 화 만들기는 Producer10 이상에서 쓸 수 있어요',
+  'Keeping the previous episode and the next one together needs at least 2 project slots.':
+    '앞 화와 다음 화를 함께 두려면 프로젝트 칸이 2개 이상 필요해요.',
+  // 칸을 다 썼어요(프로토타입 LS)
+  'You have used all {count} project slots': '프로젝트 칸 {count}개를 다 썼어요',
+  'The next episode is a project too, so it needs one slot. Delete an old episode or upgrade your plan.':
+    '다음 화도 프로젝트 하나라 칸이 하나 필요해요. 옛 화를 지우거나 요금제를 올려 주세요.',
+  'Deleting an old episode keeps the character and background images copied into the next episode.':
+    '옛 화를 지워도 다음 화에 복사된 인물·배경 그림은 남아요.',
+  // 다음 화 만들기 창(프로토타입 N2)
+  'Create the next episode of "{title}"': '「{title}」의 다음 화 만들기',
+  'The next episode starts as a new project and inherits everything below.': '다음 화는 새 프로젝트로 만들어지고 아래 것을 그대로 이어받아요.',
+  'Same as the previous episode': '앞 화와 같아요',
+  'Inherited from the previous episode': '앞 화에서 이어받아요',
+  Voices: '말투',
+  'Start from the last scene of the previous episode': '앞 화 마지막 장면에서 이어 시작하기',
+  'Create next episode · uses 1 slot': '다음 화 만들기 · 칸 1개 사용',
+  'The previous episode is gone. Refresh the list.': '앞 화를 찾을 수 없어요. 목록을 새로 고쳐 주세요.',
+  'Could not create the next episode. Please try again.': '다음 화를 만들지 못했어요. 다시 시도해 주세요.',
+  // 다음 화가 있는 화를 지울 때(프로토타입 LD)
+  'This episode has a next episode': '이 화를 이어받은 다음 화가 있어요',
+  'Delete the project "{title}"?': '「{title}」 프로젝트를 지울까요?',
+  'Next episode': '다음 화',
+  'What stays': '남는 것',
+  'Character and background images copied into the next episode, the art style, the voices': '다음 화에 복사된 인물·배경 그림 · 그림체 · 말투',
+  'What disappears': '사라지는 것',
+  'Every video and image file in this episode, and the story of this episode that the next episode reads':
+    '이 화의 영상·그림 파일 전부 · 다음 화 Writer가 읽던 이 화 줄거리',
+  'After deleting, the next episode card shows "The previous episode was deleted". This cannot be undone.':
+    '지우면 다음 화 카드에 "앞 화가 지워졌어요"가 보여요. 되돌릴 수 없어요.',
+  // 앞 화 산문 보기
+  'View prose': '산문 보기',
+  'Previous episode prose': '앞 화 산문',
+  'This is the confirmed prose of "{title}". If you edit the previous episode, this changes too.':
+    '「{title}」의 확정 산문이에요. 앞 화를 고치면 여기도 바뀌어요.',
+  'The previous episode was deleted, so its prose can no longer be read.': '앞 화가 지워져 산문을 읽을 수 없어요.',
+  'Could not load the prose.': '산문을 불러오지 못했어요.',
+  // ── 시리즈(2026-10-26) · 시작 화면 ──
+  'The next episode of "{title}"': '「{title}」의 다음 화예요',
+  'Carried over: {characters} characters · {locations} backgrounds': '이어받은 인물 {characters} · 배경 {locations}',
+  'This episode starts from the last scene of the previous episode.': '앞 화 마지막 장면에서 이어 시작해요.',
+  "Couldn't copy the pictures for {names}. The cards came over, and the Artist draws them again in this episode's art style.":
+    '{names} 그림을 복사하지 못했어요. 카드는 넘어왔고, 그림은 Artist에서 이 화 그림체로 새로 그려요.',
+  // 설정 화면 잠금 묶음(프로토타입 E3s) · 시작 확인 창(E4s)
+  'Previous episode': '앞 화',
+  'Picked the previous episode value. It cannot be changed after you start': '앞 화 값으로 골라 뒀어요. 시작하면 끝까지 바꿀 수 없어요',
+  'Same as the previous episode. Locked to carry over the voices': '앞 화와 같아요. 대사 말투를 이으려고 바꿀 수 없어요',
+  'Carried over': '이어받는 것',
+  '{count} backgrounds': '배경 {count}',
+  'Previous episode story': '앞 화 줄거리',
+  'First shot': '첫 샷',
+  // ── 시리즈(2026-10-26) · Writer · Artist ──
+  'View the previous episode story': '앞 화 줄거리 보기',
+  'Carried over from the previous episode': '앞 화에서 이어받음',
+  'We redraw it in this episode style using the previous picture as the guide': '앞 화 그림을 참고해 이 화 그림체로 다시 그려요',
+  'Kept': '보관',
+  'Not in this episode. The picture stays as it is and carries over to the next episode.': '이번 화에 안 나와요. 그림은 그대로 두고 다음 화로 넘겨요.',
+  'Previous episode style': '앞 화 그림체',
+  'If the style stays the same, the carried-over pictures are used as they are. If you change it, the carried-over characters and backgrounds in this episode are redrawn in this style.':
+    '같은 그림체면 이어받은 그림을 그대로 써요. 바꾸면 이번 화에 나오는 이어받은 인물·배경을 이 그림체로 다시 그려요.',
+  'The previous episode was deleted. From now on [AI rewrite] writes without the story of the previous episode. The characters, backgrounds and art style you carried over are still here.':
+    '앞 화가 지워졌어요. 이제 [AI 다시 쓰기]는 앞 화 줄거리 없이 써요. 이어받은 인물·배경 그림과 그림체는 남아 있어요.',
 }

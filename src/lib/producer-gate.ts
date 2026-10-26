@@ -45,6 +45,8 @@ export interface CastMember {
   sourceImageUrl?: string
   /** 트리트먼트에서 맞춘 때의 내용 지문(2026-10-02 시안 v04) — 지금 내용과 다르면 사람이 고친 카드다. */
   treatmentHash?: string
+  /** 시리즈 다음 화가 앞 화에서 이어받은 카드(2026-10-26). 변화 · 동기는 화마다 새로 정해 빈 칸이 넘기기를 막지 않는다. */
+  inherited?: boolean
 }
 
 export interface BackgroundSource {
@@ -60,6 +62,8 @@ export interface BackgroundSource {
   sourceImageUrl?: string
   /** 트리트먼트에서 맞춘 때의 내용 지문(2026-10-02 시안 v04) — 지금 내용과 다르면 사람이 고친 카드다. */
   treatmentHash?: string
+  /** 시리즈 다음 화가 앞 화에서 이어받은 배경(2026-10-26). 목적은 화마다 새로 정해 빈 칸이 넘기기를 막지 않는다. */
+  inherited?: boolean
 }
 
 export interface GateIssue {
@@ -226,7 +230,8 @@ export function evaluateProducerGate({
   const isProducerOrigin = (c: { origin?: CastMember['origin'] }) => c.origin !== 'writer'
   // 트리트먼트가 만든 카드(2026-10-02 시안 v04 "비어 있는 곳은 Writer에서 채웁니다")는 인원 · 배경 수에는 들지만
   //   빈 칸은 채우면 좋은 것(soft)으로만 싣는다 — 넘기기를 막지 않는다.
-  const gapsOf = (c: { origin?: CastMember['origin'] }) => (c.origin === 'treatment' ? softMissing : hardMissing)
+  //   시리즈 다음 화가 이어받은 카드(inherited)도 같다 — 변화 · 동기 · 목적은 이번 화에서 새로 정한다(2026-10-26).
+  const gapsOf = (c: { origin?: CastMember['origin']; inherited?: boolean }) => (c.origin === 'treatment' || c.inherited ? softMissing : hardMissing)
   const producerCast = cast.filter(isProducerOrigin)
   const persons = producerCast.filter((c) => c.entityType === 'person')
 
@@ -277,7 +282,7 @@ export function evaluateProducerGate({
   for (const b of producerBackgrounds) {
     const issues = evaluateBackgroundFields(b, locale)
     if (!issues.length) continue
-    ;(hasCompleteBackground || b.origin === 'treatment' ? softMissing : hardMissing).push(...issues)
+    ;(hasCompleteBackground || b.origin === 'treatment' || b.inherited ? softMissing : hardMissing).push(...issues)
   }
 
   return {

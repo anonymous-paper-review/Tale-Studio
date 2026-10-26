@@ -17,7 +17,8 @@ export function castContractToCharacters(cast: CastContract): Characters {
         name: c.name,
         entity_type: c.entity_type === 'object' ? 'object' : 'person',
         role: c.role ?? 'supporting',
-        personality: [],
+        // 시리즈(2026-10-26): 앞 화에서 이어받은 인물은 성격을 가지고 온다. Producer 카드에는 성격이 없어 빈 목록이다.
+        personality: c.personality?.length ? [...c.personality] : [],
         arc: c.arc ?? { start_state: '', end_state: '', arc_type: '' },
         appearance_description: c.appearance,
         motivation: {

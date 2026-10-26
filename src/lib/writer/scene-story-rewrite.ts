@@ -2,6 +2,7 @@
 //   안 하나가 끝날 때마다 최신 실행을 다시 읽어 그 칸만 저장한다. 본문(scenes)과 원문 버전은 건드리지 않는다 —
 //   적용 · 버리기는 scene-gate 라우트가 한다. 버렸거나 바뀐 수정안의 늦은 결과는 되살리지 않는다.
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { loadSeriesWriterInput } from '@/lib/series/server'
 import { getActiveRun } from '@/lib/writer/run-store'
 import { sceneStoryProposalExpired, type SceneStoryProposal } from '@/lib/producer/scene-story-proposal'
 import { rewriteStatus, type SceneStoryRewriteVariant } from '@/lib/producer/scene-story-rewrite'
@@ -78,6 +79,21 @@ async function saveVariant(projectId: string, runId: string, proposalId: string,
   console.warn('[writer/scene-story-rewrite] concurrent writes prevented saving variant', proposalId, variantId)
 }
 
+/**
+ * 시리즈 다음 화(2026-10-26): 다시 쓸 때마다 앞 화를 다시 읽어 시리즈 칸을 새로 채운다 — 그 사이에 앞 화가 지워졌으면 줄거리 없이 쓴다.
+ *   시리즈가 아닌 화는 읽지 않고 그대로 둔다. 읽기가 실패하면 다시 쓰기를 죽이지 않고 지금 실행에 들어 있는 시리즈 칸을 그대로 쓴다.
+ */
+async function withFreshSeries(projectId: string, state: WriterRunState): Promise<WriterRunState> {
+  if (!state.input.series) return state
+  try {
+    const fresh = await loadSeriesWriterInput(projectId)
+    return { ...state, input: { ...state.input, series: fresh?.series, inheritedVoices: fresh?.inheritedVoices } }
+  } catch (error) {
+    console.warn('[writer/scene-story-rewrite] series reload failed', error)
+    return state
+  }
+}
+
 /** variantId 를 주면 그 안 하나만 만든다(scene-story-rewrite 라우트 — 안마다 따로 요청). 없으면 세 안을 한꺼번에. */
 export async function generateSceneStoryRewrite(projectId: string, runId: string, proposalId: string, variantId?: string): Promise<void> {
   const run = await getActiveRun(projectId)
@@ -87,13 +103,14 @@ export async function generateSceneStoryRewrite(projectId: string, runId: string
   if (!proposal || proposal.id !== proposalId || !proposal.variants?.length || proposal.status !== 'generating' || sceneStoryProposalExpired(proposal)) return
   const targets = proposal.variants.filter((variant) => (variantId ? variant.id === variantId : true) && variant.status === 'generating')
   if (!targets.length) return
+  const writeState = await withFreshSeries(projectId, state)
   const logger = new PipelineLogger(projectId)
   try {
     await logger.init()
     await Promise.all(targets.map(async (variant) => {
       let result: VariantResult
       try {
-        result = await writeVariant(state, proposal, variant, logger)
+        result = await writeVariant(writeState, proposal, variant, logger)
       } catch (error) {
         console.error('[writer/scene-story-rewrite]', variant.id, error)
         result = { status: 'failed', error: 'scene_story_rewrite_failed' }

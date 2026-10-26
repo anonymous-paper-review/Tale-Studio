@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils'
 import { kindOf } from '@/lib/upload/limits'
 import { ingestCreationFile } from '@/lib/project/start-new-project'
 import { breakdownRows } from '@/lib/artist/breakdown'
+import { useSeriesInfo } from '@/features/series/use-series-info'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProducerStore } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
@@ -38,6 +39,11 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
   const fileRef = useRef<HTMLInputElement>(null)
   const { requestImageUploadConsent, imageUploadConsentDialog } = useImageUploadConsent(projectId)
   const locked = custom?.locked === true
+  // 시리즈 다음 화(2026-10-26): 앞 화 그림체로 시작한다 — style_anchor_key 가 이미 복사돼 있어 아래 picked 가 savedKey(= 앞 화 그림체)에서 시작한다.
+  //   그 자리에 "앞 화 그림체" 표시만 붙이고 고를 값은 바꾸지 않는다(올린 그림체가 잠긴 프로젝트는 지금처럼 못 바꾼다).
+  const { view: series } = useSeriesInfo(projectId)
+  const prevStyleId = series?.styleId ?? null
+  const prevIsCustom = !!custom && !!prevStyleId && prevStyleId === savedKey
   const rows = breakdownRows(cast, backgrounds)
   const persons = rows.filter((row) => row.kind === 'person').length
   const places = rows.length - persons
@@ -117,6 +123,11 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
                 {t('The art style is fixed to the picture you uploaded.')}
               </p>
             ) : null}
+            {prevStyleId ? (
+              <p className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground" data-testid="artist-style-series">
+                {t('If the style stays the same, the carried-over pictures are used as they are. If you change it, the carried-over characters and backgrounds in this episode are redrawn in this style.')}
+              </p>
+            ) : null}
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4" role="radiogroup" aria-label={t('Style')}>
               <button
                 type="button"
@@ -130,6 +141,7 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
                 </span>
                 <span className="px-2 py-1.5 text-xs">
                   <span className="line-clamp-1 font-medium">{custom ? custom.label : t('Upload my art style')}</span>
+                  {prevIsCustom ? <span className="block text-[10px] text-muted-foreground">{t('Previous episode style')}</span> : null}
                   {upload?.error
                     ? <span className="line-clamp-2 text-destructive">{upload.error}</span>
                     : styleSetting
@@ -160,7 +172,11 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
                       {anchor.previewUrl ? <ThumbImage src={anchor.previewUrl} alt={name} className="size-full object-cover" /> : <ImageIcon className="size-5 text-muted-foreground opacity-40" aria-hidden />}
                     </span>
                     {on ? <span className="absolute right-1.5 top-1.5 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground"><Check className="size-3" /></span> : null}
-                    <span className="line-clamp-1 px-2 py-1.5 text-xs font-medium">{name}</span>
+                    <span className={cn('line-clamp-1 px-2 text-xs font-medium', prevStyleId === anchor.key ? 'pt-1.5' : 'py-1.5')}>{name}</span>
+                    {/* 시리즈 다음 화: 앞 화 그림체 자리를 알려 그대로 두는 것이 "이어받기"라는 것을 보인다. */}
+                    {prevStyleId === anchor.key ? (
+                      <span className="line-clamp-1 px-2 pb-1.5 text-[10px] text-muted-foreground">{t('Previous episode style')}</span>
+                    ) : null}
                   </button>
                 )
               })}

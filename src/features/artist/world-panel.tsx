@@ -8,7 +8,9 @@ import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { WorldViewDialog } from '@/features/artist/world-view-dialog'
 import { LocationAppearanceCreateDialog } from '@/features/artist/location-appearance-create-dialog'
 import { useArtistStore, worldFailureKey, type WorldShotKey } from '@/stores/artist-store'
-import { DEFAULT_LOCATION_APPEARANCE_KEY } from '@/types/asset'
+import { DEFAULT_LOCATION_APPEARANCE_KEY, type WorldAsset } from '@/types/asset'
+import { groupSeriesAssets } from '@/features/series/artist-series'
+import { useSeriesInfo } from '@/features/series/use-series-info'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useProjectStore } from '@/stores/project-store'
 import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
@@ -73,151 +75,180 @@ export function WorldPanel({
   const getScene = (sceneId: string) =>
     sceneManifest?.scenes.find((s) => s.sceneId === sceneId)
 
+  const gridClass = cn(
+    columns >= 3 && 'grid grid-cols-3 items-start gap-4',
+    columns === 2 && 'grid grid-cols-2 items-start gap-4',
+    columns <= 1 && 'space-y-6',
+  )
+  // 시리즈 다음 화(2026-10-26): 앞 화에서 이어받은 배경에 표시를 붙이고, 이번 화 산문에 안 나오는 것은 맨 아래 "보관" 묶음으로 내린다.
+  //   보관 카드도 같은 카드 함수로 그린다 — 지금 카드가 하는 일(고르기 · 멘션 · 팝업)을 그대로 쓴다.
+  const { view: series } = useSeriesInfo(projectId)
+  const groups = groupSeriesAssets(series, { characters: [], locations: worldAssets.map((world) => world.locationId) })
+  const liveCards = worldAssets.filter((world) => !groups.locations[world.locationId].kept)
+  const keptCards = worldAssets.filter((world) => groups.locations[world.locationId].kept)
+
+  const card = (world: WorldAsset) => {
+    const mark = groups.locations[world.locationId]
+    const scene = getScene(world.sceneId)
+    const isSelected = selectedLocationId === world.locationId
+    // 약속 C10: 고른 모습(탭). 기본 모습은 배경 자체, 변형은 appearances 의 행.
+    const pickedKey = selectedLocationAppearances[world.locationId] ?? DEFAULT_LOCATION_APPEARANCE_KEY
+    const variant = pickedKey !== DEFAULT_LOCATION_APPEARANCE_KEY ? (world.appearances ?? []).find((a) => a.appearanceKey === pickedKey) ?? null : null
+    const variantKey = variant ? variant.appearanceKey : null
+    const isGenerating = generatingLocations.includes(worldFailureKey(world.locationId, variantKey))
+    const shownImage = variant ? variant.wideShot : world.wideShot
+    // 약속 B7·B8: 설명이 바뀐 뒤 재생성 전이면 "설명 바뀜", 최근 생성이 실패했으면 "이미지 실패".
+    const candidates = variant ? variant.candidates : (world.candidates ?? [])
+    const selectedCandidate = candidates.find((c) => c.isSelected)
+    const descriptionChanged = classifyWorldImageStale(variant ? variant.visualDescription : world.visualDescription, selectedCandidate) !== 'fresh'
+    const failed = !!worldFailures[worldFailureKey(world.locationId, variantKey)]
+
+    return (
+      <div
+        key={world.locationId}
+        role="button"
+        tabIndex={0}
+        onClick={() => { selectLocation(world.locationId); noteSelection(world.locationId, variantKey ?? DEFAULT_LOCATION_APPEARANCE_KEY, 'card') }}
+        // ⌘/Ctrl+클릭 = 채팅 @멘션 토글 (#artist-mention 2026-08-11, 캐릭터 카드와 동일).
+        onPointerDownCapture={(e) => {
+          if (e.metaKey || e.ctrlKey) {
+            e.preventDefault()
+            e.stopPropagation()
+          }
+        }}
+        onClickCapture={(e) => {
+          if (!(e.metaKey || e.ctrlKey) || !world.name?.trim()) return
+          e.preventDefault()
+          e.stopPropagation()
+          const removing = chatInputHasMention(world.name)
+          useChatUiStore.getState().requestMentionToggle(world.name)
+          launchMentionFlight({
+            label: world.name,
+            clickX: e.clientX,
+            clickY: e.clientY,
+            toChat: !removing,
+          })
+        }}
+        // 더블 클릭 = 사진 클릭과 동일(#d5 2026-08-03) — 프롬프트/재생성 팝업
+        onDoubleClick={() => {
+          noteSelection(world.locationId, variantKey ?? DEFAULT_LOCATION_APPEARANCE_KEY, 'image')
+          setViewDialog({ locationId: world.locationId, shot: 'wideShot', appearanceKey: variantKey })
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            selectLocation(world.locationId)
+            noteSelection(world.locationId, variantKey ?? DEFAULT_LOCATION_APPEARANCE_KEY, 'card')
+          }
+        }}
+        className={cn(
+          'cursor-pointer rounded-xl border p-4 transition-colors',
+          isSelected
+            ? 'border-primary bg-accent'
+            : 'border-border hover:bg-accent/50',
+          mentionedLocationIds.has(world.locationId) &&
+            'mention-flash ring-2 ring-sky-400/70 border-sky-400/50 bg-sky-400/10',
+        )}
+      >
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className="min-w-0 flex-1 truncate font-medium">{world.name}</span>
+          {/* 시리즈 다음 화: 앞 화에서 그림까지 이어받은 배경인가. */}
+          {mark.inherited ? (
+            <Badge variant="outline" className="shrink-0 text-[10px]" data-testid="artist-series-inherited">
+              {t('Carried over from the previous episode')}
+            </Badge>
+          ) : null}
+          {failed && (
+            <Badge variant="destructive" className="text-[10px]">
+              {t('Image failed')}
+            </Badge>
+          )}
+          {descriptionChanged && !isGenerating && (
+            <Badge variant="outline" className="text-[10px] text-warning">
+              {t('Description changed')}
+            </Badge>
+          )}
+          {scene && !variant && (
+            <Badge variant="outline" className="text-[10px]">
+              {scene.timeOfDay}
+            </Badge>
+          )}
+        </div>
+
+        {/* 모습 탭(약속 C10) — 캐릭터 카드와 같은 줄: 기본 + 변형들 + "+ 모습 추가". 항상 보인다. */}
+        <div className="mb-2 flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
+          {[{ appearanceKey: DEFAULT_LOCATION_APPEARANCE_KEY, label: t('Default') }, ...(world.appearances ?? [])].map((ap) => {
+            const active = pickedKey === ap.appearanceKey
+            return (
+              <button
+                key={ap.appearanceKey}
+                type="button"
+                onClick={() => { selectLocationAppearance(world.locationId, ap.appearanceKey); noteSelection(world.locationId, ap.appearanceKey, 'appearance') }}
+                aria-pressed={active}
+                className={cn(
+                  'rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors',
+                  active ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-accent',
+                )}
+              >
+                {ap.label}
+              </button>
+            )
+          })}
+          <button
+            type="button"
+            onClick={() => setCreateFor(world.locationId)}
+            className="rounded-md border border-dashed border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent"
+            title={t('Add appearance')}
+          >
+            {t('+ Add appearance')}
+          </button>
+        </div>
+
+        {/* 배경 = 이미지 1장(#6·#9): establishing 셀 제거, wide 1컷만. 클릭 → 프롬프트/재생성 Dialog. */}
+        <button
+          type="button"
+          title={t('Background: click to view or regenerate the prompt')}
+          onClick={(e) => {
+            e.stopPropagation()
+            noteSelection(world.locationId, variantKey ?? DEFAULT_LOCATION_APPEARANCE_KEY, 'image')
+            setViewDialog({ locationId: world.locationId, shot: 'wideShot', appearanceKey: variantKey })
+          }}
+          className="block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
+        >
+          <ImagePlaceholder
+            label={t('Background')}
+            aspectRatio="video"
+            imageUrl={shownImage}
+            generating={isGenerating}
+            hideCaption
+          />
+        </button>
+
+        {/* 시리즈 다음 화: 앞 화 그림을 참고해 이 화 그림체로 다시 그릴 카드만 한 줄 알린다. */}
+        {mark.use === 'redraw' ? (
+          <p className="mt-1.5 text-[11px] text-muted-foreground" data-testid="artist-series-redraw">
+            {t('We redraw it in this episode style using the previous picture as the guide')}
+          </p>
+        ) : null}
+
+        {/* 카드 생성 버튼 제거(약속 B2, 2026-09-04) — 캐릭터 카드와 같이 생성/재생성은 팝업과 채팅으로만. */}
+      </div>
+    )
+  }
+
   return (
     <div ref={wheelRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {/* 모델(provider)·톤(boost) 선택 툴바 제거(#10). 생성은 store 기본값으로 수행. */}
       <ScrollArea className="min-h-0 flex-1 px-6 py-4">
-        <div
-          className={cn(
-            columns >= 3 && 'grid grid-cols-3 items-start gap-4',
-            columns === 2 && 'grid grid-cols-2 items-start gap-4',
-            columns <= 1 && 'space-y-6',
-          )}
-        >
-          {worldAssets.map((world) => {
-            const scene = getScene(world.sceneId)
-            const isSelected = selectedLocationId === world.locationId
-            // 약속 C10: 고른 모습(탭). 기본 모습은 배경 자체, 변형은 appearances 의 행.
-            const pickedKey = selectedLocationAppearances[world.locationId] ?? DEFAULT_LOCATION_APPEARANCE_KEY
-            const variant = pickedKey !== DEFAULT_LOCATION_APPEARANCE_KEY ? (world.appearances ?? []).find((a) => a.appearanceKey === pickedKey) ?? null : null
-            const variantKey = variant ? variant.appearanceKey : null
-            const isGenerating = generatingLocations.includes(worldFailureKey(world.locationId, variantKey))
-            const shownImage = variant ? variant.wideShot : world.wideShot
-            // 약속 B7·B8: 설명이 바뀐 뒤 재생성 전이면 "설명 바뀜", 최근 생성이 실패했으면 "이미지 실패".
-            const candidates = variant ? variant.candidates : (world.candidates ?? [])
-            const selectedCandidate = candidates.find((c) => c.isSelected)
-            const descriptionChanged = classifyWorldImageStale(variant ? variant.visualDescription : world.visualDescription, selectedCandidate) !== 'fresh'
-            const failed = !!worldFailures[worldFailureKey(world.locationId, variantKey)]
-
-            return (
-              <div
-                key={world.locationId}
-                role="button"
-                tabIndex={0}
-                onClick={() => { selectLocation(world.locationId); noteSelection(world.locationId, variantKey ?? DEFAULT_LOCATION_APPEARANCE_KEY, 'card') }}
-                // ⌘/Ctrl+클릭 = 채팅 @멘션 토글 (#artist-mention 2026-08-11, 캐릭터 카드와 동일).
-                onPointerDownCapture={(e) => {
-                  if (e.metaKey || e.ctrlKey) {
-                    e.preventDefault()
-                    e.stopPropagation()
-                  }
-                }}
-                onClickCapture={(e) => {
-                  if (!(e.metaKey || e.ctrlKey) || !world.name?.trim()) return
-                  e.preventDefault()
-                  e.stopPropagation()
-                  const removing = chatInputHasMention(world.name)
-                  useChatUiStore.getState().requestMentionToggle(world.name)
-                  launchMentionFlight({
-                    label: world.name,
-                    clickX: e.clientX,
-                    clickY: e.clientY,
-                    toChat: !removing,
-                  })
-                }}
-                // 더블 클릭 = 사진 클릭과 동일(#d5 2026-08-03) — 프롬프트/재생성 팝업
-                onDoubleClick={() => {
-                  noteSelection(world.locationId, variantKey ?? DEFAULT_LOCATION_APPEARANCE_KEY, 'image')
-                  setViewDialog({ locationId: world.locationId, shot: 'wideShot', appearanceKey: variantKey })
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    selectLocation(world.locationId)
-                    noteSelection(world.locationId, variantKey ?? DEFAULT_LOCATION_APPEARANCE_KEY, 'card')
-                  }
-                }}
-                className={cn(
-                  'cursor-pointer rounded-xl border p-4 transition-colors',
-                  isSelected
-                    ? 'border-primary bg-accent'
-                    : 'border-border hover:bg-accent/50',
-                  mentionedLocationIds.has(world.locationId) &&
-                    'mention-flash ring-2 ring-sky-400/70 border-sky-400/50 bg-sky-400/10',
-                )}
-              >
-                <div className="mb-3 flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate font-medium">{world.name}</span>
-                  {failed && (
-                    <Badge variant="destructive" className="text-[10px]">
-                      {t('Image failed')}
-                    </Badge>
-                  )}
-                  {descriptionChanged && !isGenerating && (
-                    <Badge variant="outline" className="text-[10px] text-warning">
-                      {t('Description changed')}
-                    </Badge>
-                  )}
-                  {scene && !variant && (
-                    <Badge variant="outline" className="text-[10px]">
-                      {scene.timeOfDay}
-                    </Badge>
-                  )}
-                </div>
-
-                {/* 모습 탭(약속 C10) — 캐릭터 카드와 같은 줄: 기본 + 변형들 + "+ 모습 추가". 항상 보인다. */}
-                <div className="mb-2 flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
-                  {[{ appearanceKey: DEFAULT_LOCATION_APPEARANCE_KEY, label: t('Default') }, ...(world.appearances ?? [])].map((ap) => {
-                    const active = pickedKey === ap.appearanceKey
-                    return (
-                      <button
-                        key={ap.appearanceKey}
-                        type="button"
-                        onClick={() => { selectLocationAppearance(world.locationId, ap.appearanceKey); noteSelection(world.locationId, ap.appearanceKey, 'appearance') }}
-                        aria-pressed={active}
-                        className={cn(
-                          'rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors',
-                          active ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-accent',
-                        )}
-                      >
-                        {ap.label}
-                      </button>
-                    )
-                  })}
-                  <button
-                    type="button"
-                    onClick={() => setCreateFor(world.locationId)}
-                    className="rounded-md border border-dashed border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent"
-                    title={t('Add appearance')}
-                  >
-                    {t('+ Add appearance')}
-                  </button>
-                </div>
-
-                {/* 배경 = 이미지 1장(#6·#9): establishing 셀 제거, wide 1컷만. 클릭 → 프롬프트/재생성 Dialog. */}
-                <button
-                  type="button"
-                  title={t('Background: click to view or regenerate the prompt')}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    noteSelection(world.locationId, variantKey ?? DEFAULT_LOCATION_APPEARANCE_KEY, 'image')
-                    setViewDialog({ locationId: world.locationId, shot: 'wideShot', appearanceKey: variantKey })
-                  }}
-                  className="block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
-                >
-                  <ImagePlaceholder
-                    label={t('Background')}
-                    aspectRatio="video"
-                    imageUrl={shownImage}
-                    generating={isGenerating}
-                    hideCaption
-                  />
-                </button>
-
-                {/* 카드 생성 버튼 제거(약속 B2, 2026-09-04) — 캐릭터 카드와 같이 생성/재생성은 팝업과 채팅으로만. */}
-              </div>
-            )
-          })}
-        </div>
+        <div className={gridClass}>{liveCards.map(card)}</div>
+        {keptCards.length > 0 ? (
+          <section className="mt-6 border-t border-border pt-4" data-testid="artist-series-kept">
+            <div className="mb-3 flex flex-wrap items-baseline gap-2">
+              <h2 className="text-sm font-medium">{t('Kept')}</h2>
+              <p className="text-xs text-muted-foreground">{t('Not in this episode. The picture stays as it is and carries over to the next episode.')}</p>
+            </div>
+            <div className={gridClass}>{keptCards.map(card)}</div>
+          </section>
+        ) : null}
       </ScrollArea>
 
       <WorldViewDialog

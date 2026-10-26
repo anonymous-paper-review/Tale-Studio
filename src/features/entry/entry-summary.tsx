@@ -18,6 +18,7 @@ export function EntrySummary() {
   const router = useRouter()
   const draft = useEntryStore((s) => s.draft)
   const locale = useEntryStore((s) => s.locale)
+  const series = useEntryStore((s) => s.series)
   const writer = useEntryStore((s) => s.writer)
   const writerStart = useEntryStore((s) => s.writerStart)
   const writing = useEntryStore((s) => s.writing)
@@ -66,7 +67,7 @@ export function EntrySummary() {
       {fromNewFlow ? (
         <section className="rounded-xl border border-border bg-card p-6" aria-label={t('Settings')}>
           <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm">
-            {summaryRows(draft, { t, locale, mode: 'done' }).map((row) => (
+            {summaryRows(draft, { t, locale, mode: 'done', series }).map((row) => (
               <div key={row.key} className="contents">
                 <dt className="text-muted-foreground">{row.label}</dt>
                 <dd className="flex flex-wrap items-center gap-2 break-words">

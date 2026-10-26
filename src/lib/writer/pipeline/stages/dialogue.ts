@@ -73,7 +73,25 @@ export async function runVoiceProfiles(
   axisConfig: LlmAxisConfig,
   outputLocale?: AppLocale,
   dialogueLanguage?: DialogueLanguage,
+  // 시리즈 다음 화(2026-10-26): 앞 화에서 이어받은 말투. 같은 character_id 인물은 말투를 새로 정하지 않고
+  //   그 말투를 그대로 쓴다 — 나머지 인물만 AI 가 정하고 character_id 로 합친다(전부 이어받았으면 AI 를 부르지 않는다).
+  inheritedVoices?: VoiceProfile[],
 ): Promise<VoiceProfile[]> {
+  const inherited = (inheritedVoices ?? []).filter((v) => !!v?.character_id);
+  const inheritedIds = new Set(inherited.map((v) => v.character_id));
+  const fresh = inherited.length
+    ? characters.characters.filter((c) => !inheritedIds.has(c.id))
+    : characters.characters;
+  // 전부 앞 화에서 이어받은 인물이면 새로 정할 말투가 없다 — LLM 호출 없이 그대로 쓴다.
+  if (inherited.length && fresh.length === 0) return inherited;
+
+  // 이어받은 말투는 고정 맥락으로 함께 보여 준다 — 새 인물의 말투가 그 인물의 말투와 겹치지 않게.
+  const inheritedBlock = inherited.length
+    ? `\n[앞 화에서 이어받은 말투 — 고정]
+이 인물의 말투는 앞 화에서 이미 정해진 것이다. 다시 정하지 말고, 새 인물의 말투가 이 말투와 겹치지 않게 대비를 만든다.
+${JSON.stringify(inherited, null, 2)}\n`
+    : '';
+
   const userPrompt = `[스토리]
 ${story}
 
@@ -81,8 +99,8 @@ ${story}
 ${JSON.stringify({ genre: genre.genre, tone: genre.tone, targetEmotion: genre.targetEmotion })}
 
 [인물]
-${JSON.stringify(characters.characters, null, 2)}
-
+${JSON.stringify(fresh, null, 2)}
+${inheritedBlock}
 [출력 형식 - JSON]
 {
   "profiles": [
@@ -114,7 +132,9 @@ ${JSON.stringify(characters.characters, null, 2)}
   if (!Array.isArray(profiles) || profiles.length === 0) {
     throw new Error(`voice profiles unexpected shape: ${JSON.stringify(raw).slice(0, 200)}`);
   }
-  return profiles;
+  // 이어받은 말투가 이긴다 — 모델이 그 인물의 말투를 다시 내도 새 것을 쓰지 않는다.
+  if (!inherited.length) return profiles;
+  return [...inherited, ...profiles.filter((p) => !inheritedIds.has(p?.character_id))];
 }
 
 // ---------------------------------------------------------------------
@@ -402,6 +422,8 @@ export async function runDialogue(
     outputLocale?: AppLocale;
     /** #dialogue-language: 발화 언어 설정 — line·narration 만 이 언어로(출력 언어와 독립). */
     dialogueLanguage?: DialogueLanguage;
+    /** 시리즈 다음 화(2026-10-26): 앞 화 말투(PipelineInput.inheritedVoices). 미지정이면 지금과 동일하게 말투를 전부 새로 정한다. */
+    inheritedVoices?: VoiceProfile[];
   },
 ): Promise<RunDialogueResult> {
   const resume = opts?.resume ?? null;
@@ -421,7 +443,8 @@ export async function runDialogue(
   // 프로파일은 스테이지 1회 — resume이 이미 갖고 있으면 재사용.
   //   (const 로 고정해야 아래 워커 클로저에서 타입이 좁혀진 채 잡힌다.)
   const profiles =
-    resume?.profiles ?? (await runVoiceProfiles(story, characters, genre, logger, axisConfig, outputLocale, dialogueLanguage));
+    resume?.profiles ??
+    (await runVoiceProfiles(story, characters, genre, logger, axisConfig, outputLocale, dialogueLanguage, opts?.inheritedVoices));
 
   const shotsOf = (scene: StoryScene): DecoupageShot[] =>
     decoupage.scenes.find((d) => d.scene_id === scene.scene_id)?.shots ?? [];

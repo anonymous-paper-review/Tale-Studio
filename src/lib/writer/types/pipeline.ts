@@ -234,6 +234,20 @@ export interface PipelineInput {
    * 씬·인물·대사를 대본에서 그대로 만들고(재생성 없음), 대본에 없는 칸만 채워 "추가됨"으로 표시한다.
    */
   preserveScript?: boolean;
+  /**
+   * 시리즈 다음 화(2026-10-26): 앞 화에서 이어받은 것. writer/start 가 projects.series 와 앞 화 확정 산문을 매번 다시 읽어 채운다.
+   * 산문을 쓰는 단계(이야기 엔진 · 구조 · 씬)와 대사 단계가 series-block 으로 지시에 싣는다. 없으면 보통 프로젝트다.
+   */
+  series?: {
+    prevTitle: string;
+    /** 앞 화 확정 산문(trimSeriesProse 로 줄인 것). 앞 화가 지워져 읽지 못했으면 null. */
+    prevProse: string | null;
+    /** 이어받은 인물 · 배경 이름 — 앞 화와 같은 사람 · 같은 장소다. */
+    characters: string[];
+    locations: string[];
+  };
+  /** 시리즈: 앞 화 말투(앞 화가 대사까지 끝났을 때만). 같은 character_id 인물은 이 말투로 시작하고 새 인물만 말투를 새로 정한다. */
+  inheritedVoices?: VoiceProfile[];
 }
 
 export interface WriterRerunContext {
@@ -379,6 +393,8 @@ export interface CastContractCharacter {
   appearance: string;
   arc?: { start_state: string; end_state: string; arc_type: string };
   motivation?: { want: string; need?: string; wound?: string };
+  /** 시리즈(2026-10-26): 앞 화에서 이어받은 인물의 성격. Producer 카드에는 없고 writer/start 가 projects.series 에서 채운다. */
+  personality?: string[];
 }
 export interface CastContract {
   characters: CastContractCharacter[];

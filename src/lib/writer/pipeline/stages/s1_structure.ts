@@ -1,5 +1,6 @@
 // S1: 내러티브 구조, POV, 주제, CDQ
 import { changeLevelBlock } from '@/lib/writer/pipeline/change-level';
+import { seriesBlock } from '@/lib/writer/pipeline/series-block';
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import { NarrativeStructureSchema } from '@/lib/writer/pipeline/schemas';
 import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
@@ -57,7 +58,7 @@ ${outputLanguageClause(input.outputLocale)}`;
 `
     : '';
 
-  const userPrompt = `${dramaturgyBlock}${changeLevelBlock(input)}[스토리]
+  const userPrompt = `${dramaturgyBlock}${changeLevelBlock(input)}${seriesBlock(input)}[스토리]
 ${input.story}
 
 [genre]

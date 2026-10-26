@@ -18,7 +18,6 @@ import {
   EXAMPLES_PER_PAGE,
   MOODS,
   RATIOS,
-  RECOMMENDED_RATIO,
   RUNTIMES,
   examplesPage,
   ideaLength,
@@ -39,6 +38,7 @@ import {
 } from './chat-flow'
 import { useEntryStore } from './entry-store'
 import { AgentBubble, FileChip, RecommendedBadge, UploadingChip, UserBubble, WhyLine } from './entry-parts'
+import { ratioRecommendation } from './series'
 import { summaryRows } from './summary'
 
 export function EntryChat() {
@@ -174,7 +174,22 @@ interface CardOption {
 }
 
 /** 카드 안 선택지 — 누르면 바로 답이 된다(지금 고른 값은 눌린 모양). 추천에는 추천 표시. */
-function CardOptions({ options, current, recommended, onPick, column }: { options: CardOption[]; current: string | null; recommended: string | null; onPick: (v: string) => void; column?: boolean }) {
+function CardOptions({
+  options,
+  current,
+  recommended,
+  recommendedLabel,
+  onPick,
+  column,
+}: {
+  options: CardOption[]
+  current: string | null
+  recommended: string | null
+  /** 추천 표시의 말(기본 "추천", 시리즈 다음 화의 화면 비율은 "앞 화"). */
+  recommendedLabel?: string
+  onPick: (v: string) => void
+  column?: boolean
+}) {
   return (
     <div className={cn('flex gap-2', column ? 'flex-col' : 'flex-wrap')}>
       {options.map((o) => (
@@ -191,7 +206,7 @@ function CardOptions({ options, current, recommended, onPick, column }: { option
         >
           <span className="flex w-full items-center gap-2">
             <span className={cn('font-medium', o.mono && 'font-mono tabular-nums')}>{o.label}</span>
-            {o.value === recommended ? <RecommendedBadge /> : null}
+            {o.value === recommended ? <RecommendedBadge label={recommendedLabel} /> : null}
           </span>
           {o.sub ? <span className="flex flex-col text-xs text-muted-foreground">{o.sub}</span> : null}
         </button>
@@ -206,6 +221,7 @@ function QuestionCard({ question, draft, t }: { question: ChatQuestionKey | 'con
   const start = useEntryStore((s) => s.start)
   const writing = useEntryStore((s) => s.writing)
   const entryLocale = useEntryStore((s) => s.locale)
+  const series = useEntryStore((s) => s.series)
   const rec = draft.rec
   const keepOpen = levelAvailable('keep', draft.idea, draft.file)
   const acceptButton = (
@@ -222,7 +238,7 @@ function QuestionCard({ question, draft, t }: { question: ChatQuestionKey | 'con
       <AgentBubble>
         <p>{t('I will start like this.')}</p>
         <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-md border border-border bg-background px-3 py-2.5">
-          {summaryRows(draft, { t, locale: entryLocale }).map((row) => (
+          {summaryRows(draft, { t, locale: entryLocale, series }).map((row) => (
             <div key={row.key} className="contents">
               <dt className="flex items-center gap-1.5 text-muted-foreground">
                 {row.locked ? <Lock className="size-3.5" aria-hidden /> : null}
@@ -278,7 +294,11 @@ function QuestionCard({ question, draft, t }: { question: ChatQuestionKey | 'con
             {t('Once chosen, it cannot be changed until the end.')}
           </span>
         </p>
-        <CardOptions options={RATIOS.map((r) => ({ value: r.key, label: r.key, sub: t(r.sub), mono: true }))} current={draft.picks.ratio} recommended={RECOMMENDED_RATIO} onPick={(v) => void answer('ratio', v)} />
+        <CardOptions options={RATIOS.map((r) => ({ value: r.key, label: r.key, sub: t(r.sub), mono: true }))} current={draft.picks.ratio}
+          recommended={ratioRecommendation(series)}
+          recommendedLabel={series?.ratio ? t('Previous episode') : undefined}
+          onPick={(v) => void answer('ratio', v)}
+        />
         {acceptButton}
       </AgentBubble>
     )

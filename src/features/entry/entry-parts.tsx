@@ -24,9 +24,10 @@ export interface OptionItem {
 }
 
 /** 추천 표시 — 작은 배지(design.md §7.3: pill 은 배지 · 칩만). */
-export function RecommendedBadge() {
+/** 추천 표시. label 을 주면 그 말을 쓴다(시리즈 다음 화의 화면 비율은 "앞 화"). */
+export function RecommendedBadge({ label }: { label?: string } = {}) {
   const t = useT()
-  return <span className="shrink-0 rounded-full border border-border bg-muted px-1.5 text-xs font-medium leading-5 text-muted-foreground">{t('Recommended')}</span>
+  return <span className="shrink-0 rounded-full border border-border bg-muted px-1.5 text-xs font-medium leading-5 text-muted-foreground">{label ?? t('Recommended')}</span>
 }
 
 /** AI가 고른 이유 한 줄. */
@@ -50,6 +51,7 @@ export function OptionGroup({
   options,
   value,
   recommended,
+  recommendedLabel,
   onChange,
   className,
   size = 'md',
@@ -59,6 +61,8 @@ export function OptionGroup({
   options: OptionItem[]
   value: string | null
   recommended?: string | null
+  /** 추천 표시의 말(기본 "추천"). */
+  recommendedLabel?: string
   onChange: (value: string) => void
   className?: string
   size?: 'sm' | 'md'
@@ -119,7 +123,7 @@ export function OptionGroup({
             >
               <span className="flex w-full flex-wrap items-center justify-between gap-x-2 gap-y-1">
                 <span className={cn('whitespace-nowrap font-medium', o.mono && 'font-mono tabular-nums')}>{o.label}</span>
-                {o.value === recommended ? <RecommendedBadge /> : null}
+                {o.value === recommended ? <RecommendedBadge label={recommendedLabel} /> : null}
               </span>
               {o.sub ? <span className="text-xs text-muted-foreground">{o.sub}</span> : null}
             </button>

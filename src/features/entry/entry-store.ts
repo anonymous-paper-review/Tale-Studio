@@ -39,6 +39,7 @@ import {
   type ChatUi,
   type Translator,
 } from './chat-flow'
+import { parseEntrySeries, type EntrySeries } from './series'
 
 const IDEA_SAVE_DEBOUNCE_MS = 600
 const READ_STEP_MS = 1400
@@ -70,6 +71,8 @@ interface EntryData {
   locale: AppLocale
   stage: string | null
   format: ProjectFormat | null
+  /** 시리즈 다음 화면 앞 화 비율 · 언어 · 이어받은 개수(프로토타입 E3s · E4s). 시리즈가 아니면 null. */
+  series: EntrySeries | null
   writer: WriterInfo | null
   writerStart: EntryWriterStartBody | null
   /** 화면에서 고르기: ① 이야기 재료 · ② 설정. */
@@ -125,6 +128,7 @@ function initialData(): EntryData {
     locale: 'en',
     stage: null,
     format: null,
+    series: null,
     writer: null,
     writerStart: null,
     formStep: 1,
@@ -370,6 +374,7 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
           locale: parseAppLocale(body.locale) ?? useLocaleStore.getState().locale,
           stage: typeof body.stage === 'string' ? body.stage : null,
           format: parseProjectFormat(body.format),
+          series: parseEntrySeries(body.series),
           writer,
           writerStart: body.writerStart && typeof body.writerStart === 'object' ? (body.writerStart as EntryWriterStartBody) : null,
           formStep: recIsCurrent(draft) ? 2 : 1,
@@ -495,7 +500,7 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
     },
 
     chatAcceptRecommendation: async (key) => {
-      const value = recommendedValue(get().draft, key)
+      const value = recommendedValue(get().draft, key, get().series)
       if (value) await get().chatAnswer(key, value)
     },
 

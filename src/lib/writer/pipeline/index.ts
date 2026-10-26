@@ -451,7 +451,7 @@ async function _runPipelineInner(
       '14b_dialogue.json',
       async () => {
         if (preserved) return dialogueTrackFromScript(preserved.doc, scenes, decoupage); // 대본 보존: 대사를 저작하지 않는다
-        const result = await runDialogue(input.story, genre, characters, scenes, decoupage, logger, models.S);
+        const result = await runDialogue(input.story, genre, characters, scenes, decoupage, logger, models.S, { inheritedVoices: input.inheritedVoices });
         return toDialogueTrack(result);
       },
       'dialogue',

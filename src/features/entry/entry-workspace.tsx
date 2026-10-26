@@ -4,6 +4,7 @@
 //   화면에서 고르기(1안: ① 이야기 재료 → ② 설정) · 채팅으로 만들기(2안: 가운데 채팅). 마지막에 고른 탭은 브라우저에 기억한다.
 //   시작한 프로젝트는 고칠 수 없는 완료 화면이다. AI가 읽거나 산문 초안을 쓰는 동안은 전체 잠금 화면을 띄운다.
 //   오른쪽 채팅은 이 단계에 없다(layout.tsx).
+//   시리즈 다음 화(2026-10-26 · 프로토타입 E1s)는 맨 윗줄(단계 배지 · 제목 · 탭) 바로 아래에 앞 화 제목 · 이어받은 인물 · 배경 이름 띠를 붙인다.
 import { useEffect, useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -24,6 +25,7 @@ import { EntryForm } from './entry-form'
 import { EntryChat } from './entry-chat'
 import { EntrySummary } from './entry-summary'
 import { ProjectTitleField } from './project-title-field'
+import { useSeriesInfo } from '@/features/series/use-series-info'
 
 // ── 탭 기억(이 브라우저) — 서버 그리기는 기본 탭, 붙은 뒤 저장된 탭 ─────────────────
 const tabListeners = new Set<() => void>()
@@ -112,6 +114,8 @@ export function EntryWorkspace() {
         ) : null}
       </header>
 
+      {ready ? <SeriesBanner projectId={projectId} /> : null}
+
       {status === 'error' ? (
         <div className="mx-auto flex max-w-md flex-col items-center gap-3 px-6 py-24 text-center" role="alert">
           <CircleAlert className="size-6 text-destructive" aria-hidden />
@@ -149,6 +153,55 @@ export function EntryWorkspace() {
       />
       <WritingOverlay />
     </Tabs>
+  )
+}
+
+/**
+ * 시리즈 다음 화 띠(프로토타입 E1s) — 앞 화 제목, 이어받은 인물 · 배경 이름, 마지막 장면 잇기, 복사하지 못한 그림 안내.
+ *   시리즈가 아니면 아무것도 그리지 않는다(view === null).
+ */
+function SeriesBanner({ projectId }: { projectId: string | null }) {
+  const t = useT()
+  const { view } = useSeriesInfo(projectId)
+  if (!view) return null
+  // 인물 먼저, 배경 다음. 인물과 배경 번호가 같아도 목록 키가 겹치지 않게 종류를 앞에 붙인다.
+  const carried = [
+    ...view.characters.map((c) => ({ key: `character:${c.id}`, name: c.name })),
+    ...view.locations.map((l) => ({ key: `location:${l.id}`, name: l.name })),
+  ]
+  return (
+    <div className="shrink-0 border-b border-border bg-muted/40 px-6 py-3">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-1.5">
+        <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <span className="text-sm font-medium">{t('The next episode of "{title}"', { title: view.prevTitle })}</span>
+          <span className="text-xs text-muted-foreground">
+            {t('Carried over: {characters} characters · {locations} backgrounds', { characters: view.characters.length, locations: view.locations.length })}
+          </span>
+        </p>
+        {carried.length ? (
+          <ul className="flex flex-wrap gap-1.5">
+            {carried.map((item) => (
+              <li key={item.key} className="rounded-full border border-border bg-background px-2 text-xs font-medium leading-5 text-muted-foreground">
+                {item.name}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {view.continuesLastScene ? (
+          <p className="text-xs text-muted-foreground">{t('This episode starts from the last scene of the previous episode.')}</p>
+        ) : null}
+        {view.copyFailures.length ? (
+          <p className="flex items-start gap-1.5 text-xs text-muted-foreground" role="status">
+            <CircleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+            <span>
+              {t("Couldn't copy the pictures for {names}. The cards came over, and the Artist draws them again in this episode's art style.", {
+                names: view.copyFailures.join(', '),
+              })}
+            </span>
+          </p>
+        ) : null}
+      </div>
+    </div>
   )
 }
 

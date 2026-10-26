@@ -44,6 +44,7 @@ import { isChatTraceId } from '@/lib/chat-trace'
 import { isImageModelKey, normalizeImageModelKey, resolveImageEndpoint, resolveSheetImageModel } from '@/lib/image-models'
 import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
 import { existingStoryboardJobId } from '@/lib/director/storyboard-active-job'
+import { loadSeriesFirstShotContinuity, seriesContinuityPromptLine } from '@/lib/series/continuity'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -94,7 +95,7 @@ export async function POST(req: Request) {
     const [{ data: project }, { data: shot }] = await Promise.all([
       supabaseAdmin
         .from('projects')
-        .select('workspace_id, style_anchor_key, custom_style_anchor, settings')
+        .select('workspace_id, style_anchor_key, custom_style_anchor, settings, series, optional_reference_frame_url')
         .eq('id', projectId)
         .maybeSingle(),
       supabaseAdmin
@@ -148,20 +149,28 @@ export async function POST(req: Request) {
       ? (callerRefs ?? []).slice(refSplit.characterRefCount + refSplit.worldRefCount)
       : (callerRefs ?? [])
     const clientExtras = serverPlan ? [...new Set(rawExtras.filter((u) => !knownRefs.has(stripUrlQuery(u))))] : []
-    const assembledRefs: string[] = serverPlan
-      ? [
-          ...serverPlan.characterRefs.map((r) => r.url),
-          ...(serverPlan.worldRef ? [serverPlan.worldRef] : []),
-          ...clientExtras,
-        ]
-      : (callerRefs ?? [])
+    // 시리즈 연속성(2026-10-26): "앞 화 마지막 장면에서 이어 시작하기"로 만든 화의 첫 샷만 — 앞 화 끝 장면을
+    //   추가 입력(인물 · 배경 뒤, 화풍 참고 앞)으로 한 장 더 붙이고 프롬프트에 연속성 한 줄을 더한다.
+    //   역할 경계(characterRefCount · worldRefCount)는 그대로 두고 extraRefCount 만 하나 늘려 참조 순서 계약을 지킨다.
+    const continuity = await loadSeriesFirstShotContinuity(projectId, project)
+    const seriesFrameUrl = continuity && continuity.firstShotId === writerShotId ? continuity.frameUrl : null
+    const assembledRefs: string[] = [
+      ...(serverPlan
+        ? [
+            ...serverPlan.characterRefs.map((r) => r.url),
+            ...(serverPlan.worldRef ? [serverPlan.worldRef] : []),
+            ...clientExtras,
+          ]
+        : (callerRefs ?? [])),
+      ...(seriesFrameUrl ? [seriesFrameUrl] : []),
+    ]
     const refCounts = serverPlan
       ? {
           characterRefCount: serverPlan.characterRefs.length,
           worldRefCount: serverPlan.worldRef ? 1 : 0,
-          extraRefCount: clientExtras.length,
+          extraRefCount: clientExtras.length + (seriesFrameUrl ? 1 : 0),
         }
-      : { ...refSplit, extraRefCount: 0 }
+      : { ...refSplit, extraRefCount: seriesFrameUrl ? 1 : 0 }
     const characterRefLabels = serverPlan
       ? serverPlan.characterRefs.map((r) => ({ name: r.name, position: r.position, pose: r.pose }))
       : undefined
@@ -235,6 +244,7 @@ export async function POST(req: Request) {
     const guardedPrompt =
       appendCheckConstraints(promptEn, (shot as { check_notes?: unknown } | null)?.check_notes) +
       continuityLine +
+      (seriesFrameUrl ? `\n${seriesContinuityPromptLine()}` : '') +
       (noPeopleShot
         ? ' This shot contains NO people — do not draw any person or figure; anyone implied by the text is off-screen.'
         : '')

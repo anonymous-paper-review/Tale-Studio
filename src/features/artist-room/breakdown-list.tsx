@@ -3,18 +3,23 @@
 // Artist 브레이크다운 목록(리뉴얼 1차 2026-10-19, 프로토타입 A1). 확정 산문에서 뽑은 인물 · 배경을 글 목록으로 보고,
 //   줄마다 설명을 고친다. 그림은 아직 없다 — [목록이 맞아요 · 그림 만들기]가 스타일 팝업을 연다.
 //   [인물·배경 추가]는 없다(인물 · 배경은 산문에서 나온다). 재점검 · 산문으로 돌아가기는 2차.
+//   시리즈 다음 화(2026-10-26 · 프로토타입 A1s)는 이어받은 줄에 표시를 붙이고, 이번 산문에 안 나오는 것은 아래 "보관" 묶음으로 내린다.
 import { useState } from 'react'
 import { ArrowRight, Check, Pencil } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { splitBreakdownRows } from '@/features/series/artist-series'
+import { useSeriesInfo } from '@/features/series/use-series-info'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { breakdownRows, type BreakdownRow } from '@/lib/artist/breakdown'
 import { useProducerStore } from '@/stores/producer-store'
+import { useProjectStore } from '@/stores/project-store'
 
 type Filter = 'all' | 'person' | 'background'
 
-function Row({ row }: { row: BreakdownRow }) {
+function Row({ row }: { row: BreakdownRow & { inherited: boolean } }) {
   const t = useT()
   const [draft, setDraft] = useState<string | null>(null)
   const save = () => {
@@ -30,6 +35,11 @@ function Row({ row }: { row: BreakdownRow }) {
         <p className="flex items-center gap-2 text-sm">
           <b className="font-semibold">{row.name || t('Unnamed')}</b>
           <span className="rounded-sm border border-border px-1.5 text-[11px] text-muted-foreground">{t(row.kind === 'person' ? 'Person' : 'Background')}</span>
+          {row.inherited ? (
+            <Badge variant="outline" className="shrink-0 text-[10px]" data-testid="breakdown-series-inherited">
+              {t('Carried over from the previous episode')}
+            </Badge>
+          ) : null}
         </p>
         {draft === null ? (
           <p className={cn('text-sm leading-6', row.description ? 'text-foreground/85' : 'text-muted-foreground')}>
@@ -58,11 +68,16 @@ export function BreakdownList({ onMake }: { onMake: () => void }) {
   const t = useT()
   const cast = useProducerStore((s) => s.cast)
   const backgrounds = useProducerStore((s) => s.backgrounds)
+  const projectId = useProjectStore((s) => s.projectId)
+  const { view: series } = useSeriesInfo(projectId)
   const [filter, setFilter] = useState<Filter>('all')
-  const rows = breakdownRows(cast, backgrounds)
+  // 보관 묶음은 이번 산문에서 뽑은 것이 아니라 개수에 넣지 않는다.
+  const { shown: rows, kept } = splitBreakdownRows(breakdownRows(cast, backgrounds), series)
   const persons = rows.filter((row) => row.kind === 'person').length
   const places = rows.length - persons
-  const shown = rows.filter((row) => filter === 'all' || row.kind === filter)
+  const byFilter = (row: BreakdownRow) => filter === 'all' || row.kind === filter
+  const shown = rows.filter(byFilter)
+  const keptShown = kept.filter(byFilter)
   // 프로토타입 A1 [모두 · 인물 · 배경].
   const tabs: Array<[Filter, string, number]> = [['all', 'All items', rows.length], ['person', 'People', persons], ['background', 'Backgrounds', places]]
 
@@ -101,6 +116,17 @@ export function BreakdownList({ onMake }: { onMake: () => void }) {
               {shown.map((row) => <Row key={`${row.kind}:${row.id}`} row={row} />)}
             </ul>
           )}
+          {keptShown.length > 0 ? (
+            <section className="flex flex-col gap-2" data-testid="breakdown-series-kept">
+              <div className="flex flex-wrap items-baseline gap-2">
+                <h2 className="text-sm font-medium">{t('Kept')}</h2>
+                <p className="text-xs text-muted-foreground">{t('Not in this episode. The picture stays as it is and carries over to the next episode.')}</p>
+              </div>
+              <ul className="rounded-xl border border-border bg-card/40 px-4">
+                {keptShown.map((row) => <Row key={`${row.kind}:${row.id}`} row={row} />)}
+              </ul>
+            </section>
+          ) : null}
           <p className="text-xs text-muted-foreground">
             {t('Looks that change by scene (clothes, age) can be added after the images are made, from the card details or in Storyboard.')}
           </p>

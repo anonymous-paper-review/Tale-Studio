@@ -44,6 +44,8 @@ import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
 import { applyStyleAnchor, resolveStyleAnchor } from '@/lib/style-anchor'
 import { styleAnalysisPending } from '@/lib/style-facets/analysis-wait'
 import { sheetIdentityReferences } from '@/lib/artist/source-image'
+import { parseSeries } from '@/lib/series/snapshot'
+import { seriesCharacterReference } from '@/lib/series/redraw-reference'
 import { resolveCharacterPromptInput, styleFromUserAnalysis } from '@/lib/artist/sheet-prompt-input'
 import { templateAssetUrl } from '@/lib/storage/template-asset'
 import { normalizeImageModelKey, resolveImageEndpoint } from '@/lib/image-models'
@@ -175,7 +177,7 @@ export async function POST(req: Request) {
       await Promise.all([
         supabaseAdmin
           .from('projects')
-          .select('workspace_id, design_tokens, style_anchor_key, custom_style_anchor')
+          .select('workspace_id, design_tokens, style_anchor_key, custom_style_anchor, series')
           .eq('id', projectId)
           .single(),
         supabaseAdmin
@@ -236,6 +238,13 @@ export async function POST(req: Request) {
     const refMain = appearance.sheet_url as string | null
     // #image-to-artist: 사용자가 올린 원본(derived_from_url)이 있으면 시트의 정체성 참조 첫 자리다.
     const sourceImageUrl = typeof appearance.derived_from_url === 'string' && appearance.derived_from_url ? (appearance.derived_from_url as string) : null
+    // 시리즈 다음 화(2026-10-26): 이어받았는데 이 화 시트가 아직 비어 있는 기본 모습만 앞 화 시트를 정체성 참조로 받는다 —
+    //   그림체는 이 화 것이다(turnaround.ts hasSeriesSheet). 이 화 시트가 생긴 뒤의 재생성은 그 시트(refMain)가 정체성 기준이라
+    //   앞 화 그림을 다시 싣지 않고, 기준 얼굴(비기본 모습) 경로도 이 화 기본 모습이 기준이다 — 그래서 앞 화 시트는 늘 참조의 마지막 장이다.
+    const seriesSheetUrl =
+      appearance.is_default && !refMain
+        ? seriesCharacterReference(parseSeries((project as { series?: unknown }).series), characterId)
+        : null
     const webhookUrl = resolveWebhookUrl()
     let submitOpts: FalImageOptions
     let styleAnchorMode: 'turnaround' | 'single' | null = null
@@ -259,6 +268,7 @@ export async function POST(req: Request) {
             ...sheetIdentityReferences({ sourceImageUrl }),
             ...(baseFaceUrl ? [baseFaceUrl] : []),
             ...(refMain ? [refMain] : []),
+            ...(seriesSheetUrl ? [seriesSheetUrl] : []),
           ]
           submitOpts = {
             model: endpoint,
@@ -266,6 +276,7 @@ export async function POST(req: Request) {
               hasBaseFace: !!baseFaceUrl,
               hasPriorRender: !!refMain,
               hasSourceImage: !!sourceImageUrl,
+              hasSeriesSheet: !!seriesSheetUrl,
             }),
             // 템플릿이 첫 장(레이아웃 기준), 그 뒤가 정체성 이미지(기준얼굴·직전 시트).
             //   순서가 뒤바뀌면 모델이 얼굴 이미지를 레이아웃으로 오인한다.

@@ -31,6 +31,11 @@ import { assessContentSafetyRisk } from '@/lib/writer/content-safety-hint';
 import { parseCustomStyleAnchor } from '@/lib/style-anchor';
 import { planSourceImageWrites, stripSourceImages } from '@/lib/producer/source-image';
 import { userOwnsProject } from '@/lib/generation-jobs';
+import { mergeSeriesBackgrounds, mergeSeriesCast } from '@/lib/series/seed';
+import { loadSeriesWriterInput, type SeriesWriterInput } from '@/lib/series/server';
+import { styleIdOf, type SeriesSnapshot } from '@/lib/series/snapshot';
+import { appearingIn } from '@/lib/series/view';
+import { planInheritedImageWrites } from '@/lib/series/inherited-images';
 import { continueDraftState, draftBasisChanges, draftContinueBlock } from '@/lib/writer/treatment-draft';
 import { normalizeEntryDraft } from '@/lib/entry/draft';
 import type { WriterRunState } from '@/lib/writer/pipeline/steps';
@@ -237,6 +242,53 @@ async function applySourceImages(
   }
 }
 
+/**
+ * 시리즈 다음 화(2026-10-26): 앞 화에서 이어받은 그림을 이 화 보관함에 적는다 — 인물 기본 모습의 시트 · 배경 와이드샷의 빈칸만.
+ *   그림체가 달라 이번 화 산문에 나오는 인물 · 배경은 비워 둔다 — Artist 자동 초안이 앞 화 그림을 참고해 이 화 그림체로 다시 그린다.
+ *   산문은 지금 실행의 씬(이어 가기면 그 초안의 씬)에서 읽는다 — 아직 산문이 없으면 아무것도 적지 않는다.
+ */
+async function applyInheritedImages(
+  projectId: string,
+  series: SeriesSnapshot,
+  run: { state?: unknown } | null | undefined,
+): Promise<void> {
+  const [project, appearances, locations] = await Promise.all([
+    supabaseAdmin.from('projects').select('style_anchor_key, custom_style_anchor').eq('id', projectId).maybeSingle(),
+    supabaseAdmin
+      .from('character_appearances')
+      .select('character_id, sheet_url, portrait_url')
+      .eq('project_id', projectId)
+      .eq('is_default', true),
+    supabaseAdmin.from('locations').select('location_id, wide_shot').eq('project_id', projectId),
+  ]);
+  if (project.error) throw new Error(`series style read failed: ${project.error.message}`);
+  if (appearances.error) throw new Error(`series appearance read failed: ${appearances.error.message}`);
+  if (locations.error) throw new Error(`series location read failed: ${locations.error.message}`);
+  const plan = planInheritedImageWrites({
+    series,
+    currentStyleId: styleIdOf(project.data ?? {}),
+    appearance: appearingIn((run?.state ?? null) as Parameters<typeof appearingIn>[0]),
+    existing: { characters: appearances.data ?? [], locations: locations.data ?? [] },
+  });
+  for (const row of plan.characters) {
+    const { error } = await supabaseAdmin
+      .from('character_appearances')
+      .update({ sheet_url: row.sheet_url, portrait_url: row.portrait_url })
+      .eq('project_id', projectId)
+      .eq('character_id', row.character_id)
+      .eq('is_default', true);
+    if (error) throw new Error(`series character image failed: ${error.message}`);
+  }
+  for (const row of plan.locations) {
+    const { error } = await supabaseAdmin
+      .from('locations')
+      .update({ wide_shot: row.wide_shot })
+      .eq('project_id', projectId)
+      .eq('location_id', row.location_id);
+    if (error) throw new Error(`series location image failed: ${error.message}`);
+  }
+}
+
 async function upsertProducerBackgrounds(projectId: string, backgrounds: ProducerBackgrounds): Promise<void> {
   if (!backgrounds.locations.length) return;
 
@@ -320,10 +372,7 @@ export async function POST(req: NextRequest) {
     // models(축별 LLM 제공자·주소)는 본문에서 받지 않는다 — 제공자를 고를 수 있으면 서버가
     //   사용자가 준 주소로 원고를 보내고(SSRF), 개인정보처리방침에 적지 않은 업체로 글이 나간다.
     //   파이프라인 입력의 models 는 서버 내부(스크립트·하네스)만 쓴다.
-    const { projectId, story, runtimeSeconds, genre, cast: castWithImages, backgrounds } = body;
-    // #image-to-artist: 캐스트 계약의 그림 주소는 DB(대표 사진·시트 출처)에만 쓰고 파이프라인 시드에서는 뗀다 —
-    //   글 프롬프트에 URL 이 섞이면 안 된다.
-    const cast: CastContract | undefined = castWithImages ? stripSourceImages(castWithImages) : undefined;
+    const { projectId, story, runtimeSeconds, genre, cast: bodyCast, backgrounds: bodyBackgrounds } = body;
     // #script-preserve: producer 채팅에서 "그대로 보존"을 고른 대본. 명시적 true 만.
     const preserveScript = readPreserveScript(body);
     // 그대로 쓰기는 설정한 영상 길이 대신 대본 길이로 장르의 길이 · 깊이를 정하고 길이 값은 보내지 않는다(2026-10-09 오너 "영상 길이 제한을 없애줘").
@@ -350,6 +399,24 @@ export async function POST(req: NextRequest) {
     if (!(await userOwnsProject(projectId, user.id))) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    // 시리즈 다음 화(2026-10-26): 앞 화에서 이어받은 인물 · 배경 · 말투와 앞 화 확정 산문을 매번 다시 읽는다 —
+    //   모든 시작 경로(초안 · 다시 시도 · 이어 가기 · 일반 시작 · 다시 실행)가 같은 재료로 돈다.
+    //   best-effort: 조회가 실패하면 로그만 남기고 시리즈 없이 진행한다(스타일 앵커 조회와 같은 관례).
+    let seriesInput: SeriesWriterInput | null = null;
+    try {
+      seriesInput = await loadSeriesWriterInput(projectId);
+    } catch (e) {
+      console.error('[writer/start] series load failed (proceeding):', e);
+    }
+    const series: SeriesSnapshot | null = seriesInput?.context.series ?? null;
+    // 이어받은 인물 · 배경을 Producer 카드에 합친다 — 카드가 비어 와도 앞 화 인물이 빠지지 않고,
+    //   표 쓰기(upsertProducerCast · upsertProducerBackgrounds)와 파이프라인 시드가 같은 합친 값을 쓴다.
+    const castWithImages: CastContractWithImages | undefined = mergeSeriesCast(bodyCast, series);
+    const backgrounds: ProducerBackgrounds | undefined = mergeSeriesBackgrounds(bodyBackgrounds, series);
+    // #image-to-artist: 캐스트 계약의 그림 주소는 DB(대표 사진·시트 출처)에만 쓰고 파이프라인 시드에서는 뗀다 —
+    //   글 프롬프트에 URL 이 섞이면 안 된다.
+    const cast: CastContract | undefined = castWithImages ? stripSourceImages(castWithImages) : undefined;
 
     // 트리트먼트 초안은 확정 단계가 있는 V1 로만 돈다(V2 는 확정 단계가 없다).
     const writerEngine: WriterEngine = treatmentDraft || continueDraft
@@ -463,6 +530,13 @@ export async function POST(req: NextRequest) {
       await applySourceImages(projectId, castWithImages, backgrounds).catch((e) => {
         console.error('[writer/start] source image apply failed (proceeding):', e);
       });
+      // 시리즈 다음 화(2026-10-26): 이어받은 그림은 그림체가 같으면 그대로 적고, 다르면 빈칸으로 남긴다(Artist 가 다시 그린다).
+      //   카드 그림(applySourceImages) 다음에 둔다 — 사람이 이 화에서 올린 그림이 이긴다. 실패해도 핸드오프는 진행한다.
+      if (series) {
+        await applyInheritedImages(projectId, series, existing).catch((e) => {
+          console.error('[writer/start] series inherited image apply failed (proceeding):', e);
+        });
+      }
       // #name-en(2026-09-08, 오너 지시): 인물·배경 이름의 영어 표기를 핸드오프 때 한 번 정해 둔다 — 러프·프롬프트가 저장값을 쓴다.
       //   best-effort(실패해도 러프 라우트가 처음 필요할 때 한 번 정한다).
       await ensureEntityNamesEn(projectId).catch((e) => {
@@ -558,6 +632,9 @@ export async function POST(req: NextRequest) {
       genre: effectiveGenre,
       cast,
       ...(preserveScript ? { preserveScript: true } : {}),
+      // 시리즈 다음 화 — 앞 화 제목 · 앞 화 산문 · 이어받은 인물 · 배경 이름. 시리즈가 아니면 칸을 두지 않는다.
+      ...(seriesInput ? { series: seriesInput.series } : {}),
+      ...(seriesInput?.inheritedVoices.length ? { inheritedVoices: seriesInput.inheritedVoices } : {}),
       background: backgrounds?.locations?.length
         ? {
             locations: backgrounds.locations.map((b) => ({

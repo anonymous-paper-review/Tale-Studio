@@ -20,6 +20,8 @@ import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProducerStore } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterRoomStore, type WorkspaceTab } from '@/stores/writer-room-store'
+import { useSeriesInfo } from '@/features/series/use-series-info'
+import { ProseSeriesBanner } from '@/features/series/prose-series-banner'
 import { useProse } from '@/features/prose/use-prose'
 import { ConditionBar } from '@/features/prose/condition-bar'
 import { ProseDocument } from '@/features/prose/prose-document'
@@ -39,6 +41,8 @@ export function ProseWorkspace() {
   const loadProject = useProducerStore((s) => s.loadProject)
   const tab = useWriterRoomStore((s) => s.tab)
   const messagesLoaded = useGlobalChatStore((s) => s.messagesLoadedProjectId === projectId)
+  // 다음 화(시리즈)면 화면 맨 위에 띠 한 줄로 알린다(프로토타입 W1s). 앞 화 산문은 [앞 화 줄거리 보기]를 누를 때만 따로 읽는다.
+  const series = useSeriesInfo(projectId)
   const title = projectTitle && projectTitle !== 'Untitled' ? projectTitle : t('A story without a title yet')
 
   useEffect(() => {
@@ -110,6 +114,8 @@ export function ProseWorkspace() {
           )}
         </div>
       </div>
+
+      {series.view ? <ProseSeriesBanner projectId={projectId} view={series.view} /> : null}
 
       {prose.legacyGate ? (
         <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border bg-muted/40 px-6 py-2.5 text-sm" role="status" data-testid="prose-legacy-gate">

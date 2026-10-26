@@ -24,6 +24,8 @@ import { isDefiniteSubmitRejection } from '@/lib/fal/submit-rejection'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { buildCharacterTurnaroundPrompt } from '@/lib/artist/turnaround'
 import { sheetIdentityReferences } from '@/lib/artist/source-image'
+import { parseSeries } from '@/lib/series/snapshot'
+import { seriesCharacterReference, seriesLocationReference, withSeriesLocationReference } from '@/lib/series/redraw-reference'
 import { resolveCharacterPromptInput, styleFromUserAnalysis, type SheetDesignTokens } from '@/lib/artist/sheet-prompt-input'
 import { DEFAULT_IMAGE_MODEL, resolveImageEndpoint } from '@/lib/image-models'
 import { CHARACTER_VIEW_COLUMNS } from '@/types/asset'
@@ -132,7 +134,7 @@ export async function triggerCharacterDrafts(
         .eq('is_default', true),
       supabaseAdmin
         .from('projects')
-        .select('design_tokens, workspace_id, style_anchor_key, custom_style_anchor')
+        .select('design_tokens, workspace_id, style_anchor_key, custom_style_anchor, series')
         .eq('id', projectId)
         .maybeSingle(),
     ])
@@ -150,6 +152,8 @@ export async function triggerCharacterDrafts(
     }
     const webhookUrl = resolveWebhookUrl()
     const anchor = await resolveStyleAnchor(project)
+    // 시리즈 다음 화(2026-10-26): 이어받았는데 이 화 시트가 비어 있는 인물은 앞 화 시트를 정체성 참고로 넣어 이 화 그림체로 다시 그린다.
+    const series = parseSeries((project as { series?: unknown } | null)?.series)
     const defaultAppearances = new Map<string, DraftAppearanceRow>()
     for (const appearance of appearances ?? []) {
       const row = appearance as DraftAppearanceRow
@@ -212,7 +216,12 @@ export async function triggerCharacterDrafts(
         // #image-to-artist: 사용자가 올린 원본(derived_from_url)이 있으면 시트의 정체성 참조로 넣는다(버튼 경로와 같은 규칙).
         const sourceImageUrl =
           typeof defaultAppearance.derived_from_url === 'string' && defaultAppearance.derived_from_url ? defaultAppearance.derived_from_url : null
-        const prompt = buildCharacterTurnaroundPrompt(promptInput, { hasSourceImage: !!sourceImageUrl })
+        // 앞 화 시트는 정체성 참고의 마지막 장이다(turnaround.ts 의 'the LAST reference image' 계약) — 사용자 원본이 있으면 그 뒤에 온다.
+        const seriesSheetUrl = seriesCharacterReference(series, c.character_id)
+        const prompt = buildCharacterTurnaroundPrompt(promptInput, {
+          hasSourceImage: !!sourceImageUrl,
+          hasSeriesSheet: !!seriesSheetUrl,
+        })
         // 템플릿은 스토리지에서 (template-asset.ts 주석 참고).
         const templateUrl = await templateAssetUrl('character-template.png')
         // 모델 = Artist 기본(레지스트리) — 템플릿이 있으면 edit 갈래, 없으면 T2I 폴백.
@@ -221,7 +230,11 @@ export async function triggerCharacterDrafts(
           ? {
               model: resolveImageEndpoint(DEFAULT_IMAGE_MODEL, true).endpoint,
               prompt,
-              reference_image_urls: [templateUrl, ...sheetIdentityReferences({ sourceImageUrl })],
+              reference_image_urls: [
+                templateUrl,
+                ...sheetIdentityReferences({ sourceImageUrl }),
+                ...(seriesSheetUrl ? [seriesSheetUrl] : []),
+              ],
               webhookUrl,
             }
           : { model: resolveImageEndpoint(DEFAULT_IMAGE_MODEL, false).endpoint, prompt, aspect_ratio: '3:2', webhookUrl }
@@ -396,13 +409,16 @@ export async function triggerWorldDrafts(
         .is('wide_shot', null),
       supabaseAdmin
         .from('projects')
-        .select('workspace_id, style_anchor_key, custom_style_anchor')
+        .select('workspace_id, style_anchor_key, custom_style_anchor, series')
         .eq('id', projectId)
         .maybeSingle(),
     ])
     if (!locations?.length) return result
 
     const anchor = await resolveStyleAnchor(project)
+    // 시리즈 다음 화(2026-10-26): 이어받았는데 이 화 와이드샷이 비어 있는 배경은(위 조회가 빈 것만 가지고 온다)
+    //   앞 화 와이드샷을 참고 그림으로 넣어 이 화 그림체로 다시 그린다.
+    const series = parseSeries((project as { series?: unknown } | null)?.series)
     // 기준 그림 없이 그리는 그림체(실사, 2026-10-13 오너)의 배경은 글자 금지 줄과 16:9 크기로 그린다(generate-world 와 같은 규칙).
     const styleWithoutReference = !anchor && (await styleDrawsWithoutReference(project))
 
@@ -423,6 +439,7 @@ export async function triggerWorldDrafts(
           null,
           'wideShot',
         )
+        const seriesWideShotUrl = seriesLocationReference(series, location.location_id)
         // #creem-moderation(2026-10-11): 검사는 이야기에서 나온 배경 설명만 본다 — 사람 금지 절·샷 종류
         //   꼬리말(wide shot, panoramic)은 우리 문구라 보내지 않는다.
         const moderation = await assertUserTextAllowed(
@@ -447,11 +464,12 @@ export async function triggerWorldDrafts(
             projectId,
             locationId: location.location_id,
             column: 'wide_shot',
-            prompt: builtPrompt,
+            prompt: seriesWideShotUrl ? withSeriesLocationReference(builtPrompt) : builtPrompt,
             aspectRatio: '16:9',
             sourceHash: computeWorldImageSourceHash(builtPrompt),
             // 약속 B7: 자동 초안도 설명 해시를 남겨야 뒤에 설명이 바뀌었을 때 "설명 바뀜"을 판정할 수 있다.
             descriptionHash: computeWorldDescriptionHash(location.visual_description),
+            referenceImageUrls: seriesWideShotUrl ? [seriesWideShotUrl] : null,
             actor: 'writer',
             workspaceId: project?.workspace_id ?? undefined,
             anchor,

@@ -165,7 +165,7 @@ export function buildCharacterMainPrompt(input: CharacterPromptInput): string {
  */
 export function buildCharacterTurnaroundPrompt(
   input: CharacterPromptInput,
-  opts?: { hasBaseFace?: boolean; hasPriorRender?: boolean; hasSourceImage?: boolean },
+  opts?: { hasBaseFace?: boolean; hasPriorRender?: boolean; hasSourceImage?: boolean; hasSeriesSheet?: boolean },
 ): string {
   const d = describeParts(input)
   const head = [
@@ -177,6 +177,15 @@ export function buildCharacterTurnaroundPrompt(
       ? [
           'one of the reference images is the ORIGINAL picture of this exact character supplied by the user — draw the same person: reproduce the face, hair, skin, build, outfit and colors from that picture faithfully in every tile',
           'do not copy its background, framing or pose into the sheet — only the character',
+        ]
+      : []),
+    // 시리즈 다음 화(2026-10-26): 앞 화 시트를 참조로 붙였다 — 그림체가 다를 수 있어 정체성만 가져오고 그림체는 이 화 것이다.
+    //   호출부 계약: 앞 화 시트는 참조 그림의 **마지막 장**이다(기준 얼굴 · 직전 시트가 있는 경로에는 싣지 않는다) —
+    //   그래서 위치로 가리킬 수 있고 사용자 원본의 "그대로 재현" 문장과 섞이지 않는다.
+    ...(opts?.hasSeriesSheet
+      ? [
+          'the LAST reference image is this same character as drawn for the PREVIOUS episode of this series — take ONLY the identity from it: the face, hair, build and the shape and colors of the outfit',
+          'redraw that identity completely in the art style declared for THIS sheet — never copy the previous episode image\'s linework, shading, texture or medium',
         ]
       : []),
     // #g4(2026-08-27): 둘째 참조 이미지가 있으면 그건 "이 인물의 다른 시점 얼굴"이다.

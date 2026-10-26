@@ -4,6 +4,7 @@
 //   설정에는 AI가 글을 읽고 고른 추천이 미리 들어 있고, 장르·분위기와 길이는 이유를 한 줄씩 보여준다.
 //   화면 비율은 잠금 묶음에 따로 둔다 — [AI로 진행] → 확인 창 [예, 시작]에서 잠기고 산문 초안을 쓴다.
 //   형식 고르기(단편 · 광고 · MV …) · 이미지 권리 동의 · 채팅 · 대사 언어 고르기는 없다(채팅 · 대사 언어 = 사이트 언어).
+//   시리즈 다음 화(2026-10-26 · 프로토타입 E3s)는 화면 비율에 "앞 화" 표시를 붙이고, 앞 화 대사 언어를 잠금 묶음에 보여 준다.
 import { useState } from 'react'
 import { ArrowLeft, ArrowRight, Check, CircleAlert, Lock, Paperclip } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -16,7 +17,6 @@ import {
   MIN_IDEA_CHARS,
   MOODS,
   RATIOS,
-  RECOMMENDED_RATIO,
   RUNTIMES,
   ideaLength,
   keepUnavailableNote,
@@ -28,6 +28,7 @@ import {
 import { fileReadLine, isScriptDraft, levelOptionsOf } from './chat-flow'
 import { useEntryStore } from './entry-store'
 import { FileChip, OptionGroup, UploadingChip, WhyLine, RecommendedBadge } from './entry-parts'
+import { dialogueLanguageName, ratioRecommendation } from './series'
 import { summaryRows } from './summary'
 
 export function EntryForm() {
@@ -163,6 +164,7 @@ function SettingsStep() {
   const formBack = useEntryStore((s) => s.formBack)
   const start = useEntryStore((s) => s.start)
   const writing = useEntryStore((s) => s.writing)
+  const series = useEntryStore((s) => s.series)
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   const rec = draft.rec
@@ -247,17 +249,30 @@ function SettingsStep() {
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <Lock className="size-4 text-muted-foreground" aria-hidden />
           <h3 className="text-sm font-medium">{t('Screen ratio')}</h3>
-          <span className="text-xs text-muted-foreground">{t('It cannot be changed after you start')}</span>
+          <span className="text-xs text-muted-foreground">
+            {t(series?.ratio ? 'Picked the previous episode value. It cannot be changed after you start' : 'It cannot be changed after you start')}
+          </span>
         </div>
         <OptionGroup
           label={t('Screen ratio')}
           hideLabel
           options={RATIOS.map((r) => ({ value: r.key, label: r.key, sub: t(r.sub), mono: true }))}
           value={picks.ratio}
-          recommended={RECOMMENDED_RATIO}
+          recommended={ratioRecommendation(series)}
+          recommendedLabel={series?.ratio ? t('Previous episode') : undefined}
           onChange={(v) => void formPick('ratio', v)}
           className="grid-cols-2 sm:grid-cols-4"
         />
+        {series?.dialogueLanguage ? (
+          <div className="flex flex-col gap-2 border-t border-border pt-4">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <Lock className="size-4 text-muted-foreground" aria-hidden />
+              <h3 className="text-sm font-medium">{t('Language')}</h3>
+              <span className="text-xs text-muted-foreground">{t('Same as the previous episode. Locked to carry over the voices')}</span>
+            </div>
+            <span className="w-fit rounded-md border border-foreground bg-accent px-3 py-2 text-sm font-medium">{dialogueLanguageName(series.dialogueLanguage)}</span>
+          </div>
+        ) : null}
       </div>
 
       <footer className="flex items-start justify-between gap-4 border-t border-border pt-4">
@@ -284,7 +299,7 @@ function SettingsStep() {
             <DialogDescription>{t('When you start, the screen ratio is locked.')}</DialogDescription>
           </DialogHeader>
           <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2.5 text-sm">
-            {summaryRows(draft, { t, locale: entryLocale }).map((row) => (
+            {summaryRows(draft, { t, locale: entryLocale, series }).map((row) => (
               <div key={row.key} className="contents">
                 <dt className="flex items-center gap-1.5 text-muted-foreground">
                   {row.locked ? <Lock className="size-3.5" aria-hidden /> : null}

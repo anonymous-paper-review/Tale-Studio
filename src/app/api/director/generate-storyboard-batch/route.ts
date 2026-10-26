@@ -31,6 +31,7 @@ import {
   type CharacterRefLabel,
 } from '@/lib/director/storyboard-strip'
 import { applyDirectorRefs, directorRefsExcludeWorld, loadSceneWorldRefs, parseDirectorRefs, readCharacterBlocking, readOffFrame } from '@/lib/director/shot-references'
+import { loadSeriesFirstShotContinuity, seriesContinuityPromptLine } from '@/lib/series/continuity'
 import { parseProjectFormat } from '@/types/project'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 import { storageKeySegment } from '@/lib/storage/key-segment'
@@ -120,7 +121,7 @@ export async function POST(req: NextRequest) {
 
     const { data: project } = await supabaseAdmin
       .from('projects')
-      .select('workspace_id, style_anchor_key, custom_style_anchor, settings')
+      .select('workspace_id, style_anchor_key, custom_style_anchor, settings, series, optional_reference_frame_url')
       .eq('id', projectId)
       .maybeSingle()
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
@@ -323,6 +324,9 @@ export async function POST(req: NextRequest) {
     //   #ref-gate 수정: 씬→로케이션은 scenes.location(location_id) 이 진실 — locations.scene_id 만 보던 첫 배선은
     //   실측 전 프로젝트에서 null 이라 배경을 한 번도 못 붙였다. 공용 헬퍼(scenes.location 우선, scene_id 폴백).
     const worldRefByScene = await loadSceneWorldRefs(projectId, sceneIds)
+    // 시리즈 연속성(2026-10-26): "앞 화 마지막 장면에서 이어 시작하기"로 만든 화의 첫 샷이 이 시트에 들어 있을 때만 —
+    //   앞 화 끝 장면을 인물 · 배경 뒤(화풍 참고 앞)에 한 장 더 붙이고 그 칸을 가리키는 연속성 한 줄을 더한다.
+    const continuity = await loadSeriesFirstShotContinuity(projectId, project)
 
     const webhookUrl = resolveWebhookUrl()
     const submitted: Array<{ jobId: string; shotIds: string[] }> = []
@@ -392,6 +396,8 @@ export async function POST(req: NextRequest) {
       //   A안(preview 2번 스타일 레퍼런스). 전부 DB(style_anchors)가 진실.
       const anchorTwoRef = !!(anchor?.usePreviewRef && anchor.previewUrl)
       const worldRef = group.every((s) => s.excludeWorld) ? null : (worldRefByScene.get(group[0].scene_id) ?? null)
+      const seriesFrameColumn = continuity ? group.findIndex((s) => s.shot_id === continuity.firstShotId) : -1
+      const seriesFrameUrl = continuity && seriesFrameColumn >= 0 ? continuity.frameUrl : null
       const prompt = buildRealGridPrompt(group.length, {
         characterRefCount: groupRefs.length,
         worldRefCount: worldRef ? 1 : 0,
@@ -404,11 +410,12 @@ export async function POST(req: NextRequest) {
         styleRefCount: anchorTwoRef ? 2 : 1,
         styleAnchors: userStyleFacets?.probeAnchors ?? null,
         styleAvoid: userStyleFacets?.negative ?? null,
-      })
+      }) + (seriesFrameUrl ? `\n- ${seriesContinuityPromptLine(seriesFrameColumn + 1)}` : '')
       const referenceImageUrls = [
         refUrl,
         ...groupRefs.map((r) => r.url),
         ...(worldRef ? [worldRef] : []),
+        ...(seriesFrameUrl ? [seriesFrameUrl] : []),
         ...(anchor ? [anchor.imageUrl] : []),
         ...(anchorTwoRef ? [anchor!.previewUrl as string] : []),
       ]

@@ -9,7 +9,6 @@ import {
   MIN_IDEA_CHARS,
   PICK_KEYS,
   QUESTION_NAME,
-  RECOMMENDED_RATIO,
   TOO_SHORT_KEY,
   chatQuestionOrder,
   levelAvailable,
@@ -25,6 +24,7 @@ import {
   type ParsedAnswer,
   type PickKey,
 } from './options'
+import { ratioRecommendation, type EntrySeries } from './series'
 
 export type Translator = (key: string, params?: Record<string, string | number>) => string
 
@@ -239,10 +239,10 @@ export function reaskPatch(draft: EntryDraft, key: PickKey): ChatPatch {
   return { picks: {}, chat }
 }
 
-/** [추천대로]의 값 — 화면 비율은 언제나 9:16 추천, "그대로"를 고를 수 없으면 다듬기. */
-export function recommendedValue(draft: EntryDraft, key: ChatQuestionKey): string | null {
+/** [추천대로]의 값 — 화면 비율은 9:16 추천(시리즈 다음 화는 앞 화 비율), "그대로"를 고를 수 없으면 다듬기. */
+export function recommendedValue(draft: EntryDraft, key: ChatQuestionKey, series: EntrySeries | null = null): string | null {
   const rec = draft.rec
-  if (key === 'ratio') return RECOMMENDED_RATIO
+  if (key === 'ratio') return ratioRecommendation(series)
   if (!rec) return null
   if (key === 'mood') return rec.mood
   if (key === 'runtime') return rec.runtime
