@@ -6,6 +6,7 @@ import { ArrowRight, Loader2, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useT } from '@/lib/i18n'
+import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useWriterRoomStore } from '@/stores/writer-room-store'
 import { useConfirmProse } from '@/features/prose/writer-next-card'
 
@@ -13,8 +14,10 @@ export function ProseConfirmDialog() {
   const t = useT()
   const open = useWriterRoomStore((s) => s.confirmOpen)
   const confirm = useConfirmProse()
+  // [아니오] · X · Esc = 확정하지 않고 닫기 — 그 뒤 고친 걸 적용해도 채팅이 같은 질문을 다시 하지 않는다(디자이너 QA 1차 #08).
+  //   확정에 성공해 닫는 것은 useConfirmProse 의 closeConfirm 이라 여기를 지나지 않는다.
   const close = () => {
-    if (!confirm.busy) useWriterRoomStore.getState().closeConfirm()
+    if (!confirm.busy) useGlobalChatStore.getState().declineProseConfirm()
   }
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) close() }}>

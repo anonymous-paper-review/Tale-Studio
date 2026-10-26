@@ -94,8 +94,9 @@ export interface CharacterAsset {
   appearanceNative?: string
   /** 현재 룩(전역 디자인 토큰 + 의상) 지문 — stale 비교 시 전달(C2). 룩 미반영이면 null. */
   lookFingerprint?: string | null
-  /** 출처 — producer 정의(핸드오프) vs writer 파이프라인 추가. 온보딩 갭 계산에 사용. */
-  origin?: 'producer' | 'writer'
+  /** 출처 — producer 정의(핸드오프) vs writer 파이프라인 추가. 온보딩 갭 계산에 사용.
+   *  'user' = 산문 밖에서(예전 Artist 채팅 · + 단추) 만들어진 카드 — 쓰이지 않으면 지울 수 있다(2026-10-27 디자이너 QA 1차 #04). */
+  origin?: 'producer' | 'writer' | 'user'
   /** 대표 포트레이트(028) — 턴어라운드 시트 좌상단 CHARACTER CONCEPT 크롭. 없으면 views.main 폴백. */
   portrait?: string | null
   /** 뷰별 후보 히스토리 (character_image_candidates). 없으면 빈 객체. */

@@ -1,16 +1,20 @@
 // artist 채팅 cc(LLM) 가 반환한 update 들의 화이트리스트 검증 (순수 함수).
 //
 // F6 안전 규칙(원천/파생 §3 + 원칙2): cc 가 자동으로 실행(applyUpdates)할 수 있는 update 는
-//   엄격한 화이트리스트뿐이다 — createCharacter(신규 생성) / regenerate*(차 있는 파생 이미지 교체, 사람 요청).
+//   엄격한 화이트리스트뿐이다 — regenerate*(차 있는 파생 이미지 교체, 사람 요청).
 //   기존 캐릭터의 canonical 외형(원천) 변경은 자동경로로 절대 들어오지 못한다: 그런 type 은 화이트리스트에
 //   없어 드롭되며, cc 는 그 의도를 update 가 아니라 pending-proposal('artistSourceAppearancePatch')로만 표면화해
 //   사용자 승인 뒤 서버 검증 라우트로 커밋해야 한다. (모델은 제안만 — architecture §3.)
+//   새 인물 · 배경 카드는 채팅이 만들지 않는다(2026-10-27 디자이너 QA 1차 #04 · 오너 "채팅 추가 막고 안내") —
+//   인물 · 배경은 확정한 산문에서 나온다. createCharacter 는 화이트리스트에서 뺐고, 모델이 지어낸 만들기 명령도
+//   countNewCardUpdates 로 세어 라우트가 답을 안내 문장으로 바꾼다(noNewCardReply).
 //
 // route 와 분리해 순수 단위 테스트가 가능하게 한다(F6 회귀 가드).
 
 import { isImageModelKey } from '@/lib/image-models'
+import type { AppLocale } from '@/lib/locale'
+import { translate } from '@/lib/i18n/translate'
 
-const VALID_ROLES = new Set(['protagonist', 'antagonist', 'supporting'])
 const VALID_VIEWS = new Set(['main', 'back', 'sideLeft', 'sideRight'])
 const VALID_NARRATIVE_TIMES = new Set(['present', 'past', 'future'])
 
@@ -19,11 +23,34 @@ const VALID_NARRATIVE_TIMES = new Set(['present', 'past', 'future'])
 //   달리 원천 mutation 이 아니다 — 무과금(이미지 생성은 별도 요청)이라 자동 실행 화이트리스트에 넣는다.
 // createAppearance 는 약속 C3·C4(2026-09-04)로 승인 게이트로 옮겼다 — 새 모습은 만든 직후 이미지를 자동 생성해
 //   과금이 생기므로 제안 카드(artistCreateAppearance)를 거친다(extractAppearanceCreations).
+// createCharacter 는 2026-10-27(디자이너 QA 1차 #04) 뺐다 — 채팅은 새 인물 카드를 만들지 않는다.
 export const AUTO_APPLY_UPDATE_TYPES = new Set([
-  'createCharacter',
   'regenerateCharacter',
   'regenerateWorldAsset',
 ])
+
+/** 새 인물 · 배경을 만들어 달라는 말에 Artist 채팅이 하는 답(2026-10-27 오너 "채팅 추가 막고 안내"). */
+export const NO_NEW_CARD_GUIDANCE =
+  'Characters and backgrounds come from the confirmed prose. Artist cannot make a new character or background that is not in the prose. Fix it in the prose. You can add a look (outfit, age) to a character that already exists here.'
+
+// 새 카드 만들기 명령 — 원래 있던 createCharacter 와 모델이 지어낼 만한 이름(createLocation · addBackground 등).
+//   있는 카드의 새 모습(createAppearance · createLocationAppearance)은 끝(Appearance)이 달라 걸리지 않는다.
+const NEW_CARD_UPDATE_TYPE = /^(?:create|add|new|make|insert)(?:character|person|people|cast(?:member)?|prop|object|location|background|world(?:asset)?|place)s?$/i
+
+/** 모델이 낸 updates 중 새 인물 · 배경 카드를 만들라는 명령의 수. 실행하지 않고 세기만 한다. */
+export function countNewCardUpdates(raw: unknown[]): number {
+  return raw.filter((u) => {
+    if (!u || typeof u !== 'object') return false
+    const type = (u as Record<string, unknown>).type
+    return typeof type === 'string' && NEW_CARD_UPDATE_TYPE.test(type)
+  }).length
+}
+
+/** 만들기 명령을 버린 턴의 답 — 모델의 "추가했어요"를 남기지 않고 안내 문장만 남긴다(이미 안내했으면 그대로). */
+export function noNewCardReply(reply: string, locale: AppLocale): string {
+  const guidance = translate(locale, NO_NEW_CARD_GUIDANCE)
+  return reply.includes(guidance) ? reply : guidance
+}
 
 function asString(x: unknown): string | undefined {
   return typeof x === 'string' ? x : undefined
@@ -41,21 +68,6 @@ export function validateUpdates(raw: unknown[]): unknown[] {
     if (typeof rec.type !== 'string' || !AUTO_APPLY_UPDATE_TYPES.has(rec.type)) continue
 
     switch (rec.type) {
-      case 'createCharacter': {
-        const name = asString(rec.name)?.trim()
-        if (name) {
-          out.push({
-            type: 'createCharacter',
-            name,
-            ...(typeof rec.role === 'string' && VALID_ROLES.has(rec.role)
-              ? { role: rec.role }
-              : {}),
-            ...(asString(rec.description) ? { description: rec.description } : {}),
-            ...(asString(rec.appearance) ? { appearance: rec.appearance } : {}),
-          })
-        }
-        break
-      }
       case 'regenerateCharacter':
         if (asString(rec.characterId)) {
           const views = Array.isArray(rec.views)

@@ -104,6 +104,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, status: 'queued', deduped: true, locationId, column })
     }
 
+    // 빈칸만 채운다(캐릭터 시트 라우트와 대칭, 2026-10-27 디자이너 QA 1차 #05): 자율 생성(actor='auto')은 이 모습의
+    //   그림이 이미 있으면 제출하지 않는다. 화면이 아직 모르는 사이 다 그려진 배경을 '안 나온 그림 다시 그리기'가
+    //   또 요청하면 같은 배경을 두 번 그리고 두 번 과금됐다. 사람의 다시 만들기(ui/chat)는 그대로 그린다.
+    if (actor === 'auto') {
+      const { data: drawn, error: drawnError } = appearanceKey
+        ? await supabaseAdmin.from('location_appearances').select('wide_shot')
+          .eq('project_id', projectId).eq('location_id', locationId).eq('appearance_key', appearanceKey).maybeSingle()
+        : await supabaseAdmin.from('locations').select('wide_shot')
+          .eq('project_id', projectId).eq('location_id', locationId).maybeSingle()
+      if (drawnError) throw drawnError
+      const existing = (drawn as { wide_shot?: unknown } | null)?.wide_shot
+      if (typeof existing === 'string' && existing) {
+        return NextResponse.json({ ok: true, skipped: true, reason: 'exists', locationId, column })
+      }
+    }
+
     // safe-mode 자격/상한(약속 B9): 슬롯의 최근 실패가 moderation 류일 때만 순화 변환을 적용하고,
     //   사람이 누른 우회 재시도는 SAFE_RETRY_CAP 으로 비용 상한을 둔다.
     let effectiveSafeMode = false

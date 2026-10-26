@@ -2,14 +2,17 @@
 
 // AI 작업 중 전체 잠금 (리뉴얼 1차 2026-10-19, 프로토타입 원칙 "AI가 일하는 동안은 전체 잠금").
 //   AI 에이전트가 일을 시작하면 단계 화면과 채팅을 덮고 입력을 막는다 — 끝나야 고칠 수 있고, 동시 작업은 없다.
-//   왼쪽 단계 레일은 덮지 않는다(다른 단계로 나가는 것은 막지 않는다 — 작업은 서버에서 계속 돈다).
+//   왼쪽 단계 레일은 덮지 않지만, 일하는 동안은 단계 단추 · Alt 단축키로 다른 단계로 옮겨 가지 않는다(ai-busy-store,
+//   디자이너 QA 1차 #07 — 초안을 쓰는 중에 Writer 로 넘어가 같은 산문을 두 번 쓰게 할 수 있었다). 홈(프로젝트 목록)으로는
+//   나갈 수 있다 — 작업은 서버에서 계속 돈다. 실패 안내(busy=false)로 바뀌면 다시 옮겨 갈 수 있다.
 //   document.body 로 띄운다 — 단계 화면 안에 그리면 뒤를 inert 로 막을 때 이 창의 버튼(다시 그리기 · 닫기)까지 막힌다.
-import { useEffect, useSyncExternalStore } from 'react'
+import { useEffect, useId, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { AlertCircle, Check, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SHELL_INSET, SHELL_RAIL_WIDTH } from '@/lib/constants'
 import { useT } from '@/lib/i18n'
+import { aiBusyHolds, holdAiBusy } from '@/stores/ai-busy-store'
 
 export interface AiBusyStep {
   label: string
@@ -52,6 +55,14 @@ export function AiBusyOverlay({ open, title, description, steps, progress, progr
       for (const el of targets) el.removeAttribute('inert')
     }
   }, [open])
+
+  // 일하는 동안 왼쪽 레일의 단계 이동을 막는다 — 닫히거나 실패 안내로 바뀌거나 이 화면이 사라지면 푼다.
+  const holdId = useId()
+  const holding = aiBusyHolds({ open, busy })
+  useEffect(() => {
+    if (!holding) return
+    return holdAiBusy(holdId)
+  }, [holding, holdId])
 
   if (!open || !inBrowser) return null
   const pct = typeof progress === 'number' && Number.isFinite(progress) ? Math.max(0, Math.min(100, Math.round(progress))) : null

@@ -785,10 +785,11 @@ export async function listGenerationCompletionRows(projectId: string, untilMs = 
   }
 }
 
-/** queued 인 character_view main 잡 목록(클라가 [id] reconcile 로 마무리할 대상). */
+/** queued 인 character_view main 잡 목록(클라가 [id] reconcile 로 마무리할 대상).
+ *  어느 모습인지(appearanceKey)도 함께 준다 — 빼면 화면이 다 그린 그림을 카드에 못 넣는다(2026-10-27 디자이너 QA 1차 #06). */
 export async function listQueuedMainJobs(
   projectId: string,
-): Promise<Array<{ characterId: string; jobId: string }>> {
+): Promise<Array<{ characterId: string; appearanceKey: string; jobId: string }>> {
   const { data, error } = await supabaseAdmin
     .from('generation_jobs')
     .select('id, target')
@@ -797,12 +798,12 @@ export async function listQueuedMainJobs(
     .eq('status', 'queued')
   if (error) throw error
   if (!data) throw new Error('generation job queued-main query returned no data')
-  const out: Array<{ characterId: string; jobId: string }> = []
+  const out: Array<{ characterId: string; appearanceKey: string; jobId: string }> = []
   for (const row of data as Array<{ id: string; target: GenerationJobTarget | null }>) {
     const t = row.target ?? {}
     if (t.view === 'main' && t.characterId) {
       if (!t.appearanceKey) throw new Error('queued character_view main job missing appearanceKey')
-      out.push({ characterId: t.characterId, jobId: row.id as string })
+      out.push({ characterId: t.characterId, appearanceKey: t.appearanceKey, jobId: row.id as string })
     }
   }
   return out

@@ -32,7 +32,8 @@ export function ImageUploadConsentDialog({
             onChange={(event) => setChecked(event.target.checked)}
             className="mt-1 size-4 shrink-0 accent-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           />
-          <span lang="en">I have the right to use this image, and if it shows an identifiable person, I have their consent to use it here.</span>
+          {/* 동의 문구도 화면 언어로(2026-10-27 디자이너 QA #10 · 오너 "남기고 한국어로"). */}
+          <span>{t('I have the right to use this image, and if it shows an identifiable person, I have their consent to use it here.')}</span>
         </label>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={() => onDecision(false)}>{t('Cancel')}</Button>

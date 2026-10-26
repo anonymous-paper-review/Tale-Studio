@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { AlertTriangle, Check, Loader2, RefreshCw, Sparkles, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useT } from '@/lib/i18n'
-import type { SceneStoryProposalView } from '@/lib/producer/scene-story-proposal'
+import { changedSceneRows, type SceneStoryProposalView } from '@/lib/producer/scene-story-proposal'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 
@@ -16,11 +16,7 @@ export function SceneStoryProposalCard({ projectId, proposal }: { projectId: str
   const failed = proposal.status === 'failed'
   const conflict = proposal.status === 'ready' && proposal.stale
   const disabled = manualEdit || working
-  const changes = [...new Set([...proposal.before, ...proposal.after].map((scene) => scene.sceneId))].flatMap((id) => {
-    const before = proposal.before.find((scene) => scene.sceneId === id)
-    const after = proposal.after.find((scene) => scene.sceneId === id)
-    return before?.index === after?.index && JSON.stringify(before?.beats) === JSON.stringify(after?.beats) ? [] : [{ id, before, after }]
-  })
+  const changes = changedSceneRows(proposal.before, proposal.after)
 
   const resolve = async (action: 'apply' | 'discard') => {
     if (disabled || useProjectStore.getState().projectId !== projectId) return
@@ -36,6 +32,9 @@ export function SceneStoryProposalCard({ projectId, proposal }: { projectId: str
     if (discarded && useProjectStore.getState().projectId === projectId) await chat.reviseSceneGate(proposal.feedback)
     setWorking(false)
   }
+
+  // 바꿀 곳이 없었던 수정안(디자이너 QA 1차 #01)은 카드로 보이지 않는다 — 화면이 버리고 채팅에 알린다(settleUnchangedSceneStoryProposal).
+  if (failed && proposal.error === 'scene_story_proposal_unchanged') return null
 
   return (
     <section className="space-y-3 rounded-xl border border-border bg-card p-3 text-xs" data-testid="scene-story-proposal" aria-label={t('Scene story proposal')}>

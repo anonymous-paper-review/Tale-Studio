@@ -231,6 +231,8 @@ export function BusyOverlayPortal(props: {
   description?: string
   steps?: AiBusyStep[]
   footer?: ReactNode
+  /** false = 실패 안내(경고 표시 · 왼쪽 레일 단계 이동을 다시 연다). 기본 true. */
+  busy?: boolean
 }) {
   const mounted = useMounted()
   if (!mounted || !props.open) return null

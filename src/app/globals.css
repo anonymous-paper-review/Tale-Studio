@@ -352,9 +352,26 @@
 }
 
 /* 한 바퀴만 도는 빛 테두리 (#handoff-beam 2026-08-11) — "여기 새 문구가 떴다"는 등장 신호라
-   상시 표시(생성 중)와 달리 1회로 끝나야 한다. 끝나면 흔적을 남기지 않게 forwards 없이 둔다. */
+   상시 표시(생성 중)와 달리 1회로 끝나야 한다. forwards 없이 두기만 하면 다 돈 뒤 바탕 모습(--beam-angle 0도)으로
+   돌아가 빛 조각이 그 자리에 멈춰 남는다(디자이너 QA 1차 관찰 27 — 단추 둘레의 깨진 테두리). 그래서 바탕은 보이지 않게 두고,
+   한 바퀴 도는 자기 키프레임 동안만 켠 뒤 끝에서 흐려 끈다. */
 .tale-beam-once {
-  animation: beam-spin 1.5s linear 1;
+  opacity: 0;
+  animation: beam-arrive 1.5s linear 1;
+}
+
+@keyframes beam-arrive {
+  from {
+    --beam-angle: 0deg;
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  to {
+    --beam-angle: 360deg;
+    opacity: 0;
+  }
 }
 
 /* 모션 최소화 선호 시 회전 대신 정적 accent ring */

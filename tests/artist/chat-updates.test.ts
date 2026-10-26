@@ -12,9 +12,9 @@ const types = (out: unknown[]) => out.map((u) => (u as U).type)
 describe('validateUpdates — F6 허용된 작업만 자동 처리하고 원천 외형 변경은 막는다', () => {
   // createAppearance(#g4-chat 2026-08-31): 새 서사 시점 외형 "행"만 만든다 — 무과금이고
   //   기존 외형을 바꾸지 않으므로(F6의 보호 대상은 원천 교체) 자동 허용이 맞다.
-  it('새 캐릭터와 파생 이미지만 자동으로 만들고 원천 외형은 C3 승인 뒤 바꾼다 (C3)', () => {
+  it('파생 이미지 다시 그리기만 자동으로 받고 새 인물은 만들지 않으며 원천 외형은 C3 승인 뒤 바꾼다 (C3)', () => {
+    // 왜: 채팅이 만든 인물 카드가 산문과 어긋났다(디자이너 QA 1차 #04 · 오너 "채팅 추가 막고 안내") — 새 인물은 허용 목록에서 뺐다.
     expect([...AUTO_APPLY_UPDATE_TYPES].sort()).toEqual([
-      'createCharacter',
       'regenerateCharacter',
       'regenerateWorldAsset',
     ])
@@ -57,15 +57,14 @@ describe('validateUpdates — F6 허용된 작업만 자동 처리하고 원천 
     expect(validateUpdates([{ type: 'regenerateCharacter' }])).toEqual([])
   })
 
-  it('새 캐릭터는 외형을 함께 만들고 이름이 없으면 빼며 잘못된 역할은 무시한다', () => {
+  it('새 캐릭터 만들기 요청은 이름 · 외형 · 역할이 있어도 자동으로 받지 않는다', () => {
+    // 왜: 모델이 그래도 새 인물 명령을 내면 서버가 버려야 카드가 생기지 않는다(디자이너 QA 1차 #04 · 오너 "채팅 추가 막고 안내").
     const out = validateUpdates([
       { type: 'createCharacter', name: '지아', role: 'protagonist', appearance: '검은 코트' },
-      { type: 'createCharacter', name: '  ', appearance: 'x' }, // 빈 이름 드롭
-      { type: 'createCharacter', name: '봇', role: 'bogus' }, // 잘못된 role strip
+      { type: 'createCharacter', name: '  ', appearance: 'x' },
+      { type: 'createCharacter', name: '봇', role: 'bogus' },
     ])
-    expect(types(out)).toEqual(['createCharacter', 'createCharacter'])
-    expect(out[0]).toMatchObject({ type: 'createCharacter', name: '지아', role: 'protagonist', appearance: '검은 코트' })
-    expect((out[1] as U).role).toBeUndefined()
+    expect(types(out)).toEqual([])
   })
 
   it('장소 그림을 다시 만들고 장소 정보가 없으면 요청을 버린다', () => {

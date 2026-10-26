@@ -1,6 +1,6 @@
 // 리뉴얼 1차: Writer 는 산문 초안을 쓰는 동안과 산문을 고치는 동안 화면 전체를 진행 표시로 잠근다 (2026-10-19)
 import { describe, expect, it } from 'vitest'
-import { proseBusy } from '@/lib/prose/busy'
+import { proseBusy, proseStartOffered } from '@/lib/prose/busy'
 
 describe('Writer AI 작업 중 잠금', () => {
   // 왜: 프로토타입 E5 — 산문 초안을 쓰는 동안 "자료 정리 · 이야기 뼈대 · 씬 스토리 쓰기" 중 어디인지 보여 준다.
@@ -27,5 +27,29 @@ describe('Writer AI 작업 중 잠금', () => {
   it('확정한 산문은 뒷단계가 도는 동안에도 잠그지 않는다', () => {
     expect(proseBusy({ draftLive: false, phase: 'continuing', currentStage: 'decoupage', requestPending: false })).toBeNull()
     expect(proseBusy({ draftLive: false, phase: 'writing', currentStage: 'scenes', requestPending: false })).toBeNull()
+  })
+})
+
+describe('Writer에 들어온 직후 진행 상태를 읽기 전', () => {
+  it('산문 진행 상태를 아직 읽지 못했으면 초안을 쓰는 중으로 보고 잠근다', () => {
+    // 왜: Writer에 들어온 직후 약 2초 동안 잠금 없이 '산문 쓰기' 단추와 채팅 입력이 열렸다(디자이너 QA 1차 #07).
+    //   시작 화면에서 초안을 쓰는 중에 Writer로 넘어오거나, 초안이 다 돼 Writer로 보내질 때 첫 화면부터 잠근다.
+    //   어느 줄을 쓰는 중인지는 아직 모른다(step null) — 다 쓴 초안에서 넘어올 때 첫 줄부터 다시 쓰는 것처럼 보이지 않게.
+    expect(proseBusy({ draftLive: true, phase: 'before', statusRead: false, requestPending: false })).toEqual({ kind: 'draft', step: null })
+    // 읽고 나면 읽은 대로 — 다 쓴 초안(확정 대기)은 잠그지 않는다.
+    expect(proseBusy({ draftLive: true, phase: 'gate', statusRead: true, proposal: null, requestPending: false })).toBeNull()
+  })
+
+  it('산문 진행 상태를 읽기 전에는 산문 쓰기 단추를 보이지 않는다', () => {
+    // 왜: 진행 상태를 읽기 전에는 Writer가 아직 쓴 적이 없는 것처럼 보여 '산문 쓰기' 단추가 잠깐 열렸다(디자이너 QA 1차 #07).
+    expect(proseStartOffered({ locked: false, storyReady: true, phase: 'before', statusRead: false })).toBe(false)
+    // 읽어 보니 Writer가 시작한 적이 없을 때만 단추를 둔다.
+    expect(proseStartOffered({ locked: false, storyReady: true, phase: 'before', statusRead: true })).toBe(true)
+    expect(proseStartOffered({ locked: false, storyReady: true, phase: 'writing', statusRead: true })).toBe(false)
+  })
+
+  it('확정한 산문은 진행 상태를 읽는 중이어도 잠그지 않는다', () => {
+    // 왜: 확정한 산문은 읽고 복사하는 화면이다 — 다시 열 때마다 잠금 화면이 번쩍이면 안 된다(디자이너 QA 1차 #07).
+    expect(proseBusy({ draftLive: false, phase: 'before', statusRead: false, requestPending: false })).toBeNull()
   })
 })

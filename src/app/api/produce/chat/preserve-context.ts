@@ -68,6 +68,9 @@ export function lockedProducerDirective(producerLocked: unknown): string | null 
     'Answer questions about them, summarize or explain them, but do not emit extractedSettings, choices or proposals that change them.',
     'If the user asks for a change, say plainly that Producer is confirmed and cannot be changed, that a new project is needed to change it,',
     'and that scenes and dialogue can still be edited in Writer and character and background pictures in Artist.',
+    // 2026-10-27 디자이너 QA 1차 #04: 산문 밖에서(예전 Artist 채팅) 만들어진 인물 카드는 지우기 단추로 지울 수 있다 — "새 프로젝트가 필요해요"와 어긋나지 않게.
+    'One exception: a character card that was made outside the prose (for example by the old Artist chat) and is not used by any scene or shot',
+    'can be deleted with the trash button on that card in Artist. Say so if the user wants to remove such a card. You cannot delete it from this chat.',
   ].join('\n')
 }
 

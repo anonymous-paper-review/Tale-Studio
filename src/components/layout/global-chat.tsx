@@ -59,6 +59,7 @@ import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { useWriterPreview } from '@/lib/writer/use-writer-preview'
 import { SceneStoryProposalCard } from '@/components/layout/scene-story-proposal-card'
 import { SceneStoryRewriteCard, SceneStoryUndoCard } from '@/components/layout/scene-story-rewrite-card'
+import { unresolvedSceneStoryProposal } from '@/lib/producer/scene-story-proposal'
 import { WriterNextCard } from '@/features/prose/writer-next-card'
 import {
   buildScriptLines,
@@ -481,11 +482,15 @@ export function GlobalChat() {
   const treatmentDraft = useProjectStore((s) => s.treatmentDraft)
   const sceneStoryLive = currentStage === 'producer' && (producerLocked || treatmentDraft)
   const { preview: sceneStoryPreview } = useWriterPreview(projectId, { enabled: sceneStoryLive, refreshKey: sceneStoryRefresh })
-  const sceneStoryProposal = sceneStoryLive ? sceneStoryPreview?.sceneStoryProposal : null
+  // 적용 · 버린 수정안은 미리 보기를 다시 읽기 전이라도 카드를 내리고, 다시 붙잡지도 않는다(디자이너 QA 1차 관찰 26).
+  const sceneStoryResolved = useGlobalChatStore((s) => s.sceneStoryResolved)
+  const openSceneStoryProposal = unresolvedSceneStoryProposal(sceneStoryPreview?.sceneStoryProposal, sceneStoryResolved, projectId)
+  const sceneStoryProposal = sceneStoryLive ? openSceneStoryProposal : null
   const sceneStoryUndo = sceneStoryLive && !sceneStoryProposal ? sceneStoryPreview?.sceneStoryUndo ?? null : null
+  const openSceneStoryProposalId = openSceneStoryProposal?.id ?? null
   useEffect(() => {
-    if (projectId && sceneStoryLive && sceneStoryPreview) useGlobalChatStore.getState().syncSceneStoryProposal(projectId, sceneStoryPreview.sceneStoryProposal?.id ?? null)
-  }, [projectId, sceneStoryLive, sceneStoryPreview])
+    if (projectId && sceneStoryLive && sceneStoryPreview) useGlobalChatStore.getState().syncSceneStoryProposal(projectId, openSceneStoryProposalId)
+  }, [projectId, sceneStoryLive, sceneStoryPreview, openSceneStoryProposalId])
 
   // 폭 리사이즈 + 접기 (chat-ui-store, persist)
   const chatWidth = useChatUiStore((s) => s.chatWidth)

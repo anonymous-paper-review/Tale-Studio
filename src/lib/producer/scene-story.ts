@@ -5,6 +5,7 @@ export type SceneStoryView =
   | { kind: 'original'; text: string }
   | { kind: 'scenes'; paragraphs: string[] }
   | { kind: 'writing' }
+  | { kind: 'loading' }
   | { kind: 'empty' }
 
 export function sceneStoryView(input: {
@@ -16,12 +17,19 @@ export function sceneStoryView(input: {
   streamed: string[]
   /** 저장된 씬 요약 — 실행 기록이 없는 옛 프로젝트의 대신. */
   saved: string[]
+  /** Writer 실행 기록(미리 보기)을 읽은 결과 — 'loading' 아직 못 읽음 · 'none' 실행이 없음(옛 프로젝트) · 'started' 실행이 있음.
+   *  없으면 예전처럼 본다(본문이 없으면 저장된 요약으로 대신). */
+  run?: 'loading' | 'none' | 'started'
 }): SceneStoryView {
   if (input.preserveScript === true && input.storyText.trim()) return { kind: 'original', text: input.storyText }
   // 넘기기 전에는 씬이 없다 — 남아 있는 옛 줄글·요약을 보이면 지금 이야기와 어긋난다.
   if (!input.locked) return { kind: 'empty' }
   if (input.streamed.length > 0) return { kind: 'scenes', paragraphs: input.streamed }
-  if (input.saved.length > 0) return { kind: 'scenes', paragraphs: input.saved }
+  // 실행 기록을 읽기 전에는 저장된 씬 요약을 그리지 않는다 — 확정 직후 Writer 를 열면 Artist [만들기]가 저장한
+  //   씬 한 줄 요약이 산문 본문보다 먼저 보였다(디자이너 QA 1차 #09).
+  if (input.run === 'loading') return { kind: 'loading' }
+  // 저장된 씬 요약은 실행 기록이 없는 옛 프로젝트의 대신일 뿐 — 실행 기록이 있으면 본문이 올 때까지 쓰는 중이다.
+  if (input.saved.length > 0 && input.run !== 'started') return { kind: 'scenes', paragraphs: input.saved }
   return { kind: 'writing' }
 }
 

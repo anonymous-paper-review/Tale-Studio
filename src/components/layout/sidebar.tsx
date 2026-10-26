@@ -28,6 +28,7 @@ import { UserMenu } from '@/components/layout/user-menu'
 import { ContactPopover } from '@/components/contact-popover'
 import { ExportMenu } from '@/components/export-menu'
 import { useProjectStore } from '@/stores/project-store'
+import { aiBusyNow, railNavBlocked, useAiBusyStore } from '@/stores/ai-busy-store'
 import { useStageBadges } from '@/lib/stage-seen'
 import { useTakeBalance } from '@/lib/billing/use-take-balance'
 import { refetchBillingAccount, useBillingAccount } from '@/lib/billing/use-billing-account'
@@ -67,6 +68,8 @@ export function Sidebar() {
   const stageBadges = useStageBadges(badgeProjectId ?? null, visibleStage ?? null)
   const projectTitle = useProjectStore((s) => s.projectTitle)
   const renameProject = useProjectStore((s) => s.renameProject)
+  // AI 가 일하는 잠금 화면이 떠 있는 동안은 단계 단추를 막는다(디자이너 QA 1차 #07). 홈 단추는 그대로 둔다.
+  const aiBusy = useAiBusyStore((s) => s.tokens.length > 0)
 
   // 스테이지 라우트 프리페치(#tab-slide 2026-08-03) — 탭 클릭 시점에 RSC payload·JS 청크를
   //   받기 시작하면 그 다운로드가 곧 "무응답 구간"이 된다. 미리 받아두면 클릭 → 커밋이 즉시다.
@@ -87,11 +90,12 @@ export function Sidebar() {
 
   // 스테이지 이동 한 곳 (#keyboard-only) — 클릭과 단축키가 같은 경로를 타야 잠금·전환 연출이 갈리지 않는다.
   //   canNavigateTo 는 getState() 로 읽는다: 리스너가 오래 살아 있어도 잠금 판정이 낡지 않게.
+  //   AI 가 일하는 동안(잠금 화면이 떠 있는 동안)도 옮겨 가지 않는다 — 같은 이유로 지금 값(aiBusyNow)을 읽는다.
   const goToStage = useCallback(
     (stageId: StageId) => {
       const stage = STAGES.find((s) => s.id === stageId)
       if (!stage || pathname.startsWith(stage.path)) return
-      if (!useProjectStore.getState().canNavigateTo(stageId)) return
+      if (railNavBlocked({ to: 'stage', locked: !useProjectStore.getState().canNavigateTo(stageId), aiBusy: aiBusyNow() })) return
       setPendingStage(stageId)
       navigateWithStageSlide(pathname, stage.path, () =>
         router.push(withDemoShare(stage.path)),
@@ -188,7 +192,10 @@ export function Sidebar() {
         <HoverCardTrigger asChild>
           <button
             aria-label={t('Back to Projects')}
-            onClick={() => router.push('/projects')}
+            // AI 가 일하는 동안에도 프로젝트 목록으로는 나갈 수 있다(빠져나갈 길) — 막는 규칙은 railNavBlocked 한 곳.
+            onClick={() => {
+              if (!railNavBlocked({ to: 'projects', aiBusy: aiBusyNow() })) router.push('/projects')
+            }}
             className="mb-2 flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
           >
             <Home className="h-5 w-5" />
@@ -262,6 +269,9 @@ export function Sidebar() {
             stage.id === 'artist' && reachedByStage && !artistImagesReady
           const isArtistRetryable =
             isArtistImageLocked && (artistImagesFailed || artistImagesStalled)
+          // AI 가 일하는 동안은 지금 화면이 아닌 단계 단추를 막는다(디자이너 QA 1차 #07) — 지금 단계 단추는 그대로 둔다.
+          const busyBlocked = aiBusy && !isCommitted
+          const isDisabled = (isLocked && !isArtistRetryable) || busyBlocked
           // 다른 stage 작업 완료 배지 — 활성/잠금 stage엔 표시 안 함(활성은 진입 시 클리어됨)
           const badge = !isActive && !isLocked ? (stageBadges[stage.id] ?? 0) : 0
 
@@ -277,14 +287,14 @@ export function Sidebar() {
                   }}
                   aria-label={badge > 0 ? `${STAGE_LABEL[stage.id]} · ${t('Unseen completions: {count}', { count: badge })}` : STAGE_LABEL[stage.id]}
                   aria-current={isCommitted ? 'page' : undefined}
-                  disabled={isLocked && !isArtistRetryable}
+                  disabled={isDisabled}
                   className={cn(
                     'relative flex h-14 w-14 shrink-0 flex-col items-center justify-center gap-1 rounded-xl transition-colors',
-                    isLocked && !isArtistRetryable && 'cursor-not-allowed opacity-30',
-                    isArtistRetryable && 'cursor-pointer text-destructive hover:bg-sidebar-accent',
+                    isDisabled && 'cursor-not-allowed opacity-30',
+                    isArtistRetryable && !busyBlocked && 'cursor-pointer text-destructive hover:bg-sidebar-accent',
                     isActive && !isLocked
                       ? 'bg-sidebar-accent text-primary'
-                      : !isLocked &&
+                      : !isLocked && !busyBlocked &&
                           'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground',
                   )}
                 >
@@ -302,8 +312,8 @@ export function Sidebar() {
                       {badge}
                     </span>
                   )}
-                  {/* 액세스 키 배지 — Alt(Option) 를 누르고 있는 동안만. 잠긴 탭은 갈 수 없으니 안 보인다. */}
-                  {accessKeysVisible && !isLocked && (
+                  {/* 액세스 키 배지 — Alt(Option) 를 누르고 있는 동안만. 잠긴 탭 · AI 가 일하는 동안은 갈 수 없으니 안 보인다. */}
+                  {accessKeysVisible && !isLocked && !busyBlocked && (
                     <span className="absolute left-0.5 top-0.5 rounded border border-border bg-card px-1 font-mono text-[9px] font-semibold leading-[1.35] text-foreground shadow-sm">
                       {STAGE_ACCESS_KEY[stage.id]}
                     </span>
@@ -323,11 +333,13 @@ export function Sidebar() {
                 <span className="font-medium">{stage.name}</span>
                 {badge > 0 ? <span>{t('Unseen completions: {count}', { count: badge })}</span> : null}
                 <span className="text-xs text-muted-foreground">
-                  {isLocked
-                    ? isArtistImageLocked
-                      ? artistImageLockCopy
-                      : 'Complete previous step first'
-                    : stage.agent}
+                  {busyBlocked
+                    ? t('AI is working. You can move once it finishes.')
+                    : isLocked
+                      ? isArtistImageLocked
+                        ? artistImageLockCopy
+                        : 'Complete previous step first'
+                      : stage.agent}
                 </span>
                 {/* 단축키 표기는 Alt 홀드 배지가 전담(#feedback 2026-08-11) — 툴팁에서 제거. */}
               </TooltipContent>

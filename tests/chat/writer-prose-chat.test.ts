@@ -4,11 +4,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTrace: vi.fn(), saveChatTracePatch: vi.fn(), loadLatestChatTrace: vi.fn() }))
 vi.mock('@/lib/writer/use-writer-status', async (original) => ({ ...(await original<typeof import('@/lib/writer/use-writer-status')>()), restartWriterStatus: vi.fn() }))
 
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore } from '@/stores/producer-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { useWriterRoomStore } from '@/stores/writer-room-store'
+import { SceneStoryProposalCard } from '@/components/layout/scene-story-proposal-card'
+import { unresolvedSceneStoryProposal, type SceneStoryProposalView } from '@/lib/producer/scene-story-proposal'
 
 let request: ReturnType<typeof vi.fn>
 const bodies = () => request.mock.calls.map(([url, init]) => ({ url: String(url), body: JSON.parse(String((init as RequestInit).body)) }))
@@ -112,6 +116,103 @@ describe('다음 단계 묻기', () => {
     await useGlobalChatStore.getState().resolveSceneStoryProposal('discard', 'p1')
 
     expect(useGlobalChatStore.getState().suggestion).toBeNull()
+  })
+})
+
+describe('바꿀 곳이 없는 수정안', () => {
+  it('바꿀 곳이 없었던 수정안은 카드 없이 내리고 채팅에 바꿀 곳을 찾지 못했다고 알린다', async () => {
+    // 왜: 바뀐 것이 0개인 수정안을 적용하면 아무것도 안 바뀌는데 '적용했어요'가 뜨고, 요청 문장이 이후 수정 지시로 계속 남았다(디자이너 QA 1차 #01).
+    const unchanged: SceneStoryProposalView = {
+      id: 'p1', status: 'failed', error: 'scene_story_proposal_unchanged', feedback: '다음 챕터로 이동해줘', createdAt: '2026-10-27T00:00:00Z', stale: false,
+      before: [{ sceneId: 's1', index: 0, beats: ['원문'] }], after: [],
+    }
+    expect(renderToStaticMarkup(createElement(SceneStoryProposalCard, { projectId: 'prose-project', proposal: unchanged }))).toBe('')
+    useGlobalChatStore.setState({ sceneStoryProposalPending: { projectId: 'prose-project', id: 'p1' } })
+    request.mockImplementation(async () => Response.json({ ok: true }))
+
+    await useGlobalChatStore.getState().settleUnchangedSceneStoryProposal('p1')
+    await useGlobalChatStore.getState().settleUnchangedSceneStoryProposal('p1')
+
+    expect(bodies()).toEqual([{ url: '/api/writer/scene-gate', body: { projectId: 'prose-project', action: 'discard', proposalId: 'p1' } }])
+    expect(useGlobalChatStore.getState().suggestion).toBeNull()
+    const notes = useGlobalChatStore.getState().messages.filter((message) => message.content === '바꿀 곳을 찾지 못해 산문을 그대로 뒀어요. 어떻게 고칠지 조금 더 구체적으로 말해 주세요.')
+    expect(notes).toHaveLength(1)
+    expect(notes[0]).toMatchObject({ stage: 'producer', role: 'model' })
+  })
+})
+
+describe('넘어갈지는 한 곳에서 묻는다', () => {
+  it('산문 확정 창을 열면 채팅에 떠 있던 "다음 단계로 넘어갈까요?" 질문은 내린다', async () => {
+    // 왜: 같은 질문이 확정 창과 채팅 두 곳에 동시에 떠 있었다(디자이너 QA 1차 #08). 창은 [브레이크다운하기] · 다음 단계 버튼 · 채팅 넘김 말 어디서든 열린다.
+    const ways = [
+      () => useWriterRoomStore.getState().openConfirm(),
+      () => useGlobalChatStore.getState().requestNextStep(),
+      () => useGlobalChatStore.getState().sendMessage('다음 단계로'),
+    ]
+    for (const open of ways) {
+      useWriterRoomStore.setState({ confirmOpen: false })
+      useGlobalChatStore.getState().offerWriterNext('ask')
+      expect(useGlobalChatStore.getState().suggestion?.action).toEqual({ kind: 'writerNext', step: 'ask' })
+
+      await open()
+
+      expect(useWriterRoomStore.getState().confirmOpen).toBe(true)
+      expect(useGlobalChatStore.getState().suggestion).toBeNull()
+    }
+  })
+
+  it('산문 확정 창에서 아니오를 고른 뒤 고친 걸 적용하면 다음 단계를 다시 묻지 않고 적용했다고만 알린다', async () => {
+    // 왜: 넘어가겠다고 한 번 말해 확정 창을 본 사람에게, 고친 걸 적용할 때마다 채팅에서 같은 질문이 또 들어왔다(디자이너 QA 1차 #08). 넘어가기는 [브레이크다운하기] · "다음 단계로"로 언제든 연다.
+    const plain = '적용했어요. 넘어갈 준비가 되면 [브레이크다운하기]를 누르거나 "다음 단계로"라고 말해 주세요.'
+    await useGlobalChatStore.getState().requestNextStep()
+    useGlobalChatStore.getState().declineProseConfirm()
+    expect(useWriterRoomStore.getState().confirmOpen).toBe(false)
+    useGlobalChatStore.setState({ sceneStoryProposalPending: { projectId: 'prose-project', id: 'p1' } })
+    request.mockImplementation(async () => Response.json({ ok: true }))
+
+    expect(await useGlobalChatStore.getState().resolveSceneStoryProposal('apply', 'p1')).toBe(true)
+
+    expect(useGlobalChatStore.getState().suggestion).toBeNull()
+    expect(useGlobalChatStore.getState().messages.at(-1)).toMatchObject({ stage: 'producer', role: 'model', content: plain })
+    // 직접 고친 걸 저장해도(직접 작성 팝업의 저장이 같은 묻기를 부른다) 적용했다고만 알린다.
+    useGlobalChatStore.getState().offerWriterNext('ask')
+    expect(useGlobalChatStore.getState().suggestion).toBeNull()
+    expect(useGlobalChatStore.getState().messages.filter((message) => message.content === plain)).toHaveLength(2)
+  })
+})
+
+describe('정한 수정안 카드는 바로 내려간다', () => {
+  it('AI 안을 적용하면 그 수정안 카드는 다음 단계 질문과 같은 순간에 내려간다', async () => {
+    // 왜: 적용한 카드가 다음 새로고침까지 남아 있다가 늦게 사라져 질문 단추가 아래에 떴다가 위로 튀었고(오클릭), 남은 [적용]을 또 누르면 오류가 났다(디자이너 QA 1차 관찰 26).
+    const stalePreview = { id: 'p1' } // 미리 보기를 다시 읽기 전에는 적용한 안이 그대로 실려 온다.
+    useGlobalChatStore.setState({ sceneStoryProposalPending: { projectId: 'prose-project', id: 'p1' } })
+    request.mockImplementation(async () => Response.json({ ok: true }))
+    const cardWhenAsked: unknown[] = []
+    const stop = useGlobalChatStore.subscribe((state) => {
+      if (state.suggestion?.action?.kind === 'writerNext' && cardWhenAsked.length === 0) cardWhenAsked.push(unresolvedSceneStoryProposal(stalePreview, state.sceneStoryResolved, 'prose-project'))
+    })
+
+    expect(await useGlobalChatStore.getState().resolveSceneStoryProposal('apply', 'p1')).toBe(true)
+    stop()
+
+    expect(cardWhenAsked).toEqual([null])
+    // 다음에 새로 오는 수정안 카드는 가리지 않는다.
+    expect(unresolvedSceneStoryProposal({ id: 'p2' }, useGlobalChatStore.getState().sceneStoryResolved, 'prose-project')).toEqual({ id: 'p2' })
+  })
+
+  it('AI 안을 버리면 그 수정안 카드는 버리는 순간 내려간다', async () => {
+    // 왜: 버린 카드도 다음 새로고침까지 남아 있으면 남은 단추를 또 누르게 된다(디자이너 QA 1차 관찰 26).
+    useGlobalChatStore.setState({ sceneStoryProposalPending: { projectId: 'prose-project', id: 'p1' } })
+    request.mockImplementation(async () => Response.json({ ok: true }))
+    const cardWhenCleared: unknown[] = []
+    const stop = useGlobalChatStore.subscribe((state, before) => {
+      if (before.sceneStoryProposalPending && !state.sceneStoryProposalPending) cardWhenCleared.push(unresolvedSceneStoryProposal({ id: 'p1' }, state.sceneStoryResolved, 'prose-project'))
+    })
+
+    expect(await useGlobalChatStore.getState().resolveSceneStoryProposal('discard', 'p1')).toBe(true)
+    stop()
+
+    expect(cardWhenCleared).toEqual([null])
   })
 })
 

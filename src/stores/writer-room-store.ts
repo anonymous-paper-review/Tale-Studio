@@ -29,6 +29,17 @@ export function writeWorkspaceTab(tab: WorkspaceTab): void {
   }
 }
 
+/** 지금 보일 Writer 탭. 확정한 산문은 고칠 수 없다 — 고치기 탭(화면에서 고치기 · 채팅으로 고치기)을 숨기고 화면 보기로 연다.
+ *  기억한 탭이 채팅이어도 그렇다(기억은 그대로 둔다 — 다음 프로젝트는 고른 방식대로 연다)(디자이너 QA 1차 #09). */
+export function proseWorkspaceTab(input: { tab: WorkspaceTab; locked: boolean }): { tab: WorkspaceTab; tabsShown: boolean } {
+  return input.locked ? { tab: 'screen', tabsShown: false } : { tab: input.tab, tabsShown: true }
+}
+
+/** Writer 화면에서 오른쪽 채팅을 닫을지 — 채팅 탭이면 가운데가 채팅이라 닫는다. 확정한 산문은 화면 보기라 열어 둔다. */
+export function writerRightChatHidden(input: { tab: WorkspaceTab; locked: boolean }): boolean {
+  return proseWorkspaceTab(input).tab === 'chat'
+}
+
 interface WriterRoomState {
   tab: WorkspaceTab
   tabLoaded: boolean

@@ -5,7 +5,7 @@
 //   [만들기] = 확정 산문 초안을 이어 가며 인물 · 배경 디자인 뒤에 멈추게 한다(artistGate). 예전 채팅 팔레트의
 //   "내 그림체 올리기"도 여기서 쓴다(올린 그림체로 고정된다). 그림은 Take 가 들지 않는다(take-cost: Take 는 영상 전용).
 import { useEffect, useRef, useState } from 'react'
-import { Check, ImageIcon, Loader2, Lock, Plus, Sparkles } from 'lucide-react'
+import { Check, ImageIcon, Loader2, Lock, Plus, Sparkles, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -36,6 +36,7 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
   const [picked, setPicked] = useState<string | null>(savedKey)
   const [making, setMaking] = useState(false)
   const [upload, setUpload] = useState<{ busy: boolean; error: string | null } | null>(null)
+  const [removing, setRemoving] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const { requestImageUploadConsent, imageUploadConsentDialog } = useImageUploadConsent(projectId)
   const locked = custom?.locked === true
@@ -62,6 +63,18 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
   const chosenLabel = custom ? custom.label : chosenAnchor ? styleAnchorName(chosenAnchor, locale) : null
   const canMake = !making && !styleSetting && !upload?.busy && (locked || !!custom || !!picked)
 
+  // 올린 내 그림체 지우기(2026-10-27 QA #03 · 오너 "지우기(X) 추가") — 지우면 고정이 풀려 다른 스타일을 고를 수 있다.
+  const removeCustom = async () => {
+    if (removing || !window.confirm(t('Remove my art style? You can pick another style after removing it.'))) return
+    setRemoving(true)
+    try {
+      if (await useProducerStore.getState().removeCustomStyleAnchor()) setPicked(null)
+      else toast.error(useProducerStore.getState().error ?? t('Could not remove my art style. Please try again.'))
+    } finally {
+      setRemoving(false)
+    }
+  }
+
   const pickFile = () => {
     if (!upload?.busy && !locked) fileRef.current?.click()
   }
@@ -82,7 +95,8 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
       return
     }
     setUpload(null)
-    await useGlobalChatStore.getState().applyUploadedStyle({ id: uploaded.id, name: uploaded.name, thumbUrl: uploaded.thumbUrl, sliceUrls: uploaded.sliceUrls })
+    // Artist 화면의 일이라 말풍선 · 안내도 Artist 이름으로 남긴다(2026-10-27 디자이너 QA 1차 관찰 49).
+    await useGlobalChatStore.getState().applyUploadedStyle({ id: uploaded.id, name: uploaded.name, thumbUrl: uploaded.thumbUrl, sliceUrls: uploaded.sliceUrls }, { stage: 'artist' })
   }
 
   const make = async () => {
@@ -120,7 +134,10 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
             {locked ? (
               <p className="flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm">
                 <Lock className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                {t('The art style is fixed to the picture you uploaded.')}
+                <span>
+                  {t('The art style is fixed to the picture you uploaded.')}{' '}
+                  <span className="text-muted-foreground">{t('To pick another style, remove my art style with ✕.')}</span>
+                </span>
               </p>
             ) : null}
             {prevStyleId ? (
@@ -129,11 +146,12 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
               </p>
             ) : null}
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4" role="radiogroup" aria-label={t('Style')}>
+              <div className="relative flex">
               <button
                 type="button"
                 onClick={pickFile}
                 disabled={locked || upload?.busy}
-                className="group flex flex-col overflow-hidden rounded-lg border border-dashed border-border-strong text-left transition-colors hover:border-primary/60 disabled:opacity-50"
+                className="group flex w-full flex-col overflow-hidden rounded-lg border border-dashed border-border-strong text-left transition-colors hover:border-primary/60 disabled:opacity-50"
                 data-testid="artist-style-upload"
               >
                 <span className="flex aspect-square items-center justify-center bg-muted/30">
@@ -151,6 +169,21 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
                         : null}
                 </span>
               </button>
+              {custom ? (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="outline"
+                  className="absolute right-1.5 top-1.5 size-6 rounded-full bg-background/90"
+                  onClick={() => void removeCustom()}
+                  aria-label={t('Remove my art style')}
+                  title={t('Remove my art style')}
+                  disabled={removing || styleSetting || making || !!upload?.busy} data-testid="artist-style-remove"
+                >
+                  {removing ? <Loader2 className="size-3 animate-spin" aria-hidden /> : <X className="size-3" aria-hidden />}
+                </Button>
+              ) : null}
+              </div>
               {anchors.map((anchor) => {
                 const on = !custom && picked === anchor.key
                 const name = styleAnchorName(anchor, locale)

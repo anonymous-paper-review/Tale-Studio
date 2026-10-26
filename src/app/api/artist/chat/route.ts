@@ -6,10 +6,12 @@ import { hydrateInspectionImages } from '@/lib/chat-tools/inspect-images'
 // Artist 카드 스튜디오 채팅 에이전트 (카드 모델, 2026-06-06 재작성)
 //
 // 옛 L0 노드그래프(Actor/World/Status) 프롬프트를 폐기하고, 현재의 카드형 Artist
-// (Characters / World 탭)에 맞춘 카드 액션 모델로 재정의했다. 채팅으로 새 캐릭터를
-// 만들거나(createCharacter) 기존 에셋 이미지를 재생성(regenerateCharacter /
-// regenerateWorldAsset)할 수 있다. 실제 mutation 은 클라이언트(global-chat-store →
-// artist-store.applyUpdates)가 수행하고, 이 라우트는 검증된 updates[] 만 반환한다.
+// (Characters / World 탭)에 맞춘 카드 액션 모델로 재정의했다. 채팅으로 기존 에셋 이미지를
+// 재생성(regenerateCharacter / regenerateWorldAsset)하거나 있는 인물 · 배경에 새 모습을 더할 수 있다(승인 카드).
+// 새 인물 · 배경 카드는 만들지 않는다(2026-10-27 디자이너 QA 1차 #04 · 오너 "채팅 추가 막고 안내") — 인물 · 배경은
+// 확정한 산문에서 나오므로, 그런 요청에는 산문에서 고쳐야 한다고 안내한다. 모델이 그래도 만들기 명령을 내면
+// 이 라우트가 버리고 답을 안내 문장으로 바꾼다(countNewCardUpdates · noNewCardReply). 실제 mutation 은
+// 클라이언트(global-chat-store)가 수행하고, 이 라우트는 검증된 updates[] 만 반환한다.
 import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
@@ -22,6 +24,9 @@ import { userOwnsProject } from '@/lib/generation-jobs'
 import { buildArtistActivityContext } from '@/lib/artist/chat-context'
 import {
   validateUpdates,
+  countNewCardUpdates,
+  noNewCardReply,
+  NO_NEW_CARD_GUIDANCE,
   extractAppearanceCreations,
   extractAppearanceProposals,
   extractLocationAppearanceCreations,
@@ -41,18 +46,22 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { translate } from '@/lib/i18n/translate'
 import { isExplicitAppearanceAddition, missingMentionedAppearanceNames } from '@/lib/artist/chat-request-coverage'
 
-const ARTIST_SYSTEM = `You are the Concept Artist agent for the Tale L0 Artist studio. Users define Characters and World locations as cards. Each character appearance has one reference sheet; each world card has its background image and optional narrative-time appearances.
+// 새 인물 · 배경 요청에 하는 답(2026-10-27 디자이너 QA 1차 #04) — 화면 문구 사전과 같은 문장을 모델에게도 준다.
+const NO_NEW_CARD_GUIDANCE_KO = translate('ko', NO_NEW_CARD_GUIDANCE)
+
+const ARTIST_SYSTEM = `You are the Concept Artist agent for the Tale L0 Artist studio. Characters and World locations are cards made from the confirmed prose. Each character appearance has one reference sheet; each world card has its background image and optional narrative-time appearances.
 
 A character can have MULTIPLE appearances (an appearance timeline) — narrative-time versions of the same person, e.g. "present" (default) and "young"/"old"/"injured". Each appearance has its own reference sheet. The context lists each character's appearance timeline (key/label/narrative time/has-image). A character with only a default appearance is a normal single-look card.
 
 <role>
 You can both discuss concept/art-direction AND directly mutate the studio by emitting an updates[] block.
-When the user wants to CREATE a new character, or REGENERATE a character's image (its turnaround sheet) or a world's background, plan the actions and emit them.
+When the user wants to REGENERATE a character's image (its turnaround sheet) or a world's background, or add a new look to a character or background that already exists, plan the actions and emit them.
+You never create a new character or background card (see <no-new-cards>).
 Each character has ONE image per appearance: a turnaround sheet that already contains every angle. Never talk about separate back/side views or "4 views" — there is only the sheet, per appearance.
 </role>
 
 <context>
-A summary of the current assets (existing characters/worlds with their ids) is provided before the user's message. When referencing an EXISTING asset, use its exact id from that summary. For a NEW character you don't need an id — the studio assigns one.
+A summary of the current assets (existing characters/worlds with their ids) is provided before the user's message. When referencing an EXISTING asset, use its exact id from that summary.
 
 A "## 최근 생성 활동" section may also be provided — the recent image generation activity log, regardless of where it was triggered: [ui] = the user clicked regenerate directly in the studio UI, [chat] = via this chat, [writer] = the automatic handoff pipeline. Use it to answer questions like "방금 뭐 했지?" or "재생성 끝났어?". Treat "진행 중" as in-progress: do NOT re-emit a regenerate action for an asset that already has an in-progress job (it would double-bill).
 </context>
@@ -61,31 +70,38 @@ A "## 최근 생성 활동" section may also be provided — the recent image ge
 Every image generation call is billed. Emit regenerate actions ONLY when the user explicitly asks for (re)generation in their current message. Never regenerate on your own initiative, never retry a failed job without being asked.
 </cost-guard>
 
+<no-new-cards>
+Characters and backgrounds (world locations) come only from the confirmed prose. There is no action that creates a new character, person, object or background card, so never emit one.
+If the user asks to add or create a character or background that is not in the asset summary, emit no updates, never say you added it or will add it, and answer with this guidance in the response language:
+- English: "${NO_NEW_CARD_GUIDANCE}"
+- Korean: "${NO_NEW_CARD_GUIDANCE_KO}"
+A new look (outfit, age, injury) of a character that already exists is still allowed with createAppearance, and a new look of an existing background with createLocationAppearance.
+If the user asks to delete a whole character card: you cannot delete cards from this chat. A card made outside the prose (for example by the old chat) that no scene or shot uses has a trash button on its card; cards from the prose are fixed in the prose.
+</no-new-cards>
+
 <actions>
-1. {"type":"createCharacter","name":"...","role":"protagonist"|"antagonist"|"supporting","description":"성격·서사적 배경","appearance":"외형 prose (이미지 생성 프롬프트로 사용)"}
-   - role / description / appearance 는 선택. 사용자가 새 캐릭터를 원할 때 사용.
-2. {"type":"regenerateCharacter","characterId":"<id>","appearanceKey":"<appearance key>","instruction":"...","model":"<image-model>"}
+1. {"type":"regenerateCharacter","characterId":"<id>","appearanceKey":"<appearance key>","instruction":"...","model":"<image-model>"}
    - 그 캐릭터의 시트(턴어라운드 1장)를 다시 그린다. context 의 정확한 id 사용.
    - appearanceKey 선택: 사용자가 특정 모습("젊은 시절 다시 그려줘")을 짚으면 context 의 외형 타임라인에 있는 그 모습의 키를
      넣어라. 생략 = 기본 모습. 기본 모습이 아닌 모습을 다시 그릴 때 기본 모습을 건드리지 마라.
    - instruction 선택: "더 낡게", "머리 짧게" 같은 이번 재생성에만 적용할 지시.
    - model 선택 (생략 = 기본 gpt-image-2). 사용자가 이미지 생성기를 지정할 때만 <image-models> 의 키로 전달.
-3. {"type":"regenerateWorldAsset","locationId":"<id>"}
+2. {"type":"regenerateWorldAsset","locationId":"<id>"}
    - context 의 정확한 id 사용.
-4. {"type":"createAppearance","characterId":"<id>","label":"...","appearance":"외형 prose","narrativeTime":"present"|"past"|"future"}
+3. {"type":"createAppearance","characterId":"<id>","label":"...","appearance":"외형 prose","narrativeTime":"present"|"past"|"future"}
    - 사용자가 기존 캐릭터의 새로운 서사 시점 버전(old / young / injured 등)을 원할 때 쓴다 — 기본 외형을 덮어쓰는 changeAppearance 가 아니라
      새 "행"을 추가하는 createAppearance 를 emit하라. 이건 자동 실행되지 않고 앱이 "새 모습을 추가하고 이미지를 만들까요?" 승인 카드로
      띄운다 — 승인하면 모습이 추가되고 그 이미지가 기본 모습의 얼굴을 참조해 바로 만들어진다(과금). appearance 는 이 새 모습의
      전체 외형 prose(이미지 프롬프트). label 은 화면에 보이는 이름(예: "젊은 시절", "다친 모습"). narrativeTime 은 과거/현재/미래 중 하나.
-5. {"type":"createLocationAppearance","locationId":"<id>","label":"...","visualDescription":"바뀐 전체 배경 설명","narrativeTime":"present"|"past"|"future"}
+4. {"type":"createLocationAppearance","locationId":"<id>","label":"...","visualDescription":"바뀐 전체 배경 설명","narrativeTime":"present"|"past"|"future"}
    - 배경(월드)의 다른 시점 모습(불탄 뒤 / 겨울 / 전쟁 전 등)을 원할 때 쓴다 — 기본 설명을 바꾸는 changeLocationDescription 이 아니라
      새 모습 "행"을 추가한다. 캐릭터의 createAppearance 처럼 승인 카드로 뜨고, 승인하면 기본 배경 이미지를 참조해 이미지가 바로 만들어진다.
    - regenerateWorldAsset 에 appearanceKey 를 넣으면 그 모습의 배경 이미지만 다시 그린다(생략 = 기본 모습).
    - regenerateWorldAsset 에도 선택적 model(<image-models> 키)을 넣을 수 있다. 사용자가 배경 이미지 생성기를 지정할 때만.
-6. {"type":"deleteAppearance","characterId":"<id>","appearanceKey":"<appearance key>"} / {"type":"deleteLocationAppearance","locationId":"<id>","appearanceKey":"<key>"}
+5. {"type":"deleteAppearance","characterId":"<id>","appearanceKey":"<appearance key>"} / {"type":"deleteLocationAppearance","locationId":"<id>","appearanceKey":"<key>"}
    - 사용자가 특정 모습(탭)을 지우라고 명시할 때만. 자동 실행되지 않고 "이 모습을 삭제할까요?" 승인 카드로 뜬다. 기본 모습·기본 배경은 삭제할 수 없다 — 기본을 바꾸려면 appearances 도구의 isDefault 를 먼저 쓰라고 안내한다.
-7. 안전 모드 재시도: 이미지가 정책 거절로 실패한 뒤 사용자가 "안전하게/순화해서 다시" 라고 하면 regenerateCharacter 또는 regenerateWorldAsset 에 "safeMode":true 를 넣는다. 사용자가 말하지 않으면 넣지 않는다.
-8. 모습의 설명·이름·시점·기본 지정·이전 후보 되돌리기는 이미지를 만들지 않는 편집이다. updates 가 아니라 앱 도구(read_project/edit_project 의 appearances·background_appearances 리소스)를 쓴다.
+6. 안전 모드 재시도: 이미지가 정책 거절로 실패한 뒤 사용자가 "안전하게/순화해서 다시" 라고 하면 regenerateCharacter 또는 regenerateWorldAsset 에 "safeMode":true 를 넣는다. 사용자가 말하지 않으면 넣지 않는다.
+7. 모습의 설명·이름·시점·기본 지정·이전 후보 되돌리기는 이미지를 만들지 않는 편집이다. updates 가 아니라 앱 도구(read_project/edit_project 의 appearances·background_appearances 리소스)를 쓴다.
 </actions>
 
 <image-models>
@@ -123,13 +139,12 @@ The JSON block (if any) MUST be the LAST element in the response.
 <examples>
 <example>
 <user>Kai라는 캐릭터 만들어줘. 갈색 머리에 검은 롱코트, 주인공이야.</user>
-<assistant>Kai를 주인공 캐릭터로 추가했습니다. 카드를 더블클릭해 상세 팝업에서 이미지를 만들 수 있어요.
+<assistant>${NO_NEW_CARD_GUIDANCE_KO}</assistant>
+</example>
 
-\`\`\`json
-{"updates":[
-  {"type":"createCharacter","name":"Kai","role":"protagonist","description":"주인공","appearance":"갈색 머리, 검은 롱코트, 날카로운 눈매"}
-]}
-\`\`\`</assistant>
+<example>
+<user>비 오는 부두 배경도 하나 추가해줘.</user>
+<assistant>${NO_NEW_CARD_GUIDANCE_KO}</assistant>
 </example>
 
 <example>
@@ -156,7 +171,7 @@ The JSON block (if any) MUST be the LAST element in the response.
 
 <example>
 <user>이 스토리에 어울리는 조연 한 명 추천해줄래?</user>
-<assistant>주인공과 대비되는 냉정한 정보원 캐릭터를 제안합니다. 이름만 정해주시면 카드로 만들어 드릴게요.</assistant>
+<assistant>주인공과 대비되는 냉정한 정보원 같은 조연이 어울릴 것 같아요. 다만 산문에 없는 인물은 Artist에서 새로 만들 수 없어서, 넣고 싶다면 산문에서 고쳐야 해요.</assistant>
 </example>
 </examples>`
 
@@ -176,6 +191,8 @@ function parseUpdates(text: string): {
   locationAppearanceCreations: LocationAppearanceCreation[]
   appearanceDeletions: AppearanceDeletion[]
   locationAppearanceDeletions: LocationAppearanceDeletion[]
+  /** 버린 새 인물 · 배경 만들기 명령의 수(디자이너 QA 1차 #04) — 0 보다 크면 답을 안내 문장으로 바꾼다. */
+  newCardRequests: number
   parseStatus: string
   rawUpdateCount: number
   validUpdateCount: number
@@ -197,6 +214,7 @@ function parseUpdates(text: string): {
     locationAppearanceCreations: extractLocationAppearanceCreations(raw),
     appearanceDeletions: extractAppearanceDeletions(raw),
     locationAppearanceDeletions: extractLocationAppearanceDeletions(raw),
+    newCardRequests: countNewCardUpdates(raw),
     parseStatus: status,
     rawUpdateCount: raw.length,
     validUpdateCount: updates.length,
@@ -319,10 +337,16 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
       locationAppearanceCreations,
       appearanceDeletions,
       locationAppearanceDeletions,
+      newCardRequests,
       parseStatus,
       rawUpdateCount,
       validUpdateCount,
     } = parseUpdates(text)
+    // 새 인물 · 배경 카드는 만들지 않는다(디자이너 QA 1차 #04 · 오너 "채팅 추가 막고 안내"). 명령은 validateUpdates 가 이미 버렸고,
+    //   모델의 "추가했어요"가 화면에 남지 않게 답을 안내 문장으로 바꾼다.
+    const guidedReply = newCardRequests > 0
+      ? noNewCardReply(reply, projectLocale ?? parseAppLocale(uiLocale) ?? 'en')
+      : reply
 
     // 모델의 제안이 한 인물에서 끝나도 명시된 다른 이름을 조용히 잃지 않는다.
     // 이 대조는 안내만 만든다. 추측한 생성 명령이나 재호출을 추가하지 않는다.
@@ -364,7 +388,7 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
       toolSupport: !!appTools,
       contentLocale: projectLocale,
       localeSwitched,
-      reply: coverageNotice ? `${reply}\n\n${coverageNotice}` : reply,
+      reply: coverageNotice ? `${guidedReply}\n\n${coverageNotice}` : guidedReply,
       updates,
       proposals,
       locationProposals,

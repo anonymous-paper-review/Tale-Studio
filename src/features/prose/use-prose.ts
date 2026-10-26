@@ -9,8 +9,9 @@ import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { sceneGatePhase } from '@/lib/writer/scene-gate'
 import { sceneStoryView } from '@/lib/producer/scene-story'
 import { treatmentDiff } from '@/lib/producer/scene-story-rewrite'
+import { unresolvedSceneStoryProposal } from '@/lib/producer/scene-story-proposal'
 import { previewedVariant } from '@/components/layout/scene-story-rewrite-card'
-import { handedRunStopped, legacyGateWaiting, proseBusy } from '@/lib/prose/busy'
+import { handedRunStopped, legacyGateWaiting, proseBusy, proseStartOffered } from '@/lib/prose/busy'
 import { proseTools } from '@/lib/prose/conditions'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProducerStore } from '@/stores/producer-store'
@@ -24,10 +25,14 @@ export function useProse() {
   const preserveScript = useProducerStore((s) => s.preserveScript)
   const storyText = useProducerStore((s) => s.storyText)
   const projectSettings = useProducerStore((s) => s.projectSettings)
+  const storyReady = useProducerStore((s) => s.storyReady)
   const savedScenes = useWriterStore((s) => s.sceneManifest?.scenes)
   const draftLive = !projectLocked && treatmentDraft
   const hasTreatment = projectLocked || treatmentDraft
-  const { status, restart: restartStatus } = useWriterStatus(hasTreatment ? projectId : null)
+  // 진행 상태는 넘기기 전 초안인지 아직 모를 때(새로 고침 직후)도 읽는다 — 읽기 전에는 [산문 쓰기]를 두지 않고,
+  //   초안이면 쓰는 중으로 잠근다(디자이너 QA 1차 #07). 읽다 실패한 것도 읽은 것으로 본다(계속 잠겨 갇히지 않게).
+  const { status, error: statusError, restart: restartStatus } = useWriterStatus(projectId)
+  const statusRead = status !== null || statusError !== null
   const phase = hasTreatment ? sceneGatePhase(status) : 'before'
   const refreshKey = useGlobalChatStore((s) => s.sceneStoryRefresh)
   const showOriginal = preserveScript === true && storyText.trim().length > 0
@@ -36,8 +41,16 @@ export function useProse() {
   const pending = useGlobalChatStore((s) => s.sceneStoryProposalPending)
   const session = useGlobalChatStore((s) => s.sceneStoryEdit)
   const editing = session?.projectId === projectId ? session : null
+  const resolved = useGlobalChatStore((s) => s.sceneStoryResolved)
 
-  const proposal = preview?.sceneStoryProposal ?? null
+  // 적용 · 버린 수정안은 미리 보기를 다시 읽기 전이라도 내린다(디자이너 QA 1차 관찰 26) — 두 탭이 모두 이 값을 읽는다.
+  const proposal = unresolvedSceneStoryProposal(preview?.sceneStoryProposal, resolved, projectId)
+  // 바꿀 곳이 없었던 수정안(디자이너 QA 1차 #01)은 카드 없이 버리고 채팅에 알린다 — 채팅 탭에서는 오른쪽 채팅이 없어 여기서 한다.
+  //   버리기가 실패하면(연결 끊김) 다음 미리 보기 때 다시 시도한다 — 보이지 않는 수정안이 산문 도구를 계속 잠그지 않게. 같은 수정안은 한 번만 보낸다.
+  const unchangedProposalId = proposal?.status === 'failed' && proposal.error === 'scene_story_proposal_unchanged' ? proposal.id : null
+  useEffect(() => {
+    if (unchangedProposalId) void useGlobalChatStore.getState().settleUnchangedSceneStoryProposal(unchangedProposalId)
+  }, [unchangedProposalId, preview])
   const requestPending = pending?.projectId === projectId && pending.id === null
   const hasProposal = !!proposal || pending?.projectId === projectId
   const locked = projectLocked || preview?.proseLocked === true
@@ -49,7 +62,10 @@ export function useProse() {
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
     .map((scene) => scene.narrativeSummary?.trim() ?? '')
     .filter(Boolean)
-  const view = sceneStoryView({ preserveScript, storyText, locked: hasTreatment, streamed, saved })
+  // 실행 기록(미리 보기)을 읽기 전에는 불러오는 중 — 저장된 씬 한 줄 요약이 산문 본문보다 먼저 보였다(디자이너 QA 1차 #09).
+  //   v2 실행은 기록에 산문 본문이 없어 옛 프로젝트처럼 저장된 요약으로 본다.
+  const run = !preview ? 'loading' : preview.started && preview.engine !== 'v2' ? 'started' : 'none'
+  const view = sceneStoryView({ preserveScript, storyText, locked: hasTreatment, streamed, saved, run })
   const paragraphs = view.kind === 'scenes' ? view.paragraphs : []
   const hasProse = view.kind === 'scenes' ? paragraphs.length > 0 : view.kind === 'original'
 
@@ -62,7 +78,9 @@ export function useProse() {
     ? treatmentDiff(currentScenes, proposalAfter.filter((scene) => scene.beats.length > 0).map((scene) => ({ sceneId: scene.sceneId, text: sceneText(scene.beats) })))
     : null
 
-  const busy = proseBusy({ draftLive, phase, currentStage: status?.current_stage, proposal, requestPending })
+  const busy = proseBusy({ draftLive, phase, statusRead, currentStage: status?.current_stage, proposal, requestPending })
+  // [산문 쓰기]는 읽은 실행 상태 그대로 본다 — 초안인지 아직 모르는 동안에도 이미 시작한 실행이면 두지 않는다.
+  const startOffered = proseStartOffered({ locked, storyReady, phase: sceneGatePhase(status), statusRead })
   const tools = proseTools({ preserved: showOriginal, locked, hasProse: hasProse && (phase === 'gate' || locked), busy: !!busy || !!editing || (hasProposal && !locked) })
   // 브레이크다운은 고르지 않은 수정안이 있으면 막는다(서버도 같은 규칙) — 산문이 쓰인 뒤라면 수정안을 정하고 누를 수 있다.
   const canBreakdown = locked ? hasProse : tools.breakdown && !hasProposal
@@ -121,6 +139,7 @@ export function useProse() {
     locked,
     draftLive,
     busy,
+    startOffered,
     tools,
     canBreakdown,
     editing,

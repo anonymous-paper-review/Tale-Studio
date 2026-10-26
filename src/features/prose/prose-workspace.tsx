@@ -19,7 +19,7 @@ import { withDemoShare } from '@/lib/demo/context'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProducerStore } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
-import { useWriterRoomStore, type WorkspaceTab } from '@/stores/writer-room-store'
+import { proseWorkspaceTab, useWriterRoomStore, type WorkspaceTab } from '@/stores/writer-room-store'
 import { useSeriesInfo } from '@/features/series/use-series-info'
 import { ProseSeriesBanner } from '@/features/series/prose-series-banner'
 import { useProse } from '@/features/prose/use-prose'
@@ -39,7 +39,9 @@ export function ProseWorkspace() {
   const projectId = useProjectStore((s) => s.projectId)
   const projectTitle = useProjectStore((s) => s.projectTitle)
   const loadProject = useProducerStore((s) => s.loadProject)
-  const tab = useWriterRoomStore((s) => s.tab)
+  const rememberedTab = useWriterRoomStore((s) => s.tab)
+  // 확정한 산문은 고치기 탭 없이 화면 보기로 연다 — 오른쪽 채팅도 열린다(레이아웃이 같은 규칙을 쓴다, 디자이너 QA 1차 #09).
+  const { tab, tabsShown } = proseWorkspaceTab({ tab: rememberedTab, locked: prose.locked })
   const messagesLoaded = useGlobalChatStore((s) => s.messagesLoadedProjectId === projectId)
   // 다음 화(시리즈)면 화면 맨 위에 띠 한 줄로 알린다(프로토타입 W1s). 앞 화 산문은 [앞 화 줄거리 보기]를 누를 때만 따로 읽는다.
   const series = useSeriesInfo(projectId)
@@ -63,6 +65,8 @@ export function ProseWorkspace() {
     if (!prose.busy) return undefined
     if (prose.busy.kind === 'draft') {
       const at = prose.busy.step
+      // 진행 상태를 읽기 전에는 어느 줄인지 모른다 — 줄 목록 없이 잠근다(다 쓴 초안이 첫 줄부터 다시 쓰는 것처럼 보이지 않게).
+      if (at === null) return undefined
       return DRAFT_STEPS.map((label, index) => ({ label: t(label), state: index < at ? 'done' : index === at ? 'current' : 'todo' }))
     }
     return [
@@ -97,12 +101,14 @@ export function ProseWorkspace() {
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Tabs value={tab} onValueChange={(value) => useWriterRoomStore.getState().setTab(value as WorkspaceTab)}>
-            <TabsList>
-              <TabsTrigger value="screen" data-testid="prose-tab-screen">{t('Edit on screen')}</TabsTrigger>
-              <TabsTrigger value="chat" data-testid="prose-tab-chat">{t('Edit in chat')}</TabsTrigger>
-            </TabsList>
-          </Tabs>
+          {tabsShown ? (
+            <Tabs value={tab} onValueChange={(value) => useWriterRoomStore.getState().setTab(value as WorkspaceTab)}>
+              <TabsList>
+                <TabsTrigger value="screen" data-testid="prose-tab-screen">{t('Edit on screen')}</TabsTrigger>
+                <TabsTrigger value="chat" data-testid="prose-tab-chat">{t('Edit in chat')}</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          ) : null}
           {prose.locked ? (
             <Button onClick={() => router.push(withDemoShare('/studio/artist'))} data-testid="prose-go-artist">
               {t('Go to Artist')}<ArrowRight className="size-4" />

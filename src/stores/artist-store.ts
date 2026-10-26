@@ -35,6 +35,7 @@ import { registerCharacterCard } from '@/stores/asset-storage-store'
 import { isDemoSession } from '@/lib/demo/context'
 import type { ArtistSourceSnapshot } from '@/lib/artist/source-snapshot'
 import { fetchArtistGenerationLimit, runAdaptivePool } from '@/lib/artist/generation-slots'
+import { DRAW_CONTINUE_MAX_ROUNDS, missingDrawTargets } from '@/lib/artist/draw-continue'
 // 최종 룩 요약(design_tokens 파생) — 옛 온보딩 버블 카피용으로 태어났지만(2026-08-06 제거)
 //   "지금 룩이 뭔지"의 파생 상태로 남긴다. 채팅 컨텍스트·향후 UI가 소비.
 export interface ArtistLookSummary {
@@ -72,6 +73,13 @@ export interface ViewFailure {
 }
 export type ViewFailures = Record<string, Record<string, Record<string, ViewFailure>>>
 
+/** [안 나온 그림 다시 그리기] 한 번의 결과 — 몇 장을 요청했고, 실제로 보냈고, 접수 전에 거절됐는지. */
+export interface DrawMissingOutcome {
+  requested: number
+  submitted: number
+  refused: boolean
+}
+
 export function requireDefaultAppearanceKey(character: CharacterAsset): string {
   const defaults = character.appearances.filter((appearance) => appearance.isDefault)
   if (defaults.length !== 1) {
@@ -80,7 +88,7 @@ export function requireDefaultAppearanceKey(character: CharacterAsset): string {
   return defaults[0].appearanceKey
 }
 
-/** 새 캐릭터 생성 입력 (+버튼 Dialog / 채팅 createCharacter 공용) */
+/** 새 캐릭터 생성 입력 (addCharacter). 채팅은 더 이상 새 인물을 만들지 않는다(2026-10-27 디자이너 QA 1차 #04). */
 export interface NewCharacterInput {
   name: string
   role?: CharacterRole
@@ -112,7 +120,6 @@ export type ArtistUpdate =
       model?: ImageModelKey
       /** 정책 거절 뒤 안전 모드 재시도(UI retryWorldShotSafe와 같음). */
       safeMode?: boolean }
-  | ({ type: 'createCharacter' } & NewCharacterInput)
   | {
       type: 'createAppearance'
       characterId: string
@@ -258,9 +265,11 @@ async function generateAndPersistWorldShot(
       skipped?: boolean
       deduped?: boolean
       status?: string
+      reason?: string
     }
     // 서버 give-up 게이트(반복 실패 슬롯의 자율 재생성 차단) → jobId 없음. 에러 아님: null 로 조용히 종료.
-    if (body.deduped) {
+    // 서버 "이미 있음"(자동 경로가 다 그려진 배경을 다시 요청, 2026-10-27)도 겹친 요청처럼 조용히 끝낸다 — 멈췄다는 안내가 아니다.
+    if (body.deduped || (body.skipped && body.reason === 'exists')) {
       options?.onJob?.({ jobId: null, status: 'deduped' })
       return null
     }
@@ -646,9 +655,23 @@ interface ArtistState {
   /** 콘텐츠 정책 거절 뒤 우회(safe) 재시도 — 약속 B9. */
   retryWorldShotSafe: (locationId: string, model?: ImageModelKey, appearanceKey?: string | null) => Promise<void>
   autoGenerateBaseImages: () => Promise<void>
-  /** 리뉴얼 1차: [남은 그림 다시 그리기] — 대표 그림(인물 기본 모습 시트 · 배경 넓은 그림)이 없는 것을 모두 그린다.
-   *  자동 그리기와 달리 서버 초안을 기다리던 인물도 그린다(서버 초안이 실패했을 때 영영 비지 않게). */
-  drawMissingImages: () => Promise<void>
+  /** 리뉴얼 1차: [안 나온 그림 다시 그리기] — 대표 그림(인물 기본 모습 시트 · 배경 넓은 그림)이 없고 그리는 중도 아닌 것을 그린다.
+   *  자동 그리기와 달리 서버 초안을 기다리던 인물도 그린다(서버 초안이 실패했을 때 영영 비지 않게).
+   *  자동 생성과 같은 동시 장수 규칙(runAdaptivePool)으로 보낸다(2026-10-27 디자이너 QA 1차 #05). skipFailed 면 실패 기록이 있는 칸은 뺀다. */
+  drawMissingImages: (opts?: { skipFailed?: boolean }) => Promise<DrawMissingOutcome>
+  /** 그림 상태(실패 · 서버가 그리는 중)를 읽어 카드 배지와 "그리는 중"을 맞추고, 서버가 다 그린 그림을 새로고침 없이 넣는다. */
+  syncGenerationStatus: (projectId: string) => Promise<void>
+  /** 마지막으로 그림 상태를 읽은 시각(ms) — 이어 그리기가 서버가 막 보낸 그림을 모른 채 다시 요청하지 않게 한다. */
+  serverDrawCheckedAt: number | null
+  /** 그리기 단계(디자인 뒤)를 이 화면이 처음 본 시각 — 이 뒤에 읽은 상태만 믿는다. */
+  drawingBeganAt: { projectId: string; at: number } | null
+  markDrawingBegan: (projectId: string) => void
+  /** 내 한도에 막혀 못 그린 그림 이어 그리기(2026-10-27 디자이너 QA 1차 #06) — 횟수 · 멈춤(거절 · 보낸 것 없음). */
+  drawContinue: { projectId: string | null; rounds: number; stopped: boolean; running: boolean }
+  /** 앞의 그림이 다 끝났을 때 실패 기록 없는 빈칸을 이어 그린다. 거절(자리 없음 등)되거나 새로 보낸 것이 없으면 멈춘다. */
+  continueMissingImages: () => Promise<void>
+  /** 사람이 누른 [안 나온 그림 n장 다시 그리기] — 실패한 칸도 다시 그리고, 멈춘 이어 그리기를 다시 켠다. */
+  redrawMissingImages: () => Promise<void>
   /** 온보딩 "진행" 단일 진입점 — look-pending 초안 + writer-추가 무이미지 캐릭터의 main 을 재생성(유저 클릭만). */
   refreshLookPendingDrafts: () => Promise<void>
   applyUpdates: (updates: ArtistUpdate[]) => Promise<void>
@@ -725,6 +748,9 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   },
   generatingViews: [],
   generatingLocations: [],
+  serverDrawCheckedAt: null,
+  drawingBeganAt: null,
+  drawContinue: { projectId: null, rounds: 0, stopped: false, running: false },
   selectedBoostPreset: null,
   imageProvider: 'fal' as ImageProvider,
   error: null,
@@ -904,7 +930,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             portrait: c.portrait ?? null,
             viewCandidates: {},
             lookFingerprint: computeLookFingerprint(designTokens, c.costume, styleAnchorKey),
-            origin: c.origin === 'writer' ? 'writer' : 'producer',
+            // 'user' = Artist 채팅(예전)으로 만들어진 카드 — 지우기 단추의 근거라 producer 로 뭉개지 않는다(2026-10-27 디자이너 QA 1차 #04).
+            origin: c.origin === 'writer' ? 'writer' : c.origin === 'user' ? 'user' : 'producer',
           }))
           const worldAssets: WorldAsset[] = dbLocations.map((location) => {
             const scene = sceneByLocation.get(location.locationId)
@@ -944,95 +971,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             selectedLocationAppearances: readLocationAppearanceSelection(projectId, worldAssets, get().selectedLocationAppearances),
           })
 
-          // 생성 상태(실패/대기) 조회 — generation_jobs 는 RLS 로 클라 직접 불가 → owner-checked 엔드포인트 1회.
-          //   per-character/per-view 실패(reload-survivable)를 viewFailures 로 보관하고, queued main 은
-          //   /api/generation-jobs/[id] reconcile(pollGenerationJob)로 마무리(webhook 누락 안전망). fire-and-forget.
-          void (async () => {
-            try {
-              const res = await fetch(
-                `/api/artist/generation-status?projectId=${encodeURIComponent(projectId)}`,
-              )
-              if (!res.ok) return
-              const { failures, queuedMain, worldFailures, queuedWorld } = (await res.json()) as {
-                failures: Array<{
-                  characterId: string
-                  appearanceKey: string
-                  view: string
-                  error: string | null
-                  failCount: number
-                  safeFailCount: number
-                  moderation: boolean
-                }>
-                queuedMain: Array<{ characterId: string; appearanceKey: string; jobId: string }>
-                queuedWorld?: Array<{ locationId: string; appearanceKey: string | null; jobId: string }>
-                worldFailures?: Array<{
-                  locationId: string
-                  column: string
-                  error: string | null
-                  failCount: number
-                  safeFailCount: number
-                  moderation: boolean
-                }>
-              }
-              if (useProjectStore.getState().projectId !== projectId) return
-              set({ worldFailures: worldFailuresFromStatus(worldFailures) })
-              const vf: ViewFailures = {}
-              for (const f of failures) {
-                if (!f.appearanceKey) continue
-                ;((vf[f.characterId] ??= {})[f.appearanceKey] ??= {})[f.view] = {
-                  error: f.error,
-                  moderation: f.moderation,
-                  failCount: f.failCount,
-                  safeFailCount: f.safeFailCount,
-                }
-              }
-              set({ viewFailures: vf })
-              for (const { locationId, appearanceKey, jobId } of queuedWorld ?? []) {
-                const slotKey = worldFailureKey(locationId, appearanceKey)
-                if (get().generatingLocations.includes(slotKey)) continue
-                set((state) => ({ generatingLocations: [...state.generatingLocations, slotKey] }))
-                void pollGenerationJob(jobId)
-                  .then((url) => {
-                    if (useProjectStore.getState().projectId !== projectId) return
-                    set((state) => ({ worldAssets: state.worldAssets.map((world) =>
-                      world.locationId !== locationId ? world : appearanceKey && appearanceKey !== DEFAULT_LOCATION_APPEARANCE_KEY
-                        ? { ...world, appearances: (world.appearances ?? []).map((appearance) => appearance.appearanceKey === appearanceKey ? { ...appearance, wideShot: url } : appearance) }
-                        : { ...world, wideShot: url },
-                    ) }))
-                    return refreshLocationCandidates(projectId, locationId, set)
-                  })
-                  .catch(() => {
-                    if (useProjectStore.getState().projectId === projectId) void refreshWorldFailures(projectId, set)
-                  })
-                  .finally(() => {
-                    if (useProjectStore.getState().projectId !== projectId) return
-                    set((state) => ({ generatingLocations: state.generatingLocations.filter((key) => key !== slotKey) }))
-                  })
-              }
-              for (const { characterId, appearanceKey, jobId } of queuedMain) {
-                void pollGenerationJob(jobId)
-                  .then((url) => {
-                    set((state) => ({
-                      characterAssets: state.characterAssets.map((ca) =>
-                        ca.characterId === characterId
-                          ? {
-                              ...ca,
-                              appearances: ca.appearances.map((appearance) =>
-                                appearance.appearanceKey === appearanceKey
-                                  ? { ...appearance, sheetUrl: url }
-                                  : appearance,
-                              ),
-                            }
-                          : ca,
-                      ),
-                    }))
-                  })
-                  .catch(() => {})
-              }
-            } catch {
-              // best-effort — 상태 조회 실패는 로드를 막지 않는다.
-            }
-          })()
+          // 생성 상태(실패/대기) 조회 — 실패 배지 · 서버가 그리는 중인 그림 · 다 그린 그림 넣기(syncGenerationStatus). fire-and-forget.
+          void get().syncGenerationStatus(projectId)
           return
         }
       } catch (err) {
@@ -1087,7 +1027,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     // No data available — keep empty state (don't show fake mock data)
   },
 
-  // 새 캐릭터 카드 추가. UI(+버튼)·채팅(createCharacter) 공용 단일 경로.
+  // 새 캐릭터 카드 추가. 채팅(createCharacter)은 2026-10-27(디자이너 QA 1차 #04)부터 이 길을 쓰지 않는다.
   //   1) 낙관적으로 store(characterAssets + sceneManifest.characters)에 즉시 반영 → 카드 "뿅" 등장
   //   2) projectId 있으면 /api/artist/character 로 DB 영속 (실패해도 로컬 카드는 유지, error 표기)
   // 이미지(views)는 비워둠 — 사용자가 "Generate All Views" 로 생성하거나 autoGenerate가 보강.
@@ -1110,7 +1050,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       fixedPrompt: appearance,
       appearances: [],
       viewCandidates: {},
-      origin: 'producer',
+      // 서버(/api/artist/character POST)가 origin 'user' 로 저장한다 — 화면도 같은 값을 든다.
+      origin: 'user',
     }
 
     set((state) => ({
@@ -1416,6 +1357,108 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
 
   retryCharacterViewSafe: async (characterId, appearanceKey, view, model) => {
     await get().generateCharacterView(characterId, appearanceKey, view, 'ui', undefined, true, model)
+  },
+
+  // 생성 상태(실패/대기) 조회 — generation_jobs 는 RLS 로 클라 직접 불가 → owner-checked 엔드포인트.
+  //   per-character/per-view 실패(reload-survivable)를 viewFailures 로 보관하고, 서버가 그리는 중인(queued) 대표 그림 · 배경은
+  //   "그리는 중"으로 세면서 /api/generation-jobs/[id] reconcile(pollGenerationJob)로 마무리해 카드에 바로 넣는다
+  //   (webhook 누락 안전망 · 2026-10-27 디자이너 QA 1차 #05 #06: 서버 그림을 세지 않아 그리는 중에 다시 그리기가 떴고,
+  //   모습 키가 빠져 다 그린 그림이 새로고침해야 보였다). 같은 작업은 pollGenerationJob 이 하나로 합친다.
+  syncGenerationStatus: async (projectId) => {
+    // 읽기를 시작한 시각을 남긴다 — 그리기 단계가 시작되기 전에 보낸 읽기의 답은 "그 뒤의 상태"로 치지 않는다.
+    const requestedAt = Date.now()
+    try {
+      const res = await fetch(
+        `/api/artist/generation-status?projectId=${encodeURIComponent(projectId)}`,
+      )
+      if (!res.ok) return
+      const { failures, queuedMain, worldFailures, queuedWorld } = (await res.json()) as {
+        failures: Array<{
+          characterId: string
+          appearanceKey: string
+          view: string
+          error: string | null
+          failCount: number
+          safeFailCount: number
+          moderation: boolean
+        }>
+        queuedMain: Array<{ characterId: string; appearanceKey: string; jobId: string }>
+        queuedWorld?: Array<{ locationId: string; appearanceKey: string | null; jobId: string }>
+        worldFailures?: Array<{
+          locationId: string
+          column: string
+          error: string | null
+          failCount: number
+          safeFailCount: number
+          moderation: boolean
+        }>
+      }
+      if (useProjectStore.getState().projectId !== projectId) return
+      const vf: ViewFailures = {}
+      for (const f of failures) {
+        if (!f.appearanceKey) continue
+        ;((vf[f.characterId] ??= {})[f.appearanceKey] ??= {})[f.view] = {
+          error: f.error,
+          moderation: f.moderation,
+          failCount: f.failCount,
+          safeFailCount: f.safeFailCount,
+        }
+      }
+      set({ worldFailures: worldFailuresFromStatus(worldFailures), viewFailures: vf })
+      for (const { locationId, appearanceKey, jobId } of queuedWorld ?? []) {
+        const slotKey = worldFailureKey(locationId, appearanceKey)
+        if (get().generatingLocations.includes(slotKey)) continue
+        set((state) => ({ generatingLocations: [...state.generatingLocations, slotKey] }))
+        void pollGenerationJob(jobId)
+          .then((url) => {
+            if (useProjectStore.getState().projectId !== projectId) return
+            set((state) => ({ worldAssets: state.worldAssets.map((world) =>
+              world.locationId !== locationId ? world : appearanceKey && appearanceKey !== DEFAULT_LOCATION_APPEARANCE_KEY
+                ? { ...world, appearances: (world.appearances ?? []).map((appearance) => appearance.appearanceKey === appearanceKey ? { ...appearance, wideShot: url } : appearance) }
+                : { ...world, wideShot: url },
+            ) }))
+            return refreshLocationCandidates(projectId, locationId, set)
+          })
+          .catch(() => {
+            if (useProjectStore.getState().projectId === projectId) void refreshWorldFailures(projectId, set)
+          })
+          .finally(() => {
+            if (useProjectStore.getState().projectId !== projectId) return
+            set((state) => ({ generatingLocations: state.generatingLocations.filter((key) => key !== slotKey) }))
+          })
+      }
+      for (const { characterId, appearanceKey, jobId } of queuedMain) {
+        if (!appearanceKey) continue
+        const slot: CharacterAppearanceSlot = { characterId, appearanceKey, view: 'main' }
+        if (get().generatingViews.some((active) => sameCharacterAppearanceSlot(active, characterId, appearanceKey, 'main'))) continue
+        set((state) => ({ generatingViews: [...state.generatingViews, slot] }))
+        void pollGenerationJob(jobId)
+          .then((url) => {
+            if (useProjectStore.getState().projectId !== projectId) return
+            set((state) => ({
+              characterAssets: state.characterAssets.map((ca) => {
+                if (ca.characterId !== characterId) return ca
+                const appearances = ca.appearances.map((appearance) =>
+                  appearance.appearanceKey === appearanceKey ? { ...appearance, sheetUrl: url } : appearance,
+                )
+                return { ...ca, appearances, views: { ...ca.views, main: mainImageFromAppearances(ca.views.main, appearances) } }
+              }),
+            }))
+          })
+          .catch(() => {
+            if (useProjectStore.getState().projectId === projectId) void get().refreshViewFailures()
+          })
+          .finally(() => {
+            if (useProjectStore.getState().projectId !== projectId) return
+            set((state) => ({
+              generatingViews: state.generatingViews.filter((active) => !sameCharacterAppearanceSlot(active, characterId, appearanceKey, 'main')),
+            }))
+          })
+      }
+      set({ serverDrawCheckedAt: requestedAt })
+    } catch {
+      // best-effort — 상태 조회 실패는 로드를 막지 않는다.
+    }
   },
 
   refreshViewFailures: async () => {
@@ -1871,27 +1914,70 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   //   producer main 은 서버 초안 트리거(draft-trigger.ts)가 단일 생산자다(C1) — 여기서
   //   client 가 main 을 다시 자동 제출하지 않는다(이중 생성/과금 방지; 서버 실패는 카드 배지로 표시).
   //   여기선 writer-origin 오픈캐스트 main 과 월드 fallback 만 보강한다(자연 캐시 skip).
-  drawMissingImages: async () => {
-    const { characterAssets, worldAssets, generatingLocations } = get()
-    const tasks: Array<Promise<unknown>> = []
-    for (const c of characterAssets) {
-      if (c.entityType === 'object') continue
-      // [완료하기]와 같은 기준 — 대표 모습에 시트가 있어야 그린 것이다(예전 대표 그림만 있으면 완료하기가 막힌다, completion-gaps).
-      if (c.appearances.some((a) => a.isDefault && a.sheetUrl)) continue
-      // 대표 모습 정보가 깨진 인물 하나 때문에 나머지를 멈추지 않는다.
-      let appearanceKey: string
-      try {
-        appearanceKey = requireDefaultAppearanceKey(c)
-      } catch {
-        continue
-      }
-      tasks.push(get().generateCharacterView(c.characterId, appearanceKey, 'main', 'auto').catch(() => null))
+  drawMissingImages: async (opts = {}) => {
+    const { characterAssets, worldAssets, generatingViews, generatingLocations, viewFailures, worldFailures } = get()
+    // [완료하기]와 같은 기준 — 대표 모습에 시트가 있어야 그린 것이다(completion-gaps). 그리는 중인 칸은 다시 보내지 않는다(같은 그림이 두 번 나간다).
+    const targets = missingDrawTargets({
+      characters: characterAssets,
+      worlds: worldAssets,
+      drawingViews: generatingViews,
+      drawingLocations: generatingLocations,
+      failedViews: viewFailures,
+      failedLocations: worldFailures,
+    }, { skipFailed: opts.skipFailed })
+    const receipts: GenerationJobReceipt[] = []
+    const onJob: GenerationJobObserver = (receipt) => { receipts.push(receipt) }
+    const tasks: Array<() => Promise<void>> = [
+      ...targets.characters.map(({ characterId, appearanceKey }) => async () => {
+        await get().generateCharacterView(characterId, appearanceKey, 'main', 'auto', undefined, undefined, undefined, { onJob })
+      }),
+      ...targets.worlds.map((locationId) => async () => {
+        await get().generateWorldShot(locationId, 'wideShot', undefined, 'auto', undefined, { onJob })
+      }),
+    ]
+    // 자동 생성과 같은 가변 동시 장수(러프 중 1 · 아니면 3) — 한꺼번에 보내면 유저 한도(6)에 막힌다(2026-10-27 디자이너 QA 1차 #05).
+    //   한 장의 실패가 나머지를 막지 않는다(각 생성 함수가 실패를 스스로 알린다).
+    await runAdaptivePool(tasks, fetchArtistGenerationLimit).catch(() => undefined)
+    return {
+      requested: tasks.length,
+      // 보낸 장수 — 접수 번호가 붙은 작업 수(같은 작업의 진행 알림은 한 번만 센다).
+      submitted: new Set(receipts.filter((receipt) => receipt.jobId && receipt.status !== 'failed').map((receipt) => receipt.jobId)).size,
+      // 접수 전에 거절됐다(자리 없음 · 이용권 · 내용 규칙) — 이어 그리기는 여기서 멈춘다(자동 재시도 없음, 2026-09-11 오너).
+      refused: receipts.some((receipt) => receipt.status === 'failed' && !receipt.jobId && (receipt.httpStatus ?? 0) >= 400),
     }
-    for (const w of worldAssets) {
-      if (w.wideShot != null || generatingLocations.includes(w.locationId)) continue
-      tasks.push(get().generateWorldShot(w.locationId, 'wideShot', undefined, 'auto').catch(() => null))
-    }
-    await Promise.all(tasks)
+  },
+
+  markDrawingBegan: (projectId) => {
+    if (get().drawingBeganAt?.projectId === projectId) return
+    set({ drawingBeganAt: { projectId, at: Date.now() } })
+  },
+
+  continueMissingImages: async () => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) return
+    const current = get().drawContinue
+    const mine = current.projectId === projectId ? current : { projectId, rounds: 0, stopped: false, running: false }
+    if (mine.running || mine.stopped || mine.rounds >= DRAW_CONTINUE_MAX_ROUNDS) return
+    set({ drawContinue: { ...mine, running: true } })
+    const outcome = await get().drawMissingImages({ skipFailed: true })
+    if (useProjectStore.getState().projectId !== projectId) return
+    const rounds = mine.rounds + 1
+    set({
+      drawContinue: {
+        projectId,
+        rounds,
+        // 거절됐거나 새로 보낸 것이 없으면(겹친 요청 · 이미 있음뿐) 같은 요청을 되풀이하지 않는다.
+        stopped: outcome.refused || outcome.submitted === 0 || rounds >= DRAW_CONTINUE_MAX_ROUNDS,
+        running: false,
+      },
+    })
+  },
+
+  redrawMissingImages: async () => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) return
+    set({ drawContinue: { projectId, rounds: 0, stopped: false, running: false } })
+    await get().drawMissingImages()
   },
 
   autoGenerateBaseImages: async () => {
@@ -2010,15 +2096,9 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   },
 
   applyUpdates: async (updates) => {
+    // 채팅 명령에는 새 인물 만들기가 없다(2026-10-27 디자이너 QA 1차 #04) — 인물 · 배경은 확정한 산문에서 나온다.
     for (const u of updates) {
-      if (u.type === 'createCharacter') {
-        await get().addCharacter({
-          name: u.name,
-          role: u.role,
-          description: u.description,
-          appearance: u.appearance,
-        })
-      } else if (u.type === 'regenerateCharacter') {
+      if (u.type === 'regenerateCharacter') {
         const character = get().characterAssets.find((asset) => asset.characterId === u.characterId)
         if (!character) throw new Error(`Character ${u.characterId} was not found`)
         // 약속 C6(2026-09-04): 채팅이 특정 모습을 짚으면 그 모습을 다시 그린다 — 없거나 모르는 키면 기본 모습.
@@ -2306,6 +2386,9 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       selectedLocationAppearances: {},
       generatingViews: [],
       generatingLocations: [],
+      serverDrawCheckedAt: null,
+      drawingBeganAt: null,
+      drawContinue: { projectId: null, rounds: 0, stopped: false, running: false },
       selectedBoostPreset: null,
       imageProvider: 'fal' as ImageProvider,
       error: null,

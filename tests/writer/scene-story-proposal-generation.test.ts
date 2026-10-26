@@ -75,6 +75,16 @@ describe('씬 스토리 수정안 생성 완료', () => {
     expect(mocks.update).toHaveBeenCalledTimes(2)
     expect(mocks.update.mock.calls[1][0].state.scenes).toEqual(scenes('경쟁 중 저장한 원문'))
   })
+  it('고친 결과가 지금 산문과 한 글자도 다르지 않으면 수정안 카드를 만들지 않고 바꿀 곳이 없었다고 남긴다', async () => {
+    // 왜: 바뀐 것이 0개인 수정안을 적용하면 아무것도 안 바뀌는데 '적용했어요'가 뜨고, 요청 문장이 이후 수정 지시로 계속 남았다(디자이너 QA 1차 #01).
+    mocks.scenes.mockResolvedValue(scenes())
+    await generateSceneStoryProposal('project-1', 'run-1', 'p1')
+    const patch = mocks.update.mock.calls[0][0]
+    expect(patch.state._sceneStoryProposal.status).toBe('failed')
+    expect(patch.state._sceneStoryProposal.error).toBe('scene_story_proposal_unchanged')
+    expect(patch.state._sceneStoryProposal.scenes).toBeUndefined()
+    expect(patch.state.scenes).toEqual(scenes())
+  })
   // 같이 정한 것. 왜: 생성 실패는 초안 손실이나 전체 제작 실패로 번지면 안 된다.
   it('AI 생성이 실패하면 원문을 유지하고 수정안의 실패만 저장한다', async () => {
     const errorLog = vi.spyOn(console, 'error').mockImplementation(() => undefined)

@@ -1,7 +1,7 @@
 // 씬 수정안은 최신 실행을 다시 읽고 저장한다. 원문·직접 편집·다른 수정안은 건드리지 않는다.
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { getActiveRun } from '@/lib/writer/run-store'
-import { sceneStoryProposalExpired } from '@/lib/producer/scene-story-proposal'
+import { sceneStoryProposalExpired, sceneStoryUnchanged } from '@/lib/producer/scene-story-proposal'
 import { runScenes } from '@/lib/writer/pipeline/stages/s3_scenes'
 import { resolveModels } from '@/lib/writer/pipeline'
 import { PipelineLogger } from '@/lib/writer/logger'
@@ -24,7 +24,11 @@ export async function generateSceneStoryProposal(projectId: string, runId: strin
       logger, resolveModels(state.input).S,
       [...(state._sceneRevisionNotes ?? []), proposal.feedback], state.dramaturgy ?? null, proposal.baseScenes,
     )
-    result = { status: 'ready', scenes }
+    // 고친 결과가 지금 산문과 한 글자도 다르지 않으면 카드로 내놓지 않는다(디자이너 QA 1차 #01) — 적용해도 바뀌는 것이 없는데
+    //   '적용했어요'가 뜨고 요청 문장이 이후 수정 지시(_sceneRevisionNotes)로 계속 남았다. 화면은 이 실패를 카드 없이 내리고 채팅에 알린다.
+    result = !proposal.variants?.length && sceneStoryUnchanged(proposal.baseScenes, scenes)
+      ? { status: 'failed', error: 'scene_story_proposal_unchanged' }
+      : { status: 'ready', scenes }
   } catch (error) {
     console.error('[writer/scene-story-proposal]', error)
     result = { status: 'failed', error: 'scene_story_proposal_failed' }

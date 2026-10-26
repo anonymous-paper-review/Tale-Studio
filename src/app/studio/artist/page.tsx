@@ -28,6 +28,8 @@ import { useLocale, useT } from '@/lib/i18n'
 import { styleAnchorName } from '@/lib/style-anchor-name'
 import { AiBusyOverlay } from '@/components/ai-busy-overlay'
 import { artistPhase, artistRunStopped, assetCompletionGaps, makingProgress } from '@/lib/artist/breakdown'
+import { ARTIST_BRIEF_TEXT, artistBriefCounts, offerArtistBrief } from '@/lib/artist/brief'
+import { completeBlockedNote, drawContinueDecision, drawTargetCount, missingDrawTargets } from '@/lib/artist/draw-continue'
 import { backgroundRoughReady, storyboardPrepView } from '@/lib/artist/background-roughs'
 import { isDemoSession } from '@/lib/demo/context'
 import { useBackgroundRoughs } from '@/features/artist-room/use-background-roughs'
@@ -274,40 +276,6 @@ export default function VisualPage() {
 
   // 리뉴얼 1차(2026-10-19): "Director로 넘어갈까요?" 준비 완료 넛지는 없다 — Artist 다음은 [완료하기]로 여는 Storyboard 다.
   const generatingCount = generatingViews.length + generatingLocations.length
-  const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
-
-  // 첫 진입 브리핑(2026-08-06 간소화) — "최종 룩으로 정리" 상태 온보딩 제안은 제거(피드백:
-  //   긴 버블이 채팅을 점유하고, 초안이 남아 있는 동안 Director 핸드오프 제안을 가렸다).
-  //   룩 미반영/실패는 카드 배지가 알리고, 일괄 정리는 채팅으로 요청할 수 있다.
-  const artistBriefContent = t(
-    'I have concepts ready for the characters and backgrounds: {count} characters · {worldCount} backgrounds.\n' +
-      "Let me know which character or background you'd like to revise or add.\n" +
-      'Press "@" to pick a character or background (Ctrl+click a card does the same).',
-    { count: characterAssets.length, worldCount: worldAssets.length },
-  )
-  useEffect(() => {
-    if (!projectId || !ready) return
-    const hasArtistChat = useGlobalChatStore.getState().messages.some((m) => m.stage === 'artist')
-    if (hasArtistChat || artistBriefedRef.current === projectId) return
-
-    const id = `artist-brief:${projectId}`
-    const dismissed = useGlobalChatStore.getState().dismissedSuggestionIds.includes(id)
-    offerSuggestion({
-      id,
-      stage: 'artist',
-      // #feedback 2026-08-07: 온보딩 강화 — 무엇을 만들었는지 + @멘션·Ctrl+클릭 조작법 명시
-      //   (8/6 간소화 유지 — 상태 분기 없이 첫 브리핑 한 종류만).
-      content: artistBriefContent,
-      action: null,
-      // dismissible(2026-08-11): false → true. false 면 선점 불가라, 유저가 말을 안 걸고 에셋만
-      //   보다가 준비가 끝나면 Director 핸드오프 제안이 이 브리핑에 막혀 영영 못 떴다(#handoff-starved).
-      dismissible: true,
-    })
-    // 실제 표면화(같은 id 활성)됐거나 이미 dismiss 된 경우만 1회 가드 고정.
-    if (dismissed || useGlobalChatStore.getState().suggestion?.id === id) {
-      artistBriefedRef.current = projectId
-    }
-  }, [projectId, ready, offerSuggestion, characterAssets.length, worldAssets.length, artistBriefContent])
 
   // 리뉴얼 1차(2026-10-19, 프로토타입 A1 · A2 · A4 · A5 · A9): 확정 산문의 글 목록 → [만들기] → 디자인 · 그림 → 카드 → [완료하기].
   const router = useRouter()
@@ -319,6 +287,19 @@ export default function VisualPage() {
   // [완료하기]를 해 Storyboard 가 열렸다(예전 흐름으로 끝까지 만든 프로젝트 포함) — 다시 완료하지 않는다.
   const artistCompleted = stageIndex(reachedStage) >= stageIndex('writer')
   const phase = artistPhase({ proseLocked, draftRun, status: writerStatus, hasAssets, artistCompleted })
+
+  // 첫 진입 브리핑(2026-08-06 간소화) — 무엇을 만들었는지 + @멘션 · Ctrl+클릭 조작법. 룩 미반영/실패는 카드 배지가 알린다.
+  //   인물 · 배경 카드가 생긴 뒤(디자인이 끝난 뒤)에 그 수로 한 번만 말한다(2026-10-27 디자이너 QA 1차 관찰 49) —
+  //   산문 목록 단계 · 디자인 중에는 카드 행이 없거나 일부라 '캐릭터 0명 · 배경 0곳'으로 남았다. "추가"는 말하지 않는다(#04).
+  // 첫 안내는 채팅 기록을 다 읽은 뒤에만 — 읽기 전에 말하면 이미 안내한 프로젝트에 한 번 더 남는다.
+  const chatHistoryLoaded = useGlobalChatStore((s) => s.messagesLoadedProjectId === projectId)
+  const briefCounts = artistBriefCounts({ ready, phase, characters: characterAssets, worlds: worldAssets })
+  const artistBriefContent = briefCounts ? t(ARTIST_BRIEF_TEXT, briefCounts) : null
+  useEffect(() => {
+    if (!projectId || !artistBriefContent || !chatHistoryLoaded || artistBriefedRef.current === projectId) return
+    if (offerArtistBrief(projectId, artistBriefContent)) artistBriefedRef.current = projectId
+  }, [projectId, artistBriefContent, chatHistoryLoaded])
+
   const gaps = assetCompletionGaps(characterAssets, worldAssets)
   const personTotal = characterAssets.filter((c) => c.entityType === 'person').length
   const progress = makingProgress(writerStatus, {
@@ -363,21 +344,53 @@ export default function VisualPage() {
     progress.drawn,
   )
   const storyboardPrep = storyboardPrepView({ status: writerStatus, drawing: roughs.drawing, outcome: roughs.outcome, artistCompleted })
-  const stuck = progress.step === 2 && !progress.done && generatingCount === 0
+  // 그림 그리는 단계의 이어 그리기 · 안 나온 그림 다시 그리기(2026-10-27 디자이너 QA 1차 #05 #06).
+  //   "그리는 중"은 화면이 보낸 것 + 서버가 그리는 것(생성 상태의 대기 작업)이다 — 하나라도 그리는 중이면 기다리고 단추를 숨긴다.
+  //   앞의 그림이 다 끝났는데 실패 기록 없이 빈 칸이 남았으면(내 한도에 막혀 건너뛴 그림) 이어서 그린다. 거절되면 멈추고 단추로 남긴다.
+  const viewFailures = useArtistStore((s) => s.viewFailures)
+  const worldFailures = useArtistStore((s) => s.worldFailures)
+  const serverDrawCheckedAt = useArtistStore((s) => s.serverDrawCheckedAt)
+  const drawingBeganAt = useArtistStore((s) => s.drawingBeganAt)
+  const drawContinue = useArtistStore((s) => s.drawContinue)
+  const drawInput = { characters: characterAssets, worlds: worldAssets, drawingViews: generatingViews, drawingLocations: generatingLocations, failedViews: viewFailures, failedLocations: worldFailures }
+  const missingCount = drawTargetCount(missingDrawTargets(drawInput))
+  const drawDecision = drawContinueDecision({
+    // 만드는 중(완료하기 전)에만 — 완료한 프로젝트를 열었다고 빈 칸을 저절로 그리지 않는다. 데모는 그리지 않는다.
+    step: making && !isDemoSession() ? progress.step : 0,
+    done: progress.done,
+    drawing: generatingCount,
+    checkedSinceDrawingBegan: !!projectId && drawingBeganAt?.projectId === projectId && serverDrawCheckedAt !== null && serverDrawCheckedAt > drawingBeganAt.at,
+    autoTargets: drawTargetCount(missingDrawTargets(drawInput, { skipFailed: true })),
+    stopped: drawContinue.projectId === projectId && drawContinue.stopped,
+  })
+  useEffect(() => {
+    if (projectId && making && progress.step === 2 && !progress.done) useArtistStore.getState().markDrawingBegan(projectId)
+  }, [projectId, making, progress.step, progress.done])
+  useEffect(() => {
+    if (drawDecision === 'continue') void useArtistStore.getState().continueMissingImages()
+  }, [drawDecision])
+  const redrawButton = drawDecision === 'stop' && missingCount > 0 ? (
+    <Button size="sm" onClick={() => void useArtistStore.getState().redrawMissingImages()} data-testid="artist-redraw-missing">
+      {t('Draw the {count} missing images', { count: missingCount })}
+    </Button>
+  ) : null
   const makingOverlay = (
     <AiBusyOverlay
       open={overlayOpen}
       title={t(makingTitle ?? 'Making the images')}
+      // 그리는 중인 그림이 없고 안 나온 그림이 남았으면 일이 멈춘 것이다 — 도는 원 대신 멈춤 표시와 다시 그리기 단추.
+      busy={!redrawButton}
+      description={redrawButton ? t('Some images could not be drawn. Draw the missing ones again, or close this and check the cards.') : undefined}
       steps={[
         { label: t('Designing the characters and backgrounds'), state: progress.step > 0 ? 'done' : 'current' },
         { label: t('Starting to draw'), state: progress.step > 1 ? 'done' : progress.step === 1 ? 'current' : 'todo' },
         { label: progress.total > 0 ? t('Drawing images {drawn}/{total}', { drawn: progress.drawn, total: progress.total }) : t('Drawing images'), state: progress.step === 2 ? 'current' : 'todo' },
       ]}
       progress={progress.total > 0 && progress.step === 2 ? (progress.drawn / progress.total) * 100 : null}
-      footer={stuck ? (
+      footer={redrawButton ? (
         <>
           <Button size="sm" variant="outline" onClick={() => setMakingDismissed(projectId)}>{t('Close')}</Button>
-          <Button size="sm" onClick={() => void useArtistStore.getState().drawMissingImages()}>{t('Draw the remaining images')}</Button>
+          {redrawButton}
         </>
       ) : undefined}
     />
@@ -427,6 +440,8 @@ export default function VisualPage() {
   // 메인 헤더(리뉴얼 1차, 프로토타입 A5) — "Artist · 인물 N · 배경 M", 작품 스타일, 오른쪽 [완료하기 →].
   //   완료한 뒤(또는 예전 흐름으로 끝까지 만든 프로젝트)는 다시 완료하지 않고 Storyboard 로 가기만 한다.
   const completeBlocked = gaps.characters.length + gaps.locations.length > 0
+  // [완료하기]가 꺼진 까닭을 글로 보인다 — 마우스를 올려야 보이는 안내뿐이라 이유를 몰랐다(2026-10-27 디자이너 QA 1차 #06).
+  const completeNote = phase === 'cards' ? completeBlockedNote({ gaps, drawing: generatingCount }) : null
   const headerRow = (
     <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
       <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
@@ -445,11 +460,21 @@ export default function VisualPage() {
         ) : null}
       </div>
       {phase === 'cards' ? (
-        <span title={completeBlocked ? t('Make the images for the characters and backgrounds that have none first.') : undefined}>
-          <Button onClick={() => setCompleteOpen(true)} disabled={completeBlocked} data-testid="artist-complete-open">
-            {t('Complete')}<ArrowRight className="size-4" />
-          </Button>
-        </span>
+        <div className="flex flex-col items-end gap-1.5">
+          <span title={completeBlocked ? t('Make the images for the characters and backgrounds that have none first.') : undefined}>
+            <Button onClick={() => setCompleteOpen(true)} disabled={completeBlocked} data-testid="artist-complete-open">
+              {t('Complete')}<ArrowRight className="size-4" />
+            </Button>
+          </span>
+          {completeNote ? (
+            <p className="max-w-xs text-right text-xs text-muted-foreground" role="status" data-testid="artist-complete-note">
+              {completeNote.kind === 'drawing'
+                ? t('Drawing the images. You can complete once they are done.')
+                : t('No image yet: {names}', { names: completeNote.names.join(' · ') })}
+            </p>
+          ) : null}
+          {overlayOpen ? null : redrawButton}
+        </div>
       ) : stageIndex(reachedStage) >= stageIndex('writer') ? (
         <Button variant="outline" onClick={() => router.push(withDemoShare('/studio/writer'))} data-testid="artist-go-storyboard">
           {t('Go to Storyboard')}<ArrowRight className="size-4" />

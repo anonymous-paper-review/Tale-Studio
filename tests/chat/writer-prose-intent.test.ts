@@ -23,4 +23,27 @@ describe('Writer 채팅 말 읽기', () => {
   it('넘기지 말라는 말은 산문 확정 창을 열지 않는다', () => {
     expect(writerChatIntent('아직 Artist로 넘기지 마')).not.toBe('breakdown')
   })
+
+  it.each(['다음 챕터로 이동해줘', '다음 챕터로 넘어가자', '좋아요, 다음 단계로', '다음 단계로', 'Artist로 가줘', 'Go to the next step', 'Move on to the next chapter'])('"%s"라고 하면 산문 수정안을 만들지 않고 산문 확정 창을 연다', (text) => {
+    // 왜: "다음 챕터로 이동해줘"가 산문 수정 요청으로 읽혀 1분 잠금 뒤 요청 문장을 제목으로 한 씬 3개 수정안이 생겼다(디자이너 QA 1차 #01). "좋아요, 다음 단계로"는 채팅 단추 이름을 그대로 친 말이다.
+    expect(writerChatIntent(text)).toBe('breakdown')
+  })
+
+  it('다음이라는 말이 있어도 고칠 점을 말하면 산문 수정안을 만든다', () => {
+    // 왜: 넘김 말을 넓게 읽다가 "다음 장면"·"다음 챕터에서"를 고쳐 달라는 말까지 넘김으로 오인하면 고칠 말이 사라진다(디자이너 QA 1차 #01).
+    expect(writerChatIntent('다음 장면을 더 길게 해줘')).toBe('revise')
+    expect(writerChatIntent('다음 챕터에서 순자가 웃게 해줘')).toBe('revise')
+  })
+
+  it('넘어가기 전에 고칠 점을 말하면 산문 확정 창이 아니라 산문 수정안을 만든다', () => {
+    // 왜: "다음 단계로 넘어가기 전에 결말을 바꿔줘"는 고쳐 달라는 말이다 — 확정 창이 뜨면 고칠 말이 사라진다(디자이너 QA 1차 #01 검토).
+    expect(writerChatIntent('다음 단계로 넘어가기 전에 결말을 바꿔줘')).toBe('revise')
+    expect(writerChatIntent('Artist로 넘기기 전에 순자 대사를 줄여줘')).toBe('revise')
+    expect(writerChatIntent('Before we move on to the next step, make the ending warmer')).toBe('revise')
+  })
+
+  it('다음 단계로 넘어가지 말라는 말은 산문 확정 창을 열지 않는다', () => {
+    // 왜: 새로 알아듣는 "다음 챕터" 넘김 말도 부정이면 넘김이 아니다(디자이너 QA 1차 #01).
+    expect(writerChatIntent('아직 다음 챕터로 넘어가지 마')).not.toBe('breakdown')
+  })
 })

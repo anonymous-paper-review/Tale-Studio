@@ -237,6 +237,8 @@ interface ProducerState {
   /** D12: 채팅이 이름/느낌으로 고른 카탈로그 앵커 키 적용 — 카탈로그 검증 후 setStyleAnchor.
    *  모델이 발명한 키는 unknown_key로 되돌려 호출부가 정직하게 말하게 한다. */
   applyStyleAnchorKeyFromChat: (key: string) => Promise<'applied' | 'unknown_key' | 'failed' | 'locked'>
+  /** 올린 내 그림체를 지운다 — 고정된 그림체여도 지울 수 있고, 지우면 다른 스타일을 고를 수 있다(2026-10-27 QA #03 · 오너). */
+  removeCustomStyleAnchor: () => Promise<boolean>
   /** 채팅이 해석한 화풍 의도를 반영 — 저장은 서버(api/produce/style-anchor)가 검증 후 한다. */
   applyCustomStyleAnchor: (anchor: {
     key: string
@@ -839,6 +841,35 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       if (current()) set({
         ...(!written ? { styleAnchorKey: prev, customStyleAnchor: prevCustom } : {}),
         error: translate(useLocaleStore.getState().locale, 'Failed to save style: {message}', { message: error instanceof Error ? error.message : String(error) }),
+      })
+      return false
+    }
+  },
+
+  removeCustomStyleAnchor: async () => {
+    if (isDemoSession() || castLocked()) return false
+    const projectId = useProjectStore.getState().projectId
+    const prevKey = get().styleAnchorKey
+    const prevCustom = get().customStyleAnchor
+    if (!projectId || !prevCustom) return false
+    set({ styleAnchorKey: null, customStyleAnchor: null })
+    const current = () => useProjectStore.getState().projectId === projectId
+    let written = false
+    try {
+      const db = createClient()
+      const { error } = await db.from('projects').update({ custom_style_anchor: null, style_anchor_key: '' }).eq('id', projectId)
+      if (!current()) return false
+      if (error) throw new Error(error.message)
+      written = true
+      const { data, error: readError } = await db.from('projects').select('style_anchor_key,custom_style_anchor').eq('id', projectId).maybeSingle()
+      if (!current()) return false
+      if (readError || !data || data.custom_style_anchor != null) throw new Error(readError?.message ?? 'Removed style could not be verified')
+      set({ error: null })
+      return true
+    } catch (error) {
+      if (current()) set({
+        ...(!written ? { styleAnchorKey: prevKey, customStyleAnchor: prevCustom } : {}),
+        error: translate(useLocaleStore.getState().locale, 'Could not remove my art style: {message}', { message: error instanceof Error ? error.message : String(error) }),
       })
       return false
     }

@@ -3,6 +3,12 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { requireProjectAccess } from '@/lib/api/guard'
 import { appearanceI18nFields } from '@/lib/writer/i18n/derive-en'
+import {
+  characterUsage,
+  isChatMadeCharacter,
+  queuedJobDrawsCharacter,
+  removeCharacterFromProducerDraft,
+} from '@/lib/artist/character-delete'
 
 export const runtime = 'nodejs'
 
@@ -201,6 +207,87 @@ export async function PATCH(req: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     console.error('[artist/character PATCH]', message)
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
+
+/**
+ * 채팅으로 만들어진 인물 카드 지우기(2026-10-27 디자이너 QA 1차 #04 · 오너 "채팅 추가 막고 안내").
+ *   산문에서 나온 인물(origin producer · writer)은 지우지 않는다(from_prose). 그림을 그리는 중(drawing)이거나
+ *   씬 · 샷이 부르고 있으면(in_use) 까닭과 함께 거절한다. 모습 · 그림 후보는 FK cascade 로 함께 지워진다.
+ *   산문 초안(producer_draft)에 접혀 들어간 같은 카드를 먼저 빼고 행을 지운다 — 다시 열어도 되살아나지 않게.
+ *   스토리지 파일은 남긴다(모습 지우기와 같은 규칙).
+ */
+export async function DELETE(req: Request) {
+  const demoBlocked = demoWriteBlock(req)
+  if (demoBlocked) return demoBlocked
+
+  try {
+    const body = (await req.json().catch(() => ({}))) as { projectId?: unknown; characterId?: unknown }
+    const projectId = typeof body.projectId === 'string' ? body.projectId : undefined
+    const characterId = typeof body.characterId === 'string' ? body.characterId.trim() : ''
+    if (!projectId || !characterId) {
+      return NextResponse.json({ error: 'Invalid request: projectId, characterId required' }, { status: 400 })
+    }
+
+    const access = await requireProjectAccess(req, projectId)
+    if (!access.ok) return access.response
+
+    const { data: person, error: personError } = await supabaseAdmin
+      .from('characters')
+      .select('character_id, name, origin')
+      .eq('project_id', projectId)
+      .eq('character_id', characterId)
+      .maybeSingle()
+    if (personError) throw personError
+    if (!person) return NextResponse.json({ error: 'Character not found', code: 'not_found' }, { status: 404 })
+    if (!isChatMadeCharacter(person)) {
+      return NextResponse.json({ error: 'This character comes from the prose, so it cannot be deleted', code: 'from_prose' }, { status: 409 })
+    }
+
+    const [jobs, scenes, shots, overrides] = await Promise.all([
+      supabaseAdmin.from('generation_jobs').select('id, target').eq('project_id', projectId).eq('kind', 'character_view').eq('status', 'queued'),
+      supabaseAdmin.from('scenes').select('scene_id, characters_present').eq('project_id', projectId),
+      supabaseAdmin.from('shots').select('shot_id, characters, character_appearance_keys, dialogue_lines, director_refs').eq('project_id', projectId),
+      supabaseAdmin.from('scene_character_appearance_overrides').select('scene_id, character_id').eq('project_id', projectId).eq('character_id', characterId),
+    ])
+    for (const result of [jobs, scenes, shots, overrides]) if (result.error) throw result.error
+    if (queuedJobDrawsCharacter(jobs.data ?? [], characterId)) {
+      return NextResponse.json({ error: 'This character is still being drawn', code: 'drawing' }, { status: 409 })
+    }
+    const usage = characterUsage(characterId, { scenes: scenes.data ?? [], shots: shots.data ?? [], overrides: overrides.data ?? [] })
+    if (usage.scenes + usage.shots > 0) {
+      return NextResponse.json({ error: 'This character is used in scenes or shots', code: 'in_use', usage }, { status: 409 })
+    }
+
+    const { data: project, error: projectError } = await supabaseAdmin
+      .from('projects')
+      .select('producer_draft')
+      .eq('id', projectId)
+      .maybeSingle()
+    if (projectError) throw projectError
+    const cleaned = removeCharacterFromProducerDraft((project as { producer_draft?: unknown } | null)?.producer_draft ?? null, { characterId, name: person.name ?? '' })
+    if (cleaned.changed) {
+      const { error } = await supabaseAdmin.from('projects').update({ producer_draft: cleaned.draft }).eq('id', projectId)
+      if (error) throw error
+    }
+
+    const { error: deleteError } = await supabaseAdmin
+      .from('characters')
+      .delete()
+      .eq('project_id', projectId)
+      .eq('character_id', characterId)
+    if (deleteError) {
+      // 다른 표(관계 · 씬별 모습)가 아직 이 인물을 붙잡고 있다 — 쓰이는 인물과 같은 까닭으로 알린다.
+      if ((deleteError as { code?: string }).code === '23503') {
+        return NextResponse.json({ error: 'This character is used in scenes or shots', code: 'in_use' }, { status: 409 })
+      }
+      throw deleteError
+    }
+    return NextResponse.json({ ok: true, characterId })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    console.error('[artist/character DELETE]', message)
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

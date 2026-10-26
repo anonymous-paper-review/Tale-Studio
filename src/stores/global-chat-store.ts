@@ -149,8 +149,16 @@ interface GlobalChatState {
   refreshSceneStory: () => void
   sceneStoryProposalPending: { projectId: string; id: string | null } | null
   syncSceneStoryProposal: (projectId: string, id: string | null) => void
+  /** 마지막으로 적용 · 버린 수정안(디자이너 QA 1차 관찰 26) — 미리 보기를 다시 읽기 전에도 그 카드를 내린다(unresolvedSceneStoryProposal). */
+  sceneStoryResolved: { projectId: string; id: string } | null
   /** variantId — 다시 쓰기의 세 안 중 고른 안(2026-10-02 시안 v04). AI 수정안 하나면 비운다. */
   resolveSceneStoryProposal: (action: 'apply' | 'discard', proposalId: string, variantId?: string) => Promise<boolean>
+  /** 바꿀 곳이 없었던 수정안(디자이너 QA 1차 #01)을 카드 없이 버리고 채팅에 한 줄 알린다. 수정안 하나에 한 번. */
+  settleUnchangedSceneStoryProposal: (proposalId: string) => Promise<boolean>
+  /** 산문 확정 창을 확정하지 않고 닫은 프로젝트([아니오] · X · Esc, 디자이너 QA 1차 #08) — 그 뒤 적용 · 저장은 다음 단계를 다시 묻지 않는다. */
+  proseConfirmDeclined: string | null
+  /** 산문 확정 창의 [아니오] · 닫기 — 아무것도 넘기지 않고 창을 닫으며 위 기록을 남긴다. 확정한 뒤 닫기는 closeConfirm 이다. */
+  declineProseConfirm: () => void
   /** 다시 쓰기(시안 v04) — 정도 하나로 세 가지 안을 요청한다. 조건(리뉴얼 1차 Writer)을 주면 그 길이 · 장르 · 소재로 쓴다. */
   rewriteSceneStory: (level: RewriteLevel | null, conditions?: ProseConditions) => Promise<boolean>
   /** 리뉴얼 1차 Writer — 적용 · 저장 뒤 다음 단계를 묻는 카드(ask), 아니요면 할 일 버튼(more). */
@@ -271,8 +279,9 @@ interface GlobalChatState {
   offerImageRoles: (images: ChatImageInput[], opts: { typed: string; msg: string }) => boolean
   /** 새 프로젝트 화면에서 고른 대로 이어서 한다 — 그림 카드 · 그림체 · 원작(대본 · 만화) 채우기 뒤 트리트먼트(2026-10-09 오너). 묻지 않는다. */
   runCreationPlan: (plan: PendingCreation) => Promise<void>
-  /** 스타일 선택 창의 "내 그림체 올리기"로 올린 그림을 그림체로 쓴다 — 채팅의 "그림체"와 같은 규칙(2026-10-10 오너). */
-  applyUploadedStyle: (image: ChatImageInput) => Promise<void>
+  /** 스타일 선택 창의 "내 그림체 올리기"로 올린 그림을 그림체로 쓴다 — 채팅의 "그림체"와 같은 규칙(2026-10-10 오너).
+   *  stage = 말풍선 · 안내를 남길 채팅 단계(기본 producer). Artist 스타일 창은 artist 로 부른다(2026-10-27 디자이너 QA 1차 관찰 49). */
+  applyUploadedStyle: (image: ChatImageInput, opts?: { stage?: StageId }) => Promise<void>
   approvePendingProposal: (id?: string) => Promise<boolean>
   /** 백그라운드 생성 완료 통지 — 다른 stage에 있을 때만 배지 bump + 스로틀된 채팅 메시지. */
   notifyCompletion: (stage: StageId, label: string) => void
@@ -406,6 +415,8 @@ interface ImageRoleGate {
   msg: string
   /** 사용자가 읽고 고른 분석 안내의 판 — 없으면 채팅 그림마다 질문(chat-image-role-v1). */
   consent?: string
+  /** 그림체 안내를 남길 채팅 단계 — 없으면 producer(Artist 스타일 창은 artist, 2026-10-27 디자이너 QA 1차 관찰 49). */
+  stage?: StageId
 }
 
 interface ImageBatchGate {
@@ -432,12 +443,12 @@ function askImageBatch(get: () => GlobalChatState): void {
   )
 }
 
-/** 사용자 말풍선을 그림과 함께 남긴다(질문을 세우기 전 · 묻지 않고 바로 쓸 때). */
-function recordImageTurn(set: (fn: (state: GlobalChatState) => Partial<GlobalChatState>) => void, msg: string, images: ChatImageInput[]): void {
+/** 사용자 말풍선을 그림과 함께 남긴다(질문을 세우기 전 · 묻지 않고 바로 쓸 때). stage 기본은 producer. */
+function recordImageTurn(set: (fn: (state: GlobalChatState) => Partial<GlobalChatState>) => void, msg: string, images: ChatImageInput[], stage: StageId = 'producer'): void {
   const projectId = useProjectStore.getState().projectId
   const content = withAttachmentMarker(msg, images.map((image) => image.thumbUrl))
-  set((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'producer' as const, role: 'user' as const, content }] }))
-  if (projectId) saveChatMessage(projectId, 'producer', 'user', content)
+  set((state) => ({ messages: [...state.messages, { id: makeId(), stage, role: 'user' as const, content }] }))
+  if (projectId) saveChatMessage(projectId, stage, 'user', content)
 }
 
 const comicPageUrls = (page: ChatImageInput) => (page.sliceUrls.length ? page.sliceUrls : [page.thumbUrl])
@@ -513,14 +524,14 @@ function askComicStyle(get: () => GlobalChatState, images: ChatImageInput[], pla
 const postJson = (url: string, body: unknown) =>
   fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
 
-/** Producer 한 줄을 채팅에 남긴다 — 보던 프로젝트가 바뀌었으면 남기지 않는다. */
-function producerSpeaker(projectId: string): (content: string) => void {
+/** Producer 한 줄을 채팅에 남긴다 — 보던 프로젝트가 바뀌었으면 남기지 않는다. stage 를 주면 그 단계 이름으로 남긴다(Artist 스타일 창). */
+function producerSpeaker(projectId: string, stage: StageId = 'producer'): (content: string) => void {
   return (content) => {
     if (useProjectStore.getState().projectId !== projectId) return
     useGlobalChatStore.setState((state) => ({
-      messages: [...state.messages, { id: makeId(), stage: 'producer' as const, role: 'model' as const, content }],
+      messages: [...state.messages, { id: makeId(), stage, role: 'model' as const, content }],
     }))
-    saveChatMessage(projectId, 'producer', 'model', content)
+    saveChatMessage(projectId, stage, 'model', content)
   }
 }
 
@@ -528,12 +539,13 @@ function producerSpeaker(projectId: string): (content: string) => void {
  * 그림 한 장을 이 프로젝트 그림체(사용자 앵커)로 정하고 그림체 분석기로 분석한다(2026-10-09 — 만화 원고 · 새 프로젝트의 그림체 그림).
  *   그림체 등록은 매체(애니 · 카툰 · 실사 등)가 있어야 받는다 — 먼저 허용 목록에서 고르고, 못 고르면 정하지 않는다.
  *   분석이 실패해도 그림은 그림체로 남는다. consent = 사용자가 읽고 고른 분석 안내의 판.
+ *   stage = 안내를 남길 채팅 단계(기본 producer · Artist 스타일 창은 artist — 2026-10-27 디자이너 QA 1차 관찰 49).
  */
-async function runStyleFromImage(image: ChatImageInput, kind: 'comic' | 'picture', consent: string): Promise<void> {
+async function runStyleFromImage(image: ChatImageInput, kind: 'comic' | 'picture', consent: string, stage: StageId = 'producer'): Promise<void> {
   const projectId = useProjectStore.getState().projectId
   if (!projectId) return
   const voice = contentLocale()
-  const speak = producerSpeaker(projectId)
+  const speak = producerSpeaker(projectId, stage)
   const sameProject = () => useProjectStore.getState().projectId === projectId
   const comic = kind === 'comic'
   // 고정된 그림체(그림체 추출로 정함)는 바꾸지 않는다 — 분석 모델도 부르지 않는다(2026-10-09 오너).
@@ -809,6 +821,8 @@ interface MaterialPlan {
   consent: string
   /** 만화를 다시 옮길 때 이어서 할 일(새 프로젝트의 트리트먼트). */
   then?: ComicRetry['then']
+  /** 그림체 안내를 남길 채팅 단계 — 없으면 producer. */
+  stage?: StageId
 }
 
 async function runMaterialPlan(get: () => GlobalChatState, plan: MaterialPlan): Promise<{ scriptSet: boolean; styleDone: Promise<void> }> {
@@ -827,7 +841,7 @@ async function runMaterialPlan(get: () => GlobalChatState, plan: MaterialPlan): 
     await cardsDone
     return { scriptSet: comic.scriptSet, styleDone: comic.styleDone }
   }
-  const styleDone = plan.styleImage ? runStyleFromImage(plan.styleImage, 'picture', plan.consent) : Promise.resolve()
+  const styleDone = plan.styleImage ? runStyleFromImage(plan.styleImage, 'picture', plan.consent, plan.stage) : Promise.resolve()
   await cardsDone
   return { scriptSet: false, styleDone }
 }
@@ -845,6 +859,7 @@ function materialPlanFromRoles(plan: ImageRoleGate, comicStyle: 'lock' | 'adapt'
     typed: plan.typed,
     referenceMsg: plan.msg,
     consent: plan.consent ?? CHAT_IMAGE_ROLE_CONSENT,
+    ...(plan.stage ? { stage: plan.stage } : {}),
   }
 }
 
@@ -1000,6 +1015,8 @@ function writerProseLive(): boolean {
 const sceneStoryRequests = new Map<string, symbol>()
 // 트리트먼트를 다 썼다고 알린 실행(프로젝트:실행) — 화면이 다시 그려져도 같은 말을 두 번 남기지 않는다.
 const announcedTreatments = new Set<string>()
+// 바꿀 곳이 없어 버린 수정안(프로젝트:수정안) — 두 탭 · 다시 그리기가 같은 수정안을 또 버리거나 같은 말을 두 번 남기지 않는다.
+const settledUnchangedProposals = new Set<string>()
 
 /** 넘김 확인 창(2026-10-01 오너). via = 창을 연 곳 — 채팅에서 연 창은 진행할 때 넘김 문장을 다시 남기지 않는다. */
 export type HandoffConfirm =
@@ -1217,6 +1234,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   sceneStoryEdit: null,
   sceneStoryRefresh: 0,
   sceneStoryProposalPending: null,
+  sceneStoryResolved: null,
+  proseConfirmDeclined: null,
   sceneStoryVariantPreview: null,
   refreshSceneStory: () => set((state) => ({ sceneStoryRefresh: state.sceneStoryRefresh + 1 })),
   previewSceneStoryVariant: (proposalId, variantId) => {
@@ -1654,7 +1673,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         get().refreshSceneStory()
         return false
       }
-      set({ sceneStoryProposalPending: null, sceneStoryVariantPreview: null })
+      // 정한 수정안은 이 순간 카드에서 내린다(디자이너 QA 1차 관찰 26) — 미리 보기를 다시 읽을 때까지 남아 있으면
+      //   아래 다음 단계 질문이 카드 밑에 떴다가 위로 튀고, 남은 [적용]을 또 누르면 오류가 났다.
+      set({ sceneStoryProposalPending: null, sceneStoryVariantPreview: null, sceneStoryResolved: { projectId, id: proposalId } })
       get().refreshSceneStory()
       restartWriterStatus(projectId)
       // 리뉴얼 1차 Writer — 고친 걸 적용하면 다음 단계(브레이크다운)를 먼저 묻는다(프로토타입 WP).
@@ -1666,6 +1687,26 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     } finally {
       sceneGateInFlight.delete(projectId)
     }
+  },
+
+  settleUnchangedSceneStoryProposal: async (proposalId) => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId || !proposalId) return false
+    const key = `${projectId}:${proposalId}`
+    if (settledUnchangedProposals.has(key)) return false
+    settledUnchangedProposals.add(key)
+    // 보통의 버리기와 같은 길 — 버린 수정안은 수정 지시(_sceneRevisionNotes)에 남지 않고, 다음 단계도 묻지 않는다.
+    const discarded = await get().resolveSceneStoryProposal('discard', proposalId)
+    if (!discarded) {
+      // 버리지 못했으면 다음에 화면이 다시 볼 때 또 시도한다.
+      settledUnchangedProposals.delete(key)
+      return false
+    }
+    if (useProjectStore.getState().projectId !== projectId) return true
+    const content = translate(contentLocale(), 'I could not find anything to change, so I left the prose as it is. Tell me a little more specifically how to change it.')
+    set((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'producer', role: 'model', content }] }))
+    saveChatMessage(projectId, 'producer', 'model', content)
+    return true
   },
 
   rewriteSceneStory: async (level, conditions) => {
@@ -1721,6 +1762,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     // 같은 카드라도 물을 때마다 새로 남긴다(프로토타입 "고친 걸 적용하면 다시 물어볼게요") — 떠 있는 카드는 먼저 내린다.
     const current = get().suggestion
     if (current?.id.startsWith(`writer-next:${projectId}:`)) get().dismissSuggestion({ implicit: true })
+    // 확정 창에서 [아니오]를 고른 사람에게는 같은 질문을 또 하지 않는다(디자이너 QA 1차 #08) — 적용했다는 말과
+    //   넘어가는 길([브레이크다운하기] · "다음 단계로")만 단추 없이 남긴다. 적용 · 직접 저장이 모두 이 길로 온다.
+    if (step === 'ask' && get().proseConfirmDeclined === projectId) {
+      const content = translate(locale, 'Applied. When you are ready to move on, press Breakdown or say "Next step".')
+      set((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'producer', role: 'model', content }] }))
+      saveChatMessage(projectId, 'producer', 'model', content)
+      return
+    }
     get().offerSuggestion({
       id: `writer-next:${projectId}:${step}:${makeId()}`,
       stage: 'producer',
@@ -1730,6 +1779,12 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         : 'What would you like to do next? When you apply a change, I will ask again. You can also press Breakdown at any time.'),
       action: { kind: 'writerNext', step },
     }, { preempt: true })
+  },
+
+  declineProseConfirm: () => {
+    const projectId = useProjectStore.getState().projectId
+    useWriterRoomStore.getState().closeConfirm()
+    if (projectId) set({ proseConfirmDeclined: projectId })
   },
 
   confirmProse: async () => {
@@ -2860,7 +2915,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         const costUpdates = updates.filter((u) =>
           u.type === 'regenerateCharacter' || u.type === 'regenerateWorldAsset'
         )
-        const immediateUpdates = updates.filter((u) => u.type === 'createCharacter')
+        // 새 인물 카드는 채팅으로 만들지 않는다(2026-10-27 디자이너 QA 1차 #04 · 오너 "채팅 추가 막고 안내") — 예전 서버가 보낸 만들기 명령도 버린다.
+        const ignoredNewCards = (data.updates as Array<{ type?: unknown } | null>).filter((u) => u?.type === 'createCharacter').length
 
         for (const costUpdate of costUpdates) {
           // 승인 카드의 target 은 사람이 읽는 제목 — id(char_2 등)가 아니라 이름으로(#d2 2026-08-11).
@@ -2931,14 +2987,6 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
               })
 
           artistProposals.push(proposal)
-        }
-
-        if (immediateUpdates.length > 0) {
-          void useArtistStore
-            .getState()
-            .applyUpdates(immediateUpdates)
-            .then(() => patchTrace({ appliedCount: immediateUpdates.length }))
-            .catch(() => patchTrace({ skippedCount: 1 }))
         }
 
         // 원천(외형) 변경 제안(C3 F6) — 자동 실행 금지, pending-proposal 승인 게이트 전용.
@@ -3101,8 +3149,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           }
         }
         patchTrace({
-          appliedCount: immediateUpdates.length,
-          skippedCount: 0,
+          appliedCount: 0,
+          skippedCount: ignoredNewCards,
           pendingProposal: get().pendingProposal?.traceId === traceId,
           generationStatus:
             get().pendingProposal?.traceId === traceId ? 'awaiting_approval' : null,
@@ -3797,11 +3845,13 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     return true
   },
 
-  applyUploadedStyle: async (image) => {
+  applyUploadedStyle: async (image, opts) => {
     if (!useProjectStore.getState().projectId) return
+    // 부른 화면의 단계 이름으로 남긴다 — Artist 스타일 창에서 올렸는데 Writer 가 말한 것처럼 보였다(2026-10-27 디자이너 QA 1차 관찰 49).
+    const stage = opts?.stage ?? 'producer'
     // 어떤 그림을 그림체로 골랐는지 채팅 기록에 남긴다(내 말풍선 + 그림).
-    recordImageTurn(set, translate(contentLocale(), 'Use it as the art style'), [image])
-    await finishImageRoles(get, { items: [{ image, role: 'style' }], typed: '', msg: '', consent: STYLE_PICKER_CONSENT })
+    recordImageTurn(set, translate(contentLocale(), 'Use it as the art style'), [image], stage)
+    await finishImageRoles(get, { items: [{ image, role: 'style' }], typed: '', msg: '', consent: STYLE_PICKER_CONSENT, stage })
   },
 
   runCreationPlan: async (plan) => {
@@ -4494,6 +4544,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     chatSession += 1
     sceneStoryRequests.clear()
     announcedTreatments.clear()
+    settledUnchangedProposals.clear()
     // 프로젝트 전환 시 진행 중인 완료-코얼레싱 타이머/누적도 비운다.
     for (const k of Object.keys(pendingCompletions)) {
       clearTimeout(pendingCompletions[k].timer)
@@ -4508,6 +4559,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       sceneStoryEdit: null,
       sceneStoryRefresh: 0,
       sceneStoryProposalPending: null,
+      sceneStoryResolved: null,
+      proseConfirmDeclined: null,
       sceneStoryVariantPreview: null,
       recoveryProgress: null,
       error: null,
@@ -4538,3 +4591,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     })
   },
 }))
+
+// 산문 확정 창이 열리면 채팅에 떠 있던 "다음 단계로 넘어갈까요?" 단추는 내린다(디자이너 QA 1차 #08) — 같은 질문을 두 곳에 띄우지 않는다.
+//   창을 여는 곳이 여럿이라(채팅 넘김 말 · 다음 단계 버튼 · [브레이크다운하기]) 여는 쪽마다 고치지 않고 창이 열리는 순간을 본다.
+useWriterRoomStore.subscribe((room, before) => {
+  if (!room.confirmOpen || before.confirmOpen) return
+  const chat = useGlobalChatStore.getState()
+  if (chat.suggestion?.action?.kind === 'writerNext') chat.dismissSuggestion({ implicit: true })
+})

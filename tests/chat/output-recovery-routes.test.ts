@@ -97,7 +97,7 @@ describe.each([['Producer', producer], ['Writer', writer], ['Artist', artist]] a
       ? { extractedSettings: { styleAnchorKey: 'real' } }
       : _name === 'Writer'
         ? { updates: [{ type: 'addScene', narrativeSummary: '서로를 발견한다.' }] }
-        : { updates: [{ type: 'createCharacter', name: '민수' }] }
+        : { updates: [{ type: 'regenerateCharacter', characterId: 'char_minsu' }] }
     mocks.chat.mockImplementation(async (...args: unknown[]) => {
       const options = args[5] as ChatOptions
       options.onUsage(firstUsage)

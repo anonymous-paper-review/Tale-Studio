@@ -169,11 +169,12 @@ describe('Artist 그림 보내기 순서', () => {
     expect(runs).toEqual([1, 1, 1, 1, 1, 1, 1])
   })
 
-  it('Artist 화면의 자동 생성 · 빈 시트 다시 만들기 · 채팅 다시 만들기가 모두 같은 가변 규칙으로 보낸다', () => {
-    // 왜: 세 경로가 같은 유저 상한을 쓴다 — 한 곳만 3장이면 러프 우선이 깨진다.
+  it('Artist 화면의 자동 생성 · 빈 시트 다시 만들기 · 채팅 다시 만들기 · 안 나온 그림 다시 그리기가 모두 같은 가변 규칙으로 보낸다', () => {
+    // 왜: 네 경로가 같은 유저 상한을 쓴다 — 한 곳만 3장이면 러프 우선이 깨진다.
+    //   2026-10-27 디자이너 QA 1차 #05: 안 나온 그림 다시 그리기가 한꺼번에 보내 한도(6장)에 막혔다 — 같은 규칙에 넣었다(3 → 4).
     const store = readFileSync('src/stores/artist-store.ts', 'utf8')
-    expect(store.match(/runAdaptivePool\(/g)?.length).toBe(3)
-    expect(store.match(/runAdaptivePool\([\s\S]*?,\s*fetchArtistGenerationLimit\s*,?\s*\)/g)?.length).toBe(3)
+    expect(store.match(/runAdaptivePool\(/g)?.length).toBe(4)
+    expect(store.match(/runAdaptivePool\([\s\S]*?,\s*fetchArtistGenerationLimit\s*,?\s*\)/g)?.length).toBe(4)
     expect(store).not.toMatch(/runPool\(/)
     expect(store).not.toContain('ARTIST_GENERATION_CONCURRENCY')
   })

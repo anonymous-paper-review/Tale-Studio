@@ -217,6 +217,8 @@ function WritingOverlay() {
   return (
     <BusyOverlayPortal
       open={open}
+      // 실패하면 실패 안내로 바뀐다 — 도는 표시 대신 경고를 두고, 왼쪽 레일의 단계 이동도 다시 연다(디자이너 QA 1차 #07).
+      busy={!failed}
       title={failed ? t(startFailed ? "Couldn't start" : "Couldn't write the prose draft") : t('Writing the prose draft')}
       description={failed ? t(startFailed ? 'Please check the settings and try again.' : 'Something went wrong while writing. Please try again.') : undefined}
       steps={stepsFrom(WRITING_STEPS, writing.step, t)}

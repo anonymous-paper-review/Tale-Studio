@@ -47,6 +47,36 @@ export function sceneStoryProposalExpired(proposal: SceneStoryProposal, now = Da
 const equal = (left: unknown, right: unknown) => JSON.stringify(left) === JSON.stringify(right)
 const sceneIds = (scenes: Scenes) => scenes.scenes.map((scene) => scene.scene_id)
 
+type SceneRow = SceneStoryProposalView['before'][number]
+const sceneRows = (value: Scenes | undefined): SceneRow[] => (value?.scenes ?? []).map((scene, index) => ({
+  sceneId: scene.scene_id, index, beats: scene.scene_actions,
+}))
+
+/** 수정안 카드의 비교 줄 — 같은 자리 · 같은 글인 씬은 빼고 바뀐 씬만 남긴다. */
+export function changedSceneRows(before: SceneRow[], after: SceneRow[]): Array<{ id: string; before?: SceneRow; after?: SceneRow }> {
+  return [...new Set([...before, ...after].map((scene) => scene.sceneId))].flatMap((id) => {
+    const was = before.find((scene) => scene.sceneId === id)
+    const now = after.find((scene) => scene.sceneId === id)
+    return was?.index === now?.index && equal(was?.beats, now?.beats) ? [] : [{ id, before: was, after: now }]
+  })
+}
+
+/** 고친 결과가 지금 산문과 한 글자도 다르지 않다(씬 · 순서 · 글이 모두 같다) — 카드로 보일 수정안이 아니다(디자이너 QA 1차 #01). */
+export function sceneStoryUnchanged(base: Scenes, after: Scenes): boolean {
+  return changedSceneRows(sceneRows(base), sceneRows(after)).length === 0
+}
+
+/** 적용 · 버리기를 마친 수정안은 미리 보기를 다시 읽기 전이라도 카드에서 내린다(디자이너 QA 1차 관찰 26).
+ *  resolved = 이 프로젝트에서 마지막으로 정한 수정안. 새로 오는 다른 수정안은 그대로 보인다. */
+export function unresolvedSceneStoryProposal<T extends { id: string }>(
+  proposal: T | null | undefined,
+  resolved: { projectId: string; id: string } | null | undefined,
+  projectId: string | null | undefined,
+): T | null {
+  if (!proposal) return null
+  return resolved && resolved.projectId === projectId && resolved.id === proposal.id ? null : proposal
+}
+
 /** AI가 바꾼 씬만 적용한다. 구성 변경은 초안 전체가 그대로일 때만 허용한다. */
 export function mergeSceneStoryProposal(proposal: SceneStoryProposal, current: Scenes): Scenes | null {
   const { baseScenes: base, scenes: after } = proposal
@@ -76,9 +106,6 @@ export function sceneStoryProposalView(
 ): SceneStoryProposalView | null {
   if (!proposal) return null
   const expired = sceneStoryProposalExpired(proposal, now)
-  const scenes = (value: Scenes | undefined) => (value?.scenes ?? []).map((scene, index) => ({
-    sceneId: scene.scene_id, index, beats: scene.scene_actions,
-  }))
   if (proposal.variants?.length) {
     // 오래 걸려 끝나지 않은 안은 실패로 본다 — 나온 안은 그대로 고를 수 있다.
     const variants = proposal.variants.map((variant) => {
@@ -88,7 +115,7 @@ export function sceneStoryProposalView(
         id: variant.id,
         direction: variant.direction,
         status,
-        after: scenes(variant.scenes),
+        after: sceneRows(variant.scenes),
         stale: !current || (asProposal ? mergeSceneStoryProposal(asProposal, current) === null : !equal(proposal.baseScenes, current)),
         ...(status === 'failed' ? { error: variant.error ?? 'scene_story_rewrite_timed_out' } : {}),
       }
@@ -99,7 +126,7 @@ export function sceneStoryProposalView(
       status,
       feedback: proposal.feedback,
       createdAt: proposal.createdAt,
-      before: scenes(proposal.baseScenes),
+      before: sceneRows(proposal.baseScenes),
       after: [],
       stale: !current || !equal(proposal.baseScenes, current),
       level: proposal.level,
@@ -112,8 +139,8 @@ export function sceneStoryProposalView(
     status: expired ? 'failed' : proposal.status,
     feedback: proposal.feedback,
     createdAt: proposal.createdAt,
-    before: scenes(proposal.baseScenes),
-    after: scenes(proposal.scenes),
+    before: sceneRows(proposal.baseScenes),
+    after: sceneRows(proposal.scenes),
     stale: !current || (proposal.status === 'ready'
       ? mergeSceneStoryProposal(proposal, current) === null
       : !equal(proposal.baseScenes, current)),
