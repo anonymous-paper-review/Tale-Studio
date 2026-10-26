@@ -2627,12 +2627,23 @@ export const KO: Record<string, string> = {
   'Draw the remaining cuts': '남은 컷 그리기',
   'Yes, hand over': '예, 넘기기',
   // ── 시리즈(2026-10-26) · 프로젝트 목록 · 다음 화 만들기 ──
-  'Create next episode': '다음 화 만들기',
-  'Available on Producer10 and above': 'Producer10 이상에서 쓸 수 있어요',
   'The previous episode was deleted': '앞 화가 지워졌어요',
-  'You can create the next episode from an episode where you pressed [Create] in Artist.':
-    'Artist에서 [만들기]를 누른 화부터 다음 화를 만들 수 있어요.',
+  'You can create the next episode from an episode where you started making the character and background images.':
+    '인물·배경 그림을 만들기 시작한 화부터 다음 화를 만들 수 있어요.',
   'View pricing': '요금제 보기',
+  // [새 프로젝트] → 처음부터 / 앞 화에서 이어 만들기(2026-10-26 오너: 카드 버튼을 여기로 옮김)
+  'How do you want to start?': '어떻게 시작할까요?',
+  'Start from scratch': '처음부터 만들기',
+  'Start a new story with new characters and backgrounds.': '새 인물·배경으로 새 이야기를 시작해요.',
+  'Continue from a previous episode': '앞 화에서 이어 만들기',
+  'Available on Producer10 and above': 'Producer10 이상에서 쓸 수 있어요',
+  'Pick an episode and carry over its characters, backgrounds, art style and voices.':
+    '앞 화를 골라 인물·배경·그림체·말투를 이어받아요.',
+  'Which episode do you want to continue?': '어느 화에서 이어 만들까요?',
+  'Only episodes where you started making the character and background images appear. Most recently edited first.':
+    '인물·배경 그림을 만들기 시작한 화만 보여요. 최근에 고친 순서예요.',
+  'Find by project name': '프로젝트 이름으로 찾기',
+  'No episode matches that name.': '이름이 맞는 화가 없어요.',
   // 요금제 안내(프로토타입 LU)
   'Creating a next episode needs Producer10 or above': '다음 화 만들기는 Producer10 이상에서 쓸 수 있어요',
   'Keeping the previous episode and the next one together needs at least 2 project slots.':
@@ -2664,8 +2675,7 @@ export const KO: Record<string, string> = {
     '이 화의 영상·그림 파일 전부 · 다음 화 Writer가 읽던 이 화 줄거리',
   'After deleting, the next episode card shows "The previous episode was deleted". This cannot be undone.':
     '지우면 다음 화 카드에 "앞 화가 지워졌어요"가 보여요. 되돌릴 수 없어요.',
-  // 앞 화 산문 보기
-  'View prose': '산문 보기',
+  // 앞 화 산문 보기(시작 화면 배너)
   'Previous episode prose': '앞 화 산문',
   'This is the confirmed prose of "{title}". If you edit the previous episode, this changes too.':
     '「{title}」의 확정 산문이에요. 앞 화를 고치면 여기도 바뀌어요.',

@@ -51,8 +51,8 @@ export async function GET() {
     //   (수십 프로젝트 × 샷 JSONB 포인터)에서 충분히 가볍다.
     const ids = (projects ?? []).map((p) => p.id)
     let thumbnails = new Map<string, string>()
-    // 시리즈(2026-10-26): 카드의 [다음 화 만들기]는 Artist [만들기]를 누른 화(씬 1개 이상)에서만 켜진다.
-    //   카드마다 따로 묻지 않고 목록과 같은 한 번의 묶음 조회로 센다 — 프로젝트 수만큼 조회가 늘어나지 않는다.
+    // 시리즈(2026-10-26): "앞 화에서 이어 만들기" 목록에는 씬이 1개 이상인 화(인물 · 배경 그림을 만들기 시작한 화)만 나온다.
+    //   프로젝트마다 따로 묻지 않고 목록과 같은 한 번의 묶음 조회로 센다 — 프로젝트 수만큼 조회가 늘어나지 않는다.
     let projectsWithScenes: ReadonlySet<string> = new Set<string>()
     if (ids.length > 0) {
       // 인물 컬럼은 portrait(얼굴 크롭)다 — 2026-09-09 동업자 실측: 없는 컬럼 portrait_url 을 골라 PostgREST 가 undefined 를

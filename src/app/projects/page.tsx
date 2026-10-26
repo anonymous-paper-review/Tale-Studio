@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { BookOpen, Clock, Film, Loader2, Lock, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Clock, Film, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
 import {
   useProjectStore,
 } from '@/stores/project-store'
@@ -25,21 +25,16 @@ import type { StageId } from '@/types'
 import { projectOpenPath, projectStageLabel } from '@/lib/project/open-path'
 import { DashboardHeader } from '@/components/dashboard/dashboard-header'
 import { useT } from '@/lib/i18n'
+import { relativeTime } from '@/lib/i18n/relative-time'
 import { clearLastProjectId, readLastProjectId } from '@/lib/session-restore'
 import {
   continuingEpisodes,
-  nextEpisodeButton,
+  newProjectEntry,
   prevEpisodeLink,
-  type NextEpisodeFailure,
   type SeriesPlanState,
 } from '@/features/projects/series-list'
-import {
-  NextEpisodeDialog,
-  PrevProseDialog,
-  SeriesDeleteWarningDialog,
-  SeriesPlanDialog,
-  SeriesSlotLimitDialog,
-} from '@/features/projects/next-episode-dialog'
+import { SeriesDeleteWarningDialog } from '@/features/projects/next-episode-dialog'
+import { NewProjectDialog } from '@/features/projects/new-project-dialog'
 
 interface ProjectItem {
   id: string
@@ -52,22 +47,8 @@ interface ProjectItem {
   referenceProjectId: string | null
   /** 앞 화를 지워도 카드에 남는 앞 화 제목. 시리즈가 아니면 null. */
   seriesPrevTitle: string | null
-  /** 이 화로 다음 화를 만들 수 있나 — Artist [만들기]를 누른 화(씬 1개 이상). */
+  /** 이 화로 다음 화를 만들 수 있나 — 인물 · 배경 그림을 만들기 시작해 씬이 1개 이상 생긴 화. */
   canContinue: boolean
-}
-
-
-function formatDate(dateStr: string | null) {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  const diffMin = Math.floor((Date.now() - d.getTime()) / 60000)
-  if (diffMin < 1) return 'just now'
-  if (diffMin < 60) return `${diffMin}m ago`
-  const diffHr = Math.floor(diffMin / 60)
-  if (diffHr < 24) return `${diffHr}h ago`
-  const diffDay = Math.floor(diffHr / 24)
-  if (diffDay < 7) return `${diffDay}d ago`
-  return d.toLocaleDateString()
 }
 
 // #thumb-fit(2026-08-23 오너): 16:9 박스에 object-cover 로 욱여넣으면 이형 해상도(웹툰 세로 스트립,
@@ -110,20 +91,14 @@ function ProjectThumb({ url }: { url: string }) {
 
 function ProjectCard({
   project,
-  plan,
   onOpen,
   onRenamed,
   onDeleteRequest,
-  onNextEpisode,
-  onProse,
 }: {
   project: ProjectItem
-  plan: SeriesPlanState
   onOpen: (p: ProjectItem) => void
   onRenamed: (id: string, title: string) => void
   onDeleteRequest: (p: ProjectItem) => void
-  onNextEpisode: (p: ProjectItem) => void
-  onProse: (p: ProjectItem) => void
 }) {
   const t = useT()
   const [editing, setEditing] = useState(false)
@@ -131,7 +106,6 @@ function ProjectCard({
   const inputRef = useRef<HTMLInputElement>(null)
 
   const link = prevEpisodeLink(project)
-  const next = nextEpisodeButton(project, plan)
 
   const handleSave = async () => {
     setEditing(false)
@@ -236,36 +210,10 @@ function ProjectCard({
         {project.updated_at && (
           <span className="flex items-center gap-1">
             <Clock className="size-3" />
-            {formatDate(project.updated_at)}
+            {relativeTime(project.updated_at, t)}
           </span>
         )}
       </div>
-
-      {/* 시리즈(2026-10-26, 프로토타입 L1 · L1n): 카드에서만 다음 화를 만들고, 못 만드는 화는 까닭을 한 줄 보여 준다. */}
-      <div className="mt-4 flex flex-wrap items-center gap-2" onClick={(e) => e.stopPropagation()}>
-        {link ? (
-          <Button variant="outline" size="sm" onClick={() => onProse(project)} data-testid="project-prev-prose">
-            <BookOpen className="size-3.5" aria-hidden />
-            {t('View prose')}
-          </Button>
-        ) : null}
-        <Button
-          variant={next.action === 'create' ? 'default' : 'outline'}
-          size="sm"
-          disabled={!next.enabled}
-          title={next.locked ? t('Available on Producer10 and above') : undefined}
-          onClick={() => onNextEpisode(project)}
-          data-testid="project-next-episode"
-        >
-          {next.locked ? <Lock className="size-3.5" aria-hidden /> : null}
-          {t('Create next episode')}
-        </Button>
-      </div>
-      {next.reason ? (
-        <p className="mt-2 text-xs leading-5 text-gray-500" data-testid="project-next-episode-why">
-          {t(next.reason)}
-        </p>
-      ) : null}
       </div>
     </div>
   )
@@ -284,9 +232,7 @@ export default function ProjectsPage() {
   // 시리즈(2026-10-26): 요금제 · 칸은 목록 응답이 주는 것을 그대로 쓴다(칸 수 계산은 서버가 소유).
   const [canUseReference, setCanUseReference] = useState(false)
   const [slotLimit, setSlotLimit] = useState<number | null>(null)
-  const [nextEpisodeTarget, setNextEpisodeTarget] = useState<ProjectItem | null>(null)
-  const [proseTarget, setProseTarget] = useState<ProjectItem | null>(null)
-  const [seriesBlock, setSeriesBlock] = useState<NextEpisodeFailure | null>(null)
+  const [chooserOpen, setChooserOpen] = useState(false)
 
   useEffect(() => {
     // middleware 가 비로그인은 이미 /login 으로 보냈다 — 여기서는 목록만(유저 메뉴는 헤더 담당).
@@ -305,16 +251,6 @@ export default function ProjectsPage() {
   // 이 화를 이어받은 다음 화가 있으면 지우기 전에 먼저 경고한다(프로토타입 LDq · LD).
   const deleteNextEpisodes = deleteTarget ? continuingEpisodes(projects, deleteTarget.id) : []
 
-  // 버튼 단계에서 먼저 갈라 만들기 창에 닿기 전에 요금제 · 칸을 알린다. 서버 검사는 만들 때 한 번 더 한다.
-  const handleNextEpisode = (project: ProjectItem) => {
-    const state = nextEpisodeButton(project, plan)
-    if (state.action === 'create') {
-      setNextEpisodeTarget(project)
-      return
-    }
-    if (state.action === 'plan' || state.action === 'slots') setSeriesBlock(state.action)
-  }
-
   const handleOpen = (project: ProjectItem) => {
     const stage = project.current_stage ?? 'producer'
     switchProject(project.id, project.title, stage as StageId)
@@ -322,9 +258,15 @@ export default function ProjectsPage() {
     router.push(projectOpenPath(project.current_stage, project.id))
   }
 
-  // 새 프로젝트는 무엇을 만들지 · 자료 · 아이디어를 묻는 화면에서 만든다(2026-10-02 오너 — 시안 v04 0.1).
-  //   참고 작품 고르기도 그 화면의 두 번째 단계로 옮겼다.
-  const handleNew = () => router.push('/projects/new')
+  // 새 프로젝트(2026-10-26 오너): 이어 만들 수 있는 화가 있으면 "처음부터 / 앞 화에서 이어" 고르는 창,
+  //   없으면 바로 빈 프로젝트를 만드는 화면으로 간다.
+  const handleNew = () => {
+    if (newProjectEntry(projects) === 'choose') {
+      setChooserOpen(true)
+      return
+    }
+    router.push('/projects/new')
+  }
 
   const handleDelete = async () => {
     if (!deleteTarget || deleting) return
@@ -384,7 +326,6 @@ export default function ProjectsPage() {
               <ProjectCard
                 key={project.id}
                 project={project}
-                plan={plan}
                 onOpen={handleOpen}
                 onRenamed={(id, title) =>
                   setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, title } : p)))
@@ -393,8 +334,6 @@ export default function ProjectsPage() {
                   setDeleteError(null)
                   setDeleteTarget(p)
                 }}
-                onNextEpisode={handleNextEpisode}
-                onProse={setProseTarget}
               />
             ))}
           </div>
@@ -423,7 +362,7 @@ export default function ProjectsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ── 시리즈 창들(2026-10-26) ── 다음 화가 있는 화의 지우기 경고(LD) · 만들기(N2) · 요금제(LU) · 칸(LS) · 앞 화 산문 */}
+      {/* ── 시리즈 창들(2026-10-26) ── 다음 화가 있는 화의 지우기 경고(LD) · 새 프로젝트 고르기(만들기 N2 · 요금제 LU · 칸 LS 포함) */}
       <SeriesDeleteWarningDialog
         open={!!deleteTarget && deleteNextEpisodes.length > 0}
         project={deleteTarget}
@@ -433,14 +372,7 @@ export default function ProjectsPage() {
         onCancel={() => setDeleteTarget(null)}
         onConfirm={() => void handleDelete()}
       />
-      <NextEpisodeDialog
-        project={nextEpisodeTarget}
-        onClose={() => setNextEpisodeTarget(null)}
-        onFailure={(failure) => setSeriesBlock(failure)}
-      />
-      <SeriesPlanDialog open={seriesBlock === 'plan'} onClose={() => setSeriesBlock(null)} />
-      <SeriesSlotLimitDialog open={seriesBlock === 'slots'} slotLimit={slotLimit} onClose={() => setSeriesBlock(null)} />
-      <PrevProseDialog project={proseTarget} onClose={() => setProseTarget(null)} />
+      <NewProjectDialog open={chooserOpen} projects={projects} plan={plan} onClose={() => setChooserOpen(false)} />
     </div>
   )
 }

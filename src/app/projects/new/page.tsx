@@ -1,7 +1,7 @@
 'use client'
 
 // 새 프로젝트(리뉴얼 1차 2026-10-19, 프로토타입 20261013). 빈 프로젝트를 만들고 Producer 시작 화면
-//   (/studio/start: 이야기 재료 → 설정)으로 보낸다. 앞 화에 이어지는 프로젝트는 프로젝트 카드의 [다음 화 만들기]가 만든다.
+//   (/studio/start: 이야기 재료 → 설정)으로 보낸다. 앞 화에 이어지는 프로젝트는 [새 프로젝트] → "앞 화에서 이어 만들기"가 만든다.
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'

@@ -16,25 +16,14 @@ import { clearLastProjectId } from '@/lib/session-restore'
 import { useProjectStore } from '@/stores/project-store'
 import { STAGES } from '@/lib/constants'
 import { useT } from '@/lib/i18n'
+import { relativeTime } from '@/lib/i18n/relative-time'
+import { newProjectEntry, type SeriesPlanState } from '@/features/projects/series-list'
+import { NewProjectDialog, type NewProjectChoice } from '@/features/projects/new-project-dialog'
 import { toast } from 'sonner'
 
-interface ProjectItem {
-  id: string
+interface ProjectItem extends NewProjectChoice {
   title: string
   updated_at: string
-}
-
-// 포맷터는 컴포넌트가 아니라 훅을 쓸 수 없다 — t 를 인자로 받는다(#i18n-s5-batch2).
-function relativeTime(dateStr: string, t: ReturnType<typeof useT>): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
-  const mins = Math.floor(diff / 60000)
-  if (mins < 1) return t('Just now')
-  if (mins < 60) return t('{mins}m ago', { mins })
-  const hours = Math.floor(mins / 60)
-  if (hours < 24) return t('{hours}h ago', { hours })
-  const days = Math.floor(hours / 24)
-  if (days < 30) return t('{days}d ago', { days })
-  return t('{months}mo ago', { months: Math.floor(days / 30) })
 }
 
 export function UserMenu() {
@@ -47,6 +36,10 @@ export function UserMenu() {
   const [avatar, setAvatar] = useState<string | null>(null)
   const [initials, setInitials] = useState('U')
   const [projects, setProjects] = useState<ProjectItem[]>([])
+  // 새 프로젝트 고르기 창(2026-10-26) — 프로젝트 목록 화면과 같은 창. 요금제 · 칸은 목록 응답을 그대로 쓴다.
+  const [chooserOpen, setChooserOpen] = useState(false)
+  const [canUseReference, setCanUseReference] = useState(false)
+  const [slotLimit, setSlotLimit] = useState<number | null>(null)
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -68,9 +61,13 @@ export function UserMenu() {
     const res = await fetch('/api/project/list')
     if (res.ok) {
       const data = await res.json()
-      setProjects(data.projects)
+      setProjects(Array.isArray(data?.projects) ? data.projects : [])
+      setCanUseReference(data?.canUseReference === true)
+      setSlotLimit(typeof data?.slotLimit === 'number' ? data.slotLimit : null)
     }
   }, [])
+
+  const plan: SeriesPlanState = { canUseReference, slotLimit, used: projects.length }
 
   const handleLogout = async () => {
     // 공용 브라우저에서 다음 계정에게 마지막 프로젝트 힌트가 안 새도록 제거.
@@ -80,9 +77,14 @@ export function UserMenu() {
     router.push('/login')
   }
 
-  // 새 프로젝트는 무엇을 만들지 · 자료 · 아이디어를 먼저 묻는 화면에서 만든다(2026-10-02 시안 v04 0.1).
+  // 새 프로젝트(2026-10-26 오너): 이어 만들 수 있는 화가 있으면 프로젝트 목록과 같은 고르기 창,
+  //   없으면 바로 빈 프로젝트를 만드는 화면으로 간다. 목록은 메뉴를 열 때 받아 둔 것을 쓴다.
   const handleNewProject = () => {
     setOpen(false)
+    if (newProjectEntry(projects) === 'choose') {
+      setChooserOpen(true)
+      return
+    }
     router.push('/projects/new')
   }
 
@@ -136,6 +138,7 @@ export function UserMenu() {
   }
 
   return (
+    <>
     <DropdownMenu
       open={open}
       onOpenChange={(v) => {
@@ -210,7 +213,7 @@ export function UserMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleNewProject}>
           <Plus className="mr-2 h-4 w-4" />
-          New Project
+          {t('New project')}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         {/* #payments-phase-3 P9a: 계정·결제 페이지 */}
@@ -224,5 +227,7 @@ export function UserMenu() {
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    <NewProjectDialog open={chooserOpen} projects={projects} plan={plan} onClose={() => setChooserOpen(false)} />
+    </>
   )
 }
