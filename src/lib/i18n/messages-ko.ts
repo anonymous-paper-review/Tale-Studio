@@ -1495,6 +1495,11 @@ export const KO: Record<string, string> = {
   'Preparing the master sheet…': '마스터 시트를 만드는 중…',
   'This stage as ZIP': '이 단계 ZIP',
   'Entire project as ZIP': '전체 프로젝트 ZIP',
+  // previz 데이터 내보내기 요금제 잠금(2026-10-27 오너) — 내보내기 메뉴 맨 위 안내.
+  'Previz data export needs Producer10 or above': 'Previz 데이터 내보내기는 Producer10 이상에서 쓸 수 있어요',
+  'Final videos can be saved from Editor.': '최종 영상은 Editor에서 받을 수 있어요.',
+  'Checking your plan…': '요금제를 확인하고 있어요…',
+  'Could not check your plan. Open this menu again.': '요금제를 확인하지 못했어요. 메뉴를 다시 열어 주세요.',
   '{count} failed': '{count}개 실패',
   'Export complete: {count} files': '내보내기 완료: {count}개 파일',
   'Estimated export size is {size}. Continue?': '예상 내보내기 크기가 {size}입니다. 계속 진행할까요?',

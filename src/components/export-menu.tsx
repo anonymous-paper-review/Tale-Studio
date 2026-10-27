@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Download, Loader2 } from 'lucide-react'
+import Link from 'next/link'
+import { Download, Loader2, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 import { invalidateShots, loadShotsResult } from '@/lib/shots-cache'
 
@@ -21,6 +22,8 @@ import { captureScreenJpeg } from '@/lib/export/screenshot'
 import { selectHandoffTake, type VideoTakeSelectionRecord } from '@/lib/director-video-take-selection'
 import { DEFAULT_LOCALE, parseAppLocale, type AppLocale } from '@/lib/locale'
 import { useT } from '@/lib/i18n'
+import { refetchBillingAccount, useBillingAccount } from '@/lib/billing/use-billing-account'
+import { previzExportAccess } from '@/lib/billing/export-access'
 
 export type ExportFileKind = 'image' | 'video' | 'audio' | 'text' | 'other'
 export type ExportFileCountsByKind = Partial<Record<ExportFileKind, number>>
@@ -82,12 +85,22 @@ export function ExportMenu() {
     ExportScope | 'screenshot' | 'sheet' | null
   >(null)
 
+  // 요금제 잠금(2026-10-27 오너 "s2 내보내기 막으셈") — 네 항목 모두 previz 데이터라 요금제 표의 내보내기 칸을 따른다.
+  //   메뉴를 열 때마다 다시 읽어, 방금 요금제를 바꿨어도 새로 고침 없이 맞게 보인다.
+  const account = useBillingAccount()
+  const access = previzExportAccess({
+    account: account.data ? { plan: account.data.subscription.plan, unlimited: account.data.unlimited } : null,
+    loading: account.loading,
+    error: account.error,
+  })
+  const previzLocked = access !== 'open'
+
   const stage = resolveExportStage(currentStage)
   const isBusy = busyScope !== null
   const disabled = !projectId || isBusy
 
   const runExport = async (scope: ExportScope) => {
-    if (!projectId || isBusy) return
+    if (!projectId || isBusy || previzLocked) return
 
     const project: ProjectRef = {
       id: projectId,
@@ -129,7 +142,7 @@ export function ExportMenu() {
   }
 
   const runScreenshot = async () => {
-    if (!projectId || isBusy) return
+    if (!projectId || isBusy || previzLocked) return
     setBusyScope('screenshot')
     // 진행 상황 토스트(#c1) — 전체 보드 캡처는 이미지 임베드에 수 초 걸려 피드백이 필요하다.
     const toastId = toast.loading(t('Preparing the screen…'))
@@ -155,7 +168,7 @@ export function ExportMenu() {
   // 마스터 시트(2026-10-20 오너 "storyboard 탭에서 마스터시트 지워주고 export로 기능 빼줘") — 예전 Storyboard 탭과 같은 시트 ·
   //   같은 파일(한 장 PNG · 여러 장 ZIP)을 미리보기 없이 바로 받는다. 어느 단계에서든 누를 수 있다. 무거운 그리기 코드는 누를 때만 읽는다.
   const runMasterSheet = async () => {
-    if (!projectId || isBusy) return
+    if (!projectId || isBusy || previzLocked) return
     setBusyScope('sheet')
     const toastId = toast.loading(t('Preparing the master sheet…'))
     try {
@@ -206,7 +219,7 @@ export function ExportMenu() {
   }
 
   return (
-    <DropdownMenu>
+    <DropdownMenu onOpenChange={(open) => { if (open) void refetchBillingAccount() }}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
@@ -223,15 +236,40 @@ export function ExportMenu() {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent side="right" align="end" className="min-w-44">
+        {previzLocked && (
+          <>
+            <div role="status" className="max-w-64 break-keep px-2 py-1.5 text-xs text-muted-foreground">
+              {access === 'locked' ? (
+                <>
+                  <p className="flex items-center gap-1.5 font-medium text-foreground">
+                    <Lock className="size-3.5 shrink-0" aria-hidden />
+                    {t('Previz data export needs Producer10 or above')}
+                  </p>
+                  <p className="mt-1">{t('Final videos can be saved from Editor.')}</p>
+                </>
+              ) : access === 'failed' ? (
+                t('Could not check your plan. Open this menu again.')
+              ) : (
+                t('Checking your plan…')
+              )}
+            </div>
+            {access === 'locked' && (
+              <DropdownMenuItem asChild className="cursor-pointer">
+                <Link href="/pricing">{t('View pricing')}</Link>
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuItem
-          disabled={!projectId || isBusy}
+          disabled={!projectId || isBusy || previzLocked}
           onSelect={() => void runScreenshot()}
           className="cursor-pointer"
         >
           {t('Save screen as JPEG')}
         </DropdownMenuItem>
         <DropdownMenuItem
-          disabled={!projectId || isBusy}
+          disabled={!projectId || isBusy || previzLocked}
           onSelect={() => void runMasterSheet()}
           className="cursor-pointer"
         >
@@ -239,14 +277,14 @@ export function ExportMenu() {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
-          disabled={!projectId || isBusy || !stage}
+          disabled={!projectId || isBusy || !stage || previzLocked}
           onSelect={() => void runExport('stage')}
           className="cursor-pointer"
         >
           {t('This stage as ZIP')}
         </DropdownMenuItem>
         <DropdownMenuItem
-          disabled={!projectId || isBusy}
+          disabled={!projectId || isBusy || previzLocked}
           onSelect={() => void runExport('project')}
           className="cursor-pointer"
         >
