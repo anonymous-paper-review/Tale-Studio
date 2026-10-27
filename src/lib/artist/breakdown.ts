@@ -10,19 +10,37 @@ export interface BreakdownRow {
   kind: 'person' | 'background'
   name: string
   description: string
+  /** 줄에 붙은 그림 — 브레이크다운에서 올린 레퍼런스, 또는 Producer 채팅에서 카드에 붙인 그림(#image-to-artist). 없으면 null. */
+  imageUrl: string | null
+  /** 붙은 그림을 그대로 이 카드의 그림으로 쓴다(2026-10-27 오너) — 배경은 늘(와이드샷), 인물은 레퍼런스로 올린 그림만.
+   *  채팅에서 붙인 인물 그림은 시트의 출처라 시트를 새로 그린다. 넘길 때 서버가 하는 일(producer/source-image)과 같은 구분이다. */
+  imageAsIs: boolean
 }
 
 /** 확정 산문에서 뽑은 인물 · 배경(Producer 목록) → 글 목록 줄. 사물은 Artist 카드가 없어 넣지 않는다. */
 export function breakdownRows(
-  cast: ReadonlyArray<{ localId: string; characterId?: string; name: string; entityType: 'person' | 'object'; appearance: string }>,
-  backgrounds: ReadonlyArray<{ localId: string; locationId?: string; name: string; visualDescription: string }>,
+  cast: ReadonlyArray<{ localId: string; characterId?: string; name: string; entityType: 'person' | 'object'; appearance: string; sourceImageUrl?: string; sourceImageAsIs?: boolean }>,
+  backgrounds: ReadonlyArray<{ localId: string; locationId?: string; name: string; visualDescription: string; sourceImageUrl?: string }>,
 ): BreakdownRow[] {
   return [
     ...cast
       .filter((member) => member.entityType !== 'object')
-      .map((member) => ({ id: member.localId, refId: member.characterId ?? null, kind: 'person' as const, name: member.name, description: member.appearance })),
-    ...backgrounds.map((background) => ({ id: background.localId, refId: background.locationId ?? null, kind: 'background' as const, name: background.name, description: background.visualDescription })),
+      .map((member) => ({
+        id: member.localId, refId: member.characterId ?? null, kind: 'person' as const, name: member.name, description: member.appearance,
+        imageUrl: member.sourceImageUrl ?? null, imageAsIs: !!member.sourceImageUrl && member.sourceImageAsIs === true,
+      })),
+    ...backgrounds.map((background) => ({
+      id: background.localId, refId: background.locationId ?? null, kind: 'background' as const, name: background.name, description: background.visualDescription,
+      imageUrl: background.sourceImageUrl ?? null, imageAsIs: !!background.sourceImageUrl,
+    })),
   ]
+}
+
+/** [만들기]가 새로 그리는 줄과 그림을 그대로 쓰는 줄의 수(2026-10-27 오너 "이미지가 업로드되지 않은 것이 있다면 우리가 그려주면 되").
+ *  만들기 창이 그리는 수(시리즈면 앞 화 그림 수까지)를 draw 로만 센다. */
+export function rowsToDraw<T extends Pick<BreakdownRow, 'imageAsIs'>>(rows: readonly T[]): { draw: T[]; asIs: number } {
+  const draw = rows.filter((row) => !row.imageAsIs)
+  return { draw, asIs: rows.length - draw.length }
 }
 
 export type ArtistPhase = 'list' | 'making' | 'cards' | 'done'

@@ -14,7 +14,7 @@ import { ThumbImage } from '@/components/thumb-image'
 import { useLocale, useT } from '@/lib/i18n'
 import { styleAnchorName } from '@/lib/style-anchor-name'
 import { cn } from '@/lib/utils'
-import { breakdownRows } from '@/lib/artist/breakdown'
+import { breakdownRows, rowsToDraw } from '@/lib/artist/breakdown'
 import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
 import { seriesMakeCounts } from '@/features/series/artist-series'
 import { useSeriesInfo } from '@/features/series/use-series-info'
@@ -44,7 +44,8 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
   const { view: series } = useSeriesInfo(projectId)
   const prevStyleId = series?.styleId ?? null
   const prevIsCustom = !!custom && !!prevStyleId && prevStyleId === savedKey
-  const rows = breakdownRows(cast, backgrounds)
+  // 레퍼런스로 올린 그림은 그대로 쓴다(2026-10-27 오너) — 그리는 수(시리즈면 앞 화 그림 수까지)에서 빼고 아래 칸에 따로 센다.
+  const { draw: rows, asIs } = rowsToDraw(breakdownRows(cast, backgrounds))
   const persons = rows.filter((row) => row.kind === 'person').length
   const places = rows.length - persons
   // "만드는 것"은 정말 새로 그리는 수만 센다(2026-10-27 오너 승인) — 앞 화 그림을 그대로 쓰거나 보관하는 것은 아래 칸에 따로 보인다.
@@ -190,6 +191,9 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
             </div>
             <dl className="space-y-2 rounded-lg border border-border px-3 py-2.5 text-sm">
               <div className="flex gap-3" data-testid="artist-make-new"><dt className="w-24 shrink-0 text-muted-foreground">{t('What gets made')}</dt><dd>{makeCounts ? t('New character sheets {persons} · backgrounds {places}', { persons: makeCounts.newPersons, places: makeCounts.newPlaces }) : t('Character sheets {persons} · backgrounds {places}', { persons, places })}</dd></div>
+              {asIs > 0 ? (
+                <div className="flex gap-3" data-testid="artist-make-as-is"><dt className="w-24 shrink-0 text-muted-foreground">{t('Reference')}</dt><dd>{t('Used as is {count}', { count: asIs })}</dd></div>
+              ) : null}
               {prevImageParts.length > 0 ? (
                 <div className="flex gap-3" data-testid="artist-make-prev"><dt className="w-24 shrink-0 text-muted-foreground">{t('Previous episode images')}</dt><dd>{prevImageParts.join(' · ')}</dd></div>
               ) : null}
