@@ -19,7 +19,8 @@ const GIRL = {
   characterProportion: '6:1',
   palette: ['#F7FAFC', '#2D3748', '#ED8936'],
 }
-const LONG = Array.from({ length: 14 }, (_, i) => `Detail sentence ${i + 1} describes another visible trait of the character in plain words.`).join(' ')
+// 시트 지시문이 v4(2026-10-27 — 팔레트 · 포즈 칸 없음)로 짧아져 14문장은 상한 안에 든다 — 상한을 넘기려고 18문장.
+const LONG = Array.from({ length: 18 }, (_, i) => `Detail sentence ${i + 1} describes another visible trait of the character in plain words.`).join(' ')
 
 describe('인물 그림 프롬프트 상한', () => {
   it('806e2cc2 소녀처럼 설명이 긴 인물도 시트 지시문이 끝까지 들어간다', () => {
@@ -27,7 +28,7 @@ describe('인물 그림 프롬프트 상한', () => {
     const prompt = buildCharacterTurnaroundPrompt(GIRL)
     expect(prompt.endsWith(LAST_SHEET_LINE)).toBe(true)
     expect(prompt).toContain('DETAIL tiles')
-    expect(prompt).toContain('PALETTE strip')
+    expect(prompt).toContain('EXPRESSION tiles')
     expect(prompt).toContain(S3)
   })
 
@@ -37,7 +38,7 @@ describe('인물 그림 프롬프트 상한', () => {
     expect(prompt.length).toBeLessThanOrEqual(2400)
     expect(prompt.endsWith(LAST_SHEET_LINE)).toBe(true)
     expect(prompt).toContain('Detail sentence 1 ')
-    expect(prompt).not.toContain('Detail sentence 14 ')
+    expect(prompt).not.toContain('Detail sentence 18 ')
     expect(prompt).toContain('wearing 풍성한 퍼프 소매의 흰색 블라우스')
     expect(prompt).toContain('palette: #F7FAFC, #2D3748, #ED8936')
   })

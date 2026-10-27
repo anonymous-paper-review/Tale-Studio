@@ -6,17 +6,16 @@ import path from 'node:path'
 import sharp from 'sharp'
 import {
   CHARACTER_SHEET_SPEC,
-  PALETTE_SWATCHES,
   portraitRegionOfSpec,
   turnaroundSlots,
   type SheetBox,
 } from '@/lib/artist/sheet-template'
 import { TURNAROUND_PORTRAIT_REGION } from '@/lib/artist/portrait'
 
-// 캐릭터 시트 템플릿 v3 (#f8 2026-08-27) — 스펙(sheet-template.ts)에서 그리는 생성기(env 게이트)
-//   + 커밋된 PNG 가 스펙과 어긋나면 잡는 드리프트 가드. rough-template-assets 와 같은 관행.
+// 캐릭터 시트 템플릿 v4 (2026-10-27 오너 — 팔레트 · 포즈 · 3/4 정면 칸 없음, v3 #f8 2026-08-27) — 스펙(sheet-template.ts)에서
+//   그리는 생성기(env 게이트) + 커밋된 PNG 가 스펙과 어긋나면 잡는 드리프트 가드. rough-template-assets 와 같은 관행.
 //
-//   재생성: GENERATE_CHARACTER_TEMPLATE=1 pnpm vitest run tests/character-template-assets.test.ts
+//   재생성: GENERATE_CHARACTER_TEMPLATE=1 pnpm vitest run tests/artist/character-template-assets.test.ts
 
 const PUB = path.join(process.cwd(), 'public')
 const TEMPLATE_PATH = path.join(PUB, 'character-template.png')
@@ -43,24 +42,10 @@ function boxSvg(b: SheetBox): string {
 }
 
 async function renderTemplate(): Promise<Buffer> {
-  const { canvas, portrait, expressions, palette, turnaround, poses, details } =
-    CHARACTER_SHEET_SPEC
+  const { canvas, portrait, expressions, turnaround, details } = CHARACTER_SHEET_SPEC
   const svgParts: string[] = []
-  for (const b of [portrait, ...expressions, palette, turnaround, ...poses, ...details]) {
+  for (const b of [portrait, ...expressions, turnaround, ...details]) {
     svgParts.push(boxSvg(b))
-  }
-  // 팔레트 스와치 5칸 — 스트립 내부 균등 배치.
-  {
-    const inner = 12
-    const availW = palette.w - inner * 2
-    const gap = 10
-    const sw = (availW - gap * (PALETTE_SWATCHES - 1)) / PALETTE_SWATCHES
-    const sh = palette.h - 30
-    for (let i = 0; i < PALETTE_SWATCHES; i++) {
-      svgParts.push(
-        `<rect x="${palette.x + inner + i * (sw + gap)}" y="${palette.y + 24}" width="${sw}" height="${sh}" rx="6" fill="none" stroke="${BORDER}" stroke-width="1.5"/>`,
-      )
-    }
   }
   // 턴어라운드 뷰 슬롯 — 구분선 + 하단 뷰 라벨(내용 앵커).
   for (const [i, slot] of turnaroundSlots().entries()) {
@@ -78,9 +63,9 @@ async function renderTemplate(): Promise<Buffer> {
   return sharp(base).composite([{ input: Buffer.from(svg), left: 0, top: 0 }]).png().toBuffer()
 }
 
-describe('캐릭터 양식 v3 그림이 정해진 모습과 맞는다 (#f8)', () => {
+describe('캐릭터 양식 v4 그림이 정해진 모습과 맞는다 (#f8 · 2026-10-27)', () => {
   it.runIf(process.env.GENERATE_CHARACTER_TEMPLATE === '1')(
-    '필요한 설정을 켜면 v3 캐릭터 양식을 만들어 보관한다',
+    '필요한 설정을 켜면 v4 캐릭터 양식을 만들어 보관한다',
     async () => {
       await writeFile(TEMPLATE_PATH, await renderTemplate())
     },
@@ -94,13 +79,13 @@ describe('캐릭터 양식 v3 그림이 정해진 모습과 맞는다 (#f8)', ()
       const i = (Math.round(y) * info.width + Math.round(x)) * info.channels
       return [data[i], data[i + 1], data[i + 2]]
     }
-    const { portrait, turnaround, poses } = CHARACTER_SHEET_SPEC
+    const { portrait, turnaround, details } = CHARACTER_SHEET_SPEC
     const samples: Array<[number, number]> = [
       [4, 4],
       [info.width - 5, info.height - 5],
       [portrait.x + portrait.w / 2, portrait.y + portrait.h / 2],
       [turnaround.x + 60, turnaround.y + 200],
-      [poses[0].x + poses[0].w / 2, poses[0].y + poses[0].h / 2],
+      [details[0].x + details[0].w / 2, details[0].y + details[0].h / 2],
     ]
     for (const [x, y] of samples) expect(at(x, y), `${x},${y}`).toEqual([255, 255, 255])
   })
@@ -115,9 +100,8 @@ describe('캐릭터 양식 v3 그림이 정해진 모습과 맞는다 (#f8)', ()
   })
 
   it('모든 칸이 전체 그림 안에 들어오고 서로 겹치지 않는다', () => {
-    const { canvas, portrait, expressions, palette, turnaround, poses, details } =
-      CHARACTER_SHEET_SPEC
-    const boxes: SheetBox[] = [portrait, ...expressions, palette, turnaround, ...poses, ...details]
+    const { canvas, portrait, expressions, turnaround, details } = CHARACTER_SHEET_SPEC
+    const boxes: SheetBox[] = [portrait, ...expressions, turnaround, ...details]
     for (const b of boxes) {
       expect(b.x).toBeGreaterThanOrEqual(0)
       expect(b.y).toBeGreaterThanOrEqual(0)
@@ -135,7 +119,7 @@ describe('캐릭터 양식 v3 그림이 정해진 모습과 맞는다 (#f8)', ()
     }
   })
 
-  it('대표 얼굴 영역이 정해진 위치와 맞는다 (v3, v2 양식에는 쓰지 말 것)', () => {
+  it('대표 얼굴 영역이 정해진 위치와 맞는다 (v3 · v4 같은 자리, v2 양식에는 쓰지 말 것)', () => {
     expect(TURNAROUND_PORTRAIT_REGION).toEqual(portraitRegionOfSpec())
   })
 })

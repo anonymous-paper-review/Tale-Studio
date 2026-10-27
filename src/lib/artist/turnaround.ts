@@ -132,7 +132,7 @@ function fitToCap(before: string[], appearance: string, after: string[], cap: nu
   return join('').slice(0, cap)
 }
 
-/** 인물 시트 프롬프트 상한 — 시트 지시문(약 950자)과 참조 절을 빼고도 설명이 들어가게(2026-10-10, 종전 1,500자에서는 설명이 200자도 안 남았다). */
+/** 인물 시트 프롬프트 상한 — 시트 지시문(v4 약 750자)과 참조 절을 빼고도 설명이 들어가게(2026-10-10, 종전 1,500자에서는 설명이 200자도 안 남았다). */
 const SHEET_PROMPT_CAP = 2400
 /** 대표 그림 · 방향 뷰 프롬프트 상한(종전 그대로). */
 const SINGLE_PROMPT_CAP = 900
@@ -158,7 +158,7 @@ export function buildCharacterMainPrompt(input: CharacterPromptInput): string {
 }
 
 /**
- * 턴어라운드 시트 프롬프트 — "한 장에 모든 뷰"(정면·3/4·측면·후면 + 표정·포즈·디테일) v3 모델시트.
+ * 턴어라운드 시트 프롬프트 — "한 장에 모든 뷰"(정면·측면·후면 + 대표 얼굴 · 표정 · 디테일) v4 모델시트(2026-10-27 — 팔레트 · 포즈 · 3/4 정면 칸 없음).
  *   기본 경로는 캐릭터 템플릿(public/character-template.png)을 reference 로 넣은 I2I(edit) — 그 레이아웃에
  *   캐릭터를 채운다. 템플릿 URL 을 못 구하면 같은 프롬프트로 T2I 폴백. 동일 캐릭터/의상/비율을 뷰마다
  *   강하게 고정해 director 단계의 뷰 참조 일관성을 확보(#7). 개별 방향 뷰(i2i) 생성 대체 — 캐릭터당 1장(#9, 2026-07-11).
@@ -236,15 +236,17 @@ export function buildCharacterTurnaroundPrompt(
     ...styleTokens(input),
     ...deltaClause(input),
     ...(input.safeMode ? [SAFE_TOKENS] : []),
-    // 템플릿 v3(#f8 2026-08-27): 마네킹·사이즈 가이드·스케치 열·노트 칸 제거 — 빈 정형 타일 +
-    //   최소 라벨. 칸별 내용은 이 절이 전담한다(시트-프롬프트 한 쌍, sheet-template.ts 참조).
+    // 템플릿 v4(2026-10-27 오너): 팔레트 · 포즈 2 · 3/4 정면 칸을 지운 정형 타일 + 최소 라벨. 칸별 내용은 이 절이
+    //   전담한다(시트-프롬프트 한 쌍, sheet-template.ts 참조). v3(#f8): 마네킹·사이즈 가이드·스케치 열·노트 칸 제거.
     'keep the template EXACTLY as-is — every tile border, divider and small label stays in place; draw only INSIDE the tiles and never add any extra text',
+    // 다시 만들기 · 시리즈는 예전 양식(팔레트 · 포즈 칸이 있는 v3) 시트를 참고로 붙인다 — 그 칸 배치를 베끼지 않게(2026-10-27).
+    ...(opts?.hasPriorRender || opts?.hasSeriesSheet || opts?.hasSeriesStyleSample
+      ? ['other reference sheets may use an older tile layout — take the tile layout ONLY from the template and never copy extra tiles such as color palettes or pose panels from them']
+      : []),
     'PORTRAIT tile: waist-up front portrait of the character, facing camera',
-    'TURNAROUND tile: four full-body views of the same standing character in its labeled slots — FRONT, 3/4 FRONT, SIDE, BACK — same height and same neutral standing pose across all four',
+    'TURNAROUND tile: three full-body views of the same standing character in its labeled slots — FRONT, SIDE, BACK — same height and same neutral standing pose across all three',
     'EXPRESSION tiles (JOY, SORROW, ANGER, SURPRISE): the same face as a close-up with that labeled expression, one per tile',
-    'POSE tiles: two different full-body personality poses that fit this character (a dynamic action and a characteristic idle)',
     'DETAIL tiles: two close-up callouts of signature costume or prop details',
-    'PALETTE strip: fill the five swatches with the character\'s actual key colors, flat color only',
     'identical character design, outfit, colors and proportions across every tile, consistent art style',
     // #B: 옛 "clean line art"(애니 토큰) 삭제 + 애니 디폴트 차단. "declared art style"을 따르라는 조건부
     //   표현이라 아트 스타일 자체가 애니인 프로젝트와는 충돌하지 않는다(디폴트 회귀만 금지).
