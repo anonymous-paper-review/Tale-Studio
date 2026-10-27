@@ -108,10 +108,6 @@ scripts/*
 # DB 타입 재생성(#db-types-drift) — pnpm db:types 가 부르고 tests/ops/db-types-drift.test.ts 가
 # 이 명령의 존재를 검사한다. 빠지면 클린 클론에서 pnpm test 가 깨진다.
 !scripts/db-types.mjs
-# 같은 이유 — tests/seed-test-accounts.test.ts 가 이 스크립트를 import 한다.
-# 빠지면 클린 클론에서 pnpm typecheck 가 TS2307 로 깨진다. 하드코딩 비밀 없음
-# (service-role 키는 .env.local 에서 읽는다).
-!scripts/seed-test-accounts.mjs
 # 바우처 코드 만들기(2026-10-27) — tests/billing/voucher.test.ts 가 import 한다. 비밀 없음(키는 .env.local), 코드 목록은 --out 파일에만 쓴다.
 !scripts/create-vouchers.mjs
 # 테스트 묶음 실행기는 개발자가 공통으로 쓰는 명령 인터페이스라 추적한다.

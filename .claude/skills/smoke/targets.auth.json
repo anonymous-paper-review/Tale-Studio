@@ -1,7 +1,7 @@
 {
   "_": [
     "pnpm smoke --auth 로 도는 로그인 필요 화면 목록. 프로파일 tale-auth 에 세션이 남고,",
-    "자격증명은 .env.local 의 TALE_SMOKE_EMAIL / TALE_SMOKE_PASSWORD (seed-test-accounts.mjs 로 만든 테스트 계정).",
+    "자격증명은 .env.local 의 TALE_SMOKE_EMAIL / TALE_SMOKE_PASSWORD (스모크 전용 이메일 · 비밀번호 계정).",
     "",
     "⚠ 생성 버튼을 누르는 타깃을 여기 넣지 말 것 — fal·higgsfield 가 실제로 돌아 과금된다.",
     "  읽기 전용 진입만 둔다. 생성 흐름 확인이 필요하면 사람이 직접 판단해서 단건으로 돌린다.",

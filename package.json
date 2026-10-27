@@ -36,7 +36,6 @@
     "prepare": "git config core.hooksPath .githooks || true",
     "smoke": "node .claude/skills/smoke/smoke.mjs",
     "fixture:producer": "node --import ./tests/fixtures/alias-hook.mjs tests/fixtures/producer-complete.ts",
-    "seed:test-accounts": "node scripts/seed-test-accounts.mjs",
     "seed:producer:snapshot": "node scripts/producer-seed.mjs snapshot",
     "seed:producer:clone": "node scripts/producer-seed.mjs clone",
     "seed:producer:reset": "node scripts/producer-seed.mjs reset",

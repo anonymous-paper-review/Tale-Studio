@@ -193,7 +193,7 @@ function refsByRole(block, role) {
  * 로그인 세션을 확보한다. 이미 로그인돼 있으면 아무것도 하지 않는다.
  * 자격증명은 .env.local 의 TALE_SMOKE_EMAIL / TALE_SMOKE_PASSWORD 를 쓴다 —
  *   표준 프로바이더 이름을 쓰면 다른 하네스가 오인 수집해 과금 사고가 난 전례가 있어 TALE_ 접두로 고정.
- *   seed-test-accounts.mjs 로 만든 계정이며 비밀번호는 해시로만 저장돼 재조회가 불가능하다.
+ *   스모크 전용 이메일 · 비밀번호 계정이며 비밀번호는 해시로만 저장돼 재조회가 불가능하다(잃어버리면 대시보드에서 새로 만든다).
  */
 async function ensureLoggedIn(base, profileId, wait) {
   const env = loadEnvLocal()
