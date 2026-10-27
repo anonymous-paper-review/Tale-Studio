@@ -157,6 +157,18 @@ function updatedCard<T extends CastMember | BackgroundSource>(card: T, entry: Re
   return next
 }
 
+/** 합칠 때 남는 줄에 그림이 없으면 사라지는 줄의 그림(브레이크다운 레퍼런스 · 채팅 그림)을 옮긴다(2026-10-27). 줄마다 그림은 한 장이라
+ *  남는 줄에 그림이 있으면 그대로 둔다. 그림과 "그대로 쓰기" 표시는 늘 함께 옮긴다. */
+function carryPicture<T extends CastMember | BackgroundSource>(target: T, others: ReadonlyArray<CastMember | BackgroundSource>): T {
+  if (target.sourceImageUrl) return target
+  const donor = others.find((card) => card.sourceImageUrl)
+  if (!donor?.sourceImageUrl) return target
+  const next: T = { ...target, sourceImageUrl: donor.sourceImageUrl }
+  if (donor.sourceImageAsIs) next.sourceImageAsIs = true
+  else delete next.sourceImageAsIs
+  return next
+}
+
 export type BreakdownRecheckPlan =
   | { ok: true; state: WriterRunState; cast: CastMember[]; backgrounds: BackgroundSource[]; newLocalIds: string[] }
   | { ok: false; code: RecheckIssue }
@@ -215,7 +227,7 @@ export function planBreakdownRecheck(input: {
       const character = state.characters?.characters.find((item) => item.id === targetId)
       if (character && touched(entry)) character.name = entry.name
     }
-    personUpdates.set(source.localId, updatedCard(source, entry, targetId, castHash))
+    personUpdates.set(source.localId, carryPicture(updatedCard(source, entry, targetId, castHash), parts.slice(1)))
   }
 
   // ── 장소 ──
@@ -262,7 +274,7 @@ export function planBreakdownRecheck(input: {
         worldChanged = true
       }
     }
-    placeUpdates.set(source.localId, updatedCard(source, entry, targetId, backgroundHash))
+    placeUpdates.set(source.localId, carryPicture(updatedCard(source, entry, targetId, backgroundHash), parts.slice(1)))
   }
   if (worldChanged) state.world = { ...(state.world ?? {}), locations }
 
