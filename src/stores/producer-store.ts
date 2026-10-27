@@ -19,6 +19,7 @@ import type { RecheckOp } from '@/lib/artist/recheck'
 // 트리트먼트를 쓴 바탕 이름(넘길 때 낡았다는 안내) — 영어 원문 = 사전 키.
 const DRAFT_BASIS_LABEL: Record<string, string> = { story: 'the story', runtime: 'the runtime', preserveScript: 'the keep-as-written choice' }
 import { getWriterEnginePreference } from '@/lib/writer/engine'
+import { restartWriterStatus } from '@/lib/writer/use-writer-status'
 // store 액션·순수 함수는 훅을 못 쓴다 — translate() + 현재 locale 직접 조회로 번역
 //   (writer 배치의 #i18n-s5-batch3 패턴).
 import { fixKoreanParticles } from '@/lib/korean-particles'
@@ -759,6 +760,9 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       if (!response.ok) return false
       if (useProjectStore.getState().projectId !== projectId) return false
       useProjectStore.getState().setTreatmentDraft(true)
+      // 실패한 초안을 다시 시도했으면 화면의 진행 상태 읽기는 멈춰 있다(실패 = 끝난 상태) — 다시 읽어 새 초안으로 바꾼다.
+      //   안 읽으면 새로 고칠 때까지 "산문을 쓰지 못했어요"가 남는다(2026-10-27 운영 확인).
+      restartWriterStatus(projectId)
       return true
     } catch (err) {
       console.error('[producer-store] startTreatment failed:', err)

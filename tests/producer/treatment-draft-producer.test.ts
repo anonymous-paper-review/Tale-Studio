@@ -153,6 +153,18 @@ describe('트리트먼트 초안에서 Writer로 넘기기', () => {
 })
 
 describe('넘기기 안내와 Producer 채팅', () => {
+  it('산문 초안이 실패해 다시 시도하면 새로 고치지 않아도 화면이 새 초안으로 바뀌게 진행 상태를 다시 읽는다', async () => {
+    // 왜: 실패 상태를 받으면 화면이 진행 상태 읽기를 멈춘다 — [다시 시도]로 새 초안을 시작해도 새로 고칠 때까지 "산문을 쓰지 못했어요"가 남아
+    //   또 실패한 줄 알고 다시 누르게 됐다(2026-10-27 운영 프로젝트 되살리기 중 확인).
+    const { restartWriterStatus } = await import('@/lib/writer/use-writer-status')
+    vi.mocked(restartWriterStatus).mockClear()
+    status = { ...status, pipeline_failed: true, current_status: 'failed' }
+    startResponse = () => Response.json({ projectId: 'proj-1', runId: 'run-2', status: 'started', sceneGate: true })
+
+    expect(await useProducerStore.getState().startTreatment()).toBe(true)
+    expect(restartWriterStatus).toHaveBeenCalledWith('proj-1')
+  })
+
   it('넘기기 전 트리트먼트 초안은 채팅에 확정 안내를 띄우지 않아 Producer 채팅이 그대로 쓰인다', async () => {
     // 왜: 닫을 수 없는 확정 안내가 떠 있으면 고쳐 달라는 말이 전부 트리트먼트 수정안으로 가고, 스타일 · 그림 쓰임새 질문이 뜨지 못했다(검토 지적).
     const { sceneGateOfferMode } = await import('@/lib/writer/scene-gate')
