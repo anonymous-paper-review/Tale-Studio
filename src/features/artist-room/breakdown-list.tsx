@@ -4,11 +4,13 @@
 //   줄마다 설명을 고친다. 그림은 아직 없다 — [목록이 맞아요 · 그림 만들기]가 스타일 팝업을 연다.
 //   [인물·배경 추가]는 없다(인물 · 배경은 산문에서 나온다). 재점검 · 산문으로 돌아가기는 2차.
 //   시리즈 다음 화(2026-10-26 · 프로토타입 A1s)는 이어받은 줄에 표시를 붙이고, 이번 산문에 안 나오는 것은 아래 "보관" 묶음으로 내린다.
-import { useState } from 'react'
+//   레퍼런스(2026-10-27 오너): 이번 화 줄마다 그림 한 장을 올리면 그대로 그 카드의 그림이 된다(breakdown-reference). 보관 줄은 그리지 않아 칸이 없다.
+import { useState, type ReactNode } from 'react'
 import { ArrowRight, Check, Pencil } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { BreakdownReference } from '@/features/artist-room/breakdown-reference'
 import { splitBreakdownRows } from '@/features/series/artist-series'
 import { useSeriesInfo } from '@/features/series/use-series-info'
 import { useT } from '@/lib/i18n'
@@ -19,7 +21,7 @@ import { useProjectStore } from '@/stores/project-store'
 
 type Filter = 'all' | 'person' | 'background'
 
-function Row({ row }: { row: BreakdownRow & { inherited: boolean } }) {
+function Row({ row, reference }: { row: BreakdownRow & { inherited: boolean }; reference?: ReactNode }) {
   const t = useT()
   const [draft, setDraft] = useState<string | null>(null)
   const save = () => {
@@ -48,6 +50,7 @@ function Row({ row }: { row: BreakdownRow & { inherited: boolean } }) {
         ) : (
           <Textarea value={draft} rows={2} autoFocus onChange={(event) => setDraft(event.target.value)} aria-label={t('Description')} className="text-sm" />
         )}
+        {reference}
       </div>
       <div className="shrink-0 pt-0.5">
         {draft === null ? (
@@ -71,6 +74,9 @@ export function BreakdownList({ onMake }: { onMake: () => void }) {
   const projectId = useProjectStore((s) => s.projectId)
   const { view: series } = useSeriesInfo(projectId)
   const [filter, setFilter] = useState<Filter>('all')
+  // 레퍼런스를 올리는 중인 줄 수 — 올리는 동안 [만들기]를 막는다(먼저 나가면 그 그림은 실리지 않고 AI 가 그린다).
+  const [uploading, setUploading] = useState(0)
+  const onBusyChange = (busy: boolean) => setUploading((count) => Math.max(0, count + (busy ? 1 : -1)))
   // 보관 묶음은 이번 산문에서 뽑은 것이 아니라 개수에 넣지 않는다.
   const { shown: rows, kept } = splitBreakdownRows(breakdownRows(cast, backgrounds), series)
   const persons = rows.filter((row) => row.kind === 'person').length
@@ -88,7 +94,7 @@ export function BreakdownList({ onMake }: { onMake: () => void }) {
           <h1 className="text-lg font-semibold">{t('Artist · breakdown')}</h1>
           <span className="text-xs text-muted-foreground">{t('From the confirmed prose: {persons} characters · {places} backgrounds', { persons, places })}</span>
         </div>
-        <Button onClick={onMake} disabled={rows.length === 0} data-testid="breakdown-make">
+        <Button onClick={onMake} disabled={rows.length === 0 || uploading > 0} data-testid="breakdown-make">
           {t('The list is right · make the images')}<ArrowRight className="size-4" />
         </Button>
       </div>
@@ -107,13 +113,18 @@ export function BreakdownList({ onMake }: { onMake: () => void }) {
               </button>
             ))}
           </div>
+          {rows.length > 0 ? (
+            <p className="text-xs text-muted-foreground">{t("A picture you upload as a reference becomes that card's image as is. The rest are drawn by AI.")}</p>
+          ) : null}
           {rows.length === 0 ? (
             <p className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
               {t('No characters or backgrounds were found in the prose yet.')}
             </p>
           ) : (
             <ul className="rounded-xl border border-border bg-card/70 px-4">
-              {shown.map((row) => <Row key={`${row.kind}:${row.id}`} row={row} />)}
+              {shown.map((row) => (
+                <Row key={`${row.kind}:${row.id}`} row={row} reference={<BreakdownReference row={row} onBusyChange={onBusyChange} />} />
+              ))}
             </ul>
           )}
           {keptShown.length > 0 ? (

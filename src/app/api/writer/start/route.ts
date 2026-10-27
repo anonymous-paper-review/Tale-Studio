@@ -51,6 +51,8 @@ interface ProducerBackgrounds {
     user_edited?: boolean;
     /** #image-to-artist: Producer 카드에 붙은 그림(우리 보관함 주소만 유효). 그대로 wide_shot 이 된다. */
     source_image_url?: string;
+    /** Artist 브레이크다운에서 레퍼런스로 올린 그림(2026-10-27) — 빈 wide_shot 에만 적고, 못 적으면 시작을 멈춘다. */
+    source_image_as_is?: boolean;
   }>;
 }
 
@@ -213,8 +215,9 @@ async function upsertProducerCast(projectId: string, cast: CastContract): Promis
 }
 
 // producer 핸드오프 캐스트 페이로드 — 계약 + 카드 그림 주소(#image-to-artist). 파이프라인에는 stripSourceImages 로 뗀 계약만 간다.
+//   source_image_as_is: Artist 브레이크다운 레퍼런스(2026-10-27) — 그림이 출처가 아니라 그 인물의 시트 자체다.
 type CastContractWithImages = Omit<CastContract, 'characters'> & {
-  characters: Array<CastContractCharacter & { source_image_url?: string }>;
+  characters: Array<CastContractCharacter & { source_image_url?: string; source_image_as_is?: boolean }>;
 };
 
 async function applySourceImages(
@@ -239,6 +242,63 @@ async function applySourceImages(
       .eq('project_id', projectId)
       .eq('location_id', location_id);
     if (error) throw new Error(`location source image failed: ${error.message}`);
+  }
+}
+
+/**
+ * Artist 브레이크다운 레퍼런스(2026-10-27 오너 "입력한 이미지는 그대로 artist에 사용하면 되") — 올린 그림을 그 카드의 그림으로 바로 적는다.
+ *   인물은 기본 모습의 시트 · 대표 사진이다. 시트의 출처(derived_from_url)로는 적지 않는다 — 적으면 그 그림을 따라 시트를 새로 그린다.
+ *   대표 사진도 같이 적어야 다른 모습을 만들 수 있다(generate-sheet 는 기본 모습 대표 사진을 얼굴 기준으로 요구한다). 배경은 와이드샷.
+ *   빈칸에만 적는다 — 같은 카드가 다시 넘어와도(다시 실행 등) 그 사이 Artist 에서 다시 그린 그림을 처음 올린 그림으로 되돌리지 않는다.
+ *   못 적으면 던진다 — 그대로 이어 가면 사람이 올린 그림 대신 AI 가 그린다. 호출부가 시작을 멈춘다.
+ */
+async function applyReferenceImages(
+  projectId: string,
+  cast: CastContractWithImages | undefined,
+  backgrounds: ProducerBackgrounds | undefined,
+): Promise<void> {
+  const { asIs } = planSourceImageWrites({ cast: cast?.characters, backgrounds: backgrounds?.locations });
+  const wanted = [...(cast?.characters ?? []), ...(backgrounds?.locations ?? [])].filter((card) => card.source_image_as_is === true).length;
+  if (wanted > asIs.characters.length + asIs.locations.length) {
+    console.warn(`[writer/start] ${projectId}: skipped ${wanted - asIs.characters.length - asIs.locations.length} reference image(s) (not our storage or not a person)`);
+  }
+  for (const { character_id, url } of asIs.characters) {
+    const { data: row, error } = await supabaseAdmin
+      .from('character_appearances')
+      .select('sheet_url')
+      .eq('project_id', projectId)
+      .eq('character_id', character_id)
+      .eq('is_default', true)
+      .maybeSingle();
+    if (error) throw new Error(`reference image read failed: ${error.message}`);
+    if (!row) throw new Error(`reference image failed: ${character_id} has no default appearance`);
+    if (row.sheet_url) continue;
+    const { error: writeError } = await supabaseAdmin
+      .from('character_appearances')
+      .update({ sheet_url: url, portrait_url: url })
+      .eq('project_id', projectId)
+      .eq('character_id', character_id)
+      .eq('is_default', true)
+      .is('sheet_url', null);
+    if (writeError) throw new Error(`reference image failed: ${writeError.message}`);
+  }
+  for (const { location_id, url } of asIs.locations) {
+    const { data: row, error } = await supabaseAdmin
+      .from('locations')
+      .select('wide_shot')
+      .eq('project_id', projectId)
+      .eq('location_id', location_id)
+      .maybeSingle();
+    if (error) throw new Error(`reference image read failed: ${error.message}`);
+    if (!row) throw new Error(`reference image failed: ${location_id} is not a background of this project`);
+    if (row.wide_shot) continue;
+    const { error: writeError } = await supabaseAdmin
+      .from('locations')
+      .update({ wide_shot: url })
+      .eq('project_id', projectId)
+      .eq('location_id', location_id)
+      .is('wide_shot', null);
+    if (writeError) throw new Error(`reference image failed: ${writeError.message}`);
   }
 }
 
@@ -524,6 +584,17 @@ export async function POST(req: NextRequest) {
         await applyProducerI18n(projectId, undefined, backgrounds).catch((e) => {
           console.error('[writer/start] location i18n derive failed (proceeding):', e);
         });
+      }
+      // Artist 브레이크다운 레퍼런스(2026-10-27 오너): 올린 그림은 그 카드의 그림이다 — 못 적으면 Writer 를 이어 가지 않는다
+      //   (이어 가면 사람이 올린 그림 대신 AI 가 그린다). 다시 누르면 같은 값으로 다시 적는다. 약속: tests/writer/reference-image-start.test.ts
+      try {
+        await applyReferenceImages(projectId, castWithImages, backgrounds);
+      } catch (e) {
+        console.error('[writer/start] reference image apply failed (stopping):', e);
+        return NextResponse.json(
+          { error: 'Could not attach the uploaded reference pictures. Please try again.', code: 'reference_image_failed' },
+          { status: 500 },
+        );
       }
       // #image-to-artist(2026-09-17): 카드에 붙은 그림 — 배경은 그대로 와이드샷, 인물은 기본 모습의 대표 사진이자 시트의 출처.
       //   우리 보관함 주소만 받는다(planSourceImageWrites 가 거른다). 실패해도 핸드오프는 진행한다(그림 없이 종전 경로).

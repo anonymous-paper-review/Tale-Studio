@@ -43,6 +43,9 @@ export interface CastMember {
   userEdited?: boolean
   /** #image-to-artist: 채팅에 올려 이 카드에 붙인 그림(원본 업로드 주소). 넘길 때 Artist 의 대표 사진·시트 출처가 된다. */
   sourceImageUrl?: string
+  /** Artist 브레이크다운에서 레퍼런스로 올린 그림이다(2026-10-27 오너 "입력한 이미지는 그대로 artist에 사용") —
+   *  넘길 때 시트의 출처가 아니라 그대로 기본 모습의 시트 · 대표 사진이 된다. */
+  sourceImageAsIs?: boolean
   /** 트리트먼트에서 맞춘 때의 내용 지문(2026-10-02 시안 v04) — 지금 내용과 다르면 사람이 고친 카드다. */
   treatmentHash?: string
   /** 시리즈 다음 화가 앞 화에서 이어받은 카드(2026-10-26). 변화 · 동기는 화마다 새로 정해 빈 칸이 넘기기를 막지 않는다. */
@@ -60,6 +63,8 @@ export interface BackgroundSource {
   stale?: boolean
   /** #image-to-artist: 채팅에 올려 이 카드에 붙인 그림. 넘길 때 그대로 그 배경의 와이드샷이 된다. */
   sourceImageUrl?: string
+  /** Artist 브레이크다운에서 레퍼런스로 올린 그림이다(2026-10-27 오너) — 와이드샷이 비어 있을 때 그대로 그 배경의 와이드샷이 된다. */
+  sourceImageAsIs?: boolean
   /** 트리트먼트에서 맞춘 때의 내용 지문(2026-10-02 시안 v04) — 지금 내용과 다르면 사람이 고친 카드다. */
   treatmentHash?: string
   /** 시리즈 다음 화가 앞 화에서 이어받은 배경(2026-10-26). 목적은 화마다 새로 정해 빈 칸이 넘기기를 막지 않는다. */

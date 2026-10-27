@@ -267,6 +267,9 @@ interface ProducerState {
   addBackground: () => string
   updateBackground: (localId: string, patch: Partial<BackgroundSource>) => void
   removeBackground: (localId: string) => void
+  /** Artist 브레이크다운 레퍼런스(2026-10-27 오너) — 줄의 카드에 올린 그림을 붙인다(null 이면 뗀다). 넘길 때 그대로 그 카드의 그림이 된다.
+   *  글을 고친 것이 아니라 userEdited 는 그대로 둔다. 목록을 고칠 수 없으면(만들기 뒤 · 데모) false. */
+  setBreakdownImage: (kind: 'person' | 'background', localId: string, url: string | null) => boolean
   /** artistGate(리뉴얼 1차): Artist [만들기] — 확정 산문 초안을 이어 가며 Artist 화면에 머문다. 2026-10-20부터 디자인 뒤에도 멈추지 않고
    *  씬 · 샷까지 이어 만든다(서버에 멈춤 표시를 보내지 않는다 — 오너 "Artist 만들면서 씬 · 샷 · Storyboard 도 같이"). */
   saveAndHandoff: (options?: { rerun?: boolean; artistGate?: boolean }) => Promise<boolean>
@@ -501,6 +504,8 @@ function castContractOf(cast: CastMember[]) {
       motivation: m.motivation,
       // #image-to-artist: 카드에 붙은 그림 — 서버가 대표 사진·시트 출처로 적는다(파이프라인 시드에서는 서버가 뗀다).
       ...(m.sourceImageUrl ? { source_image_url: m.sourceImageUrl } : {}),
+      // Artist 브레이크다운 레퍼런스(2026-10-27) — 출처가 아니라 그대로 시트 · 대표 사진으로 적으라는 표시.
+      ...(m.sourceImageUrl && m.sourceImageAsIs ? { source_image_as_is: true } : {}),
     })),
   }
 }
@@ -513,6 +518,7 @@ function backgroundContractOf(backgrounds: BackgroundSource[]) {
       purpose: background.purpose,
       user_edited: background.userEdited === true,
       ...(background.sourceImageUrl ? { source_image_url: background.sourceImageUrl } : {}),
+      ...(background.sourceImageUrl && background.sourceImageAsIs ? { source_image_as_is: true } : {}),
     })),
   }
 }
@@ -1089,6 +1095,24 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     scheduleDraftSave()
   },
 
+  setBreakdownImage: (kind, localId, url) => {
+    // 줄 설명 고치기와 같은 조건 — 산문 확정 뒤에도 [만들기] 전에만 고친다(castLocked).
+    if (isDemoSession() || castLocked()) return false
+    const list = kind === 'person' ? get().cast : get().backgrounds
+    if (!list.some((card) => card.localId === localId)) return false
+    const withImage = <T extends CastMember | BackgroundSource>(card: T): T => {
+      if (card.localId !== localId) return card
+      const next = { ...card }
+      delete next.sourceImageUrl
+      delete next.sourceImageAsIs
+      return url ? { ...next, sourceImageUrl: url, sourceImageAsIs: true } : next
+    }
+    set((state) => (kind === 'person' ? { cast: state.cast.map(withImage) } : { backgrounds: state.backgrounds.map(withImage) }))
+    // 올리기는 한 번의 일이다 — 기다리지 않고 바로 초안에 남긴다(새로 고쳐도 그림이 줄에 남게).
+    void get().saveDraftNow()
+    return true
+  },
+
   saveAndHandoff: async (options) => {
     if (isDemoSession()) return false
     const { storyText, projectSettings, cast, backgrounds } = get()
@@ -1256,10 +1280,14 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
         }
         if (!writerResponse.ok) {
           let detail = writerResponse.statusText
+          let code: unknown = null
           try {
             const body = await writerResponse.json()
             detail = body?.error ?? detail
+            code = body?.code
           } catch {}
+          // 올린 레퍼런스 그림을 적지 못해 서버가 멈췄다(2026-10-27) — 화면 언어로 다시 누르라고 알린다(다시 누르면 다시 적는다).
+          if (code === 'reference_image_failed') throw new Error(translate(useLocaleStore.getState().locale, 'Could not attach the uploaded reference pictures. Please try again.'))
           throw new Error(`writer start failed: ${detail}`)
         }
         // 서버가 씬 스토리 확정 단계(#s3-gate)로 시작했으면 확정은 Producer 메인에서 한다(2026-10-01 오너).
