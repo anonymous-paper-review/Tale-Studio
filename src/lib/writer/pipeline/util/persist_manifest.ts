@@ -339,10 +339,13 @@ export async function persistAssetsToDb(
     // 언어 경계: writer-신규 인물 외형도 EN base + _native 표기로 분리(생성=EN, 표시=유저 언어).
     //   빠뜨리면 appearance(생성 canonical)가 스토리 언어 그대로 들어간다(라이브 8건 확인, 2026-07-03).
     //   deriveEnBatch 는 이미 영어면 무비용 통과, deriveNativeBatch 는 locale=en 이면 no-op.
+    // 외형 설명이 빈 인물(산문 재점검으로 넣은 인물 등, 2026-10-27)은 v2 디자인이 만든 외형으로 빈칸만 채운다 —
+    //   비워 두면 카드 설명이 비고 시트를 이름 · 의상만으로 그린다. 설명이 있으면(사람 · 산문이 정한 원천) 디자인이 덮지 않는다.
+    const designedAppearance = new Map(characterVisual.characters.map((cv) => [cv.character_id, (cv.appearance ?? '').trim()]))
     const appearRaw = new Map(
       characters.characters
-        .filter((c) => (c.appearance_description ?? '').trim())
-        .map((c) => [c.id, (c.appearance_description as string).trim()]),
+        .map((c) => [c.id, (c.appearance_description ?? '').trim() || designedAppearance.get(c.id) || ''] as const)
+        .filter(([, text]) => text),
     )
     const appearEn = await deriveEnBatch(
       [...appearRaw].map(([id, native]) => ({ id, native })),

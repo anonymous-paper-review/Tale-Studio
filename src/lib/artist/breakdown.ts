@@ -10,18 +10,24 @@ export interface BreakdownRow {
   kind: 'person' | 'background'
   name: string
   description: string
+  /** 산문에 나오는 다른 이름(또는) — 산문 재점검에서 이름을 고치거나 합치면 생긴다(2026-10-27 오너). */
+  aliases: string[]
+  /** 산문 재점검으로 새로 들어온 줄 — 이 화면을 보는 동안 "새로"로 보인다. */
+  isNew: boolean
 }
 
 /** 확정 산문에서 뽑은 인물 · 배경(Producer 목록) → 글 목록 줄. 사물은 Artist 카드가 없어 넣지 않는다. */
 export function breakdownRows(
-  cast: ReadonlyArray<{ localId: string; characterId?: string; name: string; entityType: 'person' | 'object'; appearance: string }>,
-  backgrounds: ReadonlyArray<{ localId: string; locationId?: string; name: string; visualDescription: string }>,
+  cast: ReadonlyArray<{ localId: string; characterId?: string; name: string; entityType: 'person' | 'object'; appearance: string; aliases?: string[] }>,
+  backgrounds: ReadonlyArray<{ localId: string; locationId?: string; name: string; visualDescription: string; aliases?: string[] }>,
+  newIds: readonly string[] = [],
 ): BreakdownRow[] {
+  const isNew = (localId: string) => newIds.includes(localId)
   return [
     ...cast
       .filter((member) => member.entityType !== 'object')
-      .map((member) => ({ id: member.localId, refId: member.characterId ?? null, kind: 'person' as const, name: member.name, description: member.appearance })),
-    ...backgrounds.map((background) => ({ id: background.localId, refId: background.locationId ?? null, kind: 'background' as const, name: background.name, description: background.visualDescription })),
+      .map((member) => ({ id: member.localId, refId: member.characterId ?? null, kind: 'person' as const, name: member.name, description: member.appearance, aliases: member.aliases ?? [], isNew: isNew(member.localId) })),
+    ...backgrounds.map((background) => ({ id: background.localId, refId: background.locationId ?? null, kind: 'background' as const, name: background.name, description: background.visualDescription, aliases: background.aliases ?? [], isNew: isNew(background.localId) })),
   ]
 }
 

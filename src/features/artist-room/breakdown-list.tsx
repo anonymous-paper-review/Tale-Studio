@@ -2,13 +2,15 @@
 
 // Artist 브레이크다운 목록(리뉴얼 1차 2026-10-19, 프로토타입 A1). 확정 산문에서 뽑은 인물 · 배경을 글 목록으로 보고,
 //   줄마다 설명을 고친다. 그림은 아직 없다 — [목록이 맞아요 · 그림 만들기]가 스타일 팝업을 연다.
-//   [인물·배경 추가]는 없다(인물 · 배경은 산문에서 나온다). 재점검 · 산문으로 돌아가기는 2차.
+//   [인물·배경 추가]는 없다(인물 · 배경은 산문에서 나온다). 빠지거나 겹친 것은 아래 [인물·배경이 빠졌거나 겹쳤어요]가 여는
+//   산문 재점검으로 바로잡는다(2026-10-27 오너, 프로토타입 WT). 산문으로 돌아가기는 아직 없다.
 //   시리즈 다음 화(2026-10-26 · 프로토타입 A1s)는 이어받은 줄에 표시를 붙이고, 이번 산문에 안 나오는 것은 아래 "보관" 묶음으로 내린다.
 import { useState } from 'react'
-import { ArrowRight, Check, Pencil } from 'lucide-react'
+import { ArrowRight, Check, Pencil, ScanSearch } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { ProseRecheckDialog } from '@/features/artist-room/prose-recheck-dialog'
 import { splitBreakdownRows } from '@/features/series/artist-series'
 import { useSeriesInfo } from '@/features/series/use-series-info'
 import { useT } from '@/lib/i18n'
@@ -30,11 +32,19 @@ function Row({ row }: { row: BreakdownRow & { inherited: boolean } }) {
     setDraft(null)
   }
   return (
-    <li className="flex gap-4 border-b border-border px-1 py-3 last:border-b-0" data-testid="breakdown-row" data-kind={row.kind}>
+    <li
+      className={cn('flex gap-4 border-b border-border px-1 py-3 last:border-b-0', row.isNew && 'shadow-[inset_3px_0_0_var(--success)]')}
+      data-testid="breakdown-row"
+      data-kind={row.kind}
+      data-new={row.isNew || undefined}
+    >
       <div className="min-w-0 flex-1 space-y-1">
         <p className="flex items-center gap-2 text-sm">
           <b className="font-semibold">{row.name || t('Unnamed')}</b>
           <span className="rounded-sm border border-border px-1.5 text-[11px] text-muted-foreground">{t(row.kind === 'person' ? 'Person' : 'Background')}</span>
+          {/* 산문 재점검(2026-10-27 오너): 새로 들어온 줄 · 다른 이름(또는). */}
+          {row.isNew ? <span className="text-[11px] font-medium text-success">{t('Newly added')}</span> : null}
+          {row.aliases.length > 0 ? <span className="text-[11px] text-muted-foreground">{t('Also called {names}', { names: row.aliases.join(' · ') })}</span> : null}
           {row.inherited ? (
             <Badge variant="outline" className="shrink-0 text-[10px]" data-testid="breakdown-series-inherited">
               {t('Carried over from the previous episode')}
@@ -43,7 +53,7 @@ function Row({ row }: { row: BreakdownRow & { inherited: boolean } }) {
         </p>
         {draft === null ? (
           <p className={cn('text-sm leading-6', row.description ? 'text-foreground/85' : 'text-muted-foreground')}>
-            {row.description || t('No description yet. AI fills it in from the prose when it makes the image.')}
+            {row.description || t(row.isNew ? (row.kind === 'person' ? 'A character marked in the prose. AI reads the prose and fills in the description.' : 'A place marked in the prose.') : 'No description yet. AI fills it in from the prose when it makes the image.')}
           </p>
         ) : (
           <Textarea value={draft} rows={2} autoFocus onChange={(event) => setDraft(event.target.value)} aria-label={t('Description')} className="text-sm" />
@@ -69,10 +79,14 @@ export function BreakdownList({ onMake }: { onMake: () => void }) {
   const cast = useProducerStore((s) => s.cast)
   const backgrounds = useProducerStore((s) => s.backgrounds)
   const projectId = useProjectStore((s) => s.projectId)
+  // 산문 초안인지 읽기 전(새로 고침 직후)에는 목록 저장이 잠겨 있다 — 재점검은 그 뒤에 연다(반영 전에 고치던 설명을 먼저 저장한다).
+  const listReady = useProjectStore((s) => s.treatmentDraft)
+  const recheckNewIds = useProducerStore((s) => s.recheckNewIds)
+  const [recheckOpen, setRecheckOpen] = useState(false)
   const { view: series } = useSeriesInfo(projectId)
   const [filter, setFilter] = useState<Filter>('all')
   // 보관 묶음은 이번 산문에서 뽑은 것이 아니라 개수에 넣지 않는다.
-  const { shown: rows, kept } = splitBreakdownRows(breakdownRows(cast, backgrounds), series)
+  const { shown: rows, kept } = splitBreakdownRows(breakdownRows(cast, backgrounds, recheckNewIds), series)
   const persons = rows.filter((row) => row.kind === 'person').length
   const places = rows.length - persons
   const byFilter = (row: BreakdownRow) => filter === 'all' || row.kind === filter
@@ -130,8 +144,15 @@ export function BreakdownList({ onMake }: { onMake: () => void }) {
           <p className="text-xs text-muted-foreground">
             {t('Looks that change by scene (clothes, age) can be added after the images are made, from the card details or in Storyboard.')}
           </p>
+          {/* 프로토타입 A1 아래 줄 — 누를 때만 재점검 창을 연다(기본 화면에서는 점검하라고 묻지 않는다). */}
+          <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
+            <Button variant="outline" onClick={() => setRecheckOpen(true)} disabled={!listReady} data-testid="breakdown-recheck-open">
+              <ScanSearch className="size-4" aria-hidden />{t('Characters or backgrounds are missing or doubled')}
+            </Button>
+          </div>
         </div>
       </div>
+      <ProseRecheckDialog open={recheckOpen} onOpenChange={setRecheckOpen} rows={rows} />
     </div>
   )
 }

@@ -27,9 +27,10 @@ interface Board {
 
 const key = (name: string) => name.trim().toLowerCase()
 
-const castHash = (c: Pick<CastMember, 'name' | 'entityType' | 'appearance' | 'role' | 'arc' | 'motivation'>) =>
+// 산문 재점검(2026-10-27)도 같은 지문을 쓴다 — 이름만 고친 카드 · 새로 넣은 카드가 "손대지 않은 산문 카드"로 남게.
+export const castHash = (c: Pick<CastMember, 'name' | 'entityType' | 'appearance' | 'role' | 'arc' | 'motivation'>) =>
   stableHash({ name: c.name, entityType: c.entityType, appearance: c.appearance, role: c.role ?? null, arc: c.arc ?? null, motivation: c.motivation ?? null })
-const backgroundHash = (b: Pick<BackgroundSource, 'name' | 'visualDescription' | 'purpose'>) =>
+export const backgroundHash = (b: Pick<BackgroundSource, 'name' | 'visualDescription' | 'purpose'>) =>
   stableHash({ name: b.name, visualDescription: b.visualDescription, purpose: b.purpose })
 
 /** 트리트먼트에서 온 카드를 사람이 손댔나 — 카드 편집 · 채팅 수정 · 그림 붙이기 어느 쪽이든. */

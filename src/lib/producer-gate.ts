@@ -47,6 +47,8 @@ export interface CastMember {
   treatmentHash?: string
   /** 시리즈 다음 화가 앞 화에서 이어받은 카드(2026-10-26). 변화 · 동기는 화마다 새로 정해 빈 칸이 넘기기를 막지 않는다. */
   inherited?: boolean
+  /** 산문에 나오는 다른 이름(또는) — 산문 재점검에서 이름을 고치거나 합치면 남는다(2026-10-27 오너). 넘길 때는 싣지 않는다. */
+  aliases?: string[]
 }
 
 export interface BackgroundSource {
@@ -64,6 +66,8 @@ export interface BackgroundSource {
   treatmentHash?: string
   /** 시리즈 다음 화가 앞 화에서 이어받은 배경(2026-10-26). 목적은 화마다 새로 정해 빈 칸이 넘기기를 막지 않는다. */
   inherited?: boolean
+  /** 산문에 나오는 다른 이름(또는) — 산문 재점검에서 이름을 고치거나 합치면 남는다(2026-10-27 오너). */
+  aliases?: string[]
 }
 
 export interface GateIssue {
