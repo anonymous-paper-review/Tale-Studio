@@ -283,7 +283,8 @@ async function generateAndPersistWorldShot(
         error: body.error ?? `HTTP ${res.status}`,
         quotaScope: quotaScopeOf(res.status, body),
     })
-      if (options?.quietQuota && isQuotaExceeded(res.status, body)) return null
+      // 내 한도 기다림 중에는 내 한도 안내만 다시 띄우지 않는다 — 모두의 자리가 찬 것은 알린다(이어 그리기가 거기서 멈춘다).
+      if (options?.quietQuota && isQuotaExceeded(res.status, body) && body.scope !== 'global') return null
       if (notifyIfQuotaExceeded(res.status, body)) return null
       throw new Error(body.error ?? `HTTP ${res.status}`)
     }
@@ -1288,7 +1289,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         const body = await res.json().catch(() => ({}))
         const error = body.error ?? `HTTP ${res.status}`
         onJob({ jobId: null, status: 'failed', httpStatus: res.status, error, quotaScope: quotaScopeOf(res.status, body) })
-        if ((options?.quietQuota && isQuotaExceeded(res.status, body)) || notifyIfQuotaExceeded(res.status, body)) {
+        if ((options?.quietQuota && isQuotaExceeded(res.status, body) && body.scope !== 'global') || notifyIfQuotaExceeded(res.status, body)) {
           return { jobId: null, status: 'failed', httpStatus: res.status, error }
         }
         throw new Error(body.error ?? `HTTP ${res.status}`)

@@ -124,7 +124,7 @@ export default function VisualPage() {
   // 실험 New UI(에셋·샷 보드) 토글 — 스토어 보관으로 탭 전환(remount)에도 유지.
 
   // writer-pipeline 진행상황 (producer→artist 직행 시 백그라운드 생성 진행 표시용, decisions #37)
-  const { status: writerStatus, error: writerStatusError, restart: restartWriterStatus } = useWriterStatus(projectId)
+  const { status: writerStatus, restart: restartWriterStatus } = useWriterStatus(projectId)
   const setLifecycleStatus = useProjectStore((s) => s.setLifecycleStatus)
 
   // 프로젝트당 1회만 자동생성 트리거 (마운트/재진입 중복 방지)
@@ -288,11 +288,11 @@ export default function VisualPage() {
   useEffect(() => {
     if (!projectId || !ready) return
     if (autoGenTriggeredRef.current === projectId) return
-    if (!writerStatusKnown({ status: writerStatus, error: writerStatusError })) return
+    if (!writerStatusKnown({ status: writerStatus })) return
     autoGenTriggeredRef.current = projectId
     if (!autoGenerateOnEnter({ phase })) return
     void autoGenerateBaseImages()
-  }, [projectId, ready, phase, writerStatus, writerStatusError, autoGenerateBaseImages])
+  }, [projectId, ready, phase, writerStatus, autoGenerateBaseImages])
 
   // 첫 진입 브리핑(2026-08-06 간소화) — 무엇을 만들었는지 + @멘션 · Ctrl+클릭 조작법. 룩 미반영/실패는 카드 배지가 알린다.
   //   인물 · 배경 카드가 생긴 뒤(디자인이 끝난 뒤)에 그 수로 한 번만 말한다(2026-10-27 디자이너 QA 1차 관찰 49) —

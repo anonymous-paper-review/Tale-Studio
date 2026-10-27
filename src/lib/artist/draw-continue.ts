@@ -25,9 +25,9 @@ export function autoGenerateOnEnter(input: { phase: string }): boolean {
 }
 /** Writer 진행 상태를 한 번이라도 읽었다(실행이 없어도 started=false 로 온다). 읽기 전에는 화면 단계가 기본값('다 만듦')이라
  *  [만들기] 중인지 모른다 — 새로고침 직후 자동 생성은 이것이 참이 된 뒤에 정한다(2026-10-27 검토 지적).
- *  읽기가 실패하면 기다리지 않는다(예전처럼 빈칸을 채운다). */
-export function writerStatusKnown(input: { status: unknown; error: string | null | undefined }): boolean {
-  return input.status != null || !!input.error
+ *  읽기가 실패해도 다음 읽기(3초마다)를 기다린다 — 한 번 실패로 정하면 [만들기] 중에 화면이 직접 그리는 문제가 다시 생긴다. */
+export function writerStatusKnown(input: { status: unknown }): boolean {
+  return input.status != null
 }
 /** 이만큼 실패한 칸은 자동 경로(이어 그리기 · 다시 그리기 단추)가 서버에서 거절된다 — 카드의 다시 만들기로 사람이 고른다.
  *  서버 give-up 게이트(generation-jobs AUTO_GENERATION_GIVE_UP_THRESHOLD)와 같은 값이다. */

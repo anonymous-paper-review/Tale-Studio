@@ -29,10 +29,14 @@ export const BREAKDOWN_IMAGE_MAX_RATIO = 4
  */
 async function normalize(data: Buffer, format: 'jpeg' | 'png' | 'webp'): Promise<{ data: Buffer } | { badShape: true } | null> {
   try {
-    const rotated = await sharp(data, { failOn: 'error', limitInputPixels: IMAGE_MAX_PIXELS }).rotate().toBuffer({ resolveWithObject: true })
-    const { width, height } = rotated.info
+    const input = { failOn: 'error' as const, limitInputPixels: IMAGE_MAX_PIXELS }
+    // 세운 뒤의 가로 · 세로로 모양을 본다 — 다시 저장은 한 번에(세우기 · 줄이기 · 저장) 해 두 번 압축하지 않는다(검토).
+    const meta = await sharp(data, input).metadata()
+    const width = meta.autoOrient?.width ?? meta.width ?? 0
+    const height = meta.autoOrient?.height ?? meta.height ?? 0
+    if (!width || !height) return null
     if (Math.max(width, height) > BREAKDOWN_IMAGE_MAX_RATIO * Math.min(width, height)) return { badShape: true }
-    const image = sharp(rotated.data).resize({ width: DOWNSCALE_MAX_EDGE, height: DOWNSCALE_MAX_EDGE, fit: 'inside', withoutEnlargement: true })
+    const image = sharp(data, input).rotate().resize({ width: DOWNSCALE_MAX_EDGE, height: DOWNSCALE_MAX_EDGE, fit: 'inside', withoutEnlargement: true })
     if (format === 'jpeg') return { data: await image.jpeg({ quality: 92 }).toBuffer() }
     if (format === 'webp') return { data: await image.webp({ quality: 92 }).toBuffer() }
     return { data: await image.png().toBuffer() }

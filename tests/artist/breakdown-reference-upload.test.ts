@@ -158,4 +158,18 @@ describe('레퍼런스 그림 올리기 라우트', () => {
     }
     expect(mocks.uploads).toEqual([])
   })
+
+  it('JPG · WebP 그림은 한 번만 다시 저장해 화질을 지킨다', async () => {
+    // 왜: 세우기 · 줄이기를 두 번에 나눠 저장하면 두 번 압축돼 화질이 떨어졌다 — 이 그림이 그대로 카드의 시트 · 배경 그림이 된다(2026-10-27 검토 지적).
+    for (const [format, type] of [['jpeg', 'image/jpeg'], ['webp', 'image/webp']] as const) {
+      mocks.uploads.length = 0
+      const photo = await sharp({ create: { width: 2600, height: 1300, channels: 3, background: { r: 120, g: 80, b: 200 } } })
+        .composite([{ input: Buffer.from('<svg width="2600" height="1300"><circle cx="900" cy="600" r="400" fill="#f5c542"/></svg>') }])
+        .toFormat(format).withMetadata({ orientation: 6 }).toBuffer()
+      const response = await post(blob(photo, type), { name: `photo.${format === 'jpeg' ? 'jpg' : 'webp'}` })
+      expect(response.status).toBe(200)
+      const once = await sharp(photo).rotate().resize({ width: 2048, height: 2048, fit: 'inside', withoutEnlargement: true }).toFormat(format, { quality: 92 }).toBuffer()
+      expect(originals()[0].data.equals(once), format).toBe(true)
+    }
+  })
 })

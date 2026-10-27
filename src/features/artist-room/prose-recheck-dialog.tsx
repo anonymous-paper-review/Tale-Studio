@@ -27,6 +27,7 @@ import {
   type RecheckKind,
   type RecheckSession,
 } from '@/lib/artist/recheck'
+import { loadSeriesInfo } from '@/features/series/use-series-info'
 import { useWriterPreview } from '@/lib/writer/use-writer-preview'
 import { useProducerStore } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
@@ -295,6 +296,9 @@ export function ProseRecheckDialog({ open, onOpenChange, rows, keptIds = [] }: {
     setApplying(true)
     try {
       const result = await useProducerStore.getState().applyRecheck(session.ops, keptIds)
+      // 보관 줄이 있는 화: 반영했거나(성공) 반영했는지 몰라 목록을 다시 읽었으면 시리즈 정보도 다시 읽는다 —
+      //   넣은 보관 인물이 이번 화 씬에 들어가 보관 묶음에서 이번 화 목록으로 올라온다(검토).
+      if ((result.ok || ('reloaded' in result && result.reloaded)) && keptIds.length && projectId) void loadSeriesInfo(projectId, false)
       if (!result.ok) {
         toast.error(result.error)
         if ('reloaded' in result && result.reloaded) onOpenChange(false)

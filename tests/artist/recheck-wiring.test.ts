@@ -23,4 +23,10 @@ describe('재점검 창 잇기', () => {
     // 왜: 창이 옛 목록으로 고친 것을 들고 있으면 다시 눌러 같은 인물을 또 넣는다 — 다시 읽은 목록을 보고 빠진 것만 다시 열어 고친다.
     expect(dialog).toMatch(/if \(!result\.ok\) \{\s+toast\.error\(result\.error\)\s+if \('reloaded' in result && result\.reloaded\) onOpenChange\(false\)\s+return/)
   })
+
+  it('보관 줄이 있는 화에서 반영했거나 반영했는지 몰라 목록을 다시 읽었으면 시리즈 정보도 다시 읽는다', () => {
+    // 왜: 보관 인물을 넣으면 서버는 그 인물을 이번 화 씬에 넣지만, 화면이 들고 있던 시리즈 정보는 그대로라 그 인물이 계속 "보관"에 보였다.
+    //   답을 못 받은 경우도 서버는 반영했을 수 있다(2026-10-27 검토 지적).
+    expect(dialog).toMatch(/if \(\(result\.ok \|\| \('reloaded' in result && result\.reloaded\)\) && keptIds\.length && projectId\) void loadSeriesInfo\(projectId, false\)/)
+  })
 })

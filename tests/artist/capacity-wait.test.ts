@@ -207,6 +207,18 @@ describe('내 한도에 막힌 이어 그리기', () => {
     }
   })
 
+  it('기다림 중 조용히 다시 보더라도 모두의 자리가 찼다는 안내는 띄운다', async () => {
+    // 왜: 내 한도를 기다리다 모두의 자리가 차면 이어 그리기가 멈춘다 — 그 까닭은 알려야 한다(조용히는 내 한도 안내만, 2026-10-27 검토 지적).
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ code: 'quota_exceeded', scope: 'global', category: 'image' }, { status: 429 })))
+    useArtistStore.setState({ generateCharacterView: realGenerateCharacterView })
+    try {
+      await useArtistStore.getState().generateCharacterView('mara', 'current', 'main', 'auto', undefined, undefined, undefined, { quietQuota: true })
+      expect(mocks.notify).toHaveBeenCalledOnce()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('내 한도에 막혀 30분을 기다려도 자리가 나지 않으면 멈추고 다시 그리기 단추로 남긴다', async () => {
     // 왜: 끝없이 두드리지 않는다 — 30분이 지나면 사람이 [안 나온 그림 다시 그리기]로 다시 시작한다.
     expect(USER_LIMIT_WAIT_MAX_MS).toBe(30 * 60_000)
@@ -230,11 +242,15 @@ describe('[만들기] 중 Artist 화면의 자동 생성', () => {
   it('새로고침 뒤 Writer 진행 상태를 아직 읽지 못했으면 Artist 화면은 자동으로 그리지 않고 상태를 읽은 뒤에 정한다', () => {
     // 왜: 새로고침하면 진행 상태를 읽기 전 화면 단계가 기본값 '다 만듦'이라, [만들기]가 도는 중에도 화면이 직접 그려
     //   내 자리를 먼저 차지했다 — 위 시험의 막음이 새로고침에서는 듣지 않았다(2026-10-27 검토 지적).
-    expect(writerStatusKnown({ status: null, error: null })).toBe(false)
-    expect(writerStatusKnown({ status: { started: false }, error: null })).toBe(true)
-    // 상태 읽기가 실패하면 기다리지 않는다 — 예전처럼 빈칸을 채운다.
-    expect(writerStatusKnown({ status: null, error: 'status 500' })).toBe(true)
-    expect(readFileSync('src/app/studio/artist/page.tsx', 'utf8')).toMatch(/if \(!writerStatusKnown\(\{ status: writerStatus, error: writerStatusError \}\)\) return\s+autoGenTriggeredRef\.current = projectId/)
+    expect(writerStatusKnown({ status: null })).toBe(false)
+    expect(writerStatusKnown({ status: { started: false } })).toBe(true)
+    expect(readFileSync('src/app/studio/artist/page.tsx', 'utf8')).toMatch(/if \(!writerStatusKnown\(\{ status: writerStatus \}\)\) return\s+autoGenTriggeredRef\.current = projectId/)
+  })
+
+  it('새로고침 뒤 Writer 진행 상태 읽기가 한 번 실패해도 다음 읽기(3초마다)를 기다렸다가 정한다', () => {
+    // 왜: 한 번 실패로 바로 정하면 [만들기] 중인데도 기본값 '다 만듦'으로 보고 화면이 직접 그려 같은 문제가 다시 생긴다(2026-10-27 검토 지적).
+    expect(writerStatusKnown({ status: null })).toBe(false)
+    expect(readFileSync('src/app/studio/artist/page.tsx', 'utf8')).not.toMatch(/writerStatusError/)
   })
 
   it('자동 생성에서 차례를 기다리던 인물 시트도 그 사이 다른 프로젝트로 옮겼으면 요청하지 않는다', () => {
