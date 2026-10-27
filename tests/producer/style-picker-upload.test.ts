@@ -1,4 +1,4 @@
-// 스타일 선택 창의 점선 "+" 카드로 내 그림체 그림을 올리면 채팅의 "그림체"와 같은 규칙으로 고정 · 분석한다 (2026-10-10 오너)
+// 내 그림체 그림을 올리면 채팅의 "그림체"와 같은 규칙으로 고정 · 분석한다 (2026-10-10 오너) — Artist 스타일 창의 올리기 카드는 2026-10-27 내렸다(정비 뒤 다시)
 import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -41,15 +41,17 @@ afterEach(() => {
 })
 
 describe('스타일 선택 창의 내 그림체 올리기', () => {
-  it('Artist 스타일 팝업의 첫 자리에 점선 테두리의 + 카드가 있고, 분석 모델로 보낸다는 안내가 있다', () => {
-    // 왜: 10/10 오너 — 스타일을 고르는 창에 내 그림을 그림체로 올릴 길이 있어야 한다.
-    //   리뉴얼 1차(2026-10-19): 스타일 고르기는 Artist [만들기]의 스타일 팝업으로 옮겼다(채팅 스타일 단추 없음).
+  it('Artist 스타일 팝업에는 내 그림체 올리기 카드가 없고, 이미 올린 그림체가 있으면 그 그림체와 지우기(✕)를 보인다', () => {
+    // 왜: 2026-10-27 오너 — "스타일 선택지에서 내 그림 업로드 기능을 지워줘. 추후 정비해서 다시 올릴거야."
+    //   이미 내 그림체로 만든 프로젝트는 지금처럼 그 그림체를 쓰고 지울 수 있어야 한다(QA 1차 #03 ✕).
     const dialog = readFileSync('src/features/artist-room/style-make-dialog.tsx', 'utf8')
-    expect(dialog).toMatch(/data-testid="artist-style-upload"/)
-    expect(dialog).toMatch(/border-dashed/)
-    expect(dialog).toMatch(/<Plus /)
-    expect(dialog).toMatch(/The picture goes to an analysis model to describe its art style, and the style is then fixed\./)
-    expect(translate('ko', 'The picture goes to an analysis model to describe its art style, and the style is then fixed.')).toMatch(/분석 모델/)
+    expect(dialog).not.toMatch(/data-testid="artist-style-upload"/)
+    expect(dialog).not.toMatch(/type="file"/)
+    expect(dialog).not.toMatch(/<Plus /)
+    expect(dialog).not.toMatch(/ingestCreationFile|applyUploadedStyle/)
+    expect(dialog).toMatch(/data-testid="artist-style-custom"/)
+    expect(dialog).toMatch(/data-testid="artist-style-remove"/)
+    expect(translate('ko', 'Remove my art style')).toBeTruthy()
   })
 
   it('올린 그림은 매체를 고르고 그림체로 고정한 뒤 그림체 분석기로 분석하고, 내 말풍선에 그 그림을 남긴다', async () => {

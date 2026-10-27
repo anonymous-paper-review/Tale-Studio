@@ -3,6 +3,7 @@
 // 산문 본문(리뉴얼 1차 2026-10-19, 프로토타입 W1 w-prose). S1 · S2 … 문단, 다시 쓰기 안을 미리 볼 때는 바뀐 문단만
 //   이전 글 · 새 글로 함께, 대본을 그대로 쓰는 프로젝트는 원본 대본을 그대로 보인다.
 import { useState } from 'react'
+import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
 import { AlertTriangle, Loader2, RotateCcw, ScrollText } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -16,6 +17,8 @@ import type { ProseState } from '@/features/prose/use-prose'
 export function ProseDocument({ prose }: { prose: ProseState }) {
   const t = useT()
   const [starting, setStarting] = useState(false)
+  // [산문 쓰기]를 누른 뒤 Writer 가 쓰기 시작했다고 알릴 때까지도 왼쪽 사이드바를 막는다(2026-10-27) — 그 사이 다른 단계로 옮겨 갈 수 있었다.
+  useAiBusyHold(starting)
   const { view, diffRows, phase, draftLive } = prose
 
   const startDraft = async () => {

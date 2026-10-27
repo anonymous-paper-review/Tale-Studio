@@ -35,8 +35,11 @@ export function aiBusyNow(): boolean {
 }
 
 /** 왼쪽 레일에서 그곳으로 옮겨 갈 수 없는가. 단계는 아직 안 열렸거나(locked) AI 가 일하는 동안 막는다.
+ *  아래 단추 묶음(Take · 공유 · 내보내기 · 도움말 · 프로필)도 AI 가 일하는 동안 막는다(2026-10-27 오너 재확인) — 계정 화면으로
+ *  나가거나 프로필 메뉴에서 지금 프로젝트를 지우 · 옮길 수 있었다.
  *  프로젝트 목록(홈)은 늘 갈 수 있다 — 오래 걸리는 작업 중에도 빠져나갈 길은 남긴다(생성은 서버에서 이어진다). */
-export function railNavBlocked(input: { to: 'stage' | 'projects'; locked?: boolean; aiBusy: boolean }): boolean {
+export function railNavBlocked(input: { to: 'stage' | 'projects' | 'footer'; locked?: boolean; aiBusy: boolean }): boolean {
   if (input.to === 'projects') return false
+  if (input.to === 'footer') return input.aiBusy
   return input.locked === true || input.aiBusy
 }

@@ -1,5 +1,4 @@
 // Artist 스타일 창에서 올린 그림체의 말풍선과 안내는 Writer 가 아니라 Artist 이름으로 채팅에 남는다 (2026-10-27 디자이너 QA 1차)
-import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const persist = vi.hoisted(() => ({ save: vi.fn() }))
@@ -51,8 +50,8 @@ describe('Artist 스타일 창의 내 그림체 올리기(디자이너 QA 1차 �
     expect(persist.save.mock.calls.every(([, stage]) => stage === 'artist')).toBe(true)
     expect(producer.getState().customStyleAnchor?.locked).toBe(true)
 
-    // Artist 스타일 창이 Artist 로 부르고, 다른 곳(예전 경로)은 지금처럼 Writer(producer) 채팅에 남는다.
-    expect(readFileSync('src/features/artist-room/style-make-dialog.tsx', 'utf8')).toMatch(/applyUploadedStyle\([^)]*\}, \{ stage: 'artist' \}\)/)
+    // 다른 곳(예전 경로)은 지금처럼 Writer(producer) 채팅에 남는다.
+    //   Artist 스타일 창의 올리기 카드는 2026-10-27 오너 지시로 내렸다(정비 뒤 다시) — 다시 올릴 때 Artist 로 부르면 이 규칙을 쓴다.
     chat.getState().reset()
     producer.getState().reset()
     await chat.getState().applyUploadedStyle(LOOK)

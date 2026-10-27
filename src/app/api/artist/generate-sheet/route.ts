@@ -106,10 +106,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid request: traceId does not belong to project' }, { status: 409 })
     }
 
-    // 멀티유저 동시성 게이트: 유저 상한 + 전역 fal 슬롯(#global-semaphore). 둘 중 하나라도 차면 429.
-    const quota = await checkGenerationCapacity(access.userId!, 'image')
-    if (!quota.ok) return quotaRejectionResponse(quota, { projectId, kind: 'character_view', userId: access.userId })
-
     // 클라이언트 진입점 귀속 — 'chat'(글로벌 채팅 updates)만 구분, 그 외는 전부 'ui'.
     const jobActor: GenerationJobActor = actor === 'chat' ? 'chat' : 'ui'
 
@@ -171,6 +167,11 @@ export async function POST(req: Request) {
         effectiveSafeMode = slot.moderation
       }
     }
+
+    // 멀티유저 동시성 게이트: 유저 상한 + 전역 fal 슬롯(#global-semaphore). 둘 중 하나라도 차면 429.
+    //   이미 있는 시트 · 포기 · 겹친 요청(그리는 중) · 순화 상한을 먼저 건너뛴 뒤에 본다(2026-10-27 오너 재확인) — 배경 라우트와 같은 까닭.
+    const quota = await checkGenerationCapacity(access.userId!, 'image')
+    if (!quota.ok) return quotaRejectionResponse(quota, { projectId, kind: 'character_view', userId: access.userId })
 
     // 1. 프로젝트, 캐릭터, 요청한 모습과 명시적 기본 모습을 로드한다.
     const [{ data: project }, { data: character }, { data: appearance }, { data: defaultAppearance }] =

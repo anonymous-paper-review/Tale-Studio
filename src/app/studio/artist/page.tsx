@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, ArrowRight, Check, Loader2, ZoomIn, ZoomOut } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -29,7 +30,7 @@ import { styleAnchorName } from '@/lib/style-anchor-name'
 import { AiBusyOverlay } from '@/components/ai-busy-overlay'
 import { artistPhase, artistRunStopped, assetCompletionGaps, makingProgress } from '@/lib/artist/breakdown'
 import { ARTIST_BRIEF_TEXT, artistBriefCounts, offerArtistBrief } from '@/lib/artist/brief'
-import { completeBlockedNote, drawContinueDecision, drawTargetCount, makingOverlayCopy, missingDrawTargets } from '@/lib/artist/draw-continue'
+import { completeBlockedNote, drawContinueDecision, drawTargetCount, makingOverlayCopy, missingDrawTargets, autoGenerateOnEnter } from '@/lib/artist/draw-continue'
 import { backgroundRoughReady, storyboardPrepView } from '@/lib/artist/background-roughs'
 import { isDemoSession } from '@/lib/demo/context'
 import { useBackgroundRoughs } from '@/features/artist-room/use-background-roughs'
@@ -230,16 +231,6 @@ export default function VisualPage() {
     void loadData()
   }, [projectId, writerReady, loadData])
 
-  // 진입(ready) 시 비어있는 이미지 자동생성 (1회+캐시).
-  //   mainReady 진입: main 은 이미 있으므로 비어있는 4방향만 i2i 생성.
-  //   fallback 진입: main 도 비어있으면 main 부터 보강.
-  useEffect(() => {
-    if (!projectId || !ready) return
-    if (autoGenTriggeredRef.current === projectId) return
-    autoGenTriggeredRef.current = projectId
-    void autoGenerateBaseImages()
-  }, [projectId, ready, autoGenerateBaseImages])
-
   // 시간측정: artist 진입(=main 준비/진입 가능) 순간 1회 로깅.
   //   end_to_end_ms = 핸드오프 클릭(producer) → 지금 (sessionStorage 기준 wall-clock)
   //   서버 timings 도 함께 출력 (pipeline 내부 구간).
@@ -287,6 +278,19 @@ export default function VisualPage() {
   // [완료하기]를 해 Storyboard 가 열렸다(예전 흐름으로 끝까지 만든 프로젝트 포함) — 다시 완료하지 않는다.
   const artistCompleted = stageIndex(reachedStage) >= stageIndex('writer')
   const phase = artistPhase({ proseLocked, draftRun, status: writerStatus, hasAssets, artistCompleted })
+
+  // 진입(ready) 시 비어있는 이미지 자동생성 (1회+캐시).
+  //   mainReady 진입: main 은 이미 있으므로 비어있는 4방향만 i2i 생성.
+  //   fallback 진입: main 도 비어있으면 main 부터 보강.
+  //   브레이크다운 · [만들기] 중에 처음 준비되면 그리지 않는다 — 서버 초안과 이어 그리기가 맡는다(2026-10-27 오너 재확인, autoGenerateOnEnter).
+  //   그 화면에서는 이번 진입의 자동 생성을 다시 열지 않는다(나중에 다시 들어오면 지금처럼 빈칸을 채운다).
+  useEffect(() => {
+    if (!projectId || !ready) return
+    if (autoGenTriggeredRef.current === projectId) return
+    autoGenTriggeredRef.current = projectId
+    if (!autoGenerateOnEnter({ phase })) return
+    void autoGenerateBaseImages()
+  }, [projectId, ready, phase, autoGenerateBaseImages])
 
   // 첫 진입 브리핑(2026-08-06 간소화) — 무엇을 만들었는지 + @멘션 · Ctrl+클릭 조작법. 룩 미반영/실패는 카드 배지가 알린다.
   //   인물 · 배경 카드가 생긴 뒤(디자인이 끝난 뒤)에 그 수로 한 번만 말한다(2026-10-27 디자이너 QA 1차 관찰 49) —
@@ -412,6 +416,10 @@ export default function VisualPage() {
       ) : undefined}
     />
   )
+
+  // 예전 흐름(리뉴얼 전) 프로젝트의 진행 화면(그리는 중)은 잠금 화면을 쓰지 않는다 — 그 동안도 왼쪽 사이드바를 막는다(2026-10-27).
+  const legacyProgressBusy = !gateOpen && phase === 'done' && !writerStatus?.pipeline_failed
+  useAiBusyHold(legacyProgressBusy)
 
   if (phase === 'list') {
     return (

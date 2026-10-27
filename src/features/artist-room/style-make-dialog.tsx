@@ -2,21 +2,20 @@
 
 // Artist 스타일 고르기 · 만들기(리뉴얼 1차 2026-10-19, 프로토타입 A2 "어떤 스타일로 만들까요?").
 //   작품 스타일은 하나 — 고른 스타일 · 만드는 것(인물 시트 N · 배경 M) · 예상 크레딧을 보여 주고 [만들기]로 전체를 만든다.
-//   [만들기] = 확정 산문 초안을 이어 가며 인물 · 배경 디자인 뒤에 멈추게 한다(artistGate). 예전 채팅 팔레트의
-//   "내 그림체 올리기"도 여기서 쓴다(올린 그림체로 고정된다). 그림은 Take 가 들지 않는다(take-cost: Take 는 영상 전용).
-import { useEffect, useRef, useState } from 'react'
-import { Check, ImageIcon, Loader2, Lock, Plus, Sparkles, X } from 'lucide-react'
+//   [만들기] = 확정 산문 초안을 이어 가며 인물 · 배경 디자인 뒤에 멈추게 한다(artistGate). 그림은 Take 가 들지 않는다(take-cost: Take 는 영상 전용).
+//   "내 그림체 올리기" 카드는 2026-10-27 오너 지시로 내렸다("추후 정비해서 다시 올릴거야") — 이미 올린 그림체가 있는 프로젝트는
+//   그 그림체 카드와 지우기(✕)만 보인다. 올리기 · 분석 서버 경로와 Writer 채팅의 그림체 첨부는 그대로다.
+import { useEffect, useState } from 'react'
+import { Check, ImageIcon, Loader2, Lock, Sparkles, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ThumbImage } from '@/components/thumb-image'
-import { useImageUploadConsent } from '@/components/upload/image-upload-consent'
 import { useLocale, useT } from '@/lib/i18n'
 import { styleAnchorName } from '@/lib/style-anchor-name'
 import { cn } from '@/lib/utils'
-import { kindOf } from '@/lib/upload/limits'
-import { ingestCreationFile } from '@/lib/project/start-new-project'
 import { breakdownRows } from '@/lib/artist/breakdown'
+import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
 import { seriesMakeCounts } from '@/features/series/artist-series'
 import { useSeriesInfo } from '@/features/series/use-series-info'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
@@ -36,10 +35,9 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
   const styleSetting = useGlobalChatStore((s) => !!projectId && s.styleSettingFor === projectId)
   const [picked, setPicked] = useState<string | null>(savedKey)
   const [making, setMaking] = useState(false)
-  const [upload, setUpload] = useState<{ busy: boolean; error: string | null } | null>(null)
   const [removing, setRemoving] = useState(false)
-  const fileRef = useRef<HTMLInputElement>(null)
-  const { requestImageUploadConsent, imageUploadConsentDialog } = useImageUploadConsent(projectId)
+  // [만들기]로 디자인 실행을 거는 동안 왼쪽 사이드바도 막는다 — 창이 마우스는 막아도 Alt 단축키는 막지 못했다(2026-10-27).
+  useAiBusyHold(making)
   const locked = custom?.locked === true
   // 시리즈 다음 화(2026-10-26): 앞 화 그림체로 시작한다 — style_anchor_key 가 이미 복사돼 있어 아래 picked 가 savedKey(= 앞 화 그림체)에서 시작한다.
   //   그 자리에 "앞 화 그림체" 표시만 붙이고 고를 값은 바꾸지 않는다(올린 그림체가 잠긴 프로젝트는 지금처럼 못 바꾼다).
@@ -72,7 +70,7 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
 
   const chosenAnchor = anchors.find((anchor) => anchor.key === picked)
   const chosenLabel = custom ? custom.label : chosenAnchor ? styleAnchorName(chosenAnchor, locale) : null
-  const canMake = !making && !styleSetting && !upload?.busy && (locked || !!custom || !!picked)
+  const canMake = !making && !styleSetting && (locked || !!custom || !!picked)
 
   // 올린 내 그림체 지우기(2026-10-27 QA #03 · 오너 "지우기(X) 추가") — 지우면 고정이 풀려 다른 스타일을 고를 수 있다.
   const removeCustom = async () => {
@@ -84,30 +82,6 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
     } finally {
       setRemoving(false)
     }
-  }
-
-  const pickFile = () => {
-    if (!upload?.busy && !locked) fileRef.current?.click()
-  }
-  const onFile = async (file: File) => {
-    if (!projectId) return
-    const pid = projectId
-    if (kindOf(file.name) !== 'image') {
-      setUpload({ busy: false, error: t('Choose a picture file.') })
-      return
-    }
-    if (!(await requestImageUploadConsent([file]))) return
-    if (useProjectStore.getState().projectId !== pid) return
-    setUpload({ busy: true, error: null })
-    const uploaded = await ingestCreationFile(pid, file)
-    if (useProjectStore.getState().projectId !== pid) return
-    if ('error' in uploaded || uploaded.kind !== 'image') {
-      setUpload({ busy: false, error: 'error' in uploaded ? uploaded.error : t('Choose a picture file.') })
-      return
-    }
-    setUpload(null)
-    // Artist 화면의 일이라 말풍선 · 안내도 Artist 이름으로 남긴다(2026-10-27 디자이너 QA 1차 관찰 49).
-    await useGlobalChatStore.getState().applyUploadedStyle({ id: uploaded.id, name: uploaded.name, thumbUrl: uploaded.thumbUrl, sliceUrls: uploaded.sliceUrls }, { stage: 'artist' })
   }
 
   const make = async () => {
@@ -157,44 +131,33 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
               </p>
             ) : null}
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4" role="radiogroup" aria-label={t('Style')}>
-              <div className="relative flex">
-              <button
-                type="button"
-                onClick={pickFile}
-                disabled={locked || upload?.busy}
-                className="group flex w-full flex-col overflow-hidden rounded-lg border border-dashed border-border-strong text-left transition-colors hover:border-primary/60 disabled:opacity-50"
-                data-testid="artist-style-upload"
-              >
-                <span className="flex aspect-square items-center justify-center bg-muted/30">
-                  {upload?.busy || styleSetting ? <Loader2 className="size-5 animate-spin" aria-hidden /> : custom ? <ThumbImage src={custom.url} alt={custom.label} className="size-full object-cover" /> : <Plus className="size-5 text-muted-foreground" aria-hidden />}
-                </span>
-                <span className="px-2 py-1.5 text-xs">
-                  <span className="line-clamp-1 font-medium">{custom ? custom.label : t('Upload my art style')}</span>
-                  {prevIsCustom ? <span className="block text-[10px] text-muted-foreground">{t('Previous episode style')}</span> : null}
-                  {upload?.error
-                    ? <span className="line-clamp-2 text-destructive">{upload.error}</span>
-                    : styleSetting
-                      ? <span className="text-muted-foreground">{t('Reading the art style…')}</span>
-                      : !custom
-                        ? <span className="line-clamp-3 text-muted-foreground">{t('The picture goes to an analysis model to describe its art style, and the style is then fixed.')}</span>
-                        : null}
-                </span>
-              </button>
+              {/* 이미 올린 내 그림체(올리기 카드는 2026-10-27 내림) — 보기 · 지우기만. */}
               {custom ? (
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  className="absolute right-1.5 top-1.5 size-6 rounded-full bg-background/90"
-                  onClick={() => void removeCustom()}
-                  aria-label={t('Remove my art style')}
-                  title={t('Remove my art style')}
-                  disabled={removing || styleSetting || making || !!upload?.busy} data-testid="artist-style-remove"
-                >
-                  {removing ? <Loader2 className="size-3 animate-spin" aria-hidden /> : <X className="size-3" aria-hidden />}
-                </Button>
+                <div className="relative flex">
+                  <div className="flex w-full flex-col overflow-hidden rounded-lg border border-primary ring-1 ring-primary text-left" data-testid="artist-style-custom">
+                    <span className="flex aspect-square items-center justify-center bg-muted/30">
+                      {styleSetting ? <Loader2 className="size-5 animate-spin" aria-hidden /> : <ThumbImage src={custom.url} alt={custom.label} className="size-full object-cover" />}
+                    </span>
+                    <span className="px-2 py-1.5 text-xs">
+                      <span className="line-clamp-1 font-medium">{custom.label}</span>
+                      {prevIsCustom ? <span className="block text-[10px] text-muted-foreground">{t('Previous episode style')}</span> : null}
+                      {styleSetting ? <span className="text-muted-foreground">{t('Reading the art style…')}</span> : null}
+                    </span>
+                  </div>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    className="absolute right-1.5 top-1.5 size-6 rounded-full bg-background/90"
+                    onClick={() => void removeCustom()}
+                    aria-label={t('Remove my art style')}
+                    title={t('Remove my art style')}
+                    disabled={removing || styleSetting || making} data-testid="artist-style-remove"
+                  >
+                    {removing ? <Loader2 className="size-3 animate-spin" aria-hidden /> : <X className="size-3" aria-hidden />}
+                  </Button>
+                </div>
               ) : null}
-              </div>
               {anchors.map((anchor) => {
                 const on = !custom && picked === anchor.key
                 const name = styleAnchorName(anchor, locale)
@@ -225,17 +188,6 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
                 )
               })}
             </div>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".jpg,.jpeg,.png,.webp"
-              className="hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0]
-                event.target.value = ''
-                if (file) void onFile(file)
-              }}
-            />
             <dl className="space-y-2 rounded-lg border border-border px-3 py-2.5 text-sm">
               <div className="flex gap-3" data-testid="artist-make-new"><dt className="w-24 shrink-0 text-muted-foreground">{t('What gets made')}</dt><dd>{makeCounts ? t('New character sheets {persons} · backgrounds {places}', { persons: makeCounts.newPersons, places: makeCounts.newPlaces }) : t('Character sheets {persons} · backgrounds {places}', { persons, places })}</dd></div>
               {prevImageParts.length > 0 ? (
@@ -254,7 +206,6 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {imageUploadConsentDialog}
     </>
   )
 }

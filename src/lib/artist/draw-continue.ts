@@ -12,6 +12,17 @@ export const DRAW_CONTINUE_MAX_ROUNDS = 3
 export const STYLE_WAIT_RECHECK_MS = 20_000
 /** 내 한도(개인 축)에 막혀 거절됐을 때 다시 볼 때까지 — 다른 프로젝트의 내 그림이 끝나기를 기다린다(2026-09-11 오너 (가)). */
 export const USER_LIMIT_RECHECK_MS = 60_000
+/** 내 한도에 막혀 기다리는 최대 시간 — 처음 막힌 뒤(새로 보낸 그림이 생기면 다시 잰다) 이만큼 지나도 자리가 나지 않으면 멈추고 단추로 남긴다.
+ *  바퀴 상한(DRAW_CONTINUE_MAX_ROUNDS)은 이 기다림에 쓰지 않는다 — 러프 · 다른 프로젝트 그림이 내 자리를 잡고 있으면 세 바퀴(3분) 안에
+ *  자리가 나지 않아 그림 1장이 그대로 빠졌다(2026-10-27 오너 재확인 "그림 1장이 동시 생성 한도에 막혀 그려지지 않음"). */
+export const USER_LIMIT_WAIT_MAX_MS = 30 * 60_000
+
+/** Artist 화면에 들어와 준비되자마자 비어 있는 그림을 화면이 스스로 그릴지 — 브레이크다운(list)과 [만들기](making) 중에는 그리지 않는다.
+ *  [만들기] 중에는 서버 초안(디자인 단계 뒤)과 이어 그리기가 맡는다. 화면이 배경마다 30초만 서버 그림을 기다리고 직접 그리면
+ *  디자인 전 프롬프트로 그리고 내 자리를 먼저 차지해, 그 뒤 서버가 보낸 그림이 내 한도에 막혀 빠졌다(2026-10-27 오너 재확인). */
+export function autoGenerateOnEnter(input: { phase: string }): boolean {
+  return input.phase !== 'list' && input.phase !== 'making'
+}
 /** 이만큼 실패한 칸은 자동 경로(이어 그리기 · 다시 그리기 단추)가 서버에서 거절된다 — 카드의 다시 만들기로 사람이 고른다.
  *  서버 give-up 게이트(generation-jobs AUTO_GENERATION_GIVE_UP_THRESHOLD)와 같은 값이다. */
 export const AUTO_DRAW_GIVE_UP_FAILS = 2

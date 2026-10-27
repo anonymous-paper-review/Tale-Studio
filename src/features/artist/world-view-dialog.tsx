@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
 import { AlertTriangle, ArrowLeft, Check, Loader2, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -147,6 +148,9 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
       await retryWorldShotSafe(world.locationId, imageModel, variantKey)
     },
   })
+  // 창이 열려 있고 순한 문장으로 다시 그리는 동안 왼쪽 사이드바도 막는다 — 단추 안 원만 돌아 Alt 단축키로 단계를 옮길 수 있었다(2026-10-27).
+  //   닫힌 창은 막지 않는다(locked 는 그 그림을 그리는 중이기만 해도 참이다 — 뒤에서 그리는 그림 때문에 사이드바가 잠기면 안 된다).
+  useAiBusyHold(open && safeRetry.locked)
 
   if (!open || !world || !shot) return null
 

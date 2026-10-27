@@ -35,7 +35,7 @@ import { registerCharacterCard } from '@/stores/asset-storage-store'
 import { isDemoSession } from '@/lib/demo/context'
 import type { ArtistSourceSnapshot } from '@/lib/artist/source-snapshot'
 import { fetchArtistGenerationLimit, runAdaptivePool } from '@/lib/artist/generation-slots'
-import { DRAW_CONTINUE_MAX_ROUNDS, STYLE_WAIT_RECHECK_MS, USER_LIMIT_RECHECK_MS, missingDrawTargets } from '@/lib/artist/draw-continue'
+import { DRAW_CONTINUE_MAX_ROUNDS, STYLE_WAIT_RECHECK_MS, USER_LIMIT_RECHECK_MS, missingDrawTargets, USER_LIMIT_WAIT_MAX_MS } from '@/lib/artist/draw-continue'
 // 최종 룩 요약(design_tokens 파생) — 옛 온보딩 버블 카피용으로 태어났지만(2026-08-06 제거)
 //   "지금 룩이 뭔지"의 파생 상태로 남긴다. 채팅 컨텍스트·향후 UI가 소비.
 export interface ArtistLookSummary {
@@ -693,7 +693,15 @@ interface ArtistState {
   drawingBeganAt: { projectId: string; at: number } | null
   markDrawingBegan: (projectId: string) => void
   /** 내 한도에 막혀 못 그린 그림 이어 그리기(2026-10-27 디자이너 QA 1차 #06) — 횟수 · 멈춤(거절 · 보낸 것 없음). */
-  drawContinue: { projectId: string | null; rounds: number; stopped: boolean; running: boolean; paused: boolean }
+  drawContinue: {
+    projectId: string | null
+    rounds: number
+    stopped: boolean
+    running: boolean
+    paused: boolean
+    /** 내 한도에 막혀 기다리기 시작한 때(ms) — 새로 보낸 그림이 생기면 다시 잰다. 없으면 기다리는 중이 아니다(2026-10-27). */
+    userWaitSince?: number | null
+  }
   /** 서버 초안이 자리 때문에 건너뛴 칸의 축('char:<id>' · 'world:<id>') — 모두의 자리에 막힌 칸은 이어 그리지 않는다. */
   capacitySkips: Record<string, 'user' | 'global'>
   /** 앞의 그림이 다 끝났을 때 실패 기록 없는 빈칸을 이어 그린다. 거절(자리 없음 등)되거나 새로 보낸 것이 없으면 멈춘다. */
@@ -2013,8 +2021,15 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return
     const current = get().drawContinue
-    const mine = current.projectId === projectId ? current : { projectId, rounds: 0, stopped: false, running: false, paused: false }
-    if (mine.running || mine.stopped || mine.paused || mine.rounds >= DRAW_CONTINUE_MAX_ROUNDS) return
+    const mine = current.projectId === projectId ? current : { projectId, rounds: 0, stopped: false, running: false, paused: false, userWaitSince: null }
+    // 내 한도에 막혀 기다리는 중이면(처음 막힌 뒤 30분 안) 바퀴 상한을 보지 않는다(2026-10-27 오너 재확인).
+    const userWaiting = mine.userWaitSince != null && Date.now() - mine.userWaitSince < USER_LIMIT_WAIT_MAX_MS
+    if (mine.running || mine.stopped || mine.paused) return
+    if (mine.rounds >= DRAW_CONTINUE_MAX_ROUNDS && !userWaiting) {
+      // 바퀴를 다 썼고 내 한도 기다림도 끝났다 — 그대로 돌아가면 판단이 "이어 그리기"에 머문다. 멈추고 단추로 남긴다.
+      set({ drawContinue: { ...mine, stopped: true, userWaitSince: null } })
+      return
+    }
     set({ drawContinue: { ...mine, running: true } })
     const outcome = await get().drawMissingImages({ skipFailed: true })
     if (useProjectStore.getState().projectId !== projectId) return
@@ -2032,16 +2047,20 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       return
     }
     const rounds = mine.rounds + 1
-    // 내 한도에 막혔다 — 내 다른 그림이 끝나기를 기다렸다가 다시 본다(2026-09-11 오너 (가)). 모두의 자리가 찼거나
-    //   다른 까닭으로 거절됐거나 새로 보낸 것이 없으면(겹친 요청 · 이미 있음뿐) 멈추고 단추로 남긴다(자동 재시도 없음).
-    const waitForMine = outcome.refusedScope === 'user' && rounds < DRAW_CONTINUE_MAX_ROUNDS
+    // 내 한도에 막혔다 — 내 다른 그림이 끝나기를 기다렸다가 다시 본다(2026-09-11 오너 (가)). 기다림은 바퀴 수가 아니라 시간으로 끊는다:
+    //   처음 막힌 뒤 30분(새로 보낸 그림이 생기면 다시 잰다)까지 1분마다 다시 보고, 그래도 자리가 없으면 멈추고 단추로 남긴다(2026-10-27).
+    //   모두의 자리가 찼거나 다른 까닭으로 거절됐거나 새로 보낸 것이 없으면(겹친 요청 · 이미 있음뿐) 멈추고 단추로 남긴다(자동 재시도 없음).
+    const now = Date.now()
+    const userWaitSince = outcome.refusedScope === 'user' ? (outcome.submitted > 0 ? now : mine.userWaitSince ?? now) : null
+    const waitForMine = userWaitSince != null && now - userWaitSince < USER_LIMIT_WAIT_MAX_MS
     set({
       drawContinue: {
         projectId,
         rounds,
-        stopped: !waitForMine && (outcome.refused || outcome.submitted === 0 || rounds >= DRAW_CONTINUE_MAX_ROUNDS),
+        stopped: waitForMine ? false : outcome.refusedScope === 'user' || outcome.refused || outcome.submitted === 0 || rounds >= DRAW_CONTINUE_MAX_ROUNDS,
         running: false,
         paused: waitForMine,
+        userWaitSince: waitForMine ? userWaitSince : null,
       },
     })
     if (waitForMine) pauseFor(USER_LIMIT_RECHECK_MS)
@@ -2053,7 +2072,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     // 이어 그리기와 동시에 돌지 않는다 — 함께 돌면 자리보다 많이 보내거나 같은 그림을 두 번 요청할 수 있다.
     const current = get().drawContinue
     if (current.projectId === projectId && current.running) return
-    set({ drawContinue: { projectId, rounds: 0, stopped: false, running: true, paused: false } })
+    set({ drawContinue: { projectId, rounds: 0, stopped: false, running: true, paused: false, userWaitSince: null } })
     try {
       await get().drawMissingImages()
     } finally {
@@ -2131,6 +2150,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             return
           }
           alog(`[autogen] world ${locId}:wideShot — server pre-gen 미도착, client fallback`)
+          // 기다리는 사이 다른 프로젝트(시리즈 다른 화 — 장소 id 가 같다)로 옮겼으면 보내지 않는다(2026-10-27).
+          if (useProjectStore.getState().projectId !== projectId) return
           await get().generateWorldShot(locId, 'wideShot', undefined, 'auto')
         })
       } else {

@@ -70,6 +70,7 @@ export function Sidebar() {
   const renameProject = useProjectStore((s) => s.renameProject)
   // AI 가 일하는 잠금 화면이 떠 있는 동안은 단계 단추를 막는다(디자이너 QA 1차 #07). 홈 단추는 그대로 둔다.
   const aiBusy = useAiBusyStore((s) => s.tokens.length > 0)
+  const footerBlocked = railNavBlocked({ to: 'footer', aiBusy })
 
   // 스테이지 라우트 프리페치(#tab-slide 2026-08-03) — 탭 클릭 시점에 RSC payload·JS 청크를
   //   받기 시작하면 그 다운로드가 곧 "무응답 구간"이 된다. 미리 받아두면 클릭 → 커밋이 즉시다.
@@ -271,7 +272,7 @@ export function Sidebar() {
             isArtistImageLocked && (artistImagesFailed || artistImagesStalled)
           // AI 가 일하는 동안은 지금 화면이 아닌 단계 단추를 막는다(디자이너 QA 1차 #07) — 지금 단계 단추는 그대로 둔다.
           const busyBlocked = aiBusy && !isCommitted
-          const isDisabled = (isLocked && !isArtistRetryable) || busyBlocked
+          const isDisabled = (isLocked && !isArtistRetryable) || busyBlocked || (aiBusy && isArtistRetryable)
           // 다른 stage 작업 완료 배지 — 활성/잠금 stage엔 표시 안 함(활성은 진입 시 클리어됨)
           const badge = !isActive && !isLocked ? (stageBadges[stage.id] ?? 0) : 0
 
@@ -280,7 +281,9 @@ export function Sidebar() {
               <TooltipTrigger asChild>
                 <button
                   onClick={() => {
-                    if (isArtistRetryable) void retryArtistDrafts()
+                    // AI 가 일하는 동안은 다시 시도도 보내지 않는다(2026-10-27) — 그리는 중에 요청을 또 보낼 수 있었다.
+                    if (isArtistRetryable && !aiBusy) void retryArtistDrafts()
+                    else if (isArtistRetryable) return
                     // 데모(URL 티켓): share 쿼리 유지 — 쿠키 차단 브라우저에서도 스테이지 이동 생존
                     //   이동 자체는 goToStage 한 곳(단축키와 공유. 세로 스트립 전환 포함).
                     else if (!isLocked && !isCommitted) goToStage(stage.id)
@@ -291,7 +294,7 @@ export function Sidebar() {
                   className={cn(
                     'relative flex h-14 w-14 shrink-0 flex-col items-center justify-center gap-1 rounded-xl transition-colors',
                     isDisabled && 'cursor-not-allowed opacity-30',
-                    isArtistRetryable && !busyBlocked && 'cursor-pointer text-destructive hover:bg-sidebar-accent',
+                    isArtistRetryable && !aiBusy && 'cursor-pointer text-destructive hover:bg-sidebar-accent',
                     isActive && !isLocked
                       ? 'bg-sidebar-accent text-primary'
                       : !isLocked && !busyBlocked &&
@@ -348,8 +351,14 @@ export function Sidebar() {
         })}
       </div>
 
-      {/* 푸터 액션 — 공유·내보내기·문의·프로필: 버튼 크기·캡션 타이포·세로 간격을 FooterIconItem 로 통일 */}
-      <div className="mt-2 flex shrink-0 flex-col items-center gap-1">
+      {/* 푸터 액션 — 공유·내보내기·문의·프로필: 버튼 크기·캡션 타이포·세로 간격을 FooterIconItem 로 통일.
+          AI 가 일하는 동안은 통째로 inert(누르기 · 키보드 포커스 모두 막힘, 2026-10-27 오너 재확인). */}
+      <div
+        className={cn('mt-2 flex shrink-0 flex-col items-center gap-1', footerBlocked && 'cursor-not-allowed opacity-40')}
+        data-testid="sidebar-footer"
+        inert={footerBlocked || undefined}
+        title={footerBlocked ? t('AI is working. You can move once it finishes.') : undefined}
+      >
         <SidebarTakeBalance />
         <OwnerOnly>
           <FooterIconItem label={t('Share')}>

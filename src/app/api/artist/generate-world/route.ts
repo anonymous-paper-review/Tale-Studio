@@ -92,10 +92,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid request: traceId does not belong to project' }, { status: 409 })
     }
 
-    // 멀티유저 동시성 게이트: 유저 상한 + 전역 fal 슬롯(#global-semaphore). 둘 중 하나라도 차면 429.
-    const quota = await checkGenerationCapacity(access.userId!, 'image')
-    if (!quota.ok) return quotaRejectionResponse(quota, { projectId, kind: 'world_shot', userId: access.userId })
-
     // 클라이언트 진입점 귀속 — 'chat'(글로벌 채팅 updates)만 구분, 그 외는 전부 'ui'.
     const jobActor: GenerationJobActor = actor === 'chat' ? 'chat' : 'ui'
     if (!VALID_COLUMNS.has(column)) {
@@ -140,6 +136,12 @@ export async function POST(req: Request) {
         effectiveSafeMode = slot.moderation
       }
     }
+    // 멀티유저 동시성 게이트: 유저 상한 + 전역 fal 슬롯(#global-semaphore). 둘 중 하나라도 차면 429.
+    //   겹친 요청(그리는 중) · 이미 있는 그림 · 포기 · 순화 상한을 먼저 건너뛴 뒤에 본다(2026-10-27 오너 재확인) — 자리가 찬 동안
+    //   이미 있는 그림을 물었다고 "자리 없음"이 돌아오면 이어 그리기가 한 바퀴를 헛쓰고 멈췄다. 진짜 집행은 DB 트리거다.
+    const quota = await checkGenerationCapacity(access.userId!, 'image')
+    if (!quota.ok) return quotaRejectionResponse(quota, { projectId, kind: 'world_shot', userId: access.userId })
+
     // 약속 B1: 어떤 경로(팝업 편집·채팅·자동 초안)로 왔든 배경 프롬프트에는 사람 금지 절이 붙는다.
     const finalPrompt = ensureNoPeopleClause(effectiveSafeMode ? applyWorldSafeMode(prompt) : prompt)
 

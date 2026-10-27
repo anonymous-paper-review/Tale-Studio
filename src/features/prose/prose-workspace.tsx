@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AiBusyOverlay, type AiBusyStep } from '@/components/ai-busy-overlay'
 import { proseOverlayOpen } from '@/lib/prose/busy'
+import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
 import { WriterResumeButton } from '@/components/layout/writer-resume-button'
 import { useT } from '@/lib/i18n'
 import { withDemoShare } from '@/lib/demo/context'
@@ -37,6 +38,8 @@ export function ProseWorkspace() {
   const t = useT()
   const router = useRouter()
   const prose = useProse()
+  // 산문 일이 도는 동안은 잠금 화면이 아직 안 떴어도(진행 상태를 읽는 1~2초 · 수정안을 기다리는 사이) 왼쪽 사이드바를 막는다(2026-10-27).
+  useAiBusyHold(!!prose.busy)
   const projectId = useProjectStore((s) => s.projectId)
   const projectTitle = useProjectStore((s) => s.projectTitle)
   const loadProject = useProducerStore((s) => s.loadProject)
