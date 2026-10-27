@@ -1394,6 +1394,7 @@ export const KO: Record<string, string> = {
   'The current scene story draft is ready. Confirm it or request changes in the scene story on the Producer screen.': '현재 씬 스토리 초안이 준비됐어요. Producer 화면의 씬 스토리에서 확정하거나 수정을 요청해 주세요.',
   'The scene story draft is waiting on the Producer screen. Ask for changes or confirm it there.': '씬 스토리 초안이 Producer 화면에서 기다리고 있어요. 수정 요청이나 확정은 거기서 해 주세요.',
   'Could not send the change request. Please try again.': '수정 요청을 보내지 못했어요. 다시 시도해 주세요.',
+  'This project keeps the original script as is, so the prose cannot be changed. When you have read it, press [Run breakdown] to move on.': '원작 그대로 쓰는 대본이라 산문을 고칠 수 없어요. 다 읽었으면 [브레이크다운하기]를 눌러 넘어가 주세요.',
   'Writer first drafts the scene story on this screen. You review it and confirm before the rest is made. These values are confirmed when you hand over.': 'Writer가 먼저 이 화면에 씬 스토리 초안을 써요. 확인하고 확정하면 나머지가 만들어져요. 넘기는 순간 아래 값이 확정돼요.',
   "Writer started drafting the scene story. It appears on this Producer screen as it's written. Ask for changes in chat, or confirm it to continue.": 'Writer가 씬 스토리 초안을 쓰기 시작했어요. 이 Producer 화면에 쓰이는 대로 보여요. 고칠 점은 채팅으로 말하고, 괜찮으면 확정하면 나머지 작업이 이어져요.',
   'Check the values in the window, then confirm to hand over.': '창에서 값을 확인하고 확정하면 넘길게요.',

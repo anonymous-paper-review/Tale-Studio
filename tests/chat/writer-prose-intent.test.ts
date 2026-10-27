@@ -19,6 +19,11 @@ describe('Writer 채팅 말 읽기', () => {
     expect(writerChatIntent(text)).toBe('breakdown')
   })
 
+  it.each(['브레이크 다운', '브레이크 다운 해줘'])('"%s"처럼 띄어 써도 산문 확정 창을 연다', (text) => {
+    // 왜: 2026-10-27 운영 — "브레이크 다운"(띄어 씀)이 넘김으로 읽히지 않고 산문 수정 요청으로 가서 "수정 요청을 보내지 못했어요"만 떴다(오너 "이 프로젝트 오류").
+    expect(writerChatIntent(text, { proseDraft: true })).toBe('breakdown')
+  })
+
   // 왜: 넘기지 말라는 말은 넘김이 아니다.
   it('넘기지 말라는 말은 산문 확정 창을 열지 않는다', () => {
     expect(writerChatIntent('아직 Artist로 넘기지 마')).not.toBe('breakdown')

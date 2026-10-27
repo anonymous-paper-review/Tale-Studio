@@ -8,7 +8,8 @@ export type WriterChatIntent = 'rewrite' | 'breakdown' | 'revise'
 
 // 조건 없이 "다시 써줘"만 — 고칠 점이 함께 있으면 그 말대로 수정안을 만든다.
 const REWRITE_ONLY = /^\s*(?:다시\s*(?:써|쓰)\s*(?:줘|주세요|줄래|봐)?|rewrite(?:\s+it)?(?:\s+please)?|write\s+it\s+again)\s*[.!?~]*\s*$/i // i18n-ok: 사용자 말에서 "다시 써줘"를 알아듣는 정규식
-const BREAKDOWN_WORDS = /브레이크다운|breakdown|break\s+it\s+down/i // i18n-ok: 사용자 말에서 브레이크다운 요청을 알아듣는 정규식
+// "브레이크 다운"처럼 띄어 써도 같은 말이다(2026-10-27 운영 — 띄어 쓴 말이 수정 요청으로 갔다). 영어 "break down"은 "울음이 터진다"는 뜻이 있어 넣지 않는다.
+const BREAKDOWN_WORDS = /브레이크\s*다운|breakdown|break\s+it\s+down/i // i18n-ok: 사용자 말에서 브레이크다운 요청을 알아듣는 정규식
 
 // Writer 에서만 더 알아듣는 넘김 말(디자이너 QA 1차 #01) — "다음 챕터로 이동해줘" · "좋아요, 다음 단계로" · "Artist로 가줘"는
 //   handoff-intent 의 낱말(이동 말 + 다음 단계 · 단계 이름)에 맞지 않아 산문 수정 요청으로 읽혔다.

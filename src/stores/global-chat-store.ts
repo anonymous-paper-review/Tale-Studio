@@ -1634,6 +1634,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (!isCurrent()) return false
       if (!response.ok) {
         if (accepted.code === 'scene_story_proposal_pending') set({ error: translate(contentLocale(), 'Apply or discard the current scene story proposal before requesting another.') })
+        // 원작 그대로 쓰는 대본은 서버가 고치지 않는다 — 다시 시도하라고 하면 같은 말만 돌아온다. 까닭과 넘어가는 길을 말한다(2026-10-27 운영).
+        if (accepted.code === 'preserved_script') set({ error: translate(contentLocale(), 'This project keeps the original script as is, so the prose cannot be changed. When you have read it, press [Run breakdown] to move on.') })
         return false
       }
       set({ sceneStoryProposalPending: { projectId, id: accepted.proposalId ?? null } })
@@ -1732,6 +1734,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (!isCurrent()) return false
       if (!response.ok) {
         if (accepted.code === 'scene_story_proposal_pending') set({ error: translate(contentLocale(), 'Apply or discard the current scene story proposal before requesting another.') })
+        // 원작 그대로 쓰는 대본은 서버가 고치지 않는다 — 다시 시도하라고 하면 같은 말만 돌아온다. 까닭과 넘어가는 길을 말한다(2026-10-27 운영).
+        if (accepted.code === 'preserved_script') set({ error: translate(contentLocale(), 'This project keeps the original script as is, so the prose cannot be changed. When you have read it, press [Run breakdown] to move on.') })
         return false
       }
       set({ sceneStoryProposalPending: { projectId, id: accepted.proposalId ?? null } })

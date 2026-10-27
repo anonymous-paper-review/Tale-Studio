@@ -127,20 +127,26 @@ function stripMd(s: string): string {
   return t;
 }
 
-/** 촬영용 씬 헤딩 → 장소·시간. "INT. SECURITY ROOM – DAY" / "EXT. BEACH - DUSK" / "S#3. 편의점 (실내/밤)" */
+/** 촬영 헤딩(INT. · EXT.)의 장소 · 시간 — 대시(— · – · -) 앞이 장소, 뒤가 시간. 장소 안의 "/"는 장소의 일부다. */
+function screenplayHeading(m: RegExpMatchArray): { int_ext: ScriptScene['int_ext']; location: string; time_of_day?: string } {
+  const tag = m[1].toUpperCase().replace(/\s|\./g, '');
+  const int_ext: ScriptScene['int_ext'] = tag.includes('/') || tag === 'I/E' ? 'INT/EXT' : tag.startsWith('INT') ? 'INT' : 'EXT';
+  const parts = m[2].split(/\s+[-–—]\s+/);
+  const location = parts[0].trim();
+  const time_of_day = parts.length > 1 ? parts.slice(1).join(' - ').trim() : undefined;
+  return { int_ext, location, time_of_day };
+}
+
+/** 촬영용 씬 헤딩 → 장소·시간. "INT. SECURITY ROOM – DAY" / "EXT. BEACH - DUSK" / "S#3. 편의점 (실내/밤)" / "SCENE 1. INT. 부엌 — 밤" */
 function parseHeading(line: string): { int_ext?: ScriptScene['int_ext']; location: string; time_of_day?: string } | null {
   const m = line.match(HEADING_RE);
-  if (m) {
-    const tag = m[1].toUpperCase().replace(/\s|\./g, '');
-    const int_ext: ScriptScene['int_ext'] = tag.includes('/') || tag === 'I/E' ? 'INT/EXT' : tag.startsWith('INT') ? 'INT' : 'EXT';
-    const parts = m[2].split(/\s+[-–—]\s+/);
-    const location = parts[0].trim();
-    const time_of_day = parts.length > 1 ? parts.slice(1).join(' - ').trim() : undefined;
-    return { int_ext, location, time_of_day };
-  }
+  if (m) return screenplayHeading(m);
   const k = line.match(KO_SCENE_RE);
   if (k) {
     const rest = k[2].trim();
+    // 번호 뒤에 촬영 헤딩이 오면("SCENE 1. INT. 부엌 / 일요일 아침 — 현재") INT. · EXT.를 떼고 촬영 헤딩 규칙으로 나눈다(2026-10-27 오너).
+    const inner = rest.match(HEADING_RE);
+    if (inner) return screenplayHeading(inner);
     const paren = rest.match(/^(.*?)\s*[(（](.*?)[)）]\s*$/);
     if (paren) return { location: paren[1].trim() || rest, time_of_day: paren[2].trim() };
     const parts = rest.split(/\s+[-–—/]\s+/);
@@ -520,7 +526,9 @@ export function parseScript(text: string, opts?: { assumeScript?: boolean }): Sc
       if (parseHeading(s) || isActHeading(s) || TRANSITION_RE.test(s) || matchCapsCue(s, lines[i + 1]) || matchKoreanNameCue(s, lines[i + 1], known) || listedSpeaks || listedSpeaksPeriod) flushSection();
     }
     // 앞머리 라벨 블록(등장인물/때/무대…) — 씬 안팎 모두 인정
-    const label = FRONT_LABELS.find((f) => f.re.test(s) && stripMd(s).length <= 40 && !matchColonCueStrict(s));
+    //   번호가 붙은 씬 머리("SCENE 1. …" · "Scene 2:")는 무대 장소 줄("SCENE: 거실")이 아니다 — 라벨로 읽으면 뒤 글 전체가
+    //   장소 한 칸에 들어가 씬이 0개가 된다(2026-10-27 운영). 알아보기(detectScript)처럼 씬 머리를 먼저 본다.
+    const label = !KO_SCENE_RE.test(s) && FRONT_LABELS.find((f) => f.re.test(s) && stripMd(s).length <= 40 && !matchColonCueStrict(s));
     if (label) {
       flushSection();
       section = label.kind;
