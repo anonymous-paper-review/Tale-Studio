@@ -8,8 +8,10 @@
 //   관리자 판정처럼 소유자 검사와 AND 로 쓴다 — 남의 작업 공간을 열어도 그 공간의 한도는 풀리지 않는다.
 import { isAdminEmail } from '@/lib/admin'
 import { canUseReference } from '@/lib/plan-limits'
+import { DEMO_ACCOUNT_EMAILS } from '@/lib/demo-accounts'
 
-const DEFAULT_QUOTA_EXEMPT_EMAILS = ['promotion@talestudio.art']
+// 코드 기본 시연 계정 — 화면의 자동 로그아웃 예외와 같은 목록(src/lib/demo-accounts.ts).
+const DEFAULT_QUOTA_EXEMPT_EMAILS = DEMO_ACCOUNT_EMAILS
 
 export function isQuotaExemptEmail(email: string | null | undefined): boolean {
   if (!email) return false
