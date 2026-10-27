@@ -269,8 +269,9 @@ export function RecheckMergeDialog({ session, prose, dispatch }: { session: Rech
   )
 }
 
-/** 브레이크다운이 띄우는 창. 열 때마다 지금 목록(rows — 이번 화 줄)에서 시작하고, 산문은 Writer 실행 기록에서 읽는다. */
-export function ProseRecheckDialog({ open, onOpenChange, rows }: { open: boolean; onOpenChange: (open: boolean) => void; rows: BreakdownRow[] }) {
+/** 브레이크다운이 띄우는 창. 열 때마다 지금 목록(rows — 이번 화 줄)에서 시작하고, 산문은 Writer 실행 기록에서 읽는다.
+ *  keptIds: 창에 보이지 않는 보관 줄(시리즈 다음 화) — 반영할 때 함께 보내 서버가 창과 같은 목록으로 맞춰 본다. */
+export function ProseRecheckDialog({ open, onOpenChange, rows, keptIds = [] }: { open: boolean; onOpenChange: (open: boolean) => void; rows: BreakdownRow[]; keptIds?: string[] }) {
   const projectId = useProjectStore((s) => s.projectId)
   // 산문은 잠겨 바뀌지 않는다 — 열려 있는 동안 한 번 읽으면 된다(드물게만 다시 읽는다).
   const { preview, failed } = useWriterPreview(projectId, { enabled: open, intervalMs: 60_000 })
@@ -293,9 +294,10 @@ export function ProseRecheckDialog({ open, onOpenChange, rows }: { open: boolean
     }
     setApplying(true)
     try {
-      const result = await useProducerStore.getState().applyRecheck(session.ops)
+      const result = await useProducerStore.getState().applyRecheck(session.ops, keptIds)
       if (!result.ok) {
         toast.error(result.error)
+        if ('reloaded' in result && result.reloaded) onOpenChange(false)
         return
       }
       onOpenChange(false)

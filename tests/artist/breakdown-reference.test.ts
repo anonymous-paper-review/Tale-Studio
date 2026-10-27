@@ -377,4 +377,12 @@ describe('레퍼런스 그림 올리기', () => {
     expect(shrink).toHaveBeenCalledWith(big)
     expect(upload.mock.calls.map((call) => (call as unknown[])[1])).toEqual([small, shrunk])
   })
+
+  it('너무 길거나 넓은 그림이라 거절되면 그 줄에 비율이 맞지 않는다는 이유를 화면 언어로 남긴다', async () => {
+    // 왜: 서버가 띠처럼 긴 그림을 받지 않는다(2026-10-27 검토) — "올리지 못했어요"만 보이면 같은 그림을 다시 올린다.
+    request.mockImplementation(async () => Response.json({ error: 'This picture is too long or too wide.', code: 'bad_shape' }, { status: 400 }))
+    const result = await addBreakdownImage(target, pngFile(), { confirm: async () => true })
+    expect(result).toEqual({ status: 'error', error: 'bad_shape' })
+    expect(translate('ko', BREAKDOWN_IMAGE_ERROR_TEXT.bad_shape)).toBe('그림이 너무 길거나 넓어요. 보통 사진에 가까운 비율의 그림을 골라 주세요.')
+  })
 })

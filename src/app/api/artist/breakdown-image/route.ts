@@ -11,6 +11,7 @@ import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 import { uploadThumbnail } from '@/lib/storage-thumb'
+import { DOWNSCALE_MAX_EDGE } from '@/lib/upload/downscale'
 import { decodeImage } from '@/lib/upload/image'
 import { IMAGE_MAX_BYTES, IMAGE_MAX_PIXELS, IMAGE_TYPES, isImageMimeType } from '@/lib/upload/limits'
 
@@ -18,17 +19,23 @@ export const runtime = 'nodejs'
 
 /** 보관함 경로 칸 — 작업 공간 번호가 이 꼴이 아니면 경로를 만들지 않는다(produce/ingest 와 같은 규칙). */
 const CANONICAL_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9_-]*$/
+/** 가로 · 세로 중 긴 쪽이 짧은 쪽의 이 배수를 넘으면 받지 않는다 — 띠처럼 긴 그림은 시트 · 와이드샷 자리에 맞지 않는다(2026-10-27 검토). */
+export const BREAKDOWN_IMAGE_MAX_RATIO = 4
 
 /**
  * 그림을 끝까지 열어 다시 저장한다 — 깨진 파일은 여기서 걸린다. 사진의 회전 정보대로 세우고(그림 모델은 회전 정보를 읽지 않을 수 있다),
  *   다시 저장하면서 촬영 정보(위치 등)를 지운다 — 이 주소는 공개 주소다.
+ *   긴 변은 DOWNSCALE_MAX_EDGE(2048)까지만 둔다 — 화면은 파일 크기로만 줄여, 용량은 작고 픽셀이 큰 그림이 그대로 올 수 있다(검토).
  */
-async function normalize(data: Buffer, format: 'jpeg' | 'png' | 'webp'): Promise<Buffer | null> {
+async function normalize(data: Buffer, format: 'jpeg' | 'png' | 'webp'): Promise<{ data: Buffer } | { badShape: true } | null> {
   try {
-    const image = sharp(data, { failOn: 'error', limitInputPixels: IMAGE_MAX_PIXELS }).rotate()
-    if (format === 'jpeg') return await image.jpeg({ quality: 92 }).toBuffer()
-    if (format === 'webp') return await image.webp({ quality: 92 }).toBuffer()
-    return await image.png().toBuffer()
+    const rotated = await sharp(data, { failOn: 'error', limitInputPixels: IMAGE_MAX_PIXELS }).rotate().toBuffer({ resolveWithObject: true })
+    const { width, height } = rotated.info
+    if (Math.max(width, height) > BREAKDOWN_IMAGE_MAX_RATIO * Math.min(width, height)) return { badShape: true }
+    const image = sharp(rotated.data).resize({ width: DOWNSCALE_MAX_EDGE, height: DOWNSCALE_MAX_EDGE, fit: 'inside', withoutEnlargement: true })
+    if (format === 'jpeg') return { data: await image.jpeg({ quality: 92 }).toBuffer() }
+    if (format === 'webp') return { data: await image.webp({ quality: 92 }).toBuffer() }
+    return { data: await image.png().toBuffer() }
   } catch {
     return null
   }
@@ -56,10 +63,14 @@ export async function POST(req: Request) {
     const original = Buffer.from(await file.arrayBuffer())
     // 신고한 형식과 실제 내용 · 크기를 먼저 본다(decodeImage) — 그다음 끝까지 열어 다시 저장한다.
     const decoded = await decodeImage(original, mimeType)
-    const stored = decoded.ok ? await normalize(original, IMAGE_TYPES[mimeType].format) : null
-    if (!stored) {
+    const normalized = decoded.ok ? await normalize(original, IMAGE_TYPES[mimeType].format) : null
+    if (normalized && 'badShape' in normalized) {
+      return NextResponse.json({ error: 'This picture is too long or too wide.', code: 'bad_shape' }, { status: 400 })
+    }
+    if (!normalized) {
       return NextResponse.json({ error: 'Could not read this picture.', code: 'invalid_image' }, { status: 400 })
     }
+    const stored = normalized.data
 
     const { data: project, error } = await supabaseAdmin
       .from('projects')

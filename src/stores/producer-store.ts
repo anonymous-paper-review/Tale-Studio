@@ -275,7 +275,7 @@ interface ProducerState {
   recheckNewIds: string[]
   /** 산문 재점검 반영(2026-10-27 오너 · 프로토타입 WT [목록에 반영]) — 고치던 설명을 먼저 저장하고, 서버가 Writer 실행 기록과
    *  이 목록을 함께 고친 결과로 목록을 바꾼다. 받지 않으면 목록은 그대로이고 까닭(화면 언어)을 돌려준다. */
-  applyRecheck: (ops: RecheckOp[]) => Promise<{ ok: true } | { ok: false; error: string }>
+  applyRecheck: (ops: RecheckOp[], kept?: string[]) => Promise<{ ok: true } | { ok: false; error: string; reloaded?: true }>
   /** artistGate(리뉴얼 1차): Artist [만들기] — 확정 산문 초안을 이어 가며 Artist 화면에 머문다. 2026-10-20부터 디자인 뒤에도 멈추지 않고
    *  씬 · 샷까지 이어 만든다(서버에 멈춤 표시를 보내지 않는다 — 오너 "Artist 만들면서 씬 · 샷 · Storyboard 도 같이"). */
   saveAndHandoff: (options?: { rerun?: boolean; artistGate?: boolean }) => Promise<boolean>
@@ -1120,9 +1120,15 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     return true
   },
 
-  applyRecheck: async (ops) => {
+  applyRecheck: async (ops, kept = []) => {
     // 실패 까닭은 화면(크롬) 문구 → UI 언어.
     const fail = (text: string) => ({ ok: false as const, error: translate(useLocaleStore.getState().locale, text) })
+    // 보낸 뒤 답을 못 받았다 — 서버가 반영했는지 모른다. 저장된 목록을 다시 읽고 창을 닫게 한다(reloaded): 창을 그대로 두고 다시 누르면
+    //   먼저 옛 목록을 저장해 반영한 줄을 지우고 같은 인물을 한 번 더 넣는다(2026-10-27 검토).
+    const unknownOutcome = async () => {
+      await get().loadProject().catch(() => {})
+      return { ...fail('Could not confirm that the list was updated. We reloaded the list, so check it and try again if something is missing.'), reloaded: true as const }
+    }
     const projectId = useProjectStore.getState().projectId
     // 산문 초안인지 아직 모르면(새로 고침 직후) 목록 저장이 잠겨 있다 — 고치던 설명을 먼저 저장하지 못한 채 보내면 그 설명이 사라진다.
     if (!projectId || isDemoSession() || castLocked()) return fail('The list is not ready yet. Try again in a moment.')
@@ -1135,23 +1141,39 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
         releaseAction(actionKey)
         return fail('Could not update the list. Please try again.')
       }
-      const response = await fetch('/api/writer/breakdown-recheck', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ projectId, ops }),
-      })
+      // 보관 줄(창에 보이지 않던 줄)도 함께 보낸다 — 서버가 창과 같은 목록으로 고친 것을 맞춰 본다.
+      let response: Response
+      try {
+        response = await fetch('/api/writer/breakdown-recheck', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ projectId, ops, ...(kept.length ? { kept } : {}) }),
+        })
+      } catch (err) {
+        console.error('[producer-store] applyRecheck request lost:', err)
+        releaseAction(actionKey)
+        if (useProjectStore.getState().projectId !== projectId) return fail('Could not update the list. Please try again.')
+        return unknownOutcome()
+      }
       const body = (await response.json().catch(() => null)) as { cast?: unknown; backgrounds?: unknown; newIds?: unknown; code?: unknown } | null
       if (useProjectStore.getState().projectId !== projectId) return fail('Could not update the list. Please try again.')
       if (!response.ok || !body || !Array.isArray(body.cast) || !Array.isArray(body.backgrounds)) {
         releaseAction(actionKey)
+        // 서버가 까닭을 말하지 않은 실패(500 · 깨진 답)는 반영했는지 모른다.
+        if (response.status >= 500 || (response.ok && !body?.code)) return unknownOutcome()
         // 다른 창에서 먼저 반영했으면 저장된 목록을 다시 읽는다 — 다시 연 창이 옛 목록에서 시작하지 않게.
-        if (body?.code === 'list_changed') await get().loadProject()
+        const listMoved = body?.code === 'list_changed' || body?.code === 'already_listed' || body?.code === 'name_taken'
+        if (listMoved) await get().loadProject()
         return fail(
           body?.code === 'list_changed'
             ? 'The list changed in the meantime. Open the re-check again.'
-            : body?.code === 'breakdown_closed'
-              ? 'Making the images has already started, so the list cannot be changed here.'
-              : 'Could not update the list. Please try again.',
+            : body?.code === 'already_listed'
+              ? 'A name you added is already in the list. Open the re-check again.'
+              : body?.code === 'name_taken'
+                ? 'A new name is already used by another row. Open the re-check again.'
+                : body?.code === 'breakdown_closed'
+                  ? 'Making the images has already started, so the list cannot be changed here.'
+                  : 'Could not update the list. Please try again.',
         )
       }
       const newIds = Array.isArray(body.newIds) ? body.newIds.filter((id): id is string => typeof id === 'string') : []

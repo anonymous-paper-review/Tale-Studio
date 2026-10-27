@@ -157,13 +157,14 @@ export function BreakdownList({ onMake }: { onMake: () => void }) {
           </p>
           {/* 프로토타입 A1 아래 줄 — 누를 때만 재점검 창을 연다(기본 화면에서는 점검하라고 묻지 않는다). */}
           <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
-            <Button variant="outline" onClick={() => setRecheckOpen(true)} disabled={!listReady} data-testid="breakdown-recheck-open">
+            {/* 레퍼런스 그림을 올리는 동안은 막는다 — 반영한 목록이 화면 목록을 바꾸면 다 올라온 그림이 붙을 줄이 사라질 수 있다(검토). */}
+            <Button variant="outline" onClick={() => setRecheckOpen(true)} disabled={!listReady || uploading > 0} data-testid="breakdown-recheck-open">
               <ScanSearch className="size-4" aria-hidden />{t('Characters or backgrounds are missing or doubled')}
             </Button>
           </div>
         </div>
       </div>
-      <ProseRecheckDialog open={recheckOpen} onOpenChange={setRecheckOpen} rows={rows} />
+      <ProseRecheckDialog open={recheckOpen} onOpenChange={setRecheckOpen} rows={rows} keptIds={kept.map((row) => row.id)} />
     </div>
   )
 }

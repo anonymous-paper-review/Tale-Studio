@@ -173,14 +173,24 @@ export type BreakdownRecheckPlan =
   | { ok: true; state: WriterRunState; cast: CastMember[]; backgrounds: BackgroundSource[]; newLocalIds: string[] }
   | { ok: false; code: RecheckIssue }
 
+/** 카드의 이름이나 다른 이름이 그 말인가(대소문자 · 앞뒤 빈칸은 따지지 않는다). */
+function namedAs(card: { name: string; aliases?: string[] }, word: string): boolean {
+  const key = nameKey(word)
+  return !!key && [card.name, ...(card.aliases ?? [])].some((name) => nameKey(name) === key)
+}
+
 export function planBreakdownRecheck(input: {
   state: WriterRunState
   cast: readonly CastMember[]
   backgrounds: readonly BackgroundSource[]
   ops: readonly RecheckOp[]
+  /** 창에 보이지 않던 줄(시리즈 다음 화의 "보관") — 창과 같게 비교 대상에서 빼고, 목록에는 그대로 남긴다(2026-10-27 검토). */
+  kept?: readonly string[]
 }): BreakdownRecheckPlan {
+  const kept = new Set(input.kept ?? [])
+  const isKept = (card: { localId: string }) => kept.has(card.localId)
   const prose = proseScenesOfState(input.state)
-  const base = recheckBase(input.cast, input.backgrounds)
+  const base = recheckBase(input.cast.filter((card) => !isKept(card)), input.backgrounds.filter((card) => !isKept(card)))
   const applied = applyRecheckOps(base, input.ops, prose)
   if (!applied.ok) return { ok: false, code: applied.issue }
   const entries = applied.entries
@@ -211,9 +221,24 @@ export function planBreakdownRecheck(input: {
     const runIds = unique(parts.map((card) => personRunIds.get(card.localId)).filter((id): id is string => !!id))
     const source = parts[0]
     if (!source) {
-      const id = ids.fresh(entry.name, 'char')
       state.characters ??= { characters: [], relationships: [], subtext_notes: [] }
-      state.characters.characters.push(newCharacter(id, entry.name))
+      // 보관 인물(앞 화에서 이어받았는데 이번 화 씬에 없는 인물)과 같은 이름이면 새 인물을 만들지 않는다 — 그 인물을 이름이 나오는
+      //   씬에 넣어 이번 화로 올린다(번호가 같아야 앞 화 그림을 이어 쓴다). 카드는 그대로다.
+      const keptCard = input.cast.find((card) => isKept(card) && card.entityType !== 'object' && namedAs(card, entry.name))
+      if (keptCard) {
+        const id = personRunIds.get(keptCard.localId) ?? keptCard.characterId ?? ids.fresh(keptCard.name, 'char')
+        if (!state.characters.characters.some((character) => character.id === id)) {
+          state.characters.characters.push({ ...newCharacter(id, keptCard.name), appearance_description: keptCard.appearance ?? '' })
+        }
+        freshPersons.push({ key: entry.key, id })
+        continue
+      }
+      // 실행 기록에만 남은 같은 이름의 인물(반영 뒤 답을 못 받았거나 목록 저장이 실패해 되돌리지 못한 반영)은 그 번호를 다시 쓴다 —
+      //   새 번호로 또 만들면 같은 사람이 둘이 되어 [만들기]가 두 번 그린다(2026-10-27 검토).
+      const mapped = new Set(personRunIds.values())
+      const orphan = state.characters.characters.find((character) => character.entity_type !== 'object' && !mapped.has(character.id) && nameKey(character.name) === nameKey(entry.name))
+      const id = orphan ? orphan.id : ids.fresh(entry.name, 'char')
+      if (!orphan) state.characters.characters.push(newCharacter(id, entry.name))
       freshPersons.push({ key: entry.key, id })
       const fields = { name: entry.name, entityType: 'person' as const, appearance: '', role: 'supporting' }
       const card: CastMember = { localId: `recheck:${id}`, characterId: id, origin: 'treatment', ...fields, ...(entry.aliases.length ? { aliases: [...entry.aliases] } : {}), treatmentHash: castHash(fields) }
@@ -248,11 +273,16 @@ export function planBreakdownRecheck(input: {
     const runIds = unique(parts.map((card) => placeRunIds.get(card.localId)).filter((id): id is string => !!id))
     const source = parts[0]
     if (!source) {
+      // 보관 묶음에 이미 있는 장소다 — 새 장소는 목록에만 넣으니(오너 결정 2) 한 줄 더 만들지 않는다(같은 배경을 두 번 그린다).
+      if (input.backgrounds.some((card) => isKept(card) && namedAs(card, entry.name))) continue
+      const mapped = new Set(placeRunIds.values())
+      const orphan = locations.find((location) => !mapped.has(location.id) && nameKey(location.name) === nameKey(entry.name))
       // 이야기 엔진이 적어 둔 장소 후보와 같은 이름이면 그 번호 · 설명을 이어받는다 — 배경 디자인이 산문에 맞는 재료를 받는다.
       const candidate = (state.dramaturgy?.world_inventory ?? []).find((item) => nameKey(item.name) === nameKey(entry.name))
-      const id = candidate && !ids.isUsed(candidate.id) ? ids.claim(candidate.id) : ids.fresh(entry.name, 'location')
-      const description = candidate?.description ?? ''
-      locations.push({ id, name: entry.name, description })
+      // 실행 기록에만 남은 같은 이름의 장소는 그 번호를 다시 쓴다(인물과 같은 까닭).
+      const id = orphan ? orphan.id : candidate && !ids.isUsed(candidate.id) ? ids.claim(candidate.id) : ids.fresh(entry.name, 'location')
+      const description = orphan?.description ?? candidate?.description ?? ''
+      if (!orphan) locations.push({ id, name: entry.name, description })
       worldChanged = true
       const card: BackgroundSource = { localId: `recheck:${id}`, locationId: id, name: entry.name, visualDescription: description, purpose: '', origin: 'treatment', ...(entry.aliases.length ? { aliases: [...entry.aliases] } : {}) }
       card.treatmentHash = backgroundHash(card)
@@ -288,12 +318,13 @@ export function planBreakdownRecheck(input: {
   }
 
   // 목록 순서는 그대로 — 합쳐 사라진 줄만 빠지고, 새 줄은 끝에 붙는다. 사물 카드는 손대지 않는다.
+  //   보관 줄은 창에 없어 고치지 않았다 — 그대로 남긴다.
   const cast = [
-    ...input.cast.flatMap((card) => (card.entityType === 'object' ? [card] : personUpdates.has(card.localId) ? [personUpdates.get(card.localId)!] : [])),
+    ...input.cast.flatMap((card) => (card.entityType === 'object' || isKept(card) ? [card] : personUpdates.has(card.localId) ? [personUpdates.get(card.localId)!] : [])),
     ...newCast,
   ]
   const backgrounds = [
-    ...input.backgrounds.flatMap((card) => (placeUpdates.has(card.localId) ? [placeUpdates.get(card.localId)!] : [])),
+    ...input.backgrounds.flatMap((card) => (isKept(card) ? [card] : placeUpdates.has(card.localId) ? [placeUpdates.get(card.localId)!] : [])),
     ...newBackgrounds,
   ]
   return { ok: true, state, cast, backgrounds, newLocalIds }

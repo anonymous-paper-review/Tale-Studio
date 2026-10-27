@@ -21,7 +21,12 @@ const opSchema = z.discriminatedUnion('op', [
   z.object({ op: z.literal('rename'), key: z.string().min(1).max(200), name: z.string().min(1).max(100) }),
   z.object({ op: z.literal('merge'), from: z.string().min(1).max(200), into: z.string().min(1).max(200) }),
 ])
-const bodySchema = z.object({ projectId: z.string().min(1), ops: z.array(opSchema).min(1).max(200) })
+// kept: 창에 보이지 않던 줄(시리즈 다음 화의 "보관") — 창과 같게 비교 대상에서 빼고 목록에는 그대로 남긴다(2026-10-27 검토).
+const bodySchema = z.object({
+  projectId: z.string().min(1),
+  ops: z.array(opSchema).min(1).max(200),
+  kept: z.array(z.string().min(1).max(200)).max(500).optional(),
+})
 
 const listChanged = () => NextResponse.json({ error: 'The list changed. Open the re-check again.', code: 'list_changed' }, { status: 409 })
 
@@ -49,7 +54,7 @@ export async function POST(req: NextRequest) {
       const lists = draftLists(rawDraft)
       if (!lists) return NextResponse.json({ error: 'The list is not saved yet', code: 'list_missing' }, { status: 409 })
 
-      const plan = planBreakdownRecheck({ state: run.state as WriterRunState, cast: lists.cast, backgrounds: lists.backgrounds, ops: parsed.data.ops })
+      const plan = planBreakdownRecheck({ state: run.state as WriterRunState, cast: lists.cast, backgrounds: lists.backgrounds, ops: parsed.data.ops, kept: parsed.data.kept })
       // 목록에 없는 줄 — 다른 창에서 먼저 반영해 합쳐졌거나 지워졌다. 옛 목록으로 고친 것을 얹지 않는다.
       if (!plan.ok) return plan.code === 'unknown_entry' ? listChanged() : NextResponse.json({ error: 'The re-check was not accepted', code: plan.code }, { status: 409 })
 
@@ -69,12 +74,16 @@ export async function POST(req: NextRequest) {
       const { error: draftError } = await supabaseAdmin.from('projects').update({ producer_draft: draft }).eq('id', access.projectId)
       if (draftError) {
         // 목록을 쓰지 못했으면 실행 기록도 되돌린다 — 화면 목록에 없는 인물을 [만들기]가 그리지 않게.
-        await supabaseAdmin
+        //   되돌리지 못하면 실행 기록에만 인물이 남는다 — 다음 넣기가 같은 이름이면 그 인물을 다시 쓴다(planBreakdownRecheck). 기록은 남긴다.
+        const { data: restored, error: restoreError } = await supabaseAdmin
           .from('writer_runs')
           .update({ state: run.state, status: 'awaiting_confirmation', updated_at: new Date(new Date(updatedAt).getTime() + 1).toISOString() })
           .eq('id', run.id)
           .eq('updated_at', updatedAt)
           .select('id')
+        if (restoreError || !restored?.length) {
+          console.error('[writer/breakdown-recheck] run rollback failed after the list save failed:', restoreError?.message ?? 'the run changed meanwhile')
+        }
         throw new Error(draftError.message)
       }
       return NextResponse.json({ ok: true, cast: plan.cast, backgrounds: plan.backgrounds, newIds: plan.newLocalIds })

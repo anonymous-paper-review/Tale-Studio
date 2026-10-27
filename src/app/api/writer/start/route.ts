@@ -30,6 +30,7 @@ import { parseDialogueLanguage } from '@/lib/writer/pipeline/util/output-languag
 import { assessContentSafetyRisk } from '@/lib/writer/content-safety-hint';
 import { parseCustomStyleAnchor } from '@/lib/style-anchor';
 import { planSourceImageWrites, stripSourceImages } from '@/lib/producer/source-image';
+import { mediaPathFromUrl } from '@/lib/storage/media-url';
 import { userOwnsProject } from '@/lib/generation-jobs';
 import { mergeSeriesBackgrounds, mergeSeriesCast } from '@/lib/series/seed';
 import { loadSeriesWriterInput, type SeriesWriterInput } from '@/lib/series/server';
@@ -257,11 +258,31 @@ async function applyReferenceImages(
   cast: CastContractWithImages | undefined,
   backgrounds: ProducerBackgrounds | undefined,
 ): Promise<void> {
-  const { asIs } = planSourceImageWrites({ cast: cast?.characters, backgrounds: backgrounds?.locations });
+  const planned = planSourceImageWrites({ cast: cast?.characters, backgrounds: backgrounds?.locations }).asIs;
   const wanted = [...(cast?.characters ?? []), ...(backgrounds?.locations ?? [])].filter((card) => card.source_image_as_is === true).length;
-  if (wanted > asIs.characters.length + asIs.locations.length) {
-    console.warn(`[writer/start] ${projectId}: skipped ${wanted - asIs.characters.length - asIs.locations.length} reference image(s) (not our storage or not a person)`);
+  if (!planned.characters.length && !planned.locations.length) {
+    if (wanted) console.warn(`[writer/start] ${projectId}: skipped ${wanted} reference image(s) (not our storage or not a person)`);
+    return;
   }
+  // 그대로 쓰는 그림은 이 프로젝트 브레이크다운에 올린 그림만 받는다 — 우리 보관함이기만 하면 다른 프로젝트 그림도 적혔다(2026-10-27 검토).
+  const { data: project, error: projectError } = await supabaseAdmin
+    .from('projects')
+    .select('workspace_id')
+    .eq('id', projectId)
+    .maybeSingle();
+  if (projectError) throw new Error(`reference image read failed: ${projectError.message}`);
+  const folder = `${(project as { workspace_id?: string } | null)?.workspace_id ?? ''}/${projectId}/breakdown/`;
+  const uploadedHere = (value: unknown) => typeof value === 'string' && (mediaPathFromUrl(value)?.startsWith(folder) ?? false);
+  const asIs = {
+    characters: planned.characters.filter((item) => uploadedHere(item.url)),
+    locations: planned.locations.filter((item) => uploadedHere(item.url)),
+  };
+  if (wanted > asIs.characters.length + asIs.locations.length) {
+    console.warn(`[writer/start] ${projectId}: skipped ${wanted - asIs.characters.length - asIs.locations.length} reference image(s) (not uploaded to this project's breakdown, or not a person)`);
+  }
+  // 빈칸만 채운다 — 다만 그 칸이 이 프로젝트 브레이크다운에 예전에 올린 그림이면 새로 올린 그림으로 바꾼다(그림을 바꿔 다시 누른 경우, 검토).
+  //   Artist 에서 다시 그린 그림 · 이어받은 그림은 덮지 않는다. 읽은 값과 같을 때만 쓴다(그 사이 다시 그렸으면 그대로 둔다).
+  const replaceable = (current: unknown, url: string) => !current || (uploadedHere(current) && current !== url);
   for (const { character_id, url } of asIs.characters) {
     const { data: row, error } = await supabaseAdmin
       .from('character_appearances')
@@ -272,14 +293,14 @@ async function applyReferenceImages(
       .maybeSingle();
     if (error) throw new Error(`reference image read failed: ${error.message}`);
     if (!row) throw new Error(`reference image failed: ${character_id} has no default appearance`);
-    if (row.sheet_url) continue;
-    const { error: writeError } = await supabaseAdmin
+    if (!replaceable(row.sheet_url, url)) continue;
+    const write = supabaseAdmin
       .from('character_appearances')
       .update({ sheet_url: url, portrait_url: url })
       .eq('project_id', projectId)
       .eq('character_id', character_id)
-      .eq('is_default', true)
-      .is('sheet_url', null);
+      .eq('is_default', true);
+    const { error: writeError } = await (row.sheet_url ? write.eq('sheet_url', row.sheet_url) : write.is('sheet_url', null));
     if (writeError) throw new Error(`reference image failed: ${writeError.message}`);
   }
   for (const { location_id, url } of asIs.locations) {
@@ -291,13 +312,13 @@ async function applyReferenceImages(
       .maybeSingle();
     if (error) throw new Error(`reference image read failed: ${error.message}`);
     if (!row) throw new Error(`reference image failed: ${location_id} is not a background of this project`);
-    if (row.wide_shot) continue;
-    const { error: writeError } = await supabaseAdmin
+    if (!replaceable(row.wide_shot, url)) continue;
+    const write = supabaseAdmin
       .from('locations')
       .update({ wide_shot: url })
       .eq('project_id', projectId)
-      .eq('location_id', location_id)
-      .is('wide_shot', null);
+      .eq('location_id', location_id);
+    const { error: writeError } = await (row.wide_shot ? write.eq('wide_shot', row.wide_shot) : write.is('wide_shot', null));
     if (writeError) throw new Error(`reference image failed: ${writeError.message}`);
   }
 }

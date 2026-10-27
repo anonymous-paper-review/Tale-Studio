@@ -352,58 +352,63 @@ export function Sidebar() {
       </div>
 
       {/* 푸터 액션 — 공유·내보내기·문의·프로필: 버튼 크기·캡션 타이포·세로 간격을 FooterIconItem 로 통일.
-          AI 가 일하는 동안은 통째로 inert(누르기 · 키보드 포커스 모두 막힘, 2026-10-27 오너 재확인). */}
+          AI 가 일하는 동안은 통째로 inert(누르기 · 키보드 포커스 모두 막힘, 2026-10-27 오너 재확인).
+          inert 안쪽에는 마우스가 닿지 않는다 — 막힌 까닭(title) · 금지 커서는 막지 않는 바깥 묶음에 둔다(검토). */}
       <div
-        className={cn('mt-2 flex shrink-0 flex-col items-center gap-1', footerBlocked && 'cursor-not-allowed opacity-40')}
-        data-testid="sidebar-footer"
-        inert={footerBlocked || undefined}
+        className={cn('mt-2 shrink-0', footerBlocked && 'cursor-not-allowed')}
         title={footerBlocked ? t('AI is working. You can move once it finishes.') : undefined}
       >
-        <SidebarTakeBalance />
-        <OwnerOnly>
-          <FooterIconItem label={t('Share')}>
-            <ShareButton />
+        <div
+          className={cn('flex flex-col items-center gap-1', footerBlocked && 'opacity-40')}
+          data-testid="sidebar-footer"
+          inert={footerBlocked || undefined}
+        >
+          <SidebarTakeBalance />
+          <OwnerOnly>
+            <FooterIconItem label={t('Share')}>
+              <ShareButton />
+            </FooterIconItem>
+          </OwnerOnly>
+          <OwnerOnly>
+            <FooterIconItem label={t('Export')}>
+              <ExportMenu />
+            </FooterIconItem>
+          </OwnerOnly>
+          {/* 도움말은 다른 보조 메뉴와 같은 강조 수준을 쓴다. */}
+          <FooterIconItem label="Help">
+            <ContactPopover
+              side="right"
+              align="end"
+              note={(() => {
+                const [feedbackPre, feedbackPost] = t(
+                  "Feedback is always open. If we don't reply within 12 hours, you'll get {credit} per hour.",
+                ).split('{credit}')
+                return (
+                  <>
+                    {feedbackPre}
+                    <strong className="font-bold text-foreground">100 Credit</strong>
+                    {feedbackPost}
+                  </>
+                )
+              })()}
+              trigger={
+                <button
+                  type="button"
+                  aria-label={t('Contact / Help')}
+                  title={t('Contact / Help')}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary text-secondary-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <MessageCircle className="h-5 w-5" />
+                </button>
+              }
+            />
           </FooterIconItem>
-        </OwnerOnly>
-        <OwnerOnly>
-          <FooterIconItem label={t('Export')}>
-            <ExportMenu />
-          </FooterIconItem>
-        </OwnerOnly>
-        {/* 도움말은 다른 보조 메뉴와 같은 강조 수준을 쓴다. */}
-        <FooterIconItem label="Help">
-          <ContactPopover
-            side="right"
-            align="end"
-            note={(() => {
-              const [feedbackPre, feedbackPost] = t(
-                "Feedback is always open. If we don't reply within 12 hours, you'll get {credit} per hour.",
-              ).split('{credit}')
-              return (
-                <>
-                  {feedbackPre}
-                  <strong className="font-bold text-foreground">100 Credit</strong>
-                  {feedbackPost}
-                </>
-              )
-            })()}
-            trigger={
-              <button
-                type="button"
-                aria-label={t('Contact / Help')}
-                title={t('Contact / Help')}
-                className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary text-secondary-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <MessageCircle className="h-5 w-5" />
-              </button>
-            }
-          />
-        </FooterIconItem>
-        <OwnerOnly>
-          <FooterIconItem label={t('Profile')}>
-            <UserMenu />
-          </FooterIconItem>
-        </OwnerOnly>
+          <OwnerOnly>
+            <FooterIconItem label={t('Profile')}>
+              <UserMenu />
+            </FooterIconItem>
+          </OwnerOnly>
+        </div>
       </div>
     </aside>
   )

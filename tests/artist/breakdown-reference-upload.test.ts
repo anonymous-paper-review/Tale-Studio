@@ -139,4 +139,23 @@ describe('레퍼런스 그림 올리기 라우트', () => {
     expect(meta.orientation).toBeUndefined()
     expect(meta.exif).toBeUndefined()
   })
+
+  it('긴 변이 2048을 넘는 그림은 비율을 지켜 긴 변 2048로 줄여 저장한다', async () => {
+    // 왜: 화면은 파일 크기로만 줄인다 — 단색 PNG 처럼 용량은 작고 픽셀이 큰 그림이 그대로 시트 · 참고 그림이 되면 그림 모델이 느려지거나 거절한다(2026-10-27 검토 지적).
+    const response = await post(blob(await picture('png', 3000, 1500), 'image/png'))
+
+    expect(response.status).toBe(200)
+    const meta = await sharp(originals()[0].data).metadata()
+    expect([meta.width, meta.height]).toEqual([2048, 1024])
+  })
+
+  it('가로나 세로가 다른 쪽의 4배를 넘는 그림은 받지 않는다', async () => {
+    // 왜: 띠처럼 긴 그림은 인물 시트 · 배경 와이드샷 자리에 맞지 않아 카드와 장면 그림이 깨진다(2026-10-27 검토 지적).
+    for (const [width, height] of [[500, 100], [100, 500]]) {
+      const response = await post(blob(await picture('png', width, height), 'image/png'))
+      expect(response.status).toBe(400)
+      expect(await response.json()).toMatchObject({ code: 'bad_shape' })
+    }
+    expect(mocks.uploads).toEqual([])
+  })
 })

@@ -2632,6 +2632,7 @@ export const KO: Record<string, string> = {
   "A picture you upload as a reference becomes that card's image as is. The rest are drawn by AI.": '레퍼런스로 올린 그림은 그 카드의 그림으로 그대로 써요. 나머지는 AI가 그려요.',
   'Choose a JPG, PNG or WebP picture.': 'JPG · PNG · WebP 그림을 골라 주세요.',
   'The picture is too large. Choose a smaller one.': '그림이 너무 커요. 더 작은 그림을 골라 주세요.',
+  'The picture is too long or too wide. Choose one closer to the shape of a usual photo.': '그림이 너무 길거나 넓어요. 보통 사진에 가까운 비율의 그림을 골라 주세요.',
   'Could not read this picture. Try another file.': '이 그림을 읽지 못했어요. 다른 파일로 올려 주세요.',
   'Could not upload the picture. Please try again.': '그림을 올리지 못했어요. 다시 시도해 주세요.',
   'Could not attach the picture to this row.': '이 줄에 그림을 붙이지 못했어요.',
@@ -2776,6 +2777,9 @@ export const KO: Record<string, string> = {
   'Could not load the prose. Please try again.': '산문을 불러오지 못했어요. 다시 시도해 주세요.',
   'Could not update the list. Please try again.': '목록에 반영하지 못했어요. 다시 시도해 주세요.',
   'The list changed in the meantime. Open the re-check again.': '그 사이 목록이 바뀌었어요. 재점검을 다시 열어 주세요.',
+  'Could not confirm that the list was updated. We reloaded the list, so check it and try again if something is missing.': '목록이 바뀌었는지 확인하지 못했어요. 목록을 다시 불러왔으니 확인하고 빠진 것이 있으면 다시 해 주세요.',
+  'A name you added is already in the list. Open the re-check again.': '넣으려던 이름이 이미 목록에 있어요. 재점검을 다시 열어 주세요.',
+  'A new name is already used by another row. Open the re-check again.': '고친 이름을 이미 다른 줄이 쓰고 있어요. 재점검을 다시 열어 주세요.',
   'Making the images has already started, so the list cannot be changed here.': '그림 만들기를 이미 시작해서 여기서 목록을 고칠 수 없어요.',
   'The list is not ready yet. Try again in a moment.': '목록을 아직 불러오는 중이에요. 잠시 뒤 다시 눌러 주세요.',
   // ── 시리즈(2026-10-26) · Writer · Artist ──

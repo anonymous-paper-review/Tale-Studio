@@ -341,9 +341,25 @@ export async function persistAssetsToDb(
     //   deriveEnBatch 는 이미 영어면 무비용 통과, deriveNativeBatch 는 locale=en 이면 no-op.
     // 외형 설명이 빈 인물(산문 재점검으로 넣은 인물 등, 2026-10-27)은 v2 디자인이 만든 외형으로 빈칸만 채운다 —
     //   비워 두면 카드 설명이 비고 시트를 이름 · 의상만으로 그린다. 설명이 있으면(사람 · 산문이 정한 원천) 디자인이 덮지 않는다.
+    //   그림이 이미 있으면(사람이 올린 그림 · 이미 그린 시트) 그림이 생김새다 — 산문만 읽고 지은 글로 채우지도, 빈칸으로 덮지도
+    //   않고 저장된 외형을 그대로 둔다(keepStoredAppearance, 2026-10-27 검토).
+    const blankIds = characters.characters.filter((c) => !(c.appearance_description ?? '').trim()).map((c) => c.id)
+    const keepStoredAppearance = new Set<string>()
+    if (blankIds.length) {
+      const { data: pictured, error: picturedErr } = await supabaseAdmin
+        .from('character_appearances')
+        .select('character_id, portrait_url, sheet_url')
+        .eq('project_id', projectId)
+        .eq('is_default', true)
+      assertDbOk('default appearance pictures read', picturedErr)
+      for (const row of (pictured ?? []) as Array<{ character_id: string; portrait_url: string | null; sheet_url: string | null }>) {
+        if (blankIds.includes(row.character_id) && (row.portrait_url || row.sheet_url)) keepStoredAppearance.add(row.character_id)
+      }
+    }
     const designedAppearance = new Map(characterVisual.characters.map((cv) => [cv.character_id, (cv.appearance ?? '').trim()]))
     const appearRaw = new Map(
       characters.characters
+        .filter((c) => !keepStoredAppearance.has(c.id))
         .map((c) => [c.id, (c.appearance_description ?? '').trim() || designedAppearance.get(c.id) || ''] as const)
         .filter(([, text]) => text),
     )
@@ -373,7 +389,7 @@ export async function persistAssetsToDb(
     // 사람만 사람 전용 저장 창구로 보낸다(2026-10-10 오너 · 운영 806e2cc2) — 사물은 8월부터 사물 목록(props) 자리다.
     //   넘길 때(writer/start) 사물은 이미 사물 목록에 들어갔다. 섞어 보내면 사물이 사람 행으로 한 번 더 생겨 Artist 가 사람 시트로 그린다.
     const people = characters.characters.filter((c) => c.entity_type !== 'object').map((c) => {
-      const af = appearFields(c.id)
+      const af = keepStoredAppearance.has(c.id) ? {} : appearFields(c.id)
       return {
         character_id: c.id,
         name: c.name,

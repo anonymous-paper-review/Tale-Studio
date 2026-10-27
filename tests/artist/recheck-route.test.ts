@@ -194,6 +194,34 @@ describe('재점검 반영 요청', () => {
     expect(filters).toContainEqual(['updated_at', mocks.runUpdate.mock.calls[0][0].updated_at])
   })
 
+  it('보관 줄을 함께 받으면 그 줄은 비교 대상에서 빼고 목록에는 그대로 남긴다', async () => {
+    // 왜: 재점검 창은 이번 화 줄만 보인다 — 서버가 보관 줄까지 비교하면 창에서 되던 넣기를 "이미 있다"며 통째로 거절했다(2026-10-27 검토 지적).
+    const keptGuard = { localId: 'series:char_7', characterId: 'char_7', name: '경비원', entityType: 'person', appearance: '회색 제복', origin: 'producer' }
+    mocks.project.mockReturnValue({ data: { producer_draft: { ...draft, cast: [...draft.cast, keptGuard] } }, error: null })
+
+    const response = await post({ ...addGuard, kept: ['series:char_7'] })
+
+    expect(response.status).toBe(200)
+    const body = await response.json()
+    expect(body.cast).toEqual([draft.cast[0], keptGuard])
+    expect(body.newIds).toEqual([])
+    const [runRow] = mocks.runUpdate.mock.calls[0]
+    expect(runRow.state.scenes.scenes[1].characters_in_scene).toEqual(['char', 'char_7'])
+  })
+
+  it('목록 저장과 실행 기록 되돌리기가 모두 실패하면 그 사실을 남긴다', async () => {
+    // 왜: 되돌리기 결과를 보지 않으면 실행 기록에만 인물이 남은 줄 모른다 — 다음 넣기가 그 인물을 다시 쓰게 했지만(재점검 보관 시험) 기록은 남겨야 한다.
+    mocks.projectUpdate.mockReturnValue({ error: { message: 'boom' } })
+    mocks.runUpdate.mockResolvedValueOnce({ data: [{ id: 'run-1' }], error: null }).mockResolvedValueOnce({ data: [], error: null })
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    const response = await post(addGuard)
+
+    expect(response.status).toBe(500)
+    expect(logged.mock.calls.some((call) => String(call[0]).includes('rollback failed'))).toBe(true)
+    logged.mockRestore()
+  })
+
   it('프로젝트 주인이 아니거나 공유 데모로 들어왔으면 반영하지 않는다', async () => {
     // 왜: 남의 프로젝트 번호로 인물 · 배경 목록을 바꾸거나, 읽기 전용 데모에서 목록을 바꾸면 안 된다.
     mocks.access.mockResolvedValueOnce({ ok: false, response: Response.json({ error: 'Forbidden' }, { status: 403 }) })

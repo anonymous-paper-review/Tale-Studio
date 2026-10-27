@@ -30,7 +30,7 @@ import {
 import { claimAction } from '@/lib/action-guard'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
-import { notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
+import { isQuotaExceeded, notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
 import { registerCharacterCard } from '@/stores/asset-storage-store'
 import { isDemoSession } from '@/lib/demo/context'
 import type { ArtistSourceSnapshot } from '@/lib/artist/source-snapshot'
@@ -156,6 +156,8 @@ export type GenerationActor = 'ui' | 'chat' | 'auto'
 export type GenerationRequestOptions = {
   traceId?: string
   onJob?: GenerationJobObserver
+  /** 내 한도에 막혀 기다리는 동안 다시 보는 요청 — 처음 막힐 때 이미 알렸다, 같은 한도 안내를 다시 띄우지 않는다(2026-10-27 검토). */
+  quietQuota?: boolean
 }
 export type AppearanceCreationOptions = GenerationRequestOptions & {
   generate?: boolean
@@ -281,6 +283,7 @@ async function generateAndPersistWorldShot(
         error: body.error ?? `HTTP ${res.status}`,
         quotaScope: quotaScopeOf(res.status, body),
     })
+      if (options?.quietQuota && isQuotaExceeded(res.status, body)) return null
       if (notifyIfQuotaExceeded(res.status, body)) return null
       throw new Error(body.error ?? `HTTP ${res.status}`)
     }
@@ -684,7 +687,7 @@ interface ArtistState {
   /** 리뉴얼 1차: [안 나온 그림 다시 그리기] — 대표 그림(인물 기본 모습 시트 · 배경 넓은 그림)이 없고 그리는 중도 아닌 것을 그린다.
    *  자동 그리기와 달리 서버 초안을 기다리던 인물도 그린다(서버 초안이 실패했을 때 영영 비지 않게).
    *  자동 생성과 같은 동시 장수 규칙(runAdaptivePool)으로 보낸다(2026-10-27 디자이너 QA 1차 #05). skipFailed 면 실패 기록이 있는 칸은 뺀다. */
-  drawMissingImages: (opts?: { skipFailed?: boolean }) => Promise<DrawMissingOutcome>
+  drawMissingImages: (opts?: { skipFailed?: boolean; quietQuota?: boolean }) => Promise<DrawMissingOutcome>
   /** 그림 상태(실패 · 서버가 그리는 중)를 읽어 카드 배지와 "그리는 중"을 맞추고, 서버가 다 그린 그림을 새로고침 없이 넣는다. */
   syncGenerationStatus: (projectId: string) => Promise<void>
   /** 마지막으로 그림 상태를 읽은 시각(ms) — 이어 그리기가 서버가 막 보낸 그림을 모른 채 다시 요청하지 않게 한다. */
@@ -1285,7 +1288,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         const body = await res.json().catch(() => ({}))
         const error = body.error ?? `HTTP ${res.status}`
         onJob({ jobId: null, status: 'failed', httpStatus: res.status, error, quotaScope: quotaScopeOf(res.status, body) })
-        if (notifyIfQuotaExceeded(res.status, body)) {
+        if ((options?.quietQuota && isQuotaExceeded(res.status, body)) || notifyIfQuotaExceeded(res.status, body)) {
           return { jobId: null, status: 'failed', httpStatus: res.status, error }
         }
         throw new Error(body.error ?? `HTTP ${res.status}`)
@@ -1692,7 +1695,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         prompt,
         imageProvider,
         actor,
-        { traceId: extra?.traceId, onJob },
+        { traceId: extra?.traceId, onJob, quietQuota: extra?.quietQuota },
         {
           model,
           safeMode: extra?.safeMode,
@@ -1980,11 +1983,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     const tasks: Array<() => Promise<void>> = [
       ...targets.characters.map(({ characterId, appearanceKey }) => async () => {
         if (!sameProject()) return
-        await get().generateCharacterView(characterId, appearanceKey, 'main', 'auto', undefined, undefined, undefined, { onJob })
+        await get().generateCharacterView(characterId, appearanceKey, 'main', 'auto', undefined, undefined, undefined, { onJob, quietQuota: opts.quietQuota })
       }),
       ...targets.worlds.map((locationId) => async () => {
         if (!sameProject()) return
-        await get().generateWorldShot(locationId, 'wideShot', undefined, 'auto', undefined, { onJob })
+        await get().generateWorldShot(locationId, 'wideShot', undefined, 'auto', undefined, { onJob, quietQuota: opts.quietQuota })
       }),
     ]
     // 자동 생성과 같은 가변 동시 장수(러프 중 1 · 아니면 3) — 한꺼번에 보내면 유저 한도(6)에 막힌다(2026-10-27 디자이너 QA 1차 #05).
@@ -2031,7 +2034,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       return
     }
     set({ drawContinue: { ...mine, running: true } })
-    const outcome = await get().drawMissingImages({ skipFailed: true })
+    // 이미 내 한도에 막혀 기다리는 중이면 다시 볼 때 같은 한도 안내를 다시 띄우지 않는다(처음 막힐 때 한 번만, 검토).
+    const outcome = await get().drawMissingImages({ skipFailed: true, quietQuota: mine.userWaitSince != null })
     if (useProjectStore.getState().projectId !== projectId) return
     // 잠시 쉬었다가 다시 본다 — 쉬는 동안 판단은 "기다림"이라 단추도 뜨지 않는다.
     const pauseFor = (ms: number) => {
@@ -2106,6 +2110,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       if (c.origin === 'writer') {
         queuedRest.push(`char ${c.characterId}:main (opencast 턴어라운드 자율)`)
         restTasks.push(async () => {
+          // 차례를 기다리는 사이 다른 프로젝트(시리즈 다른 화 — 인물 번호가 같다)로 옮겼으면 보내지 않는다(2026-10-27 검토).
+          if (useProjectStore.getState().projectId !== projectId) return
           await get().generateCharacterView(c.characterId, requireDefaultAppearanceKey(c), 'main', 'auto')
         })
       } else {

@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   hasQueuedWorld: vi.fn(),
   hasQueuedView: vi.fn(),
   reserveJob: vi.fn(),
+  countFailed: vi.fn(),
+  notify: vi.fn(),
 }))
 vi.mock('@/lib/supabase/client', () => ({ createClient: () => ({ from: mocks.from }) }))
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: { from: mocks.from } }))
@@ -17,6 +19,11 @@ vi.mock('@/lib/api/guard', () => ({ requireProjectAccess: async () => ({ ok: tru
 vi.mock('@/lib/generation-quota', () => ({ checkGenerationCapacity: mocks.capacity }))
 vi.mock('@/lib/api/quota', () => ({ quotaRejectionResponse: () => new Response(JSON.stringify({ code: 'quota_exceeded', scope: 'user' }), { status: 429 }), capacityReservationRejection: () => null }))
 vi.mock('@/lib/chat-trace-server', () => ({ chatTraceBelongsToProject: async () => true }))
+// 한도 안내는 띄웠는지만 본다(진짜 판정 함수는 그대로).
+vi.mock('@/lib/generation-quota-toast', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/generation-quota-toast')>()),
+  notifyIfQuotaExceeded: mocks.notify,
+}))
 vi.mock('@/lib/style-anchor', () => ({ resolveStyleAnchor: async () => null, applyStyleAnchor: (_: unknown, value: unknown) => value }))
 vi.mock('@/lib/fal/webhook-url', () => ({ resolveWebhookUrl: () => 'https://example.test/webhook' }))
 vi.mock('@/lib/writer/llm/fal', () => ({ falImageSubmit: vi.fn() }))
@@ -29,13 +36,13 @@ vi.mock('@/lib/generation-jobs', () => ({
   hasQueuedCharacterViewJob: mocks.hasQueuedView,
   listFailedWorldShotJobs: async () => [],
   listFailedCharacterViewJobs: async () => [],
-  countFailedJobsForTarget: async () => 0,
+  countFailedJobsForTarget: mocks.countFailed,
   AUTO_GENERATION_GIVE_UP_THRESHOLD: 3,
 }))
 
 import { POST as generateWorld } from '@/app/api/artist/generate-world/route'
 import { POST as generateSheet } from '@/app/api/artist/generate-sheet/route'
-import { autoGenerateOnEnter, USER_LIMIT_RECHECK_MS, USER_LIMIT_WAIT_MAX_MS } from '@/lib/artist/draw-continue'
+import { autoGenerateOnEnter, USER_LIMIT_RECHECK_MS, USER_LIMIT_WAIT_MAX_MS, writerStatusKnown } from '@/lib/artist/draw-continue'
 import { useArtistStore } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
 import type { GenerationJobReceipt } from '@/lib/generation-jobs-client'
@@ -72,6 +79,8 @@ beforeEach(() => {
   mocks.capacity.mockResolvedValue({ ok: false, scope: 'user', queued: 6, limit: 6, category: 'image', axis: 'user_image' })
   mocks.hasQueuedWorld.mockResolvedValue(false)
   mocks.hasQueuedView.mockResolvedValue(false)
+  mocks.countFailed.mockResolvedValue(0)
+  mocks.notify.mockImplementation((status: number) => status === 429)
 })
 
 describe('자리 검사보다 먼저 건너뛰는 요청', () => {
@@ -104,6 +113,21 @@ describe('자리 검사보다 먼저 건너뛰는 요청', () => {
     await expect(res.json()).resolves.toMatchObject({ skipped: true, reason: 'exists' })
   })
 
+  it('자동 경로가 두 번 실패해 포기한 배경 · 인물 시트를 다시 요청하면 자리가 다 찼어도 자리 없음이 아니라 포기했다고 답한다', async () => {
+    // 왜: 자리 없음으로 답하면 이어 그리기가 포기한 그림을 30분 동안 기다리며 다시 두드린다 — 포기한 그림은 사람이 카드에서 다시 만든다(2026-10-27 검토 지적).
+    mocks.countFailed.mockResolvedValue(3)
+    rows.locations = [{ project_id: 'project-1', location_id: 'roof', name: '옥상', wide_shot: null }]
+    const world = await generateWorld(new Request('http://localhost/api/artist/generate-world', json({ projectId: 'project-1', locationId: 'roof', column: 'wide_shot', prompt: 'a roof', actor: 'auto' })))
+    expect(world.status).toBe(200)
+    await expect(world.json()).resolves.toMatchObject({ skipped: true, reason: 'gave_up' })
+
+    rows.character_appearances = [{ project_id: 'project-1', character_id: 'mara', appearance_key: 'current', sheet_url: null }]
+    const sheet = await generateSheet(new Request('http://localhost/api/artist/generate-sheet', json({ projectId: 'project-1', characterId: 'mara', appearanceKey: 'current', view: 'main', prompt: 'mara', actor: 'auto' })))
+    expect(sheet.status).toBe(200)
+    await expect(sheet.json()).resolves.toMatchObject({ skipped: true, reason: 'gave_up' })
+    expect(mocks.capacity).not.toHaveBeenCalled()
+  })
+
   it('새로 그려야 하는 그림은 지금처럼 자리가 다 찼으면 거절한다', async () => {
     // 왜: 정상 경로 고정 — 자리 검사는 순서만 뒤로 갔을 뿐 새 그림은 그대로 막는다.
     rows.locations = [{ project_id: 'project-1', location_id: 'roof', name: '옥상', wide_shot: null }]
@@ -112,6 +136,8 @@ describe('자리 검사보다 먼저 건너뛰는 요청', () => {
     expect(mocks.reserveJob).not.toHaveBeenCalled()
   })
 })
+
+const realGenerateCharacterView = useArtistStore.getState().generateCharacterView
 
 describe('내 한도에 막힌 이어 그리기', () => {
   const appearance = { appearanceKey: 'current', label: '현재', isDefault: true, narrativeTime: 'present' as const, sheetUrl: null, portraitUrl: null, appearance: null, appearanceNative: null, viewCandidates: {} }
@@ -157,6 +183,30 @@ describe('내 한도에 막힌 이어 그리기', () => {
     expect(useArtistStore.getState().drawContinue).toMatchObject({ stopped: false })
   })
 
+  it('내 한도에 막혀 기다리는 동안 1분마다 다시 볼 때는 한도 안내를 다시 띄우지 않는다', async () => {
+    // 왜: 30분 기다리는 동안 1분마다 같은 "동시에 6장까지" 안내가 다시 떴다(2026-10-27 검토 지적) — 처음 막힐 때 한 번만 알린다.
+    await round()
+    await round()
+    await round()
+    const quiet = view.mock.calls.map((call) => (call[7] as { quietQuota?: boolean } | undefined)?.quietQuota === true)
+    expect(quiet).toEqual([false, true, true])
+  })
+
+  it('조용히 다시 보는 그림 요청이 내 한도에 막히면 안내를 띄우지 않고 막혔다는 것만 돌려준다', async () => {
+    // 왜: 기다림 중 다시 보기는 안내 없이 자리만 확인한다 — 사람이 누른 요청 · 처음 막힌 요청은 지금처럼 안내한다.
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ code: 'quota_exceeded', scope: 'user', category: 'image', limit: 6 }, { status: 429 })))
+    useArtistStore.setState({ generateCharacterView: realGenerateCharacterView })
+    try {
+      const quiet = await useArtistStore.getState().generateCharacterView('mara', 'current', 'main', 'auto', undefined, undefined, undefined, { quietQuota: true })
+      expect(quiet).toMatchObject({ status: 'failed', httpStatus: 429 })
+      expect(mocks.notify).not.toHaveBeenCalled()
+      await useArtistStore.getState().generateCharacterView('mara', 'current', 'main', 'auto')
+      expect(mocks.notify).toHaveBeenCalledOnce()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('내 한도에 막혀 30분을 기다려도 자리가 나지 않으면 멈추고 다시 그리기 단추로 남긴다', async () => {
     // 왜: 끝없이 두드리지 않는다 — 30분이 지나면 사람이 [안 나온 그림 다시 그리기]로 다시 시작한다.
     expect(USER_LIMIT_WAIT_MAX_MS).toBe(30 * 60_000)
@@ -175,6 +225,21 @@ describe('[만들기] 중 Artist 화면의 자동 생성', () => {
     expect(autoGenerateOnEnter({ phase: 'list' })).toBe(false)
     expect(autoGenerateOnEnter({ phase: 'cards' })).toBe(true)
     expect(readFileSync('src/app/studio/artist/page.tsx', 'utf8')).toMatch(/autoGenerateOnEnter\(\{ phase \}\)/)
+  })
+
+  it('새로고침 뒤 Writer 진행 상태를 아직 읽지 못했으면 Artist 화면은 자동으로 그리지 않고 상태를 읽은 뒤에 정한다', () => {
+    // 왜: 새로고침하면 진행 상태를 읽기 전 화면 단계가 기본값 '다 만듦'이라, [만들기]가 도는 중에도 화면이 직접 그려
+    //   내 자리를 먼저 차지했다 — 위 시험의 막음이 새로고침에서는 듣지 않았다(2026-10-27 검토 지적).
+    expect(writerStatusKnown({ status: null, error: null })).toBe(false)
+    expect(writerStatusKnown({ status: { started: false }, error: null })).toBe(true)
+    // 상태 읽기가 실패하면 기다리지 않는다 — 예전처럼 빈칸을 채운다.
+    expect(writerStatusKnown({ status: null, error: 'status 500' })).toBe(true)
+    expect(readFileSync('src/app/studio/artist/page.tsx', 'utf8')).toMatch(/if \(!writerStatusKnown\(\{ status: writerStatus, error: writerStatusError \}\)\) return\s+autoGenTriggeredRef\.current = projectId/)
+  })
+
+  it('자동 생성에서 차례를 기다리던 인물 시트도 그 사이 다른 프로젝트로 옮겼으면 요청하지 않는다', () => {
+    // 왜: 한 번에 1~3장씩만 보내 뒤 차례의 인물은 몇 분 뒤에 나간다 — 시리즈 화들은 인물 번호가 같아, 옮겨 간 화에 그 인물을 그릴 수 있었다(2026-10-27 검토 지적).
+    expect(readFileSync('src/stores/artist-store.ts', 'utf8')).toMatch(/opencast 턴어라운드 자율[\s\S]{0,200}restTasks\.push\(async \(\) => \{\s+(?:\/\/[^\n]*\s+)?if \(useProjectStore\.getState\(\)\.projectId !== projectId\) return\s+await get\(\)\.generateCharacterView/)
   })
 
   it('자동 생성이 배경 그림을 기다리는 사이 다른 프로젝트로 옮기면 그 배경을 요청하지 않는다', () => {

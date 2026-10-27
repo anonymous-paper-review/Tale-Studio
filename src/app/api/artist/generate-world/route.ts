@@ -136,15 +136,6 @@ export async function POST(req: Request) {
         effectiveSafeMode = slot.moderation
       }
     }
-    // 멀티유저 동시성 게이트: 유저 상한 + 전역 fal 슬롯(#global-semaphore). 둘 중 하나라도 차면 429.
-    //   겹친 요청(그리는 중) · 이미 있는 그림 · 포기 · 순화 상한을 먼저 건너뛴 뒤에 본다(2026-10-27 오너 재확인) — 자리가 찬 동안
-    //   이미 있는 그림을 물었다고 "자리 없음"이 돌아오면 이어 그리기가 한 바퀴를 헛쓰고 멈췄다. 진짜 집행은 DB 트리거다.
-    const quota = await checkGenerationCapacity(access.userId!, 'image')
-    if (!quota.ok) return quotaRejectionResponse(quota, { projectId, kind: 'world_shot', userId: access.userId })
-
-    // 약속 B1: 어떤 경로(팝업 편집·채팅·자동 초안)로 왔든 배경 프롬프트에는 사람 금지 절이 붙는다.
-    const finalPrompt = ensureNoPeopleClause(effectiveSafeMode ? applyWorldSafeMode(prompt) : prompt)
-
     // give-up 게이트: 자율 first-fill(actor='auto')은 같은 슬롯 실패가 임계값 이상이면 멈춘다
     //   (무한 재시도·fal 과금 차단). 사람의 명시적 재생성(ui/chat)은 통과 → 회복 경로(architecture §5).
     if (actor === 'auto') {
@@ -159,6 +150,15 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true, skipped: true, reason: 'gave_up', failed })
       }
     }
+
+    // 멀티유저 동시성 게이트: 유저 상한 + 전역 fal 슬롯(#global-semaphore). 둘 중 하나라도 차면 429.
+    //   겹친 요청(그리는 중) · 이미 있는 그림 · 포기 · 순화 상한을 먼저 건너뛴 뒤에 본다(2026-10-27 오너 재확인) — 자리가 찬 동안
+    //   이미 있는 그림을 물었다고 "자리 없음"이 돌아오면 이어 그리기가 한 바퀴를 헛쓰고 멈췄다. 진짜 집행은 DB 트리거다.
+    const quota = await checkGenerationCapacity(access.userId!, 'image')
+    if (!quota.ok) return quotaRejectionResponse(quota, { projectId, kind: 'world_shot', userId: access.userId })
+
+    // 약속 B1: 어떤 경로(팝업 편집·채팅·자동 초안)로 왔든 배경 프롬프트에는 사람 금지 절이 붙는다.
+    const finalPrompt = ensureNoPeopleClause(effectiveSafeMode ? applyWorldSafeMode(prompt) : prompt)
 
     const { data: project } = await supabaseAdmin
       .from('projects')

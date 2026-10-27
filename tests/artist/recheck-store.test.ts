@@ -112,4 +112,36 @@ describe('재점검 반영', () => {
     expect(db.save).not.toHaveBeenCalled()
     expect(useProducerStore.getState().cast).toEqual([minho])
   })
+
+  it('창에 보이지 않던 보관 줄을 함께 보내 서버가 창과 같은 목록으로 고친 것을 맞춰 보게 한다', async () => {
+    // 왜: 시리즈 다음 화의 "보관" 줄은 재점검 창에 없다 — 서버가 그 줄까지 비교하면 창에서는 되던 넣기를 "이미 있다"며 통째로 거절했다(2026-10-27 검토 지적).
+    const fetchMock = serverAnswers(200, { ok: true, cast: [minho, guard], backgrounds: [hallway], newIds: [] })
+
+    await useProducerStore.getState().applyRecheck(ops, ['series:char_9'])
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    expect(JSON.parse(String(init.body))).toEqual({ projectId: 'p1', ops, kept: ['series:char_9'] })
+  })
+
+  it('보낸 뒤 답을 받지 못하면 저장된 목록을 다시 읽고 창을 닫게 해 같은 고친 것을 두 번 얹지 않는다', async () => {
+    // 왜: 서버는 반영했는데 답만 못 받았을 때 창을 그대로 두고 다시 누르면, 먼저 옛 목록을 저장해 반영한 줄을 지우고 같은 인물을
+    //   한 번 더 넣었다(2026-10-27 검토 지적). 다시 읽은 목록을 보고 빠진 것만 다시 하면 된다.
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('network down') }))
+    const lost = await useProducerStore.getState().applyRecheck(ops)
+    expect(lost).toEqual({ ok: false, reloaded: true, error: '목록이 바뀌었는지 확인하지 못했어요. 목록을 다시 불러왔으니 확인하고 빠진 것이 있으면 다시 해 주세요.' })
+    expect(useProducerStore.getState().loadProject).toHaveBeenCalledOnce()
+
+    serverAnswers(500, { error: 'boom' })
+    expect(await useProducerStore.getState().applyRecheck(ops)).toMatchObject({ ok: false, reloaded: true })
+    expect(useProducerStore.getState().loadProject).toHaveBeenCalledTimes(2)
+  })
+
+  it('다른 창에서 먼저 고친 목록과 이름이 부딪치면 무엇이 부딪쳤는지 말하고 저장된 목록을 다시 읽는다', async () => {
+    // 왜: 예전에는 "목록을 고치지 못했어요"만 떠서 다시 눌러도 같은 까닭으로 막혔다 — 무엇을 해야 할지 알아야 한다(2026-10-27 검토 지적).
+    serverAnswers(409, { error: 'The re-check was not accepted', code: 'already_listed' })
+    expect(await useProducerStore.getState().applyRecheck(ops)).toEqual({ ok: false, error: '넣으려던 이름이 이미 목록에 있어요. 재점검을 다시 열어 주세요.' })
+    serverAnswers(409, { error: 'The re-check was not accepted', code: 'name_taken' })
+    expect(await useProducerStore.getState().applyRecheck(ops)).toEqual({ ok: false, error: '고친 이름을 이미 다른 줄이 쓰고 있어요. 재점검을 다시 열어 주세요.' })
+    expect(useProducerStore.getState().loadProject).toHaveBeenCalledTimes(2)
+  })
 })

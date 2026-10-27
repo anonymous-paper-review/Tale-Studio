@@ -88,6 +88,16 @@ export function artistPhase(input: {
   return 'done'
 }
 
+/** 예전 흐름(리뉴얼 전) 진행 화면이 왼쪽 사이드바를 막을지 — Writer 실행이 정말 도는 동안만(2026-10-27 검토).
+ *  상태를 읽기 전(새로고침 직후 깜빡임) · 사람을 기다리는 멈춤(씬 확인 · Artist 완료 대기) · 멈춘 뒤 · 다 만든 뒤에는 막지 않는다 —
+ *  씬 확인을 기다리는데 막으면 Producer 로 가서 확인할 길이 없다. */
+export function legacyProgressHolds(input: { gateOpen: boolean; phase: ArtistPhase | string; status: RunStatusLike }): boolean {
+  const status = input.status
+  if (input.gateOpen || input.phase !== 'done' || !status?.started) return false
+  if (status.pipeline_completed || status.pipeline_failed) return false
+  return status.current_status !== 'awaiting_confirmation' && status.current_status !== 'awaiting_artist'
+}
+
 /** 이어 만들던 실행이 멈췄다 — 카드가 보여도 Artist 화면 위에 멈춘 이유와 [이어서 다시 시도]를 보인다(리뉴얼 1차 검토).
  *  아직 [만들기] 전인 산문 초안 실행은 Writer 화면의 [다시 시도]가 맡는다. */
 export function artistRunStopped(input: { draftRun: boolean; status: { pipeline_failed?: boolean } | null | undefined }): boolean {

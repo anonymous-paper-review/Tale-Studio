@@ -6,12 +6,13 @@ import { downscaleForUpload, needsDownscale } from '@/lib/upload/downscale'
 import { useProducerStore } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
 
-export type BreakdownImageError = 'not_image' | 'too_large' | 'unreadable' | 'failed' | 'not_attached'
+export type BreakdownImageError = 'not_image' | 'too_large' | 'bad_shape' | 'unreadable' | 'failed' | 'not_attached'
 
 /** 줄 아래에 보일 이유 — 영어 원문 = 사전 키. */
 export const BREAKDOWN_IMAGE_ERROR_TEXT: Record<BreakdownImageError, string> = {
   not_image: 'Choose a JPG, PNG or WebP picture.',
   too_large: 'The picture is too large. Choose a smaller one.',
+  bad_shape: 'The picture is too long or too wide. Choose one closer to the shape of a usual photo.',
   unreadable: 'Could not read this picture. Try another file.',
   failed: 'Could not upload the picture. Please try again.',
   not_attached: 'Could not attach the picture to this row.',
@@ -37,6 +38,7 @@ export interface BreakdownImageDeps {
 function errorOf(status: number, code: unknown): BreakdownImageError {
   if (code === 'unsupported_type' || status === 415) return 'not_image'
   if (code === 'too_large' || status === 413) return 'too_large'
+  if (code === 'bad_shape') return 'bad_shape'
   if (code === 'invalid_image') return 'unreadable'
   return 'failed'
 }

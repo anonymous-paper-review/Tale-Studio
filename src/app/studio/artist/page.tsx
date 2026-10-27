@@ -28,9 +28,9 @@ import { AltArrowHint } from '@/components/alt-arrow-hint'
 import { useLocale, useT } from '@/lib/i18n'
 import { styleAnchorName } from '@/lib/style-anchor-name'
 import { AiBusyOverlay } from '@/components/ai-busy-overlay'
-import { artistPhase, artistRunStopped, assetCompletionGaps, makingProgress } from '@/lib/artist/breakdown'
+import { artistPhase, artistRunStopped, assetCompletionGaps, legacyProgressHolds, makingProgress } from '@/lib/artist/breakdown'
 import { ARTIST_BRIEF_TEXT, artistBriefCounts, offerArtistBrief } from '@/lib/artist/brief'
-import { completeBlockedNote, drawContinueDecision, drawTargetCount, makingOverlayCopy, missingDrawTargets, autoGenerateOnEnter } from '@/lib/artist/draw-continue'
+import { completeBlockedNote, drawContinueDecision, drawTargetCount, makingOverlayCopy, missingDrawTargets, autoGenerateOnEnter, writerStatusKnown } from '@/lib/artist/draw-continue'
 import { backgroundRoughReady, storyboardPrepView } from '@/lib/artist/background-roughs'
 import { isDemoSession } from '@/lib/demo/context'
 import { useBackgroundRoughs } from '@/features/artist-room/use-background-roughs'
@@ -124,7 +124,7 @@ export default function VisualPage() {
   // 실험 New UI(에셋·샷 보드) 토글 — 스토어 보관으로 탭 전환(remount)에도 유지.
 
   // writer-pipeline 진행상황 (producer→artist 직행 시 백그라운드 생성 진행 표시용, decisions #37)
-  const { status: writerStatus, restart: restartWriterStatus } = useWriterStatus(projectId)
+  const { status: writerStatus, error: writerStatusError, restart: restartWriterStatus } = useWriterStatus(projectId)
   const setLifecycleStatus = useProjectStore((s) => s.setLifecycleStatus)
 
   // 프로젝트당 1회만 자동생성 트리거 (마운트/재진입 중복 방지)
@@ -284,13 +284,15 @@ export default function VisualPage() {
   //   fallback 진입: main 도 비어있으면 main 부터 보강.
   //   브레이크다운 · [만들기] 중에 처음 준비되면 그리지 않는다 — 서버 초안과 이어 그리기가 맡는다(2026-10-27 오너 재확인, autoGenerateOnEnter).
   //   그 화면에서는 이번 진입의 자동 생성을 다시 열지 않는다(나중에 다시 들어오면 지금처럼 빈칸을 채운다).
+  //   새로고침 직후에는 진행 상태를 읽은 뒤에 정한다 — 읽기 전 phase 는 기본값 'done' 이다(writerStatusKnown).
   useEffect(() => {
     if (!projectId || !ready) return
     if (autoGenTriggeredRef.current === projectId) return
+    if (!writerStatusKnown({ status: writerStatus, error: writerStatusError })) return
     autoGenTriggeredRef.current = projectId
     if (!autoGenerateOnEnter({ phase })) return
     void autoGenerateBaseImages()
-  }, [projectId, ready, phase, autoGenerateBaseImages])
+  }, [projectId, ready, phase, writerStatus, writerStatusError, autoGenerateBaseImages])
 
   // 첫 진입 브리핑(2026-08-06 간소화) — 무엇을 만들었는지 + @멘션 · Ctrl+클릭 조작법. 룩 미반영/실패는 카드 배지가 알린다.
   //   인물 · 배경 카드가 생긴 뒤(디자인이 끝난 뒤)에 그 수로 한 번만 말한다(2026-10-27 디자이너 QA 1차 관찰 49) —
@@ -418,7 +420,8 @@ export default function VisualPage() {
   )
 
   // 예전 흐름(리뉴얼 전) 프로젝트의 진행 화면(그리는 중)은 잠금 화면을 쓰지 않는다 — 그 동안도 왼쪽 사이드바를 막는다(2026-10-27).
-  const legacyProgressBusy = !gateOpen && phase === 'done' && !writerStatus?.pipeline_failed
+  //   Writer 실행이 정말 도는 동안만 — 상태를 읽기 전 · 씬 확인 대기에는 막지 않는다(legacyProgressHolds, 검토).
+  const legacyProgressBusy = legacyProgressHolds({ gateOpen, phase, status: writerStatus })
   useAiBusyHold(legacyProgressBusy)
 
   if (phase === 'list') {

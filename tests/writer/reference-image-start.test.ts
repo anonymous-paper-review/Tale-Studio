@@ -228,4 +228,38 @@ describe('레퍼런스 그림 넘기기', () => {
     expect(appearance('jia')).toMatchObject({ sheet_url: JIA_REF, portrait_url: JIA_REF })
     expect(mocks.writes.some((w) => w.table === 'character_appearances' && w.payload.sheet_url === PREV_SHEET)).toBe(false)
   })
+
+  it('올린 레퍼런스 그림을 바꿔 다시 넘기면 예전에 올린 그림 대신 새로 올린 그림이 그 카드의 그림이 된다', async () => {
+    // 왜: 넘기기가 중간에 실패해 그림을 바꾸고 다시 누르면, 빈칸만 채우는 규칙 때문에 예전에 올린 그림이 남았다(2026-10-27 검토 지적).
+    //   이 프로젝트 브레이크다운에 올린 그림만 바꾼다 — Artist 에서 다시 그린 그림은 지금처럼 덮지 않는다(위 시험).
+    const OLD = own('breakdown/minho-old.png')
+    const OLD_HALL = own('breakdown/hall-old.jpg')
+    mocks.tables.character_appearances = [{ project_id: 'project-1', character_id: 'minho', appearance_key: 'current', is_default: true, sheet_url: OLD, portrait_url: OLD, derived_from_url: null }]
+    mocks.tables.locations = [{ project_id: 'project-1', location_id: 'hall', name: '회사 복도', wide_shot: OLD_HALL }]
+
+    const response = await make({
+      cast: { characters: [minho({ source_image_url: MINHO_REF, source_image_as_is: true })] },
+      backgrounds: { locations: [hall({ source_image_url: HALL_REF, source_image_as_is: true })] },
+    })
+
+    expect(response.status).toBe(200)
+    expect(appearance('minho')).toMatchObject({ sheet_url: MINHO_REF, portrait_url: MINHO_REF })
+    expect(location('hall')).toMatchObject({ wide_shot: HALL_REF })
+  })
+
+  it('그대로 쓰는 레퍼런스는 이 프로젝트 브레이크다운에 올린 그림만 받는다', async () => {
+    // 왜: 우리 보관함 주소이기만 하면 다른 프로젝트 그림도 이 카드의 그림으로 적혔다 — 그대로 쓰는 그림은 이 프로젝트에 올린 것뿐이다(2026-10-27 검토 지적).
+    const base = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').replace(/\/+$/, '')
+    const OTHER = `${base}/storage/v1/object/public/media/ws-1/project-2/breakdown/x.png`
+    const NOT_BREAKDOWN = own('characters/minho_main.png')
+
+    const response = await make({
+      cast: { characters: [minho({ source_image_url: OTHER, source_image_as_is: true })] },
+      backgrounds: { locations: [hall({ source_image_url: NOT_BREAKDOWN, source_image_as_is: true })] },
+    })
+
+    expect(response.status).toBe(200)
+    expect(appearance('minho')).toMatchObject({ sheet_url: null, portrait_url: null })
+    expect(location('hall')?.wide_shot ?? null).toBeNull()
+  })
 })
