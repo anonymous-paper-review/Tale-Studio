@@ -145,8 +145,13 @@ function parseHeading(line: string): { int_ext?: ScriptScene['int_ext']; locatio
   if (k) {
     const rest = k[2].trim();
     // 번호 뒤에 촬영 헤딩이 오면("SCENE 1. INT. 부엌 / 일요일 아침 — 현재") INT. · EXT.를 떼고 촬영 헤딩 규칙으로 나눈다(2026-10-27 오너).
+    //   시간을 대시 대신 괄호로 쓴 꼴("S#1. EXT. 해변 (낮)")은 괄호 안을 시간으로 읽는다(예전 읽기와 같게, 검토).
     const inner = rest.match(HEADING_RE);
-    if (inner) return screenplayHeading(inner);
+    if (inner) {
+      const head = screenplayHeading(inner);
+      const timeInParen = head.time_of_day === undefined ? head.location.match(/^(.*?)\s*[(（](.*?)[)）]\s*$/) : null;
+      return timeInParen ? { ...head, location: timeInParen[1].trim() || head.location, time_of_day: timeInParen[2].trim() } : head;
+    }
     const paren = rest.match(/^(.*?)\s*[(（](.*?)[)）]\s*$/);
     if (paren) return { location: paren[1].trim() || rest, time_of_day: paren[2].trim() };
     const parts = rest.split(/\s+[-–—/]\s+/);
@@ -538,6 +543,9 @@ export function parseScript(text: string, opts?: { assumeScript?: boolean }): Sc
       i++;
       continue;
     }
+    // 씬 · 막 머리가 오면 앞머리 칸(때 · 장소 · 로그라인)을 닫고 그 줄부터 대본으로 읽는다 — 빈 줄 없이 붙여 넣은 글에서
+    //   "때: 현재" 아래 대본 전체가 한 칸에 들어가 씬이 0개가 됐다(2026-10-27 검토). 인물 목록 칸은 위에서 따로 닫는다.
+    if (section !== 'none' && (parseHeading(s) || isActHeading(s))) flushSection();
     if (section !== 'none') {
       if (!/^\s*#{1,6}\s/.test(line)) sectionBuf.push(s); // "### 조연" 같은 소제목은 항목이 아니다
       i++;

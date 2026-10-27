@@ -52,4 +52,21 @@ describe('번호로 시작하는 씬 머리', () => {
     expect(doc.scenes).toHaveLength(1)
     expect(doc.scenes[0].heading).toBe('1막')
   })
+
+  it('앞머리의 때 · 장소 줄 바로 아래에 빈 줄 없이 씬 머리가 오면 그 줄에서 앞머리를 닫고 씬으로 나눈다', () => {
+    // 왜: 붙여 넣은 글에는 빈 줄이 없기 쉽다 — "때: 현재" 바로 아래 씬 머리부터 대본 끝까지가 시간 한 칸에 들어가 씬이 0개가 됐다(2026-10-27 검토 지적, 같은 증상).
+    for (const head of ['때: 현재', '장소: 서울의 작은 동네']) {
+      const doc = parseScript(['토요일의 꿈', head, 'SCENE 1. INT. 수민의 방 / 토요일 아침 — 현재', '수민이 일어난다.', '수민: 또 그 꿈이야.', 'SCENE 2. EXT. 골목 — 낮', '지호: 왔어?', '수민: 응.', '지호: 가자.'].join('\n'))!
+      expect(doc.scenes.map((scene) => scene.location), head).toEqual(['수민의 방 / 토요일 아침', '골목'])
+    }
+    const play = parseScript(['등장인물', '영수: 다방 주인', '미자: 손님', '', '때: 1970년대 겨울', '1막', '영수: 어서 오세요.', '미자: 커피 한 잔 주세요.', '영수: 네, 잠시만요.'].join('\n'))!
+    expect(play.front_matter.default_time).toBe('1970년대 겨울')
+    expect(play.scenes.map((scene) => scene.heading)).toEqual(['1막'])
+  })
+
+  it('S# 번호 뒤 촬영 헤딩의 시간을 괄호로 쓰면 괄호 안을 시간으로 읽는다', () => {
+    // 왜: "S#1. EXT. 해변 (낮)"은 예전에 시간 "낮"으로 읽혔다 — INT. · EXT.를 떼면서 괄호 시간이 장소에 붙지 않게 한다(2026-10-27 검토 지적).
+    const doc = parseScript(['S#1. EXT. 해변 (낮)', '파도가 친다.', '수아: 바다다!', 'S#2. INT. 버스 안 — 밤', '수아가 존다.', '기사: 종점입니다.', '수아: 네!'].join('\n'))!
+    expect(doc.scenes.map((scene) => [scene.int_ext, scene.location, scene.time_of_day])).toEqual([['EXT', '해변', '낮'], ['INT', '버스 안', '밤']])
+  })
 })
