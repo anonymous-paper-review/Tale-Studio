@@ -1970,6 +1970,44 @@ export type Database = {
           },
         ]
       }
+      vouchers: {
+        Row: {
+          code: string
+          created_at: string
+          note: string | null
+          plan: string
+          redeemed_at: string | null
+          redeemed_by: string | null
+          redeemed_workspace_id: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          note?: string | null
+          plan: string
+          redeemed_at?: string | null
+          redeemed_by?: string | null
+          redeemed_workspace_id?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          note?: string | null
+          plan?: string
+          redeemed_at?: string | null
+          redeemed_by?: string | null
+          redeemed_workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vouchers_redeemed_workspace_id_fkey"
+            columns: ["redeemed_workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspaces: {
         Row: {
           created_at: string | null
@@ -2201,6 +2239,17 @@ export type Database = {
           p_provider_status: number
         }
         Returns: boolean
+      }
+      redeem_voucher: {
+        Args: {
+          p_code: string
+          p_expires_at: string
+          p_plan: string
+          p_takes: number
+          p_user: string
+          p_workspace: string
+        }
+        Returns: Json
       }
       refresh_director_video_projection: {
         Args: { p_project_id: string; p_shot_id: string }

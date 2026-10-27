@@ -14,6 +14,7 @@ import { AlertTriangle, Check, LogOut, RefreshCw, X } from 'lucide-react'
 import { DashboardHeader } from '@/components/dashboard/dashboard-header'
 import { CheckoutButton } from '@/components/billing/checkout-button'
 import { PortalButton } from '@/components/billing/portal-button'
+import { VoucherCard } from '@/components/billing/voucher-card'
 import { DeleteAccountDialog } from '@/components/account/delete-account-dialog'
 import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
@@ -22,6 +23,7 @@ import { useT } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 import { PADDLE_PLANS, PADDLE_TAKE_PACKS, isPurchasable } from '@/lib/billing/catalog'
 import { getPlanEntitlements } from '@/lib/plan-limits'
+import { showVoucherCard } from '@/lib/billing/voucher'
 import type { LedgerKind } from '@/lib/billing/account-summary'
 import { refetchBillingAccount, useBillingAccount } from '@/lib/billing/use-billing-account'
 import { cn } from '@/lib/utils'
@@ -213,6 +215,9 @@ export default function AccountPage() {
             </div>
           </div>
         </Card>
+
+        {/* 받은 코드로 요금제 시작(2026-10-27 오너 바우처) — 무료 요금제 계정에만. */}
+        {data && showVoucherCard({ plan, unlimited: data.unlimited }) && <VoucherCard />}
 
         <Card title={t('Takes')}>
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
