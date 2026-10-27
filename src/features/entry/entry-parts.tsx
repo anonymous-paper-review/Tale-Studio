@@ -121,11 +121,12 @@ export function OptionGroup({
                 o.disabled && 'cursor-not-allowed opacity-50 hover:border-border hover:bg-background',
               )}
             >
+              {/* 이름은 낱말 단위로만 줄을 바꾼다(좁은 칸에서 옆 칸 밑으로 잘리던 nowrap 대신) — 추천 표시는 자리가 모자라면 다음 줄로(2026-10-27 오너). */}
               <span className="flex w-full flex-wrap items-center justify-between gap-x-2 gap-y-1">
-                <span className={cn('whitespace-nowrap font-medium', o.mono && 'font-mono tabular-nums')}>{o.label}</span>
+                <span className={cn('break-keep text-pretty font-medium', o.mono && 'font-mono tabular-nums')}>{o.label}</span>
                 {o.value === recommended ? <RecommendedBadge label={recommendedLabel} /> : null}
               </span>
-              {o.sub ? <span className="text-xs text-muted-foreground">{o.sub}</span> : null}
+              {o.sub ? <span className="break-keep text-pretty text-xs text-muted-foreground">{o.sub}</span> : null}
             </button>
           )
         })}

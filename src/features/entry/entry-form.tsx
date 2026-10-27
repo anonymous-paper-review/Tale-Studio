@@ -174,6 +174,7 @@ function SettingsStep() {
   const level = levels.find((l) => l.key === picks.level) ?? null
   const keepOpen = levelAvailable('keep', draft.idea, draft.file)
   const complete = picksComplete(picks) && (picks.level !== 'keep' || keepOpen)
+  const lengthFollowsOriginal = picks.level === 'keep'
   const starting = writing.status === 'starting' || writing.status === 'writing'
 
   return (
@@ -199,16 +200,29 @@ function SettingsStep() {
         </div>
 
         <div className="flex flex-col gap-2">
+          {/* 원작 그대로면 길이는 원작이 정한다 — 길이 단추를 끄고 그 까닭을 보인다(2026-10-27 오너). */}
           <OptionGroup
             label={t('Length')}
-            options={RUNTIMES.map((r) => ({ value: r.key, label: t(r.label), sub: t(r.sub) }))}
-            value={picks.runtime}
-            recommended={rec?.runtime}
+            options={RUNTIMES.map((r) => ({
+              value: r.key,
+              label: t(r.label),
+              sub: t(r.sub),
+              disabled: lengthFollowsOriginal,
+              disabledReason: t('When the original is kept as is, the length follows the original.'),
+            }))}
+            value={lengthFollowsOriginal ? null : picks.runtime}
+            recommended={lengthFollowsOriginal ? null : rec?.runtime}
             onChange={(v) => void formPick('runtime', v)}
             className="grid-cols-2 sm:grid-cols-4"
           />
-          <WhyLine text={rec?.runtimeWhy} />
-          {picks.level === 'keep' ? <p className="text-xs text-muted-foreground">{t('When the original is kept as is, the length follows the original.')}</p> : null}
+          {lengthFollowsOriginal ? (
+            <p className="flex items-center gap-1.5 text-xs text-foreground" data-testid="entry-length-follows-original">
+              <Lock className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              {t('When the original is kept as is, the length follows the original.')}
+            </p>
+          ) : (
+            <WhyLine text={rec?.runtimeWhy} />
+          )}
         </div>
 
         <div className="flex flex-col gap-3">
@@ -382,18 +396,21 @@ function LevelOptions({ options, value, recommended, onChange }: { options: Leve
               o.disabled && 'cursor-not-allowed opacity-50 hover:border-border hover:bg-background',
             )}
           >
-            <span className="flex w-full items-center gap-2">
-              <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full border border-border font-mono text-xs tabular-nums text-muted-foreground" aria-hidden>
-                {o.n}
+            {/* 번호 · 이름은 한 덩어리, 추천 표시는 자리가 모자라면 다음 줄로 — 한 줄에 묶여 이름이 한 낱말씩 꺾이던 것(2026-10-27 오너). */}
+            <span className="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="inline-flex size-5 shrink-0 items-center justify-center rounded-full border border-border font-mono text-xs tabular-nums text-muted-foreground" aria-hidden>
+                  {o.n}
+                </span>
+                <span className="break-keep text-pretty font-medium">{o.label}</span>
               </span>
-              <span className="font-medium">{o.label}</span>
               {o.value === recommended ? (
                 <span className="ml-auto">
                   <RecommendedBadge />
                 </span>
               ) : null}
             </span>
-            <span className="text-xs text-muted-foreground">{o.sub}</span>
+            <span className="break-keep text-pretty text-xs text-muted-foreground">{o.sub}</span>
           </button>
         )
       })}

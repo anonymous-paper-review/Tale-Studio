@@ -33,7 +33,7 @@ export function summaryRows(
   const rows: SummaryRow[] = []
   if (ratio) rows.push({ key: 'ratio', label: t(QUESTION_NAME.ratio), value: mode === 'confirm' ? `${ratio} · ${t(RATIO_LOCK_NOTE)}` : ratio, locked: true })
   if (mood) rows.push({ key: 'mood', label: t(QUESTION_NAME.mood), value: t(moodOf(mood).label) })
-  if (runtime) rows.push({ key: 'runtime', label: t(QUESTION_NAME.runtime), value: level === 'keep' ? t('As long as the original') : t(runtimeOf(runtime).label) })
+  if (runtime || level === 'keep') rows.push({ key: 'runtime', label: t(QUESTION_NAME.runtime), value: level === 'keep' || !runtime ? t('As long as the original') : t(runtimeOf(runtime).label) })
   if (level) {
     const options = levelOptionsOf(draft)
     const index = Math.max(0, options.findIndex((o) => o.key === level))

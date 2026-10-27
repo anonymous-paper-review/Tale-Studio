@@ -119,14 +119,14 @@ export function planEntryStart({ projectId, draft, locale, currentTitle, series 
   if (ideaLength(draft.idea) < MIN_IDEA_CHARS && !fileHasText(draft.file)) return { ok: false, code: 'too_short' }
   if (!picksComplete(draft.picks)) return { ok: false, code: 'missing_picks' }
   const { mood, runtime, level, ratio } = draft.picks
-  if (!mood || !runtime || !level || !ratio) return { ok: false, code: 'missing_picks' }
+  if (!mood || !level || !ratio || (!runtime && level !== 'keep')) return { ok: false, code: 'missing_picks' }
   if (level === 'keep' && !hasOriginalText(draft.idea, draft.file)) return { ok: false, code: 'keep_needs_original' }
 
   const keep = level === 'keep'
   // 그대로(대본 보존)는 대본 파일이 있으면 파일 글만 원문으로 지킨다 — 아이디어 칸의 설명이 대본에 섞이지 않게(2026-10-19).
   const story = keep && fileHasText(draft.file) ? (draft.file!.text ?? '').trim() : entryStory(draft)
   // 그대로 영상화는 원작 길이가 영상 길이다 — 길이를 정하지 않는다(2026-10-09 오너 "영상 길이 제한을 없애줘").
-  const playtime = keep ? 0 : runtimeSeconds(runtime)
+  const playtime = keep || !runtime ? 0 : runtimeSeconds(runtime)
   const format = formatFromRatio(ratio)
   const genre = translate(locale, moodOf(mood).label)
   // 대사 언어는 앞 화를 따른다 — 언어가 바뀌면 이어받은 말투를 쓸 수 없다(2026-10-26 오너 확정).

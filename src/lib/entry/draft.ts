@@ -226,7 +226,8 @@ export function recIsCurrent(draft: EntryDraft): boolean {
 }
 
 export function picksComplete(picks: EntryPicks): boolean {
-  return PICK_KEYS.every((k) => picks[k] !== null)
+  // 원작 그대로면 길이는 원작이 정한다 — 길이는 고르지 않아도 된다(2026-10-27 오너: 그대로면 길이 단추를 끈다).
+  return PICK_KEYS.every((k) => picks[k] !== null || (k === 'runtime' && picks.level === 'keep'))
 }
 
 export { fileHasText }
