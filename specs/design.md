@@ -82,12 +82,12 @@ source-of-truth는 `src/app/globals.css`. 본 섹션은 *역할*만 enumerate �
 
 ### 2.2 Chart 토큰 (노드 색)
 
-엔티티 노드 식별색. 현재 노드 surface는 **Director Canvas만** (L0 artist 노드 그래프는 2026-06-04 폐기 — chart-1/2는 예약 상태).
+엔티티 노드 식별색. 현재 노드 surface는 **Director Canvas만** (L0 artist 노드 그래프는 2026-06-04 폐기). chart-1/2 는 같은 엔티티(인물 · 장소) 표시에만 쓴다.
 
 | 토큰 | 사용처 |
 |---|---|
-| `--chart-1` (red) | 예약 — 옛 Actor 노드(L0, 폐기). 신규 용도 배정 시 본 표 갱신 |
-| `--chart-2` (blue) | 예약 — 옛 World 노드(L0, 폐기) |
+| `--chart-1` (red) | **인물** 표시 — Artist 산문 재점검의 산문 속 인물 이름 · 범례 칩(`/15` 바탕 + `/40` 테두리, 2026-10-27). 옛 Actor 노드(L0, 폐기) 자리 |
+| `--chart-2` (blue) | **장소** 표시 — Artist 산문 재점검의 산문 속 장소 이름 · 범례 칩(같은 알파, 2026-10-27). 옛 World 노드(L0, 폐기) 자리 |
 | `--chart-3` | **Scene** 노드 (Director) |
 | `--chart-4` | **Shot** 노드 (Director) |
 | `--chart-5` | **Video** 노드 (Director) |

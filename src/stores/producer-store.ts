@@ -14,6 +14,7 @@ import { computeProducerSourceHash } from '@/lib/lifecycle'
 import { createPendingProposal } from '@/lib/pending-proposal'
 import { evaluateProducerGate } from '@/lib/producer-gate'
 import { cardsForHandoff, syncTreatmentCast, type TreatmentCast } from '@/lib/producer/treatment-cast-sync'
+import type { RecheckOp } from '@/lib/artist/recheck'
 
 // 트리트먼트를 쓴 바탕 이름(넘길 때 낡았다는 안내) — 영어 원문 = 사전 키.
 const DRAFT_BASIS_LABEL: Record<string, string> = { story: 'the story', runtime: 'the runtime', preserveScript: 'the keep-as-written choice' }
@@ -270,6 +271,11 @@ interface ProducerState {
   /** Artist 브레이크다운 레퍼런스(2026-10-27 오너) — 줄의 카드에 올린 그림을 붙인다(null 이면 뗀다). 넘길 때 그대로 그 카드의 그림이 된다.
    *  글을 고친 것이 아니라 userEdited 는 그대로 둔다. 목록을 고칠 수 없으면(만들기 뒤 · 데모) false. */
   setBreakdownImage: (kind: 'person' | 'background', localId: string, url: string | null) => boolean
+  /** 산문 재점검(2026-10-27 오너)으로 새로 들어온 줄(localId) — 이 화면을 보는 동안만 "새로"로 보인다. 초안에는 저장하지 않는다. */
+  recheckNewIds: string[]
+  /** 산문 재점검 반영(2026-10-27 오너 · 프로토타입 WT [목록에 반영]) — 고치던 설명을 먼저 저장하고, 서버가 Writer 실행 기록과
+   *  이 목록을 함께 고친 결과로 목록을 바꾼다. 받지 않으면 목록은 그대로이고 까닭(화면 언어)을 돌려준다. */
+  applyRecheck: (ops: RecheckOp[]) => Promise<{ ok: true } | { ok: false; error: string }>
   /** artistGate(리뉴얼 1차): Artist [만들기] — 확정 산문 초안을 이어 가며 Artist 화면에 머문다. 2026-10-20부터 디자인 뒤에도 멈추지 않고
    *  씬 · 샷까지 이어 만든다(서버에 멈춤 표시를 보내지 않는다 — 오너 "Artist 만들면서 씬 · 샷 · Storyboard 도 같이"). */
   saveAndHandoff: (options?: { rerun?: boolean; artistGate?: boolean }) => Promise<boolean>
@@ -705,6 +711,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   error: null,
   lastHandoffGated: false,
   treatmentSyncedVersion: null,
+  recheckNewIds: [],
 
   syncTreatmentCast: (treatment, version) => {
     if (isDemoSession() || producerLocked()) return
@@ -1113,6 +1120,54 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     return true
   },
 
+  applyRecheck: async (ops) => {
+    // 실패 까닭은 화면(크롬) 문구 → UI 언어.
+    const fail = (text: string) => ({ ok: false as const, error: translate(useLocaleStore.getState().locale, text) })
+    const projectId = useProjectStore.getState().projectId
+    // 산문 초안인지 아직 모르면(새로 고침 직후) 목록 저장이 잠겨 있다 — 고치던 설명을 먼저 저장하지 못한 채 보내면 그 설명이 사라진다.
+    if (!projectId || isDemoSession() || castLocked()) return fail('The list is not ready yet. Try again in a moment.')
+    if (ops.length === 0) return { ok: true }
+    const actionKey = `producer:recheck:${projectId}`
+    if (!claimAction(actionKey)) return fail('Could not update the list. Please try again.')
+    try {
+      // 서버는 저장된 목록에 얹는다 — 늦게 도착한 자동저장이 재점검 결과를 덮지 않게 지금 목록을 먼저 저장한다.
+      if (!(await get().saveDraftNow())) {
+        releaseAction(actionKey)
+        return fail('Could not update the list. Please try again.')
+      }
+      const response = await fetch('/api/writer/breakdown-recheck', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ projectId, ops }),
+      })
+      const body = (await response.json().catch(() => null)) as { cast?: unknown; backgrounds?: unknown; newIds?: unknown; code?: unknown } | null
+      if (useProjectStore.getState().projectId !== projectId) return fail('Could not update the list. Please try again.')
+      if (!response.ok || !body || !Array.isArray(body.cast) || !Array.isArray(body.backgrounds)) {
+        releaseAction(actionKey)
+        // 다른 창에서 먼저 반영했으면 저장된 목록을 다시 읽는다 — 다시 연 창이 옛 목록에서 시작하지 않게.
+        if (body?.code === 'list_changed') await get().loadProject()
+        return fail(
+          body?.code === 'list_changed'
+            ? 'The list changed in the meantime. Open the re-check again.'
+            : body?.code === 'breakdown_closed'
+              ? 'Making the images has already started, so the list cannot be changed here.'
+              : 'Could not update the list. Please try again.',
+        )
+      }
+      const newIds = Array.isArray(body.newIds) ? body.newIds.filter((id): id is string => typeof id === 'string') : []
+      set((state) => ({
+        cast: body.cast as CastMember[],
+        backgrounds: body.backgrounds as BackgroundSource[],
+        recheckNewIds: [...new Set([...state.recheckNewIds, ...newIds])],
+      }))
+      return { ok: true }
+    } catch (err) {
+      console.error('[producer-store] applyRecheck failed:', err)
+      releaseAction(actionKey)
+      return fail('Could not update the list. Please try again.')
+    }
+  },
+
   saveAndHandoff: async (options) => {
     if (isDemoSession()) return false
     const { storyText, projectSettings, cast, backgrounds } = get()
@@ -1437,6 +1492,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
       error: null,
       lastHandoffGated: false,
       treatmentSyncedVersion: null,
+      recheckNewIds: [],
     })
   },
 }))
