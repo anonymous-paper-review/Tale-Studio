@@ -239,18 +239,19 @@ export function earlierVersions<T extends VersionSummary>(versions: readonly T[]
 /**
  * 머리 줄 — 지금 버전 번호 · 기록 수 · 두 단추 · 까닭. 기록이 없으면 지금 그림이 v1 이다.
  *   stopped = 재생성 그림이 다 그려지기 전에 멈췄다 — [불러오기]로 이전 버전에 돌아갈 수 있고(남은 재생성은 그만둔다),
- *   [재생성하기]는 남은 그림을 그리거나 돌아간 뒤에 한다(2026-10-28 검토 지적).
+ *   [재생성하기]는 남은 그림을 그리거나 돌아간 뒤에 한다(2026-10-28 검토 지적). loading = 버전을 불러오는 중.
  */
-export function versionHeader(input: { versions: readonly VersionSummary[]; completed: boolean; drawing: boolean; demo?: boolean; stopped?: boolean }): {
+export function versionHeader(input: { versions: readonly VersionSummary[]; completed: boolean; drawing: boolean; demo?: boolean; stopped?: boolean; loading?: boolean }): {
   n: number
   count: number
   canLoad: boolean
   canRegenerate: boolean
-  note: 'completed' | 'drawing' | 'stopped' | 'single' | null
+  note: 'completed' | 'loading' | 'drawing' | 'stopped' | 'single' | null
 } {
   const count = Math.max(1, input.versions.length)
   const n = input.versions.find((version) => version.current)?.n ?? (input.versions.length ? Math.max(...input.versions.map((version) => version.n)) : 1)
   if (input.completed) return { n, count, canLoad: false, canRegenerate: false, note: 'completed' }
+  if (input.loading) return { n, count, canLoad: false, canRegenerate: false, note: 'loading' }
   if (input.drawing) return { n, count, canLoad: false, canRegenerate: false, note: 'drawing' }
   if (input.demo) return { n, count, canLoad: false, canRegenerate: false, note: null }
   if (input.stopped) return { n, count, canLoad: count > 1, canRegenerate: false, note: 'stopped' }

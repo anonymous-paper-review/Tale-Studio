@@ -50,6 +50,12 @@ describe('머리 줄 — 작품 스타일 · 버전 · 두 단추', () => {
     const versions = [v(1, 'real', [{ from: null, to: T1 }]), v(2, 'watercolor', [{ from: T1, to: null }], true)]
     expect(versionHeader({ versions, completed: false, drawing: true })).toEqual({ n: 2, count: 2, canLoad: false, canRegenerate: false, note: 'drawing' })
   })
+
+  it('버전을 불러오는 동안에는 [불러오기] · [재생성하기]가 꺼지고 "그리는 중"이 아니라 불러오는 중이라고 보인다', () => {
+    // 왜: 멈춘 재생성에서 [이전 버전으로 돌아가기]를 누르면 머리 줄이 "그림을 그리는 중이에요"로 바뀌어 아직 그리는 줄 알았다(2026-10-28 개발 DB e2e).
+    const versions = [v(1, 'real', [{ from: null, to: T1 }]), v(2, 'watercolor', [{ from: T1, to: null }], true)]
+    expect(versionHeader({ versions, completed: false, drawing: false, loading: true, stopped: true })).toEqual({ n: 2, count: 2, canLoad: false, canRegenerate: false, note: 'loading' })
+  })
 })
 
 describe('재생성 창 — 어떤 스타일로 다시 만들까요?', () => {

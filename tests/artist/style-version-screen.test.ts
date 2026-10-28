@@ -169,6 +169,18 @@ describe('머리 줄 그려 보기', () => {
     expect(tagOf(actions, 'artist-regen-go-back')).not.toBe('')
   })
 
+  it('버전을 불러오는 동안 머리 줄은 "버전을 불러오는 중이에요."를 보이고 두 단추를 끈다', () => {
+    // 왜: 불러오는 동안 "그림을 그리는 중이에요"가 보여 아직 그리는 줄 알았다(2026-10-28 개발 DB e2e).
+    screenState({ versions: [versionView(1, 'real', false), versionView(2, 'watercolor', true)], stopped: true })
+    useArtistVersionStore.setState({ busy: 'load' })
+    serveCurrent(useArtistVersionStore)
+    const out = html(createElement(StyleVersionBar, { completed: false, drawing: false }))
+    expect(out).toContain('버전을 불러오는 중이에요.')
+    expect(out).not.toContain('그림을 그리는 중이에요')
+    expect(isDisabled(out, 'artist-version-history-open')).toBe(true)
+    expect(isDisabled(out, 'artist-regen-open')).toBe(true)
+  })
+
   it('재생성 그림을 그리는 중에는 돌아가기 단추를 보이지 않는다', () => {
     // 왜: 그리는 중에 돌아가면 늦게 온 그림이 불러온 버전에 들어간다 — 멈췄을 때만 보인다.
     screenState({ versions: [versionView(1, 'real', false), versionView(2, 'watercolor', true)] })

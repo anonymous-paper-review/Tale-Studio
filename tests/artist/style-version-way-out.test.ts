@@ -104,6 +104,27 @@ describe('멈춘 재생성에서 돌아가기', () => {
     expect(artistMessages()).toContain('v1(실사)를 불러왔어요. 작품 스타일도 실사로 바뀌었어요.')
   })
 
+  it('[이전 버전으로 돌아가기]를 누른 뒤 불러오기가 끝날 때까지는 멈춘 상태를 두어, 잠금 화면이 "그림을 만들고 있어요"로 다시 열리지 않는다', async () => {
+    // 왜: 불러오기 답을 받자마자 멈춤을 풀었더니 기록을 다시 읽기 전 잠깐 잠금 화면이 "그림을 만들고 있어요 · 수채 · v5"로 다시 떴다(2026-10-28 개발 DB e2e).
+    const server = fakeServer()
+    useArtistStore.setState({ loadData: vi.fn(async () => {}) } as never)
+    await useArtistVersionStore.getState().refresh()
+    useArtistVersionStore.setState({ run: { running: false, stopped: true, userWaitSince: null }, overlayDismissedFor: 3 })
+    const seen: Array<{ url: string; stopped: boolean; dismissed: number | null }> = []
+    const inner = globalThis.fetch as unknown as (input: string, init?: RequestInit) => Promise<Response>
+    vi.stubGlobal('fetch', vi.fn(async (input: string, init?: RequestInit) => {
+      const state = useArtistVersionStore.getState()
+      seen.push({ url: String(input), stopped: state.run.stopped, dismissed: state.overlayDismissedFor })
+      return inner(input, init)
+    }))
+    expect(await useArtistVersionStore.getState().goBackToPrevious()).toBe(true)
+    const reread = seen.filter((call) => call.url.startsWith('/api/artist/versions?'))
+    expect(reread.length).toBeGreaterThan(0)
+    for (const call of reread) expect(call).toMatchObject({ stopped: true, dismissed: 3 })
+    expect(useArtistVersionStore.getState().run.stopped).toBe(false)
+    expect(server.current).toBe(1)
+  })
+
   it('재생성 그림이 멈췄을 때 생성 기록에서 불러오면 남은 재생성을 그만두고 불러오고, 그리는 중에는 그만두지 않는다', async () => {
     // 왜: [불러오기]가 멈춘 재생성을 빠져나가는 다른 길이다. 그리는 중에 그만두면 늦게 온 그림이 불러온 버전에 들어간다.
     const server = fakeServer()

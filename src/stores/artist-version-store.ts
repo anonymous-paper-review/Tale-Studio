@@ -322,12 +322,13 @@ export const useArtistVersionStore = create<ArtistVersionState>((set, get) => {
           }
           return false
         }
-        if (cancelRegen) set({ run: { ...IDLE_RUN }, overlayDismissedFor: null })
         const styleKey = typeof body.styleKey === 'string' ? body.styleKey : null
         const customStyle = (body.customStyle ?? null) as VersionCustomStyle | null
         applyStyle(styleKey, customStyle)
         await useArtistStore.getState().loadData()
         await get().refresh()
+        // 멈춤은 기록을 다시 읽은 뒤에 푼다 — 먼저 풀면 그 사이 잠금 화면이 "그림을 만들고 있어요"로 다시 떴다(2026-10-28 개발 DB e2e).
+        if (cancelRegen) set({ run: { ...IDLE_RUN } })
         set({ historyDialogOpen: false, regenDialogOpen: false })
         useGlobalChatStore.getState().notifyIssue('artist', versionLoadedMessage(contentLocale(), { n, style: styleLabelOf({ styleKey, customStyle }) }))
         return true

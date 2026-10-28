@@ -2861,4 +2861,5 @@ export const KO: Record<string, string> = {
   'Go back to the previous version': '이전 버전으로 돌아가기',
   'You can complete once the regenerated images are drawn.': '다시 만드는 그림을 다 그린 뒤에 완료할 수 있어요.',
   'Loading the version. Try again in a moment.': '버전을 불러오는 중이에요. 잠시 뒤 다시 해 보세요.',
+  'Loading the version.': '버전을 불러오는 중이에요.',
 }

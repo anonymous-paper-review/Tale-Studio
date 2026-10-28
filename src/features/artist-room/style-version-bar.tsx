@@ -17,6 +17,7 @@ import { useProducerStore } from '@/stores/producer-store'
 const NOTE_TEXT = {
   completed: 'The style cannot be changed after Storyboard opens.',
   drawing: 'Drawing the images. You can change the style once they are done.',
+  loading: 'Loading the version.',
   stopped: 'Some images were not drawn. Draw the rest again, or go back to the previous version.',
   single: 'Regenerating keeps the earlier version here',
 } as const
@@ -31,7 +32,7 @@ export function StyleVersionBar({ completed, drawing }: { completed: boolean; dr
   const anchors = useProducerStore((s) => s.styleAnchors)
   const styleKey = useProducerStore((s) => s.styleAnchorKey)
   const custom = useProducerStore((s) => s.customStyleAnchor)
-  const header = versionHeader({ versions, completed, drawing: drawing || busy !== null, demo: isDemoSession(), stopped })
+  const header = versionHeader({ versions, completed, drawing: drawing || busy === 'regenerate', loading: busy === 'load', demo: isDemoSession(), stopped })
   const label = versionStyleLabel({ styleKey, customStyle: custom }, anchors, locale)
   const swatch = custom?.url ?? anchors.find((anchor) => anchor.key === styleKey)?.previewUrl ?? null
   const note = header.note ? t(NOTE_TEXT[header.note]) : null
