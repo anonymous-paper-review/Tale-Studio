@@ -52,6 +52,10 @@ import { sceneGatePhase } from '@/lib/writer/scene-gate'
 import { REWRITE_LEVELS, rewriteLevelOf, type RewriteLevel } from '@/lib/producer/scene-story-rewrite'
 import type { ProseConditions } from '@/lib/writer/prose-conditions'
 import { writerChatIntent } from '@/lib/prose/writer-chat'
+import { styleReturnCard, styleReturnRequest, versionStyleLabel } from '@/lib/artist/style-versions'
+import { styleAnchorName } from '@/lib/style-anchor-name'
+import { stageIndex } from '@/lib/stage-gate'
+import { useArtistVersionStore } from '@/stores/artist-version-store'
 import { useWriterRoomStore } from '@/stores/writer-room-store'
 import { restartWriterStatus } from '@/lib/writer/use-writer-status'
 import { completeKoreanDialogue, dialogueHandoffTarget } from '@/lib/writer/dialogue-handoff'
@@ -132,6 +136,8 @@ export interface ChatSuggestion {
     | { kind: 'choices'; options: Array<{ label: string; utterance: string }>; answeringProducerQuestion?: true }
     // 리뉴얼 1차 Writer — 적용 · 저장 뒤 "다음 단계로 넘어갈까요?"(ask) / "무엇을 더 해 볼까요?"(more) 카드(프로토타입 WP · WN).
     | { kind: 'writerNext'; step: 'ask' | 'more' }
+    // 작품 스타일 기록(2026-10-28, 프로토타입 AY) — "이전 스타일로 돌아갈까요?": 버전마다 [v{n} · 스타일 불러오기], 없으면 [재생성하기].
+    | { kind: 'artistVersions'; options: Array<{ n: number; label: string }>; regenerate: boolean }
     | null
   /** 새로고침으로 복원한 선택지는 표시 전용이며 action을 복원하지 않는다. */
   restoredChoices?: { options: string[] }
@@ -307,6 +313,51 @@ function loadConversationState(projectId: string): Partial<SavedConversationStat
     if (!value || !Array.isArray(value.deferredProposals) || !Array.isArray(value.deferredSuggestions)) return {}
     return value
   } catch { return {} }
+}
+
+/** 채팅이 알아듣는 스타일 이름 — 카탈로그의 한국어 · 영어 이름과 직접 올린 그림체 이름("실사로 돌아가고 싶어"). */
+function artistStyleNames(): string[] {
+  const producer = useProducerStore.getState()
+  return [
+    ...producer.styleAnchors.flatMap((anchor) => [anchor.label, styleAnchorName(anchor, 'en')]),
+    ...(producer.customStyleAnchor?.label ? [producer.customStyleAnchor.label] : []),
+  ]
+}
+
+/** "이전 스타일로 돌아갈까요?" 카드(프로토타입 AY) — 버전 기록을 새로 읽고, 이전 버전마다 불러오기(없으면 재생성하기). */
+async function offerStyleReturn(get: () => GlobalChatState, projectId: string, said: string): Promise<void> {
+  const locale = contentLocale()
+  // 사람의 말은 바로 남긴다 — 기록을 다시 읽는 동안 말이 사라진 것처럼 보이지 않게.
+  useGlobalChatStore.setState((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'artist', role: 'user', content: said }] }))
+  saveChatMessage(projectId, 'artist', 'user', said)
+  const versionStore = useArtistVersionStore.getState()
+  const fresh = await versionStore.refresh()
+  if (useProjectStore.getState().projectId !== projectId) return
+  const versions = fresh?.versions ?? (versionStore.projectId === projectId ? versionStore.versions : [])
+  const completed = fresh?.completed === true || stageIndex(useProjectStore.getState().reachedStage) >= stageIndex('writer')
+  const card = styleReturnCard({ versions, completed })
+  if (card.kind === 'completed') {
+    get().notifyIssue('artist', translate(locale, 'The style cannot be changed after Storyboard opens.'))
+    return
+  }
+  const anchors = useProducerStore.getState().styleAnchors
+  const options = card.kind === 'versions'
+    ? card.versions.map((summary) => {
+        const version = versions.find((item) => item.n === summary.n)
+        const style = version ? versionStyleLabel(version, anchors, locale) : ''
+        return { n: summary.n, label: translate(locale, 'Load v{n} · {style}', { n: summary.n, style }) }
+      })
+    : []
+  const body = card.kind === 'versions'
+    ? translate(locale, 'You can load an earlier version instead of remaking it. Loading it also switches the work style to that version.')
+    : translate(locale, 'There is no earlier version yet. To make it in another style, regenerate it.')
+  get().offerSuggestion({
+    id: `artist-versions:${projectId}:${makeId()}`,
+    stage: 'artist',
+    content: `${translate(locale, 'Shall we go back to an earlier style?')}\n${body}`,
+    dismissible: true,
+    action: { kind: 'artistVersions', options, regenerate: card.kind === 'none' },
+  }, { preempt: true })
 }
 
 function makeId(): string {
@@ -2159,6 +2210,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         ],
       }))
       if (projectId) saveChatMessage(projectId, stage, 'model', content)
+      return
+    }
+
+    // 작품 스타일 기록(2026-10-28 오너, 프로토타입 AY): Artist 에서 이전 스타일 · 버전으로 돌아가자는 말은 모델에 보내지 않는다 —
+    //   모델은 새로 그리자고 제안해 비용이 든다. 다시 그리지 않고 불러오는 카드("이전 스타일로 돌아갈까요?")로 답하고,
+    //   Storyboard 를 연 뒤에는 바꿀 수 없다는 까닭만 말한다(머리 줄 단추와 같은 까닭).
+    if (stage === 'artist' && projectId && !opts?.silentUser && styleReturnRequest(trimmed, artistStyleNames())) {
+      await offerStyleReturn(get, projectId, trimmed)
       return
     }
 

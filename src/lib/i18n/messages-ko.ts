@@ -2630,7 +2630,8 @@ export const KO: Record<string, string> = {
   'Starting to draw': '그림 그리기 시작',
   'The art style is fixed to the picture you uploaded.': '올린 그림의 그림체로 고정돼 있어서 바꿀 수 없어요.',
   'The list is right · make the images': '목록이 맞아요 · 그림 만들기',
-  'This work has one style. Every character and background image is made in the style you pick.': '이 작품의 스타일은 하나예요. 고른 스타일로 인물 · 배경 그림을 모두 만들어요.',
+  'This work has one style. Every character and background image is made in the style you pick. Later you can pick another style with Regenerate, and the earlier version stays in the history.':
+    '이 작품의 스타일은 하나예요. 고른 스타일로 인물 · 배경 그림을 모두 만들어요. 나중에 [재생성하기]로 다른 스타일을 다시 고를 수 있고, 이전 버전은 기록에 남아요.',
   'Unnamed': '이름 없음',
   'What gets made': '만드는 것',
   'Which style should we make it in?': '어떤 스타일로 만들까요?',
@@ -2815,9 +2816,42 @@ export const KO: Record<string, string> = {
   'Used as is {count}': '그대로 써요 {count}',
   'Redrawn in this style {count}': '이 그림체로 다시 그려요 {count}',
   'Kept {count}': '보관 {count}',
-  // 작품 스타일 기록(2026-10-28 오너) — 채팅 알림 · 스타일 이름
+  // 작품 스타일 기록(2026-10-28 오너, 프로토타입 A5 · A6 · AV · AY · A7)
+  'Work style · v{n}': '작품 스타일 · v{n}',
+  'Load · history {count}': '불러오기 · 기록 {count}',
+  'Regenerate everything': '재생성하기',
+  'Regenerating keeps the earlier version here': '재생성하면 이전 버전이 여기 남아요',
+  'The style cannot be changed after Storyboard opens.': 'Storyboard를 연 뒤에는 스타일을 바꿀 수 없어요.',
+  'Drawing the images. You can change the style once they are done.': '그림을 그리는 중이에요. 다 그린 뒤에 스타일을 바꿀 수 있어요.',
+  'Which style should we remake it in?': '어떤 스타일로 다시 만들까요?',
+  'You can remake it in the same style or pick another one. The current version (v{n} · {style}) stays in the history, so you can load it any time.':
+    '같은 스타일로 다시 만들어도 되고, 다른 스타일을 골라도 돼요. 지금 버전(v{n} · {style})은 기록에 남아서 언제든 불러올 수 있어요.',
+  '✦ v{n} was made in {style}. You can load it instead of remaking it.': '✦ v{n}에 {style}로 만든 게 있어요. 다시 만들지 않고 불러올 수 있어요',
+  'Load v{n}': 'v{n} 불러오기', // copy-ok: 버전 표기 v{n}(프로토타입 A5 · AV 그대로 소문자)
+  'What gets remade': '다시 만드는 것',
+  'Characters {persons} · backgrounds {places}, all of them': '인물 {persons} · 배경 {places} 전체',
+  '{style} (unchanged)': '{style} (그대로)',
+  '{style} · the work style changes to this': '{style} · 작품 스타일이 이걸로 바뀌어요',
+  'To remake it in another style, press ✕ on my art style. It stays in the current version in the history.': '다른 스타일로 다시 만들려면 내 그림체의 ✕를 눌러 주세요. 지금 버전 기록에는 그대로 남아요.',
+  'Generation history': '생성 기록',
+  'Load a version you liked. The work has one style, so loading a version also switches the style to that version.':
+    '마음에 들었던 버전을 불러오세요. 스타일은 작품에 하나라서, 불러오면 스타일도 그 버전으로 바뀌어요.',
+  'It is in another style, so it cannot be loaded': '다른 스타일이라 불러올 수 없어요',
+  'v{n} · {style} · another style': 'v{n} · {style} · 다른 스타일', // copy-ok: 버전 표기 v{n}(프로토타입 A5 · AV 그대로 소문자)
+  'Only the same style ({style}) can be loaded': '같은 스타일({style})만 불러올 수 있어요',
   'Made v{n} in {style}. The earlier version is in [Load].': '{style}{ro} v{n}{ul} 만들었어요. 이전 버전은 [불러오기]에 있어요.',
   '{count} could not be drawn. Remake them from the cards.': '{count}장은 그리지 못했어요. 카드에서 다시 만들어 주세요.',
   'Loaded v{n} ({style}). The work style changed to {style} too.': 'v{n}({style}){ul} 불러왔어요. 작품 스타일도 {style}{ro} 바뀌었어요.', // copy-ok: 버전 표기 v{n}(프로토타입 A5 · AV 그대로 소문자)
+  'Shall we go back to an earlier style?': '이전 스타일로 돌아갈까요?',
+  'You can load an earlier version instead of remaking it. Loading it also switches the work style to that version.': '다시 만들지 않고 이전 버전을 불러올 수 있어요. 불러오면 작품 스타일도 그 버전으로 바뀌어요.',
+  'There is no earlier version yet. To make it in another style, regenerate it.': '아직 이전 버전이 없어요. 다른 스타일로 만들려면 재생성해 주세요.',
+  'Load v{n} · {style}': 'v{n} · {style} 불러오기', // copy-ok: 버전 표기 v{n}(프로토타입 A5 · AV 그대로 소문자)
   'No style': '스타일 없음',
+  '{style} · v{n}': '{style} · v{n}',
+  'Could not start the regeneration. Please try again.': '재생성을 시작하지 못했어요. 다시 시도해 주세요.',
+  'Could not load the version. Please try again.': '버전을 불러오지 못했어요. 다시 시도해 주세요.',
+  'Wait until the images are drawn, then try again.': '그림을 다 그린 뒤에 다시 눌러 주세요.',
+  'Another window changed the version first. Check the history and try again.': '다른 창에서 먼저 버전을 바꿨어요. 기록을 확인하고 다시 해 주세요.',
+  'There are no characters or backgrounds to remake yet.': '아직 다시 만들 인물 · 배경이 없어요.',
+  'Pick a style that is available.': '쓸 수 있는 스타일을 골라 주세요.',
 }

@@ -19,7 +19,7 @@ import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
 import { seriesMakeCounts } from '@/features/series/artist-series'
 import { useSeriesInfo } from '@/features/series/use-series-info'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
-import { useProducerStore } from '@/stores/producer-store'
+import { useProducerStore, type StyleAnchor } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
 
 export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boolean; onOpenChange: (open: boolean) => void; onStarted: () => void }) {
@@ -114,7 +114,7 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
         <DialogContent className="flex max-h-[88vh] flex-col sm:max-w-2xl" showCloseButton={!making} data-testid="artist-style-make">
           <DialogHeader>
             <DialogTitle>{t('Which style should we make it in?')}</DialogTitle>
-            <DialogDescription>{t('This work has one style. Every character and background image is made in the style you pick.')}</DialogDescription>
+            <DialogDescription>{t('This work has one style. Every character and background image is made in the style you pick. Later you can pick another style with Regenerate, and the earlier version stays in the history.')}</DialogDescription>
           </DialogHeader>
           <div className="min-h-0 space-y-4 overflow-y-auto py-1">
             {locked ? (
@@ -131,64 +131,19 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
                 {t('If the style stays the same, the carried-over pictures are used as they are. If you change it, the carried-over characters and backgrounds in this episode are redrawn in this style.')}
               </p>
             ) : null}
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4" role="radiogroup" aria-label={t('Style')}>
-              {/* 이미 올린 내 그림체(올리기 카드는 2026-10-27 내림) — 보기 · 지우기만. */}
-              {custom ? (
-                <div className="relative flex">
-                  <div className="flex w-full flex-col overflow-hidden rounded-lg border border-primary ring-1 ring-primary text-left" data-testid="artist-style-custom">
-                    <span className="flex aspect-square items-center justify-center bg-muted/30">
-                      {styleSetting ? <Loader2 className="size-5 animate-spin" aria-hidden /> : <ThumbImage src={custom.url} alt={custom.label} className="size-full object-cover" />}
-                    </span>
-                    <span className="px-2 py-1.5 text-xs">
-                      <span className="line-clamp-1 font-medium">{custom.label}</span>
-                      {prevIsCustom ? <span className="block text-[10px] text-muted-foreground">{t('Previous episode style')}</span> : null}
-                      {styleSetting ? <span className="text-muted-foreground">{t('Reading the art style…')}</span> : null}
-                    </span>
-                  </div>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="outline"
-                    className="absolute right-1.5 top-1.5 size-6 rounded-full bg-background/90"
-                    onClick={() => void removeCustom()}
-                    aria-label={t('Remove my art style')}
-                    title={t('Remove my art style')}
-                    disabled={removing || styleSetting || making} data-testid="artist-style-remove"
-                  >
-                    {removing ? <Loader2 className="size-3 animate-spin" aria-hidden /> : <X className="size-3" aria-hidden />}
-                  </Button>
-                </div>
-              ) : null}
-              {anchors.map((anchor) => {
-                const on = !custom && picked === anchor.key
-                const name = styleAnchorName(anchor, locale)
-                return (
-                  <button
-                    key={anchor.key}
-                    type="button"
-                    role="radio"
-                    aria-checked={on}
-                    disabled={locked || !!custom}
-                    onClick={() => setPicked(anchor.key)}
-                    className={cn(
-                      'relative flex flex-col overflow-hidden rounded-lg border text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-                      on ? 'border-primary ring-1 ring-primary' : 'border-border hover:border-border-strong',
-                    )}
-                    data-testid="artist-style-option"
-                  >
-                    <span className="flex aspect-square items-center justify-center bg-muted">
-                      {anchor.previewUrl ? <ThumbImage src={anchor.previewUrl} alt={name} className="size-full object-cover" /> : <ImageIcon className="size-5 text-muted-foreground opacity-40" aria-hidden />}
-                    </span>
-                    {on ? <span className="absolute right-1.5 top-1.5 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground"><Check className="size-3" /></span> : null}
-                    <span className={cn('line-clamp-1 px-2 text-xs font-medium', prevStyleId === anchor.key ? 'pt-1.5' : 'py-1.5')}>{name}</span>
-                    {/* 시리즈 다음 화: 앞 화 그림체 자리를 알려 그대로 두는 것이 "이어받기"라는 것을 보인다. */}
-                    {prevStyleId === anchor.key ? (
-                      <span className="line-clamp-1 px-2 pb-1.5 text-[10px] text-muted-foreground">{t('Previous episode style')}</span>
-                    ) : null}
-                  </button>
-                )
-              })}
-            </div>
+            <StyleGrid
+              anchors={anchors}
+              picked={picked}
+              onPick={setPicked}
+              custom={custom}
+              locked={locked}
+              styleSetting={styleSetting}
+              removing={removing}
+              busy={making}
+              onRemoveCustom={() => void removeCustom()}
+              prevStyleId={prevStyleId}
+              prevIsCustom={prevIsCustom}
+            />
             <dl className="space-y-2 rounded-lg border border-border px-3 py-2.5 text-sm">
               <div className="flex gap-3" data-testid="artist-make-new"><dt className="w-24 shrink-0 text-muted-foreground">{t('What gets made')}</dt><dd>{makeCounts ? t('New character sheets {persons} · backgrounds {places}', { persons: makeCounts.newPersons, places: makeCounts.newPlaces }) : t('Character sheets {persons} · backgrounds {places}', { persons, places })}</dd></div>
               {asIs > 0 ? (
@@ -211,5 +166,93 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
         </DialogContent>
       </Dialog>
     </>
+  )
+}
+
+/**
+ * 스타일 격자 — 처음 만드는 창(A2)과 재생성 창(A6, regenerate-style-dialog)이 같이 쓴다.
+ *   이미 올린 내 그림체가 있으면 그 카드(보기 · ✕)가 맨 앞이고, 그 그림체를 쓰는 동안 다른 스타일은 고를 수 없다(✕로 내려야 고른다).
+ *   currentKey = 재생성 창의 지금 작품 스타일("지금" 표시, 직접 올린 그림체면 'custom').
+ */
+export function StyleGrid({ anchors, picked, onPick, custom, locked, styleSetting, removing, busy, onRemoveCustom, prevStyleId, prevIsCustom, currentKey = null }: {
+  anchors: readonly StyleAnchor[]
+  picked: string | null
+  onPick: (key: string) => void
+  custom: { url: string; label: string } | null
+  locked: boolean
+  styleSetting: boolean
+  removing: boolean
+  busy: boolean
+  onRemoveCustom: () => void
+  prevStyleId: string | null
+  prevIsCustom: boolean
+  currentKey?: string | null
+}) {
+  const t = useT()
+  const locale = useLocale()
+  return (
+    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4" role="radiogroup" aria-label={t('Style')}>
+      {/* 이미 올린 내 그림체(올리기 카드는 2026-10-27 내림) — 보기 · 지우기만. */}
+      {custom ? (
+        <div className="relative flex">
+          <div className="flex w-full flex-col overflow-hidden rounded-lg border border-primary ring-1 ring-primary text-left" data-testid="artist-style-custom">
+            <span className="flex aspect-square items-center justify-center bg-muted/30">
+              {styleSetting ? <Loader2 className="size-5 animate-spin" aria-hidden /> : <ThumbImage src={custom.url} alt={custom.label} className="size-full object-cover" />}
+            </span>
+            <span className="px-2 py-1.5 text-xs">
+              <span className="line-clamp-1 font-medium">{custom.label}</span>
+              {prevIsCustom ? <span className="block text-[10px] text-muted-foreground">{t('Previous episode style')}</span> : null}
+              {currentKey === 'custom' ? <span className="block text-[10px] text-muted-foreground">{t('Now')}</span> : null}
+              {styleSetting ? <span className="text-muted-foreground">{t('Reading the art style…')}</span> : null}
+            </span>
+          </div>
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
+            className="absolute right-1.5 top-1.5 size-6 rounded-full bg-background/90"
+            onClick={onRemoveCustom}
+            aria-label={t('Remove my art style')}
+            title={t('Remove my art style')}
+            disabled={removing || styleSetting || busy} data-testid="artist-style-remove"
+          >
+            {removing ? <Loader2 className="size-3 animate-spin" aria-hidden /> : <X className="size-3" aria-hidden />}
+          </Button>
+        </div>
+      ) : null}
+      {anchors.map((anchor) => {
+        const on = !custom && picked === anchor.key
+        const name = styleAnchorName(anchor, locale)
+        return (
+          <button
+            key={anchor.key}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            disabled={locked || !!custom}
+            onClick={() => onPick(anchor.key)}
+            className={cn(
+              'relative flex flex-col overflow-hidden rounded-lg border text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50',
+              on ? 'border-primary ring-1 ring-primary' : 'border-border hover:border-border-strong',
+            )}
+            data-testid="artist-style-option"
+          >
+            <span className="flex aspect-square items-center justify-center bg-muted">
+              {anchor.previewUrl ? <ThumbImage src={anchor.previewUrl} alt={name} className="size-full object-cover" /> : <ImageIcon className="size-5 text-muted-foreground opacity-40" aria-hidden />}
+            </span>
+            {on ? <span className="absolute right-1.5 top-1.5 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground"><Check className="size-3" /></span> : null}
+            <span className={cn('line-clamp-1 px-2 text-xs font-medium', prevStyleId === anchor.key || currentKey === anchor.key ? 'pt-1.5' : 'py-1.5')}>{name}</span>
+            {/* 재생성 창(A6): 지금 작품 스타일 자리 — 같은 스타일로 다시 만들 수 있다. */}
+            {currentKey === anchor.key ? (
+              <span className="line-clamp-1 px-2 pb-1.5 text-[10px] text-muted-foreground" data-testid="artist-style-current">{t('Now')}</span>
+            ) : null}
+            {/* 시리즈 다음 화: 앞 화 그림체 자리를 알려 그대로 두는 것이 "이어받기"라는 것을 보인다. */}
+            {prevStyleId === anchor.key ? (
+              <span className="line-clamp-1 px-2 pb-1.5 text-[10px] text-muted-foreground">{t('Previous episode style')}</span>
+            ) : null}
+          </button>
+        )
+      })}
+    </div>
   )
 }

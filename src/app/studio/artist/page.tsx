@@ -43,6 +43,11 @@ import { ArtistCompleteDialog } from '@/features/artist-room/artist-complete-dia
 import { groupSeriesAssets, seriesMakingTitle } from '@/features/series/artist-series'
 import { useSeriesInfo } from '@/features/series/use-series-info'
 import { styleIdOf } from '@/lib/series/snapshot'
+import { StyleVersionBar } from '@/features/artist-room/style-version-bar'
+import { RegenerateStyleDialog } from '@/features/artist-room/regenerate-style-dialog'
+import { VersionHistoryDialog } from '@/features/artist-room/version-history-dialog'
+import { useArtistVersionStore } from '@/stores/artist-version-store'
+import { versionStyleLabel } from '@/lib/artist/style-versions'
 
 type ArtistTab = 'characters' | 'world'
 
@@ -419,6 +424,59 @@ export default function VisualPage() {
     />
   )
 
+  // 작품 스타일 기록(2026-10-28 오너, 프로토타입 A5 · A6 · AV · AY) — 머리 줄 버전 · [불러오기] · [재생성하기].
+  //   이 화면이 열려 있을 때만 재생성 그림을 이어 그린다(떠났다 돌아오면 남은 칸부터). 데모는 읽지도 그리지도 않는다.
+  const cardsShown = phase === 'cards' || phase === 'done'
+  useEffect(() => {
+    if (!projectId) return
+    const versions = useArtistVersionStore.getState()
+    versions.setScreenOpen(projectId, true)
+    return () => useArtistVersionStore.getState().setScreenOpen(projectId, false)
+  }, [projectId])
+  useEffect(() => {
+    if (projectId && cardsShown && !isDemoSession()) void useArtistVersionStore.getState().refresh()
+  }, [projectId, cardsShown])
+  const regen = useArtistVersionStore((s) => s.regen)
+  const regenRun = useArtistVersionStore((s) => s.run)
+  const versionBusy = useArtistVersionStore((s) => s.busy)
+  const overlayDismissedFor = useArtistVersionStore((s) => s.overlayDismissedFor)
+  const regenVersion = useArtistVersionStore((s) => s.versions.find((version) => version.n === s.regen?.n) ?? null)
+  // 다 그렸다고 알리기 전의 재생성 — 남은 칸을 그리거나 완료를 알린다. 그리는 동안은 [완료하기] · 머리 줄 단추가 꺼진다.
+  const regenOpen = !!regen && !isDemoSession() && !artistCompleted
+  const regenDrawing = regenOpen && !regen.complete
+  useEffect(() => {
+    if (projectId && regenOpen) void useArtistVersionStore.getState().continueRegen()
+  }, [projectId, regenOpen, regen?.n])
+  // 그리는 동안 진행(k/N)을 몇 초마다 다시 읽는다 — 한 묶음(동시 3장)이 다 끝날 때까지 숫자가 멈춰 보이지 않게.
+  useEffect(() => {
+    if (!projectId || !regenDrawing) return
+    const id = setInterval(() => void useArtistVersionStore.getState().refresh(), 5000)
+    return () => clearInterval(id)
+  }, [projectId, regenDrawing])
+  const regenOverlayOpen = regenDrawing && overlayDismissedFor !== regen.n
+  const regenStyleLabel = regenVersion ? versionStyleLabel(regenVersion, styleAnchors, locale) : styleLabel ?? ''
+  const regenTodo = regen ? Object.values(regen.states).filter((state) => state === 'todo').length : 0
+  const regenOverlay = regen ? (
+    <AiBusyOverlay
+      open={regenOverlayOpen}
+      title={t(regenRun.stopped ? 'Some images were not drawn' : 'Making the images')}
+      busy={!regenRun.stopped}
+      description={regenRun.stopped ? t('Draw the missing ones again, or close this and check the cards.') : t('{style} · v{n}', { style: regenStyleLabel, n: regen.n })}
+      steps={[{ label: t('Drawing images {drawn}/{total}', { drawn: regen.done, total: regen.total }), state: 'current' }]}
+      progress={regen.total > 0 ? ((regen.done + regen.failed) / regen.total) * 100 : null}
+      footer={(
+        <>
+          <Button size="sm" variant="outline" onClick={() => useArtistVersionStore.getState().dismissOverlay()}>{t('Close')}</Button>
+          {regenRun.stopped && regenTodo > 0 ? (
+            <Button size="sm" onClick={() => void useArtistVersionStore.getState().resumeRegen()} data-testid="artist-regen-resume">
+              {t('Draw the {count} missing images', { count: regenTodo })}
+            </Button>
+          ) : null}
+        </>
+      )}
+    />
+  ) : null
+
   // 예전 흐름(리뉴얼 전) 프로젝트의 진행 화면(그리는 중)은 잠금 화면을 쓰지 않는다 — 그 동안도 왼쪽 사이드바를 막는다(2026-10-27).
   //   Writer 실행이 정말 도는 동안만 — 상태를 읽기 전 · 씬 확인 대기에는 막지 않는다(legacyProgressHolds, 검토).
   const legacyProgressBusy = legacyProgressHolds({ gateOpen, phase, status: writerStatus })
@@ -467,32 +525,33 @@ export default function VisualPage() {
 
   // 메인 헤더(리뉴얼 1차, 프로토타입 A5) — "Artist · 인물 N · 배경 M", 작품 스타일, 오른쪽 [완료하기 →].
   //   완료한 뒤(또는 예전 흐름으로 끝까지 만든 프로젝트)는 다시 완료하지 않고 Storyboard 로 가기만 한다.
-  const completeBlocked = gaps.characters.length + gaps.locations.length > 0
+  // 재생성 그림을 그리는 동안도 [완료하기]를 막는다 — 옛 스타일 그림이 섞인 채로 Storyboard 가 열리지 않게(2026-10-28).
+  const completeBlocked = gaps.characters.length + gaps.locations.length > 0 || regenDrawing
   // [완료하기]가 꺼진 까닭을 글로 보인다 — 마우스를 올려야 보이는 안내뿐이라 이유를 몰랐다(2026-10-27 디자이너 QA 1차 #06).
-  const completeNote = phase === 'cards' ? completeBlockedNote({ gaps, drawing: generatingCount }) : null
+  const completeNote = phase === 'cards' ? completeBlockedNote({ gaps, drawing: generatingCount }) ?? (regenDrawing ? { kind: 'drawing' as const } : null) : null
   const headerRow = (
     <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-        <h1 className="text-lg font-semibold">Artist</h1>
-        <span className="text-xs text-muted-foreground" data-testid="artist-header-counts">
-          {t('Characters {persons} · backgrounds {places}', { persons: headerPersons, places: headerPlaces })}
-          {headerKept > 0 ? ` · ${t('Kept {count}', { count: headerKept })}` : null}
-        </span>
-        {styleLabel ? (
-          <span className="rounded-md border border-border px-2 py-0.5 text-xs" data-testid="artist-style-bar">
-            <span className="text-muted-foreground">{t('Work style')}</span> · <b className="font-medium">{styleLabel}</b>
+      <div className="flex min-w-0 flex-col gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+          <h1 className="text-lg font-semibold">Artist</h1>
+          <span className="text-xs text-muted-foreground" data-testid="artist-header-counts">
+            {t('Characters {persons} · backgrounds {places}', { persons: headerPersons, places: headerPlaces })}
+            {headerKept > 0 ? ` · ${t('Kept {count}', { count: headerKept })}` : null}
           </span>
-        ) : null}
-        {storyboardPrep ? (
-          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground" role="status" data-testid="artist-storyboard-prep" data-state={storyboardPrep}>
-            {storyboardPrep === 'ready' ? <Check className="size-3.5" aria-hidden /> : <Loader2 className="size-3.5 animate-spin" aria-hidden />}
-            {t(storyboardPrep === 'splitting' ? 'Getting Storyboard ready · splitting scenes and shots' : storyboardPrep === 'drawing' ? 'Getting Storyboard ready · drawing the roughs' : 'Storyboard is ready')}
-          </span>
-        ) : null}
+          {storyboardPrep ? (
+            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground" role="status" data-testid="artist-storyboard-prep" data-state={storyboardPrep}>
+              {storyboardPrep === 'ready' ? <Check className="size-3.5" aria-hidden /> : <Loader2 className="size-3.5 animate-spin" aria-hidden />}
+              {t(storyboardPrep === 'splitting' ? 'Getting Storyboard ready · splitting scenes and shots' : storyboardPrep === 'drawing' ? 'Getting Storyboard ready · drawing the roughs' : 'Storyboard is ready')}
+            </span>
+          ) : null}
+        </div>
+        {/* 작품 스타일 막대(A5) — 제목 아래 한 줄: 견본 · 이름 · "작품 스타일 · v{n}" · [불러오기 · 기록 N] · [재생성하기].
+            Storyboard 를 연 뒤 · 그리는 중에는 꺼지고 까닭이 보인다. */}
+        <StyleVersionBar completed={artistCompleted} drawing={generatingCount > 0 || regenDrawing} />
       </div>
       {phase === 'cards' ? (
         <div className="flex flex-col items-end gap-1.5">
-          <span title={completeBlocked ? t('Make the images for the characters and backgrounds that have none first.') : undefined}>
+          <span title={gaps.characters.length + gaps.locations.length > 0 ? t('Make the images for the characters and backgrounds that have none first.') : undefined}>
             <Button onClick={() => setCompleteOpen(true)} disabled={completeBlocked} data-testid="artist-complete-open">
               {t('Complete')}<ArrowRight className="size-4" />
             </Button>
@@ -613,7 +672,10 @@ export default function VisualPage() {
       {/* 게이트 상태 푸터는 제거(#d5 2026-08-11 오너 지시) — 게이트 판정 자체는 그대로 살아
           Director 핸드오프 제안(#handoff-starved)과 사이드바 잠금이 쓴다. 개발용 세부는 콘솔로. */}
       <ArtistCompleteDialog open={completeOpen} onOpenChange={setCompleteOpen} summary={{ persons: personTotal, places: worldAssets.length, style: styleLabel }} />
+      <RegenerateStyleDialog />
+      <VersionHistoryDialog canLoad={!artistCompleted && generatingCount === 0 && !regenDrawing && versionBusy === null} />
       {makingOverlay}
+      {regenOverlay}
     </>
   )
 }

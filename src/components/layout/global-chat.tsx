@@ -61,6 +61,7 @@ import { SceneStoryProposalCard } from '@/components/layout/scene-story-proposal
 import { SceneStoryRewriteCard, SceneStoryUndoCard } from '@/components/layout/scene-story-rewrite-card'
 import { unresolvedSceneStoryProposal } from '@/lib/producer/scene-story-proposal'
 import { WriterNextCard } from '@/features/prose/writer-next-card'
+import { StyleReturnCard } from '@/features/artist-room/style-return-card'
 import {
   buildScriptLines,
   scriptLineMentions,
@@ -960,8 +961,8 @@ export function GlobalChat() {
     }
     // #p4-choices 는 렌더에서 버튼별 인라인 처리 — 이 핸들러엔 도달하지 않는다(타입 내로잉용).
     if (action.kind === 'choices') return
-    // Writer 다음 단계 카드(리뉴얼 1차)는 카드 안 버튼이 각자 일을 한다.
-    if (action.kind === 'writerNext') return
+    // Writer 다음 단계 카드(리뉴얼 1차) · Artist 이전 스타일 카드(작품 스타일 기록)는 카드 안 버튼이 각자 일을 한다.
+    if (action.kind === 'writerNext' || action.kind === 'artistVersions') return
     if (action.kind === 'message') {
       dismissSuggestion()
       await sendMessage(action.utterance, undefined, { stageOverride: suggestion?.stage, ...(action.answeringProducerQuestion ? { answeringProducerQuestion: true } : {}) })
@@ -1550,6 +1551,8 @@ export function GlobalChat() {
                   <SceneGateControls label={suggestion.action.label} handoff={treatmentDraft && !producerLocked} />
                 ) : suggestion.action?.kind === 'writerNext' ? (
                   <WriterNextCard step={suggestion.action.step} />
+                ) : suggestion.action?.kind === 'artistVersions' ? (
+                  <StyleReturnCard options={suggestion.action.options} regenerate={suggestion.action.regenerate} />
                 ) : (suggestion.action || suggestion.dismissible !== false) && (
                   <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
                     {/* kind: 'choices' 는 여기 오지 않는다 — 입력창 앵커 선택지(#p4-choices v2) */}

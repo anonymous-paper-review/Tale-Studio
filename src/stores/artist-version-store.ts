@@ -1,0 +1,328 @@
+// Artist 작품 스타일 기록(버전) 화면 상태(2026-10-28 오너, 프로토타입 A5 · A6 · AV · AY).
+//   서버 창구(/api/artist/versions*)가 버전 · 재생성 진행을 정하고, 이 스토어는 그것을 읽어 머리 줄 · 창 · 채팅 카드에 준다.
+//   [다시 만들기] 뒤 그림은 이 화면이 칸마다 지금의 [다시 만들기]와 같은 함수(generateCharacterView · generateWorldShot, actor 'ui')로 그린다 —
+//   지금 그림을 얼굴 참고로(오너 결정 1). 기본 모습을 먼저, 다른 모습은 그 인물 · 배경의 기본 모습이 끝난 뒤.
+//   이어 그리기 규칙은 draw-continue 와 같다: Artist 화면이 열려 있을 때만, 실패한 칸은 다시 보내지 않고(9/11), 내 한도에 막히면 잠시 뒤 다시,
+//   모두의 자리에 막히면 멈추고 단추로 남긴다. 다 그리면(완료 표시는 서버가 한 번만) 채팅에 알린다. 약속: tests/artist/style-version-store.test.ts
+import { create } from 'zustand'
+import { useArtistStore } from '@/stores/artist-store'
+import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { useProducerStore } from '@/stores/producer-store'
+import { useProjectStore } from '@/stores/project-store'
+import { contentLocale } from '@/lib/i18n/content'
+import { translate } from '@/lib/i18n/translate'
+import { useLocaleStore } from '@/stores/locale-store'
+import { fetchArtistGenerationLimit, runAdaptivePool } from '@/lib/artist/generation-slots'
+import { STYLE_WAIT_RECHECK_MS, USER_LIMIT_RECHECK_MS, USER_LIMIT_WAIT_MAX_MS } from '@/lib/artist/draw-continue'
+import {
+  ARTIST_VERSION_CODES,
+  nextRegenTargets,
+  regenDoneMessage,
+  regenSlotKey,
+  versionLoadedMessage,
+  versionStyleLabel,
+  type RegenProgress,
+  type RegenSlot,
+  type VersionCustomStyle,
+  type VersionView,
+} from '@/lib/artist/style-versions'
+import type { GenerationJobReceipt } from '@/lib/generation-jobs-client'
+
+/** 그리는 중인 칸 · 잠시 기다리는 칸을 다시 볼 때까지. */
+export const REGEN_POLL_MS = 4_000
+
+export interface ArtistVersionsResponse {
+  versions: VersionView[]
+  currentN: number
+  regen: RegenProgress | null
+  completed: boolean
+}
+
+interface RegenRun {
+  running: boolean
+  /** 모두의 자리가 차서 멈췄다 — [남은 그림 그리기]로 다시 켠다. */
+  stopped: boolean
+  /** 내 한도에 막혀 기다리기 시작한 때 — 새로 보낸 그림이 생기면 다시 잰다. */
+  userWaitSince: number | null
+}
+
+interface ArtistVersionState {
+  projectId: string | null
+  versions: VersionView[]
+  currentN: number
+  regen: RegenProgress | null
+  completed: boolean
+  loaded: boolean
+  busy: 'regenerate' | 'load' | null
+  lastError: string | null
+  regenDialogOpen: boolean
+  historyDialogOpen: boolean
+  /** 그리는 중 잠금 화면을 닫은 재생성 번호 — 닫아도 머리 줄 단추 · [완료하기]는 다 그릴 때까지 꺼져 있다. */
+  overlayDismissedFor: number | null
+  /** Artist 화면이 열려 있나 — 닫혀 있으면 남은 칸을 보내지 않는다. */
+  screen: { projectId: string | null; open: boolean }
+  run: RegenRun
+  setScreenOpen: (projectId: string, open: boolean) => void
+  refresh: (opts?: { ensure?: boolean }) => Promise<ArtistVersionsResponse | null>
+  openRegenerate: () => void
+  closeRegenerate: () => void
+  openHistory: () => void
+  closeHistory: () => void
+  dismissOverlay: () => void
+  regenerate: (styleKey: string) => Promise<boolean>
+  loadVersion: (n: number) => Promise<boolean>
+  /** 남은 재생성 칸을 이어 그린다 — 이미 도는 중이면 그 일을 기다린다. */
+  continueRegen: () => Promise<void>
+  /** 멈춘 이어 그리기를 다시 켠다([남은 그림 그리기]). */
+  resumeRegen: () => Promise<void>
+  reset: () => void
+}
+
+const IDLE_RUN: RegenRun = { running: false, stopped: false, userWaitSince: null }
+let inflight: Promise<void> | null = null
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
+
+/** 거절 까닭 코드 → 화면 안내(번역 키). */
+function messageForCode(code: string | undefined, fallback: string): string {
+  if (code === ARTIST_VERSION_CODES.completed) return 'The style cannot be changed after Storyboard opens.'
+  if (code === ARTIST_VERSION_CODES.drawing || code === ARTIST_VERSION_CODES.regenPending) return 'Wait until the images are drawn, then try again.'
+  if (code === ARTIST_VERSION_CODES.conflict || code === ARTIST_VERSION_CODES.alreadyCurrent) return 'Another window changed the version first. Check the history and try again.'
+  if (code === ARTIST_VERSION_CODES.nothingToDraw) return 'There are no characters or backgrounds to remake yet.'
+  if (code === ARTIST_VERSION_CODES.unknownStyle) return 'Pick a style that is available.'
+  return fallback
+}
+
+/** 버전의 스타일을 Producer 스토어(작품 스타일의 화면 값)에 옮긴다 — 서버가 이미 바꿨다. */
+function applyStyle(styleKey: string | null, customStyle: VersionCustomStyle | null) {
+  useProducerStore.setState({ styleAnchorKey: styleKey || null, customStyleAnchor: customStyle ? { url: customStyle.url, label: customStyle.label, medium: customStyle.medium, ...(customStyle.locked ? { locked: true } : {}) } : null })
+}
+
+function styleLabelOf(version: { styleKey: string | null; customStyle: VersionCustomStyle | null }): string {
+  return versionStyleLabel(version, useProducerStore.getState().styleAnchors, contentLocale())
+}
+
+async function postJson(url: string, body: unknown): Promise<{ ok: boolean; body: Record<string, unknown> }> {
+  try {
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    return { ok: res.ok, body: ((await res.json().catch(() => ({}))) ?? {}) as Record<string, unknown> }
+  } catch (e) {
+    return { ok: false, body: { error: e instanceof Error ? e.message : String(e) } }
+  }
+}
+
+/** 칸 하나의 마지막 답으로 이어 그리기가 할 일을 가른다. */
+function classify(receipts: GenerationJobReceipt[]): 'submitted' | 'user' | 'global' | 'wait' | 'style' | 'refused' {
+  const last = receipts.at(-1)
+  if (!last) return 'refused'
+  if (receipts.some((receipt) => receipt.jobId)) return 'submitted'
+  if (last.status === 'deduped') return last.error === 'waiting_for_style' ? 'style' : 'wait'
+  if (last.status === 'failed' && last.httpStatus === 429 && last.quotaScope === 'user') return 'user'
+  if (last.status === 'failed' && last.httpStatus === 429 && last.quotaScope === 'global') return 'global'
+  return 'refused'
+}
+
+export const useArtistVersionStore = create<ArtistVersionState>((set, get) => {
+  const sameProject = (projectId: string) => useProjectStore.getState().projectId === projectId
+  const screenOpen = (projectId: string) => sameProject(projectId) && get().screen.projectId === projectId && get().screen.open
+
+  /** 칸들을 그린다(지금의 다시 만들기와 같은 함수 · 같은 동시 장수) — 칸마다 받은 답을 돌려준다. */
+  async function drawSlots(projectId: string, slots: RegenSlot[], quietQuota: boolean): Promise<Map<string, GenerationJobReceipt[]>> {
+    const receipts = new Map<string, GenerationJobReceipt[]>()
+    const tasks = slots.map((slot) => async () => {
+      if (!screenOpen(projectId)) return
+      const key = regenSlotKey(slot)
+      const list: GenerationJobReceipt[] = []
+      receipts.set(key, list)
+      const onJob = (receipt: GenerationJobReceipt) => { list.push(receipt) }
+      const artist = useArtistStore.getState()
+      if (slot.kind === 'character') {
+        await artist.generateCharacterView(slot.id, slot.appearanceKey ?? '', 'main', 'ui', undefined, undefined, undefined, { onJob, quietQuota })
+      } else {
+        await artist.generateWorldShot(slot.id, 'wideShot', undefined, 'ui', undefined, { appearanceKey: slot.appearanceKey, onJob, quietQuota })
+      }
+    })
+    await runAdaptivePool(tasks, fetchArtistGenerationLimit).catch(() => undefined)
+    return receipts
+  }
+
+  async function finish(projectId: string, regen: RegenProgress): Promise<void> {
+    const { ok, body } = await postJson('/api/artist/versions/regen', { projectId, n: regen.n, action: 'finish' })
+    if (!ok || body.announced !== true || !sameProject(projectId)) return
+    const version = get().versions.find((item) => item.n === regen.n)
+    const style = version ? styleLabelOf(version) : styleLabelOf({ styleKey: useProducerStore.getState().styleAnchorKey, customStyle: useProducerStore.getState().customStyleAnchor })
+    useGlobalChatStore.getState().notifyIssue('artist', regenDoneMessage(contentLocale(), { style, n: regen.n, failed: typeof body.failed === 'number' ? body.failed : regen.failed }))
+    await get().refresh()
+  }
+
+  async function regenLoop(projectId: string): Promise<void> {
+    if (!screenOpen(projectId) || get().run.stopped) return
+    set({ run: { ...get().run, running: true } })
+    // 칸마다 다시 볼 때 — 내 한도 · 그림체 읽기 · 겹친 요청은 잠시 뒤 다시 본다.
+    const retryAt = new Map<string, number>()
+    let userWaitSince = get().run.userWaitSince
+    try {
+      for (;;) {
+        if (!screenOpen(projectId)) return
+        const view = await get().refresh()
+        if (!view || !screenOpen(projectId)) return
+        const regen = view.regen
+        if (!regen) return
+        if (regen.complete) {
+          await finish(projectId, regen)
+          return
+        }
+        const now = Date.now()
+        const targets = nextRegenTargets(regen, regen.states).filter((slot) => (retryAt.get(regenSlotKey(slot)) ?? 0) <= now)
+        if (targets.length === 0) {
+          // 그리는 중인 칸을 기다리거나, 다시 볼 때를 기다린다. 내 한도 기다림은 시간으로 끊는다(draw-continue 와 같은 30분).
+          if (userWaitSince != null && now - userWaitSince >= USER_LIMIT_WAIT_MAX_MS) {
+            set({ run: { running: false, stopped: true, userWaitSince: null } })
+            return
+          }
+          const soonest = Math.min(...[...retryAt.values()].filter((at) => at > now), now + REGEN_POLL_MS)
+          await sleep(Math.max(10, Math.min(REGEN_POLL_MS, soonest - now)))
+          continue
+        }
+        const receipts = await drawSlots(projectId, targets, userWaitSince != null)
+        if (!sameProject(projectId)) return
+        const refused: string[] = []
+        let submitted = 0
+        let global = false
+        for (const [key, list] of receipts) {
+          const outcome = classify(list)
+          if (outcome === 'submitted') submitted++
+          else if (outcome === 'global') global = true
+          else if (outcome === 'user') retryAt.set(key, Date.now() + USER_LIMIT_RECHECK_MS)
+          else if (outcome === 'style') retryAt.set(key, Date.now() + STYLE_WAIT_RECHECK_MS)
+          else if (outcome === 'wait') retryAt.set(key, Date.now() + REGEN_POLL_MS)
+          else refused.push(key)
+        }
+        const userRefused = [...receipts.values()].some((list) => classify(list) === 'user')
+        userWaitSince = userRefused ? (submitted > 0 ? Date.now() : userWaitSince ?? Date.now()) : submitted > 0 ? null : userWaitSince
+        set({ run: { ...get().run, userWaitSince } })
+        // 접수 전에 다른 까닭으로 막힌 칸은 실패로 적는다 — 다시 보내도 같은 답이다(내용 규칙 · 기준 얼굴 없음 등).
+        if (refused.length) await postJson('/api/artist/versions/regen', { projectId, n: regen.n, action: 'fail', slots: refused })
+        if (global) {
+          set({ run: { running: false, stopped: true, userWaitSince: null } })
+          return
+        }
+      }
+    } finally {
+      if (get().run.running) set({ run: { ...get().run, running: false } })
+    }
+  }
+
+  return {
+    projectId: null,
+    versions: [],
+    currentN: 1,
+    regen: null,
+    completed: false,
+    loaded: false,
+    busy: null,
+    lastError: null,
+    regenDialogOpen: false,
+    historyDialogOpen: false,
+    overlayDismissedFor: null,
+    screen: { projectId: null, open: false },
+    run: { ...IDLE_RUN },
+
+    setScreenOpen: (projectId, open) => {
+      const projectChanged = get().projectId !== projectId
+      set({ screen: { projectId, open }, ...(projectChanged ? { projectId, versions: [], currentN: 1, regen: null, completed: false, loaded: false, run: { ...IDLE_RUN }, overlayDismissedFor: null } : {}) })
+    },
+
+    refresh: async (opts) => {
+      const projectId = useProjectStore.getState().projectId
+      if (!projectId) return null
+      try {
+        const res = await fetch(`/api/artist/versions?projectId=${encodeURIComponent(projectId)}${opts?.ensure ? '&ensure=1' : ''}`, { cache: 'no-store' })
+        if (!res.ok) return null
+        const body = (await res.json()) as ArtistVersionsResponse
+        if (!sameProject(projectId)) return null
+        set({ projectId, versions: body.versions ?? [], currentN: body.currentN ?? 1, regen: body.regen ?? null, completed: body.completed === true, loaded: true })
+        return body
+      } catch {
+        return null
+      }
+    },
+
+    openRegenerate: () => set({ regenDialogOpen: true, historyDialogOpen: false }),
+    closeRegenerate: () => set({ regenDialogOpen: false }),
+    openHistory: () => {
+      set({ historyDialogOpen: true, regenDialogOpen: false })
+      // 기록 창을 처음 열 때 지금 그림 · 지금 스타일로 v1 을 남긴다(이 기능 전 그림은 v1).
+      void get().refresh({ ensure: true })
+    },
+    closeHistory: () => set({ historyDialogOpen: false }),
+    dismissOverlay: () => set({ overlayDismissedFor: get().regen?.n ?? null }),
+
+    regenerate: async (styleKey) => {
+      const projectId = useProjectStore.getState().projectId
+      if (!projectId || get().busy) return false
+      set({ busy: 'regenerate', lastError: null })
+      try {
+        const { ok, body } = await postJson('/api/artist/versions/regenerate', { projectId, styleAnchorKey: styleKey })
+        if (!sameProject(projectId)) return false
+        if (!ok) {
+          set({ lastError: translate(useLocaleStore.getState().locale, messageForCode(body.code as string | undefined, 'Could not start the regeneration. Please try again.')) })
+          return false
+        }
+        const producer = useProducerStore.getState()
+        const keepsCustom = styleKey === producer.styleAnchorKey && !!producer.customStyleAnchor
+        if (!keepsCustom) applyStyle(styleKey, null)
+        set({ regenDialogOpen: false, historyDialogOpen: false, overlayDismissedFor: null, run: { ...IDLE_RUN } })
+        await get().refresh()
+        // 새 스타일 키로 그림 지문을 다시 맞춘다 — 그리는 동안 옛 그림은 "최종 룩 전"으로 보일 수 있다.
+        void useArtistStore.getState().loadData()
+        void get().continueRegen()
+        return true
+      } finally {
+        set({ busy: null })
+      }
+    },
+
+    loadVersion: async (n) => {
+      const projectId = useProjectStore.getState().projectId
+      if (!projectId || get().busy) return false
+      set({ busy: 'load', lastError: null })
+      try {
+        const { ok, body } = await postJson('/api/artist/versions/load', { projectId, n })
+        if (!sameProject(projectId)) return false
+        if (!ok) {
+          set({ lastError: translate(useLocaleStore.getState().locale, messageForCode(body.code as string | undefined, 'Could not load the version. Please try again.')) })
+          return false
+        }
+        const styleKey = typeof body.styleKey === 'string' ? body.styleKey : null
+        const customStyle = (body.customStyle ?? null) as VersionCustomStyle | null
+        applyStyle(styleKey, customStyle)
+        await useArtistStore.getState().loadData()
+        await get().refresh()
+        set({ historyDialogOpen: false, regenDialogOpen: false })
+        useGlobalChatStore.getState().notifyIssue('artist', versionLoadedMessage(contentLocale(), { n, style: styleLabelOf({ styleKey, customStyle }) }))
+        return true
+      } finally {
+        set({ busy: null })
+      }
+    },
+
+    continueRegen: () => {
+      const projectId = useProjectStore.getState().projectId
+      if (!projectId) return Promise.resolve()
+      if (inflight) return inflight
+      inflight = regenLoop(projectId).finally(() => { inflight = null })
+      return inflight
+    },
+
+    resumeRegen: async () => {
+      set({ run: { ...IDLE_RUN }, overlayDismissedFor: null })
+      await get().continueRegen()
+    },
+
+    reset: () => set({
+      projectId: null, versions: [], currentN: 1, regen: null, completed: false, loaded: false, busy: null, lastError: null,
+      regenDialogOpen: false, historyDialogOpen: false, overlayDismissedFor: null, screen: { projectId: null, open: false }, run: { ...IDLE_RUN },
+    }),
+  }
+})

@@ -28,6 +28,7 @@ import { sceneShotLabel } from '@/lib/writer/shot-edit'
 import { cn } from '@/lib/utils'
 import { useLocale, useT } from '@/lib/i18n'
 import { styleAnchorName } from '@/lib/style-anchor-name'
+import { useHistoryStyle } from '@/features/artist-room/use-history-style'
 
 type Props = {
   locationId: string | null
@@ -52,6 +53,8 @@ export function worldDescriptionDraft(world: { visualDescriptionNative?: string 
  */
 export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKeyProp, onClose, onAddAppearance }: Props) {
   const t = useT()
+  // 기록(시계)은 지금 작품 스타일 그림만 불러온다 — 다른 스타일 버전 그림은 꺼 두고 어느 버전인지 보인다(2026-10-28).
+  const historyStyle = useHistoryStyle()
   const world = useArtistStore((s) =>
     s.worldAssets.find((w) => w.locationId === locationId),
   )
@@ -235,7 +238,7 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
               </Button>
             ) : null}
             <span className="ml-auto flex items-center gap-1">
-              <HistoryButton candidates={hasHistory ? candidates : []} onPick={(id) => void selectLocationCandidate(world.locationId, id, variantKey)} />
+              <HistoryButton candidates={hasHistory ? candidates : []} onPick={(id) => void selectLocationCandidate(world.locationId, id, variantKey)} describe={historyStyle.describe} hint={historyStyle.hint} />
               <Button size="sm" variant="outline" disabled={generate.locked} onClick={openRegenerate} data-testid="detail-regenerate-open">
                 {generate.locked ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
                 {imageUrl ? t('Remake') : t('Make the image')}

@@ -98,10 +98,16 @@ export function DetailSection({ title, hint, children, testId }: { title: string
   )
 }
 
-/** 기록(시계) — 같은 칸에 남은 이전 그림. "지금" 아래 이전 그림마다 [불러오기]. 두 장 이상일 때만 열린다. */
-export function HistoryButton({ candidates, onPick }: {
-  candidates: ReadonlyArray<{ id: string; url: string; isSelected: boolean }>
+/** 기록 줄 하나의 상태 — 다른 스타일 버전에서 그린 그림은 꺼 두고 어느 버전 · 스타일인지 보인다(작품 스타일 기록, 2026-10-28). */
+export interface HistoryItemState { disabled: boolean; note: string | null }
+
+/** 기록(시계) — 같은 칸에 남은 이전 그림. "지금" 아래 이전 그림마다 [불러오기]. 두 장 이상일 때만 열린다.
+ *  describe 가 주어지면 줄마다 불러올 수 있는지 · 덧붙일 말을 정한다(지금 작품 스타일과 같은 스타일만 불러온다). hint = 창 위 안내. */
+export function HistoryButton({ candidates, onPick, describe, hint }: {
+  candidates: ReadonlyArray<{ id: string; url: string; isSelected: boolean; generatedAt?: string }>
   onPick: (id: string) => void
+  describe?: (candidate: { id: string; url: string; isSelected: boolean; generatedAt?: string }) => HistoryItemState | null
+  hint?: string
 }) {
   const t = useT()
   const [open, setOpen] = useState(false)
@@ -115,18 +121,30 @@ export function HistoryButton({ candidates, onPick }: {
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-2">
-        <p className="px-1 pb-2 text-xs text-muted-foreground">{t('History · load an earlier image')}</p>
+        <p className="px-1 pb-2 text-xs text-muted-foreground">{hint ?? t('History · load an earlier image')}</p>
         <ul className="flex max-h-72 flex-col gap-1 overflow-y-auto">
-          {candidates.map((candidate) => (
-            <li key={candidate.id} className="flex items-center gap-2 rounded-md px-1 py-1 hover:bg-accent/50">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={candidate.url} alt={t('Candidate image')} className="h-10 w-16 shrink-0 rounded object-cover" />
-              <span className="flex-1 text-xs">{candidate.isSelected ? t('Now') : ''}</span>
-              {candidate.isSelected ? null : (
-                <Button size="sm" variant="outline" className="h-7" onClick={() => { onPick(candidate.id); setOpen(false) }}>{t('Load')}</Button>
-              )}
-            </li>
-          ))}
+          {candidates.map((candidate) => {
+            const state = candidate.isSelected ? null : describe?.(candidate) ?? null
+            return (
+              <li key={candidate.id} className={cn('flex items-center gap-2 rounded-md px-1 py-1 hover:bg-accent/50', state?.disabled && 'opacity-60')} data-testid="detail-history-item" data-disabled={state?.disabled ? 'true' : undefined}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={candidate.url} alt={t('Candidate image')} className="h-10 w-16 shrink-0 rounded object-cover" />
+                <span className="flex-1 text-xs">{candidate.isSelected ? t('Now') : state?.note ?? ''}</span>
+                {candidate.isSelected ? null : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7"
+                    disabled={state?.disabled}
+                    title={state?.disabled ? t('It is in another style, so it cannot be loaded') : undefined}
+                    onClick={() => { onPick(candidate.id); setOpen(false) }}
+                  >
+                    {t('Load')}
+                  </Button>
+                )}
+              </li>
+            )
+          })}
         </ul>
       </PopoverContent>
     </Popover>

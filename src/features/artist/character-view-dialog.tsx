@@ -29,6 +29,7 @@ import { useGuardedAction } from '@/hooks/use-guarded-action'
 import { cn } from '@/lib/utils'
 import { useLocale, useT } from '@/lib/i18n'
 import { styleAnchorName } from '@/lib/style-anchor-name'
+import { useHistoryStyle } from '@/features/artist-room/use-history-style'
 
 type Props = {
   charId: string | null
@@ -48,6 +49,8 @@ type Props = {
  */
 export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, view, onClose, onAddAppearance }: Props) {
   const t = useT()
+  // 기록(시계)은 지금 작품 스타일 그림만 불러온다 — 다른 스타일 버전 그림은 꺼 두고 어느 버전인지 보인다(2026-10-28).
+  const historyStyle = useHistoryStyle()
   const char = useArtistStore((s) =>
     s.characterAssets.find((c) => c.characterId === charId),
   )
@@ -283,7 +286,7 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
               </Button>
             ) : null}
             <span className="ml-auto flex items-center gap-1">
-              <HistoryButton candidates={candidates} onPick={(id) => selectCandidate(char.characterId, appearanceKey, view, id)} />
+              <HistoryButton candidates={candidates} onPick={(id) => selectCandidate(char.characterId, appearanceKey, view, id)} describe={historyStyle.describe} hint={historyStyle.hint} />
               <Button size="sm" variant="outline" disabled={generate.locked || needsMain} onClick={openRegenerate} data-testid="detail-regenerate-open">
                 {generate.locked ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
                 {imageUrl ? t('Remake') : t('Make the image')}
