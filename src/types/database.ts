@@ -14,6 +14,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      artist_versions: {
+        Row: {
+          active: Json
+          created_at: string
+          custom_style_anchor: Json | null
+          id: string
+          is_current: boolean
+          n: number
+          project_id: string
+          regen: Json | null
+          snapshot: Json | null
+          style_anchor_key: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: Json
+          created_at?: string
+          custom_style_anchor?: Json | null
+          id?: string
+          is_current?: boolean
+          n: number
+          project_id: string
+          regen?: Json | null
+          snapshot?: Json | null
+          style_anchor_key?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: Json
+          created_at?: string
+          custom_style_anchor?: Json | null
+          id?: string
+          is_current?: boolean
+          n?: number
+          project_id?: string
+          regen?: Json | null
+          snapshot?: Json | null
+          style_anchor_key?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "artist_versions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       billing_customers: {
         Row: {
           created_at: string

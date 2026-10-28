@@ -2459,7 +2459,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       set({ error: body.error ?? `Candidate selection failed HTTP ${res.status}` })
       return
     }
-    const { url } = (await res.json()) as { url: string }
+    // 서버가 대표 얼굴도 고른 시트에서 다시 잘라 준다(2026-10-28) — 카드 얼굴이 고른 그림을 따라간다.
+    const { url, portraitUrl } = (await res.json()) as { url: string; portraitUrl?: string }
     set((state) => ({
       characterAssets: state.characterAssets.map((c) => {
         if (c.characterId !== characterId) return c
@@ -2475,6 +2476,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             return {
               ...a,
               sheetUrl: view === 'main' ? url : a.sheetUrl,
+              portraitUrl: view === 'main' && portraitUrl ? portraitUrl : a.portraitUrl,
               viewCandidates: { ...a.viewCandidates, [view]: nextCandidates },
             }
           }),

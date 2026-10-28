@@ -2815,4 +2815,9 @@ export const KO: Record<string, string> = {
   'Used as is {count}': '그대로 써요 {count}',
   'Redrawn in this style {count}': '이 그림체로 다시 그려요 {count}',
   'Kept {count}': '보관 {count}',
+  // 작품 스타일 기록(2026-10-28 오너) — 채팅 알림 · 스타일 이름
+  'Made v{n} in {style}. The earlier version is in [Load].': '{style}{ro} v{n}{ul} 만들었어요. 이전 버전은 [불러오기]에 있어요.',
+  '{count} could not be drawn. Remake them from the cards.': '{count}장은 그리지 못했어요. 카드에서 다시 만들어 주세요.',
+  'Loaded v{n} ({style}). The work style changed to {style} too.': 'v{n}({style}){ul} 불러왔어요. 작품 스타일도 {style}{ro} 바뀌었어요.', // copy-ok: 버전 표기 v{n}(프로토타입 A5 · AV 그대로 소문자)
+  'No style': '스타일 없음',
 }

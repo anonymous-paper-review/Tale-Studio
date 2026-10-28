@@ -46,3 +46,32 @@ export function fixKoreanParticles(text: string, names: readonly string[]): stri
   }
   return out
 }
+
+// 숫자로 끝나는 말(v2 등)의 받침 — 읽는 소리(일 · 이 · 삼 …) 기준. 0 은 "십 · 영"으로 읽혀 받침이 있다.
+const DIGIT_HAS_BATCHIM = [true, true, false, true, false, false, true, true, true, false] as const
+
+/** 말 끝 받침 — 한글 음절이면 받침 유무, 숫자면 읽는 소리 기준, 그 밖(영문 등)은 모름(null). */
+function endsWithBatchim(word: string): { has: boolean; rieul: boolean } | null {
+  const last = word.trim().slice(-1)
+  if (!last) return null
+  if (/[0-9]/.test(last)) {
+    const digit = Number(last)
+    return { has: DIGIT_HAS_BATCHIM[digit], rieul: digit === 1 || digit === 7 || digit === 8 }
+  }
+  const jong = hangulJong(last)
+  if (jong === null) return null
+  return { has: jong !== 0, rieul: jong === 8 }
+}
+
+/** 목적격 조사(을/를) — 끝 소리를 모르면 '을'. */ // i18n-ok: 한국어 조사 규칙 자체
+export function objectParticle(word: string): string {
+  const end = endsWithBatchim(word)
+  return end && !end.has ? '를' : '을' // i18n-ok: 한국어 조사 규칙 자체
+}
+
+/** 방향 조사(으로/로) — 받침이 없거나 ㄹ 받침이면 '로', 끝 소리를 모르면 '으로'. */ // i18n-ok: 한국어 조사 규칙 자체
+export function directionParticle(word: string): string {
+  const end = endsWithBatchim(word)
+  if (!end) return '으로' // i18n-ok: 한국어 조사 규칙 자체
+  return end.has && !end.rieul ? '으로' : '로' // i18n-ok: 한국어 조사 규칙 자체
+}

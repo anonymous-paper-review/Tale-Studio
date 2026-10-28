@@ -283,7 +283,8 @@ export function createStudioToolResources(options: {
         const response = await postJson('/api/artist/select-candidate', 'POST', { characterId, appearanceKey, view: 'main', candidateId: patch.selectedCandidateId })
         if (!response.ok) return response.result
         const url = String(response.body.url ?? '')
-        useArtistStore.setState(state => ({ characterAssets: state.characterAssets.map(c => c.characterId !== characterId ? c : { ...c, appearances: c.appearances.map(a => a.appearanceKey !== appearanceKey ? a : { ...a, sheetUrl: url, viewCandidates: { ...a.viewCandidates, main: (a.viewCandidates.main ?? []).map(cand => ({ ...cand, isSelected: cand.id === patch.selectedCandidateId })) } }) }) }))
+        const portraitUrl = typeof response.body.portraitUrl === 'string' ? response.body.portraitUrl : null
+        useArtistStore.setState(state => ({ characterAssets: state.characterAssets.map(c => c.characterId !== characterId ? c : { ...c, appearances: c.appearances.map(a => a.appearanceKey !== appearanceKey ? a : { ...a, sheetUrl: url, portraitUrl: portraitUrl ?? a.portraitUrl, viewCandidates: { ...a.viewCandidates, main: (a.viewCandidates.main ?? []).map(cand => ({ ...cand, isSelected: cand.id === patch.selectedCandidateId })) } }) }) }))
         return { status: 'ok' }
       }
       if ('appearance' in patch && before.isDefault === true) {

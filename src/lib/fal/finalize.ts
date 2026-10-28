@@ -16,7 +16,9 @@ import {
   type GenerationJob,
 } from '@/lib/generation-jobs'
 import { selectCandidatesToEvict, type CandidateView } from '@/lib/image-provenance'
-import { cropTurnaroundPortrait } from '@/lib/artist/portrait'
+import { generationFilePath } from '@/lib/artist/image-files'
+import { removeEvictedImageFiles } from '@/lib/artist/image-file-cleanup'
+import { portraitUrlForSheet } from '@/lib/artist/portrait-file'
 import { cropRoughGridFrames } from '@/lib/writer/rough-grid-crop'
 import { sheetGeometry } from '@/lib/writer/rough-storyboard-grid'
 import { parseProjectFormat } from '@/types/project'
@@ -607,7 +609,9 @@ export async function finalizeCharacterViewJob(
   if (!imgRes.ok) throw providerImageFetchFailure(imgRes.status)
   const buf = Buffer.from(await imgRes.arrayBuffer())
 
-  const path = `${workspaceId}/${job.project_id}/characters/${storageKeySegment(characterId)}/${storageKeySegment(appearanceKey)}_${view}.png`
+  // 그릴 때마다 새 파일(작업 번호가 이름, 2026-10-28) — 한 칸에 파일이 하나뿐이면 카드 기록의 예전 그림이 모두 최신 그림을 가리켰다.
+  //   같은 작업이 다시 마무리돼도 같은 파일이다(upsert). 카드 기록에서 빠지면 그 파일을 지운다(image-file-cleanup).
+  const path = generationFilePath(`${workspaceId}/${job.project_id}/characters/${storageKeySegment(characterId)}/${storageKeySegment(appearanceKey)}_${view}`, job.id)
   const { error: upErr } = await mediaUpload(path, buf, { contentType: 'image/png', upsert: true })
   if (upErr) throw classifyMediaPersistenceFailure(upErr, 'storage')
   await uploadThumbnail(path, buf)
@@ -639,7 +643,7 @@ export async function finalizeCharacterViewJob(
   // 대표 포트레이트(New UI 에셋 칩) — 사람 main 은 시트 좌상단 CHARACTER CONCEPT 크롭,
   //   사물/비-시트는 main 그대로. best-effort(실패해도 시트 착지는 유지).
   if (view === 'main') {
-    await savePortraitFromMain(job, characterId, appearanceKey, buf, publicUrl).catch((e) => {
+    await savePortraitFromMain(job, characterId, appearanceKey, buf, publicUrl, path).catch((e) => {
       console.warn('[finalize] portrait crop failed (sheet landed):', e instanceof Error ? e.message : e)
     })
   }
@@ -658,6 +662,7 @@ async function savePortraitFromMain(
   appearanceKey: string,
   sheetBuf: Buffer,
   mainUrl: string,
+  sheetPath: string,
 ): Promise<void> {
   const [{ data: ch }, { data: sourceRow }] = await Promise.all([
     supabaseAdmin
@@ -678,19 +683,9 @@ async function savePortraitFromMain(
   // #image-to-artist(2026-09-17): 사용자가 올린 원본이 있는 모습은 그 원본이 대표 사진이다 — 시트 크롭으로 덮지 않는다.
   if (keepsSourcePortrait(sourceRow as { derived_from_url?: string | null } | null)) return
 
-  let portraitUrl = mainUrl // 사물 or 비-시트 폴백: main 자체가 이미 단일 포트레이트
-  if (ch?.entity_type !== 'object') {
-    const cropped = await cropTurnaroundPortrait(sheetBuf)
-    if (cropped) {
-      const path = `${job.target.workspaceId}/${job.project_id}/characters/${storageKeySegment(characterId)}/${storageKeySegment(appearanceKey)}_portrait.png`
-      const { error: upErr } = await mediaUpload(path, cropped, { contentType: 'image/png', upsert: true })
-      if (upErr) throw classifyMediaPersistenceFailure(upErr, 'storage')
-      await uploadThumbnail(path, cropped)
-      portraitUrl = versionedUrl(
-        mediaPublicUrl(path),
-      )
-    }
-  }
+  // 사물 or 비-시트 폴백은 main 자체가 대표 그림이다. 사람 시트는 시트 파일 옆(같은 이름 + _portrait)에 잘라 둔다 —
+  //   카드 기록에서 이 시트를 다시 골라도 같은 대표 얼굴 파일을 쓴다(select-candidate, 2026-10-28).
+  const portraitUrl = await portraitUrlForSheet({ sheetPath, sheetBuf, sheetUrl: mainUrl, entityType: ch?.entity_type ?? null })
 
   const { data: updatedAppearance, error } = await supabaseAdmin
     .from('character_appearances')
@@ -763,7 +758,7 @@ async function recordCharacterImageCandidate(
   //    남기는 예전 evict 정책(#57 원안)으로 복귀한다. 선택본은 항상 보존(evict 대상 아님).
   const { data: unselected } = await supabaseAdmin
     .from('character_image_candidates')
-    .select('id, generated_at')
+    .select('id, generated_at, url')
     .eq('project_id', job.project_id)
     .eq('character_id', characterId)
     .eq('appearance_key', appearanceKey)
@@ -779,6 +774,8 @@ async function recordCharacterImageCandidate(
   )
   if (staleIds.length) {
     await supabaseAdmin.from('character_image_candidates').delete().in('id', staleIds)
+    // 기록에서 빠진 그림의 파일도 지운다(그림마다 새 파일, 2026-10-28) — 버전 기록 · 지금 그림이 가리키는 파일은 남긴다.
+    await removeEvictedImageFiles(job.project_id, job.target.workspaceId, (unselected ?? []).filter((r) => staleIds.includes(r.id as string)).map((r) => r.url as string))
   }
 }
 
@@ -860,7 +857,7 @@ async function recordLocationImageCandidate(
   //   슬롯당 최근 CANDIDATE_RETENTION(5)장을 남긴다 — 재생성해도 직전 이미지로 되돌릴 수 있다. 선택본은 보존.
   const unselectedQ = supabaseAdmin
     .from('location_image_candidates')
-    .select('id, generated_at')
+    .select('id, generated_at, url')
     .match(slot)
     .eq('is_selected', false)
   const { data: unselected } = await (variantKey ? unselectedQ.eq('variant_key', variantKey) : unselectedQ.is('variant_key', null))
@@ -874,6 +871,7 @@ async function recordLocationImageCandidate(
   )
   if (staleIds.length) {
     await supabaseAdmin.from('location_image_candidates').delete().in('id', staleIds)
+    await removeEvictedImageFiles(job.project_id, job.target.workspaceId, (unselected ?? []).filter((r) => staleIds.includes(r.id as string)).map((r) => r.url as string))
   }
 }
 
@@ -890,9 +888,10 @@ export async function finalizeWorldShotJob(
   await recordFalResponseSnapshot(job, falPayload)
   // 약속 C10: 변형(모습)은 location_appearances 행의 wide_shot 을, 기본 모습은 locations[column] 을 갱신한다.
   const appearanceKey = job.target.appearanceKey && job.target.appearanceKey !== 'default' ? job.target.appearanceKey : null
-  const path = appearanceKey
-    ? `${workspaceId}/${job.project_id}/locations/${storageKeySegment(locationId)}_${storageKeySegment(appearanceKey)}_${column}.png`
-    : `${workspaceId}/${job.project_id}/locations/${storageKeySegment(locationId)}_${column}.png`
+  // 그릴 때마다 새 파일(작업 번호가 이름, 2026-10-28) — 캐릭터 시트와 같은 까닭.
+  const path = generationFilePath(appearanceKey
+    ? `${workspaceId}/${job.project_id}/locations/${storageKeySegment(locationId)}_${storageKeySegment(appearanceKey)}_${column}`
+    : `${workspaceId}/${job.project_id}/locations/${storageKeySegment(locationId)}_${column}`, job.id)
   const publicUrl = await uploadImageFromUrl(falImageUrl, path)
 
   if (appearanceKey) {

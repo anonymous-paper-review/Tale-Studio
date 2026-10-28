@@ -1,0 +1,46 @@
+// GET /api/artist/versions?projectId=…[&ensure=1] — 작품 스타일 기록(2026-10-28 오너, 프로토타입 A5 · AV).
+//   버전 목록(새 버전부터 정렬은 화면이 한다) · 지금 버전 번호 · 남은 재생성 그림 · Storyboard 를 열었는지.
+//   v1 은 처음 필요할 때(기록 창을 열 때 ensure=1 · 재생성 · 불러오기) 지금 그림 · 지금 스타일로 만든다 — 화면을 열기만 해서는 만들지 않는다.
+//   artist_versions 는 서버 전용 표(RLS, 정책 없음)라 화면은 이 창구로만 읽는다. 약속: tests/artist/style-version-routes.test.ts
+import { NextResponse } from 'next/server'
+import { requireProjectAccess } from '@/lib/api/guard'
+import { parseRegenRecord } from '@/lib/artist/style-versions'
+import {
+  artistStyleLocked,
+  ensureFirstVersion,
+  readLiveImages,
+  readVersionProject,
+  readVersionRows,
+  regenProgressFor,
+  versionViews,
+} from '@/lib/artist/style-versions-server'
+
+export const runtime = 'nodejs'
+
+export async function GET(req: Request) {
+  try {
+    const url = new URL(req.url)
+    const access = await requireProjectAccess(req, url.searchParams.get('projectId'))
+    if (!access.ok) return access.response
+    const projectId = access.projectId
+    const project = await readVersionProject(projectId)
+    if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+
+    const [completed, live, firstRows] = await Promise.all([artistStyleLocked(project), readLiveImages(projectId), readVersionRows(projectId)])
+    const rows = url.searchParams.get('ensure') === '1' ? await ensureFirstVersion(project, firstRows) : firstRows
+    const current = rows.find((row) => row.is_current) ?? null
+    const record = current ? parseRegenRecord(current.regen) : null
+    // 다 그렸다고 알린 재생성은 더 볼 것이 없다 — 남은 그림이 있거나 아직 알리지 않았을 때만 진행을 준다.
+    const regen = current && record && !record.doneAt ? await regenProgressFor(projectId, current.n, record, live) : null
+    return NextResponse.json({
+      versions: versionViews(rows, live),
+      currentN: current?.n ?? 1,
+      regen,
+      completed,
+    })
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e)
+    console.error('[artist/versions]', message)
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}

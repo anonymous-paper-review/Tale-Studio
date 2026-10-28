@@ -1,0 +1,160 @@
+// 새로 그린 인물 · 배경 그림은 매번 새 파일로 저장하고, 카드 기록에서 빠진 그림 파일만 지운다(버전 기록이 가리키는 파일은 남긴다) (2026-10-28 작품 스타일 기록)
+import { randomUUID } from 'node:crypto'
+import { readdirSync, readFileSync } from 'node:fs'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { memorySupabase, mediaUrlOf, type Row } from '../fixtures/_memory-supabase'
+
+const state = vi.hoisted(() => ({
+  db: null as unknown as ReturnType<typeof import('../fixtures/_memory-supabase').memorySupabase>,
+  thumbs: [] as string[],
+}))
+vi.mock('@/lib/supabase/admin', () => ({
+  supabaseAdmin: new Proxy({}, { get: (_target, key) => (state.db.client as unknown as Record<string | symbol, unknown>)[key] }),
+}))
+vi.mock('@/lib/storage-thumb', async (original) => ({
+  ...await original<typeof import('@/lib/storage-thumb')>(),
+  uploadThumbnail: vi.fn(async (path: string) => { state.thumbs.push(path) }),
+}))
+vi.mock('@/lib/artist/portrait', () => ({ cropTurnaroundPortrait: vi.fn(async () => Buffer.from('face')) }))
+vi.mock('@/lib/fal/observability', () => ({ buildFalResponseSnapshot: () => ({}) }))
+vi.mock('@/lib/generation-jobs', () => ({
+  completeGenerationJob: vi.fn(),
+  failGenerationJob: vi.fn(),
+  patchGenerationJobResponseSnapshotByRequestId: vi.fn(),
+  GenerationJobTerminalTransitionError: class GenerationJobTerminalTransitionError extends Error {},
+}))
+
+import { finalizeCharacterViewJob, finalizeWorldShotJob } from '@/lib/fal/finalize'
+import type { GenerationJob } from '@/lib/generation-jobs'
+
+const P = 'p1'
+const WS = 'ws1'
+const pathOf = (url: unknown) => new URL(String(url)).pathname.replace('/storage/v1/object/public/media/', '')
+
+const characterJob = (id = randomUUID()): GenerationJob => ({
+  id, project_id: P, request_id: `req-${id}`, model: 'openai/gpt-image-2/edit', kind: 'character_view', status: 'queued',
+  target: { workspaceId: WS, characterId: 'minho', appearanceKey: 'current', view: 'main', column: 'view_main' },
+  input_snapshot: { source_hash: 'sh', appearance_hash: 'ah' }, video_clip_id: null, idempotency_key: null, result_url: null, error: null, fal_key_id: 'key-1',
+})
+const worldJob = (id = randomUUID(), appearanceKey?: string): GenerationJob => ({
+  ...characterJob(id), kind: 'world_shot',
+  target: { workspaceId: WS, locationId: 'hall', column: 'wide_shot', ...(appearanceKey ? { appearanceKey } : {}) },
+})
+
+function seed(extra: Record<string, Row[]> = {}) {
+  return memorySupabase({
+    characters: [{ project_id: P, character_id: 'minho', entity_type: 'person' }],
+    character_appearances: [{ project_id: P, character_id: 'minho', appearance_key: 'current', is_default: true, sheet_url: null, portrait_url: null, derived_from_url: null }],
+    character_image_candidates: [],
+    locations: [{ project_id: P, location_id: 'hall', wide_shot: null }],
+    location_appearances: [{ project_id: P, location_id: 'hall', appearance_key: 'night', wide_shot: null }],
+    location_image_candidates: [],
+    artist_versions: [],
+    ...extra,
+  }, {
+    character_image_candidates: [{ columns: ['project_id', 'character_id', 'appearance_key', 'view'], where: (row) => row.is_selected === true }],
+    location_image_candidates: [{ columns: ['project_id', 'location_id', 'view', 'variant_key'], where: (row) => row.is_selected === true, normalize: { variant_key: (value) => value ?? '' } }],
+  })
+}
+
+beforeEach(() => {
+  state.db = seed()
+  state.thumbs = []
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(Buffer.from('png-bytes'), { status: 200 })))
+})
+
+describe('그림 파일은 그릴 때마다 새로', () => {
+  it('새로 그린 인물 시트는 매번 새 파일로 저장하고, 작은 미리보기와 대표 얼굴도 그 파일 옆에 따로 만든다', async () => {
+    // 왜: 한 칸에 파일이 하나뿐이면 카드 기록의 예전 그림이 모두 최신 그림을 가리켜(주소 뒤 ?v= 만 다름) 예전 그림을 불러올 수 없었다.
+    const first = characterJob()
+    const second = characterJob()
+    const firstUrl = await finalizeCharacterViewJob(first, 'https://fal.test/a.png')
+    const secondUrl = await finalizeCharacterViewJob(second, 'https://fal.test/b.png')
+
+    expect(pathOf(firstUrl)).toMatch(new RegExp(`^${WS}/${P}/characters/.+_main_g${first.id}\\.png$`))
+    expect(pathOf(secondUrl)).toMatch(new RegExp(`_main_g${second.id}\\.png$`))
+    expect(pathOf(firstUrl)).not.toBe(pathOf(secondUrl))
+    for (const url of [firstUrl, secondUrl]) {
+      const sheet = pathOf(url)
+      const face = sheet.replace(/\.png$/, '_portrait.png')
+      expect(state.db.objects.has(sheet)).toBe(true)
+      expect(state.db.objects.has(face)).toBe(true)
+      expect(state.thumbs).toEqual(expect.arrayContaining([sheet, face]))
+    }
+    // 카드 기록의 두 줄은 서로 다른 파일을 가리키고, 지금 그림 · 대표 얼굴은 나중 것이다.
+    const candidates = state.db.rows('character_image_candidates')
+    expect(new Set(candidates.map((row) => pathOf(row.url))).size).toBe(2)
+    const row = state.db.rows('character_appearances')[0]
+    expect(pathOf(row.sheet_url)).toBe(pathOf(secondUrl))
+    expect(pathOf(row.portrait_url)).toBe(pathOf(secondUrl).replace(/\.png$/, '_portrait.png'))
+  })
+
+  it('새로 그린 배경 그림(기본 모습 · 다른 모습)도 매번 새 파일로 저장한다', async () => {
+    // 왜: 인물과 같은 까닭 — 배경 기록의 예전 그림도 그 그림 그대로 불러올 수 있어야 한다.
+    const a = worldJob()
+    const b = worldJob()
+    const night = worldJob(randomUUID(), 'night')
+    const urlA = await finalizeWorldShotJob(a, 'https://fal.test/a.png')
+    const urlB = await finalizeWorldShotJob(b, 'https://fal.test/b.png')
+    const urlNight = await finalizeWorldShotJob(night, 'https://fal.test/n.png')
+    expect(pathOf(urlA)).toMatch(new RegExp(`^${WS}/${P}/locations/.+_wide_shot_g${a.id}\\.png$`))
+    expect(pathOf(urlB)).toMatch(new RegExp(`_wide_shot_g${b.id}\\.png$`))
+    expect(pathOf(urlNight)).toMatch(new RegExp(`_wide_shot_g${night.id}\\.png$`))
+    expect(pathOf(state.db.rows('locations')[0].wide_shot)).toBe(pathOf(urlB))
+    expect(pathOf(state.db.rows('location_appearances')[0].wide_shot)).toBe(pathOf(urlNight))
+    expect(state.thumbs).toEqual(expect.arrayContaining([pathOf(urlA), pathOf(urlB), pathOf(urlNight)]))
+  })
+
+  it('배경의 기본 모습과 다른 모습은 카드 기록의 "지금" 그림을 따로 가진다', async () => {
+    // 왜: DB 의 "지금 그림은 하나" 규칙이 배경 한 곳 전체에 걸려 있어, 다른 모습을 그리면 기본 모습의 기록 줄이 조용히 빠졌다(개발 DB 실측 1곳).
+    //   규칙(유일 색인)을 모습마다로 바꾼다 — 기존 표에 칸을 더하지 않고 색인만 바꾼다.
+    const migration = readdirSync('supabase/migrations').filter((name) => name.endsWith('_artist_versions.sql'))
+    expect(migration).toHaveLength(1)
+    const sql = readFileSync(`supabase/migrations/${migration[0]}`, 'utf8').replace(/\s+/g, ' ')
+    expect(sql).toContain("create unique index idx_loc_img_candidates_one_selected on public.location_image_candidates (project_id, location_id, view, coalesce(variant_key, '')) where is_selected")
+    await finalizeWorldShotJob(worldJob(), 'https://fal.test/a.png')
+    await finalizeWorldShotJob(worldJob(randomUUID(), 'night'), 'https://fal.test/n.png')
+    const selected = state.db.rows('location_image_candidates').filter((row) => row.is_selected)
+    expect(selected.map((row) => row.variant_key ?? 'default').sort()).toEqual(['default', 'night'])
+  })
+})
+
+describe('카드 기록에서 빠진 그림 파일', () => {
+  it('보관 한도(5장)를 넘어 카드 기록에서 빠진 그림의 파일은 지우고, 버전 기록이 가리키는 파일 · 버전 폴더 파일 · 예전 고정 경로 파일은 지우지 않는다', async () => {
+    // 왜: 그림마다 새 파일이 생기면 보관함이 끝없이 커진다 — 기록에서 빠진 그림은 다시 볼 길이 없으니 지운다(혼자 정한 것).
+    //   남긴 버전 · 예전 고정 경로(여러 기록 줄이 같은 파일을 가리킨다) · 지금 그림은 지우면 안 된다.
+    const dir = `${WS}/${P}/characters/minho`
+    const unique = (n: number) => `${dir}/current_main_g${'0000000' + n}-0000-4000-8000-000000000000.png`
+    const paths = {
+      gone: unique(1),
+      inVersion: unique(2),
+      legacy: `${dir}/current_main.png`,
+      versionCopy: `${WS}/${P}/versions/v1/c-minho-current-sheet-abcd.png`,
+    }
+    const at = (h: number) => `2026-10-27T0${h}:00:00.000Z`
+    const rows: Row[] = [
+      { id: 'gone', url: mediaUrlOf(paths.gone), generated_at: at(1) },
+      { id: 'in-version', url: mediaUrlOf(paths.inVersion), generated_at: at(2) },
+      { id: 'legacy', url: `${mediaUrlOf(paths.legacy)}?v=3`, generated_at: at(3) },
+      { id: 'version-copy', url: mediaUrlOf(paths.versionCopy), generated_at: at(4) },
+      ...[5, 6, 7, 8].map((h) => ({ id: `keep-${h}`, url: mediaUrlOf(unique(h)), generated_at: at(h) })),
+    ].map((row) => ({ project_id: P, character_id: 'minho', appearance_key: 'current', view: 'main', source_hash: null, appearance_hash: null, is_selected: false, pinned: false, ...row }))
+    rows.push({ id: 'selected', project_id: P, character_id: 'minho', appearance_key: 'current', view: 'main', url: mediaUrlOf(unique(9)), source_hash: null, appearance_hash: null, is_selected: true, pinned: false, generated_at: at(9) })
+    state.db = seed({
+      character_image_candidates: rows,
+      artist_versions: [{ id: 'v1', project_id: P, n: 1, is_current: false, snapshot: { characters: [{ characterId: 'minho', appearanceKey: 'current', sheet: { url: mediaUrlOf(paths.inVersion), candidateId: 'in-version', sourceHash: null, appearanceHash: null, generatedAt: at(2) }, portraitUrl: null }], locations: [] } }],
+    })
+    for (const path of [...Object.values(paths), paths.gone.replace(/\.png$/, '_portrait.png'), paths.gone.replace(/\.png$/, '_thumb.webp')]) state.db.objects.set(path, { bytes: Buffer.from(path) })
+
+    await finalizeCharacterViewJob(characterJob(), 'https://fal.test/new.png')
+
+    const left = state.db.rows('character_image_candidates').map((row) => row.id)
+    expect(left).not.toEqual(expect.arrayContaining(['gone', 'in-version', 'legacy', 'version-copy']))
+    expect(state.db.objects.has(paths.gone)).toBe(false)
+    expect(state.db.objects.has(paths.gone.replace(/\.png$/, '_portrait.png'))).toBe(false)
+    expect(state.db.objects.has(paths.gone.replace(/\.png$/, '_thumb.webp'))).toBe(false)
+    expect(state.db.objects.has(paths.inVersion)).toBe(true)
+    expect(state.db.objects.has(paths.legacy)).toBe(true)
+    expect(state.db.objects.has(paths.versionCopy)).toBe(true)
+  })
+})
