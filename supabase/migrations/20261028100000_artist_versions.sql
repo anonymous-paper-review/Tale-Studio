@@ -4,7 +4,8 @@
 --   복사해 snapshot 에 남긴다. active = 그 버전이 지금이었던 때들({from,to}) — 카드 기록의 그림이 어느 버전(스타일) 것인지 그린 때로 가린다.
 --   regen = 재생성 그림 그리기(시작 시각 · 그릴 칸 · 접수 전에 막힌 칸 · 다 그린 때) — 화면을 떠났다 돌아오면 남은 칸을 이어 그린다.
 --   오너 결정(4): 새 표 하나만 더하고 기존 표에는 칸을 더하지 않는다. 서버(service role)만 읽고 쓴다 — 화면은 /api/artist/versions 로 읽는다.
---   약속: tests/artist/style-version-routes.test.ts · tests/artist/style-versions.test.ts
+--   약속: tests/artist/style-version-routes.test.ts · tests/artist/style-versions.test.ts · tests/ops/artist-versions-migration.test.ts
+--   되돌리기: supabase/rollbacks/20261028100000_artist_versions.rollback.sql(이 폴더 밖 — 이 폴더의 .sql 은 모두 마이그레이션으로 실행된다).
 begin;
 
 create table public.artist_versions (
@@ -37,6 +38,24 @@ alter table public.artist_versions enable row level security;
 -- 배경 카드 기록의 "지금 그림" 규칙을 모습마다로(2026-10-28): 예전 색인은 배경 한 곳 전체에 하나만 허락해,
 --   다른 모습(밤 등)을 그리면 기본 모습의 기록 줄이 조용히 빠졌다(개발 DB 실측 1곳). 기존 표에 칸을 더하지 않고 색인만 바꾼다.
 --   새 색인이 더 느슨하다 — 지금 있는 행은 모두 만족한다.
+--   먼저 확인한다(2026-10-28 검토 지적): 옛 색인이 있는지, 새 규칙으로 겹치는 지금 그림이 없는지 — 아니면 여기서 멈춘다(전체가 되돌아간다).
+do $$
+begin
+  if not exists (
+    select 1 from pg_indexes
+    where schemaname = 'public' and tablename = 'location_image_candidates' and indexname = 'idx_loc_img_candidates_one_selected'
+  ) then
+    raise exception 'idx_loc_img_candidates_one_selected is missing on public.location_image_candidates; check the index before applying';
+  end if;
+  if exists (
+    select 1 from public.location_image_candidates
+    where is_selected
+    group by project_id, location_id, view, coalesce(variant_key, '') having count(*) > 1
+  ) then
+    raise exception 'location_image_candidates has more than one selected row per (project, location, view, variant); clean them up before applying';
+  end if;
+end $$;
+
 drop index if exists public.idx_loc_img_candidates_one_selected;
 create unique index idx_loc_img_candidates_one_selected
   on public.location_image_candidates (project_id, location_id, view, coalesce(variant_key, ''))

@@ -158,3 +158,29 @@ describe('카드 기록에서 빠진 그림 파일', () => {
     expect(state.db.objects.has(paths.versionCopy)).toBe(true)
   })
 })
+
+describe('카드 기록 줄이 가리키는 파일', () => {
+  it('카드 기록에서 빠진 줄과 같은 파일을 다른 기록 줄이 아직 가리키면 그 파일은 지우지 않는다', async () => {
+    // 왜: 같은 그림 작업이 웹훅과 확인 두 길로 함께 마무리되면 한 파일에 기록 줄이 둘 생긴다 — 하나가 빠질 때 파일을 지우면
+    //   남은 줄(지금 그림일 수도 있다)이 깨진 그림이 된다(2026-10-28 검토 지적).
+    const dir = `${WS}/${P}/characters/minho`
+    const unique = (n: number) => `${dir}/current_main_g${'0000000' + n}-0000-4000-8000-000000000000.png`
+    const at = (h: number) => `2026-10-27T0${h}:00:00.000Z`
+    const shared = unique(1)
+    const rows: Row[] = [
+      { id: 'twin-old', url: mediaUrlOf(shared), generated_at: at(1) },
+      ...[2, 3, 4, 5].map((h) => ({ id: `keep-${h}`, url: mediaUrlOf(unique(h)), generated_at: at(h) })),
+      { id: 'twin-new', url: mediaUrlOf(shared), generated_at: at(6) },
+    ].map((row) => ({ project_id: P, character_id: 'minho', appearance_key: 'current', view: 'main', source_hash: null, appearance_hash: null, is_selected: false, pinned: false, ...row }))
+    state.db = seed({ character_image_candidates: rows })
+    state.db.objects.set(shared, { bytes: Buffer.from('shared') })
+
+    await finalizeCharacterViewJob(characterJob(), 'https://fal.test/new.png')
+
+    const left = state.db.rows('character_image_candidates').map((row) => row.id)
+    expect(left).not.toContain('twin-old')
+    expect(left).toContain('twin-new')
+    expect(state.db.objects.has(shared)).toBe(true)
+  })
+})
+

@@ -3,7 +3,9 @@
 //   [다시 만들기] 뒤 그림은 이 화면이 칸마다 지금의 [다시 만들기]와 같은 함수(generateCharacterView · generateWorldShot, actor 'ui')로 그린다 —
 //   지금 그림을 얼굴 참고로(오너 결정 1). 기본 모습을 먼저, 다른 모습은 그 인물 · 배경의 기본 모습이 끝난 뒤.
 //   이어 그리기 규칙은 draw-continue 와 같다: Artist 화면이 열려 있을 때만, 실패한 칸은 다시 보내지 않고(9/11), 내 한도에 막히면 잠시 뒤 다시,
-//   모두의 자리에 막히면 멈추고 단추로 남긴다. 다 그리면(완료 표시는 서버가 한 번만) 채팅에 알린다. 약속: tests/artist/style-version-store.test.ts
+//   모두의 자리에 막히면 멈추고 단추로 남긴다. 다 그리면(완료 표시는 서버가 한 번만) 채팅에 알린다. Storyboard 를 연 뒤(완료)면 더 그리지 않는다.
+//   멈춘 재생성은 [남은 그림 다시 그리기](resumeRegen) 또는 [이전 버전으로 돌아가기](goBackToPrevious)로 빠져나간다 — 멈춘 동안의 불러오기는
+//   남은 재생성을 그만두고 불러온다(2026-10-28 검토 지적). 약속: tests/artist/style-version-store.test.ts · style-version-way-out.test.ts
 import { create } from 'zustand'
 import { useArtistStore } from '@/stores/artist-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
@@ -16,6 +18,7 @@ import { fetchArtistGenerationLimit, runAdaptivePool } from '@/lib/artist/genera
 import { STYLE_WAIT_RECHECK_MS, USER_LIMIT_RECHECK_MS, USER_LIMIT_WAIT_MAX_MS } from '@/lib/artist/draw-continue'
 import {
   ARTIST_VERSION_CODES,
+  earlierVersions,
   nextRegenTargets,
   regenDoneMessage,
   regenSlotKey,
@@ -70,7 +73,10 @@ interface ArtistVersionState {
   closeHistory: () => void
   dismissOverlay: () => void
   regenerate: (styleKey: string) => Promise<boolean>
-  loadVersion: (n: number) => Promise<boolean>
+  /** 버전을 불러온다. cancelRegen 을 주지 않으면 재생성 그림이 멈춘 채일 때만 그 재생성을 그만두고 불러온다. */
+  loadVersion: (n: number, opts?: { cancelRegen?: boolean }) => Promise<boolean>
+  /** 멈춘 재생성을 그만두고 재생성 전 버전으로 돌아간다([이전 버전으로 돌아가기]). */
+  goBackToPrevious: () => Promise<boolean>
   /** 남은 재생성 칸을 이어 그린다 — 이미 도는 중이면 그 일을 기다린다. */
   continueRegen: () => Promise<void>
   /** 멈춘 이어 그리기를 다시 켠다([남은 그림 그리기]). */
@@ -90,7 +96,20 @@ function messageForCode(code: string | undefined, fallback: string): string {
   if (code === ARTIST_VERSION_CODES.conflict || code === ARTIST_VERSION_CODES.alreadyCurrent) return 'Another window changed the version first. Check the history and try again.'
   if (code === ARTIST_VERSION_CODES.nothingToDraw) return 'There are no characters or backgrounds to remake yet.'
   if (code === ARTIST_VERSION_CODES.unknownStyle) return 'Pick a style that is available.'
+  if (code === ARTIST_VERSION_CODES.restoring) return 'Loading the version. Try again in a moment.'
   return fallback
+}
+
+/** 재생성 그림이 다 그려지기 전에 멈췄나 — 이어 그리기가 모두의 자리 · 오랜 한도 기다림으로 멈춘 채 남은 칸이 있다. */
+function regenStopped(state: Pick<ArtistVersionState, 'regen' | 'run'>): boolean {
+  return !!state.regen && !state.regen.complete && state.run.stopped
+}
+
+/** 재생성 전 버전 — 기록에 적어 둔 번호, 없으면(예전 기록) 재생성을 시작할 때 떠난 버전, 그것도 없으면 가장 최근의 이전 버전. */
+function versionBeforeRegen(regen: RegenProgress, versions: readonly VersionView[]): number | null {
+  if (regen.fromN != null) return regen.fromN
+  const left = versions.find((version) => !version.current && version.active.some((range) => range.to === regen.startedAt))
+  return left?.n ?? earlierVersions(versions)[0]?.n ?? null
 }
 
 /** 버전의 스타일을 Producer 스토어(작품 스타일의 화면 값)에 옮긴다 — 서버가 이미 바꿨다. */
@@ -166,6 +185,8 @@ export const useArtistVersionStore = create<ArtistVersionState>((set, get) => {
         if (!screenOpen(projectId)) return
         const view = await get().refresh()
         if (!view || !screenOpen(projectId)) return
+        // 다른 창에서 [완료하기]를 눌렀다 — Storyboard 로 넘어간 그림을 바꾸지 않게 더 그리지 않는다(2026-10-28 검토 지적).
+        if (view.completed) return
         const regen = view.regen
         if (!regen) return
         if (regen.complete) {
@@ -283,17 +304,25 @@ export const useArtistVersionStore = create<ArtistVersionState>((set, get) => {
       }
     },
 
-    loadVersion: async (n) => {
+    loadVersion: async (n, opts) => {
       const projectId = useProjectStore.getState().projectId
       if (!projectId || get().busy) return false
+      const cancelRegen = opts?.cancelRegen ?? regenStopped(get())
       set({ busy: 'load', lastError: null })
       try {
-        const { ok, body } = await postJson('/api/artist/versions/load', { projectId, n })
+        const { ok, body } = await postJson('/api/artist/versions/load', { projectId, n, ...(cancelRegen ? { cancelRegen: true } : {}) })
         if (!sameProject(projectId)) return false
         if (!ok) {
-          set({ lastError: translate(useLocaleStore.getState().locale, messageForCode(body.code as string | undefined, 'Could not load the version. Please try again.')) })
+          const code = body.code as string | undefined
+          set({ lastError: translate(useLocaleStore.getState().locale, messageForCode(code, 'Could not load the version. Please try again.')) })
+          // 답을 못 받았으면(시간 제한 등) 서버가 어디까지 했는지 모른다 — 기록 · 그림을 다시 읽어 화면을 맞춘다.
+          if (!code) {
+            await get().refresh()
+            void useArtistStore.getState().loadData()
+          }
           return false
         }
+        if (cancelRegen) set({ run: { ...IDLE_RUN }, overlayDismissedFor: null })
         const styleKey = typeof body.styleKey === 'string' ? body.styleKey : null
         const customStyle = (body.customStyle ?? null) as VersionCustomStyle | null
         applyStyle(styleKey, customStyle)
@@ -305,6 +334,14 @@ export const useArtistVersionStore = create<ArtistVersionState>((set, get) => {
       } finally {
         set({ busy: null })
       }
+    },
+
+    goBackToPrevious: async () => {
+      const regen = get().regen
+      if (!regen) return false
+      const n = versionBeforeRegen(regen, get().versions)
+      if (n == null) return false
+      return get().loadVersion(n, { cancelRegen: true })
     },
 
     continueRegen: () => {

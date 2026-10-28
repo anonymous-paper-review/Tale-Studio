@@ -12,7 +12,7 @@ import { requireProjectAccess } from '@/lib/api/guard'
 import { CHARACTER_VIEW_KEYS, type CharacterViewKey } from '@/types/asset'
 import { viewKeyToCandidateView } from '@/lib/image-provenance'
 import { keepsSourcePortrait } from '@/lib/artist/source-image'
-import { portraitUrlForSheet, readSheetBytes } from '@/lib/artist/portrait-file'
+import { portraitForSheetUrl } from '@/lib/artist/portrait-file'
 import { ARTIST_VERSION_CODES } from '@/lib/artist/style-versions'
 import { candidateStyleAllowed } from '@/lib/artist/style-versions-server'
 
@@ -29,11 +29,8 @@ async function portraitForChosenSheet(projectId: string, characterId: string, ap
   ])
   if (keepsSourcePortrait(appearance as { derived_from_url?: string | null } | null)) return null
   const entityType = (character as { entity_type?: string | null } | null)?.entity_type ?? null
-  if (entityType === 'object') return sheetUrl
   try {
-    const sheet = await readSheetBytes(sheetUrl)
-    if (!sheet.path) return sheetUrl
-    return await portraitUrlForSheet({ sheetPath: sheet.path, sheetBuf: sheet.bytes, sheetUrl, entityType })
+    return await portraitForSheetUrl(sheetUrl, entityType)
   } catch (e) {
     console.warn('[artist/select-candidate] portrait crop skipped:', e instanceof Error ? e.message : e)
     return null

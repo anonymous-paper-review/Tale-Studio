@@ -2854,4 +2854,11 @@ export const KO: Record<string, string> = {
   'Another window changed the version first. Check the history and try again.': '다른 창에서 먼저 버전을 바꿨어요. 기록을 확인하고 다시 해 주세요.',
   'There are no characters or backgrounds to remake yet.': '아직 다시 만들 인물 · 배경이 없어요.',
   'Pick a style that is available.': '쓸 수 있는 스타일을 골라 주세요.',
+  // 작품 스타일 기록 검토 지적(2026-10-28) — 멈춘 재생성에서 돌아가기 · 재생성 중 [완료하기] · 불러오는 중
+  'Some images were not drawn. Draw the rest again, or go back to the previous version.': '그리지 못한 그림이 있어요. 남은 그림을 다시 그리거나 이전 버전으로 돌아갈 수 있어요.',
+  'Draw the rest again, or go back to the previous version.': '남은 그림을 다시 그리거나 이전 버전으로 돌아갈 수 있어요.',
+  'Draw the remaining images again': '남은 그림 다시 그리기',
+  'Go back to the previous version': '이전 버전으로 돌아가기',
+  'You can complete once the regenerated images are drawn.': '다시 만드는 그림을 다 그린 뒤에 완료할 수 있어요.',
+  'Loading the version. Try again in a moment.': '버전을 불러오는 중이에요. 잠시 뒤 다시 해 보세요.',
 }

@@ -18,20 +18,23 @@ export const ARTIST_VERSION_CODES = {
   unknownStyle: 'unknown_style',
   nothingToDraw: 'nothing_to_draw',
   otherStyle: 'other_style',
+  restoring: 'version_restoring',
 } as const
 
 /** 그 버전이 지금이었던 때 — from 이 null 이면 기록 기능 전부터(v1). to 가 null 이면 지금도. */
 export interface ActiveRange { from: string | null; to: string | null }
 
-/** 버전에 남긴 그림 한 장 — 카드 기록 줄(후보)과 그때의 지문을 함께 둔다(되살릴 때 "바뀜" 판정이 그대로다). */
+/** 버전에 남긴 그림 한 장 — 카드 기록 줄(후보)과 그때의 지문을 함께 둔다(되살릴 때 "바뀜" 판정이 그대로다).
+ *  sourceUrl = 복사해 온 지금 그림 주소 — 다음에 떠날 때 지금 그림이 그대로면 복사본을 다시 쓴다(보관함이 커지지 않게). */
 export interface VersionImage {
   url: string
   candidateId: string | null
   sourceHash: string | null
   appearanceHash: string | null
   generatedAt: string | null
+  sourceUrl?: string | null
 }
-export interface VersionCharacterImage { characterId: string; appearanceKey: string; sheet: VersionImage; portraitUrl: string | null }
+export interface VersionCharacterImage { characterId: string; appearanceKey: string; sheet: VersionImage; portraitUrl: string | null; portraitSourceUrl?: string | null }
 export interface VersionLocationImage { locationId: string; appearanceKey: string | null; wideShot: VersionImage }
 /** look.l1 = 그 버전 때의 그림 지시 그림체 값(design_tokens.l1) — 불러오면 이것으로 돌아간다(styleLookTokens). */
 export interface VersionSnapshot { characters: VersionCharacterImage[]; locations: VersionLocationImage[]; look?: { l1: Record<string, unknown> | null } }
@@ -53,8 +56,9 @@ export interface VersionView extends VersionSummary {
 
 /** 다시 그릴 칸 하나. phase 0 = 기본 모습, 1 = 다른 모습(그 인물 · 배경의 기본 모습이 끝난 뒤). fromUrl = 시작할 때의 그림. */
 export interface RegenSlot { kind: 'character' | 'location'; id: string; appearanceKey: string | null; phase: 0 | 1; fromUrl: string | null }
-/** 버전 행의 regen 칸 — 시작 시각 · 그릴 칸 · 접수 전에 막힌 칸(실패로 본다) · 다 그린 때(완료 알림을 한 번만 한다). */
-export interface RegenRecord { startedAt: string; slots: RegenSlot[]; failed: string[]; doneAt: string | null }
+/** 버전 행의 regen 칸 — 시작 시각 · 그릴 칸 · 접수 전에 막힌 칸(실패로 본다) · 다 그린 때(완료 알림을 한 번만 한다).
+ *  fromN = 재생성 전 버전([이전 버전으로 돌아가기]가 불러온다). cancelledAt = 다 그리기 전에 그만둔 때(다시 와도 이어 그리지 않는다). */
+export interface RegenRecord { startedAt: string; slots: RegenSlot[]; failed: string[]; doneAt: string | null; fromN?: number | null; cancelledAt?: string | null }
 export type RegenSlotState = 'done' | 'failed' | 'drawing' | 'todo'
 /** 칸 하나의 지금 사실 — jobs 는 시작 뒤에 만든 그 칸의 그림 작업들(fresh = 10분 안의 대기). */
 export interface RegenSlotFacts {
@@ -65,6 +69,8 @@ export interface RegenSlotFacts {
 export interface RegenProgress {
   n: number
   startedAt: string
+  /** 재생성 전 버전 — 모르면(이 칸이 생기기 전 기록) null. */
+  fromN: number | null
   slots: RegenSlot[]
   states: Record<string, RegenSlotState>
   total: number
@@ -139,6 +145,7 @@ export function regenProgress(n: number, record: RegenRecord, factsOf: (slot: Re
   return {
     n,
     startedAt: record.startedAt,
+    fromN: record.fromN ?? null,
     slots: record.slots,
     states,
     total: values.length,
@@ -229,19 +236,24 @@ export function earlierVersions<T extends VersionSummary>(versions: readonly T[]
   return historyOrder(versions.filter((version) => !version.current))
 }
 
-/** 머리 줄 — 지금 버전 번호 · 기록 수 · 두 단추 · 까닭. 기록이 없으면 지금 그림이 v1 이다. */
-export function versionHeader(input: { versions: readonly VersionSummary[]; completed: boolean; drawing: boolean; demo?: boolean }): {
+/**
+ * 머리 줄 — 지금 버전 번호 · 기록 수 · 두 단추 · 까닭. 기록이 없으면 지금 그림이 v1 이다.
+ *   stopped = 재생성 그림이 다 그려지기 전에 멈췄다 — [불러오기]로 이전 버전에 돌아갈 수 있고(남은 재생성은 그만둔다),
+ *   [재생성하기]는 남은 그림을 그리거나 돌아간 뒤에 한다(2026-10-28 검토 지적).
+ */
+export function versionHeader(input: { versions: readonly VersionSummary[]; completed: boolean; drawing: boolean; demo?: boolean; stopped?: boolean }): {
   n: number
   count: number
   canLoad: boolean
   canRegenerate: boolean
-  note: 'completed' | 'drawing' | 'single' | null
+  note: 'completed' | 'drawing' | 'stopped' | 'single' | null
 } {
   const count = Math.max(1, input.versions.length)
   const n = input.versions.find((version) => version.current)?.n ?? (input.versions.length ? Math.max(...input.versions.map((version) => version.n)) : 1)
   if (input.completed) return { n, count, canLoad: false, canRegenerate: false, note: 'completed' }
   if (input.drawing) return { n, count, canLoad: false, canRegenerate: false, note: 'drawing' }
   if (input.demo) return { n, count, canLoad: false, canRegenerate: false, note: null }
+  if (input.stopped) return { n, count, canLoad: count > 1, canRegenerate: false, note: 'stopped' }
   if (count <= 1) return { n, count, canLoad: false, canRegenerate: true, note: 'single' }
   return { n, count, canLoad: true, canRegenerate: true, note: null }
 }
@@ -279,7 +291,10 @@ function parseImage(raw: unknown): VersionImage | null {
   const image = raw as Record<string, unknown>
   const url = str(image.url)
   if (!url) return null
-  return { url, candidateId: str(image.candidateId), sourceHash: str(image.sourceHash), appearanceHash: str(image.appearanceHash), generatedAt: str(image.generatedAt) }
+  return {
+    url, candidateId: str(image.candidateId), sourceHash: str(image.sourceHash), appearanceHash: str(image.appearanceHash), generatedAt: str(image.generatedAt),
+    sourceUrl: str(image.sourceUrl),
+  }
 }
 
 export function parseVersionSnapshot(raw: unknown): VersionSnapshot | null {
@@ -290,7 +305,7 @@ export function parseVersionSnapshot(raw: unknown): VersionSnapshot | null {
     const sheet = parseImage(entry.sheet)
     const characterId = str(entry.characterId)
     const appearanceKey = str(entry.appearanceKey)
-    return sheet && characterId && appearanceKey ? [{ characterId, appearanceKey, sheet, portraitUrl: str(entry.portraitUrl) }] : []
+    return sheet && characterId && appearanceKey ? [{ characterId, appearanceKey, sheet, portraitUrl: str(entry.portraitUrl), portraitSourceUrl: str(entry.portraitSourceUrl) }] : []
   })
   const locations = (Array.isArray(snapshot.locations) ? snapshot.locations : []).flatMap((item) => {
     const entry = (item ?? {}) as Record<string, unknown>
@@ -315,7 +330,8 @@ export function parseRegenRecord(raw: unknown): RegenRecord | null {
     return [{ kind: slot.kind, id, appearanceKey: str(slot.appearanceKey), phase: slot.phase === 1 ? 1 : 0, fromUrl: str(slot.fromUrl) }]
   })
   const failed = Array.isArray(record.failed) ? record.failed.filter((key): key is string => typeof key === 'string') : []
-  return { startedAt, slots, failed, doneAt: str(record.doneAt) }
+  const fromN = typeof record.fromN === 'number' && Number.isInteger(record.fromN) ? record.fromN : null
+  return { startedAt, slots, failed, doneAt: str(record.doneAt), fromN, cancelledAt: str(record.cancelledAt) }
 }
 
 /** 직접 올린 그림체(custom_style_anchor) — 화면이 쓰는 모양만. */
@@ -356,15 +372,22 @@ export function versionLoadedMessage(locale: AppLocale, input: { style: string; 
   })
 }
 
-// 이전 스타일 · 버전으로 돌아가자는 말(프로토타입 AY) — 공백을 지운 소문자 말에 맞춘다. 되돌리기 어려운 선택이 아니라 카드만 띄운다.
-const KO_PREV_STYLE = /(?:이전|예전|원래|지난|처음|앞|전)(?:의)?(?:스타일|그림체|화풍|버전|룩)/ // i18n-ok: 사용자 말에서 "이전 스타일 · 버전"을 알아듣는 정규식
+// 이전 스타일 · 버전으로 돌아가자는 말(프로토타입 AY) — 되돌리기 어려운 선택이 아니라 카드만 띄운다.
+//   "이전 스타일"은 띄어 쓴 말 그대로 맞춘다 — 공백을 지우면 "완전 스타일"의 "전 스타일"처럼 낱말 사이가 붙어 걸렸다(2026-10-28 검토 지적).
+//   한 글자 "앞" · "전"은 낱말 첫머리일 때만. 나머지(되돌리자는 말 · 말끝 · 아니라는 말)는 공백을 지운 말에 맞춘다.
+const KO_PREV_STYLE = /(?:이전|예전|원래|지난|처음|(?:^|[^가-힣])(?:앞|전))(?:의)?\s*(?:스타일|그림체|화풍|버전|룩)/ // i18n-ok: 사용자 말에서 "이전 스타일 · 버전"을 알아듣는 정규식
 const KO_BACK = /(?:돌아|되돌|돌려|복구|복원|불러)/ // i18n-ok: 사용자 말에서 되돌아가자는 말을 알아듣는 정규식
 const KO_TO_END = /(?:스타일|그림체|화풍|버전|룩)(?:으로|로)[.!~]*$/ // i18n-ok: "전 버전으로"처럼 말이 끝나는 경우
 const KO_NEGATED = /(?:가지|하지|돌리지|되돌리지)(?:마|말|않)|싫어|아니야/ // i18n-ok: 되돌리지 말라는 말
+// 영어는 "이전 · 예전 · 처음 스타일 · 버전(· 룩)으로"를 붙여 말할 때만 — "go back … look"처럼 사이를 비워 맞추면
+//   "go back and make him look older" 같은 평범한 요청까지 걸렸다(2026-10-28 검토 지적).
+const EN_EARLIER = String.raw`(?:the\s+|my\s+|our\s+)?(?:previous|old|older|earlier|original|last|first|prior)\s+(?:art\s+)?(?:style|version|look)`
 const EN_RULES = [
-  /\b(?:go|going|get|switch|change|roll|revert|turn)\s+(?:it\s+)?back\b[^.?!]*\b(?:style|version|look)\b/i,
-  /\brevert\b[^.?!]*\b(?:style|version|look)\b/i,
-  /\b(?:restore|load|return\s+to|bring\s+back|undo)\b[^.?!]*\b(?:previous|old|earlier|original|last)\s+(?:style|version|look)\b/i,
+  new RegExp(String.raw`\b(?:go|going|get|switch|change|roll|revert|turn)\s+(?:it\s+|this\s+)?back\s+to\s+${EN_EARLIER}\b`, 'i'),
+  new RegExp(String.raw`\brevert\s+(?:it\s+|this\s+)?(?:back\s+)?to\s+${EN_EARLIER}\b`, 'i'),
+  new RegExp(String.raw`\b(?:restore|load|bring\s+back|return\s+to|use)\s+${EN_EARLIER}\b`, 'i'),
+  /\b(?:go|switch|roll|revert|turn)\s+back\s+to\s+v\d+\b/i,
+  /\b(?:load|restore)\s+v\d+\b/i,
 ]
 const EN_NEGATED = /\b(?:don['’]?t|do\s+not|never|not)\b/i
 
@@ -372,9 +395,10 @@ const EN_NEGATED = /\b(?:don['’]?t|do\s+not|never|not)\b/i
 export function styleReturnRequest(text: string, styleNames: readonly string[] = []): boolean {
   const said = text.trim()
   if (!said) return false
-  const compact = said.toLowerCase().replace(/\s+/g, '')
+  const lower = said.toLowerCase()
+  const compact = lower.replace(/\s+/g, '')
   if (!KO_NEGATED.test(compact)) {
-    if (KO_PREV_STYLE.test(compact) && (KO_BACK.test(compact) || KO_TO_END.test(compact))) return true
+    if (KO_PREV_STYLE.test(lower) && (KO_BACK.test(compact) || KO_TO_END.test(compact))) return true
     const names = styleNames.map((name) => name.toLowerCase().replace(/\s+/g, '')).filter((name) => name.length > 0)
     for (const name of names) {
       const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')

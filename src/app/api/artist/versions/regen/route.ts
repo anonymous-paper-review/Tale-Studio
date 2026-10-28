@@ -16,7 +16,7 @@ async function updateRegen(projectId: string, n: number, change: (record: RegenR
   for (let attempt = 0; attempt < 3; attempt++) {
     const row = (await readVersionRows(projectId)).find((item) => item.n === n && item.is_current)
     const record = row ? parseRegenRecord(row.regen) : null
-    if (!row || !record) return null
+    if (!row || !record || record.cancelledAt) return null
     const next = change(record, row)
     if (!next) return { row, record, changed: false }
     const { data, error } = await supabaseAdmin
@@ -54,7 +54,8 @@ export async function POST(req: Request) {
 
     const row = (await readVersionRows(projectId)).find((item) => item.n === n && item.is_current)
     const record = row ? parseRegenRecord(row.regen) : null
-    if (!row || !record) return NextResponse.json({ ok: true, announced: false, complete: true, failed: 0 })
+    // 그만둔 재생성(이전 버전으로 돌아감)은 더 그리지도 알리지도 않는다.
+    if (!row || !record || record.cancelledAt) return NextResponse.json({ ok: true, announced: false, complete: true, failed: 0 })
     const progress = await regenProgressFor(projectId, n, record, await readLiveImages(projectId))
     if (!progress.complete) return NextResponse.json({ ok: true, announced: false, complete: false, failed: progress.failed })
     if (record.doneAt) return NextResponse.json({ ok: true, announced: false, complete: true, failed: progress.failed })

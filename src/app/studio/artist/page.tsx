@@ -44,6 +44,7 @@ import { groupSeriesAssets, seriesMakingTitle } from '@/features/series/artist-s
 import { useSeriesInfo } from '@/features/series/use-series-info'
 import { styleIdOf } from '@/lib/series/snapshot'
 import { StyleVersionBar } from '@/features/artist-room/style-version-bar'
+import { RegenStoppedActions } from '@/features/artist-room/regen-stopped-actions'
 import { RegenerateStyleDialog } from '@/features/artist-room/regenerate-style-dialog'
 import { VersionHistoryDialog } from '@/features/artist-room/version-history-dialog'
 import { useArtistVersionStore } from '@/stores/artist-version-store'
@@ -442,8 +443,12 @@ export default function VisualPage() {
   const overlayDismissedFor = useArtistVersionStore((s) => s.overlayDismissedFor)
   const regenVersion = useArtistVersionStore((s) => s.versions.find((version) => version.n === s.regen?.n) ?? null)
   // 다 그렸다고 알리기 전의 재생성 — 남은 칸을 그리거나 완료를 알린다. 그리는 동안은 [완료하기] · 머리 줄 단추가 꺼진다.
+  //   모두의 자리 · 오랜 한도 기다림으로 멈추면(regenStopped) [남은 그림 다시 그리기] · [이전 버전으로 돌아가기]로 빠져나간다 —
+  //   그동안 [불러오기]는 켜지고 [완료하기] · [재생성하기]는 꺼진 채다(2026-10-28 검토 지적).
   const regenOpen = !!regen && !isDemoSession() && !artistCompleted
-  const regenDrawing = regenOpen && !regen.complete
+  const regenPending = regenOpen && !regen.complete
+  const regenStopped = regenPending && regenRun.stopped
+  const regenDrawing = regenPending && !regenRun.stopped
   useEffect(() => {
     if (projectId && regenOpen) void useArtistVersionStore.getState().continueRegen()
   }, [projectId, regenOpen, regen?.n])
@@ -453,25 +458,20 @@ export default function VisualPage() {
     const id = setInterval(() => void useArtistVersionStore.getState().refresh(), 5000)
     return () => clearInterval(id)
   }, [projectId, regenDrawing])
-  const regenOverlayOpen = regenDrawing && overlayDismissedFor !== regen.n
+  const regenOverlayOpen = regenPending && overlayDismissedFor !== regen.n
   const regenStyleLabel = regenVersion ? versionStyleLabel(regenVersion, styleAnchors, locale) : styleLabel ?? ''
-  const regenTodo = regen ? Object.values(regen.states).filter((state) => state === 'todo').length : 0
   const regenOverlay = regen ? (
     <AiBusyOverlay
       open={regenOverlayOpen}
       title={t(regenRun.stopped ? 'Some images were not drawn' : 'Making the images')}
       busy={!regenRun.stopped}
-      description={regenRun.stopped ? t('Draw the missing ones again, or close this and check the cards.') : t('{style} · v{n}', { style: regenStyleLabel, n: regen.n })}
+      description={regenRun.stopped ? t('Draw the rest again, or go back to the previous version.') : t('{style} · v{n}', { style: regenStyleLabel, n: regen.n })}
       steps={[{ label: t('Drawing images {drawn}/{total}', { drawn: regen.done, total: regen.total }), state: 'current' }]}
       progress={regen.total > 0 ? ((regen.done + regen.failed) / regen.total) * 100 : null}
       footer={(
         <>
           <Button size="sm" variant="outline" onClick={() => useArtistVersionStore.getState().dismissOverlay()}>{t('Close')}</Button>
-          {regenRun.stopped && regenTodo > 0 ? (
-            <Button size="sm" onClick={() => void useArtistVersionStore.getState().resumeRegen()} data-testid="artist-regen-resume">
-              {t('Draw the {count} missing images', { count: regenTodo })}
-            </Button>
-          ) : null}
+          <RegenStoppedActions />
         </>
       )}
     />
@@ -526,9 +526,11 @@ export default function VisualPage() {
   // 메인 헤더(리뉴얼 1차, 프로토타입 A5) — "Artist · 인물 N · 배경 M", 작품 스타일, 오른쪽 [완료하기 →].
   //   완료한 뒤(또는 예전 흐름으로 끝까지 만든 프로젝트)는 다시 완료하지 않고 Storyboard 로 가기만 한다.
   // 재생성 그림을 그리는 동안도 [완료하기]를 막는다 — 옛 스타일 그림이 섞인 채로 Storyboard 가 열리지 않게(2026-10-28).
-  const completeBlocked = gaps.characters.length + gaps.locations.length > 0 || regenDrawing
+  const completeBlocked = gaps.characters.length + gaps.locations.length > 0 || regenDrawing || regenStopped
   // [완료하기]가 꺼진 까닭을 글로 보인다 — 마우스를 올려야 보이는 안내뿐이라 이유를 몰랐다(2026-10-27 디자이너 QA 1차 #06).
-  const completeNote = phase === 'cards' ? completeBlockedNote({ gaps, drawing: generatingCount }) ?? (regenDrawing ? { kind: 'drawing' as const } : null) : null
+  const completeNote = phase === 'cards'
+    ? completeBlockedNote({ gaps, drawing: generatingCount }) ?? (regenDrawing ? { kind: 'drawing' as const } : regenStopped ? { kind: 'regen' as const } : null)
+    : null
   const headerRow = (
     <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
       <div className="flex min-w-0 flex-col gap-2">
@@ -560,7 +562,9 @@ export default function VisualPage() {
             <p className="max-w-xs text-right text-xs text-muted-foreground" role="status" data-testid="artist-complete-note">
               {completeNote.kind === 'drawing'
                 ? t('Drawing the images. You can complete once they are done.')
-                : t('No image yet: {names}', { names: completeNote.names.join(' · ') })}
+                : completeNote.kind === 'regen'
+                  ? t('You can complete once the regenerated images are drawn.')
+                  : t('No image yet: {names}', { names: completeNote.names.join(' · ') })}
             </p>
           ) : null}
           {overlayOpen ? null : redrawButton}

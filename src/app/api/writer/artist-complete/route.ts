@@ -12,6 +12,7 @@ import { getActiveRun } from '@/lib/writer/run-store'
 import { triggerWriterStep } from '@/lib/writer/pipeline/steps'
 import type { WriterRunState } from '@/lib/writer/pipeline/steps'
 import { loadCompletionGaps } from '@/lib/artist/completion'
+import { versionWorkPending } from '@/lib/artist/style-versions-server'
 
 export const runtime = 'nodejs'
 
@@ -44,6 +45,15 @@ export async function POST(req: NextRequest) {
         { error: 'Some characters or backgrounds have no image yet', code: 'artist_images_missing', missing },
         { status: 409 },
       )
+    }
+    // 재생성 그림이 다 그려지기 전 · 버전을 불러오다 멈춘 채면 받지 않는다 — 옛 스타일 그림이 섞인 채로 Storyboard 가 열리면
+    //   러프 · 샷이 섞인 그림으로 만들어진다. 화면 단추가 꺼져 있어도 다른 창 · 오래된 화면이 누를 수 있다(2026-10-28 검토 지적).
+    const versionWork = await versionWorkPending(projectId)
+    if (versionWork === 'regen') {
+      return NextResponse.json({ error: 'The regenerated images are still being drawn', code: 'regen_pending' }, { status: 409 })
+    }
+    if (versionWork === 'restoring') {
+      return NextResponse.json({ error: 'A version is still being loaded', code: 'version_restoring' }, { status: 409 })
     }
 
     for (let attempt = 0; attempt < 3; attempt++) {

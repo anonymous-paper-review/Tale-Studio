@@ -92,6 +92,8 @@ const get = (query: string) => new NextRequest(`http://localhost/api/artist/vers
 const versionRows = () => state.db.rows('artist_versions')
 const appearance = (characterId: string, appearanceKey: string) => state.db.rows('character_appearances').find((row) => row.character_id === characterId && row.appearance_key === appearanceKey)!
 const pathOf = (url: unknown) => new URL(String(url)).pathname.replace('/storage/v1/object/public/media/', '')
+/** 그 주소의 그림이 처음 그 그림과 같은 그림인가(파일 내용) — 불러오면 버전 폴더 복사본을 가리킨다(2026-10-28 검토 지적 6). */
+const imageOf = (url: unknown) => state.db.objects.get(pathOf(url))?.bytes.toString()
 
 /** 재생성 뒤 새 그림이 들어온 것처럼 만든다(서버 webhook 이 하는 일). */
 function landNewImages(tag: string) {
@@ -282,14 +284,14 @@ describe('불러오기', () => {
     expect(await res.json()).toMatchObject({ ok: true, n: 1, styleKey: 'real' })
 
     // 카드 기록에 남아 있던 그 그림을 다시 고른다(같은 후보 · 같은 지문) — 대표 얼굴은 남긴 복사본.
-    expect(appearance('minho', 'current').sheet_url).toBe(URLS.minho)
+    expect(imageOf(appearance('minho', 'current').sheet_url)).toBe(imageOf(URLS.minho))
     expect(pathOf(appearance('minho', 'current').portrait_url).startsWith(`${WS}/${P}/versions/v1/`)).toBe(true)
-    expect(appearance('minho', 'young').sheet_url).toBe(URLS.young)
-    expect(appearance('soonja', 'current').sheet_url).toBe(URLS.soonja)
+    expect(imageOf(appearance('minho', 'young').sheet_url)).toBe(imageOf(URLS.young))
+    expect(imageOf(appearance('soonja', 'current').sheet_url)).toBe(imageOf(URLS.soonja))
     expect(state.db.rows('character_image_candidates').find((row) => row.id === 'cand-minho')?.is_selected).toBe(true)
     expect(state.db.rows('character_image_candidates').find((row) => row.id === 'cand-minho-current-g2')?.is_selected).toBe(false)
-    expect(state.db.rows('locations')[0].wide_shot).toBe(URLS.hall)
-    expect(state.db.rows('location_appearances')[0].wide_shot).toBe(URLS.night)
+    expect(imageOf(state.db.rows('locations')[0].wide_shot)).toBe(imageOf(URLS.hall))
+    expect(imageOf(state.db.rows('location_appearances')[0].wide_shot)).toBe(imageOf(URLS.night))
     expect(state.db.rows('location_image_candidates').filter((row) => row.is_selected).map((row) => row.id).sort()).toEqual(['lc-hall', 'lc-night'])
     expect(state.db.rows('projects')[0]).toMatchObject({ style_anchor_key: 'real' })
 

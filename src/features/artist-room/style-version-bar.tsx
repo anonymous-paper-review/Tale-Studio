@@ -3,18 +3,21 @@
 // Artist 머리 줄의 작품 스타일 막대(2026-10-28 오너, 프로토타입 A5) — 작은 견본 그림 + 스타일 이름 + "작품 스타일 · v{n}",
 //   [불러오기 · 기록 N] [재생성하기]. 단추가 꺼지면 그 까닭을 글로 보인다(마우스를 올려야 보이는 안내만으로는 몰랐다, QA 1차 #06):
 //   Storyboard 를 연 뒤 · 그리는 중 · 기록이 하나뿐(재생성하면 이전 버전이 여기 남아요).
+//   재생성 그림이 멈추면 까닭과 [남은 그림 다시 그리기] · [이전 버전으로 돌아가기]를 막대 아래에 보인다(2026-10-28 검토 지적).
 import { History, ImageIcon, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThumbImage } from '@/components/thumb-image'
 import { useLocale, useT } from '@/lib/i18n'
 import { isDemoSession } from '@/lib/demo/context'
 import { versionHeader, versionStyleLabel } from '@/lib/artist/style-versions'
+import { RegenStoppedActions } from '@/features/artist-room/regen-stopped-actions'
 import { useArtistVersionStore } from '@/stores/artist-version-store'
 import { useProducerStore } from '@/stores/producer-store'
 
 const NOTE_TEXT = {
   completed: 'The style cannot be changed after Storyboard opens.',
   drawing: 'Drawing the images. You can change the style once they are done.',
+  stopped: 'Some images were not drawn. Draw the rest again, or go back to the previous version.',
   single: 'Regenerating keeps the earlier version here',
 } as const
 
@@ -24,10 +27,11 @@ export function StyleVersionBar({ completed, drawing }: { completed: boolean; dr
   const versions = useArtistVersionStore((s) => s.versions)
   const loaded = useArtistVersionStore((s) => s.loaded)
   const busy = useArtistVersionStore((s) => s.busy)
+  const stopped = useArtistVersionStore((s) => !!s.regen && !s.regen.complete && s.run.stopped)
   const anchors = useProducerStore((s) => s.styleAnchors)
   const styleKey = useProducerStore((s) => s.styleAnchorKey)
   const custom = useProducerStore((s) => s.customStyleAnchor)
-  const header = versionHeader({ versions, completed, drawing: drawing || busy !== null, demo: isDemoSession() })
+  const header = versionHeader({ versions, completed, drawing: drawing || busy !== null, demo: isDemoSession(), stopped })
   const label = versionStyleLabel({ styleKey, customStyle: custom }, anchors, locale)
   const swatch = custom?.url ?? anchors.find((anchor) => anchor.key === styleKey)?.previewUrl ?? null
   const note = header.note ? t(NOTE_TEXT[header.note]) : null
@@ -50,7 +54,7 @@ export function StyleVersionBar({ completed, drawing }: { completed: boolean; dr
             variant="outline"
             className="h-7"
             disabled={!loaded || !header.canLoad}
-            title={note ?? undefined}
+            title={header.canLoad ? undefined : note ?? undefined}
             onClick={() => store().openHistory()}
             data-testid="artist-version-history-open"
           >
@@ -70,6 +74,7 @@ export function StyleVersionBar({ completed, drawing }: { completed: boolean; dr
         </span>
       </div>
       {note ? <p className="text-xs text-muted-foreground" role="status" data-testid="artist-style-note">{note}</p> : null}
+      {header.note === 'stopped' ? <RegenStoppedActions /> : null}
     </div>
   )
 }

@@ -2,7 +2,8 @@
 //   여러 표를 오가는 라우트(작품 스타일 기록 등)를 "쿼리 하나 = 모의 하나"로 짜면 시험이 구현 순서를 외우게 된다 —
 //   대신 행을 넣고 라우트를 돌린 뒤 행 · 파일을 본다. 유일 제약(부분 유일 포함)은 표마다 적어 주면 23505 로 거절한다.
 //   지원: select · eq · neq · is · in · gte · gt · lte · lt · order · limit · maybeSingle · single · insert · update · delete · match,
-//   storage.from(bucket).copy · upload · remove · download · info. 열 이름 고르기(select 'a, b')는 무시하고 행 전체를 돌려준다.
+//   storage.from(bucket).copy · upload · remove · download · info. 열 이름 고르기(select 'a, b')는 무시하고 행 전체를 돌려준다 —
+//   단 jsonb 글 꺼내기 별칭(`prose_locked:state->>_proseLocked`)은 그 별칭 칸을 글로 더해 준다. 읽은 열 이름은 log 에 남는다.
 
 export type Row = Record<string, unknown>
 export interface UniqueRule {
@@ -27,6 +28,12 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
   const failNext: Record<string, number> = {}
   /** 읽기를 실패시키는 표(아직 없는 표 등). */
   const failReads = new Set<string>()
+  /** 특정 표 · 쓰기 종류를 정해진 횟수만큼 실패시킨다(되돌리기 길 시험). hang 이면 답하지 않는다(함수가 시간 제한에 걸려 멈춘 것처럼). */
+  const failOn: Array<{ table: string; op: 'insert' | 'update' | 'delete'; times: number; hang?: boolean }> = []
+  /** 표의 쓰기마다 걸리는 시간(ms) — 동시에 몇 개가 함께 도는지(maxInflight) 재려고. */
+  const latency: Record<string, number> = {}
+  const inflight: Record<string, number> = {}
+  const maxInflight: Record<string, number> = {}
 
   const table = (name: string) => (tables[name] ??= [])
 
@@ -53,11 +60,17 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
     let op: 'select' | 'insert' | 'update' | 'delete' = 'select'
     let payload: Row | Row[] | null = null
     let returning = false
+    let columns = '*'
     let orderBy: Array<{ column: string; ascending: boolean }> = []
     let limitTo: number | null = null
 
     const run = (): { data: unknown; error: { code?: string; message: string } | null } => {
       if (failReads.has(name) && op === 'select') return { data: null, error: { code: 'PGRST205', message: `Could not find the table 'public.${name}'` } }
+      const rule = op !== 'select' ? failOn.find((item) => item.table === name && item.op === op && item.times > 0) : undefined
+      if (rule && !rule.hang) {
+        rule.times--
+        return { data: null, error: { message: `forced ${op} failure on ${name}` } }
+      }
       if (failNext[name] && op !== 'select') {
         failNext[name]--
         return { data: null, error: { message: `forced failure on ${name}` } }
@@ -101,11 +114,46 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
         })
       }
       if (limitTo != null) rows = rows.slice(0, limitTo)
+      // jsonb 글 꺼내기 별칭 — "별칭:칸->>열쇠"는 그 칸 안 값을 글로(없으면 null).
+      for (const item of columns.split(',').map((part) => part.trim())) {
+        const alias = item.match(/^([a-z_][a-z0-9_]*):([a-z_][a-z0-9_]*)->>([A-Za-z_][A-Za-z0-9_]*)$/)
+        if (!alias) continue
+        for (const row of rows) {
+          const holder = row[alias[2]]
+          const value = holder && typeof holder === 'object' ? (holder as Row)[alias[3]] : undefined
+          row[alias[1]] = value === undefined || value === null ? null : typeof value === 'object' ? JSON.stringify(value) : String(value)
+        }
+      }
       return { data: rows, error: null }
     }
 
+    /** 쓰기 시간 · 멈춤을 흉내 내고 run 한다. */
+    const exec = async (): Promise<{ data: unknown; error: { code?: string; message: string } | null }> => {
+      if (op !== 'select') {
+        const hang = failOn.find((item) => item.table === name && item.op === op && item.times > 0 && item.hang)
+        if (hang) {
+          hang.times--
+          return new Promise(() => {})
+        }
+        const wait = latency[name]
+        if (wait) {
+          inflight[name] = (inflight[name] ?? 0) + 1
+          maxInflight[name] = Math.max(maxInflight[name] ?? 0, inflight[name])
+          await new Promise((resolve) => setTimeout(resolve, wait))
+          inflight[name]--
+        }
+      }
+      return run()
+    }
+
     const q = {
-      select: (_columns?: string) => { if (op === 'select') op = 'select'; else returning = true; return q },
+      select: (picked?: string) => {
+        if (op === 'select') {
+          columns = picked ?? '*'
+          log.push({ op: 'select', table: name, detail: columns })
+        } else returning = true
+        return q
+      },
       insert: (rows: Row | Row[]) => { op = 'insert'; payload = rows; return q },
       update: (patch: Row) => { op = 'update'; payload = patch; return q },
       delete: () => { op = 'delete'; return q },
@@ -121,18 +169,18 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
       order: (column: string, opts?: { ascending?: boolean }) => { orderBy.push({ column, ascending: opts?.ascending !== false }); return q },
       limit: (n: number) => { limitTo = n; return q },
       maybeSingle: async () => {
-        const result = run()
+        const result = await exec()
         if (result.error) return result
         const rows = (result.data as Row[] | null) ?? []
         return { data: rows[0] ?? null, error: null }
       },
       single: async () => {
-        const result = run()
+        const result = await exec()
         if (result.error) return result
         const rows = (result.data as Row[] | null) ?? []
         return rows.length === 1 ? { data: rows[0], error: null } : { data: null, error: { message: `expected one row, got ${rows.length}` } }
       },
-      then: (resolve: (value: unknown) => unknown, reject?: (error: unknown) => unknown) => Promise.resolve(run()).then(resolve, reject),
+      then: (resolve: (value: unknown) => unknown, reject?: (error: unknown) => unknown) => exec().then(resolve, reject),
     }
     // reset ordering defaults per builder
     orderBy = []
@@ -178,6 +226,9 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
     log,
     failNext,
     failReads,
+    failOn,
+    latency,
+    maxInflight,
   }
 }
 

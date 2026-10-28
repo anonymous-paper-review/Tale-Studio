@@ -1,5 +1,6 @@
 import { inspectionImageRevision } from '@/lib/chat-tools/inspect'
 import { create } from 'zustand'
+import { toast } from 'sonner'
 import { mainImageFromAppearances } from '@/lib/artist/main-image'
 import { displayNameOf } from '@/lib/display-name'
 import type { SceneManifest, CharacterAppearance, CharacterAsset, WorldAsset } from '@/types'
@@ -178,6 +179,13 @@ export type { WorldShotKey }
 
 export function shouldMarkWorldGenerationUserEdited(actor: GenerationActor): boolean {
   return actor !== 'auto'
+}
+
+/** 카드 기록에서 고른 그림이 지금 작품 스타일과 달라 서버가 막았다(다른 창에서 스타일이 바뀐 화면) — 한국어 알림을 띄우고
+ *  버전 기록을 다시 읽어 카드 기록의 다른 스타일 그림을 꺼 둔다(2026-10-28 검토 지적). 버전 스토어가 이 스토어를 부르므로 늦게 불러온다. */
+function refusedOtherStyle(): void {
+  toast.error(translate(useLocaleStore.getState().locale, 'It is in another style, so it cannot be loaded'))
+  void import('@/stores/artist-version-store').then(({ useArtistVersionStore }) => useArtistVersionStore.getState().refresh()).catch(() => undefined)
 }
 
 async function markLocationUserEdited(projectId: string, locationId: string): Promise<void> {
@@ -1631,7 +1639,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     const pid = useProjectStore.getState().projectId
     const variantKey = extra?.appearanceKey && extra.appearanceKey !== DEFAULT_LOCATION_APPEARANCE_KEY ? extra.appearanceKey : null
     const slotKey = worldFailureKey(locationId, variantKey)
-    if (actor === 'ui' && !claimAction(`artist:world:${pid}:${slotKey}:${shot}`)) return
+    // 1초 안에 다시 누른 요청 — 겹친 요청으로 알린다. 답 없이 끝나면 재생성 이어 그리기가 그 칸을 실패로 적었다(2026-10-28 검토 지적).
+    if (actor === 'ui' && !claimAction(`artist:world:${pid}:${slotKey}:${shot}`)) {
+      extra?.onJob?.({ jobId: null, status: 'deduped' })
+      return
+    }
     if (get().generatingLocations.includes(slotKey)) {
       extra?.onJob?.({ jobId: null, status: 'deduped' })
       return
@@ -1804,6 +1816,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     })
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
+      if (body.code === 'other_style') return refusedOtherStyle()
       throw new Error(body.error ?? `HTTP ${res.status}`)
     }
     const { url } = (await res.json()) as { url: string }
@@ -2456,6 +2469,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     })
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
+      if (body.code === 'other_style') return refusedOtherStyle()
       set({ error: body.error ?? `Candidate selection failed HTTP ${res.status}` })
       return
     }

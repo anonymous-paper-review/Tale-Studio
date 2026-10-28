@@ -1,7 +1,15 @@
 // Artist 작품 스타일 기록 화면 — 머리 줄 · 재생성 창 · 생성 기록 창 · 카드 기록 · 처음 스타일 창의 문구와 배선이 프로토타입 그대로다 (2026-10-28 오너, A2 · A5 · A6 · AV · A7)
 import { readFileSync } from 'node:fs'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { KO } from '@/lib/i18n/messages-ko'
+import { StyleVersionBar } from '@/features/artist-room/style-version-bar'
+import { StyleReturnCard } from '@/features/artist-room/style-return-card'
+import { RegenStoppedActions } from '@/features/artist-room/regen-stopped-actions'
+import { useArtistVersionStore } from '@/stores/artist-version-store'
+import { useLocaleStore } from '@/stores/locale-store'
+import { useProducerStore } from '@/stores/producer-store'
 
 const read = (path: string) => readFileSync(path, 'utf8')
 
@@ -92,3 +100,91 @@ describe('처음 만드는 스타일 창(A2)', () => {
     expect(KO[key]).toBe('이 작품의 스타일은 하나예요. 고른 스타일로 인물 · 배경 그림을 모두 만들어요. 나중에 [재생성하기]로 다른 스타일을 다시 고를 수 있고, 이전 버전은 기록에 남아요.')
   })
 })
+
+// ── 그려 보기(2026-10-28 검토 지적: 소스 글 확인만으로는 화면에 무엇이 보이는지 모른다) ──
+
+/** 정적 렌더는 스토어의 처음 값을 읽는다 — 지금 값을 처음 값으로 옮겨 그린다(recheck-screen 과 같은 방법). */
+function serveCurrent(...stores: Array<{ getState: () => object; getInitialState: () => object }>) {
+  for (const store of stores) Object.assign(store.getInitialState(), store.getState())
+}
+const html = (element: ReturnType<typeof createElement>) =>
+  renderToStaticMarkup(element).replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&amp;/g, '&')
+const tagOf = (out: string, testId: string) => out.match(new RegExp(`<[a-z]+[^>]*data-testid="${testId}"[^>]*>`))?.[0] ?? ''
+const isDisabled = (out: string, testId: string) => / disabled=""/.test(tagOf(out, testId))
+const versionView = (n: number, styleKey: string, current: boolean) => ({ n, styleId: styleKey, styleKey, customStyle: null, current, active: [], createdAt: '', thumbs: [] })
+const SLOTS = [{ kind: 'character' as const, id: 'minho', appearanceKey: 'current', phase: 0 as const, fromUrl: null }]
+
+function screenState(input: { versions: ReturnType<typeof versionView>[]; stopped?: boolean }) {
+  useLocaleStore.setState({ locale: 'ko' })
+  useProducerStore.setState({
+    styleAnchorKey: 'watercolor', customStyleAnchor: null,
+    styleAnchors: [
+      { key: 'real', label: '실사', medium: 'photo', imageUrl: null, previewUrl: null, subtitle: null },
+      { key: 'watercolor', label: '수채화', medium: 'watercolor', imageUrl: null, previewUrl: null, subtitle: null },
+    ],
+  } as never)
+  useArtistVersionStore.setState({
+    projectId: 'p1', versions: input.versions, currentN: input.versions.find((v) => v.current)?.n ?? 1, loaded: true, busy: null,
+    regen: input.stopped ? { n: 2, startedAt: '', fromN: 1, slots: SLOTS, states: { 'c:minho:current': 'todo' }, total: 1, done: 0, failed: 0, drawing: 0, complete: false, announced: false } : null,
+    run: { running: false, stopped: !!input.stopped, userWaitSince: null },
+  })
+  serveCurrent(useLocaleStore, useProducerStore, useArtistVersionStore)
+}
+
+describe('머리 줄 그려 보기', () => {
+  it('머리 줄은 작품 스타일 이름 · "작품 스타일 · v{n}" · [불러오기 · 기록 N]을 그리고, 기록이 하나면 [불러오기]가 꺼지고 "재생성하면 이전 버전이 여기 남아요"를 보인다', () => {
+    // 왜: 프로토타입 A5 — 지금 스타일과 버전이 늘 보이고, 꺼진 단추는 까닭을 글로 보인다(QA 1차 #06).
+    screenState({ versions: [versionView(1, 'watercolor', true)] })
+    const out = html(createElement(StyleVersionBar, { completed: false, drawing: false }))
+    expect(out).toContain('수채화')
+    expect(out).toContain('작품 스타일 · v1')
+    expect(out).toContain('불러오기 · 기록 1')
+    expect(isDisabled(out, 'artist-version-history-open')).toBe(true)
+    expect(isDisabled(out, 'artist-regen-open')).toBe(false)
+    expect(out).toContain('재생성하면 이전 버전이 여기 남아요')
+  })
+
+  it('Storyboard를 연 뒤에는 머리 줄의 두 단추가 꺼지고 "Storyboard를 연 뒤에는 스타일을 바꿀 수 없어요."를 보인다', () => {
+    // 왜: 오너 결정(2) — 스타일을 바꾸는 일은 Storyboard 를 열기 전에만 한다.
+    screenState({ versions: [versionView(1, 'real', false), versionView(2, 'watercolor', true)] })
+    const out = html(createElement(StyleVersionBar, { completed: true, drawing: false }))
+    expect(out).toContain('작품 스타일 · v2')
+    expect(isDisabled(out, 'artist-version-history-open')).toBe(true)
+    expect(isDisabled(out, 'artist-regen-open')).toBe(true)
+    expect(out).toContain('Storyboard를 연 뒤에는 스타일을 바꿀 수 없어요.')
+  })
+
+  it('재생성 그림이 멈추면 머리 줄에 까닭과 [남은 그림 다시 그리기] · [이전 버전으로 돌아가기]가 보이고, [불러오기]는 켜지고 [재생성하기]는 꺼진다', () => {
+    // 왜: 멈춘 재생성은 다 그릴 때까지 모든 길을 막았다 — 남은 그림을 다시 그리거나 이전 버전으로 돌아가는 길을 보인다(2026-10-28 검토 지적).
+    screenState({ versions: [versionView(1, 'real', false), versionView(2, 'watercolor', true)], stopped: true })
+    const out = html(createElement(StyleVersionBar, { completed: false, drawing: false }))
+    expect(out).toContain('그리지 못한 그림이 있어요. 남은 그림을 다시 그리거나 이전 버전으로 돌아갈 수 있어요.')
+    expect(out).toContain('남은 그림 다시 그리기')
+    expect(out).toContain('이전 버전으로 돌아가기')
+    expect(isDisabled(out, 'artist-version-history-open')).toBe(false)
+    expect(isDisabled(out, 'artist-regen-open')).toBe(true)
+    // 같은 단추는 잠금 화면 아래에도 그대로 쓴다.
+    const actions = html(createElement(RegenStoppedActions))
+    expect(tagOf(actions, 'artist-regen-resume')).not.toBe('')
+    expect(tagOf(actions, 'artist-regen-go-back')).not.toBe('')
+  })
+
+  it('재생성 그림을 그리는 중에는 돌아가기 단추를 보이지 않는다', () => {
+    // 왜: 그리는 중에 돌아가면 늦게 온 그림이 불러온 버전에 들어간다 — 멈췄을 때만 보인다.
+    screenState({ versions: [versionView(1, 'real', false), versionView(2, 'watercolor', true)] })
+    expect(html(createElement(RegenStoppedActions))).toBe('')
+  })
+})
+
+describe('채팅 카드 그려 보기(AY)', () => {
+  it('채팅 카드는 이전 버전마다 [v{n} · {스타일} 불러오기] 단추를 그리고, 이전 버전이 없으면 [재생성하기]를 그린다', () => {
+    // 왜: 프로토타입 AY — 다시 그리지 않고 돌아가는 길을 단추로 보인다. 돌아갈 버전이 없으면 다른 스타일로 만드는 길.
+    screenState({ versions: [versionView(1, 'real', false), versionView(2, 'watercolor', true)] })
+    const withVersions = html(createElement(StyleReturnCard, { options: [{ n: 1, label: 'v1 · 실사 불러오기' }], regenerate: false }))
+    expect(withVersions).toContain('v1 · 실사 불러오기')
+    expect(withVersions).not.toContain('재생성하기')
+    const none = html(createElement(StyleReturnCard, { options: [], regenerate: true }))
+    expect(none).toContain('재생성하기')
+  })
+})
+

@@ -22,6 +22,8 @@ export function completeError(code: string | undefined, missing?: { characters?:
   }
   if (code === 'artist_not_started' || code === 'artist_not_waiting' || code === 'artist_design_unfinished') return { key: 'The images are still being designed. Try again once they are ready.' }
   if (code === 'artist_design_failed') return { key: 'Designing the characters and backgrounds stopped. Continue with Resume at the top first.' }
+  if (code === 'regen_pending') return { key: 'You can complete once the regenerated images are drawn.' }
+  if (code === 'version_restoring') return { key: 'Loading the version. Try again in a moment.' }
   return { key: 'Could not complete. Please try again.' }
 }
 

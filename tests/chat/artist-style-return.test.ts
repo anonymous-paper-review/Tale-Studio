@@ -60,6 +60,29 @@ describe('이전 스타일로 돌아가자는 말 알아듣기', () => {
   })
 })
 
+describe('되돌리자는 말이 아닌 비슷한 말', () => {
+  it('"go back and make him look older"처럼 스타일 · 버전을 말하지 않는 영어 요청은 카드로 가로채지 않는다', () => {
+    // 왜: "go back … look"만 맞추면 인물을 고치는 평범한 요청까지 카드가 가로채 채팅이 일을 못 했다(2026-10-28 검토 지적).
+    for (const said of ['go back and make him look older', 'Switch back to the kitchen, it has a better look', 'Can you change it back to blue?', 'revert the hair color but keep the style', 'I like the look of the previous scene', "Don't go back to the old style"]) {
+      expect(styleReturnRequest(said, STYLE_NAMES), said).toBe(false)
+    }
+  })
+
+  it('영어로 이전 스타일 · 버전으로 돌아가자고 분명히 말하면 알아듣는다', () => {
+    // 왜: 정상 경로 고정 — 좁힌 뒤에도 분명한 영어 요청은 카드로 답한다.
+    for (const said of ['Go back to the previous style', 'revert to the old version', 'Can we switch back to the original style?', 'restore the previous version', 'go back to the earlier look', 'switch back to v1']) {
+      expect(styleReturnRequest(said, STYLE_NAMES), said).toBe(true)
+    }
+  })
+
+  it('"완전 스타일리시하게 돌려줘" · "이전 스타일 설명해줘" · "민호를 이전 모습으로 돌려줘"처럼 스타일을 되돌리자는 말이 아니면 한국어도 가로채지 않는다', () => {
+    // 왜: 띄어쓰기를 지우고 맞추면 "완전 스타일"의 "전 스타일"처럼 낱말 사이가 붙어 엉뚱한 말이 걸렸다(2026-10-28 검토 지적).
+    for (const said of ['완전 스타일리시하게 돌려줘', '이전 스타일 설명해줘', '민호를 이전 모습으로 돌려줘', '배경을 원래대로 돌려줘', '안전 버전으로 다시 그려줘', '전 스타일 안 바꿀래']) {
+      expect(styleReturnRequest(said, STYLE_NAMES), said).toBe(false)
+    }
+  })
+})
+
 describe('"이전 스타일로 돌아갈까요?" 카드', () => {
   it('이전 버전이 있으면 다시 만들지 않고 불러올 수 있다고 알리고 버전마다 [v{n} · {스타일} 불러오기]를 보인다', async () => {
     // 왜: 프로토타입 AY — 다시 그리지 않고 예전 그림으로 돌아가는 길. 불러오면 작품 스타일도 바뀐다는 것을 함께 말한다.
