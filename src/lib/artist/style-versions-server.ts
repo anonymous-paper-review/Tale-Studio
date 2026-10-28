@@ -404,12 +404,18 @@ export function versionViews(rows: VersionRow[], live: LiveImages): VersionView[
   })
 }
 
-/** 카드 기록 줄의 그림이 지금 작품 스타일 것인가(서버 쪽 확인) — 기록이 없으면 가리지 않는다. */
+/** 카드 기록 줄의 그림이 지금 작품 스타일 것인가(서버 쪽 확인) — 기록이 없으면 가리지 않는다.
+ *  덧붙인 검사라 기록을 못 읽으면(기록 표가 아직 없는 곳 등) 막지 않는다 — 카드 기록 되돌리기는 지금처럼 된다. */
 export async function candidateStyleAllowed(projectId: string, generatedAt: string | null | undefined): Promise<boolean> {
   if (!generatedAt) return true
-  const [rows, project] = await Promise.all([readVersionRows(projectId), readVersionProject(projectId)])
-  if (!project || rows.length === 0) return true
-  return historyPick({ generatedAt, versions: rows.map(summaryOf), currentStyleId: styleIdOf(project) }).loadable
+  try {
+    const [rows, project] = await Promise.all([readVersionRows(projectId), readVersionProject(projectId)])
+    if (!project || rows.length === 0) return true
+    return historyPick({ generatedAt, versions: rows.map(summaryOf), currentStyleId: styleIdOf(project) }).loadable
+  } catch (e) {
+    console.warn('[artist-versions] style check skipped:', e instanceof Error ? e.message : e)
+    return true
+  }
 }
 
 // ── 버전 바꾸기(재생성 · 불러오기 공용) ─────────────────────────────

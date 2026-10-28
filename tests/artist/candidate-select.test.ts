@@ -70,6 +70,14 @@ describe('인물 카드 기록에서 고르기', () => {
     expect(state.db.rows('character_image_candidates').filter((row) => row.is_selected).map((row) => row.id)).toEqual(['old'])
   })
 
+  it('작품 스타일 기록을 읽지 못해도(기록 표가 아직 없는 곳) 카드 기록에서 고르기는 지금처럼 된다', async () => {
+    // 왜: 스타일 확인은 덧붙인 검사다 — 코드가 마이그레이션보다 먼저 배포돼도 카드 기록 되돌리기가 멈추면 안 된다(혼자 정한 것).
+    state.db.failReads.add('artist_versions')
+    const res = await selectCandidate(post('/api/artist/select-candidate', { projectId: P, characterId: 'minho', appearanceKey: 'current', view: 'main', candidateId: 'old' }))
+    expect(res.status).toBe(200)
+    expect(pathOf(minho().sheet_url)).toBe(OLD)
+  })
+
   it('사람이 올린 원본이 있는 모습은 기록에서 골라도 대표 얼굴을 원본 그대로 둔다', async () => {
     // 왜: 올린 사진이 그 인물의 대표 얼굴이다(#image-to-artist) — 시트 크롭으로 덮으면 사람이 고른 얼굴이 사라진다.
     const source = mediaUrlOf(`${WS}/${P}/produce/photo.png`)

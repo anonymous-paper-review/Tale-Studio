@@ -25,6 +25,8 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
   const log: Array<{ op: string; table?: string; detail?: unknown }> = []
   /** 다음 쓰기를 실패시키는 갈고리 — 표 이름 → 남은 실패 횟수. */
   const failNext: Record<string, number> = {}
+  /** 읽기를 실패시키는 표(아직 없는 표 등). */
+  const failReads = new Set<string>()
 
   const table = (name: string) => (tables[name] ??= [])
 
@@ -55,6 +57,7 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
     let limitTo: number | null = null
 
     const run = (): { data: unknown; error: { code?: string; message: string } | null } => {
+      if (failReads.has(name) && op === 'select') return { data: null, error: { code: 'PGRST205', message: `Could not find the table 'public.${name}'` } }
       if (failNext[name] && op !== 'select') {
         failNext[name]--
         return { data: null, error: { message: `forced failure on ${name}` } }
@@ -174,6 +177,7 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
     objects,
     log,
     failNext,
+    failReads,
   }
 }
 
