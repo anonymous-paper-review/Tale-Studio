@@ -1,0 +1,23 @@
+{
+  "migrationVersion": "20261029160000",
+  "migrationName": "share_vouchers",
+  "sha256": "dc4c58cc416718c5be25255d8507ec29e89756f653ed330f55331aab1d7d8c0c",
+  "development": {
+    "project": "pbiumddivadgbzxuymak",
+    "appliedAt": "2026-10-29T06:13:54.253Z",
+    "appliedWith": "node scripts/apply-dev-migration.mjs supabase/migrations/20261029160000_share_vouchers.sql",
+    "historyRecorded": true
+  },
+  "production": {
+    "project": "qnjnrihfpqkdhjuzvepy",
+    "appliedAfter": "main 6cad827c 운영 배포 성공(GitHub deployment Production=success) 뒤",
+    "appliedWith": "Supabase Management API database/query 로 파일 그대로 실행 + supabase_migrations.schema_migrations 에 이력 행",
+    "historyRecorded": true,
+    "before": { "vouchers": 90, "redeemedVouchers": 0 },
+    "after": { "vouchers": 90, "singleUseVouchers": 90, "voucherRedemptions": 0, "oldRedeemedColumns": 0, "redemptionsRls": true }
+  },
+  "typesRegenerated": "pnpm db:types (개발 DB 기준). 커밋 안 된 artist_versions 표는 이 커밋에서 뺐다.",
+  "verifiedWith": "개발 · 운영 DB 각각 되돌리는 트랜잭션(DO 블록 끝 raise)으로 redeem_voucher 실행: 2명 코드 첫 계정 ok · 같은 계정 다시 used · 둘째 ok · 셋째 used, 1명 코드 ok, Take 줄 3개. 남은 시험 행 0.",
+  "codesCreated": "운영 DB 에 공용 코드 2개(s2 · p10, 코드마다 100개 계정, 메모 '공용 코드 2026-10-29'). 목록은 ~/Downloads/voucher-shared-*-2026-10-29.csv 에만 있다.",
+  "productionChanged": true
+}
