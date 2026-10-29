@@ -1,7 +1,7 @@
 // POST /api/billing/voucher — 받은 코드를 넣으면 그 요금제와 한 달 Take 를 넣는다(2026-10-27 오너 바우처).
-//   코드 표를 먼저 읽어 없는 코드 · 쓴 코드는 바로 거절하고(작업 공간도 만들지 않는다),
-//   실제 쓰기는 DB 함수 redeem_voucher 가 잠금을 걸고 한 번에 한다: 코드 쓴 표시 · 요금제 바꾸기 · Take 넣기.
-//   읽은 뒤 다른 사람이 먼저 썼거나 무료가 아닌 계정이면 그 함수가 거절한다.
+//   코드 표를 먼저 읽어 없는 코드는 바로 거절하고(작업 공간도 만들지 않는다),
+//   실제 쓰기는 DB 함수 redeem_voucher 가 잠금을 걸고 한 번에 한다: 쓴 기록 · 요금제 바꾸기 · Take 넣기.
+//   자리를 다 채운 코드 · 이 계정이 이미 쓴 코드 · 무료가 아닌 계정은 그 함수가 거절한다(2026-10-29 여러 계정이 쓰는 코드).
 //   약속: tests/billing/voucher.test.ts
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
@@ -34,12 +34,11 @@ export async function POST(req: Request) {
 
     const { data: voucher, error: lookupError } = await supabaseAdmin
       .from('vouchers')
-      .select('plan, redeemed_at')
+      .select('plan')
       .eq('code', code)
       .maybeSingle()
     if (lookupError) throw lookupError
     if (!voucher) return fail('invalid')
-    if (voucher.redeemed_at) return fail('used')
 
     const plan = String(voucher.plan)
     const workspace = await ensureWorkspace(user)

@@ -1970,43 +1970,68 @@ export type Database = {
           },
         ]
       }
-      vouchers: {
+      voucher_redemptions: {
         Row: {
           code: string
-          created_at: string
-          note: string | null
-          plan: string
-          redeemed_at: string | null
+          id: string
+          redeemed_at: string
           redeemed_by: string | null
           redeemed_workspace_id: string | null
         }
         Insert: {
           code: string
-          created_at?: string
-          note?: string | null
-          plan: string
-          redeemed_at?: string | null
+          id?: string
+          redeemed_at?: string
           redeemed_by?: string | null
           redeemed_workspace_id?: string | null
         }
         Update: {
           code?: string
-          created_at?: string
-          note?: string | null
-          plan?: string
-          redeemed_at?: string | null
+          id?: string
+          redeemed_at?: string
           redeemed_by?: string | null
           redeemed_workspace_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "vouchers_redeemed_workspace_id_fkey"
+            foreignKeyName: "voucher_redemptions_code_fkey"
+            columns: ["code"]
+            isOneToOne: false
+            referencedRelation: "vouchers"
+            referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "voucher_redemptions_redeemed_workspace_id_fkey"
             columns: ["redeemed_workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
+      }
+      vouchers: {
+        Row: {
+          code: string
+          created_at: string
+          max_uses: number
+          note: string | null
+          plan: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          max_uses?: number
+          note?: string | null
+          plan: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          max_uses?: number
+          note?: string | null
+          plan?: string
+        }
+        Relationships: []
       }
       workspaces: {
         Row: {
