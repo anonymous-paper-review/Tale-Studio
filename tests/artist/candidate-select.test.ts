@@ -1,4 +1,4 @@
-// 카드 기록에서 예전 그림을 고르면 인물은 대표 얼굴까지 그 그림으로 바뀌고, 배경은 고른 모습의 선택만 바뀐다 (2026-10-28 작품 스타일 기록 작업 중 고침)
+// 카드 기록에서 예전 그림을 고르면 인물은 대표 얼굴까지 그 그림으로 바뀌고, 배경은 그 배경의 "지금" 표시를 모두 내리고 고른 그림만 "지금"으로 한다 (2026-10-28 · 10-31 오너)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 import { memorySupabase, mediaUrlOf, type Row } from '../fixtures/_memory-supabase'
@@ -39,12 +39,12 @@ function seed(appearance: Partial<Row> = {}, entityType = 'person') {
       { id: 'hall-a', project_id: P, location_id: 'hall', view: 'wide_shot', variant_key: null, url: mediaUrlOf(`${WS}/${P}/locations/hall_a.png`), is_selected: false, generated_at: '2026-10-27T01:00:00.000Z' },
       { id: 'hall-b', project_id: P, location_id: 'hall', view: 'wide_shot', variant_key: null, url: mediaUrlOf(`${WS}/${P}/locations/hall_b.png`), is_selected: true, generated_at: '2026-10-27T02:00:00.000Z' },
       { id: 'night-a', project_id: P, location_id: 'hall', view: 'wide_shot', variant_key: 'night', url: mediaUrlOf(`${WS}/${P}/locations/night_a.png`), is_selected: false, generated_at: '2026-10-27T01:00:00.000Z' },
-      { id: 'night-b', project_id: P, location_id: 'hall', view: 'wide_shot', variant_key: 'night', url: mediaUrlOf(`${WS}/${P}/locations/night_b.png`), is_selected: true, generated_at: '2026-10-27T02:00:00.000Z' },
+      { id: 'night-b', project_id: P, location_id: 'hall', view: 'wide_shot', variant_key: 'night', url: mediaUrlOf(`${WS}/${P}/locations/night_b.png`), is_selected: false, generated_at: '2026-10-27T02:00:00.000Z' },
     ],
     artist_versions: [],
   }, {
     character_image_candidates: [{ columns: ['project_id', 'character_id', 'appearance_key', 'view'], where: (row) => row.is_selected === true }],
-    location_image_candidates: [{ columns: ['project_id', 'location_id', 'view', 'variant_key'], where: (row) => row.is_selected === true, normalize: { variant_key: (value) => value ?? '' } }],
+    location_image_candidates: [{ columns: ['project_id', 'location_id', 'view'], where: (row) => row.is_selected === true }],
   })
   db.objects.set(OLD, { bytes: Buffer.from('old-sheet') })
   db.objects.set(NEW, { bytes: Buffer.from('new-sheet') })
@@ -96,23 +96,17 @@ describe('인물 카드 기록에서 고르기', () => {
 })
 
 describe('배경 카드 기록에서 고르기', () => {
-  it('배경 기록에서 그림을 고르면 그 모습의 선택만 바뀌고 다른 모습의 선택은 그대로다', async () => {
-    // 왜: 기본 모습 그림을 고르면 다른 모습(밤 등)의 "지금" 표시까지 지워져 그 모습 기록이 비어 보였다.
+  it('배경 기록에서 그림을 고르면 그 배경의 "지금" 표시를 다른 모습 것까지 모두 내리고 고른 그림만 "지금"으로 한다', async () => {
+    // 왜: 2026-10-31 오너 결정 A — 배경 "지금 그림"을 모습마다 따로 두는 색인 바꾸기를 보류했다. 운영 DB 색인은 배경 한 곳에 "지금" 하나라
+    //   예전처럼 그 배경의 선택을 모두 내린 뒤 고른다(모습마다 내리면 다른 모습이 "지금"일 때 고르기가 실패한다).
     const res = await selectLocationCandidate(post('/api/artist/select-location-candidate', { projectId: P, locationId: 'hall', candidateId: 'hall-a' }))
     expect(res.status).toBe(200)
-    const selected = state.db.rows('location_image_candidates').filter((row) => row.is_selected).map((row) => row.id).sort()
-    expect(selected).toEqual(['hall-a', 'night-b'])
+    expect(state.db.rows('location_image_candidates').filter((row) => row.is_selected).map((row) => row.id)).toEqual(['hall-a'])
     expect(pathOf(state.db.rows('locations')[0].wide_shot)).toBe(`${WS}/${P}/locations/hall_a.png`)
-    expect(pathOf(state.db.rows('location_appearances')[0].wide_shot)).toBe(`${WS}/${P}/locations/night_b.png`)
 
-    await selectLocationCandidate(post('/api/artist/select-location-candidate', { projectId: P, locationId: 'hall', candidateId: 'night-a', appearanceKey: 'night' }))
-    expect(state.db.rows('location_image_candidates').filter((row) => row.is_selected).map((row) => row.id).sort()).toEqual(['hall-a', 'night-a'])
-  })
-
-  it('배경 기록은 다른 모습의 그림을 고를 수 없다', async () => {
-    // 왜: 밤 모습의 그림을 기본 모습 자리에 넣으면 카드와 기록이 서로 다른 모습을 가리킨다.
-    const res = await selectLocationCandidate(post('/api/artist/select-location-candidate', { projectId: P, locationId: 'hall', candidateId: 'night-a' }))
-    expect(res.status).toBe(404)
-    expect(state.db.rows('location_image_candidates').filter((row) => row.is_selected).map((row) => row.id).sort()).toEqual(['hall-b', 'night-b'])
+    const night = await selectLocationCandidate(post('/api/artist/select-location-candidate', { projectId: P, locationId: 'hall', candidateId: 'night-a', appearanceKey: 'night' }))
+    expect(night.status).toBe(200)
+    expect(state.db.rows('location_image_candidates').filter((row) => row.is_selected).map((row) => row.id)).toEqual(['night-a'])
+    expect(pathOf(state.db.rows('location_appearances')[0].wide_shot)).toBe(`${WS}/${P}/locations/night_a.png`)
   })
 })

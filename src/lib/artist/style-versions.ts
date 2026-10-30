@@ -5,6 +5,7 @@
 import { translate } from '@/lib/i18n/translate'
 import { directionParticle, objectParticle } from '@/lib/korean-particles'
 import type { AppLocale } from '@/lib/locale'
+import { mediaPathFromUrl } from '@/lib/storage/media-url'
 import { styleAnchorName } from '@/lib/style-anchor-name'
 
 /** 거절 까닭 코드 — 화면이 안내를 고른다. */
@@ -85,16 +86,37 @@ export function regenSlotKey(slot: Pick<RegenSlot, 'kind' | 'id' | 'appearanceKe
   return `${slot.kind === 'character' ? 'c' : 'l'}:${slot.id}:${slot.appearanceKey ?? 'default'}`
 }
 
-/**
- * 재생성으로 다시 그릴 칸 — 인물 시트의 모든 모습 · 배경의 모든 모습(오너 "전체").
- *   사물 카드(예전 흐름에만 남음)는 다시 그리지 않는다 — 요약 줄이 인물 · 배경만 센다(혼자 정한 것).
- */
-export function buildRegenPlan(input: {
+/** 이 작품 브레이크다운에 올린 그림인가({작업 공간}/{프로젝트}/breakdown/…) — "그대로 쓰기"로 카드 그림이 된 그림. */
+export function isBreakdownUpload(url: string | null | undefined, projectId: string | null | undefined): boolean {
+  if (!url || !projectId) return false
+  const parts = mediaPathFromUrl(url)?.split('/') ?? []
+  return parts[1] === projectId && parts[2] === 'breakdown'
+}
+
+export interface RegenPlanInput {
+  /** 이 작품 — 주면 지금 그림이 이 작품 브레이크다운에 올린 그림인 칸을 빼고 그린다(2026-10-31 오너 결정 C). */
+  projectId?: string | null
   characters: ReadonlyArray<{ characterId: string; entityType: string | null }>
   appearances: ReadonlyArray<{ characterId: string; appearanceKey: string; isDefault: boolean; sheetUrl: string | null }>
   locations: ReadonlyArray<{ locationId: string; wideShot: string | null }>
   locationAppearances: ReadonlyArray<{ locationId: string; appearanceKey: string; wideShot: string | null }>
-}): RegenSlot[] {
+}
+
+/**
+ * 재생성으로 다시 그릴 칸 — 인물 시트의 모든 모습 · 배경의 모든 모습(오너 "전체").
+ *   사물 카드(예전 흐름에만 남음)는 다시 그리지 않는다 — 요약 줄이 인물 · 배경만 센다(혼자 정한 것).
+ *   지금 그림이 이 작품에 올린 그림(그대로 쓰기)인 칸도 다시 그리지 않는다 — 버전 기록에는 남긴다(2026-10-31 오너 결정 C).
+ */
+export function buildRegenPlan(input: RegenPlanInput): RegenSlot[] {
+  return allRegenSlots(input).filter((slot) => !isBreakdownUpload(slot.fromUrl, input.projectId))
+}
+
+/** 재생성 창 요약의 "올린 그림 n장은 그대로 둬요" — 다시 그리지 않고 두는 올린 그림 칸 수. */
+export function regenKeptUploads(input: RegenPlanInput): number {
+  return allRegenSlots(input).filter((slot) => isBreakdownUpload(slot.fromUrl, input.projectId)).length
+}
+
+function allRegenSlots(input: RegenPlanInput): RegenSlot[] {
   const persons = new Set(input.characters.filter((c) => c.entityType !== 'object').map((c) => c.characterId))
   const places = new Set(input.locations.map((l) => l.locationId))
   const characters = input.appearances

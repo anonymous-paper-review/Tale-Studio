@@ -45,6 +45,7 @@ const URLS = {
   soonjaFace: mediaUrlOf(file('soonja_current_portrait.png')),
   hall: mediaUrlOf(place('hall_wide_shot_g0.png')),
   night: mediaUrlOf(place('hall_night_wide_shot_g0.png')),
+  roof: mediaUrlOf(place('roof_wide_shot_g0.png')),
 }
 const T0 = '2026-10-27T00:00:00.000Z'
 const REAL_L1 = { art_style: 'live_action', line_quality: 'none', shape_language: 'natural', texture_philosophy: 'photorealistic', character_proportion: '7.5:1' }
@@ -70,11 +71,16 @@ function seed(extra: Record<string, Row[]> = {}) {
       { id: 'cand-young', project_id: P, character_id: 'minho', appearance_key: 'young', view: 'main', url: URLS.young, source_hash: 'sh-young', appearance_hash: 'ah-young', is_selected: true, pinned: false, generated_at: T0 },
       { id: 'cand-soonja', project_id: P, character_id: 'soonja', appearance_key: 'current', view: 'main', url: URLS.soonja, source_hash: 'sh-soonja', appearance_hash: 'ah-soonja', is_selected: true, pinned: false, generated_at: T0 },
     ],
-    locations: [{ project_id: P, location_id: 'hall', name: '회사 복도', wide_shot: URLS.hall }],
+    // 옥상은 다른 모습이 없는 배경 — 불러오면 그 버전 그림으로 돌아간다(다른 모습이 있는 복도는 지금 그림 그대로, 2026-10-31 오너 결정 A).
+    locations: [
+      { project_id: P, location_id: 'hall', name: '회사 복도', wide_shot: URLS.hall },
+      { project_id: P, location_id: 'roof', name: '옥상', wide_shot: URLS.roof },
+    ],
     location_appearances: [{ project_id: P, location_id: 'hall', appearance_key: 'night', label: '밤', wide_shot: URLS.night }],
     location_image_candidates: [
       { id: 'lc-hall', project_id: P, location_id: 'hall', view: 'wide_shot', variant_key: null, url: URLS.hall, source_hash: 'sh-hall', appearance_hash: 'ah-hall', is_selected: true, pinned: false, generated_at: T0 },
-      { id: 'lc-night', project_id: P, location_id: 'hall', view: 'wide_shot', variant_key: 'night', url: URLS.night, source_hash: 'sh-night', appearance_hash: 'ah-night', is_selected: true, pinned: false, generated_at: T0 },
+      { id: 'lc-night', project_id: P, location_id: 'hall', view: 'wide_shot', variant_key: 'night', url: URLS.night, source_hash: 'sh-night', appearance_hash: 'ah-night', is_selected: false, pinned: false, generated_at: T0 },
+      { id: 'lc-roof', project_id: P, location_id: 'roof', view: 'wide_shot', variant_key: null, url: URLS.roof, source_hash: 'sh-roof', appearance_hash: 'ah-roof', is_selected: true, pinned: false, generated_at: T0 },
     ],
     generation_jobs: [],
     shots: [],
@@ -84,7 +90,8 @@ function seed(extra: Record<string, Row[]> = {}) {
   }, {
     artist_versions: [{ columns: ['project_id', 'n'] }, { columns: ['project_id'], where: (row) => row.is_current === true }],
     character_image_candidates: [{ columns: ['project_id', 'character_id', 'appearance_key', 'view'], where: (row) => row.is_selected === true }],
-    location_image_candidates: [{ columns: ['project_id', 'location_id', 'view', 'variant_key'], where: (row) => row.is_selected === true, normalize: { variant_key: (value) => value ?? '' } }],
+    // 배경 카드 기록의 "지금"은 배경 한 곳(뷰)에 하나 — 운영 DB 색인 그대로(2026-10-31 오너: 모습마다로 바꾸기는 보류).
+    location_image_candidates: [{ columns: ['project_id', 'location_id', 'view'], where: (row) => row.is_selected === true }],
   })
   for (const url of Object.values(URLS)) {
     db.objects.set(pathOf(url), { bytes: Buffer.from(`image:${pathOf(url)}`) })
@@ -123,20 +130,23 @@ function landNewImages(tag: string, only?: string[]) {
     state.db.rows('generation_jobs').push({ id: `job-${slot}-${tag}`, project_id: P, kind: 'character_view', status: 'completed', target: { characterId: row.character_id, appearanceKey: row.appearance_key, view: 'main' }, created_at: at })
   }
   if (only) return
-  const hall = state.db.rows('locations')[0]
+  const hall = state.db.rows('locations').find((row) => row.location_id === 'hall')!
   hall.wide_shot = mediaUrlOf(place(`hall_wide_shot_${tag}.png`))
   const night = state.db.rows('location_appearances')[0]
   night.wide_shot = mediaUrlOf(place(`hall_night_wide_shot_${tag}.png`))
-  state.db.objects.set(pathOf(hall.wide_shot), { bytes: Buffer.from(tag) })
-  state.db.objects.set(pathOf(night.wide_shot), { bytes: Buffer.from(tag) })
+  const roof = state.db.rows('locations').find((row) => row.location_id === 'roof')!
+  roof.wide_shot = mediaUrlOf(place(`roof_wide_shot_${tag}.png`))
+  for (const url of [hall.wide_shot, night.wide_shot, roof.wide_shot]) state.db.objects.set(pathOf(url), { bytes: Buffer.from(tag) })
   for (const cand of state.db.rows('location_image_candidates')) cand.is_selected = false
   state.db.rows('location_image_candidates').push(
     { id: `lc-hall-${tag}`, project_id: P, location_id: 'hall', view: 'wide_shot', variant_key: null, url: hall.wide_shot, source_hash: 'x', appearance_hash: 'x', is_selected: true, pinned: false, generated_at: at },
-    { id: `lc-night-${tag}`, project_id: P, location_id: 'hall', view: 'wide_shot', variant_key: 'night', url: night.wide_shot, source_hash: 'x', appearance_hash: 'x', is_selected: true, pinned: false, generated_at: at },
+    { id: `lc-night-${tag}`, project_id: P, location_id: 'hall', view: 'wide_shot', variant_key: 'night', url: night.wide_shot, source_hash: 'x', appearance_hash: 'x', is_selected: false, pinned: false, generated_at: at },
+    { id: `lc-roof-${tag}`, project_id: P, location_id: 'roof', view: 'wide_shot', variant_key: null, url: roof.wide_shot, source_hash: 'x', appearance_hash: 'x', is_selected: true, pinned: false, generated_at: at },
   )
   state.db.rows('generation_jobs').push(
     { id: `job-hall-${tag}`, project_id: P, kind: 'world_shot', status: 'completed', target: { locationId: 'hall', column: 'wide_shot' }, created_at: at },
     { id: `job-night-${tag}`, project_id: P, kind: 'world_shot', status: 'completed', target: { locationId: 'hall', column: 'wide_shot', appearanceKey: 'night' }, created_at: at },
+    { id: `job-roof-${tag}`, project_id: P, kind: 'world_shot', status: 'completed', target: { locationId: 'roof', column: 'wide_shot' }, created_at: at },
   )
 }
 
@@ -175,7 +185,8 @@ describe('불러오다 멈췄을 때', () => {
     expect(snapshotOf(1).restoring).toBeUndefined()
     expect(appearance('minho', 'current').sheet_url).toBe(sheetIn(1, 'minho', 'current').sheet.url)
     expect(appearance('soonja', 'current').sheet_url).toBe(sheetIn(1, 'soonja', 'current').sheet.url)
-    expect(state.db.rows('locations')[0].wide_shot).toBe(snapshotOf(1).locations.find((entry) => entry.appearanceKey === null)!.wideShot.url)
+    const roofNow = state.db.rows('locations').find((row) => row.location_id === 'roof')!.wide_shot
+    expect(roofNow).toBe(snapshotOf(1).locations.find((entry) => entry.locationId === 'roof')!.wideShot.url)
     expect(state.db.rows('projects')[0]).toMatchObject({ style_anchor_key: 'real' })
     expect((state.db.rows('projects')[0].design_tokens as { l1: unknown }).l1).toEqual(REAL_L1)
   })
@@ -301,13 +312,13 @@ describe('버전 폴더의 그림 파일', () => {
   it('불러오면 지금 그림은 그 버전 폴더에 남긴 그림을 가리켜, 그 사이 원래 파일이 덮여도 그 버전 그림 그대로 돌아온다', async () => {
     // 왜: 예전 고정 경로 파일은 나중에 올린 그림이 같은 자리에 덮어쓴다 — 원래 파일을 가리키면 다른 그림이 돌아온다(2026-10-28 검토 지적).
     await twoVersions()
-    state.db.objects.set(pathOf(URLS.hall), { bytes: Buffer.from('uploaded later') })
+    state.db.objects.set(pathOf(URLS.roof), { bytes: Buffer.from('uploaded later') })
     expect((await doLoad(1)).status).toBe(200)
-    const hall = state.db.rows('locations')[0].wide_shot as string
-    expect(pathOf(hall).startsWith(`${WS}/${P}/versions/v1/`)).toBe(true)
-    expect(state.db.objects.get(pathOf(hall))?.bytes.toString()).toBe(`image:${pathOf(URLS.hall)}`)
+    const roof = state.db.rows('locations').find((row) => row.location_id === 'roof')!.wide_shot as string
+    expect(pathOf(roof).startsWith(`${WS}/${P}/versions/v1/`)).toBe(true)
+    expect(state.db.objects.get(pathOf(roof))?.bytes.toString()).toBe(`image:${pathOf(URLS.roof)}`)
     // 카드 기록은 그때의 줄(같은 지문)을 다시 고른다.
-    expect(state.db.rows('location_image_candidates').filter((row) => row.is_selected).map((row) => row.id).sort()).toEqual(['lc-hall', 'lc-night'])
+    expect(state.db.rows('location_image_candidates').filter((row) => row.is_selected && row.location_id === 'roof').map((row) => row.id)).toEqual(['lc-roof'])
     expect(pathOf(appearance('minho', 'current').sheet_url)).toBe(pathOf(sheetIn(1, 'minho', 'current').sheet.url))
   })
 

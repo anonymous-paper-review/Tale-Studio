@@ -7,6 +7,7 @@
 //   멈춘 재생성은 [남은 그림 다시 그리기](resumeRegen) 또는 [이전 버전으로 돌아가기](goBackToPrevious)로 빠져나간다 — 멈춘 동안의 불러오기는
 //   남은 재생성을 그만두고 불러온다(2026-10-28 검토 지적). 약속: tests/artist/style-version-store.test.ts · style-version-way-out.test.ts
 import { create } from 'zustand'
+import { toast } from 'sonner'
 import { useArtistStore } from '@/stores/artist-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProducerStore } from '@/stores/producer-store'
@@ -329,6 +330,9 @@ export const useArtistVersionStore = create<ArtistVersionState>((set, get) => {
         await get().refresh()
         // 멈춤은 기록을 다시 읽은 뒤에 푼다 — 먼저 풀면 그 사이 잠금 화면이 "그림을 만들고 있어요"로 다시 떴다(2026-10-28 개발 DB e2e).
         if (cancelRegen) set({ run: { ...IDLE_RUN } })
+        // 다른 모습이 있는 배경은 지금 그림 그대로다 — 일부 배경이 안 바뀐 까닭을 한 줄로 알린다(2026-10-31 오너 결정 A).
+        const kept = typeof body.keptBackgrounds === 'number' ? body.keptBackgrounds : 0
+        if (kept > 0) toast.info(translate(useLocaleStore.getState().locale, '{count} backgrounds with other looks keep their current pictures.', { count: kept }))
         set({ historyDialogOpen: false, regenDialogOpen: false })
         useGlobalChatStore.getState().notifyIssue('artist', versionLoadedMessage(contentLocale(), { n, style: styleLabelOf({ styleKey, customStyle }) }))
         return true

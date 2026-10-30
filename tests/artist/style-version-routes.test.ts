@@ -69,7 +69,7 @@ function seed(extra: Record<string, Row[]> = {}) {
     location_appearances: [{ project_id: P, location_id: 'hall', appearance_key: 'night', label: '밤', wide_shot: URLS.night }],
     location_image_candidates: [
       { id: 'lc-hall', project_id: P, location_id: 'hall', view: 'wide_shot', variant_key: null, url: URLS.hall, source_hash: 'sh-hall', appearance_hash: 'ah-hall', is_selected: true, pinned: false, generated_at: T0 },
-      { id: 'lc-night', project_id: P, location_id: 'hall', view: 'wide_shot', variant_key: 'night', url: URLS.night, source_hash: 'sh-night', appearance_hash: 'ah-night', is_selected: true, pinned: false, generated_at: T0 },
+      { id: 'lc-night', project_id: P, location_id: 'hall', view: 'wide_shot', variant_key: 'night', url: URLS.night, source_hash: 'sh-night', appearance_hash: 'ah-night', is_selected: false, pinned: false, generated_at: T0 },
     ],
     generation_jobs: [],
     shots: [],
@@ -78,7 +78,8 @@ function seed(extra: Record<string, Row[]> = {}) {
   }, {
     artist_versions: [{ columns: ['project_id', 'n'] }, { columns: ['project_id'], where: (row) => row.is_current === true }],
     character_image_candidates: [{ columns: ['project_id', 'character_id', 'appearance_key', 'view'], where: (row) => row.is_selected === true }],
-    location_image_candidates: [{ columns: ['project_id', 'location_id', 'view', 'variant_key'], where: (row) => row.is_selected === true, normalize: { variant_key: (value) => value ?? '' } }],
+    // 배경 카드 기록의 "지금"은 배경 한 곳(뷰)에 하나 — 운영 DB 색인 그대로(2026-10-31 오너: 모습마다로 바꾸기는 보류).
+    location_image_candidates: [{ columns: ['project_id', 'location_id', 'view'], where: (row) => row.is_selected === true }],
   })
   for (const url of Object.values(URLS)) {
     const path = new URL(url).pathname.replace('/storage/v1/object/public/media/', '')
@@ -113,8 +114,15 @@ function landNewImages(tag: string) {
   for (const cand of state.db.rows('location_image_candidates')) cand.is_selected = false
   state.db.rows('location_image_candidates').push(
     { id: `lc-hall-${tag}`, project_id: P, location_id: 'hall', view: 'wide_shot', variant_key: null, url: hall.wide_shot, source_hash: 'x', appearance_hash: 'x', is_selected: true, pinned: false, generated_at: at },
-    { id: `lc-night-${tag}`, project_id: P, location_id: 'hall', view: 'wide_shot', variant_key: 'night', url: night.wide_shot, source_hash: 'x', appearance_hash: 'x', is_selected: true, pinned: false, generated_at: at },
+    { id: `lc-night-${tag}`, project_id: P, location_id: 'hall', view: 'wide_shot', variant_key: 'night', url: night.wide_shot, source_hash: 'x', appearance_hash: 'x', is_selected: false, pinned: false, generated_at: at },
   )
+  const roof = state.db.rows('locations').find((row) => row.location_id === 'roof')
+  if (roof) {
+    roof.wide_shot = mediaUrlOf(place(`roof_wide_shot_${tag}.png`))
+    state.db.objects.set(pathOf(roof.wide_shot), { bytes: Buffer.from(tag) })
+    state.db.rows('location_image_candidates').push({ id: `lc-roof-${tag}`, project_id: P, location_id: 'roof', view: 'wide_shot', variant_key: null, url: roof.wide_shot, source_hash: 'x', appearance_hash: 'x', is_selected: true, pinned: false, generated_at: at })
+    state.db.rows('generation_jobs').push({ id: `job-roof-${tag}`, project_id: P, kind: 'world_shot', status: 'completed', target: { locationId: 'roof', column: 'wide_shot' }, created_at: at })
+  }
   for (const slot of ['minho:current', 'minho:young', 'soonja:current']) {
     const [characterId, appearanceKey] = slot.split(':')
     state.db.rows('generation_jobs').push({ id: `job-${slot}-${tag}`, project_id: P, kind: 'character_view', status: 'completed', target: { characterId, appearanceKey, view: 'main' }, created_at: at })
@@ -123,6 +131,24 @@ function landNewImages(tag: string) {
     { id: `job-hall-${tag}`, project_id: P, kind: 'world_shot', status: 'completed', target: { locationId: 'hall', column: 'wide_shot' }, created_at: at },
     { id: `job-night-${tag}`, project_id: P, kind: 'world_shot', status: 'completed', target: { locationId: 'hall', column: 'wide_shot', appearanceKey: 'night' }, created_at: at },
   )
+}
+
+/** 다른 모습이 없는 배경(옥상)을 더한다 — 불러오면 그 버전 그림으로 돌아가는 배경. */
+function addRoof() {
+  const url = mediaUrlOf(place('roof_wide_shot_g0.png'))
+  state.db.objects.set(pathOf(url), { bytes: Buffer.from(`image:${pathOf(url)}`) })
+  state.db.rows('locations').push({ project_id: P, location_id: 'roof', name: '옥상', wide_shot: url })
+  state.db.rows('location_image_candidates').push({ id: 'lc-roof', project_id: P, location_id: 'roof', view: 'wide_shot', variant_key: null, url, source_hash: 'sh-roof', appearance_hash: 'ah-roof', is_selected: true, pinned: false, generated_at: T0 })
+  return url
+}
+
+/** 순자 기본 모습을 브레이크다운에 올린 그림으로(그대로 쓰기 — 시트 · 대표 얼굴이 그 그림, 카드 기록 줄은 없다). */
+function uploadSoonja() {
+  const url = mediaUrlOf(`${WS}/${P}/breakdown/soonja-upload.png`)
+  state.db.objects.set(pathOf(url), { bytes: Buffer.from('uploaded') })
+  Object.assign(appearance('soonja', 'current'), { sheet_url: url, portrait_url: url })
+  state.db.tables.character_image_candidates = state.db.rows('character_image_candidates').filter((row) => row.character_id !== 'soonja')
+  return url
 }
 
 beforeEach(() => {
@@ -275,8 +301,10 @@ describe('그림 지시의 그림체 값', () => {
 })
 
 describe('불러오기', () => {
-  it('버전을 불러오면 그 버전의 그림(인물 모습별 시트 · 대표 얼굴, 배경 모습별 그림)으로 돌아가고 작품 스타일도 그 버전 것으로 바뀐다', async () => {
+  it('버전을 불러오면 그 버전의 그림(인물 모습별 시트 · 대표 얼굴, 다른 모습이 없는 배경 그림)으로 돌아가고 작품 스타일도 그 버전 것으로 바뀐다', async () => {
     // 왜: 오너 "그 버전의 그림 전부로 돌아가고 작품 스타일도 그 버전 것으로 바뀐다(다시 그리지 않음)".
+    //   다른 모습이 있는 배경은 지금 그림 그대로다(2026-10-31 오너 결정 A — 아래 시험).
+    const roof = addRoof()
     await regenerate(post('/api/artist/versions/regenerate', { projectId: P, styleAnchorKey: 'watercolor' }))
     landNewImages('g2')
     const res = await loadVersion(post('/api/artist/versions/load', { projectId: P, n: 1 }))
@@ -290,9 +318,8 @@ describe('불러오기', () => {
     expect(imageOf(appearance('soonja', 'current').sheet_url)).toBe(imageOf(URLS.soonja))
     expect(state.db.rows('character_image_candidates').find((row) => row.id === 'cand-minho')?.is_selected).toBe(true)
     expect(state.db.rows('character_image_candidates').find((row) => row.id === 'cand-minho-current-g2')?.is_selected).toBe(false)
-    expect(imageOf(state.db.rows('locations')[0].wide_shot)).toBe(imageOf(URLS.hall))
-    expect(imageOf(state.db.rows('location_appearances')[0].wide_shot)).toBe(imageOf(URLS.night))
-    expect(state.db.rows('location_image_candidates').filter((row) => row.is_selected).map((row) => row.id).sort()).toEqual(['lc-hall', 'lc-night'])
+    expect(imageOf(state.db.rows('locations').find((row) => row.location_id === 'roof')!.wide_shot)).toBe(imageOf(roof))
+    expect(state.db.rows('location_image_candidates').filter((row) => row.is_selected && row.location_id === 'roof').map((row) => row.id)).toEqual(['lc-roof'])
     expect(state.db.rows('projects')[0]).toMatchObject({ style_anchor_key: 'real' })
 
     const [v1, v2] = [...versionRows()].sort((a, b) => Number(a.n) - Number(b.n))
@@ -301,6 +328,59 @@ describe('불러오기', () => {
     expect(v2.is_current).toBe(false)
     // 떠난 v2 도 그 그림을 버전 폴더에 남긴다 — 다시 불러올 수 있다.
     expect(((v2.snapshot as { characters: Array<{ sheet: { url: string } }> }).characters[0].sheet.url)).toContain(`/versions/v2/`)
+  })
+
+  it('다른 모습이 있는 배경은 버전을 불러와도 기본 · 다른 모습 그림을 지금 그대로 두고, 그런 배경이 몇 곳인지 알려 준다', async () => {
+    // 왜: 2026-10-31 오너 결정 A — 배경 카드 기록의 "지금"은 배경 한 곳에 하나(운영 DB 색인)라, 모습마다 따로 되돌리지 않는다.
+    //   다른 모습이 없는 배경은 지금처럼 그 버전 그림으로 돌아간다.
+    addRoof()
+    await regenerate(post('/api/artist/versions/regenerate', { projectId: P, styleAnchorKey: 'watercolor' }))
+    landNewImages('g2')
+    const before = { hall: state.db.rows('locations')[0].wide_shot, night: state.db.rows('location_appearances')[0].wide_shot }
+    const res = await loadVersion(post('/api/artist/versions/load', { projectId: P, n: 1 }))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({ ok: true, n: 1, keptBackgrounds: 1 })
+    expect(state.db.rows('locations')[0].wide_shot).toBe(before.hall)
+    expect(state.db.rows('location_appearances')[0].wide_shot).toBe(before.night)
+    expect(state.db.rows('location_image_candidates').filter((row) => row.is_selected && row.location_id === 'hall').map((row) => row.id)).toEqual(['lc-hall-g2'])
+    expect(pathOf(state.db.rows('locations').find((row) => row.location_id === 'roof')!.wide_shot).startsWith(`${WS}/${P}/versions/v1/`)).toBe(true)
+  })
+
+  it('다른 모습이 있는 배경은 그 버전을 다시 떠나도 그 버전 기록에 처음 남긴 그 배경 그림을 그대로 둔다', async () => {
+    // 왜: 혼자 정한 것 — 불러올 때 그대로 둔 지금 그림(다른 버전 그림)으로 기록을 덮으면 그 버전의 배경 그림이 기록에서 사라진다.
+    await regenerate(post('/api/artist/versions/regenerate', { projectId: P, styleAnchorKey: 'watercolor' }))
+    landNewImages('g2')
+    const first = (versionRows().find((row) => row.n === 1)!.snapshot as { locations: unknown[] }).locations
+    await loadVersion(post('/api/artist/versions/load', { projectId: P, n: 1 }))
+    await loadVersion(post('/api/artist/versions/load', { projectId: P, n: 2 }))
+    expect((versionRows().find((row) => row.n === 1)!.snapshot as { locations: unknown[] }).locations).toEqual(first)
+  })
+
+  it('지금 그림이 이 작품 브레이크다운에 올린 그림(그대로 쓰기)인 칸은 재생성에서 다시 그리지 않고, 남기는 버전 기록에는 그 그림도 남긴다', async () => {
+    // 왜: 2026-10-31 오너 결정 C — 사용자가 올려 그대로 쓰기로 한 그림을 다른 스타일로 다시 그리면 올린 그림이 사라진다.
+    const upload = uploadSoonja()
+    const res = await regenerate(post('/api/artist/versions/regenerate', { projectId: P, styleAnchorKey: 'watercolor' }))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.slots.map((slot: { kind: string; id: string; appearanceKey: string | null }) => `${slot.kind}:${slot.id}:${slot.appearanceKey ?? 'default'}`)).not.toContain('character:soonja:current')
+    expect(body.slots).toHaveLength(4)
+    const kept = (versionRows().find((row) => row.n === 1)!.snapshot as { characters: Array<{ characterId: string; sheet: { url: string; sourceUrl?: string } }> }).characters.find((entry) => entry.characterId === 'soonja')!
+    expect(pathOf(kept.sheet.url).startsWith(`${WS}/${P}/versions/v1/`)).toBe(true)
+    expect(kept.sheet.sourceUrl).toBe(upload)
+  })
+
+  it('올린 그림 칸은 버전을 불러와도 올린 그 파일로 돌아가고 카드 기록에 줄을 새로 만들지 않아, 다음 재생성에서도 그대로 둔다', async () => {
+    // 왜: 혼자 정한 것 — 버전 폴더 복사본을 가리키면 "올린 그림"인지 알 수 없어 다음 재생성이 그 칸을 다시 그린다. 올린 파일은 지우지 않는다.
+    const upload = uploadSoonja()
+    await regenerate(post('/api/artist/versions/regenerate', { projectId: P, styleAnchorKey: 'watercolor' }))
+    landNewImages('g2')
+    expect((await loadVersion(post('/api/artist/versions/load', { projectId: P, n: 1 }))).status).toBe(200)
+    expect(appearance('soonja', 'current')).toMatchObject({ sheet_url: upload, portrait_url: upload })
+    const soonjaRows = state.db.rows('character_image_candidates').filter((row) => row.character_id === 'soonja')
+    expect(soonjaRows.map((row) => row.id)).toEqual(['cand-soonja-current-g2'])
+    expect(soonjaRows[0].is_selected).toBe(false)
+    const again = await (await regenerate(post('/api/artist/versions/regenerate', { projectId: P, styleAnchorKey: 'watercolor' }))).json()
+    expect(again.slots.map((slot: { id: string; appearanceKey: string | null }) => `${slot.id}:${slot.appearanceKey ?? 'default'}`)).not.toContain('soonja:current')
   })
 
   it('그 버전 뒤에 새로 생긴 인물 · 배경은 불러와도 지금 그림을 그대로 둔다', async () => {

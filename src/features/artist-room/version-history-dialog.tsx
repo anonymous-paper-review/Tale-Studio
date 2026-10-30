@@ -2,6 +2,7 @@
 
 // Artist [불러오기 · 기록 N] 창 "생성 기록"(2026-10-28 오너, 프로토타입 AV) — 새 버전부터 줄마다 v{n} · 스타일 이름 · 지금 표시 ·
 //   인물(기본 모습 대표 얼굴) · 배경(기본 그림) 썸네일 한 줄, 지금이 아닌 줄에는 [불러오기]. 불러오면 그림과 작품 스타일이 그 버전으로 돌아간다.
+//   다른 모습이 있는 배경은 불러와도 지금 그림 그대로라 그 수를 한 줄로 먼저 알린다(2026-10-31 오너 결정 A).
 import { ImageOff, Loader2, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -11,6 +12,7 @@ import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
 import { useLocale, useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { historyOrder, versionStyleLabel } from '@/lib/artist/style-versions'
+import { useArtistStore } from '@/stores/artist-store'
 import { useArtistVersionStore } from '@/stores/artist-version-store'
 import { useProducerStore } from '@/stores/producer-store'
 
@@ -21,6 +23,7 @@ export function VersionHistoryDialog({ canLoad }: { canLoad: boolean }) {
   const versions = useArtistVersionStore((s) => s.versions)
   const busy = useArtistVersionStore((s) => s.busy)
   const anchors = useProducerStore((s) => s.styleAnchors)
+  const keptBackgrounds = useArtistStore((s) => s.worldAssets.filter((world) => (world.appearances?.length ?? 0) > 0).length)
   useAiBusyHold(open && busy === 'load')
   const close = () => { if (!busy) useArtistVersionStore.getState().closeHistory() }
   const load = async (n: number) => {
@@ -35,6 +38,9 @@ export function VersionHistoryDialog({ canLoad }: { canLoad: boolean }) {
         <DialogHeader>
           <DialogTitle>{t('Generation history')}</DialogTitle>
           <DialogDescription>{t('Load a version you liked. The work has one style, so loading a version also switches the style to that version.')}</DialogDescription>
+          {keptBackgrounds > 0 ? (
+            <p className="text-sm text-muted-foreground" data-testid="artist-history-kept-backgrounds">{t('{count} backgrounds with other looks keep their current pictures.', { count: keptBackgrounds })}</p>
+          ) : null}
         </DialogHeader>
         <ul className="min-h-0 space-y-2 overflow-y-auto py-1">
           {versions.length === 0 ? (

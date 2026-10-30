@@ -1,8 +1,9 @@
 // 배경 후보 이미지 선택본 교체 — 약속 B4(2026-09-04), 캐릭터 select-candidate 와 대칭.
 //   location_image_candidates 에서 선택본 flip + locations.wide_shot 미러. finalize 가 슬롯당 최근 5장을
 //   보관하므로 이 라우트로 직전 이미지를 되돌릴 수 있다.
-//   2026-10-28: 칸은 (배경, 뷰, 모습) — 고른 모습의 선택만 바꾸고(예전엔 다른 모습의 "지금"까지 지웠다), 다른 모습의 그림은 고를 수 없다.
-//   지금 작품 스타일과 다른 버전에서 그린 그림은 받지 않는다(code other_style). 약속: tests/artist/candidate-select.test.ts
+//   "지금"은 배경(뷰) 한 곳에 하나 — 고르기 전에 그 배경의 선택을 모습과 상관없이 모두 내린다(운영 DB 색인 그대로,
+//   2026-10-31 오너: 모습마다 따로 두는 바꾸기는 보류). 지금 작품 스타일과 다른 버전에서 그린 그림은 받지 않는다(code other_style).
+//   약속: tests/artist/candidate-select.test.ts
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
@@ -40,38 +41,29 @@ export async function POST(req: Request) {
     const access = await requireProjectAccess(req, projectId)
     if (!access.ok) return access.response
 
-    // 슬롯(project + location + view + 모습) 안의 후보만 선택할 수 있다 — 다른 모습의 그림을 이 모습 자리에 넣지 않는다.
+    // 슬롯(project + location + view) 안의 후보만 선택할 수 있다.
     const { data: candidate, error: candidateError } = await supabaseAdmin
       .from('location_image_candidates')
-      .select('id, url, variant_key, generated_at')
+      .select('id, url, generated_at')
       .eq('id', candidateId)
       .eq('project_id', projectId)
       .eq('location_id', locationId)
       .eq('view', view)
       .maybeSingle()
     if (candidateError) throw candidateError
-    const found = candidate as { id: string; url: string; variant_key?: string | null; generated_at?: string | null } | null
-    if (!found || (found.variant_key ?? null) !== appearanceKey) return NextResponse.json({ error: 'Candidate not found' }, { status: 404 })
+    const found = candidate as { id: string; url: string; generated_at?: string | null } | null
+    if (!found) return NextResponse.json({ error: 'Candidate not found' }, { status: 404 })
     if (!(await candidateStyleAllowed(projectId, found.generated_at))) {
       return NextResponse.json({ error: 'This image is in another style', code: ARTIST_VERSION_CODES.otherStyle }, { status: 409 })
     }
 
-    // 같은 모습의 "지금"만 내린다 — 배경의 다른 모습(밤 등)은 그대로다.
-    const { data: selectedRows, error: selectedError } = await supabaseAdmin
+    const { error: clearError } = await supabaseAdmin
       .from('location_image_candidates')
-      .select('id, variant_key')
+      .update({ is_selected: false })
       .eq('project_id', projectId)
       .eq('location_id', locationId)
       .eq('view', view)
       .eq('is_selected', true)
-    if (selectedError) throw selectedError
-    const clearIds = (Array.isArray(selectedRows) ? selectedRows as Array<{ id: string; variant_key?: string | null }> : [])
-      .filter((row) => (row.variant_key ?? null) === appearanceKey)
-      .map((row) => row.id)
-    const { error: clearError } = await supabaseAdmin
-      .from('location_image_candidates')
-      .update({ is_selected: false })
-      .in('id', clearIds)
     if (clearError) throw clearError
 
     const { error: selectError } = await supabaseAdmin

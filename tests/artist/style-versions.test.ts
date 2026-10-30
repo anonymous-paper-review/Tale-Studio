@@ -1,5 +1,6 @@
 // 작품 스타일 기록(버전) 판정 — 머리 줄 단추 · 재생성 창 요약 · 그릴 칸과 순서 · 이어 그리기 · 카드 기록의 스타일 판정 (2026-10-28 오너, 프로토타입 A5 · A6 · AV · A7)
 import { describe, expect, it } from 'vitest'
+import { mediaUrlOf } from '../fixtures/_memory-supabase'
 import {
   buildRegenPlan,
   historyOrder,
@@ -7,6 +8,7 @@ import {
   nextRegenTargets,
   previousVersionWithStyle,
   regenCounts,
+  regenKeptUploads,
   regenProgress,
   regenSlotKey,
   regenSlotState,
@@ -204,3 +206,35 @@ describe('생성 기록 창(AV)', () => {
     expect(historyOrder(versions).map((item) => [item.n, item.current])).toEqual([[3, true], [2, false], [1, false]])
   })
 })
+
+describe('올린 그림(그대로 쓰기)은 재생성에서 그대로', () => {
+  const media = (path: string) => mediaUrlOf(path)
+  const input = {
+    projectId: 'p1',
+    characters: [{ characterId: 'minho', entityType: 'person' }, { characterId: 'soonja', entityType: 'person' }],
+    appearances: [
+      { characterId: 'minho', appearanceKey: 'current', isDefault: true, sheetUrl: media('ws1/p1/breakdown/minho-upload.png') },
+      { characterId: 'minho', appearanceKey: 'young', isDefault: false, sheetUrl: media('ws1/p1/characters/minho/young_main.png') },
+      // 다른 프로젝트 브레이크다운 그림은 이 작품이 올린 그림이 아니다.
+      { characterId: 'soonja', appearanceKey: 'current', isDefault: true, sheetUrl: media('ws1/other-project/breakdown/soonja.png') },
+    ],
+    locations: [{ locationId: 'hall', wideShot: media('ws1/p1/breakdown/hall-upload.webp') }, { locationId: 'roof', wideShot: null }],
+    locationAppearances: [],
+  }
+
+  it('지금 그림이 이 작품 브레이크다운에 올린 그림인 칸은 재생성에서 다시 그리지 않고, 그대로 두는 장수를 센다', () => {
+    // 왜: 2026-10-31 오너 결정 C — 사용자가 올려 그대로 쓰기로 한 그림을 다른 스타일로 다시 그리면 올린 그림이 사라진다.
+    const plan = buildRegenPlan(input)
+    expect(plan.map(regenSlotKey).sort()).toEqual(['c:minho:young', 'c:soonja:current', 'l:roof:default'])
+    expect(regenKeptUploads(input)).toBe(2)
+    // 요약 줄의 "인물 N · 배경 M"은 다시 그리는 것만 센다.
+    expect(regenCounts(plan)).toEqual({ persons: 2, places: 1 })
+  })
+
+  it('올린 그림이 없으면 지금처럼 인물 · 배경의 모든 모습을 다시 그린다', () => {
+    // 왜: 정상 경로 고정 — 작품을 모르면(projectId 없음) 올린 그림을 가리지 않는다.
+    expect(buildRegenPlan({ ...input, projectId: undefined })).toHaveLength(5)
+    expect(regenKeptUploads({ ...input, projectId: undefined })).toBe(0)
+  })
+})
+

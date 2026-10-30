@@ -70,7 +70,9 @@ export async function POST(req: Request) {
     if (await regenStillPending(projectId, current, live)) return reject(ARTIST_VERSION_CODES.regenPending, 'The images of the new version are still being drawn')
     if (await imagesDrawing(projectId)) return reject(ARTIST_VERSION_CODES.drawing, 'Images are being drawn')
 
+    // 지금 그림이 이 작품에 올린 그림(그대로 쓰기)인 칸은 다시 그리지 않는다 — 버전 기록에는 남는다(2026-10-31 오너 결정 C).
     const slots = buildRegenPlan({
+      projectId,
       characters: live.characters.map((c) => ({ characterId: c.character_id, entityType: c.entity_type })),
       appearances: live.appearances.map((a) => ({ characterId: a.character_id, appearanceKey: a.appearance_key, isDefault: a.is_default, sheetUrl: a.sheet_url })),
       locations: live.locations.map((l) => ({ locationId: l.location_id, wideShot: l.wide_shot })),

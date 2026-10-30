@@ -16,6 +16,7 @@ import { portraitForSheetUrl } from '@/lib/artist/portrait-file'
 import {
   closeActiveRange,
   historyPick,
+  isBreakdownUpload,
   openActiveRange,
   parseActive,
   parseCustomStyle,
@@ -296,12 +297,15 @@ async function freezeImage(url: string, previous: { url: string; sourceUrl: stri
 /**
  * 떠나는 버전의 그림을 버전 폴더({ws}/{project}/versions/v{n}/)에 남긴다 — 나중에 다시 그리거나 지워도 남긴 버전은 그대로다.
  *   previous = 그 버전이 지난번에 남긴 기록(다시 쓸 복사본). created = 이번에 새로 복사한 파일(바꾸기가 무르면 거둔다).
+ *   carryLocations = 불러와도 지금 그림 그대로 두는 배경(다른 모습이 있는 배경) — 지난번 기록이 있으면 그 기록을 그대로 둔다.
+ *     불러올 때 그대로 둔 다른 버전 그림으로 덮으면 그 버전의 배경 그림이 기록에서 사라진다(혼자 정한 것, 2026-10-31).
  */
 export async function freezeSnapshot(
   project: Pick<VersionProject, 'id' | 'workspace_id'>,
   n: number,
   snapshot: VersionSnapshot,
   previous: VersionSnapshot | null = null,
+  carryLocations: ReadonlySet<string> = new Set(),
 ): Promise<{ snapshot: VersionSnapshot; created: string[] }> {
   const folder = versionFolder(project.workspace_id, project.id, n)
   const token = randomUUID().slice(0, 8)
@@ -312,8 +316,11 @@ export async function freezeSnapshot(
     if (frozen.created) created.push(frozen.created)
     return frozen
   }
+  const carried = (previous?.locations ?? []).filter((entry) => carryLocations.has(entry.locationId))
+  const carriedIds = new Set(carried.map((entry) => entry.locationId))
+  const liveLocations = snapshot.locations.filter((entry) => !carriedIds.has(entry.locationId))
   const characters: VersionCharacterImage[] = new Array(snapshot.characters.length)
-  const locations: VersionLocationImage[] = new Array(snapshot.locations.length)
+  const locations: VersionLocationImage[] = new Array(liveLocations.length)
   const tasks = [
     ...snapshot.characters.map((entry, i) => async () => {
       const before = previous?.characters.find((e) => e.characterId === entry.characterId && e.appearanceKey === entry.appearanceKey) ?? null
@@ -325,7 +332,7 @@ export async function freezeSnapshot(
       }
       characters[i] = { ...entry, sheet: { ...entry.sheet, url: sheet.url, sourceUrl: sheet.sourceUrl }, portraitUrl: face.url, portraitSourceUrl: face.sourceUrl }
     }),
-    ...snapshot.locations.map((entry, i) => async () => {
+    ...liveLocations.map((entry, i) => async () => {
       const before = previous?.locations.find((e) => e.locationId === entry.locationId && e.appearanceKey === entry.appearanceKey) ?? null
       const wide = kept(await freezeImage(entry.wideShot.url, before ? { url: before.wideShot.url, sourceUrl: before.wideShot.sourceUrl ?? null } : null, name('l', entry.locationId, entry.appearanceKey, 'wide'), folder))
       locations[i] = { ...entry, wideShot: { ...entry.wideShot, url: wide.url, sourceUrl: wide.sourceUrl } }
@@ -337,7 +344,7 @@ export async function freezeSnapshot(
     await removeFiles(created, 'half-made version copies')
     throw e
   }
-  return { snapshot: { characters, locations }, created }
+  return { snapshot: { characters, locations: [...locations, ...carried] }, created }
 }
 
 /** 떠난 버전 기록이 더는 가리키지 않는 그 버전 폴더의 옛 복사본을 지운다 — 다른 버전 기록 · 지금 그림 · 카드 기록 줄이 가리키는 파일은 남긴다(최선). */
@@ -376,27 +383,36 @@ type SlotCandidate = { id: string; url: string; is_selected: boolean }
 
 /**
  * 그 칸의 기록 줄을 "지금"으로 — 그때의 줄이 남아 있으면 그 줄(같은 지문), 앞서 되살린 줄(같은 복사본)이 있으면 그 줄,
- *   둘 다 없으면 버전 폴더 그림으로 줄을 새로 만든다. 이미 그렇게 되어 있으면 아무것도 쓰지 않는다(다시 돌려도 같다).
+ *   둘 다 없으면 버전 폴더 그림으로 줄을 새로 만든다(newRow 가 null 이면 — 올린 그림 — 만들지 않고 "지금" 표시만 내린다).
+ *   selected = 먼저 내릴 "지금" 줄 — 배경은 그 배경(뷰)의 모든 모습 것이다(운영 DB 색인은 배경 한 곳에 "지금" 하나).
+ *   이미 그렇게 되어 있으면 아무것도 쓰지 않는다(다시 돌려도 같다).
  */
 async function pickRestoredCandidate(
   table: 'character_image_candidates' | 'location_image_candidates',
   slot: readonly SlotCandidate[],
+  selected: readonly string[],
   image: VersionImage,
-  newRow: () => Record<string, unknown>,
+  newRow: (() => Record<string, unknown>) | null,
 ): Promise<void> {
   const keep = (image.candidateId ? slot.find((c) => c.id === image.candidateId) : undefined) ?? slot.find((c) => withoutQuery(c.url) === withoutQuery(image.url))
-  const selected = slot.filter((c) => c.is_selected).map((c) => c.id)
   if (keep) {
     if (selected.length === 1 && selected[0] === keep.id) return
-    await selectCandidateRow(table, selected, keep.id)
+    await selectCandidateRow(table, [...selected], keep.id)
     return
   }
   if (selected.length) {
-    const { error } = await supabaseAdmin.from(table).update({ is_selected: false }).in('id', selected)
+    const { error } = await supabaseAdmin.from(table).update({ is_selected: false }).in('id', [...selected])
     if (error) throw new Error(`${table} clear failed: ${error.message}`)
   }
+  if (!newRow) return
   const { error } = await supabaseAdmin.from(table).insert(newRow())
   if (error) throw new Error(`${table} restore failed: ${error.message}`)
+}
+
+/** 되돌릴 그림 주소 — 이 작품에 올린 그림(그대로 쓰기)이었으면 올린 그 파일(지우지 않는 파일이다), 아니면 버전 폴더 복사본.
+ *  복사본을 가리키면 다음 재생성이 "올린 그림"인지 몰라 다시 그린다(2026-10-31 오너 결정 C, 혼자 정한 것). */
+function restoredUrl(projectId: string, url: string, sourceUrl: string | null | undefined): { url: string; upload: boolean } {
+  return sourceUrl && isBreakdownUpload(sourceUrl, projectId) ? { url: sourceUrl, upload: true } : { url, upload: false }
 }
 
 /** 얼굴 없이 남은 버전의 대표 얼굴 — 불러온 시트에서 다시 자른다(select-candidate 와 같은 규칙). 못 자르면 비운다(다른 스타일 얼굴을 남기지 않게). */
@@ -413,7 +429,8 @@ async function restoreCharacter(projectId: string, entry: VersionCharacterImage,
   const appearance = live.appearances.find((a) => a.character_id === entry.characterId && a.appearance_key === entry.appearanceKey)
   if (!appearance) return
   const slot = live.characterCandidates.filter((c) => c.character_id === entry.characterId && c.appearance_key === entry.appearanceKey && c.view === 'main')
-  await pickRestoredCandidate('character_image_candidates', slot, entry.sheet, () => ({
+  const sheet = restoredUrl(projectId, entry.sheet.url, entry.sheet.sourceUrl)
+  await pickRestoredCandidate('character_image_candidates', slot, slot.filter((c) => c.is_selected).map((c) => c.id), entry.sheet, sheet.upload ? null : () => ({
     project_id: projectId,
     character_id: entry.characterId,
     appearance_key: entry.appearanceKey,
@@ -426,16 +443,17 @@ async function restoreCharacter(projectId: string, entry: VersionCharacterImage,
     generated_at: entry.sheet.generatedAt ?? at,
   }))
   // 지금 그림은 버전 폴더에 남긴 그림이다 — 원래 파일은 나중에 같은 자리에 덮이거나(예전 고정 경로) 지워질 수 있다(2026-10-28 검토 지적).
-  const patch: Record<string, unknown> = { sheet_url: entry.sheet.url }
+  //   이 작품에 올린 그림(그대로 쓰기)은 올린 그 파일로 돌린다(restoredUrl).
+  const patch: Record<string, unknown> = { sheet_url: sheet.url }
   // 올린 원본이 있는 모습은 그 원본이 대표 얼굴이다(#image-to-artist) — 덮지 않는다.
   if (!appearance.derived_from_url) {
-    if (entry.portraitUrl) patch.portrait_url = entry.portraitUrl
+    if (entry.portraitUrl) patch.portrait_url = restoredUrl(projectId, entry.portraitUrl, entry.portraitSourceUrl).url
     else {
-      const sheetPath = mediaPathFromUrl(entry.sheet.url)
+      const sheetPath = mediaPathFromUrl(sheet.url)
       const cropped = !!sheetPath && !!appearance.portrait_url && mediaPathFromUrl(appearance.portrait_url) === portraitPathForSheet(sheetPath)
       if (!cropped) {
         const entityType = live.characters.find((c) => c.character_id === entry.characterId)?.entity_type
-        patch.portrait_url = await restoredPortrait(entry.sheet.url, entityType)
+        patch.portrait_url = await restoredPortrait(sheet.url, entityType)
       }
     }
   }
@@ -449,14 +467,18 @@ async function restoreCharacter(projectId: string, entry: VersionCharacterImage,
   if (error) throw new Error(`character appearance restore failed: ${error.message}`)
 }
 
+/** 다른 모습이 없는 배경 하나를 되돌린다(다른 모습이 있는 배경은 restoreSnapshot 이 건너뛴다). */
 async function restoreLocation(projectId: string, entry: VersionLocationImage, live: LiveImages, at: string): Promise<void> {
   const variant = entry.appearanceKey
   const target = variant
     ? live.locationAppearances.find((a) => a.location_id === entry.locationId && a.appearance_key === variant)
     : live.locations.find((l) => l.location_id === entry.locationId)
   if (!target) return
-  const slot = live.locationCandidates.filter((c) => c.location_id === entry.locationId && c.view === 'wide_shot' && (c.variant_key ?? null) === variant)
-  await pickRestoredCandidate('location_image_candidates', slot, entry.wideShot, () => ({
+  const background = live.locationCandidates.filter((c) => c.location_id === entry.locationId && c.view === 'wide_shot')
+  const slot = background.filter((c) => (c.variant_key ?? null) === variant)
+  const wide = restoredUrl(projectId, entry.wideShot.url, entry.wideShot.sourceUrl)
+  // "지금" 표시는 그 배경(뷰)에 하나 — 모습과 상관없이 모두 내린 뒤 고른다(운영 DB 색인, 2026-10-31 오너 결정 A).
+  await pickRestoredCandidate('location_image_candidates', slot, background.filter((c) => c.is_selected).map((c) => c.id), entry.wideShot, wide.upload ? null : () => ({
     project_id: projectId,
     location_id: entry.locationId,
     view: 'wide_shot',
@@ -468,22 +490,36 @@ async function restoreLocation(projectId: string, entry: VersionLocationImage, l
     is_selected: true,
     generated_at: entry.wideShot.generatedAt ?? at,
   }))
-  if (target.wide_shot === entry.wideShot.url) return
+  if (target.wide_shot === wide.url) return
   const { error } = variant
-    ? await supabaseAdmin.from('location_appearances').update({ wide_shot: entry.wideShot.url, updated_at: at }).eq('project_id', projectId).eq('location_id', entry.locationId).eq('appearance_key', variant)
-    : await supabaseAdmin.from('locations').update({ wide_shot: entry.wideShot.url }).eq('project_id', projectId).eq('location_id', entry.locationId)
+    ? await supabaseAdmin.from('location_appearances').update({ wide_shot: wide.url, updated_at: at }).eq('project_id', projectId).eq('location_id', entry.locationId).eq('appearance_key', variant)
+    : await supabaseAdmin.from('locations').update({ wide_shot: wide.url }).eq('project_id', projectId).eq('location_id', entry.locationId)
   if (error) throw new Error(`location restore failed: ${error.message}`)
+}
+
+/** 다른 모습(location_appearances)이 있는 배경 — 불러와도 기본 · 다른 모습 그림을 지금 그대로 둔다(2026-10-31 오너 결정 A). */
+export function backgroundsWithOtherLooks(live: Pick<LiveImages, 'locationAppearances'>): Set<string> {
+  return new Set(live.locationAppearances.map((a) => a.location_id))
+}
+
+/** 그 버전을 불러올 때 지금 그림 그대로 두는 배경 수(그 버전 기록에 있는 배경 중 다른 모습이 있는 것). */
+export function keptBackgroundsOf(snapshot: VersionSnapshot | null, live: Pick<LiveImages, 'locationAppearances'>): number {
+  const withLooks = backgroundsWithOtherLooks(live)
+  return new Set((snapshot?.locations ?? []).filter((entry) => withLooks.has(entry.locationId)).map((entry) => entry.locationId)).size
 }
 
 /**
  * 버전 그림으로 되돌린다(다시 그리지 않음). 그 버전에 있던 칸만 — 뒤에 새로 생긴 인물 · 배경 · 모습은 지금 그림 그대로.
+ *   다른 모습이 있는 배경도 지금 그림 그대로다(기본 · 다른 모습 모두) — 그 수를 돌려준다(화면이 알린다, 2026-10-31 오너 결정 A).
  *   칸마다 따로라 여러 칸을 함께(RESTORE_CONCURRENCY) 되돌린다. 칸마다 이미 되돌린 것은 건너뛰어, 멈춘 뒤 다시 돌려도 같다.
  */
-export async function restoreSnapshot(projectId: string, snapshot: VersionSnapshot, live: LiveImages, at: string): Promise<void> {
+export async function restoreSnapshot(projectId: string, snapshot: VersionSnapshot, live: LiveImages, at: string): Promise<{ keptBackgrounds: number }> {
+  const withLooks = backgroundsWithOtherLooks(live)
   await runLimited([
     ...snapshot.characters.map((entry) => () => restoreCharacter(projectId, entry, live, at)),
-    ...snapshot.locations.map((entry) => () => restoreLocation(projectId, entry, live, at)),
+    ...snapshot.locations.filter((entry) => !withLooks.has(entry.locationId)).map((entry) => () => restoreLocation(projectId, entry, live, at)),
   ], RESTORE_CONCURRENCY)
+  return { keptBackgrounds: keptBackgroundsOf(snapshot, live) }
 }
 
 // ── 재생성 칸 사실 ───────────────────────────────────────────────
@@ -613,7 +649,7 @@ export async function leaveCurrentVersion(
 ): Promise<LeftVersion | { ok: false }> {
   const folder = versionFolder(project.workspace_id, project.id, current.n)
   const previous = parseVersionSnapshot(current.snapshot)
-  const { snapshot, created } = await freezeSnapshot(project, current.n, liveSnapshot(live), previous)
+  const { snapshot, created } = await freezeSnapshot(project, current.n, liveSnapshot(live), previous, backgroundsWithOtherLooks(live))
   // 그때의 그림 지시 그림체 값도 남긴다 — 불러오면 그림과 함께 이 값으로 돌아간다(styleLookTokens).
   const frozen: VersionSnapshot = { ...snapshot, look: { l1: designL1(project.design_tokens) } }
   // 떠날 수 있는 버전의 재생성은 다 그린 것이다(남은 그림이 있으면 부르는 쪽이 막는다) — 아직 알리지 않았으면 다 그렸다고 적어,

@@ -1,15 +1,37 @@
 // Artist 작품 스타일 기록 화면 — 머리 줄 · 재생성 창 · 생성 기록 창 · 카드 기록 · 처음 스타일 창의 문구와 배선이 프로토타입 그대로다 (2026-10-28 오너, A2 · A5 · A6 · AV · A7)
 import { readFileSync } from 'node:fs'
-import { createElement } from 'react'
+import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { mediaUrlOf } from '../fixtures/_memory-supabase'
+
+// 창은 열려 있을 때 내용을 그대로 그린다(정적 렌더에는 창 겉껍데기가 없다 — recheck-screen 과 같은 방법).
+vi.mock('@/components/ui/dialog', async () => {
+  const { createElement: h } = await import('react')
+  type Props = { children?: ReactNode; className?: string; 'data-testid'?: string; open?: boolean }
+  const plain = (tag: string) => ({ children, className, 'data-testid': testId }: Props) => h(tag, { className, 'data-testid': testId }, children)
+  return {
+    Dialog: ({ open, children }: Props) => (open ? children : null),
+    DialogContent: plain('div'),
+    DialogHeader: plain('div'),
+    DialogFooter: plain('div'),
+    DialogTitle: plain('h2'),
+    DialogDescription: plain('p'),
+  }
+})
+
 import { KO } from '@/lib/i18n/messages-ko'
+import { RegenerateStyleDialog } from '@/features/artist-room/regenerate-style-dialog'
+import { VersionHistoryDialog } from '@/features/artist-room/version-history-dialog'
 import { StyleVersionBar } from '@/features/artist-room/style-version-bar'
 import { StyleReturnCard } from '@/features/artist-room/style-return-card'
 import { RegenStoppedActions } from '@/features/artist-room/regen-stopped-actions'
 import { useArtistVersionStore } from '@/stores/artist-version-store'
+import { useArtistStore } from '@/stores/artist-store'
+import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { useProducerStore } from '@/stores/producer-store'
+import { useProjectStore } from '@/stores/project-store'
 
 const read = (path: string) => readFileSync(path, 'utf8')
 
@@ -197,6 +219,47 @@ describe('채팅 카드 그려 보기(AY)', () => {
     expect(withVersions).not.toContain('재생성하기')
     const none = html(createElement(StyleReturnCard, { options: [], regenerate: true }))
     expect(none).toContain('재생성하기')
+  })
+})
+
+describe('재생성 · 생성 기록 창 그려 보기(2026-10-31 오너 결정)', () => {
+  const generated = (name: string) => mediaUrlOf(`ws1/p1/characters/${name}.png`)
+  function cards() {
+    useProjectStore.setState({ projectId: 'p1' })
+    useGlobalChatStore.setState({ styleSettingFor: null } as never)
+    useArtistStore.setState({
+      characterAssets: [
+        { characterId: 'minho', name: '민호', entityType: 'person', appearances: [{ appearanceKey: 'current', isDefault: true, sheetUrl: mediaUrlOf('ws1/p1/breakdown/minho-upload.png') }] },
+        { characterId: 'soonja', name: '순자', entityType: 'person', appearances: [{ appearanceKey: 'current', isDefault: true, sheetUrl: generated('soonja') }] },
+      ],
+      worldAssets: [
+        { locationId: 'hall', name: '회사 복도', wideShot: generated('hall'), appearances: [{ appearanceKey: 'night', wideShot: generated('night') }] },
+        { locationId: 'roof', name: '옥상', wideShot: generated('roof'), appearances: [] },
+      ],
+    } as never)
+    serveCurrent(useProjectStore, useGlobalChatStore, useArtistStore)
+  }
+
+  it('재생성 창 요약은 올린 그림(그대로 쓰기)이 있으면 "올린 그림 n장은 그대로 둬요"를 보이고, 다시 그리는 인물 · 배경 수에서 뺀다', () => {
+    // 왜: 2026-10-31 오너 결정 C — 올린 그림은 다시 그리지 않는다. 누르기 전에 무엇이 그대로인지 보인다.
+    screenState({ versions: [versionView(1, 'watercolor', true)] })
+    cards()
+    useArtistVersionStore.setState({ regenDialogOpen: true })
+    serveCurrent(useArtistVersionStore)
+    const out = html(createElement(RegenerateStyleDialog))
+    expect(out).toContain('인물 1 · 배경 2 전체')
+    expect(out).toContain('올린 그림 1장은 그대로 둬요')
+    expect(KO['{count} uploaded pictures stay as they are']).toBe('올린 그림 {count}장은 그대로 둬요')
+  })
+
+  it('생성 기록 창은 다른 모습이 있는 배경이 있으면 "다른 모습이 있는 배경 n곳은 지금 그림 그대로예요."를 보인다', () => {
+    // 왜: 2026-10-31 오너 결정 A — 그런 배경은 불러와도 지금 그림 그대로라, 불러오기 전에 알린다.
+    screenState({ versions: [versionView(1, 'real', false), versionView(2, 'watercolor', true)] })
+    cards()
+    useArtistVersionStore.setState({ historyDialogOpen: true })
+    serveCurrent(useArtistVersionStore)
+    const out = html(createElement(VersionHistoryDialog, { canLoad: true }))
+    expect(out).toContain('다른 모습이 있는 배경 1곳은 지금 그림 그대로예요.')
   })
 })
 

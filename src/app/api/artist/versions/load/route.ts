@@ -1,6 +1,7 @@
 // POST /api/artist/versions/load { projectId, n, cancelRegen? } — 생성 기록 [불러오기] · 채팅 카드 [v{n} · 스타일 불러오기](2026-10-28 오너, 프로토타입 AV · AY).
 //   다시 그리지 않고 그 버전의 그림(인물 모습별 시트 · 대표 얼굴, 배경 모습별 그림)으로 돌리고 작품 스타일도 그 버전 것으로 바꾼다.
 //   떠나는 지금 버전은 그림을 버전 폴더에 남긴다. 그 버전 뒤에 새로 생긴 인물 · 배경 · 모습은 지금 그림 그대로.
+//   다른 모습이 있는 배경도 지금 그림 그대로 두고 그 수(keptBackgrounds)를 돌려준다 — 화면이 알린다(2026-10-31 오너 결정 A).
 //   막는 때는 재생성과 같다 — 단 다 그리기 전에 멈춘 재생성은 cancelRegen 으로 그만두고 불러올 수 있다(그리는 그림이 없을 때).
 //   불러오는 동안은 그 버전에 "불러오는 중" 표시를 달아 두고 다 되돌리면 뗀다 — 함수가 시간 제한에 걸려 멈추면 다음 요청이 마저 한다.
 //   되돌리다 실패하면 떠난 버전 그림 · 스타일로 다시 돌려 둔다(최선). 약속: tests/artist/style-version-routes.test.ts · style-version-fixes.test.ts
@@ -13,6 +14,7 @@ import {
   artistStyleLocked,
   clearRestoringMark,
   ensureFirstVersion,
+  keptBackgroundsOf,
   failStaleImageJobs,
   imagesDrawing,
   leaveCurrentVersion,
@@ -36,7 +38,8 @@ export const runtime = 'nodejs'
 export const maxDuration = 300
 
 const reject = (code: string, error: string, status = 409) => NextResponse.json({ error, code }, { status })
-const loaded = (row: VersionRow) => NextResponse.json({ ok: true, n: row.n, styleKey: row.style_anchor_key, customStyle: parseCustomStyle(row.custom_style_anchor) })
+const loaded = (row: VersionRow, keptBackgrounds: number) =>
+  NextResponse.json({ ok: true, n: row.n, styleKey: row.style_anchor_key, customStyle: parseCustomStyle(row.custom_style_anchor), keptBackgrounds })
 
 export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
@@ -59,7 +62,7 @@ export async function POST(req: Request) {
     if (!target) return reject(ARTIST_VERSION_CODES.notFound, 'Version not found', 404)
     if (target.is_current) {
       // 멈췄던 불러오기를 방금 마저 했다 — 다시 누른 요청은 불러온 것으로 답한다.
-      if (settled.finishedN === n) return loaded(target)
+      if (settled.finishedN === n) return loaded(target, keptBackgroundsOf(parseVersionSnapshot(target.snapshot), await readLiveImages(projectId)))
       if (settled.restoringN === n) return reject(ARTIST_VERSION_CODES.restoring, 'The version is still being loaded')
       return reject(ARTIST_VERSION_CODES.alreadyCurrent, 'This version is already the current one')
     }
@@ -94,11 +97,12 @@ export async function POST(req: Request) {
       throw new Error(`version activate failed: ${activateError.message}`)
     }
 
+    let keptBackgrounds = 0
     try {
       // 그 버전 때의 그림 지시 그림체 값으로도 돌아간다 — 남긴 값이 없으면(예전 버전) 지금 값을 둔다.
       const designTokens = snapshot.look?.l1 ? withDesignL1(project.design_tokens, snapshot.look.l1) : undefined
       await setProjectStyle(projectId, target.style_anchor_key, target.custom_style_anchor, designTokens)
-      await restoreSnapshot(projectId, snapshot, live, at)
+      keptBackgrounds = (await restoreSnapshot(projectId, snapshot, live, at)).keptBackgrounds
     } catch (e) {
       // 되돌리다 멈췄으면 떠난 버전 그림 · 스타일로 다시 돌려 둔다 — 반쯤 섞인 그림으로 남지 않게(최선).
       console.error('[artist/versions/load] restore failed, returning:', e instanceof Error ? e.message : e)
@@ -113,7 +117,7 @@ export async function POST(req: Request) {
       throw e
     }
     await clearRestoringMark(target.id, marked, activatedAt)
-    return loaded(target)
+    return loaded(target, keptBackgrounds)
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     console.error('[artist/versions/load]', message)

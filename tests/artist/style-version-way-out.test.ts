@@ -24,7 +24,7 @@ const regenView = (states: Record<string, string>, extra: Record<string, unknown
 })
 
 /** 서버 창구 흉내 — 버전 v1(실사) · v2(수채화) · v3(수채화, 재생성 중). */
-function fakeServer(opts: { completed?: boolean } = {}) {
+function fakeServer(opts: { completed?: boolean; keptBackgrounds?: number } = {}) {
   const server = { current: 3, regen: regenView({ 'c:minho:current': 'todo', 'l:hall:default': 'todo' }) as ReturnType<typeof regenView> | null, calls: [] as Array<{ url: string; body: Record<string, unknown> | null }> }
   const styles: Record<number, string> = { 1: 'real', 2: 'watercolor', 3: 'watercolor' }
   vi.stubGlobal('fetch', vi.fn(async (input: string, init?: RequestInit) => {
@@ -35,7 +35,7 @@ function fakeServer(opts: { completed?: boolean } = {}) {
     if (url.startsWith('/api/artist/versions/load')) {
       server.current = body!.n as number
       server.regen = null
-      return Response.json({ ok: true, n: body!.n, styleKey: styles[body!.n as number], customStyle: null })
+      return Response.json({ ok: true, n: body!.n, styleKey: styles[body!.n as number], customStyle: null, keptBackgrounds: opts.keptBackgrounds ?? 0 })
     }
     if (url.startsWith('/api/artist/versions/regen')) {
       // 접수 전에 막힌 칸은 실패로 적는다 — 이어 그리기가 같은 칸을 다시 보내지 않는다.
@@ -59,6 +59,7 @@ const original = { ...useArtistStore.getState() }
 
 beforeEach(() => {
   toast.error.mockClear()
+  toast.info.mockClear()
   useLocaleStore.setState({ locale: 'ko' })
   useGlobalChatStore.getState().reset()
   useArtistVersionStore.getState().reset()
@@ -138,6 +139,21 @@ describe('멈춘 재생성에서 돌아가기', () => {
     useArtistVersionStore.setState({ run: { running: false, stopped: true, userWaitSince: null } })
     await useArtistVersionStore.getState().loadVersion(2)
     expect(again.calls.find((call) => call.url.startsWith('/api/artist/versions/load'))?.body).toMatchObject({ n: 2, cancelRegen: true })
+  })
+})
+
+describe('그대로 둔 배경 알리기', () => {
+  it('불러온 버전에서 다른 모습이 있는 배경을 지금 그림 그대로 두었으면 "다른 모습이 있는 배경 n곳은 지금 그림 그대로예요."를 알린다', async () => {
+    // 왜: 2026-10-31 오너 결정 A — 불러왔는데 일부 배경이 그대로면 고장 난 줄 안다. 몇 곳이 왜 그대로인지 한 줄로 알린다.
+    fakeServer({ keptBackgrounds: 2 })
+    useArtistStore.setState({ loadData: vi.fn(async () => {}) } as never)
+    expect(await useArtistVersionStore.getState().loadVersion(1)).toBe(true)
+    expect(toast.info).toHaveBeenCalledWith('다른 모습이 있는 배경 2곳은 지금 그림 그대로예요.')
+
+    toast.info.mockClear()
+    fakeServer({ keptBackgrounds: 0 })
+    await useArtistVersionStore.getState().loadVersion(2)
+    expect(toast.info).not.toHaveBeenCalled()
   })
 })
 

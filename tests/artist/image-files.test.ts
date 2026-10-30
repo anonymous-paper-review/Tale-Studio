@@ -1,6 +1,5 @@
 // 새로 그린 인물 · 배경 그림은 매번 새 파일로 저장하고, 카드 기록에서 빠진 그림 파일만 지운다(버전 기록이 가리키는 파일은 남긴다) (2026-10-28 작품 스타일 기록)
 import { randomUUID } from 'node:crypto'
-import { readdirSync, readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { memorySupabase, mediaUrlOf, type Row } from '../fixtures/_memory-supabase'
 
@@ -53,7 +52,8 @@ function seed(extra: Record<string, Row[]> = {}) {
     ...extra,
   }, {
     character_image_candidates: [{ columns: ['project_id', 'character_id', 'appearance_key', 'view'], where: (row) => row.is_selected === true }],
-    location_image_candidates: [{ columns: ['project_id', 'location_id', 'view', 'variant_key'], where: (row) => row.is_selected === true, normalize: { variant_key: (value) => value ?? '' } }],
+    // 배경 카드 기록의 "지금"은 배경 한 곳(뷰)에 하나 — 운영 DB 색인 그대로(2026-10-31 오너: 모습마다로 바꾸기는 보류).
+    location_image_candidates: [{ columns: ['project_id', 'location_id', 'view'], where: (row) => row.is_selected === true }],
   })
 }
 
@@ -103,19 +103,6 @@ describe('그림 파일은 그릴 때마다 새로', () => {
     expect(pathOf(state.db.rows('locations')[0].wide_shot)).toBe(pathOf(urlB))
     expect(pathOf(state.db.rows('location_appearances')[0].wide_shot)).toBe(pathOf(urlNight))
     expect(state.thumbs).toEqual(expect.arrayContaining([pathOf(urlA), pathOf(urlB), pathOf(urlNight)]))
-  })
-
-  it('배경의 기본 모습과 다른 모습은 카드 기록의 "지금" 그림을 따로 가진다', async () => {
-    // 왜: DB 의 "지금 그림은 하나" 규칙이 배경 한 곳 전체에 걸려 있어, 다른 모습을 그리면 기본 모습의 기록 줄이 조용히 빠졌다(개발 DB 실측 1곳).
-    //   규칙(유일 색인)을 모습마다로 바꾼다 — 기존 표에 칸을 더하지 않고 색인만 바꾼다.
-    const migration = readdirSync('supabase/migrations').filter((name) => name.endsWith('_artist_versions.sql'))
-    expect(migration).toHaveLength(1)
-    const sql = readFileSync(`supabase/migrations/${migration[0]}`, 'utf8').replace(/\s+/g, ' ')
-    expect(sql).toContain("create unique index idx_loc_img_candidates_one_selected on public.location_image_candidates (project_id, location_id, view, coalesce(variant_key, '')) where is_selected")
-    await finalizeWorldShotJob(worldJob(), 'https://fal.test/a.png')
-    await finalizeWorldShotJob(worldJob(randomUUID(), 'night'), 'https://fal.test/n.png')
-    const selected = state.db.rows('location_image_candidates').filter((row) => row.is_selected)
-    expect(selected.map((row) => row.variant_key ?? 'default').sort()).toEqual(['default', 'night'])
   })
 })
 

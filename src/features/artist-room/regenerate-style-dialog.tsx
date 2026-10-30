@@ -4,6 +4,7 @@
 //   지금 버전은 기록에 남는다. 스타일 격자는 처음 만드는 창(A2)의 것을 그대로 쓴다(내 그림체 올리기 없음 — 이미 올린 내 그림체 카드는 그대로 보인다).
 //   내 그림체를 쓰는 동안 다른 스타일은 고를 수 없다 — ✕로 내리면 고를 수 있고, 내 그림체는 지금 버전 기록에 남는다(혼자 정한 것).
 //   고른 스타일로 만든 이전 버전이 있으면 다시 만들지 않고 불러오는 길을 보인다. [다시 만들기] → artist-version-store.regenerate.
+//   요약의 "인물 N · 배경 M"은 서버와 같은 규칙(buildRegenPlan)으로 센다 — 올린 그림(그대로 쓰기) 칸은 그대로 두고 그 장수를 보인다(2026-10-31 오너 결정 C).
 import { useState } from 'react'
 import { Loader2, Lock, RotateCcw, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
@@ -13,7 +14,7 @@ import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
 import { useLocale, useT } from '@/lib/i18n'
 import { fixKoreanParticles } from '@/lib/korean-particles'
 import { styleAnchorName } from '@/lib/style-anchor-name'
-import { previousVersionWithStyle, regenStyleNote, versionStyleLabel } from '@/lib/artist/style-versions'
+import { buildRegenPlan, previousVersionWithStyle, regenCounts, regenKeptUploads, regenStyleNote, versionStyleLabel, type RegenPlanInput } from '@/lib/artist/style-versions'
 import { StyleGrid } from '@/features/artist-room/style-make-dialog'
 import { useArtistStore } from '@/stores/artist-store'
 import { useArtistVersionStore } from '@/stores/artist-version-store'
@@ -33,8 +34,17 @@ export function RegenerateStyleDialog() {
   const savedKey = useProducerStore((s) => s.styleAnchorKey)
   const custom = useProducerStore((s) => s.customStyleAnchor)
   const styleSetting = useGlobalChatStore((s) => !!projectId && s.styleSettingFor === projectId)
-  const persons = useArtistStore((s) => s.characterAssets.filter((c) => c.entityType === 'person').length)
-  const places = useArtistStore((s) => s.worldAssets.length)
+  const characterAssets = useArtistStore((s) => s.characterAssets)
+  const worldAssets = useArtistStore((s) => s.worldAssets)
+  const planInput: RegenPlanInput = {
+    projectId,
+    characters: characterAssets.map((c) => ({ characterId: c.characterId, entityType: c.entityType })),
+    appearances: characterAssets.flatMap((c) => c.appearances.map((a) => ({ characterId: c.characterId, appearanceKey: a.appearanceKey, isDefault: a.isDefault, sheetUrl: a.sheetUrl }))),
+    locations: worldAssets.map((w) => ({ locationId: w.locationId, wideShot: w.wideShot })),
+    locationAppearances: worldAssets.flatMap((w) => (w.appearances ?? []).map((a) => ({ locationId: w.locationId, appearanceKey: a.appearanceKey, wideShot: a.wideShot }))),
+  }
+  const { persons, places } = regenCounts(buildRegenPlan(planInput))
+  const keptUploads = regenKeptUploads(planInput)
   const [picked, setPicked] = useState<string | null>(savedKey)
   // ✕ — 이번 재생성에서 내 그림체를 쓰지 않는다(지우지 않는다: 지금 버전 기록에 남는다).
   const [dropCustom, setDropCustom] = useState(false)
@@ -118,7 +128,13 @@ export function RegenerateStyleDialog() {
             </p>
           ) : null}
           <dl className="space-y-2 rounded-lg border border-border px-3 py-2.5 text-sm" data-testid="artist-regen-summary">
-            <div className="flex gap-3"><dt className="w-24 shrink-0 text-muted-foreground">{t('What gets remade')}</dt><dd>{t('Characters {persons} · backgrounds {places}, all of them', { persons, places })}</dd></div>
+            <div className="flex gap-3">
+              <dt className="w-24 shrink-0 text-muted-foreground">{t('What gets remade')}</dt>
+              <dd>
+                {t('Characters {persons} · backgrounds {places}, all of them', { persons, places })}
+                {keptUploads > 0 ? <span className="block text-muted-foreground" data-testid="artist-regen-kept-uploads">{t('{count} uploaded pictures stay as they are', { count: keptUploads })}</span> : null}
+              </dd>
+            </div>
             <div className="flex gap-3">
               <dt className="w-24 shrink-0 text-muted-foreground">{t('Style')}</dt>
               <dd>
