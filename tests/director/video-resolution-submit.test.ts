@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
+  getUser: vi.fn(),
   userOwnsProject: vi.fn(),
   checkGenerationCapacity: vi.fn(),
   checkProjectVideoBudget: vi.fn(),
@@ -20,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   falKeyById: vi.fn(),
 }))
 
+vi.mock('@/lib/supabase/auth', () => ({ getUser: mocks.getUser }))
 vi.mock('@/lib/generation-jobs', () => ({
   userOwnsProject: mocks.userOwnsProject,
   getGenerationJobById: mocks.getJob,
@@ -51,6 +53,7 @@ vi.mock('@/lib/fal/keys', () => ({
 
 import {
   prepareDirectorVideoSubmission,
+  submitDirectorVideoRequest,
   submitPreparedDirectorVideo,
   type PreparedDirectorVideoSubmission,
 } from '@/lib/director/video-submit'
@@ -143,9 +146,23 @@ async function submitAndReadHold(prepared: PreparedDirectorVideoSubmission): Pro
   return mocks.holdTakesForVideoJob.mock.calls[0][0].amount as number
 }
 
+/** 화면 한 편 경로(POST 한 번에 준비 + 제출). 예약에 실린 입력 그대로 작업 행을 돌려준다. */
+async function submitSingle(req: Request) {
+  mocks.reserveTake.mockImplementation(async (args: { inputSnapshot: unknown }) => {
+    mocks.getJob.mockResolvedValueOnce({
+      id: 'job-1', request_id: 'reserved:job-1', provider: 'fal', fal_key_id: 'prod-2000',
+      model: 'stored-model', status: 'queued', input_snapshot: args.inputSnapshot,
+    })
+    return { video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: false }
+  })
+  mocks.submit.mockResolvedValue({ request_id: 'fal-1' })
+  return submitDirectorVideoRequest(req)
+}
+
 beforeEach(() => {
   vi.resetAllMocks()
   vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'resolution-test-signing-key')
+  mocks.getUser.mockResolvedValue({ id: 'user-1' })
   mocks.userOwnsProject.mockResolvedValue(true)
   mocks.checkGenerationCapacity.mockResolvedValue({ ok: true })
   mocks.checkProjectVideoBudget.mockResolvedValue({ ok: true, used: 0, limit: 100 })
@@ -321,6 +338,74 @@ describe('혼자 정한 것', () => {
     expect(resumed.status).toBe(200)
     expect(mocks.submit).toHaveBeenCalledTimes(1)
     expect(mocks.attach).toHaveBeenLastCalledWith('project-1', 'job-1', 'fal-already-submitted', expect.objectContaining({ provider: 'fal' }))
+  })
+
+  // 왜: 새 테이크 설정(override)은 노드가 보여줄 기록일 뿐이다. 설정 칸에 1080p 를 적어 보내는 요청(조작된 화면 · 옛 화면)이
+  //   720p 값으로 1080p 를 받아 가면 안 된다 — Take 와 영상 생성처에 보내는 해상도는 서버가 검사한 요청 해상도 하나로 정한다.
+  it('새 테이크 설정에 1080p가 적혀 있어도 요청 해상도가 720p거나 없으면 720p로 만들고 한 배 Take를 잡는다', async () => {
+    for (const resolution of ['720p', undefined]) {
+      seedShotRows()
+      const prepared = await prepare(request({ model: 'seedance', resolution, override: { resolution: '1080p' } }))
+      expect(falInput(prepared).resolution).toBe('720p')
+      expect(await submitAndReadHold(prepared)).toBe(5)
+    }
+
+    seedShotRows()
+    mocks.holdTakesForVideoJob.mockClear()
+    mocks.submit.mockClear()
+    const single = await submitSingle(request({ model: 'seedance', override: { resolution: '1080p' } }))
+    expect(single.status).toBe(200)
+    expect(mocks.submit).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ input: expect.objectContaining({ resolution: '720p' }) }))
+    expect(mocks.holdTakesForVideoJob).toHaveBeenCalledWith(expect.objectContaining({ amount: 5 }))
+  })
+
+  // 왜: 반대로 설정 칸에 720p 가 남아 있어도 요청이 1080p 면 1080p 로 만들고 그만큼 잡는다 — 받는 영상과 내는 Take 가 늘 같다.
+  it('새 테이크 설정에 720p가 적혀 있어도 요청 해상도가 1080p면 1080p로 만들고 두 배 Take를 잡는다', async () => {
+    const prepared = await prepare(request({ model: 'seedance', resolution: '1080p', override: { resolution: '720p' } }))
+    expect(falInput(prepared).resolution).toBe('1080p')
+    expect(await submitAndReadHold(prepared)).toBe(10)
+
+    seedShotRows()
+    mocks.holdTakesForVideoJob.mockClear()
+    mocks.submit.mockClear()
+    const single = await submitSingle(request({ model: 'seedance', resolution: '1080p', override: { resolution: '720p' } }))
+    expect(single.status).toBe(200)
+    expect(mocks.submit).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ input: expect.objectContaining({ resolution: '1080p' }) }))
+    expect(mocks.holdTakesForVideoJob).toHaveBeenCalledWith(expect.objectContaining({ amount: 10 }))
+  })
+
+  // 왜: 새 테이크 설정은 영상 테이크 기록에 그대로 남는다 — 객체가 아닌 값이 남으면 화면이 그 테이크를 읽지 못해 캔버스에서 사라진다.
+  //   테이크 설정 저장 칸(video-takes PATCH)과 같은 규칙 · 같은 안내로 거절한다.
+  it('새 테이크 설정이 평범한 객체가 아니면 Take를 잡거나 영상을 맡기기 전에 거절한다', async () => {
+    for (const override of [['1080p'], '1080p', 5, true]) {
+      seedShotRows()
+      const batch = await prepareDirectorVideoSubmission(request({ model: 'seedance', override }), 'user-1')
+      expect(batch).toBeInstanceOf(Response)
+      expect((batch as Response).status).toBe(400)
+      await expect((batch as Response).json()).resolves.toEqual({ error: 'Invalid request: override must be a plain JSON object or null' })
+      seedShotRows()
+      expect((await submitDirectorVideoRequest(request({ model: 'seedance', override }))).status).toBe(400)
+    }
+    expect(mocks.reserveTake).not.toHaveBeenCalled()
+    expect(mocks.holdTakesForVideoJob).not.toHaveBeenCalled()
+    expect(mocks.submit).not.toHaveBeenCalled()
+
+    seedShotRows()
+    const empty = await prepare(request({ model: 'seedance', override: null }))
+    expect(empty.override).toEqual({})
+  })
+
+  // 왜: 영상 노드 설정에 없는 칸이나 고를 수 없는 해상도가 테이크 기록에 남으면 노드가 엉뚱한 값을 보여준다 — 아는 칸만 남긴다.
+  it('새 테이크 설정에서 모르는 칸과 고를 수 없는 해상도는 버리고 아는 칸만 남긴다', async () => {
+    const camera = { horizontal: 1, vertical: 0, pan: 0, tilt: 0, roll: 0, zoom: 0 }
+    const prepared = await prepare(request({
+      model: 'happy-horse',
+      override: { provider: 'happy-horse', prompt: 'Rain on the harbor', camera, resolution: '4k', seed: 7, takeAmount: 0 },
+    }))
+
+    const kept = { provider: 'happy-horse', prompt: 'Rain on the harbor', camera }
+    expect(prepared.override).toEqual(kept)
+    expect(prepared.inputSnapshot.new_take_metadata).toMatchObject({ override: kept })
   })
 
   // 왜: 참고 그림이 하나도 없으면 글만으로 만드는 다른 입구로 나가고, 그 입구에는 해상도 칸이 없다 — 받지 못할 1080p 값을 받지 않는다.
