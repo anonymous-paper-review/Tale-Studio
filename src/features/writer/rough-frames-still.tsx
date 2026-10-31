@@ -73,9 +73,11 @@ export function RoughFramesStill({
               {labels[frame]}
             </span>
           </div>
+          {/* 세 칸 폭에 맞춰 줄을 바꾼다 — 영어 "Regenerate this frame only"가 칸을 넘어 옆 단추와 겹쳤다(2026-10-31 QA). */}
           <Button
             size="sm"
             variant="outline"
+            className="h-auto min-h-8 w-full whitespace-normal py-1.5 leading-tight"
             disabled={busy !== null}
             onClick={() => void regenerate(frame)}
             title={t('Redraw only this frame (1 image generation). The other two stay as they are.')}
