@@ -3562,7 +3562,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           get().offerSuggestion({
             id: `rough-redraw:${traceId}`,
             stage: 'writer',
-            content: translate(locale, 'The rough sketch still shows the old version for {count} changed shots. Redraw them with the changes? Each shot is one new picture.', { count: redraw.length }),
+            content: translate(locale, 'The rough sketches of the shots you changed still show the old version. Redraw them with the changes? Each shot is one new picture.', { count: redraw.length }),
             action: { kind: 'roughRedraw', shotIds: redraw, label: translate(locale, 'Redraw the rough') },
           })
         }
