@@ -98,6 +98,8 @@ function renderNode(id = videoId): Element[] {
 }
 
 const SURFACES = [['왼쪽 상세 패널', VideoDetailPanel], ['영상 팝업', VideoNodePopup]] as const
+// 오너 문장의 "Node 뷰의 영상 팝업" = Node 뷰에서 영상 노드를 누르면 열리는 왼쪽 상세 패널. 같은 단추를 둔 영상 팝업도 같이 본다.
+const WHERE = [['Director Node 뷰의 왼쪽 상세 패널', VideoDetailPanel], ['영상 팝업', VideoNodePopup]] as const
 
 beforeEach(() => {
   hooks.slots = []
@@ -110,8 +112,8 @@ beforeEach(() => {
 })
 
 describe('같이 정한 것', () => {
-  // 왜: Node 뷰에서 영상 노드를 누르면 왼쪽 상세 패널이, Storyboard 뷰에서는 영상 팝업이 열린다 — 둘 다 같은 자리에 단추가 있어야 한다.
-  it.each(SURFACES)('Director Node 뷰의 영상 팝업에서 영상 생성 모델 아래에 해상도 단추(720p · 1080p)가 있다 (%s)', (_label, surface) => {
+  // 왜: Node 뷰에서 영상 노드를 누르면 왼쪽 상세 패널이 열린다(오너가 말한 "영상 팝업"). 같은 단추를 둔 영상 팝업도 같은 자리에 있어야 한다.
+  it.each(WHERE)('%s에서 영상 생성 모델 아래에 해상도 단추(720p · 1080p)가 있다', (_label, surface) => {
     const nodes = render(surface)
     const models = modelButtons(nodes)
     const resolutions = resolutionButtons(nodes)
@@ -177,30 +179,38 @@ describe('혼자 정한 것', () => {
     expect(resolutionButtons(nodes)).toEqual([])
   })
 
-  // 왜: 캔버스에서 노드만 보고 다시 찍기를 누를 때 — 노드의 Take 표시가 실제로 잡힐 Take 와 같아야 하고, 몇 p 로 만드는지 보여야 한다.
-  it('영상 노드의 Take 표시도 해상도를 따라 두 배로 보이고, 1080p로 만들 때는 노드에 작은 1080p 표시가 붙는다', () => {
+  // 왜: 캔버스에서 노드만 보고 [영상 리테이크]를 누를 때 — 노드의 Take 표시가 그 버튼으로 실제로 잡힐 Take 와 같아야 한다.
+  it('영상 노드의 Take 표시는 다음에 만들 해상도를 따라 두 배로 보인다', () => {
     expect(takeTexts(renderNode())).toEqual(['Take 5개'])
-    expect(renderNode().some((node) => node.type === 'span' && textOf(node) === '1080p')).toBe(false)
 
     director.getState().applyVideoOverride(videoId, { resolution: '1080p' })
 
-    const nodes = renderNode()
-    expect(takeTexts(nodes)).toEqual(['Take 10개'])
-    expect(nodes.some((node) => node.type === 'span' && textOf(node) === '1080p')).toBe(true)
-    // 해상도는 마더 샷을 바꾼 값이 아니다 — 노란 "바꾼 설정" 표시 대신 1080p 표시 하나로 보인다.
-    expect(nodes.some((node) => node.type === 'span' && textOf(node) === 'resolution')).toBe(false)
+    expect(takeTexts(renderNode())).toEqual(['Take 10개'])
+  })
+
+  // 왜: 노드의 1080p 표시는 지금 보이는 영상에 대한 말이다 — 설정만 바꾸고 아직 다시 만들지 않은 영상에 붙으면 틀린 말이 된다(2026-10-31 리뷰).
+  //   다음에 만들 해상도(설정)는 왼쪽 패널 단추와 Take 표시가 보여준다.
+  it('영상 노드의 1080p 표시는 지금 영상이 실제로 1080p로 만들어졌을 때만 붙는다', () => {
+    const has1080 = (nodes: Element[]) => nodes.some((node) => node.type === 'span' && textOf(node) === '1080p')
+    director.getState().updateNodeData<'video'>(videoId, { videoUrl: 'https://media.test/take.mp4', status: 'completed', videoResolution: null })
+    director.getState().applyVideoOverride(videoId, { resolution: '1080p' })
+    expect(has1080(renderNode())).toBe(false)
+
+    director.getState().updateNodeData<'video'>(videoId, { videoResolution: '1080p' })
+    director.getState().applyVideoOverride(videoId, { resolution: '720p' })
+    const made1080 = renderNode()
+    expect(has1080(made1080)).toBe(true)
+    expect(takeTexts(made1080)).toEqual(['Take 5개'])
+    // 해상도는 마더 샷을 바꾼 값이 아니다 — 노란 "바꾼 설정" 표시에 넣지 않는다.
+    expect(made1080.some((node) => node.type === 'span' && textOf(node) === 'resolution')).toBe(false)
   })
 
   // 왜: 1080p 를 남겨 둔 채 모델만 Kling 으로 바꿨다가 되돌리는 경우 — 고른 해상도는 지우지 않고, 낼 수 없는 동안만 쓰지 않는다.
-  it('1080p를 남긴 채 해상도를 고를 수 없는 모델로 바꾸면 노드는 기본 Take를 보이고 1080p 표시를 떼며, 모델을 되돌리면 다시 1080p다', () => {
+  it('1080p를 남긴 채 해상도를 고를 수 없는 모델로 바꾸면 노드는 기본 Take를 보이고, 모델을 되돌리면 다시 두 배다', () => {
     director.getState().applyVideoOverride(videoId, { resolution: '1080p', provider: 'kling-o3' })
-    const kling = renderNode()
-    expect(takeTexts(kling)).toEqual(['Take 5개'])
-    expect(kling.some((node) => node.type === 'span' && textOf(node) === '1080p')).toBe(false)
+    expect(takeTexts(renderNode())).toEqual(['Take 5개'])
 
     director.getState().applyVideoOverride(videoId, { provider: 'seedance' })
-    const back = renderNode()
-    expect(takeTexts(back)).toEqual(['Take 10개'])
-    expect(back.some((node) => node.type === 'span' && textOf(node) === '1080p')).toBe(true)
+    expect(takeTexts(renderNode())).toEqual(['Take 10개'])
   })
 })

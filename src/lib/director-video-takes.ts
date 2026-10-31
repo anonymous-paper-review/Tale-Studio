@@ -151,18 +151,58 @@ export async function updateDirectorVideoTakeMetadata(
   return data as DirectorVideoTake
 }
 
-export async function listLiveDirectorVideoTakes(projectId: string): Promise<DirectorVideoTake[]> {
-  const { data, error } = await supabaseAdmin
+/** 영상 테이크 + 지금 영상이 1080p 로 만들어졌으면 '1080p'(모르거나 아니면 null) — 노드의 1080p 표시 근거(2026-10-31 리뷰). */
+export type LiveDirectorVideoTake = DirectorVideoTake & { video_resolution: '1080p' | null }
+
+/** 테이크의 마지막 시도 작업 — video_clips.last_attempt_job_id 외래 키로 같은 조회에서 함께 읽는다(지난 기록 전체는 읽지 않는다). */
+type LastAttemptJob = {
+  id: string
+  status: string | null
+  model: string | null
+  result_url: string | null
+  resolution: string | null
+}
+
+const LIVE_TAKE_WITH_LAST_JOB =
+  '*, last_attempt_job:generation_jobs!video_clips_last_attempt_job_fkey(id, status, model, result_url, resolution:input_snapshot->>resolution)'
+
+/**
+ * 지금 영상 파일이 실제로 1080p 로 만들어졌는가. 근거는 그 파일을 낸 작업뿐이다 — 마지막 시도가 완료되어 같은 파일을
+ * 냈을 때만 판단하고(다시 만드는 중 · 다시 만들기 실패면 모른다 = null), 대체 모델 미니맥스는 늘 768P 다.
+ */
+export function madeVideoResolution(
+  take: Pick<DirectorVideoTake, 'url' | 'storage_path'>,
+  job: LastAttemptJob | null | undefined,
+): '1080p' | null {
+  if (!take.url || !job || job.status !== 'completed') return null
+  const sameFile = job.result_url === take.url || !!take.storage_path?.endsWith(`/${job.id}.mp4`)
+  if (!sameFile || job.model?.startsWith('minimax/')) return null
+  return job.resolution === '1080p' ? '1080p' : null
+}
+
+async function selectLiveTakes(projectId: string, columns: string) {
+  return supabaseAdmin
     .from('video_clips')
-    .select('*')
+    .select(columns)
     .eq('project_id', projectId)
     .is('deleted_at', null)
     .order('shot_id', { ascending: true })
     .order('take_number', { ascending: true })
     .order('created_at', { ascending: true })
     .order('id', { ascending: true })
+}
+
+export async function listLiveDirectorVideoTakes(projectId: string): Promise<LiveDirectorVideoTake[]> {
+  const withJob = await selectLiveTakes(projectId, LIVE_TAKE_WITH_LAST_JOB)
+  if (!withJob.error) {
+    return ((withJob.data ?? []) as unknown as Array<DirectorVideoTake & { last_attempt_job?: LastAttemptJob | null }>)
+      .map(({ last_attempt_job: job, ...take }) => ({ ...take, video_resolution: madeVideoResolution(take, job) }))
+  }
+  // 작업 기록을 함께 읽지 못해도 캔버스의 영상 테이크는 떠야 한다 — 해상도 표시만 빠진다.
+  console.error('[director-video-takes] last attempt job embed failed:', withJob.error.message)
+  const { data, error } = await selectLiveTakes(projectId, '*')
   if (error) throw error
-  return (data ?? []) as DirectorVideoTake[]
+  return ((data ?? []) as unknown as DirectorVideoTake[]).map((take) => ({ ...take, video_resolution: null }))
 }
 
 export async function createStandaloneDirectorVideoTake(input: {

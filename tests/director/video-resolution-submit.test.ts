@@ -252,6 +252,77 @@ describe('혼자 정한 것', () => {
     expect(prepared.takeAmount).toBe(takeCostForVideo('happy-horse', '720p'))
   })
 
+  // 왜: [모든 샷 영상 만들기]는 서버가 준비해 둔 입력으로 새 테이크를 예약한다 — 그 예약에 설정이 실려야
+  //   새 테이크 노드가 1080p · 해피홀스로 보이고 리테이크도 같은 설정으로 만든다(2026-10-31 리뷰).
+  it('일괄로 준비한 입력을 낼 때 새 테이크 기록에 그 테이크의 설정(모델 · 해상도)을 남긴다', async () => {
+    const override = { provider: 'happy-horse', resolution: '1080p' }
+    const prepared = await prepare(request({ model: 'happy-horse', resolution: '1080p', override }))
+    expect(prepared.override).toEqual(override)
+
+    mocks.from.mockReset()
+    mocks.from.mockReturnValue(query(null))
+    const reserve = vi.fn().mockResolvedValue({ video_clip_id: 'clip-new', job_id: 'job-1', take_number: 2, replayed: false })
+    mocks.getJob.mockResolvedValue({
+      id: 'job-1', request_id: 'reserved:job-1', provider: 'fal', fal_key_id: 'prod-2000',
+      model: 'stored-model', status: 'queued', input_snapshot: prepared.inputSnapshot,
+    })
+    mocks.submit.mockResolvedValue({ request_id: 'fal-1' })
+
+    const response = await submitPreparedDirectorVideo(prepared, { reserve })
+
+    expect(response.status).toBe(200)
+    expect(reserve).toHaveBeenCalledWith(expect.objectContaining({ override }))
+    expect(mocks.holdTakesForVideoJob).toHaveBeenCalledWith(expect.objectContaining({ amount: 2 }))
+  })
+
+  // 왜: 화면이 같은 요청 키로 다시 낼 때(응답 유실 뒤 이어 내기) 처음 예약과 해상도가 다르면 다른 요청이다 —
+  //   그대로 이어 내면 720p 값으로 1080p 를 받거나 그 반대가 된다.
+  it('같은 요청 키로 다시 낼 때 작업 기록의 해상도가 다르면 처음 예약과 다른 요청으로 보고 이어 내지 않는다', async () => {
+    const prepared = await prepare(request({ model: 'seedance', resolution: '720p' }))
+
+    mocks.from.mockReset()
+    mocks.from.mockReturnValue(query({ id: 'job-1', video_clip_id: 'clip-1', target: { retakeMode: 'new_take', writerShotId: 'shot-1' } }))
+    mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: true })
+    mocks.getJob.mockResolvedValue({
+      id: 'job-1', request_id: 'reserved:job-1', provider: 'fal', fal_key_id: 'prod-2000',
+      model: 'stored-model', status: 'queued', input_snapshot: { ...prepared.inputSnapshot, resolution: '1080p' },
+    })
+
+    const response = await submitPreparedDirectorVideo(prepared)
+
+    expect(response.status).toBe(409)
+    await expect(response.json()).resolves.toMatchObject({ error: expect.stringContaining('does not match the reserved video input') })
+    expect(mocks.submit).not.toHaveBeenCalled()
+    expect(mocks.holdTakesForVideoJob).not.toHaveBeenCalled()
+  })
+
+  // 왜: 이 기능 전에 예약된 작업은 기록에 해상도 칸이 없다(720p). 배포 직후 그 작업을 이어 낼 때 다른 요청으로 보면 안 된다.
+  it('해상도 기록이 없는 예전 720p 예약 작업은 같은 요청으로 이어 낼 수 있다', async () => {
+    const prepared = await prepare(request({ model: 'seedance' }))
+    expect(prepared.inputSnapshot).not.toHaveProperty('resolution')
+    mocks.from.mockReset()
+    mocks.from.mockReturnValue(query(null))
+    mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: false })
+    const oldJob = {
+      id: 'job-1', request_id: 'reserved:job-1', provider: 'fal', fal_key_id: 'prod-2000',
+      model: 'stored-model', status: 'queued', input_snapshot: { ...prepared.inputSnapshot },
+    }
+    mocks.getJob.mockResolvedValue(oldJob)
+    mocks.submit.mockResolvedValue({ request_id: 'fal-already-submitted' })
+    mocks.attach.mockRejectedValueOnce(new Error('database temporarily unavailable'))
+    const first = await submitPreparedDirectorVideo(prepared)
+    const { recoveryReceipt } = await first.json()
+    expect(typeof recoveryReceipt).toBe('string')
+
+    mocks.from.mockReturnValue(query({ id: 'job-1', video_clip_id: 'clip-1', target: { retakeMode: 'new_take', writerShotId: 'shot-1' } }))
+    mocks.reserveTake.mockResolvedValue({ video_clip_id: 'clip-1', job_id: 'job-1', take_number: 1, replayed: true })
+    const resumed = await submitPreparedDirectorVideo(prepared, { recoveryReceipt })
+
+    expect(resumed.status).toBe(200)
+    expect(mocks.submit).toHaveBeenCalledTimes(1)
+    expect(mocks.attach).toHaveBeenLastCalledWith('project-1', 'job-1', 'fal-already-submitted', expect.objectContaining({ provider: 'fal' }))
+  })
+
   // 왜: 참고 그림이 하나도 없으면 글만으로 만드는 다른 입구로 나가고, 그 입구에는 해상도 칸이 없다 — 받지 못할 1080p 값을 받지 않는다.
   it('참고 그림 없이 글로만 만드는 영상은 해상도를 보내지 않으므로 기본 Take를 잡는다', async () => {
     const prepared = await prepare(request({ model: 'seedance', resolution: '1080p', frameSource: undefined }))

@@ -178,6 +178,8 @@ export function buildVideoBatchInputs(
       model: settings.model,
       // 해상도(오너 2026-10-31): 서버가 모델이 낼 수 있는지 다시 정하고 그 값으로 Take 를 잡는다.
       resolution: settings.resolution,
+      // 새 테이크에 남길 설정 — 배선한 테이크의 설정(모델 · 해상도 등). 없으면 빈 설정(마더 그대로).
+      override: settings.override,
       // 제공자는 fal 하나다(2026-10-11 자체 호스팅 경로 제거). store 의 요청 조립과 동일 계약.
       provider: 'fal',
       durationSeconds: mother.durationSeconds,

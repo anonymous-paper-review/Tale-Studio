@@ -56,11 +56,13 @@ export function pickActiveTake(nodes: readonly DirectorNode[], shotNodeId: strin
 /**
  * 일괄이 이 샷에 쓸 모델과 해상도. 배선한 테이크가 있으면 그 테이크의 설정, 없으면 마더 샷 설정(해상도는 720p —
  * 마더 샷에는 해상도가 없다, 오너 2026-10-31). 샷이 아니면 null.
+ * override 는 일괄이 새로 만드는 테이크에 남길 설정이다 — 그 테이크가 어떤 설정으로 만들어졌는지 노드가 그대로 보이고,
+ * 거기서 리테이크해도 같은 설정으로 만든다(2026-10-31 리뷰). 배선한 테이크가 없으면 빈 설정(마더 그대로).
  */
 export function videoBatchShotSettings(
   nodes: readonly DirectorNode[],
   shotNodeId: string,
-): { model: VideoModelKey; resolution: VideoResolution } | null {
+): { model: VideoModelKey; resolution: VideoResolution; override: VideoOverride } | null {
   const shotNode = nodes.find((n) => n.id === shotNodeId)
   if (!shotNode || !isShotData(shotNode.data)) return null
   const take = pickActiveTake(nodes, shotNodeId)
@@ -69,5 +71,6 @@ export function videoBatchShotSettings(
   return {
     model: normalizeProvider(override.provider ?? shotNode.data.provider),
     resolution: isVideoResolution(override.resolution) ? override.resolution : DEFAULT_VIDEO_RESOLUTION,
+    override,
   }
 }

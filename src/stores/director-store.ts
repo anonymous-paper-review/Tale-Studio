@@ -215,6 +215,8 @@ type HydratedVideoTake = {
   /** #wiring-persistence: 수동 연결 안정 참조 (select * 로 흘러옴). 구행 = 없음. */
   frame_inputs?: unknown
   video_chain?: unknown
+  /** 지금 영상이 1080p 로 만들어졌으면 '1080p' — video-takes 목록이 그 영상을 낸 작업 기록으로 정한다. 모르면 null. */
+  video_resolution?: string | null
 }
 type VideoGenerationResponse = {
   error?: string
@@ -2028,6 +2030,12 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                     createdAt: row.created_at ?? existingNode.data.createdAt,
                     // #adherence P2: DB 판정이 있으면 채택(재검사 결과 수렴), 없으면 로컬 유지
                     adherence: (row.adherence as VideoAdherence | null) ?? existingNode.data.adherence ?? null,
+                    // 지금 영상이 만들어진 해상도 — 서버가 모를 때(다시 만드는 중 등)도 영상 파일이 같으면 아는 값을 버리지 않는다.
+                    videoResolution: isVideoResolution(row.video_resolution)
+                      ? row.video_resolution
+                      : row.url && row.url === existingNode.data.videoUrl
+                        ? existingNode.data.videoResolution ?? null
+                        : null,
                   },
                 } as DirectorNode
                 if (standaloneConfig) {
@@ -2062,6 +2070,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               data.thumbnailUrl = (row.thumbnail_url as string) ?? null
               data.status = hydratedVideoStatus(row)
               data.adherence = (row.adherence as VideoAdherence | null) ?? null
+              data.videoResolution = isVideoResolution(row.video_resolution) ? row.video_resolution : null
               const id = newDirectorId('dn')
               nodes = [...nodes, {
                 id,

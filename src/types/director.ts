@@ -201,6 +201,9 @@ type VideoNodeCommonData = {
   stale: boolean
   /** 모션 계약 준수 판정(#adherence P2) — 완료 후 첫/끝 프레임 검사 결과. null=미검사. */
   adherence?: VideoAdherence | null
+  /** 지금 영상이 실제로 만들어진 해상도(그 영상을 낸 작업 기록 기준, 2026-10-31 리뷰). null/없음 = 모름 · 1080p 아님.
+   *  다음에 만들 해상도(설정)는 override.resolution — 둘은 다를 수 있다. */
+  videoResolution?: VideoResolution | null
   [key: string]: unknown
 }
 

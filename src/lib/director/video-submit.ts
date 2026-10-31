@@ -116,9 +116,10 @@ function canonicalJson(value: Json): string {
 }
 
 function snapshotValueMatches(snapshot: Record<string, unknown>, candidate: Record<string, unknown>): boolean {
+  // resolution: 1080p 일 때만 적힌다 — 칸이 없는 옛 720p 작업은 720p 요청과 그대로 맞는다(둘 다 없음).
   return [
     'prompt', 'full_prompt', 'camera', 'duration_seconds', 'aspect_ratio', 'generation_method',
-    'provider', 'model', 'resolved_model_key', 'reference_image_url', 'reference_image_urls',
+    'provider', 'model', 'resolved_model_key', 'resolution', 'reference_image_url', 'reference_image_urls',
     'reference_image_roles',
     'movement_preset', 'camera_preset', 'fal_request', 'new_take_metadata',
   ].every((key) => {

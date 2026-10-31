@@ -28,10 +28,11 @@ const startSchema = z.object({
 
 // #batch-resume: 신원·예약키·복구 증표·기존 테이크는 외부 요청에서 받지 않는다.
 //   resolution(오너 2026-10-31): 샷마다 고른 해상도 — 준비 단계가 검사하고 그 값으로 Take 를 정한다.
+//   override: 일괄이 새로 만드는 테이크에 남길 설정(배선한 테이크의 모델 · 해상도 등) — 기존 테이크를 고르는 값이 아니다.
 const INPUT_FIELDS = [
   'prompt', 'camera', 'lighting', 'cameraPreset', 'model', 'provider',
   'durationSeconds', 'aspectRatio', 'frameSource', 'referenceImageUrl',
-  'referenceImageUrls', 'referenceImageRoles', 'resolution',
+  'referenceImageUrls', 'referenceImageRoles', 'resolution', 'override',
 ] as const
 
 async function access(projectId: string) {

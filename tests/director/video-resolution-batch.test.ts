@@ -123,4 +123,38 @@ describe('혼자 정한 것', () => {
     const prepared = mocks.create.mock.calls[0][0].items[0].prepared
     expect(prepared.inputSnapshot).toMatchObject({ model: 'seedance', resolution: '1080p' })
   })
+
+  // 왜: 일괄은 배선한 테이크로 새 테이크를 만든다. 그 설정이 새 테이크에 남지 않으면 1080p 로 만들고(Take 두 배)도
+  //   노드에는 720p · Take 5개로 보이고, 거기서 리테이크하면 720p 로 만든다(2026-10-31 리뷰).
+  it('그림을 이어 둔 1080p 테이크로 모든 샷 영상 만들기를 하면 새 테이크에도 그 테이크의 설정(모델 · 해상도)을 남긴다', () => {
+    const nodes = [
+      shot('shot-wired'),
+      wiredTake('take-wired', 'shot-wired', { provider: 'happy-horse', resolution: '1080p' }),
+      shot('shot-plain'),
+      START_ASSET,
+    ]
+
+    const { items } = buildVideoBatchInputs('project-1', nodes, ['shot-wired', 'shot-plain'])
+
+    expect(items[0]!.request.override).toEqual({ provider: 'happy-horse', resolution: '1080p' })
+    // 그림을 잇지 않은 샷은 지금처럼 마더 설정 그대로 — 새 테이크에 따로 남길 설정이 없다.
+    expect(items[1]!.request.override).toEqual({})
+  })
+
+  // 왜: 서버는 일괄 입력을 정해진 칸만 받아 저장한다 — 새 테이크 설정 칸이 빠지면 위 약속이 서버에서 끊긴다.
+  it('일괄 요청에 실린 새 테이크 설정은 서버가 입력을 준비할 때까지 그대로 간다', async () => {
+    const response = await POST(new Request('http://test/api/director/video-batches', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        batchId: '22222222-2222-4222-8222-222222222222',
+        projectId: '11111111-1111-4111-8111-111111111111',
+        items: [{ shotId: 'shot-1', request: { prompt: 'A harbor', model: 'happy-horse', resolution: '1080p', override: { provider: 'happy-horse', resolution: '1080p' } } }],
+      }),
+    }))
+
+    expect(response.status).toBe(200)
+    const prepared = mocks.create.mock.calls[0][0].items[0].prepared
+    expect(prepared.inputSnapshot.override).toEqual({ provider: 'happy-horse', resolution: '1080p' })
+  })
 })
