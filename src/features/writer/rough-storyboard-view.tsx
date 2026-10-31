@@ -181,7 +181,9 @@ export function RoughStoryboardView() {
   // DB 진실은 shots.rough_storyboard — 오버라이드는 다음 loadProject 전까지의 캐시.
   const [panelJobs, setPanelJobs] = useState<Record<string, PanelJob>>({})
   const [overrides, setOverrides] = useState<Record<string, RoughStoryboardImage>>({})
-  const [detailShotId, setDetailShotId] = useState<string | null>(null)
+  // 샷 고치기 팝업에 연 샷 — 대사 탭에서 샷을 눌러도 같은 팝업이 열려서(2026-10-31 QA) 보드 밖과 나눈다.
+  const detailShotId = useBoardUiStore((s) => s.shotEditId)
+  const setDetailShotId = useBoardUiStore((s) => s.setShotEditId)
   // 씬 접기(#c2 2026-08-03) — 씬 이름 클릭으로 토글. 세션 로컬(새로고침 시 전부 펼침).
   const [collapsedScenes, setCollapsedScenes] = useState<ReadonlySet<string>>(new Set())
   const toggleSceneCollapsed = (sceneId: string) =>
@@ -214,8 +216,11 @@ export function RoughStoryboardView() {
   // Director 넘김 확인 창 — 머리의 [다음: Director로 →](모든 탭)가 열고, 이 보드가 그린다.
   const directorConfirmOpen = useBoardUiStore((s) => s.directorConfirmOpen)
   const setDirectorConfirmOpen = useBoardUiStore((s) => s.setDirectorConfirmOpen)
-  // 보드가 떨어지면(관리자 V2 미리보기 탭 등) 창도 닫는다 — 다시 붙을 때 저절로 열리지 않게.
-  useEffect(() => () => useBoardUiStore.getState().setDirectorConfirmOpen(false), [])
+  // 보드가 떨어지면(관리자 V2 미리보기 탭 등) 창 · 샷 고치기 팝업도 닫는다 — 다시 붙을 때 저절로 열리지 않게.
+  useEffect(() => () => {
+    useBoardUiStore.getState().setDirectorConfirmOpen(false)
+    useBoardUiStore.getState().setShotEditId(null)
+  }, [])
 
   useEffect(() => {
     if (projectId) void loadProject()
@@ -639,11 +644,6 @@ export function RoughStoryboardView() {
     [generate],
   )
 
-  const running = !!(
-    status?.started &&
-    !status.pipeline_completed &&
-    !status.pipeline_failed
-  )
   // 채팅 고치기 뒤 [러프 다시 그리기](2026-10-31 QA) — 고친 샷들만 위 [남은 컷 다시 그리기]와 같은 길로 다시 그린다.
   //   보드가 이미 그리는 중이면 끝난 뒤에 받는다(요청을 버리지 않는다).
   const roughRedrawRequest = useBoardUiStore((s) => s.roughRedrawRequest)
@@ -653,6 +653,11 @@ export function RoughStoryboardView() {
     void drawShots(roughRedrawRequest.shotIds)
   }, [roughRedrawRequest, pumpActive, drawShots])
 
+  const running = !!(
+    status?.started &&
+    !status.pipeline_completed &&
+    !status.pipeline_failed
+  )
   const hasShots = shots.length > 0
   const panelOf = (shot: Shot): RoughStoryboardImage | null =>
     overrides[shot.shotId] ?? shot.roughStoryboard ?? null
@@ -1123,11 +1128,13 @@ export function RoughStoryboardView() {
                         {panel?.url && job?.status !== 'generating' ? (
                           // #p1-quickwin W3: 첫 진입 시 전 카드 1회 순환 후 hover 전용.
                           //   W4: 카드 위 재생성 칩 제거 — 재생성은 카드 팝업·채팅으로 일원화.
+                          //   그림을 눌러도 멈추지 않고 고치기 팝업이 열린다(pauseOnClick=false, 2026-10-31 QA) — 카드 대부분이 그림이다.
                           <RoughFrameCycle
                             panel={panel}
                             alt={`${shot.shotId} rough storyboard`}
                             introPlay
                             sizeToImage
+                            pauseOnClick={false}
                           />
                         ) : (
                         <div className="relative aspect-video overflow-hidden bg-muted">
@@ -1137,13 +1144,11 @@ export function RoughStoryboardView() {
                               <Loader2 className="absolute left-1/2 top-1/2 size-6 -translate-x-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />
                             </div>
                           ) : job?.status === 'failed' ? (
-                          //   그림을 눌러도 멈추지 않고 고치기 팝업이 열린다(pauseOnClick=false, 2026-10-31 QA) — 카드 대부분이 그림이다.
                             <div className="flex size-full flex-col items-center justify-center gap-2 p-4">
                               <AlertCircle className="size-5 text-destructive" />
                               <p className="line-clamp-2 text-center text-xs text-destructive">
                                 {job.error ?? t('Generation failed')}
                               </p>
-                            pauseOnClick={false}
                               <Button
                                 size="sm"
                                 variant="outline"

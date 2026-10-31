@@ -5,11 +5,13 @@
 //   강조(나머지 흐림)한다. 데이터는 트리트먼트와 동일한 진실(shots.dialogueLines) —
 //   이 뷰는 렌더 + 재생성 트리거만 담당한다.
 //   "대사 생성/재생성" → POST /api/writer/dialogue (완료된 run state 기반 V4 재생성) → loadProject 리프레시.
+//   샷을 누르면 그 샷 고치기 팝업(대사 칸)을 연다(2026-10-31 QA "Dialogue 수정 기능이 죽어 있다") — 고치는 곳은 팝업 하나다.
 
 import { useMemo, useState } from 'react'
 import { Loader2, MessageSquareText, RefreshCw } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { WriterHeader } from '@/features/writer/writer-header'
+import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { useGuardedAction } from '@/hooks/use-guarded-action'
 import { cn } from '@/lib/utils'
 import { useProjectStore } from '@/stores/project-store'
@@ -128,6 +130,9 @@ export function DialogueView() {
     action: runGenerate,
   })
 
+  // 샷 고치기 팝업은 러프 보드가 그린다 — 연 샷 id 만 넘긴다(대사 탭은 그대로 보인다).
+  const openShotEdit = (shotId: string) => useBoardUiStore.getState().setShotEditId(shotId)
+
   const onGenerateClick = () => {
     // 이미 대사가 있으면 덮어쓰기 — 2단 확인 (차 있는 것 교체는 사람의 명시 행동, architecture §5).
     if (totalLines > 0 && !confirming) {
@@ -140,7 +145,7 @@ export function DialogueView() {
   return (
     <div className="flex h-full flex-col">
       <WriterHeader
-        description={t('Dialogue viewer: select a character to highlight only their lines')}
+        description={t('Dialogue viewer: select a character to highlight only their lines. Click a shot to edit its dialogue')}
       />
 
       {/* 인물 칩 + 생성 버튼 */}
@@ -229,7 +234,21 @@ export function DialogueView() {
                     {sceneShots.map((shot, shotIdx) => {
                       const lines = dialogueLinesOf(shot)
                       return (
-                        <div key={shot.shotId} className="group">
+                        <div
+                          key={shot.shotId}
+                          role="button"
+                          tabIndex={0}
+                          data-shot-id={shot.shotId}
+                          title={t('Click to edit the dialogue of this shot')}
+                          onClick={() => openShotEdit(shot.shotId)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              openShotEdit(shot.shotId)
+                            }
+                          }}
+                          className="group -mx-2 cursor-pointer rounded-md px-2 py-1 transition-colors hover:bg-accent/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring/50"
+                        >
                           {/* 글자 크기는 트리트먼트와 통일(#c5), 본문은 흰색(#c2 2026-08-03) —
                               muted 회색은 대본이 부차 정보처럼 읽혔다. 라벨(Shot N)만 muted 유지. */}
                           <p className="text-sm leading-7 text-foreground">
