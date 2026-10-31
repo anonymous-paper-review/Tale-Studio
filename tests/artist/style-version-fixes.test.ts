@@ -31,6 +31,7 @@ import { POST as regenerate } from '@/app/api/artist/versions/regenerate/route'
 import { POST as loadVersion } from '@/app/api/artist/versions/load/route'
 import { POST as selectCandidate } from '@/app/api/artist/select-candidate/route'
 import { thumbObjectPath } from '@/lib/storage-thumb'
+import { versionWorkPending } from '@/lib/artist/style-versions-server'
 
 const P = 'p1'
 const WS = 'ws1'
@@ -303,6 +304,55 @@ describe('불러오다 멈췄을 때', () => {
     expect((await doLoad(failed!.from!)).status).toBe(200)
     expect(versionRows().filter((row) => row.is_current).map((row) => row.n)).toEqual([2])
     expect((snapshotOf(1) as unknown as Record<string, unknown>).characters).toEqual(record.characters)
+  })
+
+  it('불러오다 실패하고 떠난 버전으로 돌려 두기마저 실패하면, 섞인 그림을 떠난 버전으로 조용히 두지 않고 불러오려던 버전을 "다 불러오지 못함"으로 둔다', async () => {
+    // 왜: 돌려 두기 실패를 삼켜 섞인 그림이 떠난 버전(v2)으로 아무 표시 없이 남았다 — [완료하기]가 받아졌고, 다음 불러오기가 v2 기록을 섞인 그림으로
+    //   덮고 v2 복사본 6장을 지웠다(2026-10-31 재검토 지적 · 막는 문제). 표시가 있으면 다시 불러오기 · 돌아가기 · [완료하기] 막기 · 기록 지키기가 걸린다.
+    await twoVersions()
+    const background = { table: 'locations', op: 'update' as const, times: 1 }
+    const characters = { table: 'character_appearances', op: 'update' as const, times: 0 }
+    state.db.failOn.push(background, characters)
+    // 배경 되돌리기가 실패한 뒤의 첫 읽기(돌려 두기 전 지금 그림 읽기)부터 인물 되돌리기가 실패한다(한 번만 건다).
+    let armed = false
+    state.db.afterRead.push(() => {
+      if (armed || background.times !== 0) return
+      armed = true
+      characters.times = 1000
+    })
+    expect((await doLoad(1)).status).toBe(500)
+    characters.times = 0
+    // v2 는 떠날 때 기록 · 복사본을 남겼다 — 그 기록이 v2 그림이다.
+    const v2Record = JSON.parse(JSON.stringify(snapshotOf(2))) as Record<string, unknown>
+    const v2Copies = objectsUnder(`${WS}/${P}/versions/v2/`)
+    expect(v2Copies.length).toBeGreaterThan(0)
+    expect(versionRows().filter((row) => row.is_current).map((row) => row.n)).toEqual([1])
+    expect(snapshotOf(1)).toMatchObject({ loadFailed: { from: 2 } })
+    expect((await (await getVersions(get(`projectId=${P}`))).json()).loadFailed).toEqual({ n: 1, from: 2 })
+    expect(await versionWorkPending(P)).toBe('load_failed')
+    // 불러오기 전 버전(v2)으로 돌아가면 v2 의 기록대로 돌아오고, v2 기록 · 복사본은 그대로다.
+    expect((await doLoad(2)).status).toBe(200)
+    const v2After = snapshotOf(2) as unknown as Record<string, unknown>
+    expect({ characters: v2After.characters, locations: v2After.locations }).toEqual({ characters: v2Record.characters, locations: v2Record.locations })
+    for (const path of v2Copies) expect(state.db.objects.has(path), path).toBe(true)
+    expect(pathOf(appearance('minho', 'current').sheet_url)).toBe(pathOf(sheetIn(2, 'minho', 'current').sheet.url))
+  })
+
+  it('불러오다 실패한 뒤 지금 그림을 다시 읽지 못하면, 옛 읽기로 돌려 두지 않고 불러오려던 버전을 "다 불러오지 못함"으로 둔다', async () => {
+    // 왜: 다시 읽기에 실패하면 불러오기 전에 읽은 옛 목록으로 돌려 두어 몇 칸을 건너뛸 수 있다 — 무엇이 보이는지 모르면 표시를 남긴다(2026-10-31 재검토 지적).
+    await twoVersions()
+    const background = { table: 'locations', op: 'update' as const, times: 1 }
+    state.db.failOn.push(background)
+    let armed = false
+    state.db.afterRead.push(() => {
+      if (armed || background.times !== 0) return
+      armed = true
+      state.db.failReadErrors.location_image_candidates = { code: '08006', message: 'connection failure' }
+    })
+    expect((await doLoad(1)).status).toBe(500)
+    delete state.db.failReadErrors.location_image_candidates
+    expect(versionRows().filter((row) => row.is_current).map((row) => row.n)).toEqual([1])
+    expect(snapshotOf(1)).toMatchObject({ loadFailed: { from: 2 } })
   })
 
   it('기록 읽기가 끊긴 불러오기를 마저 하다 다시 끊겨도 그 시도를 한 번으로 센다', async () => {

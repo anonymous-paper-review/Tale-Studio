@@ -60,6 +60,9 @@ export async function POST(req: NextRequest) {
     if (versionWork === 'load_failed') {
       return NextResponse.json({ error: 'The version could not be fully loaded', code: 'version_load_failed' }, { status: 409 })
     }
+    if (versionWork === 'unknown') {
+      return NextResponse.json({ error: 'Could not check the version history', code: 'version_check_failed' }, { status: 409 })
+    }
 
     for (let attempt = 0; attempt < 3; attempt++) {
       const run = await getActiveRun(projectId)

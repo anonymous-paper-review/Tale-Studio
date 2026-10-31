@@ -114,6 +114,31 @@ describe('재생성 중 [완료하기]', () => {
     expect(KO['The version could not be fully loaded. Load it again or go back to the previous version.']).toBe('버전을 다 불러오지 못했어요. 다시 불러오거나 이전 버전으로 돌아가 주세요.')
   })
 
+  it('작품 스타일 기록을 읽지 못하면 [완료하기]를 받지 않고 잠시 뒤 다시 하라고 한다', async () => {
+    // 왜: 기록을 못 읽었는데 받으면 불러오는 중 · 다 불러오지 못한 섞인 그림이 Storyboard 로 넘어갈 수 있다(2026-10-31 재검토 지적, 막힌 쪽으로).
+    state.db.failReadErrors.artist_versions = { code: '57014', message: 'canceling statement due to statement timeout' }
+    const res = await completeArtist(request())
+    expect(res.status).toBe(409)
+    expect(await res.json()).toMatchObject({ code: 'version_check_failed' })
+    expect(completeError('version_check_failed')).toEqual({ key: 'Could not check the version history. Try again in a moment.' })
+    expect(KO['Could not check the version history. Try again in a moment.']).toBe('작품 스타일 기록을 확인하지 못했어요. 잠시 뒤 다시 해 보세요.')
+  })
+
+  it('지금 버전이 없는 사이(다른 창이 버전을 바꾸는 중)에는 [완료하기]를 받지 않는다', async () => {
+    // 왜: 다른 창이 버전을 바꾸는 그 짧은 사이에 받으면 바뀌는 중인 그림이 넘어간다(2026-10-31 재검토 지적).
+    state.db = seed([{ ...v1, is_current: false }, v2(null, { is_current: false })])
+    const res = await completeArtist(request())
+    expect(res.status).toBe(409)
+    expect(await res.json()).toMatchObject({ code: 'version_check_failed' })
+  })
+
+  it('작품 스타일 기록 표가 아직 없는 곳(운영에 넣기 전)은 [완료하기]를 지금처럼 받는다', async () => {
+    // 왜: 정상 경로 고정 — 코드가 마이그레이션보다 먼저 나가도 [완료하기]는 지금처럼 된다.
+    state.db.failReads.add('artist_versions')
+    const res = await completeArtist(request())
+    expect(res.status).toBe(200)
+  })
+
   it('[완료하기]는 끊긴 불러오기를 마저 할 수 있게 불러오기 창구와 같은 시간 제한(300초)을 쓴다', () => {
     // 왜: 마저 하기는 그림 칸이 많으면 오래 걸린다 — 기본 시간 제한에 끊기면 그 시도만 세고 끝난다(2026-10-31 재검토 지적).
     expect(completeMaxDuration).toBe(300)

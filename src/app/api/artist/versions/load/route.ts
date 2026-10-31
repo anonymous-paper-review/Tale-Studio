@@ -149,16 +149,36 @@ export async function POST(req: Request) {
       await setProjectStyle(projectId, target.style_anchor_key, target.custom_style_anchor, designTokens)
       keptBackgrounds = (await restoreSnapshot(projectId, snapshot, live, at)).keptBackgrounds
     } catch (e) {
-      // 되돌리다 멈췄으면 떠난 버전 그림 · 스타일로 다시 돌려 둔다 — 반쯤 섞인 그림으로 남지 않게(최선).
+      // 되돌리다 멈췄으면 떠난 버전 그림 · 스타일로 다시 돌려 둔다 — 반쯤 섞인 그림으로 남지 않게.
+      //   돌려 두기도 실패하거나 지금 그림을 다시 읽지 못하면 무엇이 보이는지 확실하지 않다 — 떠난 버전으로 아무 표시 없이 두지 않고
+      //   불러오려던 버전을 지금 버전으로 둔 채 "다 불러오지 못함"으로 남긴다. 그러면 다시 불러오기 · 이전 버전으로 돌아가기가 되고
+      //   [완료하기]는 막히고 떠나도 기록을 덮지 않는다(돌려 두기 실패를 삼켜 섞인 그림이 남았다, 2026-10-31 재검토 지적 · 막는 문제).
       console.error('[artist/versions/load] restore failed, returning:', e instanceof Error ? e.message : e)
-      const fresh = await readLiveImages(projectId).catch(() => live)
-      await restoreSnapshot(projectId, left.frozen, fresh, at).catch(() => null)
-      await setProjectStyle(projectId, project.style_anchor_key, project.custom_style_anchor, project.design_tokens).catch(() => null)
-      await supabaseAdmin
-        .from('artist_versions')
-        .update({ is_current: false, active: target.active as never, snapshot: withRestoringMark(target.snapshot, null) as never, updated_at: nextStamp(activatedAt) })
-        .eq('id', target.id)
-      await returnToVersion(current, left)
+      let returned = false
+      try {
+        const fresh = await readLiveImages(projectId)
+        await restoreSnapshot(projectId, left.frozen, fresh, at)
+        await setProjectStyle(projectId, project.style_anchor_key, project.custom_style_anchor, project.design_tokens)
+        returned = true
+      } catch (rollbackError) {
+        console.error('[artist/versions/load] could not return to the left version, marking the load failed:', rollbackError instanceof Error ? rollbackError.message : rollbackError)
+      }
+      if (returned) {
+        const { error: deactivateError } = await supabaseAdmin
+          .from('artist_versions')
+          .update({ is_current: false, active: target.active as never, snapshot: withRestoringMark(target.snapshot, null) as never, updated_at: nextStamp(activatedAt) })
+          .eq('id', target.id)
+        // 내리지 못했으면 불러오는 중 표시가 남아 있다 — 맡은 시간이 지나면 다음 요청이 그 버전을 마저 불러온다(표시가 있어 보호된다).
+        if (deactivateError) console.error('[artist/versions/load] could not step back from the target:', deactivateError.message)
+        else await returnToVersion(current, left)
+      } else {
+        const { error: markError } = await supabaseAdmin
+          .from('artist_versions')
+          .update({ snapshot: loadFailedSnapshot(marked, mark) as never, updated_at: nextStamp(activatedAt) })
+          .eq('id', target.id)
+        // 표시를 바꾸지 못했으면 불러오는 중 표시가 남아 있다 — 맡은 시간이 지나면 다음 요청이 마저 하거나 끝내 다 불러오지 못함으로 둔다.
+        if (markError) console.error('[artist/versions/load] could not mark the load failed:', markError.message)
+      }
       throw e
     }
     await clearRestoringMark(target.id, marked, activatedAt)

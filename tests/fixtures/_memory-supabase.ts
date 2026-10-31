@@ -37,6 +37,8 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
   const failReadsFrom: Record<string, number> = {}
   /** 받기(download)가 끝나지 않는 파일 경로. */
   const hangDownloads = new Set<string>()
+  /** 표 → 읽기 실패(오류 코드 · 글을 정한다 — 표가 없는 것과 읽기 오류를 가르는 시험). */
+  const failReadErrors: Record<string, { code?: string; message: string }> = {}
   /** 이어 읽기(id 보다 뒤 — .gt('id', …))를 실패시키는 표. */
   const failPagedReads = new Set<string>()
   /** 읽기가 끝날 때마다 부르는 갈고리(읽는 사이에 다른 요청이 행을 지우는 경우 등). */
@@ -79,6 +81,7 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
 
     const run = (): { data: unknown; error: { code?: string; message: string } | null } => {
       if (failReads.has(name) && op === 'select') return { data: null, error: { code: 'PGRST205', message: `Could not find the table 'public.${name}'` } }
+      if (failReadErrors[name] && op === 'select') return { data: null, error: { ...failReadErrors[name] } }
       const rule = op !== 'select' ? failOn.find((item) => item.table === name && item.op === op && item.times > 0) : undefined
       if (rule && !rule.hang) {
         rule.times--
@@ -257,6 +260,7 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
     hangDownloads,
     failPagedReads,
     afterRead,
+    failReadErrors,
   }
 }
 

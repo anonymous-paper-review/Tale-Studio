@@ -119,8 +119,14 @@ export async function readVersionRows(projectId: string): Promise<VersionRow[]> 
     .select('id, project_id, n, style_anchor_key, custom_style_anchor, snapshot, is_current, active, regen, created_at, updated_at')
     .eq('project_id', projectId)
     .order('n', { ascending: true })
-  if (error) throw new Error(`artist versions read failed: ${error.message}`)
+  if (error) throw Object.assign(new Error(`artist versions read failed: ${error.message}`), { code: error.code })
   return rowsOf<VersionRow>(data)
+}
+
+/** 작품 스타일 기록 표가 아직 없다(운영에 마이그레이션을 넣기 전) — 다른 읽기 오류와 가른다. */
+export function versionTableMissing(e: unknown): boolean {
+  const code = e && typeof e === 'object' ? (e as { code?: unknown }).code : null
+  return code === 'PGRST205' || code === '42P01'
 }
 
 export function summaryOf(row: Pick<VersionRow, 'n' | 'style_anchor_key' | 'custom_style_anchor' | 'is_current' | 'active'>): VersionSummary {
@@ -641,23 +647,33 @@ export async function regenStillPending(projectId: string, current: VersionRow, 
 }
 
 /**
- * [완료하기]를 막을 버전 일 — 불러오는 중(restoring) · 다 불러오지 못함(load_failed) · 다 그리기 전 재생성(regen).
- *   덧붙인 검사라 기록을 못 읽으면 막지 않는다. 끊긴 불러오기는 다시 해 볼 때가 됐으면 여기서 마저 한다
- *   — 기록 읽기 전에 누르면 "불러오는 중"만 되풀이됐다(2026-10-31 재검토 지적).
+ * [완료하기]를 막을 버전 일 — 불러오는 중(restoring) · 다 불러오지 못함(load_failed) · 다 그리기 전 재생성(regen) ·
+ *   확인하지 못함(unknown: 기록을 읽지 못함, 또는 지금 버전이 없는 사이 — 다른 창이 버전을 바꾸는 중). 확인하지 못하면 막는다
+ *   (섞인 그림이 넘어갈 수 있다, 2026-10-31 재검토 지적). 기록 표가 아직 없는 곳(운영에 넣기 전)과 기록이 없는 작품은 지금처럼 받는다.
+ *   끊긴 불러오기는 다시 해 볼 때가 됐으면 여기서 마저 한다 — 기록 읽기 전에 누르면 "불러오는 중"만 되풀이됐다.
  */
-export async function versionWorkPending(projectId: string): Promise<'restoring' | 'load_failed' | 'regen' | null> {
+export async function versionWorkPending(projectId: string): Promise<'restoring' | 'load_failed' | 'regen' | 'unknown' | null> {
+  let rows: VersionRow[]
+  try {
+    rows = await readVersionRows(projectId)
+  } catch (e) {
+    if (versionTableMissing(e)) return null
+    console.error('[artist-versions] version check failed:', e instanceof Error ? e.message : e)
+    return 'unknown'
+  }
+  if (rows.length === 0) return null
   try {
     const project = await readVersionProject(projectId)
-    if (!project) return null
-    const settled = await settleVersions(project, await readVersionRows(projectId))
+    if (!project) return 'unknown'
+    const settled = await settleVersions(project, rows)
     if (settled.restoringN !== null) return 'restoring'
     const current = settled.rows.find((row) => row.is_current)
-    if (!current) return null
+    if (!current) return 'unknown'
     if (loadFailedOf(current.snapshot)) return 'load_failed'
     return (await regenStillPending(projectId, current, await readLiveImages(projectId))) ? 'regen' : null
   } catch (e) {
-    console.warn('[artist-versions] version check skipped:', e instanceof Error ? e.message : e)
-    return null
+    console.error('[artist-versions] version check failed:', e instanceof Error ? e.message : e)
+    return 'unknown'
   }
 }
 

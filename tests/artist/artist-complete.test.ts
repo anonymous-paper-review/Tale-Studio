@@ -40,6 +40,12 @@ vi.mock('@/lib/supabase/admin', () => ({
           }),
         }
       }
+      // 작품 스타일 기록 표가 아직 없는 DB(운영에 넣기 전)와 같다 — [완료하기]는 기록 확인 없이 지금처럼 간다(2026-10-31).
+      if (table === 'artist_versions') {
+        const missing = { data: null, error: { code: 'PGRST205', message: "Could not find the table 'public.artist_versions'" } }
+        const q = { select: () => q, eq: () => q, order: () => q, then: (resolve: (v: unknown) => unknown) => resolve(missing) }
+        return q
+      }
       const data = table === 'characters' ? mocks.rows.characters : table === 'character_appearances' ? mocks.rows.appearances : mocks.rows.locations
       const q = { select: () => q, eq: () => q, then: (resolve: (v: unknown) => unknown) => resolve({ data, error: null }) }
       return q
