@@ -25,7 +25,7 @@ import { RegenerateStyleDialog } from '@/features/artist-room/regenerate-style-d
 import { VersionHistoryDialog } from '@/features/artist-room/version-history-dialog'
 import { StyleVersionBar } from '@/features/artist-room/style-version-bar'
 import { StyleReturnCard } from '@/features/artist-room/style-return-card'
-import { RegenStoppedActions } from '@/features/artist-room/regen-stopped-actions'
+import { RegenOverlayFooter, RegenStoppedActions } from '@/features/artist-room/regen-stopped-actions'
 import { useArtistVersionStore } from '@/stores/artist-version-store'
 import { useArtistStore } from '@/stores/artist-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
@@ -214,6 +214,21 @@ describe('머리 줄 그려 보기', () => {
     expect(tagOf(out, 'artist-load-go-back')).not.toBe('')
     expect(out).toContain('다시 불러오기')
     expect(out).toContain('이전 버전으로 돌아가기')
+  })
+
+  it('재생성 그림이 멈춘 잠금 화면 아래에는 [닫기] [남은 그림 그리기] [이전 버전으로]가 한 줄에 나란히 있다', () => {
+    // 왜: 2026-10-31 오너 — 잠금 화면 단추가 [닫기] 한 줄, 두 단추 한 줄로 갈라졌다(R08). 짧은 이름으로 한 줄에 둔다(머리 줄은 지금 이름 그대로).
+    screenState({ versions: [versionView(1, 'real', false), versionView(2, 'watercolor', true)], stopped: true })
+    const out = html(createElement(RegenOverlayFooter))
+    const row = out.match(/^<div[^>]*data-testid="artist-regen-overlay-footer"[^>]*>(.*)<\/div>$/)
+    expect(row).not.toBeNull()
+    expect(tagOf(out, 'artist-regen-overlay-footer')).toContain('flex-nowrap')
+    const buttons = [...row![1].matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((match) => match[1].replace(/<[^>]+>/g, ''))
+    expect(buttons).toEqual(['닫기', '남은 그림 그리기', '이전 버전으로'])
+    // 세 단추가 한 줄의 바로 아래 칸이다(따로 묶는 칸 없이).
+    expect(row![1]).toMatch(/^<button[^>]*>.*?<\/button><button[^>]*data-testid="artist-regen-resume"[^>]*>.*?<\/button><button[^>]*data-testid="artist-regen-go-back"[^>]*>.*?<\/button>$/)
+    expect(KO['Draw the remaining images']).toBe('남은 그림 그리기')
+    expect(KO['Back to the previous version']).toBe('이전 버전으로')
   })
 
   it('재생성 그림을 그리는 중에는 돌아가기 단추를 보이지 않는다', () => {

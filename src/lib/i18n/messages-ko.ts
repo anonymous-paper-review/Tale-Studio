@@ -2874,4 +2874,7 @@ export const KO: Record<string, string> = {
   'The version could not be fully loaded. Load it again or go back to the previous version.': '버전을 다 불러오지 못했어요. 다시 불러오거나 이전 버전으로 돌아가 주세요.',
   'Load it again': '다시 불러오기',
   'Could not check the version history. Try again in a moment.': '작품 스타일 기록을 확인하지 못했어요. 잠시 뒤 다시 해 보세요.',
+  // 재생성 잠금 화면 아래 단추 — [닫기]와 한 줄에 들어가게 짧게(2026-10-31 오너)
+  'Draw the remaining images': '남은 그림 그리기',
+  'Back to the previous version': '이전 버전으로',
 }

@@ -44,7 +44,7 @@ import { groupSeriesAssets, seriesMakingTitle } from '@/features/series/artist-s
 import { useSeriesInfo } from '@/features/series/use-series-info'
 import { styleIdOf } from '@/lib/series/snapshot'
 import { StyleVersionBar } from '@/features/artist-room/style-version-bar'
-import { RegenStoppedActions } from '@/features/artist-room/regen-stopped-actions'
+import { RegenOverlayFooter } from '@/features/artist-room/regen-stopped-actions'
 import { RegenerateStyleDialog } from '@/features/artist-room/regenerate-style-dialog'
 import { VersionHistoryDialog } from '@/features/artist-room/version-history-dialog'
 import { completeVersionBlock, useArtistVersionStore, versionsNeedRefresh } from '@/stores/artist-version-store'
@@ -472,12 +472,7 @@ export default function VisualPage() {
       description={regenRun.stopped ? t('Draw the rest again, or go back to the previous version.') : t('{style} · v{n}', { style: regenStyleLabel, n: regen.n })}
       steps={[{ label: t('Drawing images {drawn}/{total}', { drawn: regen.done, total: regen.total }), state: 'current' }]}
       progress={regen.total > 0 ? ((regen.done + regen.failed) / regen.total) * 100 : null}
-      footer={(
-        <>
-          <Button size="sm" variant="outline" onClick={() => useArtistVersionStore.getState().dismissOverlay()}>{t('Close')}</Button>
-          <RegenStoppedActions />
-        </>
-      )}
+      footer={<RegenOverlayFooter />}
     />
   ) : null
 
