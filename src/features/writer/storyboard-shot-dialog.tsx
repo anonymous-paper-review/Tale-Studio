@@ -21,7 +21,7 @@ import { AiBusyOverlay, type AiBusyStep } from '@/components/ai-busy-overlay'
 import { DirectingArrowEditor } from '@/features/writer/directing-arrow-editor'
 import { RoughFramesStill } from '@/features/writer/rough-frames-still'
 import { SHOT_TYPES, SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
-import { CAMERA_ANGLES, angleOfCamera, applyStartEdit, nextApplyStep, readRedrawReply, redrawDirectionOnly, sceneShotLabel, type RoughFrame } from '@/lib/writer/shot-edit'
+import { CAMERA_ANGLES, angleOfCamera, applyStartEdit, nextApplyStep, readRedrawReply, redrawDirectionOnly, sceneShotLabel, startChanges, type RoughFrame } from '@/lib/writer/shot-edit'
 import { notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { invalidateShots } from '@/lib/shots-cache'
@@ -45,15 +45,6 @@ function draftOf(shot: Shot): Draft {
     shotType: shot.shotType,
     durationSeconds: shot.durationSeconds,
   }
-}
-
-/** 시작 묶음에서 바뀐 것만 — 저장할 샷 고침. */
-function startChanges(shot: Shot, draft: Draft): Partial<Shot> {
-  const changes: Partial<Shot> = {}
-  if (draft.actionDescription.trim() !== shot.actionDescription) changes.actionDescription = draft.actionDescription.trim()
-  if (JSON.stringify(draft.dialogueLines) !== JSON.stringify(shot.dialogueLines)) changes.dialogueLines = draft.dialogueLines.filter((line) => line.text.trim())
-  if (draft.shotType !== shot.shotType) changes.shotType = draft.shotType
-  return changes
 }
 
 export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: string | null; panel: RoughStoryboardImage | null; onOpenChange: (open: boolean) => void }) {

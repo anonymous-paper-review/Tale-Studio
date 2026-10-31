@@ -16,6 +16,7 @@ import { withCacheBust } from '@/components/rough-frame-cycle'
 import { cn } from '@/lib/utils'
 import type { RoughStoryboardImage } from '@/types'
 import { translate, useT } from '@/lib/i18n'
+import { reloadAfterRoughFrameEdit } from '@/lib/writer/rough-frame-refresh'
 import { useLocaleStore } from '@/stores/locale-store'
 
 const UNDO_LIMIT = 10
@@ -288,7 +289,7 @@ export function DirectingArrowEditor({
       if (!res.ok) throw new Error(j?.error ?? `HTTP ${res.status}`)
       if (!regenerateEnd) {
         toast.success(t('Saved the DIRECTING frame'))
-        onSaved()
+        await reloadAfterRoughFrameEdit(projectId, onSaved)
         return
       }
       // 저장이 끝난 뒤(= 서버가 새 DIRECTING 을 갖고 있는 상태) END 를 그 그림 기준으로 다시 그린다.
@@ -301,7 +302,7 @@ export function DirectingArrowEditor({
       const endJson = await endRes.json().catch(() => null)
       if (!endRes.ok) throw new Error(endJson?.error ?? `HTTP ${endRes.status}`)
       toast.success(t('Saved DIRECTING and regenerated the END frame'))
-      onSaved()
+      await reloadAfterRoughFrameEdit(projectId, onSaved)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t('Save failed'))
     } finally {

@@ -13,6 +13,7 @@ import { ThumbImage } from '@/components/thumb-image'
 import { withCacheBust } from '@/components/rough-frame-cycle'
 import type { RoughStoryboardImage } from '@/types/shot'
 import { useT } from '@/lib/i18n'
+import { reloadAfterRoughFrameEdit } from '@/lib/writer/rough-frame-refresh'
 
 export type RoughFrameKey = 'start' | 'direction' | 'end'
 export const ROUGH_FRAME_ORDER: readonly RoughFrameKey[] = ['start', 'direction', 'end']
@@ -41,7 +42,7 @@ export function RoughFramesStill({
   const regenerate = async (frame: RoughFrameKey) => {
     setBusy(frame)
     try {
-      toast.info(t('Redrawing the {frame} frame, about 30 seconds', { frame: labels[frame] }))
+      toast.info(t('Redrawing the {frame}, about 30 seconds', { frame: labels[frame] }))
       const res = await fetch('/api/writer/rough-directing-edit', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -49,8 +50,8 @@ export function RoughFramesStill({
       })
       const j = await res.json().catch(() => null)
       if (!res.ok) throw new Error(j?.error ?? `HTTP ${res.status}`)
-      toast.success(t('Redrew the {frame} frame. The other two are unchanged.', { frame: labels[frame] }))
-      onRegenerated()
+      toast.success(t('Redrew the {frame}. The other two are unchanged.', { frame: labels[frame] }))
+      await reloadAfterRoughFrameEdit(projectId, onRegenerated)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t('Regeneration failed'))
     } finally {

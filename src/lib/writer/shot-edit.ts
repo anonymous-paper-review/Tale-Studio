@@ -1,6 +1,34 @@
 // Storyboard 샷 고치기 팝업(프로토타입 S2, 2026-10-20)의 순수 규칙 — 씬 안 번호 · 카메라 앵글 · 다시 그리는 순서.
 //   약속: tests/writer/shot-edit-popup.test.ts
-import type { CameraConfig } from '@/types'
+import type { CameraConfig, DialogueLine, Shot, ShotType } from '@/types'
+
+/** 시작 묶음(스토리 · 대사 · 샷 타입)의 값 — 팝업이 고치는 중인 값과 저장된 샷이 같은 모양이다. */
+export interface StartFields {
+  actionDescription: string
+  dialogueLines: DialogueLine[]
+  shotType: ShotType
+  durationSeconds?: number
+}
+
+/** 칸 순서와 상관없는 비교용 글 — 저장소(jsonb)는 다시 읽은 대사의 칸 순서를 바꿔 돌려준다. */
+function orderFreeJson(value: unknown): string {
+  return JSON.stringify(value, (_key, v: unknown) =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)))
+      : v,
+  )
+}
+
+/** 시작 묶음에서 바뀐 것만 — 저장할 샷 고침. 스토리는 앞뒤 빈칸을 덜어 비교하고, 대사는 칸 순서와 상관없이 비교한다
+ *  (저장 뒤 다시 읽은 대사를 "바뀜"으로 보면 그리기만 남은 [다시 그리기] 대신 [적용]이 남는다 — 2026-10-31 QA).
+ *  약속: tests/writer/shot-edit-retry-label.test.ts */
+export function startChanges(shot: StartFields, draft: StartFields): Partial<Shot> {
+  const changes: Partial<Shot> = {}
+  if (draft.actionDescription.trim() !== shot.actionDescription) changes.actionDescription = draft.actionDescription.trim()
+  if (orderFreeJson(draft.dialogueLines) !== orderFreeJson(shot.dialogueLines)) changes.dialogueLines = draft.dialogueLines.filter((line) => line.text.trim())
+  if (draft.shotType !== shot.shotType) changes.shotType = draft.shotType
+  return changes
+}
 
 /** 씬 안 순서로 부르는 샷 번호(프로토타입 "S1-3") — 씬 순서는 장면 목록, 샷 순서는 보드(샷 목록) 순서. 없으면 null. */
 export function sceneShotLabel(

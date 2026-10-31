@@ -1128,11 +1128,13 @@ export function RoughStoryboardView() {
                               <Loader2 className="absolute left-1/2 top-1/2 size-6 -translate-x-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />
                             </div>
                           ) : job?.status === 'failed' ? (
+                          //   그림을 눌러도 멈추지 않고 고치기 팝업이 열린다(pauseOnClick=false, 2026-10-31 QA) — 카드 대부분이 그림이다.
                             <div className="flex size-full flex-col items-center justify-center gap-2 p-4">
                               <AlertCircle className="size-5 text-destructive" />
                               <p className="line-clamp-2 text-center text-xs text-destructive">
                                 {job.error ?? t('Generation failed')}
                               </p>
+                            pauseOnClick={false}
                               <Button
                                 size="sm"
                                 variant="outline"

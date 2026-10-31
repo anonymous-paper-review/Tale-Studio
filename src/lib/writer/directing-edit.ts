@@ -11,6 +11,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { generateReservedImage } from '@/lib/fal/generate-image'
 import { assertUserTextAllowed } from '@/lib/moderation/creem'
 import { mediaPathFromUrl, mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
+import { uploadThumbnail } from '@/lib/storage-thumb'
 import { translate } from '@/lib/i18n'
 import type { AppLocale } from '@/lib/locale'
 
@@ -57,6 +58,14 @@ async function uploadToMedia(path: string, buf: Buffer, contentType: string): Pr
   if (error) throw error
   const publicUrl = mediaPublicUrl(path)
   return `${publicUrl}?v=${Date.now()}`
+}
+
+/** 러프 한 장을 올리고 그 장의 작은 미리보기(_thumb.webp)도 새로 만든다 — 카드 · 팝업의 세 장은 미리보기를 보여 준다
+ *  (운영 NEXT_PUBLIC_IMAGE_THUMBS=1). 미리보기를 그대로 두면 처음 그린 그림이 계속 보인다(2026-10-31 QA). */
+async function uploadRoughFrame(path: string, buf: Buffer, contentType: string): Promise<string> {
+  const url = await uploadToMedia(path, buf, contentType)
+  await uploadThumbnail(path, buf)
+  return url
 }
 
 /**
@@ -233,7 +242,7 @@ export async function regenerateRoughFrame(
   const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg'
   const current = rb.frames[frame]!
   const framePath = `${storagePathFromPublicUrl(current, locale).replace(/\.[a-z]+$/i, '')}.${ext}`
-  const newUrl = await uploadToMedia(framePath, buf, contentType)
+  const newUrl = await uploadRoughFrame(framePath, buf, contentType)
 
   const latest = await loadRough(projectId, shotId)
   if (!latest || (latest.generatedAt ?? 0) !== (rb.generatedAt ?? 0)) {
@@ -278,7 +287,7 @@ export async function saveDirectingFrame(
     throw new Error(translate(locale, 'The image is too large (over 15MB)'))
 
   const dirPath = storagePathFromPublicUrl(rb.frames.direction, locale)
-  const newUrl = await uploadToMedia(dirPath, buf, 'image/png')
+  const newUrl = await uploadRoughFrame(dirPath, buf, 'image/png')
   const now = Date.now()
   // generatedAt 을 올려 3프레임 표시가 캐시버스트되게 한다. 클린 플레이트는 이 편집의 밑층
   //   그대로이므로 for 를 함께 올려 유효 캐시로 유지(다음 열람에서 재과금 방지).

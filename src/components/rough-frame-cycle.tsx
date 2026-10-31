@@ -29,6 +29,12 @@ export function cycleFrameUrls(
     : [withCacheBust(panel.url, panel.generatedAt)]
 }
 
+/** 그림을 눌렀을 때 — 'pause' = 순환을 멈추고 카드로 넘기지 않는다, 'card' = 카드의 누르기(상세 팝업)로 넘긴다.
+ *  한 장짜리는 멈출 것이 없어 언제나 카드로 넘긴다. 순수 함수 — 테스트 대상(tests/writer/card-picture-click.test.ts). */
+export function frameClickAction({ frameCount, pauseOnClick }: { frameCount: number; pauseOnClick: boolean }): 'pause' | 'card' {
+  return pauseOnClick && frameCount > 1 ? 'pause' : 'card'
+}
+
 // 3프레임 순환 라벨 — START → DIRECTING(연출 화살표/지시) → END (2026-07-22 라벨 영문 통일).
 const FRAME_LABELS = ['START', 'DIRECTING', 'END'] as const
 // 순환 간격 — 1200ms 원복(2026-08-06 요청. 1000ms 상향분이 두 화면 모두 너무 빨랐다).
@@ -45,6 +51,7 @@ export function RoughFrameCycle({
   introPlay = false,
   fit = 'cover',
   sizeToImage = false,
+  pauseOnClick = true,
 }: {
   panel: Pick<RoughStoryboardImage, 'url' | 'generatedAt' | 'frames'>
   alt: string
@@ -59,6 +66,9 @@ export function RoughFrameCycle({
    *  좌우 띠를 남기고 cover 는 그림을 자른다 — 상자가 그림을 따라가면 둘 다 사라진다.
    *  이 모드에선 루트가 in-flow(w-full) 이므로 부모의 absolute 배치 상자가 필요 없다. */
   sizeToImage?: boolean
+  /** 그림 누르기 = 순환 멈춤(기본, Director 그리드 · 노드). false 면 누르기를 카드로 넘긴다 — Storyboard 보드는
+   *  카드를 누르면 언제나 고치기 팝업이다(프로토타입 S1, 2026-10-31 "수정 기능이 죽어 있다" 피드백). */
+  pauseOnClick?: boolean
 }) {
   const t = useT()
   const urls = cycleFrameUrls(panel)
@@ -122,8 +132,8 @@ export function RoughFrameCycle({
       }}
       onClick={(e) => {
         // 이미지 클릭 = 일시정지 토글. 카드의 클릭 액션(팝업 열기 등)과 충돌하지 않게 전파 차단
-        //   — 단일 패널(순환 없음)은 개입하지 않고 카드 클릭으로 흘려보낸다.
-        if (!multi) return
+        //   — 단일 패널(순환 없음)과 pauseOnClick=false(Storyboard 보드)는 개입하지 않고 카드 클릭으로 흘려보낸다.
+        if (frameClickAction({ frameCount: urls.length, pauseOnClick }) === 'card') return
         e.stopPropagation()
         setIntroDone(true)
         setPausedLock((v) => !v)
