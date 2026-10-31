@@ -644,6 +644,15 @@ export function RoughStoryboardView() {
     !status.pipeline_completed &&
     !status.pipeline_failed
   )
+  // 채팅 고치기 뒤 [러프 다시 그리기](2026-10-31 QA) — 고친 샷들만 위 [남은 컷 다시 그리기]와 같은 길로 다시 그린다.
+  //   보드가 이미 그리는 중이면 끝난 뒤에 받는다(요청을 버리지 않는다).
+  const roughRedrawRequest = useBoardUiStore((s) => s.roughRedrawRequest)
+  useEffect(() => {
+    if (!roughRedrawRequest || pumpActive) return
+    useBoardUiStore.getState().consumeRoughRedraw(roughRedrawRequest.id)
+    void drawShots(roughRedrawRequest.shotIds)
+  }, [roughRedrawRequest, pumpActive, drawShots])
+
   const hasShots = shots.length > 0
   const panelOf = (shot: Shot): RoughStoryboardImage | null =>
     overrides[shot.shotId] ?? shot.roughStoryboard ?? null

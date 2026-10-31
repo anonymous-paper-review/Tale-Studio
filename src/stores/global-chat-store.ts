@@ -59,6 +59,7 @@ import { useArtistVersionStore } from '@/stores/artist-version-store'
 import { useWriterRoomStore } from '@/stores/writer-room-store'
 import { restartWriterStatus } from '@/lib/writer/use-writer-status'
 import { completeKoreanDialogue, dialogueHandoffTarget } from '@/lib/writer/dialogue-handoff'
+import { shotsToRedrawAfterChat } from '@/lib/writer/chat-rough-redraw'
 import { handoffToStage } from '@/lib/stage-nav'
 import {
   loadLatestChatTrace,
@@ -138,6 +139,8 @@ export interface ChatSuggestion {
     | { kind: 'writerNext'; step: 'ask' | 'more' }
     // 작품 스타일 기록(2026-10-28, 프로토타입 AY) — "이전 스타일로 돌아갈까요?": 버전마다 [v{n} · 스타일 불러오기], 없으면 [재생성하기].
     | { kind: 'artistVersions'; options: Array<{ n: number; label: string }>; regenerate: boolean }
+    // Storyboard 채팅 고치기 뒤(2026-10-31 QA) — 글만 바뀌어 낡은 러프를 그 샷들만 다시 그린다. 누를 때만 그린다(채팅은 그림을 만들지 않는다).
+    | { kind: 'roughRedraw'; shotIds: string[]; label: string }
     | null
   /** 새로고침으로 복원한 선택지는 표시 전용이며 action을 복원하지 않는다. */
   restoredChoices?: { options: string[] }
@@ -3548,6 +3551,21 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         set(state => ({ loading: false, messages: state.messages.map(message => message.id === replyId ? { ...message, content: finalReply } : message) }))
         if (projectId) saveChatMessage(projectId, stage, 'model', finalReply)
         pendingReplyId = null
+      }
+      // 채팅 고치기는 글만 저장한다(그림 생성 없음). 러프가 있는 샷의 그림에 보이는 칸(스토리 · 샷 타입 · 등장인물)을 바꿨으면
+      //   그림은 예전 그대로라고 알리고 [러프 다시 그리기]를 준다 — 누르면 보드가 그 샷들만 다시 그린다(2026-10-31 QA:
+      //   "더 어둡게 바꿔 저장했어요"라는 답 뒤에도 보드 그림이 그대로라 고치기가 죽은 것처럼 보였다).
+      if (stage === 'writer' && projectId && isCurrentSession()) {
+        const redraw = shotsToRedrawAfterChat(completedTools, useWriterStore.getState().shots)
+        if (redraw.length > 0) {
+          const locale = contentLocale()
+          get().offerSuggestion({
+            id: `rough-redraw:${traceId}`,
+            stage: 'writer',
+            content: translate(locale, 'The rough sketch still shows the old version for {count} changed shots. Redraw them with the changes? Each shot is one new picture.', { count: redraw.length }),
+            action: { kind: 'roughRedraw', shotIds: redraw, label: translate(locale, 'Redraw the rough') },
+          })
+        }
       }
       if (styleAnchorFailure) {
         const failure = styleAnchorFailure

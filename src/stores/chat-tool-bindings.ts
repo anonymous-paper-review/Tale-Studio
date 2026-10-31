@@ -26,6 +26,18 @@ function objectPatch(value: unknown, keys: string[]): Record<string, unknown> {
   if (JSON.stringify(patch).length > 60_000) throw new Error('The edit is too large; split it into smaller targets.')
   return patch
 }
+// 읽은 대사의 빈 감정 · 말투 칸('')과 0 이하 길이 힌트는 "칸 없음"과 같다 — 검사(validateWriterUpdates)가 덜어 내는 그대로 맞춰 비교한다.
+//   파이프라인 대사는 빈 감정 칸을 갖고 있어, 읽은 그대로 보존해 보낸 고침이 거절되던 것(2026-10-31 QA).
+function withoutBlankDialogueFields(patch: Record<string, unknown>): Record<string, unknown> {
+  if (!Array.isArray(patch.dialogueLines)) return patch
+  return { ...patch, dialogueLines: patch.dialogueLines.map((line: unknown) => {
+    if (!line || typeof line !== 'object' || Array.isArray(line)) return line
+    const out = { ...(line as Record<string, unknown>) }
+    for (const key of ['emotion', 'delivery']) if (out[key] === '' || out[key] == null) delete out[key]
+    if (!(typeof out.durationHint === 'number' && out.durationHint > 0)) delete out.durationHint
+    return out
+  }) }
+}
 const requireText = (value: unknown, key: string, allowEmpty = false) => {
   if (typeof value !== 'string' || (!allowEmpty && !value.trim()) || value.length > 2000) throw new Error(`${key} must be text of 1–2000 characters`)
 }
@@ -129,7 +141,7 @@ export function createStudioToolResources(options: {
       const fields = resource === 'scenes' ? SCENE_TOOL_FIELDS : resource === 'dialogue' ? { dialogueLines: ['dialogue_lines'] } : SHOT_TOOL_FIELDS
       const patch = objectPatch(value, Object.keys(fields))
       const update = validateWriterUpdates([{ type: resource === 'scenes' ? 'updateScene' : 'updateShot', id: 'target', patch }], characterIds)[0]
-      if (!update || typeof update !== 'object' || !('patch' in update) || !sameToolValue(update.patch, patch)) throw new Error('Invalid fields or character IDs. Preserve complete dialogue metadata and use the registered character IDs (null for narration).')
+      if (!update || typeof update !== 'object' || !('patch' in update) || !sameToolValue(update.patch, withoutBlankDialogueFields(patch))) throw new Error('Invalid fields or character IDs. Preserve complete dialogue metadata and use the registered character IDs (null for narration).')
       return patch
     },
     write: async (id, patch, before) => {

@@ -2580,6 +2580,8 @@ export const KO: Record<string, string> = {
   '✦ You can also just say it: tell the agent "close-up on this shot" and it changes it for you.': '✦ 말로 해도 돼요: 에이전트에게 “이 샷 클로즈업으로”라고 하면 바꿔 드려요.',
   'Apply · redraw the rough': '적용 · 러프 다시 그리기',
   'Redraw': '다시 그리기',
+  'The rough sketch still shows the old version for {count} changed shots. Redraw them with the changes? Each shot is one new picture.': '고친 샷 {count}개의 러프 그림은 아직 예전 그대로예요. 바뀐 내용으로 다시 그릴까요? 샷마다 그림을 한 장씩 새로 그려요.',
+  'Redraw the rough': '러프 다시 그리기',
   'Could not save the changes. Please try again.': '고친 내용을 저장하지 못했어요. 다시 시도해 주세요.',
   'Drawing the rough': '러프를 그리고 있어요',
   'Saving the changes': '고친 내용 저장',

@@ -55,6 +55,7 @@ import {
   type SceneShotMentionTarget,
 } from '@/lib/card-mention'
 import { SceneGateControls } from '@/features/writer/scene-gate-panel'
+import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { useWriterPreview } from '@/lib/writer/use-writer-preview'
 import { SceneStoryProposalCard } from '@/components/layout/scene-story-proposal-card'
@@ -966,6 +967,12 @@ export function GlobalChat() {
     if (action.kind === 'message') {
       dismissSuggestion()
       await sendMessage(action.utterance, undefined, { stageOverride: suggestion?.stage, ...(action.answeringProducerQuestion ? { answeringProducerQuestion: true } : {}) })
+      return
+    }
+    // 채팅 고치기 뒤 [러프 다시 그리기](2026-10-31 QA) — 보드가 그 샷들만 다시 그린다(카드의 다시 시도와 같은 길 · 잠금 표시).
+    if (action.kind === 'roughRedraw') {
+      dismissSuggestion()
+      useBoardUiStore.getState().requestRoughRedraw(action.shotIds)
       return
     }
     // 씬 게이트 확정(#s3-gate P3b) — 게이트 패널의 [이대로 확정]과 같은 API. 성공 전환은
