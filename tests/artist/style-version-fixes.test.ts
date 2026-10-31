@@ -355,6 +355,44 @@ describe('불러오다 멈췄을 때', () => {
     expect(snapshotOf(1)).toMatchObject({ loadFailed: { from: 2 } })
   })
 
+  it('끊긴 불러오기의 마지막 시도가 실패하고 "다 불러오지 못함" 기록마저 실패하면 [완료하기]를 받지 않는다', async () => {
+    // 왜: 그 기록이 실패해도 그만뒀다고 보아, 불러오는 중 표시가 남은 섞인 그림인데 [완료하기] 한 번이 받아졌다(2026-10-31 마지막 확인 지적).
+    await twoVersions()
+    await hangingLoadOfV1()
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(Date.now() + 6 * 60_000)
+    state.db.failOn.push({ table: 'character_appearances', op: 'update', times: 1000 })
+    for (let i = 0; i < 2; i++) {
+      await getVersions(get(`projectId=${P}`))
+      vi.setSystemTime(Date.now() + 61_000)
+    }
+    // 세 번째 시도를 맡은 뒤 "다 불러오지 못함" 기록이 한 번 실패한다.
+    let armed = false
+    state.db.afterRead.push(() => {
+      if (armed) return
+      const mark = (version(1).snapshot as { restoring?: { attempts?: number } }).restoring
+      if (mark?.attempts !== 3) return
+      armed = true
+      state.db.failOn.unshift({ table: 'artist_versions', op: 'update', times: 1 })
+    })
+    expect(await versionWorkPending(P)).not.toBeNull()
+    expect(armed).toBe(true)
+    expect(await versionWorkPending(P)).not.toBeNull()
+  })
+
+  it('다른 창이 버전을 불러오는 동안(떠나는 버전 그림을 버전 폴더에 남기는 중)에는 [완료하기]를 받지 않는다', async () => {
+    // 왜: 불러오기는 떠나는 버전을 남기는 동안 아직 아무 표시가 없어, 그 사이 [완료하기]가 받아지면 그림이 바뀌는 중에 Storyboard 가 열렸다(2026-10-31 마지막 확인 지적).
+    await twoVersions()
+    const hung = pathOf(appearance('minho', 'current').sheet_url)
+    state.db.hangCopyFrom.add(hung)
+    void doLoad(1)
+    await vi.waitFor(() => expect(state.db.log.some((entry) => entry.op === 'copy' && (entry.detail as { from?: string }).from === hung)).toBe(true))
+    expect(await versionWorkPending(P)).toBe('restoring')
+    expect((await (await getVersions(get(`projectId=${P}`))).json()).restoring).toBe(true)
+    // 다른 창의 재생성 · 불러오기도 기다린다.
+    expect(await (await doRegenerate('real')).json()).toMatchObject({ code: 'version_restoring' })
+  })
+
   it('기록 읽기가 끊긴 불러오기를 마저 하다 다시 끊겨도 그 시도를 한 번으로 센다', async () => {
     // 왜: [완료하기] · 기록 읽기도 함수 시간 제한에 끊길 수 있다 — 세지 않으면 끊길 때마다 처음부터 다시 맡아 끝없이 되풀이한다(2026-10-31 재검토 지적).
     await twoVersions()

@@ -10,11 +10,13 @@ import { requireProjectAccess } from '@/lib/api/guard'
 import { ARTIST_VERSION_CODES, buildRegenPlan, parseCustomStyle, styleLookTokens } from '@/lib/artist/style-versions'
 import {
   artistStyleLocked,
+  clearLeavingMark,
   designL1,
   ensureFirstVersion,
   failStaleImageJobs,
   imagesDrawing,
   leaveCurrentVersion,
+  markLeaving,
   readLiveImages,
   readVersionProject,
   readVersionRows,
@@ -79,10 +81,19 @@ export async function POST(req: Request) {
       locationAppearances: live.locationAppearances.map((a) => ({ locationId: a.location_id, appearanceKey: a.appearance_key, wideShot: a.wide_shot })),
     })
     if (slots.length === 0) return reject(ARTIST_VERSION_CODES.nothingToDraw, 'There are no characters or backgrounds to remake')
+    // 떠나는 중 표시부터 — 지금 버전 그림을 버전 폴더에 남기는 동안에도 [완료하기] · 다른 바꾸기를 받지 않게(2026-10-31 마지막 확인 지적).
+    const leaving = await markLeaving(current)
+    if (!leaving) return reject(ARTIST_VERSION_CODES.conflict, 'Another window changed the version first')
     await failStaleImageJobs(projectId)
 
     const at = new Date().toISOString()
-    const left = await leaveCurrentVersion(project, current, live, at)
+    let left: Awaited<ReturnType<typeof leaveCurrentVersion>>
+    try {
+      left = await leaveCurrentVersion(project, leaving, live, at)
+    } catch (e) {
+      await clearLeavingMark(leaving)
+      throw e
+    }
     if (!left.ok) return reject(ARTIST_VERSION_CODES.conflict, 'Another window changed the version first')
 
     const n = Math.max(...rows.map((row) => row.n)) + 1
@@ -99,7 +110,7 @@ export async function POST(req: Request) {
       updated_at: at,
     })
     if (insertError) {
-      await returnToVersion(current, left)
+      await returnToVersion(leaving, left)
       if (insertError.code === '23505') return reject(ARTIST_VERSION_CODES.conflict, 'Another window changed the version first')
       throw new Error(`version insert failed: ${insertError.message}`)
     }
@@ -112,7 +123,7 @@ export async function POST(req: Request) {
     } catch (e) {
       // 스타일을 못 바꿨으면 새 버전을 거두고 떠난 버전으로 돌아간다 — 그린 그림이 엉뚱한 스타일로 남지 않게.
       await supabaseAdmin.from('artist_versions').delete().eq('project_id', projectId).eq('n', n)
-      await returnToVersion(current, left)
+      await returnToVersion(leaving, left)
       throw e
     }
     return NextResponse.json({ ok: true, n, slots })

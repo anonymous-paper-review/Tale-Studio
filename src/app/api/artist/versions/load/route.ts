@@ -19,9 +19,11 @@ import {
   imagesDrawing,
   keptAtLoadFrom,
   keptBackgroundsOf,
+  clearLeavingMark,
   leaveCurrentVersion,
   loadFailedOf,
   loadFailedSnapshot,
+  markLeaving,
   nextStamp,
   readLiveImages,
   readVersionProject,
@@ -119,10 +121,19 @@ export async function POST(req: Request) {
     const pending = await regenStillPending(projectId, current, live)
     if (pending && body?.cancelRegen !== true) return reject(ARTIST_VERSION_CODES.regenPending, 'The images of the new version are still being drawn')
     if (await imagesDrawing(projectId)) return reject(ARTIST_VERSION_CODES.drawing, 'Images are being drawn')
+    // 떠나는 중 표시부터 — 지금 버전 그림을 버전 폴더에 남기는 동안에도 [완료하기] · 다른 바꾸기를 받지 않게(2026-10-31 마지막 확인 지적).
+    const leaving = await markLeaving(current)
+    if (!leaving) return reject(ARTIST_VERSION_CODES.conflict, 'Another window changed the version first')
     await failStaleImageJobs(projectId)
 
     const at = new Date().toISOString()
-    const left = await leaveCurrentVersion(project, current, live, at, { cancelRegen: pending })
+    let left: Awaited<ReturnType<typeof leaveCurrentVersion>>
+    try {
+      left = await leaveCurrentVersion(project, leaving, live, at, { cancelRegen: pending })
+    } catch (e) {
+      await clearLeavingMark(leaving)
+      throw e
+    }
     if (!left.ok) return reject(ARTIST_VERSION_CODES.conflict, 'Another window changed the version first')
 
     const mark = restoringMarkFrom(at, current.n)
@@ -137,7 +148,7 @@ export async function POST(req: Request) {
       .eq('updated_at', target.updated_at)
       .select('id')
     if (activateError || !Array.isArray(activated) || activated.length !== 1) {
-      await returnToVersion(current, left)
+      await returnToVersion(leaving, left)
       if (!activateError || activateError.code === '23505') return reject(ARTIST_VERSION_CODES.conflict, 'Another window changed the version first')
       throw new Error(`version activate failed: ${activateError.message}`)
     }
@@ -170,7 +181,7 @@ export async function POST(req: Request) {
           .eq('id', target.id)
         // 내리지 못했으면 불러오는 중 표시가 남아 있다 — 맡은 시간이 지나면 다음 요청이 그 버전을 마저 불러온다(표시가 있어 보호된다).
         if (deactivateError) console.error('[artist/versions/load] could not step back from the target:', deactivateError.message)
-        else await returnToVersion(current, left)
+        else await returnToVersion(leaving, left)
       } else {
         const { error: markError } = await supabaseAdmin
           .from('artist_versions')

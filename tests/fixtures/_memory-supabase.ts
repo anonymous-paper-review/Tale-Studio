@@ -37,6 +37,8 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
   const failReadsFrom: Record<string, number> = {}
   /** 받기(download)가 끝나지 않는 파일 경로. */
   const hangDownloads = new Set<string>()
+  /** 이 파일에서 복사(copy)하면 끝나지 않는다(함수가 시간 제한에 걸린 것처럼). */
+  const hangCopyFrom = new Set<string>()
   /** 표 → 읽기 실패(오류 코드 · 글을 정한다 — 표가 없는 것과 읽기 오류를 가르는 시험). */
   const failReadErrors: Record<string, { code?: string; message: string }> = {}
   /** 이어 읽기(id 보다 뒤 — .gt('id', …))를 실패시키는 표. */
@@ -217,6 +219,7 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
     from: (_bucket: string) => ({
       copy: async (from: string, to: string) => {
         log.push({ op: 'copy', detail: { from, to } })
+        if (hangCopyFrom.has(from)) return new Promise(() => {})
         const source = objects.get(from)
         if (!source) return { data: null, error: { message: 'Object not found', statusCode: '404' } }
         if (objects.has(to)) return { data: null, error: { message: 'The resource already exists', statusCode: '409' } }
@@ -261,6 +264,7 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
     failPagedReads,
     afterRead,
     failReadErrors,
+    hangCopyFrom,
   }
 }
 

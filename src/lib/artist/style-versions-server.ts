@@ -669,6 +669,8 @@ export async function versionWorkPending(projectId: string): Promise<'restoring'
     if (settled.restoringN !== null) return 'restoring'
     const current = settled.rows.find((row) => row.is_current)
     if (!current) return 'unknown'
+    // 표시가 남아 있으면(불러오는 중 · 떠나는 중) 받지 않는다 — 표시를 적거나 떼지 못한 경우에도 섞인 그림이 넘어가지 않게.
+    if (restoringMarkOf(current.snapshot) || leavingMarkOf(current.snapshot)) return 'restoring'
     if (loadFailedOf(current.snapshot)) return 'load_failed'
     return (await regenStillPending(projectId, current, await readLiveImages(projectId))) ? 'regen' : null
   } catch (e) {
@@ -780,6 +782,52 @@ export function loadFailedOf(snapshot: unknown): LoadFailedMark | null {
   return typeof at === 'string' ? { at, attempts: numberOrNull(attempts) ?? 0, from: numberOrNull(from) } : null
 }
 
+/** 떠나는 중 표시(버전 행 snapshot.leaving) — 불러오기 · 재생성이 지금 버전 그림을 버전 폴더에 남기는 동안. 그 사이 [완료하기] ·
+ *  다른 바꾸기를 받지 않는다(2026-10-31 마지막 확인 지적). 떠나면 새 기록이 들어오며 없어진다. 끝 시각이 지나도 남았으면 떠나기 전에
+ *  끊긴 것이다 — 아직 떠나지 않았으니 되돌릴 것은 없고 표시만 뗀다. */
+export interface LeavingMark { at: string; until: string }
+
+export function leavingMarkOf(snapshot: unknown): LeavingMark | null {
+  if (!snapshot || typeof snapshot !== 'object') return null
+  const mark = (snapshot as { leaving?: unknown }).leaving
+  if (!mark || typeof mark !== 'object') return null
+  const { at, until } = mark as { at?: unknown; until?: unknown }
+  return typeof at === 'string' && typeof until === 'string' ? { at, until } : null
+}
+
+function withLeavingMark(snapshot: unknown, mark: LeavingMark | null): Record<string, unknown> | null {
+  if ((!snapshot || typeof snapshot !== 'object') && !mark) return null
+  const base = snapshot && typeof snapshot === 'object' ? { ...(snapshot as Record<string, unknown>) } : {}
+  delete base.leaving
+  return mark ? { ...base, leaving: mark } : base
+}
+
+/** 지금 버전에 떠나는 중 표시를 단다(바뀐 시각 비교) — 단 행을 돌려준다(떠나기는 그 행으로 한다). 다른 창이 먼저 바꿨으면 null. */
+export async function markLeaving(current: VersionRow): Promise<VersionRow | null> {
+  const at = new Date().toISOString()
+  const updatedAt = nextStamp(current.updated_at)
+  const snapshot = withLeavingMark(current.snapshot, { at, until: new Date(Date.parse(at) + RESTORE_LEASE_MS).toISOString() })
+  const { data, error } = await supabaseAdmin
+    .from('artist_versions')
+    .update({ snapshot: snapshot as never, updated_at: updatedAt })
+    .eq('id', current.id)
+    .eq('is_current', true)
+    .eq('updated_at', current.updated_at)
+    .select('id')
+  if (error) throw new Error(`version leaving mark failed: ${error.message}`)
+  return rowsOf(data).length === 1 ? { ...current, snapshot, updated_at: updatedAt } : null
+}
+
+/** 떠나지 못하고 그만두면 떠나는 중 표시를 뗀다(최선 — 못 떼면 끝 시각 뒤 기록 읽기가 뗀다). */
+export async function clearLeavingMark(row: VersionRow): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('artist_versions')
+    .update({ snapshot: withLeavingMark(row.snapshot, null) as never, updated_at: nextStamp(row.updated_at) })
+    .eq('id', row.id)
+    .eq('updated_at', row.updated_at)
+  if (error) console.error('[artist-versions] leaving mark left:', error.message)
+}
+
 function withLoadFailed(snapshot: unknown, mark: LoadFailedMark | null): Record<string, unknown> {
   const base = snapshot && typeof snapshot === 'object' ? { ...(snapshot as Record<string, unknown>) } : {}
   delete base.loadFailed
@@ -879,7 +927,17 @@ async function finishRestore(project: VersionProject, row: VersionRow, mark: Res
     console.error('[artist-versions] finishing an interrupted load failed:', row.n, claimedMark.attempts, e instanceof Error ? e.message : e)
     const last = (claimedMark.attempts ?? 0) >= MAX_RESTORE_ATTEMPTS
     const next = last ? loadFailedSnapshot(claimed, claimedMark) : withRestoringMark(claimed, { ...claimedMark, until: new Date(Date.now() + RESTORE_RETRY_GAP_MS).toISOString() })
-    await supabaseAdmin.from('artist_versions').update({ snapshot: next as never, updated_at: nextStamp(claimedAt) }).eq('id', row.id).eq('updated_at', claimedAt)
+    const { data: written, error: writeError } = await supabaseAdmin
+      .from('artist_versions')
+      .update({ snapshot: next as never, updated_at: nextStamp(claimedAt) })
+      .eq('id', row.id)
+      .eq('updated_at', claimedAt)
+      .select('id')
+    // 적지 못했으면 불러오는 중 표시(맡은 시간)가 그대로다 — 그만뒀다고 보지 않는다(2026-10-31 마지막 확인 지적).
+    if (writeError || rowsOf(written).length !== 1) {
+      console.error('[artist-versions] could not record the failed finish:', row.n, writeError?.message ?? 'row changed')
+      return 'failed'
+    }
     return last ? 'gave-up' : 'failed'
   }
   await clearRestoringMark(row.id, claimed, claimedAt)
@@ -901,6 +959,15 @@ export async function settleVersions(project: VersionProject, rows: VersionRow[]
       current = rows.find((row) => row.is_current) ?? null
       changed = true
     }
+    const leaving = current ? leavingMarkOf(current.snapshot) : null
+    if (current && leaving) {
+      // 다른 요청이 이 버전을 떠나는 중 — 끝날 때까지 기다린다. 끝 시각이 지났으면 떠나기 전에 끊긴 것이라 표시만 뗀다.
+      if (Date.now() <= Date.parse(leaving.until)) return { rows, changed, finishedN: null, restoringN: current.n }
+      await clearLeavingMark(current)
+      rows = await readVersionRows(project.id)
+      current = rows.find((row) => row.is_current) ?? null
+      changed = true
+    }
     const mark = current ? restoringMarkOf(current.snapshot) : null
     if (!current || !mark) return { rows, changed, finishedN: null, restoringN: null }
     if (Date.now() <= Date.parse(mark.until)) return { rows, changed, finishedN: null, restoringN: current.n }
@@ -908,7 +975,7 @@ export async function settleVersions(project: VersionProject, rows: VersionRow[]
     return { rows: await readVersionRows(project.id), changed: true, finishedN: outcome === 'finished' ? current.n : null, restoringN: outcome === 'busy' || outcome === 'failed' ? current.n : null }
   } catch (e) {
     console.warn('[artist-versions] settle skipped:', e instanceof Error ? e.message : e)
-    return { rows, changed, finishedN: null, restoringN: current && restoringMarkOf(current.snapshot) ? current.n : null }
+    return { rows, changed, finishedN: null, restoringN: current && (restoringMarkOf(current.snapshot) || leavingMarkOf(current.snapshot)) ? current.n : null }
   }
 }
 
