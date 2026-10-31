@@ -11,6 +11,7 @@ import { mediaFrameStyle } from '@/lib/project-aspect'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import {
   getEffectiveVideoConfig,
+  getVideoNodeResolution,
   effectivePrompt,
   useDirectorCanvasStore,
 } from '@/stores/director-store'
@@ -18,7 +19,8 @@ import {
   isShotData,
   type VideoNodeData,
 } from '@/types/director'
-import { FAL_VIDEO_MODEL_ORDER, VIDEO_MODELS } from '@/lib/video-models'
+import { FAL_VIDEO_MODEL_ORDER, VIDEO_MODELS, normalizeProvider } from '@/lib/video-models'
+import { VideoResolutionButtons, VideoTakeCost } from '@/features/director/video-resolution-buttons'
 import { useT } from '@/lib/i18n'
 
 /** 영상 미리보기 틀의 높이 상한(세로·정사각 포맷) — 패널·팝업 안에서 스크롤 없이 보이게. */
@@ -52,6 +54,7 @@ export function VideoDetailPanel({
     () => getEffectiveVideoConfig({ nodes }, nodeId),
     [nodes, nodeId],
   )
+  const resolution = useDirectorCanvasStore((s) => getVideoNodeResolution(s, nodeId))
   const motherNode = useMemo(
     () => nodes.find((n) => n.id === data.parentShotNodeId),
     [nodes, data.parentShotNodeId],
@@ -129,6 +132,7 @@ export function VideoDetailPanel({
     ? motherNode.data
     : null
   const motherPrompt = mother ? effectivePrompt(mother) : null
+  const videoModel = normalizeProvider(effective.provider)
 
   const commitLabel = () => {
     setLabelDraft({ nodeId, value: label, dirty: false })
@@ -400,7 +404,19 @@ export function VideoDetailPanel({
         </div>
       </PanelSection>
 
-      <footer className="mt-auto flex flex-wrap gap-2 border-t border-border pt-4">
+      {/* 해상도(오너 2026-10-31): 모델 단추 바로 아래 — 영상 팝업과 같은 단추. 독립 영상은 설정 전체를 그 영상이
+          갖고 있고 해상도는 그 안에 없어 두지 않는다(서버도 720p 로 만든다). */}
+      {!isStandalone && (
+        <PanelSection title={t('Resolution')}>
+          <VideoResolutionButtons
+            model={videoModel}
+            resolution={resolution}
+            onSelect={(choice) => applyVideoOverride(nodeId, { resolution: choice })}
+          />
+        </PanelSection>
+      )}
+
+      <footer className="mt-auto flex flex-wrap items-center gap-2 border-t border-border pt-4">
         <Button
           size="sm"
           onClick={() => void handleRegenerate()}
@@ -419,6 +435,7 @@ export function VideoDetailPanel({
             </>
           )}
         </Button>
+        <VideoTakeCost model={videoModel} resolution={resolution} />
         <div className="ml-auto" />
         <Button
           size="sm"

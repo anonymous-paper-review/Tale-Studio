@@ -19,6 +19,7 @@ import { mediaFrameStyle } from '@/lib/project-aspect'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import {
   getEffectiveVideoConfig,
+  getVideoNodeResolution,
   effectivePrompt,
   useDirectorCanvasStore,
 } from '@/stores/director-store'
@@ -26,7 +27,8 @@ import {
   isShotData,
   type VideoNodeData,
 } from '@/types/director'
-import { FAL_VIDEO_MODEL_ORDER, VIDEO_MODELS } from '@/lib/video-models'
+import { FAL_VIDEO_MODEL_ORDER, VIDEO_MODELS, normalizeProvider } from '@/lib/video-models'
+import { VideoResolutionButtons, VideoTakeCost } from '@/features/director/video-resolution-buttons'
 import { useT } from '@/lib/i18n'
 
 /** 영상 미리보기 틀의 높이 상한(세로·정사각 포맷) — 패널·팝업 안에서 스크롤 없이 보이게. */
@@ -81,6 +83,7 @@ export function VideoNodePopup({ nodeId, data }: Props) {
     () => getEffectiveVideoConfig({ nodes }, nodeId),
     [nodes, nodeId],
   )
+  const resolution = useDirectorCanvasStore((s) => getVideoNodeResolution(s, nodeId))
   const motherNode = useMemo(
     () => nodes.find((n) => n.id === data.parentShotNodeId),
     [nodes, data.parentShotNodeId],
@@ -124,6 +127,7 @@ export function VideoNodePopup({ nodeId, data }: Props) {
   }
   const mother = motherNode.data
   const motherPrompt = effectivePrompt(mother)
+  const videoModel = normalizeProvider(effective.provider)
 
   const commitLabel = () => {
     setLabelDraft({ nodeId, value: label, dirty: false })
@@ -355,11 +359,20 @@ export function VideoNodePopup({ nodeId, data }: Props) {
               })}
             </div>
           </Field>
+
+          {/* 해상도(오너 2026-10-31): 모델 단추 바로 아래. 1080p 는 두 배 Take, 해상도 칸이 없는 모델은 단추를 끈다. */}
+          <Field label={t('Resolution')}>
+            <VideoResolutionButtons
+              model={videoModel}
+              resolution={resolution}
+              onSelect={(choice) => applyVideoOverride(nodeId, { resolution: choice })}
+            />
+          </Field>
         </div>
 
         <Separator />
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             size="sm"
             onClick={() => void handleRegenerate()}
@@ -378,6 +391,7 @@ export function VideoNodePopup({ nodeId, data }: Props) {
               </>
             )}
           </Button>
+          <VideoTakeCost model={videoModel} resolution={resolution} />
           <div className="ml-auto" />
           <Button
             size="sm"

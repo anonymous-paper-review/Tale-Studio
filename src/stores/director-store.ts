@@ -87,7 +87,13 @@ import { notifyGenerationComplete, notifyGenerationFailure } from '@/lib/generat
 import { claimAction, releaseAction } from '@/lib/action-guard'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
-import { DEFAULT_VIDEO_MODEL, normalizeProvider } from '@/lib/video-models'
+import {
+  DEFAULT_VIDEO_MODEL,
+  DEFAULT_VIDEO_RESOLUTION,
+  isVideoResolution,
+  normalizeProvider,
+  type VideoResolution,
+} from '@/lib/video-models'
 import {
   isStandaloneVideoOwnerKey,
   normalizeStandaloneVideoConfig,
@@ -1458,6 +1464,20 @@ export function getEffectiveVideoConfig(
     provider: o.provider ?? m.provider,
     durationSeconds: m.durationSeconds,
   }
+}
+
+/**
+ * 영상 노드가 고른 해상도(오너 2026-10-31). 고른 적 없으면 720p. 독립 영상은 해상도를 고르지 않아 늘 720p.
+ * 모델이 그 해상도를 낼 수 있는지는 여기서 따지지 않는다 — Take 계산기와 서버가 effectiveVideoResolution 으로 정한다.
+ */
+export function getVideoNodeResolution(
+  state: Pick<DirectorCanvasState, 'nodes'>,
+  videoNodeId: string,
+): VideoResolution {
+  const video = state.nodes.find((n) => n.id === videoNodeId)
+  if (!video || !isVideoData(video.data) || video.data.parentShotNodeId === null) return DEFAULT_VIDEO_RESOLUTION
+  const chosen = video.data.override.resolution
+  return isVideoResolution(chosen) ? chosen : DEFAULT_VIDEO_RESOLUTION
 }
 
 function videoOwnerKey(data: VideoNodeData): string {
@@ -4587,6 +4607,15 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           ...(referenceImageUrls ? { referenceImageUrls } : {}),
           ...(referenceImageUrls && referenceImageRoles ? { referenceImageRoles } : {}),
           ...(options?.traceId ? { traceId: options.traceId, actor: 'chat' } : {}),
+          ...(shotNode && isShotData(shotNode.data)
+            ? {
+                // 해상도(오너 2026-10-31): 영상 노드가 고른 값. 서버가 모델이 낼 수 있는지 다시 정하고 Take 도 그 값으로 잡는다.
+                resolution: getVideoNodeResolution(get(), videoNodeId),
+                // 아직 저장 전인 새 테이크는 이 노드의 설정(override)도 보낸다 — 리테이크가 물려받은 해상도 · 모델이
+                //   서버 테이크에도 남아, 다시 읽어 와도 같은 설정으로 보인다(#retake-inherit 의 상속을 DB 까지).
+                ...(videoNode.data.videoClipId ? {} : { override: videoNode.data.override }),
+              }
+            : {}),
         }
         const postGeneration = (recoveryReceipt?: string) =>
           fetch('/api/director/generate-video', {

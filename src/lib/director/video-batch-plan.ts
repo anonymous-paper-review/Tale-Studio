@@ -3,10 +3,10 @@
 //   오너 결정(E2, 1안): Take가 모자라면 가진 만큼 앞에서부터 만들고 "N개 중 M개만 만들 수 있어요"라고 미리 알린다.
 //   과금 모드: off = Take 줄 없음(계산만) · shadow = 숫자는 보이되 막지 않는다(전부 만든다) · enforce = 가진 만큼만.
 //   단가는 서버 hold 와 같은 계산기(take-cost)로, 새 take 는 마더(샷)의 모델을 물려받는다(director-store 결정 #13).
+//   모델 · 해상도는 요청 조립(video-batch-inputs)과 같은 판정(video-batch-take)으로 정한다 — 1080p 는 두 배(오너 2026-10-31).
 import type { DirectorNode } from '@/types/director'
-import { isShotData } from '@/types/director'
 import { takeCostForVideo } from '@/lib/billing/take-cost'
-import { normalizeProvider } from '@/lib/video-models'
+import { videoBatchShotSettings } from '@/lib/director/video-batch-take'
 import type { TakeBillingMode } from '@/lib/billing/take-hold'
 
 export interface VideoBatchPlan {
@@ -25,13 +25,11 @@ export interface VideoBatchPlan {
   short: boolean
 }
 
-/** 샷 순서대로 영상 한 편의 Take 단가 — 샷의 모델(legacy 'kling' 포함)을 정규화해 계산기에 넣는다. */
+/** 샷 순서대로 영상 한 편의 Take 단가 — 일괄 요청과 같은 모델(legacy 'kling' 포함 정규화) · 해상도로 계산기에 넣는다. */
 export function videoBatchTakeCosts(nodes: readonly DirectorNode[], shotIds: readonly string[]): number[] {
-  const byId = new Map(nodes.map((n) => [n.id, n] as const))
   return shotIds.map((id) => {
-    const node = byId.get(id)
-    const provider = node && isShotData(node.data) ? node.data.provider : null
-    return takeCostForVideo(provider ? normalizeProvider(provider) : null)
+    const settings = videoBatchShotSettings(nodes, id)
+    return settings ? takeCostForVideo(settings.model, settings.resolution) : takeCostForVideo(null)
   })
 }
 

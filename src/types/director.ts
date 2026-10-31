@@ -5,7 +5,7 @@ import type {
   CameraPreset,
   GenerationMethod,
 } from '@/types/shot'
-import type { VideoModelKey } from '@/lib/video-models'
+import type { VideoModelKey, VideoResolution } from '@/lib/video-models'
 
 // ============================================================================
 // Director Canvas Types
@@ -152,6 +152,8 @@ export type VideoOverride = Partial<{
   lighting: LightingConfig
   cameraPreset: CameraPreset
   provider: DirectorVideoProvider
+  /** 영상 노드가 고른 해상도(오너 2026-10-31). 마더 Shot 에는 없는 값 — 없으면 720p. */
+  resolution: VideoResolution
 }>
 
 /** 부모 Shot 없이 독립 생성한 Video가 직접 소유하는 완전한 생성 설정. */

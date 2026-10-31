@@ -34,7 +34,13 @@ import { moderationRejectionResponse } from '@/lib/api/moderation'
 import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { buildBestEffortFalRequestCapturePatch } from '@/lib/fal/observability'
-import { normalizeProvider, type VideoModelKey } from '@/lib/video-models'
+import {
+  DEFAULT_VIDEO_RESOLUTION,
+  effectiveVideoResolution,
+  isVideoResolution,
+  normalizeProvider,
+  type VideoModelKey,
+} from '@/lib/video-models'
 import {
   attachProviderRequestToReservedVideoJob,
   markDirectorVideoAttemptFailed,
@@ -395,6 +401,8 @@ async function prepareVideoRequest(
       standaloneConfig?: unknown
       /** Director 배선 5: 사람이 배선한 프레임('manual')만 존중, 그 밖('auto')은 서버가 DB 실사로 정한다. */
       frameSource?: 'manual' | 'auto'
+      /** 영상 노드가 고른 해상도(오너 2026-10-31) — '720p' | '1080p', 없으면 720p. */
+      resolution?: unknown
     }
     let {
       prompt,
@@ -457,6 +465,10 @@ async function prepareVideoRequest(
     }
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(idempotencyKey)) {
       return NextResponse.json({ error: 'Invalid request: idempotencyKey must be a UUID' }, { status: 400 })
+    }
+    // 해상도(오너 2026-10-31): 720p · 1080p 만 받는다 — 그 밖의 값(4k 등)은 몇 배를 잡을지 정한 적이 없다.
+    if (body.resolution != null && !isVideoResolution(body.resolution)) {
+      return NextResponse.json({ error: 'Invalid request: resolution must be 720p or 1080p' }, { status: 400 })
     }
     if (clientGenerationMethod === 'I2V' && !clientReferenceImageUrl) return NextResponse.json({ error: 'Invalid request: referenceImageUrl is required for I2V' }, { status: 400 })
     if (!(await userOwnsProject(projectId, user.id))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -601,6 +613,10 @@ async function prepareVideoRequest(
         ? referenceImageUrlsV2
         : [referenceImageUrl]
       : null
+    // 실제로 만들 해상도(오너 2026-10-31) — 고른 모델이 낼 수 있으면 고른 값, 아니면 모델 기본값(Kling O3 Pro 는
+    //   해상도 칸이 없다). 독립 영상은 해상도를 고르지 않고(설정 전체를 그 영상이 갖는다), 참고 그림 없는 글 영상은
+    //   해상도 칸이 없는 T2V 입구로 나간다 — 둘 다 기본 해상도다. 이 값 하나가 요청 · 작업 기록 · Take 를 정한다.
+    const resolution = effectiveVideoResolution(modelKey, !standalone && submitRefUrls ? body.resolution : null)
     // 영상 카메라 기재 억제(#F-004 B7 2026-08-12) — 앵커 매체가 실사(live_action)가 아니면
     //   "shot on Arri Alexa, 35mm…" 기재 문구를 뺀다. 실측(dc531572, 3D 애니메이션 프로젝트):
     //   영상 프롬프트가 실사 카메라 촬영을 지시해 앵커 룩과 정면 충돌했다. 앵커가 없거나
@@ -734,7 +750,7 @@ async function prepareVideoRequest(
       }
     }
     const falSubmitRequest = submitRefUrls
-      ? buildFalReferenceToVideoRequest(modelKey, fullPrompt, submitRefUrls, dur, effectiveAspectRatio)
+      ? buildFalReferenceToVideoRequest(modelKey, fullPrompt, submitRefUrls, dur, effectiveAspectRatio, resolution)
       : buildFalT2VFallbackRequest(fullPrompt, dur, effectiveAspectRatio)
     const falCapture = buildBestEffortFalRequestCapturePatch(falSubmitRequest.input, falSubmitRequest.model)
     const normalizedNewTakeMetadata = {
@@ -753,6 +769,9 @@ async function prepareVideoRequest(
       provider: provider ?? null,
       model: model ?? null,
       resolved_model_key: modelKey,
+      // 자동 대체 · 복구가 처음 요청과 같은 해상도를 다시 쓴다(video-fallback). 기본값(720p)이 아닐 때만 적는다 —
+      //   배열 키와 같은 규칙: 이 칸이 없는 옛 예약 작업의 재생 비교(RPC 의 스냅샷 비교)와 어긋나지 않게. 없으면 720p.
+      ...(resolution !== DEFAULT_VIDEO_RESOLUTION ? { resolution } : {}),
       reference_image_url: referenceImageUrl ?? null,
       // 배열 키는 존재할 때만 — 구버전 예약 잡의 리플레이 비교(snapshotValueMatches)와 호환.
       ...(referenceImageUrlsV2?.length ? { reference_image_urls: referenceImageUrlsV2 } : {}),
@@ -775,7 +794,7 @@ async function prepareVideoRequest(
       standalone,
       standaloneConfig,
       modelKey,
-      takeAmount: takeCostForVideo(modelKey),
+      takeAmount: takeCostForVideo(modelKey, resolution),
       provider: 'fal',
       idempotencyKey,
       traceId: traceId ?? null,

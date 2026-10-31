@@ -118,6 +118,29 @@ export const VIDEO_MODELS: Record<VideoModelKey, VideoModelSpec> = {
   },
 }
 
+// 해상도 선택(오너 2026-10-31): 영상 노드에서 720p · 1080p 중 고른다. 처음은 720p(종전과 같음).
+//   고른 값은 모델이 낼 수 있을 때만 쓴다 — 해상도 칸이 없는 모델(Kling O3 Pro)은 모델 기본값으로 만든다.
+//   Take 배수(1080p = 두 배)는 take-cost 가, 실제 요청 값은 fal-video-request 가 이 판정을 같이 쓴다.
+export const VIDEO_RESOLUTION_CHOICES = ['720p', '1080p'] as const
+export type VideoResolution = (typeof VIDEO_RESOLUTION_CHOICES)[number]
+export const DEFAULT_VIDEO_RESOLUTION: VideoResolution = '720p'
+
+export function isVideoResolution(value: unknown): value is VideoResolution {
+  return (VIDEO_RESOLUTION_CHOICES as readonly unknown[]).includes(value)
+}
+
+/** 이 모델로 해상도를 고를 수 있나 — 고를 수 있는 값(720p · 1080p)을 하나도 내지 않으면 false. */
+export function canChooseVideoResolution(modelKey: VideoModelKey): boolean {
+  return VIDEO_RESOLUTION_CHOICES.some((resolution) => VIDEO_MODELS[modelKey].resolutions.includes(resolution))
+}
+
+/** 실제로 만들 해상도 — 고른 값을 모델이 낼 수 있으면 그 값, 아니면(고르지 않음 · 모르는 값 · 못 내는 모델) 모델 기본값. */
+export function effectiveVideoResolution(modelKey: VideoModelKey, requested: unknown): VideoResolution {
+  const spec = VIDEO_MODELS[modelKey]
+  if (isVideoResolution(requested) && spec.resolutions.includes(requested)) return requested
+  return isVideoResolution(spec.defaultResolution) ? spec.defaultResolution : DEFAULT_VIDEO_RESOLUTION
+}
+
 /** flexible 모델의 duration을 spec 범위(min~max)로 가두고 정수로 반올림. fixed는 seconds 반환. */
 export function clampDuration(spec: VideoModelSpec, seconds: number): number {
   if (spec.duration.mode === 'fixed') return spec.duration.seconds

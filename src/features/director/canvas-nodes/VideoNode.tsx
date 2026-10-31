@@ -7,7 +7,11 @@ import { Button } from '@/components/ui/button'
 import { GeneratedImage, GeneratingOverlay } from '@/components/generating-frame'
 import { BaseNode } from './BaseNode'
 import { LabeledTargetHandle } from './LabeledHandle'
-import { getEffectiveVideoConfig, useDirectorCanvasStore } from '@/stores/director-store'
+import {
+  getEffectiveVideoConfig,
+  getVideoNodeResolution,
+  useDirectorCanvasStore,
+} from '@/stores/director-store'
 import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
 import { cn } from '@/lib/utils'
 import { mediaFrameStyle } from '@/lib/project-aspect'
@@ -15,7 +19,7 @@ import { useProjectFormatStore } from '@/stores/project-format-store'
 import { useT } from '@/lib/i18n'
 import { useTakeBalance } from '@/lib/billing/use-take-balance'
 import { takeCostForVideo } from '@/lib/billing/take-cost'
-import { normalizeProvider } from '@/lib/video-models'
+import { effectiveVideoResolution, normalizeProvider } from '@/lib/video-models'
 
 /** 영상 노드 틀의 높이 상한(세로·정사각 포맷) — 테이크 간격(VIDEO_OFFSET_Y 260px) 안에서 겹치지 않게. */
 const VIDEO_NODE_MEDIA_MAX_H = 150
@@ -60,6 +64,11 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   })
   // #payments-phase-2 v4 #2: 생성 전 소모량 표시 — 리테이크 버튼은 이 샷을 다시 만든다(같은 provider).
   const effectiveProvider = useDirectorCanvasStore((s) => getEffectiveVideoConfig(s, id)?.provider ?? null)
+  // 해상도(오너 2026-10-31): 고른 값. 모델이 못 내면(Kling O3 Pro) Take 계산기가 기본값으로 센다.
+  const chosenResolution = useDirectorCanvasStore((s) => getVideoNodeResolution(s, id))
+  const madeAt1080p =
+    !!effectiveProvider &&
+    effectiveVideoResolution(normalizeProvider(effectiveProvider), chosenResolution) === '1080p'
   const takeBalance = useTakeBalance()
 
   // effect 입력은 early-return 전에 안전 추출 (훅은 무조건 호출돼야 함).
@@ -96,10 +105,11 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   if (!isVideoData(data)) return null
 
   const isPlaying = playingNodeId === id
+  // 해상도는 마더 Shot 을 바꾼 값이 아니다(마더에는 해상도가 없다) — 노란 "바꾼 설정" 표시 대신 아래 1080p 표시로 보인다.
   const overrideKeys =
     data.parentShotNodeId === null
       ? []
-      : (Object.keys(data.override) as (keyof typeof data.override)[])
+      : (Object.keys(data.override) as (keyof typeof data.override)[]).filter((k) => k !== 'resolution')
 
   const isStrongStale = data.stale
   const canMarkFinal =
@@ -173,9 +183,9 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           {/* #payments-phase-2 v4 #2: 생성 전 소모량 표시 — mode==='off'면 배지 숨김. */}
           {takeBalance.mode !== 'off' && (
             <span className="rounded-sm border border-primary/40 bg-primary/10 px-1.5 py-1 text-[10px] font-medium text-foreground">
-              {/* 표시는 서버가 실제로 쓰는 모델 기준이어야 한다 — 설정에 남은 옛 모델 이름은
-                  제출 전에 기본 모델로 바뀐다(video-batch-plan 의 승인 카드와 같은 계산). */}
-              {t('{count} Take', { count: takeCostForVideo(effectiveProvider ? normalizeProvider(effectiveProvider) : null) })}
+              {/* 표시는 서버가 실제로 쓰는 모델 · 해상도 기준이어야 한다 — 설정에 남은 옛 모델 이름은
+                  제출 전에 기본 모델로 바뀐다(video-batch-plan 의 승인 카드와 같은 계산). 1080p 는 두 배. */}
+              {t('{count} Take', { count: takeCostForVideo(effectiveProvider ? normalizeProvider(effectiveProvider) : null, chosenResolution) })}
             </span>
           )}
         </div>
@@ -336,7 +346,10 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         >
           {videoStatusLabel(data.lastAttemptStatus ?? data.status, t)}
         </span>
-        {data.final && <span className="font-mono text-[10px] text-warning">★ FINAL</span>}
+        <span className="flex items-center gap-1.5">
+          {madeAt1080p && <span className="font-mono text-[10px] text-muted-foreground">1080p</span>}
+          {data.final && <span className="font-mono text-[10px] text-warning">★ FINAL</span>}
+        </span>
       </div>
       {/* #adherence P2: 모션 계약 위반 배지 — 첫/끝 프레임 검사 결과. */}
       {data.adherence && data.adherence.status !== 'ok' && data.adherence.status !== 'skipped' && (

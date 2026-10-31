@@ -41,7 +41,8 @@ describe('자체 호스팅 영상 경로 제거', () => {
   //   서버는 기본 모델로 바꿔 보내므로 표시와 실제 차감이 어긋난다 — 종량제 신뢰가 깨지는 자리다.
   it('표시하는 Take 수는 서버가 실제로 쓰는 모델 기준이다', () => {
     const videoNode = readFileSync(path.join(SRC, 'features/director/canvas-nodes/VideoNode.tsx'), 'utf8')
-    expect(videoNode).toContain('takeCostForVideo(effectiveProvider ? normalizeProvider(effectiveProvider) : null)')
+    // 2026-10-31(오너 1080p): 같은 계산기에 고른 해상도도 넘긴다 — 서버도 모델 · 해상도로 Take 를 잡는다.
+    expect(videoNode).toContain('takeCostForVideo(effectiveProvider ? normalizeProvider(effectiveProvider) : null, chosenResolution)')
   })
 
   // 왜: Kling 직접 호출 모듈(JWT 토큰 발급 포함)은 아무도 쓰지 않는데 키만 요구하는 잔재였다.

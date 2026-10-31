@@ -1,7 +1,7 @@
 // fal 영상 요청 만들기·보내기 — 첫 제출(video-submit)과 실패 후 다른 모델로 넘기기(video-fallback)가 함께 쓴다.
 import { FalUnknownKeyError, falKeyById } from '@/lib/fal/keys'
 import { assertModerationReceipt, type ModerationReceipt } from '@/lib/moderation/creem'
-import { VIDEO_MODELS, clampDuration, type VideoModelKey } from '@/lib/video-models'
+import { VIDEO_MODELS, clampDuration, effectiveVideoResolution, type VideoModelKey } from '@/lib/video-models'
 
 export type FalVideoSubmitRequest = {
   model: string
@@ -10,13 +10,15 @@ export type FalVideoSubmitRequest = {
 
 /* ── FAL.ai reference-to-video (레지스트리 기반, #5) ──
    V2 refs(#real-strip 2026-07-22): imageUrls 가 [START, END] 2장이면 시작·끝 구도 고정 —
-   전 모델 refParam 이 image_urls 배열이라 스키마 변경 없이 원소만 늘어난다. */
+   전 모델 refParam 이 image_urls 배열이라 스키마 변경 없이 원소만 늘어난다.
+   resolution(오너 2026-10-31): 영상 노드가 고른 해상도. 없거나 모델이 못 내는 값이면 모델 기본 해상도. */
 export function buildFalReferenceToVideoRequest(
   modelKey: VideoModelKey,
   prompt: string,
   imageUrls: string[],
   durationSeconds: number,
   aspectRatio: string,
+  resolution?: string | null,
 ): FalVideoSubmitRequest {
   const spec = VIDEO_MODELS[modelKey]
   if (!spec.endpoint) throw new Error('FAL reference-to-video endpoint missing')
@@ -43,9 +45,9 @@ export function buildFalReferenceToVideoRequest(
     input[spec.audioParam] = spec.audioDefault
   }
 
-  // resolution: 노출하는 모델만 기본 해상도
+  // resolution: 노출하는 모델만 — 고른 해상도(낼 수 있을 때) 또는 기본 해상도
   if (spec.resolutions.length > 0) {
-    input.resolution = spec.defaultResolution
+    input.resolution = effectiveVideoResolution(modelKey, resolution)
   }
 
   // aspect_ratio: kling-o3는 미노출(확실치 않아 omit), 그 외 전달

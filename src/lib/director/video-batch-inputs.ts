@@ -9,9 +9,7 @@ import {
   isShotData,
   isVideoData,
   type DirectorNode,
-  type VideoNodeData,
 } from '@/types/director'
-import { normalizeProvider } from '@/lib/video-models'
 import {
   chainFrameMatchesSource,
   effectivePromptOf,
@@ -20,6 +18,7 @@ import {
   resolveShotFrameImageUrl,
   usableFrameImageUrl,
 } from '@/lib/director/video-frame-inputs'
+import { pickActiveTake, videoBatchShotSettings } from '@/lib/director/video-batch-take'
 
 export type VideoBatchInputItem = {
   shotId: string
@@ -34,42 +33,6 @@ export type VideoBatchInputSkip = {
 export type VideoBatchInputsResult = {
   items: VideoBatchInputItem[]
   skipped: VideoBatchInputSkip[]
-}
-
-function getChildVideos(nodes: readonly DirectorNode[], shotNodeId: string): DirectorNode[] {
-  return nodes.filter(
-    (n) => isVideoData(n.data) && n.data.parentShotNodeId === shotNodeId,
-  )
-}
-
-function isPlayableCompleted(data: VideoNodeData): boolean {
-  return data.status === 'completed' && !!usableFrameImageUrl(data.videoUrl)
-}
-
-function isManuallyWired(data: VideoNodeData): boolean {
-  const frameInputs = normalizeFrameInputs(data.frameInputs)
-  return (
-    !!frameInputs.start ||
-    !!frameInputs.end ||
-    frameInputs.refs.length > 0 ||
-    !!data.videoChainInputId
-  )
-}
-
-/**
- * 아직 완성되지 않았고 사람이 배선한 take 중 가장 최근 것을 고른다.
- * takeNumber 큰 순 → 동률이면 createdAt 최신 순. 없으면 null(마더 설정 그대로).
- */
-function pickActiveTake(nodes: readonly DirectorNode[], shotNodeId: string): (DirectorNode & { data: VideoNodeData }) | null {
-  const candidates = getChildVideos(nodes, shotNodeId).filter(
-    (n) => isVideoData(n.data) && !isPlayableCompleted(n.data) && isManuallyWired(n.data),
-  ) as Array<DirectorNode & { data: VideoNodeData }>
-  if (candidates.length === 0) return null
-  candidates.sort((a, b) => {
-    if (a.data.takeNumber !== b.data.takeNumber) return b.data.takeNumber - a.data.takeNumber
-    return (b.data.createdAt ?? '').localeCompare(a.data.createdAt ?? '')
-  })
-  return candidates[0]!
 }
 
 /**
@@ -199,7 +162,8 @@ export function buildVideoBatchInputs(
     const camera = override.camera ?? mother.camera
     const lighting = override.lighting ?? mother.lighting
     const cameraPreset = override.cameraPreset ?? mother.cameraPreset
-    const provider = override.provider ?? mother.provider
+    // 모델 · 해상도는 확인창의 Take 계산(video-batch-plan)과 같은 판정으로 정한다 — 배선한 테이크가 있으면 그 테이크 값.
+    const settings = videoBatchShotSettings(nodes, shotNodeId)!
 
     const request: Record<string, unknown> = {
       projectId,
@@ -211,7 +175,9 @@ export function buildVideoBatchInputs(
       cameraPreset,
       // 화면비는 서버가 프로젝트 포맷에서 정한다(2026-09-30) — 여기서 16:9 를 박지 않는다.
       generationMethod: referenceImageUrl ? 'I2V' : 'T2V',
-      model: normalizeProvider(provider),
+      model: settings.model,
+      // 해상도(오너 2026-10-31): 서버가 모델이 낼 수 있는지 다시 정하고 그 값으로 Take 를 잡는다.
+      resolution: settings.resolution,
       // 제공자는 fal 하나다(2026-10-11 자체 호스팅 경로 제거). store 의 요청 조립과 동일 계약.
       provider: 'fal',
       durationSeconds: mother.durationSeconds,

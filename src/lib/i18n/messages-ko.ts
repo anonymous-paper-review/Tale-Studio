@@ -667,6 +667,9 @@ export const KO: Record<string, string> = {
   'Prompt (for video generation)': '프롬프트 (영상 생성용)',
   'Action, mood, camera intent, etc. happening in this shot': '이 샷에서 일어나는 액션, 분위기, 카메라 의도 등',
   'Video generation model': '영상 생성 모델',
+  // 영상 해상도(오너 2026-10-31 1080p): 모델 단추 아래 720p · 1080p
+  Resolution: '해상도',
+  'This model cannot choose a resolution': '이 모델은 해상도를 고를 수 없어요',
   'Reference images ({count})': '참고 이미지 ({count}장)',
   'Remove reference image': '참고 이미지 삭제',
   'Upload reference image': '참고 이미지 업로드',

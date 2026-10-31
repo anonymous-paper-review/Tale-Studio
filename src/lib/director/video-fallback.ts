@@ -8,6 +8,9 @@
 //   사용자는 고른 모델 값을 내고 영상을 받는다(오너 확인 2026-10-12). 마지막 모델까지 실패해야
 //   markDirectorVideoAttemptFailed 로 실패 처리하고 그때 이용권을 돌려준다.
 //
+// 해상도(오너 2026-10-31): 다음 모델도 처음 고른 해상도(작업 기록의 resolution)를 낼 수 있으면 그 값으로 만든다 —
+//   해피홀스는 1080p 를 낸다. 미니맥스는 늘 768P 다. 1080p 로 잡은 Take 도 위 규칙대로 그대로 둔다.
+//
 // 차지(claim): 실패한 요청 id 를 들고 있는 queued 작업만 'reserved:' 로 바꿔 차지한다. 웹훅과 폴링이
 //   같은 실패를 동시에 보더라도 한 쪽만 다음 모델을 보낸다. 'reserved:' 상태는 폴링·청소가 손대지 않는
 //   "제출 중" 표시이고, 제출이 끝나면 attach 가 새 요청 id 로 바꾼다(첫 제출과 같은 순서).
@@ -147,7 +150,8 @@ function buildFallbackRequest(model: VideoFallbackModel, plan: FallbackPlan): Fa
     : 5
   const aspectRatio = typeof plan.snapshot.aspect_ratio === 'string' ? plan.snapshot.aspect_ratio : '16:9'
   if (model === 'minimax') return buildMinimaxRequest(plan, prompt, durationSeconds, aspectRatio)
-  return buildFalReferenceToVideoRequest(model, prompt, plan.imageUrls, durationSeconds, aspectRatio)
+  const resolution = typeof plan.snapshot.resolution === 'string' ? plan.snapshot.resolution : null
+  return buildFalReferenceToVideoRequest(model, prompt, plan.imageUrls, durationSeconds, aspectRatio, resolution)
 }
 
 /** 실패한 요청 id 를 아직 들고 있는 queued 작업만 'reserved:' 로 차지한다. 다른 처리가 먼저 가져갔으면 false. */
