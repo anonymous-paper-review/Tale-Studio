@@ -203,6 +203,19 @@ describe('머리 줄 그려 보기', () => {
     expect(isDisabled(out, 'artist-regen-open')).toBe(true)
   })
 
+  it('버전을 다 불러오지 못했으면 머리 줄에 "v1을 다 불러오지 못했어요. 다시 불러오거나 이전 버전으로 돌아가 주세요."와 [다시 불러오기] · [이전 버전으로 돌아가기]를 보인다', () => {
+    // 왜: 반쯤 불러온 버전이 아무 말 없이 지금 버전으로 남았다(2026-10-31 재검토 지적, 막는 문제).
+    screenState({ versions: [versionView(1, 'real', true), versionView(2, 'watercolor', false)] })
+    useArtistVersionStore.setState({ loadFailed: { n: 1, from: 2 } })
+    serveCurrent(useArtistVersionStore)
+    const out = html(createElement(StyleVersionBar, { completed: false, drawing: false }))
+    expect(out).toContain('v1을 다 불러오지 못했어요. 다시 불러오거나 이전 버전으로 돌아가 주세요.')
+    expect(tagOf(out, 'artist-load-retry')).not.toBe('')
+    expect(tagOf(out, 'artist-load-go-back')).not.toBe('')
+    expect(out).toContain('다시 불러오기')
+    expect(out).toContain('이전 버전으로 돌아가기')
+  })
+
   it('재생성 그림을 그리는 중에는 돌아가기 단추를 보이지 않는다', () => {
     // 왜: 그리는 중에 돌아가면 늦게 온 그림이 불러온 버전에 들어간다 — 멈췄을 때만 보인다.
     screenState({ versions: [versionView(1, 'real', false), versionView(2, 'watercolor', true)] })

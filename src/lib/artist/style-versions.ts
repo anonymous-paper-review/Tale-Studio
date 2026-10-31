@@ -263,12 +263,12 @@ export function earlierVersions<T extends VersionSummary>(versions: readonly T[]
  *   stopped = 재생성 그림이 다 그려지기 전에 멈췄다 — [불러오기]로 이전 버전에 돌아갈 수 있고(남은 재생성은 그만둔다),
  *   [재생성하기]는 남은 그림을 그리거나 돌아간 뒤에 한다(2026-10-28 검토 지적). loading = 버전을 불러오는 중.
  */
-export function versionHeader(input: { versions: readonly VersionSummary[]; completed: boolean; drawing: boolean; demo?: boolean; stopped?: boolean; loading?: boolean }): {
+export function versionHeader(input: { versions: readonly VersionSummary[]; completed: boolean; drawing: boolean; demo?: boolean; stopped?: boolean; loading?: boolean; loadFailed?: boolean }): {
   n: number
   count: number
   canLoad: boolean
   canRegenerate: boolean
-  note: 'completed' | 'loading' | 'drawing' | 'stopped' | 'single' | null
+  note: 'completed' | 'loading' | 'drawing' | 'loadFailed' | 'stopped' | 'single' | null
 } {
   const count = Math.max(1, input.versions.length)
   const n = input.versions.find((version) => version.current)?.n ?? (input.versions.length ? Math.max(...input.versions.map((version) => version.n)) : 1)
@@ -276,6 +276,8 @@ export function versionHeader(input: { versions: readonly VersionSummary[]; comp
   if (input.loading) return { n, count, canLoad: false, canRegenerate: false, note: 'loading' }
   if (input.drawing) return { n, count, canLoad: false, canRegenerate: false, note: 'drawing' }
   if (input.demo) return { n, count, canLoad: false, canRegenerate: false, note: null }
+  // 다 불러오지 못한 버전 — 다시 불러오거나 다른 버전으로 갈 수 있다(떠나도 그 버전 기록은 그대로다, 2026-10-31 재검토).
+  if (input.loadFailed) return { n, count, canLoad: count > 1, canRegenerate: true, note: 'loadFailed' }
   if (input.stopped) return { n, count, canLoad: count > 1, canRegenerate: false, note: 'stopped' }
   if (count <= 1) return { n, count, canLoad: false, canRegenerate: true, note: 'single' }
   return { n, count, canLoad: true, canRegenerate: true, note: null }

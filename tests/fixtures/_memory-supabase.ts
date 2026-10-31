@@ -37,6 +37,10 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
   const failReadsFrom: Record<string, number> = {}
   /** 받기(download)가 끝나지 않는 파일 경로. */
   const hangDownloads = new Set<string>()
+  /** 이어 읽기(id 보다 뒤 — .gt('id', …))를 실패시키는 표. */
+  const failPagedReads = new Set<string>()
+  /** 읽기가 끝날 때마다 부르는 갈고리(읽는 사이에 다른 요청이 행을 지우는 경우 등). */
+  const afterRead: Array<(table: string) => void> = []
   const MAX_ROWS = 1000
   const inflight: Record<string, number> = {}
   const maxInflight: Record<string, number> = {}
@@ -71,6 +75,7 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
     let limitTo: number | null = null
     let rangeFrom = 0
     let rangeTo: number | null = null
+    let pagedAfterId = false
 
     const run = (): { data: unknown; error: { code?: string; message: string } | null } => {
       if (failReads.has(name) && op === 'select') return { data: null, error: { code: 'PGRST205', message: `Could not find the table 'public.${name}'` } }
@@ -122,6 +127,7 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
         })
       }
       if (failReadsFrom[name] != null && rangeFrom >= failReadsFrom[name]) return { data: null, error: { message: `forced read failure on ${name} from row ${rangeFrom}` } }
+      if (failPagedReads.has(name) && pagedAfterId) return { data: null, error: { message: `forced paged read failure on ${name}` } }
       if (rangeTo != null) rows = rows.slice(rangeFrom, rangeTo + 1)
       if (limitTo != null) rows = rows.slice(0, limitTo)
       rows = rows.slice(0, MAX_ROWS)
@@ -135,6 +141,7 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
           row[alias[1]] = value === undefined || value === null ? null : typeof value === 'object' ? JSON.stringify(value) : String(value)
         }
       }
+      for (const hook of afterRead) hook(name)
       return { data: rows, error: null }
     }
 
@@ -173,7 +180,11 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
       is: (column: string, value: unknown) => { filters.push((row) => (row[column] ?? null) === value); return q },
       in: (column: string, values: unknown[]) => { filters.push((row) => values.includes(row[column])); return q },
       gte: (column: string, value: string | number) => { filters.push((row) => (row[column] as string | number) >= value); return q },
-      gt: (column: string, value: string | number) => { filters.push((row) => (row[column] as string | number) > value); return q },
+      gt: (column: string, value: string | number) => {
+        if (column === 'id') pagedAfterId = true
+        filters.push((row) => (row[column] as string | number) > value)
+        return q
+      },
       lte: (column: string, value: string | number) => { filters.push((row) => (row[column] as string | number) <= value); return q },
       lt: (column: string, value: string | number) => { filters.push((row) => (row[column] as string | number) < value); return q },
       match: (values: Row) => { for (const [k, v] of Object.entries(values)) filters.push((row) => row[k] === v); return q },
@@ -244,6 +255,8 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
     maxInflight,
     failReadsFrom,
     hangDownloads,
+    failPagedReads,
+    afterRead,
   }
 }
 

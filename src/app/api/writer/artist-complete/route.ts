@@ -15,6 +15,8 @@ import { loadCompletionGaps } from '@/lib/artist/completion'
 import { versionWorkPending } from '@/lib/artist/style-versions-server'
 
 export const runtime = 'nodejs'
+// 끊긴 버전 불러오기를 여기서 마저 할 수 있다 — 불러오기 창구와 같은 시간 제한(2026-10-31 재검토 지적). 끊겨도 그 시도는 센다.
+export const maxDuration = 300
 
 const requestSchema = z.object({ projectId: z.string().min(1) })
 
@@ -54,6 +56,9 @@ export async function POST(req: NextRequest) {
     }
     if (versionWork === 'restoring') {
       return NextResponse.json({ error: 'A version is still being loaded', code: 'version_restoring' }, { status: 409 })
+    }
+    if (versionWork === 'load_failed') {
+      return NextResponse.json({ error: 'The version could not be fully loaded', code: 'version_load_failed' }, { status: 409 })
     }
 
     for (let attempt = 0; attempt < 3; attempt++) {

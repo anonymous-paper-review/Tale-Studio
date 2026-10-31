@@ -21,7 +21,7 @@ vi.mock('@/lib/api/guard', () => ({
 vi.mock('@/lib/writer/run-store', () => ({ getActiveRun: vi.fn(async () => ({ id: 'run-1', status: 'completed', current_stage: 'shotCheck', state: {}, updated_at: '2026-10-28T00:00:00Z' })) }))
 vi.mock('@/lib/writer/pipeline/steps', () => ({ triggerWriterStep: vi.fn() }))
 
-import { POST as completeArtist } from '@/app/api/writer/artist-complete/route'
+import { POST as completeArtist, maxDuration as completeMaxDuration } from '@/app/api/writer/artist-complete/route'
 import { completeError } from '@/features/artist-room/artist-complete-dialog'
 import { KO } from '@/lib/i18n/messages-ko'
 
@@ -101,6 +101,22 @@ describe('재생성 중 [완료하기]', () => {
     expect(res.status).toBe(200)
     expect(state.db.rows('character_appearances')[0].sheet_url).toBe(mediaUrlOf(copy))
     expect((state.db.rows('artist_versions').find((row) => row.n === 1)!.snapshot as { restoring?: unknown }).restoring).toBeUndefined()
+  })
+
+  it('버전을 다 불러오지 못한 채면 [완료하기]를 받지 않는다', async () => {
+    // 왜: 반쯤 불러온 그림이 섞인 채로 Storyboard 가 열렸다 — 다시 불러오거나 이전 버전으로 돌아간 뒤에 완료한다(2026-10-31 재검토 지적).
+    state.db = seed([v1, v2(null, { snapshot: { characters: [], locations: [], loadFailed: { at: NOW(), attempts: 3, from: 1 } } })])
+    const res = await completeArtist(request())
+    expect(res.status).toBe(409)
+    expect(await res.json()).toMatchObject({ code: 'version_load_failed' })
+    expect(state.db.rows('projects')[0].current_stage).toBe('artist')
+    expect(completeError('version_load_failed')).toEqual({ key: 'The version could not be fully loaded. Load it again or go back to the previous version.' })
+    expect(KO['The version could not be fully loaded. Load it again or go back to the previous version.']).toBe('버전을 다 불러오지 못했어요. 다시 불러오거나 이전 버전으로 돌아가 주세요.')
+  })
+
+  it('[완료하기]는 끊긴 불러오기를 마저 할 수 있게 불러오기 창구와 같은 시간 제한(300초)을 쓴다', () => {
+    // 왜: 마저 하기는 그림 칸이 많으면 오래 걸린다 — 기본 시간 제한에 끊기면 그 시도만 세고 끝난다(2026-10-31 재검토 지적).
+    expect(completeMaxDuration).toBe(300)
   })
 
   it('재생성 때문에 [완료하기]를 받지 않으면 화면은 "다시 만드는 그림을 다 그린 뒤에 완료할 수 있어요."를 알린다', () => {

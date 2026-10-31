@@ -45,8 +45,10 @@ const COPY_CONCURRENCY = 8
 export const RESTORE_LEASE_MS = 305_000
 /** 지금 버전이 없어진 뒤 되살리기까지 기다리는 시간 — 버전을 바꾸는 그 짧은 사이(떠남 → 지금으로)에는 되살리지 않는다. */
 export const HEAL_GRACE_MS = 60_000
-/** 끊긴 불러오기를 마저 하다 이만큼 실패하면 그만두고 불러오는 중 표시를 뗀다 — 버전 바꾸기 · [완료하기]가 영영 막히지 않게(2026-10-31 재검토). */
+/** 끊긴 불러오기를 마저 하는 시도 수 — 다 실패하면 그 버전을 "다 불러오지 못함"으로 남긴다(2026-10-31 재검토). */
 export const MAX_RESTORE_ATTEMPTS = 3
+/** 마저 하기가 실패한 뒤 다음 시도까지 — 화면이 5초마다 읽어도 잠깐의 오류로 시도를 다 쓰지 않게. */
+export const RESTORE_RETRY_GAP_MS = 60_000
 
 export interface VersionRow {
   id: string
@@ -639,10 +641,11 @@ export async function regenStillPending(projectId: string, current: VersionRow, 
 }
 
 /**
- * [완료하기]를 막을 버전 일 — 불러오는 중(restoring) · 다 그리기 전 재생성(regen). 덧붙인 검사라 기록을 못 읽으면 막지 않는다.
- *   끊긴 불러오기는 맡은 시간이 지났으면 여기서 마저 한다 — 기록 읽기 전에 누르면 "불러오는 중"만 되풀이됐다(2026-10-31 재검토 지적).
+ * [완료하기]를 막을 버전 일 — 불러오는 중(restoring) · 다 불러오지 못함(load_failed) · 다 그리기 전 재생성(regen).
+ *   덧붙인 검사라 기록을 못 읽으면 막지 않는다. 끊긴 불러오기는 다시 해 볼 때가 됐으면 여기서 마저 한다
+ *   — 기록 읽기 전에 누르면 "불러오는 중"만 되풀이됐다(2026-10-31 재검토 지적).
  */
-export async function versionWorkPending(projectId: string): Promise<'restoring' | 'regen' | null> {
+export async function versionWorkPending(projectId: string): Promise<'restoring' | 'load_failed' | 'regen' | null> {
   try {
     const project = await readVersionProject(projectId)
     if (!project) return null
@@ -650,6 +653,7 @@ export async function versionWorkPending(projectId: string): Promise<'restoring'
     if (settled.restoringN !== null) return 'restoring'
     const current = settled.rows.find((row) => row.is_current)
     if (!current) return null
+    if (loadFailedOf(current.snapshot)) return 'load_failed'
     return (await regenStillPending(projectId, current, await readLiveImages(projectId))) ? 'regen' : null
   } catch (e) {
     console.warn('[artist-versions] version check skipped:', e instanceof Error ? e.message : e)
@@ -673,12 +677,22 @@ export async function leaveCurrentVersion(
 ): Promise<LeftVersion | { ok: false }> {
   const folder = versionFolder(project.workspace_id, project.id, current.n)
   const previous = parseVersionSnapshot(current.snapshot)
-  // 불러올 때 그대로 둔 배경 그림이 아직 그대로면 지난번 기록을 둔다 — 이 버전에서 다시 그렸으면(그림이 바뀜) 새 그림을 남긴다.
-  const kept = keptAtLoadOf(current.snapshot)
-  const keepPrevious = (entry: VersionLocationImage) => kept[backgroundLookKey(entry.locationId, entry.appearanceKey)] === entry.wideShot.url
-  const { snapshot, created } = await freezeSnapshot(project, current.n, liveSnapshot(live), previous, keepPrevious)
-  // 그때의 그림 지시 그림체 값도 남긴다 — 불러오면 그림과 함께 이 값으로 돌아간다(styleLookTokens).
-  const frozen: VersionSnapshot = { ...snapshot, look: { l1: designL1(project.design_tokens) } }
+  // 다 불러오지 못한(또는 불러오는 중인) 버전은 지금 그림이 반쯤 섞여 있다 — 그 그림으로 기록을 덮지 않고 남긴 기록 · 복사본을 그대로 둔다
+  //   (덮으면 그 버전의 그림을 잃는다, 2026-10-31 재검토 지적 · 막는 문제). 스타일도 그 버전 것 그대로.
+  const damaged = !!previous && (!!loadFailedOf(current.snapshot) || !!restoringMarkOf(current.snapshot))
+  let frozen: VersionSnapshot
+  let created: string[] = []
+  if (damaged) {
+    frozen = previous
+  } else {
+    // 불러올 때 그대로 둔 배경 그림이 아직 그대로면 지난번 기록을 둔다 — 이 버전에서 다시 그렸으면(그림이 바뀜) 새 그림을 남긴다.
+    const kept = keptAtLoadOf(current.snapshot)
+    const keepPrevious = (entry: VersionLocationImage) => kept[backgroundLookKey(entry.locationId, entry.appearanceKey)] === entry.wideShot.url
+    const made = await freezeSnapshot(project, current.n, liveSnapshot(live), previous, keepPrevious)
+    created = made.created
+    // 그때의 그림 지시 그림체 값도 남긴다 — 불러오면 그림과 함께 이 값으로 돌아간다(styleLookTokens).
+    frozen = { ...made.snapshot, look: { l1: designL1(project.design_tokens) } }
+  }
   // 떠날 수 있는 버전의 재생성은 다 그린 것이다(남은 그림이 있으면 부르는 쪽이 막는다) — 아직 알리지 않았으면 다 그렸다고 적어,
   //   나중에 이 버전을 다시 불러와도 "만들었어요"를 또 알리지 않는다. 그만두고 떠나면 그만둔 때를 적는다.
   const record = parseRegenRecord(current.regen)
@@ -693,8 +707,8 @@ export async function leaveCurrentVersion(
       active: closeActiveRange(parseActive(current.active), at),
       regen: regen as never,
       // 그 버전의 스타일도 작품에 지금 걸린 것으로 남긴다 — 직접 올린 그림체는 버전을 만든 뒤에 분석 결과가 붙는다(2026-10-28 검토 지적).
-      style_anchor_key: project.style_anchor_key || null,
-      custom_style_anchor: (project.custom_style_anchor ?? null) as never,
+      style_anchor_key: damaged ? current.style_anchor_key : project.style_anchor_key || null,
+      custom_style_anchor: (damaged ? current.custom_style_anchor ?? null : project.custom_style_anchor ?? null) as never,
       updated_at: updatedAt,
     })
     .eq('id', current.id)
@@ -706,15 +720,18 @@ export async function leaveCurrentVersion(
     if (error) throw new Error(`current version update failed: ${error.message}`)
     return { ok: false }
   }
-  await pruneVersionCopies(project.id, folder, previous, frozen)
+  if (!damaged) await pruneVersionCopies(project.id, folder, previous, frozen)
   return { ok: true, frozen, updatedAt }
 }
 
-/** 떠난 버전을 되돌린다(뒤 단계가 실패했을 때) — 최선. 그림 기록은 떠날 때 남긴 것으로 둔다(그때 옛 복사본을 거뒀다). */
+/** 떠난 버전을 되돌린다(뒤 단계가 실패했을 때) — 최선. 그림 기록은 떠날 때 남긴 것으로 둔다(그때 옛 복사본을 거뒀다).
+ *  불러올 때 그대로 둔 배경 그림 표시 · 다 불러오지 못함 표시는 그대로 되살린다(2026-10-31 재검토 지적). */
 export async function returnToVersion(current: VersionRow, left: LeftVersion): Promise<void> {
+  const raw = current.snapshot && typeof current.snapshot === 'object' ? (current.snapshot as Record<string, unknown>) : {}
+  const marks = Object.fromEntries((['keptAtLoad', 'loadFailed'] as const).filter((key) => raw[key] !== undefined).map((key) => [key, raw[key]]))
   const { error } = await supabaseAdmin
     .from('artist_versions')
-    .update({ is_current: true, snapshot: left.frozen as never, active: current.active as never, regen: current.regen as never, updated_at: nextStamp(left.updatedAt) })
+    .update({ is_current: true, snapshot: { ...left.frozen, ...marks } as never, active: current.active as never, regen: current.regen as never, updated_at: nextStamp(left.updatedAt) })
     .eq('id', current.id)
   if (error) console.error('[artist-versions] could not return to the version:', current.n, error.message)
 }
@@ -722,16 +739,35 @@ export async function returnToVersion(current: VersionRow, left: LeftVersion): P
 // ── 기록 바로잡기 ─────────────────────────────────────────────────
 
 /** 불러오는 중 표시(버전 행 snapshot.restoring) — 그림을 다 되돌리면 지운다. 끝 시각(until)이 지나도 남았으면 불러오기가 멈춘 것이다.
- *  attempts = 멈춘 불러오기를 마저 하다 실패한 횟수(MAX_RESTORE_ATTEMPTS 에서 그만둔다). */
-export interface RestoringMark { at: string; until: string; attempts?: number }
+ *  attempts = 마저 하기를 맡은 횟수(맡을 때 센다 — 맡은 요청이 끊겨도 한 번이다). from = 불러오기 전 버전(돌아갈 곳). */
+export interface RestoringMark { at: string; until: string; attempts?: number; from?: number | null }
+
+const numberOrNull = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : null)
 
 export function restoringMarkOf(snapshot: unknown): RestoringMark | null {
   if (!snapshot || typeof snapshot !== 'object') return null
   const mark = (snapshot as { restoring?: unknown }).restoring
   if (!mark || typeof mark !== 'object') return null
-  const { at, until, attempts } = mark as { at?: unknown; until?: unknown; attempts?: unknown }
+  const { at, until, attempts, from } = mark as { at?: unknown; until?: unknown; attempts?: unknown; from?: unknown }
   if (typeof at !== 'string' || typeof until !== 'string') return null
-  return { at, until, attempts: typeof attempts === 'number' && Number.isFinite(attempts) ? attempts : 0 }
+  return { at, until, attempts: numberOrNull(attempts) ?? 0, from: numberOrNull(from) }
+}
+
+/** 다 불러오지 못한 버전 표시(버전 행 snapshot.loadFailed) — 끊긴 불러오기를 끝내 마저 하지 못했다. 다시 불러오거나 from 으로 돌아간다. */
+export interface LoadFailedMark { at: string; attempts: number; from: number | null }
+
+export function loadFailedOf(snapshot: unknown): LoadFailedMark | null {
+  if (!snapshot || typeof snapshot !== 'object') return null
+  const mark = (snapshot as { loadFailed?: unknown }).loadFailed
+  if (!mark || typeof mark !== 'object') return null
+  const { at, attempts, from } = mark as { at?: unknown; attempts?: unknown; from?: unknown }
+  return typeof at === 'string' ? { at, attempts: numberOrNull(attempts) ?? 0, from: numberOrNull(from) } : null
+}
+
+function withLoadFailed(snapshot: unknown, mark: LoadFailedMark | null): Record<string, unknown> {
+  const base = snapshot && typeof snapshot === 'object' ? { ...(snapshot as Record<string, unknown>) } : {}
+  delete base.loadFailed
+  return mark ? { ...base, loadFailed: mark } : base
 }
 
 /** 버전 행 snapshot 에 불러오는 중 표시를 달거나(mark) 뗀다(null). */
@@ -741,7 +777,19 @@ export function withRestoringMark(snapshot: unknown, mark: RestoringMark | null)
   return mark ? { ...base, restoring: mark } : base
 }
 
-export const restoringMarkFrom = (at: string): RestoringMark => ({ at, until: new Date(Date.parse(at) + RESTORE_LEASE_MS).toISOString() })
+export const restoringMarkFrom = (at: string, from: number | null = null): RestoringMark => ({ at, until: new Date(Date.parse(at) + RESTORE_LEASE_MS).toISOString(), attempts: 0, from })
+
+/** 다시 불러오기를 시작한다 — 다 불러오지 못함 표시를 떼고 새 불러오는 중 표시를 단다(시도 수는 처음부터). */
+export function retryLoadSnapshot(snapshot: unknown, at: string): { snapshot: Record<string, unknown>; mark: RestoringMark } {
+  const failed = loadFailedOf(snapshot)
+  const mark = restoringMarkFrom(at, failed?.from ?? null)
+  return { snapshot: withRestoringMark(withLoadFailed(snapshot, null), mark), mark }
+}
+
+/** 다시 불러오기도 실패했다 — 다 불러오지 못함 표시로 되돌린다. */
+export function loadFailedSnapshot(snapshot: unknown, mark: RestoringMark): Record<string, unknown> {
+  return withLoadFailed(withRestoringMark(snapshot, null), { at: new Date().toISOString(), attempts: mark.attempts ?? 0, from: mark.from ?? null })
+}
 
 /** 다 되돌렸으면 불러오는 중 표시를 뗀다 — 그 사이 다른 창구가 행을 바꿨으면 그쪽에 맡긴다(최선). */
 export async function clearRestoringMark(id: string, snapshot: unknown, updatedAt: string): Promise<void> {
@@ -777,19 +825,26 @@ async function healCurrentVersion(rows: readonly VersionRow[]): Promise<boolean>
 }
 
 /**
- * 불러오다 멈춘 버전을 마저 불러온다 — 표시의 끝 시각을 늘려 맡은 뒤(바뀐 시각 비교) 스타일 · 그림을 그 버전 것으로. 맡았으면 true.
- *   실패하면 실패 횟수를 늘리고 다음 요청이 곧바로 다시 맡게 둔다. MAX_RESTORE_ATTEMPTS 번 실패했으면 그만두고 표시를 뗀다 —
- *   그 버전이 지금 버전으로 남고(그림은 되돌린 데까지), 불러오기 · 재생성 · [완료하기]가 다시 된다(2026-10-31 재검토 지적).
+ * 불러오다 멈춘 버전을 마저 불러온다 — 시도 수를 먼저 세고 표시의 끝 시각을 늘려 맡은 뒤(바뀐 시각 비교) 스타일 · 그림을 그 버전 것으로.
+ *   맡은 요청이 끊겨도 그 시도는 센 것이다. 실패하면 다음 시도는 RESTORE_RETRY_GAP_MS 뒤 — 잠깐의 오류로 시도를 다 쓰지 않게.
+ *   MAX_RESTORE_ATTEMPTS 번 다 실패하면 그 버전을 "다 불러오지 못함"으로 남긴다 — 화면이 알리고, 다시 불러오거나 돌아가게 하고,
+ *   [완료하기]는 막고, 떠날 때 그 버전 기록을 섞인 그림으로 덮지 않는다(2026-10-31 재검토 지적 · 막는 문제).
  */
-async function finishRestore(project: VersionProject, row: VersionRow, mark: RestoringMark): Promise<'finished' | 'gave-up' | 'busy'> {
+async function finishRestore(project: VersionProject, row: VersionRow, mark: RestoringMark): Promise<'finished' | 'failed' | 'gave-up' | 'busy'> {
   const attempts = mark.attempts ?? 0
   if (attempts >= MAX_RESTORE_ATTEMPTS) {
-    console.error('[artist-versions] giving up an interrupted load:', row.n, attempts)
-    await clearRestoringMark(row.id, row.snapshot, row.updated_at)
-    return 'gave-up'
+    const { data } = await supabaseAdmin
+      .from('artist_versions')
+      .update({ snapshot: loadFailedSnapshot(row.snapshot, mark) as never, updated_at: nextStamp(row.updated_at) })
+      .eq('id', row.id)
+      .eq('updated_at', row.updated_at)
+      .select('id')
+    console.error('[artist-versions] could not finish an interrupted load:', row.n, attempts)
+    return rowsOf(data).length === 1 ? 'gave-up' : 'busy'
   }
   const claimedAt = nextStamp(row.updated_at)
-  const claimed = withRestoringMark(row.snapshot, { at: mark.at, until: new Date(Date.now() + RESTORE_LEASE_MS).toISOString(), attempts })
+  const claimedMark: RestoringMark = { ...mark, attempts: attempts + 1, until: new Date(Date.now() + RESTORE_LEASE_MS).toISOString() }
+  const claimed = withRestoringMark(row.snapshot, claimedMark)
   const { data, error } = await supabaseAdmin
     .from('artist_versions')
     .update({ snapshot: claimed as never, updated_at: claimedAt })
@@ -805,13 +860,11 @@ async function finishRestore(project: VersionProject, row: VersionRow, mark: Res
     await setProjectStyle(project.id, row.style_anchor_key, row.custom_style_anchor, designTokens)
     if (snapshot) await restoreSnapshot(project.id, snapshot, await readLiveImages(project.id), mark.at)
   } catch (e) {
-    // 실패 횟수를 늘리고 다음 요청이 곧바로 다시 맡을 수 있게 끝 시각을 되돌려 둔다 — 마지막 실패면 그만두고 표시를 뗀다.
-    const failed = attempts + 1
-    const next = failed >= MAX_RESTORE_ATTEMPTS ? null : { at: mark.at, until: mark.until, attempts: failed }
-    if (!next) console.error('[artist-versions] giving up an interrupted load:', row.n, failed, e instanceof Error ? e.message : e)
-    await supabaseAdmin.from('artist_versions').update({ snapshot: withRestoringMark(claimed, next) as never, updated_at: nextStamp(claimedAt) }).eq('id', row.id).eq('updated_at', claimedAt)
-    if (!next) return 'gave-up'
-    throw e
+    console.error('[artist-versions] finishing an interrupted load failed:', row.n, claimedMark.attempts, e instanceof Error ? e.message : e)
+    const last = (claimedMark.attempts ?? 0) >= MAX_RESTORE_ATTEMPTS
+    const next = last ? loadFailedSnapshot(claimed, claimedMark) : withRestoringMark(claimed, { ...claimedMark, until: new Date(Date.now() + RESTORE_RETRY_GAP_MS).toISOString() })
+    await supabaseAdmin.from('artist_versions').update({ snapshot: next as never, updated_at: nextStamp(claimedAt) }).eq('id', row.id).eq('updated_at', claimedAt)
+    return last ? 'gave-up' : 'failed'
   }
   await clearRestoringMark(row.id, claimed, claimedAt)
   return 'finished'
@@ -836,7 +889,7 @@ export async function settleVersions(project: VersionProject, rows: VersionRow[]
     if (!current || !mark) return { rows, changed, finishedN: null, restoringN: null }
     if (Date.now() <= Date.parse(mark.until)) return { rows, changed, finishedN: null, restoringN: current.n }
     const outcome = await finishRestore(project, current, mark)
-    return { rows: await readVersionRows(project.id), changed: true, finishedN: outcome === 'finished' ? current.n : null, restoringN: outcome === 'busy' ? current.n : null }
+    return { rows: await readVersionRows(project.id), changed: true, finishedN: outcome === 'finished' ? current.n : null, restoringN: outcome === 'busy' || outcome === 'failed' ? current.n : null }
   } catch (e) {
     console.warn('[artist-versions] settle skipped:', e instanceof Error ? e.message : e)
     return { rows, changed, finishedN: null, restoringN: current && restoringMarkOf(current.snapshot) ? current.n : null }

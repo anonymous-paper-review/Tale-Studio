@@ -44,6 +44,14 @@ export interface ArtistVersionsResponse {
   restoring?: boolean
   /** 지금 작품 스타일 — 기록을 읽을 때마다 화면 값을 맞춘다. */
   style?: { key: string | null; custom: VersionCustomStyle | null }
+  /** 끝내 다 불러오지 못한 지금 버전. */
+  loadFailed?: { n: number; from: number | null } | null
+}
+
+/** [완료하기]를 끌 버전 까닭 — 불러오는 중 · 다 불러오지 못함(서버도 막는다, 화면은 미리 끈다 — 2026-10-31 재검토 지적). */
+export function completeVersionBlock(state: { restoring: boolean; loadFailed: { n: number; from: number | null } | null }): 'restoring' | 'loadFailed' | null {
+  if (state.restoring) return 'restoring'
+  return state.loadFailed ? 'loadFailed' : null
 }
 
 interface RegenRun {
@@ -62,6 +70,8 @@ interface ArtistVersionState {
   completed: boolean
   /** 서버가 버전을 불러오는 중이라고 한다 — 머리 줄은 불러오는 중을 보이고 몇 초마다 다시 읽는다. */
   restoring: boolean
+  /** 끝내 다 불러오지 못한 지금 버전(from = 불러오기 전 버전) — 머리 줄이 알리고 [다시 불러오기] · [이전 버전으로 돌아가기]를 준다. */
+  loadFailed: { n: number; from: number | null } | null
   loaded: boolean
   busy: 'regenerate' | 'load' | null
   lastError: string | null
@@ -84,6 +94,10 @@ interface ArtistVersionState {
   loadVersion: (n: number, opts?: { cancelRegen?: boolean }) => Promise<boolean>
   /** 멈춘 재생성을 그만두고 재생성 전 버전으로 돌아간다([이전 버전으로 돌아가기]). */
   goBackToPrevious: () => Promise<boolean>
+  /** 다 불러오지 못한 버전을 다시 불러온다([다시 불러오기]). */
+  retryFailedLoad: () => Promise<boolean>
+  /** 다 불러오지 못한 버전에서 불러오기 전 버전으로 돌아간다([이전 버전으로 돌아가기]). */
+  goBackFromFailedLoad: () => Promise<boolean>
   /** 남은 재생성 칸을 이어 그린다 — 이미 도는 중이면 그 일을 기다린다. */
   continueRegen: () => Promise<void>
   /** 멈춘 이어 그리기를 다시 켠다([남은 그림 그리기]). */
@@ -269,6 +283,7 @@ export const useArtistVersionStore = create<ArtistVersionState>((set, get) => {
     regen: null,
     completed: false,
     restoring: false,
+    loadFailed: null,
     loaded: false,
     busy: null,
     lastError: null,
@@ -280,7 +295,7 @@ export const useArtistVersionStore = create<ArtistVersionState>((set, get) => {
 
     setScreenOpen: (projectId, open) => {
       const projectChanged = get().projectId !== projectId
-      set({ screen: { projectId, open }, ...(projectChanged ? { projectId, versions: [], currentN: 1, regen: null, completed: false, restoring: false, loaded: false, run: { ...IDLE_RUN }, overlayDismissedFor: null } : {}) })
+      set({ screen: { projectId, open }, ...(projectChanged ? { projectId, versions: [], currentN: 1, regen: null, completed: false, restoring: false, loadFailed: null, loaded: false, run: { ...IDLE_RUN }, overlayDismissedFor: null } : {}) })
     },
 
     refresh: async (opts) => {
@@ -291,8 +306,12 @@ export const useArtistVersionStore = create<ArtistVersionState>((set, get) => {
         if (!res.ok) return null
         const body = (await res.json()) as ArtistVersionsResponse
         if (!sameProject(projectId)) return null
-        set({ projectId, versions: body.versions ?? [], currentN: body.currentN ?? 1, regen: body.regen ?? null, completed: body.completed === true, restoring: body.restoring === true, loaded: true })
+        const was = get()
+        const loadFailed = body.loadFailed ?? null
+        set({ projectId, versions: body.versions ?? [], currentN: body.currentN ?? 1, regen: body.regen ?? null, completed: body.completed === true, restoring: body.restoring === true, loadFailed, loaded: true })
         syncStyle(body.style)
+        // 불러오는 중이 끝났거나 다 불러오지 못했다 — 서버가 그림을 바꿨으니 카드 그림을 다시 읽는다(2026-10-31 재검토 지적).
+        if ((was.restoring && body.restoring !== true) || (loadFailed && !was.loadFailed)) void useArtistStore.getState().loadData()
         // 멈춘 재생성이라도 그리던 그림이 끝나 다 그렸으면 멈춤을 풀고 다 그렸다고 알린다(이어 그리기가 마무리한다).
         if (body.regen?.complete && !body.regen.announced && get().run.stopped) {
           set({ run: { ...IDLE_RUN } })
@@ -383,6 +402,18 @@ export const useArtistVersionStore = create<ArtistVersionState>((set, get) => {
       return get().loadVersion(n, { cancelRegen: true })
     },
 
+    retryFailedLoad: async () => {
+      const failed = get().loadFailed
+      return failed ? get().loadVersion(failed.n) : false
+    },
+
+    goBackFromFailedLoad: async () => {
+      const failed = get().loadFailed
+      if (!failed) return false
+      const n = failed.from ?? earlierVersions(get().versions)[0]?.n ?? null
+      return n == null ? false : get().loadVersion(n)
+    },
+
     continueRegen: () => {
       const projectId = useProjectStore.getState().projectId
       if (!projectId) return Promise.resolve()
@@ -397,7 +428,7 @@ export const useArtistVersionStore = create<ArtistVersionState>((set, get) => {
     },
 
     reset: () => set({
-      projectId: null, versions: [], currentN: 1, regen: null, completed: false, restoring: false, loaded: false, busy: null, lastError: null,
+      projectId: null, versions: [], currentN: 1, regen: null, completed: false, restoring: false, loadFailed: null, loaded: false, busy: null, lastError: null,
       regenDialogOpen: false, historyDialogOpen: false, overlayDismissedFor: null, screen: { projectId: null, open: false }, run: { ...IDLE_RUN },
     }),
   }

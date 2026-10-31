@@ -4,6 +4,7 @@
 //   [불러오기 · 기록 N] [재생성하기]. 단추가 꺼지면 그 까닭을 글로 보인다(마우스를 올려야 보이는 안내만으로는 몰랐다, QA 1차 #06):
 //   Storyboard 를 연 뒤 · 그리는 중 · 기록이 하나뿐(재생성하면 이전 버전이 여기 남아요).
 //   재생성 그림이 멈추면 까닭과 [남은 그림 다시 그리기] · [이전 버전으로 돌아가기]를 막대 아래에 보인다(2026-10-28 검토 지적).
+//   버전을 다 불러오지 못했으면 그 말과 [다시 불러오기] · [이전 버전으로 돌아가기]를 보인다(2026-10-31 재검토 지적).
 import { History, ImageIcon, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThumbImage } from '@/components/thumb-image'
@@ -11,6 +12,8 @@ import { useLocale, useT } from '@/lib/i18n'
 import { isDemoSession } from '@/lib/demo/context'
 import { versionHeader, versionStyleLabel } from '@/lib/artist/style-versions'
 import { RegenStoppedActions } from '@/features/artist-room/regen-stopped-actions'
+import { LoadFailedActions } from '@/features/artist-room/load-failed-actions'
+import { objectParticle } from '@/lib/korean-particles'
 import { useArtistVersionStore } from '@/stores/artist-version-store'
 import { useProducerStore } from '@/stores/producer-store'
 
@@ -30,13 +33,16 @@ export function StyleVersionBar({ completed, drawing }: { completed: boolean; dr
   const busy = useArtistVersionStore((s) => s.busy)
   const stopped = useArtistVersionStore((s) => !!s.regen && !s.regen.complete && s.run.stopped)
   const restoring = useArtistVersionStore((s) => s.restoring)
+  const loadFailed = useArtistVersionStore((s) => s.loadFailed)
   const anchors = useProducerStore((s) => s.styleAnchors)
   const styleKey = useProducerStore((s) => s.styleAnchorKey)
   const custom = useProducerStore((s) => s.customStyleAnchor)
-  const header = versionHeader({ versions, completed, drawing: drawing || busy === 'regenerate', loading: busy === 'load' || restoring, demo: isDemoSession(), stopped })
+  const header = versionHeader({ versions, completed, drawing: drawing || busy === 'regenerate', loading: busy === 'load' || restoring, demo: isDemoSession(), stopped, loadFailed: !!loadFailed })
   const label = versionStyleLabel({ styleKey, customStyle: custom }, anchors, locale)
   const swatch = custom?.url ?? anchors.find((anchor) => anchor.key === styleKey)?.previewUrl ?? null
-  const note = header.note ? t(NOTE_TEXT[header.note]) : null
+  const note = header.note === 'loadFailed'
+    ? t('Version v{n} could not be fully loaded. Load it again or go back to the previous version.', { n: loadFailed?.n ?? header.n, ul: objectParticle(`v${loadFailed?.n ?? header.n}`) })
+    : header.note ? t(NOTE_TEXT[header.note]) : null
   const store = useArtistVersionStore.getState
   // 기록과 스타일 목록을 읽기 전에는 자리만 둔다 — 읽기 전 값("스타일 없음 · 기록 1")이 잠깐 보였다(2026-10-28 e2e).
   const ready = (loaded || isDemoSession()) && (anchors.length > 0 || !!custom)
@@ -77,6 +83,7 @@ export function StyleVersionBar({ completed, drawing }: { completed: boolean; dr
       </div>
       {note ? <p className="text-xs text-muted-foreground" role="status" data-testid="artist-style-note">{note}</p> : null}
       {header.note === 'stopped' ? <RegenStoppedActions /> : null}
+      {header.note === 'loadFailed' ? <LoadFailedActions /> : null}
     </div>
   )
 }

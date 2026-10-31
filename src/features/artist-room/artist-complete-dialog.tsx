@@ -25,12 +25,13 @@ export function completeError(code: string | undefined, missing?: { characters?:
   if (code === 'artist_design_failed') return { key: 'Designing the characters and backgrounds stopped. Continue with Resume at the top first.' }
   if (code === 'regen_pending') return { key: 'You can complete once the regenerated images are drawn.' }
   if (code === 'version_restoring') return { key: 'Loading the version. Try again in a moment.' }
+  if (code === 'version_load_failed') return { key: 'The version could not be fully loaded. Load it again or go back to the previous version.' }
   return { key: 'Could not complete. Please try again.' }
 }
 
 /** 버전 일(불러오는 중 · 재생성 그림) 때문에 [완료하기]가 막혔으면 기록을 다시 읽는다 — 머리 줄이 불러오는 중 · 진행을 보이게(2026-10-31 재검토 지적). */
 export async function refreshAfterCompleteRefused(code: string | undefined): Promise<void> {
-  if (code === 'version_restoring' || code === 'regen_pending') await useArtistVersionStore.getState().refresh()
+  if (code === 'version_restoring' || code === 'version_load_failed' || code === 'regen_pending') await useArtistVersionStore.getState().refresh()
 }
 
 export function ArtistCompleteDialog({ open, onOpenChange, summary }: { open: boolean; onOpenChange: (open: boolean) => void; summary: { persons: number; places: number; style: string | null } }) {

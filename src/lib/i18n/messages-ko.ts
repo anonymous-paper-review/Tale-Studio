@@ -2866,4 +2866,8 @@ export const KO: Record<string, string> = {
   '{count} backgrounds with other looks keep their current pictures.': '다른 모습이 있는 배경 {count}곳은 지금 그림 그대로예요.',
   '{count} uploaded pictures stay as they are': '올린 그림 {count}장은 그대로 둬요',
   'Backgrounds with other looks keep their current pictures when you load a version.': '다른 모습이 있는 배경은 불러와도 지금 그림 그대로예요.',
+  // 다 불러오지 못한 버전(2026-10-31 재검토)
+  'Version v{n} could not be fully loaded. Load it again or go back to the previous version.': 'v{n}{ul} 다 불러오지 못했어요. 다시 불러오거나 이전 버전으로 돌아가 주세요.', // copy-ok: 버전 표기 v{n}(프로토타입 A5 · AV 그대로 소문자)
+  'The version could not be fully loaded. Load it again or go back to the previous version.': '버전을 다 불러오지 못했어요. 다시 불러오거나 이전 버전으로 돌아가 주세요.',
+  'Load it again': '다시 불러오기',
 }

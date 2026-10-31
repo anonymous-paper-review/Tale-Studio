@@ -5,7 +5,7 @@ const toast = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn(), message: vi.
 vi.mock('sonner', () => ({ toast }))
 vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTrace: vi.fn(), saveChatTracePatch: vi.fn(), loadLatestChatTrace: vi.fn() }))
 
-import { useArtistVersionStore, versionsNeedRefresh } from '@/stores/artist-version-store'
+import { completeVersionBlock, useArtistVersionStore, versionsNeedRefresh } from '@/stores/artist-version-store'
 import { refreshAfterCompleteRefused } from '@/features/artist-room/artist-complete-dialog'
 import { useArtistStore } from '@/stores/artist-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
@@ -27,7 +27,7 @@ const regenView = (states: Record<string, string>, extra: Record<string, unknown
 /** 서버 창구 흉내 — 버전 v1(실사) · v2(수채화) · v3(수채화, 재생성 중). */
 function fakeServer(opts: { completed?: boolean; keptBackgrounds?: number; loadNoAnswer?: boolean } = {}) {
   const server = {
-    current: 3, restoring: false, regen: regenView({ 'c:minho:current': 'todo', 'l:hall:default': 'todo' }) as ReturnType<typeof regenView> | null,
+    current: 3, restoring: false, loadFailed: null as null | { n: number; from: number | null }, regen: regenView({ 'c:minho:current': 'todo', 'l:hall:default': 'todo' }) as ReturnType<typeof regenView> | null,
     calls: [] as Array<{ url: string; body: Record<string, unknown> | null }>,
   }
   const styles: Record<number, string> = { 1: 'real', 2: 'watercolor', 3: 'watercolor' }
@@ -59,7 +59,7 @@ function fakeServer(opts: { completed?: boolean; keptBackgrounds?: number; loadN
     if (url.startsWith('/api/artist/versions')) {
       return Response.json({
         versions: [1, 2, 3].map((n) => version(n, styles[n], n === server.current)), currentN: server.current, regen: server.regen, completed: opts.completed === true,
-        restoring: server.restoring, style: { key: styles[server.current], custom: null },
+        restoring: server.restoring, loadFailed: server.loadFailed, style: { key: styles[server.current], custom: null },
       })
     }
     return Response.json({})
@@ -242,6 +242,47 @@ describe('끊긴 불러오기 · 멈춘 재생성 화면 맞추기(2026-10-31 �
     await useArtistVersionStore.getState().refresh()
     await vi.waitFor(() => expect(artistMessages().some((message) => message.startsWith('수채화로 v3을 만들었어요.'))).toBe(true))
     expect(useArtistVersionStore.getState().run.stopped).toBe(false)
+  })
+})
+
+describe('다 불러오지 못한 버전(2026-10-31 재검토)', () => {
+  it('버전을 다 불러오지 못했으면 기록 읽기로 그 상태를 받아, [다시 불러오기]는 그 버전을, [이전 버전으로 돌아가기]는 불러오기 전 버전을 불러온다', async () => {
+    // 왜: 반쯤 불러온 버전이 아무 말 없이 지금 버전으로 남았다 — 다시 불러오거나 돌아가는 두 길을 단추로 준다.
+    const server = fakeServer()
+    server.current = 1
+    server.regen = null
+    server.loadFailed = { n: 1, from: 3 }
+    useArtistStore.setState({ loadData: vi.fn(async () => {}) } as never)
+    await useArtistVersionStore.getState().refresh()
+    expect(useArtistVersionStore.getState().loadFailed).toEqual({ n: 1, from: 3 })
+    expect(await useArtistVersionStore.getState().retryFailedLoad()).toBe(true)
+    expect(server.calls.filter((call) => call.url.startsWith('/api/artist/versions/load')).at(-1)?.body).toMatchObject({ n: 1 })
+
+    server.current = 1
+    server.loadFailed = { n: 1, from: 3 }
+    await useArtistVersionStore.getState().refresh()
+    expect(await useArtistVersionStore.getState().goBackFromFailedLoad()).toBe(true)
+    expect(server.calls.filter((call) => call.url.startsWith('/api/artist/versions/load')).at(-1)?.body).toMatchObject({ n: 3 })
+  })
+
+  it('버전을 불러오는 중이 끝나면 카드 그림을 다시 읽는다', async () => {
+    // 왜: 서버가 끊긴 불러오기를 마저 했는데 카드는 반쯤 불러온 그림을 그대로 보였다(2026-10-31 재검토 지적).
+    const server = fakeServer()
+    const loadData = vi.fn(async () => {})
+    useArtistStore.setState({ loadData } as never)
+    server.restoring = true
+    await useArtistVersionStore.getState().refresh()
+    expect(loadData).not.toHaveBeenCalled()
+    server.restoring = false
+    await useArtistVersionStore.getState().refresh()
+    expect(loadData).toHaveBeenCalledTimes(1)
+  })
+
+  it('버전을 불러오는 중이거나 다 불러오지 못했으면 [완료하기]를 끄고 그 까닭을 고른다', () => {
+    // 왜: 서버가 막아도 단추가 켜져 있으면 눌러 본 뒤에야 알 수 있었다(2026-10-31 재검토 지적). 서버 거절 알림은 그대로 둔다.
+    expect(completeVersionBlock({ restoring: true, loadFailed: null })).toBe('restoring')
+    expect(completeVersionBlock({ restoring: false, loadFailed: { n: 1, from: 2 } })).toBe('loadFailed')
+    expect(completeVersionBlock({ restoring: false, loadFailed: null })).toBeNull()
   })
 })
 

@@ -24,6 +24,7 @@ vi.mock('@/lib/generation-jobs', () => ({
 }))
 
 import { finalizeCharacterViewJob, finalizeWorldShotJob } from '@/lib/fal/finalize'
+import { readAllProjectRows } from '@/lib/artist/read-all-rows'
 import type { GenerationJob } from '@/lib/generation-jobs'
 
 const P = 'p1'
@@ -200,10 +201,25 @@ describe('카드 기록 줄이 많을 때', () => {
     manyRows()
     state.db.objects.set(unique(9), { bytes: Buffer.from('only-in-evicted-row') })
     state.db.rows('character_image_candidates').find((row) => row.id === 'zz-twin-old')!.url = mediaUrlOf(unique(9))
-    state.db.failReadsFrom.character_image_candidates = 1000
+    state.db.failPagedReads.add('character_image_candidates')
     await finalizeCharacterViewJob(characterJob(), 'https://fal.test/new.png')
     expect(state.db.rows('character_image_candidates').map((row) => row.id)).not.toContain('zz-twin-old')
     expect(state.db.objects.has(unique(9))).toBe(true)
+  })
+
+  it('나눠 읽는 사이에 다른 요청이 앞쪽 줄을 지워도 뒤쪽 줄을 건너뛰지 않는다', async () => {
+    // 왜: 몇 번째 줄부터 읽기로 나누면 앞쪽 줄이 지워질 때 뒤쪽 줄이 한 칸씩 당겨져 하나를 못 읽는다 — 지킬 파일을 못 보고 지울 수 있다(2026-10-31 재검토 지적).
+    //   id 보다 뒤를 읽는 식으로 나눈다(지운 줄은 다음 읽기에 영향이 없다). 새로 생긴 줄은 새 그림이라 지울 파일과 상관없다.
+    manyRows()
+    let deleted = false
+    state.db.afterRead.push((table) => {
+      if (table !== 'character_image_candidates' || deleted) return
+      deleted = true
+      state.db.tables.character_image_candidates = state.db.rows('character_image_candidates').filter((row) => row.id !== 'aa-filler-0500')
+    })
+    const rows = await readAllProjectRows<{ id: string }>('character_image_candidates', 'id', P)
+    const ids = new Set(rows.map((row) => row.id))
+    for (const row of state.db.rows('character_image_candidates')) expect(ids.has(row.id as string), row.id as string).toBe(true)
   })
 })
 

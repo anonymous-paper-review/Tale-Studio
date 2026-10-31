@@ -4,6 +4,7 @@
 //   다른 모습이 있는 배경도 지금 그림 그대로 두고 그 수(keptBackgrounds)를 돌려준다 — 화면이 알린다(2026-10-31 오너 결정 A).
 //   막는 때는 재생성과 같다 — 단 다 그리기 전에 멈춘 재생성은 cancelRegen 으로 그만두고 불러올 수 있다(그리는 그림이 없을 때).
 //   불러오는 동안은 그 버전에 "불러오는 중" 표시를 달아 두고 다 되돌리면 뗀다 — 함수가 시간 제한에 걸려 멈추면 다음 요청이 마저 한다.
+//   끝내 다 불러오지 못한 버전(지금 버전)은 같은 버전을 다시 불러오면 다시 해 본다(2026-10-31 재검토 지적).
 //   되돌리다 실패하면 떠난 버전 그림 · 스타일로 다시 돌려 둔다(최선). 약속: tests/artist/style-version-routes.test.ts · style-version-fixes.test.ts
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
@@ -19,6 +20,8 @@ import {
   keptAtLoadFrom,
   keptBackgroundsOf,
   leaveCurrentVersion,
+  loadFailedOf,
+  loadFailedSnapshot,
   nextStamp,
   readLiveImages,
   readVersionProject,
@@ -26,11 +29,13 @@ import {
   regenStillPending,
   restoreSnapshot,
   restoringMarkFrom,
+  retryLoadSnapshot,
   returnToVersion,
   setProjectStyle,
   settleVersions,
   withDesignL1,
   withRestoringMark,
+  type VersionProject,
   type VersionRow,
 } from '@/lib/artist/style-versions-server'
 
@@ -41,6 +46,43 @@ export const maxDuration = 300
 const reject = (code: string, error: string, status = 409) => NextResponse.json({ error, code }, { status })
 const loaded = (row: VersionRow, keptBackgrounds: number) =>
   NextResponse.json({ ok: true, n: row.n, styleKey: row.style_anchor_key, customStyle: parseCustomStyle(row.custom_style_anchor), keptBackgrounds })
+
+/** 다 불러오지 못한 지금 버전을 다시 불러온다 — 다시 불러오는 중 표시를 달고 그 버전 그림 · 스타일로. 또 실패하면 다 불러오지 못함으로 둔다. */
+async function retryFailedLoad(project: VersionProject, target: VersionRow): Promise<Response> {
+  const projectId = project.id
+  if (await imagesDrawing(projectId)) return reject(ARTIST_VERSION_CODES.drawing, 'Images are being drawn')
+  const snapshot = parseVersionSnapshot(target.snapshot)
+  if (!snapshot) return reject(ARTIST_VERSION_CODES.notFound, 'Version not found', 404)
+  const at = new Date().toISOString()
+  const retry = retryLoadSnapshot(target.snapshot, at)
+  const markedAt = nextStamp(target.updated_at)
+  const { data: claimed, error: claimError } = await supabaseAdmin
+    .from('artist_versions')
+    .update({ snapshot: retry.snapshot as never, updated_at: markedAt })
+    .eq('id', target.id)
+    .eq('is_current', true)
+    .eq('updated_at', target.updated_at)
+    .select('id')
+  if (claimError) throw new Error(`version retry failed: ${claimError.message}`)
+  if (!Array.isArray(claimed) || claimed.length !== 1) return reject(ARTIST_VERSION_CODES.conflict, 'Another window changed the version first')
+  let keptBackgrounds = 0
+  try {
+    const live = await readLiveImages(projectId)
+    const designTokens = snapshot.look?.l1 ? withDesignL1(project.design_tokens, snapshot.look.l1) : undefined
+    await setProjectStyle(projectId, target.style_anchor_key, target.custom_style_anchor, designTokens)
+    keptBackgrounds = (await restoreSnapshot(projectId, snapshot, live, at)).keptBackgrounds
+  } catch (e) {
+    console.error('[artist/versions/load] retry failed:', e instanceof Error ? e.message : e)
+    await supabaseAdmin
+      .from('artist_versions')
+      .update({ snapshot: loadFailedSnapshot(retry.snapshot, retry.mark) as never, updated_at: nextStamp(markedAt) })
+      .eq('id', target.id)
+      .eq('updated_at', markedAt)
+    throw e
+  }
+  await clearRestoringMark(target.id, retry.snapshot, markedAt)
+  return loaded(target, keptBackgrounds)
+}
 
 export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
@@ -65,6 +107,7 @@ export async function POST(req: Request) {
       // 멈췄던 불러오기를 방금 마저 했다 — 다시 누른 요청은 불러온 것으로 답한다.
       if (settled.finishedN === n) return loaded(target, keptBackgroundsOf(parseVersionSnapshot(target.snapshot), await readLiveImages(projectId)))
       if (settled.restoringN === n) return reject(ARTIST_VERSION_CODES.restoring, 'The version is still being loaded')
+      if (loadFailedOf(target.snapshot)) return retryFailedLoad(project, target)
       return reject(ARTIST_VERSION_CODES.alreadyCurrent, 'This version is already the current one')
     }
     if (settled.restoringN !== null) return reject(ARTIST_VERSION_CODES.restoring, 'A version is still being loaded')
@@ -82,7 +125,7 @@ export async function POST(req: Request) {
     const left = await leaveCurrentVersion(project, current, live, at, { cancelRegen: pending })
     if (!left.ok) return reject(ARTIST_VERSION_CODES.conflict, 'Another window changed the version first')
 
-    const mark = restoringMarkFrom(at)
+    const mark = restoringMarkFrom(at, current.n)
     // 다른 모습이 있는 배경은 지금 그림 그대로 둔다 — 그 그림을 적어 두어, 이 버전을 떠날 때 그대로면 이 버전의 지난 기록을 남긴다(freezeSnapshot).
     const marked = { ...withRestoringMark(target.snapshot, mark), keptAtLoad: keptAtLoadFrom(live) }
     const activatedAt = nextStamp(target.updated_at)

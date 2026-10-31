@@ -163,6 +163,20 @@ async function hangingLoadOfV1() {
   await vi.waitFor(() => expect(snapshotOf(1).restoring).toBeTruthy())
 }
 
+/** v1 불러오기가 끊긴 뒤 마저 하기가 세 번 다 실패해 "다 불러오지 못함"이 되게 한다(1분 간격으로 세 번). 실패 갈고리는 남겨 둔다. */
+async function giveUpLoadOfV1() {
+  await hangingLoadOfV1()
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(Date.now() + 6 * 60_000)
+  state.db.failOn.push({ table: 'character_appearances', op: 'update', times: 1000 })
+  let view: { loadFailed?: { n: number; from: number | null } | null } = {}
+  for (let i = 0; i < 3; i++) {
+    view = await (await getVersions(get(`projectId=${P}`))).json()
+    vi.setSystemTime(Date.now() + 61_000)
+  }
+  return view.loadFailed ?? null
+}
+
 beforeEach(() => {
   state.db = seed()
   state.crop = 'face'
@@ -229,21 +243,77 @@ describe('불러오다 멈췄을 때', () => {
     expect(done).toMatchObject({ restoring: false, currentN: 1, style: { key: 'real', custom: null } })
   })
 
-  it('끊긴 불러오기를 마저 하다 세 번 실패하면 그만두고 불러오는 중 표시를 떼어, 불러오기 · 재생성 · 완료가 영영 막히지 않는다', async () => {
-    // 왜: 마저 하기가 실패할 때마다 표시를 되돌려 두어, 고칠 수 없는 실패면 그 작품의 버전 바꾸기 · [완료하기]가 끝없이 막혔다(2026-10-31 재검토 지적).
+  it('끊긴 불러오기를 마저 하다 실패하면 다음 시도는 1분 뒤에 하고, 세 번 다 실패하면 그 버전을 "다 불러오지 못함"으로 남겨 기록 읽기가 알린다', async () => {
+    // 왜: 그만둘 때 표시만 떼어 반쯤 불러온 버전이 아무 말 없이 지금 버전으로 남았고, 화면이 5초마다 읽어 잠깐의 오류로도 세 번을 10초 만에 다 썼다(2026-10-31 재검토 지적).
     await twoVersions()
     await hangingLoadOfV1()
     vi.useFakeTimers({ toFake: ['Date'] })
     vi.setSystemTime(Date.now() + 6 * 60_000)
     state.db.failOn.push({ table: 'character_appearances', op: 'update', times: 1000 })
-    for (let i = 0; i < 2; i++) {
-      expect((await (await getVersions(get(`projectId=${P}`))).json()).restoring).toBe(true)
-      expect((snapshotOf(1).restoring as { attempts?: number }).attempts).toBe(i + 1)
-    }
-    expect((await (await getVersions(get(`projectId=${P}`))).json()).restoring).toBe(false)
+    const read = async () => (await getVersions(get(`projectId=${P}`))).json()
+    const attempts = () => (snapshotOf(1).restoring as { attempts?: number } | undefined)?.attempts
+
+    expect(await read()).toMatchObject({ restoring: true, loadFailed: null })
+    expect(attempts()).toBe(1)
+    // 곧바로 다시 읽어도 1분이 지나기 전에는 다시 하지 않는다.
+    expect(await read()).toMatchObject({ restoring: true })
+    expect(attempts()).toBe(1)
+    vi.setSystemTime(Date.now() + 61_000)
+    await read()
+    expect(attempts()).toBe(2)
+    vi.setSystemTime(Date.now() + 61_000)
+    const failed = await read()
+    expect(failed).toMatchObject({ restoring: false, currentN: 1, loadFailed: { n: 1, from: 2 } })
     expect(snapshotOf(1).restoring).toBeUndefined()
+    expect(snapshotOf(1)).toHaveProperty('loadFailed')
+  })
+
+  it('다 불러오지 못한 버전을 다시 불러오면 거절하지 않고 다시 불러와 "다 불러오지 못함" 표시를 뗀다', async () => {
+    // 왜: 지금 버전이라 "이미 지금 버전"으로 막혀 다시 해 볼 길이 없었다(2026-10-31 재검토 지적).
+    await twoVersions()
+    const failedV1 = await giveUpLoadOfV1()
+    expect(failedV1).toMatchObject({ n: 1 })
     state.db.failOn.length = 0
-    expect((await doRegenerate('watercolor')).status).toBe(200)
+    const res = await doLoad(1)
+    expect(res.status).toBe(200)
+    expect(snapshotOf(1)).not.toHaveProperty('loadFailed')
+    expect(pathOf(appearance('minho', 'current').sheet_url)).toBe(pathOf(sheetIn(1, 'minho', 'current').sheet.url))
+    expect((await (await getVersions(get(`projectId=${P}`))).json()).loadFailed).toBeNull()
+  })
+
+  it('다 불러오지 못한 버전을 떠나도 그 버전 기록을 섞인 그림으로 덮지 않고, 그 버전에 남긴 복사본도 지우지 않는다', async () => {
+    // 왜: 반쯤 불러온 그림을 그 버전의 기록으로 남기고 그 버전의 원래 복사본을 지워, 그 버전의 그림을 잃었다(2026-10-31 재검토 지적, 막는 문제).
+    await twoVersions()
+    const record = JSON.parse(JSON.stringify(snapshotOf(1))) as Record<string, unknown>
+    const copies = objectsUnder(`${WS}/${P}/versions/v1/`)
+    await giveUpLoadOfV1()
+    state.db.failOn.length = 0
+    expect((await doRegenerate('real')).status).toBe(200)
+    const after = snapshotOf(1) as unknown as Record<string, unknown>
+    expect({ characters: after.characters, locations: after.locations, look: after.look }).toEqual({ characters: record.characters, locations: record.locations, look: record.look })
+    for (const path of copies) expect(state.db.objects.has(path), path).toBe(true)
+  })
+
+  it('다 불러오지 못한 버전에서 불러오기 전 버전으로 돌아갈 수 있고, 그 버전 기록은 그대로 둔다', async () => {
+    // 왜: 다 불러오지 못했으면 다시 불러오거나 이전 버전으로 돌아가는 두 길을 준다.
+    await twoVersions()
+    const record = JSON.parse(JSON.stringify(snapshotOf(1))) as Record<string, unknown>
+    const failed = await giveUpLoadOfV1()
+    state.db.failOn.length = 0
+    expect((await doLoad(failed!.from!)).status).toBe(200)
+    expect(versionRows().filter((row) => row.is_current).map((row) => row.n)).toEqual([2])
+    expect((snapshotOf(1) as unknown as Record<string, unknown>).characters).toEqual(record.characters)
+  })
+
+  it('기록 읽기가 끊긴 불러오기를 마저 하다 다시 끊겨도 그 시도를 한 번으로 센다', async () => {
+    // 왜: [완료하기] · 기록 읽기도 함수 시간 제한에 끊길 수 있다 — 세지 않으면 끊길 때마다 처음부터 다시 맡아 끝없이 되풀이한다(2026-10-31 재검토 지적).
+    await twoVersions()
+    await hangingLoadOfV1()
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(Date.now() + 6 * 60_000)
+    state.db.failOn.push({ table: 'character_appearances', op: 'update', times: 1, hang: true })
+    void getVersions(get(`projectId=${P}`))
+    await vi.waitFor(() => expect((snapshotOf(1).restoring as { attempts?: number } | undefined)?.attempts).toBe(1))
   })
 
   it('얼굴을 다시 자를 시트를 받는 데 오래 걸리면 기다리지 않고 얼굴을 비운다', async () => {
@@ -256,6 +326,18 @@ describe('불러오다 멈췄을 때', () => {
     await vi.advanceTimersByTimeAsync(60_000)
     expect((await pending).status).toBe(200)
     expect(appearance('soonja', 'current').portrait_url).toBeNull()
+  })
+
+  it('불러온 버전에서 다른 버전을 불러오다 실패해 돌아오면, 불러올 때 적어 둔 그대로 둔 배경 그림도 그대로 둔다', async () => {
+    // 왜: 돌아오며 그 적어 둔 것을 잃으면 다음에 떠날 때 그대로 둔 다른 버전 그림을 이 버전의 기록으로 남긴다(2026-10-31 재검토 지적).
+    await twoVersions()
+    expect((await doLoad(1)).status).toBe(200)
+    const kept = (snapshotOf(1) as unknown as { keptAtLoad?: unknown }).keptAtLoad
+    expect(kept).toBeTruthy()
+    state.db.failOn.push({ table: 'character_appearances', op: 'update', times: 1 })
+    expect((await doLoad(2)).status).toBe(500)
+    expect(versionRows().filter((row) => row.is_current).map((row) => row.n)).toEqual([1])
+    expect((snapshotOf(1) as unknown as { keptAtLoad?: unknown }).keptAtLoad).toEqual(kept)
   })
 
   it('카드 기록 줄이 1000줄을 넘어도 불러올 때 그때의 줄을 찾아 고르고 같은 그림 줄을 또 만들지 않는다', async () => {
