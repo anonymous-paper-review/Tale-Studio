@@ -47,7 +47,7 @@ import { StyleVersionBar } from '@/features/artist-room/style-version-bar'
 import { RegenStoppedActions } from '@/features/artist-room/regen-stopped-actions'
 import { RegenerateStyleDialog } from '@/features/artist-room/regenerate-style-dialog'
 import { VersionHistoryDialog } from '@/features/artist-room/version-history-dialog'
-import { useArtistVersionStore } from '@/stores/artist-version-store'
+import { useArtistVersionStore, versionsNeedRefresh } from '@/stores/artist-version-store'
 import { versionStyleLabel } from '@/lib/artist/style-versions'
 
 type ArtistTab = 'characters' | 'world'
@@ -453,11 +453,13 @@ export default function VisualPage() {
     if (projectId && regenOpen) void useArtistVersionStore.getState().continueRegen()
   }, [projectId, regenOpen, regen?.n])
   // 그리는 동안 진행(k/N)을 몇 초마다 다시 읽는다 — 한 묶음(동시 3장)이 다 끝날 때까지 숫자가 멈춰 보이지 않게.
+  //   멈춘 재생성이라도 그리던 그림이 남았거나 버전을 불러오는 중이면 계속 읽는다(2026-10-31 재검토 지적).
+  const versionsPolling = useArtistVersionStore((s) => !isDemoSession() && versionsNeedRefresh(s))
   useEffect(() => {
-    if (!projectId || !regenDrawing) return
+    if (!projectId || !versionsPolling) return
     const id = setInterval(() => void useArtistVersionStore.getState().refresh(), 5000)
     return () => clearInterval(id)
-  }, [projectId, regenDrawing])
+  }, [projectId, versionsPolling])
   const regenOverlayOpen = regenPending && overlayDismissedFor !== regen.n
   const regenStyleLabel = regenVersion ? versionStyleLabel(regenVersion, styleAnchors, locale) : styleLabel ?? ''
   const regenOverlay = regen ? (

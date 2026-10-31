@@ -13,6 +13,7 @@ import { mediaCopy, mediaPathFromUrl, mediaPublicUrl, mediaRemove } from '@/lib/
 import { portraitPathForSheet, versionFolder } from '@/lib/artist/image-files'
 import { protectedImagePaths } from '@/lib/artist/image-file-cleanup'
 import { portraitForSheetUrl } from '@/lib/artist/portrait-file'
+import { readAllProjectRows } from '@/lib/artist/read-all-rows'
 import {
   closeActiveRange,
   historyPick,
@@ -44,6 +45,8 @@ const COPY_CONCURRENCY = 8
 export const RESTORE_LEASE_MS = 305_000
 /** 지금 버전이 없어진 뒤 되살리기까지 기다리는 시간 — 버전을 바꾸는 그 짧은 사이(떠남 → 지금으로)에는 되살리지 않는다. */
 export const HEAL_GRACE_MS = 60_000
+/** 끊긴 불러오기를 마저 하다 이만큼 실패하면 그만두고 불러오는 중 표시를 뗀다 — 버전 바꾸기 · [완료하기]가 영영 막히지 않게(2026-10-31 재검토). */
+export const MAX_RESTORE_ATTEMPTS = 3
 
 export interface VersionRow {
   id: string
@@ -214,12 +217,9 @@ export interface LiveImages {
   locationCandidates: Array<{ id: string; location_id: string; view: string; url: string; source_hash: string | null; appearance_hash: string | null; is_selected: boolean; generated_at: string; variant_key: string | null }>
 }
 
+/** 지금 그림 — 카드 기록 줄은 1000줄을 넘을 수 있어 끝까지 나눠 읽는다(못 보면 같은 그림 줄을 또 만든다, 2026-10-31 재검토). */
 export async function readLiveImages(projectId: string): Promise<LiveImages> {
-  const read = async <T>(table: string, columns: string): Promise<T[]> => {
-    const { data, error } = await supabaseAdmin.from(table).select(columns).eq('project_id', projectId)
-    if (error) throw new Error(`${table} read failed: ${error.message}`)
-    return rowsOf<T>(data)
-  }
+  const read = <T>(table: string, columns: string): Promise<T[]> => readAllProjectRows<T>(table, columns, projectId)
   const [characters, appearances, characterCandidates, locations, locationAppearances, locationCandidates] = await Promise.all([
     read<LiveImages['characters'][number]>('characters', 'character_id, name, entity_type'),
     read<LiveImages['appearances'][number]>('character_appearances', 'character_id, appearance_key, is_default, sheet_url, portrait_url, derived_from_url'),
@@ -297,15 +297,15 @@ async function freezeImage(url: string, previous: { url: string; sourceUrl: stri
 /**
  * 떠나는 버전의 그림을 버전 폴더({ws}/{project}/versions/v{n}/)에 남긴다 — 나중에 다시 그리거나 지워도 남긴 버전은 그대로다.
  *   previous = 그 버전이 지난번에 남긴 기록(다시 쓸 복사본). created = 이번에 새로 복사한 파일(바꾸기가 무르면 거둔다).
- *   carryLocations = 불러와도 지금 그림 그대로 두는 배경(다른 모습이 있는 배경) — 지난번 기록이 있으면 그 기록을 그대로 둔다.
- *     불러올 때 그대로 둔 다른 버전 그림으로 덮으면 그 버전의 배경 그림이 기록에서 사라진다(혼자 정한 것, 2026-10-31).
+ *   keepPrevious = 그 배경 칸은 지난번 기록을 그대로 둔다 — 다른 모습이 있는 배경을 불러올 때 그대로 둔 다른 버전 그림이 아직 그대로일 때.
+ *     그 그림으로 덮으면 그 버전의 배경 그림이 기록에서 사라진다(혼자 정한 것, 2026-10-31). 이 버전에서 새로 그렸으면 새 그림을 남긴다(재검토 지적).
  */
 export async function freezeSnapshot(
   project: Pick<VersionProject, 'id' | 'workspace_id'>,
   n: number,
   snapshot: VersionSnapshot,
   previous: VersionSnapshot | null = null,
-  carryLocations: ReadonlySet<string> = new Set(),
+  keepPrevious: (entry: VersionLocationImage) => boolean = () => false,
 ): Promise<{ snapshot: VersionSnapshot; created: string[] }> {
   const folder = versionFolder(project.workspace_id, project.id, n)
   const token = randomUUID().slice(0, 8)
@@ -316,11 +316,8 @@ export async function freezeSnapshot(
     if (frozen.created) created.push(frozen.created)
     return frozen
   }
-  const carried = (previous?.locations ?? []).filter((entry) => carryLocations.has(entry.locationId))
-  const carriedIds = new Set(carried.map((entry) => entry.locationId))
-  const liveLocations = snapshot.locations.filter((entry) => !carriedIds.has(entry.locationId))
   const characters: VersionCharacterImage[] = new Array(snapshot.characters.length)
-  const locations: VersionLocationImage[] = new Array(liveLocations.length)
+  const locations: VersionLocationImage[] = new Array(snapshot.locations.length)
   const tasks = [
     ...snapshot.characters.map((entry, i) => async () => {
       const before = previous?.characters.find((e) => e.characterId === entry.characterId && e.appearanceKey === entry.appearanceKey) ?? null
@@ -332,8 +329,12 @@ export async function freezeSnapshot(
       }
       characters[i] = { ...entry, sheet: { ...entry.sheet, url: sheet.url, sourceUrl: sheet.sourceUrl }, portraitUrl: face.url, portraitSourceUrl: face.sourceUrl }
     }),
-    ...liveLocations.map((entry, i) => async () => {
+    ...snapshot.locations.map((entry, i) => async () => {
       const before = previous?.locations.find((e) => e.locationId === entry.locationId && e.appearanceKey === entry.appearanceKey) ?? null
+      if (before && keepPrevious(entry)) {
+        locations[i] = before
+        return
+      }
       const wide = kept(await freezeImage(entry.wideShot.url, before ? { url: before.wideShot.url, sourceUrl: before.wideShot.sourceUrl ?? null } : null, name('l', entry.locationId, entry.appearanceKey, 'wide'), folder))
       locations[i] = { ...entry, wideShot: { ...entry.wideShot, url: wide.url, sourceUrl: wide.sourceUrl } }
     }),
@@ -344,7 +345,7 @@ export async function freezeSnapshot(
     await removeFiles(created, 'half-made version copies')
     throw e
   }
-  return { snapshot: { characters, locations: [...locations, ...carried] }, created }
+  return { snapshot: { characters, locations }, created }
 }
 
 /** 떠난 버전 기록이 더는 가리키지 않는 그 버전 폴더의 옛 복사본을 지운다 — 다른 버전 기록 · 지금 그림 · 카드 기록 줄이 가리키는 파일은 남긴다(최선). */
@@ -502,6 +503,23 @@ export function backgroundsWithOtherLooks(live: Pick<LiveImages, 'locationAppear
   return new Set(live.locationAppearances.map((a) => a.location_id))
 }
 
+const backgroundLookKey = (locationId: string, appearanceKey: string | null) => `${locationId}:${appearanceKey ?? 'default'}`
+
+/** 불러올 때 그대로 둔 배경 그림(배경:모습 → 주소) — 불러온 버전 행 snapshot.keptAtLoad 에 둔다(떠날 때 새 기록으로 바뀌며 없어진다). */
+export function keptAtLoadFrom(live: Pick<LiveImages, 'locations' | 'locationAppearances'>): Record<string, string> {
+  const withLooks = backgroundsWithOtherLooks(live)
+  const kept: Record<string, string> = {}
+  for (const l of live.locations) if (withLooks.has(l.location_id) && l.wide_shot) kept[backgroundLookKey(l.location_id, null)] = l.wide_shot
+  for (const a of live.locationAppearances) if (a.wide_shot) kept[backgroundLookKey(a.location_id, a.appearance_key)] = a.wide_shot
+  return kept
+}
+
+function keptAtLoadOf(snapshot: unknown): Record<string, string> {
+  const raw = snapshot && typeof snapshot === 'object' ? (snapshot as { keptAtLoad?: unknown }).keptAtLoad : null
+  if (!raw || typeof raw !== 'object') return {}
+  return Object.fromEntries(Object.entries(raw as Record<string, unknown>).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
+}
+
 /** 그 버전을 불러올 때 지금 그림 그대로 두는 배경 수(그 버전 기록에 있는 배경 중 다른 모습이 있는 것). */
 export function keptBackgroundsOf(snapshot: VersionSnapshot | null, live: Pick<LiveImages, 'locationAppearances'>): number {
   const withLooks = backgroundsWithOtherLooks(live)
@@ -620,12 +638,18 @@ export async function regenStillPending(projectId: string, current: VersionRow, 
   return !(await regenProgressFor(projectId, current.n, record, live)).complete
 }
 
-/** [완료하기]를 막을 버전 일 — 불러오다 멈춘 채(restoring) · 다 그리기 전 재생성(regen). 덧붙인 검사라 기록을 못 읽으면 막지 않는다. */
+/**
+ * [완료하기]를 막을 버전 일 — 불러오는 중(restoring) · 다 그리기 전 재생성(regen). 덧붙인 검사라 기록을 못 읽으면 막지 않는다.
+ *   끊긴 불러오기는 맡은 시간이 지났으면 여기서 마저 한다 — 기록 읽기 전에 누르면 "불러오는 중"만 되풀이됐다(2026-10-31 재검토 지적).
+ */
 export async function versionWorkPending(projectId: string): Promise<'restoring' | 'regen' | null> {
   try {
-    const current = (await readVersionRows(projectId)).find((row) => row.is_current)
+    const project = await readVersionProject(projectId)
+    if (!project) return null
+    const settled = await settleVersions(project, await readVersionRows(projectId))
+    if (settled.restoringN !== null) return 'restoring'
+    const current = settled.rows.find((row) => row.is_current)
     if (!current) return null
-    if (restoringMarkOf(current.snapshot)) return 'restoring'
     return (await regenStillPending(projectId, current, await readLiveImages(projectId))) ? 'regen' : null
   } catch (e) {
     console.warn('[artist-versions] version check skipped:', e instanceof Error ? e.message : e)
@@ -649,7 +673,10 @@ export async function leaveCurrentVersion(
 ): Promise<LeftVersion | { ok: false }> {
   const folder = versionFolder(project.workspace_id, project.id, current.n)
   const previous = parseVersionSnapshot(current.snapshot)
-  const { snapshot, created } = await freezeSnapshot(project, current.n, liveSnapshot(live), previous, backgroundsWithOtherLooks(live))
+  // 불러올 때 그대로 둔 배경 그림이 아직 그대로면 지난번 기록을 둔다 — 이 버전에서 다시 그렸으면(그림이 바뀜) 새 그림을 남긴다.
+  const kept = keptAtLoadOf(current.snapshot)
+  const keepPrevious = (entry: VersionLocationImage) => kept[backgroundLookKey(entry.locationId, entry.appearanceKey)] === entry.wideShot.url
+  const { snapshot, created } = await freezeSnapshot(project, current.n, liveSnapshot(live), previous, keepPrevious)
   // 그때의 그림 지시 그림체 값도 남긴다 — 불러오면 그림과 함께 이 값으로 돌아간다(styleLookTokens).
   const frozen: VersionSnapshot = { ...snapshot, look: { l1: designL1(project.design_tokens) } }
   // 떠날 수 있는 버전의 재생성은 다 그린 것이다(남은 그림이 있으면 부르는 쪽이 막는다) — 아직 알리지 않았으면 다 그렸다고 적어,
@@ -694,15 +721,17 @@ export async function returnToVersion(current: VersionRow, left: LeftVersion): P
 
 // ── 기록 바로잡기 ─────────────────────────────────────────────────
 
-/** 불러오는 중 표시(버전 행 snapshot.restoring) — 그림을 다 되돌리면 지운다. 끝 시각(until)이 지나도 남았으면 불러오기가 멈춘 것이다. */
-export interface RestoringMark { at: string; until: string }
+/** 불러오는 중 표시(버전 행 snapshot.restoring) — 그림을 다 되돌리면 지운다. 끝 시각(until)이 지나도 남았으면 불러오기가 멈춘 것이다.
+ *  attempts = 멈춘 불러오기를 마저 하다 실패한 횟수(MAX_RESTORE_ATTEMPTS 에서 그만둔다). */
+export interface RestoringMark { at: string; until: string; attempts?: number }
 
 export function restoringMarkOf(snapshot: unknown): RestoringMark | null {
   if (!snapshot || typeof snapshot !== 'object') return null
   const mark = (snapshot as { restoring?: unknown }).restoring
   if (!mark || typeof mark !== 'object') return null
-  const { at, until } = mark as { at?: unknown; until?: unknown }
-  return typeof at === 'string' && typeof until === 'string' ? { at, until } : null
+  const { at, until, attempts } = mark as { at?: unknown; until?: unknown; attempts?: unknown }
+  if (typeof at !== 'string' || typeof until !== 'string') return null
+  return { at, until, attempts: typeof attempts === 'number' && Number.isFinite(attempts) ? attempts : 0 }
 }
 
 /** 버전 행 snapshot 에 불러오는 중 표시를 달거나(mark) 뗀다(null). */
@@ -747,10 +776,20 @@ async function healCurrentVersion(rows: readonly VersionRow[]): Promise<boolean>
   return !!error || rowsOf(data).length === 1
 }
 
-/** 불러오다 멈춘 버전을 마저 불러온다 — 표시의 끝 시각을 늘려 맡은 뒤(바뀐 시각 비교) 스타일 · 그림을 그 버전 것으로. 맡았으면 true. */
-async function finishRestore(project: VersionProject, row: VersionRow, mark: RestoringMark): Promise<boolean> {
+/**
+ * 불러오다 멈춘 버전을 마저 불러온다 — 표시의 끝 시각을 늘려 맡은 뒤(바뀐 시각 비교) 스타일 · 그림을 그 버전 것으로. 맡았으면 true.
+ *   실패하면 실패 횟수를 늘리고 다음 요청이 곧바로 다시 맡게 둔다. MAX_RESTORE_ATTEMPTS 번 실패했으면 그만두고 표시를 뗀다 —
+ *   그 버전이 지금 버전으로 남고(그림은 되돌린 데까지), 불러오기 · 재생성 · [완료하기]가 다시 된다(2026-10-31 재검토 지적).
+ */
+async function finishRestore(project: VersionProject, row: VersionRow, mark: RestoringMark): Promise<'finished' | 'gave-up' | 'busy'> {
+  const attempts = mark.attempts ?? 0
+  if (attempts >= MAX_RESTORE_ATTEMPTS) {
+    console.error('[artist-versions] giving up an interrupted load:', row.n, attempts)
+    await clearRestoringMark(row.id, row.snapshot, row.updated_at)
+    return 'gave-up'
+  }
   const claimedAt = nextStamp(row.updated_at)
-  const claimed = withRestoringMark(row.snapshot, { at: mark.at, until: new Date(Date.now() + RESTORE_LEASE_MS).toISOString() })
+  const claimed = withRestoringMark(row.snapshot, { at: mark.at, until: new Date(Date.now() + RESTORE_LEASE_MS).toISOString(), attempts })
   const { data, error } = await supabaseAdmin
     .from('artist_versions')
     .update({ snapshot: claimed as never, updated_at: claimedAt })
@@ -759,19 +798,23 @@ async function finishRestore(project: VersionProject, row: VersionRow, mark: Res
     .eq('updated_at', row.updated_at)
     .select('id')
   if (error) throw new Error(`restore claim failed: ${error.message}`)
-  if (rowsOf(data).length !== 1) return false
+  if (rowsOf(data).length !== 1) return 'busy'
   try {
     const snapshot = parseVersionSnapshot(row.snapshot)
     const designTokens = snapshot?.look?.l1 ? withDesignL1(project.design_tokens, snapshot.look.l1) : undefined
     await setProjectStyle(project.id, row.style_anchor_key, row.custom_style_anchor, designTokens)
     if (snapshot) await restoreSnapshot(project.id, snapshot, await readLiveImages(project.id), mark.at)
   } catch (e) {
-    // 다음 요청이 곧바로 다시 맡을 수 있게 끝 시각을 되돌려 둔다.
-    await supabaseAdmin.from('artist_versions').update({ snapshot: withRestoringMark(row.snapshot, mark) as never, updated_at: nextStamp(claimedAt) }).eq('id', row.id).eq('updated_at', claimedAt)
+    // 실패 횟수를 늘리고 다음 요청이 곧바로 다시 맡을 수 있게 끝 시각을 되돌려 둔다 — 마지막 실패면 그만두고 표시를 뗀다.
+    const failed = attempts + 1
+    const next = failed >= MAX_RESTORE_ATTEMPTS ? null : { at: mark.at, until: mark.until, attempts: failed }
+    if (!next) console.error('[artist-versions] giving up an interrupted load:', row.n, failed, e instanceof Error ? e.message : e)
+    await supabaseAdmin.from('artist_versions').update({ snapshot: withRestoringMark(claimed, next) as never, updated_at: nextStamp(claimedAt) }).eq('id', row.id).eq('updated_at', claimedAt)
+    if (!next) return 'gave-up'
     throw e
   }
   await clearRestoringMark(row.id, claimed, claimedAt)
-  return true
+  return 'finished'
 }
 
 /**
@@ -792,8 +835,8 @@ export async function settleVersions(project: VersionProject, rows: VersionRow[]
     const mark = current ? restoringMarkOf(current.snapshot) : null
     if (!current || !mark) return { rows, changed, finishedN: null, restoringN: null }
     if (Date.now() <= Date.parse(mark.until)) return { rows, changed, finishedN: null, restoringN: current.n }
-    const finished = await finishRestore(project, current, mark)
-    return { rows: await readVersionRows(project.id), changed: true, finishedN: finished ? current.n : null, restoringN: finished ? null : current.n }
+    const outcome = await finishRestore(project, current, mark)
+    return { rows: await readVersionRows(project.id), changed: true, finishedN: outcome === 'finished' ? current.n : null, restoringN: outcome === 'busy' ? current.n : null }
   } catch (e) {
     console.warn('[artist-versions] settle skipped:', e instanceof Error ? e.message : e)
     return { rows, changed, finishedN: null, restoringN: current && restoringMarkOf(current.snapshot) ? current.n : null }

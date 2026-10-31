@@ -688,8 +688,9 @@ interface ArtistState {
   worldFailures: Record<string, ViewFailure>
   /** 배경 설명(원천) 편집 — 약속 B3·B6. 서버가 EN base 파생·저장, Writer 씬이 읽는 값이 바뀐다. */
   updateLocationDescription: (locationId: string, visualDescription: string, sourceSnapshot?: ArtistSourceSnapshot) => Promise<void>
-  /** 배경 후보 히스토리에서 직전 이미지로 되돌리기 — 약속 B4. appearanceKey 는 변형(C10). */
-  selectLocationCandidate: (locationId: string, candidateId: string, appearanceKey?: string | null) => Promise<void>
+  /** 배경 후보 히스토리에서 직전 이미지로 되돌리기 — 약속 B4. appearanceKey 는 변형(C10).
+   *  다른 스타일 그림이라 서버가 막으면 { ok: false, code: 'other_style' } — 화면은 한국어 알림, quiet(채팅 도구)는 알림 없이 실패만 돌려준다. */
+  selectLocationCandidate: (locationId: string, candidateId: string, appearanceKey?: string | null, opts?: { quiet?: boolean }) => Promise<{ ok: boolean; code?: string }>
   /** 콘텐츠 정책 거절 뒤 우회(safe) 재시도 — 약속 B9. */
   retryWorldShotSafe: (locationId: string, model?: ImageModelKey, appearanceKey?: string | null) => Promise<void>
   autoGenerateBaseImages: () => Promise<void>
@@ -1805,7 +1806,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   },
 
   // 약속 B4: 후보 히스토리에서 되돌리기 — 서버가 선택본 flip + locations.wide_shot 미러.
-  selectLocationCandidate: async (locationId, candidateId, appearanceKey) => {
+  selectLocationCandidate: async (locationId, candidateId, appearanceKey, opts) => {
     const projectId = useProjectStore.getState().projectId
     if (!projectId) throw new Error('A project is required to select a background image')
     const variantKey = appearanceKey && appearanceKey !== DEFAULT_LOCATION_APPEARANCE_KEY ? appearanceKey : null
@@ -1816,7 +1817,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     })
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
-      if (body.code === 'other_style') return refusedOtherStyle()
+      // 다른 스타일 그림 — 채팅 도구가 "바꿨어요"라고 말하지 않게 실패를 돌려준다(2026-10-31 재검토 지적).
+      if (body.code === 'other_style') {
+        if (!opts?.quiet) refusedOtherStyle()
+        return { ok: false, code: 'other_style' }
+      }
       throw new Error(body.error ?? `HTTP ${res.status}`)
     }
     const { url } = (await res.json()) as { url: string }
@@ -1836,6 +1841,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         return { ...w, wideShot: url, candidates: (w.candidates ?? []).map((c) => ({ ...c, isSelected: c.id === candidateId })) }
       }),
     }))
+    return { ok: true }
   },
 
   createLocationAppearance: async (locationId, label, visualDescription, narrativeTime, options) => {

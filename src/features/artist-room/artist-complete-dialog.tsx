@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useT } from '@/lib/i18n'
 import { withDemoShare } from '@/lib/demo/context'
 import { restartWriterStatus } from '@/lib/writer/use-writer-status'
+import { useArtistVersionStore } from '@/stores/artist-version-store'
 import { useProjectStore } from '@/stores/project-store'
 
 export function completeError(code: string | undefined, missing?: { characters?: string[]; locations?: string[] }): { key: string; params?: Record<string, string> } {
@@ -25,6 +26,11 @@ export function completeError(code: string | undefined, missing?: { characters?:
   if (code === 'regen_pending') return { key: 'You can complete once the regenerated images are drawn.' }
   if (code === 'version_restoring') return { key: 'Loading the version. Try again in a moment.' }
   return { key: 'Could not complete. Please try again.' }
+}
+
+/** 버전 일(불러오는 중 · 재생성 그림) 때문에 [완료하기]가 막혔으면 기록을 다시 읽는다 — 머리 줄이 불러오는 중 · 진행을 보이게(2026-10-31 재검토 지적). */
+export async function refreshAfterCompleteRefused(code: string | undefined): Promise<void> {
+  if (code === 'version_restoring' || code === 'regen_pending') await useArtistVersionStore.getState().refresh()
 }
 
 export function ArtistCompleteDialog({ open, onOpenChange, summary }: { open: boolean; onOpenChange: (open: boolean) => void; summary: { persons: number; places: number; style: string | null } }) {
@@ -45,6 +51,7 @@ export function ArtistCompleteDialog({ open, onOpenChange, summary }: { open: bo
       if (!response.ok) {
         const error = completeError(body.code, body.missing)
         toast.error(t(error.key, error.params))
+        void refreshAfterCompleteRefused(body.code)
         return
       }
       if (useProjectStore.getState().projectId !== projectId) return

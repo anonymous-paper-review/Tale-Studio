@@ -14,9 +14,10 @@ import {
   artistStyleLocked,
   clearRestoringMark,
   ensureFirstVersion,
-  keptBackgroundsOf,
   failStaleImageJobs,
   imagesDrawing,
+  keptAtLoadFrom,
+  keptBackgroundsOf,
   leaveCurrentVersion,
   nextStamp,
   readLiveImages,
@@ -82,7 +83,8 @@ export async function POST(req: Request) {
     if (!left.ok) return reject(ARTIST_VERSION_CODES.conflict, 'Another window changed the version first')
 
     const mark = restoringMarkFrom(at)
-    const marked = withRestoringMark(target.snapshot, mark)
+    // 다른 모습이 있는 배경은 지금 그림 그대로 둔다 — 그 그림을 적어 두어, 이 버전을 떠날 때 그대로면 이 버전의 지난 기록을 남긴다(freezeSnapshot).
+    const marked = { ...withRestoringMark(target.snapshot, mark), keptAtLoad: keptAtLoadFrom(live) }
     const activatedAt = nextStamp(target.updated_at)
     const { data: activated, error: activateError } = await supabaseAdmin
       .from('artist_versions')

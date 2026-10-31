@@ -29,4 +29,13 @@ describe('작품 스타일 기록 마이그레이션', () => {
     expect(sql).toContain("delete from supabase_migrations.schema_migrations where version = '20261028100000'")
     expect(sql).not.toContain('location_image_candidates')
   })
+
+  it('작품 스타일 기록 마이그레이션은 번호가 앞이라도 20261029160000 뒤에 손으로 넣었고, 운영에 넣을 때 db push 에 --include-all 이 필요하다고 적어 둔다', () => {
+    // 왜: 번호(20261028100000)가 이미 운영에 넣은 공용 바우처(20261029160000)보다 앞이라 db push 가 건너뛴다(2026-10-31 재검토 지적).
+    //   개발 DB 기록은 이 파일 이름 그대로라 이름은 두고 적어만 둔다(서로 기대는 것은 없다).
+    const sql = readFileSync(`supabase/migrations/${MIGRATION}`, 'utf8')
+    expect(sql).toMatch(/--[^\n]*20261029160000[^\n]*/)
+    expect(sql).toMatch(/--[^\n]*--include-all/)
+  })
 })
+

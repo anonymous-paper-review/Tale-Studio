@@ -217,6 +217,58 @@ describe('불러오다 멈췄을 때', () => {
     expect(await regen.json()).toMatchObject({ code: 'version_restoring' })
   })
 
+  it('버전을 불러오는 중이면 기록 읽기가 불러오는 중이라고 알리고, 작품 스타일은 늘 지금 작품에 걸린 것을 알려 준다', async () => {
+    // 왜: 끊긴 불러오기를 화면이 몰라 머리 줄에 아무것도 안 보였고, 답을 못 받은 화면은 옛 스타일 이름 · 카드 기록 가리기를 그대로 썼다(2026-10-31 재검토 지적).
+    await twoVersions()
+    await hangingLoadOfV1()
+    const loading = await (await getVersions(get(`projectId=${P}`))).json()
+    expect(loading).toMatchObject({ restoring: true, style: { key: 'real', custom: null } })
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(Date.now() + 6 * 60_000)
+    const done = await (await getVersions(get(`projectId=${P}`))).json()
+    expect(done).toMatchObject({ restoring: false, currentN: 1, style: { key: 'real', custom: null } })
+  })
+
+  it('끊긴 불러오기를 마저 하다 세 번 실패하면 그만두고 불러오는 중 표시를 떼어, 불러오기 · 재생성 · 완료가 영영 막히지 않는다', async () => {
+    // 왜: 마저 하기가 실패할 때마다 표시를 되돌려 두어, 고칠 수 없는 실패면 그 작품의 버전 바꾸기 · [완료하기]가 끝없이 막혔다(2026-10-31 재검토 지적).
+    await twoVersions()
+    await hangingLoadOfV1()
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(Date.now() + 6 * 60_000)
+    state.db.failOn.push({ table: 'character_appearances', op: 'update', times: 1000 })
+    for (let i = 0; i < 2; i++) {
+      expect((await (await getVersions(get(`projectId=${P}`))).json()).restoring).toBe(true)
+      expect((snapshotOf(1).restoring as { attempts?: number }).attempts).toBe(i + 1)
+    }
+    expect((await (await getVersions(get(`projectId=${P}`))).json()).restoring).toBe(false)
+    expect(snapshotOf(1).restoring).toBeUndefined()
+    state.db.failOn.length = 0
+    expect((await doRegenerate('watercolor')).status).toBe(200)
+  })
+
+  it('얼굴을 다시 자를 시트를 받는 데 오래 걸리면 기다리지 않고 얼굴을 비운다', async () => {
+    // 왜: 보관함 받기가 멈추면 불러오기 전체가 함수 시간 제한까지 기다리다 끊겼다(2026-10-31 재검토 지적).
+    appearance('soonja', 'current').portrait_url = null
+    await twoVersions()
+    state.db.hangDownloads.add(pathOf(sheetIn(1, 'soonja', 'current').sheet.url))
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const pending = doLoad(1)
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect((await pending).status).toBe(200)
+    expect(appearance('soonja', 'current').portrait_url).toBeNull()
+  })
+
+  it('카드 기록 줄이 1000줄을 넘어도 불러올 때 그때의 줄을 찾아 고르고 같은 그림 줄을 또 만들지 않는다', async () => {
+    // 왜: 한 번 읽기는 1000줄까지라 뒤쪽 줄을 못 보면 같은 그림 줄을 또 만들거나, 지킬 파일을 못 보고 지운다(2026-10-31 재검토 지적).
+    const filler = Array.from({ length: 1100 }, (_, i) => ({ id: `aa-filler-${String(i).padStart(4, '0')}`, project_id: P, character_id: 'extra', appearance_key: 'current', view: 'main', url: mediaUrlOf(file(`extra_${i}.png`)), source_hash: null, appearance_hash: null, is_selected: false, pinned: false, generated_at: T0 }))
+    state.db.tables.character_image_candidates = [...filler, ...state.db.rows('character_image_candidates').map((row) => ({ ...row, id: `zz-${row.id}` }))]
+    await twoVersions()
+    expect((await doLoad(1)).status).toBe(200)
+    const minhoRows = state.db.rows('character_image_candidates').filter((row) => row.character_id === 'minho' && row.appearance_key === 'current')
+    expect(minhoRows.map((row) => row.id).sort()).toEqual(['cand-minho-current-g2', 'zz-cand-minho'])
+    expect(minhoRows.find((row) => row.id === 'zz-cand-minho')?.is_selected).toBe(true)
+  })
+
   it('버전을 불러올 때 그림 칸을 한 번에 여러 개씩(최대 6개) 함께 되돌린다', async () => {
     // 왜: 칸마다 하나씩 차례로 되돌리면 인물 · 배경이 많은 작품은 운영 함수 시간 제한(60초)을 넘는다(2026-10-28 검토 지적).
     for (let i = 0; i < 9; i++) {

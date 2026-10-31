@@ -6,6 +6,7 @@
 --   오너 결정(4): 새 표 하나만 더하고 기존 표에는 칸을 더하지 않는다. 서버(service role)만 읽고 쓴다 — 화면은 /api/artist/versions 로 읽는다.
 --   약속: tests/artist/style-version-routes.test.ts · tests/artist/style-versions.test.ts · tests/ops/artist-versions-migration.test.ts
 --   되돌리기: supabase/rollbacks/20261028100000_artist_versions.rollback.sql(이 폴더 밖 — 이 폴더의 .sql 은 모두 마이그레이션으로 실행된다).
+--   번호가 20261029160000(공용 바우처)보다 앞이지만 그 뒤에 손으로 넣는다(서로 기대는 것 없음) — supabase db push 로 넣으면 --include-all 이 필요하다.
 begin;
 
 create table public.artist_versions (

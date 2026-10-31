@@ -5,7 +5,8 @@ const toast = vi.hoisted(() => ({ error: vi.fn(), success: vi.fn(), message: vi.
 vi.mock('sonner', () => ({ toast }))
 vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTrace: vi.fn(), saveChatTracePatch: vi.fn(), loadLatestChatTrace: vi.fn() }))
 
-import { useArtistVersionStore } from '@/stores/artist-version-store'
+import { useArtistVersionStore, versionsNeedRefresh } from '@/stores/artist-version-store'
+import { refreshAfterCompleteRefused } from '@/features/artist-room/artist-complete-dialog'
 import { useArtistStore } from '@/stores/artist-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useLocaleStore } from '@/stores/locale-store'
@@ -24,8 +25,11 @@ const regenView = (states: Record<string, string>, extra: Record<string, unknown
 })
 
 /** 서버 창구 흉내 — 버전 v1(실사) · v2(수채화) · v3(수채화, 재생성 중). */
-function fakeServer(opts: { completed?: boolean; keptBackgrounds?: number } = {}) {
-  const server = { current: 3, regen: regenView({ 'c:minho:current': 'todo', 'l:hall:default': 'todo' }) as ReturnType<typeof regenView> | null, calls: [] as Array<{ url: string; body: Record<string, unknown> | null }> }
+function fakeServer(opts: { completed?: boolean; keptBackgrounds?: number; loadNoAnswer?: boolean } = {}) {
+  const server = {
+    current: 3, restoring: false, regen: regenView({ 'c:minho:current': 'todo', 'l:hall:default': 'todo' }) as ReturnType<typeof regenView> | null,
+    calls: [] as Array<{ url: string; body: Record<string, unknown> | null }>,
+  }
   const styles: Record<number, string> = { 1: 'real', 2: 'watercolor', 3: 'watercolor' }
   vi.stubGlobal('fetch', vi.fn(async (input: string, init?: RequestInit) => {
     const url = String(input)
@@ -35,6 +39,8 @@ function fakeServer(opts: { completed?: boolean; keptBackgrounds?: number } = {}
     if (url.startsWith('/api/artist/versions/load')) {
       server.current = body!.n as number
       server.regen = null
+      // 함수가 시간 제한에 끊긴 것처럼 — 서버는 바꿨지만 답은 오지 않는다.
+      if (opts.loadNoAnswer) return new Response('An error occurred', { status: 504 })
       return Response.json({ ok: true, n: body!.n, styleKey: styles[body!.n as number], customStyle: null, keptBackgrounds: opts.keptBackgrounds ?? 0 })
     }
     if (url.startsWith('/api/artist/versions/regen')) {
@@ -44,10 +50,17 @@ function fakeServer(opts: { completed?: boolean; keptBackgrounds?: number } = {}
         const values = Object.values(server.regen.states)
         server.regen.complete = values.every((s) => s === 'done' || s === 'failed')
       }
+      if (body?.action === 'finish' && server.regen?.complete && !server.regen.announced) {
+        server.regen.announced = true
+        return Response.json({ ok: true, announced: true, complete: true, failed: 0 })
+      }
       return Response.json({ ok: true, announced: false, complete: server.regen?.complete ?? true, failed: 0 })
     }
     if (url.startsWith('/api/artist/versions')) {
-      return Response.json({ versions: [1, 2, 3].map((n) => version(n, styles[n], n === server.current)), currentN: server.current, regen: server.regen, completed: opts.completed === true })
+      return Response.json({
+        versions: [1, 2, 3].map((n) => version(n, styles[n], n === server.current)), currentN: server.current, regen: server.regen, completed: opts.completed === true,
+        restoring: server.restoring, style: { key: styles[server.current], custom: null },
+      })
     }
     return Response.json({})
   }))
@@ -178,7 +191,57 @@ describe('다른 스타일 거절', () => {
     expect(useArtistStore.getState().error).not.toBe('This image is in another style')
 
     toast.error.mockClear()
-    await expect(useArtistStore.getState().selectLocationCandidate('hall', 'lc-1', null)).resolves.toBeUndefined()
+    // 채팅 도구도 같은 함수를 부른다 — 실패를 돌려줘야 "바꿨어요"라고 말하지 않는다(2026-10-31 재검토 지적).
+    await expect(useArtistStore.getState().selectLocationCandidate('hall', 'lc-1', null)).resolves.toMatchObject({ ok: false, code: 'other_style' })
     expect(toast.error).toHaveBeenCalledWith('다른 스타일이라 불러올 수 없어요')
   })
 })
+
+describe('끊긴 불러오기 · 멈춘 재생성 화면 맞추기(2026-10-31 재검토)', () => {
+  it('버전 불러오기 답을 받지 못하면 기록을 다시 읽어 작품 스타일 이름 · 카드 기록 가리기도 서버의 지금 스타일로 맞춘다', async () => {
+    // 왜: 끊긴 불러오기는 서버가 이미 바꿨을 수 있다 — 화면이 옛 스타일 이름 · 카드 기록 가리기를 그대로 쓰면 다른 스타일 그림을 고를 수 있었다.
+    const server = fakeServer({ loadNoAnswer: true })
+    useArtistStore.setState({ loadData: vi.fn(async () => {}) } as never)
+    expect(await useArtistVersionStore.getState().loadVersion(1)).toBe(false)
+    expect(server.current).toBe(1)
+    expect(useArtistVersionStore.getState().currentN).toBe(1)
+    expect(useProducerStore.getState().styleAnchorKey).toBe('real')
+  })
+
+  it('[완료하기]가 버전을 불러오는 중이라 막히면 기록을 다시 읽어 머리 줄에 불러오는 중을 보인다', async () => {
+    // 왜: 막혔다는 알림만 뜨고 화면은 그대로라 언제 다시 눌러야 할지 몰랐다.
+    const server = fakeServer()
+    server.restoring = true
+    await refreshAfterCompleteRefused('version_restoring')
+    await vi.waitFor(() => expect(useArtistVersionStore.getState().restoring).toBe(true))
+    server.restoring = false
+    await refreshAfterCompleteRefused('artist_images_missing')
+    expect(useArtistVersionStore.getState().restoring).toBe(true)
+  })
+
+  it('불러오는 중이거나, 재생성이 멈췄어도 그리던 그림이 남았으면 기록을 몇 초마다 다시 읽는다', () => {
+    // 왜: 멈춘 뒤에 끝난 그림이 진행 · "만들었어요" 알림에 반영되지 않고 단추를 눌러야 바뀌었다.
+    const regen = regenView({ 'c:minho:current': 'drawing', 'l:hall:default': 'failed' }, { drawing: 1 })
+    const idle = { running: false, stopped: false, userWaitSince: null }
+    const stopped = { ...idle, stopped: true }
+    expect(versionsNeedRefresh({ regen, run: idle, restoring: false })).toBe(true)
+    expect(versionsNeedRefresh({ regen, run: stopped, restoring: false })).toBe(true)
+    const waiting = regenView({ 'c:minho:current': 'todo', 'l:hall:default': 'failed' }, { drawing: 0 })
+    expect(versionsNeedRefresh({ regen: waiting, run: stopped, restoring: false })).toBe(false)
+    expect(versionsNeedRefresh({ regen: null, run: idle, restoring: true })).toBe(true)
+    expect(versionsNeedRefresh({ regen: null, run: idle, restoring: false })).toBe(false)
+  })
+
+  it('재생성이 멈춘 뒤에도 그리던 그림이 끝나 다 그렸으면, 단추를 누르지 않아도 다 그렸다고 알리고 멈춤을 푼다', async () => {
+    // 왜: 모두의 자리로 멈춘 뒤 이미 보낸 그림이 끝나도 "만들었어요" 알림 · 잠금 화면이 그대로였다(2026-10-31 재검토 지적).
+    const server = fakeServer()
+    server.regen = regenView({ 'c:minho:current': 'drawing', 'l:hall:default': 'failed' }, { drawing: 1 })
+    await useArtistVersionStore.getState().refresh()
+    useArtistVersionStore.setState({ run: { running: false, stopped: true, userWaitSince: null } })
+    server.regen = regenView({ 'c:minho:current': 'done', 'l:hall:default': 'failed' }, { failed: 1, complete: true })
+    await useArtistVersionStore.getState().refresh()
+    await vi.waitFor(() => expect(artistMessages().some((message) => message.startsWith('수채화로 v3을 만들었어요.'))).toBe(true))
+    expect(useArtistVersionStore.getState().run.stopped).toBe(false)
+  })
+})
+

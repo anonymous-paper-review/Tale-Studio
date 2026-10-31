@@ -4,7 +4,7 @@ import type { PendingProposal } from '@/lib/pending-proposal'
 
 type Row = Record<string, unknown>
 const db = vi.hoisted(() => ({ rows: {} as Record<string, Row[]>, from: vi.fn(), reads: [] as Array<{ table: string; filters: Row }> }))
-const api = vi.hoisted(() => ({ calls: [] as Array<{ path: string; method: string; body: Row }>, fail: false, images: vi.fn() }))
+const api = vi.hoisted(() => ({ calls: [] as Array<{ path: string; method: string; body: Row }>, fail: false, otherStyle: false, images: vi.fn() }))
 vi.mock('@/lib/supabase/client', () => ({ createClient: () => ({ from: db.from }), createCatalogClient: vi.fn() }))
 
 import { createStudioToolResources } from '@/stores/chat-tool-bindings'
@@ -14,7 +14,7 @@ import { useArtistStore } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
 
 function seed() {
-  api.calls.length = 0; api.fail = false; db.reads.length = 0
+  api.calls.length = 0; api.fail = false; api.otherStyle = false; db.reads.length = 0
   db.rows = {
     characters: [{ project_id: 'p', character_id: 'char_doyun', name: '도윤', entity_type: 'person' }],
     character_appearances: [
@@ -91,6 +91,7 @@ function installApi() {
       return Response.json({ url: target.url })
     }
     if (path === '/api/artist/select-location-candidate' && method === 'POST') {
+      if (api.otherStyle) return Response.json({ error: 'This image is in another style', code: 'other_style' }, { status: 409 })
       const variant = body.appearanceKey && body.appearanceKey !== 'default' ? body.appearanceKey : null
       const target = find('location_image_candidates', { id: body.candidateId, project_id: body.projectId, location_id: body.locationId, variant_key: variant })
       if (!target) return Response.json({ error: 'candidate not in slot' }, { status: 404 })
@@ -225,6 +226,16 @@ describe('Artist 채팅의 모습 관리', () => {
     expect(f.proposals.at(-1)!.payload.toolEdit).toMatchObject({ resource: 'background_appearances', id: 'loc_alley/default' })
     expect(() => f.resources.background_appearances.validate({ label: '기본' })).not.toThrow()
     expect(await f.edit('background_appearances', 'loc_alley/default', await revision(f, 'background_appearances', 'loc_alley/default'), { label: '기본' })).toMatchObject({ status: 'invalid_input' })
+  })
+
+  it('다른 스타일로 그린 배경 그림을 채팅이 고르려 하면 바꿨다고 알리지 않고 실패로 돌려준다', async () => {
+    // 왜: 화면 알림만 띄우고 조용히 끝나, 채팅이 "배경을 바꿨어요"라고 말했다(2026-10-31 재검토 지적).
+    const f = fixture()
+    const rev = await revision(f, 'background_appearances', 'loc_alley/default')
+    api.otherStyle = true
+    expect(await f.edit('background_appearances', 'loc_alley/default', rev, { selectedCandidateId: 'lc-0' })).toMatchObject({ status: 'failed', retryable: false })
+    expect(useArtistStore.getState().worldAssets[0].wideShot).toBe('https://owned/alley.png')
+    expect(db.rows.location_image_candidates.find((row) => row.id === 'lc-1')!.is_selected).toBe(true)
   })
 
   it('서버가 거절하면 저장 완료로 알리지 않고 저장소 값을 유지한다', async () => {

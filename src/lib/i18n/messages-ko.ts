@@ -2865,4 +2865,5 @@ export const KO: Record<string, string> = {
   // 작품 스타일 기록 오너 결정(2026-10-31) — 다른 모습이 있는 배경은 불러와도 그대로, 올린 그림은 재생성에서 그대로
   '{count} backgrounds with other looks keep their current pictures.': '다른 모습이 있는 배경 {count}곳은 지금 그림 그대로예요.',
   '{count} uploaded pictures stay as they are': '올린 그림 {count}장은 그대로 둬요',
+  'Backgrounds with other looks keep their current pictures when you load a version.': '다른 모습이 있는 배경은 불러와도 지금 그림 그대로예요.',
 }

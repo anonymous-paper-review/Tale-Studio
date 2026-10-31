@@ -4,6 +4,7 @@
 //   지원: select · eq · neq · is · in · gte · gt · lte · lt · order · limit · maybeSingle · single · insert · update · delete · match,
 //   storage.from(bucket).copy · upload · remove · download · info. 열 이름 고르기(select 'a, b')는 무시하고 행 전체를 돌려준다 —
 //   단 jsonb 글 꺼내기 별칭(`prose_locked:state->>_proseLocked`)은 그 별칭 칸을 글로 더해 준다. 읽은 열 이름은 log 에 남는다.
+//   한 번 읽기는 운영 API 처럼 최대 1000줄(range 로 나눠 읽는다).
 
 export type Row = Record<string, unknown>
 export interface UniqueRule {
@@ -32,6 +33,11 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
   const failOn: Array<{ table: string; op: 'insert' | 'update' | 'delete'; times: number; hang?: boolean }> = []
   /** 표의 쓰기마다 걸리는 시간(ms) — 동시에 몇 개가 함께 도는지(maxInflight) 재려고. */
   const latency: Record<string, number> = {}
+  /** 표 → 이 줄 번호부터의 읽기(range)를 실패시킨다(나눠 읽다 중간에 실패하는 경우). */
+  const failReadsFrom: Record<string, number> = {}
+  /** 받기(download)가 끝나지 않는 파일 경로. */
+  const hangDownloads = new Set<string>()
+  const MAX_ROWS = 1000
   const inflight: Record<string, number> = {}
   const maxInflight: Record<string, number> = {}
 
@@ -63,6 +69,8 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
     let columns = '*'
     let orderBy: Array<{ column: string; ascending: boolean }> = []
     let limitTo: number | null = null
+    let rangeFrom = 0
+    let rangeTo: number | null = null
 
     const run = (): { data: unknown; error: { code?: string; message: string } | null } => {
       if (failReads.has(name) && op === 'select') return { data: null, error: { code: 'PGRST205', message: `Could not find the table 'public.${name}'` } }
@@ -113,7 +121,10 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
           return (x < y ? -1 : 1) * (ascending ? 1 : -1)
         })
       }
+      if (failReadsFrom[name] != null && rangeFrom >= failReadsFrom[name]) return { data: null, error: { message: `forced read failure on ${name} from row ${rangeFrom}` } }
+      if (rangeTo != null) rows = rows.slice(rangeFrom, rangeTo + 1)
       if (limitTo != null) rows = rows.slice(0, limitTo)
+      rows = rows.slice(0, MAX_ROWS)
       // jsonb 글 꺼내기 별칭 — "별칭:칸->>열쇠"는 그 칸 안 값을 글로(없으면 null).
       for (const item of columns.split(',').map((part) => part.trim())) {
         const alias = item.match(/^([a-z_][a-z0-9_]*):([a-z_][a-z0-9_]*)->>([A-Za-z_][A-Za-z0-9_]*)$/)
@@ -168,6 +179,7 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
       match: (values: Row) => { for (const [k, v] of Object.entries(values)) filters.push((row) => row[k] === v); return q },
       order: (column: string, opts?: { ascending?: boolean }) => { orderBy.push({ column, ascending: opts?.ascending !== false }); return q },
       limit: (n: number) => { limitTo = n; return q },
+      range: (from: number, to: number) => { rangeFrom = from; rangeTo = to; return q },
       maybeSingle: async () => {
         const result = await exec()
         if (result.error) return result
@@ -209,6 +221,7 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
         return { data: paths.map((name) => ({ name })), error: null }
       },
       download: async (path: string) => {
+        if (hangDownloads.has(path)) return new Promise(() => {})
         const object = objects.get(path)
         if (!object) return { data: null, error: { message: 'Object not found' } }
         return { data: new Blob([new Uint8Array(object.bytes)]), error: null }
@@ -229,6 +242,8 @@ export function memorySupabase(seed: Record<string, Row[]> = {}, unique: Record<
     failOn,
     latency,
     maxInflight,
+    failReadsFrom,
+    hangDownloads,
   }
 }
 

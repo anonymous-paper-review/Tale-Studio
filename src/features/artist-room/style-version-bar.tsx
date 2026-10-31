@@ -29,10 +29,11 @@ export function StyleVersionBar({ completed, drawing }: { completed: boolean; dr
   const loaded = useArtistVersionStore((s) => s.loaded)
   const busy = useArtistVersionStore((s) => s.busy)
   const stopped = useArtistVersionStore((s) => !!s.regen && !s.regen.complete && s.run.stopped)
+  const restoring = useArtistVersionStore((s) => s.restoring)
   const anchors = useProducerStore((s) => s.styleAnchors)
   const styleKey = useProducerStore((s) => s.styleAnchorKey)
   const custom = useProducerStore((s) => s.customStyleAnchor)
-  const header = versionHeader({ versions, completed, drawing: drawing || busy === 'regenerate', loading: busy === 'load', demo: isDemoSession(), stopped })
+  const header = versionHeader({ versions, completed, drawing: drawing || busy === 'regenerate', loading: busy === 'load' || restoring, demo: isDemoSession(), stopped })
   const label = versionStyleLabel({ styleKey, customStyle: custom }, anchors, locale)
   const swatch = custom?.url ?? anchors.find((anchor) => anchor.key === styleKey)?.previewUrl ?? null
   const note = header.note ? t(NOTE_TEXT[header.note]) : null

@@ -171,3 +171,39 @@ describe('카드 기록 줄이 가리키는 파일', () => {
   })
 })
 
+describe('카드 기록 줄이 많을 때', () => {
+  const dir = `${WS}/${P}/characters/minho`
+  const unique = (n: number) => `${dir}/current_main_g${String(n).padStart(8, '0')}-0000-4000-8000-000000000000.png`
+  const at = (h: number) => `2026-10-27T0${h}:00:00.000Z`
+  /** 1000줄을 넘는 다른 인물 기록 줄(앞쪽 id) + 민호 칸 6줄(뒤쪽 id). shared 파일은 빠질 줄과 남을 줄이 함께 가리킨다. */
+  function manyRows() {
+    const filler: Row[] = Array.from({ length: 1100 }, (_, i) => ({ id: `aa-filler-${String(i).padStart(4, '0')}`, project_id: P, character_id: 'extra', appearance_key: 'current', view: 'main', url: mediaUrlOf(`${WS}/${P}/characters/extra/${i}.png`), source_hash: null, appearance_hash: null, is_selected: false, pinned: false, generated_at: at(1) }))
+    const slot: Row[] = [
+      { id: 'zz-twin-old', url: mediaUrlOf(unique(1)), generated_at: at(1) },
+      ...[2, 3, 4, 5].map((h) => ({ id: `zz-keep-${h}`, url: mediaUrlOf(unique(h)), generated_at: at(h) })),
+      { id: 'zz-twin-new', url: mediaUrlOf(unique(1)), generated_at: at(6) },
+    ].map((row) => ({ project_id: P, character_id: 'minho', appearance_key: 'current', view: 'main', source_hash: null, appearance_hash: null, is_selected: false, pinned: false, ...row }))
+    state.db = seed({ character_image_candidates: [...filler, ...slot] })
+    state.db.objects.set(unique(1), { bytes: Buffer.from('shared') })
+  }
+
+  it('카드 기록 줄이 1000줄을 넘어도 빠진 줄과 같은 파일을 가리키는 줄을 끝까지 찾아 그 파일을 지우지 않는다', async () => {
+    // 왜: 한 번 읽기는 1000줄까지라, 뒤쪽 줄이 가리키는 파일을 못 보고 지웠다(2026-10-31 재검토 지적).
+    manyRows()
+    await finalizeCharacterViewJob(characterJob(), 'https://fal.test/new.png')
+    expect(state.db.rows('character_image_candidates').map((row) => row.id)).not.toContain('zz-twin-old')
+    expect(state.db.objects.has(unique(1))).toBe(true)
+  })
+
+  it('지킬 파일 목록을 나눠 읽다 한 번이라도 실패하면 아무 파일도 지우지 않는다', async () => {
+    // 왜: 목록 일부만 보고 지우면 아직 쓰는 파일을 지울 수 있다(2026-10-31 재검토 지적).
+    manyRows()
+    state.db.objects.set(unique(9), { bytes: Buffer.from('only-in-evicted-row') })
+    state.db.rows('character_image_candidates').find((row) => row.id === 'zz-twin-old')!.url = mediaUrlOf(unique(9))
+    state.db.failReadsFrom.character_image_candidates = 1000
+    await finalizeCharacterViewJob(characterJob(), 'https://fal.test/new.png')
+    expect(state.db.rows('character_image_candidates').map((row) => row.id)).not.toContain('zz-twin-old')
+    expect(state.db.objects.has(unique(9))).toBe(true)
+  })
+})
+

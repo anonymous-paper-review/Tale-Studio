@@ -345,8 +345,10 @@ export function createStudioToolResources(options: {
       const candidateError = requireCandidate(patch, before)
       if (candidateError) return candidateError
       if ('selectedCandidateId' in patch) {
-        await useArtistStore.getState().selectLocationCandidate(locationId, String(patch.selectedCandidateId), appearanceKey)
+        const picked = await useArtistStore.getState().selectLocationCandidate(locationId, String(patch.selectedCandidateId), appearanceKey, { quiet: true })
         check()
+        // 다른 스타일 그림은 서버가 막는다 — 바꿨다고 알리지 않는다(2026-10-31 재검토 지적).
+        if (!picked.ok) return { status: 'failed', message: 'This image is in another style of the work, so it cannot be loaded.', retryable: false }
         return { status: 'ok' }
       }
       if (before.isDefault === true) {

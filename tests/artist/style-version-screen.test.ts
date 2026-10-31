@@ -252,14 +252,27 @@ describe('재생성 · 생성 기록 창 그려 보기(2026-10-31 오너 결정)
     expect(KO['{count} uploaded pictures stay as they are']).toBe('올린 그림 {count}장은 그대로 둬요')
   })
 
-  it('생성 기록 창은 다른 모습이 있는 배경이 있으면 "다른 모습이 있는 배경 n곳은 지금 그림 그대로예요."를 보인다', () => {
-    // 왜: 2026-10-31 오너 결정 A — 그런 배경은 불러와도 지금 그림 그대로라, 불러오기 전에 알린다.
+  it('생성 기록 창은 다른 모습이 있는 배경이 있으면 "다른 모습이 있는 배경은 불러와도 지금 그림 그대로예요."를 보인다', () => {
+    // 왜: 2026-10-31 오너 결정 A — 그런 배경은 불러와도 지금 그림 그대로라, 불러오기 전에 알린다. 몇 곳인지는 버전마다 달라
+    //   불러온 뒤 알림이 센다 — 창의 줄은 어느 버전이든 맞는 말로 쓴다(재검토 지적: 창과 알림의 수가 달랐다).
     screenState({ versions: [versionView(1, 'real', false), versionView(2, 'watercolor', true)] })
     cards()
     useArtistVersionStore.setState({ historyDialogOpen: true })
     serveCurrent(useArtistVersionStore)
     const out = html(createElement(VersionHistoryDialog, { canLoad: true }))
-    expect(out).toContain('다른 모습이 있는 배경 1곳은 지금 그림 그대로예요.')
+    expect(out).toContain('다른 모습이 있는 배경은 불러와도 지금 그림 그대로예요.')
+    expect(out).not.toMatch(/배경 \d+곳은/)
+  })
+
+  it('버전을 불러오다 끊겨 서버가 아직 불러오는 중이라고 하면 머리 줄에 "버전을 불러오는 중이에요."를 보이고 두 단추를 끈다', () => {
+    // 왜: 끊긴 불러오기를 화면이 몰라 머리 줄에 아무것도 안 보였다(2026-10-31 재검토 지적).
+    screenState({ versions: [versionView(1, 'real', true), versionView(2, 'watercolor', false)] })
+    useArtistVersionStore.setState({ restoring: true })
+    serveCurrent(useArtistVersionStore)
+    const out = html(createElement(StyleVersionBar, { completed: false, drawing: false }))
+    expect(out).toContain('버전을 불러오는 중이에요.')
+    expect(isDisabled(out, 'artist-version-history-open')).toBe(true)
+    expect(isDisabled(out, 'artist-regen-open')).toBe(true)
   })
 })
 

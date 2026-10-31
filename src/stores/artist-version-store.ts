@@ -40,6 +40,10 @@ export interface ArtistVersionsResponse {
   currentN: number
   regen: RegenProgress | null
   completed: boolean
+  /** 버전을 불러오는 중(끊긴 불러오기를 서버가 아직 마저 하지 못함). */
+  restoring?: boolean
+  /** 지금 작품 스타일 — 기록을 읽을 때마다 화면 값을 맞춘다. */
+  style?: { key: string | null; custom: VersionCustomStyle | null }
 }
 
 interface RegenRun {
@@ -56,6 +60,8 @@ interface ArtistVersionState {
   currentN: number
   regen: RegenProgress | null
   completed: boolean
+  /** 서버가 버전을 불러오는 중이라고 한다 — 머리 줄은 불러오는 중을 보이고 몇 초마다 다시 읽는다. */
+  restoring: boolean
   loaded: boolean
   busy: 'regenerate' | 'load' | null
   lastError: string | null
@@ -101,6 +107,17 @@ function messageForCode(code: string | undefined, fallback: string): string {
   return fallback
 }
 
+/**
+ * 기록을 몇 초마다 다시 읽어야 하나 — 버전을 불러오는 중이거나, 다 그리기 전 재생성이 그리는 중(멈췄어도 그리던 그림이 남았으면).
+ *   멈춘 뒤 끝난 그림이 진행 · "만들었어요" 알림에 반영되지 않아 단추를 눌러야 바뀌었다(2026-10-31 재검토 지적).
+ */
+export function versionsNeedRefresh(state: { regen: Pick<RegenProgress, 'complete' | 'drawing'> | null; run: Pick<RegenRun, 'stopped'>; restoring: boolean }): boolean {
+  if (state.restoring) return true
+  const regen = state.regen
+  if (!regen || regen.complete) return false
+  return !state.run.stopped || regen.drawing > 0
+}
+
 /** 재생성 그림이 다 그려지기 전에 멈췄나 — 이어 그리기가 모두의 자리 · 오랜 한도 기다림으로 멈춘 채 남은 칸이 있다. */
 function regenStopped(state: Pick<ArtistVersionState, 'regen' | 'run'>): boolean {
   return !!state.regen && !state.regen.complete && state.run.stopped
@@ -116,6 +133,16 @@ function versionBeforeRegen(regen: RegenProgress, versions: readonly VersionView
 /** 버전의 스타일을 Producer 스토어(작품 스타일의 화면 값)에 옮긴다 — 서버가 이미 바꿨다. */
 function applyStyle(styleKey: string | null, customStyle: VersionCustomStyle | null) {
   useProducerStore.setState({ styleAnchorKey: styleKey || null, customStyleAnchor: customStyle ? { url: customStyle.url, label: customStyle.label, medium: customStyle.medium, ...(customStyle.locked ? { locked: true } : {}) } : null })
+}
+
+/** 서버의 지금 작품 스타일이 화면 값과 다르면 맞춘다 — 답을 못 받은 불러오기 뒤에도 스타일 이름 · 카드 기록 가리기가 맞게(2026-10-31 재검토 지적). */
+function syncStyle(style: ArtistVersionsResponse['style']) {
+  if (!style) return
+  const producer = useProducerStore.getState()
+  const custom = producer.customStyleAnchor
+  const sameCustom = (!custom && !style.custom) || (!!custom && !!style.custom && custom.url === style.custom.url && custom.label === style.custom.label && (custom.medium ?? null) === (style.custom.medium ?? null))
+  if ((producer.styleAnchorKey || null) === (style.key || null) && sameCustom) return
+  applyStyle(style.key, style.custom)
 }
 
 function styleLabelOf(version: { styleKey: string | null; customStyle: VersionCustomStyle | null }): string {
@@ -241,6 +268,7 @@ export const useArtistVersionStore = create<ArtistVersionState>((set, get) => {
     currentN: 1,
     regen: null,
     completed: false,
+    restoring: false,
     loaded: false,
     busy: null,
     lastError: null,
@@ -252,7 +280,7 @@ export const useArtistVersionStore = create<ArtistVersionState>((set, get) => {
 
     setScreenOpen: (projectId, open) => {
       const projectChanged = get().projectId !== projectId
-      set({ screen: { projectId, open }, ...(projectChanged ? { projectId, versions: [], currentN: 1, regen: null, completed: false, loaded: false, run: { ...IDLE_RUN }, overlayDismissedFor: null } : {}) })
+      set({ screen: { projectId, open }, ...(projectChanged ? { projectId, versions: [], currentN: 1, regen: null, completed: false, restoring: false, loaded: false, run: { ...IDLE_RUN }, overlayDismissedFor: null } : {}) })
     },
 
     refresh: async (opts) => {
@@ -263,7 +291,13 @@ export const useArtistVersionStore = create<ArtistVersionState>((set, get) => {
         if (!res.ok) return null
         const body = (await res.json()) as ArtistVersionsResponse
         if (!sameProject(projectId)) return null
-        set({ projectId, versions: body.versions ?? [], currentN: body.currentN ?? 1, regen: body.regen ?? null, completed: body.completed === true, loaded: true })
+        set({ projectId, versions: body.versions ?? [], currentN: body.currentN ?? 1, regen: body.regen ?? null, completed: body.completed === true, restoring: body.restoring === true, loaded: true })
+        syncStyle(body.style)
+        // 멈춘 재생성이라도 그리던 그림이 끝나 다 그렸으면 멈춤을 풀고 다 그렸다고 알린다(이어 그리기가 마무리한다).
+        if (body.regen?.complete && !body.regen.announced && get().run.stopped) {
+          set({ run: { ...IDLE_RUN } })
+          void get().continueRegen()
+        }
         return body
       } catch {
         return null
@@ -363,7 +397,7 @@ export const useArtistVersionStore = create<ArtistVersionState>((set, get) => {
     },
 
     reset: () => set({
-      projectId: null, versions: [], currentN: 1, regen: null, completed: false, loaded: false, busy: null, lastError: null,
+      projectId: null, versions: [], currentN: 1, regen: null, completed: false, restoring: false, loaded: false, busy: null, lastError: null,
       regenDialogOpen: false, historyDialogOpen: false, overlayDismissedFor: null, screen: { projectId: null, open: false }, run: { ...IDLE_RUN },
     }),
   }

@@ -1,7 +1,7 @@
 // Artist [완료하기]는 재생성 그림이 다 그려지기 전(또는 버전을 불러오는 중)에는 서버도 받지 않고, 화면은 그 까닭을 한국어로 알린다 (2026-10-28 검토 지적)
 import { NextRequest } from 'next/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { memorySupabase, type Row } from '../fixtures/_memory-supabase'
+import { memorySupabase, mediaUrlOf, type Row } from '../fixtures/_memory-supabase'
 
 const state = vi.hoisted(() => ({
   db: null as unknown as ReturnType<typeof import('../fixtures/_memory-supabase').memorySupabase>,
@@ -76,12 +76,31 @@ describe('재생성 중 [완료하기]', () => {
     expect(state.db.rows('projects')[0].current_stage).toBe('writer')
   })
 
-  it('버전을 불러오다 멈춘 채면 [완료하기]를 받지 않는다', async () => {
-    // 왜: 반쯤 되돌린 그림으로 Storyboard 가 열리면 섞인 그림이 넘어간다 — 화면이 기록을 다시 읽으면 마저 불러온다.
-    state.db = seed([v1, v2(null, { snapshot: { characters: [], locations: [], restoring: { at: NOW(), until: NOW() } } })])
+  it('버전을 불러오는 중이면(맡은 시간 안) [완료하기]를 받지 않는다', async () => {
+    // 왜: 반쯤 되돌린 그림으로 Storyboard 가 열리면 섞인 그림이 넘어간다 — 불러오기가 끝나거나 맡은 시간이 지난 뒤 다시 누른다.
+    const later = new Date(Date.now() + 60_000).toISOString()
+    state.db = seed([v1, v2(null, { snapshot: { characters: [], locations: [], restoring: { at: NOW(), until: later } } })])
     const res = await completeArtist(request())
     expect(res.status).toBe(409)
     expect(await res.json()).toMatchObject({ code: 'version_restoring' })
+  })
+
+  it('버전을 불러오다 끊긴 뒤 맡은 시간이 지났으면 [완료하기]가 그 버전을 마저 불러온 뒤 받는다', async () => {
+    // 왜: 끊긴 불러오기는 기록 읽기가 마저 했는데, 그 전에 [완료하기]를 누르면 "불러오는 중"이라는 거절만 끝없이 되풀이됐다(2026-10-31 재검토 지적).
+    const copy = 'ws1/p1/versions/v1/c-minho-current-sheet-abcd.png'
+    const past = new Date(Date.now() - 60_000).toISOString()
+    state.db = seed([
+      { ...v1, is_current: true, active: [{ from: null, to: past }, { from: past, to: null }], snapshot: {
+        characters: [{ characterId: 'minho', appearanceKey: 'current', sheet: { url: mediaUrlOf(copy), candidateId: null, sourceHash: null, appearanceHash: null, generatedAt: null }, portraitUrl: mediaUrlOf(copy) }],
+        locations: [], restoring: { at: past, until: past },
+      } },
+      v2(null, { is_current: false, active: [{ from: past, to: past }] }),
+    ])
+    state.db.objects.set(copy, { bytes: Buffer.from('v1-sheet') })
+    const res = await completeArtist(request())
+    expect(res.status).toBe(200)
+    expect(state.db.rows('character_appearances')[0].sheet_url).toBe(mediaUrlOf(copy))
+    expect((state.db.rows('artist_versions').find((row) => row.n === 1)!.snapshot as { restoring?: unknown }).restoring).toBeUndefined()
   })
 
   it('재생성 때문에 [완료하기]를 받지 않으면 화면은 "다시 만드는 그림을 다 그린 뒤에 완료할 수 있어요."를 알린다', () => {

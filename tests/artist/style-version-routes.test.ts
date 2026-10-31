@@ -346,7 +346,7 @@ describe('불러오기', () => {
     expect(pathOf(state.db.rows('locations').find((row) => row.location_id === 'roof')!.wide_shot).startsWith(`${WS}/${P}/versions/v1/`)).toBe(true)
   })
 
-  it('다른 모습이 있는 배경은 그 버전을 다시 떠나도 그 버전 기록에 처음 남긴 그 배경 그림을 그대로 둔다', async () => {
+  it('다른 모습이 있는 배경을 그 버전이 지금인 동안 다시 그리지 않았으면, 그 버전을 다시 떠나도 그 버전 기록에 처음 남긴 그 배경 그림을 그대로 둔다', async () => {
     // 왜: 혼자 정한 것 — 불러올 때 그대로 둔 지금 그림(다른 버전 그림)으로 기록을 덮으면 그 버전의 배경 그림이 기록에서 사라진다.
     await regenerate(post('/api/artist/versions/regenerate', { projectId: P, styleAnchorKey: 'watercolor' }))
     landNewImages('g2')
@@ -354,6 +354,27 @@ describe('불러오기', () => {
     await loadVersion(post('/api/artist/versions/load', { projectId: P, n: 1 }))
     await loadVersion(post('/api/artist/versions/load', { projectId: P, n: 2 }))
     expect((versionRows().find((row) => row.n === 1)!.snapshot as { locations: unknown[] }).locations).toEqual(first)
+  })
+
+  it('다른 모습이 있는 배경을 그 버전이 지금인 동안 다시 그렸으면, 떠날 때 그 버전 기록에 새로 그린 그림을 남긴다', async () => {
+    // 왜: 그 버전에서 새로 그린 그림까지 옛 기록으로 덮으면 생성 기록 썸네일이 틀리고 새 그림 파일도 지켜지지 않는다(2026-10-31 재검토 지적).
+    await regenerate(post('/api/artist/versions/regenerate', { projectId: P, styleAnchorKey: 'watercolor' }))
+    landNewImages('g2')
+    await loadVersion(post('/api/artist/versions/load', { projectId: P, n: 1 }))
+    const before = (versionRows().find((row) => row.n === 1)!.snapshot as { locations: Array<{ locationId: string; appearanceKey: string | null; wideShot: { url: string } }> }).locations
+    // v1 이 지금인 동안 복도 기본 모습만 다시 그렸다(밤 모습은 그대로 v2 때 그림).
+    const at = new Date(Date.now() + 5000).toISOString()
+    const redrawn = mediaUrlOf(place('hall_wide_shot_g3.png'))
+    state.db.objects.set(pathOf(redrawn), { bytes: Buffer.from('g3') })
+    state.db.rows('locations')[0].wide_shot = redrawn
+    for (const cand of state.db.rows('location_image_candidates')) if (cand.location_id === 'hall') cand.is_selected = false
+    state.db.rows('location_image_candidates').push({ id: 'lc-hall-g3', project_id: P, location_id: 'hall', view: 'wide_shot', variant_key: null, url: redrawn, source_hash: 'x', appearance_hash: 'x', is_selected: true, pinned: false, generated_at: at })
+    await loadVersion(post('/api/artist/versions/load', { projectId: P, n: 2 }))
+    const after = (versionRows().find((row) => row.n === 1)!.snapshot as { locations: Array<{ locationId: string; appearanceKey: string | null; wideShot: { url: string; sourceUrl?: string } }> }).locations
+    const base = after.find((entry) => entry.locationId === 'hall' && entry.appearanceKey === null)!
+    expect(base.wideShot.sourceUrl).toBe(redrawn)
+    expect(state.db.objects.get(pathOf(base.wideShot.url))?.bytes.toString()).toBe('g3')
+    expect(after.find((entry) => entry.appearanceKey === 'night')).toEqual(before.find((entry) => entry.appearanceKey === 'night'))
   })
 
   it('지금 그림이 이 작품 브레이크다운에 올린 그림(그대로 쓰기)인 칸은 재생성에서 다시 그리지 않고, 남기는 버전 기록에는 그 그림도 남긴다', async () => {
