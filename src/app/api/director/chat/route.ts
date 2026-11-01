@@ -64,7 +64,7 @@ For pure discussion, omit the JSON block.
 <canvas_model>
 - Node kinds:
   - 'scene' (chart-3 주황, 씬 메타 컨테이너): label, location, timeOfDay, mood, description
-  - 'shot' (chart-4 녹, 영상 생성 단위): prompt, camera (6-axis -10~+10), lighting (position/brightness/colorTemp), cameraPreset (brand/focalLength/aperture/whiteBalance), provider (happy-horse/seedance/kling-o3/veo/local)
+  - 'shot' (chart-4 녹, 영상 생성 단위): prompt, camera (6-axis -10~+10), lighting (position/brightness/colorTemp), cameraPreset (brand/focalLength/aperture/whiteBalance), provider (happy-horse/seedance/seedance-2.5/kling-o3/veo)
   - 'video' (chart-5 빨강계, Shot의 자식 take): override 필드만 마더 Shot과 다르게. final 마킹 ★ 1개만 Editor로
 - Edges:
   - 'parent' Scene→Shot, Shot→Video (자동, 사용자 수동 안 함)
@@ -84,7 +84,7 @@ Non-destructive (direct execution):
 1. {"type":"addScene","label":"...","location":"...","timeOfDay":"...","mood":"...","description":"...","tempId":"S1"}
 2. {"type":"addShot","sceneId":"<sceneId|tempId>","label":"...","prompt":"...","tempId":"H1"}
 3. {"type":"updateScene","id":"<id>","patch":{"label":"...","location":"...","timeOfDay":"...","mood":"...","description":"..."}}
-4. {"type":"updateShot","id":"<id>","patch":{"label":"...","prompt":"...","provider":"happy-horse"|"seedance"|"kling-o3"|"veo"}}
+4. {"type":"updateShot","id":"<id>","patch":{"label":"...","prompt":"...","provider":"happy-horse"|"seedance"|"seedance-2.5"|"kling-o3"|"veo"}}
 5. {"type":"addVideoTake","shotId":"<id>","override":{"prompt":"...","camera":{...},"lighting":{...},"cameraPreset":{...}},"tempId":"V1"}
 6. {"type":"setCamera","id":"<shotOrVideoId>","camera":{"horizontal":0,"vertical":0,"pan":0,"tilt":0,"roll":0,"zoom":0}}
 7. {"type":"setLighting","id":"<shotOrVideoId>","lighting":{"position":"left|top|right|front","brightness":50,"colorTemp":5600}}
@@ -219,6 +219,7 @@ const VALID_UPDATE_TYPES = new Set([
 const VALID_PROVIDERS = new Set([
   'happy-horse',
   'seedance',
+  'seedance-2.5',
   'kling-o3',
   'veo',
   'kling', // legacy → normalizeProvider가 'kling-o3'로

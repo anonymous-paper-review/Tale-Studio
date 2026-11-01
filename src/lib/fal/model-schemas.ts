@@ -5,6 +5,7 @@ import type { VideoModelKey } from '@/lib/video-models'
 const FAL_VIDEO_MODEL_ENDPOINTS: Record<VideoModelKey, string> = {
   'happy-horse': 'alibaba/happy-horse/reference-to-video',
   seedance: 'bytedance/seedance-2.0/reference-to-video',
+  'seedance-2.5': 'bytedance/seedance-2.5/us/reference-to-video',
   'kling-o3': 'fal-ai/kling-video/o3/pro/reference-to-video',
   veo: 'fal-ai/veo3.1/reference-to-video',
 }
@@ -33,6 +34,24 @@ const SEEDANCE_REFERENCE_TO_VIDEO_FIELDS = [
   'aspect_ratio',
   'generate_audio',
   'bitrate_mode',
+  'end_user_id',
+] as const
+
+// bytedance/seedance-2.5/us/reference-to-video schema (2026-11-01).
+const SEEDANCE_25_REFERENCE_TO_VIDEO_FIELDS = [
+  'prompt',
+  'image_urls',
+  'video_urls',
+  'audio_urls',
+  'task',
+  'resolution',
+  'duration',
+  'aspect_ratio',
+  'generate_audio',
+  'draft',
+  'bitrate_mode',
+  'codec',
+  'seed',
   'end_user_id',
 ] as const
 
@@ -227,6 +246,9 @@ export const FAL_INPUT_ALLOWLIST: Record<string, Set<string>> = {
 
   seedance: fieldSet(SEEDANCE_REFERENCE_TO_VIDEO_FIELDS),
   [FAL_VIDEO_MODEL_ENDPOINTS.seedance]: fieldSet(SEEDANCE_REFERENCE_TO_VIDEO_FIELDS),
+
+  'seedance-2.5': fieldSet(SEEDANCE_25_REFERENCE_TO_VIDEO_FIELDS),
+  [FAL_VIDEO_MODEL_ENDPOINTS['seedance-2.5']]: fieldSet(SEEDANCE_25_REFERENCE_TO_VIDEO_FIELDS),
 
   'kling-o3': fieldSet(KLING_O3_REFERENCE_TO_VIDEO_FIELDS),
   [FAL_VIDEO_MODEL_ENDPOINTS['kling-o3']]: fieldSet(KLING_O3_REFERENCE_TO_VIDEO_FIELDS),

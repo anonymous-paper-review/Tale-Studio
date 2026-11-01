@@ -32,6 +32,28 @@ describe('영상 모델 선택 기준', () => {
     expect(Object.keys(VIDEO_MODELS)).not.toContain('local')
   })
 
+  // 왜: 정상 경로 고정(오너 2026-11-01). 디렉터 영상 노드에서 Seedance 2.5 를 고르면 fal 의 Seedance 2.5 로 만들어야 한다.
+  //   fal 에는 Seedance 2.5 참고 영상 모델이 미국 서버 입구(us)로만 있다.
+  it('Seedance 2.5 를 고르면 fal 의 Seedance 2.5 참고 영상 모델로 만든다', () => {
+    expect(VIDEO_MODELS['seedance-2.5'].label).toBe('Seedance 2.5')
+    expect(VIDEO_MODELS['seedance-2.5'].endpoint).toBe('bytedance/seedance-2.5/us/reference-to-video')
+    expect(normalizeProvider('seedance-2.5')).toBe('seedance-2.5')
+  })
+
+  // 왜: 모델 단추가 늘어도 처음 고르는 모델(Seedance 2.0)은 그대로이고, 같은 계열 새 판은 옆에 있어야 찾기 쉽다.
+  it('영상 모델 목록에서 Seedance 2.5 는 Seedance 2.0 바로 다음에 있고 기본 모델은 그대로 Seedance 2.0 이다', () => {
+    expect(FAL_VIDEO_MODEL_ORDER.indexOf('seedance-2.5')).toBe(FAL_VIDEO_MODEL_ORDER.indexOf('seedance') + 1)
+    expect(DEFAULT_VIDEO_MODEL).toBe('seedance')
+  })
+
+  // 왜: Seedance 2.5 는 30초까지 만들 수 있지만 Take 는 길이와 상관없이 한 편 값이다. 다른 모델과 같은 15초에서 끊는다.
+  it('Seedance 2.5 영상 길이는 4~15초 안으로 맞추고 480p · 720p · 1080p 를 낼 수 있다', () => {
+    const spec = VIDEO_MODELS['seedance-2.5']
+    expect(clampDuration(spec, 2)).toBe(4)
+    expect(clampDuration(spec, 30)).toBe(15)
+    expect(spec.resolutions).toEqual(['480p', '720p', '1080p'])
+  })
+
   it('영상 길이를 넣으면 모델이 허용하는 범위 안으로 맞추고 고정 길이 모델은 정해진 길이를 쓴다', () => {
     const spec = VIDEO_MODELS[DEFAULT_VIDEO_MODEL]
     expect(spec.duration.mode).toBe('flexible')

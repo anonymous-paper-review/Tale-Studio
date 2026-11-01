@@ -63,4 +63,13 @@ describe('감독 채팅의 영상 모델 변경', () => {
 
     expect(updates[0]!.patch).toEqual({ label: 'river_gaze', provider: 'kling-o3' })
   })
+
+  // 왜: 화면 단추로 고를 수 있는 Seedance 2.5(오너 2026-11-01)를 감독 채팅으로 바꾸라고 해도 똑같이 받아야 한다.
+  it('감독 채팅이 Seedance 2.5 로 바꾸라고 하면 받아들인다', async () => {
+    const updates = await updatesOf([
+      { type: 'updateShot', id: 'dn_shot_1', patch: { label: 'river_gaze', provider: 'seedance-2.5' } },
+    ])
+
+    expect(updates[0]!.patch).toEqual({ label: 'river_gaze', provider: 'seedance-2.5' })
+  })
 })

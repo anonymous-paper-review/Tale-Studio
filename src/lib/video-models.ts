@@ -1,7 +1,7 @@
 // ============================================================================
 // Video model registry — Director 영상 생성 모델 카탈로그.
 //
-// FAL reference-to-video 모델 4종을 단일 레지스트리로 묶는다. generate-video
+// FAL reference-to-video 모델 5종을 단일 레지스트리로 묶는다. generate-video
 // 라우트가 이 spec으로 input(duration/audio/resolution)을 구성하고, store/popup이
 // model key·label·가격 힌트를 소비한다.
 //
@@ -10,7 +10,7 @@
 // 저장된 'local' 이름은 normalizeProvider 가 기본 모델로 바꿔 읽는다.
 //
 // duration 처리(#4):
-//   - flexible 모델(happy-horse/seedance/kling-o3): shot durationSeconds를 그대로
+//   - flexible 모델(happy-horse/seedance/seedance-2.5/kling-o3): shot durationSeconds를 그대로
 //     duration(정수)로 전달 (1안). clampDuration으로 min~max 안에 가둔다.
 //   - fixed 모델(veo): API가 8초 고정("8s"). 에디터가 shot durationSeconds로 트림
 //     하고, 라우트는 prompt에 "N초 후 black screen" 지시를 덧붙인다 (2안).
@@ -19,6 +19,7 @@
 export type VideoModelKey =
   | 'happy-horse'
   | 'seedance'
+  | 'seedance-2.5'
   | 'kling-o3'
   | 'veo'
 
@@ -62,6 +63,7 @@ export const DEFAULT_VIDEO_MODEL: VideoModelKey = 'seedance'
 /** UI 모델 선택지 순서(#ui-cleanup 2026-08-31) — fal.ai 카탈로그 모델만. */
 export const FAL_VIDEO_MODEL_ORDER: VideoModelKey[] = [
   'seedance',
+  'seedance-2.5',
   'happy-horse',
   'kling-o3',
   'veo',
@@ -91,6 +93,21 @@ export const VIDEO_MODELS: Record<VideoModelKey, VideoModelSpec> = {
     resolutions: ['480p', '720p', '1080p'],
     defaultResolution: '720p',
     pricePerSecNoAudio: 0.3024,
+  },
+  // 2026-11-01 오너: 디렉터 영상 모델에 Seedance 2.5 를 더한다. fal 에는 미국 서버 입구(us)만 있다.
+  //   fal 은 30초까지 받지만 Take 가 길이와 상관없는 한 편 값이라 다른 모델과 같은 15초에서 끊는다. 4k 는 없다.
+  //   초당 가격 힌트 = Seedance 2.0 × 1.53(1000 토큰당 0.0214 대 0.014 달러, 2026-11-01 fal 가격표).
+  'seedance-2.5': {
+    key: 'seedance-2.5',
+    label: 'Seedance 2.5',
+    endpoint: 'bytedance/seedance-2.5/us/reference-to-video',
+    duration: { mode: 'flexible', min: 4, max: 15 },
+    refParam: 'image_urls',
+    audioParam: 'generate_audio',
+    audioDefault: true,
+    resolutions: ['480p', '720p', '1080p'],
+    defaultResolution: '720p',
+    pricePerSecNoAudio: 0.4622,
   },
   'kling-o3': {
     key: 'kling-o3',

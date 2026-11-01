@@ -7,6 +7,7 @@
 // ⚠ 계수 확정 상태: seedance(Seedance 2.0)=5 만 v4 확정값. kling-o3/veo=5 는 **잠정**(기획 확정
 //   대상) — 오너가 v4 시트에 최종 숫자를 박으면 이 표만 갱신하면 된다(호출부 변경 불필요).
 //   happy-horse=1 은 저해상도 드래프트 모델 기준.
+//   seedance-2.5=8 (2026-11-01): fal 원가가 Seedance 2.0 의 1.53배(1000 토큰당 0.0214 대 0.014 달러) — 5 × 1.53 = 7.6 을 올렸다.
 //
 // 해상도(오너 2026-10-31): 위 계수는 720p 값이다. 1080p 는 두 배. 배수는 모델이 실제로 낼 해상도
 //   (effectiveVideoResolution)로 정한다 — 해상도 칸이 없는 모델(Kling O3 Pro)은 1080p 를 골라 두어도 한 배다.
@@ -17,6 +18,7 @@ import { effectiveVideoResolution, type VideoModelKey, type VideoResolution } fr
 export const TAKE_COST_BY_MODEL: Record<VideoModelKey, number> = {
   'happy-horse': 1,
   seedance: 5, // v4 확정
+  'seedance-2.5': 8, // 원가 비례(2.0 의 1.53배) — 오너 확인 대상
   'kling-o3': 5, // 잠정 — 기획 확정 대상
   veo: 5, // 잠정 — 기획 확정 대상
 }

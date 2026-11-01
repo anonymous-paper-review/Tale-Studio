@@ -19,6 +19,14 @@ describe('Take 사용량 계산', () => {
       expect(takeCostForVideo('veo')).toBe(5)
     })
 
+    // 왜: fal 원가가 Seedance 2.0 의 1.53배다(1000 토큰당 0.0214 대 0.014 달러, 2026-11-01 fal 가격표).
+    //   2.0 의 5 Take × 1.53 = 7.6 을 올려 8 Take 로 한다. 1080p 는 다른 모델과 같이 두 배다.
+    it('Seedance 2.5 는 720p 한 편에 8 Take, 1080p 한 편에 16 Take 를 쓴다', () => {
+      expect(takeCostForVideo('seedance-2.5', '720p')).toBe(8)
+      expect(takeCostForVideo('seedance-2.5', '1080p')).toBe(16)
+      expect(takeCostForVideo('seedance-2.5')).toBe(8)
+    })
+
     it('모델을 지정하지 않으면 영상 Take 1을 적용한다', () => {
       expect(takeCostForVideo(null)).toBe(1)
       expect(takeCostForVideo(undefined)).toBe(1)
