@@ -42,6 +42,7 @@ import { HoverBeam } from '@/components/hover-beam'
 import { ThumbImage } from '@/components/thumb-image'
 import { MarkdownText } from '@/components/layout/markdown-text'
 import { scrubInternalIdsInProse } from '@/lib/display-names'
+import { roughRedrawOfferHere } from '@/lib/writer/chat-rough-redraw'
 import { MentionTextarea, type MentionItem } from '@/components/layout/mention-textarea'
 import { ChatProgressPin } from '@/components/layout/chat-progress-pin'
 import { ChatModelControls } from '@/components/layout/chat-model-controls'
@@ -447,6 +448,8 @@ export function GlobalChat() {
   const clearError = useGlobalChatStore((s) => s.clearError)
   const loadMessages = useGlobalChatStore((s) => s.loadMessages)
   const suggestion = useGlobalChatStore((s) => s.suggestion)
+  // 지금 열린 Storyboard 보드의 프로젝트 — [러프 다시 그리기] 카드는 그 보드에서만 보인다(리뷰 B1).
+  const boardProjectId = useBoardUiStore((s) => s.boardProjectId)
   const pendingNavigatePath = useGlobalChatStore((s) => s.pendingNavigatePath)
   const directorHandoff = useGlobalChatStore((s) => s.directorHandoff)
   const workflowNavigation = useGlobalChatStore((s) => s.workflowNavigation)
@@ -971,8 +974,10 @@ export function GlobalChat() {
     }
     // 채팅 고치기 뒤 [러프 다시 그리기](2026-10-31 QA) — 보드가 그 샷들만 다시 그린다(카드의 다시 시도와 같은 길 · 잠금 표시).
     if (action.kind === 'roughRedraw') {
+      // 그 프로젝트의 Storyboard 보드가 열려 있을 때만 맡긴다(리뷰 B1) — 다른 화면에서는 카드도 보이지 않는다.
+      if (!roughRedrawOfferHere(action, useBoardUiStore.getState().boardProjectId)) return
       dismissSuggestion()
-      useBoardUiStore.getState().requestRoughRedraw(action.shotIds)
+      useBoardUiStore.getState().requestRoughRedraw(action.projectId, action.shotIds)
       return
     }
     // 씬 게이트 확정(#s3-gate P3b) — 게이트 패널의 [이대로 확정]과 같은 API. 성공 전환은
@@ -1270,7 +1275,8 @@ export function GlobalChat() {
   // 계단식 등장(#chat-settle) — settle 후 보이는 임시 블록이 위에서부터 CASCADE_STEP_MS 간격으로
   //   나타난다. fill-mode backwards: 자기 차례 전까지 첫 키프레임(투명)에 머문다.
   const showSuggestion =
-    !!suggestion?.action && suggestion.action.kind !== 'choices' && !choices && !(suggestion.action.kind === 'confirmScenes' && (sceneStoryProposal || sceneStoryProposalPending?.projectId === projectId))
+    !!suggestion?.action && suggestion.action.kind !== 'choices' && !choices && !(suggestion.action.kind === 'confirmScenes' && (sceneStoryProposal || sceneStoryProposalPending?.projectId === projectId)) &&
+    roughRedrawOfferHere(suggestion.action, boardProjectId)
   const showProposal = !!pendingProposal
   let cascadeSlots = 0
   const suggestionSlot = showSuggestion ? cascadeSlots++ : 0

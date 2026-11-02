@@ -59,7 +59,8 @@ import { useArtistVersionStore } from '@/stores/artist-version-store'
 import { useWriterRoomStore } from '@/stores/writer-room-store'
 import { restartWriterStatus } from '@/lib/writer/use-writer-status'
 import { completeKoreanDialogue, dialogueHandoffTarget } from '@/lib/writer/dialogue-handoff'
-import { shotsToRedrawAfterChat } from '@/lib/writer/chat-rough-redraw'
+import { roughRedrawCandidates, roughVisibleState, type RoughVisibleState } from '@/lib/writer/chat-rough-redraw'
+import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { handoffToStage } from '@/lib/stage-nav'
 import {
   loadLatestChatTrace,
@@ -140,7 +141,7 @@ export interface ChatSuggestion {
     // 작품 스타일 기록(2026-10-28, 프로토타입 AY) — "이전 스타일로 돌아갈까요?": 버전마다 [v{n} · 스타일 불러오기], 없으면 [재생성하기].
     | { kind: 'artistVersions'; options: Array<{ n: number; label: string }>; regenerate: boolean }
     // Storyboard 채팅 고치기 뒤(2026-10-31 QA) — 글만 바뀌어 낡은 러프를 그 샷들만 다시 그린다. 누를 때만 그린다(채팅은 그림을 만들지 않는다).
-    | { kind: 'roughRedraw'; shotIds: string[]; label: string }
+    | { kind: 'roughRedraw'; projectId: string; shotIds: string[]; label: string }
     | null
   /** 새로고침으로 복원한 선택지는 표시 전용이며 action을 복원하지 않는다. */
   restoredChoices?: { options: string[] }
@@ -2452,6 +2453,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const turnArtistSelection = artistSelection?.projectId === projectId ? { ...artistSelection } : null
     let endpoint: string
     let body: Record<string, unknown>
+    // 러프 그림에 보이는 칸의 턴 시작 모습 — 턴 끝과 견줘 실제로 바뀐 것만 [러프 다시 그리기]를 묻는다(2026-11-01 리뷰 M3).
+    let roughBefore: RoughVisibleState | null = null
 
     switch (stage) {
       case 'producer': {
@@ -2552,6 +2555,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       case 'writer': {
         // Writers' Room agentic 모드 — 스크립트 라인 스냅샷을 컨텍스트와 L번호 해석표에 함께 사용.
         const writerState = useWriterStore.getState()
+        roughBefore = roughVisibleState(writerState.sceneManifest, writerState.shots)
         const scriptLines = buildScriptLines(writerState.sceneManifest, writerState.shots)
         const lineRefs = resolveLineRefs(trimmed, scriptLines)
         endpoint = '/api/writer/chat'
@@ -3552,18 +3556,23 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         if (projectId) saveChatMessage(projectId, stage, 'model', finalReply)
         pendingReplyId = null
       }
-      // 채팅 고치기는 글만 저장한다(그림 생성 없음). 러프가 있는 샷의 그림에 보이는 칸(스토리 · 샷 타입 · 등장인물)을 바꿨으면
-      //   그림은 예전 그대로라고 알리고 [러프 다시 그리기]를 준다 — 누르면 보드가 그 샷들만 다시 그린다(2026-10-31 QA:
-      //   "더 어둡게 바꿔 저장했어요"라는 답 뒤에도 보드 그림이 그대로라 고치기가 죽은 것처럼 보였다).
-      if (stage === 'writer' && projectId && isCurrentSession()) {
-        const redraw = shotsToRedrawAfterChat(completedTools, useWriterStore.getState().shots)
+      // 채팅 고치기는 글만 저장한다(그림 생성 없음). 러프가 있는 샷의 그림에 보이는 칸(스토리 · 샷 타입 · 등장인물, 씬의 장소 · 시간대 · 분위기)이
+      //   이 턴에 실제로 바뀌었으면 그림은 예전 그대로라고 알리고 [러프 다시 그리기]를 준다 — 누르면 보드가 그 샷들만 다시 그린다(2026-10-31 QA:
+      //   "더 어둡게 바꿔 저장했어요"라는 답 뒤에도 보드 그림이 그대로라 고치기가 죽은 것처럼 보였다. 오너 2026-11-02 "단추로 묻기").
+      //   그 프로젝트의 Storyboard 보드가 열려 있을 때만 묻는다 — 다른 화면에서 눌린 요청이 다음 보드로 새지 않게(리뷰 B1).
+      if (stage === 'writer' && projectId && roughBefore && isCurrentSession() && useBoardUiStore.getState().boardProjectId === projectId) {
+        const writerAfter = useWriterStore.getState()
+        const redraw = roughRedrawCandidates(completedTools, roughBefore, roughVisibleState(writerAfter.sceneManifest, writerAfter.shots))
         if (redraw.length > 0) {
           const locale = contentLocale()
+          const fromScene = completedTools.some((o) => o.call.name === 'edit_project' && o.result.status === 'ok' && (o.call.input as { resource?: unknown }).resource === 'scenes')
           get().offerSuggestion({
             id: `rough-redraw:${traceId}`,
             stage: 'writer',
-            content: translate(locale, 'The rough sketches of the shots you changed still show the old version. Redraw them with the changes? Each shot is one new picture.', { count: redraw.length }),
-            action: { kind: 'roughRedraw', shotIds: redraw, label: translate(locale, 'Redraw the rough') },
+            content: fromScene
+              ? translate(locale, 'The scene changed, so its rough sketches still show the old version. Redraw them with the changes? Shots to redraw: {count}. Each shot is one new picture.', { count: redraw.length })
+              : translate(locale, 'The rough sketches of the shots you changed still show the old version. Redraw them with the changes? Shots to redraw: {count}. Each shot is one new picture.', { count: redraw.length }),
+            action: { kind: 'roughRedraw', projectId, shotIds: redraw, label: translate(locale, 'Redraw the rough') },
           })
         }
       }

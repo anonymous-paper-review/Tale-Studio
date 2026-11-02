@@ -645,13 +645,19 @@ export function RoughStoryboardView() {
   )
 
   // 채팅 고치기 뒤 [러프 다시 그리기](2026-10-31 QA) — 고친 샷들만 위 [남은 컷 다시 그리기]와 같은 길로 다시 그린다.
-  //   보드가 이미 그리는 중이면 끝난 뒤에 받는다(요청을 버리지 않는다).
+  //   보드가 이미 그리는 중이면 끝난 뒤에 받는다. 요청은 프로젝트에 묶여 있다 — 이 보드의 프로젝트 것만 그리고, 다른 프로젝트 것은 버린다.
+  //   이 보드가 열려 있는 동안만 채팅이 묻고, 보드가 내려가거나 프로젝트가 바뀌면 남은 요청을 지운다(2026-11-01 리뷰 B1).
+  useEffect(() => {
+    if (!projectId) return
+    useBoardUiStore.getState().openBoard(projectId)
+    return () => useBoardUiStore.getState().closeBoard(projectId)
+  }, [projectId])
   const roughRedrawRequest = useBoardUiStore((s) => s.roughRedrawRequest)
   useEffect(() => {
-    if (!roughRedrawRequest || pumpActive) return
-    useBoardUiStore.getState().consumeRoughRedraw(roughRedrawRequest.id)
-    void drawShots(roughRedrawRequest.shotIds)
-  }, [roughRedrawRequest, pumpActive, drawShots])
+    if (!roughRedrawRequest || pumpActive || !projectId) return
+    const shotIds = useBoardUiStore.getState().takeRoughRedraw(projectId)
+    if (shotIds) void drawShots(shotIds)
+  }, [roughRedrawRequest, pumpActive, projectId, drawShots])
 
   const running = !!(
     status?.started &&
