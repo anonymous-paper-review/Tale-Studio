@@ -293,7 +293,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           >
             <GeneratedImage
               src={data.thumbnailUrl}
-              alt={data.label}
+              alt={`${parentShotTitle ?? directorNodeLabel(data, boardNames)} · ${t('Take {n}', { n: data.takeNumber })}`}
               className="h-full w-full object-cover"
             />
             {data.videoUrl && (

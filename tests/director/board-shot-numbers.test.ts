@@ -1,7 +1,8 @@
 // Director 캔버스 · 격자 · 채팅 @멘션 · 채팅 모델에 보내는 캔버스 목록이 샷과 씬을 보드와 같은 전체 번호로 부르는지 검사한다
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { boardNodeNames, directorMentionTargets, directorNodeLabel, sortByBoard } from '@/features/director/node-label'
+import { boardNodeNames, directorFullLabel, directorMentionTargets, directorNodeLabel, sortByBoard } from '@/features/director/node-label'
+import { translate } from '@/lib/i18n/translate'
 import { sceneShotMentions } from '@/lib/card-mention'
 import { serializeDirectorCanvasContext } from '@/stores/director-store'
 import { CHAT_OUTPUT_FORMAT_GUIDE } from '@/lib/chat-format'
@@ -74,6 +75,25 @@ describe('Director 도 보드와 같은 전체 번호', () => {
     // 모든 단계가 함께 쓰는 답 쓰기 규칙도 id 숫자 이름("Scene 2 · Shot 7")을 가르치지 않는다.
     expect(CHAT_OUTPUT_FORMAT_GUIDE).not.toContain('"Scene 2 · Shot 7"')
     expect(CHAT_OUTPUT_FORMAT_GUIDE).toContain('보드 이름')
+  })
+
+  // 왜: 오너 2026-11-02 "Director 화면 샷 이름 → 보드 번호" — 그림 대체 글(화면 읽기 · 그림이 안 뜰 때 보이는 글)과 노드 지우기 확인 창이
+  //   내부 id("sh_02_07" 노드를 삭제할까요?)를 그대로 보였다. 이웃한 화면과 같은 이름으로 — 격자 카드는 "Scene 2 · Shot 8",
+  //   노드는 "Shot 8", 지우기 창은 씬 맥락이 없어 "Scene 2 · Shot 8"(영상 테이크는 "… · 테이크 1").
+  it('Director 그림 대체 글과 노드 지우기 확인 창도 내부 id 대신 보드 이름으로 부른다', () => {
+    expect(directorFullLabel(shotNode('n1', 'sh_02_02', null).data, names)).toBe('Scene 3 · Shot 4')
+    expect(directorFullLabel(sceneNode('s3', 'sc_03').data, names)).toBe('Scene 2')
+    expect(directorFullLabel(shotNode('n9', null, null, 'river_gaze').data, names)).toBe('river_gaze')
+    expect(translate('ko', 'Delete the "{label}" node?', { label: 'Scene 2 · Shot 8' })).toBe('"Scene 2 · Shot 8" 노드를 삭제할까요?')
+    expect(translate('ko', '{label} (previz)', { label: 'Scene 2 · Shot 8' })).toBe('Scene 2 · Shot 8 (목각)')
+    expect(translate('ko', '{label} storyboard', { label: 'Shot 8' })).toBe('Shot 8 스토리보드')
+    const modal = readFileSync('src/features/director/canvas-popups/DeleteConfirmModal.tsx', 'utf8')
+    expect(modal).toContain('directorFullLabel(')
+    expect(modal).toContain("t('Delete the \"{label}\" node?'")
+    expect(modal).not.toMatch(/node\.data\.label \|\|/)
+    for (const file of ['src/features/director/canvas-views/StoryboardGridView.tsx', 'src/features/director/canvas-nodes/ShotNode.tsx', 'src/features/director/canvas-nodes/VideoNode.tsx']) {
+      expect(readFileSync(file, 'utf8')).not.toMatch(/alt=\{(`\$\{)?data\.label/)
+    }
   })
 
   // 왜: 이름이 보드 번호가 되면, 나중에 끼워 넣은 샷이 격자 끝에 붙어 "Shot 1, 2, 4, 5, 3"처럼 보였다 — 격자도 보드 순서로 늘어놓는다.

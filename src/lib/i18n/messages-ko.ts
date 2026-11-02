@@ -711,7 +711,9 @@ export const KO: Record<string, string> = {
   '⚠ Includes a take marked ★ Final. This may affect the Editor handoff.':
     '⚠ ★ Final로 마킹된 테이크가 포함됩니다. Editor 핸드오프에 영향이 있을 수 있어요.',
   'Delete node': '노드 삭제',
-  'Delete the "{label}" ({kind}) node?': '"{label}" ({kind}) 노드를 삭제할까요?',
+  'Delete the "{label}" node?': '"{label}" 노드를 삭제할까요?',
+  '{label} (previz)': '{label} (목각)',
+  '{label} storyboard': '{label} 스토리보드',
   'Define relationship': '관계 정의',
   'Record the narrative relationship between the two nodes in one line.': '두 노드의 내러티브 관계를 한 줄로 기록할 수 있어요.',
   'Narrative (optional)': '내러티브 (선택)',

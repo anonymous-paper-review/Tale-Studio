@@ -209,6 +209,8 @@ function ShotCell({
   const requestMentionToggle = useChatUiStore((s) => s.requestMentionToggle)
   // 실사 이미지가 없을 때 러프 스토리보드 폴백 표시(#e11) — writer-store 스코프 구독
   const writerShotId = isShotData(node.data) ? node.data.writerShotId : null
+  // 그림 대체 글은 카드 제목과 같은 이름("Scene 2 · Shot 8") — 내부 id 를 보이지 않는다(오너 2026-11-02).
+  const cardName = sceneLabel ? `${sceneLabel} · ${shotLabel}` : shotLabel
   const rough = useRoughStoryboard(writerShotId)
   // 카드 설명문(#e5 2026-08-12) — EN 렌더 프롬프트가 아니라 writer 의 유저 언어 산출
   //   (shots.action_description_native → writer-store actionDescription)을 그대로 쓴다.
@@ -506,7 +508,7 @@ function ShotCell({
         {framePanel && !generating ? (
           <RoughFrameCycle
             panel={framePanel}
-            alt={mediaMode === 'previz' ? `${data.label} (previz)` : data.label}
+            alt={mediaMode === 'previz' ? t('{label} (previz)', { label: cardName }) : cardName}
             introPlay
             sizeToImage
           />
@@ -514,7 +516,7 @@ function ShotCell({
           // 구형 단일 패널 러프(3프레임 이전 데이터) → 대표 프레임 표시
           <GeneratedImage
             src={roughStartUrl}
-            alt={`${data.label} (previz)`}
+            alt={t('{label} (previz)', { label: cardName })}
             className="size-full object-cover"
           />
         ) : completedVideoUrl ? (
@@ -523,11 +525,11 @@ function ShotCell({
         ) : hasImage ? (
           img!.frames ? (
             // 실사 3프레임(#real-strip) — 러프 보드와 동일한 hover 순환(START→DIRECTING→END).
-            <RoughFrameCycle panel={img!} alt={data.label} />
+            <RoughFrameCycle panel={img!} alt={cardName} />
           ) : (
             <GeneratedImage
               src={img!.url}
-              alt={data.label}
+              alt={cardName}
               className="size-full object-cover"
             />
           )

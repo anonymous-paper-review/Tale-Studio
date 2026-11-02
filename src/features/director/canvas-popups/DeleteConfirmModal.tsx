@@ -11,6 +11,9 @@ import {
 import { Button } from '@/components/ui/button'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useT } from '@/lib/i18n'
+import { directorFullLabel } from '@/features/director/node-label'
+import { useBoardNodeNames } from '@/features/director/hooks/use-board-node-names'
+import { isShotData, isVideoData } from '@/types/director'
 
 export function DeleteConfirmModal() {
   const t = useT()
@@ -20,6 +23,7 @@ export function DeleteConfirmModal() {
     (s) => s.closeDeleteConfirm,
   )
   const confirmDelete = useDirectorCanvasStore((s) => s.confirmDelete)
+  const boardNames = useBoardNodeNames()
 
   if (!info) return null
 
@@ -30,7 +34,12 @@ export function DeleteConfirmModal() {
   }
 
   const kind = node.data.kind
-  const label = node.data.label || '(untitled)'
+  // 이름은 보드 번호로(오너 2026-11-02 "Director 화면 샷 이름 → 보드 번호") — 내부 id("sh_02_07")를 보이지 않는다.
+  //   영상 테이크는 부모 샷 이름에 테이크 번호를 붙인다("Scene 2 · Shot 8 · 테이크 1").
+  const parent = isVideoData(node.data) && node.data.parentShotNodeId ? nodes.find((n) => n.id === (node.data as { parentShotNodeId: string }).parentShotNodeId) : undefined
+  const label = (isVideoData(node.data) && parent && isShotData(parent.data)
+    ? `${directorFullLabel(parent.data, boardNames)} · ${t('Take {n}', { n: node.data.takeNumber })}`
+    : directorFullLabel(node.data, boardNames)) || '(untitled)'
 
   const cascadeLines: string[] = []
   if (kind === 'scene') {
@@ -70,7 +79,7 @@ export function DeleteConfirmModal() {
         <DialogHeader>
           <DialogTitle>{t('Delete node')}</DialogTitle>
           <DialogDescription>
-            {t('Delete the "{label}" ({kind}) node?', { label, kind })}
+            {t('Delete the "{label}" node?', { label })}
           </DialogDescription>
         </DialogHeader>
 

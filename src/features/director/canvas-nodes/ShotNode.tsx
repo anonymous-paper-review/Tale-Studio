@@ -61,6 +61,8 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   // #payments-phase-2 v4 #2: 생성 전 소모량 표시 — mode==='off'면 배지를 숨긴다(현재 기본값).
 
   if (!isShotData(data)) return null
+  // 노드 제목 · 그림 대체 글은 보드와 같은 이름("Shot 8") — 내부 id 를 보이지 않는다(오너 2026-11-02).
+  const nodeTitle = directorNodeLabel(data, boardNames)
 
   const camActiveAxes = (
     ['horizontal', 'vertical', 'pan', 'tilt', 'roll', 'zoom'] as const
@@ -95,7 +97,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       <BaseNode
         id={id}
         theme="shot"
-        title={directorNodeLabel(data, boardNames)}
+        title={nodeTitle}
         selected={selected}
         width={280}
         stale={data.stale}
@@ -136,7 +138,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           >
             {realImage ? (
               realImage.frames ? (
-                <RoughFrameCycle panel={realImage} alt={`${data.label} storyboard`} />
+                <RoughFrameCycle panel={realImage} alt={t('{label} storyboard', { label: nodeTitle })} />
               ) : (
                 <ThumbImage
                   src={realImage.url}
@@ -145,7 +147,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
                 />
               )
             ) : rough?.status === 'completed' && rough.frames ? (
-              <RoughFrameCycle panel={rough} alt={`${data.label} (previz)`} />
+              <RoughFrameCycle panel={rough} alt={t('{label} (previz)', { label: nodeTitle })} />
             ) : (
               <ThumbImage
                 src={stageImageUrl}

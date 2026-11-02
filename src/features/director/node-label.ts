@@ -69,6 +69,11 @@ export function directorBoardLabel(data: NamedNodeData, names: BoardNodeNames | 
   return boardEntry(data, names)?.label ?? null
 }
 
+/** 씬 맥락 없이 쓰는 이름(지우기 확인 창 · 그림 대체 글) — 보드의 샷은 "Scene 2 · Shot 8", 씬은 "Scene 2", 그 밖은 지금 이름. */
+export function directorFullLabel(data: NamedNodeData, names: BoardNodeNames | null | undefined): string {
+  return directorBoardLabel(data, names) ?? prettyNodeLabel(data.label)
+}
+
 /** 보드 순서로 늘어놓는다 — 보드의 씬 · 샷은 보드 순서, 나머지는 원래 순서대로 뒤에(안정 정렬). */
 export function sortByBoard<N extends { data: NamedNodeData }>(nodes: readonly N[], names: BoardNodeNames | null | undefined): N[] {
   const rank = (node: N) => boardEntry(node.data, names)?.order ?? Number.POSITIVE_INFINITY
