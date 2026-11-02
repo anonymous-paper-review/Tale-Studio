@@ -2560,7 +2560,7 @@ export const KO: Record<string, string> = {
   'It is made from the description below. The style stays the same.': '아래 설명대로 만들어요. 스타일은 그대로예요.',
   'The earlier image stays in the history (clock).': '이전 그림은 기록(시계 아이콘)에 남아요.',
   '{label} · edit': '{label} 고치기',
-  'Edit in two groups. Editing the start redraws the rough of this shot; editing the directing frame changes only that frame.': '두 묶음으로 고쳐요. 시작을 고치면 이 샷의 러프를 새로 그리고, 연출을 고치면 연출만 바뀌어요.',
+  'Edit in two groups. Changing the story or shot type redraws the rough of this shot, and changing only the dialogue just saves it. Editing the directing frame changes only that frame.': '두 묶음으로 고쳐요. 스토리나 샷 타입을 고치면 이 샷의 러프를 새로 그리고, 대사만 고치면 저장만 해요. 연출을 고치면 연출만 바뀌어요.',
   'Directing': '연출',
   'Not sketched yet': '스케치 전',
   'Edit the start': '시작 고치기',

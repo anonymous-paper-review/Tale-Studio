@@ -268,7 +268,7 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
         <DialogContent className="flex max-h-[92vh] flex-col gap-0 p-0 sm:max-w-[1080px]" showCloseButton={!busy} data-testid="shot-edit">
           <DialogHeader className="shrink-0 border-b border-border px-6 py-4">
             <DialogTitle className="text-base">{t('{label} · edit', { label })}</DialogTitle>
-            <DialogDescription>{t('Edit in two groups. Editing the start redraws the rough of this shot; editing the directing frame changes only that frame.')}</DialogDescription>
+            <DialogDescription>{t('Edit in two groups. Changing the story or shot type redraws the rough of this shot, and changing only the dialogue just saves it. Editing the directing frame changes only that frame.')}</DialogDescription>
           </DialogHeader>
           <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] md:overflow-hidden">
             <div className="flex min-w-0 flex-col gap-3 p-6 md:overflow-y-auto">
