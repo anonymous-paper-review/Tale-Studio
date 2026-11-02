@@ -1,5 +1,6 @@
 // 연출 그림 저장 · 한 장 다시 그리기 · 화살표 분리가 그 프로젝트 폴더의 파일만 덮어쓰고, 미리보기는 '그사이 다시 그려졌는지' 확인 뒤에만 바꾸는지 검사한다
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const PROJECT = '11111111-2222-4333-8444-555555555555'
@@ -78,6 +79,35 @@ describe('연출 고치기는 그 프로젝트 폴더의 파일만 덮어쓴다'
       `${WORKSPACE}/${PROJECT}/shots/v1-x_rough_direction.png`,
       `${WORKSPACE}/${PROJECT}/shots/v1-x_rough_start.jpg`,
     ])
+  })
+})
+
+describe('연출 고치기를 부르는 서버 길', () => {
+  // 왜: 2026-11-02 리뷰 L8 — 폴더 검사는 켜야 도는 칸(projectFolderOnly)이라, 새 서버 길이 이 함수들을 부르면서 칸을 빠뜨리면
+  //   검사 없이 남의 그림을 덮을 수 있다. src/app 의 모든 부르는 곳이 칸을 켜는지 본다.
+  it('연출 고치기를 부르는 모든 서버 길은 프로젝트 폴더 검사를 켠다', () => {
+    const files = (readdirSync('src/app', { recursive: true }) as string[])
+      .filter((file) => /\.(ts|tsx)$/.test(file))
+      .map((file) => join('src/app', file))
+    const calls: Array<{ file: string; args: string }> = []
+    for (const file of files) {
+      const src = readFileSync(file, 'utf8')
+      for (const name of ['separateArrowLayer', 'regenerateRoughFrame', 'regenerateEndFrame', 'saveDirectingFrame']) {
+        let at = src.indexOf(`${name}(`)
+        while (at >= 0) {
+          let depth = 0
+          let end = at + name.length
+          for (; end < src.length; end++) {
+            if (src[end] === '(') depth++
+            else if (src[end] === ')' && --depth === 0) break
+          }
+          calls.push({ file, args: src.slice(at, end + 1) })
+          at = src.indexOf(`${name}(`, end)
+        }
+      }
+    }
+    expect(calls.length).toBeGreaterThanOrEqual(4)
+    for (const call of calls) expect(call.args, `${call.file}: ${call.args}`).toContain('projectFolderOnly: true')
   })
 })
 
