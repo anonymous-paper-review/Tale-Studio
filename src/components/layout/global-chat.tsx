@@ -42,7 +42,7 @@ import { HoverBeam } from '@/components/hover-beam'
 import { ThumbImage } from '@/components/thumb-image'
 import { MarkdownText } from '@/components/layout/markdown-text'
 import { scrubInternalIdsInProse } from '@/lib/display-names'
-import { enterBelongsToElement } from '@/lib/chat-enter-key'
+import { enterAcceptsCard } from '@/lib/chat-enter-key'
 import { roughRedrawOfferHere } from '@/lib/writer/chat-rough-redraw'
 import { boardShotLabels } from '@/lib/writer/board-summary'
 import { MentionTextarea, type MentionItem } from '@/components/layout/mention-textarea'
@@ -1304,9 +1304,9 @@ export function GlobalChat() {
       const target = e.target as HTMLElement | null
       // 선택지 버튼의 Enter는 그 버튼의 동작이다. 함께 복원된 승인 카드를 실행하지 않는다.
       if (target?.closest('[data-chat-choices], [data-testid="scene-story-proposal"]')) return
-      // 포커스된 단추 · 누를 수 있는 줄 · 입력칸에서 친 Enter 는 그 요소의 것이다 — 채팅 안의 [나중에] · [다시 열기] · [취소]도(리뷰 M2 · M2b).
-      //   카드를 누르는 Enter 는 채팅 입력칸이나 아무것도 고르지 않은 곳의 것뿐이다. Esc(나중에)는 돈이 들지 않아 지금처럼 어디서 눌러도 카드를 내린다.
-      if (e.key === 'Enter' && enterBelongsToElement(target, textareaRef.current)) return
+      // 카드를 누르는 Enter 는 채팅 입력칸이나 아무것도 고르지 않은 곳(body)의 것뿐이다 — 포커스된 요소가 있으면 Enter 는 그 요소의 것이다
+      //   (리뷰 M2 · M2b · 3차 M2). Esc(나중에)는 돈이 들지 않아 지금처럼 어디서 눌러도 카드를 내린다.
+      if (e.key === 'Enter' && !enterAcceptsCard(target, textareaRef.current)) return
       const inChatInput = !!target && target === textareaRef.current
       // 다른 입력 요소(인라인 '직접 입력', 이름 변경 등)에 있으면 그쪽 몫.
       if (
