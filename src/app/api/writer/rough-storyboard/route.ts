@@ -218,7 +218,7 @@ export async function POST(req: Request) {
         supabaseAdmin
           .from('shots')
           .select(
-            'shot_id, scene_id, shot_type, action_description, characters, camera_config, lighting_config, focal_length, aperture, duration_seconds, rough_storyboard, design_ref, check_notes, prompt, static_spec, dynamic_spec',
+            'shot_id, scene_id, shot_type, action_description, characters, camera_config, lighting_config, focal_length, aperture, duration_seconds, rough_storyboard, design_ref, check_notes, prompt, static_spec, dynamic_spec, created_at',
           )
           .eq('project_id', projectId)
           .order('sort_order'),
@@ -245,7 +245,7 @@ export async function POST(req: Request) {
         // 별도 상태 저장 없음 — 실패 잡의 존재가 진실 (architecture §0).
         supabaseAdmin
           .from('generation_jobs')
-          .select('target')
+          .select('target, created_at')
           .eq('project_id', projectId)
           .eq('kind', 'shot_rough_storyboard')
           .eq('status', 'failed'),
@@ -315,10 +315,16 @@ export async function POST(req: Request) {
       }
     }
     // 실패 누적 횟수(샷별) — safeMode 파생 + give-up 게이트(임계값 이상이면 자율 재생성 멈춤).
+    //   그 샷 행이 생긴 뒤의 실패만 센다 — 지운 샷 번호를 다시 받은 새 샷이 옛 샷의 실패로 한 번도 그려 보지 못하고 멈추지 않게
+    //   (2026-11-02 최종 리뷰 L3). 만든 때를 모르는 기록은 지금처럼 센다.
+    const shotCreatedAt = new Map((shots ?? []).map((s) => [s.shot_id as string, Date.parse((s.created_at as string | null) ?? '')]))
     const failCountByShot = new Map<string, number>()
     for (const j of failedJobs ?? []) {
       const target = j.target as { writerShotId?: string; writerShotIds?: string[] }
+      const failedAt = Date.parse((j.created_at as string | null) ?? '')
       for (const id of new Set([...(target?.writerShotIds ?? []), ...(target?.writerShotId ? [target.writerShotId] : [])])) {
+        const bornAt = shotCreatedAt.get(id) ?? Number.NaN
+        if (!Number.isNaN(failedAt) && !Number.isNaN(bornAt) && failedAt < bornAt) continue
         failCountByShot.set(id, (failCountByShot.get(id) ?? 0) + 1)
       }
     }
