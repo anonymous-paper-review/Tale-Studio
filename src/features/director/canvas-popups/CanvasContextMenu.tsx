@@ -27,7 +27,8 @@ import {
   downloadImageUrl,
   nodePrimaryImageUrl,
 } from '@/features/director/clipboard-image'
-import { prettyNodeLabel } from '@/features/director/node-label'
+import { directorNodeLabel } from '@/features/director/node-label'
+import { useBoardNodeNames } from '@/features/director/hooks/use-board-node-names'
 import { useT } from '@/lib/i18n'
 
 export type CanvasMenuState =
@@ -77,6 +78,8 @@ export function CanvasContextMenu({ state, onClose }: Props) {
   const addStandaloneVideo = useDirectorCanvasStore((s) => s.addStandaloneVideo)
   const addPromptNode = useDirectorCanvasStore((s) => s.addPromptNode)
   const selectNode = useDirectorCanvasStore((s) => s.selectNode)
+  // 내려받기 파일 이름도 카드와 같은 보드 번호("Shot_8", 오너 2026-11-02 "전체 번호로 통일").
+  const boardNames = useBoardNodeNames()
 
   // 바깥 클릭·Esc 로 닫기 — mousedown 캡처라 메뉴 안 클릭은 stopPropagation 불필요
   useEffect(() => {
@@ -181,7 +184,7 @@ export function CanvasContextMenu({ state, onClose }: Props) {
     const items = nodeContextMenuItems(node.data.kind, !!imageUrl)
     if (items.length === 0) return null
     const filenameBase =
-      prettyNodeLabel(node.data.label).replace(/[^\w가-힣-]+/g, '_') || 'image' // i18n-ok: 파일명 정제용 한글 문자 범위
+      directorNodeLabel(node.data, boardNames).replace(/[^\w가-힣-]+/g, '_') || 'image' // i18n-ok: 파일명 정제용 한글 문자 범위
 
     return (
       <>

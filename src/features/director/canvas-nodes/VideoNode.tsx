@@ -13,6 +13,8 @@ import {
   useDirectorCanvasStore,
 } from '@/stores/director-store'
 import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
+import { directorNodeLabel } from '@/features/director/node-label'
+import { useBoardNodeNames } from '@/features/director/hooks/use-board-node-names'
 import { cn } from '@/lib/utils'
 import { mediaFrameStyle } from '@/lib/project-aspect'
 import { useProjectFormatStore } from '@/stores/project-format-store'
@@ -62,6 +64,14 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
     const p = s.nodes.find((n) => n.id === parentShotId)
     return p && isShotData(p.data) ? p.data.label : null
   })
+  const parentWriterShotId = useDirectorCanvasStore((s) => {
+    if (!parentShotId) return null
+    const p = s.nodes.find((n) => n.id === parentShotId)
+    return p && isShotData(p.data) ? p.data.writerShotId : null
+  })
+  // 부모 샷 이름도 보드와 같은 전체 번호("Shot 8", 오너 2026-11-02 "전체 번호로 통일").
+  const boardNames = useBoardNodeNames()
+  const parentShotTitle = parentShotLabel === null ? null : directorNodeLabel({ label: parentShotLabel, writerShotId: parentWriterShotId }, boardNames)
   // #payments-phase-2 v4 #2: 생성 전 소모량 표시 — 리테이크 버튼은 이 샷을 다시 만든다(같은 provider).
   const effectiveProvider = useDirectorCanvasStore((s) => getEffectiveVideoConfig(s, id)?.provider ?? null)
   // 해상도(오너 2026-10-31): 다음에 만들 때 고른 값 — Take 표시용. 모델이 못 내면(Kling O3 Pro) 계산기가 기본값으로 센다.
@@ -192,7 +202,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
     <BaseNode
       id={id}
       theme="video"
-      title={parentShotLabel ?? data.label}
+      title={parentShotTitle ?? data.label}
       selected={selected}
       width={240}
       stale={data.stale}

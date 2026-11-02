@@ -55,7 +55,6 @@ import {
   sceneShotMentions,
   toggleMentionToken,
   FOUNDATION_MENTIONS,
-  type SceneShotMentionTarget,
 } from '@/lib/card-mention'
 import { SceneGateControls } from '@/features/writer/scene-gate-panel'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
@@ -98,8 +97,7 @@ import {
 import { useT } from '@/lib/i18n'
 import { totalInputTokens, type ChatTrace } from '@/lib/chat-trace'
 import type { StageId } from '@/types'
-import { isSceneData, isShotData } from '@/types/director'
-import { prettyNodeLabel } from '@/features/director/node-label'
+import { boardNodeNames, directorMentionTargets } from '@/features/director/node-label'
 
 /** 입력창에 얹혀 있는 첨부 하나. 전송되면 비워진다(이번 턴 한정). */
 interface Attachment {
@@ -523,6 +521,8 @@ export function GlobalChat() {
   const characterHint = t('Character')
   const locationHint = t('Location')
   const directorNodes = useDirectorCanvasStore((s) => s.nodes)
+  // Director 씬 · 샷 멘션 이름은 보드와 같은 전체 번호("Previz Shot 8", 오너 2026-11-02 "전체 번호로 통일").
+  const directorNames = useMemo(() => boardNodeNames(writerManifest, writerShots), [writerManifest, writerShots])
   const mentionItems = useMemo<MentionItem[]>(() => {
     if (currentStage === 'producer') {
       return [
@@ -548,17 +548,7 @@ export function GlobalChat() {
       ].map((m) => ({ id: m.ref, label: m.label, hint: m.hint }))
     }
     if (currentStage === 'director') {
-      const targets = directorNodes.flatMap(
-        (node): SceneShotMentionTarget[] => {
-          if (isSceneData(node.data)) {
-            return [{ kind: 'scene', id: node.id, label: prettyNodeLabel(node.data.label) }]
-          }
-          if (isShotData(node.data)) {
-            return [{ kind: 'shot', id: node.id, label: prettyNodeLabel(node.data.label) }]
-          }
-          return []
-        },
-      )
+      const targets = directorMentionTargets(directorNodes, directorNames)
       return [...sceneShotMentions(targets, 'previz'), ...sceneShotMentions(targets, 'real')].map(
         (m) => ({ id: m.ref, label: m.label, hint: m.hint }),
       )
@@ -575,6 +565,7 @@ export function GlobalChat() {
     characterHint,
     locationHint,
     directorNodes,
+    directorNames,
   ])
   // #internal-id-scrub(2026-08-26, 오너 E5): 에이전트 발화·제안에 새는 내부 id(sh_../char_..)와
   //   [p3] 마커를 표시 직전에 걷는다 — 프롬프트 금지 규칙이 1차, 이 스크럽이 과거 메시지까지

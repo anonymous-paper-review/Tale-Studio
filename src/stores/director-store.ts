@@ -87,6 +87,7 @@ import { notifyGenerationComplete, notifyGenerationFailure } from '@/lib/generat
 import { claimAction, releaseAction } from '@/lib/action-guard'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
+import { directorBoardLabel, type BoardNodeNames } from '@/features/director/node-label'
 import {
   DEFAULT_VIDEO_MODEL,
   DEFAULT_VIDEO_RESOLUTION,
@@ -5727,8 +5728,14 @@ export function nextScenePosition(
  */
 export function serializeDirectorCanvasContext(
   state: Pick<DirectorCanvasState, 'nodes' | 'edges' | 'selectedNodeId'>,
+  /** 보드 이름표 — 씬 · 샷에 보드 이름("Scene 2 · Shot 8")을 붙인다(오너 2026-11-02 "전체 번호로 통일"). Writer 스토어는 부르는 쪽이 읽는다. */
+  boardNames?: BoardNodeNames | null,
 ): string {
   const { nodes, edges, selectedNodeId } = state
+  const boardSuffix = (data: Parameters<typeof directorBoardLabel>[0]) => {
+    const name = directorBoardLabel(data, boardNames)
+    return name ? ` (board: ${name})` : ''
+  }
 
   const scenes = nodes.filter((n) => isSceneData(n.data))
   const shots = nodes.filter((n) => isShotData(n.data))
@@ -5752,9 +5759,12 @@ export function serializeDirectorCanvasContext(
 
   if (nodes.length > 0) {
     lines.push('### 노드 트리')
+    if (boardNames && boardNames.shots.size > 0) {
+      lines.push('Board names in parentheses are what the user sees: shot numbers count across the whole storyboard and scene numbers follow the scene order. "@Previz Shot 8", "@Real Shot 8", "Shot 8" or "Scene 2 · Shot 8" means the node whose board name says so. Call scenes and shots by their board names in replies.')
+    }
     scenes.forEach((scene) => {
       if (!isSceneData(scene.data)) return
-      lines.push(`- [${scene.id}] Scene "${scene.data.label}"`)
+      lines.push(`- [${scene.id}] Scene "${scene.data.label}"${boardSuffix(scene.data)}`)
       if (scene.data.location) lines.push(`    location: ${scene.data.location}`)
       if (scene.data.timeOfDay)
         lines.push(`    timeOfDay: ${scene.data.timeOfDay}`)
@@ -5778,7 +5788,7 @@ export function serializeDirectorCanvasContext(
             ? `, image refs: ${imageInputs.join(',')}`
             : ''
         lines.push(
-          `  - [${sh.id}] Shot "${shData.label}" (camera ${camActive}/6 active, light ${shData.lighting.position}, ${shData.provider}${imageSuffix})${shData.stale ? ' [stale]' : ''}: ${promptSnippet || '(빈 prompt)'}`,
+          `  - [${sh.id}] Shot "${shData.label}"${boardSuffix(shData)} (camera ${camActive}/6 active, light ${shData.lighting.position}, ${shData.provider}${imageSuffix})${shData.stale ? ' [stale]' : ''}: ${promptSnippet || '(빈 prompt)'}`,
         )
         const childVideos = nodes.filter(
           (n) => isVideoData(n.data) && n.data.parentShotNodeId === sh.id,
@@ -5820,7 +5830,7 @@ export function serializeDirectorCanvasContext(
           imageInputs.length > 0
             ? ` (image refs: ${imageInputs.join(',')})`
             : ''
-        lines.push(`  - [${sh.id}] Shot "${sh.data.label}"${imageSuffix}`)
+        lines.push(`  - [${sh.id}] Shot "${sh.data.label}"${boardSuffix(sh.data)}${imageSuffix}`)
       })
     }
     const standaloneVideos = videos.filter(

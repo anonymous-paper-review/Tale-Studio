@@ -43,7 +43,6 @@ import {
   sceneShotMentionRef,
   sceneShotMentions,
   type CardMention,
-  type SceneShotMentionTarget,
 } from '@/lib/card-mention'
 import {
   isSceneData,
@@ -53,7 +52,8 @@ import {
   type DirectorVideoStatus,
   type ShotNodeData,
 } from '@/types/director'
-import { prettyNodeLabel } from '@/features/director/node-label'
+import { directorMentionTargets, directorNodeLabel, sortByBoard } from '@/features/director/node-label'
+import { useBoardNodeNames } from '@/features/director/hooks/use-board-node-names'
 import { useT } from '@/lib/i18n'
 
 type SceneGroup = {
@@ -176,6 +176,7 @@ function ShotCell({
   roster,
   mediaMode,
   sceneLabel,
+  shotLabel,
   queuedImageShots,
   queuedVideoShots,
   queueStatus,
@@ -187,6 +188,8 @@ function ShotCell({
   mediaMode: StoryboardMediaMode
   /** 카드 제목 앞에 붙는 씬 표기(#e5 2026-08-12) — 예: "Scene 4". 미배정 그룹은 null. */
   sceneLabel: string | null
+  /** 카드 제목의 샷 이름 — 보드와 같은 전체 번호("Shot 8", 오너 2026-11-02 "전체 번호로 통일"). */
+  shotLabel: string
   /** 지금 큐에 떠 있는 잡의 대상 샷들(#queue-restore) — 탭을 떠났다 와도 진행 표시를 되살린다. */
   queuedImageShots: ReadonlySet<string>
   queuedVideoShots: ReadonlySet<string>
@@ -516,7 +519,7 @@ function ShotCell({
           />
         ) : completedVideoUrl ? (
           // 영상까지 완성된 샷(#e13) — 호버 시에만 재생, 클릭 = 일시정지(#e1).
-          <HoverPlayVideo src={completedVideoUrl} label={prettyNodeLabel(data.label)} />
+          <HoverPlayVideo src={completedVideoUrl} label={shotLabel} />
         ) : hasImage ? (
           img!.frames ? (
             // 실사 3프레임(#real-strip) — 러프 보드와 동일한 hover 순환(START→DIRECTING→END).
@@ -727,7 +730,7 @@ function ShotCell({
       >
         <span className="truncate text-sm font-medium text-foreground">
           {sceneLabel ? `${sceneLabel} · ` : ''}
-          {prettyNodeLabel(data.label)}
+          {shotLabel}
         </span>
         {(nativeDescription || prompt) && (
           <p
@@ -777,21 +780,15 @@ export function StoryboardGridView({
     ],
     [registeredCharacters, registeredWorlds, projectId],
   )
+  // 씬 · 샷 이름과 늘어놓는 순서는 보드와 같다(오너 2026-11-02 "전체 번호로 통일") — 끼워 넣은 샷도 보드 자리에 선다.
+  const boardNames = useBoardNodeNames()
   const sceneShotMentionItems = useMemo(() => {
-    const targets = nodes.flatMap((node): SceneShotMentionTarget[] => {
-      if (isSceneData(node.data)) {
-        return [{ kind: 'scene', id: node.id, label: prettyNodeLabel(node.data.label) }]
-      }
-      if (isShotData(node.data)) {
-        return [{ kind: 'shot', id: node.id, label: prettyNodeLabel(node.data.label) }]
-      }
-      return []
-    })
+    const targets = directorMentionTargets(nodes, boardNames)
     return [
       ...sceneShotMentions(targets, 'previz'),
       ...sceneShotMentions(targets, 'real'),
     ]
-  }, [nodes])
+  }, [nodes, boardNames])
 
   // 진행 중 잡 (#queue-restore) — 셀마다 훅을 걸면 폴링은 공유돼도 리렌더가 카드 수만큼 늘어난다.
   //   여기서 한 번 읽어 집합으로 내려보낸다.
@@ -849,16 +846,16 @@ export function StoryboardGridView({
     (n) => isShotData(n.data) && !n.data.parentSceneNodeId,
   )
 
-  const groups: SceneGroup[] = scenes
+  const groups: SceneGroup[] = sortByBoard(scenes, boardNames)
     .filter((scene) => isSceneData(scene.data))
     .map((scene) => {
       const data = scene.data
       return {
         key: scene.id,
-        label: isSceneData(data) ? data.label : scene.id,
+        label: isSceneData(data) ? directorNodeLabel(data, boardNames) : scene.id,
         location: isSceneData(data) ? data.location : '',
         timeOfDay: isSceneData(data) ? data.timeOfDay : '',
-        shots: getChildShots({ nodes }, scene.id),
+        shots: sortByBoard(getChildShots({ nodes }, scene.id), boardNames),
       }
     })
 
@@ -949,7 +946,7 @@ export function StoryboardGridView({
                   requestMentionToggle(label)
                 }}
               >
-                {prettyNodeLabel(group.label)}
+                {group.label}
               </h2>
               <span className="flex items-center gap-3 text-xs text-muted-foreground">
                 {group.location && (
@@ -979,7 +976,8 @@ export function StoryboardGridView({
                     node={shot}
                     roster={roster}
                     mediaMode={mediaMode}
-                    sceneLabel={group.key === '__orphan__' ? null : prettyNodeLabel(group.label)}
+                    sceneLabel={group.key === '__orphan__' ? null : group.label}
+                    shotLabel={directorNodeLabel(shot.data, boardNames)}
                     queuedImageShots={queuedImageShots}
                     queuedVideoShots={queuedVideoShots}
                     queueStatus={queueStatus}

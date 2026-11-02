@@ -18,7 +18,8 @@ import { useRoughStoryboard } from '@/features/director/hooks/use-rough-storyboa
 import { RoughFrameCycle } from '@/components/rough-frame-cycle'
 import { isShotData, type DirectorNode } from '@/types/director'
 import { IMAGE_MODELS, normalizeImageModelKey } from '@/lib/image-models'
-import { prettyNodeLabel } from '@/features/director/node-label'
+import { directorNodeLabel } from '@/features/director/node-label'
+import { useBoardNodeNames } from '@/features/director/hooks/use-board-node-names'
 import { ThumbImage } from '@/components/thumb-image'
 import { useT } from '@/lib/i18n'
 import { useActiveGenerationJobs, activeShotIds } from '@/lib/generation-queue'
@@ -37,6 +38,8 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const projectFormat = useProjectFormatStore((s) => s.format)
   const mediaFrame = mediaFrameStyle(projectFormat, SHOT_NODE_MEDIA_MAX_H)
   const entityNames = useEntityNames()
+  // 노드 제목은 보드와 같은 전체 번호("Shot 8", 오너 2026-11-02 "전체 번호로 통일").
+  const boardNames = useBoardNodeNames()
   const generation = useStoryboardImageGeneration(isShotData(data) ? data : null)
   const isGenerating = generation.generating
   const generateVideoForShot = useDirectorCanvasStore(
@@ -92,7 +95,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       <BaseNode
         id={id}
         theme="shot"
-        title={prettyNodeLabel(data.label)}
+        title={directorNodeLabel(data, boardNames)}
         selected={selected}
         width={280}
         stale={data.stale}

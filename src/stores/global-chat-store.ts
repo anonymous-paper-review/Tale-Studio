@@ -61,6 +61,7 @@ import { restartWriterStatus } from '@/lib/writer/use-writer-status'
 import { completeKoreanDialogue, dialogueHandoffTarget } from '@/lib/writer/dialogue-handoff'
 import { roughRedrawCandidates, roughVisibleState, type RoughVisibleState } from '@/lib/writer/chat-rough-redraw'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
+import { boardNodeNames } from '@/features/director/node-label'
 import { handoffToStage } from '@/lib/stage-nav'
 import {
   loadLatestChatTrace,
@@ -2539,7 +2540,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         // Director Canvas agentic 모드 — 항상 canvasContext 전달.
         // (unify-director-store-db Step 1: 옛 director-store legacy 분기 제거, canvas가 단일 진실)
         const canvasState = useDirectorCanvasStore.getState()
-        const canvasContext = serializeDirectorCanvasContext(canvasState)
+        // 씬 · 샷마다 보드 이름("Scene 2 · Shot 8")을 붙인다 — 사용자는 보드 번호로 부르고(@Previz Shot 8), 모델도 그 이름으로 답한다(오너 2026-11-02 "전체 번호로 통일").
+        const writerBoard = useWriterStore.getState()
+        const canvasContext = serializeDirectorCanvasContext(canvasState, boardNodeNames(writerBoard.sceneManifest, writerBoard.shots))
         endpoint = '/api/director/chat'
         body = {
           message: trimmed,
