@@ -44,6 +44,7 @@ import { MarkdownText } from '@/components/layout/markdown-text'
 import { scrubInternalIdsInProse } from '@/lib/display-names'
 import { enterBelongsToPage } from '@/lib/chat-enter-key'
 import { roughRedrawOfferHere } from '@/lib/writer/chat-rough-redraw'
+import { boardShotLabels } from '@/lib/writer/board-summary'
 import { MentionTextarea, type MentionItem } from '@/components/layout/mention-textarea'
 import { ChatProgressPin } from '@/components/layout/chat-progress-pin'
 import { ChatModelControls } from '@/components/layout/chat-model-controls'
@@ -592,7 +593,9 @@ export function GlobalChat() {
     for (const l of writerManifest?.locations ?? []) put(l.locationId, l.name)
     return map
   }, [producerCast, artistCharacters, artistWorlds, writerManifest])
-  const scrubProse = (text: string) => scrubInternalIdsInProse(text, scrubNameById)
+  // 샷 id 는 지금 보드의 전체 번호로(오너 2026-11-02 "전체 번호로 통일") — id 숫자는 샷을 더하거나 지우면 보드와 어긋난다.
+  const shotLabelById = useMemo(() => boardShotLabels(writerManifest, writerShots), [writerManifest, writerShots])
+  const scrubProse = (text: string) => scrubInternalIdsInProse(text, scrubNameById, shotLabelById)
   const [input, setInput] = useState('')
   // 하나의 스레드를 stage 구간으로 쪼갠다 — 필터가 아니라 구분선용(전 메시지가 그대로 보인다).
   const sections = useMemo(

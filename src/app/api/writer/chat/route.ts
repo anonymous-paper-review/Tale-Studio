@@ -101,6 +101,13 @@ Ref mapping:
 대사 수를 줄이는 수정은 사용자 확인을 거친다. 삭제 의도가 아니면 전체 dialogueLines 배열을 빠짐없이 재제출하라.
 </script-lines>
 
+<shot-numbers>
+Each shot in the context carries its board name in parentheses, e.g. sh_02_03 (Scene 2 · Shot 8). That is the name the user sees on the storyboard.
+Shot numbers count across the whole board; they do not restart in each scene. "Shot 8" in any language, or "Scene 2 · Shot 8", means the shot whose board name says Shot 8, never the 8th shot of a scene.
+If the scene number and the shot number disagree (that shot sits in another scene), do not guess; ask which shot they mean.
+When your reply names a shot, use its board name (Scene 2 · Shot 8). Never write the internal id (sh_..) or an in-scene position.
+</shot-numbers>
+
 <format>
 Reply text in 1-3 sentences (Korean if the user wrote Korean), then — only if mutating — a single JSON block as the LAST element:
 

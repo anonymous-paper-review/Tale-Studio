@@ -27,6 +27,7 @@ Supported edits must use tools instead of extractedSettings or updates JSON. Do 
 Settings fields: playtime (seconds), genre, subGenre, format (horizontal_16:9/vertical_9:16/cinema_2.39:1/square_1:1), tone (array of labels), dialogueLanguage (ko/en/ja/zh).
 Scene fields: location, timeOfDay, mood, narrativeSummary, originalTextQuote, charactersPresent, estimatedDurationSeconds.
 Shot fields: shotType, actionDescription, characters, durationSeconds, dialogueLines.
+Shot rows carry boardLabel (read-only), the board name the user sees ("Scene 2 · Shot 8"; shot numbers count across the board). Find a shot the user names by number through boardLabel, and call shots by boardLabel in replies, never by id.
 Dialogue fields: dialogueLines (complete array; retain every unchanged line and all its metadata; characterId:null means narration).
 Character fields: name, role, description, appearance (base appearance source; approval required).
 Background fields: visualDescription (base description source; approval required).

@@ -6,9 +6,11 @@ import { isRoughDrawn } from '@/lib/writer/rough-progress'
 import type { RoughStoryboardImage, Shot } from '@/types'
 
 type BoardShotInput = Pick<Shot, 'shotId' | 'sceneId' | 'durationSeconds' | 'actionDescription' | 'roughStoryboard'>
+/** 번호만 셀 때 필요한 칸 — 씬 · 샷 id 와 순서. */
+type NumberedShot = Pick<Shot, 'shotId' | 'sceneId'>
 type BoardManifest = { scenes: ReadonlyArray<{ sceneId: string }> } | null | undefined
 
-export interface BoardShotEntry<S extends BoardShotInput = BoardShotInput> {
+export interface BoardShotEntry<S extends NumberedShot = BoardShotInput> {
   shot: S
   /** 보드에 보이는 씬 번호(1부터). */
   sceneNo: number
@@ -18,8 +20,9 @@ export interface BoardShotEntry<S extends BoardShotInput = BoardShotInput> {
   label: string
 }
 
-/** 보드에 그려지는 샷과 번호 — 씬 목록 순서, 씬 안에서는 샷 순서. 씬 목록에 없는 샷은 보드에 없다. */
-export function boardShots<S extends BoardShotInput>(manifest: BoardManifest, shots: readonly S[]): BoardShotEntry<S>[] {
+/** 보드에 그려지는 샷과 번호 — 씬 목록 순서, 씬 안에서는 샷 순서. 씬 목록에 없는 샷은 보드에 없다.
+ *  샷 번호를 보이는 모든 곳(멘션 · 채팅 · 도구 · 말풍선 · Artist · Editor · 내보내기)이 이 셈 하나를 쓴다(오너 2026-11-02 "전체 번호로 통일"). */
+export function boardShots<S extends NumberedShot>(manifest: BoardManifest, shots: readonly S[]): BoardShotEntry<S>[] {
   const out: BoardShotEntry<S>[] = []
   let shotNo = 0
   ;(manifest?.scenes ?? []).forEach((scene, sceneIndex) => {
@@ -30,6 +33,11 @@ export function boardShots<S extends BoardShotInput>(manifest: BoardManifest, sh
     }
   })
   return out
+}
+
+/** 샷 id → 보드 카드 이름("Scene 2 · Shot 8") — 번호는 id 가 아니라 지금 순서에서 센다(샷을 더하거나 지우면 다시 센다). */
+export function boardShotLabels(manifest: BoardManifest, shots: readonly NumberedShot[]): Map<string, string> {
+  return new Map(boardShots(manifest, shots).map((entry) => [entry.shot.shotId, entry.label]))
 }
 
 export interface BoardStats {

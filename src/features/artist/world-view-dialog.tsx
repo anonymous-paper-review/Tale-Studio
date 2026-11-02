@@ -24,7 +24,7 @@ import {
 } from '@/lib/image-models'
 import { classifyWorldImageStale } from '@/lib/image-provenance'
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
-import { sceneShotLabel } from '@/lib/writer/shot-edit'
+import { boardShotLabels } from '@/lib/writer/board-summary'
 import { cn } from '@/lib/utils'
 import { useLocale, useT } from '@/lib/i18n'
 import { styleAnchorName } from '@/lib/style-anchor-name'
@@ -178,7 +178,9 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
   const lookLabel = variant ? variant.label : t('Default')
 
   const sceneIds = new Set((sceneManifest?.scenes ?? []).filter((scene) => scene.location === world.locationId).map((scene) => scene.sceneId))
-  const usedLabels = shots.filter((item) => sceneIds.has(item.sceneId)).map((item) => sceneShotLabel(sceneManifest, shots, item.shotId)).filter((value): value is string => !!value)
+  // 샷 이름은 보드 카드와 같은 전체 번호("Scene 2 · Shot 8") — 오너 2026-11-02 "전체 번호로 통일".
+  const boardLabels = boardShotLabels(sceneManifest, shots)
+  const usedLabels = shots.filter((item) => sceneIds.has(item.sceneId)).map((item) => boardLabels.get(item.shotId)).filter((value): value is string => !!value)
 
   // 다시 만들기 창은 늘 저장된 설명에서 시작한다(앞에서 쓰다 취소한 글이 남지 않게).
   const openRegenerate = () => {

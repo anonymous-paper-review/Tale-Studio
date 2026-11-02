@@ -25,7 +25,9 @@ export function sceneIdDisplayName(sceneId: string): string | null {
 
 /**
  * 산문(챗 말풍선 등)에 새어 나온 내부 id 를 표시명으로 치환하고 내부 마커를 걷는다.
- *   - sh_XX_YY / sc_XX → 규칙 생성명
+ *   - sh_XX_YY → shotLabelById 가 오면 지금 보드의 전체 번호 이름("Scene 2 · Shot 8", board-summary.boardShotLabels) —
+ *     id 숫자는 샷을 더하거나 지우면 보드와 어긋난다(오너 2026-11-02 "전체 번호로 통일"). 맵에 없으면 규칙 생성명.
+ *   - sc_XX → 규칙 생성명
  *   - nameById 가 오면 char_../loc_.. 류 id 도 이름으로 (맵은 호출부의 스테이지 진실에서)
  *   - 과거 스테이지 대괄호 마커 제거([L3] 스크립트 라인 참조는 실제 기능이라 보존)
  * 사용자 발화에는 적용하지 않는다 — 사용자가 직접 쓴 원문은 불가침.
@@ -33,8 +35,9 @@ export function sceneIdDisplayName(sceneId: string): string | null {
 export function scrubInternalIdsInProse(
   text: string,
   nameById?: ReadonlyMap<string, string>,
+  shotLabelById?: ReadonlyMap<string, string>,
 ): string {
-  let out = text.replace(/\bsh[_-]\d+[_-]\d+\b/gi, (id) => shotIdDisplayName(id) ?? id)
+  let out = text.replace(/\bsh[_-]\d+[_-]\d+\b/gi, (id) => shotLabelById?.get(id) ?? shotIdDisplayName(id) ?? id)
   out = out.replace(/\bsc[_-]\d+\b/gi, (id) => sceneIdDisplayName(id) ?? id)
   out = stripLegacyStageMarkers(out)
   if (nameById && nameById.size > 0) {

@@ -11,9 +11,9 @@ import { replaceSlugs, type SlugEntry } from '@/lib/script-lines'
 import { translate } from '@/lib/i18n'
 import { DEFAULT_LOCALE, type AppLocale } from '@/lib/locale'
 import { h1, h2 } from './md'
-import { sanitizeSegment } from './sanitize'
 import type { ArtifactFile } from './types'
 import { loadShotsResult } from '@/lib/shots-cache'
+import { boardShots } from '@/lib/writer/board-summary'
 
 interface SceneRow {
   scene_id: string
@@ -83,6 +83,13 @@ async function loadWriterBoardData(projectId: string): Promise<WriterBoardData> 
   return { scenes: (scenesRes.data ?? []) as SceneRow[], shotsByScene, roster }
 }
 
+/** 샷 id → 보드 카드와 같은 전체 번호(씬마다 다시 세지 않는다) — 보드와 같은 셈 boardShots 하나를 쓴다(오너 2026-11-02 "전체 번호로 통일"). */
+function boardShotNumbers(data: WriterBoardData): Map<string, number> {
+  const manifest = { scenes: data.scenes.map((scene) => ({ sceneId: scene.scene_id })) }
+  const shots = data.scenes.flatMap((scene) => (data.shotsByScene.get(scene.scene_id) ?? []).map((shot) => ({ shotId: shot.shot_id, sceneId: shot.scene_id })))
+  return new Map(boardShots(manifest, shots).map((entry) => [entry.shot.shotId, entry.shotNo]))
+}
+
 function completedRoughUrl(shot: ShotRow): string | null {
   const rough = shot.rough_storyboard
   if (!rough?.url) return null
@@ -93,6 +100,7 @@ function completedRoughUrl(shot: ShotRow): string | null {
 // ── 1) treatment.md — 트리트먼트 탭 내용의 md 재현 ──────────────────────────
 function renderTreatmentMd(data: WriterBoardData, locale: AppLocale): string {
   const { scenes, shotsByScene, roster } = data
+  const shotNo = boardShotNumbers(data)
   let body = h1('Treatment')
   if (scenes.length === 0) return body + `${translate(locale, 'No scenes')}\n`
 
@@ -106,11 +114,11 @@ function renderTreatmentMd(data: WriterBoardData, locale: AppLocale): string {
     body += '\n'
 
     const shots = shotsByScene.get(scene.scene_id) ?? []
-    shots.forEach((shot, shotIndex) => {
+    shots.forEach((shot) => {
       const meta = [shot.shot_type, shot.duration_seconds ? `${shot.duration_seconds}s` : null]
         .filter(Boolean)
         .join(' · ')
-      body += `### Shot ${shotIndex + 1}${meta ? ` (${meta})` : ''}\n\n`
+      body += `### Shot ${shotNo.get(shot.shot_id)}${meta ? ` (${meta})` : ''}\n\n`
       body += `${replaceSlugs(shot.action_description || translate(locale, '(No description)'), roster)}\n\n`
       for (const line of shot.dialogue_lines ?? []) {
         if (!line?.text) continue
@@ -162,15 +170,16 @@ function drawCover(
 async function renderBoardSheet(data: WriterBoardData, locale: AppLocale): Promise<Blob | null> {
   if (typeof document === 'undefined') return null
   const { scenes, shotsByScene, roster } = data
+  const shotNo = boardShotNumbers(data)
 
   // 씬별 (완료 패널 있는) 샷 수집 — 하나도 없으면 시트 생략.
   const sceneBlocks = scenes
     .map((scene, sceneIndex) => ({
       scene,
       sceneIndex,
-      shots: (shotsByScene.get(scene.scene_id) ?? []).map((shot, shotIndex) => ({
+      shots: (shotsByScene.get(scene.scene_id) ?? []).map((shot) => ({
         shot,
-        shotIndex,
+        shotNo: shotNo.get(shot.shot_id),
         url: completedRoughUrl(shot),
       })),
     }))
@@ -245,7 +254,7 @@ async function renderBoardSheet(data: WriterBoardData, locale: AppLocale): Promi
       ctx.fillStyle = '#d4d4d8'
       ctx.font = '14px system-ui, sans-serif'
       ctx.fillText(
-        `Shot ${entry.shotIndex + 1}${meta ? ` · ${meta}` : ''}`,
+        `Shot ${entry.shotNo}${meta ? ` · ${meta}` : ''}`,
         x,
         cy + CARD_H + 8,
       )
@@ -274,13 +283,14 @@ export async function collectWriterBoardArtifacts(
     { path: 'writer/treatment.md', kind: 'text', content: renderTreatmentMd(data, locale) },
   ]
 
-  // 샷별 러프 패널 원본 — scene/shot 순번으로 파일명 부여.
+  // 샷별 러프 패널 원본 — 씬 번호와 보드 전체 샷 번호로 파일명 부여(전체 번호라 겹치지 않는다 · 내부 id 는 넣지 않는다).
+  const shotNo = boardShotNumbers(data)
   data.scenes.forEach((scene, sceneIndex) => {
     const shots = data.shotsByScene.get(scene.scene_id) ?? []
-    shots.forEach((shot, shotIndex) => {
+    shots.forEach((shot) => {
       const url = completedRoughUrl(shot)
       if (!url) return
-      const name = `scene-${String(sceneIndex + 1).padStart(2, '0')}_shot-${String(shotIndex + 1).padStart(2, '0')}_${sanitizeSegment(shot.shot_id)}.png`
+      const name = `scene-${String(sceneIndex + 1).padStart(2, '0')}_shot-${String(shotNo.get(shot.shot_id)).padStart(2, '0')}.png`
       files.push({ path: `writer/rough-storyboard/${name}`, kind: 'media', url })
     })
   })

@@ -113,7 +113,7 @@ export const STAGE_FACE_COLOR: Record<StageId, string> = {
 export const STAGE_PLACEHOLDER: Record<StageId, string> = {
   entry: 'Tell us about your story…',
   producer: 'E.g. rewrite it, or make the ending funnier',
-  writer: 'E.g. make scene 2 shot 3 darker',
+  writer: 'E.g. make shot 8 darker',
   // 새 인물 · 배경은 채팅으로 만들지 않는다(디자이너 QA 1차 #04) — 있는 인물을 고치는 예시를 든다.
   artist: "E.g. make the main character's hair shorter",
   director: 'Try generating the rough storyboard into shooting-ready images.',

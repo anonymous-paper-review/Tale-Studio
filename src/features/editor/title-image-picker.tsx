@@ -14,6 +14,7 @@ import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useT } from '@/lib/i18n'
+import { boardShotLabels } from '@/lib/writer/board-summary'
 
 export interface ProjectImageOption {
   id: string
@@ -27,7 +28,7 @@ export function collectProjectImages(input: {
   projectId: string | null
   characters: Record<string, { projectId: string; name: string; views: { single: Array<{ url: string }> } }>
   worlds: Record<string, { projectId: string; name: string; views: { single: Array<{ url: string }> } }>
-  shots: Array<{ shotId: string; roughStoryboard?: { status: string; frames?: { start: string } } | null }>
+  shots: Array<{ shotId: string; boardLabel?: string; roughStoryboard?: { status: string; frames?: { start: string } } | null }>
 }): ProjectImageOption[] {
   const out: ProjectImageOption[] = []
   const seen = new Set<string>()
@@ -48,7 +49,7 @@ export function collectProjectImages(input: {
   }
   for (const s of input.shots) {
     const url = s.roughStoryboard?.status === 'completed' ? s.roughStoryboard.frames?.start : undefined
-    if (url) push({ id: `rough:${s.shotId}`, url, label: s.shotId, group: 'rough' })
+    if (url) push({ id: `rough:${s.shotId}`, url, label: s.boardLabel ?? s.shotId, group: 'rough' })
   }
   return out
 }
@@ -67,7 +68,13 @@ export function TitleImagePicker({
   const { requestImageUploadConsent, imageUploadConsentDialog } = useImageUploadConsent(projectId)
   const characters = useAssetStorageStore((s) => s.characters)
   const worlds = useAssetStorageStore((s) => s.worlds)
-  const shots = useWriterStore((s) => s.shots)
+  const writerShots = useWriterStore((s) => s.shots)
+  const sceneManifest = useWriterStore((s) => s.sceneManifest)
+  // 러프 그림 이름은 보드 카드와 같은 전체 번호("Scene 2 · Shot 8") — 내부 id 를 보이지 않는다(오너 2026-11-02 "전체 번호로 통일").
+  const shots = useMemo(() => {
+    const labels = boardShotLabels(sceneManifest, writerShots)
+    return writerShots.map((shot) => ({ ...shot, boardLabel: labels.get(shot.shotId) }))
+  }, [sceneManifest, writerShots])
   const options = useMemo(() => collectProjectImages({ projectId, characters, worlds, shots }), [projectId, characters, worlds, shots])
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)

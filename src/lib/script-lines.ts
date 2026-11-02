@@ -7,6 +7,7 @@ import {
 } from '@/lib/card-mention'
 import type { DialogueLine, Scene, SceneManifest, Shot } from '@/types'
 import { fixKoreanParticles } from '@/lib/korean-particles'
+import { boardShotLabels, boardShots } from '@/lib/writer/board-summary'
 import { translate } from '@/lib/i18n'
 import type { AppLocale } from '@/lib/locale'
 
@@ -173,7 +174,8 @@ export function scriptLineMentions(
 
 /**
  * Writer 채팅에서 라인 외에 직접 참조할 수 있는 씬·샷 목록.
- * 순서와 stable id를 라벨에 함께 넣어 같은 장소/이름의 대상도 혼동하지 않는다.
+ * 샷은 보드 카드와 같은 전체 번호(씬마다 다시 세지 않는 번호)로 부른다 — "Shot 8"(오너 2026-11-02 "전체 번호로 통일").
+ * 셈은 보드와 같은 boardShots 하나다. 보드에 없는(씬 목록 밖) 샷은 멘션에도 없다.
  */
 export function writerSceneShotMentions(
   manifest: SceneManifest | null,
@@ -186,21 +188,10 @@ export function writerSceneShotMentions(
     label: `Scene ${scenes.indexOf(scene) + 1}`,
   }))
   const seenShots = new Set<string>()
-  for (const shot of shots) {
-    if (seenShots.has(shot.shotId)) continue
-    seenShots.add(shot.shotId)
-    const sceneIndex = scenes.findIndex((scene) => scene.sceneId === shot.sceneId)
-    const position =
-      sceneIndex >= 0
-        ? shots.filter((candidate) => candidate.sceneId === shot.sceneId).findIndex(
-            (candidate) => candidate.shotId === shot.shotId,
-          ) + 1
-        : 1
-    targets.push({
-      kind: 'shot',
-      id: shot.shotId,
-      label: `Shot ${sceneIndex >= 0 ? `${sceneIndex + 1}.` : ''}${position}`,
-    })
+  for (const entry of boardShots(manifest, shots)) {
+    if (seenShots.has(entry.shot.shotId)) continue
+    seenShots.add(entry.shot.shotId)
+    targets.push({ kind: 'shot', id: entry.shot.shotId, label: `Shot ${entry.shotNo}` })
   }
   return sceneShotMentions(targets, 'writer')
 }
@@ -226,9 +217,10 @@ export function serializeWriterScriptContext(
   const sceneIds = new Set(scenes.map((scene) => scene.sceneId))
   const lines: string[] = [
     '## 현재 씬/샷 (scene_id·shot_id 를 그대로 사용, [L#] = 스크립트 라인 번호)',
-    // #p4-understand A1: 위치형 지칭("씬2의 3번째 샷") 해석 근거 — 아래 나열 순서가 곧 위치다.
-    '위치 별칭: 사용자가 "씬N의 M번째 샷"처럼 위치로 지칭하면, 아래 씬 순서(### 표기의 씬N)와 그 씬 안 샷 나열 순서로 대응하는 shot_id 를 찾아 사용한다.',
+    // 오너 2026-11-02 "전체 번호로 통일" — 보드 카드 이름(괄호)이 샷의 이름이다. 씬마다 다시 세지 않는다.
+    '샷 번호: 샷마다 괄호 안의 보드 이름("Scene 2 · Shot 8")이 사용자가 보는 이름이고, 샷 번호는 씬마다 다시 세지 않는 전체 번호다. "샷 8"·"Shot 8"·"Scene 2 · Shot 8"은 그 전체 번호의 샷이다. 씬 번호와 샷 번호가 맞지 않으면(그 샷이 다른 씬에 있으면) 고치지 말고 되묻는다. 답할 때 샷은 이 보드 이름으로 부르고 id(sh_..)나 씬 안 순서로 부르지 않는다.',
   ]
+  const boardLabels = boardShotLabels(manifest, shots)
   const roster = manifest?.characters ?? []
   if (roster.length > 0) {
     lines.push(
@@ -247,7 +239,7 @@ export function serializeWriterScriptContext(
     if (scene.narrativeSummary) lines.push(`  요약: ${scene.narrativeSummary}`)
 
     for (const shot of shots.filter((s) => s.sceneId === scene.sceneId)) {
-      pushShotContextLines(lines, byRef, manifest, shot)
+      pushShotContextLines(lines, byRef, manifest, shot, boardLabels.get(shot.shotId))
     }
   }
 
@@ -255,7 +247,7 @@ export function serializeWriterScriptContext(
   if (orphan.length > 0) {
     lines.push('\n### (씬 미배정 샷)')
     for (const shot of orphan) {
-      pushShotContextLines(lines, byRef, manifest, shot)
+      pushShotContextLines(lines, byRef, manifest, shot, undefined)
     }
   }
 
@@ -267,12 +259,13 @@ function pushShotContextLines(
   byRef: Map<string, ScriptLine>,
   manifest: SceneManifest | null,
   shot: Shot,
+  boardLabel: string | undefined,
 ): void {
   const action = byRef.get(`${shot.shotId}.action`)
   const chars =
     (shot.characters ?? []).map((id) => characterRef(manifest, id)).join(', ') || '없음'
   lines.push(
-    `  - ${lineLabel(action)}${shot.shotId} [${shot.shotType}] ${shot.actionDescription || '(설명 없음)'} (등장: ${chars}, ${shot.durationSeconds}s)`,
+    `  - ${lineLabel(action)}${shot.shotId}${boardLabel ? ` (${boardLabel})` : ''} [${shot.shotType}] ${shot.actionDescription || '(설명 없음)'} (등장: ${chars}, ${shot.durationSeconds}s)`,
   )
 
   dialogueLinesOf(shot).forEach((dialogue, index) => {

@@ -9,6 +9,7 @@ import { validateWriterUpdates } from '@/lib/writer-chat-updates'
 import { invalidateShots } from '@/lib/shots-cache'
 import { useProducerStore, type ExtractedSettings } from './producer-store'
 import { useWriterStore, hasPendingWriterEdit } from './writer-store'
+import { boardShotLabels } from '@/lib/writer/board-summary'
 import { useArtistStore } from './artist-store'
 import type { Scene, Shot } from '@/types'
 import { parseProjectFormat } from '@/types/project'
@@ -130,11 +131,17 @@ export function createStudioToolResources(options: {
         readTable(scene ? 'scenes' : 'shots', '*'), readTable('characters', 'character_id'),
       ])
       characterIds = new Set(characters.map(c => String(c.character_id)))
+      // 샷은 보드 카드와 같은 전체 번호 이름을 함께 준다(읽기 전용) — 사용자는 "샷 8"로 부르고, 모델도 그 이름으로 답한다(오너 2026-11-02).
+      const writer = useWriterStore.getState()
+      const boardLabels = scene ? null : boardShotLabels(writer.sceneManifest, writer.shots)
       return rows.map(row => {
         const id = String(row[scene ? 'scene_id' : 'shot_id'])
         stored.set(`${resource}:${id}`, row)
         const values: Record<string, unknown> = Object.fromEntries(Object.entries(fields).map(([key, columns]) => [key, row[columns.at(-1)!] ?? row[columns[0]] ?? (key === 'dialogueLines' ? [] : '')]))
-        if (!scene) values.sceneId = row.scene_id
+        if (!scene) {
+          values.sceneId = row.scene_id
+          values.boardLabel = boardLabels?.get(id) ?? null
+        }
         return { id, values }
       })
     },

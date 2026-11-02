@@ -1270,7 +1270,7 @@ export const KO: Record<string, string> = {
   'Close banner': '배너 닫기',
   // ── misc: constants.ts ──
   'Tell us about your story…': '스토리에 대해 말해주세요…',
-  'E.g. make scene 2 shot 3 darker': '예: 씬2 샷3을 더 어둡게 바꿔줘',
+  'E.g. make shot 8 darker': '예: 샷 8을 더 어둡게 바꿔줘',
   "E.g. make the main character's hair shorter": '예: 주인공 머리를 더 짧게 해 줘',
   'Try generating the rough storyboard into shooting-ready images.': '러프 스토리보드를 실제 촬영 이미지로 생성해보세요.',
   "Chat isn't available at this stage yet.": '아직 이 단계에서는 채팅을 쓸 수 없어요.',

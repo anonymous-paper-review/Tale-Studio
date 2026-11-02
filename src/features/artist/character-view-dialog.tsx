@@ -24,7 +24,7 @@ import {
 } from '@/lib/image-models'
 import { classifyLookImageStale } from '@/lib/image-provenance'
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
-import { sceneShotLabel } from '@/lib/writer/shot-edit'
+import { boardShotLabels } from '@/lib/writer/board-summary'
 import { useGuardedAction } from '@/hooks/use-guarded-action'
 import { cn } from '@/lib/utils'
 import { useLocale, useT } from '@/lib/i18n'
@@ -191,7 +191,9 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
   const capReached = (failure?.safeFailCount ?? 0) >= SAFE_RETRY_CAP
 
   const usedIn = shots.filter((shot) => shot.characters.includes(char.characterId))
-  const usedLabels = usedIn.map((shot) => sceneShotLabel(sceneManifest, shots, shot.shotId)).filter((value): value is string => !!value)
+  // 샷 이름은 보드 카드와 같은 전체 번호("Scene 2 · Shot 8") — 오너 2026-11-02 "전체 번호로 통일".
+  const boardLabels = boardShotLabels(sceneManifest, shots)
+  const usedLabels = usedIn.map((shot) => boardLabels.get(shot.shotId)).filter((value): value is string => !!value)
 
   // 모습 지우기 — 기본 모습은 지우지 못한다(약속 C8). 팝업은 닫지 않는다 — 보던 모습을 지웠으면 기준 모습을 보인다(검토 지적).
   const shownKey = appearanceKey
