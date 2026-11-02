@@ -10,6 +10,7 @@
 //   우(무엇을) — 새 항목의 내용 설정(샷: 타입·길이·스토리·연출 / 씬: 장소·시간·분위기·요약).
 //
 // 표시 번호는 "순서(위치)" 기준 — 불변 id 접미사가 아니라(중간 삽입 시 번호 뒤죽박죽 방지, #5).
+//   샷 번호는 보드 카드와 같은 전체 번호(boardShots, 오너 2026-11-02 "전체 번호로 통일") — 씬마다 1부터 다시 세지 않는다.
 // 확정 시 writer-store.addShot/addScene(위치 삽입)으로 생성. 위치는 팝업 안의 일시적 로컬 상태.
 // 더한 샷의 러프는 Storyboard 보드가 바로 그린다(addShot 의 더한 순간 알림 → use-added-shot-draws, 2026-11-02 오너).
 
@@ -38,6 +39,7 @@ import { Slider } from '@/components/ui/slider'
 import { cn } from '@/lib/utils'
 import { useWriterStore } from '@/stores/writer-store'
 import { SHOT_TYPES, SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
+import { boardShots } from '@/lib/writer/board-summary'
 import type { GenerationMethod, LightingConfig, ShotType } from '@/types'
 import { useT } from '@/lib/i18n'
 
@@ -189,6 +191,10 @@ export function AddItemDialog({
 
   const scenes = useMemo(() => sceneManifest?.scenes ?? [], [sceneManifest])
   const characters = useMemo(() => sceneManifest?.characters ?? [], [sceneManifest])
+  const globalShotNo = useMemo(
+    () => new Map(boardShots(sceneManifest, shots).map((entry) => [entry.shot.shotId, entry.shotNo])),
+    [sceneManifest, shots],
+  )
 
   const [locked, setLocked] = useState<Gap | null>(null)
   const [hovered, setHovered] = useState<string | null>(null)
@@ -387,7 +393,7 @@ export function AddItemDialog({
                                 )}
                               >
                                 <span className="shrink-0 text-xs font-medium text-muted-foreground">
-                                  Shot {ki + 1}
+                                  Shot {globalShotNo.get(shot.shotId) ?? ki + 1}
                                 </span>
                                 <TruncatedStory
                                   text={shot.actionDescription}

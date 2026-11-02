@@ -351,6 +351,13 @@ describe('더한 샷 그리기와 보드 · 채팅 잠금', () => {
     expect(KO[key]).toBe('샷을 더하면 스토리로 러프를 바로 그려요. 스토리가 비어 있으면 그리지 않아요.')
     expect(addDialog).toContain(`t('${key}')`)
   })
+
+  // 왜: 오너 11/2 "전체 번호로 통일" — 어디에 더할지 고르는 목록의 "Shot 3"이 보드 카드 "Scene 2 · Shot 7"과 다르면 다른 샷 뒤에 더한다.
+  it('[+ 샷 추가] 창 왼쪽 목록의 샷 번호는 보드 카드와 같은 전체 번호다', () => {
+    expect(addDialog).toContain('boardShots(sceneManifest, shots)')
+    expect(addDialog).toMatch(/Shot \{globalShotNo\.get\(shot\.shotId\) \?\? ki \+ 1\}/)
+    expect(addDialog).not.toMatch(/Shot \{ki \+ 1\}/)
+  })
 })
 
 describe('샷을 더한 순간의 알림 (writer-store)', () => {
