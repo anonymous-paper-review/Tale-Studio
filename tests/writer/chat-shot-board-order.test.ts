@@ -94,3 +94,58 @@ describe('씬을 끼워 넣은 뒤 보드 이름으로 고치기 · 지우기', 
     expect(resolveChatShotRef(legacy, 'Shot 7', { manifest: board })).toEqual({ kind: 'shot', shotId: 'shot_8' })
   })
 })
+
+// 리뷰 4차 재현 보드 그대로: Scene 1 = sh_01_01(Shot 1) · sh_01_02(Shot 2), Scene 2 = sh_02_03(Shot 3) · sh_02_04(Shot 4) · sh_02_05(Shot 5).
+function reviewerBoard() {
+  useWriterStore.setState({
+    sceneManifest: { scenes: [scene('sc_01', 0), scene('sc_02', 1)], characters: [], locations: [] },
+    shots: [shot('sh_01_01', 'sc_01', 0), shot('sh_01_02', 'sc_01', 1), shot('sh_02_03', 'sc_02', 2), shot('sh_02_04', 'sc_02', 3), shot('sh_02_05', 'sc_02', 4)],
+    error: null,
+  })
+}
+const idsOf = () => useWriterStore.getState().shots.map((s) => s.shotId)
+
+describe('한 답 안의 여러 고침은 답을 받기 전 보드로 푼다', () => {
+  // 왜: 2026-11-02 리뷰 4차 — 한 답의 고침을 하나씩 적용하면서 그때그때의 보드로 이름을 풀어, 앞의 지우기가 번호를 당겨
+  //   "Shot 3" + "Shot 4"를 지우라는 답이 sh_02_03 과 sh_02_05 를 지웠다(지우려던 sh_02_04 는 남음).
+  it('한 번의 채팅 답에서 보드 이름으로 샷 둘을 지우면 답을 받기 전 보드의 그 두 샷을 지운다', async () => {
+    reviewerBoard()
+    const result = await useWriterStore.getState().applyChatUpdates([{ type: 'deleteShot', id: 'Shot 3' }, { type: 'deleteShot', id: 'Shot 4' }])
+    expect(result.skipped).toEqual([])
+    expect(deleted).toEqual(['sh_02_03', 'sh_02_04'])
+    expect(idsOf()).toEqual(['sh_01_01', 'sh_01_02', 'sh_02_05'])
+  })
+
+  // 왜: 같은 까닭으로 지운 뒤의 고치기도 한 칸 밀린 샷을 고쳤다.
+  it('같은 답에서 샷을 지운 뒤 보드 이름으로 고치면 답을 받기 전 보드의 그 샷을 고친다', async () => {
+    reviewerBoard()
+    await useWriterStore.getState().applyChatUpdates([{ type: 'deleteShot', id: 'Shot 3' }, { type: 'updateShot', id: 'Shot 4', patch: { shotType: 'CU' } }])
+    expect(typeOf('sh_02_04')).toBe('CU')
+    expect(typeOf('sh_02_05')).toBe('MS')
+  })
+
+  // 왜: 끼울 자리(afterShotId)도 같다 — "Shot 4 뒤에"는 답을 받기 전 보드의 Shot 4(sh_02_04) 뒤다.
+  it('같은 답에서 샷을 지운 뒤 보드 이름 뒤에 샷을 더하면 답을 받기 전 보드의 그 샷 뒤에 더한다', async () => {
+    reviewerBoard()
+    await useWriterStore.getState().applyChatUpdates([
+      { type: 'deleteShot', id: 'Shot 3' },
+      { type: 'addShot', sceneId: 'sc_02', afterShotId: 'Shot 4', shotType: 'CU', actionDescription: 'new', characters: [], durationSeconds: 3, tempId: 'H1' } as never,
+    ])
+    const sceneTwo = useWriterStore.getState().shots.filter((s) => s.sceneId === 'sc_02').map((s) => s.actionDescription)
+    expect(sceneTwo).toEqual(['sh_02_04', 'new', 'sh_02_05'])
+  })
+
+  // 왜: 정상 경로 고정 — 같은 답에서 더한 샷은 받은 임시 id(tempId)로 가리켜 고칠 수 있고(보드 번호는 아직 없다),
+  //   같은 답에서 지운 샷을 다시 가리키면 그 고침만 못 찾았다고 건너뛴다.
+  it('같은 답에서 더한 샷은 임시 id 로 고칠 수 있고, 같은 답에서 지운 샷을 다시 가리키면 그 고침만 건너뛴다', async () => {
+    reviewerBoard()
+    const result = await useWriterStore.getState().applyChatUpdates([
+      { type: 'addShot', sceneId: 'sc_02', shotType: 'MS', actionDescription: 'added', characters: [], durationSeconds: 3, tempId: 'H1' } as never,
+      { type: 'updateShot', id: 'H1', patch: { shotType: 'ECU' } },
+      { type: 'deleteShot', id: 'Shot 3' },
+      { type: 'updateShot', id: 'sh_02_03', patch: { shotType: 'CU' } },
+    ])
+    expect(useWriterStore.getState().shots.find((s) => s.actionDescription === 'added')?.shotType).toBe('ECU')
+    expect(result.skipped.map((item) => item.id)).toEqual(['sh_02_03'])
+  })
+})

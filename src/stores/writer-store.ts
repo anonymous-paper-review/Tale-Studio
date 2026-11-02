@@ -13,7 +13,7 @@ import type {
 import { createClient } from '@/lib/supabase/client'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { classifyDialoguePatch } from '@/lib/writer-chat-updates'
-import { resolveChatShotRef } from '@/lib/writer/chat-id-resolve'
+import { resolveChatShotRef, type ChatShotRef } from '@/lib/writer/chat-id-resolve'
 import { boardShotLabels } from '@/lib/writer/board-summary'
 import { useProjectStore } from '@/stores/project-store'
 import { invalidateShots, loadShotsResult } from '@/lib/shots-cache'
@@ -684,22 +684,30 @@ export const useWriterStore = create<WriterState>((set, get) => ({
     //   "씬2 샷5"가 보드 번호와 씬 안 자리로 다른 두 샷이면 고르지 않고 어느 샷인지 묻는다(2026-11-02 리뷰 M3).
     //   번호는 보드 순서(씬 목록 → 그 씬의 샷)로 센다 — 끼워 넣은 씬의 샷이 목록 맨 뒤에 있어도(리뷰 3차 M1).
     //   지우기는 정확한 id 나 보드 이름으로만 찾는다(되돌릴 수 없다 — 리뷰 3차 L4).
-    const shotRef = (rawId: string, strict = false) => resolveChatShotRef(
-      get().shots.map((s) => ({ shotId: s.shotId, sceneId: s.sceneId })),
-      tempMap.get(rawId) ?? rawId,
-      { manifest: get().sceneManifest, strict },
-    )
+    //   한 답의 모든 샷 이름(지우기 · 고치기 · 끼울 자리)은 답을 받기 전 보드 하나로 풀고 정확한 id 로 적용한다(리뷰 4차) — 하나씩
+    //   적용하며 그때의 보드로 풀면 앞의 지우기 · 더하기가 번호를 밀어 "Shot 3" + "Shot 4" 지우기가 Shot 3 과 Shot 5 를 지웠다.
+    //   같은 답에서 더한 샷은 받은 임시 id(tempId)로만 가리킨다 — 아직 보드 번호가 없다. 같은 답에서 지운 샷은 그 고침만 못 찾음이다.
+    const boardBefore = {
+      manifest: get().sceneManifest,
+      shots: get().shots.map((s) => ({ shotId: s.shotId, sceneId: s.sceneId })),
+    }
+    const shotRef = (rawId: string, strict = false): ChatShotRef | null => {
+      const created = tempMap.get(rawId)
+      if (created) return { kind: 'shot', shotId: created }
+      return resolveChatShotRef(boardBefore.shots, rawId, { manifest: boardBefore.manifest, strict })
+    }
     const shotNotResolved = (rawId: string, strict = false): string => {
       const ref = shotRef(rawId, strict)
       const locale = useLocaleStore.getState().locale
       if (ref?.kind !== 'ambiguous') return translate(locale, "Shot '{id}' not found", { id: rawId })
-      const labels = boardShotLabels(get().sceneManifest, get().shots)
+      const labels = boardShotLabels(boardBefore.manifest, boardBefore.shots)
       const [first, second] = ref.shotIds.map((shotId) => labels.get(shotId) ?? shotId)
       return translate(locale, 'Which shot do you mean: {first} or {second}?', { first, second })
     }
     const resolveShot = (rawId: string, strict = false): string | null => {
       const ref = shotRef(rawId, strict)
-      return ref?.kind === 'shot' ? ref.shotId : null
+      if (ref?.kind !== 'shot') return null
+      return get().shots.some((s) => s.shotId === ref.shotId) ? ref.shotId : null
     }
     for (const u of updates) {
       try {
