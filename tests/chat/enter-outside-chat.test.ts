@@ -19,7 +19,8 @@ describe('채팅 제안 카드의 Enter', () => {
       expect(PAGE_INTERACTIVE_SELECTOR).toContain(token)
     }
     const chat = readFileSync('src/components/layout/global-chat.tsx', 'utf8')
-    expect(chat).toMatch(/if \(enterBelongsToPage\(target\)\) return/)
+    // Enter 만 양보한다 — Esc(나중에)는 지금처럼 어디서 눌러도 카드를 내린다(돈이 들지 않는다).
+    expect(chat).toMatch(/if \(e\.key === 'Enter' && enterBelongsToPage\(target\)\) return/)
   })
 
   // 왜: 키보드만으로 넘김 · 승인을 받는 약속(#keyboard-only 2026-08-11)은 그대로 — 채팅 입력칸이나 화면 빈 곳의 Enter 는 지금처럼 카드를 누른다.

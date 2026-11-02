@@ -1314,7 +1314,8 @@ export function GlobalChat() {
       // 선택지 버튼의 Enter는 그 버튼의 동작이다. 함께 복원된 승인 카드를 실행하지 않는다.
       if (target?.closest('[data-chat-choices], [data-testid="scene-story-proposal"]')) return
       // 채팅 밖의 단추 · 누를 수 있는 줄 · 입력칸에서 친 Enter 는 그 요소의 것이다(리뷰 M2 — 대사 줄 · 카드의 Enter 가 다시 그리기 · 넘김을 눌렀다).
-      if (enterBelongsToPage(target)) return
+      //   Esc(나중에)는 돈이 들지 않아 지금처럼 어디서 눌러도 카드를 내린다.
+      if (e.key === 'Enter' && enterBelongsToPage(target)) return
       const inChatInput = !!target && target === textareaRef.current
       // 다른 입력 요소(인라인 '직접 입력', 이름 변경 등)에 있으면 그쪽 몫.
       if (
