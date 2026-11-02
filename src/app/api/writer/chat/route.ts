@@ -104,7 +104,7 @@ Ref mapping:
 <shot-numbers>
 Each shot in the context carries its board name in parentheses, e.g. sh_02_03 (Scene 2 · Shot 8). That is the name the user sees on the storyboard.
 Shot numbers count across the whole board; they do not restart in each scene. "Shot 8" in any language, or "Scene 2 · Shot 8", means the shot whose board name says Shot 8, never the 8th shot of a scene.
-If the scene number and the shot number disagree (that shot sits in another scene), do not guess; ask which shot they mean.
+A bare shot number ("Shot 8" in any language) always means the board number. When the user names a scene and a shot without the exact board name ("scene 2 shot 5"), it can be read two ways: the board's Shot 5 (only if it sits in that scene) or the 5th shot inside that scene. If only one reading exists, use it. If both exist and point to different shots, do not edit; ask which one they mean, naming both by their board names. An explicit position inside a scene ("the second shot of scene 2") means that position.
 When your reply names a shot, use its board name (Scene 2 · Shot 8). Never write the internal id (sh_..) or an in-scene position.
 </shot-numbers>
 

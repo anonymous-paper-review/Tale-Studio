@@ -13,7 +13,8 @@ import type {
 import { createClient } from '@/lib/supabase/client'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { classifyDialoguePatch } from '@/lib/writer-chat-updates'
-import { resolveChatShotId } from '@/lib/writer/chat-id-resolve'
+import { resolveChatShotRef } from '@/lib/writer/chat-id-resolve'
+import { boardShotLabels } from '@/lib/writer/board-summary'
 import { useProjectStore } from '@/stores/project-store'
 import { invalidateShots, loadShotsResult } from '@/lib/shots-cache'
 import { isDemoSession } from '@/lib/demo/context'
@@ -680,12 +681,22 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       }
     }
     // 샷 id 관용 해석(A2): tempMap → 실재 → 레거시/위치형 폴백. 실패는 null.
+    //   "씬2 샷5"가 보드 번호와 씬 안 자리로 다른 두 샷이면 고르지 않고 어느 샷인지 묻는다(2026-11-02 리뷰 M3).
+    const shotNotResolved = (rawId: string): string => {
+      const ref = resolveChatShotRef(get().shots.map((s) => ({ shotId: s.shotId, sceneId: s.sceneId })), tempMap.get(rawId) ?? rawId)
+      const locale = useLocaleStore.getState().locale
+      if (ref?.kind !== 'ambiguous') return translate(locale, "Shot '{id}' not found", { id: rawId })
+      const labels = boardShotLabels(get().sceneManifest, get().shots)
+      const [first, second] = ref.shotIds.map((shotId) => labels.get(shotId) ?? shotId)
+      return translate(locale, 'Which shot do you mean: {first} or {second}?', { first, second })
+    }
     const resolveShot = (rawId: string): string | null => {
       const viaTemp = tempMap.get(rawId) ?? rawId
-      return resolveChatShotId(
+      const ref = resolveChatShotRef(
         get().shots.map((s) => ({ shotId: s.shotId, sceneId: s.sceneId })),
         viaTemp,
       )
+      return ref?.kind === 'shot' ? ref.shotId : null
     }
     for (const u of updates) {
       try {
@@ -722,13 +733,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         } else if (u.type === 'updateShot') {
           const shotId = resolveShot(u.id)
           if (!shotId) {
-            skipped.push({
-              type: u.type,
-              id: u.id,
-              reason: translate(useLocaleStore.getState().locale, "Shot '{id}' not found", {
-                id: u.id,
-              }),
-            })
+            skipped.push({ type: u.type, id: u.id, reason: shotNotResolved(u.id) })
             continue
           }
           const nextDialogueLines = u.patch.dialogueLines
@@ -769,13 +774,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         } else if (u.type === 'deleteShot') {
           const delId = resolveShot(u.id)
           if (!delId) {
-            skipped.push({
-              type: u.type,
-              id: u.id,
-              reason: translate(useLocaleStore.getState().locale, "Shot '{id}' not found", {
-                id: u.id,
-              }),
-            })
+            skipped.push({ type: u.type, id: u.id, reason: shotNotResolved(u.id) })
             continue
           }
           await get().deleteShot(delId)
