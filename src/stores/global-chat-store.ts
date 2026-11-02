@@ -59,7 +59,7 @@ import { useArtistVersionStore } from '@/stores/artist-version-store'
 import { useWriterRoomStore } from '@/stores/writer-room-store'
 import { restartWriterStatus } from '@/lib/writer/use-writer-status'
 import { completeKoreanDialogue, dialogueHandoffTarget } from '@/lib/writer/dialogue-handoff'
-import { roughRedrawCandidates, roughVisibleState, type RoughVisibleState } from '@/lib/writer/chat-rough-redraw'
+import { roughRedrawCandidates, roughRedrawOfferHere, roughVisibleState, type RoughVisibleState } from '@/lib/writer/chat-rough-redraw'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { boardNodeNames } from '@/features/director/node-label'
 import { handoffToStage } from '@/lib/stage-nav'
@@ -281,6 +281,8 @@ interface GlobalChatState {
   restorePendingProposal: (id: string) => boolean
   deferSuggestion: () => void
   restoreSuggestion: (id: string) => boolean
+  /** 보드가 [러프 다시 그리기]를 실제로 그리기 시작했다 — 그 프로젝트 · 그 샷들의 카드를 내린다(2026-11-02 리뷰 L7). */
+  settleRoughRedraw: (projectId: string, shotIds: readonly string[]) => void
   dismissPendingProposal: (id?: string) => void
   /** #script-preserve: 붙여 넣은 글이 대본이면 그 글을 그대로 스토리로 두고 "그대로 보존할까요" 카드를 띄운다. 대본이 아니면 false(종전 경로). */
   offerScriptPreserve: (text: string, opts?: { traceId?: string; held?: ScriptPreserveHeld }) => boolean
@@ -3705,6 +3707,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const edit = get().sceneStoryEdit
     if (edit && suggestion.id !== `scene-story-edit:${edit.projectId}`) return
     if (get().pendingProposal?.stage === 'producer' && isProducerChoice(suggestion)) return
+    // 보드 밖에서 숨은 [러프 다시 그리기] 카드는 새 제안에 자리를 비켜 "나중에"로 간다(2026-11-02 리뷰 M1) — 카드는 그 프로젝트
+    //   Storyboard 보드에서만 보이는데 제안 자리는 하나라, 숨은 채로 Director 의 Editor 넘김 질문 같은 제안을 막았다.
+    //   보드를 떠날 때가 아니라 새 제안이 올 때 비킨다 — 새로 고침 뒤에도 카드는 저장된 채 돌아오고, 다른 제안이 없으면 보드에서 그대로 보인다.
+    const parked = get().suggestion
+    if (parked && parked.id !== suggestion.id && !roughRedrawOfferHere(parked.action, useBoardUiStore.getState().boardProjectId)) {
+      set(state => ({ suggestion: null, deferredSuggestions: [...state.deferredSuggestions.filter(item => item.id !== parked.id), parked] }))
+      persistConversationState(get())
+    }
     const { suggestion: current, dismissedSuggestionIds } = get()
     if (suggestion.content && suggestion.action?.kind !== 'choices' && !get().recordedSuggestionIds.includes(suggestion.id)) {
       const message = { id: makeId(), stage: suggestion.stage, role: 'model' as const, content: suggestion.content }
@@ -3771,6 +3781,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     if (get().suggestion?.dismissible === false) return false
     const suggestion = get().deferredSuggestions.find(item => item.id === id)
     if (!suggestion) return false
+    // [러프 다시 그리기]는 그 프로젝트 보드에서만 다시 연다 — 보드 밖에서 열면 숨은 채 자리를 막는다(리뷰 M1).
+    if (!roughRedrawOfferHere(suggestion.action, useBoardUiStore.getState().boardProjectId)) return false
     if (get().pendingProposal?.stage === 'producer' && isProducerChoice(suggestion)) return false
     const current = get().suggestion
     set(state => ({ suggestion, deferredSuggestions: [
@@ -3779,6 +3791,17 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     ] }))
     persistConversationState(get())
     return true
+  },
+
+  settleRoughRedraw: (projectId, shotIds) => {
+    const same = (item: ChatSuggestion | null | undefined) =>
+      item?.action?.kind === 'roughRedraw' && item.action.projectId === projectId &&
+      item.action.shotIds.length === shotIds.length && item.action.shotIds.every((id, index) => id === shotIds[index])
+    if (same(get().suggestion)) get().dismissSuggestion()
+    if (get().deferredSuggestions.some(same)) {
+      set(state => ({ deferredSuggestions: state.deferredSuggestions.filter(item => !same(item)) }))
+      persistConversationState(get())
+    }
   },
 
   cancelDeferredProposal: (id) => {

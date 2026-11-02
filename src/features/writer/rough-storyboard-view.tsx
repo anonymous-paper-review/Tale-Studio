@@ -656,7 +656,10 @@ export function RoughStoryboardView() {
   useEffect(() => {
     if (!roughRedrawRequest || pumpActive || !projectId) return
     const shotIds = useBoardUiStore.getState().takeRoughRedraw(projectId)
-    if (shotIds) void drawShots(shotIds)
+    if (!shotIds) return
+    // 실제로 그리기 시작할 때 채팅 카드를 내린다(2026-11-02 리뷰 L7) — 그 전에 보드를 떠나면 카드는 남아 다시 누를 수 있다.
+    useGlobalChatStore.getState().settleRoughRedraw(projectId, shotIds)
+    void drawShots(shotIds)
   }, [roughRedrawRequest, pumpActive, projectId, drawShots])
 
   const running = !!(

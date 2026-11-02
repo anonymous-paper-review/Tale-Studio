@@ -971,7 +971,7 @@ export function GlobalChat() {
     if (action.kind === 'roughRedraw') {
       // 그 프로젝트의 Storyboard 보드가 열려 있을 때만 맡긴다(리뷰 B1) — 다른 화면에서는 카드도 보이지 않는다.
       if (!roughRedrawOfferHere(action, useBoardUiStore.getState().boardProjectId)) return
-      dismissSuggestion()
+      // 카드는 보드가 실제로 그리기 시작할 때 내린다(settleRoughRedraw, 리뷰 L7) — 보드가 다른 그림을 그리는 중이면 요청은 기다린다.
       useBoardUiStore.getState().requestRoughRedraw(action.projectId, action.shotIds)
       return
     }
@@ -1671,7 +1671,7 @@ export function GlobalChat() {
               {deferredSuggestions.map(item => (
                 <div key={item.id} className="flex items-start justify-between gap-2">
                   <span className="min-w-0">{item.content}</span>
-                  <Button size="sm" variant="outline" disabled={suggestion?.dismissible === false} onClick={() => restoreSuggestion(item.id)}>{t('Reopen')}</Button>
+                  <Button size="sm" variant="outline" disabled={suggestion?.dismissible === false || !roughRedrawOfferHere(item.action, boardProjectId)} onClick={() => restoreSuggestion(item.id)}>{t('Reopen')}</Button>
                 </div>
               ))}
             </div>
