@@ -2914,6 +2914,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (styleLockedReply) reply = styleLockedReply
       const replyBeforeReceipt = reply
       const waitForLegacy = !dialogueTarget && toolsEnabled && ((requestedHandoff && requestsSupportedChatEdit(stage, trimmed)) || (stage === 'writer' && data.updates?.length) || (stage === 'artist' && (data.proposals?.length || data.locationProposals?.length)))
+      // 답을 실행 결과로 바꿀 때 실제로 지우고 더한 것을 함께 알리는 한 줄("적용: 샷 2개 지움 · 샷 1개 더함", 리뷰 4차 후속 L2).
+      let appliedStructureLine = ''
       reply = guardChatToolReply(reply, toolOutcomes, contentLocale() === 'ko')
       if (lockedReply) reply = lockedReply
       if (styleLockedReply) reply = styleLockedReply
@@ -3489,26 +3491,45 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           })
         }
         // 검증된 씬/샷 CRUD 액션 — writer-store 가 기존 CRUD 로 DB 반영.
+        const applyList = rawUpdates.filter((u) => u.type !== 'clarify')
         const result = await useWriterStore
           .getState()
-          .applyChatUpdates(rawUpdates.filter((u) => u.type !== 'clarify'), executeApp ? { executeEdit: executeJsonEdit } : undefined)
+          .applyChatUpdates(applyList, executeApp ? { executeEdit: executeJsonEdit } : undefined)
         // 못 한 고침은 실행 결과에 남긴다 — 결과에 못 한 것이 있으면 "했어요" 답 대신 결과를 보인다(guardChatToolReply).
         //   씬 · 샷 칸 고치기만 남겨, 못 한 지우기 · 더하기는 채팅에 "지웠어요"로 남았다(2026-11-02 리뷰 4차 후속) — 다 같은 길로 남긴다.
-        const updateTarget = (u: WriterChatUpdate) => ('id' in u && typeof u.id === 'string' ? u.id : 'tempId' in u && typeof u.tempId === 'string' ? u.tempId : undefined)
+        //   짝은 받은 목록의 차례(index)로 짓는다 — id 로 짝지으면 임시 id 없는 더하기 하나가 못 되어도 모든 더하기에 실패가 붙었다(L1).
+        //   더하기 줄은 답 안의 차례로 이름 붙인다("새 샷 2") — 같은 이름이면 결과에서 한 줄로 합쳐져 까닭이 사라졌다.
+        const addOrdinal = (index: number, type: 'addShot' | 'addScene') => {
+          const same = applyList.filter((u) => u.type === type)
+          const name = translate(contentLocale(), type === 'addShot' ? 'New shot' : 'New scene')
+          return same.length > 1 ? `${name} ${same.indexOf(applyList[index]) + 1}` : name
+        }
         for (const skipped of result.skipped) {
-          const updates = rawUpdates.filter(u => u.type !== 'clarify' && (skipped.type === 'all' || (u.type === skipped.type && (!skipped.id || updateTarget(u) === skipped.id))))
-          for (const update of updates) {
+          const entries = skipped.index !== undefined
+            ? [{ update: applyList[skipped.index], index: skipped.index }]
+            : applyList.map((update, index) => ({ update, index })).filter(({ update }) => skipped.type === 'all' || update.type === skipped.type)
+          for (const { update, index } of entries) {
+            if (!update) continue
             if (update.type === 'updateScene' || update.type === 'updateShot') {
               const resource = update.type === 'updateScene' ? 'scenes' : 'shots'
               if (!toolOutcomes.some(o => o.result.source === 'json' && (o.call.input as Record<string, unknown>).id === update.id)) recordJsonResult(resource, update.id, update.patch, { status: 'blocked', message: skipped.reason })
               continue
             }
-            if (update.type === 'clarify') continue
             const resource = update.type === 'addScene' || update.type === 'deleteScene' ? 'scenes' : 'shots'
-            const target = update.type === 'addShot' ? translate(contentLocale(), 'New shot') : update.type === 'addScene' ? translate(contentLocale(), 'New scene') : update.id
+            const target = update.type === 'addShot' || update.type === 'addScene' ? addOrdinal(index, update.type) : update.id
             recordJsonResult(resource, target, {}, { status: skipped.type === 'all' ? 'blocked' : 'invalid_input', message: skipped.reason })
           }
         }
+        // 실제로 지우고 더한 것은 한 줄로 센다 — 답이 결과로 바뀌면 못 한 것만 적혀 된 것을 말하지 않았다(L2).
+        const appliedCount = (type: string) => result.appliedChanges.filter((change) => change.type === type).length
+        const countText = (count: number, one: string, many: string) => (count === 1 ? translate(contentLocale(), one) : translate(contentLocale(), many, { count }))
+        const appliedItems = [
+          ['deleteShot', 'Deleted 1 shot', 'Deleted {count} shots'],
+          ['addShot', 'Added 1 shot', 'Added {count} shots'],
+          ['deleteScene', 'Deleted 1 scene', 'Deleted {count} scenes'],
+          ['addScene', 'Added 1 scene', 'Added {count} scenes'],
+        ].flatMap(([type, one, many]) => (appliedCount(type) > 0 ? [countText(appliedCount(type), one, many)] : []))
+        appliedStructureLine = appliedItems.length ? translate(contentLocale(), 'Applied: {items}', { items: appliedItems.join(' · ') }) : ''
         patchTrace({
           appliedCount: result.applied,
           skippedCount: result.skipped.length,
@@ -3575,7 +3596,10 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       }
       if (waitForLegacy) {
         if (!isCurrentSession()) return
-        const finalReply = lockedReply ?? guardChatToolReply(replyBeforeReceipt, toolOutcomes, contentLocale() === 'ko')
+        const guarded = guardChatToolReply(replyBeforeReceipt, toolOutcomes, contentLocale() === 'ko')
+        // 답이 실행 결과로 바뀌었으면(못 한 것이 있음) 실제로 지우고 더한 것도 한 줄로 덧붙인다(리뷰 4차 후속 L2).
+        const replaced = !!appliedStructureLine && guarded === chatToolReceipt(toolOutcomes, contentLocale() === 'ko')
+        const finalReply = lockedReply ?? (replaced ? `${guarded}\n${appliedStructureLine}` : guarded)
         set(state => ({ loading: false, messages: state.messages.map(message => message.id === replyId ? { ...message, content: finalReply } : message) }))
         if (projectId) saveChatMessage(projectId, stage, 'model', finalReply)
         pendingReplyId = null

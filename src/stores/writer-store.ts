@@ -119,7 +119,10 @@ export interface WriterApplyChatUpdatesResult {
   pendingDialogueShrinks: WriterDialogueShrinkProposal[]
   // #p4-understand B: 침묵 no-op 제거 — 채팅이 적용/건너뜀을 사용자에게 표면화한다.
   applied: number
-  skipped: Array<{ type: string; id?: string; reason: string }>
+  /** 적용된 고침 — 받은 목록에서의 차례(index)와 종류. 채팅이 "적용: 샷 2개 지움"처럼 센다(리뷰 4차 후속 L2). */
+  appliedChanges: Array<{ index: number; type: string }>
+  /** 못 한 고침 — index 는 받은 목록에서의 차례(전체를 막은 'all' 만 없다). 채팅은 이 차례로 고침과 짝짓는다(리뷰 4차 후속 L1). */
+  skipped: Array<{ type: string; id?: string; index?: number; reason: string }>
 }
 
 // applyChatUpdates 보조 — update 에서 Scene/Shot 칸만 추린다(route 가 1차 검증, 여기선 타입 좁힘 + 잉여 키 제거).
@@ -634,13 +637,14 @@ export const useWriterStore = create<WriterState>((set, get) => ({
 
   applyChatUpdates: async (updates, options) => {
     if (updates.some((u) => u.type === 'clarify')) {
-      return { applied: 0, skipped: [], pendingDialogueShrinks: [] }
+      return { applied: 0, appliedChanges: [], skipped: [], pendingDialogueShrinks: [] }
     }
     const tempMap = new Map<string, string>() // tempId → 실제 id
     const pendingDialogueShrinks: WriterDialogueShrinkProposal[] = []
     // #p4-understand: 침묵 no-op 제거 — 적용/건너뜀을 집계해 호출자(채팅)가 표면화한다.
     let applied = 0
-    const skipped: Array<{ type: string; id?: string; reason: string }> = []
+    const appliedChanges: Array<{ index: number; type: string }> = []
+    const skipped: Array<{ type: string; id?: string; index?: number; reason: string }> = []
 
     // 활성 런 가드(#F-003 R2 2026-08-12) — 런이 도는 동안(씬 게이트 대기 포함) 채팅 CRUD 를
     //   막는다. 실측(dc531572): 런 중 채팅이 씬 4개·샷 16개를 병행 생성했다. persistShots 는
@@ -663,6 +667,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           if (st.started && !st.pipeline_completed && !st.pipeline_failed) {
             return {
               applied: 0,
+              appliedChanges: [],
               skipped: [
                 {
                   type: 'all',
@@ -709,7 +714,11 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       if (ref?.kind !== 'shot') return null
       return get().shots.some((s) => s.shotId === ref.shotId) ? ref.shotId : null
     }
-    for (const u of updates) {
+    for (const [index, u] of updates.entries()) {
+      const markApplied = () => {
+        applied += 1
+        if (!appliedChanges.some((change) => change.index === index)) appliedChanges.push({ index, type: u.type })
+      }
       try {
         if (u.type === 'addScene') {
           const before = u.beforeSceneId === undefined ? undefined : tempMap.get(u.beforeSceneId) ?? u.beforeSceneId
@@ -720,7 +729,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           const newId = await get().addScene({ afterSceneId, fields: pickSceneFields(u) })
           if (!newId) continue
           if (u.tempId) tempMap.set(u.tempId, newId)
-          applied += 1
+          markApplied()
         } else if (u.type === 'addShot') {
           const realSceneId = tempMap.get(u.sceneId) ?? u.sceneId
           const before = u.beforeShotId === undefined ? undefined : resolveShot(u.beforeShotId) ?? u.beforeShotId
@@ -731,20 +740,20 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           const newId = await get().addShot(realSceneId, { afterShotId, fields: pickShotFields(u) })
           if (!newId) continue
           if (u.tempId) tempMap.set(u.tempId, newId)
-          applied += 1
+          markApplied()
         } else if (u.type === 'updateScene') {
           if (options) {
             const result = await options.executeEdit('scenes', tempMap.get(u.id) ?? u.id, u.patch)
-            if (result.status === 'ok') applied += 1
-            else if (result.status !== 'approval_required') skipped.push({ type: u.type, id: u.id, reason: result.message ?? result.status })
+            if (result.status === 'ok') markApplied()
+            else if (result.status !== 'approval_required') skipped.push({ type: u.type, id: u.id, index, reason: result.message ?? result.status })
             continue
           }
           get().updateScene(tempMap.get(u.id) ?? u.id, u.patch)
-          applied += 1
+          markApplied()
         } else if (u.type === 'updateShot') {
           const shotId = resolveShot(u.id)
           if (!shotId) {
-            skipped.push({ type: u.type, id: u.id, reason: shotNotResolved(u.id) })
+            skipped.push({ type: u.type, id: u.id, index, reason: shotNotResolved(u.id) })
             continue
           }
           const nextDialogueLines = u.patch.dialogueLines
@@ -756,8 +765,8 @@ export const useWriterStore = create<WriterState>((set, get) => ({
             const patches = [rest, ...(shrinking ? [{ dialogueLines: nextDialogueLines }] : [])].filter(patch => Object.keys(patch).length)
             for (const patch of patches) {
               const result = await options.executeEdit('shots', shotId, patch)
-              if (result.status === 'ok') applied += 1
-              else if (result.status !== 'approval_required') skipped.push({ type: u.type, id: shotId, reason: result.message ?? result.status })
+              if (result.status === 'ok') markApplied()
+              else if (result.status !== 'approval_required') skipped.push({ type: u.type, id: shotId, index, reason: result.message ?? result.status })
             }
             continue
           }
@@ -781,27 +790,27 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           } else {
             get().updateShot(shotId, u.patch)
           }
-          applied += 1
+          markApplied()
         } else if (u.type === 'deleteShot') {
           const delId = resolveShot(u.id, true)
           if (!delId) {
-            skipped.push({ type: u.type, id: u.id, reason: shotNotResolved(u.id, true) })
+            skipped.push({ type: u.type, id: u.id, index, reason: shotNotResolved(u.id, true) })
             continue
           }
           await get().deleteShot(delId)
-          applied += 1
+          markApplied()
         } else if (u.type === 'deleteScene') {
           await get().deleteScene(tempMap.get(u.id) ?? u.id)
-          applied += 1
+          markApplied()
         }
       } catch (e) {
         // 어느 고침이었는지 남긴다(더하기는 임시 id) — 채팅이 실행 결과에 못 한 것을 하나하나 적는다(리뷰 4차 후속).
         const target = 'id' in u && typeof u.id === 'string' ? u.id : 'tempId' in u && typeof u.tempId === 'string' ? u.tempId : undefined
-        skipped.push({ type: u.type, ...(target ? { id: target } : {}), reason: e instanceof Error ? e.message : 'chat update failed' })
+        skipped.push({ type: u.type, ...(target ? { id: target } : {}), index, reason: e instanceof Error ? e.message : 'chat update failed' })
         set({ error: e instanceof Error ? e.message : 'chat update failed' })
       }
     }
-    return { pendingDialogueShrinks, applied, skipped }
+    return { pendingDialogueShrinks, applied, appliedChanges, skipped }
   },
 
   clearError: () => set({ error: null }),

@@ -12,6 +12,7 @@ import { useGlobalChatStore as chat } from '@/stores/global-chat-store'
 import { useProjectStore as project } from '@/stores/project-store'
 import { useWriterStore } from '@/stores/writer-store'
 import { useLocaleStore } from '@/stores/locale-store'
+import { translate } from '@/lib/i18n/translate'
 import type { Scene, Shot } from '@/types'
 
 function shot(shotId: string, sceneId: string): Shot {
@@ -79,5 +80,41 @@ describe('못 한 지우기 · 더하기는 답 대신 실행 결과로', () => 
     expect(toast).toContain('어느 샷인지 알려 주세요')
     expect(lastModelMessage()).toContain('어느 샷인지 알려 주세요')
     expect(lastModelMessage()).not.toContain('처리했어요')
+  })
+})
+
+describe('실행 결과는 고침 하나하나를 제 줄로', () => {
+  const addShot = (anchor: Record<string, unknown>) => ({ type: 'addShot', sceneId: 'sc_02', shotType: 'CU', actionDescription: '새 컷', characters: [], durationSeconds: 3, ...anchor })
+
+  // 왜: 2026-11-02 리뷰 4차 후속 L1 — 임시 id 가 없는 더하기가 못 되면 답의 모든 더하기(된 것까지)에 실패를 붙였고, 결과는 한 "새 샷" 줄로
+  //   합쳐져 마지막 까닭만 남았다. 고침은 답 안의 차례(번호)로 짝짓는다.
+  it('더하기 여럿 가운데 하나만 못 하면 못 한 그 더하기만 실행 결과에 제 까닭과 함께 남는다', async () => {
+    modelReplies('둘 다 더했어요.', [addShot({}), addShot({ afterShotId: 'Shot 9' })])
+    await chat.getState().sendMessage('씬 2 에 샷 둘 더해줘')
+    expect(useWriterStore.getState().shots).toHaveLength(5)
+    const message = lastModelMessage()
+    expect(message).toContain("새 샷 2: 입력 수정 필요 (추가할 위치 'Shot 9'")
+    expect(message).not.toContain('새 샷 1')
+    expect(message).toContain('적용: 샷 1개 더함')
+  })
+
+  // 왜: 같은 까닭으로 못 한 더하기 둘이 한 줄로 합쳐져 첫 까닭이 사라졌다 — 줄도 둘, 까닭도 하나하나.
+  it('더하기 둘을 다 못 하면 실행 결과에 줄도 둘이고 까닭도 하나하나 붙는다', async () => {
+    modelReplies('둘 다 더했어요.', [addShot({ afterShotId: 'Shot 9' }), addShot({ beforeShotId: 'Shot 8' })])
+    await chat.getState().sendMessage('씬 2 에 샷 둘 더해줘')
+    const message = lastModelMessage()
+    expect(message).toContain("새 샷 1: 입력 수정 필요 (추가할 위치 'Shot 9'")
+    expect(message).toContain("새 샷 2: 입력 수정 필요 (추가할 위치 'Shot 8'")
+  })
+
+  // 왜: 리뷰 4차 후속 L2 — 답을 실행 결과로 바꾸면 못 한 것만 적혀, 실제로 지우고 더한 것은 말하지 않았다. 된 것은 한 줄로 센다.
+  it('답을 실행 결과로 바꿀 때 실제로 지우고 더한 것도 한 줄로 알린다', async () => {
+    modelReplies('모두 처리했어요.', [{ type: 'deleteShot', id: 'Shot 2' }, addShot({}), { type: 'deleteShot', id: 'Shot 9' }])
+    await chat.getState().sendMessage('샷 2 와 샷 9 를 지우고 씬 2 에 샷 하나 더해줘')
+    const message = lastModelMessage()
+    expect(message).not.toContain('처리했어요')
+    expect(message).toContain('적용: 샷 1개 지움 · 샷 1개 더함')
+    expect(message).toContain("샷 'Shot 9' 를 찾지 못했어요")
+    expect(translate('en', 'Applied: {items}', { items: [translate('en', 'Deleted {count} shots', { count: 2 }), translate('en', 'Added 1 shot')].join(' · ') })).toBe('Applied: Deleted 2 shots · Added 1 shot')
   })
 })
