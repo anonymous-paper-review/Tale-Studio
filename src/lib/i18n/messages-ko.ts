@@ -655,6 +655,7 @@ export const KO: Record<string, string> = {
   'Enter a story (action) to enable generation': '스토리(액션)를 입력하면 생성할 수 있어요',
   // 더한 샷 바로 그리기(2026-11-02 오너 "더할 때마다 자동")
   'Draws as soon as a slot frees up': '자리가 나면 바로 그려요',
+  'Stopped after repeated failures. Press Retry to draw it.': '여러 번 실패해 멈췄어요. 다시 시도를 눌러 그려 주세요.',
   'No slot freed up within 30 minutes, so this rough was not drawn.': '30분 동안 자리가 나지 않아 러프를 그리지 못했어요.',
   'Adding the shot draws its rough from the story right away. Nothing is drawn while the story is empty.': '샷을 더하면 스토리로 러프를 바로 그려요. 스토리가 비어 있으면 그리지 않아요.',
   'The image may not match the description. Click the card to try regenerating': '설명과 다른 그림일 수 있어요. 카드를 눌러 재생성해 보세요',

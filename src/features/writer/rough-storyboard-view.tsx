@@ -55,12 +55,14 @@ import { isRoughDrawn, roughRedrawBatches, summarizeRoughProgress, undrawnRoughS
 import {
   addedDrawJobs,
   addedDrawOutcome,
+  autoSubmitEventPayload,
   boardDrawingCount,
   boardMissingRoughIds,
   roughContentSignature,
   withoutAddedShots,
   type DrawAddedShot,
   type RoughDrawRound,
+  type RoughRequestFrom,
 } from '@/lib/writer/added-shot-draws'
 import {
   INITIAL_BOARD_LOCK,
@@ -317,6 +319,7 @@ export function RoughStoryboardView() {
   }, [status?.pipeline_completed, reloadSettled])
 
   // opts.quietUserLimit: 내 한도 안내("다시 시도해 주세요")를 띄우지 않는다 — 더한 샷 바로 그리기만 쓴다(카드가 "자리가 나면 바로 그려요"로 알린다, 2026-11-02 리드).
+  //   opts.source: 자동으로 보낸 요청의 출처 — 더한 샷 바로 그리기('added_shot')는 진입 자동 그리기(auto)와 따로 기록한다(리뷰 R7).
   //   돌려주는 refusal · submittedShotIds · skipped 는 더한 샷 바로 그리기가 읽는다(lib/writer/added-shot-draws RoughDrawRound).
   const generate = useCallback(
     async (
@@ -324,7 +327,7 @@ export function RoughStoryboardView() {
       force?: boolean,
       auto?: boolean,
       styleHints?: string[],
-      opts?: { quietUserLimit?: boolean },
+      opts?: { quietUserLimit?: boolean; source?: RoughRequestFrom['source'] },
     ): Promise<(RoughDrawRound & { remaining: number; quota: boolean }) | null> => {
       if (!projectId) return null
       if (shotIds?.length) {
@@ -367,18 +370,16 @@ export function RoughStoryboardView() {
         if (res.status === 429) {
           // 내 한도인가 · 모두의 자리인가 — 더한 샷 그리기(quietUserLimit)만 내 한도 안내를 빼고, 다른 길은 지금처럼 안내한다.
           const scope = notifyQuotaRefusal(res.status, j, opts)
-          if (auto) {
-            recordWriterObservabilityEventClient(projectId, 'auto_submit_response', {
-              auto: true,
-              httpStatus: 429,
-              submittedCount: 0,
-              remaining: 0,
-              quota: true,
-              queued: typeof j?.queued === 'number' ? j.queued : null,
-              limit: typeof j?.limit === 'number' ? j.limit : null,
-              code: typeof j?.code === 'string' ? j.code : null,
-            })
-          }
+          const event = autoSubmitEventPayload({ auto, source: opts?.source }, {
+            httpStatus: 429,
+            submittedCount: 0,
+            remaining: 0,
+            quota: true,
+            queued: typeof j?.queued === 'number' ? j.queued : null,
+            limit: typeof j?.limit === 'number' ? j.limit : null,
+            code: typeof j?.code === 'string' ? j.code : null,
+          })
+          if (event) recordWriterObservabilityEventClient(projectId, 'auto_submit_response', event)
           if (shotIds?.length) {
             setPanelJobs((prev) => {
               const next = { ...prev }
@@ -400,22 +401,19 @@ export function RoughStoryboardView() {
         if (confirmationPending) {
           toast.info(translate(locale, 'Confirming the previous rough request. It will not be submitted again.'))
         }
-        if (auto) {
-          const skipped = (j.data?.skipped ?? []) as Array<{ reason?: unknown }>
-          const skippedByReason = skipped.reduce<Record<string, number>>((counts, item) => {
-            const reason = typeof item.reason === 'string' ? item.reason : 'unknown'
-            counts[reason] = (counts[reason] ?? 0) + 1
-            return counts
-          }, {})
-          recordWriterObservabilityEventClient(projectId, 'auto_submit_response', {
-            auto: true,
-            httpStatus: res.status,
-            submittedCount: submitted.length,
-            remaining: j.data?.remaining ?? 0,
-            skippedByReason,
-          })
-        }
-        // give-up 게이트로 건너뛴 샷 안내 — 진입 자동 생성(auto)에는 매번 뜨지 않도록 억제.
+        const skippedByReason = ((j.data?.skipped ?? []) as Array<{ reason?: unknown }>).reduce<Record<string, number>>((counts, item) => {
+          const reason = typeof item.reason === 'string' ? item.reason : 'unknown'
+          counts[reason] = (counts[reason] ?? 0) + 1
+          return counts
+        }, {})
+        const event = autoSubmitEventPayload({ auto, source: opts?.source }, {
+          httpStatus: res.status,
+          submittedCount: submitted.length,
+          remaining: j.data?.remaining ?? 0,
+          skippedByReason,
+        })
+        if (event) recordWriterObservabilityEventClient(projectId, 'auto_submit_response', event)
+        // give-up 게이트로 건너뛴 샷 안내 — 진입 자동 생성(auto)에는 매번 뜨지 않도록 억제. 더한 샷 그리기는 띄운다(카드에도 까닭이 남는다, 리뷰 R7).
         if (!auto) {
           const gaveUp = (
             (j.data?.skipped ?? []) as Array<{ reason: string }>
@@ -456,13 +454,14 @@ export function RoughStoryboardView() {
         //   서버는 ok:true·제출 0 을 준다. 예전엔 낙관적 스피너만 남고 아무 말이 없어 "눌러도
         //   반응 없음 = 재생성 불가"로 보였다. 클릭 유래(force)일 때만 스피너를 풀고 이유를 말한다.
         //   자동 경로(auto)는 원래 조용해야 하므로 제외 — 진짜 생성 중인 샷의 표시를 지우지 않는다.
+        //   더한 샷의 한 번 더 그리기(source)도 사람이 누른 것이 아니라 조용하다 — 그 샷을 그리는 다른 그리기가 고친 내용을 그린다(리뷰 R7).
         if (force && !auto && submitted.length === 0) {
           const blocked = (
             (j.data?.skipped ?? []) as Array<{ shotId: string; reason: string }>
           )
             .filter((x) => x.reason === 'in_flight')
             .map((x) => x.shotId)
-          if (blocked.length && !confirmationPending) {
+          if (blocked.length && !confirmationPending && !opts?.source) {
             setPanelJobs((prev) => {
               const next = { ...prev }
               for (const id of blocked) delete next[id]
@@ -589,12 +588,8 @@ export function RoughStoryboardView() {
           done: Promise.allSettled(polls),
         }
       } catch (e) {
-        if (auto) {
-          recordWriterObservabilityEventClient(projectId, 'auto_submit_response', {
-            auto: true,
-            error: e instanceof Error ? e.message : String(e),
-          })
-        }
+        const event = autoSubmitEventPayload({ auto, source: opts?.source }, { error: e instanceof Error ? e.message : String(e) })
+        if (event) recordWriterObservabilityEventClient(projectId, 'auto_submit_response', event)
         if (shotIds?.length) {
           setPanelJobs((prev) => {
             const next = { ...prev }
@@ -615,6 +610,7 @@ export function RoughStoryboardView() {
   //   빈칸만 채운다(force 없이): 그새 그림이 생겼거나 다른 곳에서 그리는 중이면 서버가 건너뛰어 같은 샷을 두 번 그리지 않는다.
   //   스토리를 막 고쳤으면 저장을 먼저 끝낸다(서버가 빈 스토리로 보지 않게). 무엇을 할지는 lib/writer/added-shot-draws 가 정한다.
   //   redraw(그리는 동안 고친 샷의 한 번 더 그리기)는 그린 그림을 덮어 그린다(force). 보낼 때의 내용 지문을 장부에 넘긴다(리뷰 R3).
+  //   진입 자동 그리기(auto)가 아니다 — 출처 added_shot 으로 기록하고, 반복 실패로 멈추면 안내한다(리뷰 R7).
   const drawAdded = useCallback<DrawAddedShot>(
     async (shotId, { redraw }) => {
       const shotNow = () => useWriterStore.getState().shots.find((s) => s.shotId === shotId)
@@ -623,18 +619,19 @@ export function RoughStoryboardView() {
       await flushShotSave(shotId).catch(() => {})
       const sent = shotNow()
       const signature = sent ? roughContentSignature(sent) : undefined
-      const round = await generate([shotId], redraw, true, undefined, { quietUserLimit: true })
+      const round = await generate([shotId], redraw, false, undefined, { quietUserLimit: true, source: 'added_shot' })
       const drawn = addedDrawOutcome(round, shotId, storyOf(), locale)
       const outcome = drawn.kind === 'submitted' ? { ...drawn, signature } : drawn
-      if (outcome.kind === 'no_story' || outcome.kind === 'skipped') {
-        // 서버가 건너뛰었다 — 걸어 둔 그리는 중 표시를 거둔다. 다른 곳에서 그리는 중이면 생성 큐가 그 표시를 맡는다.
+      if (outcome.kind !== 'submitted') {
+        // 접수되지 않았다 — 걸어 둔 그리는 중 표시를 거둔다(멈춘 까닭은 장부가 카드에 보인다).
         setPanelJobs((prev) => {
           if (!(shotId in prev)) return prev
           const next = { ...prev }
           delete next[shotId]
           return next
         })
-        refreshGenerationQueue()
+        // 서버가 건너뛰었다 — 다른 곳에서 그리는 중이면 생성 큐가 그 표시를 맡는다.
+        if (outcome.kind === 'no_story' || outcome.kind === 'skipped') refreshGenerationQueue()
       }
       return outcome
     },

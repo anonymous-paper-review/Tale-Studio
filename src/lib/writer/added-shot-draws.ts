@@ -8,7 +8,7 @@
 //   보드가 열려 있는 프로젝트만 그린다 — 보드를 떠나면 아직 보내지 않은 샷은 보내지 않고, 같은 프로젝트 보드로 돌아오면 이어 간다.
 //   그리는 동안 스토리 · 샷 타입 · 등장인물을 고치면 그 그리기가 그려진 뒤 한 번 더(덮어) 그린다. 실패했으면 다시 그리지 않는다(2026-11-02 리드, 리뷰 R3).
 //   아직 보내지 않은 샷은 보낼 때 고친 내용을 읽으므로 한 번만 그린다.
-//   화면(브라우저)과 테스트가 함께 쓴다 — 서버 전용 모듈을 들이지 않는다. 약속: tests/writer/added-shot-draw.test.ts
+//   화면(브라우저)과 테스트가 함께 쓴다 — 서버 전용 모듈을 들이지 않는다. 약속: tests/writer/added-shot-*.test.ts
 import { USER_LIMIT_RECHECK_MS, USER_LIMIT_WAIT_MAX_MS } from '@/lib/artist/draw-continue'
 import { ROUGH_VISIBLE_SHOT_FIELDS } from '@/lib/writer/chat-rough-redraw'
 import { translate } from '@/lib/i18n/translate'
@@ -102,7 +102,23 @@ export function addedDrawOutcome(round: RoughDrawRound | null, shotId: string, s
     return { kind: 'submitted', done: round.done.then(roughDrawResult, () => 'failed' as const) }
   }
   if (round.skipped?.some((item) => item.shotId === shotId && item.reason === 'no_info')) return { kind: 'no_story', story }
+  // 반복 실패로 서버가 저절로 그리기를 멈췄다 — 멈춤으로 까닭과 [다시 시도]를 카드에 둔다(다시 시도는 사람의 덮어 그리기라 멈추지 않는다, 리뷰 R7).
+  if (round.skipped?.some((item) => item.shotId === shotId && item.reason === 'gave_up')) {
+    return { kind: 'failed', reason: translate(locale, 'Stopped after repeated failures. Press Retry to draw it.') }
+  }
   return { kind: 'skipped' }
+}
+
+/** 보드 러프 요청을 누가 보냈나 — auto: 진입 자동 그리기 · 펌프, source: 더한 샷 바로 그리기. 둘 다 없으면 사람이 누른 요청이다. */
+export interface RoughRequestFrom {
+  auto?: boolean
+  source?: 'added_shot'
+}
+
+/** 자동으로 보낸 러프 요청의 응답 기록(auto_submit_response) — 출처(auto · added_shot)를 붙인다. 사람이 누른 요청은 기록하지 않는다(null). */
+export function autoSubmitEventPayload(from: RoughRequestFrom, fields: Record<string, unknown>): Record<string, unknown> | null {
+  const source = from.source ?? (from.auto ? 'auto' : null)
+  return source ? { auto: !!from.auto, source, ...fields } : null
 }
 
 /** 카드에 보일 상태 — 보낼 차례 · 보내는 중은 그리는 중, 자리 기다림은 기다림, 멈춤은 실패(까닭). 그 밖은 보드의 그리기 상태를 따른다. */
