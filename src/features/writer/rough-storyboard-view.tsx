@@ -57,6 +57,7 @@ import {
   addedDrawOutcome,
   boardDrawingCount,
   boardMissingRoughIds,
+  roughContentSignature,
   withoutAddedShots,
   type DrawAddedShot,
   type RoughDrawRound,
@@ -526,7 +527,8 @@ export function RoughStoryboardView() {
             /* best-effort */
           }
         }
-        const convergeJob = async (jobId: string, jobShotIds: string[]) => {
+        // 끝을 돌려준다 — 'drawn'(그 샷들이 그려짐) · 'failed'(작업 실패 확정) · 'unknown'(상한까지 모름). 더한 샷의 한 번 더 그리기가 읽는다.
+        const convergeJob = async (jobId: string, jobShotIds: string[]): Promise<'drawn' | 'failed' | 'unknown'> => {
           const pollOk = await pollGenerationJob(jobId)
             .then(() => true)
             .catch(() => false)
@@ -549,7 +551,7 @@ export function RoughStoryboardView() {
             clearShots(settled)
             if (settled.length === jobShotIds.length) {
               void runAdherence(jobShotIds) // 완료 배치 정합 검사 (fire-and-forget, 클라 생존 중)
-              return
+              return 'drawn'
             }
             if (jobFailed) {
               // 잡 실패 확정 — 미완 샷을 실패 표기(재시도 버튼 노출)하고 종료.
@@ -560,7 +562,7 @@ export function RoughStoryboardView() {
                 }
                 return next
               })
-              return
+              return 'failed'
             }
             // 폴링 성공(완료 확정)이면 짧게, 미확정이면 웹훅 지연을 감안해 길게 재확인.
             await new Promise((r) => setTimeout(r, pollOk ? 2000 : 10_000))
@@ -571,6 +573,7 @@ export function RoughStoryboardView() {
             for (const id of jobShotIds) if (!isDone(id)) delete next[id]
             return next
           })
+          return 'unknown'
         }
         const polls = [...shotIdsByJob.entries()].map(([jobId, jobShotIds]) =>
           convergeJob(jobId, jobShotIds),
@@ -611,13 +614,18 @@ export function RoughStoryboardView() {
   // ── 더한 샷 바로 그리기(2026-11-02 오너 "더할 때마다 자동") ── 카드의 그리기와 같은 요청 길로 그 샷 하나를 보낸다.
   //   빈칸만 채운다(force 없이): 그새 그림이 생겼거나 다른 곳에서 그리는 중이면 서버가 건너뛰어 같은 샷을 두 번 그리지 않는다.
   //   스토리를 막 고쳤으면 저장을 먼저 끝낸다(서버가 빈 스토리로 보지 않게). 무엇을 할지는 lib/writer/added-shot-draws 가 정한다.
+  //   redraw(그리는 동안 고친 샷의 한 번 더 그리기)는 그린 그림을 덮어 그린다(force). 보낼 때의 내용 지문을 장부에 넘긴다(리뷰 R3).
   const drawAdded = useCallback<DrawAddedShot>(
-    async (shotId) => {
-      const storyOf = () => useWriterStore.getState().shots.find((s) => s.shotId === shotId)?.actionDescription ?? ''
+    async (shotId, { redraw }) => {
+      const shotNow = () => useWriterStore.getState().shots.find((s) => s.shotId === shotId)
+      const storyOf = () => shotNow()?.actionDescription ?? ''
       if (!shotHasInfo(storyOf())) return { kind: 'no_story', story: storyOf() }
       await flushShotSave(shotId).catch(() => {})
-      const round = await generate([shotId], false, true, undefined, { quietUserLimit: true })
-      const outcome = addedDrawOutcome(round, shotId, storyOf(), locale)
+      const sent = shotNow()
+      const signature = sent ? roughContentSignature(sent) : undefined
+      const round = await generate([shotId], redraw, true, undefined, { quietUserLimit: true })
+      const drawn = addedDrawOutcome(round, shotId, storyOf(), locale)
+      const outcome = drawn.kind === 'submitted' ? { ...drawn, signature } : drawn
       if (outcome.kind === 'no_story' || outcome.kind === 'skipped') {
         // 서버가 건너뛰었다 — 걸어 둔 그리는 중 표시를 거둔다. 다른 곳에서 그리는 중이면 생성 큐가 그 표시를 맡는다.
         setPanelJobs((prev) => {

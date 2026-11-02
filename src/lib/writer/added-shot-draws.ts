@@ -6,8 +6,11 @@
 //   공용 안내 "다시 시도해 주세요"는 띄우지 않는다(2026-11-02 리드, 보드의 그리기가 quietUserLimit 으로 부른다).
 //   한 번에 한 요청씩 맡긴다 — 한꺼번에 보내면 자리 검사가 엇갈려 한도를 넘길 수 있다(2026-09-11 감사). 그리기는 함께 돈다.
 //   보드가 열려 있는 프로젝트만 그린다 — 보드를 떠나면 아직 보내지 않은 샷은 보내지 않고, 같은 프로젝트 보드로 돌아오면 이어 간다.
+//   그리는 동안 스토리 · 샷 타입 · 등장인물을 고치면 그 그리기가 그려진 뒤 한 번 더(덮어) 그린다. 실패했으면 다시 그리지 않는다(2026-11-02 리드, 리뷰 R3).
+//   아직 보내지 않은 샷은 보낼 때 고친 내용을 읽으므로 한 번만 그린다.
 //   화면(브라우저)과 테스트가 함께 쓴다 — 서버 전용 모듈을 들이지 않는다. 약속: tests/writer/added-shot-draw.test.ts
 import { USER_LIMIT_RECHECK_MS, USER_LIMIT_WAIT_MAX_MS } from '@/lib/artist/draw-continue'
+import { ROUGH_VISIBLE_SHOT_FIELDS } from '@/lib/writer/chat-rough-redraw'
 import { translate } from '@/lib/i18n/translate'
 import type { AppLocale } from '@/lib/locale'
 
@@ -48,14 +51,28 @@ export interface AddedDrawView {
 }
 
 export type AddedDrawOutcome =
-  | { kind: 'submitted'; done: Promise<unknown> }
+  /** 접수됐다 — done 은 그 그리기의 끝('drawn' = 그려짐, 그 밖은 실패 · 모름). signature 는 보낼 때의 그림에 보이는 내용. */
+  | { kind: 'submitted'; done: Promise<unknown>; signature?: string }
   | { kind: 'skipped' }
   | { kind: 'no_story'; story: string }
   | { kind: 'user_limit' }
   | { kind: 'stop_all'; reason: string }
   | { kind: 'failed'; reason?: string }
 
-export type DrawAddedShot = (shotId: string) => Promise<AddedDrawOutcome>
+/** redraw: 그린 그림을 고친 내용으로 덮어 그린다(그리는 동안 고친 경우) — 처음 그리기는 빈칸만 채운다. */
+export type DrawAddedShot = (shotId: string, options: { redraw: boolean }) => Promise<AddedDrawOutcome>
+
+/** 러프에 그려지는 내용(스토리 · 샷 타입 · 등장인물)의 지문 — 대사 · 길이는 러프에 그려지지 않는다. 채팅 [러프 다시 그리기]와 같은 칸이다. */
+export function roughContentSignature(shot: object): string {
+  const record = shot as Partial<Record<(typeof ROUGH_VISIBLE_SHOT_FIELDS)[number], unknown>>
+  return JSON.stringify(ROUGH_VISIBLE_SHOT_FIELDS.map((field) => record[field] ?? null))
+}
+
+/** 보드 요청의 끝(작업마다 그려짐 · 실패 · 모름)을 하나로 — 모두 그려졌을 때만 'drawn'. */
+function roughDrawResult(results: unknown): 'drawn' | 'failed' {
+  if (!Array.isArray(results) || results.length === 0) return 'failed'
+  return results.every((r) => (r as { status?: string; value?: unknown })?.status === 'fulfilled' && (r as { value?: unknown }).value === 'drawn') ? 'drawn' : 'failed'
+}
 
 /** 보드의 러프 요청(rough-storyboard-view generate) 한 번의 결과 — 더한 샷 그리기가 읽는 칸만. */
 export interface RoughDrawRound {
@@ -81,7 +98,9 @@ export function addedDrawOutcome(round: RoughDrawRound | null, shotId: string, s
     case 'content':
       return { kind: 'failed', reason: translate(locale, 'This request breaks the content rules, so nothing was generated. Edit the description and try again.') }
   }
-  if (round.confirmationPending || round.submittedShotIds?.includes(shotId)) return { kind: 'submitted', done: round.done }
+  if (round.confirmationPending || round.submittedShotIds?.includes(shotId)) {
+    return { kind: 'submitted', done: round.done.then(roughDrawResult, () => 'failed' as const) }
+  }
   if (round.skipped?.some((item) => item.shotId === shotId && item.reason === 'no_info')) return { kind: 'no_story', story }
   return { kind: 'skipped' }
 }
@@ -162,6 +181,11 @@ interface Entry {
   noSlot?: boolean
   /** 스토리가 없어 멈췄을 때의 스토리 — 바뀌면 다시 본다. */
   story?: string
+  /** 보낸 그리기의 내용 지문 · 그 뒤 화면이 알린 지금 내용 지문 — 다르면 그려진 뒤 한 번 더 그린다. */
+  signature?: string
+  latestSignature?: string
+  /** 다음 그리기는 덮어 그리기다(그리는 동안 고친 경우). */
+  redraw?: boolean
 }
 
 interface Queue {
@@ -249,14 +273,26 @@ export function createAddedShotDraws(deps: AddedShotDrawsDeps = {}) {
     switch (outcome.kind) {
       case 'submitted': {
         entry.phase = 'drawing'
+        entry.signature = outcome.signature
+        entry.redraw = false
         // 자리를 얻었다 — 아직 기다리는 샷이 있으면 기다림을 지금부터 다시 잰다(Artist 이어 그리기와 같다).
         queue.userWaitSince = hasWaiting(queue) ? now() : null
-        const finish = () => {
-          if (entry.phase !== 'drawing') return
+        const finish = (result: unknown) => {
+          if (entry.phase !== 'drawing' || queue.entries.get(entry.shotId) !== entry) return
+          const changedSince = entry.latestSignature !== undefined && entry.signature !== undefined && entry.latestSignature !== entry.signature
+          if (result === 'drawn' && changedSince) {
+            // 그리는 동안 고쳤다 — 그려진 그림을 고친 내용으로 한 번 더 그린다(실패했으면 다시 그리지 않는다, 9/11).
+            entry.redraw = true
+            entry.phase = queue.userWaitSince !== null ? 'waiting' : 'pending'
+            changed()
+            if (entry.phase === 'waiting') scheduleRecheck(projectId)
+            void pump()
+            return
+          }
           entry.phase = 'done'
           changed()
         }
-        outcome.done.then(finish, finish)
+        outcome.done.then(finish, () => finish('failed'))
         break
       }
       case 'skipped':
@@ -302,7 +338,7 @@ export function createAddedShotDraws(deps: AddedShotDrawsDeps = {}) {
     changed()
     let outcome: AddedDrawOutcome
     try {
-      outcome = await draw(entry.shotId)
+      outcome = await draw(entry.shotId, { redraw: !!entry.redraw })
     } catch {
       outcome = { kind: 'failed' }
     } finally {
@@ -372,6 +408,11 @@ export function createAddedShotDraws(deps: AddedShotDrawsDeps = {}) {
       const after = new Set(jobIds)
       queue.lastJobIds = after
       if (before && [...before].some((id) => !after.has(id))) recheck(projectId)
+    },
+    /** 화면이 본 더한 샷의 지금 내용(러프에 그려지는 칸의 지문) — 보낸 뒤 바뀌었으면 그려진 뒤 한 번 더 그린다(리뷰 R3). */
+    contentChanged(projectId: string, shotId: string, signature: string): void {
+      const entry = queues.get(projectId)?.entries.get(shotId)
+      if (entry) entry.latestSignature = signature
     },
     /** 스토리가 없어 멈춘 더한 샷에 스토리가 생겼다 — 그린다. */
     storyChanged(projectId: string, shotId: string, story: string): void {

@@ -81,7 +81,7 @@ describe('샷을 더하면 바로 그리기', () => {
     expect(draw).not.toHaveBeenCalled()
     saved.resolve(true)
     await tick()
-    expect(draw).toHaveBeenCalledWith('sh_01_03')
+    expect(draw).toHaveBeenCalledWith('sh_01_03', { redraw: false })
     expect(draws.view('p').get('sh_01_03')?.phase).toBe('drawing')
   })
 
@@ -189,7 +189,7 @@ describe('샷을 더하면 바로 그리기', () => {
     draws.jobsChanged('p', ['job-2'])
     await tick()
     expect(draw).toHaveBeenCalledTimes(2)
-    expect(draw.mock.calls[1]).toEqual(['sh_01_03'])
+    expect(draw.mock.calls[1]).toEqual(['sh_01_03', { redraw: false }])
     expect(draws.view('p').get('sh_01_03')?.phase).toBe('drawing')
   })
 
@@ -202,7 +202,7 @@ describe('샷을 더하면 바로 그리기', () => {
     await tick()
     await vi.advanceTimersByTimeAsync(USER_LIMIT_RECHECK_MS)
     await vi.advanceTimersByTimeAsync(USER_LIMIT_RECHECK_MS)
-    expect(draw.mock.calls).toEqual([['sh_01_03'], ['sh_01_03'], ['sh_01_03']])
+    expect(draw.mock.calls.map(([id]) => id)).toEqual(['sh_01_03', 'sh_01_03', 'sh_01_03'])
   })
 
   // 왜: 2026-11-02 리드 결정 — 카드가 "자리가 나면 바로 그려요"라고 하는데 공용 안내가 "다시 시도해 주세요"라고 하면 서로 어긋난다.
@@ -219,7 +219,7 @@ describe('샷을 더하면 바로 그리기', () => {
     info.mockClear()
     expect(notifyQuotaRefusal(429, { ...own, scope: 'global' }, { quietUserLimit: true })).toBe('global')
     expect(info).toHaveBeenCalledWith('지금 생성 자리가 모두 사용 중이에요. 잠시 뒤에 다시 시도해 주세요.', { id: 'generation-quota-exceeded' })
-    expect(board).toMatch(/generate\(\[shotId\], false, true, undefined, \{ quietUserLimit: true \}\)/)
+    expect(board).toMatch(/generate\(\[shotId\], redraw, true, undefined, \{ quietUserLimit: true \}\)/)
     expect(board).toContain('notifyQuotaRefusal(res.status, j, opts)')
     expect(board).toContain('void generate([shot.shotId], true)')
     expect(readFileSync('src/stores/artist-store.ts', 'utf8')).not.toContain('notifyQuotaRefusal')
@@ -460,7 +460,7 @@ describe('샷을 더한 순간의 알림 (writer-store)', () => {
       const result = await useWriterStore.getState().applyChatUpdates(updates)
       expect(result.applied).toBe(1)
       await tick()
-      expect(draw).toHaveBeenCalledWith('sh_01_01')
+      expect(draw).toHaveBeenCalledWith('sh_01_01', { redraw: false })
       expect(draws.view('project-add').get('sh_01_01')?.phase).toBe('drawing')
     } finally {
       stop()
