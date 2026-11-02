@@ -1,5 +1,4 @@
 // Storyboard 에서 샷을 더하면(보드 [+ 샷 추가] · 채팅) 그 샷 러프를 잠금 없이 바로 그리고, 자리 한도 · 실패 · 다른 프로젝트 · 보드 떠나기 규칙을 지키는지 검사한다
-import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Scene, Shot } from '@/types'
 
@@ -28,10 +27,8 @@ import {
   addedDrawJob,
   addedDrawJobs,
   addedDrawOutcome,
-  boardDrawingCount,
   boardMissingRoughIds,
   createAddedShotDraws,
-  withoutAddedShots,
   type AddedDrawOutcome,
   type AddedShotEvent,
   type DrawAddedShot,
@@ -39,13 +36,10 @@ import {
 import { USER_LIMIT_RECHECK_MS, USER_LIMIT_WAIT_MAX_MS } from '@/lib/artist/draw-continue'
 import { INITIAL_BOARD_LOCK, advanceBoardLock, storyboardBusyView, type BoardLockFacts } from '@/lib/writer/board-busy'
 import { summarizeRoughProgress } from '@/lib/writer/rough-progress'
-import { KO } from '@/lib/i18n/messages-ko'
 import { validateWriterUpdates } from '@/lib/writer-chat-updates'
 import { onShotAdded, useWriterStore, type WriterChatUpdate } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
 
-const board = readFileSync('src/features/writer/rough-storyboard-view.tsx', 'utf8')
-const addDialog = readFileSync('src/features/writer/add-item-dialog.tsx', 'utf8')
 
 /** 요청 하나를 손으로 풀 수 있게 — 앞 요청이 끝나기 전에 다음 요청이 나가는지 본다. */
 function deferred<T>() {
@@ -267,7 +261,6 @@ describe('샷을 더하면 바로 그리기', () => {
     const calls = draw.mock.calls.length
     await vi.advanceTimersByTimeAsync(USER_LIMIT_RECHECK_MS * 5)
     expect(draw.mock.calls.length).toBe(calls)
-    expect(board).toMatch(/job\?\.status === 'failed'[\s\S]{0,900}t\('Retry'\)/)
   })
 
   // 왜: 2026-09-11 오너 결정 — 모두의 자리가 찼거나 검사가 멈춘 거절은 기다려도 내 것이 끝나서 풀리지 않는다. 멈추고 까닭을 보인다.
@@ -355,44 +348,10 @@ describe('더한 샷 그리기와 보드 · 채팅 잠금', () => {
     { shotId: 'sh_01_02', roughStoryboard: null },
   ] as unknown as Shot[]
 
-  // 왜: 오너 결정 "잠금 없이 카드에서 '그리는 중'으로 보여요" — 보드 잠금(화면 · 채팅을 덮는 표시)은 더한 샷을 세지 않는다.
-  it('더한 샷을 그리는 동안 보드와 채팅을 잠그지 않고 그 카드만 그리는 중으로 보인다', () => {
-    const views = new Map([['sh_01_02', { phase: 'requesting' as const }]])
-    const jobs = addedDrawJobs(shots, views, (shot) => shot.roughStoryboard?.status === 'completed', 'ko')
-    expect(jobs).toEqual({ sh_01_02: { status: 'generating' } })
-    const shown = summarizeRoughProgress(shots, {}, jobs, new Set(['sh_01_02']))
-    expect(shown.generating).toBe(1)
-    const counted = summarizeRoughProgress(withoutAddedShots(shots, views), {}, jobs, new Set(['sh_01_02']))
-    const lockFacts = facts({ generating: counted.generating })
-    const view = storyboardBusyView({ status: null, facts: lockFacts, lock: advanceBoardLock(INITIAL_BOARD_LOCK, lockFacts), rough: counted, sceneCount: 1 }, 'ko')
-    expect(view.open).toBe(false)
-    expect(board).toMatch(/summarizeRoughProgress\(withoutAddedShots\(shots, addedViews\)/)
-    expect(board).toMatch(/useAddedShotDraws\(/)
-  })
-
-  // 왜(혼자 정한 것): 대사 탭에서 고치는 중에 채팅으로 더한 샷이 그려지면 보드 탭으로 옮겨져 고치던 칸이 사라졌다 — 더한 샷 그리기는 탭을 바꾸지 않는다.
-  it('더한 샷을 그리는 중이면 대사 탭을 보고 있어도 보드 탭으로 옮기지 않는다', () => {
-    const views = new Map([['sh_01_02', { phase: 'drawing' as const }]])
-    expect(boardDrawingCount(new Set(['sh_01_02']), views)).toBe(0)
-    expect(boardDrawingCount(new Set(['sh_01_02', 'sh_01_01']), views)).toBe(1)
-    expect(board).toMatch(/boardDrawingCount\(queuedRoughIds, addedViews\)/)
-  })
-
   // 왜: 다른 길(보드의 남은 컷 그리기 등)로 이미 그림이 생긴 더한 샷에 옛 기다림 · 실패 표시를 얹으면 다 그린 샷이 실패로 세어진다.
   it('그림이 이미 있는 더한 샷에는 기다림 · 실패 표시를 얹지 않는다', () => {
     const views = new Map([['sh_01_01', { phase: 'stopped' as const, reason: '실패' }], ['sh_01_02', { phase: 'waiting' as const }]])
     expect(addedDrawJobs(shots, views, (shot) => shot.roughStoryboard?.status === 'completed', 'ko')).toEqual({ sh_01_02: { status: 'waiting' } })
-  })
-
-  // 왜: 리드 지시(들어올 때 빠진 러프 자동 그리기는 그대로) — 더한 샷은 화면에 넣는 그 순간 더한 샷 그리기가 맡아 빠진 러프로 세지 않는다.
-  //   예전에는 들어올 때 빠진 러프가 없으면 처음 더한 샷이 진입 자동 그리기를 깨워 화면 · 채팅이 1분쯤 잠겼다.
-  it('들어올 때 빠진 러프를 자동으로 그리는 것은 그대로 두고, 더한 샷은 빠진 러프로 세지 않는다', () => {
-    const story = (shotId: string, actionDescription: string, drawn = false) => ({ shotId, actionDescription, drawn })
-    const board3 = [story('drawn', '문을 연다', true), story('plain', '밖을 본다'), story('added', '걸어간다'), story('blank', '  ')]
-    const views = new Map([['added', { phase: 'pending' as const }]])
-    expect(boardMissingRoughIds(board3, { hasPanel: (s) => s.drawn, hasJob: () => false }, views)).toEqual(['plain'])
-    expect(board).toMatch(/const missingIds = boardMissingRoughIds\(shots, \{ hasPanel: \(s\) => !!panelOf\(s\), hasJob: \(shotId\) => !!jobOf\(shotId\) \}, addedViews\)/)
-    expect(board).toContain('void generateAllMissing(true)')
   })
 
   // 왜: 2026-11-02 리뷰 R2 — 스토리 없이 더한 샷에 스토리를 쓰면 그 샷이 "빠진 러프"로 세어져 진입 자동 그리기가 깨고, 보드 · 채팅이
@@ -414,26 +373,6 @@ describe('더한 샷 그리기와 보드 · 채팅 잠금', () => {
     expect(missing).toEqual(['gave-up', 'stopped'])
     const facts2 = facts({ autoDrawPending: missing.includes('story-later') })
     expect(storyboardBusyView({ status: null, facts: facts2, lock: advanceBoardLock(INITIAL_BOARD_LOCK, facts2), rough: summarizeRoughProgress([], {}, {}, new Set()), sceneCount: 1 }, 'ko').open).toBe(false)
-  })
-
-  // 왜: 기다리는 카드가 그리는 중처럼 돌면 사람은 왜 안 끝나는지 모른다 — 자리를 기다린다고 알린다.
-  it('자리를 기다리는 더한 샷 카드에는 "자리가 나면 바로 그려요"가 보인다', () => {
-    expect(KO['Draws as soon as a slot frees up']).toBe('자리가 나면 바로 그려요')
-    expect(board).toContain("t('Draws as soon as a slot frees up')")
-  })
-
-  // 왜: 샷을 더하면 돈이 드는 그림이 바로 생긴다 — 더하기 전에 알려 준다(스토리가 비면 그리지 않는다는 것도).
-  it('[+ 샷 추가] 창은 더하면 스토리로 러프를 바로 그린다고 알려 준다', () => {
-    const key = 'Adding the shot draws its rough from the story right away. Nothing is drawn while the story is empty.'
-    expect(KO[key]).toBe('샷을 더하면 스토리로 러프를 바로 그려요. 스토리가 비어 있으면 그리지 않아요.')
-    expect(addDialog).toContain(`t('${key}')`)
-  })
-
-  // 왜: 오너 11/2 "전체 번호로 통일" — 어디에 더할지 고르는 목록의 "Shot 3"이 보드 카드 "Scene 2 · Shot 7"과 다르면 다른 샷 뒤에 더한다.
-  it('[+ 샷 추가] 창 왼쪽 목록의 샷 번호는 보드 카드와 같은 전체 번호다', () => {
-    expect(addDialog).toContain('boardShots(sceneManifest, shots)')
-    expect(addDialog).toMatch(/Shot \{globalShotNo\.get\(shot\.shotId\) \?\? ki \+ 1\}/)
-    expect(addDialog).not.toMatch(/Shot \{ki \+ 1\}/)
   })
 })
 

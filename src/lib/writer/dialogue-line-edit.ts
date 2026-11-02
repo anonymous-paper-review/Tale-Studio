@@ -1,7 +1,7 @@
 // Storyboard 대사(Dialogue) 탭에서 대사 한 줄을 그 자리에서 고치는 규칙(2026-11-02 오너 "탭 안에서 바로 고치기").
 //   어떤 키로 끝내는지 · 끝낼 때 저장할지 · 저장할 대사 목록은 여기서 정하고, 화면(dialogue-view)은 보이기만 한다.
 //   저장 길은 샷 고치기 팝업과 같다(writer-store updateShot → flushShotSave). 러프는 대사를 읽지 않아 다시 그리지 않는다.
-//   약속: tests/writer/dialogue-tab-edit.test.ts
+//   약속: tests/writer/dialogue-tab-*.test.ts
 import type { DialogueLine } from '@/types'
 
 export type LineEditKey = 'save' | 'cancel' | null

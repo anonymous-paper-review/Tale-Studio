@@ -65,7 +65,7 @@ const edited = () => {
 
 describe('대사 탭 바로 고치기의 저장', () => {
   // 왜: 리드 지시 — 팝업과 같은 저장 길이어야 사물함(30초 신선) · 다른 화면(Director · Editor)이 같은 대사를 본다.
-  //   러프 그림 요청은 대사를 읽지 않으므로(아래 시험) 대사만 고쳐서는 그림을 다시 그리지 않는다.
+  //   러프 그림 요청은 대사를 읽지 않으므로(writer/rough-prompt-dialogue) 대사만 고쳐서는 그림을 다시 그리지 않는다.
   it('대사 탭에서 고친 대사는 샷 고치기 팝업과 같은 저장 길로 저장하고 러프는 다시 그리지 않는다', async () => {
     await saveShotDialogue('sh_01_01', edited())
     expect(useWriterStore.getState().shots[0].dialogueLines).toEqual([{ ...line, text: '아, 또 먹었어?' }])
@@ -88,16 +88,5 @@ describe('대사 탭 바로 고치기의 저장', () => {
     await expect(saveShotDialogue('sh_01_01', edited())).rejects.toThrow('network down')
     expect(useWriterStore.getState().shots[0].dialogueLines[0].text).toBe('아, 또 먹었어?')
     expect(invalidateShots).not.toHaveBeenCalled()
-  })
-
-  // 왜: "대사만 고치면 그림을 다시 그리지 않는다"의 근거 — 러프 라우트가 샷에서 읽는 칸에 대사가 없다(2026-11-02 확인).
-  it('러프 그림 요청은 샷의 대사 칸을 읽지 않는다', () => {
-    const route = readFileSync('src/app/api/writer/rough-storyboard/route.ts', 'utf8')
-    const shotColumns = /\.from\('shots'\)\s*\.select\(\s*'([^']+)'/.exec(route)?.[1] ?? ''
-    expect(shotColumns).toContain('action_description')
-    expect(shotColumns).not.toContain('dialogue')
-    for (const file of ['src/lib/writer/rough-storyboard.ts', 'src/lib/writer/rough-storyboard-grid.ts']) {
-      expect(readFileSync(file, 'utf8')).not.toMatch(/dialogue/i)
-    }
   })
 })

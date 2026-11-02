@@ -1,4 +1,4 @@
-// Storyboard 보드가 더한 샷을 보드의 러프 요청으로 그릴 때 남기는 기록 · 띄우는 안내 · 카드 표시를, 보드 화면 함수를 직접 불러 검사한다
+// Storyboard 보드가 더한 샷을 보드의 러프 요청으로 그릴 때 남기는 기록 · 띄우는 안내 · 카드 표시 · 잠금 · 탭과 [+ 샷 추가] 창을, 화면 함수를 직접 불러 검사한다
 import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { isValidElement, type ReactElement, type ReactNode } from 'react'
@@ -9,6 +9,8 @@ import type { AddedDrawView, DrawAddedShot } from '@/lib/writer/added-shot-draws
 const hooks = vi.hoisted(() => ({
   slots: [] as unknown[],
   cursor: 0,
+  /** 그린 뒤 상태가 바뀌었다 — 한 번 더 그려야 한다. */
+  dirty: false,
   effects: [] as Array<{ effect: () => void | (() => void); deps?: readonly unknown[] }>,
   mounted: [] as Array<{ deps?: readonly unknown[]; cleanup: void | (() => void) } | undefined>,
 }))
@@ -30,7 +32,10 @@ vi.mock('react', async (original) => {
       const slot = hooks.cursor++
       if (!(slot in hooks.slots)) hooks.slots[slot] = typeof initial === 'function' ? (initial as () => unknown)() : initial
       return [hooks.slots[slot], (value: unknown) => {
-        hooks.slots[slot] = typeof value === 'function' ? (value as (prev: unknown) => unknown)(hooks.slots[slot]) : value
+        const next = typeof value === 'function' ? (value as (prev: unknown) => unknown)(hooks.slots[slot]) : value
+        if (Object.is(next, hooks.slots[slot])) return
+        hooks.slots[slot] = next
+        hooks.dirty = true
       }]
     },
     useRef: (initial: unknown) => {
@@ -70,14 +75,28 @@ vi.mock('@/features/writer/use-added-shot-draws', async (original) => {
   }
 })
 vi.mock('@/lib/writer/use-writer-status', () => ({ useWriterStatus: () => ({ status: null, restart: () => {} }) }))
+vi.mock('@/lib/supabase/client', () => ({
+  createClient: () => ({
+    from: () => {
+      const query = { eq: () => query, then: (resolve: (value: { error: null }) => unknown) => Promise.resolve({ error: null }).then(resolve) }
+      return { insert: async () => ({ error: null }), update: () => query }
+    },
+  }),
+}))
+// 접수된 그리기는 끝나지 않은 채 둔다(그리는 중) — 끝은 이 파일이 보지 않는다.
+vi.mock('@/lib/generation-jobs-client', () => ({ pollGenerationJob: vi.fn(() => new Promise(() => {})) }))
 vi.mock('@/lib/writer/debug-events-client', () => ({ recordWriterObservabilityEventClient: vi.fn() }))
 vi.mock('@/lib/shots-cache', () => ({ invalidateShots: vi.fn().mockResolvedValue(undefined), loadShotsResult: vi.fn() }))
 vi.mock('@/lib/generation-queue', async (original) => ({ ...(await original<typeof import('@/lib/generation-queue')>()), refreshGenerationQueue: vi.fn() }))
 vi.mock('sonner', () => ({ toast: { info: vi.fn(), error: vi.fn(), success: vi.fn(), warning: vi.fn() } }))
 
 import { toast } from 'sonner'
+import { AiBusyOverlay } from '@/components/ai-busy-overlay'
+import { AddItemDialog } from '@/features/writer/add-item-dialog'
 import { RoughStoryboardView } from '@/features/writer/rough-storyboard-view'
+import { _setGenerationQueueSnapshotForTests } from '@/lib/generation-queue'
 import { autoSubmitEventPayload } from '@/lib/writer/added-shot-draws'
+import { KO } from '@/lib/i18n/messages-ko'
 import { recordWriterObservabilityEventClient } from '@/lib/writer/debug-events-client'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useLocaleStore } from '@/stores/locale-store'
@@ -105,6 +124,30 @@ function render(): Element[] {
   hooks.effects = []
   return elements(RoughStoryboardView())
 }
+/** 그린 뒤 화면에 붙인다 — deps 가 바뀐 효과만 (앞 정리 뒤) 다시 돌고, 그 사이 상태가 바뀌면 가라앉을 때까지 다시 그린다. */
+function commit() {
+  const same = (a?: readonly unknown[], b?: readonly unknown[]) => !!a && !!b && a.length === b.length && a.every((value, i) => Object.is(value, b[i]))
+  for (let pass = 0; pass < 10; pass++) {
+    hooks.dirty = false
+    render()
+    hooks.effects.forEach(({ effect, deps }, index) => {
+      const prev = hooks.mounted[index]
+      if (prev && same(prev.deps, deps)) return
+      if (typeof prev?.cleanup === 'function') prev.cleanup()
+      hooks.mounted[index] = { deps, cleanup: effect() }
+    })
+    if (!hooks.dirty) return
+  }
+  throw new Error('the board kept re-rendering')
+}
+/** 보드를 내린다(효과 정리) — 다음 보드는 처음부터 붙는다. */
+function unmount() {
+  for (const mounted of hooks.mounted) if (typeof mounted?.cleanup === 'function') mounted.cleanup()
+  hooks.mounted = []
+  hooks.slots = []
+}
+/** 보드 · 채팅을 덮는 잠금 표시가 열려 있나. */
+const locked = () => render().find((node) => node.type === AiBusyOverlay)?.props.open
 /** 그 샷의 카드. */
 function card(shotId: string): Element {
   const found = render().find((node) => node.type === 'article' && node.key === shotId)
@@ -138,6 +181,7 @@ const skippedAs = (shotId: string, reason: string) => ({ status: 200, body: { ok
 beforeEach(() => {
   hooks.slots = []
   hooks.mounted = []
+  _setGenerationQueueSnapshotForTests({ projectId: PROJECT, jobs: [] })
   board.draw = null
   board.views = null
   requests.length = 0
@@ -154,8 +198,9 @@ beforeEach(() => {
   })
   useWriterUiStore.setState({ setActiveTab: vi.fn() })
   useGlobalChatStore.setState({ offerSuggestion: vi.fn(), messages: [] })
-  // 잠금 표시는 document.body 로 띄운다 — 여기서는 그 자리에 그대로 둔다(createPortal 을 걷었다).
-  vi.stubGlobal('document', { body: {} })
+  // 잠금 표시는 document.body 로 띄운다 — 여기서는 그 자리에 그대로 둔다(createPortal 을 걷었다). 샷 더하기는 데모 화면인지 주소 · 쿠키로 본다.
+  vi.stubGlobal('document', { body: {}, cookie: '' })
+  vi.stubGlobal('window', { location: { pathname: '/studio/writer', search: '' } })
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: { body?: string }) => {
     if (String(url).startsWith('/api/writer/rough-storyboard')) {
       requests.push(init?.body ? JSON.parse(init.body) : {})
@@ -165,7 +210,7 @@ beforeEach(() => {
   }))
 })
 afterEach(() => {
-  for (const mounted of hooks.mounted) if (typeof mounted?.cleanup === 'function') mounted.cleanup()
+  unmount()
   vi.unstubAllGlobals()
 })
 
@@ -232,5 +277,98 @@ describe('더한 샷 그리기의 러프 요청', () => {
     expect(toast.info).not.toHaveBeenCalled()
     press(card('sh_01_02'), '패널 생성')
     await vi.waitFor(() => expect(toast.info).toHaveBeenCalledWith('패널 1개는 앞선 생성이 아직 끝나지 않았어요. 잠시 후 다시 눌러주세요.'))
+  })
+})
+
+describe('보드의 더한 샷 카드 · 잠금 · 탭', () => {
+  // 왜: 오너 결정 "잠금 없이 카드에서 '그리는 중'으로 보여요" — 보드 잠금(화면 · 채팅을 덮는 표시)은 더한 샷을 세지 않는다.
+  it('더한 샷을 그리는 동안 보드와 채팅을 잠그지 않고 그 카드만 그리는 중으로 보인다', () => {
+    board.views = new Map([['sh_01_02', { phase: 'requesting' }]])
+    commit()
+    expect(locked()).toBe(false)
+    expect(elements(card('sh_01_02').props.children as ReactNode).some((node) => node.props['aria-busy'] === 'true')).toBe(true)
+    // 정상 경로 고정 — 더한 샷이 아닌 샷을 그리는 중이면 지금처럼 잠근다.
+    board.views = null
+    _setGenerationQueueSnapshotForTests({ projectId: PROJECT, jobs: [{ id: 'job-1', kind: 'shot_rough_storyboard', target: { writerShotIds: ['sh_01_02'] } } as never] })
+    commit()
+    expect(locked()).toBe(true)
+  })
+
+  // 왜(혼자 정한 것): 대사 탭에서 고치는 중에 채팅으로 더한 샷이 그려지면 보드 탭으로 옮겨져 고치던 칸이 사라졌다 — 더한 샷 그리기는 탭을 바꾸지 않는다.
+  it('더한 샷을 그리는 중이면 대사 탭을 보고 있어도 보드 탭으로 옮기지 않는다', () => {
+    board.views = new Map([['sh_01_02', { phase: 'drawing' }]])
+    _setGenerationQueueSnapshotForTests({ projectId: PROJECT, jobs: [{ id: 'job-1', kind: 'shot_rough_storyboard', target: { writerShotIds: ['sh_01_02'] } } as never] })
+    commit()
+    const setActiveTab = useWriterUiStore.getState().setActiveTab
+    expect(setActiveTab).not.toHaveBeenCalled()
+    // 정상 경로 고정 — 더한 샷이 아닌 샷을 그리기 시작하면 지금처럼 보드 탭으로 옮긴다.
+    _setGenerationQueueSnapshotForTests({ projectId: PROJECT, jobs: [{ id: 'job-2', kind: 'shot_rough_storyboard', target: { writerShotIds: ['sh_01_01', 'sh_01_02'] } } as never] })
+    commit()
+    expect(setActiveTab).toHaveBeenCalledWith('storyboard')
+  })
+
+  // 왜: 기다리는 카드가 그리는 중처럼 돌면 사람은 왜 안 끝나는지 모른다 — 자리를 기다린다고 알린다.
+  it('자리를 기다리는 더한 샷 카드에는 "자리가 나면 바로 그려요"가 보인다', () => {
+    board.views = new Map([['sh_01_02', { phase: 'waiting' }]])
+    const waiting = card('sh_01_02')
+    expect(textOf(waiting)).toContain('자리가 나면 바로 그려요')
+    expect(elements(waiting.props.children as ReactNode).some((node) => node.props['aria-busy'] === 'true')).toBe(false)
+  })
+
+  // 왜: 리드 지시(들어올 때 빠진 러프 자동 그리기는 그대로) — 더한 샷은 화면에 넣는 그 순간 더한 샷 그리기가 맡아 빠진 러프로 세지 않는다.
+  //   2026-11-02 리뷰 R2 — 스토리 없이 더한 샷에 스토리를 쓰면 빠진 러프로 세어져 진입 자동 그리기가 깨고 보드 · 채팅이 잠겼다(예전 이 검사는 소스 글만 봐서 놓쳤다).
+  it('들어올 때 빠진 러프를 자동으로 그리는 것은 그대로 두고, 더한 샷은 빠진 러프로 세지 않는다', async () => {
+    useProjectStore.setState({ projectId: 'project-entry' })
+    _setGenerationQueueSnapshotForTests({ projectId: 'project-entry', jobs: [] })
+    commit()
+    await vi.waitFor(() => expect(requests).toEqual([{ projectId: 'project-entry', force: false }]))
+    unmount()
+    requests.length = 0
+    useProjectStore.setState({ projectId: 'project-added' })
+    _setGenerationQueueSnapshotForTests({ projectId: 'project-added', jobs: [] })
+    useWriterStore.setState({ shots: [shot('sh_01_01', 0, true)] })
+    commit()
+    const id = await useWriterStore.getState().addShot('sc_01', { fields: { actionDescription: '' } })
+    await vi.waitFor(() => { commit(); expect(textOf(card(id!))).toContain('스토리(액션)를 입력하면 생성할 수 있어요') })
+    useWriterStore.getState().updateShot(id!, { actionDescription: '민호가 돌아선다.' })
+    commit()
+    expect(locked()).toBe(false)
+    reply = { status: 200, body: { ok: true, data: { submitted: [{ shotId: id, jobId: 'job-added' }], skipped: [], remaining: 0 } } }
+    await vi.waitFor(() => { commit(); expect(requests).toEqual([{ projectId: 'project-added', shotIds: [id], force: false }]) })
+    commit()
+    expect(requests).toHaveLength(1)
+    expect(locked()).toBe(false)
+  })
+})
+
+describe('[+ 샷 추가] 창', () => {
+  const twoScenes = () => {
+    const second: Scene = { ...scene, sceneId: 'sc_02', sortOrder: 1 }
+    useWriterStore.setState({
+      sceneManifest: { scenes: [scene, second], characters: [], locations: [] },
+      shots: [shot('sh_01_01', 0, true), shot('sh_01_02', 1, true), { ...shot('sh_02_01', 2, true), sceneId: 'sc_02' }],
+    })
+  }
+  const dialog = () => {
+    hooks.cursor = 0
+    hooks.effects = []
+    return elements(AddItemDialog({ open: true, mode: 'shot', contextSceneId: 'sc_02', onOpenChange: () => {} }))
+  }
+
+  // 왜: 샷을 더하면 돈이 드는 그림이 바로 생긴다 — 더하기 전에 알려 준다(스토리가 비면 그리지 않는다는 것도).
+  it('[+ 샷 추가] 창은 더하면 스토리로 러프를 바로 그린다고 알려 준다', () => {
+    const key = 'Adding the shot draws its rough from the story right away. Nothing is drawn while the story is empty.'
+    expect(KO[key]).toBe('샷을 더하면 스토리로 러프를 바로 그려요. 스토리가 비어 있으면 그리지 않아요.')
+    expect(dialog().some((node) => textOf(node) === KO[key])).toBe(true)
+  })
+
+  // 왜: 오너 11/2 "전체 번호로 통일" — 어디에 더할지 고르는 목록의 "Shot 3"이 보드 카드 "Scene 2 · Shot 3"과 다르면 다른 샷 뒤에 더한다.
+  it('[+ 샷 추가] 창 왼쪽 목록의 샷 번호는 보드 카드와 같은 전체 번호다', () => {
+    twoScenes()
+    const listed = dialog().filter((node) => node.type === 'span' && /^Shot \d+$/.test(textOf(node))).map(textOf)
+    expect(listed).toEqual(['Shot 1', 'Shot 2', 'Shot 3'])
+    hooks.slots = []
+    const cardLabel = elements(card('sh_02_01').props.children as ReactNode).find((node) => node.type === 'span' && textOf(node).startsWith('Scene '))
+    expect(textOf(cardLabel)).toBe('Scene 2 · Shot 3')
   })
 })

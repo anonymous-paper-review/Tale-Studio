@@ -1,5 +1,4 @@
-// 대사(Dialogue) 탭에서 대사 한 줄을 그 자리에서 고치는지(누르면 고치는 칸 · Enter/벗어나면 저장 · Esc 취소 · 빈 글은 되돌림)와 줄 · 연필 단추의 읽는 이름을 검사한다
-import { readFileSync } from 'node:fs'
+// 대사(Dialogue) 탭에서 대사 한 줄을 고칠 때의 규칙(한글 조합 · 한 줄로 저장 · 고친 글만 바꾸기 · 바꾼 것 없으면 그대로)과 줄의 모습 · 읽는 이름 · 샷 번호를 검사한다
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -32,9 +31,7 @@ vi.mock('@/features/writer/writer-header', () => ({ WriterHeader: ({ description
 import { DialogueView } from '@/features/writer/dialogue-view'
 import { DialogueLineRow } from '@/features/writer/dialogue-line-row'
 import { commitLineEdit, lineEditKey, oneLine, revertLineEdit } from '@/lib/writer/dialogue-line-edit'
-import { useBoardUiStore } from '@/features/writer/board-ui-store'
 
-const view = readFileSync('src/features/writer/dialogue-view.tsx', 'utf8')
 const line = { characterId: 'min_ho', text: '아, 또야?', emotion: 'annoyed', delivery: 'sigh', durationHint: 1 }
 const noop = () => {}
 const row = (state: Parameters<typeof DialogueLineRow>[0]['state']) =>
@@ -48,26 +45,6 @@ beforeEach(() => {
 })
 
 describe('대사 탭에서 바로 고치기', () => {
-  // 왜: 2026-11-02 오너가 고른 방식 "탭 안에서 바로 고치기"(대사 글을 탭 안에서 바로 고치고 저장해요). 예전에는 샷을 누르면 팝업이 열렸다(2026-10-31 QA).
-  it('대사 탭에서 대사 줄을 누르면 그 자리에서 대사 글을 고치는 칸이 열린다', () => {
-    const html = renderToStaticMarkup(createElement(DialogueView))
-    expect(html.match(/data-testid="dialogue-line"/g)?.length).toBe(2)
-    expect(view).toMatch(/onStart=\{\(\) => startEdit\(/)
-    const editing = row({ kind: 'editing', draft: '아, 또 먹었어?' })
-    expect(editing).toContain('<textarea')
-    expect(editing).toContain('아, 또 먹었어?')
-    expect(editing).toContain('Enter 저장 · Esc 취소')
-  })
-
-  // 왜: 앱의 다른 바로 고치기(프로젝트 제목 등)와 같은 조작이다 — Enter 나 바깥을 누르면 저장, Esc 는 고치기 전 글로 돌아간다(혼자 정한 것).
-  it('Enter 를 누르거나 칸 밖을 누르면 저장하고 Esc 를 누르면 고치기 전 글로 돌아간다', () => {
-    expect(lineEditKey({ key: 'Enter' })).toBe('save')
-    expect(lineEditKey({ key: 'Escape' })).toBe('cancel')
-    expect(lineEditKey({ key: 'a' })).toBeNull()
-    expect(view).toMatch(/onBlur=\{\(\) => commitEdit\('blur'\)\}|onCommit=\{\(via\) => commitEdit\(via\)\}/)
-    expect(view).toMatch(/onCancel=\{cancelEdit\}/)
-  })
-
   // 왜: 한글은 조합 중에 Enter 를 눌러 글자를 마친다 — 그 Enter 로 저장하면 마지막 글자가 빠지거나 반쪽 글이 저장된다.
   it('한글을 조합하는 중에 누른 Enter 로는 저장하지 않는다', () => {
     expect(lineEditKey({ key: 'Enter', isComposing: true })).toBeNull()
@@ -82,12 +59,6 @@ describe('대사 탭에서 바로 고치기', () => {
     expect(result).toEqual({ kind: 'save', lines: [{ ...line, text: '아, 또 먹었어?' }] })
   })
 
-  // 왜: 리드 지시(빈 글은 저장하지 않고 원래 글로) — 실수로 다 지운 것과 줄 지우기를 구분한다. 줄 지우기는 샷 고치기 창에서 한다.
-  it('대사 글을 다 지우고 끝내면 저장하지 않고 원래 글로 되돌린다', () => {
-    expect(commitLineEdit({ lines: [line], index: 0, original: line, draft: '   ' })).toEqual({ kind: 'empty' })
-    expect(view).toContain("t('Empty lines are not saved. To delete a line, open the shot editor with the pencil button.')")
-  })
-
   // 왜: 바꾸지 않았는데 저장하면 같은 글을 헛저장한다(정상 경로 고정).
   it('바꾼 것이 없으면 저장하지 않는다', () => {
     expect(commitLineEdit({ lines: [line], index: 0, original: line, draft: ' 아, 또야? ' })).toEqual({ kind: 'unchanged' })
@@ -98,13 +69,6 @@ describe('대사 탭에서 바로 고치기', () => {
     const other = { characterId: null, text: '밤이었다.', emotion: '', delivery: 'V.O.', durationHint: 2 }
     const result = commitLineEdit({ lines: [line, other], index: 0, original: line, draft: '아, 또 먹었어?' })
     expect(result).toEqual({ kind: 'save', lines: [{ ...line, text: '아, 또 먹었어?' }, other] })
-  })
-
-  // 왜(혼자 정한 것): 고치는 동안 채팅이 같은 샷의 대사를 바꾸면 줄 순서가 달라질 수 있다 — 엉뚱한 줄을 덮어쓰지 않는다.
-  it('고치는 동안 그 대사가 다른 곳에서 바뀌었으면 덮어쓰지 않고 다시 눌러 고쳐 달라고 알린다', () => {
-    const changed = { ...line, text: '어? 나왔다!' }
-    expect(commitLineEdit({ lines: [changed], index: 0, original: line, draft: '아, 또 먹었어?' })).toEqual({ kind: 'conflict' })
-    expect(view).toContain("t('This line changed while you were editing. Click it to edit again.')")
   })
 
   // 왜: 리드 지시(실패하면 쓴 글을 그대로 두고 알리고 다시 할 수 있게) — 저장하는 동안에는 그 줄을 다시 고칠 수 없다.
@@ -132,30 +96,10 @@ describe('대사 탭에서 바로 고치기', () => {
     expect(labels.some((label) => label.includes('자판기') || label.includes('바람'))).toBe(false)
   })
 
-  // 왜: 저장한 뒤 키보드 사용자가 같은 자리에서 이어 갈 수 있어야 한다(리드 지시) — Enter · Esc 로 끝내면 그 줄로 포커스를 돌린다.
-  it('Enter 로 저장하거나 Esc 로 취소하면 포커스가 그 대사 줄로 돌아온다', () => {
-    expect(view).toMatch(/via === 'key'[\s\S]{0,80}setFocusKey\(/)
-    expect(view).toMatch(/const cancelEdit = [\s\S]{0,200}setFocusKey\(/)
-    expect(view).toMatch(/rowRefs\.current\.get\(focusKey\)\?\.focus\(\)/)
-  })
-
   // 왜: 리드 지시(샷 번호는 보드의 전체 번호) — 보드 카드 "Scene 2 · Shot 3"과 같은 번호여야 "그 샷"을 부를 수 있다.
   it('대사 탭의 샷 번호는 보드 카드와 같은 전체 번호다', () => {
     const html = renderToStaticMarkup(createElement(DialogueView))
     expect(html).toMatch(/Shot (<!-- -->)?3</)
-    expect(view).toContain('boardShots(sceneManifest, shots)')
-  })
-
-  // 왜(혼자 정한 것): 화자 바꾸기 · 줄 더하기 · 빼기는 샷 고치기 창에 있다(프로토타입 대본 보기의 ✎) — 대사가 없는 샷도 여기서 대사를 더한다.
-  it('샷마다 연필 단추가 있고 누르면 그 샷 고치기 창이 열린다', () => {
-    const html = renderToStaticMarkup(createElement(DialogueView))
-    expect(html).toContain('aria-label="샷 1 고치기 창 열기"')
-    expect(html).toContain('aria-label="샷 2 고치기 창 열기"')
-    expect(html).toContain('aria-label="샷 3 고치기 창 열기"')
-    expect(view).toMatch(/useBoardUiStore\.getState\(\)\.setShotEditId\(shot\.shotId\)/)
-    useBoardUiStore.getState().setShotEditId('sh_02_01')
-    expect(useBoardUiStore.getState().shotEditId).toBe('sh_02_01')
-    useBoardUiStore.getState().setShotEditId(null)
   })
 
   // 왜(혼자 정한 것): 대사를 새로 쓰는 동안(1~2분) 고친 줄은 새 대사로 통째로 바뀐다 — 그동안은 고치지 못하게 한다.
