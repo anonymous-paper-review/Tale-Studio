@@ -8,11 +8,12 @@ export interface RoughProgress {
   failed: number
 }
 
-/** 보드에 있는 샷을 한 번씩 센다. 진행 큐는 이전 완료 이미지·실패보다 현재 시도를 우선한다. */
+/** 보드에 있는 샷을 한 번씩 센다. 진행 큐는 이전 완료 이미지·실패보다 현재 시도를 우선한다.
+ *  화면의 'waiting'(더한 샷이 내 동시 생성 자리를 기다림)은 그리는 중이 아니라 대기로 센다. */
 export function summarizeRoughProgress(
   shots: ReadonlyArray<Pick<Shot, 'shotId' | 'roughStoryboard'>>,
   overrides: Readonly<Record<string, RoughStoryboardImage>>,
-  localJobs: Readonly<Record<string, { status: 'generating' | 'failed' }>>,
+  localJobs: Readonly<Record<string, { status: 'generating' | 'waiting' | 'failed' }>>,
   queuedShotIds: ReadonlySet<string>,
 ): RoughProgress {
   const counts: RoughProgress = { total: 0, completed: 0, generating: 0, waiting: 0, failed: 0 }
@@ -40,7 +41,7 @@ export function isRoughDrawn(panel: Pick<RoughStoryboardImage, 'status' | 'url'>
 export function undrawnRoughShotIds(
   shots: ReadonlyArray<Pick<Shot, 'shotId' | 'roughStoryboard' | 'actionDescription'>>,
   overrides: Readonly<Record<string, RoughStoryboardImage>>,
-  localJobs: Readonly<Record<string, { status: 'generating' | 'failed' }>>,
+  localJobs: Readonly<Record<string, { status: 'generating' | 'waiting' | 'failed' }>>,
   queuedShotIds: ReadonlySet<string>,
 ): string[] {
   const out: string[] = []

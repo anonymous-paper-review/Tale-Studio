@@ -14,10 +14,12 @@
 //   씬 · 샷을 나누는 동안과 러프를 그리는 동안 보드 위에 잠금 표시(AiBusyOverlay)를 얹고 화면 · 채팅을 잠근다 —
 //   언제 잠그고 무엇을 보일지는 lib/writer/board-busy. 보드는 뒤에 그대로 그려져 다 그린 샷부터 보인다.
 //   Director 넘김 확인 창(머리의 [다음: Director로 →])도 여기서 그린다 — [남은 컷 그리기]가 이 보드의 그리기 상태를 쓴다.
+//   샷을 더하면(보드 [+ 샷 추가] · 채팅) 그 샷 러프를 바로 그린다(2026-11-02 오너 "더할 때마다 자동") — 잠금 없이 그 카드만
+//   그리는 중으로 보인다. 규칙은 lib/writer/added-shot-draws, 연결은 use-added-shot-draws.
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
-import { AlertCircle, ChevronDown, ImageIcon, Loader2, Plus, RefreshCw } from 'lucide-react'
+import { AlertCircle, ChevronDown, Clock, ImageIcon, Loader2, Plus, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -39,16 +41,25 @@ import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
 import { handOverToDirector } from '@/features/writer/storyboard-director'
 import { StoryboardDirectorDialog } from '@/features/writer/storyboard-director-dialog'
+import { useAddedShotDraws } from '@/features/writer/use-added-shot-draws'
 import { WriterHeader } from '@/features/writer/writer-header'
 import { useProjectStore } from '@/stores/project-store'
 import { useArtistStore } from '@/stores/artist-store'
-import { useWriterStore } from '@/stores/writer-store'
+import { flushShotSave, onShotAdded, useWriterStore } from '@/stores/writer-store'
 import { useWriterUiStore } from '@/stores/writer-ui-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { WriterResumeButton } from '@/components/layout/writer-resume-button'
 import { writerProgressView } from '@/lib/writer/progress-view'
-import { roughRedrawBatches, summarizeRoughProgress, undrawnRoughShotIds } from '@/lib/writer/rough-progress'
+import { isRoughDrawn, roughRedrawBatches, summarizeRoughProgress, undrawnRoughShotIds } from '@/lib/writer/rough-progress'
+import {
+  addedDrawJobs,
+  addedDrawOutcome,
+  boardDrawingCount,
+  withoutAddedShots,
+  type DrawAddedShot,
+  type RoughDrawRound,
+} from '@/lib/writer/added-shot-draws'
 import {
   INITIAL_BOARD_LOCK,
   advanceBoardLock,
@@ -63,6 +74,7 @@ import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import {
   isContentPolicyBlocked,
   isModerationUnavailable,
+  isQuotaExceeded,
   notifyIfQuotaExceeded,
 } from '@/lib/generation-quota-toast'
 import { runRoughPump } from '@/lib/writer/rough-pump-client'
@@ -91,7 +103,8 @@ import { invalidateShots } from '@/lib/shots-cache'
 import { computeSettledJobs, reportUiReflected } from '@/lib/generation-ui-reflected'
 import { recordWriterObservabilityEventClient } from '@/lib/writer/debug-events-client'
 
-type PanelJob = { status: 'generating' | 'failed'; error?: string }
+// waiting = 더한 샷이 내 동시 생성 자리를 기다린다(자리가 나면 그린다).
+type PanelJob = { status: 'generating' | 'waiting' | 'failed'; error?: string }
 
 // artist 백필(#writer-to-artist-backfill) 프로젝트당 1회 가드 — 탭 왕복 remount 에도 유지.
 const artistBackfillTriggered = new Set<string>()
@@ -145,12 +158,6 @@ export function RoughStoryboardView() {
   const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
   const chatMessages = useGlobalChatStore((s) => s.messages)
   const briefedRef = useRef(false)
-
-  // 러프 생성이 진행 중이면 마지막 탭보다 진행 화면을 우선한다.
-  // WriterWorkspace가 각 탭 화면을 동시에 마운트하므로 백그라운드 잡도 놓치지 않는다.
-  useEffect(() => {
-    if (queuedRoughIds.size > 0) setActiveTab('storyboard')
-  }, [queuedRoughIds.size, setActiveTab])
 
   // Coordinate (4) ui_reflected for Writer rough panels (#a2-observability 2026-08-26).
   // Director canvas got this first; without the same wiring here every Writer job looks
@@ -307,13 +314,16 @@ export function RoughStoryboardView() {
     return () => clearTimeout(timer)
   }, [status?.pipeline_completed, reloadSettled])
 
+  // opts.quietUserLimit: 내 한도 기다림 중 다시 볼 때 — 같은 "동시에 6장까지" 안내를 다시 띄우지 않는다(더한 샷 바로 그리기, 처음 막힐 때만 안내).
+  //   돌려주는 refusal · submittedShotIds · skipped 는 더한 샷 바로 그리기가 읽는다(lib/writer/added-shot-draws RoughDrawRound).
   const generate = useCallback(
     async (
       shotIds?: string[],
       force?: boolean,
       auto?: boolean,
       styleHints?: string[],
-    ): Promise<{ submitted: number; remaining: number; quota: boolean; confirmationPending?: boolean; done: Promise<unknown> } | null> => {
+      opts?: { quietUserLimit?: boolean },
+    ): Promise<(RoughDrawRound & { remaining: number; quota: boolean }) | null> => {
       if (!projectId) return null
       if (shotIds?.length) {
         // 클릭 즉시 피드백 — 서버가 in_flight skip 으로 응답하면 아래에서 정리됨
@@ -341,13 +351,21 @@ export function RoughStoryboardView() {
               return next
             })
           }
-          return { submitted: 0, remaining: 0, quota: true, done: Promise.resolve() }
+          return {
+            submitted: 0,
+            remaining: 0,
+            quota: true,
+            refusal: isContentPolicyBlocked(res.status, j) ? 'content' : 'moderation',
+            done: Promise.resolve(),
+          }
         }
         // 자리 부족(429)은 멈춤이다 — 자동 재시도 없음(2026-09-11 오너 결정). 어느 경로든(전체 펌프·자동 진입·
         //   개별 패널 버튼) 공용 토스트로 한 번 알린다. 예전에는 펌프가 "큐가 빌 때까지 대기" 신호로 재시도했고
         //   개별 버튼은 무음으로 끝났다(2026-09-11 동시성 감사). 토스트 id 가 고정이라 여러 장이 동시에 429 를 받아도 하나만 보인다.
         if (res.status === 429) {
-          notifyIfQuotaExceeded(res.status, j)
+          // 내 한도인가 · 모두의 자리인가(까닭을 모르는 429 는 모두의 자리로 본다 — 기다려도 내 것이 끝나 풀리지 않는다).
+          const scope = isQuotaExceeded(res.status, j) && j.scope !== 'global' ? 'user' : 'global'
+          if (!(opts?.quietUserLimit && scope === 'user')) notifyIfQuotaExceeded(res.status, j)
           if (auto) {
             recordWriterObservabilityEventClient(projectId, 'auto_submit_response', {
               auto: true,
@@ -367,7 +385,7 @@ export function RoughStoryboardView() {
               return next
             })
           }
-          return { submitted: 0, remaining: 0, quota: true, done: Promise.resolve() }
+          return { submitted: 0, remaining: 0, quota: true, refusal: scope, done: Promise.resolve() }
         }
         if (!res.ok || !j?.ok) {
           throw new Error(j?.error?.message ?? `HTTP ${res.status}`)
@@ -562,6 +580,8 @@ export function RoughStoryboardView() {
           remaining: (j.data?.remaining as number | undefined) ?? 0,
           quota: false,
           confirmationPending,
+          submittedShotIds: submitted.map((item) => item.shotId),
+          skipped: (j.data?.skipped ?? []) as Array<{ shotId: string; reason: string }>,
           // 이번 라운드 잡들의 종결(성공/실패 모두 위에서 상태 반영) — 펌프의 라운드 배리어.
           done: Promise.allSettled(polls),
         }
@@ -587,6 +607,56 @@ export function RoughStoryboardView() {
     },
     [projectId, loadProject, locale],
   )
+
+  // ── 더한 샷 바로 그리기(2026-11-02 오너 "더할 때마다 자동") ── 카드의 그리기와 같은 요청 길로 그 샷 하나를 보낸다.
+  //   빈칸만 채운다(force 없이): 그새 그림이 생겼거나 다른 곳에서 그리는 중이면 서버가 건너뛰어 같은 샷을 두 번 그리지 않는다.
+  //   스토리를 막 고쳤으면 저장을 먼저 끝낸다(서버가 빈 스토리로 보지 않게). 무엇을 할지는 lib/writer/added-shot-draws 가 정한다.
+  const drawAdded = useCallback<DrawAddedShot>(
+    async (shotId, { quietUserLimit }) => {
+      const storyOf = () => useWriterStore.getState().shots.find((s) => s.shotId === shotId)?.actionDescription ?? ''
+      if (!shotHasInfo(storyOf())) return { kind: 'no_story', story: storyOf() }
+      await flushShotSave(shotId).catch(() => {})
+      const round = await generate([shotId], false, true, undefined, { quietUserLimit })
+      const outcome = addedDrawOutcome(round, shotId, storyOf(), locale)
+      if (outcome.kind === 'no_story' || outcome.kind === 'skipped') {
+        // 서버가 건너뛰었다 — 걸어 둔 그리는 중 표시를 거둔다. 다른 곳에서 그리는 중이면 생성 큐가 그 표시를 맡는다.
+        setPanelJobs((prev) => {
+          if (!(shotId in prev)) return prev
+          const next = { ...prev }
+          delete next[shotId]
+          return next
+        })
+        refreshGenerationQueue()
+      }
+      return outcome
+    },
+    [generate, locale],
+  )
+  const activeJobsKey = activeJobs.map((job) => job.id).sort().join(',')
+  const addedViews = useAddedShotDraws({ projectId, draw: drawAdded, activeJobsKey, shots })
+  // 지운 샷 번호를 다시 쓴 새 샷에 옛 그림 · 옛 실패가 남지 않게 — 더한 순간 그 번호의 화면 기록을 비운다.
+  useEffect(
+    () =>
+      onShotAdded((event) => {
+        if (event.projectId !== projectId) return
+        const drop = <T,>(prev: Record<string, T>): Record<string, T> => {
+          if (!(event.shotId in prev)) return prev
+          const next = { ...prev }
+          delete next[event.shotId]
+          return next
+        }
+        setPanelJobs(drop)
+        setOverrides(drop)
+      }),
+    [projectId],
+  )
+  // 러프 생성이 진행 중이면 마지막 탭보다 진행 화면을 우선한다.
+  // WriterWorkspace가 각 탭 화면을 동시에 마운트하므로 백그라운드 잡도 놓치지 않는다.
+  //   더한 샷 그리기는 세지 않는다 — 대사 탭에서 고치는 중에 채팅으로 더한 샷이 그려져도 탭을 빼앗지 않는다(그 카드만 그리는 중).
+  const boardDrawing = boardDrawingCount(queuedRoughIds, addedViews)
+  useEffect(() => {
+    if (boardDrawing > 0) setActiveTab('storyboard')
+  }, [boardDrawing, setActiveTab])
 
   // 누락 패널 전체 생성 펌프 — 루프 규칙은 rough-pump-client.ts(자리 부족은 재시도 없이 멈춤, 내 묶음이
   //   끝나면 다음 묶음). 여기는 컴포넌트 상태(실행 중·이탈)만 잌는다.
@@ -674,14 +744,18 @@ export function RoughStoryboardView() {
   const entityNames = manifestEntities(sceneManifest)
   // 큐가 로컬 상태를 이긴다(#queue-restore) — 잡이 실제로 떠 있으면 그게 진행 중의 진실이다.
   //   (탭 왕복으로 panelJobs 를 잃었거나, 옛 'failed' 표기가 남아 있어도 큐가 맞다.)
+  //   더한 샷 바로 그리기의 보내기 전 상태(그리는 중 · 자리 기다림 · 멈춤)는 그 밑에 깐다 — 보낸 뒤로는 panelJobs · 큐가 이긴다.
+  const localJobs = { ...addedDrawJobs(shots, addedViews, (shot) => isRoughDrawn(panelOf(shot)), locale), ...panelJobs }
   const jobOf = (shotId: string): PanelJob | undefined =>
-    queuedRoughIds.has(shotId) ? { status: 'generating' } : panelJobs[shotId]
+    queuedRoughIds.has(shotId) ? { status: 'generating' } : localJobs[shotId]
   // #5: 정보(액션)가 없는 샷은 자동 생성 대상에서 제외 — 근거 없는 빈 패널 생성 방지.
   const missingIds = shots
     .filter((s) => !panelOf(s) && !jobOf(s.shotId) && shotHasInfo(s.actionDescription))
     .map((s) => s.shotId)
-  const roughProgress = summarizeRoughProgress(shots, overrides, panelJobs, queuedRoughIds)
+  const roughProgress = summarizeRoughProgress(shots, overrides, localJobs, queuedRoughIds)
   const generatingCount = roughProgress.generating
+  // 잠금이 세는 그리기 — 이 화면에서 더한 샷은 뺀다(오너 "잠금 없이 카드에서 '그리는 중'으로").
+  const lockProgress = summarizeRoughProgress(withoutAddedShots(shots, addedViews), overrides, localJobs, queuedRoughIds)
 
   // ── 잠금 표시(리뉴얼 1차, 프로토타입 S0) ── 이번 순간의 사실을 모아 잠금 상태를 한 걸음 옮기고, 보일 내용을 정한다(lib/writer/board-busy).
   //   진입 자동 그리기 직전(그리기가 아직 한 번도 안 돌았고 빠진 패널이 있다)도 그리기로 본다 — 잠금이 한 프레임 풀렸다 닫히지 않게.
@@ -690,8 +764,8 @@ export function RoughStoryboardView() {
     runActive: isBoardRunActive(status),
     reloading: !!status?.pipeline_completed && !reloadSettled,
     hasShots,
-    generating: roughProgress.generating,
-    failed: roughProgress.failed,
+    generating: lockProgress.generating,
+    failed: lockProgress.failed,
     pumpActive,
     autoDrawPending,
   }
@@ -710,7 +784,7 @@ export function RoughStoryboardView() {
   const remainingIds = undrawnRoughShotIds(
     boardList.map((entry) => entry.shot),
     overrides,
-    panelJobs,
+    localJobs,
     queuedRoughIds,
   )
   const directorView = directorConfirmView(directorHandoffSummary(sceneManifest, shots, panelOf), locale)
@@ -1151,6 +1225,12 @@ export function RoughStoryboardView() {
                             <div className="absolute inset-0" aria-busy="true">
                               <div className="size-full animate-pulse bg-muted-foreground/10" />
                               <Loader2 className="absolute left-1/2 top-1/2 size-6 -translate-x-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />
+                            </div>
+                          ) : job?.status === 'waiting' ? (
+                            // 더한 샷이 내 동시 생성 자리를 기다린다 — 자리가 나면 그린다(2026-09-11 오너 (가)). 도는 표시를 쓰지 않는다.
+                            <div className="flex size-full flex-col items-center justify-center gap-2 p-4 text-center" role="status">
+                              <Clock className="size-5 text-muted-foreground" aria-hidden />
+                              <p className="text-xs text-muted-foreground">{t('Draws as soon as a slot frees up')}</p>
                             </div>
                           ) : job?.status === 'failed' ? (
                             <div className="flex size-full flex-col items-center justify-center gap-2 p-4">

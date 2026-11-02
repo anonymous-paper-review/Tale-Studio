@@ -19,6 +19,7 @@ import { useProjectStore } from '@/stores/project-store'
 import { invalidateShots, loadShotsResult } from '@/lib/shots-cache'
 import { isDemoSession } from '@/lib/demo/context'
 import { notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
+import type { AddedShotEvent, AddedShotOrigin } from '@/lib/writer/added-shot-draws'
 // store 액션은 훅을 못 쓴다 — translate() + 현재 locale 직접 조회로 useT() 없이 번역(#i18n-s5-batch3).
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
@@ -47,6 +48,17 @@ const shotSaveRuns = new Map<string, () => Promise<void>>()
 // 이번 묶음에서 사람이 바꾼 카메라 · 조명(2026-10-20 샷 고치기) — 바꾼 것만 저장한다. 손대지 않은 샷의 빈 칸을
 //   화면 기본값으로 채우면 Director 가 그 값을 사람이 정한 것으로 읽는다.
 const shotConfigDirty = new Map<string, { camera: boolean; lighting: boolean }>()
+
+// 샷을 더한 순간을 듣는 곳(Storyboard 보드의 더한 샷 바로 그리기) — onShotAdded 로 붙는다.
+const shotAddedListeners = new Set<(event: AddedShotEvent) => void>()
+
+/** 샷을 더한 순간(화면에 넣은 때)을 듣는다 — 보드 [+ 샷 추가] · 채팅 모두 addShot 을 거친다. 돌려준 함수로 그만 듣는다. */
+export function onShotAdded(listener: (event: AddedShotEvent) => void): () => void {
+  shotAddedListeners.add(listener)
+  return () => {
+    shotAddedListeners.delete(listener)
+  }
+}
 
 /** 미뤄 둔 샷 저장을 지금 하고 끝날 때까지 기다린다(샷 고치기의 [적용] 뒤 다시 그리기 전에). 미뤄 둔 것이 없으면 진행 중인 저장만 기다린다. */
 export async function flushShotSave(id: string): Promise<void> {
@@ -190,9 +202,10 @@ interface WriterState {
   updateScene: (id: string, changes: Partial<Scene>) => void
   updateShot: (id: string, changes: Partial<Shot>) => void
   // opts.afterShotId: undefined=씬 끝에 append(기존 동작), null=씬 맨 앞, shotId=그 샷 뒤에 삽입.
+  // opts.origin: 누가 더했나(보드 [+ 샷 추가] = 'board' 기본 · 채팅 = 'chat') — 더한 순간 알림(onShotAdded)에 싣는다.
   addShot: (
     sceneId: string,
-    opts?: { afterShotId?: string | null; fields?: Partial<Shot> },
+    opts?: { afterShotId?: string | null; fields?: Partial<Shot>; origin?: AddedShotOrigin },
   ) => Promise<string | null>
   deleteShot: (shotId: string) => Promise<void>
   recomputeSceneDuration: (sceneId: string) => void
@@ -377,53 +390,70 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
     )
     set({ shots: nextShots })
-
-    const supabase = createClient()
-    // 편집(추가 폼)은 유저 언어 → primary·_native 둘 다 native 로 기록(러프 라우트가 EN skip-or-derive). (S3b)
-    const { error } = await supabase.from('shots').insert({
-      project_id: projectId,
-      scene_id: sceneId,
-      shot_id: shotId,
-      source: 'manual', // #F-003 R3 — 사람의 글: 파이프라인 재런의 DELETE 에서 살아남는다
-      shot_type: newShot.shotType,
-      action_description: newShot.actionDescription,
-      action_description_native: newShot.actionDescription,
-      characters: newShot.characters,
-      duration_seconds: newShot.durationSeconds,
-      generation_method: newShot.generationMethod,
-      dialogue_lines: newShot.dialogueLines,
-      camera_config: newShot.camera,
-      lighting_config: newShot.lighting,
-      sort_order: newOrder,
-      // G4 스키마 계약: NOT NULL — 수동 샷도 전 등장인물→'current' 스냅샷을 기록한다.
-      character_appearance_keys: Object.fromEntries(
-        (newShot.characters ?? []).map((c) => [c, 'current']),
-      ),
-    })
-
-    if (error) {
-      set({ shots: prevShots, error: error.message })
-      notifySaveError("Couldn't add the shot. The change was rolled back.", error.message)
-      return null
+    // 더한 순간을 알린다(보드 [+ 샷 추가] · 채팅) — Storyboard 보드가 그 샷을 바로 맡아 러프를 그린다(2026-11-02 오너 "더할 때마다 자동").
+    //   화면에 넣는 그 순간 알려야 카드가 처음부터 그리는 중이다. saved 는 저장(자리 밀기까지)이 끝나면 성공 여부로 풀린다.
+    let markSaved: (ok: boolean) => void = () => {}
+    const saved = new Promise<boolean>((resolve) => { markSaved = resolve })
+    for (const listener of shotAddedListeners) {
+      try {
+        listener({ projectId, shotId, origin: opts?.origin ?? 'board', saved })
+      } catch (err) {
+        console.error('[writer-store] shot-added listener failed:', err instanceof Error ? err.message : err)
+      }
     }
-    // 자리 확보: 신규 order 이상이던 기존 샷들을 +1 로 밀어 DB 반영(순서 무결성). insert 성공 후 실행 —
-    //   중간 실패해도 sort_order 중복은 grouping-by-scene 표시에 무해(다음 재정렬에서 수렴).
-    if (shift) {
-      await Promise.all(
-        prevShots
-          .filter((s) => (s.sortOrder ?? 0) >= newOrder)
-          .map((s) =>
-            supabase
-              .from('shots')
-              .update({ sort_order: (s.sortOrder ?? 0) + 1 })
-              .eq('project_id', projectId)
-              .eq('shot_id', s.shotId),
-          ),
-      )
+
+    try {
+      const supabase = createClient()
+      // 편집(추가 폼)은 유저 언어 → primary·_native 둘 다 native 로 기록(러프 라우트가 EN skip-or-derive). (S3b)
+      const { error } = await supabase.from('shots').insert({
+        project_id: projectId,
+        scene_id: sceneId,
+        shot_id: shotId,
+        source: 'manual', // #F-003 R3 — 사람의 글: 파이프라인 재런의 DELETE 에서 살아남는다
+        shot_type: newShot.shotType,
+        action_description: newShot.actionDescription,
+        action_description_native: newShot.actionDescription,
+        characters: newShot.characters,
+        duration_seconds: newShot.durationSeconds,
+        generation_method: newShot.generationMethod,
+        dialogue_lines: newShot.dialogueLines,
+        camera_config: newShot.camera,
+        lighting_config: newShot.lighting,
+        sort_order: newOrder,
+        // G4 스키마 계약: NOT NULL — 수동 샷도 전 등장인물→'current' 스냅샷을 기록한다.
+        character_appearance_keys: Object.fromEntries(
+          (newShot.characters ?? []).map((c) => [c, 'current']),
+        ),
+      })
+
+      if (error) {
+        set({ shots: prevShots, error: error.message })
+        notifySaveError("Couldn't add the shot. The change was rolled back.", error.message)
+        return null
+      }
+      // 자리 확보: 신규 order 이상이던 기존 샷들을 +1 로 밀어 DB 반영(순서 무결성). insert 성공 후 실행 —
+      //   중간 실패해도 sort_order 중복은 grouping-by-scene 표시에 무해(다음 재정렬에서 수렴).
+      if (shift) {
+        await Promise.all(
+          prevShots
+            .filter((s) => (s.sortOrder ?? 0) >= newOrder)
+            .map((s) =>
+              supabase
+                .from('shots')
+                .update({ sort_order: (s.sortOrder ?? 0) + 1 })
+                .eq('project_id', projectId)
+                .eq('shot_id', s.shotId),
+            ),
+        )
+      }
+      markSaved(true)
+      void invalidateShots(projectId)
+      get().recomputeSceneDuration(sceneId)
+      return shotId
+    } finally {
+      // 저장하지 못했다(되돌림 · 예외) — 먼저 풀린 성공은 그대로다.
+      markSaved(false)
     }
-    void invalidateShots(projectId)
-    get().recomputeSceneDuration(sceneId)
-    return shotId
   },
 
   deleteShot: async (shotId) => {
@@ -738,7 +768,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           const afterShotId = insertionAfter(
             get().shots.filter((s) => s.sceneId === realSceneId).map((s) => s.shotId), before, after,
           )
-          const newId = await get().addShot(realSceneId, { afterShotId, fields: pickShotFields(u) })
+          const newId = await get().addShot(realSceneId, { afterShotId, fields: pickShotFields(u), origin: 'chat' })
           if (!newId) continue
           if (u.tempId) tempMap.set(u.tempId, newId)
           markApplied()

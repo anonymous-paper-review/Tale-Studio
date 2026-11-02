@@ -11,6 +11,7 @@
 //
 // 표시 번호는 "순서(위치)" 기준 — 불변 id 접미사가 아니라(중간 삽입 시 번호 뒤죽박죽 방지, #5).
 // 확정 시 writer-store.addShot/addScene(위치 삽입)으로 생성. 위치는 팝업 안의 일시적 로컬 상태.
+// 더한 샷의 러프는 Storyboard 보드가 바로 그린다(addShot 의 더한 순간 알림 → use-added-shot-draws, 2026-11-02 오너).
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, Loader2, Plus } from 'lucide-react'
@@ -498,6 +499,10 @@ export function AddItemDialog({
                         {t(
                           'This becomes the source text for the rough panel, storyboard, and video generation prompts.',
                         )}
+                      </p>
+                      {/* 더하면 그 샷 러프를 바로 그린다(2026-11-02 오너 "더할 때마다 자동") — 그림 값이 드는 일이라 더하기 전에 알린다. */}
+                      <p className="text-xs text-muted-foreground">
+                        {t('Adding the shot draws its rough from the story right away. Nothing is drawn while the story is empty.')}
                       </p>
                     </div>
 
