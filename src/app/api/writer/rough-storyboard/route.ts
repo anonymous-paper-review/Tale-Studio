@@ -17,7 +17,8 @@ import {
   getGenerationJobById,
 } from '@/lib/generation-jobs'
 import { checkGenerationCapacity } from '@/lib/generation-quota'
-import { quotaRejectionResponse } from '@/lib/api/quota'
+import { capacityReservationRejection, quotaRejectionResponse } from '@/lib/api/quota'
+import { RoughReservationError } from '@/lib/writer/rough-reservation-error'
 import { assertUserTextAllowed } from '@/lib/moderation/creem'
 import { moderationRejectionResponse } from '@/lib/api/moderation'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
@@ -667,35 +668,48 @@ export async function POST(req: Request) {
         }
       }
       const chunkShotIds = chunk.map((s) => s.shot_id as string)
-      const result = await submitRoughStoryboardGrid({
-        projectId,
-        workspaceId: project.workspace_id,
-        userId: access.userId!,
-        shotIds: chunkShotIds,
-        gridVariant,
-        force,
-        snapshot: {
-          prompt, gridVariant, shotIds: chunkShotIds, templateUrl,
-          ...(blockoutUrl ? { blockoutUrl } : {}),
-          sheet_format: sheetGeom.roughImageSize ? projectFormat : null,
-        },
-        options: templateUrl
-          ? {
-              model: DEFAULT_EDIT_IMAGE_MODEL, prompt,
-              reference_image_urls: blockoutUrl ? [templateUrl, blockoutUrl] : [templateUrl],
-              ...(sheetGeom.roughImageSize ? { image_size: sheetGeom.roughImageSize } : {}),
-              webhookUrl,
-            }
-          : {
-              model: DEFAULT_IMAGE_MODEL, prompt,
-              aspect_ratio: (() => {
-                const [w, h] = sheetGeom.repaintCanvas.split('x').map(Number)
-                return w > h ? '16:9' : w < h ? '9:16' : '1:1'
-              })(),
-              webhookUrl,
-            },
-        moderation,
-      })
+      let result: Awaited<ReturnType<typeof submitRoughStoryboardGrid>>
+      try {
+        result = await submitRoughStoryboardGrid({
+          projectId,
+          workspaceId: project.workspace_id,
+          userId: access.userId!,
+          shotIds: chunkShotIds,
+          gridVariant,
+          force,
+          snapshot: {
+            prompt, gridVariant, shotIds: chunkShotIds, templateUrl,
+            ...(blockoutUrl ? { blockoutUrl } : {}),
+            sheet_format: sheetGeom.roughImageSize ? projectFormat : null,
+          },
+          options: templateUrl
+            ? {
+                model: DEFAULT_EDIT_IMAGE_MODEL, prompt,
+                reference_image_urls: blockoutUrl ? [templateUrl, blockoutUrl] : [templateUrl],
+                ...(sheetGeom.roughImageSize ? { image_size: sheetGeom.roughImageSize } : {}),
+                webhookUrl,
+              }
+            : {
+                model: DEFAULT_IMAGE_MODEL, prompt,
+                aspect_ratio: (() => {
+                  const [w, h] = sheetGeom.repaintCanvas.split('x').map(Number)
+                  return w > h ? '16:9' : w < h ? '9:16' : '1:1'
+                })(),
+                webhookUrl,
+              },
+          moderation,
+        })
+      } catch (err) {
+        // 예약에서 자리 축(내 한도 · 모두의 자리)에 막혔다 — 사전 검사를 함께 통과한 다른 요청과 엇갈린 경우다(2026-09-11 감사).
+        //   다른 생성 라우트와 같이 자리 없음(429)으로 답한다. 먼저 낸 묶음이 있으면 그대로 두고 막힌 샷은 남은 몫으로 돌려준다(리뷰 R4).
+        //   그 밖의 거절 · 외부 접수 오류는 지금처럼 500 이다.
+        const rejected = err instanceof RoughReservationError
+          ? capacityReservationRejection(err.reason, { projectId, kind: 'shot_rough_storyboard', userId: access.userId })
+          : null
+        if (!rejected) throw err
+        if (!submitted.length) return rejected
+        break
+      }
       for (const receipt of result.submitted) {
         if (submitted.some((item) => item.shotId === receipt.shotId)) continue
         submitted.push({ ...receipt, promptSource: translatedSpecs.get(receipt.shotId) ? 'shotDesign' : 'db_fallback', safeMode: false })

@@ -6,6 +6,7 @@ import { getGenerationJobById } from '@/lib/generation-jobs'
 import { syncFalKeyLimits } from '@/lib/generation-quota'
 import { moderatedSubmitInput, type ModerationReceipt } from '@/lib/moderation/creem'
 import { recordModerationPass } from '@/lib/api/moderation'
+import { RoughReservationError } from '@/lib/writer/rough-reservation-error'
 
 type Reservation = { job_id: string | null; shot_ids: string[]; state: 'reserved' | 'existing' | 'exists'; confirmation_pending?: boolean }
 export type RoughSubmission = { shotId: string; jobId: string; confirmationPending?: boolean }
@@ -37,7 +38,8 @@ export async function submitRoughStoryboardGrid(input: {
     p_shot_ids: input.shotIds, p_grid_variant: input.gridVariant, p_model: input.options.model,
     p_input_snapshot: snapshot, p_force: input.force ?? false,
   })
-  if (error) throw error
+  // 예약에서 거절됐다(외부 접수 전) — 라우트가 자리 축 거절을 자리 없음으로 바꾼다(리뷰 R4).
+  if (error) throw new RoughReservationError(error)
   const reservations = data as Reservation[] | null
   if (!reservations?.length) throw new Error('Rough reservation returned no target')
   const submitted: RoughSubmission[] = []
