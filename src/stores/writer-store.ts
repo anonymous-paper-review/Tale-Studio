@@ -682,20 +682,23 @@ export const useWriterStore = create<WriterState>((set, get) => ({
     }
     // 샷 id 관용 해석(A2): tempMap → 실재 → 레거시/위치형 폴백. 실패는 null.
     //   "씬2 샷5"가 보드 번호와 씬 안 자리로 다른 두 샷이면 고르지 않고 어느 샷인지 묻는다(2026-11-02 리뷰 M3).
-    const shotNotResolved = (rawId: string): string => {
-      const ref = resolveChatShotRef(get().shots.map((s) => ({ shotId: s.shotId, sceneId: s.sceneId })), tempMap.get(rawId) ?? rawId)
+    //   번호는 보드 순서(씬 목록 → 그 씬의 샷)로 센다 — 끼워 넣은 씬의 샷이 목록 맨 뒤에 있어도(리뷰 3차 M1).
+    //   지우기는 정확한 id 나 보드 이름으로만 찾는다(되돌릴 수 없다 — 리뷰 3차 L4).
+    const shotRef = (rawId: string, strict = false) => resolveChatShotRef(
+      get().shots.map((s) => ({ shotId: s.shotId, sceneId: s.sceneId })),
+      tempMap.get(rawId) ?? rawId,
+      { manifest: get().sceneManifest, strict },
+    )
+    const shotNotResolved = (rawId: string, strict = false): string => {
+      const ref = shotRef(rawId, strict)
       const locale = useLocaleStore.getState().locale
       if (ref?.kind !== 'ambiguous') return translate(locale, "Shot '{id}' not found", { id: rawId })
       const labels = boardShotLabels(get().sceneManifest, get().shots)
       const [first, second] = ref.shotIds.map((shotId) => labels.get(shotId) ?? shotId)
       return translate(locale, 'Which shot do you mean: {first} or {second}?', { first, second })
     }
-    const resolveShot = (rawId: string): string | null => {
-      const viaTemp = tempMap.get(rawId) ?? rawId
-      const ref = resolveChatShotRef(
-        get().shots.map((s) => ({ shotId: s.shotId, sceneId: s.sceneId })),
-        viaTemp,
-      )
+    const resolveShot = (rawId: string, strict = false): string | null => {
+      const ref = shotRef(rawId, strict)
       return ref?.kind === 'shot' ? ref.shotId : null
     }
     for (const u of updates) {
@@ -772,9 +775,9 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           }
           applied += 1
         } else if (u.type === 'deleteShot') {
-          const delId = resolveShot(u.id)
+          const delId = resolveShot(u.id, true)
           if (!delId) {
-            skipped.push({ type: u.type, id: u.id, reason: shotNotResolved(u.id) })
+            skipped.push({ type: u.type, id: u.id, reason: shotNotResolved(u.id, true) })
             continue
           }
           await get().deleteShot(delId)
