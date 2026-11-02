@@ -74,8 +74,8 @@ import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import {
   isContentPolicyBlocked,
   isModerationUnavailable,
-  isQuotaExceeded,
   notifyIfQuotaExceeded,
+  notifyQuotaRefusal,
 } from '@/lib/generation-quota-toast'
 import { runRoughPump } from '@/lib/writer/rough-pump-client'
 import { resolveEntityNames, manifestEntities } from '@/lib/writer/resolve-entity-names'
@@ -314,7 +314,7 @@ export function RoughStoryboardView() {
     return () => clearTimeout(timer)
   }, [status?.pipeline_completed, reloadSettled])
 
-  // opts.quietUserLimit: 내 한도 기다림 중 다시 볼 때 — 같은 "동시에 6장까지" 안내를 다시 띄우지 않는다(더한 샷 바로 그리기, 처음 막힐 때만 안내).
+  // opts.quietUserLimit: 내 한도 안내("다시 시도해 주세요")를 띄우지 않는다 — 더한 샷 바로 그리기만 쓴다(카드가 "자리가 나면 바로 그려요"로 알린다, 2026-11-02 리드).
   //   돌려주는 refusal · submittedShotIds · skipped 는 더한 샷 바로 그리기가 읽는다(lib/writer/added-shot-draws RoughDrawRound).
   const generate = useCallback(
     async (
@@ -363,9 +363,8 @@ export function RoughStoryboardView() {
         //   개별 패널 버튼) 공용 토스트로 한 번 알린다. 예전에는 펌프가 "큐가 빌 때까지 대기" 신호로 재시도했고
         //   개별 버튼은 무음으로 끝났다(2026-09-11 동시성 감사). 토스트 id 가 고정이라 여러 장이 동시에 429 를 받아도 하나만 보인다.
         if (res.status === 429) {
-          // 내 한도인가 · 모두의 자리인가(까닭을 모르는 429 는 모두의 자리로 본다 — 기다려도 내 것이 끝나 풀리지 않는다).
-          const scope = isQuotaExceeded(res.status, j) && j.scope !== 'global' ? 'user' : 'global'
-          if (!(opts?.quietUserLimit && scope === 'user')) notifyIfQuotaExceeded(res.status, j)
+          // 내 한도인가 · 모두의 자리인가 — 더한 샷 그리기(quietUserLimit)만 내 한도 안내를 빼고, 다른 길은 지금처럼 안내한다.
+          const scope = notifyQuotaRefusal(res.status, j, opts)
           if (auto) {
             recordWriterObservabilityEventClient(projectId, 'auto_submit_response', {
               auto: true,
@@ -612,11 +611,11 @@ export function RoughStoryboardView() {
   //   빈칸만 채운다(force 없이): 그새 그림이 생겼거나 다른 곳에서 그리는 중이면 서버가 건너뛰어 같은 샷을 두 번 그리지 않는다.
   //   스토리를 막 고쳤으면 저장을 먼저 끝낸다(서버가 빈 스토리로 보지 않게). 무엇을 할지는 lib/writer/added-shot-draws 가 정한다.
   const drawAdded = useCallback<DrawAddedShot>(
-    async (shotId, { quietUserLimit }) => {
+    async (shotId) => {
       const storyOf = () => useWriterStore.getState().shots.find((s) => s.shotId === shotId)?.actionDescription ?? ''
       if (!shotHasInfo(storyOf())) return { kind: 'no_story', story: storyOf() }
       await flushShotSave(shotId).catch(() => {})
-      const round = await generate([shotId], false, true, undefined, { quietUserLimit })
+      const round = await generate([shotId], false, true, undefined, { quietUserLimit: true })
       const outcome = addedDrawOutcome(round, shotId, storyOf(), locale)
       if (outcome.kind === 'no_story' || outcome.kind === 'skipped') {
         // 서버가 건너뛰었다 — 걸어 둔 그리는 중 표시를 거둔다. 다른 곳에서 그리는 중이면 생성 큐가 그 표시를 맡는다.

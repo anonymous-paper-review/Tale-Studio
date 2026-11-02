@@ -2,7 +2,8 @@
 //   [+ 샷 추가]와 채팅 둘 다 writer-store addShot 을 거친다 — 더한 순간(화면에 넣은 때) 알림을 받아 그 샷만 맡는다.
 //   보드 · 채팅은 잠그지 않는다. 그 카드만 그리는 중(또는 자리를 기다리는 중)으로 보이고, 그리기는 카드의 그리기와 같은 요청 길이다.
 //   2026-09-11 규칙: 실패는 저절로 다시 그리지 않는다 · 내 한도에 막히면 자리가 날 때 이어 그린다(Artist 이어 그리기와 같은 1분 · 30분)
-//   · 모두의 자리 · 검사 장애로 거절되면 멈추고 까닭을 보인다.
+//   · 모두의 자리 · 검사 장애로 거절되면 멈추고 까닭을 보인다. 내 한도 기다림은 카드("자리가 나면 바로 그려요")만 알린다 —
+//   공용 안내 "다시 시도해 주세요"는 띄우지 않는다(2026-11-02 리드, 보드의 그리기가 quietUserLimit 으로 부른다).
 //   한 번에 한 요청씩 맡긴다 — 한꺼번에 보내면 자리 검사가 엇갈려 한도를 넘길 수 있다(2026-09-11 감사). 그리기는 함께 돈다.
 //   보드가 열려 있는 프로젝트만 그린다 — 보드를 떠나면 아직 보내지 않은 샷은 보내지 않고, 같은 프로젝트 보드로 돌아오면 이어 간다.
 //   화면(브라우저)과 테스트가 함께 쓴다 — 서버 전용 모듈을 들이지 않는다. 약속: tests/writer/added-shot-draw.test.ts
@@ -54,7 +55,7 @@ export type AddedDrawOutcome =
   | { kind: 'stop_all'; reason: string }
   | { kind: 'failed'; reason?: string }
 
-export type DrawAddedShot = (shotId: string, options: { quietUserLimit: boolean }) => Promise<AddedDrawOutcome>
+export type DrawAddedShot = (shotId: string) => Promise<AddedDrawOutcome>
 
 /** 보드의 러프 요청(rough-storyboard-view generate) 한 번의 결과 — 더한 샷 그리기가 읽는 칸만. */
 export interface RoughDrawRound {
@@ -282,8 +283,7 @@ export function createAddedShotDraws(deps: AddedShotDrawsDeps = {}) {
     changed()
     let outcome: AddedDrawOutcome
     try {
-      // 이미 내 한도를 기다리는 중이면 같은 한도 안내를 다시 띄우지 않는다(처음 막힐 때 한 번만, Artist 와 같다).
-      outcome = await draw(entry.shotId, { quietUserLimit: queue.userWaitSince !== null })
+      outcome = await draw(entry.shotId)
     } catch {
       outcome = { kind: 'failed' }
     } finally {

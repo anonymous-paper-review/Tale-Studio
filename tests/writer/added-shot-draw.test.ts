@@ -42,6 +42,9 @@ import { KO } from '@/lib/i18n/messages-ko'
 import { validateWriterUpdates } from '@/lib/writer-chat-updates'
 import { onShotAdded, useWriterStore, type WriterChatUpdate } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
+import { useLocaleStore } from '@/stores/locale-store'
+import { notifyQuotaRefusal } from '@/lib/generation-quota-toast'
+import { toast } from 'sonner'
 
 const board = readFileSync('src/features/writer/rough-storyboard-view.tsx', 'utf8')
 const addDialog = readFileSync('src/features/writer/add-item-dialog.tsx', 'utf8')
@@ -77,7 +80,7 @@ describe('샷을 더하면 바로 그리기', () => {
     expect(draw).not.toHaveBeenCalled()
     saved.resolve(true)
     await tick()
-    expect(draw).toHaveBeenCalledWith('sh_01_03', { quietUserLimit: false })
+    expect(draw).toHaveBeenCalledWith('sh_01_03')
     expect(draws.view('p').get('sh_01_03')?.phase).toBe('drawing')
   })
 
@@ -185,13 +188,12 @@ describe('샷을 더하면 바로 그리기', () => {
     draws.jobsChanged('p', ['job-2'])
     await tick()
     expect(draw).toHaveBeenCalledTimes(2)
-    expect(draw.mock.calls[1]).toEqual(['sh_01_03', { quietUserLimit: true }])
+    expect(draw.mock.calls[1]).toEqual(['sh_01_03'])
     expect(draws.view('p').get('sh_01_03')?.phase).toBe('drawing')
   })
 
-  // 왜: 내 자리를 다른 프로젝트 그림이 잡고 있으면 이 보드는 끝나는 것을 못 본다 — Artist 이어 그리기처럼 1분마다 다시 보고,
-  //   같은 "동시에 6장까지" 안내는 처음 막힐 때 한 번만 띄운다(2026-10-27 검토 지적과 같은 규칙).
-  it('내 한도를 기다리는 동안 1분마다 다시 보고 한도 안내는 처음 막힐 때만 띄운다', async () => {
+  // 왜: 내 자리를 다른 프로젝트 그림이 잡고 있으면 이 보드는 끝나는 것을 못 본다 — Artist 이어 그리기처럼 1분마다 다시 본다.
+  it('내 한도를 기다리는 동안 1분마다 다시 본다', async () => {
     const draws = createAddedShotDraws()
     const draw = vi.fn<DrawAddedShot>(async () => ({ kind: 'user_limit' }))
     draws.attach('p', draw)
@@ -199,7 +201,27 @@ describe('샷을 더하면 바로 그리기', () => {
     await tick()
     await vi.advanceTimersByTimeAsync(USER_LIMIT_RECHECK_MS)
     await vi.advanceTimersByTimeAsync(USER_LIMIT_RECHECK_MS)
-    expect(draw.mock.calls.map(([, options]) => options.quietUserLimit)).toEqual([false, true, true])
+    expect(draw.mock.calls).toEqual([['sh_01_03'], ['sh_01_03'], ['sh_01_03']])
+  })
+
+  // 왜: 2026-11-02 리드 결정 — 카드가 "자리가 나면 바로 그려요"라고 하는데 공용 안내가 "다시 시도해 주세요"라고 하면 서로 어긋난다.
+  //   더한 샷의 기다림만 조용히 하고, 카드의 그리기 · 남은 컷 · 진입 자동 그리기 · Artist 의 같은 안내는 지금 그대로 둔다.
+  it('더한 샷이 내 한도에 막혀 기다릴 때는 "다시 시도해 주세요" 공용 안내를 띄우지 않고, 다른 길의 안내는 지금 그대로다', () => {
+    useLocaleStore.setState({ locale: 'ko' })
+    const info = vi.mocked(toast.info)
+    info.mockClear()
+    const own = { code: 'quota_exceeded', scope: 'user', category: 'image', queued: 6, limit: 6 }
+    expect(notifyQuotaRefusal(429, own, { quietUserLimit: true })).toBe('user')
+    expect(info).not.toHaveBeenCalled()
+    expect(notifyQuotaRefusal(429, own)).toBe('user')
+    expect(info).toHaveBeenCalledWith('이미지는 동시에 6개까지 생성할 수 있어요. 진행 중인 생성이 끝나면 다시 시도해 주세요.', { id: 'generation-quota-exceeded' })
+    info.mockClear()
+    expect(notifyQuotaRefusal(429, { ...own, scope: 'global' }, { quietUserLimit: true })).toBe('global')
+    expect(info).toHaveBeenCalledWith('지금 생성 자리가 모두 사용 중이에요. 잠시 뒤에 다시 시도해 주세요.', { id: 'generation-quota-exceeded' })
+    expect(board).toMatch(/generate\(\[shotId\], false, true, undefined, \{ quietUserLimit: true \}\)/)
+    expect(board).toContain('notifyQuotaRefusal(res.status, j, opts)')
+    expect(board).toContain('void generate([shot.shotId], true)')
+    expect(readFileSync('src/stores/artist-store.ts', 'utf8')).not.toContain('notifyQuotaRefusal')
   })
 
   // 왜: 끝없이 두드리지 않는다 — 처음 막힌 뒤 30분이 지나도 자리가 없으면 멈추고, 카드의 [다시 시도]로 사람이 다시 시작한다(Artist 와 같은 30분).
@@ -413,7 +435,7 @@ describe('샷을 더한 순간의 알림 (writer-store)', () => {
       const result = await useWriterStore.getState().applyChatUpdates(updates)
       expect(result.applied).toBe(1)
       await tick()
-      expect(draw).toHaveBeenCalledWith('sh_01_01', { quietUserLimit: false })
+      expect(draw).toHaveBeenCalledWith('sh_01_01')
       expect(draws.view('project-add').get('sh_01_01')?.phase).toBe('drawing')
     } finally {
       stop()

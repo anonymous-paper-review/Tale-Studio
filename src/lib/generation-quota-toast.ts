@@ -69,6 +69,17 @@ export function notifyQuotaExceeded(body: QuotaExceededBody | null | undefined):
   toast.info(message, { id: 'generation-quota-exceeded' })
 }
 
+/**
+ * 429 를 거절의 축과 함께 안내한다 — 돌려주는 값: 'user'(내 한도) · 'global'(모두의 자리. 까닭을 모르는 429 도 모두의 자리로 본다 —
+ * 기다려도 내 것이 끝나 풀리지 않는다). quietUserLimit 이면 내 한도 안내만 띄우지 않는다: 화면이 기다림을 따로 알리는 곳
+ * (Storyboard 더한 샷 카드 "자리가 나면 바로 그려요", 2026-11-02 리드)만 쓴다. 모두의 자리 · 예산 안내는 언제나 띄운다.
+ */
+export function notifyQuotaRefusal(status: number, body: unknown, options: { quietUserLimit?: boolean } = {}): 'user' | 'global' {
+  const scope = isQuotaExceeded(status, body) && body.scope !== 'global' ? 'user' : 'global'
+  if (!(options.quietUserLimit && scope === 'user')) notifyIfQuotaExceeded(status, body)
+  return scope
+}
+
 /** #f4(2026-08-27): 프로젝트 영상 예산 소진 429 — code 'video_budget_exceeded'. */
 export interface VideoBudgetExceededBody {
   code?: string
