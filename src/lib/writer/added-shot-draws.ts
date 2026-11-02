@@ -234,6 +234,7 @@ export function createAddedShotDraws(deps: AddedShotDrawsDeps = {}) {
     return queue
   }
   const hasWaiting = (queue: Queue) => [...queue.entries.values()].some((entry) => entry.phase === 'waiting')
+  const hasQueued = (queue: Queue) => [...queue.entries.values()].some((entry) => entry.phase === 'waiting' || entry.phase === 'pending')
   const stopRecheck = () => {
     cancelRecheck?.()
     cancelRecheck = null
@@ -275,8 +276,9 @@ export function createAddedShotDraws(deps: AddedShotDrawsDeps = {}) {
         entry.phase = 'drawing'
         entry.signature = outcome.signature
         entry.redraw = false
-        // 자리를 얻었다 — 아직 기다리는 샷이 있으면 기다림을 지금부터 다시 잰다(Artist 이어 그리기와 같다).
-        queue.userWaitSince = hasWaiting(queue) ? now() : null
+        // 자리를 얻었다 — 기다리던 중이고 아직 보낼 샷이 남았으면 기다림을 이어 가되 지금부터 다시 잰다(Artist 이어 그리기와 같다).
+        //   남은 샷이 "보낼 차례"라고 기다림을 풀면 그 사이 더한 샷이 자리 없이 나가고 30분 셈이 끊겼다(리뷰 R5).
+        if (queue.userWaitSince !== null) queue.userWaitSince = hasQueued(queue) ? now() : null
         const finish = (result: unknown) => {
           if (entry.phase !== 'drawing' || queue.entries.get(entry.shotId) !== entry) return
           const changedSince = entry.latestSignature !== undefined && entry.signature !== undefined && entry.latestSignature !== entry.signature
@@ -324,6 +326,8 @@ export function createAddedShotDraws(deps: AddedShotDrawsDeps = {}) {
         entry.reason = outcome.reason
         break
     }
+    // 기다리는 샷이 남았으면 언제나 다시 볼 시계를 건다 — 기다림 중에 더한 샷은 앞 요청이 실패 · 건너뜀으로 끝나도 영영 기다리지 않는다(리뷰 R6).
+    if (hasWaiting(queue)) scheduleRecheck(projectId)
     changed()
   }
 

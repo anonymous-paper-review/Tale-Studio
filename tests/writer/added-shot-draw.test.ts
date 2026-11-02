@@ -205,6 +205,59 @@ describe('샷을 더하면 바로 그리기', () => {
     expect(draw.mock.calls.map(([id]) => id)).toEqual(['sh_01_03', 'sh_01_03', 'sh_01_03'])
   })
 
+  // 왜: 2026-11-02 리뷰 R5 — 기다리던 샷 둘 중 하나가 접수되면 남은 샷이 "보낼 차례"라는 까닭으로 기다림이 풀려, 그 사이 더한 샷이
+  //   자리가 없는데 곧바로 나갔고(예전엔 한도 안내도 다시 떴다) 30분 셈도 끊겼다. 남은 샷이 있는 동안은 기다림을 이어 간다.
+  it('내 한도를 기다리던 샷이 여럿이면 하나가 접수돼도 남은 샷은 기다림을 이어 가, 그 사이 더한 샷도 함께 기다린다', async () => {
+    const draws = createAddedShotDraws()
+    const hang = deferred<AddedDrawOutcome>()
+    let open = false
+    const draw = vi.fn<DrawAddedShot>(async (shotId) => {
+      if (!open) return { kind: 'user_limit' }
+      return shotId === 'sh_01_03' ? submitted() : hang.promise
+    })
+    draws.attach('p', draw)
+    draws.add(event('p', 'sh_01_03'))
+    draws.add(event('p', 'sh_01_04'))
+    await tick()
+    expect(draws.view('p').get('sh_01_04')?.phase).toBe('waiting')
+    open = true
+    await vi.advanceTimersByTimeAsync(USER_LIMIT_RECHECK_MS)
+    expect(draws.view('p').get('sh_01_03')?.phase).toBe('drawing')
+    expect(draws.view('p').get('sh_01_04')?.phase).toBe('requesting')
+    draws.add(event('p', 'sh_01_05'))
+    await tick()
+    expect(draws.view('p').get('sh_01_05')?.phase).toBe('waiting')
+  })
+
+  // 왜: 2026-11-02 리뷰 R6 — 기다림 중에 더한 샷은 "기다림"으로 들어가는데, 앞 요청이 실패 · 건너뜀으로 끝나면 다시 볼 시계가 없어
+  //   그 샷이 영영 기다렸다(30분 멈춤에도 닿지 않았다). 기다리는 샷이 남아 있으면 언제나 1분 뒤 다시 본다.
+  it('기다림 중에 더한 샷은 앞 요청이 실패로 끝나도 1분 뒤 다시 보고, 30분이 지나도 자리가 없으면 멈춘다', async () => {
+    const draws = createAddedShotDraws()
+    const hang = deferred<AddedDrawOutcome>()
+    let firstSeen = false
+    const draw = vi.fn<DrawAddedShot>(async (shotId) => {
+      if (shotId === 'sh_01_03') {
+        if (!firstSeen) { firstSeen = true; return { kind: 'user_limit' } }
+        return hang.promise
+      }
+      return { kind: 'user_limit' }
+    })
+    draws.attach('p', draw)
+    draws.add(event('p', 'sh_01_03'))
+    await tick()
+    await vi.advanceTimersByTimeAsync(USER_LIMIT_RECHECK_MS)
+    expect(draws.view('p').get('sh_01_03')?.phase).toBe('requesting')
+    draws.add(event('p', 'sh_01_04'))
+    await tick()
+    expect(draws.view('p').get('sh_01_04')?.phase).toBe('waiting')
+    hang.resolve({ kind: 'failed', reason: '러프 스토리보드 생성 요청 실패' })
+    await tick()
+    await vi.advanceTimersByTimeAsync(USER_LIMIT_RECHECK_MS)
+    expect(draw.mock.calls.some(([id]) => id === 'sh_01_04')).toBe(true)
+    for (let waited = 0; waited <= USER_LIMIT_WAIT_MAX_MS; waited += USER_LIMIT_RECHECK_MS) await vi.advanceTimersByTimeAsync(USER_LIMIT_RECHECK_MS)
+    expect(draws.view('p').get('sh_01_04')).toMatchObject({ phase: 'stopped', noSlot: true })
+  })
+
   // 왜: 2026-11-02 리드 결정 — 카드가 "자리가 나면 바로 그려요"라고 하는데 공용 안내가 "다시 시도해 주세요"라고 하면 서로 어긋난다.
   //   더한 샷의 기다림만 조용히 하고, 카드의 그리기 · 남은 컷 · 진입 자동 그리기 · Artist 의 같은 안내는 지금 그대로 둔다.
   it('더한 샷이 내 한도에 막혀 기다릴 때는 "다시 시도해 주세요" 공용 안내를 띄우지 않고, 다른 길의 안내는 지금 그대로다', () => {
