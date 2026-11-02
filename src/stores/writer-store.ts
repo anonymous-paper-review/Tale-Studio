@@ -15,6 +15,7 @@ import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { classifyDialoguePatch } from '@/lib/writer-chat-updates'
 import { resolveChatShotRef, type ChatShotRef } from '@/lib/writer/chat-id-resolve'
 import { boardShotLabels } from '@/lib/writer/board-summary'
+import { activeJobsSnapshot, activeShotIds } from '@/lib/generation-queue'
 import { useProjectStore } from '@/stores/project-store'
 import { invalidateShots, loadShotsResult } from '@/lib/shots-cache'
 import { isDemoSession } from '@/lib/demo/context'
@@ -57,6 +58,35 @@ export function onShotAdded(listener: (event: AddedShotEvent) => void): () => vo
   shotAddedListeners.add(listener)
   return () => {
     shotAddedListeners.delete(listener)
+  }
+}
+
+// 샷을 지운 것을 듣는 곳(더한 샷 그리기 장부가 그 샷을 내려놓는다, 2026-11-02 리뷰 R1).
+const shotsRemovedListeners = new Set<(event: { projectId: string; shotIds: string[] }) => void>()
+
+/** 샷을 지웠다(씬을 지우면 그 씬의 샷 모두) — 지우기가 저장된 뒤에만 알린다. 돌려준 함수로 그만 듣는다. */
+export function onShotsRemoved(listener: (event: { projectId: string; shotIds: string[] }) => void): () => void {
+  shotsRemovedListeners.add(listener)
+  return () => {
+    shotsRemovedListeners.delete(listener)
+  }
+}
+
+// 이 화면에서 지운 샷 번호(프로젝트마다) — 새 샷에 다시 주지 않는다. 지운 샷의 러프 작업이 아직 돌면 완료가 번호로 써지므로,
+//   같은 번호의 새 샷에 지운 샷의 그림이 앉고 다시 그려지지 않았다(2026-11-02 리뷰 R1).
+const retiredShotIds = new Map<string, Set<string>>()
+
+function retireShots(projectId: string, shotIds: string[]) {
+  if (!shotIds.length) return
+  const retired = retiredShotIds.get(projectId) ?? new Set<string>()
+  for (const id of shotIds) retired.add(id)
+  retiredShotIds.set(projectId, retired)
+  for (const listener of shotsRemovedListeners) {
+    try {
+      listener({ projectId, shotIds: [...shotIds] })
+    } catch (err) {
+      console.error('[writer-store] shots-removed listener failed:', err instanceof Error ? err.message : err)
+    }
   }
 }
 
@@ -334,10 +364,12 @@ export const useWriterStore = create<WriterState>((set, get) => ({
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return null
     const prevShots = get().shots
-    const shotId = nextShotId(
-      sceneId,
-      prevShots.map((s) => s.shotId),
-    )
+    // 새 번호는 지금 있는 샷 · 이 화면에서 지운 샷 · 러프를 그리는 중인 번호를 모두 피한다(리뷰 R1).
+    const shotId = nextShotId(sceneId, [
+      ...prevShots.map((s) => s.shotId),
+      ...(retiredShotIds.get(projectId) ?? []),
+      ...activeShotIds(activeJobsSnapshot(projectId), ['shot_rough_storyboard']),
+    ])
 
     // 삽입 sort_order — 이웃의 실제 sort_order 기준(배열 index 아님: 기존 데이터에 gap 이 있어도 안전).
     //   append=맨 뒤(시프트 불요), 그 외(맨 앞/특정 샷 뒤)=신규 order 이상을 전부 +1 밀어 자리 확보.
@@ -480,6 +512,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       notifySaveError("Couldn't delete the shot. It was restored.", error.message)
       return
     }
+    retireShots(projectId, [shotId])
     void invalidateShots(projectId)
     get().recomputeSceneDuration(target.sceneId)
   },
@@ -634,6 +667,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       notifySaveError("Couldn't delete the scene. It was restored.", (shotErr ?? sceneErr)?.message)
       return
     }
+    retireShots(projectId, prevShots.filter((s) => s.sceneId === sceneId).map((s) => s.shotId))
     void invalidateShots(projectId)
   },
 

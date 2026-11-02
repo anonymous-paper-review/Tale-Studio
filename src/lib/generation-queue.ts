@@ -304,8 +304,14 @@ export function useGenerationCompletions(projectId: string | null): GenerationCo
   return useSyncExternalStore(subscribe, () => getCompletionsSnapshot(projectId), () => EMPTY_COMPLETIONS)
 }
 
-/** 테스트 전용 — 스냅샷 주입(서버 없이 파생 훅을 검증). */
-export function _setGenerationQueueSnapshotForTests(next: { jobs?: ActiveJob[]; batches?: GenerationBatch[]; completions?: GenerationCompletion[] }): void {
+/** 지금 도는 잡 목록을 구독 없이 한 번 읽는다(스토어 액션용) — 그 프로젝트를 지켜보고 있지 않으면 빈 목록. */
+export function activeJobsSnapshot(id: string | null): readonly ActiveJob[] {
+  return getSnapshot(id)
+}
+
+/** 테스트 전용 — 스냅샷 주입(서버 없이 파생 훅을 검증). projectId 를 주면 그 프로젝트를 지켜보는 것으로 둔다. */
+export function _setGenerationQueueSnapshotForTests(next: { projectId?: string; jobs?: ActiveJob[]; batches?: GenerationBatch[]; completions?: GenerationCompletion[] }): void {
+  if (next.projectId !== undefined) projectId = next.projectId
   if (next.jobs) jobs = next.jobs
   if (next.batches) batches = next.batches
   if (next.completions) completions = next.completions

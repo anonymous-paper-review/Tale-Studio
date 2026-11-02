@@ -6,7 +6,7 @@
 //   이 프로젝트의 도는 작업이 하나 끝나면 자리가 났을 수 있어 기다리던 샷을 다시 보고, 스토리가 생긴 더한 샷은 그때 그린다.
 import { useEffect, useSyncExternalStore } from 'react'
 import { createAddedShotDraws, type AddedDrawView, type DrawAddedShot } from '@/lib/writer/added-shot-draws'
-import { onShotAdded } from '@/stores/writer-store'
+import { onShotAdded, onShotsRemoved } from '@/stores/writer-store'
 
 const draws = createAddedShotDraws()
 let listening = false
@@ -26,6 +26,7 @@ export function useAddedShotDraws(input: {
     if (!listening) {
       listening = true
       onShotAdded((event) => draws.add(event))
+      onShotsRemoved((event) => draws.remove(event.projectId, event.shotIds))
     }
     if (!projectId) return
     return draws.attach(projectId, draw)

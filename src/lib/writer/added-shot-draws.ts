@@ -337,6 +337,14 @@ export function createAddedShotDraws(deps: AddedShotDrawsDeps = {}) {
       }
       event.saved.then(afterSave, () => afterSave(false))
     },
+    /** 샷을 지웠다 — 장부에서 내려놓는다(그리는 중이었어도). 같은 번호가 다시 오면 새 샷으로 맡는다(리뷰 R1). */
+    remove(projectId: string, shotIds: readonly string[]): void {
+      const queue = queues.get(projectId)
+      if (!queue) return
+      let removed = false
+      for (const id of shotIds) removed = queue.entries.delete(id) || removed
+      if (removed) changed()
+    },
     /** 이 프로젝트의 도는 작업 목록이 바뀌었다 — 하나라도 끝났으면 자리가 났을 수 있어 기다리던 샷을 다시 본다. */
     jobsChanged(projectId: string, jobIds: readonly string[]): void {
       // 샷을 더하기 전부터 지켜본다 — 처음 막힌 뒤 끝나는 작업을 놓치지 않게.
