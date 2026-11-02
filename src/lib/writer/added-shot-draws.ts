@@ -262,6 +262,17 @@ export function createAddedShotDraws(deps: AddedShotDrawsDeps = {}) {
       recheck(projectId)
     }, USER_LIMIT_RECHECK_MS)
   }
+  /** 보낼 차례로 둔다 — 내 한도를 기다리는 중이면 함께 기다리고, 기다리면 언제나 다시 볼 시계를 건다(최종 리뷰 M1). */
+  const enqueue = (projectId: string, queue: Queue, entry: Entry) => {
+    entry.phase = queue.userWaitSince !== null ? 'waiting' : 'pending'
+    if (entry.phase === 'waiting') scheduleRecheck(projectId)
+  }
+  /** 기다리거나 보낼 샷이 하나도 남지 않았으면 기다림을 끝낸다 — 남겨 두면 나중에 더한 샷이 다시 볼 시계 없이 기다림에 갇혔다(최종 리뷰 M1). */
+  const releaseWait = (queue: Queue) => {
+    if (![...queue.entries.values()].some((entry) => entry.phase === 'waiting' || entry.phase === 'pending' || entry.phase === 'requesting')) {
+      queue.userWaitSince = null
+    }
+  }
 
   /** 자리가 났을 수 있다 — 기다리던 샷을 다시 보낸다. 처음 막힌 뒤 30분이 지났으면 멈추고 [다시 시도]로 남긴다. */
   function recheck(projectId: string) {
@@ -301,9 +312,8 @@ export function createAddedShotDraws(deps: AddedShotDrawsDeps = {}) {
           if (result === 'drawn' && changedSince) {
             // 그리는 동안 고쳤다 — 그려진 그림을 고친 내용으로 한 번 더 그린다(실패했으면 다시 그리지 않는다, 9/11).
             entry.redraw = true
-            entry.phase = queue.userWaitSince !== null ? 'waiting' : 'pending'
+            enqueue(projectId, queue, entry)
             changed()
-            if (entry.phase === 'waiting') scheduleRecheck(projectId)
             void pump()
             return
           }
@@ -342,7 +352,9 @@ export function createAddedShotDraws(deps: AddedShotDrawsDeps = {}) {
         entry.reason = outcome.reason
         break
     }
-    // 기다리는 샷이 남았으면 언제나 다시 볼 시계를 건다 — 기다림 중에 더한 샷은 앞 요청이 실패 · 건너뜀으로 끝나도 영영 기다리지 않는다(리뷰 R6).
+    // 기다리던 샷이 모두 빠졌으면 기다림을 끝내고(최종 리뷰 M1), 기다리는 샷이 남았으면 언제나 다시 볼 시계를 건다 —
+    //   기다림 중에 더한 샷은 앞 요청이 실패 · 건너뜀으로 끝나도 영영 기다리지 않는다(리뷰 R6).
+    releaseWait(queue)
     if (hasWaiting(queue)) scheduleRecheck(projectId)
     changed()
   }
@@ -406,7 +418,7 @@ export function createAddedShotDraws(deps: AddedShotDrawsDeps = {}) {
           changed()
           return
         }
-        entry.phase = queue.userWaitSince !== null ? 'waiting' : 'pending'
+        enqueue(event.projectId, queue, entry)
         changed()
         void pump()
       }
@@ -418,7 +430,9 @@ export function createAddedShotDraws(deps: AddedShotDrawsDeps = {}) {
       if (!queue) return
       let removed = false
       for (const id of shotIds) removed = queue.entries.delete(id) || removed
-      if (removed) changed()
+      if (!removed) return
+      releaseWait(queue)
+      changed()
     },
     /** 이 프로젝트의 도는 작업 목록이 바뀌었다 — 하나라도 끝났으면 자리가 났을 수 있어 기다리던 샷을 다시 본다. */
     jobsChanged(projectId: string, jobIds: readonly string[]): void {
@@ -439,7 +453,7 @@ export function createAddedShotDraws(deps: AddedShotDrawsDeps = {}) {
       const queue = queues.get(projectId)
       const entry = queue?.entries.get(shotId)
       if (!queue || !entry || entry.phase !== 'no_story' || !story.trim() || story === entry.story) return
-      entry.phase = queue.userWaitSince !== null ? 'waiting' : 'pending'
+      enqueue(projectId, queue, entry)
       changed()
       void pump()
     },

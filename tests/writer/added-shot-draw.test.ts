@@ -249,6 +249,52 @@ describe('샷을 더하면 바로 그리기', () => {
     expect(draws.view('p').get('sh_01_04')).toMatchObject({ phase: 'stopped', noSlot: true })
   })
 
+  // 왜: 2026-11-02 최종 리뷰 M1 — 내 한도를 기다리던 샷을 지워도 "기다리는 중" 표시가 남아, 나중에 더한 샷이 "자리가 나면 바로 그려요"로
+  //   영영 기다렸다(다시 볼 시계도 30분 멈춤도 없었다). 기다리던 샷이 모두 빠지면 기다림도 끝난다 — 다음 샷은 바로 보내고, 다시 막히면 그때부터 잰다.
+  it('내 한도를 기다리던 샷을 지우면 기다림도 풀어, 나중에 더한 샷은 바로 보내고 다시 막히면 1분마다 다시 보다 30분 뒤 멈춘다', async () => {
+    const draws = createAddedShotDraws()
+    const draw = vi.fn<DrawAddedShot>(async () => ({ kind: 'user_limit' }))
+    draws.attach('p', draw)
+    draws.add(event('p', 'sh_01_03'))
+    await tick()
+    expect(draws.view('p').get('sh_01_03')?.phase).toBe('waiting')
+    draws.remove('p', ['sh_01_03'])
+    await vi.advanceTimersByTimeAsync(USER_LIMIT_WAIT_MAX_MS)
+    draws.add(event('p', 'sh_01_05'))
+    await tick()
+    expect(draw.mock.calls.map(([id]) => id)).toEqual(['sh_01_03', 'sh_01_05'])
+    expect(draws.view('p').get('sh_01_05')?.phase).toBe('waiting')
+    await vi.advanceTimersByTimeAsync(USER_LIMIT_RECHECK_MS)
+    expect(draw.mock.calls.filter(([id]) => id === 'sh_01_05')).toHaveLength(2)
+    expect(draws.view('p').get('sh_01_05')?.phase).toBe('waiting')
+    for (let waited = 0; waited <= USER_LIMIT_WAIT_MAX_MS; waited += USER_LIMIT_RECHECK_MS) await vi.advanceTimersByTimeAsync(USER_LIMIT_RECHECK_MS)
+    expect(draws.view('p').get('sh_01_05')).toMatchObject({ phase: 'stopped', noSlot: true })
+  })
+
+  // 왜: 최종 리뷰 M1 — 기다리던 마지막 샷을 다시 보냈는데 실패 · 건너뜀 · 스토리 없음으로 끝나도 "기다리는 중"이 남아 같은 일이 났다.
+  it.each([
+    ['실패로', { kind: 'failed', reason: '러프 스토리보드 생성 요청 실패' }],
+    ['건너뜀으로', { kind: 'skipped' }],
+    ['스토리 없음으로', { kind: 'no_story', story: '' }],
+  ] as Array<[string, AddedDrawOutcome]>)('내 한도를 기다리던 마지막 샷의 다시 보내기가 %s 끝나도 기다림을 풀어, 나중에 더한 샷은 바로 보낸다', async (_label, end) => {
+    const draws = createAddedShotDraws()
+    let blocked = true
+    const draw = vi.fn<DrawAddedShot>(async (shotId) => {
+      if (shotId !== 'sh_01_03') return submitted()
+      if (blocked) { blocked = false; return { kind: 'user_limit' } }
+      return end
+    })
+    draws.attach('p', draw)
+    draws.add(event('p', 'sh_01_03'))
+    await tick()
+    await vi.advanceTimersByTimeAsync(USER_LIMIT_RECHECK_MS)
+    expect(draw).toHaveBeenCalledTimes(2)
+    draws.add(event('p', 'sh_01_05'))
+    await tick()
+    expect(draw.mock.calls.map(([id]) => id)).toEqual(['sh_01_03', 'sh_01_03', 'sh_01_05'])
+    expect(draws.view('p').get('sh_01_05')?.phase).toBe('drawing')
+  })
+
   // 왜: 끝없이 두드리지 않는다 — 처음 막힌 뒤 30분이 지나도 자리가 없으면 멈추고, 카드의 [다시 시도]로 사람이 다시 시작한다(Artist 와 같은 30분).
   it('내 한도에 막혀 30분을 기다려도 자리가 나지 않으면 멈추고 카드에 까닭과 [다시 시도]를 둔다', async () => {
     const draws = createAddedShotDraws()
