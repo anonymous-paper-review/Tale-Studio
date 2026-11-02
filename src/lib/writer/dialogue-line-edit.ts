@@ -28,20 +28,19 @@ export type LineCommit =
   | { kind: 'conflict' }
   | { kind: 'save'; lines: DialogueLine[] }
 
-/** 끝낼 때 — 고친 글로 그 샷의 대사 목록을 만든다. 보이던 글(shown)과 같으면 그대로, 비면 저장하지 않는다.
+/** 끝낼 때 — 고친 글로 그 샷의 대사 목록을 만든다. 고치기 전 글과 같으면 그대로, 비면 저장하지 않는다.
+ *  고치는 칸은 저장된 글 그대로에서 시작한다(샷 고치기 창의 대사 칸과 같다, 2026-11-02 리뷰 R8) — 화면에서 이름으로 바꿔 보인 것은 저장하지 않는다.
  *  고친 줄의 화자 · 감정 · 말투 · 길이는 그대로 둔다(글만 바꾼다). */
 export function commitLineEdit(input: {
   lines: readonly DialogueLine[]
   index: number
   /** 고치기 시작할 때의 그 줄. */
   original: Pick<DialogueLine, 'characterId' | 'text'>
-  /** 고치기 시작할 때 화면에 보이던 글(이름으로 바꾼 글). */
-  shown: string
   draft: string
 }): LineCommit {
   const text = oneLine(input.draft)
   if (!text) return { kind: 'empty' }
-  if (text === oneLine(input.shown)) return { kind: 'unchanged' }
+  if (text === oneLine(input.original.text)) return { kind: 'unchanged' }
   const current = input.lines[input.index]
   if (!current || current.text !== input.original.text || current.characterId !== input.original.characterId) return { kind: 'conflict' }
   return { kind: 'save', lines: input.lines.map((line, i) => (i === input.index ? { ...line, text } : line)) }

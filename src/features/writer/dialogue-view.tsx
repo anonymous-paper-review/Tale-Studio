@@ -6,6 +6,7 @@
 //   이 뷰는 렌더 + 재생성 트리거만 담당한다.
 //   "대사 생성/재생성" → POST /api/writer/dialogue (완료된 run state 기반 V4 재생성) → loadProject 리프레시.
 //   대사 줄을 누르면 그 자리에서 글을 고친다(2026-11-02 오너 "탭 안에서 바로 고치기") — Enter · 바깥 누르기 = 저장, Esc = 취소.
+//   고치는 칸은 저장된 글 그대로에서 시작한다(팝업의 대사 칸과 같다 — 인물 id 를 이름으로 바꾸는 것은 보기에만, 리뷰 R8).
 //   저장은 샷 고치기 팝업과 같은 길(dialogue-line-save)이고 러프는 다시 그리지 않는다. 화자 · 줄 더하기 · 빼기는
 //   샷마다 붙은 연필 단추가 여는 샷 고치기 팝업에서 한다(팝업은 러프 보드가 그린다 — 연 샷 id 만 board-ui-store 로 넘긴다).
 //   샷 번호는 보드 카드와 같은 전체 번호(boardShots)다.
@@ -57,8 +58,7 @@ interface LineDraft {
   index: number
   /** 고치기 시작할 때의 그 줄 — 그새 바뀌었는지 볼 때와 [되돌리기]에 쓴다. */
   original: DialogueLine
-  /** 고치기 시작할 때 보이던 글(이름으로 바꾼 글). */
-  shown: string
+  /** 고치는 글 — 저장된 글 그대로에서 시작한다(샷 고치기 창의 대사 칸과 같다, 리뷰 R8). */
   draft: string
 }
 interface LineSave extends LineDraft {
@@ -195,12 +195,12 @@ export function DialogueView() {
     )
   }
 
-  const startEdit = (shotId: string, index: number, line: DialogueLine, shown: string) => {
+  const startEdit = (shotId: string, index: number, line: DialogueLine) => {
     if (generate.locked) return
     const key = lineKey(shotId, index)
     // 저장 중 · 실패한 줄은 먼저 끝낸다([다시 저장] · [되돌리기]).
     if (saves[key]) return
-    setEditingLine({ key, shotId, index, original: line, shown, draft: shown })
+    setEditingLine({ key, shotId, index, original: line, draft: line.text })
   }
   const commitEdit = (via: 'key' | 'blur') => {
     const current = editingRef.current
@@ -211,7 +211,6 @@ export function DialogueView() {
       lines: shotDialogueLines(current.shotId) ?? [],
       index: current.index,
       original: current.original,
-      shown: current.shown,
       draft: current.draft,
     })
     if (result.kind === 'unchanged') return
@@ -255,7 +254,8 @@ export function DialogueView() {
   const lineState = (key: LineKey): DialogueLineState => {
     if (editing?.key === key) return { kind: 'editing', draft: editing.draft }
     const entry = saves[key]
-    if (entry) return { kind: entry.status, draft: entry.saved }
+    // 저장 중 · 실패한 줄도 보기처럼 이름으로 바꿔 보인다(저장값은 그대로).
+    if (entry) return { kind: entry.status, draft: resolveEntityNames(entry.saved, entityNames) }
     return { kind: 'idle' }
   }
 
@@ -401,7 +401,6 @@ export function DialogueView() {
                                 const dimmed = !!selectedSpeaker && line.characterId !== selectedSpeaker
                                 const focused = !!selectedSpeaker && line.characterId === selectedSpeaker
                                 const key = lineKey(shot.shotId, i)
-                                const shown = resolveEntityNames(line.text, entityNames)
                                 return (
                                   <DialogueLineRow
                                     key={i}
@@ -423,13 +422,13 @@ export function DialogueView() {
                                         ? (color?.chip ?? 'text-foreground')
                                         : 'italic text-muted-foreground' // V.O./내레이션 구분
                                     }
-                                    text={shown}
+                                    text={resolveEntityNames(line.text, entityNames)}
                                     delivery={line.delivery ? resolveEntityNames(line.delivery, entityNames) : undefined}
                                     label={t('Edit line {line} of shot {shot} ({speaker})', { line: i + 1, shot: shotNo, speaker: speakerName })}
                                     state={lineState(key)}
                                     disabled={generate.locked}
                                     focused={focused}
-                                    onStart={() => startEdit(shot.shotId, i, line, shown)}
+                                    onStart={() => startEdit(shot.shotId, i, line)}
                                     onDraftChange={(draft) => {
                                       const current = editingRef.current
                                       if (current?.key === key) setEditingLine({ ...current, draft })

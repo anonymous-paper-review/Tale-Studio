@@ -58,7 +58,7 @@ afterEach(() => {
 })
 
 const edited = () => {
-  const result = commitLineEdit({ lines: shot.dialogueLines, index: 0, original: line, shown: line.text, draft: '아, 또 먹었어?' })
+  const result = commitLineEdit({ lines: shot.dialogueLines, index: 0, original: line, draft: '아, 또 먹었어?' })
   if (result.kind !== 'save') throw new Error(`expected save, got ${result.kind}`)
   return result.lines
 }

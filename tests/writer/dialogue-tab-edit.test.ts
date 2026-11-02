@@ -78,32 +78,32 @@ describe('대사 탭에서 바로 고치기', () => {
   it('Shift+Enter 로도 줄을 바꾸지 않고 저장하며 붙여 넣은 줄바꿈은 빈칸으로 바꿔 저장한다', () => {
     expect(lineEditKey({ key: 'Enter', shiftKey: true })).toBe('save')
     expect(oneLine('아, 또\n먹었어?  ')).toBe('아, 또 먹었어?')
-    const result = commitLineEdit({ lines: [line], index: 0, original: line, shown: '아, 또야?', draft: '아, 또\r\n먹었어?' })
+    const result = commitLineEdit({ lines: [line], index: 0, original: line, draft: '아, 또\r\n먹었어?' })
     expect(result).toEqual({ kind: 'save', lines: [{ ...line, text: '아, 또 먹었어?' }] })
   })
 
   // 왜: 리드 지시(빈 글은 저장하지 않고 원래 글로) — 실수로 다 지운 것과 줄 지우기를 구분한다. 줄 지우기는 샷 고치기 창에서 한다.
   it('대사 글을 다 지우고 끝내면 저장하지 않고 원래 글로 되돌린다', () => {
-    expect(commitLineEdit({ lines: [line], index: 0, original: line, shown: '아, 또야?', draft: '   ' })).toEqual({ kind: 'empty' })
+    expect(commitLineEdit({ lines: [line], index: 0, original: line, draft: '   ' })).toEqual({ kind: 'empty' })
     expect(view).toContain("t('Empty lines are not saved. To delete a line, open the shot editor with the pencil button.')")
   })
 
   // 왜: 바꾸지 않았는데 저장하면 같은 글을 헛저장한다(정상 경로 고정).
   it('바꾼 것이 없으면 저장하지 않는다', () => {
-    expect(commitLineEdit({ lines: [line], index: 0, original: line, shown: '아, 또야?', draft: ' 아, 또야? ' })).toEqual({ kind: 'unchanged' })
+    expect(commitLineEdit({ lines: [line], index: 0, original: line, draft: ' 아, 또야? ' })).toEqual({ kind: 'unchanged' })
   })
 
   // 왜(혼자 정한 것): 여기서는 대사 글만 고친다 — 고친 줄의 화자 · 감정 · 말투 · 길이를 빼고 저장하면 그 칸이 지워진다(채팅 고치기의 같은 결함 2026-10-31).
   it('대사 글을 고쳐 저장해도 그 줄의 화자 · 감정 · 말투 · 길이는 그대로 둔다', () => {
     const other = { characterId: null, text: '밤이었다.', emotion: '', delivery: 'V.O.', durationHint: 2 }
-    const result = commitLineEdit({ lines: [line, other], index: 0, original: line, shown: '아, 또야?', draft: '아, 또 먹었어?' })
+    const result = commitLineEdit({ lines: [line, other], index: 0, original: line, draft: '아, 또 먹었어?' })
     expect(result).toEqual({ kind: 'save', lines: [{ ...line, text: '아, 또 먹었어?' }, other] })
   })
 
   // 왜(혼자 정한 것): 고치는 동안 채팅이 같은 샷의 대사를 바꾸면 줄 순서가 달라질 수 있다 — 엉뚱한 줄을 덮어쓰지 않는다.
   it('고치는 동안 그 대사가 다른 곳에서 바뀌었으면 덮어쓰지 않고 다시 눌러 고쳐 달라고 알린다', () => {
     const changed = { ...line, text: '어? 나왔다!' }
-    expect(commitLineEdit({ lines: [changed], index: 0, original: line, shown: '아, 또야?', draft: '아, 또 먹었어?' })).toEqual({ kind: 'conflict' })
+    expect(commitLineEdit({ lines: [changed], index: 0, original: line, draft: '아, 또 먹었어?' })).toEqual({ kind: 'conflict' })
     expect(view).toContain("t('This line changed while you were editing. Click it to edit again.')")
   })
 
