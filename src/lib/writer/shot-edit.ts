@@ -1,8 +1,9 @@
-// Storyboard 샷 고치기 팝업(프로토타입 S2, 2026-10-20)의 순수 규칙 — 씬 안 번호 · 카메라 앵글 · 다시 그리는 순서.
+// Storyboard 샷 고치기 팝업(프로토타입 S2, 2026-10-20)의 순수 규칙 — 샷 이름 · 카메라 앵글 · 다시 그리는 순서.
 //   약속: tests/writer/shot-edit-popup.test.ts
 import type { CameraConfig, DialogueLine, Shot, ShotType } from '@/types'
 import { toolValueKey } from '@/lib/chat-tools/executor'
 import { ROUGH_VISIBLE_SHOT_FIELDS } from '@/lib/writer/chat-rough-redraw'
+import { boardShotLabels } from '@/lib/writer/board-summary'
 
 /** 시작 묶음(스토리 · 대사 · 샷 타입)의 값 — 팝업이 고치는 중인 값과 저장된 샷이 같은 모양이다. */
 export interface StartFields {
@@ -34,18 +35,14 @@ export function startApplyKind(changes: Partial<Shot>, hasRough: boolean): Apply
   return hasRough && ROUGH_VISIBLE_SHOT_FIELDS.some((field) => field in changes) ? 'redraw' : 'save'
 }
 
-/** 씬 안 순서로 부르는 샷 번호(프로토타입 "S1-3") — 씬 순서는 장면 목록, 샷 순서는 보드(샷 목록) 순서. 없으면 null. */
+/** 팝업이 부르는 샷 이름 — 보드 카드와 같은 전체 번호 이름("Scene 2 · Shot 8", 오너 2026-11-02 "전체 번호로 통일"). 보드에 없으면 null.
+ *  옛 이름은 씬 안 번호("S2-3")였다. */
 export function sceneShotLabel(
   manifest: { scenes: ReadonlyArray<{ sceneId: string }> } | null | undefined,
   shots: ReadonlyArray<{ shotId: string; sceneId: string }>,
   shotId: string,
 ): string | null {
-  const shot = shots.find((item) => item.shotId === shotId)
-  if (!shot) return null
-  const sceneIndex = manifest?.scenes.findIndex((scene) => scene.sceneId === shot.sceneId) ?? -1
-  if (sceneIndex < 0) return null
-  const inScene = shots.filter((item) => item.sceneId === shot.sceneId)
-  return `S${sceneIndex + 1}-${inScene.findIndex((item) => item.shotId === shotId) + 1}`
+  return boardShotLabels(manifest, shots).get(shotId) ?? null
 }
 
 export type CameraAngle = 'eye' | 'high' | 'low'

@@ -6,6 +6,7 @@ import type { DialogueLine, ProjectFormat, ShotType } from '@/types'
 import { shotImageAspectRatio } from '@/lib/project-aspect'
 import { manifestEntities, resolveEntityNames } from '@/lib/writer/resolve-entity-names'
 import { SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
+import { boardShots } from '@/lib/writer/board-summary'
 
 export interface MasterSheetSceneInput {
   sceneId: string
@@ -53,7 +54,7 @@ export interface MasterSheetFrameSet {
 }
 
 export interface MasterSheetRow {
-  /** "씬번호-씬 안 샷번호" (예: "1-2"), 둘 다 1부터. 내부 shotId/sceneId 대신 쓰는 표시용 코드. */
+  /** 보드 카드와 같은 전체 샷 번호(예: "8", 1부터 — 오너 2026-11-02 "전체 번호로 통일"). 내부 shotId 대신 쓰는 표시용 코드. */
   code: string
   frames: MasterSheetFrameSet
   framesComplete: boolean
@@ -154,6 +155,9 @@ export function buildMasterSheet(input: BuildMasterSheetInput): MasterSheetResul
   const entityNames = manifestEntities({ characters: input.characters, locations: input.locations })
 
   const scenesSorted = [...input.scenes].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+  // 샷 번호는 보드와 같은 셈 하나(boardShots) — 씬 순서 → 그 안 샷 순서로 씬마다 다시 세지 않는다.
+  const shotsSorted = [...input.shots].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+  const shotNoById = new Map(boardShots({ scenes: scenesSorted }, shotsSorted).map((entry) => [entry.shot.shotId, entry.shotNo]))
 
   let missingFrameShots = 0
   let shotCount = 0
@@ -175,8 +179,7 @@ export function buildMasterSheet(input: BuildMasterSheetInput): MasterSheetResul
 
     const chunks = chunk(sceneShots, capacity)
     chunks.forEach((chunkShots, chunkIdx) => {
-      const rows: MasterSheetRow[] = chunkShots.map((shot, rowIdx) => {
-        const shotNumber = chunkIdx * capacity + rowIdx + 1
+      const rows: MasterSheetRow[] = chunkShots.map((shot) => {
         const frames: MasterSheetFrameSet = shot.roughStoryboard?.frames
           ? {
               start: shot.roughStoryboard.frames.start,
@@ -191,7 +194,7 @@ export function buildMasterSheet(input: BuildMasterSheetInput): MasterSheetResul
         runningSeconds += shot.durationSeconds
         const timecodeEnd = runningSeconds
         return {
-          code: `${sceneNumber}-${shotNumber}`,
+          code: String(shotNoById.get(shot.shotId) ?? ''),
           frames,
           framesComplete,
           shotSizeLabel: SHOT_TYPE_DESCRIPTIONS[shot.shotType] ?? shot.shotType,

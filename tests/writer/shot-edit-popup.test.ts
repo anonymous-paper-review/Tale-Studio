@@ -1,6 +1,7 @@
 // Storyboard 샷 고치기 팝업(프로토타입 S2): 씬 안 번호 · 저장 뒤 다시 그리기 (2026-10-20 오너 "HTML 확인해서 팝업 수정")
 import { describe, expect, it, vi } from 'vitest'
 import { angleOfCamera, applyStartEdit, cameraWithAngle, nextApplyStep, readRedrawReply, redrawDirectionOnly, sceneShotLabel } from '@/lib/writer/shot-edit'
+import { translate } from '@/lib/i18n/translate'
 
 const manifest = { scenes: [{ sceneId: 'sc1' }, { sceneId: 'sc2' }] }
 const shots = [
@@ -11,10 +12,12 @@ const shots = [
 ]
 
 describe('샷 번호', () => {
-  it('샷 고치기 팝업은 씬 안 순서로 "S2-1"처럼 부른다', () => {
-    // 왜: 프로토타입 S2 제목 "S1-3 고치기" — 몇 번째 씬의 몇 번째 샷인지 한눈에 보인다.
-    expect(sceneShotLabel(manifest, shots, 'b')).toBe('S1-2')
-    expect(sceneShotLabel(manifest, shots, 'c')).toBe('S2-1')
+  it('샷 고치기 팝업은 보드 카드와 같은 전체 번호로 "Scene 2 · Shot 8"처럼 부른다', () => {
+    // 왜: 오너 2026-11-02 전체 번호로 통일 — 보드 카드는 "Scene 2 · Shot 8"인데 팝업 머리는 씬 안 번호("S2-3")라 같은 샷을 두 이름으로 불렀다.
+    //   팝업 제목은 카드와 같은 이름에 "고치기"를 붙인다(오너에게 보인 그대로: "Scene 2 · Shot 8 고치기").
+    expect(sceneShotLabel(manifest, shots, 'b')).toBe('Scene 1 · Shot 2')
+    expect(sceneShotLabel(manifest, shots, 'c')).toBe('Scene 2 · Shot 3')
+    expect(translate('ko', '{label} · edit', { label: 'Scene 2 · Shot 8' })).toBe('Scene 2 · Shot 8 고치기')
   })
 
   it('목록에 없는 샷은 번호를 지어내지 않는다', () => {

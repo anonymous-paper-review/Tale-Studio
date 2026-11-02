@@ -60,7 +60,8 @@ describe('마스터 시트는 씬 순서와 그 안의 샷 순서대로 샷을 �
     ]
     const result = buildMasterSheet(baseInput({ scenes, shots }))
     const codes = result.pages.flatMap((p) => p.rows.map((r) => r.code))
-    expect(codes).toEqual(['1-1', '1-2', '2-1'])
+    // 왜: 오너 2026-11-02 전체 번호로 통일 — 칸도 보드 카드와 같은 전체 번호("8")로 쓴다(옛 "씬-씬 안 번호" 2-1).
+    expect(codes).toEqual(['1', '2', '3'])
   })
 })
 
@@ -114,7 +115,8 @@ describe('설명문에는 샷 번호·샷 크기·인물·액션·대사·길이
     ]
     const result = buildMasterSheet(baseInput({ scenes, shots }))
     const row = result.pages[0].rows[0]
-    expect(row.code).toBe('1-1')
+    // 왜: 오너 2026-11-02 전체 번호로 통일 — 샷 번호 칸은 보드 카드와 같은 전체 번호다.
+    expect(row.code).toBe('1')
     expect(row.shotSizeLabel).toBe('Close-up: mostly the face')
     expect(row.characters).toEqual(['지아', '레오'])
     expect(row.action).toBe('A quiet embrace.')
@@ -183,10 +185,10 @@ describe('씬이 바뀌면 새 장에서 시작하고 넘치는 씬은 여러 �
     for (const page of sceneAPages) expect(page.scenePart.total).toBe(sceneAPages.length)
     expect(sceneBPages[0].scenePart).toEqual({ index: 1, total: 1 })
 
-    // 한 장의 모든 행은 그 장의 씬 번호에서만 온다 — 씬이 섞이지 않는다.
-    for (const page of result.pages) {
-      for (const row of page.rows) expect(row.code.startsWith(`${page.sceneNumber}-`)).toBe(true)
-    }
+    // 한 장의 모든 행은 그 장의 씬에서만 온다 — 씬이 섞이지 않는다.
+    // 왜: 오너 2026-11-02 전체 번호로 통일 — 칸이 씬 번호를 담지 않으므로 번호 구간으로 본다: 씬 A 는 1~9, 씬 B 는 10.
+    expect(sceneAPages.flatMap((p) => p.rows.map((r) => r.code))).toEqual(Array.from({ length: 9 }, (_, i) => String(i + 1)))
+    expect(sceneBPages[0].rows.map((r) => r.code)).toEqual(['10'])
 
     // 전역 페이지 번호가 1부터 연속이다.
     const totalPages = result.pages.length

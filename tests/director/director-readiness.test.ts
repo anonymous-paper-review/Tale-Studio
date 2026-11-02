@@ -87,10 +87,18 @@ describe('샷마다 Director로 넘길 준비가 됐는지 가린다', () => {
     expect(shotOf(r, 'sh_1').rough).toBeNull()
   })
 
-  it('샷 번호는 씬 순서-샷 순서로 붙고 씬마다 장소와 시간대를 단다', () => {
+  it('샷 번호는 보드와 같은 전체 번호로 붙고 씬마다 장소와 시간대를 단다', () => {
+    // 왜: 오너 2026-11-02 전체 번호로 통일 — 넘김 확인 목록이 "2-1"처럼 씬 안 번호를 써서 보드 카드("Scene 2 · Shot 3")와 달랐다. 목록에는 "Shot 3"으로 보인다.
     const r = report({ shots: [shot('sh_3', 'sc_2', 0), shot('sh_2', 'sc_1', 1), shot('sh_1', 'sc_1', 0)] })
     expect(r.scenes.map((s) => [s.sceneNumber, s.locationName, s.timeOfDay])).toEqual([[1, '마을 광장', '낮'], [2, '우물가', '낮']])
-    expect(r.scenes.flatMap((s) => s.shots.map((x) => x.code))).toEqual(['1-1', '1-2', '2-1'])
+    expect(r.scenes.flatMap((s) => s.shots.map((x) => x.code))).toEqual(['Shot 1', 'Shot 2', 'Shot 3'])
+  })
+
+  it('샷이 없는 씬이 있어도 씬 번호는 보드와 같다', () => {
+    // 왜: 보드는 샷이 없는 씬도 "Scene 1"로 세는데, 목록은 빈 씬을 건너뛰고 셌다 — 같은 씬이 보드에서는 Scene 2, 목록에서는 S1 이었다.
+    const r = report({ scenes: [scene('sc_0', 0, 'plaza'), scene('sc_1', 1, 'plaza'), scene('sc_2', 2, 'well')] })
+    expect(r.scenes.map((s) => s.sceneNumber)).toEqual([2, 3])
+    expect(r.scenes.flatMap((s) => s.shots.map((x) => x.code))).toEqual(['Shot 1', 'Shot 2', 'Shot 3'])
   })
 })
 

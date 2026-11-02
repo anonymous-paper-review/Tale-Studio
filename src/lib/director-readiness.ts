@@ -2,6 +2,7 @@
 //   프로토타입(tale-proto-v04 directorCheck)과 같은 기준 — 샷에 나오는 인물과 그 샷의 배경에 이미지가 있으면 준비된 샷,
 //   없으면 이유(정보 부족 · 이미지 없음 · 만드는 중)를 단다. 러프 스토리보드는 판정에 넣지 않고 보여주기만 한다.
 //   순수 함수 — 데이터 모으기는 director-readiness-loader(브라우저), 결정은 global-chat-store.
+import { boardShots } from '@/lib/writer/board-summary'
 
 export interface ReadinessCharacter {
   characterId: string
@@ -51,7 +52,7 @@ export interface ShotGap {
 
 export interface ShotReadiness {
   shotId: string
-  /** 씬 순서-샷 순서(1부터) — 화면에 보이는 샷 번호. */
+  /** 화면에 보이는 샷 이름 — 보드 카드와 같은 전체 번호("Shot 8", 오너 2026-11-02 "전체 번호로 통일"). */
   code: string
   description: string
   rough: { start: string; end: string } | null
@@ -61,6 +62,7 @@ export interface ShotReadiness {
 
 export interface SceneReadiness {
   sceneId: string
+  /** 보드와 같은 씬 번호 — 샷이 없는 씬도 센다. */
   sceneNumber: number
   locationName: string
   timeOfDay: string
@@ -92,23 +94,24 @@ export function classifyDirectorReadiness(input: {
   const characters = new Map(input.characters.map((c) => [c.characterId, c]))
   const locations = new Map(input.locations.map((l) => [l.locationId, l]))
   const orderedScenes = [...input.scenes].sort((a, b) => a.sortOrder - b.sortOrder)
+  const orderedShots = [...input.shots].sort((a, b) => a.sortOrder - b.sortOrder)
+  // 번호는 보드와 같은 셈 하나(boardShots) — 씬 순서 → 그 안 샷 순서로 씬마다 다시 세지 않는다.
+  const board = new Map(boardShots({ scenes: orderedScenes }, orderedShots).map((entry) => [entry.shot.shotId, entry]))
   const scenes: SceneReadiness[] = []
   let readyCount = 0
   let incompleteCount = 0
 
-  orderedScenes.forEach((scene) => {
-    const shots = input.shots
-      .filter((shot) => shot.sceneId === scene.sceneId)
-      .sort((a, b) => a.sortOrder - b.sortOrder)
+  orderedScenes.forEach((scene, sceneIndex) => {
+    const shots = orderedShots.filter((shot) => shot.sceneId === scene.sceneId)
     if (shots.length === 0) return
-    const sceneNumber = scenes.length + 1
+    const sceneNumber = sceneIndex + 1
     const sceneLocation = scene.locationId ? locations.get(scene.locationId) : undefined
     scenes.push({
       sceneId: scene.sceneId,
       sceneNumber,
       locationName: sceneLocation?.name ?? '',
       timeOfDay: scene.timeOfDay ?? '',
-      shots: shots.map((shot, index) => {
+      shots: shots.map((shot) => {
         const gaps: ShotGap[] = []
         for (const id of new Set(shot.characterIds)) {
           const character = characters.get(id)
@@ -128,7 +131,7 @@ export function classifyDirectorReadiness(input: {
         else incompleteCount += 1
         return {
           shotId: shot.shotId,
-          code: `${sceneNumber}-${index + 1}`,
+          code: `Shot ${board.get(shot.shotId)?.shotNo ?? '?'}`,
           description: shot.description,
           rough: shot.rough,
           gaps,
