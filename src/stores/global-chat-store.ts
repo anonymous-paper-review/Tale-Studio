@@ -2040,6 +2040,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       (opts?.answeringProducerQuestion === true || (producerChoices?.answeringProducerQuestion === true && answersProducerChoice))
     const planningChoiceTurn = answeringProducerQuestion ||
       (!requestsSupportedChatEdit(stage, trimmed) && !(answersProducerChoice && !producerChoices?.answeringProducerQuestion))
+    // 내려가는 [러프 다시 그리기] 카드의 샷은 이번 턴의 다음 카드에 함께 싣는다(2026-11-02 리뷰 3차 L7 — 잇달아 고치면 앞 카드의 샷을
+    //   다시 묻지 않았다). 같은 프로젝트 것만, 이미 눌러 보드가 그리기를 기다리는 샷은 빼고(같은 그림을 두 번 그리지 않게).
+    const carriedRedraw: string[] = []
+    if (activeSuggestion?.action?.kind === 'roughRedraw' && activeSuggestion.action.projectId === projectId) {
+      const waiting = useBoardUiStore.getState().roughRedrawRequest
+      const clicked = waiting?.projectId === projectId && waiting.shotIds.join(' ') === activeSuggestion.action.shotIds.join(' ')
+      if (!clicked) carriedRedraw.push(...activeSuggestion.action.shotIds)
+    }
     if (
       activeSuggestion &&
       !(activeSuggestion.action?.kind === 'confirmScenes' && writerInputRoute(trimmed, { sceneGate: true, running: false, explicitRevision: true }) === 'chat') &&
@@ -3569,7 +3577,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (stage === 'writer' && projectId && roughBefore && isCurrentSession() && useBoardUiStore.getState().boardProjectId === projectId) {
         const writerAfter = useWriterStore.getState()
         const roughAfter = roughVisibleState(writerAfter.sceneManifest, writerAfter.shots)
-        const redraw = roughRedrawCandidates(completedTools, roughBefore, roughAfter)
+        const fresh = roughRedrawCandidates(completedTools, roughBefore, roughAfter)
+        // 앞 카드에서 넘어온 샷 — 이번 턴에 새로 물을 것이 있을 때만 함께 싣는다(딴 얘기면 제안을 내린다 — #suggestion-linger).
+        const redraw = fresh.length > 0
+          ? [...new Set([...carriedRedraw.filter((shotId) => roughAfter.shots.get(shotId)?.drawn), ...fresh])]
+          : []
         if (redraw.length > 0) {
           const locale = contentLocale()
           // 씬 문구는 장소 · 시간대 · 분위기가 실제로 바뀐 씬이 있을 때만(리뷰 L6) — 요약만 저장된 씬은 셈하지 않는다.

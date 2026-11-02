@@ -198,6 +198,36 @@ describe('채팅 고치기 뒤 [러프 다시 그리기] 제안', () => {
     expect(suggestion?.content).not.toContain('씬을 고쳐')
   })
 
+  // 왜: 2026-11-02 리뷰 3차 L7 — 잇달아 고치면 다음 말을 보낼 때 앞 카드가 내려가고, 그 샷들은 다시 묻지 않아 그림이 예전 그대로 남았다.
+  //   앞 카드의 샷을 다음 [러프 다시 그리기]에 함께 싣는다(같은 프로젝트일 때만).
+  it('채팅으로 잇달아 고치면 앞 카드의 샷도 다음 [러프 다시 그리기]에 함께 묻는다', async () => {
+    modelEdits('shots', 'sh_01_02', { shotType: 'CU' })
+    await chat.getState().sendMessage('씬1 샷2를 클로즈업으로 바꿔줘')
+    modelEdits('shots', 'sh_01_04', { shotType: 'CU' })
+    await chat.getState().sendMessage('샷 3도 클로즈업으로 바꿔줘')
+
+    const suggestion = chat.getState().suggestion
+    expect(suggestion?.action).toMatchObject({ kind: 'roughRedraw', projectId: 'p-redraw', shotIds: ['sh_01_02', 'sh_01_04'] })
+    expect(suggestion?.content).toContain('2개')
+  })
+
+  // 왜: 사람이 딴 얘기를 하면 제안은 내린다(#suggestion-linger) — 다음 말이 고치기가 아니면 앞 카드를 다시 띄우지 않는다.
+  //   이미 누른 카드(보드가 그리기를 기다리는 샷)는 다음 카드에 다시 싣지 않는다 — 같은 그림을 두 번 그리지 않게(정상 경로 고정).
+  it('다음 말이 고치기가 아니면 앞 카드를 다시 띄우지 않고, 이미 누른 카드의 샷은 다음 카드에 다시 싣지 않는다', async () => {
+    modelEdits('shots', 'sh_01_02', { shotType: 'CU' })
+    await chat.getState().sendMessage('씬1 샷2를 클로즈업으로 바꿔줘')
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => Response.json(url === '/api/writer/chat' ? { reply: '좋아요.' } : {})))
+    await chat.getState().sendMessage('고마워')
+    expect(chat.getState().suggestion?.action?.kind).not.toBe('roughRedraw')
+
+    modelEdits('shots', 'sh_01_02', { shotType: 'WS' })
+    await chat.getState().sendMessage('씬1 샷2를 와이드로 바꿔줘')
+    useBoardUiStore.getState().requestRoughRedraw('p-redraw', ['sh_01_02'])
+    modelEdits('shots', 'sh_01_04', { shotType: 'CU' })
+    await chat.getState().sendMessage('샷 3도 클로즈업으로 바꿔줘')
+    expect(chat.getState().suggestion?.action).toMatchObject({ kind: 'roughRedraw', shotIds: ['sh_01_04'] })
+  })
+
   // 왜: 단추를 누르면 보드가 카드의 [다시 시도]와 같은 길로 그 샷들만 다시 그린다(잠금 표시 · 완료 뒤 카드 갱신).
   it('[러프 다시 그리기]를 누르면 보드가 고친 샷들만 다시 그린다', () => {
     useBoardUiStore.getState().requestRoughRedraw('p-redraw', ['sh_01_02'])
