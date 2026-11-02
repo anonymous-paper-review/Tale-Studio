@@ -78,6 +78,17 @@ describe('샷 번호는 보드와 같은 전체 번호', () => {
     expect(route).toContain('<shot-numbers>')
   })
 
+  // 왜: 2026-11-02 리뷰 L5 — 한국어 대사 이어 쓰기는 씬 하나만 담은 목록을 보내 "Scene 1 · Shot 1"처럼 그 씬 안에서 다시 셌다.
+  //   <shot-numbers> 규칙(보드 전체 번호)과 어긋난다 — 번호는 보드 전체에서 센다.
+  it('한국어 대사 이어 쓰기에 보내는 샷 목록도 보드 전체 번호다', () => {
+    const oneScene = { ...manifest, scenes: manifest.scenes.filter((s) => s.sceneId === 'sc_02') }
+    const context = serializeWriterScriptContext(oneScene, shots.filter((s) => s.sceneId === 'sc_02'), undefined, { manifest, shots })
+    expect(context).toMatch(/sh_02_03 \(Scene 2 · Shot 4\)/)
+    expect(context).toContain('(씬2)')
+    const store = readFileSync('src/stores/global-chat-store.ts', 'utf8')
+    expect(store).toMatch(/serializeWriterScriptContext\(manifest, shots, buildScriptLines\(manifest, shots\), \{ manifest: writer\.sceneManifest, shots: writer\.shots \}\)/)
+  })
+
   // 왜: 도구로 읽은 샷에도 같은 이름이 있어야 모델이 고친 샷을 보드 번호로 말한다.
   it('채팅 도구로 읽은 샷에 보드 전체 번호(boardLabel)가 붙는다', async () => {
     const r = createStudioToolResources({ stage: 'writer', projectId: 'p', traceId: 't', signal: new AbortController().signal, isCurrent: () => true })

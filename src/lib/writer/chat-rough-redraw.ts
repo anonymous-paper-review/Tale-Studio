@@ -35,29 +35,43 @@ export function roughVisibleState(manifest: StateManifest, shots: readonly State
   }
 }
 
+type Outcomes = ReadonlyArray<Pick<ToolOutcome, 'call' | 'result'>>
+
+/** 이 턴에 저장된 고침(edit_project · ok)의 대상 — 자원과 id. */
+function savedTargets(outcomes: Outcomes): Array<{ resource: unknown; id: string }> {
+  return outcomes.flatMap(({ call, result }) => {
+    if (call.name !== 'edit_project' || result.status !== 'ok') return []
+    const input = call.input as { resource?: unknown; id?: unknown }
+    return typeof input.id === 'string' ? [{ resource: input.resource, id: input.id }] : []
+  })
+}
+
+/** 이 턴에 장소 · 시간대 · 분위기가 실제로 바뀐 씬 — 저장만 된 씬(요약만 바뀐 것 포함)은 빠진다(2026-11-02 리뷰 L6). */
+export function roughRedrawChangedScenes(outcomes: Outcomes, before: RoughVisibleState, after: RoughVisibleState): string[] {
+  const changed: string[] = []
+  for (const { resource, id } of savedTargets(outcomes)) {
+    if (resource !== 'scenes' || changed.includes(id)) continue
+    const was = before.scenes.get(id)
+    const now = after.scenes.get(id)
+    if (was !== undefined && now !== undefined && was !== now) changed.push(id)
+  }
+  return changed
+}
+
 /** 이 턴에 저장된 고침(edit_project · ok) 중 그림에 보이는 칸이 실제로 바뀐 샷 — 씬을 고쳤으면 그 씬의 그려진 샷 모두. 처음 나온 차례대로. */
-export function roughRedrawCandidates(
-  outcomes: ReadonlyArray<Pick<ToolOutcome, 'call' | 'result'>>,
-  before: RoughVisibleState,
-  after: RoughVisibleState,
-): string[] {
+export function roughRedrawCandidates(outcomes: Outcomes, before: RoughVisibleState, after: RoughVisibleState): string[] {
   const picked: string[] = []
   const pick = (shotId: string) => {
     if (after.shots.get(shotId)?.drawn && !picked.includes(shotId)) picked.push(shotId)
   }
-  for (const { call, result } of outcomes) {
-    if (call.name !== 'edit_project' || result.status !== 'ok') continue
-    const input = call.input as { resource?: unknown; id?: unknown }
-    if (typeof input.id !== 'string') continue
-    if (input.resource === 'shots') {
-      const was = before.shots.get(input.id)
-      const now = after.shots.get(input.id)
-      if (was && now && was.key !== now.key) pick(input.id)
-    } else if (input.resource === 'scenes') {
-      const was = before.scenes.get(input.id)
-      const now = after.scenes.get(input.id)
-      if (was === undefined || now === undefined || was === now) continue
-      for (const [shotId, shot] of after.shots) if (shot.sceneId === input.id) pick(shotId)
+  const changedScenes = roughRedrawChangedScenes(outcomes, before, after)
+  for (const { resource, id } of savedTargets(outcomes)) {
+    if (resource === 'shots') {
+      const was = before.shots.get(id)
+      const now = after.shots.get(id)
+      if (was && now && was.key !== now.key) pick(id)
+    } else if (resource === 'scenes' && changedScenes.includes(id)) {
+      for (const [shotId, shot] of after.shots) if (shot.sceneId === id) pick(shotId)
     }
   }
   return picked

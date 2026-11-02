@@ -170,6 +170,34 @@ describe('채팅 고치기 뒤 [러프 다시 그리기] 제안', () => {
     expect(suggestion?.content).toContain('2개')
   })
 
+  // 왜: 2026-11-02 리뷰 L6 — 씬을 저장만 하면(요약만 바뀌어도) "씬을 고쳐 그 씬 샷 N개…" 문구를 썼다. 실제로 장소 · 시간대 · 분위기가
+  //   바뀐 씬이 없으면 고친 샷 문구로 묻는다.
+  it('한 번에 씬의 요약만 고치고 샷 타입을 바꾸면 [러프 다시 그리기]는 "고친 샷" 문구로 묻는다', async () => {
+    let calls = 0
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url !== '/api/writer/chat') return Response.json({})
+      calls += 1
+      return Response.json(calls === 1
+        ? { toolTurn: { stopReason: 'tool_use', content: [
+          { type: 'tool_use', id: 'edit-1', name: 'edit_project', input: { resource: 'scenes', id: 'sc_01', revision: 'r1', patch: { narrativeSummary: '새 요약' } } },
+          { type: 'tool_use', id: 'edit-2', name: 'edit_project', input: { resource: 'shots', id: 'sh_01_02', revision: 'r2', patch: { shotType: 'CU' } } },
+        ] } }
+        : { reply: '바꿔서 저장했어요.' })
+    }))
+    mocks.execute.mockImplementation(async (call: { input: { resource: string; id: string; patch: Record<string, unknown> } }) => {
+      const { resource, id, patch } = call.input
+      if (resource === 'shots') useWriterStore.setState((s) => ({ shots: s.shots.map((x) => (x.shotId === id ? { ...x, ...patch } : x)) }))
+      else useWriterStore.setState((s) => ({ sceneManifest: s.sceneManifest ? { ...s.sceneManifest, scenes: s.sceneManifest.scenes.map((x) => (x.sceneId === id ? { ...x, ...patch } : x)) } : null }))
+      return { status: 'ok' }
+    })
+    await chat.getState().sendMessage('씬1 요약을 고치고 씬1 샷2를 클로즈업으로 바꿔줘')
+
+    const suggestion = chat.getState().suggestion
+    expect(suggestion?.action).toMatchObject({ kind: 'roughRedraw', shotIds: ['sh_01_02'] })
+    expect(suggestion?.content).toContain('고친 샷 1개의 러프 그림은 아직 예전 그대로예요')
+    expect(suggestion?.content).not.toContain('씬을 고쳐')
+  })
+
   // 왜: 단추를 누르면 보드가 카드의 [다시 시도]와 같은 길로 그 샷들만 다시 그린다(잠금 표시 · 완료 뒤 카드 갱신).
   it('[러프 다시 그리기]를 누르면 보드가 고친 샷들만 다시 그린다', () => {
     useBoardUiStore.getState().requestRoughRedraw('p-redraw', ['sh_01_02'])

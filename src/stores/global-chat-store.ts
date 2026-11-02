@@ -59,7 +59,7 @@ import { useArtistVersionStore } from '@/stores/artist-version-store'
 import { useWriterRoomStore } from '@/stores/writer-room-store'
 import { restartWriterStatus } from '@/lib/writer/use-writer-status'
 import { completeKoreanDialogue, dialogueHandoffTarget } from '@/lib/writer/dialogue-handoff'
-import { roughRedrawCandidates, roughRedrawOfferHere, roughVisibleState, type RoughVisibleState } from '@/lib/writer/chat-rough-redraw'
+import { roughRedrawCandidates, roughRedrawChangedScenes, roughRedrawOfferHere, roughVisibleState, type RoughVisibleState } from '@/lib/writer/chat-rough-redraw'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { boardNodeNames } from '@/features/director/node-label'
 import { handoffToStage } from '@/lib/stage-nav'
@@ -3414,7 +3414,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           requestScene: async (shots) => {
             const writer = useWriterStore.getState()
             const manifest = writer.sceneManifest ? { ...writer.sceneManifest, scenes: writer.sceneManifest.scenes.filter(scene => scene.sceneId === shots[0].sceneId) } : null
-            const context = serializeWriterScriptContext(manifest, shots, buildScriptLines(manifest, shots))
+            // 번호는 보드 전체에서 센다(리뷰 L5) — 씬 하나만 담은 목록으로 세면 "Scene 1 · Shot 1"이 되어 <shot-numbers> 와 어긋난다.
+            const context = serializeWriterScriptContext(manifest, shots, buildScriptLines(manifest, shots), { manifest: writer.sceneManifest, shots: writer.shots })
             const response = await fetch('/api/writer/chat', {
               signal: controller.signal, method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -3567,10 +3568,12 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       //   그 프로젝트의 Storyboard 보드가 열려 있을 때만 묻는다 — 다른 화면에서 눌린 요청이 다음 보드로 새지 않게(리뷰 B1).
       if (stage === 'writer' && projectId && roughBefore && isCurrentSession() && useBoardUiStore.getState().boardProjectId === projectId) {
         const writerAfter = useWriterStore.getState()
-        const redraw = roughRedrawCandidates(completedTools, roughBefore, roughVisibleState(writerAfter.sceneManifest, writerAfter.shots))
+        const roughAfter = roughVisibleState(writerAfter.sceneManifest, writerAfter.shots)
+        const redraw = roughRedrawCandidates(completedTools, roughBefore, roughAfter)
         if (redraw.length > 0) {
           const locale = contentLocale()
-          const fromScene = completedTools.some((o) => o.call.name === 'edit_project' && o.result.status === 'ok' && (o.call.input as { resource?: unknown }).resource === 'scenes')
+          // 씬 문구는 장소 · 시간대 · 분위기가 실제로 바뀐 씬이 있을 때만(리뷰 L6) — 요약만 저장된 씬은 셈하지 않는다.
+          const fromScene = roughRedrawChangedScenes(completedTools, roughBefore, roughAfter).length > 0
           get().offerSuggestion({
             id: `rough-redraw:${traceId}`,
             stage: 'writer',

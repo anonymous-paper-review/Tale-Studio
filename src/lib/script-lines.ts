@@ -208,6 +208,8 @@ export function serializeWriterScriptContext(
   manifest: SceneManifest | null,
   shots: Shot[],
   precomputedLines?: ScriptLine[],
+  /** 번호를 셀 보드 전체 — 목록이 보드 일부(씬 하나)일 때 넘긴다. 없으면 이 목록이 보드다(리뷰 L5). */
+  board?: { manifest: SceneManifest | null; shots: readonly Shot[] },
 ): string {
   const scenes = manifest?.scenes ?? []
   if (scenes.length === 0 && shots.length === 0) return '## 현재 씬/샷\n(아직 없음)'
@@ -220,7 +222,12 @@ export function serializeWriterScriptContext(
     // 오너 2026-11-02 "전체 번호로 통일" — 보드 카드 이름(괄호)이 샷의 이름이다. 씬마다 다시 세지 않는다.
     '샷 번호: 샷마다 괄호 안의 보드 이름("Scene 2 · Shot 8")이 사용자가 보는 이름이고, 샷 번호는 씬마다 다시 세지 않는 전체 번호다. "샷 8"·"Shot 8"·"Scene 2 · Shot 8"은 그 전체 번호의 샷이다. 씬과 샷을 함께 말하면("씬2 샷5") 보드 Shot 5(그 씬에 있을 때)와 그 씬의 다섯 번째 샷 두 가지로 읽힐 수 있다 — 하나만 되면 그것, 둘 다 되고 서로 다르면 고치지 말고 두 샷을 보드 이름으로 보여 주며 되묻는다. "2씬 두 번째 샷"처럼 씬 안 자리를 말하면 그 자리다. 답할 때 샷은 이 보드 이름으로 부르고 id(sh_..)나 씬 안 순서로 부르지 않는다.',
   ]
-  const boardLabels = boardShotLabels(manifest, shots)
+  const numbering = board ?? { manifest, shots }
+  const boardLabels = boardShotLabels(numbering.manifest, numbering.shots)
+  const boardSceneNo = (sceneId: string, fallback: number) => {
+    const index = numbering.manifest?.scenes.findIndex((scene) => scene.sceneId === sceneId) ?? -1
+    return index >= 0 ? index + 1 : fallback
+  }
   const roster = manifest?.characters ?? []
   if (roster.length > 0) {
     lines.push(
@@ -234,7 +241,7 @@ export function serializeWriterScriptContext(
       (scene.charactersPresent ?? []).map((id) => characterRef(manifest, id)).join(', ') || '없음'
     const heading = byRef.get(`${scene.sceneId}.heading`)
     lines.push(
-      `\n### ${lineLabel(heading)}${scene.sceneId} (씬${sceneIdx + 1}) — 장소:${scene.location || '?'} / ${scene.timeOfDay || '?'} / 분위기:${scene.mood || '?'} (등장: ${present})`,
+      `\n### ${lineLabel(heading)}${scene.sceneId} (씬${boardSceneNo(scene.sceneId, sceneIdx + 1)}) — 장소:${scene.location || '?'} / ${scene.timeOfDay || '?'} / 분위기:${scene.mood || '?'} (등장: ${present})`,
     )
     if (scene.narrativeSummary) lines.push(`  요약: ${scene.narrativeSummary}`)
 
