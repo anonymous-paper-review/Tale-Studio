@@ -118,3 +118,19 @@ describe('실행 결과는 고침 하나하나를 제 줄로', () => {
     expect(translate('en', 'Applied: {items}', { items: [translate('en', 'Deleted {count} shots', { count: 2 }), translate('en', 'Added 1 shot')].join(' · ') })).toBe('Applied: Deleted 2 shots · Added 1 shot')
   })
 })
+
+describe('저장이 실패한 고치기는 한 줄', () => {
+  // 왜: 2026-11-02 리뷰 4차 후속 — 보드 이름("Shot 4")으로 한 고치기의 저장이 실패하면 저장 줄(sh_02_04) 아래 "Shot 4" 실행 대기 줄이
+  //   하나 더 붙었다. 이미 저장 결과가 있는 차례의 고침은 다시 적지 않는다.
+  it('보드 이름으로 한 고치기의 저장이 실패하면 실행 결과에 그 고치기의 줄이 하나만 있다', async () => {
+    mocks.execute.mockImplementation(async (call: { name: string; input: { id: string } }) => (call.name === 'read_project'
+      ? { status: 'ok', records: [{ id: call.input.id, revision: 'r1', values: {} }] }
+      : { status: 'failed', message: 'save failed' }))
+    modelReplies('샷 4를 클로즈업으로 바꿨어요.', [{ type: 'updateShot', id: 'Shot 4', patch: { shotType: 'CU' } }])
+    await chat.getState().sendMessage('샷 4를 클로즈업으로 바꿔줘')
+    const message = lastModelMessage()
+    expect(message).toContain('save failed')
+    expect(message).not.toContain('- Shot 4:')
+    expect(message.split('\n').filter((line) => line.startsWith('- '))).toHaveLength(1)
+  })
+})

@@ -3492,9 +3492,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         }
         // 검증된 씬/샷 CRUD 액션 — writer-store 가 기존 CRUD 로 DB 반영.
         const applyList = rawUpdates.filter((u) => u.type !== 'clarify')
+        // 저장을 해 본 차례 — 그 저장 결과가 이미 실행 결과에 있으니 건너뜀으로 한 줄 더 적지 않는다(보드 이름 "Shot 4" ≠ 푼 id, 리뷰 4차 후속).
+        const savedPositions = new Set<number>()
         const result = await useWriterStore
           .getState()
-          .applyChatUpdates(applyList, executeApp ? { executeEdit: executeJsonEdit } : undefined)
+          .applyChatUpdates(applyList, executeApp ? { executeEdit: (resource, id, patch, index) => {
+            if (index !== undefined) savedPositions.add(index)
+            return executeJsonEdit(resource, id, patch)
+          } } : undefined)
         // 못 한 고침은 실행 결과에 남긴다 — 결과에 못 한 것이 있으면 "했어요" 답 대신 결과를 보인다(guardChatToolReply).
         //   씬 · 샷 칸 고치기만 남겨, 못 한 지우기 · 더하기는 채팅에 "지웠어요"로 남았다(2026-11-02 리뷰 4차 후속) — 다 같은 길로 남긴다.
         //   짝은 받은 목록의 차례(index)로 짓는다 — id 로 짝지으면 임시 id 없는 더하기 하나가 못 되어도 모든 더하기에 실패가 붙었다(L1).
@@ -3512,6 +3517,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             if (!update) continue
             if (update.type === 'updateScene' || update.type === 'updateShot') {
               const resource = update.type === 'updateScene' ? 'scenes' : 'shots'
+              if (savedPositions.has(index)) continue
               if (!toolOutcomes.some(o => o.result.source === 'json' && (o.call.input as Record<string, unknown>).id === update.id)) recordJsonResult(resource, update.id, update.patch, { status: 'blocked', message: skipped.reason })
               continue
             }

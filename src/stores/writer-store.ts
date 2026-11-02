@@ -202,7 +202,8 @@ interface WriterState {
   ) => Promise<string | null>
   deleteScene: (sceneId: string) => Promise<void>
   saveDialogueTranslation: (projectId: string, shot: Shot, lines: DialogueLine[]) => Promise<void>
-  applyChatUpdates: (updates: WriterChatUpdate[], options?: { executeEdit: (resource: 'scenes' | 'shots', id: string, patch: Record<string, unknown>) => Promise<ToolResult> }) => Promise<WriterApplyChatUpdatesResult>
+  /** executeEdit 의 index = 받은 목록에서 그 고침의 차례 — 채팅이 저장 결과가 이미 있는 차례를 다시 적지 않게(리뷰 4차 후속). */
+  applyChatUpdates: (updates: WriterChatUpdate[], options?: { executeEdit: (resource: 'scenes' | 'shots', id: string, patch: Record<string, unknown>, index?: number) => Promise<ToolResult> }) => Promise<WriterApplyChatUpdatesResult>
   clearError: () => void
   reset: () => void
 }
@@ -743,7 +744,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           markApplied()
         } else if (u.type === 'updateScene') {
           if (options) {
-            const result = await options.executeEdit('scenes', tempMap.get(u.id) ?? u.id, u.patch)
+            const result = await options.executeEdit('scenes', tempMap.get(u.id) ?? u.id, u.patch, index)
             if (result.status === 'ok') markApplied()
             else if (result.status !== 'approval_required') skipped.push({ type: u.type, id: u.id, index, reason: result.message ?? result.status })
             continue
@@ -764,7 +765,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
             if (shrinking) delete rest.dialogueLines
             const patches = [rest, ...(shrinking ? [{ dialogueLines: nextDialogueLines }] : [])].filter(patch => Object.keys(patch).length)
             for (const patch of patches) {
-              const result = await options.executeEdit('shots', shotId, patch)
+              const result = await options.executeEdit('shots', shotId, patch, index)
               if (result.status === 'ok') markApplied()
               else if (result.status !== 'approval_required') skipped.push({ type: u.type, id: shotId, index, reason: result.message ?? result.status })
             }
