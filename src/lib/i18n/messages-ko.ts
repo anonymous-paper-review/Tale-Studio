@@ -472,8 +472,14 @@ export const KO: Record<string, string> = {
   // ── writer 스테이지: dialogue-view ──
   'Dialogue generation failed ({status})': '대사 생성 실패 ({status})',
   'Dialogue generation failed.': '대사 생성에 실패했습니다.',
-  'Dialogue viewer: select a character to highlight only their lines. Click a shot to edit its dialogue': '대사 뷰어: 인물을 선택하면 그 인물의 대사만 강조돼요. 샷을 누르면 대사를 고칠 수 있어요',
-  'Click to edit the dialogue of this shot': '눌러서 이 샷의 대사 고치기',
+  'Dialogue viewer: select a character to highlight only their lines. Click a line to edit it right here': '대사 뷰어: 인물을 선택하면 그 인물의 대사만 강조돼요. 대사를 누르면 그 자리에서 고칠 수 있어요',
+  // 대사 줄 바로 고치기(2026-11-02 오너 "탭 안에서 바로 고치기")
+  'Edit line {line} of shot {shot} ({speaker})': '샷 {shot}의 대사 {line} ({speaker}) 고치기',
+  'Open the editor for shot {shot}': '샷 {shot} 고치기 창 열기',
+  'Could not save the line. Save it again or undo the change.': '대사를 저장하지 못했어요. 다시 저장하거나 되돌려 주세요.',
+  'Save again': '다시 저장',
+  'Empty lines are not saved. To delete a line, open the shot editor with the pencil button.': '빈 대사는 저장하지 않아요. 줄을 지우려면 연필 단추로 샷 고치기 창을 여세요.',
+  'This line changed while you were editing. Click it to edit again.': '고치는 동안 이 대사가 바뀌었어요. 다시 눌러 고쳐 주세요.',
   'No dialogue yet': '아직 대사가 없어요',
   'This rewrites the existing {count} dialogue lines. Press again to run': '기존 대사 {count}개를 새로 씁니다. 한 번 더 누르면 실행돼요',
   'Writing dialogue… (1-2 min)': '대사 쓰는 중… (1~2분)',

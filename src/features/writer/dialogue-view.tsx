@@ -5,17 +5,27 @@
 //   강조(나머지 흐림)한다. 데이터는 트리트먼트와 동일한 진실(shots.dialogueLines) —
 //   이 뷰는 렌더 + 재생성 트리거만 담당한다.
 //   "대사 생성/재생성" → POST /api/writer/dialogue (완료된 run state 기반 V4 재생성) → loadProject 리프레시.
-//   샷을 누르면 그 샷 고치기 팝업(대사 칸)을 연다(2026-10-31 QA "Dialogue 수정 기능이 죽어 있다") — 고치는 곳은 팝업 하나다.
+//   대사 줄을 누르면 그 자리에서 글을 고친다(2026-11-02 오너 "탭 안에서 바로 고치기") — Enter · 바깥 누르기 = 저장, Esc = 취소.
+//   저장은 샷 고치기 팝업과 같은 길(dialogue-line-save)이고 러프는 다시 그리지 않는다. 화자 · 줄 더하기 · 빼기는
+//   샷마다 붙은 연필 단추가 여는 샷 고치기 팝업에서 한다(팝업은 러프 보드가 그린다 — 연 샷 id 만 board-ui-store 로 넘긴다).
+//   샷 번호는 보드 카드와 같은 전체 번호(boardShots)다.
 
-import { useMemo, useState } from 'react'
-import { Loader2, MessageSquareText, RefreshCw } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Loader2, MessageSquareText, Pencil, RefreshCw } from 'lucide-react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { WriterHeader } from '@/features/writer/writer-header'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
+import { DialogueLineRow, type DialogueLineState } from '@/features/writer/dialogue-line-row'
+import { saveShotDialogue, shotDialogueLines } from '@/features/writer/dialogue-line-save'
 import { useGuardedAction } from '@/hooks/use-guarded-action'
 import { cn } from '@/lib/utils'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterStore } from '@/stores/writer-store'
+import { boardShots } from '@/lib/writer/board-summary'
+import { commitLineEdit, revertLineEdit } from '@/lib/writer/dialogue-line-edit'
 import { manifestEntities, resolveEntityNames } from '@/lib/writer/resolve-entity-names'
 import type { DialogueLine, Shot } from '@/types'
 import { useT } from '@/lib/i18n'
@@ -37,6 +47,24 @@ interface SpeakerInfo {
 
 function dialogueLinesOf(shot: Shot): DialogueLine[] {
   return Array.isArray(shot.dialogueLines) ? shot.dialogueLines : []
+}
+
+type LineKey = string
+const lineKey = (shotId: string, index: number): LineKey => `${shotId}#${index}`
+
+interface LineDraft {
+  shotId: string
+  index: number
+  /** 고치기 시작할 때의 그 줄 — 그새 바뀌었는지 볼 때와 [되돌리기]에 쓴다. */
+  original: DialogueLine
+  /** 고치기 시작할 때 보이던 글(이름으로 바꾼 글). */
+  shown: string
+  draft: string
+}
+interface LineSave extends LineDraft {
+  status: 'saving' | 'failed'
+  /** 저장하려던 글(한 줄로 다듬은 글). */
+  saved: string
 }
 
 export function DialogueView() {
@@ -130,8 +158,106 @@ export function DialogueView() {
     action: runGenerate,
   })
 
-  // 샷 고치기 팝업은 러프 보드가 그린다 — 연 샷 id 만 넘긴다(대사 탭은 그대로 보인다).
-  const openShotEdit = (shotId: string) => useBoardUiStore.getState().setShotEditId(shotId)
+  // 보드 카드와 같은 전체 샷 번호(#shot-global-no) — 씬마다 1부터 다시 세지 않는다.
+  const shotNoById = useMemo(
+    () => new Map(boardShots(sceneManifest, shots).map((entry) => [entry.shot.shotId, entry.shotNo])),
+    [sceneManifest, shots],
+  )
+
+  // ── 대사 줄 바로 고치기 ── 고치는 줄은 하나, 저장 중 · 실패한 줄은 따로 센다(저장을 기다리지 않고 다음 줄을 고친다).
+  //   고치는 줄은 ref 에도 둔다 — Enter 로 끝낸 뒤 칸이 사라지며 오는 blur 가 같은 고침을 두 번 저장하지 않게.
+  const [editing, setEditing] = useState<(LineDraft & { key: LineKey }) | null>(null)
+  const editingRef = useRef<(LineDraft & { key: LineKey }) | null>(null)
+  const [saves, setSaves] = useState<Record<LineKey, LineSave>>({})
+  const rowRefs = useRef(new Map<LineKey, HTMLDivElement>())
+  const [focusKey, setFocusKey] = useState<LineKey | null>(null)
+  useEffect(() => {
+    if (!focusKey) return
+    rowRefs.current.get(focusKey)?.focus()
+    setFocusKey(null)
+  }, [focusKey])
+  const setEditingLine = (next: (LineDraft & { key: LineKey }) | null) => {
+    editingRef.current = next
+    setEditing(next)
+  }
+  const dropSave = (key: LineKey) =>
+    setSaves((prev) => {
+      if (!(key in prev)) return prev
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+  const runSave = (key: LineKey, entry: LineSave, lines: DialogueLine[]) => {
+    setSaves((prev) => ({ ...prev, [key]: { ...entry, status: 'saving' } }))
+    saveShotDialogue(entry.shotId, lines).then(
+      () => dropSave(key),
+      () => setSaves((prev) => (prev[key] ? { ...prev, [key]: { ...prev[key], status: 'failed' } } : prev)),
+    )
+  }
+
+  const startEdit = (shotId: string, index: number, line: DialogueLine, shown: string) => {
+    if (generate.locked) return
+    const key = lineKey(shotId, index)
+    // 저장 중 · 실패한 줄은 먼저 끝낸다([다시 저장] · [되돌리기]).
+    if (saves[key]) return
+    setEditingLine({ key, shotId, index, original: line, shown, draft: shown })
+  }
+  const commitEdit = (via: 'key' | 'blur') => {
+    const current = editingRef.current
+    if (!current) return
+    setEditingLine(null)
+    if (via === 'key') setFocusKey(current.key)
+    const result = commitLineEdit({
+      lines: shotDialogueLines(current.shotId) ?? [],
+      index: current.index,
+      original: current.original,
+      shown: current.shown,
+      draft: current.draft,
+    })
+    if (result.kind === 'unchanged') return
+    if (result.kind === 'empty') {
+      toast.info(t('Empty lines are not saved. To delete a line, open the shot editor with the pencil button.'))
+      return
+    }
+    if (result.kind === 'conflict') {
+      toast.info(t('This line changed while you were editing. Click it to edit again.'))
+      return
+    }
+    runSave(current.key, { ...current, status: 'saving', saved: result.lines[current.index].text }, result.lines)
+  }
+  const cancelEdit = () => {
+    const current = editingRef.current
+    if (!current) return
+    setEditingLine(null)
+    setFocusKey(current.key)
+  }
+  // [다시 저장] — 화면에 남은 고친 글로 그 샷의 대사를 다시 저장한다(팝업의 다시 저장과 같은 길). 그새 그 줄이 바뀌었으면 덮어쓰지 않는다.
+  const retrySave = (key: LineKey) => {
+    const entry = saves[key]
+    const lines = entry ? shotDialogueLines(entry.shotId) : null
+    if (!entry || entry.status !== 'failed' || !lines) return
+    if (lines[entry.index]?.text !== entry.saved) {
+      dropSave(key)
+      toast.info(t('This line changed while you were editing. Click it to edit again.'))
+      return
+    }
+    runSave(key, entry, lines)
+  }
+  // [되돌리기] — 저장하지 못한 고침을 버리고 고치기 전 글로 돌린다(화면 값도 같은 길로 다시 저장).
+  const revertSave = (key: LineKey) => {
+    const entry = saves[key]
+    if (!entry) return
+    dropSave(key)
+    setFocusKey(key)
+    const reverted = revertLineEdit({ lines: shotDialogueLines(entry.shotId) ?? [], index: entry.index, original: entry.original, saved: entry.saved })
+    if (reverted) void saveShotDialogue(entry.shotId, reverted).catch(() => {})
+  }
+  const lineState = (key: LineKey): DialogueLineState => {
+    if (editing?.key === key) return { kind: 'editing', draft: editing.draft }
+    const entry = saves[key]
+    if (entry) return { kind: entry.status, draft: entry.saved }
+    return { kind: 'idle' }
+  }
 
   const onGenerateClick = () => {
     // 이미 대사가 있으면 덮어쓰기 — 2단 확인 (차 있는 것 교체는 사람의 명시 행동, architecture §5).
@@ -145,7 +271,7 @@ export function DialogueView() {
   return (
     <div className="flex h-full flex-col">
       <WriterHeader
-        description={t('Dialogue viewer: select a character to highlight only their lines. Click a shot to edit its dialogue')}
+        description={t('Dialogue viewer: select a character to highlight only their lines. Click a line to edit it right here')}
       />
 
       {/* 인물 칩 + 생성 버튼 */}
@@ -213,6 +339,7 @@ export function DialogueView() {
       {/* 대본 본문 — 왼쪽 정렬(#c5 2026-08-03): 트리트먼트와 같은 축이라 탭을 오가도 시선이
           안 흔들린다. max-w 는 가독 폭 유지용으로만 남긴다(중앙 배치 제거). */}
       <ScrollArea className="min-h-0 flex-1">
+        <TooltipProvider>
         <div className="w-full max-w-3xl px-6 py-6">
           {scenes.length === 0 ? (
             <p className="py-16 text-center text-sm text-muted-foreground">
@@ -233,30 +360,35 @@ export function DialogueView() {
                   <div className="flex flex-col gap-2.5">
                     {sceneShots.map((shot, shotIdx) => {
                       const lines = dialogueLinesOf(shot)
+                      const shotNo = shotNoById.get(shot.shotId) ?? shotIdx + 1
+                      const editShotLabel = t('Open the editor for shot {shot}', { shot: shotNo })
                       return (
-                        <div
-                          key={shot.shotId}
-                          role="button"
-                          tabIndex={0}
-                          data-shot-id={shot.shotId}
-                          title={t('Click to edit the dialogue of this shot')}
-                          onClick={() => openShotEdit(shot.shotId)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault()
-                              openShotEdit(shot.shotId)
-                            }
-                          }}
-                          className="group -mx-2 cursor-pointer rounded-md px-2 py-1 transition-colors hover:bg-accent/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring/50"
-                        >
+                        <div key={shot.shotId} data-shot-id={shot.shotId} className="group -mx-2 rounded-md px-2 py-1">
                           {/* 글자 크기는 트리트먼트와 통일(#c5), 본문은 흰색(#c2 2026-08-03) —
-                              muted 회색은 대본이 부차 정보처럼 읽혔다. 라벨(Shot N)만 muted 유지. */}
-                          <p className="text-sm leading-7 text-foreground">
-                            <span className="mr-1.5 font-mono text-xs font-semibold text-muted-foreground/60">
-                              Shot {shotIdx + 1}
-                            </span>
-                            {resolveEntityNames(shot.actionDescription, entityNames)}
-                          </p>
+                              muted 회색은 대본이 부차 정보처럼 읽혔다. 라벨(Shot N)만 muted 유지.
+                              스토리는 러프에 그려지므로 여기서 고치지 않는다 — 연필 단추가 샷 고치기 창을 연다(프로토타입 대본 보기의 ✎). */}
+                          <div className="flex items-start gap-2">
+                            <p className="min-w-0 flex-1 text-sm leading-7 text-foreground">
+                              <span className="mr-1.5 font-mono text-xs font-semibold text-muted-foreground/60">
+                                Shot {shotNo}
+                              </span>
+                              {resolveEntityNames(shot.actionDescription, entityNames)}
+                            </p>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon-xs"
+                                  variant="ghost"
+                                  aria-label={editShotLabel}
+                                  className="mt-0.5 text-muted-foreground"
+                                  onClick={() => useBoardUiStore.getState().setShotEditId(shot.shotId)}
+                                >
+                                  <Pencil />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>{editShotLabel}</TooltipContent>
+                            </Tooltip>
+                          </div>
                           {lines.length > 0 && (
                             <div className="mt-1 flex flex-col gap-1 pl-4">
                               {lines.map((line, i) => {
@@ -268,10 +400,16 @@ export function DialogueView() {
                                   : undefined
                                 const dimmed = !!selectedSpeaker && line.characterId !== selectedSpeaker
                                 const focused = !!selectedSpeaker && line.characterId === selectedSpeaker
+                                const key = lineKey(shot.shotId, i)
+                                const shown = resolveEntityNames(line.text, entityNames)
                                 return (
-                                  <div
+                                  <DialogueLineRow
                                     key={i}
-                                    className={cn(
+                                    rowRef={(element) => {
+                                      if (element) rowRefs.current.set(key, element)
+                                      else rowRefs.current.delete(key)
+                                    }}
+                                    rowClassName={cn(
                                       // 라인 바/배경 색은 선택된 인물의 대사에만 — 본문은 한 색으로.
                                       //   (#p1-quickwin W6: 화자 "이름"만은 상시 화자 색 — 스캔 가능성.)
                                       'rounded-sm border-l-2 py-1 pl-3 pr-2 transition-opacity hover:bg-accent/30',
@@ -279,29 +417,28 @@ export function DialogueView() {
                                       focused && (color?.on ?? 'bg-accent'),
                                       dimmed && 'opacity-30',
                                     )}
-                                  >
-                                    <span
-                                      className={cn(
-                                        'mr-2 font-mono text-[11px] font-semibold uppercase tracking-wide',
-                                        line.characterId
-                                          ? (color?.chip ?? 'text-foreground')
-                                          : 'italic text-muted-foreground', // V.O./내레이션 구분
-                                      )}
-                                    >
-                                      {speakerName}
-                                    </span>
-                                    <span
-                                      className={cn(
-                                        'text-[15px] leading-7 text-foreground',
-                                        focused && 'font-medium',
-                                      )}
-                                    >
-                                      &ldquo;{resolveEntityNames(line.text, entityNames)}&rdquo;
-                                    </span>
-                                    {line.delivery && (
-                                      <span className="ml-2 text-[11px] text-foreground/70">({resolveEntityNames(line.delivery, entityNames)})</span>
-                                    )}
-                                  </div>
+                                    speaker={speakerName}
+                                    speakerClassName={
+                                      line.characterId
+                                        ? (color?.chip ?? 'text-foreground')
+                                        : 'italic text-muted-foreground' // V.O./내레이션 구분
+                                    }
+                                    text={shown}
+                                    delivery={line.delivery ? resolveEntityNames(line.delivery, entityNames) : undefined}
+                                    label={t('Edit line {line} of shot {shot} ({speaker})', { line: i + 1, shot: shotNo, speaker: speakerName })}
+                                    state={lineState(key)}
+                                    disabled={generate.locked}
+                                    focused={focused}
+                                    onStart={() => startEdit(shot.shotId, i, line, shown)}
+                                    onDraftChange={(draft) => {
+                                      const current = editingRef.current
+                                      if (current?.key === key) setEditingLine({ ...current, draft })
+                                    }}
+                                    onCommit={(via) => commitEdit(via)}
+                                    onCancel={cancelEdit}
+                                    onRetry={() => retrySave(key)}
+                                    onRevert={() => revertSave(key)}
+                                  />
                                 )
                               })}
                             </div>
@@ -337,6 +474,7 @@ export function DialogueView() {
             </div>
           )}
         </div>
+        </TooltipProvider>
       </ScrollArea>
     </div>
   )
