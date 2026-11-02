@@ -29,6 +29,7 @@ import {
   addedDrawJobs,
   addedDrawOutcome,
   boardDrawingCount,
+  boardMissingRoughIds,
   createAddedShotDraws,
   withoutAddedShots,
   type AddedDrawOutcome,
@@ -356,9 +357,33 @@ describe('더한 샷 그리기와 보드 · 채팅 잠금', () => {
   // 왜: 리드 지시(들어올 때 빠진 러프 자동 그리기는 그대로) — 더한 샷은 화면에 넣는 그 순간 더한 샷 그리기가 맡아 빠진 러프로 세지 않는다.
   //   예전에는 들어올 때 빠진 러프가 없으면 처음 더한 샷이 진입 자동 그리기를 깨워 화면 · 채팅이 1분쯤 잠겼다.
   it('들어올 때 빠진 러프를 자동으로 그리는 것은 그대로 두고, 더한 샷은 빠진 러프로 세지 않는다', () => {
-    expect(board).toMatch(/const localJobs = \{ \.\.\.addedDrawJobs\(/)
-    expect(board).toMatch(/queuedRoughIds\.has\(shotId\) \? \{ status: 'generating' \} : localJobs\[shotId\]/)
+    const story = (shotId: string, actionDescription: string, drawn = false) => ({ shotId, actionDescription, drawn })
+    const board3 = [story('drawn', '문을 연다', true), story('plain', '밖을 본다'), story('added', '걸어간다'), story('blank', '  ')]
+    const views = new Map([['added', { phase: 'pending' as const }]])
+    expect(boardMissingRoughIds(board3, { hasPanel: (s) => s.drawn, hasJob: () => false }, views)).toEqual(['plain'])
+    expect(board).toMatch(/const missingIds = boardMissingRoughIds\(shots, \{ hasPanel: \(s\) => !!panelOf\(s\), hasJob: \(shotId\) => !!jobOf\(shotId\) \}, addedViews\)/)
     expect(board).toContain('void generateAllMissing(true)')
+  })
+
+  // 왜: 2026-11-02 리뷰 R2 — 스토리 없이 더한 샷에 스토리를 쓰면 그 샷이 "빠진 러프"로 세어져 진입 자동 그리기가 깨고, 보드 · 채팅이
+  //   그리기 내내 잠겼다. 더한 샷 그리기가 맡고 있는 동안(멈춤 · 끝남 전)은 빠진 러프가 아니다 — 더한 샷 그리기가 잠금 없이 그린다.
+  it('스토리 없이 더한 샷에 스토리가 생겨도 진입 자동 그리기(보드 · 채팅 잠금)로 그리지 않는다', () => {
+    const shots2 = [
+      { shotId: 'story-later', actionDescription: '민호가 돌아선다.' },
+      { shotId: 'waiting', actionDescription: '캔이 떨어진다.' },
+      { shotId: 'gave-up', actionDescription: '수진이 웃는다.' },
+      { shotId: 'stopped', actionDescription: '불이 꺼진다.' },
+    ]
+    const views = new Map([
+      ['story-later', { phase: 'no_story' as const }],
+      ['waiting', { phase: 'waiting' as const }],
+      ['gave-up', { phase: 'done' as const }],
+      ['stopped', { phase: 'stopped' as const }],
+    ])
+    const missing = boardMissingRoughIds(shots2, { hasPanel: () => false, hasJob: () => false }, views)
+    expect(missing).toEqual(['gave-up', 'stopped'])
+    const facts2 = facts({ autoDrawPending: missing.includes('story-later') })
+    expect(storyboardBusyView({ status: null, facts: facts2, lock: advanceBoardLock(INITIAL_BOARD_LOCK, facts2), rough: summarizeRoughProgress([], {}, {}, new Set()), sceneCount: 1 }, 'ko').open).toBe(false)
   })
 
   // 왜: 기다리는 카드가 그리는 중처럼 돌면 사람은 왜 안 끝나는지 모른다 — 자리를 기다린다고 알린다.

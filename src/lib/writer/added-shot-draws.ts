@@ -123,6 +123,25 @@ export function addedDrawJobs<S extends { shotId: string }>(
   return out
 }
 
+// 더한 샷 그리기가 맡고 있는 동안의 단계 — 멈춤 · 끝남이 아니면 보드의 다른 그리기(진입 자동 그리기 · 누락 패널)가 건드리지 않는다.
+const ADDED_DRAW_BUSY: ReadonlySet<AddedDrawPhase> = new Set(['adding', 'pending', 'requesting', 'waiting', 'drawing', 'no_story'])
+
+/** 진입 자동 그리기 · [누락 패널 생성]이 세는 빠진 러프 — 그림도 그리기도 없고 스토리가 있는 샷. 더한 샷 그리기가 맡고 있는 샷은 세지 않는다:
+ *  세면 진입 자동 그리기가 깨어 보드 · 채팅을 잠근다(스토리 없이 더한 샷에 스토리를 쓴 때, 2026-11-02 리뷰 R2). */
+export function boardMissingRoughIds<S extends { shotId: string; actionDescription?: string | null }>(
+  shots: readonly S[],
+  probe: { hasPanel: (shot: S) => boolean; hasJob: (shotId: string) => boolean },
+  views: ReadonlyMap<string, AddedDrawView>,
+): string[] {
+  return shots
+    .filter((shot) => {
+      const phase = views.get(shot.shotId)?.phase
+      if (phase && ADDED_DRAW_BUSY.has(phase)) return false
+      return !probe.hasPanel(shot) && !probe.hasJob(shot.shotId) && !!shot.actionDescription?.trim()
+    })
+    .map((shot) => shot.shotId)
+}
+
 /** 보드 잠금이 세는 샷 — 이 화면에서 더한 샷은 뺀다(더한 샷은 카드에서만 그리는 중으로 보인다, 다시 그려도). */
 export function withoutAddedShots<S extends { shotId: string }>(shots: readonly S[], views: ReadonlyMap<string, AddedDrawView>): S[] {
   return views.size === 0 ? [...shots] : shots.filter((shot) => !views.has(shot.shotId))

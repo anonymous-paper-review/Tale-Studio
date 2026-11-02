@@ -56,6 +56,7 @@ import {
   addedDrawJobs,
   addedDrawOutcome,
   boardDrawingCount,
+  boardMissingRoughIds,
   withoutAddedShots,
   type DrawAddedShot,
   type RoughDrawRound,
@@ -748,9 +749,8 @@ export function RoughStoryboardView() {
   const jobOf = (shotId: string): PanelJob | undefined =>
     queuedRoughIds.has(shotId) ? { status: 'generating' } : localJobs[shotId]
   // #5: 정보(액션)가 없는 샷은 자동 생성 대상에서 제외 — 근거 없는 빈 패널 생성 방지.
-  const missingIds = shots
-    .filter((s) => !panelOf(s) && !jobOf(s.shotId) && shotHasInfo(s.actionDescription))
-    .map((s) => s.shotId)
+  //   더한 샷 그리기가 맡고 있는 샷도 빠진 러프로 세지 않는다(리뷰 R2 — 세면 진입 자동 그리기가 보드 · 채팅을 잠근다).
+  const missingIds = boardMissingRoughIds(shots, { hasPanel: (s) => !!panelOf(s), hasJob: (shotId) => !!jobOf(shotId) }, addedViews)
   const roughProgress = summarizeRoughProgress(shots, overrides, localJobs, queuedRoughIds)
   const generatingCount = roughProgress.generating
   // 잠금이 세는 그리기 — 이 화면에서 더한 샷은 뺀다(오너 "잠금 없이 카드에서 '그리는 중'으로").
