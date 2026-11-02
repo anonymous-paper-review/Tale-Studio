@@ -2573,6 +2573,7 @@ export const KO: Record<string, string> = {
   'Dialogue you write stays as written': '직접 쓴 대사는 그대로 보존돼요',
   'Narration': '내레이션',
   'Applying saves the changes and redraws the rough of this shot (start · directing · end).': '적용하면 고친 내용을 저장하고, 이 샷의 러프(시작 · 연출 · 끝)를 새로 그려요.',
+  'Dialogue does not show in the rough, so applying only saves it. The rough stays as it is.': '대사는 러프 그림에 그려지지 않아서 적용하면 저장만 해요. 러프는 그대로예요.',
   'This shot has no rough yet. It is drawn with your changes.': '아직 러프가 없는 샷이에요. 고친 내용으로 그려요.',
   'Shorter': '짧게',
   'Longer': '길게',

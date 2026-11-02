@@ -1,6 +1,8 @@
 // Storyboard 샷 고치기 팝업(프로토타입 S2, 2026-10-20)의 순수 규칙 — 씬 안 번호 · 카메라 앵글 · 다시 그리는 순서.
 //   약속: tests/writer/shot-edit-popup.test.ts
 import type { CameraConfig, DialogueLine, Shot, ShotType } from '@/types'
+import { toolValueKey } from '@/lib/chat-tools/executor'
+import { ROUGH_VISIBLE_SHOT_FIELDS } from '@/lib/writer/chat-rough-redraw'
 
 /** 시작 묶음(스토리 · 대사 · 샷 타입)의 값 — 팝업이 고치는 중인 값과 저장된 샷이 같은 모양이다. */
 export interface StartFields {
@@ -10,24 +12,26 @@ export interface StartFields {
   durationSeconds?: number
 }
 
-/** 칸 순서와 상관없는 비교용 글 — 저장소(jsonb)는 다시 읽은 대사의 칸 순서를 바꿔 돌려준다. */
-function orderFreeJson(value: unknown): string {
-  return JSON.stringify(value, (_key, v: unknown) =>
-    v && typeof v === 'object' && !Array.isArray(v)
-      ? Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b)))
-      : v,
-  )
-}
-
 /** 시작 묶음에서 바뀐 것만 — 저장할 샷 고침. 스토리는 앞뒤 빈칸을 덜어 비교하고, 대사는 칸 순서와 상관없이 비교한다
  *  (저장 뒤 다시 읽은 대사를 "바뀜"으로 보면 그리기만 남은 [다시 그리기] 대신 [적용]이 남는다 — 2026-10-31 QA).
+ *  칸 순서를 무시하는 비교는 채팅 도구와 같은 toolValueKey 하나다(저장소 jsonb 가 칸 순서를 바꿔 돌려준다 — 리뷰 L8).
  *  약속: tests/writer/shot-edit-retry-label.test.ts */
 export function startChanges(shot: StartFields, draft: StartFields): Partial<Shot> {
   const changes: Partial<Shot> = {}
   if (draft.actionDescription.trim() !== shot.actionDescription) changes.actionDescription = draft.actionDescription.trim()
-  if (orderFreeJson(draft.dialogueLines) !== orderFreeJson(shot.dialogueLines)) changes.dialogueLines = draft.dialogueLines.filter((line) => line.text.trim())
+  if (toolValueKey(draft.dialogueLines) !== toolValueKey(shot.dialogueLines)) changes.dialogueLines = draft.dialogueLines.filter((line) => line.text.trim())
   if (draft.shotType !== shot.shotType) changes.shotType = draft.shotType
   return changes
+}
+
+export type ApplyKind = 'save' | 'redraw'
+
+/** [적용]이 할 일 — 러프가 있는 샷에서 그림에 보이는 칸(스토리 · 샷 타입 · 등장인물)을 고쳤으면 저장하고 다시 그린다.
+ *  대사만 고쳤거나 러프가 아직 없으면 저장만 한다(러프는 대사를 그리지 않는다 — 리드 결정 D2, 2026-11-02).
+ *  그림에 보이는 칸은 채팅 고치기 뒤 [러프 다시 그리기]와 같은 목록(ROUGH_VISIBLE_SHOT_FIELDS)이다.
+ *  약속: tests/writer/popup-dialogue-only-save.test.ts */
+export function startApplyKind(changes: Partial<Shot>, hasRough: boolean): ApplyKind {
+  return hasRough && ROUGH_VISIBLE_SHOT_FIELDS.some((field) => field in changes) ? 'redraw' : 'save'
 }
 
 /** 씬 안 순서로 부르는 샷 번호(프로토타입 "S1-3") — 씬 순서는 장면 목록, 샷 순서는 보드(샷 목록) 순서. 없으면 null. */

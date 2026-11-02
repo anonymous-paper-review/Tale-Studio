@@ -21,7 +21,7 @@ import { AiBusyOverlay, type AiBusyStep } from '@/components/ai-busy-overlay'
 import { DirectingArrowEditor } from '@/features/writer/directing-arrow-editor'
 import { RoughFramesStill } from '@/features/writer/rough-frames-still'
 import { SHOT_TYPES, SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
-import { CAMERA_ANGLES, angleOfCamera, applyStartEdit, nextApplyStep, readRedrawReply, redrawDirectionOnly, sceneShotLabel, startChanges, type RoughFrame } from '@/lib/writer/shot-edit'
+import { CAMERA_ANGLES, angleOfCamera, applyStartEdit, nextApplyStep, readRedrawReply, redrawDirectionOnly, sceneShotLabel, startApplyKind, startChanges, type ApplyKind, type RoughFrame } from '@/lib/writer/shot-edit'
 import { notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { invalidateShots } from '@/lib/shots-cache'
@@ -61,6 +61,8 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
   const [busy, setBusy] = useState<{ title: string; steps: AiBusyStep[] } | null>(null)
   // [적용] 뒤 남은 일(nextApplyStep) — 'redraw' = 저장은 됐고 그리기만 다시, 'resave' = 저장부터 다시.
   const [retryStep, setRetryStep] = useState<'redraw' | 'resave' | null>(null)
+  // 저장이 실패한 [적용]이 하려던 일 — 다시 저장할 때 화면에는 이미 고친 값이 있어 무엇을 고쳤는지 다시 셀 수 없다.
+  const [resaveKind, setResaveKind] = useState<ApplyKind>('redraw')
 
   if (!shotId && draft.shotId) {
     setDraft({ shotId: null, value: null })
@@ -84,6 +86,10 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
   const frames = completed ? panel!.frames! : null
   const changes = startChanges(shot, value)
   const startDirty = Object.keys(changes).length > 0
+  // [적용]이 할 일 — 그림에 보이는 칸을 고쳤거나 앞선 [적용]의 그리기가 남았으면 저장하고 다시 그린다. 대사만이면 저장만(리드 결정 D2).
+  const applyKind: ApplyKind = completed && (retryStep === 'redraw' || (retryStep === 'resave' && resaveKind === 'redraw')) ? 'redraw' : startApplyKind(changes, completed)
+  // 러프가 있는데 저장만 하는 [적용](대사만 고침) — 단추와 안내가 그렇다고 말한다.
+  const saveOnly = completed && applyKind === 'save' && (startDirty || retryStep === 'resave')
   const durationDirty = value.durationSeconds !== shot.durationSeconds
   const angleLabel = t(CAMERA_ANGLES.find((item) => item.value === angleOfCamera(shot.camera))?.label ?? 'Eye level')
 
@@ -158,8 +164,9 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
   const applyStart = async () => {
     // 저장이 실패했던 고침은 화면에 이미 고친 값이 있어 바뀐 것이 없어 보여도 다시 저장한다(저장은 그 샷의 지금 값을 통째로 쓴다).
     if (startDirty || retryStep === 'resave') updateShot(shot.shotId, changes)
-    if (!completed) {
-      // 아직 러프가 없는 샷 — 저장만 한다(보드가 빠진 러프를 그릴 때 고친 내용으로 그린다).
+    setResaveKind(applyKind)
+    if (applyKind === 'save') {
+      // 아직 러프가 없는 샷(보드가 빠진 러프를 그릴 때 고친 내용으로 그린다)이나 대사만 고친 샷(러프는 대사를 그리지 않는다) — 저장만 한다.
       try {
         await flushShotSave(shot.shotId)
         setRetryStep(null)
@@ -337,7 +344,7 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
                       </SelectContent>
                     </Select>
                   </Field>
-                  <p className="text-xs text-muted-foreground">{completed ? t('Applying saves the changes and redraws the rough of this shot (start · directing · end).') : t('This shot has no rough yet. It is drawn with your changes.')}</p>
+                  <p className="text-xs text-muted-foreground">{!completed ? t('This shot has no rough yet. It is drawn with your changes.') : saveOnly ? t('Dialogue does not show in the rough, so applying only saves it. The rough stays as it is.') : t('Applying saves the changes and redraws the rough of this shot (start · directing · end).')}</p>
                 </>
               ) : (
                 <>
@@ -363,7 +370,7 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
             <Button variant="outline" onClick={close} disabled={!!busy}>{t('Cancel')}</Button>
             {tab === 'start' ? (
               <Button onClick={() => void applyStart()} disabled={!!busy || (!startDirty && !retryStep)} data-testid="shot-edit-apply-start">
-                {retryStep === 'redraw' && !startDirty ? t('Redraw') : completed ? t('Apply · redraw the rough') : t('Apply')}<ArrowRight className="size-4" />
+                {retryStep === 'redraw' && !startDirty ? t('Redraw') : completed && !saveOnly ? t('Apply · redraw the rough') : t('Apply')}<ArrowRight className="size-4" />
               </Button>
             ) : (
               <Button onClick={() => void saveDuration()} disabled={!!busy || !durationDirty} data-testid="shot-edit-apply-direction">

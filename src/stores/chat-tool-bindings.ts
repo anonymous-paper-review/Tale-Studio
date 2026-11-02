@@ -26,15 +26,16 @@ function objectPatch(value: unknown, keys: string[]): Record<string, unknown> {
   if (JSON.stringify(patch).length > 60_000) throw new Error('The edit is too large; split it into smaller targets.')
   return patch
 }
-// 읽은 대사의 빈 감정 · 말투 칸('')과 0 이하 길이 힌트는 "칸 없음"과 같다 — 검사(validateWriterUpdates)가 덜어 내는 그대로 맞춰 비교한다.
-//   파이프라인 대사는 빈 감정 칸을 갖고 있어, 읽은 그대로 보존해 보낸 고침이 거절되던 것(2026-10-31 QA).
+// 읽은 대사의 빈 감정 · 말투 칸('')과 길이 힌트 0은 "칸 없음"과 같다 — 검사(validateWriterUpdates)가 덜어 내는 그대로 맞춰 비교한다.
+//   파이프라인 대사는 빈 감정 칸을 갖고 있어, 읽은 그대로 보존해 보낸 고침이 거절되던 것(2026-10-31 QA). 빈 칸은 이 둘뿐이다 —
+//   감정 null · 길이 힌트 "2s" · 음수는 그대로 두어 거절한다(2026-11-01 리뷰 L6). 0 은 파이프라인(v2 persist)과 팝업의 새 대사 줄이 쓰는 값이다.
 function withoutBlankDialogueFields(patch: Record<string, unknown>): Record<string, unknown> {
   if (!Array.isArray(patch.dialogueLines)) return patch
   return { ...patch, dialogueLines: patch.dialogueLines.map((line: unknown) => {
     if (!line || typeof line !== 'object' || Array.isArray(line)) return line
     const out = { ...(line as Record<string, unknown>) }
-    for (const key of ['emotion', 'delivery']) if (out[key] === '' || out[key] == null) delete out[key]
-    if (!(typeof out.durationHint === 'number' && out.durationHint > 0)) delete out.durationHint
+    for (const key of ['emotion', 'delivery']) if (out[key] === '') delete out[key]
+    if (out.durationHint === 0) delete out.durationHint
     return out
   }) }
 }
@@ -142,7 +143,8 @@ export function createStudioToolResources(options: {
       const patch = objectPatch(value, Object.keys(fields))
       const update = validateWriterUpdates([{ type: resource === 'scenes' ? 'updateScene' : 'updateShot', id: 'target', patch }], characterIds)[0]
       if (!update || typeof update !== 'object' || !('patch' in update) || !sameToolValue(update.patch, withoutBlankDialogueFields(patch))) throw new Error('Invalid fields or character IDs. Preserve complete dialogue metadata and use the registered character IDs (null for narration).')
-      return patch
+      // 저장은 검사가 다듬은 값으로 한다(빈 칸을 덜어 낸 값 — 리뷰 L6).
+      return update.patch as Record<string, unknown>
     },
     write: async (id, patch, before) => {
       check()
