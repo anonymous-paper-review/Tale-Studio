@@ -11,6 +11,8 @@ export interface DialogueLine {
   emotion: string
   delivery: string
   durationHint: number
+  /** V2 파이프라인이 쓰는 계획한 대사 시점(v2/persist) — 아직 읽는 곳은 없지만 고치기가 지우지 않는다(2026-11-02). */
+  plannedTiming?: string
 }
 
 /** Kling 6-axis camera config, each -10 to +10 */

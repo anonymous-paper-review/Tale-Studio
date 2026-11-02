@@ -116,6 +116,8 @@ function pickDialogueLines(
       ...(typeof line.durationHint === 'number' && line.durationHint > 0
         ? { durationHint: line.durationHint }
         : {}),
+      // V2 대사의 계획한 시점도 같은 까닭으로 보존한다 — 모르는 칸으로 거절하거나 빼고 저장해 지웠다(2026-11-02).
+      ...(typeof line.plannedTiming === 'string' && line.plannedTiming ? { plannedTiming: line.plannedTiming } : {}),
     }))
   // 전량 불량 배열이 빈 patch 로 통과하면 "대사 전체 삭제"로 위장한다 —
   // 명시적 [] 만 빈 배열로 인정하고, 불량 엔트리만 있던 배열은 필드 자체를 drop.

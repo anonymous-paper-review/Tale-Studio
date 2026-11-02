@@ -277,6 +277,7 @@ function pushShotContextLines(
     if (dialogue.emotion) extras.push(`emotion: ${dialogue.emotion}`)
     if (dialogue.delivery) extras.push(`delivery: ${dialogue.delivery}`)
     if (dialogue.durationHint) extras.push(`durationHint: ${dialogue.durationHint}`)
+    if (dialogue.plannedTiming) extras.push(`plannedTiming: ${dialogue.plannedTiming}`)
     const extraNote = extras.length > 0 ? ` {${extras.join(' · ')}}` : ''
     lines.push(`    ${lineLabel(line)}대사[${index}] ${speaker}: "${dialogue.text}"${extraNote}`)
   })
