@@ -9,6 +9,7 @@ import { userOwnsProject } from '@/lib/generation-jobs'
 import { capacityReservationRejection } from '@/lib/api/quota'
 import { moderationRejectionResponse } from '@/lib/api/moderation'
 import {
+  ForeignMediaPathError,
   separateArrowLayer,
   saveDirectingFrame,
   regenerateEndFrame,
@@ -59,21 +60,23 @@ export async function POST(req: Request) {
     }
     capacityContext = { projectId: body.projectId, kind: 'image_generation', userId: user.id }
 
+    // 덮어쓸 그림은 늘 이 프로젝트 폴더 안이어야 한다 — 주소가 브라우저가 고칠 수 있는 rough_storyboard 에서 온다(2026-11-01 리뷰 M5).
     if (body.action === 'separate') {
-      const data = await separateArrowLayer(body.projectId, body.shotId)
+      const data = await separateArrowLayer(body.projectId, body.shotId, undefined, { projectFolderOnly: true })
       return NextResponse.json({ data })
     }
     if (body.action === 'regenerate-end') {
-      const data = await regenerateEndFrame(body.projectId, body.shotId)
+      const data = await regenerateEndFrame(body.projectId, body.shotId, undefined, { projectFolderOnly: true })
       return NextResponse.json({ data })
     }
     if (body.action === 'regenerate-frame') {
-      const data = await regenerateRoughFrame(body.projectId, body.shotId, body.frame)
+      const data = await regenerateRoughFrame(body.projectId, body.shotId, body.frame, undefined, { projectFolderOnly: true })
       return NextResponse.json({ data })
     }
-    const data = await saveDirectingFrame(body.projectId, body.shotId, body.image)
+    const data = await saveDirectingFrame(body.projectId, body.shotId, body.image, undefined, { projectFolderOnly: true })
     return NextResponse.json({ data })
   } catch (e) {
+    if (e instanceof ForeignMediaPathError) return NextResponse.json({ error: e.message }, { status: 403 })
     // 내용 규칙 거절·검사 장애도 자리 부족과 같은 자리에서 표준 상황코드로 바꾼다(#creem-moderation).
     const blocked = capacityContext && moderationRejectionResponse(e, capacityContext)
     if (blocked) return blocked

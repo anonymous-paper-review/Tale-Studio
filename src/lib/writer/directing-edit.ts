@@ -68,6 +68,30 @@ async function uploadRoughFrame(path: string, buf: Buffer, contentType: string):
   return url
 }
 
+/** 연출 고치기 옵션 — 라우트는 늘 projectFolderOnly 로 부른다. */
+export interface DirectingEditOptions {
+  /** 덮어쓸 파일이 "작업 공간/프로젝트/" 폴더 안일 때만 올린다(2026-11-01 리뷰 M5). 주소는 브라우저가 고칠 수 있는
+   *  rough_storyboard 에서 오므로 버킷만 보면 다른 작업 공간의 그림 · 미리보기를 덮을 수 있었다. 함수를 직접 부르는 옛 시험은 끈 채로 둔다. */
+  projectFolderOnly?: boolean
+}
+
+export class ForeignMediaPathError extends Error {
+  constructor(locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK) {
+    super(translate(locale, "This picture is not in this project's folder, so it can't be changed"))
+    this.name = 'ForeignMediaPathError'
+  }
+}
+
+/** 그 경로가 이 프로젝트 폴더("작업 공간/프로젝트/") 안인지 — 아니면 ForeignMediaPathError. */
+async function assertProjectFolder(projectId: string, path: string, locale: AppLocale): Promise<void> {
+  const { data, error } = await supabaseAdmin.from('projects').select('workspace_id').eq('id', projectId).maybeSingle()
+  if (error) throw error
+  const workspaceId = (data as { workspace_id?: unknown } | null)?.workspace_id
+  if (typeof workspaceId !== 'string' || !workspaceId || !path.startsWith(`${workspaceId}/${projectId}/`)) {
+    throw new ForeignMediaPathError(locale)
+  }
+}
+
 /**
  * 화살표 레이어 분리 — direction 프레임에서 화살표를 지운 클린 플레이트를 만들거나 캐시를 돌려준다.
  * 과금 방어: 같은 generatedAt 에 대해 1회만 생성(캐시 히트 시 fal 호출 없음).
@@ -76,6 +100,7 @@ export async function separateArrowLayer(
   projectId: string,
   shotId: string,
   locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
+  opts: DirectingEditOptions = {},
 ): Promise<{ cleanUrl: string; cached: boolean }> {
   const rb = await loadRough(projectId, shotId)
   if (rb?.status !== 'completed' || !rb.frames?.direction) {
@@ -116,6 +141,8 @@ export async function separateArrowLayer(
   const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg'
   const dirPath = storagePathFromPublicUrl(rb.frames.direction, locale)
   const cleanPath = `${dirPath.replace(/\.[a-z]+$/i, '')}_clean.${ext}`
+  // 그린 뒤 올리기 전에 본다 — 옛 라우트 시험(용량 거절)이 프로젝트 행 없이 그리기 단계까지 오기 때문(리뷰 M5).
+  if (opts.projectFolderOnly) await assertProjectFolder(projectId, cleanPath, locale)
   const cleanUrl = await uploadToMedia(cleanPath, buf, contentType)
 
   // JSONB 병합 — 생성 도중 재생성됐으면(다른 generatedAt) 낡은 캐시를 쓰지 않는다(rough-adherence 패턴).
@@ -199,11 +226,14 @@ export async function regenerateRoughFrame(
   shotId: string,
   frame: RoughFrameKey,
   locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
+  opts: DirectingEditOptions = {},
 ): Promise<{ url: string; generatedAt: number; frame: RoughFrameKey }> {
   const rb = await loadRough(projectId, shotId)
   if (rb?.status !== 'completed' || !rb.frames?.start || !rb.frames?.direction || !rb.frames?.end) {
     throw new Error(translate(locale, 'You need the 3-frame rough set to redraw a frame'))
   }
+  // 그리기 전에 본다 — 남의 파일 자리 때문에 그림 값을 쓰지 않는다(리뷰 M5).
+  if (opts.projectFolderOnly) await assertProjectFolder(projectId, storagePathFromPublicUrl(rb.frames[frame]!, locale), locale)
   let action: string | null = null
   if (frame === 'direction') {
     const { data } = await supabaseAdmin
@@ -242,12 +272,14 @@ export async function regenerateRoughFrame(
   const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg'
   const current = rb.frames[frame]!
   const framePath = `${storagePathFromPublicUrl(current, locale).replace(/\.[a-z]+$/i, '')}.${ext}`
-  const newUrl = await uploadRoughFrame(framePath, buf, contentType)
+  const newUrl = await uploadToMedia(framePath, buf, contentType)
 
   const latest = await loadRough(projectId, shotId)
   if (!latest || (latest.generatedAt ?? 0) !== (rb.generatedAt ?? 0)) {
     throw new Error(translate(locale, 'The rough set was regenerated in the meantime. Please try again'))
   }
+  // 미리보기는 "그사이 다시 그려졌는지" 확인 뒤에만 — PNG · JPG 가 미리보기 한 장을 같이 써서 새 세트의 미리보기를 덮을 수 있었다(리뷰 L7).
+  await uploadThumbnail(framePath, buf)
   const now = Date.now()
   const { error } = await supabaseAdmin
     .from('shots')
@@ -263,8 +295,9 @@ export async function regenerateEndFrame(
   projectId: string,
   shotId: string,
   locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
+  opts: DirectingEditOptions = {},
 ): Promise<{ url: string; generatedAt: number }> {
-  const { url, generatedAt } = await regenerateRoughFrame(projectId, shotId, 'end', locale)
+  const { url, generatedAt } = await regenerateRoughFrame(projectId, shotId, 'end', locale, opts)
   return { url, generatedAt }
 }
 
@@ -274,6 +307,7 @@ export async function saveDirectingFrame(
   shotId: string,
   imageDataUrl: string,
   locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
+  opts: DirectingEditOptions = {},
 ): Promise<{ url: string; generatedAt: number }> {
   const rb = await loadRough(projectId, shotId)
   if (rb?.status !== 'completed' || !rb.frames?.direction) {
@@ -287,6 +321,7 @@ export async function saveDirectingFrame(
     throw new Error(translate(locale, 'The image is too large (over 15MB)'))
 
   const dirPath = storagePathFromPublicUrl(rb.frames.direction, locale)
+  if (opts.projectFolderOnly) await assertProjectFolder(projectId, dirPath, locale)
   const newUrl = await uploadRoughFrame(dirPath, buf, 'image/png')
   const now = Date.now()
   // generatedAt 을 올려 3프레임 표시가 캐시버스트되게 한다. 클린 플레이트는 이 편집의 밑층
