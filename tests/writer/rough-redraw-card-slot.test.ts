@@ -93,3 +93,43 @@ describe('눌린 [러프 다시 그리기]는 그리기가 시작될 때까지',
     expect(chat().suggestion?.id).toBe(redrawCard.id)
   })
 })
+
+describe('눌린 [러프 다시 그리기]를 "나중에" · Esc 로 내리면', () => {
+  // 왜: 2026-11-02 리뷰 3차 M3 — 보드가 다른 그림을 그리는 동안 누른 카드는 그리기가 시작될 때까지 남는데, 그 카드를 [나중에]나 Esc 로
+  //   내려도 기다리던 요청은 남아 보드가 나중에 돈 드는 다시 그리기를 했다. 카드를 내리면 그 카드의 요청(같은 프로젝트 · 같은 샷)도 지운다.
+  it('[러프 다시 그리기]를 누른 뒤 [나중에]나 Esc로 카드를 내리면 기다리던 다시 그리기도 지운다', () => {
+    useBoardUiStore.setState({ boardProjectId: 'p' })
+    useBoardUiStore.getState().requestRoughRedraw('p', ['sh_01_02'])
+    chat().deferSuggestion()
+    expect(useBoardUiStore.getState().roughRedrawRequest).toBeNull()
+
+    useGlobalChatStore.setState({ suggestion: redrawCard })
+    useBoardUiStore.getState().requestRoughRedraw('p', ['sh_01_02'])
+    chat().dismissSuggestion()
+    expect(useBoardUiStore.getState().roughRedrawRequest).toBeNull()
+  })
+
+  // 왜: 지운 요청은 사람이 다시 누를 때 다시 맡긴다 — "나중에"에서 다시 열어 누르면 그때 그린다.
+  it('"나중에"에서 다시 열어 [러프 다시 그리기]를 누르면 다시 맡긴다', () => {
+    useBoardUiStore.setState({ boardProjectId: 'p' })
+    useBoardUiStore.getState().requestRoughRedraw('p', ['sh_01_02'])
+    chat().deferSuggestion()
+    expect(chat().restoreSuggestion(redrawCard.id)).toBe(true)
+    const branch = chatPanel.slice(chatPanel.indexOf("if (action.kind === 'roughRedraw') {"), chatPanel.indexOf("if (action.kind === 'roughRedraw') {") + 500)
+    expect(branch).toContain('requestRoughRedraw(action.projectId, action.shotIds)')
+  })
+
+  // 왜: 다른 프로젝트 · 다른 샷의 요청이나, 사람이 채팅을 이어 말해 카드가 저절로 내려간 경우는 지우지 않는다 —
+  //   이미 누른 다시 그리기는 그대로 맡겨 둔다(정상 경로 고정).
+  it('다른 샷의 요청이나 채팅을 이어 말해 카드가 저절로 내려간 경우에는 기다리던 다시 그리기를 그대로 둔다', () => {
+    useBoardUiStore.setState({ boardProjectId: 'p' })
+    useBoardUiStore.getState().requestRoughRedraw('p', ['sh_09_09'])
+    chat().deferSuggestion()
+    expect(useBoardUiStore.getState().roughRedrawRequest?.shotIds).toEqual(['sh_09_09'])
+
+    useGlobalChatStore.setState({ suggestion: redrawCard })
+    useBoardUiStore.getState().requestRoughRedraw('p', ['sh_01_02'])
+    chat().dismissSuggestion({ implicit: true })
+    expect(useBoardUiStore.getState().roughRedrawRequest?.shotIds).toEqual(['sh_01_02'])
+  })
+})

@@ -3763,6 +3763,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     if (current?.action?.kind === 'choices' || current?.restoredChoices) {
       saveChoiceClearMarker(current.stage)
     }
+    // [러프 다시 그리기]를 누른 뒤 [나중에] · Esc 로 내리면 기다리던 그 요청도 지운다(리뷰 3차 M3) — 다시 열어 누르면 다시 맡긴다.
+    //   채팅을 이어 말해 저절로 내려간 경우(implicit)는 이미 누른 다시 그리기를 그대로 둔다.
+    if (current?.action?.kind === 'roughRedraw' && !opts?.implicit) {
+      useBoardUiStore.getState().cancelRoughRedraw(current.action.projectId, current.action.shotIds)
+    }
     set((state) => ({
       suggestion: null,
       dismissedSuggestionIds:

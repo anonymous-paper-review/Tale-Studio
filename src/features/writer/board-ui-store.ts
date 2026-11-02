@@ -23,6 +23,8 @@ interface BoardUiState {
   requestRoughRedraw: (projectId: string, shotIds: string[]) => void
   /** 요청을 꺼낸다 — 그 프로젝트 것이면 샷 id 들, 아니면 null(요청은 어느 쪽이든 지운다). */
   takeRoughRedraw: (projectId: string) => string[] | null
+  /** 카드를 [나중에] · Esc 로 내렸다 — 그 카드의 요청(같은 프로젝트 · 같은 샷)이 아직 기다리면 지운다(2026-11-02 리뷰 3차 M3). */
+  cancelRoughRedraw: (projectId: string, shotIds: readonly string[]) => void
 }
 
 let nextRequestId = 0
@@ -46,5 +48,10 @@ export const useBoardUiStore = create<BoardUiState>((set, get) => ({
     if (!request) return null
     set({ roughRedrawRequest: null })
     return request.projectId === projectId ? request.shotIds : null
+  },
+  cancelRoughRedraw: (projectId, shotIds) => {
+    const request = get().roughRedrawRequest
+    if (!request || request.projectId !== projectId || request.shotIds.length !== shotIds.length) return
+    if (request.shotIds.every((id, index) => id === shotIds[index])) set({ roughRedrawRequest: null })
   },
 }))
