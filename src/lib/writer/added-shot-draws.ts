@@ -7,7 +7,8 @@
 //   한 번에 한 요청씩 맡긴다 — 한꺼번에 보내면 자리 검사가 엇갈려 한도를 넘길 수 있다(2026-09-11 감사). 그리기는 함께 돈다.
 //   보드가 열려 있는 프로젝트만 그린다 — 보드를 떠나면 아직 보내지 않은 샷은 보내지 않고, 같은 프로젝트 보드로 돌아오면 이어 간다.
 //   그리는 동안 스토리 · 샷 타입 · 등장인물을 고치면 그 그리기가 그려진 뒤 한 번 더(덮어) 그린다. 실패했으면 다시 그리지 않는다(2026-11-02 리드, 리뷰 R3).
-//   아직 보내지 않은 샷은 보낼 때 고친 내용을 읽으므로 한 번만 그린다.
+//   아직 보내지 않은 샷은 보낼 때 고친 내용을 읽으므로 한 번만 그린다. 그려 둔 그림의 다시 그리기가 기다리거나 멈추면 그림 아래에 그 상태를 보이고,
+//   그동안 다른 길(샷 고치기 창 · 채팅)이 그 샷을 새로 그리면 다시 그리기를 내려놓는다(최종 리뷰 L2).
 //   화면(브라우저)과 테스트가 함께 쓴다 — 서버 전용 모듈을 들이지 않는다. 약속: tests/writer/added-shot-*.test.ts
 import { USER_LIMIT_RECHECK_MS, USER_LIMIT_WAIT_MAX_MS } from '@/lib/artist/draw-continue'
 import { ROUGH_VISIBLE_SHOT_FIELDS } from '@/lib/writer/chat-rough-redraw'
@@ -48,6 +49,10 @@ export interface AddedDrawView {
   reason?: string
   /** 30분을 기다려도 자리가 나지 않아 멈췄다. */
   noSlot?: boolean
+  /** 그려 둔 그림을 고친 내용으로 다시 그리는 차례다 — 기다림 · 멈춤도 그림 아래에 보인다(최종 리뷰 L2). */
+  redraw?: boolean
+  /** 그 다시 그리기 작업이 실패했다. */
+  redrawFailed?: boolean
 }
 
 export type AddedDrawOutcome =
@@ -136,14 +141,19 @@ export function addedDrawJob(
     case 'stopped':
       return {
         status: 'failed',
-        error: view.noSlot ? translate(locale, 'No slot freed up within 30 minutes, so this rough was not drawn.') : view.reason,
+        error: view.redrawFailed
+          ? translate(locale, 'Could not redraw the rough with your changes.')
+          : view.noSlot
+            ? translate(locale, view.redraw ? 'No slot freed up within 30 minutes, so the rough was not redrawn with your changes.' : 'No slot freed up within 30 minutes, so this rough was not drawn.')
+            : view.reason,
       }
     default:
       return undefined
   }
 }
 
-/** 보드의 카드 상태에 얹을 더한 샷 상태 — 그림이 이미 있는 샷은 얹지 않는다(다른 길로 그려졌으면 그 그림이 맞다). */
+/** 보드의 카드 상태에 얹을 더한 샷 상태 — 그림이 이미 있는 샷은 얹지 않는다(다른 길로 그려졌으면 그 그림이 맞다).
+ *  다만 그려 둔 그림을 고친 내용으로 다시 그리는 샷의 기다림 · 멈춤은 얹는다 — 그림만 보이면 기다리는지 멈췄는지 모른다(최종 리뷰 L2). */
 export function addedDrawJobs<S extends { shotId: string }>(
   shots: readonly S[],
   views: ReadonlyMap<string, AddedDrawView>,
@@ -152,8 +162,9 @@ export function addedDrawJobs<S extends { shotId: string }>(
 ): Record<string, { status: 'generating' | 'waiting' | 'failed'; error?: string }> {
   const out: Record<string, { status: 'generating' | 'waiting' | 'failed'; error?: string }> = {}
   for (const shot of shots) {
-    const job = addedDrawJob(views.get(shot.shotId), locale)
-    if (job && !isDrawn(shot)) out[shot.shotId] = job
+    const view = views.get(shot.shotId)
+    const job = addedDrawJob(view, locale)
+    if (job && (!isDrawn(shot) || (view?.redraw && job.status !== 'generating'))) out[shot.shotId] = job
   }
   return out
 }
@@ -202,6 +213,10 @@ interface Entry {
   latestSignature?: string
   /** 다음 그리기는 덮어 그리기다(그리는 동안 고친 경우). */
   redraw?: boolean
+  /** 그 덮어 그리기 작업이 실패했다. */
+  redrawFailed?: boolean
+  /** 다시 그리기를 기다리거나 멈춘 동안 화면에 있던 그림 — 바뀌면 다른 길이 새로 그린 것이다. */
+  heldPicture?: string
 }
 
 interface Queue {
@@ -300,9 +315,12 @@ export function createAddedShotDraws(deps: AddedShotDrawsDeps = {}) {
     if (queue.entries.get(entry.shotId) !== entry) return
     switch (outcome.kind) {
       case 'submitted': {
+        const redrawn = !!entry.redraw
         entry.phase = 'drawing'
         entry.signature = outcome.signature
         entry.redraw = false
+        entry.redrawFailed = false
+        entry.heldPicture = undefined
         // 자리를 얻었다 — 기다리던 중이고 아직 보낼 샷이 남았으면 기다림을 이어 가되 지금부터 다시 잰다(Artist 이어 그리기와 같다).
         //   남은 샷이 "보낼 차례"라고 기다림을 풀면 그 사이 더한 샷이 자리 없이 나가고 30분 셈이 끊겼다(리뷰 R5).
         if (queue.userWaitSince !== null) queue.userWaitSince = hasQueued(queue) ? now() : null
@@ -315,6 +333,14 @@ export function createAddedShotDraws(deps: AddedShotDrawsDeps = {}) {
             enqueue(projectId, queue, entry)
             changed()
             void pump()
+            return
+          }
+          if (result !== 'drawn' && redrawn) {
+            // 그려 둔 그림을 고친 내용으로 다시 그리지 못했다 — 저절로 다시 그리지 않고(9/11) 그림 아래에 까닭과 [다시 시도]를 둔다(최종 리뷰 L2).
+            entry.phase = 'stopped'
+            entry.redraw = true
+            entry.redrawFailed = true
+            changed()
             return
           }
           entry.phase = 'done'
@@ -448,6 +474,24 @@ export function createAddedShotDraws(deps: AddedShotDrawsDeps = {}) {
       const entry = queues.get(projectId)?.entries.get(shotId)
       if (entry) entry.latestSignature = signature
     },
+    /** 화면에 보이는 그 샷의 그림(대표 그림 주소) — 다시 그리기를 기다리거나 멈춘 동안 바뀌면 다른 길(샷 고치기 창 · 채팅)이 새로 그린 것이라
+     *  다시 그리기를 내려놓는다. 남겨 두면 새 그림 아래에 멈춤이 남거나, 자리가 났을 때 같은 그림을 한 장 더 그린다(최종 리뷰 L2). */
+    pictureSeen(projectId: string, shotId: string, picture: string): void {
+      const queue = queues.get(projectId)
+      const entry = queue?.entries.get(shotId)
+      if (!queue || !entry?.redraw || (entry.phase !== 'waiting' && entry.phase !== 'stopped')) return
+      if (entry.heldPicture === undefined) {
+        entry.heldPicture = picture
+        return
+      }
+      if (entry.heldPicture === picture) return
+      entry.phase = 'done'
+      entry.redraw = false
+      entry.redrawFailed = false
+      entry.heldPicture = undefined
+      releaseWait(queue)
+      changed()
+    },
     /** 스토리가 없어 멈춘 더한 샷에 스토리가 생겼다 — 그린다. */
     storyChanged(projectId: string, shotId: string, story: string): void {
       const queue = queues.get(projectId)
@@ -467,7 +511,13 @@ export function createAddedShotDraws(deps: AddedShotDrawsDeps = {}) {
         ? new Map(
             [...queue.entries.values()].map((entry) => [
               entry.shotId,
-              { phase: entry.phase, ...(entry.reason ? { reason: entry.reason } : {}), ...(entry.noSlot ? { noSlot: true } : {}) },
+              {
+                phase: entry.phase,
+                ...(entry.reason ? { reason: entry.reason } : {}),
+                ...(entry.noSlot ? { noSlot: true } : {}),
+                ...(entry.redraw ? { redraw: true } : {}),
+                ...(entry.redrawFailed ? { redrawFailed: true } : {}),
+              },
             ]),
           )
         : EMPTY_VIEWS

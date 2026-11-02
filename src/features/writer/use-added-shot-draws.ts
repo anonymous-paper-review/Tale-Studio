@@ -5,6 +5,7 @@
 //   writer-store 가 알리는 "샷을 더했다"(보드 [+ 샷 추가] · 채팅)를 장부에 넘기고, 보드가 열려 있는 동안 보드의 그리기를 맡긴다.
 //   이 프로젝트의 도는 작업이 하나 끝나면 자리가 났을 수 있어 기다리던 샷을 다시 보고, 스토리가 생긴 더한 샷은 그때 그린다.
 //   보내는 중 · 그리는 중인 더한 샷의 그림에 보이는 내용(스토리 · 샷 타입 · 등장인물)을 장부에 넘긴다 — 바뀌었으면 그려진 뒤 한 번 더 그린다(리뷰 R3).
+//   그 다시 그리기가 기다리거나 멈춘 동안의 그림(대표 그림 주소)도 넘긴다 — 다른 길이 새로 그렸으면 장부가 다시 그리기를 내려놓는다(최종 리뷰 L2).
 import { useEffect, useSyncExternalStore } from 'react'
 import { createAddedShotDraws, roughContentSignature, type AddedDrawView, type DrawAddedShot } from '@/lib/writer/added-shot-draws'
 import type { Shot } from '@/types'
@@ -21,7 +22,7 @@ export function useAddedShotDraws(input: {
   draw: DrawAddedShot
   /** 이 프로젝트의 도는 작업 id 를 정렬해 쉼표로 이은 글. */
   activeJobsKey: string
-  shots: ReadonlyArray<Pick<Shot, 'shotId' | 'actionDescription' | 'shotType' | 'characters'>>
+  shots: ReadonlyArray<Pick<Shot, 'shotId' | 'actionDescription' | 'shotType' | 'characters' | 'roughStoryboard'>>
 }): ReadonlyMap<string, AddedDrawView> {
   const { projectId, draw, activeJobsKey, shots } = input
   useEffect(() => {
@@ -63,5 +64,19 @@ export function useAddedShotDraws(input: {
       draws.contentChanged(projectId, shotId, signature)
     }
   }, [projectId, contentKey])
+  const pictureKey = shots
+    .filter((shot) => {
+      const view = views.get(shot.shotId)
+      return !!view?.redraw && (view.phase === 'waiting' || view.phase === 'stopped')
+    })
+    .map((shot) => `${shot.shotId}\u0000${shot.roughStoryboard?.url ?? ''}`)
+    .join('\u0001')
+  useEffect(() => {
+    if (!projectId || !pictureKey) return
+    for (const pair of pictureKey.split('\u0001')) {
+      const [shotId, picture] = pair.split('\u0000')
+      draws.pictureSeen(projectId, shotId, picture)
+    }
+  }, [projectId, pictureKey])
   return views
 }

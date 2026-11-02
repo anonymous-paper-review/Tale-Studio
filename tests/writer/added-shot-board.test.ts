@@ -92,7 +92,10 @@ vi.mock('sonner', () => ({ toast: { info: vi.fn(), error: vi.fn(), success: vi.f
 
 import { toast } from 'sonner'
 import { AiBusyOverlay } from '@/components/ai-busy-overlay'
+import { RoughFrameCycle } from '@/components/rough-frame-cycle'
 import { AddItemDialog } from '@/features/writer/add-item-dialog'
+import { AddedRedrawStatus } from '@/features/writer/added-redraw-status'
+import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { RoughStoryboardView } from '@/features/writer/rough-storyboard-view'
 import { _setGenerationQueueSnapshotForTests } from '@/lib/generation-queue'
 import { autoSubmitEventPayload } from '@/lib/writer/added-shot-draws'
@@ -145,6 +148,18 @@ function unmount() {
   for (const mounted of hooks.mounted) if (typeof mounted?.cleanup === 'function') mounted.cleanup()
   hooks.mounted = []
   hooks.slots = []
+}
+/** 보드 안의 작은 화면(함수 컴포넌트) 하나를 제 훅 자리에서 그린다 — 보드의 훅 자리와 섞이지 않게. */
+function renderPart(node: Element): Element[] {
+  const saved = { slots: hooks.slots, cursor: hooks.cursor, effects: hooks.effects }
+  hooks.slots = []
+  hooks.cursor = 0
+  hooks.effects = []
+  try {
+    return elements((node.type as (props: Record<string, unknown>) => ReactNode)(node.props))
+  } finally {
+    Object.assign(hooks, saved)
+  }
 }
 /** 보드 · 채팅을 덮는 잠금 표시가 열려 있나. */
 const locked = () => render().find((node) => node.type === AiBusyOverlay)?.props.open
@@ -338,6 +353,52 @@ describe('보드의 더한 샷 카드 · 잠금 · 탭', () => {
     commit()
     expect(requests).toHaveLength(1)
     expect(locked()).toBe(false)
+  })
+})
+
+describe('그려 둔 더한 샷의 다시 그리기', () => {
+  const inCard = (shotId: string) => elements(card(shotId).props.children as ReactNode)
+
+  // 왜: 2026-11-02 최종 리뷰 L2 — 다시 그리기가 내 한도를 기다리거나 멈추면 카드는 고치기 전 그림만 보여 줬다. 그림은 그대로 두고
+  //   그 아래에 기다림("자리가 나면 고친 내용으로 다시 그려요") · 멈춤(까닭과 [다시 시도])을 보인다. [다시 시도]는 고친 내용으로 덮어 그린다.
+  it('그려 둔 그림 아래에 다시 그리기의 기다림 · 멈춤을 보이고, 멈췄으면 [다시 시도]로 고친 내용을 덮어 그린다', async () => {
+    board.views = new Map([['sh_01_01', { phase: 'waiting', redraw: true }]])
+    expect(inCard('sh_01_01').some((node) => node.type === RoughFrameCycle)).toBe(true)
+    let status = inCard('sh_01_01').find((node) => node.type === AddedRedrawStatus)!
+    expect(renderPart(status).map(textOf).join(' ')).toContain('자리가 나면 고친 내용으로 다시 그려요')
+    board.views = new Map([['sh_01_01', { phase: 'stopped', redraw: true, noSlot: true }]])
+    expect(inCard('sh_01_01').some((node) => node.type === RoughFrameCycle)).toBe(true)
+    status = inCard('sh_01_01').find((node) => node.type === AddedRedrawStatus)!
+    const stopped = renderPart(status)
+    expect(stopped.map(textOf).join(' ')).toContain('30분 동안 자리가 나지 않아 고친 내용으로 다시 그리지 못했어요.')
+    const retry = stopped.find((node) => typeof node.props.onClick === 'function' && textOf(node) === '다시 시도')!
+    ;(retry.props.onClick as (event: { stopPropagation: () => void }) => void)({ stopPropagation: () => {} })
+    await vi.waitFor(() => expect(requests).toEqual([{ projectId: PROJECT, shotIds: ['sh_01_01'], force: true }]))
+    // 정상 경로 고정 — 다시 그리기가 없는 그려 둔 샷에는 아무것도 붙지 않는다.
+    expect(inCard('sh_01_02').some((node) => node.type === AddedRedrawStatus)).toBe(false)
+  })
+
+  // 왜(혼자 정한 것): 그려 둔 샷을 다시 그릴 때는 옛 그림도 "다 그림"이라 보드의 그리기 끝이 실패한 작업도 그려짐으로 읽었다 —
+  //   그림이 정말 바뀌었을 때만 그려짐으로 본다(바뀌지 않았으면 장부가 멈춤으로 까닭과 [다시 시도]를 둔다).
+  it('그려 둔 그림을 다시 그린 작업이 실패해 그림이 그대로면 그려지지 않은 것으로 본다', async () => {
+    render()
+    reply = { status: 200, body: { ok: true, data: { submitted: [{ shotId: 'sh_01_01', jobId: 'job-redraw' }], skipped: [], remaining: 0 } } }
+    vi.mocked(pollGenerationJob).mockRejectedValueOnce(new Error('job failed'))
+    const failed = await board.draw!('sh_01_01', { redraw: true })
+    expect(failed.kind === 'submitted' ? await failed.done : failed.kind).toBe('failed')
+    // 정상 경로 고정 — 새 그림이 앉으면 그려짐이다.
+    useWriterStore.setState({
+      loadProject: vi.fn(async () => {
+        useWriterStore.setState({
+          shots: useWriterStore.getState().shots.map((s) => (s.shotId === 'sh_01_01' ? { ...s, roughStoryboard: { ...s.roughStoryboard!, url: 'sh_01_01.png?v=2' } } : s)),
+        })
+      }),
+    })
+    hooks.slots = []
+    render()
+    vi.mocked(pollGenerationJob).mockResolvedValueOnce(undefined as never)
+    const redrawn = await board.draw!('sh_01_01', { redraw: true })
+    expect(redrawn.kind === 'submitted' ? await redrawn.done : redrawn.kind).toBe('drawn')
   })
 })
 

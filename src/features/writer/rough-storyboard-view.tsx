@@ -37,6 +37,7 @@ import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
 import { AiBusyOverlay } from '@/components/ai-busy-overlay'
 import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
 import { AddItemDialog, type AddMode } from '@/features/writer/add-item-dialog'
+import { AddedRedrawStatus } from '@/features/writer/added-redraw-status'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
 import { handOverToDirector } from '@/features/writer/storyboard-director'
@@ -611,17 +612,23 @@ export function RoughStoryboardView() {
   //   스토리를 막 고쳤으면 저장을 먼저 끝낸다(서버가 빈 스토리로 보지 않게). 무엇을 할지는 lib/writer/added-shot-draws 가 정한다.
   //   redraw(그리는 동안 고친 샷의 한 번 더 그리기)는 그린 그림을 덮어 그린다(force). 보낼 때의 내용 지문을 장부에 넘긴다(리뷰 R3).
   //   진입 자동 그리기(auto)가 아니다 — 출처 added_shot 으로 기록하고, 반복 실패로 멈추면 안내한다(리뷰 R7).
+  //   그려 둔 샷을 다시 그릴 때는 옛 그림도 "다 그림"이라 보드의 그리기 끝이 실패한 작업도 그려짐으로 읽는다 —
+  //   대표 그림 주소가 정말 바뀌었을 때만 그려짐으로 넘긴다(최종 리뷰 L2).
   const drawAdded = useCallback<DrawAddedShot>(
     async (shotId, { redraw }) => {
       const shotNow = () => useWriterStore.getState().shots.find((s) => s.shotId === shotId)
       const storyOf = () => shotNow()?.actionDescription ?? ''
+      const pictureOf = () => shotNow()?.roughStoryboard?.url ?? ''
       if (!shotHasInfo(storyOf())) return { kind: 'no_story', story: storyOf() }
       await flushShotSave(shotId).catch(() => {})
       const sent = shotNow()
       const signature = sent ? roughContentSignature(sent) : undefined
+      const pictureBefore = pictureOf()
       const round = await generate([shotId], redraw, false, undefined, { quietUserLimit: true, source: 'added_shot' })
       const drawn = addedDrawOutcome(round, shotId, storyOf(), locale)
-      const outcome = drawn.kind === 'submitted' ? { ...drawn, signature } : drawn
+      const outcome = drawn.kind === 'submitted'
+        ? { ...drawn, signature, done: drawn.done.then((result) => (result === 'drawn' && pictureOf() === pictureBefore ? 'failed' : result)) }
+        : drawn
       if (outcome.kind !== 'submitted') {
         // 접수되지 않았다 — 걸어 둔 그리는 중 표시를 거둔다(멈춘 까닭은 장부가 카드에 보인다).
         setPanelJobs((prev) => {
@@ -1216,13 +1223,22 @@ export function RoughStoryboardView() {
                           // #p1-quickwin W3: 첫 진입 시 전 카드 1회 순환 후 hover 전용.
                           //   W4: 카드 위 재생성 칩 제거 — 재생성은 카드 팝업·채팅으로 일원화.
                           //   그림을 눌러도 멈추지 않고 고치기 팝업이 열린다(pauseOnClick=false, 2026-10-31 QA) — 카드 대부분이 그림이다.
-                          <RoughFrameCycle
-                            panel={panel}
-                            alt={`${shot.shotId} rough storyboard`}
-                            introPlay
-                            sizeToImage
-                            pauseOnClick={false}
-                          />
+                          <>
+                            <RoughFrameCycle
+                              panel={panel}
+                              alt={`${shot.shotId} rough storyboard`}
+                              introPlay
+                              sizeToImage
+                              pauseOnClick={false}
+                            />
+                            {/* 그려 둔 그림을 고친 내용으로 다시 그리는 차례가 기다리거나 멈췄다 — 그림 아래에 알린다(최종 리뷰 L2). */}
+                            {job?.status === 'waiting' || job?.status === 'failed' ? (
+                              <AddedRedrawStatus
+                                job={{ status: job.status, error: job.error }}
+                                onRetry={() => void generate([shot.shotId], true)}
+                              />
+                            ) : null}
+                          </>
                         ) : (
                         <div className="relative aspect-video overflow-hidden bg-muted">
                           {job?.status === 'generating' ? (
