@@ -408,6 +408,8 @@ export const KO: Record<string, string> = {
   'Draft generation is in progress. You can edit once scene confirmation and generation finish': '초안 생성이 진행 중이에요. 씬 확정과 생성이 끝난 뒤에 수정할 수 있어요',
   "Shot '{id}' not found": "샷 '{id}' 를 찾지 못했어요",
   'Which shot do you mean: {first} or {second}?': '어느 샷인지 알려 주세요: {first} 또는 {second}',
+  'New shot': '새 샷',
+  'New scene': '새 씬',
   'Previz video did not finish within the time limit': 'Previz 영상이 제한 시간 안에 완료되지 않았습니다',
   'Previz video generation failed': 'Previz 영상 생성 실패',
   // ── writer 스테이지: writer-story-stream ──

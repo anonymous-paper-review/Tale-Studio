@@ -3492,12 +3492,21 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         const result = await useWriterStore
           .getState()
           .applyChatUpdates(rawUpdates.filter((u) => u.type !== 'clarify'), executeApp ? { executeEdit: executeJsonEdit } : undefined)
+        // 못 한 고침은 실행 결과에 남긴다 — 결과에 못 한 것이 있으면 "했어요" 답 대신 결과를 보인다(guardChatToolReply).
+        //   씬 · 샷 칸 고치기만 남겨, 못 한 지우기 · 더하기는 채팅에 "지웠어요"로 남았다(2026-11-02 리뷰 4차 후속) — 다 같은 길로 남긴다.
+        const updateTarget = (u: WriterChatUpdate) => ('id' in u && typeof u.id === 'string' ? u.id : 'tempId' in u && typeof u.tempId === 'string' ? u.tempId : undefined)
         for (const skipped of result.skipped) {
-          const updates = rawUpdates.filter(u => (u.type === 'updateScene' || u.type === 'updateShot') && (skipped.type === 'all' || (u.type === skipped.type && (!skipped.id || u.id === skipped.id))))
+          const updates = rawUpdates.filter(u => u.type !== 'clarify' && (skipped.type === 'all' || (u.type === skipped.type && (!skipped.id || updateTarget(u) === skipped.id))))
           for (const update of updates) {
-            if (update.type !== 'updateScene' && update.type !== 'updateShot') continue
-            const resource = update.type === 'updateScene' ? 'scenes' : 'shots'
-            if (!toolOutcomes.some(o => o.result.source === 'json' && (o.call.input as Record<string, unknown>).id === update.id)) recordJsonResult(resource, update.id, update.patch, { status: 'blocked', message: skipped.reason })
+            if (update.type === 'updateScene' || update.type === 'updateShot') {
+              const resource = update.type === 'updateScene' ? 'scenes' : 'shots'
+              if (!toolOutcomes.some(o => o.result.source === 'json' && (o.call.input as Record<string, unknown>).id === update.id)) recordJsonResult(resource, update.id, update.patch, { status: 'blocked', message: skipped.reason })
+              continue
+            }
+            if (update.type === 'clarify') continue
+            const resource = update.type === 'addScene' || update.type === 'deleteScene' ? 'scenes' : 'shots'
+            const target = update.type === 'addShot' ? translate(contentLocale(), 'New shot') : update.type === 'addScene' ? translate(contentLocale(), 'New scene') : update.id
+            recordJsonResult(resource, target, {}, { status: skipped.type === 'all' ? 'blocked' : 'invalid_input', message: skipped.reason })
           }
         }
         patchTrace({
@@ -3508,10 +3517,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         // #p4-understand B: 침묵 no-op 제거 — 적용/건너뜀을 즉시 표면화.
         const locale = contentLocale()
         if (result.skipped.length > 0) {
+          // 까닭은 모두 보인다 — 첫 까닭만 보이면 "어느 샷인지 알려 주세요" 물음이 다른 까닭 뒤에 묻혔다(리뷰 4차 후속).
           toast.warning(
             translate(locale, "Couldn't apply {count} changes: {reason}", {
               count: result.skipped.length,
-              reason: result.skipped[0].reason,
+              reason: [...new Set(result.skipped.map((item) => item.reason))].join(' · '),
             }),
           )
         } else if (result.applied > 0) {

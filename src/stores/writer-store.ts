@@ -795,7 +795,9 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           applied += 1
         }
       } catch (e) {
-        skipped.push({ type: u.type, reason: e instanceof Error ? e.message : 'chat update failed' })
+        // 어느 고침이었는지 남긴다(더하기는 임시 id) — 채팅이 실행 결과에 못 한 것을 하나하나 적는다(리뷰 4차 후속).
+        const target = 'id' in u && typeof u.id === 'string' ? u.id : 'tempId' in u && typeof u.tempId === 'string' ? u.tempId : undefined
+        skipped.push({ type: u.type, ...(target ? { id: target } : {}), reason: e instanceof Error ? e.message : 'chat update failed' })
         set({ error: e instanceof Error ? e.message : 'chat update failed' })
       }
     }
