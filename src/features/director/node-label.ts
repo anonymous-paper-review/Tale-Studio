@@ -74,9 +74,14 @@ export function directorFullLabel(data: NamedNodeData, names: BoardNodeNames | n
   return directorBoardLabel(data, names) ?? prettyNodeLabel(data.label)
 }
 
-/** 보드 순서로 늘어놓는다 — 보드의 씬 · 샷은 보드 순서, 나머지는 원래 순서대로 뒤에(안정 정렬). */
+/** 보드 순서로 늘어놓는다 — Writer 에서 온 씬 · 샷은 보드 순서(이름을 바꿨어도 Writer id 의 자리 — 리뷰 3차 L5),
+ *  나머지는 원래 순서대로 뒤에(안정 정렬). */
 export function sortByBoard<N extends { data: NamedNodeData }>(nodes: readonly N[], names: BoardNodeNames | null | undefined): N[] {
-  const rank = (node: N) => boardEntry(node.data, names)?.order ?? Number.POSITIVE_INFINITY
+  const rank = (node: N) => {
+    const { writerShotId, writerSceneId } = node.data
+    const entry = typeof writerShotId === 'string' ? names?.shots.get(writerShotId) : typeof writerSceneId === 'string' ? names?.scenes.get(writerSceneId) : undefined
+    return entry?.order ?? Number.POSITIVE_INFINITY
+  }
   return [...nodes].sort((a, b) => {
     const ra = rank(a)
     const rb = rank(b)

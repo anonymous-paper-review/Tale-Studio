@@ -104,4 +104,12 @@ describe('Director 도 보드와 같은 전체 번호', () => {
     expect(sortByBoard(shots, names).map((n) => n.id)).toEqual(['b', 'a', 'm'])
     expect(readFileSync('src/features/director/canvas-views/StoryboardGridView.tsx', 'utf8')).toContain('sortByBoard(')
   })
+
+  // 왜: 2026-11-02 리뷰 3차 L5 — 사람이 이름을 바꾼 샷 노드는 보드에 없는 노드처럼 셈해 그 씬의 맨 끝으로 밀려났다.
+  //   이름은 그대로 두되(보일 때만 바꾸지 않는다), 늘어놓는 자리는 Writer 샷의 보드 자리다.
+  it('이름을 바꾼 샷 노드도 격자에서는 보드 자리 그대로 선다', () => {
+    const shots = [shotNode('a', 'sh_01_04', 's1'), shotNode('b', 'sh_01_01', 's1', 'river_gaze'), shotNode('m', null, 's1')]
+    expect(sortByBoard(shots, names).map((n) => n.id)).toEqual(['b', 'a', 'm'])
+    expect(directorNodeLabel(shots[1].data, names)).toBe('river_gaze')
+  })
 })
