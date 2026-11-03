@@ -3,9 +3,13 @@
 // 시작한 프로젝트의 Producer 화면(리뉴얼 1차 2026-10-19) — 고칠 수 없는 완료 화면.
 //   넘어간 Producer 는 잠금이 아니라 할 일을 끝낸 "완료"다(프로토타입 원칙). 고른 값 · 잠긴 화면 비율을 보여주고 [Writer로 가기].
 //   산문 초안 쓰기가 실패했거나 시작하지 못했으면 그 자리에서 [다시 시도](같은 값으로 Writer 시작을 다시 보낸다).
+//   v3(2026-11-03): 설정 화면과 같은 화면 머리 · 큰 내용 판, 잠김 표시는 작은 꼬리표.
 import { useRouter } from 'next/navigation'
 import { ArrowRight, CircleCheck, Lock, RotateCcw } from 'lucide-react'
+import { PageHeader } from '@/components/layout/page-header'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { useT } from '@/lib/i18n'
 import { useProjectStore } from '@/stores/project-store'
 import { useEntryStore } from './entry-store'
@@ -39,13 +43,17 @@ export function EntrySummary() {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-6 py-10">
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-2">
-          <CircleCheck className="size-5 shrink-0 text-success" aria-hidden />
-          <h2 className="text-xl font-semibold">{t('This project has started')}</h2>
-        </div>
-        <p className="text-sm text-muted-foreground">
+    <div className="mx-auto flex w-full max-w-[924px] flex-col gap-6 px-8 py-10">
+      <div className="flex flex-col gap-2.5">
+        <PageHeader
+          title={
+            <span className="flex items-center gap-2">
+              <CircleCheck className="size-6 shrink-0 text-success" aria-hidden />
+              {t('This project has started')}
+            </span>
+          }
+        />
+        <p className="text-body text-muted-foreground">
           {fromNewFlow
             ? t('The Producer settings are done and cannot be changed. Continue in Writer.')
             : t('This project was started before the new start screen. Continue in Writer.')}
@@ -53,42 +61,42 @@ export function EntrySummary() {
       </div>
 
       {fromNewFlow && (preview || draft.file) ? (
-        <section className="flex flex-col gap-3 rounded-xl border border-border bg-card p-6" aria-label={t('Story material')}>
-          <h3 className="text-sm font-medium">{t('Story material')}</h3>
-          {preview ? <p className="line-clamp-6 select-text whitespace-pre-wrap text-sm">{preview}</p> : null}
+        <Card role="region" className="rounded-[22px] px-6 py-[22px]" aria-label={t('Story material')}>
+          <h3 className="text-body font-semibold">{t('Story material')}</h3>
+          {preview ? <p className="line-clamp-6 select-text whitespace-pre-wrap text-body text-muted-foreground">{preview}</p> : null}
           {draft.file ? (
             <div>
               <FileChip file={draft.file} />
             </div>
           ) : null}
-        </section>
+        </Card>
       ) : null}
 
       {fromNewFlow ? (
-        <section className="rounded-xl border border-border bg-card p-6" aria-label={t('Settings')}>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-sm">
+        <Card role="region" className="rounded-[22px] px-6 py-[22px]" aria-label={t('Settings')}>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 text-label">
             {summaryRows(draft, { t, locale, mode: 'done', series }).map((row) => (
               <div key={row.key} className="contents">
                 <dt className="text-muted-foreground">{row.label}</dt>
                 <dd className="flex flex-wrap items-center gap-2 break-words">
-                  <span className={row.key === 'ratio' ? 'font-mono tabular-nums' : undefined}>{row.value}</span>
+                  <span className={row.key === 'ratio' ? 'font-num tabular-nums' : undefined}>{row.value}</span>
                   {row.locked ? (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                      <Lock className="size-3" aria-hidden />
+                    <Badge variant="tag">
+                      <Lock aria-hidden />
                       {t('Locked')}
-                    </span>
+                    </Badge>
                   ) : null}
                 </dd>
               </div>
             ))}
           </dl>
-        </section>
+        </Card>
       ) : null}
 
-      <footer className="flex flex-wrap items-center justify-end gap-3 border-t border-border pt-4">
+      <footer className="flex flex-wrap items-center justify-end gap-3">
         {needsRetry ? (
           <>
-            <p className="mr-auto text-sm text-muted-foreground" role="status">
+            <p className="mr-auto text-label text-muted-foreground" role="status">
               {t('The prose draft has not been written yet.')}
             </p>
             <Button onClick={() => void retryWriter()} disabled={busy}>
