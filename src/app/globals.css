@@ -135,6 +135,9 @@
   --color-chat-send: var(--chat-send);
   --color-chat-user-bubble: var(--chat-user-bubble);
   --color-chat-user-bubble-foreground: var(--chat-user-bubble-foreground);
+
+  /* v3p2-board */
+  --color-mention: var(--mention);
 }
 
 /*
@@ -272,6 +275,9 @@
   --z-modal: 50;
   --z-popover: 60;
   --z-toast: 70;
+
+  /* v3p2-board — Storyboard 카드 글 속 인물 이름(v3 시안 S1 Story "@민호" 글자 색, 이름 붙은 스타일 없음) */
+  --mention: #8eb2ff;
 }
 
 /* 지금 단계 색 하나 — 컨테이너에 data-stage 를 붙이면 그 아래 --stage 가 바뀐다(Lumi 가이드 채팅창 CSS 와 같은 방식).

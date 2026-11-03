@@ -37,11 +37,14 @@ interface AiBusyOverlayProps {
   /** 'dialog' = 열린 팝업 위를 덮는다(팝업에서 시작한 AI 작업, 2026-10-20 Artist 상세 · 샷 고치기). 기본은 단계 화면만 덮는다.
    *  팝업이 열려 있으면 body 가 클릭을 받지 않는다(Radix) — 덮개가 클릭을 직접 받아 밑의 팝업 버튼으로 새지 않게 한다. */
   layer?: 'stage' | 'dialog'
+  /** 단계를 넘어가며 기다리는 화면의 큰 Lumi(v3 Content/Loading Card, 오너 결정 8 2026-11-03) — 있으면 맨 위 가운데에 두고 글을 가운데로 모은다.
+   *  일이 멈춘 실패 안내(busy=false)에는 그리지 않고 예전 모양으로 둔다(오류 안내에는 Lumi 를 넣지 않는다). */
+  art?: React.ReactNode
 }
 
 const subscribeNothing = () => () => {}
 
-export function AiBusyOverlay({ open, title, description, steps, progress, progressLabel, footer, busy = true, layer = 'stage' }: AiBusyOverlayProps) {
+export function AiBusyOverlay({ open, title, description, steps, progress, progressLabel, footer, busy = true, layer = 'stage', art }: AiBusyOverlayProps) {
   const t = useT()
   // 서버 렌더에는 body 가 없다 — 브라우저에서만 띄운다(하이드레이션이 어긋나지 않게).
   const inBrowser = useSyncExternalStore(subscribeNothing, () => true, () => false)
@@ -66,6 +69,8 @@ export function AiBusyOverlay({ open, title, description, steps, progress, progr
 
   if (!open || !inBrowser) return null
   const pct = typeof progress === 'number' && Number.isFinite(progress) ? Math.max(0, Math.min(100, Math.round(progress))) : null
+  // v3 로딩 카드 — 큰 Lumi 가 기다리는 동안만. 막대는 지금 단계 색(시안 Track · Bar).
+  const loadingCard = !!art && busy
 
   return createPortal(
     <div
@@ -78,32 +83,49 @@ export function AiBusyOverlay({ open, title, description, steps, progress, progr
       aria-busy={busy}
       data-testid="ai-busy-overlay"
     >
-      <div className="flex w-full max-w-md flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-lg">
-        <div className="flex items-start gap-3">
-          {busy ? (
-            <Loader2 className="mt-0.5 size-5 shrink-0 animate-spin text-muted-foreground motion-reduce:animate-none" aria-hidden />
-          ) : (
-            <AlertCircle className="mt-0.5 size-5 shrink-0 text-destructive" aria-hidden />
-          )}
-          <div className="flex flex-col gap-1">
-            <h2 className="text-lg font-medium leading-7">{title}</h2>
-            <p className="text-sm text-muted-foreground">
-              {description ?? t('While AI is working, the whole screen is locked. You can edit once it finishes.')}
-            </p>
+      <div
+        className={loadingCard
+          ? 'flex w-full max-w-[440px] flex-col items-center gap-3 rounded-[26px] bg-panel px-9 pb-[26px] pt-[30px] text-center shadow-panel'
+          : 'flex w-full max-w-md flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-lg'}
+        data-testid={loadingCard ? 'ai-busy-loading-card' : undefined}
+      >
+        {loadingCard ? (
+          <>
+            {art}
+            <div className="flex flex-col gap-1.5">
+              <h2 className="text-[22px] font-bold leading-[28.6px] text-foreground">{title}</h2>
+              <p className="text-caption text-muted-foreground">
+                {description ?? t('While AI is working, the whole screen is locked. You can edit once it finishes.')}
+              </p>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-start gap-3">
+            {busy ? (
+              <Loader2 className="mt-0.5 size-5 shrink-0 animate-spin text-muted-foreground motion-reduce:animate-none" aria-hidden />
+            ) : (
+              <AlertCircle className="mt-0.5 size-5 shrink-0 text-destructive" aria-hidden />
+            )}
+            <div className="flex flex-col gap-1">
+              <h2 className="text-lg font-medium leading-7">{title}</h2>
+              <p className="text-sm text-muted-foreground">
+                {description ?? t('While AI is working, the whole screen is locked. You can edit once it finishes.')}
+              </p>
+            </div>
           </div>
-        </div>
+        )}
         {pct !== null || progressLabel ? (
-          <div className="flex flex-col gap-1.5">
+          <div className={cn('flex flex-col gap-1.5', loadingCard && 'w-full max-w-[300px]')}>
             {pct !== null ? (
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
-                <div className="h-full rounded-full bg-primary transition-[width] duration-350 ease-out" style={{ width: `${pct}%` }} />
+              <div className={cn('h-1.5 w-full overflow-hidden rounded-full', loadingCard ? 'bg-card' : 'bg-muted')} aria-hidden>
+                <div className={cn('h-full rounded-full transition-[width] duration-350 ease-out', loadingCard ? 'bg-stage' : 'bg-primary')} style={{ width: `${pct}%` }} />
               </div>
             ) : null}
             {progressLabel ? <p className="font-mono text-xs tabular-nums text-muted-foreground">{progressLabel}</p> : null}
           </div>
         ) : null}
         {steps && steps.length > 0 ? (
-          <ol className="flex flex-col gap-1.5 text-sm">
+          <ol className={cn('flex flex-col gap-1.5 text-sm', loadingCard && 'self-stretch rounded-xl bg-card px-4 py-3 text-left')}>
             {steps.map((step, i) => (
               <li
                 key={`${i}-${step.label}`}
@@ -128,7 +150,7 @@ export function AiBusyOverlay({ open, title, description, steps, progress, progr
             ))}
           </ol>
         ) : null}
-        {footer ? <div className="flex flex-wrap justify-end gap-2">{footer}</div> : null}
+        {footer ? <div className={cn('flex flex-wrap gap-2', loadingCard ? 'justify-center' : 'justify-end')}>{footer}</div> : null}
       </div>
     </div>,
     document.body,

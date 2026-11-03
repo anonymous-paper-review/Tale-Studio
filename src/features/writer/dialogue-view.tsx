@@ -10,6 +10,7 @@
 //   저장은 샷 고치기 팝업과 같은 길(dialogue-line-save)이고 러프는 다시 그리지 않는다. 화자 · 줄 더하기 · 빼기는
 //   샷마다 붙은 연필 단추가 여는 샷 고치기 팝업에서 한다(팝업은 러프 보드가 그린다 — 연 샷 id 만 board-ui-store 로 넘긴다).
 //   샷 번호는 보드 카드와 같은 전체 번호(boardShots)다.
+//   v3(2026-11-03 오너 "v3로 적용"): 화면 머리 · 알약 탭은 러프 보드와 같고, 인물 칩은 32px 알약, 씬마다 큰 내용 판(panel). 동작은 그대로.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, MessageSquareText, Pencil, RefreshCw } from 'lucide-react'
@@ -275,7 +276,7 @@ export function DialogueView() {
       />
 
       {/* 인물 칩 + 생성 버튼 */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-border px-6 py-2.5">
+      <div className="flex flex-wrap items-center gap-1.5 px-7 pt-3">
         {/* 선택된 인물만 색을 갖는다(2026-07-31) — 아무도 선택 안 한 기본 상태는 전부 회색이라
             대본이 조용하고, 색은 "지금 보고 있는 인물"이라는 한 가지 뜻만 갖는다. */}
         {speakers.map((s) => {
@@ -287,36 +288,37 @@ export function DialogueView() {
               aria-pressed={active}
               onClick={() => setSelectedSpeaker(active ? null : s.id)}
               className={cn(
-                'flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors',
+                'flex min-h-8 items-center gap-1.5 rounded-full border-[1.5px] px-3.5 py-1 text-label font-medium transition-colors',
                 active
                   ? cn(s.color.chip, s.color.on)
-                  : 'border-border text-muted-foreground hover:bg-accent hover:text-foreground',
+                  : 'border-transparent bg-card text-muted-foreground hover:bg-accent hover:text-foreground',
               )}
             >
               {s.name}
-              <span className="font-mono text-[10px] opacity-70">{s.lineCount}</span>
+              <span className="font-num text-meta opacity-70">{s.lineCount}</span>
             </button>
           )
         })}
         {speakers.length === 0 && (
-          <span className="text-xs text-muted-foreground">{t('No dialogue yet')}</span>
+          <span className="text-caption text-subtle-foreground">{t('No dialogue yet')}</span>
         )}
 
         <div className="ml-auto flex items-center gap-2">
           {confirming && !generating && (
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-caption text-subtle-foreground">
               {t('This rewrites the existing {count} dialogue lines. Press again to run', {
                 count: totalLines,
               })}
             </span>
           )}
-          <button
-            type="button"
+          <Button
+            size="sm"
+            variant="secondary"
             onClick={onGenerateClick}
             disabled={generate.locked || !projectId}
             className={cn(
-              'flex h-7 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs font-medium text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50',
-              confirming && 'border-destructive/50 text-destructive',
+              'rounded-full px-3.5',
+              confirming && 'bg-destructive/10 text-destructive hover:bg-destructive/15',
             )}
           >
             {generate.locked ? (
@@ -329,33 +331,33 @@ export function DialogueView() {
               : totalLines > 0
                 ? t('Regenerate dialogue')
                 : t('Generate dialogue')}
-          </button>
+          </Button>
         </div>
       </div>
       {error && (
-        <p className="border-b border-border bg-destructive/10 px-6 py-1.5 text-xs text-destructive">{error}</p>
+        <p className="mx-7 mt-2 rounded-lg bg-destructive/10 px-3 py-1.5 text-caption text-destructive">{error}</p>
       )}
 
       {/* 대본 본문 — 왼쪽 정렬(#c5 2026-08-03): 트리트먼트와 같은 축이라 탭을 오가도 시선이
           안 흔들린다. max-w 는 가독 폭 유지용으로만 남긴다(중앙 배치 제거). */}
       <ScrollArea className="min-h-0 flex-1">
         <TooltipProvider>
-        <div className="w-full max-w-3xl px-6 py-6">
+        <div className="w-full max-w-3xl space-y-[18px] px-7 pb-7 pt-4">
           {scenes.length === 0 ? (
-            <p className="py-16 text-center text-sm text-muted-foreground">
+            <p className="py-16 text-center text-caption text-muted-foreground">
               {t('No scenes yet. The script will appear here once Writer generation finishes.')}
             </p>
           ) : (
             scenes.map((scene, sceneIdx) => {
               const sceneShots = shotsByScene.get(scene.sceneId) ?? []
               return (
-                <section key={scene.sceneId} className="mb-8">
-                  <h3 className="mb-3 border-b border-border pb-1.5 font-mono text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Scene {sceneIdx + 1}
-                    <span className="ml-2 font-normal normal-case">
+                <section key={scene.sceneId} className="rounded-xl bg-panel px-5 py-4">
+                  <h3 className="mb-3 flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+                    <span className="font-num text-micro font-semibold text-foreground">Scene {sceneIdx + 1}</span>
+                    <span className="text-body font-semibold text-foreground">
                       {resolveEntityNames(scene.location, entityNames)}
-                      {scene.mood ? ` · ${scene.mood}` : ''}
                     </span>
+                    {scene.mood ? <span className="text-caption text-subtle-foreground">{scene.mood}</span> : null}
                   </h3>
                   <div className="flex flex-col gap-2.5">
                     {sceneShots.map((shot, shotIdx) => {
@@ -369,7 +371,7 @@ export function DialogueView() {
                               스토리는 러프에 그려지므로 여기서 고치지 않는다 — 연필 단추가 샷 고치기 창을 연다(프로토타입 대본 보기의 ✎). */}
                           <div className="flex items-start gap-2">
                             <p className="min-w-0 flex-1 text-sm leading-7 text-foreground">
-                              <span className="mr-1.5 font-mono text-xs font-semibold text-muted-foreground/60">
+                              <span className="mr-1.5 font-num text-micro font-semibold text-subtle-foreground">
                                 Shot {shotNo}
                               </span>
                               {resolveEntityNames(shot.actionDescription, entityNames)}
@@ -380,7 +382,7 @@ export function DialogueView() {
                                   size="icon-xs"
                                   variant="ghost"
                                   aria-label={editShotLabel}
-                                  className="mt-0.5 text-muted-foreground"
+                                  className="mt-0.5 text-subtle-foreground"
                                   onClick={() => useBoardUiStore.getState().setShotEditId(shot.shotId)}
                                 >
                                   <Pencil />
@@ -446,7 +448,7 @@ export function DialogueView() {
                       )
                     })}
                     {sceneShots.length === 0 && (
-                      <p className="text-xs text-muted-foreground/60">{t('(no shots)')}</p>
+                      <p className="text-caption text-subtle-foreground">{t('(no shots)')}</p>
                     )}
                   </div>
                 </section>
@@ -455,8 +457,8 @@ export function DialogueView() {
           )}
           {scenes.length > 0 && totalLines === 0 && (
             <div className="flex flex-col items-center gap-2 py-10 text-center">
-              <MessageSquareText className="size-6 text-muted-foreground/50" />
-              <p className="text-sm text-muted-foreground">
+              <MessageSquareText className="size-6 text-subtle-foreground" />
+              <p className="text-caption text-muted-foreground">
                 {(() => {
                   const [l1, l2] = t(
                     'No shot dialogue yet. Press "Generate dialogue" above to design character voices{br}and write shot-by-shot dialogue that follows the scene.',

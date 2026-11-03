@@ -62,6 +62,28 @@ export function boardStatsLabel(stats: BoardStats, locale: AppLocale): string {
   return translate(locale, 'Scenes {scenes} · Shots {shots} · {seconds}s', { scenes: stats.scenes, shots: stats.shots, seconds: stats.seconds })
 }
 
+export interface SceneStats {
+  shots: number
+  /** 그 씬 샷 길이의 합 — 정수 초(화면 머리와 같은 셈). */
+  seconds: number
+}
+
+/** 씬 id → 씬 머리의 "3컷 · 7초"(v3 시안 S1, 2026-11-03). 씬 목록의 씬은 샷이 없어도 0으로 있다. 약속: tests/writer/board-card.test.ts */
+export function sceneStats(manifest: BoardManifest, shots: readonly Pick<Shot, 'shotId' | 'sceneId' | 'durationSeconds'>[]): Map<string, SceneStats> {
+  const entries = boardShots(manifest, shots)
+  return new Map(
+    (manifest?.scenes ?? []).map((scene) => {
+      const own = entries.filter((entry) => entry.shot.sceneId === scene.sceneId)
+      return [scene.sceneId, { shots: own.length, seconds: secondsOf(own) }]
+    }),
+  )
+}
+
+/** 씬 머리 "3컷 · 7초". */
+export function sceneStatsLabel(stats: SceneStats, locale: AppLocale): string {
+  return translate(locale, '{count} cuts · {seconds}s', { count: stats.shots, seconds: stats.seconds })
+}
+
 export interface DirectorHandoffSummary {
   /** 러프가 있어 Director 로 넘어가는 샷 수. */
   movingShots: number

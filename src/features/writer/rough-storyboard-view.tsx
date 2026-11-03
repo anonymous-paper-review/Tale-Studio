@@ -17,9 +17,9 @@
 //   샷을 더하면(보드 [+ 샷 추가] · 채팅) 그 샷 러프를 바로 그린다(2026-11-02 오너 "더할 때마다 자동") — 잠금 없이 그 카드만
 //   그리는 중으로 보인다. 규칙은 lib/writer/added-shot-draws, 연결은 use-added-shot-draws.
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { Fragment, useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
-import { AlertCircle, ChevronDown, Clock, ImageIcon, Loader2, Plus, RefreshCw } from 'lucide-react'
+import { AlertCircle, AlertTriangle, ChevronDown, Clock, ImageIcon, Loader2, MoreHorizontal, Plus, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -35,6 +35,7 @@ import { ADHERENCE_START_ENABLED } from '@/lib/adherence/core'
 import { handoffFrom } from '@/lib/handoff-intent'
 import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
 import { AiBusyOverlay } from '@/components/ai-busy-overlay'
+import { Lumi } from '@/components/lumi/lumi'
 import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
 import { AddItemDialog, type AddMode } from '@/features/writer/add-item-dialog'
 import { AddedRedrawStatus } from '@/features/writer/added-redraw-status'
@@ -74,7 +75,8 @@ import {
   type BoardLockFacts,
   type BoardLockState,
 } from '@/lib/writer/board-busy'
-import { boardShots, directorConfirmView, directorHandoffSummary, storyboardBriefing } from '@/lib/writer/board-summary'
+import { boardShots, directorConfirmView, directorHandoffSummary, sceneStats, sceneStatsLabel, storyboardBriefing } from '@/lib/writer/board-summary'
+import { cardDialogue, mentionSegments, sceneHeadTitle, shotCardChips } from '@/lib/writer/board-card'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import {
   isContentPolicyBlocked,
@@ -825,6 +827,29 @@ export function RoughStoryboardView() {
   const headerDescription = t(
     'Rough storyboard: click a card to review, edit, or regenerate; click a scene name to collapse it',
   )
+  // v3 도구 줄(시안 S1) — 탭 옆 [+ 씬 추가] · [+ 샷 추가] 알약. 샷 추가는 어디에 더할지 고르는 [+ 샷 추가] 창을 씬 없이 연다(씬 머리의 것은 그 씬으로 연다).
+  const storyboardTools = hasShots ? (
+    <>
+      <Button
+        size="sm"
+        variant="secondary"
+        className="rounded-full px-3.5"
+        onClick={() => setAddDialog({ mode: 'scene', contextSceneId: null })}
+      >
+        <Plus className="size-3.5" />
+        {t('Add scene')}
+      </Button>
+      <Button
+        size="sm"
+        variant="secondary"
+        className="rounded-full px-3.5"
+        onClick={() => setAddDialog({ mode: 'shot', contextSceneId: null })}
+      >
+        <Plus className="size-3.5" />
+        {t('Add shot')}
+      </Button>
+    </>
+  ) : null
   const storyboardActions = hasShots ? (
     <>
       {/* 축척 — 가로 열 수 조절 (Ctrl+wheel 로도 가능) */}
@@ -836,22 +861,13 @@ export function RoughStoryboardView() {
         <Button
           size="sm"
           variant="secondary"
-          className="hover-red-beam"
+          className="rounded-full px-3.5"
           onClick={() => void generateAllMissing(false)}
         >
           <RefreshCw className="size-3.5" />
           {t('Generate {count} missing panels', { count: missingIds.length })}
         </Button>
       )}
-      <Button
-        size="sm"
-        variant="outline"
-        className="hover-red-beam"
-        onClick={() => setAddDialog({ mode: 'scene', contextSceneId: null })}
-      >
-        <Plus className="size-3.5" />
-        {t('Add scene')}
-      </Button>
     </>
   ) : null
 
@@ -1021,6 +1037,8 @@ export function RoughStoryboardView() {
               progress={busy.progress}
               progressLabel={busy.progressLabel}
               footer={busyFooter}
+              // Artist → Storyboard 로 넘어가며 기다리는 화면 — 큰 Lumi(Storyboard 옷 · 로딩, 오너 결정 8). 끝나면 잠금 화면째 사라진다.
+              art={busy.stageEntry ? <Lumi persona="storyboard" state="loading" size={300} /> : undefined}
             />,
             document.body,
           )
@@ -1052,19 +1070,19 @@ export function RoughStoryboardView() {
         {busy.open ? (
           <div className="flex-1" aria-hidden />
         ) : (
-          <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
-            <ImageIcon className="size-12 text-muted-foreground" />
-            <p className="text-base font-medium">{waiting ? progress.label : t('No scenes or shots generated yet')}</p>
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+            <ImageIcon className="size-10 text-subtle-foreground" />
+            <p className="text-body font-semibold text-foreground">{waiting ? progress.label : t('No scenes or shots generated yet')}</p>
             {status?.pipeline_failed ? (
               <>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-caption text-muted-foreground">
                   {t('Generation stopped')}
-                  {status.error ? ` — ${status.error}` : ''}
+                  {status.error ? `: ${status.error}` : ''}
                 </p>
                 <WriterResumeButton projectId={projectId} onResumed={restart} />
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-caption text-muted-foreground">
                 {waiting ? progress.detail : t('Scenes and shots are made when you press Complete in Artist.')}
               </p>
             )}
@@ -1086,11 +1104,17 @@ export function RoughStoryboardView() {
   // 설명문 폰트(#zoom-desc) — 열이 늘수록(축소) 글자도 줄여 전문이 들어가게. 클램프는 제거.
   const descFontSize = storyboardDescriptionFontSize(cols)
 
+  // v3 씬 머리(시안 S1) — 이름(장소 · 때) · 요약 · 컷 수 · 초. 셈은 화면 머리와 같다(lib/writer/board-summary sceneStats).
+  const statsByScene = sceneStats(sceneManifest, shots)
+  // 카드 글 속 인물 이름(멘션 색)과 대사 한 줄의 화자 이름 — Artist 목록의 인물(lib/writer/board-card).
+  const characterNames = new Map((sceneManifest?.characters ?? []).map((c) => [c.characterId, c.name]))
+  const mentionNames = [...characterNames.values()]
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <WriterHeader description={headerDescription} actions={storyboardActions} />
-      <div role="status" aria-label={t('Rough storyboard progress')} className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b border-border px-6 py-2 text-xs tabular-nums text-muted-foreground">
-        <span className="font-medium text-foreground">{t('Board total: {count} shots', { count: roughProgress.total })}</span>
+      <WriterHeader description={headerDescription} tools={storyboardTools} actions={storyboardActions} />
+      <div role="status" aria-label={t('Rough storyboard progress')} className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 px-7 pt-3 font-num text-meta tabular-nums text-subtle-foreground">
+        <span className="font-medium text-muted-foreground">{t('Board total: {count} shots', { count: roughProgress.total })}</span>
         <span>{t('Completed')} {roughProgress.completed}</span>
         <span className="inline-flex items-center gap-1">
           {generatingCount > 0 && <Loader2 className="size-3 animate-spin" />}
@@ -1102,21 +1126,24 @@ export function RoughStoryboardView() {
 
       {/* #coverage-first(2026-09-02 오너): 연출 점검 — 영상으로 넘어가기 전에 커버리지 결함
           (반응 없는 다인 비트·리빌 없는 시선 비트·감정 연쇄 단절·급전환)을 보여준다.
-          위치 표기는 파이프라인 샷 순번(오너의 "Shot2~3" 셈법과 동일). 메시지는 점검기 산출 데이터. */}
+          위치 표기는 파이프라인 샷 순번(오너의 "Shot2~3" 셈법과 동일). 메시지는 점검기 산출 데이터.
+          관리자 계정에게만 보인다(서버가 관리자에게만 보낸다, 2026-11-03 오너). v3: 주의 색 판 + 아이콘. */}
       {status?.directing_issues && status.directing_issues.length > 0 && (
-        <details className="mx-6 mt-4 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
-          <summary className="cursor-pointer font-medium">
+        <details className="group mx-7 mt-3 rounded-xl bg-warning/10 px-4 py-3 text-label">
+          <summary className="flex cursor-pointer list-none items-center gap-2 font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+            <AlertTriangle className="size-4 shrink-0 text-warning" aria-hidden />
             {t('Directing check: {count} issues to review before video', { count: status.directing_issues.length })}
+            <ChevronDown className="ml-auto size-4 shrink-0 text-subtle-foreground transition-transform group-open:rotate-180" aria-hidden />
           </summary>
-          <ul className="mt-2 space-y-1.5 text-xs text-muted-foreground">
+          <ul className="mt-2 space-y-1.5 pl-6 text-caption text-muted-foreground">
             {status.directing_issues.map((issue, i) => (
               <li key={`${issue.location}-${i}`} className="flex gap-2">
-                <span className="shrink-0 font-mono text-foreground">
+                <span className="shrink-0 font-num font-semibold text-foreground">
                   {issue.location.replace(/shot_(\d+)/g, 'Shot $1').replace(/scene_(\d+)/g, 'Scene $1')}
                 </span>
                 <span>
                   {issue.message}
-                  {issue.suggestion ? ` — ${issue.suggestion}` : ''}
+                  {issue.suggestion ? ` · ${issue.suggestion}` : ''}
                 </span>
               </li>
             ))}
@@ -1127,7 +1154,7 @@ export function RoughStoryboardView() {
       <ScrollArea className="min-h-0 flex-1">
         <div
           ref={boardRef}
-          className="cursor-grab space-y-8 p-6"
+          className="cursor-grab space-y-[18px] px-7 pb-7 pt-4"
           tabIndex={0}
           aria-label={t('Rough storyboard board')}
           onKeyDown={handleBoardKeyDown}
@@ -1136,32 +1163,34 @@ export function RoughStoryboardView() {
           {(sceneManifest?.scenes ?? []).map((scene, sceneIdx) => {
             const sceneShots = shots.filter((s) => s.sceneId === scene.sceneId)
             const sceneCollapsed = collapsedScenes.has(scene.sceneId)
+            const sceneTitle = sceneHeadTitle(scene, entityNames)
+            const sceneSummary = [
+              resolveEntityNames(scene.narrativeSummary, entityNames).trim(),
+              sceneStatsLabel(statsByScene.get(scene.sceneId) ?? { shots: sceneShots.length, seconds: 0 }, locale),
+            ].filter(Boolean).join(' · ')
             return (
               <section key={scene.sceneId} className="space-y-3">
-                {/* 씬 구분선 — id 만 노출(사용자 결정 2026-06-12). 장소·분위기는 편집 팝업에서.
-                    씬 이름 클릭 = 접기/펼치기 토글(#c2 2026-08-03, chevron 회전으로 상태 표시). */}
-                <div className="flex items-center gap-2">
+                {/* 씬 머리(v3 시안 S1) — 씬 번호(전체 번호 그대로, 씬 안 번호를 새로 만들지 않는다) · 이름(장소 · 때) · 요약 · 컷 수 · 초 · [+ 샷 추가].
+                    예전에는 id 만 보였다(사용자 결정 2026-06-12) — v3 를 따른다. 씬 머리를 누르면 접기/펼치기(#c2 2026-08-03, 갈매기 회전으로 상태 표시). */}
+                <div className="flex min-h-8 items-center gap-2.5">
                   <button
                     type="button"
                     onClick={() => toggleSceneCollapsed(scene.sceneId)}
                     aria-expanded={!sceneCollapsed}
-                    className="flex items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                    className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring/50"
                   >
                     <ChevronDown
-                      className={cn('size-3.5 transition-transform', sceneCollapsed && '-rotate-90')}
+                      className={cn('size-3.5 shrink-0 text-subtle-foreground transition-transform', sceneCollapsed && '-rotate-90')}
+                      aria-hidden
                     />
-                    Scene {sceneIdx + 1}
-                    {sceneCollapsed ? (
-                      <span className="font-normal text-muted-foreground/70">
-                        · {t('{count} shots', { count: sceneShots.length })}
-                      </span>
-                    ) : null}
+                    <span className="shrink-0 font-num text-micro font-semibold text-foreground">Scene {sceneIdx + 1}</span>
+                    {sceneTitle ? <span className="min-w-0 max-w-[45%] shrink-0 truncate text-body font-semibold text-foreground">{sceneTitle}</span> : null}
+                    <span className="min-w-0 truncate text-caption text-subtle-foreground" title={sceneSummary}>{sceneSummary}</span>
                   </button>
-                  <div className="h-px flex-1 bg-border" />
                   <Button
                     size="sm"
-                    variant="ghost"
-                    className="text-muted-foreground hover-red-beam"
+                    variant="secondary"
+                    className="shrink-0 rounded-full px-3.5"
                     onClick={() =>
                       setAddDialog({ mode: 'shot', contextSceneId: scene.sceneId })
                     }
@@ -1183,7 +1212,7 @@ export function RoughStoryboardView() {
                 >
                 <div className="min-h-0 overflow-hidden">
                 <div
-                  className="grid gap-4 p-0.5"
+                  className="grid gap-3 p-0.5"
                   style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
                 >
                   {sceneShots.length === 0 && (
@@ -1192,15 +1221,18 @@ export function RoughStoryboardView() {
                       onClick={() =>
                         setAddDialog({ mode: 'shot', contextSceneId: scene.sceneId })
                       }
-                      className="flex aspect-video flex-col items-center justify-center gap-2 rounded-xl border border-dashed text-muted-foreground transition-colors hover:bg-accent/40 hover-red-beam"
+                      className="flex aspect-video flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border text-subtle-foreground transition-colors hover:bg-accent/40 hover-red-beam"
                     >
                       <Plus className="size-6" />
-                      <span className="text-sm">{t('Add shot')}</span>
+                      <span className="text-label">{t('Add shot')}</span>
                     </button>
                   )}
                   {sceneShots.map((shot, shotIdx) => {
                     const panel = panelOf(shot)
                     const job = jobOf(shot.shotId)
+                    const shotLabel = `Scene ${sceneIdx + 1} · Shot ${globalShotNo.get(shot.shotId) ?? shotIdx + 1}`
+                    const dialogue = cardDialogue(shot.dialogueLines, characterNames)
+                    const dialogueText = dialogue ? resolveEntityNames(dialogue.text, entityNames) : ''
                     return (
                       <article
                         key={shot.shotId}
@@ -1214,23 +1246,47 @@ export function RoughStoryboardView() {
                             openDetail(shot.shotId)
                           }
                         }}
-                        className="group cursor-pointer rounded-xl border bg-card p-2.5 transition-colors duration-100 hover:bg-accent/40 hover-red-beam focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring/50"
+                        className="group flex cursor-pointer flex-col gap-2.5 rounded-xl bg-panel p-3 transition-colors duration-100 hover-red-beam focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring/50"
                       >
-                        {/* 그림은 카드에 '담긴' 사각형이다(#card-inset 2026-08-11) — 카드 모서리에
-                            물려 깎이지 않게 여백을 두르고, 그림 자체엔 라운드를 주지 않는다.
-                            sizeToImage(#fit-tight): 상자가 그림 비율을 따라가 좌우 띠 없이 전부 보인다. */}
+                        {/* 카드 머리(v3 시안 S1) — 전체 번호 이름 그대로 · 길이 · ···(샷 고치기 팝업, 카드 누르기와 같다).
+                            제품에 카드 메뉴로 둘 다른 일(지우기 · 다시 그리기)이 화면에 없어 메뉴 대신 팝업을 연다 — 결정 대기. */}
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-num text-micro font-semibold text-foreground">{shotLabel}</span>
+                          <span className="font-num text-meta font-medium tabular-nums text-subtle-foreground">
+                            {t('{seconds}s', { seconds: shot.durationSeconds })}
+                          </span>
+                          <Button
+                            size="icon-xs"
+                            variant="ghost"
+                            className="ml-auto text-subtle-foreground"
+                            aria-label={t('{label} · edit', { label: shotLabel })}
+                            title={t('{label} · edit', { label: shotLabel })}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openDetail(shot.shotId)
+                            }}
+                          >
+                            <MoreHorizontal />
+                          </Button>
+                        </div>
+                        {/* 그림 — 한 칸에서 시작 · 연출 · 끝 세 장을 돌려 본다(오너 결정 5, 시안의 두 장 나란히는 안 한다).
+                            지금 보이는 장에 이름표(시안 "시작 · 연출")를 붙인다. sizeToImage(#fit-tight): 상자가 그림 비율을 따라가 좌우 띠 없이 전부 보인다.
+                            v3 시안처럼 그림 모서리를 둥글린다(예전 #card-inset 2026-08-11 은 라운드 없이 여백만 둘렀다). */}
                         {panel?.url && job?.status !== 'generating' ? (
                           // #p1-quickwin W3: 첫 진입 시 전 카드 1회 순환 후 hover 전용.
                           //   W4: 카드 위 재생성 칩 제거 — 재생성은 카드 팝업·채팅으로 일원화.
                           //   그림을 눌러도 멈추지 않고 고치기 팝업이 열린다(pauseOnClick=false, 2026-10-31 QA) — 카드 대부분이 그림이다.
                           <>
-                            <RoughFrameCycle
-                              panel={panel}
-                              alt={`${shot.shotId} rough storyboard`}
-                              introPlay
-                              sizeToImage
-                              pauseOnClick={false}
-                            />
+                            <div className="overflow-hidden rounded-[14px]">
+                              <RoughFrameCycle
+                                panel={panel}
+                                alt={`${shot.shotId} rough storyboard`}
+                                introPlay
+                                sizeToImage
+                                pauseOnClick={false}
+                                frameTag
+                              />
+                            </div>
                             {/* 그려 둔 그림을 고친 내용으로 다시 그리는 차례가 기다리거나 멈췄다 — 그림 아래에 알린다(최종 리뷰 L2). */}
                             {job?.status === 'waiting' || job?.status === 'failed' ? (
                               <AddedRedrawStatus
@@ -1240,27 +1296,33 @@ export function RoughStoryboardView() {
                             ) : null}
                           </>
                         ) : (
-                        <div className="relative aspect-video overflow-hidden bg-muted">
+                        <div
+                          className={cn(
+                            'relative aspect-video overflow-hidden rounded-[14px] bg-art-placeholder',
+                            job?.status === 'failed' && 'ring-1 ring-inset ring-destructive/50',
+                          )}
+                        >
                           {job?.status === 'generating' ? (
                             <div className="absolute inset-0" aria-busy="true">
-                              <div className="size-full animate-pulse bg-muted-foreground/10" />
+                              <div className="size-full animate-pulse bg-foreground/5" />
                               <Loader2 className="absolute left-1/2 top-1/2 size-6 -translate-x-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />
                             </div>
                           ) : job?.status === 'waiting' ? (
                             // 더한 샷이 내 동시 생성 자리를 기다린다 — 자리가 나면 그린다(2026-09-11 오너 (가)). 도는 표시를 쓰지 않는다.
                             <div className="flex size-full flex-col items-center justify-center gap-2 p-4 text-center" role="status">
                               <Clock className="size-5 text-muted-foreground" aria-hidden />
-                              <p className="text-xs text-muted-foreground">{t('Draws as soon as a slot frees up')}</p>
+                              <p className="text-caption text-muted-foreground">{t('Draws as soon as a slot frees up')}</p>
                             </div>
                           ) : job?.status === 'failed' ? (
                             <div className="flex size-full flex-col items-center justify-center gap-2 p-4">
                               <AlertCircle className="size-5 text-destructive" />
-                              <p className="line-clamp-2 text-center text-xs text-destructive">
+                              <p className="line-clamp-2 text-center text-caption text-destructive">
                                 {job.error ?? t('Generation failed')}
                               </p>
                               <Button
                                 size="sm"
-                                variant="outline"
+                                variant="secondary"
+                                className="rounded-full px-3.5"
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   void generate([shot.shotId], true)
@@ -1271,13 +1333,13 @@ export function RoughStoryboardView() {
                             </div>
                           ) : (
                             <div className="flex size-full flex-col items-center justify-center gap-2 p-3 text-center">
-                              <ImageIcon className="size-8 text-muted-foreground" />
+                              <ImageIcon className="size-7 text-muted-foreground" />
                               {/* #5: 정보(액션) 없으면 생성 불가 — 카드 클릭해 스토리부터 입력하게 유도. */}
                               {shotHasInfo(shot.actionDescription) ? (
                                 <Button
                                   size="sm"
-                                  variant="outline"
-                                  className="hover-red-beam"
+                                  variant="secondary"
+                                  className="rounded-full px-3.5 hover-red-beam"
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     // 사람의 명시적 클릭 → force(give-up 게이트 통과).
@@ -1287,7 +1349,7 @@ export function RoughStoryboardView() {
                                   {t('Generate panel')}
                                 </Button>
                               ) : (
-                                <p className="text-xs text-muted-foreground">
+                                <p className="text-caption text-muted-foreground">
                                   {t('Enter a story (action) to enable generation')}
                                 </p>
                               )}
@@ -1301,43 +1363,58 @@ export function RoughStoryboardView() {
                         </div>
                         )}
 
-                        <div className="space-y-2 px-1 pb-0.5 pt-3">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium text-muted-foreground">
-                              Scene {sceneIdx + 1} · Shot {globalShotNo.get(shot.shotId) ?? shotIdx + 1}
-                            </span>
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Badge variant="outline" className="cursor-help text-xs">
-                                    {shot.shotType}
-                                  </Badge>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  {t(SHOT_TYPE_DESCRIPTIONS[shot.shotType] ?? shot.shotType)}
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                            <span className="ml-auto font-mono text-xs tabular-nums text-muted-foreground">
-                              {shot.durationSeconds}s
-                            </span>
-                          </div>
-                          {/* 전문 표시(#zoom-desc) — 잘라내지 않는다. 축소 시 폰트가 함께 줄어든다. */}
-                          <p className="leading-relaxed" style={{ fontSize: descFontSize }}>
-                            {resolveEntityNames(shot.actionDescription, entityNames)}
+                        {/* 액션 글 — 전문 표시(#zoom-desc, 잘라내지 않는다 · 축소 시 폰트가 함께 줄어든다). 인물 이름은 멘션 색(시안 "@민호", 글은 그대로). */}
+                        <p className="font-medium leading-relaxed text-foreground" style={{ fontSize: descFontSize }}>
+                          {mentionSegments(resolveEntityNames(shot.actionDescription, entityNames), mentionNames).map((part, i) =>
+                            part.mention ? (
+                              <span key={i} className="font-semibold text-mention">{part.text}</span>
+                            ) : (
+                              <Fragment key={i}>{part.text}</Fragment>
+                            ),
+                          )}
+                        </p>
+                        {/* 대사 한 줄(v3 시안 S1) — 첫 대사, 더 있으면 +N. 예전(#8 2026-07-09)에는 파이프라인이 대사 칸에 상황 요약을 채워 뺐다 —
+                            지금 대사 칸은 대사 탭과 같은 진짜 대사다(#dialogue-v4 2026-07-23). */}
+                        {dialogue ? (
+                          <p className="truncate text-caption text-muted-foreground" title={`${dialogue.speaker} “${dialogueText}”`}>
+                            {dialogue.speaker} &ldquo;{dialogueText}&rdquo;
+                            {dialogue.more > 0 ? <span className="ml-1.5 font-num text-subtle-foreground">+{dialogue.more}</span> : null}
                           </p>
-                          {/* #8: 대사 표시 제거 — 파이프라인이 대사 슬롯에 상황 요약을 채워 실제 대사가 아님(2026-07-09). */}
-                          {/* #adherence P2: START↔설명 불일치 배지 — 팝업의 "저장 후 재생성"으로 유도. */}
-                          {shot.roughStoryboard?.adherence?.status === 'mismatch' ? (
-                            <p
-                              className="flex items-center gap-1 text-xs text-warning"
-                              title={shot.roughStoryboard.adherence.reason ?? undefined}
-                            >
-                              <AlertCircle className="size-3.5 shrink-0" />
-                              {t('The image may not match the description. Click the card to try regenerating')}
-                            </p>
-                          ) : null}
+                        ) : null}
+                        {/* 칩(v3 시안 S1) — 샷 크기는 늘, 앵글 · 움직임 · 색온도는 러프가 따르는 무대 설계 값이 있을 때만(lib/writer/board-card).
+                            연출 메모는 제품에 칸이 없어 두지 않는다(결정 대기). */}
+                        <div className="flex flex-wrap gap-1">
+                          {shotCardChips(shot, locale).map((chip) =>
+                            chip.kind === 'size' ? (
+                              <TooltipProvider key={chip.kind}>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge variant="tag" className="cursor-help">
+                                      {chip.label}
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    {t(SHOT_TYPE_DESCRIPTIONS[shot.shotType] ?? shot.shotType)}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            ) : (
+                              <Badge key={chip.kind} variant="tag">
+                                {chip.label}
+                              </Badge>
+                            ),
+                          )}
                         </div>
+                        {/* #adherence P2: START↔설명 불일치 배지 — 팝업의 "저장 후 재생성"으로 유도. */}
+                        {shot.roughStoryboard?.adherence?.status === 'mismatch' ? (
+                          <p
+                            className="flex items-center gap-1 text-caption text-warning"
+                            title={shot.roughStoryboard.adherence.reason ?? undefined}
+                          >
+                            <AlertCircle className="size-3.5 shrink-0" />
+                            {t('The image may not match the description. Click the card to try regenerating')}
+                          </p>
+                        ) : null}
                       </article>
                     )
                   })}

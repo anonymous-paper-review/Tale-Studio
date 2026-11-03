@@ -82,6 +82,9 @@ export interface StoryboardBusyView {
   failed: number
   /** 실패 안내의 버튼 이름. */
   actions?: { redraw: string; close: string }
+  /** Artist 에서 넘어와 씬 · 샷을 나누고 첫 러프를 그리는 동안 — 단계를 넘어가며 기다리는 화면(큰 Lumi 자리, 오너 결정 8 2026-11-03).
+   *  보드에서 다시 그리는 잠금 · 실패 안내 · 이 화면에서 도는 다른 실행은 아니다. 약속: tests/writer/board-wait-lumi.test.ts */
+  stageEntry: boolean
 }
 
 // 씬 · 샷 나누기 단계 → 잠금 표시의 줄(0~3). v2Design 등 앞 단계는 [완료하기] 직후 실행이 다음 단계로 들어가기 전의 틈이다.
@@ -127,14 +130,14 @@ export function storyboardBusyView(
   locale: AppLocale,
 ): StoryboardBusyView {
   const { status, facts, lock, rough, sceneCount } = input
-  const closed: StoryboardBusyView = { open: false, phase: null, title: '', progress: null, failed: rough.failed }
+  const closed: StoryboardBusyView = { open: false, phase: null, title: '', progress: null, failed: rough.failed, stageEntry: false }
 
   if (facts.runActive) {
     const step = status?.engine !== 'v2' ? SPLIT_STEP[status?.current_stage ?? ''] : undefined
     if (step === undefined) {
       // 씬 · 샷 나누기가 아닌 실행(산문 초안 · 실험 엔진)이 이 화면에서 돈다 — Writer 진행 문구로 잠근다.
       const progress = writerProgressView(status, locale)
-      return { open: true, phase: 'split', title: progress.label, description: progress.detail, progress: progress.percent, progressLabel: progress.countLabel, failed: rough.failed }
+      return { open: true, phase: 'split', title: progress.label, description: progress.detail, progress: progress.percent, progressLabel: progress.countLabel, failed: rough.failed, stageEntry: false }
     }
     const percent = Math.round((step / SPLIT_STEPS) * 100)
     return {
@@ -146,6 +149,7 @@ export function storyboardBusyView(
       progress: percent,
       progressLabel: translate(locale, 'Step {current}/{total} · {percent}%', { current: step + 1, total: SPLIT_STEPS, percent }),
       failed: rough.failed,
+      stageEntry: true,
     }
   }
 
@@ -165,6 +169,7 @@ export function storyboardBusyView(
       progress: percent,
       progressLabel: roughLabel,
       failed: rough.failed,
+      stageEntry: firstDraw,
     }
   }
 
@@ -178,6 +183,7 @@ export function storyboardBusyView(
       progressLabel: roughLabel,
       failed: rough.failed,
       actions: { redraw: translate(locale, 'Draw the remaining cuts again'), close: translate(locale, 'Close') },
+      stageEntry: false,
     }
   }
 

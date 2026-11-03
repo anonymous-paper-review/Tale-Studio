@@ -98,6 +98,9 @@ export interface Shot {
   roughStoryboard?: RoughStoryboardImage | null
   /** 목각 previz 영상(#previz-video 2026-07-22) — 러프 START+END 로 생성한 연출 판독용 영상. */
   previzVideo?: RoughStoryboardImage | null
+  /** 러프가 따르는 무대 설계 값(shots.static_spec · dynamic_spec, 읽기만) — Storyboard 카드 칩(v3, 2026-11-03).
+   *  직접 더한 샷 · 옛 프로젝트는 없다. 저장하지 않는다(writer-store 의 샷 저장은 칸을 골라 쓴다). */
+  stageDesign?: ShotStageDesign | null
   /** DB shots.sort_order — 씬 내 순서. 위치 삽입(추가 팝업)에서 이웃 기준 계산에 사용. */
   sortOrder?: number
   /**
@@ -110,6 +113,16 @@ export interface Shot {
    *   자리는 화면 비율(덩어리 가운데). 편집기 스냅샷(editor_states)에 저장된다.
    */
   subtitle?: ShotSubtitle | null
+}
+
+/** 파이프라인 무대 설계에서 읽은 카드 칩 값 — 원문 그대로(이름은 lib/writer/board-card 가 붙인다). */
+export interface ShotStageDesign {
+  /** 카메라 높이(eye_level · low_angle · high_angle · dutch · overhead 등). */
+  cameraAngle: string | null
+  /** 카메라 움직임 유형(static · dolly_in · tracking 등). */
+  cameraMotion: string | null
+  /** 조명 색온도(K). */
+  colorTempK: number | null
 }
 
 export interface ShotSubtitle {

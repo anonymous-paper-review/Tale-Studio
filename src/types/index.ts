@@ -11,6 +11,7 @@ export type {
   CameraPreset,
   Shot,
   RoughStoryboardImage,
+  ShotStageDesign,
   VideoClip,
   AudioTrackClip,
   AudioSource,
