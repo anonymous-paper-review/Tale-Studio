@@ -1549,6 +1549,11 @@ export const KO: Record<string, string> = {
   'Final videos can be saved from Editor.': '최종 영상은 Editor에서 받을 수 있어요.',
   'Checking your plan…': '요금제를 확인하고 있어요…',
   'Could not check your plan. Open this menu again.': '요금제를 확인하지 못했어요. 메뉴를 다시 열어 주세요.',
+  // [내보내기] 체크 창(v3 2026-11-03 오너 "버튼을 누르면 check 박스가 떠서 어떤 아이템만 내보낼 수 있을지 정해줘").
+  'Choose what to export. Only the checked items are saved, one after another.': '내보낼 것을 고르세요. 고른 것만 하나씩 차례로 받아요.',
+  'Not available on this stage.': '이 단계에서는 받을 수 없어요.',
+  'When you export more than one, your browser may ask whether to allow multiple downloads.': '여러 개를 받으면 브라우저가 여러 파일 다운로드를 허용할지 물을 수 있어요.',
+  'Could not check your plan. Close this window and open it again.': '요금제를 확인하지 못했어요. 창을 닫았다가 다시 열어 주세요.',
   '{count} failed': '{count}개 실패',
   'Export complete: {count} files': '내보내기 완료: {count}개 파일',
   'Estimated export size is {size}. Continue?': '예상 내보내기 크기가 {size}입니다. 계속 진행할까요?',
