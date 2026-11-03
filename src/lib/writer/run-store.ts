@@ -106,17 +106,35 @@ export async function createRun(
 /**
  * 프로젝트의 최신 run 행 (created_at desc). 없으면 null.
  */
-export async function getActiveRun(projectId: string): Promise<WriterRunRow | null> {
+// state 를 뺀 writer_runs 열 — 칸만 골라 읽을 때도 행 모양(WriterRunRow)은 그대로 돌려준다.
+const RUN_COLUMNS = ['id', 'project_id', 'status', 'current_stage', 'completed_units', 'total_units', 'error', 'created_at', 'updated_at', 'state_version'] as const;
+
+/**
+ * 최근 실행 기록. stateFields 를 주면 state 에서 그 최상위 칸만 DB 에 묻고(state->칸) 그 칸들로 state 를 다시 만든다 —
+ *   완성된 실행 기록은 샷 설계 · 렌더 지시가 수백 KB 라, 산문만 보는 화면(미리 보기)이 그것까지 받으면 느리다(2026-11-03 오너 QA 2번).
+ *   기록에 없던 칸(DB 가 null 로 답한 칸)은 state 에 넣지 않는다. 주지 않으면 지금처럼 전부 읽는다.
+ */
+export async function getActiveRun(projectId: string, opts: { stateFields?: readonly string[] } = {}): Promise<WriterRunRow | null> {
+  const fields = opts.stateFields;
+  const columns = fields ? [...RUN_COLUMNS, ...fields.map((field, i) => `s${i}:state->${field}`)].join(',') : '*';
   const { data, error } = await supabaseAdmin
     .from('writer_runs')
-    .select('*')
+    .select(columns)
     .eq('project_id', projectId)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 
   if (error) throw new Error(`getActiveRun failed: ${error.message}`);
-  return (data as WriterRunRow | null) ?? null;
+  if (!data || !fields) return (data as WriterRunRow | null) ?? null;
+  const row = data as unknown as Record<string, unknown>;
+  const state: Record<string, unknown> = {};
+  fields.forEach((field, i) => {
+    const value = row[`s${i}`];
+    if (value !== null && value !== undefined) state[field] = value;
+  });
+  const base = Object.fromEntries(RUN_COLUMNS.map((column) => [column, row[column]]));
+  return { ...base, state } as unknown as WriterRunRow;
 }
 
 /**

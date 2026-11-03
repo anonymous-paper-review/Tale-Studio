@@ -6,6 +6,8 @@
 //       (decoupage/shotDesign 산출물은 영어 + 연출 표현이라 "유저 언어 스토리" 목표에 안 맞아 미사용.)
 //     - 캐릭터 = state.characters(이름/역할, 이른 시점) + characters 테이블(네이티브 설명 + 초안 이미지 URL).
 //   폴링은 실행 중 한 프로젝트만 저빈도(≈4s)로 하므로 state 블롭 SELECT 비용은 감내한다.
+//   2026-11-03 오너 QA 2번("Writer 탭 로딩이 너무 길다, 완성된 경우는 더"): 완성된 실행 기록은 샷 설계 · 렌더 지시가 대부분이다 —
+//   state 에서 이 라우트가 쓰는 칸만 읽고(PREVIEW_STATE_FIELDS), 실행 기록 · 언어 · 인물 · 모습 · 배경을 한꺼번에 읽는다.
 import { NextRequest, NextResponse } from 'next/server';
 import { displayNameOf } from '@/lib/display-name';
 import { requireProjectAccess } from '@/lib/api/guard';
@@ -20,6 +22,7 @@ import { stableHash } from '@/lib/stable-hash';
 import { draftBasisOf } from '@/lib/writer/treatment-draft';
 import { proseConditionsOf, type ProseSeed } from '@/lib/writer/prose-conditions';
 import { mergeOpenWorld } from '@/lib/writer/pipeline/stages/s3_scenes';
+import { PREVIEW_STATE_FIELDS } from '@/lib/writer/preview-fields';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -97,7 +100,29 @@ export async function GET(
     const access = await requireProjectAccess(req, projectId, { allowShare: true });
     if (!access.ok) return access.response;
 
-    const run = await getActiveRun(projectId);
+    // 실행 기록(산문 화면이 쓰는 칸만) · 프로젝트 언어 · 인물 · 기본 모습 · 배경을 한꺼번에 읽는다 — 서로 기다릴 까닭이 없다.
+    //   언어 · 배경 읽기는 예전처럼 끊겨도 산문을 막지 않는다(언어는 화면 언어로, 배경 카드는 빈 목록으로).
+    const uiLocale = parseAppLocale(req.nextUrl.searchParams.get('locale')) ?? 'en';
+    const [run, localeRow, charactersRes, appearancesRes, locRows] = await Promise.all([
+      getActiveRun(projectId, { stateFields: PREVIEW_STATE_FIELDS }),
+      Promise.resolve(supabaseAdmin.from('projects').select('locale,locale_locked').eq('id', projectId).maybeSingle())
+        .then(({ data }) => ({ data }), () => null),
+      supabaseAdmin
+        .from('characters')
+        .select('character_id,name,role')
+        .eq('project_id', projectId),
+      supabaseAdmin
+        .from('character_appearances')
+        .select('character_id,appearance,appearance_native,portrait_url,sheet_url')
+        .eq('project_id', projectId)
+        .eq('is_default', true),
+      Promise.resolve(
+        supabaseAdmin
+          .from('locations')
+          .select('location_id, name, visual_description, visual_description_native')
+          .eq('project_id', projectId),
+      ).then(({ data }) => data, () => null),
+    ]);
     if (!run) {
       return NextResponse.json({
         started: false,
@@ -151,15 +176,11 @@ export async function GET(
     pushRoster(roster, seen, state.worldVisual?.locations);
     pushRoster(roster, seen, state.world?.locations);
 
-    // 화면과 같은 콘텐츠 언어 계약: 잠긴 프로젝트 언어 우선, 미잠금은 요청한 화면 언어.
-    const uiLocale = parseAppLocale(req.nextUrl.searchParams.get('locale')) ?? 'en';
-    let locale: AppLocale = uiLocale;
-    try {
-      const { data } = await supabaseAdmin.from('projects').select('locale,locale_locked').eq('id', projectId).maybeSingle();
-      locale = pickContentLocale({ projectLocale: parseAppLocale(data?.locale), locked: data?.locale_locked ?? null, uiLocale });
-    } catch {
-      // 조회가 실패하면 현재 화면 언어를 사용한다.
-    }
+    // 화면과 같은 콘텐츠 언어 계약: 잠긴 프로젝트 언어 우선, 미잠금은 요청한 화면 언어. 조회가 실패하면 현재 화면 언어를 사용한다.
+    const localeData = localeRow?.data as { locale?: unknown; locale_locked?: boolean | null } | null | undefined;
+    const locale: AppLocale = localeRow
+      ? pickContentLocale({ projectLocale: parseAppLocale(localeData?.locale), locked: localeData?.locale_locked ?? null, uiLocale })
+      : uiLocale;
 
     // #s3-gate(2026-08-05): 샷 단위 이야기(#shot-story) 노출 중단 — 게이트 검토 대상은 씬 스토리다
     //   (요구: "shot 스토리 제거"). 필드는 클라 호환용으로 빈 배열 유지 — 토글이 자연히 숨는다.
@@ -173,18 +194,7 @@ export async function GET(
       shotStories: [],
     }));
 
-    // 캐릭터 정체성은 characters, 일반 표시 모습은 유일한 기본 character_appearances 행에서 읽는다.
-    const [charactersRes, appearancesRes] = await Promise.all([
-      supabaseAdmin
-        .from('characters')
-        .select('character_id,name,role')
-        .eq('project_id', projectId),
-      supabaseAdmin
-        .from('character_appearances')
-        .select('character_id,appearance,appearance_native,portrait_url,sheet_url')
-        .eq('project_id', projectId)
-        .eq('is_default', true),
-    ]);
+    // 캐릭터 정체성은 characters, 일반 표시 모습은 유일한 기본 character_appearances 행에서 읽는다(위에서 함께 읽었다).
     if (charactersRes.error) throw new Error(`writer preview characters load failed: ${charactersRes.error.message}`);
     if (appearancesRes.error) throw new Error(`writer preview appearances load failed: ${appearancesRes.error.message}`);
 
@@ -230,13 +240,9 @@ export async function GET(
       };
     });
 
-    // #p3b 쇼케이스: 배경(locations) 텍스트 카드 — writer 뒷단(v2)이 서술을 채우면 점진 노출.
+    // #p3b 쇼케이스: 배경(locations) 텍스트 카드 — writer 뒷단(v2)이 서술을 채우면 점진 노출(위에서 함께 읽었다).
     let worlds: Array<{ id: string; name: string; description: string; descriptionFallback: boolean }> = [];
     try {
-      const { data: locRows } = await supabaseAdmin
-        .from('locations')
-        .select('location_id, name, visual_description, visual_description_native')
-        .eq('project_id', projectId);
       worlds = (locRows ?? [])
         .map((r) => ({
           id: (r.location_id as string) ?? '',

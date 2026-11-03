@@ -1,6 +1,8 @@
 // writer 중간 산출물(스토리) 프리뷰 폴링 훅(#story-stream 2026-07-21).
 //   /api/writer/preview/{projectId} 를 저빈도로 폴링해 실행 중 점진적 스토리 뷰어에 공급한다.
 //   진행상태(단계/진행률/ETA)는 useWriterStatus 가 담당 — 이 훅은 콘텐츠 전용.
+//   2026-11-03 오너 QA 2번: 같은 때 여러 곳이 읽으면 요청을 합치고, 완성된 산문은 화면이 다시 열릴 때 받아 둔 것을 바로 쓴 뒤
+//   다시 읽는다(lib/writer/preview-cache). 고칠 수 있는 초안은 지금처럼 늘 새로 읽는다.
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
@@ -9,6 +11,7 @@ import type { WriterV2Package } from '@/lib/writer/v2/semantic-unit'
 import { useLocaleStore } from '@/stores/locale-store'
 import { useProjectStore } from '@/stores/project-store'
 import { pickContentLocale } from '@/lib/locale'
+import { readyPreview, refreshPreview } from '@/lib/writer/preview-cache'
 import type { SceneStoryProposalView } from '@/lib/producer/scene-story-proposal'
 import type { TreatmentCast } from '@/lib/producer/treatment-cast-sync'
 import type { DraftBasis } from '@/lib/writer/treatment-draft'
@@ -108,9 +111,9 @@ export function useWriterPreview(
       setLoading(true)
       let stop = false
       try {
-        const r = await fetch(`/api/writer/preview/${projectId}?locale=${displayLocale}`)
+        const r = await refreshPreview(projectId, displayLocale, refreshKey)
         if (r.ok) {
-          const j = (await r.json()) as WriterPreview
+          const j = r.preview
           if (!cancelled) {
             setPreviewState({ projectId, preview: j })
             setFailedFor(null)
@@ -137,5 +140,8 @@ export function useWriterPreview(
     }
   }, [projectId, interval, enabled, displayLocale, refreshKey])
 
-  return { preview: previewState && previewState.projectId === projectId ? previewState.preview : null, loading, failed: failedFor === projectId }
+  // 이 화면이 아직 읽지 못했으면 받아 둔 바뀌지 않는 산문(완성 · 확정)을 바로 쓴다 — 읽기는 위에서 그대로 한다.
+  const own = previewState && previewState.projectId === projectId ? previewState.preview : null
+  const preview = own ?? (enabled ? readyPreview(projectId, displayLocale) : null)
+  return { preview, loading, failed: failedFor === projectId }
 }
