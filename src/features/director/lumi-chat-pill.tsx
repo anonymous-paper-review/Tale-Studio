@@ -1,7 +1,7 @@
 'use client'
 
 // Director 툴바 오른쪽 끝의 Lumi 알약(v3 D1 "Lumi Chat 접힘", 2026-11-03) — 채팅이 닫혀 있을 때만 보이고, 누르면 채팅이 열린다.
-//   Lumi 는 멈춘 그림(채팅 아바타와 같은 Director 옷). 약속: tests/chat/director-chat-closed.test.ts
+//   Lumi 는 멈춘 그림(채팅 아바타와 같은 Director 옷). 약속: tests/director/chat-closed.test.ts
 import { ExpandIcon } from '@/components/icons/v3-icons'
 import { LumiAvatar } from '@/components/lumi/lumi'
 import { useT } from '@/lib/i18n'
