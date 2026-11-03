@@ -9,6 +9,7 @@ import { markStageSeen } from '@/lib/stage-seen'
 import { useProducerStore } from '@/stores/producer-store'
 import { useWriterStore } from '@/stores/writer-store'
 import { useArtistStore } from '@/stores/artist-store'
+import { useEntryStore } from '@/features/entry/entry-store'
 import { Sidebar } from '@/components/layout/sidebar'
 import { GlobalChat } from '@/components/layout/global-chat'
 import { useWriterRoomStore, writerRightChatHidden } from '@/stores/writer-room-store'
@@ -131,6 +132,8 @@ export default function StudioLayout({
       if (stage !== 'producer') void useProducerStore.getState().loadProject()
       if (stage !== 'writer') void useWriterStore.getState().loadProject()
       if (stage !== 'artist') void useArtistStore.getState().loadData()
+      // Producer 시작 화면(id entry) — 시작한 프로젝트의 완료 화면만 받아 둔다(QA 2026-11-03, tests/producer/entry-prefetch.test.ts).
+      if (stage !== 'entry') void useEntryStore.getState().prefetch(projectId)
     }, 1500)
     return () => clearTimeout(t)
   }, [projectId, initLoading])
