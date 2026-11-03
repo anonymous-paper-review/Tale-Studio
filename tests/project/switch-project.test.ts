@@ -105,7 +105,7 @@ describe('프로젝트 바꾸기', () => {
     expect(mocks.fetch).not.toHaveBeenCalled()
   })
 
-  it('같은 프로젝트를 다시 열어도 프로젝트가 잠깐 비었다가 다시 정해져, 열린 화면이 새로 읽는다', async () => {
+  it('같은 프로젝트를 다시 열어도 프로젝트가 잠깐 비었다가 다시 정해진다', async () => {
     // 왜: 프로젝트가 그대로면 화면은 다시 읽지 않는다 — 비우기만 하고 다시 읽지 않으면 빈 화면으로 남는다.
     open()
     const store = await load()
