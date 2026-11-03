@@ -308,8 +308,27 @@ interface GlobalChatState {
 }
 
 type SavedConversationState = Pick<GlobalChatState, 'pendingProposal' | 'deferredProposals' | 'deferredSuggestions' | 'dismissedSuggestionIds' | 'recordedSuggestionIds' | 'suggestion' | 'cancelledProposalIds'>
+// 늦은 비우기 막이(QA 2026-11-03 밤 유실 점검): 화면이 읽어 둔 지금 프로젝트의 채팅 기억을 store 비우기(reset)가 늦게 비우면,
+//   그 프로젝트 채팅을 다시 읽기 전에는 이 브라우저에 저장해 둔 기억을 덮지 않는다 — 빈 채팅에서 무엇이든 하면 빈 기억이 답을 기다리던
+//   승인 카드 · 미뤄 둔 제안 · 닫은 제안 기록을 덮었다. 저장해 둔 기억이 없으면 잃을 것이 없어 막이를 풀고 쓴다.
+//   다른 프로젝트로 바꾸며 비우는 것은 막지 않는다. 약속: tests/chat/late-reset-memory.test.ts
+let conversationProjectId: string | null = null
+let wipedConversationProjectId: string | null = null
 function persistConversationState(state: SavedConversationState, projectId = useProjectStore.getState().projectId): void {
-  if (!projectId || typeof localStorage === 'undefined') return
+  if (!projectId) return
+  if (projectId === wipedConversationProjectId) {
+    if (storedConversationExists(projectId)) return
+    wipedConversationProjectId = null
+  }
+  writeConversationState(state, projectId)
+}
+function storedConversationExists(projectId: string): boolean {
+  if (typeof localStorage === 'undefined') return false
+  try { return localStorage.getItem(`tale:chat-actions:${projectId}`) !== null } catch { return false }
+}
+/** 저장된 기억에 합쳐 쓰는 길(지금 store 가 아닌 저장본 기준)은 늦은 비우기 막이를 거치지 않는다. */
+function writeConversationState(state: SavedConversationState, projectId: string): void {
+  if (typeof localStorage === 'undefined') return
   const { pendingProposal, deferredProposals, deferredSuggestions, dismissedSuggestionIds, recordedSuggestionIds, suggestion, cancelledProposalIds } = state
   try { localStorage.setItem(`tale:chat-actions:${projectId}`, JSON.stringify({ pendingProposal, deferredProposals, deferredSuggestions, dismissedSuggestionIds, recordedSuggestionIds, suggestion: suggestion?.action?.kind === 'choices' || suggestion?.restoredChoices ? null : suggestion, cancelledProposalIds })) } catch { /* 대화 자체는 서버에 남는다. */ }
 }
@@ -1354,6 +1373,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   loadMessages: async (projectId) => {
     // #welcome-race: 아래 hydrate 의 set 은 suggestion 을 (복원 선택지 또는 null 로) 덮어쓴다.
     //   완료 마커를 로드 전 비우고 모든 종료 경로에서 세워, 제안 발사측이 로드 뒤에만 쏘게 한다.
+    // 이 프로젝트 채팅 기억을 다시 읽었다(바로 아래 set) — 늦은 비우기 막이를 푼다.
+    conversationProjectId = projectId
+    if (wipedConversationProjectId === projectId) wipedConversationProjectId = null
     set({ messagesLoadedProjectId: null, lastTrace: null, suggestion: null, pendingProposal: null, deferredProposals: [], deferredSuggestions: [], recordedSuggestionIds: [], dismissedSuggestionIds: [], cancelledProposalIds: [], sceneStoryEdit: null, sceneStoryProposalPending: null, sceneStoryVariantPreview: null, ...loadConversationState(projectId) })
     if (get().pendingProposal?.stage === 'producer' && isProducerChoice(get().suggestion)) get().dismissSuggestion()
     const hadProducerApproval = get().pendingProposal?.stage === 'producer'
@@ -4129,7 +4151,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         if (!projectId) return
         const saved = loadConversationState(projectId)
         const deferredProposals = [...(saved.deferredProposals ?? []).filter(item => item.id !== proposal.id), ...(queued ? [queued] : [])]
-        persistConversationState({ pendingProposal: null, suggestion: null, dismissedSuggestionIds: [], recordedSuggestionIds: [], deferredSuggestions: [], cancelledProposalIds: [], ...saved, deferredProposals }, projectId)
+        writeConversationState({ pendingProposal: null, suggestion: null, dismissedSuggestionIds: [], recordedSuggestionIds: [], deferredSuggestions: [], cancelledProposalIds: [], ...saved, deferredProposals }, projectId)
         return
       }
       set(state => ({ deferredProposals: [
@@ -4717,6 +4739,10 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   clearError: () => set({ error: null }),
 
   reset: () => {
+    // 읽어 둔 지금 프로젝트의 채팅 기억을 비우는 것(늦은 비우기)이면 다시 읽기 전까지 그 프로젝트 기억 저장을 막는다.
+    const current = useProjectStore.getState().projectId
+    if (conversationProjectId && conversationProjectId === current) wipedConversationProjectId = current
+    conversationProjectId = null
     chatSession += 1
     sceneStoryRequests.clear()
     announcedTreatments.clear()
