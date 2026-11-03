@@ -37,6 +37,7 @@ import { isDemoSession } from '@/lib/demo/context'
 import type { ArtistSourceSnapshot } from '@/lib/artist/source-snapshot'
 import { fetchArtistGenerationLimit, runAdaptivePool } from '@/lib/artist/generation-slots'
 import { DRAW_CONTINUE_MAX_ROUNDS, STYLE_WAIT_RECHECK_MS, USER_LIMIT_RECHECK_MS, missingDrawTargets, USER_LIMIT_WAIT_MAX_MS } from '@/lib/artist/draw-continue'
+import type { ArtistFilter } from '@/lib/artist/card-filter'
 // 최종 룩 요약(design_tokens 파생) — 옛 온보딩 버블 카피용으로 태어났지만(2026-08-06 제거)
 //   "지금 룩이 뭔지"의 파생 상태로 남긴다. 채팅 컨텍스트·향후 UI가 소비.
 export interface ArtistLookSummary {
@@ -727,8 +728,9 @@ interface ArtistState {
   /** 진입 허용된 projectId 기록 (멱등). 페이지가 ready 도달 시 1회 호출. */
   markEntered: (projectId: string) => void
   /** 약속 D15(2026-09-04): 보던 탭(인물/배경) — 떠났다 돌아와도 그대로. 고른 카드는 selected* 가 이미 기억한다. */
-  uiTab: 'characters' | 'world'
-  setUiTab: (tab: 'characters' | 'world') => void
+  /** 보던 칸(v3 A5 걸러 보기: 모두 · 인물 · 배경 — lib/artist/card-filter). */
+  uiTab: ArtistFilter
+  setUiTab: (tab: ArtistFilter) => void
   /** 승인된 원천 외형 변경을 로컬 반영(C3 F6) — fixedPrompt 갱신 → 기존 파생 이미지가 stale 로 표시(자동 재생성 없음). */
   applyAppearancePatch: (characterId: string, appearance: string, appearanceNative?: string | null) => void
   updateCharacterAppearance: (

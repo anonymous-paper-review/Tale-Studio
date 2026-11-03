@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { classifyWorldImageStale } from '@/lib/image-provenance'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
+import { VersionBadge, lookChipClass, useCardVersion } from '@/features/artist/card-parts'
 import { WorldViewDialog } from '@/features/artist/world-view-dialog'
 import { LocationAppearanceCreateDialog } from '@/features/artist/location-appearance-create-dialog'
 import { useArtistStore, worldFailureKey, type WorldShotKey } from '@/stores/artist-store'
@@ -20,6 +20,8 @@ import { useT } from '@/lib/i18n'
 
 // columns: 보드 축척(#d1) — 1(기존 세로 스택)~3열 그리드. 페이지 헤더의 슬라이더가 결정.
 // onZoomStep: Ctrl+휠 축척(#a1 2026-07-15) — 캐릭터 탭과 동일한 굴림당 1단계.
+// v3 A5(2026-11-03): 카드 = 배경 묶음 판 — 이름 · "배경" 꼬리표 · 모습 수, 모습 칩, 그림(판 배지 v1 · v2 …), 모습 설명 한 줄.
+//   스크롤은 Artist 화면이 한 번에 한다 — 이 판은 자기 스크롤이 없다.
 export function WorldPanel({
   columns = 1,
   onZoomStep,
@@ -32,6 +34,7 @@ export function WorldPanel({
     if (useArtistStore.getState().chatSelection?.target === 'background') useArtistStore.getState().setChatSelection(null)
   }, [])
   const t = useT()
+  const versionOf = useCardVersion()
   const {
     sceneManifest,
     worldAssets,
@@ -76,9 +79,9 @@ export function WorldPanel({
     sceneManifest?.scenes.find((s) => s.sceneId === sceneId)
 
   const gridClass = cn(
-    columns >= 3 && 'grid grid-cols-3 items-start gap-4',
-    columns === 2 && 'grid grid-cols-2 items-start gap-4',
-    columns <= 1 && 'space-y-6',
+    columns >= 3 && 'grid grid-cols-3 items-start gap-3.5',
+    columns === 2 && 'grid grid-cols-2 items-start gap-3.5',
+    columns <= 1 && 'space-y-3.5',
   )
   // 시리즈 다음 화(2026-10-26): 앞 화에서 이어받은 배경에 표시를 붙이고, 이번 화 산문에 안 나오는 것은 맨 아래 "보관" 묶음으로 내린다.
   //   보관 카드도 같은 카드 함수로 그린다 — 지금 카드가 하는 일(고르기 · 멘션 · 팝업)을 그대로 쓴다.
@@ -141,17 +144,19 @@ export function WorldPanel({
           }
         }}
         className={cn(
-          'cursor-pointer rounded-xl border p-4 transition-colors',
+          'cursor-pointer rounded-[18px] border border-transparent bg-panel px-4 pb-4 pt-3.5 shadow-panel transition-colors',
           isSelected
-            ? 'border-primary bg-accent'
-            : 'border-border hover:bg-accent/50',
+            ? 'ring-[1.5px] ring-stage'
+            : 'hover:border-border',
           mentionedLocationIds.has(world.locationId) &&
             'mention-flash ring-2 ring-sky-400/70 border-sky-400/50 bg-sky-400/10',
         )}
       >
         <div className="mb-3 flex flex-wrap items-center gap-2">
           {/* 좁은 카드에서 이름이 잘리지 않게 두 줄까지 보인다(2026-10-27 QA). */}
-          <span className="line-clamp-2 min-w-[5rem] flex-1 break-words font-medium">{world.name}</span>
+          <span className="line-clamp-2 min-w-0 break-words text-body font-semibold">{world.name}</span>
+          {/* v3 A5 꼬리표. */}
+          <Badge variant="tag">{t('Background')}</Badge>
           {/* 시리즈 다음 화: 앞 화에서 그림까지 이어받은 배경인가. */}
           {mark.inherited ? (
             <Badge variant="outline" className="shrink-0 text-[10px]" data-testid="artist-series-inherited">
@@ -173,6 +178,8 @@ export function WorldPanel({
               {scene.timeOfDay}
             </Badge>
           )}
+          {/* 모습 수(v3 A5 "모습 1") — 기본 모습 + 변형. */}
+          <span className="ml-auto shrink-0 text-caption text-subtle-foreground">{t('Looks {count}', { count: 1 + (world.appearances?.length ?? 0) })}</span>
         </div>
 
         {/* 모습 탭(약속 C10) — 캐릭터 카드와 같은 줄: 기본 + 변형들 + "+ 모습 추가". 항상 보인다. */}
@@ -185,10 +192,7 @@ export function WorldPanel({
                 type="button"
                 onClick={() => { selectLocationAppearance(world.locationId, ap.appearanceKey); noteSelection(world.locationId, ap.appearanceKey, 'appearance') }}
                 aria-pressed={active}
-                className={cn(
-                  'rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors',
-                  active ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-accent',
-                )}
+                className={lookChipClass(active)}
               >
                 {ap.label}
               </button>
@@ -197,7 +201,7 @@ export function WorldPanel({
           <button
             type="button"
             onClick={() => setCreateFor(world.locationId)}
-            className="rounded-md border border-dashed border-border px-2 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent"
+            className={lookChipClass(false)}
             title={t('Add appearance')}
           >
             {t('+ Add appearance')}
@@ -213,7 +217,7 @@ export function WorldPanel({
             noteSelection(world.locationId, variantKey ?? DEFAULT_LOCATION_APPEARANCE_KEY, 'image')
             setViewDialog({ locationId: world.locationId, shot: 'wideShot', appearanceKey: variantKey })
           }}
-          className="block w-full rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
+          className="relative block w-full overflow-hidden rounded-[14px] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
         >
           <ImagePlaceholder
             label={t('Background')}
@@ -222,7 +226,14 @@ export function WorldPanel({
             generating={isGenerating}
             hideCaption
           />
+          {/* 판 배지(v3 A5) — 이 그림을 그린 때의 작품 스타일 버전. 그리는 중 · 그림이 없으면 없다. */}
+          <VersionBadge n={isGenerating ? null : versionOf(shownImage, candidates)} />
         </button>
+
+        {/* 모습 설명(v3 A5 그림 아래 한 줄) — 유저 언어 설명만. */}
+        {(variant ? variant.visualDescriptionNative : world.visualDescriptionNative) ? (
+          <p className="mt-2 line-clamp-2 text-caption text-subtle-foreground">{variant ? variant.visualDescriptionNative : world.visualDescriptionNative}</p>
+        ) : null}
 
         {/* 시리즈 다음 화: 앞 화 그림을 참고해 이 화 그림체로 다시 그릴 카드만 한 줄 알린다. */}
         {mark.use === 'redraw' ? (
@@ -237,20 +248,18 @@ export function WorldPanel({
   }
 
   return (
-    <div ref={wheelRef} className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div ref={wheelRef} data-testid="artist-world-cards">
       {/* 모델(provider)·톤(boost) 선택 툴바 제거(#10). 생성은 store 기본값으로 수행. */}
-      <ScrollArea className="min-h-0 flex-1 px-6 py-4">
-        <div className={gridClass}>{liveCards.map(card)}</div>
-        {keptCards.length > 0 ? (
-          <section className="mt-6 border-t border-border pt-4" data-testid="artist-series-kept">
-            <div className="mb-3 flex flex-wrap items-baseline gap-2">
-              <h2 className="text-sm font-medium">{t('Kept')}</h2>
-              <p className="text-xs text-muted-foreground">{t('Not in this episode. The picture stays as it is and carries over to the next episode.')}</p>
-            </div>
-            <div className={gridClass}>{keptCards.map(card)}</div>
-          </section>
-        ) : null}
-      </ScrollArea>
+      <div className={gridClass}>{liveCards.map(card)}</div>
+      {keptCards.length > 0 ? (
+        <section className="mt-6 border-t border-border pt-4" data-testid="artist-series-kept">
+          <div className="mb-3 flex flex-wrap items-baseline gap-2">
+            <h2 className="text-body font-semibold">{t('Kept')}</h2>
+            <p className="text-caption text-muted-foreground">{t('Not in this episode. The picture stays as it is and carries over to the next episode.')}</p>
+          </div>
+          <div className={gridClass}>{keptCards.map(card)}</div>
+        </section>
+      ) : null}
 
       <WorldViewDialog
         locationId={viewDialog?.locationId ?? null}
