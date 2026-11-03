@@ -642,6 +642,13 @@ function boardOf(
   }
 }
 
+// 늦은 비우기 막이(QA 2026-11-03 밤 유실 점검): 화면이 읽어 둔 지금 프로젝트를 store 비우기(reset)가 늦게 비우면,
+//   그 프로젝트를 다시 읽기 전에는 초안을 저장하지 않는다 — 빈 화면에서 무엇이든 고치면 기본값에 그 한 줄을 더한 초안이
+//   오너가 고른 설정 · 넘기기 전 이야기 · 초안에만 있던 카드를 덮었다. 다른 프로젝트로 바꾸며 비우는 것은 막지 않는다.
+//   약속: tests/producer/late-reset-save.test.ts
+let loadedProjectId: string | null = null
+let wipedProjectId: string | null = null
+
 // 같은 프로젝트의 자동저장과 명시 저장은 순서를 지키고, 다른 프로젝트 저장은 기다리지 않는다.
 const DRAFT_SAVE_DEBOUNCE_MS = 800
 let draftSaveTimer: ReturnType<typeof setTimeout> | null = null
@@ -903,6 +910,11 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     const projectId = useProjectStore.getState().projectId
     // 잠긴 Producer 는 바뀐 것이 없다 — 초안을 다시 쓰지 않는다.
     if (!projectId || isDemoSession() || castLocked()) return false
+    // 늦게 비워진 뒤 아직 다시 읽지 않은 자료 — 저장된 초안을 빈 상태로 덮지 않고, 저장하지 못했다고 알린다.
+    if (wipedProjectId === projectId) {
+      set({ error: translate(contentLocale(), 'Could not save your changes. Please try again.') })
+      return false
+    }
     const draft = buildProducerDraft(boardOf(get()))
     try {
       await persistDraft(projectId, draft)
@@ -1481,6 +1493,9 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
         //   DB(characters/locations)에만 있는 writer-origin 카드는 이름 기준으로 합쳐 누락 없이 보여준다.
         const draft = parseProducerDraft((project as { producer_draft?: unknown }).producer_draft)
         const restored = mergeDraftWithDb(draft, dbBoard)
+        // 이 프로젝트 자료를 다시 읽었다 — 늦은 비우기 막이를 푼다.
+        loadedProjectId = projectId
+        if (wipedProjectId === projectId) wipedProjectId = null
         set({
           storyText: restored.storyText,
           storyReady: restored.storyReady,
@@ -1505,6 +1520,10 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
 
   reset: () => {
     cancelDraftSave()
+    // 읽어 둔 지금 프로젝트를 비우는 것(늦은 비우기)이면 다시 읽기 전까지 그 프로젝트 초안 저장을 막는다.
+    const current = useProjectStore.getState().projectId
+    if (loadedProjectId && loadedProjectId === current) wipedProjectId = current
+    loadedProjectId = null
     set({
       storyText: '',
       storyReady: false,
