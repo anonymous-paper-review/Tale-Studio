@@ -1,27 +1,28 @@
 'use client'
 
 import { usePathname, useRouter } from 'next/navigation'
-import { useState, useRef, useEffect, useCallback } from 'react'
-import {
-  Users,
-  PenTool,
-  Palette,
-  Clapperboard,
-  LayoutGrid,
-  Film,
-  Home,
-  Loader2,
-  Pencil,
-  MessageCircle,
-} from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { Loader2 } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   HoverCard,
   HoverCardContent,
   HoverCardTrigger,
 } from '@/components/ui/hover-card'
+import {
+  ArtistIcon,
+  DirectorIcon,
+  EditorIcon,
+  HelpIcon,
+  ProducerIcon,
+  StoryboardIcon,
+  TakeIcon,
+  WriterIcon,
+} from '@/components/icons/v3-icons'
 import { cn } from '@/lib/utils'
 import { STAGES, STAGE_LABEL, SHELL_INSET, SHELL_RAIL_WIDTH } from '@/lib/constants'
+import { STAGE_PERSONA } from '@/lib/lumi'
+import { railStageState } from '@/lib/stage-rail'
 import { STAGE_ACCESS_KEY, stageForShortcut } from '@/lib/stage-shortcuts'
 import { navigateWithStageSlide } from '@/lib/stage-transition'
 import { UserMenu } from '@/components/layout/user-menu'
@@ -35,18 +36,18 @@ import { refetchBillingAccount, useBillingAccount } from '@/lib/billing/use-bill
 import type { StageId } from '@/types'
 import { OwnerOnly } from '@/components/demo/owner-only'
 import { ShareButton } from '@/components/demo/share-button'
-import { FooterIconItem } from '@/components/layout/footer-icon-item'
+import { FooterIconItem, FOOTER_TRIGGER_CLASS } from '@/components/layout/footer-icon-item'
 import { withDemoShare } from '@/lib/demo/context'
 import { useT } from '@/lib/i18n'
 
-// 아이콘은 화면 이름을 따른다(리뉴얼 1차): Producer(entry)=사람들, Writer(producer)=펜, Storyboard(writer)=칸.
+// 아이콘은 화면 이름을 따른다(리뉴얼 1차) — v3 채움 아이콘: Producer(entry)=전구, Writer(producer)=책, Storyboard(writer)=네 칸.
 const STAGE_ICONS: Record<StageId, React.ElementType> = {
-  entry: Users,
-  producer: PenTool,
-  writer: LayoutGrid,
-  artist: Palette,
-  director: Clapperboard,
-  editor: Film,
+  entry: ProducerIcon,
+  producer: WriterIcon,
+  writer: StoryboardIcon,
+  artist: ArtistIcon,
+  director: DirectorIcon,
+  editor: EditorIcon,
 }
 
 export function Sidebar() {
@@ -66,8 +67,6 @@ export function Sidebar() {
   const badgeProjectId = useProjectStore((s) => s.projectId)
   const visibleStage = STAGES.find((stage) => pathname.startsWith(stage.path))?.id ?? currentStage
   const stageBadges = useStageBadges(badgeProjectId ?? null, visibleStage ?? null)
-  const projectTitle = useProjectStore((s) => s.projectTitle)
-  const renameProject = useProjectStore((s) => s.renameProject)
   // AI 가 일하는 잠금 화면이 떠 있는 동안은 단계 단추를 막는다(디자이너 QA 1차 #07). 홈 단추는 그대로 둔다.
   const aiBusy = useAiBusyStore((s) => s.tokens.length > 0)
   const footerBlocked = railNavBlocked({ to: 'footer', aiBusy })
@@ -145,36 +144,12 @@ export function Sidebar() {
           total: artistAssetProgress?.total ?? 0,
         })
 
-  // Home HoverCard: 프로젝트명 인라인 편집. 편집 중에는 hover가 벗어나도 카드 유지(controlled open).
-  const [homeOpen, setHomeOpen] = useState(false)
-  const [editingName, setEditingName] = useState(false)
-  const [nameDraft, setNameDraft] = useState(projectTitle)
-  const nameInputRef = useRef<HTMLInputElement>(null)
-
-  // 편집 진입 시점에 draft를 현재 이름으로 시드(아래 연필 onClick) — effect 내 setState 회피.
-  useEffect(() => {
-    if (editingName) {
-      nameInputRef.current?.focus()
-      nameInputRef.current?.select()
-    }
-  }, [editingName])
-
-  const commitName = () => {
-    const t = nameDraft.trim()
-    if (t && t !== projectTitle) void renameProject(t)
-    setEditingName(false)
-  }
-  const cancelName = () => {
-    setNameDraft(projectTitle)
-    setEditingName(false)
-  }
-
   // 화면 가장자리에 붙은 area 가 아니라 INSET 만큼 띄운 둥근 패널 (#shell-lift 2026-07-31).
-  //   실제 가용 면적은 그대로지만 배경이 사방으로 비쳐 화면이 넓어 보인다. bg-sidebar 는
-  //   surface 사다리 최상단보다 밝은 전용 토큰 — 레일만 앞으로 떠오르게 한다.
+  //   v3(2026-11-03): 바탕은 사이드바 색(#1F1E1D) 하나, 테두리 · 그림자 없음. 맨 위는 Tale 로고(누르면 프로젝트 목록),
+  //   프로젝트 이름 바꾸기는 위 막대(StudioTopBar)의 연필로 옮겼다.
   return (
     <aside
-      className="fixed z-40 flex flex-col items-center rounded-2xl border border-sidebar-border bg-sidebar py-3 shadow-lg"
+      className="fixed z-40 flex flex-col items-center gap-1.5 rounded-xl bg-sidebar pb-4 pt-3"
       style={{
         left: SHELL_INSET,
         top: SHELL_INSET,
@@ -182,80 +157,28 @@ export function Sidebar() {
         width: SHELL_RAIL_WIDTH,
       }}
     >
-      {/* Home / Back button — hover 시 프로젝트명 표시 + 연필로 인라인 이름변경(HoverCard).
-          편집 중엔 controlled open으로 카드 유지(Tooltip과 달리 상호작용 가능). */}
-      <HoverCard
-        open={homeOpen || editingName}
-        onOpenChange={setHomeOpen}
-        openDelay={0}
-        closeDelay={120}
-      >
-        <HoverCardTrigger asChild>
+      <Tooltip delayDuration={0}>
+        <TooltipTrigger asChild>
           <button
+            type="button"
             aria-label={t('Back to Projects')}
             // AI 가 일하는 동안에도 프로젝트 목록으로는 나갈 수 있다(빠져나갈 길) — 막는 규칙은 railNavBlocked 한 곳.
             onClick={() => {
               if (!railNavBlocked({ to: 'projects', aiBusy: aiBusyNow() })) router.push('/projects')
             }}
-            className="mb-2 flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
+            className="flex size-10 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <Home className="h-5 w-5" />
+            {/* eslint-disable-next-line @next/next/no-img-element -- 브랜드 심볼 SVG(정적 파일) */}
+            <img src="/brand/tale-symbol.svg" alt="" width={30} height={24} className="h-6 w-[30px]" draggable={false} />
           </button>
-        </HoverCardTrigger>
-        <HoverCardContent
-          side="right"
-          align="start"
-          className="flex w-56 flex-col gap-1.5"
-        >
-          {editingName ? (
-            <input
-              ref={nameInputRef}
-              value={nameDraft}
-              onChange={(e) => setNameDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  commitName()
-                } else if (e.key === 'Escape') {
-                  e.preventDefault()
-                  cancelName()
-                }
-              }}
-              onBlur={commitName}
-              placeholder={t('Project name')}
-              className="w-full rounded-md border border-input bg-background px-2 py-1 text-sm font-medium outline-none focus:border-ring focus:ring-2 focus:ring-ring/40"
-            />
-          ) : (
-            <div className="flex items-center justify-between gap-2">
-              <span className="truncate font-medium">
-                {projectTitle || 'Untitled'}
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setNameDraft(projectTitle)
-                  setEditingName(true)
-                }}
-                title={t('Rename')}
-                aria-label={t('Rename project')}
-                className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          )}
-          <span className="text-xs text-muted-foreground">
-            {editingName ? t('Enter to save · Esc to cancel') : 'Back to Projects'}
-          </span>
-        </HoverCardContent>
-      </HoverCard>
-
-      <div className="mb-2 h-px w-8 bg-sidebar-border" />
+        </TooltipTrigger>
+        <TooltipContent side="right">{t('Back to Projects')}</TooltipContent>
+      </Tooltip>
 
       {/* Stage navigation — STAGES(constants.ts) 순서 그대로 (writer 탭 2026-06-12 부활).
           아이콘 + 라벨이 한 버튼 안에 들어간다: 활성 배경이 둘을 함께 감싸야 하나의 탭으로 읽힌다.
           라벨이 5줄 늘어난 만큼 세로가 빠듯해질 수 있어 낮은 뷰포트에선 이 영역만 스크롤한다. */}
-      <div className="flex min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto">
+      <div className="flex min-h-0 flex-1 flex-col items-center gap-1.5 overflow-y-auto">
         {STAGES.map((stage) => {
           const Icon = STAGE_ICONS[stage.id]
           const isCommitted = pathname.startsWith(stage.path)
@@ -275,6 +198,8 @@ export function Sidebar() {
           const isDisabled = (isLocked && !isArtistRetryable) || busyBlocked || (aiBusy && isArtistRetryable)
           // 다른 stage 작업 완료 배지 — 활성/잠금 stage엔 표시 안 함(활성은 진입 시 클리어됨)
           const badge = !isActive && !isLocked ? (stageBadges[stage.id] ?? 0) : 0
+          // v3 칸 모습 — 지금 단계(밝은 바탕 · 단계 색 아이콘) · 끝낸 단계(체크) · 열린 단계 · 아직 안 연 단계(흐림).
+          const railState = railStageState(stage.id, { active: isActive && !isLocked ? stage.id : null, reached: reachedStage })
 
           return (
             <Tooltip key={stage.id} delayDuration={0}>
@@ -291,33 +216,46 @@ export function Sidebar() {
                   aria-label={badge > 0 ? `${STAGE_LABEL[stage.id]} · ${t('Unseen completions: {count}', { count: badge })}` : STAGE_LABEL[stage.id]}
                   aria-current={isCommitted ? 'page' : undefined}
                   disabled={isDisabled}
+                  data-stage={STAGE_PERSONA[stage.id]}
+                  data-rail-state={railState}
                   className={cn(
-                    'relative flex h-14 w-14 shrink-0 flex-col items-center justify-center gap-1 rounded-xl transition-colors',
-                    isDisabled && 'cursor-not-allowed opacity-30',
+                    'relative flex h-[58px] w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-lg transition-colors',
+                    isDisabled && 'cursor-not-allowed',
+                    busyBlocked && 'opacity-40',
+                    railState === 'current' && 'bg-sidebar-accent text-foreground',
+                    (railState === 'done' || railState === 'open') && 'text-muted-foreground',
+                    railState === 'upcoming' && 'text-subtle-foreground',
+                    railState !== 'current' && !isDisabled && 'hover:bg-sidebar-accent hover:text-foreground',
                     isArtistRetryable && !aiBusy && 'cursor-pointer text-destructive hover:bg-sidebar-accent',
-                    isActive && !isLocked
-                      ? 'bg-sidebar-accent text-primary'
-                      : !isLocked && !busyBlocked &&
-                          'text-muted-foreground hover:bg-sidebar-accent hover:text-foreground',
                   )}
                 >
-                  {/* 활성 표시 — 둥근 패널에 직각 border-l 은 어울리지 않아 좌측 pill 로 대체 */}
-                  {isActive && !isLocked && (
-                    <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-full bg-primary" />
-                  )}
-                  <Icon className="size-5" />
-                  {/* 긴 이름(Storyboard, 리뉴얼 1차)은 레일 폭 안에 들도록 한 단계 작게 · 자간을 좁힌다. */}
-                  <span className={cn('text-xs font-medium leading-none', STAGE_LABEL[stage.id].length > 8 && 'text-[10.5px] tracking-tight')}>
+                  <span className="relative">
+                    {/* 지금 단계 아이콘만 그 단계 색(브랜드 가이드 "현재 단계 아이콘") — 색은 data-stage 가 정한다. */}
+                    <Icon className={cn('size-[22px]', railState === 'current' && 'text-stage')} />
+                    {railState === 'done' && (
+                      <span
+                        data-testid="rail-done-check"
+                        className="absolute -right-1.5 -top-1 flex size-2.5 items-center justify-center rounded-full bg-foreground text-on-stage"
+                        aria-hidden
+                      >
+                        <svg viewBox="0 0 10 10" className="size-2.5" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 5.2 4.4 6.5 7 3.8" />
+                        </svg>
+                      </span>
+                    )}
+                  </span>
+                  {/* 긴 이름(Storyboard, 리뉴얼 1차)도 칸 폭(64) 안에 든다 — v3 11.5px 600. */}
+                  <span className="text-micro font-semibold leading-none">
                     {STAGE_LABEL[stage.id]}
                   </span>
                   {badge > 0 && (
-                    <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-semibold leading-none text-primary-foreground">
+                    <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 font-num text-[9px] font-semibold leading-none text-primary-foreground">
                       {badge}
                     </span>
                   )}
                   {/* 액세스 키 배지 — Alt(Option) 를 누르고 있는 동안만. 잠긴 탭 · AI 가 일하는 동안은 갈 수 없으니 안 보인다. */}
                   {accessKeysVisible && !isLocked && !busyBlocked && (
-                    <span className="absolute left-0.5 top-0.5 rounded border border-border bg-card px-1 font-mono text-[9px] font-semibold leading-[1.35] text-foreground shadow-sm">
+                    <span className="absolute left-0.5 top-0.5 rounded border border-border bg-card px-1 font-num text-[9px] font-semibold leading-[1.35] text-foreground shadow-sm">
                       {STAGE_ACCESS_KEY[stage.id]}
                     </span>
                   )}
@@ -351,7 +289,7 @@ export function Sidebar() {
         })}
       </div>
 
-      {/* 푸터 액션 — 공유·내보내기·문의·프로필: 버튼 크기·캡션 타이포·세로 간격을 FooterIconItem 로 통일.
+      {/* 푸터 액션 — Take · 공유 · 내보내기 · Help · 프로필(v3 순서): 아이콘 · 캡션 크기와 세로 간격을 FooterIconItem 로 통일.
           AI 가 일하는 동안은 통째로 inert(누르기 · 키보드 포커스 모두 막힘, 2026-10-27 오너 재확인).
           inert 안쪽에는 마우스가 닿지 않는다 — 막힌 까닭(title) · 금지 커서는 막지 않는 바깥 묶음에 둔다(검토). */}
       <div
@@ -359,7 +297,7 @@ export function Sidebar() {
         title={footerBlocked ? t('AI is working. You can move once it finishes.') : undefined}
       >
         <div
-          className={cn('flex flex-col items-center gap-1', footerBlocked && 'opacity-40')}
+          className={cn('flex flex-col items-center gap-1.5', footerBlocked && 'opacity-40')}
           data-testid="sidebar-footer"
           inert={footerBlocked || undefined}
         >
@@ -396,17 +334,18 @@ export function Sidebar() {
                   type="button"
                   aria-label={t('Contact / Help')}
                   title={t('Contact / Help')}
-                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary text-secondary-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className={FOOTER_TRIGGER_CLASS}
                 >
-                  <MessageCircle className="h-5 w-5" />
+                  <HelpIcon className="size-6" />
                 </button>
               }
             />
           </FooterIconItem>
+          {/* 프로필은 v3 처럼 동그란 머리글자만 — 캡션 없이(이름은 누르면 열리는 메뉴에 있다). */}
           <OwnerOnly>
-            <FooterIconItem label={t('Profile')}>
+            <div className="mt-1">
               <UserMenu />
-            </FooterIconItem>
+            </div>
           </OwnerOnly>
         </div>
       </div>
@@ -418,7 +357,7 @@ export function Sidebar() {
 // #payments-phase-3 P9a(2026-09-07): Take 잔액 배지 — 합계는 기존 잔액 훅, 호버하면 종류별(플랜/충전/무료)로
 //   나눠 보인다(오너 09-07: 소멸 알림 대신 호버 구분). 누르면 계정·결제 페이지. 과금 모드 off 면 숨긴다.
 //   관리자(무제한)는 ∞. 잔액 음수(환불 회수)는 경고색.
-//   오너 09-07: 옛 "영상 0/100" 게이지(#f4)는 이 배지로 통합 — 아이콘은 그 게이지의 Film 을 이어받는다.
+//   오너 09-07: 옛 "영상 0/100" 게이지(#f4)는 이 배지로 통합. v3(2026-11-03): 아이콘은 Take 채움 아이콘, 잔액은 아이콘 옆 작은 숫자.
 function SidebarTakeBalance() {
   const t = useT()
   const router = useRouter()
@@ -446,13 +385,11 @@ function SidebarTakeBalance() {
               type="button"
               aria-label={t('Open account & billing')}
               onClick={() => router.push('/account')}
-              className={cn(
-                'flex h-10 w-10 flex-col items-center justify-center rounded-full border bg-background/60 transition-colors hover:border-border-strong',
-                negative ? 'border-destructive/60 text-destructive' : 'border-border text-muted-foreground',
-              )}
+              className={cn(FOOTER_TRIGGER_CLASS, 'relative', negative && 'text-destructive')}
             >
-              <Film className="size-3.5" />
-              <span className="text-[9px] font-medium leading-none tabular-nums">
+              <TakeIcon className="size-6" />
+              {/* 잔액 — 아이콘 오른쪽 아래 작은 숫자(v3 는 아이콘 · 캡션만, 숫자는 Inter). 관리자(무제한)는 ∞. */}
+              <span className="absolute -bottom-1 -right-1.5 min-w-4 rounded-full bg-chip px-1 text-center font-num text-[9px] font-semibold leading-[14px] tabular-nums text-foreground">
                 {unlimited ? '∞' : take.balance}
               </span>
             </button>

@@ -4,7 +4,9 @@
 //   클릭 → POST /api/share(스냅샷 캡처+토큰 발급) → 전체 URL 클립보드 복사 + 토스트.
 //   OwnerOnly 로 감싸 데모 세션에선 렌더 안 됨.
 import { useState } from 'react'
-import { Loader2, Share2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
+import { ShareIcon } from '@/components/icons/v3-icons'
+import { FOOTER_TRIGGER_CLASS } from '@/components/layout/footer-icon-item'
 import { toast } from 'sonner'
 import { useProjectStore } from '@/stores/project-store'
 import { useT } from '@/lib/i18n'
@@ -42,12 +44,12 @@ export function ShareButton() {
       disabled={!projectId || loading}
       aria-label={t('Create share link')}
       title={t('Create share link (read-only preview)')}
-      className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary text-secondary-foreground shadow-sm transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+      className={FOOTER_TRIGGER_CLASS}
     >
       {loading ? (
-        <Loader2 className="h-5 w-5 animate-spin" />
+        <Loader2 className="size-5 animate-spin" />
       ) : (
-        <Share2 className="h-5 w-5" />
+        <ShareIcon className="size-6" />
       )}
     </button>
   )

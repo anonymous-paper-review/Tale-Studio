@@ -147,12 +147,12 @@ export function UserMenu() {
       }}
     >
       <DropdownMenuTrigger asChild>
-        <button className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-muted text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus:outline-none">
+        <button className="flex size-8 items-center justify-center rounded-full bg-card text-label font-semibold text-foreground transition-colors hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           {avatar ? (
             <img
               src={avatar}
               alt="User"
-              className="h-10 w-10 rounded-full object-cover"
+              className="size-8 rounded-full object-cover"
               referrerPolicy="no-referrer"
             />
           ) : (

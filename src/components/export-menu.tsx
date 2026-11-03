@@ -2,7 +2,9 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Download, Loader2, Lock } from 'lucide-react'
+import { Loader2, Lock } from 'lucide-react'
+import { ExportIcon } from '@/components/icons/v3-icons'
+import { FOOTER_TRIGGER_CLASS } from '@/components/layout/footer-icon-item'
 import { toast } from 'sonner'
 import { invalidateShots, loadShotsResult } from '@/lib/shots-cache'
 
@@ -226,12 +228,12 @@ export function ExportMenu() {
           aria-label={t('Export')}
           title={projectId ? t('Export') : t('Open a project first.')}
           disabled={disabled}
-          className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary text-secondary-foreground shadow-sm transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          className={FOOTER_TRIGGER_CLASS}
         >
           {isBusy ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
+            <Loader2 className="size-5 animate-spin" />
           ) : (
-            <Download className="h-5 w-5" />
+            <ExportIcon className="size-6" />
           )}
         </button>
       </DropdownMenuTrigger>

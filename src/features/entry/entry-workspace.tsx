@@ -8,11 +8,12 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { CircleAlert, LayoutList, Loader2, MessageSquare, Upload } from 'lucide-react'
+import { CircleAlert, Loader2, Upload } from 'lucide-react'
+import { ChatIcon, ListIcon } from '@/components/icons/v3-icons'
+import { StudioTopBar } from '@/components/layout/studio-top-bar'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { STAGE_BADGE_CLASS, STAGE_LABEL } from '@/lib/constants'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { useProjectStore } from '@/stores/project-store'
@@ -85,15 +86,19 @@ export function EntryWorkspace() {
 
   return (
     <Tabs value={tab} onValueChange={(v) => setTab(v === 'chat' ? 'chat' : 'form')} className="flex min-h-0 flex-1 flex-col gap-0">
-      <header className="sticky top-0 z-sticky flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background px-6">
-        <span className={cn('shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium', STAGE_BADGE_CLASS.entry)}>{STAGE_LABEL.entry}</span>
-        {/* 제목은 시작 화면에서 바로 정한다(2026-10-21 오너 "프로젝트 제목을 처음에 설정 불가능"). */}
-        <ProjectTitleField
-          title={projectTitle}
-          onRename={(next) => void useProjectStore.getState().renameProject(next).then((saved) => {
-            if (!saved) toast.error(t("Couldn't save the title. Please try again."))
-          })}
-        />
+      {/* 위 막대(v3 2026-11-03) — 다른 단계와 같은 막대(단계 칩 · 제목 · 연필)에 이 화면의 탭을 오른쪽에 둔다. */}
+      <StudioTopBar
+        stage="entry"
+        title={
+          /* 제목은 시작 화면에서 바로 정한다(2026-10-21 오너 "프로젝트 제목을 처음에 설정 불가능"). */
+          <ProjectTitleField
+            title={projectTitle}
+            onRename={(next) => void useProjectStore.getState().renameProject(next).then((saved) => {
+              if (!saved) toast.error(t("Couldn't save the title. Please try again."))
+            })}
+          />
+        }
+      >
         {saveError && !started ? (
           <p className="ml-auto flex shrink-0 items-center gap-1 text-xs text-destructive" role="status">
             <CircleAlert className="size-3.5" aria-hidden />
@@ -101,18 +106,18 @@ export function EntryWorkspace() {
           </p>
         ) : null}
         {!started ? (
-          <TabsList className={saveError ? undefined : 'ml-auto'} aria-label={t('How to make it')}>
+          <TabsList aria-label={t('How to make it')}>
             <TabsTrigger value="form" className="px-3">
-              <LayoutList aria-hidden />
+              <ListIcon aria-hidden />
               {t('Choose on screen')}
             </TabsTrigger>
             <TabsTrigger value="chat" className="px-3">
-              <MessageSquare aria-hidden />
+              <ChatIcon aria-hidden />
               {t('Make it with chat')}
             </TabsTrigger>
           </TabsList>
         ) : null}
-      </header>
+      </StudioTopBar>
 
       {ready ? <SeriesBanner projectId={projectId} /> : null}
 

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="83" height="67" viewBox="37 30.5 83 67" fill="none">
+  <title>Tale Studio</title>
+  <!-- v3 브랜드 가이드 01 로고 · 심볼(어두운 바탕). 반쪽 T(오렌지 골드 → 로즈 레드 → 바이올렛)와 이야기 꼬리(딥 블루 → 애저 → 민트 틸), 겹친 곳은 빛 섞임(스크린 90%). -->
+  <path d="M37 82C37 73.4396 43.9396 66.5 52.5 66.5H104.5C113.06 66.5 120 73.4396 120 82C120 90.5604 113.06 97.5 104.5 97.5H52.5C43.9396 97.5 37 90.5604 37 82Z" fill="url(#tail)"/>
+  <path d="M83.5 30.5C92.6127 30.5 100 37.8873 100 47C100 56.1127 92.6127 63.5 83.5 63.5H78C72.4772 63.5 68 67.9772 68 73.5V82C68 90.5604 61.0604 97.5 52.5 97.5C43.9396 97.5 37 90.5604 37 82V46C37 37.4396 43.9396 30.5 52.5 30.5C52.6663 30.5 52.832 30.5026 52.9971 30.5078C53.1641 30.5028 53.3318 30.5 53.5 30.5H83.5Z" fill="url(#t)"/>
+  <g opacity="0.9" style="mix-blend-mode:screen">
+    <path d="M70.8604 66.5C69.0916 68.3038 68 70.7741 68 73.5V82C68 90.5604 61.0604 97.5 52.5 97.5C43.9396 97.5 37 90.5604 37 82C37 73.4396 43.9396 66.5 52.5 66.5H70.8604Z" fill="url(#overlap)"/>
+  </g>
+  <defs>
+    <linearGradient id="tail" x1="39.0312" y1="77.2102" x2="88.7073" y2="120.426" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2F45FF"/>
+      <stop offset="0.5" stop-color="#0096FF"/>
+      <stop offset="1" stop-color="#00C9A7"/>
+    </linearGradient>
+    <linearGradient id="t" x1="53.7116" y1="34.4213" x2="86.2245" y2="91.9184" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFA600"/>
+      <stop offset="0.5" stop-color="#FF3D5A"/>
+      <stop offset="1" stop-color="#7B2FFF"/>
+    </linearGradient>
+    <linearGradient id="overlap" x1="45.9819" y1="68.3143" x2="59.7989" y2="96.698" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFA600"/>
+      <stop offset="0.5" stop-color="#FF3D5A"/>
+      <stop offset="1" stop-color="#7B2FFF"/>
+    </linearGradient>
+  </defs>
+</svg>

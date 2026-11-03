@@ -13,6 +13,8 @@ import { Sidebar } from '@/components/layout/sidebar'
 import { GlobalChat } from '@/components/layout/global-chat'
 import { useWriterRoomStore, writerRightChatHidden } from '@/stores/writer-room-store'
 import { ChatBackground } from '@/components/layout/chat-background'
+import { StudioTopBar } from '@/components/layout/studio-top-bar'
+import { STAGE_PERSONA } from '@/lib/lumi'
 import { useIdleTimeout } from '@/hooks/use-idle-timeout'
 import { useArtistLockPoll } from '@/hooks/use-artist-lock-poll'
 import { readLastProjectId, writeLastProjectId } from '@/lib/session-restore'
@@ -165,20 +167,31 @@ export default function StudioLayout({
   const producerLocked = useProjectStore((s) => s.producerLocked)
   const proseChatTab = writerRightChatHidden({ tab: writerTab, locked: producerLocked })
   const onEntry = pathname.startsWith('/studio/start') || (pathname.startsWith('/studio/producer') && proseChatTab)
+  // 지금 단계 색 하나(v3) — 화면 이름(Lumi 옷 이름)으로 셸과 <html> 에 붙인다. <html> 에도 붙이는 까닭: 팝업 · 메뉴(포털)는 body 아래에 열린다.
+  const storeStage = useProjectStore((s) => s.currentStage)
+  const shownStage = (STAGES.find((s) => pathname.startsWith(s.path))?.id as StageId | undefined) ?? storeStage
+  const stageTheme = STAGE_PERSONA[shownStage]
+  useEffect(() => {
+    const root = document.documentElement
+    root.dataset.stage = stageTheme
+    return () => {
+      delete root.dataset.stage
+    }
+  }, [stageTheme])
 
   return (
-    <>
+    <div data-stage={stageTheme} className="contents">
       <DemoBanner />
       <Sidebar />
       <main
         className="min-h-screen transition-[margin] duration-350 ease-out"
-        // 좌우 패널은 INSET 만큼 띄운 둥근 패널(#shell-lift) — 본문 여백은
-        //   바깥 INSET + 패널폭 + 패널↔본문 INSET. 접힘 시 폭은 열기 레일(w-11) 전용.
+        // 왼쪽 레일은 INSET 만큼 띄운 둥근 패널(#shell-lift), 오른쪽 채팅은 v3 처럼 가장자리에 붙은 패널 — 본문 여백은
+        //   왼쪽 INSET + 레일폭 + INSET, 오른쪽 채팅폭 + INSET. 접힘 시 폭은 열기 레일(w-11) 전용.
         style={{
           marginLeft: SHELL_INSET * 2 + SHELL_RAIL_WIDTH,
           marginRight: onEntry
             ? SHELL_INSET
-            : SHELL_INSET * 2 + (chatCollapsed ? CHAT_COLLAPSED_RAIL : chatWidth),
+            : SHELL_INSET + (chatCollapsed ? CHAT_COLLAPSED_RAIL : chatWidth),
         }}
       >
         {/* h-screen으로 높이 고정 + overflow-y-auto: 내용이 화면을 넘치면
@@ -192,11 +205,13 @@ export default function StudioLayout({
           data-stage-content
           className="flex h-screen flex-col overflow-x-hidden overflow-y-auto"
         >
+          {/* 위 막대(v3) — 단계 칩 · 프로젝트 제목 · 연필. Producer 시작 화면은 탭이 든 자기 막대를 같은 모양으로 그린다. */}
+          {pathname.startsWith('/studio/start') ? null : <StudioTopBar stage={shownStage} />}
           {children}
         </div>
       </main>
       {onEntry ? <ChatBackground /> : <GlobalChat />}
       <HandoffConfirmDialogs />
-    </>
+    </div>
   )
 }
