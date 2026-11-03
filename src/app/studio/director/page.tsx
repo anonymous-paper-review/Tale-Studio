@@ -1203,7 +1203,7 @@ function PaletteBar({
 // ────────────────────────────────────────────────────────────────────────────
 
 export default function DirectorCanvasPage() {
-  // v3 D1(2026-11-03): Director 는 채팅을 닫은 채 시작하고 툴바의 Lumi 알약으로 연다 — 떠나면 들어오기 전 모습으로 돌아간다.
+  // v3 D1(2026-11-03): Director 는 채팅을 닫은 채 시작하고 툴바의 Lumi 알약으로 연다 — 떠나면 들어오기 전 모습으로 돌아간다(오너 2026-11-03 확인).
   useHoldChatClosed('director')
   const handoffProjectId = useProjectStore((s) => s.projectId)
   // 라우터 요청이 아닌 실제 Director 화면의 mount가 이동 완료를 확인한다.

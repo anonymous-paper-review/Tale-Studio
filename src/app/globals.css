@@ -717,7 +717,7 @@ html[data-stage-nav]::view-transition-new(chat-panel) {
 /* v3p2-entry — Producer 설정 · 랜딩(로그인 전 첫 화면)이 더한 토큰.
    lock-note: 잠금 안내 글자(시안 E3 "시작하면 끝까지 바꿀 수 없어요" #D9967C). 오류(Danger)도 주의(노랑)도 아닌
      "되돌릴 수 없어요" 안내 — 화면 비율 · 시리즈 언어 잠금 줄에만 쓴다. text-lock-note
-   landing: 랜딩 바탕(시안 144-668 "v3 · Home 예시" #0B0B0B) — 배경 영상이 비치는 극장 같은 바탕. 작업 화면은 Shell 그대로. bg-landing */
+   landing: 랜딩 바탕(시안 144-668 "v3 · Home 예시" #0B0B0B) — 단계 색 흐린 빛이 비치는 극장 같은 바탕. 작업 화면은 Shell 그대로. bg-landing */
 @theme inline {
   --color-lock-note: var(--lock-note);
   --color-landing: var(--landing);

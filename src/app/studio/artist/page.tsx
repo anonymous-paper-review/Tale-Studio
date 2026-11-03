@@ -74,7 +74,7 @@ export default function VisualPage() {
   // 약속 D15(2026-09-04): 보던 탭은 스토어가 기억한다 — 떠났다 돌아와도 그대로.
   const tab = useArtistStore((s) => s.uiTab)
   const setTab = useArtistStore((s) => s.setUiTab)
-  // Alt+←/→ 로 칸 순환(#keyboard-only 2026-08-11) — v3 에서는 모두 · 인물 · 배경 세 칸을 차례로 돈다.
+  // Alt+←/→ 로 칸 순환(#keyboard-only 2026-08-11) — v3 에서는 모두 · 인물 · 배경 세 칸을 차례로 돈다(예전 두 탭, 오너 2026-11-03 v3 대로 확인).
   useAltArrowCycle(ARTIST_FILTERS, tab, setTab)
   // 탭 전환 슬라이드(#d3) — 방향은 탭 순서 기준(왼→오른쪽 = forward). set-state-in-render 패턴.
   //   미끄러짐은 새로 보이게 된 묶음에만(검토 A M1) — slideFrom = 바로 앞 칸. 계속 보이는 묶음은 움직이지 않는다.

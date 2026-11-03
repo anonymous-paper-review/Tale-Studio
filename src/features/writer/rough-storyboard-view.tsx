@@ -1171,7 +1171,7 @@ export function RoughStoryboardView() {
             return (
               <section key={scene.sceneId} className="space-y-3">
                 {/* 씬 머리(v3 시안 S1) — 씬 번호(전체 번호 그대로, 씬 안 번호를 새로 만들지 않는다) · 이름(장소 · 때) · 요약 · 컷 수 · 초 · [+ 샷 추가].
-                    예전에는 id 만 보였다(사용자 결정 2026-06-12) — v3 를 따른다. 씬 머리를 누르면 접기/펼치기(#c2 2026-08-03, 갈매기 회전으로 상태 표시). */}
+                    예전에는 id 만 보였다(사용자 결정 2026-06-12) — v3 를 따른다(오너 2026-11-03 v3 대로 확인). 씬 머리를 누르면 접기/펼치기(#c2 2026-08-03, 갈매기 회전으로 상태 표시). */}
                 <div className="flex min-h-8 items-center gap-2.5">
                   <button
                     type="button"
@@ -1374,7 +1374,7 @@ export function RoughStoryboardView() {
                           )}
                         </p>
                         {/* 대사 한 줄(v3 시안 S1) — 첫 대사, 더 있으면 +N. 예전(#8 2026-07-09)에는 파이프라인이 대사 칸에 상황 요약을 채워 뺐다 —
-                            지금 대사 칸은 대사 탭과 같은 진짜 대사다(#dialogue-v4 2026-07-23). */}
+                            지금 대사 칸은 대사 탭과 같은 진짜 대사다(#dialogue-v4 2026-07-23). 카드에 다시 두는 것은 오너 2026-11-03 v3 대로 확인. */}
                         {dialogue ? (
                           <p className="truncate text-caption text-muted-foreground" title={`${dialogue.speaker} “${dialogueText}”`}>
                             {dialogue.speaker} &ldquo;{dialogueText}&rdquo;
