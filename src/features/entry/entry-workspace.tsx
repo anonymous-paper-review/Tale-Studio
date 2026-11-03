@@ -22,6 +22,7 @@ import { useImageUploadConsent } from '@/components/upload/image-upload-consent'
 import { entryStarted, useEntryStore } from './entry-store'
 import { BusyOverlayPortal, UploadingChip, stepsFrom, useUploadErrorMessage } from './entry-parts'
 import { writeWorkspaceTab } from '@/stores/writer-room-store'
+import { STAGE_PERSONA } from '@/lib/lumi'
 import { EntryForm } from './entry-form'
 import { EntryChat } from './entry-chat'
 import { EntrySummary } from './entry-summary'
@@ -151,10 +152,12 @@ export function EntryWorkspace() {
         </>
       )}
 
+      {/* 이야기 재료를 읽는 동안 — 큰 Lumi 가 Producer 옷으로 "글 읽기" 로딩(Lumi 가이드: 화이트 펄 → Producer). */}
       <BusyOverlayPortal
         open={!!reading}
         title={t(reading?.image ? 'Reading text from the image' : 'Reading your text')}
         steps={stepsFrom(readingSteps(!!reading?.image), reading?.step ?? 0, t)}
+        lumi={STAGE_PERSONA.entry}
       />
       <WritingOverlay />
     </Tabs>
@@ -175,28 +178,28 @@ function SeriesBanner({ projectId }: { projectId: string | null }) {
     ...view.locations.map((l) => ({ key: `location:${l.id}`, name: l.name })),
   ]
   return (
-    <div className="shrink-0 border-b border-border bg-muted/40 px-6 py-3">
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-1.5">
+    <div className="shrink-0 border-b border-border-subtle bg-panel px-8 py-3">
+      <div className="mx-auto flex w-full max-w-[860px] flex-col gap-1.5">
         <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className="text-sm font-medium">{t('The next episode of "{title}"', { title: view.prevTitle })}</span>
-          <span className="text-xs text-muted-foreground">
+          <span className="text-label font-semibold">{t('The next episode of "{title}"', { title: view.prevTitle })}</span>
+          <span className="font-num text-meta text-subtle-foreground">
             {t('Carried over: {characters} characters · {locations} backgrounds', { characters: view.characters.length, locations: view.locations.length })}
           </span>
         </p>
         {carried.length ? (
           <ul className="flex flex-wrap gap-1.5">
             {carried.map((item) => (
-              <li key={item.key} className="rounded-full border border-border bg-background px-2 text-xs font-medium leading-5 text-muted-foreground">
+              <li key={item.key} className="rounded-full bg-chip px-2.5 text-caption font-medium leading-6 text-muted-foreground">
                 {item.name}
               </li>
             ))}
           </ul>
         ) : null}
         {view.continuesLastScene ? (
-          <p className="text-xs text-muted-foreground">{t('This episode starts from the last scene of the previous episode.')}</p>
+          <p className="text-caption text-muted-foreground">{t('This episode starts from the last scene of the previous episode.')}</p>
         ) : null}
         {view.copyFailures.length ? (
-          <p className="flex items-start gap-1.5 text-xs text-muted-foreground" role="status">
+          <p className="flex items-start gap-1.5 text-caption text-muted-foreground" role="status">
             <CircleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
             <span>
               {t("Couldn't copy the pictures for {names}. The cards came over, and the Artist draws them again in this episode's art style.", {
@@ -210,7 +213,10 @@ function SeriesBanner({ projectId }: { projectId: string | null }) {
   )
 }
 
-/** 산문 초안을 쓰는 동안의 잠금 화면 — 실패하면 [닫기] · [다시 시도]. */
+/**
+ * 산문 초안을 쓰는 동안의 잠금 화면 — 실패하면 [닫기] · [다시 시도].
+ *   Producer → Writer 로 넘어가며 기다리는 화면이라 큰 Lumi 는 Writer 옷(오너 11/3 결정 8), 실패하면 같은 옷의 오류 모습.
+ */
 function WritingOverlay() {
   const t = useT()
   const writing = useEntryStore((s) => s.writing)
@@ -227,10 +233,11 @@ function WritingOverlay() {
       title={failed ? t(startFailed ? "Couldn't start" : "Couldn't write the prose draft") : t('Writing the prose draft')}
       description={failed ? t(startFailed ? 'Please check the settings and try again.' : 'Something went wrong while writing. Please try again.') : undefined}
       steps={stepsFrom(WRITING_STEPS, writing.step, t)}
+      lumi={STAGE_PERSONA.producer}
       footer={
         failed ? (
           <>
-            <Button variant="outline" onClick={dismiss}>
+            <Button variant="ghost" onClick={dismiss}>
               {t('Close')}
             </Button>
             <Button onClick={() => void retryWriter()}>{t('Try again')}</Button>

@@ -5,8 +5,10 @@
 //   파일을 올린 사람은 "어떻게 쓸까요"를, 글만 쓴 사람은 장르·분위기 → 길이 → 바꿈 정도를 묻고 마지막에 화면 비율 →
 //   정리 카드의 [Writer에게 써 달라고 하기]로 시작한다(확인 창 없이 1안과 같은 시작). 말로 답해도 된다.
 //   화면에서 고르기 탭과 같은 초안을 쓴다 — 거기서 쓴 글 · 고른 값이 여기 그대로 보인다.
+//   v3(2026-11-03): 말풍선 · 빠른 답 칩 · 입력 알약은 오른쪽 채팅(global-chat)과 같은 모양, 선택지는 controls 의 칩 · 선택 카드.
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { Lightbulb, Lock, Paperclip, PenLine, Send } from 'lucide-react'
+import { ChoiceChip, OptionCard } from '@/components/controls/choice-chip'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -71,8 +73,8 @@ export function EntryChat() {
           ) : null}
         </div>
       </div>
-      <div className="shrink-0 border-t border-border bg-background">
-        <div className="mx-auto w-full max-w-2xl px-6 py-4">{sent ? <ReplyInput /> : <FirstComposer />}</div>
+      <div className="shrink-0 bg-background">
+        <div className="mx-auto w-full max-w-2xl px-6 pb-5 pt-3">{sent ? <ReplyInput /> : <FirstComposer />}</div>
       </div>
     </div>
   )
@@ -81,8 +83,8 @@ export function EntryChat() {
 function ChipsBar({ draft, t }: { draft: EntryDraft; t: Translator }) {
   const reask = useEntryStore((s) => s.chatReask)
   return (
-    <nav aria-label={t('What we have decided so far')} className="shrink-0 border-b border-border bg-background">
-      <div className="mx-auto flex w-full max-w-2xl flex-wrap gap-2 px-6 py-3">
+    <nav aria-label={t('What we have decided so far')} className="shrink-0 border-b border-border-subtle bg-background">
+      <div className="mx-auto flex w-full max-w-2xl flex-wrap gap-1.5 px-6 py-3">
         {chatChips(draft, t).map((chip) => (
           <button
             key={chip.key}
@@ -91,15 +93,16 @@ function ChipsBar({ draft, t }: { draft: EntryDraft; t: Translator }) {
             disabled={!chip.value}
             title={chip.value ? t('Click to choose again') : undefined}
             aria-current={chip.current ? 'step' : undefined}
+            // 지금 묻는 칸은 지금 단계 색 테두리 · 18% 바탕(v3 고른 칩과 같은 규칙), 아직 못 정한 칸은 흐린 글자.
             className={cn(
-              'inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs outline-none transition-colors duration-100 ease-out focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-default',
-              chip.current ? 'border-foreground' : 'border-border',
-              chip.value ? 'hover:bg-accent' : 'text-muted-foreground',
+              'inline-flex min-h-7 items-center gap-1.5 rounded-full border-[1.5px] px-3 py-0.5 text-caption outline-none transition-colors duration-100 ease-out focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default',
+              chip.current ? 'border-stage bg-stage/18' : 'border-transparent bg-card',
+              chip.value ? 'hover:bg-accent' : 'text-subtle-foreground',
             )}
           >
             {chip.key === 'ratio' ? <Lock className="size-3" aria-hidden /> : null}
             <span className="text-muted-foreground">{chip.label}</span>
-            <span className={chip.value ? 'font-medium' : ''}>{chip.value ?? t('Not yet')}</span>
+            <span className={chip.value ? 'font-semibold text-foreground' : ''}>{chip.value ?? t('Not yet')}</span>
           </button>
         ))}
       </div>
@@ -125,7 +128,7 @@ function ChatRow({ item, draft, t }: { item: ChatItem; draft: EntryDraft; t: Tra
       <p className="whitespace-pre-wrap">{item.text}</p>
       {item.action === 'show_examples' ? (
         <div>
-          <Button variant="outline" size="sm" onClick={showExamples}>
+          <Button variant="secondary" size="sm" onClick={showExamples}>
             <Lightbulb aria-hidden />
             {t('Show me examples')}
           </Button>
@@ -149,10 +152,10 @@ function ExamplesBubble({ page, intro, t }: { page: number; intro: string; t: Tr
             key={example.title}
             type="button"
             onClick={() => pickExample(start + i, t)}
-            className="flex flex-col items-start gap-1 rounded-md border border-border bg-background p-3 text-left outline-none transition-colors duration-100 ease-out hover:border-border-strong hover:bg-accent/50 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+            className="flex flex-col items-start gap-1 rounded-[14px] bg-card px-4 py-3 text-left outline-none transition-colors duration-100 ease-out hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <span className="text-sm font-medium">{t(example.title)}</span>
-            <span className="text-xs text-muted-foreground">{t(example.text)}</span>
+            <span className="text-label font-semibold">{t(example.title)}</span>
+            <span className="text-caption text-muted-foreground">{t(example.text)}</span>
           </button>
         ))}
       </div>
@@ -173,7 +176,10 @@ interface CardOption {
   mono?: boolean
 }
 
-/** 카드 안 선택지 — 누르면 바로 답이 된다(지금 고른 값은 눌린 모양). 추천에는 추천 표시. */
+/**
+ * 카드 안 선택지 — 누르면 바로 답이 된다(지금 고른 값은 눌린 모양). 추천에는 추천 표시.
+ *   v3: 한 줄 선택지는 채팅 빠른 답 칩(tone="chat"), 설명이 붙은 선택지는 선택 카드.
+ */
 function CardOptions({
   options,
   current,
@@ -190,27 +196,32 @@ function CardOptions({
   onPick: (v: string) => void
   column?: boolean
 }) {
+  const withSub = options.some((o) => o.sub)
   return (
-    <div className={cn('flex gap-2', column ? 'flex-col' : 'flex-wrap')}>
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          aria-pressed={o.value === current}
-          disabled={o.disabled}
-          onClick={() => onPick(o.value)}
-          className={cn(
-            'flex flex-col items-start gap-0.5 rounded-md border px-3 py-1.5 text-left text-sm outline-none transition-colors duration-100 ease-out focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50',
-            o.value === current ? 'border-foreground bg-accent' : 'border-border bg-background hover:border-border-strong hover:bg-accent/50',
-          )}
-        >
-          <span className="flex w-full items-center gap-2">
-            <span className={cn('font-medium', o.mono && 'font-mono tabular-nums')}>{o.label}</span>
-            {o.value === recommended ? <RecommendedBadge label={recommendedLabel} /> : null}
-          </span>
-          {o.sub ? <span className="flex flex-col text-xs text-muted-foreground">{o.sub}</span> : null}
-        </button>
-      ))}
+    <div className={cn('gap-2', column ? 'flex flex-col' : withSub ? 'grid grid-cols-2 sm:grid-cols-4' : 'flex flex-wrap')}>
+      {options.map((o) => {
+        const isRecommended = o.value === recommended
+        // 추천 표시의 말을 바꾼 칸(시리즈 "앞 화")은 이름 옆에 그 배지를 직접 단다 — 칸 부품의 추천 배지는 늘 "추천"이다.
+        const name = (
+          <>
+            <span className={cn(o.mono && 'font-num tabular-nums')}>{o.label}</span>
+            {isRecommended && recommendedLabel ? <RecommendedBadge label={recommendedLabel} /> : null}
+          </>
+        )
+        const common = {
+          selected: o.value === current,
+          recommended: isRecommended && !recommendedLabel,
+          disabled: o.disabled,
+          onClick: () => onPick(o.value),
+        }
+        return withSub ? (
+          <OptionCard key={o.value} {...common} title={name} description={o.sub ? <span className="flex flex-col">{o.sub}</span> : undefined} />
+        ) : (
+          <ChoiceChip key={o.value} tone="chat" {...common}>
+            {name}
+          </ChoiceChip>
+        )
+      })}
     </div>
   )
 }
@@ -226,7 +237,7 @@ function QuestionCard({ question, draft, t }: { question: ChatQuestionKey | 'con
   const keepOpen = levelAvailable('keep', draft.idea, draft.file)
   const acceptButton = (
     <div>
-      <Button variant="outline" size="sm" onClick={() => void accept(question as ChatQuestionKey)}>
+      <Button variant="secondary" size="sm" onClick={() => void accept(question as ChatQuestionKey)}>
         {t('Go with the recommendation')}
       </Button>
     </div>
@@ -237,7 +248,7 @@ function QuestionCard({ question, draft, t }: { question: ChatQuestionKey | 'con
     return (
       <AgentBubble>
         <p>{t('I will start like this.')}</p>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-md border border-border bg-background px-3 py-2.5">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-xl bg-card px-4 py-3">
           {summaryRows(draft, { t, locale: entryLocale, series }).map((row) => (
             <div key={row.key} className="contents">
               <dt className="flex items-center gap-1.5 text-muted-foreground">
@@ -254,7 +265,7 @@ function QuestionCard({ question, draft, t }: { question: ChatQuestionKey | 'con
             {t('Ask Writer to write it')}
           </Button>
         </div>
-        <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+        <p className="flex items-start gap-1.5 text-caption text-muted-foreground">
           <Lock className="mt-0.5 size-3 shrink-0" aria-hidden />
           <span>{t('When you press it, the screen ratio is locked. To change something, click an item above or say it, like "make the length 1 minute".')}</span>
         </p>
@@ -289,7 +300,7 @@ function QuestionCard({ question, draft, t }: { question: ChatQuestionKey | 'con
       <AgentBubble>
         <p>
           {t(CHAT_QUESTION.ratio)}{' '}
-          <span className="inline-flex items-center gap-1 font-medium">
+          <span className="inline-flex items-center gap-1 font-semibold text-lock-note">
             <Lock className="size-3.5" aria-hidden />
             {t('Once chosen, it cannot be changed until the end.')}
           </span>
@@ -327,7 +338,7 @@ function QuestionCard({ question, draft, t }: { question: ChatQuestionKey | 'con
         <>
           <p>{fileReadLine(draft, t)}</p>
           {ocrLine ? (
-            <blockquote className="border-l-2 border-border pl-3 text-xs text-muted-foreground">
+            <blockquote className="border-l-2 border-border pl-3 text-caption text-muted-foreground">
               <span className="select-text">{ocrLine}</span> <span>{t('(the first line read from the picture)')}</span>
             </blockquote>
           ) : null}
@@ -337,7 +348,7 @@ function QuestionCard({ question, draft, t }: { question: ChatQuestionKey | 'con
         <p>{t(CHAT_QUESTION.level)}</p>
       )}
       <CardOptions column options={levelOptions} current={draft.picks.level} recommended={rec ? (levelAvailable(rec.level, draft.idea, draft.file) ? rec.level : 'polish') : null} onPick={(v) => void answer(question, v)} />
-      {!keepOpen ? <p className="text-xs text-muted-foreground">{t(keepUnavailableNote('chat'))}</p> : null}
+      {!keepOpen ? <p className="text-caption text-muted-foreground">{t(keepUnavailableNote('chat'))}</p> : null}
       {acceptButton}
     </AgentBubble>
   )
@@ -369,7 +380,8 @@ function FirstComposer() {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-2">
-      <div className="flex flex-col gap-2 rounded-xl border border-input bg-card p-3 transition-colors duration-150 ease-out focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50">
+      {/* v3 입력 알약(오른쪽 채팅과 같다) — 카드색 · 포커스면 지금 단계 색 테두리 · 크림 보내기 원. */}
+      <div className="flex flex-col gap-2 rounded-[22px] border border-transparent bg-chat-input py-2.5 pl-4 pr-2.5 transition-colors duration-150 ease-out focus-within:border-stage">
         <Textarea
           aria-label={t('Idea')}
           rows={2}
@@ -377,7 +389,7 @@ function FirstComposer() {
           onChange={(e) => setIdea(e.target.value)}
           onKeyDown={onKeyDown}
           placeholder={t('Write who, where, what happens, and how it ends')}
-          className="min-h-12 resize-none border-0 bg-transparent p-1 text-sm shadow-none focus-visible:ring-0 dark:bg-transparent"
+          className="min-h-12 resize-none border-0 bg-transparent p-1 text-chat shadow-none focus-visible:ring-0 dark:bg-transparent"
         />
         <div className="flex flex-wrap items-center gap-2">
           {upload.status === 'uploading' ? (
@@ -389,19 +401,18 @@ function FirstComposer() {
               <Button type="button" variant="ghost" size="icon-sm" aria-label={t('Attach a file')} title={t('Attach a file')} onClick={openFileDialog} disabled={busy}>
                 <Paperclip aria-hidden />
               </Button>
-              <span className="text-xs text-muted-foreground">{t('Upload a file if you have one')}</span>
+              <span className="text-caption text-subtle-foreground">{t('Upload a file if you have one')}</span>
             </>
           )}
-          <span className="ml-auto font-mono text-xs tabular-nums text-muted-foreground" aria-live="polite">
+          <span className="ml-auto font-num text-meta font-medium tabular-nums text-subtle-foreground" aria-live="polite">
             {t('{n} characters', { n: ideaLength(draft.idea) })}
           </span>
-          <Button type="submit" size="sm" disabled={busy || !canSend}>
-            {t('Send')}
+          <Button type="submit" size="icon" className="rounded-full" aria-label={t('Send')} title={t('Send')} disabled={busy || !canSend}>
             <Send aria-hidden />
           </Button>
         </div>
       </div>
-      <p className="text-xs text-muted-foreground">{t('Enter to send · Shift+Enter for a new line')}</p>
+      <p className="pl-4 text-caption text-subtle-foreground">{t('Enter to send · Shift+Enter for a new line')}</p>
     </form>
   )
 }
@@ -421,7 +432,7 @@ function ReplyInput() {
     void reply(said)
   }
   return (
-    <form onSubmit={submit} className="flex items-center gap-2">
+    <form onSubmit={submit} className="flex items-center gap-2 rounded-[26px] border border-transparent bg-chat-input py-2 pl-4 pr-2 transition-colors duration-150 ease-out focus-within:border-stage">
       <Input
         aria-label={t('Chat input')}
         value={text}
@@ -434,9 +445,9 @@ function ReplyInput() {
         }}
         placeholder={t('Pick one, or just say it. E.g. make it 1 minute')}
         disabled={disabled}
-        className="h-10"
+        className="h-9 border-0 bg-transparent px-0 text-chat shadow-none focus-visible:ring-0 dark:bg-transparent"
       />
-      <Button type="submit" size="icon-lg" aria-label={t('Send')} disabled={disabled || !text.trim()}>
+      <Button type="submit" size="icon" className="shrink-0 rounded-full" aria-label={t('Send')} disabled={disabled || !text.trim()}>
         <Send aria-hidden />
       </Button>
     </form>

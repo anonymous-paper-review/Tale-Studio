@@ -2,11 +2,14 @@
 
 // Producer 시작 화면 공용 부품(리뉴얼 1차 2026-10-19): 고르기 묶음(라디오) · 추천 표시 · 이유 한 줄 · 파일 칩 · 말풍선 · 잠금 화면 띄우기.
 //   두 탭(화면에서 고르기 · 채팅으로 만들기)이 같은 부품을 써서 같은 값이 같은 모양으로 보인다. 색은 토큰만(design.md §2).
+//   v3(2026-11-03): 고르기 칸은 controls 의 고르기 칩 · 선택 카드(고른 것 = 지금 단계 색), 말풍선은 채팅과 같은 Lumi 말풍선.
 import { useId, useRef, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { FileText, ImageIcon, Loader2, Sparkles, X } from 'lucide-react'
+import { FileText, ImageIcon, Loader2, X } from 'lucide-react'
 import { AiBusyOverlay, type AiBusyStep } from '@/components/ai-busy-overlay'
-import { STAGE_BADGE_CLASS, STAGE_LABEL } from '@/lib/constants'
+import { ChoiceChip, OptionCard, RecommendBadge } from '@/components/controls/choice-chip'
+import { LumiAvatar } from '@/components/lumi/lumi'
+import { STAGE_PERSONA, type LumiPersona } from '@/lib/lumi'
 import { useLocale, useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import type { EntryFileMeta } from '@/lib/entry/draft'
@@ -23,19 +26,37 @@ export interface OptionItem {
   mono?: boolean
 }
 
-/** 추천 표시 — 작은 배지(design.md §7.3: pill 은 배지 · 칩만). */
-/** 추천 표시. label 을 주면 그 말을 쓴다(시리즈 다음 화의 화면 비율은 "앞 화"). */
-export function RecommendedBadge({ label }: { label?: string } = {}) {
-  const t = useT()
-  return <span className="shrink-0 rounded-full border border-border bg-muted px-1.5 text-xs font-medium leading-5 text-muted-foreground">{label ?? t('Recommended')}</span>
+/** 꺼진 칸(aria-disabled) — 까닭 툴팁이 보이도록 진짜 disabled 대신 쓴다. 흐리게 · 눌러도 바뀌지 않는 모양. */
+export const OPTION_OFF_CLASS = 'aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-card'
+
+/**
+ * 꺼진 선택 카드의 까닭 — 선택 카드(OptionCard)의 title 은 카드 제목 칸이라 버튼에 말풍선(title 속성)을 못 단다.
+ *   마우스 말풍선은 감싼 칸(상자 없는 contents)의 title 로, 화면 읽기는 숨긴 글로 — 카드에 aria-describedby={id} 를 준다.
+ *   까닭이 없으면 카드만 그린다. 약속: tests/producer/entry-settings-controls.test.ts
+ */
+export function WithOffReason({ reason, id, children }: { reason?: string; id: string; children: ReactNode }) {
+  if (!reason) return <>{children}</>
+  return (
+    <span title={reason} className="contents">
+      {children}
+      <span id={id} className="sr-only">
+        {reason}
+      </span>
+    </span>
+  )
 }
 
-/** AI가 고른 이유 한 줄. */
-export function WhyLine({ text }: { text?: string | null }) {
+/** 추천 표시(v3 Control/Badge, 지금 단계 색). label 을 주면 그 말을 쓴다(시리즈 다음 화의 화면 비율은 "앞 화"). */
+export function RecommendedBadge({ label }: { label?: string } = {}) {
+  return <RecommendBadge>{label}</RecommendBadge>
+}
+
+/** AI가 고른 이유 한 줄(✦ + 보조 글자). */
+export function WhyLine({ text, className }: { text?: string | null; className?: string }) {
   if (!text) return null
   return (
-    <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
-      <Sparkles className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+    <p className={cn('flex items-start gap-1.5 text-caption text-muted-foreground', className)}>
+      <span aria-hidden>✦</span>
       <span>{text}</span>
     </p>
   )
@@ -44,20 +65,24 @@ export function WhyLine({ text }: { text?: string | null }) {
 /**
  * 하나만 고르는 묶음(role=radiogroup). 화살표 키로 옮기며 고르고, 탭 키는 고른 칸(없으면 첫 칸)에만 멈춘다.
  *   꺼진 칸은 aria-disabled + 까닭(title) — 포커스는 건너뛴다.
+ *   v3: variant="chip" = 고르기 칩(장르처럼 줄바꿈하며 늘어선 알약), "card" = 선택 카드(제목 + 한 줄 설명).
+ *   aside = 묶음 이름 오른쪽(AI가 고른 이유 한 줄 등, 시안 E3).
  */
 export function OptionGroup({
   label,
   hideLabel,
+  aside,
   options,
   value,
   recommended,
   recommendedLabel,
   onChange,
   className,
-  size = 'md',
+  variant = 'card',
 }: {
   label: string
   hideLabel?: boolean
+  aside?: ReactNode
   options: OptionItem[]
   value: string | null
   recommended?: string | null
@@ -65,7 +90,7 @@ export function OptionGroup({
   recommendedLabel?: string
   onChange: (value: string) => void
   className?: string
-  size?: 'sm' | 'md'
+  variant?: 'chip' | 'card'
 }) {
   const labelId = useId()
   const refs = useRef<Array<HTMLButtonElement | null>>([])
@@ -91,43 +116,61 @@ export function OptionGroup({
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <span id={labelId} className={hideLabel ? 'sr-only' : 'text-sm font-medium'}>
-        {label}
-      </span>
-      <div role="radiogroup" aria-labelledby={labelId} className={cn('grid gap-2', className)}>
+    <div className="flex flex-col gap-3">
+      {hideLabel ? (
+        <span id={labelId} className="sr-only">
+          {label}
+        </span>
+      ) : (
+        <div className="flex items-start gap-2.5">
+          <span id={labelId} className="shrink-0 text-body font-semibold">
+            {label}
+          </span>
+          {aside ? <div className="ml-auto min-w-0 text-right">{aside}</div> : null}
+        </div>
+      )}
+      <div role="radiogroup" aria-labelledby={labelId} className={cn(variant === 'chip' ? 'flex flex-wrap gap-2' : 'grid gap-2.5', className)}>
         {options.map((o, i) => {
           const checked = o.value === value
-          return (
-            <button
-              key={o.value}
-              ref={(el) => {
-                refs.current[i] = el
-              }}
-              type="button"
-              role="radio"
-              aria-checked={checked}
-              aria-disabled={o.disabled || undefined}
-              title={o.disabled ? o.disabledReason : undefined}
-              tabIndex={i === tabStop ? 0 : -1}
-              onClick={() => {
-                if (!o.disabled) onChange(o.value)
-              }}
-              onKeyDown={(e) => onKeyDown(e, i)}
-              className={cn(
-                'flex flex-col items-start gap-0.5 rounded-md border text-left text-sm outline-none transition-colors duration-100 ease-out focus-visible:ring-[3px] focus-visible:ring-ring/50',
-                size === 'sm' ? 'px-3 py-1.5' : 'min-h-10 px-3 py-2',
-                checked ? 'border-foreground bg-accent text-foreground' : 'border-border bg-background hover:border-border-strong hover:bg-accent/50',
-                o.disabled && 'cursor-not-allowed opacity-50 hover:border-border hover:bg-background',
-              )}
-            >
-              {/* 이름은 낱말 단위로만 줄을 바꾼다(좁은 칸에서 옆 칸 밑으로 잘리던 nowrap 대신) — 추천 표시는 자리가 모자라면 다음 줄로(2026-10-27 오너). */}
-              <span className="flex w-full flex-wrap items-center justify-between gap-x-2 gap-y-1">
-                <span className={cn('break-keep text-pretty font-medium', o.mono && 'font-mono tabular-nums')}>{o.label}</span>
-                {o.value === recommended ? <RecommendedBadge label={recommendedLabel} /> : null}
-              </span>
-              {o.sub ? <span className="break-keep text-pretty text-xs text-muted-foreground">{o.sub}</span> : null}
-            </button>
+          const isRecommended = o.value === recommended
+          // 추천 표시의 말을 바꾼 칸(시리즈 "앞 화")은 이름 옆에 그 배지를 직접 단다 — 칸 부품의 추천 배지는 늘 "추천"이다.
+          const name = (
+            <>
+              {/* 이름은 낱말 단위로만 줄을 바꾼다(좁은 칸에서 옆 칸 밑으로 잘리던 nowrap 대신)(2026-10-27 오너). */}
+              <span className={cn('break-keep text-pretty', o.mono && 'font-num tabular-nums')}>{o.label}</span>
+              {isRecommended && recommendedLabel ? <RecommendedBadge label={recommendedLabel} /> : null}
+            </>
+          )
+          const reason = o.disabled ? o.disabledReason : undefined
+          const reasonId = `${labelId}-off-${i}`
+          const common = {
+            ref: (el: HTMLButtonElement | null) => {
+              refs.current[i] = el
+            },
+            role: 'radio' as const,
+            selected: checked,
+            recommended: isRecommended && !recommendedLabel,
+            'aria-disabled': o.disabled || undefined,
+            tabIndex: i === tabStop ? 0 : -1,
+            onClick: () => {
+              if (!o.disabled) onChange(o.value)
+            },
+            onKeyDown: (e: KeyboardEvent<HTMLButtonElement>) => onKeyDown(e, i),
+            className: OPTION_OFF_CLASS,
+          }
+          return variant === 'chip' ? (
+            <ChoiceChip key={o.value} {...common} title={reason}>
+              {name}
+            </ChoiceChip>
+          ) : (
+            <WithOffReason key={o.value} reason={reason} id={reasonId}>
+              <OptionCard
+                {...common}
+                aria-describedby={reason ? reasonId : undefined}
+                title={name}
+                description={o.sub ? <span className="break-keep text-pretty">{o.sub}</span> : undefined}
+              />
+            </WithOffReason>
           )
         })}
       </div>
@@ -145,7 +188,7 @@ export function FileChip({ file, onRemove, disabled }: { file: EntryFileMeta; on
       ? t('{n} characters read', { n: file.chars })
       : t('Text is read from the image')
   return (
-    <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-background py-1 pl-2.5 pr-1 text-xs">
+    <span className="inline-flex max-w-full items-center gap-2 rounded-full bg-chip py-1 pl-2.5 pr-1 text-caption">
       <Icon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
       <span className="truncate font-medium">{file.name}</span>
       <span className="shrink-0 text-muted-foreground">{status}</span>
@@ -168,7 +211,7 @@ export function FileChip({ file, onRemove, disabled }: { file: EntryFileMeta; on
 export function UploadingChip({ name }: { name: string }) {
   const t = useT()
   return (
-    <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-border bg-background px-2.5 py-1 text-xs" role="status">
+    <span className="inline-flex max-w-full items-center gap-2 rounded-full bg-chip px-2.5 py-1 text-caption" role="status">
       <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground motion-reduce:animate-none" aria-hidden />
       <span className="truncate">{name}</span>
       <span className="shrink-0 text-muted-foreground">{t('Uploading…')}</span>
@@ -186,15 +229,19 @@ export function useUploadErrorMessage(): (error: UploadError) => string {
   }
 }
 
-/** Producer 에이전트 말풍선 — 단계 색은 이름 배지에만(design.md §2.9). */
+/** Producer 에이전트 말풍선 — 오른쪽 채팅과 같은 Lumi 말풍선(v3: Lumi 얼굴 · 단계 색 이름 · 왼쪽 위 모서리 6). */
 export function AgentBubble({ children, alert }: { children: ReactNode; alert?: boolean }) {
   return (
-    <div className="flex max-w-[88%] flex-col items-start gap-1.5">
-      <span className={cn('rounded-full border px-1.5 text-xs font-medium leading-5', STAGE_BADGE_CLASS.entry)}>{STAGE_LABEL.entry}</span>
+    <div className="flex max-w-[88%] items-start gap-2">
+      <LumiAvatar persona={STAGE_PERSONA.entry} state={alert ? 'error' : 'idle'} size={28} />
       <div
         role={alert ? 'alert' : undefined}
-        className={cn('flex w-full flex-col gap-3 rounded-xl border bg-card px-4 py-3 text-sm', alert ? 'border-destructive/40' : 'border-border')}
+        className={cn(
+          'flex min-w-0 flex-1 flex-col gap-3 rounded-xl rounded-tl-[6px] bg-chat-lumi-bubble px-4 pb-3.5 pt-3 text-chat text-foreground',
+          alert && 'ring-1 ring-destructive/40',
+        )}
       >
+        <p className="-mb-1.5 text-micro font-semibold leading-none text-stage">Lumi</p>
         {children}
       </div>
     </div>
@@ -203,10 +250,10 @@ export function AgentBubble({ children, alert }: { children: ReactNode; alert?: 
 
 export function UserBubble({ text, fileName }: { text: string; fileName?: string }) {
   return (
-    <div className="ml-auto flex max-w-[88%] flex-col items-end gap-2 rounded-xl bg-chat-user-bubble px-4 py-2.5 text-sm text-chat-user-bubble-foreground">
+    <div className="ml-auto flex max-w-[88%] flex-col items-end gap-2 rounded-xl rounded-tr-[6px] bg-chat-user-bubble px-4 py-2.5 text-chat text-chat-user-bubble-foreground">
       {text ? <p className="select-text whitespace-pre-wrap break-words">{text}</p> : null}
       {fileName ? (
-        <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-chat-user-bubble-foreground/30 px-2 py-0.5 text-xs">
+        <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-chip px-2 py-0.5 text-caption">
           <FileText className="size-3 shrink-0" aria-hidden />
           <span className="truncate">{fileName}</span>
         </span>
@@ -234,6 +281,8 @@ export function BusyOverlayPortal(props: {
   footer?: ReactNode
   /** false = 실패 안내(경고 표시 · 왼쪽 레일 단계 이동을 다시 연다). 기본 true. */
   busy?: boolean
+  /** 큰 Lumi 의 옷(v3) — 기다리는 동안 넘어가는 단계. AiBusyOverlay 의 lumi. */
+  lumi?: LumiPersona
 }) {
   const mounted = useMounted()
   if (!mounted || !props.open) return null

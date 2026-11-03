@@ -29,7 +29,7 @@ v3 "Claude 톤"(따뜻한 무채색 · 크림 메인 단추 · 지금 단계 색
 - Storyboard 카드는 지금의 3컷 순환 그대로.
 - 채팅의 모델 고르기 · 다른 단계 고르기 · [+] 첨부는 모두에게 그대로 — 모양만 바꾼다.
 - Writer 는 [화면에서 고치기 | 채팅으로 고치기] 토글을 뺐다 — [직접 작성] · [AI 다시 쓰기] · 오른쪽 채팅이 한 화면이고, 문단을 누르면 그 문단을 채팅에 붙여 고친다(`src/features/prose/prose-workspace.tsx`).
-- 큰 3D Lumi 는 가이드가 말한 자리 모두: 확인 팝업(넘기기 확인 창 맨 위 `ConfirmLumi`, §13.3) · 단계 넘어가며 기다리는 화면(§13.5) · 프로젝트 목록 첫 화면(2단계 작업).
+- 큰 3D Lumi 는 가이드가 말한 자리 모두: 확인 팝업(넘기기 확인 창 맨 위 `ConfirmLumi`, §13.3) · 단계 넘어가며 기다리는 화면(§13.5) · 새 프로젝트 만드는 화면 · 프로젝트 목록 첫 화면(§15.4).
 - 채팅 아바타는 움직이지 않는 그림(가이드가 목록에는 그림을 권한다).
 
 ---
@@ -469,6 +469,7 @@ Radix primitive 는 body 로 portal — `<html data-stage>` 덕에 지금 단계
 
 - **레일** `src/components/layout/sidebar.tsx`: 맨 위 Tale 로고(누르면 프로젝트 목록) · 단계 칸(v3 채움 아이콘 · 라벨 · 끝낸 단계 체크 · 지금 단계 밝은 바탕과 단계 색 아이콘) · 아래 Take · 공유 · 내보내기 · Help · 프로필. 칸 모습 판정은 `src/lib/stage-rail.ts` `railStageState`(약속 tests/project/rail-done-mark.test.ts).
 - **위 막대** `src/components/layout/studio-top-bar.tsx` `StudioTopBar`: 단계 칩(`StageChip`) · 프로젝트 제목 + 연필(`ProjectTitleField`, 이름 바꾸기) · 오른쪽 자리. 스튜디오 레이아웃이 모든 단계 화면 위에 놓고(위에 붙는 sticky), Producer 시작 화면은 탭이 든 자기 막대를 같은 컴포넌트로 그린다. 화면이 오른쪽 자리에 단추를 놓을 때는 `<TopBarActions>`(포털).
+- **대시보드 머리** `src/components/dashboard/dashboard-header.tsx` `DashboardHeader`: 스튜디오 밖(/projects · /projects/new · /playground · /queue · /account) 공용 — 작업 화면과 같은 바탕색 막대 · `TaleLockup` · 탭 묶음 · 오른쪽 자리(새 프로젝트 등).
 - **화면 머리** `src/components/layout/page-header.tsx` `PageHeader`: `title` · `tag` · `meta` · `actions`(오른쪽, 메인은 크림). 작업 영역 맨 위.
 - **채팅** `src/components/layout/global-chat.tsx`: §13.10.
 
@@ -480,7 +481,7 @@ Radix primitive 는 body 로 portal — `<html data-stage>` 덕에 지금 단계
 
 shadcn `Dialog` — 바탕색 판 · `rounded-2xl` · `shadow-panel` · 막 검정 60%. 제목 `text-lg font-semibold`, 설명 `text-label text-muted-foreground`. 메인 단추(크림)는 오른쪽, 취소는 ghost.
 **확인 팝업**(큰 일을 하기 전에 "~할까요?"를 묻는 창 — 단계 넘기기 · 확정) 맨 위에는 큰 Lumi `<ConfirmLumi stage={지금 단계} />`
-(`src/components/handoff/confirm-lumi.tsx`: 지금 단계 옷 · `idle` · 폭 180). 지우기 확인 · 오류 안내에는 넣지 않는다. 지금 쓰는 곳: Writer 로 넘기기 전 확정 창(`handoff/producer-lock-dialog.tsx`) · Director 로 넘기기 전 준비 창(`handoff/director-readiness-dialog.tsx`).
+(`src/components/handoff/confirm-lumi.tsx`: 지금 단계 옷 · `idle` · 폭 180). 지우기 확인 · 오류 안내에는 넣지 않는다. 지금 쓰는 곳: Producer 시작 확인(`features/entry/entry-form.tsx`) · Writer 로 넘기기 전 확정 창(`handoff/producer-lock-dialog.tsx`) · 산문 확정(`features/prose/prose-confirm-dialog.tsx`) · Artist 그림체 고르기 · 다시 만들기 · 완료(`features/artist-room/style-make-dialog.tsx` · `regenerate-style-dialog.tsx` · `artist-complete-dialog.tsx`) · Storyboard → Director 넘기기(`features/writer/storyboard-director-dialog.tsx`) · Director 로 넘기기 전 준비 창(`handoff/director-readiness-dialog.tsx`).
 
 ### 13.4 Form anatomy
 
@@ -492,8 +493,9 @@ label 위 · input 아래 · helper/error 더 아래. 입력칸은 카드색 · 
 
 **단계 넘어가며 기다리는 화면**은 AI 잠금 덮개에 큰 Lumi 를 준다 — `<AiBusyOverlay lumi={옷} />`(`src/components/ai-busy-overlay.tsx` `AiBusyCard`,
 시안 Content/Loading Card): 큰 Lumi `loading`(폭 240, 일이 멈춰 실패 안내가 되면 `error`) · 제목 22/700 · 설명 · 진행 막대(폭 300, Lumi 옷의 단계 색 기울기 —
-화이트 펄 · 완성 옷이면 놓인 화면의 색) · 단계 목록(카드색 상자). 옷 = 넘어가는 다음 단계. 쓰는 곳: Producer 글 읽기 · Writer 산문 초안 · Artist 그림 ·
-Storyboard 나누기 · 첫 러프 · Editor 준비. `lumi` 를 안 주는 잠금(그림 다시 그리기 · 샷 고치기 팝업 위 등)은 도는 원의 작은 카드 그대로(약속 tests/project/busy-overlay-lumi.test.ts).
+화이트 펄 · 완성 옷이면 놓인 화면의 색) · 단계 목록(카드색 상자). 옷 = 넘어가는 다음 단계. 쓰는 곳: Producer 글 읽기 · Writer 산문 초안(Producer 에서 넘길 때 · Writer 화면) · Artist 그림 ·
+Storyboard 나누기 · 첫 러프. 덮개 없이 화면 가운데에 큰 Lumi `loading`(폭 300)만 두는 곳: 새 프로젝트 만들기(`/projects/new`, Producer 옷 · 실패면 `error`) ·
+Editor 클립 준비. `lumi` 를 안 주는 잠금(그림 다시 그리기 · 샷 고치기 팝업 위 등)은 도는 원의 작은 카드 그대로(약속 tests/project/busy-overlay-lumi.test.ts).
 
 ### 13.8 Component patterns (shadcn primitives)
 
@@ -563,11 +565,12 @@ Figma 에 있는 v3 아이콘은 `v3-icons.tsx` 에 더한다(이름 `<Name>Icon
 ### 15.3 브랜드 자산
 
 - 로고 심볼 `public/brand/tale-symbol.svg`(어두운 바탕용) — 레일 맨 위 30px.
+- 로고 묶음 `src/components/tale-lockup.tsx` `TaleLockup`(심볼 + 글자 "tale studio", v3 Logo/Tale Lockup) — 대시보드 머리 · 랜딩 머리 · 꼬리말.
 - 색 · 기울기 · 겹침 색을 바꾸지 않는다, 심볼에 테두리 · 흰 광택을 넣지 않는다(브랜드 가이드 "로고 쓰는 법").
 
 ### 15.4 Lumi
 
-- **큰 Lumi** `<Lumi persona state size />`(`src/components/lumi/lumi.tsx`): `public/lumi-persona.js`(웹 컴포넌트 `<lumi-persona>`, 약 3.1MB)를 **처음 그릴 때만** 불러온다. 다 불러오기 전 · WebGL 없음 · 불러오기 실패 → 같은 모습의 그림(`public/lumi/full/*.webp`), 동작 줄이기 → `paused`. 한 화면에 큰 Lumi 는 하나. 자리: 확인 팝업(`ConfirmLumi`, §13.3) · 단계 넘어가며 기다리는 화면(`AiBusyOverlay lumi`, §13.5) · 프로젝트 목록 첫 화면(2단계 작업).
+- **큰 Lumi** `<Lumi persona state size />`(`src/components/lumi/lumi.tsx`): `public/lumi-persona.js`(웹 컴포넌트 `<lumi-persona>`, 약 3.1MB)를 **처음 그릴 때만** 불러온다. 다 불러오기 전 · WebGL 없음 · 불러오기 실패 → 같은 모습의 그림(`public/lumi/full/*.webp`), 동작 줄이기 → `paused`. 한 화면에 큰 Lumi 는 하나. 자리: 확인 팝업(`ConfirmLumi`, §13.3) · 단계 넘어가며 기다리는 화면(`AiBusyOverlay lumi`, §13.5) · 새 프로젝트 만드는 화면(`/projects/new`, Producer 옷 `loading`) · 프로젝트 목록 첫 화면(화이트 펄 `idle` 폭 320 — 목록 머리 왼쪽, 빈 목록이면 빈 안내 자리).
 - **채팅 아바타** `<LumiAvatar persona state size />`: 그림만(`public/lumi/avatar/*.webp`, 80px). 바탕은 그 단계 색 12%.
 - persona: `pearl`(시작 · 목록) · 여섯 단계 · `complete`(작품 완성). state: idle · listening · thinking · complete · error · loading. 단계 id → persona 는 `STAGE_PERSONA`.
 
