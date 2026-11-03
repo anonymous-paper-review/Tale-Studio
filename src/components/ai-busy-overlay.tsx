@@ -12,6 +12,8 @@ import { AlertCircle, Check, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SHELL_INSET, SHELL_RAIL_WIDTH } from '@/lib/constants'
 import { useT } from '@/lib/i18n'
+import { Lumi } from '@/components/lumi/lumi'
+import type { LumiPersona } from '@/lib/lumi'
 import { aiBusyHolds, holdAiBusy } from '@/stores/ai-busy-store'
 
 export interface AiBusyStep {
@@ -37,11 +39,14 @@ interface AiBusyOverlayProps {
   /** 'dialog' = 열린 팝업 위를 덮는다(팝업에서 시작한 AI 작업, 2026-10-20 Artist 상세 · 샷 고치기). 기본은 단계 화면만 덮는다.
    *  팝업이 열려 있으면 body 가 클릭을 받지 않는다(Radix) — 덮개가 클릭을 직접 받아 밑의 팝업 버튼으로 새지 않게 한다. */
   layer?: 'stage' | 'dialog'
+  /** 큰 Lumi(v3 오너 2026-11-03 결정 8) — 단계를 넘어가며 기다리는 화면이면 넘어가는 다음 단계 옷. 있으면 카드 맨 위 가운데에 둔다.
+   *  일하는 동안은 loading, 일이 멈추면(busy=false) error 모습. 없으면 지금 모습 그대로(돌아가는 원). */
+  lumi?: LumiPersona
 }
 
 const subscribeNothing = () => () => {}
 
-export function AiBusyOverlay({ open, title, description, steps, progress, progressLabel, footer, busy = true, layer = 'stage' }: AiBusyOverlayProps) {
+export function AiBusyOverlay({ open, title, description, steps, progress, progressLabel, footer, busy = true, layer = 'stage', lumi }: AiBusyOverlayProps) {
   const t = useT()
   // 서버 렌더에는 body 가 없다 — 브라우저에서만 띄운다(하이드레이션이 어긋나지 않게).
   const inBrowser = useSyncExternalStore(subscribeNothing, () => true, () => false)
@@ -79,9 +84,11 @@ export function AiBusyOverlay({ open, title, description, steps, progress, progr
       data-testid="ai-busy-overlay"
     >
       <div className="flex w-full max-w-md flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-lg">
+        {lumi ? <Lumi persona={lumi} state={busy ? 'loading' : 'error'} size={300} className="mx-auto" /> : null}
         <div className="flex items-start gap-3">
+          {/* 큰 Lumi 가 있으면 Lumi 가 기다림을 보인다 — 도는 원은 두지 않는다. */}
           {busy ? (
-            <Loader2 className="mt-0.5 size-5 shrink-0 animate-spin text-muted-foreground motion-reduce:animate-none" aria-hidden />
+            lumi ? null : <Loader2 className="mt-0.5 size-5 shrink-0 animate-spin text-muted-foreground motion-reduce:animate-none" aria-hidden />
           ) : (
             <AlertCircle className="mt-0.5 size-5 shrink-0 text-destructive" aria-hidden />
           )}
