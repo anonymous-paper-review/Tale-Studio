@@ -309,9 +309,19 @@ export default function DesignShowcasePage() {
         </div>
       </Section>
 
-      <Section title="AI busy card · big Lumi" hint="components/ai-busy-overlay.tsx AiBusyCard — lumi given: loading Lumi while busy, error Lumi when stopped; no lumi: spinner as before">
+      <Section title="AI busy card · big Lumi" hint="components/ai-busy-overlay.tsx AiBusyCard — lumi given: v3 Loading Card (loading Lumi while busy, bar in the Lumi's stage gradient; error Lumi when stopped); no lumi: spinner as before">
         <div className="grid gap-6 lg:grid-cols-3">
-          <AiBusyCard title="Writing the prose draft" description="Lumi is reading your story." progress={64} lumi="writer" />
+          <AiBusyCard
+            title="Drawing the first roughs"
+            description="Lumi is splitting the story into shots."
+            progress={40}
+            steps={[
+              { label: 'Split into scenes and shots', state: 'done' },
+              { label: 'Draw rough frames', state: 'current' },
+              { label: 'Open the board', state: 'todo' },
+            ]}
+            lumi="storyboard"
+          />
           <AiBusyCard
             title="Could not write the draft"
             description="Try again in a moment."

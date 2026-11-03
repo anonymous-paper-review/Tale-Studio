@@ -28,8 +28,8 @@ v3 "Claude 톤"(따뜻한 무채색 · 크림 메인 단추 · 지금 단계 색
   (고를 수 있는 조건은 예전 메뉴 그대로, `src/lib/export/export-choices.ts` · `src/components/export-menu.tsx`).
 - Storyboard 카드는 지금의 3컷 순환 그대로.
 - 채팅의 모델 고르기 · 다른 단계 고르기 · [+] 첨부는 모두에게 그대로 — 모양만 바꾼다.
-- Writer 는 [화면에서 고치기 | 채팅으로 고치기] 토글을 뺀다(2단계 작업).
-- 큰 3D Lumi 는 가이드가 말한 자리 모두: 확인 팝업(넘기기 확인 창 맨 위 `ConfirmLumi`, §13.3) · 단계 넘어가는 로딩 · 프로젝트 목록 첫 화면(뒤 둘은 2단계 작업).
+- Writer 는 [화면에서 고치기 | 채팅으로 고치기] 토글을 뺐다 — [직접 작성] · [AI 다시 쓰기] · 오른쪽 채팅이 한 화면이고, 문단을 누르면 그 문단을 채팅에 붙여 고친다(`src/features/prose/prose-workspace.tsx`).
+- 큰 3D Lumi 는 가이드가 말한 자리 모두: 확인 팝업(넘기기 확인 창 맨 위 `ConfirmLumi`, §13.3) · 단계 넘어가며 기다리는 화면(§13.5) · 프로젝트 목록 첫 화면(2단계 작업).
 - 채팅 아바타는 움직이지 않는 그림(가이드가 목록에는 그림을 권한다).
 
 ---
@@ -488,7 +488,12 @@ label 위 · input 아래 · helper/error 더 아래. 입력칸은 카드색 · 
 
 ### 13.5 Empty / Loading / Error 결정 트리
 
-데이터 모양을 알면 Skeleton, 모르면 Spinner + 동사 문구. 단계 넘어가는 로딩은 큰 Lumi `state="loading"`(2단계 작업). 그림 자리는 `bg-art-placeholder`.
+데이터 모양을 알면 Skeleton, 모르면 Spinner + 동사 문구. 그림 자리는 `bg-art-placeholder`.
+
+**단계 넘어가며 기다리는 화면**은 AI 잠금 덮개에 큰 Lumi 를 준다 — `<AiBusyOverlay lumi={옷} />`(`src/components/ai-busy-overlay.tsx` `AiBusyCard`,
+시안 Content/Loading Card): 큰 Lumi `loading`(폭 240, 일이 멈춰 실패 안내가 되면 `error`) · 제목 22/700 · 설명 · 진행 막대(폭 300, Lumi 옷의 단계 색 기울기 —
+화이트 펄 · 완성 옷이면 놓인 화면의 색) · 단계 목록(카드색 상자). 옷 = 넘어가는 다음 단계. 쓰는 곳: Producer 글 읽기 · Writer 산문 초안 · Artist 그림 ·
+Storyboard 나누기 · 첫 러프 · Editor 준비. `lumi` 를 안 주는 잠금(그림 다시 그리기 · 샷 고치기 팝업 위 등)은 도는 원의 작은 카드 그대로(약속 tests/project/busy-overlay-lumi.test.ts).
 
 ### 13.8 Component patterns (shadcn primitives)
 
@@ -562,7 +567,7 @@ Figma 에 있는 v3 아이콘은 `v3-icons.tsx` 에 더한다(이름 `<Name>Icon
 
 ### 15.4 Lumi
 
-- **큰 Lumi** `<Lumi persona state size />`(`src/components/lumi/lumi.tsx`): `public/lumi-persona.js`(웹 컴포넌트 `<lumi-persona>`, 약 3.1MB)를 **처음 그릴 때만** 불러온다. 다 불러오기 전 · WebGL 없음 · 불러오기 실패 → 같은 모습의 그림(`public/lumi/full/*.webp`), 동작 줄이기 → `paused`. 한 화면에 큰 Lumi 는 하나. 자리: 확인 팝업(`ConfirmLumi`, §13.3) · 단계 넘어가는 로딩 · 프로젝트 목록 첫 화면(뒤 둘은 2단계 작업).
+- **큰 Lumi** `<Lumi persona state size />`(`src/components/lumi/lumi.tsx`): `public/lumi-persona.js`(웹 컴포넌트 `<lumi-persona>`, 약 3.1MB)를 **처음 그릴 때만** 불러온다. 다 불러오기 전 · WebGL 없음 · 불러오기 실패 → 같은 모습의 그림(`public/lumi/full/*.webp`), 동작 줄이기 → `paused`. 한 화면에 큰 Lumi 는 하나. 자리: 확인 팝업(`ConfirmLumi`, §13.3) · 단계 넘어가며 기다리는 화면(`AiBusyOverlay lumi`, §13.5) · 프로젝트 목록 첫 화면(2단계 작업).
 - **채팅 아바타** `<LumiAvatar persona state size />`: 그림만(`public/lumi/avatar/*.webp`, 80px). 바탕은 그 단계 색 12%.
 - persona: `pearl`(시작 · 목록) · 여섯 단계 · `complete`(작품 완성). state: idle · listening · thinking · complete · error · loading. 단계 id → persona 는 `STAGE_PERSONA`.
 

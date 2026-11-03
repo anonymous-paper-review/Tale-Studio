@@ -25,6 +25,11 @@ export const STAGE_PERSONA: Record<StageId, LumiStagePersona> = {
   editor: 'editor',
 }
 
+/** 단계 옷이면 그 단계 색 이름(data-stage 값) — 화이트 펄 · 완성은 단계 색이 없다. */
+export function lumiStageTheme(persona: LumiPersona): LumiStagePersona | undefined {
+  return (Object.values(STAGE_PERSONA) as string[]).includes(persona) ? (persona as LumiStagePersona) : undefined
+}
+
 /** 움직이는 Lumi 파일(약 3.1MB, React · three.js 포함) — public/ 에 둔다. 큰 Lumi 가 처음 나올 때만 불러온다. */
 export const LUMI_SCRIPT_SRC = '/lumi-persona.js'
 

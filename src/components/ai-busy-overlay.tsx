@@ -17,7 +17,7 @@ import { AlertCircle, Check, Loader2 } from 'lucide-react'
 import { Lumi } from '@/components/lumi/lumi'
 import { cn } from '@/lib/utils'
 import { SHELL_INSET, SHELL_RAIL_WIDTH } from '@/lib/constants'
-import type { LumiPersona } from '@/lib/lumi'
+import { lumiStageTheme, type LumiPersona } from '@/lib/lumi'
 import { useT } from '@/lib/i18n'
 import { lockForAiWork, overlayClipPath } from '@/lib/ai-busy-lock'
 import { aiBusyHolds, holdAiBusy } from '@/stores/ai-busy-store'
@@ -144,18 +144,21 @@ export function AiBusyCard({
   const pct = typeof progress === 'number' && Number.isFinite(progress) ? Math.max(0, Math.min(100, Math.round(progress))) : null
   return (
     <div
+      // v3 기다리는 카드(Content/Loading Card) — 모서리 26 · 안쪽 30/36/26 · 사이 12 · 폭 440 · 그림자 하나. 진행 막대(폭 300)는
+      //   Lumi 가 입은 단계 색 기울기(data-stage) — Lumi 와 막대가 같은 단계를 말한다. 화이트 펄 · 완성은 놓인 화면의 색.
+      data-stage={lumi ? lumiStageTheme(lumi) : undefined}
       className={cn(
-        'flex w-full max-w-md flex-col gap-4',
+        'flex w-full flex-col',
         lumi
-          ? 'items-stretch rounded-3xl bg-panel px-9 pb-7 pt-7 shadow-panel'
-          : 'rounded-xl border border-border bg-card p-6 shadow-lg',
+          ? 'max-w-[440px] items-stretch gap-3 rounded-[26px] bg-panel px-9 pb-[26px] pt-[30px] shadow-panel'
+          : 'max-w-md gap-4 rounded-xl border border-border bg-card p-6 shadow-lg',
       )}
     >
       {lumi ? (
-        // v3 기다리는 카드 — 큰 Lumi(3:2) 아래 제목 · 설명을 가운데로. 일하는 동안 loading, 멈추면 error(가이드 상태).
-        <div className="flex flex-col items-center gap-2 text-center">
+        // 큰 Lumi(3:2) 아래 제목(22/700) · 설명을 가운데로. 일하는 동안 loading, 멈추면 error(가이드 상태).
+        <div className="flex flex-col items-center gap-1.5 text-center">
           <Lumi persona={lumi} state={busy ? 'loading' : 'error'} size={240} />
-          <h2 className="text-lg font-semibold leading-7">{title}</h2>
+          <h2 className="mt-1.5 text-[22px] font-bold leading-[1.3] tracking-[-0.01em]">{title}</h2>
           <p className="text-caption text-muted-foreground">
             {description ?? t('While AI is working, the whole screen is locked. You can edit once it finishes.')}
           </p>
@@ -176,17 +179,17 @@ export function AiBusyCard({
         </div>
       )}
       {pct !== null || progressLabel ? (
-        <div className="flex flex-col gap-1.5">
+        <div className={cn('flex flex-col gap-1.5', lumi && 'mx-auto w-full max-w-[300px] text-center')}>
           {pct !== null ? (
-            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
-              <div className="h-full rounded-full bg-primary transition-[width] duration-350 ease-out" style={{ width: `${pct}%` }} />
+            <div className={cn('h-1.5 w-full overflow-hidden rounded-full', lumi ? 'bg-card' : 'bg-muted')} aria-hidden>
+              <div className={cn('h-full rounded-full transition-[width] duration-350 ease-out', lumi ? 'bg-stage-gradient' : 'bg-primary')} style={{ width: `${pct}%` }} />
             </div>
           ) : null}
           {progressLabel ? <p className="font-mono text-xs tabular-nums text-muted-foreground">{progressLabel}</p> : null}
         </div>
       ) : null}
       {steps && steps.length > 0 ? (
-        <ol className="flex flex-col gap-1.5 text-sm">
+        <ol className={cn('flex flex-col gap-1.5 text-sm', lumi && 'rounded-xl bg-card px-4 py-3 text-left')}>
           {steps.map((step, i) => (
             <li
               key={`${i}-${step.label}`}

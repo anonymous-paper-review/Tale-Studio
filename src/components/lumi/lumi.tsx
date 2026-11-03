@@ -8,8 +8,8 @@
 //   약속: tests/chat/lumi-persona.test.ts
 import { useEffect, useImperativeHandle, useRef, useState, useSyncExternalStore, type Ref } from 'react'
 import {
-  STAGE_PERSONA,
   detectWebGL,
+  lumiStageTheme,
   loadLumiScript,
   lumiRenderMode,
   lumiStillSrc,
@@ -20,11 +20,6 @@ import {
   type LumiVariant,
 } from '@/lib/lumi'
 import { cn } from '@/lib/utils'
-
-/** 단계 옷이면 그 단계 색으로(globals.css [data-stage]) — 화이트 펄 · 완성은 단계 색이 없다. */
-function stageOf(persona: LumiPersona): string | undefined {
-  return (Object.values(STAGE_PERSONA) as string[]).includes(persona) ? persona : undefined
-}
 
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)'
 function subscribeReducedMotion(onChange: () => void) {
@@ -154,7 +149,7 @@ export function Lumi({ persona = 'pearl', state = 'idle', variant = 'full', size
   useImperativeHandle(ref, () => ({ replay: () => elementRef.current?.replay?.() }), [])
 
   return (
-    <span data-stage={stageOf(persona)} className={cn('inline-block', className)}>
+    <span data-stage={lumiStageTheme(persona)} className={cn('inline-block', className)}>
       <LumiView mode={mode} persona={persona} state={state} variant={variant} size={size} label={label} elementRef={elementRef} />
     </span>
   )
@@ -174,7 +169,7 @@ interface LumiAvatarProps {
 export function LumiAvatar({ persona, state = 'idle', size = 28, bare = false, className }: LumiAvatarProps) {
   return (
     <span
-      data-stage={stageOf(persona)}
+      data-stage={lumiStageTheme(persona)}
       aria-hidden
       className={cn('inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full', !bare && 'bg-stage/12', className)}
       style={{ width: size, height: size }}
