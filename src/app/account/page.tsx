@@ -112,7 +112,7 @@ export default function AccountPage() {
     : []
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-background text-white">
       <DashboardHeader active="account" />
       <main className="mx-auto max-w-4xl space-y-6 px-6 py-10">
         <div>

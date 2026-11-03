@@ -1,4 +1,4 @@
-// Director 에 들어오면 채팅이 닫혀 있고 접힌 레일 없이 Lumi 알약으로 열며, 떠나면 채팅이 들어오기 전 모습으로 돌아가는지 검사한다 (v3 D1, 2026-11-03)
+// Director 에 들어오면 채팅이 닫혀 있고 접힌 레일 없이 Lumi 알약으로 열며, 떠나면 채팅이 들어오기 전 모습으로 돌아가고, 닫힌 동안의 멘션 · Lumi 의 새 말을 놓치지 않는지 검사한다 (v3 D1, 2026-11-03)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import path from 'node:path'
@@ -196,6 +196,42 @@ describe('혼자 정한 것', () => {
     expect(mainMarginRight('/studio/director')).toBe(SHELL_INSET + CHAT_DEFAULT_WIDTH)
   })
 
+  // 왜: 검토 B B1 — Director 는 채팅을 닫아 둔 채 시작한다. 샷을 Cmd/Ctrl+클릭으로 멘션하면 멘션이 닫힌 채팅 입력칸에 소리 없이 들어가고
+  //   커서도 보이지 않는 입력칸으로 갔다 — Enter 를 치면 보이지 않는 글이 보내질 수 있었다.
+  it('Director 에서 샷을 멘션하면 닫혀 있던 채팅이 열리고 입력칸에 멘션이 보인다', () => {
+    enter('director')
+    expect(chatClosed()).toBe(true)
+
+    useChatUiStore.getState().requestMentionToggle('Scene 1 · Shot 2')
+
+    expect(chatClosed()).toBe(false)
+    expect(useChatUiStore.getState().mentionInsert).toMatchObject({ label: 'Scene 1 · Shot 2', mode: 'toggle' })
+    // 스토리보드 격자의 Cmd/Ctrl+클릭은 이 멘션 요청을 쓰고, 채팅은 그 요청을 입력칸에 "@이름"으로 넣는다.
+    expect(read('src/features/director/canvas-views/StoryboardGridView.tsx')).toMatch(/requestMentionToggle\(label\)/)
+    expect(read('src/components/layout/global-chat.tsx')).toMatch(/const token = `@\$\{mentionInsert\.label\}`/)
+  })
+
+  // 왜: 검토 B B1 — 다른 단계에서 채팅 입력칸에 커서를 둔 채 Director 로 오면 채팅은 닫히는데 커서는 숨은 입력칸에 남아, 치는 글이 보이지 않는 곳에 들어갔다.
+  it('Director 에 들어와 채팅을 닫아 둘 때 입력칸에 있던 커서는 빠진다', () => {
+    const blur = vi.fn()
+    vi.stubGlobal('document', { activeElement: { closest: (selector: string) => (selector === '[data-chat-panel]' ? {} : null), blur } })
+    try {
+      enter('director')
+      expect(blur).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+    // 채팅 밖(캔버스 등)에 있던 커서는 그대로 둔다.
+    const canvasBlur = vi.fn()
+    vi.stubGlobal('document', { activeElement: { closest: () => null, blur: canvasBlur } })
+    try {
+      enter('editor')
+      expect(canvasBlur).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   // 왜: 접힌 레일(v3 Chat Toggle «)은 다른 단계에서 닫힌 채팅을 여는 곳이다 — Director 밖은 바뀌지 않는다.
   it('Director 밖의 단계에서는 채팅을 접으면 지금처럼 접힌 레일이 남는다', () => {
     useChatUiStore.setState({ collapsed: true, chatWidth: CHAT_DEFAULT_WIDTH })
@@ -203,5 +239,62 @@ describe('혼자 정한 것', () => {
       expect(railOpenButton(pathname), pathname).toBe(true)
       expect(mainMarginRight(pathname), pathname).toBe(SHELL_INSET + CHAT_COLLAPSED_RAIL)
     }
+  })
+})
+
+/** Lumi 알약을 한 번 그린다 — 붙어 있는 동안 하는 일(본 말 기억하기)까지 돈다. */
+const pillMounted = () => LumiChatPill()
+/** 알약의 지금 모습(붙을 때 하는 일은 돌리지 않는다). */
+const pill = () => draw(() => LumiChatPill(), '/studio/director')
+const lumiSays = (...ids: string[]) =>
+  useGlobalChatStore.setState((state) => ({ messages: [...state.messages, ...ids.map((id) => ({ id, stage: 'director' as const, role: 'model' as const, content: id }))] }))
+const unseenBadge = () => pill().find((node) => node.props['data-testid'] === 'lumi-pill-unseen')
+
+describe('혼자 정한 것 · 닫힌 채팅의 Lumi 알약(검토 B B2, 시안 D1 알약의 파란 숫자)', () => {
+  beforeEach(() => {
+    useGlobalChatStore.setState({
+      messages: [{ id: 'old-1', stage: 'director', role: 'model', content: '예전에 한 말' }],
+      messagesLoadedProjectId: 'chat-closed-project',
+      loading: false,
+      error: null,
+    })
+  })
+
+  // 왜: Director 는 채팅을 닫은 채 시작한다 — 첫 안내 · 채워 두면 좋은 항목 · Editor 로 넘기자는 권유가 닫힌 채팅에 쌓여도 알 수 없었다.
+  //   예전 대화(불러온 기록)는 새 말이 아니다.
+  it('Director 에서 채팅이 닫혀 있는 동안 Lumi 가 새로 말하면 Lumi 알약에 그 수가 뜬다', () => {
+    enter('director')
+    pillMounted()
+    expect(unseenBadge()).toBeUndefined()
+
+    lumiSays('welcome', 'gaps')
+
+    expect(unseenBadge()?.props.children).toBe(2)
+  })
+
+  // 왜: 수는 "아직 안 본 말"이다 — 채팅을 열어 보았으면 다시 닫아도 0 에서 센다.
+  it('채팅을 열면 알약의 수가 사라진다', () => {
+    enter('director')
+    pillMounted()
+    lumiSays('welcome')
+    expect(unseenBadge()?.props.children).toBe(1)
+
+    useChatUiStore.getState().setCollapsed(false)
+    pillMounted()
+    useChatUiStore.getState().setCollapsed(true)
+    pillMounted()
+
+    expect(unseenBadge()).toBeUndefined()
+  })
+
+  // 왜: 알약은 닫힌 채팅의 얼굴이다 — 접힌 레일의 Lumi 처럼 답을 쓰는 중 · 오류를 같은 모습으로 보인다.
+  it('Lumi 가 답을 쓰는 중이면 알약의 Lumi 도 생각 중 모습이다', () => {
+    enter('director')
+    const lumiState = () => pill().find((node) => typeof node.props.persona === 'string')?.props.state
+    expect(lumiState()).toBe('idle')
+    useGlobalChatStore.setState({ loading: true })
+    expect(lumiState()).toBe('thinking')
+    useGlobalChatStore.setState({ loading: false, error: '실패' })
+    expect(lumiState()).toBe('error')
   })
 })

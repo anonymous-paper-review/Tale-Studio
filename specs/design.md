@@ -481,7 +481,7 @@ Radix primitive 는 body 로 portal — `<html data-stage>` 덕에 지금 단계
 
 shadcn `Dialog` — 바탕색 판 · `rounded-2xl` · `shadow-panel` · 막 검정 60%. 제목 `text-lg font-semibold`, 설명 `text-label text-muted-foreground`. 메인 단추(크림)는 오른쪽, 취소는 ghost.
 **확인 팝업**(큰 일을 하기 전에 "~할까요?"를 묻는 창 — 단계 넘기기 · 확정) 맨 위에는 큰 Lumi `<ConfirmLumi stage={지금 단계} />`
-(`src/components/handoff/confirm-lumi.tsx`: 지금 단계 옷 · `idle` · 폭 180). 지우기 확인 · 오류 안내에는 넣지 않는다. 지금 쓰는 곳: Producer 시작 확인(`features/entry/entry-form.tsx`) · Writer 로 넘기기 전 확정 창(`handoff/producer-lock-dialog.tsx`) · 산문 확정(`features/prose/prose-confirm-dialog.tsx`) · Artist 그림체 고르기 · 다시 만들기 · 완료(`features/artist-room/style-make-dialog.tsx` · `regenerate-style-dialog.tsx` · `artist-complete-dialog.tsx`) · Storyboard → Director 넘기기(`features/writer/storyboard-director-dialog.tsx`) · Director 로 넘기기 전 준비 창(`handoff/director-readiness-dialog.tsx`).
+(`src/components/handoff/confirm-lumi.tsx`: 지금 단계 옷 · `idle` · 폭 180). 지우기 확인 · 오류 안내에는 넣지 않는다. 지금 쓰는 곳: Producer 시작 확인(`features/entry/entry-form.tsx`) · Writer 로 넘기기 전 확정 창(`handoff/producer-lock-dialog.tsx`) · 산문 확정(`features/prose/prose-confirm-dialog.tsx`) · Artist 그림체 고르기 · 다시 만들기 · 완료(`features/artist-room/style-make-dialog.tsx` · `regenerate-style-dialog.tsx` · `artist-complete-dialog.tsx`) · Storyboard → Director 넘기기(`features/writer/storyboard-director-dialog.tsx`) · Director 로 넘기기 전 준비 창(`handoff/director-readiness-dialog.tsx`) · Director 다시 만들기 · 영상 만들기 확인(`features/director/regenerate-confirm-dialog.tsx`).
 
 ### 13.4 Form anatomy
 
@@ -529,6 +529,7 @@ Editor 클립 준비. `lumi` 를 안 주는 잠금(그림 다시 그리기 · �
 - Lumi 말풍선: 턴 첫 메시지에 아바타 · "Lumi"(단계 색), 이어지는 메시지는 들여쓴다. 승인 카드도 말풍선 꼴(제목 + 보조 글자).
 - 내 말풍선 · 빠른 답 칩(줄바꿈, 고른 칩 단계 색, 숫자 단축키 흐리게) · 입력 알약(카드색 · 포커스 단계 색 · 크림 보내기 원).
 - 알약 아래 한 줄: [+] 첨부(Writer) · 단계 칩(빠른 요청 · 다음 단계) · @멘션 · 모델 고르기.
+- 닫힌 채팅: 다른 단계는 오른쪽 접힌 레일(« · Lumi 얼굴), Director 는 레일 없이 툴바 끝 Lumi 알약(`features/director/lumi-chat-pill.tsx`). 알약의 Lumi 는 채팅 Lumi 와 같은 모습(생각 중 · 오류)이고, 닫힌 동안 새로 온 Lumi 말 수를 지금 단계 색 숫자로 보인다(채팅을 열면 0). 카드를 멘션하면 닫힌 채팅이 먼저 열린다(약속 tests/director/chat-closed.test.ts).
 
 ---
 

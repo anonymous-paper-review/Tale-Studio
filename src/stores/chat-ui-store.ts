@@ -41,6 +41,7 @@ interface ChatUiState {
   mentionedRefs: string[]
   setMentionedRefs: (refs: string[]) => void
   // Cmd/Ctrl+클릭으로 카드 → 입력창 멘션 삽입 요청(브리지). GlobalChat이 소비.
+  //   채팅이 닫혀 있으면 먼저 연다 — 닫힌 입력칸에 멘션이 소리 없이 들어가고 커서가 숨은 입력칸으로 가지 않게(검토 B B1).
   mentionInsert: MentionInsertRequest | null
   requestMentionInsert: (label: string) => void
   // 라인 재클릭 시 선택 해제까지 지원하는 토글 요청(스크립트 뷰어). GlobalChat이 소비.
@@ -55,6 +56,10 @@ interface ChatUiState {
   focusRequest: number | null
   requestChatFocus: () => void
   consumeChatFocus: () => void
+  /** 채팅이 닫혀 있는 동안 이미 본 것으로 치는 채팅 말(닫힌 채 대화 기록을 다 읽은 때 있던 말의 id) — Director Lumi 알약이
+   *  그 뒤에 온 Lumi 말 수를 보인다(v3 D1, 검토 B B2). 채팅을 열면 비운다. 기억하지 않는다. */
+  closedSeen: { projectId: string; ids: string[] } | null
+  setClosedSeen: (seen: { projectId: string; ids: string[] } | null) => void
 }
 
 const clampWidth = (w: number) =>
@@ -95,11 +100,11 @@ export const useChatUiStore = create<ChatUiState>()(
             : { mentionedRefs: refs },
         ),
       mentionInsert: null,
-      requestMentionInsert: (label) => set({ mentionInsert: { id: Date.now(), label } }),
+      requestMentionInsert: (label) => set({ mentionInsert: { id: Date.now(), label }, collapsed: false }),
       requestMentionToggle: (label) =>
-        set({ mentionInsert: { id: Date.now(), label, mode: 'toggle' } }),
+        set({ mentionInsert: { id: Date.now(), label, mode: 'toggle' }, collapsed: false }),
       requestMentionCompose: (label, hint) =>
-        set({ mentionInsert: { id: Date.now(), label, mode: 'compose', hint } }),
+        set({ mentionInsert: { id: Date.now(), label, mode: 'compose', hint }, collapsed: false }),
       consumeMentionInsert: (id) =>
         set((s) => (s.mentionInsert?.id === id ? { mentionInsert: null } : s)),
       stylePickerRequest: null,
@@ -108,6 +113,8 @@ export const useChatUiStore = create<ChatUiState>()(
       focusRequest: null,
       requestChatFocus: () => set({ focusRequest: Date.now() }),
       consumeChatFocus: () => set({ focusRequest: null }),
+      closedSeen: null,
+      setClosedSeen: (seen) => set({ closedSeen: seen }),
     }),
     {
       name: 'tale-chat-ui',

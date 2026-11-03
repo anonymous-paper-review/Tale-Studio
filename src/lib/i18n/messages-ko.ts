@@ -284,6 +284,7 @@ export const KO: Record<string, string> = {
   'Stop generating response': '응답 생성 중단',
   Send: '보내기',
   'Open chat': '채팅 열기',
+  'Open chat · {count} new messages': '채팅 열기 · 새 메시지 {count}개',
   'Context {tokens}': '컨텍스트 {tokens}',
   'Input {tokens}': '입력 {tokens}',
   'Output {tokens}': '출력 {tokens}',

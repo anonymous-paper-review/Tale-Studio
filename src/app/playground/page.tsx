@@ -59,7 +59,7 @@ export default function PlaygroundPage() {
   }, [])
 
   return (
-    <div className="flex min-h-screen flex-col bg-black text-white">
+    <div className="flex min-h-screen flex-col bg-background text-white">
       {authed === true ? <DashboardHeader active="playground" /> : null}
       {authed === false ? <SiteHeader /> : null}
       <main

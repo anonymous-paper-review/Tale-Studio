@@ -217,7 +217,7 @@ export default function QueuePage() {
   ]
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-background text-white">
       <DashboardHeader active="queue" />
       <main className="mx-auto max-w-7xl px-6 py-10">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">

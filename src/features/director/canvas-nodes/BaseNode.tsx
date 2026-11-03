@@ -5,6 +5,7 @@ import { Handle, Position } from '@xyflow/react'
 import { Copy, Edit, GitBranch, MoreHorizontal, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { nodeFrameBorder } from '@/features/director/canvas-meta'
 import { useT } from '@/lib/i18n'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { editActionForKind } from '@/features/director/canvas-interaction'
@@ -97,8 +98,7 @@ function BaseNodeImpl({
       className={cn(
         // v3 D1(2026-11-03): 작업 바탕색 판 · 모서리 14 · 그림자 하나 · 안쪽 12. 고른 노드만 지금 단계 색 1.5px 테두리.
         'group relative rounded-[14px] border-[1.5px] bg-node-bg-default p-3 shadow-node transition-[border-color] duration-100',
-        selected ? 'border-stage' : 'border-transparent hover:border-border',
-        strongStale && 'border-destructive',
+        nodeFrameBorder({ strongStale, selected }),
       )}
       style={width ? { width: `${width}px` } : undefined}
     >
@@ -142,14 +142,18 @@ function BaseNodeImpl({
         id="left"
       />
 
-      {/* 머리 — 점 · 종류 · ···(마우스를 올리면 편집 · 가지 · 복제 · 지우기). */}
+      {/* 머리 — 점 · 종류 · ···(마우스를 올리거나 Tab 으로 옮겨 가면 편집 · 가지 · 복제 · 지우기).
+          단추는 늘 자리에 두고 보이게만 바꾼다 — 키보드 · 터치로도 닿는다(검토 B B3). ··· 는 단추 묶음 오른쪽 끝에 겹쳐 둔다. */}
       <div className="flex h-4 items-center gap-1.5 text-[11px] font-medium text-subtle-foreground">
         <span className={cn('size-1.5 shrink-0 rounded-full', selected ? 'bg-stage' : 'bg-subtle-foreground')} />
         <span>{t(LABEL_BY_THEME[theme])}</span>
-        <div className="ml-auto flex items-center gap-0.5">
+        <div className="relative ml-auto flex items-center gap-0.5">
           {headerExtra}
-          <MoreHorizontal className="size-3.5 group-hover:hidden" aria-hidden />
-          <div className="hidden items-center gap-0.5 group-hover:flex">
+          <MoreHorizontal
+            className="pointer-events-none absolute right-0.5 top-1/2 size-3.5 -translate-y-1/2 transition-opacity duration-100 group-focus-within:opacity-0 group-hover:opacity-0"
+            aria-hidden
+          />
+          <div className="flex items-center gap-0.5 opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-within:opacity-100">
             <Button
               variant="ghost"
               size="icon-xs"
