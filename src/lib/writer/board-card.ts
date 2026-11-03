@@ -136,12 +136,31 @@ export function mentionSegments(text: string, names: readonly string[]): Mention
   return out
 }
 
-/** 씬 머리 이름 — "장소 이름 · 때". 장소 칸의 id 는 Artist 목록 이름으로(모르는 id 는 그대로), 빈 칸은 건너뛴다. */
+// 씬의 때로 흔히 저장되는 영어 낱말 — [+ 씬 추가]에서 비운 때('day') · 대본 머리("INT. 복도 – NIGHT")가 남긴다(검토 A L5).
+//   화면 언어로 옮기고, 이 밖의 말(한국어 때 · 파이프라인이 쓴 자유 글)은 지어내지 않고 그대로 둔다.
+const TIME_WORDS: Record<string, string> = {
+  day: 'Day',
+  night: 'Night',
+  dawn: 'Dawn',
+  dusk: 'Dusk',
+  morning: 'Morning',
+  noon: 'Noon',
+  afternoon: 'Afternoon',
+  evening: 'Evening',
+  sunrise: 'Sunrise',
+  sunset: 'Sunset',
+  midnight: 'Midnight',
+}
+
+/** 씬 머리 이름 — "장소 이름 · 때". 장소 칸의 id 는 Artist 목록 이름으로(모르는 id 는 그대로), 빈 칸은 건너뛴다.
+ *  locale 을 주면 흔한 영어 때(day · night …)를 그 언어로 옮긴다. */
 export function sceneHeadTitle(
   scene: { location: string; timeOfDay: string },
   entities: ReadonlyArray<{ id: string; name: string }>,
+  locale?: AppLocale,
 ): string {
   const place = resolveEntityNames(scene.location?.trim(), entities).trim()
   const time = scene.timeOfDay?.trim() ?? ''
-  return [place, time].filter(Boolean).join(' · ')
+  const word = TIME_WORDS[time.toLowerCase()]
+  return [place, locale && word ? translate(locale, word) : time].filter(Boolean).join(' · ')
 }

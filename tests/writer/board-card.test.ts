@@ -1,4 +1,5 @@
 // Storyboard 카드와 씬 머리에 보이는 글(칩 · 대사 한 줄 · 인물 이름 표시 · 씬 이름 · 컷 수와 초)을 무엇으로 정하는지 검사한다
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   cardDialogue,
@@ -27,13 +28,27 @@ describe('씬 머리', () => {
     expect(sceneStatsLabel({ shots: 2, seconds: 6 }, 'en')).toBe('2 cuts · 6s')
   })
 
-  // 왜: v3 시안 "회사 복도 자판기 앞 · 낮" — 씬의 장소 칸은 id(vending_machine_corridor)라 그대로 보이면 안 된다(#id-leak). 모르는 id 는 지어내지 않고 그대로 둔다.
-  it('씬 머리 이름은 장소 이름과 때를 " · "로 잇고, 장소 id 는 Artist 목록의 이름으로 바꾼다', () => {
+  // 왜: v3 시안 "회사 복도 자판기 앞 · 낮" — 씬에 저장된 장소는 속 이름(vending_machine_corridor)이라 그대로 보이면 안 된다(#id-leak).
+  //   Artist 배경 카드에 없는 장소는 지어내지 않고 저장된 그대로 둔다.
+  it('씬 머리 이름은 장소와 때를 " · "로 잇고, 장소는 Artist 배경 카드에 붙은 이름으로 보인다', () => {
     const entities = [{ id: 'vending_machine_corridor', name: '복도 끝 자판기 구역' }]
     expect(sceneHeadTitle({ location: 'vending_machine_corridor', timeOfDay: '밤' }, entities)).toBe('복도 끝 자판기 구역 · 밤')
     expect(sceneHeadTitle({ location: 'rooftop', timeOfDay: ' ' }, entities)).toBe('rooftop')
     expect(sceneHeadTitle({ location: '', timeOfDay: '낮' }, entities)).toBe('낮')
     expect(sceneHeadTitle({ location: '', timeOfDay: '' }, entities)).toBe('')
+  })
+
+  // 왜: 검토 A L5 — [+ 씬 추가]에서 때를 비우면 'day'로 저장되고, 대본 머리("INT. 복도 – NIGHT")는 영어 때를 남긴다.
+  //   한국어 화면 씬 머리에 'day'가 그대로 보였다. 모르는 말은 지어내지 않고 그대로 둔다.
+  it('씬 머리의 때가 흔한 영어 낱말(day · night · dawn 등)로 저장돼 있으면 화면 언어로 보이고, 모르는 말은 그대로 보인다', () => {
+    expect(sceneHeadTitle({ location: '', timeOfDay: 'day' }, [], 'ko')).toBe('낮')
+    expect(sceneHeadTitle({ location: 'rooftop', timeOfDay: 'NIGHT' }, [], 'ko')).toBe('rooftop · 밤')
+    expect(sceneHeadTitle({ location: '', timeOfDay: ' dusk ' }, [], 'ko')).toBe('해 질 녘')
+    expect(sceneHeadTitle({ location: '', timeOfDay: 'dawn' }, [], 'en')).toBe('Dawn')
+    expect(sceneHeadTitle({ location: '', timeOfDay: 'continuous' }, [], 'ko')).toBe('continuous')
+    expect(sceneHeadTitle({ location: '', timeOfDay: '새벽' }, [], 'ko')).toBe('새벽')
+    // Storyboard 씬 머리는 화면 언어로 이름을 만든다.
+    expect(readFileSync('src/features/writer/rough-storyboard-view.tsx', 'utf8')).toMatch(/sceneHeadTitle\(scene, entityNames, locale\)/)
   })
 })
 

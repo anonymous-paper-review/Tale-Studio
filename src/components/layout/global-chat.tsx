@@ -64,7 +64,7 @@ import { SceneStoryRewriteCard, SceneStoryUndoCard } from '@/components/layout/s
 import { unresolvedSceneStoryProposal } from '@/lib/producer/scene-story-proposal'
 import { WriterNextCard } from '@/features/prose/writer-next-card'
 import { ParagraphChip } from '@/features/prose/paragraph-chip'
-import { attachedParagraph, sendParagraphRequest } from '@/features/prose/paragraph-request'
+import { goesToParagraph, sendParagraphRequest } from '@/features/prose/paragraph-request'
 import { StyleReturnCard } from '@/features/artist-room/style-return-card'
 import {
   buildScriptLines,
@@ -874,7 +874,8 @@ export function GlobalChat() {
     const typed = input.trim()
     // 붙은 문단으로 보내기(v3 2026-11-03 오너 결정 7) — Writer 입력칸 위에 문단이 붙어 있으면 적은 말은 말 읽기를 거치지 않고
     //   그 문단만 고쳐 달라는 수정 요청으로 간다(features/prose/paragraph-request). 얹어 둔 파일은 그대로 남는다.
-    if (currentStage === 'producer' && typed && attachedParagraph()) {
+    //   넘김 · 확정 말이면 붙은 문단을 떼고 아래 지금 길로 간다 — 확정 창이 열린다(검토 A L1).
+    if (currentStage === 'producer' && typed && goesToParagraph(typed)) {
       setInput('')
       await sendParagraphRequest(typed)
       return

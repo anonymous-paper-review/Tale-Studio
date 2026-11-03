@@ -4,6 +4,8 @@
 //   이전 글 · 새 글로 함께, 대본을 그대로 쓰는 프로젝트는 원본 대본을 그대로 보인다.
 //   v3(2026-11-03 오너 결정 7): 직접 고칠 수 있을 때(tools.manual) 문단은 눌리는 칸이다 — 누르면 그 문단이 채팅 입력칸 위에 붙고,
 //   다시 누르면 떨어진다(붙은 문단은 단계 색 테두리). 확정 · 대본 그대로 · AI 작업 중에는 읽기만 한다. 규칙: lib/prose/paragraph-pick.
+//   문단은 단추가 아니라 누르는 칸(role="button")이다 — 글을 끌어 고를 수 있고, 끌어 골랐으면 붙이지 않는다(검토 A L2).
+//   화면은 끌어 고르기를 기본으로 꺼 두므로(globals.css body) 문단 글에는 select-text 를 붙인다.
 import { useState } from 'react'
 import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
 import { AlertTriangle, Loader2, RotateCcw, ScrollText } from 'lucide-react'
@@ -11,7 +13,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
-import { paragraphLabel } from '@/lib/prose/paragraph-pick'
+import { paragraphClickPicks, paragraphKeyPicks, paragraphLabel } from '@/lib/prose/paragraph-pick'
 import { TreatmentDiffView } from '@/features/producer/treatment-diff-view'
 import { useProducerStore } from '@/stores/producer-store'
 import { useWriterRoomStore } from '@/stores/writer-room-store'
@@ -74,18 +76,27 @@ export function ProseDocument({ prose }: { prose: ProseState }) {
             return (
               <div key={index} className="flex gap-4 rounded-[14px] py-4 pl-4 pr-6">
                 {label}
-                <p className="min-w-0 text-prose text-foreground">{paragraph}</p>
+                <p className="min-w-0 select-text text-prose text-foreground">{paragraph}</p>
               </div>
             )
           }
           const attached = pick?.projectId === prose.projectId && pick.index === index
+          const toggle = () => {
+            if (prose.projectId) useWriterRoomStore.getState().toggleParagraph({ projectId: prose.projectId, index, text: paragraph }, pickable)
+          }
           return (
-            <button
+            <div
               key={index}
-              type="button"
+              role="button"
+              tabIndex={0}
               aria-pressed={attached}
               onClick={() => {
-                if (prose.projectId) useWriterRoomStore.getState().toggleParagraph({ projectId: prose.projectId, index, text: paragraph }, pickable)
+                if (paragraphClickPicks(window.getSelection()?.toString() ?? '')) toggle()
+              }}
+              onKeyDown={(event) => {
+                if (event.target !== event.currentTarget || !paragraphKeyPicks(event.key)) return
+                event.preventDefault()
+                toggle()
               }}
               className={cn(
                 'flex w-full gap-4 rounded-[14px] py-4 pl-4 pr-6 text-left transition-colors duration-100 ease-out',
@@ -95,8 +106,8 @@ export function ProseDocument({ prose }: { prose: ProseState }) {
               data-testid={`prose-paragraph-${index + 1}`}
             >
               {label}
-              <span className="block min-w-0 text-prose text-foreground">{paragraph}</span>
-            </button>
+              <span className="block min-w-0 select-text text-prose text-foreground">{paragraph}</span>
+            </div>
           )
         })}
       </article>

@@ -496,6 +496,7 @@ label 위 · input 아래 · helper/error 더 아래. 입력칸은 카드색 · 
 화이트 펄 · 완성 옷이면 놓인 화면의 색) · 단계 목록(카드색 상자). 옷 = 넘어가는 다음 단계. 쓰는 곳: Producer 글 읽기 · Writer 산문 초안(Producer 에서 넘길 때 · Writer 화면) · Artist 그림 ·
 Storyboard 나누기 · 첫 러프. 덮개 없이 화면 가운데에 큰 Lumi `loading`(폭 300)만 두는 곳: 새 프로젝트 만들기(`/projects/new`, Producer 옷 · 실패면 `error`) ·
 Editor 클립 준비. `lumi` 를 안 주는 잠금(그림 다시 그리기 · 샷 고치기 팝업 위 등)은 도는 원의 작은 카드 그대로(약속 tests/project/busy-overlay-lumi.test.ts).
+실패 안내의 오류 모습 큰 Lumi 도 단계를 넘어가는 기다림의 실패에만 둔다 — Storyboard 보드에서 컷을 다시 그리다 난 실패는 작은 카드(약속 tests/writer/board-wait-lumi.test.ts).
 
 ### 13.8 Component patterns (shadcn primitives)
 

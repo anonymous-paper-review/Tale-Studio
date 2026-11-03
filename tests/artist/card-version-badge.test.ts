@@ -44,6 +44,16 @@ describe('판 배지', () => {
     expect(cardVersion({ imageUrl: 'https://media.example/b.png', candidates: [drawn('2026-10-31T09:00:00.000Z', false), drawn('2026-11-02T09:00:00.000Z')], versions: VERSIONS })).toBe(2)
   })
 
+  // 왜: 검토 A L9 — 기록에서 고른 표시가 보이는 그림과 다른 그림에 남아 있으면(불러오기 · 재생성 사이) 배지가 다른 그림의 버전을 붙였다.
+  it('카드에 보이는 그림과 같은 그림의 기록이 있으면, 고른 표시가 다른 기록에 있어도 보이는 그림을 그린 때의 버전을 붙인다', () => {
+    const shown = 'https://media.example/shown.png'
+    const candidates = [
+      { url: 'https://media.example/older.png', isSelected: true, generatedAt: '2026-10-31T09:00:00.000Z' },
+      { url: shown, isSelected: false, generatedAt: '2026-11-02T09:00:00.000Z' },
+    ]
+    expect(cardVersion({ imageUrl: shown, candidates, versions: VERSIONS })).toBe(2)
+  })
+
   // 왜: 작품 스타일을 바꾼 적이 없으면 지금 그림이 첫 버전이다(머리 줄 "작품 스타일 · v1"과 같다).
   it('버전 기록이 없는 프로젝트의 그림은 v1이다', () => {
     expect(cardVersion({ imageUrl: 'https://media.example/a.png', candidates: [drawn('2026-10-31T09:00:00.000Z')], versions: [] })).toBe(1)

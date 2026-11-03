@@ -33,9 +33,11 @@ export interface BoardLockState {
   wasDrawing: boolean
   /** 그리기가 실패를 남기고 끝났다 — [닫기] 전까지 실패 안내를 띄운다. */
   failureNotice: boolean
+  /** 그 실패가 첫 러프(단계를 넘어가며 그린 것)에서 났다 — 실패 안내에 큰 Lumi 를 둔다. 보드에서 다시 그리다 난 실패는 아니다. */
+  firstDrawFailure: boolean
 }
 
-export const INITIAL_BOARD_LOCK: BoardLockState = { awaitingFirstDraw: false, wasDrawing: false, failureNotice: false }
+export const INITIAL_BOARD_LOCK: BoardLockState = { awaitingFirstDraw: false, wasDrawing: false, failureNotice: false, firstDrawFailure: false }
 
 /** 실행이 일하는 중인가 — Artist [완료하기] · 씬 초안 확정을 기다리는 정지는 일이 아니다. */
 export function isBoardRunActive(status: Partial<WriterStatus> | null | undefined): boolean {
@@ -56,13 +58,16 @@ export function advanceBoardLock(prev: BoardLockState, facts: BoardLockFacts): B
   let awaitingFirstDraw = prev.awaitingFirstDraw || facts.runActive || facts.autoDrawPending
   // 실행이 멈췄거나 끝났고, 샷을 기다리지도 않고, 그리는 일도 없다 → 첫 그리기는 끝났다(또는 그릴 것이 없다).
   if (awaitingFirstDraw && !facts.runActive && !awaitingShots(facts) && !drawing) awaitingFirstDraw = false
-  const failureNotice = drawing ? false : prev.failureNotice || (prev.wasDrawing && facts.failed > 0)
-  return { awaitingFirstDraw, wasDrawing: drawing, failureNotice }
+  // 그리기가 방금 실패를 남기고 끝났다 — 그 그리기가 첫 러프였는지(직전까지 첫 그리기를 기다렸는지)를 함께 남긴다.
+  const raised = !drawing && prev.wasDrawing && facts.failed > 0
+  const failureNotice = drawing ? false : prev.failureNotice || raised
+  const firstDrawFailure = drawing ? false : raised ? prev.awaitingFirstDraw : prev.failureNotice && prev.firstDrawFailure
+  return { awaitingFirstDraw, wasDrawing: drawing, failureNotice, firstDrawFailure }
 }
 
 /** 실패 안내의 [닫기] — 잠금만 푼다. 실패한 카드는 보드에 남아 다시 그릴 수 있다. */
 export function dismissBoardFailure(prev: BoardLockState): BoardLockState {
-  return { ...prev, failureNotice: false }
+  return { ...prev, failureNotice: false, firstDrawFailure: false }
 }
 
 export interface StoryboardBusyStep {
@@ -83,8 +88,8 @@ export interface StoryboardBusyView {
   /** 실패 안내의 버튼 이름. */
   actions?: { redraw: string; close: string }
   /** 큰 Lumi 를 둘지(공용 덮개 lumi — 일하는 동안 로딩, 실패 안내면 오류 모습, 오너 결정 8 2026-11-03).
-   *  Artist 에서 넘어와 씬 · 샷을 나누고 첫 러프를 그리는 동안(단계를 넘어가며 기다리는 화면)과 실패 안내(가이드 error = 생성 실패 공통)에 둔다.
-   *  보드에서 다시 그리는 잠금 · 이 화면에서 도는 다른 실행은 단계 넘김이 아니라 두지 않는다. 약속: tests/writer/board-wait-lumi.test.ts */
+   *  Artist 에서 넘어와 씬 · 샷을 나누고 첫 러프를 그리는 동안(단계를 넘어가며 기다리는 화면)과 그 첫 러프의 실패 안내(가이드 error = 생성 실패 공통)에 둔다.
+   *  보드에서 다시 그리는 잠금과 그 실패 · 이 화면에서 도는 다른 실행은 단계 넘김이 아니라 두지 않는다(design.md §13.5). 약속: tests/writer/board-wait-lumi.test.ts */
   lumi: boolean
 }
 
@@ -184,7 +189,7 @@ export function storyboardBusyView(
       progressLabel: roughLabel,
       failed: rough.failed,
       actions: { redraw: translate(locale, 'Draw the remaining cuts again'), close: translate(locale, 'Close') },
-      lumi: true,
+      lumi: lock.firstDrawFailure,
     }
   }
 

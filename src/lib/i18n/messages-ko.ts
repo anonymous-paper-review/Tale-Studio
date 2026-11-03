@@ -2245,7 +2245,7 @@ export const KO: Record<string, string> = {
   'Make the dialogue funnier': '대사를 더 웃기게',
   'Go to Artist': 'Artist로 가기',
   'Creating a new project…': '새 프로젝트를 만드는 중…',
-  'While AI is working, the whole screen is locked. You can edit once it finishes.': 'AI가 작업하는 동안은 화면 전체가 잠겨요. 끝나면 고칠 수 있어요.',
+  'While AI is working, the screen and chat are locked. You can edit once it finishes.': 'AI가 작업하는 동안은 화면과 채팅이 잠겨요. 끝나면 고칠 수 있어요.',
   'AI is working. You can move once it finishes.': 'AI가 일하는 중이에요. 끝나면 옮겨 갈 수 있어요.',
 
   // ── Producer 시작 화면 (리뉴얼 1차) ──
@@ -2583,6 +2583,15 @@ export const KO: Record<string, string> = {
   'Night': '밤',
   'Rain': '비',
   'Sunset': '노을',
+  // 씬 머리의 때(board-card sceneHeadTitle) — 저장된 영어 때를 화면 언어로.
+  'Dawn': '새벽',
+  'Dusk': '해 질 녘',
+  'Morning': '아침',
+  'Noon': '한낮',
+  'Afternoon': '오후',
+  'Evening': '저녁',
+  'Sunrise': '해돋이',
+  'Midnight': '한밤중',
   'Cold': '차가운',
   'Sense of space': '공간감',
   'Cramped': '좁은',

@@ -1,6 +1,15 @@
 // AI가 일하는 잠금 화면이 떠 있어도 위 막대에서 프로젝트 이름은 바꿀 수 있고, 나머지는 그대로 막히는지 검사한다 (2026-11-03 v3 2단계)
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { describe, expect, it, vi } from 'vitest'
+
+vi.mock('@/lib/i18n', async () => {
+  const { translate } = await import('@/lib/i18n/translate')
+  return { translate, useT: () => (text: string, params?: Record<string, string | number>) => translate('ko', text, params) }
+})
+
+import { AiBusyCard } from '@/components/ai-busy-overlay'
 import { lockForAiWork, overlayClipPath, type LockNode } from '@/lib/ai-busy-lock'
 
 const read = (file: string) => readFileSync(file, 'utf8')
@@ -61,6 +70,15 @@ describe('AI가 일하는 동안 프로젝트 이름 바꾸기', () => {
     // 위 막대는 이름 칸을 남길 칸으로 표시하고, 단계 화면 위 잠금 화면은 그 칸을 남겨 둔다.
     expect(read('src/components/layout/studio-top-bar.tsx')).toMatch(/<div data-ai-lock-keep className="contents">\s*\{title \?\? <CurrentProjectTitle \/>\}/)
     expect(read('src/components/ai-busy-overlay.tsx')).toMatch(/keep: layer === 'stage' && stage \? Array\.from\(stage\.querySelectorAll<HTMLElement>\('\[data-ai-lock-keep\]'\)\) : \[\]/)
+  })
+
+  it('AI가 일하는 동안 잠금 화면의 기본 안내는 화면 전체가 잠긴다고 하지 않는다', () => {
+    // 왜: 검토 A L8 — 이름 칸은 열려 있는데 "화면 전체가 잠겨요"라고 하면 안내가 틀린 말을 한다. 잠기는 화면 · 채팅만 말한다.
+    for (const lumi of [undefined, 'writer'] as const) {
+      const html = renderToStaticMarkup(createElement(AiBusyCard, { title: '산문 초안을 쓰고 있어요', lumi }))
+      expect(html).toContain('AI가 작업하는 동안은 화면과 채팅이 잠겨요. 끝나면 고칠 수 있어요.')
+      expect(html).not.toContain('화면 전체')
+    }
   })
 
   it('AI가 일하는 동안 이름 칸 말고 단계 화면 · 위 막대의 다른 단추 · 채팅은 그대로 막힌다', () => {

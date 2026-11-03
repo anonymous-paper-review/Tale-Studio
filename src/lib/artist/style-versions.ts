@@ -244,7 +244,8 @@ export function historyPick(input: { generatedAt: string; versions: readonly Ver
 
 /**
  * 카드 그림의 판 배지(v3 A5 "v1 · v2 …", 오너 2026-11-03) — 그 그림을 그린 때의 작품 스타일 버전 번호. 그림이 없으면 null.
- *   그린 때 = 카드 기록(후보)에서 고른 그림(없으면 같은 주소의 기록)의 시각. 기록이 없거나 그때의 버전을 모르면 지금 버전,
+ *   그린 때 = 카드 기록(후보)에서 보이는 그림과 같은 주소의 기록(없으면 고른 기록)의 시각 — 고른 표시가 다른 그림에 남아 있어도
+ *   보이는 그림의 버전을 붙인다(검토 A L9). 기록이 없거나 그때의 버전을 모르면 지금 버전,
  *   버전 기록이 없으면 1(머리 줄 versionHeader 와 같다). 약속: tests/artist/card-version-badge.test.ts
  */
 export function cardVersion(input: {
@@ -254,7 +255,7 @@ export function cardVersion(input: {
 }): number | null {
   if (!input.imageUrl) return null
   const candidates = input.candidates ?? []
-  const drawn = candidates.find((candidate) => candidate.isSelected) ?? candidates.find((candidate) => candidate.url === input.imageUrl)
+  const drawn = candidates.find((candidate) => candidate.url === input.imageUrl) ?? candidates.find((candidate) => candidate.isSelected)
   const at = drawn ? versionAt(input.versions, drawn.generatedAt) : null
   if (at) return at.n
   return input.versions.find((version) => version.current)?.n ?? (input.versions.length ? Math.max(...input.versions.map((version) => version.n)) : 1)

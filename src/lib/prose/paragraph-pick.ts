@@ -32,6 +32,16 @@ export function nextParagraphPick(current: ParagraphPick | null, clicked: Paragr
   return clicked
 }
 
+/** 문단을 누른 것이 붙이기인가 — 글을 끌어 골랐으면(고른 글이 있으면) 붙이지 않는다(검토 A L2). */
+export function paragraphClickPicks(selectedText: string): boolean {
+  return selectedText.trim().length === 0
+}
+
+/** 키보드로 문단을 누르는 키 — 단추와 같은 Enter · 스페이스. */
+export function paragraphKeyPicks(key: string): boolean {
+  return key === 'Enter' || key === ' '
+}
+
 /** 화면이 바뀐 뒤에도 붙어 있을 문단 — 붙일 수 없게 됐거나(확정 · AI 작업 · 직접 작성 창), 다른 프로젝트이거나, 그 문단 글이 바뀌었으면 뗀다. */
 export function keptParagraphPick(
   current: ParagraphPick | null,

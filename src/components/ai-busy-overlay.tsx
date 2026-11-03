@@ -160,7 +160,7 @@ export function AiBusyCard({
           <Lumi persona={lumi} state={busy ? 'loading' : 'error'} size={240} />
           <h2 className="mt-1.5 text-[22px] font-bold leading-[1.3] tracking-[-0.01em]">{title}</h2>
           <p className="text-caption text-muted-foreground">
-            {description ?? t('While AI is working, the whole screen is locked. You can edit once it finishes.')}
+            {description ?? t('While AI is working, the screen and chat are locked. You can edit once it finishes.')}
           </p>
         </div>
       ) : (
@@ -173,7 +173,7 @@ export function AiBusyCard({
           <div className="flex flex-col gap-1">
             <h2 className="text-lg font-medium leading-7">{title}</h2>
             <p className="text-sm text-muted-foreground">
-              {description ?? t('While AI is working, the whole screen is locked. You can edit once it finishes.')}
+              {description ?? t('While AI is working, the screen and chat are locked. You can edit once it finishes.')}
             </p>
           </div>
         </div>

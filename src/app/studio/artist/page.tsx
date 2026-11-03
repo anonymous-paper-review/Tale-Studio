@@ -22,7 +22,6 @@ import {
   evaluateDirectorGate,
   type WriterGateStatus,
 } from '@/lib/lifecycle'
-import { cn } from '@/lib/utils'
 
 import { useAltArrowCycle } from '@/lib/use-alt-arrow-cycle'
 import { AltArrowHint } from '@/components/alt-arrow-hint'
@@ -50,7 +49,7 @@ import { RegenerateStyleDialog } from '@/features/artist-room/regenerate-style-d
 import { VersionHistoryDialog } from '@/features/artist-room/version-history-dialog'
 import { completeVersionBlock, useArtistVersionStore, versionsNeedRefresh } from '@/stores/artist-version-store'
 import { versionStyleLabel } from '@/lib/artist/style-versions'
-import { ARTIST_FILTERS, artistFilterCounts, artistFilterShows, type ArtistFilter } from '@/lib/artist/card-filter'
+import { ARTIST_FILTERS, artistFilterCounts, artistFilterPanels, type ArtistFilter } from '@/lib/artist/card-filter'
 
 // v3 A5(2026-11-03): 탭(등장인물 · 배경) 대신 걸러 보기 칸(모두 · 인물 · 배경) — lib/artist/card-filter.
 type ArtistTab = ArtistFilter
@@ -78,12 +77,15 @@ export default function VisualPage() {
   // Alt+←/→ 로 칸 순환(#keyboard-only 2026-08-11) — v3 에서는 모두 · 인물 · 배경 세 칸을 차례로 돈다.
   useAltArrowCycle(ARTIST_FILTERS, tab, setTab)
   // 탭 전환 슬라이드(#d3) — 방향은 탭 순서 기준(왼→오른쪽 = forward). set-state-in-render 패턴.
+  //   미끄러짐은 새로 보이게 된 묶음에만(검토 A M1) — slideFrom = 바로 앞 칸. 계속 보이는 묶음은 움직이지 않는다.
   const [prevTab, setPrevTab] = useState<ArtistTab>(tab)
+  const [slideFrom, setSlideFrom] = useState<ArtistTab>(tab)
   const [tabSlide, setTabSlide] = useState<'forward' | 'back' | 'none'>('none')
   if (tab !== prevTab) {
     setTabSlide(
       ARTIST_TAB_ORDER.indexOf(tab) > ARTIST_TAB_ORDER.indexOf(prevTab) ? 'forward' : 'back',
     )
+    setSlideFrom(prevTab)
     setPrevTab(tab)
   }
   const tabSlideClass =
@@ -586,7 +588,6 @@ export default function VisualPage() {
   )
 
   // 걸러 보기(v3 A5) — 칸마다 보이는 카드 수. 모두 칸에서 축척을 움직이면 인물 · 배경 둘 다 바뀐다.
-  const shows = artistFilterShows(tab)
   const filterCounts = artistFilterCounts({ characters: characterAssets.length, worlds: worldAssets.length })
   const zoomKey: 'characters' | 'world' = tab === 'world' ? 'world' : 'characters'
   const setShownZoom = (v: number) => {
@@ -655,19 +656,24 @@ export default function VisualPage() {
             </div>
           </div>
 
-          <div key={tab} className={cn('flex flex-col gap-3.5', tabSlideClass)}>
-            {shows.characters ? (
-              <CharacterPanel
-                columns={4 - zoomByTab.characters}
-                onZoomStep={(dir) => stepZoom('characters', dir)}
-              />
-            ) : null}
-            {shows.world ? (
-              <WorldPanel
-                columns={4 - zoomByTab.world}
-                onZoomStep={(dir) => stepZoom('world', dir)}
-              />
-            ) : null}
+          {/* 묶음마다 이름(key)이 고정이다 — 칸을 바꿔도 계속 보이는 묶음은 새로 그리지 않아 그 카드의 채팅 대상 · 카드 안에서
+              고른 모습이 남는다(예전 두 탭은 숨는 쪽만 사라졌다, 검토 A M1). 미끄러짐은 새로 보이게 된 묶음에만. */}
+          <div className="flex flex-col gap-3.5">
+            {artistFilterPanels(slideFrom, tab).map((panel) => (
+              <div key={panel.key} className={panel.entering ? tabSlideClass : undefined}>
+                {panel.key === 'characters' ? (
+                  <CharacterPanel
+                    columns={4 - zoomByTab.characters}
+                    onZoomStep={(dir) => stepZoom('characters', dir)}
+                  />
+                ) : (
+                  <WorldPanel
+                    columns={4 - zoomByTab.world}
+                    onZoomStep={(dir) => stepZoom('world', dir)}
+                  />
+                )}
+              </div>
+            ))}
           </div>
 
           <div className="flex flex-wrap items-start justify-end gap-3" data-testid="artist-next-row">{nextRow}</div>

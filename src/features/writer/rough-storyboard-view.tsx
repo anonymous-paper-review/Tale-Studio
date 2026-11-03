@@ -1163,7 +1163,7 @@ export function RoughStoryboardView() {
           {(sceneManifest?.scenes ?? []).map((scene, sceneIdx) => {
             const sceneShots = shots.filter((s) => s.sceneId === scene.sceneId)
             const sceneCollapsed = collapsedScenes.has(scene.sceneId)
-            const sceneTitle = sceneHeadTitle(scene, entityNames)
+            const sceneTitle = sceneHeadTitle(scene, entityNames, locale)
             const sceneSummary = [
               resolveEntityNames(scene.narrativeSummary, entityNames).trim(),
               sceneStatsLabel(statsByScene.get(scene.sceneId) ?? { shots: sceneShots.length, seconds: 0 }, locale),

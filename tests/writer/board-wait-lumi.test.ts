@@ -1,4 +1,4 @@
-// Storyboard 잠금 화면 가운데 어느 것에 큰 Lumi 를 두는지(단계를 넘어가며 기다리는 화면 · 실패 안내) 검사한다
+// Storyboard 잠금 화면 가운데 어느 것에 큰 Lumi 를 두는지(단계를 넘어가며 기다리는 화면 · 그 기다림의 실패 안내) 검사한다
 import { describe, expect, it } from 'vitest'
 import { INITIAL_BOARD_LOCK, advanceBoardLock, storyboardBusyView, type BoardLockFacts } from '@/lib/writer/board-busy'
 import type { RoughProgress } from '@/lib/writer/rough-progress'
@@ -25,12 +25,22 @@ describe('잠금 화면의 큰 Lumi', () => {
     expect(storyboardBusyView({ status: completed, facts: pending, lock: INITIAL_BOARD_LOCK, rough: rough(), sceneCount: 2 }, 'ko').lumi).toBe(true)
   })
 
-  // 왜: Lumi 가이드의 error 는 "읽기 · 생성 실패(공통)"다 — 러프를 다 못 그린 실패 안내는 공용 덮개(base 52bb6d15)가 큰 Lumi 를 오류 모습으로 그린다(리드 지시 11/3).
-  it('러프를 그리다 실패한 컷이 남아 실패 안내를 띄우면 큰 Lumi 를 둔다', () => {
+  // 왜: Lumi 가이드의 error 는 "읽기 · 생성 실패(공통)"다 — 단계를 넘어가며 그린 첫 러프를 다 못 그린 실패 안내는 공용 덮개가 큰 Lumi 를 오류 모습으로 그린다(리드 지시 11/3).
+  it('씬 · 샷을 나눈 뒤 첫 러프를 그리다 실패한 컷이 남으면 실패 안내에 큰 Lumi 를 둔다', () => {
     const ended = facts({ failed: 2 })
     const failed = storyboardBusyView({ status: completed, facts: ended, lock: walk(splitting, facts({ pumpActive: true, generating: 8 }), ended), rough: rough({ completed: 6, waiting: 0, failed: 2 }), sceneCount: 3 }, 'ko')
     expect(failed.phase).toBe('failed')
     expect(failed.lumi).toBe(true)
+  })
+
+  // 왜: 검토 A L3 — 큰 Lumi 는 단계를 넘어가는 기다림에만 둔다(design.md §13.5). 보드에서 다시 그리다 난 실패까지 큰 오류 Lumi 가 서면 작은 일에 큰 경고가 된다.
+  it('보드에서 컷을 다시 그리다 실패하면 실패 안내에 큰 Lumi 를 두지 않는다', () => {
+    const idle = facts()
+    const redraw = facts({ generating: 1 })
+    const ended = facts({ failed: 1 })
+    const failed = storyboardBusyView({ status: completed, facts: ended, lock: walk(idle, redraw, ended), rough: rough({ completed: 7, waiting: 0, failed: 1 }), sceneCount: 3 }, 'ko')
+    expect(failed.phase).toBe('failed')
+    expect(failed.lumi).toBe(false)
   })
 
   // 왜: 보드에서 컷을 다시 그리는 잠금은 단계를 넘어가는 것이 아니다 — Lumi 의 로딩은 "이전 단계 → 이 단계" 연기라 다시 그리기에 틀면 틀린 말을 한다.
