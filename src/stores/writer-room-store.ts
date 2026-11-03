@@ -1,7 +1,11 @@
 // Writer 산문 작업공간의 화면 상태(리뉴얼 1차 2026-10-19). 화면 · 채팅 카드 · 채팅 말 읽기가 같은 창을 연다 —
 //   [AI 다시 쓰기 ▾] 조건, 직접 작성 팝업, 산문 확정(브레이크다운) 창. 저장할 값은 없다(산문은 실행 기록이 진실).
 //   탭(화면에서 고치기 · 채팅으로 고치기)은 브라우저에 기억한다 — Producer 시작 화면의 탭과 같은 칸을 쓴다.
+//   v3(2026-11-03 오너 결정 7): Writer 화면은 탭 없이 한 화면이라 기억한 탭을 불러오지 않는다(이 스토어의 탭은 늘 화면 보기).
+//   채팅에 붙인 문단도 여기 둔다 — 산문 본문이 붙이고, 채팅 입력칸이 칩으로 보이고 보낸다(lib/prose/paragraph-pick).
 import { create } from 'zustand'
+import { nextParagraphPick, type ParagraphPick } from '@/lib/prose/paragraph-pick'
+import { useChatUiStore } from '@/stores/chat-ui-store'
 
 export type WorkspaceTab = 'screen' | 'chat'
 
@@ -51,6 +55,8 @@ interface WriterRoomState {
   confirmOpen: boolean
   /** 채팅 입력칸에 커서를 놓아 달라는 요청(2안 채팅 탭 입력칸). */
   chatFocusRequest: number
+  /** 채팅 입력칸 위에 붙인 문단(v3) — 붙은 채로 보낸 말은 그 문단 수정 요청이 된다. */
+  paragraph: ParagraphPick | null
   loadTab: () => void
   setTab: (tab: WorkspaceTab) => void
   openRewrite: () => void
@@ -59,6 +65,9 @@ interface WriterRoomState {
   openConfirm: () => void
   closeConfirm: () => void
   requestChatFocus: () => void
+  /** 문단을 눌렀다 — 붙일 수 있으면 붙이고(같은 문단이면 뗀다), 붙이면 오른쪽 채팅을 펴고 입력칸에 커서를 놓는다. */
+  toggleParagraph: (clicked: ParagraphPick, pickable: boolean) => void
+  clearParagraph: () => void
 }
 
 export const useWriterRoomStore = create<WriterRoomState>((set, get) => ({
@@ -68,6 +77,7 @@ export const useWriterRoomStore = create<WriterRoomState>((set, get) => ({
   manualRequest: 0,
   confirmOpen: false,
   chatFocusRequest: 0,
+  paragraph: null,
   loadTab: () => {
     if (get().tabLoaded) return
     set({ tab: readWorkspaceTab(), tabLoaded: true })
@@ -82,4 +92,17 @@ export const useWriterRoomStore = create<WriterRoomState>((set, get) => ({
   openConfirm: () => set({ confirmOpen: true, rewriteOpen: false }),
   closeConfirm: () => set({ confirmOpen: false }),
   requestChatFocus: () => set((state) => ({ chatFocusRequest: state.chatFocusRequest + 1 })),
+  toggleParagraph: (clicked, pickable) => {
+    const before = get().paragraph
+    const next = nextParagraphPick(before, clicked, pickable)
+    if (next === before) return
+    set({ paragraph: next })
+    if (!next) return
+    const chat = useChatUiStore.getState()
+    if (chat.collapsed) chat.setCollapsed(false)
+    chat.requestChatFocus()
+  },
+  clearParagraph: () => {
+    if (get().paragraph) set({ paragraph: null })
+  },
 }))

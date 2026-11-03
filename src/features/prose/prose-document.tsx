@@ -2,14 +2,19 @@
 
 // 산문 본문(리뉴얼 1차 2026-10-19, 프로토타입 W1 w-prose). S1 · S2 … 문단, 다시 쓰기 안을 미리 볼 때는 바뀐 문단만
 //   이전 글 · 새 글로 함께, 대본을 그대로 쓰는 프로젝트는 원본 대본을 그대로 보인다.
+//   v3(2026-11-03 오너 결정 7): 직접 고칠 수 있을 때(tools.manual) 문단은 눌리는 칸이다 — 누르면 그 문단이 채팅 입력칸 위에 붙고,
+//   다시 누르면 떨어진다(붙은 문단은 단계 색 테두리). 확정 · 대본 그대로 · AI 작업 중에는 읽기만 한다. 규칙: lib/prose/paragraph-pick.
 import { useState } from 'react'
 import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
 import { AlertTriangle, Loader2, RotateCcw, ScrollText } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { useT } from '@/lib/i18n'
+import { cn } from '@/lib/utils'
+import { paragraphLabel } from '@/lib/prose/paragraph-pick'
 import { TreatmentDiffView } from '@/features/producer/treatment-diff-view'
 import { useProducerStore } from '@/stores/producer-store'
+import { useWriterRoomStore } from '@/stores/writer-room-store'
 import type { ProseState } from '@/features/prose/use-prose'
 
 // 산문 박스는 안에서 따로 스크롤하지 않는다 — 글이 길면 박스가 길어지고, 화면 영역(화면에서 고치기)이나
@@ -17,6 +22,7 @@ import type { ProseState } from '@/features/prose/use-prose'
 export function ProseDocument({ prose }: { prose: ProseState }) {
   const t = useT()
   const [starting, setStarting] = useState(false)
+  const pick = useWriterRoomStore((s) => s.paragraph)
   // [산문 쓰기]를 누른 뒤 Writer 가 쓰기 시작했다고 알릴 때까지도 왼쪽 사이드바를 막는다(2026-10-27) — 그 사이 다른 단계로 옮겨 갈 수 있었다.
   useAiBusyHold(starting)
   const { view, diffRows, phase, draftLive } = prose
@@ -44,9 +50,10 @@ export function ProseDocument({ prose }: { prose: ProseState }) {
       </div>
     )
   }
-  if (diffRows) return <TreatmentDiffView rows={diffRows} />
+  // v3 판 안쪽 여백 — 문단 줄(16)과 같게 둔다.
+  if (diffRows) return <div className="px-4 py-3"><TreatmentDiffView rows={diffRows} /></div>
   if (view.kind === 'original') {
-    return <pre className="whitespace-pre-wrap font-mono text-[13px] leading-6 text-foreground/90" data-testid="prose-original">{view.text}</pre>
+    return <pre className="whitespace-pre-wrap px-4 py-3 font-mono text-[13px] leading-6 text-foreground/90" data-testid="prose-original">{view.text}</pre>
   }
   // 실행 기록(산문 본문)을 읽는 중 — 그 전에 저장된 씬 한 줄 요약을 본문처럼 그리지 않는다(디자이너 QA 1차 #09).
   if (view.kind === 'loading') {
@@ -58,14 +65,40 @@ export function ProseDocument({ prose }: { prose: ProseState }) {
     )
   }
   if (view.kind === 'scenes' && prose.paragraphs.length) {
+    const pickable = prose.tools.manual
     return (
-      <article className="space-y-4" data-testid="prose-article">
-        {prose.paragraphs.map((paragraph, index) => (
-          <div key={index} className="flex gap-3">
-            <span className="w-7 shrink-0 pt-1 font-mono text-[11px] text-muted-foreground">S{index + 1}</span>
-            <p className="text-[15px] leading-8 text-foreground/90">{paragraph}</p>
-          </div>
-        ))}
+      <article className="space-y-1" data-testid="prose-article">
+        {prose.paragraphs.map((paragraph, index) => {
+          const label = <span className="w-4 shrink-0 pt-1 font-num text-micro font-semibold text-foreground">{paragraphLabel(index)}</span>
+          if (!pickable) {
+            return (
+              <div key={index} className="flex gap-4 rounded-[14px] py-4 pl-4 pr-6">
+                {label}
+                <p className="min-w-0 text-prose text-foreground">{paragraph}</p>
+              </div>
+            )
+          }
+          const attached = pick?.projectId === prose.projectId && pick.index === index
+          return (
+            <button
+              key={index}
+              type="button"
+              aria-pressed={attached}
+              onClick={() => {
+                if (prose.projectId) useWriterRoomStore.getState().toggleParagraph({ projectId: prose.projectId, index, text: paragraph }, pickable)
+              }}
+              className={cn(
+                'flex w-full gap-4 rounded-[14px] py-4 pl-4 pr-6 text-left transition-colors duration-100 ease-out',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                attached ? 'bg-stage/12 ring-[1.5px] ring-inset ring-stage' : 'hover:bg-accent/60',
+              )}
+              data-testid={`prose-paragraph-${index + 1}`}
+            >
+              {label}
+              <span className="block min-w-0 text-prose text-foreground">{paragraph}</span>
+            </button>
+          )
+        })}
       </article>
     )
   }

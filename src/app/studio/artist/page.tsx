@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from 'react'
 import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, ArrowRight, Check, Loader2, ZoomIn, ZoomOut } from 'lucide-react'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
+import { ChoiceChip } from '@/components/controls/choice-chip'
+import { PageHeader } from '@/components/layout/page-header'
 import { Slider } from '@/components/ui/slider'
 import { NextStepButton } from '@/components/handoff/next-step-button'
 import { CharacterPanel } from '@/features/artist/character-panel'
@@ -49,11 +50,14 @@ import { RegenerateStyleDialog } from '@/features/artist-room/regenerate-style-d
 import { VersionHistoryDialog } from '@/features/artist-room/version-history-dialog'
 import { completeVersionBlock, useArtistVersionStore, versionsNeedRefresh } from '@/stores/artist-version-store'
 import { versionStyleLabel } from '@/lib/artist/style-versions'
+import { ARTIST_FILTERS, artistFilterCounts, artistFilterShows, type ArtistFilter } from '@/lib/artist/card-filter'
 
-type ArtistTab = 'characters' | 'world'
+// v3 A5(2026-11-03): 탭(등장인물 · 배경) 대신 걸러 보기 칸(모두 · 인물 · 배경) — lib/artist/card-filter.
+type ArtistTab = ArtistFilter
 
-// 탭 순서 — 전환 슬라이드 방향의 기준 (#d3 2026-08-03, writer 탭과 동일 패턴).
-const ARTIST_TAB_ORDER: readonly ArtistTab[] = ['characters', 'world']
+// 칸 순서 — 전환 슬라이드 방향의 기준 (#d3 2026-08-03, writer 탭과 동일 패턴).
+const ARTIST_TAB_ORDER: readonly ArtistTab[] = ARTIST_FILTERS
+const FILTER_LABEL: Record<ArtistTab, string> = { all: 'All {count}', characters: 'Characters {count}', world: 'Backgrounds {count}' }
 
 export default function VisualPage() {
   const t = useT()
@@ -71,9 +75,8 @@ export default function VisualPage() {
   // 약속 D15(2026-09-04): 보던 탭은 스토어가 기억한다 — 떠났다 돌아와도 그대로.
   const tab = useArtistStore((s) => s.uiTab)
   const setTab = useArtistStore((s) => s.setUiTab)
-  // Alt+←/→ 로 인물 ↔ 배경 순환(#keyboard-only 2026-08-11) — 오너 지정 범위는 두 탭.
-  //   인벤토리에 있다가 누르면 인물로 복귀한다(두 탭 순환에 합류).
-  useAltArrowCycle(['characters', 'world'] as const, tab, setTab)
+  // Alt+←/→ 로 칸 순환(#keyboard-only 2026-08-11) — v3 에서는 모두 · 인물 · 배경 세 칸을 차례로 돈다.
+  useAltArrowCycle(ARTIST_FILTERS, tab, setTab)
   // 탭 전환 슬라이드(#d3) — 방향은 탭 순서 기준(왼→오른쪽 = forward). set-state-in-render 패턴.
   const [prevTab, setPrevTab] = useState<ArtistTab>(tab)
   const [tabSlide, setTabSlide] = useState<'forward' | 'back' | 'none'>('none')
@@ -405,6 +408,8 @@ export default function VisualPage() {
   const makingOverlay = (
     <AiBusyOverlay
       open={overlayOpen}
+      // 산문을 넘겨 Artist 그림을 기다리는 화면(v3 오너 2026-11-03 결정 8) — 큰 Lumi(Artist 옷). 일이 멈추면 오류 모습.
+      lumi="artist"
       // 그리는 중인 그림이 없고 빈칸이 남았으면 일이 멈춘 것이다 — 제목 · 도는 원 대신 멈춤 표시와 다시 그리기 단추(없으면 카드로 안내).
       title={overlayCopy.title ? t(overlayCopy.title) : t(makingTitle ?? 'Making the images')}
       busy={!overlayCopy.stopped}
@@ -530,146 +535,144 @@ export default function VisualPage() {
   const completeNote = phase === 'cards'
     ? completeBlockedNote({ gaps, drawing: generatingCount }) ?? (regenDrawing ? { kind: 'drawing' as const } : regenStopped ? { kind: 'regen' as const } : versionBlock === 'restoring' ? { kind: 'restoring' as const } : versionBlock === 'loadFailed' ? { kind: 'loadFailed' as const } : null)
     : null
+  // 머리 줄(v3 A5) — 제목 "인물 · 배경" · 인물 N · 배경 M(보관 수), 오른쪽에 Storyboard 준비 상태.
+  const storyboardPrepNote = storyboardPrep ? (
+    <span className="inline-flex items-center gap-1.5 text-caption text-muted-foreground" role="status" data-testid="artist-storyboard-prep" data-state={storyboardPrep}>
+      {storyboardPrep === 'ready' ? <Check className="size-3.5" aria-hidden /> : <Loader2 className="size-3.5 animate-spin" aria-hidden />}
+      {t(storyboardPrep === 'splitting' ? 'Getting Storyboard ready · splitting scenes and shots' : storyboardPrep === 'drawing' ? 'Getting Storyboard ready · drawing the roughs' : 'Storyboard is ready')}
+    </span>
+  ) : null
   const headerRow = (
-    <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
-      <div className="flex min-w-0 flex-col gap-2">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-          <h1 className="text-lg font-semibold">Artist</h1>
-          <span className="text-xs text-muted-foreground" data-testid="artist-header-counts">
-            {t('Characters {persons} · backgrounds {places}', { persons: headerPersons, places: headerPlaces })}
-            {headerKept > 0 ? ` · ${t('Kept {count}', { count: headerKept })}` : null}
-          </span>
-          {storyboardPrep ? (
-            <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground" role="status" data-testid="artist-storyboard-prep" data-state={storyboardPrep}>
-              {storyboardPrep === 'ready' ? <Check className="size-3.5" aria-hidden /> : <Loader2 className="size-3.5 animate-spin" aria-hidden />}
-              {t(storyboardPrep === 'splitting' ? 'Getting Storyboard ready · splitting scenes and shots' : storyboardPrep === 'drawing' ? 'Getting Storyboard ready · drawing the roughs' : 'Storyboard is ready')}
-            </span>
-          ) : null}
-        </div>
-        {/* 작품 스타일 막대(A5) — 제목 아래 한 줄: 견본 · 이름 · "작품 스타일 · v{n}" · [불러오기 · 기록 N] · [재생성하기].
-            Storyboard 를 연 뒤 · 그리는 중에는 꺼지고 까닭이 보인다. */}
-        <StyleVersionBar completed={artistCompleted} drawing={generatingCount > 0 || regenDrawing} />
-      </div>
-      {phase === 'cards' ? (
-        <div className="flex flex-col items-end gap-1.5">
-          <span title={gaps.characters.length + gaps.locations.length > 0 ? t('Make the images for the characters and backgrounds that have none first.') : undefined}>
-            <Button onClick={() => setCompleteOpen(true)} disabled={completeBlocked} data-testid="artist-complete-open">
-              {t('Complete')}<ArrowRight className="size-4" />
-            </Button>
-          </span>
-          {completeNote ? (
-            <p className="max-w-xs text-right text-xs text-muted-foreground" role="status" data-testid="artist-complete-note">
-              {completeNote.kind === 'drawing'
-                ? t('Drawing the images. You can complete once they are done.')
-                : completeNote.kind === 'regen'
-                  ? t('You can complete once the regenerated images are drawn.')
-                  : completeNote.kind === 'restoring'
-                    ? t('Loading the version.')
-                    : completeNote.kind === 'loadFailed'
-                      ? t('The version could not be fully loaded. Load it again or go back to the previous version.')
-                      : t('No image yet: {names}', { names: completeNote.names.join(' · ') })}
-            </p>
-          ) : null}
-          {overlayOpen ? null : redrawButton}
-        </div>
-      ) : stageIndex(reachedStage) >= stageIndex('writer') ? (
-        <Button variant="outline" onClick={() => router.push(withDemoShare('/studio/writer'))} data-testid="artist-go-storyboard">
-          {t('Go to Storyboard')}<ArrowRight className="size-4" />
-        </Button>
-      ) : (
-        <NextStepButton />
-      )}
-    </div>
+    <PageHeader
+      title={t('Characters · backgrounds')}
+      meta={
+        <span data-testid="artist-header-counts">
+          {t('Characters {persons} · backgrounds {places}', { persons: headerPersons, places: headerPlaces })}
+          {headerKept > 0 ? ` · ${t('Kept {count}', { count: headerKept })}` : null}
+        </span>
+      }
+      actions={storyboardPrepNote}
+    />
   )
+  // 맨 아래 다음 단계(v3 A5 [완료하기 · Storyboard로 →]) — 완료한 뒤(또는 예전 흐름으로 끝까지 만든 프로젝트)는 다시 완료하지 않고 Storyboard 로 가기만 한다.
+  const nextRow = phase === 'cards' ? (
+    <div className="flex flex-col items-end gap-1.5">
+      <span title={gaps.characters.length + gaps.locations.length > 0 ? t('Make the images for the characters and backgrounds that have none first.') : undefined}>
+        <Button onClick={() => setCompleteOpen(true)} disabled={completeBlocked} data-testid="artist-complete-open">
+          {t('Complete · to Storyboard')}<ArrowRight className="size-4" />
+        </Button>
+      </span>
+      {completeNote ? (
+        <p className="max-w-xs text-right text-caption text-muted-foreground" role="status" data-testid="artist-complete-note">
+          {completeNote.kind === 'drawing'
+            ? t('Drawing the images. You can complete once they are done.')
+            : completeNote.kind === 'regen'
+              ? t('You can complete once the regenerated images are drawn.')
+              : completeNote.kind === 'restoring'
+                ? t('Loading the version.')
+                : completeNote.kind === 'loadFailed'
+                  ? t('The version could not be fully loaded. Load it again or go back to the previous version.')
+                  : t('No image yet: {names}', { names: completeNote.names.join(' · ') })}
+        </p>
+      ) : null}
+      {overlayOpen ? null : redrawButton}
+    </div>
+  ) : stageIndex(reachedStage) >= stageIndex('writer') ? (
+    <Button onClick={() => router.push(withDemoShare('/studio/writer'))} data-testid="artist-go-storyboard">
+      {t('Go to Storyboard')}<ArrowRight className="size-4" />
+    </Button>
+  ) : (
+    <NextStepButton />
+  )
+
+  // 걸러 보기(v3 A5) — 칸마다 보이는 카드 수. 모두 칸에서 축척을 움직이면 인물 · 배경 둘 다 바뀐다.
+  const shows = artistFilterShows(tab)
+  const filterCounts = artistFilterCounts({ characters: characterAssets.length, worlds: worldAssets.length })
+  const zoomKey: 'characters' | 'world' = tab === 'world' ? 'world' : 'characters'
+  const setShownZoom = (v: number) => {
+    if (tab !== 'world') setZoom('characters', v)
+    if (tab !== 'characters') setZoom('world', v)
+  }
 
   return (
     <>
-      <Tabs
-          value={tab}
-          onValueChange={(v) => setTab(v as ArtistTab)}
-          className="flex min-h-0 flex-1 flex-col overflow-hidden"
-        >
-          {artistRunStopped({ draftRun, status: writerStatus }) ? (
-            <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border bg-muted/40 px-6 py-2.5 text-sm" role="alert" data-testid="artist-run-stopped">
-              <AlertTriangle className="size-4 shrink-0 text-warning" aria-hidden />
-              <div className="min-w-0 flex-1">
-                <p className="font-medium">{t('AI generation stopped')}</p>
-                <p className="break-words text-xs text-muted-foreground">{writerStatus?.error ?? t('Background generation stopped.')}</p>
+      {artistRunStopped({ draftRun, status: writerStatus }) ? (
+        <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border bg-muted/40 px-6 py-2.5 text-sm" role="alert" data-testid="artist-run-stopped">
+          <AlertTriangle className="size-4 shrink-0 text-warning" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">{t('AI generation stopped')}</p>
+            <p className="break-words text-xs text-muted-foreground">{writerStatus?.error ?? t('Background generation stopped.')}</p>
+          </div>
+          <WriterResumeButton projectId={projectId} onResumed={restartWriterStatus} />
+        </div>
+      ) : null}
+      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-7">
+        {/* v3 A5 — 화면 머리 · 작품 스타일 막대 · 걸러 보기 · 카드 묶음 · 맨 아래 다음 단계가 860 폭 한 줄로 쌓인다(간격 16). */}
+        <div className="mx-auto flex max-w-[860px] flex-col gap-4">
+          {headerRow}
+          {/* 작품 스타일 막대(A5) — 견본 · 이름 · "작품 스타일 · v{n}" · [불러오기 · 기록 N] · [재생성하기].
+              Storyboard 를 연 뒤 · 그리는 중에는 꺼지고 까닭이 보인다. */}
+          <StyleVersionBar completed={artistCompleted} drawing={generatingCount > 0 || regenDrawing} />
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <AltArrowHint>
+              <div role="group" aria-label={t('Filter cards')} className="flex flex-wrap gap-1.5" data-testid="artist-filter">
+                {ARTIST_FILTERS.map((filter) => (
+                  <ChoiceChip key={filter} selected={tab === filter} onClick={() => setTab(filter)} data-testid={`artist-filter-${filter}`}>
+                    {t(FILTER_LABEL[filter], { count: filterCounts[filter] })}
+                  </ChoiceChip>
+                ))}
               </div>
-              <WriterResumeButton projectId={projectId} onResumed={restartWriterStatus} />
-            </div>
-          ) : null}
-          <div className="border-b border-border px-6 py-3">
-            {headerRow}
-            <div className="flex items-center justify-between gap-4">
-              <AltArrowHint>
-              <TabsList>
-                {/* 탭 한글화(#d3 2026-08-03) — writer 탭(러프 스토리보드…)과 표기 통일 */}
-                <TabsTrigger value="characters">{t('Characters')}</TabsTrigger>
-                <TabsTrigger value="world">{t('Background')}</TabsTrigger>
-              </TabsList>
-              </AltArrowHint>
-              {/* 보드 축척(#d1) — writer 러프 보드와 동일 UI, 인물/배경 탭별 저장 */}
-              {(tab === 'characters' || tab === 'world') && (
-                <div className="flex shrink-0 items-center gap-1.5">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-7 hover-red-beam"
-                    aria-label={t('Zoom out (more columns)')}
-                    onClick={() => setZoom(tab, zoomByTab[tab] - 1)}
-                  >
-                    <ZoomOut className="size-4" />
-                  </Button>
-                  <Slider
-                    className="w-24"
-                    min={1}
-                    max={3}
-                    step={1}
-                    value={[zoomByTab[tab]]}
-                    onValueChange={([v]) => setZoom(tab, v)}
-                    aria-label={t('Board zoom')}
-                  />
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-7 hover-red-beam"
-                    aria-label={t('Zoom in (fewer columns)')}
-                    onClick={() => setZoom(tab, zoomByTab[tab] + 1)}
-                  >
-                    <ZoomIn className="size-4" />
-                  </Button>
-                </div>
-              )}
+            </AltArrowHint>
+            {/* 보드 축척(#d1) — writer 러프 보드와 동일 UI, 인물/배경 칸별 저장 */}
+            <div className="flex shrink-0 items-center gap-1.5">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-7 hover-red-beam"
+                aria-label={t('Zoom out (more columns)')}
+                onClick={() => setShownZoom(zoomByTab[zoomKey] - 1)}
+              >
+                <ZoomOut className="size-4" />
+              </Button>
+              <Slider
+                className="w-24"
+                min={1}
+                max={3}
+                step={1}
+                value={[zoomByTab[zoomKey]]}
+                onValueChange={([v]) => setShownZoom(v)}
+                aria-label={t('Board zoom')}
+              />
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-7 hover-red-beam"
+                aria-label={t('Zoom in (fewer columns)')}
+                onClick={() => setShownZoom(zoomByTab[zoomKey] + 1)}
+              >
+                <ZoomIn className="size-4" />
+              </Button>
             </div>
           </div>
 
-          <TabsContent
-            value="characters"
-            className={cn(
-              'flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden',
-              tabSlideClass,
-            )}
-          >
-            <CharacterPanel
-              columns={4 - zoomByTab.characters}
-              onZoomStep={(dir) => stepZoom('characters', dir)}
-            />
-          </TabsContent>
+          <div key={tab} className={cn('flex flex-col gap-3.5', tabSlideClass)}>
+            {shows.characters ? (
+              <CharacterPanel
+                columns={4 - zoomByTab.characters}
+                onZoomStep={(dir) => stepZoom('characters', dir)}
+              />
+            ) : null}
+            {shows.world ? (
+              <WorldPanel
+                columns={4 - zoomByTab.world}
+                onZoomStep={(dir) => stepZoom('world', dir)}
+              />
+            ) : null}
+          </div>
 
-          <TabsContent
-            value="world"
-            className={cn(
-              'flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden',
-              tabSlideClass,
-            )}
-          >
-            <WorldPanel
-              columns={4 - zoomByTab.world}
-              onZoomStep={(dir) => stepZoom('world', dir)}
-            />
-          </TabsContent>
-        </Tabs>
+          <div className="flex flex-wrap items-start justify-end gap-3" data-testid="artist-next-row">{nextRow}</div>
+        </div>
+      </div>
 
       {error && (
         <div className="border-t border-destructive/30 bg-destructive/10 px-6 py-2 text-sm text-destructive">
