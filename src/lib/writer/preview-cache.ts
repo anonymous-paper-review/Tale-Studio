@@ -14,6 +14,8 @@ import { useProjectStore } from '@/stores/project-store'
 
 const known = new Map<string, WriterPreview>()
 const reading = new Map<string, Promise<unknown>>()
+/** 비울 때마다 오른다 — 비우기 전에 나간 읽기의 답은 받아 두지도 화면에 올리지도 않는다(로그인한 사람이 바뀐 뒤 도착한 앞 사람의 답). */
+let epoch = 0
 
 const keyOf = (projectId: string, locale: AppLocale) => `${projectId}|${locale}`
 /** 로그인 · 주인 · 프로젝트가 없다는 답 — 잠깐 실패한 것(5xx · 끊김)과 달리 받아 둔 것도 쓰면 안 된다. */
@@ -50,16 +52,20 @@ export function loadPreviewOnce<T>(key: string, load: () => Promise<T>): Promise
   return started
 }
 
-/** 미리 보기를 한 번 읽는다(같은 때 읽기는 합친다) — 받으면 받아 둔다. 거절 답이면 그 프로젝트의 받아 둔 것을 버린다(refused). */
-export function refreshPreview(projectId: string, locale: AppLocale, refreshKey: number): Promise<{ ok: true; preview: WriterPreview } | { ok: false; refused: boolean }> {
+/** 미리 보기를 한 번 읽는다(같은 때 읽기는 합친다) — 받으면 받아 둔다. 거절 답이면 그 프로젝트의 받아 둔 것을 버린다(refused).
+ *  읽는 사이에 비웠으면(로그인한 사람이 바뀜) 그 답은 버린다(stale) — 화면도 올리지 않는다. */
+export function refreshPreview(projectId: string, locale: AppLocale, refreshKey: number): Promise<{ ok: true; preview: WriterPreview } | { ok: false; refused: boolean; stale?: true }> {
   return loadPreviewOnce(`${keyOf(projectId, locale)}|${refreshKey}`, async () => {
+    const started = epoch
     const response = await fetch(`/api/writer/preview/${projectId}?locale=${locale}`)
+    if (epoch !== started) return { ok: false as const, refused: false, stale: true as const }
     if (!response.ok) {
       const refused = REFUSED.has(response.status)
       if (refused) forgetProject(projectId)
       return { ok: false as const, refused }
     }
     const preview = (await response.json()) as WriterPreview
+    if (epoch !== started) return { ok: false as const, refused: false, stale: true as const }
     rememberPreview(projectId, locale, preview)
     return { ok: true as const, preview }
   })
@@ -83,6 +89,7 @@ export async function warmWriterPreview(projectId: string): Promise<boolean> {
 
 /** 받아 둔 것 · 읽는 중인 것을 비운다 — 로그인한 사람이 바뀔 때(그리고 시험). */
 export function forgetPreviews(): void {
+  epoch += 1
   known.clear()
   reading.clear()
 }
