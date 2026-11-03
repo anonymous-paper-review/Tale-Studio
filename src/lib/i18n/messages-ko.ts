@@ -211,6 +211,8 @@ export const KO: Record<string, string> = {
   // ── 프로젝트 대시보드 (/projects) ──
   'New project': '새 프로젝트',
   'No projects yet': '아직 프로젝트가 없어요',
+  // v3 프로젝트 목록 첫 화면 머리(2026-11-03)
+  'Total {n}': '모두 {n}개',
   'Create your first project': '첫 프로젝트 만들기',
   'Name your project. You can rename it anytime.': '프로젝트 이름을 지어 주세요. 나중에 언제든 바꿀 수 있어요.',
   'E.g. One rainy night in the city': '예: 비 오는 도시의 하룻밤',

@@ -4,11 +4,13 @@
 //   탭 [프로젝트 | Playground] 로 두 페이지가 형제임을 보이고(Playground 가 랜딩의 자식처럼
 //   보이던 문제 수정), 유저 메뉴(로그아웃)를 함께 제공한다. 우측 슬롯(children)에는 페이지
 //   전용 액션(새 프로젝트 버튼 등)이 들어간다.
+//   v3(2026-11-03): 작업 화면과 같은 바탕색 막대(검정 · 반투명 흐림 대신), Tale 로고 묶음, 탭은 v3 segmented 묶음(카드색 · 고른 칸 칩색).
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Check, ChevronDown, Film, Languages, LogOut } from 'lucide-react'
+import { Check, ChevronDown, Languages, LogOut } from 'lucide-react'
+import { TaleLockup } from '@/components/tale-lockup'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -75,24 +77,23 @@ export function DashboardHeader({
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-white/10 bg-black/80 backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-border-subtle bg-background">
       <div className="mx-auto flex min-h-16 max-w-7xl flex-wrap items-center justify-between gap-3 px-6 py-3 lg:h-16 lg:flex-nowrap lg:py-0">
         <div className="flex min-w-0 flex-wrap items-center gap-3 lg:flex-nowrap lg:gap-8">
-          <Link href="/projects" className="flex items-center gap-2">
-            <Film className="size-6 text-primary" />
-            <span className="text-lg font-bold tracking-tight text-white">Tale Studio</span>
+          <Link href="/projects" className="flex items-center rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">
+            <TaleLockup size={28} />
           </Link>
-          <nav className="flex max-w-full flex-wrap items-center gap-1 rounded-2xl border border-white/10 bg-white/5 p-1 text-sm font-medium sm:rounded-full">
+          <nav className="flex max-w-full flex-wrap items-center gap-0.5 rounded-lg bg-card p-[3px] text-label">
             {TABS.map((tab) =>
               tab.key === active ? (
-                <span key={tab.key} className="rounded-full bg-white px-4 py-1.5 text-black">
+                <span key={tab.key} aria-current="page" className="rounded-[9px] bg-chip px-3.5 py-1.5 font-semibold text-foreground">
                   {t(tab.label)}
                 </span>
               ) : (
                 <Link
                   key={tab.key}
                   href={tab.href}
-                  className="rounded-full px-4 py-1.5 text-gray-300 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  className="rounded-[9px] px-3.5 py-1.5 font-medium text-subtle-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
                   {t(tab.label)}
                 </Link>
@@ -106,12 +107,12 @@ export function DashboardHeader({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
-                className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-gray-300 transition-colors hover:text-white focus:outline-none"
+                className="flex h-9 items-center gap-1.5 rounded-full bg-card px-3.5 text-label text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 aria-label={t('Language')}
               >
-                <Languages className="size-4" />
+                <Languages className="size-4" aria-hidden />
                 {LOCALE_LABELS[locale]}
-                <ChevronDown className="size-3.5 text-gray-500" />
+                <ChevronDown className="size-3.5 text-subtle-foreground" aria-hidden />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-36">
@@ -126,21 +127,21 @@ export function DashboardHeader({
           {userInfo && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2 rounded-full focus:outline-none">
+                <button className="flex items-center gap-2 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
                   {userInfo.avatar ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={userInfo.avatar}
                       alt={userInfo.name}
-                      className="size-8 rounded-full border border-white/20 object-cover"
+                      className="size-8 rounded-full object-cover"
                       referrerPolicy="no-referrer"
                     />
                   ) : (
-                    <div className="flex size-8 items-center justify-center rounded-full bg-white/10 text-xs font-medium text-white">
+                    <div className="flex size-8 items-center justify-center rounded-full bg-card text-label font-semibold text-foreground">
                       {userInfo.name.charAt(0).toUpperCase()}
                     </div>
                   )}
-                  <ChevronDown className="size-4 text-gray-400" />
+                  <ChevronDown className="size-4 text-subtle-foreground" aria-hidden />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-44">

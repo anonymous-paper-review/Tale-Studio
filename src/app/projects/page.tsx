@@ -4,13 +4,18 @@
 //   로그인 전용(middleware 가 /login 으로 보냄). 랜딩(/)은 순수 마케팅 페이지가 됐고,
 //   로그인 상태로 / 진입 시 middleware 가 여기로 돌린다.
 //   상단 탭: 프로젝트(여기) | Playground(공개 갤러리, /playground).
+//   v3(2026-11-03): 작업 화면과 같은 따뜻한 무채색 바탕 · 카드는 큰 내용 판(panel), 첫 화면에 큰 Lumi(화이트 펄 · 기본 모습,
+//   오너 11/3 결정 8 · Lumi 가이드 "pearl = 시작 · 홈, 프로젝트 목록"). 한 화면에 큰 Lumi 는 하나 — 빈 목록이면 빈 안내 자리에 둔다.
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Clock, Film, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Clock, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
 import {
   useProjectStore,
 } from '@/stores/project-store'
+import { PageHeader } from '@/components/layout/page-header'
+import { Lumi } from '@/components/lumi/lumi'
+import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
@@ -122,31 +127,30 @@ function ProjectCard({
   return (
     <div
       onClick={() => !editing && onOpen(project)}
-      // eslint-disable-next-line no-restricted-syntax -- hover 상태 글로우, accent 원값. 토큰화는 티켓 glow-token-cleanup(#accent-glow-tokenize)
-      className="group flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/5 text-left backdrop-blur-sm transition-all duration-300 hover:border-primary/50 hover:bg-white/10 hover:shadow-[0_10px_30px_rgba(229,9,20,0.1)]"
+      // v3: 유리(white/5 + 흐림) · 빨간 빛 대신 큰 내용 판 하나 — 올리면 한 단 밝아진다(판 아래 그림자 하나만, design.md §9).
+      className="group flex cursor-pointer flex-col overflow-hidden rounded-xl bg-panel text-left shadow-panel transition-colors duration-150 hover:bg-card"
     >
       {/* 대표 썸네일(#landing-v2b) — 이름만으로는 구별이 어려워 프로젝트의 첫 그림을 얹는다.
-          아직 그림이 없는 프로젝트는 제목 이니셜 워터마크가 구별을 돕는다.
-          워터마크 배경은 무채색 8% — 레드+스틸블루 안 폐기 (#design-gate 2026-09-02 오너 판정 C).
+          아직 그림이 없는 프로젝트는 제목 이니셜 워터마크가 구별을 돕는다 — 바탕은 v3 그림 자리(Content/Art Placeholder).
           [container-type:size] 는 #thumb-fit 의 100cqh(박스 높이 기준 팬 종점) 용. */}
-      <div className="relative aspect-video overflow-hidden bg-black/60 [container-type:size]">
+      <div className="relative aspect-video overflow-hidden bg-art-placeholder [container-type:size]">
         {project.thumbnail_url ? (
           <ProjectThumb url={project.thumbnail_url} />
         ) : (
-          <div className="flex size-full items-center justify-center bg-[radial-gradient(ellipse_at_top_left,color-mix(in_srgb,white_8%,transparent),transparent_60%)]">
-            <span className="select-none text-5xl font-bold text-white/15">
+          <div className="flex size-full items-center justify-center">
+            <span className="select-none text-5xl font-bold text-foreground/15">
               {(project.title || 'U').charAt(0).toUpperCase()}
             </span>
           </div>
         )}
       </div>
 
-      <div className="flex flex-col p-5">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col px-5 pb-5 pt-4">
+      <div className="flex items-center justify-between gap-2">
         {editing ? (
           <Input
             ref={inputRef}
-            className="h-9 text-lg font-semibold text-white caret-white placeholder:text-gray-500"
+            className="h-9 text-body font-semibold"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onBlur={handleSave}
@@ -162,10 +166,10 @@ function ProjectCard({
           />
         ) : (
           <>
-            <h3 className="text-lg font-semibold text-white transition-colors group-hover:text-primary">
+            <h3 className="min-w-0 truncate text-body font-semibold text-foreground">
               {title}
             </h3>
-            <div className="flex items-center gap-0.5">
+            <div className="flex shrink-0 items-center gap-0.5">
               <button
                 onClick={(e) => {
                   e.stopPropagation()
@@ -173,7 +177,7 @@ function ProjectCard({
                 }}
                 title={t('Rename')}
                 aria-label={t('Rename project')}
-                className="rounded p-1 text-gray-500 opacity-0 transition-opacity hover:text-white group-hover:opacity-100"
+                className="rounded-md p-1 text-subtle-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
               >
                 <Pencil className="size-3.5" />
               </button>
@@ -184,7 +188,7 @@ function ProjectCard({
                 }}
                 title={t('Delete project')}
                 aria-label={t('Delete project')}
-                className="rounded p-1 text-gray-500 opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
+                className="rounded-md p-1 text-subtle-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
               >
                 <Trash2 className="size-3.5" />
               </button>
@@ -195,7 +199,7 @@ function ProjectCard({
       {/* 시리즈(2026-10-26, 프로토타입 L1): 다음 화 카드에는 "← 앞 화 제목". 앞 화를 지우면 연결만 끊기고 제목은 남는다. */}
       {link ? (
         <div
-          className={`mt-1.5 truncate text-xs ${link.deleted ? 'text-gray-500' : 'text-gray-400'}`}
+          className={`mt-1.5 truncate text-caption ${link.deleted ? 'text-subtle-foreground' : 'text-muted-foreground'}`}
           data-testid="project-prev-episode"
         >
           {'← '}
@@ -203,13 +207,11 @@ function ProjectCard({
           {link.deleted ? ` · ${t('The previous episode was deleted')}` : ''}
         </div>
       ) : null}
-      <div className="mt-3 flex items-center gap-3 text-xs text-gray-400">
-        <span className="rounded-md bg-white/10 px-2.5 py-1 font-medium">
-          {projectStageLabel(project.current_stage)}
-        </span>
+      <div className="mt-3 flex items-center gap-3">
+        <Badge variant="tag">{projectStageLabel(project.current_stage)}</Badge>
         {project.updated_at && (
-          <span className="flex items-center gap-1">
-            <Clock className="size-3" />
+          <span className="flex items-center gap-1 font-num text-meta font-medium text-subtle-foreground">
+            <Clock className="size-3" aria-hidden />
             {relativeTime(project.updated_at, t)}
           </span>
         )}
@@ -289,38 +291,38 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      {/* 공용 대시보드 헤더(#landing-v2b) — 탭·유저 메뉴는 헤더가, 새 프로젝트 버튼만 이 페이지 전용 */}
+    <div className="min-h-screen bg-background text-foreground">
+      {/* 공용 대시보드 헤더(#landing-v2b) — 탭·유저 메뉴는 헤더가, 새 프로젝트 버튼만 이 페이지 전용(화면의 크림 단추 하나) */}
       <DashboardHeader active="projects">
-        <button
-          onClick={handleNew}
-          className="flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition-all hover:bg-primary/90"
-          data-testid="projects-new"
-        >
-          <Plus className="size-4" />
+        <Button onClick={handleNew} className="rounded-full px-5" data-testid="projects-new">
+          <Plus aria-hidden />
           {t('New project')}
-        </button>
+        </Button>
       </DashboardHeader>
 
       {/* ── 프로젝트 그리드 ── */}
-      <main className="mx-auto max-w-7xl px-6 py-10">
+      <main className="mx-auto max-w-7xl px-6 pb-16 pt-6">
         {loading ? (
-          <div className="flex items-center justify-center py-24">
-            <Loader2 className="size-6 animate-spin text-gray-500" />
+          <div className="flex items-center justify-center py-24" role="status" aria-label={t('Loading…')}>
+            <Loader2 className="size-6 animate-spin text-subtle-foreground motion-reduce:animate-none" aria-hidden />
           </div>
         ) : projects.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-[2rem] border border-dashed border-white/10 py-24">
-            <Film className="size-10 text-gray-600" />
-            <p className="mt-4 text-sm text-gray-500">{t('No projects yet')}</p>
-            <button
-              onClick={handleNew}
-              className="mt-6 flex items-center gap-2 rounded-full border border-white/20 px-6 py-3 text-sm font-medium transition-all hover:border-primary hover:text-primary"
-            >
-              <Plus className="size-4" />
+          // 빈 목록 — 큰 Lumi 가 빈 안내 자리에 선다(한 화면에 큰 Lumi 하나). 크림 단추는 위 막대의 [새 프로젝트] 하나라 여기는 보조.
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <Lumi persona="pearl" state="idle" size={320} />
+            <p className="mt-2 text-body text-muted-foreground">{t('No projects yet')}</p>
+            <Button variant="secondary" onClick={handleNew} className="mt-6 rounded-full px-5">
+              <Plus aria-hidden />
               {t('Create your first project')}
-            </button>
+            </Button>
           </div>
         ) : (
+          <>
+          {/* 첫 화면 머리 — 큰 Lumi(화이트 펄)가 목록 쪽을 바라본다(꼬리는 왼쪽, 얼굴은 오른쪽). */}
+          <section className="mb-6 flex items-center gap-2">
+            <Lumi persona="pearl" state="idle" size={320} className="-ml-12 shrink-0" />
+            <PageHeader title={t('Projects')} meta={t('Total {n}', { n: projects.length })} />
+          </section>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {projects.map((project) => (
               <ProjectCard
@@ -337,6 +339,7 @@ export default function ProjectsPage() {
               />
             ))}
           </div>
+          </>
         )}
       </main>
 
@@ -351,7 +354,7 @@ export default function ProjectsPage() {
           </DialogHeader>
           {deleteError ? <p className="text-sm text-destructive">{deleteError}</p> : null}
           <DialogFooter>
-            <Button variant="outline" disabled={deleting} onClick={() => setDeleteTarget(null)}>
+            <Button variant="ghost" disabled={deleting} onClick={() => setDeleteTarget(null)}>
               {t('Cancel')}
             </Button>
             <Button variant="destructive" disabled={deleting} onClick={() => void handleDelete()}>

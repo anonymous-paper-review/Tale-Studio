@@ -55,14 +55,15 @@ function ChoiceButton({
       type="button"
       onClick={onClick}
       data-testid={testId}
-      className="flex w-full items-center gap-3 rounded-xl border border-border p-4 text-left transition-colors hover:border-primary/60 hover:bg-accent"
+      // v3 선택 카드(Control/Option Card)와 같은 면 — 테두리 없이 카드색, 올리면 칩색.
+      className="flex w-full items-center gap-3 rounded-[14px] bg-card px-4 py-3.5 text-left outline-none transition-colors duration-100 ease-out hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground">{icon}</span>
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-chip text-foreground">{icon}</span>
       <span className="min-w-0 flex-1">
-        <span className="block text-sm font-semibold text-foreground">{title}</span>
-        <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">{description}</span>
+        <span className="block text-body font-semibold text-foreground">{title}</span>
+        <span className="mt-0.5 block text-caption text-muted-foreground">{description}</span>
       </span>
-      <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+      <ChevronRight className="size-4 shrink-0 text-subtle-foreground" aria-hidden />
     </button>
   )
 }
@@ -168,7 +169,7 @@ export function NewProjectDialog({
               </div>
               <div className="-mx-1 max-h-72 overflow-y-auto px-1">
                 {episodes.length === 0 ? (
-                  <p className="py-8 text-center text-sm text-muted-foreground">{t('No episode matches that name.')}</p>
+                  <p className="py-8 text-center text-label text-muted-foreground">{t('No episode matches that name.')}</p>
                 ) : (
                   <ul className="space-y-1">
                     {episodes.map((project) => (
@@ -177,16 +178,16 @@ export function NewProjectDialog({
                           type="button"
                           onClick={() => pick(project)}
                           data-testid="new-project-episode"
-                          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-accent"
+                          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left outline-none transition-colors hover:bg-card focus-visible:ring-2 focus-visible:ring-ring"
                         >
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-medium text-foreground">{project.title || 'Untitled'}</span>
-                            <span className="mt-0.5 block text-xs text-muted-foreground">
+                            <span className="block truncate text-label font-semibold text-foreground">{project.title || 'Untitled'}</span>
+                            <span className="mt-0.5 block font-num text-meta text-subtle-foreground">
                               {projectStageLabel(project.current_stage)}
                               {project.updated_at ? ` · ${relativeTime(project.updated_at, t)}` : ''}
                             </span>
                           </span>
-                          <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                          <ChevronRight className="size-4 shrink-0 text-subtle-foreground" aria-hidden />
                         </button>
                       </li>
                     ))}
@@ -195,7 +196,7 @@ export function NewProjectDialog({
               </div>
               <DialogFooter>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   onClick={() => {
                     setStep('choose')
                     setQuery('')
