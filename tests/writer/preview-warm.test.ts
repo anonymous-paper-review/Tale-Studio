@@ -1,4 +1,6 @@
 // 워밍(스튜디오 1.5초 미리 받기) 때 산문을 확정한 프로젝트만 Writer 미리 보기를 받아 두어, Writer 를 처음 열 때도 받아 둔 것을 바로 보인다 (2026-11-03 오너 QA 2번)
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -79,5 +81,12 @@ describe('Writer 미리 보기 워밍', () => {
     expect(await warmWriterPreview('p1')).toBe(false)
 
     expect(readyPreview('p1', 'en')).toBeNull()
+  })
+
+  it('스튜디오는 지금 단계가 Writer 가 아니면 다른 단계 자료와 함께 조금 뒤 Writer 미리 보기를 받아 둔다', () => {
+    // 왜: 미리 받기는 스튜디오 레이아웃의 워밍(진입 1.5초 뒤 한 번) 한 곳에서 한다 — Writer(id producer)에 있으면 그 화면이 직접 받는다.
+    const layout = readFileSync(path.join(process.cwd(), 'src/app/studio/layout.tsx'), 'utf8')
+    const warm = layout.slice(layout.indexOf('const warmedProjectRef'), layout.indexOf('}, [projectId, initLoading])'))
+    expect(warm).toMatch(/if \(stage !== 'producer'\) void warmWriterPreview\(projectId\)/)
   })
 })

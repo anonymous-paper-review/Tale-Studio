@@ -10,6 +10,7 @@ import { useProducerStore } from '@/stores/producer-store'
 import { useWriterStore } from '@/stores/writer-store'
 import { useArtistStore } from '@/stores/artist-store'
 import { useEntryStore } from '@/features/entry/entry-store'
+import { warmWriterPreview } from '@/lib/writer/preview-cache'
 import { Sidebar } from '@/components/layout/sidebar'
 import { GlobalChat } from '@/components/layout/global-chat'
 import { useWriterRoomStore, writerRightChatHidden } from '@/stores/writer-room-store'
@@ -134,6 +135,8 @@ export default function StudioLayout({
       if (stage !== 'artist') void useArtistStore.getState().loadData()
       // Producer 시작 화면(id entry) — 시작한 프로젝트의 완료 화면만 받아 둔다(QA 2026-11-03, tests/producer/entry-prefetch.test.ts).
       if (stage !== 'entry') void useEntryStore.getState().prefetch(projectId)
+      // Writer 산문(id producer) — 산문을 확정한 프로젝트만 미리 보기를 받아 둔다(QA 2026-11-03, tests/writer/preview-warm.test.ts).
+      if (stage !== 'producer') void warmWriterPreview(projectId)
     }, 1500)
     return () => clearTimeout(t)
   }, [projectId, initLoading])
