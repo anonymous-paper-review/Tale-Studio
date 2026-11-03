@@ -92,6 +92,8 @@ interface EntryData {
 
 interface EntryActions {
   load: (projectId: string) => Promise<void>
+  /** 미리 받기(스튜디오 워밍) — 지금 화면 상태는 그대로, 시작한 프로젝트면 다시 열 때 바로 보일 완료 화면만 받아 둔다. */
+  prefetch: (projectId: string) => Promise<void>
   setIdea: (text: string) => void
   flushIdea: () => Promise<void>
   formNext: () => Promise<NextResult>
@@ -160,6 +162,29 @@ let ideaTimer: ReturnType<typeof setTimeout> | null = null
 let pendingIdea: { projectId: string; idea: string } | null = null
 let saveQueue: Promise<unknown> = Promise.resolve()
 let readTicker: ReturnType<typeof setInterval> | null = null
+
+/**
+ * 시작한 프로젝트의 시작 화면에서 받아 둔 것(QA 2026-11-03 "Producer 탭 로딩이 너무 길다") — 탭을 떠나도(reset) 남는다.
+ *   시작한 프로젝트의 시작 화면은 읽기만 하는 완료 화면이라, 다시 열면 이것을 바로 보이고 뒤에서 새로 받는다.
+ *   시작 전 프로젝트는 넣지 않는다(고치는 화면 — 옛 초안을 먼저 보이면 고치는 동안 새 초안과 겹친다). 프로젝트 하나만 둔다.
+ *   약속: tests/producer/entry-revisit.test.ts
+ */
+type StartedView = Pick<EntryData, 'draft' | 'title' | 'locale' | 'stage' | 'format' | 'series' | 'writer' | 'writerStart'>
+let startedView: { projectId: string; view: StartedView } | null = null
+
+/** GET /api/produce/entry 답 → 시작 화면이 보이는 값. */
+function viewFrom(body: Record<string, unknown>): StartedView {
+  return {
+    draft: normalizeEntryDraft(body.draft),
+    title: typeof body.title === 'string' ? body.title : 'Untitled',
+    locale: parseAppLocale(body.locale) ?? useLocaleStore.getState().locale,
+    stage: typeof body.stage === 'string' ? body.stage : null,
+    format: parseProjectFormat(body.format),
+    series: parseEntrySeries(body.series),
+    writer: parseWriter(body.writer),
+    writerStart: body.writerStart && typeof body.writerStart === 'object' ? (body.writerStart as EntryWriterStartBody) : null,
+  }
+}
 
 function enqueue<T>(task: () => Promise<T>): Promise<T> {
   const run = saveQueue.then(task, task)
@@ -355,37 +380,46 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
       const gen = generation
       savePendingIdea()
       stopReadTicker()
-      set({ ...initialData(), projectId, status: 'loading', locale: useLocaleStore.getState().locale })
+      // 시작한 프로젝트를 다시 열면 받아 둔 완료 화면을 바로 보인다 — 아래 새로 받기가 끝나면 그 값으로 바꾼다.
+      const kept = startedView?.projectId === projectId ? startedView.view : null
+      set({ ...initialData(), projectId, status: kept ? 'ready' : 'loading', locale: useLocaleStore.getState().locale, ...kept })
       try {
         const res = await fetch(`/api/produce/entry?projectId=${encodeURIComponent(projectId)}`)
         if (gen !== generation) return
         if (!res.ok) {
-          set({ status: 'error' })
+          // 서버가 잠깐 실패한 것이면 받아 둔 완료 화면을 그대로 둔다. 로그인 · 주인 · 프로젝트가 없다는 답이면 받아 둔 것도 버린다.
+          const refused = res.status === 401 || res.status === 403 || res.status === 404
+          if (refused && startedView?.projectId === projectId) startedView = null
+          if (!kept || refused) set({ status: 'error' })
           return
         }
         const body = (await readJson(res)) ?? {}
         if (gen !== generation) return
-        const draft = normalizeEntryDraft(body.draft)
-        const writer = parseWriter(body.writer)
-        set({
-          status: 'ready',
-          draft,
-          title: typeof body.title === 'string' ? body.title : 'Untitled',
-          locale: parseAppLocale(body.locale) ?? useLocaleStore.getState().locale,
-          stage: typeof body.stage === 'string' ? body.stage : null,
-          format: parseProjectFormat(body.format),
-          series: parseEntrySeries(body.series),
-          writer,
-          writerStart: body.writerStart && typeof body.writerStart === 'object' ? (body.writerStart as EntryWriterStartBody) : null,
-          formStep: recIsCurrent(draft) ? 2 : 1,
-        })
+        const view = viewFrom(body)
+        const { draft, writer } = view
+        set({ status: 'ready', ...view, formStep: recIsCurrent(draft) ? 2 : 1 })
+        startedView = entryStarted(view) ? { projectId, view } : startedView?.projectId === projectId ? null : startedView
         // 새로 고침해도 쓰는 중인 산문 초안을 놓치지 않는다. 확정 뒤의 Writer 작업(초안 아님)은 시작 화면이 잠그지 않는다.
         if (draft.startedAt && writer?.started && writer.status === 'running' && writer.draft) {
           set({ writing: { status: 'writing', step: 0 } })
           void pollWriter(gen)
         }
       } catch {
-        if (gen === generation) set({ status: 'error' })
+        // 연결이 잠깐 끊긴 것이면 받아 둔 완료 화면을 그대로 둔다.
+        if (gen === generation && !kept) set({ status: 'error' })
+      }
+    },
+
+    prefetch: async (projectId) => {
+      if (startedView?.projectId === projectId) return
+      try {
+        const res = await fetch(`/api/produce/entry?projectId=${encodeURIComponent(projectId)}`)
+        if (!res.ok) return
+        const view = viewFrom((await readJson(res)) ?? {})
+        // 시작한(읽기만 하는) 프로젝트만 받아 둔다 — 시작 전 화면은 늘 새로 받은 초안으로 연다.
+        if (entryStarted(view)) startedView = { projectId, view }
+      } catch {
+        // 미리 받기는 실패해도 된다 — 화면을 열 때 다시 받는다.
       }
     },
 

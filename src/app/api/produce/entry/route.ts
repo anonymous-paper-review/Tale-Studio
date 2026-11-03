@@ -11,21 +11,34 @@ import { parseAppLocale } from '@/lib/locale'
 import { parseSeries } from '@/lib/series/snapshot'
 import { getRunStatusLight } from '@/lib/writer/run-store'
 import { parseProjectFormat } from '@/types/project'
-import { authorizeEntry, loadEntryProject, saveEntryDraft, serverError } from './entry-access'
+import { PROJECT_ID_RE, authorizeEntry, loadEntryProject, saveEntryDraft, serverError } from './entry-access'
 
 export const runtime = 'nodejs'
 
+/** 시작 화면이 읽는 것 — 초안 칸 · Writer 진행(시작했는지 · 산문 초안을 쓰는 중인지). */
+function readEntry(id: string) {
+  return Promise.all([
+    loadEntryProject(id, 'title, locale, current_stage, entry_draft, story_text, settings, series'),
+    getRunStatusLight(id).catch(() => null),
+  ])
+}
+
 export async function GET(req: NextRequest) {
   const projectId = req.nextUrl.searchParams.get('projectId')
+  // 주인 확인(로그인 · 주인 두 번)과 자료 읽기를 함께 시작한다 — 차례로 하면 데이터베이스 왕복 다섯 번이 쌓여
+  //   Producer 탭이 늦게 떴다(QA 2026-11-03). 꼴이 맞는 번호만 읽고, 주인이 아니면 읽은 것은 버린 채 거절만 돌려준다.
+  //   약속: tests/producer/entry-read-speed.test.ts
+  const reads = typeof projectId === 'string' && PROJECT_ID_RE.test(projectId) ? readEntry(projectId) : null
+  // 거절로 끝나 기다리지 않게 된 읽기의 실패가 처리 안 된 거절로 새지 않게.
+  reads?.catch(() => null)
   const access = await authorizeEntry(req, projectId, { write: false })
   if (!access.ok) return access.response
   const id = projectId as string
   try {
-    const row = await loadEntryProject(id, 'title, locale, current_stage, entry_draft, story_text, settings, series')
+    const [row, run] = await (reads ?? readEntry(id))
     if (!row) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     const draft = entryDraftFor({ entryDraft: row.entry_draft, storyText: row.story_text, stage: row.current_stage })
     const locale = parseAppLocale(row.locale) ?? 'en'
-    const run = await getRunStatusLight(id).catch(() => null)
     // 시작한 프로젝트는 같은 값으로 Writer 시작을 다시 할 수 있게 요청을 돌려준다(초안 쓰기가 실패했을 때).
     const series = parseSeries(row.series)
     const plan = draft.startedAt ? planEntryStart({ projectId: id, draft, locale, currentTitle: row.title ?? '', series }) : null
