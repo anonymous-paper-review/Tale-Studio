@@ -92,6 +92,14 @@ describe('Storyboard 연출 점검은 관리자 계정만 본다', () => {
     expect(body).not.toHaveProperty('directing_issues')
   })
 
+  // 왜: 이 응답은 진행 중에 몇 초마다 다시 읽힌다 — 보낼 점검이 없을 때는 계정 확인으로 기다리게 하지 않는다(정상 경로 고정).
+  it('파이프라인이 끝나기 전에는 계정을 확인하지 않고 연출 점검도 보내지 않는다', async () => {
+    mocks.run.status = 'running'
+    const body = await statusAs('user-admin-early')
+    expect(body).not.toHaveProperty('directing_issues')
+    expect(mocks.getUserById).not.toHaveBeenCalled()
+  })
+
   // 왜: 정상 경로 고정 — 관리자는 영상으로 넘어가기 전에 연출 결함을 지금처럼 본다.
   it('관리자 계정이면 Storyboard 연출 점검을 지금처럼 보낸다', async () => {
     const body = await statusAs('user-admin')
