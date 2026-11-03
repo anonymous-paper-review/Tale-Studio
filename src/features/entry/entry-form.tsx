@@ -9,7 +9,8 @@ import { useId, useState } from 'react'
 import { ArrowLeft, ArrowRight, Check, CircleAlert, Lock, Paperclip } from 'lucide-react'
 import { OptionCard } from '@/components/controls/choice-chip'
 import { PageHeader } from '@/components/layout/page-header'
-import { Lumi, LumiView } from '@/components/lumi/lumi'
+import { ConfirmLumi } from '@/components/handoff/confirm-lumi'
+import { LumiView } from '@/components/lumi/lumi'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -334,8 +335,8 @@ function SettingsStep() {
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent className="sm:max-w-md" showCloseButton={false}>
-          {/* 확인 창의 큰 Lumi(오너 11/3 결정 8) — 지금 단계(Producer) 옷 · 기본 모습. */}
-          <Lumi persona={STAGE_PERSONA.entry} state="idle" size={180} className="-mb-2 self-center" />
+          {/* 확인 창의 큰 Lumi(오너 11/3 결정 8) — 다른 단계 확인 창과 같은 공용 부품, 지금 단계(Producer) 옷 · 기본 모습. */}
+          <ConfirmLumi stage="entry" />
           <DialogHeader>
             <DialogTitle>{t('Start like this?')}</DialogTitle>
             <DialogDescription>{t('When you start, the screen ratio is locked.')}</DialogDescription>

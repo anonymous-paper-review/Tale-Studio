@@ -31,7 +31,8 @@ export function ImagePlaceholder({
   return (
     <div
       className={cn(
-        'relative flex items-center justify-center overflow-hidden rounded-lg border border-dashed border-border bg-muted/50 transition-colors',
+        // v3 A5(2026-11-03): 그림 자리는 테두리 없는 그림자리 그라데이션(bg-art-placeholder) · 모서리 14.
+        'relative flex items-center justify-center overflow-hidden rounded-[14px] bg-art-placeholder transition-colors',
         aspectRatio === 'square' ? 'aspect-square' : 'aspect-video',
         className,
       )}
@@ -40,7 +41,7 @@ export function ImagePlaceholder({
         <GeneratedImage
           src={imageUrl}
           alt={label}
-          className="h-full w-full rounded-lg object-cover"
+          className="h-full w-full rounded-[14px] object-cover"
         />
       ) : (
         <div className="flex flex-col items-center gap-1.5 text-muted-foreground">

@@ -1,19 +1,21 @@
 'use client'
 
-// Writer 산문 작업공간(리뉴얼 1차 2026-10-19, 프로토타입 W1 · W1r · W3 · W4 · W5 · W6 · WP · WN).
+// Writer 산문 작업공간(리뉴얼 1차 2026-10-19, 프로토타입 W1 · W1r · W3 · W4 · W5 · W6 · WP · WN → v3 W1 2026-11-03).
 //   Writer 는 산문만 다룬다 — 제목 아래 설정 칩 · 인물 · 배경 카드 · 스타일이 없다(예전 Meeting Room 을 대신한다).
-//   두 탭이 같은 산문을 쓴다: 화면에서 고치기(1안: 조건 줄 + 오른쪽 채팅) · 채팅으로 고치기(2안: 가운데 채팅에 산문 카드).
-//   AI 가 일하는 동안(초안 쓰기 · 다시 쓰기 · 수정안)은 화면 전체를 진행 표시로 덮는다.
+//   v3(오너 결정 7): 고치기 방식 전환(화면에서 고치기 · 채팅으로 고치기)이 없는 한 화면이다 — 화면 머리 [직접 작성] · [AI 다시 쓰기] ·
+//   [브레이크다운하기], 조건 칩, 산문, 오른쪽 채팅. 문단을 누르면 그 문단이 채팅 입력칸 위에 붙어 그 문단만 고친다(lib/prose/paragraph-pick).
+//   AI 가 일하는 동안(초안 쓰기 · 다시 쓰기 · 수정안)은 화면 전체를 진행 표시로 덮는다 — 초안을 쓰는 동안은 큰 Lumi(오너 결정 8).
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, ArrowRight, Check, Loader2, Lock } from 'lucide-react'
 import { toast } from 'sonner'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { PageHeader } from '@/components/layout/page-header'
 import { AiBusyOverlay, type AiBusyStep } from '@/components/ai-busy-overlay'
 import { proseOverlayOpen } from '@/lib/prose/busy'
+import { keptParagraphPick } from '@/lib/prose/paragraph-pick'
+import { proseWaitingLumi, variantsPickerOpen } from '@/lib/prose/screen'
 import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
 import { WriterResumeButton } from '@/components/layout/writer-resume-button'
 import { useT } from '@/lib/i18n'
@@ -21,13 +23,12 @@ import { withDemoShare } from '@/lib/demo/context'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProducerStore } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
-import { proseWorkspaceTab, useWriterRoomStore, type WorkspaceTab } from '@/stores/writer-room-store'
+import { useWriterRoomStore } from '@/stores/writer-room-store'
 import { useSeriesInfo } from '@/features/series/use-series-info'
 import { ProseSeriesBanner } from '@/features/series/prose-series-banner'
 import { useProse } from '@/features/prose/use-prose'
-import { ConditionBar } from '@/features/prose/condition-bar'
+import { ProseConditionChips, ProseEditActions } from '@/features/prose/condition-bar'
 import { ProseDocument } from '@/features/prose/prose-document'
-import { ProseChatTab } from '@/features/prose/prose-chat-tab'
 import { VariantsPicker } from '@/features/prose/variants-picker'
 import { ManualEditDialog } from '@/features/prose/manual-edit-dialog'
 import { ProseConfirmDialog } from '@/features/prose/prose-confirm-dialog'
@@ -41,19 +42,11 @@ export function ProseWorkspace() {
   // 산문 일이 도는 동안은 잠금 화면이 아직 안 떴어도(진행 상태를 읽는 1~2초 · 수정안을 기다리는 사이) 왼쪽 사이드바를 막는다(2026-10-27).
   useAiBusyHold(!!prose.busy)
   const projectId = useProjectStore((s) => s.projectId)
-  const projectTitle = useProjectStore((s) => s.projectTitle)
   const loadProject = useProducerStore((s) => s.loadProject)
-  const rememberedTab = useWriterRoomStore((s) => s.tab)
-  // 확정한 산문은 고치기 탭 없이 화면 보기로 연다 — 오른쪽 채팅도 열린다(레이아웃이 같은 규칙을 쓴다, 디자이너 QA 1차 #09).
-  const { tab, tabsShown } = proseWorkspaceTab({ tab: rememberedTab, locked: prose.locked })
   const messagesLoaded = useGlobalChatStore((s) => s.messagesLoadedProjectId === projectId)
   // 다음 화(시리즈)면 화면 맨 위에 띠 한 줄로 알린다(프로토타입 W1s). 앞 화 산문은 [앞 화 줄거리 보기]를 누를 때만 따로 읽는다.
   const series = useSeriesInfo(projectId)
-  const title = projectTitle && projectTitle !== 'Untitled' ? projectTitle : t('A story without a title yet')
 
-  useEffect(() => {
-    useWriterRoomStore.getState().loadTab()
-  }, [])
   useEffect(() => {
     if (projectId) void loadProject()
   }, [projectId, loadProject])
@@ -64,6 +57,15 @@ export function ProseWorkspace() {
     if (!projectId || !messagesLoaded || !prose.draftLive || prose.phase !== 'gate' || sceneCount === 0) return
     useGlobalChatStore.getState().announceProseReady(projectId, sceneCount, prose.preserved)
   }, [projectId, messagesLoaded, prose.draftLive, prose.phase, sceneCount, prose.preserved])
+
+  // 채팅에 붙인 문단 — 붙일 수 없게 되거나(확정 · AI 작업 · 직접 작성 창) 그 문단 글이 바뀌면 뗀다. 화면을 떠나도 뗀다.
+  const pick = useWriterRoomStore((s) => s.paragraph)
+  const pickable = prose.tools.manual
+  const paragraphs = prose.paragraphs
+  useEffect(() => {
+    if (pick && keptParagraphPick(pick, { projectId, pickable, paragraphs }) !== pick) useWriterRoomStore.getState().clearParagraph()
+  }, [pick, projectId, pickable, paragraphs])
+  useEffect(() => () => useWriterRoomStore.getState().clearParagraph(), [])
 
   const busySteps = useMemo<AiBusyStep[] | undefined>(() => {
     if (!prose.busy) return undefined
@@ -92,39 +94,24 @@ export function ProseWorkspace() {
     }
   }
 
-  const variantsOpen = tab === 'screen' && !!prose.proposal?.variants?.length && prose.proposal.status !== 'generating' && !prose.locked
+  const variantsOpen = variantsPickerOpen({ proposal: prose.proposal, locked: prose.locked })
   const currentScenes = (prose.preview?.scenes ?? []).filter((scene) => scene.beats.length > 0).map((scene) => ({ sceneId: scene.sceneId, text: prose.sceneText(scene.beats) }))
 
-  return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden" data-testid="prose-workspace" data-tab={tab}>
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border px-6 py-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <h1 className="truncate text-lg font-semibold" data-testid="prose-title">{title}</h1>
-          {prose.locked ? (
-            <Badge variant="outline" className="shrink-0 gap-1 text-muted-foreground"><Lock className="size-3" />{t('Confirmed')}</Badge>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {tabsShown ? (
-            <Tabs value={tab} onValueChange={(value) => useWriterRoomStore.getState().setTab(value as WorkspaceTab)}>
-              <TabsList>
-                <TabsTrigger value="screen" data-testid="prose-tab-screen">{t('Edit on screen')}</TabsTrigger>
-                <TabsTrigger value="chat" data-testid="prose-tab-chat">{t('Edit in chat')}</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          ) : null}
-          {prose.locked ? (
-            <Button onClick={() => router.push(withDemoShare('/studio/artist'))} data-testid="prose-go-artist">
-              {t('Go to Artist')}<ArrowRight className="size-4" />
-            </Button>
-          ) : (
-            <Button onClick={() => useWriterRoomStore.getState().openConfirm()} disabled={!prose.canBreakdown} data-testid="prose-breakdown">
-              {t('Run breakdown')}<ArrowRight className="size-4" />
-            </Button>
-          )}
-        </div>
-      </div>
+  const actions = prose.locked ? (
+    <Button onClick={() => router.push(withDemoShare('/studio/artist'))} data-testid="prose-go-artist">
+      {t('Go to Artist')}<ArrowRight className="size-4" />
+    </Button>
+  ) : (
+    <>
+      {prose.preserved ? null : <ProseEditActions prose={prose} />}
+      <Button onClick={() => useWriterRoomStore.getState().openConfirm()} disabled={!prose.canBreakdown} data-testid="prose-breakdown">
+        {t('Run breakdown')}<ArrowRight className="size-4" />
+      </Button>
+    </>
+  )
 
+  return (
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden" data-testid="prose-workspace">
       {series.view ? <ProseSeriesBanner projectId={projectId} view={series.view} /> : null}
 
       {prose.legacyGate ? (
@@ -147,29 +134,35 @@ export function ProseWorkspace() {
         </div>
       ) : null}
 
-      {tab === 'chat' ? (
-        <ProseChatTab prose={prose} title={title} />
-      ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto flex max-w-3xl flex-col gap-4 px-6 py-6">
-            {prose.locked ? (
-              <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm" role="status" data-testid="prose-locked-banner">
-                <Lock className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
-                <p>{t('This prose is confirmed and locked. You can read and copy it, but not change it.')}</p>
-              </div>
-            ) : prose.preserved ? (
-              <div className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm" role="status" data-testid="prose-preserved-banner">
-                {t('This project uses the script as written. You cannot change the prose. Check it, then run the breakdown.')}
-              </div>
-            ) : (
-              <ConditionBar prose={prose} />
-            )}
-            <div className="rounded-xl border border-border bg-card/70 p-6">
-              <ProseDocument prose={prose} />
+      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-7">
+        {/* v3 W1 — 화면 머리 · 조건 칩 · 산문 판 · 안내가 820 폭 한 줄로 쌓인다(간격 18). */}
+        <div className="mx-auto flex max-w-[820px] flex-col gap-[18px]">
+          <PageHeader
+            title={t('Prose')}
+            tag={prose.locked ? <span className="inline-flex items-center gap-1"><Lock className="size-3" aria-hidden />{t('Confirmed')}</span> : undefined}
+            meta={sceneCount > 0 ? t('Scenes {count}', { count: sceneCount }) : undefined}
+            actions={actions}
+          />
+          {prose.locked ? (
+            <div className="flex items-start gap-2 rounded-xl bg-card px-4 py-3 text-label" role="status" data-testid="prose-locked-banner">
+              <Lock className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+              <p>{t('This prose is confirmed and locked. You can read and copy it, but not change it.')}</p>
             </div>
+          ) : prose.preserved ? (
+            <div className="rounded-xl bg-card px-4 py-3 text-label" role="status" data-testid="prose-preserved-banner">
+              {t('This project uses the script as written. You cannot change the prose. Check it, then run the breakdown.')}
+            </div>
+          ) : (
+            <ProseConditionChips prose={prose} />
+          )}
+          <div className="rounded-[20px] bg-panel p-3 shadow-panel">
+            <ProseDocument prose={prose} />
           </div>
+          {pickable && sceneCount > 0 && !prose.diffRows ? (
+            <p className="text-caption text-subtle-foreground" data-testid="prose-paragraph-hint">{t('Click a paragraph to edit just that paragraph in the chat.')}</p>
+          ) : null}
         </div>
-      )}
+      </div>
 
       <Dialog open={variantsOpen}>
         <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-2xl" showCloseButton={false} onInteractOutside={(event) => event.preventDefault()} onEscapeKeyDown={(event) => event.preventDefault()}>
@@ -189,6 +182,7 @@ export function ProseWorkspace() {
         open={proseOverlayOpen(prose.busy)}
         title={t(prose.busy?.kind === 'draft' ? 'Writing the prose draft' : 'Revising the prose')}
         steps={busySteps}
+        lumi={proseWaitingLumi(prose.busy) ?? undefined}
       />
     </div>
   )

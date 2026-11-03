@@ -3,6 +3,8 @@
 // 스튜디오 위 막대(v3 Nav/Stage Header, 2026-11-03) — 지금 단계 칩 · 프로젝트 제목 · 연필(이름 바꾸기) · 오른쪽 자리.
 //   스튜디오 레이아웃이 모든 단계 화면 위에 놓는다. Producer 시작 화면은 자기 머리(탭)를 같은 막대로 그린다.
 //   오른쪽 자리에 단추를 놓고 싶은 화면(예: Director 의 [다음: Editor로])은 <TopBarActions> 로 넣는다.
+//   AI 가 일하는 잠금 화면이 떠 있어도 제목 칸은 막히지 않는다(data-ai-lock-keep, lib/ai-busy-lock) — 예전 레일 홈 카드처럼 이름을 바꾼다.
+//   단계 칩 · 오른쪽 자리는 그동안 막히고, 오른쪽 자리는 흐려져 막혀 있음을 알린다.
 import { useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
@@ -50,8 +52,13 @@ export function StudioTopBar({
       data-testid="studio-top-bar"
     >
       <StageChip stage={stage} />
-      {title ?? <CurrentProjectTitle />}
-      <div id={children ? undefined : ACTIONS_ID} className="ml-auto flex min-w-0 items-center gap-2">
+      <div data-ai-lock-keep className="contents">
+        {title ?? <CurrentProjectTitle />}
+      </div>
+      <div
+        id={children ? undefined : ACTIONS_ID}
+        className="ml-auto flex min-w-0 items-center gap-2 transition-opacity duration-150 data-ai-locked:opacity-40"
+      >
         {children}
       </div>
     </header>

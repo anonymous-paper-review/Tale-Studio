@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react'
 import { Check, ImageIcon, Loader2, Lock, Sparkles, X } from 'lucide-react'
 import { toast } from 'sonner'
+import { ConfirmLumi } from '@/components/handoff/confirm-lumi'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ThumbImage } from '@/components/thumb-image'
@@ -112,6 +113,8 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
     <>
       <Dialog open={open} onOpenChange={(next) => { if (!making) onOpenChange(next) }}>
         <DialogContent className="flex max-h-[88vh] flex-col sm:max-w-2xl" showCloseButton={!making} data-testid="artist-style-make">
+          {/* v3(오너 2026-11-03 결정 8): 그림을 만들기 전에 묻는 창 — 큰 Lumi(Artist 옷 · 기본 모습). */}
+          <ConfirmLumi stage="artist" />
           <DialogHeader>
             <DialogTitle>{t('Which style should we make it in?')}</DialogTitle>
             <DialogDescription>{t('This work has one style. Every character and background image is made in the style you pick. Later you can pick another style with Regenerate, and the earlier version stays in the history.')}</DialogDescription>
