@@ -28,6 +28,7 @@ import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { AiBusyCard } from '@/components/ai-busy-overlay'
 import { ChoiceChip, OptionCard, RecommendBadge } from '@/components/controls/choice-chip'
 import { StageChip } from '@/components/controls/stage-chip'
 import { PageHeader } from '@/components/layout/page-header'
@@ -136,6 +137,7 @@ export default function DesignShowcasePage() {
   const [length, setLength] = useState('15-60s')
   const [avatarState, setAvatarState] = useState<LumiState>('idle')
   const [bigPersona, setBigPersona] = useState<LumiPersona>('writer')
+  const [ratio, setRatio] = useState('9:16')
 
   return (
     <div className="mx-auto max-w-5xl space-y-10 p-8">
@@ -274,6 +276,50 @@ export default function DesignShowcasePage() {
             <Badge variant="tag">Unnamed</Badge>
             <Badge variant="tag">Character</Badge>
           </div>
+        </div>
+      </Section>
+
+      <Section title="Radio chips · option cards" hint="role=&quot;radio&quot; inside role=&quot;radiogroup&quot; → aria-checked (pick one); without role → aria-pressed (toggle)">
+        <div data-stage="producer" className="space-y-3">
+          <div role="radiogroup" aria-label="Aspect ratio" className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+            {[
+              ['16:9', 'Landscape'],
+              ['9:16', 'Vertical · short form'],
+              ['1:1', 'Square'],
+              ['2.39:1', 'Cinema'],
+            ].map(([title, description]) => (
+              <OptionCard
+                key={title}
+                role="radio"
+                title={title}
+                description={description}
+                selected={ratio === title}
+                recommended={title === '9:16'}
+                onClick={() => setRatio(title)}
+              />
+            ))}
+          </div>
+          <div role="radiogroup" aria-label="Aspect ratio chips" className="flex flex-wrap gap-2">
+            {['16:9', '9:16', '1:1', '2.39:1'].map((value) => (
+              <ChoiceChip key={value} role="radio" selected={ratio === value} onClick={() => setRatio(value)}>
+                {value}
+              </ChoiceChip>
+            ))}
+          </div>
+        </div>
+      </Section>
+
+      <Section title="AI busy card · big Lumi" hint="components/ai-busy-overlay.tsx AiBusyCard — lumi given: loading Lumi while busy, error Lumi when stopped; no lumi: spinner as before">
+        <div className="grid gap-6 lg:grid-cols-3">
+          <AiBusyCard title="Writing the prose draft" description="Lumi is reading your story." progress={64} lumi="writer" />
+          <AiBusyCard
+            title="Could not write the draft"
+            description="Try again in a moment."
+            busy={false}
+            lumi="writer"
+            footer={<Button size="sm">Try again</Button>}
+          />
+          <AiBusyCard title="Making the image" description="Minho · White shirt" />
         </div>
       </Section>
 
