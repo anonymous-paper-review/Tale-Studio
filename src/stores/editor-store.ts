@@ -51,8 +51,9 @@ let editorLoadEpoch = 0
 //   약속: tests/editor/load-ends.test.ts
 export const EDITOR_LOAD_TIMEOUT_MS = 20_000
 
+// 이 문장은 실패 화면에 그대로 보인다 — 화면 언어로 낸다(2026-11-04 리드 2차 검토).
 function timeoutError(ms: number): Error {
-  return new Error(`Editor data load timed out after ${Math.round(ms / 1000)}s`)
+  return new Error(translate(useLocaleStore.getState().locale, 'Loading timed out after {seconds} seconds.', { seconds: Math.round(ms / 1000) }))
 }
 
 // Per-shot debounce timers for speed persist (300ms)

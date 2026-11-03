@@ -9,6 +9,7 @@ import { EMPTY_LIFECYCLE_STATUS } from '@/lib/lifecycle'
 import { createClient } from '@/lib/supabase/client'
 import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import { useLocaleStore } from '@/stores/locale-store'
+import { onSignedInChange } from '@/lib/signed-in-reset'
 
 const parseLocked = (v: unknown): boolean | null => (typeof v === 'boolean' ? v : null)
 
@@ -277,8 +278,13 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   initProject: async (restoreId?: string) => {
     // 프로젝트를 바꾸는 중이면 바꾸기가 프로젝트를 정할 때까지 기다린다 — 먼저 정하면 늦은 비우기가 그 프로젝트 자료를 지운다.
-    if (pendingSwitch) await pendingSwitch
+    //   기다리는 사이 또 바꾸면 그 바꾸기까지 기다린다(2026-11-04 리드 2차 검토). 바꾸기가 실패해도 시작 준비는 이어 간다.
+    while (pendingSwitch) await pendingSwitch.catch(() => undefined)
     if (get().projectId) return
+    // 시작 준비가 답을 기다리는 동안 프로젝트를 바꾸면(로그인한 사람이 바뀐 것 포함) 그 답은 버린다 — 늦게 온 답이 고른 프로젝트를 덮었다.
+    //   약속: tests/project/switch-project.test.ts(시작 준비와 바꾸기가 겹칠 때)
+    const seq = switchSeq
+    const stale = () => seq !== switchSeq
     // 데모(공유) 세션: 실 /api/project/init 대신 스냅샷으로 부팅(로그인·백엔드 없이).
     if (typeof document !== 'undefined' && isDemoSession()) {
       set({ initLoading: true })
@@ -301,6 +307,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         | { title?: string; current_stage?: StageId; locale?: unknown; locale_locked?: unknown; settings?: { format?: unknown } | null }
         | null
         | undefined
+      if (stale()) return
       if (snap && p) {
         set({
           workspaceId: snap.workspaceId,
@@ -334,6 +341,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       const res = await fetch(url, { method: 'POST' })
       if (!res.ok) throw new Error('Failed to init project')
       const { workspaceId, projectId, project } = await res.json()
+      if (stale()) return
       set({
         workspaceId,
         projectId,
@@ -355,10 +363,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       // 화면 포맷(2026-09-30) — Director 이미지·영상 틀의 기준. 보관 장소는 project-format-store 한 곳.
       useProjectFormatStore.getState().setFormat(parseProjectFormat(project.settings?.format))
       const { useDirectorCanvasStore } = await import('@/stores/director-store')
-      useDirectorCanvasStore.getState().setProjectId(projectId)
+      if (!stale()) useDirectorCanvasStore.getState().setProjectId(projectId)
     } catch (err) {
       console.error('[project-store] initProject failed:', err)
-      set({ initLoading: false })
+      // 그사이 바꾸기가 시작됐으면 여는 중 표시는 바꾸기가 맡는다.
+      if (!stale()) set({ initLoading: false })
     }
   },
 
@@ -686,3 +695,15 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     useProjectFormatStore.getState().setFormat(null)
   },
 }))
+
+// 로그인한 사람이 바뀌면(로그아웃 · 다른 계정 로그인) 앞 계정의 프로젝트(id · 제목 · 단계)와 화면마다의 store 를 비운다(2026-11-04 리드 2차 검토).
+//   진행 중인 바꾸기 · 시작 준비의 답은 버린다(번호를 올린다). 프로젝트를 먼저 비운 뒤에 화면 자료를 비운다 — 늦은 비우기 막이(Producer · 채팅)가
+//   앞 계정 프로젝트를 "늦게 비워진 지금 프로젝트"로 여기지 않게. 토큰 갱신 · 처음 연 페이지에서는 불리지 않는다(signed-in-reset 의 규칙).
+//   약속: tests/login/project-reset.test.ts
+onSignedInChange(() => {
+  switchSeq += 1
+  useProjectStore.getState().resetProject()
+  void resetChildStores().catch((err) => {
+    console.error('[project-store] resetChildStores failed:', err)
+  })
+})

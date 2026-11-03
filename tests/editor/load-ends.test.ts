@@ -33,6 +33,7 @@ vi.mock('@/lib/editor-persistence', () => ({
 import { EDITOR_LOAD_TIMEOUT_MS, useEditorStore } from '@/stores/editor-store'
 import { clipDisplayStatus, clipStatusLabel, editorEmptyScreen, previewPane } from '@/features/editor/editor-labels'
 import { translate } from '@/lib/i18n/translate'
+import { useLocaleStore } from '@/stores/locale-store'
 import type { VideoClip } from '@/types'
 
 const read = (file: string) => readFileSync(file, 'utf8')
@@ -116,6 +117,21 @@ describe('Editor 를 여는 기다림은 끝난다', () => {
     ok()
     await useEditorStore.getState().loadData()
     expect(useEditorStore.getState()).toMatchObject({ loadStatus: 'ready', error: null })
+  })
+
+  it('샷 · 영상 목록을 20초 안에 받지 못하면 한국어 화면에는 그 까닭을 한국어로 보인다', async () => {
+    // 왜: 기다림을 멈춘 화면이 "클립을 불러오지 못했어요" 아래에 영어 문장(Editor data load timed out after 20s)을 그대로 보였다(2026-11-04 리드 2차 검토).
+    vi.useFakeTimers()
+    useLocaleStore.setState({ locale: 'ko' })
+    try {
+      answer(never(), never())
+      const loading = useEditorStore.getState().loadData()
+      await vi.advanceTimersByTimeAsync(EDITOR_LOAD_TIMEOUT_MS)
+      await loading
+      expect(useEditorStore.getState()).toMatchObject({ loadStatus: 'error', error: '20초 동안 답이 없어 불러오기를 멈췄어요.' })
+    } finally {
+      useLocaleStore.setState({ locale: 'en' })
+    }
   })
 })
 

@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { clearLastProjectId } from '@/lib/session-restore'
 import { useProjectStore } from '@/stores/project-store'
-import { STAGES } from '@/lib/constants'
+import { openAfterDeletingCurrent } from '@/lib/project/open-after-delete'
 import { useT } from '@/lib/i18n'
 import { relativeTime } from '@/lib/i18n/relative-time'
 import { newProjectEntry, type SeriesPlanState } from '@/features/projects/series-list'
@@ -29,7 +29,7 @@ interface ProjectItem extends NewProjectChoice {
 export function UserMenu() {
   const router = useRouter()
   const supabase = createClient()
-  const { projectId, createNewProject, switchProject } = useProjectStore()
+  const { projectId, switchProject } = useProjectStore()
   const t = useT()
 
   const [open, setOpen] = useState(false)
@@ -120,20 +120,12 @@ export function UserMenu() {
     setProjects(remaining)
     if (p.id === projectId) {
       setOpen(false)
-      if (remaining.length > 0) {
-        switchProject(remaining[0].id, remaining[0].title)
-      } else {
-        const result = await createNewProject(undefined, { entry: true })
-        if (!result.ok) {
-          toast.error(result.error ?? t('Failed to create project'))
-          return
-        }
+      const next = await openAfterDeletingCurrent(remaining)
+      if (!next.ok) {
+        toast.error(next.error ?? t('Failed to create project'))
+        return
       }
-      const nextId = useProjectStore.getState().projectId
-      // 남은 프로젝트로 옮기면 그 단계로, 새로 만들었으면 Producer 시작 화면으로(리뉴얼 1차).
-      const nextStage = useProjectStore.getState().currentStage
-      const nextPath = STAGES.find((s) => s.id === nextStage)?.path ?? '/studio/start'
-      router.push(nextId ? `${nextPath}?projectId=${nextId}` : nextPath)
+      router.push(next.path)
     }
   }
 

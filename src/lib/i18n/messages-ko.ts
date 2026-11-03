@@ -1284,6 +1284,8 @@ export const KO: Record<string, string> = {
   // 영상을 불러오지 못한 클립(QA 2026-11-03 밤 "Editor에서 무한 로딩") — 그 클립만 실패로 보인다.
   'Could not load': '불러오지 못함',
   "Couldn't load this cut's video.": '이 컷의 영상을 불러오지 못했어요.',
+  // Editor 를 열 때 샷 · 영상 목록을 한도 안에 못 받아 기다림을 멈춘 까닭(실패 화면의 작은 글, 2026-11-04 리드 2차 검토).
+  'Loading timed out after {seconds} seconds.': '{seconds}초 동안 답이 없어 불러오기를 멈췄어요.',
   'No videos on the timeline yet. Generate videos in Director first.': '타임라인에 영상이 아직 없어요. 먼저 Director에서 영상을 생성하세요.',
   '{failed} of {total} clips could not be preloaded. They will stream as before.': '{total}개 중 {failed}개는 미리 받지 못했어요. 해당 클립은 종전처럼 스트리밍돼요.',
   // ── misc: studio/producer/page.tsx (direct) ──

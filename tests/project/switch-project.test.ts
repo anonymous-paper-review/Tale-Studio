@@ -126,3 +126,34 @@ describe('프로젝트 바꾸기', () => {
     expect(mocks.events.filter((e) => e.startsWith('project:') && e !== 'project:none')).toEqual(['project:project-c'])
   })
 })
+
+describe('시작 준비와 바꾸기가 겹칠 때', () => {
+  it('시작 준비 중에 다른 프로젝트로 바꾸면 시작 준비가 받은 프로젝트는 쓰지 않는다', async () => {
+    // 왜: 스튜디오를 열면 주소의 프로젝트로 시작 준비(init)를 하며 서버 답을 기다린다. 그사이 유저 메뉴로 다른 프로젝트를 고르면
+    //   늦게 온 시작 준비의 답이 고른 프로젝트를 덮어 엉뚱한 프로젝트가 열렸다(2026-11-04 리드 2차 검토). 고장: 느린 연결에서 열자마자 바꿀 때.
+    open()
+    const store = await load()
+    let answer!: (response: Response) => void
+    mocks.fetch.mockImplementationOnce(() => new Promise<Response>((resolve) => { answer = resolve }))
+    const init = store.getState().initProject('project-hint')
+    await flush()
+    await store.getState().switchProject('project-d', 'D', 'editor')
+    answer(new Response(JSON.stringify({ workspaceId: 'w', projectId: 'project-hint', project: { title: 'Hint' } }), { status: 200 }))
+    await init
+    expect(store.getState()).toMatchObject({ projectId: 'project-d', projectTitle: 'D', initLoading: false })
+  })
+
+  it('바꾸기를 기다리는 사이 또 바꾸면 시작 준비는 마지막으로 고른 프로젝트까지 기다렸다가 그 프로젝트로 연다', async () => {
+    // 왜: 시작 준비가 진행 중인 바꾸기 하나만 기다리면, 그사이 또 고른 프로젝트가 정해지기 전에 주소 힌트로 다른 프로젝트를 받을 수 있다(리드 2차 검토).
+    const store = await load()
+    const toB = store.getState().switchProject('project-b', 'B', 'editor')
+    const init = store.getState().initProject('project-hint')
+    await flush()
+    const toC = store.getState().switchProject('project-c', 'C', 'writer')
+    open()
+    await Promise.all([toB, toC, init])
+    await flush()
+    expect(store.getState()).toMatchObject({ projectId: 'project-c', projectTitle: 'C' })
+    expect(mocks.fetch).not.toHaveBeenCalled()
+  })
+})
