@@ -31,7 +31,7 @@ vi.mock('@/lib/editor-persistence', () => ({
 }))
 
 import { EDITOR_LOAD_TIMEOUT_MS, useEditorStore } from '@/stores/editor-store'
-import { clipDisplayStatus, clipStatusLabel, previewPane } from '@/features/editor/editor-labels'
+import { clipDisplayStatus, clipStatusLabel, editorEmptyScreen, previewPane } from '@/features/editor/editor-labels'
 import { translate } from '@/lib/i18n/translate'
 import type { VideoClip } from '@/types'
 
@@ -116,6 +116,20 @@ describe('Editor 를 여는 기다림은 끝난다', () => {
     ok()
     await useEditorStore.getState().loadData()
     expect(useEditorStore.getState()).toMatchObject({ loadStatus: 'ready', error: null })
+  })
+})
+
+describe('샷이 없을 때 Editor 가 보이는 화면', () => {
+  it('프로젝트를 여는 중(아직 정해지지 않음)에는 "이전 단계를 먼저 끝내세요" 대신 기다림을 보인다', () => {
+    // 왜: 프로젝트를 바꾸는 동안에는 프로젝트가 잠깐 비어 있다 — 그때 "이전 단계를 먼저 끝내세요"를 띄우면 틀린 안내다(#pps-empty-states).
+    expect(editorEmptyScreen({ loadStatus: 'ready', projectId: null, initLoading: true })).toBe('loading')
+    expect(editorEmptyScreen({ loadStatus: 'idle', projectId: null, initLoading: true })).toBe('loading')
+    // 정상 경로 고정: 프로젝트가 정해진 뒤에는 지금처럼 읽는 중 · 실패 · 샷 없음을 나눠 보인다.
+    expect(editorEmptyScreen({ loadStatus: 'loading', projectId: 'project-1', initLoading: false })).toBe('loading')
+    expect(editorEmptyScreen({ loadStatus: 'error', projectId: 'project-1', initLoading: false })).toBe('error')
+    expect(editorEmptyScreen({ loadStatus: 'ready', projectId: 'project-1', initLoading: false })).toBe('empty')
+    expect(editorEmptyScreen({ loadStatus: 'ready', projectId: null, initLoading: false })).toBe('empty')
+    expect(read('src/app/studio/editor/page.tsx')).toMatch(/editorEmptyScreen\(\{ loadStatus, projectId, initLoading: projectInitLoading \}\)/)
   })
 })
 
