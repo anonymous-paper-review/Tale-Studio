@@ -1,4 +1,5 @@
 // Writer 산문 미리 보기는 실행 기록에서 산문 화면이 쓰는 칸만 골라 읽고, 다른 표 읽기와 함께 보내 빨리 답한다 — 답은 예전과 같다 (2026-11-03 오너 QA 2번)
+import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
@@ -93,6 +94,25 @@ describe('미리 보기가 읽는 실행 기록 칸', () => {
     expect(whole.sceneStoryUndo).toEqual({ id: 'u1', label: 'v2' })
     expect(whole.treatmentCast.characters[0]).toMatchObject({ id: 'minho', name: '민호' })
     expect(whole.proseConditions).toEqual({ runtimeSeconds: 15, genre: '코미디', seed: 'keep' })
+  })
+})
+
+describe('골라 읽는 칸 목록 지키기', () => {
+  // 왜: 미리 보기가 실행 기록에서 새 칸을 읽게 되었는데 목록에 더하지 않으면, 그 칸은 늘 비어 조용히 틀린 화면이 된다.
+  it('미리 보기 라우트가 실행 기록에서 읽는 칸은 모두 골라 읽는 칸 목록에 있고, 목록에 쓰지 않는 칸은 없다', () => {
+    const route = readFileSync('src/app/api/writer/preview/[projectId]/route.ts', 'utf8')
+    const read = new Set<string>()
+    for (const match of route.matchAll(/\bstate\??\.(\w+)/g)) read.add(match[1])
+    // state 를 통째로 넘기는 도우미가 있으면 그 도우미가 읽는 칸도 센다(예: 조건 줄 proseConditionsOf).
+    for (const [, helper] of route.matchAll(/\b(\w+)\(state\b/g)) {
+      const from = route.match(new RegExp(`import \\{[^}]*\\b${helper}\\b[^}]*\\} from '@/([^']+)'`))?.[1]
+      if (!from) continue // 기본 함수(Boolean 등)는 칸을 읽지 않는다
+      const source = readFileSync(`src/${from}.ts`, 'utf8')
+      const body = source.slice(source.indexOf(`export function ${helper}(`)).split('\nexport ')[0]
+      for (const match of body.matchAll(/\bstate\??\.(\w+)/g)) read.add(match[1])
+    }
+
+    expect([...read].sort()).toEqual([...PREVIEW_STATE_FIELDS].sort())
   })
 })
 

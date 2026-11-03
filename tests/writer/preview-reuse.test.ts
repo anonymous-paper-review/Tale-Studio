@@ -95,6 +95,33 @@ describe('받아 둔 미리 보기 다시 쓰기', () => {
   })
 })
 
+describe('거절 답', () => {
+  // 왜: 로그인이 풀렸거나 주인이 아니거나 프로젝트가 없어졌다는 답인데 받아 둔 산문을 계속 보이면 볼 수 없는 산문이 남는다(시작 화면과 같은 규칙).
+  it('권한이 없다는 답이 오면 받아 둔 산문을 버린다', async () => {
+    for (const status of [401, 403, 404]) {
+      rememberPreview('p1', 'en', preview())
+      rememberPreview('p1', 'ko', preview())
+      vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: 'Forbidden' }, { status })))
+
+      expect(await refreshPreview('p1', 'en', 0)).toEqual({ ok: false, refused: true })
+
+      expect(readyPreview('p1', 'en')).toBeNull()
+      expect(readyPreview('p1', 'ko')).toBeNull()
+    }
+  })
+
+  // 왜: 정상 경로 고정 — 서버가 잠깐 실패하거나 연결이 끊긴 것이면 받아 둔 산문을 그대로 두고 다음에 다시 읽는다.
+  it('서버가 잠깐 실패하거나 연결이 끊기면 받아 둔 산문을 그대로 둔다', async () => {
+    rememberPreview('p1', 'en', preview())
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: 'boom' }, { status: 500 })))
+    expect(await refreshPreview('p1', 'en', 0)).toEqual({ ok: false, refused: false })
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline') }))
+    await expect(refreshPreview('p1', 'en', 1)).rejects.toThrow('offline')
+
+    expect(readyPreview('p1', 'en')).not.toBeNull()
+  })
+})
+
 describe('같은 때 읽기 합치기', () => {
   // 왜: Writer 화면은 산문 칸과 오른쪽 채팅이 같은 미리 보기를 따로 읽어 요청이 두세 번 갔다 — 큰 실행 기록이면 그만큼 서버가 오래 걸렸다.
   it('같은 프로젝트의 미리 보기를 여러 곳이 같은 때 읽으면 요청은 한 번만 간다', async () => {

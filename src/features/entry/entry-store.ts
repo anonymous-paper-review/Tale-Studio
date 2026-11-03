@@ -40,6 +40,7 @@ import {
   type Translator,
 } from './chat-flow'
 import { parseEntrySeries, type EntrySeries } from './series'
+import { onSignedInChange } from '@/lib/signed-in-reset'
 
 const IDEA_SAVE_DEBOUNCE_MS = 600
 const READ_STEP_MS = 1400
@@ -171,6 +172,12 @@ let readTicker: ReturnType<typeof setInterval> | null = null
  */
 type StartedView = Pick<EntryData, 'draft' | 'title' | 'locale' | 'stage' | 'format' | 'series' | 'writer' | 'writerStart'>
 let startedView: { projectId: string; view: StartedView } | null = null
+
+/** 받아 둔 시작 화면을 버린다 — 로그인한 사람이 바뀔 때(로그아웃 · 다른 계정 로그인, 검토 C). 약속: tests/login/signed-in-reset.test.ts */
+export function forgetStartedView(): void {
+  startedView = null
+}
+onSignedInChange(forgetStartedView)
 
 /** GET /api/produce/entry 답 → 시작 화면이 보이는 값. */
 function viewFrom(body: Record<string, unknown>): StartedView {
