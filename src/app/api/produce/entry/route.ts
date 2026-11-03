@@ -7,8 +7,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { entrySeriesOf } from '@/features/entry/series'
 import { applyEntryPatch, entryDraftFor } from '@/lib/entry/draft'
 import { planEntryStart } from '@/lib/entry/start-plan'
+import { userOwnsProject } from '@/lib/generation-jobs'
 import { parseAppLocale } from '@/lib/locale'
 import { parseSeries } from '@/lib/series/snapshot'
+import { getUser } from '@/lib/supabase/auth'
 import { getRunStatusLight } from '@/lib/writer/run-store'
 import { parseProjectFormat } from '@/types/project'
 import { PROJECT_ID_RE, authorizeEntry, loadEntryProject, saveEntryDraft, serverError } from './entry-access'
@@ -25,17 +27,22 @@ function readEntry(id: string) {
 
 export async function GET(req: NextRequest) {
   const projectId = req.nextUrl.searchParams.get('projectId')
-  // 주인 확인(로그인 · 주인 두 번)과 자료 읽기를 함께 시작한다 — 차례로 하면 데이터베이스 왕복 다섯 번이 쌓여
-  //   Producer 탭이 늦게 떴다(QA 2026-11-03). 꼴이 맞는 번호만 읽고, 주인이 아니면 읽은 것은 버린 채 거절만 돌려준다.
+  // 로그인 확인 → (주인 확인 ‖ 자료 읽기). 차례로 하면 데이터베이스 왕복 다섯 번이 쌓여 Producer 탭이 늦게 떴다(QA 2026-11-03).
+  //   로그인 확인을 먼저 해도 시간은 같다 — 주인 확인(왕복 두 번)하는 동안 자료 읽기(한 번)가 끝난다. 익명 요청은 데이터베이스를 읽지 않는다(검토 11/3).
+  //   거절은 authorizeEntry 의 읽기 길과 같은 순서 · 같은 답이다(401 → 400 → 403). 주인이 아니면 읽은 것은 버리고 기다리지 않는다.
   //   약속: tests/producer/entry-read-speed.test.ts
-  const reads = typeof projectId === 'string' && PROJECT_ID_RE.test(projectId) ? readEntry(projectId) : null
+  const user = await getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (typeof projectId !== 'string' || !PROJECT_ID_RE.test(projectId)) {
+    return NextResponse.json({ error: 'Invalid request: projectId is required' }, { status: 400 })
+  }
+  const reads = readEntry(projectId)
   // 거절로 끝나 기다리지 않게 된 읽기의 실패가 처리 안 된 거절로 새지 않게.
-  reads?.catch(() => null)
-  const access = await authorizeEntry(req, projectId, { write: false })
-  if (!access.ok) return access.response
-  const id = projectId as string
+  reads.catch(() => null)
+  if (!(await userOwnsProject(projectId, user.id))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const id = projectId
   try {
-    const [row, run] = await (reads ?? readEntry(id))
+    const [row, run] = await reads
     if (!row) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     const draft = entryDraftFor({ entryDraft: row.entry_draft, storyText: row.story_text, stage: row.current_stage })
     const locale = parseAppLocale(row.locale) ?? 'en'

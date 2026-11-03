@@ -118,6 +118,16 @@ describe('시작 화면 자료 읽기', () => {
     expect(await anonymousMissing.text()).toBe('{"error":"Unauthorized"}')
   })
 
+  it('로그인하지 않은 요청은 프로젝트 자료를 읽지 않고 거절한다', async () => {
+    // 왜: 로그인 확인을 먼저 해도 걸리는 시간은 같다(주인 확인 왕복 두 번 동안 자료 읽기가 끝난다) — 익명 요청은 데이터베이스를 건드리지 않는다(검토 11/3).
+    mocks.getUser.mockResolvedValue(null)
+    const res = await GET(request(PID))
+    expect(res.status).toBe(401)
+    expect(await res.text()).toBe('{"error":"Unauthorized"}')
+    expect(mocks.reads).toEqual([])
+    expect(mocks.owns).not.toHaveBeenCalled()
+  })
+
   it('프로젝트 번호 꼴이 이상하면 자료를 읽지 않고 거절한다', async () => {
     // 왜: 정상 경로 고정 — 함께 읽기를 앞당겨도, 확인하지 않은 값으로 데이터베이스를 읽지 않는다.
     const res = await GET(request('../other'))
