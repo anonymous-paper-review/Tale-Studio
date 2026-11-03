@@ -1,4 +1,4 @@
-// 최근 실행 기록을 state 칸만 골라 읽으면 그 칸만 DB 에 묻고 그 칸들로 state 를 다시 만든다 — 고르지 않으면 지금처럼 전부 읽는다 (2026-11-03 오너 QA 2번)
+// 실행 기록에서 산문 화면이 쓰는 칸만 고르면 그 칸만 읽고 같은 모양으로 돌려준다 — 고르지 않으면 지금처럼 다 읽는다 (2026-11-03 오너 QA 2번)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ select: vi.fn(), row: null as Record<string, unknown> | null }))
@@ -22,8 +22,8 @@ beforeEach(() => {
 })
 
 describe('실행 기록 칸 골라 읽기', () => {
-  // 왜: 완성된 실행 기록은 수백 KB 짜리 샷 설계 칸을 품고 있다 — 산문만 보는 화면이 그것까지 받으면 느리다.
-  it('state 칸을 고르면 그 칸만 DB 에 묻고 state 전체는 묻지 않는다', async () => {
+  // 왜: 완성된 실행 기록은 수백 KB 짜리 샷 설계를 품고 있다 — 산문만 보는 화면이 그것까지 받으면 Writer 탭이 늦게 열린다.
+  it('실행 기록에서 산문 화면이 쓰는 칸만 고르면 그 칸만 읽는다', async () => {
     mocks.row = { ...COLUMNS }
 
     await getActiveRun('p1', { stateFields: ['scenes', '_proseLocked'] })
@@ -36,8 +36,8 @@ describe('실행 기록 칸 골라 읽기', () => {
     for (const column of Object.keys(COLUMNS)) expect(asked.split(',')).toContain(column)
   })
 
-  // 왜: 화면 코드는 run.state.scenes 처럼 그대로 읽는다 — 고른 칸으로 같은 모양을 다시 만들고, 기록에 없던 칸은 없는 그대로 둔다.
-  it('골라 읽은 칸으로 state 를 다시 만들고 기록에 없던 칸은 비워 둔다', async () => {
+  // 왜: 산문 화면은 고르기 전과 같은 모양으로 실행 기록을 읽는다 — 기록에 없던 칸은 고른 뒤에도 없는 그대로여야 한다.
+  it('고른 칸만 읽어도 실행 기록은 같은 모양으로 오고, 기록에 없던 칸은 비어 있다', async () => {
     const values: Record<string, unknown> = { scenes: { scenes: [{ scene_id: 'scene_1' }] }, _proseLocked: true, worldVisual: null }
     // DB 는 묻는 별칭마다 그 칸 값을 돌려준다(별칭 이름은 run-store 가 정한다) — 없는 칸은 null.
     mocks.select.mockImplementation((columns: string) => {
@@ -53,8 +53,8 @@ describe('실행 기록 칸 골라 읽기', () => {
     expect(result).toEqual({ ...COLUMNS, state: { scenes: { scenes: [{ scene_id: 'scene_1' }] }, _proseLocked: true } })
   })
 
-  // 왜: 정상 경로 고정 — 다른 서버 길(파이프라인 · 씬 게이트)은 지금처럼 실행 기록 전체를 읽는다.
-  it('칸을 고르지 않으면 지금처럼 실행 기록 전체를 읽는다', async () => {
+  // 왜: 정상 경로 고정 — 산문 화면 말고 다른 곳(이야기 만들기 · 씬 확정)은 지금처럼 실행 기록을 다 읽는다.
+  it('칸을 고르지 않으면 지금처럼 실행 기록을 다 읽는다', async () => {
     mocks.row = { ...COLUMNS, state: { input: { story: '이야기' }, shotSequence: { shots: [] } } }
 
     const result = await getActiveRun('p1')

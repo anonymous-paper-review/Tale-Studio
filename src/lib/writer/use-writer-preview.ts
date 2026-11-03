@@ -122,6 +122,8 @@ export function useWriterPreview(
           stop = !!(j.completed || j.failed)
         } else if (!cancelled) {
           setFailedFor(projectId)
+          // 로그인 · 주인 · 프로젝트가 없다는 답이면 이 화면이 받은 것도 내린다(받아 둔 것은 preview-cache 가 버렸다).
+          if (r.refused) setPreviewState((current) => (current?.projectId === projectId ? null : current))
         }
       } catch {
         // 네트워크 블립 — 다음 tick 에 다시 읽고, 그동안은 실패로 표시한다.

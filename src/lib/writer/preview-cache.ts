@@ -3,9 +3,12 @@
 //   - 받은 미리 보기는 프로젝트 · 언어별로 들고 있다. 실행이 끝났거나 산문을 확정한 것(바뀌지 않는 산문)만 화면이 다시 열릴 때
 //     바로 쓴다 — 쓴 뒤에도 화면은 한 번 다시 읽어 바뀐 것을 반영한다. 고칠 수 있는 초안은 늘 새로 읽는다.
 //   - 워밍(스튜디오 레이아웃 1.5초 미리 받기): 산문을 확정한 프로젝트면 Writer 미리 보기를 한 번 받아 둔다 — 처음 열 때도 바로 보인다.
-//   약속: tests/writer/preview-reuse.test.ts · preview-warm.test.ts
+//   - 로그인 · 주인 · 프로젝트가 없다는 답(401 · 403 · 404)이면 그 프로젝트의 받아 둔 것을 버린다(시작 화면과 같은 규칙, 검토 C).
+//     로그인한 사람이 바뀌면(로그아웃 · 다른 계정 로그인) 모두 버린다(lib/signed-in-reset).
+//   약속: tests/writer/preview-reuse.test.ts · preview-warm.test.ts · tests/login/signed-in-reset.test.ts
 import { pickContentLocale, type AppLocale } from '@/lib/locale'
 import type { WriterPreview } from '@/lib/writer/use-writer-preview'
+import { onSignedInChange } from '@/lib/signed-in-reset'
 import { useLocaleStore } from '@/stores/locale-store'
 import { useProjectStore } from '@/stores/project-store'
 
@@ -13,6 +16,12 @@ const known = new Map<string, WriterPreview>()
 const reading = new Map<string, Promise<unknown>>()
 
 const keyOf = (projectId: string, locale: AppLocale) => `${projectId}|${locale}`
+/** 로그인 · 주인 · 프로젝트가 없다는 답 — 잠깐 실패한 것(5xx · 끊김)과 달리 받아 둔 것도 쓰면 안 된다. */
+const REFUSED = new Set([401, 403, 404])
+
+function forgetProject(projectId: string): void {
+  for (const key of [...known.keys()]) if (key.startsWith(`${projectId}|`)) known.delete(key)
+}
 
 /** 바뀌지 않는 산문인가 — 실행이 끝났거나(완성) 산문을 확정해 잠갔다. 실패 · 초안 · 쓰는 중은 아니다. */
 export function previewSettled(preview: Pick<WriterPreview, 'completed' | 'proseLocked'>): boolean {
@@ -41,11 +50,15 @@ export function loadPreviewOnce<T>(key: string, load: () => Promise<T>): Promise
   return started
 }
 
-/** 미리 보기를 한 번 읽는다(같은 때 읽기는 합친다) — 받으면 받아 둔다. */
-export function refreshPreview(projectId: string, locale: AppLocale, refreshKey: number): Promise<{ ok: true; preview: WriterPreview } | { ok: false }> {
+/** 미리 보기를 한 번 읽는다(같은 때 읽기는 합친다) — 받으면 받아 둔다. 거절 답이면 그 프로젝트의 받아 둔 것을 버린다(refused). */
+export function refreshPreview(projectId: string, locale: AppLocale, refreshKey: number): Promise<{ ok: true; preview: WriterPreview } | { ok: false; refused: boolean }> {
   return loadPreviewOnce(`${keyOf(projectId, locale)}|${refreshKey}`, async () => {
     const response = await fetch(`/api/writer/preview/${projectId}?locale=${locale}`)
-    if (!response.ok) return { ok: false as const }
+    if (!response.ok) {
+      const refused = REFUSED.has(response.status)
+      if (refused) forgetProject(projectId)
+      return { ok: false as const, refused }
+    }
     const preview = (await response.json()) as WriterPreview
     rememberPreview(projectId, locale, preview)
     return { ok: true as const, preview }
@@ -68,8 +81,9 @@ export async function warmWriterPreview(projectId: string): Promise<boolean> {
   }
 }
 
-/** 시험용 — 받아 둔 것 · 읽는 중인 것을 비운다. */
+/** 받아 둔 것 · 읽는 중인 것을 비운다 — 로그인한 사람이 바뀔 때(그리고 시험). */
 export function forgetPreviews(): void {
   known.clear()
   reading.clear()
 }
+onSignedInChange(forgetPreviews)
