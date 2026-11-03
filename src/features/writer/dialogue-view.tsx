@@ -338,11 +338,11 @@ export function DialogueView() {
         <p className="mx-7 mt-2 rounded-lg bg-destructive/10 px-3 py-1.5 text-caption text-destructive">{error}</p>
       )}
 
-      {/* 대본 본문 — 왼쪽 정렬(#c5 2026-08-03): 트리트먼트와 같은 축이라 탭을 오가도 시선이
-          안 흔들린다. max-w 는 가독 폭 유지용으로만 남긴다(중앙 배치 제거). */}
+      {/* 대본 본문 — 왼쪽 정렬(#c5 2026-08-03). 씬 판은 탭 영역 전체 폭을 쓰고 좌우 여백은 러프 보드 탭과 같다(px-7)
+          — 2026-11-03 오너 QA "dialogue 탭 안 박스의 width 를 전체 섹션을 다 사용하게"(예전엔 가독 폭 max-w-3xl 에 묶었다). */}
       <ScrollArea className="min-h-0 flex-1">
         <TooltipProvider>
-        <div className="w-full max-w-3xl space-y-[18px] px-7 pb-7 pt-4">
+        <div className="w-full space-y-[18px] px-7 pb-7 pt-4">
           {scenes.length === 0 ? (
             <p className="py-16 text-center text-caption text-muted-foreground">
               {t('No scenes yet. The script will appear here once Writer generation finishes.')}
