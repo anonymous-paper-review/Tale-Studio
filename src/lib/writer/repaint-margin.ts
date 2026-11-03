@@ -5,10 +5,13 @@
 //   띠 너머로 아래 칸 테두리 · 그림 몇 줄까지 물었고, 영상은 이 칸을 시작 · 끝 그림으로 받아 흰 띠를 옮겼다(sh_04_46).
 // 종이색은 그 시트에서 잰다(measureSheetPaper) — 운영 시트 10장의 종이색은 247~253 으로 시트마다 달랐고, 한 시트 안의 띠끼리는
 //   10장 중 9장에서 1 안쪽으로 같았다. 정해 둔 한 색 ±10 으로 견주던 첫 판은 매끈한 흰 벽 · 날아간 하늘(252) · 푸른 눈밭을 띠로 보고 깎았다(검토 지적).
-// 여백으로 보는 조건(셋 다):
+// 여백으로 보는 조건(넷 다):
 //   ① 종이색 줄 — 줄 평균이 그 시트 종이색 ±4 이고 줄 전체가 고르다(밝기 표준편차 ≤ 3, 실측 띠 0.3~2.6). 두 줄 이상 이어진다.
 //   ② 상한 — 띠는 변 길이의 10% 안에 있다. 종이색이 그보다 안쪽까지 이어지면 여백이 아니라 그림(빈 벽 · 눈밭)으로 본다.
 //   ③ 칸 테두리 — 띠 안쪽(테두리 옆 밝은 번짐 2줄까지 지나) 3줄 안에 어두운 줄(밝기 ≤ 140)이 있다. 모델이 그린 칸 테두리 선이다.
+//   ④ 바깥으로 이어짐 — 띠 줄을 자르기 자리 옆 바깥(칸 안쪽 여유 + 칸 사이 여백 절반)까지 늘여도 종이색이다(한쪽이면 된다).
+//      진짜 띠는 칸 사이 여백 줄이라 자리 밖으로 이어지고, 그림 속 흰 면은 자리 밖에서 곧 그 칸의 테두리를 만난다(2차 검토 지적:
+//      종이색 ±4 안의 따뜻한 흰 벽 · 크림색 벽 · 밝은 종이 위 날아간 하늘).
 // 깎는 양 = 띠 + 번짐 줄 + 테두리 몫 3줄. 띠 너머(가장자리 쪽)에 이웃 칸 조각이 있어도 함께 나간다. 종이색을 못 재면 깎지 않는다.
 // sharp 를 쓰지 않는 순수 셈이다 — 자르기 · 크기 되돌리기는 rough-grid-crop 의 repaint 길이 한다.
 
@@ -34,6 +37,11 @@ export interface EdgeTrim {
 export type RGB = readonly [number, number, number]
 /** 칸 경계 비례 좌표 [시작, 끝] — rough-storyboard-grid 의 sheetGeometry cols · rows 와 같은 꼴. */
 type Bounds = ReadonlyArray<readonly [number, number]>
+/** 띠 줄을 자르기 자리 밖으로 늘여 볼 길이(px) — x 는 좌우로, y 는 위아래로. */
+export interface Reach {
+  x: number
+  y: number
+}
 
 const PAPER_TOLERANCE = 4
 const PAPER_STD_MAX = 3
@@ -118,6 +126,18 @@ export function paperSampleLines(cols: Bounds, rows: Bounds, width: number, heig
   return lines
 }
 
+/**
+ * 띠 줄을 자리 밖으로 늘여 볼 길이 — 자르기 자리에서 칸 테두리까지(insetX · insetY + 칸 안쪽 여유)를 지나 칸 사이 여백 가운데까지.
+ *   칸이 하나뿐인 축은 칸 사이 여백이 없어 10px 를 더한다.
+ */
+export function marginReach(cols: Bounds, rows: Bounds, width: number, height: number, insetX: number, insetY: number): Reach {
+  const halfGap = (bounds: Bounds, total: number): number => {
+    const gaps = bounds.slice(1).map((b, i) => Math.round((b[0] - bounds[i][1]) * total))
+    return gaps.length ? Math.floor(Math.min(...gaps) / 2) : 10
+  }
+  return { x: insetX + halfGap(cols, width), y: insetY + halfGap(rows, height) }
+}
+
 /** 그 시트의 종이색 — 고른 밝은 줄들의 채널별 가운데 값. 그런 줄이 셋 미만이면(시트를 꽉 채워 그림) null. */
 export function measureSheetPaper(img: RawImage, lines: readonly Rect[]): RGB | null {
   const paper = lines
@@ -147,8 +167,27 @@ function isPale(s: LineStat): boolean {
   return s.lum >= PALE_LUM_MIN && s.std <= PALE_STD_MAX
 }
 
+/** 가장자리에서 index 번째 띠 줄을 자리 밖 양옆으로 reach 만큼 늘인 조각 중 하나라도 종이색인가. */
+function continuesOutside(img: RawImage, rect: Rect, side: Side, index: number, paper: RGB, reach: Reach): boolean {
+  const segments: Rect[] = []
+  if (side === 'top' || side === 'bottom') {
+    const y = side === 'top' ? rect.top + index : rect.top + rect.height - 1 - index
+    const leftFrom = Math.max(0, rect.left - reach.x)
+    const rightFrom = rect.left + rect.width
+    segments.push({ left: leftFrom, top: y, width: rect.left - leftFrom, height: 1 })
+    segments.push({ left: rightFrom, top: y, width: Math.min(img.width, rightFrom + reach.x) - rightFrom, height: 1 })
+  } else {
+    const x = side === 'left' ? rect.left + index : rect.left + rect.width - 1 - index
+    const topFrom = Math.max(0, rect.top - reach.y)
+    const bottomFrom = rect.top + rect.height
+    segments.push({ left: x, top: topFrom, width: 1, height: rect.top - topFrom })
+    segments.push({ left: x, top: bottomFrom, width: 1, height: Math.min(img.height, bottomFrom + reach.y) - bottomFrom })
+  }
+  return segments.some((s) => s.width * s.height >= 8 && isPaper(regionStat(img, s), paper))
+}
+
 /** 한 변에서 깎을 줄 수 — 여백이 아니면 0. */
-function sideDepth(img: RawImage, rect: Rect, side: Side, paper: RGB): number {
+function sideDepth(img: RawImage, rect: Rect, side: Side, paper: RGB, reach: Reach): number {
   const across = side === 'top' || side === 'bottom' ? rect.height : rect.width
   const cap = Math.max(1, Math.round(across * MARGIN_CAP_FRAC))
   const lines: LineStat[] = []
@@ -162,6 +201,10 @@ function sideDepth(img: RawImage, rect: Rect, side: Side, paper: RGB): number {
   if (inner < 0) return 0
   // 종이색이 상한 너머까지 이어진다 — 여백이 아니라 그림으로 본다.
   if (inner + 1 < strict.length && strict[inner + 1]) return 0
+  // 띠 가운데 줄이 자리 밖 칸 사이 여백으로 이어지나 — 아니면 그림 속 흰 면이다.
+  let outer = inner
+  while (outer > 0 && strict[outer - 1]) outer--
+  if (!continuesOutside(img, rect, side, Math.floor((outer + inner) / 2), paper, reach)) return 0
   let end = inner
   while (end + 1 < lines.length && end - inner < PALE_MAX && isPale(lines[end + 1])) end++
   let border = false
@@ -172,13 +215,13 @@ function sideDepth(img: RawImage, rect: Rect, side: Side, paper: RGB): number {
   return Math.min(across - 1, end + 1 + BORDER_TRIM)
 }
 
-/** rect(자르기 자리) 네 가장자리의 여백 깊이 — paper 는 그 시트에서 잰 종이색. */
-export function repaintMarginTrim(img: RawImage, rect: Rect, paper: RGB): EdgeTrim {
+/** rect(자르기 자리) 네 가장자리의 여백 깊이 — paper 는 그 시트에서 잰 종이색, reach 는 자리 밖으로 늘여 볼 길이(marginReach). */
+export function repaintMarginTrim(img: RawImage, rect: Rect, paper: RGB, reach: Reach): EdgeTrim {
   return {
-    top: sideDepth(img, rect, 'top', paper),
-    bottom: sideDepth(img, rect, 'bottom', paper),
-    left: sideDepth(img, rect, 'left', paper),
-    right: sideDepth(img, rect, 'right', paper),
+    top: sideDepth(img, rect, 'top', paper, reach),
+    bottom: sideDepth(img, rect, 'bottom', paper, reach),
+    left: sideDepth(img, rect, 'left', paper, reach),
+    right: sideDepth(img, rect, 'right', paper, reach),
   }
 }
 
