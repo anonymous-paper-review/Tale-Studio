@@ -38,9 +38,15 @@ async function openedByFirstUser() {
   useProjectStore.setState({ workspaceId: 'w-a', projectId: 'p-letters', projectTitle: 'Letters', currentStage: 'editor', reachedStage: 'editor', producerLocked: true })
   reset.signedInUserChanged('user-a')
   mocks.events = []
-  return { store: useProjectStore, signedInUserChanged: reset.signedInUserChanged }
+  return { store: useProjectStore, signedInUserChanged: reset.signedInUserChanged, signOutHere: reset.signOutHere }
 }
 const resets = () => mocks.events.filter((e) => e.startsWith('reset:'))
+/** 이 탭에 열린 화면(주소) — 다른 곳으로 보내면 assign 이 불린다. */
+function tabAt(pathname: string) {
+  const assign = vi.fn()
+  vi.stubGlobal('window', { location: { pathname, assign } })
+  return assign
+}
 
 beforeEach(() => {
   vi.resetModules()
@@ -52,7 +58,10 @@ beforeEach(() => {
     return { useDirectorCanvasStore: childStore('director') }
   })
 })
-afterEach(() => open())
+afterEach(() => {
+  open()
+  vi.unstubAllGlobals()
+})
 
 describe('로그인한 사람이 바뀔 때', () => {
   it('로그아웃하면 앞 계정의 프로젝트와 화면 자료가 모두 비워진다', async () => {
@@ -110,5 +119,34 @@ describe('로그인한 사람이 바뀔 때', () => {
     await switching
     await flush()
     expect(store.getState()).toMatchObject({ projectId: null, projectTitle: 'Untitled' })
+  })
+
+  it('다른 탭에서 계정이 바뀌면 열려 있던 스튜디오는 프로젝트 목록으로 간다', async () => {
+    // 왜: 다른 탭의 로그아웃 · 다른 계정 로그인 소식으로 이 탭을 비우면 프로젝트가 빈 채 시작 준비가 다시 불리지 않아, Editor · Writer 산문이
+    //   "불러오는 중"에 멈췄다(2026-11-04 리드 3차 검토). 새로고침처럼 목록을 다시 열어 남은 메모리를 버린다. 로그인이 없으면 미들웨어가 /login 으로 보낸다.
+    const assign = tabAt('/studio/editor')
+    open()
+    const { signedInUserChanged } = await openedByFirstUser()
+    signedInUserChanged('user-b')
+    expect(assign).toHaveBeenCalledWith('/projects')
+  })
+
+  it('이 탭에서 로그아웃하면 프로젝트 목록으로 보내지 않는다', async () => {
+    // 왜: 정상 경로 고정 — 이 탭의 로그아웃은 로그아웃한 곳(유저 메뉴 · 자리 비움)이 지금처럼 /login 으로 보낸다. 목록으로도 보내면 두 번 옮긴다.
+    const assign = tabAt('/studio/editor')
+    open()
+    const { store, signedInUserChanged, signOutHere } = await openedByFirstUser()
+    await signOutHere(async () => signedInUserChanged(null))
+    expect(assign).not.toHaveBeenCalled()
+    expect(store.getState().projectId).toBeNull()
+  })
+
+  it('스튜디오가 열려 있지 않으면 계정이 바뀌어도 다른 곳으로 보내지 않는다', async () => {
+    // 왜: 정상 경로 고정 — 프로젝트 목록 · 홈 · 계정 화면은 프로젝트 자료가 비어도 멈추지 않는다.
+    const assign = tabAt('/projects')
+    open()
+    const { signedInUserChanged } = await openedByFirstUser()
+    signedInUserChanged(null)
+    expect(assign).not.toHaveBeenCalled()
   })
 })

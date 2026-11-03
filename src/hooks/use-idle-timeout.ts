@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 import { idleLogoutExempt } from '@/lib/idle-logout'
+import { signOutHere } from '@/lib/signed-in-reset'
 
 const IDLE_TIMEOUT = 30 * 60 * 1000 // 30 minutes
 const WARNING_BEFORE = 5 * 60 * 1000 // warn 5 min before
@@ -39,7 +40,8 @@ export function useIdleTimeout() {
       }, IDLE_TIMEOUT - WARNING_BEFORE)
 
       idleTimer.current = setTimeout(async () => {
-        await supabase.auth.signOut()
+        // 이 탭의 로그아웃 — 스튜디오를 비우는 쪽이 목록으로 보내지 않고 여기서 /login 으로 간다(signed-in-reset).
+        await signOutHere(() => supabase.auth.signOut())
         router.push('/login')
       }, IDLE_TIMEOUT)
     }

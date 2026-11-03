@@ -9,7 +9,7 @@ import { EMPTY_LIFECYCLE_STATUS } from '@/lib/lifecycle'
 import { createClient } from '@/lib/supabase/client'
 import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import { useLocaleStore } from '@/stores/locale-store'
-import { onSignedInChange } from '@/lib/signed-in-reset'
+import { changedHere, onSignedInChange } from '@/lib/signed-in-reset'
 
 const parseLocked = (v: unknown): boolean | null => (typeof v === 'boolean' ? v : null)
 
@@ -706,4 +706,10 @@ onSignedInChange(() => {
   void resetChildStores().catch((err) => {
     console.error('[project-store] resetChildStores failed:', err)
   })
+  // 다른 탭에서 계정이 바뀌었는데 이 탭에 스튜디오가 열려 있으면 새로고침처럼 프로젝트 목록을 다시 연다(2026-11-04 리드 3차 검토) —
+  //   비운 채로 두면 시작 준비가 다시 불리지 않아 Editor · Writer 산문이 "불러오는 중"에 멈췄다. 로그인이 없으면 미들웨어가 /login 으로 보낸다.
+  //   이 탭의 로그아웃(signOutHere)은 로그아웃한 곳이 지금처럼 /login 으로 보낸다.
+  if (typeof window !== 'undefined' && !changedHere() && window.location.pathname.startsWith('/studio')) {
+    window.location.assign('/projects')
+  }
 })

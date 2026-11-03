@@ -13,6 +13,7 @@ import {
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { clearLastProjectId } from '@/lib/session-restore'
+import { signOutHere } from '@/lib/signed-in-reset'
 import { useProjectStore } from '@/stores/project-store'
 import { openAfterDeletingCurrent } from '@/lib/project/open-after-delete'
 import { useT } from '@/lib/i18n'
@@ -73,7 +74,8 @@ export function UserMenu() {
     // 공용 브라우저에서 다음 계정에게 마지막 프로젝트 힌트가 안 새도록 제거.
     // (서버가 워크스페이스 범위로 거르긴 하지만 명시적 의도 표시로 클라에서도 정리)
     clearLastProjectId()
-    await supabase.auth.signOut()
+    // 이 탭의 로그아웃 — 스튜디오를 비우는 쪽이 목록으로 보내지 않고 여기서 /login 으로 간다(signed-in-reset).
+    await signOutHere(() => supabase.auth.signOut())
     router.push('/login')
   }
 

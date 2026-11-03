@@ -78,6 +78,29 @@ describe('로그인한 사람이 바뀔 때', () => {
     expect(reopensFromCache()).toBe(false)
   })
 
+  // 왜: 처음 연 페이지의 첫 소식이 "로그인 없음"으로 오고 곧 같은 사람 소식이 오면, 쓰던 화면을 비워 "불러오는 중"에 멈출 수 있었다(2026-11-04 리드 3차 검토).
+  it('로그인 없음 소식 뒤에 로그인한 사람 소식이 오면 받아 둔 것을 비우지 않는다', async () => {
+    signedInUserChanged(null)
+    await cachedByFirstUser()
+
+    signedInUserChanged('user-a')
+
+    expect(readyPreview('p-letters', 'en')).not.toBeNull()
+    expect(reopensFromCache()).toBe(true)
+  })
+
+  // 왜: 정상 경로 고정 — 로그인 없음 뒤에는 비우지 않아도, 로그아웃(앞 사람 → 로그인 없음)할 때 이미 비워 다음 사람에게 앞 사람 것이 남지 않는다.
+  it('로그아웃한 뒤 다른 사람이 로그인하면 앞 사람이 받아 둔 것은 이미 비워져 있다', async () => {
+    signedInUserChanged('user-a')
+    await cachedByFirstUser()
+
+    signedInUserChanged(null)
+    signedInUserChanged('user-b')
+
+    expect(readyPreview('p-letters', 'en')).toBeNull()
+    expect(reopensFromCache()).toBe(false)
+  })
+
   // 왜: 정상 경로 고정 — 같은 사람의 로그인 정보가 새로 바뀌거나(토큰 갱신) 페이지를 처음 열 때는 받아 둔 것을 그대로 쓴다.
   it('같은 사람이면 받아 둔 산문 · 시작 화면을 그대로 쓴다', async () => {
     signedInUserChanged('user-a')

@@ -2,7 +2,7 @@
 //   로그아웃 · 로그인은 새로고침 없이 화면을 옮겨서, 받아 둔 것(Writer 산문 미리 보기 · Producer 시작 화면)이 다음 계정에게 남을 수 있었다.
 //   받아 두는 모듈이 불릴 때 자기 비우기를 여기 적고(onSignedInChange), 로그인 상태 바뀜은 Supabase 가 알려 주는 한 곳에서 듣는다 —
 //   로그아웃 단추가 여러 곳(메뉴 · 계정 · 홈 · 자리 비움 · 계정 지우기)이라 그 자리마다 부르지 않는다.
-//   페이지를 처음 열 때의 소식은 비우지 않고, 같은 사람의 로그인 정보가 새로 바뀐 것(토큰 갱신)도 비우지 않는다.
+//   페이지를 처음 열 때의 소식은 비우지 않고, 같은 사람의 로그인 정보가 새로 바뀐 것(토큰 갱신) · 로그인 없음 뒤의 로그인도 비우지 않는다.
 //   적힌 비우기는 적은 차례와 상관없이 다 부른다 — 하나가 실패해도 나머지는 부른다(검토 C 2차). 비운 뒤에 도착한 앞 사람의 답은
 //   각 모듈이 비울 때 올린 세대 번호로 가려 버린다(preview-cache · entry-store).
 //   약속: tests/login/signed-in-reset.test.ts
@@ -24,12 +24,11 @@ export function onSignedInChange(reset: () => void): () => void {
 
 /** 로그인한 사람 소식(없으면 null) — 앞 사람과 다르면 받아 둔 것을 모두 버린다. */
 export function signedInUserChanged(userId: string | null): void {
-  if (lastUserId === undefined) {
-    lastUserId = userId
-    return
-  }
-  if (lastUserId === userId) return
+  const previous = lastUserId
   lastUserId = userId
+  // 앞 사람이 로그인한 사용자였을 때만 비운다(2026-11-04 리드 3차 검토) — 처음 연 페이지의 첫 소식이 "로그인 없음"이고 곧 같은 사람
+  //   소식이 오면 쓰던 화면을 비워 멈출 수 있었다. 로그아웃 뒤 다른 사람(A → 로그인 없음 → B)은 로그아웃 소식에서 이미 비운다.
+  if (!previous || previous === userId) return
   for (const reset of [...resets]) {
     try {
       reset()
@@ -42,6 +41,25 @@ export function signedInUserChanged(userId: string | null): void {
 /** 시험용 — 처음 연 페이지처럼 앞 사람을 잊는다. */
 export function forgetSignedInUser(): void {
   lastUserId = undefined
+}
+
+// 이 탭에서 하는 로그아웃(2026-11-04 리드 3차 검토) — 그동안 오는 바뀜 소식은 이 탭이 한 일이라, 비우는 쪽이 열린 화면을 다른 곳으로
+//   보내지 않는다(로그아웃한 곳이 /login 으로 보낸다). 다른 탭의 로그아웃 · 로그인 소식은 이 표시 없이 온다.
+let signingOutHere = false
+
+/** 이 탭에서 로그아웃한다 — signOut 이 끝날 때까지 "이 탭의 바뀜"으로 표시한다. */
+export async function signOutHere(signOut: () => Promise<unknown>): Promise<void> {
+  signingOutHere = true
+  try {
+    await signOut()
+  } finally {
+    signingOutHere = false
+  }
+}
+
+/** 지금 오는 바뀜 소식이 이 탭에서 한 로그아웃인가. */
+export function changedHere(): boolean {
+  return signingOutHere
 }
 
 function listen(): void {
