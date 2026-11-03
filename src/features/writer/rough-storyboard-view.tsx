@@ -35,7 +35,6 @@ import { ADHERENCE_START_ENABLED } from '@/lib/adherence/core'
 import { handoffFrom } from '@/lib/handoff-intent'
 import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
 import { AiBusyOverlay } from '@/components/ai-busy-overlay'
-import { Lumi } from '@/components/lumi/lumi'
 import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
 import { AddItemDialog, type AddMode } from '@/features/writer/add-item-dialog'
 import { AddedRedrawStatus } from '@/features/writer/added-redraw-status'
@@ -1037,8 +1036,9 @@ export function RoughStoryboardView() {
               progress={busy.progress}
               progressLabel={busy.progressLabel}
               footer={busyFooter}
-              // Artist → Storyboard 로 넘어가며 기다리는 화면 — 큰 Lumi(Storyboard 옷 · 로딩, 오너 결정 8). 끝나면 잠금 화면째 사라진다.
-              art={busy.stageEntry ? <Lumi persona="storyboard" state="loading" size={300} /> : undefined}
+              // 큰 Lumi(Storyboard 옷, 오너 결정 8) — Artist → Storyboard 로 넘어가며 기다리는 동안 로딩, 실패 안내면 오류 모습(공용 덮개가 정한다).
+              //   보드에서 다시 그리는 잠금에는 두지 않는다(lib/writer/board-busy lumi).
+              lumi={busy.lumi ? 'storyboard' : undefined}
             />,
             document.body,
           )

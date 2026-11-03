@@ -3,9 +3,10 @@
 // Storyboard → Director 넘김 확인 창 (리뉴얼 1차 2026-10-19, 프로토타입 S7).
 //   넘어가는 샷 수 · 러닝타임을 보여 주고, 러프가 없는 샷은 이번에 빠진다고 알리며 [남은 컷 그리기]를 같이 둔다.
 //   문구와 숫자는 lib/writer/board-summary 의 directorConfirmView 가 정한다 — 여기는 그리기만 한다.
-//   v3(2026-11-03 오너 결정 8): 단계를 넘기기 전에 "~할까요?"를 묻는 확인 창이라 맨 위에 큰 Lumi(지금 단계 Storyboard 옷 · 기본 모습)를 둔다.
+//   v3(2026-11-03 오너 결정 8): 단계를 넘기기 전에 "~할까요?"를 묻는 확인 창이라 맨 위에 큰 Lumi(지금 단계 Storyboard 옷 · 기본 모습)를 둔다 —
+//   넘김 확인 창들과 같은 ConfirmLumi(handoff/confirm-lumi) 하나를 쓴다.
 import { AlertTriangle } from 'lucide-react'
-import { Lumi } from '@/components/lumi/lumi'
+import { ConfirmLumi } from '@/components/handoff/confirm-lumi'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useT } from '@/lib/i18n'
@@ -28,7 +29,7 @@ export function StoryboardDirectorDialog({
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? null : onClose())}>
       <DialogContent className="sm:max-w-lg" aria-describedby={undefined} data-testid="storyboard-director-dialog">
-        <Lumi persona="storyboard" state="idle" size={180} className="mx-auto -mb-1" />
+        <ConfirmLumi stage="writer" />
         <DialogHeader className="items-center text-center sm:text-center">
           <DialogTitle>{view.title}</DialogTitle>
         </DialogHeader>
