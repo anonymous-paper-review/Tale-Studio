@@ -1,7 +1,7 @@
 ---
 name: tale-studio design references
 version: 0.1.0
-last_updated: 2026-05-28
+last_updated: 2026-11-03
 owner: shared
 companion_to: specs/design.md
 ---
@@ -11,6 +11,10 @@ companion_to: specs/design.md
 > *왜 그 값들을 선택했는가* (정성 reference). 정량 명세는 [`specs/design.md`](./design.md).
 >
 > 본 문서는 reference 분석 + tale-studio 채택/거부 매핑. 신규 디자인 결정 시 본 문서의 "We are NOT" 리스트를 먼저 확인.
+>
+> **2026-11-03 v3**: 오너 지시로 디자이너 v3("Claude 톤")를 적용했다 — 색(Netflix Dark · Netflix Red → 따뜻한 무채색 · 크림 메인 단추 · 단계 색 하나)과
+> 글꼴(Geist · Geist Mono → Pretendard · Inter)은 이 문서가 아니라 [`specs/design.md`](./design.md) §0 · §2 · §4 를 따른다.
+> 아래 reference 분석(정보 밀도 · 캔버스 · glassmorphism 거부 등)은 그대로 유효하다.
 
 ---
 

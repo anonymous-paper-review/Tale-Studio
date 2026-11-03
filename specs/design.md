@@ -1,13 +1,14 @@
 ---
 name: tale-studio design system
-version: 0.4.0
-last_updated: 2026-10-19
+version: 1.0.0
+last_updated: 2026-11-03
 owner: shared
 canonical_implementation: src/app/globals.css
 source_of_truth: 토큰 값은 globals.css. design.md는 *역할 / 사용 룰 / 스케일 정량 명세*.
+design_source: Figma 「Tale Studio 리뉴얼 (복사)」 v3 (Claude 톤 · 확정 방향) — research/figma-renewal-v3/ (git 밖)
 ---
 
-# tale-studio design system
+# tale-studio design system — v3
 
 > **목적**: 시각·인터랙션 공통 컨벤션의 단일 명세. design.md는 *어떤 값을 쓸 것인가* (정량). *왜 그 값들을 선택했는가* (정성 reference)는 [`specs/design-references.md`](./design-references.md).
 >
@@ -15,41 +16,57 @@ source_of_truth: 토큰 값은 globals.css. design.md는 *역할 / 사용 룰 / 
 >
 > 룰을 어기는 코드는 사용자가 명시적으로 허락하지 않는 한 reject. 위반이 반복되면 본 문서 또는 hooks를 강화.
 
+## 0. 이번 판(v1.0.0)이 바뀐 까닭
+
+**2026-11-03 오너 지시 — 디자이너 v3 디자인을 적용한다.** 예전 판(0.4.0, Netflix Dark · Netflix Red 단일 accent · Geist)을
+v3 "Claude 톤"(따뜻한 무채색 · 크림 메인 단추 · 지금 단계 색 하나 · Pretendard + Inter)으로 갈아 끼웠다.
+
+같은 날 오너가 정한 것(v3 와 제품 구조가 부딪치는 자리):
+- 샷 번호는 보드의 전체 번호("Scene 2 · Shot 8") 그대로 — v3 의 "S1-2" 를 쓰지 않는다.
+- 단계 색은 Figma 브랜드 가이드 값(아래 §2.9). Lumi 개발 가이드 채팅 CSS 의 `--stage-*` 값 대신 이 값을 쓴다. 채팅 무채색은 가이드 그대로.
+- 마스터 시트는 체크박스가 있는 내보내기 창(2단계 작업).
+- Storyboard 카드는 지금의 3컷 순환 그대로.
+- 채팅의 모델 고르기 · 다른 단계 고르기 · [+] 첨부는 모두에게 그대로 — 모양만 바꾼다.
+- Writer 는 [화면에서 고치기 | 채팅으로 고치기] 토글을 뺀다(2단계 작업).
+- 큰 3D Lumi 는 가이드가 말한 자리 모두: 단계 넘어가는 로딩 · 프로젝트 목록 첫 화면 · 확인 팝업(2단계 작업).
+- 채팅 아바타는 움직이지 않는 그림(가이드가 목록에는 그림을 권한다).
+
 ---
 
 ## 1. Overview
 
-tale-studio는 **B2B AI 비디오 파이프라인 (Tale)** 의 내부 도구다. 텍스트 → 전문 촬영 기법 적용 고품질 AI 비디오 자동 생성. 차별화는 Knowledge DB 기반 cinematography RAG.
+tale-studio는 **AI 비디오 파이프라인 (Tale)** 의 제작 도구다. 이야기 → 산문 → 인물 · 배경 → 스토리보드 → 연출 · 촬영 → 편집.
 
-**Personality**: *Quiet, info-dense, dark-first B2B craft tool for video professionals.* Linear typographic + Vercel/Geist monochrome + Runway media-respectful + n8n 3-패널 canvas skeleton + Higgsfield 노드-그래프 친숙성 (단, **inversion**: 노드 = 엔티티, 모델 아님).
+**Personality(v3)**: *Claude · Figma 처럼 담백하게.* 바탕과 글자는 따뜻한 무채색, 메인 단추는 크림 하나, 상태 색은 정말 필요한 곳(오류 · 완료 · 주의 · 링크)에만.
+단계마다 그 단계 색 하나가 지금 단계의 칩 · 선택 · 배지에만 나온다. 캐릭터 Lumi 가 단계마다 그 단계 옷을 입고 채팅에서 말한다.
 
-**Mode**: dark-first, light parity 보존 (현재 unused, 클라이언트 데모용 토글 가능). 새 컴포넌트는 dark + light 둘 다 동작해야 함.
+**Mode**: **어두운 화면 하나(dark only)**. `<html class="dark">` 고정, 밝은 테마 값은 두지 않는다(globals.css `:root` 가 곧 어두운 값).
 
-### 5 design 원칙 (decisions #30)
-1. **캔버스 제일주의** (패널 보조)
-2. **`globals.css` 토큰 외 신규 색 금지**
-3. **모션은 정보 전달** (장식 아님)
+### 5 design 원칙
+1. **작업 화면 제일주의** — 사이드바 · 위 막대 · 채팅은 무채색 틀, 내용이 주인공
+2. **`globals.css` 토큰 외 신규 색 금지** (`pnpm lint:design` 이 기계로 막는다)
+3. **모션은 정보 전달** (장식 아님) — 큰 Lumi 의 상태 연기는 "지금 무슨 일인지"를 알린다
 4. **키보드 일등 시민**
 5. **한 화면 정보 위계 2단까지**
 
-### 4 hard rules
-1. **Dark-first with light parity**. light-only 금지.
-2. **One accent** (Netflix Red `#E50914`, decisions #30) — CTA + active state만. 카테고리 색 분기 금지.
-3. **Geist Mono** — camera-axis values, render IDs, frame numbers.
-4. **캔버스 확장 토큰** (`--canvas-*`, `--node-*`, `--edge-*`) 사용. 새 토큰 만들지 말 것.
+### 6 hard rules (v3)
+1. **Dark only.** 밝은 테마 · 밝은 화면 금지(마케팅 홈 시안도 어두운 바탕).
+2. **메인 단추는 크림 하나** (`--primary` #EDEAE0 바탕 · 어두운 글씨 `--primary-foreground`). 화면에 하나 — 나머지는 보조(카드색) · ghost.
+3. **지금 단계 색은 지금 단계의 칩 · 선택 · 배지에만** (`--stage`, §2.9 · §2.11). 한 화면에 단계 색은 하나. 단계 색으로 단추를 칠하지 않는다.
+4. **글꼴 = Pretendard(글자) + Inter(숫자 · 메타)**. 고정폭 글꼴은 두지 않는다(`font-mono` 도 Inter, §4.1).
+5. **No glassmorphism** — 반투명 + 배경 흐림(backdrop-blur) 판 금지. 판은 단색, 효과는 아래 그림자 하나(§9).
+6. **캔버스 확장 토큰** (`--canvas-*`, `--node-*`, `--edge-*`) 사용. 새 토큰 만들지 말 것.
 
 ### "We are NOT" exclusion list
-1. **NOT Higgsfield** — glassmorphism, neon edge-glow, volumetric 3D icon, liquid-glass surface, creator-prosumer flourish 금지.
-2. **NOT 커뮤니티-flavored 오픈소스 도구** — 불균일 아이콘, 혼합 radius 카드, saturated 카테고리 배너 색 금지 (n8n).
-3. **NOT consumer creative app** — light-mode-first 금지, playful 일러스트 금지, in-product marketing-hero gradient 금지.
-4. **NOT marketing-tier 대시보드** — featured 캐러셀, large hero 모듈 in-studios 금지 (Producer 랜딩에만 max).
-5. **NOT pure-black Vercel-extreme** — pure `#000` 옆 skin-tone 비디오 프레임은 banding 생산. 우리는 *warm* near-black이 아닌 **Netflix Dark grayscale** (chroma 0).
+1. **NOT Higgsfield** — glassmorphism, neon edge-glow, liquid-glass surface 금지. (단, 브랜드 캐릭터 Lumi 의 3D 광택은 브랜드 자산이라 예외 — 정해진 자리에만, §15.4)
+2. **NOT 커뮤니티-flavored 오픈소스 도구** — 불균일 아이콘, 혼합 radius 카드, saturated 카테고리 배너 색 금지.
+3. **NOT 여러 색 대시보드** — 단계 색을 한 화면에 여럿 칠하지 않는다. 지난 단계 표시는 무채색.
+4. **NOT pure-black** — 바탕은 `#000` 이 아니라 따뜻한 무채색(Shell #262624).
 
 ### Non-goals
-- consumer / creator-prosumer app
-- 마케팅 헤더, 카루셀, hero gradient (스튜디오 내부에선)
-- 두 번째 chromatic accent (Linear lime, Higgsfield cyan 등)
-- decoration shadow / glow (state 표현만 허용)
+- 밝은 테마 · 테마 토글
+- 단계 색 외의 두 번째 chromatic accent
+- 장식 그림자 · 빛(glow) — 판 아래 그림자 하나만 허용
 
 ---
 
@@ -57,37 +74,36 @@ tale-studio는 **B2B AI 비디오 파이프라인 (Tale)** 의 내부 도구다.
 
 ### 2.1 Token reference
 
-source-of-truth는 `src/app/globals.css`. 본 섹션은 *역할*만 enumerate — **값(oklch)은 여기 복제하지 않는다** (2026-06-10 값 컬럼 제거 — 양쪽 동기화 의무 폐지).
+source-of-truth는 `src/app/globals.css`. 본 섹션은 *역할*만 enumerate — **값은 여기 복제하지 않는다**(/design 쇼케이스가 계산된 값을 보여 준다).
 
-| 토큰 | 역할 |
+| 토큰 | 역할 (v3 브랜드 가이드 04 시스템 색) |
 |---|---|
-| `--background` | 앱 캔버스 배경 (Radix step 1, Netflix Dark `#121212`) |
-| `--foreground` | 기본 텍스트 (Radix step 12) |
-| `--card` | elevated surface (Radix step 2) |
-| `--popover` | floating overlay |
-| `--primary` | 브랜드 accent (Netflix Red — 유일한 chromatic accent) |
-| `--primary-foreground` | primary 위 텍스트 |
-| `--secondary` | 보조 액션 surface |
-| `--muted` | subdued surface |
-| `--muted-foreground` | low-contrast text (Radix step 11) |
-| `--accent` | hover/active for ghost (Radix step 4) |
-| `--destructive` | 위험 색 |
-| `--border` | hairline 1px (Radix 6/7/8 collapsed) |
-| `--input` | form border |
-| `--ring` | focus ring (= `--primary`) |
-| `--surface-primary` | base canvas (= `--background`) |
-| `--surface-secondary` | depth 1 surface (= `--card`) |
-| `--surface-tertiary` | depth 2 surface (= `--popover`) |
-| `--surface-elevated` | depth 3 surface (top) |
+| `--shell` = `--background` | 작업 화면 바탕 |
+| `--side` | 사이드바 · 채팅 바탕 |
+| `--panel` | **큰 내용 판** — 산문 카드 · 설정 카드 · 인물 묶음 · 샷 카드. 바탕보다 한 단 어둡다(시안 #1D191A 85~88% 를 바탕 위에 합친 단색) |
+| `--card` | **카드 · 입력 · 보조 단추** — 선택 카드, 입력칸, 탭 묶음 바탕 |
+| `--chip` = `--accent` | 칩 · 보조 단추 눌림 · hover |
+| `--foreground` | 본문 글자 (Text) |
+| `--muted-foreground` | 보조 글자 (Text 2) — 설명 · 부제 |
+| `--subtle-foreground` | 흐린 글자 — 메타 · 힌트 · 자리표시 · 아직 안 연 단계 (시안 #8E8B82) |
+| `--primary` / `--primary-foreground` | 크림 메인 단추 / 그 위 어두운 글씨 |
+| `--secondary` | 보조 단추 바탕 (= card) |
+| `--muted` | subdued surface (= card) |
+| `--popover` | 팝오버 · 메뉴 바탕 (= card) |
+| `--destructive` | Danger — 오류 · 삭제. 늘 아이콘과 함께 |
+| `--border` · `--input` | hairline 1px / 입력 테두리 |
+| `--ring` | 포커스 링 = Info 파랑 (브랜드 가이드 "링크 · 포커스") |
+| `--surface-primary/secondary/tertiary/elevated` | shell / card / chip / 가장 위(툴팁) |
+| `--on-stage` | 단계 색 바탕 위 어두운 글씨 |
 
 ### 2.2 Chart 토큰 (노드 색)
 
-엔티티 노드 식별색. 현재 노드 surface는 **Director Canvas만** (L0 artist 노드 그래프는 2026-06-04 폐기). chart-1/2 는 같은 엔티티(인물 · 장소) 표시에만 쓴다.
+엔티티 표시색. chart-1/2 는 같은 엔티티(인물 · 장소) 표시에만 쓴다.
 
 | 토큰 | 사용처 |
 |---|---|
-| `--chart-1` (red) | **인물** 표시 — Artist 산문 재점검의 산문 속 인물 이름 · 범례 칩(`/15` 바탕 + `/40` 테두리, 2026-10-27). 옛 Actor 노드(L0, 폐기) 자리 |
-| `--chart-2` (blue) | **장소** 표시 — Artist 산문 재점검의 산문 속 장소 이름 · 범례 칩(같은 알파, 2026-10-27). 옛 World 노드(L0, 폐기) 자리 |
+| `--chart-1` (red) | **인물** 표시 — Artist 산문 재점검의 산문 속 인물 이름 · 범례 칩 |
+| `--chart-2` (blue) | **장소** 표시 — Artist 산문 재점검의 산문 속 장소 이름 · 범례 칩 |
 | `--chart-3` | **Scene** 노드 (Director) |
 | `--chart-4` | **Shot** 노드 (Director) |
 | `--chart-5` | **Video** 노드 (Director) |
@@ -96,83 +112,98 @@ source-of-truth는 `src/app/globals.css`. 본 섹션은 *역할*만 enumerate �
 
 | Tier | 토큰 | 사용 |
 |---|---|---|
-| Primary | `--foreground` | 본문, 제목 (Radix step 12) |
-| Secondary | `--muted-foreground` | 보조 라벨, 캡션, placeholder (Radix step 11) |
-| Subtle | `--muted-foreground` + opacity-70 | 타임스탬프, render ID hash |
-| Disabled | `--muted-foreground` + opacity-50 | disabled control 텍스트 |
-| Inverse | `--primary-foreground` | accent surface 위 텍스트 |
+| Primary | `--foreground` | 본문, 제목 |
+| Secondary | `--muted-foreground` | 설명 · 부제 · 보조 라벨 · 끝낸 단계 |
+| Subtle | `--subtle-foreground` | 메타(숫자) · 힌트 · 자리표시 · 아직 안 연 단계 · 타임스탬프 |
+| Disabled | 지금 글자 + opacity-50 | disabled control |
+| Inverse | `--primary-foreground` | 크림 위 글씨 |
 
-### 2.4 Border tiers (shadcn collapse 보강)
+Tailwind: `text-foreground` · `text-muted-foreground` · `text-subtle-foreground`.
 
-shadcn `--border`가 Radix step 6/7/8을 하나로 collapse. tale-studio는 3-tier로 확장:
+### 2.4 Border tiers
+
+v3 시안에는 테두리가 거의 없다(면 색 차이로 나눈다). 테두리는 꼭 필요할 때만.
 
 | Tier | 토큰 | 사용 |
 |---|---|---|
-| Subtle | `--border-subtle` | 비-interactive separator (테이블 행 구분, 노드 안 sub-frame) |
-| Default | `--border` | 카드, 입력, 패널 구분 (rest 상태) |
-| Strong | `--border-strong` | hovered interactive border, 강조된 panel 경계 |
-| Focus | `--ring` (= `--primary`, Netflix Red) | focus ring |
-
-Tailwind 클래스: `border-border-subtle`, `border-border` (default), `border-border-strong`, `ring-ring`.
+| Subtle | `--border-subtle` | 비-interactive separator |
+| Default | `--border` | 카드 · 패널 구분 (rest) |
+| Strong | `--border-strong` | hovered interactive border |
+| Focus | `--ring` (Info) | focus ring |
+| Selected | `--stage` 1.5px | 고른 칩 · 고른 선택 카드 (§2.11) |
 
 ### 2.5 Semantic state colors
 
 | 상태 | 토큰 | Foreground | 사용 |
 |---|---|---|---|
-| Error / destructive | `--destructive` | `--primary-foreground` | shadcn 기본. 필드 invalid, 위험 액션 |
-| Success | `--success` (green) | `--success-foreground` | 저장 완료 토스트, 등록 완료 badge |
-| Warning | `--warning` (amber) | `--warning-foreground` | quota 임박, stale 노드 경고 banner |
-| Info | `--info` (blue) | `--info-foreground` | 도움말 banner, render 가이드 |
-| Generating | `--primary` + pulse (animated) | — | `generatingNodeIds` state, BaseNode spinner |
+| Error / destructive | `--destructive` (Danger) | white | 오류 · 삭제. Writer 로즈 레드와 겹치지 않게 **늘 아이콘과 함께** |
+| Success | `--success` | `--success-foreground` | 완료 · 저장됨 |
+| Warning | `--warning` | `--warning-foreground` | 주의 · 크레딧 |
+| Info | `--info` | `--info-foreground` | 링크 · 포커스 |
+| Generating | `.tale-beam` (`--primary` 기본) | — | 생성 중 카드 테두리 빛 |
 
-Tailwind 클래스: `bg-success`, `text-success-foreground`, `border-success` (warning/info도 동일 패턴). Generating은 token 아님 — `bg-primary animate-pulse` 조합.
-
-**룰**: 상태는 **색 + icon + label** 3중. 색만으로 상태 전달 금지 (color-blind 안전). semantic accent (success/warning/info)는 *상태 표현*에만 — CTA로 사용 금지 (Netflix Red 단일 accent 원칙).
+**룰**: 상태는 **색 + icon + label** 3중. 상태 색은 상태 표현에만 — 단추를 칠하지 않는다.
 
 ### 2.6 Focus ring
 
-- 색: `--ring` (= `--primary`)
-- 너비: shadcn 기본 follow — `focus-visible:ring-[3px]` (`src/components/ui/button.tsx` 및 shadcn primitive 기준)
-- ring color alpha: `ring-ring/50`
-- 스타일: solid (dashed/dotted 금지)
-- 모든 `*`에 `@layer base`에서 `outline-ring/50` 자동 적용 (alpha 50%)
+- 색: `--ring` (Info 파랑), `focus-visible:ring-[3px] ring-ring/50` (입력칸은 /30)
+- 채팅 입력창만 예외: 포커스면 지금 단계 색 1px 테두리(Lumi 가이드 `.chat-input:focus-within`)
 - focus-visible만 (mouse focus는 ring 없음)
 
 ### 2.7 Interaction state delta
 
 | State | 적용 |
 |---|---|
-| Hover | `--accent` (배경) 또는 `bg-{token}/80` (opacity) |
-| Active / pressed | `--accent` + `--primary` ring or scale-95 (subtle) |
-| Selected | `--accent` 지속 적용 + 노드의 경우 selection halo (§17.6) |
-| Disabled | `opacity-50` + `pointer-events-none` + `cursor-not-allowed` |
-| Loading | `opacity-70` + spinner. **opacity-50 (disabled)와 구분** |
+| Hover | `bg-accent`(chip) 또는 `bg-{token}/90` |
+| Selected (칩 · 선택 카드 · pill 탭) | `border-stage` 1.5px + `bg-stage/18` + `aria-pressed`/`data-state` |
+| Selected (segmented 탭) | `bg-accent` 눌린 칸 + 글자 600 |
+| Disabled | `opacity-50` + `pointer-events-none` |
+| Loading | `opacity-70` + spinner. disabled 와 구분 |
 
 ### 2.8 Forbidden colors
-- 두 번째 chromatic accent (Linear lime, cyan, magenta 등 추가 금지)
-- Raw hex / RGB in `*.tsx` (globals.css 외)
-- Saturated 카테고리 배너 (n8n-style)
-- Glassmorphism `bg-white/N + backdrop-blur` (decoration용)
+- Raw hex / RGB in `src/components` · `src/app` 의 `*.tsx`(globals.css 외) — `pnpm lint:design`
+- 단계 색으로 단추 · 큰 면 칠하기 (칩 · 선택 · 배지 · 지금 단계 아이콘만)
+- Glassmorphism `bg-white/N + backdrop-blur`
+- 지난 단계를 그 단계 색으로 표시하기(채팅 구간 구분선 · 레일) — 무채색
 
-### 2.9 Stage 색 (파이프라인 P1~P6)
+### 2.9 Stage 색 (단계 6개)
 
-GlobalChat badge + AgentFace 등 **단계 식별**용. chart 토큰(엔티티 노드, §2.2)과 의미축이 다르므로 별도 토큰.
+**값은 Figma 브랜드 가이드 03(오너 11/3)** — 로고의 여섯 색이 곧 단계 색. 토큰 이름은 **화면 이름**이다(단계 id 와 다르다 — §2.11).
 
-| 토큰 | Stage | 사용처 |
+| 토큰 | 화면 | 뜻 |
 |---|---|---|
-| `--stage-producer` (violet) | P1 Producer | badge, agent face |
-| `--stage-writer` (blue) | P2 Writer | badge, agent face |
-| `--stage-artist` (amber) | P3 Artist | badge, agent face |
-| `--stage-storyboard` (cyan) | P4 Storyboard (리뉴얼 1차 2026-10-19, 이름 가칭) | badge, agent face |
-| `--stage-director` (rose) | P5 Director | badge, agent face |
-| `--stage-editor` (emerald) | P6 Editor | badge, agent face |
+| `--stage-producer` | Producer (id entry) | 오렌지 골드 · 기획 |
+| `--stage-writer` | Writer (id producer) | 로즈 레드 · 글 |
+| `--stage-artist` | Artist | 일렉트릭 바이올렛 · 그림 |
+| `--stage-storyboard` | Storyboard (id writer) | 딥 블루 · 콘티 |
+| `--stage-director` | Director | 애저 · 연출 |
+| `--stage-editor` | Editor | 민트 틸 · 편집 |
 
-Tailwind 클래스: `bg-stage-{id}`, `text-stage-{id}`, `border-stage-{id}` (+ 알파 `/15` `/30`). SVG fill/stroke는 `var(--stage-{id})` 또는 `currentColor`.
+같이 따라오는 것: `--stage-badge-{화면}`(위 막대 단계 칩 그라데이션, 좌→우), `--stage-gradient-{화면}`(단계 카드 그라데이션, 진한 → 연한), `--pearl-vivid`(브랜드 그라데이션 — 로고 · 홈 헤드라인 · 앱 아이콘 · 작품 완성 순간에만), `--text-gradient`(홈 헤드라인 글자).
 
-**룰**:
-- **director는 rose** — `--primary`(Netflix Red)와 분리해 one-accent 룰 보존. 단계 색은 *식별*용일 뿐 CTA 아님.
-- face와 badge는 **같은 stage 색** 사용 (불일치 금지).
-- 단계 색 정의/조회는 `src/lib/constants.ts` 단일 source (`STAGE_BADGE_CLASS` / `STAGE_FACE_COLOR`).
+Tailwind: `bg-stage-{화면}` · `text-stage-{화면}` (+ 알파), `bg-stage-badge` · `bg-stage-gradient` · `bg-pearl-vivid` · `text-gradient`(@utility).
+단계 id → 화면 이름 매핑은 `src/lib/lumi.ts` `STAGE_PERSONA` 한 곳. 옛 색 매핑(`STAGE_BADGE_CLASS` / `STAGE_FACE_COLOR`, constants.ts)은 그대로 화면 이름 색을 가리킨다.
+
+### 2.10 채팅 색 (Lumi 개발 가이드)
+
+채팅창 틀은 **무채색 고정**, 지금 단계 색 하나만 아바타 바탕 12% · 단계 칩 · Lumi 이름 · 생각 중 점 · 고른 빠른 답 · 입력창 포커스에 쓴다.
+
+| 토큰 | 역할 |
+|---|---|
+| `--chat-bg` | 채팅 패널 (= side) |
+| `--chat-lumi-bubble` | Lumi 말풍선 |
+| `--chat-my-bubble` = `--chat-user-bubble` | 내 말풍선 |
+| `--chat-chip` | 빠른 답 칩 |
+| `--chat-input` | 입력 알약 |
+| `--chat-send` | 보내기 단추 (= primary) |
+
+### 2.11 지금 단계 색 — `data-stage`
+
+`[data-stage="producer|writer|artist|storyboard|director|editor"]` 를 붙인 요소 아래에서 `--stage` · `--stage-badge` · `--stage-badge-foreground` · `--stage-gradient` 가 그 단계 값이 된다(Lumi 가이드 채팅 CSS 와 같은 방식).
+- 스튜디오 레이아웃이 지금 보는 단계로 셸과 `<html>` 에 붙인다(팝업 · 메뉴 포털도 같은 색).
+- 레일 칸 · 단계 칩 · Lumi 아바타처럼 "자기 단계"가 정해진 요소는 자기 `data-stage` 를 단다.
+- 단계 밖(프로젝트 목록 · /design)은 `--stage` = 크림.
+- 쓰는 곳: `bg-stage` · `text-stage` · `border-stage` · `bg-stage/18`(고른 칩 바탕) · `bg-stage/12`(아바타 바탕).
 
 ---
 
@@ -180,60 +211,37 @@ Tailwind 클래스: `bg-stage-{id}`, `text-stage-{id}`, `border-stage-{id}` (+ �
 
 ### 3.1 Base unit & scale
 
-**Base unit**: 4px (Tailwind v4 default `--spacing: 0.25rem`).
+**Base unit**: 4px (Tailwind v4 default). Tailwind numeric scale 사용. **허용 step**: 1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24 (+ v3 실측의 0.5 · 1.5 · 2.5 · 3.5).
 
-Tailwind numeric scale 사용 (1=4px, 2=8px, 3=12px, 4=16px, 6=24px, 8=32px, 12=48px). T-shirt scale (sm/md/lg) 컴포넌트별 prop으로만, spacing에는 사용 금지 (혼용 안티패턴).
+### 3.2 v3 실측 (Figma file.json)
 
-**허용 step**: 1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24. 그 외 (예: 7, 9, 14)는 사용 자제. AI가 임의 step 발명 방지.
-
-### 3.2 Per-component inner padding
-
-Button padding 값은 `src/components/ui/button.tsx` CVA의 `size` variant가 진실 (여기 복제 금지).
-
-| 컴포넌트 | Padding (X / Y) |
+| 자리 | 값 |
 |---|---|
-| Input / Select | `px-3 py-2` (12/8) — h-9 |
-| Card | `p-6` (24) 본문, header/footer는 `p-4` (16) |
-| Dialog | `p-6` (24) 본문, header `pb-4`, footer `pt-4 gap-2` |
-| Sheet (inspector) | `p-6` (24) 본문, sticky header `px-6 py-4` |
-| Popover | `p-4` (16) |
-| Tooltip | `px-2 py-1` (8/4) |
-| Badge | `px-2 py-0.5` (8/2) |
-| Toast | `p-4 gap-3` (16/12) |
+| 셸 | 바탕 Shell, 레일 왼쪽 위아래 8 띄움 · 폭 80 · 모서리 16, 본문 ↔ 레일 8, 채팅은 오른쪽 가장자리에 붙고 왼쪽 모서리만 16 |
+| 레일 칸 | 64 × 58 · 모서리 12 · 아이콘 22 · 라벨 11.5/600 · 칸 사이 6 · 위 12 아래 16 |
+| 레일 아래 단추 | 아이콘 24 + 캡션 11.5/600, 사이 3 · 프로필 32 원 |
+| 위 막대 | 높이 42(+위 8) · 좌 24 우 20 · 사이 12 · 단계 칩 높이 22 좌우 10 |
+| 작업 영역 | 위아래 28 · 좌우 32 (Storyboard 24/28) · 묶음 사이 16~18 |
+| 화면 머리 | 제목 28/700 · 메타 Inter 12 · 사이 10~12 · 단추 높이 36 |
+| 큰 내용 판 | 모서리 16~22 · 안쪽 12~16 |
+| 칩 | 높이 32 · 좌우 14 · 사이 6 |
+| 선택 카드 | 모서리 14 · 안쪽 14/16 · 사이 4 |
+| 채팅 | 머리 56(위 16 · 좌 20 · 우 14) · 메시지 사이 12~14 · 좌우 20 · 말풍선 안쪽 12/16/14/16 · 입력 알약 높이 52 · 안쪽 8/8/8/16 · 보내기 36 원 |
 
 ### 3.3 Stack gap defaults
 
 | 패턴 | gap |
 |---|---|
-| Form fields (vertical) | `gap-4` (16) — label과 input은 `gap-2` (8) |
-| List items | `gap-2` (8) |
-| Section blocks | `gap-6` (24) |
-| Card group | `gap-4` (16) |
-| Page header → content | `gap-6` (24) |
-| Button group (inline) | `gap-2` (8) |
-| Toolbar icon button | `gap-1` (4) |
+| Form fields (vertical) | `gap-4` — label/input `gap-2` |
+| List items | `gap-2` |
+| Section blocks | `gap-6` |
+| Card group | `gap-3`~`gap-4` |
+| Button group (inline) | `gap-2` |
+| Chip group | `gap-1.5`~`gap-2` |
 
-### 3.4 Inset 룰
+### 3.4 `gap` vs `margin` vs `padding`
 
-| 표면 | Inset |
-|---|---|
-| Page edge (studio shell) | `px-6` (24) horizontal — content max-width와 별개 |
-| Dialog edge | `p-6` (24) |
-| Sheet edge | `p-6` (24) — sticky 영역만 `px-6 py-4` |
-| Popover edge | `p-4` (16) |
-| Canvas viewport | edge inset 없음 (캔버스가 full viewport) |
-
-### 3.5 `gap` vs `margin` vs `padding`
-
-- **flex / grid 컨테이너 → `gap`** (margin collapse 회피)
-- **컴포넌트 안 inset → `padding`**
-- **`margin`은 페이지 레이아웃 외엔 자제** — collapse + compose 어려움. `space-y-*` 도처 사용 금지
-
-### 3.6 Section spacing (responsive)
-
-- Desktop: `gap-6` between sections
-- Tablet (`md:`): 동일
-- Mobile (`sm:` 미만): `gap-4` (다음 컨테이너로 자연스럽게 밀착)
+- flex / grid → `gap` · 컴포넌트 안 inset → `padding` · `margin`은 페이지 레이아웃 외엔 자제
 
 ---
 
@@ -241,245 +249,152 @@ Button padding 값은 `src/components/ui/button.tsx` CVA의 `size` variant가 �
 
 ### 4.1 Font families
 
-3종 font variable (`--font-geist-sans`, `--font-geist-mono`, `--font-pretendard`) — 로딩 구현은 `src/app/layout.tsx` (decisions #35). Pretendard는 `next/font/local` (한국어 fallback).
+로딩은 `src/app/layout.tsx`: **Pretendard Variable**(`next/font/local`, `--font-pretendard`) + **Inter**(`next/font/google`, `--font-inter`). Geist · Geist Mono 는 뺐다(2026-11-03).
 
-**Fallback stack** (`--font-sans`): `Geist Sans → Pretendard → ui-sans-serif → system-ui → sans-serif` (globals.css `@theme inline` 기준). Latin 글리프는 Geist 우선, 한글 글리프는 자동으로 Pretendard로 fallback (브라우저 글자별 매칭).
-`--font-mono`: `Geist Mono` (globals.css `@theme inline` 기준 — 별도 fallback chain 없음).
+| Tailwind | 스택 | 쓰는 곳 |
+|---|---|---|
+| `font-sans` (body 기본) | Pretendard → system | 모든 글자 |
+| `font-num` | Inter → Pretendard → system | 숫자 · 메타(Figma Number/Meta · Number/Tag): "씬 2 · 샷 6 · 16초", 샷 크기 태그(CU · MS), 시간 코드, 단축키 |
+| `font-mono` | `font-num` 과 같은 스택 | 예전 코드의 자리 — 새 코드는 `font-num` |
 
-**Display tier**: 별도 없음. 큰 헤딩도 Geist Sans + tight tracking.
+body 에 `font-sans` 를 직접 건다(글꼴 변수가 body 에 붙기 때문 — globals.css `@layer base`).
 
-**한국어/CJK**: Pretendard Variable (weight 45~920 가변) 적용. 시스템 폰트 fallback은 마지막 안전망.
+### 4.2 Type scale (v3 이름 붙은 글자 스타일)
 
-### 4.2 Type scale
+| Token | Size / LH | 사용 |
+|---|---|---|
+| `text-display` | 32 / 41.6, -1% | 큰 물음(E3 "이렇게 만들어 볼까요?") |
+| `text-title` | 28 / 36.4, -1% | 화면 제목(산문 · 인물 · 배경 · Storyboard) — 700 |
+| `text-prose` | 16 / 29.6 | 산문 문단 (Body/Prose) |
+| `text-body` | 15 / 24 | 카드 제목 · 선택 카드 제목 · 묶음 제목 (Body/Base) |
+| `text-label` | 13.5 / 18.9 | 단추 · 칩 · UI 라벨 (UI/Label 500, Strong 600) |
+| `text-chat` | 13.5 / 20.9 | 채팅 본문 (Body/Chat) |
+| `text-caption` | 12.5 / 18.1 | 설명 · 힌트 (UI/Caption) |
+| `text-meta` | 12 / 16.8 | 숫자 메타 — `font-num` 과 함께 (Number/Meta) |
+| `text-micro` | 11.5 / 16.1 | 레일 라벨 · 단계 칩 · Lumi 이름 (UI/Micro 600) |
+| `text-tag` | 10 / 14 | 추천 배지 |
 
-base 14px (Tailwind `text-sm`). UI 도구 정보 밀도 우선.
-
-| Token | Size | Line-height | Tracking | Weight | 사용 |
-|---|---|---|---|---|---|
-| `text-xs` | 12px / 0.75rem | 16px (1.33) | 0 | 500 | 캡션, micro label, render ID (mono) |
-| `text-sm` | 14px / 0.875rem | 20px (1.43) | -0.005em | 400 | **본문 기본**, 입력 |
-| `text-base` | 16px / 1rem | 24px (1.5) | -0.01em | 400 | 카드 본문, dialog content |
-| `text-lg` | 18px / 1.125rem | 28px (1.55) | -0.01em | 500 | 섹션 헤더 |
-| `text-xl` | 20px / 1.25rem | 28px (1.4) | -0.015em | 600 | 페이지 헤더 H2 |
-| `text-2xl` | 24px / 1.5rem | 32px (1.33) | -0.02em | 600 | 페이지 H1 (studio shell) |
-| `text-3xl` | 30px / 1.875rem | 36px (1.2) | -0.025em | 700 | landing / producer hero (max) |
-
-**미사용**: `text-4xl`+ 금지 (consumer/marketing 미감).
+Tailwind 기본(`text-xs`~`text-2xl`)도 쓸 수 있지만 새 화면은 위 이름을 쓴다. `cn()` 은 이 이름들을 글자 크기로 안다(`src/lib/utils.ts`, 약속 tests/ops/class-merge.test.ts).
 
 ### 4.3 Weight palette
 
-실제 사용 weight만: **400 (regular), 500 (medium), 600 (semibold), 700 (bold)**. 그 외 (100, 200, 300, 800, 900) 사용 금지.
+400 · 500 · 600 · 700 (+ 로고 글자 800).
 
 ### 4.4 Per-context 할당
 
-| 컨텍스트 | Class | Family |
-|---|---|---|
-| Page H1 | `text-2xl font-semibold` | sans |
-| Page H2 | `text-xl font-semibold` | sans |
-| Section header | `text-lg font-medium` | sans |
-| Body | `text-sm` | sans |
-| Card title | `text-base font-medium` | sans |
-| Card body | `text-sm` | sans |
-| Label (form) | `text-sm font-medium` | sans |
-| Helper text | `text-xs text-muted-foreground` | sans |
-| Caption | `text-xs text-muted-foreground` | sans |
-| Button | `text-sm font-medium` | sans |
-| Badge | `text-xs font-medium` | sans |
-| **Camera axis value** | `text-xs font-mono tabular-nums` | mono |
-| **Render ID / Hash** | `text-xs font-mono` | mono |
-| **Frame number / Timecode** | `text-xs font-mono tabular-nums` | mono |
-| **Token name in inspector** | `text-xs font-mono` | mono |
-| Table cell (numeric) | `text-sm font-mono tabular-nums` | mono |
+| 컨텍스트 | Class |
+|---|---|
+| 화면 제목 | `text-title font-bold` |
+| 묶음 제목 · 카드 제목 | `text-body font-semibold` |
+| 본문 · UI | `text-label` |
+| 설명 | `text-caption text-muted-foreground` |
+| 메타 숫자 | `font-num text-meta font-medium text-subtle-foreground` |
+| 단추 | `text-label font-medium` (메인 600) |
+| 시간 코드 · 프레임 | `font-num tabular-nums` |
 
 ### 4.5 Numeric variants
 
-테이블·shot list·CameraConfig (-10~+10) 등 숫자가 정렬되어야 하는 곳은 **`tabular-nums` 강제**. 본 룰 위반은 jitter 안티패턴 (B.2 #8).
+숫자가 정렬돼야 하는 곳은 **`tabular-nums` 강제** (Inter 는 tnum 을 지원).
 
-### 4.6 Letter-case 룰
+### 4.6 Letter-case / 문구
 
-- **Sentence case 일관 사용** ("Create scene", "Save changes"). Title Case 금지.
-- ALL CAPS는 `text-xs uppercase tracking-wider` (`+0.05em`) 한정 — micro section header 1~2곳만.
-- 한국어는 sentence case 개념 N/A — 종결어미 사용("씬 추가", "저장").
+- 영어는 sentence case. 단계 이름(Producer · Writer · Artist · Storyboard · Director · Editor)은 대문자로 시작.
+- 화면 문구에 긴 대시(—) · 짧은 대시(–) 금지 (tests/ui-text/copy-rules.test.ts).
+- 한국어 기본, 새 문구는 `t()` + `messages-ko`.
 
 ### 4.7 Truncation 룰
 
-- 단일 라인: `truncate` (overflow-hidden + text-ellipsis + whitespace-nowrap)
-- 2~3 라인: `line-clamp-2` / `line-clamp-3`
-- 노드 라벨: `truncate` 강제 (캔버스 줌-아웃 시 폭이 가변)
-- ellipsis 후 "Show more" 토글은 카드 본문 / dialog description에만
-
-### 4.8 Min/max font-size at responsive 극단
-
-mobile-first 전환 시 base 14px → 13px로 stepdown 금지 (가독성 손실). 대신 padding/gap이 줄어들고 type은 고정.
-
-### 4.9 언어 정책
-
-- **UI 기본 언어는 한국어** (decisions log 2026-05-17 cleanup 결정 — 영문 string 한국어로 변환됨)
-- 코드 식별자 (변수, 함수, 타입)는 영문
-- 채팅 응답은 한국어 (Producer/Writer/Artist/Director agent)
-- 콘솔 로그·에러 메시지는 영문 (개발자용)
+- 단일 라인: `truncate` · 2~3 라인: `line-clamp-2/3` · 노드 라벨 `truncate`
 
 ---
 
 ## 5. Breakpoints
 
-Tailwind v4 default 그대로:
-
-| Token | px | 사용 |
-|---|---|---|
-| `sm:` | 640 | 작은 태블릿 |
-| `md:` | 768 | 태블릿 |
-| `lg:` | 1024 | 작은 데스크탑 |
-| `xl:` | 1280 | **표준 데스크탑** — design target |
-| `2xl:` | 1536 | 큰 데스크탑 |
-
-**Mobile-first** 선언. tale-studio는 *데스크탑 우선* 도구 (캔버스 작업이 모바일에 부적합). 그러나 `md:` 미만에서 *읽기 모드*는 동작해야 함 (페이지 미리보기, 사용자 listing).
-
-**Container behavior**: studio shell은 full-width (캔버스 + 좌우 패널). landing / producer는 `max-w-7xl mx-auto px-6`.
-
-**`@container` queries**: 캔버스 inspector / node popup이 폭에 따라 단축 모드로 전환할 때 사용. 페이지 레벨엔 breakpoint 우선.
+Tailwind v4 default. 설계 기준 **1440 × 900** (v3 시안 프레임). `xl:` 1280 이상이 표준 데스크탑. 데스크탑 우선 도구.
 
 ---
 
 ## 6. Sizing & dimensions
 
-### 6.1 Container & shell
+### 6.1 Container & shell (v3)
 
-| 영역 | 치수 |
+| 영역 | 치수 (정본: `src/lib/constants.ts`) |
 |---|---|
-| Studio shell header | h-14 (56px) |
-| Studio sidebar (expanded) | w-60 (240px) |
-| Studio sidebar (collapsed) | w-14 (56px) — icon-only |
-| Footer (해당 시) | h-12 (48px) |
-| Right inspector (Sheet) | w-96 (384px) default, w-[480px] max |
-| Left panel (Meeting Room) | w-80 (320px) |
-| Page content max-width (landing/producer) | max-w-7xl (1280px) |
+| 왼쪽 레일 | `SHELL_RAIL_WIDTH` 80, `SHELL_INSET` 8 띄움 |
+| 위 막대 | 50 (위 8 + 42) — `StudioTopBar` |
+| 오른쪽 채팅 | `CHAT_DEFAULT_WIDTH` 360 (280~560 리사이즈, 기억함), 가장자리에 붙음 · 접으면 44 레일 |
+| 본문 | 왼쪽 8+80+8, 오른쪽 채팅폭+8 |
 
-### 6.2 Form control height (정렬 필수)
+### 6.2 Form control height
 
-모든 form control은 **같은 행에서 baseline 정렬**. Button height/size variant 값은 `src/components/ui/button.tsx` CVA가 진실 (여기 복제 금지).
-
-**Footer 정렬 예외**: 패널 하단 footer(`p-4 border-t`)에서 입력행을 CTA(`Button lg` = h-10)와 같은 선 높이로 맞출 때는 Input/icon-button을 **h-10 / `size="icon-lg"`** 로 override. footer 총높이 = `p-4(16)+h-10(40)+p-4(16)` = 72px. 예: GlobalChat 입력부 ↔ HandoffButton.
+| 컨트롤 | 높이 |
+|---|---|
+| Button default / Input / Select | h-9 (36) |
+| Button sm · 칩 | h-8 (32) |
+| segmented 탭 묶음 | 38 (칸 32) |
+| 채팅 입력 알약 | 52 (보내기 36 원) |
 
 ### 6.3 Modal sizes
 
-| Size | max-w |
-|---|---|
-| sm | max-w-sm (384px) — confirm |
-| md (default) | max-w-md (448px) — form |
-| lg | max-w-lg (512px) — NodePopup |
-| xl | max-w-2xl (672px) — multi-section editor |
-| full | max-w-[90vw] — preset gallery |
+sm `max-w-sm` · md `max-w-md` · lg `max-w-lg`(기본) · xl `max-w-2xl` · full `max-w-[90vw]`
 
 ### 6.4 Icon sizes
 
-| Size | px | 사용 |
-|---|---|---|
-| `size-3` | 12 | inline 강조 micro icon (rare) |
-| `size-4` | 16 | **표준 인라인 icon** (button, input adornment, list) |
-| `size-5` | 20 | button-icon hover, slightly larger button |
-| `size-6` | 24 | toolbar, sidebar primary |
-| `size-8` | 32 | empty-state header, profile avatar |
+| Size | 사용 |
+|---|---|
+| `size-4` (16) | 단추 안 · 채팅 접기 |
+| `size-5` (20) | 위 막대 연필 · 탭 아이콘 |
+| `size-[22px]` | 레일 단계 아이콘 |
+| `size-6` (24) | 레일 아래 단추 |
 
 ### 6.5 Avatar sizes
 
-xs `size-6` / sm `size-8` / md `size-10` / lg `size-12` / xl `size-16`. Most actor/world thumbnails 사용하므로 별도 정의: `size-10` (40px) default, `size-16` (64px) hover preview.
-
-### 6.6 Min tap target
-
-- Desktop pointer: 24×24 minimum (Apple HIG)
-- Mobile touch: 44×44 minimum
-- 캔버스 노드 port handle: 12×12 visual + 20×20 interactive hit area (React Flow `Handle`의 size prop 또는 wrapper)
+채팅 Lumi 28(말풍선 옆 · 머리), 빠른 답 물음 20, 프로필 32.
 
 ---
 
 ## 7. Radius
 
-source: `--radius: 0.5rem` (8px). Tailwind v4 `@theme inline` 자동 파생 — calc 값은 `src/app/globals.css` `@theme inline` 블록이 진실 (여기 복제 금지).
+source: `--radius: 0.75rem` (12px). 파생: `sm` 8 · `md` 10 · `lg` 12 · `xl` 16 · `2xl` 20 · `3xl` 24 · `full`. 브랜드 가이드: **모든 모서리 둥글게, 흰 광택 · 테두리 없음**.
 
 ### 7.1 Per-component 할당
 
 | 컴포넌트 | Radius |
 |---|---|
-| Button | `rounded-md` (6) |
-| Input / Select | `rounded-md` (6) |
-| Card (shadcn default) | `rounded-xl` (12) |
-| Dialog | `rounded-lg` (8) |
-| Sheet | `rounded-none` (edge에 붙음) |
-| Popover | `rounded-md` (6) |
-| Tooltip | `rounded-sm` (4) |
-| Badge | `rounded-full` (pill) |
-| Avatar | `rounded-full` |
-| Canvas node | `rounded-lg` (8) — header/body radius 일치 |
-| Asset thumbnail | `rounded-md` (6) |
-| Video clip card | `rounded-lg` (8) |
+| Button · Input · Select | `rounded-md` (10) |
+| 레일 칸 · segmented 탭 묶음 | `rounded-lg` (12), 탭 칸 9 |
+| 레일 · 채팅 패널 · 큰 내용 판 · 말풍선 | `rounded-xl` (16) — 말풍선은 Lumi 왼쪽 위 6 · 내 것 오른쪽 위 6 |
+| 선택 카드 | 14 |
+| Dialog | `rounded-2xl` (20) |
+| Popover · HoverCard | `rounded-xl`, 메뉴 · Select 목록 `rounded-lg` |
+| 칩 · 배지 · 단계 칩 · 입력 알약 · ghost 알약 단추 | `rounded-full` |
+| 꼬리표(이름 미정 · 인물) | 6 |
 
 ### 7.2 Nesting 룰
 
-inner radius ≤ outer radius. 예: 카드(`rounded-xl 12`) 안의 button (`rounded-md 6`) OK. 반대는 금지.
+inner radius ≤ outer radius.
 
-### 7.3 Pill threshold
+### 7.3 Pill
 
-`rounded-full`은 **badge / chip / avatar** 한정. **CTA / button group 절대 금지** (소비자 앱 미감).
+v3 는 칩 · 배지 · 빠른 답 · ghost 단추("← 이야기 재료") · 입력 알약 · 보내기 원에 `rounded-full` 을 쓴다. 메인 · 보조 단추는 10.
 
 ---
 
 ## 8. Border
 
-### 8.1 Width scale
-
-`0`, `1` (default), `2` (thick), `4` (hero — 사용 안 함). 1px 이외엔 정당화 필요.
-
-### 8.2 Border vs background vs shadow 정책
-
-- **구분이 필요한가?** → 1px border (`--border`).
-- **계층이 필요한가?** → `--surface-secondary` / `--surface-tertiary`로 elevation.
-- **떠 있는 느낌?** → border만. **shadow는 popover/dialog/toast 한정**.
-
-### 8.3 Hairline color
-
-`--border` 단일 톤. shadcn collapse 그대로. `--border-strong` / `--border-subtle` 는 이미 `src/app/globals.css` (`:root` + `.dark` 양쪽)에 존재 — §2.4 Border tiers 참조. 값은 globals.css가 진실 (여기 복제 금지).
-
-### 8.4 Canvas edge
-
-캔버스 노드 border = `--border` 1px. selected = `--ring` 2px (§17.6).
+v3 는 면 색 차이로 나눈다 — **테두리는 기본으로 그리지 않는다**. 선택 표시(1.5px 단계 색)와 입력 포커스, 꼭 필요한 구분선만.
 
 ---
 
 ## 9. Shadow / Elevation
 
-### 9.1 Shadow scale
-
-Tailwind 표준 shadow 토큰 사용 (값은 Tailwind 기본 — 여기 복제 금지):
-
 | Token | 사용 |
 |---|---|
-| `shadow-none` | **default** — flat 우선 |
-| `shadow-sm` | 카드 (shadcn default, dark에선 무시) |
-| `shadow-md` | popover / dropdown |
-| `shadow-lg` | dialog / sheet |
-| `shadow-xl` | toast / floating CTA |
+| `shadow-none` | 기본 |
+| `shadow-panel` | 큰 내용 판 · 팝오버 · 메뉴 · 다이얼로그 · 툴팁 (0 20 50, 검정 40%) |
+| `shadow-node` | Director 노드 (0 8 24, 검정 35%) |
 
-### 9.2 Per-component elevation map
-
-| 컴포넌트 | Shadow |
-|---|---|
-| Card (page level) | `shadow-none` (dark) / `shadow-sm` (light) |
-| Popover | `shadow-md` |
-| Dropdown menu | `shadow-md` |
-| Dialog | `shadow-lg` |
-| Sheet | `shadow-none` (edge fixed, shadow unnecessary) |
-| Toast | `shadow-xl` |
-| **Canvas node** | `shadow-none` default — 강조는 selection halo 권장 (§17.6). shadow 사용 자유 |
-| Tooltip | `shadow-sm` |
-
-### 9.3 Dark mode 전략
-
-dark에서 box-shadow는 거의 invisible. **border + surface-tertiary 조합으로 elevation 표현**. shadow가 *진짜로* 필요한 popover/dialog/toast는 alpha 충분 (`0.2~0.3`).
-
-### 9.4 Inset shadow
-
-pressed input / button 표현에 미사용. opacity-90 + border-strong로 대체.
+브랜드 가이드: **효과는 아래 그림자 하나만**. glow · 테두리 빛 · backdrop-blur 금지.
 
 ---
 
@@ -487,63 +402,23 @@ pressed input / button 표현에 미사용. opacity-90 + border-strong로 대체
 
 ### 10.1 Duration scale
 
-decisions #30 4-tier:
-
 | Token | ms | 사용 |
 |---|---|---|
-| `duration-100` | 100 | micro-interaction (hover, focus, ring fade) |
-| `duration-150` | 150 | small state (icon toggle, button press) |
-| `duration-250` | 250 | modal / popup open/close, sheet slide |
-| `duration-350` | 350 | layout transition, sidebar expand/collapse |
+| `duration-100` | 100 | hover, focus, 칩 선택 |
+| `duration-150` | 150 | 작은 상태 |
+| `duration-250` | 250 | modal / popup |
+| `duration-350` | 350 | 레이아웃 전환, 채팅 접기 |
 
-**금지**: 500ms+ in-product (canvas pan/zoom은 React Flow default 별도).
+단계 넘김 세로 스트립(520ms)과 큰 Lumi 의 연기(웹 컴포넌트 안)는 예외.
 
-### 10.2 Easing curves
+### 10.2 Reduced-motion 정책
 
-Tailwind 표준 easing 토큰 사용 (cubic-bezier 값은 Tailwind 기본 — 여기 복제 금지):
+- 큰 Lumi 는 동작 줄이기면 `paused`(멈춘 모습) — `components/lumi/lumi.tsx`
+- `.tale-beam` · `.tale-beam-once` · 생각 중 점 · 세로 스트립은 `prefers-reduced-motion` 에서 멈춘다(globals.css)
 
-| Token | 사용 |
-|---|---|
-| `ease-out` | **default for enter** (감속 끝) |
-| `ease-in` | exit (가속 시작) |
-| `ease-in-out` | continuous (slider drag) |
-| `linear` | progress bar / spinner |
+### 10.3 Disallow
 
-### 10.3 Per-interaction recipe
-
-| Interaction | Duration | Easing | Property |
-|---|---|---|---|
-| Button hover | 100 | ease-out | bg-color |
-| Button press | 100 | ease-out | scale-95 |
-| Focus ring | 100 | ease-out | opacity |
-| Input bg on focus | 150 | ease-out | bg-color, border |
-| Dialog open | 250 | ease-out | opacity + scale-95→100 |
-| Dialog close | 200 | ease-in | opacity + scale-100→95 |
-| Sheet slide-in | 250 | ease-out | translate-x |
-| Sheet slide-out | 200 | ease-in | translate-x |
-| Popover open | 150 | ease-out | opacity + translate-y |
-| Toast in | 250 | ease-out | translate-y + opacity |
-| Toast out | 200 | ease-in | opacity |
-| Skeleton pulse | 1500 (linear) | linear | opacity 0.4↔0.7 infinite |
-| Generating spinner | 1000 | linear | rotate infinite |
-| Node selection halo | 100 | ease-out | ring-width 0→2 |
-| Canvas pan/zoom | React Flow default | — | — |
-
-### 10.4 Reduced-motion 정책
-
-**의도 (전체 정책)**:
-- duration을 50ms로 강제 클램프
-- spinner는 정적 dot icon으로 교체 (`motion-reduce:animate-none`)
-- skeleton pulse는 정적 opacity 0.5
-
-**현재 구현**: `src/app/globals.css`에는 `.tale-beam` 컴포넌트의 `prefers-reduced-motion` 분기만 존재 (animation 정지 + 정적 accent ring). 전역 50ms 클램프 CSS 블록은 **미구현** — 향후 추가 예정.
-
-### 10.5 Disallow
-
-- Parallax / scroll-jacking 금지
-- Auto-play video on hover 금지 (썸네일은 정적, 클릭 시 재생)
-- Bouncy spring 금지 (B2B 도구가 장난감 인식)
-- Enter / exit 같은 duration 금지 — exit는 enter의 70~80%
+Parallax · hover 자동 재생 · bouncy spring · enter/exit 같은 duration.
 
 ---
 
@@ -551,181 +426,98 @@ Tailwind 표준 easing 토큰 사용 (cubic-bezier 값은 Tailwind 기본 — �
 
 ### 11.1 Named layer 사다리
 
-`globals.css`에 root variable + Tailwind v4 `@utility` 클래스로 정의됨 — 값은 `src/app/globals.css` `:root` 블록이 진실 (여기 복제 금지). **named class만 사용** (`z-canvas`, `z-toolbar`, `z-modal`, `z-toast` 등). shadcn primitive의 literal `z-50`은 `z-modal` alias와 동일 — 신규 코드는 named class 우선. shadcn 컴포넌트 마이그레이션은 후속 작업.
+`globals.css`에 root variable + `@utility` 클래스(`z-canvas` … `z-toast`). 값은 globals.css 가 진실. named class만 사용.
 
 ### 11.2 Portal 전략
 
-Radix UI primitive (Dialog / Popover / Tooltip / Toast / DropdownMenu)는 body root로 portal escape. 캔버스 안 inspector도 Radix Portal 위 — 캔버스 변형/스크롤 영향 안 받음.
-
-### 11.3 룰
-
-- Literal `z-{number}` 새 코드에 도입 자제. shadcn primitive의 default 사용
-- 캔버스 노드/엣지의 z는 React Flow가 자체 관리 (선택 시 자동 상위)
+Radix primitive 는 body 로 portal — `<html data-stage>` 덕에 지금 단계 색을 그대로 입는다(§2.11).
 
 ---
 
 ## 12. States matrix
 
-각 interactive 컴포넌트의 12 state. AI slop 80% 발생 지점.
+| State | Visual treatment |
+|---|---|
+| Default | base |
+| Hover | `bg-accent` 또는 `/90` |
+| Focus-visible | Info 링 |
+| Selected | 단계 색 1.5px + 18% (칩 · 선택 카드 · pill 탭) / `bg-accent`(segmented) |
+| Disabled | `opacity-50 pointer-events-none` |
+| Loading | `opacity-70` + spinner |
+| Error | `border-destructive text-destructive` + icon + label |
+| Done (레일) | 아이콘 위 흰 원 체크 + 보조 글자 |
 
-| State | Visual treatment | 예외 |
-|---|---|---|
-| **Default** | base | — |
-| **Hover** | `bg-{token}/80` 또는 `bg-accent` | touch device 무시 |
-| **Active / pressed** | `scale-95` 또는 `bg-{token}/70` | 잠시 (~100ms) |
-| **Focus** | (보통 skip) | mouse focus — outline 없음 |
-| **Focus-visible** | `outline-ring/50 outline-2 outline-offset-2` | 키보드 only |
-| **Selected** | `bg-accent` 지속 + 노드는 selection halo | tabs, nav, list |
-| **Disabled** | `opacity-50 pointer-events-none cursor-not-allowed` | aria-disabled="true" |
-| **Loading** | `opacity-70` + spinner (size-4) | aria-busy="true" |
-| **Error** | `border-destructive text-destructive` + icon + label | aria-invalid="true" |
-| **Success** | green text + Check icon + 토스트 | one-shot, no persistent state |
-| **Empty** | empty-state pattern (§13.5) | — |
-| **Read-only** | `bg-muted/50 cursor-default` | aria-readonly="true", disabled와 분리 |
-
-### 12.1 룰
-
-- **Loading ≠ Disabled** — opacity 다르게, spinner 유무.
-- **Color 단독으로 상태 전달 금지** — icon + label + aria 페어 필수.
-- **focus-visible만 ring 표시** — mouse focus는 ring 없음 (브라우저 default).
+- **Color 단독으로 상태 전달 금지** — 고른 칩은 `aria-pressed`, 레일 지금 단계는 `aria-current`.
 
 ---
 
 ## 13. Layout primitives
 
-### 13.1 Studio shell
+### 13.1 Studio shell (v3)
 
 ```
-┌─────────────────────────────────────────────┐
-│ Header (h-14)                                │  ← sticky top
-├─────┬────────────────────────────┬──────────┤
-│ Sb  │ Content                    │ Inspector│
-│ w-60│ (canvas viewport)          │ w-96     │
-│     │                            │ (Sheet)  │
-└─────┴────────────────────────────┴──────────┘
+┌──────┬──────────────────────────────────────┬──────────────┐
+│ Rail │ [Writer] 자판기의 반란 ✎           ··· │ Lumi와 산문 이야기 » │  ← 위 막대 / 채팅 머리
+│  80  │ 산문  씬 2 · 약 15초   [보조][보조][크림]│              │  ← 화면 머리(PageHeader)
+│ 로고  │ ┌────────── 큰 내용 판 ──────────┐    │  말풍선 · 칩  │
+│ 단계  │ │                                │    │              │
+│ ...  │ └────────────────────────────────┘    │ (입력 알약 ↑) │
+│ Take │                                      │              │
+└──────┴──────────────────────────────────────┴──────────────┘
 ```
 
-- Header: `bg-background border-b border-border h-14 px-6`
-- Sidebar: `bg-sidebar w-60 border-r border-border` (collapsed: `w-14`)
-- Content: `flex-1 overflow-auto`
-- Right Inspector: `w-96` default. 캔버스(Director)에서는 NodePopup이 흡수 (Director 결정 #12) — Radix Sheet 미사용.
+- **레일** `src/components/layout/sidebar.tsx`: 맨 위 Tale 로고(누르면 프로젝트 목록) · 단계 칸(v3 채움 아이콘 · 라벨 · 끝낸 단계 체크 · 지금 단계 밝은 바탕과 단계 색 아이콘) · 아래 Take · 공유 · 내보내기 · Help · 프로필. 칸 모습 판정은 `src/lib/stage-rail.ts` `railStageState`(약속 tests/project/rail-done-mark.test.ts).
+- **위 막대** `src/components/layout/studio-top-bar.tsx` `StudioTopBar`: 단계 칩(`StageChip`) · 프로젝트 제목 + 연필(`ProjectTitleField`, 이름 바꾸기) · 오른쪽 자리. 스튜디오 레이아웃이 모든 단계 화면 위에 놓고(위에 붙는 sticky), Producer 시작 화면은 탭이 든 자기 막대를 같은 컴포넌트로 그린다. 화면이 오른쪽 자리에 단추를 놓을 때는 `<TopBarActions>`(포털).
+- **화면 머리** `src/components/layout/page-header.tsx` `PageHeader`: `title` · `tag` · `meta` · `actions`(오른쪽, 메인은 크림). 작업 영역 맨 위.
+- **채팅** `src/components/layout/global-chat.tsx`: §13.10.
 
 ### 13.2 Card anatomy
 
-```
-┌───────────────────────────────────┐
-│ Header (p-4 border-b)              │
-├───────────────────────────────────┤
-│ Body (p-6)                         │
-├───────────────────────────────────┤
-│ Footer (p-4 border-t gap-2)        │
-└───────────────────────────────────┘
-```
-
-- **shadcn Card 미도입** (`ui/card.tsx` 없음) — 현재는 plain `div` 기반 카드. 도입 시 이 anatomy 적용: `Card` / `CardHeader` / `CardContent` / `CardFooter`
-- 모든 카드 `rounded-xl border bg-card`
-- Header 내부 `flex justify-between` — 제목 좌, action 우
+`src/components/ui/card.tsx`(shadcn Card 와 같은 API) — 기본 `panel`(큰 내용 판: `bg-panel rounded-xl p-4 shadow-panel`), `variant="raised"`(카드색 작은 상자). `CardHeader` · `CardTitle`(text-body 600) · `CardDescription` · `CardAction` · `CardContent` · `CardFooter`.
 
 ### 13.3 Dialog anatomy
 
-```
-┌─────────────────────────────────┐
-│ Title         (font-semibold)    │
-│ Description   (text-muted)       │
-├─────────────────────────────────┤
-│ Body                             │
-│ (scrollable)                     │
-├─────────────────────────────────┤
-│           [Cancel] [Confirm]     │  ← LTR primary 우측
-└─────────────────────────────────┘
-```
-
-- shadcn `Dialog` / `DialogHeader` / `DialogTitle` / `DialogFooter`
-- **Primary CTA는 우측** (LTR)
-- Cancel = `variant="ghost"` 또는 `outline`
-- Body가 long-form이면 `max-h-[60vh] overflow-y-auto`
-- header `pb-4`, footer `pt-4 gap-2 justify-end`
+shadcn `Dialog` — 바탕색 판 · `rounded-2xl` · `shadow-panel` · 막 검정 60%. 제목 `text-lg font-semibold`, 설명 `text-label text-muted-foreground`. 메인 단추(크림)는 오른쪽, 취소는 ghost. 확인 팝업의 큰 Lumi 는 2단계 작업.
 
 ### 13.4 Form anatomy
 
-```
-Label (text-sm font-medium)
-[Input          ]
-Helper text (text-xs text-muted)
-또는
-Error message (text-xs text-destructive)  ← invalid 시
-```
-
-- label 위, input 아래, helper / error 더 아래 (3단 vertical)
-- helper와 error는 같은 자리. error 시 helper hide
-- required indicator: label 뒤 `*` (text-destructive)
-- form field 간 `gap-4`
-- form action: 우측 정렬 (Dialog와 동일)
+label 위 · input 아래 · helper/error 더 아래. 입력칸은 카드색 · 테두리 없음 · 자리표시 흐린 글자.
 
 ### 13.5 Empty / Loading / Error 결정 트리
 
-```
-페이지가 데이터를 기다린다 →
-  데이터 모양이 알려져 있는가?
-    YES → Skeleton (list/card shape mimic) — shadcn Skeleton 미도입(`ui/skeleton.tsx` 없음), 직접 구현
-    NO  → Spinner (`size-6 text-muted`) + label "Loading…" (verb-specific 우선)
-
-데이터가 없다 (empty result) →
-  Empty-state pattern:
-    - Icon size-12 (text-muted-foreground)
-    - 제목 text-base font-medium ("아직 생성된 영상이 없어요")
-    - 설명 text-sm text-muted ("스토리를 작성하고 씬을 생성해보세요")
-    - Primary CTA (optional)
-
-데이터 fetch 실패 →
-  Inline error (필드별):  text-xs text-destructive + AlertCircle icon
-  Banner (폼 상단):        Alert variant="destructive"
-  Transient action 실패:   Toast variant="destructive" + retry CTA
-```
-
-### 13.6 List / Table density
-
-| Density | Row height | 사용 |
-|---|---|---|
-| Compact | h-8 (32) | dense data table (shot list, render log) |
-| Default | h-10 (40) | 일반 리스트 |
-| Comfortable | h-12 (48) | nav, primary action list |
-
-### 13.7 Sticky / sticky toolbar
-
-- Studio header `sticky top-0 z-30`
-- Dialog header `sticky top-0 bg-popover`
-- Long form section header `sticky top-14 (header offset)`
-- 캔버스 toolbar: `absolute top-2 right-2` (sticky 아님, viewport 변형 안 됨)
+데이터 모양을 알면 Skeleton, 모르면 Spinner + 동사 문구. 단계 넘어가는 로딩은 큰 Lumi `state="loading"`(2단계 작업). 그림 자리는 `bg-art-placeholder`.
 
 ### 13.8 Component patterns (shadcn primitives)
 
-shadcn CLI(`npx shadcn@latest add <name>`)로 생성, `src/components/ui/`에 위치. 모든 variant×size×state를 **살아있는 토큰으로 렌더하는 카탈로그는 `/design` 쇼케이스 페이지** (`src/app/design/page.tsx`). 새 색·variant 추가 시 거기서 먼저 시각 확인.
+`src/components/ui/`(shadcn CLI 로 만든 파일을 **v3 로 직접 손봤다** — 다시 `shadcn add` 하면 v3 손질이 덮이니 diff 로 되살린다). 살아있는 카탈로그는 **`/design`** (`src/app/design/page.tsx`).
 
-현재 도입된 primitive 목록은 `ls src/components/ui/` 가 진실 — 값/variant 인벤토리는 각 CVA + globals.css 참조 (여기 복제 금지).
+| 컴포넌트 | v3 |
+|---|---|
+| Button | `default` 크림 · `secondary` 카드색 · `outline` 테두리 · `ghost` 바탕 없음(+`rounded-full` 이면 v3 ghost 알약) · `destructive` · `link`(Info) |
+| Badge | + `stage`(지금 단계 색 · 어두운 글씨, 추천) · `tag`(작은 네모 꼬리표) |
+| Tabs | `default` segmented(카드색 묶음 · 눌린 칸 chip) · `pill`(칩처럼 떨어진 탭, 고른 것 단계 색) · `line` |
+| Input · Textarea · Select | 카드색 · 테두리 없음 · Info 포커스 |
+| Popover · HoverCard · Dropdown · Context · Select 목록 | 카드색 · `shadow-panel` |
+| Tooltip | 어두운 말풍선(`surface-elevated`) · 밝은 글씨 |
+| Toaster | 늘 dark |
+| Card | §13.2 |
 
-**표준 조합 스니펫**:
+### 13.9 v3 controls (`src/components/controls/`)
 
-```tsx
-// 패널 하단 footer (CTA) — §6.2 Footer 정렬 (72px)
-<div className="border-t border-border p-4">
-  <Button size="lg" className="w-full">{label}<ArrowRight className="ml-2 h-4 w-4" /></Button>
-</div>
+| 컴포넌트 | 쓰는 곳 |
+|---|---|
+| `ChoiceChip` (`selected` · `recommended` · `tone="screen\|chat"`) | 장르 · 필터 · 빠른 답 — 32px 알약, `aria-pressed` |
+| `OptionCard` (`title` · `description` · `selected` · `recommended`) | 길이 · 화면 비율 · 바꿈 정도 |
+| `RecommendBadge` | "추천" — 지금 단계 색 |
+| `StageChip` (`stage`) | 위 막대 · 단계 표시 — 배지 그라데이션 |
 
-// 입력 footer (CTA와 같은 선 높이) — §6.2 예외
-<div className="border-t border-border p-4">
-  <div className="flex gap-2">
-    <Input className="h-10" placeholder={...} />
-    <Button size="icon-lg"><Send className="size-4" /></Button>
-  </div>
-</div>
+### 13.10 Chat panel (v3)
 
-// stage badge — §2.9 토큰 (face와 동일 색)
-<span className="rounded-full border px-1.5 py-0.5 text-[10px] font-medium
-  bg-stage-writer/15 text-stage-writer border-stage-writer/30">P2 · Writer</span>
-```
-
-**룰**: `src/components/ui/*`는 CLI 관리 — 직접 편집 시 다음 `add`가 덮어쓸 수 있음. 커스텀은 `src/components/<feature>/`. raw hex/px 금지, 토큰만.
+- 머리: Lumi 그림(지금 단계 옷, 답을 기다리면 생각하는 모습) · "Lumi와 {단계에서 하는 일} 이야기"(`STAGE_CHAT_TITLE`, 약속 tests/chat/header-title.test.ts) · 접기(»).
+- 대화는 모든 단계가 이어지는 하나 — 구간 구분선(지금 구간만 단계 색).
+- Lumi 말풍선: 턴 첫 메시지에 아바타 · "Lumi"(단계 색), 이어지는 메시지는 들여쓴다. 승인 카드도 말풍선 꼴(제목 + 보조 글자).
+- 내 말풍선 · 빠른 답 칩(줄바꿈, 고른 칩 단계 색, 숫자 단축키 흐리게) · 입력 알약(카드색 · 포커스 단계 색 · 크림 보내기 원).
+- 알약 아래 한 줄: [+] 첨부(Writer) · 단계 칩(빠른 요청 · 다음 단계) · @멘션 · 모델 고르기.
 
 ---
 
@@ -733,28 +525,16 @@ shadcn CLI(`npx shadcn@latest add <name>`)로 생성, `src/components/ui/`에 �
 
 ### 14.1 Library
 
-**Lucide** (`lucide-react`). 단일 소스. Phosphor / Heroicons mix 금지.
+- **v3 채움 아이콘** `src/components/icons/v3-icons.tsx`(Figma Icons · 채움 16개): 단계 · 레일 아래 단추 · 위 막대 연필 · 탭(화면에서 고르기 · 채팅으로 만들기) · 채팅 접기/열기 · 직접 작성. `currentColor`.
+- **Lucide** (`lucide-react`): 화면 안 작은 선 기호(+ · × · 화살표 · 시계 · 갈매기) — v3 "Icons · 선"과 같은 결.
 
-### 14.2 Sizes & stroke
+### 14.2 Icon + label 페어링
 
-- 인라인: `size-4` (16px)
-- 버튼 안: `size-4` 또는 `size-5`
-- Toolbar / sidebar: `size-5` (20px)
-- Section header: `size-6` (24px)
-- Empty state: `size-12` (48px)
-- Stroke width: Lucide default 1.5 (변경 시 *모든* 아이콘 동일하게)
+icon-only button은 **반드시 `aria-label` + Tooltip**.
 
-### 14.3 Icon + label 페어링
+### 14.3 Custom-icon 정책
 
-- 텍스트가 명확하면 icon은 보조 (decoration)
-- icon-only button은 **반드시 `aria-label` + Tooltip** 페어
-- 캔버스 노드 헤더 4 icon (Edit / Branch / Copy / Delete)은 Tooltip 강제
-
-### 14.4 Custom-icon 정책
-
-- Lucide에 없을 때만 직접 SVG 작성
-- 단일 stroke 1.5 / 같은 viewBox 24×24 / 같은 corner radius
-- `src/components/icons/`에 배치, 명명 `<Name>Icon` (suffix `Icon`)
+Figma 에 있는 v3 아이콘은 `v3-icons.tsx` 에 더한다(이름 `<Name>Icon`). 그 밖은 Lucide.
 
 ---
 
@@ -762,30 +542,26 @@ shadcn CLI(`npx shadcn@latest add <name>`)로 생성, `src/components/ui/`에 �
 
 ### 15.1 Aspect ratios
 
-| Ratio | 사용 |
-|---|---|
-| 1:1 (square) | 캐릭터 카드/시트 thumbnail, avatar |
-| 4:3 | (사용 안 함) |
-| 16:9 | 월드 카드 thumbnail, Video clip, scene preview |
-| 9:16 | mobile preview, 세로 비디오 (post-MVP) |
-| 21:9 | cinematic preview (rare) |
+1:1 인물 · 16:9 배경 · 영상 · 9:16 세로 · 2.39:1 시네마. 큰 Lumi 3:2.
 
-이미지 생성 API 호출 시 에셋 종류에 맞춰 자동 (월드→16:9, 캐릭터→1:1).
-
-### 15.2 Placeholder 전략
+### 15.2 Placeholder
 
 | 상태 | 표현 |
 |---|---|
-| Empty (생성 전) | `bg-muted border-dashed border` + Lucide `ImageOff` icon size-8 |
-| Loading (생성 중) | Skeleton with shimmer (motion-safe) |
-| Failed | `bg-muted border-destructive` + AlertCircle + retry CTA |
-| Loaded | 이미지 + lazy-load |
+| Empty | `bg-art-placeholder`(v3 Content/Art Placeholder) |
+| Loading | Skeleton |
+| Failed | `bg-muted border-destructive` + AlertCircle + retry |
 
-### 15.3 Compression / 포맷
+### 15.3 브랜드 자산
 
-- 사용자 업로드: WebP 우선, PNG (alpha 필요) 허용, JPEG fallback
-- 생성된 이미지: fal 경유 이미지 모델 default 포맷 (실제 모델/포맷은 `src/lib/writer/llm/fal.ts`와 각 generate route가 진실)
-- 압축: Next.js Image automatic optimization
+- 로고 심볼 `public/brand/tale-symbol.svg`(어두운 바탕용) — 레일 맨 위 30px.
+- 색 · 기울기 · 겹침 색을 바꾸지 않는다, 심볼에 테두리 · 흰 광택을 넣지 않는다(브랜드 가이드 "로고 쓰는 법").
+
+### 15.4 Lumi
+
+- **큰 Lumi** `<Lumi persona state size />`(`src/components/lumi/lumi.tsx`): `public/lumi-persona.js`(웹 컴포넌트 `<lumi-persona>`, 약 3.1MB)를 **처음 그릴 때만** 불러온다. 다 불러오기 전 · WebGL 없음 · 불러오기 실패 → 같은 모습의 그림(`public/lumi/full/*.webp`), 동작 줄이기 → `paused`. 한 화면에 큰 Lumi 는 하나. 자리: 단계 넘어가는 로딩 · 프로젝트 목록 첫 화면 · 확인 팝업(2단계 작업).
+- **채팅 아바타** `<LumiAvatar persona state size />`: 그림만(`public/lumi/avatar/*.webp`, 80px). 바탕은 그 단계 색 12%.
+- persona: `pearl`(시작 · 목록) · 여섯 단계 · `complete`(작품 완성). state: idle · listening · thinking · complete · error · loading. 단계 id → persona 는 `STAGE_PERSONA`.
 
 ---
 
@@ -793,154 +569,68 @@ shadcn CLI(`npx shadcn@latest add <name>`)로 생성, `src/components/ui/`에 �
 
 ### 16.1 Button label format
 
-- **동사 우선 명령형** ("씬 추가", "저장", "영상 생성")
-- 명사형 금지 ("Scene Creation" ✗)
-- 영문은 verb-first imperative ("Create scene", not "Scene creation")
+동사 우선 명령형("씬 추가", "다음: Director로"). 영어는 verb-first sentence case.
 
-### 16.2 Case
-
-- 한국어: 동사 종결어미 ("씬 추가", "저장", "삭제")
-- 영문: sentence case 일관 ("Create scene", "Save changes")
-- ALL CAPS는 micro section header 한정
-
-### 16.3 Empty-state copy template
+### 16.2 Empty-state / Error / Loading copy
 
 ```
-{무엇이 없는지}이/가 없어요
-{왜 / 어떻게 생기는지 한 줄}
-[다음 액션 CTA optional]
+{무엇이 없는지}이/가 없어요 / {왜 · 어떻게 생기는지 한 줄} / [다음 액션]
+{무엇이 실패했는지}: {왜}. {어떻게 고칠지} [다시 시도]
 ```
+generic "Loading…" 금지 — 동사로("씬 만드는 중…").
 
-### 16.4 Error message format
+### 16.3 Date / time / number
 
-```
-{무엇이 실패했는지}: {왜}.
-{어떻게 수정}
-[Retry / Detail]
-```
-
-bad: "Something went wrong" — 0 정보.
-good: "이미지 생성 실패: 이미지 생성 서버 응답 시간 초과. 잠시 후 다시 시도해 주세요." + Retry
-
-### 16.5 Loading copy
-
-- generic "Loading…" 금지
-- verb-specific: "씬 생성 중…", "영상 분석 중…", "프리셋 저장 중…"
-
-### 16.6 Date / time / number
-
-- 날짜: ISO 8601 `2026-05-28` (UI table), 한국어 narrative `2026년 5월 28일` (description)
-- 시간: 24h `HH:mm` (UI), `오후 5:23` (narrative)
-- timecode: `HH:MM:SS.ms` mono
-- 숫자 천단위: `1,234` (locale="ko-KR")
-
-### 16.7 Truncation indicator
-
-- ellipsis (`…`) for visual truncation
-- "더 보기" / "Show more" toggle for description / long text
+날짜 `2026-05-28` · 시간 `HH:mm` · timecode `font-num tabular-nums` · 천단위 `1,234`.
 
 ---
 
-## 17. Canvas conventions (tale-studio React Flow)
+## 17. Canvas conventions (Director)
 
-**Director Canvas가 유일한 캔버스 surface** (L0 Concept Canvas는 2026-06-04 폐기 — artist는 카드형 패널, §13 layout 적용). 정량 룰 필수.
+**Director Canvas 가 유일한 캔버스 surface.** v3 D1: 캔버스 판 `--canvas-bg`(#1A1918, 모서리 16) 위에 노드(`--node-bg-default` = 바탕색, 모서리 14, `shadow-node`), 선 흰 20% · 고른 선 Director 색.
 
 ### 17.1 Node sizes
 
-Node width 값은 `src/features/director/canvas-nodes/` 각 컴포넌트의 `width` prop이 진실 (여기 고정하면 코드와 drift — 복제 금지). Height: content-driven (auto). min-h-20 (80px) 최소.
-
-### 17.2 Node padding
-
-- Header: `px-3 py-2` (12/8) with `border-b border-border`
-- Body: `p-3` (12)
-- Port-zone: 노드 가장자리에 absolute positioning, 내부 padding은 영향 없음
+Node width 는 `src/features/director/canvas-nodes/` 각 컴포넌트가 진실. min-h-20.
 
 ### 17.3 Edge stroke
 
-| State / Category | Width | Style | Color |
-|---|---|---|---|
-| `parent` (Scene→Shot→Video 계층) | 2px | solid | `--border` (gray) |
-| `relates-to` | 1.5px | solid | `--border` |
-| Selected | 2px | solid | `--ring` (= primary) |
-| Hovered | 2px | solid | `--muted-foreground` |
-| Invalid (생성 직전 미리보기) | 1.5px | dashed | `--destructive` |
+| State | Width | Color |
+|---|---|---|
+| 기본 | 1.5px | `--edge-default` |
+| Selected | 1.5px | `--edge-selected` (Director 색) |
+| Invalid | 1.5px dashed | `--destructive` |
 
-카테고리 정의는 `DirectorEdgeCategory` 타입 + `canvas-edges/CategoryEdge.tsx`가 진실 (옛 L0 카테고리 in-world/references는 폐기).
-
-**색 분기 금지** (decisions #30). 카테고리는 **굵기 + 스타일**로.
+카테고리는 **굵기 + 스타일**로(색 분기 금지).
 
 ### 17.4 Port size & hit area
 
-- Visual: `size-3` (12px) 원형 dot, `--border` color, hover `--ring`
-- Interactive hit area: 20×20 (visual 주변 padding)
-- React Flow `Handle` 위 wrapper 또는 `style` prop으로 hit area 확장
+Visual `size-3` · hit area 20×20.
 
 ### 17.5 Grid snap
 
-- **16px snap** (decisions Director 내부 #18 + Artist 통일)
-- React Flow `snapToGrid={true} snapGrid={[16, 16]}`
-- 자유 좌표 금지
+**16px snap** — `snapToGrid snapGrid={[16, 16]}`.
 
 ### 17.6 Selection halo
 
-- `ring-2 ring-ring ring-offset-2 ring-offset-canvas-bg`
-- 진입 100ms ease-out
-- 강조는 selection halo 권장 (box-shadow 사용 자유)
+`ring-2 ring-ring ring-offset-2 ring-offset-canvas-bg`, 진입 100ms.
 
-### 17.7 Pan / zoom defaults
+### 17.7 Pan / zoom
 
-- 더블클릭 zoom 비활성 (`zoomOnDoubleClick={false}`) — 더블클릭은 NodePopup open (decisions #33) 또는 빈 공간 CreatorModal
-- minZoom / maxZoom / fitView padding 값은 `src/app/studio/director/page.tsx` 코드가 진실 (미구현 forward — 여기 고정 금지)
-
-### 17.8 Background pattern
-
-- React Flow `<Background>` dots, gap/size/opacity 값은 `src/app/studio/director/page.tsx`가 진실 (복제 금지)
-- color: `--muted-foreground` 기반 + opacity (사용처 책임)
-- `bg-background` (= `--surface-primary`) under
-
-### 17.9 Empty canvas state
-
-- 중앙: 큰 icon size-12 (text-muted-foreground)
-- 제목: "캔버스를 더블클릭해서 첫 Scene을 만들어 보세요"
-- subtitle 옵션: 단축키 안내
-
-### 17.10 Minimap
-
-- 우측 하단 `<MiniMap />`
-- `pannable zoomable` (구현됨)
-- 노드 색 / maskColor 커스텀: 미구현 — 코드는 `src/app/studio/director/page.tsx` MiniMap 참조
+더블클릭 zoom 비활성. 값은 `src/app/studio/director/page.tsx`.
 
 ### 17.11 캔버스 확장 토큰 namespace
 
-shadcn 표준 외 확장. **globals.css에 명시 정의됨** (`:root` alias + `@theme inline` 매핑).
-
-| 토큰 | Alias | Tailwind 클래스 예 |
+| 토큰 | 값(역할) | Tailwind 예 |
 |---|---|---|
-| `--canvas-bg` | `var(--background)` | `bg-canvas-bg` |
-| `--canvas-dot` | `var(--muted-foreground)` (opacity-20 적용은 사용처 책임) | `text-canvas-dot/20` |
-| `--node-bg-default` | `var(--card)` | `bg-node-bg-default` |
-| `--node-bg-selected` | `var(--accent)` | `bg-node-bg-selected` |
-| `--node-border-default` | `var(--border)` | `border-node-border-default`, `ring-node-border-default` |
-| `--node-border-selected` | `var(--ring)` | `border-node-border-selected`, `ring-node-border-selected` |
-| `--edge-default` | `var(--border)` | inline `stroke: var(--edge-default)` |
-| `--edge-selected` | `var(--ring)` | inline `stroke: var(--edge-selected)` |
-
-**룰**: 노드 외곽 표면/엣지 stroke는 위 토큰만 사용. 노드 내부 sub-element (썸네일 frame, separator) 는 기본 `--border` / `--muted-foreground` OK. theme palette (`--chart-1`~`--chart-5`)와 충돌 시 palette가 우선 (노드 정체성 색).
-
-### 17.12 노드 헤더 액션 (decisions #33)
-
-- 4 icon: Edit / Branch / Copy / Delete
-- `size-4` (16px), stroke 1.5
-- gap-1 (4px)
-- 우측 정렬
-- 호버 시 `--accent` 배경 표시 (각 icon마다)
-- Director Video 노드 헤더 ★ (Final 토글) 추가 — `--primary` 색일 때 active (decisions Director 내부 #11)
-
----
-
-## 18. Worked example
-
-(2026-06-10 제거 — 옛 L0 ActorNode 예시 코드는 아키텍처 폐기로 삭제. 본 문서 룰이 적용된 **살아있는 예시는 실코드**: `src/features/director/canvas-nodes/BaseNode.tsx` / `ShotNode.tsx` — §17 정량 룰, selection halo, 4 action icons, tabular-nums 적용 확인 가능.)
+| `--canvas-bg` | 캔버스 판 | `bg-canvas-bg` |
+| `--canvas-dot` | 점 격자(투명도는 사용처) | `text-canvas-dot/20` |
+| `--node-bg-default` | 노드 바탕(= background) | `bg-node-bg-default` |
+| `--node-bg-selected` | 고른 노드(= card) | `bg-node-bg-selected` |
+| `--node-border-default` | `--border` | `border-node-border-default` |
+| `--node-border-selected` | `--ring` | `border-node-border-selected` |
+| `--edge-default` | 흰 20% | inline `stroke: var(--edge-default)` |
+| `--edge-selected` | Director 색 | inline `stroke: var(--edge-selected)` |
 
 ---
 
@@ -948,32 +638,20 @@ shadcn 표준 외 확장. **globals.css에 명시 정의됨** (`:root` alias + `
 
 ### 19.1 design.md vs 코드 충돌
 
-코드가 이김. design.md는 정량 reference. 실제 토큰 값은 `globals.css`가 source-of-truth.
+코드가 이김. 실제 토큰 값은 `globals.css`.
 
-### 19.2 새 컴포넌트 추가 시 워크플로
+### 19.2 새 컴포넌트 추가 시
 
-1. shadcn primitive 있는지 확인 (`/shadcn-component` 스킬)
-2. 기존 토큰으로 표현 가능한지 확인 — 가능하면 새 토큰 만들지 말 것
-3. 새 패턴이면 본 문서 §관련 섹션에 1줄 추가 + `last_updated` 갱신
-4. 새 강제가 필요한 룰만 본 문서에 inline
+1. shadcn primitive 있는지 확인 (`/shadcn-component` 스킬) → v3 로 손본다
+2. 기존 토큰 · controls 로 표현 가능한지 확인 — 가능하면 새 토큰 만들지 말 것
+3. `/design` 쇼케이스에 추가 + 본 문서 §관련 섹션 1줄 + `last_updated` 갱신
 
 ### 19.3 새 토큰 추가 시
 
-1. **정말 필요한가?** 기존 alias로 표현 가능한지 재확인 (37 anti-patterns #1: collapse drift)
-2. globals.css에 추가 (light + dark 둘 다)
-3. `@theme inline`의 색상이면 `--color-{name}` 추가
-4. 본 문서 §2 표 갱신
-5. owner는 docs 메타데이터에서 확인
+1. 정말 필요한가? 2. globals.css `:root` 에 값, 색이면 `@theme inline` 에 `--color-{name}` 3. 글자 크기 · 그림자 이름이면 `src/lib/utils.ts` 의 합치기 설정에도 4. 본 문서 §2 표 · /design 갱신
 
-### 19.4 design.md drift 방지
+### 19.4 drift 방지
 
-- **last_updated 매 PR**: 본 문서 수정 시 frontmatter 날짜 갱신
-- **owner 검증**: 공유 영역 변경은 PR 리뷰
-- **design.md가 enforcement 기준**: 작업 중 적용되는 hard rules는 본 문서와 일관 유지
-- **drift 감지**: §2 표는 *역할만* 기술 (값 컬럼 없음, 2026-06-10) — globals.css 값 변경은 본 문서 갱신 불필요. **토큰 추가/삭제/역할 변경 시에만** §2 표 갱신
-
-### 19.5 다음에 채울 영역 (TBD)
-
-(2026-05-28: 직전 TBD 5개 모두 globals.css에 반영됨 — border tier, semantic state, 캔버스 토큰, z-index named, Pretendard)
-
-현재 비어 있음. 새로 발견되는 미명세 영역은 본 섹션에 1줄 추가 후 후속 작업.
+- 본 문서 수정 시 frontmatter `last_updated` 갱신
+- §2 표는 *역할만*(값은 globals.css) — 토큰 추가/삭제/역할 변경 시에만 갱신
+- 화면 생김새는 테스트가 아니라 스크린샷으로 확인한다(`.claude/rules/owner-gates.md`)

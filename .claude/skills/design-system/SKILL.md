@@ -10,18 +10,19 @@ allowed-tools: Read, Grep, Glob
 
 UI 코드 작성 전 `specs/design.md` (정량 명세) + `specs/design-references.md` (정성 reference) + `src/app/globals.css` (토큰 source-of-truth) 로드.
 
-## 4 hard rules (사용자 명시 지시 없이 위반 금지)
-1. **Dark-first with light parity**. light-only 금지.
-2. **One accent** (Netflix Red `#E50914`, decisions #30) — CTA + active state만.
-3. **Geist Mono** — camera-axis values, render IDs, frame numbers.
-4. **캔버스 확장 토큰** 사용. 새 토큰 만들지 말 것.
+## 6 hard rules — v3 (2026-11-03 오너 지시, 사용자 명시 지시 없이 위반 금지)
+1. **Dark only** — 밝은 테마 금지.
+2. **메인 단추는 크림 하나** (`--primary` 바탕 · 어두운 글씨). 나머지는 secondary(카드색) · ghost.
+3. **지금 단계 색은 지금 단계의 칩 · 선택 · 배지에만** — `--stage`(`data-stage`), 한 화면에 단계 색 하나.
+4. **Pretendard(글자) + Inter(숫자 · 메타, `font-num`)** — 고정폭 글꼴 없음.
+5. **No glassmorphism** — 반투명 + backdrop-blur 판 금지, 효과는 아래 그림자 하나(`shadow-panel`).
+6. **캔버스 확장 토큰** 사용. 새 토큰 만들지 말 것.
 
 ## "We are NOT" exclusion list
-- NOT Higgsfield (glassmorphism, neon 금지)
-- NOT 커뮤니티-flavored 오픈소스 도구 (n8n loud 카테고리 배너 금지)
-- NOT consumer-creator (light-first, marketing gradient 금지)
-- NOT marketing-tier 대시보드 (featured 캐러셀, hero 모듈 in-studios 금지)
-- NOT pure-black Vercel-extreme (pure `#000` 금지 — Netflix Dark `#121212`)
+- NOT Higgsfield (glassmorphism, neon 금지 — Lumi 3D 는 브랜드 자산이라 정해진 자리에만)
+- NOT 커뮤니티-flavored 오픈소스 도구 (loud 카테고리 배너 금지)
+- NOT 여러 색 대시보드 (지난 단계는 무채색)
+- NOT pure-black (`#000` 금지 — 바탕은 Shell `#262624` 따뜻한 무채색)
 
 ## Process
 1. `specs/design.md`와 `specs/design-references.md` 안 읽었으면 읽기
@@ -31,14 +32,15 @@ UI 코드 작성 전 `specs/design.md` (정량 명세) + `specs/design-reference
 5. 새 토큰 필요하면 §19.3 워크플로 — 정말 필요한지 재확인 → globals.css → design.md §2 표 갱신
 
 ## 자주 참조하는 섹션
-- §1 5 design 원칙 + 4 hard rules + "We are NOT"
-- §2 Color tokens (chart-1~5 = Actor/World/Scene/Shot/Video 매핑)
-- §2.9 Stage 색 (`--stage-producer~editor`, P1~P5 badge/face. director=rose, NOT accent)
-- §4 Typography per-context 할당 + Geist Mono 강제 영역
-- §13 Layout primitives (shell, dialog, form, empty/loading/error)
-- §13.8 Component patterns (shadcn primitive 인벤토리 + 표준 조합 스니펫)
+- §0 v3 로 바뀐 까닭 · 오너 11/3 결정
+- §1 5 design 원칙 + 6 hard rules + "We are NOT"
+- §2 Color tokens (shell · side · panel · card · chip, 글자 3단, 상태 4색)
+- §2.9 Stage 색 (브랜드 가이드 값, 화면 이름 기준) · §2.10 채팅 색 · §2.11 `data-stage`
+- §4 Typography (Pretendard + Inter, text-title · text-label · text-meta …)
+- §13 Layout primitives (레일 · 위 막대 `StudioTopBar` · 화면 머리 `PageHeader` · Card · 채팅)
+- §13.8 shadcn primitive v3 손질 · §13.9 controls(`ChoiceChip` · `OptionCard` · `RecommendBadge` · `StageChip`)
+- §15.4 Lumi (`Lumi` 큰 · `LumiAvatar` 채팅)
 - §17 Canvas conventions (정량 룰 11개)
-- §18 Worked example — Actor node 풀 코드
 
 ## 살아있는 카탈로그
 - **`/design` 쇼케이스** (`src/app/design/page.tsx`) — 전 색 토큰 swatch + primitive variant/state를 살아있는 토큰으로 렌더. 새 색·variant 추가 시 여기서 먼저 시각 확인.
