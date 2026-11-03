@@ -1,7 +1,7 @@
 'use client'
 
 import { memo } from 'react'
-import { BaseEdge, EdgeLabelRenderer, getBezierPath, useViewport, type EdgeProps } from '@xyflow/react'
+import { BaseEdge, EdgeLabelRenderer, getBezierPath, useStore, useViewport, type EdgeProps } from '@xyflow/react'
 import { X } from 'lucide-react'
 import type {
   DirectorEdge,
@@ -19,22 +19,25 @@ const DELETABLE_CATEGORIES: ReadonlySet<DirectorEdgeCategory> = new Set<Director
   'relates-to',
 ])
 
+// v3 D1(2026-11-03): 선 굵기는 모두 1.5 — 종류는 점선 무늬로만 가른다.
 const STYLE_BY_CATEGORY: Record<
   DirectorEdgeCategory,
   { strokeWidth: number; strokeDasharray?: string }
 > = {
-  parent: { strokeWidth: 2 },
+  parent: { strokeWidth: 1.5 },
   'relates-to': { strokeWidth: 1.5 },
   references: { strokeWidth: 1.5, strokeDasharray: '4 4' }, // Asset→Shot, 점선
   prompt: { strokeWidth: 1.5, strokeDasharray: '2 3' }, // Prompt→Shot T 입력
   image: { strokeWidth: 1.5, strokeDasharray: '3 3' }, // Image→Shot reference input
   frame: { strokeWidth: 1.5, strokeDasharray: '2 3' }, // Video frame 입력
-  'video-chain': { strokeWidth: 2, strokeDasharray: '6 3' }, // Video last-frame → Video START
-  chain: { strokeWidth: 2 }, // previz 체인(파생) — parent 와 동일한 실선 계층 표현
+  'video-chain': { strokeWidth: 1.5, strokeDasharray: '6 3' }, // Video last-frame → Video START
+  chain: { strokeWidth: 1.5 }, // previz 체인(파생) — parent 와 동일한 실선 계층 표현
 }
 
 function CategoryEdgeImpl({
   id,
+  source,
+  target,
   sourceX,
   sourceY,
   targetX,
@@ -59,7 +62,9 @@ function CategoryEdgeImpl({
 
   const category = (data?.category ?? 'parent') as DirectorEdgeCategory
   const style = STYLE_BY_CATEGORY[category]
-  const stroke = selected ? 'var(--edge-selected)' : 'var(--edge-default)'
+  // v3 D1: 고른 노드에 이어진 선도 지금 단계 색으로 — 어느 선이 그 노드 것인지 보인다.
+  const touchesSelected = useStore((s) => !!(s.nodeLookup.get(source)?.selected || s.nodeLookup.get(target)?.selected))
+  const stroke = selected || touchesSelected ? 'var(--edge-selected)' : 'var(--edge-default)'
 
   return (
     <>

@@ -29,7 +29,7 @@ import { useEditorPlayback } from '@/features/editor/use-editor-playback'
 import { prefetchVideos, resetVideoPrefetchFor } from '@/features/editor/video-prefetch'
 import { useEditorStore, selectTimelineLayout, zoomStep } from '@/stores/editor-store'
 import { useProjectStore } from '@/stores/project-store'
-import { useChatUiStore } from '@/stores/chat-ui-store'
+import { useHoldChatClosed } from '@/hooks/use-hold-chat-closed'
 import { decodeAudioPeaks } from '@/lib/audio-waveform'
 import { downloadShotsZip } from '@/lib/editor-zip-export'
 import { renderDraftTimeline } from '@/lib/editor-draft-render'
@@ -349,14 +349,8 @@ export default function PostPage() {
     }
   }, [projectId, loadData, loadPersisted, t, retryTick])
 
-  // Editor 진입 시 채팅 기본 접힘 (요청 6b). 떠날 때 이전 상태 복원
-  useEffect(() => {
-    const prev = useChatUiStore.getState().collapsed
-    useChatUiStore.setState({ collapsed: true })
-    return () => {
-      useChatUiStore.setState({ collapsed: prev })
-    }
-  }, [])
+  // Editor 진입 시 채팅 기본 접힘 (요청 6b). 떠날 때 이전 상태 복원 — Director 와 같은 약속(닫아 둔 모습은 기억에 남기지 않는다).
+  useHoldChatClosed('editor')
 
   // 프레임 이동 버튼 꾹 누르기 → 연속 반복 (요청 2)
   const holdRef = useRef<ReturnType<typeof setInterval> | null>(null)

@@ -309,16 +309,17 @@ function ShotCell({
   //   색으로도 구분: 영상=빨강(primary), 이미지=하늘, 미생성=경고.
   //   2026-08-11: 라벨에서 "단계"를 걷어내고(중복어) 호버 없이 처음부터 문구까지 보이게 했다 —
   //   한눈에 읽으라고 만든 배지가 호버해야 읽히면 배지가 아니라 툴팁이다.
+  //   v3(2026-11-03): 그림 위 어두운 꼬리표(검정 45%) — 영상은 지금 단계 색 글자, 아직 필요한 것은 경고 색 글자.
   const stageBadge =
     mediaMode === 'previz'
       ? roughStartUrl
-        ? { label: 'Previz', cls: 'border-sky-400/50 text-sky-300', video: false }
-        : { label: t('Rough needed'), cls: 'border-warning/50 text-warning', video: false }
+        ? { label: 'Previz', cls: 'text-foreground', video: false }
+        : { label: t('Rough needed'), cls: 'text-warning', video: false }
       : completedVideoUrl
-        ? { label: t('Video'), cls: 'border-primary/50 text-primary', video: true }
+        ? { label: t('Video'), cls: 'text-stage', video: true }
         : hasImage
-          ? { label: t('Image'), cls: 'border-sky-400/50 text-sky-300', video: false }
-          : { label: t('Image needed'), cls: 'border-warning/50 text-warning', video: false }
+          ? { label: t('Image'), cls: 'text-foreground', video: false }
+          : { label: t('Image needed'), cls: 'text-warning', video: false }
 
   const runImage = async () => {
     if (imageGeneration.disabled) return
@@ -481,7 +482,8 @@ function ShotCell({
   return (
     <>
     <div
-      className="group flex cursor-pointer flex-col rounded-xl border border-border bg-card p-2.5 transition-colors duration-100 hover:bg-accent/40 hover-red-beam"
+      // v3(2026-11-03): 노드 캔버스와 같은 판(작업 바탕색 · 모서리 16 · 그림자 하나 · 안쪽 12) — 캔버스 판(--canvas-bg) 위에 뜬다.
+      className="group flex cursor-pointer flex-col rounded-2xl bg-background p-3 shadow-node transition-colors duration-100 hover:bg-card"
       onClickCapture={(event) => {
         if (mentionCardOnModifierClick(event)) {
           event.preventDefault()
@@ -499,7 +501,8 @@ function ShotCell({
           비율이 균일해 행 정렬도 유지). 영상·단일 이미지·플레이스홀더·생성 중은 16:9 고정. */}
       <div
         className={cn(
-          'relative overflow-hidden',
+          // v3 S1 그림 칸: 모서리 14, 그림이 없으면 그림 자리 그라데이션.
+          'relative overflow-hidden rounded-[14px] bg-art-placeholder',
           // 영상·단일 이미지·자리표시·생성 중 상자는 Producer 포맷의 비율(2026-09-30) — 가로 프로젝트만 종전 16:9.
           !(framePanel && !generating) && !gridFrame && 'aspect-video',
         )}
@@ -536,7 +539,7 @@ function ShotCell({
         ) : status === 'failed' ? (
           // 실패 시 이미지 자리에 로그 표시 (사용자 요청)
           <div className="flex size-full flex-col items-center justify-center gap-1 bg-destructive/10 p-2 text-center">
-            <span className="text-[11px] font-medium text-destructive">
+            <span className="text-[11.5px] font-semibold text-destructive">
               {t('Generation failed')}
             </span>
             {img?.errorMessage && (
@@ -558,16 +561,16 @@ function ShotCell({
           ) : (
             // 실사 미생성(#real-empty-guidance 2026-08-27 오너): 진입 자동 생성이 꺼진 뒤로
             //   스피너는 "곧 채워진다"는 거짓말이 됐다 — 사용자가 눌러야 생기니 안내 문구로.
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black p-3 text-center">
-              <ImageIcon className="size-6 text-white/30" />
-              <span className="text-[11px] font-medium text-white/70">
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 p-3 text-center">
+              <ImageIcon className="size-6 text-subtle-foreground" />
+              <span className="text-[11.5px] font-medium text-muted-foreground">
                 {t('Generate a Real image.')}
               </span>
             </div>
           )
         ) : (
-          <div className="flex size-full items-center justify-center bg-muted">
-            <ImageIcon className="size-8 text-muted-foreground opacity-50" />
+          <div className="flex size-full items-center justify-center">
+            <ImageIcon className="size-8 text-subtle-foreground" />
           </div>
         )}
 
@@ -578,7 +581,7 @@ function ShotCell({
           <div className="group/badge absolute left-2 top-2 z-10">
             <span
               className={cn(
-                'inline-flex items-center gap-1 rounded-md border bg-background/85 px-1.5 py-1 text-[10px] font-medium',
+                'inline-flex items-center gap-1 rounded-[6px] bg-black/45 px-1.5 py-0.5 text-[11px] font-semibold',
                 stageBadge.cls,
               )}
             >
@@ -590,14 +593,14 @@ function ShotCell({
               <span className="whitespace-nowrap">{stageBadge.label}</span>
             </span>
             {roughChanged && (
-              <span className="inline-flex items-center rounded-full border border-warning/50 px-1.5 py-0.5 text-[10px] text-warning">
+              <span className="ml-1 inline-flex items-center rounded-[6px] bg-black/45 px-1.5 py-0.5 text-[11px] font-semibold text-warning">
                 {t('Rough changed')}
               </span>
             )}
             {/* 액션 목록(#e1 2026-08-12) — absolute 라 자리를 차지하지 않는다: 리스트가 투명한
                 동안(pointer-events-none) 그 영역 호버는 통과되므로 **배지 위에서만** 열린다.
                 열린 뒤에는 pt-1 브리지가 배지→리스트 이동 중 호버 이탈을 막는다. w-24 로 축소. */}
-            <div className="pointer-events-none absolute left-0 top-full flex w-24 flex-col gap-1 pt-1 opacity-0 transition-opacity duration-150 focus-within:pointer-events-auto focus-within:opacity-100 group-hover/badge:pointer-events-auto group-hover/badge:opacity-100">
+            <div className="pointer-events-none absolute left-0 top-full flex w-28 flex-col gap-1 pt-1 opacity-0 transition-opacity duration-150 focus-within:pointer-events-auto focus-within:opacity-100 group-hover/badge:pointer-events-auto group-hover/badge:opacity-100">
               {actions.map((a) => (
                 <button
                   key={a.key}
@@ -609,10 +612,10 @@ function ShotCell({
                     a.onClick()
                   }}
                   className={cn(
-                    'h-6 w-full rounded-md px-2 text-left text-[11px] font-medium shadow-sm transition-colors duration-100 disabled:cursor-not-allowed disabled:opacity-50',
+                    'h-7 w-full rounded-full px-3 text-left text-[11.5px] font-semibold shadow-node transition-colors duration-100 disabled:cursor-not-allowed disabled:opacity-50',
                     a.primary
                       ? 'bg-primary text-primary-foreground hover:bg-primary/85'
-                      : 'bg-background/90 text-foreground backdrop-blur hover:bg-accent',
+                      : 'bg-card text-foreground hover:bg-accent',
                   )}
                 >
                   {a.label}
@@ -643,7 +646,7 @@ function ShotCell({
         {imageGeneration.phase === 'uncertain' && (
           <button
             type="button"
-            className="absolute right-2 top-2 z-20 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+            className="absolute right-2 top-2 z-20 rounded-full bg-card px-3 py-1 text-xs font-medium text-foreground shadow-node hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
             disabled={manualUncertain && realBatchBusy}
             onClick={(event) => {
               event.stopPropagation()
@@ -722,7 +725,7 @@ function ShotCell({
 
       {/* #f9(2026-08-26 오너): 글자(캡션) 원클릭 = 편집 팝업 — 더블클릭을 몰라도 수정 진입. */}
       <div
-        className="flex cursor-text flex-col gap-1 rounded-md px-1 pb-0.5 pt-2.5 transition-colors hover:bg-accent/60"
+        className="flex cursor-text flex-col gap-1 rounded-lg px-1 pb-0.5 pt-2.5 transition-colors hover:bg-accent/60"
         title={t('Click to edit this shot')}
         onClick={(event) => {
           if (isMentionModifierClick(event)) return
@@ -730,7 +733,7 @@ function ShotCell({
           openDetail()
         }}
       >
-        <span className="truncate text-sm font-medium text-foreground">
+        <span className="truncate text-label font-semibold text-foreground">
           {sceneLabel ? `${sceneLabel} · ` : ''}
           {shotLabel}
         </span>
@@ -882,11 +885,11 @@ export function StoryboardGridView({
     return (
       <div className="flex size-full items-center justify-center overflow-auto">
         <div className="flex flex-col items-center gap-2 text-center">
-          <ImageIcon className="size-12 text-muted-foreground opacity-50" />
-          <p className="text-base font-medium text-foreground">
+          <ImageIcon className="size-12 text-subtle-foreground" />
+          <p className="text-body font-semibold text-foreground">
             {t('No Shots yet')}
           </p>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-label text-muted-foreground">
             {t('Create a Scene and Shot first in the Node view.')}
           </p>
         </div>
@@ -913,7 +916,7 @@ export function StoryboardGridView({
   return (
     // Artist/Editor와 동일한 디자인 룰 — shadcn ScrollArea(스타일된 스크롤바).
     // 기존 raw overflow-auto(네이티브 스크롤바)를 교체. 부모 `min-h-0 flex-1`가 높이를 가둔다.
-    <div className="flex size-full min-h-0 flex-col bg-background">
+    <div className="flex size-full min-h-0 flex-col">
       <ScrollArea className="min-h-0 flex-1">
       {/* key=mediaMode: Previz↔Real 전환 시 remount 로 슬라이드 재생(#e2 2026-08-03).
           방향은 토글 순서(Previz 왼쪽·Real 오른쪽) — real 로 갈 땐 오른쪽에서, 되돌아오면 왼쪽에서. */}
@@ -923,17 +926,18 @@ export function StoryboardGridView({
         aria-label={t('Storyboard board')}
         onKeyDown={handleBoardKeyDown}
         className={cn(
-          'flex flex-col gap-6 p-6',
+          'flex flex-col gap-7 px-4 pb-6 pt-3',
           'animate-in fade-in-25 duration-500 ease-out motion-reduce:animate-none',
           mediaMode === 'real' ? 'slide-in-from-right-6' : 'slide-in-from-left-6',
         )}
       >
         {groups.map((group) => (
-          <section key={group.key} className="flex flex-col gap-4">
-            <div className="flex items-baseline gap-3">
+          <section key={group.key} className="flex flex-col gap-3">
+            {/* v3 S1 씬 머리: 씬 이름(15px 600) · 흐린 장소 · 시간 */}
+            <div className="flex items-baseline gap-2.5">
               <h2
                 className={cn(
-                  'text-lg font-medium text-foreground',
+                  'text-[15px] font-semibold text-foreground',
                   group.key !== '__orphan__' && 'cursor-pointer',
                 )}
                 onClick={(event) => {
@@ -950,7 +954,7 @@ export function StoryboardGridView({
               >
                 {group.label}
               </h2>
-              <span className="flex items-center gap-3 text-xs text-muted-foreground">
+              <span className="flex items-center gap-3 text-[12.5px] text-subtle-foreground">
                 {group.location && (
                   <span className="flex items-center gap-1">
                     <MapPin className="size-3" />
@@ -969,7 +973,7 @@ export function StoryboardGridView({
 
             {group.shots.length > 0 ? (
               <div
-                className="grid gap-4 p-0.5"
+                className="grid gap-3 p-0.5"
                 style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
               >
                 {group.shots.map((shot) => (
@@ -989,7 +993,7 @@ export function StoryboardGridView({
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-meta text-subtle-foreground">
                 {t('This Scene has no Shots.')}
               </p>
             )}

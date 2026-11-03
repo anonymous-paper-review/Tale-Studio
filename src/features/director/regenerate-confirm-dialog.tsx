@@ -7,8 +7,12 @@
 //   (rules/architecture §5: "빈칸 자율 채움 vs 차 있는 것 교체는 사람만").
 //
 // 채팅의 승인 게이트(pendingProposal)와 같은 문법으로 무엇이 바뀌는지를 먼저 보여준다.
+//
+// v3(2026-11-03, 오너 결정 8): "~할까요?"를 묻는 확인 창이라 위에 큰 Lumi(Director 옷, 기본 모습)를 둔다.
+//   지우기 확인 · 오류 안내에는 두지 않는다(이 창은 다시 만들기 · 영상 일괄 만들기에만 쓴다).
 
 import { Loader2 } from 'lucide-react'
+import { Lumi } from '@/components/lumi/lumi'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -44,7 +48,8 @@ export function RegenerateConfirmDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+        <Lumi persona="director" state="idle" size={180} className="mx-auto -mb-1" />
+        <DialogHeader className="items-center text-center sm:text-center">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>

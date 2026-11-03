@@ -28,15 +28,17 @@ function AssetNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       width={240}
       canDelete={false}
       beam={data.generationStatus === 'generating' ? 'success' : null}
+      // v3 D1 "Elias [인물]" — 역할은 제목 옆 꼬리표, 등록만 하고 안 쓰는 에셋은 그 옆에 흐리게.
+      tag={
+        <>
+          <span className="shrink-0 rounded-[6px] bg-card px-1.5 py-0.5 text-[10.5px] font-medium leading-none text-muted-foreground">
+            {role}
+          </span>
+          {data.unused && <span className="shrink-0 text-[11px] text-subtle-foreground">{t('Unused')}</span>}
+        </>
+      }
     >
-      <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
-        <span className="rounded-sm border border-border px-1.5 py-0.5">
-          {role}
-        </span>
-        {data.unused && <span>· {t('Unused')}</span>}
-      </div>
-
-      <div className="relative mt-2 flex aspect-video w-full items-center justify-center overflow-hidden rounded-sm border border-border/40 bg-muted">
+      <div className="relative mt-2 flex aspect-video w-full items-center justify-center overflow-hidden rounded-[10px] bg-art-placeholder">
           {data.imageUrl ? (
             <ThumbImage
               src={data.imageUrl}
@@ -46,7 +48,7 @@ function AssetNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             />
           ) : (
           <div className="flex h-full w-full items-center justify-center">
-              <ImageIcon className="size-4 text-muted-foreground" />
+              <ImageIcon className="size-4 text-subtle-foreground" />
             </div>
           )}
         <GeneratingOverlay
@@ -55,12 +57,9 @@ function AssetNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         />
       </div>
 
-      <div className="mt-2 flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
-        <span className="truncate">{model.label}</span>
-        <span>{role}</span>
-      </div>
+      <div className="mt-2 truncate text-[11px] text-subtle-foreground">{model.label}</div>
       {data.generationError && (
-        <p className="mt-1 line-clamp-2 text-[10px] text-destructive">
+        <p className="mt-1 line-clamp-2 text-[11px] text-destructive">
           {data.generationError}
         </p>
       )}

@@ -171,10 +171,10 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       {/* 선택 시 상단 플로팅 툴바(#e4) — 옛 SHOT IMAGE 카드의 '새 영상 테이크'가 여기로 이동.
           부모 샷 설정으로 새 테이크를 만들어 재생성한다. */}
       <NodeToolbar isVisible={selected} position={Position.Top} offset={8}>
-        <div className="flex items-center gap-1 rounded-md border border-border bg-popover p-1 shadow-md">
+        <div className="flex items-center gap-1.5 rounded-full bg-popover p-1 pr-2.5 shadow-node">
           <Button
             size="sm"
-            className="h-7 gap-1 px-2 text-xs"
+            className="h-7 gap-1 rounded-full px-3 text-xs"
             disabled={ownerGenerating || data.lastAttemptStatus === 'generating'}
             onClick={(e) => {
               e.stopPropagation()
@@ -191,7 +191,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           </Button>
           {/* #payments-phase-2 v4 #2: 생성 전 소모량 표시 — mode==='off'면 배지 숨김. */}
           {takeBalance.mode !== 'off' && (
-            <span className="rounded-sm border border-primary/40 bg-primary/10 px-1.5 py-1 text-[10px] font-medium text-foreground">
+            <span className="font-num text-[11px] font-medium text-muted-foreground">
               {/* 표시는 서버가 실제로 쓰는 모델 · 해상도 기준이어야 한다 — 설정에 남은 옛 모델 이름은
                   제출 전에 기본 모델로 바뀐다(video-batch-plan 의 승인 카드와 같은 계산). 1080p 는 두 배. */}
               {t('{count} Take', { count: takeCostForVideo(effectiveProvider ? normalizeProvider(effectiveProvider) : null, chosenResolution) })}
@@ -229,34 +229,35 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
     >
       {/* Manual frame wiring inputs(#handle-visibility) — 항상 보이는 라벨 홈들.
           hover-only 8px 점은 "구멍이 안 보인다"는 오너 피드백의 원인이었다. */}
+      {/* v3 D1: 한국어 라벨 · 20px 간격(제목 줄 아래부터). */}
       <LabeledTargetHandle
         id="video-chain"
-        label="PREV"
-        top={36}
+        label={t('Previous video')}
+        top={46}
         title={t('Previous-video last-frame input')}
       />
       <LabeledTargetHandle
         id="frame-start"
-        label="START"
-        top={62}
+        label={t('Start')}
+        top={66}
         title={t('START frame input')}
       />
       <LabeledTargetHandle
         id="frame-end"
-        label="END"
-        top={88}
+        label={t('End')}
+        top={86}
         title={t('END frame input')}
       />
       <LabeledTargetHandle
         id="frame-ref"
-        label="REF"
-        top={114}
+        label={t('Reference')}
+        top={106}
         title={t('REF frame input')}
       />
       {/* 영상 재생 / 썸네일 / 상태 — single-play: playingNodeId===id 일 때만 <video> 마운트.
           nodrag·nopan: React Flow 가 영상/버튼 상호작용을 노드 드래그·팬으로 가로채지 않게. */}
       <div
-        className={cn('relative mt-1 flex items-center justify-center overflow-hidden rounded-sm border border-border/40 bg-muted/40', !mediaFrame && 'h-24 w-full')}
+        className={cn('relative mt-2 flex items-center justify-center overflow-hidden rounded-[10px] bg-art-placeholder', !mediaFrame && 'h-24 w-full')}
         style={mediaFrame ?? undefined}
       >
         {data.status === 'failed' && !data.videoUrl ? (
@@ -307,12 +308,12 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             type="button"
             onClick={handlePlay}
             aria-label={t('Play')}
-            className="nodrag flex h-full w-full items-center justify-center transition-colors hover:bg-muted/60"
+            className="nodrag flex h-full w-full items-center justify-center transition-colors hover:bg-black/20"
           >
             <Play className="size-6 fill-muted-foreground text-muted-foreground" />
           </button>
         ) : (
-          <span className="text-[10px] text-muted-foreground">{t('Waiting')}</span>
+          <span className="text-[11px] text-subtle-foreground">{t('Waiting')}</span>
         )}
 
         <GeneratingOverlay
@@ -327,7 +328,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           {overrideKeys.map((k) => (
             <span
               key={k}
-              className="rounded-sm border border-warning/50 bg-warning/10 px-1 text-[9px] uppercase text-warning"
+              className="rounded-[6px] bg-warning/10 px-1.5 py-px text-[10px] font-medium text-warning"
             >
               {k}
             </span>
@@ -337,27 +338,29 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
 
       {/* 약속 H(2026-09-04, 오너 1안): 작은 영문 "take 1 · completed" 대신 큰 상태 글자. take 번호는 카드에서 빼고
           마우스를 올리면(title)·왼쪽 상세·팝업에서 작게 보인다. */}
+      {/* v3 D1 꼬리: 상태 점(완료 초록 · 실패 빨강) + 상태 글자, 오른쪽에 1080p · FINAL. */}
       <div
-        className="mt-2 flex items-center justify-between"
+        className="mt-2.5 flex items-center justify-between gap-2"
         title={t('Take {n}', { n: data.takeNumber })}
       >
-        <span
-          className={cn(
-            'text-sm font-semibold',
-            (data.lastAttemptStatus ?? data.status) === 'failed'
-              ? 'text-destructive'
-              : (data.lastAttemptStatus ?? data.status) === 'generating'
-                ? 'text-primary'
-                : (data.lastAttemptStatus ?? data.status) === 'completed'
-                  ? 'text-success'
-                  : 'text-muted-foreground',
-          )}
-        >
-          {videoStatusLabel(data.lastAttemptStatus ?? data.status, t)}
+        <span className="flex items-center gap-1.5 text-[11.5px] font-semibold">
+          {(data.lastAttemptStatus ?? data.status) === 'completed' && <span className="size-1.5 rounded-full bg-success" />}
+          {(data.lastAttemptStatus ?? data.status) === 'failed' && <span className="size-1.5 rounded-full bg-destructive" />}
+          <span
+            className={cn(
+              (data.lastAttemptStatus ?? data.status) === 'failed'
+                ? 'text-destructive'
+                : (data.lastAttemptStatus ?? data.status) === 'generating' || (data.lastAttemptStatus ?? data.status) === 'completed'
+                  ? 'text-foreground'
+                  : 'text-subtle-foreground',
+            )}
+          >
+            {videoStatusLabel(data.lastAttemptStatus ?? data.status, t)}
+          </span>
         </span>
         <span className="flex items-center gap-1.5">
-          {madeAt1080p && <span className="font-mono text-[10px] text-muted-foreground">1080p</span>}
-          {data.final && <span className="font-mono text-[10px] text-warning">★ FINAL</span>}
+          {madeAt1080p && <span className="font-num text-[11px] text-subtle-foreground">1080p</span>}
+          {data.final && <span className="font-num text-[11px] font-semibold text-warning">★ FINAL</span>}
         </span>
       </div>
       {/* #adherence P2: 모션 계약 위반 배지 — 첫/끝 프레임 검사 결과. */}

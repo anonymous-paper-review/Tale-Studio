@@ -18,38 +18,35 @@ function PromptNodeImpl({ data, selected }: NodeProps<DirectorNode>) {
   return (
     <div
       className={cn(
-        'group relative w-56 rounded-lg bg-node-bg-default transition-[border-width] duration-100',
-        'border',
-        selected
-          ? 'border-2 border-primary ring-4 ring-primary/30'
-          : 'border-border hover:border-2 hover:ring-4 hover:ring-primary/20',
+        // v3 D1(2026-11-03): 다른 노드와 같은 판(작업 바탕색 · 모서리 14 · 그림자 하나), 고른 노드만 지금 단계 색 테두리.
+        'group relative w-56 rounded-[14px] border-[1.5px] bg-node-bg-default p-3 shadow-node transition-[border-color] duration-100',
+        selected ? 'border-stage' : 'border-transparent hover:border-border',
       )}
     >
       <Handle
         type="source"
         position={Position.Right}
         id="right"
-        className="!h-2 !w-2 !border-0 bg-foreground/60 opacity-0 group-hover:opacity-100"
+        className="!size-2.5 !rounded-full !border-2 !border-canvas-bg !bg-muted-foreground transition-transform hover:!scale-125"
+        style={{ top: 28 }}
       />
 
-      <div className="flex h-7 items-center gap-1.5 border-b border-border/60 px-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        <span className="h-1.5 w-1.5 rounded-full bg-foreground/50" />
-        Prompt
+      <div className="flex h-4 items-center gap-1.5 text-[11px] font-medium text-subtle-foreground">
+        <span className={cn('size-1.5 rounded-full', selected ? 'bg-stage' : 'bg-subtle-foreground')} />
+        {t('Prompt')}
       </div>
 
-      <div className="p-3">
-        <p
-          className={cn(
-            'whitespace-pre-wrap text-xs',
-            data.text ? 'text-foreground' : 'text-muted-foreground',
-          )}
-        >
-          {data.text || 'Describe what you want to create...'}
-        </p>
-        {data.targetShotNodeId && (
-          <p className="mt-2 text-[10px] text-muted-foreground">→ {t('Connected to Shot')}</p>
+      <p
+        className={cn(
+          'mt-2 whitespace-pre-wrap text-[11.5px] leading-[1.45]',
+          data.text ? 'text-foreground' : 'text-subtle-foreground',
         )}
-      </div>
+      >
+        {data.text || t('Describe what you want to create...')}
+      </p>
+      {data.targetShotNodeId && (
+        <p className="mt-2 text-[11px] text-subtle-foreground">→ {t('Connected to Shot')}</p>
+      )}
     </div>
   )
 }
