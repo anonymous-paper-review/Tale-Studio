@@ -51,6 +51,22 @@ export function proseConditionLine(
   ].filter(Boolean).join(' · ')
 }
 
+const SEED_VALUE: Record<ProseSeed, string> = { keep: 'Keep', new: 'New' }
+
+/** 산문 위 조건 칩(v3 W1 "지금 산문 조건 · 길이 15초 이하 · 장르 코미디 · 소재 그대로") — 정해진 값만 칩으로.
+ *  길이 · 장르를 정하지 않았으면 그 칩을 두지 않는다(지어내지 않는다). 소재(그대로 · 새롭게)는 늘 있다. */
+export function proseConditionChips(
+  conditions: { runtimeSeconds: number | null; genre: string | null; seed: ProseSeed },
+  locale: AppLocale,
+): Array<{ key: 'length' | 'genre' | 'seed'; label: string; value: string }> {
+  const chips: Array<{ key: 'length' | 'genre' | 'seed'; label: string; value: string }> = []
+  if (conditions.runtimeSeconds) chips.push({ key: 'length', label: translate(locale, 'Length'), value: runtimeLabel(conditions.runtimeSeconds, locale) })
+  const genre = conditions.genre?.trim()
+  if (genre) chips.push({ key: 'genre', label: translate(locale, 'Genre'), value: genre })
+  chips.push({ key: 'seed', label: translate(locale, 'Source idea'), value: translate(locale, SEED_VALUE[conditions.seed]) })
+  return chips
+}
+
 /** 옵션을 열 때 골라 둘 길이 구간 — 구간 밖 길이는 그 길이를 담는 구간으로, 모르면 15~60초. */
 export function runtimeIndexOf(seconds: number | null | undefined): number {
   if (!seconds || seconds <= 0) return 1

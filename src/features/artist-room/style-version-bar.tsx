@@ -5,6 +5,7 @@
 //   Storyboard 를 연 뒤 · 그리는 중 · 기록이 하나뿐(재생성하면 이전 버전이 여기 남아요).
 //   재생성 그림이 멈추면 까닭과 [남은 그림 다시 그리기] · [이전 버전으로 돌아가기]를 막대 아래에 보인다(2026-10-28 검토 지적).
 //   버전을 다 불러오지 못했으면 그 말과 [다시 불러오기] · [이전 버전으로 돌아가기]를 보인다(2026-10-31 재검토 지적).
+//   v3 A5(2026-11-03): 막대는 큰 판(견본 44×32 · 이름 · 버전 두 줄), [불러오기 · 기록 N]은 테두리 없는 알약, [재생성하기]는 보조 단추.
 import { History, ImageIcon, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ThumbImage } from '@/components/thumb-image'
@@ -46,21 +47,22 @@ export function StyleVersionBar({ completed, drawing }: { completed: boolean; dr
   const store = useArtistVersionStore.getState
   // 기록과 스타일 목록을 읽기 전에는 자리만 둔다 — 읽기 전 값("스타일 없음 · 기록 1")이 잠깐 보였다(2026-10-28 e2e).
   const ready = (loaded || isDemoSession()) && (anchors.length > 0 || !!custom)
-  if (!ready) return <div className="h-8 w-80 max-w-full rounded-md border border-border bg-muted/30" aria-hidden data-testid="artist-style-bar-loading" />
+  if (!ready) return <div className="h-[57px] w-full rounded-2xl bg-panel" aria-hidden data-testid="artist-style-bar-loading" />
 
   return (
     <div className="flex flex-col items-start gap-1" data-testid="artist-style-version">
-      <div className="flex flex-wrap items-center gap-2 rounded-md border border-border py-1 pl-1 pr-1.5 text-xs" data-testid="artist-style-bar">
-        <span className="flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-muted">
+      <div className="flex w-full flex-wrap items-center gap-3 rounded-2xl bg-panel px-3 py-2.5" data-testid="artist-style-bar">
+        <span className="flex h-8 w-11 shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-art-placeholder">
           {swatch ? <ThumbImage src={swatch} alt={label} className="size-full object-cover" /> : <ImageIcon className="size-3.5 text-muted-foreground" aria-hidden />}
         </span>
-        <b className="font-medium">{label}</b>
-        <span className="text-muted-foreground" data-testid="artist-style-version-n">{t('Work style · v{n}', { n: header.n })}</span>
-        <span className="flex items-center gap-1.5">
+        <span className="flex min-w-0 flex-col">
+          <b className="truncate text-label font-semibold text-foreground">{label}</b>
+          <span className="text-caption text-subtle-foreground" data-testid="artist-style-version-n">{t('Work style · v{n}', { n: header.n })}</span>
+        </span>
+        <span className="ml-auto flex items-center gap-2">
           <Button
-            size="sm"
-            variant="outline"
-            className="h-7"
+            variant="ghost"
+            className="h-[30px] rounded-full px-3"
             disabled={!loaded || !header.canLoad}
             title={header.canLoad ? undefined : note ?? undefined}
             onClick={() => store().openHistory()}
@@ -69,9 +71,7 @@ export function StyleVersionBar({ completed, drawing }: { completed: boolean; dr
             <History className="size-3.5" />{t('Load · history {count}', { count: header.count })}
           </Button>
           <Button
-            size="sm"
-            variant="outline"
-            className="h-7"
+            variant="secondary"
             disabled={!loaded || !header.canRegenerate}
             title={header.note === 'single' ? undefined : note ?? undefined}
             onClick={() => store().openRegenerate()}
@@ -81,7 +81,7 @@ export function StyleVersionBar({ completed, drawing }: { completed: boolean; dr
           </Button>
         </span>
       </div>
-      {note ? <p className="text-xs text-muted-foreground" role="status" data-testid="artist-style-note">{note}</p> : null}
+      {note ? <p className="text-caption text-muted-foreground" role="status" data-testid="artist-style-note">{note}</p> : null}
       {header.note === 'stopped' ? <RegenStoppedActions /> : null}
       {header.note === 'loadFailed' ? <LoadFailedActions /> : null}
     </div>

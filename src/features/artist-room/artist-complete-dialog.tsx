@@ -4,10 +4,12 @@
 //   [예, 완료하기]면 Storyboard 가 열린다(/api/writer/artist-complete). 씬 · 샷 나누기와 러프는 [만들기] 때부터 이어서
 //   만들고 있다(2026-10-20) — 아직 덜 됐으면 Storyboard 에서 이어서 본다.
 //   완료한 뒤에도 Artist 로 돌아와 그림을 고칠 수 있다(Artist ⇄ Storyboard).
+//   v3(오너 2026-11-03 결정 8): 확인 창 맨 위에 큰 Lumi — 지금 단계(Artist) 옷 · 기본 모습.
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowRight, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { ConfirmLumi } from '@/components/handoff/confirm-lumi'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useT } from '@/lib/i18n'
@@ -70,6 +72,7 @@ export function ArtistCompleteDialog({ open, onOpenChange, summary }: { open: bo
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!busy) onOpenChange(next) }}>
       <DialogContent className="sm:max-w-md" showCloseButton={!busy} data-testid="artist-complete">
+        <ConfirmLumi stage="artist" />
         <DialogHeader>
           <DialogTitle>{t('Complete and move on to Storyboard?')}</DialogTitle>
           <DialogDescription className="sr-only">{t('Check what moves on to Storyboard.')}</DialogDescription>

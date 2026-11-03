@@ -63,6 +63,8 @@ import { SceneStoryProposalCard } from '@/components/layout/scene-story-proposal
 import { SceneStoryRewriteCard, SceneStoryUndoCard } from '@/components/layout/scene-story-rewrite-card'
 import { unresolvedSceneStoryProposal } from '@/lib/producer/scene-story-proposal'
 import { WriterNextCard } from '@/features/prose/writer-next-card'
+import { ParagraphChip } from '@/features/prose/paragraph-chip'
+import { attachedParagraph, sendParagraphRequest } from '@/features/prose/paragraph-request'
 import { StyleReturnCard } from '@/features/artist-room/style-return-card'
 import {
   buildScriptLines,
@@ -870,6 +872,13 @@ export function GlobalChat() {
     if (!input.trim() && !canSendAttachments) return
 
     const typed = input.trim()
+    // 붙은 문단으로 보내기(v3 2026-11-03 오너 결정 7) — Writer 입력칸 위에 문단이 붙어 있으면 적은 말은 말 읽기를 거치지 않고
+    //   그 문단만 고쳐 달라는 수정 요청으로 간다(features/prose/paragraph-request). 얹어 둔 파일은 그대로 남는다.
+    if (currentStage === 'producer' && typed && attachedParagraph()) {
+      setInput('')
+      await sendParagraphRequest(typed)
+      return
+    }
     const texts = readyAttachments.filter((a) => a.kind === 'text')
     const images = readyAttachments.filter((a) => a.kind === 'image')
 
@@ -1866,6 +1875,8 @@ export function GlobalChat() {
             {/* 입력창(v3 Composer) — 카드색 알약 안에 글칸 + 둥근 크림 보내기. 포커스면 지금 단계 색 테두리(Lumi 가이드 .chat-input:focus-within).
                 모델 고르기 · 단계 칩(빠른 요청) · [+] 첨부 · @멘션은 알약 아래 한 줄로 그대로 둔다(오너 11/3: 모양만 바꾼다). */}
             <div className="rounded-[26px] border border-transparent bg-chat-input py-2 pl-4 pr-2 transition-colors focus-within:border-stage">
+                {/* Writer 산문에서 누른 문단(v3) — 붙은 채로 보내면 그 문단만 고쳐 달라는 요청이 된다. */}
+                {currentStage === 'producer' && <ParagraphChip />}
                 {/* 첨부 칩 — 파일은 얹혀만 있고, 무엇으로 쓸지는 아래 입력창에 말로 적는다. */}
                 {attachments.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 pb-1.5 pt-1">
