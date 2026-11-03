@@ -24,8 +24,14 @@ export async function authorizeEntryUser(req: Request): Promise<EntryAccess> {
   return { ok: true, userId: user.id }
 }
 
-/** 로그인 · 주인 확인. write = 데모(공유) 세션의 쓰기를 먼저 막는다. */
-export async function authorizeEntry(req: Request, projectId: unknown, opts: { write: boolean }): Promise<EntryAccess> {
+export type EntrySignedIn = { ok: true; userId: string; projectId: string } | { ok: false; response: Response }
+
+/**
+ * 주인 확인 앞까지 — 로그인 · 프로젝트 번호 꼴. write = 데모(공유) 세션의 쓰기를 먼저 막는다.
+ *   시작 화면 GET 은 이것을 지난 뒤 주인 확인(authorizeEntryOwner)과 자료 읽기를 함께 시작한다 — 익명 요청은 데이터베이스를 읽지 않는다.
+ *   규칙은 여기 한 곳 — GET · PATCH · 파일 · 추천 · 시작이 같은 확인을 쓴다(2차 검토 11/4, 약속 tests/producer/entry-read-speed.test.ts).
+ */
+export async function authorizeEntrySignedIn(req: Request, projectId: unknown, opts: { write: boolean }): Promise<EntrySignedIn> {
   if (opts.write) {
     const blocked = demoWriteBlock(req)
     if (blocked) return { ok: false, response: blocked }
@@ -35,8 +41,20 @@ export async function authorizeEntry(req: Request, projectId: unknown, opts: { w
   if (typeof projectId !== 'string' || !PROJECT_ID_RE.test(projectId)) {
     return { ok: false, response: NextResponse.json({ error: 'Invalid request: projectId is required' }, { status: 400 }) }
   }
-  if (!(await userOwnsProject(projectId, user.id))) return { ok: false, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
-  return { ok: true, userId: user.id }
+  return { ok: true, userId: user.id, projectId }
+}
+
+/** 주인 확인 — authorizeEntrySignedIn 을 지난 사용자가 그 프로젝트 주인인가. */
+export async function authorizeEntryOwner(signedIn: { userId: string; projectId: string }): Promise<EntryAccess> {
+  if (!(await userOwnsProject(signedIn.projectId, signedIn.userId))) return { ok: false, response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) }
+  return { ok: true, userId: signedIn.userId }
+}
+
+/** 로그인 · 주인 확인을 차례로. write = 데모(공유) 세션의 쓰기를 먼저 막는다. */
+export async function authorizeEntry(req: Request, projectId: unknown, opts: { write: boolean }): Promise<EntryAccess> {
+  const signedIn = await authorizeEntrySignedIn(req, projectId, opts)
+  if (!signedIn.ok) return signedIn
+  return authorizeEntryOwner(signedIn)
 }
 
 export interface EntryProjectRow {

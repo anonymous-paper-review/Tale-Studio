@@ -1,4 +1,6 @@
 // Producer 시작 화면 자료는 주인 확인이 끝나기를 기다리지 않고 함께 읽기 시작하고, 주인이 아니면 읽은 것을 돌려주지 않으며 거절 답은 지금과 같다 (QA 2026-11-03 "Producer 탭 로딩이 너무 길다")
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
@@ -37,7 +39,7 @@ vi.mock('@/lib/supabase/admin', () => ({
   },
 }))
 
-import { GET } from '@/app/api/produce/entry/route'
+import { GET, PATCH } from '@/app/api/produce/entry/route'
 
 const PID = 'project-1'
 // 이 시험을 위해 새로 지은 글 — 실제 작품이 아니다.
@@ -126,6 +128,24 @@ describe('시작 화면 자료 읽기', () => {
     expect(await res.text()).toBe('{"error":"Unauthorized"}')
     expect(mocks.reads).toEqual([])
     expect(mocks.owns).not.toHaveBeenCalled()
+  })
+
+  it('시작 화면 GET 과 PATCH 는 같은 로그인 · 번호 · 주인 확인을 거쳐 같은 거절을 돌려준다', async () => {
+    // 왜: 확인 규칙이 GET 에만 옮겨 적혀 있으면, 나중에 규칙이 더해질 때 GET 만 빠진다(2차 검토 11/4). 규칙은 entry-access 한 곳에 둔다.
+    const patch = (projectId: string) =>
+      new NextRequest('http://localhost/api/produce/entry', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, patch: { idea: IDEA } }) })
+    const both = async (projectId: string) => {
+      const [read, write] = [await GET(request(projectId)), await PATCH(patch(projectId))]
+      return [`${read.status} ${await read.text()}`, `${write.status} ${await write.text()}`]
+    }
+    mocks.getUser.mockResolvedValue(null)
+    expect(await both(PID)).toEqual(['401 {"error":"Unauthorized"}', '401 {"error":"Unauthorized"}'])
+    mocks.getUser.mockResolvedValue({ id: 'user-1' })
+    expect(await both('../other')).toEqual(Array(2).fill('400 {"error":"Invalid request: projectId is required"}'))
+    mocks.owns.mockResolvedValue(false)
+    expect(await both(PID)).toEqual(['403 {"error":"Forbidden"}', '403 {"error":"Forbidden"}'])
+    const route = readFileSync(path.join(process.cwd(), 'src/app/api/produce/entry/route.ts'), 'utf8')
+    expect(route).not.toMatch(/\bgetUser\(|\buserOwnsProject\(/)
   })
 
   it('프로젝트 번호 꼴이 이상하면 자료를 읽지 않고 거절한다', async () => {
