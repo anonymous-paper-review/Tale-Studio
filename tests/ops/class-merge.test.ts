@@ -22,4 +22,13 @@ describe('클래스 합치기(cn)', () => {
     expect(cn('shadow-sm', 'shadow-panel')).toBe('shadow-panel')
     expect(cn('shadow-panel', 'shadow-black/40').split(' ')).toEqual(['shadow-panel', 'shadow-black/40'])
   })
+
+  it('v3 그라데이션 바탕(bg-stage-badge 등)은 바탕색 · 글자 색과 같이 써도 지워지지 않는다', () => {
+    // 왜: 합치기 도구가 bg-stage-badge 를 바탕색으로 보면, 뒤에 bg-card 같은 바탕색이 오거나 앞에 있을 때 둘 중 하나를 지운다.
+    for (const image of ['bg-stage-badge', 'bg-stage-gradient', 'bg-pearl-vivid', 'bg-art-placeholder']) {
+      expect(cn(image, 'bg-card').split(' '), image).toEqual([image, 'bg-card'])
+      expect(cn('bg-card', image).split(' '), image).toEqual(['bg-card', image])
+    }
+    expect(cn('text-gradient', 'text-foreground').split(' ')).toEqual(['text-gradient', 'text-foreground'])
+  })
 })

@@ -34,6 +34,8 @@ function subscribeReducedMotion(onChange: () => void) {
 }
 const reducedMotionNow = () => window.matchMedia(REDUCED_MOTION).matches
 
+const noSubscribe = () => () => {}
+
 let webglKnown: boolean | null = null
 function webglAvailable(): boolean {
   if (webglKnown === null) webglKnown = detectWebGL(() => document.createElement('canvas'))
@@ -115,16 +117,14 @@ interface LumiProps {
  */
 export function Lumi({ persona = 'pearl', state = 'idle', variant = 'full', size = 320, label, className, onStateChange, ref }: LumiProps) {
   const reducedMotion = useSyncExternalStore(subscribeReducedMotion, reducedMotionNow, () => false)
-  const [webgl, setWebgl] = useState<boolean | null>(null)
-  const [script, setScript] = useState<LumiScriptStatus>('idle')
+  // WebGL 은 서버에서 모른다(null → 그림). 붙은 뒤 한 번 재고 기억한다.
+  const webgl = useSyncExternalStore(noSubscribe, webglAvailable, () => null)
+  const [script, setScript] = useState<LumiScriptStatus>('loading')
   const elementRef = useRef<LumiElement>(null)
 
   useEffect(() => {
-    const ok = webglAvailable()
-    setWebgl(ok)
-    if (!ok) return
+    if (!webgl) return
     let alive = true
-    setScript('loading')
     loadLumiScript().then(
       () => {
         if (alive) setScript('ready')
@@ -136,7 +136,7 @@ export function Lumi({ persona = 'pearl', state = 'idle', variant = 'full', size
     return () => {
       alive = false
     }
-  }, [])
+  }, [webgl])
 
   const mode = lumiRenderMode({ webgl, reducedMotion, script })
 

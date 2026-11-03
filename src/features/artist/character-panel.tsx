@@ -128,41 +128,42 @@ export function CharacterPanel({
 
 
     // hover 정보 본문 — 4개 뷰 이미지의 개별 Tooltip 에 공유(같은 캐릭터 정보).
+    //   v3(2026-11-03): 툴팁이 어두운 말풍선이 됐다 — 밝은 툴팁용 반전 글자 대신 글자 3단 토큰.
     const charTooltipBody = (
       <>
         <p className="font-medium">
           {char.name}
-          <span className="font-normal text-background/60">
+          <span className="font-normal text-muted-foreground">
             {' · '}
             {role}
           </span>
         </p>
         {char.description ? (
-          <p className="leading-snug text-background/80">
+          <p className="leading-snug text-foreground/90">
             {char.description}
           </p>
         ) : null}
         {(char.appearanceNative || char.fixedPrompt) ? (
-          <p className="leading-snug text-background/70">
-            <span className="text-background/50">{t('Appearance')} · </span>
+          <p className="leading-snug text-muted-foreground">
+            <span className="text-subtle-foreground">{t('Appearance')} · </span>
             {char.appearanceNative || char.fixedPrompt}
           </p>
         ) : null}
         {bgScenes.length > 0 ? (
-          <div className="space-y-0.5 border-t border-background/20 pt-1.5">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-background/50">
+          <div className="space-y-0.5 border-t border-border pt-1.5">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-subtle-foreground">
               {t('Scenes appeared · background')}
             </p>
             {bgScenes.slice(0, 3).map((s) => (
               <p
                 key={s.sceneId}
-                className="leading-snug text-background/80"
+                className="leading-snug text-foreground/90"
               >
                 • {s.narrativeSummary}
               </p>
             ))}
             {bgScenes.length > 3 ? (
-              <p className="text-background/50">
+              <p className="text-subtle-foreground">
                 {t('+{count} more scenes', { count: bgScenes.length - 3 })}
               </p>
             ) : null}
@@ -171,7 +172,7 @@ export function CharacterPanel({
         {!char.description &&
         !char.fixedPrompt &&
         bgScenes.length === 0 ? (
-          <p className="text-background/60">{t('No profile info yet.')}</p>
+          <p className="text-muted-foreground">{t('No profile info yet.')}</p>
         ) : null}
       </>
     )

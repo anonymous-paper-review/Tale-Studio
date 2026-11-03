@@ -3,7 +3,7 @@
 // 스튜디오 위 막대(v3 Nav/Stage Header, 2026-11-03) — 지금 단계 칩 · 프로젝트 제목 · 연필(이름 바꾸기) · 오른쪽 자리.
 //   스튜디오 레이아웃이 모든 단계 화면 위에 놓는다. Producer 시작 화면은 자기 머리(탭)를 같은 막대로 그린다.
 //   오른쪽 자리에 단추를 놓고 싶은 화면(예: Director 의 [다음: Editor로])은 <TopBarActions> 로 넣는다.
-import { useEffect, useState, type ReactNode } from 'react'
+import { useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
 import { StageChip } from '@/components/controls/stage-chip'
@@ -58,11 +58,11 @@ export function StudioTopBar({
   )
 }
 
-/** 화면이 위 막대 오른쪽에 단추를 놓는다 — 화면이 사라지면 단추도 같이 사라진다. */
+const noSubscribe = () => () => {}
+const slotNow = () => document.getElementById(ACTIONS_ID)
+
+/** 화면이 위 막대 오른쪽에 단추를 놓는다 — 화면이 사라지면 단추도 같이 사라진다. 서버 그리기에서는 자리가 없어 붙인 뒤에 나온다. */
 export function TopBarActions({ children }: { children: ReactNode }) {
-  const [slot, setSlot] = useState<HTMLElement | null>(null)
-  useEffect(() => {
-    setSlot(document.getElementById(ACTIONS_ID))
-  }, [])
+  const slot = useSyncExternalStore(noSubscribe, slotNow, () => null)
   return slot ? createPortal(children, slot) : null
 }

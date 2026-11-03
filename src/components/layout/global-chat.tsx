@@ -1854,11 +1854,9 @@ export function GlobalChat() {
           {/* 진행도 핀 (#chat-progress-pin → #f1 2026-08-26 오너: 헤더 아래→입력창 위로 이동.
               시선이 머무는 입력창 쪽에서 진행이 보인다). 도는 게 없으면 스스로 사라진다. */}
           <ChatProgressPin stage={currentStage} />
+          {/* 파일 놓기 자리는 입력 알약과 아래 도구 줄을 함께 감싼다 — [+] 첨부 위에 끌어다 놓아도 첨부된다(예전처럼 입력부 전체). */}
           <div
-            className={cn(
-              'relative rounded-[26px] transition-colors',
-              fileDragActive && 'ring-2 ring-stage/60',
-            )}
+            className="relative rounded-[26px]"
             onDragEnter={handleFileDragEnter}
             onDragOver={handleFileDragOver}
             onDragLeave={handleFileDragLeave}
@@ -1968,6 +1966,134 @@ export function GlobalChat() {
                 )}
               </div>
             </div>
+            {/* 하단 툴바 (#oiioii-chat spec §10 매핑) — v3 알약 밖 한 줄: [+] 첨부 · 단계 칩 · @멘션 · 모델 고르기 */}
+            <div className="mt-2 flex min-h-7 items-center gap-1 px-1">
+              {currentStage === 'producer' && (
+                <>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept={UPLOAD_ACCEPT}
+                    multiple
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                  <Button
+                    size="icon-xs"
+                    variant="ghost"
+                    className="size-7 rounded-full text-muted-foreground hover:text-foreground"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={loading || uploading}
+                    title={t('Attach a file: manuscript (txt·md·docx) or image (jpg·png·webp)')}
+                    aria-label={t('Attach file')}
+                  >
+                    <Plus className="size-4" />
+                  </Button>
+                  <span className="mx-0.5 h-4 w-px shrink-0 bg-border" aria-hidden />
+                </>
+              )}
+                    {/* 에이전트 필 — oiioii 의 스킬 필 자리. 클릭 = 이 에이전트의 빠른 요청 목록. */}
+                    <Popover open={presetOpen} onOpenChange={setPresetOpen}>
+                      <PopoverTrigger asChild>
+                        {/* 단계 칩(Lumi 가이드 .stage-chip) — 지금 단계 색 바탕 · 어두운 글씨. 누르면 이 단계의 빠른 요청 · 다음 단계 넘기기. */}
+                        <button
+                          type="button"
+                          title={t('Quick requests')}
+                          className="flex h-6 shrink-0 items-center gap-1 rounded-full bg-stage pl-2.5 pr-2 text-micro font-semibold text-on-stage transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          {STAGE_LABEL[currentStage]}
+                          <ChevronDown className="size-3 opacity-70" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" side="top" sideOffset={8} className="w-64 p-1.5">
+                        <div className="px-2 py-1.5 text-[10px] font-medium uppercase tracking-wider text-subtle-foreground">
+                          {t('Quick requests')}
+                        </div>
+                        {STAGE_PROMPT_PRESETS[currentStage].map((preset) => (
+                          <button
+                            key={preset}
+                            type="button"
+                            onClick={() => insertPreset(t(preset))}
+                            className="w-full rounded-sm px-2 py-1.5 text-left text-label text-foreground transition-colors hover:bg-accent"
+                          >
+                            {t(preset)}
+                          </button>
+                        ))}
+                        {STAGE_PROMPT_PRESETS[currentStage].length === 0 && (
+                          <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                            {t("Chat isn't supported at this stage.")}
+                          </p>
+                        )}
+                        {(() => {
+                          const handoff = handoffFrom(currentStage)
+                          if (!handoff) return null
+                          return (
+                            <>
+                              <div className="mx-1 my-1 h-px bg-border" aria-hidden />
+                              <button
+                                type="button"
+                                onClick={() => insertPreset(t(handoff.utterance))}
+                                className="w-full rounded-sm px-2 py-1.5 text-left text-label font-semibold text-foreground transition-colors hover:bg-accent"
+                              >
+                                {t(handoff.label)} →
+                              </button>
+                            </>
+                          )
+                        })()}
+                      </PopoverContent>
+                    </Popover>
+                    {/* 스타일 픽커 (#style-entry #feedback 2026-08-07) — producer 에선 four-dot 자리를
+                        스타일 버튼이 차지한다(에셋 멘션은 @ 타이핑·Ctrl+카드 클릭이 대체). 첫 클릭 전
+                        + 스타일 미선택이면 빔 상시 점등. 다른 스테이지는 기존 에셋 팔레트 유지. */}
+                    {/* 리뉴얼 1차: Writer(id producer)는 산문만 다룬다 — 스타일은 Artist [만들기]의 스타일 팝업에서 고른다(채팅 스타일 단추 없음). */}
+                    {currentStage === 'producer' ? null : (
+                    <Popover open={assetsOpen} onOpenChange={setAssetsOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          size="icon-xs"
+                          variant="ghost"
+                          className="size-7 rounded-full text-muted-foreground hover:text-foreground"
+                          title={t('Asset mentions')}
+                          aria-label={t('Asset mentions')}
+                        >
+                          <LayoutGrid className="size-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="start" side="top" sideOffset={8} className="max-h-64 w-64 overflow-y-auto p-1.5">
+                        <div className="px-2 py-1.5 text-[10px] font-medium uppercase tracking-wider text-subtle-foreground">
+                          {t('Asset mentions')}
+                        </div>
+                        {mentionItems.map((item) => {
+                          const active = input.includes(`@${item.label}`)
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => toggleAssetMention(item.label)}
+                              className={cn(
+                                'flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-label transition-colors hover:bg-accent',
+                                active ? 'font-medium text-foreground' : 'text-foreground/80',
+                              )}
+                            >
+                              <span className="truncate">@{item.label}</span>
+                              <span className="flex shrink-0 items-center gap-1 text-[10px] text-muted-foreground">
+                                {item.hint}
+                                {active && <Check className="size-3 text-success" />}
+                              </span>
+                            </button>
+                          )
+                        })}
+                        {mentionItems.length === 0 && (
+                          <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                            {t("There's nothing to mention at this stage.")}
+                          </p>
+                        )}
+                      </PopoverContent>
+                    </Popover>
+                    )}
+              <div className="flex-1" />
+              {['producer', 'writer', 'artist'].includes(currentStage) && <ChatModelControls disabled={loading} />}
+            </div>
             {fileDragActive && (
               <div
                 className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[26px] border-2 border-dashed border-stage bg-stage/10 text-xs font-medium text-stage"
@@ -1976,134 +2102,6 @@ export function GlobalChat() {
                 파일을 놓으면 첨부돼요
               </div>
             )}
-          </div>
-          {/* 하단 툴바 (#oiioii-chat spec §10 매핑) — v3 알약 밖 한 줄: [+] 첨부 · 단계 칩 · @멘션 · 모델 고르기 */}
-          <div className="mt-2 flex min-h-7 items-center gap-1 px-1">
-            {currentStage === 'producer' && (
-              <>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept={UPLOAD_ACCEPT}
-                  multiple
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
-                <Button
-                  size="icon-xs"
-                  variant="ghost"
-                  className="size-7 rounded-full text-muted-foreground hover:text-foreground"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={loading || uploading}
-                  title={t('Attach a file: manuscript (txt·md·docx) or image (jpg·png·webp)')}
-                  aria-label={t('Attach file')}
-                >
-                  <Plus className="size-4" />
-                </Button>
-                <span className="mx-0.5 h-4 w-px shrink-0 bg-border" aria-hidden />
-              </>
-            )}
-                  {/* 에이전트 필 — oiioii 의 스킬 필 자리. 클릭 = 이 에이전트의 빠른 요청 목록. */}
-                  <Popover open={presetOpen} onOpenChange={setPresetOpen}>
-                    <PopoverTrigger asChild>
-                      {/* 단계 칩(Lumi 가이드 .stage-chip) — 지금 단계 색 바탕 · 어두운 글씨. 누르면 이 단계의 빠른 요청 · 다음 단계 넘기기. */}
-                      <button
-                        type="button"
-                        title={t('Quick requests')}
-                        className="flex h-6 shrink-0 items-center gap-1 rounded-full bg-stage pl-2.5 pr-2 text-micro font-semibold text-on-stage transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      >
-                        {STAGE_LABEL[currentStage]}
-                        <ChevronDown className="size-3 opacity-70" />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent align="start" side="top" sideOffset={8} className="w-64 p-1.5">
-                      <div className="px-2 py-1.5 text-[10px] font-medium uppercase tracking-wider text-subtle-foreground">
-                        {t('Quick requests')}
-                      </div>
-                      {STAGE_PROMPT_PRESETS[currentStage].map((preset) => (
-                        <button
-                          key={preset}
-                          type="button"
-                          onClick={() => insertPreset(t(preset))}
-                          className="w-full rounded-sm px-2 py-1.5 text-left text-label text-foreground transition-colors hover:bg-accent"
-                        >
-                          {t(preset)}
-                        </button>
-                      ))}
-                      {STAGE_PROMPT_PRESETS[currentStage].length === 0 && (
-                        <p className="px-2 py-1.5 text-xs text-muted-foreground">
-                          {t("Chat isn't supported at this stage.")}
-                        </p>
-                      )}
-                      {(() => {
-                        const handoff = handoffFrom(currentStage)
-                        if (!handoff) return null
-                        return (
-                          <>
-                            <div className="mx-1 my-1 h-px bg-border" aria-hidden />
-                            <button
-                              type="button"
-                              onClick={() => insertPreset(t(handoff.utterance))}
-                              className="w-full rounded-sm px-2 py-1.5 text-left text-label font-semibold text-foreground transition-colors hover:bg-accent"
-                            >
-                              {t(handoff.label)} →
-                            </button>
-                          </>
-                        )
-                      })()}
-                    </PopoverContent>
-                  </Popover>
-                  {/* 스타일 픽커 (#style-entry #feedback 2026-08-07) — producer 에선 four-dot 자리를
-                      스타일 버튼이 차지한다(에셋 멘션은 @ 타이핑·Ctrl+카드 클릭이 대체). 첫 클릭 전
-                      + 스타일 미선택이면 빔 상시 점등. 다른 스테이지는 기존 에셋 팔레트 유지. */}
-                  {/* 리뉴얼 1차: Writer(id producer)는 산문만 다룬다 — 스타일은 Artist [만들기]의 스타일 팝업에서 고른다(채팅 스타일 단추 없음). */}
-                  {currentStage === 'producer' ? null : (
-                  <Popover open={assetsOpen} onOpenChange={setAssetsOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        size="icon-xs"
-                        variant="ghost"
-                        className="size-7 rounded-full text-muted-foreground hover:text-foreground"
-                        title={t('Asset mentions')}
-                        aria-label={t('Asset mentions')}
-                      >
-                        <LayoutGrid className="size-4" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent align="start" side="top" sideOffset={8} className="max-h-64 w-64 overflow-y-auto p-1.5">
-                      <div className="px-2 py-1.5 text-[10px] font-medium uppercase tracking-wider text-subtle-foreground">
-                        {t('Asset mentions')}
-                      </div>
-                      {mentionItems.map((item) => {
-                        const active = input.includes(`@${item.label}`)
-                        return (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => toggleAssetMention(item.label)}
-                            className={cn(
-                              'flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-label transition-colors hover:bg-accent',
-                              active ? 'font-medium text-foreground' : 'text-foreground/80',
-                            )}
-                          >
-                            <span className="truncate">@{item.label}</span>
-                            <span className="flex shrink-0 items-center gap-1 text-[10px] text-muted-foreground">
-                              {item.hint}
-                              {active && <Check className="size-3 text-success" />}
-                            </span>
-                          </button>
-                        )
-                      })}
-                      {mentionItems.length === 0 && (
-                        <p className="px-2 py-1.5 text-xs text-muted-foreground">
-                          {t("There's nothing to mention at this stage.")}
-                        </p>
-                      )}
-                    </PopoverContent>
-                  </Popover>
-                  )}
-            <div className="flex-1" />
-            {['producer', 'writer', 'artist'].includes(currentStage) && <ChatModelControls disabled={loading} />}
           </div>
         </div>
       </aside>

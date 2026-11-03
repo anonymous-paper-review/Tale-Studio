@@ -222,11 +222,12 @@ export function Sidebar() {
                     'relative flex h-[58px] w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-lg transition-colors',
                     isDisabled && 'cursor-not-allowed',
                     busyBlocked && 'opacity-40',
+                    // 글자 색은 칸 모습이 정한다 — 예전처럼 다시 시도 칸의 빨강보다 뒤에 둬서 칸 모습 색이 이긴다(오래 걸림은 실패가 아니다, #stale-gate).
+                    isArtistRetryable && !aiBusy && 'cursor-pointer text-destructive hover:bg-sidebar-accent',
                     railState === 'current' && 'bg-sidebar-accent text-foreground',
                     (railState === 'done' || railState === 'open') && 'text-muted-foreground',
                     railState === 'upcoming' && 'text-subtle-foreground',
                     railState !== 'current' && !isDisabled && 'hover:bg-sidebar-accent hover:text-foreground',
-                    isArtistRetryable && !aiBusy && 'cursor-pointer text-destructive hover:bg-sidebar-accent',
                   )}
                 >
                   <span className="relative">
@@ -389,7 +390,7 @@ function SidebarTakeBalance() {
             >
               <TakeIcon className="size-6" />
               {/* 잔액 — 아이콘 오른쪽 아래 작은 숫자(v3 는 아이콘 · 캡션만, 숫자는 Inter). 관리자(무제한)는 ∞. */}
-              <span className="absolute -bottom-1 -right-1.5 min-w-4 rounded-full bg-chip px-1 text-center font-num text-[9px] font-semibold leading-[14px] tabular-nums text-foreground">
+              <span className={cn('absolute -bottom-1 -right-1.5 min-w-4 rounded-full bg-chip px-1 text-center font-num text-[9px] font-semibold leading-[14px] tabular-nums', negative ? 'text-destructive' : 'text-foreground')}>
                 {unlimited ? '∞' : take.balance}
               </span>
             </button>
