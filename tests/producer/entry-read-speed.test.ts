@@ -74,16 +74,25 @@ describe('시작 화면 자료 읽기', () => {
     expect((await res.json()).draft).toMatchObject({ idea: IDEA })
   })
 
-  it('주인이 아니면 함께 읽은 시작 화면 자료도 돌려주지 않는다', async () => {
-    // 왜: 주인 확인과 자료 읽기를 함께 시작해도, 주인이 아닌 사람에게 초안(올린 대본 글)이 새면 안 된다.
+  it('주인이 아니면 응답은 이전과 같은 거절이고, 함께 읽은 자료는 어디에도 실리지 않는다', async () => {
+    // 왜: 주인 확인과 자료 읽기를 함께 시작해도, 주인이 아닌 사람에게 초안(올린 대본 글) · 제목이 본문에도 머리(header)에도 새면 안 된다(리드 11/3).
+    //   "이전과 같은 거절" = 함께 읽기 전 라우트의 답 그대로 — 로그인했지만 주인이 아니면 403 {"error":"Forbidden"}, 로그인 안 했으면 401 {"error":"Unauthorized"}.
+    const leaked = (res: Response, body: string) =>
+      [body, ...[...res.headers.entries()].map(([name, value]) => `${name}: ${value}`)].some((text) => text.includes(IDEA) || text.includes('등대의 편지'))
+
     mocks.owns.mockResolvedValue(false)
     const forbidden = await GET(request(PID))
+    const forbiddenBody = await forbidden.text()
     expect(forbidden.status).toBe(403)
-    expect(JSON.stringify(await forbidden.json())).not.toContain(IDEA)
+    expect(forbiddenBody).toBe('{"error":"Forbidden"}')
+    expect(leaked(forbidden, forbiddenBody)).toBe(false)
+
     mocks.getUser.mockResolvedValue(null)
     const anonymous = await GET(request(PID))
+    const anonymousBody = await anonymous.text()
     expect(anonymous.status).toBe(401)
-    expect(JSON.stringify(await anonymous.json())).not.toContain(IDEA)
+    expect(anonymousBody).toBe('{"error":"Unauthorized"}')
+    expect(leaked(anonymous, anonymousBody)).toBe(false)
   })
 
   it('주인이 아니면 남의 프로젝트가 있든 없든 지금과 같은 거절 답을 함께 읽기를 기다리지 않고 돌려주어, 그 프로젝트가 있는지 알 수 없다', async () => {
