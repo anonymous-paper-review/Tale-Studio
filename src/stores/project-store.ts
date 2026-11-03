@@ -19,6 +19,11 @@ let pendingRename: Promise<unknown> | null = null
 export function settleProjectRename(): Promise<void> {
   return (pendingRename ?? Promise.resolve()).then(() => undefined, () => undefined)
 }
+
+// 진행 중인 프로젝트 바꾸기(QA 2026-11-03 밤) — 스튜디오 시작 준비(initProject)가 바꾸기보다 먼저 프로젝트를 정하지 않게 기다린다.
+//   switchSeq 는 연달아 바꿀 때 마지막으로 고른 프로젝트만 정하게 하는 번호.
+let pendingSwitch: Promise<void> | null = null
+let switchSeq = 0
 import {
   isDemoSession,
   getDemoSnapshot,
@@ -104,7 +109,8 @@ interface ProjectState {
     title?: string,
     options?: CreateProjectOptions,
   ) => Promise<ProjectCreationResult>
-  switchProject: (id: string, title: string, stage?: StageId) => void
+  /** 화면마다의 store 를 다 비운 뒤에 새 프로젝트로 바꾼다 — 끝나면 풀리는 약속을 돌려준다(부르는 쪽은 기다리지 않아도 된다). */
+  switchProject: (id: string, title: string, stage?: StageId) => Promise<void>
   /** 저장했으면 true. 못 했으면 화면 제목을 되돌리고 false. */
   renameProject: (title: string) => Promise<boolean>
   /** 서버가 채택한 콘텐츠 언어를 반영(#chat-locale-follow) — 저장 없이 상태만 동기화. locked = 채팅이 확정(잠금)했을 때. */
@@ -135,14 +141,24 @@ function furtherStage(a: StageId, b: StageId): StageId {
 }
 
 async function resetChildStores() {
-  // Lazy imports to avoid circular dependencies
-  const { useProducerStore } = await import('@/stores/producer-store')
-  const { useWriterStore } = await import('@/stores/writer-store')
-  const { useArtistStore } = await import('@/stores/artist-store')
-  const { useEditorStore } = await import('@/stores/editor-store')
-  const { useGlobalChatStore } = await import('@/stores/global-chat-store')
-  const { useAssetStorageStore } = await import('@/stores/asset-storage-store')
-  const { useDirectorCanvasStore } = await import('@/stores/director-store')
+  // Lazy imports to avoid circular dependencies — 한꺼번에 불러온다(예전에는 하나씩 기다려 처음 열 때 비우기가 늦게 끝났다).
+  const [
+    { useProducerStore },
+    { useWriterStore },
+    { useArtistStore },
+    { useEditorStore },
+    { useGlobalChatStore },
+    { useAssetStorageStore },
+    { useDirectorCanvasStore },
+  ] = await Promise.all([
+    import('@/stores/producer-store'),
+    import('@/stores/writer-store'),
+    import('@/stores/artist-store'),
+    import('@/stores/editor-store'),
+    import('@/stores/global-chat-store'),
+    import('@/stores/asset-storage-store'),
+    import('@/stores/director-store'),
+  ])
 
   useProducerStore.getState().reset()
   useWriterStore.getState().reset()
@@ -260,6 +276,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   initProject: async (restoreId?: string) => {
+    // 프로젝트를 바꾸는 중이면 바꾸기가 프로젝트를 정할 때까지 기다린다 — 먼저 정하면 늦은 비우기가 그 프로젝트 자료를 지운다.
+    if (pendingSwitch) await pendingSwitch
     if (get().projectId) return
     // 데모(공유) 세션: 실 /api/project/init 대신 스냅샷으로 부팅(로그인·백엔드 없이).
     if (typeof document !== 'undefined' && isDemoSession()) {
@@ -413,63 +431,82 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   switchProject: (id, title, stage) => {
-    resetChildStores()
-    set({
-      projectId: id,
-      projectTitle: title,
-      projectLocale: null, // 이전 프로젝트 언어 잔상 금지 — 아래 조회가 채울 때까지 UI 언어 폴백
-      projectLocaleLocked: null,
-      currentStage: stage ?? 'producer',
-      reachedStage: stage ?? 'producer',
-      storedStage: stage ?? null,
-      // 호출부가 넘긴 DB 단계로 먼저 잠그고, 아래 조회가 DB current_stage 로 확정한다.
-      producerLocked: (stage ?? 'producer') !== 'producer',
-      treatmentDraft: false,
-      // 새 프로젝트 진입 — 게이트 플래그 초기화 (verifyWriterGate 가 곧 재계산).
-      writerComplete: true,
-      writerActive: false,
-      writerNeedsRerun: false,
-      lifecycleStatus: EMPTY_LIFECYCLE_STATUS,
-      ...DEFAULT_ARTIST_ASSET_GATE,
-    })
+    // 바꾸기 순서(QA 2026-11-03 밤 Editor 무한 로딩): 화면마다의 store 를 다 비운 뒤에 새 프로젝트로 바꾼다.
+    //   예전에는 새 프로젝트로 먼저 바꾸고 비우기(동적 import 라 늦다)를 나중에 끝내, 그사이 화면이 새 프로젝트를 읽기 시작하면
+    //   비우기가 그 자료를 지웠다 — Editor 는 기다림이 끝나지 않았고, 빈 편집 상태가 그 프로젝트 이름으로 저장됐다.
+    //   비우는 동안은 프로젝트를 비워 두고(projectId null · initLoading) 어느 화면도 읽기 시작하지 않게 한다. 같은 프로젝트를 다시 열어도
+    //   비었다가 다시 정해지므로 열린 화면이 새로 읽는다. 연달아 바꾸면 마지막으로 고른 것만 정한다. 약속: tests/project/switch-project.test.ts
+    const seq = ++switchSeq
+    set({ projectId: null, initLoading: true })
     // 화면 포맷(2026-09-30) — Director 이미지·영상 틀의 기준. 보관 장소는 project-format-store 한 곳.
     useProjectFormatStore.getState().setFormat(null)
-    // 호출부(대시보드 카드·유저 메뉴)는 locale 을 안 들고 다닌다 — 여기서 1쿼리로 싣는다.
-    //   실패는 무해(null 유지 = UI 언어 폴백). 응답 도착 전에 또 전환됐으면 버린다.
-    void (async () => {
-      try {
-        const { data } = await createClient()
-          .from('projects')
-          .select('locale, locale_locked, settings')
-          .eq('id', id)
-          .maybeSingle()
-        if (get().projectId === id) {
-          const row = data as { locale?: unknown; locale_locked?: unknown; settings?: { format?: unknown } | null } | null
-          set({
-            projectLocale: parseAppLocale(row?.locale),
-            projectLocaleLocked: parseLocked(row?.locale_locked),
-          })
-          // 화면 포맷(2026-09-30) — Director 이미지·영상 틀의 기준. 보관 장소는 project-format-store 한 곳.
-          useProjectFormatStore.getState().setFormat(parseProjectFormat(row?.settings?.format))
-        }
-      } catch {
-        /* 폴백: UI 언어 */
-      }
-    })()
-    // Producer 잠금의 진실은 DB current_stage 다 — 단계를 안 넘기는 호출부(유저 메뉴)도 있어 따로 확정한다.
-    //   잠그기만 하고 풀지는 않는다(응답 도착 전에 또 전환됐으면 버린다).
-    void (async () => {
-      try {
-        const { data } = await createClient().from('projects').select('current_stage').eq('id', id).maybeSingle()
-        const stageNow = (data as { current_stage?: unknown } | null)?.current_stage
-        if (get().projectId === id && typeof stageNow === 'string') set({ storedStage: stageNow })
-        if (get().projectId === id && typeof stageNow === 'string' && stageNow !== 'producer' && stageNow !== 'entry') set({ producerLocked: true })
-      } catch {
-        /* 폴백: 호출부가 넘긴 단계 */
-      }
-    })()
-    const { useDirectorCanvasStore } = require('@/stores/director-store')
-    useDirectorCanvasStore.getState().setProjectId(id)
+    const switched = resetChildStores()
+      .catch((err) => {
+        console.error('[project-store] resetChildStores failed:', err)
+      })
+      .then(async () => {
+        if (seq !== switchSeq) return
+        set({
+          projectId: id,
+          projectTitle: title,
+          projectLocale: null, // 이전 프로젝트 언어 잔상 금지 — 아래 조회가 채울 때까지 UI 언어 폴백
+          projectLocaleLocked: null,
+          currentStage: stage ?? 'producer',
+          reachedStage: stage ?? 'producer',
+          storedStage: stage ?? null,
+          // 호출부가 넘긴 DB 단계로 먼저 잠그고, 아래 조회가 DB current_stage 로 확정한다.
+          producerLocked: (stage ?? 'producer') !== 'producer',
+          treatmentDraft: false,
+          initLoading: false,
+          // 새 프로젝트 진입 — 게이트 플래그 초기화 (verifyWriterGate 가 곧 재계산).
+          writerComplete: true,
+          writerActive: false,
+          writerNeedsRerun: false,
+          lifecycleStatus: EMPTY_LIFECYCLE_STATUS,
+          ...DEFAULT_ARTIST_ASSET_GATE,
+        })
+        // 호출부(대시보드 카드·유저 메뉴)는 locale 을 안 들고 다닌다 — 여기서 1쿼리로 싣는다.
+        //   실패는 무해(null 유지 = UI 언어 폴백). 응답 도착 전에 또 전환됐으면 버린다.
+        void (async () => {
+          try {
+            const { data } = await createClient()
+              .from('projects')
+              .select('locale, locale_locked, settings')
+              .eq('id', id)
+              .maybeSingle()
+            if (get().projectId === id) {
+              const row = data as { locale?: unknown; locale_locked?: unknown; settings?: { format?: unknown } | null } | null
+              set({
+                projectLocale: parseAppLocale(row?.locale),
+                projectLocaleLocked: parseLocked(row?.locale_locked),
+              })
+              // 화면 포맷(2026-09-30) — Director 이미지·영상 틀의 기준. 보관 장소는 project-format-store 한 곳.
+              useProjectFormatStore.getState().setFormat(parseProjectFormat(row?.settings?.format))
+            }
+          } catch {
+            /* 폴백: UI 언어 */
+          }
+        })()
+        // Producer 잠금의 진실은 DB current_stage 다 — 단계를 안 넘기는 호출부(유저 메뉴)도 있어 따로 확정한다.
+        //   잠그기만 하고 풀지는 않는다(응답 도착 전에 또 전환됐으면 버린다).
+        void (async () => {
+          try {
+            const { data } = await createClient().from('projects').select('current_stage').eq('id', id).maybeSingle()
+            const stageNow = (data as { current_stage?: unknown } | null)?.current_stage
+            if (get().projectId === id && typeof stageNow === 'string') set({ storedStage: stageNow })
+            if (get().projectId === id && typeof stageNow === 'string' && stageNow !== 'producer' && stageNow !== 'entry') set({ producerLocked: true })
+          } catch {
+            /* 폴백: 호출부가 넘긴 단계 */
+          }
+        })()
+        const { useDirectorCanvasStore } = await import('@/stores/director-store')
+        if (seq === switchSeq) useDirectorCanvasStore.getState().setProjectId(id)
+      })
+    pendingSwitch = switched
+    void switched.finally(() => {
+      if (pendingSwitch === switched) pendingSwitch = null
+    })
+    return switched
   },
 
   renameProject: async (title: string) => {
