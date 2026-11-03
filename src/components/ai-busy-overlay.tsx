@@ -9,7 +9,9 @@
 //   v3(2026-11-03 오너 "큰 Lumi 를 단계 넘어갈 때 기다리는 화면에"): lumi 를 주면 도는 원 자리에 큰 Lumi(일하는 동안 loading,
 //   실패 안내면 error)가 서고 카드는 v3 기다리는 카드(Content/Loading Card) 모습이 된다. 안 주면 예전 그대로.
 //   약속: tests/project/busy-overlay-lumi.test.ts
-import { useEffect, useId, useSyncExternalStore } from 'react'
+//   위 막대의 프로젝트 이름 칸은 막지 않고 덮지도 않는다(v3 2단계 2026-11-03) — 예전 레일 홈 카드처럼 일하는 동안에도 이름을 바꾼다.
+//   무엇을 막고 남기는지는 lib/ai-busy-lock 한 곳(약속: tests/project/ai-busy-rename.test.ts).
+import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { AlertCircle, Check, Loader2 } from 'lucide-react'
 import { Lumi } from '@/components/lumi/lumi'
@@ -17,6 +19,7 @@ import { cn } from '@/lib/utils'
 import { SHELL_INSET, SHELL_RAIL_WIDTH } from '@/lib/constants'
 import type { LumiPersona } from '@/lib/lumi'
 import { useT } from '@/lib/i18n'
+import { lockForAiWork, overlayClipPath } from '@/lib/ai-busy-lock'
 import { aiBusyHolds, holdAiBusy } from '@/stores/ai-busy-store'
 
 export interface AiBusyStep {
@@ -52,15 +55,41 @@ export function AiBusyOverlay({ open, title, description, steps, progress, progr
   // 서버 렌더에는 body 가 없다 — 브라우저에서만 띄운다(하이드레이션이 어긋나지 않게).
   const inBrowser = useSyncExternalStore(subscribeNothing, () => true, () => false)
 
-  // 덮는 동안 단계 화면과 채팅을 inert 로 — 키보드 포커스도 뒤로 들어가지 못한다.
+  // 덮는 동안 단계 화면과 채팅을 inert 로 — 키보드 포커스도 뒤로 들어가지 못한다. 단계 화면 위 잠금은 위 막대의 이름 칸만 남긴다.
+  //   일하는 동안 화면이 바뀌어 길 옆에 새 조각이 붙으면 그 조각도 막는다.
   useEffect(() => {
     if (!open) return
-    const targets = Array.from(document.querySelectorAll<HTMLElement>('[data-stage-content], [data-chat-panel]'))
-    for (const el of targets) el.setAttribute('inert', '')
+    const stage = document.querySelector<HTMLElement>('[data-stage-content]')
+    const lock = lockForAiWork<HTMLElement>({
+      stage,
+      chats: Array.from(document.querySelectorAll<HTMLElement>('[data-chat-panel]')),
+      keep: layer === 'stage' && stage ? Array.from(stage.querySelectorAll<HTMLElement>('[data-ai-lock-keep]')) : [],
+    })
+    const observer = new MutationObserver(() => lock.refresh())
+    for (const node of lock.watch) observer.observe(node, { childList: true })
     return () => {
-      for (const el of targets) el.removeAttribute('inert')
+      observer.disconnect()
+      lock.release()
     }
-  }, [open])
+  }, [open, layer])
+
+  // 단계 화면 위 잠금은 위 막대 자리를 오려 내고 덮는다 — 막이 이름 칸 위에 놓이지 않게. 채팅 폭 · 창 크기가 바뀌면 다시 잰다.
+  const overlayRef = useRef<HTMLDivElement>(null)
+  const [clipPath, setClipPath] = useState<string | undefined>(undefined)
+  useLayoutEffect(() => {
+    const overlay = overlayRef.current
+    const bar = document.querySelector<HTMLElement>('[data-stage-content] [data-testid="studio-top-bar"]')
+    if (!open || !inBrowser || layer !== 'stage' || !overlay || !bar) return
+    const measure = () => setClipPath(overlayClipPath(overlay.getBoundingClientRect(), bar.getBoundingClientRect()))
+    measure()
+    const resize = new ResizeObserver(measure)
+    resize.observe(bar)
+    resize.observe(overlay)
+    return () => {
+      resize.disconnect()
+      setClipPath(undefined)
+    }
+  }, [open, inBrowser, layer])
 
   // 일하는 동안 왼쪽 레일의 단계 이동을 막는다 — 닫히거나 실패 안내로 바뀌거나 이 화면이 사라지면 푼다.
   const holdId = useId()
@@ -74,10 +103,11 @@ export function AiBusyOverlay({ open, title, description, steps, progress, progr
 
   return createPortal(
     <div
+      ref={overlayRef}
       className={layer === 'dialog'
         ? 'pointer-events-auto fixed inset-0 z-popover flex items-center justify-center bg-background/85 p-6'
         : 'fixed inset-y-0 right-0 z-overlay flex items-center justify-center bg-background/85 p-6'}
-      style={layer === 'dialog' ? undefined : { left: SHELL_INSET * 2 + SHELL_RAIL_WIDTH }}
+      style={layer === 'dialog' ? undefined : { left: SHELL_INSET * 2 + SHELL_RAIL_WIDTH, clipPath }}
       role="status"
       aria-live="polite"
       aria-busy={busy}

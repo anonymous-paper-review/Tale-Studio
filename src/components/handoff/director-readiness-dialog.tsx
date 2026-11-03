@@ -3,6 +3,7 @@
 // Director 로 넘기기 전 준비 창(2026-10-01 오너 "director 넘어갈 때 미완성 팝업", "그래도 진행을 줘야해").
 //   프로토타입(tale-proto-v04 art:next)처럼 준비된 샷 / 덜 된 샷 수를 보이고, 덜 된 샷마다 이유와 "채우러 가기"를 둔다.
 //   프로토타입의 샷 골라 생성하기는 이번 범위가 아니다 — "그래도 진행"은 모든 샷을 그대로 Director 로 넘긴다.
+//   v3(2026-11-03): 맨 위에 지금 단계 옷의 큰 Lumi(오너 "확인 창"), 테두리 없는 카드색 상자 · ghost 취소. 글 · 단추 · 동작은 그대로.
 import { AlertTriangle, ImageOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -11,6 +12,8 @@ import type { DirectorReadinessReport, ShotGap } from '@/lib/director-readiness'
 import { useT } from '@/lib/i18n'
 import { useArtistStore } from '@/stores/artist-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { useProjectStore } from '@/stores/project-store'
+import { ConfirmLumi } from './confirm-lumi'
 
 function useGapLabel() {
   const t = useT()
@@ -36,6 +39,7 @@ export function DirectorReadinessDialog({
   const gapLabel = useGapLabel()
   const proceed = useGlobalChatStore((s) => s.proceedToDirectorAnyway)
   const close = useGlobalChatStore((s) => s.closeHandoffConfirm)
+  const currentStage = useProjectStore((s) => s.currentStage)
   const incompleteScenes = (report?.scenes ?? [])
     .map((scene) => ({ ...scene, shots: scene.shots.filter((shot) => !shot.ready) }))
     .filter((scene) => scene.shots.length > 0)
@@ -58,7 +62,8 @@ export function DirectorReadinessDialog({
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? null : close())}>
       <DialogContent className="max-h-[90vh] grid-rows-[auto_auto_minmax(0,1fr)_auto] sm:max-w-2xl" data-testid="director-readiness-dialog">
-        <DialogHeader>
+        <DialogHeader className="sm:text-center">
+          <ConfirmLumi stage={currentStage} />
           <DialogTitle>{t('Hand over to Director')}</DialogTitle>
           <DialogDescription>
             {t('Some shots are missing character or background images. Fill them in first, or proceed anyway.')}
@@ -66,26 +71,26 @@ export function DirectorReadinessDialog({
         </DialogHeader>
 
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-xl border border-border bg-card px-4 py-3">
-            <div className="font-mono text-xl tabular-nums">{readyCount}</div>
-            <div className="text-xs text-muted-foreground">{t('Ready shots')}</div>
+          <div className="rounded-xl bg-card px-4 py-3">
+            <div className="font-num text-xl font-semibold tabular-nums">{readyCount}</div>
+            <div className="text-caption text-muted-foreground">{t('Ready shots')}</div>
           </div>
-          <div className="rounded-xl border border-warning/40 bg-warning/10 px-4 py-3">
-            <div className="font-mono text-xl tabular-nums text-warning">{incompleteCount || gateGaps.length}</div>
-            <div className="text-xs text-muted-foreground">{t('Shots not ready')}</div>
+          <div className="rounded-xl bg-warning/10 px-4 py-3">
+            <div className="font-num text-xl font-semibold tabular-nums text-warning">{incompleteCount || gateGaps.length}</div>
+            <div className="text-caption text-muted-foreground">{t('Shots not ready')}</div>
           </div>
         </div>
 
         <div className="min-h-0 space-y-4 overflow-y-auto pr-1">
-          <p className="flex gap-2 text-xs leading-relaxed text-muted-foreground">
+          <p className="flex gap-2 text-caption leading-relaxed text-muted-foreground">
             <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warning" aria-hidden />
             {t('Shots with every character and background image ready come out best. Shots that are not ready still open in Director: a shot missing a character image waits until that image exists, and a shot missing a background image is drawn without the background reference.')}
           </p>
 
           {incompleteScenes.map((scene) => (
-            <section key={scene.sceneId} className="overflow-hidden rounded-xl border border-border">
-              <header className="flex items-center gap-2 border-b border-border bg-muted/40 px-4 py-2 text-xs">
-                <span className="font-mono font-semibold">Scene {scene.sceneNumber}</span>
+            <section key={scene.sceneId} className="overflow-hidden rounded-xl bg-card">
+              <header className="flex items-center gap-2 bg-chip px-4 py-2 text-caption">
+                <span className="font-num font-semibold">Scene {scene.sceneNumber}</span>
                 <span className="truncate text-muted-foreground">
                   {[scene.locationName, scene.timeOfDay].filter(Boolean).join(' · ')}
                 </span>
@@ -93,22 +98,22 @@ export function DirectorReadinessDialog({
               <ul className="divide-y divide-border">
                 {scene.shots.map((shot) => (
                   <li key={shot.shotId} className="flex items-start gap-3 px-4 py-3">
-                    <span className="w-14 shrink-0 pt-0.5 font-mono text-xs text-muted-foreground">{shot.code}</span>
+                    <span className="w-14 shrink-0 pt-0.5 font-num text-caption text-muted-foreground">{shot.code}</span>
                     <span className="flex shrink-0 gap-1">
                       {shot.rough ? (
                         <>
-                          <ThumbImage src={shot.rough.start} alt={t('Start frame')} className="h-10 w-auto rounded border border-border bg-muted object-cover" />
-                          <ThumbImage src={shot.rough.end} alt={t('End frame')} className="h-10 w-auto rounded border border-border bg-muted object-cover" />
+                          <ThumbImage src={shot.rough.start} alt={t('Start frame')} className="h-10 w-auto rounded-md bg-art-placeholder object-cover" />
+                          <ThumbImage src={shot.rough.end} alt={t('End frame')} className="h-10 w-auto rounded-md bg-art-placeholder object-cover" />
                         </>
                       ) : (
-                        <span className="flex h-10 w-16 items-center justify-center rounded border border-dashed border-border text-muted-foreground">
+                        <span className="flex h-10 w-16 items-center justify-center rounded-md bg-art-placeholder text-subtle-foreground">
                           <ImageOff className="size-4" aria-label={t('No rough storyboard')} />
                         </span>
                       )}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="line-clamp-2 text-sm">{shot.description}</span>
-                      <span className="mt-1 block text-xs text-warning">{shot.gaps.map(gapLabel).join(' · ')}</span>
+                      <span className="line-clamp-2 text-label text-foreground">{shot.description}</span>
+                      <span className="mt-1 block text-caption text-warning">{shot.gaps.map(gapLabel).join(' · ')}</span>
                     </span>
                     <Button size="sm" variant="outline" className="shrink-0" onClick={() => fillIn(shot.gaps[0])}>
                       {t('Fill in')}
@@ -120,7 +125,7 @@ export function DirectorReadinessDialog({
           ))}
 
           {incompleteScenes.length === 0 && gateGaps.length > 0 ? (
-            <ul className="space-y-1 rounded-xl border border-border px-4 py-3 text-sm">
+            <ul className="space-y-1 rounded-xl bg-card px-4 py-3 text-label">
               {gateGaps.map((gap) => (
                 <li key={gap} className="text-warning">· {gap}</li>
               ))}
@@ -128,12 +133,12 @@ export function DirectorReadinessDialog({
           ) : null}
 
           {readyCount > 0 ? (
-            <p className="text-xs text-muted-foreground">{t('{count} shots are ready.', { count: readyCount })}</p>
+            <p className="text-caption text-muted-foreground">{t('{count} shots are ready.', { count: readyCount })}</p>
           ) : null}
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={close}>
+          <Button variant="ghost" onClick={close}>
             {t('Fill in first')}
           </Button>
           <Button onClick={() => void proceed()} data-testid="director-proceed-anyway">

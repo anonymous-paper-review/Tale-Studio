@@ -24,11 +24,12 @@ v3 "Claude 톤"(따뜻한 무채색 · 크림 메인 단추 · 지금 단계 색
 같은 날 오너가 정한 것(v3 와 제품 구조가 부딪치는 자리):
 - 샷 번호는 보드의 전체 번호("Scene 2 · Shot 8") 그대로 — v3 의 "S1-2" 를 쓰지 않는다.
 - 단계 색은 Figma 브랜드 가이드 값(아래 §2.9). Lumi 개발 가이드 채팅 CSS 의 `--stage-*` 값 대신 이 값을 쓴다. 채팅 무채색은 가이드 그대로.
-- 마스터 시트는 체크박스가 있는 내보내기 창(2단계 작업).
+- 마스터 시트는 [내보내기] 체크 창의 한 칸 — 화면 JPEG · 마스터 시트 그림 · 이 단계 ZIP · 전체 프로젝트 ZIP 중 고른 것만 창의 순서대로 받는다
+  (고를 수 있는 조건은 예전 메뉴 그대로, `src/lib/export/export-choices.ts` · `src/components/export-menu.tsx`).
 - Storyboard 카드는 지금의 3컷 순환 그대로.
 - 채팅의 모델 고르기 · 다른 단계 고르기 · [+] 첨부는 모두에게 그대로 — 모양만 바꾼다.
 - Writer 는 [화면에서 고치기 | 채팅으로 고치기] 토글을 뺀다(2단계 작업).
-- 큰 3D Lumi 는 가이드가 말한 자리 모두: 단계 넘어가는 로딩 · 프로젝트 목록 첫 화면 · 확인 팝업(2단계 작업).
+- 큰 3D Lumi 는 가이드가 말한 자리 모두: 확인 팝업(넘기기 확인 창 맨 위 `ConfirmLumi`, §13.3) · 단계 넘어가는 로딩 · 프로젝트 목록 첫 화면(뒤 둘은 2단계 작업).
 - 채팅 아바타는 움직이지 않는 그림(가이드가 목록에는 그림을 권한다).
 
 ---
@@ -477,7 +478,9 @@ Radix primitive 는 body 로 portal — `<html data-stage>` 덕에 지금 단계
 
 ### 13.3 Dialog anatomy
 
-shadcn `Dialog` — 바탕색 판 · `rounded-2xl` · `shadow-panel` · 막 검정 60%. 제목 `text-lg font-semibold`, 설명 `text-label text-muted-foreground`. 메인 단추(크림)는 오른쪽, 취소는 ghost. 확인 팝업의 큰 Lumi 는 2단계 작업.
+shadcn `Dialog` — 바탕색 판 · `rounded-2xl` · `shadow-panel` · 막 검정 60%. 제목 `text-lg font-semibold`, 설명 `text-label text-muted-foreground`. 메인 단추(크림)는 오른쪽, 취소는 ghost.
+**확인 팝업**(큰 일을 하기 전에 "~할까요?"를 묻는 창 — 단계 넘기기 · 확정) 맨 위에는 큰 Lumi `<ConfirmLumi stage={지금 단계} />`
+(`src/components/handoff/confirm-lumi.tsx`: 지금 단계 옷 · `idle` · 폭 180). 지우기 확인 · 오류 안내에는 넣지 않는다. 지금 쓰는 곳: Writer 로 넘기기 전 확정 창(`handoff/producer-lock-dialog.tsx`) · Director 로 넘기기 전 준비 창(`handoff/director-readiness-dialog.tsx`).
 
 ### 13.4 Form anatomy
 
@@ -559,7 +562,7 @@ Figma 에 있는 v3 아이콘은 `v3-icons.tsx` 에 더한다(이름 `<Name>Icon
 
 ### 15.4 Lumi
 
-- **큰 Lumi** `<Lumi persona state size />`(`src/components/lumi/lumi.tsx`): `public/lumi-persona.js`(웹 컴포넌트 `<lumi-persona>`, 약 3.1MB)를 **처음 그릴 때만** 불러온다. 다 불러오기 전 · WebGL 없음 · 불러오기 실패 → 같은 모습의 그림(`public/lumi/full/*.webp`), 동작 줄이기 → `paused`. 한 화면에 큰 Lumi 는 하나. 자리: 단계 넘어가는 로딩 · 프로젝트 목록 첫 화면 · 확인 팝업(2단계 작업).
+- **큰 Lumi** `<Lumi persona state size />`(`src/components/lumi/lumi.tsx`): `public/lumi-persona.js`(웹 컴포넌트 `<lumi-persona>`, 약 3.1MB)를 **처음 그릴 때만** 불러온다. 다 불러오기 전 · WebGL 없음 · 불러오기 실패 → 같은 모습의 그림(`public/lumi/full/*.webp`), 동작 줄이기 → `paused`. 한 화면에 큰 Lumi 는 하나. 자리: 확인 팝업(`ConfirmLumi`, §13.3) · 단계 넘어가는 로딩 · 프로젝트 목록 첫 화면(뒤 둘은 2단계 작업).
 - **채팅 아바타** `<LumiAvatar persona state size />`: 그림만(`public/lumi/avatar/*.webp`, 80px). 바탕은 그 단계 색 12%.
 - persona: `pearl`(시작 · 목록) · 여섯 단계 · `complete`(작품 완성). state: idle · listening · thinking · complete · error · loading. 단계 id → persona 는 `STAGE_PERSONA`.
 

@@ -3,10 +3,12 @@
 // Writer 로 넘기기 전 확정 창(2026-10-01 오너 "producer 완성 시 잠그기 (writer로 넘어갈 때 경고 팝업)").
 //   넘기면 Producer 가 영구히 읽기 전용이 된다 — 무엇이 확정되는지 값을 보여 주고, "확정할게요"를 체크해야 넘긴다.
 //   실제 넘김은 global-chat-store.confirmProducerLock(넘김 문장을 채팅에 남기고 Writer 시작).
+//   v3(2026-11-03): 맨 위에 지금 단계 옷의 큰 Lumi(오너 "확인 창"), 테두리 없는 카드색 상자 · 크림 메인 단추 · ghost 취소. 글 · 단추 · 동작은 그대로.
 import { useState } from 'react'
 import { Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { ConfirmLumi } from './confirm-lumi'
 import { FORMAT_OPTIONS, LANGUAGE_OPTIONS } from '@/features/producer/quest-journal'
 import { useLocale, useT } from '@/lib/i18n'
 import { styleAnchorName } from '@/lib/style-anchor-name'
@@ -18,9 +20,9 @@ import { useProducerStore } from '@/stores/producer-store'
 function Row({ label, value }: { label: string; value: string | null }) {
   const t = useT()
   return (
-    <div className="flex items-baseline gap-4 px-4 py-2.5 text-sm">
-      <span className="w-36 shrink-0 text-xs text-muted-foreground">{label}</span>
-      <span className={value ? 'min-w-0 flex-1 truncate font-medium' : 'min-w-0 flex-1 text-muted-foreground'}>
+    <div className="flex items-baseline gap-4 px-4 py-2.5 text-label">
+      <span className="w-36 shrink-0 text-caption text-muted-foreground">{label}</span>
+      <span className={value ? 'min-w-0 flex-1 truncate font-medium text-foreground' : 'min-w-0 flex-1 text-subtle-foreground'}>
         {value || t('Empty')}
       </span>
     </div>
@@ -39,6 +41,7 @@ export function ProducerLockDialog({ open }: { open: boolean }) {
   const styleAnchorKey = useProducerStore((s) => s.styleAnchorKey)
   const customStyleAnchor = useProducerStore((s) => s.customStyleAnchor)
   const confirmProducerLock = useGlobalChatStore((s) => s.confirmProducerLock)
+  const currentStage = useProjectStore((s) => s.currentStage)
   const closeHandoffConfirm = useGlobalChatStore((s) => s.closeHandoffConfirm)
   const [agreed, setAgreed] = useState(false)
   // 넘기기 전 트리트먼트 초안(2026-10-02 시안 v04) — 이미 쓴 트리트먼트를 확정하고 나머지를 이어 간다.
@@ -63,7 +66,8 @@ export function ProducerLockDialog({ open }: { open: boolean }) {
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? null : close())}>
       <DialogContent className="sm:max-w-xl" data-testid="producer-lock-dialog">
-        <DialogHeader>
+        <DialogHeader className="sm:text-center">
+          <ConfirmLumi stage={currentStage} />
           <DialogTitle>{t('Confirm before handing over to Writer')}</DialogTitle>
           <DialogDescription>
             {treatmentDraft
@@ -72,7 +76,7 @@ export function ProducerLockDialog({ open }: { open: boolean }) {
           </DialogDescription>
         </DialogHeader>
 
-        <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card">
+        <div className="divide-y divide-border overflow-hidden rounded-xl bg-card">
           <Row label={t('Story')} value={storyValue} />
           <Row label={t('Style')} value={styleLabel} />
           <Row label={t('Genre')} value={genre || null} />
@@ -90,26 +94,26 @@ export function ProducerLockDialog({ open }: { open: boolean }) {
           />
         </div>
 
-        <div className="flex gap-3 rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm">
+        <div className="flex gap-3 rounded-xl bg-warning/10 p-4 text-label">
           <Lock className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
-          <p className="leading-relaxed">
+          <p className="leading-relaxed text-foreground">
             {t('After handing over, Producer becomes read only and cannot be unlocked. To change these values, start a new project.')}
           </p>
         </div>
 
-        <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-border px-4 py-3 text-sm">
+        <label className="flex cursor-pointer items-center gap-3 rounded-xl bg-card px-4 py-3 text-label text-foreground">
           <input
             type="checkbox"
             checked={agreed}
             onChange={(e) => setAgreed(e.target.checked)}
-            className="size-4 accent-primary"
+            className="size-4 accent-primary scheme-dark"
             data-testid="producer-lock-agree"
           />
           <span>{t('I confirm these values as they are')}</span>
         </label>
 
         <DialogFooter>
-          <Button variant="outline" onClick={close}>
+          <Button variant="ghost" onClick={close}>
             {t('Keep editing')}
           </Button>
           <Button
