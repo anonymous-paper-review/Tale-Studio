@@ -13,7 +13,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
-import { paragraphClickPicks, paragraphKeyPicks, paragraphLabel } from '@/lib/prose/paragraph-pick'
+import { paragraphClickPicks, paragraphKeyPicks, paragraphLabel, selectedTextWithin } from '@/lib/prose/paragraph-pick'
 import { TreatmentDiffView } from '@/features/producer/treatment-diff-view'
 import { useProducerStore } from '@/stores/producer-store'
 import { useWriterRoomStore } from '@/stores/writer-room-store'
@@ -90,8 +90,9 @@ export function ProseDocument({ prose }: { prose: ProseState }) {
               role="button"
               tabIndex={0}
               aria-pressed={attached}
-              onClick={() => {
-                if (paragraphClickPicks(window.getSelection()?.toString() ?? '')) toggle()
+              onClick={(event) => {
+                // 이 문단 안에서 끌어 고른 글만 붙이기를 막는다 — 다른 곳에 고른 글이 남아 있어도 문단은 붙는다.
+                if (paragraphClickPicks(selectedTextWithin(event.currentTarget, window.getSelection()))) toggle()
               }}
               onKeyDown={(event) => {
                 if (event.target !== event.currentTarget || !paragraphKeyPicks(event.key)) return

@@ -232,6 +232,20 @@ describe('혼자 정한 것', () => {
     }
   })
 
+  // 왜: 검토 C — 닫힌 채팅은 화면 밖으로 밀려 있을 뿐이라 Tab 으로 보이지 않는 입력칸에 들어가 글을 보낼 수 있었다(Director 는 늘 닫힌 채 시작해 더 쉽게 걸렸다).
+  //   잠금 화면이 [data-chat-panel] 요소 자체에 막기를 세며 걸고 풀므로, 닫힘은 그 안쪽 묶음에 건다.
+  it('채팅이 닫혀 있으면 Tab 으로 채팅 입력칸에 들어가지 못한다', () => {
+    useChatUiStore.setState({ collapsed: true })
+    const closed = draw(() => GlobalChat(), '/studio/director')
+    const locked = closed.find((node) => node.props.inert === true)
+    expect(locked).toBeDefined()
+    expect(elements(locked!.props.children as ReactNode).some((node) => 'onSubmit' in node.props && 'value' in node.props)).toBe(true)
+    expect(closed.find((node) => 'data-chat-panel' in node.props)?.props.inert).toBeUndefined()
+
+    useChatUiStore.setState({ collapsed: false })
+    expect(draw(() => GlobalChat(), '/studio/director').some((node) => node.props.inert === true)).toBe(false)
+  })
+
   // 왜: 접힌 레일(v3 Chat Toggle «)은 다른 단계에서 닫힌 채팅을 여는 곳이다 — Director 밖은 바뀌지 않는다.
   it('Director 밖의 단계에서는 채팅을 접으면 지금처럼 접힌 레일이 남는다', () => {
     useChatUiStore.setState({ collapsed: true, chatWidth: CHAT_DEFAULT_WIDTH })
@@ -252,6 +266,8 @@ const unseenBadge = () => pill().find((node) => node.props['data-testid'] === 'l
 
 describe('혼자 정한 것 · 닫힌 채팅의 Lumi 알약(검토 B B2, 시안 D1 알약의 파란 숫자)', () => {
   beforeEach(() => {
+    // 앞 시험에서 본 것으로 친 말이 남지 않게 — 화면마다 처음 들어온 사람처럼 시작한다.
+    useChatUiStore.setState({ closedSeen: null })
     useGlobalChatStore.setState({
       messages: [{ id: 'old-1', stage: 'director', role: 'model', content: '예전에 한 말' }],
       messagesLoadedProjectId: 'chat-closed-project',
@@ -285,6 +301,19 @@ describe('혼자 정한 것 · 닫힌 채팅의 Lumi 알약(검토 B B2, 시안 
     pillMounted()
 
     expect(unseenBadge()).toBeUndefined()
+  })
+
+  // 왜: 숫자는 눈으로만 보인다 — 화면 읽기 프로그램도 새 메시지 수를 읽는다. 영어는 하나일 때 "1 new message"(검토 C).
+  it('알약은 새 메시지 수를 화면 읽기 이름에도 싣고, 영어로는 하나일 때 단수로 읽는다', () => {
+    enter('director')
+    pillMounted()
+    lumiSays('welcome')
+    const label = () => pill().find((node) => node.type === 'button')?.props['aria-label']
+    expect(label()).toBe('채팅 열기 · 새 메시지 1개')
+    useLocaleStore.setState({ locale: 'en' })
+    expect(label()).toBe('Open chat · 1 new message')
+    lumiSays('gaps')
+    expect(label()).toBe('Open chat · 2 new messages')
   })
 
   // 왜: 알약은 닫힌 채팅의 얼굴이다 — 접힌 레일의 Lumi 처럼 답을 쓰는 중 · 오류를 같은 모습으로 보인다.

@@ -143,22 +143,18 @@ function BaseNodeImpl({
       />
 
       {/* 머리 — 점 · 종류 · ···(마우스를 올리거나 Tab 으로 옮겨 가면 편집 · 가지 · 복제 · 지우기).
-          단추는 늘 자리에 두고 보이게만 바꾼다 — 키보드 · 터치로도 닿는다(검토 B B3). ··· 는 단추 묶음 오른쪽 끝에 겹쳐 둔다. */}
+          단추는 늘 그려 두어 Tab 으로 닿는다(검토 B B3). 가만히 있을 때는 폭 0 · 눌리지 않음 — 영상 노드의 ★ 가 ··· 바로 옆에 있다(검토 C).
+          단추는 ★ · ··· 왼쪽에 선다 — 보이게 돼도 ★ · ··· 자리는 그대로라, 터치로 ··· 를 누르면 밑의 지우기가 아니라 노드가 눌린다. */}
       <div className="flex h-4 items-center gap-1.5 text-[11px] font-medium text-subtle-foreground">
         <span className={cn('size-1.5 shrink-0 rounded-full', selected ? 'bg-stage' : 'bg-subtle-foreground')} />
         <span>{t(LABEL_BY_THEME[theme])}</span>
-        <div className="relative ml-auto flex items-center gap-0.5">
-          {headerExtra}
-          <MoreHorizontal
-            className="pointer-events-none absolute right-0.5 top-1/2 size-3.5 -translate-y-1/2 transition-opacity duration-100 group-focus-within:opacity-0 group-hover:opacity-0"
-            aria-hidden
-          />
-          <div className="flex items-center gap-0.5 opacity-0 transition-opacity duration-100 group-hover:opacity-100 group-focus-within:opacity-100">
+        <div className="ml-auto flex items-center gap-0.5">
+          <div className="pointer-events-none flex w-0 items-center gap-0.5 overflow-hidden opacity-0 transition-opacity duration-100 group-hover:pointer-events-auto group-hover:w-auto group-hover:overflow-visible group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:w-auto group-focus-within:overflow-visible group-focus-within:opacity-100">
             <Button
               variant="ghost"
               size="icon-xs"
               onClick={handleEdit}
-              aria-label="Edit"
+              aria-label={t('Edit node')}
             >
               <Edit className="size-3" />
             </Button>
@@ -167,7 +163,7 @@ function BaseNodeImpl({
                 variant="ghost"
                 size="icon-xs"
                 onClick={handleBranch}
-                aria-label="Branch"
+                aria-label={t('Make a branch')}
               >
                 <GitBranch className="size-3" />
               </Button>
@@ -176,7 +172,7 @@ function BaseNodeImpl({
               variant="ghost"
               size="icon-xs"
               onClick={handleDuplicate}
-              aria-label="Duplicate"
+              aria-label={t('Duplicate node')}
               disabled
             >
               <Copy className="size-3 opacity-30" />
@@ -186,13 +182,15 @@ function BaseNodeImpl({
                 variant="ghost"
                 size="icon-xs"
                 onClick={handleDelete}
-                aria-label="Delete"
+                aria-label={t('Delete node')}
                 className="text-destructive"
               >
                 <Trash2 className="size-3" />
               </Button>
             )}
           </div>
+          {headerExtra}
+          <MoreHorizontal className="size-3.5" aria-hidden />
         </div>
       </div>
 

@@ -284,6 +284,7 @@ export const KO: Record<string, string> = {
   'Stop generating response': '응답 생성 중단',
   Send: '보내기',
   'Open chat': '채팅 열기',
+  'Open chat · 1 new message': '채팅 열기 · 새 메시지 1개',
   'Open chat · {count} new messages': '채팅 열기 · 새 메시지 {count}개',
   'Context {tokens}': '컨텍스트 {tokens}',
   'Input {tokens}': '입력 {tokens}',
@@ -740,6 +741,9 @@ export const KO: Record<string, string> = {
   '⚠ Includes a take marked ★ Final. This may affect the Editor handoff.':
     '⚠ ★ Final로 마킹된 테이크가 포함됩니다. Editor 핸드오프에 영향이 있을 수 있어요.',
   'Delete node': '노드 삭제',
+  'Edit node': '노드 편집',
+  'Make a branch': '가지 만들기',
+  'Duplicate node': '노드 복제',
   'Delete the "{label}" node?': '"{label}" 노드를 삭제할까요?',
   '{label} (previz)': '{label} (목각)',
   '{label} storyboard': '{label} 스토리보드',

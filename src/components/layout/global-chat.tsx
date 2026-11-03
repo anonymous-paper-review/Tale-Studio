@@ -1384,6 +1384,9 @@ export function GlobalChat() {
         )}
         style={{ width: chatWidth, right: 0, top: 0, bottom: 0 }}
       >
+        {/* 닫혀 있는 동안 패널 안쪽은 inert — 화면 밖으로 밀려 있을 뿐이라 Tab 으로 보이지 않는 입력칸에 들어가 글을 보낼 수 있었다(검토 C).
+            잠금 화면(lib/ai-busy-lock)이 [data-chat-panel] 요소 자체에 inert 를 세며 걸고 풀므로 그 요소 말고 이 안쪽 묶음에 건다. */}
+        <div className="flex min-h-0 flex-1 flex-col" inert={collapsed}>
         {/* 좌측 리사이즈 핸들 */}
         <div
           role="separator"
@@ -2115,6 +2118,7 @@ export function GlobalChat() {
               </div>
             )}
           </div>
+        </div>
         </div>
       </aside>
 

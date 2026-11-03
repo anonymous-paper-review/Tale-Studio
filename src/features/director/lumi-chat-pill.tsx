@@ -45,7 +45,7 @@ export function LumiChatPill({ className }: { className?: string } = {}) {
       type="button"
       onClick={() => useChatUiStore.getState().setCollapsed(false)}
       title={t('Open chat')}
-      aria-label={unseen > 0 ? t('Open chat · {count} new messages', { count: unseen }) : t('Open chat')}
+      aria-label={unseen === 0 ? t('Open chat') : unseen === 1 ? t('Open chat · 1 new message') : t('Open chat · {count} new messages', { count: unseen })}
       className={cn(
         'flex h-[31px] shrink-0 items-center gap-2 rounded-full bg-card pl-2.5 pr-3 text-[13px] font-semibold text-foreground shadow-node transition-colors duration-100 hover:bg-accent',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',

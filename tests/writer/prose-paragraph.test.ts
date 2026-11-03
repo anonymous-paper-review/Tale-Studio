@@ -7,7 +7,7 @@ vi.mock('@/lib/writer/use-writer-status', async (original) => ({ ...(await origi
 
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { keptParagraphPick, nextParagraphPick, paragraphClickPicks, paragraphKeyPicks, type ParagraphPick } from '@/lib/prose/paragraph-pick'
+import { keptParagraphPick, nextParagraphPick, paragraphClickPicks, paragraphKeyPicks, selectedTextWithin, type ParagraphPick } from '@/lib/prose/paragraph-pick'
 import { proseTools } from '@/lib/prose/conditions'
 import { goesToParagraph, sendParagraphRequest } from '@/features/prose/paragraph-request'
 import { ParagraphChip } from '@/features/prose/paragraph-chip'
@@ -92,6 +92,21 @@ describe('문단 붙이기', () => {
     expect(document).toMatch(/<div role="button" tabindex="0" aria-pressed="false"[^>]*data-testid="prose-paragraph-2"/)
     // 화면은 끌어 고르기를 기본으로 꺼 둔다(캔버스 · 타임라인 끌기) — 문단 글은 고를 수 있는 글로 둔다.
     expect(document).toMatch(/data-testid="prose-paragraph-2"><span[^>]*>S2<\/span><span class="[^"]*\bselect-text\b/)
+  })
+
+  // 왜: 검토 C — 붙이기를 막는 기준이 "화면 어디든 고른 글이 있나"라서, 다른 곳(다른 문단 · 채팅)에 고른 글이 남은 채
+  //   다른 문단의 번호 칸 · 가장자리를 누르면 아무 일도 일어나지 않았다. 그 문단 안에서 끌어 고른 글만 막는다.
+  it('다른 곳에 고른 글이 남아 있어도 문단을 누르면 그 문단이 붙는다', () => {
+    const inside = {} as Node
+    const outside = {} as Node
+    const paragraph = { contains: (node: Node | null) => node === inside }
+    const selected = (node: Node) => ({ isCollapsed: false, anchorNode: node, focusNode: node, toString: () => '자판기가 덜컹거리더니' })
+    expect(paragraphClickPicks(selectedTextWithin(paragraph, selected(outside)))).toBe(true)
+    expect(paragraphClickPicks(selectedTextWithin(paragraph, selected(inside)))).toBe(false)
+    expect(paragraphClickPicks(selectedTextWithin(paragraph, { isCollapsed: true, anchorNode: inside, focusNode: inside, toString: () => '' }))).toBe(true)
+    expect(paragraphClickPicks(selectedTextWithin(paragraph, null))).toBe(true)
+    // 문단을 누를 때는 그 문단 안에서 고른 글만 본다.
+    expect(readFileSync('src/features/prose/prose-document.tsx', 'utf8')).toMatch(/selectedTextWithin\(event\.currentTarget, window\.getSelection\(\)\)/)
   })
 
   // 왜: 마우스 없이 쓰는 사람도 문단을 붙인다 — 단추였을 때처럼 Tab 으로 옮겨 가 Enter · 스페이스로 누른다.

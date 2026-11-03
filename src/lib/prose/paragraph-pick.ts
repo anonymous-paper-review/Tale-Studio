@@ -37,6 +37,15 @@ export function paragraphClickPicks(selectedText: string): boolean {
   return selectedText.trim().length === 0
 }
 
+/** 이 문단 안에서 고른 글 — 고른 글이 다른 곳(다른 문단 · 채팅)에만 있으면 빈 글이다(검토 C: 다른 곳에 고른 글이 남아 문단을 못 붙였다). */
+export function selectedTextWithin(
+  container: { contains(node: Node | null): boolean },
+  selection: { isCollapsed: boolean; anchorNode: Node | null; focusNode: Node | null; toString(): string } | null,
+): string {
+  if (!selection || selection.isCollapsed) return ''
+  return container.contains(selection.anchorNode) || container.contains(selection.focusNode) ? selection.toString() : ''
+}
+
 /** 키보드로 문단을 누르는 키 — 단추와 같은 Enter · 스페이스. */
 export function paragraphKeyPicks(key: string): boolean {
   return key === 'Enter' || key === ' '
