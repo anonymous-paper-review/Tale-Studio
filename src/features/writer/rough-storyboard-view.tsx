@@ -1164,20 +1164,20 @@ export function RoughStoryboardView() {
             const sceneShots = shots.filter((s) => s.sceneId === scene.sceneId)
             const sceneCollapsed = collapsedScenes.has(scene.sceneId)
             const sceneTitle = sceneHeadTitle(scene, entityNames, locale)
-            const sceneSummary = [
-              resolveEntityNames(scene.narrativeSummary, entityNames).trim(),
-              sceneStatsLabel(statsByScene.get(scene.sceneId) ?? { shots: sceneShots.length, seconds: 0 }, locale),
-            ].filter(Boolean).join(' · ')
+            const sceneSummary = resolveEntityNames(scene.narrativeSummary, entityNames).trim()
+            const sceneStatsText = sceneStatsLabel(statsByScene.get(scene.sceneId) ?? { shots: sceneShots.length, seconds: 0 }, locale)
             return (
               <section key={scene.sceneId} className="space-y-3">
                 {/* 씬 머리(v3 시안 S1) — 씬 번호(전체 번호 그대로, 씬 안 번호를 새로 만들지 않는다) · 이름(장소 · 때) · 요약 · 컷 수 · 초 · [+ 샷 추가].
-                    예전에는 id 만 보였다(사용자 결정 2026-06-12) — v3 를 따른다(오너 2026-11-03 v3 대로 확인). 씬 머리를 누르면 접기/펼치기(#c2 2026-08-03, 갈매기 회전으로 상태 표시). */}
+                    예전에는 id 만 보였다(사용자 결정 2026-06-12) — v3 를 따른다(오너 2026-11-03 v3 대로 확인). 씬 머리를 누르면 접기/펼치기(#c2 2026-08-03, 갈매기 회전으로 상태 표시).
+                    한 줄로 잘라 보이는(truncate) 이름 · 요약이 보드의 최소 폭이 되지 않게 가둔다(contain: inline-size) — 스크롤 칸 안쪽 틀(Radix table)이
+                    그 폭만큼 넓어져, 채팅을 열어 보드가 좁아지면 오른쪽 카드가 잘렸다(2026-11-03 오너 QA 1번). Director storyboard 뷰처럼 카드 열은 폭에 맞춰 줄어든다. */}
                 <div className="flex min-h-8 items-center gap-2.5">
                   <button
                     type="button"
                     onClick={() => toggleSceneCollapsed(scene.sceneId)}
                     aria-expanded={!sceneCollapsed}
-                    className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring/50"
+                    className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md text-left [contain:inline-size] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring/50"
                   >
                     <ChevronDown
                       className={cn('size-3.5 shrink-0 text-subtle-foreground transition-transform', sceneCollapsed && '-rotate-90')}
@@ -1185,7 +1185,11 @@ export function RoughStoryboardView() {
                     />
                     <span className="shrink-0 font-num text-micro font-semibold text-foreground">Scene {sceneIdx + 1}</span>
                     {sceneTitle ? <span className="min-w-0 max-w-[45%] shrink-0 truncate text-body font-semibold text-foreground">{sceneTitle}</span> : null}
-                    <span className="min-w-0 truncate text-caption text-subtle-foreground" title={sceneSummary}>{sceneSummary}</span>
+                    {/* 좁으면 요약만 말줄임 — 컷 수 · 초는 늘 보인다. */}
+                    <span className="flex min-w-0 items-baseline gap-1 text-caption text-subtle-foreground">
+                      {sceneSummary ? <span className="min-w-0 truncate" title={sceneSummary}>{sceneSummary}</span> : null}
+                      <span className="shrink-0 tabular-nums">{sceneSummary ? `· ${sceneStatsText}` : sceneStatsText}</span>
+                    </span>
                   </button>
                   <Button
                     size="sm"
