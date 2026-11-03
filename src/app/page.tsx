@@ -1,7 +1,8 @@
 'use client'
 
-// 랜딩(로그인 전 첫 화면). v3(2026-11-03): 첫 화면(히어로)은 시안 144-668 "v3 · Home 예시" — 극장 같은 바탕에 단계 색 흐린 빛,
-//   Tale 로고 묶음, 크림 알약 단추. 구조 · 글은 그대로 두고(서비스 · 프로젝트 · 꼬리말 섹션도), 색 · 글꼴 · 단추 · 카드만 v3 토큰.
+// 랜딩(로그인 전 첫 화면). v3(2026-11-03): 첫 화면(히어로)은 시안 144-668 "v3 · Home 예시" — 극장 같은 바탕 · Tale 로고 묶음 ·
+//   크림 알약 단추 · 헤드라인 글자 그라데이션. 배경 영상은 지금 그대로 둔다(시안의 단계 색 흐린 빛은 브랜드 가이드의 빛 금지와
+//   어긋나 오너가 고른다). 구조 · 글은 그대로(서비스 · 프로젝트 · 꼬리말 섹션도 토큰만).
 //   밝은 섹션 · 빨간 빛 · 유리(white/5 + 흐림)는 없앴다(design.md 6 hard rules: dark only · no glassmorphism).
 //   로그인 전 화면이라 큰 Lumi(움직이는 파일은 로그인 미들웨어를 탄다)는 두지 않는다.
 import { useEffect, useRef, useState } from 'react'
@@ -84,15 +85,6 @@ const SERVICES = [
     image:
       'https://images.unsplash.com/photo-1687715997916-4030568eda97?auto=format&fit=crop&q=80&w=800',
   },
-]
-
-// 시안 Home(144-668)의 흐린 빛 다섯 — 히어로 가운데 기준 자리(px) · 크기 · 단계 색과 진하기. 흐림은 Figma 160 ≈ CSS 80.
-const HERO_GLOWS = [
-  { className: 'bg-stage-writer/32', w: 420, h: 360, x: -130, y: 60 },
-  { className: 'bg-stage-storyboard/32', w: 440, h: 380, x: 140, y: 20 },
-  { className: 'bg-stage-director/26', w: 380, h: 320, x: 330, y: 70 },
-  { className: 'bg-stage-producer/18', w: 360, h: 260, x: 20, y: 150 },
-  { className: 'bg-stage-editor/16', w: 320, h: 240, x: 240, y: 170 },
 ]
 
 function formatDate(dateStr: string | null) {
@@ -409,16 +401,25 @@ export default function HomePage() {
 
       {/* ── Hero ── */}
       <section className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-landing">
-        {/* 단계 색 흐린 빛(시안 Home 의 Ellipse 5개, 흐림 160) — 여섯 단계 색이 한데 비친다. 배경 영상 대신. */}
-        <div className="pointer-events-none absolute inset-0" aria-hidden>
-          {HERO_GLOWS.map((glow) => (
-            <span
-              key={glow.className}
-              className={`absolute left-1/2 top-1/2 rounded-full blur-[80px] ${glow.className}`}
-              style={{ width: glow.w, height: glow.h, transform: `translate(calc(-50% + ${glow.x}px), calc(-50% + ${glow.y}px))` }}
-            />
-          ))}
-        </div>
+        {/* Background video — 지금 영상 그대로(시안 Home 의 단계 색 흐린 빛은 브랜드 가이드의 "빛 금지"와 어긋나 오너가 고른다). */}
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-50 mix-blend-screen"
+          poster="https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?auto=format&fit=crop&q=80&w=1080"
+        >
+          <source
+            src="https://assets.mixkit.co/videos/preview/mixkit-network-of-connections-in-a-dark-background-22204-large.mp4"
+            type="video/mp4"
+          />
+        </video>
+
+        {/* Overlays — 검정 · 흰색 대신 랜딩 바탕색으로 덮고, 아래는 어두운 서비스 섹션으로 이어지게 흐린다. */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-landing/60 via-landing/30 to-landing/80" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,var(--landing)_100%)] opacity-60" />
+        <div className="pointer-events-none absolute bottom-0 left-0 h-48 w-full bg-gradient-to-t from-landing via-landing/80 to-transparent" />
 
         <div className="relative z-10 mx-auto max-w-5xl px-6 pt-24 text-center">
           {/* Badge */}
@@ -511,7 +512,7 @@ export default function HomePage() {
 
               {/* AI Active badge */}
               <div className="absolute right-6 top-6 z-20 flex items-center gap-2 rounded-full bg-landing/80 px-3 py-1.5 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                <div className="size-2 rounded-full bg-pearl-vivid" />
+                <div className="size-2 rounded-full bg-primary" />
                 <span className="text-tag font-semibold uppercase tracking-widest text-foreground">
                   AI Active
                 </span>
