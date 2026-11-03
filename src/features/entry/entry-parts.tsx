@@ -29,6 +29,23 @@ export interface OptionItem {
 /** 꺼진 칸(aria-disabled) — 까닭 툴팁이 보이도록 진짜 disabled 대신 쓴다. 흐리게 · 눌러도 바뀌지 않는 모양. */
 export const OPTION_OFF_CLASS = 'aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-card'
 
+/**
+ * 꺼진 선택 카드의 까닭 — 선택 카드(OptionCard)의 title 은 카드 제목 칸이라 버튼에 말풍선(title 속성)을 못 단다.
+ *   마우스 말풍선은 감싼 칸(상자 없는 contents)의 title 로, 화면 읽기는 숨긴 글로 — 카드에 aria-describedby={id} 를 준다.
+ *   까닭이 없으면 카드만 그린다. 약속: tests/producer/entry-settings-controls.test.ts
+ */
+export function WithOffReason({ reason, id, children }: { reason?: string; id: string; children: ReactNode }) {
+  if (!reason) return <>{children}</>
+  return (
+    <span title={reason} className="contents">
+      {children}
+      <span id={id} className="sr-only">
+        {reason}
+      </span>
+    </span>
+  )
+}
+
 /** 추천 표시(v3 Control/Badge, 지금 단계 색). label 을 주면 그 말을 쓴다(시리즈 다음 화의 화면 비율은 "앞 화"). */
 export function RecommendedBadge({ label }: { label?: string } = {}) {
   return <RecommendBadge>{label}</RecommendBadge>
@@ -125,6 +142,7 @@ export function OptionGroup({
             </>
           )
           const reason = o.disabled ? o.disabledReason : undefined
+          const reasonId = `${labelId}-off-${i}`
           const common = {
             ref: (el: HTMLButtonElement | null) => {
               refs.current[i] = el
@@ -145,7 +163,14 @@ export function OptionGroup({
               {name}
             </ChoiceChip>
           ) : (
-            <OptionCard key={o.value} {...common} tooltip={reason} title={name} description={o.sub ? <span className="break-keep text-pretty">{o.sub}</span> : undefined} />
+            <WithOffReason key={o.value} reason={reason} id={reasonId}>
+              <OptionCard
+                {...common}
+                aria-describedby={reason ? reasonId : undefined}
+                title={name}
+                description={o.sub ? <span className="break-keep text-pretty">{o.sub}</span> : undefined}
+              />
+            </WithOffReason>
           )
         })}
       </div>

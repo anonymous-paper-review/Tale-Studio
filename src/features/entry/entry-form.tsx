@@ -5,7 +5,7 @@
 //   화면 비율은 잠금 묶음에 따로 둔다 — [AI로 진행] → 확인 창 [예, 시작]에서 잠기고 산문 초안을 쓴다.
 //   형식 고르기(단편 · 광고 · MV …) · 이미지 권리 동의 · 채팅 · 대사 언어 고르기는 없다(채팅 · 대사 언어 = 사이트 언어).
 //   시리즈 다음 화(2026-10-26 · 프로토타입 E3s)는 화면 비율에 "앞 화" 표시를 붙이고, 앞 화 대사 언어를 잠금 묶음에 보여 준다.
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { ArrowLeft, ArrowRight, Check, CircleAlert, Lock, Paperclip } from 'lucide-react'
 import { OptionCard } from '@/components/controls/choice-chip'
 import { PageHeader } from '@/components/layout/page-header'
@@ -32,7 +32,7 @@ import {
 } from './options'
 import { fileReadLine, isScriptDraft, levelOptionsOf } from './chat-flow'
 import { useEntryStore } from './entry-store'
-import { FileChip, OPTION_OFF_CLASS, OptionGroup, UploadingChip, WhyLine } from './entry-parts'
+import { FileChip, OPTION_OFF_CLASS, OptionGroup, UploadingChip, WhyLine, WithOffReason } from './entry-parts'
 import { dialogueLanguageName, ratioRecommendation } from './series'
 import { summaryRows } from './summary'
 
@@ -381,6 +381,7 @@ interface LevelOptionItem {
 
 /** 바꿈 정도 카드(이름 · 한 줄 설명, v3 선택 카드) — OptionGroup 과 같은 라디오 규칙(화살표로 옮기며 고른다). */
 function LevelOptions({ options, value, recommended, onChange }: { options: LevelOptionItem[]; value: string | null; recommended: string | null; onChange: (v: string) => void }) {
+  const reasonBase = useId()
   const enabled = options.filter((o) => !o.disabled)
   const tabStop = enabled.find((o) => o.value === value)?.value ?? enabled[0]?.value
   const move = (from: string, dir: 1 | -1, target: HTMLElement) => {
@@ -393,34 +394,39 @@ function LevelOptions({ options, value, recommended, onChange }: { options: Leve
   }
   return (
     <>
-      {options.map((o) => (
-        <OptionCard
-          key={o.value}
-          role="radio"
-          selected={o.value === value}
-          recommended={o.value === recommended}
-          data-level={o.value}
-          aria-disabled={o.disabled || undefined}
-          tooltip={o.disabled ? o.disabledReason : undefined}
-          tabIndex={o.value === tabStop ? 0 : -1}
-          onClick={() => {
-            if (!o.disabled) onChange(o.value)
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-              e.preventDefault()
-              move(o.value, 1, e.currentTarget)
-            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-              e.preventDefault()
-              move(o.value, -1, e.currentTarget)
-            }
-          }}
-          className={OPTION_OFF_CLASS}
-          // 이름 · 설명은 낱말 단위로만 줄을 바꾼다 — 한 낱말씩 꺾이던 것(2026-10-27 오너).
-          title={<span className="break-keep text-pretty">{o.label}</span>}
-          description={<span className="break-keep text-pretty">{o.sub}</span>}
-        />
-      ))}
+      {options.map((o) => {
+        const reason = o.disabled ? o.disabledReason : undefined
+        const reasonId = `${reasonBase}-off-${o.value}`
+        return (
+          <WithOffReason key={o.value} reason={reason} id={reasonId}>
+            <OptionCard
+              role="radio"
+              selected={o.value === value}
+              recommended={o.value === recommended}
+              data-level={o.value}
+              aria-disabled={o.disabled || undefined}
+              aria-describedby={reason ? reasonId : undefined}
+              tabIndex={o.value === tabStop ? 0 : -1}
+              onClick={() => {
+                if (!o.disabled) onChange(o.value)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                  e.preventDefault()
+                  move(o.value, 1, e.currentTarget)
+                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                  e.preventDefault()
+                  move(o.value, -1, e.currentTarget)
+                }
+              }}
+              className={OPTION_OFF_CLASS}
+              // 이름 · 설명은 낱말 단위로만 줄을 바꾼다 — 한 낱말씩 꺾이던 것(2026-10-27 오너).
+              title={<span className="break-keep text-pretty">{o.label}</span>}
+              description={<span className="break-keep text-pretty">{o.sub}</span>}
+            />
+          </WithOffReason>
+        )
+      })}
     </>
   )
 }
