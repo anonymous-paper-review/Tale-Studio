@@ -231,6 +231,46 @@ describe('실사 시트 칸 자르기 — 시트 여백 띠를 잘라 낸다 (#r
     }
   }, 30_000)
 
+  it('그림 속 흰 면이 종이색과 같아도, 바깥쪽에 칸 테두리가 먼저 오면 깎지 않는다', async () => {
+    // 왜: 진짜 여백은 자르기 자리 밖으로도 칸 사이 여백(종이)으로 이어지고, 그림 속 흰 면은 자리 밖에서 곧 그 칸의 테두리를 만난다 —
+    //   종이색 ±4 안의 따뜻한 흰 벽 · 크림색 벽 · 밝은 종이 위 날아간 하늘을 띠로 보고 23~27줄을 깎던 것(2차 검토 지적).
+    /** 칸 (s, f) 안쪽 전체 너비로, 자르기 자리 아래 rows 줄부터 칸 테두리 직전까지 흰 면 + 그 위 곧은 어두운 줄. */
+    const surfaceAtBottom = (sh: Sheet, s: number, f: number, color: RGB, rows: number) => {
+      const [x0, x1] = SPEC.colBoxes[s]
+      const [, y1] = SPEC.rowBoxes[f]
+      const w = windowOf(s, f)
+      const wb = w.top + w.height
+      sh.fill(x0 + 2, wb - rows - 2, x1 - 2, wb - rows, [35, 32, 30])
+      sh.noise(x0 + 2, wb - rows, x1 - 2, y1 - 2, color, 0, 31)
+    }
+    const cream = await sheetWith(undefined, (sh) => {
+      surfaceAtBottom(sh, 0, 0, [248, 246, 240], 20) // 따뜻한 흰 벽
+      surfaceAtBottom(sh, 1, 0, [251, 249, 244], 20) // 크림색 벽
+    })
+    const creamShots = await cropRoughGridFrames(cream, 'grid4', 2, FMT, 'repaint')
+    expect((await sharp(creamShots[0].start).removeAlpha().raw().toBuffer()).equals(await plainCut(cream, 0, 0)), '따뜻한 흰 벽').toBe(true)
+    expect((await sharp(creamShots[1].start).removeAlpha().raw().toBuffer()).equals(await plainCut(cream, 1, 0)), '크림색 벽').toBe(true)
+
+    const brightPaper: RGB = [253, 253, 251]
+    const bright = await sheetWith(shortStart(3), (sh) => {
+      const [x0, x1] = SPEC.colBoxes[0]
+      const [y0] = SPEC.rowBoxes[0]
+      const w = windowOf(0, 0)
+      sh.noise(x0 + 2, y0 + 2, x1 - 2, w.top + 24, [252, 252, 252], 0, 32) // 날아간 하늘(칸 테두리부터 자리 안 24줄)
+      sh.fill(x0 + 2, w.top + 24, x1 - 2, w.top + 26, [40, 36, 34]) // 곧은 지붕선
+    }, brightPaper)
+    const brightShots = await cropRoughGridFrames(bright, 'grid4', 4, FMT, 'repaint')
+    expect((await sharp(brightShots[0].start).removeAlpha().raw().toBuffer()).equals(await plainCut(bright, 0, 0)), '날아간 하늘').toBe(true)
+    // 같은 시트의 진짜 띠(샷 3 시작 칸)는 그대로 잘린다 — 바깥으로 칸 사이 여백이 이어진다.
+    let paperRows = 0
+    const banded = await frameOf(brightShots[3].start)
+    for (let i = 0; i < 30; i++) {
+      const { rgb, std } = lineAt(banded, 'bottom', i)
+      if (near(rgb, brightPaper, 6) && std <= 4) paperRows++
+    }
+    expect(paperRows, '밝은 종이 시트의 진짜 띠').toBe(0)
+  }, 30_000)
+
   it('시트 종이색이 흔한 크림색과 달라도 그 시트의 칸 사이 여백 색으로 띠를 알아본다', async () => {
     // 왜: 시트마다 종이색이 다르다(운영 시트 10장 247~253) — 정해 둔 한 색과 견주면 어두운 종이의 띠는 놓치고 흰 그림은 띠로 본다.
     const greyPaper: RGB = [238, 236, 232]
