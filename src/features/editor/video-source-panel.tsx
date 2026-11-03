@@ -3,8 +3,7 @@
 import { useRef, useState } from 'react'
 import { useEntityNames } from '@/lib/writer/use-entity-names'
 import { resolveEntityNames } from '@/lib/writer/resolve-entity-names'
-import { PanelLeftClose, PanelLeftOpen, Film, Music, Plus, X, Loader2, Eye, ListPlus } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { PanelLeftClose, PanelLeftOpen, Music, Plus, X, Loader2, Eye, ListPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -20,6 +19,8 @@ import { startBinDrag, dropTargetSec } from '@/lib/pointer-drag'
 import { thumbUrl } from '@/lib/image-url'
 import { ThumbImage } from '@/components/thumb-image'
 import { useT } from '@/lib/i18n'
+import { cn } from '@/lib/utils'
+import { clipStatusLabel } from '@/features/editor/editor-labels'
 
 interface VideoSourcePanelProps {
   open: boolean
@@ -87,42 +88,41 @@ export function VideoSourcePanel({
 
   if (!open) {
     return (
-      <div className="flex w-9 shrink-0 flex-col items-center border-r border-border bg-card py-2">
-        <Button size="icon" variant="ghost" className="size-7" onClick={onToggle} title={t('Expand source panel')}>
+      <div className="flex h-full w-10 shrink-0 flex-col items-center py-3">
+        <Button size="icon" variant="ghost" className="size-7 text-muted-foreground" onClick={onToggle} title={t('Expand source panel')}>
           <PanelLeftOpen className="size-4" />
         </Button>
         <div className="mt-2 flex flex-1 items-center">
-          <span className="rotate-180 text-[10px] font-medium tracking-wide text-muted-foreground [writing-mode:vertical-rl]">SOURCE</span>
+          <span className="rotate-180 text-[11px] font-semibold text-subtle-foreground [writing-mode:vertical-rl]">{t('Source')}</span>
         </div>
       </div>
     )
   }
 
+  // v3 ED1(2026-11-03): 큰 판 안 — "소스" 제목(14px 600), 영상 · 오디오 알약 탭(고른 탭 = 지금 단계 색), 2열 클립 카드.
   return (
-    <aside className="flex h-full w-full min-w-0 shrink-0 flex-col border-r border-border bg-card">
-      <div className="flex items-center justify-between border-b border-border px-3 py-2">
-        <span className="text-xs font-semibold">Source</span>
-        <Button size="icon" variant="ghost" className="size-6" onClick={onToggle} title={t('Collapse panel')}>
+    <aside className="flex h-full w-full min-w-0 shrink-0 flex-col">
+      <div className="flex items-center justify-between px-4 pb-2.5 pt-3.5">
+        <span className="text-[14px] font-semibold text-foreground">{t('Source')}</span>
+        <Button size="icon" variant="ghost" className="size-6 text-muted-foreground" onClick={onToggle} title={t('Collapse panel')}>
           <PanelLeftClose className="size-3.5" />
         </Button>
       </div>
 
       <Tabs defaultValue="video" className="flex min-h-0 flex-1 flex-col gap-0">
-        <TabsList className="mx-2 mt-2 grid grid-cols-2">
-          <TabsTrigger value="video" className="gap-1 text-xs">
-            <Film className="size-3" /> Video
-            <Badge variant="secondary" className="ml-1 h-4 px-1 text-[9px] tabular-nums">{sourceShots.length}</Badge>
+        <TabsList variant="pill" className="mx-4 mb-1">
+          <TabsTrigger value="video">
+            {t('Video')} <span className="font-num tabular-nums">{sourceShots.length}</span>
           </TabsTrigger>
-          <TabsTrigger value="audio" className="gap-1 text-xs">
-            <Music className="size-3" /> Audio
-            <Badge variant="secondary" className="ml-1 h-4 px-1 text-[9px] tabular-nums">{audioSources.length}</Badge>
+          <TabsTrigger value="audio">
+            {t('Audio')} <span className="font-num tabular-nums">{audioSources.length}</span>
           </TabsTrigger>
         </TabsList>
 
         {/* ── Video 탭 ── */}
         <TabsContent value="video" className="mt-0 min-h-0 flex-1">
           <ScrollArea className="h-[calc(100%-22px)]">
-            <div className="grid grid-cols-2 gap-2 p-2">
+            <div className="grid grid-cols-2 gap-2 px-4 pb-4 pt-2">
               {sourceShots.map((shot) => {
                 const clip = videoClips.find((c) => c.shotId === shot.shotId)
                 return (
@@ -143,9 +143,9 @@ export function VideoSourcePanel({
                           })
                         }
                         title={`${resolveEntityNames(shot.actionDescription, entityNames)}\n${t('(Click: preview / drag·right-click: add to timeline)')}`}
-                        className="group flex cursor-grab flex-col rounded-md border border-border p-1.5 transition-all hover:bg-accent/50 active:cursor-grabbing"
+                        className="group flex cursor-grab flex-col rounded-xl bg-background p-1.5 transition-colors hover:bg-card active:cursor-grabbing"
                       >
-                        <div className="flex aspect-video items-center justify-center overflow-hidden rounded bg-muted text-[9px] text-muted-foreground">
+                        <div className="flex aspect-video items-center justify-center overflow-hidden rounded-lg bg-art-placeholder font-num text-[10px] font-semibold text-muted-foreground">
                           {clip?.url ? (
                             <video src={clip.url} poster={clip.thumbnailUrl ?? thumbUrl(shot.referenceImageUrl)} className="h-full w-full rounded object-cover" muted preload={(clip.thumbnailUrl ?? shot.referenceImageUrl) ? 'none' : 'metadata'} draggable={false} />
                           ) : shot.referenceImageUrl ? (
@@ -156,13 +156,11 @@ export function VideoSourcePanel({
                             shot.shotType
                           )}
                         </div>
-                        <p className="mt-1 truncate text-[9px] leading-tight">{resolveEntityNames(shot.actionDescription, entityNames)}</p>
-                        <div className="mt-0.5 flex items-center gap-1">
-                          <Badge variant="secondary" className="h-3.5 px-1 font-mono text-[8px]">{shot.durationSeconds}s</Badge>
-                          {clip && (
-                            <Badge variant={clip.status === 'completed' ? 'default' : 'secondary'} className="h-3.5 px-1 text-[8px]">{clip.status}</Badge>
-                          )}
-                        </div>
+                        <p className="mt-1.5 truncate px-0.5 text-[11px] leading-tight text-foreground">{resolveEntityNames(shot.actionDescription, entityNames)}</p>
+                        <p className="mt-1 truncate px-0.5 text-[10px] font-medium text-subtle-foreground">
+                          {t('{seconds}s', { seconds: shot.durationSeconds })}
+                          {clip && <span className={cn(clip.status === 'completed' && 'text-success', clip.status === 'failed' && 'text-destructive')}> · {t(clipStatusLabel(clip.status))}</span>}
+                        </p>
                       </div>
                     </ContextMenuTrigger>
                     <ContextMenuContent className="w-40">
@@ -177,7 +175,7 @@ export function VideoSourcePanel({
                 )
               })}
               {sourceShots.length === 0 && (
-                <p className="col-span-2 py-8 text-center text-[10px] text-muted-foreground">{t('No clips generated yet')}</p>
+                <p className="col-span-2 py-8 text-center text-meta text-subtle-foreground">{t('No clips generated yet')}</p>
               )}
             </div>
           </ScrollArea>
@@ -185,13 +183,13 @@ export function VideoSourcePanel({
 
         {/* ── Audio 탭 ── */}
         <TabsContent value="audio" className="mt-0 min-h-0 flex-1">
-          <div className="flex items-center justify-between border-b border-border px-2 py-1">
-            <span className="text-[9px] text-muted-foreground">{t('Drag = add to audio track')}</span>
+          <div className="flex items-center justify-between px-4 py-1.5">
+            <span className="text-[11px] text-subtle-foreground">{t('Drag = add to audio track')}</span>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+              className="flex h-7 items-center gap-1 rounded-full bg-card px-2.5 text-[11.5px] font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
               title={t('Upload audio')}
             >
               {uploading ? <Loader2 className="size-3 animate-spin" /> : <Plus className="size-3" />} {t('Upload')}
@@ -199,7 +197,7 @@ export function VideoSourcePanel({
             <input ref={fileInputRef} type="file" accept="audio/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleAudioFile(f); e.target.value = '' }} />
           </div>
           <ScrollArea className="h-[calc(100%-25px)]">
-            <div className="flex flex-col gap-1.5 p-2">
+            <div className="flex flex-col gap-1.5 px-4 pb-4 pt-1">
               {audioSources.map((src) => (
                 <ContextMenu key={src.id}>
                   <ContextMenuTrigger asChild>
@@ -216,12 +214,12 @@ export function VideoSourcePanel({
                         })
                       }
                       title={`${src.name}\n${t('(Drag: add to audio track / right-click: menu)')}`}
-                      className="group flex cursor-grab items-center gap-2 rounded-md border border-border p-1.5 transition-all hover:bg-accent/50 active:cursor-grabbing"
+                      className="group flex cursor-grab items-center gap-2 rounded-xl bg-background px-2.5 py-2 transition-colors hover:bg-card active:cursor-grabbing"
                     >
-                      <Music className="size-3.5 shrink-0 text-primary" />
+                      <Music className="size-3.5 shrink-0 text-stage" />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-[10px] leading-tight">{src.name}</p>
-                        <span className="font-mono text-[8px] text-muted-foreground">{fmtDur(src.durationSec)}</span>
+                        <p className="truncate text-[11px] leading-tight text-foreground">{src.name}</p>
+                        <span className="font-num text-[10px] text-subtle-foreground">{fmtDur(src.durationSec)}</span>
                       </div>
                       <button
                         type="button"
@@ -242,7 +240,7 @@ export function VideoSourcePanel({
                 </ContextMenu>
               ))}
               {audioSources.length === 0 && (
-                <p className="py-8 text-center text-[10px] text-muted-foreground">
+                <p className="py-8 text-center text-meta text-subtle-foreground">
                   {t('No audio sources.')}
                   <br />
                   {t('Upload one, then drag it to the audio track.')}

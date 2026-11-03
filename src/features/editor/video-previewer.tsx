@@ -207,43 +207,40 @@ export function VideoPreviewer() {
           )}
         </div>
       ) : activeShot ? (
-        <div className="flex flex-col items-center gap-3">
-          <div className="flex h-48 w-80 items-center justify-center rounded-lg border border-dashed border-muted-foreground/30 bg-muted/10">
-            <div className="text-center">
-              <p className="text-lg font-semibold text-muted-foreground">{activeShot.shotType}</p>
-              <p className="mt-1 max-w-[260px] text-xs text-muted-foreground/70">{resolveEntityNames(activeShot.actionDescription, entityNames)}</p>
-              <p className="mt-2 text-[10px] text-muted-foreground/50">
-                {activeClip?.status === 'generating' ? 'Generating...' : 'No video generated yet'}
-              </p>
-            </div>
-          </div>
+        // v3 ED1(2026-11-03): 아직 영상이 없는 컷 — 큰 판 안 작은 판(샷 크기 · 설명 · 상태).
+        <div className="flex w-[380px] max-w-[calc(100%-2rem)] flex-col items-center rounded-2xl bg-panel px-7 py-5 text-center">
+          <p className="font-num text-[20px] font-semibold text-foreground">{activeShot.shotType}</p>
+          <p className="mt-2 line-clamp-3 text-[12.5px] leading-[1.5] text-muted-foreground">{resolveEntityNames(activeShot.actionDescription, entityNames)}</p>
+          <p className="mt-4 text-[11px] font-medium text-subtle-foreground">
+            {activeClip?.status === 'generating' ? t('Generating') : t('No video made yet')}
+          </p>
         </div>
       ) : (
         // 영상 없는 구간 = 검은 화면. 타임라인이 비었을 때만 안내 문구.
-        !hasClips && <p className="text-sm text-muted-foreground">{t('No clips in the timeline')}</p>
+        !hasClips && <p className="text-label text-subtle-foreground">{t('No clips in the timeline')}</p>
       )}
 
       {/* 디졸브 막(2026-09-08): 검은 화면의 투명도만 바뀐다 — 클릭은 통과 */}
       <div ref={dissolveRef} data-testid="dissolve-overlay" className="pointer-events-none absolute inset-0 z-20 bg-black" style={{ opacity: 0 }} />
 
       {/* 재생 컨트롤 (항상 표시 — 검은 구간에서도 스크럽 가능) */}
-      <div className="absolute bottom-0 left-0 right-0 flex items-center gap-3 bg-gradient-to-t from-black/80 to-transparent px-4 pb-4 pt-8">
+      <div className="absolute bottom-0 left-0 right-0 flex items-center gap-3 bg-gradient-to-t from-black/80 to-transparent px-5 pb-4 pt-8">
         <Button
           size="icon"
           variant="ghost"
-          className="size-8 shrink-0 text-white hover:bg-white/20 hover:text-white"
+          className="size-8 shrink-0 rounded-full text-foreground hover:bg-white/15 hover:text-foreground"
           onClick={togglePlay}
         >
           {isPlaying ? <Pause className="size-4" /> : <Play className="size-4" />}
         </Button>
 
         <div className="group relative flex h-5 flex-1 cursor-pointer items-center" onClick={onProgressClick}>
-          <div className="h-1 w-full rounded-full bg-white/20 transition-all group-hover:h-1.5">
-            <div ref={fillRef} className="h-full rounded-full bg-white" style={{ width: '0%' }} />
+          <div className="h-1 w-full rounded-full bg-white/15 transition-all group-hover:h-1.5">
+            <div ref={fillRef} className="h-full rounded-full bg-foreground" style={{ width: '0%' }} />
           </div>
         </div>
 
-        <span ref={timeRef} className="shrink-0 text-xs tabular-nums text-white/70">
+        <span ref={timeRef} className="shrink-0 font-num text-meta font-medium tabular-nums text-muted-foreground">
           0:00 / 0:00
         </span>
 
@@ -252,7 +249,7 @@ export function VideoPreviewer() {
           <button
             type="button"
             onClick={() => setMasterVolume(masterVolume > 0 ? 0 : 1)}
-            className="text-white/80 hover:text-white"
+            className="text-muted-foreground hover:text-foreground"
             title={masterVolume > 0 ? t('Mute') : t('Unmute')}
           >
             {masterVolume > 0 ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}
@@ -271,13 +268,13 @@ export function VideoPreviewer() {
       </div>
 
       {/* 모드 뱃지 + 길이 뱃지 (활성 클립 있을 때만) */}
-      <div className="absolute right-3 top-3 flex items-center gap-1.5">
+      <div className="absolute right-4 top-3.5 flex items-center gap-1.5">
         {previewSourceShotId && (
-          <span className="rounded bg-primary/80 px-2 py-0.5 text-xs font-medium text-primary-foreground">{t('Source preview')}</span>
+          <span className="rounded-full bg-stage px-2.5 py-0.5 text-[11.5px] font-semibold text-on-stage">{t('Source preview')}</span>
         )}
         {activeShot && (
-          <span className="rounded bg-black/60 px-2 py-0.5 text-xs text-white">
-            {(actualDuration ?? activeShot.durationSeconds).toFixed(1)}s
+          <span className="rounded-full bg-black/45 px-2 py-0.5 font-num text-meta font-medium text-muted-foreground">
+            {t('{seconds}s', { seconds: (actualDuration ?? activeShot.durationSeconds).toFixed(1) })}
           </span>
         )}
       </div>

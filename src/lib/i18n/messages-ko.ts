@@ -1268,6 +1268,12 @@ export const KO: Record<string, string> = {
   'Watch all': '전체 보기',
   'Preparing {done}/{total}…': '준비 중 {done}/{total}…',
   'Preload every clip, then play the whole timeline from the start': '모든 클립을 미리 받아 타임라인을 처음부터 끊김 없이 재생',
+  // v3 ED1 Editor(2026-11-03) — 화면 머리 · 소스 판 · 트랙 이름 · 빈 컷
+  'Final edit': '최종 편집',
+  '{cuts} cuts · {seconds}s · video {ready}/{total}': '컷 {cuts} · {seconds}초 · 영상 {ready}/{total}',
+  Source: '소스',
+  'Audio {n}': '오디오 {n}',
+  'No video made yet': '아직 만든 영상이 없어요',
   'No videos on the timeline yet. Generate videos in Director first.': '타임라인에 영상이 아직 없어요. 먼저 Director에서 영상을 생성하세요.',
   '{failed} of {total} clips could not be preloaded. They will stream as before.': '{total}개 중 {failed}개는 미리 받지 못했어요. 해당 클립은 종전처럼 스트리밍돼요.',
   // ── misc: studio/producer/page.tsx (direct) ──

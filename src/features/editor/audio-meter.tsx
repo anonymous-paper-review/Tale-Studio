@@ -116,16 +116,16 @@ export function AudioMeter({ audioClips }: { audioClips: AudioTrackClip[] }) {
   }, [audioClips])
 
   return (
-    <div className="flex h-full w-8 shrink-0 flex-col items-center gap-1 border-l border-border bg-card py-2">
-      <span className="font-mono text-[8px] text-muted-foreground">dB</span>
-      <div className="relative flex-1 w-2 overflow-hidden rounded-sm bg-muted">
+    <div className="flex h-full w-8 shrink-0 flex-col items-center gap-1 border-l border-border-subtle py-2">
+      <span className="font-num text-[8px] text-subtle-foreground">dB</span>
+      <div className="relative w-2 flex-1 overflow-hidden rounded-full bg-card">
         <div
           ref={barRef}
           className="absolute bottom-0 w-full bg-primary transition-[height] duration-75"
           style={{ height: '0%' }}
         />
       </div>
-      <span className="font-mono text-[7px] text-muted-foreground">VU</span>
+      <span className="font-num text-[7px] text-subtle-foreground">VU</span>
     </div>
   )
 }
