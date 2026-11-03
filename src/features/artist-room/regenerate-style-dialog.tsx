@@ -8,7 +8,7 @@
 import { useState } from 'react'
 import { Loader2, Lock, RotateCcw, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
-import { Lumi } from '@/components/lumi/lumi'
+import { ConfirmLumi } from '@/components/handoff/confirm-lumi'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
@@ -88,7 +88,7 @@ export function RegenerateStyleDialog() {
     <Dialog open={open} onOpenChange={(next) => { if (!next) close() }}>
       <DialogContent className="flex max-h-[88vh] flex-col sm:max-w-2xl" showCloseButton={!busy} data-testid="artist-regen-dialog">
         {/* v3(오너 2026-11-03 결정 8): 다시 만들기 전에 묻는 창 — 큰 Lumi(Artist 옷 · 기본 모습). */}
-        <Lumi persona="artist" state="idle" size={160} className="mx-auto shrink-0" />
+        <ConfirmLumi stage="artist" />
         <DialogHeader>
           <DialogTitle>{t('Which style should we remake it in?')}</DialogTitle>
           <DialogDescription>

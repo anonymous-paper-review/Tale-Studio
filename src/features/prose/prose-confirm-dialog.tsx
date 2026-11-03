@@ -4,7 +4,7 @@
 //   넘길 때 러닝타임 검사는 없다. 확정한 산문은 고칠 수 없다(산문으로 돌아가 다시 쓰기는 2차).
 //   v3(오너 2026-11-03 결정 8): 확인 창 맨 위에 큰 Lumi — 지금 단계(Writer) 옷 · 기본 모습.
 import { ArrowRight, Loader2, Lock } from 'lucide-react'
-import { Lumi } from '@/components/lumi/lumi'
+import { ConfirmLumi } from '@/components/handoff/confirm-lumi'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useT } from '@/lib/i18n'
@@ -24,7 +24,7 @@ export function ProseConfirmDialog() {
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) close() }}>
       <DialogContent className="sm:max-w-md" showCloseButton={!confirm.busy} data-testid="prose-confirm">
-        <Lumi persona="writer" state="idle" size={180} className="mx-auto" />
+        <ConfirmLumi stage="producer" />
         <DialogHeader>
           <DialogTitle>{t('Confirm the prose?')}</DialogTitle>
           <DialogDescription className="sr-only">{t('Check what happens when you confirm the prose.')}</DialogDescription>
