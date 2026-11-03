@@ -1,4 +1,4 @@
-// Director 에 들어오면 채팅이 닫혀 있고 Lumi 알약으로 열며, 떠나면 채팅이 들어오기 전 모습으로 돌아가는지 검사한다 (v3 D1, 2026-11-03)
+// Director 에 들어오면 채팅이 닫혀 있고 접힌 레일 없이 Lumi 알약으로 열며, 떠나면 채팅이 들어오기 전 모습으로 돌아가는지 검사한다 (v3 D1, 2026-11-03)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import path from 'node:path'
@@ -11,14 +11,29 @@ vi.hoisted(() => {
   g.window ??= globalThis
 })
 // 화면이 붙을 때 하는 일은 바로 돌리고, 화면을 떠날 때 할 일은 모아 둔다 — 시험이 "떠나기"를 직접 부른다.
-const effects = vi.hoisted(() => ({ cleanups: [] as Array<() => void> }))
+//   채팅 패널 · 스튜디오 틀을 그려 보는 시험은 붙을 때 하는 일(브라우저가 있어야 도는 일)을 끄고 그 모습만 본다(run=false).
+const effects = vi.hoisted(() => ({ cleanups: [] as Array<() => void>, run: true }))
+const hooks = vi.hoisted(() => ({ slots: [] as unknown[], cursor: 0, pathname: '/studio/director' }))
 vi.mock('react', async (original) => ({
   ...await original<typeof import('react')>(),
   useCallback: (callback: unknown) => callback,
   useMemo: (factory: () => unknown) => factory(),
   useSyncExternalStore: (_subscribe: unknown, snapshot: () => unknown) => snapshot(),
   useDebugValue: () => {},
+  useState: (initial: unknown) => {
+    const slot = hooks.cursor++
+    if (!(slot in hooks.slots)) hooks.slots[slot] = typeof initial === 'function' ? (initial as () => unknown)() : initial
+    return [hooks.slots[slot], (value: unknown) => {
+      hooks.slots[slot] = typeof value === 'function' ? value(hooks.slots[slot]) : value
+    }]
+  },
+  useRef: (initial: unknown) => {
+    const slot = hooks.cursor++
+    if (!(slot in hooks.slots)) hooks.slots[slot] = { current: initial }
+    return hooks.slots[slot]
+  },
   useEffect: (effect: () => void | (() => void)) => {
+    if (!effects.run) return
     const cleanup = effect()
     if (typeof cleanup === 'function') effects.cleanups.push(cleanup)
   },
@@ -34,10 +49,21 @@ vi.mock('zustand', async (original) => {
   }
   return { ...actual, create }
 })
+vi.mock('next/navigation', () => ({
+  usePathname: () => hooks.pathname,
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+}))
+vi.mock('@/lib/writer/use-writer-status', () => ({ useWriterStatus: () => ({ status: null }) }))
+vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn() }))
 
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useHoldChatClosed } from '@/hooks/use-hold-chat-closed'
 import { LumiChatPill } from '@/features/director/lumi-chat-pill'
+import { GlobalChat } from '@/components/layout/global-chat'
+import StudioLayout from '@/app/studio/layout'
+import { CHAT_COLLAPSED_RAIL, CHAT_DEFAULT_WIDTH, SHELL_INSET } from '@/lib/constants'
+import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { useProjectStore } from '@/stores/project-store'
 import { useLocaleStore } from '@/stores/locale-store'
 
 type Element = ReactElement<Record<string, unknown>>
@@ -64,8 +90,32 @@ const chatClosed = () => useChatUiStore.getState().collapsed
 /** 브라우저에 기억된 채팅 모습(새로고침하면 이 값으로 다시 시작한다). */
 const remembered = () => JSON.parse(localStorage.getItem('tale-chat-ui') ?? '{}').state?.collapsed
 
+/** 그 주소의 화면을 한 번 그려 요소 목록을 돌려준다(붙을 때 하는 일은 돌리지 않는다). */
+function draw(component: () => ReactNode, pathname: string): Element[] {
+  hooks.pathname = pathname
+  hooks.slots = []
+  hooks.cursor = 0
+  effects.run = false
+  try {
+    return elements(component())
+  } finally {
+    effects.run = true
+  }
+}
+/** 접힌 채팅을 여는 레일 단추(채팅 열기)가 있나. */
+const railOpenButton = (pathname: string) =>
+  draw(() => GlobalChat(), pathname).some((node) => node.props['aria-label'] === '채팅 열기')
+/** 단계 화면(main)이 오른쪽에 비워 두는 폭. */
+const mainMarginRight = (pathname: string) => {
+  const main = draw(() => StudioLayout({ children: null }), pathname).find((node) => node.type === 'main')
+  return (main?.props.style as { marginRight?: number } | undefined)?.marginRight
+}
+
 beforeEach(() => {
   effects.cleanups = []
+  effects.run = true
+  useGlobalChatStore.getState().reset()
+  useProjectStore.setState({ projectId: 'chat-closed-project', currentStage: 'director' })
   localStorage.clear()
   useChatUiStore.setState({ collapsed: false, chatHolds: [], collapsedBeforeHold: null })
   useLocaleStore.setState({ locale: 'ko' })
@@ -133,5 +183,25 @@ describe('혼자 정한 것', () => {
       .map((entry) => entry.name)
       .sort()
     expect(holding).toEqual(['director', 'editor'])
+  })
+
+  // 왜: D1 시안은 접힌 채팅 레일 없이 캔버스가 오른쪽 끝까지 가고, 닫힌 채팅을 여는 곳은 툴바 끝 Lumi 알약 하나다(리드 확인 2026-11-03).
+  //   레일까지 남으면 같은 일을 하는 단추가 둘이고 캔버스 오른쪽 44px 가 비어 보인다. 채팅을 열면 다른 단계처럼 채팅 폭만큼 비운다.
+  it('Director 에서 채팅이 닫혀 있으면 오른쪽 접힌 레일이 없고 단계 화면이 오른쪽 끝까지 간다', () => {
+    useChatUiStore.setState({ collapsed: true, chatWidth: CHAT_DEFAULT_WIDTH })
+    expect(railOpenButton('/studio/director')).toBe(false)
+    expect(mainMarginRight('/studio/director')).toBe(SHELL_INSET)
+
+    useChatUiStore.setState({ collapsed: false })
+    expect(mainMarginRight('/studio/director')).toBe(SHELL_INSET + CHAT_DEFAULT_WIDTH)
+  })
+
+  // 왜: 접힌 레일(v3 Chat Toggle «)은 다른 단계에서 닫힌 채팅을 여는 곳이다 — Director 밖은 바뀌지 않는다.
+  it('Director 밖의 단계에서는 채팅을 접으면 지금처럼 접힌 레일이 남는다', () => {
+    useChatUiStore.setState({ collapsed: true, chatWidth: CHAT_DEFAULT_WIDTH })
+    for (const pathname of ['/studio/producer', '/studio/artist', '/studio/writer', '/studio/editor']) {
+      expect(railOpenButton(pathname), pathname).toBe(true)
+      expect(mainMarginRight(pathname), pathname).toBe(SHELL_INSET + CHAT_COLLAPSED_RAIL)
+    }
   })
 })

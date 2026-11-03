@@ -192,7 +192,7 @@ export default function StudioLayout({
           marginRight: onEntry
             ? SHELL_INSET
             // v3p2-set: D1 시안 — Director 는 접힌 레일 없이 툴바 Lumi 알약으로 연다
-            : chatCollapsed && shownStage === 'director' ? 0
+            : chatCollapsed && shownStage === 'director' ? SHELL_INSET
             : SHELL_INSET + (chatCollapsed ? CHAT_COLLAPSED_RAIL : chatWidth),
         }}
       >

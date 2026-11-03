@@ -1318,9 +1318,9 @@ export default function DirectorCanvasPage() {
   }, [guideProjectId, viewMode, stageReady, offerSuggestion, t])
 
   return (
-    // v3 D1(2026-11-03): 위 막대 아래 캔버스 판 하나(모서리 16 · --canvas-bg) — 오른쪽 · 아래 8px 띄움.
+    // v3 D1(2026-11-03): 위 막대 아래 캔버스 판 하나(모서리 16 · --canvas-bg) — 아래 8px 띄움, 오른쪽 8px 는 스튜디오 틀 여백(SHELL_INSET)이 준다.
     //   제목 "The Set" · 도움말은 판 안 툴바 왼쪽으로, [다음: Editor로]는 위 막대 오른쪽으로 옮겼다.
-    <div className="flex flex-1 flex-col overflow-hidden pb-2 pr-2">
+    <div className="flex flex-1 flex-col overflow-hidden pb-2">
       {/* 다음 단계 버튼(2026-10-01 오너 — 채팅 위 버튼을 각 단계 오른쪽 위로 옮김) → v3 위 막대 오른쪽 자리. */}
       <TopBarActions>
         <NextStepButton />
