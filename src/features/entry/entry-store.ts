@@ -172,9 +172,14 @@ let readTicker: ReturnType<typeof setInterval> | null = null
  */
 type StartedView = Pick<EntryData, 'draft' | 'title' | 'locale' | 'stage' | 'format' | 'series' | 'writer' | 'writerStart'>
 let startedView: { projectId: string; view: StartedView } | null = null
+/** 로그인한 사람이 바뀔 때마다 오른다 — 그 전에 나간 읽기 · 미리 받기의 답은 받아 두지도 화면에 올리지도 않는다(검토 C 2차). */
+let signedInEpoch = 0
 
-/** 받아 둔 시작 화면을 버린다 — 로그인한 사람이 바뀔 때(로그아웃 · 다른 계정 로그인, 검토 C). 약속: tests/login/signed-in-reset.test.ts */
+/** 받아 둔 시작 화면을 버린다 — 로그인한 사람이 바뀔 때(로그아웃 · 다른 계정 로그인, 검토 C). 도는 읽기 · 폴링도 그 답을 버린다.
+ *  약속: tests/login/signed-in-reset.test.ts */
 export function forgetStartedView(): void {
+  signedInEpoch += 1
+  generation += 1
   startedView = null
 }
 onSignedInChange(forgetStartedView)
@@ -419,10 +424,12 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
 
     prefetch: async (projectId) => {
       if (startedView?.projectId === projectId) return
+      const epoch = signedInEpoch
       try {
         const res = await fetch(`/api/produce/entry?projectId=${encodeURIComponent(projectId)}`)
-        if (!res.ok) return
+        if (!res.ok || epoch !== signedInEpoch) return
         const view = viewFrom((await readJson(res)) ?? {})
+        if (epoch !== signedInEpoch) return
         // 시작한(읽기만 하는) 프로젝트만 받아 둔다 — 시작 전 화면은 늘 새로 받은 초안으로 연다.
         if (entryStarted(view)) startedView = { projectId, view }
       } catch {

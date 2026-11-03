@@ -120,7 +120,8 @@ export function useWriterPreview(
           }
           // 완료/실패면 한 번 더 받고 폴링 중단(마지막 산출물 반영).
           stop = !!(j.completed || j.failed)
-        } else if (!cancelled) {
+        } else if (!cancelled && !r.stale) {
+          // 비운 뒤에 도착한 앞 사람의 답(stale)은 실패로도 보이지 않는다 — 다음 읽기가 새로 간다.
           setFailedFor(projectId)
           // 로그인 · 주인 · 프로젝트가 없다는 답이면 이 화면이 받은 것도 내린다(받아 둔 것은 preview-cache 가 버렸다).
           if (r.refused) setPreviewState((current) => (current?.projectId === projectId ? null : current))
