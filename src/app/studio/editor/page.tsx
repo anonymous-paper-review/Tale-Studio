@@ -23,7 +23,7 @@ import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/layout/page-header'
 import { Lumi } from '@/components/lumi/lumi'
 import { useHoldChatClosed } from '@/hooks/use-hold-chat-closed'
-import { editorHeaderMeta } from '@/features/editor/editor-labels'
+import { editorEmptyScreen, editorHeaderMeta } from '@/features/editor/editor-labels'
 import { VideoPreviewer } from '@/features/editor/video-previewer'
 import { Timeline } from '@/features/editor/timeline'
 import { VideoSourcePanel } from '@/features/editor/video-source-panel'
@@ -126,6 +126,7 @@ export default function PostPage() {
 
   const projectId = useProjectStore((s) => s.projectId)
   const projectTitle = useProjectStore((s) => s.projectTitle)
+  const projectInitLoading = useProjectStore((s) => s.initLoading)
   const router = useRouter()
   // #pps-empty-states: 로드 실패 화면의 '다시 시도' — 로드 effect 를 통째로 재발화시켜
   //   loadData→loadPersisted→오디오 자동 부착 순서를 그대로 다시 탄다.
@@ -302,7 +303,11 @@ export default function PostPage() {
                   }
                   resolve()
                 }
-                v.onerror = () => resolve()
+                // 영상을 불러오지 못하면(404 · 막힘) 그 클립만 "불러오지 못함"으로 남긴다 — 나머지는 그대로 연다.
+                v.onerror = () => {
+                  if (!cancelled) useEditorStore.getState().markVideoUnplayable(c.url as string)
+                  resolve()
+                }
                 v.src = c.url as string
               }),
           ),
@@ -352,6 +357,18 @@ export default function PostPage() {
       cancelled = true
     }
   }, [projectId, loadData, loadPersisted, t, retryTick])
+
+  // 이 화면이 열린 동안 편집 상태가 비워지면(프로젝트를 여는 길의 늦은 비우기, QA 2026-11-03 밤) '다시 시도'처럼 처음부터 다시 읽는다 —
+  //   읽던 결과는 비우기 때 버려지므로, 다시 읽지 않으면 기다림 화면이 끝나지 않았다. 비우기 한 번에 다시 읽기 한 번.
+  //   약속: tests/editor/load-ends.test.ts
+  useEffect(() => {
+    let seen = useEditorStore.getState().resetCount
+    return useEditorStore.subscribe((s) => {
+      if (s.resetCount === seen) return
+      seen = s.resetCount
+      setRetryTick((n) => n + 1)
+    })
+  }, [])
 
   // Editor 진입 시 채팅 기본 접힘 (요청 6b). 떠날 때 이전 상태 복원 — Director 와 같은 약속(닫아 둔 모습은 기억에 남기지 않는다).
   useHoldChatClosed('editor')
@@ -421,7 +438,9 @@ export default function PostPage() {
   // #pps-empty-states(2026-08-27 오너 확정): shots=0 의 세 이유(로딩/실패/정상 빈)를 한 화면으로
   //   뭉개지 않는다 — 로딩 플래시가 "이전 단계를 완료하라"는 틀린 진단으로 보이던 것의 수리.
   if (shots.length === 0) {
-    if (loadStatus === 'error') {
+    // 프로젝트를 여는 중(바꾸는 동안 포함)에는 "이전 단계를 먼저 끝내세요" 대신 기다림을 보인다(QA 2026-11-03 밤).
+    const emptyScreen = editorEmptyScreen({ loadStatus, projectId, initLoading: projectInitLoading })
+    if (emptyScreen === 'error') {
       return (
         <div className="flex flex-1 items-center justify-center">
           <div className="max-w-sm text-center">
@@ -435,7 +454,7 @@ export default function PostPage() {
         </div>
       )
     }
-    if (loadStatus === 'ready') {
+    if (emptyScreen === 'empty') {
       return (
         <div className="flex flex-1 items-center justify-center">
           <div className="max-w-sm text-center">

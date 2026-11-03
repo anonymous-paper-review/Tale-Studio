@@ -1281,6 +1281,9 @@ export const KO: Record<string, string> = {
   Source: '소스',
   'Audio {n}': '오디오 {n}',
   'No video made yet': '아직 만든 영상이 없어요',
+  // 영상을 불러오지 못한 클립(QA 2026-11-03 밤 "Editor에서 무한 로딩") — 그 클립만 실패로 보인다.
+  'Could not load': '불러오지 못함',
+  "Couldn't load this cut's video.": '이 컷의 영상을 불러오지 못했어요.',
   'No videos on the timeline yet. Generate videos in Director first.': '타임라인에 영상이 아직 없어요. 먼저 Director에서 영상을 생성하세요.',
   '{failed} of {total} clips could not be preloaded. They will stream as before.': '{total}개 중 {failed}개는 미리 받지 못했어요. 해당 클립은 종전처럼 스트리밍돼요.',
   // ── misc: studio/producer/page.tsx (direct) ──

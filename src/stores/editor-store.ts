@@ -5,7 +5,7 @@ import type { Shot, VideoClip, DialogueLine, AudioTrackClip, AudioSource, ClipTr
 import { toast } from 'sonner'
 import { useProjectStore } from '@/stores/project-store'
 import { createClient } from '@/lib/supabase/client'
-import { loadShotsResult } from '@/lib/shots-cache'
+import { cancelShotsLoad, loadShotsResult } from '@/lib/shots-cache'
 import {
   selectHandoffTake,
   selectLatestAttempt,
@@ -45,6 +45,15 @@ type HandoffClip = VideoTakeSelectionRecord & {
 // never apply local state to the project selected while it was in flight.
 let persistedLoadEpoch = 0
 let editorLoadEpoch = 0
+
+// Editor 를 열 때 샷 · 영상 목록을 기다리는 한도(QA 2026-11-03 밤 "Editor에서 무한 로딩") — 넘으면 기다림을 멈추고
+//   "클립을 불러오지 못했어요" + [다시 시도]. 연결이 멈추거나 로그인 갱신이 걸리면 읽기가 끝나지 않았다.
+//   약속: tests/editor/load-ends.test.ts
+export const EDITOR_LOAD_TIMEOUT_MS = 20_000
+
+function timeoutError(ms: number): Error {
+  return new Error(`Editor data load timed out after ${Math.round(ms / 1000)}s`)
+}
 
 // Per-shot debounce timers for speed persist (300ms)
 const speedPersistTimers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -91,6 +100,11 @@ interface EditorState {
   // #pps-empty-states(2026-08-27): shots=0 의 세 이유(로딩/실패/정상 빈)를 화면이 구분하게 하는
   //   로드 상태. 'idle' 은 loadData 발화 전 첫 렌더 — 화면은 로딩과 동일하게 취급한다.
   loadStatus: 'idle' | 'loading' | 'error' | 'ready'
+  // 편집 상태를 비운(reset) 횟수 — 열린 Editor 화면이 이 값이 바뀌면 다시 읽는다. 프로젝트를 여는 길(switchProject)은
+  //   store 들을 늦게(비동기로) 비워, 화면이 읽기 시작한 뒤에 비우면 읽던 결과가 버려진 채 기다림이 끝나지 않았다.
+  resetCount: number
+  // 영상을 불러오지 못한 클립 주소(404 · 막힘 · 끊김) — 그 클립만 "불러오지 못함"으로 보인다. 저장하지 않고, 다시 읽으면 지운다.
+  unplayableVideoUrls: string[]
 
   // Video Source 패널 (프리미어2 좌상단 카드 그리드) — 토글로 접기
   sourcePanelOpen: boolean
@@ -128,6 +142,8 @@ interface EditorState {
 
   loadData: () => void
   reset: () => void
+  /** 빈 주소는 무시한다. */
+  markVideoUnplayable: (url: string | null | undefined) => void
   selectScene: (sceneId: string) => void
   selectClip: (shotId: string) => void                 // 단일 선택 (교체)
   toggleClipSelection: (shotId: string) => void        // ctrl+click
@@ -349,6 +365,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   clipOrder: {},
   error: null,
   loadStatus: 'idle',
+  resetCount: 0,
+  unplayableVideoUrls: [],
   sourcePanelOpen: true,
   currentTime: 0,
   pxPerSec: PX_PER_SEC_DEFAULT,
@@ -762,19 +780,32 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       audioTracks: [{ id: 'atrack_1' }],
       binDragKind: null,
       binDropSec: null,
+      unplayableVideoUrls: [] as string[],
     }
 
     // 1) Try Supabase
     if (projectId) {
       try {
         const supabase = createClient()
-        const [{ data: dbShots, error: shotsError }, { data: dbClips, error: clipsError }] = await Promise.all([
-          loadShotsResult(projectId),
-          supabase
-            .from('video_clips')
-            .select('id, shot_id, url, status, is_final, take_number, created_at, deleted_at, thumbnail_url, last_attempt_status, last_attempt_at')
-            .eq('project_id', projectId),
-        ])
+        // 한도(EDITOR_LOAD_TIMEOUT_MS) 안에 못 받으면 기다림을 멈추고 실패로 알린다. 샷은 같은 요청을 함께 기다리는 사물함이라
+        //   그 칸의 멈춘 요청을 취소해 둔다 — 그대로 두면 [다시 시도]도 같은 요청에 붙어 또 멈춘다.
+        let timer: ReturnType<typeof setTimeout> | undefined
+        const timedOut = new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            cancelShotsLoad(projectId)
+            reject(timeoutError(EDITOR_LOAD_TIMEOUT_MS))
+          }, EDITOR_LOAD_TIMEOUT_MS)
+        })
+        const [{ data: dbShots, error: shotsError }, { data: dbClips, error: clipsError }] = await Promise.race([
+          Promise.all([
+            loadShotsResult(projectId),
+            supabase
+              .from('video_clips')
+              .select('id, shot_id, url, status, is_final, take_number, created_at, deleted_at, thumbnail_url, last_attempt_status, last_attempt_at')
+              .eq('project_id', projectId),
+          ]),
+          timedOut,
+        ]).finally(() => clearTimeout(timer))
         if (
           editorLoadEpoch !== loadEpoch ||
           useProjectStore.getState().projectId !== projectId
@@ -898,7 +929,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   reset: () => {
     ++editorLoadEpoch
     ++persistedLoadEpoch
-    set({
+    set((state) => ({
+      resetCount: state.resetCount + 1,
+      unplayableVideoUrls: [],
       shots: [],
       videoClips: [],
       selectedSceneId: null,
@@ -922,8 +955,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       panelSizes: { ...DEFAULT_PANEL_SIZES },
       past: [],
       future: [],
-    })
+    }))
   },
+
+  // 영상을 불러오지 못한 클립(미리 보기 · 열 때의 길이 재기가 영상 오류를 받음) — 그 클립만 "불러오지 못함".
+  markVideoUnplayable: (url) =>
+    set((state) => (!url || state.unplayableVideoUrls.includes(url) ? state : { unplayableVideoUrls: [...state.unplayableVideoUrls, url] })),
 
   selectScene: (sceneId) =>
     set((state) => {
@@ -1585,6 +1622,9 @@ if (typeof window !== 'undefined') {
       return // 편집 상태 변화 없음 (재생/선택 등) → 저장 안 함
     }
     prev = cur
+    // 아직 못 읽은 빈 편집 상태(비워짐 · 읽는 중 · 읽기 실패)는 저장하지 않는다(QA 2026-11-03 밤) — 프로젝트를 여는 길의 늦은 비우기가
+    //   빈 상태를 막 연 프로젝트 이름으로 저장해 자른 조각 · 타이틀 카드 · 자막 · 오디오 배치를 덮었다(운영 3945d1e6 서버 편집 상태 샷 0).
+    if (state.loadStatus !== 'ready' && state.shots.length === 0) return
 
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return

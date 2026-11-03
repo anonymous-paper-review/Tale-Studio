@@ -1,6 +1,6 @@
 'use client'
 
-import { Play, Pause, Volume2, VolumeX } from 'lucide-react'
+import { AlertCircle, Play, Pause, Volume2, VolumeX } from 'lucide-react'
 import { dissolveOpacityAt } from '@/lib/editor/transition'
 import { useEntityNames } from '@/lib/writer/use-entity-names'
 import { resolveEntityNames } from '@/lib/writer/resolve-entity-names'
@@ -11,6 +11,7 @@ import { SubtitleLayer } from '@/features/editor/subtitle-layer'
 import { resolveSubtitle } from '@/lib/editor/subtitle'
 import { useEditorStore, selectTimelineLayout, isTitleCardShotId } from '@/stores/editor-store'
 import { cachedVideoUrl } from '@/features/editor/video-prefetch'
+import { previewPane } from '@/features/editor/editor-labels'
 import { useT } from '@/lib/i18n'
 
 function formatTime(sec: number) {
@@ -25,6 +26,8 @@ function formatTime(sec: number) {
  *   1) 타임라인 모드(default): currentTime 아래 클립을 trim/speed 반영해 일렬 재생.
  *      영상이 없는 구간(영상 끝 이후 등)에선 클립을 잡지 않고 검은 화면 (요청 1).
  *   2) 소스 미리보기 모드(previewSourceShotId): 단일 클립을 원본 그대로 loop 재생.
+ *   영상을 불러오지 못하면(404 · 막힘 · 끊김) 검은 화면 대신 그 컷 자리에 안내를 보이고 그 클립을 "불러오지 못함"으로 남긴다
+ *   (QA 2026-11-03 밤 — 검은 채 아무 말이 없어 아직 불러오는 것처럼 보였다). 판단은 editor-labels.previewPane.
  */
 export function VideoPreviewer() {
   const entityNames = useEntityNames()
@@ -52,6 +55,8 @@ export function VideoPreviewer() {
   const updateTitleCard = useEditorStore((s) => s.updateTitleCard)
   const setSubtitle = useEditorStore((s) => s.setSubtitle)
   const pushHistory = useEditorStore((s) => s.pushHistory)
+  const unplayable = useEditorStore((s) => s.unplayableVideoUrls)
+  const markVideoUnplayable = useEditorStore((s) => s.markVideoUnplayable)
 
   // ── 동기화 루프 ──
   useEffect(() => {
@@ -154,10 +159,11 @@ export function VideoPreviewer() {
   const activeClip = videoClips.find((c) => c.shotId === activeShotId)
   // 타이틀 카드(#owner-title-card) 구간 — 영상 없이 검은 배경 + 중앙 텍스트(+선택 이미지)만 렌더.
   const isTitleCard = !!activeShotId && isTitleCardShotId(activeShotId)
+  const pane = previewPane({ isTitleCard, hasShot: !!activeShot, clip: activeClip, unplayable })
 
   return (
     <div className="relative flex h-full flex-col items-center justify-center bg-black">
-      {isTitleCard && activeShotId ? (
+      {pane === 'title' && activeShotId ? (
         // 약속 J(2026-09-04): 글자·이미지 자유 배치 무대 — 내보내기와 같은 배치·줄바꿈(src/lib/editor/title-card.ts).
         <TitleCardStage
           key={activeShotId}
@@ -181,7 +187,7 @@ export function VideoPreviewer() {
             ) : null
           }
         />
-      ) : activeClip?.url ? (
+      ) : pane === 'video' && activeClip?.url ? (
         // 약속 K: 자막은 영상 그림 위에 얹힌다 — 상자가 영상 크기를 따라가므로 자리 비율이 내보내기와 같다.
         <div className="relative max-h-full max-w-full">
           <video
@@ -196,6 +202,7 @@ export function VideoPreviewer() {
             onLoadedMetadata={() => {
               if (videoRef.current) setActualDuration(videoRef.current.duration)
             }}
+            onError={() => markVideoUnplayable(activeClip.url)}
           />
           {activeShot && activeShotId && (
             <SubtitleLayer
@@ -205,6 +212,16 @@ export function VideoPreviewer() {
               onBeforeChange={pushHistory}
             />
           )}
+        </div>
+      ) : pane === 'unplayable' && activeShot ? (
+        // 영상을 불러오지 못한 컷 — 아직 영상이 없는 컷과 같은 작은 판에 그 까닭(다른 컷은 그대로 재생된다).
+        <div className="flex w-[380px] max-w-[calc(100%-2rem)] flex-col items-center rounded-2xl bg-panel px-7 py-5 text-center" data-testid="preview-unplayable">
+          <p className="font-num text-[20px] font-semibold text-foreground">{activeShot.shotType}</p>
+          <p className="mt-2 line-clamp-3 text-[12.5px] leading-[1.5] text-muted-foreground">{resolveEntityNames(activeShot.actionDescription, entityNames)}</p>
+          <p className="mt-4 flex items-center gap-1.5 text-[11px] font-medium text-destructive">
+            <AlertCircle className="size-3.5 shrink-0" aria-hidden />
+            {t("Couldn't load this cut's video.")}
+          </p>
         </div>
       ) : activeShot ? (
         // v3 ED1(2026-11-03): 아직 영상이 없는 컷 — 큰 판 안 작은 판(샷 크기 · 설명 · 상태).

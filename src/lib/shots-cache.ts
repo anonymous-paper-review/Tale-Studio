@@ -113,6 +113,14 @@ export function invalidateShots(projectId: string): Promise<void> {
   return getQueryClient().invalidateQueries({ queryKey: shotsKey(projectId) })
 }
 
+/**
+ * 이 칸의 진행 중인 요청을 버린다 — 멈춘 요청에 다음 loadShots 가 합류하지 않고 새로 받게(Editor 읽기 한도, QA 2026-11-03 밤).
+ * 이미 받은 행은 그대로 둔다.
+ */
+export function cancelShotsLoad(projectId: string): void {
+  void getQueryClient().cancelQueries({ queryKey: shotsKey(projectId) })
+}
+
 /** supabase 의 { data, error } 반환 모양이 필요한 자리(기존 Promise.all 다리)용 어댑터.
  *  옛 코드의 오류 처리 분기를 바꾸지 않고 다리만 갈아끼우게 한다. */
 export function loadShotsResult(
