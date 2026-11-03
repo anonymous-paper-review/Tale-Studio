@@ -2912,4 +2912,11 @@ export const KO: Record<string, string> = {
   // 재생성 잠금 화면 아래 단추 — [닫기]와 한 줄에 들어가게 짧게(2026-10-31 오너)
   'Draw the remaining images': '남은 그림 그리기',
   'Back to the previous version': '이전 버전으로',
+  // v3 채팅 머리(2026-11-03) — 그 단계에서 하는 일
+  'Planning with Lumi': 'Lumi와 기획 이야기',
+  'Prose with Lumi': 'Lumi와 산문 이야기',
+  'Art with Lumi': 'Lumi와 그림 이야기',
+  'Directing with Lumi': 'Lumi와 연출 이야기',
+  'Shooting with Lumi': 'Lumi와 촬영 이야기',
+  'Editing with Lumi': 'Lumi와 편집 이야기',
 }

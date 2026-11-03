@@ -109,6 +109,17 @@ export const STAGE_FACE_COLOR: Record<StageId, string> = {
   editor: 'var(--stage-editor)',
 }
 
+// 채팅 머리 제목(v3 2026-11-03) — "Lumi와 산문 이야기"처럼 그 단계에서 하는 일. 시안에 있는 넷(산문 · 그림 · 연출 · 편집) 그대로,
+//   시안에 없는 Producer 는 기획, Director 는 촬영(Storyboard 가 이미 연출이라 겹치지 않게). 값은 영어 원문 = i18n 키.
+export const STAGE_CHAT_TITLE: Record<StageId, string> = {
+  entry: 'Planning with Lumi',
+  producer: 'Prose with Lumi',
+  artist: 'Art with Lumi',
+  writer: 'Directing with Lumi',
+  director: 'Shooting with Lumi',
+  editor: 'Editing with Lumi',
+}
+
 // 값은 영어 원문 = i18n 키(#i18n-s5-batch4). 렌더 지점(global-chat.tsx)이 t() 로 번역한다.
 export const STAGE_PLACEHOLDER: Record<StageId, string> = {
   entry: 'Tell us about your story…',
@@ -213,7 +224,8 @@ export const CHAT_MESSAGES_LOAD_LIMIT = 200
 export const CHAT_COMPACTION_TRIGGER_TOKENS = 600_000
 
 // ── GlobalChat: 폭 리사이즈/접기 (design.md §6.1, chat-ui-store) ──
-export const CHAT_DEFAULT_WIDTH = 320 // = 기존 w-80 (20rem)
+// v3(2026-11-03) 시안의 채팅 폭은 360~380 — 본문이 넓은 쪽(360)을 기본으로. 사용자가 바꾼 폭은 그대로 기억한다.
+export const CHAT_DEFAULT_WIDTH = 360
 export const CHAT_MIN_WIDTH = 280
 export const CHAT_MAX_WIDTH = 560
 

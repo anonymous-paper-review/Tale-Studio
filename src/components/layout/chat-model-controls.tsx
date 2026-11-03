@@ -15,11 +15,11 @@ export function ChatModelControls({ disabled }: { disabled: boolean }) {
     { key: 'effort', label: 'Effort', values: CHAT_EFFORTS.map(value => ({ value, label: value })) },
   ] as const
   return (
-    <div className="flex justify-end px-1 pb-1">
+    <div className="flex min-w-0 justify-end">
       <Popover>
         <PopoverTrigger asChild>
           <button type="button" disabled={disabled} aria-label={t('Configure chat model')}
-            className="flex h-7 max-w-full items-center gap-1.5 rounded-lg px-2 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50">
+            className="flex h-7 max-w-full items-center gap-1.5 rounded-full px-2 font-num text-[11px] text-subtle-foreground transition-colors hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50">
             <SlidersHorizontal className="size-3.5 shrink-0" aria-hidden />
             <span className="truncate">{CHAT_MODELS.find(model => model.id === settings.model)?.label} · {settings.effort}{settings.thinking === 'adaptive' ? ` · ${t('Model thinking')}` : ''}</span>
           </button>
@@ -30,7 +30,7 @@ export function ChatModelControls({ disabled }: { disabled: boolean }) {
             <label key={field.key} className="block space-y-1 text-xs">
               <span className="text-muted-foreground">{t(field.label)}</span>
               <select aria-label={t(field.label)} value={settings[field.key]} disabled={disabled}
-                className="h-9 w-full rounded-md border border-input bg-background px-2 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                className="h-9 w-full rounded-md border border-transparent bg-chip px-2 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                 onChange={event => {
                   const next = parseChatModelSettings({ ...settings, [field.key]: event.target.value })
                   if (next) setSettings(next)

@@ -11,8 +11,6 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
-  ChevronsLeft,
-  ChevronsRight,
   Copy,
   FileImage,
   FileText,
@@ -28,7 +26,9 @@ import { Button } from '@/components/ui/button'
 import { useImageUploadConsent } from '@/components/upload/image-upload-consent'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { AgentFace } from '@/components/agent-face'
+import { LumiAvatar } from '@/components/lumi/lumi'
+import { CollapseIcon, ExpandIcon } from '@/components/icons/v3-icons'
+import { STAGE_PERSONA, chatLumiState } from '@/lib/lumi'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore } from '@/stores/producer-store'
@@ -38,7 +38,6 @@ import { useWriterStore } from '@/stores/writer-store'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { handoffToStage } from '@/lib/stage-nav'
 import { cn } from '@/lib/utils'
-import { HoverBeam } from '@/components/hover-beam'
 import { ThumbImage } from '@/components/thumb-image'
 import { MarkdownText } from '@/components/layout/markdown-text'
 import { scrubInternalIdsInProse } from '@/lib/display-names'
@@ -81,12 +80,12 @@ import {
   STAGES,
   STAGE_LABEL,
   STAGE_BADGE_CLASS,
+  STAGE_CHAT_TITLE,
   STAGE_FACE_COLOR,
   STAGE_PLACEHOLDER,
   STAGE_PROMPT_PRESETS,
   STAGE_THINKING_PHRASES,
   CHAT_SUPPORTED_STAGES,
-  SHELL_INSET,
 } from '@/lib/constants'
 import { buildChatSections } from '@/lib/chat-sections'
 import { buildChatBlocks, groupStatusStacks, parseAttachmentMarker, parseHandoffMarker } from '@/lib/chat-blocks'
@@ -147,10 +146,11 @@ function StageDivider({ stage, current }: { stage: StageId; current: boolean }) 
       className="flex items-center gap-2 py-1"
     >
       <span className="h-px flex-1 bg-border-subtle" />
+      {/* v3: 한 화면에 단계 색은 하나 — 지금 단계 구간만 그 색, 지난 구간은 무채색. */}
       <span
         className={cn(
-          'inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium',
-          STAGE_BADGE_CLASS[stage],
+          'inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-tag font-semibold',
+          current ? 'bg-stage/18 text-stage' : 'bg-card text-subtle-foreground',
         )}
       >
         {STAGE_LABEL[stage]}
@@ -162,23 +162,37 @@ function StageDivider({ stage, current }: { stage: StageId; current: boolean }) 
 }
 
 /**
- * 화자 name plate (#oiioii-chat 2026-08-06) — 에이전트 턴의 첫 일반 메시지에만 1회 렌더
- * (배치는 chat-blocks.ts buildChatBlocks 가 판정). 메시지마다 아바타+이름을 반복하는 대신
- * stage 색이 좌→우로 사라지는 그라디언트 플레이트가 "여기서부터 이 에이전트의 턴"을 표시하고,
- * 상단 여백(mt-5)이 턴 구분자 역할을 한다 (ref: oiioii-chat-ui-spec.md §4).
+ * Lumi 말풍선(v3 Chat/Lumi · Chat/Lumi Ask, 2026-11-03) — 왼쪽에 그 단계 옷을 입은 Lumi 그림, 말풍선 안 맨 위에 "Lumi".
+ *   턴의 첫 메시지에만 아바타 · 이름을 단다(배치는 chat-blocks.ts buildChatBlocks 의 showRolePlate). 이어지는 메시지는
+ *   아바타 폭만큼 들여 같은 턴으로 읽힌다. 이름 색은 그 단계 색(Lumi 가이드 .lumi-name) — data-stage 가 정한다.
+ *   title 이 있으면 굵은 한 줄 + 보조 글자 본문(Chat/Lumi Ask).
  */
-function RolePlate({ stage }: { stage: StageId }) {
+function LumiBubble({
+  stage,
+  first,
+  title,
+  children,
+  className,
+}: {
+  stage: StageId
+  first: boolean
+  title?: React.ReactNode
+  children: React.ReactNode
+  className?: string
+}) {
   return (
-    <div
-      className="mb-1.5 mt-5 flex h-7 items-center gap-2 rounded-2xl pl-0.5 pr-9"
-      style={{
-        background: `linear-gradient(90deg, color-mix(in oklab, ${STAGE_FACE_COLOR[stage]} 28%, transparent) 0%, transparent 100%)`,
-      }}
-    >
-      <AgentFace stage={stage} size={24} />
-      <span className="text-[13px] font-extrabold text-foreground">
-        {STAGE_LABEL[stage]}
-      </span>
+    <div data-stage={STAGE_PERSONA[stage]} className={cn('flex gap-2', first ? 'mt-2' : 'pl-9')}>
+      {first && <LumiAvatar persona={STAGE_PERSONA[stage]} size={28} />}
+      <div
+        className={cn(
+          'group relative min-w-0 flex-1 select-text rounded-xl rounded-tl-[6px] bg-chat-lumi-bubble px-4 pb-3.5 pt-3 text-chat text-foreground',
+          className,
+        )}
+      >
+        {first && <p className="mb-1.5 text-micro font-semibold leading-none text-stage">Lumi</p>}
+        {title ? <div className="mb-1 font-semibold">{title}</div> : null}
+        <div className={cn(title ? 'text-muted-foreground' : undefined)}>{children}</div>
+      </div>
     </div>
   )
 }
@@ -199,8 +213,8 @@ function ThinkingIndicator({ stage }: { stage: StageId }) {
     return () => clearInterval(t)
   }, [phrases])
   return (
-    <div className="mr-6 flex items-center gap-2 rounded-2xl border border-border bg-muted/40 px-3.5 py-2.5 text-xs text-muted-foreground">
-      <AgentFace stage={stage} size={20} expression="thinking" />
+    <div data-stage={STAGE_PERSONA[stage]} className="mr-6 flex items-center gap-2 rounded-xl rounded-tl-[6px] bg-chat-lumi-bubble px-3.5 py-2.5 text-caption text-muted-foreground">
+      <LumiAvatar persona={STAGE_PERSONA[stage]} state="thinking" size={22} />
       {/* key=idx: 문구가 바뀔 때마다 아래에서 스르륵 올라오는 재등장 */}
       <span
         key={idx}
@@ -243,7 +257,7 @@ function StatusStackRow({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center gap-2.5 rounded-2xl border border-border bg-muted/40 px-3.5 py-2.5 text-left text-xs text-foreground hover:bg-muted/60"
+        className="flex w-full items-center gap-2.5 rounded-xl bg-chat-lumi-bubble px-3.5 py-2.5 text-left text-caption text-foreground transition-colors hover:bg-card"
       >
         {stack.failed > 0 && stack.done === 0 ? (
           <AlertTriangle className="size-3.5 shrink-0 text-warning" />
@@ -255,14 +269,14 @@ function StatusStackRow({
         <span className="w-0 flex-1 truncate">
           <MarkdownText text={scrub(first.msg.content.trimStart().replace(/^[✓⚠]\s*/, ''))} />
         </span>
-        <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+        <span className="shrink-0 rounded-full bg-card px-2 py-0.5 font-num text-tag font-semibold text-muted-foreground">
           {summary} · +{stack.items.length - 1}
         </span>
       </button>
       {open && (
         <div className="space-y-1 pl-4">
           {stack.items.map(({ msg, failed }, i) => (
-            <div key={msg.id ?? i} className="flex items-center gap-2 rounded-xl border border-border/60 px-3 py-1.5 text-[11px] text-muted-foreground">
+            <div key={msg.id ?? i} className="flex items-center gap-2 rounded-lg bg-chat-lumi-bubble/60 px-3 py-1.5 text-[11px] text-muted-foreground">
               {failed ? <AlertTriangle className="size-3 shrink-0 text-warning" /> : <CheckCircle2 className="size-3 shrink-0 text-success" />}
               <span className="min-w-0"><MarkdownText text={scrub(msg.content.trimStart().replace(/^[✓⚠]\s*/, ''))} /></span>
             </div>
@@ -291,7 +305,7 @@ function CopyButton({ text }: { text: string }) {
       onClick={handleCopy}
       title={t('Copy message')}
       aria-label={t('Copy message')}
-      className="absolute right-1 top-1 rounded-md border border-border bg-card/80 p-1 text-muted-foreground opacity-0 backdrop-blur transition-opacity hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
+      className="absolute right-1.5 top-1.5 rounded-md bg-card p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100 focus-visible:opacity-100"
     >
       {copied ? (
         <Check className="size-3 text-success" />
@@ -386,7 +400,7 @@ function ChatTraceFooter({
   })()
 
   return (
-    <details className="shrink-0 border-t border-border-subtle bg-muted/20 px-4 py-1.5 text-[10px] text-muted-foreground">
+    <details className="shrink-0 border-t border-border-subtle px-5 py-1.5 font-num text-[10px] text-subtle-foreground">
       <summary className="flex cursor-pointer list-none items-center gap-1.5 outline-none [&::-webkit-details-marker]:hidden">
         <Activity
           className="size-3 shrink-0"
@@ -717,7 +731,7 @@ export function GlobalChat() {
     requestAnimationFrame(() => textareaRef.current?.focus())
   }, [mentionInsert, consumeMentionInsert])
 
-  // 첫 진입 웰컴 등 → 채팅 입력창 포커스. HoverBeam 래퍼의 focus-within 이 빨간 빔을 켜 주의를 끈다.
+  // 첫 진입 웰컴 등 → 채팅 입력창 포커스. 입력 알약의 focus-within 이 지금 단계 색 테두리를 켜 주의를 끈다(v3).
   useEffect(() => {
     if (focusRequest == null) return
     requestAnimationFrame(() => textareaRef.current?.focus())
@@ -1154,8 +1168,8 @@ export function GlobalChat() {
   }
   const handleResizePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!dragging) return
-    // 패널이 우측에서 INSET 만큼 떠 있으므로 그만큼 빼야 커서와 좌측 경계가 붙어 움직인다.
-    setChatWidth(window.innerWidth - e.clientX - SHELL_INSET) // clamp은 store에서
+    // v3: 패널이 오른쪽 가장자리에 붙어 있다 — 커서 위치가 곧 왼쪽 경계다.
+    setChatWidth(window.innerWidth - e.clientX) // clamp은 store에서
   }
   const handleResizePointerEnd = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.currentTarget.hasPointerCapture(e.pointerId)) {
@@ -1349,24 +1363,16 @@ export function GlobalChat() {
 
   return (
     <>
-      {/* 좌측 레일과 짝을 이루는 둥근 부유 패널 (#shell-lift 2026-07-31).
-          접힘 이동거리는 100% + INSET — inset 만큼 띄워 놨으므로 100% 만으론 가장자리가 남는다. */}
+      {/* 오른쪽 가장자리에 붙은 채팅 패널(v3 2026-11-03) — 바탕은 채팅색(#1F1E1D), 왼쪽 모서리만 둥글다. 틀은 무채색 고정이고
+          지금 단계 색은 칩 · 이름 · 생각 중 점 · 고른 빠른 답 · 입력창 포커스에만 쓴다(Lumi 가이드 채팅창 색). */}
       <aside
         // data-chat-panel: 멘션 비행 연출(mention-flight)이 입력창 위치를 찾는 앵커
         data-chat-panel
         className={cn(
-          'fixed z-sidebar flex flex-col rounded-2xl border border-border bg-card shadow-lg transition-transform duration-350 ease-out',
-          collapsed && 'translate-x-[calc(100%_+_var(--shell-inset))]',
+          'fixed z-sidebar flex flex-col rounded-l-xl bg-chat-bg transition-transform duration-350 ease-out',
+          collapsed && 'translate-x-full',
         )}
-        style={
-          {
-            width: chatWidth,
-            right: SHELL_INSET,
-            top: SHELL_INSET,
-            bottom: SHELL_INSET,
-            '--shell-inset': `${SHELL_INSET}px`,
-          } as React.CSSProperties
-        }
+        style={{ width: chatWidth, right: 0, top: 0, bottom: 0 }}
       >
         {/* 좌측 리사이즈 핸들 */}
         <div
@@ -1382,45 +1388,38 @@ export function GlobalChat() {
           )}
         />
 
-        {/* Header — 지금 어느 stage 챕터인지 표시하되, 부제로 "방은 하나"임을 명시(#chat-continuity) */}
-        <div className="flex shrink-0 items-center gap-3 border-b border-border px-4 py-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-foreground">{t('Agent chat')}</span>
-              <span
-                className={cn(
-                  'shrink-0 rounded-full border px-1.5 text-[10px] font-medium leading-4',
-                  STAGE_BADGE_CLASS[currentStage],
-                )}
-              >
-                {STAGE_LABEL[currentStage]}
-              </span>
-            </div>
-            <span className="text-[11px] text-muted-foreground">
-              {t('One conversation that continues across every stage')}
-            </span>
-          </div>
+        {/* Header(v3) — "Lumi와 산문 이야기"처럼 지금 단계에서 하는 일 + 그 단계 옷을 입은 Lumi. 대화는 모든 단계가 이어지는 하나다
+            (#chat-continuity) — 구간 구분선이 단계를 가른다. 답을 기다리는 동안 Lumi 는 생각하는 모습. */}
+        <div className="flex shrink-0 items-center gap-2 pb-3 pl-5 pr-3.5 pt-4">
+          <LumiAvatar
+            persona={STAGE_PERSONA[currentStage]}
+            state={chatLumiState({ loading, error: !!error })}
+            size={28}
+            bare
+          />
+          <h2 className="min-w-0 flex-1 truncate text-label font-semibold text-foreground">{t(STAGE_CHAT_TITLE[currentStage])}</h2>
           {/* 다음 단계 호출 칩(#owner-handoff-reentry 2026-08-31)은 2026-10-01 오너 지시("채팅 위의 버튼은 없애줘")로
               각 단계 화면 오른쪽 위 NextStepButton 으로 옮겼다 — 같은 문장을 채팅에 입력해 넘긴다. */}
           <Button
             size="icon-sm"
-            variant="ghost"
+            variant="secondary"
+            className="size-7 text-muted-foreground hover:text-foreground"
             onClick={toggleCollapsed}
             title={t('Collapse chat')}
             aria-label={t('Collapse chat')}
           >
-            <ChevronsRight className="size-4" />
+            <CollapseIcon className="size-4" />
           </Button>
         </div>
 
         {/* Messages */}
-        <ScrollArea className="min-h-0 flex-1 px-4 py-3">
-          <div className="space-y-2">
+        <ScrollArea className="min-h-0 flex-1 px-5 pb-3 pt-2">
+          <div className="space-y-3">
 
             {sections.filter(section => section.messages.length > 0).map((section, si) => (
               <section
                 key={`${section.stage}-${si}`}
-                className={cn('space-y-2', si > 0 && 'pt-2')}
+                className={cn('space-y-2.5', si > 0 && 'pt-2')}
               >
                 <StageDivider stage={section.stage} current={section.current} />
                 {/* 렌더 분류 (#oiioii-chat) — 유저만 채운 말풍선, 에이전트는 flat 출력 +
@@ -1435,8 +1434,9 @@ export function GlobalChat() {
                     // 첨부 마커 분리 — 본문은 말풍선에, 원본 URL 은 썸네일로.
                     const { text, urls } = parseAttachmentMarker(msg.content)
                     return (
-                      <div key={msg.id} className="flex justify-end pl-7">
-                        <div className="group relative w-fit max-w-full select-text whitespace-pre-wrap rounded-3xl rounded-br-sm bg-chat-user-bubble px-4 py-2.5 pr-8 text-xs text-chat-user-bubble-foreground">
+                      <div key={msg.id} className="flex justify-end pl-10">
+                        {/* 내 말풍선(v3 Chat/Me) — 오른쪽 위 모서리만 덜 둥글다. */}
+                        <div className="group relative w-fit max-w-full select-text whitespace-pre-wrap rounded-xl rounded-tr-[6px] bg-chat-user-bubble px-3.5 py-[9px] pr-8 text-chat text-chat-user-bubble-foreground">
                           {urls.length > 0 && (
                             <div className="mb-1.5 flex flex-wrap justify-end gap-1">
                               {urls.map((url) => (
@@ -1461,7 +1461,7 @@ export function GlobalChat() {
                     return (
                       <div
                         key={msg.id}
-                        className="flex items-center gap-2.5 rounded-2xl border border-border bg-muted/40 px-3.5 py-2.5 text-xs text-foreground"
+                        className="flex items-center gap-2.5 rounded-xl bg-chat-lumi-bubble px-3.5 py-2.5 text-caption text-foreground"
                       >
                         {failed ? (
                           <AlertTriangle className="size-3.5 shrink-0 text-warning" />
@@ -1495,9 +1495,9 @@ export function GlobalChat() {
                             className="tale-beam-once pointer-events-none absolute inset-0 rounded-2xl"
                           />
                           <div className="flex items-center gap-3">
-                            <AgentFace stage={invite.from} size={26} />
+                            <LumiAvatar persona={STAGE_PERSONA[invite.from]} size={26} />
                             <MoveRight className="size-4 text-muted-foreground" />
-                            <AgentFace stage={invite.to} size={34} />
+                            <LumiAvatar persona={STAGE_PERSONA[invite.to]} size={34} />
                           </div>
                           <p className="text-[11px] text-muted-foreground">
                             {invitePre}
@@ -1515,15 +1515,12 @@ export function GlobalChat() {
                     }
                     // 마커 파싱 실패 — 원문 그대로 flat 출력 (데이터를 숨기지 않는다).
                   }
-                  // 일반 에이전트 발화 — 배경 없는 flat 출력. 화자는 턴 첫 메시지의 plate 가 말한다.
+                  // 일반 에이전트 발화 — Lumi 말풍선(v3). 턴 첫 메시지에만 아바타 · 이름(showRolePlate, chat-blocks.ts).
                   return (
-                    <div key={msg.id}>
-                      {showRolePlate && <RolePlate stage={msg.stage} />}
-                      <div className="group relative select-text whitespace-pre-wrap px-1 pr-8 text-xs leading-relaxed text-foreground">
-                        <MarkdownText text={scrubProse(msg.content)} />
-                        <CopyButton text={scrubProse(msg.content)} />
-                      </div>
-                    </div>
+                    <LumiBubble key={msg.id} stage={msg.stage} first={showRolePlate} className="whitespace-pre-wrap pr-8">
+                      <MarkdownText text={scrubProse(msg.content)} />
+                      <CopyButton text={scrubProse(msg.content)} />
+                    </LumiBubble>
                   )
                 })}
               </section>
@@ -1597,8 +1594,9 @@ export function GlobalChat() {
 
             {showProposal && pendingProposal && (
               <div
+                data-stage={STAGE_PERSONA[pendingProposal.stage]}
                 className={cn(
-                  'mr-6 rounded-2xl border border-warning/40 bg-warning/10 px-3.5 py-2.5 text-xs text-foreground',
+                  'ml-9 rounded-xl rounded-tl-[6px] bg-chat-lumi-bubble px-4 pb-3.5 pt-3 text-chat text-foreground',
                   CASCADE_IN,
                 )}
                 style={cascadeStyle(proposalSlot)}
@@ -1606,14 +1604,14 @@ export function GlobalChat() {
                 <div className="flex items-start gap-1.5">
                   <span
                     className={cn(
-                      'mt-px inline-flex items-center rounded-full border px-1.5 py-0 align-middle text-[9px] font-medium',
+                      'mt-0.5 inline-flex items-center rounded-full border px-1.5 py-0 align-middle text-tag font-semibold',
                       STAGE_BADGE_CLASS[pendingProposal.stage],
                     )}
                   >
                     Suggestion
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium"><MarkdownText text={scrubProse(pendingProposal.target)} /></p>
+                    <p className="font-semibold"><MarkdownText text={scrubProse(pendingProposal.target)} /></p>
                     <p className="mt-0.5 text-muted-foreground"><MarkdownText text={scrubProse(pendingProposal.action)} /></p>
                     {pendingProposal.impact.length > 0 && (
                       <ul className="mt-2 list-disc space-y-0.5 pl-4 text-muted-foreground">
@@ -1694,7 +1692,7 @@ export function GlobalChat() {
             Textarea 는 입력 길이 따라 자동 확장 (max-h = 10줄 + padding). 내부 스크롤은
             MentionTextarea 의 ^/v 버튼으로 안내(#a3). Enter 전송 / Shift+Enter 개행.
             툴바: + 업로드 · 에이전트 필(빠른 요청) · four-dot(@멘션) · 우측 원형 send→Stop. */}
-        <div className="shrink-0 p-3 pt-1">
+        <div className="shrink-0 px-4 pb-[18px] pt-2">
           {sceneEditActive?.mode === 'manual' ? (
             <div className="mb-3 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2" data-testid="scene-story-chat-edit">
               <p className="text-xs leading-5 text-muted-foreground">{t('Editing in the window. Save or cancel to use chat again.')}</p>
@@ -1705,21 +1703,23 @@ export function GlobalChat() {
             <div
               data-chat-choices=""
               className={cn(
-                'mb-2 flex flex-col gap-1.5 px-1',
+                'mb-3 flex flex-col gap-2',
                 'animate-in fade-in-0 slide-in-from-bottom-1 duration-150 ease-out motion-reduce:animate-none',
               )}
             >
               {choices.question && (
-                <div className="flex items-start gap-1.5">
-                  <AgentFace stage={choices.stage} size={16} />
-                  <p className="min-w-0 text-xs text-foreground">{choices.question}</p>
+                <div className="flex items-start gap-2">
+                  <LumiAvatar persona={STAGE_PERSONA[choices.stage]} size={20} />
+                  <p className="min-w-0 text-chat text-foreground">{choices.question}</p>
                 </div>
               )}
               {choices.displayOnly && (
-                <p className="text-xs text-muted-foreground">
+                <p className="text-caption text-subtle-foreground">
                   {t('Click an option to put it in your message, then send.')}
                 </p>
               )}
+              {/* 빠른 답(v3 Control/Choice Chip) — 줄바꿈하며 늘어선 32px 알약. 고른 칩은 지금 단계 색 테두리 · 18% 바탕(Lumi 가이드 .quick-reply). */}
+              <div className="flex flex-wrap gap-1.5">
               {choices.options.map((opt, oi) => {
                 if (choices.displayOnly) {
                   return (
@@ -1730,7 +1730,7 @@ export function GlobalChat() {
                         setInput(opt.label)
                         requestAnimationFrame(() => textareaRef.current?.focus())
                       }}
-                      className="w-full rounded-xl border border-border-subtle bg-muted/40 px-3 py-2 text-center text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                      className="inline-flex min-h-8 items-center rounded-full bg-chat-chip px-3.5 py-1 text-left text-label font-medium text-foreground transition-colors hover:bg-accent"
                     >
                       {opt.label}
                     </button>
@@ -1748,17 +1748,17 @@ export function GlobalChat() {
                       setSelectedChoice(selected ? null : opt.label)
                     }}
                     className={cn(
-                      'relative w-full rounded-xl border-2 px-9 py-2 text-center text-xs text-foreground transition-colors duration-100 ease-out disabled:pointer-events-none disabled:opacity-50',
+                      'inline-flex min-h-8 items-center gap-1.5 rounded-full border-[1.5px] px-3.5 py-1 text-left text-label text-foreground transition-colors duration-100 ease-out disabled:pointer-events-none disabled:opacity-50',
                       selected
-                        ? 'border-border-strong bg-accent'
-                        : 'border-transparent bg-muted/60 hover:border-border-strong hover:bg-accent',
+                        ? 'border-stage bg-stage/18 font-semibold'
+                        : 'border-transparent bg-chat-chip font-medium hover:bg-accent',
                     )}
                   >
                     {/* 숫자키 바로 선택(#choices-keys) 안내 겸 단축키 라벨 */}
                     <span
                       className={cn(
-                        'absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[10px]',
-                        selected ? 'text-foreground/70' : 'text-muted-foreground/50',
+                        'font-num text-tag font-semibold',
+                        selected ? 'text-foreground/70' : 'text-subtle-foreground',
                       )}
                     >
                       {oi + 1}
@@ -1767,12 +1767,10 @@ export function GlobalChat() {
                   </button>
                 )
               })}
-              {!choices.displayOnly && (
-                <>
               {/* 직접 입력 행을 누르면 선택지 안에서 답을 쓸 수 있다. */}
-              {freeformOpen ? (
-                <div className="relative w-full rounded-xl border-2 border-border-strong bg-accent px-9 py-2">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[10px] text-foreground/70">
+              {choices.displayOnly ? null : freeformOpen ? (
+                <div className="flex min-h-8 w-full items-center gap-1.5 rounded-full border-[1.5px] border-stage bg-stage/18 px-3.5 py-1">
+                  <span className="font-num text-tag font-semibold text-foreground/70">
                     {choices.options.length + 1}
                   </span>
                   <input
@@ -1790,7 +1788,7 @@ export function GlobalChat() {
                     }}
                     placeholder={t('Type what you want to say, then press Enter…')}
                     aria-label={t('Type my own answer')}
-                    className="w-full border-0 bg-transparent text-xs leading-4 text-foreground outline-none placeholder:text-muted-foreground/60"
+                    className="w-full border-0 bg-transparent text-label leading-5 text-foreground outline-none placeholder:text-subtle-foreground"
                   />
                 </div>
               ) : (
@@ -1800,18 +1798,18 @@ export function GlobalChat() {
                   aria-pressed={selectedChoice === FREEFORM}
                   onClick={openFreeform}
                   className={cn(
-                    'relative w-full rounded-xl border-2 px-9 py-2 text-center text-xs transition-colors duration-100 ease-out disabled:pointer-events-none disabled:opacity-50',
+                    'inline-flex min-h-8 items-center gap-1.5 rounded-full border-[1.5px] px-3.5 py-1 text-left text-label font-medium transition-colors duration-100 ease-out disabled:pointer-events-none disabled:opacity-50',
                     selectedChoice === FREEFORM
-                      ? 'border-border-strong bg-accent text-foreground'
-                      : 'border-transparent bg-muted/60 text-muted-foreground hover:border-border-strong hover:bg-accent hover:text-foreground',
+                      ? 'border-stage bg-stage/18 text-foreground'
+                      : 'border-transparent bg-chat-chip text-muted-foreground hover:bg-accent hover:text-foreground',
                   )}
                 >
                   <span
                     className={cn(
-                      'absolute left-3 top-1/2 -translate-y-1/2 font-mono text-[10px]',
+                      'font-num text-tag font-semibold',
                       selectedChoice === FREEFORM
                         ? 'text-foreground/70'
-                        : 'text-muted-foreground/50',
+                        : 'text-subtle-foreground',
                     )}
                   >
                     {choices.options.length + 1}
@@ -1819,6 +1817,9 @@ export function GlobalChat() {
                   {t('Type my own answer…')}
                 </button>
               )}
+              </div>
+              {!choices.displayOnly && (
+                <>
               {/* 직접 입력이 열려 있으면 입력한 답을, 아니면 고른 선택지를 전송한다. */}
               <Button
                 size="sm"
@@ -1830,18 +1831,18 @@ export function GlobalChat() {
               </Button>
               <div className="flex items-center justify-center gap-1.5">
                 {/* 키 힌트(#choices-keys) — kbd 문법. 자유 입력은 '직접 입력' 행이 담당 */}
-                <p className="text-[10px] text-muted-foreground">
-                  <kbd className="rounded border border-border bg-muted px-1">↑↓</kbd>·
-                  <kbd className="rounded border border-border bg-muted px-1">1-{Math.min(choices.options.length + 1, 9)}</kbd> {t('Select (2× = confirm)')} ·{' '}
-                  <kbd className="rounded border border-border bg-muted px-1">Enter</kbd> {t('Confirm')} ·{' '}
-                  <kbd className="rounded border border-border bg-muted px-1">Esc</kbd> {t('Close')}
+                <p className="text-[10px] text-subtle-foreground">
+                  <kbd className="rounded border border-border bg-card px-1 font-num">↑↓</kbd>·
+                  <kbd className="rounded border border-border bg-card px-1 font-num">1-{Math.min(choices.options.length + 1, 9)}</kbd> {t('Select (2× = confirm)')} ·{' '}
+                  <kbd className="rounded border border-border bg-card px-1 font-num">Enter</kbd> {t('Confirm')} ·{' '}
+                  <kbd className="rounded border border-border bg-card px-1 font-num">Esc</kbd> {t('Close')}
                 </p>
                 <button
                   type="button"
                   onClick={() => dismissSuggestion()}
                   title={t('Close choices')}
                   aria-label={t('Close choices')}
-                  className="rounded-full bg-muted p-1 text-muted-foreground transition-colors duration-100 ease-out hover:bg-accent hover:text-foreground"
+                  className="rounded-full bg-card p-1 text-muted-foreground transition-colors duration-100 ease-out hover:bg-accent hover:text-foreground"
                 >
                   <X className="size-3" />
                 </button>
@@ -1855,8 +1856,8 @@ export function GlobalChat() {
           <ChatProgressPin stage={currentStage} />
           <div
             className={cn(
-              'relative rounded-3xl transition-colors',
-              fileDragActive && 'rounded-3xl ring-2 ring-primary/60',
+              'relative rounded-[26px] transition-colors',
+              fileDragActive && 'ring-2 ring-stage/60',
             )}
             onDragEnter={handleFileDragEnter}
             onDragOver={handleFileDragOver}
@@ -1864,217 +1865,89 @@ export function GlobalChat() {
             onDrop={handleFileDrop}
             data-file-drop-zone
           >
-            <HoverBeam className="rounded-3xl">
-              <div className="rounded-3xl border border-border bg-background px-2 pb-1.5 pt-1">
-              {/* 첨부 칩 — 파일은 얹혀만 있고, 무엇으로 쓸지는 아래 입력창에 말로 적는다. */}
-              {attachments.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 px-1 pb-1.5 pt-1">
-                  {attachments.map((a) => (
-                    <span
-                      key={a.id}
-                      title={a.error ?? a.name}
-                      className={cn(
-                        'flex items-center gap-1.5 rounded-lg border py-1 pl-1.5 pr-1 text-xs',
-                        a.status === 'error'
-                          ? 'border-destructive/40 bg-destructive/10 text-destructive'
-                          : 'border-border bg-muted text-muted-foreground',
-                      )}
-                    >
-                      {a.status === 'uploading' ? (
-                        <Loader2 className="size-3.5 shrink-0 animate-spin" />
-                      ) : a.kind === 'image' && a.thumbUrl ? (
-                        <img
-                          src={a.thumbUrl}
-                          alt=""
-                          className="size-5 shrink-0 rounded object-cover"
-                        />
-                      ) : a.kind === 'image' ? (
-                        <FileImage className="size-3.5 shrink-0" />
-                      ) : (
-                        <FileText className="size-3.5 shrink-0" />
-                      )}
-                      <span className="max-w-40 truncate">{a.name}</span>
-                      {a.status === 'ready' &&
-                        a.kind === 'image' &&
-                        (a.sliceUrls?.length ?? 0) > 1 && (
-                          <span className="shrink-0 tabular-nums opacity-70">
-                            {t('{count} slices', { count: a.sliceUrls?.length ?? 0 })}
-                          </span>
+            {/* 입력창(v3 Composer) — 카드색 알약 안에 글칸 + 둥근 크림 보내기. 포커스면 지금 단계 색 테두리(Lumi 가이드 .chat-input:focus-within).
+                모델 고르기 · 단계 칩(빠른 요청) · [+] 첨부 · @멘션은 알약 아래 한 줄로 그대로 둔다(오너 11/3: 모양만 바꾼다). */}
+            <div className="rounded-[26px] border border-transparent bg-chat-input py-2 pl-4 pr-2 transition-colors focus-within:border-stage">
+                {/* 첨부 칩 — 파일은 얹혀만 있고, 무엇으로 쓸지는 아래 입력창에 말로 적는다. */}
+                {attachments.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pb-1.5 pt-1">
+                    {attachments.map((a) => (
+                      <span
+                        key={a.id}
+                        title={a.error ?? a.name}
+                        className={cn(
+                          'flex items-center gap-1.5 rounded-lg border py-1 pl-1.5 pr-1 text-xs',
+                          a.status === 'error'
+                            ? 'border-destructive/40 bg-destructive/10 text-destructive'
+                            : 'border-transparent bg-chip text-muted-foreground',
                         )}
-                      {a.truncated && <span className="shrink-0 text-warning">{t('Truncated')}</span>}
-                      <button
-                        type="button"
-                        onClick={() => removeAttachment(a.id)}
-                        title={t('Remove attachment')}
-                        aria-label={t('Remove {name}', { name: a.name })}
-                        className="shrink-0 rounded p-0.5 transition-colors duration-100 ease-out hover:bg-accent hover:text-foreground"
                       >
-                        <X className="size-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-              <MentionTextarea
-                ref={textareaRef}
-                value={input}
-                onChange={setInput}
-                onSubmit={handleSend}
-                items={mentionItems}
-                disabled={inputLocked}
-                ghost={composeHint && input === composeHint.token && composeHint.hint ? composeHint.hint : undefined}
-                placeholder={
-                  choices
-                    ? t('Choose above or type your answer…')
-                    : sceneGateActive
-                      ? treatmentDraft && !producerLocked
-                        ? t('Type your changes, or press Enter as-is to hand over to Writer')
-                        : t('Type your changes, or press Enter as-is to confirm the scenes')
-                      : canSendAttachments
-                        ? t("Tell us how to use it, or leave it blank and we'll fold it into the story")
-                        : t(STAGE_PLACEHOLDER[currentStage])
-                }
-                className={cn(
-                  'max-h-[13.625rem] min-h-9 w-full resize-none border-0 bg-transparent px-2 py-2 leading-5 shadow-none focus-visible:border-transparent focus-visible:ring-0 dark:bg-transparent [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
-                  producerUntouched &&
-                    'placeholder:text-success placeholder:animate-pulse',
-                )}
-              />
-              {/* 하단 툴바 (#oiioii-chat spec §10 매핑) */}
-              {['producer', 'writer', 'artist'].includes(currentStage) && <ChatModelControls disabled={loading} />}
-              <div className="flex items-center gap-1">
-                {currentStage === 'producer' && (
-                  <>
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept={UPLOAD_ACCEPT}
-                      multiple
-                      className="hidden"
-                      onChange={handleFileChange}
-                    />
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
-                      className="rounded-full"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={loading || uploading}
-                      title={t('Attach a file: manuscript (txt·md·docx) or image (jpg·png·webp)')}
-                      aria-label={t('Attach file')}
-                    >
-                      <Plus className="size-4" />
-                    </Button>
-                    <span className="mx-0.5 h-4 w-px shrink-0 bg-border" aria-hidden />
-                  </>
-                )}
-                {/* 에이전트 필 — oiioii 의 스킬 필 자리. 클릭 = 이 에이전트의 빠른 요청 목록. */}
-                <Popover open={presetOpen} onOpenChange={setPresetOpen}>
-                  <PopoverTrigger asChild>
-                    <button
-                      type="button"
-                      title={t('Quick requests')}
-                      className={cn(
-                        'flex h-7 shrink-0 items-center gap-1.5 rounded-lg border px-2 text-xs font-medium transition-colors',
-                        STAGE_BADGE_CLASS[currentStage],
-                      )}
-                    >
-                      <AgentFace stage={currentStage} size={16} />
-                      {STAGE_LABEL[currentStage]}
-                      <ChevronDown className="size-3 opacity-60" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent align="start" side="top" sideOffset={8} className="w-64 p-1.5">
-                    <div className="px-2 py-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                      {t('Quick requests')}
-                    </div>
-                    {STAGE_PROMPT_PRESETS[currentStage].map((preset) => (
-                      <button
-                        key={preset}
-                        type="button"
-                        onClick={() => insertPreset(t(preset))}
-                        className="w-full rounded-md px-2 py-1.5 text-left text-xs text-foreground transition-colors hover:bg-accent"
-                      >
-                        {t(preset)}
-                      </button>
-                    ))}
-                    {STAGE_PROMPT_PRESETS[currentStage].length === 0 && (
-                      <p className="px-2 py-1.5 text-xs text-muted-foreground">
-                        {t("Chat isn't supported at this stage.")}
-                      </p>
-                    )}
-                    {(() => {
-                      const handoff = handoffFrom(currentStage)
-                      if (!handoff) return null
-                      return (
-                        <>
-                          <div className="mx-1 my-1 h-px bg-border" aria-hidden />
-                          <button
-                            type="button"
-                            onClick={() => insertPreset(t(handoff.utterance))}
-                            className="w-full rounded-md px-2 py-1.5 text-left text-xs font-medium text-foreground transition-colors hover:bg-accent"
-                          >
-                            {t(handoff.label)} →
-                          </button>
-                        </>
-                      )
-                    })()}
-                  </PopoverContent>
-                </Popover>
-                {/* 스타일 픽커 (#style-entry #feedback 2026-08-07) — producer 에선 four-dot 자리를
-                    스타일 버튼이 차지한다(에셋 멘션은 @ 타이핑·Ctrl+카드 클릭이 대체). 첫 클릭 전
-                    + 스타일 미선택이면 빔 상시 점등. 다른 스테이지는 기존 에셋 팔레트 유지. */}
-                {/* 리뉴얼 1차: Writer(id producer)는 산문만 다룬다 — 스타일은 Artist [만들기]의 스타일 팝업에서 고른다(채팅 스타일 단추 없음). */}
-                {currentStage === 'producer' ? null : (
-                <Popover open={assetsOpen} onOpenChange={setAssetsOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
-                      className="rounded-full"
-                      title={t('Asset mentions')}
-                      aria-label={t('Asset mentions')}
-                    >
-                      <LayoutGrid className="size-4" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="start" side="top" sideOffset={8} className="max-h-64 w-64 overflow-y-auto p-1.5">
-                    <div className="px-2 py-1.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                      {t('Asset mentions')}
-                    </div>
-                    {mentionItems.map((item) => {
-                      const active = input.includes(`@${item.label}`)
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => toggleAssetMention(item.label)}
-                          className={cn(
-                            'flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-xs transition-colors hover:bg-accent',
-                            active ? 'font-medium text-foreground' : 'text-foreground/80',
+                        {a.status === 'uploading' ? (
+                          <Loader2 className="size-3.5 shrink-0 animate-spin" />
+                        ) : a.kind === 'image' && a.thumbUrl ? (
+                          <img
+                            src={a.thumbUrl}
+                            alt=""
+                            className="size-5 shrink-0 rounded object-cover"
+                          />
+                        ) : a.kind === 'image' ? (
+                          <FileImage className="size-3.5 shrink-0" />
+                        ) : (
+                          <FileText className="size-3.5 shrink-0" />
+                        )}
+                        <span className="max-w-40 truncate">{a.name}</span>
+                        {a.status === 'ready' &&
+                          a.kind === 'image' &&
+                          (a.sliceUrls?.length ?? 0) > 1 && (
+                            <span className="shrink-0 tabular-nums opacity-70">
+                              {t('{count} slices', { count: a.sliceUrls?.length ?? 0 })}
+                            </span>
                           )}
+                        {a.truncated && <span className="shrink-0 text-warning">{t('Truncated')}</span>}
+                        <button
+                          type="button"
+                          onClick={() => removeAttachment(a.id)}
+                          title={t('Remove attachment')}
+                          aria-label={t('Remove {name}', { name: a.name })}
+                          className="shrink-0 rounded p-0.5 transition-colors duration-100 ease-out hover:bg-accent hover:text-foreground"
                         >
-                          <span className="truncate">@{item.label}</span>
-                          <span className="flex shrink-0 items-center gap-1 text-[10px] text-muted-foreground">
-                            {item.hint}
-                            {active && <Check className="size-3 text-success" />}
-                          </span>
+                          <X className="size-3" />
                         </button>
-                      )
-                    })}
-                    {mentionItems.length === 0 && (
-                      <p className="px-2 py-1.5 text-xs text-muted-foreground">
-                        {t("There's nothing to mention at this stage.")}
-                      </p>
-                    )}
-                  </PopoverContent>
-                </Popover>
+                      </span>
+                    ))}
+                  </div>
                 )}
-                <div className="flex-1" />
-                {/* send ↑ → 응답 중이면 Stop ■ (abort, #oiioii-chat) */}
+              <div className="flex items-end gap-2.5">
+                <MentionTextarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={setInput}
+                  onSubmit={handleSend}
+                  items={mentionItems}
+                  disabled={inputLocked}
+                  ghost={composeHint && input === composeHint.token && composeHint.hint ? composeHint.hint : undefined}
+                  placeholder={
+                    choices
+                      ? t('Choose above or type your answer…')
+                      : sceneGateActive
+                        ? treatmentDraft && !producerLocked
+                          ? t('Type your changes, or press Enter as-is to hand over to Writer')
+                          : t('Type your changes, or press Enter as-is to confirm the scenes')
+                        : canSendAttachments
+                          ? t("Tell us how to use it, or leave it blank and we'll fold it into the story")
+                          : t(STAGE_PLACEHOLDER[currentStage])
+                  }
+                  className={cn(
+                    'max-h-[13.625rem] min-h-9 w-full resize-none border-0 bg-transparent px-0 py-2 text-chat leading-5 shadow-none placeholder:text-subtle-foreground focus-visible:border-transparent focus-visible:ring-0 md:text-chat dark:bg-transparent [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+                    producerUntouched &&
+                      'placeholder:text-success placeholder:animate-pulse',
+                  )}
+                />
+                {/* send ↑ → 응답 중이면 Stop ■ (abort, #oiioii-chat) — v3: 36px 둥근 크림 단추, 어두운 화살표 */}
                 {loading ? (
                   <Button
-                    size="icon-sm"
-                    className="rounded-full"
+                    size="icon"
+                    className="shrink-0 rounded-full"
                     onClick={stopGeneration}
                     title={t('Stop generating response')}
                     aria-label={t('Stop generating response')}
@@ -2083,48 +1956,177 @@ export function GlobalChat() {
                   </Button>
                 ) : (
                   <Button
-                    size="icon-sm"
-                    className="rounded-full"
+                    size="icon"
+                    className="shrink-0 rounded-full"
                     onClick={handleSend}
                     disabled={sendDisabled || uploading || (!input.trim() && !canSendAttachments)}
                     title={t('Send')}
                     aria-label={t('Send')}
                   >
-                    <ArrowUp className="size-4" />
+                    <ArrowUp className="size-5" />
                   </Button>
                 )}
               </div>
             </div>
-          </HoverBeam>
             {fileDragActive && (
               <div
-                className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-3xl border-2 border-dashed border-primary bg-primary/10 text-xs font-medium text-primary"
+                className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[26px] border-2 border-dashed border-stage bg-stage/10 text-xs font-medium text-stage"
                 aria-hidden
               >
                 파일을 놓으면 첨부돼요
               </div>
             )}
           </div>
+          {/* 하단 툴바 (#oiioii-chat spec §10 매핑) — v3 알약 밖 한 줄: [+] 첨부 · 단계 칩 · @멘션 · 모델 고르기 */}
+          <div className="mt-2 flex min-h-7 items-center gap-1 px-1">
+            {currentStage === 'producer' && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={UPLOAD_ACCEPT}
+                  multiple
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  className="size-7 rounded-full text-muted-foreground hover:text-foreground"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={loading || uploading}
+                  title={t('Attach a file: manuscript (txt·md·docx) or image (jpg·png·webp)')}
+                  aria-label={t('Attach file')}
+                >
+                  <Plus className="size-4" />
+                </Button>
+                <span className="mx-0.5 h-4 w-px shrink-0 bg-border" aria-hidden />
+              </>
+            )}
+                  {/* 에이전트 필 — oiioii 의 스킬 필 자리. 클릭 = 이 에이전트의 빠른 요청 목록. */}
+                  <Popover open={presetOpen} onOpenChange={setPresetOpen}>
+                    <PopoverTrigger asChild>
+                      {/* 단계 칩(Lumi 가이드 .stage-chip) — 지금 단계 색 바탕 · 어두운 글씨. 누르면 이 단계의 빠른 요청 · 다음 단계 넘기기. */}
+                      <button
+                        type="button"
+                        title={t('Quick requests')}
+                        className="flex h-6 shrink-0 items-center gap-1 rounded-full bg-stage pl-2.5 pr-2 text-micro font-semibold text-on-stage transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {STAGE_LABEL[currentStage]}
+                        <ChevronDown className="size-3 opacity-70" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" side="top" sideOffset={8} className="w-64 p-1.5">
+                      <div className="px-2 py-1.5 text-[10px] font-medium uppercase tracking-wider text-subtle-foreground">
+                        {t('Quick requests')}
+                      </div>
+                      {STAGE_PROMPT_PRESETS[currentStage].map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => insertPreset(t(preset))}
+                          className="w-full rounded-sm px-2 py-1.5 text-left text-label text-foreground transition-colors hover:bg-accent"
+                        >
+                          {t(preset)}
+                        </button>
+                      ))}
+                      {STAGE_PROMPT_PRESETS[currentStage].length === 0 && (
+                        <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                          {t("Chat isn't supported at this stage.")}
+                        </p>
+                      )}
+                      {(() => {
+                        const handoff = handoffFrom(currentStage)
+                        if (!handoff) return null
+                        return (
+                          <>
+                            <div className="mx-1 my-1 h-px bg-border" aria-hidden />
+                            <button
+                              type="button"
+                              onClick={() => insertPreset(t(handoff.utterance))}
+                              className="w-full rounded-sm px-2 py-1.5 text-left text-label font-semibold text-foreground transition-colors hover:bg-accent"
+                            >
+                              {t(handoff.label)} →
+                            </button>
+                          </>
+                        )
+                      })()}
+                    </PopoverContent>
+                  </Popover>
+                  {/* 스타일 픽커 (#style-entry #feedback 2026-08-07) — producer 에선 four-dot 자리를
+                      스타일 버튼이 차지한다(에셋 멘션은 @ 타이핑·Ctrl+카드 클릭이 대체). 첫 클릭 전
+                      + 스타일 미선택이면 빔 상시 점등. 다른 스테이지는 기존 에셋 팔레트 유지. */}
+                  {/* 리뉴얼 1차: Writer(id producer)는 산문만 다룬다 — 스타일은 Artist [만들기]의 스타일 팝업에서 고른다(채팅 스타일 단추 없음). */}
+                  {currentStage === 'producer' ? null : (
+                  <Popover open={assetsOpen} onOpenChange={setAssetsOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        size="icon-xs"
+                        variant="ghost"
+                        className="size-7 rounded-full text-muted-foreground hover:text-foreground"
+                        title={t('Asset mentions')}
+                        aria-label={t('Asset mentions')}
+                      >
+                        <LayoutGrid className="size-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" side="top" sideOffset={8} className="max-h-64 w-64 overflow-y-auto p-1.5">
+                      <div className="px-2 py-1.5 text-[10px] font-medium uppercase tracking-wider text-subtle-foreground">
+                        {t('Asset mentions')}
+                      </div>
+                      {mentionItems.map((item) => {
+                        const active = input.includes(`@${item.label}`)
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => toggleAssetMention(item.label)}
+                            className={cn(
+                              'flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-label transition-colors hover:bg-accent',
+                              active ? 'font-medium text-foreground' : 'text-foreground/80',
+                            )}
+                          >
+                            <span className="truncate">@{item.label}</span>
+                            <span className="flex shrink-0 items-center gap-1 text-[10px] text-muted-foreground">
+                              {item.hint}
+                              {active && <Check className="size-3 text-success" />}
+                            </span>
+                          </button>
+                        )
+                      })}
+                      {mentionItems.length === 0 && (
+                        <p className="px-2 py-1.5 text-xs text-muted-foreground">
+                          {t("There's nothing to mention at this stage.")}
+                        </p>
+                      )}
+                    </PopoverContent>
+                  </Popover>
+                  )}
+            <div className="flex-1" />
+            {['producer', 'writer', 'artist'].includes(currentStage) && <ChatModelControls disabled={loading} />}
+          </div>
         </div>
       </aside>
 
-      {/* 접힌 상태 — 우측 슬림 레일 + 상단 열기 버튼.
-          닫기 버튼(패널 헤더 상단)과 수직 위치를 맞추고, 레일이 우측 44px를 전용 점유해
-          (layout.tsx 가 접힘 시 marginRight 44 확보) 페이지 우상단 버튼들과의 겹침을 원천 차단한다. */}
+      {/* 접힌 상태 — 오른쪽 가장자리에 붙은 슬림 레일 + 위쪽 열기 단추(v3 Chat Toggle «).
+          닫기 단추(패널 머리)와 세로 위치를 맞추고, 레일이 오른쪽 44px 를 전용 점유해
+          (layout.tsx 가 접힘 시 marginRight 확보) 페이지 오른쪽 위 단추들과의 겹침을 원천 차단한다. */}
       {collapsed && (
         <aside
-          className="z-sidebar fixed flex w-11 flex-col items-center rounded-2xl border border-border bg-card pt-3 shadow-lg"
-          style={{ right: SHELL_INSET, top: SHELL_INSET, bottom: SHELL_INSET }}
+          className="z-sidebar fixed flex w-11 flex-col items-center gap-3 rounded-l-xl bg-chat-bg pt-4"
+          style={{ right: 0, top: 0, bottom: 0 }}
         >
           <Button
             size="icon-sm"
-            variant="ghost"
+            variant="secondary"
+            className="size-7 text-muted-foreground hover:text-foreground"
             onClick={toggleCollapsed}
             title={t('Open chat')}
             aria-label={t('Open chat')}
           >
-            <ChevronsLeft className="size-4" />
+            <ExpandIcon className="size-4" />
           </Button>
+          <LumiAvatar persona={STAGE_PERSONA[currentStage]} state={chatLumiState({ loading, error: !!error })} size={26} bare />
         </aside>
       )}
       {imageUploadConsentDialog}
