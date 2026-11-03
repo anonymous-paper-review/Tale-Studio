@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import { requireProjectAccess } from '@/lib/api/guard';
+import { isAdminUserId } from '@/lib/quota-exempt-server';
 import { STALE_QUEUED_MS } from '@/lib/generation-jobs';
 import {
   getRunStatusLight,
@@ -271,7 +272,9 @@ export async function GET(
     if (new URL(req.url).searchParams.get('assets') === '1') {
       body.assets = await computeAssets(projectId, body.pipeline_completed, new URL(req.url).searchParams.get('strict') === '1');
     }
-    if (body.pipeline_completed && Array.isArray(row?.shot_issues)) {
+    // 2026-11-03 오너 "Directing Check는 관리자 계정 아니면 안 보이게": 연출 점검은 관리자 계정에게만 보낸다.
+    //   화면은 이 칸이 있을 때만 띠를 그린다. 공유 보기(userId 없음) · 계정 읽기 실패는 관리자가 아닌 것으로 본다.
+    if (body.pipeline_completed && Array.isArray(row?.shot_issues) && access.userId && (await isAdminUserId(access.userId))) {
       const all = row.shot_issues
         .filter((i) => (i.category === 'cinematography' || i.category === 'continuity') && (i.severity === 'WARNING' || i.severity === 'CRITICAL'))
         .map((i) => ({ severity: String(i.severity), location: String(i.location ?? ''), message: String(i.message ?? ''), suggestion: i.suggestion ? String(i.suggestion) : null }));
