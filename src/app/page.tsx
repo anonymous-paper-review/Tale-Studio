@@ -1,5 +1,9 @@
 'use client'
 
+// 랜딩(로그인 전 첫 화면). v3(2026-11-03): 첫 화면(히어로)은 시안 144-668 "v3 · Home 예시" — 극장 같은 바탕에 단계 색 흐린 빛,
+//   Tale 로고 묶음, 크림 알약 단추. 구조 · 글은 그대로 두고(서비스 · 프로젝트 · 꼬리말 섹션도), 색 · 글꼴 · 단추 · 카드만 v3 토큰.
+//   밝은 섹션 · 빨간 빛 · 유리(white/5 + 흐림)는 없앴다(design.md 6 hard rules: dark only · no glassmorphism).
+//   로그인 전 화면이라 큰 Lumi(움직이는 파일은 로그인 미들웨어를 탄다)는 두지 않는다.
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
@@ -18,6 +22,7 @@ import {
   ShieldCheck,
   LogOut,
 } from 'lucide-react'
+import { TaleLockup } from '@/components/tale-lockup'
 import { useProjectStore } from '@/stores/project-store'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -81,6 +86,15 @@ const SERVICES = [
   },
 ]
 
+// 시안 Home(144-668)의 흐린 빛 다섯 — 히어로 가운데 기준 자리(px) · 크기 · 단계 색과 진하기. 흐림은 Figma 160 ≈ CSS 80.
+const HERO_GLOWS = [
+  { className: 'bg-stage-writer/32', w: 420, h: 360, x: -130, y: 60 },
+  { className: 'bg-stage-storyboard/32', w: 440, h: 380, x: 140, y: 20 },
+  { className: 'bg-stage-director/26', w: 380, h: 320, x: 330, y: 70 },
+  { className: 'bg-stage-producer/18', w: 360, h: 260, x: 20, y: 150 },
+  { className: 'bg-stage-editor/16', w: 320, h: 240, x: 240, y: 170 },
+]
+
 function formatDate(dateStr: string | null) {
   if (!dateStr) return ''
   const d = new Date(dateStr)
@@ -126,15 +140,14 @@ function ProjectCard({
   return (
     <div
       onClick={() => !editing && onOpen(project)}
-      // eslint-disable-next-line no-restricted-syntax -- 글로우·하이라이트 원값 보존(픽셀 불변). 토큰화는 티켓 glow-token-cleanup(#accent-glow-tokenize)
-      className="group flex cursor-pointer flex-col rounded-2xl border border-white/10 bg-white/5 p-6 text-left backdrop-blur-sm transition-all duration-300 hover:border-primary/50 hover:bg-white/10 hover:shadow-[0_10px_30px_rgba(229,9,20,0.1)]"
+      // v3: 큰 내용 판 하나(판 아래 그림자 하나만) — 올리면 한 단 밝아진다. 빨간 빛 · 유리는 없앴다.
+      className="group flex cursor-pointer flex-col rounded-xl bg-panel p-6 text-left shadow-panel transition-colors duration-150 hover:bg-card"
     >
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         {editing ? (
           <Input
             ref={inputRef}
-            // 랜딩 카드가 다크 배경이라 기본 글자색이 검정으로 떨어지면 안 보임(#a3) — 흰 글씨 강제.
-            className="h-9 text-lg font-semibold text-white caret-white placeholder:text-gray-500"
+            className="h-9 text-body font-semibold"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onBlur={handleSave}
@@ -147,10 +160,10 @@ function ProjectCard({
           />
         ) : (
           <>
-            <h3 className="text-lg font-semibold text-white transition-colors group-hover:text-primary">
+            <h3 className="min-w-0 truncate text-body font-semibold text-foreground">
               {title}
             </h3>
-            <div className="flex items-center gap-0.5">
+            <div className="flex shrink-0 items-center gap-0.5">
               <button
                 onClick={(e) => {
                   e.stopPropagation()
@@ -158,7 +171,7 @@ function ProjectCard({
                 }}
                 title="Rename"
                 aria-label="Rename project"
-                className="rounded p-1 text-gray-500 opacity-0 transition-opacity hover:text-white group-hover:opacity-100"
+                className="rounded-md p-1 text-subtle-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
               >
                 <Pencil className="size-3.5" />
               </button>
@@ -169,7 +182,7 @@ function ProjectCard({
                 }}
                 title="Delete project"
                 aria-label="Delete project"
-                className="rounded p-1 text-gray-500 opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
+                className="rounded-md p-1 text-subtle-foreground opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100 group-hover:opacity-100"
               >
                 <Trash2 className="size-3.5" />
               </button>
@@ -177,13 +190,13 @@ function ProjectCard({
           </>
         )}
       </div>
-      <div className="mt-4 flex items-center gap-3 text-xs text-gray-400">
-        <span className="rounded-md bg-white/10 px-2.5 py-1 font-medium">
+      <div className="mt-4 flex items-center gap-3">
+        <span className="rounded-[6px] bg-card px-[7px] py-0.5 text-micro font-semibold text-muted-foreground">
           {projectStageLabel(project.current_stage)}
         </span>
         {project.updated_at && (
-          <span className="flex items-center gap-1">
-            <Clock className="size-3" />
+          <span className="flex items-center gap-1 font-num text-meta font-medium text-subtle-foreground">
+            <Clock className="size-3" aria-hidden />
             {formatDate(project.updated_at)}
           </span>
         )}
@@ -323,68 +336,63 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-black selection:bg-primary selection:text-white">
-      {/* ── Navbar ── */}
-      <nav className="fixed top-0 z-50 w-full bg-gradient-to-b from-black/80 to-transparent px-6 py-6">
-        <div className="mx-auto flex max-w-7xl items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Film className="size-8 text-primary" />
-            <span className="text-2xl font-bold tracking-tight text-white">
-              Tale Studio
-            </span>
-          </div>
+    <div className="min-h-screen bg-landing text-foreground selection:bg-primary selection:text-primary-foreground">
+      {/* ── Navbar(시안 Home: 로고 묶음 · 흐린 글자 메뉴 · 크림 알약 Get Started) ── */}
+      <nav className="fixed top-0 z-50 w-full bg-gradient-to-b from-landing via-landing/70 to-transparent px-6 py-6">
+        <div className="mx-auto flex max-w-[1200px] items-center justify-between">
+          <TaleLockup size={36} />
           <a
             href="/pricing"
-            className="flex min-h-11 items-center rounded-sm px-2 text-sm font-medium text-gray-300 transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring md:hidden"
+            className="flex min-h-11 items-center rounded-sm px-2 text-body font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring md:hidden"
           >
             Pricing
           </a>
-          <div className="hidden items-center gap-4 text-sm font-medium md:flex lg:gap-10">
+          <div className="hidden items-center gap-6 text-body font-medium md:flex lg:gap-9">
             <a
               href="#services"
-              className="text-gray-300 transition-colors hover:text-primary"
+              className="text-muted-foreground transition-colors hover:text-foreground"
             >
               Services
             </a>
             <a
               href="#projects"
-              className="text-gray-300 transition-colors hover:text-primary"
+              className="text-muted-foreground transition-colors hover:text-foreground"
             >
               Projects
             </a>
             <a
               href="/pricing"
-              className="rounded-sm text-gray-300 transition-colors hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+              className="rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
             >
               Pricing
             </a>
             <button
               onClick={handleNew}
               disabled={creating}
-              className="rounded-full bg-white px-6 py-2.5 font-semibold text-black transition-all duration-300 hover:bg-primary hover:text-white hover:shadow-lg hover:shadow-primary/20"
+              className="rounded-full bg-primary px-[22px] py-[11px] font-semibold text-primary-foreground transition-colors duration-150 hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-50"
             >
               {creating ? 'Creating...' : 'Get Started'}
             </button>
             {userInfo && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-2 rounded-full focus:outline-none">
+                  <button className="flex items-center gap-2 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
                     {userInfo.avatar ? (
                       <img
                         src={userInfo.avatar}
                         alt={userInfo.name}
-                        className="size-8 rounded-full border border-white/20 object-cover"
+                        className="size-8 rounded-full object-cover"
                         referrerPolicy="no-referrer"
                       />
                     ) : (
-                      <div className="flex size-8 items-center justify-center rounded-full bg-white/10 text-xs font-medium text-white">
+                      <div className="flex size-8 items-center justify-center rounded-full bg-card text-label font-semibold text-foreground">
                         {userInfo.name.charAt(0).toUpperCase()}
                       </div>
                     )}
-                    <span className="max-w-[120px] truncate text-xs text-gray-300">
+                    <span className="max-w-[120px] truncate text-caption text-muted-foreground">
                       {userInfo.name}
                     </span>
-                    <ChevronDown className="size-4 text-gray-300" />
+                    <ChevronDown className="size-4 text-subtle-foreground" />
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-44">
@@ -400,75 +408,54 @@ export default function HomePage() {
       </nav>
 
       {/* ── Hero ── */}
-      <section className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-black">
-        {/* Background video */}
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-50 mix-blend-screen"
-          poster="https://images.unsplash.com/photo-1620641788421-7a1c342ea42e?auto=format&fit=crop&q=80&w=1080"
-        >
-          <source
-            src="https://assets.mixkit.co/videos/preview/mixkit-network-of-connections-in-a-dark-background-22204-large.mp4"
-            type="video/mp4"
-          />
-        </video>
-
-        {/* Overlays */}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-black/80" />
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,black_100%)] opacity-60" />
-        <div className="pointer-events-none absolute bottom-0 left-0 h-48 w-full bg-gradient-to-t from-white via-white/80 to-transparent" />
+      <section className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-landing">
+        {/* 단계 색 흐린 빛(시안 Home 의 Ellipse 5개, 흐림 160) — 여섯 단계 색이 한데 비친다. 배경 영상 대신. */}
+        <div className="pointer-events-none absolute inset-0" aria-hidden>
+          {HERO_GLOWS.map((glow) => (
+            <span
+              key={glow.className}
+              className={`absolute left-1/2 top-1/2 rounded-full blur-[80px] ${glow.className}`}
+              style={{ width: glow.w, height: glow.h, transform: `translate(calc(-50% + ${glow.x}px), calc(-50% + ${glow.y}px))` }}
+            />
+          ))}
+        </div>
 
         <div className="relative z-10 mx-auto max-w-5xl px-6 pt-24 text-center">
           {/* Badge */}
-          <div className="mb-10 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-medium tracking-wide text-white backdrop-blur-md">
-            <span className="relative flex size-2.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-              <span className="relative inline-flex size-2.5 rounded-full bg-primary" />
-            </span>
+          <div className="mb-2 inline-flex items-center gap-2.5 rounded-full bg-foreground/6 px-[18px] py-[9px] text-body font-medium text-foreground">
+            <span className="size-2 rounded-full bg-pearl-vivid" aria-hidden />
             The Future of Filmmaking is Here
           </div>
 
-          {/* Title */}
-          <h1 className="mb-8 text-3xl font-semibold leading-[1.05] tracking-tighter text-white sm:text-5xl md:text-6xl lg:text-7xl">
+          {/* Title — 둘째 줄의 Pre-visualization. 은 v3 헤드라인 글자 그라데이션(흰색 → 따뜻한 회색) */}
+          <h1 className="mb-6 text-4xl font-extrabold leading-[1.08] tracking-[-0.03em] text-foreground sm:text-6xl lg:text-[76px]">
             Your Tale Deserves a Take <br className="hidden md:block" />
             by{' '}
-            <span className="relative inline-block">
-              <span className="relative z-10 bg-gradient-to-r from-primary via-red-500 to-orange-500 bg-clip-text text-transparent">
-                Pre-visualization.
-              </span>
-              <span className="pointer-events-none absolute -inset-2 z-0 animate-pulse rounded-full bg-primary/20 opacity-50 blur-2xl" />
-            </span>
+            <span className="text-gradient">Pre-visualization.</span>
           </h1>
 
           {/* Subtitle */}
-          <p className="mx-auto mb-14 max-w-3xl text-xl font-light leading-relaxed tracking-wide text-gray-300 md:text-2xl">
+          <p className="mx-auto mb-10 max-w-[674px] text-lg leading-[1.6] text-muted-foreground md:text-[22px]">
             Tale Studio redefines the production pipeline. Experience the
             perfect synergy of cinematic artistry and AI precision.
           </p>
 
-          {/* CTA */}
-          <div className="flex flex-col items-center justify-center gap-6 sm:flex-row">
+          {/* CTA — 크림 알약(View Projects) · 흐린 알약(Get Started) */}
+          <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
             <button
               onClick={scrollToProjects}
-              // eslint-disable-next-line no-restricted-syntax -- 글로우·하이라이트 원값 보존(픽셀 불변). 토큰화는 티켓 glow-token-cleanup(#accent-glow-tokenize)
-              className="group relative inline-flex w-full items-center justify-center gap-3 overflow-hidden rounded-full bg-primary px-8 py-5 text-lg font-medium text-primary-foreground transition-all duration-300 hover:bg-primary/90 hover:shadow-[0_0_40px_rgba(229,9,20,0.4)] sm:w-auto"
+              className="group inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-[34px] py-[18px] text-[19px] font-semibold text-primary-foreground transition-colors duration-150 hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:w-auto"
             >
-              <span className="relative z-10 flex items-center gap-2">
-                View Projects
-                <ArrowRight className="size-5 transition-transform duration-300 group-hover:translate-x-1" />
-              </span>
+              View Projects
+              <ArrowRight className="size-5 transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transition-none" />
             </button>
 
             <button
               onClick={handleNew}
               disabled={creating}
-              // eslint-disable-next-line no-restricted-syntax -- 글로우·하이라이트 원값 보존(픽셀 불변). 토큰화는 티켓 glow-token-cleanup(#accent-glow-tokenize)
-              className="group inline-flex w-full items-center justify-center gap-3 rounded-full border border-white/20 bg-black/30 px-8 py-5 text-lg font-medium text-white backdrop-blur-sm transition-all duration-300 hover:border-white hover:bg-white hover:text-black hover:shadow-[0_0_30px_rgba(255,255,255,0.3)] sm:w-auto"
+              className="inline-flex w-full items-center justify-center gap-2.5 rounded-full bg-foreground/6 px-[34px] py-[18px] text-[19px] font-semibold text-foreground transition-colors duration-150 hover:bg-foreground/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-50 sm:w-auto"
             >
-              <Sparkles className="size-5 transition-transform duration-300 group-hover:scale-110" />
+              <Sparkles className="size-5" aria-hidden />
               {creating ? 'Creating...' : 'Get Started'}
             </button>
           </div>
@@ -479,11 +466,11 @@ export default function HomePage() {
           className="group absolute bottom-8 left-1/2 z-20 flex -translate-x-1/2 cursor-pointer flex-col items-center gap-3"
           onClick={scrollToProjects}
         >
-          <span className="text-xs font-bold uppercase tracking-[0.3em] text-gray-400 transition-colors duration-300 group-hover:text-black">
+          <span className="text-micro font-semibold uppercase tracking-[0.3em] text-subtle-foreground transition-colors duration-150 group-hover:text-muted-foreground">
             Scroll to explore
           </span>
-          <div className="rounded-full border border-white/10 bg-white/10 p-2 backdrop-blur-sm transition-colors group-hover:border-black/10 group-hover:bg-black/5">
-            <ChevronDown className="size-6 text-primary" />
+          <div className="rounded-full bg-foreground/6 p-2 transition-colors group-hover:bg-foreground/10">
+            <ChevronDown className="size-6 text-muted-foreground" />
           </div>
         </div>
       </section>
@@ -494,14 +481,14 @@ export default function HomePage() {
         className="mx-auto max-w-7xl px-6 pb-32 pt-10 md:px-12"
       >
         <div className="mb-24 text-center">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1 text-xs font-bold uppercase tracking-widest text-gray-600">
-            <Sparkles className="size-3 text-primary" />
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-card px-3 py-1 text-micro font-semibold uppercase tracking-widest text-muted-foreground">
+            <Sparkles className="size-3" />
             Platform Capabilities
           </div>
-          <h2 className="mb-8 text-5xl font-semibold tracking-tighter text-black md:text-6xl">
+          <h2 className="mb-8 text-5xl font-extrabold tracking-[-0.03em] text-foreground md:text-6xl">
             Our Services
           </h2>
-          <p className="mx-auto max-w-2xl text-lg font-light leading-relaxed text-gray-500 md:text-xl">
+          <p className="mx-auto max-w-2xl text-lg leading-relaxed text-muted-foreground md:text-xl">
             Tale Studio transforms the traditional filmmaking process into an
             efficient, secure, and limitless AI-powered experience.
           </p>
@@ -511,40 +498,39 @@ export default function HomePage() {
           {SERVICES.map((service) => (
             <div
               key={service.title}
-              // eslint-disable-next-line no-restricted-syntax -- 글로우·하이라이트 원값 보존(픽셀 불변). 토큰화는 티켓 glow-token-cleanup(#accent-glow-tokenize)
-              className="group relative aspect-[4/3] cursor-pointer overflow-hidden rounded-[2rem] bg-black shadow-sm transition-all duration-500 hover:shadow-[0_20px_40px_rgba(229,9,20,0.15)]"
+              // v3: 큰 내용 판(판 아래 그림자 하나만) — 빨간 빛 없앴다.
+              className="group relative aspect-[4/3] cursor-pointer overflow-hidden rounded-2xl bg-panel shadow-panel"
             >
               <img
                 src={service.image}
                 alt={service.title}
-                className="absolute inset-0 h-full w-full object-cover saturate-[1.2] transition-all duration-700 group-hover:scale-105"
+                className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105 motion-reduce:transition-none"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
-              <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent opacity-50" />
-              <div className="absolute inset-0 bg-primary/10 opacity-0 mix-blend-overlay transition-opacity duration-700 group-hover:opacity-100" />
+              {/* 글자가 읽히도록 사진 아래쪽을 랜딩 바탕색으로 덮는다. */}
+              <div className="absolute inset-0 bg-gradient-to-t from-landing via-landing/40 to-transparent" />
 
               {/* AI Active badge */}
-              <div className="absolute right-6 top-6 z-20 flex items-center gap-2 rounded-full border border-white/10 bg-black/60 px-3 py-1.5 opacity-0 backdrop-blur-md transition-all duration-500 group-hover:opacity-100">
-                <div className="size-2 animate-pulse rounded-full bg-primary" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-white">
+              <div className="absolute right-6 top-6 z-20 flex items-center gap-2 rounded-full bg-landing/80 px-3 py-1.5 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                <div className="size-2 rounded-full bg-pearl-vivid" />
+                <span className="text-tag font-semibold uppercase tracking-widest text-foreground">
                   AI Active
                 </span>
               </div>
 
               {/* Content */}
-              <div className="absolute inset-0 z-20 flex flex-col justify-end p-8 text-white md:p-10">
-                <div className="flex items-center gap-3 mb-4 text-primary">
-                  <div className="rounded-lg border border-primary/30 bg-primary/20 p-2 backdrop-blur-sm">
+              <div className="absolute inset-0 z-20 flex flex-col justify-end p-8 text-foreground md:p-10">
+                <div className="mb-4 flex items-center gap-3 text-foreground">
+                  <div className="rounded-lg bg-foreground/10 p-2">
                     {service.icon}
                   </div>
-                  <span className="text-xs font-bold uppercase tracking-widest">
+                  <span className="text-micro font-semibold uppercase tracking-widest">
                     Tale AI
                   </span>
                 </div>
-                <h3 className="mb-3 text-2xl font-bold tracking-tight text-white md:text-3xl">
+                <h3 className="mb-3 text-2xl font-bold tracking-tight text-foreground md:text-3xl">
                   {service.title}
                 </h3>
-                <p className="line-clamp-2 text-sm font-light leading-relaxed text-gray-200 md:text-base">
+                <p className="line-clamp-2 text-label leading-relaxed text-muted-foreground md:text-body">
                   {service.desc}
                 </p>
               </div>
@@ -554,23 +540,22 @@ export default function HomePage() {
       </section>
 
       {/* ── Projects ── */}
-      <section id="projects" className="bg-black px-6 py-24 md:px-12">
+      <section id="projects" className="bg-landing px-6 py-24 md:px-12">
         <div className="mx-auto max-w-7xl">
           <div className="mb-12 flex items-center justify-between">
             <div>
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold uppercase tracking-widest text-gray-400">
-                <Film className="size-3 text-primary" />
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-card px-3 py-1 text-micro font-semibold uppercase tracking-widest text-muted-foreground">
+                <Film className="size-3" />
                 Your Workspace
               </div>
-              <h2 className="text-4xl font-semibold tracking-tighter text-white md:text-5xl">
+              <h2 className="text-4xl font-extrabold tracking-[-0.03em] text-foreground md:text-5xl">
                 Projects
               </h2>
             </div>
             <button
               onClick={handleNew}
               disabled={creating}
-              // eslint-disable-next-line no-restricted-syntax -- 글로우·하이라이트 원값 보존(픽셀 불변). 토큰화는 티켓 glow-token-cleanup(#accent-glow-tokenize)
-              className="flex items-center gap-2 rounded-full bg-primary px-6 py-3 font-semibold text-primary-foreground transition-all duration-300 hover:bg-primary/90 hover:shadow-[0_0_30px_rgba(229,9,20,0.3)]"
+              className="flex items-center gap-2 rounded-full bg-primary px-6 py-3 font-semibold text-primary-foreground transition-colors duration-150 hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-50"
             >
               {creating ? (
                 <Loader2 className="size-4 animate-spin" />
@@ -583,16 +568,16 @@ export default function HomePage() {
 
           {loading ? (
             <div className="flex items-center justify-center py-20">
-              <Loader2 className="size-6 animate-spin text-gray-500" />
+              <Loader2 className="size-6 animate-spin text-subtle-foreground" />
             </div>
           ) : projects.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-[2rem] border border-dashed border-white/10 py-20">
-              <Film className="size-10 text-gray-600" />
-              <p className="mt-4 text-sm text-gray-500">No projects yet</p>
+            <div className="flex flex-col items-center justify-center rounded-2xl bg-panel py-20">
+              <Film className="size-10 text-subtle-foreground" />
+              <p className="mt-4 text-label text-muted-foreground">No projects yet</p>
               <button
                 onClick={handleNew}
                 disabled={creating}
-                className="mt-6 flex items-center gap-2 rounded-full border border-white/20 px-6 py-3 text-sm font-medium text-white transition-all hover:border-primary hover:text-primary"
+                className="mt-6 flex items-center gap-2 rounded-full bg-card px-6 py-3 text-label font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-50"
               >
                 <Plus className="size-4" />
                 Create your first project
@@ -645,7 +630,7 @@ export default function HomePage() {
           />
           <DialogFooter>
             <Button
-              variant="outline"
+              variant="ghost"
               disabled={creating}
               onClick={() => setNameOpen(false)}
             >
@@ -679,7 +664,7 @@ export default function HomePage() {
           ) : null}
           <DialogFooter>
             <Button
-              variant="outline"
+              variant="ghost"
               disabled={deleting}
               onClick={() => setDeleteTarget(null)}
             >
@@ -698,24 +683,21 @@ export default function HomePage() {
       </Dialog>
 
       {/* ── Footer ── */}
-      <footer className="bg-black px-6 pb-12 pt-24 text-white md:px-12">
+      <footer className="bg-landing px-6 pb-12 pt-24 text-foreground md:px-12">
         <div className="mx-auto mb-20 grid max-w-7xl grid-cols-1 gap-12 md:grid-cols-3 md:gap-8">
           <div className="col-span-1 md:col-span-2">
-            <div className="mb-6 flex items-center gap-2 text-white">
-              <Film className="size-8 text-primary" />
-              <span className="text-2xl font-medium tracking-tight">
-                Tale Studio
-              </span>
+            <div className="mb-6 flex items-center">
+              <TaleLockup size={32} />
             </div>
-            <p className="max-w-md font-light leading-relaxed text-gray-400">
+            <p className="max-w-md leading-relaxed text-muted-foreground">
               Pioneering the next era of cinematic storytelling through advanced
               artificial intelligence and human collaboration.
             </p>
           </div>
 
           <div>
-            <h4 className="mb-6 font-semibold text-gray-200">Studio</h4>
-            <ul className="space-y-4 font-light text-gray-400">
+            <h4 className="mb-6 font-semibold text-foreground">Studio</h4>
+            <ul className="space-y-4 text-muted-foreground">
               <li>
                 <ContactPopover />
               </li>
@@ -723,11 +705,11 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 border-t border-gray-800 pt-8">
-          <p className="text-sm font-light text-gray-500">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 border-t border-border-subtle pt-8">
+          <p className="text-label text-subtle-foreground">
             &copy; {new Date().getFullYear()} Tale Studio. All rights reserved.
           </p>
-          <div className="text-sm text-gray-500">
+          <div className="text-label text-subtle-foreground">
             <LegalFooter />
           </div>
         </div>
