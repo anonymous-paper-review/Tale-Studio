@@ -36,6 +36,20 @@ export function clipDisplayStatus(clip: Pick<VideoClip, 'url' | 'status'>, unpla
   return clip.url && unplayable.includes(clip.url) ? 'unplayable' : clip.status
 }
 
+/**
+ * 샷이 없을 때 Editor 가 보일 화면 — 읽는 중(큰 Lumi) · 읽기 실패([다시 시도]) · 샷 없음("이전 단계를 먼저 끝내세요").
+ *   프로젝트를 여는 중(아직 정해지지 않음, 프로젝트를 바꾸는 동안 포함)에는 샷 없음이 아니라 읽는 중이다(#pps-empty-states).
+ */
+export function editorEmptyScreen(input: {
+  loadStatus: 'idle' | 'loading' | 'error' | 'ready'
+  projectId: string | null
+  initLoading: boolean
+}): 'loading' | 'error' | 'empty' {
+  if (input.loadStatus === 'error') return 'error'
+  if (!input.projectId && input.initLoading) return 'loading'
+  return input.loadStatus === 'ready' ? 'empty' : 'loading'
+}
+
 export type PreviewPane = 'title' | 'video' | 'unplayable' | 'no-video' | 'empty'
 
 /** 미리 보기 판에 무엇을 그릴지 — 타이틀 카드 · 영상 · 그 컷만 "불러오지 못함" 안내 · 아직 영상 없음 · 빈 구간. */
