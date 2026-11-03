@@ -206,9 +206,10 @@ export async function renderDraftTimeline(opts: {
       .filter((u): u is string => !!u),
     ...audible.map((a) => a.url).filter((u) => /^https?:/i.test(u)),
   ]
+  // 취소하면 미리 받기도 바로 멈춘다(QA 2026-11-03 밤) — 받기가 다 끝날 때까지 "클립 준비 중"이 남았다.
   await prefetchVideos(opts.projectId, remoteUrls, (done, prefetchTotal) => {
     onPhase?.('prefetch', prefetchTotal > 0 ? done / prefetchTotal : 1)
-  })
+  }, { signal })
   if (signal?.aborted) throw abortError()
 
   const localUrl = (url: string): string => cachedVideoUrl(url) ?? url

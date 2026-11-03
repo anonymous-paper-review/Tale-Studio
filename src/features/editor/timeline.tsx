@@ -3,13 +3,13 @@
 import { useRef, useCallback, useMemo, useEffect, useState } from 'react'
 import { useEntityNames } from '@/lib/writer/use-entity-names'
 import { resolveEntityNames } from '@/lib/writer/resolve-entity-names'
-import { Trash2, Plus, Volume2, VolumeX, Scissors, Gauge, Type, Blend } from 'lucide-react'
+import { AlertCircle, Trash2, Plus, Volume2, VolumeX, Scissors, Gauge, Type, Blend } from 'lucide-react'
 import { DISSOLVE_CHOICES } from '@/lib/editor/transition'
 import type { ClipTransition } from '@/types'
 import type { Shot, VideoClip, AudioTrackClip, AudioSource } from '@/types'
 import { cn } from '@/lib/utils'
 import { ingestAudioFile, drawWaveform } from '@/lib/audio-waveform'
-import { PX_PER_SEC_MIN, PX_PER_SEC_MAX, isTitleCardShotId } from '@/stores/editor-store'
+import { PX_PER_SEC_MIN, PX_PER_SEC_MAX, isTitleCardShotId, useEditorStore } from '@/stores/editor-store'
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -421,6 +421,7 @@ export function Timeline({
 }: TimelineProps) {
   const entityNames = useEntityNames()
   const t = useT()
+  const unplayableUrls = useEditorStore((s) => s.unplayableVideoUrls)
   const trackRef = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const videoTrackRef = useRef<HTMLDivElement>(null)
@@ -928,6 +929,16 @@ export function Timeline({
                           {isTitleCardShotId(item.shotId) ? `${t('Title')} · ${item.durationSec.toFixed(1)}s` : shot.shotType}
                           {clip?.speed && clip.speed !== 1 && <span className="ml-1 text-stage">{clip.speed.toFixed(2)}×</span>}
                         </span>
+                        {/* 영상을 불러오지 못한 클립은 그 클립만 오른쪽 위에 "불러오지 못함"(QA 2026-11-03 밤). */}
+                        {clip?.url && unplayableUrls.includes(clip.url) ? (
+                          <span
+                            className="pointer-events-none absolute right-1.5 top-1.5 flex items-center gap-0.5 rounded-[5px] bg-chip px-[5px] py-px text-[9.5px] font-semibold text-destructive"
+                            data-testid="timeline-clip-unplayable"
+                          >
+                            <AlertCircle className="size-3 shrink-0" aria-hidden />
+                            {t('Could not load')}
+                          </span>
+                        ) : null}
                         {/* v3 ED1: 왼쪽 아래 길이("5초") */}
                         <span className="pointer-events-none absolute bottom-1.5 left-2 font-num text-[10.5px] font-medium text-subtle-foreground">
                           {t('{seconds}s', { seconds: Math.round(item.durationSec * 10) / 10 })}

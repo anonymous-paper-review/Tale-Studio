@@ -16,6 +16,11 @@ export interface PersistedEditor {
 const LS_PREFIX = 'tale:editor:v1:'
 const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
+// 저장해 둔 편집의 오디오 파일(IndexedDB)을 다시 잇기를 기다리는 한도(QA 2026-11-03 밤 "Editor에서 무한 로딩").
+//   저장소가 답하지 않거나(다른 탭이 잡고 있음) 고장 나면 그 파일 없이 나머지 편집을 연다 — 기다림이 끝나지 않으면
+//   그 뒤의 영상 길이 재기 · 첫 진입 오디오 놓기가 영영 안 됐다. 약속: tests/editor/saved-edit-load.test.ts
+export const AUDIO_BLOB_TIMEOUT_MS = 5_000
+
 export function saveEditorState(projectId: string, data: PersistedEditor): void {
   if (typeof window === 'undefined') return
 
@@ -46,20 +51,26 @@ export async function loadEditorState(projectId: string): Promise<PersistedEdito
     return null
   }
 
-  // Rehydrate stale object URLs from IndexedDB blobs
+  // Rehydrate stale object URLs from IndexedDB blobs — 저장소가 고장 나면 그 파일만 건너뛰고, 한도가 지나면 기다리지 않는다.
   const rehydrate = async (clip: AudioTrackClip | AudioSource) => {
     const key = (clip as { blobKey?: string }).blobKey
     if (!key) return
-    const url = await getAudioBlobURL(key)
+    const url = await getAudioBlobURL(key).catch(() => null)
     if (url) {
       (clip as { url: string }).url = url
     }
   }
 
-  await Promise.all([
-    ...parsed.audioClips.map(rehydrate),
-    ...parsed.audioSources.map(rehydrate),
-  ])
+  let timer: ReturnType<typeof setTimeout> | undefined
+  await Promise.race([
+    Promise.all([
+      ...(parsed.audioClips ?? []).map(rehydrate),
+      ...(parsed.audioSources ?? []).map(rehydrate),
+    ]),
+    new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, AUDIO_BLOB_TIMEOUT_MS)
+    }),
+  ]).finally(() => clearTimeout(timer))
 
   return parsed
 }

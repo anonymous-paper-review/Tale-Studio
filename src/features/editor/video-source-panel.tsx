@@ -20,7 +20,8 @@ import { thumbUrl } from '@/lib/image-url'
 import { ThumbImage } from '@/components/thumb-image'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
-import { clipStatusLabel } from '@/features/editor/editor-labels'
+import { clipDisplayStatus, clipStatusLabel } from '@/features/editor/editor-labels'
+import { useEditorStore } from '@/stores/editor-store'
 
 interface VideoSourcePanelProps {
   open: boolean
@@ -69,6 +70,7 @@ export function VideoSourcePanel({
 }: VideoSourcePanelProps) {
   const entityNames = useEntityNames()
   const t = useT()
+  const unplayable = useEditorStore((s) => s.unplayableVideoUrls)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
 
@@ -159,7 +161,11 @@ export function VideoSourcePanel({
                         <p className="mt-1.5 truncate px-0.5 text-[11px] leading-tight text-foreground">{resolveEntityNames(shot.actionDescription, entityNames)}</p>
                         <p className="mt-1 truncate px-0.5 text-[10px] font-medium text-subtle-foreground">
                           {t('{seconds}s', { seconds: shot.durationSeconds })}
-                          {clip && <span className={cn(clip.status === 'completed' && 'text-success', clip.status === 'failed' && 'text-destructive')}> · {t(clipStatusLabel(clip.status))}</span>}
+                          {clip && (() => {
+                            // 영상을 불러오지 못한 클립은 그 클립만 "불러오지 못함"(QA 2026-11-03 밤).
+                            const status = clipDisplayStatus(clip, unplayable)
+                            return <span className={cn(status === 'completed' && 'text-success', (status === 'failed' || status === 'unplayable') && 'text-destructive')}> · {t(clipStatusLabel(status))}</span>
+                          })()}
                         </p>
                       </div>
                     </ContextMenuTrigger>

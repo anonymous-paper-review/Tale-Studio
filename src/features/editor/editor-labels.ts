@@ -1,5 +1,6 @@
-// Editor 화면 글 — 화면 머리 숫자(v3 ED1 "컷 7 · 33초 · 영상 0/7", 2026-11-03)와 영상 상태 낱말.
-//   약속: tests/editor/header-meta.test.ts
+// Editor 화면 글 — 화면 머리 숫자(v3 ED1 "컷 7 · 33초 · 영상 0/7", 2026-11-03)와 영상 상태 낱말,
+//   그리고 영상을 못 불러온 클립의 표시 규칙(QA 2026-11-03 밤 "Editor에서 무한 로딩").
+//   약속: tests/editor/header-meta.test.ts · tests/editor/load-ends.test.ts
 import { isTitleCardShotId } from '@/stores/editor-store'
 import type { VideoClip } from '@/types'
 
@@ -18,10 +19,33 @@ export function editorHeaderMeta(
   return t('{cuts} cuts · {seconds}s · video {ready}/{total}', { cuts: layout.length, seconds, ready, total: needVideo.length })
 }
 
+/** 화면에 보이는 영상 상태 — 영상 주소가 있어도 불러오지 못했으면(404 · 막힘 · 끊김) 'unplayable'. */
+export type ClipDisplayStatus = VideoClip['status'] | 'unplayable'
+
 /** 영상 상태 낱말(사전 키) — 소스 카드가 영어 원문(pending · completed)을 보이던 자리. */
-export function clipStatusLabel(status: VideoClip['status']): string {
+export function clipStatusLabel(status: ClipDisplayStatus): string {
+  if (status === 'unplayable') return 'Could not load'
   if (status === 'completed') return 'Completed'
   if (status === 'generating') return 'Generating'
   if (status === 'failed') return 'Failed'
   return 'Waiting'
+}
+
+/** 그 클립의 화면 상태 — 불러오지 못한 영상 주소면 그 클립만 'unplayable', 나머지는 받은 상태 그대로. */
+export function clipDisplayStatus(clip: Pick<VideoClip, 'url' | 'status'>, unplayable: readonly string[]): ClipDisplayStatus {
+  return clip.url && unplayable.includes(clip.url) ? 'unplayable' : clip.status
+}
+
+export type PreviewPane = 'title' | 'video' | 'unplayable' | 'no-video' | 'empty'
+
+/** 미리 보기 판에 무엇을 그릴지 — 타이틀 카드 · 영상 · 그 컷만 "불러오지 못함" 안내 · 아직 영상 없음 · 빈 구간. */
+export function previewPane(input: {
+  isTitleCard: boolean
+  hasShot: boolean
+  clip: Pick<VideoClip, 'url'> | undefined
+  unplayable: readonly string[]
+}): PreviewPane {
+  if (input.isTitleCard) return 'title'
+  if (input.clip?.url) return input.unplayable.includes(input.clip.url) ? 'unplayable' : 'video'
+  return input.hasShot ? 'no-video' : 'empty'
 }

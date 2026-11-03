@@ -302,7 +302,11 @@ export default function PostPage() {
                   }
                   resolve()
                 }
-                v.onerror = () => resolve()
+                // 영상을 불러오지 못하면(404 · 막힘) 그 클립만 "불러오지 못함"으로 남긴다 — 나머지는 그대로 연다.
+                v.onerror = () => {
+                  if (!cancelled) useEditorStore.getState().markVideoUnplayable(c.url as string)
+                  resolve()
+                }
                 v.src = c.url as string
               }),
           ),
@@ -352,6 +356,18 @@ export default function PostPage() {
       cancelled = true
     }
   }, [projectId, loadData, loadPersisted, t, retryTick])
+
+  // 이 화면이 열린 동안 편집 상태가 비워지면(프로젝트를 여는 길의 늦은 비우기, QA 2026-11-03 밤) '다시 시도'처럼 처음부터 다시 읽는다 —
+  //   읽던 결과는 비우기 때 버려지므로, 다시 읽지 않으면 기다림 화면이 끝나지 않았다. 비우기 한 번에 다시 읽기 한 번.
+  //   약속: tests/editor/load-ends.test.ts
+  useEffect(() => {
+    let seen = useEditorStore.getState().resetCount
+    return useEditorStore.subscribe((s) => {
+      if (s.resetCount === seen) return
+      seen = s.resetCount
+      setRetryTick((n) => n + 1)
+    })
+  }, [])
 
   // Editor 진입 시 채팅 기본 접힘 (요청 6b). 떠날 때 이전 상태 복원 — Director 와 같은 약속(닫아 둔 모습은 기억에 남기지 않는다).
   useHoldChatClosed('editor')
