@@ -92,6 +92,8 @@ interface EntryData {
 
 interface EntryActions {
   load: (projectId: string) => Promise<void>
+  /** 미리 받기(스튜디오 워밍) — 지금 화면 상태는 그대로, 시작한 프로젝트면 다시 열 때 바로 보일 완료 화면만 받아 둔다. */
+  prefetch: (projectId: string) => Promise<void>
   setIdea: (text: string) => void
   flushIdea: () => Promise<void>
   formNext: () => Promise<NextResult>
@@ -169,6 +171,20 @@ let readTicker: ReturnType<typeof setInterval> | null = null
  */
 type StartedView = Pick<EntryData, 'draft' | 'title' | 'locale' | 'stage' | 'format' | 'series' | 'writer' | 'writerStart'>
 let startedView: { projectId: string; view: StartedView } | null = null
+
+/** GET /api/produce/entry 답 → 시작 화면이 보이는 값. */
+function viewFrom(body: Record<string, unknown>): StartedView {
+  return {
+    draft: normalizeEntryDraft(body.draft),
+    title: typeof body.title === 'string' ? body.title : 'Untitled',
+    locale: parseAppLocale(body.locale) ?? useLocaleStore.getState().locale,
+    stage: typeof body.stage === 'string' ? body.stage : null,
+    format: parseProjectFormat(body.format),
+    series: parseEntrySeries(body.series),
+    writer: parseWriter(body.writer),
+    writerStart: body.writerStart && typeof body.writerStart === 'object' ? (body.writerStart as EntryWriterStartBody) : null,
+  }
+}
 
 function enqueue<T>(task: () => Promise<T>): Promise<T> {
   const run = saveQueue.then(task, task)
@@ -379,18 +395,8 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
         }
         const body = (await readJson(res)) ?? {}
         if (gen !== generation) return
-        const draft = normalizeEntryDraft(body.draft)
-        const writer = parseWriter(body.writer)
-        const view: StartedView = {
-          draft,
-          title: typeof body.title === 'string' ? body.title : 'Untitled',
-          locale: parseAppLocale(body.locale) ?? useLocaleStore.getState().locale,
-          stage: typeof body.stage === 'string' ? body.stage : null,
-          format: parseProjectFormat(body.format),
-          series: parseEntrySeries(body.series),
-          writer,
-          writerStart: body.writerStart && typeof body.writerStart === 'object' ? (body.writerStart as EntryWriterStartBody) : null,
-        }
+        const view = viewFrom(body)
+        const { draft, writer } = view
         set({ status: 'ready', ...view, formStep: recIsCurrent(draft) ? 2 : 1 })
         startedView = entryStarted(view) ? { projectId, view } : startedView?.projectId === projectId ? null : startedView
         // 새로 고침해도 쓰는 중인 산문 초안을 놓치지 않는다. 확정 뒤의 Writer 작업(초안 아님)은 시작 화면이 잠그지 않는다.
@@ -401,6 +407,19 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
       } catch {
         // 연결이 잠깐 끊긴 것이면 받아 둔 완료 화면을 그대로 둔다.
         if (gen === generation && !kept) set({ status: 'error' })
+      }
+    },
+
+    prefetch: async (projectId) => {
+      if (startedView?.projectId === projectId) return
+      try {
+        const res = await fetch(`/api/produce/entry?projectId=${encodeURIComponent(projectId)}`)
+        if (!res.ok) return
+        const view = viewFrom((await readJson(res)) ?? {})
+        // 시작한(읽기만 하는) 프로젝트만 받아 둔다 — 시작 전 화면은 늘 새로 받은 초안으로 연다.
+        if (entryStarted(view)) startedView = { projectId, view }
+      } catch {
+        // 미리 받기는 실패해도 된다 — 화면을 열 때 다시 받는다.
       }
     },
 
