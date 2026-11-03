@@ -45,6 +45,7 @@ import { TopBarActions } from '@/components/layout/studio-top-bar'
 import { useHoldChatClosed } from '@/hooks/use-hold-chat-closed'
 import { LumiChatPill } from '@/features/director/lumi-chat-pill'
 import { HIDDEN_ON_CANVAS, directorCanvasMeta } from '@/features/director/canvas-meta'
+import { separateAssetCards } from '@/features/director/asset-column'
 
 import { handoffFrom } from '@/lib/handoff-intent'
 import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
@@ -691,7 +692,11 @@ function CanvasInner() {
   const hiddenNodeIds = new Set(
     nodes.filter((n) => HIDDEN_ON_CANVAS.has(n.data.kind)).map((n) => n.id),
   )
-  const visibleNodes = nodes.filter((n) => !hiddenNodeIds.has(n.id))
+  // 오너 QA 2026-11-03 3번: 인물 · 배경 카드가 위아래로 겹치면 그릴 때만 아래로 내린다(저장된 자리는 그대로).
+  const visibleNodes = useMemo(
+    () => separateAssetCards(nodes.filter((n) => !HIDDEN_ON_CANVAS.has(n.data.kind))),
+    [nodes],
+  )
   const visibleEdges = edges.filter(
     (e) => !hiddenNodeIds.has(e.source) && !hiddenNodeIds.has(e.target),
   )
