@@ -29,12 +29,12 @@ class Sheet {
   readonly width: number
   readonly height: number
   readonly data: Uint8Array
-  constructor() {
+  constructor(paper: RGB = PAPER) {
     const spec = sheetSpecOf('grid4', FMT)!
     this.width = spec.canvas.width
     this.height = spec.canvas.height
     this.data = new Uint8Array(this.width * this.height * 3)
-    this.fill(0, 0, this.width, this.height, PAPER)
+    this.fill(0, 0, this.width, this.height, paper)
   }
   fill(x0: number, y0: number, x1: number, y1: number, c: RGB): void {
     for (let y = Math.max(0, y0); y < Math.min(this.height, y1); y++)
@@ -68,8 +68,8 @@ const BASES: RGB[][] = [
   [[120, 120, 130], [130, 110, 100], [100, 130, 120]],
 ]
 /** 스펙 칸 자리 그대로 그린 시트(띠 없음). 칸 (s, f) 를 바꾸려면 override 가 [x0, y0, x1, y1] 을 돌려준다. */
-async function sheetWith(override: (s: number, f: number, box: [number, number, number, number]) => [number, number, number, number] = (_s, _f, b) => b, extra?: (sheet: Sheet) => void): Promise<Buffer> {
-  const sheet = new Sheet()
+async function sheetWith(override: (s: number, f: number, box: [number, number, number, number]) => [number, number, number, number] = (_s, _f, b) => b, extra?: (sheet: Sheet) => void, paper: RGB = PAPER): Promise<Buffer> {
+  const sheet = new Sheet(paper)
   for (let s = 0; s < 4; s++)
     for (let f = 0; f < 3; f++) {
       const [x0, x1] = SPEC.colBoxes[s]
@@ -207,6 +207,62 @@ describe('실사 시트 칸 자르기 — 시트 여백 띠를 잘라 낸다 (#r
     const bed = await sharp(shots[3].end).removeAlpha().raw().toBuffer()
     expect(wall.equals(await plainCut(sheet, 3, 0)), '흰 벽 칸은 지금 자르기와 같아야 한다').toBe(true)
     expect(bed.equals(await plainCut(sheet, 3, 2)), '흰 침구 칸은 지금 자르기와 같아야 한다').toBe(true)
+  }, 30_000)
+
+  it('칸 가장자리의 매끈한 흰 벽 · 날아간 하늘 · 눈밭은 곧은 선이 붙어 있어도 깎지 않는다', async () => {
+    // 왜: 걸레받이 · 지붕선 · 울타리 가로대가 붙은 고른 흰 면은 시트 여백과 생김새가 같다 — 시트 종이색과 아주 가깝지 않으면 그림으로 보고 그대로 둔다(검토 지적, 첫 판은 23~27줄을 깎아 칸이 11% 커졌다).
+    const sheet = await sheetWith(undefined, (sh) => {
+      const wall = windowOf(0, 0)
+      const wb = wall.top + wall.height
+      sh.fill(wall.left - 20, wb - 22, wall.left + wall.width + 20, wb - 20, [35, 32, 30]) // 걸레받이
+      sh.noise(wall.left - 20, wb - 20, wall.left + wall.width + 20, wb + 12, [244, 244, 242], 1, 11) // 매끈한 흰 벽 20줄
+      const sky = windowOf(1, 0)
+      sh.noise(sky.left - 20, sky.top - 12, sky.left + sky.width + 20, sky.top + 24, [252, 252, 252], 0, 12) // 날아간 하늘 24줄
+      sh.fill(sky.left - 20, sky.top + 24, sky.left + sky.width + 20, sky.top + 26, [40, 36, 34]) // 곧은 지붕선
+      const snow = windowOf(2, 2)
+      const sb = snow.top + snow.height
+      sh.fill(snow.left - 20, sb - 26, snow.left + snow.width + 20, sb - 24, [52, 44, 38]) // 울타리 가로대
+      sh.noise(snow.left - 20, sb - 24, snow.left + snow.width + 20, sb + 12, [244, 247, 251], 1, 13) // 푸른빛 눈밭
+    })
+    const shots = await cropRoughGridFrames(sheet, 'grid4', 3, FMT, 'repaint')
+    for (const [s, f, frame] of [[0, 0, shots[0].start], [1, 0, shots[1].start], [2, 2, shots[2].end]] as const) {
+      const got = await sharp(frame).removeAlpha().raw().toBuffer()
+      expect(got.equals(await plainCut(sheet, s, f)), `샷 ${s} 칸 ${f} 은 지금 자르기와 같아야 한다`).toBe(true)
+    }
+  }, 30_000)
+
+  it('시트 종이색이 흔한 크림색과 달라도 그 시트의 칸 사이 여백 색으로 띠를 알아본다', async () => {
+    // 왜: 시트마다 종이색이 다르다(운영 시트 10장 247~253) — 정해 둔 한 색과 견주면 어두운 종이의 띠는 놓치고 흰 그림은 띠로 본다.
+    const greyPaper: RGB = [238, 236, 232]
+    const sheet = await sheetWith(shortStart(0), undefined, greyPaper)
+    const [shot] = await cropRoughGridFrames(sheet, 'grid4', 1, FMT, 'repaint')
+    const after = await frameOf(shot.start)
+    let paperRows = 0
+    for (let i = 0; i < 30; i++) {
+      const { rgb, std } = lineAt(after, 'bottom', i)
+      if (near(rgb, greyPaper, 6) && std <= 4) paperRows++
+    }
+    expect(paperRows, '잘라 낸 칸 아래 30줄 안의 종이색 줄 수').toBe(0)
+  }, 30_000)
+
+  it('칸 사이 여백에서 종이색을 잴 수 없으면 깎지 않는다', async () => {
+    // 왜: 모델이 시트를 여백 없이 꽉 채워 그리면 무엇이 종이인지 모른다 — 모를 때는 지금 자르기 그대로 둔다.
+    const sheet = await sheetWith(shortStart(0), (sh) => {
+      // 시트 바깥 여백 · 칸 사이를 모두 거친 무늬로 덮고 칸 자리만 되살린다 — 시작 칸 아래 짧아진 자리의 종이색 줄은 남는다.
+      const saved = sh.data.slice()
+      sh.noise(0, 0, sh.width, sh.height, [120, 116, 110], 30, 21)
+      for (let s = 0; s < 4; s++)
+        for (let f = 0; f < 3; f++) {
+          const w = windowOf(s, f)
+          for (let y = w.top - 14; y < w.top + w.height + 14; y++) {
+            const from = (y * sh.width + w.left - 23) * 3
+            sh.data.set(saved.subarray(from, from + (w.width + 46) * 3), from)
+          }
+        }
+    })
+    const [shot] = await cropRoughGridFrames(sheet, 'grid4', 1, FMT, 'repaint')
+    const got = await sharp(shot.start).removeAlpha().raw().toBuffer()
+    expect(got.equals(await plainCut(sheet, 0, 0))).toBe(true)
   }, 30_000)
 
   it('종이색이 정해 둔 상한보다 안쪽까지 이어지면 그림으로 보고 깎지 않는다', async () => {

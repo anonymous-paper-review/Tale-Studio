@@ -26,7 +26,7 @@
 //   불통과(밝은 콘텐츠 밴드로 인한 가짜 분할, 거터 소실 병합 등) 시 v4 앵커 스캔으로 폴백.
 import sharp from 'sharp'
 import { sheetGeometry, sheetSpecOf, type RoughGridVariant } from '@/lib/writer/rough-storyboard-grid'
-import { aspectFitBox, hasTrim, repaintMarginTrim, unionTrim } from '@/lib/writer/repaint-margin'
+import { aspectFitBox, hasTrim, measureSheetPaper, paperSampleLines, repaintMarginTrim, unionTrim } from '@/lib/writer/repaint-margin'
 import type { ProjectFormat } from '@/types/project'
 
 export interface RoughGridFrames {
@@ -281,10 +281,12 @@ export async function cropRoughGridFrames(
       const insetX = Math.max(2, Math.round((cols[0][1] - cols[0][0]) * W * REPAINT_INSET_FRAC))
       const insetY = Math.max(2, Math.round((rows[0][1] - rows[0][0]) * H * REPAINT_INSET_FRAC))
       // #repaint-margin(2026-11-03, 운영 3945d1e6 88샷 중 25샷): 모델이 칸을 스펙 자리보다 짧게 · 옆으로 밀어 그리면 이 고정 자리가
-      //   시트 여백(종이색 띠)과 칸 테두리까지 물어 영상 시작 · 끝 그림에 흰 띠가 남는다. 칸마다 띠를 재고, 띠를 뺀 안쪽에서 같은
-      //   비율로 잘라 원래 크기로 되돌린다. 띠가 없으면 종전 그대로.
+      //   시트 여백(종이색 띠)과 칸 테두리까지 물어 영상 시작 · 끝 그림에 흰 띠가 남는다. 종이색은 이 시트의 칸 사이 여백에서 재고,
+      //   칸마다 띠를 재 띠를 뺀 안쪽에서 같은 비율로 잘라 원래 크기로 되돌린다. 띠가 없거나 종이색을 못 재면 종전 그대로.
       const sheet = await sharp(grid).removeAlpha().raw().toBuffer({ resolveWithObject: true })
       const raw = { data: sheet.data, width: sheet.info.width, height: sheet.info.height, channels: sheet.info.channels }
+      const paper = measureSheetPaper(raw, paperSampleLines(cols, rows, W, H))
+      const noTrim = { top: 0, bottom: 0, left: 0, right: 0 }
       const out: RoughGridFrames[] = []
       for (let s = 0; s < shotCount; s++) {
         const rects = [0, 1, 2].map((f) => {
@@ -296,7 +298,7 @@ export async function cropRoughGridFrames(
           const height = Math.min(Math.max(8, Math.round((cy[1] - cy[0]) * H) - insetY * 2), H - top)
           return { left, top, width, height }
         })
-        const own = rects.map((rect) => repaintMarginTrim(raw, rect))
+        const own = rects.map((rect) => (paper ? repaintMarginTrim(raw, rect, paper) : noTrim))
         // 시작 · 끝은 영상에 한 쌍으로 넘어간다 — 둘 중 하나에 띠가 있으면 세 칸을 같은 자리에서 자른다(배율이 다르면 멈춘 카메라가
         //   밀려 보이고 세 장 돌려 보기가 흔들린다). 가운데(방향) 칸에만 띠가 있으면 그 칸만 자른다 — 멀쩡한 영상용 칸은 그대로 둔다.
         const shared = unionTrim(own)
