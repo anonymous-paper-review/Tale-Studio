@@ -19,7 +19,8 @@ export function WriterTabs() {
   // Alt+←/→ 로 러프 스토리보드 ↔ 대사 순환(#keyboard-only)
   useAltArrowCycle(order, activeTab, setActiveTab)
 
-  // artist 탭(Characters/World/Inventory)과 동일한 기본 TabsList 스타일(#c1 2026-07-13).
+  // v3(2026-11-03, 시안 S1 "러프 | 대본"): 칩처럼 떨어진 알약 탭 — 고른 탭은 지금 단계 색 테두리 · 18% 바탕.
+  //   탭 이름은 그대로 둔다(tests/writer/tabs.test.ts 가 글을 못 박았다 — 시안의 "러프 | 대본"은 결정 대기).
   //   AltArrowHint: Alt 홀드 중 좌우 ←/→ 칩 — 이 묶음이 Alt+화살표로 넘어감을 알린다.
   return (
     <AltArrowHint>
@@ -28,7 +29,7 @@ export function WriterTabs() {
         onValueChange={(value) => setActiveTab(value as WriterTab)}
         className="w-fit shrink-0"
       >
-        <TabsList>
+        <TabsList variant="pill">
           {v2Available ? <TabsTrigger value="v2">{t('V2 units')}</TabsTrigger> : null}
           <TabsTrigger value="storyboard">{t('Rough storyboard')}</TabsTrigger>
           <TabsTrigger value="dialogue">{t('Dialogue')}</TabsTrigger>

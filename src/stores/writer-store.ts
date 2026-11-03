@@ -15,6 +15,7 @@ import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { classifyDialoguePatch } from '@/lib/writer-chat-updates'
 import { resolveChatShotRef, type ChatShotRef } from '@/lib/writer/chat-id-resolve'
 import { boardShotLabels } from '@/lib/writer/board-summary'
+import { shotStageDesign } from '@/lib/writer/board-card'
 import { activeJobsSnapshot, activeShotIds } from '@/lib/generation-queue'
 import { useProjectStore } from '@/stores/project-store'
 import { invalidateShots, loadShotsResult } from '@/lib/shots-cache'
@@ -1081,6 +1082,8 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         roughStoryboard: (s.rough_storyboard as RoughStoryboardImage | null) ?? null,
         // 목각 previz 영상 (director storyboard 뷰, #previz-video)
         previzVideo: (s.previz_video as RoughStoryboardImage | null) ?? null,
+        // 러프가 따르는 무대 설계(카드 칩, v3 2026-11-03) — 읽기만 한다. 직접 더한 샷 · 옛 프로젝트는 null.
+        stageDesign: shotStageDesign(s.static_spec, s.dynamic_spec),
       }))
 
       set({

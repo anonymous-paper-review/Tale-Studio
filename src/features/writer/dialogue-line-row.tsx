@@ -63,7 +63,7 @@ export function DialogueLineRow({
   const t = useT()
   const textId = useId()
   const speakerLabel = (
-    <span className={cn('mr-2 font-mono text-[11px] font-semibold uppercase tracking-wide', speakerClassName)}>{speaker}</span>
+    <span className={cn('mr-2 font-num text-micro font-semibold uppercase tracking-wide', speakerClassName)}>{speaker}</span>
   )
   const quoted = (value: string) => (
     <span id={textId} className={cn('text-[15px] leading-7 text-foreground', focused && 'font-medium')}>
@@ -103,7 +103,7 @@ export function DialogueLineRow({
             className="min-h-0 flex-1 resize-none px-2 py-1 text-[15px] leading-7 md:text-[15px]"
           />
         </div>
-        <span className="pl-1 text-[11px] text-muted-foreground">{t('Enter to save · Esc to cancel')}</span>
+        <span className="pl-1 text-micro text-subtle-foreground">{t('Enter to save · Esc to cancel')}</span>
       </div>
     )
   }
@@ -126,12 +126,12 @@ export function DialogueLineRow({
           {speakerLabel}
           {quoted(state.draft)}
         </span>
-        <p role="alert" className="flex items-center gap-1.5 text-xs text-destructive">
+        <p role="alert" className="flex items-center gap-1.5 text-caption text-destructive">
           <AlertCircle className="size-3.5 shrink-0" aria-hidden />
           {t('Could not save the line. Save it again or undo the change.')}
         </p>
         <div className="flex gap-2">
-          <Button size="xs" variant="outline" onClick={onRetry}>
+          <Button size="xs" variant="secondary" className="rounded-full" onClick={onRetry}>
             {t('Save again')}
           </Button>
           <Button size="xs" variant="ghost" onClick={onRevert}>
@@ -166,7 +166,7 @@ export function DialogueLineRow({
     >
       {speakerLabel}
       {quoted(text)}
-      {delivery ? <span className="ml-2 text-[11px] text-foreground/70">({delivery})</span> : null}
+      {delivery ? <span className="ml-2 text-caption text-subtle-foreground">({delivery})</span> : null}
       {disabled ? null : (
         <Pencil
           className="ml-1.5 inline size-3.5 align-[-2px] text-muted-foreground opacity-0 transition-opacity group-hover/line:opacity-60 group-focus-visible/line:opacity-60"

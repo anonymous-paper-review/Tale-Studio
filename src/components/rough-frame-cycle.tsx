@@ -37,6 +37,8 @@ export function frameClickAction({ frameCount, pauseOnClick }: { frameCount: num
 
 // 3프레임 순환 라벨 — START → DIRECTING(연출 화살표/지시) → END (2026-07-22 라벨 영문 통일).
 const FRAME_LABELS = ['START', 'DIRECTING', 'END'] as const
+// 지금 보이는 장 이름표(frameTag, v3 시안 S1 "시작 · 연출" 꼬리표 2026-11-03) — 화면 언어로 번역한다.
+const FRAME_TAG_KEYS = ['Start', 'Directing', 'End'] as const
 // 순환 간격 — 1200ms 원복(2026-08-06 요청. 1000ms 상향분이 두 화면 모두 너무 빨랐다).
 //   writer 러프 보드와 director Previz 가 같은 컴포넌트를 쓰므로 두 화면이 함께 느려진다.
 const FRAME_CYCLE_MS = 1200
@@ -52,6 +54,7 @@ export function RoughFrameCycle({
   fit = 'cover',
   sizeToImage = false,
   pauseOnClick = true,
+  frameTag = false,
 }: {
   panel: Pick<RoughStoryboardImage, 'url' | 'generatedAt' | 'frames'>
   alt: string
@@ -69,6 +72,8 @@ export function RoughFrameCycle({
   /** 그림 누르기 = 순환 멈춤(기본, Director 그리드 · 노드). false 면 누르기를 카드로 넘긴다 — Storyboard 보드는
    *  카드를 누르면 언제나 고치기 팝업이다(프로토타입 S1, 2026-10-31 "수정 기능이 죽어 있다" 피드백). */
   pauseOnClick?: boolean
+  /** 지금 보이는 장의 이름표(시작 · 연출 · 끝)를 오른쪽 아래에 붙인다 — Storyboard 보드(v3, 2026-11-03). 기본은 붙이지 않는다(Director). */
+  frameTag?: boolean
 }) {
   const t = useT()
   const urls = cycleFrameUrls(panel)
@@ -193,10 +198,17 @@ export function RoughFrameCycle({
               )}
             />
           ))}
-          <span className="ml-0.5 font-mono text-[9px] tabular-nums text-muted-foreground">
-            {FRAME_LABELS[current]}
-          </span>
+          {frameTag ? null : (
+            <span className="ml-0.5 font-mono text-[9px] tabular-nums text-muted-foreground">
+              {FRAME_LABELS[current]}
+            </span>
+          )}
         </div>
+      ) : null}
+      {frameTag && multi ? (
+        <span className="pointer-events-none absolute bottom-1.5 right-1.5 rounded-[6px] bg-black/45 px-1.5 py-px text-micro font-semibold text-foreground">
+          {t(FRAME_TAG_KEYS[current])}
+        </span>
       ) : null}
     </div>
   )
