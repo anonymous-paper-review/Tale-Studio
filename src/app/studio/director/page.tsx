@@ -7,22 +7,25 @@ import {
   ReactFlow,
   ReactFlowProvider,
   Background,
-  Controls,
   MiniMap,
+  Panel,
   ConnectionMode,
   PanOnScrollMode,
   applyNodeChanges,
   applyEdgeChanges,
   useReactFlow,
   useNodesInitialized,
+  useStore,
+  useStoreApi,
   type NodeChange,
   type EdgeChange,
   type Connection,
   type OnConnectStart,
   type OnConnectEnd,
+  type ReactFlowState,
 } from '@xyflow/react'
 import { Loader2,
-  Square, ImageIcon, ChevronDown, ChevronUp, LayoutGrid, Boxes, Map as MapIcon, Lock, Unlock, Type } from 'lucide-react'
+  Square, ChevronDown, ChevronUp, LayoutGrid, Boxes, Lock, Unlock, Plus, Minus, Maximize2, Play, RefreshCw } from 'lucide-react'
 
 import { toast } from 'sonner'
 import { runRealBatch } from '@/lib/director/real-batch-client'
@@ -38,6 +41,10 @@ import { useAltArrowCycle } from '@/lib/use-alt-arrow-cycle'
 import { AltArrowHint } from '@/components/alt-arrow-hint'
 import { StageHelpBadge } from '@/components/stage-help-badge'
 import { NextStepButton } from '@/components/handoff/next-step-button'
+import { TopBarActions } from '@/components/layout/studio-top-bar'
+import { useHoldChatClosed } from '@/hooks/use-hold-chat-closed'
+import { LumiChatPill } from '@/features/director/lumi-chat-pill'
+import { HIDDEN_ON_CANVAS, directorCanvasMeta } from '@/features/director/canvas-meta'
 
 import { handoffFrom } from '@/lib/handoff-intent'
 import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
@@ -169,11 +176,10 @@ function MiniMapPanel() {
   return (
     <div
       className={cn(
-        'absolute z-10 overflow-hidden rounded-lg border bg-card/50 transition-opacity',
+        // v3 D1 미니맵(2026-11-03): 작업 바탕색 판 · 모서리 14 · 그림자 하나.
+        'absolute z-10 overflow-hidden rounded-[14px] bg-background shadow-node transition-opacity',
         // 접힘: 헤더 바만 남기고 아주 투명하게(hover 시 또렷해져 다시 펼치기 유도).
-        collapsed
-          ? 'border-border/40 opacity-35 hover:opacity-100'
-          : 'border-border opacity-100',
+        collapsed ? 'opacity-35 hover:opacity-100' : 'opacity-100',
       )}
       style={{ right: pos.right, bottom: pos.bottom }}
     >
@@ -189,22 +195,18 @@ function MiniMapPanel() {
       <div
         onPointerDown={onHeaderPointerDown}
         className={cn(
-          'flex h-6 items-center justify-between gap-2 px-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground',
-          !collapsed && 'border-b border-border/60',
+          'flex h-8 items-center justify-between gap-2 px-3 text-[11px] font-medium text-subtle-foreground',
           locked ? 'cursor-default' : 'cursor-grab active:cursor-grabbing',
         )}
       >
-        <span className="flex items-center gap-1">
-          <MapIcon className="size-3" />
-          {t('Minimap')}
-        </span>
+        <span>{t('Minimap')}</span>
         <div className="flex items-center gap-0.5">
           {!collapsed && (
             <button
               type="button"
               onClick={() => setLocked((v) => !v)}
               title={locked ? t('Unlock position') : t('Lock position')}
-              className="rounded p-0.5 hover:bg-accent hover:text-foreground hover-red-beam"
+              className="rounded-md p-1 transition-colors hover:bg-accent hover:text-foreground"
             >
               {locked ? <Lock className="size-3" /> : <Unlock className="size-3" />}
             </button>
@@ -213,7 +215,7 @@ function MiniMapPanel() {
             type="button"
             onClick={() => setCollapsed((v) => !v)}
             title={collapsed ? t('Expand minimap') : t('Collapse minimap')}
-            className="rounded p-0.5 hover:bg-accent hover:text-foreground hover-red-beam"
+            className="rounded-md p-1 transition-colors hover:bg-accent hover:text-foreground"
           >
             {collapsed ? (
               <ChevronUp className="size-3" />
@@ -224,15 +226,69 @@ function MiniMapPanel() {
         </div>
       </div>
       {!collapsed && (
-        <div style={{ width: size.w, height: size.h }}>
+        <div className="px-2 pb-2" style={{ width: size.w, height: size.h }}>
+          {/* 노드는 흰 35%, 고른 노드는 지금 단계 색, 보이는 자리는 흰 30% 테두리(D1). 색은 globals.css v3p2-set 토큰. */}
           <MiniMap
             className="!static !m-0 !h-full !w-full !bg-transparent"
+            bgColor="transparent"
+            nodeColor={(node) => (node.selected ? 'var(--stage)' : 'var(--minimap-node)')}
+            nodeBorderRadius={3}
+            maskColor="var(--minimap-mask)"
+            maskStrokeColor="var(--minimap-viewport)"
+            maskStrokeWidth={1}
             pannable
             zoomable
           />
         </div>
       )}
     </div>
+  )
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// 확대 · 축소 알약(v3 D1 "− 100% + ⤢", 2026-11-03) — xyflow 기본 세로 단추 묶음을 대신한다.
+//   기본 묶음에 있던 편집 잠금(노드 끌기 · 잇기 · 고르기 끄기)도 그대로 둔다(시안에는 없다).
+const zoomPillSelector = (s: ReactFlowState) => ({
+  zoom: s.transform[2],
+  minReached: s.transform[2] <= s.minZoom,
+  maxReached: s.transform[2] >= s.maxZoom,
+  interactive: s.nodesDraggable || s.nodesConnectable || s.elementsSelectable,
+})
+
+function CanvasZoomPill() {
+  const t = useT()
+  const store = useStoreApi()
+  const { zoom, minReached, maxReached, interactive } = useStore(zoomPillSelector, (a, b) =>
+    a.zoom === b.zoom && a.minReached === b.minReached && a.maxReached === b.maxReached && a.interactive === b.interactive,
+  )
+  const { zoomIn, zoomOut, fitView } = useReactFlow()
+  const button =
+    'flex size-7 items-center justify-center rounded-full text-muted-foreground transition-colors duration-100 hover:bg-card hover:text-foreground disabled:pointer-events-none disabled:opacity-40'
+  return (
+    <Panel position="bottom-left" className="!m-4">
+      <div className="flex h-[37px] items-center gap-0.5 rounded-full bg-background px-1.5 shadow-node" role="group" aria-label={t('Canvas zoom')}>
+        <button type="button" className={button} onClick={() => void zoomOut()} disabled={minReached} title={t('Zoom out canvas')} aria-label={t('Zoom out canvas')}>
+          <Minus className="size-3.5" />
+        </button>
+        <span className="min-w-11 text-center font-num text-meta font-medium tabular-nums text-muted-foreground">{Math.round(zoom * 100)}%</span>
+        <button type="button" className={button} onClick={() => void zoomIn()} disabled={maxReached} title={t('Zoom in canvas')} aria-label={t('Zoom in canvas')}>
+          <Plus className="size-3.5" />
+        </button>
+        <button type="button" className={button} onClick={() => void fitView()} title={t('Fit the canvas to the screen')} aria-label={t('Fit the canvas to the screen')}>
+          <Maximize2 className="size-3.5" />
+        </button>
+        <button
+          type="button"
+          className={button}
+          onClick={() => store.setState({ nodesDraggable: !interactive, nodesConnectable: !interactive, elementsSelectable: !interactive })}
+          title={interactive ? t('Lock canvas editing') : t('Unlock canvas editing')}
+          aria-label={interactive ? t('Lock canvas editing') : t('Unlock canvas editing')}
+          aria-pressed={!interactive}
+        >
+          {interactive ? <Unlock className="size-3.5" /> : <Lock className="size-3.5" />}
+        </button>
+      </div>
+    </Panel>
   )
 }
 
@@ -633,14 +689,7 @@ function CanvasInner() {
   // #scene-hide: 씬 노드와 씬 관련 엣지는 캔버스에 안 그린다 (데이터는 유지 —
   //   Writer 동기화·스토리보드 뷰·챗 명령이 계속 쓴다). 구 persist의 파생 카드 쟔재도 함께 거른다.
   const hiddenNodeIds = new Set(
-    nodes
-      .filter(
-        (n) =>
-          n.data.kind === 'scene' ||
-          n.data.kind === 'shotImage' ||
-          n.data.kind === 'videoPlaceholder',
-      )
-      .map((n) => n.id),
+    nodes.filter((n) => HIDDEN_ON_CANVAS.has(n.data.kind)).map((n) => n.id),
   )
   const visibleNodes = nodes.filter((n) => !hiddenNodeIds.has(n.id))
   const visibleEdges = edges.filter(
@@ -731,18 +780,19 @@ function CanvasInner() {
         // 큰 그래프(완성 프로젝트)에서 오프스크린 노드까지 전부 마운트하면 풀해상도
         //   스토리보드 <img> 수십 장이 한 번에 렌더돼 초기 진입이 느리다 → 보이는 노드만 렌더.
         onlyRenderVisibleElements
-        className="bg-background"
+        // v3 D1(2026-11-03): 캔버스는 노드보다 한 단 어두운 바탕(--canvas-bg) 위 옅은 점.
+        className="bg-canvas-bg"
       >
-        <Background gap={16} size={1} className="opacity-30" />
-        <Controls className="!border !border-border" />
+        <Background gap={20} size={1.2} color="var(--canvas-dot)" className="opacity-10" />
+        <CanvasZoomPill />
         <MiniMapPanel />
       </ReactFlow>
 
       {nodes.length === 0 && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="text-center text-sm text-muted-foreground">
+          <div className="text-center text-label text-muted-foreground">
             {t('Scenes come in automatically once you create them in Writer.')}
-            <div className="mt-1 text-xs opacity-70">
+            <div className="mt-1 text-meta text-subtle-foreground">
               {t('Or double-click the canvas to create a Scene directly.')}
             </div>
           </div>
@@ -764,6 +814,10 @@ function CanvasInner() {
 // ────────────────────────────────────────────────────────────────────────────
 
 // ────────────────────────────────────────────────────────────────────────────
+
+// v3 D1 툴바 알약(2026-11-03) — 작업 바탕색 · 끝까지 둥근 모서리 · 그림자 하나 · 13px.
+const TOOLBAR_PILL =
+  'flex h-[34px] shrink-0 items-center gap-1.5 rounded-full bg-background px-3.5 text-[13px] font-medium text-foreground shadow-node transition-colors duration-100 hover:bg-card'
 
 // Alt+←/→ 순환 뷰 시퀀스(#keyboard-only 2026-08-11) — Node → Storyboard(Previz) → Storyboard(Real).
 const DIRECTOR_VIEW_CYCLE = ['node', 'previz', 'real'] as const
@@ -826,25 +880,27 @@ function PaletteBar({
   // 약속 E1·E2(2026-09-04): 확인창에 만들 영상 수·필요한 Take·가진 Take — 채팅 승인 카드와 같은 계산(video-batch-plan).
   const takeState = useTakeBalance()
   const videoPlan = planVideoBatch(videoBatchTakeCosts(nodes, eligibleVideoBatchShotIds(nodes)), takeState.balance, takeState.mode)
+  // D1 "The Set 노드 9 · 샷 4" — 캔버스에 보이는 노드와 그중 샷.
+  const canvasMeta = directorCanvasMeta(nodes, t)
 
-  // 상단 이동(#e1 2026-07-13): 하단 border-t 바 → 캔버스 위 border-b 바.
-  //   Node/Storyboard 토글은 artist 탭(Characters/World/Inventory)과 동일한 TabsList 스타일.
+  // v3 D1 툴바(2026-11-03): 캔버스 판 안 위쪽 — 왼쪽 [노드 | 스토리보드] · 제목, 가운데 일괄 생성, 오른쪽 캔버스 도구 · Lumi 알약.
+  //   단추는 작업 바탕색 알약(그림자 하나). 좁으면(채팅을 연 화면) 다음 줄로 넘어간다.
   return (
-    <div className="flex h-12 shrink-0 items-center gap-3 border-b border-border px-4">
-      <div className="flex items-center gap-3">
+    <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 px-4 pb-2 pt-4">
+      <div className="flex min-w-0 items-center gap-3">
         {/* Node / Storyboard 토글 */}
         <AltArrowHint>
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'node' | 'storyboard')}>
-            <TabsList>
-              <TabsTrigger value="node">{t('Node')}</TabsTrigger>
-              <TabsTrigger value="storyboard">{t('Storyboard')}</TabsTrigger>
+            <TabsList className="h-9 rounded-full bg-background p-1 shadow-node">
+              <TabsTrigger value="node" className="rounded-full px-3.5 text-[13px]">{t('Node')}</TabsTrigger>
+              <TabsTrigger value="storyboard" className="rounded-full px-3.5 text-[13px]">{t('Storyboard')}</TabsTrigger>
             </TabsList>
           </Tabs>
         </AltArrowHint>
 
         {/* Previz | Real 미디어 토글(#previz-video) — Storyboard 뷰 전용, 상단바 상주(2026-07-22). */}
         {viewMode === 'storyboard' && (
-          <div className="flex items-center gap-0.5 rounded-lg border border-border p-0.5">
+          <div className="flex h-9 items-center gap-0.5 rounded-full bg-background p-1 shadow-node">
             {(['previz', 'real'] as const).map((m) => (
               <button
                 key={m}
@@ -852,10 +908,10 @@ function PaletteBar({
                 onClick={() => setStoryboardMediaMode(m)}
                 aria-pressed={storyboardMediaMode === m}
                 className={cn(
-                  'rounded-md px-3 py-1 text-xs font-medium transition-colors',
+                  'h-full rounded-full px-3 text-[13px] transition-colors',
                   storyboardMediaMode === m
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground',
+                    ? 'bg-accent font-semibold text-foreground'
+                    : 'font-medium text-subtle-foreground hover:text-foreground',
                 )}
               >
                 {m === 'previz' ? 'Previz' : 'Real'}
@@ -864,230 +920,238 @@ function PaletteBar({
           </div>
         )}
 
-        {/* 스토리보드 일괄 생성 */}
-        <button
-          type="button"
-          title={
-            isGenerating || realBatchBusy
-              ? t('Generation in progress. You can start again when it finishes.')
-              : t('Generate the rough storyboard into a real shooting-image storyboard in one go')
-          }
-          onClick={() => {
-            // #2: 이미 모두 생성됐으면 재생성 대신 알림.
-            const shots = nodes.filter((n) => isShotData(n.data))
-            const pending = shots.filter(
-              (n) =>
-                isShotData(n.data) &&
-                n.data.storyboardImage?.status !== 'completed',
-            )
-            // #c3 (2026-08-27 오너): "하나씩 하는 거 짜쳐서 전체 재생성 누르려는데 X표로 막힘".
-            //   전부 생성된 상태에서 안내만 띄우고 끝나 전체 재생성 경로가 아예 없었다.
-            //   과금이 큰 동작이라 바로 쏘지 않고 확인을 받는다.
-            if (shots.length > 0 && pending.length === 0) {
-              setConfirmRegenAll(true)
-              return
-            }
-            // #real-grid: 샷별 단일 잡 루프(generateAllStoryboardImages) → 4샷 시트 일괄로 교체.
-            //   미생성 샷만 채우는 멱등 경로 — 개별 재생성(고해상 단일 스트립)은 더블클릭 그대로.
-            const pid = useDirectorCanvasStore.getState().projectId
-            if (pid) void runRealBatch(pid)
-          }}
-          disabled={isGenerating || realBatchBusy || totalShots === 0}
-          aria-busy={isGenerating || realBatchBusy}
-          className={cn(
-            'flex h-8 items-center gap-2 rounded-md border border-border px-3',
-            'text-xs font-medium text-foreground',
-            'transition-colors duration-100 hover:bg-accent',
-            (isGenerating || realBatchBusy || totalShots === 0) &&
-              'cursor-not-allowed opacity-50',
-            (isGenerating || realBatchBusy) && 'opacity-70',
-            'hover-red-beam',
+        {/* 제목(#e1 2026-07-14 스테이지 헤더 → v3 툴바 안) — 설명문은 "?" 뱃지 호버(2026-08-06). */}
+        <div className="flex min-w-0 items-center gap-2">
+          <h1 className="shrink-0 text-[15px] font-bold text-foreground">The Set</h1>
+          <StageHelpBadge
+            text={t(
+              'Start shooting real images/videos based on the rough storyboard, characters, and world.',
+            )}
+          />
+          {canvasMeta && (
+            <span className="truncate font-num text-meta font-medium text-subtle-foreground">{canvasMeta}</span>
           )}
-        >
-          {isGenerating || realBatchBusy ? (
-            <Loader2 className="size-4 animate-spin" />
-          ) : (
-            <ImageIcon className="size-4" />
-          )}
-          <span>{t('Generate storyboard')}</span>
-          {storyboardBatch ? (
-            <span className="font-mono tabular-nums text-muted-foreground">
-              {storyboardBatch.done}/{storyboardBatch.total}
-              {storyboardBatch.failed > 0 && (
-                <span className="text-destructive"> · {t('{count} failed', { count: storyboardBatch.failed })}</span>
-              )}
-            </span>
-          ) : totalShots > 0 ? (
-            <span className="font-mono tabular-nums text-muted-foreground">
-              {completedShots}/{totalShots}
-            </span>
-          ) : null}
-        </button>
+        </div>
+      </div>
 
-        {/* 명시적 전체 영상 생성 — 과금 동작은 확인 후에만 시작한다. */}
-        <button
-          type="button"
-          title={t('Generate videos for every eligible shot')}
-          onClick={async () => {
-            // 도는 중이면 같은 자리가 중단 버튼이다(#batch-resume 2026-09-09 오너 결정 ①).
-            //   예전에는 진행 중에 비활성이라 멈출 방법이 창을 닫는 것뿐이었다.
-            if (videoBatchBusy) {
-              if (videoBatchCancelled) return
-              const run = useDirectorCanvasStore.getState()
-              const stillCurrent = () => {
-                const current = useDirectorCanvasStore.getState()
-                return current.projectId === run.projectId && current.videoBatchRunId === run.videoBatchRunId
-              }
-              try {
-                await run.cancelVideoBatch()
-                if (stillCurrent()) toast.info(t('Stop after current videos finish.'))
-              } catch (error) {
-                console.error('[video-batches] cancel failed:', error)
-                if (stillCurrent()) toast.error(t('Please try again in a moment.'))
-              }
-              return
+      <div className="mx-auto flex shrink-0 items-center gap-2">
+          {/* 스토리보드 일괄 생성 */}
+          <button
+            type="button"
+            title={
+              isGenerating || realBatchBusy
+                ? t('Generation in progress. You can start again when it finishes.')
+                : t('Generate the rough storyboard into a real shooting-image storyboard in one go')
             }
-            const eligible = eligibleVideoBatchShotIds(
-              useDirectorCanvasStore.getState().nodes,
-            )
-            if (eligible.length === 0) {
-              toast.info(t('No eligible shots for video generation.'))
-              return
-            }
-            refetchTakeBalance()
-            setConfirmVideoBatch(true)
-          }}
-          disabled={videoBatchBusy && videoBatchCancelled}
-          aria-busy={videoBatchBusy}
-          className={cn(
-            'flex h-8 items-center gap-2 rounded-md border border-border px-3',
-            'text-xs font-medium text-foreground',
-            'transition-colors duration-100 hover:bg-accent',
-            videoBatchBusy && videoBatchCancelled && 'cursor-not-allowed opacity-70',
-            'hover-red-beam',
-          )}
-        >
-          {videoBatchBusy ? (
-            videoBatchCancelled ? (
+            onClick={() => {
+              // #2: 이미 모두 생성됐으면 재생성 대신 알림.
+              const shots = nodes.filter((n) => isShotData(n.data))
+              const pending = shots.filter(
+                (n) =>
+                  isShotData(n.data) &&
+                  n.data.storyboardImage?.status !== 'completed',
+              )
+              // #c3 (2026-08-27 오너): "하나씩 하는 거 짜쳐서 전체 재생성 누르려는데 X표로 막힘".
+              //   전부 생성된 상태에서 안내만 띄우고 끝나 전체 재생성 경로가 아예 없었다.
+              //   과금이 큰 동작이라 바로 쏘지 않고 확인을 받는다.
+              if (shots.length > 0 && pending.length === 0) {
+                setConfirmRegenAll(true)
+                return
+              }
+              // #real-grid: 샷별 단일 잡 루프(generateAllStoryboardImages) → 4샷 시트 일괄로 교체.
+              //   미생성 샷만 채우는 멱등 경로 — 개별 재생성(고해상 단일 스트립)은 더블클릭 그대로.
+              const pid = useDirectorCanvasStore.getState().projectId
+              if (pid) void runRealBatch(pid)
+            }}
+            disabled={isGenerating || realBatchBusy || totalShots === 0}
+            aria-busy={isGenerating || realBatchBusy}
+            className={cn(
+              TOOLBAR_PILL,
+              (isGenerating || realBatchBusy || totalShots === 0) &&
+                'cursor-not-allowed opacity-50',
+              (isGenerating || realBatchBusy) && 'opacity-70',
+            )}
+          >
+            {isGenerating || realBatchBusy ? (
               <Loader2 className="size-4 animate-spin" />
             ) : (
-              <Square className="size-4" />
-            )
-          ) : (
-            <ImageIcon className="size-4" />
-          )}
-          <span>
-            {videoBatchBusy
-              ? videoBatchCancelled
-                ? t('Stopping')
-                : t('Stop generating')
-              : t('Generate videos')}
-          </span>
-          {videoBatch ? (
-            <>
-              <span className="font-mono tabular-nums text-muted-foreground">
-                {videoBatch.done}/{videoBatch.total}
+              <RefreshCw className="size-3.5" />
+            )}
+            <span>{t('Generate storyboard')}</span>
+            {storyboardBatch ? (
+              <span className="font-num tabular-nums text-muted-foreground">
+                {storyboardBatch.done}/{storyboardBatch.total}
+                {storyboardBatch.failed > 0 && (
+                  <span className="text-destructive"> · {t('{count} failed', { count: storyboardBatch.failed })}</span>
+                )}
               </span>
-              {videoBatch.failed > 0 && (
-                <span className="text-destructive">
-                  {t('{count} failed', { count: videoBatch.failed })}
-                </span>
-              )}
-            </>
-          ) : !videoBatchBusy && eligibleVideoCount > 0 ? (
-            <span className="font-mono tabular-nums text-muted-foreground">
-              {t('{count} available', { count: eligibleVideoCount })}
+            ) : totalShots > 0 ? (
+              <span className="font-num tabular-nums text-muted-foreground">
+                {completedShots}/{totalShots}
+              </span>
+            ) : null}
+          </button>
+
+          {/* 명시적 전체 영상 생성 — 과금 동작은 확인 후에만 시작한다. */}
+          <button
+            type="button"
+            title={t('Generate videos for every eligible shot')}
+            onClick={async () => {
+              // 도는 중이면 같은 자리가 중단 버튼이다(#batch-resume 2026-09-09 오너 결정 ①).
+              //   예전에는 진행 중에 비활성이라 멈출 방법이 창을 닫는 것뿐이었다.
+              if (videoBatchBusy) {
+                if (videoBatchCancelled) return
+                const run = useDirectorCanvasStore.getState()
+                const stillCurrent = () => {
+                  const current = useDirectorCanvasStore.getState()
+                  return current.projectId === run.projectId && current.videoBatchRunId === run.videoBatchRunId
+                }
+                try {
+                  await run.cancelVideoBatch()
+                  if (stillCurrent()) toast.info(t('Stop after current videos finish.'))
+                } catch (error) {
+                  console.error('[video-batches] cancel failed:', error)
+                  if (stillCurrent()) toast.error(t('Please try again in a moment.'))
+                }
+                return
+              }
+              const eligible = eligibleVideoBatchShotIds(
+                useDirectorCanvasStore.getState().nodes,
+              )
+              if (eligible.length === 0) {
+                toast.info(t('No eligible shots for video generation.'))
+                return
+              }
+              refetchTakeBalance()
+              setConfirmVideoBatch(true)
+            }}
+            disabled={videoBatchBusy && videoBatchCancelled}
+            aria-busy={videoBatchBusy}
+            className={cn(
+              TOOLBAR_PILL,
+              videoBatchBusy && videoBatchCancelled && 'cursor-not-allowed opacity-70',
+            )}
+          >
+            {videoBatchBusy ? (
+              videoBatchCancelled ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Square className="size-3.5" />
+              )
+            ) : (
+              <Play className="size-3.5 fill-current" />
+            )}
+            <span>
+              {videoBatchBusy
+                ? videoBatchCancelled
+                  ? t('Stopping')
+                  : t('Stop generating')
+                : t('Generate videos')}
             </span>
-          ) : null}
-          {videoBatchBusy && videoBatchProgress && !videoBatch && (
-            <>
-              <span className="font-mono tabular-nums text-muted-foreground">
-                {videoBatchProgress.done}/{videoBatchProgress.total}
-              </span>
-              {videoBatchProgress.failed > 0 && (
-                <span className="text-destructive">
-                  {t('{count} failed', { count: videoBatchProgress.failed })}
+            {videoBatch ? (
+              <>
+                <span className="font-num tabular-nums text-muted-foreground">
+                  {videoBatch.done}/{videoBatch.total}
                 </span>
-              )}
-              <span
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={videoBatchProgress.total}
-                aria-valuenow={videoBatchProgress.done}
-                className="h-1.5 w-16 overflow-hidden rounded-full bg-muted"
-              >
-                <span
-                  className="block h-full bg-primary transition-[width]"
-                  style={{
-                    width:
-                      videoBatchProgress.total > 0
-                        ? `${(videoBatchProgress.done / videoBatchProgress.total) * 100}%`
-                        : '0%',
-                  }}
-                />
+                {videoBatch.failed > 0 && (
+                  <span className="text-destructive">
+                    {t('{count} failed', { count: videoBatch.failed })}
+                  </span>
+                )}
+              </>
+            ) : !videoBatchBusy && eligibleVideoCount > 0 ? (
+              <span className="font-num tabular-nums text-muted-foreground">
+                {t('{count} available', { count: eligibleVideoCount })}
               </span>
-            </>
-          )}
-        </button>
+            ) : null}
+            {videoBatchBusy && videoBatchProgress && !videoBatch && (
+              <>
+                <span className="font-num tabular-nums text-muted-foreground">
+                  {videoBatchProgress.done}/{videoBatchProgress.total}
+                </span>
+                {videoBatchProgress.failed > 0 && (
+                  <span className="text-destructive">
+                    {t('{count} failed', { count: videoBatchProgress.failed })}
+                  </span>
+                )}
+                <span
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={videoBatchProgress.total}
+                  aria-valuenow={videoBatchProgress.done}
+                  className="h-1 w-16 overflow-hidden rounded-full bg-card"
+                >
+                  <span
+                    className="block h-full bg-stage transition-[width]"
+                    style={{
+                      width:
+                        videoBatchProgress.total > 0
+                          ? `${(videoBatchProgress.done / videoBatchProgress.total) * 100}%`
+                          : '0%',
+                    }}
+                  />
+                </span>
+              </>
+            )}
+          </button>
 
       </div>
 
-      {/* 축척 — Storyboard 뷰 전용, 우측 정렬(#e-zoom-merge 2026-08-20 오너 지시: 뷰 내부의
-          전용 바에 혼자 있던 것을 이 바로 합류). Ctrl+wheel 단축은 보드가 그대로 처리한다. */}
-      {viewMode === 'storyboard' && (
-        <div className="ml-auto flex shrink-0 items-center">
+      <div className="ml-auto flex shrink-0 items-center gap-2">
+        {/* 축척 — Storyboard 뷰 전용(#e-zoom-merge 2026-08-20 오너 지시: 뷰 내부의 전용 바에 혼자 있던 것을
+            이 바로 합류). Ctrl+wheel 단축은 보드가 그대로 처리한다. */}
+        {viewMode === 'storyboard' && (
           <StoryboardZoomControls
             zoomLevel={storyboardZoom}
             onZoomLevelChange={onStoryboardZoomChange}
+            className="h-[34px] rounded-full bg-background px-1.5 shadow-node"
           />
-        </div>
-      )}
+        )}
 
-      {/* 캔버스 전용 액션 3종 — Node 탭에서만 표시, 오른쪽 정렬(#e2 2026-07-13) */}
-      {viewMode === 'node' && (
-        <div className="ml-auto flex shrink-0 items-center gap-2">
-          {/* 미사용 에셋 불러오기 — 씬마다 그 씬이 참조 안 하는 등록 에셋도 좌측 컬럼에 표시(표시만) */}
-          <button
-            type="button"
-            onClick={() => toggleUnusedAssets()}
-            title={t('Show registered assets that this scene does not reference in the left asset column too')}
-            className={cn(
-              'flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-3 text-xs transition-colors duration-100',
-              showUnusedAssets
-                ? 'border-primary bg-primary/10 text-foreground'
-                : 'border-border text-muted-foreground hover:bg-accent hover:text-foreground',
-              'hover-red-beam',
-            )}
-          >
-            <Boxes className="size-4" />
-            <span>{showUnusedAssets ? t('Hide unused assets') : t('Load unused assets')}</span>
-          </button>
+        {/* 캔버스 전용 액션 3종 — Node 탭에서만 표시(#e2 2026-07-13) */}
+        {viewMode === 'node' && (
+          <>
+            {/* 미사용 에셋 불러오기 — 씬마다 그 씬이 참조 안 하는 등록 에셋도 좌측 컬럼에 표시(표시만) */}
+            <button
+              type="button"
+              onClick={() => toggleUnusedAssets()}
+              aria-pressed={showUnusedAssets}
+              title={t('Show registered assets that this scene does not reference in the left asset column too')}
+              className={cn(TOOLBAR_PILL, showUnusedAssets && 'bg-stage/18 ring-[1.5px] ring-inset ring-stage hover:bg-stage/25')}
+            >
+              <Boxes className="size-3.5" />
+              <span>{showUnusedAssets ? t('Hide unused assets') : t('Load unused assets')}</span>
+            </button>
 
-          {/* 노드 자동 정렬 — asset·scene·shot·video를 다이어그램 레이아웃으로 재배치 (DB 반영) */}
-          <button
-            type="button"
-            onClick={() => relayoutCanvas()}
-            title={t('Arrange assets, scenes, shots, and videos in a left-to-right layout with spacing (saved to DB)')}
-            className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-xs text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-foreground hover-red-beam"
-          >
-            <LayoutGrid className="size-4" />
-            <span>{t('Auto-arrange')}</span>
-          </button>
+            {/* 노드 자동 정렬 — asset·scene·shot·video를 다이어그램 레이아웃으로 재배치 (DB 반영) */}
+            <button
+              type="button"
+              onClick={() => relayoutCanvas()}
+              title={t('Arrange assets, scenes, shots, and videos in a left-to-right layout with spacing (saved to DB)')}
+              className={TOOLBAR_PILL}
+            >
+              <LayoutGrid className="size-3.5" />
+              <span>{t('Auto-arrange')}</span>
+            </button>
 
-          {/* 프롬프트 노드 추가 — Higgsfield식 분리 프롬프트(우측 핸들을 Shot T 입력에 연결) */}
-          <button
-            type="button"
-            onClick={() =>
-              addPromptNode({ x: 80, y: 120 + promptCount * 180 })
-            }
-            title={t('Adds a standalone prompt node. Connect its right handle to a Shot\'s T input to sync the Shot prompt.')}
-            className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-xs text-muted-foreground transition-colors duration-100 hover:bg-accent hover:text-foreground hover-red-beam"
-          >
-            <Type className="size-4" />
-            <span>{t('Prompt node')}</span>
-          </button>
-        </div>
-      )}
+            {/* 프롬프트 노드 추가 — Higgsfield식 분리 프롬프트(우측 핸들을 Shot T 입력에 연결) */}
+            <button
+              type="button"
+              onClick={() =>
+                addPromptNode({ x: 80, y: 120 + promptCount * 180 })
+              }
+              title={t('Adds a standalone prompt node. Connect its right handle to a Shot\'s T input to sync the Shot prompt.')}
+              className={TOOLBAR_PILL}
+            >
+              <Plus className="size-3.5" />
+              <span>{t('Prompt node')}</span>
+            </button>
+          </>
+        )}
+
+        {/* 채팅이 닫혀 있으면 여는 곳(v3 D1 Lumi 알약) — Director 는 채팅을 닫은 채 시작한다. */}
+        <LumiChatPill />
+      </div>
 
       {/* #c3: 전체 재생성 확인 — 이미 만든 걸 전부 갈아엎으므로 과금·교체를 명시하고 받는다. */}
       <RegenerateConfirmDialog
@@ -1139,6 +1203,8 @@ function PaletteBar({
 // ────────────────────────────────────────────────────────────────────────────
 
 export default function DirectorCanvasPage() {
+  // v3 D1(2026-11-03): Director 는 채팅을 닫은 채 시작하고 툴바의 Lumi 알약으로 연다 — 떠나면 들어오기 전 모습으로 돌아간다.
+  useHoldChatClosed('director')
   const handoffProjectId = useProjectStore((s) => s.projectId)
   // 라우터 요청이 아닌 실제 Director 화면의 mount가 이동 완료를 확인한다.
   useEffect(() => {
@@ -1252,50 +1318,42 @@ export default function DirectorCanvasPage() {
   }, [guideProjectId, viewMode, stageReady, offerSuggestion, t])
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
-      {/* 스테이지 헤더(#e1 2026-07-14) — 다른 탭(writer/artist)과 동일 구조.
-          설명문은 "?" 뱃지 호버로 이관(2026-08-06). */}
-      <div className="flex shrink-0 items-center gap-1.5 border-b border-border px-6 py-3">
-        <h1 className="text-lg font-semibold">The Set</h1>
-        <StageHelpBadge
-          text={t(
-            'Start shooting real images/videos based on the rough storyboard, characters, and world.',
-          )}
-        />
-        {/* 다음 단계 버튼(2026-10-01 오너 — 채팅 위 버튼을 각 단계 오른쪽 위로 옮김). */}
-        <NextStepButton className="ml-auto" />
-      </div>
-      <div className="flex flex-1 overflow-hidden">
+    // v3 D1(2026-11-03): 위 막대 아래 캔버스 판 하나(모서리 16 · --canvas-bg) — 아래 8px 띄움, 오른쪽 8px 는 스튜디오 틀 여백(SHELL_INSET)이 준다.
+    //   제목 "The Set" · 도움말은 판 안 툴바 왼쪽으로, [다음: Editor로]는 위 막대 오른쪽으로 옮겼다.
+    <div className="flex flex-1 flex-col overflow-hidden pb-2">
+      {/* 다음 단계 버튼(2026-10-01 오너 — 채팅 위 버튼을 각 단계 오른쪽 위로 옮김) → v3 위 막대 오른쪽 자리. */}
+      <TopBarActions>
+        <NextStepButton />
+      </TopBarActions>
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-canvas-bg">
         {/* Center: top Palette bar(#e1 — 하단→상단 이동) + Canvas (Node/Storyboard) */}
-        <div className="relative flex flex-1 flex-col overflow-hidden">
-          <PaletteBar
-            storyboardZoom={storyboardZoom}
-            onStoryboardZoomChange={setStoryboardZoom}
-          />
+        <PaletteBar
+          storyboardZoom={storyboardZoom}
+          onStoryboardZoomChange={setStoryboardZoom}
+        />
 
-          {/* min-h-0: flex-1이 내용 높이만큼 커져 PaletteBar(토글)를
-              밀어내고 StoryboardGridView의 overflow-auto가 안 걸리던 문제 수정.
-              이걸로 storyboard 그리드 스크롤 + Node/Storyboard 토글 항상 노출. */}
-          <div className="relative min-h-0 flex-1">
-            {/* key=viewMode: 전환 시 래퍼 remount 로 슬라이드 재생(#e2) — 뷰 자체도 원래 조건
-                렌더로 remount 되던 구조라 추가 비용 없음. */}
-            <div key={viewMode} className={cn('flex h-full min-h-0 flex-col', viewSlideClass)}>
-              {viewMode === 'storyboard' ? (
-                <StoryboardGridView
-                  zoomLevel={storyboardZoom}
-                  onZoomLevelChange={setStoryboardZoom}
-                />
-              ) : (
-                <ReactFlowProvider>
-                  <CanvasInner />
-                </ReactFlowProvider>
-              )}
-            </div>
+        {/* min-h-0: flex-1이 내용 높이만큼 커져 PaletteBar(토글)를
+            밀어내고 StoryboardGridView의 overflow-auto가 안 걸리던 문제 수정.
+            이걸로 storyboard 그리드 스크롤 + Node/Storyboard 토글 항상 노출. */}
+        <div className="relative min-h-0 flex-1">
+          {/* key=viewMode: 전환 시 래퍼 remount 로 슬라이드 재생(#e2) — 뷰 자체도 원래 조건
+              렌더로 remount 되던 구조라 추가 비용 없음. */}
+          <div key={viewMode} className={cn('flex h-full min-h-0 flex-col', viewSlideClass)}>
+            {viewMode === 'storyboard' ? (
+              <StoryboardGridView
+                zoomLevel={storyboardZoom}
+                onZoomLevelChange={setStoryboardZoom}
+              />
+            ) : (
+              <ReactFlowProvider>
+                <CanvasInner />
+              </ReactFlowProvider>
+            )}
           </div>
-
-          {/* Storyboard 뷰에서도 더블클릭 편집 팝업이 동작하도록 viewMode 무관 마운트 */}
-          {viewMode === 'storyboard' && <DirectorNodePopup />}
         </div>
+
+        {/* Storyboard 뷰에서도 더블클릭 편집 팝업이 동작하도록 viewMode 무관 마운트 */}
+        {viewMode === 'storyboard' && <DirectorNodePopup />}
 
         {/* 결정 #12 완료: D-3 NodePopup이 카메라/조명/렌즈 편집을 흡수.
             우측 Inspector aside 제거됨 (D-3 마일스톤, 2026-05-25) */}

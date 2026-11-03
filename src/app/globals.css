@@ -215,6 +215,10 @@
   --node-border-selected: var(--ring);
   --edge-default: rgb(255 255 255 / 0.2);
   --edge-selected: var(--stage-director);
+  /* v3p2-set — Director 미니맵(D1): 노드 흰 35% · 보이는 자리 테두리 흰 30% · 그 밖은 조금 어둡게 */
+  --minimap-node: rgb(255 255 255 / 0.35);
+  --minimap-viewport: rgb(255 255 255 / 0.3);
+  --minimap-mask: rgb(0 0 0 / 0.25);
 
   /* 단계 색(브랜드 가이드 03 · 오너 11/3: Lumi 가이드의 --stage-* 대신 이 값) */
   --stage-producer: #f2a33a;

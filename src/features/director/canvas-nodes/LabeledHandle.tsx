@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils'
 
 type Props = {
   id: string
-  /** 핸들 왼쪽 밖에 항상 표시되는 짧은 기술 라벨 (예: START/END/REF/PREV) */
+  /** 핸들 왼쪽 밖에 항상 표시되는 짧은 라벨(예: 프롬프트 · 이미지 · 시작 · 끝) — 화면 글이라 번역해서 넘긴다. */
   label: string
   /** 노드 상단 기준 y 오프셋(px) */
   top: number
@@ -27,14 +27,15 @@ export function LabeledTargetHandle({ id, label, top, title, className }: Props)
       id={id}
       title={title ?? label}
       aria-label={title ?? label}
+      // v3 D1(2026-11-03): 10px 원 · 캔버스 바탕색 2px 테두리, 라벨은 상자 없이 구멍 왼쪽 9.5px 흐린 글자.
       className={cn(
-        '!h-3.5 !w-3.5 !rounded-full !border-2 !border-background !bg-foreground/80',
+        '!size-2.5 !rounded-full !border-2 !border-canvas-bg !bg-muted-foreground',
         'transition-transform hover:!scale-125',
         className,
       )}
       style={{ top }}
     >
-      <span className="pointer-events-none absolute right-full top-1/2 mr-1.5 -translate-y-1/2 whitespace-nowrap rounded-sm border border-border/60 bg-background/90 px-1 font-mono text-[8px] uppercase leading-relaxed tracking-wider text-muted-foreground">
+      <span className="pointer-events-none absolute right-full top-1/2 mr-1.5 -translate-y-1/2 whitespace-nowrap text-[9.5px] font-medium leading-none text-subtle-foreground">
         {label}
       </span>
     </Handle>

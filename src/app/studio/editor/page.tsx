@@ -20,6 +20,10 @@ import {
   Plus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/layout/page-header'
+import { Lumi } from '@/components/lumi/lumi'
+import { useHoldChatClosed } from '@/hooks/use-hold-chat-closed'
+import { editorHeaderMeta } from '@/features/editor/editor-labels'
 import { VideoPreviewer } from '@/features/editor/video-previewer'
 import { Timeline } from '@/features/editor/timeline'
 import { VideoSourcePanel } from '@/features/editor/video-source-panel'
@@ -29,11 +33,11 @@ import { useEditorPlayback } from '@/features/editor/use-editor-playback'
 import { prefetchVideos, resetVideoPrefetchFor } from '@/features/editor/video-prefetch'
 import { useEditorStore, selectTimelineLayout, zoomStep } from '@/stores/editor-store'
 import { useProjectStore } from '@/stores/project-store'
-import { useChatUiStore } from '@/stores/chat-ui-store'
 import { decodeAudioPeaks } from '@/lib/audio-waveform'
 import { downloadShotsZip } from '@/lib/editor-zip-export'
 import { renderDraftTimeline } from '@/lib/editor-draft-render'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
 
 const FRAME = 1 / 24
@@ -349,14 +353,8 @@ export default function PostPage() {
     }
   }, [projectId, loadData, loadPersisted, t, retryTick])
 
-  // Editor 진입 시 채팅 기본 접힘 (요청 6b). 떠날 때 이전 상태 복원
-  useEffect(() => {
-    const prev = useChatUiStore.getState().collapsed
-    useChatUiStore.setState({ collapsed: true })
-    return () => {
-      useChatUiStore.setState({ collapsed: prev })
-    }
-  }, [])
+  // Editor 진입 시 채팅 기본 접힘 (요청 6b). 떠날 때 이전 상태 복원 — Director 와 같은 약속(닫아 둔 모습은 기억에 남기지 않는다).
+  useHoldChatClosed('editor')
 
   // 프레임 이동 버튼 꾹 누르기 → 연속 반복 (요청 2)
   const holdRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -452,88 +450,88 @@ export default function PostPage() {
         </div>
       )
     }
-    // 'loading'('idle' 포함 — 로드 effect 발화 전 첫 렌더): 문구 없는 레이아웃 스켈레톤.
-    //   소스 패널(좌) + 프리뷰(중) + 타임라인(하) 자리를 그대로 비쳐 화면 점프를 없앤다.
+    // 'loading'('idle' 포함 — 로드 effect 발화 전 첫 렌더): Director → Editor 로 넘어가며 기다리는 화면.
+    //   v3(2026-11-03, 오너 결정 8): 옛 레이아웃 스켈레톤 대신 큰 Lumi(Editor 옷 · 넘어가는 동안의 loading) —
+    //   "이전 단계를 완료하라" 같은 틀린 안내는 여전히 띄우지 않는다(#pps-empty-states). 글은 읽어 주는 이름으로만.
     return (
-      <div className="flex flex-1 overflow-hidden" aria-busy>
-        <div className="w-64 shrink-0 border-r border-border/50 p-3">
-          <div className="grid grid-cols-2 gap-2">
-            {Array.from({ length: 6 }, (_, i) => (
-              <div key={i} className="aspect-video animate-pulse rounded-md bg-muted-foreground/10" />
-            ))}
-          </div>
-        </div>
-        <div className="flex min-w-0 flex-1 flex-col">
-          <div className="m-4 flex-1 animate-pulse rounded-md bg-muted-foreground/10" />
-          <div className="mx-4 mb-4 space-y-2">
-            <div className="h-3 w-full animate-pulse rounded bg-muted-foreground/10" />
-            <div className="h-9 w-3/4 animate-pulse rounded bg-muted-foreground/10" />
-            <div className="h-9 w-1/2 animate-pulse rounded bg-muted-foreground/10" />
-          </div>
-        </div>
+      <div className="flex flex-1 items-center justify-center" aria-busy>
+        <Lumi persona="editor" state="loading" size={300} label={t('Preparing clips…')} />
       </div>
     )
   }
 
-  return (
-    <div className="flex flex-1 overflow-hidden">
-      {/* Far left: 소스 보관함 (Video/Voice). 열렸을 때만 너비 조절 가능 */}
-      {sourcePanelOpen ? (
-        <>
-          <div style={{ width: panelSizes.sourceW }} className="h-full shrink-0">
-            <VideoSourcePanel
-              open
-              onToggle={toggleSourcePanel}
-              shots={shots}
-              videoClips={videoClips}
-              audioSources={audioSources}
-              onPreview={previewSource}
-              onAddClip={handleAddVideoClip}
-              onAddClipAtPlayhead={handleAddVideoClipAtPlayhead}
-              onAddAudioFromSource={addAudioClipFromSource}
-              onAddAudioSource={addAudioSource}
-              onRemoveAudioSource={removeAudioSource}
-              onBinDragStart={setBinDragKind}
-              onBinDragEnd={() => {
-                setBinDragKind(null)
-                setBinDropSec(null)
-              }}
-              onSetBinDropSec={setBinDropSec}
-            />
-          </div>
-          <ResizeHandle
-            axis="x"
-            getValue={() => panelSizes.sourceW}
-            onChange={(v) => setPanelSize('sourceW', v)}
-          />
-        </>
-      ) : (
-        <VideoSourcePanel
-          open={false}
-          onToggle={toggleSourcePanel}
-          shots={shots}
-          videoClips={videoClips}
-          audioSources={audioSources}
-          onPreview={previewSource}
-          onAddClip={handleAddVideoClip}
-          onAddClipAtPlayhead={handleAddVideoClipAtPlayhead}
-          onAddAudioFromSource={addAudioClipFromSource}
-          onAddAudioSource={addAudioSource}
-          onRemoveAudioSource={removeAudioSource}
-          onBinDragStart={setBinDragKind}
-          onBinDragEnd={() => {
-            setBinDragKind(null)
-            setBinDropSec(null)
-          }}
-          onSetBinDropSec={setBinDropSec}
-        />
-      )}
+  // v3 ED1 화면 머리 숫자 — "컷 7 · 33초 · 영상 0/7"(타임라인에 놓인 것 기준).
+  const headerMeta = editorHeaderMeta(timelineLayout, videoClips, t)
 
-      {/* Center: Preview ─ (resize) ─ Toolbar ─ Timeline(+VU) */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Preview — 높이 조절 대상 */}
-        <div style={{ height: panelSizes.previewH }} className="shrink-0 overflow-hidden">
-          <VideoPreviewer />
+  return (
+    // v3 ED1(2026-11-03): 작업 영역(왼쪽 · 오른쪽 · 아래 28, 위 24) — 화면 머리, 위 줄(소스 판 | 미리 보기 판), 아래 타임라인 판.
+    //   판 사이 틈이 크기 조절 손잡이다(소스 폭 · 위 줄 높이, 기억은 예전 그대로).
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-7 pb-7 pt-6">
+      <PageHeader title={t('Final edit')} meta={headerMeta} />
+      <div className="mt-[18px] flex min-h-0 flex-1 flex-col">
+        {/* 위 줄 — 높이 조절 대상 */}
+        <div style={{ height: panelSizes.previewH }} className="flex shrink-0 overflow-hidden">
+          {/* 소스 보관함 (Video/Voice). 열렸을 때만 너비 조절 가능 */}
+          {sourcePanelOpen ? (
+            <>
+              <div style={{ width: panelSizes.sourceW }} className="h-full shrink-0 overflow-hidden rounded-[20px] bg-panel">
+                <VideoSourcePanel
+                  open
+                  onToggle={toggleSourcePanel}
+                  shots={shots}
+                  videoClips={videoClips}
+                  audioSources={audioSources}
+                  onPreview={previewSource}
+                  onAddClip={handleAddVideoClip}
+                  onAddClipAtPlayhead={handleAddVideoClipAtPlayhead}
+                  onAddAudioFromSource={addAudioClipFromSource}
+                  onAddAudioSource={addAudioSource}
+                  onRemoveAudioSource={removeAudioSource}
+                  onBinDragStart={setBinDragKind}
+                  onBinDragEnd={() => {
+                    setBinDragKind(null)
+                    setBinDropSec(null)
+                  }}
+                  onSetBinDropSec={setBinDropSec}
+                />
+              </div>
+              <ResizeHandle
+                axis="x"
+                getValue={() => panelSizes.sourceW}
+                onChange={(v) => setPanelSize('sourceW', v)}
+              />
+            </>
+          ) : (
+            <>
+              <div className="h-full shrink-0 overflow-hidden rounded-[20px] bg-panel">
+                <VideoSourcePanel
+                  open={false}
+                  onToggle={toggleSourcePanel}
+                  shots={shots}
+                  videoClips={videoClips}
+                  audioSources={audioSources}
+                  onPreview={previewSource}
+                  onAddClip={handleAddVideoClip}
+                  onAddClipAtPlayhead={handleAddVideoClipAtPlayhead}
+                  onAddAudioFromSource={addAudioClipFromSource}
+                  onAddAudioSource={addAudioSource}
+                  onRemoveAudioSource={removeAudioSource}
+                  onBinDragStart={setBinDragKind}
+                  onBinDragEnd={() => {
+                    setBinDragKind(null)
+                    setBinDropSec(null)
+                  }}
+                  onSetBinDropSec={setBinDropSec}
+                />
+              </div>
+              <div className="w-3 shrink-0" />
+            </>
+          )}
+
+          {/* 미리 보기 판 */}
+          <div className="min-w-0 flex-1 overflow-hidden rounded-[20px] bg-black">
+            <VideoPreviewer />
+          </div>
         </div>
 
         <ResizeHandle
@@ -542,232 +540,235 @@ export default function PostPage() {
           onChange={(v) => setPanelSize('previewH', v)}
         />
 
-        {/* 재생 컨트롤바 + 도구 */}
-        <div className="flex items-center gap-2 border-y border-border px-3 py-1.5">
-          {/* 도구 모드 (V/C) */}
-          <div className="flex items-center gap-0.5 rounded border border-border p-0.5">
-            <Button
-              size="icon"
-              variant={toolMode === 'select' ? 'default' : 'ghost'}
-              className="size-6 hover-red-beam"
-              onClick={() => setToolMode('select')}
-              title={t('Select tool (V)')}
-            >
-              <MousePointer2 className="size-3" />
-            </Button>
-            <Button
-              size="icon"
-              variant={toolMode === 'cut' ? 'default' : 'ghost'}
-              className="size-6 hover-red-beam"
-              onClick={() => setToolMode('cut')}
-              title={t('Cut tool (C)')}
-            >
-              <Scissors className="size-3" />
-            </Button>
-          </div>
-
-          {/* 타이틀 카드 삽입(#owner-title-card) — 지정 플레이헤드 인접 경계에 검은 배경/텍스트 카드 삽입 */}
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1.5 hover-red-beam"
-            onClick={handleAddTitleCard}
-            title={t('Insert a black title card with text at the nearest clip boundary')}
-          >
-            <Type className="size-3" />
-            {t('Title Card')}
-          </Button>
-
-          {/* 재생 컨트롤 (프레임 버튼은 꾹 누르면 연속) */}
-          <div className="flex items-center gap-0.5">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-7 hover-red-beam"
-              onPointerDown={() => startFrameHold(-FRAME)}
-              onPointerUp={stopFrameHold}
-              onPointerLeave={stopFrameHold}
-              onPointerCancel={stopFrameHold}
-              title={t('Previous frame (←) · hold for continuous')}
-            >
-              <ChevronLeft className="size-4" />
-            </Button>
-            <Button size="icon" variant="ghost" className="size-7 hover-red-beam" onClick={togglePlay} title={t('Play/pause (Space)')}>
-              {isPlaying ? <Pause className="size-4" /> : <Play className="size-4" />}
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="size-7 hover-red-beam"
-              onPointerDown={() => startFrameHold(FRAME)}
-              onPointerUp={stopFrameHold}
-              onPointerLeave={stopFrameHold}
-              onPointerCancel={stopFrameHold}
-              title={t('Next frame (→) · hold for continuous')}
-            >
-              <ChevronRight className="size-4" />
-            </Button>
-          </div>
-
-          {/* Undo / Redo */}
-          <div className="flex items-center gap-0.5">
-            <Button size="icon" variant="ghost" className="size-7 hover-red-beam" onClick={undo} disabled={past.length === 0} title={t('Undo (Ctrl+Z)')}>
-              <Undo2 className="size-4" />
-            </Button>
-            <Button size="icon" variant="ghost" className="size-7 hover-red-beam" onClick={redo} disabled={future.length === 0} title={t('Redo (Ctrl+Y)')}>
-              <Redo2 className="size-4" />
-            </Button>
-          </div>
-
-          <div className="ml-auto flex items-center gap-2">
-            {/* 축척 −·지표·+ (2026-09-08 오너 지시 5번) — 전체 보기 왼쪽. 지표는 1초당 픽셀. */}
-            <div className="flex items-center gap-0.5 rounded-md border border-border px-0.5">
-              <Button size="icon" variant="ghost" className="size-6 hover-red-beam" onClick={() => setPxPerSec(zoomStep(pxPerSec, 'out'))} title={t('Zoom out timeline')}>
-                <Minus className="size-3" />
+        {/* 타임라인 판 — 도구 줄 + 통합 타임라인(+VU) */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] bg-panel">
+          {/* 재생 컨트롤바 + 도구 */}
+          <div className="flex flex-wrap items-center gap-1.5 px-3 pb-1 pt-3">
+            {/* 도구 모드 (V/C) — v3 ED1: 작업 바탕색 칸 안, 고른 도구는 크림 */}
+            <div className="flex items-center gap-0.5 rounded-[10px] bg-background p-[3px]">
+              <Button
+                size="icon"
+                variant={toolMode === 'select' ? 'default' : 'ghost'}
+                className={cn('size-7 rounded-lg', toolMode !== 'select' && 'text-muted-foreground')}
+                onClick={() => setToolMode('select')}
+                title={t('Select tool (V)')}
+              >
+                <MousePointer2 className="size-3.5" />
               </Button>
-              <span className="min-w-[64px] text-center font-mono text-[10px] tabular-nums text-muted-foreground" title={t('Timeline scale')}>
-                {t('1s = {px}px', { px: Math.round(pxPerSec) })}
-              </span>
-              <Button size="icon" variant="ghost" className="size-6 hover-red-beam" onClick={() => setPxPerSec(zoomStep(pxPerSec, 'in'))} title={t('Zoom in timeline')}>
-                <Plus className="size-3" />
+              <Button
+                size="icon"
+                variant={toolMode === 'cut' ? 'default' : 'ghost'}
+                className={cn('size-7 rounded-lg', toolMode !== 'cut' && 'text-muted-foreground')}
+                onClick={() => setToolMode('cut')}
+                title={t('Cut tool (C)')}
+              >
+                <Scissors className="size-3.5" />
               </Button>
             </div>
-            {/* 전체 보기(#watch-all) — 전 클립 프리로드 후 처음부터 연속 재생 */}
+
+            {/* 타이틀 카드 삽입(#owner-title-card) — 지정 플레이헤드 인접 경계에 검은 배경/텍스트 카드 삽입 */}
             <Button
               size="sm"
-              variant="outline"
-              disabled={!!prefetching}
-              className="gap-1.5 hover-red-beam"
-              onClick={() => void handleWatchAll()}
-              title={t('Preload every clip, then play the whole timeline from the start')}
+              variant="secondary"
+              className="gap-1.5 rounded-full px-3.5"
+              onClick={handleAddTitleCard}
+              title={t('Insert a black title card with text at the nearest clip boundary')}
             >
-              {prefetching ? (
-                <Loader2 className="size-3 animate-spin" />
-              ) : (
-                <MonitorPlay className="size-3" />
-              )}
-              {prefetching
-                ? t('Preparing {done}/{total}…', prefetching)
-                : t('Watch all')}
+              <Type className="size-3" />
+              {t('Title Card')}
             </Button>
-            {/* 샷 영상 일괄 ZIP 다운로드 (타임라인 순서대로 NN_shotId.mp4) */}
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={exportingZip}
-              className="gap-1.5 hover-red-beam"
-              onClick={async () => {
-                setExportingZip(true)
-                try {
-                  const r = await downloadShotsZip({
-                    shots,
-                    videoClips,
-                    clipOrder,
-                    fileBaseName: 'draft_shots',
-                  })
-                  if (r.total === 0) {
-                    toast.info(t('No shot videos to download. (Generate videos first)'))
-                  } else if (r.failed > 0) {
-                    toast.warning(
-                      t('{downloaded}/{total} ZIP complete, {failed} failed (see _failed.txt inside the zip).', {
-                        downloaded: r.downloaded,
-                        total: r.total,
-                        failed: r.failed,
-                      }),
-                    )
-                  } else {
-                    toast.success(t('Downloaded {count} shots as a ZIP in order.', { count: r.downloaded }))
+
+            {/* 재생 컨트롤 (프레임 버튼은 꾹 누르면 연속) */}
+            <div className="flex items-center gap-0.5">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-7 rounded-lg text-muted-foreground"
+                onPointerDown={() => startFrameHold(-FRAME)}
+                onPointerUp={stopFrameHold}
+                onPointerLeave={stopFrameHold}
+                onPointerCancel={stopFrameHold}
+                title={t('Previous frame (←) · hold for continuous')}
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+              <Button size="icon" variant="ghost" className="size-7 rounded-lg text-muted-foreground" onClick={togglePlay} title={t('Play/pause (Space)')}>
+                {isPlaying ? <Pause className="size-4" /> : <Play className="size-4" />}
+              </Button>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-7 rounded-lg text-muted-foreground"
+                onPointerDown={() => startFrameHold(FRAME)}
+                onPointerUp={stopFrameHold}
+                onPointerLeave={stopFrameHold}
+                onPointerCancel={stopFrameHold}
+                title={t('Next frame (→) · hold for continuous')}
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+            </div>
+
+            {/* Undo / Redo */}
+            <div className="flex items-center gap-0.5">
+              <Button size="icon" variant="ghost" className="size-7 rounded-lg text-muted-foreground" onClick={undo} disabled={past.length === 0} title={t('Undo (Ctrl+Z)')}>
+                <Undo2 className="size-4" />
+              </Button>
+              <Button size="icon" variant="ghost" className="size-7 rounded-lg text-muted-foreground" onClick={redo} disabled={future.length === 0} title={t('Redo (Ctrl+Y)')}>
+                <Redo2 className="size-4" />
+              </Button>
+            </div>
+
+            <div className="ml-auto flex flex-wrap items-center gap-1.5">
+              {/* 축척 −·지표·+ (2026-09-08 오너 지시 5번) — 전체 보기 왼쪽. 지표는 1초당 픽셀. v3 ED1: 카드색 알약. */}
+              <div className="flex h-8 items-center gap-0.5 rounded-full bg-card px-1">
+                <Button size="icon" variant="ghost" className="size-6 rounded-full text-muted-foreground" onClick={() => setPxPerSec(zoomStep(pxPerSec, 'out'))} title={t('Zoom out timeline')}>
+                  <Minus className="size-3" />
+                </Button>
+                <span className="min-w-[64px] text-center font-num text-meta font-medium tabular-nums text-muted-foreground" title={t('Timeline scale')}>
+                  {t('1s = {px}px', { px: Math.round(pxPerSec) })}
+                </span>
+                <Button size="icon" variant="ghost" className="size-6 rounded-full text-muted-foreground" onClick={() => setPxPerSec(zoomStep(pxPerSec, 'in'))} title={t('Zoom in timeline')}>
+                  <Plus className="size-3" />
+                </Button>
+              </div>
+              {/* 전체 보기(#watch-all) — 전 클립 프리로드 후 처음부터 연속 재생 */}
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={!!prefetching}
+                className="gap-1.5 rounded-full px-3.5"
+                onClick={() => void handleWatchAll()}
+                title={t('Preload every clip, then play the whole timeline from the start')}
+              >
+                {prefetching ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <MonitorPlay className="size-3" />
+                )}
+                {prefetching
+                  ? t('Preparing {done}/{total}…', prefetching)
+                  : t('Watch all')}
+              </Button>
+              {/* 샷 영상 일괄 ZIP 다운로드 (타임라인 순서대로 NN_shotId.mp4) */}
+              <Button
+                size="sm"
+                variant="secondary"
+                disabled={exportingZip}
+                className="gap-1.5 rounded-full px-3.5"
+                onClick={async () => {
+                  setExportingZip(true)
+                  try {
+                    const r = await downloadShotsZip({
+                      shots,
+                      videoClips,
+                      clipOrder,
+                      fileBaseName: 'draft_shots',
+                    })
+                    if (r.total === 0) {
+                      toast.info(t('No shot videos to download. (Generate videos first)'))
+                    } else if (r.failed > 0) {
+                      toast.warning(
+                        t('{downloaded}/{total} ZIP complete, {failed} failed (see _failed.txt inside the zip).', {
+                          downloaded: r.downloaded,
+                          total: r.total,
+                          failed: r.failed,
+                        }),
+                      )
+                    } else {
+                      toast.success(t('Downloaded {count} shots as a ZIP in order.', { count: r.downloaded }))
+                    }
+                  } catch (e) {
+                    toast.error(t('ZIP generation failed: {message}', { message: e instanceof Error ? e.message : '' }))
+                  } finally {
+                    setExportingZip(false)
                   }
-                } catch (e) {
-                  toast.error(t('ZIP generation failed: {message}', { message: e instanceof Error ? e.message : '' }))
-                } finally {
-                  setExportingZip(false)
+                }}
+              >
+                {exportingZip ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <FileArchive className="size-3" />
+                )}
+                {exportingZip ? t('Zipping…') : t('Shot ZIP')}
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={onDraftRender}
+                className="gap-1.5 rounded-full px-3.5"
+                title={
+                  renderLabel
+                    ? t('Click to cancel')
+                    : t('Concatenate every clip in order and save as one video file')
                 }
-              }}
-            >
-              {exportingZip ? (
-                <Loader2 className="size-3 animate-spin" />
-              ) : (
-                <FileArchive className="size-3" />
-              )}
-              {exportingZip ? t('Zipping…') : t('Shot ZIP')}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={onDraftRender}
-              className="gap-1.5 hover-red-beam"
-              title={
-                renderLabel
-                  ? t('Click to cancel')
-                  : t('Concatenate every clip in order and save as one video file')
-              }
-            >
-              {renderLabel ? (
-                <Loader2 className="size-3 animate-spin" />
-              ) : (
-                <Download className="size-3" />
-              )}
-              {renderLabel ?? t('Draft Render')}
-            </Button>
+              >
+                {renderLabel ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <Download className="size-3" />
+                )}
+                {renderLabel ?? t('Draft Render')}
+              </Button>
+            </div>
           </div>
-        </div>
 
-        {/* 통합 타임라인 + VU 미터 (우측) */}
-        <div className="flex min-h-0 flex-1">
-          <div className="min-w-0 flex-1">
-            <Timeline
-              layout={timelineLayout}
-              shots={shots}
-              videoClips={videoClips}
-              selectedShotIds={selectedShotIds}
-              selectedAudioIds={selectedAudioIds}
-              currentTime={currentTime}
-              pxPerSec={pxPerSec}
-              toolMode={toolMode}
-              binDragKind={binDragKind}
-              binDropSec={binDropSec}
-              audioClips={audioClips}
-              audioTracks={audioTracks}
-              onSeek={seek}
-              onSelect={selectClip}
-              onToggleSelect={toggleClipSelection}
-              onRangeSelect={selectClipRange}
-              onSetSelection={setClipSelection}
-              onClearSelection={clearClipSelection}
-              onDelete={deleteClip}
-              onDeleteSelected={deleteSelectedClips}
-              onMoveClipToIndex={moveClipToIndex}
-              onZoom={setPxPerSec}
-              onSplitVideo={splitVideoClipAt}
-              onSetSpeed={setSpeed}
-              onAddAudioSource={addAudioSource}
-              onAddAudioFromSource={addAudioClipFromSource}
-              onAddAudioTrack={addAudioTrack}
-              onRemoveAudioTrack={removeAudioTrack}
-              onToggleAudioTrackMute={toggleAudioTrackMute}
-              onToggleAudioMute={toggleAudioMute}
-              onRemoveAudio={removeAudioClip}
-              onMoveAudio={moveAudioClip}
-              onSetAudioVolume={setAudioVolume}
-              onSplitAudio={splitAudioClipAt}
-              onSelectAudio={selectAudioClip}
-              onToggleAudioSelect={toggleAudioSelection}
-              onRangeAudioSelect={selectAudioRange}
-              onSetAudioSelection={setAudioSelection}
-              onClearAudioSelection={clearAudioSelection}
-              onUpdateVideoClip={updateVideoClip}
-              onUpdateAudioClip={updateAudioClip}
-              onSetTrim={setTrim}
-              onSetTitleCardDuration={setTitleCardDuration}
-              onSetTransitionIn={setTransitionIn}
-              onPushHistory={pushHistory}
-            />
+          {/* 통합 타임라인 + VU 미터 (우측) */}
+          <div className="flex min-h-0 flex-1">
+            <div className="min-w-0 flex-1">
+              <Timeline
+                layout={timelineLayout}
+                shots={shots}
+                videoClips={videoClips}
+                selectedShotIds={selectedShotIds}
+                selectedAudioIds={selectedAudioIds}
+                currentTime={currentTime}
+                pxPerSec={pxPerSec}
+                toolMode={toolMode}
+                binDragKind={binDragKind}
+                binDropSec={binDropSec}
+                audioClips={audioClips}
+                audioTracks={audioTracks}
+                onSeek={seek}
+                onSelect={selectClip}
+                onToggleSelect={toggleClipSelection}
+                onRangeSelect={selectClipRange}
+                onSetSelection={setClipSelection}
+                onClearSelection={clearClipSelection}
+                onDelete={deleteClip}
+                onDeleteSelected={deleteSelectedClips}
+                onMoveClipToIndex={moveClipToIndex}
+                onZoom={setPxPerSec}
+                onSplitVideo={splitVideoClipAt}
+                onSetSpeed={setSpeed}
+                onAddAudioSource={addAudioSource}
+                onAddAudioFromSource={addAudioClipFromSource}
+                onAddAudioTrack={addAudioTrack}
+                onRemoveAudioTrack={removeAudioTrack}
+                onToggleAudioTrackMute={toggleAudioTrackMute}
+                onToggleAudioMute={toggleAudioMute}
+                onRemoveAudio={removeAudioClip}
+                onMoveAudio={moveAudioClip}
+                onSetAudioVolume={setAudioVolume}
+                onSplitAudio={splitAudioClipAt}
+                onSelectAudio={selectAudioClip}
+                onToggleAudioSelect={toggleAudioSelection}
+                onRangeAudioSelect={selectAudioRange}
+                onSetAudioSelection={setAudioSelection}
+                onClearAudioSelection={clearAudioSelection}
+                onUpdateVideoClip={updateVideoClip}
+                onUpdateAudioClip={updateAudioClip}
+                onSetTrim={setTrim}
+                onSetTitleCardDuration={setTitleCardDuration}
+                onSetTransitionIn={setTransitionIn}
+                onPushHistory={pushHistory}
+              />
+            </div>
+            <AudioMeter audioClips={audioClips} />
           </div>
-          <AudioMeter audioClips={audioClips} />
-        </div>
 
-        {error && <p className="shrink-0 px-4 py-1 text-xs text-destructive">{error}</p>}
+          {error && <p className="shrink-0 px-4 py-1 text-xs text-destructive">{error}</p>}
+        </div>
       </div>
     </div>
   )

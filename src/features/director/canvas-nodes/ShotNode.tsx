@@ -85,10 +85,10 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           러프만 보이는 상태 → '이미지 생성', 실사 이미지가 있으면 → '이미지 리터칭'(재생성).
           영상 테이크 버튼은 SHOT VIDEO 카드('영상 리테이크')로 이동. */}
       <NodeToolbar isVisible={selected} position={Position.Top} offset={8}>
-        <div className="flex items-center gap-1 rounded-md border border-border bg-popover p-1 shadow-md">
-          <StoryboardImageButton nodeId={id} data={data} className="h-7 gap-1 px-2 text-xs" />
+        <div className="flex items-center gap-1.5 rounded-full bg-popover p-1 pr-2.5 shadow-node">
+          <StoryboardImageButton nodeId={id} data={data} className="h-7 gap-1 rounded-full px-3 text-xs" />
           {/* 선택된 이미지 모델명 — 변경은 편집 패널/팝업에서. */}
-          <span className="rounded-sm border border-primary/50 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-foreground">
+          <span className="font-num text-[11px] font-medium text-muted-foreground">
             {IMAGE_MODELS[normalizeImageModelKey(data.imageModel)].label}
           </span>
         </div>
@@ -108,22 +108,22 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           void generateVideoForShot(id)
         }}
       >
-        {/* 입력 핸들(#handle-visibility) — 항상 보이는 라벨 홈들로 교체. */}
+        {/* 입력 핸들(#handle-visibility) — 항상 보이는 라벨 홈들. v3 D1: 제목 줄 아래 20px 간격 · 한국어 라벨. */}
         <LabeledTargetHandle
           id="prompt"
-          label="PROMPT"
-          top={64}
+          label={t('Prompt')}
+          top={46}
           title={t('Prompt input')}
         />
         <LabeledTargetHandle
           id="image-reference"
-          label="IMAGE"
-          top={90}
+          label={t('Image')}
+          top={66}
           title={t('Image reference input')}
         />
 
         {prompt && (
-          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+          <p className="mt-2 line-clamp-2 text-[11.5px] leading-[1.45] text-muted-foreground">
             {prompt}
           </p>
         )}
@@ -133,7 +133,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             카드 본문·팝업에서 이미 보인다. 3프레임 없는 이미지(구버전/수동 노드)는 정적 표시. */}
         {stageImageUrl && (
           <div
-            className={cn('relative mt-2 overflow-hidden rounded-sm border border-border/40', !mediaFrame && 'aspect-video w-full')}
+            className={cn('relative mt-2 overflow-hidden rounded-[10px] bg-art-placeholder', !mediaFrame && 'aspect-video w-full')}
             style={mediaFrame ?? undefined}
           >
             {realImage ? (
@@ -155,12 +155,12 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
                 className="h-full w-full object-cover"
               />
             )}
-            <span className="pointer-events-none absolute left-1 top-1 rounded-sm bg-background/70 px-1 text-[9px] uppercase text-muted-foreground">
+            <span className="pointer-events-none absolute left-1.5 top-1.5 rounded-[6px] bg-black/45 px-1.5 py-px text-[10px] font-semibold text-foreground">
               {realImage ? t('Live-action') : t('Previz')}
             </span>
             {/* 약속 I4: 러프 3장 중 하나라도 바뀌면 "러프 바뀜" — 자동으로 다시 만들지 않는다(오너 I5). */}
             {realImage && classifyRoughChanged(rough, data.storyboardImage) && (
-              <span className="pointer-events-none absolute right-1 top-1 rounded-sm border border-warning/60 bg-background/80 px-1 text-[9px] text-warning">
+              <span className="pointer-events-none absolute right-1.5 top-1.5 rounded-[6px] bg-black/45 px-1.5 py-px text-[10px] font-semibold text-warning">
                 {t('Rough changed')}
               </span>
             )}
@@ -170,7 +170,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         {failed && (
           <div
             style={mediaFrame ?? undefined}
-            className={cn('mt-2 flex flex-col items-center justify-center gap-0.5 rounded-sm border border-destructive/50 bg-destructive/10 p-1.5 text-center', !mediaFrame && 'aspect-video w-full')}
+            className={cn('mt-2 flex flex-col items-center justify-center gap-0.5 rounded-[10px] bg-destructive/10 p-1.5 text-center', !mediaFrame && 'aspect-video w-full')}
           >
             <span className="text-[10px] font-medium text-destructive">
               {t('Generation failed')}
@@ -188,50 +188,46 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             {data.referenceImages.slice(0, 4).map((img) => (
               <div
                 key={img.id}
-                className="h-8 w-8 overflow-hidden rounded-sm border border-border/40"
+                className="size-8 overflow-hidden rounded-lg bg-card"
               >
                 <ThumbImage src={img.url} alt="ref" className="h-full w-full object-cover" />
               </div>
             ))}
             {data.referenceImages.length > 4 && (
-              <div className="flex h-8 w-8 items-center justify-center rounded-sm border border-border/40 text-[10px] text-muted-foreground">
+              <div className="flex size-8 items-center justify-center rounded-lg bg-card font-num text-[11px] font-medium text-muted-foreground">
                 +{data.referenceImages.length - 4}
               </div>
             )}
           </div>
         )}
 
-        {/* 약속 H3(2026-09-04, 오너 1안): 이미지 카드에도 영상 카드와 같은 큰 상태 글자. */}
-        <div
-          className={cn(
-            'mt-2 flex items-center gap-1.5 text-sm font-semibold',
-            failed
-              ? 'text-destructive'
-              : isGenerating
-                ? 'text-primary'
+        {/* 약속 H3(2026-09-04, 오너 1안): 이미지 카드에도 영상 카드와 같은 상태 글자.
+            v3 D1 꼬리: 상태 점(완료 초록 · 실패 빨강 · 만드는 중 도는 표시) + 상태 + 흐린 메타(카메라 축 · 조명 자리). */}
+        <div className="mt-2.5 flex min-w-0 items-center gap-1.5 text-[11.5px] font-semibold">
+          {isGenerating ? (
+            <Loader2 className="size-3 shrink-0 animate-spin text-stage" />
+          ) : failed ? (
+            <span className="size-1.5 shrink-0 rounded-full bg-destructive" />
+          ) : realImage ? (
+            <span className="size-1.5 shrink-0 rounded-full bg-success" />
+          ) : null}
+          <span className={cn(failed ? 'text-destructive' : isGenerating || realImage ? 'text-foreground' : 'text-subtle-foreground')}>
+            {failed
+              ? t('Failed')
+              : isGenerating && generation.label
+                ? t(generation.label)
                 : realImage
-                  ? 'text-success'
-                  : 'text-muted-foreground',
-          )}
-        >
-          {isGenerating && <Loader2 className="size-3.5 animate-spin" />}
-          {failed
-            ? t('Failed')
-            : isGenerating && generation.label
-              ? t(generation.label)
-              : realImage
-                ? t('Completed')
-                : t('Waiting')}
-        </div>
-        <div className="mt-1 text-[10px] text-muted-foreground">
-          <span className="flex items-center gap-2">
+                  ? t('Completed')
+                  : t('Waiting')}
+          </span>
+          <span className="flex min-w-0 items-center gap-2 text-[11px] font-normal text-subtle-foreground">
             <span className="flex items-center gap-0.5">
-              <Camera className="size-2.5" />
-              {camActiveAxes}/6
+              <Camera className="size-3" />
+              <span className="font-num">{camActiveAxes}/6</span>
             </span>
-            <span className="flex items-center gap-0.5">
-              <Lightbulb className="size-2.5" />
-              {data.lighting.position}
+            <span className="flex min-w-0 items-center gap-0.5">
+              <Lightbulb className="size-3" />
+              <span className="truncate">{data.lighting.position}</span>
             </span>
             {/* Take 배지는 영상 카드에만 둔다(약속 O 2026-09-04 — 이미지 카드의 "Take N" 제거). */}
           </span>

@@ -43,19 +43,19 @@ export function ResizeHandle({
   )
 
   return (
+    // v3 ED1(2026-11-03): 판 사이 틈(가로 12 · 세로 18)이 손잡이 — 평소엔 보이지 않고, 마우스를 올리면 가운데 짧은 선.
     <div
       onPointerDown={onPointerDown}
       className={cn(
-        'group relative shrink-0 bg-border transition-colors hover:bg-primary/40',
-        axis === 'x' ? 'w-1 cursor-col-resize' : 'h-1 cursor-row-resize',
+        'group relative shrink-0',
+        axis === 'x' ? 'w-3 cursor-col-resize' : 'h-[18px] cursor-row-resize',
       )}
       title={t('Drag to resize')}
     >
-      {/* 히트 영역 확장 (얇은 막대라도 잡기 쉽게) */}
       <span
         className={cn(
-          'absolute',
-          axis === 'x' ? '-inset-x-1 inset-y-0' : '-inset-y-1 inset-x-0',
+          'absolute rounded-full bg-border-strong opacity-0 transition-opacity group-hover:opacity-100',
+          axis === 'x' ? 'inset-y-8 left-1/2 w-0.5 -translate-x-1/2' : 'inset-x-16 top-1/2 h-0.5 -translate-y-1/2',
         )}
       />
     </div>

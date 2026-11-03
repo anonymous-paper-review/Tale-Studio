@@ -1232,6 +1232,16 @@ export const KO: Record<string, string> = {
   'This is the storyboard. See every shot image per scene at a glance.\n\n· A card marked "Image generation needed" is still in rough stage\n· Press "Generate video" on a card to go from image to video in one go\n· Double-click a card to open detailed editing': '씬별 샷 이미지를 한눈에 보는 스토리보드예요.\n\n· "이미지 생성 필요" 카드는 아직 러프 상태예요\n· 카드의 "영상 생성"을 누르면 이미지부터 영상까지 이어서 만들어요\n· 카드를 더블클릭하면 상세 편집이 열려요',
   'This is The Set, where scenes → shots → videos connect as nodes.\n\n· Double-click a card to open detailed editing\n· Select a shot card and an image-generation button appears above it\n· Use "Generate storyboard" at the top to turn every shot into a real image at once': '여기는 The Set, 촬영장이에요. 씬 → 샷 → 영상이 노드로 이어져 있어요.\n\n· 카드를 더블클릭하면 상세 편집이 열려요\n· 샷 카드를 선택하면 위에 이미지 생성 버튼이 떠요\n· 상단 "스토리보드 생성"으로 모든 샷을 한 번에 실사화할 수 있어요',
   'Start shooting real images/videos based on the rough storyboard, characters, and world.': '러프 스토리보드와 등장인물, 월드를 바탕으로 실제 이미지/영상으로 촬영을 시작하세요.',
+  // v3 D1 Director 노드 캔버스(2026-11-03) — 툴바 제목 숫자 · 확대 알약 · 입력 구멍 라벨
+  '{nodes} nodes · {shots} shots': '노드 {nodes} · 샷 {shots}',
+  'Canvas zoom': '캔버스 배율',
+  'Zoom out canvas': '캔버스 축소',
+  'Zoom in canvas': '캔버스 확대',
+  'Fit the canvas to the screen': '캔버스를 화면에 맞추기',
+  'Lock canvas editing': '캔버스 편집 잠그기',
+  'Unlock canvas editing': '캔버스 편집 잠금 풀기',
+  'Previous video': '이전 영상',
+  'Describe what you want to create...': '만들고 싶은 것을 적어 주세요...',
   // ── misc: studio/editor/page.tsx (direct) ──
   '{type} audio': '{type} 오디오',
   'Select tool (V)': '선택 도구 (V)',
@@ -1258,6 +1268,12 @@ export const KO: Record<string, string> = {
   'Watch all': '전체 보기',
   'Preparing {done}/{total}…': '준비 중 {done}/{total}…',
   'Preload every clip, then play the whole timeline from the start': '모든 클립을 미리 받아 타임라인을 처음부터 끊김 없이 재생',
+  // v3 ED1 Editor(2026-11-03) — 화면 머리 · 소스 판 · 트랙 이름 · 빈 컷
+  'Final edit': '최종 편집',
+  '{cuts} cuts · {seconds}s · video {ready}/{total}': '컷 {cuts} · {seconds}초 · 영상 {ready}/{total}',
+  Source: '소스',
+  'Audio {n}': '오디오 {n}',
+  'No video made yet': '아직 만든 영상이 없어요',
   'No videos on the timeline yet. Generate videos in Director first.': '타임라인에 영상이 아직 없어요. 먼저 Director에서 영상을 생성하세요.',
   '{failed} of {total} clips could not be preloaded. They will stream as before.': '{total}개 중 {failed}개는 미리 받지 못했어요. 해당 클립은 종전처럼 스트리밍돼요.',
   // ── misc: studio/producer/page.tsx (direct) ──

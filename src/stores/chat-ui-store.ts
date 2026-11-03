@@ -29,6 +29,14 @@ interface ChatUiState {
   setChatWidth: (w: number) => void
   toggleCollapsed: () => void
   setCollapsed: (v: boolean) => void
+  /** 채팅을 잠깐 닫아 둔 단계 화면들(Director · Editor) — 화면이 떠나면 빠진다. 기억하지 않는다. */
+  chatHolds: string[]
+  /** 처음 닫아 둘 때 사용자가 고른 열림/닫힘 — 닫아 둔 동안 브라우저에 기억하는 값도 이것이다(새로고침해도 사용자 것이 남는다). */
+  collapsedBeforeHold: boolean | null
+  /** 단계 화면이 채팅을 닫아 둔다. 이미 다른 화면이 닫아 두었으면 처음 모습을 그대로 기억한다. */
+  holdChatClosed: (holder: string) => void
+  /** 화면이 떠난다 — 닫아 둔 화면이 하나도 안 남으면 채팅을 처음 모습으로 돌린다. */
+  releaseChatHold: (holder: string) => void
   // @멘션 ↔ 카드 하이라이트 동기화. 입력창에 @멘션돼 있는 카드 ref 집합(파생, 미영속).
   mentionedRefs: string[]
   setMentionedRefs: (refs: string[]) => void
@@ -63,6 +71,21 @@ export const useChatUiStore = create<ChatUiState>()(
       setChatWidth: (w) => set({ chatWidth: clampWidth(w) }),
       toggleCollapsed: () => set((s) => ({ collapsed: !s.collapsed })),
       setCollapsed: (v) => set({ collapsed: v }),
+      chatHolds: [],
+      collapsedBeforeHold: null,
+      holdChatClosed: (holder) =>
+        set((s) => ({
+          chatHolds: s.chatHolds.includes(holder) ? s.chatHolds : [...s.chatHolds, holder],
+          collapsedBeforeHold: s.chatHolds.length > 0 ? s.collapsedBeforeHold : s.collapsed,
+          collapsed: true,
+        })),
+      releaseChatHold: (holder) =>
+        set((s) => {
+          if (!s.chatHolds.includes(holder)) return s
+          const chatHolds = s.chatHolds.filter((h) => h !== holder)
+          if (chatHolds.length > 0) return { chatHolds }
+          return { chatHolds, collapsed: s.collapsedBeforeHold ?? s.collapsed, collapsedBeforeHold: null }
+        }),
       mentionedRefs: [],
       setMentionedRefs: (refs) =>
         set((s) =>
@@ -88,7 +111,8 @@ export const useChatUiStore = create<ChatUiState>()(
     }),
     {
       name: 'tale-chat-ui',
-      partialize: (s) => ({ chatWidth: s.chatWidth, collapsed: s.collapsed, modelSettings: s.modelSettings }),
+      // 단계 화면이 채팅을 닫아 둔 동안에는 사용자가 고른 모습을 기억한다(v3 D1 — 닫아 둔 모습이 다른 단계로 새지 않게).
+      partialize: (s) => ({ chatWidth: s.chatWidth, collapsed: s.collapsedBeforeHold ?? s.collapsed, modelSettings: s.modelSettings }),
       merge: (persisted, current) => {
         const saved = persisted as Partial<ChatUiState> | undefined
         return { ...current, ...saved, modelSettings: parseChatModelSettings(saved?.modelSettings) ?? { ...DEFAULT_CHAT_MODEL_SETTINGS } }

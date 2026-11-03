@@ -179,8 +179,9 @@ function AudioClipBlock({
     if (!cv || !slice?.length) return
     cv.width = Math.floor(width)
     cv.height = 40
-    const accent = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim()
-    drawWaveform(cv, slice, accent ? `oklch(${accent})` : '#888')
+    // v3(2026-11-03): 색 토큰이 hex 라 oklch(...) 로 감싸면 그릴 수 없는 색이 돼 파형이 검게(안 보이게) 그려졌다 — 값 그대로 쓴다.
+    const accent = getComputedStyle(document.documentElement).getPropertyValue('--muted-foreground').trim()
+    drawWaveform(cv, slice, accent || '#888')
   }, [slice, width])
 
   const handleBodyPointerDown = useCallback(
@@ -300,16 +301,17 @@ function AudioClipBlock({
           data-no-seek
           onPointerDown={handleBodyPointerDown}
           className={cn(
-            'group absolute top-1 flex h-[52px] flex-col overflow-hidden rounded border',
+            // v3 ED1: 카드 바탕 클립 · 모서리 8, 고른 클립 = 지금 단계 색 1.5px.
+            'group absolute top-1.5 flex h-[52px] flex-col overflow-hidden rounded-lg border-[1.5px] bg-chat-lumi-bubble',
             cutMode ? 'cursor-col-resize' : 'cursor-grab active:cursor-grabbing',
-            selected ? 'border-primary ring-1 ring-primary' : clip.muted ? 'border-border opacity-50' : 'border-primary/50',
+            selected ? 'border-stage' : clip.muted ? 'border-transparent opacity-50' : 'border-transparent hover:border-border-strong',
           )}
           style={{ left: clip.startSec * pxPerSec, width }}
         >
-          <div className="flex items-center justify-between bg-card/80 px-1 py-px">
-            <span className="truncate font-mono text-[8px] text-muted-foreground">{clip.name}</span>
+          <div className="flex items-center justify-between px-1.5 py-px">
+            <span className="truncate text-[9.5px] font-medium text-muted-foreground">{clip.name}</span>
             <button type="button" data-no-seek onPointerDown={(e) => { e.stopPropagation(); onToggleMute() }} title={clip.muted ? t('Unmute') : t('Mute')}>
-              {clip.muted ? <VolumeX className="size-3 text-muted-foreground" /> : <Volume2 className="size-3 text-primary" />}
+              {clip.muted ? <VolumeX className="size-3 text-subtle-foreground" /> : <Volume2 className="size-3 text-muted-foreground" />}
             </button>
           </div>
           <canvas ref={canvasRef} className="pointer-events-none h-full w-full" />
@@ -708,26 +710,27 @@ export function Timeline({
   const firstTrackId = audioTracks[0]?.id
 
   return (
-    <div className="flex h-full flex-col bg-card select-none">
+    // v3 ED1(2026-11-03): 타임라인 판(bg-panel) 안 — 지금 시각(Inter 13 600) · [+ 오디오] 알약 · 전체 길이.
+    <div className="flex h-full flex-col select-none">
       {/* 상단 바 */}
-      <div className="flex items-center justify-between border-b border-border px-3 py-1">
-        <span className="font-mono text-xs tabular-nums text-foreground">{formatTimecode(currentTime)}</span>
+      <div className="flex items-center justify-between px-4 py-1.5">
+        <span className="font-num text-label font-semibold tabular-nums text-foreground">{formatTimecode(currentTime)}</span>
         <div className="flex items-center gap-2">
           {selectedShotIds.length > 1 && (
-            <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] text-primary">{t('{count} selected', { count: selectedShotIds.length })}</span>
+            <span className="rounded-full bg-stage/18 px-2 py-0.5 text-[11px] font-medium text-foreground">{t('{count} selected', { count: selectedShotIds.length })}</span>
           )}
           {selectedAudioIds.length > 1 && (
-            <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] text-primary">{t('{count} audio selected', { count: selectedAudioIds.length })}</span>
+            <span className="rounded-full bg-stage/18 px-2 py-0.5 text-[11px] font-medium text-foreground">{t('{count} audio selected', { count: selectedAudioIds.length })}</span>
           )}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            className="flex h-8 items-center gap-1 rounded-full bg-card px-3.5 text-label font-medium text-foreground transition-colors hover:bg-accent"
             title={t('Upload external audio (inserts at the playhead)')}
           >
-            <Plus className="size-3" /> {t('Audio')}
+            <Plus className="size-3.5" /> {t('Audio')}
           </button>
-          <span className="font-mono text-[10px] tabular-nums text-muted-foreground">{formatTimecode(totalSec)}</span>
+          <span className="font-num text-meta font-medium tabular-nums text-subtle-foreground">{formatTimecode(totalSec)}</span>
         </div>
         <input ref={fileInputRef} type="file" accept="audio/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleAudioFile(f); e.target.value = '' }} />
       </div>
@@ -735,22 +738,22 @@ export function Timeline({
       {/* 본문: 좌측 헤더 컬럼 + 우측 트랙(가로 스크롤) */}
       <div className="flex min-h-0 flex-1">
         {/* 헤더 컬럼 */}
-        <div className="shrink-0 overflow-hidden border-r border-border" style={{ width: HEADER_W }}>
+        <div className="shrink-0 overflow-hidden" style={{ width: HEADER_W }}>
           <div ref={headerInnerRef}>
-            <div className="h-5 border-b border-border" />
-            <div className="flex h-24 items-center justify-center border-b border-border text-[10px] font-medium text-muted-foreground">
-              Video
+            <div className="h-5 border-b border-border-subtle" />
+            <div className="flex h-24 items-center pl-4 text-meta font-medium text-muted-foreground">
+              {t('Video')}
             </div>
             {audioTracks.map((track, i) => (
               <ContextMenu key={track.id}>
                 <ContextMenuTrigger asChild>
                   <div
                     className={cn(
-                      'flex h-16 items-center justify-center gap-1 border-b border-border text-[10px] font-medium text-muted-foreground hover:bg-accent/40',
+                      'flex h-16 items-center gap-1 pl-4 text-meta font-medium text-muted-foreground hover:text-foreground',
                       track.muted && 'opacity-60',
                     )}
                   >
-                    <span>Audio {i + 1}</span>
+                    <span>{t('Audio {n}', { n: i + 1 })}</span>
                     {/* 트랙 전체 음소거 토글 */}
                     <button
                       type="button"
@@ -765,7 +768,7 @@ export function Timeline({
                       {track.muted ? (
                         <VolumeX className="size-3 text-muted-foreground" />
                       ) : (
-                        <Volume2 className="size-3 text-primary" />
+                        <Volume2 className="size-3 text-muted-foreground" />
                       )}
                     </button>
                   </div>
@@ -793,7 +796,7 @@ export function Timeline({
             <button
               type="button"
               onClick={() => onAddAudioTrack()}
-              className="flex h-6 w-full items-center justify-center gap-1 text-[9px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="flex h-8 w-full items-center gap-1 pl-4 text-meta font-medium text-subtle-foreground transition-colors hover:text-foreground"
               title={t('Add audio track')}
             >
               <Plus className="size-3" /> {t('Track')}
@@ -818,11 +821,11 @@ export function Timeline({
             onPointerLeave={() => setCutHoverSec(null)}
           >
             {/* Ruler */}
-            <div className="relative h-5 border-b border-border bg-muted/30" onPointerDown={handleSeekPointerDown}>
+            <div className="relative h-5 border-b border-border-subtle" onPointerDown={handleSeekPointerDown}>
               {ticks.map((tickSec) => (
                 <div key={tickSec} className="absolute top-0 flex h-full flex-col" style={{ left: tickSec * pxPerSec }}>
-                  <div className="h-2 w-px bg-border" />
-                  <span className="ml-0.5 font-mono text-[8px] leading-none text-muted-foreground">{formatTimecode(tickSec)}</span>
+                  <span className="ml-1 font-num text-[10px] font-medium leading-[12px] text-subtle-foreground">{formatTimecode(tickSec)}</span>
+                  <div className="mt-auto h-1.5 w-px bg-foreground/25" />
                 </div>
               ))}
             </div>
@@ -832,7 +835,7 @@ export function Timeline({
               ref={videoTrackRef}
               data-drop="video-track"
               data-pps={pxPerSec}
-              className={cn('relative h-24 border-b border-border transition-colors', binDragKind === 'video' && 'bg-primary/10 ring-1 ring-inset ring-primary/40')}
+              className={cn('relative h-24 transition-colors', binDragKind === 'video' && 'bg-stage/10 ring-1 ring-inset ring-stage/40')}
               onPointerDown={handleVideoTrackPointerDown}
             >
               {layout.map((item) => {
@@ -853,14 +856,15 @@ export function Timeline({
                         onPointerDown={(e) => handleClipPointerDown(e, item)}
                         title={resolveEntityNames(shot.actionDescription, entityNames)}
                         className={cn(
-                          'group absolute top-1 flex h-[72px] flex-col overflow-hidden rounded border',
+                          // v3 ED1: 클립 = 한 단 밝은 판 · 모서리 10, 고른 클립 = 지금 단계 색 1.5px.
+                          'group absolute top-3 flex h-[72px] flex-col overflow-hidden rounded-[10px] border-[1.5px] bg-chat-lumi-bubble',
                           cutMode ? 'cursor-col-resize' : 'cursor-pointer',
-                          isDragging && 'opacity-60 ring-1 ring-primary',
-                          isSelected ? 'border-primary ring-1 ring-primary' : 'border-border hover:border-border-strong',
+                          isDragging && 'opacity-60',
+                          isSelected ? 'border-stage' : 'border-transparent hover:border-border-strong',
                         )}
                         style={{ left, width: Math.max(width, 8) }}
                       >
-                        <div className="pointer-events-none flex h-full w-full items-center justify-center bg-muted text-[8px] text-muted-foreground">
+                        <div className="pointer-events-none flex h-full w-full items-center justify-center text-[8px] text-muted-foreground">
                           {isTitleCardShotId(item.shotId) ? (
                             <div className="flex h-full w-full flex-col items-center justify-center gap-0.5 bg-black px-1 text-center">
                               <Type className="size-3 text-white/60" />
@@ -872,9 +876,7 @@ export function Timeline({
                             <video src={clip.url} poster={clip.thumbnailUrl ?? thumbUrl(shot.referenceImageUrl)} className="h-full w-full object-cover" muted preload={(clip.thumbnailUrl ?? shot.referenceImageUrl) ? 'none' : 'metadata'} draggable={false} />
                           ) : shot.referenceImageUrl ? (
                             <ThumbImage src={shot.referenceImageUrl} alt={shot.shotType} className="h-full w-full object-cover" draggable={false} />
-                          ) : (
-                            <span className="font-mono">{shot.shotType}</span>
-                          )}
+                          ) : null}
                         </div>
                         {/* 약속 J4: 타이틀 카드는 라벨에 길이가 보이고, 누르면 초 단위 숫자를 넣는다. */}
                         {isTitleCardShotId(item.shotId) && durationEdit?.shotId === item.shotId ? (
@@ -919,12 +921,16 @@ export function Timeline({
                           }}
                           title={isTitleCardShotId(item.shotId) ? t('Title card length (seconds)') : undefined}
                           className={cn(
-                            'absolute left-1 top-0.5 rounded bg-black/60 px-1 font-mono text-[8px] text-white',
-                            isTitleCardShotId(item.shotId) ? 'cursor-text hover:bg-primary/70' : 'pointer-events-none',
+                            'absolute left-1.5 top-1.5 rounded-[5px] bg-chip px-[5px] py-px font-num text-[9.5px] font-semibold text-foreground',
+                            isTitleCardShotId(item.shotId) ? 'cursor-text hover:bg-accent' : 'pointer-events-none',
                           )}
                         >
                           {isTitleCardShotId(item.shotId) ? `${t('Title')} · ${item.durationSec.toFixed(1)}s` : shot.shotType}
-                          {clip?.speed && clip.speed !== 1 && <span className="ml-1 text-primary">{clip.speed.toFixed(2)}×</span>}
+                          {clip?.speed && clip.speed !== 1 && <span className="ml-1 text-stage">{clip.speed.toFixed(2)}×</span>}
+                        </span>
+                        {/* v3 ED1: 왼쪽 아래 길이("5초") */}
+                        <span className="pointer-events-none absolute bottom-1.5 left-2 font-num text-[10.5px] font-medium text-subtle-foreground">
+                          {t('{seconds}s', { seconds: Math.round(item.durationSec * 10) / 10 })}
                         </span>
                         {/* 트림 핸들 (요청): 점선 미리보기 → 드롭 시 적용. 원본 길이 초과 불가. */}
                         <div
@@ -1082,12 +1088,12 @@ export function Timeline({
               )}
               {trimPreview?.scope === 'video' && (
                 <div
-                  className="pointer-events-none absolute top-1 z-30 h-[72px] rounded border-2 border-dashed border-muted-foreground/80 bg-foreground/10"
+                  className="pointer-events-none absolute top-3 z-30 h-[72px] rounded-[10px] border-2 border-dashed border-muted-foreground/80 bg-foreground/10"
                   style={{ left: trimPreview.leftSec * pxPerSec, width: Math.max(2, (trimPreview.rightSec - trimPreview.leftSec) * pxPerSec) }}
                 />
               )}
               {layout.length === 0 && (
-                <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-[10px] text-muted-foreground">
+                <p className="pointer-events-none absolute inset-0 flex items-center justify-center text-meta text-subtle-foreground">
                   {t('Drag a clip from Video Source, or right-click→Add to timeline')}
                 </p>
               )}
@@ -1102,7 +1108,7 @@ export function Timeline({
                   data-drop="audio-track"
                   data-track-id={track.id}
                   data-pps={pxPerSec}
-                  className={cn('relative h-16 border-b border-border bg-muted/10 transition-colors', binDragKind === 'audio' && 'bg-primary/10 ring-1 ring-inset ring-primary/40', track.muted && 'opacity-50')}
+                  className={cn('relative h-16 rounded-[10px] bg-white/3 transition-colors', binDragKind === 'audio' && 'bg-stage/10 ring-1 ring-inset ring-stage/40', track.muted && 'opacity-50')}
                   onPointerDown={handleAudioLanePointerDown}
                 >
                   {clipsOnTrack.map((a) => (
@@ -1130,7 +1136,7 @@ export function Timeline({
                   ))}
                   {trimPreview?.scope === track.id && (
                     <div
-                      className="pointer-events-none absolute top-1 z-30 h-[52px] rounded border-2 border-dashed border-muted-foreground/80 bg-foreground/10"
+                      className="pointer-events-none absolute top-1.5 z-30 h-[52px] rounded-lg border-2 border-dashed border-muted-foreground/80 bg-foreground/10"
                       style={{ left: trimPreview.leftSec * pxPerSec, width: Math.max(2, (trimPreview.rightSec - trimPreview.leftSec) * pxPerSec) }}
                     />
                   )}
@@ -1139,7 +1145,7 @@ export function Timeline({
             })}
 
             {audioClips.length === 0 && (
-              <p className="pointer-events-none absolute left-2 z-10 text-[10px] text-muted-foreground" style={{ top: 20 + 96 + 4 }}>
+              <p className="pointer-events-none absolute left-3.5 z-10 text-meta text-subtle-foreground" style={{ top: 20 + 96 + 24 }}>
                 {t('Drag an Audio source, or upload with the + button in the top-right')}
               </p>
             )}
@@ -1166,8 +1172,9 @@ export function Timeline({
             )}
 
             {/* Playhead (전체 트랙 관통) */}
-            <div className="pointer-events-none absolute top-0 z-30 h-full w-px bg-primary" style={{ left: playheadX }}>
-              <div className="absolute -left-[5px] top-0 size-0 border-x-[5px] border-t-[6px] border-x-transparent border-t-primary" />
+            {/* v3 ED1: 2px 크림 선 + 위 10px 원 */}
+            <div className="pointer-events-none absolute top-0 z-30 h-full w-0.5 -translate-x-1/2 bg-foreground" style={{ left: playheadX }}>
+              <div className="absolute -left-1 -top-px size-2.5 rounded-full bg-foreground" />
             </div>
           </div>
         </div>
