@@ -4,13 +4,48 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Tale Studio v3 (2026-11-03 오너 지시 — 디자이너 v3 "Claude 톤" 적용).
+ * 어두운 화면 하나만 쓴다(<html class="dark">). 토큰 이름은 예전 그대로 두고 값만 v3 로 바꿨다 —
+ * 기존 컴포넌트가 이름을 통해 저절로 새 색을 입는다. 규칙은 specs/design.md, 값은 이 파일이 정본.
+ */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans:
-    var(--font-geist-sans), var(--font-pretendard), ui-sans-serif, system-ui,
-    sans-serif;
-  --font-mono: var(--font-geist-mono);
+  /* 글자: Pretendard. 숫자 · 메타(Figma Number/Meta · Number/Tag)는 Inter — 한글 글리프는 Pretendard 로 이어진다. */
+  --font-sans: var(--font-pretendard), ui-sans-serif, system-ui, sans-serif;
+  --font-num: var(--font-inter), var(--font-pretendard), ui-sans-serif, system-ui, sans-serif;
+  /* 예전 font-mono 자리(시간 코드 · 카메라 값 · 단축키)도 v3 숫자 글꼴 Inter 를 쓴다 — 고정폭 글꼴은 두지 않는다. */
+  --font-mono: var(--font-inter), var(--font-pretendard), ui-sans-serif, system-ui, sans-serif;
+
+  /* v3 글자 크기(Figma 이름 붙은 글자 스타일) — text-micro · text-caption · text-meta · text-label · text-chat · text-body · text-prose · text-title · text-display */
+  --text-tag: 0.625rem;
+  --text-tag--line-height: 1.4;
+  --text-micro: 0.71875rem;
+  --text-micro--line-height: 1.4;
+  --text-meta: 0.75rem;
+  --text-meta--line-height: 1.4;
+  --text-caption: 0.78125rem;
+  --text-caption--line-height: 1.45;
+  --text-label: 0.84375rem;
+  --text-label--line-height: 1.4;
+  --text-chat: 0.84375rem;
+  --text-chat--line-height: 1.55;
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.6;
+  --text-prose: 1rem;
+  --text-prose--line-height: 1.85;
+  --text-title: 1.75rem;
+  --text-title--line-height: 1.3;
+  --text-title--letter-spacing: -0.01em;
+  --text-display: 2rem;
+  --text-display--line-height: 1.3;
+  --text-display--letter-spacing: -0.01em;
+
+  /* 그림자는 아래로 떨어지는 것 하나만(브랜드 가이드 "효과는 아래 그림자 하나만") */
+  --shadow-panel: 0 20px 50px rgb(0 0 0 / 0.4);
+  --shadow-node: 0 8px 24px rgb(0 0 0 / 0.35);
+
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -30,6 +65,7 @@
   --color-destructive: var(--destructive);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
+  --color-subtle-foreground: var(--subtle-foreground);
   --color-muted-foreground: var(--muted-foreground);
   --color-muted: var(--muted);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -40,6 +76,9 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  /* v3 큰 내용 판(산문 · 설정 · 인물 · 샷 카드) — 바탕보다 한 단 어둡다 */
+  --color-panel: var(--panel);
+  --color-chip: var(--chip);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -76,92 +115,149 @@
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
 
-  /* Stage colors — pipeline P1~P5 (design.md §2.9). Enables bg/text/border-stage-* + alpha. */
+  /* 단계 색(design.md §2.9) — bg/text/border-stage-{단계} + 알파. 단계 이름은 화면 이름(producer=Producer … editor=Editor). */
   --color-stage-producer: var(--stage-producer);
   --color-stage-writer: var(--stage-writer);
   --color-stage-artist: var(--stage-artist);
   --color-stage-storyboard: var(--stage-storyboard);
   --color-stage-director: var(--stage-director);
   --color-stage-editor: var(--stage-editor);
+  /* 지금 단계 색 하나 — [data-stage] 가 정한다(아래). bg-stage · text-stage · border-stage · bg-stage/18 */
+  --color-stage: var(--stage);
+  --color-stage-badge-foreground: var(--stage-badge-foreground);
+  --color-on-stage: var(--on-stage);
 
-  /* GlobalChat 유저 말풍선 (#oiioii-chat v2) — primary(CTA red)보다 명도·채도를 낮춘 전용 톤.
-     "붉은 배경에 흰 글씨" 피로 완화: 버블은 콘텐츠지 CTA가 아니다. */
+  /* 채팅(Lumi 개발 가이드 채팅창 색) — 틀은 무채색 고정, 지금 단계 색 하나만 칩 · 이름 · 점 · 고른 답 · 포커스에 */
+  --color-chat-bg: var(--chat-bg);
+  --color-chat-lumi-bubble: var(--chat-lumi-bubble);
+  --color-chat-input: var(--chat-input);
+  --color-chat-chip: var(--chat-chip);
+  --color-chat-send: var(--chat-send);
   --color-chat-user-bubble: var(--chat-user-bubble);
   --color-chat-user-bubble-foreground: var(--chat-user-bubble-foreground);
 }
 
 /*
- * Netflix Dark Mode — Tale Studio
- * Dark-only app: :root light theme kept for shadcn compatibility but unused.
+ * 값 — 어두운 화면 하나(dark only). Figma v3 브랜드 가이드(157-677) · 화면 시안 실측 · Lumi 개발 가이드 채팅창 색.
  */
 :root {
-  --radius: 0.5rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --radius: 0.75rem; /* 12px — sm 8 · md 10(v3 버튼 · 입력) · lg 12(레일 칸 · 탭) · xl 16(레일 · 채팅 · 판 · 말풍선) · 2xl 20 · 3xl 24 */
 
-  /* Canvas extension tokens (design.md §17.11). Edge colors are mode-specific
-     sources of truth; the remaining aliases follow their base tokens. */
-  --canvas-bg: var(--background);
+  /* 무채색(브랜드 가이드 04 시스템 색) */
+  --shell: #262624; /* 작업 화면 바탕 */
+  --side: #1f1e1d; /* 사이드바 · 채팅 */
+  --card: #30302e; /* 카드 · 입력 · 보조 버튼 */
+  --chip: #3a3936; /* 칩 · 보조 버튼 눌림 */
+  --panel: #1e1b1c; /* 큰 내용 판 — 시안의 #1D191A 85~88% 를 바탕 위에 합친 값 */
+
+  --background: var(--shell);
+  --foreground: #f5f4ee; /* Text */
+  --card-foreground: var(--foreground);
+  --popover: var(--card);
+  --popover-foreground: var(--foreground);
+  /* 메인 버튼은 크림 하나, 글씨는 어둡게 */
+  --primary: #edeae0;
+  --primary-foreground: #1f1e1d;
+  --secondary: var(--card);
+  --secondary-foreground: var(--foreground);
+  --muted: var(--card);
+  --muted-foreground: #c2c0b6; /* Text 2 — 보조 글자 */
+  --subtle-foreground: #8e8b82; /* 메타 · 힌트 · 자리표시 · 아직 안 연 단계 */
+  --accent: var(--chip);
+  --accent-foreground: var(--foreground);
+  --destructive: #f24822; /* Danger — 상태 표시에만, 늘 아이콘과 함께 */
+
+  --border-subtle: #2f2e2b;
+  --border: #3a3936;
+  --border-strong: #4d4b46;
+  --input: #3a3936;
+  --ring: #0d99ff; /* Info — 링크 · 포커스 */
+
+  --surface-primary: var(--shell);
+  --surface-secondary: var(--card);
+  --surface-tertiary: var(--chip);
+  --surface-elevated: #45443f;
+
+  /* 상태(브랜드 가이드) — 오류 · 완료 · 주의 · 링크에만 */
+  --success: #14ae5c;
+  --success-foreground: #141312;
+  --warning: #ffcd29;
+  --warning-foreground: #141312;
+  --info: #0d99ff;
+  --info-foreground: #141312;
+
+  /* 엔티티 표시(design.md §2.2) — 인물 · 장소 · Director 노드 */
+  --chart-1: oklch(0.537 0.234 29.23);
+  --chart-2: oklch(0.614 0.189 254.8);
+  --chart-3: oklch(0.779 0.175 64.1);
+  --chart-4: oklch(0.648 0.174 142.5);
+  --chart-5: oklch(0.628 0.225 26.5);
+
+  /* 왼쪽 레일 */
+  --sidebar: var(--side);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: #2f2e2b; /* 지금 단계 칸 바탕 */
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: #2f2e2b;
+  --sidebar-ring: var(--ring);
+
+  /* 캔버스(design.md §17.11) — D1 시안: 캔버스 #1A1918, 노드는 작업 바탕색, 선은 흰 20% */
+  --canvas-bg: #1a1918;
   --canvas-dot: var(--muted-foreground);
-  --node-bg-default: var(--card);
-  --node-bg-selected: var(--accent);
+  --node-bg-default: var(--background);
+  --node-bg-selected: var(--card);
   --node-border-default: var(--border);
   --node-border-selected: var(--ring);
-  --edge-default: oklch(0.52 0.06 250);
-  --edge-selected: oklch(0.5 0.07 300);
+  --edge-default: rgb(255 255 255 / 0.2);
+  --edge-selected: var(--stage-director);
 
-  /* Border tiers (design.md §2.4). light: Radix gray-7 / gray-5. */
-  --border-strong: oklch(0.85 0 0);
-  --border-subtle: oklch(0.95 0 0);
+  /* 단계 색(브랜드 가이드 03 · 오너 11/3: Lumi 가이드의 --stage-* 대신 이 값) */
+  --stage-producer: #f2a33a;
+  --stage-writer: #e8606f;
+  --stage-artist: #8b63e8;
+  --stage-storyboard: #5a6ae6;
+  --stage-director: #3e9be0;
+  --stage-editor: #2db39a;
+  /* 단계 배지(위 막대 단계 칩) — Figma v3/Stage Badge/* */
+  --stage-badge-producer: linear-gradient(90deg, #ea8a2c, #ffb84f);
+  --stage-badge-writer: linear-gradient(90deg, #b54b57, #ea707d);
+  --stage-badge-artist: linear-gradient(90deg, #6c4db5, #9773ea);
+  --stage-badge-storyboard: linear-gradient(90deg, #4653b3, #6b79e8);
+  --stage-badge-director: linear-gradient(90deg, #3079af, #51a5e3);
+  --stage-badge-editor: linear-gradient(90deg, #238c78, #42bba4);
+  /* 단계 카드 그라데이션(진한 색 → 연한 색) — Figma v3/Stage/* */
+  --stage-gradient-producer: linear-gradient(135deg, #e98b2a 0%, #f2a33a 45%, #ffc36b 100%);
+  --stage-gradient-writer: linear-gradient(135deg, #be4f5b 0%, #e8606f 45%, #ee8893 100%);
+  --stage-gradient-artist: linear-gradient(135deg, #7251be 0%, #8b63e8 45%, #a88aee 100%);
+  --stage-gradient-storyboard: linear-gradient(135deg, #4a57bd 0%, #5a6ae6 45%, #838fec 100%);
+  --stage-gradient-director: linear-gradient(135deg, #337fb8 0%, #3e9be0 45%, #6eb4e8 100%);
+  --stage-gradient-editor: linear-gradient(135deg, #25937e 0%, #2db39a 45%, #62c6b3 100%);
+  /* 브랜드 그라데이션 Pearl Vivid — 로고 · 홈 헤드라인 · 앱 아이콘 · 작품 완성 순간에만 */
+  --pearl-vivid: linear-gradient(90deg, #f2a33a 0%, #e8606f 20%, #8b63e8 40%, #5a6ae6 60%, #3e9be0 80%, #2db39a 100%);
+  /* 홈 헤드라인 글자(흰색 → 따뜻한 회색) — Figma v3/Gradient/Text · 기본 */
+  --text-gradient: linear-gradient(90deg, #ffffff, #9e9b92);
+  /* 그림 자리(아직 그림 없음) — Figma Content/Art Placeholder */
+  --art-placeholder: linear-gradient(135deg, #4d4b46, #2e2d2a);
+  /* 단계 색 위 글씨(어두운 잉크) */
+  --on-stage: #141312;
 
-  /* Semantic state colors (design.md §2.5). Light variants — paired with foregrounds for icon+label compounds. */
-  --success: oklch(0.55 0.16 145);
-  --success-foreground: oklch(1 0 0);
-  --warning: oklch(0.7 0.18 70);
-  --warning-foreground: oklch(0.145 0 0);
-  --info: oklch(0.6 0.15 240);
-  --info-foreground: oklch(1 0 0);
+  /* 지금 단계 — [data-stage] 가 없는 곳(프로젝트 목록 등)은 크림 하나로 */
+  --stage: var(--primary);
+  --stage-badge: linear-gradient(90deg, var(--primary), var(--primary));
+  --stage-badge-foreground: var(--primary-foreground);
+  --stage-gradient: linear-gradient(135deg, var(--primary), var(--primary));
 
-  /* Stage colors (design.md §2.9). Light: Tailwind -600 step for contrast on light bg. */
-  --stage-producer: oklch(0.541 0.281 293.009); /* violet-600 */
-  --stage-writer: oklch(0.546 0.245 262.881);   /* blue-600 */
-  --stage-artist: oklch(0.666 0.179 58.318);     /* amber-600 */
-  --stage-storyboard: oklch(0.609 0.126 221.723); /* cyan-600 — 리뉴얼 1차 Storyboard(2026-10-19) */
-  --stage-director: oklch(0.586 0.253 17.585);   /* rose-600 */
-  --stage-editor: oklch(0.596 0.145 163.225);    /* emerald-600 */
-
-  /* GlobalChat 유저 말풍선 — light: 차분한 딥 뉴트럴 (붉은 CTA와 분리). */
-  --chat-user-bubble: oklch(0.32 0.015 30);
-  --chat-user-bubble-foreground: oklch(0.985 0 0);
+  /* 채팅창(Lumi 개발 가이드) */
+  --chat-bg: var(--side);
+  --chat-lumi-bubble: #2a2927;
+  --chat-my-bubble: #34332f;
+  --chat-chip: var(--chip);
+  --chat-input: var(--card);
+  --chat-send: var(--primary);
+  --chat-user-bubble: var(--chat-my-bubble);
+  --chat-user-bubble-foreground: var(--foreground);
 
   /* Z-index named ladder (design.md §11.1). Referenced by @utility z-* below. */
   --z-canvas: 0;
@@ -178,99 +274,56 @@
   --z-toast: 70;
 }
 
-.dark {
-  /* Background: #121212 */
-  --background: oklch(0.156 0 0);
-  /* Foreground: #FFFFFF */
-  --foreground: oklch(1 0 0);
+/* 지금 단계 색 하나 — 컨테이너에 data-stage 를 붙이면 그 아래 --stage 가 바뀐다(Lumi 가이드 채팅창 CSS 와 같은 방식).
+   값은 화면 이름(Lumi persona 이름과 같다): producer · writer · artist · storyboard · director · editor.
+   스튜디오 레이아웃이 지금 단계로 <html> 과 셸에 붙인다 — 팝업(포털)도 같은 색을 입는다. */
+[data-stage='producer'] {
+  --stage: var(--stage-producer);
+  --stage-badge: var(--stage-badge-producer);
+  --stage-badge-foreground: #1f1e1d;
+  --stage-gradient: var(--stage-gradient-producer);
+}
+[data-stage='writer'] {
+  --stage: var(--stage-writer);
+  --stage-badge: var(--stage-badge-writer);
+  --stage-badge-foreground: #ffffff;
+  --stage-gradient: var(--stage-gradient-writer);
+}
+[data-stage='artist'] {
+  --stage: var(--stage-artist);
+  --stage-badge: var(--stage-badge-artist);
+  --stage-badge-foreground: #ffffff;
+  --stage-gradient: var(--stage-gradient-artist);
+}
+[data-stage='storyboard'] {
+  --stage: var(--stage-storyboard);
+  --stage-badge: var(--stage-badge-storyboard);
+  --stage-badge-foreground: #ffffff;
+  --stage-gradient: var(--stage-gradient-storyboard);
+}
+[data-stage='director'] {
+  --stage: var(--stage-director);
+  --stage-badge: var(--stage-badge-director);
+  --stage-badge-foreground: #ffffff;
+  --stage-gradient: var(--stage-gradient-director);
+}
+[data-stage='editor'] {
+  --stage: var(--stage-editor);
+  --stage-badge: var(--stage-badge-editor);
+  --stage-badge-foreground: #ffffff;
+  --stage-gradient: var(--stage-gradient-editor);
+}
 
-  /* Card: #1a1a1a */
-  --card: oklch(0.185 0 0);
-  --card-foreground: oklch(1 0 0);
-
-  /* Popover: #242424 */
-  --popover: oklch(0.222 0 0);
-  --popover-foreground: oklch(1 0 0);
-
-  /* MVP-01 검수안: 정상 진행은 중립 전경색, 삭제/오류는 destructive. */
-  --primary: var(--foreground);
-  --primary-foreground: var(--background);
-
-  /* Secondary: #1a1a1a */
-  --secondary: oklch(0.185 0 0);
-  --secondary-foreground: oklch(1 0 0);
-
-  /* Muted: #2a2a2a */
-  --muted: oklch(0.243 0 0);
-  /* Muted foreground: #B3B3B3 */
-  --muted-foreground: oklch(0.762 0 0);
-
-  /* Accent: #242424 */
-  --accent: oklch(0.222 0 0);
-  --accent-foreground: oklch(1 0 0);
-
-  --destructive: oklch(0.704 0.191 22.216);
-
-  /* Border: #333333 */
-  --border: oklch(0.278 0 0);
-  --input: oklch(0.278 0 0);
-  /* Ring: #E50914 */
-  --ring: var(--primary);
-  /* Canvas edge sources of truth: muted blue by default, muted purple when selected. */
-  --edge-default: oklch(0.7 0.06 250);
-  --edge-selected: oklch(0.72 0.07 300);
-
-  --chart-1: oklch(0.537 0.234 29.23);
-  --chart-2: oklch(0.614 0.189 254.8);
-  --chart-3: oklch(0.779 0.175 64.1);
-  --chart-4: oklch(0.648 0.174 142.5);
-  --chart-5: oklch(0.628 0.225 26.5);
-
-  /* Sidebar: 좌측 스테이지 레일 전용 surface (#shell-lift 2026-07-31).
-     card(#1a1a1a)가 아니라 surface 사다리 최상단보다도 한 단 위로 올린다 — 배경(#121212) 위에
-     떠 있는 둥근 패널이라, 밝을수록 패널이 앞으로 나오고 화면이 넓어 보인다(개활감).
-     accent(hover/active)는 레일보다 *더* 밝아야 한다: 기존 --accent(0.222)를 그대로 쓰면
-     밝아진 레일 위에서 눌린 것처럼 어두워져 elevation 이 뒤집힌다. */
-  --sidebar: oklch(0.255 0 0);
-  --sidebar-foreground: oklch(1 0 0);
-  --sidebar-primary: var(--primary);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.315 0 0);
-  --sidebar-accent-foreground: oklch(1 0 0);
-  --sidebar-border: oklch(0.34 0 0);
-  --sidebar-ring: oklch(0.537 0.234 29.23);
-
-  /* Surface hierarchy */
-  --surface-primary: oklch(0.156 0 0);    /* #121212 */
-  --surface-secondary: oklch(0.185 0 0);  /* #1a1a1a */
-  --surface-tertiary: oklch(0.222 0 0);   /* #242424 */
-  --surface-elevated: oklch(0.243 0 0);   /* #2a2a2a */
-
-  /* Border tiers (design.md §2.4). dark: brighter step for hovered/strong, subtle for non-interactive separator. */
-  --border-strong: oklch(0.38 0 0);  /* ~#5a5a5a */
-  --border-subtle: oklch(0.22 0 0);  /* ~#262626 */
-
-  /* Semantic state colors — dark mode (design.md §2.5). Chroma kept low to avoid Netflix-Red accent collision. */
-  --success: oklch(0.648 0.174 142.5);
-  --success-foreground: oklch(0.156 0 0);
-  --warning: oklch(0.779 0.175 64.1);
-  --warning-foreground: oklch(0.156 0 0);
-  --info: oklch(0.614 0.189 254.8);
-  --info-foreground: oklch(1 0 0);
-
-  /* Stage colors — dark mode (design.md §2.9). Pipeline P1~P5 badge + agent face.
-     director=rose, NOT --primary red, to preserve the one-accent rule. */
-  --stage-producer: oklch(0.606 0.25 292.717); /* violet-500 */
-  --stage-writer: oklch(0.623 0.214 259.815);  /* blue-500 */
-  --stage-artist: oklch(0.769 0.188 70.08);    /* amber-500 */
-  --stage-storyboard: oklch(0.715 0.143 215.221); /* cyan-500 */
-  --stage-director: oklch(0.645 0.246 16.439); /* rose-500 */
-  --stage-editor: oklch(0.696 0.17 162.48);    /* emerald-500 */
-
-  /* GlobalChat 유저 말풍선 — dark: primary(0.537/0.234)에서 명도·채도를 눌러 소파에 깔린
-     와인/브릭 톤. 흰 글씨 대비는 유지(L 0.36 vs 0.96). */
-  --chat-user-bubble: oklch(0.36 0.09 29);
-  --chat-user-bubble-foreground: oklch(0.96 0.005 30);
+/* 그라데이션 바탕 — 색 이름 utility(bg-stage)는 단색이라 그라데이션은 여기서 연다 */
+@utility bg-stage-badge { background-image: var(--stage-badge); }
+@utility bg-stage-gradient { background-image: var(--stage-gradient); }
+@utility bg-pearl-vivid { background-image: var(--pearl-vivid); }
+@utility bg-art-placeholder { background-image: var(--art-placeholder); }
+@utility text-gradient {
+  background-image: var(--text-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 @layer base {
@@ -278,7 +331,9 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    /* font-sans 를 body 에 직접 건다 — 글꼴 변수(--font-pretendard · --font-inter)는 next/font 가 body 에 붙이는데,
+       Tailwind 기본 글꼴은 html 에 걸려 변수를 못 찾고 시스템 글꼴로 떨어졌다(v3 확인 중 발견, 2026-11-03). */
+    @apply bg-background font-sans text-foreground;
     /* 슈퍼 드래그(텍스트 선택 하이라이트) 비활성 — 캔버스/타임라인 드래그 시 OS 선택색 방지 */
     user-select: none;
     -webkit-user-select: none;
@@ -324,7 +379,7 @@
   }
 }
 
-/* --beam-color 로 빛 색을 파라미터화(#e13 2026-07-14) — 기본은 기존과 동일한 accent(red).
+/* --beam-color 로 빛 색을 파라미터화(#e13 2026-07-14) — 기본은 메인 색(--primary, v3 에서는 크림).
    이미지 생성=success(초록), 영상 생성=primary(빨강) 구분에 사용. 새 토큰이 아니라
    기존 토큰을 골라 쓰는 스위치다. */
 .tale-beam,
@@ -388,10 +443,11 @@
   }
 }
 
-/* ── Hover "red beam" (June 2026 UI 통일) ──
-   입력창·버튼에 마우스 호버(또는 포커스) 시 빨간 빛이 테두리를 따라 도는 효과.
-   .tale-beam(생성중 accent)과 동일 메커니즘(conic ring + beam-spin)이되 destructive 색 +
-   hover/focus 게이트 + ::before 오버레이. D20/D21/P2/P4/P5 공통 hover 통일.
+/* ── 입력창 · 단추 테두리 강조 (v3, 2026-11-03) ──
+   예전 이름(hover-red-beam, June 2026 UI 통일)은 그대로 두고 생김새만 v3 로 바꿨다 — 쓰는 곳이 많아 이름을 옮기지 않는다.
+   v3 에는 도는 빨간 빛이 없다: 빨강은 오류 색(Danger)이라 hover 에 쓰면 오류로 읽힌다. 대신 Lumi 가이드의
+   ".chat-input:focus-within { border: 1px solid var(--stage) }" 처럼 지금 단계 색 1px 테두리를 멈춘 채 보인다.
+   마우스를 올리면 한 단 밝은 테두리, 포커스(키보드 · 입력 중)면 지금 단계 색.
    주의: <input>/<textarea>는 ::before 미지원 → HoverBeam 래퍼(div)로 감싼다. <button>은 직접 적용. */
 .hover-red-beam {
   position: relative;
@@ -401,52 +457,27 @@
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  padding: 1.5px;
-  background: conic-gradient(
-    from var(--beam-angle),
-    transparent 0deg,
-    var(--destructive) 55deg,
-    transparent 135deg,
-    transparent 360deg
-  );
-  -webkit-mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask:
-    linear-gradient(#fff 0 0) content-box,
-    linear-gradient(#fff 0 0);
-  mask-composite: exclude;
-  opacity: 0;
-  transition: opacity 0.15s ease;
+  border: 1px solid transparent;
+  transition: border-color 0.15s ease;
   pointer-events: none;
 }
-.hover-red-beam:hover::before,
+.hover-red-beam:hover::before {
+  border-color: var(--border-strong);
+}
 .hover-red-beam:focus-visible::before,
 .hover-red-beam:focus-within::before {
-  opacity: 1;
-  animation: beam-spin 1.8s linear infinite;
-}
-@media (prefers-reduced-motion: reduce) {
-  .hover-red-beam:hover::before,
-  .hover-red-beam:focus-visible::before,
-  .hover-red-beam:focus-within::before {
-    animation: none;
-    background: var(--destructive);
-    opacity: 0.55;
-  }
+  border-color: var(--stage);
 }
 
 /* ── Mention flash (#feedback 2026-08-07) ──
-   @멘션이 점등되는 순간(입력창에 @라벨이 들어온 순간) 카드/라인이 시안 링을 한 번 퍼뜨린다.
-   클래스가 (재)추가될 때마다 애니메이션이 재생 → mentioned 토글마다 정확히 1회. 색은 멘션
-   시스템의 sky-400 (#38bdf8) — 칩·링과 같은 색 언어. */
+   @멘션이 점등되는 순간(입력창에 @라벨이 들어온 순간) 카드/라인이 링을 한 번 퍼뜨린다.
+   클래스가 (재)추가될 때마다 애니메이션이 재생 → mentioned 토글마다 정확히 1회. 색은 v3 Info(링크 · 포커스). */
 @keyframes mention-flash {
   from {
-    box-shadow: 0 0 0 0 rgb(56 189 248 / 0.7);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--info) 70%, transparent);
   }
   to {
-    box-shadow: 0 0 0 10px rgb(56 189 248 / 0);
+    box-shadow: 0 0 0 10px transparent;
   }
 }
 .mention-flash {
@@ -483,7 +514,8 @@
 }
 
 /* ── GlobalChat thinking dots (#oiioii-chat 2026-08-06) ──
-   응답 대기 카드의 3점 점멸 — oiioii thought-pool 매핑. opacity-only라 리플로 없음. */
+   응답 대기 카드의 3점 점멸 — oiioii thought-pool 매핑. opacity-only라 리플로 없음.
+   v3: 점은 지금 단계 색(Lumi 가이드 .typing-dot). */
 .chat-thinking-dots {
   display: inline-flex;
   gap: 3px;
@@ -492,7 +524,7 @@
   width: 4px;
   height: 4px;
   border-radius: 9999px;
-  background: currentColor;
+  background: var(--stage);
   animation: chat-thinking-dot 1.2s ease-in-out infinite;
 }
 .chat-thinking-dots span:nth-child(2) {

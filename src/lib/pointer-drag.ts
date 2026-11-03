@@ -39,7 +39,7 @@ export function startBinDrag({
     ghost.style.cssText =
       'position:fixed;z-index:9999;pointer-events:none;left:0;top:0;' +
       'padding:2px 8px;border-radius:4px;background:rgba(0,0,0,.82);color:#fff;' +
-      'font-size:11px;font-family:var(--font-geist-mono,monospace);' +
+      'font-size:11px;font-family:var(--font-inter,monospace);' +
       'transform:translate(-50%,-160%);white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,.4);'
     document.body.appendChild(ghost)
   }

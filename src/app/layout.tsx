@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Inter } from 'next/font/google'
 import localFont from 'next/font/local'
 import { Analytics } from '@vercel/analytics/next'
 import { QueryProvider } from '@/components/providers/query-provider'
@@ -7,14 +7,11 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { Toaster } from '@/components/ui/sonner'
 import './globals.css'
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+// v3(2026-11-03): 글자는 Pretendard, 숫자 · 메타(Figma Number/Meta · Number/Tag)는 Inter — Geist 두 벌은 뺐다.
+const inter = Inter({
+  variable: '--font-inter',
   subsets: ['latin'],
-})
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
+  display: 'swap',
 })
 
 const pretendard = localFont({
@@ -41,7 +38,7 @@ export default function RootLayout({
           우리 코드가 아닌 외부 주입이므로 body 속성 한 겹에 한해 경고만 억제한다(자식은 그대로 검사). */}
       <body
         suppressHydrationWarning
-        className={`${geistSans.variable} ${geistMono.variable} ${pretendard.variable} antialiased`}
+        className={`${inter.variable} ${pretendard.variable} antialiased`}
       >
         <QueryProvider>
           <TooltipProvider>{children}</TooltipProvider>
