@@ -17,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { PRICING_PAGE_VISIBLE } from '@/lib/billing/pricing-visibility'
 import { useT } from '@/lib/i18n'
 import { useSeriesInfo } from '@/features/series/use-series-info'
 import { NEXT_EPISODE_NOT_READY, canContinueLastScene, nextEpisodeFailure, type NextEpisodeFailure } from './series-list'
@@ -234,7 +235,7 @@ export function SeriesPlanDialog({ open, onClose }: { open: boolean; onClose: ()
           <Button variant="outline" onClick={onClose}>
             {t('Close')}
           </Button>
-          <Button onClick={() => router.push('/pricing')}>{t('View pricing')}</Button>
+          {PRICING_PAGE_VISIBLE && <Button onClick={() => router.push('/pricing')}>{t('View pricing')}</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -261,7 +262,7 @@ export function SeriesSlotLimitDialog({ open, slotLimit, onClose }: { open: bool
           <Button variant="outline" onClick={onClose}>
             {t('Close')}
           </Button>
-          <Button onClick={() => router.push('/pricing')}>{t('View pricing')}</Button>
+          {PRICING_PAGE_VISIBLE && <Button onClick={() => router.push('/pricing')}>{t('View pricing')}</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Film } from 'lucide-react'
 import { ContactPopover } from '@/components/contact-popover'
 import { LegalFooter } from '@/components/legal/legal-footer'
+import { PRICING_PAGE_VISIBLE } from '@/lib/billing/pricing-visibility'
 
 /** 공개(마케팅) 페이지 공용 푸터 (#landing-v2 2026-08-03). */
 export function SiteFooter() {
@@ -22,9 +23,11 @@ export function SiteFooter() {
           <Link href="/playground" className="w-fit transition-colors hover:text-white">
             Playground
           </Link>
-          <Link href="/pricing" className="w-fit transition-colors hover:text-white">
-            Pricing
-          </Link>
+          {PRICING_PAGE_VISIBLE && (
+            <Link href="/pricing" className="w-fit transition-colors hover:text-white">
+              Pricing
+            </Link>
+          )}
           <Link href="/docs" className="w-fit transition-colors hover:text-white">
             Docs
           </Link>

@@ -47,6 +47,7 @@ import { ContactPopover } from '@/components/contact-popover'
 import { LegalFooter } from '@/components/legal/legal-footer'
 import { toast } from 'sonner'
 import { projectOpenPath, projectStageLabel } from '@/lib/project/open-path'
+import { PRICING_PAGE_VISIBLE } from '@/lib/billing/pricing-visibility'
 
 interface ProjectItem {
   id: string
@@ -342,12 +343,14 @@ export default function HomePage() {
       <nav className="fixed top-0 z-50 w-full bg-gradient-to-b from-landing via-landing/70 to-transparent px-6 py-6">
         <div className="mx-auto flex max-w-[1200px] items-center justify-between">
           <TaleLockup size={36} />
-          <a
-            href="/pricing"
-            className="flex min-h-11 items-center rounded-sm px-2 text-body font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring md:hidden"
-          >
-            Pricing
-          </a>
+          {PRICING_PAGE_VISIBLE && (
+            <a
+              href="/pricing"
+              className="flex min-h-11 items-center rounded-sm px-2 text-body font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring md:hidden"
+            >
+              Pricing
+            </a>
+          )}
           <div className="hidden items-center gap-6 text-body font-medium md:flex lg:gap-9">
             <a
               href="#services"
@@ -361,12 +364,14 @@ export default function HomePage() {
             >
               Projects
             </a>
-            <a
-              href="/pricing"
-              className="rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
-            >
-              Pricing
-            </a>
+            {PRICING_PAGE_VISIBLE && (
+              <a
+                href="/pricing"
+                className="rounded-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring"
+              >
+                Pricing
+              </a>
+            )}
             <button
               onClick={handleNew}
               disabled={creating}

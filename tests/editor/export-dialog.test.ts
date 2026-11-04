@@ -3,8 +3,14 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+const visibility = vi.hoisted(() => ({ open: true }))
+vi.mock('@/lib/billing/pricing-visibility', () => ({
+  get PRICING_PAGE_VISIBLE() {
+    return visibility.open
+  },
+}))
 vi.mock('@/lib/i18n', async () => {
   const { translate } = await import('@/lib/i18n/translate')
   return {
@@ -74,6 +80,10 @@ function recorder(order: string[], fail: ExportChoice[] = []) {
 const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
 
 describe('[내보내기] 체크 창에서 고를 수 있는 것', () => {
+  beforeEach(() => {
+    visibility.open = true
+  })
+
   it('레일의 [내보내기]를 누르면 메뉴 대신 화면 JPEG · 마스터 시트 · 이 단계 ZIP · 전체 프로젝트 ZIP 네 칸의 체크 창이 뜬다', () => {
     // 왜: 오너 결정 3 · 4 — 지금 메뉴의 기능 그대로를 체크 칸으로 골라 내보낸다. 칸 순서도 지금 메뉴 순서다.
     expect(EXPORT_CHOICES).toEqual(['screen', 'sheet', 'stage', 'project'])
@@ -120,6 +130,15 @@ describe('[내보내기] 체크 창에서 고를 수 있는 것', () => {
     expect(html).toContain('Previz 데이터 내보내기는 Producer10 이상에서 쓸 수 있어요')
     expect(html).toContain('요금제 보기')
     expect(html.match(/<input[^>]*disabled=""/g)).toHaveLength(4)
+  })
+
+  // 왜: 2026-11-04 오너 "진입점을 일단 없애줘". 잠긴 까닭은 그대로 알리고 요금표로 가는 링크만 뺀다.
+  it('요금표를 숨겨 두면 잠긴 내보내기 안내에 요금제 보기 링크가 없고 잠긴 까닭은 그대로 보인다', () => {
+    visibility.open = false
+    const html = body({ access: 'locked' })
+    expect(html).toContain('Previz 데이터 내보내기는 Producer10 이상에서 쓸 수 있어요')
+    expect(html).not.toContain('요금제 보기')
+    expect(html).not.toContain('href="/pricing"')
   })
 
   it('창을 열 때마다 아무것도 체크돼 있지 않고, 아무것도 고르지 않으면 창의 [내보내기] 단추가 꺼진다', () => {

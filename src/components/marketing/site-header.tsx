@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Film } from 'lucide-react'
 import { LocaleToggle } from '@/components/marketing/locale-toggle'
+import { PRICING_PAGE_VISIBLE } from '@/lib/billing/pricing-visibility'
 
 /**
  * 공개(마케팅) 페이지 공용 헤더 (#landing-v2 2026-08-03) — 랜딩·Playground·Pricing·Docs.
@@ -20,9 +21,11 @@ export function SiteHeader({ showLocale = false }: { showLocale?: boolean } = {}
           <Link href="/playground" className="hidden text-gray-300 transition-colors hover:text-white sm:block">
             Playground
           </Link>
-          <Link href="/pricing" className="hidden text-gray-300 transition-colors hover:text-white sm:block">
-            Pricing
-          </Link>
+          {PRICING_PAGE_VISIBLE && (
+            <Link href="/pricing" className="hidden text-gray-300 transition-colors hover:text-white sm:block">
+              Pricing
+            </Link>
+          )}
           <Link href="/docs" className="hidden text-gray-300 transition-colors hover:text-white sm:block">
             Docs
           </Link>

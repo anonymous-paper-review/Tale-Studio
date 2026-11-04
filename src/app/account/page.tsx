@@ -26,6 +26,7 @@ import { getPlanEntitlements } from '@/lib/plan-limits'
 import { showVoucherCard } from '@/lib/billing/voucher'
 import type { LedgerKind } from '@/lib/billing/account-summary'
 import { refetchBillingAccount, useBillingAccount } from '@/lib/billing/use-billing-account'
+import { PRICING_PAGE_VISIBLE } from '@/lib/billing/pricing-visibility'
 import { cn } from '@/lib/utils'
 
 // 라벨은 영어 원문 = i18n 사전 키 (#i18n-s5).
@@ -200,9 +201,11 @@ export default function AccountPage() {
               )}
             </div>
             <div className="flex shrink-0 gap-2">
-              <Link href="/pricing" className={linkButtonClass}>
-                {t('Change plan')}
-              </Link>
+              {PRICING_PAGE_VISIBLE && (
+                <Link href="/pricing" className={linkButtonClass}>
+                  {t('Change plan')}
+                </Link>
+              )}
               {data?.hasPaddleCustomer ? (
                 <PortalButton target={subscription?.status === 'active' || subscription?.status === 'cancel_scheduled' || subscription?.status === 'past_due' ? 'cancel' : 'overview'} className={linkButtonClass}>
                   {subscription?.status === 'active' || subscription?.status === 'cancel_scheduled' || subscription?.status === 'past_due' ? t('Manage subscription') : t('Billing & receipts')}
@@ -255,9 +258,11 @@ export default function AccountPage() {
           {data && !data.canBuyPack ? (
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <p className="text-sm text-gray-300">{t('Free plans can buy one pack. Subscribe to keep topping up.')}</p>
-              <Link href="/pricing" className={linkButtonClass}>
-                {t('See plans')}
-              </Link>
+              {PRICING_PAGE_VISIBLE && (
+                <Link href="/pricing" className={linkButtonClass}>
+                  {t('See plans')}
+                </Link>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

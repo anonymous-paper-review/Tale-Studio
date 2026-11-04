@@ -34,6 +34,7 @@ import { DEFAULT_LOCALE, parseAppLocale, type AppLocale } from '@/lib/locale'
 import { useT } from '@/lib/i18n'
 import { refetchBillingAccount, useBillingAccount } from '@/lib/billing/use-billing-account'
 import { previzExportAccess, type PrevizExportAccess } from '@/lib/billing/export-access'
+import { PRICING_PAGE_VISIBLE } from '@/lib/billing/pricing-visibility'
 import { STAGE_LABEL } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 
@@ -338,9 +339,11 @@ export function ExportDialogBody({
                 {t('Previz data export needs Producer10 or above')}
               </p>
               <p>{t('Final videos can be saved from Editor.')}</p>
-              <Link href="/pricing" className="mt-1 self-start text-label font-medium text-info underline-offset-4 hover:underline">
-                {t('View pricing')}
-              </Link>
+              {PRICING_PAGE_VISIBLE && (
+                <Link href="/pricing" className="mt-1 self-start text-label font-medium text-info underline-offset-4 hover:underline">
+                  {t('View pricing')}
+                </Link>
+              )}
             </>
           ) : access === 'failed' ? (
             t('Could not check your plan. Close this window and open it again.')

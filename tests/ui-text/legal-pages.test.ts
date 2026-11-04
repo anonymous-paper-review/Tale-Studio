@@ -42,13 +42,14 @@ describe('공개 정책 문서', () => {
     expect(privacy).toContain('href="https://www.creem.io/privacy"')
   })
 
-  // 왜: 정상 경로 고정. 방문자가 약관과 가격을 왕복하며 확인할 수 있어야 한다.
-  it('정책 페이지를 열면 다른 정책과 요금표로 이동할 수 있다', async () => {
+  // 왜: 정상 경로 고정. 방문자가 정책끼리 오가며 확인할 수 있어야 한다.
+  //   요금표 링크는 요금표 공개 여부에 따라 달라져서 tests/ui-text/pricing-navigation.test.ts 가 따로 본다 (2026-11-04).
+  it('정책 페이지를 열면 다른 정책으로 이동할 수 있다', async () => {
     const { LEGAL_DOCUMENTS } = await import('@/lib/legal/documents')
     for (const key of ['terms', 'refund', 'privacy', 'acceptable-use'] as const) {
       const { default: Page, metadata } = await import(`../../src/app/${key}/page`)
       const html = renderToStaticMarkup(createElement(Page))
-      for (const path of ['/terms', '/refund', '/privacy', '/pricing']) expect(html).toContain(`href="${path}"`)
+      for (const path of ['/terms', '/refund', '/privacy']) expect(html).toContain(`href="${path}"`)
       expect(html).toContain('aria-current="page"')
       expect(html).toContain('lang="en"')
       expect(metadata.alternates.canonical).toBe(`https://talestudio.art/${key}`)

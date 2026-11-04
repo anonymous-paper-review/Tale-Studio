@@ -20,6 +20,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { clearLastProjectId } from '@/lib/session-restore'
 import { useT } from '@/lib/i18n'
+import { PRICING_PAGE_VISIBLE } from '@/lib/billing/pricing-visibility'
 import { useLocaleStore } from '@/stores/locale-store'
 import type { AppLocale } from '@/lib/locale'
 import { cn } from '@/lib/utils'
@@ -84,7 +85,8 @@ export function DashboardHeader({
             <TaleLockup size={28} />
           </Link>
           <nav className="flex max-w-full flex-wrap items-center gap-0.5 rounded-lg bg-card p-[3px] text-label">
-            {TABS.map((tab) =>
+            {/* 요금표를 숨겨 둔 동안(pricing-visibility) Pricing 탭을 뺀다. */}
+            {TABS.filter((tab) => PRICING_PAGE_VISIBLE || tab.key !== 'pricing').map((tab) =>
               tab.key === active ? (
                 <span key={tab.key} aria-current="page" className="rounded-[9px] bg-chip px-3.5 py-1.5 font-semibold text-foreground">
                   {t(tab.label)}
