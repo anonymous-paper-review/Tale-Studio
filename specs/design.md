@@ -16,7 +16,7 @@ design_source: Figma 「Tale Studio 리뉴얼 (복사)」 11/5 판(v3 + 11/4 리
 >
 > 룰을 어기는 코드는 사용자가 명시적으로 허락하지 않는 한 reject. 위반이 반복되면 본 문서 또는 hooks를 강화.
 
-## 0. 이번 판(v1.1.0)이 바뀐 까닭
+## 0. 이번 판(v1.1.1)이 바뀐 까닭
 
 ### 1.1.1(2026-11-09 오너 결정 — "일단 추천대로 다 해주고")
 
@@ -25,8 +25,12 @@ design_source: Figma 「Tale Studio 리뉴얼 (복사)」 11/5 판(v3 + 11/4 리
 - Writer 의 AI 수정안은 문서 안 **Writer 색 상자**(시안 WS). 10/02 "새로 써진 내용은 초록 바탕" 결정은 Producer 트리트먼트에만 남는다(§2.5).
 - 같은 단계 안에서 기다릴 때(WL 문단 다시 쓰기 · AR 다시 그리기)도 Lumi 를 보인다(투명 덮개 · 잠금은 그대로, §13.5).
 - 단계 넘기기: 채팅에서 물을 때만 단계 확인 단추(§13.9) — 화면 머리의 [다음 →] 단추 → 확인 창(`ConfirmLumi`)은 그대로.
-- 거절 단추 말은 "아니요"(예전 "아니오", 사전 값 한 곳).
+- 거절 단추 말은 "아니요"(예전 "아니오", 사전 값 두 곳: 'No' · 'No, let me fix it').
 - 브라우저 탭 아이콘(파비콘) · 앱 아이콘 = 새 심볼(§15.3).
+- 프로젝트 목록 머리의 큰 Lumi 는 뺐다(시안 R2) — 빈 목록 첫 화면에만 남는다(§15.4).
+- 기다리는 카드 진행 막대는 지금 그대로 단계 색 기울기(시안은 단색, §13.5).
+
+### 1.1.0(2026-11-09)
 
 **2026-11-09 오너 "새 버전으로 적용해줘" — 디자이너 11/5 판(11/4 리뷰 반영)을 적용한다.** 글은 그대로고, 바뀐 것은
 - SYS 규칙 "모든 팝업에 똑같이, 간격은 10 대신 15": 팝업 틀(§13.3) · 기다리는 카드(§13.5) · 노드 · 카드 위 기다림과 완성 표시(§13.5) · Lumi 크기 이름(§15.4).
@@ -442,8 +446,8 @@ v3 는 면 색 차이로 나눈다 — **테두리는 기본으로 그리지 않
 | `shadow-node` | Director 노드 (0 8 24, 검정 35%) |
 
 브랜드 가이드: **효과는 아래 그림자 하나만**. glow · 테두리 빛 · backdrop-blur 금지.
-예외 둘: 랜딩 히어로 배경의 단계 색 흐린 빛(오너 2026-11-03, Home 시안 144-668 — 다섯 단계 색 타원 · 흐림 80, `src/app/page.tsx` `HERO_GLOWS`),
-R1 로그인 바탕의 흐린 빛(오너 2026-11-09, 시안 299:1619 — Writer · Storyboard 색 10% 타원 둘 · 흐림 160). 스튜디오 화면에는 여전히 금지.
+예외 둘: 랜딩 히어로 배경의 단계 색 흐린 빛(오너 2026-11-03, Home 시안 144-668 — 다섯 단계 색 타원, CSS `blur-[80px]`, `src/app/page.tsx` `HERO_GLOWS`),
+R1 로그인 바탕의 흐린 빛(오너 2026-11-09, 시안 299:1619 — Writer · Storyboard 색 10% 타원 둘, CSS `blur-[80px]`(시안 Figma 흐림 160), `src/app/login/page.tsx`). 스튜디오 화면에는 여전히 금지.
 
 ---
 
@@ -554,7 +558,7 @@ label 위 · input 아래 · helper/error 더 아래. 입력칸은 카드색 · 
 **단계 넘어가며 기다리는 화면**은 AI 잠금 덮개에 Lumi 를 준다 — `<AiBusyOverlay lumi={옷} />`(`src/components/ai-busy-overlay.tsx` `AiBusyCard`,
 11/5 시안 Feedback/Loading Card · SYS 로딩 팝업, WL 기준): 폭 372 · 안쪽 50/30 · 사이 15 · 모서리 20 · `shadow-loading` ·
 Lumi L(100, `loading`, 일이 멈춰 실패 안내가 되면 `error`) → 제목 16 Bold → 설명 12.5 → 단계(✓ 끝남 흰 · ● 지금 단계 색 · ○ 남음 흐림) → 진행 막대(4 · 모서리 2).
-색 = Lumi 옷(기본 화이트 펄 + 단계 6색 = 7가지, 화이트 펄 · 완성 옷이면 놓인 화면의 색). 막대는 단계 색 기울기 — 시안은 단색이지만 출시 테스트가 기울기를 못 박아 결정 대기. 옷 = 넘어가는 다음 단계. 쓰는 곳: Producer 글 읽기 · Writer 산문 초안(Producer 에서 넘길 때 · Writer 화면) · Artist 그림 ·
+색 = Lumi 옷(기본 화이트 펄 + 단계 6색 = 7가지, 화이트 펄 · 완성 옷이면 놓인 화면의 색). 막대는 단계 색 기울기 — 시안은 단색이지만 지금 그대로(단계 색 기울기, 오너 2026-11-09). 옷 = 넘어가는 다음 단계. 쓰는 곳: Producer 글 읽기 · Writer 산문 초안(Producer 에서 넘길 때 · Writer 화면) · Artist 그림 ·
 Storyboard 나누기 · 첫 러프. 설명은 부르는 쪽이 준다 — 안 주면 잠금 안내("AI가 작업하는 동안은 화면과 채팅이 잠겨요…", 출시 테스트 고정), `description={null}` 이면 설명 줄을 비운다.
 진행 정도(`progress`)를 안 주면 막대가 없다.
 같은 단계 안에서 기다릴 때(11/5 WL 문단 다시 쓰기 · AR 다시 그리기)도 카드에 그 단계 옷 Lumi 를 보인다(오너 2026-11-09). `scrim="clear"` 는 바탕을 칠하지 않고 카드만 가운데 — 잠금(단계 화면 · 채팅 inert, 레일 붙잡기)은 그대로고,
@@ -657,7 +661,7 @@ Figma 에 있는 v3 아이콘은 `v3-icons.tsx` 에 더한다(이름 `<Name>Icon
   | `chat` | 30 | 옆 채팅 아바타 |
 
   `size` 에 숫자를 주던 예전 자리는 그 너비 그대로 그린다(높이만 0.77). 새로 쓰는 곳은 이름을 쓴다.
-- **큰 Lumi** `<Lumi persona state size />`(`src/components/lumi/lumi.tsx`): `public/lumi-persona.js`(웹 컴포넌트 `<lumi-persona>`, 약 3.1MB)를 **처음 그릴 때만** 불러온다. 다 불러오기 전 · WebGL 없음 · 불러오기 실패 → 같은 모습의 그림(`public/lumi/full/*.webp`), 동작 줄이기 → `paused`. 한 화면에 큰 Lumi 는 하나. 자리: 확인 팝업(`ConfirmLumi`, §13.3) · 단계 넘어가며 기다리는 화면(`AiBusyOverlay lumi`, §13.5) · 새 프로젝트 만드는 화면(`/projects/new`, Producer 옷 `loading`) · 프로젝트 목록 첫 화면(화이트 펄 `idle` 폭 320 — 목록 머리 왼쪽, 빈 목록이면 빈 안내 자리).
+- **큰 Lumi** `<Lumi persona state size />`(`src/components/lumi/lumi.tsx`): `public/lumi-persona.js`(웹 컴포넌트 `<lumi-persona>`, 약 3.1MB)를 **처음 그릴 때만** 불러온다. 다 불러오기 전 · WebGL 없음 · 불러오기 실패 → 같은 모습의 그림(`public/lumi/full/*.webp`), 동작 줄이기 → `paused`. 한 화면에 큰 Lumi 는 하나. 자리: 확인 팝업(`ConfirmLumi`, §13.3) · 단계 넘어가며 기다리는 화면(`AiBusyOverlay lumi`, §13.5) · 새 프로젝트 만드는 화면(`/projects/new`, Producer 옷 `loading`) · 빈 프로젝트 목록 첫 화면(화이트 펄 `idle` 폭 320, 빈 안내 자리). 목록이 있으면 머리에 큰 Lumi 를 두지 않는다(시안 R2, 오너 2026-11-09).
 - **채팅 아바타** `<LumiAvatar persona state size />`: 그림만(`public/lumi/avatar/*.webp`, 80px). 바탕은 그 단계 색 12%. 기본 크기 `chat`(30).
 - persona: `pearl`(시작 · 목록) · 여섯 단계 · `complete`(작품 완성). state: idle · listening · thinking · complete · error · loading. 단계 id → persona 는 `STAGE_PERSONA`.
 

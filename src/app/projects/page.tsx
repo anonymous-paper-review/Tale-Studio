@@ -305,7 +305,7 @@ export default function ProjectsPage() {
       {/* 공용 대시보드 헤더(#landing-v2b) — 탭·유저 메뉴는 헤더가, 새 프로젝트 버튼만 이 페이지 전용(화면의 크림 단추 하나).
           11/5 시안 R2: 높이 34 · 양옆 16 · 13px 600 알약, "+" 는 글자와 같은 굵기의 글자 기호. */}
       <DashboardHeader active="projects">
-        <Button onClick={handleNew} className="h-[34px] gap-1 rounded-full px-4 text-[13px]" data-testid="projects-new">
+        <Button onClick={handleNew} className="h-[34px] gap-1 rounded-full px-4 text-[13px] font-semibold" data-testid="projects-new">
           <span aria-hidden>+</span>
           {t('New project')}
         </Button>
