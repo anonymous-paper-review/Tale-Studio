@@ -5,6 +5,9 @@
 // 서버 zip은 Vercel 응답 4.5MB 제한에 걸리므로 브라우저에서 직접 fetch→JSZip→다운로드한다.
 // CORS 등으로 받지 못한 항목은 _failed.txt에 URL을 남겨 수동 다운로드를 안내한다.
 import JSZip from 'jszip'
+import { translate } from '@/lib/i18n/translate'
+import type { AppLocale } from '@/lib/locale'
+import { useLocaleStore } from '@/stores/locale-store'
 
 interface ShotLike {
   shotId: string
@@ -79,12 +82,8 @@ export async function downloadShotsZip(opts: {
   }
 
   if (failed.length) {
-    zip.file(
-      '_failed.txt',
-      '아래 영상은 자동 다운로드에 실패했습니다(CORS/네트워크). 브라우저에서 URL을 직접 열어 받으세요:\n\n' +
-        failed.join('\n') +
-        '\n',
-    )
+    // 화면 언어로 — 부르는 화면(editor/page)은 건드리지 않고 여기서 화면 언어를 읽는다(2026-11-10 오너 "영어 언어에서 한국어 나오는거 수정").
+    zip.file('_failed.txt', failedDownloadsNote(failed, useLocaleStore.getState().locale))
   }
 
   const blob = await zip.generateAsync({ type: 'blob' })
@@ -98,4 +97,10 @@ export async function downloadShotsZip(opts: {
   URL.revokeObjectURL(href)
 
   return { total: ordered.length, downloaded, failed: failed.length }
+}
+
+/** 자동으로 못 받은 영상 목록 파일(_failed.txt)의 글 — 안내 한 줄 + 영상마다 이름 · 주소 · 까닭. */
+export function failedDownloadsNote(failed: readonly string[], locale: AppLocale): string {
+  const lead = translate(locale, 'These videos could not be downloaded automatically (CORS or network). Open each URL in your browser to save it:')
+  return `${lead}\n\n${failed.join('\n')}\n`
 }

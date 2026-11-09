@@ -6,6 +6,8 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { isOwnMediaUrl } from '@/lib/upload/attachment'
 import { listStyleAnchorMediums } from '@/lib/style-anchor'
+import { customStyleLabel } from '@/lib/custom-style-label'
+import { DEFAULT_LOCALE, parseAppLocale } from '@/lib/locale'
 
 /**
  * 유저가 올린 이미지를 이 프로젝트의 스타일 앵커로 확정한다.
@@ -34,7 +36,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
     }
 
-    const { projectId, imageUrl, label, medium, lock } = body as Record<string, unknown>
+    const { projectId, imageUrl, label, medium, lock, uiLocale } = body as Record<string, unknown>
 
     if (typeof projectId !== 'string' || !projectId) {
       return NextResponse.json({ error: 'Invalid request: projectId is required' }, { status: 400 })
@@ -68,8 +70,11 @@ export async function POST(req: Request) {
       )
     }
 
+    // 이름 없이 저장하면 화면 언어의 기본 이름으로(2026-11-10 오너 "영어 언어에서 한국어 나오는거 수정"). 예전에 한국어로 박힌 이름은 보일 때 바꾼다(lib/custom-style-label).
     const normalizedLabel =
-      typeof label === 'string' && label.trim() ? label.trim().slice(0, MAX_LABEL_LENGTH) : '내 레퍼런스'
+      typeof label === 'string' && label.trim()
+        ? label.trim().slice(0, MAX_LABEL_LENGTH)
+        : customStyleLabel(null, parseAppLocale(uiLocale) ?? DEFAULT_LOCALE)
 
     const key = `custom_${randomUUID()}`
     const { error } = await supabaseAdmin

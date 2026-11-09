@@ -880,6 +880,8 @@ export const KO: Record<string, string> = {
     '공유 미리보기 모드예요. 실제로는 캔버스에서 샷·카메라·영상을 연출해요.',
   'This is a shared preview. In the real project, you edit cuts on the timeline here.':
     '공유 미리보기 모드예요. 실제로는 타임라인에서 컷 편집을 해요.',
+  'These videos could not be downloaded automatically (CORS or network). Open each URL in your browser to save it:':
+    '아래 영상은 자동 다운로드에 실패했습니다(CORS/네트워크). 브라우저에서 URL을 직접 열어 받으세요:',
   'Chat language': '채팅 언어',
   'Chat replies and the generated story follow this language.':
     '채팅 응답과 생성되는 이야기가 이 언어를 따라요.',

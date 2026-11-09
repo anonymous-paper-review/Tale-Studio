@@ -3,6 +3,7 @@
 //   프로젝트마다 함께 싣는 칸. 순수 함수 — 서버(목록 라우트)와 화면(카드 · 창)이 같은 판정을 쓴다.
 //   문구는 영어 원문 = 사전 키.
 //   2026-10-26 오너: 카드마다 붙은 [다음 화 만들기](99장 중 74장)가 목록을 어지럽혀 카드에서 빼고 [새 프로젝트]로 옮겼다.
+import { customStyleLabel } from '@/lib/custom-style-label'
 import type { AppLocale } from '@/lib/locale'
 import { parseSeries } from '@/lib/series/snapshot'
 import { styleAnchorName } from '@/lib/style-anchor-name'
@@ -145,7 +146,7 @@ export function nextEpisodeRows(
   const styleName = !style
     ? null
     : style.kind === 'custom'
-      ? style.label?.trim() || t('My reference')
+      ? customStyleLabel(style.label, locale)
       : styleAnchorName({ key: style.key, label: style.label, subtitle: style.subtitle }, locale)
   const rows: NextEpisodeRow[] = [
     { key: 'characters', label: t('Characters'), value: preview.characters.length ? preview.characters.join(dot) : t('None') },

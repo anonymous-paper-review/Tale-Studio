@@ -7,6 +7,7 @@ import { useProjectStore } from '@/stores/project-store'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { depthLevelFromRuntime } from '@/lib/depth'
+import { customStyleLabel } from '@/lib/custom-style-label'
 import { isDemoSession } from '@/lib/demo/context'
 import { assignCastSlugs, assignLocationSlugs } from '@/lib/cast-slug'
 import { claimAction, releaseAction } from '@/lib/action-guard'
@@ -193,10 +194,8 @@ function parseCustomAnchorRow(
   if (typeof record.url !== 'string' || !record.url) return null
   return {
     url: record.url,
-    label:
-      typeof record.label === 'string' && record.label
-        ? record.label
-        : translate(useLocaleStore.getState().locale, 'My reference'),
+    // 비었거나 기본 이름(예전 서버가 한국어로 박아 둔 "내 레퍼런스" 포함)이면 화면 언어의 기본 이름으로 보인다(2026-11-10).
+    label: customStyleLabel(record.label, useLocaleStore.getState().locale),
     medium: typeof record.medium === 'string' ? record.medium : null,
     // 고정(2026-10-09 오너) — 사용자가 올린 그림을 "그림체"로 골라 정한 그림체. 바꾸지 못한다.
     ...(record.locked === true ? { locked: true } : {}),
