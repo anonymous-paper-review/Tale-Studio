@@ -889,11 +889,14 @@ function PaletteBar({
   const takeState = useTakeBalance()
   const videoPlan = planVideoBatch(videoBatchTakeCosts(nodes, eligibleVideoBatchShotIds(nodes)), takeState.balance, takeState.mode)
   // 숫자는 예전 그대로: 서버 배치가 있으면 그 수(단추에서 바로 그린다), 없고 도는 중이면 이 화면이 받은 진행(끝난 수 / 전체).
+  //   화면 읽기 이름(도는 동안)도 단추에 보이는 숫자와 같은 수를 읽는다.
+  const shownVideoProgress = videoBatch ?? (videoBatchBusy ? videoBatchProgress : null)
   const videoButton = videoBatchButtonText({
     busy: videoBatchBusy,
     cancelled: videoBatchCancelled,
-    done: videoBatchBusy ? videoBatchProgress?.done ?? null : null,
-    total: videoBatchBusy ? videoBatchProgress?.total ?? null : null,
+    done: shownVideoProgress?.done ?? null,
+    total: shownVideoProgress?.total ?? null,
+    failed: shownVideoProgress?.failed ?? 0,
     available: eligibleVideoCount,
   }, t)
   // D1 "The Set 노드 9 · 샷 4" — 캔버스에 보이는 노드와 그중 샷.
@@ -1012,6 +1015,7 @@ function PaletteBar({
           <button
             type="button"
             title={videoButton.title}
+            aria-label={videoButton.ariaLabel}
             onClick={async () => {
               // 도는 중이면 같은 자리가 중단 버튼이다(#batch-resume 2026-09-09 오너 결정 ①).
               //   예전에는 진행 중에 비활성이라 멈출 방법이 창을 닫는 것뿐이었다.

@@ -1,4 +1,5 @@
 // Director 툴바의 영상 단추가 시안 DG 의 글로 지금 상태를 말한다 (11/5 시안, 리드 2026-11-09)
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { translate } from '@/lib/i18n/translate'
 import { videoBatchButtonText } from '@/features/director/video-batch-button'
@@ -28,5 +29,14 @@ describe('혼자 정한 것', () => {
   // 왜: 정상 경로 고정. 멈추기를 누른 뒤 이미 접수된 영상이 끝나기를 기다리는 동안은 "중단하는 중"이다.
   it("멈추는 중이면 툴바 영상 단추는 '중단하는 중'을 쓴다", () => {
     expect(videoBatchButtonText({ busy: true, cancelled: true, done: 3, total: 8, available: 0 }, t).label).toBe('중단하는 중')
+  })
+
+  // 왜: 마우스 올림 글(title)은 키보드 · 터치로는 볼 수 없다. 화면 읽기 이름에 누르면 멈춘다는 말을 넣는다(검토 B 5a, 리드 2026-11-09).
+  it("영상 묶음이 도는 동안 툴바 영상 단추의 화면 읽기 이름에 '누르면 멈춰요'가 들어간다", () => {
+    expect(videoBatchButtonText({ busy: true, cancelled: false, done: 2, total: 8, available: 0 }, t).ariaLabel)
+      .toBe('영상 만드는 중 2/8, 누르면 멈춰요')
+    expect(videoBatchButtonText({ busy: true, cancelled: false, done: 2, total: 8, failed: 1, available: 0 }, t).ariaLabel)
+      .toBe('영상 만드는 중 2/8 1개 실패, 누르면 멈춰요')
+    expect(readFileSync('src/app/studio/director/page.tsx', 'utf8')).toContain('aria-label={videoButton.ariaLabel}')
   })
 })

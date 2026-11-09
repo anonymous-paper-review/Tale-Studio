@@ -1206,6 +1206,7 @@ export const KO: Record<string, string> = {
   // 11/5 시안 DG(2026-11-09): 툴바 영상 단추가 도는 동안 · 만드는 영상 노드의 기다리는 카드 · 묶음에서 차례를 기다리는 샷
   'Making videos': '영상 만드는 중',
   'Click to stop': '누르면 멈춰요',
+  '{status}, click to stop': '{status}, 누르면 멈춰요',
   'Making the video': '영상을 만들고 있어요',
   'Up next: {names}': '다음 차례: {names}',
   '{names} and {count} more': '{names} 외 {count}개',

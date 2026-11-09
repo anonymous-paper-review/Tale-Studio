@@ -65,4 +65,21 @@ describe('혼자 정한 것', () => {
 
     expect(useGlobalChatStore.getState().suggestion?.id).toBe('choices:director')
   })
+
+  // 왜: 두 번째 방문부터는 "채워 두면 좋은 것" 안내(단추 없음)가 2초 뒤 제안 자리를 잡고, 채팅이 닫혀 있어 내려가지 않는다.
+  //   첫 안내만 비키게 했더니 이 경우 넘기기 질문의 단추가 다시 안 떴다(검토 B 2번, 리드 2026-11-09).
+  it('Director 단계의 단추 없는 안내가 떠 있어도 Editor로 넘길지 묻는 질문에는 단추가 뜬다', () => {
+    useGlobalChatStore.getState().offerSuggestion({
+      id: `director-gaps-${PROJECT}`,
+      stage: 'director',
+      content: '채워 두면 좋은 것이 2개 있어요.',
+      action: null,
+    })
+
+    offerEditorHandoff(PROJECT, handoff)
+
+    const shown = useGlobalChatStore.getState().suggestion
+    expect(shown?.id).toBe(handoff.id)
+    expect(shown?.action).toMatchObject({ kind: 'handoff', label: 'Editor로 넘기기' })
+  })
 })
