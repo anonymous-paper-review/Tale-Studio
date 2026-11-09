@@ -181,6 +181,11 @@ function liveParts(node: ReactNode, insideBusy = false): Array<{ part: string; i
   const inner = liveParts(node.props.children as ReactNode, insideBusy || node.props['aria-busy'] === 'true')
   return part ? [{ part, insideBusy }, ...inner] : inner
 }
+/** 그 카드의 기다림 카드가 화면 읽기에 알리나(announce) · 조용한가 · 기다림 카드가 없나. */
+function waitCardVoice(shotId: string): 'announce' | 'quiet' | 'none' {
+  const wait = elements(card(shotId).props.children as ReactNode).find((node) => node.type === NodeWaitCard)
+  return !wait ? 'none' : wait.props.announce === true ? 'announce' : 'quiet'
+}
 /** 카드 안에서 글이 같은 단추를 누른다. */
 function press(cardNode: Element, label: string) {
   const button = elements(cardNode.props.children as ReactNode).find((node) => typeof node.props.onClick === 'function' && textOf(node) === label)
@@ -199,6 +204,11 @@ const shot = (shotId: string, sortOrder: number, drawn: boolean): Shot => ({
   lighting: { position: 'front', brightness: 50, colorTemp: 5000 },
   roughStoryboard: drawn ? ({ status: 'completed', url: `${shotId}.png` } as Shot['roughStoryboard']) : null,
 })
+const shotIn = (sceneId: string, shotId: string, sortOrder: number, drawn: boolean): Shot => ({ ...shot(shotId, sortOrder, drawn), sceneId })
+/** 씬 둘(sc_01 → sc_02)의 보드 — 샷은 주어진 저장 순서 그대로. */
+function twoScenes(shots: Shot[]) {
+  useWriterStore.setState({ sceneManifest: { scenes: [scene, { ...scene, sceneId: 'sc_02', sortOrder: 1 }], characters: [], locations: [] }, shots })
+}
 
 /** 러프 요청(/api/writer/rough-storyboard)이 받은 몸통과, 다음 답. */
 const requests: Array<Record<string, unknown>> = []
@@ -340,6 +350,35 @@ describe('보드의 더한 샷 카드 · 잠금 · 탭', () => {
     expect(elements(lockedCard.props.children as ReactNode).some((node) => node.props['aria-busy'] === 'true')).toBe(true)
     expect(liveParts(lockedCard).map(({ part }) => part)).toContain('GeneratingOverlay')
     expect(liveParts(lockedCard).filter(({ insideBusy }) => insideBusy)).toEqual([])
+  })
+
+  // 왜: 검토 B 5c(리드 2026-11-09) — 기다림 카드마다 화면 읽기에 알리면, 더한 샷 여럿을 한꺼번에 그릴 때 같은 말을 겹쳐 읽는다.
+  //   알리는 카드는 보드 순서(씬 → 샷)로 첫 장 하나 — 저장 순서가 아니라 보이는 순서다. 그 장이 다 그려지면 다음 장이 넘겨받는다.
+  it('여러 카드를 한꺼번에 그리면 기다림 카드 중 보드 순서(씬 → 샷)로 첫 장만 화면 읽기에 알린다', () => {
+    // 저장 순서는 씬 2 의 샷이 맨 앞이다 — 보드는 씬 1 부터 보인다.
+    twoScenes([shotIn('sc_02', 'sh_02_01', 0, false), shot('sh_01_01', 0, true), shot('sh_01_02', 1, false), shot('sh_01_03', 2, false)])
+    board.views = new Map([['sh_02_01', { phase: 'requesting' }], ['sh_01_02', { phase: 'requesting' }], ['sh_01_03', { phase: 'requesting' }]])
+    commit()
+    expect(locked()).toBe(false)
+    expect(['sh_01_02', 'sh_01_03', 'sh_02_01'].map(waitCardVoice)).toEqual(['announce', 'quiet', 'quiet'])
+    // 첫 장이 다 그려지면 다음 장(같은 씬의 다음 샷)이 알린다.
+    twoScenes([shotIn('sc_02', 'sh_02_01', 0, false), shot('sh_01_01', 0, true), shot('sh_01_02', 1, true), shot('sh_01_03', 2, false)])
+    board.views = new Map([['sh_02_01', { phase: 'requesting' }], ['sh_01_03', { phase: 'requesting' }]])
+    commit()
+    expect(['sh_01_02', 'sh_01_03', 'sh_02_01'].map(waitCardVoice)).toEqual(['none', 'announce', 'quiet'])
+  })
+
+  // 왜(혼자 정한 것): 접힌 씬의 카드는 화면 읽기에서 숨겨져 그 카드가 알려도 읽히지 않는다 — 첫 장이 접힌 씬에 있으면 아무 카드도 읽히지 않는다.
+  it('접힌 씬의 카드는 알릴 카드로 고르지 않고, 펼친 씬에서 그리는 카드 중 첫 장이 알린다', () => {
+    twoScenes([shot('sh_01_01', 0, true), shot('sh_01_02', 1, false), shotIn('sc_02', 'sh_02_01', 0, false)])
+    board.views = new Map([['sh_01_02', { phase: 'requesting' }], ['sh_02_01', { phase: 'requesting' }]])
+    commit()
+    expect(['sh_01_02', 'sh_02_01'].map(waitCardVoice)).toEqual(['announce', 'quiet'])
+    // 씬 1 머리를 눌러 접는다.
+    const head = render().find((node) => node.type === 'button' && 'aria-expanded' in node.props && textOf(node).includes('Scene 1'))
+    ;(head!.props.onClick as () => void)()
+    commit()
+    expect(['sh_01_02', 'sh_02_01'].map(waitCardVoice)).toEqual(['quiet', 'announce'])
   })
 
   // 왜(혼자 정한 것): 대사 탭에서 고치는 중에 채팅으로 더한 샷이 그려지면 보드 탭으로 옮겨져 고치던 칸이 사라졌다 — 더한 샷 그리기는 탭을 바꾸지 않는다.
