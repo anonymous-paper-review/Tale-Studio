@@ -110,6 +110,8 @@ interface LumiProps {
   className?: string
   /** complete 처럼 한 번 재생하는 상태가 끝나 idle 로 돌아오면 알려 준다(가이드 statechange). */
   onStateChange?: (state: LumiState) => void
+  /** 늘 같은 모습의 그림으로 — 한 화면에 여럿 뜨는 작은 자리(노드 · 카드 위 기다림). 움직이는 파일 · WebGL 문맥을 쓰지 않는다. */
+  still?: boolean
   ref?: Ref<LumiHandle>
 }
 
@@ -117,7 +119,7 @@ interface LumiProps {
  * 큰 Lumi — 단계 넘어가는 로딩 · 프로젝트 목록 첫 화면 · 확인 팝업 자리(v3, 오너 11/3). 상태는 속성으로만 바꾼다.
  * 예: <Lumi persona="writer" state="loading" size={320} />
  */
-export function Lumi({ persona = 'pearl', state = 'idle', variant = 'full', size = 320, label, className, onStateChange, ref }: LumiProps) {
+export function Lumi({ persona = 'pearl', state = 'idle', variant = 'full', size = 320, label, className, onStateChange, still = false, ref }: LumiProps) {
   const reducedMotion = useSyncExternalStore(subscribeReducedMotion, reducedMotionNow, () => false)
   // WebGL 은 서버에서 모른다(null → 그림). 붙은 뒤 한 번 재고 기억한다.
   const webgl = useSyncExternalStore(noSubscribe, webglAvailable, () => null)
@@ -125,7 +127,7 @@ export function Lumi({ persona = 'pearl', state = 'idle', variant = 'full', size
   const elementRef = useRef<LumiElement>(null)
 
   useEffect(() => {
-    if (!webgl) return
+    if (!webgl || still) return
     let alive = true
     loadLumiScript().then(
       () => {
@@ -138,9 +140,9 @@ export function Lumi({ persona = 'pearl', state = 'idle', variant = 'full', size
     return () => {
       alive = false
     }
-  }, [webgl])
+  }, [webgl, still])
 
-  const mode = lumiRenderMode({ webgl, reducedMotion, script })
+  const mode = lumiRenderMode({ webgl, reducedMotion, script, still })
 
   useEffect(() => {
     const el = elementRef.current
