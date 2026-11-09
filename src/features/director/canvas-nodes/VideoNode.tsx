@@ -312,7 +312,8 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           >
             <Play className="size-6 fill-muted-foreground text-muted-foreground" />
           </button>
-        ) : (
+        ) : data.lastAttemptStatus === 'generating' ? null : (
+          // 만드는 중이면 "대기 중"을 쓰지 않는다. 아래 "영상 생성 중"과 같이 보이면 헷갈린다(11/5 시안 DG 맞춰 보기 2026-11-09).
           <span className="text-[11px] text-subtle-foreground">{t('Waiting')}</span>
         )}
 
