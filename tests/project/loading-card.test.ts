@@ -46,6 +46,23 @@ describe('새 기다리는 카드', () => {
     }
   })
 
+  // 왜: 같은 단계 안에서 기다릴 때(WL 문단 다시 쓰기 · AR 다시 그리기)는 그림 없이 같은 카드 모양을 쓴다(prose 갈래 2026-11-09).
+  it('Lumi 없이 새 기다리는 카드를 부르면 그림 없이 단계 ✓ · ● · ○ 와 진행 막대로 그린다', () => {
+    const html = card({ card: 'loading', steps: STEPS, progress: 40 })
+    expect(html).not.toContain('/lumi/')
+    expect(html).not.toContain('lucide-loader-circle')
+    expect(html).toMatch(/✓<\/span><span[^>]*>요청 읽기[\s\S]*●<\/span><span[^>]*>만드는 중[\s\S]*○<\/span><span[^>]*>마무리/)
+    expect(html).toContain('style="width:40%"')
+  })
+
+  // 왜: Lumi 옷이 없으니 카드가 단계 색을 따로 정하지 않는다 — 놓인 화면(지금 단계)의 색으로 ● 와 막대를 칠한다.
+  it('Lumi 없는 새 기다리는 카드는 지금 단계 색을 따른다', () => {
+    const html = card({ card: 'loading', steps: STEPS, progress: 40 })
+    expect(html).not.toMatch(/^(?:<link[^>]*\/>)*<div[^>]*data-stage=/)
+    expect(html).toContain('text-stage')
+    expect(html).toContain('bg-stage-gradient')
+  })
+
   // 왜: 진행 정도를 모르는 일(대부분의 AI 작업)에 빈 막대를 그리면 멈춘 것처럼 보인다.
   it('진행 정도를 모르면 기다리는 카드에 진행 막대가 없다', () => {
     for (const lumi of ['artist', undefined] as const) {

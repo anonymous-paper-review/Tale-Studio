@@ -11,7 +11,10 @@
 //   단계 ✓ · ● · ○ · 막대). 안 주면 예전 작은 카드 그대로. 약속: tests/project/busy-overlay-lumi.test.ts · tests/project/loading-card.test.ts
 //   위 막대의 프로젝트 이름 칸은 막지 않고 덮지도 않는다(v3 2단계 2026-11-03) — 예전 레일 홈 카드처럼 일하는 동안에도 이름을 바꾼다.
 //   무엇을 막고 남기는지는 lib/ai-busy-lock 한 곳(약속: tests/project/ai-busy-rename.test.ts).
-import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+//   11/9(prose 갈래 WL · AR "모양은 시안, 잠금은 그대로"): scrim="clear" 면 바탕을 칠하지 않고 카드만 가운데 — 잠금은 그대로고,
+//   덮개가 받은 휠 · 손가락 끌기를 아래 [data-ai-busy-scroll] 칸으로 넘겨 보기 · 스크롤만 된다(lib/ai-busy-scroll).
+//   card="loading" 이면 Lumi 없이도 새 기다리는 카드 모양(색은 놓인 화면의 지금 단계). 약속: tests/project/busy-overlay-clear.test.ts
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { AlertCircle, Check, Loader2 } from 'lucide-react'
 import { Lumi } from '@/components/lumi/lumi'
@@ -20,6 +23,7 @@ import { SHELL_INSET, SHELL_RAIL_WIDTH } from '@/lib/constants'
 import { lumiStageTheme, type LumiPersona } from '@/lib/lumi'
 import { useT } from '@/lib/i18n'
 import { lockForAiWork, overlayClipPath } from '@/lib/ai-busy-lock'
+import { AI_BUSY_SCROLL_ATTR, createScrollRelay } from '@/lib/ai-busy-scroll'
 import { aiBusyHolds, holdAiBusy } from '@/stores/ai-busy-store'
 
 export interface AiBusyStep {
@@ -47,11 +51,24 @@ interface AiBusyOverlayProps {
   layer?: 'stage' | 'dialog'
   /** 큰 Lumi 옷(단계 넘어가며 기다리면 다음 단계 옷). 주면 도는 원 · 경고 표시 자리에 큰 Lumi — 일하는 동안 loading, 멈추면 error. */
   lumi?: LumiPersona
+  /** 'loading' = Lumi 를 안 줘도 새 기다리는 카드 모양(그림만 없음, 색은 지금 단계). 안 주고 lumi 도 없으면 예전 작은 카드. */
+  card?: 'loading'
+  /** 'dim'(기본) = 바탕을 덮는다. 'clear' = 칠하지 않고 카드만 가운데 — 잠금은 그대로, 휠 · 끌기는 아래 보기 칸으로 넘긴다. */
+  scrim?: 'dim' | 'clear'
+}
+
+/** 덮개 틀 — 'dim' 은 바탕을 85% 덮고 'clear' 는 칠하지 않는다. 어느 쪽이든 그 자리를 덮어 누르기를 받는다(뒤로 새지 않는다). */
+export function aiBusyOverlayFrame(layer: 'stage' | 'dialog', scrim: 'dim' | 'clear' = 'dim'): string {
+  return cn(
+    layer === 'dialog' ? 'pointer-events-auto fixed inset-0 z-popover' : 'fixed inset-y-0 right-0 z-overlay',
+    'flex items-center justify-center p-6',
+    scrim === 'dim' && 'bg-background/85',
+  )
 }
 
 const subscribeNothing = () => () => {}
 
-export function AiBusyOverlay({ open, title, description, steps, progress, progressLabel, footer, busy = true, layer = 'stage', lumi }: AiBusyOverlayProps) {
+export function AiBusyOverlay({ open, title, description, steps, progress, progressLabel, footer, busy = true, layer = 'stage', lumi, card, scrim = 'dim' }: AiBusyOverlayProps) {
   // 서버 렌더에는 body 가 없다 — 브라우저에서만 띄운다(하이드레이션이 어긋나지 않게).
   const inBrowser = useSyncExternalStore(subscribeNothing, () => true, () => false)
 
@@ -99,19 +116,27 @@ export function AiBusyOverlay({ open, title, description, steps, progress, progr
     return holdAiBusy(holdId)
   }, [holding, holdId])
 
+  // 투명 덮개는 잠근 칸이 못 받는 휠 · 끌기를 대신 받아 아래 보기 칸([data-ai-busy-scroll])으로 넘긴다.
+  const relay = useMemo(() => createScrollRelay(() => document.querySelectorAll<HTMLElement>(`[${AI_BUSY_SCROLL_ATTR}]`)), [])
+  const clear = scrim === 'clear'
+
   if (!open || !inBrowser) return null
 
   return createPortal(
     <div
       ref={overlayRef}
-      className={layer === 'dialog'
-        ? 'pointer-events-auto fixed inset-0 z-popover flex items-center justify-center bg-background/85 p-6'
-        : 'fixed inset-y-0 right-0 z-overlay flex items-center justify-center bg-background/85 p-6'}
+      className={aiBusyOverlayFrame(layer, scrim)}
       style={layer === 'dialog' ? undefined : { left: SHELL_INSET * 2 + SHELL_RAIL_WIDTH, clipPath }}
       role="status"
       aria-live="polite"
       aria-busy={busy}
       data-testid="ai-busy-overlay"
+      data-scrim={scrim}
+      onWheel={clear ? (e) => relay.wheel(e) : undefined}
+      onTouchStart={clear ? (e) => relay.touchStart(e) : undefined}
+      onTouchMove={clear ? (e) => relay.touchMove(e) : undefined}
+      onTouchEnd={clear ? () => relay.touchEnd() : undefined}
+      onTouchCancel={clear ? () => relay.touchEnd() : undefined}
     >
       <AiBusyCard
         title={title}
@@ -122,6 +147,7 @@ export function AiBusyOverlay({ open, title, description, steps, progress, progr
         footer={footer}
         busy={busy}
         lumi={lumi}
+        card={card}
       />
     </div>,
     document.body,
@@ -139,21 +165,22 @@ export function AiBusyCard({
   footer,
   busy = true,
   lumi,
-}: Omit<AiBusyOverlayProps, 'open' | 'layer'>) {
+  card,
+}: Omit<AiBusyOverlayProps, 'open' | 'layer' | 'scrim'>) {
   const t = useT()
   const pct = typeof progress === 'number' && Number.isFinite(progress) ? Math.max(0, Math.min(100, Math.round(progress))) : null
   const lockNote = description === null ? null : (description ?? t('While AI is working, the screen and chat are locked. You can edit once it finishes.'))
-  if (lumi) {
+  if (lumi || card === 'loading') {
     return (
       <div
         // 11/5 기다리는 카드(Feedback/Loading Card · SYS 로딩 팝업) — 폭 372 · 안쪽 50/30 · 사이 15 · 모서리 20 · 그림자 하나.
         //   Lumi(L) → 제목(16 Bold) → 설명(12.5) → 단계(✓ 흰 · ● 단계 색 · ○ 흐림) → 진행 막대(4 · 모서리 2).
-        //   색은 Lumi 가 입은 옷(data-stage) — 화이트 펄 · 완성은 놓인 화면의 색(프로젝트 목록이면 크림 = 시안의 "기본").
-        data-stage={lumiStageTheme(lumi)}
+        //   색은 Lumi 가 입은 옷(data-stage) — 화이트 펄 · 완성 · Lumi 없음(card="loading")은 놓인 화면의 색(지금 단계, 프로젝트 목록이면 크림).
+        data-stage={lumi ? lumiStageTheme(lumi) : undefined}
         className="flex w-full max-w-[372px] flex-col items-center gap-[15px] rounded-[20px] bg-side px-[30px] py-[50px] text-center shadow-loading"
       >
         {/* 일하는 동안 loading, 멈추면 error(가이드 상태). */}
-        <Lumi persona={lumi} state={busy ? 'loading' : 'error'} size="l" />
+        {lumi ? <Lumi persona={lumi} state={busy ? 'loading' : 'error'} size="l" /> : null}
         <div className="flex w-full flex-col items-center gap-[9px]">
           <h2 className="text-[16px] font-bold leading-[1.2] text-foreground">{title}</h2>
           {lockNote ? <p className="text-caption leading-[1.55] text-subtle-foreground">{lockNote}</p> : null}

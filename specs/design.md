@@ -527,7 +527,10 @@ label 위 · input 아래 · helper/error 더 아래. 입력칸은 카드색 · 
 Lumi L(100, `loading`, 일이 멈춰 실패 안내가 되면 `error`) → 제목 16 Bold → 설명 12.5 → 단계(✓ 끝남 흰 · ● 지금 단계 색 · ○ 남음 흐림) → 진행 막대(4 · 모서리 2).
 색 = Lumi 옷(기본 화이트 펄 + 단계 6색 = 7가지, 화이트 펄 · 완성 옷이면 놓인 화면의 색). 막대는 단계 색 기울기 — 시안은 단색이지만 출시 테스트가 기울기를 못 박아 결정 대기. 옷 = 넘어가는 다음 단계. 쓰는 곳: Producer 글 읽기 · Writer 산문 초안(Producer 에서 넘길 때 · Writer 화면) · Artist 그림 ·
 Storyboard 나누기 · 첫 러프. 설명은 부르는 쪽이 준다 — 안 주면 잠금 안내("AI가 작업하는 동안은 화면과 채팅이 잠겨요…", 출시 테스트 고정), `description={null}` 이면 설명 줄을 비운다.
-진행 정도(`progress`)를 안 주면 막대가 없다. 덮개 없이 화면 가운데에 큰 Lumi `loading`(폭 300)만 두는 곳: 새 프로젝트 만들기(`/projects/new`, Producer 옷 · 실패면 `error`) ·
+진행 정도(`progress`)를 안 주면 막대가 없다.
+같은 단계 안에서 기다릴 때(11/5 WL 문단 다시 쓰기 · AR 다시 그리기): `scrim="clear"` 는 바탕을 칠하지 않고 카드만 가운데 — 잠금(단계 화면 · 채팅 inert, 레일 붙잡기)은 그대로고,
+덮개가 받은 휠 · 손가락 끌기를 포인터 아래 `[data-ai-busy-scroll]` 칸으로 넘겨 보기 · 스크롤만 된다(`src/lib/ai-busy-scroll.ts`, 칸이 겹치면 안쪽 칸).
+`card="loading"` 은 Lumi 없이 같은 새 카드(그림만 없음, 색은 놓인 화면의 지금 단계). 약속 tests/project/busy-overlay-clear.test.ts. 덮개 없이 화면 가운데에 큰 Lumi `loading`(폭 300)만 두는 곳: 새 프로젝트 만들기(`/projects/new`, Producer 옷 · 실패면 `error`) ·
 Editor 클립 준비. `lumi` 를 안 주는 잠금(그림 다시 그리기 · 샷 고치기 팝업 위 등)은 도는 원의 작은 카드 그대로(약속 tests/project/busy-overlay-lumi.test.ts).
 실패 안내의 오류 모습 큰 Lumi 도 단계를 넘어가는 기다림의 실패에만 둔다 — Storyboard 보드에서 컷을 다시 그리다 난 실패는 작은 카드(약속 tests/writer/board-wait-lumi.test.ts).
 

@@ -346,6 +346,17 @@ export default function DesignShowcasePage() {
             ]}
             lumi="writer"
           />
+          <AiBusyCard
+            card="loading"
+            title="Redrawing Minho"
+            description={null}
+            progress={40}
+            steps={[
+              { label: 'Read the request', state: 'done' },
+              { label: 'Drawing', state: 'current' },
+              { label: 'Finish', state: 'todo' },
+            ]}
+          />
           <AiBusyCard title="Making the image" description="Minho · White shirt" />
         </div>
       </Section>
