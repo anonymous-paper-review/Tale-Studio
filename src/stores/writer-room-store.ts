@@ -3,6 +3,7 @@
 //   탭(화면에서 고치기 · 채팅으로 고치기)은 브라우저에 기억한다 — Producer 시작 화면의 탭과 같은 칸을 쓴다.
 //   v3(2026-11-03 오너 결정 7): Writer 화면은 탭 없이 한 화면이라 기억한 탭을 불러오지 않는다(이 스토어의 탭은 늘 화면 보기).
 //   채팅에 붙인 문단도 여기 둔다 — 산문 본문이 붙이고, 채팅 입력칸이 칩으로 보이고 보낸다(lib/prose/paragraph-pick).
+//   보낸 문단은 수정안이 정해질 때까지 revising 에 남는다 — 고치는 동안 그 문단만 흐리게(11/5 시안 WL).
 import { create } from 'zustand'
 import { nextParagraphPick, type ParagraphPick } from '@/lib/prose/paragraph-pick'
 import { useChatUiStore } from '@/stores/chat-ui-store'
@@ -57,6 +58,8 @@ interface WriterRoomState {
   chatFocusRequest: number
   /** 채팅 입력칸 위에 붙인 문단(v3) — 붙은 채로 보낸 말은 그 문단 수정 요청이 된다. */
   paragraph: ParagraphPick | null
+  /** 고쳐 달라고 보낸 문단(11/5 시안 WL) — 수정안이 정해질 때까지. 붙은 문단(칩)은 보내자마자 떨어지므로 따로 둔다. */
+  revising: ParagraphPick | null
   loadTab: () => void
   setTab: (tab: WorkspaceTab) => void
   openRewrite: () => void
@@ -68,6 +71,8 @@ interface WriterRoomState {
   /** 문단을 눌렀다 — 붙일 수 있으면 붙이고(같은 문단이면 뗀다), 붙이면 오른쪽 채팅을 펴고 입력칸에 커서를 놓는다. */
   toggleParagraph: (clicked: ParagraphPick, pickable: boolean) => void
   clearParagraph: () => void
+  setRevising: (pick: ParagraphPick) => void
+  clearRevising: () => void
 }
 
 export const useWriterRoomStore = create<WriterRoomState>((set, get) => ({
@@ -78,6 +83,7 @@ export const useWriterRoomStore = create<WriterRoomState>((set, get) => ({
   confirmOpen: false,
   chatFocusRequest: 0,
   paragraph: null,
+  revising: null,
   loadTab: () => {
     if (get().tabLoaded) return
     set({ tab: readWorkspaceTab(), tabLoaded: true })
@@ -104,5 +110,9 @@ export const useWriterRoomStore = create<WriterRoomState>((set, get) => ({
   },
   clearParagraph: () => {
     if (get().paragraph) set({ paragraph: null })
+  },
+  setRevising: (pick) => set({ revising: pick }),
+  clearRevising: () => {
+    if (get().revising) set({ revising: null })
   },
 }))

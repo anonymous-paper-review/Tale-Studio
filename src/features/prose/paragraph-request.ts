@@ -38,10 +38,13 @@ export async function sendParagraphRequest(typed: string): Promise<boolean> {
   const projectId = pick.projectId
   const text = paragraphRequest(pick, said, useLocaleStore.getState().locale)
   useWriterRoomStore.getState().clearParagraph()
+  // 수정안이 정해질 때까지 어느 문단을 고치는지 기억한다 — 고치는 동안 그 문단만 흐리게(11/5 시안 WL). 보내지 못하면 잊는다.
+  useWriterRoomStore.getState().setRevising(pick)
   const chat = useGlobalChatStore.getState()
   chat.dismissSuggestion({ implicit: true })
   useGlobalChatStore.setState({ error: null })
   const ok = await chat.reviseSceneGate(text)
+  if (!ok && useWriterRoomStore.getState().revising === pick) useWriterRoomStore.getState().clearRevising()
   // 답을 기다리는 사이 다른 프로젝트로 옮겼으면 그 채팅에 남기지 않는다.
   if (useProjectStore.getState().projectId !== projectId) return true
   const reply = ok

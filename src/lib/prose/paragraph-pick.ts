@@ -1,8 +1,10 @@
 // Writer 산문 문단 붙이기 규칙(v3 W1, 오너 2026-11-03 결정 7). 문단을 누르면 그 문단이 채팅 입력칸 위에 붙고,
 //   붙은 채로 보낸 말은 그 문단만 고쳐 달라는 수정 요청이 된다. 한 번에 한 문단, 직접 고칠 수 있을 때만 붙는다.
-//   약속: tests/writer/prose-paragraph.test.ts
+//   보낸 문단은 수정안이 정해질 때까지 따로 기억해, 고치는 동안 그 문단만 흐리게 보인다(11/5 시안 WL).
+//   약속: tests/writer/prose-paragraph.test.ts · tests/writer/prose-revise-wait.test.ts
 import { translate } from '@/lib/i18n/translate'
 import type { AppLocale } from '@/lib/locale'
+import type { ProseBusy } from '@/lib/prose/busy'
 
 /** 채팅에 붙인 문단 — 화면 순서(S1 = 0)와 누를 때의 글. */
 export interface ParagraphPick {
@@ -59,6 +61,24 @@ export function keptParagraphPick(
   if (!current) return null
   if (!now.pickable || current.projectId !== now.projectId) return null
   return now.paragraphs[current.index] === current.text ? current : null
+}
+
+/** 고쳐 달라고 보낸 문단을 계속 기억할지 — 그 프로젝트에 수정 요청 · 수정안이 남아 있는 동안만(적용 · 버리기 · 보내기 실패면 잊는다). */
+export function keptRevisingParagraph(
+  current: ParagraphPick | null,
+  now: { projectId: string | null; hasProposal: boolean },
+): ParagraphPick | null {
+  if (!current) return null
+  return current.projectId === now.projectId && now.hasProposal ? current : null
+}
+
+/** 흐리게 보일 문단 번호 — 수정안을 쓰는 동안(revise) 그 프로젝트에서 보낸 문단만. 세 가지 안 · 초안은 한 문단 일이 아니다. */
+export function revisingParagraphIndex(
+  revising: ParagraphPick | null,
+  now: { projectId: string | null; busy: ProseBusy },
+): number | null {
+  if (!revising || revising.projectId !== now.projectId || now.busy?.kind !== 'revise') return null
+  return revising.index
 }
 
 /** 붙은 문단으로 보내는 수정 요청 — 문단 번호와 앞부분을 먼저 싣고 그 문단만 고치라고 한 뒤 보낸 말을 잇는다.

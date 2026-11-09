@@ -13,7 +13,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
-import { paragraphClickPicks, paragraphKeyPicks, paragraphLabel, selectedTextWithin } from '@/lib/prose/paragraph-pick'
+import { paragraphClickPicks, paragraphKeyPicks, paragraphLabel, revisingParagraphIndex, selectedTextWithin } from '@/lib/prose/paragraph-pick'
 import { TreatmentDiffView } from '@/features/producer/treatment-diff-view'
 import { useProducerStore } from '@/stores/producer-store'
 import { useWriterRoomStore } from '@/stores/writer-room-store'
@@ -25,6 +25,7 @@ export function ProseDocument({ prose }: { prose: ProseState }) {
   const t = useT()
   const [starting, setStarting] = useState(false)
   const pick = useWriterRoomStore((s) => s.paragraph)
+  const revising = useWriterRoomStore((s) => s.revising)
   // [산문 쓰기]를 누른 뒤 Writer 가 쓰기 시작했다고 알릴 때까지도 왼쪽 사이드바를 막는다(2026-10-27) — 그 사이 다른 단계로 옮겨 갈 수 있었다.
   useAiBusyHold(starting)
   const { view, diffRows, phase, draftLive } = prose
@@ -68,13 +69,16 @@ export function ProseDocument({ prose }: { prose: ProseState }) {
   }
   if (view.kind === 'scenes' && prose.paragraphs.length) {
     const pickable = prose.tools.manual
+    // 수정안을 쓰는 동안 고치는 문단만 흐리게(11/5 시안 WL 30%) — 다른 문단은 그대로 읽힌다.
+    const revisingIndex = revisingParagraphIndex(revising, { projectId: prose.projectId, busy: prose.busy })
     return (
       <article className="space-y-1" data-testid="prose-article">
         {prose.paragraphs.map((paragraph, index) => {
           const label = <span className="w-4 shrink-0 pt-1 font-num text-micro font-semibold text-foreground">{paragraphLabel(index)}</span>
           if (!pickable) {
+            const dim = revisingIndex === index
             return (
-              <div key={index} className="flex gap-4 rounded-[14px] py-4 pl-4 pr-6">
+              <div key={index} className={cn('flex gap-4 rounded-[14px] py-4 pl-4 pr-6 transition-opacity', dim && 'opacity-30')} data-revising={dim || undefined}>
                 {label}
                 <p className="min-w-0 select-text text-prose text-foreground">{paragraph}</p>
               </div>

@@ -36,6 +36,31 @@ export function proseBusy(input: {
   return null
 }
 
+const DRAFT_STEPS = ['Organizing the material', 'Story skeleton', 'Writing the scene story'] as const
+
+/** 기다리는 창의 단계 줄(영어 원문 — 화면이 번역한다). 진행 상태를 읽기 전 초안은 어느 줄인지 몰라 줄 없이 잠근다.
+ *  산문을 고치는 동안은 11/5 시안 WL 세 줄: 요청 읽기 → 수정안 쓰는 중 → 바뀐 곳 표시(수정안이 오면 산문에 바뀐 곳이 표시된다).
+ *  고치기는 진행률을 몰라 막대는 두지 않는다. 약속: tests/writer/prose-revise-wait.test.ts */
+export function proseBusySteps(busy: ProseBusy): Array<{ label: string; state: 'done' | 'current' | 'todo' }> | undefined {
+  if (!busy) return undefined
+  if (busy.kind === 'draft') {
+    const at = busy.step
+    if (at === null) return undefined
+    return DRAFT_STEPS.map((label, index) => ({ label, state: index < at ? 'done' : index === at ? 'current' : 'todo' }))
+  }
+  if (busy.kind === 'rewrite') {
+    return [
+      { label: 'Reading the request', state: 'done' },
+      { label: 'Writing three versions', state: 'current' },
+    ]
+  }
+  return [
+    { label: 'Reading the request', state: 'done' },
+    { label: 'Writing the change', state: 'current' },
+    { label: 'Marking the changes', state: 'todo' },
+  ]
+}
+
 /** 잠금 화면을 띄울 일인가 — 진행 상태를 읽는 동안(draft step null)은 띄우지 않는다. 단추 · 입력만 막는다(busy 는 그대로).
  *  읽는 1초 남짓 사이에 다 쓴 산문 위로 "산문 초안을 쓰고 있어요"가 깜빡였다(검토 지적 15). 쓰는 중이면 상태를 읽자마자 뜬다. */
 export function proseOverlayOpen(busy: ProseBusy): boolean {

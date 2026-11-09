@@ -13,8 +13,8 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { PageHeader } from '@/components/layout/page-header'
 import { AiBusyOverlay, type AiBusyStep } from '@/components/ai-busy-overlay'
-import { proseOverlayOpen } from '@/lib/prose/busy'
-import { keptParagraphPick } from '@/lib/prose/paragraph-pick'
+import { proseBusySteps, proseOverlayOpen } from '@/lib/prose/busy'
+import { keptParagraphPick, keptRevisingParagraph } from '@/lib/prose/paragraph-pick'
 import { proseWaitingLumi, variantsPickerOpen } from '@/lib/prose/screen'
 import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
 import { WriterResumeButton } from '@/components/layout/writer-resume-button'
@@ -32,8 +32,6 @@ import { ProseDocument } from '@/features/prose/prose-document'
 import { VariantsPicker } from '@/features/prose/variants-picker'
 import { ManualEditDialog } from '@/features/prose/manual-edit-dialog'
 import { ProseConfirmDialog } from '@/features/prose/prose-confirm-dialog'
-
-const DRAFT_STEPS = ['Organizing the material', 'Story skeleton', 'Writing the scene story'] as const
 
 export function ProseWorkspace() {
   const t = useT()
@@ -66,20 +64,19 @@ export function ProseWorkspace() {
     if (pick && keptParagraphPick(pick, { projectId, pickable, paragraphs }) !== pick) useWriterRoomStore.getState().clearParagraph()
   }, [pick, projectId, pickable, paragraphs])
   useEffect(() => () => useWriterRoomStore.getState().clearParagraph(), [])
+  // 고쳐 달라고 보낸 문단(11/5 시안 WL) — 수정 요청 · 수정안이 없어지거나(적용 · 버리기 · 실패) 다른 프로젝트면 잊는다. 화면을 떠나도 잊는다.
+  const revising = useWriterRoomStore((s) => s.revising)
+  const hasProposal = prose.hasProposal
+  useEffect(() => {
+    if (revising && keptRevisingParagraph(revising, { projectId, hasProposal }) !== revising) useWriterRoomStore.getState().clearRevising()
+  }, [revising, projectId, hasProposal])
+  useEffect(() => () => useWriterRoomStore.getState().clearRevising(), [])
 
-  const busySteps = useMemo<AiBusyStep[] | undefined>(() => {
-    if (!prose.busy) return undefined
-    if (prose.busy.kind === 'draft') {
-      const at = prose.busy.step
-      // 진행 상태를 읽기 전에는 어느 줄인지 모른다 — 줄 목록 없이 잠근다(다 쓴 초안이 첫 줄부터 다시 쓰는 것처럼 보이지 않게).
-      if (at === null) return undefined
-      return DRAFT_STEPS.map((label, index) => ({ label: t(label), state: index < at ? 'done' : index === at ? 'current' : 'todo' }))
-    }
-    return [
-      { label: t('Reading the request'), state: 'done' },
-      { label: t(prose.busy.kind === 'rewrite' ? 'Writing three versions' : 'Writing the change'), state: 'current' },
-    ]
-  }, [prose.busy, t])
+  // 기다리는 창의 단계 줄(lib/prose/busy) — 산문을 고치는 동안은 11/5 시안 WL 세 줄, 진행 상태를 읽기 전 초안은 줄 없이.
+  const busySteps = useMemo<AiBusyStep[] | undefined>(
+    () => proseBusySteps(prose.busy)?.map((step) => ({ label: t(step.label), state: step.state })),
+    [prose.busy, t],
+  )
 
   // 예전 방식 프로젝트의 씬 스토리 확정(리뉴얼 전 흐름) — 확정하면 나머지를 이어 만들고 Storyboard 로 간다.
   const [legacyConfirming, setLegacyConfirming] = useState(false)
