@@ -86,6 +86,23 @@ describe('프로젝트 목록 이름으로 찾기', () => {
     expect(ko('No project matches that name.')).toBe('이름이 맞는 프로젝트가 없어요.')
   })
 
+  // 왜: 화면 읽기로 쓰는 사람은 단추 글("최신순")만으로는 무엇을 고르는 단추인지 모른다(검토 B 5b).
+  it('정렬 단추는 화면 읽기에 "정렬: 최신순"처럼 무엇을 고르는 단추인지와 지금 정렬을 함께 알린다', () => {
+    const out = renderToStaticMarkup(
+      createElement(ProjectListTools, { query: '', onQueryChange: () => {}, sort: 'name', onSortChange: () => {} }),
+    )
+    expect(out).toContain('aria-label="정렬: 이름순 (ㄱ → ㅎ)"')
+    expect(en('Sort: {sort}').replace('{sort}', en('Latest'))).toBe('Sort: Latest')
+  })
+
+  // 왜: 고른 줄의 ✓ 는 눈으로만 보인다 — 메뉴를 열면 화면 읽기도 어느 줄이 골라져 있는지 알려야 한다(검토 B 5b).
+  it('정렬 메뉴는 네 줄을 하나만 고르는 묶음으로 두어 화면 읽기에 고른 줄을 알린다', () => {
+    const source = readFileSync('src/features/projects/project-list-tools.tsx', 'utf8')
+    expect(source).toContain('<DropdownMenuRadioGroup value={sort}')
+    expect(source).toContain('<DropdownMenuRadioItem')
+    expect(source).not.toContain('<DropdownMenuItem')
+  })
+
   // 왜: 찾기 칸과 정렬 단추는 목록 머리에 같이 있다(시안 R2) — 지금 고른 정렬 이름이 단추에 보인다.
   it('목록 머리에 "프로젝트 이름으로 찾기" 칸과 지금 정렬 이름이 적힌 정렬 단추를 둔다', () => {
     const out = renderToStaticMarkup(

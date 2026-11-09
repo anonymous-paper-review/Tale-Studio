@@ -217,6 +217,7 @@ export const KO: Record<string, string> = {
   // v3 프로젝트 목록 첫 화면 머리(2026-11-03)
   'Total {n}': '모두 {n}개',
   // 프로젝트 목록 찾기 · 정렬(11/5 시안 R2)
+  'Sort: {sort}': '정렬: {sort}', // 정렬 단추의 화면 읽기 이름(검토 B 5b)
   'Latest': '최신순',
   'Oldest': '오래된순',
   'Name (A → Z)': '이름순 (ㄱ → ㅎ)',
