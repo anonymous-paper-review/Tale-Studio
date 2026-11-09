@@ -42,6 +42,16 @@ describe('노드 · 카드 위 기다림', () => {
     expect(lumiRenderMode({ webgl: true, reducedMotion: false, script: 'ready' })).toBe('animated')
   })
 
+  // 왜: 검토 B 5c — 카드마다 화면 읽기 알림(role="status")이라, 여럿이 동시에 뜨면 같은 "다음 차례: …"를 겹쳐 읽었다.
+  //   알릴 카드 하나는 부르는 쪽이 고른다(보드 · Director 는 첫 카드).
+  it('노드 위 기다림 카드는 부르는 쪽이 고른 하나만 화면 읽기에 알린다', () => {
+    const quiet = renderToStaticMarkup(createElement(NodeWaitCard, { lumi: 'director', title: '영상을 만들고 있어요', note: '다음 차례: 샷 2' }))
+    expect(quiet).not.toContain('role="status"')
+    expect(quiet).not.toContain('aria-live')
+    const told = renderToStaticMarkup(createElement(NodeWaitCard, { lumi: 'director', title: '영상을 만들고 있어요', note: '다음 차례: 샷 2', announce: true }))
+    expect(told).toMatch(/^(?:<link[^>]*\/>)*<div[^>]*role="status"[^>]*aria-live="polite"/)
+  })
+
   // 왜: SYS "완성 표시" — 다 만든 노드는 단계 그라데이션 "✓ 완성" 배지와 단계 색 테두리로 알린다.
   it('완성 배지는 "✓ 완성" 을 그 단계 색으로 쓰고, 기다림 카드는 단계 색 테두리를 단다', () => {
     const html = renderToStaticMarkup(createElement(DoneBadge, { lumi: 'artist' }))
