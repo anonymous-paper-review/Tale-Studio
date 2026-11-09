@@ -5,6 +5,7 @@
 import type { DesignTokens, VoiceProfile } from '@/lib/writer/types/pipeline'
 import type { DialogueLanguage } from '@/lib/writer/pipeline/util/output-language'
 import type { ProjectFormat } from '@/types/project'
+import { MOODS, type MoodKey } from '@/features/entry/options'
 
 export const SERIES_VERSION = 1
 
@@ -72,6 +73,11 @@ export interface SeriesSnapshot {
    *   운영 2화 뱃사공은 "짚 모자"라는 낱말만 보고 1화(중세 유럽풍)와 다른 삿갓 차림으로 그려졌다. 적지 못했으면 null.
    */
   world: string | null
+  /**
+   * 2026-11-09 오너(추천대로): 앞 화 장르 · 분위기. 다음 화 시작 화면이 미리 골라 두고 "앞 화" 표시를 붙인다(바꿀 수 있다).
+   *   앞 화 장르를 알 수 없었거나 이 칸이 생기기 전에 만든 다음 화면 없다.
+   */
+  mood?: MoodKey
 }
 
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -171,7 +177,14 @@ export function parseSeries(raw: unknown): SeriesSnapshot | null {
     copyFailures: strList(raw.copyFailures),
     designTokens: parseSeriesDesignTokens(raw.designTokens),
     world: strOrNull(raw.world)?.trim() ?? null,
+    ...moodOf(raw.mood),
   }
+}
+
+/** 시리즈 기록의 장르 칸 — 아는 장르면 { mood }, 아니면 칸을 두지 않는다(예전 기록과 같은 모양). */
+function moodOf(raw: unknown): { mood?: MoodKey } {
+  const mood = MOODS.find((m) => m.key === raw)?.key
+  return mood ? { mood } : {}
 }
 
 /** 그림체 정체 — 프리셋은 키, 사용자가 올린 그림체도 프로젝트마다 custom_<uuid> 키를 갖는다(복사하면 키도 같이 넘어간다). */

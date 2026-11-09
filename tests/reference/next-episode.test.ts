@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server'
 import { storageKeySegment } from '@/lib/storage/key-segment'
 import type { SeriesSnapshot } from '@/lib/series/snapshot'
 import { SERIES_WORLD_MAX_CHARS, buildSeriesWorldPrompt, parseSeriesWorldLine } from '@/lib/series/world-line'
+import { emptyEntryDraft } from '@/lib/entry/draft'
 
 const ANCHOR_URL = 'https://media.test/workspace-1/prev-episode/anchors/style.png'
 const MINHO_SHEET = 'https://media.test/workspace-1/prev-episode/characters/minho-sheet.png'
@@ -446,7 +447,7 @@ describe('앞 화에서 다음 화 만들기', () => {
     await POST(postRequest({ fromProjectId: 'prev-episode' }))
 
     const draft = mocks.updates[0].entry_draft as { picks: Record<string, unknown>; startedAt: unknown }
-    expect(draft.picks).toMatchObject({ ratio: '9:16', mood: null, runtime: null, level: null })
+    expect(draft.picks).toMatchObject({ ratio: '9:16', mood: 'comedy', runtime: null, level: null })
     expect(draft.startedAt).toBeNull()
     expect((mocks.updates[0].settings as Record<string, unknown>).format).toBe('vertical_9:16')
     expect(seriesOf().format).toBe('vertical_9:16')
@@ -511,10 +512,52 @@ describe('앞 화에서 다음 화 만들기', () => {
       locations: ['회사 복도'],
       hasVoices: true,
       lastSceneAvailable: true,
+      style: { kind: 'custom', label: 'Watercolor' },
+      genre: 'comedy',
     })
     expect(mocks.rpc).not.toHaveBeenCalled()
     expect(mocks.updates).toEqual([])
     expect(mocks.mediaCopy).not.toHaveBeenCalled()
+  })
+
+  // 왜: 만들기 창이 "앞 화와 같아요 (수묵 스케치)"처럼 어떤 그림체가 넘어오는지 이름을 보여 준다(11/5 시안 R6, 오너 2026-11-09 추천대로).
+  it('미리보기는 앞 화가 그림체 목록에서 고른 그림체면 그 그림체 이름을 함께 알려 준다', async () => {
+    mocks.rows.projects = { ...(mocks.rows.projects as Record<string, unknown>), style_anchor_key: 'ink_sketch', custom_style_anchor: null }
+    mocks.rows.style_anchors = { key: 'ink_sketch', label: '수묵 스케치', subtitle: 'Ink sketch' }
+
+    const body = await (await GET(getRequest('prev-episode'))).json()
+
+    expect(body.style).toEqual({ kind: 'preset', key: 'ink_sketch', label: '수묵 스케치', subtitle: 'Ink sketch' })
+  })
+
+  // 왜: 다음 화도 대개 같은 장르다 — Producer 장르 · 분위기를 앞 화 장르로 미리 골라 두고, 바꿀 수 있다(오너 2026-11-09 추천대로).
+  it('앞 화 장르를 다음 화 시작 화면의 장르 · 분위기 기본값으로 넣고 시리즈 기록에 남긴다', async () => {
+    await POST(postRequest({ fromProjectId: 'prev-episode' }))
+    const draft = mocks.updates[0].entry_draft as { picks: Record<string, unknown>; chat: { answered: Record<string, unknown> } }
+    expect(draft.picks.mood).toBe('comedy')
+    expect(draft.chat.answered).toEqual({})
+    expect(seriesOf().mood).toBe('comedy')
+
+    // 앞 화가 새 시작 화면에서 고른 장르가 있으면 그것을 쓴다.
+    mocks.updates = []
+    mocks.rows.projects = {
+      ...(mocks.rows.projects as Record<string, unknown>),
+      entry_draft: { ...emptyEntryDraft(), picks: { mood: 'romance', runtime: 'r60', level: 'grow', ratio: '9:16' }, startedAt: '2026-11-01T00:00:00.000Z' },
+    }
+    await POST(postRequest({ fromProjectId: 'prev-episode' }))
+    expect((mocks.updates[0].entry_draft as { picks: Record<string, unknown> }).picks.mood).toBe('romance')
+    expect(seriesOf().mood).toBe('romance')
+  })
+
+  // 왜: 앞 화 장르를 고를 수 없는 말이면 엉뚱한 장르를 넣지 않는다 — 시작 화면에서 사람이 고른다.
+  it('앞 화 장르를 알 수 없으면 다음 화 장르는 비워 둔다', async () => {
+    mocks.rows.projects = {
+      ...(mocks.rows.projects as Record<string, unknown>),
+      settings: { format: 'vertical_9:16', dialogueLanguage: 'ko', genre: '아무 장르', playtime: 60, tone: [] },
+    }
+    await POST(postRequest({ fromProjectId: 'prev-episode' }))
+    expect((mocks.updates[0].entry_draft as { picks: Record<string, unknown> }).picks.mood).toBeNull()
+    expect(seriesOf().mood ?? null).toBeNull()
   })
 })
 

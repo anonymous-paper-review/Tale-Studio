@@ -19,7 +19,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { PRICING_PAGE_VISIBLE } from '@/lib/billing/pricing-visibility'
-import { useT } from '@/lib/i18n'
+import { useLocale, useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { useSeriesInfo } from '@/features/series/use-series-info'
 import { useProjectStore } from '@/stores/project-store'
@@ -30,20 +30,16 @@ import {
   canContinueLastScene,
   canCreateNextEpisode,
   nextEpisodeFailure,
+  nextEpisodeRows,
   nextEpisodeSwitch,
   nextEpisodeWaitDone,
   nextEpisodeWaitStep,
   type NextEpisodeFailure,
+  type NextEpisodePreviewView,
 } from './series-list'
 
-/** GET /api/project/next-episode 미리보기(계약 1). */
-interface NextEpisodePreview {
-  prevTitle: string
-  characters: string[]
-  locations: string[]
-  hasVoices: boolean
-  lastSceneAvailable: boolean
-}
+/** GET /api/project/next-episode 미리보기(계약 1) — 그림체 · 장르 칸은 2026-11-09 오너 추천대로 더했다. */
+type NextEpisodePreview = NextEpisodePreviewView
 
 export interface SeriesTarget {
   id: string
@@ -88,6 +84,7 @@ export function NextEpisodeDialog({
   onFailure: (failure: NextEpisodeFailure) => void
 }) {
   const t = useT()
+  const locale = useLocale()
   const router = useRouter()
   const [preview, setPreview] = useState<NextEpisodePreview | null>(null)
   const [loading, setLoading] = useState(false)
@@ -233,18 +230,9 @@ export function NextEpisodeDialog({
           <>
             {/* 11/5 시안(R6): 테두리 · 나눔 선 없는 바탕색 상자(팝업 #1F1E1D 보다 한 단 밝게) · 모서리 16 · 안쪽 10/20 · 이름 칸 64 이상 · 이름과 값 사이 16 */}
             <dl className="grid grid-cols-[minmax(4rem,auto)_1fr] gap-x-4 rounded-xl bg-background px-5 py-2.5">
-              <InheritRow
-                roomy
-                label={t('Characters')}
-                value={preview.characters.length ? preview.characters.join(DOT) : t('None')}
-              />
-              <InheritRow
-                roomy
-                label={t('Backgrounds')}
-                value={preview.locations.length ? preview.locations.join(DOT) : t('None')}
-              />
-              <InheritRow roomy label={t('Art style')} value={t('Same as the previous episode')} />
-              {preview.hasVoices ? <InheritRow roomy label={t('Voices')} value={t('Inherited from the previous episode')} /> : null}
+              {nextEpisodeRows(preview, t, locale).map((row) => (
+                <InheritRow key={row.key} roomy label={row.label} value={row.value} />
+              ))}
             </dl>
 
             {canContinueLastScene(preview) ? (

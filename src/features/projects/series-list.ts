@@ -3,7 +3,9 @@
 //   프로젝트마다 함께 싣는 칸. 순수 함수 — 서버(목록 라우트)와 화면(카드 · 창)이 같은 판정을 쓴다.
 //   문구는 영어 원문 = 사전 키.
 //   2026-10-26 오너: 카드마다 붙은 [다음 화 만들기](99장 중 74장)가 목록을 어지럽혀 카드에서 빼고 [새 프로젝트]로 옮겼다.
+import type { AppLocale } from '@/lib/locale'
 import { parseSeries } from '@/lib/series/snapshot'
+import { styleAnchorName } from '@/lib/style-anchor-name'
 import type { StageId } from '@/types'
 
 /** 목록(GET /api/project/list)이 프로젝트마다 주는 시리즈 칸. */
@@ -109,6 +111,54 @@ export function continuingEpisodes<T extends SeriesListProject>(projects: readon
 /** "앞 화 마지막 장면에서 이어 시작하기" 체크박스를 보일지 — 미리보기(GET /api/project/next-episode)가 끝 장면을 찾았을 때만. */
 export function canContinueLastScene(preview: { lastSceneAvailable?: boolean } | null | undefined): boolean {
   return preview?.lastSceneAvailable === true
+}
+
+/** 만들기 창이 받는 미리보기(GET /api/project/next-episode) — 그림체 · 장르는 2026-11-09 오너 추천대로 더했다. */
+export interface NextEpisodePreviewView {
+  prevTitle: string
+  characters: string[]
+  locations: string[]
+  hasVoices: boolean
+  lastSceneAvailable: boolean
+  style?: { kind: 'custom'; label: string | null } | { kind: 'preset'; key: string; label: string; subtitle: string | null } | null
+  genre?: string | null
+}
+
+export interface NextEpisodeRow {
+  key: 'characters' | 'backgrounds' | 'style' | 'genre' | 'voices'
+  label: string
+  value: string
+}
+
+/**
+ * 만들기 창의 이어받는 것 줄(11/5 시안 R6) — 등장인물 · 배경 · 그림체(이름과 함께) · 장르(이어받을 때) · 말투(대사까지 끝난 앞 화).
+ *   그림체 이름은 화면 언어로(목록 그림체는 그 언어 이름, 사용자가 올린 그림체는 그 이름 · 없으면 "내 레퍼런스").
+ *   약속: tests/project/next-episode-rows.test.ts
+ */
+export function nextEpisodeRows(
+  preview: NextEpisodePreviewView,
+  t: (key: string, params?: Record<string, string | number>) => string,
+  locale: AppLocale,
+): NextEpisodeRow[] {
+  const dot = ' · '
+  const style = preview.style ?? null
+  const styleName = !style
+    ? null
+    : style.kind === 'custom'
+      ? style.label?.trim() || t('My reference')
+      : styleAnchorName({ key: style.key, label: style.label, subtitle: style.subtitle }, locale)
+  const rows: NextEpisodeRow[] = [
+    { key: 'characters', label: t('Characters'), value: preview.characters.length ? preview.characters.join(dot) : t('None') },
+    { key: 'backgrounds', label: t('Backgrounds'), value: preview.locations.length ? preview.locations.join(dot) : t('None') },
+    {
+      key: 'style',
+      label: t('Art style'),
+      value: styleName ? t('Same as the previous episode ({style})', { style: styleName }) : t('Same as the previous episode'),
+    },
+  ]
+  if (preview.genre) rows.push({ key: 'genre', label: t('Genre'), value: t('Inherited from the previous episode') })
+  if (preview.hasVoices) rows.push({ key: 'voices', label: t('Voices'), value: t('Inherited from the previous episode') })
+  return rows
 }
 
 /**
