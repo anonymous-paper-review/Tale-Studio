@@ -4,6 +4,7 @@
 //   여백 18 · Lumi S(만드는 중) · 단계 색 테두리 1.5 · 진행 막대. 한 번에 하나씩 덮고 나머지 노드는 그대로 둔다(붙이는 쪽이 정한다).
 //   완성 표시: 단계 그라데이션 "✓ 완성" 배지(DoneBadge) + 단계 색 테두리(STAGE_FRAME).
 //   색은 lumi 옷(data-stage) — 놓인 화면이 다른 단계여도 Lumi 와 테두리 · 막대가 같은 단계를 말한다. 약속: tests/project/node-wait.test.ts
+//   Lumi 는 늘 그림(still) — 카드가 여럿 뜨면 움직이는 Lumi 마다 WebGL 문맥을 하나씩 열어 브라우저 한도에 걸린다(검토 C 2026-11-09).
 import { Lumi } from '@/components/lumi/lumi'
 import { useT } from '@/lib/i18n'
 import { lumiStageTheme, type LumiPersona } from '@/lib/lumi'
@@ -38,7 +39,7 @@ export function NodeWaitCard({ lumi, title, description, progress, note, classNa
         className,
       )}
     >
-      <Lumi persona={lumi} state="loading" size="s" />
+      <Lumi persona={lumi} state="loading" size="s" still />
       <div className="flex flex-col items-center gap-1">
         <p className="text-[14px] font-bold leading-[1.2] text-foreground">{title}</p>
         {description ? <p className="text-caption leading-[1.55] text-subtle-foreground">{description}</p> : null}

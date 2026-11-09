@@ -205,7 +205,8 @@ Tailwind: `bg-stage-{화면}` · `text-stage-{화면}` (+ 알파), `bg-stage-bad
 
 ### 2.10 채팅 색 (Lumi 개발 가이드)
 
-채팅창 틀은 **무채색 고정**, 지금 단계 색 하나만 아바타 바탕 12% · 단계 칩 · Lumi 이름 · 생각 중 점 · 고른 빠른 답 · 입력창 포커스에 쓴다.
+채팅창 틀은 **무채색 고정**, 지금 단계 색 하나만 단계 칩 · Lumi 이름 · 생각 중 점 · 고른 빠른 답 · 입력창 포커스에 쓴다.
+채팅 얼굴(`LumiAvatar`)은 **바탕 없이 Lumi 만** — 11/5 시안의 옆 채팅(W1 · A5 · WL · WS)과 가운데 채팅(P1 · P2) 모두 둥근 바탕이 없다(예전 가이드의 단계 색 12% 바탕은 뺐다).
 
 | 토큰 | 역할 |
 |---|---|
@@ -216,6 +217,7 @@ Tailwind: `bg-stage-{화면}` · `text-stage-{화면}` (+ 알파), `bg-stage-bad
 | `--chat-input` | 입력 알약 |
 | `--chat-send` | 보내기 단추 (= primary) |
 | `--chat-center-lumi-bubble` · `--chat-center-my-bubble` | **가운데 채팅**(Producer P1 · P2, 11/5) Lumi · 내 말풍선 — 바탕(shell)이 옆 채팅(side)보다 밝아 한 단씩 밝힌 값 |
+| `--chat-center-chip` | 가운데 채팅의 안 고른 빠른 답(`ChoiceChip tone="chat"`) — 내 말풍선과 같은 값 |
 | `--chat-summary` | 정리 표 상자 · "지금까지 정한 것" 묶음 (= side) |
 | `--chat-summary-cell` | 그 안의 칸 (= `--side-raised`) |
 
@@ -541,7 +543,7 @@ Editor 클립 준비. `lumi` 를 안 주는 잠금(그림 다시 그리기 · �
 실패 안내의 오류 모습 큰 Lumi 도 단계를 넘어가는 기다림의 실패에만 둔다 — Storyboard 보드에서 컷을 다시 그리다 난 실패는 작은 카드(약속 tests/writer/board-wait-lumi.test.ts).
 
 **노드 · 카드 위에서 기다릴 때**(SYS, DG 기준) — `src/components/feedback/node-wait.tsx` `<NodeWaitCard lumi title description? progress? note? />`:
-그 노드(부모 `relative`)를 꽉 덮고 여백 18 · Lumi S(56, 만드는 중) · 단계 색 테두리 1.5(`STAGE_FRAME`) · 제목 14 Bold · 설명 12.5 · 막대. 한 번에 하나씩 덮고 나머지 노드는 그대로 둔다(붙이는 쪽이 정한다).
+그 노드(부모 `relative`)를 꽉 덮고 여백 18 · Lumi S(56, 만드는 중, 늘 그림 `still` — 여럿 떠도 WebGL 문맥을 열지 않는다) · 단계 색 테두리 1.5(`STAGE_FRAME`) · 제목 14 Bold · 설명 12.5 · 막대. 한 번에 하나씩 덮고 나머지 노드는 그대로 둔다(붙이는 쪽이 정한다).
 **완성 표시**: 단계 그라데이션 "✓ 완성" 알약(`<DoneBadge lumi? />`) + 단계 색 테두리(`STAGE_FRAME`). DG 그림의 완성 노드에 있는 단계 색 빛(0 0 24)은 §9 빛 금지라 넣지 않았다. 약속 tests/project/node-wait.test.ts · tests/project/loading-card.test.ts.
 
 ### 13.8 Component patterns (shadcn primitives)
