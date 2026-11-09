@@ -225,7 +225,7 @@ export function RecheckBody({ session, prose, dispatch, loading, failed, applyin
       <DialogFooter className="items-center gap-3 border-t border-border pt-4 sm:justify-between">
         <p className="text-xs text-muted-foreground">{t('If you need a character or background that is not in the prose, the prose has to be rewritten.')}</p>
         <div className="flex shrink-0 gap-2">
-          <Button variant="outline" onClick={onCancel} disabled={applying} data-testid="recheck-cancel">{t('Cancel')}</Button>
+          <Button variant="secondary" onClick={onCancel} disabled={applying} data-testid="recheck-cancel">{t('Cancel')}</Button>
           <span title={session.editing ? t('Confirm the name you are fixing first') : undefined}>
             <Button onClick={onApply} disabled={!!session.editing || applying || loading || failed} data-testid="recheck-apply">
               {applying ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
@@ -248,7 +248,7 @@ export function RecheckMergeDialog({ session, prose, dispatch }: { session: Rech
   const aliases = from ? [from.name, ...from.aliases].join('", "') : ''
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) dispatch({ type: 'cancelMerge' }) }}>
-      <DialogContent className="sm:max-w-md" data-testid="recheck-merge">
+      <DialogContent data-testid="recheck-merge">
         {from && into ? (
           <>
             <DialogHeader>
@@ -260,7 +260,7 @@ export function RecheckMergeDialog({ session, prose, dispatch }: { session: Rech
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button variant="outline" onClick={() => dispatch({ type: 'cancelMerge' })} data-testid="recheck-merge-cancel">{t('Cancel')}</Button>
+              <Button variant="secondary" onClick={() => dispatch({ type: 'cancelMerge' })} data-testid="recheck-merge-cancel">{t('Cancel')}</Button>
               <Button onClick={() => dispatch({ type: 'confirmMerge' })} data-testid="recheck-merge-go">{t('Merge')}</Button>
             </DialogFooter>
           </>

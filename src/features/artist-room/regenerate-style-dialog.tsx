@@ -86,10 +86,11 @@ export function RegenerateStyleDialog() {
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) close() }}>
-      <DialogContent className="flex max-h-[88vh] flex-col sm:max-w-2xl" showCloseButton={!busy} data-testid="artist-regen-dialog">
-        {/* v3(오너 2026-11-03 결정 8): 다시 만들기 전에 묻는 창 — 큰 Lumi(Artist 옷 · 기본 모습). */}
-        <ConfirmLumi stage="artist" />
+      {/* 11/5 SYS 넓은 팝업(스타일 고르기와 같은 격자) — 폭 · 단추 모양은 ui/dialog 가 정한다. */}
+      <DialogContent size="wide" className="flex max-h-[88vh] flex-col" showCloseButton={!busy} data-testid="artist-regen-dialog">
         <DialogHeader>
+          {/* v3(오너 2026-11-03 결정 8): 다시 만들기 전에 묻는 창 — 큰 Lumi(Artist 옷 · 기본 모습). */}
+          <ConfirmLumi stage="artist" />
           <DialogTitle>{t('Which style should we remake it in?')}</DialogTitle>
           <DialogDescription>
             {t('You can remake it in the same style or pick another one. The current version (v{n} · {style}) stays in the history, so you can load it any time.', { n: currentN, style: currentLabel })}
@@ -151,8 +152,8 @@ export function RegenerateStyleDialog() {
             <div className="flex gap-3"><dt className="w-24 shrink-0 text-muted-foreground">{t('Estimated credits')}</dt><dd>{t('Images do not use Takes.')}</dd></div>
           </dl>
         </div>
-        <DialogFooter className="border-t border-border pt-4">
-          <Button variant="outline" onClick={close} disabled={!!busy}>{t('Cancel')}</Button>
+        <DialogFooter>
+          <Button variant="secondary" onClick={close} disabled={!!busy}>{t('Cancel')}</Button>
           <Button onClick={() => void remake()} disabled={!canRemake} data-testid="artist-regen-go">
             {busy === 'regenerate' ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
             {t('Remake')}

@@ -6,7 +6,7 @@
 //   "내 그림체 올리기" 카드는 2026-10-27 오너 지시로 내렸다("추후 정비해서 다시 올릴거야") — 이미 올린 그림체가 있는 프로젝트는
 //   그 그림체 카드와 지우기(✕)만 보인다. 올리기 · 분석 서버 경로와 Writer 채팅의 그림체 첨부는 그대로다.
 import { useEffect, useState } from 'react'
-import { Check, ImageIcon, Loader2, Lock, Sparkles, X } from 'lucide-react'
+import { Check, ImageIcon, Loader2, Lock, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { ConfirmLumi } from '@/components/handoff/confirm-lumi'
 import { Button } from '@/components/ui/button'
@@ -113,11 +113,12 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
   return (
     <>
       <Dialog open={open} onOpenChange={(next) => { if (!making) onOpenChange(next) }}>
-        <DialogContent className="flex max-h-[88vh] flex-col sm:max-w-2xl" showCloseButton={!making} data-testid="artist-style-make">
-          {/* v3(오너 2026-11-03 결정 8): 그림을 만들기 전에 묻는 창 — 큰 Lumi(Artist 옷 · 기본 모습). */}
-          <ConfirmLumi stage="artist" />
+        {/* 11/5 SYS 넓은 팝업(AS 스타일 고르기) — 틀 · 단추 모양은 ui/dialog 가 정한다. */}
+        <DialogContent size="wide" className="flex max-h-[88vh] flex-col" showCloseButton={!making} data-testid="artist-style-make">
           <DialogHeader>
-            <DialogTitle>{t('Which style should we make it in?')}</DialogTitle>
+            {/* v3(오너 2026-11-03 결정 8): 그림을 만들기 전에 묻는 창 — 큰 Lumi(Artist 옷 · 기본 모습), 11/5 SYS "팝업 제목 위" 크기. */}
+            <ConfirmLumi stage="artist" />
+            <DialogTitle>{t('Which style should we draw it in?')}</DialogTitle>
             <DialogDescription>{t('This work has one style. Every character and background image is made in the style you pick. Later you can pick another style with Regenerate, and the earlier version stays in the history.')}</DialogDescription>
           </DialogHeader>
           <div className="min-h-0 space-y-4 overflow-y-auto py-1">
@@ -148,22 +149,22 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
               prevStyleId={prevStyleId}
               prevIsCustom={prevIsCustom}
             />
-            <dl className="space-y-2 rounded-lg border border-border px-3 py-2.5 text-sm">
-              <div className="flex gap-3" data-testid="artist-make-new"><dt className="w-24 shrink-0 text-muted-foreground">{t('What gets made')}</dt><dd>{makeCounts ? t('New character sheets {persons} · backgrounds {places}', { persons: makeCounts.newPersons, places: makeCounts.newPlaces }) : t('Character sheets {persons} · backgrounds {places}', { persons, places })}</dd></div>
+          </div>
+          <DialogFooter className="sm:items-center">
+            {/* 11/5 시안 AS — 단추 왼쪽 한 줄 "인물 3 · 배경 1"(걸리는 시간은 어림할 근거가 없어 뺀다). 레퍼런스 · 앞 화 그림 · Take 안내는 그 아래 작은 줄. */}
+            <div className="flex min-w-0 flex-col gap-0.5 text-caption text-subtle-foreground sm:mr-auto">
+              <p data-testid="artist-make-new">{makeCounts ? t('New character sheets {persons} · backgrounds {places}', { persons: makeCounts.newPersons, places: makeCounts.newPlaces }) : t('Character sheets {persons} · backgrounds {places}', { persons, places })}</p>
               {asIs > 0 ? (
-                <div className="flex gap-3" data-testid="artist-make-as-is"><dt className="w-24 shrink-0 text-muted-foreground">{t('Reference')}</dt><dd>{t('Used as is {count}', { count: asIs })}</dd></div>
+                <p data-testid="artist-make-as-is">{t('Reference')} · {t('Used as is {count}', { count: asIs })}</p>
               ) : null}
               {prevImageParts.length > 0 ? (
-                <div className="flex gap-3" data-testid="artist-make-prev"><dt className="w-24 shrink-0 text-muted-foreground">{t('Previous episode images')}</dt><dd>{prevImageParts.join(' · ')}</dd></div>
+                <p data-testid="artist-make-prev">{t('Previous episode images')} · {prevImageParts.join(' · ')}</p>
               ) : null}
-              <div className="flex gap-3"><dt className="w-24 shrink-0 text-muted-foreground">{t('Style')}</dt><dd>{chosenLabel ?? t('Pick a style')}</dd></div>
-              <div className="flex gap-3"><dt className="w-24 shrink-0 text-muted-foreground">{t('Estimated credits')}</dt><dd>{t('Images do not use Takes.')}</dd></div>
-            </dl>
-          </div>
-          <DialogFooter className="border-t border-border pt-4">
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={making}>{t('Cancel')}</Button>
+              <p>{t('Images do not use Takes.')}</p>
+            </div>
+            <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={making}>{t('Cancel')}</Button>
             <Button onClick={() => void make()} disabled={!canMake} data-testid="artist-style-make-go">
-              {making ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+              {making ? <Loader2 className="size-4 animate-spin" /> : null}
               {makeButtonText(t, chosenLabel)}
             </Button>
           </DialogFooter>
@@ -173,10 +174,10 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
   )
 }
 
-/** [만들기] 단추 글 — 한국어는 스타일 이름 받침에 맞춰 '으로 · 로'를 붙인다("3D 애니메이션으로 만들기").
- *  스타일을 아직 고르지 않았으면 이름 없이 [만들기]. 약속: tests/artist/style-make-button.test.ts */
+/** 만들기 단추 글(11/5 시안 AS "실사로 그리기") — 한국어는 스타일 이름 받침에 맞춰 '으로 · 로'를 붙인다("3D 애니메이션으로 그리기").
+ *  스타일을 아직 고르지 않았으면 이름 없이 [그리기]. 약속: tests/artist/style-make-button.test.ts */
 export function makeButtonText(t: (text: string, params?: Record<string, string | number>) => string, style: string | null): string {
-  return style ? t('Make it in {style}', { style, ro: directionParticle(style) }) : t('Make')
+  return style ? t('Draw it in {style}', { style, ro: directionParticle(style) }) : t('Draw')
 }
 
 // v3 AS(11/5 시안) 스타일 칸의 그림 — 164×112 비율 · 모서리 12 · 그림자리 바탕. 고른 칸은 그림 안쪽 2px 지금 단계 색 테두리,

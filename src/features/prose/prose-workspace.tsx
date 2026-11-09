@@ -165,7 +165,7 @@ export function ProseWorkspace() {
       </div>
 
       <Dialog open={variantsOpen}>
-        <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-2xl" showCloseButton={false} onInteractOutside={(event) => event.preventDefault()} onEscapeKeyDown={(event) => event.preventDefault()}>
+        <DialogContent size="wide" className="flex max-h-[85vh] flex-col" showCloseButton={false} onInteractOutside={(event) => event.preventDefault()} onEscapeKeyDown={(event) => event.preventDefault()}>
           <DialogHeader>
             <DialogTitle>{t('Three versions')}</DialogTitle>
             <DialogDescription>{t('Pick one and apply it, or discard them. Your prose stays as it is until you apply.')}</DialogDescription>

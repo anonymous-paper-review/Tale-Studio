@@ -56,9 +56,9 @@ export function LocationAppearanceCreateDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
-          <DialogTitle className="text-sm">{t('Add an appearance for {name}', { name: world?.name ?? '' })}</DialogTitle>
+          <DialogTitle>{t('Add an appearance for {name}', { name: world?.name ?? '' })}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <div>

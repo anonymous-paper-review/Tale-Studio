@@ -94,7 +94,7 @@ export function ManualEditDialog({ preview, enabled }: { preview: WriterPreview 
 
   return (
     <Dialog open={edit?.mode === 'manual' && draft?.projectId === projectId} onOpenChange={(next) => { if (!next) close() }}>
-      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-3xl" showCloseButton={!edit?.busy} onInteractOutside={(event) => event.preventDefault()} data-testid="prose-manual-edit">
+      <DialogContent size="wide" className="flex max-h-[85vh] flex-col" showCloseButton={!edit?.busy} onInteractOutside={(event) => event.preventDefault()} data-testid="prose-manual-edit">
         <DialogHeader>
           <DialogTitle>{t('Write directly')}</DialogTitle>
           <DialogDescription>{t('While this window is open, the agent chat is locked. Nothing changes until you save.')}</DialogDescription>
@@ -124,8 +124,8 @@ export function ManualEditDialog({ preview, enabled }: { preview: WriterPreview 
           ))}
         </div>
         {saveError ? <p role="alert" className="text-sm text-destructive">{saveError}</p> : null}
-        <DialogFooter className="border-t border-border pt-4">
-          <Button variant="outline" disabled={edit?.busy} onClick={close}>{t('Cancel')}</Button>
+        <DialogFooter>
+          <Button variant="secondary" disabled={edit?.busy} onClick={close}>{t('Cancel')}</Button>
           <Button onClick={() => void save()} disabled={edit?.busy || !draft?.scenes.length || draft.scenes.some((scene) => !scene.text.trim()) || !changed} data-testid="prose-manual-save">
             {edit?.busy ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
             {t(edit?.busy ? 'Saving…' : 'Save')}

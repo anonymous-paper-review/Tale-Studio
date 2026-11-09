@@ -35,7 +35,7 @@ export function VersionHistoryDialog({ canLoad }: { canLoad: boolean }) {
 
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) close() }}>
-      <DialogContent className="flex max-h-[88vh] flex-col sm:max-w-2xl" showCloseButton={!busy} data-testid="artist-version-history">
+      <DialogContent size="wide" className="flex max-h-[88vh] flex-col" showCloseButton={!busy} data-testid="artist-version-history">
         <DialogHeader>
           <DialogTitle>{t('Generation history')}</DialogTitle>
           <DialogDescription>{t('Load a version you liked. The work has one style, so loading a version also switches the style to that version.')}</DialogDescription>
@@ -74,8 +74,8 @@ export function VersionHistoryDialog({ canLoad }: { canLoad: boolean }) {
             </li>
           ))}
         </ul>
-        <DialogFooter className="border-t border-border pt-4">
-          <Button variant="outline" onClick={close} disabled={!!busy}>{t('Close')}</Button>
+        <DialogFooter>
+          <Button variant="secondary" onClick={close} disabled={!!busy}>{t('Close')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
