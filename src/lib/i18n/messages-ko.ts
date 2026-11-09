@@ -203,6 +203,17 @@ export const KO: Record<string, string> = {
   'Generation is not complete for everyone. {names}: not handled. These names appear in your request, but no usable new-appearance proposal was received for them, so their new appearances were not started. Received proposals still require approval.': '아직 전체 생성이 완료된 것은 아니에요. {names}: 미처리. 요청에 이름이 언급됐지만, 사용할 수 있는 새 모습 제안을 받지 못해 시작하지 않았어요. 전달된 제안도 승인 뒤에만 시작해요.',
   'The received proposals are still available for approval, but I could not check for missing characters. This response does not confirm that all generation is complete.': '받은 제안은 승인할 수 있도록 유지했지만, 인물 누락 여부를 확인하지 못했어요. 이 응답이 전체 생성 완료를 뜻하지는 않아요.',
   'Writer': 'Writer', // 출처 배지(고유명 — 한국어 화면에서도 그대로)
+  // ── 로그인(11/5 시안 R1, 오너 2026-11-09 추천대로 — 다른 화면처럼 화면 언어를 따른다) ──
+  'Continue with Google': 'Google로 계속하기',
+  'Connecting to Google…': 'Google에 연결하는 중…',
+  'Or': '또는',
+  'Email': '이메일',
+  'Password': '비밀번호',
+  'Log in': '로그인',
+  'Logging in…': '로그인하는 중…',
+  'Incorrect email or password': '이메일 또는 비밀번호가 맞지 않아요',
+  'Could not sign in with Google. Please try again.': 'Google로 로그인하지 못했어요. 다시 시도해 주세요.',
+  'Caps Lock is on. Passwords are case-sensitive.': 'Caps Lock이 켜져 있어요. 비밀번호는 대문자와 소문자를 가려요.',
   // ── 대시보드 공통 ──
   Projects: '프로젝트',
   // 위 막대 탭(11/5 시안 R2~R6) — 탭 이름은 변수로 번역해서 사전 누락 검사가 못 잡는다
@@ -2443,7 +2454,15 @@ export const KO: Record<string, string> = {
   'This project was started before the new start screen. Continue in Writer.': '이 프로젝트는 새 시작 화면 전에 시작했어요. Writer에서 이어서 작업하세요.',
   'The prose draft has not been written yet.': '산문 초안을 아직 쓰지 못했어요.',
   // 채팅으로 만들기
-  'What shall we make? Upload material if you have it, or write it yourself. If you have no idea yet, I can show you examples.': '무엇을 만들까요? 자료가 있으면 올리거나 직접 적어 주세요. 아이디어가 아직 없으면 예시를 들려드릴게요.',
+  // 첫 인사 · 빠른 답(11/5 시안 P1, 오너 2026-11-09 추천대로)
+  'Hi! What story would you like to make?\nOne line is enough. We will decide the genre, length and screen ratio together.': '안녕하세요! 어떤 이야기를 만들고 싶어요?\n한 줄이면 충분해요. 장르 · 길이 · 화면 비율은 같이 정해요.',
+  'I have an idea': '아이디어가 있어요',
+  'I have a script': '대본이 있어요',
+  'I will upload a file': '파일로 올릴게요',
+  'Paste the script, or upload it as a file.': '대본을 붙여 넣거나 파일로 올려 주세요.',
+  'E.g. A story of two people who meet on a rainy day': '예: 비 오는 날 만난 두 사람 이야기',
+  // 정리 카드의 [아니요, 더 고칠래요](11/5 시안 P2)
+  'What would you like to change?': '무엇을 바꿀까요?',
   'Show me examples': '예시 보여줘',
   'How about these? Click one you like and I will put it in the input. You can edit it before sending.': '이런 건 어때요? 마음에 드는 걸 누르면 입력칸에 넣어 드려요. 고쳐서 보내도 돼요.',
   'Other examples': '다른 예시',
@@ -2865,6 +2884,7 @@ export const KO: Record<string, string> = {
   'Create the next episode of "{title}"': '「{title}」의 다음 화 만들기',
   'The next episode starts as a new project and inherits everything below.': '다음 화는 새 프로젝트로 만들어지고 아래 것을 그대로 이어받아요.',
   'Same as the previous episode': '앞 화와 같아요',
+  'Same as the previous episode ({style})': '앞 화와 같아요 ({style})', // 그림체 이름과 함께(11/5 시안 R6)
   'Inherited from the previous episode': '앞 화에서 이어받아요',
   Voices: '말투',
   'Start from the last scene of the previous episode': '앞 화 마지막 장면에서 이어 시작하기',
