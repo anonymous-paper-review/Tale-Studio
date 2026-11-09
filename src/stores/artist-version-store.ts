@@ -15,6 +15,7 @@ import { useProjectStore } from '@/stores/project-store'
 import { contentLocale } from '@/lib/i18n/content'
 import { translate } from '@/lib/i18n/translate'
 import { useLocaleStore } from '@/stores/locale-store'
+import { customStyleLabel } from '@/lib/custom-style-label'
 import { fetchArtistGenerationLimit, runAdaptivePool } from '@/lib/artist/generation-slots'
 import { STYLE_WAIT_RECHECK_MS, USER_LIMIT_RECHECK_MS, USER_LIMIT_WAIT_MAX_MS } from '@/lib/artist/draw-continue'
 import {
@@ -144,9 +145,12 @@ function versionBeforeRegen(regen: RegenProgress, versions: readonly VersionView
   return left?.n ?? earlierVersions(versions)[0]?.n ?? null
 }
 
+/** 그림체 이름의 화면 값 — 프로젝트 행을 읽을 때(producer-store)와 같이, 예전 기본 이름("내 레퍼런스")은 화면 언어의 기본 이름으로(2026-11-10 검토 C). */
+const shownCustomLabel = (label: string) => customStyleLabel(label, useLocaleStore.getState().locale)
+
 /** 버전의 스타일을 Producer 스토어(작품 스타일의 화면 값)에 옮긴다 — 서버가 이미 바꿨다. */
 function applyStyle(styleKey: string | null, customStyle: VersionCustomStyle | null) {
-  useProducerStore.setState({ styleAnchorKey: styleKey || null, customStyleAnchor: customStyle ? { url: customStyle.url, label: customStyle.label, medium: customStyle.medium, ...(customStyle.locked ? { locked: true } : {}) } : null })
+  useProducerStore.setState({ styleAnchorKey: styleKey || null, customStyleAnchor: customStyle ? { url: customStyle.url, label: shownCustomLabel(customStyle.label), medium: customStyle.medium, ...(customStyle.locked ? { locked: true } : {}) } : null })
 }
 
 /** 서버의 지금 작품 스타일이 화면 값과 다르면 맞춘다 — 답을 못 받은 불러오기 뒤에도 스타일 이름 · 카드 기록 가리기가 맞게(2026-10-31 재검토 지적). */
@@ -154,7 +158,8 @@ function syncStyle(style: ArtistVersionsResponse['style']) {
   if (!style) return
   const producer = useProducerStore.getState()
   const custom = producer.customStyleAnchor
-  const sameCustom = (!custom && !style.custom) || (!!custom && !!style.custom && custom.url === style.custom.url && custom.label === style.custom.label && (custom.medium ?? null) === (style.custom.medium ?? null))
+  // 이름은 화면 값끼리 비교한다 — 서버 값("내 레퍼런스")과 바꾼 화면 값("My reference")을 글자로 비교하면 늘 달라 덮었다(검토 C).
+  const sameCustom = (!custom && !style.custom) || (!!custom && !!style.custom && custom.url === style.custom.url && shownCustomLabel(custom.label) === shownCustomLabel(style.custom.label) && (custom.medium ?? null) === (style.custom.medium ?? null))
   if ((producer.styleAnchorKey || null) === (style.key || null) && sameCustom) return
   applyStyle(style.key, style.custom)
 }
