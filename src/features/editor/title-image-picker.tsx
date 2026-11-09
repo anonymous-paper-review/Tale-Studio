@@ -108,7 +108,7 @@ export function TitleImagePicker({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t('Put an image on the title card')}</DialogTitle>
           <DialogDescription>{t('Pick one made in Artist or Director, or upload a file from your computer.')}</DialogDescription>

@@ -4,9 +4,6 @@ import { useEffect, useMemo, useRef, useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Loader2,
-  Download,
-  FileArchive,
-  MonitorPlay,
   Play,
   Pause,
   ChevronLeft,
@@ -21,7 +18,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/layout/page-header'
-import { Lumi } from '@/components/lumi/lumi'
+import { AiBusyCard } from '@/components/ai-busy-overlay'
 import { useHoldChatClosed } from '@/hooks/use-hold-chat-closed'
 import { editorEmptyScreen, editorHeaderMeta } from '@/features/editor/editor-labels'
 import { VideoPreviewer } from '@/features/editor/video-previewer'
@@ -470,11 +467,12 @@ export default function PostPage() {
       )
     }
     // 'loading'('idle' 포함 — 로드 effect 발화 전 첫 렌더): Director → Editor 로 넘어가며 기다리는 화면.
-    //   v3(2026-11-03, 오너 결정 8): 옛 레이아웃 스켈레톤 대신 큰 Lumi(Editor 옷 · 넘어가는 동안의 loading) —
-    //   "이전 단계를 완료하라" 같은 틀린 안내는 여전히 띄우지 않는다(#pps-empty-states). 글은 읽어 주는 이름으로만.
+    //   11/5 SYS(모든 팝업 · 기다리는 화면 공통): 큰 Lumi 대신 기다리는 카드(Editor 옷 · Lumi L) — 글은 예전 그대로 "클립 준비 중…".
+    //   AI 작업 잠금(AiBusyOverlay)이 아니라 카드만 이 자리에 그린다 — 읽는 동안에도 레일로 다른 단계에 갈 수 있다(예전처럼).
+    //   설명은 비워 둔다 — 비우지 않으면 카드가 AI 작업 잠금 안내를 쓴다. "이전 단계를 완료하라" 같은 틀린 안내는 여전히 띄우지 않는다(#pps-empty-states).
     return (
-      <div className="flex flex-1 items-center justify-center" aria-busy>
-        <Lumi persona="editor" state="loading" size={300} label={t('Preparing clips…')} />
+      <div className="flex flex-1 items-center justify-center p-6" aria-busy>
+        <AiBusyCard lumi="editor" title={t('Preparing clips…')} description="" />
       </div>
     )
   }
@@ -660,11 +658,8 @@ export default function PostPage() {
                 onClick={() => void handleWatchAll()}
                 title={t('Preload every clip, then play the whole timeline from the start')}
               >
-                {prefetching ? (
-                  <Loader2 className="size-3 animate-spin" />
-                ) : (
-                  <MonitorPlay className="size-3" />
-                )}
+                {/* 쉬는 동안은 글만(v3 11/5 판 ED1 — 타임라인 단추는 아이콘 없이). 받는 동안만 도는 원을 둔다. */}
+                {prefetching ? <Loader2 className="size-3 animate-spin" /> : null}
                 {prefetching
                   ? t('Preparing {done}/{total}…', prefetching)
                   : t('Watch all')}
@@ -704,11 +699,7 @@ export default function PostPage() {
                   }
                 }}
               >
-                {exportingZip ? (
-                  <Loader2 className="size-3 animate-spin" />
-                ) : (
-                  <FileArchive className="size-3" />
-                )}
+                {exportingZip ? <Loader2 className="size-3 animate-spin" /> : null}
                 {exportingZip ? t('Zipping…') : t('Shot ZIP')}
               </Button>
               <Button
@@ -722,11 +713,7 @@ export default function PostPage() {
                     : t('Concatenate every clip in order and save as one video file')
                 }
               >
-                {renderLabel ? (
-                  <Loader2 className="size-3 animate-spin" />
-                ) : (
-                  <Download className="size-3" />
-                )}
+                {renderLabel ? <Loader2 className="size-3 animate-spin" /> : null}
                 {renderLabel ?? t('Draft Render')}
               </Button>
             </div>

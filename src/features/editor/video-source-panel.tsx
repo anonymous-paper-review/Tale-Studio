@@ -158,7 +158,8 @@ export function VideoSourcePanel({
                             shot.shotType
                           )}
                         </div>
-                        <p className="mt-1.5 truncate px-0.5 text-[11px] leading-tight text-foreground">{resolveEntityNames(shot.actionDescription, entityNames)}</p>
+                        {/* 설명 줄 간격은 글자 크기의 155%(v3 11/5 판 ED1). */}
+                        <p className="mt-1.5 truncate px-0.5 text-[11px] leading-[1.55] text-foreground">{resolveEntityNames(shot.actionDescription, entityNames)}</p>
                         <p className="mt-1 truncate px-0.5 text-[10px] font-medium text-subtle-foreground">
                           {t('{seconds}s', { seconds: shot.durationSeconds })}
                           {clip && (() => {
