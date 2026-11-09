@@ -23,7 +23,8 @@ design_source: Figma 「Tale Studio 리뉴얼 (복사)」 11/5 판(v3 + 11/4 리
 - 로고 심볼: "책 두 권" → "반쪽 T · 꼬리 · 물방울"(§15.3).
 - 왼쪽 레일 색: 지금 단계 아이콘 = 단계 색, 다른 단계 아이콘 #C2C0B6, 끝낸 단계 표시 크림, 아래 단추 아이콘 · 글 사이 4(§13.1).
 - 넓힌 간격: 채팅 말풍선 · 빠른 답 칩(§13.10), 고르기 카드(§13.9).
-- 새 부품: 단계 확인 단추(§13.9) · AI 아이콘(§14.1).
+- 새 부품: 단계 확인 단추(§13.9) · 작은 알약 단추 `pill`(§13.8) · AI 아이콘 · AI 다시 쓰기 아이콘(§14.1).
+- 스튜디오 밖 화면(로그인 · 프로젝트 목록 · 플레이그라운드 · 대기열 · 계정): 바탕 `--lobby`(§2.1) · 대시보드 위 막대 · 프로젝트 목록 머리(§13.1). 앱 아이콘 · 파비콘도 새 심볼(§15.3).
 
 규칙 글과 실제 그림이 다른 두 곳은 **규칙 값을 따랐고 디자이너 확인 대기**다: 넓은 팝업 748(그림 AS 752) · 기다리는 팝업 372(그림 R5 408).
 
@@ -157,6 +158,9 @@ v3 시안에는 테두리가 거의 없다(면 색 차이로 나눈다). 테두�
 | Generating | `.tale-beam` (`--primary` 기본) | — | 생성 중 카드 테두리 빛 |
 
 **룰**: 상태는 **색 + icon + label** 3중. 상태 색은 상태 표현에만 — 단추를 칠하지 않는다.
+
+**생성 중 = 도는 빛**(카드 테두리 `.tale-beam`). 11/5 SYS "노드 위에서 기다릴 때"를 따라 Director **영상 노드**는 그 자리를 `NodeWaitCard`(Lumi S · 단계 색 테두리 1.5 · 안쪽 18, §13.5)로 바꾼다(붙이는 것은 set 갈래).
+**그림**(스토리보드 4샷 시트)은 지금처럼 꼬리 글 + 도는 표시 그대로.
 
 ### 2.6 Focus ring
 
@@ -345,6 +349,7 @@ Tailwind v4 default. 설계 기준 **1440 × 900** (v3 시안 프레임). `xl:` 
 |---|---|
 | Button default / Input / Select | h-9 (36) |
 | Button sm · 칩 | h-8 (32) |
+| Button `pill`(글 · 카드 안 작은 알약, 11/5 WS) | 30 |
 | segmented 탭 묶음 | 38 (칸 32) |
 | 채팅 입력 알약 | 52 (보내기 36 원) |
 
@@ -521,7 +526,8 @@ label 위 · input 아래 · helper/error 더 아래. 입력칸은 카드색 · 
 11/5 시안 Feedback/Loading Card · SYS 로딩 팝업, WL 기준): 폭 372 · 안쪽 50/30 · 사이 15 · 모서리 20 · `shadow-loading` ·
 Lumi L(100, `loading`, 일이 멈춰 실패 안내가 되면 `error`) → 제목 16 Bold → 설명 12.5 → 단계(✓ 끝남 흰 · ● 지금 단계 색 · ○ 남음 흐림) → 진행 막대(4 · 모서리 2).
 색 = Lumi 옷(기본 화이트 펄 + 단계 6색 = 7가지, 화이트 펄 · 완성 옷이면 놓인 화면의 색). 막대는 단계 색 기울기 — 시안은 단색이지만 출시 테스트가 기울기를 못 박아 결정 대기. 옷 = 넘어가는 다음 단계. 쓰는 곳: Producer 글 읽기 · Writer 산문 초안(Producer 에서 넘길 때 · Writer 화면) · Artist 그림 ·
-Storyboard 나누기 · 첫 러프. 덮개 없이 화면 가운데에 큰 Lumi `loading`(폭 300)만 두는 곳: 새 프로젝트 만들기(`/projects/new`, Producer 옷 · 실패면 `error`) ·
+Storyboard 나누기 · 첫 러프. 설명은 부르는 쪽이 준다 — 안 주면 잠금 안내("AI가 작업하는 동안은 화면과 채팅이 잠겨요…", 출시 테스트 고정), `description={null}` 이면 설명 줄을 비운다.
+진행 정도(`progress`)를 안 주면 막대가 없다. 덮개 없이 화면 가운데에 큰 Lumi `loading`(폭 300)만 두는 곳: 새 프로젝트 만들기(`/projects/new`, Producer 옷 · 실패면 `error`) ·
 Editor 클립 준비. `lumi` 를 안 주는 잠금(그림 다시 그리기 · 샷 고치기 팝업 위 등)은 도는 원의 작은 카드 그대로(약속 tests/project/busy-overlay-lumi.test.ts).
 실패 안내의 오류 모습 큰 Lumi 도 단계를 넘어가는 기다림의 실패에만 둔다 — Storyboard 보드에서 컷을 다시 그리다 난 실패는 작은 카드(약속 tests/writer/board-wait-lumi.test.ts).
 
@@ -535,7 +541,7 @@ Editor 클립 준비. `lumi` 를 안 주는 잠금(그림 다시 그리기 · �
 
 | 컴포넌트 | v3 |
 |---|---|
-| Button | `default` 크림 · `secondary` 카드색 · `outline` 테두리 · `ghost` 바탕 없음(+`rounded-full` 이면 v3 ghost 알약) · `destructive` · `link`(Info) |
+| Button | `default` 크림 · `secondary` 카드색 · `outline` 테두리 · `ghost` 바탕 없음(+`rounded-full` 이면 v3 ghost 알약) · `destructive` · `link`(Info). 크기 + `pill`(11/5 WS 수정안 [되돌리기] · [적용]: 높이 30 · 양옆 14 · 13px 600 알약 — 보조는 `secondary`, 확정은 `default`) |
 | Badge | + `stage`(지금 단계 색 · 어두운 글씨, 추천) · `tag`(작은 네모 꼬리표) |
 | Tabs | `default` segmented(카드색 묶음 · 눌린 칸 chip) · `pill`(칩처럼 떨어진 탭, 고른 것 단계 색) · `line` |
 | Input · Textarea · Select | 카드색 · 테두리 없음 · Info 포커스 |
@@ -570,7 +576,7 @@ Editor 클립 준비. `lumi` 를 안 주는 잠금(그림 다시 그리기 · �
 
 ### 14.1 Library
 
-- **v3 채움 아이콘** `src/components/icons/v3-icons.tsx`(Figma Icons · 채움 17개): 단계 · 레일 아래 단추 · 위 막대 연필 · 탭(화면에서 고르기 · 채팅으로 만들기) · 채팅 접기/열기 · 직접 작성 · AI(`AiIcon`, 11/5 반짝이는 별). `currentColor`.
+- **v3 채움 아이콘** `src/components/icons/v3-icons.tsx`(Figma Icons · 채움 17개): 단계 · 레일 아래 단추 · 위 막대 연필 · 탭(화면에서 고르기 · 채팅으로 만들기) · 채팅 접기/열기 · 직접 작성 · AI(`AiIcon`, 11/5 반짝이는 별) · AI 다시 쓰기(`AiRewriteIcon`, 11/5 Lumi 실루엣 + 다시 하기 화살표 — Figma 부품 원본은 파일에 없어 WL 인스턴스 299:2246 경로로 만들었다, 한 색). `currentColor`.
 - **Lucide** (`lucide-react`): 화면 안 작은 선 기호(+ · × · 화살표 · 시계 · 갈매기) — v3 "Icons · 선"과 같은 결.
 
 ### 14.2 Icon + label 페어링
@@ -601,7 +607,8 @@ Figma 에 있는 v3 아이콘은 `v3-icons.tsx` 에 더한다(이름 `<Name>Icon
 
 - 로고 심볼 `public/brand/tale-symbol.svg`(어두운 바탕용) — 11/5 새 심볼 "반쪽 T · 꼬리 · 물방울"(브랜드 가이드 157:687 그대로, 캔버스 225:198 = 그림자 자리를 품은 틀). 레일 맨 위 30×26.
 - 로고 묶음 `src/components/tale-lockup.tsx` `TaleLockup size={틀 높이}`(심볼 + 글자 "tale studio", v3 Logo/Tale Lockup) — 로그인 32 · 홈 36 · 프로젝트 목록 26(11/5 시안), 대시보드 머리 · 랜딩 머리 · 꼬리말.
-- 앱 아이콘 · 파비콘(`src/app/icon.png` · `favicon.ico`)은 바꾸지 않았다 — 브랜드 가이드에 "심볼만 쓸 때: 사이드바 홈 30px · 앱 아이콘 · 파비콘" 한 줄만 있고 크기 · 바탕 · 여백 규격이 없다(결정 대기).
+- 앱 아이콘 · 파비콘(`src/app/icon.png` 512 · `favicon.ico` 16 · 32 · 48)도 새 심볼(브랜드 가이드 "심볼만 쓸 때: 사이드바 홈 30px · 앱 아이콘 · 파비콘").
+  가이드에 크기 · 바탕 · 여백 규격이 없어 예전 파일의 틀을 그대로 따랐다(11/9 리드): 투명 바탕 · 보이는 내용(그림자 포함)의 긴 변이 캔버스의 82%(512) / 83~88%(작은 크기마다 예전 값) · 가운데.
 - 색 · 기울기 · 겹침 색을 바꾸지 않는다, 심볼에 테두리 · 흰 광택을 넣지 않는다(브랜드 가이드 "로고 쓰는 법").
 
 ### 15.4 Lumi

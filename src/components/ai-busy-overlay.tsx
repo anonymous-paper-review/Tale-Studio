@@ -31,8 +31,8 @@ interface AiBusyOverlayProps {
   open: boolean
   /** 이미 번역된 제목(예: "산문 초안을 쓰고 있어요"). */
   title: string
-  /** 이미 번역된 설명. 없으면 잠금 안내를 쓴다. */
-  description?: string
+  /** 이미 번역된 설명. 안 주면 잠금 안내를 쓰고, null 이면 설명 줄을 비운다(할 말이 없는 화면). */
+  description?: string | null
   steps?: AiBusyStep[]
   /** 0~100. 없으면 막대를 그리지 않는다. */
   progress?: number | null
@@ -142,7 +142,7 @@ export function AiBusyCard({
 }: Omit<AiBusyOverlayProps, 'open' | 'layer'>) {
   const t = useT()
   const pct = typeof progress === 'number' && Number.isFinite(progress) ? Math.max(0, Math.min(100, Math.round(progress))) : null
-  const lockNote = description ?? t('While AI is working, the screen and chat are locked. You can edit once it finishes.')
+  const lockNote = description === null ? null : (description ?? t('While AI is working, the screen and chat are locked. You can edit once it finishes.'))
   if (lumi) {
     return (
       <div
@@ -156,7 +156,7 @@ export function AiBusyCard({
         <Lumi persona={lumi} state={busy ? 'loading' : 'error'} size="l" />
         <div className="flex w-full flex-col items-center gap-[9px]">
           <h2 className="text-[16px] font-bold leading-[1.2] text-foreground">{title}</h2>
-          <p className="text-caption leading-[1.55] text-subtle-foreground">{lockNote}</p>
+          {lockNote ? <p className="text-caption leading-[1.55] text-subtle-foreground">{lockNote}</p> : null}
         </div>
         {steps && steps.length > 0 ? (
           <ol className="flex w-full flex-col gap-3 p-3 text-left">
@@ -203,7 +203,7 @@ export function AiBusyCard({
         )}
         <div className="flex flex-col gap-1">
           <h2 className="text-lg font-medium leading-7">{title}</h2>
-          <p className="text-sm text-muted-foreground">{lockNote}</p>
+          {lockNote ? <p className="text-sm text-muted-foreground">{lockNote}</p> : null}
         </div>
       </div>
       {pct !== null || progressLabel ? (

@@ -43,12 +43,14 @@ import { LUMI_PERSONAS, LUMI_SIZE, LUMI_STATES, STAGE_PERSONA, type LumiPersona,
 type Swatch = { token: string; role: string }
 
 const NEUTRALS: Swatch[] = [
+  { token: 'lobby', role: 'Outside the studio — login · project list (11/5)' },
   { token: 'shell', role: 'Work screen background (= background)' },
   { token: 'side', role: 'Sidebar · chat' },
   { token: 'panel', role: 'Large content panel (prose · settings · cards)' },
   { token: 'card', role: 'Card · input · secondary button' },
   { token: 'chip', role: 'Chip · pressed secondary (= accent)' },
   { token: 'surface-elevated', role: 'Tooltip · topmost' },
+  { token: 'tab-selected', role: 'Selected tab in a pill group (11/5 top bar)' },
 ]
 const TEXT: Swatch[] = [
   { token: 'foreground', role: 'Text' },
@@ -80,7 +82,7 @@ const CHAT: Swatch[] = [
 const STAGE_KEYS = ['producer', 'writer', 'artist', 'storyboard', 'director', 'editor'] as const
 
 const BUTTON_VARIANTS = ['default', 'secondary', 'outline', 'ghost', 'destructive', 'link'] as const
-const BUTTON_SIZES = ['xs', 'sm', 'default', 'lg'] as const
+const BUTTON_SIZES = ['xs', 'sm', 'pill', 'default', 'lg'] as const
 const BADGE_VARIANTS = ['default', 'secondary', 'outline', 'ghost', 'destructive', 'link', 'stage', 'tag'] as const
 
 const TYPE_SCALE = [
@@ -335,6 +337,15 @@ export default function DesignShowcasePage() {
             lumi="writer"
             footer={<Button size="sm">Try again</Button>}
           />
+          <AiBusyCard
+            title="Rewriting the paragraph"
+            description={null}
+            steps={[
+              { label: 'Read the paragraph', state: 'done' },
+              { label: 'Rewriting', state: 'current' },
+            ]}
+            lumi="writer"
+          />
           <AiBusyCard title="Making the image" description="Minho · White shirt" />
         </div>
       </Section>
@@ -504,8 +515,9 @@ export default function DesignShowcasePage() {
         </div>
       </Section>
 
-      <Section title="Page header" hint="components/layout/page-header.tsx — big title, tag, Inter meta, cream CTA on the right">
+      <Section title="Page header" hint="components/layout/page-header.tsx — big title, tag, Inter meta, cream CTA on the right. variant=&quot;stacked&quot; = project list (title 30, meta on the next line)">
         <div className="space-y-5">
+          <PageHeader variant="stacked" title="Projects" meta="Total 6" actions={<Button variant="secondary" className="rounded-full">Newest</Button>} />
           <PageHeader title="Storyboard" tag="Unnamed" meta="Scene 2 · 6 shots · 16s" actions={<Button>Next: Director <ArrowRight /></Button>} />
           <PageHeader
             title="Prose"

@@ -35,4 +35,23 @@ describe('새 기다리는 카드', () => {
     const html = card({ lumi: 'artist', steps: STEPS, progress: 40 })
     expect(html.indexOf('마무리')).toBeLessThan(html.indexOf('style="width:40%"'))
   })
+
+  // 왜: 설명은 화면마다 다르다 — 시안의 "창을 닫아도 계속 만들어요"는 모든 화면에 맞는 말이 아니다(prose 갈래 2026-11-09).
+  //   할 말이 없는 화면은 줄을 비운다. 아무것도 안 주면 나오는 기본 잠금 안내는 그대로다(tests/project/ai-busy-rename.test.ts).
+  it('부르는 쪽이 설명을 비워 두면 기다리는 카드에 설명 줄이 없다', () => {
+    for (const lumi of ['writer', undefined] as const) {
+      const html = card({ lumi, description: null, steps: STEPS })
+      expect(html, String(lumi)).not.toContain('AI가 작업하는 동안은 화면과 채팅이 잠겨요')
+      expect(html, String(lumi)).toMatch(/만들고 있어요<\/h2><\/div>|만들고 있어요<\/h2><\/div><\/div>/)
+    }
+  })
+
+  // 왜: 진행 정도를 모르는 일(대부분의 AI 작업)에 빈 막대를 그리면 멈춘 것처럼 보인다.
+  it('진행 정도를 모르면 기다리는 카드에 진행 막대가 없다', () => {
+    for (const lumi of ['artist', undefined] as const) {
+      const html = card({ lumi, steps: STEPS })
+      expect(html, String(lumi)).not.toMatch(/style="width:\d+%"/)
+      expect(html, String(lumi)).not.toContain('bg-progress-track')
+    }
+  })
 })
