@@ -143,6 +143,11 @@
   --color-chat-send: var(--chat-send);
   --color-chat-user-bubble: var(--chat-user-bubble);
   --color-chat-user-bubble-foreground: var(--chat-user-bubble-foreground);
+  --color-chat-center-lumi-bubble: var(--chat-center-lumi-bubble);
+  --color-chat-center-my-bubble: var(--chat-center-my-bubble);
+  --color-chat-summary: var(--chat-summary);
+  --color-chat-summary-cell: var(--chat-summary-cell);
+  --color-side-raised: var(--side-raised);
 
   /* v3p2-board */
   --color-mention: var(--mention);
@@ -162,6 +167,7 @@
   --panel: #1e1b1c; /* 큰 내용 판 — 시안의 #1D191A 85~88% 를 바탕 위에 합친 값 */
   --lobby: #141312; /* 스튜디오 밖 화면 바탕 — 로그인 · 프로젝트 목록(11/5 R1 · R2~R6). 작업 화면보다 한 단 어둡다 */
   --tab-selected: #34332f; /* 알약 탭 묶음(바탕 side)의 고른 칸 — 11/5 위 막대 탭 */
+  --side-raised: #2a2927; /* side 위 한 단 밝은 칸 — 11/5 정렬 알약(R2 "최신순") · 정리 칸 */
 
   --background: var(--shell);
   --foreground: #f5f4ee; /* Text */
@@ -277,6 +283,12 @@
   --chat-send: var(--primary);
   --chat-user-bubble: var(--chat-my-bubble);
   --chat-user-bubble-foreground: var(--foreground);
+  /* 11/5 가운데 채팅(Producer P1 · P2) — 바탕(shell)이 옆 채팅 바탕(side)보다 밝아 말풍선을 한 단씩 밝혔다 */
+  --chat-center-lumi-bubble: #34332f;
+  --chat-center-my-bubble: #45443f;
+  /* 정리 표 상자 · "지금까지 정한 것" 묶음(바탕보다 한 단 어둡다)과 그 안의 칸 */
+  --chat-summary: var(--side);
+  --chat-summary-cell: var(--side-raised);
 
   /* Z-index named ladder (design.md §11.1). Referenced by @utility z-* below. */
   --z-canvas: 0;

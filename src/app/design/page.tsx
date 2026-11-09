@@ -51,6 +51,7 @@ const NEUTRALS: Swatch[] = [
   { token: 'chip', role: 'Chip · pressed secondary (= accent)' },
   { token: 'surface-elevated', role: 'Tooltip · topmost' },
   { token: 'tab-selected', role: 'Selected tab in a pill group (11/5 top bar)' },
+  { token: 'side-raised', role: 'One step above side — sort pill · summary cell (11/5)' },
 ]
 const TEXT: Swatch[] = [
   { token: 'foreground', role: 'Text' },
@@ -78,6 +79,10 @@ const CHAT: Swatch[] = [
   { token: 'chat-chip', role: 'Quick reply' },
   { token: 'chat-input', role: 'Composer' },
   { token: 'chat-send', role: 'Send button' },
+  { token: 'chat-center-lumi-bubble', role: 'Center chat Lumi bubble (11/5 P1 · P2)' },
+  { token: 'chat-center-my-bubble', role: 'Center chat my bubble' },
+  { token: 'chat-summary', role: 'Summary table · decided-so-far box' },
+  { token: 'chat-summary-cell', role: 'Cell inside the summary box' },
 ]
 const STAGE_KEYS = ['producer', 'writer', 'artist', 'storyboard', 'director', 'editor'] as const
 
