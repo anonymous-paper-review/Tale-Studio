@@ -9,24 +9,49 @@
 //   ② artist 챗은 방어 자체가 없었다 — 파싱 실패 시 raw JSON 을 그대로 채팅에 노출하고
 //      updates 를 조용히 폐기했다(writer/director 는 안내 문구가 있었다).
 //   ③ 서버 로그가 없어 운영자가 발생 빈도를 알 수 없었다.
+import { translate } from '@/lib/i18n/translate'
+import type { AppLocale } from '@/lib/locale'
 import { repairJsonWithMeta } from '@/lib/writer/llm/json_repair'
 
-/** 잘림(닫는 펜스 없음) — 원인이 분명해 문구로 단정할 수 있다. */
-const NOTICE_TRUNCATED =
-  '(변경 명령이 너무 커서 응답이 중간에 잘렸어요. 적용된 변경은 없습니다 — 범위를 씬 단위로 나눠 다시 요청해 주세요.)'
-/** 펜스는 닫혔는데 내용이 깨짐 — 잘림으로 단정하지 않는다. */
-const NOTICE_UNREADABLE =
-  '(변경 사항을 읽지 못했어요. 적용된 변경은 없습니다 — 다시 한 번 요청해 주세요.)'
-/** 일부만 살린 경우 — 건수를 못 세는 경로(legacy 등)용 일반 문구. */
-export const NOTICE_PARTIAL =
-  '(응답이 중간에 잘려서 변경 일부만 적용했어요. 나머지는 범위를 나눠 다시 요청해 주세요.)'
+// 안내는 채팅 언어로 고른다(2026-11-10 오너 "영어 언어에서 한국어 나오는거 수정") — 문구는 영어 원문 = 사전 키, 한국어는 사전에서.
+//   언어를 안 넘기는 옛 호출은 종전처럼 한국어(하위호환, card-mention 과 같은 취급). 채팅 서버 셋은 채팅 언어를 넘긴다.
+const UNSPECIFIED_LOCALE_FALLBACK: AppLocale = 'ko'
+
+/** 답 본문 뒤에 붙는 안내 한 줄 — 괄호로 감싸 모델이 쓴 글과 구분한다. */
+const wrap = (text: string) => `(${text})`
+
+/** 반영하지 못한 까닭 — 잘림(닫는 펜스 없음)은 원인이 분명해 단정하고, 펜스는 닫혔는데 내용이 깨진 것은 잘림으로 단정하지 않는다. */
+type FailureKind = 'truncated' | 'unreadable'
+function failureNotice(kind: FailureKind, locale: AppLocale): string {
+  return wrap(
+    kind === 'truncated'
+      ? translate(locale, 'The change request was too big and the reply was cut off. No changes were applied. Split it by scene and ask again.')
+      : translate(locale, "Couldn't read the changes. No changes were applied. Please ask again."),
+  )
+}
+
+/** 일부만 살린 경우 — 건수를 못 세는 경로(Director legacy 등)용 일반 문구. */
+export function partialNotice(locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK): string {
+  return wrap(translate(locale, 'The reply was cut off, so only some of the changes were applied. Split the rest and ask again.'))
+}
+
+/** Storyboard 채팅이 등장인물 목록에 없는 인물을 빼고 반영했을 때 답 끝에 붙이는 안내. */
+export function droppedCharactersNotice(ids: readonly string[], locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK): string {
+  const list = ids.map((id) => `\`${id}\``).join(', ')
+  return wrap(translate(locale, 'Characters not in the cast list were left out: {ids}. To add a new character, add them in the Producer stage.', { ids: list }))
+}
 
 /** 실패 경로에서 첫 ```json 펜스 이후를 잘라내고 안내 문구로 대체 (raw JSON 노출 방어). */
-export function stripLeakedUpdatesBlock(text: string, notice = NOTICE_TRUNCATED): string {
+export function stripLeakedUpdatesBlock(
+  text: string,
+  locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
+  kind: FailureKind = 'truncated',
+): string {
   const i = text.indexOf('```json')
   if (i === -1) return text
   const head = text.slice(0, i).trim()
-  return head ? `${head}\n\n${notice}` : notice
+  const line = failureNotice(kind, locale)
+  return head ? `${head}\n\n${line}` : line
 }
 
 export type FencedReplyStatus =
@@ -49,7 +74,11 @@ export interface FencedReplyResult {
  * 살린 경우와 못 살린 경우를 각각 사용자 문구·서버 로그로 표면화한다(무신호 금지).
  * 화이트리스트 검증은 호출부의 책임 — 여기서는 형태만 다룬다.
  */
-export function parseFencedJsonReply(text: string, label: string): FencedReplyResult {
+export function parseFencedJsonReply(
+  text: string,
+  label: string,
+  locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
+): FencedReplyResult {
   const fenceAt = text.indexOf('```json')
   if (fenceAt === -1) return { reply: text, data: null, status: 'none' }
 
@@ -86,7 +115,7 @@ export function parseFencedJsonReply(text: string, label: string): FencedReplyRe
         `[${label}] 펜스 JSON 파싱 실패 — 변경 미적용 (${truncated ? '잘림' : '형식 오류'}, ${text.length}자)`,
       )
       return {
-        reply: stripLeakedUpdatesBlock(text, truncated ? NOTICE_TRUNCATED : NOTICE_UNREADABLE),
+        reply: stripLeakedUpdatesBlock(text, locale, truncated ? 'truncated' : 'unreadable'),
         data: null,
         status: 'failed',
       }
@@ -120,16 +149,18 @@ export function parseFencedUpdates(
   text: string,
   label: string,
   validate: (raw: unknown[]) => unknown[],
+  locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
 ): { reply: string; updates: unknown[]; raw: unknown[]; status: FencedReplyStatus } {
-  const { reply, data, status } = parseFencedJsonReply(text, label)
+  const { reply, data, status } = parseFencedJsonReply(text, label, locale)
   const raw = updatesFrom(data)
   const updates = validate(raw)
   if (status !== 'recovered') return { reply, updates, raw, status }
 
   const hint = resumeHintOf(updates[updates.length - 1])
-  const notice = updates.length
-    ? `(응답이 중간에 잘려서 ${updates.length}건만 적용했어요` +
-      (hint ? ` — 마지막으로 반영된 항목은 ${hint} 입니다. 그 다음부터 이어서 요청해 주세요.)` : '. 나머지는 범위를 나눠 다시 요청해 주세요.)')
-    : NOTICE_PARTIAL
-  return { reply: reply ? `${reply}\n\n${notice}` : notice, updates, raw, status }
+  const line = !updates.length
+    ? partialNotice(locale)
+    : hint
+      ? wrap(translate(locale, 'The reply was cut off, so only {count} of the changes were applied. The last one applied was {item}. Ask again from the one after it.', { count: updates.length, item: hint }))
+      : wrap(translate(locale, 'The reply was cut off, so only {count} of the changes were applied. Split the rest and ask again.', { count: updates.length }))
+  return { reply: reply ? `${reply}\n\n${line}` : line, updates, raw, status }
 }

@@ -845,6 +845,41 @@ export const KO: Record<string, string> = {
   'Tone: fill this in for a better script': '톤: 채우면 각본 퀄이 올라가요',
   'E.g. dark': '예: dark',
   'Dialogue language': '대사 언어',
+  // 영어 화면에 새던 채팅 · Storyboard 고정 안내(2026-11-10 오너 "영어 언어에서 한국어 나오는거 수정") — 한국어는 종전 글에서 긴 대시만 뺐다.
+  'Story genre': '스토리 장르',
+  'Drop files here to attach them': '파일을 놓으면 첨부돼요',
+  'The change request was too big and the reply was cut off. No changes were applied. Split it by scene and ask again.':
+    '변경 명령이 너무 커서 응답이 중간에 잘렸어요. 적용된 변경은 없습니다. 범위를 씬 단위로 나눠 다시 요청해 주세요.',
+  "Couldn't read the changes. No changes were applied. Please ask again.":
+    '변경 사항을 읽지 못했어요. 적용된 변경은 없습니다. 다시 한 번 요청해 주세요.',
+  'The reply was cut off, so only some of the changes were applied. Split the rest and ask again.':
+    '응답이 중간에 잘려서 변경 일부만 적용했어요. 나머지는 범위를 나눠 다시 요청해 주세요.',
+  'The reply was cut off, so only {count} of the changes were applied. The last one applied was {item}. Ask again from the one after it.':
+    '응답이 중간에 잘려서 {count}건만 적용했어요. 마지막으로 반영된 항목은 {item} 입니다. 그 다음부터 이어서 요청해 주세요.',
+  'The reply was cut off, so only {count} of the changes were applied. Split the rest and ask again.':
+    '응답이 중간에 잘려서 {count}건만 적용했어요. 나머지는 범위를 나눠 다시 요청해 주세요.',
+  'Characters not in the cast list were left out: {ids}. To add a new character, add them in the Producer stage.':
+    '등장인물 목록에 없는 인물 {ids} 은(는) 반영하지 않았어요. 새 인물이 필요하면 Producer 단계에서 추가해 주세요.',
+  'The source check needed for approval is missing. Read it again and ask for the change again.':
+    '승인에 필요한 원천 확인 정보가 없습니다. 다시 읽어 변경을 요청해 주세요.',
+  'The target changed after the approval request. Read it again and ask for the change again.':
+    '승인 요청 후 대상이 변경되었습니다. 다시 읽어 변경을 요청해 주세요.',
+  "Couldn't confirm that the requested values were saved.": '요청한 값의 저장을 확인하지 못했습니다.',
+  '{name}: no image': '{name}: 이미지 없음',
+  '{name}: no character or background reference': '{name}: 캐릭터·배경 참조 없음',
+  '{name}: no sheet for {characters}': '{name}: 시트 없는 인물({characters})',
+  '{name}: no storyboard yet': '{name}: 스토리보드 미생성',
+  '…and {count} more': '…외 {count}건',
+  'This is a shared preview, so chat is turned off. In the real Producer stage, you shape the story, characters and tone together here.':
+    '지금은 공유 미리보기라 실제 대화는 비활성이에요. 실제 프로듀서 단계에선 여기서 스토리·캐릭터·톤을 함께 정리해요.',
+  'This is a shared preview. In the real project, you review and edit the scene structure and rough storyboard here.':
+    '공유 미리보기 모드예요. 실제로는 여기서 씬 구조와 러프 스토리보드를 검토·수정해요.',
+  'This is a shared preview. In the real project, you create and refine character and world cards here.':
+    '공유 미리보기 모드예요. 실제로는 캐릭터·월드 카드를 생성하고 다듬어요.',
+  'This is a shared preview. In the real project, you direct shots, camera and video on the canvas here.':
+    '공유 미리보기 모드예요. 실제로는 캔버스에서 샷·카메라·영상을 연출해요.',
+  'This is a shared preview. In the real project, you edit cuts on the timeline here.':
+    '공유 미리보기 모드예요. 실제로는 타임라인에서 컷 편집을 해요.',
   'Chat language': '채팅 언어',
   'Chat replies and the generated story follow this language.':
     '채팅 응답과 생성되는 이야기가 이 언어를 따라요.',

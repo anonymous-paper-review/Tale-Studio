@@ -12,8 +12,9 @@
 import { translate } from '@/lib/i18n'
 import type { AppLocale } from '@/lib/locale'
 
-// locale 인자를 안 넘기는 기존 호출부(global-chat.tsx — 범위 밖, hint 를 그대로 렌더)가 조용히
-//   깨지지 않도록, 함수 도입 이전 동작(항상 한국어)을 기본값으로 보존한다. 앱 전역 DEFAULT_LOCALE
+// locale 인자를 안 넘기는 호출부(서버 produce/chat 의 LLM 문맥 — 라벨만 쓴다)가 조용히
+//   깨지지 않도록, 함수 도입 이전 동작(항상 한국어)을 기본값으로 보존한다. 채팅 고르기(global-chat.tsx)는
+//   2026-11-10 부터 화면 언어를 넘긴다. 앱 전역 DEFAULT_LOCALE
 //   ('en')과 다른 값을 의도적으로 쓴다 — 이건 "새 기능의 기본"이 아니라 "미갱신 호출부의 하위호환".
 const UNSPECIFIED_LOCALE_FALLBACK: AppLocale = 'ko'
 
@@ -147,15 +148,21 @@ export function backgroundMentions(
 
 // 스토리/설정 등 비-엔티티 보드 요소도 @멘션·선택 가능하게 하는 고정 ref/label.
 // AI는 보드 설정/스토리를 항상 컨텍스트로 받으므로 이 라벨 참조는 별도 매핑 없이 자연 해석된다.
-export const FOUNDATION_MENTIONS: CardMention[] = [
-  { ref: 'story', label: '스토리', hint: '설정' },
-  { ref: 'setting:playtime', label: '러닝타임', hint: '설정' },
-  { ref: 'setting:genre', label: '스토리 장르', hint: '설정' },
-  { ref: 'setting:subGenre', label: '세부 장르', hint: '설정' },
-  { ref: 'setting:format', label: '포맷', hint: '설정' },
-  { ref: 'setting:tone', label: '톤', hint: '설정' },
-  { ref: 'setting:dialogueLanguage', label: '대사 언어', hint: '설정' },
+// 이름 · 종류 표시는 화면 언어로 옮긴다(2026-11-10 오너 "영어 언어에서 한국어 나오는거 수정") — 이 라벨은 서버가 읽지 않고,
+//   채팅 입력의 @글자와 고르기 목록(그리고 Producer 보드의 스토리 카드)이 같은 화면 언어로 서로 맞춘다. 값은 영어 원문 = 사전 키.
+const FOUNDATION_LABELS: ReadonlyArray<{ ref: string; label: string }> = [
+  { ref: 'story', label: 'Story' },
+  { ref: 'setting:playtime', label: 'Runtime' },
+  { ref: 'setting:genre', label: 'Story genre' },
+  { ref: 'setting:subGenre', label: 'Sub-genre' },
+  { ref: 'setting:format', label: 'Format' },
+  { ref: 'setting:tone', label: 'Tone' },
+  { ref: 'setting:dialogueLanguage', label: 'Dialogue language' },
 ]
+
+export function foundationMentions(locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK): CardMention[] {
+  return FOUNDATION_LABELS.map(({ ref, label }) => ({ ref, label: translate(locale, label), hint: translate(locale, 'Settings') }))
+}
 
 // 입력창 텍스트에서 현재 @멘션된 카드들의 ref를 추출한다(입력↔카드 하이라이트 동기화용).
 // 긴 라벨부터 매칭/소비해 "이름 미정 인물"이 "이름 미정 인물 2"의 접두어로 오인식되지 않게 한다.

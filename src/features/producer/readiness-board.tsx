@@ -30,7 +30,7 @@ import { StageHelpBadge } from '@/components/stage-help-badge'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { Textarea } from '@/components/ui/textarea'
 import { useChatUiStore } from '@/stores/chat-ui-store'
-import { castMentions, backgroundMentions } from '@/lib/card-mention'
+import { castMentions, backgroundMentions, foundationMentions } from '@/lib/card-mention'
 import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
 import { useProducerStore } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
@@ -662,6 +662,8 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
   const mentionLocale = useLocale()
   const castMentionList = castMentions(cast, mentionLocale)
   const bgMentionList = backgroundMentions(backgrounds, mentionLocale)
+  // 스토리 카드는 채팅 @ 고르기의 스토리 항목과 같은 이름(화면 언어)으로 넣어야 목록과 맞는다(2026-11-10).
+  const storyMentionLabel = foundationMentions(mentionLocale).find((m) => m.ref === 'story')?.label ?? 'Story'
 
   const hardByField = useMemo(
     () => new Map(gate.hardMissing.map((issue) => [issue.field, issue])),
@@ -779,7 +781,7 @@ export function ProducerReadinessBoard({ gate }: { gate: GateResult }) {
               kicker + 큰 제목 + 로그라인(살아있는 초안, 프롬프트 living draft) + 설정 뱃지가
               한 카드 안에. "내 영화의 타이틀 페이지가 채워져 간다"가 이 화면의 심장. */}
           <section>
-            <MentionableCard refId="story" label="스토리" pulse={storyPulse} className="rounded-2xl p-7">
+            <MentionableCard refId="story" label={storyMentionLabel} pulse={storyPulse} className="rounded-2xl p-7">
               <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-stage-producer">
                 Now assembling
               </div>

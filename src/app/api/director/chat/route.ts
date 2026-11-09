@@ -5,9 +5,9 @@ import { llmChat } from '@/lib/llm'
 import { CHAT_OUTPUT_FORMAT_GUIDE, CHAT_UPDATES_BATCH_GUIDE, resolveChatLocale, responseLanguageDirective } from '@/lib/chat-format'
 import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import {
-  NOTICE_PARTIAL,
   parseFencedJsonReply,
   parseFencedUpdates,
+  partialNotice,
 } from '@/lib/agentic-reply-guard'
 import { normalizeProvider } from '@/lib/video-models'
 import type {
@@ -499,7 +499,7 @@ function validateCanvasUpdates(raw: unknown[]): unknown[] {
   return out
 }
 
-function parseAgenticResponse(text: string): {
+function parseAgenticResponse(text: string, locale: AppLocale): {
   reply: string
   updates: unknown[]
   parseStatus: string
@@ -511,6 +511,7 @@ function parseAgenticResponse(text: string): {
     text,
     'director/chat',
     validateCanvasUpdates,
+    locale,
   )
   return {
     reply,
@@ -521,7 +522,7 @@ function parseAgenticResponse(text: string): {
   }
 }
 
-function parseLegacyResponse(text: string): {
+function parseLegacyResponse(text: string, locale: AppLocale): {
   reply: string
   suggestedCamera?: Record<string, number>
   suggestedLighting?: Record<string, unknown>
@@ -530,8 +531,9 @@ function parseLegacyResponse(text: string): {
 } {
   // agentic 경로와 같은 가드를 태운다 — 종전엔 실패 시 raw JSON 이 그대로 노출됐다(#p4-json-guard).
   //   이 경로의 산출은 배열이 아니라 제안 3종이라 "몇 건 적용" 을 셀 수 없다 — 일반 문구를 쓴다.
-  const { reply: head, data, status } = parseFencedJsonReply(text, 'director/chat:legacy')
-  const reply = status === 'recovered' ? (head ? `${head}\n\n${NOTICE_PARTIAL}` : NOTICE_PARTIAL) : head
+  const { reply: head, data, status } = parseFencedJsonReply(text, 'director/chat:legacy', locale)
+  const partial = partialNotice(locale)
+  const reply = status === 'recovered' ? (head ? `${head}\n\n${partial}` : partial) : head
   if (!data) return { reply, parseStatus: status }
   return {
     reply,
@@ -620,7 +622,7 @@ export async function POST(req: Request) {
         parseStatus,
         rawUpdateCount,
         validUpdateCount,
-      } = parseAgenticResponse(text)
+      } = parseAgenticResponse(text, projectLocale ?? parseAppLocale(uiLocale) ?? 'en')
       const trace = buildChatTrace({
         traceId,
         stage: 'director',
@@ -666,7 +668,7 @@ export async function POST(req: Request) {
         },
       },
     )
-    const result = parseLegacyResponse(text)
+    const result = parseLegacyResponse(text, projectLocale ?? parseAppLocale(uiLocale) ?? 'en')
     const { parseStatus, ...legacyResult } = result
     const trace = buildChatTrace({
       traceId,

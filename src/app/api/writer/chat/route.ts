@@ -18,7 +18,7 @@ import { CHAT_OUTPUT_FORMAT_GUIDE, CHAT_UPDATES_BATCH_GUIDE, resolveChatLocale, 
 import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import { parseDialogueLanguage, type DialogueLanguage } from '@/lib/writer/pipeline/util/output-language'
 import { sanitizeLineRefs, validateWriterUpdates } from '@/lib/writer-chat-updates'
-import { parseFencedUpdates } from '@/lib/agentic-reply-guard'
+import { droppedCharactersNotice, parseFencedUpdates } from '@/lib/agentic-reply-guard'
 import {
   buildChatTrace,
   createChatTraceId,
@@ -170,7 +170,8 @@ const normalizeHistory = normalizeChatHistory
 
 function parseAgenticResponse(
   text: string,
-  allowedCharacterIds?: ReadonlySet<string>,
+  allowedCharacterIds: ReadonlySet<string> | undefined,
+  locale: AppLocale,
 ): {
   reply: string
   updates: unknown[]
@@ -185,6 +186,7 @@ function parseAgenticResponse(
     text,
     'writer/chat',
     (raw) => validateWriterUpdates(raw, allowedCharacterIds, dropped),
+    locale,
   )
   return {
     reply,
@@ -304,6 +306,8 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
     )
     if (appTools?.turn) return NextResponse.json({ toolTurn: appTools.turn, toolSupport: true, toolUsage: llmUsage, contentLocale: projectLocale, localeSwitched })
 
+    // 답 끝에 붙는 안내(못 읽음 · 일부만 · 빠진 인물)는 답과 같은 채팅 언어로 — 프로젝트가 없으면 화면 언어(2026-11-10 오너).
+    const replyLocale: AppLocale = projectLocale ?? parseAppLocale(uiLocale) ?? 'en'
     const {
       reply,
       updates,
@@ -311,14 +315,10 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
       parseStatus,
       rawUpdateCount,
       validUpdateCount,
-    } = parseAgenticResponse(text, allowedCharacterIds)
+    } = parseAgenticResponse(text, allowedCharacterIds, replyLocale)
     // 드롭 표면화 — 침묵 드롭은 이 사고(무검증 저장)와 같은 함정을 반대 방향으로 판다.
     const dropped = [...new Set(droppedCharacterIds)]
-    const replyOut = dropped.length
-      ? `${reply}
-
-(등장인물 목록에 없는 인물 ${dropped.map((d) => `\`${d}\``).join(', ')} 은(는) 반영하지 않았어요 — 새 인물이 필요하면 Producer 단계에서 추가해 주세요.)`
-      : reply
+    const replyOut = dropped.length ? `${reply}\n\n${droppedCharactersNotice(dropped, replyLocale)}` : reply
     const trace = buildChatTrace({
       traceId,
       stage: 'writer',
