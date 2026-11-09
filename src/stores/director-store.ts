@@ -11,10 +11,7 @@ import {
 } from '@/types/shot'
 import {
   newDirectorId,
-  SHOT_OFFSET_X,
-  SHOT_OFFSET_Y,
-  VIDEO_OFFSET_X,
-  VIDEO_OFFSET_Y,
+  DEFAULT_SCENE_GROUP_WIDTH,
   ASSET_OFFSET_X,
   ASSET_OFFSET_Y,
   isShotData,
@@ -88,7 +85,15 @@ import { claimAction, releaseAction } from '@/lib/action-guard'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 import { directorBoardLabel, type BoardNodeNames } from '@/features/director/node-label'
-import { arrangeDirectorCanvas, ASSET_TO_SHOT_GAP } from '@/features/director/canvas-layout'
+import {
+  arrangeDirectorCanvas,
+  ASSET_TO_SHOT_GAP,
+  newShotPosition,
+  newTakePosition,
+  renderedCardSizes,
+  type CardSizing,
+} from '@/features/director/canvas-layout'
+import { useProjectFormatStore } from '@/stores/project-format-store'
 import { ASSET_CARD_WIDTH } from '@/features/director/asset-column'
 import {
   DEFAULT_VIDEO_MODEL,
@@ -1153,6 +1158,9 @@ interface DirectorCanvasState {
   persistNodePosition: (nodeId: string) => void
   /** [디버그] 전체 노드를 scene 가로 / shot 세로 / video 우측 그리드로 재배치 (+ DB 영속) */
   relayoutCanvas: () => void
+  /** [자동 정렬]을 기다리는 중(검토 C 3번): 캔버스가 화면 밖 카드까지 그려 지금 크기를 잰 뒤 relayoutCanvas 를 부른다. relayoutCanvas · 프로젝트 바꿈이 끈다. */
+  arrangePending: boolean
+  requestArrange: () => void
   /** 진입 시 DB → 캔버스 hydrate. canvas_position 적용 + 누락 Video 노드 생성 (DB가 진실) */
   hydrateFromDb: (projectId: string) => Promise<void>
 
@@ -1690,6 +1698,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             generationErrors: {},
             playingNodeId: null,
             showUnusedAssets: false,
+            arrangePending: false,
             historyPast: [],
             historyFuture: [],
             lastSavedAt: Date.now(),
@@ -1753,15 +1762,20 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       //   규칙은 canvas-layout.ts(오너 2026-11-10 "피그마 자료처럼 조금 가깝게"): 11/5 시안 D1 · DG 간격(열 96 · 줄 56 · 에셋 35 ·
       //   에셋 → 샷 116 · 씬 묶음 160)으로, 화면이 잰 카드 크기를 세어 겹치지 않게 놓는다.
       //   in-memory 즉시 적용 + 씬 · 샷 · 영상은 nodeId별 persist로 DB(canvas_position) 반영(재진입 유지). 에셋 자리는 DB 에 없다.
+      arrangePending: false,
+      requestArrange: () => set({ arrangePending: true }),
+
       relayoutCanvas: () => {
         get().commitHistory()
-        const posById = arrangeDirectorCanvas(get().nodes)
+        // 크기 셈(검토 C 3번): 지금 화면에 그린 카드는 DOM 크기, 화면 밖은 예전에 잰 크기와 넉넉한 크기 중 큰 값.
+        const posById = arrangeDirectorCanvas(get().nodes, canvasCardSizing())
         set((s) => ({
           nodes: s.nodes.map((n) => {
             const p = posById.get(n.id)
             return p ? { ...n, position: p } : n
           }),
           lastSavedAt: Date.now(),
+          arrangePending: false,
         }))
         for (const id of posById.keys()) {
           const node = get().nodes.find((n) => n.id === id)
@@ -5593,6 +5607,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           generationErrors: {},
           playingNodeId: null,
           showUnusedAssets: false,
+          arrangePending: false,
           historyPast: [],
           historyFuture: [],
           lastSavedAt: Date.now(),
@@ -5652,38 +5667,32 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
 // Auto-placement (결정 #18) — Writer ↔ Director sync에서 사용 (Phase D-4)
 // ============================================================================
 
+/** 지금 캔버스의 카드 크기 셈 재료(검토 C 3번): 그린 카드의 DOM 크기와 프로젝트 포맷(세로 · 정사각이면 넉넉한 크기가 크다). */
+function canvasCardSizing(): CardSizing {
+  const format = useProjectFormatStore.getState().format
+  return { fresh: renderedCardSizes(), tall: format === 'vertical_9:16' || format === 'square_1:1' }
+}
+
 /**
- * 부모 Scene의 우측에 새 Shot 노드 위치 자동 계산.
- * 형제 Shot 아래로 stacking (snap 16px).
+ * 새 Shot 노드 자리(검토 C 1번, 2026-11-10). 그 씬에 샷이 있으면 그 샷 열의 맨 아래 줄(샷과 그 테이크) 밑,
+ * 없으면 씬 오른쪽 샷 열 맨 위. 정한 자리가 다른 카드와 겹치면 안 겹칠 때까지 아래로(canvas-layout.newShotPosition).
  */
 export function nextShotPosition(
   state: Pick<DirectorCanvasState, 'nodes'>,
   parentSceneNodeId: string,
 ): XYPosition {
-  const parent = state.nodes.find((n) => n.id === parentSceneNodeId)
-  if (!parent) return { x: 80, y: 80 }
-  const siblings = getChildShots(state, parentSceneNodeId)
-  return {
-    x: parent.position.x + SHOT_OFFSET_X,
-    y: parent.position.y + siblings.length * SHOT_OFFSET_Y,
-  }
+  return newShotPosition(state.nodes, parentSceneNodeId, canvasCardSizing()) ?? { x: 80, y: 80 }
 }
 
 /**
- * 부모 Shot의 우측에 새 Video take 노드 위치 자동 계산 (addVideoTake와 동일 규칙).
- * 형제 Video 아래로 stacking.
+ * 새 Video take 노드 자리(addVideoTake와 동일 규칙, 검토 C 1번 2026-11-10). 그 샷에 테이크가 있으면 그 테이크 열의 맨 아래 밑,
+ * 없으면 그 씬의 테이크 열(없으면 샷 오른쪽 + 시안 열 간격)에서 샷 높이부터. 다른 카드와 겹치면 아래로(canvas-layout.newTakePosition).
  */
 export function nextVideoPosition(
   state: Pick<DirectorCanvasState, 'nodes'>,
   parentShotNodeId: string,
 ): XYPosition {
-  const parent = state.nodes.find((n) => n.id === parentShotNodeId)
-  if (!parent) return { x: 80, y: 80 }
-  const siblings = getChildVideos(state, parentShotNodeId)
-  return {
-    x: parent.position.x + VIDEO_OFFSET_X,
-    y: parent.position.y + siblings.length * VIDEO_OFFSET_Y,
-  }
+  return newTakePosition(state.nodes, parentShotNodeId, canvasCardSizing()) ?? { x: 80, y: 80 }
 }
 
 /**
@@ -5700,7 +5709,7 @@ export function nextScenePosition(
   //   (옛 nextScenePosition 은 ASSET_OFFSET_X 를 빠뜨려 촘촘한 '예전 layout' 이 됐다.)
   //   [자동 정렬]은 canvas-layout.ts 의 시안 간격으로 다시 놓는다(오너 2026-11-10). 기본 자리까지 줄이면 예전 간격으로
   //   저장된 카드와 섞여 겹친다(개발 DB 77dfa43c: 저장된 두 번째 테이크가 다음 씬 샷과 겹침). 그래서 기본 자리는 그대로 둔다.
-  const GROUP_WIDTH = ASSET_OFFSET_X + SHOT_OFFSET_X + VIDEO_OFFSET_X + 400
+  const GROUP_WIDTH = DEFAULT_SCENE_GROUP_WIDTH
   const scenes = state.nodes.filter((n) => n.data.kind === 'scene')
   if (scenes.length === 0) return { x: 80 + ASSET_OFFSET_X, y: 80 }
   const maxX = Math.max(...scenes.map((n) => n.position.x))

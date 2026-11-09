@@ -46,6 +46,7 @@ import { useHoldChatClosed } from '@/hooks/use-hold-chat-closed'
 import { LumiChatPill } from '@/features/director/lumi-chat-pill'
 import { HIDDEN_ON_CANVAS, directorCanvasMeta } from '@/features/director/canvas-meta'
 import { separateAssetCards } from '@/features/director/asset-column'
+import { arrangeOnceCardsRendered, renderedCardSizes } from '@/features/director/canvas-layout'
 
 import { handoffFrom } from '@/lib/handoff-intent'
 import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
@@ -487,6 +488,18 @@ function CanvasInner() {
   } = useReactFlow()
   const nodesInitialized = useNodesInitialized()
 
+  // [자동 정렬](검토 C 3번, 2026-11-10): 누른 동안만 화면 밖 카드까지 그려 지금 크기를 재고, 다 그려지면 정렬한다.
+  //   정렬이 기다림 표시를 끄면 다시 보이는 카드만 그린다(아래 onlyRenderVisibleElements).
+  const arrangePending = useDirectorCanvasStore((s) => s.arrangePending)
+  useEffect(() => {
+    if (!arrangePending) return
+    return arrangeOnceCardsRendered({
+      cardIds: () => useDirectorCanvasStore.getState().nodes.filter((n) => !HIDDEN_ON_CANVAS.has(n.data.kind)).map((n) => n.id),
+      renderedIds: renderedCardSizes,
+      arrange: () => useDirectorCanvasStore.getState().relayoutCanvas(),
+    })
+  }, [arrangePending])
+
   // Node 뷰 재진입 시 마지막 뷰포트 복원 (#e 2026-07-14).
   //   CanvasInner는 Node↔Storyboard 토글·스테이지 이동마다 remount된다. 예전엔 매 mount마다
   //   fitView가 돌아 위치가 초기화됐다. 이제 최초 진입(viewportInitialized=false)만 fitView하고,
@@ -789,7 +802,8 @@ function CanvasInner() {
         proOptions={{ hideAttribution: true }}
         // 큰 그래프(완성 프로젝트)에서 오프스크린 노드까지 전부 마운트하면 풀해상도
         //   스토리보드 <img> 수십 장이 한 번에 렌더돼 초기 진입이 느리다 → 보이는 노드만 렌더.
-        onlyRenderVisibleElements
+        //   [자동 정렬]을 기다리는 동안만 전부 그려 크기를 잰다(검토 C 3번).
+        onlyRenderVisibleElements={!arrangePending}
         // v3 D1(2026-11-03): 캔버스는 노드보다 한 단 어두운 바탕(--canvas-bg) 위 옅은 점.
         className="bg-canvas-bg"
       >
@@ -868,7 +882,7 @@ function PaletteBar({
   const realBatchRemaining = useDirectorCanvasStore((s) => s.realBatchRemaining)
   const storyboardBatch = withStoryboardBacklog(generationBatches, realBatchRemaining ?? 0).find((b) => b.lane === 'director-storyboard') ?? null
   const videoBatch = generationBatches.find((b) => b.lane === 'director-video') ?? null
-  const relayoutCanvas = useDirectorCanvasStore((s) => s.relayoutCanvas)
+  const requestArrange = useDirectorCanvasStore((s) => s.requestArrange)
   const showUnusedAssets = useDirectorCanvasStore((s) => s.showUnusedAssets)
   const toggleUnusedAssets = useDirectorCanvasStore((s) => s.toggleUnusedAssets)
   const addPromptNode = useDirectorCanvasStore((s) => s.addPromptNode)
@@ -1147,7 +1161,7 @@ function PaletteBar({
             {/* 노드 자동 정렬 — asset·scene·shot·video를 다이어그램 레이아웃으로 재배치 (DB 반영) */}
             <button
               type="button"
-              onClick={() => relayoutCanvas()}
+              onClick={() => requestArrange()}
               title={t('Arrange assets, scenes, shots, and videos in a left-to-right layout with spacing (saved to DB)')}
               className={TOOLBAR_PILL}
             >
