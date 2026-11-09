@@ -341,9 +341,9 @@ export function CharacterPanel({
             {charTooltipBody}
           </TooltipContent>
         </Tooltip>
-        {/* 모습 설명(v3 A5 그림 아래 한 줄) — 유저 언어 외형만(영어 생성 지시문은 보이지 않는다). */}
+        {/* 모습 설명(v3 A5 그림 아래 한 줄, 그림과 사이 9 — 11/5 시안) — 유저 언어 외형만(영어 생성 지시문은 보이지 않는다). */}
         {(appearance?.appearanceNative || (appearance?.isDefault ? char.appearanceNative : null)) ? (
-          <p className="mt-2 line-clamp-2 text-caption text-subtle-foreground">{appearance?.appearanceNative || char.appearanceNative}</p>
+          <p className="mt-[9px] line-clamp-2 text-caption text-subtle-foreground">{appearance?.appearanceNative || char.appearanceNative}</p>
         ) : null}
         {/* #image-to-artist(2026-09-17, 오너 결정): 사용자가 올린 원본은 시트와 별개로 그대로 남는다 — 시트는 이 원본을
             참조해 만들어졌다는 뜻이다. 원본이 있는 모습에서만 시트 아래에 작게 보인다. */}

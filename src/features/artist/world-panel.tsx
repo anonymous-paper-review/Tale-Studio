@@ -230,9 +230,9 @@ export function WorldPanel({
           <VersionBadge n={isGenerating ? null : versionOf(shownImage, candidates)} />
         </button>
 
-        {/* 모습 설명(v3 A5 그림 아래 한 줄) — 유저 언어 설명만. */}
+        {/* 모습 설명(v3 A5 그림 아래 한 줄, 그림과 사이 9 — 11/5 시안) — 유저 언어 설명만. */}
         {(variant ? variant.visualDescriptionNative : world.visualDescriptionNative) ? (
-          <p className="mt-2 line-clamp-2 text-caption text-subtle-foreground">{variant ? variant.visualDescriptionNative : world.visualDescriptionNative}</p>
+          <p className="mt-[9px] line-clamp-2 text-caption text-subtle-foreground">{variant ? variant.visualDescriptionNative : world.visualDescriptionNative}</p>
         ) : null}
 
         {/* 시리즈 다음 화: 앞 화 그림을 참고해 이 화 그림체로 다시 그릴 카드만 한 줄 알린다. */}

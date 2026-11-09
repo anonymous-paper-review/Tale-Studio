@@ -179,6 +179,10 @@ export function makeButtonText(t: (text: string, params?: Record<string, string 
   return style ? t('Make it in {style}', { style, ro: directionParticle(style) }) : t('Make')
 }
 
+// v3 AS(11/5 시안) 스타일 칸의 그림 — 164×112 비율 · 모서리 12 · 그림자리 바탕. 고른 칸은 그림 안쪽 2px 지금 단계 색 테두리,
+//   이름은 그림 밖 아래(고른 것 흰 600 · 나머지 회색 500).
+const TILE_ART = 'relative flex aspect-[41/28] items-center justify-center overflow-hidden rounded-[12px] bg-art-placeholder outline-2 -outline-offset-2 transition-colors'
+
 /**
  * 스타일 격자 — 처음 만드는 창(A2)과 재생성 창(A6, regenerate-style-dialog)이 같이 쓴다.
  *   이미 올린 내 그림체가 있으면 그 카드(보기 · ✕)가 맨 앞이고, 그 그림체를 쓰는 동안 다른 스타일은 고를 수 없다(✕로 내려야 고른다).
@@ -200,34 +204,36 @@ export function StyleGrid({ anchors, picked, onPick, custom, locked, styleSettin
 }) {
   const t = useT()
   const locale = useLocale()
+  const pickable = !(locked || custom)
   return (
-    <div className="grid grid-cols-3 gap-2 sm:grid-cols-4" role="radiogroup" aria-label={t('Style')}>
-      {/* 이미 올린 내 그림체(올리기 카드는 2026-10-27 내림) — 보기 · 지우기만. */}
+    <div className="grid grid-cols-3 gap-x-3 gap-y-3.5 sm:grid-cols-4" role="radiogroup" aria-label={t('Style')}>
+      {/* 이미 올린 내 그림체(올리기 카드는 2026-10-27 내림) — 보기 · 지우기만. 쓰는 동안은 늘 고른 칸이다. */}
       {custom ? (
-        <div className="relative flex">
-          <div className="flex w-full flex-col overflow-hidden rounded-lg border border-primary ring-1 ring-primary text-left" data-testid="artist-style-custom">
-            <span className="flex aspect-square items-center justify-center bg-muted/30">
-              {styleSetting ? <Loader2 className="size-5 animate-spin" aria-hidden /> : <ThumbImage src={custom.url} alt={custom.label} className="size-full object-cover" />}
+        <div className="flex min-w-0 flex-col gap-2" data-testid="artist-style-custom">
+          <span className={cn(TILE_ART, 'outline-stage')}>
+            {styleSetting ? <Loader2 className="size-5 animate-spin" aria-hidden /> : <ThumbImage src={custom.url} alt={custom.label} className="size-full object-cover" />}
+            <Button
+              type="button"
+              size="icon"
+              variant="outline"
+              className="absolute right-1.5 top-1.5 size-6 rounded-full bg-background/90"
+              onClick={onRemoveCustom}
+              aria-label={t('Remove my art style')}
+              title={t('Remove my art style')}
+              disabled={removing || styleSetting || busy} data-testid="artist-style-remove"
+            >
+              {removing ? <Loader2 className="size-3 animate-spin" aria-hidden /> : <X className="size-3" aria-hidden />}
+            </Button>
+          </span>
+          <span className="flex min-w-0 flex-col gap-0.5">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <PickedMark />
+              <span className="truncate text-[13px] font-semibold leading-4 text-foreground">{custom.label}</span>
             </span>
-            <span className="px-2 py-1.5 text-xs">
-              <span className="line-clamp-1 font-medium">{custom.label}</span>
-              {prevIsCustom ? <span className="block text-[10px] text-muted-foreground">{t('Previous episode style')}</span> : null}
-              {currentKey === 'custom' ? <span className="block text-[10px] text-muted-foreground">{t('Now')}</span> : null}
-              {styleSetting ? <span className="text-muted-foreground">{t('Reading the art style…')}</span> : null}
-            </span>
-          </div>
-          <Button
-            type="button"
-            size="icon"
-            variant="outline"
-            className="absolute right-1.5 top-1.5 size-6 rounded-full bg-background/90"
-            onClick={onRemoveCustom}
-            aria-label={t('Remove my art style')}
-            title={t('Remove my art style')}
-            disabled={removing || styleSetting || busy} data-testid="artist-style-remove"
-          >
-            {removing ? <Loader2 className="size-3 animate-spin" aria-hidden /> : <X className="size-3" aria-hidden />}
-          </Button>
+            {prevIsCustom ? <span className="truncate text-[10px] text-subtle-foreground">{t('Previous episode style')}</span> : null}
+            {currentKey === 'custom' ? <span className="truncate text-[10px] text-subtle-foreground">{t('Now')}</span> : null}
+            {styleSetting ? <span className="truncate text-[10px] text-subtle-foreground">{t('Reading the art style…')}</span> : null}
+          </span>
         </div>
       ) : null}
       {anchors.map((anchor) => {
@@ -241,28 +247,38 @@ export function StyleGrid({ anchors, picked, onPick, custom, locked, styleSettin
             aria-checked={on}
             disabled={locked || !!custom}
             onClick={() => onPick(anchor.key)}
-            className={cn(
-              'relative flex flex-col overflow-hidden rounded-lg border text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-              on ? 'border-primary ring-1 ring-primary' : 'border-border hover:border-border-strong',
-            )}
+            className="group flex min-w-0 flex-col gap-2 text-left focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
             data-testid="artist-style-option"
           >
-            <span className="flex aspect-square items-center justify-center bg-muted">
+            <span className={cn(TILE_ART, on ? 'outline-stage' : 'outline-transparent group-focus-visible:outline-ring', !on && pickable && 'group-hover:outline-border-strong')}>
               {anchor.previewUrl ? <ThumbImage src={anchor.previewUrl} alt={name} className="size-full object-cover" /> : <ImageIcon className="size-5 text-muted-foreground opacity-40" aria-hidden />}
             </span>
-            {on ? <span className="absolute right-1.5 top-1.5 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground"><Check className="size-3" /></span> : null}
-            <span className={cn('line-clamp-1 px-2 text-xs font-medium', prevStyleId === anchor.key || currentKey === anchor.key ? 'pt-1.5' : 'py-1.5')}>{name}</span>
-            {/* 재생성 창(A6): 지금 작품 스타일 자리 — 같은 스타일로 다시 만들 수 있다. */}
-            {currentKey === anchor.key ? (
-              <span className="line-clamp-1 px-2 pb-1.5 text-[10px] text-muted-foreground" data-testid="artist-style-current">{t('Now')}</span>
-            ) : null}
-            {/* 시리즈 다음 화: 앞 화 그림체 자리를 알려 그대로 두는 것이 "이어받기"라는 것을 보인다. */}
-            {prevStyleId === anchor.key ? (
-              <span className="line-clamp-1 px-2 pb-1.5 text-[10px] text-muted-foreground">{t('Previous episode style')}</span>
-            ) : null}
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <span className="flex min-w-0 items-center gap-1.5">
+                {on ? <PickedMark /> : null}
+                <span className={cn('truncate text-[13px] leading-4', on ? 'font-semibold text-foreground' : 'font-medium text-muted-foreground')}>{name}</span>
+              </span>
+              {/* 재생성 창(A6): 지금 작품 스타일 자리 — 같은 스타일로 다시 만들 수 있다. */}
+              {currentKey === anchor.key ? (
+                <span className="truncate text-[10px] text-subtle-foreground" data-testid="artist-style-current">{t('Now')}</span>
+              ) : null}
+              {/* 시리즈 다음 화: 앞 화 그림체 자리를 알려 그대로 두는 것이 "이어받기"라는 것을 보인다. */}
+              {prevStyleId === anchor.key ? (
+                <span className="truncate text-[10px] text-subtle-foreground">{t('Previous episode style')}</span>
+              ) : null}
+            </span>
           </button>
         )
       })}
     </div>
+  )
+}
+
+/** 고른 칸 표시 — 이름 앞 크림 동그라미 ✓(v3 AS 11/5 시안). */
+function PickedMark() {
+  return (
+    <span className="flex size-4 shrink-0 items-center justify-center rounded-full bg-foreground text-on-stage" aria-hidden>
+      <Check className="size-2.5" strokeWidth={3} />
+    </span>
   )
 }
