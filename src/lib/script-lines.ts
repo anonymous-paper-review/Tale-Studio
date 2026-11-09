@@ -11,8 +11,8 @@ import { boardShotLabels, boardShots } from '@/lib/writer/board-summary'
 import { translate } from '@/lib/i18n'
 import type { AppLocale } from '@/lib/locale'
 
-// locale 을 안 넘기는 호출부(global-chat.tsx 의 scriptLineMentions 호출)가 조용히 안 깨지도록
-//   기존 동작(항상 한국어)을 기본값으로 보존한다 — producer-gate.ts/card-mention.ts 와 동일 취급.
+// locale 을 안 넘기는 호출부가 조용히 안 깨지도록 기존 동작(항상 한국어)을 기본값으로 보존한다 —
+//   producer-gate.ts/card-mention.ts 와 동일 취급. 채팅 고르기(global-chat.tsx)는 2026-11-10 부터 화면 언어를 넘긴다.
 const UNSPECIFIED_LOCALE_FALLBACK: AppLocale = 'ko'
 
 export type ScriptLineKind = 'sceneHeading' | 'action' | 'dialogue'

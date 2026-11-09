@@ -2482,7 +2482,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           loading: false,
           messages: [
             ...s.messages,
-            { id: makeId(), stage, role: 'model', content: cannedFor(stage) },
+            { id: makeId(), stage, role: 'model', content: cannedFor(stage, contentLocale()) },
           ],
         }))
       }, 700)
@@ -4245,7 +4245,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         ['artistSourceAppearancePatch', 'artistSourceLocationPatch'].includes(proposal.kind) &&
         !(proposal.payload.toolEdit as { sourceSnapshot?: ArtistSourceSnapshot } | undefined)?.sourceSnapshot
       ) {
-        throw new Error('승인에 필요한 원천 확인 정보가 없습니다. 다시 읽어 변경을 요청해 주세요.')
+        throw new Error(translate(contentLocale(), 'The source check needed for approval is missing. Read it again and ask for the change again.'))
       }
       if (proposal.payload.toolEdit && projectId) {
         const approved = proposal.payload.toolEdit as { resource: string; id: string; patch: Record<string, unknown>; before: Record<string, unknown>; sourceSnapshot?: ArtistSourceSnapshot }
@@ -4257,7 +4257,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         if (!current ||
           !sameToolValue(current.values, approved.before) ||
           !sameToolValue(current.sourceSnapshot, approved.sourceSnapshot)) {
-          throw new Error('승인 요청 후 대상이 변경되었습니다. 다시 읽어 변경을 요청해 주세요.')
+          throw new Error(translate(contentLocale(), 'The target changed after the approval request. Read it again and ask for the change again.'))
         }
         const patch = resource.validate(approved.patch)
         const result = approved.sourceSnapshot
@@ -4267,7 +4267,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         if (result.status !== 'ok') throw new Error(result.message ?? result.status)
         const saved = (await (resource.readSaved ?? resource.read)()).find(row => row.id === approved.id)
         if (!isCurrentSession()) return false
-        if (!saved || !Object.entries(patch).every(([key, value]) => sameToolValue(saved.values[key], value))) throw new Error('요청한 값의 저장을 확인하지 못했습니다.')
+        if (!saved || !Object.entries(patch).every(([key, value]) => sameToolValue(saved.values[key], value))) throw new Error(translate(contentLocale(), "Couldn't confirm that the requested values were saved."))
         speak(`${proposal.target}: ${contentLocale() === 'ko' ? '저장을 확인했습니다.' : 'Saved and verified.'}`)
         patchTrace({ appliedCount: 1, pendingProposal: false })
         return true

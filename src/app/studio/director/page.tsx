@@ -64,6 +64,7 @@ import { useGenerationBatches } from '@/lib/generation-queue'
 import { withStoryboardBacklog } from '@/lib/generation-batches'
 import { getDirectorGaps, ledgerGapLabels, summarizeGaps } from '@/lib/completeness'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
+import { useLocaleStore } from '@/stores/locale-store'
 import {
   isShotData,
   SNAP_GRID,
@@ -311,6 +312,8 @@ const edgeTypes = {
 
 function CanvasInner() {
   const t = useT()
+  // 채울 것 넛지의 목록 줄도 감싸는 문장(t)과 같은 화면 언어로 — 스토어 값(문자열)이라 memo deps 에 넣어도 안정적이다.
+  const locale = useLocaleStore((s) => s.locale)
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   const edges = useDirectorCanvasStore((s) => s.edges)
   const deleteNode = useDirectorCanvasStore((s) => s.deleteNode)
@@ -398,8 +401,7 @@ function CanvasInner() {
   const gapNudgeRef = useRef<string | null>(null)
   // gaps/content 는 렌더 본문에서 미리 계산 — effect 안에서 t() 를 직접 부르면 t 가 매 렌더
   //   새 참조라 deps 에 넣을 때 2000ms 디바운스가 렌더마다 리셋된다(#i18n-s5-batch4).
-  //   summarizeGaps() 자체 산출물은 범위 밖(@/lib/completeness)이라 그대로 통과, 감싸는
-  //   문장만 번역한다.
+  //   목록 줄(@/lib/completeness)도 감싸는 문장과 같은 화면 언어로 쓴다(2026-11-10 오너 "영어 언어에서 한국어 나오는거 수정").
   // #ref-gate: 시트 없는 인물까지 잡으려면 에셋 store 의 이미지 유무가 필요하다(순수 함수엔 조회자로 넘긴다).
   const assetCharacters = useAssetStorageStore((st) => st.characters)
   // #ledger: 상태 변화(누움→섬 등)를 보여주는 샷이 없는 항목 — 무대 장부(scenes.stage.ledger)에서.
@@ -411,16 +413,16 @@ function CanvasInner() {
         return !!c && ((c.referenceImages?.length ?? 0) > 0 || (c.views?.single?.length ?? 0) > 0)
       },
       characterName: (id: string) => assetCharacters[id]?.name ?? id,
-      ledgerGaps: ledgerGapLabels(sceneLedgers, (id) => assetCharacters[id]?.name ?? id),
+      ledgerGaps: ledgerGapLabels(sceneLedgers, (id) => assetCharacters[id]?.name ?? id, locale),
     }),
-    [assetCharacters, sceneLedgers],
+    [assetCharacters, sceneLedgers, locale],
   )
-  const gaps = getDirectorGaps(nodes, gapAssets)
+  const gaps = getDirectorGaps(nodes, gapAssets, locale)
   const gapNudgeContent =
     gaps.length > 0
       ? t('There are {count} things worth filling in:\n{summary}', {
           count: gaps.length,
-          summary: summarizeGaps(gaps),
+          summary: summarizeGaps(gaps, 3, locale),
         })
       : null
   useEffect(() => {

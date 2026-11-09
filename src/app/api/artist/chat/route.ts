@@ -182,7 +182,7 @@ const normalizeHistory = normalizeChatHistory
 // 카드 모델 update 검증(F6 화이트리스트)은 src/lib/artist/chat-updates.ts 로 분리(순수 단위 테스트 대상).
 //   외형(원천) 변경 type 은 화이트리스트 밖이라 자동경로에서 드롭된다 — 승인 경로는 pending-proposal.
 
-function parseUpdates(text: string): {
+function parseUpdates(text: string, locale: AppLocale): {
   reply: string
   updates: unknown[]
   proposals: AppearanceProposal[]
@@ -203,6 +203,7 @@ function parseUpdates(text: string): {
     text,
     'artist/chat',
     validateUpdates,
+    locale,
   )
   // updates = 자동 실행(화이트리스트). proposals = 원천 외형 변경(승인 게이트 — F6, 원본 배열 기준).
   return {
@@ -341,7 +342,7 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
       parseStatus,
       rawUpdateCount,
       validUpdateCount,
-    } = parseUpdates(text)
+    } = parseUpdates(text, projectLocale ?? parseAppLocale(uiLocale) ?? 'en')
     // 새 인물 · 배경 카드는 만들지 않는다(디자이너 QA 1차 #04 · 오너 "채팅 추가 막고 안내"). 명령은 validateUpdates 가 이미 버렸고,
     //   모델의 "추가했어요"가 화면에 남지 않게 답을 안내 문장으로 바꾼다.
     const guidedReply = newCardRequests > 0

@@ -38,6 +38,7 @@ import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useArtistStore } from '@/stores/artist-store'
 import { useWriterStore } from '@/stores/writer-store'
 import { useDirectorCanvasStore } from '@/stores/director-store'
+import { useLocaleStore } from '@/stores/locale-store'
 import { handoffToStage } from '@/lib/stage-nav'
 import { cn } from '@/lib/utils'
 import { ThumbImage } from '@/components/thumb-image'
@@ -55,7 +56,7 @@ import {
   activeMentionRefs,
   sceneShotMentions,
   toggleMentionToken,
-  FOUNDATION_MENTIONS,
+  foundationMentions,
 } from '@/lib/card-mention'
 import { SceneGateControls } from '@/features/writer/scene-gate-panel'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
@@ -488,6 +489,8 @@ export function GlobalChat() {
   const cancelDeferredProposal = useGlobalChatStore((s) => s.cancelDeferredProposal)
   const restoreSuggestion = useGlobalChatStore((s) => s.restoreSuggestion)
   const t = useT()
+  // 채팅 @ 고르기 · 끌어 놓기 안내는 화면 크롬이라 화면 언어(2026-11-10). 스토어 값(문자열)이라 memo deps 에 넣어도 안정적이다.
+  const locale = useLocaleStore((s) => s.locale)
 
   const router = useRouter()
   // stage 는 URL 에서 직접 읽는다 (#chat-continuity 2026-07-31). store.currentStage 는
@@ -545,9 +548,9 @@ export function GlobalChat() {
   const mentionItems = useMemo<MentionItem[]>(() => {
     if (currentStage === 'producer') {
       return [
-        ...FOUNDATION_MENTIONS.map((m) => ({ id: m.ref, label: m.label, hint: m.hint })),
-        ...castMentions(producerCast).map((m) => ({ id: m.ref, label: m.label, hint: m.hint })),
-        ...backgroundMentions(producerBackgrounds).map((m) => ({ id: m.ref, label: m.label, hint: m.hint })),
+        ...foundationMentions(locale).map((m) => ({ id: m.ref, label: m.label, hint: m.hint })),
+        ...castMentions(producerCast, locale).map((m) => ({ id: m.ref, label: m.label, hint: m.hint })),
+        ...backgroundMentions(producerBackgrounds, locale).map((m) => ({ id: m.ref, label: m.label, hint: m.hint })),
       ]
     }
     if (currentStage === 'artist') {
@@ -563,7 +566,7 @@ export function GlobalChat() {
     if (currentStage === 'writer') {
       return [
         ...writerSceneShotMentions(writerManifest, writerShots),
-        ...scriptLineMentions(buildScriptLines(writerManifest, writerShots)),
+        ...scriptLineMentions(buildScriptLines(writerManifest, writerShots), locale),
       ].map((m) => ({ id: m.ref, label: m.label, hint: m.hint }))
     }
     if (currentStage === 'director') {
@@ -585,6 +588,7 @@ export function GlobalChat() {
     locationHint,
     directorNodes,
     directorNames,
+    locale,
   ])
   // #internal-id-scrub(2026-08-26, 오너 E5): 에이전트 발화·제안에 새는 내부 id(sh_../char_..)와
   //   [p3] 마커를 표시 직전에 걷는다 — 프롬프트 금지 규칙이 1차, 이 스크럽이 과거 메시지까지
@@ -2128,7 +2132,7 @@ export function GlobalChat() {
                 className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[26px] border-2 border-dashed border-stage bg-stage/10 text-xs font-medium text-stage"
                 aria-hidden
               >
-                파일을 놓으면 첨부돼요
+                {t('Drop files here to attach them')}
               </div>
             )}
           </div>
