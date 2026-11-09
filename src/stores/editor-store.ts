@@ -13,6 +13,7 @@ import {
 } from '@/lib/director-video-take-selection'
 import {
   saveEditorState,
+  saveEditorStateNow,
   loadEditorState,
   deleteAudioBlob,
   type PersistedEditor,
@@ -72,6 +73,13 @@ export function isSyntheticShotId(shotId: string): boolean {
 export function baseShotIdOf(shotId: string): string {
   return shotId.replace(SYNTHETIC_SHOT_RE, '')
 }
+// 조각을 또 자른 조각(`원본__cA__cB`)도 맨 처음 원본 샷까지 거슬러 간다 — 한 겹만 벗기면 원본을 못 찾아
+//   다시 열 때 셋째 조각을 버렸다(2026-11-10). 약속: tests/editor/reopen-edits.test.ts
+function rootShotIdOf(shotId: string): string {
+  let id = shotId
+  while (isSyntheticShotId(id)) id = baseShotIdOf(id)
+  return id
+}
 
 // 타이틀 카드 판별(#owner-title-card) — __t 접미. baseShotIdOf 대상이 없다(독립 클립, 원본 shot 미연결).
 // 약속 J2(2026-09-04): 타이틀 카드를 가운데서 자르면 조각 id 가 `title__tX__cY` 가 된다 — 접미가 __t 로 끝나지 않아도
@@ -106,6 +114,9 @@ interface EditorState {
   resetCount: number
   // 영상을 불러오지 못한 클립 주소(404 · 막힘 · 끊김) — 그 클립만 "불러오지 못함"으로 보인다. 저장하지 않고, 다시 읽으면 지운다.
   unplayableVideoUrls: string[]
+  // 편집 상태를 준비하는 중(Editor 를 열 때 — 저장한 편집 되살리기, 처음이면 영상 소리를 오디오 칸에 나누고 파형 채우기 · 저장).
+  //   null 이 아니면 화면은 편집 화면 대신 기다리는 카드를 보이고, 편집 상태를 저장하지 않는다. done/total 은 파형을 채운 소리 수(오너 2026-11-10).
+  editorPrep: { done: number; total: number } | null
 
   // Video Source 패널 (프리미어2 좌상단 카드 그리드) — 토글로 접기
   sourcePanelOpen: boolean
@@ -209,7 +220,9 @@ interface EditorState {
 
   // 리사이즈 섹션 크기 + 영속화
   setPanelSize: (key: 'sourceW' | 'previewH', value: number) => void
-  loadPersisted: () => Promise<void>
+  /** 이 브라우저에 저장한 편집을 되살린다 — 되살렸으면 true(저장한 편집이 없거나 그새 다른 프로젝트로 바뀌었으면 false). */
+  loadPersisted: () => Promise<boolean>
+  setEditorPrep: (prep: { done: number; total: number } | null) => void
 
   // 전역 볼륨 / bin 드래그 하이라이트
   setMasterVolume: (v: number) => void
@@ -368,6 +381,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   loadStatus: 'idle',
   resetCount: 0,
   unplayableVideoUrls: [],
+  editorPrep: null,
   sourcePanelOpen: true,
   currentTime: 0,
   pxPerSec: PX_PER_SEC_DEFAULT,
@@ -385,6 +399,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   future: [],
 
   toggleSourcePanel: () => set((state) => ({ sourcePanelOpen: !state.sourcePanelOpen })),
+
+  setEditorPrep: (prep) => set({ editorPrep: prep }),
 
   togglePlay: () => set((state) => ({ isPlaying: !state.isPlaying })),
   setPlaying: (playing) => set({ isPlaying: playing }),
@@ -631,16 +647,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   // ── 영속화 로드 (loadData 후 호출) — canonical media is never restored locally ──
   loadPersisted: async () => {
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined') return false
     const projectId = useProjectStore.getState().projectId
-    if (!projectId) return
+    if (!projectId) return false
     const loadToken = ++persistedLoadEpoch
     const saved = await loadEditorState(projectId)
     if (
       !saved ||
       persistedLoadEpoch !== loadToken ||
       useProjectStore.getState().projectId !== projectId
-    ) return
+    ) return false
 
     // 복구: 이전 버전(모듈 카운터)에서 중복된 트랙/오디오 클립 id 제거
     const seenTracks = new Set<string>()
@@ -674,6 +690,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const baseShotById = new Map(cur.shots.map((s) => [s.shotId, s]))
     const restoredShots: Shot[] = []
     const restoredClips: VideoClip[] = []
+    // 잘라 낸 조각을 되살린 원본 샷 — 자르기가 바꾼 앞 조각(원본)의 구간은 DB 에 쓰지 않으므로 저장한 편집에서 되살린다(2026-11-10).
+    const cutRoots = new Set<string>()
     for (const savedShot of saved.shots ?? []) {
       if (!isSyntheticShotId(savedShot.shotId)) continue
       if (canonicalShotIds.has(savedShot.shotId)) continue
@@ -695,8 +713,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         canonicalShotIds.add(savedShot.shotId)
         continue
       }
-      const base = baseShotById.get(baseShotIdOf(savedShot.shotId))
+      const base = baseShotById.get(rootShotIdOf(savedShot.shotId))
       if (!base) continue
+      if (savedShot.shotId.includes('__c')) cutRoots.add(base.shotId)
       restoredShots.push({ ...savedShot, sceneId: base.sceneId, durationSeconds: base.durationSeconds })
       const savedClip = savedClipByShot.get(savedShot.shotId)
       const baseClip = baseClipByShot.get(base.shotId)
@@ -721,7 +740,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ? cur.shots.map((s) => (savedSubtitleById.has(s.shotId) ? { ...s, subtitle: savedSubtitleById.get(s.shotId) ?? null } : s))
       : cur.shots
     const combinedShots = restoredShots.length ? [...baseShots, ...restoredShots] : baseShots
-    const combinedClips = restoredClips.length ? [...cur.videoClips, ...restoredClips] : cur.videoClips
+    // 자른 앞 조각(원본)의 구간은 저장한 편집에서 되살린다 — 그 밖의 원본 구간은 DB 값(손잡이로 바꾼 구간은 DB 에도 쓴다).
+    const baseClips = cutRoots.size
+      ? cur.videoClips.map((c) => {
+          const savedClip = cutRoots.has(c.shotId) ? savedClipByShot.get(c.shotId) : undefined
+          return savedClip && (savedClip.trimStart !== undefined || savedClip.trimEnd !== undefined)
+            ? { ...c, trimStart: savedClip.trimStart, trimEnd: savedClip.trimEnd }
+            : c
+        })
+      : cur.videoClips
+    const combinedClips = restoredClips.length ? [...baseClips, ...restoredClips] : baseClips
 
     const canonicalOrder = new Map<string, string[]>()
     for (const shot of combinedShots) {
@@ -729,13 +757,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       order.push(shot.shotId)
       canonicalOrder.set(shot.sceneId, order)
     }
+    // 저장할 때 있던 샷이 저장한 순서에 없으면 사람이 타임라인에서 지운 것이다 — 되살리지 않는다.
+    //   저장한 뒤에 새로 생긴 샷만 씬 끝에 붙인다(2026-11-10, 약속: tests/editor/reopen-edits.test.ts).
+    const savedShotIds = new Set((saved.shots ?? []).map((s) => s.shotId))
     const clipOrder: Record<string, string[]> = {}
     for (const [sceneId, canonicalIds] of canonicalOrder) {
       const savedIds = saved.clipOrder?.[sceneId] ?? []
       const retained = savedIds.filter(
         (shotId, index) => canonicalShotIds.has(shotId) && savedIds.indexOf(shotId) === index,
       )
-      clipOrder[sceneId] = [...retained, ...canonicalIds.filter((id) => !retained.includes(id))]
+      clipOrder[sceneId] = [...retained, ...canonicalIds.filter((id) => !retained.includes(id) && !savedShotIds.has(id))]
     }
     set({
       // Canonical shots/videoClips come from loadData (DB truth). Only synthetic editor
@@ -758,6 +789,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       past: [],
       future: [],
     })
+    return true
   },
 
   loadData: async () => {
@@ -933,6 +965,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => ({
       resetCount: state.resetCount + 1,
       unplayableVideoUrls: [],
+      editorPrep: null,
       shots: [],
       videoClips: [],
       selectedSceneId: null,
@@ -1552,61 +1585,87 @@ export function scheduleServerSave(
   const scheduled = setTimeout(() => {
     if (serverSaveTimers.get(projectId) !== scheduled) return
     serverSaveTimers.delete(projectId)
-    if (serverSaveGenerations.get(projectId) !== generation) return
-    if (serverSaveInFlight.get(projectId)) return
-
-    const latestSnapshot = serverSaveSnapshots.get(projectId)
-    if (!latestSnapshot) return
-    serverSaveInFlight.set(projectId, true)
-    void saveEditorStateToServer(
-      projectId,
-      latestSnapshot,
-      () => serverSaveGenerations.get(projectId) === generation,
-    ).then((result) => {
-      serverSaveInFlight.delete(projectId)
-      const latestGeneration = serverSaveGenerations.get(projectId)
-      if (latestGeneration !== generation) {
-        const newestSnapshot = serverSaveSnapshots.get(projectId)
-        if (newestSnapshot) scheduleServerSave(projectId, newestSnapshot, 0, latestGeneration)
-        return
-      }
-      if (result === 'saved') {
-        serverSaveSnapshots.delete(projectId)
-        return
-      }
-      if (result === 'fatal') {
-        // 재시도로 달라지지 않는 실패(삭제된 프로젝트·만료 세션) — 루프를 멈춘다.
-        //   편집 내용은 localStorage(saveEditorState)에 그대로 남아 있고, 다음 편집이
-        //   새 generation 으로 다시 저장을 시도한다.
-        serverSaveSnapshots.delete(projectId)
-        if (!fatalSaveNotified.has(projectId)) {
-          fatalSaveNotified.add(projectId)
-          toast.error(
-            translate(
-              useLocaleStore.getState().locale,
-              "Couldn't save your edits to the server. The project may have been deleted or the session may have expired. Refresh to restore your most recent project.",
-            ),
-          )
-        }
-        return
-      }
-      const retrySnapshot = serverSaveSnapshots.get(projectId)
-      if (retrySnapshot) scheduleServerSave(projectId, retrySnapshot, 5000, generation)
-    })
+    void runServerSave(projectId, generation)
   }, delay)
   serverSaveTimers.set(projectId, scheduled)
 }
 
-if (typeof window !== 'undefined') {
-  const pick = (s: EditorState) => ({
-    shots: s.shots,
-    clipOrder: s.clipOrder,
-    videoClips: s.videoClips,
-    audioClips: s.audioClips,
-    audioSources: s.audioSources,
-    audioTracks: s.audioTracks,
-    panelSizes: s.panelSizes,
+// 이 세대(generation)의 저장을 서버에 보낸다 — 더 새 세대가 있거나 이미 보내는 중이면 보내지 않는다(null).
+function runServerSave(projectId: string, generation: number): Promise<ServerSaveResult | null> {
+  if (serverSaveGenerations.get(projectId) !== generation) return Promise.resolve(null)
+  if (serverSaveInFlight.get(projectId)) return Promise.resolve(null)
+
+  const latestSnapshot = serverSaveSnapshots.get(projectId)
+  if (!latestSnapshot) return Promise.resolve(null)
+  serverSaveInFlight.set(projectId, true)
+  return saveEditorStateToServer(
+    projectId,
+    latestSnapshot,
+    () => serverSaveGenerations.get(projectId) === generation,
+  ).then((result) => {
+    serverSaveInFlight.delete(projectId)
+    const latestGeneration = serverSaveGenerations.get(projectId)
+    if (latestGeneration !== generation) {
+      const newestSnapshot = serverSaveSnapshots.get(projectId)
+      if (newestSnapshot) scheduleServerSave(projectId, newestSnapshot, 0, latestGeneration)
+      return result
+    }
+    if (result === 'saved') {
+      serverSaveSnapshots.delete(projectId)
+      return result
+    }
+    if (result === 'fatal') {
+      // 재시도로 달라지지 않는 실패(삭제된 프로젝트·만료 세션) — 루프를 멈춘다.
+      //   편집 내용은 localStorage(saveEditorState)에 그대로 남아 있고, 다음 편집이
+      //   새 generation 으로 다시 저장을 시도한다.
+      serverSaveSnapshots.delete(projectId)
+      if (!fatalSaveNotified.has(projectId)) {
+        fatalSaveNotified.add(projectId)
+        toast.error(
+          translate(
+            useLocaleStore.getState().locale,
+            "Couldn't save your edits to the server. The project may have been deleted or the session may have expired. Refresh to restore your most recent project.",
+          ),
+        )
+      }
+      return result
+    }
+    const retrySnapshot = serverSaveSnapshots.get(projectId)
+    if (retrySnapshot) scheduleServerSave(projectId, retrySnapshot, 5000, generation)
+    return result
   })
+}
+
+// 저장하는 편집 상태 — 재생 · 선택 · 확대처럼 보는 상태는 넣지 않는다.
+const pickPersisted = (s: EditorState) => ({
+  shots: s.shots,
+  clipOrder: s.clipOrder,
+  videoClips: s.videoClips,
+  audioClips: s.audioClips,
+  audioSources: s.audioSources,
+  audioTracks: s.audioTracks,
+  panelSizes: s.panelSizes,
+})
+
+/**
+ * 지금 편집 상태를 바로 저장한다 — 이 브라우저에 쓰고 서버 답까지 기다린다. Editor 를 처음 열 때 소리를 다 나눈 결과를
+ *   편집 화면을 열기 전에 남긴다(오너 2026-11-10 "DB에 다 올라왔을 때 내용이 보여지게"). 서버가 잠시 고장이면 뒤에서 다시 시도한다.
+ *   약속: tests/editor/first-open.test.ts
+ */
+export function saveEditorNow(projectId: string): Promise<ServerSaveResult | null> {
+  const snapshot: PersistedEditor = { version: 1, ...pickPersisted(useEditorStore.getState()) }
+  saveEditorStateNow(projectId, snapshot)
+  const generation = (serverSaveGenerations.get(projectId) ?? 0) + 1
+  serverSaveGenerations.set(projectId, generation)
+  serverSaveSnapshots.set(projectId, snapshot)
+  const timer = serverSaveTimers.get(projectId)
+  if (timer) clearTimeout(timer)
+  serverSaveTimers.delete(projectId)
+  return runServerSave(projectId, generation)
+}
+
+if (typeof window !== 'undefined') {
+  const pick = pickPersisted
   let prev = pick(useEditorStore.getState())
 
   useEditorStore.subscribe((state) => {
@@ -1626,6 +1685,10 @@ if (typeof window !== 'undefined') {
     // 아직 못 읽은 빈 편집 상태(비워짐 · 읽는 중 · 읽기 실패)는 저장하지 않는다(QA 2026-11-03 밤) — 프로젝트를 여는 길의 늦은 비우기가
     //   빈 상태를 막 연 프로젝트 이름으로 저장해 자른 조각 · 타이틀 카드 · 자막 · 오디오 배치를 덮었다(운영 3945d1e6 서버 편집 상태 샷 0).
     if (state.loadStatus !== 'ready' && state.shots.length === 0) return
+    // 편집 상태를 준비하는 동안(Editor 를 열 때 — 저장한 편집 되살리기, 처음이면 소리 나누기)은 저장하지 않는다(오너 2026-11-10).
+    //   반쯤 된 상태(오디오 · 파형 없음, 되살리기 전 DB 모습)가 저장되면 다음에 열 때 그것을 다 된 편집으로 읽는다.
+    //   처음 열 때는 다 나눈 뒤 saveEditorNow 가 한 번에 저장한다. 약속: tests/editor/first-open.test.ts
+    if (state.editorPrep) return
 
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return
