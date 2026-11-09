@@ -19,7 +19,7 @@ export function UploadedSheet({ url, alt }: { url: string; alt: string }) {
   }, [url])
   const box = uploadedSheetBox(tile ?? 'portrait')
   return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-md bg-white" data-testid="artist-uploaded-sheet" data-tile={tile ?? 'loading'}>
+    <div className="relative aspect-video w-full overflow-hidden rounded-[14px] bg-white" data-testid="artist-uploaded-sheet" data-tile={tile ?? 'loading'}>
       {/* eslint-disable-next-line @next/next/no-img-element -- 정적 시트 양식(빈 칸 · 칸 이름)을 그대로 깐다 */}
       <img src="/character-template.png" alt="" aria-hidden draggable={false} className="pointer-events-none absolute inset-0 size-full select-none object-fill" />
       {/* eslint-disable-next-line @next/next/no-img-element -- 사용자가 올린 원본(보관함 public URL)을 칸에 담는다 */}

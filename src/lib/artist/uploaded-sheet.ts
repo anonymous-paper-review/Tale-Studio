@@ -1,5 +1,5 @@
 // 브레이크다운에서 올린 인물 그림을 캐릭터 시트 틀에 담는 자리(오너 2026-11-10 "인물 이미지 입력하면 … 캐릭터 시트에 담아서 제공해줘.
-//   (빈 곳은 그대로 놔둠)"). 시트는 카드에 보이는 모습일 뿐 새 그림 파일이 아니다 — 뒤 단계는 올린 원본을 그대로 쓴다.
+//   (빈 곳은 그대로 놔둠)"). 시트는 카드 · 인물 상세 창에 보이는 모습일 뿐 새 그림 파일이 아니다 — 뒤 단계는 올린 원본을 그대로 쓴다.
 //   칸 좌표는 시트 양식 v4(sheet-template)가 정본이다. 약속: tests/artist/uploaded-sheet.test.ts
 import { CHARACTER_SHEET_SPEC, turnaroundSlots } from '@/lib/artist/sheet-template'
 

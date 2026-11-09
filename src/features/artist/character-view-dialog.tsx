@@ -9,10 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ThumbImage } from '@/components/thumb-image'
 import { AiBusyOverlay } from '@/components/ai-busy-overlay'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
+import { UploadedSheet } from '@/features/artist/uploaded-sheet'
 import { DescriptionBox, DetailFrame, DetailSection, HistoryButton, RegenerateDialog, artistDetailTitleKey, lookAfterDelete } from '@/features/artist/detail-parts'
 import { sameCharacterAppearanceSlot, useArtistStore } from '@/stores/artist-store'
 import { useWriterStore } from '@/stores/writer-store'
 import { useProducerStore } from '@/stores/producer-store'
+import { useProjectStore } from '@/stores/project-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { CHARACTER_VIEW_LABELS, type CharacterViewKey } from '@/types/asset'
 import {
@@ -30,6 +32,7 @@ import { cn } from '@/lib/utils'
 import { useLocale, useT } from '@/lib/i18n'
 import { styleAnchorName } from '@/lib/style-anchor-name'
 import { appearanceLabel } from '@/lib/artist/look-label'
+import { isBreakdownUpload } from '@/lib/artist/style-versions'
 import { useHistoryStyle } from '@/features/artist-room/use-history-style'
 
 type Props = {
@@ -65,6 +68,7 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
   const retryCharacterViewSafe = useArtistStore((s) => s.retryCharacterViewSafe)
   const shots = useWriterStore((s) => s.shots)
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
+  const projectId = useProjectStore((s) => s.projectId)
   // 스타일 이름은 화면 언어로(2026-10-21). 직접 올린 그림체는 붙인 이름 그대로.
   const locale = useLocale()
   const styleLabel = useProducerStore((s) => {
@@ -170,6 +174,8 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
   const needsMain = isDirectional && !appearance.sheetUrl
   // 사람 main = 와이드 턴어라운드 시트 → 16:9 프레임으로 전체 표시(잘림 방지, #4).
   const isSheet = !isObject && view === 'main'
+  // 브레이크다운에서 올린 그림을 그대로 쓴 모습 — 카드처럼 흰 캐릭터 시트 틀에 담아 보이고, 밑 글도 올린 그림이라고 알린다(리드 2026-11-10).
+  const uploaded = isSheet && !!imageUrl && isBreakdownUpload(imageUrl, projectId)
   const defaultAppearance = char.appearances.find((item) => item.isDefault) ?? null
 
   const initialPrompt = appearance.appearanceNative || appearance.appearance || ''
@@ -302,12 +308,16 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
       </div>
       {manageError ? <p className="text-xs text-destructive">{manageError}</p> : null}
 
-      <ImagePlaceholder
-        label={view === 'main' ? '' : label}
-        aspectRatio={isSheet ? 'video' : 'square'}
-        imageUrl={imageUrl}
-        generating={isGenerating}
-      />
+      {uploaded && !isGenerating ? (
+        <UploadedSheet key={imageUrl} url={imageUrl} alt={t('{name} turnaround sheet', { name: char.name || t('Character') })} />
+      ) : (
+        <ImagePlaceholder
+          label={view === 'main' ? '' : label}
+          aspectRatio={isSheet ? 'video' : 'square'}
+          imageUrl={imageUrl}
+          generating={isGenerating}
+        />
+      )}
 
       {isSheet && !appearance.isDefault ? (
         <div className="flex flex-wrap gap-2">
@@ -328,7 +338,7 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
             ? t('Regenerating creates a new image.')
             : t('This generates the image.')
           : view === 'main'
-            ? styleLabel ? t('Turnaround sheet · style {style}', { style: styleLabel }) : t('Turnaround sheet')
+            ? uploaded ? t('Picture uploaded as a reference · used as is') : styleLabel ? t('Turnaround sheet · style {style}', { style: styleLabel }) : t('Turnaround sheet')
             : needsMain
               ? t('Directional views are generated from Main. Generate Main first.')
               : t('This view is regenerated based on the Main image.')}

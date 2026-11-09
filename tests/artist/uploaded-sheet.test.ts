@@ -6,9 +6,12 @@ import { describe, expect, it } from 'vitest'
 import { CHARACTER_SHEET_SPEC, turnaroundSlots } from '@/lib/artist/sheet-template'
 import { uploadedSheetBox, uploadedSheetTile } from '@/lib/artist/uploaded-sheet'
 import { UploadedSheet } from '@/features/artist/uploaded-sheet'
+import { translate } from '@/lib/i18n/translate'
 
 const UPLOAD = 'https://example.supabase.co/storage/v1/object/public/media/ws/p1/breakdown/soonja.png'
 const PANEL = 'src/features/artist/character-panel.tsx'
+const DIALOG = 'src/features/artist/character-view-dialog.tsx'
+const UPLOADED_CAPTION = 'Picture uploaded as a reference · used as is'
 const pct = (value: number, of: number) => Number(((value / of) * 100).toFixed(3))
 
 describe('올린 인물 그림을 담은 캐릭터 시트', () => {
@@ -58,5 +61,21 @@ describe('올린 인물 그림을 담은 캐릭터 시트', () => {
   it('AI가 그린 시트는 지금처럼 시트 그대로(확대경으로) 보인다', () => {
     // 왜: 정상 경로 고정 — 올린 그림을 그대로 쓴 카드만 틀에 담는다. 뒤 단계(Storyboard · Director)도 올린 원본을 그대로 쓴다.
     expect(readFileSync(PANEL, 'utf8')).toMatch(/<TurnaroundRegionCycle\s+url=\{appearance\.sheetUrl\}/)
+  })
+
+  it('인물 상세 창에서도 올린 그림을 그대로 쓴 모습은 올린 그림을 흰 캐릭터 시트 틀 안에 담아 보인다', () => {
+    // 왜: 리드 2026-11-10 — 카드는 시트인데 카드를 눌러 연 상세 창은 올린 원본이 16:9 칸에 잘려 머리가 잘려 보였다.
+    //   다시 만드는 중에는 다른 그림처럼 그리는 중 표시를 보인다(카드와 같다).
+    const dialog = readFileSync(DIALOG, 'utf8')
+    expect(dialog).toMatch(/const uploaded = isSheet && !!imageUrl && isBreakdownUpload\(imageUrl, projectId\)/)
+    expect(dialog).toMatch(/uploaded && !isGenerating \?\s*\(?\s*<UploadedSheet key=\{imageUrl\} url=\{imageUrl\}/)
+  })
+
+  it('상세 창에서 올린 그림을 담은 시트의 밑 글은 시트 · 스타일 대신 레퍼런스로 올린 그림을 그대로 쓴다고 알린다', () => {
+    // 왜: "Turnaround sheet · style 실사"는 AI가 그 스타일로 그린 시트라는 뜻이라 올린 그림에는 맞지 않는다.
+    //   낱말은 브레이크다운 레퍼런스 안내("레퍼런스로 올린 그림은 … 그대로 써요")와 같은 말을 쓴다(혼자 정한 것).
+    expect(translate('en', UPLOADED_CAPTION)).toBe('Picture uploaded as a reference · used as is')
+    expect(translate('ko', UPLOADED_CAPTION)).toBe('레퍼런스로 올린 그림 · 그대로 써요')
+    expect(readFileSync(DIALOG, 'utf8')).toMatch(/uploaded\s*\?\s*t\('Picture uploaded as a reference · used as is'\)\s*:\s*styleLabel/)
   })
 })
