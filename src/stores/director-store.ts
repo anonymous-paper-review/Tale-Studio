@@ -88,6 +88,8 @@ import { claimAction, releaseAction } from '@/lib/action-guard'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 import { directorBoardLabel, type BoardNodeNames } from '@/features/director/node-label'
+import { arrangeDirectorCanvas, ASSET_TO_SHOT_GAP } from '@/features/director/canvas-layout'
+import { ASSET_CARD_WIDTH } from '@/features/director/asset-column'
 import {
   DEFAULT_VIDEO_MODEL,
   DEFAULT_VIDEO_RESOLUTION,
@@ -1748,40 +1750,12 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       },
 
       // 자동 정렬 — 겹친 노드를 다이어그램 레이아웃으로 재배치.
-      //   [Asset 컬럼(좌)] - Scene - Shot 세로 - Video 세로, 각 scene 그룹은 좌우로 분리.
-      //   그룹 폭에 asset 컬럼(좌)·video(우) 공간을 포함해 asset이 옆 그룹과 안 겹치게 한다.
-      //   in-memory 즉시 적용 + nodeId별 persist로 DB(canvas_position) 반영(재진입 유지).
-      //   asset 노드는 scene 좌측 파생이므로 재배치 후 rebuildAssetNodes로 갱신.
+      //   규칙은 canvas-layout.ts(오너 2026-11-10 "피그마 자료처럼 조금 가깝게"): 11/5 시안 D1 · DG 간격(열 96 · 줄 56 · 에셋 35 ·
+      //   에셋 → 샷 116 · 씬 묶음 160)으로, 화면이 잰 카드 크기를 세어 겹치지 않게 놓는다.
+      //   in-memory 즉시 적용 + 씬 · 샷 · 영상은 nodeId별 persist로 DB(canvas_position) 반영(재진입 유지). 에셋 자리는 DB 에 없다.
       relayoutCanvas: () => {
         get().commitHistory()
-        // 그룹 폭 = asset 컬럼(좌) + scene→shot + shot→video + video 노드/여백
-        const GROUP_WIDTH = ASSET_OFFSET_X + SHOT_OFFSET_X + VIDEO_OFFSET_X + 400
-        const state = get()
-        const scenes = state.nodes
-          .filter((n) => isSceneData(n.data))
-          .sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x)
-        const posById = new Map<string, XYPosition>()
-        scenes.forEach((scene, i) => {
-          // 첫 그룹부터 asset 컬럼 공간을 확보(scene을 asset 폭만큼 우측에서 시작)
-          const sx = 80 + ASSET_OFFSET_X + i * GROUP_WIDTH
-          const sy = 80
-          posById.set(scene.id, { x: sx, y: sy })
-          getChildShots(state, scene.id)
-            .sort((a, b) => a.position.y - b.position.y)
-            .forEach((shot, j) => {
-              const shx = sx + SHOT_OFFSET_X
-              const shy = sy + j * SHOT_OFFSET_Y
-              posById.set(shot.id, { x: shx, y: shy })
-              getChildVideos(state, shot.id)
-                .sort((a, b) => a.position.y - b.position.y)
-                .forEach((vid, k) => {
-                  posById.set(vid.id, {
-                    x: shx + VIDEO_OFFSET_X,
-                    y: shy + k * VIDEO_OFFSET_Y,
-                  })
-                })
-            })
-        })
+        const posById = arrangeDirectorCanvas(get().nodes)
         set((s) => ({
           nodes: s.nodes.map((n) => {
             const p = posById.get(n.id)
@@ -1789,8 +1763,11 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           }),
           lastSavedAt: Date.now(),
         }))
-        for (const id of posById.keys()) get().persistNodePosition(id)
-        // asset 컬럼·previz 체인을 새 위치 기준으로 재배치 (둘 다 파생 — 멱등 재생성)
+        for (const id of posById.keys()) {
+          const node = get().nodes.find((n) => n.id === id)
+          if (node && !isAssetData(node.data)) get().persistNodePosition(id)
+        }
+        // asset 컬럼·previz 체인을 새 위치 기준으로 다시 맞춘다(둘 다 파생이라 멱등 재생성, 에셋은 방금 놓은 자리를 그대로 쓴다).
         get().rebuildAssetNodes()
         get().rebuildShotChainNodes()
       },
@@ -3330,10 +3307,14 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           )
 
           const anchors = [...shots, ...nodes.filter((node) => isSceneData(node.data))]
+          // 처음 놓는 에셋 열: 샷이 있으면 첫 샷 열 왼쪽에 시안 간격(116)으로(오너 2026-11-10), 없으면 예전처럼 씬 왼쪽.
+          //   예전엔 숨은 씬 노드 기준이라 샷 열과 420 떨어졌다.
           const baseX =
-            (anchors.length > 0
-              ? Math.min(...anchors.map((node) => node.position.x))
-              : 400) - ASSET_OFFSET_X
+            shots.length > 0
+              ? Math.min(...shots.map((node) => node.position.x)) - ASSET_TO_SHOT_GAP - ASSET_CARD_WIDTH
+              : (anchors.length > 0
+                ? Math.min(...anchors.map((node) => node.position.x))
+                : 400) - ASSET_OFFSET_X
           let y =
             anchors.length > 0
               ? Math.min(...anchors.map((node) => node.position.y))
@@ -5715,9 +5696,10 @@ export function nextVideoPosition(
 export function nextScenePosition(
   state: Pick<DirectorCanvasState, 'nodes'>,
 ): XYPosition {
-  // 초기 배치를 '자동 정렬'(relayoutCanvas)과 동일하게(#d1 2026-07-18). 그룹 폭·시작 x 에
-  //   ASSET_OFFSET_X(좌측 asset 컬럼)를 포함해야 asset 노드가 옆 그룹과 겹치지 않는다.
+  // 처음 여는 기본 자리(#d1 2026-07-18). 그룹 폭·시작 x 에 ASSET_OFFSET_X(좌측 asset 컬럼)를 포함한 넉넉한 간격 그대로다.
   //   (옛 nextScenePosition 은 ASSET_OFFSET_X 를 빠뜨려 촘촘한 '예전 layout' 이 됐다.)
+  //   [자동 정렬]은 canvas-layout.ts 의 시안 간격으로 다시 놓는다(오너 2026-11-10). 기본 자리까지 줄이면 예전 간격으로
+  //   저장된 카드와 섞여 겹친다(개발 DB 77dfa43c: 저장된 두 번째 테이크가 다음 씬 샷과 겹침). 그래서 기본 자리는 그대로 둔다.
   const GROUP_WIDTH = ASSET_OFFSET_X + SHOT_OFFSET_X + VIDEO_OFFSET_X + 400
   const scenes = state.nodes.filter((n) => n.data.kind === 'scene')
   if (scenes.length === 0) return { x: 80 + ASSET_OFFSET_X, y: 80 }
