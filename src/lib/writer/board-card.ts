@@ -95,6 +95,18 @@ export function boardStoryFontSize(columns: number): string {
   return BOARD_STORY_FONT[clamped]
 }
 
+/** 그리는 카드의 기다림 모습 — light: 그림 칸의 예전 가벼운 표시 · card: 카드 전체를 덮는 기다림 카드 · card-compact: 설명을 뺀 좁은 기다림 카드. */
+export type CardWaitLook = 'none' | 'light' | 'card' | 'card-compact'
+
+// 보드가 잠긴 동안은 잠금 화면이 보드를 덮고, 러프는 여러 장을 한꺼번에 그려 카드마다 움직이는 Lumi 를 띄우면 그 수만큼 WebGL 이 생긴다 —
+//   잠금 없이 그리는 카드(더한 샷)만 11/5 SYS "노드 · 카드 위" 기다림 카드로 덮는다. 축척 5 · 6열 카드(174 · 143px)에는 설명까지 들어가지 않는다(11/9 실측).
+//   약속: tests/writer/card-wait-look.test.ts
+export function cardWaitLook({ drawing, boardLocked, columns }: { drawing: boolean; boardLocked: boolean; columns: number }): CardWaitLook {
+  if (!drawing) return 'none'
+  if (boardLocked) return 'light'
+  return columns >= 5 ? 'card-compact' : 'card'
+}
+
 export interface CardDialogue {
   speaker: string
   text: string

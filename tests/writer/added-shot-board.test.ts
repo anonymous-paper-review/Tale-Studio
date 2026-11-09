@@ -92,6 +92,8 @@ vi.mock('sonner', () => ({ toast: { info: vi.fn(), error: vi.fn(), success: vi.f
 
 import { toast } from 'sonner'
 import { AiBusyOverlay } from '@/components/ai-busy-overlay'
+import { NodeWaitCard } from '@/components/feedback/node-wait'
+import { GeneratingOverlay } from '@/components/generating-frame'
 import { RoughFrameCycle } from '@/components/rough-frame-cycle'
 import { AddItemDialog } from '@/features/writer/add-item-dialog'
 import { AddedRedrawStatus } from '@/features/writer/added-redraw-status'
@@ -168,6 +170,16 @@ function card(shotId: string): Element {
   const found = render().find((node) => node.type === 'article' && node.key === shotId)
   if (!found) throw new Error(`card ${shotId} not rendered`)
   return found
+}
+/** 알림(기다림 카드 · 그리는 중 띠 · 알림 칸)마다 그것을 감싼 "그리는 중" 표시(aria-busy)가 있는지 — 감싸여 있으면 화면 읽기 프로그램이 그 표시가 풀릴 때까지 알림을 미룰 수 있다. */
+function liveParts(node: ReactNode, insideBusy = false): Array<{ part: string; insideBusy: boolean }> {
+  if (Array.isArray(node)) return node.flatMap((child) => liveParts(child, insideBusy))
+  if (!isValidElement<Record<string, unknown>>(node)) return []
+  const part = node.type === NodeWaitCard ? 'NodeWaitCard'
+    : node.type === GeneratingOverlay && node.props.active === true ? 'GeneratingOverlay'
+      : node.props.role === 'status' ? `${String(node.type)}[role=status]` : null
+  const inner = liveParts(node.props.children as ReactNode, insideBusy || node.props['aria-busy'] === 'true')
+  return part ? [{ part, insideBusy }, ...inner] : inner
 }
 /** 카드 안에서 글이 같은 단추를 누른다. */
 function press(cardNode: Element, label: string) {
@@ -307,6 +319,27 @@ describe('보드의 더한 샷 카드 · 잠금 · 탭', () => {
     _setGenerationQueueSnapshotForTests({ projectId: PROJECT, jobs: [{ id: 'job-1', kind: 'shot_rough_storyboard', target: { writerShotIds: ['sh_01_02'] } } as never] })
     commit()
     expect(locked()).toBe(true)
+  })
+
+  // 왜: 검토 C 2(리드 2026-11-09) — 카드 위 기다림 카드는 바뀌면 읽어 주는 알림인데, "그리는 중" 표시가 그것을 감싸면 화면 읽기 프로그램이
+  //   그 표시가 풀릴 때(다 그렸을 때)까지 알림을 미룰 수 있다 — 다 그리면 알림도 사라져 끝내 읽히지 않는다. 잠긴 보드의 가벼운 표시도 같은 규칙이다.
+  it('그리는 카드는 그림 칸을 그리는 중으로 표시하고, 기다림 알림은 그 표시 밖에 두어 화면 읽기 프로그램이 미루지 않고 읽는다', () => {
+    board.views = new Map([['sh_01_02', { phase: 'requesting' }]])
+    commit()
+    expect(locked()).toBe(false)
+    const unlocked = card('sh_01_02')
+    expect(elements(unlocked.props.children as ReactNode).some((node) => node.props['aria-busy'] === 'true')).toBe(true)
+    expect(liveParts(unlocked).map(({ part }) => part)).toContain('NodeWaitCard')
+    expect(liveParts(unlocked).filter(({ insideBusy }) => insideBusy)).toEqual([])
+    // 잠긴 보드(더한 샷이 아닌 샷)의 가벼운 표시 — 그리는 중 띠도 그 표시 밖이다.
+    board.views = null
+    _setGenerationQueueSnapshotForTests({ projectId: PROJECT, jobs: [{ id: 'job-1', kind: 'shot_rough_storyboard', target: { writerShotIds: ['sh_01_02'] } } as never] })
+    commit()
+    expect(locked()).toBe(true)
+    const lockedCard = card('sh_01_02')
+    expect(elements(lockedCard.props.children as ReactNode).some((node) => node.props['aria-busy'] === 'true')).toBe(true)
+    expect(liveParts(lockedCard).map(({ part }) => part)).toContain('GeneratingOverlay')
+    expect(liveParts(lockedCard).filter(({ insideBusy }) => insideBusy)).toEqual([])
   })
 
   // 왜(혼자 정한 것): 대사 탭에서 고치는 중에 채팅으로 더한 샷이 그려지면 보드 탭으로 옮겨져 고치던 칸이 사라졌다 — 더한 샷 그리기는 탭을 바꾸지 않는다.
