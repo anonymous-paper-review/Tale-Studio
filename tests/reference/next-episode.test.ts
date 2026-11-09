@@ -550,6 +550,27 @@ describe('앞 화에서 다음 화 만들기', () => {
   })
 
   // 왜: 앞 화 장르를 고를 수 없는 말이면 엉뚱한 장르를 넣지 않는다 — 시작 화면에서 사람이 고른다.
+  // 왜: 앞 화 Writer [AI 다시 쓰기]로 장르를 바꿨으면 그 장르가 앞 화의 지금 장르다 — 시작 화면에서 고른 처음 장르가 아니다(검토 B2 #1).
+  it('앞 화에서 Writer 로 장르를 바꿨으면 다음 화는 바꾼 장르를 이어받는다', async () => {
+    mocks.rows.projects = {
+      ...(mocks.rows.projects as Record<string, unknown>),
+      entry_draft: { ...emptyEntryDraft(), picks: { mood: 'comedy', runtime: 'r60', level: 'grow', ratio: '9:16' }, startedAt: '2026-11-01T00:00:00.000Z' },
+    }
+    const run = mocks.rows.writer_runs as { state: Record<string, unknown> }
+    run.state = { ...run.state, genre: { genre: '로맨스', tone: [], targetEmotion: [], runtime_seconds: 60 } }
+
+    await POST(postRequest({ fromProjectId: 'prev-episode' }))
+
+    expect((mocks.updates[0].entry_draft as { picks: Record<string, unknown> }).picks.mood).toBe('romance')
+    expect(seriesOf().mood).toBe('romance')
+
+    // 실행 기록의 장르가 고를 수 있는 장르가 아니면 시작 화면에서 고른 장르로 돌아간다(맞추는 규칙은 같다).
+    mocks.updates = []
+    run.state = { ...run.state, genre: { genre: '로맨틱 스릴러 코미디', tone: [], targetEmotion: [], runtime_seconds: 60 } }
+    await POST(postRequest({ fromProjectId: 'prev-episode' }))
+    expect(seriesOf().mood).toBe('comedy')
+  })
+
   it('앞 화 장르를 알 수 없으면 다음 화 장르는 비워 둔다', async () => {
     mocks.rows.projects = {
       ...(mocks.rows.projects as Record<string, unknown>),

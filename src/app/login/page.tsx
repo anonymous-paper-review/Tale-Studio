@@ -154,6 +154,8 @@ export default function LoginPage() {
               type="email"
               autoComplete="email"
               className="h-12 rounded-lg bg-side-raised px-4"
+              // 자리표시는 글을 쓰면 사라진다 — 화면 읽기 이름을 따로 둔다(검토 B2 #2).
+              aria-label={t('Email')}
               placeholder={t('Email')}
               value={email}
               aria-invalid={!!errorMsg}
@@ -163,6 +165,7 @@ export default function LoginPage() {
               type="password"
               autoComplete="current-password"
               className="h-12 rounded-lg bg-side-raised px-4"
+              aria-label={t('Password')}
               placeholder={t('Password')}
               value={password}
               aria-invalid={!!errorMsg}
@@ -178,7 +181,7 @@ export default function LoginPage() {
               </p>
             ) : null}
             {errorMsg ? (
-              <p className="text-sm text-destructive">{t(errorMsg)}</p>
+              <p role="alert" className="text-sm text-destructive">{t(errorMsg)}</p>
             ) : null}
             <Button type="submit" className="mt-1.5 h-12 w-full rounded-lg" disabled={submitting || googleSubmitting}>
               {submitting ? t('Logging in…') : t('Log in')}

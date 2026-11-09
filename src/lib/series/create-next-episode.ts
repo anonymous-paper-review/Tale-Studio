@@ -192,19 +192,27 @@ export async function loadPrevEpisode(input: {
     locations: prevLocations(locations),
     voices: inheritedVoices(run?.state),
     lastSceneUrl,
-    mood: prevEpisodeMood(project.entry_draft, settings),
+    mood: prevEpisodeMood(text(asObject(asObject(run?.state)?.genre)?.genre), project.entry_draft, settings),
     style,
   }
 }
 
 /**
- * 앞 화 장르 — 새 시작 화면에서 고른 값(entry_draft)을 먼저, 없으면 예전 설정의 장르 글(settings.genre)을 장르 키 · 한국어 ·
- *   영어 이름과 맞춰 본다. 고를 수 있는 장르가 아니면 null(엉뚱한 장르를 넣지 않는다).
+ * 앞 화 장르 — 실행 기록의 장르(state.genre.genre)를 먼저 본다: Writer [AI 다시 쓰기]로 장르를 바꿨으면 그것이 앞 화의 지금
+ *   장르다(검토 B2 #1). 없거나 고를 수 있는 장르가 아니면 새 시작 화면에서 고른 값(entry_draft), 그다음 예전 설정의 장르 글
+ *   (settings.genre). 글은 장르 키 · 한국어 · 영어 이름과 맞춰 보고, 고를 수 있는 장르가 아니면 null(엉뚱한 장르를 넣지 않는다).
  */
-function prevEpisodeMood(entryDraft: unknown, settings: Record<string, unknown> | null): MoodKey | null {
+function prevEpisodeMood(runGenre: string, entryDraft: unknown, settings: Record<string, unknown> | null): MoodKey | null {
+  const fromRun = moodFromGenreText(runGenre)
+  if (fromRun) return fromRun
   const picked = entryDraft ? normalizeEntryDraft(entryDraft).picks.mood : null
   if (picked) return picked
-  const genre = typeof settings?.genre === 'string' ? settings.genre.trim().toLowerCase() : ''
+  return moodFromGenreText(typeof settings?.genre === 'string' ? settings.genre : '')
+}
+
+/** 장르 글 → 장르 키. 키 그대로이거나 한국어 · 영어 이름이면 그 장르, 아니면 null. */
+function moodFromGenreText(value: string): MoodKey | null {
+  const genre = value.trim().toLowerCase()
   if (!genre) return null
   const match = MOODS.find(
     (m) => m.key === genre || translate('en', m.label).toLowerCase() === genre || translate('ko', m.label).toLowerCase() === genre,
