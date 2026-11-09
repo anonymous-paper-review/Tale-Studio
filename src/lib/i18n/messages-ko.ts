@@ -2735,7 +2735,7 @@ export const KO: Record<string, string> = {
   'Go to Storyboard': 'Storyboard로 가기',
   'Images do not use Takes.': '그림은 Take가 들지 않아요.',
   'Looks that change by scene (clothes, age) can be added after the images are made, from the card details or in Storyboard.': '씬마다 다른 모습(옷 · 나이)은 그림을 만든 뒤 카드 상세나 Storyboard에서 더할 수 있어요.',
-  'Make it in {style}': '{style}로 만들기',
+  'Make it in {style}': '{style}{ro} 만들기',
   'Make the images for the characters and backgrounds that have none first.': '그림 없는 인물 · 배경을 먼저 만들어 주세요.',
   'Make': '만들기',
   'Making the images': '그림을 만들고 있어요',

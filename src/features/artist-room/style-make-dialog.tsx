@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ThumbImage } from '@/components/thumb-image'
 import { useLocale, useT } from '@/lib/i18n'
+import { directionParticle } from '@/lib/korean-particles'
 import { styleAnchorName } from '@/lib/style-anchor-name'
 import { cn } from '@/lib/utils'
 import { breakdownRows, rowsToDraw } from '@/lib/artist/breakdown'
@@ -163,13 +164,19 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={making}>{t('Cancel')}</Button>
             <Button onClick={() => void make()} disabled={!canMake} data-testid="artist-style-make-go">
               {making ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
-              {chosenLabel ? t('Make it in {style}', { style: chosenLabel }) : t('Make')}
+              {makeButtonText(t, chosenLabel)}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </>
   )
+}
+
+/** [만들기] 단추 글 — 한국어는 스타일 이름 받침에 맞춰 '으로 · 로'를 붙인다("3D 애니메이션으로 만들기").
+ *  스타일을 아직 고르지 않았으면 이름 없이 [만들기]. 약속: tests/artist/style-make-button.test.ts */
+export function makeButtonText(t: (text: string, params?: Record<string, string | number>) => string, style: string | null): string {
+  return style ? t('Make it in {style}', { style, ro: directionParticle(style) }) : t('Make')
 }
 
 /**
