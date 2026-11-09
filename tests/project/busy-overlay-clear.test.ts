@@ -32,7 +32,7 @@ function writer() {
   const chat = new Pane('채팅', { left: 1000, top: 0, right: 1440, bottom: 900 })
   return { prose, chat, relay: createScrollRelay(() => [prose, chat]) }
 }
-const wheel = (x: number, y: number, deltaY: number, deltaMode = 0) => ({ clientX: x, clientY: y, deltaX: 0, deltaY, deltaMode })
+const wheel = (x: number, y: number, deltaY: number, deltaMode = 0, ctrlKey = false) => ({ clientX: x, clientY: y, deltaX: 0, deltaY, deltaMode, ctrlKey })
 const touches = (x: number, y: number) => ({ touches: [{ clientX: x, clientY: y }] })
 
 describe('투명 덮개(scrim="clear")', () => {
@@ -90,6 +90,15 @@ describe('투명 덮개(scrim="clear")', () => {
     expect(viewport).toContain(`${AI_BUSY_SCROLL_ATTR}=""`)
     expect(root).not.toContain(AI_BUSY_SCROLL_ATTR)
     expect(readFileSync('src/components/layout/global-chat.tsx', 'utf8')).toMatch(/<ScrollArea\b[^>]*viewportProps=\{\{ \[AI_BUSY_SCROLL_ATTR\]: '' \}\}/)
+  })
+
+  // 왜: 검토 A2 N2 — 트랙패드 오므리기 · Ctrl+휠은 확대 · 축척(Artist 보드)이다. 아래 칸을 스크롤하면 안 된다.
+  it('Ctrl 을 누른 채 굴린 휠(트랙패드 오므리기)은 아래 칸으로 넘기지 않는다', () => {
+    const { prose, relay } = writer()
+    relay.wheel(wheel(400, 500, 120, 0, true))
+    expect(prose.scrolled.y).toBe(0)
+    relay.wheel(wheel(400, 500, 120))
+    expect(prose.scrolled.y).toBe(120)
   })
 
   // 왜: 산문 칸 안에 작은 스크롤 칸(문단 목록 등)이 있으면 손이 닿은 안쪽 칸이 움직여야 한다.

@@ -37,7 +37,9 @@ function paneAt<T extends ScrollPane>(panes: ArrayLike<T>, x: number, y: number)
 export function createScrollRelay<T extends ScrollPane>(panes: () => ArrayLike<T>) {
   let drag: { pane: T; x: number; y: number } | null = null
   return {
-    wheel(e: Point & { deltaX: number; deltaY: number; deltaMode: number }) {
+    wheel(e: Point & { deltaX: number; deltaY: number; deltaMode: number; ctrlKey?: boolean }) {
+      // 트랙패드 오므리기 · Ctrl+휠은 확대 · 축척(Artist 보드)이다 — 아래 칸을 스크롤하지 않는다(검토 A2 N2).
+      if (e.ctrlKey) return
       const pane = paneAt(panes(), e.clientX, e.clientY)
       if (!pane) return
       const k = e.deltaMode === 1 ? LINE_PX : e.deltaMode === 2 ? pane.clientHeight : 1
