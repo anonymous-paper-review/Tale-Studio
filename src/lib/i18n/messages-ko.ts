@@ -1207,6 +1207,9 @@ export const KO: Record<string, string> = {
   'Making videos': '영상 만드는 중',
   'Click to stop': '누르면 멈춰요',
   '{status}, click to stop': '{status}, 누르면 멈춰요',
+  // Director 넘기기 질문의 키 안내(단계 확인 단추와 같은 말, 2026-11-09)
+  'Start editing': '편집하기로',
+  'Edit more': '더 고칠래요',
   'Making the video': '영상을 만들고 있어요',
   'Up next: {names}': '다음 차례: {names}',
   '{names} and {count} more': '{names} 외 {count}개',

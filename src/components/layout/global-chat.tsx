@@ -1577,7 +1577,14 @@ export function GlobalChat() {
                   //   [Editor로 넘기기](넘김 문장을 보낸다), 「아니요, 더 고칠래요」 = 예전 [나중에](접어 둔다). 약속: tests/director/editor-handoff-confirm.test.ts
                   <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
                     <StageConfirm stage="director" tone="chat" onConfirm={() => void handleSuggestionAction()} onRevise={deferSuggestion} />
-                    {suggestionOpen && <KeyHint dismissible={suggestion.dismissible !== false} />}
+                    {/* 키 안내도 새 단추와 같은 말로(리드 2026-11-09): Enter = 편집하기로, Esc = 더 고칠래요(접어 두기). */}
+                    {suggestionOpen && (
+                      <span className="text-[10px] text-muted-foreground">
+                        <kbd className="rounded border border-border bg-muted px-1">Enter</kbd> {t('Start editing')}
+                        {' · '}
+                        <kbd className="rounded border border-border bg-muted px-1">Esc</kbd> {t('Edit more')}
+                      </span>
+                    )}
                   </div>
                 ) : (suggestion.action || suggestion.dismissible !== false) && (
                   <div className="mt-2 flex flex-wrap items-center gap-2 px-1">

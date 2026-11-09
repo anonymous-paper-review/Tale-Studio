@@ -70,6 +70,15 @@ function renderChat(): Element[] {
   return elements(GlobalChat())
 }
 const buttonTexts = (nodes: Element[]) => nodes.filter((node) => node.type === Button).map(textOf)
+/** 키 안내 글 — 채팅의 KeyHint(안에서 만든 컴포넌트)는 펼쳐 읽고, 바로 그린 안내 줄은 그대로 읽는다. */
+function hintTexts(nodes: Element[]): string[] {
+  return nodes.flatMap((node) => {
+    if (typeof node.type === 'function' && node.type.name === 'KeyHint') {
+      return [textOf((node.type as (props: Record<string, unknown>) => ReactNode)(node.props))]
+    }
+    return node.type === 'span' && textOf(node).startsWith('Enter') ? [textOf(node)] : []
+  })
+}
 
 const PROJECT = 'handoff-confirm-project'
 const sendMessage = vi.fn(async () => {})
@@ -143,5 +152,23 @@ describe('같이 정한 것', () => {
 
     expect(confirm).toBeUndefined()
     expect(buttonTexts(nodes)).toEqual(expect.arrayContaining(['Storyboard로 넘기기', '나중에']))
+  })
+
+  // 왜: 단추가 「좋아요, 편집하기로」 · 「아니요, 더 고칠래요」로 바뀌었는데 키 안내는 "Enter 수락 · Esc 나중에"로 남아 말이 어긋났다(리드 2026-11-09).
+  it('Director 넘기기 질문의 키 안내는 새 단추와 같은 말이다 (Enter 편집하기로 · Esc 더 고칠래요)', () => {
+    const hints = hintTexts(renderChat())
+
+    expect(hints).toContain('Enter 편집하기로 · Esc 더 고칠래요')
+    expect(hints.some((hint) => hint.includes('수락') || hint.includes('나중에'))).toBe(false)
+  })
+
+  // 왜: 정상 경로 고정. 다른 단계의 넘기기 질문은 단추도 키 안내도 지금 그대로다.
+  it('다른 단계의 넘기기 질문 키 안내는 지금 그대로다 (Enter 수락 · Esc 나중에)', () => {
+    route.path = '/studio/artist'
+    ask('artist', 'Storyboard로 넘기기', 'Storyboard로 넘겨주세요')
+
+    const hints = hintTexts(renderChat())
+
+    expect(hints).toContain('Enter 수락 · Esc 나중에')
   })
 })
