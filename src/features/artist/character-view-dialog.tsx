@@ -29,6 +29,7 @@ import { useGuardedAction } from '@/hooks/use-guarded-action'
 import { cn } from '@/lib/utils'
 import { useLocale, useT } from '@/lib/i18n'
 import { styleAnchorName } from '@/lib/style-anchor-name'
+import { appearanceLabel } from '@/lib/artist/look-label'
 import { useHistoryStyle } from '@/features/artist-room/use-history-style'
 
 type Props = {
@@ -242,6 +243,8 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
 
   const title = t(artistDetailTitleKey(isObject ? 'object' : 'person'), { name: char.name })
   const timeLabel = appearance.narrativeTime ? t(appearance.narrativeTime === 'past' ? 'Past' : appearance.narrativeTime === 'future' ? 'Future' : 'Present') : ''
+  // 보이는 모습 이름 — 서버가 붙인 기본 모습 이름 "현재"는 화면 언어로(오너 2026-11-10). 이름 바꾸기 칸은 저장된 이름 그대로 연다.
+  const shownLabel = appearanceLabel(appearance, t)
 
   const left = (
     <>
@@ -278,9 +281,9 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
           </>
         ) : (
           <>
-            <span className="text-sm font-semibold">{isSheet ? appearance.label : label}</span>
+            <span className="text-sm font-semibold">{isSheet ? shownLabel : label}</span>
             {isSheet && appearance.isDefault ? <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground">{t('Base')}</span> : null}
-            {isSheet && timeLabel && timeLabel !== appearance.label ? <span className="text-xs text-muted-foreground">{timeLabel}</span> : null}
+            {isSheet && timeLabel && timeLabel !== shownLabel ? <span className="text-xs text-muted-foreground">{timeLabel}</span> : null}
             {descriptionChanged ? <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground">{t('Changed · remake to apply')}</span> : null}
             {isSheet ? (
               <Button size="icon" variant="ghost" className="size-7" aria-label={t('Rename')} title={t('Rename')} onClick={() => { setRenameDraft(appearance.label); setRenaming(true) }}>
@@ -363,14 +366,14 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
         <DetailSection title={t('Look description')}>
           {!appearance.isDefault && defaultAppearance ? (
             <DescriptionBox
-              caption={t('Base look · {label}', { label: defaultAppearance.label })}
+              caption={t('Base look · {label}', { label: appearanceLabel(defaultAppearance, t) })}
               value={defaultAppearance.appearanceNative || defaultAppearance.appearance || ''}
               readOnly
             />
           ) : null}
           <DescriptionBox
             key={`${char.characterId}:${appearanceKey}`}
-            caption={appearance.isDefault ? t('Base look · {label}', { label: appearance.label }) : t('Changed look · {label}', { label: appearance.label })}
+            caption={appearance.isDefault ? t('Base look · {label}', { label: shownLabel }) : t('Changed look · {label}', { label: shownLabel })}
             value={initialPrompt}
             placeholder={t("This character's appearance description")}
             changed={descriptionChanged}
@@ -388,11 +391,11 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
               return (
                 <li key={look.appearanceKey} className={cn('flex items-center gap-3 rounded-lg border border-border p-2', viewingThis && 'bg-accent/40')}>
                   <div className="h-12 w-20 shrink-0 overflow-hidden rounded-md border border-border bg-muted/40">
-                    {look.sheetUrl ? <ThumbImage src={look.sheetUrl} alt={look.label} className="size-full object-cover" /> : null}
+                    {look.sheetUrl ? <ThumbImage src={look.sheetUrl} alt={appearanceLabel(look, t)} className="size-full object-cover" /> : null}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
-                      {look.label}
+                      {appearanceLabel(look, t)}
                       {look.isDefault ? <span className="rounded-full border border-border px-1.5 text-[10px] font-normal text-muted-foreground">{t('Base')}</span> : null}
                       {!look.sheetUrl ? <span className="rounded-full border border-border px-1.5 text-[10px] font-normal text-muted-foreground">{t('No image')}</span> : null}
                     </p>
@@ -438,7 +441,7 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
   const footer = (
     <div className="flex w-full flex-wrap items-center justify-end gap-3">
       {descriptionChanged ? (
-        <p className="mr-auto text-xs text-muted-foreground">{t('Changed description · {label}. Remake it to apply it to the image.', { label: appearance.label })}</p>
+        <p className="mr-auto text-xs text-muted-foreground">{t('Changed description · {label}. Remake it to apply it to the image.', { label: shownLabel })}</p>
       ) : null}
       {descriptionChanged ? (
         <Button variant="outline" disabled={generate.locked} onClick={() => void redraw(initialPrompt)}>
@@ -455,7 +458,7 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
       <RegenerateDialog
         open={regenOpen}
         onOpenChange={setRegenOpen}
-        title={imageUrl ? t('{name} · {look}: make it again?', { name: char.name, look: appearance.label }) : t('{name} · {look}: make it?', { name: char.name, look: appearance.label })}
+        title={imageUrl ? t('{name} · {look}: make it again?', { name: char.name, look: shownLabel }) : t('{name} · {look}: make it?', { name: char.name, look: shownLabel })}
         intro={styleLabel ? t('It is made from the description below. The style ({style}) stays the same.', { style: styleLabel }) : t('It is made from the description below. The style stays the same.')}
         kind={isObject ? null : 'person'}
         description={prompt}
@@ -486,7 +489,7 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
         busy={generate.locked}
         onConfirm={() => void redraw(prompt)}
       />
-      <AiBusyOverlay open={redrawing} layer="dialog" title={t('Making the image')} description={t('{name} · {look}', { name: char.name, look: appearance.label })} />
+      <AiBusyOverlay open={redrawing} layer="dialog" title={t('Making the image')} description={t('{name} · {look}', { name: char.name, look: shownLabel })} />
     </>
   )
 }

@@ -12,6 +12,9 @@ import { CharacterViewDialog } from '@/features/artist/character-view-dialog'
 import { AppearanceCreateDialog } from '@/features/artist/appearance-create-dialog'
 import { CharacterDeleteButton } from '@/features/artist/character-delete-button'
 import { TurnaroundRegionCycle } from '@/features/artist/turnaround-region-cycle'
+import { UploadedSheet } from '@/features/artist/uploaded-sheet'
+import { appearanceLabel } from '@/lib/artist/look-label'
+import { isBreakdownUpload } from '@/lib/artist/style-versions'
 import { RegenCardMark, VersionBadge, lookChipClass, useCardVersion, useRegenCardMarks } from '@/features/artist/card-parts'
 import { sameCharacterAppearanceSlot, useArtistStore } from '@/stores/artist-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
@@ -287,7 +290,7 @@ export function CharacterPanel({
                   aria-pressed={active}
                   className={lookChipClass(active)}
                 >
-                  {ap.label}
+                  {appearanceLabel(ap, t)}
                 </button>
               )
             })}
@@ -315,12 +318,17 @@ export function CharacterPanel({
               className="relative block w-full overflow-hidden rounded-[14px] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
             >
               {/* 사람 시트는 hover 리전 순환(#d2) — 컨셉→디테일→스케치→표정을 잘라 옮겨
-                  다닌다. 생성 중·이미지 없음·사물은 기존 placeholder 경로 그대로. */}
+                  다닌다. 생성 중·이미지 없음·사물은 기존 placeholder 경로 그대로.
+                  브레이크다운에서 올린 그림을 그대로 쓴 모습은 그 그림을 흰 캐릭터 시트 틀에 담아 보인다(오너 2026-11-10, 빈 칸은 그대로). */}
               {!isObject && appearance?.sheetUrl && !isViewGenerating('main') ? (
-                <TurnaroundRegionCycle
-                  url={appearance.sheetUrl}
-                  alt={t('{name} turnaround sheet', { name: char.name || t('Character') })}
-                />
+                isBreakdownUpload(appearance.sheetUrl, projectId) ? (
+                  <UploadedSheet key={appearance.sheetUrl} url={appearance.sheetUrl} alt={t('{name} turnaround sheet', { name: char.name || t('Character') })} />
+                ) : (
+                  <TurnaroundRegionCycle
+                    url={appearance.sheetUrl}
+                    alt={t('{name} turnaround sheet', { name: char.name || t('Character') })}
+                  />
+                )
               ) : (
                 <ImagePlaceholder
                   label={isObject ? '' : t('Turnaround (all views)')}
