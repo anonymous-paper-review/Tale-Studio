@@ -4,9 +4,6 @@ import { useEffect, useMemo, useRef, useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Loader2,
-  Download,
-  FileArchive,
-  MonitorPlay,
   Play,
   Pause,
   ChevronLeft,
@@ -660,11 +657,8 @@ export default function PostPage() {
                 onClick={() => void handleWatchAll()}
                 title={t('Preload every clip, then play the whole timeline from the start')}
               >
-                {prefetching ? (
-                  <Loader2 className="size-3 animate-spin" />
-                ) : (
-                  <MonitorPlay className="size-3" />
-                )}
+                {/* 쉬는 동안은 글만(v3 11/5 판 ED1 — 타임라인 단추는 아이콘 없이). 받는 동안만 도는 원을 둔다. */}
+                {prefetching ? <Loader2 className="size-3 animate-spin" /> : null}
                 {prefetching
                   ? t('Preparing {done}/{total}…', prefetching)
                   : t('Watch all')}
@@ -704,11 +698,7 @@ export default function PostPage() {
                   }
                 }}
               >
-                {exportingZip ? (
-                  <Loader2 className="size-3 animate-spin" />
-                ) : (
-                  <FileArchive className="size-3" />
-                )}
+                {exportingZip ? <Loader2 className="size-3 animate-spin" /> : null}
                 {exportingZip ? t('Zipping…') : t('Shot ZIP')}
               </Button>
               <Button
@@ -722,11 +712,7 @@ export default function PostPage() {
                     : t('Concatenate every clip in order and save as one video file')
                 }
               >
-                {renderLabel ? (
-                  <Loader2 className="size-3 animate-spin" />
-                ) : (
-                  <Download className="size-3" />
-                )}
+                {renderLabel ? <Loader2 className="size-3 animate-spin" /> : null}
                 {renderLabel ?? t('Draft Render')}
               </Button>
             </div>

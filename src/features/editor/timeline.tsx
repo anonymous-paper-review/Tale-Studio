@@ -1155,8 +1155,9 @@ export function Timeline({
               )
             })}
 
+            {/* 빈 오디오 줄 안내 — 줄 간격은 글자 크기의 155%(v3 11/5 판 ED1). */}
             {audioClips.length === 0 && (
-              <p className="pointer-events-none absolute left-3.5 z-10 text-meta text-subtle-foreground" style={{ top: 20 + 96 + 24 }}>
+              <p className="pointer-events-none absolute left-3.5 z-10 text-meta leading-[1.55] text-subtle-foreground" style={{ top: 20 + 96 + 24 }}>
                 {t('Drag an Audio source, or upload with the + button in the top-right')}
               </p>
             )}
