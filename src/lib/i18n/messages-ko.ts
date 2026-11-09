@@ -2733,7 +2733,7 @@ export const KO: Record<string, string> = {
   '{names}: done': '{names} · 다 그렸어요',
   'Drawing {names}': '{names} 그리는 중',
   '{names}: waiting': '{names} 기다리는 중',
-  '{names} and {count} more': '{names} 외 {count}',
+  '{names} and {count} others': '{names} 외 {count}',
   'Draw the missing ones again, or close this and check the cards.': '안 나온 그림을 다시 그리거나, 닫고 카드에서 확인해 주세요.',
   'Remake the images that failed from each card.': '그리지 못한 그림은 카드에서 [다시 만들기]로 다시 그려 주세요.',
   'Drawing the images. You can complete once they are done.': '그림을 그리는 중이에요. 다 그리면 완료할 수 있어요.',

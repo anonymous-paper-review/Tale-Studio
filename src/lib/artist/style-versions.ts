@@ -471,7 +471,7 @@ export function regenStepLines(
   }
   const names = (list: string[]) => {
     const shown = list.slice(0, STEP_NAMES_SHOWN).join(' · ')
-    return list.length > STEP_NAMES_SHOWN ? translate(locale, '{names} and {count} more', { names: shown, count: list.length - STEP_NAMES_SHOWN }) : shown
+    return list.length > STEP_NAMES_SHOWN ? translate(locale, '{names} and {count} others', { names: shown, count: list.length - STEP_NAMES_SHOWN }) : shown
   }
   const lines: Array<{ label: string; state: 'done' | 'current' | 'todo' }> = []
   if (groups.done.length) lines.push({ label: translate(locale, '{names}: done', { names: names(groups.done) }), state: 'done' })
