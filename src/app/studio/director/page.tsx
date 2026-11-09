@@ -76,7 +76,7 @@ import { useQueueRehydrate } from '@/features/director/hooks/use-queue-rehydrate
 import { ShotNode } from '@/features/director/canvas-nodes/ShotNode'
 import { VideoNode } from '@/features/director/canvas-nodes/VideoNode'
 import { offerEditorHandoff } from '@/features/director/editor-handoff-nudge'
-import { videoBatchButtonText } from '@/features/director/video-batch-button'
+import { RUNNING_VIDEO_PILL, videoBatchButtonText } from '@/features/director/video-batch-button'
 import { AssetNode } from '@/features/director/canvas-nodes/AssetNode'
 import { PromptNode } from '@/features/director/canvas-nodes/PromptNode'
 import { CategoryEdge } from '@/features/director/canvas-edges/CategoryEdge'
@@ -899,6 +899,9 @@ function PaletteBar({
     failed: shownVideoProgress?.failed ?? 0,
     available: eligibleVideoCount,
   }, t)
+  // 단계 칠 위(도는 동안)에서는 숫자 · 실패 글을 칠 위 글자색으로: 흐린 회색 · 빨강은 파란 칠 위에서 안 읽힌다.
+  const videoCountTone = videoButton.tone === 'stage' ? 'text-stage-badge-foreground/80' : 'text-muted-foreground'
+  const videoFailTone = videoButton.tone === 'stage' ? 'text-stage-badge-foreground' : 'text-destructive'
   // D1 "The Set 노드 9 · 샷 4" — 캔버스에 보이는 노드와 그중 샷.
   const canvasMeta = directorCanvasMeta(nodes, t)
 
@@ -1049,6 +1052,7 @@ function PaletteBar({
             aria-busy={videoBatchBusy}
             className={cn(
               TOOLBAR_PILL,
+              videoButton.tone === 'stage' && RUNNING_VIDEO_PILL,
               videoBatchBusy && videoBatchCancelled && 'cursor-not-allowed opacity-70',
             )}
           >
@@ -1066,26 +1070,26 @@ function PaletteBar({
             <span>{videoButton.label}</span>
             {videoBatch ? (
               <>
-                <span aria-hidden className="text-muted-foreground">·</span>
-                <span className="font-num tabular-nums text-muted-foreground">
+                <span aria-hidden className={videoCountTone}>·</span>
+                <span className={cn('font-num tabular-nums', videoCountTone)}>
                   {videoBatch.done}/{videoBatch.total}
                 </span>
                 {videoBatch.failed > 0 && (
-                  <span className="text-destructive">
+                  <span className={videoFailTone}>
                     {t('{count} failed', { count: videoBatch.failed })}
                   </span>
                 )}
               </>
             ) : videoButton.count ? (
               <>
-                <span aria-hidden className="text-muted-foreground">·</span>
-                <span className="font-num tabular-nums text-muted-foreground">{videoButton.count}</span>
+                <span aria-hidden className={videoCountTone}>·</span>
+                <span className={cn('font-num tabular-nums', videoCountTone)}>{videoButton.count}</span>
               </>
             ) : null}
             {videoBatchBusy && videoBatchProgress && !videoBatch && (
               <>
                 {videoBatchProgress.failed > 0 && (
-                  <span className="text-destructive">
+                  <span className={videoFailTone}>
                     {t('{count} failed', { count: videoBatchProgress.failed })}
                   </span>
                 )}
@@ -1094,10 +1098,10 @@ function PaletteBar({
                   aria-valuemin={0}
                   aria-valuemax={videoBatchProgress.total}
                   aria-valuenow={videoBatchProgress.done}
-                  className="h-1 w-16 overflow-hidden rounded-full bg-card"
+                  className={cn('h-1 w-16 overflow-hidden rounded-full', videoButton.tone === 'stage' ? 'bg-stage-badge-foreground/25' : 'bg-card')}
                 >
                   <span
-                    className="block h-full bg-stage transition-[width]"
+                    className={cn('block h-full transition-[width]', videoButton.tone === 'stage' ? 'bg-stage-badge-foreground' : 'bg-stage')}
                     style={{
                       width:
                         videoBatchProgress.total > 0

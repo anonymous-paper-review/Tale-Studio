@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { translate } from '@/lib/i18n/translate'
-import { videoBatchButtonText } from '@/features/director/video-batch-button'
+import { RUNNING_VIDEO_PILL, videoBatchButtonText } from '@/features/director/video-batch-button'
 
 const t = (text: string, params?: Record<string, string | number>) => translate('ko', text, params)
 
@@ -38,5 +38,21 @@ describe('혼자 정한 것', () => {
     expect(videoBatchButtonText({ busy: true, cancelled: false, done: 2, total: 8, failed: 1, available: 0 }, t).ariaLabel)
       .toBe('영상 만드는 중 2/8 1개 실패, 누르면 멈춰요')
     expect(readFileSync('src/app/studio/director/page.tsx', 'utf8')).toContain('aria-label={videoButton.ariaLabel}')
+  })
+})
+
+describe('같이 정한 것', () => {
+  // 왜: 오너 2026-11-09 결정 10(추천대로): 시안 DG 처럼 도는 동안의 영상 단추를 단계 그라데이션으로 칠한다. 시안의 파란 빛은 넣지 않는다(design.md §9).
+  it('영상 묶음이 도는 동안 툴바 영상 단추는 단계 그라데이션으로 칠하고 빛은 넣지 않는다', () => {
+    expect(videoBatchButtonText({ busy: true, cancelled: false, done: 2, total: 8, available: 0 }, t).tone).toBe('stage')
+    expect(RUNNING_VIDEO_PILL).toContain('bg-stage-badge')
+    expect(RUNNING_VIDEO_PILL).not.toMatch(/shadow|glow|drop-shadow|ring/)
+    expect(readFileSync('src/app/studio/director/page.tsx', 'utf8')).toContain("videoButton.tone === 'stage' && RUNNING_VIDEO_PILL")
+  })
+
+  // 왜: 정상 경로 고정. 쉴 때와 멈추는 중(이미 낸 영상만 마저 받는 중)의 단추는 지금처럼 보통 알약이다.
+  it('쉴 때와 멈추는 중의 툴바 영상 단추는 지금처럼 보통 알약이다', () => {
+    expect(videoBatchButtonText({ busy: false, cancelled: false, done: null, total: null, available: 8 }, t).tone).toBe('plain')
+    expect(videoBatchButtonText({ busy: true, cancelled: true, done: 3, total: 8, available: 0 }, t).tone).toBe('plain')
   })
 })

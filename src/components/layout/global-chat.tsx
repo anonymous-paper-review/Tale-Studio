@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { StageConfirm } from '@/components/controls/stage-confirm'
 import { useImageUploadConsent } from '@/components/upload/image-upload-consent'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -1571,6 +1572,13 @@ export function GlobalChat() {
                   <WriterNextCard step={suggestion.action.step} />
                 ) : suggestion.action?.kind === 'artistVersions' ? (
                   <StyleReturnCard options={suggestion.action.options} regenerate={suggestion.action.regenerate} />
+                ) : suggestion.action?.kind === 'handoff' && suggestion.stage === 'director' ? (
+                  // Director 의 Editor 넘기기 질문은 시안의 단계 확인 단추(오너 2026-11-09 결정 1, 추천 ㉢): 「좋아요, 편집하기로」 = 예전
+                  //   [Editor로 넘기기](넘김 문장을 보낸다), 「아니요, 더 고칠래요」 = 예전 [나중에](접어 둔다). 약속: tests/director/editor-handoff-confirm.test.ts
+                  <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
+                    <StageConfirm stage="director" tone="chat" onConfirm={() => void handleSuggestionAction()} onRevise={deferSuggestion} />
+                    {suggestionOpen && <KeyHint dismissible={suggestion.dismissible !== false} />}
+                  </div>
                 ) : (suggestion.action || suggestion.dismissible !== false) && (
                   <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
                     {/* kind: 'choices' 는 여기 오지 않는다 — 입력창 앵커 선택지(#p4-choices v2) */}
