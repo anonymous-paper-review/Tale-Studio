@@ -9,12 +9,14 @@
 import { useEffect, useImperativeHandle, useRef, useState, useSyncExternalStore, type Ref } from 'react'
 import {
   detectWebGL,
+  lumiBox,
   lumiStageTheme,
   loadLumiScript,
   lumiRenderMode,
   lumiStillSrc,
   type LumiPersona,
   type LumiRenderMode,
+  type LumiSize,
   type LumiScriptStatus,
   type LumiState,
   type LumiVariant,
@@ -51,8 +53,8 @@ interface LumiViewProps {
   persona: LumiPersona
   state: LumiState
   variant?: LumiVariant
-  /** 가로 폭(px) — 큰 Lumi 는 3:2, 아바타는 정사각형. */
-  size: number
+  /** 크기 — SYS 이름(xl · l · m · s · xs · chat) 또는 너비(px). 큰 Lumi 상자는 1:0.77, 아바타는 정사각형. */
+  size: LumiSize | number
   /** 읽어 줄 이름. 없으면 꾸밈으로 보고 읽지 않는다. */
   label?: string
   className?: string
@@ -61,7 +63,7 @@ interface LumiViewProps {
 
 /** 정해진 모습(mode) 그대로 그린다 — 그림 또는 <lumi-persona> 태그. 상태(파일 · WebGL · 동작 줄이기)는 Lumi 가 정한다. */
 export function LumiView({ mode, persona, state, variant = 'full', size, label, className, elementRef }: LumiViewProps) {
-  const height = variant === 'full' ? Math.round((size * 2) / 3) : size
+  const { width, height } = lumiBox(size, variant)
   if (mode === 'still') {
     return (
       // eslint-disable-next-line @next/next/no-img-element -- 작은 정지 그림(webp)이라 이미지 최적화가 필요 없다.
@@ -69,27 +71,29 @@ export function LumiView({ mode, persona, state, variant = 'full', size, label, 
         src={lumiStillSrc(persona, state, variant)}
         alt={label ?? ''}
         aria-hidden={label ? undefined : true}
-        width={size}
+        width={width}
         height={height}
         draggable={false}
         className={cn('pointer-events-none select-none object-contain', className)}
-        style={{ width: size, height }}
+        style={{ width, height }}
       />
     )
   }
+  // 움직이는 Lumi 는 너비로만 크기를 정한다(가이드, 3:2) — SYS 상자(1:0.77) 가운데에 놓는다.
   return (
-    <lumi-persona
-      ref={elementRef}
-      persona={persona}
-      state={state}
-      variant={variant}
-      paused={mode === 'paused' ? '' : undefined}
-      aria-label={label}
-      // 사용자 정의 태그는 true 를 빈 값으로 적는다 — 읽지 않음은 글자 "true" 로 넘긴다.
-      aria-hidden={label ? undefined : 'true'}
-      className={className}
-      style={{ width: size }}
-    />
+    <span className={cn('inline-flex items-center justify-center', className)} style={{ width, height }}>
+      <lumi-persona
+        ref={elementRef}
+        persona={persona}
+        state={state}
+        variant={variant}
+        paused={mode === 'paused' ? '' : undefined}
+        aria-label={label}
+        // 사용자 정의 태그는 true 를 빈 값으로 적는다 — 읽지 않음은 글자 "true" 로 넘긴다.
+        aria-hidden={label ? undefined : 'true'}
+        style={{ width }}
+      />
+    </span>
   )
 }
 
@@ -97,8 +101,8 @@ interface LumiProps {
   persona?: LumiPersona
   state?: LumiState
   variant?: LumiVariant
-  /** 가로 폭(px). 기본 320(가이드 예시). */
-  size?: number
+  /** 크기 — SYS 이름(xl · l · m · s · xs) 또는 너비(px). 기본 320(가이드 예시). */
+  size?: LumiSize | number
   label?: string
   className?: string
   /** complete 처럼 한 번 재생하는 상태가 끝나 idle 로 돌아오면 알려 준다(가이드 statechange). */
@@ -158,28 +162,29 @@ export function Lumi({ persona = 'pearl', state = 'idle', variant = 'full', size
 interface LumiAvatarProps {
   persona: LumiPersona
   state?: LumiState
-  /** 지름(px). 채팅 말풍선 옆은 28(v3 Chat/Lumi Avatar). */
-  size?: number
+  /** 지름 — SYS 이름(채팅 xs 36 · 옆 채팅 chat 30) 또는 px. 기본은 옆 채팅(30). */
+  size?: LumiSize | number
   /** 둥근 바탕 없이 Lumi 만(채팅 머리). */
   bare?: boolean
   className?: string
 }
 
 /** 채팅 아바타 — 움직이지 않는 그림. 바탕은 그 단계 색 12%(가이드 .chat-avatar). */
-export function LumiAvatar({ persona, state = 'idle', size = 28, bare = false, className }: LumiAvatarProps) {
+export function LumiAvatar({ persona, state = 'idle', size = 'chat', bare = false, className }: LumiAvatarProps) {
+  const { width } = lumiBox(size, 'avatar')
   return (
     <span
       data-stage={lumiStageTheme(persona)}
       aria-hidden
       className={cn('inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full', !bare && 'bg-stage/12', className)}
-      style={{ width: size, height: size }}
+      style={{ width, height: width }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element -- 2KB 정지 그림(webp), 최적화 불필요 */}
       <img
         src={lumiStillSrc(persona, state, 'avatar')}
         alt=""
-        width={size}
-        height={size}
+        width={width}
+        height={width}
         draggable={false}
         className={cn('pointer-events-none select-none object-contain', bare ? 'size-full' : 'size-[86%]')}
       />

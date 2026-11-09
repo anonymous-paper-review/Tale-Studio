@@ -7,7 +7,7 @@ const twMerge = extendTailwindMerge<"text-gradient">({
   extend: {
     theme: {
       text: ["tag", "micro", "meta", "caption", "label", "chat", "body", "prose", "title", "display"],
-      shadow: ["panel", "node"],
+      shadow: ["panel", "node", "dialog", "loading"],
     },
     classGroups: {
       "bg-image": [{ bg: ["stage-badge", "stage-gradient", "pearl-vivid", "art-placeholder"] }],

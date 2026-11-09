@@ -31,11 +31,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { AiBusyCard } from '@/components/ai-busy-overlay'
 import { ChoiceChip, OptionCard, RecommendBadge } from '@/components/controls/choice-chip'
 import { StageChip } from '@/components/controls/stage-chip'
+import { StageConfirm } from '@/components/controls/stage-confirm'
+import { DoneBadge, NodeWaitCard, STAGE_FRAME } from '@/components/feedback/node-wait'
+import { ConfirmLumi } from '@/components/handoff/confirm-lumi'
 import { PageHeader } from '@/components/layout/page-header'
 import * as Icons from '@/components/icons/v3-icons'
 import { Lumi, LumiAvatar } from '@/components/lumi/lumi'
 import { STAGES } from '@/lib/constants'
-import { LUMI_PERSONAS, LUMI_STATES, STAGE_PERSONA, type LumiPersona, type LumiState } from '@/lib/lumi'
+import { LUMI_PERSONAS, LUMI_SIZE, LUMI_STATES, STAGE_PERSONA, type LumiPersona, type LumiSize, type LumiState } from '@/lib/lumi'
 
 type Swatch = { token: string; role: string }
 
@@ -309,19 +312,22 @@ export default function DesignShowcasePage() {
         </div>
       </Section>
 
-      <Section title="AI busy card · big Lumi" hint="components/ai-busy-overlay.tsx AiBusyCard — lumi given: v3 Loading Card (loading Lumi while busy, bar in the Lumi's stage gradient; error Lumi when stopped); no lumi: spinner as before">
-        <div className="grid gap-6 lg:grid-cols-3">
-          <AiBusyCard
-            title="Drawing the first roughs"
-            description="Lumi is splitting the story into shots."
-            progress={40}
-            steps={[
-              { label: 'Split into scenes and shots', state: 'done' },
-              { label: 'Draw rough frames', state: 'current' },
-              { label: 'Open the board', state: 'todo' },
-            ]}
-            lumi="storyboard"
-          />
+      <Section title="Loading card (11/5 SYS)" hint="components/ai-busy-overlay.tsx AiBusyCard — lumi given: Feedback/Loading Card (372 · Lumi L · steps ✓ ● ○ · bar). pearl = default (cream on the project list), six stages = stage colour. Stopped: error Lumi. No lumi: small spinner card as before">
+        <div className="grid justify-items-center gap-6 md:grid-cols-2 xl:grid-cols-4">
+          {(['pearl', 'producer', 'writer', 'artist', 'storyboard', 'director', 'editor'] as const).map((persona) => (
+            <AiBusyCard
+              key={persona}
+              title="Making it now"
+              description="Please wait a moment. It keeps going even if you close the window."
+              progress={64}
+              steps={[
+                { label: 'Read the request', state: 'done' },
+                { label: 'Making', state: 'current' },
+                { label: 'Finish', state: 'todo' },
+              ]}
+              lumi={persona}
+            />
+          ))}
           <AiBusyCard
             title="Could not write the draft"
             description="Try again in a moment."
@@ -330,6 +336,36 @@ export default function DesignShowcasePage() {
             footer={<Button size="sm">Try again</Button>}
           />
           <AiBusyCard title="Making the image" description="Minho · White shirt" />
+        </div>
+      </Section>
+
+      <Section title="Node waiting · done mark (11/5 SYS)" hint="components/feedback/node-wait.tsx — NodeWaitCard fills its node (padding 18 · Lumi S · stage border 1.5 · bar); DoneBadge + STAGE_FRAME for a finished node">
+        <div data-stage="director" className="flex flex-wrap gap-6">
+          <div className="relative h-[264px] w-[240px] rounded-[14px] bg-background shadow-node">
+            <NodeWaitCard lumi="director" title="Making the video" description="Shot 3 · I2V 4s · about 1 min left" progress={60} note="Next up: New shot → Shot 2" />
+          </div>
+          <div className={`flex h-[264px] w-[240px] flex-col gap-2 rounded-[14px] bg-background p-3 shadow-node ${STAGE_FRAME}`}>
+            <div className="flex items-center justify-between text-[11px] text-subtle-foreground">
+              <span>Video</span>
+              <DoneBadge />
+            </div>
+            <p className="text-[14px] font-semibold">Shot 1 · Video</p>
+            <div className="flex-1 rounded-[14px] bg-art-placeholder" />
+          </div>
+          <div className="relative h-[150px] w-[150px] rounded-[14px] bg-art-placeholder">
+            <NodeWaitCard lumi="artist" title="Drawing" progress={55} />
+          </div>
+        </div>
+      </Section>
+
+      <Section title="Stage confirm (11/5)" hint="components/controls/stage-confirm.tsx — stage = current stage id; left = next stage icon + label (cream), right = revise. tone=&quot;chat&quot; inside a Lumi bubble">
+        <div className="flex flex-col gap-4">
+          {STAGES.map((stage) => (
+            <StageConfirm key={stage.id} stage={stage.id} onConfirm={() => toast('Next')} onRevise={() => toast('Revise')} />
+          ))}
+          <div className="w-fit rounded-xl rounded-tl-[6px] bg-chat-lumi-bubble px-[22px] py-[18px]">
+            <StageConfirm stage="entry" tone="chat" onConfirm={() => toast('Next')} onRevise={() => toast('Revise')} />
+          </div>
         </div>
       </Section>
 
@@ -417,14 +453,36 @@ export default function DesignShowcasePage() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
+                <ConfirmLumi stage="writer" />
                 <DialogTitle>Hand over to Director?</DialogTitle>
                 <DialogDescription>The storyboard stays as it is. You can come back any time.</DialogDescription>
               </DialogHeader>
               <DialogFooter>
-                <Button variant="ghost">Cancel</Button>
+                <Button variant="secondary">Cancel</Button>
                 <Button>
                   Next: Director <ArrowRight />
                 </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="secondary">Open wide dialog</Button>
+            </DialogTrigger>
+            <DialogContent size="wide">
+              <DialogHeader>
+                <ConfirmLumi persona="pearl" />
+                <DialogTitle>Which style should we draw in?</DialogTitle>
+                <DialogDescription>Wide popup (748) for choices like the style picker.</DialogDescription>
+              </DialogHeader>
+              <div className="grid grid-cols-4 gap-3">
+                {['Real', '3D', 'Anime', 'Cartoon'].map((style) => (
+                  <OptionCard key={style} title={style} description="Example" />
+                ))}
+              </div>
+              <DialogFooter>
+                <Button variant="secondary">Cancel</Button>
+                <Button>Draw in Real</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -503,6 +561,27 @@ export default function DesignShowcasePage() {
           ))}
         </div>
         <Lumi persona={bigPersona} state="idle" size={240} label="Lumi" />
+      </Section>
+
+      <Section title="Lumi · sizes (11/5 SYS)" hint="lib/lumi.ts LUMI_SIZE — width, box 1 : 0.77. xl first greeting · l loading popup · page head · m popup title · s node waiting · xs chat avatar · chat side-chat avatar">
+        <div className="flex flex-wrap items-end gap-8">
+          {(['xl', 'l', 'm', 's'] as LumiSize[]).map((size) => (
+            <div key={size} className="flex flex-col items-center gap-2">
+              <Lumi persona="pearl" state="idle" size={size} />
+              <span className="font-num text-xs text-subtle-foreground">
+                {size.toUpperCase()} · {LUMI_SIZE[size]}
+              </span>
+            </div>
+          ))}
+          {(['xs', 'chat'] as LumiSize[]).map((size) => (
+            <div key={size} className="flex flex-col items-center gap-2">
+              <LumiAvatar persona="pearl" size={size} />
+              <span className="font-num text-xs text-subtle-foreground">
+                {size.toUpperCase()} · {LUMI_SIZE[size]}
+              </span>
+            </div>
+          ))}
+        </div>
       </Section>
 
       <Section title="Icons · v3 fill" hint="components/icons/v3-icons.tsx — currentColor, 24×24">

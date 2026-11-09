@@ -1,6 +1,6 @@
 // Lumi(디자이너 v3 캐릭터) — 페르소나 · 상태 · 그림 경로 · 큰 Lumi 를 어떻게 보일지 정하는 순수 함수들.
 //   화면 쪽은 components/lumi/lumi.tsx. 근거: Figma v3 Lumi 개발 가이드(lumi-persona.js · <lumi-persona> 태그).
-//   약속: tests/chat/lumi-persona.test.ts
+//   약속: tests/chat/lumi-persona.test.ts · tests/chat/lumi-size.test.ts
 import type { StageId } from '@/types'
 
 /** 가이드의 persona 값 — 시작(화이트 펄) · 여섯 단계 · 작품 완성. */
@@ -14,6 +14,19 @@ export const LUMI_STATES = ['idle', 'listening', 'thinking', 'complete', 'error'
 export type LumiState = (typeof LUMI_STATES)[number]
 
 export type LumiVariant = 'full' | 'avatar'
+
+/** Lumi 크기 이름(11/5 Figma SYS) — 너비(px). 첫 인사 xl · 기다리는 팝업 · 페이지 머리 l · 팝업 제목 위 m ·
+ *  노드 · 카드 위 기다림 s · 채팅 아바타 xs · 옆 채팅 아바타 chat. */
+export const LUMI_SIZE = { xl: 150, l: 100, m: 78, s: 56, xs: 36, chat: 30 } as const
+export type LumiSize = keyof typeof LUMI_SIZE
+/** 전신 Lumi 상자의 세로 ÷ 가로(SYS 1:0.77). 그림 · 움직이는 Lumi(3:2)는 이 상자 가운데에 맞춘다. */
+export const LUMI_BOX_RATIO = 0.77
+
+/** 그 크기의 상자 — 이름이면 SYS 너비, 숫자면 그 너비(예전 호출). 전신은 높이 = 너비 × 0.77, 아바타는 정사각형. */
+export function lumiBox(size: LumiSize | number, variant: LumiVariant = 'full'): { width: number; height: number } {
+  const width = typeof size === 'number' ? size : LUMI_SIZE[size]
+  return { width, height: variant === 'full' ? Math.round(width * LUMI_BOX_RATIO) : width }
+}
 
 /** 단계 id → 화면 이름과 같은 Lumi 옷. id 는 옛 이름이다(entry=Producer, producer=Writer, writer=Storyboard). */
 export const STAGE_PERSONA: Record<StageId, LumiStagePersona> = {

@@ -45,6 +45,9 @@
   /* 그림자는 아래로 떨어지는 것 하나만(브랜드 가이드 "효과는 아래 그림자 하나만") */
   --shadow-panel: 0 20px 50px rgb(0 0 0 / 0.4);
   --shadow-node: 0 8px 24px rgb(0 0 0 / 0.35);
+  /* 11/5 SYS — 팝업(0 30 80 · 55%) · 기다리는 카드(0 20 60 · 50%). */
+  --shadow-dialog: 0 30px 80px rgb(0 0 0 / 0.55);
+  --shadow-loading: 0 20px 60px rgb(0 0 0 / 0.5);
 
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -66,6 +69,9 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-subtle-foreground: var(--subtle-foreground);
+  --color-faint-foreground: var(--faint-foreground);
+  --color-progress-track: var(--progress-track);
+  --color-side: var(--side);
   --color-muted-foreground: var(--muted-foreground);
   --color-muted: var(--muted);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -166,6 +172,8 @@
   --muted: var(--card);
   --muted-foreground: #c2c0b6; /* Text 2 — 보조 글자 */
   --subtle-foreground: #8e8b82; /* 메타 · 힌트 · 자리표시 · 아직 안 연 단계 */
+  --faint-foreground: #5c5a55; /* 11/5 기다리는 카드의 남은 단계 기호(○) */
+  --progress-track: rgb(255 255 255 / 0.08); /* 11/5 진행 막대 바닥(기다리는 카드 · 노드 위 기다림) */
   --accent: var(--chip);
   --accent-foreground: var(--foreground);
   --destructive: #f24822; /* Danger — 상태 표시에만, 늘 아이콘과 함께 */

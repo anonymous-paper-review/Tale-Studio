@@ -7,8 +7,8 @@
 //   나갈 수 있다 — 작업은 서버에서 계속 돈다. 실패 안내(busy=false)로 바뀌면 다시 옮겨 갈 수 있다.
 //   document.body 로 띄운다 — 단계 화면 안에 그리면 뒤를 inert 로 막을 때 이 창의 버튼(다시 그리기 · 닫기)까지 막힌다.
 //   v3(2026-11-03 오너 "큰 Lumi 를 단계 넘어갈 때 기다리는 화면에"): lumi 를 주면 도는 원 자리에 큰 Lumi(일하는 동안 loading,
-//   실패 안내면 error)가 서고 카드는 v3 기다리는 카드(Content/Loading Card) 모습이 된다. 안 주면 예전 그대로.
-//   약속: tests/project/busy-overlay-lumi.test.ts
+//   실패 안내면 error)가 서고 카드는 기다리는 카드 모습이 된다 — 11/5 부터 Feedback/Loading Card(SYS 로딩 팝업, 372 · Lumi L ·
+//   단계 ✓ · ● · ○ · 막대). 안 주면 예전 작은 카드 그대로. 약속: tests/project/busy-overlay-lumi.test.ts · tests/project/loading-card.test.ts
 //   위 막대의 프로젝트 이름 칸은 막지 않고 덮지도 않는다(v3 2단계 2026-11-03) — 예전 레일 홈 카드처럼 일하는 동안에도 이름을 바꾼다.
 //   무엇을 막고 남기는지는 lib/ai-busy-lock 한 곳(약속: tests/project/ai-busy-rename.test.ts).
 import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
@@ -129,7 +129,7 @@ export function AiBusyOverlay({ open, title, description, steps, progress, progr
 }
 
 
-/** 잠금 카드 — 덮개 안의 내용(큰 Lumi 또는 도는 원 · 제목 · 설명 · 진행 · 단계 · 단추). 포털 · 잠금 없이 그리기만 한다. */
+/** 잠금 카드 — 덮개 안의 내용(큰 Lumi 또는 도는 원 · 제목 · 설명 · 단계 · 진행 · 단추). 포털 · 잠금 없이 그리기만 한다. */
 export function AiBusyCard({
   title,
   description,
@@ -142,54 +142,82 @@ export function AiBusyCard({
 }: Omit<AiBusyOverlayProps, 'open' | 'layer'>) {
   const t = useT()
   const pct = typeof progress === 'number' && Number.isFinite(progress) ? Math.max(0, Math.min(100, Math.round(progress))) : null
-  return (
-    <div
-      // v3 기다리는 카드(Content/Loading Card) — 모서리 26 · 안쪽 30/36/26 · 사이 12 · 폭 440 · 그림자 하나. 진행 막대(폭 300)는
-      //   Lumi 가 입은 단계 색 기울기(data-stage) — Lumi 와 막대가 같은 단계를 말한다. 화이트 펄 · 완성은 놓인 화면의 색.
-      data-stage={lumi ? lumiStageTheme(lumi) : undefined}
-      className={cn(
-        'flex w-full flex-col',
-        lumi
-          ? 'max-w-[440px] items-stretch gap-3 rounded-[26px] bg-panel px-9 pb-[26px] pt-[30px] shadow-panel'
-          : 'max-w-md gap-4 rounded-xl border border-border bg-card p-6 shadow-lg',
-      )}
-    >
-      {lumi ? (
-        // 큰 Lumi(3:2) 아래 제목(22/700) · 설명을 가운데로. 일하는 동안 loading, 멈추면 error(가이드 상태).
-        <div className="flex flex-col items-center gap-1.5 text-center">
-          <Lumi persona={lumi} state={busy ? 'loading' : 'error'} size={240} />
-          <h2 className="mt-1.5 text-[22px] font-bold leading-[1.3] tracking-[-0.01em]">{title}</h2>
-          <p className="text-caption text-muted-foreground">
-            {description ?? t('While AI is working, the screen and chat are locked. You can edit once it finishes.')}
-          </p>
+  const lockNote = description ?? t('While AI is working, the screen and chat are locked. You can edit once it finishes.')
+  if (lumi) {
+    return (
+      <div
+        // 11/5 기다리는 카드(Feedback/Loading Card · SYS 로딩 팝업) — 폭 372 · 안쪽 50/30 · 사이 15 · 모서리 20 · 그림자 하나.
+        //   Lumi(L) → 제목(16 Bold) → 설명(12.5) → 단계(✓ 흰 · ● 단계 색 · ○ 흐림) → 진행 막대(4 · 모서리 2).
+        //   색은 Lumi 가 입은 옷(data-stage) — 화이트 펄 · 완성은 놓인 화면의 색(프로젝트 목록이면 크림 = 시안의 "기본").
+        data-stage={lumiStageTheme(lumi)}
+        className="flex w-full max-w-[372px] flex-col items-center gap-[15px] rounded-[20px] bg-side px-[30px] py-[50px] text-center shadow-loading"
+      >
+        {/* 일하는 동안 loading, 멈추면 error(가이드 상태). */}
+        <Lumi persona={lumi} state={busy ? 'loading' : 'error'} size="l" />
+        <div className="flex w-full flex-col items-center gap-[9px]">
+          <h2 className="text-[16px] font-bold leading-[1.2] text-foreground">{title}</h2>
+          <p className="text-caption leading-[1.55] text-subtle-foreground">{lockNote}</p>
         </div>
-      ) : (
-        <div className="flex items-start gap-3">
-          {busy ? (
-            <Loader2 className="mt-0.5 size-5 shrink-0 animate-spin text-muted-foreground motion-reduce:animate-none" aria-hidden />
-          ) : (
-            <AlertCircle className="mt-0.5 size-5 shrink-0 text-destructive" aria-hidden />
-          )}
-          <div className="flex flex-col gap-1">
-            <h2 className="text-lg font-medium leading-7">{title}</h2>
-            <p className="text-sm text-muted-foreground">
-              {description ?? t('While AI is working, the screen and chat are locked. You can edit once it finishes.')}
-            </p>
+        {steps && steps.length > 0 ? (
+          <ol className="flex w-full flex-col gap-3 p-3 text-left">
+            {steps.map((step, i) => {
+              // 멈춘 일(busy=false)의 지금 줄은 단계 색으로 칠하지 않는다 — 아직 하는 중처럼 보이지 않게(2026-10-27 QA).
+              const live = step.state === 'current' && busy
+              return (
+                <li key={`${i}-${step.label}`} className="flex items-center gap-2.5 text-[13px] font-medium leading-tight">
+                  <span
+                    aria-hidden
+                    className={cn(
+                      'w-[11px] shrink-0 font-num text-xs font-semibold leading-none',
+                      step.state === 'done' && 'text-foreground',
+                      live && 'text-stage',
+                      step.state === 'current' && !busy && 'text-subtle-foreground',
+                      step.state === 'todo' && 'text-faint-foreground',
+                    )}
+                  >
+                    {step.state === 'done' ? '✓' : step.state === 'current' ? '●' : '○'}
+                  </span>
+                  <span className={step.state === 'todo' ? 'text-subtle-foreground' : 'text-foreground'}>{step.label}</span>
+                </li>
+              )
+            })}
+          </ol>
+        ) : null}
+        {pct !== null ? (
+          <div className="h-1 w-full overflow-hidden rounded-[2px] bg-progress-track" aria-hidden>
+            <div className="h-full rounded-[2px] bg-stage-gradient transition-[width] duration-350 ease-out" style={{ width: `${pct}%` }} />
           </div>
+        ) : null}
+        {progressLabel ? <p className="font-num text-micro tabular-nums text-subtle-foreground">{progressLabel}</p> : null}
+        {footer ? <div className="flex flex-wrap justify-center gap-2">{footer}</div> : null}
+      </div>
+    )
+  }
+  return (
+    <div className="flex w-full max-w-md flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-lg">
+      <div className="flex items-start gap-3">
+        {busy ? (
+          <Loader2 className="mt-0.5 size-5 shrink-0 animate-spin text-muted-foreground motion-reduce:animate-none" aria-hidden />
+        ) : (
+          <AlertCircle className="mt-0.5 size-5 shrink-0 text-destructive" aria-hidden />
+        )}
+        <div className="flex flex-col gap-1">
+          <h2 className="text-lg font-medium leading-7">{title}</h2>
+          <p className="text-sm text-muted-foreground">{lockNote}</p>
         </div>
-      )}
+      </div>
       {pct !== null || progressLabel ? (
-        <div className={cn('flex flex-col gap-1.5', lumi && 'mx-auto w-full max-w-[300px] text-center')}>
+        <div className="flex flex-col gap-1.5">
           {pct !== null ? (
-            <div className={cn('h-1.5 w-full overflow-hidden rounded-full', lumi ? 'bg-card' : 'bg-muted')} aria-hidden>
-              <div className={cn('h-full rounded-full transition-[width] duration-350 ease-out', lumi ? 'bg-stage-gradient' : 'bg-primary')} style={{ width: `${pct}%` }} />
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden>
+              <div className="h-full rounded-full bg-primary transition-[width] duration-350 ease-out" style={{ width: `${pct}%` }} />
             </div>
           ) : null}
           {progressLabel ? <p className="font-mono text-xs tabular-nums text-muted-foreground">{progressLabel}</p> : null}
         </div>
       ) : null}
       {steps && steps.length > 0 ? (
-        <ol className={cn('flex flex-col gap-1.5 text-sm', lumi && 'rounded-xl bg-card px-4 py-3 text-left')}>
+        <ol className="flex flex-col gap-1.5 text-sm">
           {steps.map((step, i) => (
             <li
               key={`${i}-${step.label}`}

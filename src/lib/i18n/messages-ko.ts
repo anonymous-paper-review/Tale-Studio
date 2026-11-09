@@ -2485,6 +2485,15 @@ export const KO: Record<string, string> = {
   'Prose confirmed. Artist is opening.': '산문을 확정했어요. Artist로 가요.',
   'Yes, go to the next step': '좋아요, 다음 단계로',
   'No, I want to edit more': '아니요, 더 고칠래요',
+  // 11/5 단계 확인 단추(Control/Stage Confirm) — 다음 단계에서 하는 일
+  'Yes, write the prose': '좋아요, 산문 쓰기로',
+  'Yes, draw the images': '좋아요, 그림 그리기로',
+  'Yes, plan the storyboard': '좋아요, 콘티 짜기로',
+  'Yes, start directing': '좋아요, 연출하기로',
+  'Yes, start editing': '좋아요, 편집하기로',
+  'Yes, finish it': '좋아요, 완성하기',
+  // 11/5 SYS 완성 표시
+  '✓ Complete': '✓ 완성',
   'Ask for a rewrite': '다시 써 달라고 하기',
   'Edit it myself': '직접 고치기',
   'I will say it in the chat': '채팅으로 말할게요',

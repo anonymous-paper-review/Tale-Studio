@@ -89,6 +89,15 @@ export function ShareIcon(props: IconProps) {
   )
 }
 
+/** AI — 반짝이는 별(11/5 Figma icon-fill/ai) */
+export function AiIcon(props: IconProps) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 3.74933L13.9444 9.16599L19 11.2493L13.9444 13.3327L12 18.7493L10.0556 13.3327L5 11.2493L10.0556 9.16599L12 3.74933Z" />
+    </svg>
+  )
+}
+
 /** 내보내기 — 아래 화살표 */
 export function ExportIcon(props: IconProps) {
   return (
