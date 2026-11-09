@@ -9,10 +9,13 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { Lightbulb, Lock, Paperclip, PenLine, Send } from 'lucide-react'
 import { ChoiceChip, OptionCard } from '@/components/controls/choice-chip'
+import { Lumi } from '@/components/lumi/lumi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { STAGE_LABEL } from '@/lib/constants'
 import { useT } from '@/lib/i18n'
+import { STAGE_PERSONA } from '@/lib/lumi'
 import { cn } from '@/lib/utils'
 import { type EntryDraft } from '@/lib/entry/draft'
 import {
@@ -60,10 +63,12 @@ export function EntryChat() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {sent ? <ChipsBar draft={draft} t={t} /> : null}
+      {/* 보내기 전에도 보인다(11/5 시안 P1, 리드 결정) — 칸 이름 · "아직"은 그대로, 지금 묻는 칸 표시는 보낸 뒤부터. */}
+      <ChipsBar draft={draft} sent={sent} t={t} />
       <div ref={threadRef} className="min-h-0 flex-1 overflow-y-auto">
         {/* 대화 줄 사이 28(11/5 시안 P1 · P2) */}
         <div className="mx-auto flex w-full max-w-2xl flex-col gap-7 px-6 py-6" aria-live="polite">
+          <ChatHero t={t} />
           {items.map((item) => (
             <ChatRow key={item.id} item={item} draft={draft} t={t} />
           ))}
@@ -81,23 +86,39 @@ export function EntryChat() {
   )
 }
 
-function ChipsBar({ draft, t }: { draft: EntryDraft; t: Translator }) {
+/** 첫 인사 위 머리(11/5 시안 P1) — 큰 Lumi(Producer 옷, XL) · 단계 칩 · "Lumi와 기획해요". 대화가 길어지면 위로 밀려 올라간다. */
+function ChatHero({ t }: { t: Translator }) {
+  return (
+    <div data-testid="entry-chat-hero" className="flex flex-col items-center gap-2.5">
+      <Lumi persona={STAGE_PERSONA.entry} state="idle" size="xl" />
+      <div className="flex items-center gap-2">
+        <span className="rounded-full bg-stage px-2.5 py-1 text-micro font-semibold leading-none text-on-stage">{STAGE_LABEL.entry}</span>
+        <span className="text-label font-medium text-muted-foreground">{t('Plan with Lumi')}</span>
+      </div>
+    </div>
+  )
+}
+
+function ChipsBar({ draft, sent, t }: { draft: EntryDraft; sent: boolean; t: Translator }) {
   const reask = useEntryStore((s) => s.chatReask)
   return (
     <nav aria-label={t('What we have decided so far')} className="shrink-0 border-b border-border-subtle bg-background">
       <div className="mx-auto flex w-full max-w-2xl flex-wrap gap-1.5 px-6 py-3">
-        {chatChips(draft, t).map((chip) => (
+        {chatChips(draft, t).map((chip) => {
+          // 아직 아무것도 묻지 않았으면(보내기 전) 지금 묻는 칸이 없다.
+          const current = sent && chip.current
+          return (
           <button
             key={chip.key}
             type="button"
             onClick={() => void reask(chip.key)}
             disabled={!chip.value}
             title={chip.value ? t('Click to choose again') : undefined}
-            aria-current={chip.current ? 'step' : undefined}
+            aria-current={current ? 'step' : undefined}
             // 지금 묻는 칸은 지금 단계 색 테두리 · 18% 바탕(v3 고른 칩과 같은 규칙), 아직 못 정한 칸은 흐린 글자.
             className={cn(
               'inline-flex min-h-7 items-center gap-1.5 rounded-full border-[1.5px] px-3 py-0.5 text-caption outline-none transition-colors duration-100 ease-out focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default',
-              chip.current ? 'border-stage bg-stage/18' : 'border-transparent bg-card',
+              current ? 'border-stage bg-stage/18' : 'border-transparent bg-card',
               chip.value ? 'hover:bg-accent' : 'text-subtle-foreground',
             )}
           >
@@ -105,7 +126,8 @@ function ChipsBar({ draft, t }: { draft: EntryDraft; t: Translator }) {
             <span className="text-muted-foreground">{chip.label}</span>
             <span className={chip.value ? 'font-semibold text-foreground' : ''}>{chip.value ?? t('Not yet')}</span>
           </button>
-        ))}
+          )
+        })}
       </div>
     </nav>
   )

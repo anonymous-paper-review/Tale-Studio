@@ -231,12 +231,13 @@ export function useUploadErrorMessage(): (error: UploadError) => string {
 
 /**
  * Producer 에이전트 말풍선 — 오른쪽 채팅과 같은 Lumi 말풍선(v3: Lumi 얼굴 · 단계 색 이름 · 왼쪽 위 모서리 6).
- *   11/5 시안(P1 · P2): 얼굴과 말풍선 사이 12 · 안쪽 18/22 · 줄 사이 12 · 모서리 18. roomy = 정리 카드처럼 표가 든 말풍선(안쪽 20/30 · 사이 15).
+ *   11/5 시안(P1 · P2): 얼굴은 채팅 아바타 XS(36) · 얼굴과 말풍선 사이 12 · 안쪽 18/22 · 줄 사이 12 · 모서리 18.
+ *   roomy = 정리 카드처럼 표가 든 말풍선(안쪽 20/30 · 사이 15).
  */
 export function AgentBubble({ children, alert, roomy }: { children: ReactNode; alert?: boolean; roomy?: boolean }) {
   return (
     <div className="flex max-w-[88%] items-start gap-3">
-      <LumiAvatar persona={STAGE_PERSONA.entry} state={alert ? 'error' : 'idle'} size={28} />
+      <LumiAvatar persona={STAGE_PERSONA.entry} state={alert ? 'error' : 'idle'} size="xs" />
       <div
         role={alert ? 'alert' : undefined}
         className={cn(
