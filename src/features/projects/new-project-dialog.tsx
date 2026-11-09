@@ -168,7 +168,7 @@ export function NewProjectDialog({
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={t('Find by project name')}
                   aria-label={t('Find by project name')}
-                  className="h-11 rounded-lg pl-9"
+                  className="h-11 rounded-lg bg-side-raised pl-9"
                   autoFocus
                   data-testid="new-project-search"
                 />
@@ -177,7 +177,7 @@ export function NewProjectDialog({
                 {episodes.length === 0 ? (
                   <p className="py-8 text-center text-label text-muted-foreground">{t('No episode matches that name.')}</p>
                 ) : (
-                  // 11/5 시안(R4): 줄 안쪽 14/16 · 모서리 12 · 줄 사이 2.
+                  // 11/5 시안(R4): 줄 안쪽 14/16 · 모서리 12 · 줄 사이 2 · 올리면 팝업 위 한 단 밝은 칸(side-raised).
                   <ul className="space-y-0.5">
                     {episodes.map((project) => (
                       <li key={project.id}>
@@ -185,7 +185,7 @@ export function NewProjectDialog({
                           type="button"
                           onClick={() => pick(project)}
                           data-testid="new-project-episode"
-                          className="flex w-full items-center gap-3.5 rounded-lg px-4 py-3.5 text-left outline-none transition-colors hover:bg-card focus-visible:ring-2 focus-visible:ring-ring"
+                          className="flex w-full items-center gap-3.5 rounded-lg px-4 py-3.5 text-left outline-none transition-colors hover:bg-side-raised focus-visible:ring-2 focus-visible:ring-ring"
                         >
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-label font-semibold text-foreground">{project.title || 'Untitled'}</span>

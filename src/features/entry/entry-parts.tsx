@@ -231,7 +231,8 @@ export function useUploadErrorMessage(): (error: UploadError) => string {
 
 /**
  * Producer 에이전트 말풍선 — 오른쪽 채팅과 같은 Lumi 말풍선(v3: Lumi 얼굴 · 단계 색 이름 · 왼쪽 위 모서리 6).
- *   11/5 시안(P1 · P2): 얼굴은 채팅 아바타 XS(36) · 얼굴과 말풍선 사이 12 · 안쪽 18/22 · 줄 사이 12 · 모서리 18.
+ *   11/5 시안(P1 · P2): 가운데 채팅 색(바탕이 옆 채팅보다 밝아 한 단 밝음) · 얼굴은 채팅 아바타 XS(36) · 얼굴과 말풍선 사이 12 ·
+ *   안쪽 18/22 · 줄 사이 12 · 모서리 18.
  *   roomy = 정리 카드처럼 표가 든 말풍선(안쪽 20/30 · 사이 15).
  */
 export function AgentBubble({ children, alert, roomy }: { children: ReactNode; alert?: boolean; roomy?: boolean }) {
@@ -241,7 +242,7 @@ export function AgentBubble({ children, alert, roomy }: { children: ReactNode; a
       <div
         role={alert ? 'alert' : undefined}
         className={cn(
-          'flex min-w-0 flex-1 flex-col rounded-[18px] rounded-tl-[6px] bg-chat-lumi-bubble text-chat text-foreground',
+          'flex min-w-0 flex-1 flex-col rounded-[18px] rounded-tl-[6px] bg-chat-center-lumi-bubble text-chat text-foreground',
           roomy ? 'gap-[15px] px-[30px] py-5' : 'gap-3 px-[22px] py-[18px]',
           alert && 'ring-1 ring-destructive/40',
         )}
@@ -253,10 +254,10 @@ export function AgentBubble({ children, alert, roomy }: { children: ReactNode; a
   )
 }
 
-/** 내 말풍선 — 11/5 시안(P2): 안쪽 14/20 · 모서리 18(오른쪽 위 6). */
+/** 내 말풍선 — 11/5 시안(P2): 가운데 채팅 내 색 · 안쪽 14/20 · 모서리 18(오른쪽 위 6). */
 export function UserBubble({ text, fileName }: { text: string; fileName?: string }) {
   return (
-    <div className="ml-auto flex max-w-[88%] flex-col items-end gap-2 rounded-[18px] rounded-tr-[6px] bg-chat-user-bubble px-5 py-3.5 text-chat text-chat-user-bubble-foreground">
+    <div className="ml-auto flex max-w-[88%] flex-col items-end gap-2 rounded-[18px] rounded-tr-[6px] bg-chat-center-my-bubble px-5 py-3.5 text-chat text-chat-user-bubble-foreground">
       {text ? <p className="select-text whitespace-pre-wrap break-words">{text}</p> : null}
       {fileName ? (
         <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-chip px-2 py-0.5 text-caption">
