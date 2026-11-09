@@ -49,6 +49,8 @@ type BaseNodeProps = {
   strongStale?: boolean
   /** 생성 중 테두리 회전 빛(#e5): 'success'=이미지(초록) / 'primary'=영상(빨강). null=없음 */
   beam?: 'success' | 'primary' | null
+  /** 기다리는 카드가 노드를 덮는 동안: 머리 · 제목 줄에 Tab 이 들어가지 않게 inert(검토 A C1). 구멍(핸들)은 그대로 둔다. */
+  inert?: boolean
 }
 
 function BaseNodeImpl({
@@ -66,6 +68,7 @@ function BaseNodeImpl({
   stale,
   strongStale,
   beam,
+  inert = false,
 }: BaseNodeProps) {
   const t = useT()
   const openPopup = useDirectorCanvasStore((s) => s.openPopup)
@@ -145,7 +148,7 @@ function BaseNodeImpl({
       {/* 머리 — 점 · 종류 · ···(마우스를 올리거나 Tab 으로 옮겨 가면 편집 · 가지 · 복제 · 지우기).
           단추는 늘 그려 두어 Tab 으로 닿는다(검토 B B3). 가만히 있을 때는 폭 0 · 눌리지 않음 — 영상 노드의 ★ 가 ··· 바로 옆에 있다(검토 C).
           단추는 ★ · ··· 왼쪽에 선다 — 보이게 돼도 ★ · ··· 자리는 그대로라, 터치로 ··· 를 누르면 밑의 지우기가 아니라 노드가 눌린다. */}
-      <div className="flex h-4 items-center gap-1.5 text-[11px] font-medium text-subtle-foreground">
+      <div className="flex h-4 items-center gap-1.5 text-[11px] font-medium text-subtle-foreground" inert={inert}>
         <span className={cn('size-1.5 shrink-0 rounded-full', selected ? 'bg-stage' : 'bg-subtle-foreground')} />
         <span>{t(LABEL_BY_THEME[theme])}</span>
         <div className="ml-auto flex items-center gap-0.5">
@@ -195,7 +198,7 @@ function BaseNodeImpl({
       </div>
 
       {/* 제목 · 꼬리표 */}
-      <div className="mt-2 flex min-w-0 items-center gap-1.5">
+      <div className="mt-2 flex min-w-0 items-center gap-1.5" inert={inert}>
         <div className="min-w-0 truncate text-[14px] font-semibold leading-tight text-foreground">{prettyNodeLabel(title) || '(untitled)'}</div>
         {tag}
       </div>

@@ -227,7 +227,8 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       width={240}
       stale={data.stale}
       strongStale={isStrongStale}
-      // 만드는 중은 도는 빛 대신 노드를 덮는 기다리는 카드(아래 NodeWaitCard, 11/5 시안 DG).
+      // 만드는 중은 도는 빛 대신 노드를 덮는 기다리는 카드(아래 NodeWaitCard, 11/5 시안 DG). 덮인 동안 머리 단추는 inert(검토 A C1).
+      inert={generating}
       headerExtra={parentShotId ? (
         <Button
           variant="ghost"
@@ -275,10 +276,12 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         title={t('REF frame input')}
       />
       {/* 영상 재생 / 썸네일 / 상태 — single-play: playingNodeId===id 일 때만 <video> 마운트.
-          nodrag·nopan: React Flow 가 영상/버튼 상호작용을 노드 드래그·팬으로 가로채지 않게. */}
+          nodrag·nopan: React Flow 가 영상/버튼 상호작용을 노드 드래그·팬으로 가로채지 않게.
+          아래 덩어리들은 기다리는 카드가 덮는 동안 inert: 보이지 않는 [재생] 등에 Tab 이 들어가지 않는다(검토 A C1). 구멍 · 카드는 밖이다. */}
       <div
         className={cn('relative mt-2 flex items-center justify-center overflow-hidden rounded-[10px] bg-art-placeholder', !mediaFrame && 'h-24 w-full')}
         style={mediaFrame ?? undefined}
+        inert={generating}
       >
         {data.status === 'failed' && !data.videoUrl ? (
           <span className="px-2 text-center text-[10px] text-destructive">
@@ -347,7 +350,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
 
       {/* override indicator */}
       {overrideKeys.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1">
+        <div className="mt-2 flex flex-wrap gap-1" inert={generating}>
           {overrideKeys.map((k) => (
             <span
               key={k}
@@ -365,6 +368,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       <div
         className="mt-2.5 flex items-center justify-between gap-2"
         title={t('Take {n}', { n: data.takeNumber })}
+        inert={generating}
       >
         {/* 다 만들면 "● 완료" 자리에 "✓ 완성" 배지(11/5 시안 완성 표시, 리드 b5). 빛 · 단계 색 테두리는 '고른 노드'와 헷갈려 넣지 않는다. */}
         {completed ? (
@@ -395,6 +399,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         <p
           className="mt-1 text-[10px] text-warning"
           title={[data.adherence.reason, data.adherence.observed].filter(Boolean).join(' / ')}
+          inert={generating}
         >
           ⚠ {data.adherence.status === 'over_motion'
             ? t('Static contract violated: the camera moved')
@@ -403,9 +408,9 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
               : t('Direction mismatch: moved differently from the arrow')}
         </p>
       )}
-      {finalError && <p className="mt-1 text-[10px] text-destructive">{finalError}</p>}
+      {finalError && <p className="mt-1 text-[10px] text-destructive" inert={generating}>{finalError}</p>}
       {data.lastAttemptError && (
-        <p className="mt-1 text-[10px] text-destructive">{data.lastAttemptError}</p>
+        <p className="mt-1 text-[10px] text-destructive" inert={generating}>{data.lastAttemptError}</p>
       )}
       {/* 만드는 동안 노드를 덮는 기다리는 카드(11/5 시안 DG · SYS "노드 위 기다림", 리드 2026-11-09). 동시에 만드는 영상마다 하나씩
           (만드는 순서는 그대로). 남은 시간은 쓰지 않고, 막대 · 다음 차례는 묶음일 때만. 노드 테두리까지 덮고, 입력 구멍은 위에 남는다. */}
