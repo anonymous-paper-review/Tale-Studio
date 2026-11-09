@@ -118,7 +118,7 @@ export function DashboardHeader({
                 aria-label={t('Language')}
               >
                 {LOCALE_LABELS[locale]}
-                <span aria-hidden>▾</span>
+                <span aria-hidden className="text-[9px]">▾</span>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-36">
