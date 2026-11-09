@@ -129,9 +129,9 @@ function ProjectCard({
   return (
     <div
       onClick={() => !editing && onOpen(project)}
-      // v3: 유리(white/5 + 흐림) · 빨간 빛 대신 큰 내용 판 하나 — 올리면 한 단 밝아진다(판 아래 그림자 하나만, design.md §9).
-      //   11/5 시안(R2): 모서리 18.
-      className="group flex cursor-pointer flex-col overflow-hidden rounded-[18px] bg-panel text-left shadow-panel transition-colors duration-150 hover:bg-card"
+      // v3: 유리(white/5 + 흐림) · 빨간 빛 대신 큰 내용 판 하나 — 올리면 한 단 밝아진다.
+      //   11/5 시안(R2): 스튜디오 밖 바탕(lobby) 위에 한 단 밝은 판(side) · 모서리 18 · 그림자 없음.
+      className="group flex cursor-pointer flex-col overflow-hidden rounded-[18px] bg-side text-left transition-colors duration-150 hover:bg-card"
     >
       {/* 대표 썸네일(#landing-v2b) — 이름만으로는 구별이 어려워 프로젝트의 첫 그림을 얹는다.
           아직 그림이 없는 프로젝트는 제목 이니셜 워터마크가 구별을 돕는다 — 바탕은 v3 그림 자리(Content/Art Placeholder).
@@ -326,13 +326,16 @@ export default function ProjectsPage() {
         ) : (
           <>
           {/* 첫 화면 머리 — 큰 Lumi(화이트 펄)가 목록 쪽을 바라본다(꼬리는 왼쪽, 얼굴은 오른쪽). */}
-          <section className="mb-6 flex flex-wrap items-center gap-2">
+          {/* 11/5 시안 R2 머리 — 제목 30 · 다음 줄 메타(stacked), 찾기 · 정렬은 머리 오른쪽(List Tools). */}
+          <section className="mb-6 flex items-center gap-2">
             <Lumi persona="pearl" state="idle" size={320} className="-ml-12 shrink-0" />
-            <PageHeader title={t('Projects')} meta={t('Total {n}', { n: projects.length })} />
-            {/* 찾기 · 정렬은 머리 오른쪽(11/5 시안 R2 List Tools). */}
-            <div className="ml-auto">
-              <ProjectListTools query={query} onQueryChange={setQuery} sort={sort} onSortChange={setSort} />
-            </div>
+            <PageHeader
+              variant="stacked"
+              className="min-w-0 flex-1"
+              title={t('Projects')}
+              meta={t('Total {n}', { n: projects.length })}
+              actions={<ProjectListTools query={query} onQueryChange={setQuery} sort={sort} onSortChange={setSort} />}
+            />
           </section>
           {shown.length === 0 ? (
             <p className="py-16 text-center text-label text-muted-foreground" role="status">

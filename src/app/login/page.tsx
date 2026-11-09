@@ -90,8 +90,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center bg-background px-4">
-      {/* 11/5 시안 R1 — 가운데 카드(400 · 안쪽 50/30 · 사이 15 · 모서리 22), 칸 · 단추 높이 48 · 모서리 12, 꼬리글은 화면 아래.
+    <div className="flex min-h-screen flex-col items-center bg-lobby px-4">
+      {/* 11/5 시안 R1 — 스튜디오 밖 바탕(lobby) 가운데 카드(400 · 안쪽 50/30 · 사이 15 · 모서리 22), 칸 · 단추 높이 48 · 모서리 12, 꼬리글은 화면 아래.
           글은 아직 영어 그대로다(화면 언어 · 부제 · 가입하기 · 바탕 흐린 빛은 오너 결정 대기). */}
       <main className="flex w-full flex-1 items-center justify-center py-12">
         <div className="flex w-full max-w-[400px] flex-col gap-[15px] rounded-[22px] bg-side px-[30px] py-[50px]">

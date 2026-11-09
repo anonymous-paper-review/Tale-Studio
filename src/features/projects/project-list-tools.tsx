@@ -1,11 +1,13 @@
 'use client'
 
 // 프로젝트 목록 머리의 찾기 칸 · 정렬 단추(11/5 시안 R2, 리드 2026-11-09) — 값은 목록 화면이 갖고 여기는 보이고 알리기만 한다.
-//   시안: 찾기 알약 260 · 정렬 알약(지금 정렬 이름 + ▾) · 펼친 메뉴는 고른 줄에 ✓. 바탕 색은 목록 바탕 토큰이 들어오면 맞춘다.
+//   시안: 찾기 알약 260(바탕 side) · 정렬 알약(지금 정렬 이름 + ▾) · 펼친 메뉴(바탕 · 모서리 14)는 고른 줄이 tab-selected 에 ✓.
+//   정렬 알약의 시안 색(#2A2927)은 토큰이 아직 없어 카드색으로 둔다.
 import { Check, ChevronDown, Search } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { useT } from '@/lib/i18n'
+import { cn } from '@/lib/utils'
 import { PROJECT_SORTS, type ProjectSort } from './project-list'
 
 export function ProjectListTools({
@@ -30,7 +32,7 @@ export function ProjectListTools({
           onChange={(e) => onQueryChange(e.target.value)}
           placeholder={t('Find by project name')}
           aria-label={t('Find by project name')}
-          className="h-10 rounded-full pl-10 pr-4"
+          className="h-10 rounded-full bg-side pl-10 pr-4"
           data-testid="projects-search"
         />
       </div>
@@ -45,13 +47,21 @@ export function ProjectListTools({
             <ChevronDown className="size-3.5 text-muted-foreground" aria-hidden />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-[200px]">
-          {PROJECT_SORTS.map((option) => (
-            <DropdownMenuItem key={option.key} onClick={() => onSortChange(option.key)} data-testid={`projects-sort-${option.key}`}>
-              <span className="flex-1">{t(option.label)}</span>
-              {option.key === sort ? <Check className="size-4" aria-hidden /> : null}
-            </DropdownMenuItem>
-          ))}
+        <DropdownMenuContent align="end" className="min-w-[200px] space-y-0.5 rounded-[14px] bg-background p-1.5">
+          {PROJECT_SORTS.map((option) => {
+            const picked = option.key === sort
+            return (
+              <DropdownMenuItem
+                key={option.key}
+                onClick={() => onSortChange(option.key)}
+                className={cn('rounded-lg px-2.5 py-2', picked ? 'bg-tab-selected text-foreground' : 'text-muted-foreground')}
+                data-testid={`projects-sort-${option.key}`}
+              >
+                <span className="flex-1">{t(option.label)}</span>
+                {picked ? <Check className="size-4 text-foreground" aria-hidden /> : null}
+              </DropdownMenuItem>
+            )
+          })}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
