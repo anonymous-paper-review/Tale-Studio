@@ -88,8 +88,8 @@ describe('Writer에서 넘길 때는 산문 확정 창을 먼저 연다', () => 
     expect(userLines()).toEqual([])
   })
 
-  // 왜: [아니오]면 아무것도 잠그거나 넘기지 않는다.
-  it('산문 확정 창에서 아니오를 누르면 아무것도 넘기지 않고 채팅에도 남기지 않는다', async () => {
+  // 왜: [아니요]면 아무것도 잠그거나 넘기지 않는다.
+  it('산문 확정 창에서 아니요를 누르면 아무것도 넘기지 않고 채팅에도 남기지 않는다', async () => {
     await useGlobalChatStore.getState().requestNextStep()
     useWriterRoomStore.getState().closeConfirm()
     expect(useWriterRoomStore.getState().confirmOpen).toBe(false)
