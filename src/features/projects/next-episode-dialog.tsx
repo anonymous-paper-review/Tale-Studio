@@ -6,7 +6,7 @@
 //     POST /api/project/next-episode 로 만든 뒤 /studio/start?projectId=<새 프로젝트> 로 간다.
 //   - 이어받을 것을 고르는 단계는 없다(10-26 오너) — 앞 화의 인물 · 배경 · 그림체 · 말투를 전부 이어받는다.
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { Loader2, Lock, Trash2 } from 'lucide-react'
 import { AiBusyOverlay, type AiBusyStep } from '@/components/ai-busy-overlay'
 import { Button } from '@/components/ui/button'
@@ -22,12 +22,16 @@ import { PRICING_PAGE_VISIBLE } from '@/lib/billing/pricing-visibility'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { useSeriesInfo } from '@/features/series/use-series-info'
+import { useProjectStore } from '@/stores/project-store'
 import {
   NEXT_EPISODE_NOT_READY,
   NEXT_EPISODE_WAIT_STEPS,
   NEXT_EPISODE_WAIT_STEP_MS,
   canContinueLastScene,
+  canCreateNextEpisode,
   nextEpisodeFailure,
+  nextEpisodeSwitch,
+  nextEpisodeWaitDone,
   nextEpisodeWaitStep,
   type NextEpisodeFailure,
 } from './series-list'
@@ -90,6 +94,11 @@ export function NextEpisodeDialog({
   const [creating, setCreating] = useState(false)
   const [failure, setFailure] = useState<NextEpisodeFailure | null>(null)
   const [continueLastScene, setContinueLastScene] = useState(false)
+  // 이 창에서 만든 다음 화 — 있으면 다시 만들 수 없고, 열린 프로젝트가 그 화로 바뀌면 창을 닫는다(검토 B 높음 1).
+  const [createdId, setCreatedId] = useState<string | null>(null)
+  const switchProject = useProjectStore((s) => s.switchProject)
+  const openProjectId = useProjectStore((s) => s.projectId)
+  const pathname = usePathname()
 
   const projectId = project?.id ?? null
 
@@ -108,6 +117,7 @@ export function NextEpisodeDialog({
     setPreview(null)
     setFailure(null)
     setContinueLastScene(false)
+    setCreatedId(null)
     setLoading(true)
     void (async () => {
       try {
@@ -144,8 +154,17 @@ export function NextEpisodeDialog({
     return () => clearInterval(ticker)
   }, [creating])
 
+  // 스튜디오 안(레일 프로필 메뉴)에서 연 창은 틀이 이동해도 그대로다 — 열린 프로젝트가 새 화로 바뀌면 기다리는 카드와 창을 닫는다.
+  //   프로젝트 목록 화면은 새 화로 옮겨 가면 화면째 사라져서 닫지 않는다(nextEpisodeWaitDone).
+  useEffect(() => {
+    if (!nextEpisodeWaitDone({ createdId, projectId: openProjectId, pathname })) return
+    setCreating(false)
+    setCreatedId(null)
+    onCloseRef.current()
+  }, [createdId, openProjectId, pathname])
+
   const create = useCallback(async () => {
-    if (!projectId || creating) return
+    if (!projectId || !canCreateNextEpisode({ preview, creating, createdId })) return
     setWaitStep(0)
     setCreating(true)
     setFailure(null)
@@ -157,7 +176,12 @@ export function NextEpisodeDialog({
       })
       const body = await res.json().catch(() => null)
       if (res.ok && body?.projectId) {
-        // 만들어졌으면 기다리는 카드를 띄운 채 새 프로젝트로 간다 — 카드를 먼저 닫으면 뒤의 창이 잠깐 다시 보인다.
+        // 만들어졌으면 기다리는 카드를 띄운 채 새 화로 간다 — 카드를 먼저 닫으면 뒤의 창이 잠깐 다시 보인다.
+        //   스튜디오는 주소만 바꿔서는 다른 프로젝트를 열지 않아 먼저 바꾼다(유저 메뉴의 프로젝트 바꾸기와 같은 길).
+        //   바뀌면 위 effect 가 카드와 창을 닫고, 이 창에서는 다시 만들 수 없다.
+        const next = nextEpisodeSwitch(body)
+        setCreatedId(next.id)
+        void switchProject(next.id, next.title, next.stage)
         router.push(`/studio/start?projectId=${body.projectId}`)
         return
       }
@@ -174,7 +198,7 @@ export function NextEpisodeDialog({
       setCreating(false)
       setFailure('unknown')
     }
-  }, [projectId, continueLastScene, creating, onClose, onFailure, router])
+  }, [projectId, preview, creating, createdId, continueLastScene, onClose, onFailure, router, switchProject])
 
   const error = failureText(t, failure)
   const waitSteps: AiBusyStep[] = NEXT_EPISODE_WAIT_STEPS.map((label, i) => ({
@@ -250,7 +274,7 @@ export function NextEpisodeDialog({
           <Button variant="secondary" disabled={creating} onClick={onClose}>
             {t('Cancel')}
           </Button>
-          <Button disabled={creating || !preview} onClick={() => void create()} data-testid="next-episode-create">
+          <Button disabled={!canCreateNextEpisode({ preview, creating, createdId })} onClick={() => void create()} data-testid="next-episode-create">
             {t('Create next episode · uses 1 slot')}
           </Button>
         </DialogFooter>

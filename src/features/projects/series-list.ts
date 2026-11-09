@@ -4,6 +4,7 @@
 //   문구는 영어 원문 = 사전 키.
 //   2026-10-26 오너: 카드마다 붙은 [다음 화 만들기](99장 중 74장)가 목록을 어지럽혀 카드에서 빼고 [새 프로젝트]로 옮겼다.
 import { parseSeries } from '@/lib/series/snapshot'
+import type { StageId } from '@/types'
 
 /** 목록(GET /api/project/list)이 프로젝트마다 주는 시리즈 칸. */
 export interface SeriesListProject {
@@ -121,6 +122,37 @@ export const NEXT_EPISODE_WAIT_STEP_MS = 1400
 /** 다음으로 보일 단계 번호 — 마지막에서 멈춘다. */
 export function nextEpisodeWaitStep(step: number): number {
   return Math.min(step + 1, NEXT_EPISODE_WAIT_STEPS.length - 1)
+}
+
+/**
+ * 다음 화가 만들어진 뒤 열 프로젝트(시작 화면) — 스튜디오는 주소만 바꿔서는 다른 프로젝트를 열지 않아
+ *   유저 메뉴의 프로젝트 바꾸기(switchProject)와 같은 길로 먼저 바꾼다(검토 B 높음 1, 2026-11-09).
+ */
+export function nextEpisodeSwitch(body: { projectId: string; project?: { title?: unknown } | null }): { id: string; title: string; stage: StageId } {
+  const title = typeof body.project?.title === 'string' && body.project.title.trim() ? body.project.title : 'Untitled'
+  return { id: body.projectId, title, stage: 'entry' }
+}
+
+/**
+ * 만든 뒤 기다리는 카드 · 창을 닫을 때 — 스튜디오 안(레일 프로필 메뉴)에서 연 창은 틀이 이동해도 그대로라,
+ *   열린 프로젝트가 새 화로 바뀌면 닫는다. 프로젝트 목록 화면은 새 화로 옮겨 가면 화면째 사라지므로 닫지 않는다
+ *   (먼저 닫으면 목록이 한 번 깜박인다).
+ */
+export function nextEpisodeWaitDone({
+  createdId,
+  projectId,
+  pathname,
+}: {
+  createdId: string | null
+  projectId: string | null
+  pathname: string | null
+}): boolean {
+  return !!createdId && projectId === createdId && !!pathname?.startsWith('/studio')
+}
+
+/** [다음 화 만들기]를 누를 수 있나 — 미리 보기가 있고, 만드는 중이 아니고, 이 창에서 아직 만들지 않았을 때(한 창에 한 번). */
+export function canCreateNextEpisode({ preview, creating, createdId }: { preview: unknown; creating: boolean; createdId: string | null }): boolean {
+  return !!preview && !creating && !createdId
 }
 
 /** 목록 라우트가 읽는 projects 행(필요한 칸만). */
