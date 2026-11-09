@@ -6,7 +6,7 @@
 //   v3(2026-11-03 오너 결정 8): 단계를 넘기기 전에 "~할까요?"를 묻는 확인 창이라 맨 위에 큰 Lumi(지금 단계 Storyboard 옷 · 기본 모습)를 둔다 —
 //   넘김 확인 창들과 같은 ConfirmLumi(handoff/confirm-lumi) 하나를 쓴다.
 //   11/5 SYS 팝업(오너 2026-11-09 "새 버전으로 적용"): 폭은 틀 기본 520, Lumi(M)는 제목 묶음 안 맨 위, 취소 [아니오] = secondary · 확인 = 크림.
-//   창 안 내용(요약 표 · 빠진 러프 경고 · [남은 컷 그리기])은 그대로다.
+//   창 안 내용(요약 표 · 빠진 러프 경고 · [남은 컷 그리기])은 그대로다. [남은 컷 그리기]는 취소와 같아 보이지 않게 ghost(검토 C 3 — 이 창은 시안이 없다).
 import { AlertTriangle } from 'lucide-react'
 import { ConfirmLumi } from '@/components/handoff/confirm-lumi'
 import { Button } from '@/components/ui/button'
@@ -57,7 +57,7 @@ export function StoryboardDirectorDialog({
             {t('No')}
           </Button>
           {view.canDrawRemaining ? (
-            <Button variant="secondary" onClick={onDrawRemaining} data-testid="storyboard-director-draw-remaining">
+            <Button variant="ghost" onClick={onDrawRemaining} data-testid="storyboard-director-draw-remaining">
               {t('Draw the remaining cuts')}
             </Button>
           ) : null}

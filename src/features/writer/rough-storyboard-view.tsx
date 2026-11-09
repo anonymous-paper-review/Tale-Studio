@@ -76,7 +76,7 @@ import {
   type BoardLockState,
 } from '@/lib/writer/board-busy'
 import { boardShots, directorConfirmView, directorHandoffSummary, sceneStats, sceneStatsLabel, storyboardBriefing } from '@/lib/writer/board-summary'
-import { boardStoryFontSize, cardDialogue, mentionSegments, sceneHeadTitle, shotCardChips } from '@/lib/writer/board-card'
+import { boardStoryFontSize, cardDialogue, cardWaitLook, mentionSegments, sceneHeadTitle, shotCardChips } from '@/lib/writer/board-card'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import {
   isContentPolicyBlocked,
@@ -1238,10 +1238,10 @@ export function RoughStoryboardView() {
                     const dialogue = cardDialogue(shot.dialogueLines, characterNames)
                     const dialogueText = dialogue ? resolveEntityNames(dialogue.text, entityNames) : ''
                     // 그리는 카드 위 기다림(11/5 SYS 노드 · 카드 위, 오너 2026-11-09) — "그리는 중" 판정 · 동시에 그리는 순서는 그대로, 모양만.
-                    //   보드가 잠긴 동안(잠금 화면이 보드를 덮는다)은 예전 가벼운 표시 — 움직이는 Lumi 를 그리는 카드마다 띄우지 않는다
-                    //   (러프는 여러 장을 한꺼번에 그려 카드 수만큼 WebGL 이 생긴다). 잠금 없이 그리는 카드(더한 샷)만 카드 전체를 덮는다.
+                    //   잠긴 보드는 예전 가벼운 표시, 잠금 없이 그리는 카드(더한 샷)만 카드 전체를 덮는다(고르는 규칙: lib/writer/board-card cardWaitLook).
                     const drawing = job?.status === 'generating'
-                    const waitOnCard = drawing && !busy.open
+                    const waitLook = cardWaitLook({ drawing, boardLocked: busy.open, columns: cols })
+                    const waitOnCard = waitLook === 'card' || waitLook === 'card-compact'
                     return (
                       <article
                         key={shot.shotId}
@@ -1312,12 +1312,16 @@ export function RoughStoryboardView() {
                           )}
                         >
                           {drawing ? (
-                            waitOnCard ? null : (
-                              <div className="absolute inset-0" aria-busy="true">
-                                <div className="size-full animate-pulse bg-foreground/5" />
-                                <Loader2 className="absolute left-1/2 top-1/2 size-6 -translate-x-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />
-                              </div>
-                            )
+                            // "그리는 중" 표시는 그림 자리에만 — 알림(그리는 중 띠 · 카드 위 기다림 카드)은 그 밖에 둔다.
+                            //   알림을 감싸면 화면 읽기 프로그램이 다 그릴 때까지 알림을 미룰 수 있다(검토 C 2). 카드 위 기다림이면 그림 자리는 비워 둔다.
+                            <div className="absolute inset-0" aria-busy="true">
+                              {waitLook === 'light' ? (
+                                <>
+                                  <div className="size-full animate-pulse bg-foreground/5" />
+                                  <Loader2 className="absolute left-1/2 top-1/2 size-6 -translate-x-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />
+                                </>
+                              ) : null}
+                            </div>
                           ) : job?.status === 'waiting' ? (
                             // 더한 샷이 내 동시 생성 자리를 기다린다 — 자리가 나면 그린다(2026-09-11 오너 (가)). 도는 표시를 쓰지 않는다.
                             <div className="flex size-full flex-col items-center justify-center gap-2 p-4 text-center" role="status">
@@ -1367,7 +1371,7 @@ export function RoughStoryboardView() {
                             </div>
                           )}
                           <GeneratingOverlay
-                            active={drawing && !waitOnCard}
+                            active={waitLook === 'light'}
                             label={t('Generating rough storyboard')}
                             beamColor="success"
                           />
@@ -1427,16 +1431,14 @@ export function RoughStoryboardView() {
                           </p>
                         ) : null}
                         {waitOnCard ? (
-                          // 카드 전체를 덮는다(SYS "그 노드 크기에 맞춘다") — 덮인 카드도 누르면 지금처럼 고치기 팝업이 열린다.
+                          // 카드 전체를 덮는다(SYS "그 노드 크기에 맞춘다", 기다림 카드가 스스로 카드를 꽉 채운다) — 덮인 카드도 누르면 지금처럼 고치기 팝업이 열린다.
                           //   좁은 카드(축척 5 · 6열)는 여백 · 사이를 줄이고 설명(샷 이름 · 길이)을 뺀다.
-                          <div className="absolute inset-0 z-10 rounded-[inherit]" aria-busy="true">
-                            <NodeWaitCard
-                              lumi="storyboard"
-                              title={t('Drawing the rough')}
-                              description={cols >= 5 ? undefined : `${shotLabel} · ${t('{seconds}s', { seconds: shot.durationSeconds })}`}
-                              className={cols >= 5 ? 'gap-2 p-2.5' : undefined}
-                            />
-                          </div>
+                          <NodeWaitCard
+                            lumi="storyboard"
+                            title={t('Drawing the rough')}
+                            description={waitLook === 'card-compact' ? undefined : `${shotLabel} · ${t('{seconds}s', { seconds: shot.durationSeconds })}`}
+                            className={waitLook === 'card-compact' ? 'gap-2 p-2.5' : undefined}
+                          />
                         ) : null}
                       </article>
                     )
