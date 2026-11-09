@@ -130,7 +130,7 @@ function BaseNodeImpl({
         type="source"
         position={Position.Right}
         title="Output"
-        className="!size-2.5 !rounded-full !border-2 !border-canvas-bg !bg-muted-foreground transition-transform hover:!scale-125"
+        className="!z-20 !size-2.5 !rounded-full !border-2 !border-canvas-bg !bg-muted-foreground transition-transform hover:!scale-125"
         style={{ top: 28 }}
         id="right"
       />

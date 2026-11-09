@@ -5,6 +5,7 @@ import { NodeToolbar, Position, type NodeProps } from '@xyflow/react'
 import { Play, RefreshCw, Square, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { GeneratedImage, GeneratingOverlay } from '@/components/generating-frame'
+import { DoneBadge, NodeWaitCard } from '@/components/feedback/node-wait'
 import { BaseNode } from './BaseNode'
 import { LabeledTargetHandle } from './LabeledHandle'
 import {
@@ -13,7 +14,10 @@ import {
   useDirectorCanvasStore,
 } from '@/stores/director-store'
 import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
-import { directorNodeLabel } from '@/features/director/node-label'
+import { directorNodeLabel, prettyNodeLabel } from '@/features/director/node-label'
+import { nextInLineNote, pendingShotNames, requestedVideoSeconds } from '@/features/director/video-wait'
+import { VideoLengthChip } from '@/features/director/video-length-chip'
+import { STAGE_PERSONA } from '@/lib/lumi'
 import { useBoardNodeNames } from '@/features/director/hooks/use-board-node-names'
 import { cn } from '@/lib/utils'
 import { mediaFrameStyle } from '@/lib/project-aspect'
@@ -74,6 +78,19 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const parentShotTitle = parentShotLabel === null ? null : directorNodeLabel({ label: parentShotLabel, writerShotId: parentWriterShotId }, boardNames)
   // #payments-phase-2 v4 #2: 생성 전 소모량 표시 — 리테이크 버튼은 이 샷을 다시 만든다(같은 provider).
   const effectiveProvider = useDirectorCanvasStore((s) => getEffectiveVideoConfig(s, id)?.provider ?? null)
+  const effectiveSeconds = useDirectorCanvasStore((s) => getEffectiveVideoConfig(s, id)?.durationSeconds ?? null)
+  // 묶음으로 만드는 영상이면(서버 조회가 알려 준 작업 id) 그 묶음의 진행과 다음 차례(11/5 시안 DG, 리드 2026-11-09).
+  //   숫자 · 글자로 골라, 노드를 끌 때마다 모든 영상 노드가 다시 그려지지 않게 한다. 따로 누른 영상은 묶음 것을 빌려 쓰지 않는다.
+  const batchJobId = isVideoData(data) ? data.generationJobId : null
+  const inBatch = useDirectorCanvasStore((s) => !!batchJobId && !!s.videoBatchQueue?.jobIds.includes(batchJobId))
+  const batchPercent = useDirectorCanvasStore((s) =>
+    inBatch && s.videoBatchProgress && s.videoBatchProgress.total > 0
+      ? (s.videoBatchProgress.done / s.videoBatchProgress.total) * 100
+      : null,
+  )
+  const nextNames = useDirectorCanvasStore((s) =>
+    inBatch && !s.videoBatchCancelled ? pendingShotNames(s.nodes, s.videoBatchQueue?.pendingShotIds ?? [], boardNames).join('\n') : '',
+  )
   // 해상도(오너 2026-10-31): 다음에 만들 때 고른 값 — Take 표시용. 모델이 못 내면(Kling O3 Pro) 계산기가 기본값으로 센다.
   const chosenResolution = useDirectorCanvasStore((s) => getVideoNodeResolution(s, id))
   const takeBalance = useTakeBalance()
@@ -112,6 +129,9 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   if (!isVideoData(data)) return null
 
   const isPlaying = playingNodeId === id
+  const generating = data.lastAttemptStatus === 'generating'
+  const completed = (data.lastAttemptStatus ?? data.status) === 'completed'
+  const requestedSeconds = effectiveProvider && effectiveSeconds !== null ? requestedVideoSeconds(effectiveProvider, effectiveSeconds) : null
   // 1080p 표시는 지금 영상에 대한 말이다 — 그 영상을 낸 작업 기록 기준(2026-10-31 리뷰). 설정은 왼쪽 패널이 보여준다.
   const madeAt1080p = !!data.videoUrl && data.videoResolution === '1080p'
   // 해상도는 마더 Shot 을 바꾼 값이 아니다(마더에는 해상도가 없다) — 노란 "바꾼 설정" 표시 대신 아래 1080p 표시로 보인다.
@@ -207,7 +227,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       width={240}
       stale={data.stale}
       strongStale={isStrongStale}
-      beam={data.lastAttemptStatus === 'generating' ? 'primary' : null}
+      // 만드는 중은 도는 빛 대신 노드를 덮는 기다리는 카드(아래 NodeWaitCard, 11/5 시안 DG).
       headerExtra={parentShotId ? (
         <Button
           variant="ghost"
@@ -302,6 +322,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
                 <Play className="size-6 fill-white text-white" />
               </span>
             )}
+            {data.videoUrl && completed && <VideoLengthChip url={data.videoUrl} />}
           </button>
         ) : data.videoUrl ? (
           <button
@@ -311,8 +332,10 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             className="nodrag flex h-full w-full items-center justify-center transition-colors hover:bg-black/20"
           >
             <Play className="size-6 fill-muted-foreground text-muted-foreground" />
+            {completed && <VideoLengthChip url={data.videoUrl} />}
           </button>
-        ) : (
+        ) : data.lastAttemptStatus === 'generating' ? null : (
+          // 만드는 중이면 "대기 중"을 쓰지 않는다. 아래 "영상 생성 중"과 같이 보이면 헷갈린다(11/5 시안 DG 맞춰 보기 2026-11-09).
           <span className="text-[11px] text-subtle-foreground">{t('Waiting')}</span>
         )}
 
@@ -343,21 +366,25 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         className="mt-2.5 flex items-center justify-between gap-2"
         title={t('Take {n}', { n: data.takeNumber })}
       >
-        <span className="flex items-center gap-1.5 text-[11.5px] font-semibold">
-          {(data.lastAttemptStatus ?? data.status) === 'completed' && <span className="size-1.5 rounded-full bg-success" />}
-          {(data.lastAttemptStatus ?? data.status) === 'failed' && <span className="size-1.5 rounded-full bg-destructive" />}
-          <span
-            className={cn(
-              (data.lastAttemptStatus ?? data.status) === 'failed'
-                ? 'text-destructive'
-                : (data.lastAttemptStatus ?? data.status) === 'generating' || (data.lastAttemptStatus ?? data.status) === 'completed'
-                  ? 'text-foreground'
-                  : 'text-subtle-foreground',
-            )}
-          >
-            {videoStatusLabel(data.lastAttemptStatus ?? data.status, t)}
+        {/* 다 만들면 "● 완료" 자리에 "✓ 완성" 배지(11/5 시안 완성 표시, 리드 b5). 빛 · 단계 색 테두리는 '고른 노드'와 헷갈려 넣지 않는다. */}
+        {completed ? (
+          <DoneBadge lumi={STAGE_PERSONA.director} />
+        ) : (
+          <span className="flex items-center gap-1.5 text-[11.5px] font-semibold">
+            {(data.lastAttemptStatus ?? data.status) === 'failed' && <span className="size-1.5 rounded-full bg-destructive" />}
+            <span
+              className={cn(
+                (data.lastAttemptStatus ?? data.status) === 'failed'
+                  ? 'text-destructive'
+                  : (data.lastAttemptStatus ?? data.status) === 'generating'
+                    ? 'text-foreground'
+                    : 'text-subtle-foreground',
+              )}
+            >
+              {videoStatusLabel(data.lastAttemptStatus ?? data.status, t)}
+            </span>
           </span>
-        </span>
+        )}
         <span className="flex items-center gap-1.5">
           {madeAt1080p && <span className="font-num text-[11px] text-subtle-foreground">1080p</span>}
           {data.final && <span className="font-num text-[11px] font-semibold text-warning">★ FINAL</span>}
@@ -379,6 +406,22 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       {finalError && <p className="mt-1 text-[10px] text-destructive">{finalError}</p>}
       {data.lastAttemptError && (
         <p className="mt-1 text-[10px] text-destructive">{data.lastAttemptError}</p>
+      )}
+      {/* 만드는 동안 노드를 덮는 기다리는 카드(11/5 시안 DG · SYS "노드 위 기다림", 리드 2026-11-09). 동시에 만드는 영상마다 하나씩
+          (만드는 순서는 그대로). 남은 시간은 쓰지 않고, 막대 · 다음 차례는 묶음일 때만. 노드 테두리까지 덮고, 입력 구멍은 위에 남는다. */}
+      {generating && (
+        <NodeWaitCard
+          lumi={STAGE_PERSONA.director}
+          title={t('Making the video')}
+          description={
+            requestedSeconds === null
+              ? prettyNodeLabel(parentShotTitle ?? data.label)
+              : `${prettyNodeLabel(parentShotTitle ?? data.label)} · ${t('{seconds}s', { seconds: requestedSeconds })}`
+          }
+          progress={batchPercent ?? undefined}
+          note={nextInLineNote(nextNames ? nextNames.split('\n') : [], t)}
+          className="-inset-[1.5px]"
+        />
       )}
     </BaseNode>
     </>

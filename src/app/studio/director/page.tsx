@@ -75,6 +75,8 @@ import { useQueueRehydrate } from '@/features/director/hooks/use-queue-rehydrate
 
 import { ShotNode } from '@/features/director/canvas-nodes/ShotNode'
 import { VideoNode } from '@/features/director/canvas-nodes/VideoNode'
+import { offerEditorHandoff } from '@/features/director/editor-handoff-nudge'
+import { videoBatchButtonText } from '@/features/director/video-batch-button'
 import { AssetNode } from '@/features/director/canvas-nodes/AssetNode'
 import { PromptNode } from '@/features/director/canvas-nodes/PromptNode'
 import { CategoryEdge } from '@/features/director/canvas-edges/CategoryEdge'
@@ -463,7 +465,8 @@ function CanvasInner() {
     editorNudgeRef.current = directorProjectId
     const spec = handoffFrom('director')
     if (!spec) return
-    offerSuggestion({
+    // 첫 진입 안내가 제안 자리를 잡고 있어도 단추가 뜨게(2026-11-09): editor-handoff-nudge.ts.
+    offerEditorHandoff(directorProjectId, {
       id: `handoff:director:${directorProjectId}`,
       stage: 'director',
       content: t('{done} of {total} shots have video. Shall we move to Editor and start assembling?', {
@@ -472,7 +475,7 @@ function CanvasInner() {
       }),
       action: { kind: 'handoff', utterance: t(spec.utterance), label: t(spec.label) },
     })
-  }, [directorProjectId, hasRenderedVideo, shotsWithVideo.size, shotCountForNudge, offerSuggestion, reachedStageForNudge, t])
+  }, [directorProjectId, hasRenderedVideo, shotsWithVideo.size, shotCountForNudge, reachedStageForNudge, t])
 
   const {
     screenToFlowPosition,
@@ -885,6 +888,14 @@ function PaletteBar({
   // 약속 E1·E2(2026-09-04): 확인창에 만들 영상 수·필요한 Take·가진 Take — 채팅 승인 카드와 같은 계산(video-batch-plan).
   const takeState = useTakeBalance()
   const videoPlan = planVideoBatch(videoBatchTakeCosts(nodes, eligibleVideoBatchShotIds(nodes)), takeState.balance, takeState.mode)
+  // 숫자는 예전 그대로: 서버 배치가 있으면 그 수(단추에서 바로 그린다), 없고 도는 중이면 이 화면이 받은 진행(끝난 수 / 전체).
+  const videoButton = videoBatchButtonText({
+    busy: videoBatchBusy,
+    cancelled: videoBatchCancelled,
+    done: videoBatchBusy ? videoBatchProgress?.done ?? null : null,
+    total: videoBatchBusy ? videoBatchProgress?.total ?? null : null,
+    available: eligibleVideoCount,
+  }, t)
   // D1 "The Set 노드 9 · 샷 4" — 캔버스에 보이는 노드와 그중 샷.
   const canvasMeta = directorCanvasMeta(nodes, t)
 
@@ -1000,7 +1011,7 @@ function PaletteBar({
           {/* 명시적 전체 영상 생성 — 과금 동작은 확인 후에만 시작한다. */}
           <button
             type="button"
-            title={t('Generate videos for every eligible shot')}
+            title={videoButton.title}
             onClick={async () => {
               // 도는 중이면 같은 자리가 중단 버튼이다(#batch-resume 2026-09-09 오너 결정 ①).
               //   예전에는 진행 중에 비활성이라 멈출 방법이 창을 닫는 것뿐이었다.
@@ -1041,20 +1052,17 @@ function PaletteBar({
               videoBatchCancelled ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
-                <Square className="size-3.5" />
+                // v3 DG: 도는 동안은 채운 네모(■) — 누르면 멈춘다.
+                <Square className="size-3 fill-current" />
               )
             ) : (
               <Play className="size-3.5 fill-current" />
             )}
-            <span>
-              {videoBatchBusy
-                ? videoBatchCancelled
-                  ? t('Stopping')
-                  : t('Stop generating')
-                : t('Generate videos')}
-            </span>
+            {/* v3 DG(2026-11-09): "영상 만드는 중 · 2/8" · "영상 생성 · 8개 가능". 누르면 멈춘다는 것은 마우스 올림 글(title). */}
+            <span>{videoButton.label}</span>
             {videoBatch ? (
               <>
+                <span aria-hidden className="text-muted-foreground">·</span>
                 <span className="font-num tabular-nums text-muted-foreground">
                   {videoBatch.done}/{videoBatch.total}
                 </span>
@@ -1064,16 +1072,14 @@ function PaletteBar({
                   </span>
                 )}
               </>
-            ) : !videoBatchBusy && eligibleVideoCount > 0 ? (
-              <span className="font-num tabular-nums text-muted-foreground">
-                {t('{count} available', { count: eligibleVideoCount })}
-              </span>
+            ) : videoButton.count ? (
+              <>
+                <span aria-hidden className="text-muted-foreground">·</span>
+                <span className="font-num tabular-nums text-muted-foreground">{videoButton.count}</span>
+              </>
             ) : null}
             {videoBatchBusy && videoBatchProgress && !videoBatch && (
               <>
-                <span className="font-num tabular-nums text-muted-foreground">
-                  {videoBatchProgress.done}/{videoBatchProgress.total}
-                </span>
                 {videoBatchProgress.failed > 0 && (
                   <span className="text-destructive">
                     {t('{count} failed', { count: videoBatchProgress.failed })}

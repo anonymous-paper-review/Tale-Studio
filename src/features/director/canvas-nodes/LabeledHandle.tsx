@@ -28,8 +28,9 @@ export function LabeledTargetHandle({ id, label, top, title, className }: Props)
       title={title ?? label}
       aria-label={title ?? label}
       // v3 D1(2026-11-03): 10px 원 · 캔버스 바탕색 2px 테두리, 라벨은 상자 없이 구멍 왼쪽 9.5px 흐린 글자.
+      //   만드는 동안 노드를 덮는 기다리는 카드(z-10)보다 위에 두어 구멍이 가려지지 않는다(11/5 시안 DG, 2026-11-09).
       className={cn(
-        '!size-2.5 !rounded-full !border-2 !border-canvas-bg !bg-muted-foreground',
+        '!z-20 !size-2.5 !rounded-full !border-2 !border-canvas-bg !bg-muted-foreground',
         'transition-transform hover:!scale-125',
         className,
       )}
