@@ -179,6 +179,26 @@ export function regenProgress(n: number, record: RegenRecord, factsOf: (slot: Re
   }
 }
 
+/** 다시 그리는 동안 카드 그림 위 표시(11/5 시안 AR) — 새로 그렸어요 · 그리는 중 · 순서 기다리는 중. */
+export type RegenCardMarkState = 'new' | 'drawing' | 'waiting'
+
+/**
+ * 카드가 보이는 칸(인물 모습 · 배경 모습)의 다시 그리기 표시. 재생성이 없거나 다 끝났으면 null.
+ *   그리지 못한 칸 · 이번 재생성에 없는 칸도 null — 지금 모습 그대로 둔다(리드 2026-11-09).
+ *   멈춘 재생성(stopped)의 남은 칸은 차례가 오지 않으니 "순서 기다리는 중"을 보이지 않는다. 약속: tests/artist/regen-card-mark.test.ts
+ */
+export function regenCardMark(
+  input: { regen: Pick<RegenProgress, 'complete' | 'states'> | null; stopped: boolean },
+  slot: Pick<RegenSlot, 'kind' | 'id' | 'appearanceKey'>,
+): RegenCardMarkState | null {
+  if (!input.regen || input.regen.complete) return null
+  const state = input.regen.states[regenSlotKey(slot)]
+  if (state === 'done') return 'new'
+  if (state === 'drawing') return 'drawing'
+  if (state === 'todo' && !input.stopped) return 'waiting'
+  return null
+}
+
 /**
  * 지금 그릴 칸 — 남은(todo) 칸 중 기본 모습, 그리고 그 인물 · 배경의 기본 모습이 끝난(다 그림 · 실패) 다른 모습.
  *   다른 모습은 기본 모습 대표 얼굴 · 기본 배경 그림을 참고로 그린다 — 새 스타일 기본 모습이 먼저 있어야 덜 섞인다(혼자 정한 것).
@@ -407,6 +427,57 @@ export function regenDoneMessage(locale: AppLocale, input: { style: string; n: n
     n: input.n, style: input.style, ro: directionParticle(input.style), ul: objectParticle(`v${input.n}`),
   })
   return input.failed > 0 ? `${made} ${translate(locale, '{count} could not be drawn. Remake them from the cards.', { count: input.failed })}` : made
+}
+
+/** 다시 그리는 기다리는 창 설명 — "3D 애니메이션 · v2로 그려요. 이 창을 닫아도 계속 그려요. Artist 화면을 떠나면 멈춰요."
+ *  재생성 그림은 Artist 화면이 열려 있을 때만 그린다 — 창은 닫아도 되지만 화면을 떠나면 멈춘다(사실대로, 리드 2026-11-09). */
+export function regenOverlayDescription(locale: AppLocale, input: { style: string; n: number }): string {
+  return translate(locale, 'Drawing in {style} · v{n}. It keeps drawing if you close this window, and stops if you leave the Artist screen.', {
+    style: input.style, n: input.n, ro: directionParticle(`v${input.n}`),
+  })
+}
+
+/** 한 줄에 적는 이름 수 — 넘으면 "외 N"(기다리는 창 폭을 넘쳐 여러 줄로 늘어지지 않게). */
+const STEP_NAMES_SHOWN = 3
+
+/**
+ * 다시 그리는 기다리는 창의 단계 줄(11/5 시안 AR "민호 · 다 그렸어요 / 팀장 그리는 중 / 틴장 · 배경 기다리는 중") — 인물 · 배경 단위.
+ *   모습 칸이 모두 끝나야 다 그림(✓), 하나라도 그리는 중이면 그리는 중(●), 남은 칸이 있으면 기다리는 중(○).
+ *   그리지 못한 칸이 섞여 끝난 인물 · 배경은 어느 줄에도 넣지 않는다(카드 · 머리 줄이 알린다). 멈춘 재생성은 기다리는 줄이 없다.
+ *   이름은 화면이 준다(모르면 인물 · 배경). 약속: tests/artist/regen-overlay-copy.test.ts
+ */
+export function regenStepLines(
+  locale: AppLocale,
+  input: {
+    regen: Pick<RegenProgress, 'slots' | 'states'>
+    stopped: boolean
+    nameOf: (entity: Pick<RegenSlot, 'kind' | 'id'>) => string | null | undefined
+  },
+): Array<{ label: string; state: 'done' | 'current' | 'todo' }> {
+  const groups = { done: [] as string[], drawing: [] as string[], waiting: [] as string[] }
+  const seen = new Set<string>()
+  for (const slot of input.regen.slots) {
+    const entity = `${slot.kind}:${slot.id}`
+    if (seen.has(entity)) continue
+    seen.add(entity)
+    const states = input.regen.slots
+      .filter((other) => other.kind === slot.kind && other.id === slot.id)
+      .map((other) => input.regen.states[regenSlotKey(other)])
+    const name = input.nameOf(slot)?.trim() || translate(locale, slot.kind === 'character' ? 'Person' : 'Background')
+    if (states.some((state) => state === 'drawing')) groups.drawing.push(name)
+    else if (states.some((state) => state === 'todo')) {
+      if (!input.stopped) groups.waiting.push(name)
+    } else if (states.every((state) => state === 'done')) groups.done.push(name)
+  }
+  const names = (list: string[]) => {
+    const shown = list.slice(0, STEP_NAMES_SHOWN).join(' · ')
+    return list.length > STEP_NAMES_SHOWN ? translate(locale, '{names} and {count} more', { names: shown, count: list.length - STEP_NAMES_SHOWN }) : shown
+  }
+  const lines: Array<{ label: string; state: 'done' | 'current' | 'todo' }> = []
+  if (groups.done.length) lines.push({ label: translate(locale, '{names}: done', { names: names(groups.done) }), state: 'done' })
+  if (groups.drawing.length) lines.push({ label: translate(locale, 'Drawing {names}', { names: names(groups.drawing) }), state: 'current' })
+  if (groups.waiting.length) lines.push({ label: translate(locale, '{names}: waiting', { names: names(groups.waiting) }), state: 'todo' })
+  return lines
 }
 
 /** 불러온 뒤 채팅 — "v{n}({스타일})을 불러왔어요. 작품 스타일도 {스타일}으로 바뀌었어요." */

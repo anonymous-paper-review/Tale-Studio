@@ -48,7 +48,7 @@ import { RegenOverlayFooter } from '@/features/artist-room/regen-stopped-actions
 import { RegenerateStyleDialog } from '@/features/artist-room/regenerate-style-dialog'
 import { VersionHistoryDialog } from '@/features/artist-room/version-history-dialog'
 import { completeVersionBlock, useArtistVersionStore, versionsNeedRefresh } from '@/stores/artist-version-store'
-import { versionStyleLabel } from '@/lib/artist/style-versions'
+import { regenOverlayDescription, regenStepLines, versionStyleLabel } from '@/lib/artist/style-versions'
 import { ARTIST_FILTERS, artistFilterCounts, artistFilterPanels, type ArtistFilter } from '@/lib/artist/card-filter'
 
 // v3 A5(2026-11-03): 탭(등장인물 · 배경) 대신 걸러 보기 칸(모두 · 인물 · 배경) — lib/artist/card-filter.
@@ -471,14 +471,21 @@ export default function VisualPage() {
   }, [projectId, versionsPolling])
   const regenOverlayOpen = regenPending && overlayDismissedFor !== regen.n
   const regenStyleLabel = regenVersion ? versionStyleLabel(regenVersion, styleAnchors, locale) : styleLabel ?? ''
+  const regenNameOf = (entity: { kind: 'character' | 'location'; id: string }) =>
+    entity.kind === 'character'
+      ? characterAssets.find((c) => c.characterId === entity.id)?.name
+      : worldAssets.find((w) => w.locationId === entity.id)?.name
   const regenOverlay = regen ? (
     <AiBusyOverlay
       open={regenOverlayOpen}
-      title={t(regenRun.stopped ? 'Some images were not drawn' : 'Making the images')}
+      title={t(regenRun.stopped ? 'Some images were not drawn' : 'Redrawing the images')}
       busy={!regenRun.stopped}
-      description={regenRun.stopped ? t('Draw the rest again, or go back to the previous version.') : t('{style} · v{n}', { style: regenStyleLabel, n: regen.n })}
-      steps={[{ label: t('Drawing images {drawn}/{total}', { drawn: regen.done, total: regen.total }), state: 'current' }]}
+      // 11/5 시안 AR 문구를 사실대로 — 이 창은 닫아도 되지만, 재생성 그림은 Artist 화면이 열려 있을 때만 그린다.
+      description={regenRun.stopped ? t('Draw the rest again, or go back to the previous version.') : regenOverlayDescription(locale, { style: regenStyleLabel, n: regen.n })}
+      // 11/5 시안 AR 단계 줄 — 인물 · 배경 단위(다 그림 ✓ · 그리는 중 ● · 기다리는 중 ○). 그린 수/전체 수는 막대 아래 한 줄로 남긴다.
+      steps={regenStepLines(locale, { regen, stopped: regenRun.stopped, nameOf: regenNameOf })}
       progress={regen.total > 0 ? ((regen.done + regen.failed) / regen.total) * 100 : null}
+      progressLabel={t('Drawing images {drawn}/{total}', { drawn: regen.done, total: regen.total })}
       footer={<RegenOverlayFooter />}
     />
   ) : null
