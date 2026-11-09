@@ -35,6 +35,7 @@ import { ADHERENCE_START_ENABLED } from '@/lib/adherence/core'
 import { handoffFrom } from '@/lib/handoff-intent'
 import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
 import { AiBusyOverlay } from '@/components/ai-busy-overlay'
+import { NodeWaitCard } from '@/components/feedback/node-wait'
 import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
 import { AddItemDialog, type AddMode } from '@/features/writer/add-item-dialog'
 import { AddedRedrawStatus } from '@/features/writer/added-redraw-status'
@@ -75,7 +76,7 @@ import {
   type BoardLockState,
 } from '@/lib/writer/board-busy'
 import { boardShots, directorConfirmView, directorHandoffSummary, sceneStats, sceneStatsLabel, storyboardBriefing } from '@/lib/writer/board-summary'
-import { cardDialogue, mentionSegments, sceneHeadTitle, shotCardChips } from '@/lib/writer/board-card'
+import { boardStoryFontSize, cardDialogue, mentionSegments, sceneHeadTitle, shotCardChips } from '@/lib/writer/board-card'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import {
   isContentPolicyBlocked,
@@ -99,7 +100,6 @@ import {
   StoryboardZoomControls,
   applyStoryboardZoomShortcut,
   storyboardColumns,
-  storyboardDescriptionFontSize,
   useStoryboardZoom,
 } from '@/components/generating-frame'
 import type { RoughStoryboardImage, Shot } from '@/types'
@@ -1101,8 +1101,8 @@ export function RoughStoryboardView() {
   //   샷 각각의 고유 호출 번호가 목적(오너). 위치 기준(불변 id 아님)은 기존 결정 유지.
   //   셈은 Director 넘김 창 · 머리 숫자와 같은 boardShots(lib/writer/board-summary) 하나로 한다.
   const globalShotNo = new Map(boardList.map((entry) => [entry.shot.shotId, entry.shotNo]))
-  // 설명문 폰트(#zoom-desc) — 열이 늘수록(축소) 글자도 줄여 전문이 들어가게. 클램프는 제거.
-  const descFontSize = storyboardDescriptionFontSize(cols)
+  // 설명문 폰트(#zoom-desc) — 열이 늘수록(축소) 글자도 줄여 전문이 들어가게. 기본 3열은 11/5 시안 S1 의 13.5px(보드 전용 크기표, lib/writer/board-card).
+  const descFontSize = boardStoryFontSize(cols)
 
   // v3 씬 머리(시안 S1) — 이름(장소 · 때) · 요약 · 컷 수 · 초. 셈은 화면 머리와 같다(lib/writer/board-summary sceneStats).
   const statsByScene = sceneStats(sceneManifest, shots)
@@ -1237,6 +1237,11 @@ export function RoughStoryboardView() {
                     const shotLabel = `Scene ${sceneIdx + 1} · Shot ${globalShotNo.get(shot.shotId) ?? shotIdx + 1}`
                     const dialogue = cardDialogue(shot.dialogueLines, characterNames)
                     const dialogueText = dialogue ? resolveEntityNames(dialogue.text, entityNames) : ''
+                    // 그리는 카드 위 기다림(11/5 SYS 노드 · 카드 위, 오너 2026-11-09) — "그리는 중" 판정 · 동시에 그리는 순서는 그대로, 모양만.
+                    //   보드가 잠긴 동안(잠금 화면이 보드를 덮는다)은 예전 가벼운 표시 — 움직이는 Lumi 를 그리는 카드마다 띄우지 않는다
+                    //   (러프는 여러 장을 한꺼번에 그려 카드 수만큼 WebGL 이 생긴다). 잠금 없이 그리는 카드(더한 샷)만 카드 전체를 덮는다.
+                    const drawing = job?.status === 'generating'
+                    const waitOnCard = drawing && !busy.open
                     return (
                       <article
                         key={shot.shotId}
@@ -1250,7 +1255,7 @@ export function RoughStoryboardView() {
                             openDetail(shot.shotId)
                           }
                         }}
-                        className="group flex cursor-pointer flex-col gap-2.5 rounded-xl bg-panel p-3 transition-colors duration-100 hover-red-beam focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring/50"
+                        className="group relative flex cursor-pointer flex-col gap-2.5 rounded-xl bg-panel p-3 transition-colors duration-100 hover-red-beam focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring/50"
                       >
                         {/* 카드 머리(v3 시안 S1) — 전체 번호 이름 그대로 · 길이 · ···(샷 고치기 팝업, 카드 누르기와 같다).
                             제품에 카드 메뉴로 둘 다른 일(지우기 · 다시 그리기)이 화면에 없어 메뉴 대신 팝업을 연다 — 결정 대기. */}
@@ -1306,11 +1311,13 @@ export function RoughStoryboardView() {
                             job?.status === 'failed' && 'ring-1 ring-inset ring-destructive/50',
                           )}
                         >
-                          {job?.status === 'generating' ? (
-                            <div className="absolute inset-0" aria-busy="true">
-                              <div className="size-full animate-pulse bg-foreground/5" />
-                              <Loader2 className="absolute left-1/2 top-1/2 size-6 -translate-x-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />
-                            </div>
+                          {drawing ? (
+                            waitOnCard ? null : (
+                              <div className="absolute inset-0" aria-busy="true">
+                                <div className="size-full animate-pulse bg-foreground/5" />
+                                <Loader2 className="absolute left-1/2 top-1/2 size-6 -translate-x-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />
+                              </div>
+                            )
                           ) : job?.status === 'waiting' ? (
                             // 더한 샷이 내 동시 생성 자리를 기다린다 — 자리가 나면 그린다(2026-09-11 오너 (가)). 도는 표시를 쓰지 않는다.
                             <div className="flex size-full flex-col items-center justify-center gap-2 p-4 text-center" role="status">
@@ -1360,7 +1367,7 @@ export function RoughStoryboardView() {
                             </div>
                           )}
                           <GeneratingOverlay
-                            active={job?.status === 'generating'}
+                            active={drawing && !waitOnCard}
                             label={t('Generating rough storyboard')}
                             beamColor="success"
                           />
@@ -1368,7 +1375,7 @@ export function RoughStoryboardView() {
                         )}
 
                         {/* 액션 글 — 전문 표시(#zoom-desc, 잘라내지 않는다 · 축소 시 폰트가 함께 줄어든다). 인물 이름은 멘션 색(시안 "@민호", 글은 그대로). */}
-                        <p className="font-medium leading-relaxed text-foreground" style={{ fontSize: descFontSize }}>
+                        <p className="font-medium leading-[1.4] text-foreground" style={{ fontSize: descFontSize }}>
                           {mentionSegments(resolveEntityNames(shot.actionDescription, entityNames), mentionNames).map((part, i) =>
                             part.mention ? (
                               <span key={i} className="font-semibold text-mention">{part.text}</span>
@@ -1418,6 +1425,18 @@ export function RoughStoryboardView() {
                             <AlertCircle className="size-3.5 shrink-0" />
                             {t('The image may not match the description. Click the card to try regenerating')}
                           </p>
+                        ) : null}
+                        {waitOnCard ? (
+                          // 카드 전체를 덮는다(SYS "그 노드 크기에 맞춘다") — 덮인 카드도 누르면 지금처럼 고치기 팝업이 열린다.
+                          //   좁은 카드(축척 5 · 6열)는 여백 · 사이를 줄이고 설명(샷 이름 · 길이)을 뺀다.
+                          <div className="absolute inset-0 z-10 rounded-[inherit]" aria-busy="true">
+                            <NodeWaitCard
+                              lumi="storyboard"
+                              title={t('Drawing the rough')}
+                              description={cols >= 5 ? undefined : `${shotLabel} · ${t('{seconds}s', { seconds: shot.durationSeconds })}`}
+                              className={cols >= 5 ? 'gap-2 p-2.5' : undefined}
+                            />
+                          </div>
                         ) : null}
                       </article>
                     )
