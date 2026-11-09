@@ -40,6 +40,7 @@ import {
 } from '@/features/projects/series-list'
 import { DEFAULT_PROJECT_SORT, projectStageDot, visibleProjects, type ProjectSort } from '@/features/projects/project-list'
 import { ProjectListTools } from '@/features/projects/project-list-tools'
+import { ProjectCardArt } from '@/features/projects/project-card-art'
 import { SeriesDeleteWarningDialog } from '@/features/projects/next-episode-dialog'
 import { NewProjectDialog } from '@/features/projects/new-project-dialog'
 
@@ -56,44 +57,6 @@ interface ProjectItem {
   seriesPrevTitle: string | null
   /** 이 화로 다음 화를 만들 수 있나 — 인물 · 배경 그림을 만들기 시작해 씬이 1개 이상 생긴 화. */
   canContinue: boolean
-}
-
-// #thumb-fit(2026-08-23 오너): 16:9 박스에 object-cover 로 욱여넣으면 이형 해상도(웹툰 세로 스트립,
-//   시네마 와이드)가 잘려 보인다. 박스는 16:9 그대로 두고 — 세로형은 가로폭을 맞춰 위부터 넣고
-//   호버 시 위→아래로 훑어 내려가며(넘친 만큼), 와이드형은 가로폭 맞춤 = 상하 레터박스.
-//   판정은 로드된 실제 비율로 — 16:9 근방(±3%)만 종전 cover 유지.
-function ProjectThumb({ url }: { url: string }) {
-  const [fit, setFit] = useState<'cover' | 'tall' | 'wide'>('cover')
-  const [panMs, setPanMs] = useState(0)
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={url}
-      alt=""
-      loading="lazy"
-      onLoad={(e) => {
-        const im = e.currentTarget
-        if (!im.naturalWidth || !im.naturalHeight) return
-        const ratio = im.naturalWidth / im.naturalHeight
-        const box = 16 / 9
-        if (ratio < box * 0.97) {
-          setFit('tall')
-          // 팬 시간은 넘친 높이에 비례 — 짧은 초과는 최소 1.2s, 웹툰 스트립도 6s 안에 완주.
-          setPanMs(Math.min(6000, Math.max(1200, (box / ratio - 1) * 2600)))
-        } else {
-          setFit(ratio > box * 1.03 ? 'wide' : 'cover')
-        }
-      }}
-      style={fit === 'tall' ? { transitionDuration: `${panMs}ms` } : undefined}
-      className={
-        fit === 'tall'
-          ? 'absolute inset-x-0 top-0 w-full transition-transform ease-in-out group-hover:translate-y-[calc(100cqh-100%)]'
-          : fit === 'wide'
-            ? 'absolute inset-x-0 top-1/2 w-full -translate-y-1/2 transition-transform duration-500 group-hover:scale-[1.03]'
-            : 'size-full object-cover transition-transform duration-500 group-hover:scale-[1.03]'
-      }
-    />
-  )
 }
 
 function ProjectCard({
@@ -133,20 +96,8 @@ function ProjectCard({
       //   11/5 시안(R2): 스튜디오 밖 바탕(lobby) 위에 한 단 밝은 판(side) · 모서리 18 · 그림자 없음.
       className="group flex cursor-pointer flex-col overflow-hidden rounded-[18px] bg-side text-left transition-colors duration-150 hover:bg-card"
     >
-      {/* 대표 썸네일(#landing-v2b) — 이름만으로는 구별이 어려워 프로젝트의 첫 그림을 얹는다.
-          아직 그림이 없는 프로젝트는 제목 이니셜 워터마크가 구별을 돕는다 — 바탕은 v3 그림 자리(Content/Art Placeholder).
-          [container-type:size] 는 #thumb-fit 의 100cqh(박스 높이 기준 팬 종점) 용. */}
-      <div className="relative aspect-video overflow-hidden bg-art-placeholder [container-type:size]">
-        {project.thumbnail_url ? (
-          <ProjectThumb url={project.thumbnail_url} />
-        ) : (
-          <div className="flex size-full items-center justify-center">
-            <span className="select-none text-5xl font-bold text-foreground/15">
-              {(project.title || 'U').charAt(0).toUpperCase()}
-            </span>
-          </div>
-        )}
-      </div>
+      {/* 대표 썸네일 — 없거나 못 읽으면 이름 첫 글자 타일(features/projects/project-card-art). */}
+      <ProjectCardArt url={project.thumbnail_url} title={project.title} />
 
       <div className="flex flex-col px-5 pb-5 pt-4">
       <div className="flex items-center justify-between gap-2">
