@@ -12,7 +12,7 @@ import { CharacterViewDialog } from '@/features/artist/character-view-dialog'
 import { AppearanceCreateDialog } from '@/features/artist/appearance-create-dialog'
 import { CharacterDeleteButton } from '@/features/artist/character-delete-button'
 import { TurnaroundRegionCycle } from '@/features/artist/turnaround-region-cycle'
-import { VersionBadge, lookChipClass, useCardVersion } from '@/features/artist/card-parts'
+import { RegenCardMark, VersionBadge, lookChipClass, useCardVersion, useRegenCardMarks } from '@/features/artist/card-parts'
 import { sameCharacterAppearanceSlot, useArtistStore } from '@/stores/artist-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useProjectStore } from '@/stores/project-store'
@@ -51,6 +51,7 @@ export function CharacterPanel({
   }, [])
   const t = useT()
   const versionOf = useCardVersion()
+  const regenMarkOf = useRegenCardMarks()
   const {
     sceneManifest,
     characterAssets,
@@ -128,6 +129,8 @@ export function CharacterPanel({
         : false
     const isObject = char.entityType === 'object'
     const bgScenes = getBackgroundScenes(char.characterId)
+    // 작품 스타일을 다시 그리는 동안 이 카드가 보이는 모습 칸의 표시(11/5 시안 AR) — 사물은 다시 그리지 않는다.
+    const regenMark = appearance && !isObject ? regenMarkOf({ kind: 'character', id: char.characterId, appearanceKey: appearance.appearanceKey }) : null
 
 
     // hover 정보 본문 — 4개 뷰 이미지의 개별 Tooltip 에 공유(같은 캐릭터 정보).
@@ -323,12 +326,13 @@ export function CharacterPanel({
                   label={isObject ? '' : t('Turnaround (all views)')}
                   aspectRatio={isObject ? 'square' : 'video'}
                   imageUrl={appearance?.sheetUrl ?? null}
-                  generating={isViewGenerating('main')}
+                  generating={isViewGenerating('main') && !regenMark}
                   hideCaption
                 />
               )}
               {/* 판 배지(v3 A5) — 이 그림을 그린 때의 작품 스타일 버전. 그리는 중 · 그림이 없으면 없다. */}
               <VersionBadge n={isViewGenerating('main') ? null : versionOf(appearance?.sheetUrl, appearance?.viewCandidates?.main)} />
+              <RegenCardMark mark={regenMark} />
             </button>
           </TooltipTrigger>
           <TooltipContent
@@ -341,9 +345,9 @@ export function CharacterPanel({
             {charTooltipBody}
           </TooltipContent>
         </Tooltip>
-        {/* 모습 설명(v3 A5 그림 아래 한 줄) — 유저 언어 외형만(영어 생성 지시문은 보이지 않는다). */}
+        {/* 모습 설명(v3 A5 그림 아래 한 줄, 그림과 사이 9 — 11/5 시안) — 유저 언어 외형만(영어 생성 지시문은 보이지 않는다). */}
         {(appearance?.appearanceNative || (appearance?.isDefault ? char.appearanceNative : null)) ? (
-          <p className="mt-2 line-clamp-2 text-caption text-subtle-foreground">{appearance?.appearanceNative || char.appearanceNative}</p>
+          <p className="mt-[9px] line-clamp-2 text-caption text-subtle-foreground">{appearance?.appearanceNative || char.appearanceNative}</p>
         ) : null}
         {/* #image-to-artist(2026-09-17, 오너 결정): 사용자가 올린 원본은 시트와 별개로 그대로 남는다 — 시트는 이 원본을
             참조해 만들어졌다는 뜻이다. 원본이 있는 모습에서만 시트 아래에 작게 보인다. */}

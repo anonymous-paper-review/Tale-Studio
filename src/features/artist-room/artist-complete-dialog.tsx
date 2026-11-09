@@ -71,9 +71,9 @@ export function ArtistCompleteDialog({ open, onOpenChange, summary }: { open: bo
   }
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!busy) onOpenChange(next) }}>
-      <DialogContent className="sm:max-w-md" showCloseButton={!busy} data-testid="artist-complete">
-        <ConfirmLumi stage="artist" />
+      <DialogContent showCloseButton={!busy} data-testid="artist-complete">
         <DialogHeader>
+          <ConfirmLumi stage="artist" />
           <DialogTitle>{t('Complete and move on to Storyboard?')}</DialogTitle>
           <DialogDescription className="sr-only">{t('Check what moves on to Storyboard.')}</DialogDescription>
         </DialogHeader>
@@ -92,7 +92,7 @@ export function ArtistCompleteDialog({ open, onOpenChange, summary }: { open: bo
           </div>
         </dl>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>{t('No')}</Button>
+          <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={busy}>{t('No')}</Button>
           <Button onClick={() => void complete()} disabled={busy} data-testid="artist-complete-yes">
             {busy ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}{t('Yes, complete it')}
           </Button>

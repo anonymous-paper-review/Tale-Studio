@@ -263,7 +263,7 @@ export function RegenerateDialog({ open, onOpenChange, title, intro, kind, descr
   const t = useT()
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!busy) onOpenChange(next) }}>
-      <DialogContent className="flex max-h-[88vh] flex-col sm:max-w-xl" data-testid="detail-regenerate">
+      <DialogContent className="flex max-h-[88vh] flex-col" data-testid="detail-regenerate">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{intro}</DialogDescription>
@@ -277,7 +277,7 @@ export function RegenerateDialog({ open, onOpenChange, title, intro, kind, descr
           {notes}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>{t('Cancel')}</Button>
+          <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={busy}>{t('Cancel')}</Button>
           <Button onClick={onConfirm} disabled={busy || !description.trim()} data-testid="detail-regenerate-go">
             {busy ? <Loader2 className="size-4 animate-spin" /> : null}{confirmLabel}
           </Button>

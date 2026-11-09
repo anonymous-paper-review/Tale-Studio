@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { classifyWorldImageStale } from '@/lib/image-provenance'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
-import { VersionBadge, lookChipClass, useCardVersion } from '@/features/artist/card-parts'
+import { RegenCardMark, VersionBadge, lookChipClass, useCardVersion, useRegenCardMarks } from '@/features/artist/card-parts'
 import { WorldViewDialog } from '@/features/artist/world-view-dialog'
 import { LocationAppearanceCreateDialog } from '@/features/artist/location-appearance-create-dialog'
 import { useArtistStore, worldFailureKey, type WorldShotKey } from '@/stores/artist-store'
@@ -35,6 +35,7 @@ export function WorldPanel({
   }, [])
   const t = useT()
   const versionOf = useCardVersion()
+  const regenMarkOf = useRegenCardMarks()
   const {
     sceneManifest,
     worldAssets,
@@ -99,6 +100,8 @@ export function WorldPanel({
     const variant = pickedKey !== DEFAULT_LOCATION_APPEARANCE_KEY ? (world.appearances ?? []).find((a) => a.appearanceKey === pickedKey) ?? null : null
     const variantKey = variant ? variant.appearanceKey : null
     const isGenerating = generatingLocations.includes(worldFailureKey(world.locationId, variantKey))
+    // 작품 스타일을 다시 그리는 동안 이 카드가 보이는 모습 칸의 표시(11/5 시안 AR) — 기본 모습이면 기본 배경 칸.
+    const regenMark = regenMarkOf({ kind: 'location', id: world.locationId, appearanceKey: variantKey })
     const shownImage = variant ? variant.wideShot : world.wideShot
     // 약속 B7·B8: 설명이 바뀐 뒤 재생성 전이면 "설명 바뀜", 최근 생성이 실패했으면 "이미지 실패".
     const candidates = variant ? variant.candidates : (world.candidates ?? [])
@@ -223,16 +226,17 @@ export function WorldPanel({
             label={t('Background')}
             aspectRatio="video"
             imageUrl={shownImage}
-            generating={isGenerating}
+            generating={isGenerating && !regenMark}
             hideCaption
           />
           {/* 판 배지(v3 A5) — 이 그림을 그린 때의 작품 스타일 버전. 그리는 중 · 그림이 없으면 없다. */}
           <VersionBadge n={isGenerating ? null : versionOf(shownImage, candidates)} />
+          <RegenCardMark mark={regenMark} />
         </button>
 
-        {/* 모습 설명(v3 A5 그림 아래 한 줄) — 유저 언어 설명만. */}
+        {/* 모습 설명(v3 A5 그림 아래 한 줄, 그림과 사이 9 — 11/5 시안) — 유저 언어 설명만. */}
         {(variant ? variant.visualDescriptionNative : world.visualDescriptionNative) ? (
-          <p className="mt-2 line-clamp-2 text-caption text-subtle-foreground">{variant ? variant.visualDescriptionNative : world.visualDescriptionNative}</p>
+          <p className="mt-[9px] line-clamp-2 text-caption text-subtle-foreground">{variant ? variant.visualDescriptionNative : world.visualDescriptionNative}</p>
         ) : null}
 
         {/* 시리즈 다음 화: 앞 화 그림을 참고해 이 화 그림체로 다시 그릴 카드만 한 줄 알린다. */}

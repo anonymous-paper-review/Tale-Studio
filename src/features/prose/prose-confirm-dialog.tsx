@@ -23,9 +23,9 @@ export function ProseConfirmDialog() {
   }
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) close() }}>
-      <DialogContent className="sm:max-w-md" showCloseButton={!confirm.busy} data-testid="prose-confirm">
-        <ConfirmLumi stage="producer" />
+      <DialogContent showCloseButton={!confirm.busy} data-testid="prose-confirm">
         <DialogHeader>
+          <ConfirmLumi stage="producer" />
           <DialogTitle>{t('Confirm the prose?')}</DialogTitle>
           <DialogDescription className="sr-only">{t('Check what happens when you confirm the prose.')}</DialogDescription>
         </DialogHeader>
@@ -40,7 +40,7 @@ export function ProseConfirmDialog() {
           </div>
         </dl>
         <DialogFooter>
-          <Button variant="outline" onClick={close} disabled={confirm.busy}>{t('No')}</Button>
+          <Button variant="secondary" onClick={close} disabled={confirm.busy}>{t('No')}</Button>
           <Button onClick={() => void confirm.run()} disabled={confirm.busy} data-testid="prose-confirm-yes">
             {confirm.busy ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
             {t('Yes, confirm it')}
