@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { sanitizeNextPath, NEXT_PATH_COOKIE } from '@/lib/session-restore'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { TaleLockup } from '@/components/tale-lockup'
 
 // user enumeration 방지: 성공/실패/빈입력 모두 동일한 단일 메시지(원본 supabase 에러 비노출).
 const GENERIC_LOGIN_ERROR = 'Incorrect email or password'
@@ -92,7 +93,10 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background">
       <div className="flex w-full max-w-sm flex-col items-center gap-8">
         <div className="flex flex-col items-center gap-2">
-          <h1 className="text-2xl font-bold tracking-tight">Tale Studio</h1>
+          {/* 11/5 시안 R1 — 이름 대신 로고 묶음(틀 32). 글자 "Tale Studio" 는 로고 안의 글이라 머리글로 그대로 읽힌다. */}
+          <h1>
+            <TaleLockup size={32} />
+          </h1>
           <p className="text-sm text-muted-foreground">
             AI Video Generation Pipeline
           </p>

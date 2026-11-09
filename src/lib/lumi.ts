@@ -21,6 +21,9 @@ export const LUMI_SIZE = { xl: 150, l: 100, m: 78, s: 56, xs: 36, chat: 30 } as 
 export type LumiSize = keyof typeof LUMI_SIZE
 /** 전신 Lumi 상자의 세로 ÷ 가로(SYS 1:0.77). 그림 · 움직이는 Lumi(3:2)는 이 상자 가운데에 맞춘다. */
 export const LUMI_BOX_RATIO = 0.77
+/** 크기 이름으로 그릴 때 그림 배율 — 시안 Lumi 그림은 몸에 맞춰 잘라 몸이 폭의 98%, 우리 그림(가이드 480×320)은 둘레에
+ *  소품 자리가 있어 몸이 폭의 약 68%다. 1.45배로 그려 몸이 상자 너비를 채우게 한다(상자 · 자리는 그대로, 둘레 빈 곳만 넘친다). */
+export const LUMI_DRAW_SCALE = 1.45
 
 /** 그 크기의 상자 — 이름이면 SYS 너비, 숫자면 그 너비(예전 호출). 전신은 높이 = 너비 × 0.77, 아바타는 정사각형. */
 export function lumiBox(size: LumiSize | number, variant: LumiVariant = 'full'): { width: number; height: number } {

@@ -169,7 +169,7 @@ export function Sidebar() {
             className="flex size-10 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-sidebar-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- 브랜드 심볼 SVG(정적 파일) */}
-            <img src="/brand/tale-symbol.svg" alt="" width={30} height={24} className="h-6 w-[30px]" draggable={false} />
+            <img src="/brand/tale-symbol.svg" alt="" width={30} height={26} className="h-[26px] w-[30px]" draggable={false} />
           </button>
         </TooltipTrigger>
         <TooltipContent side="right">{t('Back to Projects')}</TooltipContent>
@@ -219,7 +219,7 @@ export function Sidebar() {
                   data-stage={STAGE_PERSONA[stage.id]}
                   data-rail-state={railState}
                   className={cn(
-                    'relative flex h-[58px] w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-lg transition-colors',
+                    'group relative flex h-[58px] w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-lg transition-colors',
                     isDisabled && 'cursor-not-allowed',
                     busyBlocked && 'opacity-40',
                     // 글자 색은 칸 모습이 정한다 — 예전처럼 다시 시도 칸의 빨강보다 뒤에 둬서 칸 모습 색이 이긴다(오래 걸림은 실패가 아니다, #stale-gate).
@@ -231,8 +231,16 @@ export function Sidebar() {
                   )}
                 >
                   <span className="relative">
-                    {/* 지금 단계 아이콘만 그 단계 색(브랜드 가이드 "현재 단계 아이콘") — 색은 data-stage 가 정한다. */}
-                    <Icon className={cn('size-[22px]', railState === 'current' && 'text-stage')} />
+                    {/* 지금 단계 아이콘만 그 단계 색(브랜드 가이드 "현재 단계 아이콘") — 색은 data-stage 가 정한다.
+                        다른 단계 아이콘은 이름보다 한 단계 밝은 #C2C0B6(11/5 시안), 다시 시도 칸은 칸의 빨강을 그대로 따른다. */}
+                    <Icon
+                      className={cn(
+                        'size-[22px]',
+                        railState === 'current'
+                          ? 'text-stage'
+                          : !(isArtistRetryable && !aiBusy) && cn('text-muted-foreground', !isDisabled && 'group-hover:text-foreground'),
+                      )}
+                    />
                     {railState === 'done' && (
                       <span
                         data-testid="rail-done-check"

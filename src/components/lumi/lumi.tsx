@@ -8,6 +8,7 @@
 //   약속: tests/chat/lumi-persona.test.ts
 import { useEffect, useImperativeHandle, useRef, useState, useSyncExternalStore, type Ref } from 'react'
 import {
+  LUMI_DRAW_SCALE,
   detectWebGL,
   lumiBox,
   lumiStageTheme,
@@ -64,6 +65,8 @@ interface LumiViewProps {
 /** 정해진 모습(mode) 그대로 그린다 — 그림 또는 <lumi-persona> 태그. 상태(파일 · WebGL · 동작 줄이기)는 Lumi 가 정한다. */
 export function LumiView({ mode, persona, state, variant = 'full', size, label, className, elementRef }: LumiViewProps) {
   const { width, height } = lumiBox(size, variant)
+  // 크기 이름(SYS)이면 몸이 상자 너비를 채우게 키워 그린다 — 숫자 크기(예전 자리)는 예전처럼.
+  const scale = variant === 'full' && typeof size !== 'number' ? LUMI_DRAW_SCALE : 1
   if (mode === 'still') {
     return (
       // eslint-disable-next-line @next/next/no-img-element -- 작은 정지 그림(webp)이라 이미지 최적화가 필요 없다.
@@ -75,7 +78,7 @@ export function LumiView({ mode, persona, state, variant = 'full', size, label, 
         height={height}
         draggable={false}
         className={cn('pointer-events-none select-none object-contain', className)}
-        style={{ width, height }}
+        style={{ width, height, transform: scale === 1 ? undefined : `scale(${scale})` }}
       />
     )
   }
@@ -91,7 +94,7 @@ export function LumiView({ mode, persona, state, variant = 'full', size, label, 
         aria-label={label}
         // 사용자 정의 태그는 true 를 빈 값으로 적는다 — 읽지 않음은 글자 "true" 로 넘긴다.
         aria-hidden={label ? undefined : 'true'}
-        style={{ width }}
+        style={{ width: Math.round(width * scale), flex: 'none' }}
       />
     </span>
   )

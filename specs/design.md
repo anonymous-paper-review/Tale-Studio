@@ -1,11 +1,11 @@
 ---
 name: tale-studio design system
-version: 1.0.0
-last_updated: 2026-11-03
+version: 1.1.0
+last_updated: 2026-11-09
 owner: shared
 canonical_implementation: src/app/globals.css
 source_of_truth: 토큰 값은 globals.css. design.md는 *역할 / 사용 룰 / 스케일 정량 명세*.
-design_source: Figma 「Tale Studio 리뉴얼 (복사)」 v3 (Claude 톤 · 확정 방향) — research/figma-renewal-v3/ (git 밖)
+design_source: Figma 「Tale Studio 리뉴얼 (복사)」 11/5 판(v3 + 11/4 리뷰 반영) — research/figma-renewal/2026-11-05_v3-review1104/ (git 밖, 11/3 판은 ../2026-11-03_v3/)
 ---
 
 # tale-studio design system — v3
@@ -16,7 +16,18 @@ design_source: Figma 「Tale Studio 리뉴얼 (복사)」 v3 (Claude 톤 · 확�
 >
 > 룰을 어기는 코드는 사용자가 명시적으로 허락하지 않는 한 reject. 위반이 반복되면 본 문서 또는 hooks를 강화.
 
-## 0. 이번 판(v1.0.0)이 바뀐 까닭
+## 0. 이번 판(v1.1.0)이 바뀐 까닭
+
+**2026-11-09 오너 "새 버전으로 적용해줘" — 디자이너 11/5 판(11/4 리뷰 반영)을 적용한다.** 글은 그대로고, 바뀐 것은
+- SYS 규칙 "모든 팝업에 똑같이, 간격은 10 대신 15": 팝업 틀(§13.3) · 기다리는 카드(§13.5) · 노드 · 카드 위 기다림과 완성 표시(§13.5) · Lumi 크기 이름(§15.4).
+- 로고 심볼: "책 두 권" → "반쪽 T · 꼬리 · 물방울"(§15.3).
+- 왼쪽 레일 색: 지금 단계 아이콘 = 단계 색, 다른 단계 아이콘 #C2C0B6, 끝낸 단계 표시 크림, 아래 단추 아이콘 · 글 사이 4(§13.1).
+- 넓힌 간격: 채팅 말풍선 · 빠른 답 칩(§13.10), 고르기 카드(§13.9).
+- 새 부품: 단계 확인 단추(§13.9) · AI 아이콘(§14.1).
+
+규칙 글과 실제 그림이 다른 두 곳은 **규칙 값을 따랐고 디자이너 확인 대기**다: 넓은 팝업 748(그림 AS 752) · 기다리는 팝업 372(그림 R5 408).
+
+### 1.0.0(2026-11-03)
 
 **2026-11-03 오너 지시 — 디자이너 v3 디자인을 적용한다.** 예전 판(0.4.0, Netflix Dark · Netflix Red 단일 accent · Geist)을
 v3 "Claude 톤"(따뜻한 무채색 · 크림 메인 단추 · 지금 단계 색 하나 · Pretendard + Inter)으로 갈아 끼웠다.
@@ -337,7 +348,8 @@ Tailwind v4 default. 설계 기준 **1440 × 900** (v3 시안 프레임). `xl:` 
 
 ### 6.3 Modal sizes
 
-sm `max-w-sm` · md `max-w-md` · lg `max-w-lg`(기본) · xl `max-w-2xl` · full `max-w-[90vw]`
+`<DialogContent size>` — `default` 520 · `wide` 748(SYS, 스타일 고르기처럼 고르는 칸이 많은 팝업). 샷 · 인물 상세처럼 큰 작업 창은 부르는 쪽이 폭을 준다(1080 등).
+11/9 기준 예전 호출 자리 40여 곳이 `sm:max-w-*` 로 폭을 따로 준다 — 화면을 맡은 갈래가 지우고, 남은 것은 합친 뒤 한 번에 지운다.
 
 ### 6.4 Icon sizes
 
@@ -350,7 +362,7 @@ sm `max-w-sm` · md `max-w-md` · lg `max-w-lg`(기본) · xl `max-w-2xl` · ful
 
 ### 6.5 Avatar sizes
 
-채팅 Lumi 28(말풍선 옆 · 머리), 빠른 답 물음 20, 프로필 32.
+채팅 Lumi: 옆 채팅 30(`size="chat"`) · 채팅 화면(P1 Producer 채팅) 36(`size="xs"`), 빠른 답 물음 20, 프로필 32. 큰 Lumi 크기는 §15.4.
 
 ---
 
@@ -392,7 +404,9 @@ v3 는 면 색 차이로 나눈다 — **테두리는 기본으로 그리지 않
 | Token | 사용 |
 |---|---|
 | `shadow-none` | 기본 |
-| `shadow-panel` | 큰 내용 판 · 팝오버 · 메뉴 · 다이얼로그 · 툴팁 (0 20 50, 검정 40%) |
+| `shadow-panel` | 큰 내용 판 · 팝오버 · 메뉴 · 툴팁 (0 20 50, 검정 40%) |
+| `shadow-dialog` | 팝업(SYS 0 30 80, 검정 55%) · 노드 위 기다림 카드 |
+| `shadow-loading` | 기다리는 카드(SYS 0 20 60, 검정 50%) |
 | `shadow-node` | Director 노드 (0 8 24, 검정 35%) |
 
 브랜드 가이드: **효과는 아래 그림자 하나만**. glow · 테두리 빛 · backdrop-blur 금지.
@@ -468,7 +482,8 @@ Radix primitive 는 body 로 portal — `<html data-stage>` 덕에 지금 단계
 └──────┴──────────────────────────────────────┴──────────────┘
 ```
 
-- **레일** `src/components/layout/sidebar.tsx`: 맨 위 Tale 로고(누르면 프로젝트 목록) · 단계 칸(v3 채움 아이콘 · 라벨 · 끝낸 단계 체크 · 지금 단계 밝은 바탕과 단계 색 아이콘) · 아래 Take · 공유 · 내보내기 · Help · 프로필. 칸 모습 판정은 `src/lib/stage-rail.ts` `railStageState`(약속 tests/project/rail-done-mark.test.ts).
+- **레일** `src/components/layout/sidebar.tsx`: 맨 위 Tale 로고(30×26, 누르면 프로젝트 목록) · 단계 칸(v3 채움 아이콘 · 라벨 · 끝낸 단계 체크 · 지금 단계 밝은 바탕과 단계 색 아이콘) · 아래 Take · 공유 · 내보내기 · Help · 프로필. 칸 모습 판정은 `src/lib/stage-rail.ts` `railStageState`(약속 tests/project/rail-done-mark.test.ts).
+  11/5 색: 지금 단계 아이콘 = 그 단계 색(`text-stage`) · 이름 #F5F4EE, 다른 단계 아이콘 #C2C0B6(`text-muted-foreground`) · 이름은 끝냄 #C2C0B6 · 안 연 #8E8B82, 끝낸 단계 체크 크림 #F5F4EE. 아래 단추는 아이콘 · 글 사이 4(`FooterIconItem`).
 - **위 막대** `src/components/layout/studio-top-bar.tsx` `StudioTopBar`: 단계 칩(`StageChip`) · 프로젝트 제목 + 연필(`ProjectTitleField`, 이름 바꾸기) · 오른쪽 자리. 스튜디오 레이아웃이 모든 단계 화면 위에 놓고(위에 붙는 sticky), Producer 시작 화면은 탭이 든 자기 막대를 같은 컴포넌트로 그린다. 화면이 오른쪽 자리에 단추를 놓을 때는 `<TopBarActions>`(포털).
 - **대시보드 머리** `src/components/dashboard/dashboard-header.tsx` `DashboardHeader`: 스튜디오 밖(/projects · /projects/new · /playground · /queue · /account) 공용 — 작업 화면과 같은 바탕색 막대 · `TaleLockup` · 탭 묶음 · 오른쪽 자리(새 프로젝트 등).
 - **화면 머리** `src/components/layout/page-header.tsx` `PageHeader`: `title` · `tag` · `meta` · `actions`(오른쪽, 메인은 크림). 작업 영역 맨 위.
@@ -480,9 +495,12 @@ Radix primitive 는 body 로 portal — `<html data-stage>` 덕에 지금 단계
 
 ### 13.3 Dialog anatomy
 
-shadcn `Dialog` — 바탕색 판 · `rounded-2xl` · `shadow-panel` · 막 검정 60%. 제목 `text-lg font-semibold`, 설명 `text-label text-muted-foreground`. 메인 단추(크림)는 오른쪽, 취소는 ghost.
+shadcn `Dialog`(`src/components/ui/dialog.tsx`) — **11/5 SYS "모든 팝업에 똑같이"**(R3 기준):
+너비 520 · 넓은 팝업 748(`size="wide"`) · 안쪽 위아래 50 · 양옆 30 · 블록 사이 20 · 모서리 22 · `shadow-dialog`(0 30 80 검정 55%) · 막 검정 60% · 바탕 `bg-side`.
+`DialogHeader` = 제목 묶음(Lumi · 제목 · 설명) 가운데 · 사이 15 · 위아래 6. 제목 20 Bold, 설명 13.5 · 줄 150% · `text-subtle-foreground`. 닫기 X 24px(위 13 · 오른쪽 23).
+`DialogFooter` 단추는 오른쪽 정렬 · 사이 8 · 둥근 알약(11/18 · 14 600) — 취소 `variant="secondary"`(#30302E), 확인 기본(크림).
 **확인 팝업**(큰 일을 하기 전에 "~할까요?"를 묻는 창 — 단계 넘기기 · 확정) 맨 위에는 큰 Lumi `<ConfirmLumi stage={지금 단계} />`
-(`src/components/handoff/confirm-lumi.tsx`: 지금 단계 옷 · `idle` · 폭 180). 지우기 확인 · 오류 안내에는 넣지 않는다. 지금 쓰는 곳: Producer 시작 확인(`features/entry/entry-form.tsx`) · Writer 로 넘기기 전 확정 창(`handoff/producer-lock-dialog.tsx`) · 산문 확정(`features/prose/prose-confirm-dialog.tsx`) · Artist 그림체 고르기 · 다시 만들기 · 완료(`features/artist-room/style-make-dialog.tsx` · `regenerate-style-dialog.tsx` · `artist-complete-dialog.tsx`) · Storyboard → Director 넘기기(`features/writer/storyboard-director-dialog.tsx`) · Director 로 넘기기 전 준비 창(`handoff/director-readiness-dialog.tsx`) · Director 다시 만들기 · 영상 만들기 확인(`features/director/regenerate-confirm-dialog.tsx`).
+(`src/components/handoff/confirm-lumi.tsx`: 지금 단계 옷 · `idle` · SYS "팝업 제목 위" M 78, 단계 밖 팝업은 `persona="pearl"`). 자리는 `DialogHeader` 안 맨 위 — Header 앞에 둔 창도 틀이 Lumi · 제목 사이를 15 로 맞춘다. 지우기 확인 · 오류 안내에는 넣지 않는다. 지금 쓰는 곳: Producer 시작 확인(`features/entry/entry-form.tsx`) · Writer 로 넘기기 전 확정 창(`handoff/producer-lock-dialog.tsx`) · 산문 확정(`features/prose/prose-confirm-dialog.tsx`) · Artist 그림체 고르기 · 다시 만들기 · 완료(`features/artist-room/style-make-dialog.tsx` · `regenerate-style-dialog.tsx` · `artist-complete-dialog.tsx`) · Storyboard → Director 넘기기(`features/writer/storyboard-director-dialog.tsx`) · Director 로 넘기기 전 준비 창(`handoff/director-readiness-dialog.tsx`) · Director 다시 만들기 · 영상 만들기 확인(`features/director/regenerate-confirm-dialog.tsx`).
 
 ### 13.4 Form anatomy
 
@@ -492,12 +510,17 @@ label 위 · input 아래 · helper/error 더 아래. 입력칸은 카드색 · 
 
 데이터 모양을 알면 Skeleton, 모르면 Spinner + 동사 문구. 그림 자리는 `bg-art-placeholder`.
 
-**단계 넘어가며 기다리는 화면**은 AI 잠금 덮개에 큰 Lumi 를 준다 — `<AiBusyOverlay lumi={옷} />`(`src/components/ai-busy-overlay.tsx` `AiBusyCard`,
-시안 Content/Loading Card): 큰 Lumi `loading`(폭 240, 일이 멈춰 실패 안내가 되면 `error`) · 제목 22/700 · 설명 · 진행 막대(폭 300, Lumi 옷의 단계 색 기울기 —
-화이트 펄 · 완성 옷이면 놓인 화면의 색) · 단계 목록(카드색 상자). 옷 = 넘어가는 다음 단계. 쓰는 곳: Producer 글 읽기 · Writer 산문 초안(Producer 에서 넘길 때 · Writer 화면) · Artist 그림 ·
+**단계 넘어가며 기다리는 화면**은 AI 잠금 덮개에 Lumi 를 준다 — `<AiBusyOverlay lumi={옷} />`(`src/components/ai-busy-overlay.tsx` `AiBusyCard`,
+11/5 시안 Feedback/Loading Card · SYS 로딩 팝업, WL 기준): 폭 372 · 안쪽 50/30 · 사이 15 · 모서리 20 · `shadow-loading` ·
+Lumi L(100, `loading`, 일이 멈춰 실패 안내가 되면 `error`) → 제목 16 Bold → 설명 12.5 → 단계(✓ 끝남 흰 · ● 지금 단계 색 · ○ 남음 흐림) → 진행 막대(4 · 모서리 2).
+색 = Lumi 옷(기본 화이트 펄 + 단계 6색 = 7가지, 화이트 펄 · 완성 옷이면 놓인 화면의 색). 막대는 단계 색 기울기 — 시안은 단색이지만 출시 테스트가 기울기를 못 박아 결정 대기. 옷 = 넘어가는 다음 단계. 쓰는 곳: Producer 글 읽기 · Writer 산문 초안(Producer 에서 넘길 때 · Writer 화면) · Artist 그림 ·
 Storyboard 나누기 · 첫 러프. 덮개 없이 화면 가운데에 큰 Lumi `loading`(폭 300)만 두는 곳: 새 프로젝트 만들기(`/projects/new`, Producer 옷 · 실패면 `error`) ·
 Editor 클립 준비. `lumi` 를 안 주는 잠금(그림 다시 그리기 · 샷 고치기 팝업 위 등)은 도는 원의 작은 카드 그대로(약속 tests/project/busy-overlay-lumi.test.ts).
 실패 안내의 오류 모습 큰 Lumi 도 단계를 넘어가는 기다림의 실패에만 둔다 — Storyboard 보드에서 컷을 다시 그리다 난 실패는 작은 카드(약속 tests/writer/board-wait-lumi.test.ts).
+
+**노드 · 카드 위에서 기다릴 때**(SYS, DG 기준) — `src/components/feedback/node-wait.tsx` `<NodeWaitCard lumi title description? progress? note? />`:
+그 노드(부모 `relative`)를 꽉 덮고 여백 18 · Lumi S(56, 만드는 중) · 단계 색 테두리 1.5(`STAGE_FRAME`) · 제목 14 Bold · 설명 12.5 · 막대. 한 번에 하나씩 덮고 나머지 노드는 그대로 둔다(붙이는 쪽이 정한다).
+**완성 표시**: 단계 그라데이션 "✓ 완성" 알약(`<DoneBadge lumi? />`) + 단계 색 테두리(`STAGE_FRAME`). DG 그림의 완성 노드에 있는 단계 색 빛(0 0 24)은 §9 빛 금지라 넣지 않았다. 약속 tests/project/node-wait.test.ts · tests/project/loading-card.test.ts.
 
 ### 13.8 Component patterns (shadcn primitives)
 
@@ -519,15 +542,17 @@ Editor 클립 준비. `lumi` 를 안 주는 잠금(그림 다시 그리기 · �
 | 컴포넌트 | 쓰는 곳 |
 |---|---|
 | `ChoiceChip` (`selected` · `recommended` · `tone="screen\|chat"`) | 장르 · 필터 · 빠른 답 — 32px 알약, `aria-pressed` |
-| `OptionCard` (`title` · `description` · `selected` · `recommended`) | 길이 · 화면 비율 · 바꿈 정도 |
+| `OptionCard` (`title` · `description` · `selected` · `recommended`) | 길이 · 화면 비율 · 바꿈 정도 — 안 사이 9(11/5) |
 | `RecommendBadge` | "추천" — 지금 단계 색 |
 | `StageChip` (`stage`) | 위 막대 · 단계 표시 — 배지 그라데이션 |
+| `StageConfirm` (`stage` · `onConfirm` · `onRevise` · `tone="screen\|chat"`) | 단계를 넘길지 묻는 한 쌍(11/5 Control/Stage Confirm) — 왼쪽 크림 알약 = 다음 단계 아이콘 + "좋아요, 산문 쓰기로 / 그림 그리기로 / 콘티 짜기로 / 연출하기로 / 편집하기로 / 완성하기", 오른쪽 "아니요, 더 고칠래요"(chat 이면 한 단계 밝은 바탕). 약속 tests/project/stage-confirm.test.ts |
 
 ### 13.10 Chat panel (v3)
 
 - 머리: Lumi 그림(지금 단계 옷, 답을 기다리면 생각하는 모습) · "Lumi와 {단계에서 하는 일} 이야기"(`STAGE_CHAT_TITLE`, 약속 tests/chat/header-title.test.ts) · 접기(»).
 - 대화는 모든 단계가 이어지는 하나 — 구간 구분선(지금 구간만 단계 색).
-- Lumi 말풍선: 턴 첫 메시지에 아바타 · "Lumi"(단계 색), 이어지는 메시지는 들여쓴다. 승인 카드도 말풍선 꼴(제목 + 보조 글자).
+- Lumi 말풍선: 턴 첫 메시지에 아바타(30) · "Lumi"(단계 색), 이어지는 메시지는 들여쓴다. 승인 카드도 말풍선 꼴(제목 + 보조 글자).
+  11/5 간격: 말풍선 안쪽 위아래 18 · 양옆 22, 안의 줄(이름 · 제목 · 본문) 사이 12, 말풍선 사이 20, 빠른 답 칩 사이 10.
 - 내 말풍선 · 빠른 답 칩(줄바꿈, 고른 칩 단계 색, 숫자 단축키 흐리게) · 입력 알약(카드색 · 포커스 단계 색 · 크림 보내기 원).
 - 알약 아래 한 줄: [+] 첨부(Writer) · 단계 칩(빠른 요청 · 다음 단계) · @멘션 · 모델 고르기.
 - 닫힌 채팅: 다른 단계는 오른쪽 접힌 레일(« · Lumi 얼굴), Director 는 레일 없이 툴바 끝 Lumi 알약(`features/director/lumi-chat-pill.tsx`). 알약의 Lumi 는 채팅 Lumi 와 같은 모습(생각 중 · 오류)이고, 닫힌 동안 새로 온 Lumi 말 수를 지금 단계 색 숫자로 보인다(채팅을 열면 0). 카드를 멘션하면 닫힌 채팅이 먼저 열린다(약속 tests/director/chat-closed.test.ts).
@@ -538,7 +563,7 @@ Editor 클립 준비. `lumi` 를 안 주는 잠금(그림 다시 그리기 · �
 
 ### 14.1 Library
 
-- **v3 채움 아이콘** `src/components/icons/v3-icons.tsx`(Figma Icons · 채움 16개): 단계 · 레일 아래 단추 · 위 막대 연필 · 탭(화면에서 고르기 · 채팅으로 만들기) · 채팅 접기/열기 · 직접 작성. `currentColor`.
+- **v3 채움 아이콘** `src/components/icons/v3-icons.tsx`(Figma Icons · 채움 17개): 단계 · 레일 아래 단추 · 위 막대 연필 · 탭(화면에서 고르기 · 채팅으로 만들기) · 채팅 접기/열기 · 직접 작성 · AI(`AiIcon`, 11/5 반짝이는 별). `currentColor`.
 - **Lucide** (`lucide-react`): 화면 안 작은 선 기호(+ · × · 화살표 · 시계 · 갈매기) — v3 "Icons · 선"과 같은 결.
 
 ### 14.2 Icon + label 페어링
@@ -555,7 +580,7 @@ Figma 에 있는 v3 아이콘은 `v3-icons.tsx` 에 더한다(이름 `<Name>Icon
 
 ### 15.1 Aspect ratios
 
-1:1 인물 · 16:9 배경 · 영상 · 9:16 세로 · 2.39:1 시네마. 큰 Lumi 3:2.
+1:1 인물 · 16:9 배경 · 영상 · 9:16 세로 · 2.39:1 시네마. Lumi 상자 1 : 0.77(SYS) — 그림 · 움직이는 Lumi(3:2)는 그 가운데에 놓는다.
 
 ### 15.2 Placeholder
 
@@ -567,14 +592,27 @@ Figma 에 있는 v3 아이콘은 `v3-icons.tsx` 에 더한다(이름 `<Name>Icon
 
 ### 15.3 브랜드 자산
 
-- 로고 심볼 `public/brand/tale-symbol.svg`(어두운 바탕용) — 레일 맨 위 30px.
-- 로고 묶음 `src/components/tale-lockup.tsx` `TaleLockup`(심볼 + 글자 "tale studio", v3 Logo/Tale Lockup) — 대시보드 머리 · 랜딩 머리 · 꼬리말.
+- 로고 심볼 `public/brand/tale-symbol.svg`(어두운 바탕용) — 11/5 새 심볼 "반쪽 T · 꼬리 · 물방울"(브랜드 가이드 157:687 그대로, 캔버스 225:198 = 그림자 자리를 품은 틀). 레일 맨 위 30×26.
+- 로고 묶음 `src/components/tale-lockup.tsx` `TaleLockup size={틀 높이}`(심볼 + 글자 "tale studio", v3 Logo/Tale Lockup) — 로그인 32 · 홈 36 · 프로젝트 목록 26(11/5 시안), 대시보드 머리 · 랜딩 머리 · 꼬리말.
+- 앱 아이콘 · 파비콘(`src/app/icon.png` · `favicon.ico`)은 바꾸지 않았다 — 브랜드 가이드에 "심볼만 쓸 때: 사이드바 홈 30px · 앱 아이콘 · 파비콘" 한 줄만 있고 크기 · 바탕 · 여백 규격이 없다(결정 대기).
 - 색 · 기울기 · 겹침 색을 바꾸지 않는다, 심볼에 테두리 · 흰 광택을 넣지 않는다(브랜드 가이드 "로고 쓰는 법").
 
 ### 15.4 Lumi
 
+- **크기 이름(11/5 SYS)** `LUMI_SIZE`(`src/lib/lumi.ts`) — 너비 기준, 상자 1 : 0.77(`lumiBox`):
+
+  | 이름 | 너비 | 쓰는 곳 |
+  |---|---|---|
+  | `xl` | 150 | 화면 첫 인사(P1) |
+  | `l` | 100 | 기다리는 팝업 · 페이지 머리 |
+  | `m` | 78 | 팝업 제목 위(`ConfirmLumi`) |
+  | `s` | 56 | 노드 · 카드 위에서 기다릴 때(`NodeWaitCard`) |
+  | `xs` | 36 | 채팅 아바타(채팅 화면) |
+  | `chat` | 30 | 옆 채팅 아바타 |
+
+  `size` 에 숫자를 주던 예전 자리는 그 너비 그대로 그린다(높이만 0.77). 새로 쓰는 곳은 이름을 쓴다.
 - **큰 Lumi** `<Lumi persona state size />`(`src/components/lumi/lumi.tsx`): `public/lumi-persona.js`(웹 컴포넌트 `<lumi-persona>`, 약 3.1MB)를 **처음 그릴 때만** 불러온다. 다 불러오기 전 · WebGL 없음 · 불러오기 실패 → 같은 모습의 그림(`public/lumi/full/*.webp`), 동작 줄이기 → `paused`. 한 화면에 큰 Lumi 는 하나. 자리: 확인 팝업(`ConfirmLumi`, §13.3) · 단계 넘어가며 기다리는 화면(`AiBusyOverlay lumi`, §13.5) · 새 프로젝트 만드는 화면(`/projects/new`, Producer 옷 `loading`) · 프로젝트 목록 첫 화면(화이트 펄 `idle` 폭 320 — 목록 머리 왼쪽, 빈 목록이면 빈 안내 자리).
-- **채팅 아바타** `<LumiAvatar persona state size />`: 그림만(`public/lumi/avatar/*.webp`, 80px). 바탕은 그 단계 색 12%.
+- **채팅 아바타** `<LumiAvatar persona state size />`: 그림만(`public/lumi/avatar/*.webp`, 80px). 바탕은 그 단계 색 12%. 기본 크기 `chat`(30).
 - persona: `pearl`(시작 · 목록) · 여섯 단계 · `complete`(작품 완성). state: idle · listening · thinking · complete · error · loading. 단계 id → persona 는 `STAGE_PERSONA`.
 
 ---

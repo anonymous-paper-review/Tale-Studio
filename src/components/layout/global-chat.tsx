@@ -183,16 +183,17 @@ function LumiBubble({
   className?: string
 }) {
   return (
-    <div data-stage={STAGE_PERSONA[stage]} className={cn('flex gap-2', first ? 'mt-2' : 'pl-9')}>
-      {first && <LumiAvatar persona={STAGE_PERSONA[stage]} size={28} />}
+    // 11/5 시안 Chat/Lumi — 말풍선 안쪽 위아래 18 · 양옆 22, 안의 줄(이름 · 제목 · 본문) 사이 12, 아바타는 옆 채팅 크기(30).
+    <div data-stage={STAGE_PERSONA[stage]} className={cn('flex gap-2', first ? 'mt-2' : 'pl-[38px]')}>
+      {first && <LumiAvatar persona={STAGE_PERSONA[stage]} size="chat" />}
       <div
         className={cn(
-          'group relative min-w-0 flex-1 select-text rounded-xl rounded-tl-[6px] bg-chat-lumi-bubble px-4 pb-3.5 pt-3 text-chat text-foreground',
+          'group relative flex min-w-0 flex-1 select-text flex-col gap-3 rounded-xl rounded-tl-[6px] bg-chat-lumi-bubble px-[22px] py-[18px] text-chat text-foreground',
           className,
         )}
       >
-        {first && <p className="mb-1.5 text-micro font-semibold leading-none text-stage">Lumi</p>}
-        {title ? <div className="mb-1 font-semibold">{title}</div> : null}
+        {first && <p className="text-micro font-semibold leading-none text-stage">Lumi</p>}
+        {title ? <div className="font-semibold">{title}</div> : null}
         <div className={cn(title ? 'text-muted-foreground' : undefined)}>{children}</div>
       </div>
     </div>
@@ -1427,12 +1428,13 @@ export function GlobalChat() {
 
         {/* Messages */}
         <ScrollArea className="min-h-0 flex-1 px-5 pb-3 pt-2">
-          <div className="space-y-3">
+          {/* 11/5 시안 — 말풍선 사이 20(구간 사이도 같다). */}
+          <div className="space-y-5">
 
             {sections.filter(section => section.messages.length > 0).map((section, si) => (
               <section
                 key={`${section.stage}-${si}`}
-                className={cn('space-y-2.5', si > 0 && 'pt-2')}
+                className="space-y-5"
               >
                 <StageDivider stage={section.stage} current={section.current} />
                 {/* 렌더 분류 (#oiioii-chat) — 유저만 채운 말풍선, 에이전트는 flat 출력 +
@@ -1731,8 +1733,8 @@ export function GlobalChat() {
                   {t('Click an option to put it in your message, then send.')}
                 </p>
               )}
-              {/* 빠른 답(v3 Control/Choice Chip) — 줄바꿈하며 늘어선 32px 알약. 고른 칩은 지금 단계 색 테두리 · 18% 바탕(Lumi 가이드 .quick-reply). */}
-              <div className="flex flex-wrap gap-1.5">
+              {/* 빠른 답(v3 Control/Choice Chip) — 줄바꿈하며 늘어선 32px 알약, 칩 사이 10(11/5). 고른 칩은 지금 단계 색 테두리 · 18% 바탕(Lumi 가이드 .quick-reply). */}
+              <div className="flex flex-wrap gap-2.5">
               {choices.options.map((opt, oi) => {
                 if (choices.displayOnly) {
                   return (

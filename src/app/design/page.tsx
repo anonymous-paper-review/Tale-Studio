@@ -313,7 +313,7 @@ export default function DesignShowcasePage() {
       </Section>
 
       <Section title="Loading card (11/5 SYS)" hint="components/ai-busy-overlay.tsx AiBusyCard — lumi given: Feedback/Loading Card (372 · Lumi L · steps ✓ ● ○ · bar). pearl = default (cream on the project list), six stages = stage colour. Stopped: error Lumi. No lumi: small spinner card as before">
-        <div className="grid justify-items-center gap-6 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(0,372px))] gap-6">
           {(['pearl', 'producer', 'writer', 'artist', 'storyboard', 'director', 'editor'] as const).map((persona) => (
             <AiBusyCard
               key={persona}

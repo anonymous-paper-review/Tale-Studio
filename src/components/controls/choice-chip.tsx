@@ -74,7 +74,7 @@ export function OptionCard({ title, description, selected = false, recommended =
       type={type}
       {...selectionState(role, selected)}
       className={cn(
-        'flex min-w-0 flex-col items-start gap-1 rounded-[14px] border-[1.5px] px-4 py-3.5 text-left transition-colors duration-100 ease-out',
+        'flex min-w-0 flex-col items-start gap-[9px] rounded-[14px] border-[1.5px] px-4 py-3.5 text-left transition-colors duration-100 ease-out',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50',
         selected ? 'border-stage bg-stage/18' : 'border-transparent bg-card hover:bg-accent',
         className,
