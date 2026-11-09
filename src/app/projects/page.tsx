@@ -4,8 +4,9 @@
 //   로그인 전용(middleware 가 /login 으로 보냄). 랜딩(/)은 순수 마케팅 페이지가 됐고,
 //   로그인 상태로 / 진입 시 middleware 가 여기로 돌린다.
 //   상단 탭: 프로젝트(여기) | Playground(공개 갤러리, /playground).
-//   v3(2026-11-03): 작업 화면과 같은 따뜻한 무채색 바탕 · 카드는 큰 내용 판(panel), 첫 화면에 큰 Lumi(화이트 펄 · 기본 모습,
-//   오너 11/3 결정 8 · Lumi 가이드 "pearl = 시작 · 홈, 프로젝트 목록"). 한 화면에 큰 Lumi 는 하나 — 빈 목록이면 빈 안내 자리에 둔다.
+//   v3(2026-11-03): 작업 화면과 같은 따뜻한 무채색 바탕 · 카드는 큰 내용 판(panel).
+//   11/5 시안 R2(오너 2026-11-09 추천대로): 머리에는 큰 Lumi 를 두지 않는다 — 프로젝트가 하나도 없을 때의 첫 화면에만 Lumi(화이트 펄).
+//   카드마다 단계 이름 앞에 그 단계 색 점(design.md 규칙 3의 예외).
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -15,7 +16,6 @@ import {
 } from '@/stores/project-store'
 import { PageHeader } from '@/components/layout/page-header'
 import { Lumi } from '@/components/lumi/lumi'
-import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
@@ -38,7 +38,7 @@ import {
   prevEpisodeLink,
   type SeriesPlanState,
 } from '@/features/projects/series-list'
-import { DEFAULT_PROJECT_SORT, visibleProjects, type ProjectSort } from '@/features/projects/project-list'
+import { DEFAULT_PROJECT_SORT, projectStageDot, visibleProjects, type ProjectSort } from '@/features/projects/project-list'
 import { ProjectListTools } from '@/features/projects/project-list-tools'
 import { SeriesDeleteWarningDialog } from '@/features/projects/next-episode-dialog'
 import { NewProjectDialog } from '@/features/projects/new-project-dialog'
@@ -212,7 +212,11 @@ function ProjectCard({
       ) : null}
       {/* 단계 · 며칠 전(11/5 시안 R2: 사이 8, 시계 아이콘 없음) */}
       <div className="mt-3 flex items-center gap-2">
-        <Badge variant="tag">{projectStageLabel(project.current_stage)}</Badge>
+        {/* 단계 칩(11/5 시안 R2) — 그 단계 색 점 + 화면 이름. */}
+        <span className="inline-flex items-center gap-1.5 rounded-[6px] bg-side-raised px-2 py-[3px] text-micro font-medium text-muted-foreground">
+          <span className={`size-1.5 shrink-0 rounded-full ${projectStageDot(project.current_stage)}`} aria-hidden />
+          {projectStageLabel(project.current_stage)}
+        </span>
         {project.updated_at && (
           <span className="font-num text-meta font-medium text-subtle-foreground">{relativeTime(project.updated_at, t)}</span>
         )}
@@ -328,7 +332,6 @@ export default function ProjectsPage() {
           {/* 첫 화면 머리 — 큰 Lumi(화이트 펄)가 목록 쪽을 바라본다(꼬리는 왼쪽, 얼굴은 오른쪽). */}
           {/* 11/5 시안 R2 머리 — 제목 30 · 다음 줄 메타(stacked), 찾기 · 정렬은 머리 오른쪽(List Tools). */}
           <section className="mb-6 flex items-center gap-2">
-            <Lumi persona="pearl" state="idle" size={320} className="-ml-12 shrink-0" />
             <PageHeader
               variant="stacked"
               className="min-w-0 flex-1"
