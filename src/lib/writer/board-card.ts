@@ -107,6 +107,22 @@ export function cardWaitLook({ drawing, boardLocked, columns }: { drawing: boole
   return columns >= 5 ? 'card-compact' : 'card'
 }
 
+/** 카드 전체를 덮는 기다림 카드(card · card-compact)를 쓰는 모습인가. */
+export function coversCard(look: CardWaitLook): boolean {
+  return look === 'card' || look === 'card-compact'
+}
+
+// 화면 읽기에 알리는 기다림 카드는 하나(검토 B 5c) — 여럿이 알리면 더한 샷 여럿을 한꺼번에 그릴 때 같은 말을 겹쳐 읽는다.
+//   기다림 카드를 쓰는 카드 중 보드 순서(씬 → 샷)로 첫 장. 접힌 씬은 화면 읽기에서 숨겨져 알려도 읽히지 않으니 건너뛴다.
+//   약속: tests/writer/added-shot-board.test.ts
+export function announcedWaitShot(
+  boardOrder: ReadonlyArray<{ shotId: string; sceneId: string }>,
+  lookOf: (shotId: string) => CardWaitLook,
+  collapsedScenes: ReadonlySet<string>,
+): string | null {
+  return boardOrder.find(({ shotId, sceneId }) => !collapsedScenes.has(sceneId) && coversCard(lookOf(shotId)))?.shotId ?? null
+}
+
 export interface CardDialogue {
   speaker: string
   text: string

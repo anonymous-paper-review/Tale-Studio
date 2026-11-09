@@ -76,7 +76,16 @@ import {
   type BoardLockState,
 } from '@/lib/writer/board-busy'
 import { boardShots, directorConfirmView, directorHandoffSummary, sceneStats, sceneStatsLabel, storyboardBriefing } from '@/lib/writer/board-summary'
-import { boardStoryFontSize, cardDialogue, cardWaitLook, mentionSegments, sceneHeadTitle, shotCardChips } from '@/lib/writer/board-card'
+import {
+  announcedWaitShot,
+  boardStoryFontSize,
+  cardDialogue,
+  cardWaitLook,
+  coversCard,
+  mentionSegments,
+  sceneHeadTitle,
+  shotCardChips,
+} from '@/lib/writer/board-card'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import {
   isContentPolicyBlocked,
@@ -1103,6 +1112,10 @@ export function RoughStoryboardView() {
   const globalShotNo = new Map(boardList.map((entry) => [entry.shot.shotId, entry.shotNo]))
   // 설명문 폰트(#zoom-desc) — 열이 늘수록(축소) 글자도 줄여 전문이 들어가게. 기본 3열은 11/5 시안 S1 의 13.5px(보드 전용 크기표, lib/writer/board-card).
   const descFontSize = boardStoryFontSize(cols)
+  // 그리는 카드의 기다림 모습(lib/writer/board-card cardWaitLook). 화면 읽기에 알리는 기다림 카드는 보드 순서(씬 → 샷)로 첫 장 하나다(검토 B 5c).
+  const waitLookOf = (shotId: string) =>
+    cardWaitLook({ drawing: jobOf(shotId)?.status === 'generating', boardLocked: busy.open, columns: cols })
+  const announcedWaitShotId = announcedWaitShot(boardList.map((entry) => entry.shot), waitLookOf, collapsedScenes)
 
   // v3 씬 머리(시안 S1) — 이름(장소 · 때) · 요약 · 컷 수 · 초. 셈은 화면 머리와 같다(lib/writer/board-summary sceneStats).
   const statsByScene = sceneStats(sceneManifest, shots)
@@ -1240,8 +1253,8 @@ export function RoughStoryboardView() {
                     // 그리는 카드 위 기다림(11/5 SYS 노드 · 카드 위, 오너 2026-11-09) — "그리는 중" 판정 · 동시에 그리는 순서는 그대로, 모양만.
                     //   잠긴 보드는 예전 가벼운 표시, 잠금 없이 그리는 카드(더한 샷)만 카드 전체를 덮는다(고르는 규칙: lib/writer/board-card cardWaitLook).
                     const drawing = job?.status === 'generating'
-                    const waitLook = cardWaitLook({ drawing, boardLocked: busy.open, columns: cols })
-                    const waitOnCard = waitLook === 'card' || waitLook === 'card-compact'
+                    const waitLook = waitLookOf(shot.shotId)
+                    const waitOnCard = coversCard(waitLook)
                     return (
                       <article
                         key={shot.shotId}
@@ -1432,11 +1445,12 @@ export function RoughStoryboardView() {
                         ) : null}
                         {waitOnCard ? (
                           // 카드 전체를 덮는다(SYS "그 노드 크기에 맞춘다", 기다림 카드가 스스로 카드를 꽉 채운다) — 덮인 카드도 누르면 지금처럼 고치기 팝업이 열린다.
-                          //   좁은 카드(축척 5 · 6열)는 여백 · 사이를 줄이고 설명(샷 이름 · 길이)을 뺀다.
+                          //   좁은 카드(축척 5 · 6열)는 여백 · 사이를 줄이고 설명(샷 이름 · 길이)을 뺀다. 화면 읽기에는 첫 장만 알린다(announce).
                           <NodeWaitCard
                             lumi="storyboard"
                             title={t('Drawing the rough')}
                             description={waitLook === 'card-compact' ? undefined : `${shotLabel} · ${t('{seconds}s', { seconds: shot.durationSeconds })}`}
+                            announce={shot.shotId === announcedWaitShotId}
                             className={waitLook === 'card-compact' ? 'gap-2 p-2.5' : undefined}
                           />
                         ) : null}
