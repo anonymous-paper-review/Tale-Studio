@@ -33,7 +33,7 @@ vi.mock('@/lib/editor-persistence', () => ({
 }))
 
 import { useEditorStore } from '@/stores/editor-store'
-import { AUDIO_SPLIT_LIMIT_MS, finishEditorOpen } from '@/features/editor/open-editor'
+import { AUDIO_SPLIT_LIMIT_MS, EDITOR_FETCH_LIMIT, finishEditorOpen, runLimited } from '@/features/editor/open-editor'
 import { editorPrepTitle } from '@/features/editor/editor-labels'
 import { translate } from '@/lib/i18n/translate'
 import type { PersistedEditor } from '@/lib/editor-persistence'
@@ -242,27 +242,51 @@ describe('처음 여는 동안 · 연 뒤 고친 것이 없어지지 않는다',
     expect(mocks.saveEditorState).not.toHaveBeenCalled()
     expect(mocks.saveEditorStateNow).not.toHaveBeenCalled()
     expect(putBodies()).toHaveLength(0)
+    // 다음에 열기: 저장한 편집이 없으니 처음부터 다시 나눈다 — 반쯤 놓였던 오디오(3초로 옮긴 것)는 남지 않고 새로 놓인다.
+    const decode = vi.fn(async () => ({ durationSec: 5, peaks: peaksOf(3) }))
+    await openLikePage({ decodeAudio: decode })
+    expect(decode).toHaveBeenCalledTimes(2)
+    expect(useEditorStore.getState().audioClips.map((a) => [a.startSec, a.peaks])).toEqual([[0, peaksOf(3)], [5, peaksOf(3)]])
+    expect(useEditorStore.getState().editorPrep).toBeNull()
   })
 })
+
+/** 이 브라우저에 저장한 편집 — 샷이 든 저장본(예전 Editor 가 저장한 그대로의 모양). */
+function savedEdit(over: Partial<PersistedEditor> = {}): PersistedEditor {
+  const shot = (shotId: string) => ({ shotId, sceneId: 'scene-1', shotType: 'MS', actionDescription: '', characters: [], durationSeconds: 5, generationMethod: 'I2V', dialogueLines: [], camera: {}, lighting: {}, referenceImageUrl: null }) as unknown as PersistedEditor['shots'][number]
+  return {
+    version: 1,
+    shots: [shot('shot-1'), shot('shot-2')],
+    clipOrder: { 'scene-1': ['shot-1', 'shot-2'] },
+    videoClips: [],
+    audioClips: [],
+    audioSources: [],
+    audioTracks: [{ id: 'atrack_1' }],
+    panelSizes: { sourceW: 260, previewH: 240 },
+    ...over,
+  }
+}
+const savedAudio = (id: string, startSec: number, peaks: number[]) => ({ id, name: 'MS audio', url: 'https://video.test/1.mp4', startSec, durationSec: 5, peaks, sourceOffsetSec: 0, sourceDurationSec: 5, volume: 1, muted: false, trackId: 'atrack_1' })
 
 describe('다시 들어올 때', () => {
   it('저장한 편집이 있으면 오디오를 다 지웠어도 다시 들어올 때 소리를 다시 놓지 않는다', async () => {
     // 왜: 예전에는 오디오 칸이 비어 있으면 처음 여는 것으로 보고 소리를 다시 놓아, 다 지운 오디오가 되살아났다.
-    const saved: PersistedEditor = {
-      version: 1,
-      shots: [],
-      clipOrder: { 'scene-1': ['shot-1', 'shot-2'] },
-      videoClips: [],
-      audioClips: [],
-      audioSources: [],
-      audioTracks: [{ id: 'atrack_1' }],
-      panelSizes: { sourceW: 260, previewH: 240 },
-    }
-    mocks.loadEditorState.mockResolvedValue(saved)
+    mocks.loadEditorState.mockResolvedValue(savedEdit())
     const decode = vi.fn(async () => ({ durationSec: 5, peaks: peaksOf(1) }))
     await openLikePage({ decodeAudio: decode })
     expect(useEditorStore.getState().audioClips).toHaveLength(0)
     expect(decode).not.toHaveBeenCalled()
+    expect(useEditorStore.getState().editorPrep).toBeNull()
+  })
+
+  it('11/3 고장이 남긴 빈 저장본(샷 0)이 있으면 처음 여는 것으로 보고 소리를 나누어 놓는다', async () => {
+    // 왜: 11/3 늦은 비우기가 샷 · 오디오가 하나도 없는 편집 상태를 저장한 프로젝트가 있다(운영 3945d1e6 서버 편집 상태 샷 0).
+    //   그 저장본을 "되살린 편집"으로 보면 소리가 영영 놓이지 않는다(2026-11-10 검토 A E1). 고장: 그 프로젝트를 이 브라우저에서 다시 열 때.
+    mocks.loadEditorState.mockResolvedValue(savedEdit({ shots: [], clipOrder: {}, audioClips: [] }))
+    const decode = vi.fn(async () => ({ durationSec: 5, peaks: peaksOf(1) }))
+    await openLikePage({ decodeAudio: decode })
+    expect(decode).toHaveBeenCalledTimes(2)
+    expect(useEditorStore.getState().audioClips).toHaveLength(2)
     expect(useEditorStore.getState().editorPrep).toBeNull()
   })
 
@@ -273,10 +297,92 @@ describe('다시 들어올 때', () => {
     mocks.loadEditorState.mockReturnValue(later.promise)
     const opening = openLikePage()
     await vi.waitFor(() => expect(useEditorStore.getState().shots).toHaveLength(2))
+    // 되살리기 전: 기다리는 카드이고, 타임라인은 아직 DB 순서다.
     expect(useEditorStore.getState().editorPrep).not.toBeNull()
-    later.resolve(null)
+    expect(useEditorStore.getState().clipOrder['scene-1']).toEqual(['shot-1', 'shot-2'])
+    later.resolve(savedEdit({ clipOrder: { 'scene-1': ['shot-2', 'shot-1'] }, audioClips: [savedAudio('audio_saved', 9, peaksOf(4))] }))
     await opening
+    // 편집 화면이 열릴 때는 저장한 순서 · 오디오 자리가 이미 들어와 있다.
+    const st = useEditorStore.getState()
+    expect(st.editorPrep).toBeNull()
+    expect(st.clipOrder['scene-1']).toEqual(['shot-2', 'shot-1'])
+    expect(st.audioClips.map((a) => a.startSec)).toEqual([9])
+  })
+
+  it('되살린 편집에 파형이 없는 오디오가 있으면 편집 화면을 연 뒤 뒤에서 파형을 채운다', async () => {
+    // 왜: 30초를 넘겨 먼저 연 뒤 파형이 덜 찬 채 떠나면, 다음부터 그 오디오는 파형 없이 열렸다(검토 A E5). 고장: 느린 연결에서 처음 연 뒤 바로 떠날 때.
+    mocks.loadEditorState.mockResolvedValue(savedEdit({ audioClips: [savedAudio('audio_bare', 0, []), savedAudio('audio_full', 5, peaksOf(2))] }))
+    const hold = deferred<{ durationSec: number; peaks: number[] }>()
+    const decode = vi.fn(() => hold.promise)
+    await openLikePage({ decodeAudio: decode })
     expect(useEditorStore.getState().editorPrep).toBeNull()
+    expect(useEditorStore.getState().audioClips.find((a) => a.id === 'audio_bare')?.peaks).toEqual([])
+    await vi.waitFor(() => expect(decode).toHaveBeenCalledTimes(1))
+    hold.resolve({ durationSec: 4.4, peaks: peaksOf(7) })
+    await vi.waitFor(() => expect(useEditorStore.getState().audioClips.find((a) => a.id === 'audio_bare')).toMatchObject({ peaks: peaksOf(7), sourceDurationSec: 4.4 }))
+    expect(useEditorStore.getState().audioClips.find((a) => a.id === 'audio_full')?.peaks).toEqual(peaksOf(2))
+  })
+})
+
+describe('여는 길이 고장 나도 기다리는 카드는 끝난다', () => {
+  it('저장본이 망가져 되살리지 못하면 처음 여는 것으로 이어 가 소리를 나누고, 까닭을 기록한다', async () => {
+    // 왜: 망가진 저장본을 읽다 예외가 나면 기다리는 카드가 끝나지 않았다(검토 A E3). 고장: 저장본 일부가 깨진 브라우저.
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    mocks.loadEditorState.mockResolvedValue(savedEdit({ audioClips: 7 as unknown as PersistedEditor['audioClips'] }))
+    const decode = vi.fn(async () => ({ durationSec: 5, peaks: peaksOf(1) }))
+    await openLikePage({ decodeAudio: decode })
+    expect(logged).toHaveBeenCalled()
+    expect(decode).toHaveBeenCalledTimes(2)
+    expect(useEditorStore.getState().audioClips).toHaveLength(2)
+    expect(useEditorStore.getState().editorPrep).toBeNull()
+    logged.mockRestore()
+  })
+
+  it('Editor 를 여는 길에 예외가 나도 기다리는 카드를 내리고 화면을 연다', async () => {
+    // 왜: 여는 길 어디서든 예외가 나면 준비 표시가 내려가지 않아 기다리는 카드가 영영 끝나지 않았다(검토 A E3).
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
+    await openLikePage({ measureClips: () => { throw new Error('measure broke') } })
+    expect(useEditorStore.getState().editorPrep).toBeNull()
+    expect(logged).toHaveBeenCalled()
+    logged.mockRestore()
+    // 화면도 여는 길 전체를 감싸 떠나지 않은 한 준비 표시를 내린다.
+    expect(read('src/app/studio/editor/page.tsx')).toMatch(/\} finally \{\s*if \(!cancelled\) useEditorStore\.getState\(\)\.setEditorPrep\(null\)/)
+  })
+})
+
+describe('처음 열 때 받기는 줄을 세운다', () => {
+  it('처음 열 때 파형 받기는 한 번에 4개까지만 한다', async () => {
+    // 왜: 영상 파일 전체를 받아 파형을 그리는데, 한꺼번에 다 받으면 연결과 메모리를 한꺼번에 쓴다(검토 A E6). 고장: 영상이 많은 프로젝트.
+    const many = Array.from({ length: 10 }, (_, i) => ({ shot_id: `shot-${i + 1}`, scene_id: 'scene-1', shot_type: 'MS', duration_seconds: 5 }))
+    mocks.loadShotsResult.mockReturnValue(Promise.resolve({ data: many, error: null }))
+    mocks.createClient.mockReturnValue({ from: vi.fn(() => query(Promise.resolve({ data: many.map((s, i) => ({ ...dbClips[0], id: `clip-${i + 1}`, shot_id: s.shot_id, url: `https://video.test/${i + 1}.mp4` })), error: null }))) })
+    let running = 0
+    let most = 0
+    const decode = vi.fn(async () => {
+      running += 1
+      most = Math.max(most, running)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      running -= 1
+      return { durationSec: 5, peaks: peaksOf(1) }
+    })
+    await openLikePage({ decodeAudio: decode })
+    expect(decode).toHaveBeenCalledTimes(10)
+    expect(most).toBe(EDITOR_FETCH_LIMIT)
+    expect(EDITOR_FETCH_LIMIT).toBe(4)
+  })
+
+  it('Editor 를 열 때 영상 길이 재기도 한 번에 4개까지만 한다', async () => {
+    // 왜: 길이 재기는 영상마다 머리를 받는다 — 화면(page.tsx)이 같은 줄 세우기로 잰다.
+    let running = 0
+    let most = 0
+    await runLimited(Array.from({ length: 9 }, (_, i) => i), EDITOR_FETCH_LIMIT, async () => {
+      running += 1
+      most = Math.max(most, running)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      running -= 1
+    })
+    expect(most).toBe(4)
+    expect(read('src/app/studio/editor/page.tsx')).toMatch(/const measureClips = \(\) =>\s*runLimited\(\s*useEditorStore\s*\.getState\(\)\s*\.videoClips\.filter\(\(c\) => c\.url && c\.actualDurationSec == null\),\s*EDITOR_FETCH_LIMIT,/)
   })
 })
 

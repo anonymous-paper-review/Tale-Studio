@@ -1,4 +1,7 @@
+import { toast } from 'sonner'
 import type { Shot, VideoClip, AudioTrackClip, AudioSource } from '@/types'
+import { translate } from '@/lib/i18n'
+import { useLocaleStore } from '@/stores/locale-store'
 
 export interface PersistedEditor {
   version: number
@@ -21,6 +24,21 @@ const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
 //   그 뒤의 영상 길이 재기 · 첫 진입 오디오 놓기가 영영 안 됐다. 약속: tests/editor/saved-edit-load.test.ts
 export const AUDIO_BLOB_TIMEOUT_MS = 5_000
 
+// 이 브라우저에 쓰지 못했다고(저장 공간이 꽉 참 등) 알린 프로젝트 — 프로젝트당 한 번만(검토 A E2a).
+//   예전에는 개발자 콘솔에만 남기고 조용히 실패해, 다시 열면 옛 편집이나 처음 상태가 보였다. 약속: tests/editor/save-size.test.ts
+const localFailNotified = new Set<string>()
+
+function writeLocal(projectId: string, data: PersistedEditor): void {
+  try {
+    localStorage.setItem(LS_PREFIX + projectId, JSON.stringify(data))
+  } catch (err) {
+    console.warn('[editor-persistence] localStorage write failed', err)
+    if (localFailNotified.has(projectId)) return
+    localFailNotified.add(projectId)
+    toast.error(translate(useLocaleStore.getState().locale, "Couldn't save your edits in this browser. Browser storage may be full."))
+  }
+}
+
 export function saveEditorState(projectId: string, data: PersistedEditor): void {
   if (typeof window === 'undefined') return
 
@@ -28,11 +46,7 @@ export function saveEditorState(projectId: string, data: PersistedEditor): void 
   if (existing) clearTimeout(existing)
 
   const timer = setTimeout(() => {
-    try {
-      localStorage.setItem(LS_PREFIX + projectId, JSON.stringify(data))
-    } catch (err) {
-      console.warn('[editor-persistence] localStorage write failed', err)
-    }
+    writeLocal(projectId, data)
     debounceTimers.delete(projectId)
   }, 400)
 
@@ -45,11 +59,7 @@ export function saveEditorStateNow(projectId: string, data: PersistedEditor): vo
   const existing = debounceTimers.get(projectId)
   if (existing) clearTimeout(existing)
   debounceTimers.delete(projectId)
-  try {
-    localStorage.setItem(LS_PREFIX + projectId, JSON.stringify(data))
-  } catch (err) {
-    console.warn('[editor-persistence] localStorage write failed', err)
-  }
+  writeLocal(projectId, data)
 }
 
 export async function loadEditorState(projectId: string): Promise<PersistedEditor | null> {

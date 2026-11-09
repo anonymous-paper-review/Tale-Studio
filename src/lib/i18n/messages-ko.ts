@@ -1174,6 +1174,8 @@ export const KO: Record<string, string> = {
   'Failed to load shots: {message}': '샷 로드 실패: {message}',
   "Couldn't save your edits to the server. The project may have been deleted or the session may have expired. Refresh to restore your most recent project.":
     '편집 내용을 서버에 저장할 수 없어요. 프로젝트가 삭제됐거나 세션이 만료됐을 수 있어요. 새로고침하면 최근 프로젝트로 복원돼요.',
+  "Couldn't save your edits in this browser. Browser storage may be full.":
+    '이 브라우저에 편집 내용을 저장하지 못했어요. 브라우저 저장 공간이 꽉 찼을 수 있어요.',
 
   // ── misc: card-mention.ts (direct) ──
   Person: '인물',

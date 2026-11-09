@@ -9,6 +9,8 @@ import { saveEditorNow, selectTimelineLayout, useEditorStore } from '@/stores/ed
 export const AUDIO_SPLIT_LIMIT_MS = 30_000
 /** 다 나눈 결과를 서버에 저장하는 답을 기다리는 한도 — 넘거나 실패해도 편집 화면은 연다(서버 저장은 뒤에서 다시 시도한다). */
 export const FIRST_SAVE_WAIT_MS = 10_000
+/** 영상 길이 재기 · 파형 받기(영상 파일 전체)를 한 번에 몇 개까지 할지 — 한꺼번에 다 받으면 연결과 메모리를 한꺼번에 쓴다(검토 A E6). */
+export const EDITOR_FETCH_LIMIT = 4
 
 type Decoded = { durationSec: number; peaks: number[] }
 
@@ -34,7 +36,45 @@ function within(work: Promise<unknown>, deadline: number): Promise<boolean> {
   return Promise.race([work.then(() => true, () => true), limit]).finally(() => clearTimeout(timer))
 }
 
-export async function finishEditorOpen(input: FinishEditorOpenInput): Promise<'opened' | 'split' | 'split-late' | 'cancelled'> {
+/** 일을 한 번에 limit 개까지만 돌린다 — 하나가 실패해도 나머지는 이어 간다. */
+export async function runLimited<T>(items: readonly T[], limit: number, work: (item: T) => Promise<void>): Promise<void> {
+  let next = 0
+  const lane = async () => {
+    while (next < items.length) {
+      const item = items[next++]
+      await work(item).catch(() => {})
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, lane))
+}
+
+/** 오디오 클립의 파형을 채운다(파형 칸 · 실제 소리 길이만) — 사람이 옮기거나 자른 자리는 그대로 둔다. */
+function fillPeaks(clips: readonly { id: string; url: string }[], input: FinishEditorOpenInput, onDone?: () => void): Promise<void> {
+  return runLimited(clips, EDITOR_FETCH_LIMIT, async ({ id, url }) => {
+    try {
+      const { durationSec, peaks } = await input.decodeAudio(url)
+      if (input.isCancelled() || !(durationSec > 0)) return
+      useEditorStore.getState().updateAudioClip(id, { peaks, sourceDurationSec: durationSec })
+    } catch {
+      // 무음 · CORS → 파형만 생략(소리는 재생된다)
+    } finally {
+      onDone?.()
+    }
+  })
+}
+
+export async function finishEditorOpen(input: FinishEditorOpenInput): Promise<'opened' | 'split' | 'split-late' | 'cancelled' | 'failed'> {
+  try {
+    return await openSteps(input)
+  } catch (err) {
+    // 여는 길 어디서든 예외가 나면 준비 표시를 내려 편집 화면을 연다 — 기다리는 카드가 끝나지 않았다(검토 A E3).
+    console.error('[editor] opening failed:', err)
+    if (!input.isCancelled()) useEditorStore.getState().setEditorPrep(null)
+    return 'failed'
+  }
+}
+
+async function openSteps(input: FinishEditorOpenInput): Promise<'opened' | 'split' | 'split-late' | 'cancelled'> {
   const { projectId, isCancelled } = input
   const store = useEditorStore
   // 화면을 떠났으면 준비 표시를 그대로 둔다 — 반쯤 된 상태를 저장하지 않고, 다음에 열 때 처음부터 다시 준비한다.
@@ -43,6 +83,9 @@ export async function finishEditorOpen(input: FinishEditorOpenInput): Promise<'o
     // 다시 들어옴(저장한 편집을 되살림) · 샷 없음: 바로 연다. 실제 길이 재기는 화면 뒤에서(예전 그대로).
     store.getState().setEditorPrep(null)
     void input.measureClips()
+    // 30초를 넘겨 먼저 연 뒤 파형이 덜 찬 채 떠난 오디오는 열고 나서 뒤에서 채운다(검토 A E5).
+    const bare = store.getState().audioClips.filter((a) => a.url && !a.peaks?.length).map((a) => ({ id: a.id, url: a.url }))
+    if (bare.length) void fillPeaks(bare, input)
     return 'opened'
   }
 
@@ -73,22 +116,11 @@ export async function finishEditorOpen(input: FinishEditorOpenInput): Promise<'o
 
   let done = 0
   store.getState().setEditorPrep({ done, total: created.length })
-  const decoding = Promise.all(
-    created.map(async ({ id, url }) => {
-      try {
-        const { durationSec, peaks } = await input.decodeAudio(url)
-        if (isCancelled() || !(durationSec > 0)) return
-        // 파형 칸만 채운다 — 한도를 넘겨 먼저 연 뒤 사람이 옮기거나 자른 자리는 그대로 둔다.
-        store.getState().updateAudioClip(id, { peaks, sourceDurationSec: durationSec })
-      } catch {
-        // 무음 · CORS → 파형만 생략(소리는 재생된다)
-      } finally {
-        done += 1
-        // 한도를 넘겨 먼저 열었으면 진행 표시를 다시 세우지 않는다.
-        if (!isCancelled() && store.getState().editorPrep) store.getState().setEditorPrep({ done, total: created.length })
-      }
-    }),
-  )
+  const decoding = fillPeaks(created, input, () => {
+    done += 1
+    // 한도를 넘겨 먼저 열었으면 진행 표시를 다시 세우지 않는다.
+    if (!isCancelled() && store.getState().editorPrep) store.getState().setEditorPrep({ done, total: created.length })
+  })
   const finished = await within(decoding, deadline)
   if (isCancelled()) return 'cancelled'
 
