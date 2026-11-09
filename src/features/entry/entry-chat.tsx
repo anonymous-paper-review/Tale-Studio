@@ -62,7 +62,8 @@ export function EntryChat() {
     <div className="flex min-h-0 flex-1 flex-col">
       {sent ? <ChipsBar draft={draft} t={t} /> : null}
       <div ref={threadRef} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-6 py-6" aria-live="polite">
+        {/* 대화 줄 사이 28(11/5 시안 P1 · P2) */}
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-7 px-6 py-6" aria-live="polite">
           {items.map((item) => (
             <ChatRow key={item.id} item={item} draft={draft} t={t} />
           ))}
@@ -198,7 +199,7 @@ function CardOptions({
 }) {
   const withSub = options.some((o) => o.sub)
   return (
-    <div className={cn('gap-2', column ? 'flex flex-col' : withSub ? 'grid grid-cols-2 sm:grid-cols-4' : 'flex flex-wrap')}>
+    <div className={cn('gap-2.5', column ? 'flex flex-col' : withSub ? 'grid grid-cols-2 sm:grid-cols-4' : 'flex flex-wrap')}>
       {options.map((o) => {
         const isRecommended = o.value === recommended
         // 추천 표시의 말을 바꾼 칸(시리즈 "앞 화")은 이름 옆에 그 배지를 직접 단다 — 칸 부품의 추천 배지는 늘 "추천"이다.
@@ -246,16 +247,17 @@ function QuestionCard({ question, draft, t }: { question: ChatQuestionKey | 'con
   if (question === 'confirm') {
     const starting = writing.status === 'starting' || writing.status === 'writing'
     return (
-      <AgentBubble>
+      <AgentBubble roomy>
         <p>{t('I will start like this.')}</p>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-xl bg-card px-4 py-3">
+        {/* 정리 표(11/5 시안 P2): 모서리 14 · 안쪽 10/20 · 줄 위아래 11 · 이름 칸 72 이상 · 이름과 값 사이 16 */}
+        <dl className="grid grid-cols-[minmax(72px,auto)_1fr] gap-x-4 rounded-[14px] bg-card px-5 py-2.5">
           {summaryRows(draft, { t, locale: entryLocale, series }).map((row) => (
             <div key={row.key} className="contents">
-              <dt className="flex items-center gap-1.5 text-muted-foreground">
+              <dt className="flex items-center gap-1.5 py-[11px] text-subtle-foreground">
                 {row.locked ? <Lock className="size-3.5" aria-hidden /> : null}
                 {row.label}
               </dt>
-              <dd className="break-words">{row.value}</dd>
+              <dd className="break-words py-[11px]">{row.value}</dd>
             </div>
           ))}
         </dl>

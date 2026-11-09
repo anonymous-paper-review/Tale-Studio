@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog'
 import { PRICING_PAGE_VISIBLE } from '@/lib/billing/pricing-visibility'
 import { useT } from '@/lib/i18n'
+import { cn } from '@/lib/utils'
 import { useSeriesInfo } from '@/features/series/use-series-info'
 import { NEXT_EPISODE_NOT_READY, canContinueLastScene, nextEpisodeFailure, type NextEpisodeFailure } from './series-list'
 
@@ -47,11 +48,15 @@ function failureText(t: (text: string) => string, failure: NextEpisodeFailure | 
 }
 
 /** 이어받는 것 한 줄. */
-function InheritRow({ label, value }: { label: string; value: string }) {
+/**
+ * 이어받는 것 한 줄. roomy = 11/5 시안 R6 의 표(줄 위아래 11 · 이름 흐린 글자) — 부모 dl 이 두 칸 격자라
+ *   이름 칸이 줄마다 같은 폭이다(영어 이름이 길어도 겹치지 않는다).
+ */
+function InheritRow({ label, value, roomy }: { label: string; value: string; roomy?: boolean }) {
   return (
-    <div className="flex gap-3 py-1.5 text-sm">
-      <dt className="w-20 shrink-0 text-muted-foreground">{label}</dt>
-      <dd className="min-w-0 flex-1 text-foreground">{value}</dd>
+    <div className={roomy ? 'contents text-sm' : 'flex gap-3 py-1.5 text-sm'}>
+      <dt className={cn('shrink-0', roomy ? 'py-[11px] text-subtle-foreground' : 'w-20 text-muted-foreground')}>{label}</dt>
+      <dd className={cn('min-w-0 flex-1 text-foreground', roomy && 'py-[11px]')}>{value}</dd>
     </div>
   )
 }
@@ -155,7 +160,8 @@ export function NextEpisodeDialog({
 
   return (
     <Dialog open={!!project} onOpenChange={(open) => !open && !creating && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      {/* 폭은 공용 팝업 틀이 정한다(11/5 SYS: 모든 팝업 520). */}
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{t('Create the next episode of "{title}"', { title: project?.title || '' })}</DialogTitle>
           <DialogDescription>{t('The next episode starts as a new project and inherits everything below.')}</DialogDescription>
@@ -168,17 +174,20 @@ export function NextEpisodeDialog({
           </p>
         ) : preview ? (
           <>
-            <dl className="divide-y divide-border rounded-xl border border-border bg-card px-3 py-1">
+            {/* 11/5 시안(R6): 테두리 · 나눔 선 없는 상자(팝업보다 한 단 밝게) · 모서리 16 · 안쪽 10/20 · 이름 칸 64 이상 · 이름과 값 사이 16 */}
+            <dl className="grid grid-cols-[minmax(4rem,auto)_1fr] gap-x-4 rounded-xl bg-card px-5 py-2.5">
               <InheritRow
+                roomy
                 label={t('Characters')}
                 value={preview.characters.length ? preview.characters.join(DOT) : t('None')}
               />
               <InheritRow
+                roomy
                 label={t('Backgrounds')}
                 value={preview.locations.length ? preview.locations.join(DOT) : t('None')}
               />
-              <InheritRow label={t('Art style')} value={t('Same as the previous episode')} />
-              {preview.hasVoices ? <InheritRow label={t('Voices')} value={t('Inherited from the previous episode')} /> : null}
+              <InheritRow roomy label={t('Art style')} value={t('Same as the previous episode')} />
+              {preview.hasVoices ? <InheritRow roomy label={t('Voices')} value={t('Inherited from the previous episode')} /> : null}
             </dl>
 
             {canContinueLastScene(preview) ? (

@@ -9,7 +9,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Clock, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
 import {
   useProjectStore,
 } from '@/stores/project-store'
@@ -128,7 +128,8 @@ function ProjectCard({
     <div
       onClick={() => !editing && onOpen(project)}
       // v3: 유리(white/5 + 흐림) · 빨간 빛 대신 큰 내용 판 하나 — 올리면 한 단 밝아진다(판 아래 그림자 하나만, design.md §9).
-      className="group flex cursor-pointer flex-col overflow-hidden rounded-xl bg-panel text-left shadow-panel transition-colors duration-150 hover:bg-card"
+      //   11/5 시안(R2): 모서리 18.
+      className="group flex cursor-pointer flex-col overflow-hidden rounded-[18px] bg-panel text-left shadow-panel transition-colors duration-150 hover:bg-card"
     >
       {/* 대표 썸네일(#landing-v2b) — 이름만으로는 구별이 어려워 프로젝트의 첫 그림을 얹는다.
           아직 그림이 없는 프로젝트는 제목 이니셜 워터마크가 구별을 돕는다 — 바탕은 v3 그림 자리(Content/Art Placeholder).
@@ -207,13 +208,11 @@ function ProjectCard({
           {link.deleted ? ` · ${t('The previous episode was deleted')}` : ''}
         </div>
       ) : null}
-      <div className="mt-3 flex items-center gap-3">
+      {/* 단계 · 며칠 전(11/5 시안 R2: 사이 8, 시계 아이콘 없음) */}
+      <div className="mt-3 flex items-center gap-2">
         <Badge variant="tag">{projectStageLabel(project.current_stage)}</Badge>
         {project.updated_at && (
-          <span className="flex items-center gap-1 font-num text-meta font-medium text-subtle-foreground">
-            <Clock className="size-3" aria-hidden />
-            {relativeTime(project.updated_at, t)}
-          </span>
+          <span className="font-num text-meta font-medium text-subtle-foreground">{relativeTime(project.updated_at, t)}</span>
         )}
       </div>
       </div>
