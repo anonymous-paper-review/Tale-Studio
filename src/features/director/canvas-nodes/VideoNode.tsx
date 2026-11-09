@@ -15,7 +15,7 @@ import {
 } from '@/stores/director-store'
 import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
 import { directorNodeLabel, prettyNodeLabel } from '@/features/director/node-label'
-import { nextInLineNote, pendingShotNames, requestedVideoSeconds } from '@/features/director/video-wait'
+import { announcingVideoId, nextInLineNote, pendingShotNames, requestedVideoSeconds } from '@/features/director/video-wait'
 import { VideoLengthChip } from '@/features/director/video-length-chip'
 import { STAGE_PERSONA } from '@/lib/lumi'
 import { useBoardNodeNames } from '@/features/director/hooks/use-board-node-names'
@@ -88,6 +88,8 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       ? (s.videoBatchProgress.done / s.videoBatchProgress.total) * 100
       : null,
   )
+  // 동시에 여러 장이 떠도 화면 읽기에는 한 장만 알린다(검토 B 5c): 묶음이 먼저 낸 것, 없으면 화면 위 · 왼쪽의 것.
+  const announce = useDirectorCanvasStore((s) => announcingVideoId(s.nodes, s.videoBatchQueue?.jobIds) === id)
   const nextNames = useDirectorCanvasStore((s) =>
     inBatch && !s.videoBatchCancelled ? pendingShotNames(s.nodes, s.videoBatchQueue?.pendingShotIds ?? [], boardNames).join('\n') : '',
   )
@@ -425,6 +427,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           }
           progress={batchPercent ?? undefined}
           note={nextInLineNote(nextNames ? nextNames.split('\n') : [], t)}
+          announce={announce}
           className="-inset-[1.5px]"
         />
       )}

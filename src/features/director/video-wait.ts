@@ -3,7 +3,7 @@
 //   다음 차례는 묶음일 때만, 서버가 알려 준 낼 순서 그대로. 약속: tests/director/video-wait-card.test.ts
 import { clampDuration, normalizeProvider, VIDEO_MODELS } from '@/lib/video-models'
 import { directorNodeLabel, type BoardNodeNames } from '@/features/director/node-label'
-import { isShotData, type DirectorNode } from '@/types/director'
+import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
 
 type Translate = (text: string, params?: Record<string, string | number>) => string
 
@@ -33,4 +33,21 @@ export function nextInLineNote(names: readonly string[], t: Translate): string |
   const shown = names.slice(0, NEXT_NAMES_SHOWN).join(' → ')
   const rest = names.length - NEXT_NAMES_SHOWN
   return t('Up next: {names}', { names: rest > 0 ? t('{names} and {count} more', { names: shown, count: rest }) : shown })
+}
+
+/**
+ * 동시에 뜬 기다리는 카드 중 화면 읽기에 알릴 한 장(검토 B 5c, 리드 2026-11-09). 여러 장이 다 알리면 같은 "다음 차례"를 겹쳐 읽는다.
+ *   묶음 카드가 있으면 묶음이 낸 순서(서버 조회의 작업 순서)의 맨 앞, 없으면(따로 누른 영상만) 화면 위 → 왼쪽 순의 맨 앞.
+ *   약속: tests/director/wait-card-announce.test.ts
+ */
+export function announcingVideoId(nodes: readonly DirectorNode[], batchJobIds: readonly string[] | null | undefined): string | null {
+  const waiting = nodes.filter((node) => isVideoData(node.data) && node.data.lastAttemptStatus === 'generating')
+  if (waiting.length === 0) return null
+  for (const jobId of batchJobIds ?? []) {
+    const first = waiting.find((node) => isVideoData(node.data) && node.data.generationJobId === jobId)
+    if (first) return first.id
+  }
+  return waiting.reduce((top, node) =>
+    node.position.y < top.position.y || (node.position.y === top.position.y && node.position.x < top.position.x) ? node : top,
+  ).id
 }
