@@ -5,6 +5,7 @@
 //   바탕은 v3 그림 자리(Content/Art Placeholder). [container-type:size] 는 #thumb-fit 의 100cqh(박스 높이 기준 팬 종점) 용.
 //   약속: tests/project/card-thumb.test.ts
 import { useState } from 'react'
+import { projectInitial } from './project-list'
 
 export function ProjectCardArt({ url, title }: { url: string | null; title: string }) {
   // 못 읽은 썸네일 주소 — 주소가 바뀌면(새 그림) 다시 읽어 본다.
@@ -15,7 +16,7 @@ export function ProjectCardArt({ url, title }: { url: string | null; title: stri
         <ProjectThumb url={url} onError={() => setFailedUrl(url)} />
       ) : (
         <div className="flex size-full items-center justify-center">
-          <span className="select-none text-5xl font-bold text-foreground/15">{(title || 'U').charAt(0).toUpperCase()}</span>
+          <span className="select-none text-5xl font-bold text-foreground/15">{projectInitial(title)}</span>
         </div>
       )}
     </div>

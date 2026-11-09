@@ -16,6 +16,7 @@ vi.mock('react', async (original) => ({
 }))
 
 import { ProjectCardArt, ProjectThumb } from '@/features/projects/project-card-art'
+import { projectInitial } from '@/features/projects/project-list'
 
 type Element = ReactElement<Record<string, unknown>>
 function elements(node: ReactNode): Element[] {
@@ -52,6 +53,19 @@ describe('프로젝트 카드 썸네일', () => {
   it('썸네일이 없는 카드는 이름 첫 글자 타일을 보이고 이름이 없으면 U 를 보인다', () => {
     expect(letters(render({ url: null, title: 'hong kong love story' }))).toContain('H')
     expect(letters(render({ url: null, title: '' }))).toContain('U')
+  })
+
+  // 왜: "[chat-tools-fixture] …" · "[1화] …"처럼 기호로 시작하는 이름은 타일에 "[" 가 나왔다 — 앞쪽 기호 · 공백은 건너뛴다(리드 2026-11-09).
+  it('프로젝트 이름이 기호로 시작하면 타일은 첫 글자(한글 · 영문 · 숫자)를 보인다', () => {
+    expect(projectInitial('[chat-tools-fixture] 채팅 최소 실험')).toBe('C')
+    expect(projectInitial('[1화] 하동 쪽으로')).toBe('1')
+    expect(projectInitial('  「역마」 2판')).toBe('역')
+    expect(projectInitial('hong kong love story')).toBe('H')
+    // 그런 글자가 하나도 없거나 이름이 없으면 U(Untitled).
+    expect(projectInitial('★ … !!')).toBe('U')
+    expect(projectInitial('')).toBe('U')
+    expect(projectInitial(null)).toBe('U')
+    expect(letters(render({ url: null, title: '[chat-tools-fixture] 채팅 최소 실험' }))).toContain('C')
   })
 
   // 왜: 썸네일이 새 그림으로 바뀌면(주소가 바뀌면) 한 번 못 읽었던 카드도 새 그림을 다시 읽어 본다.
