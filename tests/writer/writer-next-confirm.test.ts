@@ -7,6 +7,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { WriterNextCard } from '@/features/prose/writer-next-card'
+import { StageConfirm } from '@/components/controls/stage-confirm'
 import { useLocaleStore } from '@/stores/locale-store'
 
 function render() {
@@ -36,5 +37,22 @@ describe('Writer 다음 단계 묻기', () => {
     expect(card).toMatch(/<StageConfirm[\s\S]*?stage="producer"[\s\S]*?tone="chat"/)
     expect(card).toMatch(/onConfirm=\{\(\) => void confirm\.run\(\)\}/)
     expect(card).toMatch(/onRevise=\{\(\) => useGlobalChatStore\.getState\(\)\.offerWriterNext\('more'\)\}/)
+  })
+
+  it('산문을 확정하는 동안 단계 확인 단추는 도는 표시를 보이고 다시 누를 수 없다', () => {
+    // 왜: 검토 C2 #4 — 「좋아요, 그림 그리기로」를 누르면 산문 확정(서버 1초 남짓) 동안 단추가 흐려지기만 해서 눌렸는지 몰랐다.
+    const card = readFileSync('src/features/prose/writer-next-card.tsx', 'utf8')
+    expect(card).toMatch(/<StageConfirm[\s\S]*?busy=\{confirm\.busy\}[\s\S]*?\/>/)
+    useLocaleStore.setState({ locale: 'ko' })
+    Object.assign(useLocaleStore.getInitialState(), useLocaleStore.getState())
+    const busy = renderToStaticMarkup(createElement(StageConfirm, { stage: 'producer', tone: 'chat', busy: true, onConfirm: () => {}, onRevise: () => {} }))
+    const [confirm, revise] = busy.match(/<button[^>]*>/g) ?? []
+    expect(confirm).toMatch(/\bdisabled=""/)
+    expect(confirm).toMatch(/aria-busy="true"/)
+    expect(revise).toMatch(/\bdisabled=""/)
+    expect(busy).toMatch(/<button[^>]*data-next="artist"[^>]*>(?:(?!<\/button>)[\s\S])*lucide-loader-circle/)
+    const idle = renderToStaticMarkup(createElement(StageConfirm, { stage: 'producer', tone: 'chat', onConfirm: () => {}, onRevise: () => {} }))
+    expect(idle).not.toContain('lucide-loader-circle')
+    expect(idle).not.toMatch(/\bdisabled=""/)
   })
 })

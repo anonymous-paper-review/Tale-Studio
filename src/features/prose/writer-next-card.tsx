@@ -61,7 +61,7 @@ export function WriterNextCard({ step, onChatFocus }: { step: 'ask' | 'more'; on
         <StageConfirm
           stage="producer"
           tone="chat"
-          disabled={confirm.busy}
+          busy={confirm.busy}
           onConfirm={() => void confirm.run()}
           onRevise={() => useGlobalChatStore.getState().offerWriterNext('more')}
         />

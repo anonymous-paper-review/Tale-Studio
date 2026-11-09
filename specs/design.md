@@ -594,7 +594,7 @@ Editor 클립 준비. `lumi` 를 안 주는 잠금(그림 다시 그리기 · �
 | `OptionCard` (`title` · `description` · `selected` · `recommended`) | 길이 · 화면 비율 · 바꿈 정도 — 안 사이 9(11/5) |
 | `RecommendBadge` | "추천" — 지금 단계 색 |
 | `StageChip` (`stage`) | 위 막대 · 단계 표시 — 배지 그라데이션 |
-| `StageConfirm` (`stage` · `onConfirm` · `onRevise` · `tone="screen\|chat"`) | 단계를 넘길지 묻는 한 쌍(11/5 Control/Stage Confirm) — 왼쪽 크림 알약 = 다음 단계 아이콘 + "좋아요, 산문 쓰기로 / 그림 그리기로 / 콘티 짜기로 / 연출하기로 / 편집하기로 / 완성하기", 오른쪽 "아니요, 더 고칠래요"(chat 이면 한 단계 밝은 바탕). **채팅에서 넘길지 물을 때만** 쓴다 — 화면 머리 [다음 →] 단추 → 확인 창(`ConfirmLumi`)은 그대로(오너 2026-11-09). 약속 tests/project/stage-confirm.test.ts |
+| `StageConfirm` (`stage` · `onConfirm` · `onRevise` · `tone="screen\|chat"` · `busy`) | 단계를 넘길지 묻는 한 쌍(11/5 Control/Stage Confirm) — 왼쪽 크림 알약 = 다음 단계 아이콘 + "좋아요, 산문 쓰기로 / 그림 그리기로 / 콘티 짜기로 / 연출하기로 / 편집하기로 / 완성하기", 오른쪽 "아니요, 더 고칠래요"(chat 이면 한 단계 밝은 바탕). **채팅에서 넘길지 물을 때만** 쓴다 — 화면 머리 [다음 →] 단추 → 확인 창(`ConfirmLumi`)은 그대로(오너 2026-11-09). 누른 일이 서버에서 도는 동안(산문 확정 등)은 `busy` — 왼쪽 알약에 도는 표시, 두 단추 꺼짐. 약속 tests/project/stage-confirm.test.ts |
 
 ### 13.10 Chat panel (v3)
 
