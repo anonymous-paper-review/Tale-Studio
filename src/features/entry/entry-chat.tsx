@@ -102,8 +102,13 @@ function ChatHero({ t }: { t: Translator }) {
 function ChipsBar({ draft, sent, t }: { draft: EntryDraft; sent: boolean; t: Translator }) {
   const reask = useEntryStore((s) => s.chatReask)
   return (
-    <nav aria-label={t('What we have decided so far')} className="shrink-0 border-b border-border-subtle bg-background">
-      <div className="mx-auto flex w-full max-w-2xl flex-wrap gap-1.5 px-6 py-3">
+    // 11/5 시안 P1 · P2: 대화 위 가운데에 뜬 알약 묶음(정리 바탕 · 안쪽 6/20 · 사이 6) — 보이는 이름 "지금까지 정한 것"과 칸(정리 칸 색 · 안쪽 5/10).
+    //   이름은 nav 의 aria-label 과 같아 화면 읽기에서는 한 번만 읽히게 숨긴다.
+    <nav aria-label={t('What we have decided so far')} className="flex shrink-0 justify-center bg-background px-6 pt-3">
+      <div className="flex max-w-full flex-wrap items-center justify-center gap-1.5 rounded-[18px] bg-chat-summary px-5 py-1.5">
+        <span className="text-meta font-medium text-subtle-foreground" aria-hidden>
+          {t('What we have decided so far')}
+        </span>
         {chatChips(draft, t).map((chip) => {
           // 아직 아무것도 묻지 않았으면(보내기 전) 지금 묻는 칸이 없다.
           const current = sent && chip.current
@@ -117,14 +122,14 @@ function ChipsBar({ draft, sent, t }: { draft: EntryDraft; sent: boolean; t: Tra
             aria-current={current ? 'step' : undefined}
             // 지금 묻는 칸은 지금 단계 색 테두리 · 18% 바탕(v3 고른 칩과 같은 규칙), 아직 못 정한 칸은 흐린 글자.
             className={cn(
-              'inline-flex min-h-7 items-center gap-1.5 rounded-full border-[1.5px] px-3 py-0.5 text-caption outline-none transition-colors duration-100 ease-out focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default',
-              current ? 'border-stage bg-stage/18' : 'border-transparent bg-card',
-              chip.value ? 'hover:bg-accent' : 'text-subtle-foreground',
+              'inline-flex min-h-6 items-center gap-[5px] rounded-full border-[1.5px] px-2.5 py-[3px] text-meta outline-none transition-colors duration-100 ease-out focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default',
+              current ? 'border-stage bg-stage/18' : 'border-transparent bg-chat-summary-cell',
+              chip.value ? 'hover:bg-card' : null,
             )}
           >
-            {chip.key === 'ratio' ? <Lock className="size-3" aria-hidden /> : null}
-            <span className="text-muted-foreground">{chip.label}</span>
-            <span className={chip.value ? 'font-semibold text-foreground' : ''}>{chip.value ?? t('Not yet')}</span>
+            {chip.key === 'ratio' ? <Lock className="size-3 text-subtle-foreground" aria-hidden /> : null}
+            <span className="text-subtle-foreground">{chip.label}</span>
+            <span className={chip.value ? 'font-semibold text-foreground' : 'text-subtle-foreground'}>{chip.value ?? t('Not yet')}</span>
           </button>
           )
         })}
@@ -271,8 +276,8 @@ function QuestionCard({ question, draft, t }: { question: ChatQuestionKey | 'con
     return (
       <AgentBubble roomy>
         <p>{t('I will start like this.')}</p>
-        {/* 정리 표(11/5 시안 P2): 모서리 14 · 안쪽 10/20 · 줄 위아래 11 · 이름 칸 72 이상 · 이름과 값 사이 16 */}
-        <dl className="grid grid-cols-[minmax(72px,auto)_1fr] gap-x-4 rounded-[14px] bg-card px-5 py-2.5">
+        {/* 정리 표(11/5 시안 P2): 말풍선보다 어두운 정리 바탕 · 모서리 14 · 안쪽 10/20 · 줄 위아래 11 · 이름 칸 72 이상 · 이름과 값 사이 16 */}
+        <dl className="grid grid-cols-[minmax(72px,auto)_1fr] gap-x-4 rounded-[14px] bg-chat-summary px-5 py-2.5">
           {summaryRows(draft, { t, locale: entryLocale, series }).map((row) => (
             <div key={row.key} className="contents">
               <dt className="flex items-center gap-1.5 py-[11px] text-subtle-foreground">

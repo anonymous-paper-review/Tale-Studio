@@ -1,8 +1,7 @@
 'use client'
 
 // 프로젝트 목록 머리의 찾기 칸 · 정렬 단추(11/5 시안 R2, 리드 2026-11-09) — 값은 목록 화면이 갖고 여기는 보이고 알리기만 한다.
-//   시안: 찾기 알약 260(바탕 side) · 정렬 알약(지금 정렬 이름 + ▾) · 펼친 메뉴(바탕 · 모서리 14)는 고른 줄이 tab-selected 에 ✓.
-//   정렬 알약의 시안 색(#2A2927)은 토큰이 아직 없어 카드색으로 둔다.
+//   시안: 찾기 알약 260(바탕 side) · 정렬 알약(side-raised, 지금 정렬 이름 + ▾) · 펼친 메뉴(바탕 · 모서리 14)는 고른 줄이 tab-selected 에 ✓.
 import { Check, ChevronDown, Search } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
@@ -40,7 +39,7 @@ export function ProjectListTools({
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="flex h-10 shrink-0 items-center gap-2 rounded-full bg-card px-4 text-label font-semibold text-foreground transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className="flex h-10 shrink-0 items-center gap-2 rounded-full bg-side-raised px-4 text-label font-semibold text-foreground transition-colors hover:bg-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             data-testid="projects-sort"
           >
             {t(current.label)}

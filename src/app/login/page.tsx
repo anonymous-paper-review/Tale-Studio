@@ -91,7 +91,8 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center bg-lobby px-4">
-      {/* 11/5 시안 R1 — 스튜디오 밖 바탕(lobby) 가운데 카드(400 · 안쪽 50/30 · 사이 15 · 모서리 22), 칸 · 단추 높이 48 · 모서리 12, 꼬리글은 화면 아래.
+      {/* 11/5 시안 R1 — 스튜디오 밖 바탕(lobby) 가운데 카드(400 · 안쪽 50/30 · 사이 15 · 모서리 22), 칸 · Google 단추는 카드 위 한 단 밝은 칸(side-raised)
+          · 높이 48 · 모서리 12, 꼬리글은 화면 아래.
           글은 아직 영어 그대로다(화면 언어 · 부제 · 가입하기 · 바탕 흐린 빛은 오너 결정 대기). */}
       <main className="flex w-full flex-1 items-center justify-center py-12">
         <div className="flex w-full max-w-[400px] flex-col gap-[15px] rounded-[22px] bg-side px-[30px] py-[50px]">
@@ -104,7 +105,7 @@ export default function LoginPage() {
             <Button
               type="button"
               variant="secondary"
-              className="h-12 w-full rounded-lg font-semibold"
+              className="h-12 w-full rounded-lg bg-side-raised font-semibold hover:bg-card"
               onClick={handleGoogleLogin}
               disabled={submitting || googleSubmitting}
             >
@@ -132,7 +133,7 @@ export default function LoginPage() {
             <Input
               type="email"
               autoComplete="email"
-              className="h-12 rounded-lg px-4"
+              className="h-12 rounded-lg bg-side-raised px-4"
               placeholder="Email"
               value={email}
               aria-invalid={!!errorMsg}
@@ -141,7 +142,7 @@ export default function LoginPage() {
             <Input
               type="password"
               autoComplete="current-password"
-              className="h-12 rounded-lg px-4"
+              className="h-12 rounded-lg bg-side-raised px-4"
               placeholder="Password"
               value={password}
               aria-invalid={!!errorMsg}
