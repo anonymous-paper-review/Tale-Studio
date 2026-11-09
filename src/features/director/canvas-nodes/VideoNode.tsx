@@ -16,6 +16,7 @@ import {
 import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
 import { directorNodeLabel, prettyNodeLabel } from '@/features/director/node-label'
 import { nextInLineNote, pendingShotNames, requestedVideoSeconds } from '@/features/director/video-wait'
+import { VideoLengthChip } from '@/features/director/video-length-chip'
 import { STAGE_PERSONA } from '@/lib/lumi'
 import { useBoardNodeNames } from '@/features/director/hooks/use-board-node-names'
 import { cn } from '@/lib/utils'
@@ -321,6 +322,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
                 <Play className="size-6 fill-white text-white" />
               </span>
             )}
+            {data.videoUrl && completed && <VideoLengthChip url={data.videoUrl} />}
           </button>
         ) : data.videoUrl ? (
           <button
@@ -330,6 +332,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             className="nodrag flex h-full w-full items-center justify-center transition-colors hover:bg-black/20"
           >
             <Play className="size-6 fill-muted-foreground text-muted-foreground" />
+            {completed && <VideoLengthChip url={data.videoUrl} />}
           </button>
         ) : data.lastAttemptStatus === 'generating' ? null : (
           // 만드는 중이면 "대기 중"을 쓰지 않는다. 아래 "영상 생성 중"과 같이 보이면 헷갈린다(11/5 시안 DG 맞춰 보기 2026-11-09).
