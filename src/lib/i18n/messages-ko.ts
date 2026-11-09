@@ -2564,6 +2564,7 @@ export const KO: Record<string, string> = {
   // 산문을 고치는 동안 기다리는 창 단계(11/5 시안 WL) — 요청 읽기 → 수정안 쓰는 중 → 바뀐 곳 표시.
   'Writing the change': '수정안 쓰는 중',
   'Marking the changes': '바뀐 곳 표시',
+  'Revising {label}. You can still read the other scenes.': '{label}{ul} 고치는 중이에요. 다른 씬은 그대로 볼 수 있어요.',
   'Revising the prose': '산문을 고치고 있어요',
   // v3 2단계 Writer 산문 · Artist 카드(2026-11-03 오너) — 한 화면 · 문단 붙이기 · 조건 칩 · 걸러 보기
   'Please change only paragraph {label}. "{excerpt}"': '{label} 문단만 고쳐 주세요. "{excerpt}"',

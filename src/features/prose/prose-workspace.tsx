@@ -14,8 +14,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { PageHeader } from '@/components/layout/page-header'
 import { AiBusyOverlay, type AiBusyStep } from '@/components/ai-busy-overlay'
 import { proseBusySteps, proseOverlayOpen } from '@/lib/prose/busy'
-import { keptParagraphPick, keptRevisingParagraph } from '@/lib/prose/paragraph-pick'
-import { proseWaitingLumi, variantsPickerOpen } from '@/lib/prose/screen'
+import { keptParagraphPick, keptRevisingParagraph, revisingParagraphIndex } from '@/lib/prose/paragraph-pick'
+import { proseWaitDescription, proseWaitFrame, proseWaitingLumi, variantsPickerOpen } from '@/lib/prose/screen'
 import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
 import { WriterResumeButton } from '@/components/layout/writer-resume-button'
 import { useT } from '@/lib/i18n'
@@ -77,6 +77,10 @@ export function ProseWorkspace() {
     () => proseBusySteps(prose.busy)?.map((step) => ({ label: t(step.label), state: step.state })),
     [prose.busy, t],
   )
+  // 고치는 동안(수정안 · 세 가지 안)은 화면을 덮지 않는다 — 잠금은 그대로, 산문은 보고 스크롤한다(11/5 시안 WL, 리드 추천안 ㉠).
+  //   고쳐 달라고 보낸 문단이 있으면 기다리는 창이 그 문단을 말한다. Lumi 는 오너 답 전엔 없이(초안 기다림만 Writer 옷).
+  const waitFrame = proseWaitFrame(prose.busy)
+  const waitDescription = proseWaitDescription(t, { busy: prose.busy, revisingIndex: revisingParagraphIndex(revising, { projectId, busy: prose.busy }) })
 
   // 예전 방식 프로젝트의 씬 스토리 확정(리뉴얼 전 흐름) — 확정하면 나머지를 이어 만들고 Storyboard 로 간다.
   const [legacyConfirming, setLegacyConfirming] = useState(false)
@@ -131,7 +135,8 @@ export function ProseWorkspace() {
         </div>
       ) : null}
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-7">
+      {/* 투명 덮개(고치는 동안) 너머로 휠 · 손가락 끌기가 이 칸을 스크롤한다(lib/ai-busy-scroll). */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-7" data-ai-busy-scroll>
         {/* v3 W1 — 화면 머리 · 조건 칩 · 산문 판 · 안내가 820 폭 한 줄로 쌓인다(간격 18). */}
         <div className="mx-auto flex max-w-[820px] flex-col gap-[18px]">
           <PageHeader
@@ -178,8 +183,11 @@ export function ProseWorkspace() {
         // 진행 상태를 읽는 동안은 띄우지 않는다(단추 · 입력만 막힌다) — 다 쓴 산문 위로 잠금이 깜빡이지 않게.
         open={proseOverlayOpen(prose.busy)}
         title={t(prose.busy?.kind === 'draft' ? 'Writing the prose draft' : 'Revising the prose')}
+        description={waitDescription}
         steps={busySteps}
         lumi={proseWaitingLumi(prose.busy) ?? undefined}
+        scrim={waitFrame.scrim}
+        card={waitFrame.card}
       />
     </div>
   )

@@ -478,6 +478,10 @@ export default function VisualPage() {
   const regenOverlay = regen ? (
     <AiBusyOverlay
       open={regenOverlayOpen}
+      // 11/5 시안 AR(리드 추천안 ㉠) — 화면을 덮지 않고 카드마다 상태가 보인다. 잠금은 그대로, 휠 · 끌기는 카드 칸을 스크롤한다.
+      //   Lumi 는 오너 답 전엔 없이 — 그림 없는 새 기다리는 카드.
+      scrim="clear"
+      card="loading"
       title={t(regenRun.stopped ? 'Some images were not drawn' : 'Redrawing the images')}
       busy={!regenRun.stopped}
       // 11/5 시안 AR 문구를 사실대로 — 이 창은 닫아도 되지만, 재생성 그림은 Artist 화면이 열려 있을 때만 그린다.
@@ -614,7 +618,8 @@ export default function VisualPage() {
           <WriterResumeButton projectId={projectId} onResumed={restartWriterStatus} />
         </div>
       ) : null}
-      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-7">
+      {/* 투명 덮개(다시 그리는 동안) 너머로 휠 · 손가락 끌기가 이 칸을 스크롤한다(lib/ai-busy-scroll). */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-7" data-ai-busy-scroll>
         {/* v3 A5 — 화면 머리 · 작품 스타일 막대 · 걸러 보기 · 카드 묶음 · 맨 아래 다음 단계가 860 폭 한 줄로 쌓인다(간격 16). */}
         <div className="mx-auto flex max-w-[860px] flex-col gap-4">
           {headerRow}
