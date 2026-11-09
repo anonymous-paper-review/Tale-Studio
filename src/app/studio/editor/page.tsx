@@ -21,7 +21,7 @@ import { PageHeader } from '@/components/layout/page-header'
 import { AiBusyCard } from '@/components/ai-busy-overlay'
 import { useHoldChatClosed } from '@/hooks/use-hold-chat-closed'
 import { editorEmptyScreen, editorHeaderMeta, editorPrepTitle } from '@/features/editor/editor-labels'
-import { finishEditorOpen } from '@/features/editor/open-editor'
+import { EDITOR_FETCH_LIMIT, finishEditorOpen, runLimited } from '@/features/editor/open-editor'
 import { VideoPreviewer } from '@/features/editor/video-previewer'
 import { Timeline } from '@/features/editor/timeline'
 import { VideoSourcePanel } from '@/features/editor/video-source-panel'
@@ -280,49 +280,54 @@ export default function PostPage() {
     // 프로젝트가 바뀌면 이전 프로젝트의 "전체 보기" blob 캐시를 반환한다(같은 프로젝트 재진입은 유지).
     resetVideoPrefetchFor(projectId ?? null)
     useEditorStore.getState().setEditorPrep({ done: 0, total: 0 })
+    // 여는 길에 예외가 나도(망가진 저장본 등) 떠나지 않은 한 finally 에서 준비 표시를 내린다 — 기다리는 카드가 끝나지 않았다(검토 A E3).
     ;(async () => {
-      await loadData()
-      if (cancelled) return
-      const restored = await loadPersisted()
-      if (cancelled) return
-      // #d11(2026-08-31 오너 확정): 실제 영상 파일 길이 측정 — 계획 duration 보다 짧은 파일
-      //   (시간 인플레이션·모델 최소 길이 산물)은 타임라인이 실측 길이로 자동 트림한다.
-      //   메타데이터만 로드하고 실패는 무시(측정 불가 시 종전 동작 그대로). 처음 열 때는 다 잰 뒤에 소리를 놓는다.
-      const measureClips = () =>
-        Promise.all(
-          useEditorStore
-            .getState()
-            .videoClips.filter((c) => c.url && c.actualDurationSec == null)
-            .map(
-              (c) =>
-                new Promise<void>((resolve) => {
-                  const v = document.createElement('video')
-                  v.preload = 'metadata'
-                  v.onloadedmetadata = () => {
-                    if (!cancelled && Number.isFinite(v.duration) && v.duration > 0) {
-                      useEditorStore.getState().updateVideoClip(c.shotId, {
-                        actualDurationSec: Math.round(v.duration * 10) / 10,
-                      })
-                    }
-                    resolve()
+      try {
+        await loadData()
+        if (cancelled) return
+        const restored = await loadPersisted()
+        if (cancelled) return
+        // #d11(2026-08-31 오너 확정): 실제 영상 파일 길이 측정 — 계획 duration 보다 짧은 파일
+        //   (시간 인플레이션·모델 최소 길이 산물)은 타임라인이 실측 길이로 자동 트림한다.
+        //   메타데이터만 로드하고 실패는 무시(측정 불가 시 종전 동작 그대로). 처음 열 때는 다 잰 뒤에 소리를 놓는다.
+        //   한 번에 EDITOR_FETCH_LIMIT 개까지만 잰다(검토 A E6).
+        const measureClips = () =>
+          runLimited(
+            useEditorStore
+              .getState()
+              .videoClips.filter((c) => c.url && c.actualDurationSec == null),
+            EDITOR_FETCH_LIMIT,
+            (c) =>
+              new Promise<void>((resolve) => {
+                const v = document.createElement('video')
+                v.preload = 'metadata'
+                v.onloadedmetadata = () => {
+                  if (!cancelled && Number.isFinite(v.duration) && v.duration > 0) {
+                    useEditorStore.getState().updateVideoClip(c.shotId, {
+                      actualDurationSec: Math.round(v.duration * 10) / 10,
+                    })
                   }
-                  // 영상을 불러오지 못하면(404 · 막힘) 그 클립만 "불러오지 못함"으로 남긴다 — 나머지는 그대로 연다.
-                  v.onerror = () => {
-                    if (!cancelled) useEditorStore.getState().markVideoUnplayable(c.url as string)
-                    resolve()
-                  }
-                  v.src = c.url as string
-                }),
-            ),
-        ).then(() => undefined)
-      await finishEditorOpen({
-        projectId: projectId ?? null,
-        restored,
-        isCancelled: () => cancelled,
-        audioName: (shotType) => t('{type} audio', { type: shotType ?? t('Video') }),
-        measureClips,
-        decodeAudio: (url) => decodeAudioPeaks(url),
-      })
+                  resolve()
+                }
+                // 영상을 불러오지 못하면(404 · 막힘) 그 클립만 "불러오지 못함"으로 남긴다 — 나머지는 그대로 연다.
+                v.onerror = () => {
+                  if (!cancelled) useEditorStore.getState().markVideoUnplayable(c.url as string)
+                  resolve()
+                }
+                v.src = c.url as string
+              }),
+          )
+        await finishEditorOpen({
+          projectId: projectId ?? null,
+          restored,
+          isCancelled: () => cancelled,
+          audioName: (shotType) => t('{type} audio', { type: shotType ?? t('Video') }),
+          measureClips,
+          decodeAudio: (url) => decodeAudioPeaks(url),
+        })
+      } finally {
+        if (!cancelled) useEditorStore.getState().setEditorPrep(null)
+      }
     })()
     return () => {
       cancelled = true

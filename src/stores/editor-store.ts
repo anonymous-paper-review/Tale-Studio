@@ -20,6 +20,7 @@ import {
 } from '@/lib/editor-persistence'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
+import { compactSnapshot } from '@/lib/editor/peaks'
 
 const DEFAULT_CAMERA = {
   horizontal: 0,
@@ -651,145 +652,165 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return false
     const loadToken = ++persistedLoadEpoch
-    const saved = await loadEditorState(projectId)
+    // 저장본을 읽거나 되살리다 망가진 곳이 있으면(예외) 되살리지 않은 것으로 하고 처음 여는 길로 이어 간다 — 예외가 그대로 나가면
+    //   기다리는 카드가 끝나지 않았다(2026-11-10 검토 A E3). 약속: tests/editor/first-open.test.ts
+    let saved: PersistedEditor | null
+    try {
+      saved = await loadEditorState(projectId)
+    } catch (err) {
+      console.error('[editor-store] saved edit could not be read:', err)
+      return false
+    }
     if (
       !saved ||
       persistedLoadEpoch !== loadToken ||
       useProjectStore.getState().projectId !== projectId
     ) return false
-
-    // 복구: 이전 버전(모듈 카운터)에서 중복된 트랙/오디오 클립 id 제거
-    const seenTracks = new Set<string>()
-    const dedupTracks: { id: string }[] = []
-    for (const t of saved.audioTracks ?? []) {
-      if (!seenTracks.has(t.id)) {
-        seenTracks.add(t.id)
-        dedupTracks.push(t)
-      }
+    // 샷이 하나도 없는 저장본은 되살릴 편집이 아니다 — 11/3 늦은 비우기가 남긴 빈 편집 상태(운영 3945d1e6 서버 편집 상태 샷 0)를
+    //   "되살린 편집"으로 보면 처음 열기의 소리 나누기가 영영 안 된다(검토 A E1). 처음 여는 것으로 본다.
+    if (!Array.isArray(saved.shots) || saved.shots.length === 0) return false
+    try {
+      applySavedEdit(saved)
+      return true
+    } catch (err) {
+      console.error('[editor-store] saved edit could not be restored:', err)
+      return false
     }
-    if (dedupTracks.length === 0) dedupTracks.push({ id: 'atrack_1' })
-    const validTrackIds = new Set(dedupTracks.map((t) => t.id))
-    const seenClips = new Set<string>()
-    const dedupAudioClips = (saved.audioClips ?? []).map((c) => {
-      const id = seenClips.has(c.id) ? `audio_${uid()}` : c.id
-      seenClips.add(id)
-      const trackId = c.trackId && validTrackIds.has(c.trackId) ? c.trackId : dedupTracks[0].id
-      return { ...c, id, trackId }
-    })
 
-    const cur = get()
-    const canonicalShotIds = new Set(cur.shots.map((shot) => shot.shotId))
+    // 저장한 편집을 지금(DB 에서 다시 만든) 편집 상태에 입힌다 — 한 번에 set 하므로 중간에 예외가 나면 아무것도 바뀌지 않는다.
+    function applySavedEdit(saved: PersistedEditor) {
+      // 복구: 이전 버전(모듈 카운터)에서 중복된 트랙/오디오 클립 id 제거
+      const seenTracks = new Set<string>()
+      const dedupTracks: { id: string }[] = []
+      for (const t of saved.audioTracks ?? []) {
+        if (!seenTracks.has(t.id)) {
+          seenTracks.add(t.id)
+          dedupTracks.push(t)
+        }
+      }
+      if (dedupTracks.length === 0) dedupTracks.push({ id: 'atrack_1' })
+      const validTrackIds = new Set(dedupTracks.map((t) => t.id))
+      const seenClips = new Set<string>()
+      const dedupAudioClips = (saved.audioClips ?? []).map((c) => {
+        const id = seenClips.has(c.id) ? `audio_${uid()}` : c.id
+        seenClips.add(id)
+        const trackId = c.trackId && validTrackIds.has(c.trackId) ? c.trackId : dedupTracks[0].id
+        return { ...c, id, trackId }
+      })
 
-    // Synthetic piece restore (#a3-state-loss 2026-08-26): cut/drag-to-add pieces (__c/__i)
-    // exist only in the editor - loadData rebuilds from DB shots and dropped them, so a mere
-    // tab visit reverted every cut (reproduced: evidence/a3-0*.png). Restore a saved piece
-    // only when its base shot is still canonical: deleted media must not resurrect, and the
-    // piece replays the base clip's *current* url so regenerated takes flow through.
-    const savedClipByShot = new Map((saved.videoClips ?? []).map((c) => [c.shotId, c]))
-    const baseClipByShot = new Map(cur.videoClips.map((c) => [c.shotId, c]))
-    const baseShotById = new Map(cur.shots.map((s) => [s.shotId, s]))
-    const restoredShots: Shot[] = []
-    const restoredClips: VideoClip[] = []
-    // 잘라 낸 조각을 되살린 원본 샷 — 자르기가 바꾼 앞 조각(원본)의 구간은 DB 에 쓰지 않으므로 저장한 편집에서 되살린다(2026-11-10).
-    const cutRoots = new Set<string>()
-    for (const savedShot of saved.shots ?? []) {
-      if (!isSyntheticShotId(savedShot.shotId)) continue
-      if (canonicalShotIds.has(savedShot.shotId)) continue
-      // 타이틀 카드(#owner-title-card)는 원본 shot에 연결되지 않은 독립 클립 — base shot 검증을 건너뛰고
-      // 저장된 shot/clip을 그대로 복원한다 (텍스트/이미지/길이 모두 스냅샷에 있음).
-      if (isTitleCardShotId(savedShot.shotId)) {
-        restoredShots.push(savedShot)
+      const cur = get()
+      const canonicalShotIds = new Set(cur.shots.map((shot) => shot.shotId))
+
+      // Synthetic piece restore (#a3-state-loss 2026-08-26): cut/drag-to-add pieces (__c/__i)
+      // exist only in the editor - loadData rebuilds from DB shots and dropped them, so a mere
+      // tab visit reverted every cut (reproduced: evidence/a3-0*.png). Restore a saved piece
+      // only when its base shot is still canonical: deleted media must not resurrect, and the
+      // piece replays the base clip's *current* url so regenerated takes flow through.
+      const savedClipByShot = new Map((saved.videoClips ?? []).map((c) => [c.shotId, c]))
+      const baseClipByShot = new Map(cur.videoClips.map((c) => [c.shotId, c]))
+      const baseShotById = new Map(cur.shots.map((s) => [s.shotId, s]))
+      const restoredShots: Shot[] = []
+      const restoredClips: VideoClip[] = []
+      // 잘라 낸 조각을 되살린 원본 샷 — 자르기가 바꾼 앞 조각(원본)의 구간은 DB 에 쓰지 않으므로 저장한 편집에서 되살린다(2026-11-10).
+      const cutRoots = new Set<string>()
+      for (const savedShot of saved.shots ?? []) {
+        if (!isSyntheticShotId(savedShot.shotId)) continue
+        if (canonicalShotIds.has(savedShot.shotId)) continue
+        // 타이틀 카드(#owner-title-card)는 원본 shot에 연결되지 않은 독립 클립 — base shot 검증을 건너뛰고
+        // 저장된 shot/clip을 그대로 복원한다 (텍스트/이미지/길이 모두 스냅샷에 있음).
+        if (isTitleCardShotId(savedShot.shotId)) {
+          restoredShots.push(savedShot)
+          const savedClip = savedClipByShot.get(savedShot.shotId)
+          restoredClips.push({
+            shotId: savedShot.shotId,
+            url: null,
+            status: 'completed',
+            thumbnailUrl: null,
+            trimStart: savedClip?.trimStart,
+            trimEnd: savedClip?.trimEnd,
+            speed: savedClip?.speed ?? 1.0,
+            transitionIn: savedClip?.transitionIn ?? null,
+          })
+          canonicalShotIds.add(savedShot.shotId)
+          continue
+        }
+        const base = baseShotById.get(rootShotIdOf(savedShot.shotId))
+        if (!base) continue
+        if (savedShot.shotId.includes('__c')) cutRoots.add(base.shotId)
+        restoredShots.push({ ...savedShot, sceneId: base.sceneId, durationSeconds: base.durationSeconds })
         const savedClip = savedClipByShot.get(savedShot.shotId)
+        const baseClip = baseClipByShot.get(base.shotId)
         restoredClips.push({
           shotId: savedShot.shotId,
-          url: null,
-          status: 'completed',
-          thumbnailUrl: null,
+          url: baseClip?.url ?? null,
+          status: baseClip?.status ?? 'pending',
+          thumbnailUrl: baseClip?.thumbnailUrl ?? null,
           trimStart: savedClip?.trimStart,
           trimEnd: savedClip?.trimEnd,
           speed: savedClip?.speed ?? 1.0,
           transitionIn: savedClip?.transitionIn ?? null,
         })
         canonicalShotIds.add(savedShot.shotId)
-        continue
       }
-      const base = baseShotById.get(rootShotIdOf(savedShot.shotId))
-      if (!base) continue
-      if (savedShot.shotId.includes('__c')) cutRoots.add(base.shotId)
-      restoredShots.push({ ...savedShot, sceneId: base.sceneId, durationSeconds: base.durationSeconds })
-      const savedClip = savedClipByShot.get(savedShot.shotId)
-      const baseClip = baseClipByShot.get(base.shotId)
-      restoredClips.push({
-        shotId: savedShot.shotId,
-        url: baseClip?.url ?? null,
-        status: baseClip?.status ?? 'pending',
-        thumbnailUrl: baseClip?.thumbnailUrl ?? null,
-        trimStart: savedClip?.trimStart,
-        trimEnd: savedClip?.trimEnd,
-        speed: savedClip?.speed ?? 1.0,
-        transitionIn: savedClip?.transitionIn ?? null,
-      })
-      canonicalShotIds.add(savedShot.shotId)
-    }
-    // 약속 K8: 자막은 새로고침해도 남는다 — DB 에서 온 원본 샷에도 스냅샷의 자막(글자·자리)을 다시 입힌다.
-    const savedSubtitleById = new Map<string, ShotSubtitle | null>()
-    for (const savedShot of saved.shots ?? []) {
-      if (savedShot.subtitle !== undefined) savedSubtitleById.set(savedShot.shotId, savedShot.subtitle ?? null)
-    }
-    const baseShots = savedSubtitleById.size
-      ? cur.shots.map((s) => (savedSubtitleById.has(s.shotId) ? { ...s, subtitle: savedSubtitleById.get(s.shotId) ?? null } : s))
-      : cur.shots
-    const combinedShots = restoredShots.length ? [...baseShots, ...restoredShots] : baseShots
-    // 자른 앞 조각(원본)의 구간은 저장한 편집에서 되살린다 — 그 밖의 원본 구간은 DB 값(손잡이로 바꾼 구간은 DB 에도 쓴다).
-    const baseClips = cutRoots.size
-      ? cur.videoClips.map((c) => {
-          const savedClip = cutRoots.has(c.shotId) ? savedClipByShot.get(c.shotId) : undefined
-          return savedClip && (savedClip.trimStart !== undefined || savedClip.trimEnd !== undefined)
-            ? { ...c, trimStart: savedClip.trimStart, trimEnd: savedClip.trimEnd }
-            : c
-        })
-      : cur.videoClips
-    const combinedClips = restoredClips.length ? [...baseClips, ...restoredClips] : baseClips
+      // 약속 K8: 자막은 새로고침해도 남는다 — DB 에서 온 원본 샷에도 스냅샷의 자막(글자·자리)을 다시 입힌다.
+      const savedSubtitleById = new Map<string, ShotSubtitle | null>()
+      for (const savedShot of saved.shots ?? []) {
+        if (savedShot.subtitle !== undefined) savedSubtitleById.set(savedShot.shotId, savedShot.subtitle ?? null)
+      }
+      const baseShots = savedSubtitleById.size
+        ? cur.shots.map((s) => (savedSubtitleById.has(s.shotId) ? { ...s, subtitle: savedSubtitleById.get(s.shotId) ?? null } : s))
+        : cur.shots
+      const combinedShots = restoredShots.length ? [...baseShots, ...restoredShots] : baseShots
+      // 자른 앞 조각(원본)의 구간은 저장한 편집에서 되살린다 — 그 밖의 원본 구간은 DB 값(손잡이로 바꾼 구간은 DB 에도 쓴다).
+      const baseClips = cutRoots.size
+        ? cur.videoClips.map((c) => {
+            const savedClip = cutRoots.has(c.shotId) ? savedClipByShot.get(c.shotId) : undefined
+            return savedClip && (savedClip.trimStart !== undefined || savedClip.trimEnd !== undefined)
+              ? { ...c, trimStart: savedClip.trimStart, trimEnd: savedClip.trimEnd }
+              : c
+          })
+        : cur.videoClips
+      const combinedClips = restoredClips.length ? [...baseClips, ...restoredClips] : baseClips
 
-    const canonicalOrder = new Map<string, string[]>()
-    for (const shot of combinedShots) {
-      const order = canonicalOrder.get(shot.sceneId) ?? []
-      order.push(shot.shotId)
-      canonicalOrder.set(shot.sceneId, order)
+      const canonicalOrder = new Map<string, string[]>()
+      for (const shot of combinedShots) {
+        const order = canonicalOrder.get(shot.sceneId) ?? []
+        order.push(shot.shotId)
+        canonicalOrder.set(shot.sceneId, order)
+      }
+      // 저장할 때 있던 샷이 저장한 순서에 없으면 사람이 타임라인에서 지운 것이다 — 되살리지 않는다.
+      //   저장한 뒤에 새로 생긴 샷만 씬 끝에 붙인다(2026-11-10, 약속: tests/editor/reopen-edits.test.ts).
+      const savedShotIds = new Set((saved.shots ?? []).map((s) => s.shotId))
+      const clipOrder: Record<string, string[]> = {}
+      for (const [sceneId, canonicalIds] of canonicalOrder) {
+        const savedIds = saved.clipOrder?.[sceneId] ?? []
+        const retained = savedIds.filter(
+          (shotId, index) => canonicalShotIds.has(shotId) && savedIds.indexOf(shotId) === index,
+        )
+        clipOrder[sceneId] = [...retained, ...canonicalIds.filter((id) => !retained.includes(id) && !savedShotIds.has(id))]
+      }
+      set({
+        // Canonical shots/videoClips come from loadData (DB truth). Only synthetic editor
+        // pieces whose base shot is still canonical are merged back in above - a local
+        // snapshot must not resurrect deleted media when that DB snapshot is empty.
+        shots: combinedShots,
+        videoClips: combinedClips,
+        clipOrder,
+        audioClips: dedupAudioClips,
+        audioSources: saved.audioSources ?? [],
+        audioTracks: dedupTracks,
+        panelSizes: saved.panelSizes ?? { ...DEFAULT_PANEL_SIZES },
+        selectedClipShotId: cur.selectedClipShotId,
+        selectedShotIds: [],
+        selectedAudioId: null,
+        selectedAudioIds: [],
+        previewSourceShotId: null,
+        currentTime: 0,
+        isPlaying: false,
+        past: [],
+        future: [],
+      })
     }
-    // 저장할 때 있던 샷이 저장한 순서에 없으면 사람이 타임라인에서 지운 것이다 — 되살리지 않는다.
-    //   저장한 뒤에 새로 생긴 샷만 씬 끝에 붙인다(2026-11-10, 약속: tests/editor/reopen-edits.test.ts).
-    const savedShotIds = new Set((saved.shots ?? []).map((s) => s.shotId))
-    const clipOrder: Record<string, string[]> = {}
-    for (const [sceneId, canonicalIds] of canonicalOrder) {
-      const savedIds = saved.clipOrder?.[sceneId] ?? []
-      const retained = savedIds.filter(
-        (shotId, index) => canonicalShotIds.has(shotId) && savedIds.indexOf(shotId) === index,
-      )
-      clipOrder[sceneId] = [...retained, ...canonicalIds.filter((id) => !retained.includes(id) && !savedShotIds.has(id))]
-    }
-    set({
-      // Canonical shots/videoClips come from loadData (DB truth). Only synthetic editor
-      // pieces whose base shot is still canonical are merged back in above - a local
-      // snapshot must not resurrect deleted media when that DB snapshot is empty.
-      shots: combinedShots,
-      videoClips: combinedClips,
-      clipOrder,
-      audioClips: dedupAudioClips,
-      audioSources: saved.audioSources ?? [],
-      audioTracks: dedupTracks,
-      panelSizes: saved.panelSizes ?? { ...DEFAULT_PANEL_SIZES },
-      selectedClipShotId: cur.selectedClipShotId,
-      selectedShotIds: [],
-      selectedAudioId: null,
-      selectedAudioIds: [],
-      previewSourceShotId: null,
-      currentTime: 0,
-      isPlaying: false,
-      past: [],
-      future: [],
-    })
-    return true
   },
 
   loadData: async () => {
@@ -1653,7 +1674,7 @@ const pickPersisted = (s: EditorState) => ({
  *   약속: tests/editor/first-open.test.ts
  */
 export function saveEditorNow(projectId: string): Promise<ServerSaveResult | null> {
-  const snapshot: PersistedEditor = { version: 1, ...pickPersisted(useEditorStore.getState()) }
+  const snapshot = compactSnapshot({ version: 1, ...pickPersisted(useEditorStore.getState()) })
   saveEditorStateNow(projectId, snapshot)
   const generation = (serverSaveGenerations.get(projectId) ?? 0) + 1
   serverSaveGenerations.set(projectId, generation)
@@ -1693,7 +1714,8 @@ if (typeof window !== 'undefined') {
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return
 
-    const snapshot: PersistedEditor = { version: 1, ...cur }
+    // 파형은 소수 둘째 자리로 줄여 저장한다(검토 A E2a — 꽉 차면 저장이 실패한다). 화면의 편집 상태는 그대로.
+    const snapshot = compactSnapshot({ version: 1, ...cur })
     saveEditorState(projectId, snapshot)
     scheduleServerSave(projectId, snapshot)
   })
