@@ -25,6 +25,17 @@ describe('새 기다리는 카드', () => {
     expect(html).toMatch(/✓<\/span><span[^>]*>요청 읽기[\s\S]*●<\/span><span[^>]*>만드는 중[\s\S]*○<\/span><span[^>]*>마무리/)
   })
 
+  // 왜: 검토 A L5 — ✓ · ● · ○ 기호는 화면 읽기가 읽지 않는다. 지금 단계는 aria-current 로, 끝난 · 남은 단계는 숨은 글로 알린다.
+  it('기다리는 카드의 단계는 화면 읽기에 지금 단계를 알리고, 끝난 단계 · 남은 단계도 글로 읽힌다', () => {
+    for (const lumi of ['writer', undefined] as const) {
+      const html = card({ lumi, card: 'loading', steps: STEPS })
+      expect(html, String(lumi)).toMatch(/<li[^>]*aria-current="step"[^>]*>(?:(?!<\/li>)[\s\S])*만드는 중/)
+      expect((html.match(/aria-current="step"/g) ?? []).length, String(lumi)).toBe(1)
+      expect(html, String(lumi)).toMatch(/<span class="sr-only">완료<\/span>(?:(?!<\/li>)[\s\S])*요청 읽기/)
+      expect(html, String(lumi)).toMatch(/<span class="sr-only">남음<\/span>(?:(?!<\/li>)[\s\S])*마무리/)
+    }
+  })
+
   // 왜: SYS "기다리는 팝업 = Lumi L" — 예전 카드의 240 큰 Lumi 는 새 카드 폭(372)에 맞지 않는다.
   it('기다리는 카드의 Lumi 는 기다리는 팝업 크기(L)로 그려진다', () => {
     expect(card({ lumi: 'writer' })).toMatch(/width="100" height="77"/)

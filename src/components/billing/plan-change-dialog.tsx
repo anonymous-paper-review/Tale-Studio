@@ -140,7 +140,7 @@ export function PlanChangeDialog({
         </dl>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={pending}>
+          <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={pending}>
             {t('Cancel')}
           </Button>
           <Button onClick={confirm} disabled={pending}>

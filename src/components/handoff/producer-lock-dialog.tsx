@@ -113,7 +113,7 @@ export function ProducerLockDialog({ open }: { open: boolean }) {
         </label>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={close}>
+          <Button variant="secondary" onClick={close}>
             {t('Keep editing')}
           </Button>
           <Button

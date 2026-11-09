@@ -354,7 +354,7 @@ function SettingsStep() {
           </dl>
           <p className="text-caption text-subtle-foreground">{t('You can change the genre and mood and the length again in Writer.')}</p>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setConfirmOpen(false)}>
+            <Button variant="secondary" onClick={() => setConfirmOpen(false)}>
               {t('No, let me fix it')}
             </Button>
             <Button

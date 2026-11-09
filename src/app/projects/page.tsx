@@ -373,7 +373,7 @@ export default function ProjectsPage() {
           </DialogHeader>
           {deleteError ? <p className="text-sm text-destructive">{deleteError}</p> : null}
           <DialogFooter>
-            <Button variant="ghost" disabled={deleting} onClick={() => setDeleteTarget(null)}>
+            <Button variant="secondary" disabled={deleting} onClick={() => setDeleteTarget(null)}>
               {t('Cancel')}
             </Button>
             <Button variant="destructive" disabled={deleting} onClick={() => void handleDelete()}>

@@ -393,7 +393,7 @@ export function ExportDialogBody({
       ) : null}
 
       <DialogFooter>
-        <Button variant="ghost" onClick={onCancel}>
+        <Button variant="secondary" onClick={onCancel}>
           {t('Cancel')}
         </Button>
         <Button disabled={list.length === 0} onClick={onStart} data-testid="export-start">

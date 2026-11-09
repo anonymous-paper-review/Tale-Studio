@@ -36,7 +36,7 @@ export function ImageUploadConsentDialog({
           <span>{t('I have the right to use this image, and if it shows an identifiable person, I have their consent to use it here.')}</span>
         </label>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onDecision(false)}>{t('Cancel')}</Button>
+          <Button type="button" variant="secondary" onClick={() => onDecision(false)}>{t('Cancel')}</Button>
           <Button type="button" disabled={!checked} onClick={() => { if (checked) onDecision(true) }}>{t('Upload')}</Button>
         </DialogFooter>
       </DialogContent>

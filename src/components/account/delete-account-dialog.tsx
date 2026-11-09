@@ -112,7 +112,7 @@ export function DeleteAccountDialog({
         </label>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={pending}>
+          <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={pending}>
             {t('Cancel')}
           </Button>
           <Button variant="destructive" onClick={() => void deleteAccount()} disabled={!confirmed || pending}>

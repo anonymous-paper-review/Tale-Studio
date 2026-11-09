@@ -43,10 +43,13 @@ describe('노드 · 카드 위 기다림', () => {
   })
 
   // 왜: SYS "완성 표시" — 다 만든 노드는 단계 그라데이션 "✓ 완성" 배지와 단계 색 테두리로 알린다.
-  it('완성 배지는 "✓ 완성" 을 그 단계 색으로 쓰고, 기다림 · 완성 노드는 단계 색 테두리를 단다', () => {
+  it('완성 배지는 "✓ 완성" 을 그 단계 색으로 쓰고, 기다림 카드는 단계 색 테두리를 단다', () => {
     const html = renderToStaticMarkup(createElement(DoneBadge, { lumi: 'artist' }))
     expect(html).toMatch(/^<span[^>]*data-stage="artist"/)
     expect(html).toContain('✓ 완성')
+    const card = renderToStaticMarkup(createElement(NodeWaitCard, { lumi: 'artist', title: '그리고 있어요' }))
+    const rootClass = card.match(/^(?:<link[^>]*\/>)*<div[^>]*class="([^"]*)"/)?.[1] ?? ''
+    for (const cls of STAGE_FRAME.split(' ')) expect(rootClass.split(' ')).toContain(cls)
     expect(STAGE_FRAME).toContain('border-stage')
   })
 })

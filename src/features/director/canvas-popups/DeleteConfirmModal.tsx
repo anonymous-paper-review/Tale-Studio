@@ -100,7 +100,7 @@ export function DeleteConfirmModal() {
         )}
 
         <DialogFooter>
-          <Button variant="ghost" size="sm" onClick={closeDeleteConfirm}>
+          <Button variant="secondary" size="sm" onClick={closeDeleteConfirm}>
             {t('Cancel')}
           </Button>
           <Button variant="destructive" size="sm" onClick={confirmDelete}>

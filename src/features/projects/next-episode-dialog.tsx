@@ -274,7 +274,7 @@ export function SeriesPlanDialog({ open, onClose }: { open: boolean; onClose: ()
           <DialogDescription>{t('Keeping the previous episode and the next one together needs at least 2 project slots.')}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose}>
             {t('Close')}
           </Button>
           {PRICING_PAGE_VISIBLE && <Button onClick={() => router.push('/pricing')}>{t('View pricing')}</Button>}
@@ -301,7 +301,7 @@ export function SeriesSlotLimitDialog({ open, slotLimit, onClose }: { open: bool
           {t('Deleting an old episode keeps the character and background images copied into the next episode.')}
         </p>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose}>
             {t('Close')}
           </Button>
           {PRICING_PAGE_VISIBLE && <Button onClick={() => router.push('/pricing')}>{t('View pricing')}</Button>}
@@ -360,7 +360,7 @@ export function SeriesDeleteWarningDialog({
           </p>
         ) : null}
         <DialogFooter>
-          <Button variant="outline" disabled={deleting} onClick={onCancel}>
+          <Button variant="secondary" disabled={deleting} onClick={onCancel}>
             {t('Cancel')}
           </Button>
           <Button variant="destructive" disabled={deleting} onClick={onConfirm} data-testid="series-delete-confirm">
@@ -406,7 +406,7 @@ export function PrevProseDialog({ project, onClose }: { project: SeriesTarget | 
           <p className="text-sm text-muted-foreground">{t('The previous episode was deleted, so its prose can no longer be read.')}</p>
         )}
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="secondary" onClick={onClose}>
             {t('Close')}
           </Button>
         </DialogFooter>

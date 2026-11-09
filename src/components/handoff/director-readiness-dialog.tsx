@@ -138,7 +138,7 @@ export function DirectorReadinessDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={close}>
+          <Button variant="secondary" onClick={close}>
             {t('Fill in first')}
           </Button>
           <Button onClick={() => void proceed()} data-testid="director-proceed-anyway">

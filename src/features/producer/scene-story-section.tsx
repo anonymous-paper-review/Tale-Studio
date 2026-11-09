@@ -474,7 +474,7 @@ export function SceneStorySection() {
         </div>
         {saveError ? <p role="alert" className="text-sm text-destructive">{saveError}</p> : null}
         <DialogFooter className="border-t border-border pt-4">
-          <Button variant="outline" disabled={edit?.busy} onClick={closeManual}>{t('Cancel')}</Button>
+          <Button variant="secondary" disabled={edit?.busy} onClick={closeManual}>{t('Cancel')}</Button>
           <Button onClick={() => void saveManual()} disabled={edit?.busy || !draft?.scenes.length || draft.scenes.some((scene) => !scene.text.trim()) || !draft.scenes.some((scene) => scene.text !== scene.originalText)}>
             {edit?.busy ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
             {t(edit?.busy ? 'Saving…' : 'Save')}

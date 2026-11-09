@@ -102,6 +102,8 @@ source-of-truth는 `src/app/globals.css`. 본 섹션은 *역할*만 enumerate �
 | `--foreground` | 본문 글자 (Text) |
 | `--muted-foreground` | 보조 글자 (Text 2) — 설명 · 부제 |
 | `--subtle-foreground` | 흐린 글자 — 메타 · 힌트 · 자리표시 · 아직 안 연 단계 (시안 #8E8B82) |
+| `--faint-foreground` | 가장 흐린 기호 — 기다리는 카드의 남은 단계 ○ (11/5) |
+| `--progress-track` | 진행 막대 바닥(흰 8%) — 기다리는 카드 · 노드 위 기다림 (11/5) |
 | `--primary` / `--primary-foreground` | 크림 메인 단추 / 그 위 어두운 글씨 |
 | `--secondary` | 보조 단추 바탕 (= card) |
 | `--muted` | subdued surface (= card) |
@@ -160,7 +162,8 @@ v3 시안에는 테두리가 거의 없다(면 색 차이로 나눈다). 테두�
 
 **룰**: 상태는 **색 + icon + label** 3중. 상태 색은 상태 표현에만 — 단추를 칠하지 않는다.
 
-**생성 중 = 도는 빛**(카드 테두리 `.tale-beam`). 11/5 SYS "노드 위에서 기다릴 때"를 따라 Director **영상 노드**는 그 자리를 `NodeWaitCard`(Lumi S · 단계 색 테두리 1.5 · 안쪽 18, §13.5)로 바꾼다(붙이는 것은 set 갈래).
+**생성 중 = 도는 빛**(카드 테두리 `.tale-beam`). 11/5 SYS "노드 위에서 기다릴 때"를 따라 Director **영상 노드**와 Storyboard **러프 카드**(그리는 동안)는
+그 자리를 `NodeWaitCard`(Lumi S · 단계 색 테두리 1.5 · 안쪽 18, §13.5)로 바꾼다(붙인 곳: set 갈래 VideoNode · board 갈래 rough-storyboard-view).
 **그림**(스토리보드 4샷 시트)은 지금처럼 꼬리 글 + 도는 표시 그대로.
 
 ### 2.6 Focus ring
@@ -518,8 +521,11 @@ Radix primitive 는 body 로 portal — `<html data-stage>` 덕에 지금 단계
 
 shadcn `Dialog`(`src/components/ui/dialog.tsx`) — **11/5 SYS "모든 팝업에 똑같이"**(R3 기준):
 너비 520 · 넓은 팝업 748(`size="wide"`) · 안쪽 위아래 50 · 양옆 30 · 블록 사이 20 · 모서리 22 · `shadow-dialog`(0 30 80 검정 55%) · 막 검정 60% · 바탕 `bg-side`.
-`DialogHeader` = 제목 묶음(Lumi · 제목 · 설명) 가운데 · 사이 15 · 위아래 6. 제목 20 Bold, 설명 13.5 · 줄 150% · `text-subtle-foreground`. 닫기 X 24px(위 13 · 오른쪽 23).
-`DialogFooter` 단추는 오른쪽 정렬 · 사이 8 · 둥근 알약(11/18 · 14 600) — 취소 `variant="secondary"`(#30302E), 확인 기본(크림).
+`DialogHeader` = 제목 묶음(Lumi · 제목 · 설명) 가운데 · 사이 15 · 위아래 6. 제목 20 Bold, 설명 13.5 · 줄 150% · `text-subtle-foreground`.
+닫기 ✕ = 24 틀을 채우는 X(획 18.5px · 둥근 끝 2.1, 시안 글자 ✕ 24px 와 같은 크기), 가운데가 위 29 · 오른쪽 34. 숨은 이름은 한국어 화면에서 "닫기".
+`DialogFooter` 단추는 오른쪽 정렬 · 사이 8 · 둥근 알약(11/18 · 14 600) — 취소 `variant="secondary"`(#30302E), 확인 기본(크림). 일부러 다른 셋째 단추(예: 새 프로젝트 창 [← 이전])는 그대로.
+**큰 작업 창**(`frame="work"`: 샷 고치기 1080 · 샷/씬 추가 67rem · Artist 인물 상세 1080 · 산문 재점검)은 시안이 없고 폭도 부르는 쪽이 정해,
+머리 · 여백 · 단추는 예전 모양(왼쪽 머리 · 제목 18 600 · 안쪽 24 · 알약 아님)으로 둔다(리드 2026-11-09). 바탕 · 모서리 · 그림자 · 닫기는 SYS 와 같다.
 **확인 팝업**(큰 일을 하기 전에 "~할까요?"를 묻는 창 — 단계 넘기기 · 확정) 맨 위에는 큰 Lumi `<ConfirmLumi stage={지금 단계} />`
 (`src/components/handoff/confirm-lumi.tsx`: 지금 단계 옷 · `idle` · SYS "팝업 제목 위" M 78, 단계 밖 팝업은 `persona="pearl"`). 자리는 `DialogHeader` 안 맨 위 — Header 앞에 둔 창도 틀이 Lumi · 제목 사이를 15 로 맞춘다. 지우기 확인 · 오류 안내에는 넣지 않는다. 지금 쓰는 곳: Producer 시작 확인(`features/entry/entry-form.tsx`) · Writer 로 넘기기 전 확정 창(`handoff/producer-lock-dialog.tsx`) · 산문 확정(`features/prose/prose-confirm-dialog.tsx`) · Artist 그림체 고르기 · 다시 만들기 · 완료(`features/artist-room/style-make-dialog.tsx` · `regenerate-style-dialog.tsx` · `artist-complete-dialog.tsx`) · Storyboard → Director 넘기기(`features/writer/storyboard-director-dialog.tsx`) · Director 로 넘기기 전 준비 창(`handoff/director-readiness-dialog.tsx`) · Director 다시 만들기 · 영상 만들기 확인(`features/director/regenerate-confirm-dialog.tsx`).
 

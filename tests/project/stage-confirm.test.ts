@@ -9,6 +9,7 @@ vi.mock('@/lib/i18n', async () => {
 })
 
 import { StageConfirm, stageConfirmNext } from '@/components/controls/stage-confirm'
+import { ArtistIcon, DirectorIcon, EditorIcon, ExportIcon, StoryboardIcon, WriterIcon } from '@/components/icons/v3-icons'
 import type { StageId } from '@/types'
 
 const STAGES: StageId[] = ['entry', 'producer', 'artist', 'writer', 'director', 'editor']
@@ -30,10 +31,16 @@ describe('단계 확인 단추', () => {
   })
 
   // 왜: 시안의 왼쪽 단추 아이콘은 넘어갈 단계의 아이콘이다(마지막 Editor 다음은 작품 완성 · 내보내기).
-  it('단계 확인 단추의 왼쪽 단추는 다음 단계를 가리킨다(Editor 다음은 작품 완성)', () => {
+  it('단계 확인 단추의 왼쪽 단추는 다음 단계를 가리키고 그 단계 아이콘을 단다(Editor 다음은 작품 완성 · 내보내기 아이콘)', () => {
     expect(STAGES.map(stageConfirmNext)).toEqual(['writer', 'artist', 'storyboard', 'director', 'editor', 'complete'])
     expect(html('entry')).toMatch(/data-next="writer"/)
     expect(html('editor')).toMatch(/data-next="complete"/)
+    const icons = [WriterIcon, ArtistIcon, StoryboardIcon, DirectorIcon, EditorIcon, ExportIcon]
+    STAGES.forEach((stage, i) => {
+      const [confirm] = elements(StageConfirm({ stage, onConfirm: () => {}, onRevise: () => {} })).filter((node) => node.type === 'button')
+      const drawn = elements(confirm.props.children as ReactNode).filter((node) => icons.includes(node.type as (typeof icons)[number]))
+      expect(drawn.map((node) => node.type), stage).toEqual([icons[i]])
+    })
   })
 
   // 왜: 정상 경로 고정 — 왼쪽은 넘기기, 오른쪽은 더 고치기다. 둘을 바꿔 달면 넘기려던 사람이 고치기로 간다.

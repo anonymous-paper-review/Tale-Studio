@@ -636,7 +636,7 @@ export default function HomePage() {
           />
           <DialogFooter>
             <Button
-              variant="ghost"
+              variant="secondary"
               disabled={creating}
               onClick={() => setNameOpen(false)}
             >
@@ -670,7 +670,7 @@ export default function HomePage() {
           ) : null}
           <DialogFooter>
             <Button
-              variant="ghost"
+              variant="secondary"
               disabled={deleting}
               onClick={() => setDeleteTarget(null)}
             >
