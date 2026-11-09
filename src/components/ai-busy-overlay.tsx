@@ -155,6 +155,13 @@ export function AiBusyOverlay({ open, title, description, steps, progress, progr
 }
 
 
+/** 단계 줄의 숨은 글 — 끝난 줄 "완료", 남은 줄 "남음"(지금 줄은 li 의 aria-current 가 알린다). */
+function StepStateLabel({ state }: { state: AiBusyStep['state'] }) {
+  const t = useT()
+  if (state === 'current') return null
+  return <span className="sr-only">{state === 'done' ? t('Done') : t('Remaining')}</span>
+}
+
 /** 잠금 카드 — 덮개 안의 내용(큰 Lumi 또는 도는 원 · 제목 · 설명 · 단계 · 진행 · 단추). 포털 · 잠금 없이 그리기만 한다. */
 export function AiBusyCard({
   title,
@@ -190,8 +197,14 @@ export function AiBusyCard({
             {steps.map((step, i) => {
               // 멈춘 일(busy=false)의 지금 줄은 단계 색으로 칠하지 않는다 — 아직 하는 중처럼 보이지 않게(2026-10-27 QA).
               const live = step.state === 'current' && busy
+              // ✓ · ● · ○ 는 화면 읽기가 읽지 않는다 — 지금 줄은 aria-current, 끝난 · 남은 줄은 숨은 글(검토 A L5).
               return (
-                <li key={`${i}-${step.label}`} className="flex items-center gap-2.5 text-[13px] font-medium leading-tight">
+                <li
+                  key={`${i}-${step.label}`}
+                  aria-current={step.state === 'current' ? 'step' : undefined}
+                  className="flex items-center gap-2.5 text-[13px] font-medium leading-tight"
+                >
+                  <StepStateLabel state={step.state} />
                   <span
                     aria-hidden
                     className={cn(
@@ -248,6 +261,7 @@ export function AiBusyCard({
           {steps.map((step, i) => (
             <li
               key={`${i}-${step.label}`}
+              aria-current={step.state === 'current' ? 'step' : undefined}
               className={cn(
                 'flex items-center gap-2',
                 step.state === 'todo' && 'text-muted-foreground opacity-70',
@@ -264,6 +278,7 @@ export function AiBusyCard({
               ) : (
                 <span className="mx-1 size-2 shrink-0 rounded-full bg-muted-foreground/40" aria-hidden />
               )}
+              <StepStateLabel state={step.state} />
               <span>{step.label}</span>
             </li>
           ))}

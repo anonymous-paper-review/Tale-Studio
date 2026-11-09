@@ -1526,6 +1526,8 @@ export const KO: Record<string, string> = {
   Duration: '길이',
   // ── misc: queue/page.tsx ──
   'In progress': '진행 중',
+  // 기다리는 카드 단계 줄의 숨은 글(화면 읽기) — 끝난 줄은 Done(완료), 남은 줄은 이것
+  Remaining: '남음',
   Completed: '완료',
   'Zombie {age}': '좀비 {age}',
   'Checked {checked} stale, settled {settled}': 'Stale {checked}건 확인, {settled}건 종결',

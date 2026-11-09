@@ -22,17 +22,19 @@ export interface NodeWaitCardProps {
   progress?: number
   /** 맨 아래 작은 줄(예: "다음 차례: 새 샷 → 샷 2"). */
   note?: string
+  /** 화면 읽기에 알린다(role="status"). 여럿이 동시에 뜨면 겹쳐 읽으니 부르는 쪽이 하나만 고른다(보드 · Director 는 첫 카드). 기본 false. */
+  announce?: boolean
   className?: string
 }
 
 /** 놓인 노드(부모 relative)를 꽉 채우는 기다림 카드. */
-export function NodeWaitCard({ lumi, title, description, progress, note, className }: NodeWaitCardProps) {
+export function NodeWaitCard({ lumi, title, description, progress, note, announce = false, className }: NodeWaitCardProps) {
   const pct = typeof progress === 'number' && Number.isFinite(progress) ? Math.max(0, Math.min(100, Math.round(progress))) : null
   return (
     <div
       data-stage={lumiStageTheme(lumi)}
-      role="status"
-      aria-live="polite"
+      role={announce ? 'status' : undefined}
+      aria-live={announce ? 'polite' : undefined}
       className={cn(
         'absolute inset-0 z-10 flex flex-col items-center justify-center gap-[15px] rounded-[inherit] bg-side p-[18px] text-center shadow-dialog',
         STAGE_FRAME,

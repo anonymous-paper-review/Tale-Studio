@@ -61,7 +61,7 @@ function DirectingEditDialog({ shotId, panel, onOpenChange }: Omit<ShotDetailDia
 
   return (
     <Dialog open={!!shotId} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
+      <DialogContent size="wide" className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">{positionLabel}</span>

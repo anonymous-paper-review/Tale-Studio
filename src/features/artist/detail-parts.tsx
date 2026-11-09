@@ -71,7 +71,7 @@ export function DetailFrame({ open, onClose, title, left, right, footer, busy = 
 }) {
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next && !busy) onClose() }}>
-      <DialogContent className="flex max-h-[92vh] flex-col gap-0 p-0 sm:max-w-[1080px]" showCloseButton={!busy} data-testid={testId}>
+      <DialogContent frame="work" className="flex max-h-[92vh] flex-col gap-0 p-0 sm:max-w-[1080px]" showCloseButton={!busy} data-testid={testId}>
         <DialogHeader className="shrink-0 border-b border-border px-6 py-4">
           <DialogTitle className="text-base">{title}</DialogTitle>
         </DialogHeader>

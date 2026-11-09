@@ -269,7 +269,7 @@ function EntryFileDialog() {
   return (
     <>
       <Dialog open={open} onOpenChange={(next) => (next ? undefined : close())}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('Attach a file')}</DialogTitle>
             <DialogDescription>{t('One file · up to 10MB')}</DialogDescription>
@@ -321,7 +321,7 @@ function EntryFileDialog() {
           ) : null}
           <p className="text-xs text-muted-foreground">{t('Webtoons, character sheets and reference photos will be read in a later version.')}</p>
           <DialogFooter>
-            <Button variant="outline" onClick={close} disabled={uploading}>
+            <Button variant="secondary" onClick={close} disabled={uploading}>
               {t('Close')}
             </Button>
           </DialogFooter>
@@ -346,7 +346,7 @@ function NoTextDialog({ tab }: { tab: EntryTab }) {
 
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? undefined : void removeFile())}>
-      <DialogContent className="sm:max-w-md" showCloseButton={false}>
+      <DialogContent showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>{image ? t("Couldn't find text in the image") : t("Couldn't find text in the file")}</DialogTitle>
           <DialogDescription>
@@ -357,7 +357,7 @@ function NoTextDialog({ tab }: { tab: EntryTab }) {
         </DialogHeader>
         {image ? <p className="text-xs text-muted-foreground">{t('Reading pictures for characters and backgrounds opens in a later version.')}</p> : null}
         <DialogFooter>
-          <Button variant="outline" onClick={() => void continueWithoutFile(tab)}>
+          <Button variant="secondary" onClick={() => void continueWithoutFile(tab)}>
             {t('Continue without the file')}
           </Button>
           <Button

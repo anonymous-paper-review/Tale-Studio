@@ -77,7 +77,7 @@ export function DeleteAccountDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className="size-4 text-destructive" />
@@ -112,7 +112,7 @@ export function DeleteAccountDialog({
         </label>
 
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={pending}>
+          <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={pending}>
             {t('Cancel')}
           </Button>
           <Button variant="destructive" onClick={() => void deleteAccount()} disabled={!confirmed || pending}>
