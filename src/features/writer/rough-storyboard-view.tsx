@@ -75,7 +75,7 @@ import {
   type BoardLockState,
 } from '@/lib/writer/board-busy'
 import { boardShots, directorConfirmView, directorHandoffSummary, sceneStats, sceneStatsLabel, storyboardBriefing } from '@/lib/writer/board-summary'
-import { cardDialogue, mentionSegments, sceneHeadTitle, shotCardChips } from '@/lib/writer/board-card'
+import { boardStoryFontSize, cardDialogue, mentionSegments, sceneHeadTitle, shotCardChips } from '@/lib/writer/board-card'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import {
   isContentPolicyBlocked,
@@ -99,7 +99,6 @@ import {
   StoryboardZoomControls,
   applyStoryboardZoomShortcut,
   storyboardColumns,
-  storyboardDescriptionFontSize,
   useStoryboardZoom,
 } from '@/components/generating-frame'
 import type { RoughStoryboardImage, Shot } from '@/types'
@@ -1101,8 +1100,8 @@ export function RoughStoryboardView() {
   //   샷 각각의 고유 호출 번호가 목적(오너). 위치 기준(불변 id 아님)은 기존 결정 유지.
   //   셈은 Director 넘김 창 · 머리 숫자와 같은 boardShots(lib/writer/board-summary) 하나로 한다.
   const globalShotNo = new Map(boardList.map((entry) => [entry.shot.shotId, entry.shotNo]))
-  // 설명문 폰트(#zoom-desc) — 열이 늘수록(축소) 글자도 줄여 전문이 들어가게. 클램프는 제거.
-  const descFontSize = storyboardDescriptionFontSize(cols)
+  // 설명문 폰트(#zoom-desc) — 열이 늘수록(축소) 글자도 줄여 전문이 들어가게. 기본 3열은 11/5 시안 S1 의 13.5px(보드 전용 크기표, lib/writer/board-card).
+  const descFontSize = boardStoryFontSize(cols)
 
   // v3 씬 머리(시안 S1) — 이름(장소 · 때) · 요약 · 컷 수 · 초. 셈은 화면 머리와 같다(lib/writer/board-summary sceneStats).
   const statsByScene = sceneStats(sceneManifest, shots)
@@ -1368,7 +1367,7 @@ export function RoughStoryboardView() {
                         )}
 
                         {/* 액션 글 — 전문 표시(#zoom-desc, 잘라내지 않는다 · 축소 시 폰트가 함께 줄어든다). 인물 이름은 멘션 색(시안 "@민호", 글은 그대로). */}
-                        <p className="font-medium leading-relaxed text-foreground" style={{ fontSize: descFontSize }}>
+                        <p className="font-medium leading-[1.4] text-foreground" style={{ fontSize: descFontSize }}>
                           {mentionSegments(resolveEntityNames(shot.actionDescription, entityNames), mentionNames).map((part, i) =>
                             part.mention ? (
                               <span key={i} className="font-semibold text-mention">{part.text}</span>

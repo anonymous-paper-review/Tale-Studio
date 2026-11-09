@@ -86,6 +86,15 @@ export function shotCardChips(
   return chips
 }
 
+// 러프 보드 카드 액션 글 크기 — 열 수(축척)마다. 기본 3열 = 11/5 시안 S1 의 13.5px(UI/Label), 열이 늘면 줄고 줄면 커진다(#zoom-desc).
+//   Director 격자는 공용 storyboardDescriptionFontSize(3열 12px)를 그대로 쓴다. 약속: tests/writer/board-story-font.test.ts
+const BOARD_STORY_FONT: Record<number, string> = { 1: '15px', 2: '14px', 3: '13.5px', 4: '12px', 5: '11px', 6: '10.5px' }
+
+export function boardStoryFontSize(columns: number): string {
+  const clamped = Math.min(6, Math.max(1, Math.round(columns)))
+  return BOARD_STORY_FONT[clamped]
+}
+
 export interface CardDialogue {
   speaker: string
   text: string
