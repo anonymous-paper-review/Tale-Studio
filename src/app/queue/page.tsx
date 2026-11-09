@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { DashboardHeader } from '@/components/dashboard/dashboard-header'
+import { DASHBOARD_CONTAINER, DashboardHeader } from '@/components/dashboard/dashboard-header'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
 
@@ -217,9 +217,9 @@ export default function QueuePage() {
   ]
 
   return (
-    <div className="min-h-screen bg-background text-white">
+    <div className="min-h-screen bg-lobby text-white">
       <DashboardHeader active="queue" />
-      <main className="mx-auto max-w-7xl px-6 py-10">
+      <main className={cn(DASHBOARD_CONTAINER, 'py-10')}>
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-1 text-sm">
             {FILTERS.map((f) => (

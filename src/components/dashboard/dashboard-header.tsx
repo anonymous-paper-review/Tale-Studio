@@ -5,11 +5,13 @@
 //   보이던 문제 수정), 유저 메뉴(로그아웃)를 함께 제공한다. 우측 슬롯(children)에는 페이지
 //   전용 액션(새 프로젝트 버튼 등)이 들어간다.
 //   v3(2026-11-03): 작업 화면과 같은 바탕색 막대(검정 · 반투명 흐림 대신), Tale 로고 묶음, 탭은 v3 segmented 묶음(카드색 · 고른 칸 칩색).
+//   11/5 시안(R2~R6 위 막대): 막대 바탕은 페이지 바탕을 따르고(스튜디오 밖 화면 = bg-lobby) 아래 선이 없다. 탭은 알약 하나(side 바탕 ·
+//   고른 칸 tab-selected), 언어는 "한국어 ▾" 알약, 프로필은 32 원 하나. 막대와 본문은 같은 폭(DASHBOARD_CONTAINER)으로 줄을 맞춘다.
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Check, ChevronDown, Languages, LogOut } from 'lucide-react'
+import { Check, LogOut } from 'lucide-react'
 import { TaleLockup } from '@/components/tale-lockup'
 import {
   DropdownMenu,
@@ -40,6 +42,9 @@ const TABS = [
 const LOCALE_LABELS: Record<AppLocale, string> = { en: 'English', ko: '한국어' } // i18n-ok
 
 export type DashboardTab = (typeof TABS)[number]['key']
+
+/** 로그인 뒤 대시보드(막대 · 본문) 폭 — 11/5 시안 R2: 1440 화면에서 본문 1104(양옆 168). */
+export const DASHBOARD_CONTAINER = 'mx-auto w-full max-w-[1152px] px-6'
 
 export function DashboardHeader({
   active,
@@ -78,24 +83,24 @@ export function DashboardHeader({
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border-subtle bg-background">
-      <div className="mx-auto flex min-h-16 max-w-7xl flex-wrap items-center justify-between gap-3 px-6 py-3 lg:h-16 lg:flex-nowrap lg:py-0">
-        <div className="flex min-w-0 flex-wrap items-center gap-3 lg:flex-nowrap lg:gap-8">
+    <header className="sticky top-0 z-40 bg-inherit">
+      <div className={cn(DASHBOARD_CONTAINER, 'flex min-h-[78px] flex-wrap items-center justify-between gap-3 py-5 lg:flex-nowrap')}>
+        <div className="flex min-w-0 flex-wrap items-center gap-3 lg:flex-nowrap lg:gap-[89px]">
           <Link href="/projects" className="flex items-center rounded-md focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring">
-            <TaleLockup size={28} />
+            <TaleLockup size={26} />
           </Link>
-          <nav className="flex max-w-full flex-wrap items-center gap-0.5 rounded-lg bg-card p-[3px] text-label">
+          <nav className="flex max-w-full flex-wrap items-center gap-0.5 rounded-full bg-side p-1 text-[13px] leading-4">
             {/* 요금표를 숨겨 둔 동안(pricing-visibility) Pricing 탭을 뺀다. */}
             {TABS.filter((tab) => PRICING_PAGE_VISIBLE || tab.key !== 'pricing').map((tab) =>
               tab.key === active ? (
-                <span key={tab.key} aria-current="page" className="rounded-[9px] bg-chip px-3.5 py-1.5 font-semibold text-foreground">
+                <span key={tab.key} aria-current="page" className="rounded-full bg-tab-selected px-3.5 py-[7px] font-semibold text-foreground">
                   {t(tab.label)}
                 </span>
               ) : (
                 <Link
                   key={tab.key}
                   href={tab.href}
-                  className="rounded-[9px] px-3.5 py-1.5 font-medium text-subtle-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  className="rounded-full px-3.5 py-[7px] font-medium text-subtle-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
                   {t(tab.label)}
                 </Link>
@@ -109,12 +114,11 @@ export function DashboardHeader({
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
-                className="flex h-9 items-center gap-1.5 rounded-full bg-card px-3.5 text-label text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                className="flex h-8 items-center gap-1 rounded-full bg-side px-3 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 aria-label={t('Language')}
               >
-                <Languages className="size-4" aria-hidden />
                 {LOCALE_LABELS[locale]}
-                <ChevronDown className="size-3.5 text-subtle-foreground" aria-hidden />
+                <span aria-hidden>▾</span>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-36">
@@ -129,7 +133,7 @@ export function DashboardHeader({
           {userInfo && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-2 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                <button className="flex rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
                   {userInfo.avatar ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -139,11 +143,10 @@ export function DashboardHeader({
                       referrerPolicy="no-referrer"
                     />
                   ) : (
-                    <div className="flex size-8 items-center justify-center rounded-full bg-card text-label font-semibold text-foreground">
+                    <div className="flex size-8 items-center justify-center rounded-full bg-card font-num text-[13px] font-semibold text-foreground">
                       {userInfo.name.charAt(0).toUpperCase()}
                     </div>
                   )}
-                  <ChevronDown className="size-4 text-subtle-foreground" aria-hidden />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-44">

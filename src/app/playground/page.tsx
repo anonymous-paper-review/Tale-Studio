@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Clapperboard, Loader2 } from 'lucide-react'
 import { SiteHeader } from '@/components/marketing/site-header'
 import { SiteFooter } from '@/components/marketing/site-footer'
-import { DashboardHeader } from '@/components/dashboard/dashboard-header'
+import { DASHBOARD_CONTAINER, DashboardHeader } from '@/components/dashboard/dashboard-header'
 import { createClient } from '@/lib/supabase/client'
 import { ThumbImage } from '@/components/thumb-image'
 
@@ -59,13 +59,13 @@ export default function PlaygroundPage() {
   }, [])
 
   return (
-    <div className="flex min-h-screen flex-col bg-background text-white">
+    <div className="flex min-h-screen flex-col bg-lobby text-white">
       {authed === true ? <DashboardHeader active="playground" /> : null}
       {authed === false ? <SiteHeader /> : null}
       <main
         className={
           authed === true
-            ? 'mx-auto w-full max-w-7xl flex-1 px-6 py-10'
+            ? `${DASHBOARD_CONTAINER} flex-1 py-10`
             : 'mx-auto w-full max-w-7xl flex-1 px-6 pb-20 pt-28'
         }
       >

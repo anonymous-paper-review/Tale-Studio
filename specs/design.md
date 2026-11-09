@@ -92,6 +92,8 @@ source-of-truth는 `src/app/globals.css`. 본 섹션은 *역할*만 enumerate �
 |---|---|
 | `--shell` = `--background` | 작업 화면 바탕 |
 | `--side` | 사이드바 · 채팅 바탕 |
+| `--lobby` | **스튜디오 밖 화면 바탕** — 로그인(R1) · 프로젝트 목록 · 새 프로젝트(R2~R6) · 플레이그라운드 · 대기열 · 계정. 작업 화면보다 한 단 어둡다(11/5) |
+| `--tab-selected` | 알약 탭 묶음(바탕 `--side`)의 고른 칸 — 대시보드 위 막대 탭(11/5) |
 | `--panel` | **큰 내용 판** — 산문 카드 · 설정 카드 · 인물 묶음 · 샷 카드. 바탕보다 한 단 어둡다(시안 #1D191A 85~88% 를 바탕 위에 합친 단색) |
 | `--card` | **카드 · 입력 · 보조 단추** — 선택 카드, 입력칸, 탭 묶음 바탕 |
 | `--chip` = `--accent` | 칩 · 보조 단추 눌림 · hover |
@@ -485,8 +487,13 @@ Radix primitive 는 body 로 portal — `<html data-stage>` 덕에 지금 단계
 - **레일** `src/components/layout/sidebar.tsx`: 맨 위 Tale 로고(30×26, 누르면 프로젝트 목록) · 단계 칸(v3 채움 아이콘 · 라벨 · 끝낸 단계 체크 · 지금 단계 밝은 바탕과 단계 색 아이콘) · 아래 Take · 공유 · 내보내기 · Help · 프로필. 칸 모습 판정은 `src/lib/stage-rail.ts` `railStageState`(약속 tests/project/rail-done-mark.test.ts).
   11/5 색: 지금 단계 아이콘 = 그 단계 색(`text-stage`) · 이름 #F5F4EE, 다른 단계 아이콘 #C2C0B6(`text-muted-foreground`) · 이름은 끝냄 #C2C0B6 · 안 연 #8E8B82, 끝낸 단계 체크 크림 #F5F4EE. 아래 단추는 아이콘 · 글 사이 4(`FooterIconItem`).
 - **위 막대** `src/components/layout/studio-top-bar.tsx` `StudioTopBar`: 단계 칩(`StageChip`) · 프로젝트 제목 + 연필(`ProjectTitleField`, 이름 바꾸기) · 오른쪽 자리. 스튜디오 레이아웃이 모든 단계 화면 위에 놓고(위에 붙는 sticky), Producer 시작 화면은 탭이 든 자기 막대를 같은 컴포넌트로 그린다. 화면이 오른쪽 자리에 단추를 놓을 때는 `<TopBarActions>`(포털).
-- **대시보드 머리** `src/components/dashboard/dashboard-header.tsx` `DashboardHeader`: 스튜디오 밖(/projects · /projects/new · /playground · /queue · /account) 공용 — 작업 화면과 같은 바탕색 막대 · `TaleLockup` · 탭 묶음 · 오른쪽 자리(새 프로젝트 등).
+- **대시보드 머리** `src/components/dashboard/dashboard-header.tsx` `DashboardHeader`: 스튜디오 밖(/projects · /projects/new · /playground · /queue · /account) 공용 — `TaleLockup` · 탭 묶음 · 오른쪽 자리(새 프로젝트 등).
+  11/5 R2~R6: 막대 바탕은 페이지 바탕을 따르고(이 화면들은 `bg-lobby`) 아래 선이 없다. 높이 78(위아래 20) · 로고 묶음 26 · 로고와 탭 사이 89.
+  탭은 알약 하나(`bg-side` · 안쪽 4 · 사이 2, 칸 13px · 위아래 7 · 양옆 14, 고른 칸 `bg-tab-selected` 600 · 나머지 500 흐린 글자).
+  오른쪽은 사이 12: [+ 새 프로젝트] 크림 알약(34 · 양옆 16 · 13px 600) · 언어 "한국어 ▾"(32 · `bg-side` · 13px 500 보조 글자) · 프로필 32 원(`bg-card`, 첫 글자 Inter 600).
+  막대와 본문은 같은 폭 `DASHBOARD_CONTAINER`(1440 화면에서 본문 1104 · 양옆 168).
 - **화면 머리** `src/components/layout/page-header.tsx` `PageHeader`: `title` · `tag` · `meta` · `actions`(오른쪽, 메인은 크림). 작업 영역 맨 위.
+  `variant="stacked"`(11/5 R2 프로젝트 목록): 제목 30 Bold, 메타는 다음 줄(8 아래 · 13px 500 흐린 글자), 오른쪽 자리는 두 줄의 가운데. 다른 화면은 기본(`inline`) 그대로.
 - **채팅** `src/components/layout/global-chat.tsx`: §13.10.
 
 ### 13.2 Card anatomy

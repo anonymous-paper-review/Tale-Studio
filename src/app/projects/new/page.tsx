@@ -36,7 +36,7 @@ export default function NewProjectPage() {
   }, [createNewProject, router])
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-lobby text-foreground">
       <DashboardHeader active="projects" />
       <main className="mx-auto flex max-w-md flex-col items-center gap-4 px-6 py-20 text-center">
         <Lumi persona={STAGE_PERSONA.entry} state={error ? 'error' : 'loading'} size={300} />

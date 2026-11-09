@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/dialog'
 import type { StageId } from '@/types'
 import { projectOpenPath, projectStageLabel } from '@/lib/project/open-path'
-import { DashboardHeader } from '@/components/dashboard/dashboard-header'
+import { DASHBOARD_CONTAINER, DashboardHeader } from '@/components/dashboard/dashboard-header'
 import { useT } from '@/lib/i18n'
 import { relativeTime } from '@/lib/i18n/relative-time'
 import { clearLastProjectId, readLastProjectId } from '@/lib/session-restore'
@@ -291,17 +291,18 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* 공용 대시보드 헤더(#landing-v2b) — 탭·유저 메뉴는 헤더가, 새 프로젝트 버튼만 이 페이지 전용(화면의 크림 단추 하나) */}
+    <div className="min-h-screen bg-lobby text-foreground">
+      {/* 공용 대시보드 헤더(#landing-v2b) — 탭·유저 메뉴는 헤더가, 새 프로젝트 버튼만 이 페이지 전용(화면의 크림 단추 하나).
+          11/5 시안 R2: 높이 34 · 양옆 16 · 13px 600 알약. */}
       <DashboardHeader active="projects">
-        <Button onClick={handleNew} className="rounded-full px-5" data-testid="projects-new">
-          <Plus aria-hidden />
+        <Button onClick={handleNew} className="h-[34px] rounded-full px-4 text-[13px] has-[>svg]:px-4" data-testid="projects-new">
+          <Plus className="size-3.5" aria-hidden />
           {t('New project')}
         </Button>
       </DashboardHeader>
 
       {/* ── 프로젝트 그리드 ── */}
-      <main className="mx-auto max-w-7xl px-6 pb-16 pt-6">
+      <main className={`${DASHBOARD_CONTAINER} pb-16 pt-6`}>
         {loading ? (
           <div className="flex items-center justify-center py-24" role="status" aria-label={t('Loading…')}>
             <Loader2 className="size-6 animate-spin text-subtle-foreground motion-reduce:animate-none" aria-hidden />

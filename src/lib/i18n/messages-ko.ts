@@ -205,6 +205,9 @@ export const KO: Record<string, string> = {
   'Writer': 'Writer', // 출처 배지(고유명 — 한국어 화면에서도 그대로)
   // ── 대시보드 공통 ──
   Projects: '프로젝트',
+  // 위 막대 탭(11/5 시안 R2~R6) — 탭 이름은 변수로 번역해서 사전 누락 검사가 못 잡는다
+  Playground: '플레이그라운드',
+  Queue: '대기열',
   'Log out': '로그아웃',
   Language: '언어',
 

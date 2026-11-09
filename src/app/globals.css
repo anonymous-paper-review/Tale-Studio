@@ -72,6 +72,8 @@
   --color-faint-foreground: var(--faint-foreground);
   --color-progress-track: var(--progress-track);
   --color-side: var(--side);
+  --color-lobby: var(--lobby);
+  --color-tab-selected: var(--tab-selected);
   --color-muted-foreground: var(--muted-foreground);
   --color-muted: var(--muted);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -158,6 +160,8 @@
   --card: #30302e; /* 카드 · 입력 · 보조 버튼 */
   --chip: #3a3936; /* 칩 · 보조 버튼 눌림 */
   --panel: #1e1b1c; /* 큰 내용 판 — 시안의 #1D191A 85~88% 를 바탕 위에 합친 값 */
+  --lobby: #141312; /* 스튜디오 밖 화면 바탕 — 로그인 · 프로젝트 목록(11/5 R1 · R2~R6). 작업 화면보다 한 단 어둡다 */
+  --tab-selected: #34332f; /* 알약 탭 묶음(바탕 side)의 고른 칸 — 11/5 위 막대 탭 */
 
   --background: var(--shell);
   --foreground: #f5f4ee; /* Text */
