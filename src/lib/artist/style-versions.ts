@@ -2,6 +2,7 @@
 //   버전 = 작품 스타일 하나 + 그때의 그림. [재생성하기]는 지금 버전을 남기고 새 버전을 열어 인물 · 배경의 모든 모습을 다시 그리고,
 //   [불러오기]는 다시 그리지 않고 그 버전의 그림 · 스타일로 돌린다. 카드 기록의 그림은 그린 때로 어느 버전(스타일) 것인지 가린다.
 //   서버 전용 모듈을 들이지 않는다(DB · 보관함은 style-versions-server.ts). 약속: tests/artist/style-versions.test.ts
+import { customStyleLabel } from '@/lib/custom-style-label'
 import { translate } from '@/lib/i18n/translate'
 import { directionParticle, objectParticle } from '@/lib/korean-particles'
 import type { AppLocale } from '@/lib/locale'
@@ -409,13 +410,13 @@ export function parseCustomStyle(raw: unknown): VersionCustomStyle | null {
 
 // ── 스타일 이름 · 채팅 ────────────────────────────────────────────
 
-/** 버전 스타일 이름 — 직접 올린 그림체는 붙인 이름, 카탈로그 스타일은 화면 언어 이름. 모르면 키. */
+/** 버전 스타일 이름 — 직접 올린 그림체는 붙인 이름(비었거나 기본 이름이면 화면 언어의 기본 이름, lib/custom-style-label), 카탈로그 스타일은 화면 언어 이름. 모르면 키. */
 export function versionStyleLabel(
   version: { styleKey: string | null; customStyle: VersionCustomStyle | null },
   anchors: ReadonlyArray<{ key: string; label: string; subtitle?: string | null }>,
   locale: AppLocale,
 ): string {
-  if (version.customStyle) return version.customStyle.label || translate(locale, 'My reference')
+  if (version.customStyle) return customStyleLabel(version.customStyle.label, locale)
   const anchor = anchors.find((item) => item.key === version.styleKey)
   if (anchor) return styleAnchorName(anchor, locale)
   return version.styleKey ?? translate(locale, 'No style')
