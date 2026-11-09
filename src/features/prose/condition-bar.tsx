@@ -1,13 +1,12 @@
 'use client'
 
 // 산문 조건 칩 · 고치기 단추(리뉴얼 1차 2026-10-19 프로토타입 W1 condBar → v3 W1 2026-11-03).
-//   v3: 화면 머리 오른쪽에 [직접 작성] · [✦ AI 다시 쓰기](아래로 펼치는 조건) · 크림 [브레이크다운하기], 머리 아래에
+//   v3: 화면 머리 오른쪽에 [직접 작성] · [AI 다시 쓰기](아래로 펼치는 조건) · 크림 [브레이크다운하기], 머리 아래에
 //   "지금 산문 조건 · 길이 15초 이하 · 장르 코미디 · 소재 그대로" 칩 줄. 칩은 정해진 값만 보인다(proseConditionChips).
-//   조건은 다시 쓴 안을 적용할 때만 바뀐다.
-import { Sparkles } from 'lucide-react'
+//   조건은 다시 쓴 안을 적용할 때만 바뀐다. 11/5 시안 WL · WS: [AI 다시 쓰기] 아이콘은 ✦ 대신 Lumi 실루엣 + 다시 하기 화살표(24).
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { DrawIcon } from '@/components/icons/v3-icons'
+import { AiRewriteIcon, DrawIcon } from '@/components/icons/v3-icons'
 import { useLocale, useT } from '@/lib/i18n'
 import { proseConditionChips } from '@/lib/prose/conditions'
 import { useWriterRoomStore } from '@/stores/writer-room-store'
@@ -47,7 +46,7 @@ export function ProseEditActions({ prose }: { prose: ProseState }) {
       <Popover open={open} onOpenChange={(next) => (next ? useWriterRoomStore.getState().openRewrite() : useWriterRoomStore.getState().closeRewrite())}>
         <PopoverTrigger asChild>
           <Button variant="secondary" disabled={!prose.tools.rewrite} aria-expanded={open} data-testid="prose-rewrite-open">
-            <Sparkles className="size-4" />{t('AI rewrite')}
+            <AiRewriteIcon className="size-6" />{t('AI rewrite')}
           </Button>
         </PopoverTrigger>
         <PopoverContent align="end" className="w-[min(28rem,calc(100vw-2rem))]" aria-label={t('Rewrite options')}>
