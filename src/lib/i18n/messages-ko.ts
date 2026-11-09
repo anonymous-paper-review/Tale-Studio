@@ -2854,6 +2854,8 @@ export const KO: Record<string, string> = {
   'Could not upload the picture. Please try again.': '그림을 올리지 못했어요. 다시 시도해 주세요.',
   'Could not attach the picture to this row.': '이 줄에 그림을 붙이지 못했어요.',
   'Could not attach the uploaded reference pictures. Please try again.': '올린 레퍼런스 그림을 붙이지 못했어요. 다시 시도해 주세요.',
+  // 인물 상세 창 — 올린 그림을 담은 시트의 밑 글(리드 2026-11-10)
+  'Picture uploaded as a reference · used as is': '레퍼런스로 올린 그림 · 그대로 써요',
   // ── Storyboard 보드 (리뉴얼 1차) ── 2026-10-19 프로토타입 S0 · S1 · S7: 제목 옆 숫자 · 잠금 표시 · Director 넘김 창
   'Scenes {scenes} · Shots {shots} · {seconds}s': '씬 {scenes} · 샷 {shots} · {seconds}초',
   // Storyboard v3(2026-11-03 오너 "v3로 적용") — 씬 머리 · 카드 칩(무대 설계 값) · 지금 보이는 장 이름표 · 카드 메뉴

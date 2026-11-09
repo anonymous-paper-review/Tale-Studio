@@ -9,10 +9,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ThumbImage } from '@/components/thumb-image'
 import { AiBusyOverlay } from '@/components/ai-busy-overlay'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
+import { UploadedSheet } from '@/features/artist/uploaded-sheet'
 import { DescriptionBox, DetailFrame, DetailSection, HistoryButton, RegenerateDialog, artistDetailTitleKey, lookAfterDelete } from '@/features/artist/detail-parts'
 import { sameCharacterAppearanceSlot, useArtistStore } from '@/stores/artist-store'
 import { useWriterStore } from '@/stores/writer-store'
 import { useProducerStore } from '@/stores/producer-store'
+import { useProjectStore } from '@/stores/project-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { CHARACTER_VIEW_LABELS, type CharacterViewKey } from '@/types/asset'
 import {
@@ -29,6 +31,8 @@ import { useGuardedAction } from '@/hooks/use-guarded-action'
 import { cn } from '@/lib/utils'
 import { useLocale, useT } from '@/lib/i18n'
 import { styleAnchorName } from '@/lib/style-anchor-name'
+import { appearanceLabel } from '@/lib/artist/look-label'
+import { isBreakdownUpload } from '@/lib/artist/style-versions'
 import { useHistoryStyle } from '@/features/artist-room/use-history-style'
 
 type Props = {
@@ -64,6 +68,7 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
   const retryCharacterViewSafe = useArtistStore((s) => s.retryCharacterViewSafe)
   const shots = useWriterStore((s) => s.shots)
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
+  const projectId = useProjectStore((s) => s.projectId)
   // 스타일 이름은 화면 언어로(2026-10-21). 직접 올린 그림체는 붙인 이름 그대로.
   const locale = useLocale()
   const styleLabel = useProducerStore((s) => {
@@ -169,6 +174,8 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
   const needsMain = isDirectional && !appearance.sheetUrl
   // 사람 main = 와이드 턴어라운드 시트 → 16:9 프레임으로 전체 표시(잘림 방지, #4).
   const isSheet = !isObject && view === 'main'
+  // 브레이크다운에서 올린 그림을 그대로 쓴 모습 — 카드처럼 흰 캐릭터 시트 틀에 담아 보이고, 밑 글도 올린 그림이라고 알린다(리드 2026-11-10).
+  const uploaded = isSheet && !!imageUrl && isBreakdownUpload(imageUrl, projectId)
   const defaultAppearance = char.appearances.find((item) => item.isDefault) ?? null
 
   const initialPrompt = appearance.appearanceNative || appearance.appearance || ''
@@ -242,6 +249,8 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
 
   const title = t(artistDetailTitleKey(isObject ? 'object' : 'person'), { name: char.name })
   const timeLabel = appearance.narrativeTime ? t(appearance.narrativeTime === 'past' ? 'Past' : appearance.narrativeTime === 'future' ? 'Future' : 'Present') : ''
+  // 보이는 모습 이름 — 서버가 붙인 기본 모습 이름 "현재"는 화면 언어로(오너 2026-11-10). 이름 바꾸기 칸은 저장된 이름 그대로 연다.
+  const shownLabel = appearanceLabel(appearance, t)
 
   const left = (
     <>
@@ -278,9 +287,9 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
           </>
         ) : (
           <>
-            <span className="text-sm font-semibold">{isSheet ? appearance.label : label}</span>
+            <span className="text-sm font-semibold">{isSheet ? shownLabel : label}</span>
             {isSheet && appearance.isDefault ? <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground">{t('Base')}</span> : null}
-            {isSheet && timeLabel && timeLabel !== appearance.label ? <span className="text-xs text-muted-foreground">{timeLabel}</span> : null}
+            {isSheet && timeLabel && timeLabel !== shownLabel ? <span className="text-xs text-muted-foreground">{timeLabel}</span> : null}
             {descriptionChanged ? <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground">{t('Changed · remake to apply')}</span> : null}
             {isSheet ? (
               <Button size="icon" variant="ghost" className="size-7" aria-label={t('Rename')} title={t('Rename')} onClick={() => { setRenameDraft(appearance.label); setRenaming(true) }}>
@@ -299,12 +308,16 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
       </div>
       {manageError ? <p className="text-xs text-destructive">{manageError}</p> : null}
 
-      <ImagePlaceholder
-        label={view === 'main' ? '' : label}
-        aspectRatio={isSheet ? 'video' : 'square'}
-        imageUrl={imageUrl}
-        generating={isGenerating}
-      />
+      {uploaded && !isGenerating ? (
+        <UploadedSheet key={imageUrl} url={imageUrl} alt={t('{name} turnaround sheet', { name: char.name || t('Character') })} />
+      ) : (
+        <ImagePlaceholder
+          label={view === 'main' ? '' : label}
+          aspectRatio={isSheet ? 'video' : 'square'}
+          imageUrl={imageUrl}
+          generating={isGenerating}
+        />
+      )}
 
       {isSheet && !appearance.isDefault ? (
         <div className="flex flex-wrap gap-2">
@@ -325,7 +338,7 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
             ? t('Regenerating creates a new image.')
             : t('This generates the image.')
           : view === 'main'
-            ? styleLabel ? t('Turnaround sheet · style {style}', { style: styleLabel }) : t('Turnaround sheet')
+            ? uploaded ? t('Picture uploaded as a reference · used as is') : styleLabel ? t('Turnaround sheet · style {style}', { style: styleLabel }) : t('Turnaround sheet')
             : needsMain
               ? t('Directional views are generated from Main. Generate Main first.')
               : t('This view is regenerated based on the Main image.')}
@@ -363,14 +376,14 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
         <DetailSection title={t('Look description')}>
           {!appearance.isDefault && defaultAppearance ? (
             <DescriptionBox
-              caption={t('Base look · {label}', { label: defaultAppearance.label })}
+              caption={t('Base look · {label}', { label: appearanceLabel(defaultAppearance, t) })}
               value={defaultAppearance.appearanceNative || defaultAppearance.appearance || ''}
               readOnly
             />
           ) : null}
           <DescriptionBox
             key={`${char.characterId}:${appearanceKey}`}
-            caption={appearance.isDefault ? t('Base look · {label}', { label: appearance.label }) : t('Changed look · {label}', { label: appearance.label })}
+            caption={appearance.isDefault ? t('Base look · {label}', { label: shownLabel }) : t('Changed look · {label}', { label: shownLabel })}
             value={initialPrompt}
             placeholder={t("This character's appearance description")}
             changed={descriptionChanged}
@@ -388,11 +401,11 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
               return (
                 <li key={look.appearanceKey} className={cn('flex items-center gap-3 rounded-lg border border-border p-2', viewingThis && 'bg-accent/40')}>
                   <div className="h-12 w-20 shrink-0 overflow-hidden rounded-md border border-border bg-muted/40">
-                    {look.sheetUrl ? <ThumbImage src={look.sheetUrl} alt={look.label} className="size-full object-cover" /> : null}
+                    {look.sheetUrl ? <ThumbImage src={look.sheetUrl} alt={appearanceLabel(look, t)} className="size-full object-cover" /> : null}
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
-                      {look.label}
+                      {appearanceLabel(look, t)}
                       {look.isDefault ? <span className="rounded-full border border-border px-1.5 text-[10px] font-normal text-muted-foreground">{t('Base')}</span> : null}
                       {!look.sheetUrl ? <span className="rounded-full border border-border px-1.5 text-[10px] font-normal text-muted-foreground">{t('No image')}</span> : null}
                     </p>
@@ -438,7 +451,7 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
   const footer = (
     <div className="flex w-full flex-wrap items-center justify-end gap-3">
       {descriptionChanged ? (
-        <p className="mr-auto text-xs text-muted-foreground">{t('Changed description · {label}. Remake it to apply it to the image.', { label: appearance.label })}</p>
+        <p className="mr-auto text-xs text-muted-foreground">{t('Changed description · {label}. Remake it to apply it to the image.', { label: shownLabel })}</p>
       ) : null}
       {descriptionChanged ? (
         <Button variant="outline" disabled={generate.locked} onClick={() => void redraw(initialPrompt)}>
@@ -455,7 +468,7 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
       <RegenerateDialog
         open={regenOpen}
         onOpenChange={setRegenOpen}
-        title={imageUrl ? t('{name} · {look}: make it again?', { name: char.name, look: appearance.label }) : t('{name} · {look}: make it?', { name: char.name, look: appearance.label })}
+        title={imageUrl ? t('{name} · {look}: make it again?', { name: char.name, look: shownLabel }) : t('{name} · {look}: make it?', { name: char.name, look: shownLabel })}
         intro={styleLabel ? t('It is made from the description below. The style ({style}) stays the same.', { style: styleLabel }) : t('It is made from the description below. The style stays the same.')}
         kind={isObject ? null : 'person'}
         description={prompt}
@@ -486,7 +499,7 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
         busy={generate.locked}
         onConfirm={() => void redraw(prompt)}
       />
-      <AiBusyOverlay open={redrawing} layer="dialog" title={t('Making the image')} description={t('{name} · {look}', { name: char.name, look: appearance.label })} />
+      <AiBusyOverlay open={redrawing} layer="dialog" title={t('Making the image')} description={t('{name} · {look}', { name: char.name, look: shownLabel })} />
     </>
   )
 }
