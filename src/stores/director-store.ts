@@ -1097,6 +1097,9 @@ interface DirectorCanvasState {
   /** Explicit full-video batch progress. Ephemeral UI state; never persisted. */
   videoBatchBusy: boolean
   videoBatchProgress: { done: number; total: number; failed: number } | null
+  /** 도는 묶음이 서버 조회로 알려 준 차례(11/5 시안 DG, 2026-11-09): 지금 만드는 작업 id 들과 아직 안 낸 샷(Writer 샷 id, 낼 순서).
+   *  기다리는 카드의 묶음 막대 · "다음 차례"와 샷 꼬리 "순서 기다리는 중"의 근거. 묶음이 없으면 null. 저장하지 않는다. */
+  videoBatchQueue: { jobIds: string[]; pendingShotIds: string[] } | null
   /** #batch-resume: 이전 실행의 완료 처리와 선행조건 대기를 구별하는 임시 식별자. */
   videoBatchRunId: string | null
   /**
@@ -1629,6 +1632,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       realBatchRemaining: null,
       videoBatchBusy: false,
       videoBatchProgress: null,
+      videoBatchQueue: null,
       videoBatchRunId: null,
       videoBatchCancelled: false,
       popupNodeId: null,
@@ -1677,6 +1681,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             relationModal: null,
             videoBatchBusy: false,
             videoBatchProgress: null,
+            videoBatchQueue: null,
             videoBatchRunId: null,
             videoBatchCancelled: false,
             generatingNodeIds: {},
@@ -1711,6 +1716,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           // 안 풀면 다음 일괄이 시작하자마자 멈춘다.
           videoBatchCancelled: false,
           videoBatchProgress: { done: 0, total, failed: 0 },
+          videoBatchQueue: null,
         }),
 
       cancelVideoBatch: async () => {
@@ -5599,6 +5605,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           relationModal: null,
           videoBatchBusy: false,
           videoBatchProgress: null,
+          videoBatchQueue: null,
           videoBatchRunId: null,
           videoBatchCancelled: false,
           generatingNodeIds: {},

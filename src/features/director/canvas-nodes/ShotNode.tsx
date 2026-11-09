@@ -58,6 +58,10 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const projectId = useDirectorCanvasStore((s) => s.projectId)
   const activeJobs = useActiveGenerationJobs(projectId)
   const videoQueued = !!writerShotId && activeShotIds(activeJobs, ['shot_video']).has(writerShotId)
+  // 영상 묶음에서 아직 차례를 기다리는 샷(서버 조회의 낼 순서, 11/5 시안 DG · 리드 2026-11-09). 멈추는 중이면 남은 샷은 만들지 않는다.
+  const waitingInLine = useDirectorCanvasStore(
+    (s) => !!writerShotId && !s.videoBatchCancelled && !!s.videoBatchQueue?.pendingShotIds.includes(writerShotId),
+  )
   // #payments-phase-2 v4 #2: 생성 전 소모량 표시 — mode==='off'면 배지를 숨긴다(현재 기본값).
 
   if (!isShotData(data)) return null
@@ -208,17 +212,19 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             <Loader2 className="size-3 shrink-0 animate-spin text-stage" />
           ) : failed ? (
             <span className="size-1.5 shrink-0 rounded-full bg-destructive" />
-          ) : realImage ? (
+          ) : realImage && !waitingInLine ? (
             <span className="size-1.5 shrink-0 rounded-full bg-success" />
           ) : null}
-          <span className={cn(failed ? 'text-destructive' : isGenerating || realImage ? 'text-foreground' : 'text-subtle-foreground')}>
+          <span className={cn(failed ? 'text-destructive' : isGenerating || (realImage && !waitingInLine) ? 'text-foreground' : 'text-subtle-foreground')}>
             {failed
               ? t('Failed')
               : isGenerating && generation.label
                 ? t(generation.label)
-                : realImage
-                  ? t('Completed')
-                  : t('Waiting')}
+                : waitingInLine
+                  ? t('Waiting in line')
+                  : realImage
+                    ? t('Completed')
+                    : t('Waiting')}
           </span>
           <span className="flex min-w-0 items-center gap-2 text-[11px] font-normal text-subtle-foreground">
             <span className="flex items-center gap-0.5">

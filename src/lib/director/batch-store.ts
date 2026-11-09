@@ -6,16 +6,18 @@ import type { VideoBatchSummary, VideoBatchStatus } from '@/lib/director/video-b
 import type { Json, Tables } from '@/types/database'
 
 type Batch = Tables<'director_video_batches'>
-type ItemState = Pick<Tables<'director_video_batch_items'>, 'id' | 'batch_id' | 'job_id' | 'status' | 'error' | 'submission_response'>
+type ItemState = Pick<Tables<'director_video_batch_items'>, 'id' | 'batch_id' | 'job_id' | 'status' | 'error' | 'submission_response' | 'shot_id' | 'position'>
 type JobState = Pick<Tables<'generation_jobs'>, 'id' | 'status' | 'result_url' | 'error' | 'request_id'>
 
 function summarize(batch: Batch, items: ItemState[], jobs: Map<string, JobState>): VideoBatchSummary {
   const summary: VideoBatchSummary = {
     id: batch.id, projectId: batch.project_id, status: batch.status as VideoBatchStatus,
     total: items.length, started: 0, failedToStart: 0, done: 0, failed: 0, pending: 0, active: 0,
-    stopReason: batch.stop_reason, jobs: [],
+    stopReason: batch.stop_reason, jobs: [], pendingShotIds: [],
   }
-  for (const item of items) {
+  // "다음 차례"(11/5 시안 DG)는 낼 순서 그대로다. 읽는 쪽 정렬에 기대지 않고 여기서 순서를 지킨다.
+  const ordered = [...items].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+  for (const item of ordered) {
     const job = item.job_id ? jobs.get(item.job_id) : undefined
     const response = item.submission_response
     const body = response && typeof response === 'object' && !Array.isArray(response) ? response : null
@@ -38,6 +40,7 @@ function summarize(batch: Batch, items: ItemState[], jobs: Map<string, JobState>
       })
     } else if (item.status === 'pending') {
       summary.pending += 1
+      summary.pendingShotIds!.push(item.shot_id)
     } else if (item.status === 'skipped' && item.error?.includes('batch_shot_already_completed')) {
       summary.done += 1
     } else {
@@ -51,7 +54,7 @@ function summarize(batch: Batch, items: ItemState[], jobs: Map<string, JobState>
 async function readSummary(batch: Batch): Promise<VideoBatchSummary> {
   // 묶음별 최대 100개를 따로 읽어 여러 묶음의 합이 조회 상한에 잘리지 않게 한다.
   const { data: items, error } = await supabaseAdmin.from('director_video_batch_items')
-    .select('id, batch_id, job_id, status, error, submission_response').eq('batch_id', batch.id)
+    .select('id, batch_id, job_id, status, error, submission_response, shot_id, position').eq('batch_id', batch.id)
   if (error) throw new Error(error.message)
   const jobIds = [...new Set((items ?? []).flatMap((item) => item.job_id ? [item.job_id] : []))]
   const jobs = new Map<string, JobState>()

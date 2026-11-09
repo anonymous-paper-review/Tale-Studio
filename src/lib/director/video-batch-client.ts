@@ -68,6 +68,17 @@ function isBatchActive(summary: VideoBatchSummary): boolean {
 }
 
 /**
+ * 묶음의 차례(11/5 시안 DG, 2026-11-09): 지금 만드는 작업과 아직 안 낸 샷. 멈췄거나 쉬는 묶음의 남은 샷은 만들지 않으므로
+ * 차례에 두지 않는다(계속 기다리는 것처럼 보이면 안 된다).
+ */
+function queueOf(summary: VideoBatchSummary): { jobIds: string[]; pendingShotIds: string[] } {
+  return {
+    jobIds: summary.jobs.flatMap((job) => (job.jobId && job.status === 'queued' ? [job.jobId] : [])),
+    pendingShotIds: summary.status === 'running' ? summary.pendingShotIds ?? [] : [],
+  }
+}
+
+/**
  * 서버가 이어가는 배치를 GET 으로 계속 읽어 store 진행 상태를 반영한다. 이 함수는 저장된
  * 항목을 읽기만 한다 — 새 제출은 절대 내지 않는다. GET 실패는 완료 증거가 아니므로 마지막
  * 진행 표시를 유지하고 다시 조회한다. ownsRun() 이 더 이상 참이 아니면(다른 프로젝트/실행으로 옮겨감)
@@ -92,14 +103,17 @@ async function pollVideoBatch(
         total: summary.total,
         failed: summary.failed,
       },
+      videoBatchQueue: queueOf(summary),
     })
     let sawNewTerminalJob = false
+    let sawNewRunningJob = false
     for (const job of summary.jobs) {
       if (!job.jobId) continue
       const key = `${job.jobId}:${job.status}`
       if (seenJobs.has(key)) continue
       seenJobs.add(key)
       if (job.status === 'completed' || job.status === 'failed') sawNewTerminalJob = true
+      else sawNewRunningJob = true
       try {
         onJob?.(job)
       } catch (error) {
@@ -112,6 +126,11 @@ async function pollVideoBatch(
         await store.getState().hydrateFromDb(projectId)
       }).catch((error) => {
         console.error('[video-batches] completed video refresh failed:', error)
+      })
+    } else if (sawNewRunningJob) {
+      // 서버가 새로 낸 영상의 테이크를 바로 읽어 캔버스에 만드는 중(기다리는 카드)으로 보인다(2026-11-09). 예전엔 첫 영상이 끝나야 보였다.
+      void Promise.resolve(store.getState().hydrateFromDb(projectId)).catch((error) => {
+        console.error('[video-batches] started video refresh failed:', error)
       })
     }
   }
@@ -174,7 +193,7 @@ export async function runVideoBatch(
   }
 
   const finish = (started: number, failed: number): VideoBatchResult => {
-    if (ownsRun()) store.setState({ videoBatchBusy: false, videoBatchProgress: null })
+    if (ownsRun()) store.setState({ videoBatchBusy: false, videoBatchProgress: null, videoBatchQueue: null })
     return { total, started, failed }
   }
 
@@ -284,6 +303,7 @@ export async function restoreVideoBatch(projectId: string): Promise<void> {
     videoBatchCancelled: active.status === 'cancelled',
     videoBatchRunId: active.id,
     videoBatchProgress: { done: active.done + active.failed, total: active.total, failed: active.failed },
+    videoBatchQueue: queueOf(active),
   })
 
   const batchRunId = active.id
@@ -295,7 +315,7 @@ export async function restoreVideoBatch(projectId: string): Promise<void> {
   // 같은 조회 poller를 background로 붙인다 — 완료까지 이 함수 자체는 기다리지 않는다.
   void pollVideoBatch(projectId, batchRunId, ownsRun, active, new Set<string>()).then((finalSummary) => {
     if (!finalSummary || !ownsRun()) return
-    store.setState({ videoBatchBusy: false, videoBatchProgress: null })
+    store.setState({ videoBatchBusy: false, videoBatchProgress: null, videoBatchQueue: null })
   }).catch((error) => {
     console.error('[video-batches] restored progress failed:', error)
   })

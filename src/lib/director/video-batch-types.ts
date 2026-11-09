@@ -18,6 +18,8 @@ export interface VideoBatchSummary {
   active: number
   stopReason: string | null
   jobs: GenerationJobReceipt[]
+  /** 아직 안 낸 샷(Writer 샷 id)을 낼 순서대로. 화면의 "다음 차례"(11/5 시안 DG, 2026-11-09). 옛 응답에는 없다. */
+  pendingShotIds?: string[]
 }
 
 export interface VideoBatchStartRequest {
