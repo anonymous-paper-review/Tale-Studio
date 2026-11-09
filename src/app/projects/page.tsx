@@ -329,8 +329,8 @@ export default function ProjectsPage() {
           </div>
         ) : (
           <>
-          {/* 첫 화면 머리 — 큰 Lumi(화이트 펄)가 목록 쪽을 바라본다(꼬리는 왼쪽, 얼굴은 오른쪽). */}
-          {/* 11/5 시안 R2 머리 — 제목 30 · 다음 줄 메타(stacked), 찾기 · 정렬은 머리 오른쪽(List Tools). */}
+          {/* 11/5 시안 R2 머리 — 제목 30 · 다음 줄 메타(stacked), 찾기 · 정렬은 머리 오른쪽(List Tools). 큰 Lumi 는 두지 않는다
+              (오너 2026-11-09 추천대로 — Lumi 는 프로젝트가 없을 때의 첫 화면에만). */}
           <section className="mb-6 flex items-center gap-2">
             <PageHeader
               variant="stacked"

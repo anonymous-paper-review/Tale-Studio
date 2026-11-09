@@ -2494,7 +2494,6 @@ export const KO: Record<string, string> = {
   '"{text}": set {items}.': '"{text}": {items}(으)로 정했어요.',
   '"{text}": I did not quite get that. Please choose with the buttons.': '"{text}": 잘 못 알아들었어요. 버튼으로 골라 주세요.',
   'I will start like this.': '이렇게 시작할게요.',
-  'Ask Writer to write it': 'Writer에게 써 달라고 하기',
   'When you press it, the screen ratio is locked. To change something, click an item above or say it, like "make the length 1 minute".': '누르면 화면 비율이 잠겨요. 고치고 싶으면 위쪽 항목을 누르거나 "길이는 1분으로"처럼 말해 주세요.',
   // 예시
   'Office comedy': '직장 코미디',
