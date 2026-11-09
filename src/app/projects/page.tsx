@@ -9,7 +9,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Clock, Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Loader2, Pencil, Plus, Trash2 } from 'lucide-react'
 import {
   useProjectStore,
 } from '@/stores/project-store'
@@ -29,7 +29,7 @@ import {
 import type { StageId } from '@/types'
 import { projectOpenPath, projectStageLabel } from '@/lib/project/open-path'
 import { DASHBOARD_CONTAINER, DashboardHeader } from '@/components/dashboard/dashboard-header'
-import { useT } from '@/lib/i18n'
+import { useLocale, useT } from '@/lib/i18n'
 import { relativeTime } from '@/lib/i18n/relative-time'
 import { clearLastProjectId, readLastProjectId } from '@/lib/session-restore'
 import {
@@ -38,6 +38,8 @@ import {
   prevEpisodeLink,
   type SeriesPlanState,
 } from '@/features/projects/series-list'
+import { DEFAULT_PROJECT_SORT, visibleProjects, type ProjectSort } from '@/features/projects/project-list'
+import { ProjectListTools } from '@/features/projects/project-list-tools'
 import { SeriesDeleteWarningDialog } from '@/features/projects/next-episode-dialog'
 import { NewProjectDialog } from '@/features/projects/new-project-dialog'
 
@@ -127,8 +129,9 @@ function ProjectCard({
   return (
     <div
       onClick={() => !editing && onOpen(project)}
-      // v3: 유리(white/5 + 흐림) · 빨간 빛 대신 큰 내용 판 하나 — 올리면 한 단 밝아진다(판 아래 그림자 하나만, design.md §9).
-      className="group flex cursor-pointer flex-col overflow-hidden rounded-xl bg-panel text-left shadow-panel transition-colors duration-150 hover:bg-card"
+      // v3: 유리(white/5 + 흐림) · 빨간 빛 대신 큰 내용 판 하나 — 올리면 한 단 밝아진다.
+      //   11/5 시안(R2): 스튜디오 밖 바탕(lobby) 위에 한 단 밝은 판(side) · 모서리 18 · 그림자 없음.
+      className="group flex cursor-pointer flex-col overflow-hidden rounded-[18px] bg-side text-left transition-colors duration-150 hover:bg-card"
     >
       {/* 대표 썸네일(#landing-v2b) — 이름만으로는 구별이 어려워 프로젝트의 첫 그림을 얹는다.
           아직 그림이 없는 프로젝트는 제목 이니셜 워터마크가 구별을 돕는다 — 바탕은 v3 그림 자리(Content/Art Placeholder).
@@ -207,13 +210,11 @@ function ProjectCard({
           {link.deleted ? ` · ${t('The previous episode was deleted')}` : ''}
         </div>
       ) : null}
-      <div className="mt-3 flex items-center gap-3">
+      {/* 단계 · 며칠 전(11/5 시안 R2: 사이 8, 시계 아이콘 없음) */}
+      <div className="mt-3 flex items-center gap-2">
         <Badge variant="tag">{projectStageLabel(project.current_stage)}</Badge>
         {project.updated_at && (
-          <span className="flex items-center gap-1 font-num text-meta font-medium text-subtle-foreground">
-            <Clock className="size-3" aria-hidden />
-            {relativeTime(project.updated_at, t)}
-          </span>
+          <span className="font-num text-meta font-medium text-subtle-foreground">{relativeTime(project.updated_at, t)}</span>
         )}
       </div>
       </div>
@@ -224,7 +225,11 @@ function ProjectCard({
 export default function ProjectsPage() {
   const router = useRouter()
   const t = useT()
+  const locale = useLocale()
   const switchProject = useProjectStore((s) => s.switchProject)
+  // 이름으로 찾기 · 정렬(11/5 시안 R2) — 화면 안에서만 거르고, 정렬은 기억하지 않아 들어올 때마다 최신순이다.
+  const [query, setQuery] = useState('')
+  const [sort, setSort] = useState<ProjectSort>(DEFAULT_PROJECT_SORT)
 
   const [projects, setProjects] = useState<ProjectItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -250,6 +255,7 @@ export default function ProjectsPage() {
   }, [])
 
   const plan: SeriesPlanState = { canUseReference, slotLimit, used: projects.length }
+  const shown = visibleProjects(projects, { query, sort, locale })
   // 이 화를 이어받은 다음 화가 있으면 지우기 전에 먼저 경고한다(프로토타입 LDq · LD).
   const deleteNextEpisodes = deleteTarget ? continuingEpisodes(projects, deleteTarget.id) : []
 
@@ -320,12 +326,24 @@ export default function ProjectsPage() {
         ) : (
           <>
           {/* 첫 화면 머리 — 큰 Lumi(화이트 펄)가 목록 쪽을 바라본다(꼬리는 왼쪽, 얼굴은 오른쪽). */}
+          {/* 11/5 시안 R2 머리 — 제목 30 · 다음 줄 메타(stacked), 찾기 · 정렬은 머리 오른쪽(List Tools). */}
           <section className="mb-6 flex items-center gap-2">
             <Lumi persona="pearl" state="idle" size={320} className="-ml-12 shrink-0" />
-            <PageHeader title={t('Projects')} meta={t('Total {n}', { n: projects.length })} />
+            <PageHeader
+              variant="stacked"
+              className="min-w-0 flex-1"
+              title={t('Projects')}
+              meta={t('Total {n}', { n: projects.length })}
+              actions={<ProjectListTools query={query} onQueryChange={setQuery} sort={sort} onSortChange={setSort} />}
+            />
           </section>
+          {shown.length === 0 ? (
+            <p className="py-16 text-center text-label text-muted-foreground" role="status">
+              {t('No project matches that name.')}
+            </p>
+          ) : null}
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {projects.map((project) => (
+            {shown.map((project) => (
               <ProjectCard
                 key={project.id}
                 project={project}

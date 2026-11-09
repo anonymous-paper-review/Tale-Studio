@@ -59,8 +59,8 @@ export interface ContinuableProject extends SeriesListProject {
   updated_at?: string | null
 }
 
-/** 검색은 영어 대소문자와 띄어쓰기를 무시한다 — "다음화"로 쳐도 "다음 화"가 찾아져야 한다. */
-function searchKey(value: string | null | undefined): string {
+/** 검색은 영어 대소문자와 띄어쓰기를 무시한다 — "다음화"로 쳐도 "다음 화"가 찾아져야 한다. 프로젝트 목록 찾기(project-list)도 같은 규칙. */
+export function searchKey(value: string | null | undefined): string {
   return (value ?? '').toLowerCase().replace(/\s+/g, '')
 }
 
@@ -108,6 +108,19 @@ export function continuingEpisodes<T extends SeriesListProject>(projects: readon
 /** "앞 화 마지막 장면에서 이어 시작하기" 체크박스를 보일지 — 미리보기(GET /api/project/next-episode)가 끝 장면을 찾았을 때만. */
 export function canContinueLastScene(preview: { lastSceneAvailable?: boolean } | null | undefined): boolean {
   return preview?.lastSceneAvailable === true
+}
+
+/**
+ * [다음 화 만들기]를 누른 뒤 기다리는 카드의 단계(11/5 시안 R5, 리드 2026-11-09).
+ *   서버는 한 번에 답해서 단계를 알려 주지 않는다 — Producer 자료 읽기(entry-store READ_STEP_MS)와 같은 1.4초마다 넘기고,
+ *   마지막 단계는 답이 올 때까지 지금 단계로 둔다.
+ */
+export const NEXT_EPISODE_WAIT_STEPS = ['Open the previous episode', 'Loading characters and backgrounds', 'Matching the art style'] as const
+export const NEXT_EPISODE_WAIT_STEP_MS = 1400
+
+/** 다음으로 보일 단계 번호 — 마지막에서 멈춘다. */
+export function nextEpisodeWaitStep(step: number): number {
+  return Math.min(step + 1, NEXT_EPISODE_WAIT_STEPS.length - 1)
 }
 
 /** 목록 라우트가 읽는 projects 행(필요한 칸만). */

@@ -427,8 +427,8 @@ export default function HomePage() {
         </div>
 
         <div className="relative z-10 mx-auto max-w-5xl px-6 pt-24 text-center">
-          {/* Badge */}
-          <div className="mb-2 inline-flex items-center gap-2.5 rounded-full bg-foreground/6 px-[18px] py-[9px] text-body font-medium text-foreground">
+          {/* Badge — 줄 간격 155%(11/5 시안 144-668) */}
+          <div className="mb-2 inline-flex items-center gap-2.5 rounded-full bg-foreground/6 px-[18px] py-[9px] text-body font-medium leading-[1.55] text-foreground">
             <span className="size-2 rounded-full bg-pearl-vivid" aria-hidden />
             The Future of Filmmaking is Here
           </div>

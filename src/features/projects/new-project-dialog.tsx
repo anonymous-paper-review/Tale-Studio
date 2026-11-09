@@ -9,6 +9,7 @@
 import { useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, ChevronRight, Layers, Lock, Plus, Search } from 'lucide-react'
+import { ConfirmLumi } from '@/components/handoff/confirm-lumi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -55,13 +56,13 @@ function ChoiceButton({
       type="button"
       onClick={onClick}
       data-testid={testId}
-      // v3 선택 카드(Control/Option Card)와 같은 면 — 테두리 없이 카드색, 올리면 칩색.
-      className="flex w-full items-center gap-3 rounded-[14px] bg-card px-4 py-3.5 text-left outline-none transition-colors duration-100 ease-out hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+      // 11/5 시안(R3): 팝업(#1F1E1D)보다 한 단 밝은 바탕색 카드, 올리면 한 단 더 밝게 — 안쪽 18/20 · 사이 14 · 모서리 16 · 아이콘 칸 40(모서리 12).
+      className="flex w-full items-center gap-3.5 rounded-xl bg-background px-5 py-[18px] text-left outline-none transition-colors duration-100 ease-out hover:bg-card focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-chip text-foreground">{icon}</span>
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-chip text-foreground">{icon}</span>
       <span className="min-w-0 flex-1">
         <span className="block text-body font-semibold text-foreground">{title}</span>
-        <span className="mt-0.5 block text-caption text-muted-foreground">{description}</span>
+        <span className="mt-1 block text-caption text-muted-foreground">{description}</span>
       </span>
       <ChevronRight className="size-4 shrink-0 text-subtle-foreground" aria-hidden />
     </button>
@@ -120,10 +121,13 @@ export function NewProjectDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={(next) => !next && close()}>
-        <DialogContent className="sm:max-w-md">
+        {/* 폭은 공용 팝업 틀이 정한다(11/5 SYS: 모든 팝업 520). */}
+        <DialogContent>
           {step === 'choose' ? (
             <>
               <DialogHeader>
+                {/* 11/5 시안 R3 — 제목 위 Lumi M(화이트 펄). */}
+                <ConfirmLumi persona="pearl" />
                 <DialogTitle>{t('How do you want to start?')}</DialogTitle>
               </DialogHeader>
               <div className="space-y-2">
@@ -150,6 +154,8 @@ export function NewProjectDialog({
           ) : (
             <>
               <DialogHeader>
+                {/* 11/5 시안 R4 — 제목 위 Lumi M(화이트 펄). */}
+                <ConfirmLumi persona="pearl" />
                 <DialogTitle>{t('Which episode do you want to continue?')}</DialogTitle>
                 <DialogDescription>
                   {t('Only episodes where you started making the character and background images appear. Most recently edited first.')}
@@ -162,27 +168,28 @@ export function NewProjectDialog({
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={t('Find by project name')}
                   aria-label={t('Find by project name')}
-                  className="pl-9"
+                  className="h-11 rounded-lg pl-9"
                   autoFocus
                   data-testid="new-project-search"
                 />
               </div>
-              <div className="-mx-1 max-h-72 overflow-y-auto px-1">
+              <div className="-mx-1 max-h-96 overflow-y-auto px-1">
                 {episodes.length === 0 ? (
                   <p className="py-8 text-center text-label text-muted-foreground">{t('No episode matches that name.')}</p>
                 ) : (
-                  <ul className="space-y-1">
+                  // 11/5 시안(R4): 줄 안쪽 14/16 · 모서리 12 · 줄 사이 2.
+                  <ul className="space-y-0.5">
                     {episodes.map((project) => (
                       <li key={project.id}>
                         <button
                           type="button"
                           onClick={() => pick(project)}
                           data-testid="new-project-episode"
-                          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left outline-none transition-colors hover:bg-card focus-visible:ring-2 focus-visible:ring-ring"
+                          className="flex w-full items-center gap-3.5 rounded-lg px-4 py-3.5 text-left outline-none transition-colors hover:bg-card focus-visible:ring-2 focus-visible:ring-ring"
                         >
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-label font-semibold text-foreground">{project.title || 'Untitled'}</span>
-                            <span className="mt-0.5 block font-num text-meta text-subtle-foreground">
+                            <span className="mt-1 block font-num text-meta text-subtle-foreground">
                               {projectStageLabel(project.current_stage)}
                               {project.updated_at ? ` · ${relativeTime(project.updated_at, t)}` : ''}
                             </span>
@@ -194,7 +201,8 @@ export function NewProjectDialog({
                   </ul>
                 )}
               </div>
-              <DialogFooter>
+              {/* 뒤로는 아래 왼쪽(11/5 시안 R4). */}
+              <DialogFooter className="sm:justify-start">
                 <Button
                   variant="ghost"
                   onClick={() => {

@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, Lock, Trash2 } from 'lucide-react'
+import { AiBusyOverlay, type AiBusyStep } from '@/components/ai-busy-overlay'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -19,8 +20,17 @@ import {
 } from '@/components/ui/dialog'
 import { PRICING_PAGE_VISIBLE } from '@/lib/billing/pricing-visibility'
 import { useT } from '@/lib/i18n'
+import { cn } from '@/lib/utils'
 import { useSeriesInfo } from '@/features/series/use-series-info'
-import { NEXT_EPISODE_NOT_READY, canContinueLastScene, nextEpisodeFailure, type NextEpisodeFailure } from './series-list'
+import {
+  NEXT_EPISODE_NOT_READY,
+  NEXT_EPISODE_WAIT_STEPS,
+  NEXT_EPISODE_WAIT_STEP_MS,
+  canContinueLastScene,
+  nextEpisodeFailure,
+  nextEpisodeWaitStep,
+  type NextEpisodeFailure,
+} from './series-list'
 
 /** GET /api/project/next-episode 미리보기(계약 1). */
 interface NextEpisodePreview {
@@ -47,11 +57,15 @@ function failureText(t: (text: string) => string, failure: NextEpisodeFailure | 
 }
 
 /** 이어받는 것 한 줄. */
-function InheritRow({ label, value }: { label: string; value: string }) {
+/**
+ * 이어받는 것 한 줄. roomy = 11/5 시안 R6 의 표(줄 위아래 11 · 이름 흐린 글자) — 부모 dl 이 두 칸 격자라
+ *   이름 칸이 줄마다 같은 폭이다(영어 이름이 길어도 겹치지 않는다).
+ */
+function InheritRow({ label, value, roomy }: { label: string; value: string; roomy?: boolean }) {
   return (
-    <div className="flex gap-3 py-1.5 text-sm">
-      <dt className="w-20 shrink-0 text-muted-foreground">{label}</dt>
-      <dd className="min-w-0 flex-1 text-foreground">{value}</dd>
+    <div className={roomy ? 'contents text-sm' : 'flex gap-3 py-1.5 text-sm'}>
+      <dt className={cn('shrink-0', roomy ? 'py-[11px] text-subtle-foreground' : 'w-20 text-muted-foreground')}>{label}</dt>
+      <dd className={cn('min-w-0 flex-1 text-foreground', roomy && 'py-[11px]')}>{value}</dd>
     </div>
   )
 }
@@ -122,8 +136,17 @@ export function NextEpisodeDialog({
     }
   }, [projectId])
 
+  // 만드는 동안 기다리는 카드의 단계(11/5 시안 R5) — 서버가 단계를 알려 주지 않아 시간으로 넘기고, 마지막 단계에서 답을 기다린다.
+  const [waitStep, setWaitStep] = useState(0)
+  useEffect(() => {
+    if (!creating) return
+    const ticker = setInterval(() => setWaitStep(nextEpisodeWaitStep), NEXT_EPISODE_WAIT_STEP_MS)
+    return () => clearInterval(ticker)
+  }, [creating])
+
   const create = useCallback(async () => {
     if (!projectId || creating) return
+    setWaitStep(0)
     setCreating(true)
     setFailure(null)
     try {
@@ -133,29 +156,45 @@ export function NextEpisodeDialog({
         body: JSON.stringify({ fromProjectId: projectId, continueLastScene }),
       })
       const body = await res.json().catch(() => null)
-      if (!res.ok || !body?.projectId) {
-        const mapped = nextEpisodeFailure(body?.error)
-        if (mapped === 'plan' || mapped === 'slots') {
-          onClose()
-          onFailure(mapped)
-          return
-        }
-        setFailure(mapped)
+      if (res.ok && body?.projectId) {
+        // 만들어졌으면 기다리는 카드를 띄운 채 새 프로젝트로 간다 — 카드를 먼저 닫으면 뒤의 창이 잠깐 다시 보인다.
+        router.push(`/studio/start?projectId=${body.projectId}`)
         return
       }
-      router.push(`/studio/start?projectId=${body.projectId}`)
-    } catch {
-      setFailure('unknown')
-    } finally {
+      // 못 만들었으면 카드를 닫고 창에서 이유를 보인다(요금제 · 칸은 부모가 그 안내 창을 연다).
       setCreating(false)
+      const mapped = nextEpisodeFailure(body?.error)
+      if (mapped === 'plan' || mapped === 'slots') {
+        onClose()
+        onFailure(mapped)
+        return
+      }
+      setFailure(mapped)
+    } catch {
+      setCreating(false)
+      setFailure('unknown')
     }
   }, [projectId, continueLastScene, creating, onClose, onFailure, router])
 
   const error = failureText(t, failure)
+  const waitSteps: AiBusyStep[] = NEXT_EPISODE_WAIT_STEPS.map((label, i) => ({
+    label: t(label),
+    state: i < waitStep ? 'done' : i === waitStep ? 'current' : 'todo',
+  }))
 
   return (
     <Dialog open={!!project} onOpenChange={(open) => !open && !creating && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      {/* 만드는 동안 기다리는 카드(11/5 시안 R5) — 열린 이 창 위를 덮는다. */}
+      <AiBusyOverlay
+        open={creating}
+        layer="dialog"
+        lumi="pearl"
+        title={t('Loading the previous episode')}
+        description={t('Carrying over the characters, backgrounds and art style of "{title}".', { title: project?.title || '' })}
+        steps={waitSteps}
+      />
+      {/* 폭은 공용 팝업 틀이 정한다(11/5 SYS: 모든 팝업 520). */}
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{t('Create the next episode of "{title}"', { title: project?.title || '' })}</DialogTitle>
           <DialogDescription>{t('The next episode starts as a new project and inherits everything below.')}</DialogDescription>
@@ -168,17 +207,20 @@ export function NextEpisodeDialog({
           </p>
         ) : preview ? (
           <>
-            <dl className="divide-y divide-border rounded-xl border border-border bg-card px-3 py-1">
+            {/* 11/5 시안(R6): 테두리 · 나눔 선 없는 바탕색 상자(팝업 #1F1E1D 보다 한 단 밝게) · 모서리 16 · 안쪽 10/20 · 이름 칸 64 이상 · 이름과 값 사이 16 */}
+            <dl className="grid grid-cols-[minmax(4rem,auto)_1fr] gap-x-4 rounded-xl bg-background px-5 py-2.5">
               <InheritRow
+                roomy
                 label={t('Characters')}
                 value={preview.characters.length ? preview.characters.join(DOT) : t('None')}
               />
               <InheritRow
+                roomy
                 label={t('Backgrounds')}
                 value={preview.locations.length ? preview.locations.join(DOT) : t('None')}
               />
-              <InheritRow label={t('Art style')} value={t('Same as the previous episode')} />
-              {preview.hasVoices ? <InheritRow label={t('Voices')} value={t('Inherited from the previous episode')} /> : null}
+              <InheritRow roomy label={t('Art style')} value={t('Same as the previous episode')} />
+              {preview.hasVoices ? <InheritRow roomy label={t('Voices')} value={t('Inherited from the previous episode')} /> : null}
             </dl>
 
             {canContinueLastScene(preview) ? (
@@ -204,11 +246,11 @@ export function NextEpisodeDialog({
         ) : null}
 
         <DialogFooter>
-          <Button variant="outline" disabled={creating} onClick={onClose}>
+          {/* SYS 단추: 취소 = secondary(#30302E), 확인 = 크림. 만드는 동안은 기다리는 카드가 덮는다. */}
+          <Button variant="secondary" disabled={creating} onClick={onClose}>
             {t('Cancel')}
           </Button>
           <Button disabled={creating || !preview} onClick={() => void create()} data-testid="next-episode-create">
-            {creating ? <Loader2 className="size-4 animate-spin" /> : null}
             {t('Create next episode · uses 1 slot')}
           </Button>
         </DialogFooter>

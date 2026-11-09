@@ -9,10 +9,13 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { Lightbulb, Lock, Paperclip, PenLine, Send } from 'lucide-react'
 import { ChoiceChip, OptionCard } from '@/components/controls/choice-chip'
+import { Lumi } from '@/components/lumi/lumi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { STAGE_LABEL } from '@/lib/constants'
 import { useT } from '@/lib/i18n'
+import { STAGE_PERSONA } from '@/lib/lumi'
 import { cn } from '@/lib/utils'
 import { type EntryDraft } from '@/lib/entry/draft'
 import {
@@ -60,9 +63,12 @@ export function EntryChat() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {sent ? <ChipsBar draft={draft} t={t} /> : null}
+      {/* 보내기 전에도 보인다(11/5 시안 P1, 리드 결정) — 칸 이름 · "아직"은 그대로, 지금 묻는 칸 표시는 보낸 뒤부터. */}
+      <ChipsBar draft={draft} sent={sent} t={t} />
       <div ref={threadRef} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-2xl flex-col gap-4 px-6 py-6" aria-live="polite">
+        {/* 대화 줄 사이 28(11/5 시안 P1 · P2) */}
+        <div className="mx-auto flex w-full max-w-2xl flex-col gap-7 px-6 py-6" aria-live="polite">
+          <ChatHero t={t} />
           {items.map((item) => (
             <ChatRow key={item.id} item={item} draft={draft} t={t} />
           ))}
@@ -80,23 +86,39 @@ export function EntryChat() {
   )
 }
 
-function ChipsBar({ draft, t }: { draft: EntryDraft; t: Translator }) {
+/** 첫 인사 위 머리(11/5 시안 P1) — 큰 Lumi(Producer 옷, XL) · 단계 칩 · "Lumi와 기획해요". 대화가 길어지면 위로 밀려 올라간다. */
+function ChatHero({ t }: { t: Translator }) {
+  return (
+    <div data-testid="entry-chat-hero" className="flex flex-col items-center gap-2.5">
+      <Lumi persona={STAGE_PERSONA.entry} state="idle" size="xl" />
+      <div className="flex items-center gap-2">
+        <span className="rounded-full bg-stage px-2.5 py-1 text-micro font-semibold leading-none text-on-stage">{STAGE_LABEL.entry}</span>
+        <span className="text-label font-medium text-muted-foreground">{t('Plan with Lumi')}</span>
+      </div>
+    </div>
+  )
+}
+
+function ChipsBar({ draft, sent, t }: { draft: EntryDraft; sent: boolean; t: Translator }) {
   const reask = useEntryStore((s) => s.chatReask)
   return (
     <nav aria-label={t('What we have decided so far')} className="shrink-0 border-b border-border-subtle bg-background">
       <div className="mx-auto flex w-full max-w-2xl flex-wrap gap-1.5 px-6 py-3">
-        {chatChips(draft, t).map((chip) => (
+        {chatChips(draft, t).map((chip) => {
+          // 아직 아무것도 묻지 않았으면(보내기 전) 지금 묻는 칸이 없다.
+          const current = sent && chip.current
+          return (
           <button
             key={chip.key}
             type="button"
             onClick={() => void reask(chip.key)}
             disabled={!chip.value}
             title={chip.value ? t('Click to choose again') : undefined}
-            aria-current={chip.current ? 'step' : undefined}
+            aria-current={current ? 'step' : undefined}
             // 지금 묻는 칸은 지금 단계 색 테두리 · 18% 바탕(v3 고른 칩과 같은 규칙), 아직 못 정한 칸은 흐린 글자.
             className={cn(
               'inline-flex min-h-7 items-center gap-1.5 rounded-full border-[1.5px] px-3 py-0.5 text-caption outline-none transition-colors duration-100 ease-out focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default',
-              chip.current ? 'border-stage bg-stage/18' : 'border-transparent bg-card',
+              current ? 'border-stage bg-stage/18' : 'border-transparent bg-card',
               chip.value ? 'hover:bg-accent' : 'text-subtle-foreground',
             )}
           >
@@ -104,7 +126,8 @@ function ChipsBar({ draft, t }: { draft: EntryDraft; t: Translator }) {
             <span className="text-muted-foreground">{chip.label}</span>
             <span className={chip.value ? 'font-semibold text-foreground' : ''}>{chip.value ?? t('Not yet')}</span>
           </button>
-        ))}
+          )
+        })}
       </div>
     </nav>
   )
@@ -198,7 +221,7 @@ function CardOptions({
 }) {
   const withSub = options.some((o) => o.sub)
   return (
-    <div className={cn('gap-2', column ? 'flex flex-col' : withSub ? 'grid grid-cols-2 sm:grid-cols-4' : 'flex flex-wrap')}>
+    <div className={cn('gap-2.5', column ? 'flex flex-col' : withSub ? 'grid grid-cols-2 sm:grid-cols-4' : 'flex flex-wrap')}>
       {options.map((o) => {
         const isRecommended = o.value === recommended
         // 추천 표시의 말을 바꾼 칸(시리즈 "앞 화")은 이름 옆에 그 배지를 직접 단다 — 칸 부품의 추천 배지는 늘 "추천"이다.
@@ -246,16 +269,17 @@ function QuestionCard({ question, draft, t }: { question: ChatQuestionKey | 'con
   if (question === 'confirm') {
     const starting = writing.status === 'starting' || writing.status === 'writing'
     return (
-      <AgentBubble>
+      <AgentBubble roomy>
         <p>{t('I will start like this.')}</p>
-        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 rounded-xl bg-card px-4 py-3">
+        {/* 정리 표(11/5 시안 P2): 모서리 14 · 안쪽 10/20 · 줄 위아래 11 · 이름 칸 72 이상 · 이름과 값 사이 16 */}
+        <dl className="grid grid-cols-[minmax(72px,auto)_1fr] gap-x-4 rounded-[14px] bg-card px-5 py-2.5">
           {summaryRows(draft, { t, locale: entryLocale, series }).map((row) => (
             <div key={row.key} className="contents">
-              <dt className="flex items-center gap-1.5 text-muted-foreground">
+              <dt className="flex items-center gap-1.5 py-[11px] text-subtle-foreground">
                 {row.locked ? <Lock className="size-3.5" aria-hidden /> : null}
                 {row.label}
               </dt>
-              <dd className="break-words">{row.value}</dd>
+              <dd className="break-words py-[11px]">{row.value}</dd>
             </div>
           ))}
         </dl>

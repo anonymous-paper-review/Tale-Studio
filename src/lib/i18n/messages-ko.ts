@@ -216,6 +216,12 @@ export const KO: Record<string, string> = {
   'No projects yet': '아직 프로젝트가 없어요',
   // v3 프로젝트 목록 첫 화면 머리(2026-11-03)
   'Total {n}': '모두 {n}개',
+  // 프로젝트 목록 찾기 · 정렬(11/5 시안 R2)
+  'Latest': '최신순',
+  'Oldest': '오래된순',
+  'Name (A → Z)': '이름순 (ㄱ → ㅎ)',
+  'Stage (Producer → Editor)': '단계순 (Producer → Editor)',
+  'No project matches that name.': '이름이 맞는 프로젝트가 없어요.',
   'Create your first project': '첫 프로젝트 만들기',
   'Name your project. You can rename it anytime.': '프로젝트 이름을 지어 주세요. 나중에 언제든 바꿀 수 있어요.',
   'E.g. One rainy night in the city': '예: 비 오는 도시의 하룻밤',
@@ -2449,6 +2455,7 @@ export const KO: Record<string, string> = {
   'Choose the screen ratio.': '화면 비율을 골라 주세요.',
   'Go with the recommendation': '추천대로',
   'What we have decided so far': '지금까지 정한 것',
+  'Plan with Lumi': 'Lumi와 기획해요', // 채팅 첫 화면 머리(11/5 시안 P1)
   'Click to choose again': '눌러서 다시 고르기',
   'Not yet': '아직',
   'Chat input': '채팅 입력',
@@ -2846,6 +2853,12 @@ export const KO: Record<string, string> = {
   'Create next episode · uses 1 slot': '다음 화 만들기 · 칸 1개 사용',
   'The previous episode is gone. Refresh the list.': '앞 화를 찾을 수 없어요. 목록을 새로 고쳐 주세요.',
   'Could not create the next episode. Please try again.': '다음 화를 만들지 못했어요. 다시 시도해 주세요.',
+  // 다음 화를 만드는 동안 기다리는 카드(11/5 시안 R5)
+  'Loading the previous episode': '앞 화를 불러오고 있어요',
+  'Carrying over the characters, backgrounds and art style of "{title}".': '「{title}」의 인물·배경·그림체를 이어받는 중이에요.',
+  'Open the previous episode': '앞 화 열기',
+  'Loading characters and backgrounds': '인물·배경 불러오는 중',
+  'Matching the art style': '그림체 맞추기',
   // 다음 화가 있는 화를 지울 때(프로토타입 LD)
   'This episode has a next episode': '이 화를 이어받은 다음 화가 있어요',
   'Delete the project "{title}"?': '「{title}」 프로젝트를 지울까요?',
