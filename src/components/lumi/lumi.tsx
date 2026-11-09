@@ -169,21 +169,15 @@ interface LumiAvatarProps {
   state?: LumiState
   /** 지름 — SYS 이름(채팅 xs 36 · 옆 채팅 chat 30) 또는 px. 기본은 옆 채팅(30). */
   size?: LumiSize | number
-  /** 둥근 바탕 없이 Lumi 만(채팅 머리). */
-  bare?: boolean
   className?: string
 }
 
-/** 채팅 아바타 — 움직이지 않는 그림. 바탕은 그 단계 색 12%(가이드 .chat-avatar). */
-export function LumiAvatar({ persona, state = 'idle', size = 'chat', bare = false, className }: LumiAvatarProps) {
+/** 채팅 아바타 — 움직이지 않는 그림. 11/5 시안(옆 채팅 W1 · A5 · WL · WS, 가운데 채팅 P1 · P2): 얼굴 뒤 둥근 바탕 없이 Lumi 만
+ *  (예전 가이드 .chat-avatar 의 단계 색 12% 바탕은 뺐다). */
+export function LumiAvatar({ persona, state = 'idle', size = 'chat', className }: LumiAvatarProps) {
   const { width } = lumiBox(size, 'avatar')
   return (
-    <span
-      data-stage={lumiStageTheme(persona)}
-      aria-hidden
-      className={cn('inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full', !bare && 'bg-stage/12', className)}
-      style={{ width, height: width }}
-    >
+    <span aria-hidden className={cn('inline-flex shrink-0 items-center justify-center', className)} style={{ width, height: width }}>
       {/* eslint-disable-next-line @next/next/no-img-element -- 2KB 정지 그림(webp), 최적화 불필요 */}
       <img
         src={lumiStillSrc(persona, state, 'avatar')}
@@ -191,7 +185,7 @@ export function LumiAvatar({ persona, state = 'idle', size = 'chat', bare = fals
         width={width}
         height={width}
         draggable={false}
-        className={cn('pointer-events-none select-none object-contain', bare ? 'size-full' : 'size-[86%]')}
+        className="pointer-events-none size-full select-none object-contain"
       />
     </span>
   )

@@ -205,7 +205,8 @@ Tailwind: `bg-stage-{화면}` · `text-stage-{화면}` (+ 알파), `bg-stage-bad
 
 ### 2.10 채팅 색 (Lumi 개발 가이드)
 
-채팅창 틀은 **무채색 고정**, 지금 단계 색 하나만 아바타 바탕 12% · 단계 칩 · Lumi 이름 · 생각 중 점 · 고른 빠른 답 · 입력창 포커스에 쓴다.
+채팅창 틀은 **무채색 고정**, 지금 단계 색 하나만 단계 칩 · Lumi 이름 · 생각 중 점 · 고른 빠른 답 · 입력창 포커스에 쓴다.
+채팅 얼굴(`LumiAvatar`)은 **바탕 없이 Lumi 만** — 11/5 시안의 옆 채팅(W1 · A5 · WL · WS)과 가운데 채팅(P1 · P2) 모두 둥근 바탕이 없다(예전 가이드의 단계 색 12% 바탕은 뺐다).
 
 | 토큰 | 역할 |
 |---|---|
@@ -216,6 +217,7 @@ Tailwind: `bg-stage-{화면}` · `text-stage-{화면}` (+ 알파), `bg-stage-bad
 | `--chat-input` | 입력 알약 |
 | `--chat-send` | 보내기 단추 (= primary) |
 | `--chat-center-lumi-bubble` · `--chat-center-my-bubble` | **가운데 채팅**(Producer P1 · P2, 11/5) Lumi · 내 말풍선 — 바탕(shell)이 옆 채팅(side)보다 밝아 한 단씩 밝힌 값 |
+| `--chat-center-chip` | 가운데 채팅의 안 고른 빠른 답(`ChoiceChip tone="chat"`) — 내 말풍선과 같은 값 |
 | `--chat-summary` | 정리 표 상자 · "지금까지 정한 것" 묶음 (= side) |
 | `--chat-summary-cell` | 그 안의 칸 (= `--side-raised`) |
 
