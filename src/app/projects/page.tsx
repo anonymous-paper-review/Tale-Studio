@@ -29,7 +29,7 @@ import {
 import type { StageId } from '@/types'
 import { projectOpenPath, projectStageLabel } from '@/lib/project/open-path'
 import { DASHBOARD_CONTAINER, DashboardHeader } from '@/components/dashboard/dashboard-header'
-import { useT } from '@/lib/i18n'
+import { useLocale, useT } from '@/lib/i18n'
 import { relativeTime } from '@/lib/i18n/relative-time'
 import { clearLastProjectId, readLastProjectId } from '@/lib/session-restore'
 import {
@@ -38,6 +38,8 @@ import {
   prevEpisodeLink,
   type SeriesPlanState,
 } from '@/features/projects/series-list'
+import { DEFAULT_PROJECT_SORT, visibleProjects, type ProjectSort } from '@/features/projects/project-list'
+import { ProjectListTools } from '@/features/projects/project-list-tools'
 import { SeriesDeleteWarningDialog } from '@/features/projects/next-episode-dialog'
 import { NewProjectDialog } from '@/features/projects/new-project-dialog'
 
@@ -223,7 +225,11 @@ function ProjectCard({
 export default function ProjectsPage() {
   const router = useRouter()
   const t = useT()
+  const locale = useLocale()
   const switchProject = useProjectStore((s) => s.switchProject)
+  // 이름으로 찾기 · 정렬(11/5 시안 R2) — 화면 안에서만 거르고, 정렬은 기억하지 않아 들어올 때마다 최신순이다.
+  const [query, setQuery] = useState('')
+  const [sort, setSort] = useState<ProjectSort>(DEFAULT_PROJECT_SORT)
 
   const [projects, setProjects] = useState<ProjectItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -249,6 +255,7 @@ export default function ProjectsPage() {
   }, [])
 
   const plan: SeriesPlanState = { canUseReference, slotLimit, used: projects.length }
+  const shown = visibleProjects(projects, { query, sort, locale })
   // 이 화를 이어받은 다음 화가 있으면 지우기 전에 먼저 경고한다(프로토타입 LDq · LD).
   const deleteNextEpisodes = deleteTarget ? continuingEpisodes(projects, deleteTarget.id) : []
 
@@ -319,12 +326,21 @@ export default function ProjectsPage() {
         ) : (
           <>
           {/* 첫 화면 머리 — 큰 Lumi(화이트 펄)가 목록 쪽을 바라본다(꼬리는 왼쪽, 얼굴은 오른쪽). */}
-          <section className="mb-6 flex items-center gap-2">
+          <section className="mb-6 flex flex-wrap items-center gap-2">
             <Lumi persona="pearl" state="idle" size={320} className="-ml-12 shrink-0" />
             <PageHeader title={t('Projects')} meta={t('Total {n}', { n: projects.length })} />
+            {/* 찾기 · 정렬은 머리 오른쪽(11/5 시안 R2 List Tools). */}
+            <div className="ml-auto">
+              <ProjectListTools query={query} onQueryChange={setQuery} sort={sort} onSortChange={setSort} />
+            </div>
           </section>
+          {shown.length === 0 ? (
+            <p className="py-16 text-center text-label text-muted-foreground" role="status">
+              {t('No project matches that name.')}
+            </p>
+          ) : null}
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {projects.map((project) => (
+            {shown.map((project) => (
               <ProjectCard
                 key={project.id}
                 project={project}

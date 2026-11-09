@@ -9,6 +9,7 @@
 import { useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, ChevronRight, Layers, Lock, Plus, Search } from 'lucide-react'
+import { ConfirmLumi } from '@/components/handoff/confirm-lumi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -55,9 +56,8 @@ function ChoiceButton({
       type="button"
       onClick={onClick}
       data-testid={testId}
-      // v3 선택 카드(Control/Option Card)와 같은 면 — 테두리 없이 카드색, 올리면 칩색.
-      //   11/5 시안(R3): 안쪽 18/20 · 사이 14 · 모서리 16 · 아이콘 칸 40(모서리 12).
-      className="flex w-full items-center gap-3.5 rounded-xl bg-card px-5 py-[18px] text-left outline-none transition-colors duration-100 ease-out hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+      // 11/5 시안(R3): 팝업(#1F1E1D)보다 한 단 밝은 바탕색 카드, 올리면 한 단 더 밝게 — 안쪽 18/20 · 사이 14 · 모서리 16 · 아이콘 칸 40(모서리 12).
+      className="flex w-full items-center gap-3.5 rounded-xl bg-background px-5 py-[18px] text-left outline-none transition-colors duration-100 ease-out hover:bg-card focus-visible:ring-2 focus-visible:ring-ring"
     >
       <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-chip text-foreground">{icon}</span>
       <span className="min-w-0 flex-1">
@@ -126,6 +126,8 @@ export function NewProjectDialog({
           {step === 'choose' ? (
             <>
               <DialogHeader>
+                {/* 11/5 시안 R3 — 제목 위 Lumi M(화이트 펄). */}
+                <ConfirmLumi persona="pearl" />
                 <DialogTitle>{t('How do you want to start?')}</DialogTitle>
               </DialogHeader>
               <div className="space-y-2">
@@ -152,6 +154,8 @@ export function NewProjectDialog({
           ) : (
             <>
               <DialogHeader>
+                {/* 11/5 시안 R4 — 제목 위 Lumi M(화이트 펄). */}
+                <ConfirmLumi persona="pearl" />
                 <DialogTitle>{t('Which episode do you want to continue?')}</DialogTitle>
                 <DialogDescription>
                   {t('Only episodes where you started making the character and background images appear. Most recently edited first.')}
