@@ -24,7 +24,7 @@ import {
   type ParsedAnswer,
   type PickKey,
 } from './options'
-import { ratioRecommendation, type EntrySeries } from './series'
+import { moodRecommendation, ratioRecommendation, type EntrySeries } from './series'
 
 export type Translator = (key: string, params?: Record<string, string | number>) => string
 
@@ -34,6 +34,9 @@ export interface ChatHint {
   keys: PickKey[]
 }
 
+/** 빠른 답 · 단계 확인 단추가 남기는 대화 한 쌍 — script = [대본이 있어요], revise = [아니요, 더 고칠래요](11/5 시안 P1 · P2). */
+export type ChatNudge = 'script' | 'revise'
+
 /** 채팅 화면만의 상태(초안에 저장하지 않는다). */
 export interface ChatUi {
   showExamples: boolean
@@ -41,18 +44,33 @@ export interface ChatUi {
   /** 20자 규칙을 어기고 보냈다 — 에이전트가 더 적어 달라고 말한다. */
   lengthError: boolean
   hint: ChatHint | null
+  /** 빠른 답 · [아니요, 더 고칠래요]가 남긴 한 쌍. 다음에 보내거나 답하면 지운다. */
+  nudge?: ChatNudge | null
+  /** 입력칸에 커서를 두라는 요청 횟수 — 바뀌면 지금 입력칸이 커서를 받는다. */
+  focus?: number
 }
 
-export const EMPTY_CHAT_UI: ChatUi = { showExamples: false, examplePage: 0, lengthError: false, hint: null }
+export const EMPTY_CHAT_UI: ChatUi = { showExamples: false, examplePage: 0, lengthError: false, hint: null, nudge: null, focus: 0 }
 
 export type ChatItem =
-  | { kind: 'agent'; id: string; text: string; action?: 'show_examples' }
+  | { kind: 'agent'; id: string; text: string; action?: 'quick_replies' }
   | { kind: 'user'; id: string; text: string; fileName?: string }
   | { kind: 'examples'; id: string; page: number; intro: string }
   | { kind: 'error'; id: string; text: string; guide?: string }
   | { kind: 'card'; id: string; question: ChatQuestionKey | 'confirm' }
 
-export const CHAT_GREETING = 'What shall we make? Upload material if you have it, or write it yourself. If you have no idea yet, I can show you examples.'
+// 첫 인사(11/5 시안 P1, 오너 2026-11-09 추천대로) — 20자 규칙은 그대로다(보낼 때 더 적어 달라고 한다).
+export const CHAT_GREETING = 'Hi! What story would you like to make?\nOne line is enough. We will decide the genre, length and screen ratio together.'
+/** 첫 인사 아래 빠른 답 넷 — 아이디어 · 대본 · 파일 · 예시(예시는 CHAT_SHOW_EXAMPLES). */
+export const CHAT_QUICK = {
+  idea: 'I have an idea',
+  script: 'I have a script',
+  file: 'I will upload a file',
+} as const
+const CHAT_SCRIPT_ASK = 'Paste the script, or upload it as a file.'
+/** [아니요, 더 고칠래요] — 단계 확인 단추의 오른쪽 글과 같은 키. */
+const CHAT_REVISE_SAID = 'No, I want to edit more'
+const CHAT_REVISE_ASK = 'What would you like to change?'
 export const CHAT_EXAMPLES_INTRO = 'How about these? Click one you like and I will put it in the input. You can edit it before sending.'
 export const CHAT_SHOW_EXAMPLES = 'Show me examples'
 const CHAT_GUIDE = 'Who, where, what happens and how it ends: one or two lines are enough.'
@@ -132,8 +150,13 @@ export function hintText(draft: EntryDraft, hint: ChatHint, t: Translator): stri
 /** 대화 줄 — 프로토타입 chatStage 와 같은 순서: 인사 · (예시) · (더 적어 달라는 말) / 보낸 글 · 읽었어요 · 지난 문답 · 지금 카드. */
 export function chatTranscript(draft: EntryDraft, ui: ChatUi, t: Translator): ChatItem[] {
   const sent = chatSent(draft)
-  const items: ChatItem[] = [{ kind: 'agent', id: 'greeting', text: t(CHAT_GREETING), ...(!sent && !ui.showExamples ? { action: 'show_examples' as const } : {}) }]
+  const quickReplies = !sent && !ui.showExamples && ui.nudge !== 'script'
+  const items: ChatItem[] = [{ kind: 'agent', id: 'greeting', text: t(CHAT_GREETING), ...(quickReplies ? { action: 'quick_replies' as const } : {}) }]
   if (!sent) {
+    if (ui.nudge === 'script') {
+      items.push({ kind: 'user', id: 'quick-script', text: t(CHAT_QUICK.script) })
+      items.push({ kind: 'agent', id: 'script-ask', text: t(CHAT_SCRIPT_ASK) })
+    }
     if (ui.showExamples) {
       items.push({ kind: 'user', id: 'ask-examples', text: t(CHAT_SHOW_EXAMPLES) })
       items.push({ kind: 'examples', id: 'examples', page: ui.examplePage, intro: t(CHAT_EXAMPLES_INTRO) })
@@ -163,6 +186,11 @@ export function chatTranscript(draft: EntryDraft, ui: ChatUi, t: Translator): Ch
   }
   if (ui.hint) items.push({ kind: 'agent', id: 'hint', text: hintText(draft, ui.hint, t) })
   items.push({ kind: 'card', id: 'card-confirm', question: 'confirm' })
+  // [아니요, 더 고칠래요] — 정리 카드 아래에서 무엇을 바꿀지 묻는다. 말로 답하면(지운 뒤) 바꾼 값 안내가 카드 위에 남는다.
+  if (ui.nudge === 'revise') {
+    items.push({ kind: 'user', id: 'revise', text: t(CHAT_REVISE_SAID) })
+    items.push({ kind: 'agent', id: 'revise-ask', text: t(CHAT_REVISE_ASK) })
+  }
   return items
 }
 
@@ -244,7 +272,8 @@ export function recommendedValue(draft: EntryDraft, key: ChatQuestionKey, series
   const rec = draft.rec
   if (key === 'ratio') return ratioRecommendation(series)
   if (!rec) return null
-  if (key === 'mood') return rec.mood
+  // 다음 화는 앞 화 장르(2026-11-09 오너 추천대로) — 화면 비율과 같은 규칙.
+  if (key === 'mood') return moodRecommendation(series, rec).value
   if (key === 'runtime') return rec.runtime
   const level: LevelKey = levelAvailable(rec.level, draft.idea, draft.file) ? rec.level : 'polish'
   return level

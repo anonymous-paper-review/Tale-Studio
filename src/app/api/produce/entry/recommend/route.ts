@@ -4,11 +4,13 @@
 //   추천과 읽은 글을 초안에 저장하고 고른 값을 추천으로 채운다(화면 비율은 이미 고른 값, 없으면 9:16 추천). 채팅 진행은 처음부터.
 //   약속: tests/producer/entry-routes.test.ts
 import { NextResponse } from 'next/server'
-import { RECOMMENDED_RATIO, fileHasText, materialProblem } from '@/features/entry/options'
+import { fileHasText, materialProblem } from '@/features/entry/options'
+import { picksAfterRecommend } from '@/features/entry/series'
 import { ENTRY_TEXT_MAX_BYTES, entryDraftFor, materialBasis, type EntryDraft, type EntryFileMeta } from '@/lib/entry/draft'
 import { resolveRecommendation } from '@/lib/entry/recommend'
 import { ocrImageText, recommendWithLlm } from '@/lib/entry/recommend-llm'
 import { parseAppLocale } from '@/lib/locale'
+import { parseSeries } from '@/lib/series/snapshot'
 import { mediaPublicUrl } from '@/lib/storage/media'
 import { clampTextBytes } from '@/lib/upload/limits'
 import { authorizeEntry, loadEntryProject, saveEntryDraft, serverError } from '../entry-access'
@@ -23,7 +25,7 @@ export async function POST(req: Request) {
   const projectId = body!.projectId as string
 
   try {
-    const row = await loadEntryProject(projectId, 'locale, current_stage, entry_draft, story_text')
+    const row = await loadEntryProject(projectId, 'locale, current_stage, entry_draft, story_text, series')
     if (!row) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     const draft = entryDraftFor({ entryDraft: row.entry_draft, storyText: row.story_text, stage: row.current_stage })
     if (draft.startedAt) return NextResponse.json({ error: 'already_started' }, { status: 409 })
@@ -66,7 +68,8 @@ export async function POST(req: Request) {
     const next: EntryDraft = {
       ...withFile,
       rec,
-      picks: { mood: rec.mood, runtime: rec.runtime, level: rec.level, ratio: draft.picks.ratio ?? RECOMMENDED_RATIO },
+      // 다음 화는 앞 화에서 이어받은(또는 사람이 바꾼) 장르를 지킨다(2026-11-09 오너 추천대로).
+      picks: picksAfterRecommend(draft, rec, parseSeries(row.series)?.mood),
       chat: { answered: {}, pre: {} },
     }
     await saveEntryDraft(projectId, next)
