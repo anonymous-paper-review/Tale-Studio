@@ -171,20 +171,39 @@ function card(shotId: string): Element {
   if (!found) throw new Error(`card ${shotId} not rendered`)
   return found
 }
-/** 알림(기다림 카드 · 그리는 중 띠 · 알림 칸)마다 그것을 감싼 "그리는 중" 표시(aria-busy)가 있는지 — 감싸여 있으면 화면 읽기 프로그램이 그 표시가 풀릴 때까지 알림을 미룰 수 있다. */
-function liveParts(node: ReactNode, insideBusy = false): Array<{ part: string; insideBusy: boolean }> {
-  if (Array.isArray(node)) return node.flatMap((child) => liveParts(child, insideBusy))
-  if (!isValidElement<Record<string, unknown>>(node)) return []
-  const part = node.type === NodeWaitCard ? 'NodeWaitCard'
-    : node.type === GeneratingOverlay && node.props.active === true ? 'GeneratingOverlay'
-      : node.props.role === 'status' ? `${String(node.type)}[role=status]` : null
-  const inner = liveParts(node.props.children as ReactNode, insideBusy || node.props['aria-busy'] === 'true')
-  return part ? [{ part, insideBusy }, ...inner] : inner
+/** 부품 하나를 그 자리에서 그려 본 결과 — 보드의 훅 자리와 섞이지 않게. 맨 위가 또 부품이면(그리는 중 띠 → 안쪽 칸) 이어서 그린다. */
+function drawnPart(node: Element): ReactNode {
+  const saved = { slots: hooks.slots, cursor: hooks.cursor, effects: hooks.effects }
+  hooks.slots = []
+  hooks.cursor = 0
+  hooks.effects = []
+  try {
+    let out: ReactNode = node
+    while (isValidElement<Record<string, unknown>>(out) && typeof out.type === 'function') {
+      out = (out.type as (props: Record<string, unknown>) => ReactNode)(out.props)
+    }
+    return out
+  } finally {
+    Object.assign(hooks, saved)
+  }
 }
-/** 그 카드의 기다림 카드가 화면 읽기에 알리나(announce) · 조용한가 · 기다림 카드가 없나. */
+/** 알림 칸(role="status" · aria-live)마다 그것을 감싼 "그리는 중" 표시(aria-busy)가 있는지 — 감싸여 있으면 화면 읽기 프로그램이 그 표시가 풀릴 때까지
+ *  알림을 미룰 수 있다. 기다림 카드 · 그리는 중 띠는 그려 본 결과로 본다 — 부품 종류만으로는 알림 칸이 실제로 있는지 모른다(검토 C2). */
+function liveParts(node: ReactNode, insideBusy = false, from?: string): Array<{ part: string; role: unknown; insideBusy: boolean }> {
+  if (Array.isArray(node)) return node.flatMap((child) => liveParts(child, insideBusy, from))
+  if (!isValidElement<Record<string, unknown>>(node)) return []
+  if (node.type === NodeWaitCard || node.type === GeneratingOverlay) {
+    return liveParts(drawnPart(node), insideBusy, node.type === NodeWaitCard ? 'NodeWaitCard' : 'GeneratingOverlay')
+  }
+  const live = node.props.role === 'status' || node.props['aria-live'] != null
+  const inner = liveParts(node.props.children as ReactNode, insideBusy || node.props['aria-busy'] === 'true', from)
+  return live ? [{ part: from ?? String(node.type), role: node.props.role, insideBusy }, ...inner] : inner
+}
+/** 그 카드의 기다림 카드가 화면 읽기에 알리나(그려 본 결과에 알림 칸 role="status") · 조용한가 · 기다림 카드가 없나. */
 function waitCardVoice(shotId: string): 'announce' | 'quiet' | 'none' {
   const wait = elements(card(shotId).props.children as ReactNode).find((node) => node.type === NodeWaitCard)
-  return !wait ? 'none' : wait.props.announce === true ? 'announce' : 'quiet'
+  if (!wait) return 'none'
+  return liveParts(wait).some(({ role }) => role === 'status') ? 'announce' : 'quiet'
 }
 /** 카드 안에서 글이 같은 단추를 누른다. */
 function press(cardNode: Element, label: string) {
@@ -333,23 +352,23 @@ describe('보드의 더한 샷 카드 · 잠금 · 탭', () => {
 
   // 왜: 검토 C 2(리드 2026-11-09) — 카드 위 기다림 카드는 바뀌면 읽어 주는 알림인데, "그리는 중" 표시가 그것을 감싸면 화면 읽기 프로그램이
   //   그 표시가 풀릴 때(다 그렸을 때)까지 알림을 미룰 수 있다 — 다 그리면 알림도 사라져 끝내 읽히지 않는다. 잠긴 보드의 가벼운 표시도 같은 규칙이다.
+  //   알림 칸은 부품 종류가 아니라 그려 본 결과(role="status")로 찾는다 — 종류로만 찾으면 아무 카드도 알리지 않던 때(announce 전)도 통과했다(검토 C2).
   it('그리는 카드는 그림 칸을 그리는 중으로 표시하고, 기다림 알림은 그 표시 밖에 두어 화면 읽기 프로그램이 미루지 않고 읽는다', () => {
     board.views = new Map([['sh_01_02', { phase: 'requesting' }]])
     commit()
     expect(locked()).toBe(false)
     const unlocked = card('sh_01_02')
     expect(elements(unlocked.props.children as ReactNode).some((node) => node.props['aria-busy'] === 'true')).toBe(true)
-    expect(liveParts(unlocked).map(({ part }) => part)).toContain('NodeWaitCard')
-    expect(liveParts(unlocked).filter(({ insideBusy }) => insideBusy)).toEqual([])
-    // 잠긴 보드(더한 샷이 아닌 샷)의 가벼운 표시 — 그리는 중 띠도 그 표시 밖이다.
+    // 그리는 카드 하나 — 그 기다림 카드에 알림 칸이 실제로 있고, "그리는 중" 표시 밖이다.
+    expect(liveParts(unlocked)).toEqual([{ part: 'NodeWaitCard', role: 'status', insideBusy: false }])
+    // 잠긴 보드(더한 샷이 아닌 샷)의 가벼운 표시 — 그리는 중 띠의 알림 칸도 그 표시 밖이다.
     board.views = null
     _setGenerationQueueSnapshotForTests({ projectId: PROJECT, jobs: [{ id: 'job-1', kind: 'shot_rough_storyboard', target: { writerShotIds: ['sh_01_02'] } } as never] })
     commit()
     expect(locked()).toBe(true)
     const lockedCard = card('sh_01_02')
     expect(elements(lockedCard.props.children as ReactNode).some((node) => node.props['aria-busy'] === 'true')).toBe(true)
-    expect(liveParts(lockedCard).map(({ part }) => part)).toContain('GeneratingOverlay')
-    expect(liveParts(lockedCard).filter(({ insideBusy }) => insideBusy)).toEqual([])
+    expect(liveParts(lockedCard)).toEqual([{ part: 'GeneratingOverlay', role: 'status', insideBusy: false }])
   })
 
   // 왜: 검토 B 5c(리드 2026-11-09) — 기다림 카드마다 화면 읽기에 알리면, 더한 샷 여럿을 한꺼번에 그릴 때 같은 말을 겹쳐 읽는다.
