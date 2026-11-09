@@ -83,3 +83,12 @@ export function projectStageDot(stage: string | null | undefined): string {
   const id = STAGES.find((s) => s.id === stage)?.id ?? 'entry'
   return STAGE_DOT[id]
 }
+
+/**
+ * 카드 글자 타일의 첫 글자 — 앞쪽 기호 · 공백("[1화] …" · "「역마」 …")은 건너뛰고 첫 글자(한글 · 영문 · 숫자 등 글자 · 숫자)를
+ *   대문자로. 그런 글자가 없거나 이름이 없으면 U(Untitled). 약속: tests/project/card-thumb.test.ts
+ */
+export function projectInitial(title: string | null | undefined): string {
+  const first = (title ?? '').match(/[\p{L}\p{N}]/u)?.[0]
+  return first ? first.toUpperCase() : 'U'
+}
