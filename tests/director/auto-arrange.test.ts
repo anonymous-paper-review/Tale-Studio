@@ -161,14 +161,14 @@ describe('[자동 정렬] 단추와 처음 여는 배치', () => {
     expect(persist.mock.calls.map(([id]) => id)).toEqual(expect.arrayContaining([sceneId, a, b, v]))
   })
 
-  // 왜: 처음 여는 기본 자리까지 줄이면 예전 간격으로 저장된 카드(사람이 옮겼거나 예전 [자동 정렬]로 저장된 테이크)와 섞여 겹친다
-  //   (개발 DB 77dfa43c 에서 확인: 저장된 두 번째 테이크가 다음 씬 샷과 겹침). 기본 자리는 넉넉한 예전 간격 그대로 두고, 가깝게 놓는 일은 [자동 정렬]이 한다.
-  it('처음 열 때 영상 테이크 · 씬 묶음의 기본 자리는 예전 넉넉한 간격 그대로다', () => {
+  // 왜: 씬 묶음 폭은 예전 그대로 둔다(리드 2026-11-10). 새 테이크는 시안처럼 샷 오른쪽 96 에 두고, 다른 카드(예전 간격으로 저장된 카드 포함)와
+  //   겹치면 아래로 내린다(검토 C 1번). 예전 문장 "처음 열 때 영상 테이크 · 씬 묶음의 기본 자리는 예전 넉넉한 간격 그대로다"를 리드 지시로 고쳤다.
+  it('처음 열 때 씬 묶음의 기본 간격은 예전 그대로이고 첫 테이크는 샷 오른쪽 96 에 놓는다', () => {
     const sceneId = api().addSceneNode({ x: 0, y: 0 }, 'S1')
     const shotId = api().addShotNode(sceneId, { x: 360, y: 0 }, 'Shot1')
     const videoId = api().addVideoTake(shotId)!
 
-    expect(api().nodes.find((n) => n.id === videoId)!.position.x).toBe(360 + 720)
+    expect(api().nodes.find((n) => n.id === videoId)!.position.x).toBe(360 + 280 + 96)
     expect(nextScenePosition(api()).x).toBe(1780)
   })
 

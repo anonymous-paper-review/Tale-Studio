@@ -348,10 +348,11 @@ export const SHOT_OFFSET_X = 360
 export const SHOT_OFFSET_Y = 560
 /** Shot Image(실사) 노드 x — Shot 우측(#previz-chain. 2026-07-27: previz 영상 컬럼을 이어받아 같은 행) */
 export const SHOT_IMAGE_OFFSET_X = 360
-/** Video 노드 x (Shot 기준): SHOT IMAGE 다음 컬럼.
- *  처음 여는 기본 자리용이라 넉넉하게 둔다: [자동 정렬]은 canvas-layout.ts 의 시안 간격(96)으로 다시 놓는다(오너 2026-11-10).
- *  이 값을 줄이면 예전 간격으로 저장된 테이크 · 다음 씬 샷과 겹친다(개발 DB 77dfa43c 에서 확인). */
-export const VIDEO_OFFSET_X = 720
+/** 새 Video take x (Shot 기준): 샷 카드 폭(280) + 시안 열 간격(96). 새 테이크 자리는 이 x 에서 다른 카드와 겹치지 않을 때까지
+ *  아래로 내린다(canvas-layout.newTakePosition, 검토 C 1번 2026-11-10). 예전 720 은 [자동 정렬]한 판에서 옆 씬 카드 위에 놓였다. */
+export const VIDEO_OFFSET_X = 376
+/** 새 씬 묶음 사이 기본 폭(nextScenePosition): 예전 그대로 에셋 300 + 샷 360 + 영상 720 + 400(리드 2026-11-10 "씬 묶음 폭은 그대로"). */
+export const DEFAULT_SCENE_GROUP_WIDTH = 1780
 /** Video 형제 간 세로 간격 — 썸네일 카드 겹침 방지 여유 포함(#e3) */
 export const VIDEO_OFFSET_Y = 260
 /** snap-to-grid */
