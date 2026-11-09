@@ -1,8 +1,11 @@
 // AI가 일하는 동안 바탕을 칠하지 않는 투명 덮개도 같은 잠금을 걸고, 덮개가 받은 휠 · 손가락 끌기는 아래 보기 칸을 스크롤하는지 검사한다
 import { readFileSync } from 'node:fs'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { createScrollRelay, type ScrollPane } from '@/lib/ai-busy-scroll'
+import { AI_BUSY_SCROLL_ATTR, createScrollRelay, type ScrollPane } from '@/lib/ai-busy-scroll'
 import { aiBusyOverlayFrame } from '@/components/ai-busy-overlay'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
 /** 화면의 스크롤 칸 하나 — 이 시험이 보는 것은 자리와 스크롤한 양뿐이다. */
 class Pane implements ScrollPane {
@@ -76,6 +79,17 @@ describe('투명 덮개(scrim="clear")', () => {
     relay.touchEnd()
     relay.touchMove(touches(400, 300))
     expect(prose.scrolled.y).toBe(80)
+  })
+
+  // 왜: 검토 A2 N1 — 오너 결정 4 "보기 · 스크롤은 되고"에는 채팅도 든다. 채팅 메시지는 Radix ScrollArea 라 실제로 스크롤하는 것은
+  //   뿌리가 아니라 안쪽 viewport 다(뿌리에 표시를 달면 scrollBy 가 먹지 않는다).
+  it('투명 덮개 위에서 굴린 휠은 채팅 메시지 칸도 스크롤한다 — 표시는 채팅의 실제 스크롤 칸에 붙는다', () => {
+    const html = renderToStaticMarkup(createElement(ScrollArea, { viewportProps: { [AI_BUSY_SCROLL_ATTR]: '' } }, '대화'))
+    const viewport = html.match(/<div[^>]*data-slot="scroll-area-viewport"[^>]*>/)?.[0] ?? ''
+    const root = html.match(/<div[^>]*data-slot="scroll-area"[^>]*>/)?.[0] ?? ''
+    expect(viewport).toContain(`${AI_BUSY_SCROLL_ATTR}=""`)
+    expect(root).not.toContain(AI_BUSY_SCROLL_ATTR)
+    expect(readFileSync('src/components/layout/global-chat.tsx', 'utf8')).toMatch(/<ScrollArea\b[^>]*viewportProps=\{\{ \[AI_BUSY_SCROLL_ATTR\]: '' \}\}/)
   })
 
   // 왜: 산문 칸 안에 작은 스크롤 칸(문단 목록 등)이 있으면 손이 닿은 안쪽 칸이 움직여야 한다.

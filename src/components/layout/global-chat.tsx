@@ -26,6 +26,7 @@ import { Button } from '@/components/ui/button'
 import { StageConfirm } from '@/components/controls/stage-confirm'
 import { useImageUploadConsent } from '@/components/upload/image-upload-consent'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { AI_BUSY_SCROLL_ATTR } from '@/lib/ai-busy-scroll'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { LumiAvatar } from '@/components/lumi/lumi'
 import { CollapseIcon, ExpandIcon } from '@/components/icons/v3-icons'
@@ -1423,7 +1424,8 @@ export function GlobalChat() {
         </div>
 
         {/* Messages */}
-        <ScrollArea className="min-h-0 flex-1 px-5 pb-3 pt-2">
+        {/* 투명 덮개(AI 가 같은 단계에서 일하는 동안)가 받은 휠 · 끌기를 넘길 칸 — 실제로 스크롤하는 viewport 에 단다(검토 A2 N1). */}
+        <ScrollArea className="min-h-0 flex-1 px-5 pb-3 pt-2" viewportProps={{ [AI_BUSY_SCROLL_ATTR]: '' }}>
           {/* 11/5 시안 — 말풍선 사이 20(구간 사이도 같다). */}
           <div className="space-y-5">
 
