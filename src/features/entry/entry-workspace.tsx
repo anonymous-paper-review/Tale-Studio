@@ -269,7 +269,7 @@ function EntryFileDialog() {
   return (
     <>
       <Dialog open={open} onOpenChange={(next) => (next ? undefined : close())}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('Attach a file')}</DialogTitle>
             <DialogDescription>{t('One file · up to 10MB')}</DialogDescription>
@@ -346,7 +346,7 @@ function NoTextDialog({ tab }: { tab: EntryTab }) {
 
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? undefined : void removeFile())}>
-      <DialogContent className="sm:max-w-md" showCloseButton={false}>
+      <DialogContent showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>{image ? t("Couldn't find text in the image") : t("Couldn't find text in the file")}</DialogTitle>
           <DialogDescription>

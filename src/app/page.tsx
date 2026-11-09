@@ -614,7 +614,7 @@ export default function HomePage() {
 
       {/* ── 새 프로젝트 이름 지정 팝업 (#a1) ── */}
       <Dialog open={nameOpen} onOpenChange={(o) => !creating && setNameOpen(o)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>New project</DialogTitle>
             <DialogDescription>
@@ -658,7 +658,7 @@ export default function HomePage() {
         open={!!deleteTarget}
         onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete project</DialogTitle>
             <DialogDescription>

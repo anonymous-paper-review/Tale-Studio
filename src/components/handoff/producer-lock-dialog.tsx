@@ -65,7 +65,7 @@ export function ProducerLockDialog({ open }: { open: boolean }) {
 
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? null : close())}>
-      <DialogContent className="sm:max-w-xl" data-testid="producer-lock-dialog">
+      <DialogContent data-testid="producer-lock-dialog">
         <DialogHeader className="sm:text-center">
           <ConfirmLumi stage={currentStage} />
           <DialogTitle>{t('Confirm before handing over to Writer')}</DialogTitle>

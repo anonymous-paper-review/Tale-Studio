@@ -61,7 +61,7 @@ export function DirectorReadinessDialog({
 
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? null : close())}>
-      <DialogContent className="max-h-[90vh] grid-rows-[auto_auto_minmax(0,1fr)_auto] sm:max-w-2xl" data-testid="director-readiness-dialog">
+      <DialogContent size="wide" className="max-h-[90vh] grid-rows-[auto_auto_minmax(0,1fr)_auto]" data-testid="director-readiness-dialog">
         <DialogHeader className="sm:text-center">
           <ConfirmLumi stage={currentStage} />
           <DialogTitle>{t('Hand over to Director')}</DialogTitle>

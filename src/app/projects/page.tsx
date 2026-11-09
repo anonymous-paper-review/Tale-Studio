@@ -364,7 +364,7 @@ export default function ProjectsPage() {
 
       {/* ── 프로젝트 삭제 확인 팝업 ── 다음 화가 없는 화는 지금과 같다(프로토타입 LD0) */}
       <Dialog open={!!deleteTarget && deleteNextEpisodes.length === 0} onOpenChange={(o) => !o && !deleting && setDeleteTarget(null)}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>{t('Delete project')}</DialogTitle>
             <DialogDescription>

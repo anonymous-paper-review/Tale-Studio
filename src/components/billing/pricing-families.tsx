@@ -104,7 +104,7 @@ function PricingPicker({ initialSelection, checkoutEnabled }: { initialSelection
       <Dialog open={selection !== null} onOpenChange={open => { if (!open && !busy) setSelection(null) }}>
         <DialogContent
           showCloseButton={false}
-          className="max-h-[calc(100dvh-2rem)] gap-0 overflow-y-auto p-0 data-[state=closed]:animate-none sm:max-w-xl"
+          className="max-h-[calc(100dvh-2rem)] gap-0 overflow-y-auto p-0 data-[state=closed]:animate-none"
           onEscapeKeyDown={event => { if (busy) event.preventDefault() }}
           onPointerDownOutside={event => { if (busy) event.preventDefault() }}
           onCloseAutoFocus={event => {

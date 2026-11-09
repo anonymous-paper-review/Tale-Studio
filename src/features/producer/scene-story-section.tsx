@@ -452,7 +452,7 @@ export function SceneStorySection() {
       </div>
     </section>
     <Dialog open={edit?.mode === 'manual' && draft?.projectId === projectId} onOpenChange={(open) => { if (!open) closeManual() }}>
-      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-3xl" showCloseButton={!edit?.busy} onInteractOutside={(event) => event.preventDefault()}>
+      <DialogContent size="wide" className="flex max-h-[85vh] flex-col" showCloseButton={!edit?.busy} onInteractOutside={(event) => event.preventDefault()}>
         <DialogHeader>
           <DialogTitle>{t('Edit scene story manually')}</DialogTitle>
           <DialogDescription>{t('Chat waits while you edit here. Nothing changes until you save.')}</DialogDescription>

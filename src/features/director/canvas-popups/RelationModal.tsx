@@ -49,7 +49,7 @@ export function RelationModal() {
 
   return (
     <Dialog open onOpenChange={(o) => !o && handleCancel()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{t('Define relationship')}</DialogTitle>
           <DialogDescription>

@@ -265,7 +265,7 @@ export function SeriesPlanDialog({ open, onClose }: { open: boolean; onClose: ()
   const router = useRouter()
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Lock className="size-4" aria-hidden />
@@ -290,7 +290,7 @@ export function SeriesSlotLimitDialog({ open, slotLimit, onClose }: { open: bool
   const router = useRouter()
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{t('You have used all {count} project slots', { count: slotLimit ?? 0 })}</DialogTitle>
           <DialogDescription>
@@ -332,7 +332,7 @@ export function SeriesDeleteWarningDialog({
   const t = useT()
   return (
     <Dialog open={open} onOpenChange={(next) => !next && !deleting && onCancel()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{t('This episode has a next episode')}</DialogTitle>
           <DialogDescription>{t('Delete the project "{title}"?', { title: project?.title || '' })}</DialogDescription>
@@ -380,7 +380,7 @@ export function PrevProseDialog({ project, onClose }: { project: SeriesTarget | 
   const prose = (view?.prose ?? '').trim()
   return (
     <Dialog open={!!project} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent size="wide">
         <DialogHeader>
           <DialogTitle>{t('Previous episode prose')}</DialogTitle>
           <DialogDescription>
