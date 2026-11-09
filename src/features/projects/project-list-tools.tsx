@@ -3,11 +3,22 @@
 // 프로젝트 목록 머리의 찾기 칸 · 정렬 단추(11/5 시안 R2, 리드 2026-11-09) — 값은 목록 화면이 갖고 여기는 보이고 알리기만 한다.
 //   시안: 찾기 알약 260(바탕 side) · 정렬 알약(side-raised, 지금 정렬 이름 + ▾) · 펼친 메뉴(바탕 · 모서리 14)는 고른 줄이 tab-selected 에 ✓.
 import { Check, ChevronDown, Search } from 'lucide-react'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { PROJECT_SORTS, type ProjectSort } from './project-list'
+
+/** 메뉴가 돌려준 값 → 정렬. 모르는 값이면 기본(최신순). */
+function projectSortOf(value: string): ProjectSort {
+  return PROJECT_SORTS.find((option) => option.key === value)?.key ?? 'recent'
+}
 
 export function ProjectListTools({
   query,
@@ -40,6 +51,8 @@ export function ProjectListTools({
           <button
             type="button"
             className="flex h-10 shrink-0 items-center gap-2 rounded-full bg-side-raised px-4 text-label font-semibold text-foreground transition-colors hover:bg-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            // 화면 읽기에는 무엇을 고르는 단추인지와 지금 정렬을 함께(검토 B 5b) — 예: "정렬: 최신순".
+            aria-label={t('Sort: {sort}', { sort: t(current.label) })}
             data-testid="projects-sort"
           >
             {t(current.label)}
@@ -47,20 +60,27 @@ export function ProjectListTools({
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-[200px] space-y-0.5 rounded-[14px] bg-background p-1.5">
-          {PROJECT_SORTS.map((option) => {
-            const picked = option.key === sort
-            return (
-              <DropdownMenuItem
-                key={option.key}
-                onClick={() => onSortChange(option.key)}
-                className={cn('rounded-lg px-2.5 py-2', picked ? 'bg-tab-selected text-foreground' : 'text-muted-foreground')}
-                data-testid={`projects-sort-${option.key}`}
-              >
-                <span className="flex-1">{t(option.label)}</span>
-                {picked ? <Check className="size-4 text-foreground" aria-hidden /> : null}
-              </DropdownMenuItem>
-            )
-          })}
+          {/* 하나만 고르는 묶음 — 메뉴를 열면 화면 읽기가 고른 줄을 알린다(검토 B 5b). 고른 줄 표시는 시안대로 오른쪽 ✓ 라
+              공용 줄의 왼쪽 동그라미 자리는 숨긴다. */}
+          <DropdownMenuRadioGroup value={sort} onValueChange={(value) => onSortChange(projectSortOf(value))}>
+            {PROJECT_SORTS.map((option) => {
+              const picked = option.key === sort
+              return (
+                <DropdownMenuRadioItem
+                  key={option.key}
+                  value={option.key}
+                  className={cn(
+                    'rounded-lg py-2 pl-2.5 pr-2.5 [&>span:first-child]:hidden',
+                    picked ? 'bg-tab-selected text-foreground' : 'text-muted-foreground',
+                  )}
+                  data-testid={`projects-sort-${option.key}`}
+                >
+                  <span className="flex-1">{t(option.label)}</span>
+                  {picked ? <Check className="size-4 text-foreground" aria-hidden /> : null}
+                </DropdownMenuRadioItem>
+              )
+            })}
+          </DropdownMenuRadioGroup>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

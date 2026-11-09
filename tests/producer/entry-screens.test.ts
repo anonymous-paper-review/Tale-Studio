@@ -154,12 +154,14 @@ describe('화면에서 고르기', () => {
 })
 
 describe('채팅으로 만들기', () => {
-  it('에이전트가 먼저 "무엇을 만들까요?…"를 묻고 예시 보여줘 버튼을 둔다', () => {
-    // 왜: 빈 화면 대신 에이전트가 먼저 말을 건다. 아이디어가 없으면 예시를 들려준다(프로토타입 EB1).
+  it('에이전트가 먼저 "안녕하세요! 어떤 이야기를 만들고 싶어요?…"로 인사하고 빠른 답 네 개(아이디어가 있어요 · 대본이 있어요 · 파일로 올릴게요 · 예시 보여줘)를 둔다', () => {
+    // 왜: 빈 화면 대신 에이전트가 먼저 말을 건다. 가진 것을 하나 골라 바로 시작하고, 아이디어가 없으면 예시를 들려준다
+    //   (프로토타입 EB1 · 11/5 시안 P1, 오너 2026-11-09 추천대로).
     setEntry({ draft: emptyEntryDraft() })
     const out = html(EntryChat)
-    expect(out).toContain('무엇을 만들까요? 자료가 있으면 올리거나 직접 적어 주세요. 아이디어가 아직 없으면 예시를 들려드릴게요.')
-    expect(out).toContain('예시 보여줘')
+    expect(out).toContain('안녕하세요! 어떤 이야기를 만들고 싶어요?')
+    expect(out).toContain('한 줄이면 충분해요. 장르 · 길이 · 화면 비율은 같이 정해요.')
+    for (const label of ['아이디어가 있어요', '대본이 있어요', '파일로 올릴게요', '예시 보여줘']) expect(out, label).toContain(label)
   })
 
   it('입력칸은 화면 아래에 붙어 Enter 보내기 · Shift+Enter 줄바꿈 안내와 파일 첨부 · 글자 수를 보여준다', () => {
@@ -169,7 +171,7 @@ describe('채팅으로 만들기', () => {
     expect(out).toContain('Enter 보내기 · Shift+Enter 줄바꿈')
     expect(out).toContain('aria-label="파일 첨부"')
     expect(out).toContain('6자')
-    expect(out).toContain('누가, 어디서, 무슨 일이, 어떻게 끝나는지 적어 주세요')
+    expect(out).toContain('예: 비 오는 날 만난 두 사람 이야기')
   })
 
   it('예시를 보여 달라고 하면 예시 세 개와 다른 예시 버튼을 보여준다', () => {
@@ -209,15 +211,17 @@ describe('채팅으로 만들기', () => {
     expect(out).toContain('고르면 끝까지 바꿀 수 없어요.')
   })
 
-  it('정리 카드는 정한 값을 한 장으로 보여주고 확인 창 없이 Writer에게 써 달라고 하기 버튼을 둔다', () => {
-    // 왜: 채팅에서는 정리 카드가 곧 확인이다(프로토타입 EB7). 누르면 화면 비율이 잠긴다고 알린다.
+  it('정리 카드는 정한 값을 한 장으로 보여주고 확인 창 없이 "좋아요, 산문 쓰기로" · "아니요, 더 고칠래요" 단추를 둔다', () => {
+    // 왜: 채팅에서는 정리 카드가 곧 확인이다(프로토타입 EB7 · 11/5 시안 P2 단계 확인 단추, 오너 2026-11-09 추천대로).
+    //   누르면 화면 비율이 잠긴다고 알린다.
     const draft = recDraft()
     setEntry({ draft: { ...draft, chat: { answered: { mood: true, runtime: true, level: true, ratio: true }, pre: {} } } })
     const out = html(EntryChat)
     expect(out).toContain('이렇게 시작할게요.')
-    expect(out).toContain('Writer에게 써 달라고 하기')
+    expect(out).toContain('좋아요, 산문 쓰기로')
+    expect(out).toContain('아니요, 더 고칠래요')
     expect(out).toContain('누르면 화면 비율이 잠겨요.')
-    expect(out).toContain('data-entry-start')
+    expect(out).toContain('data-next="writer"')
   })
 })
 

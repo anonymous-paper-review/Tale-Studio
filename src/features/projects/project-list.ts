@@ -3,6 +3,7 @@
 //   문구는 영어 원문 = 사전 키. 약속: tests/project/list-sort.test.ts
 import { STAGES } from '@/lib/constants'
 import type { AppLocale } from '@/lib/locale'
+import type { StageId } from '@/types'
 import { searchKey } from './series-list'
 
 export type ProjectSort = 'recent' | 'oldest' | 'name' | 'stage'
@@ -65,4 +66,20 @@ export function visibleProjects<T extends ListedProject>(
   }
   if (sort === 'stage') return found.sort((a, b) => stageIndex(a.current_stage) - stageIndex(b.current_stage) || byRecent(a, b))
   return found.sort(byRecent)
+}
+
+/** 카드의 단계 점 색(11/5 시안 R2) — 단계 이름표와 같은 화면 이름 색. Tailwind 가 찾게 글자 그대로 둔다. 약속: tests/project/list-card.test.ts */
+const STAGE_DOT: Record<StageId, string> = {
+  entry: 'bg-stage-producer',
+  producer: 'bg-stage-writer',
+  artist: 'bg-stage-artist',
+  writer: 'bg-stage-storyboard',
+  director: 'bg-stage-director',
+  editor: 'bg-stage-editor',
+}
+
+/** 단계 값 → 점 색. 단계 값이 없거나 모르는 값이면 카드 이름표처럼 Producer. */
+export function projectStageDot(stage: string | null | undefined): string {
+  const id = STAGES.find((s) => s.id === stage)?.id ?? 'entry'
+  return STAGE_DOT[id]
 }

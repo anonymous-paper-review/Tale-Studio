@@ -7,8 +7,9 @@
 //   화면에서 고르기 탭과 같은 초안을 쓴다 — 거기서 쓴 글 · 고른 값이 여기 그대로 보인다.
 //   v3(2026-11-03): 말풍선 · 빠른 답 칩 · 입력 알약은 오른쪽 채팅(global-chat)과 같은 모양, 선택지는 controls 의 칩 · 선택 카드.
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
-import { Lightbulb, Lock, Paperclip, PenLine, Send } from 'lucide-react'
+import { Lock, Paperclip, Send } from 'lucide-react'
 import { ChoiceChip, OptionCard } from '@/components/controls/choice-chip'
+import { StageConfirm } from '@/components/controls/stage-confirm'
 import { Lumi } from '@/components/lumi/lumi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,6 +33,7 @@ import {
   type ChatQuestionKey,
 } from './options'
 import {
+  CHAT_QUICK,
   chatChips,
   chatSent,
   chatTranscript,
@@ -43,7 +45,7 @@ import {
 } from './chat-flow'
 import { useEntryStore } from './entry-store'
 import { AgentBubble, FileChip, RecommendedBadge, UploadingChip, UserBubble, WhyLine } from './entry-parts'
-import { ratioRecommendation } from './series'
+import { moodRecommendation, ratioRecommendation } from './series'
 import { summaryRows } from './summary'
 
 export function EntryChat() {
@@ -139,7 +141,6 @@ function ChipsBar({ draft, sent, t }: { draft: EntryDraft; sent: boolean; t: Tra
 }
 
 function ChatRow({ item, draft, t }: { item: ChatItem; draft: EntryDraft; t: Translator }) {
-  const showExamples = useEntryStore((s) => s.showExamples)
   if (item.kind === 'user') return <UserBubble text={item.text} fileName={item.fileName} />
   if (item.kind === 'error') {
     return (
@@ -154,15 +155,34 @@ function ChatRow({ item, draft, t }: { item: ChatItem; draft: EntryDraft; t: Tra
   return (
     <AgentBubble>
       <p className="whitespace-pre-wrap">{item.text}</p>
-      {item.action === 'show_examples' ? (
-        <div>
-          <Button variant="secondary" size="sm" onClick={showExamples}>
-            <Lightbulb aria-hidden />
-            {t('Show me examples')}
-          </Button>
-        </div>
-      ) : null}
+      {item.action === 'quick_replies' ? <QuickReplies t={t} /> : null}
     </AgentBubble>
+  )
+}
+
+/**
+ * 첫 인사 아래 빠른 답 넷(11/5 시안 P1, 오너 2026-11-09 추천대로) — 아이디어: 입력칸에 커서 · 대본: 어디에 넣는지 알리고 커서 ·
+ *   파일: 파일 고르는 창 · 예시: 지금처럼 예시 셋. 말풍선 위 알약(가운데 채팅 내 말풍선 색).
+ */
+function QuickReplies({ t }: { t: Translator }) {
+  const quick = useEntryStore((s) => s.chatQuick)
+  const showExamples = useEntryStore((s) => s.showExamples)
+  const pill = 'rounded-full bg-surface-elevated hover:bg-chip'
+  return (
+    <div className="flex flex-wrap gap-2.5">
+      <Button variant="secondary" size="sm" className={pill} onClick={() => quick('idea')}>
+        {t(CHAT_QUICK.idea)}
+      </Button>
+      <Button variant="secondary" size="sm" className={pill} onClick={() => quick('script')}>
+        {t(CHAT_QUICK.script)}
+      </Button>
+      <Button variant="secondary" size="sm" className={pill} onClick={() => quick('file')}>
+        {t(CHAT_QUICK.file)}
+      </Button>
+      <Button variant="secondary" size="sm" className={pill} onClick={showExamples}>
+        {t('Show me examples')}
+      </Button>
+    </div>
   )
 }
 
@@ -258,6 +278,7 @@ function QuestionCard({ question, draft, t }: { question: ChatQuestionKey | 'con
   const answer = useEntryStore((s) => s.chatAnswer)
   const accept = useEntryStore((s) => s.chatAcceptRecommendation)
   const start = useEntryStore((s) => s.start)
+  const revise = useEntryStore((s) => s.chatRevise)
   const writing = useEntryStore((s) => s.writing)
   const entryLocale = useEntryStore((s) => s.locale)
   const series = useEntryStore((s) => s.series)
@@ -288,12 +309,9 @@ function QuestionCard({ question, draft, t }: { question: ChatQuestionKey | 'con
             </div>
           ))}
         </dl>
-        <div>
-          <Button data-entry-start onClick={() => void start()} disabled={starting}>
-            <PenLine aria-hidden />
-            {t('Ask Writer to write it')}
-          </Button>
-        </div>
+        {/* 단계 확인 단추(11/5 시안 P2, 오너 2026-11-09 추천대로) — 왼쪽은 지금까지의 [Writer에게 써 달라고 하기]와 같은 일,
+            오른쪽은 무엇을 바꿀지 묻고 입력칸으로 보낸다. 화면 비율이 잠긴다는 안내는 그대로 둔다. */}
+        <StageConfirm stage="entry" tone="chat" disabled={starting} onConfirm={() => void start()} onRevise={revise} />
         <p className="flex items-start gap-1.5 text-caption text-muted-foreground">
           <Lock className="mt-0.5 size-3 shrink-0" aria-hidden />
           <span>{t('When you press it, the screen ratio is locked. To change something, click an item above or say it, like "make the length 1 minute".')}</span>
@@ -303,11 +321,19 @@ function QuestionCard({ question, draft, t }: { question: ChatQuestionKey | 'con
   }
 
   if (question === 'mood') {
+    // 다음 화는 앞 화 장르에 "앞 화" 표시(2026-11-09 오너 추천대로) — 그때 AI 추천 이유 줄은 다른 장르 이야기라 두지 않는다.
+    const mood = moodRecommendation(series, rec)
     return (
       <AgentBubble>
         <p>{t(CHAT_QUESTION.mood)}</p>
-        <CardOptions options={MOODS.map((m) => ({ value: m.key, label: t(m.label) }))} current={draft.picks.mood} recommended={rec?.mood ?? null} onPick={(v) => void answer('mood', v)} />
-        <WhyLine text={rec?.moodWhy} />
+        <CardOptions
+          options={MOODS.map((m) => ({ value: m.key, label: t(m.label) }))}
+          current={draft.picks.mood}
+          recommended={mood.value}
+          recommendedLabel={mood.fromPreviousEpisode ? t('Previous episode') : undefined}
+          onPick={(v) => void answer('mood', v)}
+        />
+        <WhyLine text={mood.fromPreviousEpisode ? null : rec?.moodWhy} />
         {acceptButton}
       </AgentBubble>
     )
@@ -393,8 +419,15 @@ function FirstComposer() {
   const send = useEntryStore((s) => s.chatSendFirst)
   const removeFile = useEntryStore((s) => s.removeFile)
   const openFileDialog = useEntryStore((s) => s.openFileDialog)
+  const focusAsks = useEntryStore((s) => s.chat.focus ?? 0)
+  const fieldRef = useRef<HTMLTextAreaElement>(null)
   const busy = !!reading || upload.status === 'uploading'
   const canSend = !!draft.file || draft.idea.trim().length > 0
+
+  // 빠른 답(아이디어 · 대본)이 커서를 달라고 하면 입력칸이 받는다.
+  useEffect(() => {
+    if (focusAsks) fieldRef.current?.focus()
+  }, [focusAsks])
 
   const submit = (e?: FormEvent) => {
     e?.preventDefault()
@@ -412,12 +445,13 @@ function FirstComposer() {
       {/* v3 입력 알약(오른쪽 채팅과 같다) — 카드색 · 포커스면 지금 단계 색 테두리 · 크림 보내기 원. */}
       <div className="flex flex-col gap-2 rounded-[22px] border border-transparent bg-chat-input py-2.5 pl-4 pr-2.5 transition-colors duration-150 ease-out focus-within:border-stage">
         <Textarea
+          ref={fieldRef}
           aria-label={t('Idea')}
           rows={2}
           value={draft.idea}
           onChange={(e) => setIdea(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder={t('Write who, where, what happens, and how it ends')}
+          placeholder={t('E.g. A story of two people who meet on a rainy day')}
           className="min-h-12 resize-none border-0 bg-transparent p-1 text-chat shadow-none focus-visible:ring-0 dark:bg-transparent"
         />
         <div className="flex flex-wrap items-center gap-2">
@@ -451,8 +485,15 @@ function ReplyInput() {
   const t = useT()
   const reply = useEntryStore((s) => s.chatReply)
   const writing = useEntryStore((s) => s.writing)
+  const focusAsks = useEntryStore((s) => s.chat.focus ?? 0)
+  const fieldRef = useRef<HTMLInputElement>(null)
   const [text, setText] = useState('')
   const disabled = writing.status === 'starting' || writing.status === 'writing'
+
+  // [아니요, 더 고칠래요]가 커서를 달라고 하면 입력칸이 받는다.
+  useEffect(() => {
+    if (focusAsks) fieldRef.current?.focus()
+  }, [focusAsks])
   const submit = (e?: FormEvent) => {
     e?.preventDefault()
     const said = text.trim()
@@ -463,6 +504,7 @@ function ReplyInput() {
   return (
     <form onSubmit={submit} className="flex items-center gap-2 rounded-[26px] border border-transparent bg-chat-input py-2 pl-4 pr-2 transition-colors duration-150 ease-out focus-within:border-stage">
       <Input
+        ref={fieldRef}
         aria-label={t('Chat input')}
         value={text}
         onChange={(e) => setText(e.target.value)}

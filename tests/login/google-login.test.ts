@@ -19,6 +19,12 @@ vi.mock('react', async (original) => ({
   },
 }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }) }))
+// 로그인 화면도 다른 화면처럼 화면 언어를 따른다(오너 2026-11-09 추천대로) — 이 시험은 화면 함수를 React 밖에서 부르므로
+//   번역 훅을 영어 번역 함수로 바꿔 끼운다(한국어 화면은 tests/login/login-language.test.ts).
+vi.mock('@/lib/i18n', async (original) => {
+  const actual = await original<typeof import('@/lib/i18n')>()
+  return { ...actual, useT: () => (text: string, params?: Record<string, string | number>) => actual.translate('en', text, params) }
+})
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({ auth: { signInWithOAuth: mocks.signInWithOAuth } }),
 }))

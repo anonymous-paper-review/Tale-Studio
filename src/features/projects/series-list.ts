@@ -3,7 +3,10 @@
 //   프로젝트마다 함께 싣는 칸. 순수 함수 — 서버(목록 라우트)와 화면(카드 · 창)이 같은 판정을 쓴다.
 //   문구는 영어 원문 = 사전 키.
 //   2026-10-26 오너: 카드마다 붙은 [다음 화 만들기](99장 중 74장)가 목록을 어지럽혀 카드에서 빼고 [새 프로젝트]로 옮겼다.
+import type { AppLocale } from '@/lib/locale'
 import { parseSeries } from '@/lib/series/snapshot'
+import { styleAnchorName } from '@/lib/style-anchor-name'
+import type { StageId } from '@/types'
 
 /** 목록(GET /api/project/list)이 프로젝트마다 주는 시리즈 칸. */
 export interface SeriesListProject {
@@ -110,6 +113,54 @@ export function canContinueLastScene(preview: { lastSceneAvailable?: boolean } |
   return preview?.lastSceneAvailable === true
 }
 
+/** 만들기 창이 받는 미리보기(GET /api/project/next-episode) — 그림체 · 장르는 2026-11-09 오너 추천대로 더했다. */
+export interface NextEpisodePreviewView {
+  prevTitle: string
+  characters: string[]
+  locations: string[]
+  hasVoices: boolean
+  lastSceneAvailable: boolean
+  style?: { kind: 'custom'; label: string | null } | { kind: 'preset'; key: string; label: string; subtitle: string | null } | null
+  genre?: string | null
+}
+
+export interface NextEpisodeRow {
+  key: 'characters' | 'backgrounds' | 'style' | 'genre' | 'voices'
+  label: string
+  value: string
+}
+
+/**
+ * 만들기 창의 이어받는 것 줄(11/5 시안 R6) — 등장인물 · 배경 · 그림체(이름과 함께) · 장르(이어받을 때) · 말투(대사까지 끝난 앞 화).
+ *   그림체 이름은 화면 언어로(목록 그림체는 그 언어 이름, 사용자가 올린 그림체는 그 이름 · 없으면 "내 레퍼런스").
+ *   약속: tests/project/next-episode-rows.test.ts
+ */
+export function nextEpisodeRows(
+  preview: NextEpisodePreviewView,
+  t: (key: string, params?: Record<string, string | number>) => string,
+  locale: AppLocale,
+): NextEpisodeRow[] {
+  const dot = ' · '
+  const style = preview.style ?? null
+  const styleName = !style
+    ? null
+    : style.kind === 'custom'
+      ? style.label?.trim() || t('My reference')
+      : styleAnchorName({ key: style.key, label: style.label, subtitle: style.subtitle }, locale)
+  const rows: NextEpisodeRow[] = [
+    { key: 'characters', label: t('Characters'), value: preview.characters.length ? preview.characters.join(dot) : t('None') },
+    { key: 'backgrounds', label: t('Backgrounds'), value: preview.locations.length ? preview.locations.join(dot) : t('None') },
+    {
+      key: 'style',
+      label: t('Art style'),
+      value: styleName ? t('Same as the previous episode ({style})', { style: styleName }) : t('Same as the previous episode'),
+    },
+  ]
+  if (preview.genre) rows.push({ key: 'genre', label: t('Genre'), value: t('Inherited from the previous episode') })
+  if (preview.hasVoices) rows.push({ key: 'voices', label: t('Voices'), value: t('Inherited from the previous episode') })
+  return rows
+}
+
 /**
  * [다음 화 만들기]를 누른 뒤 기다리는 카드의 단계(11/5 시안 R5, 리드 2026-11-09).
  *   서버는 한 번에 답해서 단계를 알려 주지 않는다 — Producer 자료 읽기(entry-store READ_STEP_MS)와 같은 1.4초마다 넘기고,
@@ -121,6 +172,37 @@ export const NEXT_EPISODE_WAIT_STEP_MS = 1400
 /** 다음으로 보일 단계 번호 — 마지막에서 멈춘다. */
 export function nextEpisodeWaitStep(step: number): number {
   return Math.min(step + 1, NEXT_EPISODE_WAIT_STEPS.length - 1)
+}
+
+/**
+ * 다음 화가 만들어진 뒤 열 프로젝트(시작 화면) — 스튜디오는 주소만 바꿔서는 다른 프로젝트를 열지 않아
+ *   유저 메뉴의 프로젝트 바꾸기(switchProject)와 같은 길로 먼저 바꾼다(검토 B 높음 1, 2026-11-09).
+ */
+export function nextEpisodeSwitch(body: { projectId: string; project?: { title?: unknown } | null }): { id: string; title: string; stage: StageId } {
+  const title = typeof body.project?.title === 'string' && body.project.title.trim() ? body.project.title : 'Untitled'
+  return { id: body.projectId, title, stage: 'entry' }
+}
+
+/**
+ * 만든 뒤 기다리는 카드 · 창을 닫을 때 — 스튜디오 안(레일 프로필 메뉴)에서 연 창은 틀이 이동해도 그대로라,
+ *   열린 프로젝트가 새 화로 바뀌면 닫는다. 프로젝트 목록 화면은 새 화로 옮겨 가면 화면째 사라지므로 닫지 않는다
+ *   (먼저 닫으면 목록이 한 번 깜박인다).
+ */
+export function nextEpisodeWaitDone({
+  createdId,
+  projectId,
+  pathname,
+}: {
+  createdId: string | null
+  projectId: string | null
+  pathname: string | null
+}): boolean {
+  return !!createdId && projectId === createdId && !!pathname?.startsWith('/studio')
+}
+
+/** [다음 화 만들기]를 누를 수 있나 — 미리 보기가 있고, 만드는 중이 아니고, 이 창에서 아직 만들지 않았을 때(한 창에 한 번). */
+export function canCreateNextEpisode({ preview, creating, createdId }: { preview: unknown; creating: boolean; createdId: string | null }): boolean {
+  return !!preview && !creating && !createdId
 }
 
 /** 목록 라우트가 읽는 projects 행(필요한 칸만). */

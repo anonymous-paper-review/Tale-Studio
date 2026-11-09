@@ -3,9 +3,10 @@
 //   앞 화 세계를 한 줄로 적는다(만들 때만 AI 한 번 — 미리보기 · 칸이 찬 경우는 부르지 않는다).
 //   그림은 우리 보관함(media 버킷) 안에서만 복사한다 — 바깥 주소는 복사하지 않고 실패로 센다(fetch 금지).
 //   projects.series(SeriesSnapshot)를 쓰는 유일한 곳이다. 요금제 · 작업 공간 확인은 라우트와 prepareReferenceImport 가 한다.
-import { ratioFromFormat } from '@/features/entry/options'
+import { MOODS, ratioFromFormat, type MoodKey } from '@/features/entry/options'
 import { storyboardImageEndFrame, storyboardImageStartFrame } from '@/lib/director/storyboard-image'
-import { emptyEntryDraft } from '@/lib/entry/draft'
+import { emptyEntryDraft, normalizeEntryDraft } from '@/lib/entry/draft'
+import { translate } from '@/lib/i18n/translate'
 import { copyOwnMediaTo, prepareReferenceImport } from '@/lib/reference-import'
 import { storageKeySegment } from '@/lib/storage/key-segment'
 import { parseCustomStyleAnchor } from '@/lib/style-anchor'
@@ -92,7 +93,16 @@ export interface PrevEpisode {
   voices: VoiceProfile[]
   /** 앞 화 마지막 샷의 완성된 끝 장면. 없으면 null — 마지막 장면 잇기를 하지 않는다. */
   lastSceneUrl: string | null
+  /** 앞 화 장르 · 분위기(2026-11-09 오너 추천대로) — 다음 화 시작 화면이 미리 골라 둔다. 알 수 없으면 null. */
+  mood: MoodKey | null
+  /** 앞 화 그림체 이름 재료 — 만들기 창이 "앞 화와 같아요 (수묵 스케치)"로 보인다. 그림체가 없으면 null. */
+  style: NextEpisodeStyle | null
 }
+
+/** 앞 화 그림체 — 사용자가 올린 그림체(이름이 없을 수 있다) · 그림체 목록에서 고른 그림체(이름은 화면 언어로 화면이 고른다). */
+export type NextEpisodeStyle =
+  | { kind: 'custom'; label: string | null }
+  | { kind: 'preset'; key: string; label: string; subtitle: string | null }
 
 export interface NextEpisodePreview {
   prevTitle: string
@@ -100,6 +110,10 @@ export interface NextEpisodePreview {
   locations: string[]
   hasVoices: boolean
   lastSceneAvailable: boolean
+  /** 그림체 이름(2026-11-09 오너 추천대로, 11/5 시안 R6). */
+  style: NextEpisodeStyle | null
+  /** 이어받는 장르(있으면 만들기 창에 "장르 · 앞 화에서 이어받아요" 줄). */
+  genre: MoodKey | null
 }
 
 export type CreateNextEpisodeResult =
@@ -131,7 +145,7 @@ export async function loadPrevEpisode(input: {
 
   const { data: project, error: projectError } = await supabaseAdmin
     .from('projects')
-    .select('id, title, locale, settings, style_anchor_key, custom_style_anchor, series, design_tokens')
+    .select('id, title, locale, settings, style_anchor_key, custom_style_anchor, series, design_tokens, entry_draft')
     .eq('id', prevProjectId)
     .maybeSingle()
   if (projectError) throw projectError
@@ -144,7 +158,7 @@ export async function loadPrevEpisode(input: {
   if (sceneError) throw sceneError
   if (!scenes || scenes.length === 0) throw new NextEpisodeError('series_not_ready', 409)
 
-  const [characters, appearances, locations, run, lastSceneUrl] = await Promise.all([
+  const [characters, appearances, locations, run, lastSceneUrl, style] = await Promise.all([
     selectRows(prevProjectId, 'characters', 'character_id, name, role, entity_type, appearance, appearance_native'),
     selectRows(
       prevProjectId,
@@ -158,6 +172,7 @@ export async function loadPrevEpisode(input: {
     ),
     getActiveRun(prevProjectId),
     findLastSceneFrame(prevProjectId, scenes as SceneRow[]),
+    prevEpisodeStyle(text(project.style_anchor_key) || null, project.custom_style_anchor),
   ])
 
   const settings = asObject(project.settings)
@@ -177,7 +192,38 @@ export async function loadPrevEpisode(input: {
     locations: prevLocations(locations),
     voices: inheritedVoices(run?.state),
     lastSceneUrl,
+    mood: prevEpisodeMood(project.entry_draft, settings),
+    style,
   }
+}
+
+/**
+ * 앞 화 장르 — 새 시작 화면에서 고른 값(entry_draft)을 먼저, 없으면 예전 설정의 장르 글(settings.genre)을 장르 키 · 한국어 ·
+ *   영어 이름과 맞춰 본다. 고를 수 있는 장르가 아니면 null(엉뚱한 장르를 넣지 않는다).
+ */
+function prevEpisodeMood(entryDraft: unknown, settings: Record<string, unknown> | null): MoodKey | null {
+  const picked = entryDraft ? normalizeEntryDraft(entryDraft).picks.mood : null
+  if (picked) return picked
+  const genre = typeof settings?.genre === 'string' ? settings.genre.trim().toLowerCase() : ''
+  if (!genre) return null
+  const match = MOODS.find(
+    (m) => m.key === genre || translate('en', m.label).toLowerCase() === genre || translate('ko', m.label).toLowerCase() === genre,
+  )
+  return match?.key ?? null
+}
+
+/** 앞 화 그림체 이름 재료 — 사용자가 올린 그림체면 그 이름, 그림체 목록에서 골랐으면 목록의 이름 · 부제(그림체 목록 읽기 한 번). */
+async function prevEpisodeStyle(styleAnchorKey: string | null, customStyleAnchor: unknown): Promise<NextEpisodeStyle | null> {
+  const custom = parseCustomStyleAnchor(customStyleAnchor)
+  if (custom) return { kind: 'custom', label: custom.label?.trim() || null }
+  if (!styleAnchorKey) return null
+  const { data, error } = await supabaseAdmin
+    .from('style_anchors')
+    .select('key, label, subtitle')
+    .eq('key', styleAnchorKey)
+    .maybeSingle()
+  if (error || !data || typeof data.label !== 'string') return null
+  return { kind: 'preset', key: styleAnchorKey, label: data.label, subtitle: typeof data.subtitle === 'string' ? data.subtitle : null }
 }
 
 /** 만들기 창이 보여 주는 것 — 이어받을 이름과 마지막 장면을 이을 수 있는지. 아무것도 쓰지 않는다. */
@@ -188,6 +234,8 @@ export function prevEpisodePreview(prev: PrevEpisode): NextEpisodePreview {
     locations: prev.locations.map((l) => l.name),
     hasVoices: prev.voices.length > 0,
     lastSceneAvailable: prev.lastSceneUrl !== null,
+    style: prev.style,
+    genre: prev.mood,
   }
 }
 
@@ -271,7 +319,7 @@ export async function createNextEpisode(input: {
 
   const updates: Record<string, unknown> = {
     current_stage: 'entry',
-    entry_draft: entryDraftWithRatio(prev.format),
+    entry_draft: nextEpisodeEntryDraft(prev.format, prev.mood),
     style_anchor_key: prev.styleAnchorKey,
   }
 
@@ -336,6 +384,7 @@ export async function createNextEpisode(input: {
     copyFailures,
     designTokens: prev.designTokens,
     world: world.line,
+    ...(prev.mood ? { mood: prev.mood } : {}),
   }
   updates.series = series
 
@@ -512,10 +561,10 @@ function carriedStyleId(
   return prevStyleId
 }
 
-/** 시작 화면 초안 — 앞 화 화면 비율만 기본값으로 넣고 나머지는 사람이 고른다. */
-function entryDraftWithRatio(format: ProjectFormat | null) {
+/** 시작 화면 초안 — 앞 화 화면 비율 · 장르를 기본값으로 넣고(바꿀 수 있다) 나머지는 사람이 고른다. 장르는 묻는 차례에 "앞 화" 표시로 보인다. */
+function nextEpisodeEntryDraft(format: ProjectFormat | null, mood: MoodKey | null) {
   const draft = emptyEntryDraft()
-  return { ...draft, picks: { ...draft.picks, ratio: ratioFromFormat(format) } }
+  return { ...draft, picks: { ...draft.picks, ratio: ratioFromFormat(format), mood } }
 }
 
 async function copyImage(

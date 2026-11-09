@@ -4,7 +4,8 @@
 //   약속: tests/producer/entry-series-screen.test.ts · tests/producer/entry-series.test.ts
 import type { SeriesSnapshot } from '@/lib/series/snapshot'
 import { parseDialogueLanguage, type DialogueLanguage } from '@/lib/writer/pipeline/util/output-language'
-import { RATIOS, RECOMMENDED_RATIO, ratioFromFormat, type RatioKey } from './options'
+import type { EntryDraft, EntryPicks } from '@/lib/entry/draft'
+import { MOODS, RATIOS, RECOMMENDED_RATIO, ratioFromFormat, type LevelKey, type MoodKey, type RatioKey, type RuntimeKey } from './options'
 
 export interface EntrySeries {
   /** 앞 화 화면 비율 — 설정 화면이 기본으로 골라 두고 "앞 화" 표시를 붙인다. 읽지 못했으면 null(지금처럼 9:16 추천). */
@@ -16,6 +17,8 @@ export interface EntrySeries {
   /** 앞 화가 대사까지 끝나 말투가 넘어왔나. */
   hasVoices: boolean
   continuesLastScene: boolean
+  /** 앞 화 장르 · 분위기(2026-11-09 오너 추천대로) — 시작 화면이 미리 골라 두고 "앞 화" 표시를 붙인다. 모르면 칸이 없다. */
+  mood?: MoodKey
 }
 
 export function entrySeriesOf(series: SeriesSnapshot | null): EntrySeries | null {
@@ -27,6 +30,7 @@ export function entrySeriesOf(series: SeriesSnapshot | null): EntrySeries | null
     locations: series.locations.length,
     hasVoices: series.voices.length > 0,
     continuesLastScene: series.continuesLastScene,
+    ...(series.mood ? { mood: series.mood } : {}),
   }
 }
 
@@ -46,6 +50,41 @@ export function parseEntrySeries(raw: unknown): EntrySeries | null {
     locations,
     hasVoices: v.hasVoices,
     continuesLastScene: v.continuesLastScene,
+    ...moodOf(v.mood),
+  }
+}
+
+function moodOf(raw: unknown): { mood?: MoodKey } {
+  const mood = MOODS.find((m) => m.key === raw)?.key
+  return mood ? { mood } : {}
+}
+
+/**
+ * 장르 · 분위기의 추천 — 다음 화는 앞 화 장르("앞 화" 표시), 아니면 AI 추천(2026-11-09 오너 추천대로, 화면 비율과 같은 규칙).
+ *   채팅 카드 · 설정 화면 · [추천대로]가 같은 값을 쓴다. 약속: tests/producer/entry-series-mood.test.ts
+ */
+export function moodRecommendation(
+  series: EntrySeries | null | undefined,
+  rec: { mood: MoodKey } | null | undefined,
+): { value: MoodKey | null; fromPreviousEpisode: boolean } {
+  if (series?.mood) return { value: series.mood, fromPreviousEpisode: true }
+  return { value: rec?.mood ?? null, fromPreviousEpisode: false }
+}
+
+/**
+ * 글을 읽어 추천을 만든 뒤의 고른 값 — 길이 · 바꿈 정도는 추천, 화면 비율은 지금 값(없으면 9:16).
+ *   장르는 다음 화(앞 화 장르가 있는 시리즈)면 지금 고른 값(처음엔 이어받은 장르, 사람이 바꿨으면 그 값)을 지키고, 아니면 추천.
+ */
+export function picksAfterRecommend(
+  draft: EntryDraft,
+  rec: { mood: MoodKey; runtime: RuntimeKey; level: LevelKey },
+  seriesMood: MoodKey | null | undefined,
+): EntryPicks {
+  return {
+    mood: seriesMood && draft.picks.mood ? draft.picks.mood : rec.mood,
+    runtime: rec.runtime,
+    level: rec.level,
+    ratio: draft.picks.ratio ?? RECOMMENDED_RATIO,
   }
 }
 

@@ -7,12 +7,23 @@ import { sanitizeNextPath, NEXT_PATH_COOKIE } from '@/lib/session-restore'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { TaleLockup } from '@/components/tale-lockup'
+import { useT } from '@/lib/i18n'
 
-// user enumeration 방지: 성공/실패/빈입력 모두 동일한 단일 메시지(원본 supabase 에러 비노출).
+// user enumeration 방지: 성공/실패/빈입력 모두 동일한 단일 메시지(원본 supabase 에러 비노출). 값은 영어 원문 = 사전 키.
 const GENERIC_LOGIN_ERROR = 'Incorrect email or password'
+const GOOGLE_LOGIN_ERROR = 'Could not sign in with Google. Please try again.'
+
+// 바탕 흐린 빛(11/5 시안 R1 Ambient 2개 · 흐림 160) — 랜딩 히어로와 같은 방식으로 빨강(Writer) · 파랑(Storyboard) 두 빛.
+//   x · y 는 화면 가운데에서 비킨 거리(시안 1440×900 기준).
+const LOGIN_GLOWS = [
+  { className: 'bg-stage-writer/10', w: 520, h: 420, x: -80, y: -120 },
+  { className: 'bg-stage-storyboard/10', w: 560, h: 460, x: 180, y: 80 },
+]
 
 export default function LoginPage() {
   const router = useRouter()
+  // 다른 화면처럼 고른 화면 언어를 따른다(오너 2026-11-09 추천대로).
+  const t = useT()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -43,7 +54,7 @@ export default function LoginPage() {
       })
       if (error) throw error
     } catch {
-      setGoogleError('Could not sign in with Google. Please try again.')
+      setGoogleError(GOOGLE_LOGIN_ERROR)
       setGoogleSubmitting(false)
     }
   }
@@ -90,11 +101,20 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center bg-lobby px-4">
+    <div className="relative flex min-h-screen flex-col items-center overflow-hidden bg-lobby px-4">
+      <div className="pointer-events-none absolute inset-0" aria-hidden>
+        {LOGIN_GLOWS.map((glow) => (
+          <span
+            key={glow.className}
+            className={`absolute left-1/2 top-1/2 rounded-full blur-[80px] ${glow.className}`}
+            style={{ width: glow.w, height: glow.h, transform: `translate(calc(-50% + ${glow.x}px), calc(-50% + ${glow.y}px))` }}
+          />
+        ))}
+      </div>
       {/* 11/5 시안 R1 — 스튜디오 밖 바탕(lobby) 가운데 카드(400 · 안쪽 50/30 · 사이 15 · 모서리 22), 칸 · Google 단추는 카드 위 한 단 밝은 칸(side-raised)
           · 높이 48 · 모서리 12, 꼬리글은 화면 아래.
-          글은 아직 영어 그대로다(화면 언어 · 부제 · 가입하기 · 바탕 흐린 빛은 오너 결정 대기). */}
-      <main className="flex w-full flex-1 items-center justify-center py-12">
+          글은 고른 화면 언어를 따르고, 가입하기는 두지 않는다(Google 로 처음 로그인하면 계정이 생긴다 — 오너 2026-11-09 추천대로). */}
+      <main className="relative flex w-full flex-1 items-center justify-center py-12">
         <div className="flex w-full max-w-[400px] flex-col gap-[15px] rounded-[22px] bg-side px-[30px] py-[50px]">
           {/* 11/5 시안 R1 — 이름 대신 로고 묶음(틀 32). 글자 "Tale Studio" 는 로고 안의 글이라 머리글로 그대로 읽힌다. */}
           <h1 className="mb-[21px] flex justify-center">
@@ -115,17 +135,17 @@ export default function LoginPage() {
                 <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
               </svg>
-              {googleSubmitting ? 'Connecting to Google…' : 'Continue with Google'}
+              {googleSubmitting ? t('Connecting to Google…') : t('Continue with Google')}
             </Button>
             {googleError ? (
-              <p role="alert" className="text-sm text-destructive">{googleError}</p>
+              <p role="alert" className="text-sm text-destructive">{t(googleError)}</p>
             ) : null}
           </div>
 
           {/* 또는 — 구분선 사이 글(화면에는 소문자로). */}
           <div className="flex items-center gap-3" aria-hidden>
             <span className="h-px flex-1 bg-foreground/8" />
-            <span className="text-meta lowercase text-subtle-foreground">Or</span>
+            <span className="text-meta lowercase text-subtle-foreground">{t('Or')}</span>
             <span className="h-px flex-1 bg-foreground/8" />
           </div>
 
@@ -134,7 +154,7 @@ export default function LoginPage() {
               type="email"
               autoComplete="email"
               className="h-12 rounded-lg bg-side-raised px-4"
-              placeholder="Email"
+              placeholder={t('Email')}
               value={email}
               aria-invalid={!!errorMsg}
               onChange={(e) => { setEmail(e.target.value); if (errorMsg) setErrorMsg(null) }}
@@ -143,7 +163,7 @@ export default function LoginPage() {
               type="password"
               autoComplete="current-password"
               className="h-12 rounded-lg bg-side-raised px-4"
-              placeholder="Password"
+              placeholder={t('Password')}
               value={password}
               aria-invalid={!!errorMsg}
               aria-describedby={capsLockOn ? 'caps-lock-hint' : undefined}
@@ -154,19 +174,20 @@ export default function LoginPage() {
             />
             {capsLockOn ? (
               <p id="caps-lock-hint" role="status" className="text-sm text-muted-foreground">
-                Caps Lock is on. Passwords are case-sensitive.
+                {t('Caps Lock is on. Passwords are case-sensitive.')}
               </p>
             ) : null}
             {errorMsg ? (
-              <p className="text-sm text-destructive">{errorMsg}</p>
+              <p className="text-sm text-destructive">{t(errorMsg)}</p>
             ) : null}
             <Button type="submit" className="mt-1.5 h-12 w-full rounded-lg" disabled={submitting || googleSubmitting}>
-              {submitting ? 'Logging in…' : 'Log in'}
+              {submitting ? t('Logging in…') : t('Log in')}
             </Button>
           </form>
         </div>
       </main>
-      <p className="pb-8 text-center text-meta text-subtle-foreground">
+      {/* 꼬리글은 시안대로 두 언어 모두 영어 표어다. */}
+      <p className="relative pb-8 text-center text-meta text-subtle-foreground">
         AI Video Generation Pipeline · Your Tale Deserves a Take
       </p>
     </div>

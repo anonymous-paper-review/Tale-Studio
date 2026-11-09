@@ -105,6 +105,10 @@ interface EntryActions {
   chatAnswer: (key: ChatQuestionKey, value: string) => Promise<void>
   chatAcceptRecommendation: (key: ChatQuestionKey) => Promise<void>
   chatReask: (key: PickKey) => Promise<void>
+  /** 첫 인사 빠른 답(11/5 시안 P1) — idea: 입력칸에 커서 · script: 대본을 어디에 넣는지 알리고 커서 · file: 파일 고르는 창. */
+  chatQuick: (kind: 'idea' | 'script' | 'file') => void
+  /** 정리 카드의 [아니요, 더 고칠래요](11/5 시안 P2) — 무엇을 바꿀지 묻고 입력칸에 커서. */
+  chatRevise: () => void
   showExamples: () => void
   nextExamples: () => void
   pickExample: (index: number, t?: Translator) => void
@@ -519,7 +523,7 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
           await sendPatch(patch)
         }
       }
-      set({ chat: { ...get().chat, hint: null, showExamples: false } })
+      set({ chat: { ...get().chat, hint: null, showExamples: false, nudge: null } })
       return 'ok'
     },
 
@@ -530,12 +534,12 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
       const parsed = parseChatAnswer(said, { keepAllowed: hasOriginalText(draft.idea, draft.file) })
       const keys = (Object.keys(parsed) as PickKey[]).filter((k) => parsed[k])
       if (!keys.length) {
-        set({ chat: { ...get().chat, hint: { said, keys: [] } } })
+        set({ chat: { ...get().chat, hint: { said, keys: [] }, nudge: null } })
         return
       }
       const patch = parsedPatch(draft, parsed, { asPre: false })
       const order: PickKey[] = ['mood', 'runtime', 'level', 'ratio']
-      set({ draft: applyChatPatch(draft, patch), chat: { ...get().chat, hint: { said, keys: order.filter((k) => keys.includes(k)) } } })
+      set({ draft: applyChatPatch(draft, patch), chat: { ...get().chat, hint: { said, keys: order.filter((k) => keys.includes(k)) }, nudge: null } })
       await sendPatch(patch)
     },
 
@@ -543,7 +547,7 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
       if (locked()) return
       const draft = get().draft
       const patch = answerPatch(draft, key, value)
-      set({ draft: applyChatPatch(draft, patch), chat: { ...get().chat, hint: null } })
+      set({ draft: applyChatPatch(draft, patch), chat: { ...get().chat, hint: null, nudge: null } })
       await sendPatch(patch)
     },
 
@@ -556,8 +560,23 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
       if (locked()) return
       const draft = get().draft
       const patch = reaskPatch(draft, key)
-      set({ draft: applyChatPatch(draft, patch), chat: { ...get().chat, hint: null } })
+      set({ draft: applyChatPatch(draft, patch), chat: { ...get().chat, hint: null, nudge: null } })
       await sendPatch(patch)
+    },
+
+    chatQuick: (kind) => {
+      if (kind === 'file') {
+        get().openFileDialog()
+        return
+      }
+      const chat = get().chat
+      set({ chat: { ...chat, nudge: kind === 'script' ? 'script' : (chat.nudge ?? null), focus: (chat.focus ?? 0) + 1 } })
+    },
+
+    chatRevise: () => {
+      if (locked()) return
+      const chat = get().chat
+      set({ chat: { ...chat, hint: null, nudge: 'revise', focus: (chat.focus ?? 0) + 1 } })
     },
 
     showExamples: () => set({ chat: { ...get().chat, showExamples: true, lengthError: false } }),

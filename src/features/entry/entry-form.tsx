@@ -34,7 +34,7 @@ import {
 import { fileReadLine, isScriptDraft, levelOptionsOf } from './chat-flow'
 import { useEntryStore } from './entry-store'
 import { FileChip, OPTION_OFF_CLASS, OptionGroup, UploadingChip, WhyLine, WithOffReason } from './entry-parts'
-import { dialogueLanguageName, ratioRecommendation } from './series'
+import { dialogueLanguageName, moodRecommendation, ratioRecommendation } from './series'
 import { summaryRows } from './summary'
 
 export function EntryForm() {
@@ -180,6 +180,7 @@ function SettingsStep() {
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   const rec = draft.rec
+  const moodPick = moodRecommendation(series, rec)
   const { picks } = draft
   const isScript = isScriptDraft(draft)
   const levels = levelOptionsOf(draft)
@@ -203,13 +204,15 @@ function SettingsStep() {
       {/* 설정 판(시안 E3 Settings Card) — 장르·분위기 · 길이 · 바꿈 정도 · 화면 비율(잠금 묶음)을 한 판에 칸마다 나눠 담는다. */}
       <Card className="gap-1 rounded-[22px] p-0">
         <div className="px-6 py-[22px]">
+          {/* 다음 화는 앞 화 장르에 "앞 화" 표시(2026-11-09 오너 추천대로) — 채팅 카드와 같은 값 · 같은 모양. */}
           <OptionGroup
             variant="chip"
             label={t('Genre and mood')}
-            aside={<WhyLine text={rec?.moodWhy} className="justify-end" />}
+            aside={<WhyLine text={moodPick.fromPreviousEpisode ? null : rec?.moodWhy} className="justify-end" />}
             options={MOODS.map((m) => ({ value: m.key, label: t(m.label) }))}
             value={picks.mood}
-            recommended={rec?.mood}
+            recommended={moodPick.value}
+            recommendedLabel={moodPick.fromPreviousEpisode ? t('Previous episode') : undefined}
             onChange={(v) => void formPick('mood', v)}
           />
         </div>
