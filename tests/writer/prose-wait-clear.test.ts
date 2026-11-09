@@ -1,4 +1,4 @@
-// Writer 산문을 고치는 동안 기다리는 창은 화면을 덮지 않고(잠금은 그대로) 고치는 문단을 알린다(11/5 시안 WL, 리드 추천안 ㉠)
+// Writer 산문을 고치는 동안 기다리는 창은 화면을 덮지 않고(잠금은 그대로) 고치는 문단을 알린다(11/5 시안 WL, 리드 추천안 ㉠ · 오너 2026-11-09)
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { translate } from '@/lib/i18n/translate'
@@ -9,10 +9,11 @@ const en = (text: string, params?: Record<string, string | number>) => translate
 const WORKSPACE = 'src/features/prose/prose-workspace.tsx'
 
 describe('고치는 동안 기다리는 창 모양', () => {
-  it('산문을 고치는 동안 기다리는 창은 화면을 덮지 않고(투명 덮개) Lumi 없는 새 기다리는 카드로 뜬다', () => {
+  it('산문을 고치는 동안 기다리는 창은 화면을 덮지 않는다(투명 덮개)', () => {
     // 왜: 11/5 시안 WL "다른 씬은 그대로 볼 수 있어요" — 고치는 동안에도 산문을 읽는다. 고치기 · 채팅 입력 잠금은 그대로다(리드 2026-11-09 ㉠).
-    expect(proseWaitFrame({ kind: 'revise' })).toEqual({ scrim: 'clear', card: 'loading' })
-    expect(proseWaitFrame({ kind: 'rewrite' })).toEqual({ scrim: 'clear', card: 'loading' })
+    //   카드에는 Writer 옷 Lumi 가 선다(오너 2026-11-09 결정 4 — prose-one-screen 의 큰 Lumi 문장).
+    expect(proseWaitFrame({ kind: 'revise' })).toEqual({ scrim: 'clear' })
+    expect(proseWaitFrame({ kind: 'rewrite' })).toEqual({ scrim: 'clear' })
   })
 
   it('산문 초안을 기다리는 동안은 지금처럼 화면을 덮는다', () => {
@@ -27,7 +28,6 @@ describe('고치는 동안 기다리는 창 모양', () => {
     expect(workspace).toMatch(/<div className="[^"]*overflow-y-auto[^"]*" data-ai-busy-scroll>/)
     const overlay = workspace.match(/<AiBusyOverlay[\s\S]*?\/>/)?.[0] ?? ''
     expect(overlay).toContain('scrim={waitFrame.scrim}')
-    expect(overlay).toContain('card={waitFrame.card}')
     expect(overlay).toContain('description={waitDescription}')
   })
 })

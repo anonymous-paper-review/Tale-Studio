@@ -1,5 +1,5 @@
 // Writer 산문 한 화면 규칙(v3 W1, 오너 2026-11-03 결정 7 · 8). 고치기 방식 전환(화면 · 채팅 탭)을 뺐으니
-//   세 가지 안은 늘 고르기 창으로 고르고, 기다리는 화면의 큰 Lumi 는 Producer 에서 넘어와 초안을 쓰는 동안에만 나온다.
+//   세 가지 안은 늘 고르기 창으로 고르고, 기다리는 화면의 큰 Lumi 는 초안을 쓰는 동안과 고치는 동안 모두 나온다(오너 2026-11-09 결정 4).
 //   산문을 고치는 동안(수정안 · 세 가지 안)은 화면을 덮지 않는다 — 잠금은 그대로, 산문은 보고 스크롤한다(11/5 시안 WL, 리드 추천안 ㉠).
 //   약속: tests/writer/prose-one-screen.test.ts · tests/writer/prose-wait-clear.test.ts
 import type { ProseBusy } from '@/lib/prose/busy'
@@ -12,15 +12,16 @@ export function variantsPickerOpen(input: { proposal: { status: string; variants
   return !!input.proposal?.variants?.length && input.proposal.status !== 'generating' && !input.locked
 }
 
-/** 기다리는 화면의 큰 Lumi 옷 — 산문 초안을 쓰는 동안(Producer → Writer)만 Writer. 산문을 고치는 동안은 단계 넘김이 아니라 두지 않는다. */
+/** 기다리는 화면의 큰 Lumi 옷 — 산문 초안을 쓰는 동안(Producer → Writer)도, 고치는 동안(수정안 · 세 가지 안)도 Writer
+ *  (11/5 시안 WL, 오너 2026-11-09 결정 4 추천대로). 기다리는 일이 없으면 없다. */
 export function proseWaitingLumi(busy: ProseBusy): LumiStagePersona | null {
-  return busy?.kind === 'draft' ? 'writer' : null
+  return busy ? 'writer' : null
 }
 
-/** 기다리는 창 모양 — 산문 초안을 기다리는 동안은 화면을 덮고(Writer 옷 Lumi 카드), 같은 단계 안에서 고치는 동안(수정안 · 세 가지 안)은
- *  덮지 않고(투명 덮개 — 고치기 · 채팅 입력 잠금은 그대로) Lumi 없는 새 기다리는 카드. */
-export function proseWaitFrame(busy: ProseBusy): { scrim: 'dim' | 'clear'; card?: 'loading' } {
-  if (busy?.kind === 'revise' || busy?.kind === 'rewrite') return { scrim: 'clear', card: 'loading' }
+/** 기다리는 창 덮개 — 산문 초안을 기다리는 동안은 화면을 덮고, 같은 단계 안에서 고치는 동안(수정안 · 세 가지 안)은
+ *  덮지 않는다(투명 덮개 — 고치기 · 채팅 입력 잠금은 그대로). 카드 Lumi 는 proseWaitingLumi. */
+export function proseWaitFrame(busy: ProseBusy): { scrim: 'dim' | 'clear' } {
+  if (busy?.kind === 'revise' || busy?.kind === 'rewrite') return { scrim: 'clear' }
   return { scrim: 'dim' }
 }
 

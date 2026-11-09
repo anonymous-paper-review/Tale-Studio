@@ -479,9 +479,9 @@ export default function VisualPage() {
     <AiBusyOverlay
       open={regenOverlayOpen}
       // 11/5 시안 AR(리드 추천안 ㉠) — 화면을 덮지 않고 카드마다 상태가 보인다. 잠금은 그대로, 휠 · 끌기는 카드 칸을 스크롤한다.
-      //   Lumi 는 오너 답 전엔 없이 — 그림 없는 새 기다리는 카드.
+      //   카드에는 Artist 옷 Lumi(오너 2026-11-09 결정 4) — 일이 멈추면 오류 모습.
       scrim="clear"
-      card="loading"
+      lumi="artist"
       title={t(regenRun.stopped ? 'Some images were not drawn' : 'Redrawing the images')}
       busy={!regenRun.stopped}
       // 11/5 시안 AR 문구를 사실대로 — 이 창은 닫아도 되지만, 재생성 그림은 Artist 화면이 열려 있을 때만 그린다.

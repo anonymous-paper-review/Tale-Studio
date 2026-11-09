@@ -147,11 +147,12 @@ describe('지금 산문 조건 칩', () => {
 })
 
 describe('큰 Lumi', () => {
-  // 왜: 오너 결정 8 — Producer 에서 넘어와 산문 초안을 기다리는 화면이 핵심 자리다. 산문을 고치는 동안(같은 단계 안)은 단계 넘김이 아니다.
-  it('산문 초안을 쓰는 동안 기다리는 화면에만 Writer 옷을 입은 Lumi가 나온다', () => {
+  // 왜: 오너 결정 8 + 2026-11-09 결정 4(추천대로) — 산문 초안을 기다릴 때도, 같은 단계 안에서 고치는 동안(수정안 · 세 가지 안)에도
+  //   기다리는 카드에 Writer 옷 Lumi 가 선다(11/5 시안 WL). 기다리는 일이 없으면 Lumi 도 없다.
+  it('산문을 쓰거나 고치는 동안 기다리는 화면에 Writer 옷을 입은 Lumi가 나온다', () => {
     expect(proseWaitingLumi({ kind: 'draft', step: 1 })).toBe('writer')
-    expect(proseWaitingLumi({ kind: 'revise' })).toBeNull()
-    expect(proseWaitingLumi({ kind: 'rewrite' })).toBeNull()
+    expect(proseWaitingLumi({ kind: 'revise' })).toBe('writer')
+    expect(proseWaitingLumi({ kind: 'rewrite' })).toBe('writer')
     expect(proseWaitingLumi(null)).toBeNull()
   })
 

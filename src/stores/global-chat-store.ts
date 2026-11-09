@@ -271,6 +271,8 @@ interface GlobalChatState {
   stopGeneration: () => void
   /** LLM 을 태우지 않는 로컬 문답 한 쌍 — 실행 중 가드 등 결정론 즉답(#run-chat-gate). DB 에도 남긴다. */
   appendLocalExchange: (stage: StageId, userText: string, modelText: string) => void
+  /** 사람이 한 말만 남긴다(답은 나중에 — 예: 산문 수정안이 오면 Writer 화면이 "고쳐 봤어요"를 남긴다). */
+  appendLocalUser: (stage: StageId, userText: string) => void
   /** preempt: 떠 있는 제안(선택지 등)을 밀어내고 이 제안을 세운다 — 핸드오프처럼 "지금이 그 순간"인 것만. */
   offerSuggestion: (suggestion: ChatSuggestion, opts?: { preempt?: boolean }) => void
   /** implicit: 유저가 다른 말을 해서 내려간 것 — id 를 기록하지 않아 나중에 다시 뜰 수 있다. */
@@ -2023,11 +2025,16 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       set({ error: null })
       const ok = await get().reviseSceneGate(trimmed)
       if (!isCurrentSession()) return
-      const reply = ok
-        ? translate(contentLocale(), 'Creating a scene story proposal. You can keep chatting and editing while it is prepared.')
-        : get().error ?? translate(contentLocale(), 'Could not send the change request. Please try again.')
+      // 받았으면 답 문장 없이 보낸 말만 남긴다 — 수정안이 올 때까지 Lumi 점 세 개, 오면 Writer 화면이 "산문을 고쳐 봤어요"를 남긴다.
+      //   예전 답 "기다리는 동안 계속 채팅하거나 직접 고칠 수 있어요"는 화면 · 채팅이 잠기는 것과 반대였다(오너 2026-11-09 추천대로).
+      if (ok) {
+        get().appendLocalUser('producer', trimmed)
+        if (projectId) useWriterRoomStore.getState().setReviseAnnounce({ projectId, label: null })
+        return
+      }
+      const reply = get().error ?? translate(contentLocale(), 'Could not send the change request. Please try again.')
       get().appendLocalExchange('producer', trimmed, reply)
-      if (!ok) set({ error: reply })
+      set({ error: reply })
       return
     }
 
@@ -3762,6 +3769,12 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   stopGeneration: () => {
     activeGeneration?.abort()
     activeGeneration = null
+  },
+
+  appendLocalUser: (stage, userText) => {
+    const projectId = useProjectStore.getState().projectId
+    set((state) => ({ messages: [...state.messages, { id: makeId(), stage, role: 'user', content: userText }] }))
+    if (projectId) saveChatMessage(projectId, stage, 'user', userText)
   },
 
   appendLocalExchange: (stage, userText, modelText) => {

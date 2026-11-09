@@ -15,6 +15,8 @@ import { PageHeader } from '@/components/layout/page-header'
 import { AiBusyOverlay, type AiBusyStep } from '@/components/ai-busy-overlay'
 import { proseBusySteps, proseOverlayOpen } from '@/lib/prose/busy'
 import { keptParagraphPick, keptRevisingParagraph, revisingParagraphIndex } from '@/lib/prose/paragraph-pick'
+import { proseRevisedMessage, reviseAnnouncement } from '@/lib/prose/revise-chat'
+import { contentLocale } from '@/lib/i18n/content'
 import { proseWaitDescription, proseWaitFrame, proseWaitingLumi, variantsPickerOpen } from '@/lib/prose/screen'
 import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
 import { WriterResumeButton } from '@/components/layout/writer-resume-button'
@@ -71,6 +73,15 @@ export function ProseWorkspace() {
     if (revising && keptRevisingParagraph(revising, { projectId, hasProposal }) !== revising) useWriterRoomStore.getState().clearRevising()
   }, [revising, projectId, hasProposal])
   useEffect(() => () => useWriterRoomStore.getState().clearRevising(), [])
+  // 고쳐 달라고 보낸 요청의 수정안이 오면 Lumi 가 채팅에 한 번 알린다(11/5 시안 WS, 오너 2026-11-09) — 그 전까지 채팅은 Lumi 점 세 개.
+  //   실패 · 그새 산문이 바뀜 · 수정 요청이 없어짐 · 다른 프로젝트면 알리지 않고 내린다(실패 · 충돌은 채팅 카드가 까닭을 보인다).
+  const reviseAnnounce = useWriterRoomStore((s) => s.reviseAnnounce)
+  const announceProposal = prose.proposal
+  useEffect(() => {
+    const decision = reviseAnnouncement(reviseAnnounce, { projectId, proposal: announceProposal, hasProposal })
+    if (decision === 'announce' && reviseAnnounce) useGlobalChatStore.getState().notifyIssue('producer', proseRevisedMessage(contentLocale(), reviseAnnounce.label))
+    if (decision === 'announce' || decision === 'drop') useWriterRoomStore.getState().clearReviseAnnounce()
+  }, [reviseAnnounce, projectId, announceProposal, hasProposal])
 
   // 기다리는 창의 단계 줄(lib/prose/busy) — 산문을 고치는 동안은 11/5 시안 WL 세 줄, 진행 상태를 읽기 전 초안은 줄 없이.
   const busySteps = useMemo<AiBusyStep[] | undefined>(
@@ -78,7 +89,7 @@ export function ProseWorkspace() {
     [prose.busy, t],
   )
   // 고치는 동안(수정안 · 세 가지 안)은 화면을 덮지 않는다 — 잠금은 그대로, 산문은 보고 스크롤한다(11/5 시안 WL, 리드 추천안 ㉠).
-  //   고쳐 달라고 보낸 문단이 있으면 기다리는 창이 그 문단을 말한다. Lumi 는 오너 답 전엔 없이(초안 기다림만 Writer 옷).
+  //   고쳐 달라고 보낸 문단이 있으면 기다리는 창이 그 문단을 말한다. 카드에는 Writer 옷 Lumi(오너 2026-11-09 결정 4).
   const waitFrame = proseWaitFrame(prose.busy)
   const waitDescription = proseWaitDescription(t, { busy: prose.busy, revisingIndex: revisingParagraphIndex(revising, { projectId, busy: prose.busy }) })
 
@@ -187,7 +198,6 @@ export function ProseWorkspace() {
         steps={busySteps}
         lumi={proseWaitingLumi(prose.busy) ?? undefined}
         scrim={waitFrame.scrim}
-        card={waitFrame.card}
       />
     </div>
   )

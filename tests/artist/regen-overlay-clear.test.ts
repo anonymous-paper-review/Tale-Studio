@@ -1,4 +1,4 @@
-// Artist 작품 스타일을 다시 그리는 동안 기다리는 창은 화면을 덮지 않고(잠금은 그대로) 카드가 보인다(11/5 시안 AR, 리드 추천안 ㉠)
+// Artist 작품 스타일을 다시 그리는 동안 기다리는 창은 화면을 덮지 않고(잠금은 그대로) 카드가 보인다(11/5 시안 AR, 리드 추천안 ㉠ · 오너 2026-11-09)
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
@@ -6,13 +6,12 @@ const page = () => readFileSync('src/app/studio/artist/page.tsx', 'utf8')
 const overlayOf = (source: string, name: string) => source.match(new RegExp(`const ${name} = [\\s\\S]*?<AiBusyOverlay[\\s\\S]*?\\/>`))?.[0] ?? ''
 
 describe('다시 그리는 동안 기다리는 창 모양', () => {
-  it('다시 그리는 동안 기다리는 창은 화면을 덮지 않고(투명 덮개) Lumi 없는 새 기다리는 카드로 뜬다', () => {
+  it('다시 그리는 동안 기다리는 창은 화면을 덮지 않고(투명 덮개) Artist 옷 Lumi 카드로 뜬다', () => {
     // 왜: 11/5 시안 AR "화면에 반영" — 카드마다 새로 그렸어요 · 그리는 중 · 순서 기다리는 중을 덮개 너머로 본다.
-    //   고치기 · 채팅 입력 잠금은 그대로(리드 2026-11-09 ㉠). Lumi 는 오너 답 전엔 없이.
+    //   고치기 · 채팅 입력 잠금은 그대로(리드 2026-11-09 ㉠). 카드에는 Artist 옷 Lumi(오너 2026-11-09 결정 4 추천대로).
     const regen = overlayOf(page(), 'regenOverlay')
     expect(regen).toContain('scrim="clear"')
-    expect(regen).toContain('card="loading"')
-    expect(regen).not.toMatch(/\blumi=/)
+    expect(regen).toContain('lumi="artist"')
   })
 
   it('Artist 카드 칸은 투명 덮개 너머로 휠 · 손가락 끌기로 스크롤된다', () => {

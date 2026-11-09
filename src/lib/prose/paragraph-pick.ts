@@ -81,6 +81,11 @@ export function revisingParagraphIndex(
   return revising.index
 }
 
+/** 채팅에 남는 내가 한 말 — "S2 더 웃기게 해 줘"(11/5 시안 WS). AI 에게 가는 요청(paragraphRequest)은 문단 앞부분까지 싣는다. */
+export function paragraphChatLine(pick: ParagraphPick, said: string): string {
+  return `${paragraphLabel(pick.index)} ${said.trim()}`
+}
+
 /** 붙은 문단으로 보내는 수정 요청 — 문단 번호와 앞부분을 먼저 싣고 그 문단만 고치라고 한 뒤 보낸 말을 잇는다.
  *  사람이 보낸 말로 남으므로 화면 언어를 따른다(채팅의 첨부 기본 문장과 같다). */
 export function paragraphRequest(pick: ParagraphPick, request: string, locale: AppLocale): string {

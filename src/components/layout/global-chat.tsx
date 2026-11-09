@@ -1546,7 +1546,7 @@ export function GlobalChat() {
             {projectId && sceneStoryProposal ? (
               sceneStoryProposal.variants?.length
                 ? currentStage === 'producer' ? null : <SceneStoryRewriteCard key={`${projectId}:${sceneStoryProposal.id}`} projectId={projectId} proposal={sceneStoryProposal} />
-                : <SceneStoryProposalCard key={`${projectId}:${sceneStoryProposal.id}`} projectId={projectId} proposal={sceneStoryProposal} />
+                : <SceneStoryProposalCard key={`${projectId}:${sceneStoryProposal.id}`} projectId={projectId} proposal={sceneStoryProposal} look={currentStage === 'producer' ? 'writer' : 'card'} />
             ) : null}
             {projectId && sceneStoryUndo && currentStage !== 'producer' ? <SceneStoryUndoCard key={`${projectId}:${sceneStoryUndo.id}`} projectId={projectId} undo={sceneStoryUndo} /> : null}
 
