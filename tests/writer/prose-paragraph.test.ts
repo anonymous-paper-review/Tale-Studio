@@ -230,17 +230,18 @@ describe('붙은 문단으로 보내기', () => {
     expect(readFileSync('src/components/layout/global-chat.tsx', 'utf8')).toMatch(/currentStage === 'producer' && typed && goesToParagraph\(typed\)/)
   })
 
-  // 왜: 한 번 보낸 문단이 칩에 남으면 다음 말도 그 문단 요청으로 간다. 무엇을 보냈는지는 채팅에 남는다.
-  it('보내면 붙은 문단은 떨어지고 보낸 말이 채팅에 남는다', async () => {
+  // 왜: 한 번 보낸 문단이 칩에 남으면 다음 말도 그 문단 요청으로 간다. 채팅에는 내가 한 말만 "S2 …"로 짧게 남는다(11/5 시안 WS) —
+  //   AI 에게는 문단 앞부분을 붙인 요청이 간다(위 테스트). 보낸 직후의 "기다리는 동안 계속 채팅하거나 직접 고칠 수 있어요"는 화면 · 채팅이
+  //   잠기는 것과 반대라 뺐고, 수정안이 올 때까지 Lumi 점 세 개를 보인다(오너 2026-11-09 추천대로).
+  it('보내면 붙은 문단은 떨어지고 채팅에는 보낸 말이 "S2 …"로 짧게 남으며, 수정안이 오기 전에는 답 문장이 없다', async () => {
     useWriterRoomStore.setState({ paragraph: S2 })
 
     await sendParagraphRequest('팀장을 더 얄밉게')
 
     expect(useWriterRoomStore.getState().paragraph).toBeNull()
-    const [mine, reply] = useGlobalChatStore.getState().messages.slice(-2)
-    expect(mine).toMatchObject({ stage: 'producer', role: 'user', content: expect.stringContaining('팀장을 더 얄밉게') })
-    expect(mine.content).toContain('S2 문단만 고쳐 주세요.')
-    expect(reply).toMatchObject({ stage: 'producer', role: 'model', content: '씬 스토리 수정안을 만들고 있어요. 기다리는 동안 계속 채팅하거나 직접 고칠 수 있어요.' })
+    const messages = useGlobalChatStore.getState().messages
+    expect(messages.at(-1)).toMatchObject({ stage: 'producer', role: 'user', content: 'S2 팀장을 더 얄밉게' })
+    expect(messages.some((message) => message.role === 'model')).toBe(false)
   })
 
   // 왜: 정상 경로 고정 — 붙인 문단이 없으면 채팅은 지금처럼 말을 읽어 보낸다.

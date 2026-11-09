@@ -14,8 +14,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { PageHeader } from '@/components/layout/page-header'
 import { AiBusyOverlay, type AiBusyStep } from '@/components/ai-busy-overlay'
 import { proseBusySteps, proseOverlayOpen } from '@/lib/prose/busy'
-import { keptParagraphPick, keptRevisingParagraph } from '@/lib/prose/paragraph-pick'
-import { proseWaitingLumi, variantsPickerOpen } from '@/lib/prose/screen'
+import { keptParagraphPick, keptRevisingParagraph, revisingParagraphIndex } from '@/lib/prose/paragraph-pick'
+import { proseRevisedMessage, reviseAnnouncement } from '@/lib/prose/revise-chat'
+import { contentLocale } from '@/lib/i18n/content'
+import { proseWaitDescription, proseWaitFrame, proseWaitingLumi, variantsPickerOpen } from '@/lib/prose/screen'
 import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
 import { WriterResumeButton } from '@/components/layout/writer-resume-button'
 import { useT } from '@/lib/i18n'
@@ -71,12 +73,25 @@ export function ProseWorkspace() {
     if (revising && keptRevisingParagraph(revising, { projectId, hasProposal }) !== revising) useWriterRoomStore.getState().clearRevising()
   }, [revising, projectId, hasProposal])
   useEffect(() => () => useWriterRoomStore.getState().clearRevising(), [])
+  // 고쳐 달라고 보낸 요청의 수정안이 오면 Lumi 가 채팅에 한 번 알린다(11/5 시안 WS, 오너 2026-11-09) — 그 전까지 채팅은 Lumi 점 세 개.
+  //   실패 · 그새 산문이 바뀜 · 수정 요청이 없어짐 · 다른 프로젝트면 알리지 않고 내린다(실패 · 충돌은 채팅 카드가 까닭을 보인다).
+  const reviseAnnounce = useWriterRoomStore((s) => s.reviseAnnounce)
+  const announceProposal = prose.proposal
+  useEffect(() => {
+    const decision = reviseAnnouncement(reviseAnnounce, { projectId, proposal: announceProposal, hasProposal })
+    if (decision === 'announce' && reviseAnnounce) useGlobalChatStore.getState().notifyIssue('producer', proseRevisedMessage(contentLocale(), reviseAnnounce.label))
+    if (decision === 'announce' || decision === 'drop') useWriterRoomStore.getState().clearReviseAnnounce()
+  }, [reviseAnnounce, projectId, announceProposal, hasProposal])
 
   // 기다리는 창의 단계 줄(lib/prose/busy) — 산문을 고치는 동안은 11/5 시안 WL 세 줄, 진행 상태를 읽기 전 초안은 줄 없이.
   const busySteps = useMemo<AiBusyStep[] | undefined>(
     () => proseBusySteps(prose.busy)?.map((step) => ({ label: t(step.label), state: step.state })),
     [prose.busy, t],
   )
+  // 고치는 동안(수정안 · 세 가지 안)은 화면을 덮지 않는다 — 잠금은 그대로, 산문은 보고 스크롤한다(11/5 시안 WL, 리드 추천안 ㉠).
+  //   고쳐 달라고 보낸 문단이 있으면 기다리는 창이 그 문단을 말한다. 카드에는 Writer 옷 Lumi(오너 2026-11-09 결정 4).
+  const waitFrame = proseWaitFrame(prose.busy)
+  const waitDescription = proseWaitDescription(t, { busy: prose.busy, revisingIndex: revisingParagraphIndex(revising, { projectId, busy: prose.busy }) })
 
   // 예전 방식 프로젝트의 씬 스토리 확정(리뉴얼 전 흐름) — 확정하면 나머지를 이어 만들고 Storyboard 로 간다.
   const [legacyConfirming, setLegacyConfirming] = useState(false)
@@ -131,7 +146,8 @@ export function ProseWorkspace() {
         </div>
       ) : null}
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-7">
+      {/* 투명 덮개(고치는 동안) 너머로 휠 · 손가락 끌기가 이 칸을 스크롤한다(lib/ai-busy-scroll). */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-7" data-ai-busy-scroll>
         {/* v3 W1 — 화면 머리 · 조건 칩 · 산문 판 · 안내가 820 폭 한 줄로 쌓인다(간격 18). */}
         <div className="mx-auto flex max-w-[820px] flex-col gap-[18px]">
           <PageHeader
@@ -178,8 +194,10 @@ export function ProseWorkspace() {
         // 진행 상태를 읽는 동안은 띄우지 않는다(단추 · 입력만 막힌다) — 다 쓴 산문 위로 잠금이 깜빡이지 않게.
         open={proseOverlayOpen(prose.busy)}
         title={t(prose.busy?.kind === 'draft' ? 'Writing the prose draft' : 'Revising the prose')}
+        description={waitDescription}
         steps={busySteps}
         lumi={proseWaitingLumi(prose.busy) ?? undefined}
+        scrim={waitFrame.scrim}
       />
     </div>
   )

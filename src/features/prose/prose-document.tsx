@@ -15,6 +15,7 @@ import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { paragraphClickPicks, paragraphKeyPicks, paragraphLabel, revisingParagraphIndex, selectedTextWithin } from '@/lib/prose/paragraph-pick'
 import { TreatmentDiffView } from '@/features/producer/treatment-diff-view'
+import { ProseProposalView } from '@/features/prose/proposal-view'
 import { useProducerStore } from '@/stores/producer-store'
 import { useWriterRoomStore } from '@/stores/writer-room-store'
 import type { ProseState } from '@/features/prose/use-prose'
@@ -53,8 +54,12 @@ export function ProseDocument({ prose }: { prose: ProseState }) {
       </div>
     )
   }
-  // v3 판 안쪽 여백 — 문단 줄(16)과 같게 둔다.
-  if (diffRows) return <div className="px-4 py-3"><TreatmentDiffView rows={diffRows} /></div>
+  if (diffRows) {
+    // 수정안 하나(11/5 시안 WS, 오너 2026-11-09 결정 5): 고친 문단 바로 아래 "AI 수정안" 상자에서 [버리기] · [적용].
+    //   세 가지 안 미리 보기는 고르기 창이 정하므로 예전 비교 그대로(v3 판 안쪽 여백 — 문단 줄(16)과 같게).
+    if (prose.proposal && !prose.rewriting) return <ProseProposalView rows={diffRows} proposal={prose.proposal} />
+    return <div className="px-4 py-3"><TreatmentDiffView rows={diffRows} /></div>
+  }
   if (view.kind === 'original') {
     return <pre className="whitespace-pre-wrap px-4 py-3 font-mono text-[13px] leading-6 text-foreground/90" data-testid="prose-original">{view.text}</pre>
   }
