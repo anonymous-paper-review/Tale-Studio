@@ -20,7 +20,8 @@ import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/layout/page-header'
 import { AiBusyCard } from '@/components/ai-busy-overlay'
 import { useHoldChatClosed } from '@/hooks/use-hold-chat-closed'
-import { editorEmptyScreen, editorHeaderMeta } from '@/features/editor/editor-labels'
+import { editorEmptyScreen, editorHeaderMeta, editorPrepTitle } from '@/features/editor/editor-labels'
+import { finishEditorOpen } from '@/features/editor/open-editor'
 import { VideoPreviewer } from '@/features/editor/video-previewer'
 import { Timeline } from '@/features/editor/timeline'
 import { VideoSourcePanel } from '@/features/editor/video-source-panel'
@@ -49,6 +50,7 @@ export default function PostPage() {
     selectedAudioIds,
     error,
     loadStatus,
+    editorPrep,
     sourcePanelOpen,
     currentTime,
     pxPerSec,
@@ -267,7 +269,9 @@ export default function PostPage() {
     }
   }, [t])
 
-  // loadData(원본) → loadPersisted(저장된 편집 덮어쓰기) → 첫 진입 시 샷 오디오 자동 부착.
+  // loadData(원본) → loadPersisted(저장한 편집 되살리기) → finishEditorOpen(처음 여는 프로젝트면 영상 실제 길이를 잰 자리에
+  //   영상마다 소리를 오디오 칸에 나누어 놓고 파형을 채워 브라우저 · 서버에 저장). 다 준비하기 전에는 편집 화면 대신
+  //   기다리는 카드를 보이고 편집 상태를 저장하지 않는다(editorPrep, 오너 2026-11-10 "처음 Editor에 입장해서 수정하면 수정 내역 없어지는데").
   // deps 는 전부 안정 참조여야 한다 (#editor-render-loop 2026-08-24): 하나라도 매 렌더 새로
   //   생기면 effect 재실행 → loadData() → store set() → 리렌더 로 무한 루프가 된다.
   //   t 는 useT 가 useCallback 으로 고정해 준다 (src/lib/i18n/index.ts).
@@ -275,80 +279,50 @@ export default function PostPage() {
     let cancelled = false
     // 프로젝트가 바뀌면 이전 프로젝트의 "전체 보기" blob 캐시를 반환한다(같은 프로젝트 재진입은 유지).
     resetVideoPrefetchFor(projectId ?? null)
+    useEditorStore.getState().setEditorPrep({ done: 0, total: 0 })
     ;(async () => {
       await loadData()
       if (cancelled) return
-      await loadPersisted()
+      const restored = await loadPersisted()
       if (cancelled) return
       // #d11(2026-08-31 오너 확정): 실제 영상 파일 길이 측정 — 계획 duration 보다 짧은 파일
       //   (시간 인플레이션·모델 최소 길이 산물)은 타임라인이 실측 길이로 자동 트림한다.
-      //   메타데이터만 로드하고 실패는 무시(측정 불가 시 종전 동작 그대로).
-      void Promise.all(
-        useEditorStore
-          .getState()
-          .videoClips.filter((c) => c.url && c.actualDurationSec == null)
-          .map(
-            (c) =>
-              new Promise<void>((resolve) => {
-                const v = document.createElement('video')
-                v.preload = 'metadata'
-                v.onloadedmetadata = () => {
-                  if (!cancelled && Number.isFinite(v.duration) && v.duration > 0) {
-                    useEditorStore.getState().updateVideoClip(c.shotId, {
-                      actualDurationSec: Math.round(v.duration * 10) / 10,
-                    })
+      //   메타데이터만 로드하고 실패는 무시(측정 불가 시 종전 동작 그대로). 처음 열 때는 다 잰 뒤에 소리를 놓는다.
+      const measureClips = () =>
+        Promise.all(
+          useEditorStore
+            .getState()
+            .videoClips.filter((c) => c.url && c.actualDurationSec == null)
+            .map(
+              (c) =>
+                new Promise<void>((resolve) => {
+                  const v = document.createElement('video')
+                  v.preload = 'metadata'
+                  v.onloadedmetadata = () => {
+                    if (!cancelled && Number.isFinite(v.duration) && v.duration > 0) {
+                      useEditorStore.getState().updateVideoClip(c.shotId, {
+                        actualDurationSec: Math.round(v.duration * 10) / 10,
+                      })
+                    }
+                    resolve()
                   }
-                  resolve()
-                }
-                // 영상을 불러오지 못하면(404 · 막힘) 그 클립만 "불러오지 못함"으로 남긴다 — 나머지는 그대로 연다.
-                v.onerror = () => {
-                  if (!cancelled) useEditorStore.getState().markVideoUnplayable(c.url as string)
-                  resolve()
-                }
-                v.src = c.url as string
-              }),
-          ),
-      )
-      // Director→Editor 첫 진입: 저장된 오디오가 없으면 각 샷 오디오를 영상 카드처럼
-      //   '즉시' 한 번에 트랙에 올린다(빈 파형) → 파형/실제 길이는 백그라운드 병렬 디코드로 채움.
-      //   (영상은 음소거 재생 + 오디오는 별도 트랙 구조. 소리는 <audio>로 나므로 디코드 전에도 재생됨)
-      const st = useEditorStore.getState()
-      if (st.audioClips.length === 0) {
-        const items = selectTimelineLayout(st)
-        const trackId = st.audioTracks[0]?.id
-        // 1) 즉시 생성 (순차 디코드 대기 없이 바로 표시)
-        const created: { id: string; url: string }[] = []
-        for (const item of items) {
-          const src = st.videoClips.find((c) => c.shotId === item.shotId)
-          if (!src?.url) continue
-          const shot = st.shots.find((s) => s.shotId === item.shotId)
-          const id = st.addAudioClip({
-            name: t('{type} audio', { type: shot?.shotType ?? t('Video') }),
-            url: src.url,
-            startSec: item.startSec,
-            durationSec: item.durationSec,
-            peaks: [],
-            sourceOffsetSec: 0,
-            sourceDurationSec: item.durationSec,
-            trackId,
-          })
-          created.push({ id, url: src.url })
-        }
-        // 2) 백그라운드 병렬 디코드 → 파형/실제 길이 채움. 무음/CORS면 파형만 생략(소리는 재생).
-        void Promise.all(
-          created.map(async ({ id, url }) => {
-            try {
-              const { durationSec, peaks } = await decodeAudioPeaks(url)
-              if (cancelled || !(durationSec > 0)) return
-              useEditorStore
-                .getState()
-                .updateAudioClip(id, { peaks, sourceDurationSec: durationSec })
-            } catch {
-              /* 무음/CORS → 파형 생략 */
-            }
-          }),
-        )
-      }
+                  // 영상을 불러오지 못하면(404 · 막힘) 그 클립만 "불러오지 못함"으로 남긴다 — 나머지는 그대로 연다.
+                  v.onerror = () => {
+                    if (!cancelled) useEditorStore.getState().markVideoUnplayable(c.url as string)
+                    resolve()
+                  }
+                  v.src = c.url as string
+                }),
+            ),
+        ).then(() => undefined)
+      await finishEditorOpen({
+        projectId: projectId ?? null,
+        restored,
+        isCancelled: () => cancelled,
+        audioName: (shotType) => t('{type} audio', { type: shotType ?? t('Video') }),
+        measureClips,
+        decodeAudio: (url) => decodeAudioPeaks(url),
+      })
     })()
     return () => {
       cancelled = true
@@ -473,6 +447,15 @@ export default function PostPage() {
     return (
       <div className="flex flex-1 items-center justify-center p-6" aria-busy>
         <AiBusyCard lumi="editor" title={t('Preparing clips…')} description="" />
+      </div>
+    )
+  }
+  // 편집 상태를 준비하는 동안(저장한 편집 되살리기 · 처음 열 때 소리 나누기)은 샷이 있어도 편집 화면 대신 같은 기다리는 카드 —
+  //   다 준비되고(처음이면 저장까지) 나서 연다. 처음 열 때는 소리 나누기 진행을 %로 붙인다(오너 2026-11-10).
+  if (editorPrep) {
+    return (
+      <div className="flex flex-1 items-center justify-center p-6" aria-busy>
+        <AiBusyCard lumi="editor" title={editorPrepTitle(editorPrep, t)} description="" />
       </div>
     )
   }

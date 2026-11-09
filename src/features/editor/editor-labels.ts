@@ -50,6 +50,12 @@ export function editorEmptyScreen(input: {
   return input.loadStatus === 'ready' ? 'empty' : 'loading'
 }
 
+/** Editor 를 여는 동안 기다리는 카드의 제목 — 처음 열 때 소리 나누기 진행(파형을 채운 소리 수)이 있으면 %를 붙인다(2026-11-10). */
+export function editorPrepTitle(prep: { done: number; total: number }, t: Translate): string {
+  if (prep.total <= 0) return t('Preparing clips…')
+  return t('Preparing clips… {percent}%', { percent: Math.round((Math.min(prep.done, prep.total) / prep.total) * 100) })
+}
+
 export type PreviewPane = 'title' | 'video' | 'unplayable' | 'no-video' | 'empty'
 
 /** 미리 보기 판에 무엇을 그릴지 — 타이틀 카드 · 영상 · 그 컷만 "불러오지 못함" 안내 · 아직 영상 없음 · 빈 구간. */

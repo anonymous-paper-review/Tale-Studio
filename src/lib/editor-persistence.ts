@@ -39,6 +39,19 @@ export function saveEditorState(projectId: string, data: PersistedEditor): void 
   debounceTimers.set(projectId, timer)
 }
 
+/** 지금 바로 쓴다(기다리던 쓰기는 버린다) — Editor 를 처음 열 때 소리를 다 나눈 결과를 편집 화면을 열기 전에 남긴다(오너 2026-11-10). */
+export function saveEditorStateNow(projectId: string, data: PersistedEditor): void {
+  if (typeof window === 'undefined') return
+  const existing = debounceTimers.get(projectId)
+  if (existing) clearTimeout(existing)
+  debounceTimers.delete(projectId)
+  try {
+    localStorage.setItem(LS_PREFIX + projectId, JSON.stringify(data))
+  } catch (err) {
+    console.warn('[editor-persistence] localStorage write failed', err)
+  }
+}
+
 export async function loadEditorState(projectId: string): Promise<PersistedEditor | null> {
   if (typeof window === 'undefined') return null
 

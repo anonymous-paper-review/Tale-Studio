@@ -68,6 +68,8 @@ export function useEditorPlayback() {
       if (isRange && e.key.startsWith('Arrow')) return // 슬라이더 포커스 시 화살표는 네이티브 처리
 
       const s = useEditorStore.getState()
+      // 편집 상태를 준비하는 동안(기다리는 카드)은 편집 화면이 없다 — 되돌리기 · 지우기가 막 놓은 오디오를 건드리지 않게 한다(2026-11-10).
+      if (s.editorPrep) return
       const meta = e.ctrlKey || e.metaKey
 
       if (meta && (e.key === 'z' || e.key === 'Z')) {
