@@ -109,7 +109,7 @@ export function ShotNodePopup({ nodeId, data }: Props) {
 
   return (
     <Dialog open onOpenChange={(o) => !o && closePopup()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent size="wide" className="max-h-[90vh] overflow-y-auto">
         {imageUploadConsentDialog}
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

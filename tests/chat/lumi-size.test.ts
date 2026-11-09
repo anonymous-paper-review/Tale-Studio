@@ -33,8 +33,8 @@ describe('Lumi 크기', () => {
 
   // 왜: 시안의 Lumi 그림은 몸에 맞춰 자른 그림(몸이 그림 폭의 98%)이고, 우리 그림 · 움직이는 Lumi 는 둘레에 소품 자리가 있어 몸이 폭의 약 68%다.
   //   같은 너비로 그리면 시안보다 Lumi 가 작아 보인다 — 크기 이름으로 그리면 몸이 상자 너비를 채우게 1.45배로 그리고 상자는 그대로 둔다.
-  //   숫자 크기(예전 자리)는 예전처럼 그린다(화면을 옮기기 전까지 커지지 않게).
-  it('크기 이름으로 그린 Lumi 는 몸이 상자 너비를 채우게 그리고, 숫자 크기는 예전처럼 그린다', () => {
+  //   숫자 크기(예전 자리)는 키우지 않는다(화면을 옮기기 전까지 커지지 않게). 상자 높이는 숫자 크기도 SYS 비율(0.77)이다.
+  it('크기 이름으로 그린 Lumi 는 몸이 상자 너비를 채우게 키워 그리고, 숫자 크기는 키우지 않는다', () => {
     expect(renderToStaticMarkup(createElement(Lumi, { persona: 'pearl', state: 'idle', size: 'm' }))).toMatch(/style="width:78px;height:60px;transform:scale\(1\.45\)"/)
     expect(renderToStaticMarkup(createElement(Lumi, { persona: 'pearl', state: 'idle', size: 320 }))).not.toContain('transform')
   })

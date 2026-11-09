@@ -33,7 +33,8 @@ type ChipProps = Omit<ComponentProps<'button'>, 'aria-pressed' | 'aria-checked'>
   selected?: boolean
   /** 추천 배지를 붙인다(Lumi 가 미리 고른 값). */
   recommended?: boolean
-  /** 채팅 안 빠른 답은 한 단 밝은 칩 바탕(v3 채팅 칩 #3A3936), 화면 안은 카드 바탕(#30302E). */
+  /** 'chat' = 가운데 채팅(Producer P1 · P2) 안 빠른 답 — 11/5 시안 #45443F(가운데 채팅 칩 토큰). 화면 안은 카드 바탕(#30302E).
+   *  옆 채팅의 빠른 답은 global-chat 이 따로 그린다(채팅 칩 #3A3936). */
   tone?: 'screen' | 'chat'
 }
 
@@ -48,7 +49,7 @@ export function ChoiceChip({ selected = false, recommended = false, tone = 'scre
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50',
         selected
           ? 'border-stage bg-stage/18 font-semibold'
-          : cn('border-transparent font-medium hover:bg-accent', tone === 'chat' ? 'bg-chat-chip' : 'bg-card'),
+          : cn('border-transparent font-medium hover:bg-accent', tone === 'chat' ? 'bg-chat-center-chip' : 'bg-card'),
         className,
       )}
       {...props}

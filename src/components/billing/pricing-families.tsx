@@ -104,7 +104,7 @@ function PricingPicker({ initialSelection, checkoutEnabled }: { initialSelection
       <Dialog open={selection !== null} onOpenChange={open => { if (!open && !busy) setSelection(null) }}>
         <DialogContent
           showCloseButton={false}
-          className="max-h-[calc(100dvh-2rem)] gap-0 overflow-y-auto p-0 data-[state=closed]:animate-none sm:max-w-xl"
+          className="max-h-[calc(100dvh-2rem)] gap-0 overflow-y-auto p-0 data-[state=closed]:animate-none"
           onEscapeKeyDown={event => { if (busy) event.preventDefault() }}
           onPointerDownOutside={event => { if (busy) event.preventDefault() }}
           onCloseAutoFocus={event => {
@@ -114,7 +114,7 @@ function PricingPicker({ initialSelection, checkoutEnabled }: { initialSelection
         >
           {selection && option && copy && (
             <>
-              <DialogHeader className="border-b border-border px-6 py-5 text-left">
+              <DialogHeader className="items-start border-b border-border px-6 py-5 text-left">
                 <p className="text-xs text-muted-foreground">{t(copy.cadence)}</p>
                 <DialogTitle className="pr-8 text-xl">{t('Choose your {family}', { family: copy.title })}</DialogTitle>
                 <DialogDescription>{t('Slide to compare options. Nothing is charged until you continue to checkout.')}</DialogDescription>

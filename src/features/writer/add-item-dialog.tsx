@@ -301,7 +301,7 @@ export function AddItemDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[93vh] gap-0 overflow-hidden p-0 sm:max-w-[67rem]">
+      <DialogContent frame="work" className="max-h-[93vh] gap-0 overflow-hidden p-0 sm:max-w-[67rem]">
         <DialogHeader className="border-b px-6 py-4">
           <DialogTitle className="flex items-center gap-2">
             <Plus className="size-4" />

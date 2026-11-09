@@ -280,7 +280,7 @@ export function ExportMenu() {
         )}
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md" data-testid={EXPORT_DIALOG_TESTID}>
+        <DialogContent data-testid={EXPORT_DIALOG_TESTID}>
           <DialogHeader>
             <DialogTitle>{t('Export')}</DialogTitle>
             <DialogDescription>{t('Choose what to export. Only the checked items are saved, one after another.')}</DialogDescription>
@@ -393,7 +393,7 @@ export function ExportDialogBody({
       ) : null}
 
       <DialogFooter>
-        <Button variant="ghost" onClick={onCancel}>
+        <Button variant="secondary" onClick={onCancel}>
           {t('Cancel')}
         </Button>
         <Button disabled={list.length === 0} onClick={onStart} data-testid="export-start">

@@ -314,6 +314,7 @@ export function ProseRecheckDialog({ open, onOpenChange, rows, keptIds = [] }: {
     <>
       <Dialog open={open} onOpenChange={(next) => { if (!applying) onOpenChange(next) }}>
         <DialogContent
+          frame="work"
           className="flex max-h-[90vh] flex-col sm:max-w-[min(56rem,90vw)]"
           showCloseButton={!applying}
           // Esc 는 고치던 이름 · 고르던 말부터 닫는다 — 창 전체를 닫아 고친 것을 잃지 않게.

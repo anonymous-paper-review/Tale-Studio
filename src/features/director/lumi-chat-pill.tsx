@@ -52,7 +52,7 @@ export function LumiChatPill({ className }: { className?: string } = {}) {
         className,
       )}
     >
-      <LumiAvatar persona={STAGE_PERSONA.director} state={chatLumiState({ loading, error: !!error })} size={22} bare />
+      <LumiAvatar persona={STAGE_PERSONA.director} state={chatLumiState({ loading, error: !!error })} size={22} />
       Lumi
       {unseen > 0 ? (
         // 시안 D1 "New" — 지금 단계 색 알약 · 어두운 숫자.

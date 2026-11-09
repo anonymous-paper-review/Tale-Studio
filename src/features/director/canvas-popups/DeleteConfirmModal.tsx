@@ -68,7 +68,6 @@ export function DeleteConfirmModal() {
     <Dialog open onOpenChange={(o) => !o && closeDeleteConfirm()}>
       {/* Enter=삭제 확정, Esc=취소(radix 기본). (#e3 2026-07-18) */}
       <DialogContent
-        className="sm:max-w-md"
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault()
@@ -101,7 +100,7 @@ export function DeleteConfirmModal() {
         )}
 
         <DialogFooter>
-          <Button variant="ghost" size="sm" onClick={closeDeleteConfirm}>
+          <Button variant="secondary" size="sm" onClick={closeDeleteConfirm}>
             {t('Cancel')}
           </Button>
           <Button variant="destructive" size="sm" onClick={confirmDelete}>
