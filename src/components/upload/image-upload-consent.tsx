@@ -17,7 +17,7 @@ export function ImageUploadConsentDialog({
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onDecision(false) }}>
-      <DialogContent className="sm:max-w-md" onKeyDown={(event) => event.stopPropagation()}>
+      <DialogContent onKeyDown={(event) => event.stopPropagation()}>
         <DialogHeader>
           <DialogTitle>{t('Confirm image usage rights')}</DialogTitle>
           <DialogDescription>{t('Confirm your rights before uploading.')}</DialogDescription>
@@ -36,7 +36,7 @@ export function ImageUploadConsentDialog({
           <span>{t('I have the right to use this image, and if it shows an identifiable person, I have their consent to use it here.')}</span>
         </label>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onDecision(false)}>{t('Cancel')}</Button>
+          <Button type="button" variant="secondary" onClick={() => onDecision(false)}>{t('Cancel')}</Button>
           <Button type="button" disabled={!checked} onClick={() => { if (checked) onDecision(true) }}>{t('Upload')}</Button>
         </DialogFooter>
       </DialogContent>

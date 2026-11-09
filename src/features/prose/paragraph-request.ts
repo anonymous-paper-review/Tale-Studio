@@ -4,10 +4,12 @@
 //   (다시 쓰기 조건 · 확정 창 · 채팅 대답)를 거치지 않고 그 문단만 고쳐 달라는 산문 수정 요청으로 간다 — 채팅에서
 //   "고칠 점"을 말했을 때와 같은 수정안 길(reviseSceneGate)이다. 보내면 붙은 문단은 떨어진다.
 //   넘김 · 확정 말(확정할게 · 브레이크다운하자 · 다음 단계로)은 문단과 상관없이 지금처럼 확정 창으로 간다(검토 A L1).
+//   채팅에는 내가 한 말만 "S2 더 웃기게 해 줘"처럼 짧게 남고(AI 에게는 문단 앞부분을 붙인 요청), 보낸 직후 답 문장은 없다 —
+//   수정안이 올 때까지 Lumi 점 세 개, 오면 Writer 화면이 "S2를 고쳐 봤어요…"를 남긴다(11/5 시안 WS, 오너 2026-11-09 추천대로).
 //   약속: tests/writer/prose-paragraph.test.ts
 import { translate } from '@/lib/i18n/translate'
 import { contentLocale } from '@/lib/i18n/content'
-import { paragraphRequest, type ParagraphPick } from '@/lib/prose/paragraph-pick'
+import { paragraphChatLine, paragraphLabel, paragraphRequest, type ParagraphPick } from '@/lib/prose/paragraph-pick'
 import { writerChatIntent } from '@/lib/prose/writer-chat'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useLocaleStore } from '@/stores/locale-store'
@@ -47,10 +49,14 @@ export async function sendParagraphRequest(typed: string): Promise<boolean> {
   if (!ok && useWriterRoomStore.getState().revising === pick) useWriterRoomStore.getState().clearRevising()
   // 답을 기다리는 사이 다른 프로젝트로 옮겼으면 그 채팅에 남기지 않는다.
   if (useProjectStore.getState().projectId !== projectId) return true
-  const reply = ok
-    ? translate(contentLocale(), 'Creating a scene story proposal. You can keep chatting and editing while it is prepared.')
-    : useGlobalChatStore.getState().error ?? translate(contentLocale(), 'Could not send the change request. Please try again.')
-  useGlobalChatStore.getState().appendLocalExchange('producer', text, reply)
-  if (!ok) useGlobalChatStore.setState({ error: reply })
+  const line = paragraphChatLine(pick, said)
+  if (ok) {
+    useGlobalChatStore.getState().appendLocalUser('producer', line)
+    useWriterRoomStore.getState().setReviseAnnounce({ projectId, label: paragraphLabel(pick.index) })
+    return true
+  }
+  const reply = useGlobalChatStore.getState().error ?? translate(contentLocale(), 'Could not send the change request. Please try again.')
+  useGlobalChatStore.getState().appendLocalExchange('producer', line, reply)
+  useGlobalChatStore.setState({ error: reply })
   return true
 }

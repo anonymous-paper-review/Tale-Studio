@@ -4,6 +4,7 @@
 //   여백 18 · Lumi S(만드는 중) · 단계 색 테두리 1.5 · 진행 막대. 한 번에 하나씩 덮고 나머지 노드는 그대로 둔다(붙이는 쪽이 정한다).
 //   완성 표시: 단계 그라데이션 "✓ 완성" 배지(DoneBadge) + 단계 색 테두리(STAGE_FRAME).
 //   색은 lumi 옷(data-stage) — 놓인 화면이 다른 단계여도 Lumi 와 테두리 · 막대가 같은 단계를 말한다. 약속: tests/project/node-wait.test.ts
+//   Lumi 는 늘 그림(still) — 카드가 여럿 뜨면 움직이는 Lumi 마다 WebGL 문맥을 하나씩 열어 브라우저 한도에 걸린다(검토 C 2026-11-09).
 import { Lumi } from '@/components/lumi/lumi'
 import { useT } from '@/lib/i18n'
 import { lumiStageTheme, type LumiPersona } from '@/lib/lumi'
@@ -21,24 +22,26 @@ export interface NodeWaitCardProps {
   progress?: number
   /** 맨 아래 작은 줄(예: "다음 차례: 새 샷 → 샷 2"). */
   note?: string
+  /** 화면 읽기에 알린다(role="status"). 여럿이 동시에 뜨면 겹쳐 읽으니 부르는 쪽이 하나만 고른다(보드 · Director 는 첫 카드). 기본 false. */
+  announce?: boolean
   className?: string
 }
 
 /** 놓인 노드(부모 relative)를 꽉 채우는 기다림 카드. */
-export function NodeWaitCard({ lumi, title, description, progress, note, className }: NodeWaitCardProps) {
+export function NodeWaitCard({ lumi, title, description, progress, note, announce = false, className }: NodeWaitCardProps) {
   const pct = typeof progress === 'number' && Number.isFinite(progress) ? Math.max(0, Math.min(100, Math.round(progress))) : null
   return (
     <div
       data-stage={lumiStageTheme(lumi)}
-      role="status"
-      aria-live="polite"
+      role={announce ? 'status' : undefined}
+      aria-live={announce ? 'polite' : undefined}
       className={cn(
         'absolute inset-0 z-10 flex flex-col items-center justify-center gap-[15px] rounded-[inherit] bg-side p-[18px] text-center shadow-dialog',
         STAGE_FRAME,
         className,
       )}
     >
-      <Lumi persona={lumi} state="loading" size="s" />
+      <Lumi persona={lumi} state="loading" size="s" still />
       <div className="flex flex-col items-center gap-1">
         <p className="text-[14px] font-bold leading-[1.2] text-foreground">{title}</p>
         {description ? <p className="text-caption leading-[1.55] text-subtle-foreground">{description}</p> : null}

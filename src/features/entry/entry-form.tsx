@@ -337,7 +337,7 @@ function SettingsStep() {
       </footer>
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-        <DialogContent className="sm:max-w-md" showCloseButton={false}>
+        <DialogContent showCloseButton={false}>
           {/* 확인 창의 큰 Lumi(오너 11/3 결정 8) — 다른 단계 확인 창과 같은 공용 부품, 지금 단계(Producer) 옷 · 기본 모습. */}
           <ConfirmLumi stage="entry" />
           <DialogHeader>
@@ -357,7 +357,7 @@ function SettingsStep() {
           </dl>
           <p className="text-caption text-subtle-foreground">{t('You can change the genre and mood and the length again in Writer.')}</p>
           <DialogFooter>
-            <Button variant="ghost" onClick={() => setConfirmOpen(false)}>
+            <Button variant="secondary" onClick={() => setConfirmOpen(false)}>
               {t('No, let me fix it')}
             </Button>
             <Button

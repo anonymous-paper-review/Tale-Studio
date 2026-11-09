@@ -215,7 +215,7 @@ export function VideoNodePopup({ nodeId, data }: Props) {
   // effective(상속+override) 셋업을 프리셋으로 저장 (D-6, 결정 #46)
   return (
     <Dialog open onOpenChange={(o) => !o && closePopup()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent size="wide" className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span className="inline-block h-2 w-2 rounded-full bg-chart-5" />

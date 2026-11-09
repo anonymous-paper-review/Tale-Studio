@@ -4,6 +4,7 @@
 //   v3(2026-11-03 오너 결정 7): Writer 화면은 탭 없이 한 화면이라 기억한 탭을 불러오지 않는다(이 스토어의 탭은 늘 화면 보기).
 //   채팅에 붙인 문단도 여기 둔다 — 산문 본문이 붙이고, 채팅 입력칸이 칩으로 보이고 보낸다(lib/prose/paragraph-pick).
 //   보낸 문단은 수정안이 정해질 때까지 revising 에 남는다 — 고치는 동안 그 문단만 흐리게(11/5 시안 WL).
+//   고쳐 달라고 보낸 요청은 reviseAnnounce 에 남아, 수정안이 오면 채팅에 "S2를 고쳐 봤어요"를 한 번 남긴다(11/5 시안 WS).
 import { create } from 'zustand'
 import { nextParagraphPick, type ParagraphPick } from '@/lib/prose/paragraph-pick'
 import { useChatUiStore } from '@/stores/chat-ui-store'
@@ -60,6 +61,8 @@ interface WriterRoomState {
   paragraph: ParagraphPick | null
   /** 고쳐 달라고 보낸 문단(11/5 시안 WL) — 수정안이 정해질 때까지. 붙은 문단(칩)은 보내자마자 떨어지므로 따로 둔다. */
   revising: ParagraphPick | null
+  /** 수정안이 오면 채팅에 알릴 요청(오너 2026-11-09) — label = 고친 문단 번호(S2), 문단 없이 고쳐 달라고 했으면 null. 알리거나 내려가면 지운다. */
+  reviseAnnounce: { projectId: string; label: string | null } | null
   loadTab: () => void
   setTab: (tab: WorkspaceTab) => void
   openRewrite: () => void
@@ -73,6 +76,8 @@ interface WriterRoomState {
   clearParagraph: () => void
   setRevising: (pick: ParagraphPick) => void
   clearRevising: () => void
+  setReviseAnnounce: (marker: { projectId: string; label: string | null }) => void
+  clearReviseAnnounce: () => void
 }
 
 export const useWriterRoomStore = create<WriterRoomState>((set, get) => ({
@@ -84,6 +89,7 @@ export const useWriterRoomStore = create<WriterRoomState>((set, get) => ({
   chatFocusRequest: 0,
   paragraph: null,
   revising: null,
+  reviseAnnounce: null,
   loadTab: () => {
     if (get().tabLoaded) return
     set({ tab: readWorkspaceTab(), tabLoaded: true })
@@ -114,5 +120,9 @@ export const useWriterRoomStore = create<WriterRoomState>((set, get) => ({
   setRevising: (pick) => set({ revising: pick }),
   clearRevising: () => {
     if (get().revising) set({ revising: null })
+  },
+  setReviseAnnounce: (marker) => set({ reviseAnnounce: marker }),
+  clearReviseAnnounce: () => {
+    if (get().reviseAnnounce) set({ reviseAnnounce: null })
   },
 }))

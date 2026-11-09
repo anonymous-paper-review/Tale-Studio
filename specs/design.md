@@ -1,6 +1,6 @@
 ---
 name: tale-studio design system
-version: 1.1.0
+version: 1.1.1
 last_updated: 2026-11-09
 owner: shared
 canonical_implementation: src/app/globals.css
@@ -17,6 +17,16 @@ design_source: Figma 「Tale Studio 리뉴얼 (복사)」 11/5 판(v3 + 11/4 리
 > 룰을 어기는 코드는 사용자가 명시적으로 허락하지 않는 한 reject. 위반이 반복되면 본 문서 또는 hooks를 강화.
 
 ## 0. 이번 판(v1.1.0)이 바뀐 까닭
+
+### 1.1.1(2026-11-09 오너 결정 — "일단 추천대로 다 해주고")
+
+11/5 판을 맞춰 보며 시안과 지금 규칙이 부딪친 자리를 오너가 정했다(결정 페이지 11개, 모두 추천안).
+- 빛 · 단계 색 예외가 늘었다: R1 로그인 바탕의 흐린 빛(§9), R2 프로젝트 카드의 단계 색 점 · Director [영상 만드는 중] 단추의 단계 그라데이션 칠(규칙 3, 빛은 없음).
+- Writer 의 AI 수정안은 문서 안 **Writer 색 상자**(시안 WS). 10/02 "새로 써진 내용은 초록 바탕" 결정은 Producer 트리트먼트에만 남는다(§2.5).
+- 같은 단계 안에서 기다릴 때(WL 문단 다시 쓰기 · AR 다시 그리기)도 Lumi 를 보인다(투명 덮개 · 잠금은 그대로, §13.5).
+- 단계 넘기기: 채팅에서 물을 때만 단계 확인 단추(§13.9) — 화면 머리의 [다음 →] 단추 → 확인 창(`ConfirmLumi`)은 그대로.
+- 거절 단추 말은 "아니요"(예전 "아니오", 사전 값 한 곳).
+- 브라우저 탭 아이콘(파비콘) · 앱 아이콘 = 새 심볼(§15.3).
 
 **2026-11-09 오너 "새 버전으로 적용해줘" — 디자이너 11/5 판(11/4 리뷰 반영)을 적용한다.** 글은 그대로고, 바뀐 것은
 - SYS 규칙 "모든 팝업에 똑같이, 간격은 10 대신 15": 팝업 틀(§13.3) · 기다리는 카드(§13.5) · 노드 · 카드 위 기다림과 완성 표시(§13.5) · Lumi 크기 이름(§15.4).
@@ -66,6 +76,7 @@ tale-studio는 **AI 비디오 파이프라인 (Tale)** 의 제작 도구다. 이
 1. **Dark only.** 밝은 테마 · 밝은 화면 금지(마케팅 홈 시안도 어두운 바탕).
 2. **메인 단추는 크림 하나** (`--primary` #EDEAE0 바탕 · 어두운 글씨 `--primary-foreground`). 화면에 하나 — 나머지는 보조(카드색) · ghost.
 3. **지금 단계 색은 지금 단계의 칩 · 선택 · 배지에만** (`--stage`, §2.9 · §2.11). 한 화면에 단계 색은 하나(랜딩 히어로 흐린 빛만 예외, §9). 단계 색으로 단추를 칠하지 않는다.
+   예외(오너 2026-11-09): R2 프로젝트 카드의 단계 색 점(카드마다 그 프로젝트의 단계 색 — 여러 색이 한 화면에) · Director [영상 만드는 중] 단추의 단계 그라데이션 칠(빛 · 그림자는 넣지 않는다).
 4. **글꼴 = Pretendard(글자) + Inter(숫자 · 메타)**. 고정폭 글꼴은 두지 않는다(`font-mono` 도 Inter, §4.1).
 5. **No glassmorphism** — 반투명 + 배경 흐림(backdrop-blur) 판 금지. 판은 단색, 효과는 아래 그림자 하나(§9).
 6. **캔버스 확장 토큰** (`--canvas-*`, `--node-*`, `--edge-*`) 사용. 새 토큰 만들지 말 것.
@@ -102,6 +113,8 @@ source-of-truth는 `src/app/globals.css`. 본 섹션은 *역할*만 enumerate �
 | `--foreground` | 본문 글자 (Text) |
 | `--muted-foreground` | 보조 글자 (Text 2) — 설명 · 부제 |
 | `--subtle-foreground` | 흐린 글자 — 메타 · 힌트 · 자리표시 · 아직 안 연 단계 (시안 #8E8B82) |
+| `--faint-foreground` | 가장 흐린 기호 — 기다리는 카드의 남은 단계 ○ (11/5) |
+| `--progress-track` | 진행 막대 바닥(흰 8%) — 기다리는 카드 · 노드 위 기다림 (11/5) |
 | `--primary` / `--primary-foreground` | 크림 메인 단추 / 그 위 어두운 글씨 |
 | `--secondary` | 보조 단추 바탕 (= card) |
 | `--muted` | subdued surface (= card) |
@@ -160,8 +173,11 @@ v3 시안에는 테두리가 거의 없다(면 색 차이로 나눈다). 테두�
 
 **룰**: 상태는 **색 + icon + label** 3중. 상태 색은 상태 표현에만 — 단추를 칠하지 않는다.
 
-**생성 중 = 도는 빛**(카드 테두리 `.tale-beam`). 11/5 SYS "노드 위에서 기다릴 때"를 따라 Director **영상 노드**는 그 자리를 `NodeWaitCard`(Lumi S · 단계 색 테두리 1.5 · 안쪽 18, §13.5)로 바꾼다(붙이는 것은 set 갈래).
+**생성 중 = 도는 빛**(카드 테두리 `.tale-beam`). 11/5 SYS "노드 위에서 기다릴 때"를 따라 Director **영상 노드**와 Storyboard **러프 카드**(그리는 동안)는
+그 자리를 `NodeWaitCard`(Lumi S · 단계 색 테두리 1.5 · 안쪽 18, §13.5)로 바꾼다(붙인 곳: set 갈래 VideoNode · board 갈래 rough-storyboard-view).
 **그림**(스토리보드 4샷 시트)은 지금처럼 꼬리 글 + 도는 표시 그대로.
+
+**새로 써진 글**: Writer 의 AI 수정안(시안 WS)은 고친 문단 아래 문서 안 **Writer 색 상자**(오너 2026-11-09). 10/02 "새로 써진 내용은 초록 바탕"은 Producer 트리트먼트에만 남는다.
 
 ### 2.6 Focus ring
 
@@ -205,7 +221,8 @@ Tailwind: `bg-stage-{화면}` · `text-stage-{화면}` (+ 알파), `bg-stage-bad
 
 ### 2.10 채팅 색 (Lumi 개발 가이드)
 
-채팅창 틀은 **무채색 고정**, 지금 단계 색 하나만 아바타 바탕 12% · 단계 칩 · Lumi 이름 · 생각 중 점 · 고른 빠른 답 · 입력창 포커스에 쓴다.
+채팅창 틀은 **무채색 고정**, 지금 단계 색 하나만 단계 칩 · Lumi 이름 · 생각 중 점 · 고른 빠른 답 · 입력창 포커스에 쓴다.
+채팅 얼굴(`LumiAvatar`)은 **바탕 없이 Lumi 만** — 11/5 시안의 옆 채팅(W1 · A5 · WL · WS)과 가운데 채팅(P1 · P2) 모두 둥근 바탕이 없다(예전 가이드의 단계 색 12% 바탕은 뺐다).
 
 | 토큰 | 역할 |
 |---|---|
@@ -216,6 +233,7 @@ Tailwind: `bg-stage-{화면}` · `text-stage-{화면}` (+ 알파), `bg-stage-bad
 | `--chat-input` | 입력 알약 |
 | `--chat-send` | 보내기 단추 (= primary) |
 | `--chat-center-lumi-bubble` · `--chat-center-my-bubble` | **가운데 채팅**(Producer P1 · P2, 11/5) Lumi · 내 말풍선 — 바탕(shell)이 옆 채팅(side)보다 밝아 한 단씩 밝힌 값 |
+| `--chat-center-chip` | 가운데 채팅의 안 고른 빠른 답(`ChoiceChip tone="chat"`) — 내 말풍선과 같은 값 |
 | `--chat-summary` | 정리 표 상자 · "지금까지 정한 것" 묶음 (= side) |
 | `--chat-summary-cell` | 그 안의 칸 (= `--side-raised`) |
 
@@ -362,7 +380,8 @@ Tailwind v4 default. 설계 기준 **1440 × 900** (v3 시안 프레임). `xl:` 
 ### 6.3 Modal sizes
 
 `<DialogContent size>` — `default` 520 · `wide` 748(SYS, 스타일 고르기처럼 고르는 칸이 많은 팝업). 샷 · 인물 상세처럼 큰 작업 창은 부르는 쪽이 폭을 준다(1080 등).
-11/9 기준 예전 호출 자리 40여 곳이 `sm:max-w-*` 로 폭을 따로 준다 — 화면을 맡은 갈래가 지우고, 남은 것은 합친 뒤 한 번에 지운다.
+11/9 갈래를 합친 뒤 남은 `sm:max-w-*` 28곳을 지웠다(md · lg · xl → 520, 2xl · 3xl → `wide`, 스타일 고르기는 보기마다 덱 520 · 격자 wide).
+따로 폭을 주는 곳은 큰 작업 창 넷뿐이다: 샷 고치기 1080 · Artist 인물 상세 1080 · 샷/씬 추가 67rem · Artist 산문 재점검 min(56rem, 90vw).
 
 ### 6.4 Icon sizes
 
@@ -423,7 +442,8 @@ v3 는 면 색 차이로 나눈다 — **테두리는 기본으로 그리지 않
 | `shadow-node` | Director 노드 (0 8 24, 검정 35%) |
 
 브랜드 가이드: **효과는 아래 그림자 하나만**. glow · 테두리 빛 · backdrop-blur 금지.
-예외 하나: 랜딩 히어로 배경의 단계 색 흐린 빛(오너 2026-11-03, Home 시안 144-668 — 다섯 단계 색 타원 · 흐림 80, `src/app/page.tsx` `HERO_GLOWS`). 스튜디오 화면에는 여전히 금지.
+예외 둘: 랜딩 히어로 배경의 단계 색 흐린 빛(오너 2026-11-03, Home 시안 144-668 — 다섯 단계 색 타원 · 흐림 80, `src/app/page.tsx` `HERO_GLOWS`),
+R1 로그인 바탕의 흐린 빛(오너 2026-11-09, 시안 299:1619 — Writer · Storyboard 색 10% 타원 둘 · 흐림 160). 스튜디오 화면에는 여전히 금지.
 
 ---
 
@@ -515,8 +535,11 @@ Radix primitive 는 body 로 portal — `<html data-stage>` 덕에 지금 단계
 
 shadcn `Dialog`(`src/components/ui/dialog.tsx`) — **11/5 SYS "모든 팝업에 똑같이"**(R3 기준):
 너비 520 · 넓은 팝업 748(`size="wide"`) · 안쪽 위아래 50 · 양옆 30 · 블록 사이 20 · 모서리 22 · `shadow-dialog`(0 30 80 검정 55%) · 막 검정 60% · 바탕 `bg-side`.
-`DialogHeader` = 제목 묶음(Lumi · 제목 · 설명) 가운데 · 사이 15 · 위아래 6. 제목 20 Bold, 설명 13.5 · 줄 150% · `text-subtle-foreground`. 닫기 X 24px(위 13 · 오른쪽 23).
-`DialogFooter` 단추는 오른쪽 정렬 · 사이 8 · 둥근 알약(11/18 · 14 600) — 취소 `variant="secondary"`(#30302E), 확인 기본(크림).
+`DialogHeader` = 제목 묶음(Lumi · 제목 · 설명) 가운데 · 사이 15 · 위아래 6. 제목 20 Bold, 설명 13.5 · 줄 150% · `text-subtle-foreground`.
+닫기 ✕ = 24 틀을 채우는 X(획 18.5px · 둥근 끝 2.1, 시안 글자 ✕ 24px 와 같은 크기), 가운데가 위 29 · 오른쪽 34. 숨은 이름은 한국어 화면에서 "닫기".
+`DialogFooter` 단추는 오른쪽 정렬 · 사이 8 · 둥근 알약(11/18 · 14 600) — 취소 `variant="secondary"`(#30302E), 확인 기본(크림). 일부러 다른 셋째 단추(예: 새 프로젝트 창 [← 이전])는 그대로.
+**큰 작업 창**(`frame="work"`: 샷 고치기 1080 · 샷/씬 추가 67rem · Artist 인물 상세 1080 · 산문 재점검)은 시안이 없고 폭도 부르는 쪽이 정해,
+머리 · 여백 · 단추는 예전 모양(왼쪽 머리 · 제목 18 600 · 안쪽 24 · 알약 아님)으로 둔다(리드 2026-11-09). 바탕 · 모서리 · 그림자 · 닫기는 SYS 와 같다.
 **확인 팝업**(큰 일을 하기 전에 "~할까요?"를 묻는 창 — 단계 넘기기 · 확정) 맨 위에는 큰 Lumi `<ConfirmLumi stage={지금 단계} />`
 (`src/components/handoff/confirm-lumi.tsx`: 지금 단계 옷 · `idle` · SYS "팝업 제목 위" M 78, 단계 밖 팝업은 `persona="pearl"`). 자리는 `DialogHeader` 안 맨 위 — Header 앞에 둔 창도 틀이 Lumi · 제목 사이를 15 로 맞춘다. 지우기 확인 · 오류 안내에는 넣지 않는다. 지금 쓰는 곳: Producer 시작 확인(`features/entry/entry-form.tsx`) · Writer 로 넘기기 전 확정 창(`handoff/producer-lock-dialog.tsx`) · 산문 확정(`features/prose/prose-confirm-dialog.tsx`) · Artist 그림체 고르기 · 다시 만들기 · 완료(`features/artist-room/style-make-dialog.tsx` · `regenerate-style-dialog.tsx` · `artist-complete-dialog.tsx`) · Storyboard → Director 넘기기(`features/writer/storyboard-director-dialog.tsx`) · Director 로 넘기기 전 준비 창(`handoff/director-readiness-dialog.tsx`) · Director 다시 만들기 · 영상 만들기 확인(`features/director/regenerate-confirm-dialog.tsx`).
 
@@ -534,14 +557,14 @@ Lumi L(100, `loading`, 일이 멈춰 실패 안내가 되면 `error`) → 제목
 색 = Lumi 옷(기본 화이트 펄 + 단계 6색 = 7가지, 화이트 펄 · 완성 옷이면 놓인 화면의 색). 막대는 단계 색 기울기 — 시안은 단색이지만 출시 테스트가 기울기를 못 박아 결정 대기. 옷 = 넘어가는 다음 단계. 쓰는 곳: Producer 글 읽기 · Writer 산문 초안(Producer 에서 넘길 때 · Writer 화면) · Artist 그림 ·
 Storyboard 나누기 · 첫 러프. 설명은 부르는 쪽이 준다 — 안 주면 잠금 안내("AI가 작업하는 동안은 화면과 채팅이 잠겨요…", 출시 테스트 고정), `description={null}` 이면 설명 줄을 비운다.
 진행 정도(`progress`)를 안 주면 막대가 없다.
-같은 단계 안에서 기다릴 때(11/5 WL 문단 다시 쓰기 · AR 다시 그리기): `scrim="clear"` 는 바탕을 칠하지 않고 카드만 가운데 — 잠금(단계 화면 · 채팅 inert, 레일 붙잡기)은 그대로고,
+같은 단계 안에서 기다릴 때(11/5 WL 문단 다시 쓰기 · AR 다시 그리기)도 카드에 그 단계 옷 Lumi 를 보인다(오너 2026-11-09). `scrim="clear"` 는 바탕을 칠하지 않고 카드만 가운데 — 잠금(단계 화면 · 채팅 inert, 레일 붙잡기)은 그대로고,
 덮개가 받은 휠 · 손가락 끌기를 포인터 아래 `[data-ai-busy-scroll]` 칸으로 넘겨 보기 · 스크롤만 된다(`src/lib/ai-busy-scroll.ts`, 칸이 겹치면 안쪽 칸).
 `card="loading"` 은 Lumi 없이 같은 새 카드(그림만 없음, 색은 놓인 화면의 지금 단계). 약속 tests/project/busy-overlay-clear.test.ts. 덮개 없이 화면 가운데에 큰 Lumi `loading`(폭 300)만 두는 곳: 새 프로젝트 만들기(`/projects/new`, Producer 옷 · 실패면 `error`) ·
 Editor 클립 준비. `lumi` 를 안 주는 잠금(그림 다시 그리기 · 샷 고치기 팝업 위 등)은 도는 원의 작은 카드 그대로(약속 tests/project/busy-overlay-lumi.test.ts).
 실패 안내의 오류 모습 큰 Lumi 도 단계를 넘어가는 기다림의 실패에만 둔다 — Storyboard 보드에서 컷을 다시 그리다 난 실패는 작은 카드(약속 tests/writer/board-wait-lumi.test.ts).
 
-**노드 · 카드 위에서 기다릴 때**(SYS, DG 기준) — `src/components/feedback/node-wait.tsx` `<NodeWaitCard lumi title description? progress? note? />`:
-그 노드(부모 `relative`)를 꽉 덮고 여백 18 · Lumi S(56, 만드는 중) · 단계 색 테두리 1.5(`STAGE_FRAME`) · 제목 14 Bold · 설명 12.5 · 막대. 한 번에 하나씩 덮고 나머지 노드는 그대로 둔다(붙이는 쪽이 정한다).
+**노드 · 카드 위에서 기다릴 때**(SYS, DG 기준) — `src/components/feedback/node-wait.tsx` `<NodeWaitCard lumi title description? progress? note? announce? />`(화면 읽기 알림 `announce` 는 여럿 중 하나만 — 보드 · Director 는 첫 카드):
+그 노드(부모 `relative`)를 꽉 덮고 여백 18 · Lumi S(56, 만드는 중, 늘 그림 `still` — 여럿 떠도 WebGL 문맥을 열지 않는다) · 단계 색 테두리 1.5(`STAGE_FRAME`) · 제목 14 Bold · 설명 12.5 · 막대. 한 번에 하나씩 덮고 나머지 노드는 그대로 둔다(붙이는 쪽이 정한다).
 **완성 표시**: 단계 그라데이션 "✓ 완성" 알약(`<DoneBadge lumi? />`) + 단계 색 테두리(`STAGE_FRAME`). DG 그림의 완성 노드에 있는 단계 색 빛(0 0 24)은 §9 빛 금지라 넣지 않았다. 약속 tests/project/node-wait.test.ts · tests/project/loading-card.test.ts.
 
 ### 13.8 Component patterns (shadcn primitives)
@@ -567,7 +590,7 @@ Editor 클립 준비. `lumi` 를 안 주는 잠금(그림 다시 그리기 · �
 | `OptionCard` (`title` · `description` · `selected` · `recommended`) | 길이 · 화면 비율 · 바꿈 정도 — 안 사이 9(11/5) |
 | `RecommendBadge` | "추천" — 지금 단계 색 |
 | `StageChip` (`stage`) | 위 막대 · 단계 표시 — 배지 그라데이션 |
-| `StageConfirm` (`stage` · `onConfirm` · `onRevise` · `tone="screen\|chat"`) | 단계를 넘길지 묻는 한 쌍(11/5 Control/Stage Confirm) — 왼쪽 크림 알약 = 다음 단계 아이콘 + "좋아요, 산문 쓰기로 / 그림 그리기로 / 콘티 짜기로 / 연출하기로 / 편집하기로 / 완성하기", 오른쪽 "아니요, 더 고칠래요"(chat 이면 한 단계 밝은 바탕). 약속 tests/project/stage-confirm.test.ts |
+| `StageConfirm` (`stage` · `onConfirm` · `onRevise` · `tone="screen\|chat"`) | 단계를 넘길지 묻는 한 쌍(11/5 Control/Stage Confirm) — 왼쪽 크림 알약 = 다음 단계 아이콘 + "좋아요, 산문 쓰기로 / 그림 그리기로 / 콘티 짜기로 / 연출하기로 / 편집하기로 / 완성하기", 오른쪽 "아니요, 더 고칠래요"(chat 이면 한 단계 밝은 바탕). **채팅에서 넘길지 물을 때만** 쓴다 — 화면 머리 [다음 →] 단추 → 확인 창(`ConfirmLumi`)은 그대로(오너 2026-11-09). 약속 tests/project/stage-confirm.test.ts |
 
 ### 13.10 Chat panel (v3)
 
@@ -616,7 +639,7 @@ Figma 에 있는 v3 아이콘은 `v3-icons.tsx` 에 더한다(이름 `<Name>Icon
 
 - 로고 심볼 `public/brand/tale-symbol.svg`(어두운 바탕용) — 11/5 새 심볼 "반쪽 T · 꼬리 · 물방울"(브랜드 가이드 157:687 그대로, 캔버스 225:198 = 그림자 자리를 품은 틀). 레일 맨 위 30×26.
 - 로고 묶음 `src/components/tale-lockup.tsx` `TaleLockup size={틀 높이}`(심볼 + 글자 "tale studio", v3 Logo/Tale Lockup) — 로그인 32 · 홈 36 · 프로젝트 목록 26(11/5 시안), 대시보드 머리 · 랜딩 머리 · 꼬리말.
-- 앱 아이콘 · 파비콘(`src/app/icon.png` 512 · `favicon.ico` 16 · 32 · 48)도 새 심볼(브랜드 가이드 "심볼만 쓸 때: 사이드바 홈 30px · 앱 아이콘 · 파비콘").
+- 앱 아이콘 · 브라우저 탭 아이콘(파비콘, `src/app/icon.png` 512 · `favicon.ico` 16 · 32 · 48)도 새 심볼(오너 2026-11-09 확정)(브랜드 가이드 "심볼만 쓸 때: 사이드바 홈 30px · 앱 아이콘 · 파비콘").
   가이드에 크기 · 바탕 · 여백 규격이 없어 예전 파일의 틀을 그대로 따랐다(11/9 리드): 투명 바탕 · 보이는 내용(그림자 포함)의 긴 변이 캔버스의 82%(512) / 83~88%(작은 크기마다 예전 값) · 가운데.
 - 색 · 기울기 · 겹침 색을 바꾸지 않는다, 심볼에 테두리 · 흰 광택을 넣지 않는다(브랜드 가이드 "로고 쓰는 법").
 

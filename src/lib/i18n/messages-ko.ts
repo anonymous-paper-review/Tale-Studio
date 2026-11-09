@@ -100,7 +100,6 @@ export const KO: Record<string, string> = {
   "Propose from latest version": "최신 내용으로 다시 제안",
   "Apply or discard the current scene story proposal before requesting another.": "현재 씬 스토리 수정안을 적용하거나 버린 뒤 다시 요청해 주세요.",
   "Could not update the scene story proposal. Please try again.": "씬 스토리 수정안을 처리하지 못했어요. 다시 시도해 주세요.",
-  "Creating a scene story proposal. You can keep chatting and editing while it is prepared.": "씬 스토리 수정안을 만들고 있어요. 기다리는 동안 계속 채팅하거나 직접 고칠 수 있어요.",
   "Edit manually": "직접 고치기",
   "Edit with AI": "AI 고치기",
   "View AI proposal": "AI 수정안 보기",
@@ -1218,6 +1217,10 @@ export const KO: Record<string, string> = {
   // 11/5 시안 DG(2026-11-09): 툴바 영상 단추가 도는 동안 · 만드는 영상 노드의 기다리는 카드 · 묶음에서 차례를 기다리는 샷
   'Making videos': '영상 만드는 중',
   'Click to stop': '누르면 멈춰요',
+  '{status}, click to stop': '{status}, 누르면 멈춰요',
+  // Director 넘기기 질문의 키 안내(단계 확인 단추와 같은 말, 2026-11-09)
+  'Start editing': '편집하기로',
+  'Edit more': '더 고칠래요',
   'Making the video': '영상을 만들고 있어요',
   'Up next: {names}': '다음 차례: {names}',
   '{names} and {count} more': '{names} 외 {count}개',
@@ -1534,6 +1537,8 @@ export const KO: Record<string, string> = {
   Duration: '길이',
   // ── misc: queue/page.tsx ──
   'In progress': '진행 중',
+  // 기다리는 카드 단계 줄의 숨은 글(화면 읽기) — 끝난 줄은 Done(완료), 남은 줄은 이것
+  Remaining: '남음',
   Completed: '완료',
   'Zombie {age}': '좀비 {age}',
   'Checked {checked} stale, settled {settled}': 'Stale {checked}건 확인, {settled}건 종결',
@@ -2447,7 +2452,7 @@ export const KO: Record<string, string> = {
   'Material': '자료',
   'Idea text only': '아이디어 글만',
   'You can change the genre and mood and the length again in Writer.': '장르·분위기와 길이는 Writer에서 다시 바꿀 수 있어요.',
-  'No, let me fix it': '아니오, 고칠래요',
+  'No, let me fix it': '아니요, 고칠래요',
   'Yes, start': '예, 시작',
   'This project has started': '시작한 프로젝트예요',
   'The Producer settings are done and cannot be changed. Continue in Writer.': 'Producer 설정은 끝나서 고칠 수 없어요. Writer에서 이어서 작업하세요.',
@@ -2519,7 +2524,6 @@ export const KO: Record<string, string> = {
   'The prose is not ready yet. Wait until it is written, then confirm it.': '산문을 아직 다 쓰지 않았어요. 다 쓴 뒤 확정해 주세요.',
   'Could not confirm the prose. Please try again.': '산문을 확정하지 못했어요. 다시 시도해 주세요.',
   'Prose confirmed. Artist is opening.': '산문을 확정했어요. Artist로 가요.',
-  'Yes, go to the next step': '좋아요, 다음 단계로',
   'No, I want to edit more': '아니요, 더 고칠래요',
   // 11/5 단계 확인 단추(Control/Stage Confirm) — 다음 단계에서 하는 일
   'Yes, write the prose': '좋아요, 산문 쓰기로',
@@ -2552,7 +2556,7 @@ export const KO: Record<string, string> = {
   'I wrote the prose. If you do not like it, say "Rewrite it" or tell me what to change.': '산문을 썼어요. 마음에 안 들면 "다시 써줘"라고 하거나 고치고 싶은 걸 말해 주세요.',
   'Idea material': '아이디어 소재',
   'No prose yet': '아직 산문이 없어요',
-  'No': '아니오',
+  'No': '아니요',
   'Once you confirm, the prose is locked and cannot be changed.': '확정하면 산문이 잠겨서 고칠 수 없어요.',
   'Pick one and apply it, or discard them. Your prose stays as it is until you apply.': '하나를 골라 적용하거나 버려 주세요. 적용하기 전까지 산문은 그대로예요.',
   'Prose tools': '산문 도구',
@@ -2584,6 +2588,14 @@ export const KO: Record<string, string> = {
   // 산문을 고치는 동안 기다리는 창 단계(11/5 시안 WL) — 요청 읽기 → 수정안 쓰는 중 → 바뀐 곳 표시.
   'Writing the change': '수정안 쓰는 중',
   'Marking the changes': '바뀐 곳 표시',
+  'Revising {label}. You can still read the other scenes.': '{label}{ul} 고치는 중이에요. 다른 씬은 그대로 볼 수 있어요.',
+  // 수정안이 오면(11/5 시안 WS) — Lumi 말 · 채팅 칩 · 산문 안 상자.
+  'I revised {label}. The changes are marked in the prose. The original stays as it is until you press [Apply].': '{label}{ul} 고쳐 봤어요. 바뀐 곳은 산문에 표시해 뒀어요. [적용] 전에는 원래 글 그대로예요.',
+  'I revised the prose. The changes are marked in the prose. The original stays as it is until you press [Apply].': '산문을 고쳐 봤어요. 바뀐 곳은 산문에 표시해 뒀어요. [적용] 전에는 원래 글 그대로예요.',
+  'Proposal · {labels} · {count} changed': '수정안 · {labels} · {count}곳',
+  'AI proposal': 'AI 수정안',
+  'Lumi is writing the change': 'Lumi가 수정안을 쓰고 있어요',
+  'This scene is removed in the proposal.': '수정안에서는 이 씬이 빠져요.',
   'Revising the prose': '산문을 고치고 있어요',
   // v3 2단계 Writer 산문 · Artist 카드(2026-11-03 오너) — 한 화면 · 문단 붙이기 · 조건 칩 · 걸러 보기
   'Please change only paragraph {label}. "{excerpt}"': '{label} 문단만 고쳐 주세요. "{excerpt}"',

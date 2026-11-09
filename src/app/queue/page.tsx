@@ -378,7 +378,7 @@ export default function QueuePage() {
           }
         }}
       >
-        <DialogContent className="max-h-[80vh] max-w-2xl overflow-y-auto">
+        <DialogContent size="wide" className="max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-mono text-sm">
               {String(detail?.kind ?? '')} · {String(detail?.status ?? '')}

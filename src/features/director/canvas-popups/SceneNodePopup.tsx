@@ -79,7 +79,7 @@ export function SceneNodePopup({ nodeId, data }: Props) {
 
   return (
     <Dialog open onOpenChange={(o) => !o && closePopup()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <span className="inline-block h-2 w-2 rounded-full bg-chart-3" />

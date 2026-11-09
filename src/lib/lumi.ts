@@ -73,12 +73,15 @@ export function lumiRenderMode({
   webgl,
   reducedMotion,
   script,
+  still = false,
 }: {
   webgl: boolean | null
   reducedMotion: boolean
   script: LumiScriptStatus
+  /** 늘 그림으로(여러 개가 한꺼번에 뜨는 작은 자리 — WebGL 문맥을 열지 않는다). */
+  still?: boolean
 }): LumiRenderMode {
-  if (webgl !== true || script !== 'ready') return 'still'
+  if (still || webgl !== true || script !== 'ready') return 'still'
   return reducedMotion ? 'paused' : 'animated'
 }
 

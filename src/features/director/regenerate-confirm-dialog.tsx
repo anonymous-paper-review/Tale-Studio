@@ -47,7 +47,7 @@ export function RegenerateConfirmDialog({
   const t = useT()
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <ConfirmLumi stage="director" />
         <DialogHeader className="items-center text-center sm:text-center">
           <DialogTitle>{title}</DialogTitle>
@@ -61,7 +61,7 @@ export function RegenerateConfirmDialog({
           </ul>
         )}
         <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>
+          <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={busy}>
             {t('Cancel')}
           </Button>
           <Button onClick={onConfirm} disabled={busy}>

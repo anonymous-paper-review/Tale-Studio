@@ -179,11 +179,9 @@ export function StyleAnchorPicker({
     >
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent
-        className={cn(
-          // 뷰별 팝업 폭 + 전환 애니메이션(#b1) — 덱은 좁게, 그리드는 넓게, max-width 를 트랜지션.
-          'transition-[max-width] duration-300 ease-out',
-          view === 'grid' ? 'sm:max-w-2xl' : 'sm:max-w-lg',
-        )}
+        // 뷰별 팝업 폭(#b1, 11/5 SYS) — 덱은 기본 520, 그리드는 넓은 748. 폭이 바뀔 때 max-width 를 트랜지션.
+        size={view === 'grid' ? 'wide' : 'default'}
+        className="transition-[max-width] duration-300 ease-out"
         // 키보드 확정(#style-keys 2026-08-11) — ←/→ 로 덱을 넘기고 Enter 로 앞 카드를 확정한다.
         //   자동 오픈된 팝업을 마우스 없이 닫을 수 있는 유일한 긍정 경로(Esc 는 취소).
         onKeyDown={(e) => {

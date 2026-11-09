@@ -51,7 +51,8 @@ describe('혼자 정한 것', () => {
   })
 
   // 왜: 정상 경로 고정. 사용자가 답하려던 질문(선택지 등)은 넘기기 질문이 소리 없이 밀어내지 않는다.
-  it('Director 첫 안내가 아닌 다른 제안이 떠 있으면 넘기기 질문은 지금처럼 자리가 빌 때까지 기다린다', () => {
+  //   (문장은 검토 B 2번 뒤 리드 2026-11-09 승인으로 고침: 단추 없는 Director 안내는 이제 모두 비킨다.)
+  it('단추가 있는 다른 제안(선택지 등)이 떠 있으면 넘기기 질문은 지금처럼 자리가 빌 때까지 기다린다', () => {
     const choices: ChatSuggestion = {
       id: 'choices:director',
       stage: 'director',
@@ -64,5 +65,22 @@ describe('혼자 정한 것', () => {
     offerEditorHandoff(PROJECT, handoff)
 
     expect(useGlobalChatStore.getState().suggestion?.id).toBe('choices:director')
+  })
+
+  // 왜: 두 번째 방문부터는 "채워 두면 좋은 것" 안내(단추 없음)가 2초 뒤 제안 자리를 잡고, 채팅이 닫혀 있어 내려가지 않는다.
+  //   첫 안내만 비키게 했더니 이 경우 넘기기 질문의 단추가 다시 안 떴다(검토 B 2번, 리드 2026-11-09).
+  it('Director 단계의 단추 없는 안내가 떠 있어도 Editor로 넘길지 묻는 질문에는 단추가 뜬다', () => {
+    useGlobalChatStore.getState().offerSuggestion({
+      id: `director-gaps-${PROJECT}`,
+      stage: 'director',
+      content: '채워 두면 좋은 것이 2개 있어요.',
+      action: null,
+    })
+
+    offerEditorHandoff(PROJECT, handoff)
+
+    const shown = useGlobalChatStore.getState().suggestion
+    expect(shown?.id).toBe(handoff.id)
+    expect(shown?.action).toMatchObject({ kind: 'handoff', label: 'Editor로 넘기기' })
   })
 })

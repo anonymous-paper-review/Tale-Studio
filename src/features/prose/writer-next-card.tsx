@@ -6,7 +6,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ArrowRight, Loader2, MessageSquare, Pencil, Sparkles } from 'lucide-react'
+import { MessageSquare, Pencil, Sparkles } from 'lucide-react'
+import { StageConfirm } from '@/components/controls/stage-confirm'
 import { Button } from '@/components/ui/button'
 import { useT } from '@/lib/i18n'
 import { withDemoShare } from '@/lib/demo/context'
@@ -54,15 +55,16 @@ export function WriterNextCard({ step, onChatFocus }: { step: 'ask' | 'more'; on
   }
 
   if (step === 'ask') {
+    // 11/5 시안 단계 확인 단추(오너 2026-11-09 결정 1) — 「좋아요, 그림 그리기로」 · 「아니요, 더 고칠래요」. 하는 일은 그대로(산문 확정 · 할 일 보기).
     return (
-      <div className="mt-2 flex flex-wrap items-center gap-2 px-1" data-testid="writer-next-ask">
-        <Button size="sm" onClick={() => void confirm.run()} disabled={confirm.busy}>
-          {confirm.busy ? <Loader2 className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
-          {t('Yes, go to the next step')}
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => useGlobalChatStore.getState().offerWriterNext('more')} disabled={confirm.busy}>
-          {t('No, I want to edit more')}
-        </Button>
+      <div className="mt-2 px-1" data-testid="writer-next-ask">
+        <StageConfirm
+          stage="producer"
+          tone="chat"
+          disabled={confirm.busy}
+          onConfirm={() => void confirm.run()}
+          onRevise={() => useGlobalChatStore.getState().offerWriterNext('more')}
+        />
       </div>
     )
   }

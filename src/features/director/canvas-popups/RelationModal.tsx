@@ -49,7 +49,7 @@ export function RelationModal() {
 
   return (
     <Dialog open onOpenChange={(o) => !o && handleCancel()}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>{t('Define relationship')}</DialogTitle>
           <DialogDescription>
@@ -73,7 +73,7 @@ export function RelationModal() {
         </div>
 
         <DialogFooter>
-          <Button variant="ghost" size="sm" onClick={handleCancel}>
+          <Button variant="secondary" size="sm" onClick={handleCancel}>
             {t('Cancel')}
           </Button>
           <Button size="sm" onClick={handleSubmit}>

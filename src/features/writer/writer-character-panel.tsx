@@ -156,7 +156,7 @@ export function WriterCharacterPanel({
 
       {/* 캐릭터 템플릿 팝업 — 턴어라운드 시트(view_main) 전체 보기 */}
       <Dialog open={detail !== null} onOpenChange={(o) => !o && setDetail(null)}>
-        <DialogContent className="sm:max-w-3xl">
+        <DialogContent size="wide">
           {detail ? (
             <>
               <DialogHeader>

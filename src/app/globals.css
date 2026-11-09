@@ -145,6 +145,7 @@
   --color-chat-user-bubble-foreground: var(--chat-user-bubble-foreground);
   --color-chat-center-lumi-bubble: var(--chat-center-lumi-bubble);
   --color-chat-center-my-bubble: var(--chat-center-my-bubble);
+  --color-chat-center-chip: var(--chat-center-chip);
   --color-chat-summary: var(--chat-summary);
   --color-chat-summary-cell: var(--chat-summary-cell);
   --color-side-raised: var(--side-raised);
@@ -286,6 +287,7 @@
   /* 11/5 가운데 채팅(Producer P1 · P2) — 바탕(shell)이 옆 채팅 바탕(side)보다 밝아 말풍선을 한 단씩 밝혔다 */
   --chat-center-lumi-bubble: #34332f;
   --chat-center-my-bubble: #45443f;
+  --chat-center-chip: var(--chat-center-my-bubble); /* 가운데 채팅 빠른 답(안 고른 것) — 시안 #45443F, 내 말풍선과 같은 값 */
   /* 정리 표 상자 · "지금까지 정한 것" 묶음(바탕보다 한 단 어둡다)과 그 안의 칸 */
   --chat-summary: var(--side);
   --chat-summary-cell: var(--side-raised);

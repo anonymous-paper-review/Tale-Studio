@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { StageConfirm } from '@/components/controls/stage-confirm'
 import { useImageUploadConsent } from '@/components/upload/image-upload-consent'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -1405,12 +1406,7 @@ export function GlobalChat() {
         {/* Header(v3) — "Lumi와 산문 이야기"처럼 지금 단계에서 하는 일 + 그 단계 옷을 입은 Lumi. 대화는 모든 단계가 이어지는 하나다
             (#chat-continuity) — 구간 구분선이 단계를 가른다. 답을 기다리는 동안 Lumi 는 생각하는 모습. */}
         <div className="flex shrink-0 items-center gap-2 pb-3 pl-5 pr-3.5 pt-4">
-          <LumiAvatar
-            persona={STAGE_PERSONA[currentStage]}
-            state={chatLumiState({ loading, error: !!error })}
-            size={28}
-            bare
-          />
+          <LumiAvatar persona={STAGE_PERSONA[currentStage]} state={chatLumiState({ loading, error: !!error })} size={28} />
           <h2 className="min-w-0 flex-1 truncate text-label font-semibold text-foreground">{t(STAGE_CHAT_TITLE[currentStage])}</h2>
           {/* 다음 단계 호출 칩(#owner-handoff-reentry 2026-08-31)은 2026-10-01 오너 지시("채팅 위의 버튼은 없애줘")로
               각 단계 화면 오른쪽 위 NextStepButton 으로 옮겼다 — 같은 문장을 채팅에 입력해 넘긴다. */}
@@ -1546,7 +1542,7 @@ export function GlobalChat() {
             {projectId && sceneStoryProposal ? (
               sceneStoryProposal.variants?.length
                 ? currentStage === 'producer' ? null : <SceneStoryRewriteCard key={`${projectId}:${sceneStoryProposal.id}`} projectId={projectId} proposal={sceneStoryProposal} />
-                : <SceneStoryProposalCard key={`${projectId}:${sceneStoryProposal.id}`} projectId={projectId} proposal={sceneStoryProposal} />
+                : <SceneStoryProposalCard key={`${projectId}:${sceneStoryProposal.id}`} projectId={projectId} proposal={sceneStoryProposal} look={currentStage === 'producer' ? 'writer' : 'card'} />
             ) : null}
             {projectId && sceneStoryUndo && currentStage !== 'producer' ? <SceneStoryUndoCard key={`${projectId}:${sceneStoryUndo.id}`} projectId={projectId} undo={sceneStoryUndo} /> : null}
 
@@ -1576,6 +1572,20 @@ export function GlobalChat() {
                   <WriterNextCard step={suggestion.action.step} />
                 ) : suggestion.action?.kind === 'artistVersions' ? (
                   <StyleReturnCard options={suggestion.action.options} regenerate={suggestion.action.regenerate} />
+                ) : suggestion.action?.kind === 'handoff' && suggestion.stage === 'director' ? (
+                  // Director 의 Editor 넘기기 질문은 시안의 단계 확인 단추(오너 2026-11-09 결정 1, 추천 ㉢): 「좋아요, 편집하기로」 = 예전
+                  //   [Editor로 넘기기](넘김 문장을 보낸다), 「아니요, 더 고칠래요」 = 예전 [나중에](접어 둔다). 약속: tests/director/editor-handoff-confirm.test.ts
+                  <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
+                    <StageConfirm stage="director" tone="chat" onConfirm={() => void handleSuggestionAction()} onRevise={deferSuggestion} />
+                    {/* 키 안내도 새 단추와 같은 말로(리드 2026-11-09): Enter = 편집하기로, Esc = 더 고칠래요(접어 두기). */}
+                    {suggestionOpen && (
+                      <span className="text-[10px] text-muted-foreground">
+                        <kbd className="rounded border border-border bg-muted px-1">Enter</kbd> {t('Start editing')}
+                        {' · '}
+                        <kbd className="rounded border border-border bg-muted px-1">Esc</kbd> {t('Edit more')}
+                      </span>
+                    )}
+                  </div>
                 ) : (suggestion.action || suggestion.dismissible !== false) && (
                   <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
                     {/* kind: 'choices' 는 여기 오지 않는다 — 입력창 앵커 선택지(#p4-choices v2) */}
@@ -2143,7 +2153,7 @@ export function GlobalChat() {
           >
             <ExpandIcon className="size-4" />
           </Button>
-          <LumiAvatar persona={STAGE_PERSONA[currentStage]} state={chatLumiState({ loading, error: !!error })} size={26} bare />
+          <LumiAvatar persona={STAGE_PERSONA[currentStage]} state={chatLumiState({ loading, error: !!error })} size={26} />
         </aside>
       )}
       {imageUploadConsentDialog}
