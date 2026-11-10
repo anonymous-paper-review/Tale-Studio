@@ -25,6 +25,7 @@ import type {
   Scenes,
   StoryScene,
   SceneDecoupage,
+  PipelineInput,
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 import type { AppLocale } from '@/lib/locale';
@@ -178,6 +179,55 @@ const DEFAULT_SCENE_CONCURRENCY = (() => {
   return Number.isFinite(raw) && raw >= 1 ? Math.min(Math.floor(raw), MAX_SCENE_CONCURRENCY) : 4;
 })();
 
+// == 고른 길이 맞춤 == (오너 2026-11-10 추천안 "고른 길이 안으로 맞춘다 — 넘으면 샷을 줄여 다시 나눈다").
+//   Producer 에서 길이(15초 이하 · 15~60초 · 1~5분 · 5~20분)를 골랐으면 그 구간의 위 끝(input.runtimeSeconds)이 샷 길이 합의
+//   상한이다. 씬마다 산문이 나눠 둔 시간(estimated_seconds — 합이 고른 길이) 안에서 샷 수 상한까지만 나누게 하고,
+//   그래도 합이 넘으면 넘은 씬만 샷을 줄여 한 번 더 나눈다. "대본 그대로"(preserveScript — 길이 = 대본)는 맞추지 않는다.
+//   약속: tests/writer/runtime-fit.test.ts
+
+/** 씬마다 샷 수 상한을 셀 때 쓰는 샷 하나의 길이(초). 저장 때 동작 · 대사 시간으로 늘어난 뒤의 실측 평균이다
+ *  (11/10 점검: C01 41초/8샷 · C07 31초/6샷 ≈ 5초, C04 63초/14샷 ≈ 4.5초) — 샷 나누기의 의도 길이(평균 3~4초)로 세면 저장 뒤 넘친다. */
+export const RUNTIME_FIT_SHOT_SECONDS = 5;
+
+/** 고른 길이(초) — 사용자가 길이를 골랐을 때만. 대본 그대로 · 길이 없음이면 null(맞추지 않는다). */
+export function runtimeFitCap(input: Pick<PipelineInput, 'runtimeSeconds' | 'preserveScript'>): number | null {
+  if (input.preserveScript) return null;
+  const seconds = input.runtimeSeconds;
+  return typeof seconds === 'number' && Number.isFinite(seconds) && seconds > 0 ? seconds : null;
+}
+
+/** 이 씬 시간 안에서 나눌 수 있는 샷 수 상한 — 적어도 1샷. */
+export function runtimeFitShotCap(sceneSeconds: number): number {
+  return Math.max(1, Math.floor(sceneSeconds / RUNTIME_FIT_SHOT_SECONDS));
+}
+
+/** 샷 나누기 지시에 붙는 시간 예산 — 고른 길이가 있을 때만. retry = 앞 나누기가 넘어서 다시 나누는 중(그때의 합 · 샷 수). */
+interface RuntimeFit {
+  capSeconds: number;
+  retry?: { seconds: number; shots: number };
+}
+
+function sceneShotSeconds(shots: Array<{ intended_duration_seconds?: number }>): number {
+  return shots.reduce((sum, shot) => sum + (Number(shot.intended_duration_seconds) || 0), 0);
+}
+
+function runtimeBudgetBlock(scene: StoryScene, fit: RuntimeFit): string {
+  const seconds = scene.estimated_seconds;
+  // 다시 나눌 때는 앞 나누기보다 적은 샷으로(오너 추천안 "샷을 줄여") — 적어도 1샷.
+  const maxShots = fit.retry
+    ? Math.max(1, Math.min(runtimeFitShotCap(seconds), fit.retry.shots - 1))
+    : runtimeFitShotCap(seconds);
+  const retry = fit.retry
+    ? `\n앞 나누기는 이 씬을 ${fit.retry.seconds}초로 나눠 고른 길이를 넘었다(${fit.retry.shots}샷) — 샷을 줄여 다시 나눠라.`
+    : '';
+  return `
+
+[시간 예산 — 고른 길이 ${fit.capSeconds}초]
+사용자가 영상 길이를 골랐다. 이 씬 샷들의 intended_duration_seconds 합은 ${seconds}초를 넘지 마라(산문이 이 씬에 나눠 준 시간).
+이 씬은 최대 ${maxShots}샷 — 커버리지 샷도 이 수와 시간에 들어간다. 이 예산은 "샷 개수는 네가 정한다"보다 먼저다.
+샷을 줄일 때는 비트를 지우지 말고 여러 비트를 한 샷에 합쳐라(merged) — 반응 · 리빌 같은 커버리지 샷을 먼저 빼지 마라(대표 모드와 같은 절약 순서, #coverage-first).${retry}`;
+}
+
 interface SceneDecoupageResponse {
   shot_count?: number;
   rhythm_profile?: string;
@@ -192,6 +242,7 @@ function buildUserPrompt(
   characters: Characters,
   worldVisual: WorldVisual,
   shotBudgetHint: number | null,
+  fit: RuntimeFit | null = null,
 ): string {
   const beatList = scene.scene_actions
     .map((a, i) => `  [${i}] ${a}`)
@@ -202,12 +253,13 @@ function buildUserPrompt(
   const planHint = plan
     ? `[sceneCinematography 비주얼 플랜 — 협상 규칙 (단순 힌트 아님)]
 coverage_pattern=${plan.coverage_pattern}, shot_count_target=${plan.shot_count_target}, rhythm_profile=${plan.rhythm_profile}, cut_pace=${plan.cut_pace}, avg_shot_seconds=${plan.avg_shot_seconds}, lens=${plan.lens_vocabulary.join('/')}mm, energy=${plan.camera_energy}
-- shot_count_target ±1 은 **비트 샷**(derived/merged/split)의 상한이다. **커버리지 샷**(added:
+${fit ? `- 아래 [시간 예산]이 shot_count_target 보다 먼저다: 비트 샷 · 커버리지 샷 모두 그 샷 수와 시간 안에 들어가야 한다.
+- avg_shot_seconds 는 시청자의 인지 예산이다 — 샷 수를 늘리려고 샷을 짧게 압착하지 말고, 시간이 모자라면 샷 수를 줄여라.` : `- shot_count_target ±1 은 **비트 샷**(derived/merged/split)의 상한이다. **커버리지 샷**(added:
   reaction/reveal/pov/insert/cutaway, 각 2~3s)은 이 상한 밖이며 위 커버리지 문법이 요구하면 반드시
   추가한다 — 커버리지를 넣으려고 비트 샷을 병합하지 마라(#coverage-first 2026-09-02).
 - avg_shot_seconds 는 시청자의 인지 예산이다. intended_duration_seconds 합이 estimated_seconds 를
   넘는 것은 허용된다(하류가 씬 길이를 증액한다) — 샷 수를 늘리려고 **비트 샷**을 짧게 압착하지 마라.
-  (커버리지 샷은 단일 목적이라 짧아도 인지 부하가 아니다.)`
+  (커버리지 샷은 단일 목적이라 짧아도 인지 부하가 아니다.)`}`
     : `[sceneCinematography 미제공 — Compact Mode. 데쿠파주를 자체 판단으로 저작]`;
 
   // 사이즈 사다리 규칙 — cine 플랜 유무와 무관한 일반 연출 문법 (급전환 45% 실측의 상류 방어).
@@ -237,7 +289,7 @@ ${beatList}
 
 ${planHint}
 
-${ladderRule}${budgetHint}
+${ladderRule}${budgetHint}${fit ? runtimeBudgetBlock(scene, fit) : ''}
 
 [genre 장르/톤]
 genre=${genre.genre}, tone=${genre.tone.join('/')}, targetEmotion=${genre.targetEmotion.join('/')}
@@ -313,15 +365,16 @@ async function decoupageForScene(
   logger: PipelineLogger,
   axisConfig: LlmAxisConfig,
   outputLocale?: AppLocale,
+  fit: RuntimeFit | null = null,
 ): Promise<SceneDecoupage> {
-  const userPrompt = buildUserPrompt(scene, plan, genre, characters, worldVisual, shotBudgetHint);
+  const userPrompt = buildUserPrompt(scene, plan, genre, characters, worldVisual, shotBudgetHint, fit);
 
   const raw = await generateJson<unknown>(userPrompt, axisConfig, {
     systemInstruction: buildSystemInstruction(outputLocale),
     temperature: 0.7, // 연출 창의성 (V4보다 약간 높게)
   });
 
-  await logger.saveLlmCall(`decoupage_${scene.scene_id}`, {
+  await logger.saveLlmCall(`decoupage_${scene.scene_id}${fit?.retry ? '_runtime_fit' : ''}`, {
     prompt: userPrompt,
     response: JSON.stringify(raw, null, 2),
     model: describeAxisConfig(axisConfig),
@@ -395,11 +448,15 @@ export async function runDecoupage(
     concurrency?: number;
     /** #i18n-s5: 미지정(레거시)이면 systemInstruction 끝 절 미주입 — 종전 동작 그대로. */
     outputLocale?: AppLocale;
+    /** 고른 길이(초, runtimeFitCap) — 있으면 씬 시간 안에서 나누고, 합이 넘으면 넘은 씬을 한 번 더 나눈다. 없으면 종전 동작. */
+    runtimeCapSeconds?: number | null;
   },
 ): Promise<DecoupageRunResult> {
   const doneById = new Map((opts?.resume ?? []).map((sd) => [sd.scene_id, sd]));
   const softDeadlineMs = opts?.softDeadlineMs;
   const outputLocale = opts?.outputLocale;
+  const capSeconds = opts?.runtimeCapSeconds ?? null;
+  const fit: RuntimeFit | null = capSeconds !== null && capSeconds > 0 ? { capSeconds } : null;
   await logger.markStage('decoupage', 'started', {
     scene_count: scenes.scenes.length,
     resumed_scenes: doneById.size,
@@ -441,7 +498,7 @@ export async function runDecoupage(
       const plan = sceneCinematographyPlans?.find((p) => p.scene_id === scene.scene_id) ?? null;
       const sceneStartedMs = Date.now();
       try {
-        const sceneDec = await decoupageForScene(scene, plan, genre, characters, worldVisual, shotBudgetHint, logger, axisConfig, outputLocale);
+        const sceneDec = await decoupageForScene(scene, plan, genre, characters, worldVisual, shotBudgetHint, logger, axisConfig, outputLocale, fit);
         doneById.set(scene.scene_id, sceneDec);
         progressed += 1;
         estSceneMs = Math.max(estSceneMs, Math.round((Date.now() - sceneStartedMs) * 1.25));
@@ -457,12 +514,69 @@ export async function runDecoupage(
   await Promise.all(Array.from({ length: concurrency }, () => worker()));
   if (sceneErrors.length > 0 && progressed === 0) throw sceneErrors[0];
 
-  const ordered = scenes.scenes
+  const firstPass = scenes.scenes
     .map((sc) => doneById.get(sc.scene_id))
     .filter((sd): sd is SceneDecoupage => sd !== undefined);
-  if (ordered.length < scenes.scenes.length) {
-    return { done: false, scenes: ordered };
+  if (firstPass.length < scenes.scenes.length) {
+    return { done: false, scenes: firstPass };
   }
+
+  // 고른 길이 맞춤 — 샷 길이 합이 고른 길이를 넘으면 산문이 준 씬 시간을 넘은 씬만 샷을 줄여 한 번 더 나눈다
+  //   (많이 넘은 씬부터, 합이 고른 길이 안으로 들어오면 그만). 다시 나눈 쪽이 짧을 때만 바꾸고, 다시 나눈 씬은
+  //   표시해 이어달리기(resume) 때 또 부르지 않는다. 착수 게이트 · 패스당 최소 1단위 진행은 위 워커와 같은 관용구 —
+  //   이 패스가 아무것도 안 했으면 첫 다시 나누기는 예산과 무관하게 착수한다(러너가 부분 반환마다 attempt 를 리셋하므로).
+  if (fit) {
+    const totalSeconds = () => scenes.scenes.reduce((sum, sc) => sum + sceneShotSeconds(doneById.get(sc.scene_id)!.shots), 0);
+    const overBy = (sc: StoryScene) => sceneShotSeconds(doneById.get(sc.scene_id)!.shots) - sc.estimated_seconds;
+    const retryQueue = totalSeconds() > fit.capSeconds
+      ? scenes.scenes
+          .filter((sc) => !doneById.get(sc.scene_id)!.runtime_fit_retried && overBy(sc) > 0)
+          .sort((a, b) => overBy(b) - overBy(a))
+      : [];
+    const retryWorker = async (): Promise<void> => {
+      for (;;) {
+        if (launchedAny && softDeadlineMs != null && Date.now() + estSceneMs > softDeadlineMs) return;
+        if (totalSeconds() <= fit.capSeconds) {
+          retryQueue.length = 0;
+          return;
+        }
+        const scene = retryQueue.shift();
+        if (!scene) return;
+        launchedAny = true;
+        const before = doneById.get(scene.scene_id)!;
+        const previous = sceneShotSeconds(before.shots);
+        const plan = sceneCinematographyPlans?.find((p) => p.scene_id === scene.scene_id) ?? null;
+        const sceneStartedMs = Date.now();
+        let kept: SceneDecoupage = before;
+        let note: string;
+        try {
+          const again = await decoupageForScene(scene, plan, genre, characters, worldVisual, shotBudgetHint, logger, axisConfig, outputLocale, {
+            capSeconds: fit.capSeconds,
+            retry: { seconds: previous, shots: before.shots.length },
+          });
+          const againSeconds = sceneShotSeconds(again.shots);
+          if (againSeconds < previous) kept = again;
+          note = `retry=${againSeconds}s/${again.shots.length}shots kept=${kept === again ? 'retry' : 'first'}`;
+          estSceneMs = Math.max(estSceneMs, Math.round((Date.now() - sceneStartedMs) * 1.25));
+        } catch (e) {
+          // 다시 나누기가 실패하면 처음 나누기를 둔다 — run 을 막지 않는다.
+          note = `retry failed kept=first: ${e instanceof Error ? e.message : String(e)}`;
+          console.error(`[decoupage] runtime-fit retry ${scene.scene_id} failed (keeping first split):`, e instanceof Error ? e.message : e);
+        }
+        doneById.set(scene.scene_id, { ...kept, runtime_fit_retried: true });
+        await logger.saveText(
+          `decoupage_runtime_fit_${scene.scene_id}.txt`,
+          `cap=${fit.capSeconds}s scene=${scene.estimated_seconds}s first=${previous}s/${before.shots.length}shots ${note}`,
+        );
+      }
+    };
+    await Promise.all(Array.from({ length: concurrency }, () => retryWorker()));
+    if (retryQueue.length > 0) {
+      return { done: false, scenes: scenes.scenes.map((sc) => doneById.get(sc.scene_id)!) };
+    }
+  }
+
+  const ordered = scenes.scenes.map((sc) => doneById.get(sc.scene_id)!);
 
   // 전역 shot_id 재인덱싱 (씬 경계 넘어 순번) — 체크포인트에 저장된 씬-로컬 id 를 최종 조립에서
   //   통일한다. state 에 병합된 객체를 변형하지 않게 얕은 복제 후 재인덱싱.

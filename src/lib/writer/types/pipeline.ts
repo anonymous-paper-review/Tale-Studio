@@ -867,6 +867,8 @@ export interface SceneDecoupage {
   rhythm_profile: string;          // 씬의 정적/동적 에너지 곡선 (1줄)
   uncovered_beats: number[];       // 의도적으로 생략(REMOVE)한 비트 인덱스 (기본 빈 배열)
   shots: DecoupageShot[];
+  /** 고른 길이 맞춤(2026-11-10)으로 이 씬을 이미 한 번 다시 나눴다 — 이어달리기 때 또 부르지 않는다. */
+  runtime_fit_retried?: boolean;
 }
 
 export interface DecoupagePlan {

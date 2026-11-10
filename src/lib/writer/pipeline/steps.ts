@@ -18,7 +18,7 @@ import { runVisualIdentity } from '@/lib/writer/pipeline/stages/v0_visual';
 import { runActVisualArc } from '@/lib/writer/pipeline/stages/v1_act_arc';
 import { runV2Design } from '@/lib/writer/pipeline/stages/v2_design';
 import { runSceneCinematography } from '@/lib/writer/pipeline/stages/v3_scene_plan';
-import { runDecoupage } from '@/lib/writer/pipeline/stages/decoupage';
+import { runDecoupage, runtimeFitCap } from '@/lib/writer/pipeline/stages/decoupage';
 import { runSceneStage } from '@/lib/writer/pipeline/stages/v3s_stage';
 import { isFlagOn } from '@/lib/flags';
 import { runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots';
@@ -599,6 +599,8 @@ export const WRITER_STEPS: WriterStep[] = [
           // #concurrency-gap: 미지정이면 decoupage 자체 기본값(4). env 는 여전히 오버라이드.
           concurrency: Number(process.env.WRITER_SCENE_CONCURRENCY) || undefined,
           outputLocale: s.input.outputLocale,
+          // 고른 길이 맞춤(오너 2026-11-10) — 길이를 골랐으면 그 안으로 샷을 나눈다. 대본 그대로는 null.
+          runtimeCapSeconds: runtimeFitCap(s.input),
         },
       );
       await logger.flushRawLlm('decoupage');
