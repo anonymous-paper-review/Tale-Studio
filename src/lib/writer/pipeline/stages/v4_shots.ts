@@ -42,6 +42,7 @@ import type { ShotStaticSpec,
 import type { PipelineLogger } from '@/lib/writer/logger';
 import { normalizeStageTransitions } from '@/lib/writer/pipeline/stage/ledger';
 import { runStageForScene } from '@/lib/writer/pipeline/stage/orchestrate';
+import { sceneLocations } from '@/lib/writer/pipeline/util/scene-locations';
 
 /** 씬 단위 부분 진행 체크포인트(#long-writer-run 2026-07-15) — steps.ts가 state에 영속. */
 export interface ShotDesignProgress {
@@ -653,7 +654,7 @@ ${JSON.stringify(visualIdentity.style)}
 
 [월드 디자인 (v2 WorldVisual)]
 palette=${JSON.stringify(worldVisual.global_palette)}
-locations=${JSON.stringify(worldVisual.locations.filter((loc) => loc.id === scene.location || scene.location.includes(loc.id)))}
+locations=${JSON.stringify(sceneLocations(worldVisual.locations, scene.location))}
 
 [인물 의상 (v2 CharacterVisual)]
 costumes=${JSON.stringify(

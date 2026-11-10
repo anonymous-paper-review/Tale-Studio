@@ -25,6 +25,7 @@ import type {
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 import type { AppLocale } from '@/lib/locale';
+import { sceneLocations } from '@/lib/writer/pipeline/util/scene-locations';
 
 const DEFAULT_SCENE_CONCURRENCY = 4;
 
@@ -102,7 +103,7 @@ function buildUserPrompt(
   const people = characters.characters
     .filter((c) => scene.characters_in_scene.includes(c.id) && c.entity_type !== 'object')
     .map((c) => ({ id: c.id, name: c.name, role: c.role }));
-  const location = worldVisual.locations.filter((l) => l.id === scene.location || scene.location.includes(l.id));
+  const location = sceneLocations(worldVisual.locations, scene.location);
   const beats = scene.scene_actions.map((a, i) => `  [${i}] ${a}`).join('\n');
   const shots = (sceneDec ?? [])
     .map((d) => `  ${d.shot_id} size=${d.shot_size} function=${d.shot_function} beats=[${d.source_beats.join(',')}] — ${d.beat_summary}`)
