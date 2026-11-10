@@ -133,12 +133,33 @@ describe('혼자 정한 것', () => {
     expect(ids(sceneLocations(slugs, 'bus stop'))).toEqual(['bus_stop'])
   })
 
-  // 왜: 시간을 번호 끝에 붙인 장소(bus_stop_night)는 그 장소의 한때다. 같은 장소가 없을 때만, 이름으로 시작하는 장소 중 가장 꼭 맞는 하나를 고른다.
-  it('씬 장소와 같은 장소가 없으면, 씬 장소가 그 이름으로 시작하는 장소 중 가장 긴 하나만 고른다', () => {
+  // 왜: 검토 c 낮음 A(fe72b661). 앞부분 맞추기만 보면 뒷말이 중심말인 이름을 놓치거나(old_warehouse · 시골 버스 정류장) 다르게 골랐다
+  //   (hospital_rooftop → hospital, 목록에 없는 BUS TERMINAL → BUS). 이름의 중심은 끝말이라 끝으로 맞는 장소를 고르고, 앞으로 맞는 장소는 뒤에 붙은 말이
+  //   시간(bus_stop_night 의 night)일 때만 그 장소의 한때로 본다. 리드 지시(2026-11-10)로 예전 문장 "씬 장소와 같은 장소가 없으면, 씬 장소가 그 이름으로
+  //   시작하는 장소 중 가장 긴 하나만 고른다"를 고쳤다.
+  it('씬 장소와 같은 장소가 없으면 씬 장소가 그 이름으로 끝나는 장소를 고르고, 그 이름으로 시작하는 장소는 뒤에 붙은 말이 시간일 때만 고른다(여럿이면 가장 긴 하나, 같은 길이로 여럿이면 싣지 않는다)', () => {
     const slugs = [loc('bus'), loc('bus_stop'), loc('bus_depot')]
 
     expect(ids(sceneLocations(slugs, 'bus_stop_night'))).toEqual(['bus_stop'])
-    expect(ids(sceneLocations([loc('편의점'), loc('편의점 앞')], '편의점 앞 골목'))).toEqual(['편의점 앞'])
+    expect(ids(sceneLocations([loc('warehouse')], 'old_warehouse'))).toEqual(['warehouse'])
+    expect(ids(sceneLocations([loc('버스'), loc('버스 정류장')], '시골 버스 정류장'))).toEqual(['버스 정류장'])
+    expect(ids(sceneLocations([loc('rooftop'), loc('hospital')], 'hospital_rooftop'))).toEqual(['rooftop'])
+    expect(ids(sceneLocations([loc('COUNTRY BUS STOP'), loc('BUS')], 'BUS TERMINAL'))).toEqual([])
+    expect(ids(sceneLocations([loc('편의점'), loc('편의점 앞')], '편의점 앞 골목'))).toEqual([])
+    expect(ids(sceneLocations([loc('편의점')], '편의점 앞'))).toEqual(['편의점'])
+    expect(ids(sceneLocations([loc('warehouse_a', 'warehouse'), loc('warehouse_b', 'warehouse')], 'old warehouse'))).toEqual([])
+    expect(ids(sceneLocations([loc('warehouse'), loc('old warehouse district')], 'old warehouse'))).toEqual(['warehouse'])
+  })
+
+  // 왜: 검토 c 낮음 B(fe72b661). 괄호 · 쌍점 메모를 떼고 견주면 "Cafe (Old Town)" · "Cafe (New Town)"처럼 다른 장소가 같은 이름이 되어 둘 다 실렸다.
+  it('장면 머리 표시 · 시간 꼬리를 떼고 같은 장소가 여럿이면 덧붙인 설명까지 견줘 하나로 좁히고, 그래도 여럿이면 싣지 않는다', () => {
+    const cafes = [loc('Cafe (Old Town)'), loc('Cafe (New Town)')]
+    const schools = [loc('학교 (1층)'), loc('학교 (옥상)')]
+
+    expect(ids(sceneLocations(cafes, 'Cafe (Old Town) - NIGHT'))).toEqual(['Cafe (Old Town)'])
+    expect(ids(sceneLocations(schools, 'INT. 학교 (옥상) - 밤'))).toEqual(['학교 (옥상)'])
+    expect(sceneLocations(cafes, 'Cafe - NIGHT')).toEqual([])
+    expect(ids(sceneLocations([loc('kitchen', '부엌'), loc('kitchen_table')], 'kitchen (부엌)'))).toEqual(['kitchen'])
   })
 
   // 왜: 씬 장소와 이어지지 않는 디자인(이름 가운데에 겹치는 말이 있을 뿐인 장소)을 보여 주면 모델이 그 장소를 배경으로 붙인다. 모르면 싣지 않는다.
