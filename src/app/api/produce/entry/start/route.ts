@@ -1,6 +1,6 @@
 // POST /api/produce/entry/start — Producer 시작 (리뉴얼 1차 2026-10-19, 프로토타입 E4 [예, 시작] · EB7 [Writer에게 써 달라고 하기]).
 //   검사: 재료(20자 이상 글 또는 글이 담긴 파일) · 고른 값 넷 · "그대로"는 지킬 원문이 있을 때만 · 아직 시작 전 · 시작 화면 단계.
-//   저장(한 번에): 이야기(story_text) · 설정(settings: 길이 · 장르 · 화면 형식 · 대사 언어 = 프로젝트 언어) · Producer 카드 초안
+//   저장(한 번에): 이야기(story_text) · 설정(settings: 길이 · 장르 · 화면 형식 · 대사 언어 = 프로젝트 언어, 그대로는 원고 언어) · Producer 카드 초안
 //   (producer_draft, Writer 화면이 읽는다) · 단계 producer(= Writer) · 시작 시각(화면 비율 잠금) · 제목 없음이면 AI 임시 제목.
 //   시리즈 다음 화(2026-10-26)는 projects.series 를 같이 읽어 이어받은 인물 · 배경 카드와 앞 화 대사 언어를 카드 초안에 싣는다.
 //   돌려주는 writerStart 를 클라이언트가 그대로 /api/writer/start 에 보낸다(산문 초안).
