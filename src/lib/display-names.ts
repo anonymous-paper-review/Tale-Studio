@@ -8,6 +8,7 @@
 //
 // 1차 방어는 각 스테이지 챗 시스템 프롬프트의 금지 규칙이지만, 모델은 확률적으로 어기고
 // 과거 메시지는 이미 저장돼 있다 — 그래서 표시 직전 스크럽이 최종 방어다(과거分 포함 소급).
+import { collapseDoubledArticles, insideWrittenName, writtenNameSpans } from '@/lib/writer/resolve-entity-names'
 
 /** sh_02_07 → "Scene 2 · Shot 7". 패턴 밖이면 null. */
 export function shotIdDisplayName(shotId: string): string | null {
@@ -28,7 +29,8 @@ export function sceneIdDisplayName(sceneId: string): string | null {
  *   - sh_XX_YY → shotLabelById 가 오면 지금 보드의 전체 번호 이름("Scene 2 · Shot 8", board-summary.boardShotLabels) —
  *     id 숫자는 샷을 더하거나 지우면 보드와 어긋난다(오너 2026-11-02 "전체 번호로 통일"). 맵에 없으면 규칙 생성명.
  *   - sc_XX → 규칙 생성명
- *   - nameById 가 오면 char_../loc_.. 류 id 도 이름으로 (맵은 호출부의 스테이지 진실에서)
+ *   - nameById 가 오면 char_../loc_.. 류 id 도 이름으로 (맵은 호출부의 스테이지 진실에서) — 이미 쓴 이름 자리 안의 id 낱말은
+ *     그대로 두고, 관사로 시작하는 이름 앞에 겹친 관사는 하나로("the keeper" → "The Keeper", qa1110 C12 · resolveEntityNames 와 같은 규칙)
  *   - 과거 스테이지 대괄호 마커 제거([L3] 스크립트 라인 참조는 실제 기능이라 보존)
  * 사용자 발화에는 적용하지 않는다 — 사용자가 직접 쓴 원문은 불가침.
  */
@@ -41,10 +43,20 @@ export function scrubInternalIdsInProse(
   out = out.replace(/\bsc[_-]\d+\b/gi, (id) => sceneIdDisplayName(id) ?? id)
   out = stripLegacyStageMarkers(out)
   if (nameById && nameById.size > 0) {
+    // 한 번에 바꾼다(긴 id 먼저) — 앞에서 넣은 이름 안의 낱말을 뒤의 id 가 또 바꾸지 않게.
+    const labels = new Map<string, string>()
     for (const [id, name] of nameById) {
       const label = name.trim()
-      if (!id.trim() || !label) continue
-      out = out.replace(new RegExp(`\\b${escapeRegExp(id)}\\b`, 'g'), label)
+      if (id.trim() && label && !labels.has(id)) labels.set(id, label)
+    }
+    if (labels.size > 0) {
+      const names = [...new Set(labels.values())]
+      const written = writtenNameSpans(out, names)
+      const keys = [...labels.keys()].sort((a, b) => b.length - a.length).map(escapeRegExp)
+      out = out.replace(new RegExp(`\\b(?:${keys.join('|')})\\b`, 'g'), (id, offset: number) =>
+        insideWrittenName(written, offset, id.length) ? id : labels.get(id) ?? id,
+      )
+      out = collapseDoubledArticles(out, names)
     }
   }
   return out
