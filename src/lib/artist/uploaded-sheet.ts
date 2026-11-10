@@ -25,3 +25,17 @@ export function uploadedSheetBox(tile: UploadedSheetTile): { left: number; top: 
   const p = CHARACTER_SHEET_SPEC.portrait
   return { left: pct(p.x + 4, W), top: pct(p.y + 26, H), width: pct(p.w - 8, W), height: pct(p.h - 30, H) }
 }
+
+/** 올린 그림을 읽은 결과 — 담을 칸, 그리고 읽지 못했는지. */
+export type UploadedSheetLoad = { tile: UploadedSheetTile; failed: boolean }
+
+/** 그림을 읽은 결과로 칸을 정한다 — 읽지 못했으면(주소 만료 · 지워짐 · 끊김, 다 읽었다는데 크기 0) 대표 칸으로 정하고 실패로 둔다. */
+export function uploadedSheetLoad(image: { width: number; height: number } | 'error'): UploadedSheetLoad {
+  if (image === 'error' || image.width <= 0 || image.height <= 0) return { tile: 'portrait', failed: true }
+  return { tile: uploadedSheetTile(image.width, image.height), failed: false }
+}
+
+/** 올린 그림의 대체 글 — 밑 글("레퍼런스로 올린 그림 · 그대로 써요")과 같은 뜻. 카드에서는 그림 단추의 이름이 된다. */
+export function uploadedSheetAlt(name: string, t: (text: string, params?: Record<string, string | number>) => string): string {
+  return t('{name} · picture uploaded as a reference', { name })
+}

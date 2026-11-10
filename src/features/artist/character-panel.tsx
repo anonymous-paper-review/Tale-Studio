@@ -15,6 +15,7 @@ import { TurnaroundRegionCycle } from '@/features/artist/turnaround-region-cycle
 import { UploadedSheet } from '@/features/artist/uploaded-sheet'
 import { appearanceLabel } from '@/lib/artist/look-label'
 import { isBreakdownUpload } from '@/lib/artist/style-versions'
+import { uploadedSheetAlt } from '@/lib/artist/uploaded-sheet'
 import { RegenCardMark, VersionBadge, lookChipClass, useCardVersion, useRegenCardMarks } from '@/features/artist/card-parts'
 import { sameCharacterAppearanceSlot, useArtistStore } from '@/stores/artist-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
@@ -322,7 +323,7 @@ export function CharacterPanel({
                   브레이크다운에서 올린 그림을 그대로 쓴 모습은 그 그림을 흰 캐릭터 시트 틀에 담아 보인다(오너 2026-11-10, 빈 칸은 그대로). */}
               {!isObject && appearance?.sheetUrl && !isViewGenerating('main') ? (
                 isBreakdownUpload(appearance.sheetUrl, projectId) ? (
-                  <UploadedSheet key={appearance.sheetUrl} url={appearance.sheetUrl} alt={t('{name} turnaround sheet', { name: char.name || t('Character') })} />
+                  <UploadedSheet key={appearance.sheetUrl} url={appearance.sheetUrl} alt={uploadedSheetAlt(char.name || t('Character'), t)} />
                 ) : (
                   <TurnaroundRegionCycle
                     url={appearance.sheetUrl}

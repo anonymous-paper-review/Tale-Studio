@@ -13,3 +13,13 @@ export function appearanceLabel(
 ): string {
   return look.isDefault && look.label.trim() === DEFAULT_LOOK_LABEL ? t('Present') : look.label
 }
+
+/** 이름 바꾸기에서 저장할 이름 — 칸에 보인 이름(화면 언어)을 그대로 두면 원래 이름을 지킨다(데이터 그대로), 고쳤으면 적은 그대로. */
+export function labelToSave(
+  look: { label: string; isDefault?: boolean },
+  draft: string,
+  t: (text: string, params?: Record<string, string | number>) => string,
+): string {
+  const next = draft.trim()
+  return next === appearanceLabel(look, t) ? look.label : next
+}

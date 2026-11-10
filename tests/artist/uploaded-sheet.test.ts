@@ -4,15 +4,22 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { CHARACTER_SHEET_SPEC, turnaroundSlots } from '@/lib/artist/sheet-template'
-import { uploadedSheetBox, uploadedSheetTile } from '@/lib/artist/uploaded-sheet'
-import { UploadedSheet } from '@/features/artist/uploaded-sheet'
+import { uploadedSheetAlt, uploadedSheetBox, uploadedSheetLoad, uploadedSheetTile } from '@/lib/artist/uploaded-sheet'
+import { UploadedSheet, UploadedSheetFrame } from '@/features/artist/uploaded-sheet'
 import { translate } from '@/lib/i18n/translate'
+import { useLocaleStore } from '@/stores/locale-store'
 
 const UPLOAD = 'https://example.supabase.co/storage/v1/object/public/media/ws/p1/breakdown/soonja.png'
 const PANEL = 'src/features/artist/character-panel.tsx'
 const DIALOG = 'src/features/artist/character-view-dialog.tsx'
+const SHEET = 'src/features/artist/uploaded-sheet.tsx'
 const UPLOADED_CAPTION = 'Picture uploaded as a reference · used as is'
 const pct = (value: number, of: number) => Number(((value / of) * 100).toFixed(3))
+
+function setRenderLocale(locale: 'ko' | 'en') {
+  useLocaleStore.setState({ locale })
+  Object.assign(useLocaleStore.getInitialState(), useLocaleStore.getState())
+}
 
 describe('올린 인물 그림을 담은 캐릭터 시트', () => {
   it('브레이크다운에서 올린 그림을 그대로 쓴 인물 카드는 올린 그림을 흰 캐릭터 시트 틀 안에 담아 보인다', () => {
@@ -77,5 +84,33 @@ describe('올린 인물 그림을 담은 캐릭터 시트', () => {
     expect(translate('en', UPLOADED_CAPTION)).toBe('Picture uploaded as a reference · used as is')
     expect(translate('ko', UPLOADED_CAPTION)).toBe('레퍼런스로 올린 그림 · 그대로 써요')
     expect(readFileSync(DIALOG, 'utf8')).toMatch(/uploaded\s*\?\s*t\('Picture uploaded as a reference · used as is'\)\s*:\s*styleLabel/)
+  })
+
+  it('올린 그림을 읽지 못하면 그림 자리를 숨긴 채 두지 않고 대표 칸에 "그림을 불러오지 못했어요"를 보인다', () => {
+    // 왜: 검토 B(2026-11-10) — 주소가 만료되거나 그림이 지워지거나 연결이 끊기면 그림이 숨은 채 빈 흰 시트만 남아 실패를 알 수 없었다.
+    expect(uploadedSheetLoad('error')).toEqual({ tile: 'portrait', failed: true })
+    setRenderLocale('ko')
+    const ko = renderToStaticMarkup(createElement(UploadedSheetFrame, { url: UPLOAD, alt: '순자', load: uploadedSheetLoad('error') }))
+    expect(ko).toContain('data-tile="portrait"')
+    expect(ko).toContain('그림을 불러오지 못했어요')
+    setRenderLocale('en')
+    const en = renderToStaticMarkup(createElement(UploadedSheetFrame, { url: UPLOAD, alt: '순자', load: uploadedSheetLoad('error') }))
+    expect(en).toContain('Could not load the picture')
+    expect(readFileSync(SHEET, 'utf8')).toMatch(/onError=\{\(\) => setLoad\(uploadedSheetLoad\('error'\)\)\}/)
+  })
+
+  it('화면이 준비되기 전에 이미 읽기에 실패한 그림도 실패로 보인다', () => {
+    // 왜: 그림 읽기가 화면 준비보다 먼저 끝나면 실패 알림을 놓친다 — 다 읽었다는데 크기가 0이면 읽지 못한 것이다(혼자 정한 것).
+    expect(uploadedSheetLoad({ width: 0, height: 0 })).toEqual({ tile: 'portrait', failed: true })
+    expect(uploadedSheetLoad({ width: 600, height: 1200 })).toEqual({ tile: 'front', failed: false })
+    expect(readFileSync(SHEET, 'utf8')).toMatch(/if \(imageRef\.current\?\.complete\) read\(imageRef\.current\)/)
+  })
+
+  it('올린 그림의 대체 글은 "{이름} · 레퍼런스로 올린 그림"이다(카드 · 상세 창)', () => {
+    // 왜: 검토 B — 대체 글이 카드 그림 단추의 이름이 되는데 "턴어라운드 시트"라고 읽혀 밑 글("레퍼런스로 올린 그림 · 그대로 써요")과 뜻이 달랐다.
+    expect(uploadedSheetAlt('순자', (text, params) => translate('ko', text, params))).toBe('순자 · 레퍼런스로 올린 그림')
+    expect(uploadedSheetAlt('순자', (text, params) => translate('en', text, params))).toBe('순자 · picture uploaded as a reference')
+    expect(readFileSync(PANEL, 'utf8')).toMatch(/<UploadedSheet key=\{appearance\.sheetUrl\} url=\{appearance\.sheetUrl\} alt=\{uploadedSheetAlt\(/)
+    expect(readFileSync(DIALOG, 'utf8')).toMatch(/<UploadedSheet key=\{imageUrl\} url=\{imageUrl\} alt=\{uploadedSheetAlt\(/)
   })
 })
