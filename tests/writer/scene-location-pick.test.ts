@@ -135,9 +135,10 @@ describe('혼자 정한 것', () => {
 
   // 왜: 검토 c 낮음 A(fe72b661). 앞부분 맞추기만 보면 뒷말이 중심말인 이름을 놓치거나(old_warehouse · 시골 버스 정류장) 다르게 골랐다
   //   (hospital_rooftop → hospital, 목록에 없는 BUS TERMINAL → BUS). 이름의 중심은 끝말이라 끝으로 맞는 장소를 고르고, 앞으로 맞는 장소는 뒤에 붙은 말이
-  //   시간(bus_stop_night 의 night)일 때만 그 장소의 한때로 본다. 리드 지시(2026-11-10)로 예전 문장 "씬 장소와 같은 장소가 없으면, 씬 장소가 그 이름으로
-  //   시작하는 장소 중 가장 긴 하나만 고른다"를 고쳤다.
-  it('씬 장소와 같은 장소가 없으면 씬 장소가 그 이름으로 끝나는 장소를 고르고, 그 이름으로 시작하는 장소는 뒤에 붙은 말이 시간일 때만 고른다(여럿이면 가장 긴 하나, 같은 길이로 여럿이면 싣지 않는다)', () => {
+  //   시간 · 이어짐 말(bus_stop_night 의 night, kitchen - moments later)일 때만 그 장소의 한때로 본다. 리드 지시(2026-11-10)로 예전 문장
+  //   "씬 장소와 같은 장소가 없으면, 씬 장소가 그 이름으로 시작하는 장소 중 가장 긴 하나만 고른다"를 고쳤고, 검토 c(9d8b5f34) 낮음 1 에 맞춰
+  //   "…뒤에 붙은 말이 시간일 때만…"을 "시간 · 이어짐 말일 때만"으로 바로잡았다(자리 말은 아래 시험으로 뗐다).
+  it('씬 장소와 같은 장소가 없으면 씬 장소가 그 이름으로 끝나는 장소를 고르고, 그 이름으로 시작하는 장소는 뒤에 붙은 말이 시간 · 이어짐 말일 때만 고른다(여럿이면 가장 긴 하나, 같은 길이로 여럿이면 싣지 않는다)', () => {
     const slugs = [loc('bus'), loc('bus_stop'), loc('bus_depot')]
 
     expect(ids(sceneLocations(slugs, 'bus_stop_night'))).toEqual(['bus_stop'])
@@ -146,9 +147,31 @@ describe('혼자 정한 것', () => {
     expect(ids(sceneLocations([loc('rooftop'), loc('hospital')], 'hospital_rooftop'))).toEqual(['rooftop'])
     expect(ids(sceneLocations([loc('COUNTRY BUS STOP'), loc('BUS')], 'BUS TERMINAL'))).toEqual([])
     expect(ids(sceneLocations([loc('편의점'), loc('편의점 앞')], '편의점 앞 골목'))).toEqual([])
-    expect(ids(sceneLocations([loc('편의점')], '편의점 앞'))).toEqual(['편의점'])
+    expect(ids(sceneLocations([loc('kitchen')], 'kitchen_later'))).toEqual(['kitchen'])
     expect(ids(sceneLocations([loc('warehouse_a', 'warehouse'), loc('warehouse_b', 'warehouse')], 'old warehouse'))).toEqual([])
     expect(ids(sceneLocations([loc('warehouse'), loc('old warehouse district')], 'old warehouse'))).toEqual(['warehouse'])
+  })
+
+  // 왜: 검토 c(9d8b5f34) 낮음 1. 자리 말 규칙에 이름 붙은 시험이 없었다. "편의점 앞"처럼 장소 이름 뒤에 자리 말(앞 · 뒤 · 옆 · 안 · 밖)만 붙은
+  //   씬은 그 장소에서 벌어지는 일이다(중심말이 뒤에 더 붙은 "편의점 앞 골목"은 다른 곳).
+  it('씬 장소가 장소 이름 뒤에 자리 말(앞 · 뒤 · 옆 · 안 · 밖)만 붙은 꼴이면 그 장소를 고른다(편의점 앞 → 편의점)', () => {
+    expect(ids(sceneLocations([loc('편의점')], '편의점 앞'))).toEqual(['편의점'])
+    expect(ids(sceneLocations([loc('학교')], '학교 안'))).toEqual(['학교'])
+    expect(ids(sceneLocations([loc('편의점')], '편의점 앞 골목'))).toEqual([])
+  })
+
+  // 왜: 검토 c(9d8b5f34) 낮음 2 · 3. 번호와 표시 이름을 한 번에 봐서, 다른 장소의 표시 이름이 씬 장소와 같으면 둘 다 실렸다(1단계).
+  //   표시 이름이 같은 장소가 둘이면 번호가 맞는 하나가 있어도 아무것도 안 실렸다(2단계). 장소 번호가 씬 장소의 원래 짝이다.
+  it('씬 장소와 번호가 같은 장소를 먼저 고르고, 번호가 같은 장소가 없을 때만 표시 이름으로 고른다(표시 이름이 같은 장소가 여럿이면 싣지 않는다)', () => {
+    const roads = [loc('BUS', 'COUNTRY ROAD'), loc('COUNTRY ROAD')]
+    const kitchens = [loc('kitchen', 'Kitchen'), loc('kitchen_night', 'Kitchen')]
+    const cafes = [loc('cafe_a', 'Cafe'), loc('cafe_b', 'Cafe')]
+
+    expect(ids(sceneLocations(roads, 'COUNTRY ROAD'))).toEqual(['COUNTRY ROAD'])
+    expect(ids(sceneLocations(kitchens, 'kitchen'))).toEqual(['kitchen'])
+    expect(ids(sceneLocations(kitchens, 'INT. KITCHEN - NIGHT'))).toEqual(['kitchen'])
+    expect(ids(sceneLocations(cafes, 'Cafe'))).toEqual([])
+    expect(ids(sceneLocations([loc('bus_stop', 'Bus stop')], 'Bus stop'))).toEqual(['bus_stop'])
   })
 
   // 왜: 검토 c 낮음 B(fe72b661). 괄호 · 쌍점 메모를 떼고 견주면 "Cafe (Old Town)" · "Cafe (New Town)"처럼 다른 장소가 같은 이름이 되어 둘 다 실렸다.

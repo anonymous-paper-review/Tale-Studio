@@ -1,7 +1,8 @@
 // 씬의 장소 고르기(2026-11-10 B1 이어서): 무대 · 데쿠파주 · 샷 단계가 모델에게 보여 줄 장소 디자인.
 //   예전에는 글자 포함(scene.location.includes(id))으로 골라, 대본 그대로 "COUNTRY BUS STOP" 씬 지시에 "BUS"(버스 안) 디자인이
 //   같이 실렸다. 대본이 아닌 흐름에서도 이름이 겹치는 장소(bus_stop · bus, 버스 정류장 · 버스)가 같은 꼴이었다.
-//   차례로 보고 처음 찾은 단계에서 멈춘다. 2 · 3단계에서 여럿이 남으면 모르는 것이라 싣지 않는다.
+//   차례로 보고 처음 찾은 단계에서 멈춘다. 어느 단계든 여럿이 남으면 모르는 것이라 싣지 않는다.
+//   1 · 2단계는 장소 번호가 같은 것을 먼저 보고, 없을 때만 표시 이름으로 본다.
 //   1) 번호나 표시 이름이 씬 장소와 같다(대소문자 · 앞뒤 빈칸은 보지 않는다).
 //   2) 장면 머리 표시(INT. · EXT.) · 시간 꼬리(- NIGHT)를 떼고 같다. 여럿이면 덧붙인 설명("Cafe (Old Town)")까지 견주고,
 //      하나도 없으면 덧붙인 설명("kitchen (부엌)" · "kitchen: …")도 떼고 견준다(검토 c 낮음 B).
@@ -34,16 +35,20 @@ export function sceneLocations<T extends { id: string; name?: string }>(location
   const raw = (sceneLocation ?? '').trim();
   if (!raw) return [];
   const namesOf = (location: T) => [location.id, location.name].filter((name): name is string => typeof name === 'string' && !!name.trim());
-  const exact = locations.filter((location) => namesOf(location).some((name) => plain(name) === plain(raw)));
-  if (exact.length) return exact;
   const only = (found: T[]): T[] => (found.length === 1 ? found : []);
-  const midKey = mid(raw);
-  const byMid = midKey ? locations.filter((location) => namesOf(location).some((name) => mid(name) === midKey)) : [];
-  if (byMid.length) return only(byMid);
+  // 1 · 2단계는 장소 번호가 같은 것을 먼저 보고, 없을 때만 표시 이름으로 본다(검토 c 9d8b5f34 재검토). 번호가 씬 장소의 원래 짝이다.
+  //   찾았는데 여럿이면 모르는 것이라 싣지 않는다(다음 단계로 가지 않는다).
+  const pick = (key: string, by: (text: string) => string): T[] | null => {
+    if (!key) return null;
+    const byId = locations.filter((location) => by(location.id) === key);
+    if (byId.length) return only(byId);
+    const byName = locations.filter((location) => !!location.name?.trim() && by(location.name) === key);
+    return byName.length ? only(byName) : null;
+  };
+  const found = pick(plain(raw), plain) ?? pick(mid(raw), mid) ?? pick(core(raw), core);
+  if (found) return found;
   const key = core(raw);
   if (!key) return [];
-  const byCore = locations.filter((location) => namesOf(location).some((name) => core(name) === key));
-  if (byCore.length) return only(byCore);
   const words = key.split(' ');
   let best: { found: T[]; size: number } = { found: [], size: 0 };
   for (const location of locations) {
