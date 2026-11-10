@@ -195,6 +195,24 @@ export function dialogueTrackFromScript(doc: ScriptDocument, scenes: Scenes, dec
   return { profiles, scenes: out };
 }
 
+/**
+ * 산문 재점검으로 합친 인물(사라진 번호 → 남는 번호)을 대본의 화자에 얹는다(2026-11-10 B1). 대본 그대로 쓰기의 대사는 [만들기] 뒤
+ *   대본에서 다시 옮기므로, 이것이 없으면 합친 쪽 이름으로 적힌 대사가 없는 인물의 대사가 되어 화자 없이(V.O.) 나온다. 대사 글은 그대로다.
+ */
+export function mergeScriptSpeakers(doc: ScriptDocument, merged?: Record<string, string> | null): ScriptDocument {
+  if (!merged || !Object.keys(merged).length) return doc;
+  const to = (id: string) => merged[id] ?? id;
+  return {
+    ...doc,
+    characters: doc.characters.filter((c) => !(c.id in merged)),
+    scenes: doc.scenes.map((sc) => ({
+      ...sc,
+      characters: [...new Set(sc.characters.map(to))],
+      elements: sc.elements.map((el) => (el.type === 'dialogue' ? { ...el, character_id: to(el.character_id) } : el)),
+    })),
+  };
+}
+
 export type SceneAnnotation = Partial<Pick<StoryScene, 'purpose' | 'emotion_beat' | 'info_asymmetry' | 'dialogue_summary'>>;
 export type SceneAnnotator = (scene: StoryScene, ctx: { index: number; total: number }) => Promise<SceneAnnotation>;
 
