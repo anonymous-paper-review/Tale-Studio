@@ -190,11 +190,30 @@ describe('혼자 정한 것 · 검토 c 재검토(7982ba84)', () => {
   const elementsOf = (line: string) => parseScript(withLine(line), { assumeScript: true })!.scenes[0].elements
 
   // 왜: 검토 c 재검토 낮음 1(7982ba84 에서 생긴 회귀). 줄 앞 굵은 표시를 떼고 카메라 말을 보다 보니 "**CRANE:** Who goes there?"처럼
-  //   카메라 맨 낱말(CRANE · DOLLY · ZOOM)이 이름인 굵은 큐가 연출이 됐다. 굵은 큐는 예전처럼 이름이 카메라 지시로 끝날 때만 연출로 본다.
-  it('굵은 이름 큐가 카메라 맨 낱말과 같아도(**CRANE:** · **DOLLY.** · **ZOOM:**) 그 이름이 샷 · 카메라 지시로 끝나지 않으면 인물 대사로 읽는다', () => {
+  //   카메라 맨 낱말(CRANE · DOLLY · ZOOM)이 이름인 굵은 큐가 연출이 됐다. 그 낱말로 시작하는 사람 이름(DOLLY PARTON)도 같다.
+  //   검토 c(7550d031) 보통 2 를 고치며 문장을 고쳤다. 예전 문장 "…그 이름이 샷 · 카메라 지시로 끝나지 않으면 인물 대사로 읽는다"는
+  //   대상을 받는 굵은 카메라 지시(**CLOSE ON MAYA.**)까지 인물로 묶었다.
+  it('굵은 이름 큐가 카메라 맨 낱말이거나 그 낱말로 시작하는 사람 이름이면(**CRANE:** · **DOLLY.** · **ZOOM:** · **DOLLY PARTON:**) 인물 대사로 읽는다', () => {
     expect(speakers(withLine('**CRANE:** Who goes there?'))).toEqual(['MAYA', 'CRANE', 'DRIVER'])
     expect(speakers(withLine('**ZOOM:** Faster, faster!'))).toEqual(['MAYA', 'ZOOM', 'DRIVER'])
     expect(elementsOf('**DOLLY.** Hi there!')).toContainEqual(expect.objectContaining({ type: 'dialogue', text: 'Hi there!' }))
+    expect(speakers(withLine('**DOLLY PARTON:** Hello there!'))).toEqual(['MAYA', 'DOLLY PARTON', 'DRIVER'])
+  })
+
+  // 왜: 검토 c(7550d031) 보통 2. 굵은 큐를 이름이 카메라 지시로 끝날 때만 연출로 보니 "**CLOSE ON MAYA.** She smiles."가 다시 인물
+  //   "CLOSE ON MAYA."가 됐다(신고된 고장과 같은 증상: 가짜 인물 · 인물 시트). 대상을 받는 카메라 지시로 시작하면 연출이다.
+  it('굵은 카메라 지시가 대상을 받는 꼴이어도(**CLOSE ON MAYA.** · **ANGLE ON THE DOOR.** · **PUSH IN ON MAYA.** · **ZOOM IN ON MAYA.**) 인물로 읽지 않고, 뒤 문장은 지문으로 나눈다', () => {
+    const cases: Array<[string, string, string]> = [
+      ['**CLOSE ON MAYA.** She smiles.', 'CLOSE ON MAYA.', 'She smiles.'],
+      ['**ANGLE ON THE DOOR.** It creaks open.', 'ANGLE ON THE DOOR.', 'It creaks open.'],
+      ['**PUSH IN ON MAYA.** She blinks.', 'PUSH IN ON MAYA.', 'She blinks.'],
+      ['**ZOOM IN ON MAYA.** She freezes.', 'ZOOM IN ON MAYA.', 'She freezes.'],
+    ]
+    for (const [line, camera, action] of cases) {
+      expect(speakers(withLine(line)), line).toEqual(['MAYA', 'DRIVER'])
+      expect(elementsOf(line), line).toContainEqual({ type: 'camera', text: camera })
+      expect(elementsOf(line), line).toContainEqual({ type: 'action', text: action })
+    }
   })
 
   // 왜: 검토 c 재검토 참고 2. 굵은 샷 말 뒤에 구분자가 없는 줄("**WIDE SHOT** Rain falls…")은 통째로 연출이 되어 지문이 빠졌다. 굵은 표시 끝이 구분자다.
@@ -205,9 +224,10 @@ describe('혼자 정한 것 · 검토 c 재검토(7982ba84)', () => {
     expect(elements).toContainEqual({ type: 'action', text: 'Rain falls on the stop.' })
   })
 
-  // 왜: 검토 c 재검토 낮음 3. 첫 구분자에서 나눠 "INSERT - THE LETTER: …"는 연출이 "INSERT -"뿐이었다. 대문자 카메라 지시는 글(소문자 · 한글)이
-  //   나오기 바로 앞의 마지막 구분자까지다.
-  it('카메라 말 안에 쉼표 · 쌍점 · 줄표가 있어도 소문자 · 한글 글이 나오기 바로 앞의 마지막 구분자에서 나눈다', () => {
+  // 왜: 검토 c 재검토 낮음 3. 첫 구분자에서 나눠 "INSERT - THE LETTER: …"는 연출이 "INSERT -"뿐이었다. 대상을 받는 카메라 지시는 글(소문자 · 한글)이
+  //   나오기 바로 앞의 마지막 구분자까지다. 검토 c(7550d031) 보통 1 을 고치며 문장을 좁혔다(예전 문장 "카메라 말 안에 쉼표 · 쌍점 · 줄표가 있어도
+  //   소문자 · 한글 글이 나오기 바로 앞의 마지막 구분자에서 나눈다"는 샷 크기 말 뒤의 인물 소개까지 연출로 삼켰다).
+  it('대상을 받는 카메라 지시(CLOSE ON · ANGLE ON · INSERT …)는 소문자 · 한글 글이 나오기 바로 앞의 마지막 구분자까지 연출로 본다', () => {
     const letter = elementsOf("INSERT - THE LETTER: 'Dear Maya, come home.'")
     expect(letter).toContainEqual({ type: 'camera', text: 'INSERT - THE LETTER:' })
     expect(letter).toContainEqual({ type: 'action', text: "'Dear Maya, come home.'" })
@@ -224,6 +244,31 @@ describe('혼자 정한 것 · 검토 c 재검토(7982ba84)', () => {
     expect(elementsOf('C.U. Maya smiles.')).toContainEqual({ type: 'action', text: 'Maya smiles.' })
     expect(speakers(withLine('P.O.V. The dog runs.'))).toEqual(['MAYA', 'DRIVER'])
     expect(elementsOf('P.O.V. The dog runs.')).toContainEqual({ type: 'action', text: 'The dog runs.' })
+  })
+
+  // 왜: 검토 c(7550d031) 보통 1. 마지막 구분자까지 연출로 보니 "WIDE SHOT. MAYA, 20s, yellow raincoat, runs in."의 MAYA 가 연출로 넘어가 지문에서 빠졌다.
+  //   씬 인물은 지문 속 이름으로도 찾기 때문에, 그 씬에서 말이 없는 인물이 씬에서 빠졌다. 샷 크기 말은 그 말 바로 뒤 구분자까지다.
+  it('샷 크기 말(LONG · WIDE SHOT · C.U. · P.O.V. …)은 그 말 바로 뒤 구분자에서 나눠, 뒤에 오는 인물 소개(MAYA, 20s, …)는 지문에 남긴다', () => {
+    const cases: Array<[string, string, string]> = [
+      ['WIDE SHOT. MAYA, 20s, yellow raincoat, runs in.', 'WIDE SHOT.', 'MAYA, 20s, yellow raincoat, runs in.'],
+      ['WIDE SHOT. JOHN, 40s, enters the bus.', 'WIDE SHOT.', 'JOHN, 40s, enters the bus.'],
+      ['LONG SHOT. MAYA AND THE DRIVER, soaked, wait.', 'LONG SHOT.', 'MAYA AND THE DRIVER, soaked, wait.'],
+      ['WIDE SHOT OF THE ROAD. Rain falls.', 'WIDE SHOT OF THE ROAD.', 'Rain falls.'],
+    ]
+    for (const [line, camera, action] of cases) {
+      expect(elementsOf(line), line).toContainEqual({ type: 'camera', text: camera })
+      expect(elementsOf(line), line).toContainEqual({ type: 'action', text: action })
+    }
+    const silent = parseScript(`EXT. BUS STOP - NIGHT
+
+MAYA: Hello?
+
+INT. BUS - CONTINUOUS
+WIDE SHOT. MAYA, 20s, sits alone by the window.
+
+DRIVER: Next stop, the coast.
+`, { assumeScript: true })!
+    expect(silent.scenes[1].characters).toEqual(['driver', 'maya'])
   })
 })
 
