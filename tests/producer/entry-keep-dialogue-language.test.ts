@@ -8,6 +8,8 @@ import { SERIES_VERSION, type SeriesSnapshot } from '@/lib/series/snapshot'
 // 이 시험을 위해 새로 지은 글 — 실제 작품이 아니다.
 const KO_PAGE = '오늘도 야근이야?\n\n응, 금방 끝나.\n\n띵\n\n배달 왔습니다!'
 const EN_PAGE = 'Are you working late again?\n\nYes, almost done.\n\nDing\n\nDelivery!'
+// 장면 머리 · 인물 이름은 영어, 대사는 한국어인 대본(검토 C 예시).
+const SCRIPT_EN_HEADINGS = 'INT. CAFE - DAY\nMINHO: 커피 한 잔 주세요.\nBARISTA: 네.\nEXT. STREET - NIGHT\nMINHO: 춥다.'
 
 function fileOf(text: string, name = 'page_1.png'): EntryFileMeta {
   return { name, ext: 'png', kind: 'image', size: 4096, chars: text.length, text, uploadedAt: '2026-11-10T00:00:00.000Z' }
@@ -75,11 +77,25 @@ describe('그대로로 시작할 때의 대사 언어', () => {
     expect(languageOf(draftWith({ idea, file: null }), 'en')).toBe('ko')
   })
 
-  it('원고에 여러 언어가 섞여 있으면 글자가 더 많은 쪽 언어를 대사 언어로 한다', () => {
-    // 왜: 한국어 원고에 영어 이름 · 효과음(OK, AI, Ding) 몇 개가 섞여도 원고 언어는 한국어다.
-    //   반대로 영어 대사에 한국어 이름만 섞인 원고는 영어다(혼자 정한 것).
+  it('원고에 여러 언어가 섞여 있으면 음절로 세어 더 많은 쪽 언어를 대사 언어로 한다 — 로마자는 세 글자를 한 음절로 센다', () => {
+    // 왜: 한글 · 한자 · 가나는 한 글자가 한 음절쯤인데 영어는 한 낱말이 네다섯 글자다 — 글자 수로 견주면 영어가 두 배쯤 무겁게 셈해져
+    //   한국어 원고에 섞인 효과음 · 제목 몇 개로 대사 언어가 영어가 됐다(검토 C 2026-11-10). 반대로 영어 대사에 한국어 이름만 섞인 원고는 영어다(혼자 정한 것).
     expect(manuscriptDialogueLanguage('AI: 오늘도 야근이야? 민호: OK, 금방 끝나. Ding')).toBe('ko')
+    expect(manuscriptDialogueLanguage('오늘도 야근이야?\nOFFICE\n응, 금방 끝나.\nDING\nBANG')).toBe('ko')
     expect(manuscriptDialogueLanguage('민호: Are you working late again? 팀장: Yes, almost done.')).toBe('en')
+  })
+
+  it('원고에 프로젝트 언어가 열에 셋 이상 있으면 효과음 · 간판 · 제목 · 장면 머리가 다른 언어여도 대사 언어는 프로젝트 언어다', () => {
+    // 왜: 검토 C(2026-11-10) — 한국어 화면 · 한국어 원고에 영어 효과음 · 간판 · 제목 · 장면 머리가 섞이면 대사 언어가 en 이 됐다(예전엔 ko).
+    //   대본 꼴이 아닌 원고는 Writer 가 대사를 새로 쓰니 한국어 만화 대사가 영어로 써진다 — 고치려던 증상이 반대쪽에서 생긴다(혼자 정한 것).
+    expect(languageOf(draftWith({ file: fileOf('오늘도 야근이야?\nOFFICE\n응, 금방 끝나.\nDING\nBANG') }), 'ko')).toBe('ko')
+    expect(languageOf(draftWith({ file: fileOf('NIGHT SHIFT\nEpisode 12\n또 야근?\n응.') }), 'ko')).toBe('ko')
+    expect(languageOf(draftWith({ file: fileOf(SCRIPT_EN_HEADINGS, 'cafe.txt') }), 'ko')).toBe('ko')
+  })
+
+  it('대본 꼴 원고는 장면 머리 · 인물 이름을 빼고 대사 줄만 세어 원고 언어를 정한다', () => {
+    // 왜: INT. CAFE - DAY · MINHO 처럼 영어로 적은 장면 머리 · 인물 이름은 인물이 말하는 글이 아니다 — 영어 화면에서도 대사가 한국어면 한국어다(혼자 정한 것).
+    expect(languageOf(draftWith({ file: fileOf(SCRIPT_EN_HEADINGS, 'cafe.txt') }), 'en')).toBe('ko')
   })
 
   it('일본어 원고는 일본어로, 한자만 쓴 원고는 중국어로 대사 언어를 정한다', () => {

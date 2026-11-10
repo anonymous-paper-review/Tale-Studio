@@ -11,7 +11,8 @@ import type { AppLocale } from '@/lib/locale'
 import type { BackgroundSource, CastMember } from '@/lib/producer-gate'
 import { writerRuntimeSeconds } from '@/lib/producer/runtime'
 import type { SeriesSnapshot } from '@/lib/series/snapshot'
-import { manuscriptDialogueLanguage } from '@/lib/writer/pipeline/util/output-language'
+import { manuscriptDialogueLanguage, parseDialogueLanguage } from '@/lib/writer/pipeline/util/output-language'
+import { parseScript } from '@/lib/writer/script/parse'
 import type { ProducerDraft } from '@/stores/producer-store'
 import type { ProjectFormat, ProjectSettings } from '@/types/project'
 import {
@@ -115,6 +116,13 @@ export function entryStory(draft: EntryDraft): string {
   return [idea, fileText].filter(Boolean).join('\n\n')
 }
 
+/** 원고에서 인물이 말하는 글 — 대본 꼴로 읽히면 대사 줄만(장면 머리 · 인물 이름 · 지문은 빼고), 아니면 글 전체(만화 글자 · 산문). */
+function spokenText(story: string): string {
+  const doc = parseScript(story, { assumeScript: true })
+  const lines = doc?.scenes.flatMap((scene) => scene.elements.flatMap((el) => (el.type === 'dialogue' ? [el.text] : []))) ?? []
+  return lines.length > 0 ? lines.join('\n') : story
+}
+
 const UNTITLED = 'Untitled'
 
 export function planEntryStart({ projectId, draft, locale, currentTitle, series = null }: EntryStartInput): EntryStartPlan {
@@ -133,7 +141,8 @@ export function planEntryStart({ projectId, draft, locale, currentTitle, series 
   const genre = translate(locale, moodOf(mood).label)
   // 대사 언어는 앞 화를 따른다 — 언어가 바뀌면 이어받은 말투를 쓸 수 없다(2026-10-26 오너 확정).
   //   그대로는 원고 언어 그대로 둔다 — 화면 언어로 옮기지 않는다(2026-11-10 오너 "'그대로'의 약속대로"). 원고 언어를 모르면 프로젝트 언어.
-  const dialogueLanguage = series?.dialogueLanguage ?? (keep ? manuscriptDialogueLanguage(story) : null) ?? locale
+  //   원고에 프로젝트 언어가 열에 셋 이상이면 프로젝트 언어를 지킨다 — 섞인 효과음 · 제목 · 장면 머리로 바뀌지 않게(검토 C 2026-11-10).
+  const dialogueLanguage = series?.dialogueLanguage ?? (keep ? manuscriptDialogueLanguage(spokenText(story), parseDialogueLanguage(locale)) : null) ?? locale
   const settings: ProjectSettings = { playtime, genre, format, tone: [], dialogueLanguage }
   const inherited = seriesCards(series)
   const producerDraft: ProducerDraft = {

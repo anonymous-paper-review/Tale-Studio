@@ -43,26 +43,35 @@ export function parseDialogueLanguage(value: unknown): DialogueLanguage | undefi
   return value === 'ko' || value === 'en' || value === 'ja' || value === 'zh' ? value : undefined;
 }
 
+/** 원고 언어를 셀 때 로마자 몇 글자를 한 음절로 치나 — 한글 · 한자 · 가나는 한 글자가 한 음절쯤, 영어는 한 낱말이 네다섯 글자다. */
+const LATIN_LETTERS_PER_SYLLABLE = 3;
+/** 원고에 프로젝트 언어가 이만큼(음절로 세어) 있으면 프로젝트 언어를 지킨다 — 효과음 · 간판 · 제목 · 장면 머리 같은 다른 말이 섞여도. */
+const KEEP_PROJECT_LANGUAGE_SHARE = 0.3;
+
 /**
- * 원고(그대로 쓰는 글)의 대사 언어 (2026-11-10 오너 "원고 언어 그대로 둔다") — 글자 수가 가장 많은 문자 체계.
- *   한글은 한국어, 가나가 있으면 가나 · 한자를 합쳐 일본어, 가나 없는 한자는 중국어, 로마자는 영어.
- *   섞이면 글자가 더 많은 쪽, 같으면 한국어 · 일본어 · 중국어 · 영어 순. 글자가 없으면 null(호출하는 쪽이 정한 언어를 쓴다).
+ * 원고(그대로 쓰는 글)의 대사 언어 (2026-11-10 오너 "원고 언어 그대로 둔다") — 음절로 세어 가장 많은 문자 체계.
+ *   한글은 한국어, 가나가 있으면 가나 · 한자를 합쳐 일본어, 가나 없는 한자는 중국어, 로마자는 영어(세 글자를 한 음절로).
+ *   프로젝트 언어를 주면 그 언어가 열에 셋 이상일 때 그 언어를 지킨다(검토 C 2026-11-10 — 한국어 원고에 섞인 영어 효과음 · 제목).
+ *   그 밖에는 가장 많은 쪽, 같으면 한국어 · 일본어 · 중국어 · 영어 순. 글자가 없으면 null(호출하는 쪽이 정한 언어를 쓴다).
  *   약속: tests/producer/entry-keep-dialogue-language.test.ts
  */
-export function manuscriptDialogueLanguage(text: string): DialogueLanguage | null {
+export function manuscriptDialogueLanguage(text: string, projectLanguage?: DialogueLanguage | null): DialogueLanguage | null {
   const count = (re: RegExp) => text.match(re)?.length ?? 0;
   const hangul = count(/[가-힣ᄀ-ᇿ㄰-㆏]/g);
   const kana = count(/[぀-ヿ]/g);
   const han = count(/[一-鿿]/g);
-  const latin = count(/[A-Za-z]/g);
-  const scores: Array<[DialogueLanguage, number]> = [
-    ['ko', hangul],
-    ['ja', kana > 0 ? kana + han : 0],
-    ['zh', kana > 0 ? 0 : han],
-    ['en', latin],
-  ];
-  const [language, letters] = scores.reduce((best, next) => (next[1] > best[1] ? next : best));
-  return letters > 0 ? language : null;
+  const latin = count(/[A-Za-z]/g) / LATIN_LETTERS_PER_SYLLABLE;
+  const syllables: Record<DialogueLanguage, number> = {
+    ko: hangul,
+    ja: kana > 0 ? kana + han : 0,
+    zh: kana > 0 ? 0 : han,
+    en: latin,
+  };
+  const total = hangul + kana + han + latin;
+  if (total <= 0) return null;
+  if (projectLanguage && syllables[projectLanguage] / total >= KEEP_PROJECT_LANGUAGE_SHARE) return projectLanguage;
+  const order: DialogueLanguage[] = ['ko', 'ja', 'zh', 'en'];
+  return order.reduce((best, next) => (syllables[next] > syllables[best] ? next : best));
 }
 
 /** 발화 텍스트(line·narration)의 언어 계약 — outputLanguageClause **뒤에** 붙여 대사만 덮어쓴다. */
