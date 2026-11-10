@@ -343,13 +343,43 @@ describe('다시 열 때 · 새로 더할 때', () => {
   })
 
   it('처음 나눈 자리 사슬이 끊긴 뒤의 옛 소리는 억지로 잇지 않고 그대로 둔다', async () => {
-    // 왜: 리드 결정 "그래도 안 맞으면 거기서부터는 아직 모름으로 남겨요. 억지로 잇지 않아요" — 사람이 끝을 줄인 소리 뒤로는 자리를 믿을 수 없다.
-    restoreFrom(['sh_2', 'sh_3'], [old('sh_1', 0), { ...old('sh_2', 5), durationSec: 3 }, old('sh_3', 10)])
+    // 왜: 리드 결정 "그래도 안 맞으면 거기서부터는 아직 모름으로 남겨요. 억지로 잇지 않아요" — 사람이 뒤 소리들을 한꺼번에 옮겨
+    //   어느 샷 길이로도 설명되지 않는 자리에 있으면 처음 나눈 그대로인 소리로 볼 수 없다.
+    restoreFrom(['sh_1', 'sh_3'], [old('sh_1', 0), old('sh_2', 6.5), old('sh_3', 11.5)])
     expect(await api().loadPersisted()).toBe(true)
-    expect(audio('a_sh_1')).toBeUndefined()
-    expect(audio('a_sh_2')).toMatchObject({ startSec: 5, durationSec: 3 })
-    expect(audio('a_sh_3')).toMatchObject({ startSec: 10 })
+    expect(audio('a_sh_1')).toMatchObject({ linkedShotId: 'sh_1', startSec: 0 })
+    expect(audio('a_sh_2')).toMatchObject({ startSec: 6.5 })
+    expect(audio('a_sh_3')).toMatchObject({ startSec: 11.5 })
     expect([audio('a_sh_2')?.linkedShotId, audio('a_sh_3')?.linkedShotId]).toEqual([undefined, undefined])
+  })
+
+  it('사람이 영상과 소리 끝을 함께 줄인 샷이 있어도, 그 뒤 손대지 않은 소리는 처음 나눈 자리로 다시 잇는다', async () => {
+    // 왜: 샷 1 영상과 소리를 둘 다 4.4초로 줄인 저장본에서 샷 1 소리만 이어지고, 숨긴 샷 2 소리가 남고 샷 3 · 4 · 5 가 7.6초 늦었다(재검토 b).
+    //   다음 소리는 앞 소리 지금 끝뿐 아니라 "앞 소리 시작 + 그 샷이 차지했을 길이"에서도 찾는다.
+    api().reset()
+    const shots = [shot('sh_1', 6), shot('sh_2', 6), shot('sh_3', 5), shot('sh_4', 4), shot('sh_5', 5)]
+    const clips = [clip('sh_1', { trimStart: 0, trimEnd: 4.4 }), clip('sh_2'), clip('sh_3'), clip('sh_4'), clip('sh_5')]
+    useEditorStore.setState({ shots, videoClips: clips, clipOrder: { sc_01: shots.map((s) => s.shotId) } })
+    const at = (name: string, startSec: number, durationSec: number) => ({ ...old(name, startSec), durationSec })
+    saveSnapshot({ shots, videoClips: clips, clipOrder: { sc_01: ['sh_1', 'sh_3', 'sh_4', 'sh_5'] }, audioClips: [at('sh_1', 0, 4.4), at('sh_2', 6, 6), at('sh_3', 12, 5), at('sh_4', 17, 4), at('sh_5', 21, 5)] })
+    expect(await api().loadPersisted()).toBe(true)
+    expect(audio('a_sh_2')).toBeUndefined()
+    expect(['a_sh_1', 'a_sh_3', 'a_sh_4', 'a_sh_5'].map((id) => [audio(id)?.linkedShotId, audio(id)?.startSec])).toEqual([['sh_1', 0], ['sh_3', 4.4], ['sh_4', 9.4], ['sh_5', 13.4]])
+  })
+
+  it('사람이 어느 소리 끝만 줄였으면 그 소리는 그대로 두고, 그 뒤 손대지 않은 소리는 처음 나눈 자리로 다시 잇는다', async () => {
+    // 왜: 샷 3 소리 끝만 줄인 저장본에서 샷 4 · 5 소리가 6초 늦게 남았다(재검토 b). 줄인 소리 자신은 사람이 고친 것이라 잇지 않는다.
+    api().reset()
+    const shots = [shot('sh_1', 6), shot('sh_2', 6), shot('sh_3', 5), shot('sh_4', 4), shot('sh_5', 5)]
+    const clips = [clip('sh_1', { trimStart: 0, trimEnd: 4.4 }), clip('sh_2'), clip('sh_3'), clip('sh_4'), clip('sh_5')]
+    useEditorStore.setState({ shots, videoClips: clips, clipOrder: { sc_01: shots.map((s) => s.shotId) } })
+    const at = (name: string, startSec: number, durationSec: number) => ({ ...old(name, startSec), durationSec })
+    saveSnapshot({ shots, videoClips: clips, clipOrder: { sc_01: ['sh_1', 'sh_3', 'sh_4', 'sh_5'] }, audioClips: [at('sh_1', 0, 4.4), at('sh_2', 4.4, 6), at('sh_3', 10.4, 3), at('sh_4', 15.4, 4), at('sh_5', 19.4, 5)] })
+    expect(await api().loadPersisted()).toBe(true)
+    expect(audio('a_sh_2')).toBeUndefined()
+    expect(audio('a_sh_3')).toMatchObject({ startSec: 10.4, durationSec: 3 })
+    expect(audio('a_sh_3')?.linkedShotId).toBeUndefined()
+    expect(['a_sh_1', 'a_sh_4', 'a_sh_5'].map((id) => [audio(id)?.linkedShotId, audio(id)?.startSec])).toEqual([['sh_1', 0], ['sh_4', 9.4], ['sh_5', 13.4]])
   })
 
   it('실제 영상 파일이 계획보다 짧아 잰 길이로 나눈 저장본도, 계획 길이로 나눈 옛 저장본도 다시 열면 이어진다', async () => {

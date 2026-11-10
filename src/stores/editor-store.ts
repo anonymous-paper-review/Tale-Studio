@@ -379,7 +379,9 @@ const SAME_SPOT_SEC = 1e-6
 //   같은 영상 파일 · 원본 처음부터 · 앞 소리 끝에서 시작하는 소리를 이어 가면 "처음 나눈 그대로인 소리"다 — 그 뒤 자르기 · 속도와 상관없다.
 //   - 어떤 샷에 그런 소리가 없으면(처음 나눌 때 영상이 없었거나 사람이 그 소리를 옮겼다면) 그 샷의 계획 · 잰 길이만큼 건너뛴다.
 //     그래도 안 맞으면 거기서 멈추고, 남은 옛 소리는 아직 모름(undefined)으로 둔다 — 억지로 잇지 않는다.
-//   - 앞 소리는 다음 소리가 그 끝에서 이어질 때 맞다고 본다. 마지막 소리는 그 샷이 차지했을 길이와 맞을 때만(끝을 사람이 줄인 소리는 두기).
+//   - 다음 소리는 앞 소리 지금 끝에서, 그리고 "앞 소리 시작 + 그 샷이 차지했을 길이"에서도 찾는다 — 사람이 앞 소리 끝을 줄였어도
+//     그 뒤 손대지 않은 소리는 잇는다(재검토 b, 리드 결정 "넓힌다").
+//   - 앞 소리는 다음 소리가 그 끝에서 이어지거나 그 길이가 샷 길이와 맞을 때, 마지막 소리는 샷 길이와 맞을 때만 잇는다(끝을 사람이 줄인 소리는 두기).
 //   - 사람이 자른 소리(같은 파일의 다른 조각이 이 조각 끝에서 이어지는 것)는 잇지 않는다.
 //   다 이은 뒤, 지금 영상 자리와 꼭 맞는 옛 소리(끌어 놓은 복사본 등)도 그 클립에 잇는다.
 //   이은 소리는 뒤에서 지금 영상 자리로 옮겨지고(syncLinkedAudio), 숨긴 샷 소리는 함께 빠지며, 나눈 뒤 자른 조각에는 그 구간 소리를 나눠 준다.
@@ -430,9 +432,14 @@ function relinkSavedAudio(
       ? loose.find((a) => !chain.has(a.id) && !handCut.has(a.id) && a.url === url && near(offsetOf(a), 0) && cursors.some((c) => near(a.startSec, c)))
       : undefined
     if (hit) {
-      if (pending) chain.set(pending.audio.id, pending.shot.shotId)
+      // 앞 소리는 이 소리가 그 끝에서 이어지거나, 그 길이가 그 샷이 차지했을 길이와 맞을 때만 잇는다 — 끝을 사람이 줄인 소리는 두기(재검토 b).
+      const prev = pending
+      if (prev && (near(hit.startSec, prev.audio.startSec + prev.audio.durationSec) || lengthsOf(prev.shot).some((d) => near(prev.audio.durationSec, d)))) {
+        chain.set(prev.audio.id, prev.shot.shotId)
+      }
       pending = { audio: hit, shot }
-      cursors = [hit.startSec + hit.durationSec]
+      // 다음 소리는 이 소리의 지금 끝에서, 그리고 사람이 이 소리 끝을 줄였을 수 있으니 이 소리 시작 + 그 샷이 차지했을 길이에서도 찾는다.
+      cursors = uniq([hit.startSec + hit.durationSec, ...lengthsOf(shot).map((d) => hit.startSec + d)])
       skips = 0
       continue
     }
