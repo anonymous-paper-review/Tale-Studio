@@ -4,6 +4,7 @@ import { seriesBlock } from '@/lib/writer/pipeline/series-block';
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import { NarrativeStructureSchema } from '@/lib/writer/pipeline/schemas';
 import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
+import { foldActs, isShortRuntime, SHORT_RUNTIME_MAX_ACTS, SHORT_RUNTIME_SECONDS } from '@/lib/writer/pipeline/runtime-fit';
 import type { Genre, NarrativeStructure, PipelineInput, Dramaturgy } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 
@@ -58,13 +59,23 @@ ${outputLanguageClause(input.outputLocale)}`;
 `
     : '';
 
+  // 고른 길이 맞춤(오너 2026-11-10 ③): 15초 이하는 산문을 1~2씬으로 — 씬 수 ≥ 막 수 규칙은 그대로라 막을 1~2개로 쓰게 한다.
+  const short = isShortRuntime(input);
+  const shortBlock = short
+    ? `[고른 길이 — ${SHORT_RUNTIME_SECONDS}초 이하]
+사용자가 영상 길이를 ${SHORT_RUNTIME_SECONDS}초 이하로 골랐다. acts 는 1~${SHORT_RUNTIME_MAX_ACTS}개만 쓴다 — 이 길이는 한두 장면짜리 한 순간이다.
+기승전결 · 3막 같은 흐름은 막을 나누지 말고 한두 막 안의 흐름(purpose 문장)으로 담아라. 이 규칙이 "acts 수는 고른 구조를 따른다"보다 먼저다.
+
+`
+    : '';
+
   const userPrompt = `${dramaturgyBlock}${changeLevelBlock(input)}${seriesBlock(input)}[스토리]
 ${input.story}
 
 [genre]
 ${JSON.stringify(genre, null, 2)}
 
-[출력 형식 - JSON]
+${shortBlock}[출력 형식 - JSON]
 {
   "structure_type": "string",
   "acts": [
@@ -78,7 +89,7 @@ ${JSON.stringify(genre, null, 2)}
 
 acts의 proportion 합은 1.0이어야 함.`;
 
-  const result = await generateJson<NarrativeStructure>(userPrompt, axisConfig, {
+  const raw = await generateJson<NarrativeStructure>(userPrompt, axisConfig, {
     systemInstruction,
     temperature: 0.6,
     webSearch: true, // #p4-websearch: 스토리 축 — 오마쥬/실존 레퍼런스 접지
@@ -89,12 +100,15 @@ acts의 proportion 합은 1.0이어야 함.`;
 
   await logger.saveLlmCall('narrativeStructure', {
     prompt: userPrompt,
-    response: JSON.stringify(result, null, 2),
+    response: JSON.stringify(raw, null, 2),
     model: describeAxisConfig(axisConfig),
     provider: axisConfig.provider,
   });
 
+  // 지시를 어기고 막을 3개 이상 내도 15초 이하면 앞뒤 두 막으로 합친다 — 막마다 씬이 생겨 장면이 늘지 않게.
+  const result = short ? foldActs(raw, SHORT_RUNTIME_MAX_ACTS) : raw;
+
   await logger.saveStage('03_s1_narrativeStructure.json', result);
-  await logger.markStage('narrativeStructure', 'completed');
+  await logger.markStage('narrativeStructure', 'completed', result !== raw ? { folded_acts: `${raw.acts.length}→${result.acts.length}` } : undefined);
   return result;
 }

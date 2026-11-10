@@ -25,7 +25,6 @@ import type {
   Scenes,
   StoryScene,
   SceneDecoupage,
-  PipelineInput,
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 import type { AppLocale } from '@/lib/locale';
@@ -189,12 +188,8 @@ const DEFAULT_SCENE_CONCURRENCY = (() => {
  *  (11/10 점검: C01 41초/8샷 · C07 31초/6샷 ≈ 5초, C04 63초/14샷 ≈ 4.5초) — 샷 나누기의 의도 길이(평균 3~4초)로 세면 저장 뒤 넘친다. */
 export const RUNTIME_FIT_SHOT_SECONDS = 5;
 
-/** 고른 길이(초) — 사용자가 길이를 골랐을 때만. 대본 그대로 · 길이 없음이면 null(맞추지 않는다). */
-export function runtimeFitCap(input: Pick<PipelineInput, 'runtimeSeconds' | 'preserveScript'>): number | null {
-  if (input.preserveScript) return null;
-  const seconds = input.runtimeSeconds;
-  return typeof seconds === 'number' && Number.isFinite(seconds) && seconds > 0 ? seconds : null;
-}
+/** 고른 길이(초) — 기준은 산문 · 저장 단계와 같이 쓴다(runtime-fit.ts). */
+export { runtimeFitCap } from '@/lib/writer/pipeline/runtime-fit';
 
 /** 이 씬 시간 안에서 나눌 수 있는 샷 수 상한 — 적어도 1샷. */
 export function runtimeFitShotCap(sceneSeconds: number): number {

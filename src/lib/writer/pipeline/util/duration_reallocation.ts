@@ -141,3 +141,57 @@ export function reallocateShotDurations(
 
   return { shots: out, changed }
 }
+
+/** 저장과 같은 정수 초(1~10) — persist_manifest clampShotSeconds 와 같은 셈. */
+function storedSeconds(seconds: number | undefined): number {
+  return Math.min(REALLOC_MAX_SHOT_SECONDS, Math.max(1, Math.round(seconds ?? 5)))
+}
+
+/**
+ * 고른 길이 맞춤 안전망(오너 2026-11-10 ③ — 모든 길이 구간): 늘린 샷 길이 합이 고른 길이를 넘으면 넘는 초만 깎는다.
+ *   샷마다 바닥(2초, 대사가 있으면 말할 시간 + 0.5초 올림)은 지키고, 여유(바닥보다 긴 초)가 가장 큰 샷부터 1초씩 —
+ *   같으면 뒤 샷부터. 롱테이크는 다른 샷을 바닥까지 깎은 뒤에만 깎는다. 바닥만으로도 넘으면 그만큼은 넘긴다(말을 자르지 않는다).
+ *   capSeconds 가 null(대본 그대로)이면 그대로 둔다. 순수 함수 — 입력을 변경하지 않는다.
+ *   약속: tests/writer/runtime-fit-save.test.ts
+ */
+export function fitShotDurationsToRuntime(
+  shots: ShotSequenceItem[],
+  dialogueByShotId: Map<string, ShotDialogue>,
+  capSeconds: number | null,
+): DurationReallocation {
+  if (capSeconds === null || !(capSeconds > 0)) return { shots, changed: [] }
+  const seconds = shots.map((shot) => storedSeconds(shot.duration_seconds))
+  let excess = seconds.reduce((sum, s) => sum + s, 0) - capSeconds
+  if (excess <= 0) return { shots, changed: [] }
+
+  const floors = shots.map((shot) => {
+    const speech = speechSeconds(dialogueByShotId.get(shot.shot_id))
+    return Math.max(Math.ceil(REALLOC_MIN_SHOT_SECONDS), speech > 0 ? Math.ceil(speech + SHOT_PACING.speechMarginSeconds) : 0)
+  })
+  const longTake = shots.map((shot) => shot.pacing_intent === 'long_take')
+  while (excess > 0) {
+    let pick = -1
+    for (let i = shots.length - 1; i >= 0; i--) {
+      const slack = seconds[i] - floors[i]
+      if (slack <= 0) continue
+      if (pick === -1) {
+        pick = i
+        continue
+      }
+      const better = longTake[i] !== longTake[pick] ? !longTake[i] : slack > seconds[pick] - floors[pick]
+      if (better) pick = i
+    }
+    if (pick === -1) break
+    seconds[pick] -= 1
+    excess -= 1
+  }
+
+  const changed: DurationChange[] = []
+  const out = shots.map((shot, i) => {
+    const from = storedSeconds(shot.duration_seconds)
+    if (seconds[i] === from) return shot
+    changed.push({ shot_id: shot.shot_id, from, to: seconds[i], needed: floors[i] })
+    return { ...shot, duration_seconds: seconds[i] }
+  })
+  return { shots: out, changed }
+}

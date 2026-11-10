@@ -694,7 +694,8 @@ export const WRITER_STEPS: WriterStep[] = [
     has: (s) => s._shotsPersisted === true,
     run: async (s, { projectId }) => {
       try {
-        await persistShotsToDb(projectId, s.shotSequence!, s.dialogue ?? null);
+        // 고른 길이 맞춤 안전망(오너 2026-11-10 ③) — 모든 길이 구간. 대본 그대로는 null(그대로).
+        await persistShotsToDb(projectId, s.shotSequence!, s.dialogue ?? null, { runtimeCapSeconds: runtimeFitCap(s.input) });
         return { _shotsPersisted: true };
       } catch (e) {
         const tries = (s._persistTries ?? 0) + 1;
