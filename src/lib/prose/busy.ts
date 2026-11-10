@@ -61,6 +61,12 @@ export function proseBusySteps(busy: ProseBusy): Array<{ label: string; state: '
   ]
 }
 
+/** 산문 도구(다시 쓰기 · 직접 작성 · 브레이크다운)를 막을 일인가 — 쓰는 · 고치는 중, 직접 고치는 중, 정하지 않은 수정안,
+ *  만화로 산문을 다시 쓰는 중(만화를 읽는 30~60초는 옛 산문이 그대로 보여 확정할 수 있었다 — 2026-11-10 검토 a 낮음 1). */
+export function proseToolsBusy(input: { busy: ProseBusy; editing: boolean; openProposal: boolean; comicRewrite: boolean }): boolean {
+  return !!input.busy || input.editing || input.openProposal || input.comicRewrite
+}
+
 /** 잠금 화면을 띄울 일인가 — 진행 상태를 읽는 동안(draft step null)은 띄우지 않는다. 단추 · 입력만 막는다(busy 는 그대로).
  *  읽는 1초 남짓 사이에 다 쓴 산문 위로 "산문 초안을 쓰고 있어요"가 깜빡였다(검토 지적 15). 쓰는 중이면 상태를 읽자마자 뜬다. */
 export function proseOverlayOpen(busy: ProseBusy): boolean {

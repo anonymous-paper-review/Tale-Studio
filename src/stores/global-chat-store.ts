@@ -27,7 +27,7 @@ import { MAX_COMIC_PAGES, comicRewriteQuestion, comicStyleQuestion, imageBatchQu
 import { answersRestoredImageQuestion, imageRoleOptions, matchWriterBatch, matchWriterComicRewrite, matchWriterComicStyle, matchWriterImageUse, matchWriterStyleAttachment, styleAttachmentOptions } from '@/lib/producer/chip-answer'
 import { CHAT_IMAGE_ROLE_CONSENT, CHAT_STYLE_CONFIRM_CONSENT, CHAT_STYLE_REQUEST_CONSENT, COMIC_ANALYSIS_CONSENT, CREATION_ANALYSIS_CONSENT, STYLE_PICKER_CONSENT } from '@/lib/style-facets/consent'
 import type { PendingCreation } from '@/stores/pending-creation-store'
-import type { BoardBusy } from '@/lib/producer/busy'
+import { producerBusyKind, type BoardBusy } from '@/lib/producer/busy'
 import { backgroundMentions, castMentions } from '@/lib/card-mention'
 import {
   requireDefaultAppearanceKey,
@@ -852,12 +852,18 @@ async function runComicAdaptation(
       if (opts.rewriteDraft) {
         // 만화로 산문 다시 쓰기(2026-11-10 오너) — 이 대본으로 산문 초안을 새로 써서 화면 · 확정 · 이어 만들기가 같은 글을 보게 한다.
         //   옛 초안은 서버가 내려놓는다(지금 값으로 다시 쓰기와 같은 길). 못 쓰면 넣은 대본을 거두고 다시 옮기기를 고르게 한다.
-        const restarted = await useProducerStore.getState().restartTreatment()
+        //   그사이 산문을 확정했으면(prose_locked) 다시 옮겨도 또 막힌다 — 다시 옮기기 대신 참고로만 쓴다고 알린다(검토 a 낮음 1).
+        let refused: string | null = null
+        const restarted = await useProducerStore.getState().restartTreatment({ onRefused: (code) => { refused = code } })
         if (!sameProject()) return false
         if (!restarted) {
           const now = useProducerStore.getState()
           now.setStoryText(before.storyText)
           if (before.preserveScript !== null) now.setPreserveScript(before.preserveScript)
+          if (refused === 'prose_locked' || useProjectStore.getState().producerLocked) {
+            speak(translate(voice, 'The prose is already confirmed, so I will use the comic only as reference.'))
+            return false
+          }
           speak(translate(voice, "Couldn't rewrite the prose from the comic. The prose draft is unchanged. Please try again in a moment."))
           offerComicRetry(get, { pages, consent, then: opts.then ?? null, rewriteDraft: true })
           return false
@@ -1978,6 +1984,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return { ok: false }
     if (sceneGateInFlight.has(projectId)) return { ok: false, code: 'busy' }
+    // 만화로 산문을 다시 쓰는 동안(만화 읽기 · 새 초안 요청)은 확정하지 않는다 — 옛 산문을 확정하면 뒤이은 다시 쓰기와 엇갈렸다(2026-11-10 검토 a 낮음 1).
+    if (producerBusyKind(projectId, { pending: null, busy: get().boardBusy }) === 'comic') return { ok: false, code: 'comic_rewrite_running' }
     sceneGateInFlight.add(projectId)
     try {
       // 산문이 만든 인물 · 배경 목록을 먼저 저장한다 — Artist 의 브레이크다운 목록이 이 목록이다.

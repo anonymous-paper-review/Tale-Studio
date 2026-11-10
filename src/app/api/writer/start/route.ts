@@ -534,6 +534,12 @@ export async function POST(req: NextRequest) {
 
     // 이미 실행 중이거나 씬 게이트 대기 중이면 거부 (중복 시작 방지 — 게이트는 확정/수정으로만 진행).
     const existing = await getActiveRun(projectId);
+    // 산문을 확정한(_proseLocked) 초안은 지금 값으로 다시 쓰기로 내려놓지 않는다 — 확정 · 이어 만들기가 그 산문을 쓴다(scene-gate 와 같은 prose_locked).
+    //   만화로 다시 쓰는 사이에 확정하면 뒤이어 온 다시 쓰기가 확정한 초안을 내려놓을 수 있었다(2026-11-10 검토 a 낮음 1).
+    //   약속: tests/writer/treatment-draft-start.test.ts
+    if (restartDraft && (existing?.state as WriterRunState | undefined)?._proseLocked === true) {
+      return NextResponse.json({ error: 'The prose is confirmed and locked', code: 'prose_locked', projectId }, { status: 409 });
+    }
     // 이어 가기는 확정을 기다리는 트리트먼트 초안에만 — 수정안 · 다시 쓰기 안이 남아 있으면 먼저 정해야 한다.
     // 다시 쓸 초안 — 확정을 기다리는 트리트먼트 초안만 내려놓는다(넘긴 실행 · 아직 쓰는 실행은 건드리지 않는다).
     const replacingDraft = restartDraft && existing?.status === 'awaiting_confirmation'

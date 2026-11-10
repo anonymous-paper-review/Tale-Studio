@@ -141,6 +141,17 @@ describe('낡은 초안과 다시 쓰기 (검토 지적)', () => {
     expect(mocks.createRun.mock.calls[0][1]).toMatchObject({ treatmentDraft: true, runtimeSeconds: 60 })
   })
 
+  it('산문을 확정한 초안은 지금 값으로 다시 쓰기로 내려놓지 않는다', async () => {
+    // 왜: 검토 a 낮음 1(2026-11-10) — 만화로 산문을 다시 쓰는 사이(대본이 들어온 뒤 몇 초)에 확정하면 뒤이어 온 다시 쓰기가
+    //   확정한 초안을 내려놓아 확정 · 이어 만들기가 쓸 산문이 사라질 수 있었다. 확정한 산문은 다시 쓰지 않는다(scene-gate 와 같은 prose_locked).
+    mocks.activeRun.mockResolvedValue(draftRun({ _proseLocked: true }))
+    const response = await post({ treatmentDraft: true, restartDraft: true })
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ code: 'prose_locked' })
+    expect(mocks.writes.filter((w) => w.table === 'writer_runs')).toEqual([])
+    expect(mocks.createRun).not.toHaveBeenCalled()
+  })
+
   it('넘긴 실행은 다시 쓰기로 내려놓지 않는다', async () => {
     const handedOff = draftRun()
     delete (handedOff.state.input as { treatmentDraft?: boolean }).treatmentDraft

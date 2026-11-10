@@ -19,6 +19,7 @@ import { useWriterRoomStore } from '@/stores/writer-room-store'
 export function proseConfirmError(code: string | undefined): string {
   if (code === 'scene_story_proposal_pending') return 'Apply or discard the AI proposal first, then confirm the prose.'
   if (code === 'prose_missing') return 'The prose is not ready yet. Wait until it is written, then confirm it.'
+  if (code === 'comic_rewrite_running') return 'The prose is being rewritten from the comic. Confirm it after the new draft is ready.'
   return 'Could not confirm the prose. Please try again.'
 }
 

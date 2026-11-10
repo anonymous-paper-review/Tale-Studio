@@ -225,9 +225,10 @@ interface ProducerState {
   treatmentSyncedVersion: string | null
   syncTreatmentCast: (treatment: TreatmentCast, version: string) => void
   /** 트리트먼트 초안 시작(새 프로젝트 · 다시 시도) — 넘기지 않고 Writer 앞단만 돌린다. Producer 는 잠그지 않는다.
-   *  restart: 지금 값으로 다시 쓴다 — 확정을 기다리던 초안은 서버가 내려놓는다. */
-  startTreatment: (opts?: { restart?: boolean }) => Promise<boolean>
-  restartTreatment: () => Promise<boolean>
+   *  restart: 지금 값으로 다시 쓴다 — 확정을 기다리던 초안은 서버가 내려놓는다.
+   *  onRefused: 서버가 거절하면 그 까닭(code)을 받는다 — 확정한 산문(prose_locked)이면 다시 시도할 일이 아니다. */
+  startTreatment: (opts?: { restart?: boolean; onRefused?: (code: string | null) => void }) => Promise<boolean>
+  restartTreatment: (opts?: { onRefused?: (code: string | null) => void }) => Promise<boolean>
 
   setStoryText: (text: string) => void
   setPreserveScript: (value: boolean | null) => void
@@ -733,7 +734,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     scheduleDraftSave()
   },
 
-  restartTreatment: () => get().startTreatment({ restart: true }),
+  restartTreatment: (opts) => get().startTreatment({ ...opts, restart: true }),
 
   startTreatment: async (opts) => {
     if (isDemoSession() || producerLocked()) return false
@@ -763,7 +764,11 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
           backgrounds: backgroundContractOf(cardsForHandoff({ cast, backgrounds }).backgrounds),
         }),
       })
-      if (!response.ok) return false
+      if (!response.ok) {
+        const refused = (await response.json().catch(() => null)) as { code?: unknown } | null
+        opts?.onRefused?.(typeof refused?.code === 'string' ? refused.code : null)
+        return false
+      }
       if (useProjectStore.getState().projectId !== projectId) return false
       useProjectStore.getState().setTreatmentDraft(true)
       // 실패한 초안을 다시 시도했으면 화면의 진행 상태 읽기는 멈춰 있다(실패 = 끝난 상태) — 다시 읽어 새 초안으로 바꾼다.

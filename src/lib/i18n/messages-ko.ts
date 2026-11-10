@@ -2292,6 +2292,7 @@ export const KO: Record<string, string> = {
   "Rewriting the prose from the comic script. This takes a minute or two.": "만화 대본으로 산문을 다시 쓰고 있어요. 1~2분 걸려요.",
   "Couldn't rewrite the prose from the comic. The prose draft is unchanged. Please try again in a moment.": "만화로 산문을 다시 쓰지 못했어요. 산문 초안은 그대로예요. 잠시 뒤 다시 해 주세요.",
   "The prose is already confirmed, so I will use the comic only as reference.": "산문을 이미 확정해서 만화는 참고로만 쓸게요.",
+  "The prose is being rewritten from the comic. Confirm it after the new draft is ready.": "만화로 산문을 다시 쓰는 중이에요. 새 초안이 나온 뒤 확정해 주세요.",
   "Never mind": "그만두기",
   "Don't use the comic": "만화는 쓰지 말아 줘",
   "Please choose first how the art style should work: fix the comic art style, adapt to another style like live action, or stop.": "먼저 그림체를 골라 주세요: 만화 그림체로 고정, 실사 등 다른 스타일로 각색, 또는 그만두기.",
