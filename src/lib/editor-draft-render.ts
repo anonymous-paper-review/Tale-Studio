@@ -18,6 +18,20 @@ import type { ClipTransition, ShotSubtitle, TitleCardData } from '@/types/shot'
 import { dissolveOpacityAt } from '@/lib/editor/transition'
 import { drawSubtitle, resolveSubtitle } from '@/lib/editor/subtitle'
 import { cachedVideoUrl, prefetchVideos } from '@/features/editor/video-prefetch'
+import { audioSourceTime } from '@/lib/editor/audio-time'
+
+/** 내보내기에 넣는 소리 조각 — 음소거 · 소리 0 · 음소거한 줄 · 주소 없는 것을 뺀다. 편집 상태의 자리 그대로 재생한다(2026-11-10 결정 4). */
+export function draftAudioClips(audioClips: AudioTrackClip[], audioTracks: Array<{ id: string; muted?: boolean }>): AudioTrackClip[] {
+  const mutedTracks = new Set(audioTracks.filter((t) => t.muted).map((t) => t.id))
+  const firstTrackId = audioTracks[0]?.id
+  return audioClips.filter(
+    (a) =>
+      !a.muted &&
+      a.volume > 0 &&
+      !mutedTracks.has(a.trackId ?? firstTrackId ?? '') &&
+      !!a.url,
+  )
+}
 
 export interface DraftRenderStats {
   durationSec: number
@@ -191,15 +205,7 @@ export async function renderDraftTimeline(opts: {
   if (signal?.aborted) throw abortError()
 
   // ── 1) 선다운로드: 영상 전체 + 원격 오디오 (실패는 스트리밍 폴백 — 렌더는 계속) ──
-  const mutedTracks = new Set(audioTracks.filter((t) => t.muted).map((t) => t.id))
-  const firstTrackId = audioTracks[0]?.id
-  const audible = audioClips.filter(
-    (a) =>
-      !a.muted &&
-      a.volume > 0 &&
-      !mutedTracks.has(a.trackId ?? firstTrackId ?? '') &&
-      !!a.url,
-  )
+  const audible = draftAudioClips(audioClips, audioTracks)
   const remoteUrls = [
     ...layout
       .map((l) => videoClips.find((c) => c.shotId === l.shotId)?.url)
@@ -235,16 +241,20 @@ export async function renderDraftTimeline(opts: {
     el: HTMLAudioElement
     clip: AudioTrackClip
     endSec: number
+    rate: number
   }> = audible.map((clip) => {
     const el = document.createElement('audio')
     el.crossOrigin = 'anonymous'
     el.preload = 'auto'
     el.src = localUrl(clip.url)
+    // 영상에 이어진 소리는 그 영상의 속도로 — 미리 보기와 같다(2026-11-10 결정 4).
+    const rate = clip.playbackRate ?? 1
+    el.playbackRate = rate
     const src = ac.createMediaElementSource(el)
     const gain = ac.createGain()
     gain.gain.value = Math.max(0, Math.min(1, clip.volume))
     src.connect(gain).connect(dest)
-    return { el, clip, endSec: clip.startSec + clip.durationSec }
+    return { el, clip, endSec: clip.startSec + clip.durationSec, rate }
   })
 
   const videoEl = document.createElement('video')
@@ -337,7 +347,7 @@ export async function renderDraftTimeline(opts: {
       for (const a of audioEls) {
         const active = clock >= a.clip.startSec && clock < a.endSec
         if (active && a.el.paused) {
-          a.el.currentTime = (a.clip.sourceOffsetSec ?? 0) + (clock - a.clip.startSec)
+          a.el.currentTime = audioSourceTime(a.clip, clock)
           void a.el.play().catch(() => {})
         } else if (!active && !a.el.paused) {
           a.el.pause()

@@ -193,6 +193,13 @@ export interface AudioTrackClip {
   blobKey?: string
   sourceId?: string           // 어떤 AudioSource 에서 왔는지 (bin 추적용)
   trackId?: string            // 어느 오디오 레인(트랙)에 속하는지 (멀티 트랙). 없으면 첫 트랙
+  /**
+   * 이 소리가 따라가는 타임라인 영상 클립(shotId) — 영상을 숨기 · 자르기 · 옮기기 · 속도를 바꾸면 소리도 같이 움직인다
+   * (오너 2026-11-10 결정 4 "같이 움직인다 — 따로 떼고 싶을 때만 나눈다"). null = 사람이 소리 조각을 직접 끌거나 잘라 뗀 것.
+   * 없음 = 이 칸이 생기기 전 저장본 — 열 때 영상과 자리가 맞는 것만 잇는다.
+   */
+  linkedShotId?: string | null
+  playbackRate?: number       // 재생 빠르기 — 이어진 영상의 속도를 따른다. 없으면 1
 }
 
 /**

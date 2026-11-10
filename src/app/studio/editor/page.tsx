@@ -242,9 +242,10 @@ export default function PostPage() {
     ready.setPlaying(true)
   }, [projectId, t])
 
-  // 비디오 소스에 오디오가 있으면 같은 위치 오디오 트랙에 함께 삽입.
+  // 비디오 소스에 오디오가 있으면 그 영상 클립(linkTo)에 이어 오디오 트랙에 함께 삽입.
   // 비디오 파일을 decodeAudioData 로 디코드 시도 → 성공 시 소리 있음. 실패(무음/CORS) 시 비디오만.
-  const attachVideoAudio = useCallback(async (shotId: string, atSec: number) => {
+  //   자리 · 길이는 넣는 순간 이어진 클립을 따른다 — 디코드하는 사이 클립을 옮기거나 숨겨도 맞는다(오너 2026-11-10 결정 4).
+  const attachVideoAudio = useCallback(async (shotId: string, linkTo: string) => {
     const st = useEditorStore.getState()
     const src = st.videoClips.find((c) => c.shotId === shotId)
     const shot = st.shots.find((s) => s.shotId === shotId)
@@ -252,17 +253,18 @@ export default function PostPage() {
     try {
       const { durationSec, peaks } = await decodeAudioPeaks(src.url)
       if (!(durationSec > 0)) return
-      st.addAudioClip({
+      const now = useEditorStore.getState()
+      now.addAudioClip({
         name: t('{type} audio', { type: shot?.shotType ?? t('Video') }),
         url: src.url,
-        startSec: atSec,
-        // 표시 길이는 영상 슬롯(shot.durationSeconds)에 맞춰 옆 클립과 안 겹치게.
-        // 실제 오디오 길이는 sourceDurationSec(트림 한계)로 보존.
+        startSec: 0,
         durationSec: shot?.durationSeconds ?? durationSec,
         peaks,
         sourceOffsetSec: 0,
+        // 실제 오디오 길이는 sourceDurationSec(트림 한계)로 보존.
         sourceDurationSec: durationSec,
-        trackId: st.audioTracks[0]?.id,
+        trackId: now.audioTracks[0]?.id,
+        linkedShotId: linkTo,
       })
     } catch {
       // 비디오에 오디오 트랙 없음 / 디코드 불가(CORS 등) → 비디오만 삽입
@@ -371,22 +373,22 @@ export default function PostPage() {
     }
   }, [])
 
-  // 드래그-드롭: 비디오 + (있으면) 오디오 함께 삽입
+  // 드래그-드롭: 비디오 + (있으면) 오디오 함께 삽입 — 오디오는 새로 놓인 클립에 잇는다(결정 4).
   const handleAddVideoClip = useCallback(
     (shotId: string, atSec: number) => {
-      addClipInstanceAt(shotId, atSec)
-      void attachVideoAudio(shotId, atSec)
+      const instanceId = addClipInstanceAt(shotId, atSec)
+      if (instanceId) void attachVideoAudio(shotId, instanceId)
     },
     [addClipInstanceAt, attachVideoAudio],
   )
 
-  // 우클릭 "타임라인 추가": 플레이헤드 인접 경계 + 오디오 동반
+  // 우클릭 "타임라인 추가": 플레이헤드 인접 경계 + 오디오 동반 — 새 클립은 더한 직후 골라져 있다.
   const handleAddVideoClipAtPlayhead = useCallback(
     (shotId: string) => {
       addClipAtPlayhead(shotId)
       const st = useEditorStore.getState()
       const item = selectTimelineLayout(st).find((l) => l.shotId === st.selectedClipShotId)
-      if (item) void attachVideoAudio(shotId, item.startSec)
+      if (item) void attachVideoAudio(shotId, item.shotId)
     },
     [addClipAtPlayhead, attachVideoAudio],
   )

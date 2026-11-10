@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import type { AudioTrackClip } from '@/types'
+import { audioSourceTime } from '@/lib/editor/audio-time'
 import { useEditorStore } from '@/stores/editor-store'
 
 /**
@@ -95,8 +96,11 @@ export function AudioMeter({ audioClips }: { audioClips: AudioTrackClip[] }) {
         if (!entry) continue
         const local = state.currentTime - clip.startSec
         const inRange = local >= 0 && local < clip.durationSec
-        // cut 된 조각은 원본의 sourceOffsetSec 부터 재생 (조각마다 다른 구간)
-        const srcTime = local + (clip.sourceOffsetSec ?? 0)
+        // cut 된 조각은 원본의 sourceOffsetSec 부터 재생 (조각마다 다른 구간).
+        //   영상에 이어진 소리는 그 영상의 속도로 재생한다 — 원본은 타임라인 초 × 빠르기만큼 나아간다(2026-11-10 결정 4).
+        const rate = clip.playbackRate ?? 1
+        if (entry.el.playbackRate !== rate) entry.el.playbackRate = rate
+        const srcTime = audioSourceTime(clip, state.currentTime)
         // 전역 재생 볼륨(masterVolume) 곱 — 재생 전용, draft 와 무관.
         // 클립 음소거 OR 트랙 전체 음소거면 볼륨 0.
         const tFirst = state.audioTracks[0]?.id

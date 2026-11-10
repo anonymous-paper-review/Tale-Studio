@@ -110,6 +110,8 @@ async function openSteps(input: FinishEditorOpenInput): Promise<'opened' | 'spli
       sourceOffsetSec: 0,
       sourceDurationSec: item.durationSec,
       trackId,
+      // 영상 클립에 잇는다 — 영상을 숨기 · 자르기 · 옮기기 · 속도를 바꾸면 소리도 같이 움직인다(오너 2026-11-10 결정 4).
+      linkedShotId: item.shotId,
     })
     created.push({ id, url: src.url })
   }

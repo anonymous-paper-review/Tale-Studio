@@ -20,7 +20,7 @@ import {
 } from '@/lib/editor-persistence'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
-import { compactSnapshot } from '@/lib/editor/peaks'
+import { compactSnapshot, sharePeaks } from '@/lib/editor/peaks'
 
 const DEFAULT_CAMERA = {
   horizontal: 0,
@@ -177,7 +177,7 @@ interface EditorState {
   // cut(자르기) — 비디오 클립을 전역 시간 atSec 지점에서 둘로 분할
   splitVideoClipAt: (shotId: string, atGlobalSec: number) => void
   // Video Source → 타임라인 드래그-투-애드 (atSec 위치에 새 인스턴스 삽입)
-  addClipInstanceAt: (sourceShotId: string, atGlobalSec: number) => void
+  addClipInstanceAt: (sourceShotId: string, atGlobalSec: number) => string | null
   // 타이틀 카드(#owner-title-card) — 검은 배경+텍스트(+선택 이미지) synthetic 클립을 atGlobalSec
   //   인접 경계에 삽입. 길이는 기존 트림 문법(setTrim)을 재사용.
   addTitleCard: (atGlobalSec: number) => void
@@ -314,6 +314,183 @@ export function selectTimelineLayout(
     const durationSec = Math.max(0.1, (trimEnd - trimStart) / speed)
     out.push({ shotId, startSec: cursor, durationSec })
     cursor += durationSec
+  }
+  return out
+}
+
+// ── 영상과 이어진 소리 (오너 2026-11-10 결정 4 "같이 움직인다 — 따로 떼고 싶을 때만 나눈다") ──
+//   이어진 소리(linkedShotId)의 자리 · 길이 · 원본 시작점 · 빠르기는 그 영상 클립을 따르고, 타임라인에서 빠진(숨긴 · 지운)
+//   영상의 소리는 함께 뺀다. 영상을 바꾸는 동작은 모두 같은 set 안에서 이 함수로 소리를 맞춘다 — 되돌리기 한 번에 함께 돌아간다.
+//   약속: tests/editor/audio-link.test.ts
+type LinkInput = TimelineInput & { audioClips: AudioTrackClip[] }
+export function syncLinkedAudio(state: LinkInput): AudioTrackClip[] {
+  if (!state.audioClips.some((a) => a.linkedShotId)) return state.audioClips
+  const layout = new Map(selectTimelineLayout(state).map((item) => [item.shotId, item]))
+  let changed = false
+  const out: AudioTrackClip[] = []
+  for (const a of state.audioClips) {
+    if (!a.linkedShotId) {
+      out.push(a)
+      continue
+    }
+    const item = layout.get(a.linkedShotId)
+    if (!item) {
+      changed = true
+      continue
+    }
+    const clip = state.videoClips.find((c) => c.shotId === a.linkedShotId)
+    const sourceOffsetSec = clip?.trimStart ?? 0
+    const playbackRate = clip?.speed ?? 1
+    if (a.startSec === item.startSec && a.durationSec === item.durationSec && (a.sourceOffsetSec ?? 0) === sourceOffsetSec && (a.playbackRate ?? 1) === playbackRate) {
+      out.push(a)
+      continue
+    }
+    changed = true
+    out.push({ ...a, startSec: item.startSec, durationSec: item.durationSec, sourceOffsetSec, playbackRate })
+  }
+  return changed ? out : state.audioClips
+}
+
+/** 영상을 바꾸는 동작의 결과에 이어진 소리를 맞춰 붙인다 — 함께 빠진 소리는 고른 것에서도 뺀다. */
+function withLinkedAudio(state: EditorState, changes: Partial<EditorState>): Partial<EditorState> {
+  const before = changes.audioClips ?? state.audioClips
+  const audioClips = syncLinkedAudio({
+    shots: changes.shots ?? state.shots,
+    videoClips: changes.videoClips ?? state.videoClips,
+    clipOrder: changes.clipOrder ?? state.clipOrder,
+    audioClips: before,
+  })
+  if (audioClips === before) return changes
+  const kept = new Set(audioClips.map((a) => a.id))
+  const selectedAudioId = 'selectedAudioId' in changes ? changes.selectedAudioId ?? null : state.selectedAudioId
+  return {
+    ...changes,
+    audioClips,
+    selectedAudioId: selectedAudioId && kept.has(selectedAudioId) ? selectedAudioId : null,
+    selectedAudioIds: (changes.selectedAudioIds ?? state.selectedAudioIds).filter((id) => kept.has(id)),
+  }
+}
+
+// 소리 조각 자리가 이만큼 안으로 같으면 제자리다 — 초를 다시 계산한 끝자리 차이(검토 b).
+const SAME_SPOT_SEC = 1e-6
+
+// 이음 칸이 생기기 전(이번 고침 전) 저장본의 소리를 영상에 다시 잇는다 — 오너 2026-11-10 답 "고쳐 준다", 리드 결정 "사슬로 따라가기".
+//   처음 나누기는 원본 샷 순서대로 영상마다 소리 하나를 원본 처음부터(원본 0초) 앞 소리 끝에 이어 놓았다. 그래서 원본 순서(숨긴 샷 포함)대로
+//   같은 영상 파일 · 원본 처음부터 · 앞 소리 끝에서 시작하는 소리를 이어 가면 "처음 나눈 그대로인 소리"다 — 그 뒤 자르기 · 속도와 상관없다.
+//   - 어떤 샷에 그런 소리가 없으면(처음 나눌 때 영상이 없었거나 사람이 그 소리를 옮겼다면) 그 샷의 계획 · 잰 길이만큼 건너뛴다.
+//     그래도 안 맞으면 거기서 멈추고, 남은 옛 소리는 아직 모름(undefined)으로 둔다 — 억지로 잇지 않는다.
+//   - 다음 소리는 앞 소리 지금 끝에서, 그리고 "앞 소리 시작 + 그 샷이 차지했을 길이"에서도 찾는다 — 사람이 앞 소리 끝을 줄였어도
+//     그 뒤 손대지 않은 소리는 잇는다(재검토 b, 리드 결정 "넓힌다").
+//   - 앞 소리는 다음 소리가 그 끝에서 이어지거나 그 길이가 샷 길이와 맞을 때, 마지막 소리는 샷 길이와 맞을 때만 잇는다(끝을 사람이 줄인 소리는 두기).
+//   - 사람이 자른 소리(같은 파일의 다른 조각이 이 조각 끝에서 이어지는 것)는 잇지 않는다.
+//   다 이은 뒤, 지금 영상 자리와 꼭 맞는 옛 소리(끌어 놓은 복사본 등)도 그 클립에 잇는다.
+//   이은 소리는 뒤에서 지금 영상 자리로 옮겨지고(syncLinkedAudio), 숨긴 샷 소리는 함께 빠지며, 나눈 뒤 자른 조각에는 그 구간 소리를 나눠 준다.
+//   약속: tests/editor/audio-link.test.ts
+const LINK_TOLERANCE_SEC = 0.05
+const CHAIN_MAX_SKIPS = 3
+function relinkSavedAudio(
+  audioClips: AudioTrackClip[],
+  timeline: TimelineInput,
+  original: Pick<EditorState, 'shots' | 'videoClips'>,
+  savedClips: VideoClip[],
+): AudioTrackClip[] {
+  const loose = audioClips.filter((a) => a.linkedShotId === undefined)
+  if (loose.length === 0) return audioClips
+  const near = (a: number, b: number) => Math.abs(a - b) <= LINK_TOLERANCE_SEC
+  const offsetOf = (a: AudioTrackClip) => a.sourceOffsetSec ?? 0
+  const handCut = new Set(
+    loose
+      .filter((a) => loose.some((b) => b !== a && b.url === a.url && near(offsetOf(b), offsetOf(a) + a.durationSec * (a.playbackRate ?? 1))))
+      .map((a) => a.id),
+  )
+  // 저장해 둔 실제 길이(같은 파일) — 다시 열 때는 아직 재기 전이다.
+  const measured = new Map(savedClips.filter((c) => c.url && c.actualDurationSec).map((c) => [c.url as string, c.actualDurationSec as number]))
+  const clipOf = (shotId: string) => original.videoClips.find((c) => c.shotId === shotId)
+  // 처음 나눌 때 그 샷이 타임라인에서 차지했을 수 있는 길이 — 계획 · 잰 길이 · 둘 중 짧은 것 · 지금 손잡이 · 속도를 넣은 길이.
+  const lengthsOf = (shot: Shot): number[] => {
+    const clip = clipOf(shot.shotId)
+    const real = (clip?.url ? measured.get(clip.url) : undefined) ?? clip?.actualDurationSec
+    const out = [shot.durationSeconds]
+    if (real) out.push(real, Math.min(shot.durationSeconds, real))
+    if (clip && (clip.trimStart != null || clip.trimEnd != null || (clip.speed ?? 1) !== 1)) {
+      const end = clip.trimEnd ?? Math.min(shot.durationSeconds, real ?? shot.durationSeconds)
+      out.push(Math.max(0.1, (end - (clip.trimStart ?? 0)) / (clip.speed ?? 1)))
+    }
+    return out
+  }
+  const uniq = (xs: number[]) => xs.filter((x, i) => xs.findIndex((y) => near(x, y)) === i)
+
+  const chain = new Map<string, string>() // 소리 id → 원본 샷 id
+  let cursors = [0]
+  let pending: { audio: AudioTrackClip; shot: Shot } | null = null
+  let skips = 0
+  for (const shotId of selectTimelineShotIds({ shots: original.shots, clipOrder: buildClipOrder(original.shots), videoClips: original.videoClips })) {
+    const shot = original.shots.find((s) => s.shotId === shotId)
+    if (!shot) continue
+    const url = clipOf(shotId)?.url
+    const hit = url
+      ? loose.find((a) => !chain.has(a.id) && !handCut.has(a.id) && a.url === url && near(offsetOf(a), 0) && cursors.some((c) => near(a.startSec, c)))
+      : undefined
+    if (hit) {
+      // 앞 소리는 이 소리가 그 끝에서 이어지거나, 그 길이가 그 샷이 차지했을 길이와 맞을 때만 잇는다 — 끝을 사람이 줄인 소리는 두기(재검토 b).
+      const prev = pending
+      if (prev && (near(hit.startSec, prev.audio.startSec + prev.audio.durationSec) || lengthsOf(prev.shot).some((d) => near(prev.audio.durationSec, d)))) {
+        chain.set(prev.audio.id, prev.shot.shotId)
+      }
+      pending = { audio: hit, shot }
+      // 다음 소리는 이 소리의 지금 끝에서, 그리고 사람이 이 소리 끝을 줄였을 수 있으니 이 소리 시작 + 그 샷이 차지했을 길이에서도 찾는다.
+      cursors = uniq([hit.startSec + hit.durationSec, ...lengthsOf(shot).map((d) => hit.startSec + d)])
+      skips = 0
+      continue
+    }
+    if (++skips > CHAIN_MAX_SKIPS) break
+    cursors = uniq(cursors.flatMap((c) => lengthsOf(shot).map((d) => c + d))).slice(0, 12)
+  }
+  if (pending && lengthsOf(pending.shot).some((d) => near(pending.audio.durationSec, d))) chain.set(pending.audio.id, pending.shot.shotId)
+
+  const taken = new Set([...audioClips.map((a) => a.linkedShotId).filter((id): id is string => !!id), ...chain.values()])
+  // 지금 영상 자리와 꼭 맞는 옛 소리 — 저장해 둔 잰 길이 · 계획 길이로 둘 다 견준다.
+  const aligned = new Map<string, string>()
+  for (const videoClips of [
+    timeline.videoClips.map((c) => (c.actualDurationSec == null && c.url && measured.has(c.url) ? { ...c, actualDurationSec: measured.get(c.url) } : c)),
+    timeline.videoClips.map(({ actualDurationSec: _measured, ...c }) => c),
+  ]) {
+    const layout = selectTimelineLayout({ ...timeline, videoClips })
+    for (const a of loose) {
+      if (chain.has(a.id) || aligned.has(a.id) || handCut.has(a.id)) continue
+      const item = layout.find((l) => {
+        if (taken.has(l.shotId)) return false
+        const clip = videoClips.find((c) => c.shotId === l.shotId)
+        return (
+          !!clip?.url && clip.url === a.url &&
+          near(a.startSec, l.startSec) && near(a.durationSec, l.durationSec) &&
+          near(offsetOf(a), clip.trimStart ?? 0) && (clip.speed ?? 1) === (a.playbackRate ?? 1)
+        )
+      })
+      if (!item) continue
+      taken.add(item.shotId)
+      aligned.set(a.id, item.shotId)
+    }
+  }
+  if (chain.size === 0 && aligned.size === 0) return audioClips
+
+  // 처음 나눈 자리로 다시 이은 원본 샷을 그 뒤에 자른 조각이 지금 타임라인에 있으면, 조각마다 소리를 나눠 준다(자리 · 구간은 뒤에서 조각을 따른다).
+  const pieces = timeline.shots.map((s) => s.shotId).filter((id) => id.includes('__c'))
+  const out: AudioTrackClip[] = []
+  for (const a of audioClips) {
+    const fromChain = chain.get(a.id)
+    const shotId = fromChain ?? aligned.get(a.id)
+    if (!shotId) {
+      out.push(a)
+      continue
+    }
+    out.push({ ...a, linkedShotId: shotId })
+    if (!fromChain) continue
+    for (const piece of pieces) {
+      if (rootShotIdOf(piece) !== shotId || taken.has(piece)) continue
+      taken.add(piece)
+      out.push({ ...a, id: `audio_${uid()}`, linkedShotId: piece })
+    }
   }
   return out
 }
@@ -461,33 +638,46 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   addAudioClip: (clip) => {
     const id = `audio_${uid()}`
-    set((state) => ({
-      audioClips: [
-        ...state.audioClips,
-        {
-          ...clip,
-          id,
-          volume: 1,
-          muted: false,
-          sourceOffsetSec: clip.sourceOffsetSec ?? 0,
-          sourceDurationSec: clip.sourceDurationSec ?? clip.durationSec,
-        },
-      ],
-      selectedAudioId: id,
-      selectedAudioIds: [id],
-      past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
-      future: [],
-    }))
+    // 영상에 잇는 소리(linkedShotId)는 넣는 즉시 그 영상 클립 자리에 맞춘다 — 그 클립이 그새 빠졌으면 넣지 않는다.
+    set((state) =>
+      withLinkedAudio(state, {
+        audioClips: [
+          ...state.audioClips,
+          {
+            ...clip,
+            id,
+            volume: 1,
+            muted: false,
+            sourceOffsetSec: clip.sourceOffsetSec ?? 0,
+            sourceDurationSec: clip.sourceDurationSec ?? clip.durationSec,
+          },
+        ],
+        selectedAudioId: id,
+        selectedAudioIds: [id],
+        past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
+        future: [],
+      }),
+    )
     return id
   },
 
+  // 소리 조각을 직접 끌어 옮기면(자리나 줄이 바뀌면) 그 소리는 영상에서 떨어진다 — 제자리에 놓으면 그대로 잇는다(결정 4).
+  //   초를 다시 계산하며 끝자리만 달라진 것(15.4 → 15.399999999999999)은 제자리다(검토 b).
   moveAudioClip: (id, startSec, trackId) =>
     set((state) => ({
-      audioClips: state.audioClips.map((a) =>
-        a.id === id
-          ? { ...a, startSec: Math.max(0, startSec), ...(trackId ? { trackId } : {}) }
-          : a,
-      ),
+      audioClips: state.audioClips.map((a) => {
+        if (a.id !== id) return a
+        const nextStart = Math.max(0, startSec)
+        const shifted = Math.abs(nextStart - a.startSec) > SAME_SPOT_SEC
+        const moved = shifted || (!!trackId && trackId !== a.trackId)
+        return {
+          ...a,
+          startSec: shifted ? nextStart : a.startSec,
+          ...(trackId ? { trackId } : {}),
+          // 이음이 없던 옛 소리도 사람이 옮기면 뗀 소리가 된다 — 다음에 열어도 다시 잇지 않는다(검토 b).
+          ...(moved ? { linkedShotId: null } : {}),
+        }
+      }),
     })),
 
   setAudioVolume: (id, volume) =>
@@ -526,14 +716,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const srcOff = a.sourceOffsetSec ?? 0
       const srcDur = a.sourceDurationSec ?? a.durationSec
       const newId = `audio_${uid()}`
-      const first: AudioTrackClip = { ...a, durationSec: localT }
+      // 소리 조각을 직접 자르면 두 조각 모두 영상에서 떨어진다(결정 4). 빠르기는 그대로 — 원본은 타임라인 초 × 빠르기만큼 나아간다.
+      const rate = a.playbackRate ?? 1
+      const first: AudioTrackClip = { ...a, durationSec: localT, linkedShotId: null }
       const second: AudioTrackClip = {
         ...a,
         id: newId,
         startSec: a.startSec + localT,
         durationSec: a.durationSec - localT,
-        sourceOffsetSec: srcOff + localT,
+        sourceOffsetSec: srcOff + localT * rate,
         sourceDurationSec: srcDur,
+        linkedShotId: null,
       }
       return {
         audioClips: state.audioClips.flatMap((x) => (x.id === id ? [first, second] : [x])),
@@ -628,13 +821,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setBinDropSec: (sec) => set({ binDropSec: sec }),
 
   updateVideoClip: (shotId, patch) =>
-    set((state) => ({
-      videoClips: state.videoClips.map((c) => (c.shotId === shotId ? { ...c, ...patch } : c)),
-    })),
+    set((state) =>
+      withLinkedAudio(state, {
+        videoClips: state.videoClips.map((c) => (c.shotId === shotId ? { ...c, ...patch } : c)),
+      }),
+    ),
+  // 자리 · 길이 · 원본 시작점을 바꾸면(소리 조각의 앞 · 뒤를 끌어 줄이기) 영상에서 떨어진다. 파형 · 원본 길이 채우기는 그대로 잇는다(결정 4).
   updateAudioClip: (id, patch) =>
-    set((state) => ({
-      audioClips: state.audioClips.map((a) => (a.id === id ? { ...a, ...patch } : a)),
-    })),
+    set((state) => {
+      const reshaped = 'startSec' in patch || 'durationSec' in patch || 'sourceOffsetSec' in patch
+      return {
+        audioClips: state.audioClips.map((a) =>
+          a.id === id ? { ...a, ...patch, ...(reshaped ? { linkedShotId: null } : {}) } : a,
+        ),
+      }
+    }),
 
   // ── 리사이즈 섹션 크기 ──
   setPanelSize: (key, value) =>
@@ -789,6 +990,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         )
         clipOrder[sceneId] = [...retained, ...canonicalIds.filter((id) => !retained.includes(id) && !savedShotIds.has(id))]
       }
+      // 이음 칸이 없는 예전 저장본은 지금 영상 자리 · 처음 나눈 자리와 맞는 소리를 다시 잇고, 이어진 소리는 되살린 영상 자리에 맞춘다(결정 4).
+      //   같은 소리 파일의 파형은 저장본에 한 번만 있다 — 빠진 조각은 같은 파일의 파형을 함께 쓴다(검토 b).
+      const timeline = { shots: combinedShots, videoClips: combinedClips, clipOrder }
+      const relinked = relinkSavedAudio(sharePeaks(dedupAudioClips), timeline, { shots: cur.shots, videoClips: cur.videoClips }, saved.videoClips ?? [])
+      const audioClips = syncLinkedAudio({ ...timeline, audioClips: relinked })
       set({
         // Canonical shots/videoClips come from loadData (DB truth). Only synthetic editor
         // pieces whose base shot is still canonical are merged back in above - a local
@@ -796,7 +1002,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         shots: combinedShots,
         videoClips: combinedClips,
         clipOrder,
-        audioClips: dedupAudioClips,
+        audioClips,
         audioSources: saved.audioSources ?? [],
         audioTracks: dedupTracks,
         panelSizes: saved.panelSizes ?? { ...DEFAULT_PANEL_SIZES },
@@ -1153,11 +1359,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSpeed: (shotId, speed) => {
     const clamped = Math.max(0.25, Math.min(4.0, speed))
 
-    set((state) => ({
-      videoClips: state.videoClips.map((c) =>
-        c.shotId === shotId ? { ...c, speed: clamped } : c,
-      ),
-    }))
+    set((state) =>
+      withLinkedAudio(state, {
+        videoClips: state.videoClips.map((c) =>
+          c.shotId === shotId ? { ...c, speed: clamped } : c,
+        ),
+      }),
+    )
 
     // Debounced persist to DB (fire-and-forget)
     const existing = speedPersistTimers.get(shotId)
@@ -1181,15 +1389,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const start = Math.max(0, trimStart)
     if (trimEnd <= start) return
 
-    set((state) => ({
-      videoClips: state.videoClips.map((c) =>
-        c.shotId === shotId ? { ...c, trimStart: start, trimEnd } : c,
-      ),
-      // 약속 J3: 타이틀 카드는 원본 영상이 없어 "원본 길이"가 없다 — 손잡이로 늘린 만큼 카드 길이가 길어진다.
-      shots: isTitleCardShotId(shotId)
-        ? state.shots.map((s) => (s.shotId === shotId && trimEnd > s.durationSeconds ? { ...s, durationSeconds: trimEnd } : s))
-        : state.shots,
-    }))
+    set((state) =>
+      withLinkedAudio(state, {
+        videoClips: state.videoClips.map((c) =>
+          c.shotId === shotId ? { ...c, trimStart: start, trimEnd } : c,
+        ),
+        // 약속 J3: 타이틀 카드는 원본 영상이 없어 "원본 길이"가 없다 — 손잡이로 늘린 만큼 카드 길이가 길어진다.
+        shots: isTitleCardShotId(shotId)
+          ? state.shots.map((s) => (s.shotId === shotId && trimEnd > s.durationSeconds ? { ...s, durationSeconds: trimEnd } : s))
+          : state.shots,
+      }),
+    )
 
     // synthetic pieces have no shots row - the editor_states snapshot restores them instead.
     if (isSyntheticShotId(shotId)) return
@@ -1219,14 +1429,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       for (const [sceneId, ids] of Object.entries(state.clipOrder)) {
         newOrder[sceneId] = ids.filter((id) => id !== shotId)
       }
-      return {
+      // 숨긴 클립에 이어진 소리는 함께 빠지고, 뒤 클립 소리는 영상처럼 당겨진다(결정 4).
+      return withLinkedAudio(state, {
         clipOrder: newOrder,
         selectedShotIds: state.selectedShotIds.filter((id) => id !== shotId),
         selectedClipShotId:
           state.selectedClipShotId === shotId ? null : state.selectedClipShotId,
         past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
         future: [],
-      }
+      })
     }),
 
   deleteSelectedClips: () =>
@@ -1237,13 +1448,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       for (const [sceneId, list] of Object.entries(state.clipOrder)) {
         newOrder[sceneId] = list.filter((id) => !ids.has(id))
       }
-      return {
+      return withLinkedAudio(state, {
         clipOrder: newOrder,
         selectedShotIds: [],
         selectedClipShotId: null,
         past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
         future: [],
-      }
+      })
     }),
 
   // 드래그 순서변경 — shotId 를 전역 순서의 targetIndex 위치로 이동 (씬 경계 넘으면 sceneId 재배정)
@@ -1286,12 +1497,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           ? state.shots
           : state.shots.map((s) => (s.shotId === shotId ? { ...s, sceneId } : s))
 
-      return {
+      return withLinkedAudio(state, {
         shots,
         clipOrder: cleared,
         past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
         future: [],
-      }
+      })
     }),
 
   // cut(자르기) for video — atGlobalSec 에서 클립을 둘로 분할.
@@ -1328,26 +1539,35 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (idx >= 0) order.splice(idx + 1, 0, newId)
       else order.push(newId)
 
-      return {
+      // 그 클립에 이어진 소리도 같은 자리에서 둘로 — 뒷조각 소리는 새 조각을 따라간다(결정 4).
+      const audioClips = state.audioClips.flatMap((a) =>
+        a.linkedShotId === shotId ? [a, { ...a, id: `audio_${uid()}`, linkedShotId: newId }] : [a],
+      )
+
+      return withLinkedAudio(state, {
         shots: [...state.shots, newShot],
         videoClips,
+        audioClips,
         clipOrder: { ...state.clipOrder, [shot.sceneId]: order },
         selectedClipShotId: shotId,
         selectedAudioId: null,
         selectedAudioIds: [],
         past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
         future: [],
-      }
+      })
     }),
 
   // Video Source → 타임라인 드래그-투-애드. atGlobalSec 위치에 새 인스턴스(synthetic) 삽입.
-  addClipInstanceAt: (sourceShotId, atGlobalSec) =>
+  // 새 인스턴스 id 를 돌려준다 — 화면이 그 클립에 소리를 잇는다(결정 4). 원본이 없으면 null.
+  addClipInstanceAt: (sourceShotId, atGlobalSec) => {
+    let created: string | null = null
     set((state) => {
       const srcShot = state.shots.find((s) => s.shotId === sourceShotId)
       if (!srcShot) return state
       const srcClip = state.videoClips.find((c) => c.shotId === sourceShotId)
 
       const newId = `${sourceShotId}__i${uid()}`
+      created = newId
       const newShot: Shot = { ...srcShot, shotId: newId }
       // 새 인스턴스는 소스 전체를 그대로 (trim/speed 초기화)
       const newClip: VideoClip = {
@@ -1386,7 +1606,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const sceneOrder = [...(state.clipOrder[sceneId] ?? [])]
       sceneOrder.splice(localIndex, 0, newId)
 
-      return {
+      return withLinkedAudio(state, {
         shots: [...state.shots, newShot],
         videoClips: [...state.videoClips, newClip],
         clipOrder: { ...state.clipOrder, [sceneId]: sceneOrder },
@@ -1397,8 +1617,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         previewSourceShotId: null,
         past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
         future: [],
-      }
-    }),
+      })
+    })
+    return created
+  },
 
   // 소스 → 현재 플레이헤드에 가장 가까운 클립 경계에 추가 + 포커스 (요청 4)
   addClipAtPlayhead: (sourceShotId) => {
@@ -1474,11 +1696,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       // 오디오 동행(2026-09-08 오너 지시 1번): 카드가 끼는 자리 뒤에서 시작하는 오디오는 영상처럼 카드 길이만큼 밀린다.
       //   카드 자리는 끼어드는 영상 클립의 시작(맨 뒤면 전체 길이). 그 앞에서 시작한 오디오는 그대로.
       const insertAtSec = g < layout.length ? layout[g].startSec : layout.reduce((sum, l) => sum + l.durationSec, 0)
+      //   영상에 이어진 소리는 그 클립을 따라 밀리고(결정 4), 따로 둔 소리만 이 규칙으로 민다.
       const audioClips = state.audioClips.map((a) =>
-        a.startSec >= insertAtSec - 1e-6 ? { ...a, startSec: a.startSec + DEFAULT_DURATION } : a,
+        !a.linkedShotId && a.startSec >= insertAtSec - 1e-6 ? { ...a, startSec: a.startSec + DEFAULT_DURATION } : a,
       )
 
-      return {
+      return withLinkedAudio(state, {
         shots: [...state.shots, { ...newShot, sceneId: insertSceneId }],
         videoClips: [...state.videoClips, newClip],
         audioClips,
@@ -1490,7 +1713,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         previewSourceShotId: null,
         past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
         future: [],
-      }
+      })
     }),
 
   updateTitleCard: (shotId, patch) =>
@@ -1527,12 +1750,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       if (!isTitleCardShotId(shotId) || !Number.isFinite(seconds)) return state
       const sec = Math.max(0.5, Math.min(600, Math.round(seconds * 10) / 10))
-      return {
+      return withLinkedAudio(state, {
         shots: state.shots.map((s) => (s.shotId === shotId ? { ...s, durationSeconds: sec } : s)),
         videoClips: state.videoClips.map((c) => (c.shotId === shotId ? { ...c, trimStart: 0, trimEnd: sec } : c)),
         past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
         future: [],
-      }
+      })
     }),
 
 }))

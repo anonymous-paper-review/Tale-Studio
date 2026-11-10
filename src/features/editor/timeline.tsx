@@ -168,11 +168,13 @@ function AudioClipBlock({
     if (!peaks?.length) return null
     const srcDur = clip.sourceDurationSec ?? clip.durationSec
     const srcOff = clip.sourceOffsetSec ?? 0
+    // 영상에 이어진 소리는 영상 속도로 재생된다 — 원본에서는 타임라인 길이 × 빠르기만큼을 보여 준다(2026-11-10 결정 4).
+    const rate = clip.playbackRate ?? 1
     if (srcDur <= 0) return peaks
     const startIdx = Math.max(0, Math.floor((peaks.length * srcOff) / srcDur))
-    const endIdx = Math.min(peaks.length, Math.floor((peaks.length * (srcOff + clip.durationSec)) / srcDur))
+    const endIdx = Math.min(peaks.length, Math.floor((peaks.length * (srcOff + clip.durationSec * rate)) / srcDur))
     return endIdx > startIdx ? peaks.slice(startIdx, endIdx) : peaks
-  }, [clip.peaks, clip.sourceDurationSec, clip.sourceOffsetSec, clip.durationSec])
+  }, [clip.peaks, clip.sourceDurationSec, clip.sourceOffsetSec, clip.durationSec, clip.playbackRate])
 
   useEffect(() => {
     const cv = canvasRef.current
@@ -206,8 +208,13 @@ function AudioClipBlock({
       const blockEl = e.currentTarget as HTMLElement
       blockEl.style.pointerEvents = 'none' // elementFromPoint 가 아래 트랙 레인을 보도록
       const startX = e.clientX
+      const startY = e.clientY
       const origStart = clip.startSec
+      let moved = false
       const move = (ev: PointerEvent) => {
+        // 누르기만 해도 손이 몇 px 흔들린다 — 손잡이처럼 2px 를 넘겨야 옮기기로 본다(옮기면 영상에서 떨어진다, 2026-11-10 검토 b).
+        if (!moved && Math.hypot(ev.clientX - startX, ev.clientY - startY) <= 2) return
+        moved = true
         const raw = Math.max(0, origStart + (ev.clientX - startX) / pxPerSec)
         const snapped = snapStart(raw, clip.durationSec, clip.id)
         const overTrack = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('[data-drop="audio-track"]')
@@ -254,11 +261,13 @@ function AudioClipBlock({
       const dur = clip.durationSec
       const end = start + dur
       const off = clip.sourceOffsetSec ?? 0
-      const srcDur = clip.sourceDurationSec ?? dur
-      const minLeft = start - off // 원본 시작까지만 확장
+      // 빠르기가 있는 소리(영상 속도를 따른 것)는 타임라인 1초에 원본이 빠르기만큼 나아간다.
+      const rate = clip.playbackRate ?? 1
+      const srcDur = clip.sourceDurationSec ?? dur * rate
+      const minLeft = start - off / rate // 원본 시작까지만 확장
       const maxLeft = end - TRIM_MIN
       const minRight = start + TRIM_MIN
-      const maxRight = start + (srcDur - off) // 원본 끝까지만
+      const maxRight = start + (srcDur - off) / rate // 원본 끝까지만
       const startX = e.clientX
       let moved = false
       const move = (ev: PointerEvent) => {
@@ -280,7 +289,7 @@ function AudioClipBlock({
           if (edge === 'l') {
             const lft = Math.max(minLeft, Math.min(clientXToSec(ev.clientX), maxLeft))
             const dd = lft - start
-            onUpdate({ startSec: Math.max(0, start + dd), durationSec: dur - dd, sourceOffsetSec: Math.max(0, off + dd) })
+            onUpdate({ startSec: Math.max(0, start + dd), durationSec: dur - dd, sourceOffsetSec: Math.max(0, off + dd * rate) })
           } else {
             const rgt = Math.max(minRight, Math.min(clientXToSec(ev.clientX), maxRight))
             onUpdate({ durationSec: rgt - start })
@@ -291,7 +300,7 @@ function AudioClipBlock({
       window.addEventListener('pointermove', move)
       window.addEventListener('pointerup', up)
     },
-    [clip.startSec, clip.durationSec, clip.sourceOffsetSec, clip.sourceDurationSec, clientXToSec, onUpdate, onPushHistory, onTrimPreview, rowTrackId],
+    [clip.startSec, clip.durationSec, clip.sourceOffsetSec, clip.sourceDurationSec, clip.playbackRate, clientXToSec, onUpdate, onPushHistory, onTrimPreview, rowTrackId],
   )
 
   return (
