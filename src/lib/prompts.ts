@@ -1,3 +1,4 @@
+import { sceneTimeTag } from '@/lib/scene-time'
 const BOOST_KEYWORDS: Record<string, string> = {
   Cinematic: 'cinematic lighting, dramatic composition',
   'High-Res': 'ultra-detailed, 8k quality',
@@ -31,7 +32,9 @@ export function buildWorldPrompt(
   boostPreset?: string | null,
 ): string {
   const boost = boostPreset ? BOOST_KEYWORDS[boostPreset] ?? '' : ''
-  const time = timeOfDay.trim() ? `during ${timeOfDay.trim()}` : ''
+  // 장면 머리의 이어짐 말(CONTINUOUS · LATER …)은 때가 아니라 시간으로 싣지 않는다(리드 2026-11-10 R2).
+  const tag = sceneTimeTag(timeOfDay)
+  const time = tag ? `during ${tag}` : ''
   const parts = [visualDescription, time, mood, boost].filter(Boolean)
   return parts.join(', ')
 }

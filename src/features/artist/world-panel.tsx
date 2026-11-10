@@ -17,6 +17,7 @@ import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
 import { cn } from '@/lib/utils'
 import { createWheelNotchStepper } from '@/lib/wheel-notch'
 import { useT } from '@/lib/i18n'
+import { sceneTimeTag } from '@/lib/scene-time'
 
 // columns: 보드 축척(#d1) — 1(기존 세로 스택)~3열 그리드. 페이지 헤더의 슬라이더가 결정.
 // onZoomStep: Ctrl+휠 축척(#a1 2026-07-15) — 캐릭터 탭과 동일한 굴림당 1단계.
@@ -176,9 +177,10 @@ export function WorldPanel({
               {t('Description changed')}
             </Badge>
           )}
-          {scene && !variant && (
+          {/* 시간 꼬리표: 장면 머리의 이어짐 말(CONTINUOUS · LATER …)은 때가 아니라 붙이지 않는다(리드 2026-11-10 R2). */}
+          {scene && !variant && sceneTimeTag(scene.timeOfDay) && (
             <Badge variant="outline" className="text-[10px]">
-              {scene.timeOfDay}
+              {sceneTimeTag(scene.timeOfDay)}
             </Badge>
           )}
           {/* 모습 수(v3 A5 "모습 1") — 기본 모습 + 변형. */}
