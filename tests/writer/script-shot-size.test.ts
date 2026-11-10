@@ -185,3 +185,45 @@ describe('혼자 정한 것 · 검토 c 고침', () => {
     ])
   })
 })
+
+describe('혼자 정한 것 · 검토 c 재검토(7982ba84)', () => {
+  const elementsOf = (line: string) => parseScript(withLine(line), { assumeScript: true })!.scenes[0].elements
+
+  // 왜: 검토 c 재검토 낮음 1(7982ba84 에서 생긴 회귀). 줄 앞 굵은 표시를 떼고 카메라 말을 보다 보니 "**CRANE:** Who goes there?"처럼
+  //   카메라 맨 낱말(CRANE · DOLLY · ZOOM)이 이름인 굵은 큐가 연출이 됐다. 굵은 큐는 예전처럼 이름이 카메라 지시로 끝날 때만 연출로 본다.
+  it('굵은 이름 큐가 카메라 맨 낱말과 같아도(**CRANE:** · **DOLLY.** · **ZOOM:**) 그 이름이 샷 · 카메라 지시로 끝나지 않으면 인물 대사로 읽는다', () => {
+    expect(speakers(withLine('**CRANE:** Who goes there?'))).toEqual(['MAYA', 'CRANE', 'DRIVER'])
+    expect(speakers(withLine('**ZOOM:** Faster, faster!'))).toEqual(['MAYA', 'ZOOM', 'DRIVER'])
+    expect(elementsOf('**DOLLY.** Hi there!')).toContainEqual(expect.objectContaining({ type: 'dialogue', text: 'Hi there!' }))
+  })
+
+  // 왜: 검토 c 재검토 참고 2. 굵은 샷 말 뒤에 구분자가 없는 줄("**WIDE SHOT** Rain falls…")은 통째로 연출이 되어 지문이 빠졌다. 굵은 표시 끝이 구분자다.
+  it('굵은 샷 말 뒤에 구분자가 없어도(**WIDE SHOT** Rain falls…) 굵은 표시 끝에서 나눠 뒤 문장은 지문으로 남긴다', () => {
+    const elements = elementsOf('**WIDE SHOT** Rain falls on the stop.')
+
+    expect(elements).toContainEqual({ type: 'camera', text: 'WIDE SHOT' })
+    expect(elements).toContainEqual({ type: 'action', text: 'Rain falls on the stop.' })
+  })
+
+  // 왜: 검토 c 재검토 낮음 3. 첫 구분자에서 나눠 "INSERT - THE LETTER: …"는 연출이 "INSERT -"뿐이었다. 대문자 카메라 지시는 글(소문자 · 한글)이
+  //   나오기 바로 앞의 마지막 구분자까지다.
+  it('카메라 말 안에 쉼표 · 쌍점 · 줄표가 있어도 소문자 · 한글 글이 나오기 바로 앞의 마지막 구분자에서 나눈다', () => {
+    const letter = elementsOf("INSERT - THE LETTER: 'Dear Maya, come home.'")
+    expect(letter).toContainEqual({ type: 'camera', text: 'INSERT - THE LETTER:' })
+    expect(letter).toContainEqual({ type: 'action', text: "'Dear Maya, come home.'" })
+
+    const group = elementsOf('CLOSE ON MAYA, DRIVER AND THE BUS. They stare.')
+    expect(group).toContainEqual({ type: 'camera', text: 'CLOSE ON MAYA, DRIVER AND THE BUS.' })
+    expect(group).toContainEqual({ type: 'action', text: 'They stare.' })
+  })
+
+  // 왜: 검토 c 재검토 참고 1(610e06b8 부터). "C.U. Maya smiles."는 카메라 약어를 못 알아봐 인물 "C.U"가 됐다. 신고된 고장과 같은 꼴이다.
+  it('"C.U." · "P.O.V." 처럼 점을 찍은 카메라 약어로 시작하는 줄도 인물로 읽지 않고, 뒤 문장은 지문으로 나눈다', () => {
+    expect(speakers(withLine('C.U. Maya smiles.'))).toEqual(['MAYA', 'DRIVER'])
+    expect(elementsOf('C.U. Maya smiles.')).toContainEqual({ type: 'camera', text: 'C.U.' })
+    expect(elementsOf('C.U. Maya smiles.')).toContainEqual({ type: 'action', text: 'Maya smiles.' })
+    expect(speakers(withLine('P.O.V. The dog runs.'))).toEqual(['MAYA', 'DRIVER'])
+    expect(elementsOf('P.O.V. The dog runs.')).toContainEqual({ type: 'action', text: 'The dog runs.' })
+  })
+})
+

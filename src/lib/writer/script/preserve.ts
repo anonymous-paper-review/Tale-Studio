@@ -166,11 +166,15 @@ function alignToStoredBeats(
       cursor = at + 1;
       return { ...item, beat: at };
     }
-    const text = flat(item.el.text);
-    at = text ? beats.findIndex((beat, i) => i >= cursor && beat.includes(text)) : -1;
-    if (at < 0) return item;
-    cursor = at; // 묶인 비트에는 대사가 여럿 들 수 있다
-    return { ...item, beat: at };
+    // 옛 읽기가 앞 줄과 묶은 대사: "화자: 대사" 글을 먼저 찾고(앞 지문의 같은 짧은 말에 끌리지 않게), 없을 때만 대사 글만으로 찾는다(검토 c 재검토).
+    for (const needle of [own, flat(item.el.text)]) {
+      if (!needle) continue;
+      at = beats.findIndex((beat, i) => i >= cursor && beat.includes(needle));
+      if (at < 0) continue;
+      cursor = at; // 묶인 비트에는 대사가 여럿 들 수 있다
+      return { ...item, beat: at };
+    }
+    return item;
   });
 }
 

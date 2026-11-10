@@ -68,10 +68,21 @@ const TRANSITION_RE = /^\s*(CUT TO|SMASH CUT(?: TO)?|MATCH CUT(?: TO)?|HARD CUT(
 //   "MEDIUM: …"(영매) 같은 인물 이름일 수 있다. SHOT · CLOSE-UP · ANGLE 이 붙을 때만 샷 말로 본다.
 const SHOT_SIZE_WORDS = String.raw`(?:EXTREME |VERY )?(?:LONG|WIDE) SHOT|FULL SHOT|MEDIUM (?:LONG |WIDE |FULL |CLOSE )?SHOT|MID[- ]SHOT|MEDIUM CLOSE[- ]?UP|CLOSEUP|CLOSE SHOT|COWBOY SHOT|(?:TWO|THREE|2|3)[- ]SHOT|GROUP SHOT|ESTABLISHING(?: SHOT)?|MASTER SHOT|REVERSE SHOT|OVERHEAD(?: SHOT)?|AERIAL(?: SHOT| VIEW)?|BIRD'?S[- ]EYE(?: VIEW| SHOT)?|(?:HIGH|LOW|DUTCH|WIDE) ANGLE|OVER[- ]THE[- ]SHOULDER(?: SHOT)?|P\.O\.V|MCU|HANDHELD|STEADICAM|FREEZE FRAME|SPLIT SCREEN`;
 const SHOT_SIZE_WORDS_KO = String.raw`(?:익스트림 ?)?롱 ?숏|미디엄 ?(?:롱 ?|클로즈 ?)?숏|풀 ?숏|바스트 ?숏|웨이스트 ?숏|니 ?숏|투 ?숏|쓰리 ?숏|설정 ?숏|오버 ?(?:더 ?)?숄더(?: ?숏)?|하이 ?앵글|로우 ?앵글|부감(?: ?숏)?|앙각(?: ?숏)?`;
-const CAMERA_RE = new RegExp(String.raw`^\s*(${SHOT_SIZE_WORDS}|PUSH IN|PULL BACK|PULL OUT|CLOSE ON|CLOSE UP|CLOSE-UP|C\.U\.|C\/U|ECU|EXTREME CLOSE|WIDE (?:SHOT|ON)|ANGLE ON|REVERSE ANGLE|INSERT(?!\s*[-–—:]?\s*TEXT)|POV|TILT (?:UP|DOWN)|PAN (?:LEFT|RIGHT|TO|UP|DOWN)|TRACKING|DOLLY|ZOOM|CRANE|HOLD ON|HOLD\b|RACK FOCUS|SLOW MOTION|SLOW-MO|THE CAMERA|CAMERA|카메라|클로즈업|푸시 ?인|틸트|팬|트래킹|줌)\b`, 'i');
-// "LONG SHOT. Headlights appear…" 꼴: 대문자 카메라 말 + 구분자(. : , 줄표) + 글. 카메라 말은 연출 지시, 뒤 글은 지문이다(2026-11-10 B1 · 검토 c).
-//   붙임표는 앞뒤에 빈칸이 있을 때만 구분자다(CLOSE-UP 의 붙임표는 말의 일부). 뒤 글에 영어 소문자나 한글이 있을 때만 나눈다.
-const CAMERA_LEAD_RE = /^\s*([A-Z0-9](?:[A-Z0-9 '’/&]|-(?=[A-Z0-9]))*?)(\s*[.:,]|\s*[\u2013\u2014]+|\s+-{1,2}(?=\s))\s*(\S.*)$/;
+const CAMERA_RE = new RegExp(String.raw`^\s*(${SHOT_SIZE_WORDS}|PUSH IN|PULL BACK|PULL OUT|CLOSE ON|CLOSE UP|CLOSE-UP|C\.U(?=\.)|C\/U|ECU|EXTREME CLOSE|WIDE (?:SHOT|ON)|ANGLE ON|REVERSE ANGLE|INSERT(?!\s*[-\u2013\u2014:]?\s*TEXT)|POV|TILT (?:UP|DOWN)|PAN (?:LEFT|RIGHT|TO|UP|DOWN)|TRACKING|DOLLY|ZOOM|CRANE|HOLD ON|HOLD\b|RACK FOCUS|SLOW MOTION|SLOW-MO|THE CAMERA|CAMERA|카메라|클로즈업|푸시 ?인|틸트|팬|트래킹|줌)\b`, 'i');
+// "LONG SHOT. Headlights appear…" 꼴: 대문자 카메라 말 + 구분자 + 글. 카메라 말은 연출 지시, 뒤 글은 지문이다(2026-11-10 B1 · 검토 c).
+//   대문자 카메라 지시는 글(영어 소문자 · 한글)이 처음 나오기 바로 앞의 마지막 구분자까지다("INSERT - THE LETTER: 'Dear…'").
+//   구분자는 . : , en/em dash, 앞뒤에 빈칸이 있는 붙임표(- · --). CLOSE-UP 의 붙임표는 말의 일부다.
+const CAMERA_SEPARATOR_RE = /\s*[.:,]|\s*[\u2013\u2014]+|\s+-{1,2}(?=\s)/g;
+function splitCameraLead(line: string): { camera: string; rest: string } | null {
+  const text = line.search(/[a-z가-힣]/);
+  if (text <= 0) return null;
+  let cut = -1;
+  for (const m of line.slice(0, text).matchAll(CAMERA_SEPARATOR_RE)) cut = (m.index ?? 0) + m[0].length;
+  if (cut <= 0) return null;
+  const camera = line.slice(0, cut).trim();
+  const rest = line.slice(cut).trim();
+  return camera && rest && CAMERA_RE.test(camera) ? { camera, rest } : null;
+}
 const LEAD_TEXT_RE = /[a-z가-힣]/;
 // 문장 끝맺음(마침표 · 물음표 · 느낌표 · 말줄임 · 닫는 따옴표 · 괄호).
 const SENTENCE_END_RE = /[.!?…。"”'’)\]]\s*$/;
@@ -623,15 +634,23 @@ export function parseScript(text: string, opts?: { assumeScript?: boolean }): Sc
     if (RADIO_CUE_RE.test(s)) { pushEl({ type: 'sound', text: s.replace(/^\(|\)$/g, '').trim() }); i++; continue; }
     const sl = s.match(SOUND_LABEL_RE);
     if (sl && !hasLower(sl[1])) { pushEl({ type: 'sound', text: sl[2]?.trim() || s }); i++; continue; }
-    const plainLead = unboldLead(s);
+    // 굵은 이름 큐("**NAME:**" · "**NAME.**")는 이름이 카메라 지시로 끝날 때만 카메라 줄로 본다("**CRANE:** …"은 인물, 검토 c 재검토).
+    //   그 밖의 굵은 줄은 굵은 표시를 떼고 본다(검토 c 보통 3).
+    const bold = s.match(BOLD_CUE_RE);
+    const boldCamera = !!bold && cameraCueName(bold[1].replace(/[:：.]\s*$/, ''));
+    const plainLead = bold && !boldCamera ? s : unboldLead(s);
     const cm = plainLead.match(CAMERA_RE);
     if ((cm && !hasLower(cm[1])) || cameraCueLine(s)) { // 지시어 자체가 대문자일 때만("the camera pulls back" 같은 지문은 제외)
       // "LONG SHOT. Headlights appear…" 꼴은 카메라 말은 연출, 뒤 글은 지문으로 나눈다(2026-11-10 B1). 줄 전체를 연출로 두면 그 장면에서
       //   일어나는 일이 지문에서 빠져 샷을 나눌 때 보이지 않는다. 카메라 말 바로 뒤가 구분자일 때만 나눈다("PUSH IN on her face." 는 통째로 연출).
-      const lead = cm && !hasLower(cm[1]) ? plainLead.match(CAMERA_LEAD_RE) : null;
-      if (lead && LEAD_TEXT_RE.test(lead[3]) && CAMERA_RE.test(lead[1])) {
-        pushEl({ type: 'camera', text: `${lead[1]}${lead[2]}`.trim() });
-        i = readAction(i, lead[3]);
+      //   굵은 샷 말은 굵은 표시 끝이 구분자다("**WIDE SHOT** Rain falls…", 검토 c 재검토).
+      const boldRest = boldCamera ? bold![2].replace(/^[\s:：.,]+/, '').trim() : '';
+      const lead = !(cm && !hasLower(cm[1])) ? null
+        : boldCamera ? (LEAD_TEXT_RE.test(boldRest) ? { camera: bold![1].trim(), rest: boldRest } : null)
+          : splitCameraLead(plainLead);
+      if (lead) {
+        pushEl({ type: 'camera', text: lead.camera });
+        i = readAction(i, lead.rest);
         continue;
       }
       pushEl({ type: 'camera', text: s });

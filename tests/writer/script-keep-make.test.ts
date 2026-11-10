@@ -282,3 +282,23 @@ MAYA: Finally.`
     expect((mocks.persistAssetsToDb.mock.calls[0][2] as { scenes: Array<{ location: string }> }).scenes.map((s) => s.location)).toEqual(['BUS STOP', 'BUS STOP'])
   })
 })
+
+describe('혼자 정한 것 · 검토 c 재검토(7982ba84)', () => {
+  // 왜: 검토 c 재검토 낮음 2. 대사 글만으로 담긴 비트를 찾아, 앞 지문에 같은 짧은 말('Maya sighs. "Fine."')이 있으면 대사가 그 지문의 샷에 실렸다.
+  it('예전 읽기가 대사를 다른 줄과 한 비트로 묶어 두었으면 "화자: 대사" 글이 든 비트를 먼저 찾아, 앞 지문에 같은 짧은 말이 있어도 그 비트의 샷에 싣는다', () => {
+    const story = `INT. ROOM - DAY
+Maya sighs. "Fine."
+
+LONG SHOT. The door opens.
+MAYA: Fine.`
+    const state = keepState(story)
+    const stored = { ...state.scenes!, scenes: [{ ...state.scenes!.scenes[0], scene_actions: ['Maya sighs. "Fine."', 'LONG SHOT: The door opens. MAYA: Fine.'] }] }
+    const decoupage = { scenes: [{ scene_id: 'scene_1', shots: [{ shot_id: 'shot_1', source_beats: [0] }, { shot_id: 'shot_2', source_beats: [1] }] }] }
+
+    const track = dialogueTrackFromScript(preservedScript(state.input)!.doc, stored, decoupage as never)
+    const byShot = Object.fromEntries(track.scenes.flatMap((s) => s.shots.map((sh) => [sh.shot_id, sh.dialogue.map((l) => `${l.character_id}: ${l.line}`)])))
+
+    expect(byShot).toEqual({ shot_1: [], shot_2: ['maya: Fine.'] })
+  })
+})
+
