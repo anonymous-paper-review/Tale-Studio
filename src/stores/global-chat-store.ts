@@ -23,7 +23,8 @@ import { evaluateProducerGate } from '@/lib/producer-gate'
 import { selectedProducerDialogueLanguage } from '@/lib/producer-dialogue-language'
 import { fixKoreanParticles } from '@/lib/korean-particles'
 import { coerceCardFill, matchImageUseAnswer, matchImageUseInText, matchYesNo, type CardFill, type ImageUseAnswer } from '@/lib/producer/image-role'
-import { MAX_COMIC_PAGES, comicStyleQuestion, imageBatchQuestion, matchBatchImageAnswer, matchComicAnswer, matchComicIntentInText, matchComicStyleAnswer, sortComicPages } from '@/lib/producer/comic-intake'
+import { MAX_COMIC_PAGES, comicRewriteQuestion, comicStyleQuestion, imageBatchQuestion, matchBatchImageAnswer, matchComicAnswer, matchComicIntentInText, matchComicStyleAnswer, sortComicPages } from '@/lib/producer/comic-intake'
+import { answersRestoredImageQuestion, imageRoleOptions, matchWriterBatch, matchWriterComicRewrite, matchWriterComicStyle, matchWriterImageUse, matchWriterStyleAttachment, styleAttachmentOptions } from '@/lib/producer/chip-answer'
 import { CHAT_IMAGE_ROLE_CONSENT, CHAT_STYLE_CONFIRM_CONSENT, CHAT_STYLE_REQUEST_CONSENT, COMIC_ANALYSIS_CONSENT, CREATION_ANALYSIS_CONSENT, STYLE_PICKER_CONSENT } from '@/lib/style-facets/consent'
 import type { PendingCreation } from '@/stores/pending-creation-store'
 import type { BoardBusy } from '@/lib/producer/busy'
@@ -204,8 +205,10 @@ interface GlobalChatState {
   creationPlanFor: string | null
   /** 만화를 대본으로 옮기지 못했을 때 다시 옮길 거리(같은 쪽 · 같은 동의 · 이어서 할 일). */
   comicRetry: ComicRetry | null
-  /** 만화를 고른 뒤 그림체(만화 그림체로 고정 · 실사 등으로 각색)를 묻는 중 — 답하면 옮기기를 시작한다(2026-10-09 오너). */
-  comicStyleGate: { images: ChatImageInput[]; plan?: ImageRoleGate } | null
+  /** 만화를 고른 뒤 그림체(만화 그림체로 고정 · 실사 등으로 각색)를 묻는 중 — 답하면 옮기기를 시작한다(2026-10-09 오너). rewriteDraft = 옮긴 뒤 산문 초안을 새로 쓴다. */
+  comicStyleGate: { images: ChatImageInput[]; plan?: ImageRoleGate; rewriteDraft?: boolean } | null
+  /** 확정 전 Writer 화면에서 만화를 고른 뒤 산문을 만화로 다시 쓸지 묻는 중(2026-11-10 오너) — 다시 쓰기면 그림체 질문으로, 참고로만이면 참고 자료로 보낸다. */
+  comicRewriteGate: ComicRewriteGate | null
   /** 채팅 모델이 첨부 그림을 그림체로 쓰자고 해 묻는 중(2026-10-10 오너 결정) — 답하면 같은 길(runMaterialPlan)로 정하고, 다른 말이면 내린다. */
   styleAttachmentGate: { projectId: string; image: ChatImageInput } | null
   /** 그림에서 그림체를 정하는 중인 프로젝트(매체 고르기 · 저장) — 그동안 스타일 선택 창을 자동으로 띄우지 않는다. */
@@ -496,10 +499,20 @@ interface ImageRoleGate {
   consent?: string
   /** 그림체 안내를 남길 채팅 단계 — 없으면 producer(Artist 스타일 창은 artist, 2026-10-27 디자이너 QA 1차 관찰 49). */
   stage?: StageId
+  /** 확정 전 Writer 화면에서 "만화로 다시 쓰기"를 골랐다 — 만화 원고를 옮긴 뒤 그 대본으로 산문 초안을 새로 쓴다(2026-11-10 오너). */
+  rewriteDraft?: boolean
 }
 
 interface ImageBatchGate {
   images: ChatImageInput[]
+  typed: string
+  msg: string
+}
+
+/** 만화로 산문을 다시 쓸지 묻는 중인 것 — 그림마다 고른 계획(plan)에서 왔으면 그 계획, 아니면 만화 원고와 사용자가 쓴 말. */
+interface ComicRewriteGate {
+  images: ChatImageInput[]
+  plan?: ImageRoleGate
   typed: string
   msg: string
 }
@@ -509,6 +522,8 @@ interface ComicRetry {
   consent: string
   /** 새 프로젝트에서 왔으면 다시 옮긴 뒤 이어서 트리트먼트를 쓴다. */
   then: { startTreatment: boolean; locale: AppLocale } | null
+  /** Writer 화면에서 만화로 산문을 다시 쓰던 중이면 다시 옮긴 뒤 이어서 산문 초안을 새로 쓴다. */
+  rewriteDraft?: boolean
 }
 
 /** 여러 장을 한 번에 묻는 질문을 세운다 — 닫을 수 없다(올린 그림이 조용히 사라지면 안 된다). */
@@ -579,43 +594,98 @@ function isComicRetryAnswer(text: string, voice: AppLocale): boolean {
 /**
  * Writer 화면 채팅(넘기기 전 산문 초안)에서 이 말을 산문 고침보다 그림 쪽이 먼저 받는가(2026-11-10 점검 C05~C09 — 쓰임새 답이 "산문을 고쳐 봤어요"로 빠졌다).
  *   그림이 실린 말(쓰임새를 정한 뒤 이어지는 카드 채우기 · 만화 대본 · 참고 자료 요청 포함)과 떠 있는 그림 질문의 답이면 그렇다.
- *   쓰임새 · 여러 장 · 만화 그림체 질문은 닫을 수 없는 질문이라 답이 아닌 말도 그 질문이 받아 다시 묻는다(예전 Producer 채팅과 같다).
+ *   쓰임새 · 여러 장 · 만화 그림체 · 만화로 다시 쓰기 질문은 닫을 수 없는 질문이라 답이 아닌 말도 그 질문이 받아 다시 묻는다(예전 Producer 채팅과 같다).
+ *   그림체로 쓸지 묻는 질문은 닫을 수 있어 칩 말 · 짧은 답일 때만 그렇다(2026-11-10 오너).
  *   그림 없이 말만 오면 산문 고침이다. 숨은 요청은 그림 질문의 답이 아니다.
  */
 function imageTurnFirst(state: GlobalChatState, input: { text: string; hasImages: boolean; hidden: boolean; projectId: string | null }): boolean {
   if (input.hasImages) return true
   if (input.hidden) return false
-  if (state.imageRoleGate || state.imageBatchGate || state.comicStyleGate) return true
+  if (state.imageRoleGate || state.imageBatchGate || state.comicStyleGate || state.comicRewriteGate) return true
   if (state.comicRetry && isComicRetryAnswer(input.text, contentLocale())) return true
   const styleAsk = state.styleAttachmentGate
   if (!styleAsk || styleAsk.projectId !== input.projectId) return false
-  const yesNo = matchYesNo(input.text)
-  const use = matchImageUseAnswer(input.text) ?? (yesNo === 'yes' ? 'style' : yesNo === 'no' ? 'reference' : null)
-  return use === 'style' || use === 'reference'
+  return styleAttachmentAnswer(input.text) !== null
+}
+
+/** 첨부 그림을 그림체로 쓸지 묻는 질문의 답 — Writer 화면은 칩 말 · 짧은 답만(2026-11-10 오너), 예전 Producer 화면은 쓰임새 낱말 · 예 · 아니오. */
+function styleAttachmentAnswer(text: string): 'style' | 'reference' | null {
+  if (writerProseLive()) return matchWriterStyleAttachment(text)
+  const yesNo = matchYesNo(text)
+  const use = matchImageUseAnswer(text) ?? (yesNo === 'yes' ? 'style' : yesNo === 'no' ? 'reference' : null)
+  return use === 'style' || use === 'reference' ? use : null
 }
 
 /** 같은 쪽으로 다시 옮긴다(그림체는 이미 정했으니 다시 하지 않는다). 새 프로젝트에서 왔으면 이어서 트리트먼트. */
 async function retryComicScript(get: () => GlobalChatState, retry: ComicRetry): Promise<void> {
-  const comic = await runComicAdaptation(get, retry.pages, { consent: retry.consent, skipStyle: true, then: retry.then })
+  const comic = await runComicAdaptation(get, retry.pages, { consent: retry.consent, skipStyle: true, then: retry.then, ...(retry.rewriteDraft ? { rewriteDraft: true } : {}) })
   if (comic.scriptSet && retry.then?.startTreatment) await startCreationTreatment(retry.then.locale)
 }
 
 /**
  * 만화를 고르면 대본을 옮기기 전에 그림체를 묻는다(2026-10-09 오너 "그림체로 고정할지 실사와 같은 각색을 할지 물어봐줘").
  *   닫을 수 없는 선택지다. 이미 그림체가 고정된 프로젝트면 물을 것이 없어 대본만 옮긴다.
+ *   rewriteDraft = Writer 화면에서 "만화로 다시 쓰기"를 골랐다 — 옮긴 뒤 산문 초안을 새로 쓴다.
  */
-function askComicStyle(get: () => GlobalChatState, images: ChatImageInput[], plan?: ImageRoleGate): void {
+function askComicStyle(get: () => GlobalChatState, images: ChatImageInput[], plan?: ImageRoleGate, rewriteDraft = plan?.rewriteDraft === true): void {
   if (useProducerStore.getState().customStyleAnchor?.locked === true) {
     if (plan) void runChatImagePlan(get, plan, null)
-    else void runMaterialPlan(get, comicOnlyPlan(images, null))
+    else void runMaterialPlan(get, comicOnlyPlan(images, null, rewriteDraft))
     return
   }
-  useGlobalChatStore.setState({ comicStyleGate: { images, ...(plan ? { plan } : {}) } })
-  const question = comicStyleQuestion(contentLocale())
+  useGlobalChatStore.setState({ comicStyleGate: { images, ...(plan ? { plan } : {}), ...(rewriteDraft ? { rewriteDraft: true } : {}) } })
+  offerComicStyle(get)
+}
+
+/** 그림체 질문을 (다시) 띄운다 — 다시 물을 때 앞서 고른 것(그림마다 고른 쓰임새 · 다시 쓰기)을 잊지 않는다. Writer 화면이면 그만두기 칩을 둔다(2026-11-10 오너). */
+function offerComicStyle(get: () => GlobalChatState): void {
+  const gate = get().comicStyleGate
+  if (!gate) return
+  const question = comicStyleQuestion(contentLocale(), { stop: writerProseLive() })
   get().offerSuggestion(
-    { id: `comic-style:${images[0]?.id ?? 'pages'}`, stage: 'producer', content: question.content, dismissible: false, action: { kind: 'choices', options: question.options } },
+    { id: `comic-style:${gate.images[0]?.id ?? 'pages'}`, stage: 'producer', content: question.content, dismissible: false, action: { kind: 'choices', options: question.options } },
     { preempt: true },
   )
+}
+
+/**
+ * 만화(그대로 영상화)를 고른 뒤의 한 곳 — 확정 전 Writer 화면이면 바꾸기 전에 산문을 만화로 다시 쓸지 묻고(2026-11-10 오너),
+ *   아니면 그림체 질문으로 간다. 묻지 않고 화면만 만화 대본으로 바꾸면 확정 · 이어 만들기는 옛 산문을 썼다(검토 a 심각 1).
+ */
+function chooseComic(get: () => GlobalChatState, images: ChatImageInput[], said: { typed: string; msg: string }): void {
+  if (writerProseLive()) askComicRewrite(get, { images, ...said })
+  else askComicStyle(get, images)
+}
+
+/** 산문을 만화로 다시 쓸지 묻는다 — 닫을 수 없는 선택지(다시 쓰기 · 참고로만). 올린 만화가 조용히 사라지면 안 된다. */
+function askComicRewrite(get: () => GlobalChatState, gate: ComicRewriteGate): void {
+  useGlobalChatStore.setState({ comicRewriteGate: gate })
+  offerComicRewrite(get)
+}
+
+function offerComicRewrite(get: () => GlobalChatState): void {
+  const gate = get().comicRewriteGate
+  if (!gate) return
+  const question = comicRewriteQuestion(contentLocale())
+  get().offerSuggestion(
+    { id: `comic-rewrite:${gate.images[0]?.id ?? 'pages'}`, stage: 'producer', content: question.content, dismissible: false, action: { kind: 'choices', options: question.options } },
+    { preempt: true },
+  )
+}
+
+/** 다시 쓰기를 골랐다 — 그림마다 고른 계획이면 그 계획대로(그림체 그림이 없으면 그림체를 묻는다), 아니면 그림체 질문으로. 옮긴 뒤 산문 초안을 새로 쓴다. */
+function rewriteFromComic(get: () => GlobalChatState, gate: ComicRewriteGate): void {
+  if (gate.plan) void finishImageRoles(get, { ...gate.plan, rewriteDraft: true })
+  else askComicStyle(get, gate.images, undefined, true)
+}
+
+/** 참고로만 — 산문은 두고 만화는 그림마다 묻는 질문의 "참고 자료만"처럼 사용자의 말과 함께 채팅으로 보낸다. 같이 고른 다른 그림은 고른 대로. */
+async function sendComicAsReference(get: () => GlobalChatState, gate: ComicRewriteGate): Promise<void> {
+  if (gate.plan) {
+    await runChatImagePlan(get, { ...gate.plan, items: gate.plan.items.map((it) => (it.role === 'comic' ? { ...it, role: 'reference' as const } : it)) }, null)
+    return
+  }
+  await runMaterialPlan(get, { ...NO_MATERIALS, references: gate.images, typed: gate.typed, referenceMsg: gate.msg })
 }
 
 const postJson = (url: string, body: unknown) =>
@@ -711,6 +781,8 @@ interface ComicAdaptationOptions {
   styleMode?: 'lock' | 'adapt' | 'keep'
   /** 옮기기에 실패해 다시 옮길 때 이어서 할 일(새 프로젝트의 트리트먼트). */
   then?: ComicRetry['then']
+  /** 확정 전 Writer 화면에서 "만화로 다시 쓰기"를 골랐다 — 대본을 넣은 뒤 그 대본으로 산문 초안을 새로 쓴다(2026-11-10 오너). */
+  rewriteDraft?: boolean
 }
 
 /**
@@ -763,10 +835,12 @@ async function runComicAdaptation(
       if (!sameProject()) return false
       if (!res.ok || typeof body.script !== 'string' || !body.script.trim()) {
         speak(failed)
-        offerComicRetry(get, { pages, consent, then: opts.then ?? null })
+        offerComicRetry(get, { pages, consent, then: opts.then ?? null, ...(opts.rewriteDraft ? { rewriteDraft: true } : {}) })
         return false
       }
       const producer = useProducerStore.getState()
+      // 산문을 다시 쓰지 못하면 되돌릴 이야기 — 화면(대본)과 확정 · 이어 만들기(옛 산문 초안)가 다시 어긋나지 않게.
+      const before = { storyText: producer.storyText, preserveScript: producer.preserveScript }
       producer.setStoryText(body.script)
       producer.setPreserveScript(true)
       speak(
@@ -775,6 +849,21 @@ async function runComicAdaptation(
           lines: String(body.stats?.dialogue_lines ?? 0),
         }),
       )
+      if (opts.rewriteDraft) {
+        // 만화로 산문 다시 쓰기(2026-11-10 오너) — 이 대본으로 산문 초안을 새로 써서 화면 · 확정 · 이어 만들기가 같은 글을 보게 한다.
+        //   옛 초안은 서버가 내려놓는다(지금 값으로 다시 쓰기와 같은 길). 못 쓰면 넣은 대본을 거두고 다시 옮기기를 고르게 한다.
+        const restarted = await useProducerStore.getState().restartTreatment()
+        if (!sameProject()) return false
+        if (!restarted) {
+          const now = useProducerStore.getState()
+          now.setStoryText(before.storyText)
+          if (before.preserveScript !== null) now.setPreserveScript(before.preserveScript)
+          speak(translate(voice, "Couldn't rewrite the prose from the comic. The prose draft is unchanged. Please try again in a moment."))
+          offerComicRetry(get, { pages, consent, then: opts.then ?? null, rewriteDraft: true })
+          return false
+        }
+        speak(translate(voice, 'Rewriting the prose from the comic script. This takes a minute or two.'))
+      }
       if (opts.beforeFill) await opts.beforeFill.catch(() => null)
       if (!sameProject()) return true
       await sendWhenIdle(
@@ -788,7 +877,7 @@ async function runComicAdaptation(
       console.error('[comic] script failed:', error)
       if (!sameProject()) return false
       speak(failed)
-      offerComicRetry(get, { pages, consent, then: opts.then ?? null })
+      offerComicRetry(get, { pages, consent, then: opts.then ?? null, ...(opts.rewriteDraft ? { rewriteDraft: true } : {}) })
       return false
     } finally {
       releaseBusy()
@@ -804,17 +893,6 @@ async function runComicAdaptation(
     useChatUiStore.getState().requestStylePicker(projectId)
   }
   return { scriptSet: await script, styleDone }
-}
-
-// 그림마다 묻는 선택지 — 새 프로젝트 화면과 같은 다섯 가지(2026-10-10 오너 "채팅으로 올린 그림에도 그림체 선택지 넣어줘").
-function imageRoleOptions(voice: AppLocale): Array<{ label: string; utterance: string }> {
-  return [
-    { label: translate(voice, 'Comic pages'), utterance: translate(voice, 'Use it as a comic page') },
-    { label: translate(voice, 'Character card'), utterance: translate(voice, 'Use it as a character') },
-    { label: translate(voice, 'Background card'), utterance: translate(voice, 'Use it as a background') },
-    { label: translate(voice, 'Art style'), utterance: translate(voice, 'Use it as the art style') },
-    { label: translate(voice, 'Reference only'), utterance: translate(voice, 'Use it as reference only') },
-  ]
 }
 
 // 아직 답하지 않은 첫 그림의 질문을 세운다. 닫을 수 없는 선택지(dismissible:false) — 올린 그림이 조용히 사라지면 안 된다.
@@ -889,8 +967,14 @@ async function runImageRolePlan(get: () => GlobalChatState, plan: ImageRoleGate)
 async function finishImageRoles(get: () => GlobalChatState, plan: ImageRoleGate): Promise<void> {
   const hasComic = plan.items.some((it) => it.role === 'comic')
   const hasStyle = plan.items.some((it) => it.role === 'style')
+  const comicImages = plan.items.filter((it) => it.role === 'comic').map((it) => it.image)
+  // 확정 전 Writer 화면이면 만화로 산문을 다시 쓸지부터 묻는다(2026-11-10 오너).
+  if (hasComic && writerProseLive() && plan.rewriteDraft !== true) {
+    askComicRewrite(get, { images: comicImages, plan, typed: plan.typed, msg: plan.msg })
+    return
+  }
   if (hasComic && !hasStyle && useProducerStore.getState().customStyleAnchor?.locked !== true) {
-    askComicStyle(get, plan.items.filter((it) => it.role === 'comic').map((it) => it.image), plan)
+    askComicStyle(get, comicImages, plan)
     return
   }
   await runChatImagePlan(get, plan, null)
@@ -920,6 +1004,8 @@ interface MaterialPlan {
   then?: ComicRetry['then']
   /** 그림체 안내를 남길 채팅 단계 — 없으면 producer. */
   stage?: StageId
+  /** 확정 전 Writer 화면에서 만화로 산문을 다시 쓴다 — 대본을 옮긴 뒤 그 대본으로 산문 초안을 새로 쓴다(2026-11-10 오너). */
+  rewriteDraft?: boolean
 }
 
 async function runMaterialPlan(get: () => GlobalChatState, plan: MaterialPlan): Promise<{ scriptSet: boolean; styleDone: Promise<void> }> {
@@ -934,6 +1020,7 @@ async function runMaterialPlan(get: () => GlobalChatState, plan: MaterialPlan): 
       consent: plan.consent,
       beforeFill: cardsDone,
       then: plan.then ?? null,
+      ...(plan.rewriteDraft ? { rewriteDraft: true } : {}),
     })
     await cardsDone
     return { scriptSet: comic.scriptSet, styleDone: comic.styleDone }
@@ -957,11 +1044,12 @@ function materialPlanFromRoles(plan: ImageRoleGate, comicStyle: 'lock' | 'adapt'
     referenceMsg: plan.msg,
     consent: plan.consent ?? CHAT_IMAGE_ROLE_CONSENT,
     ...(plan.stage ? { stage: plan.stage } : {}),
+    ...(plan.rewriteDraft ? { rewriteDraft: true } : {}),
   }
 }
 
 /** 만화 원고만 — 여러 장을 "만화 그대로"로 골랐거나 말로 만화라고 했을 때(안내는 만화 질문의 판). */
-const comicOnlyPlan = (pages: ChatImageInput[], comicStyle: 'lock' | 'adapt' | null): MaterialPlan => ({ ...NO_MATERIALS, comicPages: pages, comicStyle, consent: COMIC_ANALYSIS_CONSENT })
+const comicOnlyPlan = (pages: ChatImageInput[], comicStyle: 'lock' | 'adapt' | null, rewriteDraft = false): MaterialPlan => ({ ...NO_MATERIALS, comicPages: pages, comicStyle, consent: COMIC_ANALYSIS_CONSENT, ...(rewriteDraft ? { rewriteDraft: true } : {}) })
 
 /** 채팅에서 그림마다 고른 대로 쓴다 — 쓰는 일은 새 프로젝트와 같은 곳(runMaterialPlan)이 한다. */
 async function runChatImagePlan(get: () => GlobalChatState, plan: ImageRoleGate, comicStyle: 'lock' | 'adapt' | null): Promise<void> {
@@ -1086,13 +1174,7 @@ function offerStyleFromAttachment(
       stage: 'producer',
       content: translate(voice, 'Use this picture as the art style? If you do, the picture goes to an analysis model and the art style is then fixed.'),
       dismissible: true,
-      action: {
-        kind: 'choices',
-        options: [
-          { label: translate(voice, 'Use as the art style'), utterance: translate(voice, 'Use it as the art style') },
-          { label: translate(voice, 'Keep as reference'), utterance: translate(voice, 'Use it as reference only') },
-        ],
-      },
+      action: { kind: 'choices', options: styleAttachmentOptions(voice) },
     },
     { preempt: true },
   )
@@ -1307,6 +1389,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   creationPlanFor: null,
   comicRetry: null,
   comicStyleGate: null,
+  comicRewriteGate: null,
   styleAttachmentGate: null,
   styleSettingFor: null,
   boardBusy: null,
@@ -1999,8 +2082,20 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       return
     }
 
+    // 새로 고침 뒤 돌아온 그림 질문(칩만 남고 올린 그림 · 질문 상태는 빠졌다)에 답하면 다시 올려 달라고만 한다 —
+    //   산문 고침 · 채팅으로 보내지 않는다(2026-11-10 검토 a 보통 3 · 오너). 답이 아닌 말은 평소대로 간다.
+    const restoredQuestion = get().suggestion
+    if (stage === 'producer' && !opts?.silentUser && restoredQuestion?.restoredChoices &&
+      answersRestoredImageQuestion({ id: restoredQuestion.id, labels: restoredQuestion.restoredChoices.options }, trimmed)) {
+      get().dismissSuggestion({ implicit: true })
+      get().appendLocalExchange('producer', trimmed, translate(contentLocale(), 'The pictures were cleared when the page reloaded. Please upload them again.'))
+      return
+    }
+
     // 그림이 실린 말 · 떠 있는 그림 질문의 답은 아래 Writer 산문 고침(다시 쓰기 · 브레이크다운 말 포함)보다 먼저 그림 쪽이 받는다(점검 C05~C09).
     const imageFirst = stage === 'producer' && imageTurnFirst(get(), { text: trimmed, hasImages: (attachmentImageUrls?.length ?? 0) > 0, hidden: opts?.silentUser === true, projectId })
+    // 그림체로 쓸지 묻는 질문은 닫을 수 있다 — Writer 화면에서 그 답이 아닌 말이 오면 질문을 끝내고 그 말은 산문 고침으로 간다(아래 예전 Producer 와 같다).
+    if (stage === 'producer' && !imageFirst && !opts?.silentUser && get().styleAttachmentGate && writerProseLive()) set({ styleAttachmentGate: null })
 
     const sceneSuggestion = get().suggestion
     const sceneChoices = sceneSuggestion?.id === `scene-story-edit:${projectId}`
@@ -2111,9 +2206,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const styleAsk = get().styleAttachmentGate
     if (styleAsk && stage === 'producer' && !opts?.silentUser) {
       set({ styleAttachmentGate: null })
-      const yesNo = matchYesNo(trimmed)
-      const use = styleAsk.projectId !== projectId ? null : matchImageUseAnswer(trimmed) ?? (yesNo === 'yes' ? 'style' : yesNo === 'no' ? 'reference' : null)
-      if (use === 'style' || use === 'reference') {
+      const use = styleAsk.projectId !== projectId ? null : styleAttachmentAnswer(trimmed)
+      if (use) {
         set((state) => ({ messages: [...state.messages, { id: makeId(), stage, role: 'user' as const, content: trimmed }] }))
         if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
         if (use === 'reference') {
@@ -2126,23 +2220,55 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       }
     }
 
+    // 만화로 산문 다시 쓰기(2026-11-10 오너): 확정 전 Writer 화면에서 만화를 고른 뒤 묻는 중 — 칩 말 · 짧은 답만 받고, 아니면 다시 묻는다.
+    const rewriteGate = get().comicRewriteGate
+    if (rewriteGate && stage === 'producer' && !opts?.silentUser) {
+      const choice = matchWriterComicRewrite(trimmed)
+      if (!choice) {
+        get().appendLocalExchange('producer', trimmed, translate(contentLocale(), 'Please choose first: rewrite the prose from the comic, or use the comic only as reference.'))
+        offerComicRewrite(get)
+        return
+      }
+      set((state) => ({ comicRewriteGate: null, messages: [...state.messages, { id: makeId(), stage, role: 'user' as const, content: trimmed }] }))
+      if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
+      if (choice === 'rewrite' && writerProseLive()) {
+        rewriteFromComic(get, rewriteGate)
+        return
+      }
+      // 그사이 산문을 확정했으면 다시 쓸 수 없다 — 확정 뒤처럼 참고로만 쓴다.
+      if (choice === 'rewrite' && projectId) producerSpeaker(projectId)(translate(contentLocale(), 'The prose is already confirmed, so I will use the comic only as reference.'))
+      void sendComicAsReference(get, rewriteGate)
+      return
+    }
+
     // 만화 그림체(2026-10-09 오너): 만화를 고른 뒤 그림체를 고정할지 각색할지 묻는 중 — 답이면 옮기기를 시작하고, 아니면 다시 묻는다.
+    //   Writer 화면에서는 칩 말 · 짧은 답만 받고 그만두기가 있다(2026-11-10 오너 — "Fix the typo in scene 2"가 고정으로 읽혔다).
     const styleGate = get().comicStyleGate
     if (styleGate && stage === 'producer' && !opts?.silentUser) {
-      const mode = matchComicStyleAnswer(trimmed)
+      const writer = writerProseLive()
+      const mode = writer ? matchWriterComicStyle(trimmed) : matchComicStyleAnswer(trimmed)
       if (!mode) {
         get().appendLocalExchange(
           'producer',
           trimmed,
-          translate(contentLocale(), 'Please choose first how the art style should work: fix the comic art style, or adapt to another style like live action.'),
+          translate(contentLocale(), writer
+            ? 'Please choose first how the art style should work: fix the comic art style, adapt to another style like live action, or stop.'
+            : 'Please choose first how the art style should work: fix the comic art style, or adapt to another style like live action.'),
         )
-        askComicStyle(get, styleGate.images)
+        offerComicStyle(get)
         return
       }
       set((state) => ({ comicStyleGate: null, messages: [...state.messages, { id: makeId(), stage, role: 'user' as const, content: trimmed }] }))
       if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
+      if (mode === 'stop') {
+        // 그만두기 — 만화 원고는 쓰지 않고 산문도 그대로. 같이 고른 다른 그림(카드 · 참고 자료)은 고른 대로 쓴다.
+        if (projectId) producerSpeaker(projectId)(translate(contentLocale(), 'Stopped. I did not use the comic pages, and the prose is unchanged.'))
+        const rest = styleGate.plan?.items.filter((it) => it.role !== 'comic') ?? []
+        if (styleGate.plan && rest.length) void runChatImagePlan(get, { ...styleGate.plan, items: rest }, null)
+        return
+      }
       if (styleGate.plan) void runChatImagePlan(get, styleGate.plan, mode)
-      else void runMaterialPlan(get, comicOnlyPlan(styleGate.images, mode))
+      else void runMaterialPlan(get, comicOnlyPlan(styleGate.images, mode, styleGate.rewriteDraft === true))
       return
     }
 
@@ -2158,7 +2284,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     // 만화 원고 받기(2026-10-09): 여러 장을 한 번에 묻는 질문에 답하는 중 — 만화 그대로 · 그림마다 정하기 · 모두 참고.
     const batchGate = get().imageBatchGate
     if (batchGate && stage === 'producer' && !opts?.silentUser) {
-      const choice = matchBatchImageAnswer(trimmed)
+      // Writer 화면에서는 칩 말 · 짧은 답만 받는다(2026-11-10 오너 — "대사는 그대로 두고 줄여줘"가 만화로 읽혔다).
+      const choice = writerProseLive() ? matchWriterBatch(trimmed) : matchBatchImageAnswer(trimmed)
       if (!choice) {
         get().appendLocalExchange(
           'producer',
@@ -2172,7 +2299,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
       set({ imageBatchGate: null })
       if (choice === 'comic') {
-        askComicStyle(get, batchGate.images)
+        chooseComic(get, batchGate.images, { typed: batchGate.typed, msg: batchGate.msg })
         return
       }
       if (choice === 'reference') {
@@ -2187,13 +2314,15 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     // #image-to-artist: 그림 쓰임새 질문에 답하는 중 — 답이면 기록하고 다음 그림을 묻거나 다 답했으면 실행, 답이 아니면 다시 묻는다.
     const imageGate = get().imageRoleGate
     if (imageGate && stage === 'producer' && !opts?.silentUser) {
-      const answer = matchImageUseAnswer(trimmed)
-      // "스토리" · "만화를 영상화하고 싶어"처럼 이야기 원작으로 답하면 만화 원고로 받는다(2026-10-09 — 같은 질문만 되풀이하던 것).
-      if (!answer && matchComicAnswer(trimmed)) {
+      // Writer 화면에서는 칩 말 · 짧은 답만 받는다(2026-11-10 오너 — "Make the background darker"가 배경 카드로 읽혔다).
+      const writer = writerProseLive()
+      const answer = writer ? matchWriterImageUse(trimmed) : matchImageUseAnswer(trimmed)
+      // "스토리" · "만화를 영상화하고 싶어"처럼 이야기 원작으로 답하면 만화 원고로 받는다(2026-10-09 — 같은 질문만 되풀이하던 것). Writer 화면은 칩 말만.
+      if (!answer && !writer && matchComicAnswer(trimmed)) {
         set((state) => ({ messages: [...state.messages, { id: makeId(), stage, role: 'user' as const, content: trimmed }] }))
         if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
         set({ imageRoleGate: null })
-        askComicStyle(get, imageGate.items.map((it) => it.image))
+        chooseComic(get, imageGate.items.map((it) => it.image), { typed: imageGate.typed, msg: imageGate.msg })
         return
       }
       if (!answer) {
@@ -4036,7 +4165,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     // 만화 원고라고 분명히 말했으면 묻지 않고 만화 원고로 받는다(2026-10-09 오너 "이 만화를 그대로 영상화하고 싶어").
     if (matchComicIntentInText(typed)) {
       recordImageTurn(set, msg, ready)
-      askComicStyle(get, ready)
+      chooseComic(get, ready, { typed, msg })
       return true
     }
     // 말이 분명하면 묻지 않는다 — 모든 그림에 같은 역할. 그림체는 한 장만이라 여러 장이면 묻는다.
@@ -4809,6 +4938,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       creationPlanFor: null,
       comicRetry: null,
       comicStyleGate: null,
+      comicRewriteGate: null,
       styleAttachmentGate: null,
       styleSettingFor: null,
       boardBusy: null,

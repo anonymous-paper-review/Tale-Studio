@@ -177,3 +177,26 @@ it('복원된 선택지에서 Enter를 누르면 다른 제안을 승인하지 �
     for (const cleanup of cleanups) cleanup?.()
   }
 })
+
+// 왜: 검토 a 보통 2(2026-11-10) — Writer 화면 그림 질문에 [직접 입력]으로 답이 아닌 말을 보내면 채팅은 같은 질문을 다시 띄우는데,
+//   채팅 창이 보낸 뒤에도 같은 질문이 남아 있다며 내려 버려 칩이 사라졌다(질문은 여전히 답을 기다렸다). 닫을 수 없는 질문은 채팅이 내리고 다시 띄운다.
+it('닫을 수 없는 그림 질문에 직접 입력으로 답이 아닌 말을 보내면 같은 질문과 칩이 그대로 다시 보인다', () => {
+  useProjectStore.setState({ projectId: 'choice-input-project', currentStage: 'producer', treatmentDraft: true, producerLocked: false })
+  const picture = { id: 'ref-person.png', name: 'ref-person.png', thumbUrl: 'https://img.test/ref-person.webp', sliceUrls: ['https://img.test/ref-person.jpg'] }
+  useGlobalChatStore.getState().offerImageRoles([picture], { typed: '', msg: '그림을 올렸어요' })
+  const asked = useGlobalChatStore.getState().suggestion?.id
+  expect(asked).toBe('image-role:ref-person.png')
+  const said = (node: Element, text: string) => ([] as unknown[]).concat(node.props.children).includes(text)
+  const own = renderChat().find((node) => node.type === 'button' && said(node, '직접 입력…'))
+  expect(own).toBeDefined()
+  ;(own!.props.onClick as () => void)()
+  const field = () => renderChat().find((node) => node.type === 'input' && node.props['aria-label'] === '직접 입력')
+  ;(field()!.props.onChange as (event: unknown) => void)({ target: { value: '잘 모르겠어' } })
+  ;(field()!.props.onKeyDown as (event: unknown) => void)({ key: 'Enter', nativeEvent: { isComposing: false }, preventDefault: () => {} })
+  expect(useGlobalChatStore.getState().imageRoleGate).not.toBeNull()
+  expect(useGlobalChatStore.getState().suggestion?.id).toBe(asked)
+  expect(renderChat().some((node) => node.type === 'button' && said(node, '인물'))).toBe(true)
+  // 보낸 말은 직접 입력 칸에 남지 않는다 — 다시 고를 수 있게 칸을 닫는다.
+  expect(field()).toBeUndefined()
+  expect(renderChat().some((node) => node.type === 'button' && said(node, '직접 입력…'))).toBe(true)
+})

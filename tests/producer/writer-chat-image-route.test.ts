@@ -73,8 +73,10 @@ describe('Writer 화면 채팅의 그림 쓰임새', () => {
   })
 
   // 왜: 점검 C06 — 만화라고 말로 같이 보내면 쓰임새 질문은 건너뛰지만, 이어진 그림체 질문에 답하면 산문 수정안으로 빠져 원고를 읽지 않았다.
-  it('Writer 화면 채팅에 만화라고 말하며 원고를 올리고 그림체를 고르면 산문을 고치지 않고 원고를 읽어 대본으로 옮긴다', async () => {
+  //   2026-11-10 오너 답(검토 a 심각 1): 확정 전 Writer 화면에서는 그림체보다 먼저 산문을 만화로 다시 쓸지 묻는다 — [다시 쓰기]를 고른 뒤 그림체를 고른다.
+  it('Writer 화면 채팅에 만화라고 말하며 원고를 올리고 다시 쓰기와 그림체를 고르면 산문 고침 요청으로 빠지지 않고 원고를 읽어 대본으로 옮긴다', async () => {
     chat.getState().offerImageRoles([PAGE], { typed: 'Turn my comic into video as drawn', msg: 'Turn my comic into video as drawn' })
+    await send('Rewrite the prose from the comic')
     expect(chat.getState().comicStyleGate).not.toBeNull()
     await send('Keep the comic art style and fix it')
     await vi.waitFor(() => expect(calls('/api/produce/comic-script')).toHaveLength(1))
