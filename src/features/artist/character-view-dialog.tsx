@@ -31,8 +31,9 @@ import { useGuardedAction } from '@/hooks/use-guarded-action'
 import { cn } from '@/lib/utils'
 import { useLocale, useT } from '@/lib/i18n'
 import { styleAnchorName } from '@/lib/style-anchor-name'
-import { appearanceLabel } from '@/lib/artist/look-label'
+import { appearanceLabel, labelToSave } from '@/lib/artist/look-label'
 import { isBreakdownUpload } from '@/lib/artist/style-versions'
+import { uploadedSheetAlt } from '@/lib/artist/uploaded-sheet'
 import { useHistoryStyle } from '@/features/artist-room/use-history-style'
 
 type Props = {
@@ -249,7 +250,8 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
 
   const title = t(artistDetailTitleKey(isObject ? 'object' : 'person'), { name: char.name })
   const timeLabel = appearance.narrativeTime ? t(appearance.narrativeTime === 'past' ? 'Past' : appearance.narrativeTime === 'future' ? 'Future' : 'Present') : ''
-  // 보이는 모습 이름 — 서버가 붙인 기본 모습 이름 "현재"는 화면 언어로(오너 2026-11-10). 이름 바꾸기 칸은 저장된 이름 그대로 연다.
+  // 보이는 모습 이름 — 서버가 붙인 기본 모습 이름 "현재"는 화면 언어로(오너 2026-11-10). 이름 바꾸기 칸도 이 이름으로 열고,
+  //   그대로 두고 저장하면 원래 이름을 지킨다(검토 B — 데이터 그대로, 저장 요청도 안 보낸다).
   const shownLabel = appearanceLabel(appearance, t)
 
   const left = (
@@ -272,7 +274,8 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
                 setManageBusy(true)
                 setManageError(null)
                 try {
-                  await renameAppearance(char.characterId, appearanceKey, renameDraft.trim())
+                  // 칸에 보인 이름을 그대로 두면 원래 이름 그대로 — 저장 요청을 보내지 않는다(검토 B).
+                  if (labelToSave(appearance, renameDraft, t) !== appearance.label) await renameAppearance(char.characterId, appearanceKey, renameDraft.trim())
                   setRenaming(false)
                 } catch (e) {
                   setManageError(e instanceof Error ? e.message : String(e))
@@ -292,7 +295,7 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
             {isSheet && timeLabel && timeLabel !== shownLabel ? <span className="text-xs text-muted-foreground">{timeLabel}</span> : null}
             {descriptionChanged ? <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground">{t('Changed · remake to apply')}</span> : null}
             {isSheet ? (
-              <Button size="icon" variant="ghost" className="size-7" aria-label={t('Rename')} title={t('Rename')} onClick={() => { setRenameDraft(appearance.label); setRenaming(true) }}>
+              <Button size="icon" variant="ghost" className="size-7" aria-label={t('Rename')} title={t('Rename')} onClick={() => { setRenameDraft(shownLabel); setRenaming(true) }}>
                 <Pencil className="size-3.5" />
               </Button>
             ) : null}
@@ -309,7 +312,7 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
       {manageError ? <p className="text-xs text-destructive">{manageError}</p> : null}
 
       {uploaded && !isGenerating ? (
-        <UploadedSheet key={imageUrl} url={imageUrl} alt={t('{name} turnaround sheet', { name: char.name || t('Character') })} />
+        <UploadedSheet key={imageUrl} url={imageUrl} alt={uploadedSheetAlt(char.name || t('Character'), t)} />
       ) : (
         <ImagePlaceholder
           label={view === 'main' ? '' : label}
