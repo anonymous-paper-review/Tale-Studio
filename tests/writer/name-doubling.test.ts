@@ -48,6 +48,20 @@ describe('이름이 겹치지 않는다', () => {
     expect(resolveEntityNames('Rain falls as an officer waves.', [{ id: 'officer', name: 'An Officer' }])).toBe('Rain falls as An Officer waves.')
   })
 
+  // 왜: 검토 B — A · An 으로 시작하는 이름 앞의 꼬리표 글자 A(Cell A · Block A · Plan A)까지 관사로 보고 지워, 낱말이 빠진 채
+  //   저장될 수 있었다. 이런 이름은 소문자 a · an 만 걷고, 대문자 A · An 은 줄 처음 · 문장 처음일 때만 걷는다.
+  it('이름이 A · An 으로 시작하면 꼬리표 글자 A 는 그대로 두고 소문자 관사와 문장 처음의 겹친 관사만 걷는다', () => {
+    const STRANGER = [{ id: 'stranger', name: 'A Stranger' }]
+    const OFFICER = [{ id: 'officer', name: 'An Officer' }]
+    expect(resolveEntityNames('Inside Cell A a stranger sleeps.', STRANGER)).toBe('Inside Cell A A Stranger sleeps.')
+    expect(resolveEntityNames('Block A an officer waits.', OFFICER)).toBe('Block A An Officer waits.')
+    expect(resolveEntityNames('Plan A stranger nods.', STRANGER)).toBe('Plan A A Stranger nods.')
+    expect(replaceSlugs('Plan A stranger nods.', [{ slug: 'stranger', name: 'A Stranger' }])).toBe('Plan A @A Stranger nods.')
+    // 예전에 겹쳐 저장된 이름은 문장 처음 · 줄 처음이면 걷는다.
+    expect(resolveEntityNames('A A Stranger knocks. Rain. A A Stranger waits.\nAn An Officer nods.', [...STRANGER, ...OFFICER]))
+      .toBe('A Stranger knocks. Rain. A Stranger waits.\nAn Officer nods.')
+  })
+
   // 왜: 검토 A — 관사를 아무거나 걷으면 앞 낱말 "A"(Room A · side A · Plan A)와 줄 바꿈까지 지워 낱말이 빠진 채 저장됐다.
   //   이름 머리와 같은 관사만(the↔The, a/an↔A/An), 같은 줄 안에서만 걷는다.
   it('이름 앞 겹친 관사는 이름 머리와 같은 관사일 때만 같은 줄 안에서 걷는다 — 앞 낱말 "A"와 줄 바꿈은 그대로', () => {
@@ -72,6 +86,15 @@ describe('이름이 겹치지 않는다', () => {
   it('이름 앞에 @ 를 붙여 보이는 곳에서도 예전에 겹쳐 저장된 이름이 한 번만 보인다', () => {
     expect(replaceSlugs('The The Keeper waits by the radio.', ROSTER)).toBe('The Keeper waits by the radio.')
     expect(replaceSlugs('Then the keeper waits.', ROSTER)).toBe('Then @The Keeper waits.')
+  })
+
+  // 왜: 검토 B — 이미 이름으로 쓴 자리를 통째로 건너뛰어, id 와 이름이 같은 인물(Kai · kai)의 @ 표시가 사라졌다
+  //   (Director 격자 대체 설명 · treatment.md 내보내기). id 가 이름의 일부일 때(The Keeper 안의 Keeper)만 그대로 둔다.
+  it('@ 를 붙여 보이는 곳에서 이름 그대로 쓴 자리에도 @ 가 붙고, 이름의 일부인 id 낱말만 그대로 둔다', () => {
+    const KAI = [{ slug: 'kai', name: 'Kai' }]
+    expect(replaceSlugs('Kai waits.', KAI)).toBe('@Kai waits.')
+    expect(replaceSlugs('kai and Kai', KAI)).toBe('@Kai and @Kai')
+    expect(replaceSlugs('The Keeper waits.', ROSTER)).toBe('The Keeper waits.')
   })
 
   // 왜: 이미 "The The Keeper"로 저장된 산문(303dd6d5 등)도 화면에서는 이름이 한 번만 보여야 한다 — 지금은 화면이 두 번 더 붙여

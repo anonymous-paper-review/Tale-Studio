@@ -33,13 +33,16 @@ export function writtenNameSpans(text: string, names: Iterable<string>): Array<[
   return spans
 }
 
-/** [at, at+length) 가 이미 쓰인 이름 자리 안에 있나 — 그 안의 id 낱말은 다시 바꾸지 않는다("The Keeper" 의 Keeper). */
+/** [at, at+length) 가 이미 쓰인 이름 자리의 일부인가 — 이름 안의 id 낱말("The Keeper" 의 Keeper)은 다시 바꾸지 않는다.
+ *  토큰이 이름 자리 전체와 같으면(Kai · kai) 일부가 아니다 — 바꿔도 같은 이름이고, @ 를 붙이는 길에서는 @ 가 붙어야 한다(검토 B). */
 export function insideWrittenName(spans: ReadonlyArray<readonly [number, number]>, at: number, length: number): boolean {
-  return spans.some(([start, end]) => start <= at && at + length <= end)
+  return spans.some(([start, end]) => start <= at && at + length <= end && end - start > length)
 }
 
 /** 관사(The · A · An)로 시작하는 이름 바로 앞에 겹친 관사를 걷는다 — "the The Keeper" · 예전에 겹쳐 저장된 "The The Keeper" → "The Keeper".
- *  이름 머리와 같은 관사만(the↔The, a·an↔A·An), 같은 줄 안에서만 — "Room A The Keeper" 의 A 나 줄 바꿈을 지우지 않게(검토 A).
+ *  이름 머리와 같은 관사만(the↔The, a·an↔A·An), 같은 줄 안에서만 — 줄 바꿈을 지우지 않게(검토 A).
+ *  A · An 이름은 소문자 a · an 만 걷고, 대문자 A · An 은 줄 처음 · 문장 처음일 때만 — "Cell A a stranger" 의 꼬리표 A 를
+ *  관사로 보고 지우지 않게(검토 B). The 는 꼬리표가 아니라 대소문자 모두 걷는다.
  *  prefix(@)를 붙여 보이는 길이면 이름 앞의 @ 는 있어도 없어도 된다(예전에 @ 없이 겹쳐 저장된 이름도 걷는다). */
 export function collapseDoubledArticles(text: string, names: Iterable<string>, prefix = ''): string {
   let out = text
@@ -47,11 +50,14 @@ export function collapseDoubledArticles(text: string, names: Iterable<string>, p
   for (const name of new Set([...names].map((n) => n.trim()).filter(Boolean))) {
     const head = /^(the|an?)\s/i.exec(name)?.[1].toLowerCase()
     if (!head) continue
-    const article = head === 'the' ? '[Tt][Hh][Ee]' : '[Aa][Nn]?'
-    out = out.replace(
-      new RegExp(`(?<![\\p{L}\\p{N}_])(?:${article}[ \\t]+)+(?=${marker}${escapeRegExp(name)}(?![A-Za-z0-9_]))`, 'gu'),
-      '',
-    )
+    const target = `(?=${marker}${escapeRegExp(name)}(?![A-Za-z0-9_]))`
+    if (head === 'the') {
+      out = out.replace(new RegExp(`(?<![\\p{L}\\p{N}_])(?:[Tt][Hh][Ee][ \\t]+)+${target}`, 'gu'), '')
+      continue
+    }
+    // 줄 처음 · 문장 처음(. ! ? … 와 닫는 따옴표 · 괄호 뒤)의 겹친 관사는 대문자여도 걷는다.
+    out = out.replace(new RegExp(`(?<=^|\\n|[.!?…]["'”’)\\]]*[ \\t]+)(?:[Aa][Nn]?[ \\t]+)+${target}`, 'gu'), '')
+    out = out.replace(new RegExp(`(?<![\\p{L}\\p{N}_])(?:an?[ \\t]+)+${target}`, 'gu'), '')
   }
   return out
 }
