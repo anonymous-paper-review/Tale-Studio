@@ -38,13 +38,18 @@ export function insideWrittenName(spans: ReadonlyArray<readonly [number, number]
   return spans.some(([start, end]) => start <= at && at + length <= end)
 }
 
-/** 관사(The · A · An)로 시작하는 이름 바로 앞에 겹친 관사를 걷는다 — "the The Keeper" · 예전에 겹쳐 저장된 "The The Keeper" → "The Keeper". */
+/** 관사(The · A · An)로 시작하는 이름 바로 앞에 겹친 관사를 걷는다 — "the The Keeper" · 예전에 겹쳐 저장된 "The The Keeper" → "The Keeper".
+ *  이름 머리와 같은 관사만(the↔The, a·an↔A·An), 같은 줄 안에서만 — "Room A The Keeper" 의 A 나 줄 바꿈을 지우지 않게(검토 A).
+ *  prefix(@)를 붙여 보이는 길이면 이름 앞의 @ 는 있어도 없어도 된다(예전에 @ 없이 겹쳐 저장된 이름도 걷는다). */
 export function collapseDoubledArticles(text: string, names: Iterable<string>, prefix = ''): string {
   let out = text
+  const marker = prefix ? `(?:${escapeRegExp(prefix)})?` : ''
   for (const name of new Set([...names].map((n) => n.trim()).filter(Boolean))) {
-    if (!/^(?:the|an?)\s/i.test(name)) continue
+    const head = /^(the|an?)\s/i.exec(name)?.[1].toLowerCase()
+    if (!head) continue
+    const article = head === 'the' ? '[Tt][Hh][Ee]' : '[Aa][Nn]?'
     out = out.replace(
-      new RegExp(`(?<![\\p{L}\\p{N}_])(?:(?:[Tt][Hh][Ee]|[Aa][Nn]?)\\s+)+(?=${escapeRegExp(prefix + name)}(?![A-Za-z0-9_]))`, 'gu'),
+      new RegExp(`(?<![\\p{L}\\p{N}_])(?:${article}[ \\t]+)+(?=${marker}${escapeRegExp(name)}(?![A-Za-z0-9_]))`, 'gu'),
       '',
     )
   }

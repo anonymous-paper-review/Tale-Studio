@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { resolveEntityNames } from '@/lib/writer/resolve-entity-names'
 import { replaceSlugs } from '@/lib/script-lines'
 import { cleanSceneProse } from '@/lib/writer/pipeline/util/prose_names'
+import { createSceneStoryDraft, sceneStoryEdits } from '@/lib/producer/scene-story-edit'
 
 // qa1110 C12(303dd6d5) 실행의 이름표 — 표시 이름 안에 id 낱말이 들어 있다.
 const CAST = [
@@ -39,8 +40,38 @@ describe('이름이 겹치지 않는다', () => {
   it('id 를 관사와 함께 쓴 문장은 이름 머리의 관사와 겹치지 않게 관사를 하나만 남긴다', () => {
     expect(resolveEntityNames('A storm rolls in as the keeper lights the lamp.', CAST)).toBe('A storm rolls in as The Keeper lights the lamp.')
     expect(replaceSlugs('Rain hits the teenager hard.', ROSTER, '')).toBe('Rain hits The Teenager hard.')
-    // 관사가 A · An 인 이름도 같다.
+  })
+
+  // 왜: 이름이 부정관사로 시작해도("A Stranger" · "An Officer") 같은 겹침("a A Stranger")이 생긴다.
+  it('이름이 A · An 으로 시작해도 관사가 하나만 남는다', () => {
     expect(resolveEntityNames('a stranger knocks twice.', [{ id: 'stranger', name: 'A Stranger' }])).toBe('A Stranger knocks twice.')
+    expect(resolveEntityNames('Rain falls as an officer waves.', [{ id: 'officer', name: 'An Officer' }])).toBe('Rain falls as An Officer waves.')
+  })
+
+  // 왜: 검토 A — 관사를 아무거나 걷으면 앞 낱말 "A"(Room A · side A · Plan A)와 줄 바꿈까지 지워 낱말이 빠진 채 저장됐다.
+  //   이름 머리와 같은 관사만(the↔The, a/an↔A/An), 같은 줄 안에서만 걷는다.
+  it('이름 앞 겹친 관사는 이름 머리와 같은 관사일 때만 같은 줄 안에서 걷는다 — 앞 낱말 "A"와 줄 바꿈은 그대로', () => {
+    expect(resolveEntityNames('In Room A the keeper waits.', CAST)).toBe('In Room A The Keeper waits.')
+    expect(resolveEntityNames('On side A The Keeper hums along.', CAST)).toBe('On side A The Keeper hums along.')
+    expect(resolveEntityNames('They choose Plan A keeper nods.', CAST)).toBe('They choose Plan A The Keeper nods.')
+    expect(resolveEntityNames('He opens locker A\nTHE KEEPER steps in.', CAST)).toBe('He opens locker A\nThe Keeper steps in.')
+  })
+
+  // 왜: 검토 A — 산문 직접 고치기 창은 문단을 줄 바꿈으로 이어 보여 준다. 줄이 붙으면 저장할 때 문단이 3 → 2 로 줄었다.
+  it('산문 직접 고치기 창에서 이름을 바꿔 보여도 줄이 붙지 않아 고친 뒤 문단 수가 그대로다', () => {
+    const [draft] = createSceneStoryDraft(
+      [{ sceneId: 'sc_01', index: 0, beats: ['He opens locker A', 'THE KEEPER steps in.', 'Rain falls.'], shotStories: [] }],
+      ROSTER,
+    )
+    expect(draft.text).toBe('He opens locker A\nThe Keeper steps in.\nRain falls.')
+    const [edited] = sceneStoryEdits([{ ...draft, text: draft.text.replace('Rain falls.', 'Rain falls hard.') }])
+    expect(edited.beats).toEqual(['He opens locker A', 'The Keeper steps in.', 'Rain falls hard.'])
+  })
+
+  // 왜: 검토 A — 이름 앞에 @ 를 붙여 보이는 곳(Director 격자 샷 설명 · treatment.md 내보내기)에서는 예전 겹침이 걷히지 않았다.
+  it('이름 앞에 @ 를 붙여 보이는 곳에서도 예전에 겹쳐 저장된 이름이 한 번만 보인다', () => {
+    expect(replaceSlugs('The The Keeper waits by the radio.', ROSTER)).toBe('The Keeper waits by the radio.')
+    expect(replaceSlugs('Then the keeper waits.', ROSTER)).toBe('Then @The Keeper waits.')
   })
 
   // 왜: 이미 "The The Keeper"로 저장된 산문(303dd6d5 등)도 화면에서는 이름이 한 번만 보여야 한다 — 지금은 화면이 두 번 더 붙여
