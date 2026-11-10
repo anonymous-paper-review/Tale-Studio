@@ -118,3 +118,70 @@ describe('혼자 정한 것', () => {
     for (const line of lines) expect(speakers(withLine(line)), line).toEqual(['MAYA', 'DRIVER'])
   })
 })
+
+describe('혼자 정한 것 · 검토 c 고침', () => {
+  const elementsOf = (line: string) => parseScript(withLine(line), { assumeScript: true })!.scenes[0].elements
+
+  // 왜: 검토 c 보통 2. 샷 말 뒤가 "마침표 + 영어 대문자 문장"일 때만 나눠서, 한국어 · 줄표 · 쉼표 · 숫자로 이어지는 줄은 통째로 연출이 되어
+  //   지문에서 빠졌다(예전엔 지문이었다). 샷을 나눌 때 그 장면의 일이 안 보이고 길이 셈에서도 4초가 빠진다.
+  it('샷 말 뒤가 마침표 · 쌍점 · 쉼표 · 줄표로 이어지면, 뒤 글이 영어 소문자 문장 · 한국어 · 숫자로 시작해도 지문으로 나눈다', () => {
+    const cases: Array<[string, string, string]> = [
+      ['LONG SHOT. 버스가 다가온다.', 'LONG SHOT.', '버스가 다가온다.'],
+      ['MEDIUM SHOT. 문이 열린다.', 'MEDIUM SHOT.', '문이 열린다.'],
+      ['LONG SHOT \u2014 Headlights appear around the bend.', 'LONG SHOT \u2014', 'Headlights appear around the bend.'],
+      ['LONG SHOT - Headlights appear around the bend.', 'LONG SHOT -', 'Headlights appear around the bend.'],
+      ['LONG SHOT -- Headlights appear around the bend.', 'LONG SHOT --', 'Headlights appear around the bend.'],
+      ['LONG SHOT, headlights appear around the bend.', 'LONG SHOT,', 'headlights appear around the bend.'],
+      ['LONG SHOT. 3 buses pass.', 'LONG SHOT.', '3 buses pass.'],
+      ['LONG SHOT: Headlights appear around the bend.', 'LONG SHOT:', 'Headlights appear around the bend.'],
+    ]
+    for (const [line, camera, action] of cases) {
+      const elements = elementsOf(line)
+      expect(elements, line).toContainEqual({ type: 'camera', text: camera })
+      expect(elements, line).toContainEqual({ type: 'action', text: action })
+      expect(speakers(withLine(line)), line).toEqual(['MAYA', 'DRIVER'])
+    }
+  })
+
+  // 왜: 검토 c 보통 3. 마크다운 대본 · 붙여 넣은 문서의 "**LONG SHOT.** …"은 굵은 이름 끝 마침표 때문에 카메라 말로 못 알아봐 인물 "LONG SHOT."이 됐다.
+  it('굵은 글씨로 적은 샷 말("**LONG SHOT.** …" · "**MEDIUM SHOT.** …")도 인물로 읽지 않고, 뒤 문장은 지문으로 나눈다', () => {
+    const cases: Array<[string, string, string]> = [
+      ['**LONG SHOT.** Headlights appear around the bend.', 'LONG SHOT.', 'Headlights appear around the bend.'],
+      ['**MEDIUM SHOT.** The door folds open.', 'MEDIUM SHOT.', 'The door folds open.'],
+    ]
+    for (const [line, camera, action] of cases) {
+      expect(speakers(withLine(line)), line).toEqual(['MAYA', 'DRIVER'])
+      expect(elementsOf(line), line).toContainEqual({ type: 'camera', text: camera })
+      expect(elementsOf(line), line).toContainEqual({ type: 'action', text: action })
+    }
+  })
+
+  // 왜: 검토 c 낮음 6. 카메라 줄을 나눈 뒤 빈 줄 없이 이어지는 줄을 지문으로 붙여 읽어, 예전엔 따로였던 카메라 지시 · 화면 문자 · 소리가
+  //   지문에 섞였다(화면 문자가 그림에 글자로 그려질 수 있다). 카메라 줄로 시작하는 문단만 그렇다.
+  it('카메라 줄 바로 아래(빈 줄 없이)에 오는 카메라 말 · 화면 문자 · 소리 큐 줄은 지문에 섞지 않고 따로 읽는다', () => {
+    expect(elementsOf('WIDE SHOT. Rain falls on the stop.\nCLOSE ON the phone screen.')).toEqual([
+      { type: 'dialogue', character: 'MAYA', character_id: 'maya', text: 'Is that the last bus?', parenthetical: undefined, extension: undefined },
+      { type: 'camera', text: 'WIDE SHOT.' },
+      { type: 'action', text: 'Rain falls on the stop.' },
+      { type: 'camera', text: 'CLOSE ON the phone screen.' },
+      { type: 'dialogue', character: 'DRIVER', character_id: 'driver', text: 'Hop in.', parenthetical: undefined, extension: undefined },
+    ])
+    expect(elementsOf('WIDE SHOT. Rain falls on the stop.\nSUPER - TEN YEARS LATER')).toContainEqual({ type: 'on_screen', text: 'TEN YEARS LATER' })
+    expect(elementsOf('WIDE SHOT. Rain falls on the stop.\n(MUSIC: a slow piano)')).toContainEqual({ type: 'sound', text: 'MUSIC: a slow piano' })
+    expect(elementsOf('WIDE SHOT. Rain falls on the stop.\nSUPER - TEN YEARS LATER')).toContainEqual({ type: 'action', text: 'Rain falls on the stop.' })
+  })
+
+  // 왜: 검토 c 낮음 6 을 고치며 정했다. 카메라 줄의 뒤 문장이 끝나면 다음 줄부터는 예전과 같은 덩이로 읽어야 원래 대본 읽기가 바뀌지 않는다.
+  //   PDF 에서 붙여 넣은 대본처럼 문장이 줄바꿈으로 잘린 경우만 다음 줄까지 이어 한 지문으로 읽는다.
+  it('카메라 줄의 뒤 문장은 문장이 끝나면 거기서 끝나고, 줄바꿈으로 잘린 문장만 다음 줄까지 이어 한 지문으로 읽는다', () => {
+    const wrapped = elementsOf('LONG SHOT. Headlights appear around the\nbend as an old bus slows down.')
+    expect(wrapped).toContainEqual({ type: 'action', text: 'Headlights appear around the bend as an old bus slows down.' })
+
+    const ended = elementsOf('WIDE SHOT. Rain falls on the stop.\nMaya runs in, out of breath.\nCLOSE-UP on her phone: the last bus is gone.')
+    expect(ended.filter((e) => e.type !== 'dialogue')).toEqual([
+      { type: 'camera', text: 'WIDE SHOT.' },
+      { type: 'action', text: 'Rain falls on the stop.' },
+      { type: 'action', text: 'Maya runs in, out of breath. CLOSE-UP on her phone: the last bus is gone.' },
+    ])
+  })
+})

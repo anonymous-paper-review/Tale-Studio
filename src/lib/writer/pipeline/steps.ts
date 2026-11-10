@@ -11,7 +11,7 @@ import { PipelineLogger } from '@/lib/writer/logger';
 import { pauseAfterStep } from './pause';
 import { runDramaturgySafe } from '@/lib/writer/pipeline/stages/s0_dramaturgy';
 import { runNarrativeStructure } from '@/lib/writer/pipeline/stages/s1_structure';
-import { runScenes, mergeOpenCast, mergeOpenWorld } from '@/lib/writer/pipeline/stages/s3_scenes';
+import { runScenes, mergeOpenCast, mergeOpenWorld, normalizeSceneLocations } from '@/lib/writer/pipeline/stages/s3_scenes';
 import { runStructureScenesMerged } from '@/lib/writer/pipeline/stages/s1s3_merged';
 import { runStoryCheck } from '@/lib/writer/pipeline/stages/c_validation_1';
 import { runVisualIdentity } from '@/lib/writer/pipeline/stages/v0_visual';
@@ -501,7 +501,10 @@ export const WRITER_STEPS: WriterStep[] = [
       // 대본 그대로(2026-11-10 B1): 대본의 장면 머리 장소가 배경이다. 씬 단계가 장소 목록을 쌓지 않아(대본에서 씬을 옮길 뿐) [만들기]가
       //   배경 0개로 디자인했다. 산문 초안 · 재점검 목록과 같은 규칙(씬에 적힌 장소)으로 목록에 없는 장면 장소를 더한다.
       //   Producer 에서 고친 카드(이름 · 설명)는 그대로 두고, 이야기 엔진이 지은 장소 후보는 넣지 않는다(대본에 없는 이름).
-      const world = preservedScript(s.input) && s.scenes ? mergeOpenWorld(s.world, s.scenes) : s.world;
+      const keep = !!preservedScript(s.input) && !!s.scenes;
+      const world = keep ? mergeOpenWorld(s.world, s.scenes!) : s.world;
+      // 대소문자만 다른 장면 장소("BUS STOP" · "Bus Stop")는 같은 배경 번호로 맞춘다(검토 c 낮음 5). 그림 참조 · Director 는 장소를 글자 그대로 비교한다.
+      const scenes = keep && world ? normalizeSceneLocations(s.scenes!, world) : s.scenes;
       const { characterVisual, worldVisual } = await runV2Design(
         s.visualIdentity!,                    // v0 전역 스타일 루트
         s.actVisualArc!,                      // v1 막별 아크 (v-체인 상속)
@@ -513,7 +516,7 @@ export const WRITER_STEPS: WriterStep[] = [
         s.input.outputLocale,
         // 로케이션 디자인이 씬의 시간대 · 날씨를 따르고, 시리즈는 앞 화와 같은 세계 · 같은 색으로(2026-10-27).
         {
-          scenes: s.scenes?.scenes,
+          scenes: scenes?.scenes,
           series: s.input.series,
           looks: s.input.inheritedLooks,
           designTokens: s.input.inheritedDesignTokens,
@@ -526,7 +529,7 @@ export const WRITER_STEPS: WriterStep[] = [
       //   assets persist 는 기존처럼 best-effort, 이후 writer 가 v2Design 확인점에서 producer-origin drafts 를 submit 한다.
       await persistDesignTokens(projectId, s.visualIdentity!, worldVisual);
       // best-effort 유지하되 침묵 금지(#persist-guard) — 실패를 로그로 드러낸다(shots 0행 사고 교훈).
-      await persistAssetsToDb(projectId, s.characters!, s.scenes!, worldVisual, characterVisual, world).catch((e) => {
+      await persistAssetsToDb(projectId, s.characters!, scenes!, worldVisual, characterVisual, world).catch((e) => {
         console.error('[writer] persistAssetsToDb 실패 (best-effort 계속):', e instanceof Error ? e.message : e);
       });
       // #C(2026-09-02 observability-audit): 생성 제출 자신는 best-effort 유지(v2Design 핵심경로를 막지 않는다)
@@ -539,7 +542,7 @@ export const WRITER_STEPS: WriterStep[] = [
         });
       });
       // 그림체 분석이 도는 중이라 미뤘다 — 기다리지 않고 다음 단계로 간다(분석 창구가 끝날 때 그린다, Writer 가 끝날 때 한 번 더 챙긴다).
-      return { characterVisual, worldVisual, ...(world !== s.world ? { world } : {}), ...(drafts?.deferred_style_analysis ? { _artistDeferred: true } : {}) };
+      return { characterVisual, worldVisual, ...(world !== s.world ? { world } : {}), ...(scenes !== s.scenes ? { scenes } : {}), ...(drafts?.deferred_style_analysis ? { _artistDeferred: true } : {}) };
     },
   },
   {

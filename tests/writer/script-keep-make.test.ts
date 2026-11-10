@@ -1,4 +1,4 @@
-// 대본 그대로 쓰기에서 [만들기] 뒤 디자인 · 대사 단계는 목록에 보인 배경(장면 머리 장소)과 재점검으로 합친 인물을 그대로 쓴다 (오너 · 리드 2026-11-10 B1)
+// 대본 그대로 쓰기에서 [만들기] 뒤 디자인 · 대사 단계는 실행 기록(목록에 보인 배경 · 재점검으로 합친 인물 · 샷을 나눈 비트)을 그대로 따른다 (오너 · 리드 2026-11-10 B1)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -60,7 +60,7 @@ vi.mock('@/lib/writer/llm/raw_collector', () => ({
 vi.mock('@/lib/artist/draft-trigger', () => ({ triggerAssetDrafts: vi.fn(async () => undefined) }))
 
 import { WRITER_STEPS, type WriterRunState } from '@/lib/writer/pipeline/steps'
-import { preservedScript, scenesFromScript } from '@/lib/writer/script/preserve'
+import { dialogueTrackFromScript, preservedScript, scenesFromScript } from '@/lib/writer/script/preserve'
 import { castContractToCharacters } from '@/lib/writer/cast-contract'
 import { planBreakdownRecheck } from '@/lib/writer/breakdown-recheck'
 import { syncTreatmentCast } from '@/lib/producer/treatment-cast-sync'
@@ -222,5 +222,63 @@ Stay.`
     const byShot = Object.fromEntries(patch.dialogue.scenes.flatMap((s) => s.shots.map((sh) => [sh.shot_id, sh.dialogue.map((l) => `${l.character_id}: ${l.line}`)])))
     expect(byShot).toEqual({ shot_1: ['mira: You came back.'], shot_2: ['grandma: I never left.'], shot_3: ['grandma: Stay.'] })
     expect(patch.dialogue.profiles.map((p) => p.character_id)).toEqual(['mira', 'grandma'])
+  })
+})
+
+describe('혼자 정한 것 · 검토 c 고침', () => {
+  const byShot = (track: ReturnType<typeof dialogueTrackFromScript>) =>
+    Object.fromEntries(track.scenes.flatMap((s) => s.shots.map((sh) => [sh.shot_id, sh.dialogue.map((l) => `${l.character_id}: ${l.line}`)])))
+
+  // 왜: 검토 c 보통 1. 배포 전에 만든 초안은 씬 비트를 옛 대본 읽기로 저장했고, [만들기] 뒤 샷도 그 비트로 나뉜다. 대사 단계는 대본을 새로 읽어
+  //   비트를 다시 세서, 카메라 줄이 연출 + 지문으로 갈라지면 번호가 밀려 대사가 다른 샷에 실렸다. 초안은 [만들기] 전까지 오래 기다릴 수 있다.
+  it('대본 그대로 쓰기에서 대사는 실행 기록의 씬 비트(샷을 나눈 그 비트)에 맞춰 싣는다: 대본 읽기가 바뀌어 비트 수가 달라져도 대사가 다른 샷으로 밀리지 않는다', () => {
+    const story = `INT. KITCHEN - NIGHT
+WIDE SHOT. Rain hits the window.
+MAYA: You came back.
+CLOSE ON DRIVER. He nods slowly.
+DRIVER: I never left.`
+    const state = keepState(story)
+    // 옛 읽기는 카메라 줄을 통째로 연출로 두어 비트가 대사 둘뿐이었다(저장된 초안 그대로).
+    const stored = { ...state.scenes!, scenes: [{ ...state.scenes!.scenes[0], scene_actions: ['MAYA: You came back.', 'DRIVER: I never left.'] }] }
+    const decoupage = { scenes: [{ scene_id: 'scene_1', shots: [{ shot_id: 'shot_1', source_beats: [0] }, { shot_id: 'shot_2', source_beats: [1] }] }] }
+
+    const track = dialogueTrackFromScript(preservedScript(state.input)!.doc, stored, decoupage as never)
+
+    expect(byShot(track)).toEqual({ shot_1: ['maya: You came back.'], shot_2: ['driver: I never left.'] })
+  })
+
+  // 왜: 검토 c 보통 1. 옛 읽기가 대사를 앞 줄과 한 비트로 묶어 둔 초안(카메라 줄이 인물로 읽혀 대사가 그 줄에 붙음)도 대사가 그 비트의 샷에 실려야 한다.
+  it('예전 읽기가 대사를 다른 줄과 한 비트로 묶어 두었으면 그 대사는 그 비트를 덮는 샷에 싣는다', () => {
+    const story = `INT. ROOM - DAY
+LONG SHOT. The door opens.
+MAYA: Hello.
+
+Rain keeps falling.`
+    const state = keepState(story)
+    const stored = { ...state.scenes!, scenes: [{ ...state.scenes!.scenes[0], scene_actions: ['LONG SHOT: The door opens. MAYA: Hello.', 'Rain keeps falling.'] }] }
+    const decoupage = { scenes: [{ scene_id: 'scene_1', shots: [{ shot_id: 'shot_1', source_beats: [0] }, { shot_id: 'shot_2', source_beats: [1] }] }] }
+
+    const track = dialogueTrackFromScript(preservedScript(state.input)!.doc, stored, decoupage as never)
+
+    expect(byShot(track)).toEqual({ shot_1: ['maya: Hello.'], shot_2: [] })
+  })
+
+  // 왜: 검토 c 낮음 5. "EXT. BUS STOP" · "EXT. Bus Stop" 은 배경 하나만 생기는데 둘째 씬 장소가 그 번호와 글자가 달라, 그림 참조 · Director 가
+  //   글자 그대로 비교해 그 씬 샷에 배경이 안 붙었다. 대본이 아닌 흐름의 씬 장소 맞추기(normalizeSceneLocations)와 같은 방식이다.
+  it('대본 그대로 쓰기에서 장면 장소가 대소문자만 다르면(BUS STOP · Bus Stop) [만들기] 때 같은 배경 번호로 맞춘다', async () => {
+    const story = `EXT. BUS STOP - NIGHT
+Maya waits.
+
+MAYA: Come on.
+
+EXT. Bus Stop - DAY
+Maya waits again.
+
+MAYA: Finally.`
+    const patch = (await step('v2Design').run(keepState(story), { logger: logger(), projectId: 'p1' })) as Partial<WriterRunState>
+
+    expect(designedWorld()?.locations.map((l) => l.id)).toEqual(['BUS STOP'])
+    expect(patch.scenes?.scenes.map((s) => s.location)).toEqual(['BUS STOP', 'BUS STOP'])
+    expect((mocks.persistAssetsToDb.mock.calls[0][2] as { scenes: Array<{ location: string }> }).scenes.map((s) => s.location)).toEqual(['BUS STOP', 'BUS STOP'])
   })
 })
