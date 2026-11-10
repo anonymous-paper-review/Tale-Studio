@@ -28,6 +28,7 @@ import type {
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 import type { AppLocale } from '@/lib/locale';
+import { sceneLocations } from '@/lib/writer/pipeline/util/scene-locations';
 
 // == 카메라 규율 == 계약 (#camera-contract-relax 2026-08-11).
 //
@@ -251,7 +252,7 @@ ${JSON.stringify(
 ${PROSE_NAME_RULE}
 
 [로케이션 디자인]
-${JSON.stringify(worldVisual.locations.filter((loc) => loc.id === scene.location || scene.location.includes(loc.id)))}
+${JSON.stringify(sceneLocations(worldVisual.locations, scene.location))}
 
 [출력 형식 - JSON]
 {

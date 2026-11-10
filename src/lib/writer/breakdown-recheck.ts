@@ -124,6 +124,9 @@ function newCharacter(id: string, name: string): StoryCharacter {
 
 /** 사라지는 인물(from)을 가리키던 곳을 남는 인물(to)로 — 씬 등장 · 대사 · 씬별 모습 · 관계. 그리고 기록에서 뺀다. */
 function mergeCharacterInto(state: WriterRunState, from: string, to: string): void {
+  // 합친 번호도 적어 둔다. 대본 그대로 쓰기는 [만들기] 뒤 대사를 대본에서 다시 옮기며 이 표로 화자를 바꾼다(2026-11-10 B1).
+  const merged = Object.fromEntries(Object.entries(state._mergedCharacters ?? {}).map(([gone, kept]) => [gone, kept === from ? to : kept]))
+  state._mergedCharacters = { ...merged, [from]: to }
   for (const scene of state.scenes?.scenes ?? []) {
     if (Array.isArray(scene.characters_in_scene)) scene.characters_in_scene = unique(scene.characters_in_scene.map((id) => (id === from ? to : id)))
     for (const line of scene.key_dialogue ?? []) if (line.character_id === from) line.character_id = to

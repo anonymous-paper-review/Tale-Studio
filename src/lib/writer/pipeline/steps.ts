@@ -11,7 +11,7 @@ import { PipelineLogger } from '@/lib/writer/logger';
 import { pauseAfterStep } from './pause';
 import { runDramaturgySafe } from '@/lib/writer/pipeline/stages/s0_dramaturgy';
 import { runNarrativeStructure } from '@/lib/writer/pipeline/stages/s1_structure';
-import { runScenes, mergeOpenCast, mergeOpenWorld } from '@/lib/writer/pipeline/stages/s3_scenes';
+import { runScenes, mergeOpenCast, mergeOpenWorld, normalizeSceneLocations } from '@/lib/writer/pipeline/stages/s3_scenes';
 import { runStructureScenesMerged } from '@/lib/writer/pipeline/stages/s1s3_merged';
 import { runStoryCheck } from '@/lib/writer/pipeline/stages/c_validation_1';
 import { runVisualIdentity } from '@/lib/writer/pipeline/stages/v0_visual';
@@ -26,7 +26,7 @@ import { runShotCheck } from '@/lib/writer/pipeline/stages/c_application_2';
 import { runRenderPrompts } from '@/lib/writer/pipeline/stages/v5_prompts';
 import { runDialogue, toDialogueTrack, type DialogueProgress } from '@/lib/writer/pipeline/stages/dialogue';
 // #script-preserve 2026-09-17: 대본 보존 — 씬·대사를 LLM 으로 다시 쓰지 않고 대본에서 옮긴다(tests/writer/script-preserve-steps.test.ts).
-import { preservedScript, scenesFromScript, annotateScriptScenes, dialogueTrackFromScript } from '@/lib/writer/script/preserve';
+import { preservedScript, scenesFromScript, annotateScriptScenes, dialogueTrackFromScript, mergeScriptSpeakers } from '@/lib/writer/script/preserve';
 import { makeScriptSceneAnnotator } from '@/lib/writer/script/annotate';
 import { inferSceneCinematographyFromShots } from '@/lib/writer/pipeline/util/infer_v3';
 import { persistDesignTokens } from '@/lib/writer/pipeline/util/persist_design_tokens';
@@ -104,6 +104,9 @@ export interface WriterRunState extends WriterRunStateBase {
   /** 리뉴얼 1차: 지금 산문의 아이디어 소재(마지막으로 적용한 다시 쓰기 조건). 없으면 그대로(keep). */
   _proseSeed?: import('@/lib/writer/prose-conditions').ProseSeed;
   _sceneRevisionNotes?: string[];
+  /** 산문 재점검으로 합친 인물(사라진 번호 → 남는 번호, 2026-11-10 B1). 대본 그대로 쓰기의 대사는 [만들기] 뒤 대본에서 다시 옮기므로
+   *  합친 쪽 이름으로 적힌 대사를 남는 인물의 대사로 바꾼다(breakdown-recheck mergeCharacterInto 가 적는다). */
+  _mergedCharacters?: Record<string, string>;
   /** 개정 요청 당시의 씬 초안. 재시도에도 같은 본문을 다듬기 위한 실행 입력이며 다음 개정에서 교체한다. */
   _sceneRevisionSource?: Scenes;
   _sceneStoryProposal?: import('@/lib/producer/scene-story-proposal').SceneStoryProposal;
@@ -334,7 +337,7 @@ async function runLaneDialogue(
   if (s.dialogue !== undefined) return {};
   // #script-preserve: 대본을 보존하면 대사는 저작하지 않고 대본의 대사를 샷에 싣는다(LLM 없음).
   const preserved = preservedScript(s.input);
-  if (preserved) return { dialogue: dialogueTrackFromScript(preserved.doc, s.scenes!, s.decoupage!), dialoguePartial: undefined };
+  if (preserved) return { dialogue: dialogueTrackFromScript(mergeScriptSpeakers(preserved.doc, s._mergedCharacters), s.scenes!, s.decoupage!), dialoguePartial: undefined };
   const models = resolveModels(s.input);
   // ⚠️ 씬 순차 + 글로벌 메모리 체인은 V4 품질 메커니즘(블라인드 A/B 검증) — 레인으로 분리만
   //   하고 내부는 병렬화하지 않는다. 씬 실패는 빈 대사로 흡수(runDialogue 내부 계약).
@@ -495,18 +498,25 @@ export const WRITER_STEPS: WriterStep[] = [
     has: (s) => s.characterVisual !== undefined && s.worldVisual !== undefined,
     run: async (s, { logger, projectId }) => {
       const models = resolveModels(s.input);
+      // 대본 그대로(2026-11-10 B1): 대본의 장면 머리 장소가 배경이다. 씬 단계가 장소 목록을 쌓지 않아(대본에서 씬을 옮길 뿐) [만들기]가
+      //   배경 0개로 디자인했다. 산문 초안 · 재점검 목록과 같은 규칙(씬에 적힌 장소)으로 목록에 없는 장면 장소를 더한다.
+      //   Producer 에서 고친 카드(이름 · 설명)는 그대로 두고, 이야기 엔진이 지은 장소 후보는 넣지 않는다(대본에 없는 이름).
+      const keep = !!preservedScript(s.input) && !!s.scenes;
+      const world = keep ? mergeOpenWorld(s.world, s.scenes!) : s.world;
+      // 대소문자만 다른 장면 장소("BUS STOP" · "Bus Stop")는 같은 배경 번호로 맞춘다(검토 c 낮음 5). 그림 참조 · Director 는 장소를 글자 그대로 비교한다.
+      const scenes = keep && world ? normalizeSceneLocations(s.scenes!, world) : s.scenes;
       const { characterVisual, worldVisual } = await runV2Design(
         s.visualIdentity!,                    // v0 전역 스타일 루트
         s.actVisualArc!,                      // v1 막별 아크 (v-체인 상속)
         s.characters!,                        // s2 인물
-        s.world,                              // s2 월드 (producer + 오픈캐스트)
+        world,                                // s2 월드 (producer + 오픈캐스트, 대본 그대로면 + 장면 장소)
         '',                                    // bridge seed 제거(E6 삭제 채택) — v2Design 시그니처 하위호환용 빈 값
         logger,
         models.V,
         s.input.outputLocale,
         // 로케이션 디자인이 씬의 시간대 · 날씨를 따르고, 시리즈는 앞 화와 같은 세계 · 같은 색으로(2026-10-27).
         {
-          scenes: s.scenes?.scenes,
+          scenes: scenes?.scenes,
           series: s.input.series,
           looks: s.input.inheritedLooks,
           designTokens: s.input.inheritedDesignTokens,
@@ -519,7 +529,7 @@ export const WRITER_STEPS: WriterStep[] = [
       //   assets persist 는 기존처럼 best-effort, 이후 writer 가 v2Design 확인점에서 producer-origin drafts 를 submit 한다.
       await persistDesignTokens(projectId, s.visualIdentity!, worldVisual);
       // best-effort 유지하되 침묵 금지(#persist-guard) — 실패를 로그로 드러낸다(shots 0행 사고 교훈).
-      await persistAssetsToDb(projectId, s.characters!, s.scenes!, worldVisual, characterVisual, s.world).catch((e) => {
+      await persistAssetsToDb(projectId, s.characters!, scenes!, worldVisual, characterVisual, world).catch((e) => {
         console.error('[writer] persistAssetsToDb 실패 (best-effort 계속):', e instanceof Error ? e.message : e);
       });
       // #C(2026-09-02 observability-audit): 생성 제출 자신는 best-effort 유지(v2Design 핵심경로를 막지 않는다)
@@ -532,7 +542,7 @@ export const WRITER_STEPS: WriterStep[] = [
         });
       });
       // 그림체 분석이 도는 중이라 미뤘다 — 기다리지 않고 다음 단계로 간다(분석 창구가 끝날 때 그린다, Writer 가 끝날 때 한 번 더 챙긴다).
-      return { characterVisual, worldVisual, ...(drafts?.deferred_style_analysis ? { _artistDeferred: true } : {}) };
+      return { characterVisual, worldVisual, ...(world !== s.world ? { world } : {}), ...(scenes !== s.scenes ? { scenes } : {}), ...(drafts?.deferred_style_analysis ? { _artistDeferred: true } : {}) };
     },
   },
   {

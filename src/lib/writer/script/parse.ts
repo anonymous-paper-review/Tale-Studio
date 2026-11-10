@@ -64,11 +64,59 @@ const HEADING_RE = /^\s*(?:\d+[.)]?\s*)?(INT\.?\s*\/\s*EXT\.?|I\/E\.?|INT\.?|EXT
 const KO_SCENE_RE = /^\s*(?:S#|씬|장면|Scene)\s*(\d+)\s*[.:\-–—)]?\s*(.*)$/i;
 const ACT_RE = /^\s*(?:제\s*)?(\d+)\s*(막|장|경)\s*[.:]?\s*(.*)$|^\s*(프롤로그|에필로그|서막|종막)\s*$|^\s*(ACT|SCENE)\s+([IVX]+|\d+)\s*[.:]?\s*(.*)$/i;
 const TRANSITION_RE = /^\s*(CUT TO|SMASH CUT(?: TO)?|MATCH CUT(?: TO)?|HARD CUT(?: TO)?|JUMP CUT(?: TO)?|DISSOLVE(?: TO)?|FADE (?:IN|OUT|TO BLACK|TO WHITE|TO \w+)|CUT TO BLACK|BACK TO SCENE|BACK TO|INTERCUT(?: WITH)?|END OF PLAY|THE END|END|BLACK SCREEN|OVER BLACK|BLACKOUT|CURTAIN|끝|막|암전|검은 화면|흰 화면|페이드 ?(?:인|아웃)|컷 ?투|디졸브)\s*[:.]?\s*$/i;
-const CAMERA_RE = /^\s*(PUSH IN|PULL BACK|PULL OUT|CLOSE ON|CLOSE UP|CLOSE-UP|C\.U\.|C\/U|ECU|EXTREME CLOSE|WIDE (?:SHOT|ON)|ANGLE ON|REVERSE ANGLE|INSERT(?!\s*[-–—:]?\s*TEXT)|POV|TILT (?:UP|DOWN)|PAN (?:LEFT|RIGHT|TO|UP|DOWN)|TRACKING|DOLLY|ZOOM|CRANE|HOLD ON|HOLD\b|RACK FOCUS|SLOW MOTION|SLOW-MO|THE CAMERA|CAMERA|카메라|클로즈업|푸시 ?인|틸트|팬|트래킹|줌)\b/i;
+// 샷 크기 · 앵글 말(2026-11-10 B1: 영어 점검에서 "LONG SHOT." · "MEDIUM SHOT." 줄이 인물이 됐다). 맨 낱말 MEDIUM · LONG 은 넣지 않는다.
+//   "MEDIUM: …"(영매) 같은 인물 이름일 수 있다. SHOT · CLOSE-UP · ANGLE 이 붙을 때만 샷 말로 본다.
+const SHOT_SIZE_WORDS = String.raw`(?:EXTREME |VERY )?(?:LONG|WIDE) SHOT|FULL SHOT|MEDIUM (?:LONG |WIDE |FULL |CLOSE )?SHOT|MID[- ]SHOT|MEDIUM CLOSE[- ]?UP|CLOSEUP|CLOSE SHOT|COWBOY SHOT|(?:TWO|THREE|2|3)[- ]SHOT|GROUP SHOT|ESTABLISHING(?: SHOT)?|MASTER SHOT|REVERSE SHOT|OVERHEAD(?: SHOT)?|AERIAL(?: SHOT| VIEW)?|BIRD'?S[- ]EYE(?: VIEW| SHOT)?|(?:HIGH|LOW|DUTCH|WIDE) ANGLE|OVER[- ]THE[- ]SHOULDER(?: SHOT)?|P\.O\.V|MCU|HANDHELD|STEADICAM|FREEZE FRAME|SPLIT SCREEN`;
+const SHOT_SIZE_WORDS_KO = String.raw`(?:익스트림 ?)?롱 ?숏|미디엄 ?(?:롱 ?|클로즈 ?)?숏|풀 ?숏|바스트 ?숏|웨이스트 ?숏|니 ?숏|투 ?숏|쓰리 ?숏|설정 ?숏|오버 ?(?:더 ?)?숄더(?: ?숏)?|하이 ?앵글|로우 ?앵글|부감(?: ?숏)?|앙각(?: ?숏)?`;
+const CAMERA_RE = new RegExp(String.raw`^\s*(${SHOT_SIZE_WORDS}|PUSH IN|PULL BACK|PULL OUT|CLOSE ON|CLOSE UP|CLOSE-UP|C\.U(?=\.)|C\/U|ECU|EXTREME CLOSE|WIDE (?:SHOT|ON)|ANGLE ON|REVERSE ANGLE|INSERT(?!\s*[-\u2013\u2014:]?\s*TEXT)|POV|TILT (?:UP|DOWN)|PAN (?:LEFT|RIGHT|TO|UP|DOWN)|TRACKING|DOLLY|ZOOM|CRANE|HOLD ON|HOLD\b|RACK FOCUS|SLOW MOTION|SLOW-MO|THE CAMERA|CAMERA|카메라|클로즈업|푸시 ?인|틸트|팬|트래킹|줌)\b`, 'i');
+// "LONG SHOT. Headlights appear…" 꼴: 대문자 카메라 말 + 구분자 + 글. 카메라 말은 연출 지시, 뒤 글은 지문이다(2026-11-10 B1 · 검토 c).
+//   샷 크기 말(LONG SHOT · C.U. · P.O.V. …)은 그 말 바로 뒤 구분자까지다. 뒤에 오는 인물 소개("WIDE SHOT. MAYA, 20s, …")는 지문이다.
+//   대상을 받는 지시(CLOSE ON · ANGLE ON · INSERT · PUSH IN …)는 글(영어 소문자 · 한글)이 처음 나오기 바로 앞의 마지막 구분자까지다
+//   ("INSERT - THE LETTER: 'Dear…'", "CLOSE ON MAYA, DRIVER AND THE BUS. They stare.").
+//   구분자는 . : , en/em dash, 앞뒤에 빈칸이 있는 붙임표(- · --). CLOSE-UP 의 붙임표는 말의 일부다.
+const CAMERA_SEPARATOR_RE = /\s*[.:,]|\s*[\u2013\u2014]+|\s+-{1,2}(?=\s)/g;
+const TARGET_CAMERA_RE = /^(?:CLOSE ON|WIDE ON|ANGLE ON|REVERSE ANGLE|INSERT|PUSH IN|PULL BACK|PULL OUT|TILT (?:UP|DOWN)|PAN (?:LEFT|RIGHT|TO|UP|DOWN)|TRACKING|DOLLY|ZOOM|CRANE|HOLD ON|HOLD|RACK FOCUS|THE CAMERA|CAMERA)$/i;
+function splitCameraLead(line: string, lead: RegExpMatchArray): { camera: string; rest: string } | null {
+  const text = line.search(/[a-z가-힣]/);
+  if (text <= 0) return null;
+  const head = line.slice(0, text);
+  const separator = new RegExp(CAMERA_SEPARATOR_RE.source, 'g');
+  separator.lastIndex = (lead.index ?? 0) + lead[0].length;
+  const first = separator.exec(head);
+  let cut = first ? first.index + first[0].length : -1;
+  // 대상을 받는 말은 첫 구분자가 마침표가 아니면 마지막 구분자까지 본다. 마침표는 연출 문장의 끝이다("TRACKING SHOT. MAYA, 20s, …", 검토 c · acb4683d).
+  if (first && first[0].trim() !== '.' && TARGET_CAMERA_RE.test(lead[1].trim())) {
+    for (const m of head.matchAll(CAMERA_SEPARATOR_RE)) cut = (m.index ?? 0) + m[0].length;
+  }
+  if (cut <= 0) return null;
+  const camera = line.slice(0, cut).trim();
+  const rest = line.slice(cut).trim();
+  return camera && rest && CAMERA_RE.test(camera) ? { camera, rest } : null;
+}
+// 굵은 이름이 카메라 지시인가(검토 c 재검토 · 7550d031): 카메라 지시로 끝나거나("**LONG SHOT.**"), 대상을 받는 카메라 지시로 시작한다
+//   ("**CLOSE ON MAYA.**" · "**ZOOM IN ON MAYA.**" · "**CRANE SHOT.**"). 맨 낱말(**CRANE:**)과 그 낱말로 시작하는 이름(**DOLLY PARTON:**)은 인물이다.
+const CAMERA_MOVE_NEXT_RE = /^(?:IN|OUT|ON|TO|UP|DOWN|LEFT|RIGHT|BACK|WITH|ACROSS|ALONG|PAST|AWAY|OVER|AROUND|THROUGH|SHOT)$/;
+function boldCameraName(raw: string): boolean {
+  const name = raw.replace(/[:：.]\s*$/, '').trim();
+  if (cameraCueName(name)) return true;
+  const m = name.match(CAMERA_RE);
+  if (!m || hasLower(m[1])) return false;
+  const words = name.split(/\s+/);
+  if (words.length < 2) return false;
+  return /\s/.test(m[1].trim()) || /^(?:INSERT|TRACKING|POV)$/i.test(m[1].trim()) || CAMERA_MOVE_NEXT_RE.test(words[1]);
+}
+const LEAD_TEXT_RE = /[a-z가-힣]/;
+// 문장 끝맺음(마침표 · 물음표 · 느낌표 · 말줄임 · 닫는 따옴표 · 괄호).
+const SENTENCE_END_RE = /[.!?…。"”'’)\]]\s*$/;
+/** 카메라 줄 판별용: 줄 앞의 굵은 표시를 뗀다("**LONG SHOT.** …" → "LONG SHOT. …", 검토 c 보통 3). */
+function unboldLead(s: string): string {
+  return s.replace(/^\*\*([^*]{1,40})\*\*(?=\s|$)/, '$1');
+}
 // 카메라 지시가 "이름: 대사" 꼴로 들어온 줄(2026-10-06 운영 제보 — 번역 대본의 "메모장으로 푸시 인: …").
 //   이름 자리가 카메라 움직임으로 끝나면 대사가 아니라 카메라 지시다. 팬 · 줌 · 틸트처럼 이름일 수도 있는 한 낱말은
 //   "왼쪽으로 팬"처럼 방향 말(~로 · ~으로 · ~에 · ~쪽) 뒤에 올 때만 본다("피터 팬: …"은 대사).
-const CAMERA_TAIL_RE = /(?:^|\s)(?:푸시 ?인|풀 ?백|풀 ?아웃|줌 ?인|줌 ?아웃|(?:익스트림 ?)?클로즈 ?업|틸트 ?업|틸트 ?다운|트래킹(?: ?숏)?|인서트(?: ?숏)?|달리 ?인|달리 ?아웃|크레인 ?업|크레인 ?다운|와이드 ?숏|POV|PUSH IN|PULL BACK|PULL OUT|CLOSE ON|CLOSE UP|CLOSE-UP|ZOOM IN|ZOOM OUT|TILT UP|TILT DOWN|TRACKING|DOLLY IN|DOLLY OUT|INSERT)$/i;
+//   샷 크기 · 앵글 말("롱 숏: …" · "**LONG SHOT:** …")도 같다(2026-11-10 B1).
+const CAMERA_TAIL_RE = new RegExp(String.raw`(?:^|\s)(?:푸시 ?인|풀 ?백|풀 ?아웃|줌 ?인|줌 ?아웃|(?:익스트림 ?)?클로즈 ?업|틸트 ?업|틸트 ?다운|트래킹(?: ?숏)?|인서트(?: ?숏)?|달리 ?인|달리 ?아웃|크레인 ?업|크레인 ?다운|와이드 ?숏|${SHOT_SIZE_WORDS_KO}|POV|PUSH IN|PULL BACK|PULL OUT|CLOSE ON|CLOSE UP|CLOSE-UP|ZOOM IN|ZOOM OUT|TILT UP|TILT DOWN|TRACKING|DOLLY IN|DOLLY OUT|INSERT|${SHOT_SIZE_WORDS})$`, 'i');
 const CAMERA_WORD_AFTER_DIRECTION_RE = /\S(?:으로|로|에|쪽)\s+(?:팬|패닝|줌|틸트)$/;
 // 한국어 표시(자막·화면 문자·효과음…)는 쌍점이 붙을 때만 받는다 — \b 는 한글을 낱말 글자로 치지 않아 한글 표시 뒤에서 늘 실패했다(2026-10-09).
 const KO_LABEL_END = '(?:\\b|(?<=[가-힣])(?=\\s*[:：]))';
@@ -101,7 +149,7 @@ function cameraCueLine(s: string): boolean {
   const m = s.match(COLON_CUE_RE);
   if (m && cameraCueName(m[1])) return true;
   const b = s.match(BOLD_CUE_RE);
-  return !!b && cameraCueName(b[1].replace(/[:：]\s*$/, ''));
+  return !!b && boldCameraName(b[1]); // "**LONG SHOT.** …" 의 끝 마침표도 뗀다(검토 c 보통 3)
 }
 
 function isBlank(s: string): boolean {
@@ -131,7 +179,7 @@ function stripMd(s: string): string {
 function screenplayHeading(m: RegExpMatchArray): { int_ext: ScriptScene['int_ext']; location: string; time_of_day?: string } {
   const tag = m[1].toUpperCase().replace(/\s|\./g, '');
   const int_ext: ScriptScene['int_ext'] = tag.includes('/') || tag === 'I/E' ? 'INT/EXT' : tag.startsWith('INT') ? 'INT' : 'EXT';
-  const parts = m[2].split(/\s+[-–—]\s+/);
+  const parts = m[2].split(/\s+(?:-{1,2}|[\u2013\u2014])\s+/); // 붙임표 두 개("-- NIGHT")도 시간 앞 줄표다(검토 c 낮음 5)
   const location = parts[0].trim();
   const time_of_day = parts.length > 1 ? parts.slice(1).join(' - ').trim() : undefined;
   return { int_ext, location, time_of_day };
@@ -154,7 +202,7 @@ function parseHeading(line: string): { int_ext?: ScriptScene['int_ext']; locatio
     }
     const paren = rest.match(/^(.*?)\s*[(（](.*?)[)）]\s*$/);
     if (paren) return { location: paren[1].trim() || rest, time_of_day: paren[2].trim() };
-    const parts = rest.split(/\s+[-–—/]\s+/);
+    const parts = rest.split(/\s+(?:-{1,2}|[\u2013\u2014/])\s+/);
     return { location: parts[0].trim(), time_of_day: parts.length > 1 ? parts.slice(1).join(' ').trim() : undefined };
   }
   return null;
@@ -204,7 +252,7 @@ function matchColonCue(line: string): CueMatch | null {
   if (b) {
     const name = b[1].replace(/[:：]\s*$/, '').trim();
     const rest = b[2].replace(/^[:：]\s*/, '');
-    if (FRONT_LABELS.some((f) => f.re.test(name)) || META_LABEL_RE.test(name) || cameraCueName(name)) return null;
+    if (FRONT_LABELS.some((f) => f.re.test(name)) || META_LABEL_RE.test(name) || boldCameraName(name)) return null;
     const { parenthetical, text } = splitLeadingParenthetical(rest);
     return { name, parenthetical, inlineText: text };
   }
@@ -508,6 +556,37 @@ export function parseScript(text: string, opts?: { assumeScript?: boolean }): Sc
   }
   const repeatedName = (n: string) => (bareCount.get(n) ?? 0) >= (n.replace(/\s/g, '').length <= 1 ? 3 : 2);
   const knownForCue = (n: string) => !!linkName(n, drafts) || repeatedName(n);
+  // 줄이 혼자 한 원소가 되는가(본래 줄 판별): 대문자 카메라 말 · 화면 문자 · 소리 큐. 카메라 줄로 시작한 문단은 이런 줄에서 끊는다(검토 c 낮음 6).
+  const ownLine = (t: string): boolean => {
+    const c = unboldLead(t).match(CAMERA_RE);
+    if (c && !hasLower(c[1])) return true;
+    const on = t.match(ON_SCREEN_RE);
+    if (on && !(on[1] === '화면' && !/^\s*화면\s*[:：]/.test(t))) return true;
+    if (RADIO_CUE_RE.test(t)) return true;
+    const sl = t.match(SOUND_LABEL_RE);
+    return !!sl && !hasLower(sl[1]);
+  };
+  // 지문(액션): 빈 줄까지 한 덩이. first 를 주면 첫 줄은 그 글로 읽는다(아래 카메라 줄에서 카메라 말을 뗀 나머지). 다음 줄 번호를 돌려준다.
+  //   카메라 줄의 나머지 글은 문장이 끝나면 거기서 끝난다. 다음 줄은 예전처럼 새로 판별해야 대본 읽기가 바뀌지 않는다(검토 c 낮음 6).
+  //   줄바꿈으로 잘린 문장(끝맺음 없음)만 다음 줄까지 이어 붙인다.
+  const readAction = (start: number, first?: string): number => {
+    let j = start;
+    const block: string[] = [];
+    while (j < lines.length && !isBlank(lines[j])) {
+      const t = j === start && first !== undefined ? first : stripMd(lines[j]);
+      if (j > start && first !== undefined && (SENTENCE_END_RE.test(block[block.length - 1]) || ownLine(t))) break;
+      if (j > start && (parseHeading(t) || isActHeading(t) || TRANSITION_RE.test(t) || isLabelBreak(t) || matchColonCue(t) || cameraCueLine(t) || matchPeriodCue(t) || matchKoreanNameCue(t, lines[j + 1], knownForCue) || matchCapsCue(t, lines[j + 1]) || FRONT_LABELS.some((f) => f.re.test(t) && t.length <= 40))) break;
+      block.push(t);
+      j++;
+    }
+    const actionText = block.join(' ').trim();
+    if (actionText) {
+      const p = actionText.match(PARENTHETICAL_RE);
+      pushEl({ type: 'action', text: p ? p[1].trim() : actionText });
+      if (cur) emitSounds(actionText);
+    }
+    return Math.max(j, start + 1);
+  };
 
   let i = 0;
   while (i < lines.length) {
@@ -577,8 +656,29 @@ export function parseScript(text: string, opts?: { assumeScript?: boolean }): Sc
     if (RADIO_CUE_RE.test(s)) { pushEl({ type: 'sound', text: s.replace(/^\(|\)$/g, '').trim() }); i++; continue; }
     const sl = s.match(SOUND_LABEL_RE);
     if (sl && !hasLower(sl[1])) { pushEl({ type: 'sound', text: sl[2]?.trim() || s }); i++; continue; }
-    const cm = s.match(CAMERA_RE);
-    if ((cm && !hasLower(cm[1])) || cameraCueLine(s)) { pushEl({ type: 'camera', text: s }); i++; continue; } // 지시어 자체가 대문자일 때만("the camera pulls back" 같은 지문은 제외)
+    // 굵은 이름 큐("**NAME:**" · "**NAME.**")는 이름이 카메라 지시로 끝날 때만 카메라 줄로 본다("**CRANE:** …"은 인물, 검토 c 재검토).
+    //   그 밖의 굵은 줄은 굵은 표시를 떼고 본다(검토 c 보통 3).
+    const bold = s.match(BOLD_CUE_RE);
+    const boldCamera = !!bold && boldCameraName(bold[1]);
+    const plainLead = bold && !boldCamera ? s : unboldLead(s);
+    const cm = plainLead.match(CAMERA_RE);
+    if ((cm && !hasLower(cm[1])) || cameraCueLine(s)) { // 지시어 자체가 대문자일 때만("the camera pulls back" 같은 지문은 제외)
+      // "LONG SHOT. Headlights appear…" 꼴은 카메라 말은 연출, 뒤 글은 지문으로 나눈다(2026-11-10 B1). 줄 전체를 연출로 두면 그 장면에서
+      //   일어나는 일이 지문에서 빠져 샷을 나눌 때 보이지 않는다. 카메라 말 바로 뒤가 구분자일 때만 나눈다("PUSH IN on her face." 는 통째로 연출).
+      //   굵은 샷 말은 굵은 표시 끝이 구분자다("**WIDE SHOT** Rain falls…", 검토 c 재검토).
+      const boldRest = boldCamera ? bold![2].replace(/^[\s:：.,]+/, '').trim() : '';
+      const lead = !(cm && !hasLower(cm[1])) ? null
+        : boldCamera ? (LEAD_TEXT_RE.test(boldRest) ? { camera: bold![1].trim(), rest: boldRest } : null)
+          : splitCameraLead(plainLead, cm);
+      if (lead) {
+        pushEl({ type: 'camera', text: lead.camera });
+        i = readAction(i, lead.rest);
+        continue;
+      }
+      pushEl({ type: 'camera', text: s });
+      i++;
+      continue;
+    }
     // 대사: "이름: 대사" 꼴. 촬영용 대본의 첫 씬 헤딩 앞(앞머리)에서는 대사로 보지 않는다 — 번역 메모("번역 표기: …")가
     //   가짜 인물·가짜 첫 대사가 됐던 실측(2026-09-21 script_test_2). 그 줄은 아래 지문 경로로 떨어져 앞머리 노트가 된다.
     const colon = kind === 'screenplay' && !cur ? null : matchColonCue(s);
@@ -672,22 +772,8 @@ export function parseScript(text: string, opts?: { assumeScript?: boolean }): Sc
       i = j;
       continue;
     }
-    // 지문(액션): 빈 줄까지 한 덩이
-    let j = i;
-    const block: string[] = [];
-    while (j < lines.length && !isBlank(lines[j])) {
-      const t = stripMd(lines[j]);
-      if (j > i && (parseHeading(t) || isActHeading(t) || TRANSITION_RE.test(t) || isLabelBreak(t) || matchColonCue(t) || cameraCueLine(t) || matchPeriodCue(t) || matchKoreanNameCue(t, lines[j + 1], knownForCue) || matchCapsCue(t, lines[j + 1]) || FRONT_LABELS.some((f) => f.re.test(t) && t.length <= 40))) break;
-      block.push(t);
-      j++;
-    }
-    const actionText = block.join(' ').trim();
-    if (actionText) {
-      const p = actionText.match(PARENTHETICAL_RE);
-      pushEl({ type: 'action', text: p ? p[1].trim() : actionText });
-      if (cur) emitSounds(actionText);
-    }
-    i = Math.max(j, i + 1);
+    // 지문(액션)
+    i = readAction(i);
   }
   flushSection();
 

@@ -147,7 +147,39 @@ function dialogueBeats(sc: ScriptScene): Array<{ beat: number; el: Extract<Scrip
   return out;
 }
 
-/** 대본 대사 → 샷 대사 트랙. 비트를 덮는 샷에 싣고, 없으면 가장 가까운 앞 샷(그것도 없으면 씬 첫 샷). 대사는 한 글자도 바꾸지 않는다. */
+/**
+ * 다시 읽은 대사의 비트 번호를 실행 기록의 씬 비트에 맞춘다(검토 c 보통 1). 샷은 실행 기록의 비트로 나뉘었는데, 배포 전에 만든 초안은 그 비트를
+ *   옛 대본 읽기로 저장했다. 같은 대사 비트를 먼저 찾고, 없으면 그 대사를 담은 비트(옛 읽기가 앞 줄과 묶은 대사), 그래도 없으면 다시 읽은 번호를 쓴다.
+ */
+function alignToStoredBeats(
+  items: Array<{ beat: number; el: Extract<ScriptElement, { type: 'dialogue' }> }>,
+  storedBeats: readonly unknown[] | undefined,
+): Array<{ beat: number; el: Extract<ScriptElement, { type: 'dialogue' }> }> {
+  const flat = (text: string) => text.replace(/\s+/g, ' ').trim();
+  const beats = (storedBeats ?? []).map((beat) => (typeof beat === 'string' ? flat(beat) : ''));
+  if (!beats.length) return items;
+  let cursor = 0;
+  return items.map((item) => {
+    const own = flat(dialogueBeat(item.el));
+    let at = beats.findIndex((beat, i) => i >= cursor && beat === own);
+    if (at >= 0) {
+      cursor = at + 1;
+      return { ...item, beat: at };
+    }
+    // 옛 읽기가 앞 줄과 묶은 대사: "화자: 대사" 글을 먼저 찾고(앞 지문의 같은 짧은 말에 끌리지 않게), 없을 때만 대사 글만으로 찾는다(검토 c 재검토).
+    for (const needle of [own, flat(item.el.text)]) {
+      if (!needle) continue;
+      at = beats.findIndex((beat, i) => i >= cursor && beat.includes(needle));
+      if (at < 0) continue;
+      cursor = at; // 묶인 비트에는 대사가 여럿 들 수 있다
+      return { ...item, beat: at };
+    }
+    return item;
+  });
+}
+
+/** 대본 대사 → 샷 대사 트랙. 비트를 덮는 샷에 싣고, 없으면 가장 가까운 앞 샷(그것도 없으면 씬 첫 샷). 대사는 한 글자도 바꾸지 않는다.
+ *  비트 번호는 실행 기록의 씬 비트(scenes, 샷을 나눈 그 비트)에 맞춘다. */
 export function dialogueTrackFromScript(doc: ScriptDocument, scenes: Scenes, decoupage: DecoupagePlan): DialogueTrack {
   const profiles: VoiceProfile[] = doc.characters.map((c) => {
     const examples = doc.scenes.flatMap((s) => s.elements).filter((e): e is Extract<ScriptElement, { type: 'dialogue' }> => e.type === 'dialogue' && e.character_id === c.id).slice(0, 2).map((e) => e.text);
@@ -181,7 +213,8 @@ export function dialogueTrackFromScript(doc: ScriptDocument, scenes: Scenes, dec
       return best?.id ?? shots[0].shot_id;
     };
     const orphan: ShotDialogueLine[] = [];
-    for (const { beat, el } of dialogueBeats(sc)) {
+    const stored = scenes.scenes.find((scene) => scene.scene_id === sc.scene_id);
+    for (const { beat, el } of alignToStoredBeats(dialogueBeats(sc), stored?.scene_actions)) {
       const line: ShotDialogueLine = { character_id: el.character_id, line: el.text, delivery: deliveryOf(el) };
       const id = pick(beat);
       if (id) lines.get(id)!.push(line);
@@ -191,8 +224,25 @@ export function dialogueTrackFromScript(doc: ScriptDocument, scenes: Scenes, dec
     if (orphan.length) shotDialogue.push({ shot_id: `${sc.scene_id}_unassigned`, dialogue: orphan, narration: null }); // 샷이 하나도 없는 씬 — 대사를 버리지 않는다
     out.push({ scene_id: sc.scene_id, shots: shotDialogue });
   }
-  void scenes; // 씬 순서는 doc 과 같다(scenesFromScript 가 만든 것) — 시그니처는 상류 확정 결과를 받는 꼴로 둔다.
   return { profiles, scenes: out };
+}
+
+/**
+ * 산문 재점검으로 합친 인물(사라진 번호 → 남는 번호)을 대본의 화자에 얹는다(2026-11-10 B1). 대본 그대로 쓰기의 대사는 [만들기] 뒤
+ *   대본에서 다시 옮기므로, 이것이 없으면 합친 쪽 이름으로 적힌 대사가 없는 인물의 대사가 되어 화자 없이(V.O.) 나온다. 대사 글은 그대로다.
+ */
+export function mergeScriptSpeakers(doc: ScriptDocument, merged?: Record<string, string> | null): ScriptDocument {
+  if (!merged || !Object.keys(merged).length) return doc;
+  const to = (id: string) => merged[id] ?? id;
+  return {
+    ...doc,
+    characters: doc.characters.filter((c) => !(c.id in merged)),
+    scenes: doc.scenes.map((sc) => ({
+      ...sc,
+      characters: [...new Set(sc.characters.map(to))],
+      elements: sc.elements.map((el) => (el.type === 'dialogue' ? { ...el, character_id: to(el.character_id) } : el)),
+    })),
+  };
 }
 
 export type SceneAnnotation = Partial<Pick<StoryScene, 'purpose' | 'emotion_beat' | 'info_asymmetry' | 'dialogue_summary'>>;
