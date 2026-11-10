@@ -576,6 +576,24 @@ function isComicRetryAnswer(text: string, voice: AppLocale): boolean {
   return text === translate(voice, 'Turn the comic into a script again') || text === translate(voice, 'Read the comic again')
 }
 
+/**
+ * Writer 화면 채팅(넘기기 전 산문 초안)에서 이 말을 산문 고침보다 그림 쪽이 먼저 받는가(2026-11-10 점검 C05~C09 — 쓰임새 답이 "산문을 고쳐 봤어요"로 빠졌다).
+ *   그림이 실린 말(쓰임새를 정한 뒤 이어지는 카드 채우기 · 만화 대본 · 참고 자료 요청 포함)과 떠 있는 그림 질문의 답이면 그렇다.
+ *   쓰임새 · 여러 장 · 만화 그림체 질문은 닫을 수 없는 질문이라 답이 아닌 말도 그 질문이 받아 다시 묻는다(예전 Producer 채팅과 같다).
+ *   그림 없이 말만 오면 산문 고침이다. 숨은 요청은 그림 질문의 답이 아니다.
+ */
+function imageTurnFirst(state: GlobalChatState, input: { text: string; hasImages: boolean; hidden: boolean; projectId: string | null }): boolean {
+  if (input.hasImages) return true
+  if (input.hidden) return false
+  if (state.imageRoleGate || state.imageBatchGate || state.comicStyleGate) return true
+  if (state.comicRetry && isComicRetryAnswer(input.text, contentLocale())) return true
+  const styleAsk = state.styleAttachmentGate
+  if (!styleAsk || styleAsk.projectId !== input.projectId) return false
+  const yesNo = matchYesNo(input.text)
+  const use = matchImageUseAnswer(input.text) ?? (yesNo === 'yes' ? 'style' : yesNo === 'no' ? 'reference' : null)
+  return use === 'style' || use === 'reference'
+}
+
 /** 같은 쪽으로 다시 옮긴다(그림체는 이미 정했으니 다시 하지 않는다). 새 프로젝트에서 왔으면 이어서 트리트먼트. */
 async function retryComicScript(get: () => GlobalChatState, retry: ComicRetry): Promise<void> {
   const comic = await runComicAdaptation(get, retry.pages, { consent: retry.consent, skipStyle: true, then: retry.then })
@@ -1981,6 +1999,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       return
     }
 
+    // 그림이 실린 말 · 떠 있는 그림 질문의 답은 아래 Writer 산문 고침(다시 쓰기 · 브레이크다운 말 포함)보다 먼저 그림 쪽이 받는다(점검 C05~C09).
+    const imageFirst = stage === 'producer' && imageTurnFirst(get(), { text: trimmed, hasImages: (attachmentImageUrls?.length ?? 0) > 0, hidden: opts?.silentUser === true, projectId })
+
     const sceneSuggestion = get().suggestion
     const sceneChoices = sceneSuggestion?.id === `scene-story-edit:${projectId}`
     // 넘기기 전 트리트먼트 초안(2026-10-02 시안 v04)은 Producer 채팅이 살아 있다 — 다시 쓰기를 연 때(선택지)만 트리트먼트로 보낸다.
@@ -1989,7 +2010,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     //   넘김 말은 확정 전이면 늘 확정 창으로 간다(산문 초안이 아직 없는 예전 프로젝트도 예전 Producer 넘김으로 가지 않는다).
     //   초안이 없는 예전 프로젝트의 나머지 말은 예전 Producer 채팅 그대로다(이야기 · 설정 채우기).
     const writerProse = stage === 'producer' && draftLive
-    if (stage === 'producer' && !useProjectStore.getState().producerLocked) {
+    if (stage === 'producer' && !imageFirst && !useProjectStore.getState().producerLocked) {
       const intent = writerChatIntent(trimmed, { proseDraft: writerProse })
       if (intent === 'breakdown' || (intent === 'rewrite' && writerProse)) {
         if (sceneSuggestion?.stage === 'producer') get().dismissSuggestion({ implicit: true })
@@ -2003,7 +2024,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     }
     const sceneGate = writerProse || (!draftLive && (sceneSuggestion?.action?.kind === 'confirmScenes' || get().sceneStoryProposalPending?.projectId === projectId))
     // 다시 쓰기 정도(시안 v04) — 선택지나 그 이름을 말하면 세 가지 안을 만든다. 다른 말은 아래처럼 수정안 하나로 간다.
-    const rewriteLevel = stage === 'producer' && (sceneChoices || sceneGate)
+    const rewriteLevel = stage === 'producer' && !imageFirst && (sceneChoices || sceneGate)
       ? rewriteLevelOf(trimmed, contentLocale()) ?? rewriteLevelOf(trimmed, useLocaleStore.getState().locale)
       : null
     if (rewriteLevel) {
@@ -2019,7 +2040,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (!ok) set({ error: reply })
       return
     }
-    if (stage === 'producer' && (sceneChoices || sceneGate) && writerInputRoute(trimmed, { sceneGate: true, running: false, explicitRevision: !sceneChoices && !writerProse }) === 'revise') {
+    if (stage === 'producer' && !imageFirst && (sceneChoices || sceneGate) && writerInputRoute(trimmed, { sceneGate: true, running: false, explicitRevision: !sceneChoices && !writerProse }) === 'revise') {
       if (isCancellationUtterance(trimmed) && sceneChoices) { get().dismissSuggestion({ implicit: true }); return }
       get().dismissSuggestion({ implicit: true })
       set({ error: null })
