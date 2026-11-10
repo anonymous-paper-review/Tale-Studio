@@ -4,7 +4,7 @@ import { seriesBlock } from '@/lib/writer/pipeline/series-block';
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import { NarrativeStructureSchema } from '@/lib/writer/pipeline/schemas';
 import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
-import { foldActs, isShortRuntime, SHORT_RUNTIME_MAX_ACTS, SHORT_RUNTIME_SECONDS } from '@/lib/writer/pipeline/runtime-fit';
+import { foldActs, isShortRuntime, shortRuntimeStructureBlock, SHORT_RUNTIME_MAX_ACTS } from '@/lib/writer/pipeline/runtime-fit';
 import type { Genre, NarrativeStructure, PipelineInput, Dramaturgy } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 
@@ -61,13 +61,7 @@ ${outputLanguageClause(input.outputLocale)}`;
 
   // 고른 길이 맞춤(오너 2026-11-10 ③): 15초 이하는 산문을 1~2씬으로 — 씬 수 ≥ 막 수 규칙은 그대로라 막을 1~2개로 쓰게 한다.
   const short = isShortRuntime(input);
-  const shortBlock = short
-    ? `[고른 길이 — ${SHORT_RUNTIME_SECONDS}초 이하]
-사용자가 영상 길이를 ${SHORT_RUNTIME_SECONDS}초 이하로 골랐다. acts 는 1~${SHORT_RUNTIME_MAX_ACTS}개만 쓴다 — 이 길이는 한두 장면짜리 한 순간이다.
-기승전결 · 3막 같은 흐름은 막을 나누지 말고 한두 막 안의 흐름(purpose 문장)으로 담아라. 이 규칙이 "acts 수는 고른 구조를 따른다"보다 먼저다.
-
-`
-    : '';
+  const shortBlock = short ? shortRuntimeStructureBlock() : '';
 
   const userPrompt = `${dramaturgyBlock}${changeLevelBlock(input)}${seriesBlock(input)}[스토리]
 ${input.story}

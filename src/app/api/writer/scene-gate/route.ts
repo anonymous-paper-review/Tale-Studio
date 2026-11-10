@@ -174,9 +174,10 @@ export async function POST(req: NextRequest) {
             const basis = rewriteBasis(state, proposal.conditions)
             state.input = basis.input
             if (basis.genre) state.genre = basis.genre
-            if (proposal.level !== 'rethink' && variant.narrativeStructure) state.narrativeStructure = variant.narrativeStructure
             state._proseSeed = proposal.conditions.seed
           }
+          // 안이 구조를 들고 오면(길이를 바꿨거나 15초 이하 옛 초안의 막을 합쳤을 때) 그 구조로 — 씬의 막 참조와 맞춘다(검토 a 2026-11-10).
+          if (proposal.level !== 'rethink' && variant.narrativeStructure) state.narrativeStructure = variant.narrativeStructure
           if (proposal.level === 'rethink') {
             // 아이디어부터 다시 — 그 안의 이야기 엔진 · 구조 · 인물 · 장소로 바꾼다. 지난 초안의 수정 요청은 더 이상 맞지 않는다.
             state.dramaturgy = variant.dramaturgy ?? undefined

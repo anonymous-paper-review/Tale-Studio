@@ -6,6 +6,7 @@ vi.mock('@/lib/writer/llm/local', () => ({ localGenerateJson: mocks.generate }))
 
 import { runNarrativeStructure } from '@/lib/writer/pipeline/stages/s1_structure'
 import { runScenes } from '@/lib/writer/pipeline/stages/s3_scenes'
+import { runStructureScenesMerged } from '@/lib/writer/pipeline/stages/s1s3_merged'
 import type { Characters, Genre, NarrativeStructure, PipelineInput, Scenes } from '@/lib/writer/types/pipeline'
 import type { PipelineLogger } from '@/lib/writer/logger'
 
@@ -107,5 +108,45 @@ describe('15초 이하 산문 — 씬 수', () => {
     const result = await runScenes(input({ runtimeSeconds: 60 }), genre(60), actsOf(['act_1', 'act_2', 'act_3']), cast, undefined, logger, S)
     expect(mocks.generate).toHaveBeenCalledTimes(1)
     expect(result.scenes).toHaveLength(4)
+  })
+})
+
+describe('15초 이하 산문 — 합친 산문 경로(구조와 씬을 한 번에 쓰는 실험 스위치)', () => {
+  const merged = (structure: NarrativeStructure, list: ReturnType<typeof scene>[]) => ({ narrative_structure: structure, ...scenesOf(list), new_characters: [] })
+
+  // 왜: 스위치(WRITER_MERGE_S1S3)를 켜도 15초 약속이 같아야 한다 — 구조와 씬이 한 번에 나와 4막이면 씬의 막 참조도 함께 옮긴다(검토 a 2026-11-10).
+  it('합친 산문 경로에서도 15초 이하면 이야기 구조를 막 1~2개로 쓰게 하고, 막이 3개 이상이면 앞뒤 두 막으로 합쳐 씬의 막 참조도 옮긴다', async () => {
+    mocks.generate.mockResolvedValueOnce(merged(FOUR_ACTS, [scene('scene_1', 'ki', 7, ['민호가 동전을 넣는다.']), scene('scene_2', 'ketsu', 8, ['캔이 쏟아진다.', '민호가 웃는다.'])]))
+    const result = await runStructureScenesMerged(input({ runtimeSeconds: 15 }), genre(15), cast, undefined, logger, S)
+    expect(prompt(0)).toContain('[고른 길이 — 15초 이하]')
+    expect(result.narrativeStructure.acts.map((a) => a.act_id)).toEqual(['ki', 'ten'])
+    expect(result.scenes.scenes.map((s) => s.act_ref)).toEqual(['ki', 'ten'])
+  })
+
+  // 왜: 오너 ③ "15초 이하는 산문을 1~2씬으로" — 합친 경로도 씬이 3개 이상이면 한 번 고쳐 쓰게 한다.
+  it('합친 산문 경로에서도 15초 이하면 씬은 2개까지이고, 넘으면 씬 수를 고쳐 쓰게 한 번 더 부른다', async () => {
+    const two = actsOf(['act_1', 'act_2'])
+    mocks.generate
+      .mockResolvedValueOnce(merged(two, [scene('scene_1', 'act_1', 5, ['민호가 동전을 넣는다.']), scene('scene_2', 'act_2', 5, ['캔이 쏟아진다.']), scene('scene_3', 'act_2', 5, ['민호가 웃는다.'])]))
+      .mockResolvedValueOnce(merged(two, [scene('scene_1', 'act_1', 7, ['민호가 동전을 넣는다.']), scene('scene_2', 'act_2', 8, ['캔이 쏟아진다.', '민호가 웃는다.'])]))
+    const result = await runStructureScenesMerged(input({ runtimeSeconds: 15 }), genre(15), cast, undefined, logger, S)
+    expect(mocks.generate).toHaveBeenCalledTimes(2)
+    expect(prompt(1)).toContain('씬 수 3개')
+    expect(result.scenes.scenes).toHaveLength(2)
+  })
+
+  // 왜: 정상 경로 고정 — 합친 경로도 15초보다 긴 길이는 지금 규칙 그대로다.
+  it('합친 산문 경로에서 15초보다 길게 골랐으면 구조 지시와 막 수 · 씬 수 검사는 지금과 같다', async () => {
+    mocks.generate.mockResolvedValueOnce(merged(FOUR_ACTS, [
+      scene('scene_1', 'ki', 15, ['민호가 동전을 넣는다.', '민호가 버튼을 누른다.']),
+      scene('scene_2', 'sho', 15, ['캔이 쏟아진다.', '민호가 놀란다.']),
+      scene('scene_3', 'ten', 15, ['민호가 캔을 줍는다.', '민호가 웃는다.']),
+      scene('scene_4', 'ketsu', 15, ['민호가 캔을 안고 걷는다.', '민호가 뒤돌아본다.']),
+    ]))
+    const result = await runStructureScenesMerged(input({ runtimeSeconds: 60 }), genre(60), cast, undefined, logger, S)
+    expect(prompt(0)).not.toContain('[고른 길이')
+    expect(mocks.generate).toHaveBeenCalledTimes(1)
+    expect(result.narrativeStructure.acts).toHaveLength(4)
+    expect(result.scenes.scenes).toHaveLength(4)
   })
 })

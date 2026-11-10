@@ -168,10 +168,11 @@ describe('고른 길이 맞춤 — 샷 나누기', () => {
   })
 
   // 왜: 넘은 씬이 여럿이면 가장 많이 넘은 씬을 먼저 줄인다. 그것만으로 고른 길이 안에 들면 나머지는 AI 를 더 부르지 않는다.
+  //   기본 동시 처리(4)로 돈다 — 동시에 다시 나누면 합이 들어온 뒤에도 남은 씬까지 불렀다(검토 a 2026-11-10: 5번 · 14초).
   it('많이 넘은 씬부터 다시 나누고, 합이 고른 길이 안으로 들어오면 남은 씬은 다시 나누지 않는다', async () => {
     const three = { scenes: [scene('scene_a', 5, ['a']), scene('scene_b', 5, ['b']), scene('scene_c', 5, ['c'])], total_estimated_seconds: 15 }
     answer({ scene_a: [[6], [5]], scene_b: [[9], [4]], scene_c: [[5]] })
-    const result = await runOn(three, 15, { concurrency: 1 })
+    const result = await runOn(three, 15)
     expect(mocks.generateJson).toHaveBeenCalledTimes(4)
     expect(mocks.prompts[3]).toContain('scene_id=scene_b')
     expect(total(result.plan)).toBe(15)

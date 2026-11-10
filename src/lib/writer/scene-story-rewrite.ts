@@ -11,6 +11,7 @@ import { runDramaturgySafe } from '@/lib/writer/pipeline/stages/s0_dramaturgy'
 import { runNarrativeStructure } from '@/lib/writer/pipeline/stages/s1_structure'
 import { conditionNote, rethinkStory, rewriteNote } from '@/lib/writer/pipeline/rewrite/instructions'
 import { rewriteBasis } from '@/lib/writer/prose-conditions'
+import { foldActsWithMap, isShortRuntime, remapActRefs, SHORT_RUNTIME_MAX_ACTS } from '@/lib/writer/pipeline/runtime-fit'
 import { castContractToCharacters } from '@/lib/writer/cast-contract'
 import { resolveModels } from '@/lib/writer/pipeline'
 import { PipelineLogger } from '@/lib/writer/logger'
@@ -45,15 +46,20 @@ async function writeVariant(state: WriterRunState, proposal: SceneStoryProposal,
   }
   if (!state.narrativeStructure || !state.characters) throw new Error('Missing scene generation context')
   // 러닝타임이 바뀌면 씬 수 · 흐름이 달라진다 — 지금 이야기 엔진으로 구조부터 새 길이에 맞춰 다시 잡는다.
-  const narrativeStructure = basis.runtimeChanged
+  const carried = basis.runtimeChanged
     ? await runNarrativeStructure(basis.input, genre, logger, model, state.dramaturgy ?? null)
     : state.narrativeStructure
+  // 15초 이하인데 들고 온 구조가 3막 이상이면(이 규칙 전 초안) 앞뒤 두 막으로 합쳐 쓴다 — 씬 2개 상한과 막 수가 부딪치지 않게.
+  //   기준 초안의 막 참조도 합친 막으로 옮겨 준다(검토 a 2026-11-10). 합친 구조는 안에 실어 적용 때 같이 저장된다.
+  const fold = isShortRuntime(basis.input) ? foldActsWithMap(carried, SHORT_RUNTIME_MAX_ACTS) : null
+  const narrativeStructure = fold ? fold.structure : carried
+  const baseScenes = fold && proposal.baseScenes ? remapActRefs(proposal.baseScenes, fold.actIdMap) : proposal.baseScenes
   const scenes = await runScenes(
     basis.input, genre, narrativeStructure, state.characters, state.world, logger, model,
     [...(state._sceneRevisionNotes ?? []), ...conditionNotes, rewriteNote(proposal.level ?? 'reword', variant.direction)],
-    state.dramaturgy ?? null, proposal.baseScenes,
+    state.dramaturgy ?? null, baseScenes,
   )
-  return basis.runtimeChanged ? { status: 'ready', scenes, narrativeStructure } : { status: 'ready', scenes }
+  return narrativeStructure !== state.narrativeStructure ? { status: 'ready', scenes, narrativeStructure } : { status: 'ready', scenes }
 }
 
 /** 최신 실행에 안 하나의 결과만 얹는다. 같은 수정안 · 같은 실행 · 아직 만드는 중인 칸일 때만. */

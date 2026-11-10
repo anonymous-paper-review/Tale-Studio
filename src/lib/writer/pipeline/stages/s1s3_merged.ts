@@ -32,6 +32,7 @@ import { assertSceneContent } from '@/lib/writer/pipeline/validators/scene_conte
 import type { Genre, NarrativeStructure, Characters, Scenes, PipelineInput, BackgroundContract, StoryScene, NewCharacter } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
 import { MergedRawSchema } from '@/lib/writer/pipeline/schemas';
+import { foldActsWithMap, isShortRuntime, remapActRefs, shortRuntimeStructureBlock, SHORT_RUNTIME_MAX_ACTS, SHORT_RUNTIME_MAX_SCENES } from '@/lib/writer/pipeline/runtime-fit';
 
 // 병합 1콜의 원시 출력 형태 — 구조와 씬이 한 응답에 같이 나온다(E13 win: 접합부가 구조적으로 소멸).
 interface MergedRaw {
@@ -141,7 +142,7 @@ ${characters.characters.length ? characters.characters.map((c) => `- ${c.id} (${
 [기존 로케이션] (producer 확정 — scene.location에 id 그대로 사용)
 ${world?.locations.length ? world.locations.map((l) => `- ${l.id}${l.name && l.name !== l.id ? ` (${l.name})` : ''}`).join('\n') : '(없음)'}
 
-[출력 형식 - JSON]
+${isShortRuntime(input) ? shortRuntimeStructureBlock() : ''}[출력 형식 - JSON]
 {
   "narrative_structure": {
     "structure_type": "string",
@@ -173,7 +174,9 @@ export async function runStructureScenesMerged(
   await logger.markStage('structureScenesMerged', 'started');
 
   // 예산표: 막 수 미정 → computeSceneBudget(genre, 1)(주입·검증 공통). act 하한은 커버리지 규칙 대체(E13 동일).
-  const budget = computeSceneBudget(genre, 1);
+  //   고른 길이 맞춤(오너 2026-11-10 ③, 검토 a): 15초 이하는 2-콜 경로와 같은 약속 — 씬 2개까지, 막 1~2개.
+  const short = isShortRuntime(input);
+  const budget = computeSceneBudget(genre, 1, short ? { maxScenes: SHORT_RUNTIME_MAX_SCENES } : undefined);
   const system = buildSystem(genre, budget) + outputLanguageClause(input.outputLocale);
   const user = buildUser(input, genre, characters, world);
 
@@ -187,8 +190,14 @@ export async function runStructureScenesMerged(
     provider: axisConfig.provider,
   });
 
-  const narrativeStructure: NarrativeStructure = raw.narrative_structure;
-  let scenes = toNormalizedScenes(raw, raw.total_estimated_seconds ?? 0, world);
+  // 15초 이하인데 막이 3개 이상이면 앞뒤 두 막으로 합치고, 씬의 막 참조도 합친 막으로 옮긴다(교정 응답도 같은 지도로).
+  const fold = short ? foldActsWithMap(raw.narrative_structure, SHORT_RUNTIME_MAX_ACTS) : null;
+  const narrativeStructure: NarrativeStructure = fold ? fold.structure : raw.narrative_structure;
+  const normalize = (r: MergedRaw, fallbackTotal: number) => {
+    const normalized = toNormalizedScenes(r, fallbackTotal, world);
+    return fold ? remapActRefs(normalized, fold.actIdMap) : normalized;
+  };
+  let scenes = normalize(raw, raw.total_estimated_seconds ?? 0);
 
   // 막 커버리지 자기검증(이관): 누락 막이 있으면 구조를 고정한 채 scenes 만 재배분 1회 교정.
   //   커버리지가 더 나은 쪽만 채택(현행 S3 repair 패턴). E13 실측상 8회 전부 0이라 대개 미발동.
@@ -207,7 +216,7 @@ ${JSON.stringify(narrativeStructure, null, 2)}`;
       model: describeAxisConfig(axisConfig),
       provider: axisConfig.provider,
     });
-    const repairedScenes = toNormalizedScenes(repaired, scenes.total_estimated_seconds, world);
+    const repairedScenes = normalize(repaired, scenes.total_estimated_seconds);
     if (uncoveredActs(repairedScenes, narrativeStructure).length < uncovered.length) {
       scenes = repairedScenes;
       uncovered = uncoveredActs(scenes, narrativeStructure);
@@ -232,7 +241,7 @@ ${JSON.stringify(narrativeStructure, null, 2)}`;
       model: describeAxisConfig(axisConfig),
       provider: axisConfig.provider,
     });
-    const repairedNorm = toNormalizedScenes(budgetRepaired, scenes.total_estimated_seconds, world);
+    const repairedNorm = normalize(budgetRepaired, scenes.total_estimated_seconds);
     if (
       uncoveredActs(repairedNorm, narrativeStructure).length <= uncovered.length &&
       validateSceneBudget(repairedNorm, budget).length < budgetViolations.length

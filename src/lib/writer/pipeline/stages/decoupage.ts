@@ -517,7 +517,8 @@ export async function runDecoupage(
   }
 
   // 고른 길이 맞춤 — 샷 길이 합이 고른 길이를 넘으면 산문이 준 씬 시간을 넘은 씬만 샷을 줄여 한 번 더 나눈다
-  //   (많이 넘은 씬부터, 합이 고른 길이 안으로 들어오면 그만). 다시 나눈 쪽이 짧을 때만 바꾸고, 다시 나눈 씬은
+  //   (많이 넘은 씬부터 한 씬씩, 합이 고른 길이 안으로 들어오면 그만 — 동시에 돌리면 앞 씬 결과로 합이 들어온 뒤에도
+  //   남은 씬까지 불렀다, 검토 a 2026-11-10). 다시 나눈 쪽이 짧을 때만 바꾸고, 다시 나눈 씬은
   //   표시해 이어달리기(resume) 때 또 부르지 않는다. 착수 게이트 · 패스당 최소 1단위 진행은 위 워커와 같은 관용구 —
   //   이 패스가 아무것도 안 했으면 첫 다시 나누기는 예산과 무관하게 착수한다(러너가 부분 반환마다 attempt 를 리셋하므로).
   if (fit) {
@@ -565,7 +566,7 @@ export async function runDecoupage(
         );
       }
     };
-    await Promise.all(Array.from({ length: concurrency }, () => retryWorker()));
+    await retryWorker();
     if (retryQueue.length > 0) {
       return { done: false, scenes: scenes.scenes.map((sc) => doneById.get(sc.scene_id)!) };
     }
