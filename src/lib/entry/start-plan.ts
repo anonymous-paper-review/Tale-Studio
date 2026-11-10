@@ -2,7 +2,8 @@
 //   시작 라우트가 검사 · 저장에 쓰고, 클라이언트는 돌려받은 Writer 시작 요청을 그대로 /api/writer/start 에 보낸다
 //   (예전 Producer 의 트리트먼트 초안 시작과 같은 모양 — producer-store startTreatment).
 //   시리즈 다음 화(2026-10-26)는 앞 화에서 이어받은 인물 · 배경을 카드 초안에 싣고 대사 언어를 앞 화로 잠근다.
-//   약속: tests/producer/entry-start-plan.test.ts · tests/producer/entry-series.test.ts
+//   그대로(keep)는 대사 언어를 원고 언어로 둔다(2026-11-10 오너).
+//   약속: tests/producer/entry-start-plan.test.ts · tests/producer/entry-series.test.ts · tests/producer/entry-keep-dialogue-language.test.ts
 import { depthLevelFromRuntime } from '@/lib/depth'
 import type { DepthLevel } from '@/lib/writer/types/pipeline'
 import { translate } from '@/lib/i18n/translate'
@@ -10,6 +11,8 @@ import type { AppLocale } from '@/lib/locale'
 import type { BackgroundSource, CastMember } from '@/lib/producer-gate'
 import { writerRuntimeSeconds } from '@/lib/producer/runtime'
 import type { SeriesSnapshot } from '@/lib/series/snapshot'
+import { manuscriptDialogueLanguage, parseDialogueLanguage } from '@/lib/writer/pipeline/util/output-language'
+import { parseScript } from '@/lib/writer/script/parse'
 import type { ProducerDraft } from '@/stores/producer-store'
 import type { ProjectFormat, ProjectSettings } from '@/types/project'
 import {
@@ -113,6 +116,13 @@ export function entryStory(draft: EntryDraft): string {
   return [idea, fileText].filter(Boolean).join('\n\n')
 }
 
+/** 원고에서 인물이 말하는 글 — 대본 꼴로 읽히면 대사 줄만(장면 머리 · 인물 이름 · 지문은 빼고), 아니면 글 전체(만화 글자 · 산문). */
+function spokenText(story: string): string {
+  const doc = parseScript(story, { assumeScript: true })
+  const lines = doc?.scenes.flatMap((scene) => scene.elements.flatMap((el) => (el.type === 'dialogue' ? [el.text] : []))) ?? []
+  return lines.length > 0 ? lines.join('\n') : story
+}
+
 const UNTITLED = 'Untitled'
 
 export function planEntryStart({ projectId, draft, locale, currentTitle, series = null }: EntryStartInput): EntryStartPlan {
@@ -130,7 +140,10 @@ export function planEntryStart({ projectId, draft, locale, currentTitle, series 
   const format = formatFromRatio(ratio)
   const genre = translate(locale, moodOf(mood).label)
   // 대사 언어는 앞 화를 따른다 — 언어가 바뀌면 이어받은 말투를 쓸 수 없다(2026-10-26 오너 확정).
-  const settings: ProjectSettings = { playtime, genre, format, tone: [], dialogueLanguage: series?.dialogueLanguage ?? locale }
+  //   그대로는 원고 언어 그대로 둔다 — 화면 언어로 옮기지 않는다(2026-11-10 오너 "'그대로'의 약속대로"). 원고 언어를 모르면 프로젝트 언어.
+  //   원고에 프로젝트 언어가 열에 셋 이상이면 프로젝트 언어를 지킨다 — 섞인 효과음 · 제목 · 장면 머리로 바뀌지 않게(검토 C 2026-11-10).
+  const dialogueLanguage = series?.dialogueLanguage ?? (keep ? manuscriptDialogueLanguage(spokenText(story), parseDialogueLanguage(locale)) : null) ?? locale
+  const settings: ProjectSettings = { playtime, genre, format, tone: [], dialogueLanguage }
   const inherited = seriesCards(series)
   const producerDraft: ProducerDraft = {
     version: PRODUCER_DRAFT_VERSION,
