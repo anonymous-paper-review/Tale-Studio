@@ -7,6 +7,9 @@
 //   2026-11-10(qa1110 C12): 이름 안에 id 낱말이 든 인물(The Keeper · keeper)은 바꿀 때마다 "The The Keeper"로 겹쳤다 —
 //   이미 이름이 쓰인 자리 안의 id 낱말은 다시 바꾸지 않고, 관사로 시작하는 이름 앞에 겹친 관사는 하나로 걷는다
 //   (예전에 겹쳐 저장된 산문도 보일 때 바로잡힌다). 표시용 replaceSlugs(script-lines)도 같은 두 규칙을 쓴다.
+//   2026-11-10(qa1110 R2): 대본 그대로의 배경 번호는 장면 머리 글자 그대로(BUS · COUNTRY ROAD)라 대소문자를 가리지 않고 바꾸면
+//   문장 속 보통 낱말 "bus"가 "BUS"가 됐다(저장 글 · 그림 프롬프트까지). 슬러그 꼴이 아닌 번호는 글자 그대로일 때만 바꾸고,
+//   번호와 이름이 대소문자만 다르면 바꾸지 않는다(keyRule). 슬러그 꼴 번호 · 인물은 지금처럼 대소문자를 가리지 않는다.
 import { fixKoreanParticles } from '@/lib/korean-particles'
 
 interface NamedEntity {
@@ -19,6 +22,20 @@ const GENERIC_WORD_IDS = new Set(['location', 'loc'])
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** 슬러그 꼴 id(소문자 · 숫자 · 밑줄 · 붙임표 — char_2 · bus_stop · maya)인가. 아니면 장면 머리 글자 그대로의 번호(BUS · COUNTRY ROAD)다. */
+export function isSlugId(id: string): boolean {
+  return /^[a-z0-9_-]+$/.test(id.trim())
+}
+
+/** 번호를 어떻게 찾나 — 'any' = 대소문자 가리지 않음(슬러그 꼴), 'exact' = 글자 그대로만(장면 머리 번호),
+ *  'skip' = 바꾸지 않음(장면 머리 번호와 이름이 대소문자만 다름 — 바꿔도 대소문자만 바뀐다). */
+export function keyRule(id: string, name: string): 'any' | 'exact' | 'skip' {
+  const key = id.trim()
+  if (isSlugId(key)) return 'any'
+  const label = name.trim()
+  return label !== key && label.toLowerCase() === key.toLowerCase() ? 'skip' : 'exact'
 }
 
 /** text 안에 이름이 이미 그대로 쓰인 자리들([시작, 끝)) — 대소문자 그대로. 경계는 id 토큰과 같은 영숫자 기준이라
@@ -77,10 +94,15 @@ export function resolveEntityNames(
   if (entities.length === 0) return text
 
   const byId = new Map<string, string>()
+  // 장면 머리 번호(슬러그 꼴 아님)는 글자 그대로일 때만 — 소문자로 찾은 토큰이 이 원래 글자와 같아야 바꾼다.
+  const exactIds = new Map<string, string>()
   for (const e of entities) {
     if (!e.id || !e.name?.trim()) continue
     const id = e.id.trim().toLowerCase()
     if (!id) continue
+    const rule = keyRule(e.id, e.name)
+    if (rule === 'skip') continue
+    if (rule === 'exact') exactIds.set(id, e.id.trim())
     byId.set(id, e.name.trim())
   }
   // 정확한 등록 ID를 모두 먼저 채운다. 다른 인물의 별칭이 실제 ID를 덮어쓰지 않는다.
@@ -106,6 +128,9 @@ export function resolveEntityNames(
     if (GENERIC_WORD_IDS.has(lower) && !/^[가-힣]/.test(whole.slice(offset + token.length))) return token // i18n-ok: 한글 범위 판정
     // 이미 쓰인 이름 안의 id 낱말(The Keeper 의 Keeper)은 그대로 — 또 바꾸면 "The The Keeper".
     if (insideWrittenName(written, offset, token.length)) return token
+    // 장면 머리 번호(BUS)는 글자 그대로 쓴 자리만 — 문장 속 보통 낱말 "bus"는 그대로.
+    const exact = exactIds.get(lower)
+    if (exact !== undefined && token !== exact) return token
     return byId.get(lower) ?? token
   })
   out = collapseDoubledArticles(out, names)

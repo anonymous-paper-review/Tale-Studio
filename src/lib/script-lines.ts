@@ -7,7 +7,7 @@ import {
 } from '@/lib/card-mention'
 import type { DialogueLine, Scene, SceneManifest, Shot } from '@/types'
 import { fixKoreanParticles } from '@/lib/korean-particles'
-import { collapseDoubledArticles, insideWrittenName, writtenNameSpans } from '@/lib/writer/resolve-entity-names'
+import { collapseDoubledArticles, insideWrittenName, keyRule, writtenNameSpans } from '@/lib/writer/resolve-entity-names'
 import { boardShotLabels, boardShots } from '@/lib/writer/board-summary'
 import { translate } from '@/lib/i18n'
 import type { AppLocale } from '@/lib/locale'
@@ -149,20 +149,29 @@ export function replaceSlugs(
 ): string {
   // #names-in-prose(2026-09-08): 긴 슬러그부터 — 'char_2' 가 'char' 로 오인되지 않게. 치환 뒤 한국어 조사를 맞춘다.
   //   한 번에 바꾼다 — 앞에서 넣은 이름 안의 낱말을 뒤의 짧은 슬러그가 또 바꾸지 않게.
+  //   장면 머리 번호(BUS · COUNTRY ROAD)는 글자 그대로일 때만, 이름과 대소문자만 다르면 바꾸지 않는다(resolveEntityNames 의 keyRule).
   const byId = new Map<string, string>()
+  const exactIds = new Map<string, string>()
   for (const e of [...entries].sort((a, b) => (b.slug?.length ?? 0) - (a.slug?.length ?? 0))) {
     const slug = e.slug?.trim()
     const name = e.name?.trim()
     if (!slug || !name || name === slug) continue
-    if (!byId.has(slug.toLowerCase())) byId.set(slug.toLowerCase(), name)
+    const rule = keyRule(slug, name)
+    if (rule === 'skip') continue
+    if (byId.has(slug.toLowerCase())) continue
+    if (rule === 'exact') exactIds.set(slug.toLowerCase(), slug)
+    byId.set(slug.toLowerCase(), name)
   }
   if (byId.size === 0) return text
   const names = [...new Set(byId.values())]
   const written = writtenNameSpans(text, names)
   const keys = [...byId.keys()].sort((a, b) => b.length - a.length).map(escapeRegExp)
-  let out = text.replace(new RegExp(`(?<![A-Za-z0-9_])(?:${keys.join('|')})(?![A-Za-z0-9_])`, 'gi'), (token, offset: number) =>
-    insideWrittenName(written, offset, token.length) ? token : `${prefix}${byId.get(token.toLowerCase()) ?? token}`,
-  )
+  let out = text.replace(new RegExp(`(?<![A-Za-z0-9_])(?:${keys.join('|')})(?![A-Za-z0-9_])`, 'gi'), (token, offset: number) => {
+    if (insideWrittenName(written, offset, token.length)) return token
+    const exact = exactIds.get(token.toLowerCase())
+    if (exact !== undefined && token !== exact) return token
+    return `${prefix}${byId.get(token.toLowerCase()) ?? token}`
+  })
   out = collapseDoubledArticles(out, names, prefix)
   return prefix === '' ? fixKoreanParticles(out, names) : out
 }
