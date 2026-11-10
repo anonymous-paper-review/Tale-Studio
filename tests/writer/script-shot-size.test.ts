@@ -299,3 +299,32 @@ DRIVER: Next stop, the coast.
   })
 })
 
+describe('혼자 정한 것 · 다시 돌리기 R2(리드 2026-11-10)', () => {
+  const elementsOf = (line: string) => parseScript(withLine(line), { assumeScript: true })!.scenes[0].elements
+
+  // 왜: 다시 돌리기 R2(C03) 보통. "TRACKING SHOT down the empty aisle. Maya sits by the window."가 통째로 연출이 되어 3씬에 "She draws…"만 남고
+  //   씬 인물이 비었다(그림에 Maya 가 이어지지 않는다). 카메라 말 뒤가 구분자가 아니라 낱말이라 앞 규칙에 안 걸렸다.
+  it('카메라 말 뒤에 소문자 말이 이어지는 줄도 ". " 다음에 대문자로 시작하는 문장이 오면 그 앞까지는 연출, 뒤는 지문으로 나눈다', () => {
+    const cases: Array<[string, string, string]> = [
+      ['TRACKING SHOT down the empty aisle. Maya sits by the window.', 'TRACKING SHOT down the empty aisle.', 'Maya sits by the window.'],
+      ['PAN ACROSS the room. A cat sleeps.', 'PAN ACROSS the room.', 'A cat sleeps.'],
+    ]
+    for (const [line, camera, action] of cases) {
+      expect(elementsOf(line), line).toContainEqual({ type: 'camera', text: camera })
+      expect(elementsOf(line), line).toContainEqual({ type: 'action', text: action })
+    }
+    expect(parseScript(LAST_BUS, { assumeScript: true })!.scenes[2].characters).toEqual(['maya'])
+  })
+
+  // 왜: 약어의 점은 문장 끝이 아니다. 나누면 "C.U." 가 "C." 와 "U. …" 로 갈리거나 장면 머리가 망가진다.
+  it('약어(C.U. · P.O.V. · INT. · EXT. · 한 글자 + 점)는 문장을 나누는 자리로 보지 않는다', () => {
+    expect(elementsOf('C.U. Maya smiles.')).toContainEqual({ type: 'camera', text: 'C.U.' })
+    expect(elementsOf('C.U. Maya smiles.')).toContainEqual({ type: 'action', text: 'Maya smiles.' })
+    expect(elementsOf('TRACKING SHOT past the U.S. Embassy sign. Maya waves.')).toContainEqual({ type: 'camera', text: 'TRACKING SHOT past the U.S. Embassy sign.' })
+    expect(elementsOf('TRACKING SHOT past the U.S. Embassy sign. Maya waves.')).toContainEqual({ type: 'action', text: 'Maya waves.' })
+    expect(elementsOf('TRACKING SHOT through the EXT. gate. Maya waits.')).toContainEqual({ type: 'camera', text: 'TRACKING SHOT through the EXT. gate.' })
+    const heading = parseScript('INT. BUS - NIGHT\nMaya sits.\n\nMAYA: Finally.\n\nEXT. ROAD - DAY\n\nDRIVER: Hold on.', { assumeScript: true })!
+    expect(heading.scenes.map((scene) => [scene.location, scene.time_of_day])).toEqual([['BUS', 'NIGHT'], ['ROAD', 'DAY']])
+  })
+})
+

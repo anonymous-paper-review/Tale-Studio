@@ -85,7 +85,9 @@ describe('대본 보존 — 씬', () => {
   // 왜: 카메라·트랜지션·화면 문자는 우리 V축이 다시 정하는 영역이라 비트에 섞지 않고 따로 넘겨 "대본의 지시" 로 보이게 한다.
   it('대본의 카메라·편집·화면·소리 지시는 비트가 아니라 씬의 지시 메모(source_directions)로 넘어간다', () => {
     expect(scenes.scenes[0].source_directions).toEqual(['CUT TO:'])
-    expect(scenes.scenes[2].source_directions).toEqual(['PUSH IN on the three figures. Callum reads a verse.', 'FADE TO WHITE.'])
+    // 오너 확인(11/10): 카메라 지시는 지시 메모로 가고, 그 줄의 뒤 문장("Callum reads a verse.")만 씬의 행동(비트)이 된다. 문장은 그대로, 기대값만 맞췄다.
+    expect(scenes.scenes[2].source_directions).toEqual(['PUSH IN on the three figures.', 'FADE TO WHITE.'])
+    expect(scenes.scenes[2].scene_actions).toContain('Callum reads a verse.')
     expect(scenes.scenes[2].scene_actions.some((a) => /PUSH IN/.test(a))).toBe(false)
   })
 
