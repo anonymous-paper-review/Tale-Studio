@@ -319,8 +319,9 @@ function EntryFileDialog() {
               <span>{errorMessage(upload.error)}</span>
             </p>
           ) : null}
-          {/* 그림은 시작한 뒤 Writer 채팅에서 쓴다(2026-11-10 오너 결정 3) — 예전 "다음 버전에서 읽어요"는 할 수 있는 곳을 알려 주지 않았다. */}
-          <p className="text-xs text-muted-foreground">{t('Webtoons, character sheets and reference photos are not read here. Upload pictures in the Writer chat after you start.')}</p>
+          {/* 그림은 시작한 뒤 Writer 채팅에서 쓴다(2026-11-10 오너 결정 3) — 예전 "다음 버전에서 읽어요"는 할 수 있는 곳을 알려 주지 않았다.
+              올리는 자리도 덧붙인다(오너 11/10 저녁) — Writer 는 탭 없이 한 화면이고 오른쪽 채팅의 [+]로 올린다. */}
+          <p className="text-xs text-muted-foreground">{t('Webtoons, character sheets and reference photos are not read here. Upload pictures in the Writer chat after you start. Use the [+] in the chat on the right.')}</p>
           <DialogFooter>
             <Button variant="secondary" onClick={close} disabled={uploading}>
               {t('Close')}
@@ -356,7 +357,7 @@ function NoTextDialog({ tab }: { tab: EntryTab }) {
               : t('There is no readable text in {name}. If it is a scanned PDF, upload the pages as images, or upload a text file.', { name })}
           </DialogDescription>
         </DialogHeader>
-        {image ? <p className="text-xs text-muted-foreground">{t('Upload pictures in the Writer chat after you start. You can use them as comic pages, character or background cards, or the art style.')}</p> : null}
+        {image ? <p className="text-xs text-muted-foreground">{t('Upload pictures in the Writer chat after you start. Use the [+] in the chat on the right. You can use them as comic pages, character or background cards, or the art style.')}</p> : null}
         <DialogFooter>
           <Button variant="secondary" onClick={() => void continueWithoutFile(tab)}>
             {t('Continue without the file')}

@@ -2426,8 +2426,8 @@ export const KO: Record<string, string> = {
   'Text files': '글 파일',
   'Images with text': '글이 담긴 이미지',
   'A photographed script or a memo screenshot': '사진 찍은 대본, 메모 스크린샷',
-  'Webtoons, character sheets and reference photos are not read here. Upload pictures in the Writer chat after you start.':
-    '웹툰 · 캐릭터 시트 · 참조 사진은 여기서 읽지 않아요. 시작한 뒤 Writer 채팅에 그림을 올려 주세요.',
+  'Webtoons, character sheets and reference photos are not read here. Upload pictures in the Writer chat after you start. Use the [+] in the chat on the right.':
+    '웹툰 · 캐릭터 시트 · 참조 사진은 여기서 읽지 않아요. 시작한 뒤 Writer 채팅에 그림을 올려 주세요. 오른쪽 채팅의 [+]로 올리면 돼요.',
   "This file can't be uploaded. You can upload txt · md · docx · pdf · hwp, or png · jpg that contain text.": '이 파일은 올릴 수 없어요. txt · md · docx · pdf · hwp 또는 글이 담긴 png · jpg만 올릴 수 있어요.',
   '"{name}" is larger than 10MB. Please upload one of 10MB or less.': '"{name}"은(는) 10MB가 넘어요. 10MB 이하로 올려 주세요.',
   '"{name}" is empty.': '"{name}"은(는) 비어 있어요.',
@@ -2442,8 +2442,8 @@ export const KO: Record<string, string> = {
   "Couldn't find text in the file": '파일에서 글을 찾지 못했어요',
   'There is no readable text in {name}. Upload an image where text is visible, or a text file.': '{name}에서 읽을 수 있는 글이 없어요. 글이 보이는 이미지나 글 파일을 올려 주세요.',
   'There is no readable text in {name}. If it is a scanned PDF, upload the pages as images, or upload a text file.': '{name}에서 읽을 수 있는 글이 없어요. 스캔한 PDF라면 쪽을 이미지로 올리거나 글 파일을 올려 주세요.',
-  'Upload pictures in the Writer chat after you start. You can use them as comic pages, character or background cards, or the art style.':
-    '시작한 뒤 Writer 채팅에 그림을 올려 주세요. 만화 원고 · 인물 · 배경 카드 · 그림체로 쓸 수 있어요.',
+  'Upload pictures in the Writer chat after you start. Use the [+] in the chat on the right. You can use them as comic pages, character or background cards, or the art style.':
+    '시작한 뒤 Writer 채팅에 그림을 올려 주세요. 오른쪽 채팅의 [+]로 올리면 돼요. 만화 원고 · 인물 · 배경 카드 · 그림체로 쓸 수 있어요.',
   'Continue without the file': '파일 빼고 진행',
   'Upload another file': '다른 파일 올리기',
   // AI 작업 중 잠금 화면
