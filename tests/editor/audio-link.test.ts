@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { selectTimelineLayout, useEditorStore } from '@/stores/editor-store'
 import { useProjectStore } from '@/stores/project-store'
 import { finishEditorOpen } from '@/features/editor/open-editor'
+import { compactSnapshot } from '@/lib/editor/peaks'
 import type { PersistedEditor } from '@/lib/editor-persistence'
 import type { AudioTrackClip, Shot, VideoClip } from '@/types'
 
@@ -42,6 +43,24 @@ function seed() {
 }
 const audio = (id: string) => api().audioClips.find((a) => a.id === id)
 const linkedTo = (shotId: string) => api().audioClips.filter((a) => a.linkedShotId === shotId)
+
+/** 이음 칸이 없던 때(이번 고침 전)의 소리 조각 — 처음 나눈 대로 영상 하나에 하나. */
+const old = (name: string, startSec: number): AudioTrackClip => ({ id: `a_${name}`, name, url: `https://video.test/${name}.mp4`, startSec, durationSec: 5, peaks: [0.5], sourceOffsetSec: 0, sourceDurationSec: 5, volume: 1, muted: false, trackId: 'atrack_1' })
+function saveSnapshot(over: Partial<PersistedEditor>) {
+  vi.stubGlobal('window', {})
+  const saved: PersistedEditor = {
+    version: 1, shots: [shot('sh_1'), shot('sh_2'), shot('sh_3')], clipOrder: { sc_01: ['sh_1', 'sh_2', 'sh_3'] },
+    videoClips: [clip('sh_1'), clip('sh_2'), clip('sh_3')], audioClips: [], audioSources: [], audioTracks: [{ id: 'atrack_1' }],
+    panelSizes: { sourceW: 260, previewH: 240 }, ...over,
+  }
+  localStorage.setItem(`tale:editor:v1:${PROJECT_ID}`, JSON.stringify(saved))
+}
+/** DB 에서 다시 읽은 원본(샷 3개 · 5초 · 손대지 않음) 위에, 타임라인 순서 · 소리 · 저장해 둔 영상 칸만 다른 저장본을 둔다. */
+function restoreFrom(order: string[], audioClips: AudioTrackClip[], savedVideo?: VideoClip[]) {
+  api().reset()
+  useEditorStore.setState({ shots: [shot('sh_1'), shot('sh_2'), shot('sh_3')], videoClips: [clip('sh_1'), clip('sh_2'), clip('sh_3')], clipOrder: { sc_01: ['sh_1', 'sh_2', 'sh_3'] } })
+  saveSnapshot({ clipOrder: { sc_01: order }, audioClips, ...(savedVideo ? { videoClips: savedVideo } : {}) })
+}
 
 beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 200 })))
@@ -191,35 +210,91 @@ describe('소리 조각을 직접 만질 때만 영상에서 떨어진다', () =
     api().deleteClip('sh_1')
     expect(audio(ids.sh_2)?.startSec).toBe(0)
   })
+it('소리 조각을 2px 안으로만 흔들거나 자리가 소수점 끝자리만 달라지면 제자리로 보고 영상에서 떼지 않는다', () => {
+    // 왜: 누르기만 해도 손이 몇 px 흔들리거나 초를 다시 계산하며 끝자리가 달라져(15.4 → 15.399999999999999) 이음이 끊겼다 — 누르기의 약 8~10%(검토 b).
+    const ids = seed()
+    const at = audio(ids.sh_3)?.startSec as number
+    api().moveAudioClip(ids.sh_3, at + 1e-9)
+    api().moveAudioClip(ids.sh_3, at - 1e-12)
+    expect(audio(ids.sh_3)).toMatchObject({ linkedShotId: 'sh_3', startSec: at })
+    // 화면: 소리 몸통을 끌 때도 손잡이처럼 2px 를 넘겨야 옮기기로 본다.
+    expect(read('src/features/editor/timeline.tsx')).toMatch(/if \(!moved && Math\.hypot\(ev\.clientX - startX, ev\.clientY - startY\) <= 2\) return/)
+  })
+
+  it('자르기 도구로 나누어도 같은 소리 파일의 파형은 저장본에 한 번만 들어가고, 다시 열면 조각들이 그 파형을 함께 쓴다', async () => {
+    // 왜: 나눌 때마다 소리 파형 전체(약 4,900자)가 한 벌씩 더 저장돼 브라우저 저장 공간을 먹었다(검토 b · 저장 크기 E2a).
+    seed()
+    api().splitVideoClipAt('sh_1', 2)
+    const st = api()
+    const snapshot = compactSnapshot({ version: 1, shots: st.shots, clipOrder: st.clipOrder, videoClips: st.videoClips, audioClips: st.audioClips, audioSources: st.audioSources, audioTracks: st.audioTracks, panelSizes: st.panelSizes })
+    const sameFile = snapshot.audioClips.filter((a) => a.url === 'https://video.test/sh_1.mp4')
+    expect(sameFile).toHaveLength(2)
+    expect(sameFile.filter((a) => a.peaks?.length)).toHaveLength(1)
+    // 다시 열면 파형이 빠진 조각도 같은 파일의 파형을 쓴다.
+    api().reset()
+    useEditorStore.setState({ shots: [shot('sh_1'), shot('sh_2'), shot('sh_3')], videoClips: [clip('sh_1'), clip('sh_2'), clip('sh_3')], clipOrder: { sc_01: ['sh_1', 'sh_2', 'sh_3'] } })
+    saveSnapshot(snapshot)
+    expect(await api().loadPersisted()).toBe(true)
+    expect(api().audioClips.filter((a) => a.url === 'https://video.test/sh_1.mp4').map((a) => a.peaks)).toEqual([[0.5], [0.5]])
+  })
 })
 
 describe('다시 열 때 · 새로 더할 때', () => {
-  it('이미 나눠 둔 프로젝트를 다시 열면 영상과 자리가 맞는 소리(같은 파일 · 같은 시작 · 같은 길이)만 잇고, 어긋난 소리는 옮기지 않는다', async () => {
-    // 왜: 이번 고침 전에 저장한 편집에는 이음 칸이 없다. 이미 어긋난 소리를 몰래 옮기면 사람이 맞춘 자리일 수도 있는 것을 바꾼다.
-    //   고장 재현 모양: 샷 2 를 숨겨 영상은 당겨졌는데 샷 3 소리가 10초에 남은 저장본(11/10 점검 C01).
-    vi.stubGlobal('window', {})
-    api().reset()
-    useEditorStore.setState({ shots: [shot('sh_1'), shot('sh_2'), shot('sh_3')], videoClips: [clip('sh_1'), clip('sh_2'), clip('sh_3')], clipOrder: { sc_01: ['sh_1', 'sh_2', 'sh_3'] } })
-    const old = (name: string, startSec: number): AudioTrackClip => ({ id: `a_${name}`, name, url: `https://video.test/${name}.mp4`, startSec, durationSec: 5, peaks: [0.5], sourceOffsetSec: 0, sourceDurationSec: 5, volume: 1, muted: false, trackId: 'atrack_1' })
-    const saved: PersistedEditor = {
-      version: 1,
-      shots: [shot('sh_1'), shot('sh_2'), shot('sh_3')],
-      clipOrder: { sc_01: ['sh_1', 'sh_3'] },
-      videoClips: [clip('sh_1'), clip('sh_2'), clip('sh_3')],
-      audioClips: [old('sh_1', 0), old('sh_2', 5), old('sh_3', 10)],
-      audioSources: [],
-      audioTracks: [{ id: 'atrack_1' }],
-      panelSizes: { sourceW: 260, previewH: 240 },
-    }
-    localStorage.setItem(`tale:editor:v1:${PROJECT_ID}`, JSON.stringify(saved))
+  it('이번 고침 전에 숨기거나 자른 프로젝트를 다시 열면, 처음 나눈 자리 그대로인 소리를 그 샷에 다시 잇고 지금 영상 자리로 옮긴다 — 숨긴 샷 소리는 빠진다', async () => {
+    // 왜: 오너 답(11/10 저녁) "고쳐 준다" — 고침 전에 샷 2 를 숨겨 영상은 당겨졌는데 소리는 처음 나눈 자리(0 · 5 · 10초)에 남은 저장본(11/10 점검 C01 모양).
+    restoreFrom(['sh_1', 'sh_3'], [old('sh_1', 0), old('sh_2', 5), old('sh_3', 10)])
     expect(await api().loadPersisted()).toBe(true)
     expect(audio('a_sh_1')).toMatchObject({ linkedShotId: 'sh_1', startSec: 0 })
-    expect(audio('a_sh_3')).toMatchObject({ linkedShotId: null, startSec: 10 })
-    expect(audio('a_sh_2')).toMatchObject({ linkedShotId: null, startSec: 5 })
-    // 이은 소리만 영상을 따라간다.
-    api().setTrim('sh_1', 0, 4)
-    expect(audio('a_sh_1')?.durationSec).toBe(4)
-    expect(audio('a_sh_3')?.startSec).toBe(10)
+    expect(audio('a_sh_2')).toBeUndefined()
+    expect(audio('a_sh_3')).toMatchObject({ linkedShotId: 'sh_3', startSec: 5 })
+  })
+
+  it('처음 나눈 뒤 클립 끝을 끌어 줄이거나 자르기 도구로 나눴어도, 처음 나눈 자리 그대로인 소리는 다시 이어져 지금 영상 조각을 따라간다', async () => {
+    // 왜: 고침 전에는 영상을 줄이거나 나눠도 소리는 처음 나눈 길이 그대로 남았다 — 다시 이으면 줄인 길이 · 나눈 조각마다 그 구간 소리가 난다.
+    api().reset()
+    useEditorStore.setState({
+      shots: [shot('sh_1'), shot('sh_2'), shot('sh_3')],
+      videoClips: [clip('sh_1'), clip('sh_2', { trimStart: 0, trimEnd: 4 }), clip('sh_3')],
+      clipOrder: { sc_01: ['sh_1', 'sh_2', 'sh_3'] },
+    })
+    saveSnapshot({
+      shots: [shot('sh_1'), shot('sh_1__cab12'), shot('sh_2'), shot('sh_3')],
+      videoClips: [clip('sh_1', { trimStart: 0, trimEnd: 2 }), clip('sh_1__cab12', { url: 'https://video.test/sh_1.mp4', trimStart: 2, trimEnd: 5 }), clip('sh_2', { trimStart: 0, trimEnd: 4 }), clip('sh_3')],
+      clipOrder: { sc_01: ['sh_1', 'sh_1__cab12', 'sh_2', 'sh_3'] },
+      audioClips: [old('sh_1', 0), old('sh_2', 5), old('sh_3', 10)],
+    })
+    expect(await api().loadPersisted()).toBe(true)
+    expect(audio('a_sh_1')).toMatchObject({ linkedShotId: 'sh_1', startSec: 0, durationSec: 2, sourceOffsetSec: 0 })
+    expect(linkedTo('sh_1__cab12')).toEqual([expect.objectContaining({ startSec: 2, durationSec: 3, sourceOffsetSec: 2, url: 'https://video.test/sh_1.mp4' })])
+    expect(audio('a_sh_2')).toMatchObject({ linkedShotId: 'sh_2', startSec: 5, durationSec: 4 })
+    expect(audio('a_sh_3')).toMatchObject({ linkedShotId: 'sh_3', startSec: 9 })
+  })
+
+  it('다시 열 때 사람이 직접 옮기거나 자른 옛 소리는 그대로 두고, 뗀 소리로 적지도 않는다', async () => {
+    // 왜: 오너 답 "사람이 직접 옮기거나 자른 소리는 그대로 둬요" — 처음 나눈 자리와 다른 소리는 사람이 고친 것일 수 있다.
+    //   뗀 소리(null)는 이음을 사람이 끊은 표시라, 잇지 못했을 뿐인 옛 소리에 적으면 다음에도 다시 잇지 못한다.
+    const cutA = { ...old('sh_1', 0), id: 'a_cut_1', durationSec: 2 }
+    const cutB = { ...old('sh_1', 2), id: 'a_cut_2', durationSec: 3, sourceOffsetSec: 2 }
+    restoreFrom(['sh_1', 'sh_2', 'sh_3'], [cutA, cutB, old('sh_2', 12), old('sh_3', 10)])
+    expect(await api().loadPersisted()).toBe(true)
+    expect(audio('a_cut_1')).toMatchObject({ startSec: 0, durationSec: 2 })
+    expect(audio('a_cut_2')).toMatchObject({ startSec: 2, durationSec: 3, sourceOffsetSec: 2 })
+    expect(audio('a_sh_2')).toMatchObject({ startSec: 12 })
+    for (const id of ['a_cut_1', 'a_cut_2', 'a_sh_2']) expect(audio(id)?.linkedShotId).toBeUndefined()
+    expect(audio('a_sh_3')).toMatchObject({ linkedShotId: 'sh_3', startSec: 10 })
+  })
+
+  it('잰 길이로 나눈 저장본도 다시 열면 이어진다 — 저장해 둔 실제 길이와 계획 길이 어느 쪽과 맞아도 잇는다', async () => {
+    // 왜: 11/10 부터는 영상 실제 길이를 잰 뒤 그 자리에 소리를 놓는다. 다시 열 때는 길이를 재기 전이라 계획 길이로만 비교하면 하나도 잇지 못했다(검토 b).
+    //   고장: 계획보다 짧게 나온 영상이 있는 프로젝트를 다시 열 때.
+    const measured = (shotId: string) => clip(shotId, { actualDurationSec: 4.2 })
+    restoreFrom(['sh_1', 'sh_2', 'sh_3'], [{ ...old('sh_1', 0), durationSec: 4.2 }, { ...old('sh_2', 4.2), durationSec: 4.2 }, { ...old('sh_3', 8.4), durationSec: 4.2 }], [measured('sh_1'), measured('sh_2'), measured('sh_3')])
+    expect(await api().loadPersisted()).toBe(true)
+    expect(api().audioClips.map((a) => a.linkedShotId)).toEqual(['sh_1', 'sh_2', 'sh_3'])
+    // 실제 길이를 재기 전 계획 길이로 나눈 옛 저장본도 잇는다.
+    restoreFrom(['sh_1', 'sh_2', 'sh_3'], [old('sh_1', 0), old('sh_2', 5), old('sh_3', 10)], [measured('sh_1'), measured('sh_2'), measured('sh_3')])
+    expect(await api().loadPersisted()).toBe(true)
+    expect(api().audioClips.map((a) => a.linkedShotId)).toEqual(['sh_1', 'sh_2', 'sh_3'])
   })
 
   it('다시 열어 영상 실제 길이를 재어 계획보다 짧으면, 이어진 소리도 그 길이로 맞춰지고 뒤 소리가 당겨진다', () => {

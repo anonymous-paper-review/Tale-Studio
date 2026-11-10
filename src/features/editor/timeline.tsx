@@ -208,8 +208,13 @@ function AudioClipBlock({
       const blockEl = e.currentTarget as HTMLElement
       blockEl.style.pointerEvents = 'none' // elementFromPoint 가 아래 트랙 레인을 보도록
       const startX = e.clientX
+      const startY = e.clientY
       const origStart = clip.startSec
+      let moved = false
       const move = (ev: PointerEvent) => {
+        // 누르기만 해도 손이 몇 px 흔들린다 — 손잡이처럼 2px 를 넘겨야 옮기기로 본다(옮기면 영상에서 떨어진다, 2026-11-10 검토 b).
+        if (!moved && Math.hypot(ev.clientX - startX, ev.clientY - startY) <= 2) return
+        moved = true
         const raw = Math.max(0, origStart + (ev.clientX - startX) / pxPerSec)
         const snapped = snapStart(raw, clip.durationSec, clip.id)
         const overTrack = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('[data-drop="audio-track"]')
