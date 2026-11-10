@@ -5,6 +5,7 @@ import { displayNameOf, humanizeSlug } from '@/lib/display-name';
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import { ScenesSchema } from '@/lib/writer/pipeline/schemas';
 import { computeSceneBudget, renderBudgetBlock, validateSceneBudget } from '@/lib/writer/pipeline/budget';
+import { isShortRuntime, SHORT_RUNTIME_MAX_ACTS, SHORT_RUNTIME_MAX_SCENES } from '@/lib/writer/pipeline/runtime-fit';
 import { SHOT_PHYSICS } from '@/lib/writer/pipeline/physics';
 import { VISUAL_BEAT_DOCTRINE } from '@/lib/writer/pipeline/visual-doctrine';
 import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
@@ -154,7 +155,9 @@ export async function runScenes(
   // 시간 예산 (E3b): 산수는 코드가 — 씬 수·총합·씬당 액션의 정합표를 계산해 주입한다 (독트린 P6).
   //   E3a 실측: 산문 힌트("총합 ≈ N초" + depth별 씬 수)만 주면 장편에서 씬당 액션 3개 고정인 채
   //   씬 초만 부풀었다(M2 9~10배). honest/representative 모드는 budget.ts(정책) 참조.
-  const budget = computeSceneBudget(genre, narrativeStructure.acts.length);
+  //   고른 길이 맞춤(오너 2026-11-10 ③): 15초 이하는 씬 2개까지 — 넘으면 아래 시간 예산 교정이 한 번 고쳐 쓰게 한다.
+  //   들어온 구조가 막 2개 이하일 때만 건다 — 이 규칙 전 4막 초안(씬 하한 4)은 수정 요청 · 씬 다시 쓰기 모두 예전 그대로(검토 a 재검토).
+  const budget = computeSceneBudget(genre, narrativeStructure.acts.length, isShortRuntime(input) && narrativeStructure.acts.length <= SHORT_RUNTIME_MAX_ACTS ? { maxScenes: SHORT_RUNTIME_MAX_SCENES } : undefined);
 
   // #i18n-s5: 미지정(레거시)이면 종전 "스토리와 같은 언어" 관례 그대로 — 지정 시 [출력 언어] 절이 우선.
   const langHint = input.outputLocale ? '[출력 언어] 절이 정한 언어' : '스토리와 같은 언어';

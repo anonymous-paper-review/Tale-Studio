@@ -36,6 +36,8 @@ export interface SceneBudget {
   mode: CoverageMode;
   sceneCountMin: number; // act 커버리지 하한(씬 수 ≥ 막 수) 반영 — E3a: D1 "1씬"은 규칙상 도달 불가였다
   sceneCountMax: number;
+  /** 검증의 씬 수 상한 — 있으면 여유(+2) 없이 이 값을 넘으면 위반(15초 이하 = 2, 고른 길이 맞춤 2026-11-10). */
+  sceneCountHardMax?: number;
   totalSeconds: number;
   totalToleranceRatio: number;
   avgSceneSeconds: number;
@@ -45,23 +47,24 @@ export interface SceneBudget {
   secondsPerAction: number;
 }
 
-export function computeSceneBudget(genre: Genre, actCount: number): SceneBudget {
+export function computeSceneBudget(genre: Genre, actCount: number, opts?: { maxScenes?: number }): SceneBudget {
   const mode: CoverageMode = REPRESENTATIVE_DEPTHS.includes(genre.depth_level) ? 'representative' : 'honest';
   const [hintLo, hintHi] = SCENE_COUNT_RANGE[genre.depth_level] ?? [5, 10];
   const sceneCountMin = Math.max(hintLo, Math.max(1, actCount));
   const sceneCountMax = Math.max(hintHi, sceneCountMin);
+  const hard = opts?.maxScenes !== undefined ? { sceneCountHardMax: opts.maxScenes } : {};
   const secondsPerAction = (SHOT_PHYSICS.shotSecondsMin + SHOT_PHYSICS.shotSecondsMax) / 2 + 1.5; // 6.5
   const totalSeconds = genre.runtime_seconds;
   const avgSceneSeconds = totalSeconds / Math.max(1, Math.round((sceneCountMin + sceneCountMax) / 2));
 
   if (mode === 'representative') {
     const [aMin, aMax] = REPRESENTATIVE_ACTIONS_RANGE;
-    return { mode, sceneCountMin, sceneCountMax, totalSeconds, totalToleranceRatio: 0.1, avgSceneSeconds, actionsPerSceneMin: aMin, actionsPerSceneMax: aMax, secondsPerAction };
+    return { mode, sceneCountMin, sceneCountMax, totalSeconds, totalToleranceRatio: 0.1, avgSceneSeconds, actionsPerSceneMin: aMin, actionsPerSceneMax: aMax, secondsPerAction, ...hard };
   }
   const a = Math.max(1, Math.min(8, Math.round(avgSceneSeconds / secondsPerAction)));
   return {
     mode, sceneCountMin, sceneCountMax, totalSeconds, totalToleranceRatio: 0.1, avgSceneSeconds,
-    actionsPerSceneMin: Math.max(1, a - 1), actionsPerSceneMax: a + 1, secondsPerAction,
+    actionsPerSceneMin: Math.max(1, a - 1), actionsPerSceneMax: a + 1, secondsPerAction, ...hard,
   };
 }
 
@@ -97,7 +100,7 @@ export function validateSceneBudget(scenes: Scenes, b: SceneBudget): BudgetViola
     v.push({ scene_id: null, message: `총합 ${total}초 — 목표 ${b.totalSeconds}초 ±${Math.round(tol)}초 이탈` });
   }
   const n = scenes.scenes.length;
-  if (n < b.sceneCountMin || n > b.sceneCountMax + 2) {
+  if (n < b.sceneCountMin || n > (b.sceneCountHardMax ?? b.sceneCountMax + 2)) {
     v.push({ scene_id: null, message: `씬 수 ${n}개 — 예산 ${b.sceneCountMin}~${b.sceneCountMax}개 이탈` });
   }
   for (const sc of scenes.scenes) {

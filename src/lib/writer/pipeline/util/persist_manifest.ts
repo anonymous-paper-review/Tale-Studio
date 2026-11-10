@@ -21,7 +21,7 @@ import {
   resolveCharacterAppearance,
   type CharacterAppearanceCandidate,
 } from '@/lib/writer/appearance-selection'
-import { reallocateShotDurations } from '@/lib/writer/pipeline/util/duration_reallocation'
+import { fitShotDurationsToRuntime, reallocateShotDurations } from '@/lib/writer/pipeline/util/duration_reallocation'
 import { buildShotDialogueMap } from '@/lib/writer/pipeline/util/dialogue_join'
 import { castSpeakerId, shotDialogueLines } from '@/lib/writer/pipeline/util/dialogue_lines'
 import { isFlagOn } from '@/lib/flags'
@@ -769,6 +769,8 @@ export async function persistShotsToDb(
   // 샷 단위 대사 트랙(#dialogue-v4 2026-07-23) — dialogue 스테이지 산출. null이면 대사 없이 기록
   //   (구 run resume 등). 옛 S.dialogue(무스펙 + chars[0] 화자 추정 + dialogue_summary 폴백)는 폐기.
   dialogue?: DialogueTrack | null,
+  // 고른 길이(초, runtimeFitCap) — 있으면 늘린 뒤 합이 넘을 때 넘는 초만 깎는다(오너 2026-11-10 ③). 없으면 종전 그대로.
+  opts?: { runtimeCapSeconds?: number | null },
 ): Promise<void> {
   if (!UUID_RE.test(projectId)) return // 핸드오프 외 run — DB project 없음
 
@@ -788,7 +790,15 @@ export async function persistShotsToDb(
         realloc.changed.map((c) => `${c.shot_id} ${c.from}→${c.to}s(need ${c.needed})`).join(', '),
     )
   }
-  const seqShots = realloc.shots
+  // 고른 길이 맞춤 안전망(오너 2026-11-10 ③ — 모든 길이 구간): 늘린 합이 고른 길이를 넘으면 넘는 초만 깎는다.
+  const fitted = fitShotDurationsToRuntime(realloc.shots, dialogueByShotId, opts?.runtimeCapSeconds ?? null)
+  if (fitted.changed.length) {
+    console.log(
+      `[persistShotsToDb] 고른 길이 ${opts?.runtimeCapSeconds}초 맞춤: ${fitted.changed.length}샷 깎음 — ` +
+        fitted.changed.map((c) => `${c.shot_id} ${c.from}→${c.to}s(floor ${c.needed})`).join(', '),
+    )
+  }
+  const seqShots = fitted.shots
 
   // appearance_key는 L4/C2가 알 수 없는 DB 이미지 슬롯이다. 샷을 행으로 매핑하기 전에
   // 씬의 서사 시점과 override, 해당 캐릭터의 DB appearance만으로 결정론적으로 해소한다.
