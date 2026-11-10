@@ -68,7 +68,7 @@ const TRANSITION_RE = /^\s*(CUT TO|SMASH CUT(?: TO)?|MATCH CUT(?: TO)?|HARD CUT(
 //   "MEDIUM: …"(영매) 같은 인물 이름일 수 있다. SHOT · CLOSE-UP · ANGLE 이 붙을 때만 샷 말로 본다.
 const SHOT_SIZE_WORDS = String.raw`(?:EXTREME |VERY )?(?:LONG|WIDE) SHOT|FULL SHOT|MEDIUM (?:LONG |WIDE |FULL |CLOSE )?SHOT|MID[- ]SHOT|MEDIUM CLOSE[- ]?UP|CLOSEUP|CLOSE SHOT|COWBOY SHOT|(?:TWO|THREE|2|3)[- ]SHOT|GROUP SHOT|ESTABLISHING(?: SHOT)?|MASTER SHOT|REVERSE SHOT|OVERHEAD(?: SHOT)?|AERIAL(?: SHOT| VIEW)?|BIRD'?S[- ]EYE(?: VIEW| SHOT)?|(?:HIGH|LOW|DUTCH|WIDE) ANGLE|OVER[- ]THE[- ]SHOULDER(?: SHOT)?|P\.O\.V|MCU|HANDHELD|STEADICAM|FREEZE FRAME|SPLIT SCREEN`;
 const SHOT_SIZE_WORDS_KO = String.raw`(?:익스트림 ?)?롱 ?숏|미디엄 ?(?:롱 ?|클로즈 ?)?숏|풀 ?숏|바스트 ?숏|웨이스트 ?숏|니 ?숏|투 ?숏|쓰리 ?숏|설정 ?숏|오버 ?(?:더 ?)?숄더(?: ?숏)?|하이 ?앵글|로우 ?앵글|부감(?: ?숏)?|앙각(?: ?숏)?`;
-const CAMERA_RE = new RegExp(String.raw`^\s*(${SHOT_SIZE_WORDS}|PUSH IN|PULL BACK|PULL OUT|CLOSE ON|CLOSE UP|CLOSE-UP|C\.U(?=\.)|C\/U|ECU|EXTREME CLOSE|WIDE (?:SHOT|ON)|ANGLE ON|REVERSE ANGLE|INSERT(?!\s*[-\u2013\u2014:]?\s*TEXT)|POV|TILT (?:UP|DOWN)|PAN (?:LEFT|RIGHT|TO|UP|DOWN)|TRACKING|DOLLY|ZOOM|CRANE|HOLD ON|HOLD\b|RACK FOCUS|SLOW MOTION|SLOW-MO|THE CAMERA|CAMERA|카메라|클로즈업|푸시 ?인|틸트|팬|트래킹|줌)\b`, 'i');
+const CAMERA_RE = new RegExp(String.raw`^\s*(${SHOT_SIZE_WORDS}|PUSH IN|PULL BACK|PULL OUT|CLOSE ON|CLOSE UP|CLOSE-UP|C\.U(?=\.)|C\/U|ECU|EXTREME CLOSE|WIDE (?:SHOT|ON)|ANGLE ON|REVERSE ANGLE|INSERT(?!\s*[-\u2013\u2014:]?\s*TEXT)|POV|TILT (?:UP|DOWN)|PAN (?:LEFT|RIGHT|TO|UP|DOWN|ACROSS)|TRACKING|DOLLY|ZOOM|CRANE|HOLD ON|HOLD\b|RACK FOCUS|SLOW MOTION|SLOW-MO|THE CAMERA|CAMERA|카메라|클로즈업|푸시 ?인|틸트|팬|트래킹|줌)\b`, 'i');
 // "LONG SHOT. Headlights appear…" 꼴: 대문자 카메라 말 + 구분자 + 글. 카메라 말은 연출 지시, 뒤 글은 지문이다(2026-11-10 B1 · 검토 c).
 //   샷 크기 말(LONG SHOT · C.U. · P.O.V. …)은 그 말 바로 뒤 구분자까지다. 뒤에 오는 인물 소개("WIDE SHOT. MAYA, 20s, …")는 지문이다.
 //   대상을 받는 지시(CLOSE ON · ANGLE ON · INSERT · PUSH IN …)는 글(영어 소문자 · 한글)이 처음 나오기 바로 앞의 마지막 구분자까지다
@@ -92,6 +92,20 @@ function splitCameraLead(line: string, lead: RegExpMatchArray): { camera: string
   const camera = line.slice(0, cut).trim();
   const rest = line.slice(cut).trim();
   return camera && rest && CAMERA_RE.test(camera) ? { camera, rest } : null;
+}
+// 카메라 말 뒤에 소문자 말이 바로 이어지는 줄("TRACKING SHOT down the empty aisle. Maya sits by the window.")은 ". " 다음에 대문자로
+//   시작하는 문장에서 나눈다: 앞은 연출, 뒤는 지문(리드 2026-11-10 R2). 약어의 점(C.U. · P.O.V. · INT. · EXT. · 한 글자 + 점)은 나누는 자리가 아니다.
+const SENTENCE_BREAK_RE = /\.\s+(?=["“'‘(]?[A-Z])/g;
+const ABBREVIATION_TAIL_RE = /(?:^|[\s("'“‘])(?:[A-Za-z](?:\.[A-Za-z])*|INT|EXT|I\/E)$/i;
+function splitCameraSentence(line: string): { camera: string; rest: string } | null {
+  for (const m of line.matchAll(SENTENCE_BREAK_RE)) {
+    const at = m.index ?? 0;
+    if (ABBREVIATION_TAIL_RE.test(line.slice(0, at))) continue;
+    const camera = line.slice(0, at + 1).trim();
+    const rest = line.slice(at + m[0].length).trim();
+    if (camera && rest && LEAD_TEXT_RE.test(rest)) return { camera, rest };
+  }
+  return null;
 }
 // 굵은 이름이 카메라 지시인가(검토 c 재검토 · 7550d031): 카메라 지시로 끝나거나("**LONG SHOT.**"), 대상을 받는 카메라 지시로 시작한다
 //   ("**CLOSE ON MAYA.**" · "**ZOOM IN ON MAYA.**" · "**CRANE SHOT.**"). 맨 낱말(**CRANE:**)과 그 낱말로 시작하는 이름(**DOLLY PARTON:**)은 인물이다.
@@ -669,7 +683,7 @@ export function parseScript(text: string, opts?: { assumeScript?: boolean }): Sc
       const boldRest = boldCamera ? bold![2].replace(/^[\s:：.,]+/, '').trim() : '';
       const lead = !(cm && !hasLower(cm[1])) ? null
         : boldCamera ? (LEAD_TEXT_RE.test(boldRest) ? { camera: bold![1].trim(), rest: boldRest } : null)
-          : splitCameraLead(plainLead, cm);
+          : splitCameraLead(plainLead, cm) ?? splitCameraSentence(plainLead);
       if (lead) {
         pushEl({ type: 'camera', text: lead.camera });
         i = readAction(i, lead.rest);
