@@ -1216,6 +1216,9 @@ export function GlobalChat() {
     setFreeformOpen(true)
     requestAnimationFrame(() => freeformInputRef.current?.focus())
   }
+  // 보낸 뒤에도 같은 질문이 떠 있으면 내린다 — 닫을 수 없는 질문(그림 질문 · 씬 스토리 고치기)은 채팅이 내리고 다시 띄운다.
+  //   답이 아니면 같은 질문을 다시 띄우는데 여기서 내리면 칩이 사라진 채 질문만 답을 기다렸다(2026-11-10 검토 a 보통 2).
+  const keepsQuestion = (asked: typeof suggestion) => asked?.id === `scene-story-edit:${projectId}` || asked?.dismissible === false
   const handleChoiceContinue = () => {
     if (inputLocked || loading || !choices || choices.displayOnly || !selectedChoice) return
     if (selectedChoice === FREEFORM) {
@@ -1227,14 +1230,17 @@ export function GlobalChat() {
     const answeringProducerQuestion = suggestion?.stage === 'producer' && suggestion.action?.kind === 'choices' && suggestion.action.answeringProducerQuestion === true
     // 전송 경로가 현재 질문의 출처를 먼저 읽게 한다. 동기 처리 중 새 제안이 생겼으면 지우지 않는다.
     void sendMessage(opt.utterance, undefined, { stageOverride: currentStage, ...(answeringProducerQuestion ? { answeringProducerQuestion: true } : {}) })
-    if (suggestion?.id !== `scene-story-edit:${projectId}` && useGlobalChatStore.getState().suggestion?.id === suggestion?.id) dismissSuggestion()
+    if (!keepsQuestion(suggestion) && useGlobalChatStore.getState().suggestion?.id === suggestion?.id) dismissSuggestion()
   }
   const handleFreeformSend = () => {
     const text = freeformText.trim()
     if (inputLocked || !text || useGlobalChatStore.getState().loading) return
     const answeringProducerQuestion = suggestion?.stage === 'producer' && suggestion.action?.kind === 'choices' && suggestion.action.answeringProducerQuestion === true
     void sendMessage(text, undefined, { stageOverride: currentStage, ...(answeringProducerQuestion ? { answeringProducerQuestion: true } : {}) })
-    if (suggestion?.id !== `scene-story-edit:${projectId}` && useGlobalChatStore.getState().suggestion?.id === suggestion?.id) dismissSuggestion()
+    // 같은 질문이 다시 떠도 보낸 말은 칸에 남기지 않는다(선택지 세트가 그대로라 렌더 중 선택 초기화가 돌지 않는다).
+    setFreeformText('')
+    setFreeformOpen(false)
+    if (!keepsQuestion(suggestion) && useGlobalChatStore.getState().suggestion?.id === suggestion?.id) dismissSuggestion()
   }
 
   // 선택지 키보드 조작 (#choices-keys 2026-08-07) — Claude Code CLI 의 AskUserQuestion 문법 차용:

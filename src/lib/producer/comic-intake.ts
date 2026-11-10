@@ -91,13 +91,28 @@ export function matchComicStyleAnswer(text: string): ComicStyle | null {
   return lock ? 'lock' : 'adapt'
 }
 
-/** 만화를 고른 뒤 대본을 옮기기 전에 묻는 그림체 질문. */
-export function comicStyleQuestion(voice: AppLocale): { content: string; options: Array<{ label: string; utterance: string }> } {
+/** 만화를 고른 뒤 대본을 옮기기 전에 묻는 그림체 질문. stop = 그만두기 칩(Writer 화면 — 2026-11-10 오너, 닫을 수 없는 질문에서 빠져나갈 길). */
+export function comicStyleQuestion(voice: AppLocale, opts: { stop?: boolean } = {}): { content: string; options: Array<{ label: string; utterance: string }> } {
   return {
     content: translate(voice, 'How should the art style work? If you keep the comic art style, it is fixed and cannot be changed later.'),
     options: [
       { label: translate(voice, 'Fix the comic art style'), utterance: translate(voice, 'Keep the comic art style and fix it') },
       { label: translate(voice, 'Adapt to another style like live action'), utterance: translate(voice, 'Adapt it to another style like live action') },
+      ...(opts.stop ? [{ label: translate(voice, 'Never mind'), utterance: translate(voice, "Don't use the comic") }] : []),
+    ],
+  }
+}
+
+/** 만화로 산문 다시 쓰기 질문의 답 — rewrite = 만화 원고 그대로 산문 초안을 새로 쓴다, reference = 산문은 두고 만화는 참고 자료로만. */
+export type ComicRewrite = 'rewrite' | 'reference'
+
+/** 확정 전 Writer 화면에서 만화를 고르면 바꾸기 전에 묻는다(2026-11-10 오너 "지금 산문 초안은 사라져요. 만화로 다시 쓸까요?"). */
+export function comicRewriteQuestion(voice: AppLocale): { content: string; options: Array<{ label: string; utterance: string }> } {
+  return {
+    content: translate(voice, 'The current prose draft will be gone. Rewrite the prose from the comic?'),
+    options: [
+      { label: translate(voice, 'Rewrite'), utterance: translate(voice, 'Rewrite the prose from the comic') },
+      { label: translate(voice, 'Only as reference'), utterance: translate(voice, 'Use the comic only as reference') },
     ],
   }
 }
