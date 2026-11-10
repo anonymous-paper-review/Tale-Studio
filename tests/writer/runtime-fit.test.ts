@@ -52,7 +52,7 @@ function shots(sceneId: string, seconds: number[]) {
     })),
   }
 }
-/** 씬 · 몇 번째 부름인지에 따라 답하는 가짜 감독(LLM). null 이면 그 부름은 실패한다. */
+/** 씬 · 몇 번째 부름인지에 따라 답하는 가짜 감독(AI). null 이면 그 부름은 실패한다. */
 function answer(plan: Record<string, Array<number[] | null>>) {
   const calls: Record<string, number> = {}
   mocks.generateJson.mockImplementation(async (prompt: string) => {
@@ -139,7 +139,7 @@ describe('고른 길이 맞춤 — 샷 나누기', () => {
     expect(readFileSync('src/lib/writer/pipeline/steps.ts', 'utf8')).toContain('runtimeCapSeconds: runtimeFitCap(s.input)')
   })
 
-  // 왜: 정상 경로 고정 — 합이 고른 길이 안이면 LLM 을 더 부르지 않는다(비용 · 시간).
+  // 왜: 정상 경로 고정 — 합이 고른 길이 안이면 AI 를 더 부르지 않는다(비용 · 시간).
   it('샷 길이 합이 고른 길이 안이면 다시 나누지 않는다', async () => {
     answer({ scene_1: [[4]], scene_2: [[5, 5]] })
     const result = await run(15)
@@ -167,7 +167,7 @@ describe('고른 길이 맞춤 — 샷 나누기', () => {
     expect(first).toContain('커버리지 샷을 먼저 빼지 마라')
   })
 
-  // 왜: 넘은 씬이 여럿이면 가장 많이 넘은 씬을 먼저 줄인다. 그것만으로 고른 길이 안에 들면 나머지는 LLM 을 더 부르지 않는다.
+  // 왜: 넘은 씬이 여럿이면 가장 많이 넘은 씬을 먼저 줄인다. 그것만으로 고른 길이 안에 들면 나머지는 AI 를 더 부르지 않는다.
   it('많이 넘은 씬부터 다시 나누고, 합이 고른 길이 안으로 들어오면 남은 씬은 다시 나누지 않는다', async () => {
     const three = { scenes: [scene('scene_a', 5, ['a']), scene('scene_b', 5, ['b']), scene('scene_c', 5, ['c'])], total_estimated_seconds: 15 }
     answer({ scene_a: [[6], [5]], scene_b: [[9], [4]], scene_c: [[5]] })
