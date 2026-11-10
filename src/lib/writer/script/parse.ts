@@ -80,14 +80,13 @@ function splitCameraLead(line: string, lead: RegExpMatchArray): { camera: string
   const text = line.search(/[a-z가-힣]/);
   if (text <= 0) return null;
   const head = line.slice(0, text);
-  let cut = -1;
-  if (TARGET_CAMERA_RE.test(lead[1].trim())) {
+  const separator = new RegExp(CAMERA_SEPARATOR_RE.source, 'g');
+  separator.lastIndex = (lead.index ?? 0) + lead[0].length;
+  const first = separator.exec(head);
+  let cut = first ? first.index + first[0].length : -1;
+  // 대상을 받는 말은 첫 구분자가 마침표가 아니면 마지막 구분자까지 본다. 마침표는 연출 문장의 끝이다("TRACKING SHOT. MAYA, 20s, …", 검토 c · acb4683d).
+  if (first && first[0].trim() !== '.' && TARGET_CAMERA_RE.test(lead[1].trim())) {
     for (const m of head.matchAll(CAMERA_SEPARATOR_RE)) cut = (m.index ?? 0) + m[0].length;
-  } else {
-    const separator = new RegExp(CAMERA_SEPARATOR_RE.source, 'g');
-    separator.lastIndex = (lead.index ?? 0) + lead[0].length;
-    const m = separator.exec(head);
-    if (m) cut = m.index + m[0].length;
   }
   if (cut <= 0) return null;
   const camera = line.slice(0, cut).trim();

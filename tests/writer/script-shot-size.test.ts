@@ -227,7 +227,9 @@ describe('혼자 정한 것 · 검토 c 재검토(7982ba84)', () => {
   // 왜: 검토 c 재검토 낮음 3. 첫 구분자에서 나눠 "INSERT - THE LETTER: …"는 연출이 "INSERT -"뿐이었다. 대상을 받는 카메라 지시는 글(소문자 · 한글)이
   //   나오기 바로 앞의 마지막 구분자까지다. 검토 c(7550d031) 보통 1 을 고치며 문장을 좁혔다(예전 문장 "카메라 말 안에 쉼표 · 쌍점 · 줄표가 있어도
   //   소문자 · 한글 글이 나오기 바로 앞의 마지막 구분자에서 나눈다"는 샷 크기 말 뒤의 인물 소개까지 연출로 삼켰다).
-  it('대상을 받는 카메라 지시(CLOSE ON · ANGLE ON · INSERT …)는 소문자 · 한글 글이 나오기 바로 앞의 마지막 구분자까지 연출로 본다', () => {
+  //   검토 c(acb4683d) 를 고치며 다시 좁혔다(리드 지시): 첫 구분자가 마침표면 거기서 나눈다(아래 시험). 예전 문장 "대상을 받는 카메라 지시(CLOSE ON ·
+  //   ANGLE ON · INSERT …)는 소문자 · 한글 글이 나오기 바로 앞의 마지막 구분자까지 연출로 본다".
+  it('대상을 받는 카메라 지시(CLOSE ON · ANGLE ON · INSERT …)는 첫 구분자가 쉼표 · 쌍점 · 줄표면 소문자 · 한글 글이 나오기 바로 앞의 마지막 구분자까지 연출로 본다', () => {
     const letter = elementsOf("INSERT - THE LETTER: 'Dear Maya, come home.'")
     expect(letter).toContainEqual({ type: 'camera', text: 'INSERT - THE LETTER:' })
     expect(letter).toContainEqual({ type: 'action', text: "'Dear Maya, come home.'" })
@@ -265,6 +267,31 @@ MAYA: Hello?
 
 INT. BUS - CONTINUOUS
 WIDE SHOT. MAYA, 20s, sits alone by the window.
+
+DRIVER: Next stop, the coast.
+`, { assumeScript: true })!
+    expect(silent.scenes[1].characters).toEqual(['driver', 'maya'])
+  })
+
+  // 왜: 검토 c(acb4683d) 보통 1 남은 것. TRACKING · CRANE · DOLLY · (THE) CAMERA 로 시작하는 샷 이름은 대상을 받는 말로 셈해 마지막 구분자까지 보다 보니
+  //   "TRACKING SHOT. MAYA, 20s, …"의 MAYA 가 연출로 넘어갔다. 마침표는 연출 문장의 끝이다(CLOSE ON 무리 · INSERT 는 첫 구분자가 쉼표 · 줄표라 그대로).
+  it('대상을 받는 카메라 지시라도 첫 구분자가 마침표면 거기서 나눠, 뒤에 오는 인물 소개(TRACKING SHOT. MAYA, 20s, …)는 지문에 남긴다', () => {
+    const cases: Array<[string, string, string]> = [
+      ['TRACKING SHOT. MAYA, 20s, runs down the aisle.', 'TRACKING SHOT.', 'MAYA, 20s, runs down the aisle.'],
+      ['CRANE SHOT. MAYA, 20s, looks up.', 'CRANE SHOT.', 'MAYA, 20s, looks up.'],
+      ['DOLLY SHOT. JOHN, 40s, walks.', 'DOLLY SHOT.', 'JOHN, 40s, walks.'],
+      ['THE CAMERA PANS. MAYA, 20s, enters.', 'THE CAMERA PANS.', 'MAYA, 20s, enters.'],
+    ]
+    for (const [line, camera, action] of cases) {
+      expect(elementsOf(line), line).toContainEqual({ type: 'camera', text: camera })
+      expect(elementsOf(line), line).toContainEqual({ type: 'action', text: action })
+    }
+    const silent = parseScript(`EXT. BUS STOP - NIGHT
+
+MAYA: Hello?
+
+INT. BUS - CONTINUOUS
+TRACKING SHOT. MAYA, 20s, walks down the aisle.
 
 DRIVER: Next stop, the coast.
 `, { assumeScript: true })!
