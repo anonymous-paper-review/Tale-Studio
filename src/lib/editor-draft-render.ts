@@ -235,16 +235,20 @@ export async function renderDraftTimeline(opts: {
     el: HTMLAudioElement
     clip: AudioTrackClip
     endSec: number
+    rate: number
   }> = audible.map((clip) => {
     const el = document.createElement('audio')
     el.crossOrigin = 'anonymous'
     el.preload = 'auto'
     el.src = localUrl(clip.url)
+    // 영상에 이어진 소리는 그 영상의 속도로 — 미리 보기와 같다(2026-11-10 결정 4).
+    const rate = clip.playbackRate ?? 1
+    el.playbackRate = rate
     const src = ac.createMediaElementSource(el)
     const gain = ac.createGain()
     gain.gain.value = Math.max(0, Math.min(1, clip.volume))
     src.connect(gain).connect(dest)
-    return { el, clip, endSec: clip.startSec + clip.durationSec }
+    return { el, clip, endSec: clip.startSec + clip.durationSec, rate }
   })
 
   const videoEl = document.createElement('video')
@@ -337,7 +341,7 @@ export async function renderDraftTimeline(opts: {
       for (const a of audioEls) {
         const active = clock >= a.clip.startSec && clock < a.endSec
         if (active && a.el.paused) {
-          a.el.currentTime = (a.clip.sourceOffsetSec ?? 0) + (clock - a.clip.startSec)
+          a.el.currentTime = (a.clip.sourceOffsetSec ?? 0) + (clock - a.clip.startSec) * a.rate
           void a.el.play().catch(() => {})
         } else if (!active && !a.el.paused) {
           a.el.pause()
