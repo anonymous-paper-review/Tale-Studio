@@ -8,10 +8,11 @@ import { useWriterPreview } from '@/lib/writer/use-writer-preview'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { sceneGatePhase } from '@/lib/writer/scene-gate'
 import { sceneStoryView } from '@/lib/producer/scene-story'
+import { producerBusyKind } from '@/lib/producer/busy'
 import { treatmentDiff } from '@/lib/producer/scene-story-rewrite'
 import { unresolvedSceneStoryProposal } from '@/lib/producer/scene-story-proposal'
 import { previewedVariant } from '@/components/layout/scene-story-rewrite-card'
-import { handedRunStopped, legacyGateWaiting, proseBusy, proseRunState, proseStartOffered } from '@/lib/prose/busy'
+import { handedRunStopped, legacyGateWaiting, proseBusy, proseRunState, proseStartOffered, proseToolsBusy } from '@/lib/prose/busy'
 import { proseTools } from '@/lib/prose/conditions'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProducerStore } from '@/stores/producer-store'
@@ -81,7 +82,10 @@ export function useProse() {
   const busy = proseBusy({ draftLive, phase, statusRead, currentStage: status?.current_stage, proposal, requestPending })
   // [산문 쓰기]는 읽은 실행 상태 그대로 본다 — 초안인지 아직 모르는 동안에도 이미 시작한 실행이면 두지 않는다.
   const startOffered = proseStartOffered({ locked, storyReady, phase: sceneGatePhase(status), statusRead })
-  const tools = proseTools({ preserved: showOriginal, locked, hasProse: hasProse && (phase === 'gate' || locked), busy: !!busy || !!editing || (hasProposal && !locked) })
+  // 만화로 산문을 다시 쓰는 동안(만화 읽기 · 새 초안 요청)은 [브레이크다운하기]도 막는다 — 확정은 채팅 스토어도 받지 않는다.
+  const boardBusy = useGlobalChatStore((s) => s.boardBusy)
+  const comicRewrite = producerBusyKind(projectId, { pending: null, busy: boardBusy }) === 'comic'
+  const tools = proseTools({ preserved: showOriginal, locked, hasProse: hasProse && (phase === 'gate' || locked), busy: proseToolsBusy({ busy, editing: !!editing, openProposal: hasProposal && !locked, comicRewrite }) })
   // 브레이크다운은 고르지 않은 수정안이 있으면 막는다(서버도 같은 규칙) — 산문이 쓰인 뒤라면 수정안을 정하고 누를 수 있다.
   const canBreakdown = locked ? hasProse : tools.breakdown && !hasProposal
 

@@ -13,6 +13,9 @@ import { useProjectStore as project } from '@/stores/project-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { sceneStoryView } from '@/lib/producer/scene-story'
+import { producerBusyKind } from '@/lib/producer/busy'
+import { proseTools } from '@/lib/prose/conditions'
+import { proseToolsBusy } from '@/lib/prose/busy'
 
 const MEDIA = 'https://example.supabase.co/storage/v1/object/public/media/ws-1/proj-1/uploads'
 const img = (name: string) => ({ id: name, name, thumbUrl: `${MEDIA}/${name}/original.webp`, sliceUrls: [`${MEDIA}/${name}/s000.jpg`] })
@@ -23,6 +26,8 @@ const SCRIPT = 'S#1. ROOM - DAY\nMAN: Hi.\nWOMAN: Hey.'
 
 let fetchMock: ReturnType<typeof vi.fn>
 let writerStart: () => Response
+// 만화 읽기 — 기본은 바로 대본을 준다. 읽는 동안을 보려면 늦춘다.
+let comicScript: () => Response | Promise<Response>
 const order: string[] = []
 // 서버가 받아 새로 쓰기 시작한 초안(실패한 요청은 빼고).
 const startedDrafts: Array<Record<string, unknown>> = []
@@ -31,7 +36,7 @@ function stub() {
   fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     const body = init?.body ? JSON.parse(String(init.body)) : {}
     order.push(url)
-    if (url === '/api/produce/comic-script') return Response.json({ script: SCRIPT, stats: { scenes: 1, dialogue_lines: 2 } })
+    if (url === '/api/produce/comic-script') return comicScript()
     if (url === '/api/produce/anchor-medium') return Response.json({ medium: '2d_anime' })
     if (url === '/api/produce/style-anchor') return Response.json({ key: 'custom_new', imageUrl: body.imageUrl, label: body.label, medium: body.medium, ...(body.lock ? { locked: true } : {}) })
     if (url === '/api/produce/style-facets') return Response.json({ ok: true, facets: true, figure: true })
@@ -91,6 +96,7 @@ beforeEach(() => {
   producer.setState({ storyText: OLD_IDEA, preserveScript: null })
   useLocaleStore.setState({ locale: 'en' })
   writerStart = () => Response.json({ runId: 'run-2' })
+  comicScript = () => Response.json({ script: SCRIPT, stats: { scenes: 1, dialogue_lines: 2 } })
   stub()
 })
 afterEach(() => {
@@ -195,5 +201,63 @@ describe('산문을 확정한 뒤', () => {
     expect(question()?.id ?? '').not.toMatch(/^comic-rewrite:/)
     expect(calls('/api/produce/comic-script')).toEqual([])
     expect(calls('/api/writer/start')).toEqual([])
+  })
+})
+
+describe('만화로 산문을 다시 쓰는 동안과 확정한 산문', () => {
+  // Writer 화면 도구(다시 쓰기 · 직접 작성 · 브레이크다운)가 지금 막혔는가 — use-prose 와 같은 규칙으로 본다(산문은 다 쓴 상태).
+  const breakdownOpen = () => proseTools({
+    preserved: false, locked: false, hasProse: true,
+    busy: proseToolsBusy({ busy: null, editing: false, openProposal: false, comicRewrite: producerBusyKind('proj-1', { pending: null, busy: chat.getState().boardBusy }) === 'comic' }),
+  }).breakdown
+
+  // 왜: 검토 a 낮음 1(2026-11-10) — 만화를 읽는 30~60초 동안 옛 산문이 그대로 보여 [브레이크다운하기]로 확정할 수 있었다.
+  //   대본이 들어온 직후 확정하면 뒤이어 온 다시 쓰기가 확정한 초안을 내려놓을 수 있었다. 다 끝나거나 실패하면 다시 확정할 수 있다.
+  it('만화로 산문을 다시 쓰는 동안에는 [브레이크다운하기] · 확정을 막고, 다시 쓰기가 끝나거나 실패하면 다시 푼다', async () => {
+    let release: () => void = () => {}
+    comicScript = () => new Promise<Response>((resolve) => { release = () => resolve(Response.json({ script: SCRIPT, stats: { scenes: 1, dialogue_lines: 2 } })) })
+    expect(breakdownOpen()).toBe(true)
+    pickComicByWords()
+    await send('Rewrite the prose from the comic')
+    await send('Adapt it to another style like live action')
+    await vi.waitFor(() => expect(calls('/api/produce/comic-script')).toHaveLength(1))
+    expect(breakdownOpen()).toBe(false)
+    expect(await chat.getState().confirmProse()).toEqual({ ok: false, code: 'comic_rewrite_running' })
+    expect(calls('/api/writer/prose-confirm')).toEqual([])
+    release()
+    await vi.waitFor(() => expect(chat.getState().boardBusy).toBeNull())
+    expect(calls('/api/writer/start')).toHaveLength(1)
+    expect(breakdownOpen()).toBe(true)
+    expect((await chat.getState().confirmProse()).ok).toBe(true)
+    expect(calls('/api/writer/prose-confirm')).toHaveLength(1)
+
+    // 만화 읽기에 실패해도 다시 푼다.
+    chat.getState().reset()
+    project.setState({ producerLocked: false })
+    producer.setState({ storyText: OLD_IDEA, preserveScript: null })
+    comicScript = () => Response.json({ error: 'comic_script_failed' }, { status: 502 })
+    pickComicByWords()
+    await send('Rewrite the prose from the comic')
+    await send('Adapt it to another style like live action')
+    await vi.waitFor(() => expect(said(/Couldn't turn the comic into a script/)).toBe(true))
+    await vi.waitFor(() => expect(chat.getState().boardBusy).toBeNull())
+    expect(breakdownOpen()).toBe(true)
+    expect((await chat.getState().confirmProse()).ok).toBe(true)
+    expect(calls('/api/writer/prose-confirm')).toHaveLength(2)
+  })
+
+  // 왜: 검토 a 낮음 1 — 다른 창 등에서 이미 확정했으면 서버가 다시 쓰기를 거절한다(prose_locked). 다시 옮겨도 또 막히니 [다시 옮기기]를 띄우지 않고,
+  //   넣은 대본을 거둬 화면이 확정한 산문과 같게 둔다.
+  it('산문 다시 쓰기가 확정 잠금에 막히면 다시 옮기기 대신 이미 확정해서 참고로만 쓴다고 알리고 화면은 옛 산문 그대로 둔다', async () => {
+    writerStart = () => Response.json({ error: 'The prose is confirmed and locked', code: 'prose_locked' }, { status: 409 })
+    pickComicByWords()
+    await send('Rewrite the prose from the comic')
+    await send('Adapt it to another style like live action')
+    await vi.waitFor(() => expect(said(/already confirmed/)).toBe(true))
+    expect(said(/Couldn't rewrite the prose from the comic/)).toBe(false)
+    expect(question()?.id ?? '').not.toMatch(/^comic-retry:/)
+    expect(chat.getState().comicRetry).toBeNull()
+    expect(producer.getState()).toMatchObject({ storyText: OLD_IDEA, preserveScript: null })
+    expect(screenProse()).toBe(OLD_PROSE)
   })
 })
