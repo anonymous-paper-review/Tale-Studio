@@ -4,6 +4,9 @@
 //   이름으로 바꾸고, 모르는 id 는 지어내지 않는다 — 틀린 이름은 안 고친 id 보다 나쁘다.
 //   2026-09-08: 한글 이름은 슬러그가 비어 'char' 로 폴백하므로 맨몸 id 도 로스터에 있으면 바꾼다. 긴 id 가 먼저
 //   잡혀(char_2 → char) 접두 오인이 없고, 바꾼 뒤 한국어 조사를 받침에 맞춘다.
+//   2026-11-10(qa1110 C12): 이름 안에 id 낱말이 든 인물(The Keeper · keeper)은 바꿀 때마다 "The The Keeper"로 겹쳤다 —
+//   이미 이름이 쓰인 자리 안의 id 낱말은 다시 바꾸지 않고, 관사로 시작하는 이름 앞에 겹친 관사는 하나로 걷는다
+//   (예전에 겹쳐 저장된 산문도 보일 때 바로잡힌다). 표시용 replaceSlugs(script-lines)도 같은 두 규칙을 쓴다.
 import { fixKoreanParticles } from '@/lib/korean-particles'
 
 interface NamedEntity {
@@ -16,6 +19,36 @@ const GENERIC_WORD_IDS = new Set(['location', 'loc'])
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/** text 안에 이름이 이미 그대로 쓰인 자리들([시작, 끝)) — 대소문자 그대로. 경계는 id 토큰과 같은 영숫자 기준이라
+ *  한국어 조사가 바로 붙은 이름("The Keeper가")도 이름 자리로 본다. */
+export function writtenNameSpans(text: string, names: Iterable<string>): Array<[number, number]> {
+  const spans: Array<[number, number]> = []
+  for (const name of new Set([...names].map((n) => n.trim()).filter(Boolean))) {
+    for (const m of text.matchAll(new RegExp(`(?<![A-Za-z0-9_])${escapeRegExp(name)}(?![A-Za-z0-9_])`, 'gu'))) {
+      spans.push([m.index, m.index + m[0].length])
+    }
+  }
+  return spans
+}
+
+/** [at, at+length) 가 이미 쓰인 이름 자리 안에 있나 — 그 안의 id 낱말은 다시 바꾸지 않는다("The Keeper" 의 Keeper). */
+export function insideWrittenName(spans: ReadonlyArray<readonly [number, number]>, at: number, length: number): boolean {
+  return spans.some(([start, end]) => start <= at && at + length <= end)
+}
+
+/** 관사(The · A · An)로 시작하는 이름 바로 앞에 겹친 관사를 걷는다 — "the The Keeper" · 예전에 겹쳐 저장된 "The The Keeper" → "The Keeper". */
+export function collapseDoubledArticles(text: string, names: Iterable<string>, prefix = ''): string {
+  let out = text
+  for (const name of new Set([...names].map((n) => n.trim()).filter(Boolean))) {
+    if (!/^(?:the|an?)\s/i.test(name)) continue
+    out = out.replace(
+      new RegExp(`(?<![\\p{L}\\p{N}_])(?:(?:[Tt][Hh][Ee]|[Aa][Nn]?)\\s+)+(?=${escapeRegExp(prefix + name)}(?![A-Za-z0-9_]))`, 'gu'),
+      '',
+    )
+  }
+  return out
 }
 
 /** 일반 낱말의 접두를 장소·인물 참조로 오인하지 않는 정확한 토큰 조회. */
@@ -55,15 +88,19 @@ export function resolveEntityNames(
   //   location 을 장소 이름으로 바꾸면 틀린 문장이 된다(겨울_7 sh_01_05 실측).
   const keys = [...byId.keys()].sort((a, b) => b.length - a.length).map(escapeRegExp)
   const re = new RegExp(`(?<![A-Za-z0-9_])(?:${keys.join('|')})(?![A-Za-z0-9_])`, 'gi')
+  const names = new Set([...byId.values()])
+  const written = writtenNameSpans(text, names)
   let out = text.replace(re, (token, offset: number, whole: string) => {
     const lower = token.toLowerCase()
     if (GENERIC_WORD_IDS.has(lower) && !/^[가-힣]/.test(whole.slice(offset + token.length))) return token // i18n-ok: 한글 범위 판정
+    // 이미 쓰인 이름 안의 id 낱말(The Keeper 의 Keeper)은 그대로 — 또 바꾸면 "The The Keeper".
+    if (insideWrittenName(written, offset, token.length)) return token
     return byId.get(lower) ?? token
   })
+  out = collapseDoubledArticles(out, names)
 
   // 이름으로 치환하고 나면 "The father (Kai)" 처럼 동격 괄호가 남는다 — 앞말과 같은 대상을
   //   가리키는 군더더기라 괄호만 벗겨 문장을 자연스럽게 둔다. (이름이 들어간 괄호에만 적용)
-  const names = new Set([...byId.values()])
   out = out.replace(/\s*\(([^()]{1,40})\)/g, (whole, inner: string) =>
     names.has(inner.trim()) ? '' : whole,
   )

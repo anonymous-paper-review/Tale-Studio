@@ -7,6 +7,7 @@ import {
 } from '@/lib/card-mention'
 import type { DialogueLine, Scene, SceneManifest, Shot } from '@/types'
 import { fixKoreanParticles } from '@/lib/korean-particles'
+import { collapseDoubledArticles, insideWrittenName, writtenNameSpans } from '@/lib/writer/resolve-entity-names'
 import { boardShotLabels, boardShots } from '@/lib/writer/board-summary'
 import { translate } from '@/lib/i18n'
 import type { AppLocale } from '@/lib/locale'
@@ -138,26 +139,31 @@ export interface SlugEntry {
  * prefix '@'면 인라인 멘션 표기(@이름), ''면 구조 필드용 플레인 이름.
  * 데이터·멘션 ref·채팅 컨텍스트는 원문(슬러그) 유지 — 구동은 변수명, 표시는 실제 이름.
  * 로스터에 없는 슬러그는 해석 불가이므로 그대로 둔다. 대소문자 무시(CSS uppercase 표시 대비).
+ * 이미 이름이 쓰인 자리 안의 슬러그 낱말은 다시 바꾸지 않고, 관사로 시작하는 이름 앞에 겹친 관사는 하나로 걷는다
+ * (qa1110 C12 "The The Keeper" — resolveEntityNames 와 같은 규칙).
  */
 export function replaceSlugs(
   text: string,
   entries: SlugEntry[],
   prefix: '@' | '' = '@',
 ): string {
-  let out = text
   // #names-in-prose(2026-09-08): 긴 슬러그부터 — 'char_2' 가 'char' 로 오인되지 않게. 치환 뒤 한국어 조사를 맞춘다.
-  const sorted = [...entries].sort((a, b) => (b.slug?.length ?? 0) - (a.slug?.length ?? 0))
-  const names: string[] = []
-  for (const e of sorted) {
+  //   한 번에 바꾼다 — 앞에서 넣은 이름 안의 낱말을 뒤의 짧은 슬러그가 또 바꾸지 않게.
+  const byId = new Map<string, string>()
+  for (const e of [...entries].sort((a, b) => (b.slug?.length ?? 0) - (a.slug?.length ?? 0))) {
     const slug = e.slug?.trim()
     const name = e.name?.trim()
     if (!slug || !name || name === slug) continue
-    out = out.replace(
-      new RegExp(`(?<![A-Za-z0-9_])${escapeRegExp(slug)}(?![A-Za-z0-9_])`, 'gi'),
-      `${prefix}${name}`,
-    )
-    names.push(name)
+    if (!byId.has(slug.toLowerCase())) byId.set(slug.toLowerCase(), name)
   }
+  if (byId.size === 0) return text
+  const names = [...new Set(byId.values())]
+  const written = writtenNameSpans(text, names)
+  const keys = [...byId.keys()].sort((a, b) => b.length - a.length).map(escapeRegExp)
+  let out = text.replace(new RegExp(`(?<![A-Za-z0-9_])(?:${keys.join('|')})(?![A-Za-z0-9_])`, 'gi'), (token, offset: number) =>
+    insideWrittenName(written, offset, token.length) ? token : `${prefix}${byId.get(token.toLowerCase()) ?? token}`,
+  )
+  out = collapseDoubledArticles(out, names, prefix)
   return prefix === '' ? fixKoreanParticles(out, names) : out
 }
 
