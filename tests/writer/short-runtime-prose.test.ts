@@ -97,6 +97,17 @@ describe('15초 이하 산문 — 씬 수', () => {
     expect(result.scenes).toHaveLength(3)
   })
 
+  // 왜: 이 규칙 전 4막 초안(씬 하한 4)에 상한 2를 걸면 이룰 수 없는 고쳐 쓰기를 한 번 더 부른다 — 씬 다시 쓰기 · 수정 요청 모두(검토 a 재검토).
+  it('15초 이하여도 들어온 구조가 막 3개 이상(이 규칙 전 초안)이면 씬 2개 상한을 걸지 않고 예전처럼 검사한다', async () => {
+    mocks.generate.mockResolvedValueOnce(scenesOf([
+      scene('scene_1', 'ki', 4, ['민호가 동전을 넣는다.']), scene('scene_2', 'sho', 4, ['민호가 버튼을 누른다.']),
+      scene('scene_3', 'ten', 4, ['캔이 쏟아진다.']), scene('scene_4', 'ketsu', 3, ['민호가 웃는다.']),
+    ]))
+    const result = await runScenes(input({ runtimeSeconds: 15 }), genre(15), FOUR_ACTS, cast, undefined, logger, S)
+    expect(mocks.generate).toHaveBeenCalledTimes(1)
+    expect(result.scenes).toHaveLength(4)
+  })
+
   // 왜: 정상 경로 고정 — 15초보다 긴 길이는 지금처럼 씬 수에 2개 여유를 둔다(60초 · 3막에 4씬이면 고쳐 쓰지 않는다).
   it('길이를 15초보다 길게 골랐으면 씬 수 검사는 지금과 같다', async () => {
     mocks.generate.mockResolvedValueOnce(scenesOf([
