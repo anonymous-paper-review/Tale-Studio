@@ -126,6 +126,27 @@ export function withComicScript(draft: EntryDraft, script: string | null | undef
   return { ...draft, file: { ...draft.file, text: script } }
 }
 
+/** 시작 때 올린 만화 쪽(media 버킷 경로) — Writer 채팅의 그림체 질문이 쓴다. */
+export interface ComicStartPage {
+  name: string
+  original: string
+  slices: string[]
+}
+
+/**
+ * 만화 쪽 그대로로 시작한 프로젝트에서 그림체 질문에 쓸 쪽(2026-11-11 오너 — 시작한 뒤 Writer 채팅에서 같은 그림체 질문을 칩으로 묻는다).
+ *   만화로 옮겼으면 이야기가 초안의 읽은 글과 다르다 — 만화가 아니면(문서 · 메모 사진) 읽은 글 그대로 시작했다.
+ *   시작 전 · 다듬기 · 새로 · 그림체가 이미 정해진 프로젝트(시리즈 다음 화 · 고정)는 물을 것이 없다.
+ */
+export function comicStartPage(draft: EntryDraft, storyText: string | null | undefined, styleSet: boolean): ComicStartPage | null {
+  const file = draft.file
+  if (!draft.startedAt || draft.picks.level !== 'keep' || file?.kind !== 'image' || styleSet) return null
+  if (!file.storagePath || !file.slicePaths?.length) return null
+  const story = storyText?.trim() ?? ''
+  if (!story || story === (file.text ?? '').trim()) return null
+  return { name: file.name, original: file.storagePath, slices: file.slicePaths }
+}
+
 /** 원고에서 인물이 말하는 글 — 대본 꼴로 읽히면 대사 줄만(장면 머리 · 인물 이름 · 지문은 빼고), 아니면 글 전체(만화 글자 · 산문). */
 function spokenText(story: string): string {
   const doc = parseScript(story, { assumeScript: true })

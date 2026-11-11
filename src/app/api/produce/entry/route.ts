@@ -2,13 +2,15 @@
 //   화면에서 고르기 · 채팅으로 만들기 두 탭이 같은 초안을 쓴다. 고칠 수 있는 칸: 아이디어 글 · 고른 값 · 채팅 진행 · 파일 빼기.
 //   시작한 뒤(entry_draft.startedAt)에는 고치지 않는다(409) — 화면 비율이 잠겼고 Producer 는 완료 화면이다.
 //   시리즈 다음 화(2026-10-26)는 앞 화 비율 · 대사 언어 · 이어받은 개수를 series 로 같이 돌려준다(설정 화면 · 확인 창이 쓴다).
-//   약속: tests/producer/entry-routes.test.ts · tests/producer/entry-series.test.ts
+//   만화 쪽 그대로로 시작했고 그림체가 아직 없으면 시작 때 올린 쪽을 comicStart 로 돌려준다 — Writer 채팅이 그 쪽으로 그림체를 칩으로 묻는다(2026-11-11 오너).
+//   약속: tests/producer/entry-routes.test.ts · tests/producer/entry-series.test.ts · tests/producer/start-comic-page.test.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { entrySeriesOf } from '@/features/entry/series'
 import { applyEntryPatch, entryDraftFor } from '@/lib/entry/draft'
-import { planEntryStart, withComicScript } from '@/lib/entry/start-plan'
+import { comicStartPage, planEntryStart, withComicScript } from '@/lib/entry/start-plan'
 import { parseAppLocale } from '@/lib/locale'
 import { parseSeries } from '@/lib/series/snapshot'
+import { mediaPublicUrl } from '@/lib/storage/media'
 import { getRunStatusLight } from '@/lib/writer/run-store'
 import { parseProjectFormat } from '@/types/project'
 import { authorizeEntry, authorizeEntryOwner, authorizeEntrySignedIn, loadEntryProject, saveEntryDraft, serverError } from './entry-access'
@@ -18,7 +20,7 @@ export const runtime = 'nodejs'
 /** 시작 화면이 읽는 것 — 초안 칸 · Writer 진행(시작했는지 · 산문 초안을 쓰는 중인지). */
 function readEntry(id: string) {
   return Promise.all([
-    loadEntryProject(id, 'title, locale, current_stage, entry_draft, story_text, settings, series'),
+    loadEntryProject(id, 'title, locale, current_stage, entry_draft, story_text, settings, series, style_anchor_key, custom_style_anchor'),
     getRunStatusLight(id).catch(() => null),
   ])
 }
@@ -46,6 +48,7 @@ export async function GET(req: NextRequest) {
     //   만화 쪽 그대로는 시작 때 옮긴 대본(저장한 이야기)으로 — 초안의 읽은 글로 다시 짜면 화면(대본)과 산문이 어긋난다(2026-11-11 결정 3).
     const series = parseSeries(row.series)
     const plan = draft.startedAt ? planEntryStart({ projectId: id, draft: withComicScript(draft, row.story_text), locale, currentTitle: row.title ?? '', series }) : null
+    const comic = comicStartPage(draft, row.story_text, !!row.style_anchor_key || row.custom_style_anchor != null)
     return NextResponse.json({
       draft,
       title: row.title ?? 'Untitled',
@@ -56,6 +59,7 @@ export async function GET(req: NextRequest) {
       series: entrySeriesOf(series),
       writer: { started: !!run, status: run?.status ?? null, draft: run?.draft === 'true' },
       writerStart: plan?.ok ? plan.writerStart : null,
+      comicStart: comic ? { name: comic.name, thumbUrl: mediaPublicUrl(comic.original), sliceUrls: comic.slices.map(mediaPublicUrl) } : null,
     })
   } catch (error) {
     return serverError('', error)

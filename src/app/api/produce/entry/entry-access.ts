@@ -68,6 +68,9 @@ export interface EntryProjectRow {
   settings?: { format?: unknown } | null
   /** 시리즈 다음 화가 앞 화에서 이어받은 것(projects.series jsonb) — parseSeries 로 읽는다. */
   series?: unknown
+  /** 그림체 — 하나라도 있으면 그림체가 정해졌다(시작 때 올린 만화 쪽으로 그림체를 묻지 않는다). */
+  style_anchor_key?: string | null
+  custom_style_anchor?: unknown
 }
 
 export async function loadEntryProject(projectId: string, columns: string): Promise<EntryProjectRow | null> {
