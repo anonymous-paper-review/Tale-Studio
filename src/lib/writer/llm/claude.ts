@@ -68,13 +68,12 @@ export async function claudeGenerate(
         : {}),
       ...(opts.zodSchema ? { output_config: { format: zodOutputFormat(opts.zodSchema) } } : {}),
     };
-    // Claude 5 는 max_tokens 바닥(32k) 때문에 SDK 가 비스트리밍을 거부("Streaming is required
-    //   for operations that may take longer than 10 minutes") — 스트리밍 수집으로 동일 응답을 얻는다.
+    // 모든 모델을 스트리밍으로 받는다 — SDK 는 비스트리밍 요청의 max_tokens 가 약 21,333 을 넘으면 보내기 전에
+    //   거부한다("Streaming is required for operations that may take longer than 10 minutes"). Claude 5 는 바닥 32k 라
+    //   늘 걸렸고, Claude 4.x 도 샷 점검(32k)이 9/2부터 이 거부로 조용히 실패했다(오너 2026-11-11 결정 1). 스트리밍 수집은 같은 응답을 준다.
+    //   약속: tests/llm-call/claude-streaming.test.ts
     const response = await withLlmRetry<Anthropic.Messages.Message>(
-      async () =>
-        isClaude5
-          ? await client.messages.stream(params as never).finalMessage()
-          : await client.messages.create(params as never),
+      async () => await client.messages.stream(params as never).finalMessage(),
       'claude',
     );
 
