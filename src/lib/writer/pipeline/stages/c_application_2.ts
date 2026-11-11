@@ -60,6 +60,8 @@ export async function runShotCheck(
   outputLocale?: AppLocale,
   // #stage/#ledger(2026-09-03): v4 가 무대에서 계산·검사한 이슈 — visual 제약은 check_notes 로 부착, 전부 보고서에.
   stageIssues: ValidationIssue[] = [],
+  // 점검 호출의 시간 예산(검토 b 2026-11-11) — 이 시각까지 답이 없으면 끊고 "점검 생략" 경고로 넘어간다(아래 catch).
+  opts?: { deadlineMs?: number },
 ): Promise<{ shotSequence: ShotSequence; report: ShotCheckReport }> {
   await logger.markStage('shotCheck', 'started');
 
@@ -161,6 +163,7 @@ ${JSON.stringify(assembledShots, null, 2)}
       systemInstruction: valSystem,
       temperature: 0.3,
       maxTokens: 32000, // #coverage-first 리뷰 M5: 샷 수 증가로 16K 초과 시 파싱 실패 → 침묵 통과되던 것
+      deadlineMs: opts?.deadlineMs,
     });
     await logger.saveLlmCall('shotCheck_validate', {
       prompt: valUser,

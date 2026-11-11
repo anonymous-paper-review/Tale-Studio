@@ -41,6 +41,8 @@ export interface DispatchOptions {
   //   (output_config.format — gemini mime 등가물). 스키마가 프롬프트 필드 전집합일 때만 켠다
   //   — 부분 스키마 강제는 스키마 밖 필드를 생성에서 억압해 하류 데이터를 소실시킨다.
   enforceSchema?: boolean;
+  // 이 시각(ms)까지 답이 없으면 기다리지 않고 끊는다(재시도 없음) — 지금은 claude 만 쓴다(샷 점검, 검토 b 2026-11-11).
+  deadlineMs?: number;
 }
 
 export async function generateJson<T>(
@@ -153,6 +155,7 @@ async function dispatchOnce<T>(
         maxTokens: opts.maxTokens,
         webSearch: opts.webSearch,
         zodSchema: opts.enforceSchema ? opts.schema : undefined,
+        deadlineMs: opts.deadlineMs,
       });
     case 'local':
       if (!cfg.baseUrl) throw new Error('local provider requires baseUrl');
