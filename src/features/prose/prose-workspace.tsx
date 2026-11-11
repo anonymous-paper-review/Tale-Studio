@@ -22,7 +22,7 @@ import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
 import { WriterResumeButton } from '@/components/layout/writer-resume-button'
 import { useT } from '@/lib/i18n'
 import { withDemoShare } from '@/lib/demo/context'
-import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { imageQuestionOpen, useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProducerStore } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterRoomStore } from '@/stores/writer-room-store'
@@ -57,6 +57,15 @@ export function ProseWorkspace() {
     if (!projectId || !messagesLoaded || !prose.draftLive || prose.phase !== 'gate' || sceneCount === 0) return
     useGlobalChatStore.getState().announceProseReady(projectId, sceneCount, prose.preserved)
   }, [projectId, messagesLoaded, prose.draftLive, prose.phase, sceneCount, prose.preserved])
+
+  // 시작 화면에서 만화 쪽을 그대로로 시작했으면 산문(옮긴 대본)이 나온 뒤 채팅에서 그림체를 칩으로 묻는다(2026-11-11 오너).
+  //   물을지(만화로 옮겼는지 · 그림체가 없는지 · 이미 답했는지)는 store 가 서버에 물어 정한다.
+  //   다른 그림 질문 · 채팅 답 · 그림체 정하기가 끝나면 다시 부른다 — 그동안 시작 질문은 자리를 내주고 답하지 않은 것으로 남는다(검토 a 보통 1 · 낮음 R11).
+  const chatSettled = useGlobalChatStore((s) => !s.loading && !imageQuestionOpen(s) && s.styleSettingFor !== projectId)
+  useEffect(() => {
+    if (!projectId || !messagesLoaded || !prose.draftLive || prose.phase !== 'gate' || !prose.preserved || !chatSettled) return
+    void useGlobalChatStore.getState().offerStartComicStyle(projectId)
+  }, [projectId, messagesLoaded, prose.draftLive, prose.phase, prose.preserved, chatSettled])
 
   // 채팅에 붙인 문단 — 붙일 수 없게 되거나(확정 · AI 작업 · 직접 작성 창) 그 문단 글이 바뀌면 뗀다. 화면을 떠나도 뗀다.
   const pick = useWriterRoomStore((s) => s.paragraph)

@@ -2310,6 +2310,8 @@ export const KO: Record<string, string> = {
   "The pictures were cleared when the page reloaded. Please upload them again.": "새로 고침으로 그림이 빠졌어요. 다시 올려 주세요.",
   "Reading the {n} comic pages. I will turn them into a script. This takes about a minute.": "만화 {n}쪽을 읽고 있어요. 대본으로 옮길게요. 1분쯤 걸려요.",
   "I won't use the comic art style. Choose the style to make it in.": "만화 그림체는 쓰지 않을게요. 만들 스타일을 골라 주세요.",
+  "Okay, I won't set the art style now. You can pick it in Artist when you make the images.": "알겠어요. 그림체는 지금 정하지 않을게요. 그림을 만들 때 Artist에서 골라 주세요.",
+  "I won't use the comic art style. Pick the style in Artist when you make the images.": "만화 그림체는 쓰지 않을게요. 그림을 만들 때 Artist에서 스타일을 골라 주세요.",
   "How should the comic art style work?": "만화 그림체는 어떻게 할까요?",
   "Keep it and fix it": "그대로 고정",
   "A fixed art style cannot be changed in Producer later.": "고정하면 나중에 Producer에서 스타일을 바꿀 수 없어요.",
