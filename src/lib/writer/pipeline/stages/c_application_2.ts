@@ -6,7 +6,7 @@
 // Step 2: Claude로 액션 스코프 + 일관성 검증 (실패 시 split)
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import { SHOT_PHYSICS } from '@/lib/writer/pipeline/physics';
-import { SHOTCHECK_MAX_SHOTS, skipsShotCheck } from '@/lib/writer/pipeline/shotcheck-policy';
+import { SHOTCHECK_CHUNK_CONCURRENCY, SHOTCHECK_CONTEXT_SHOTS, chunksShotCheck, planShotCheckChunks, shotCheckEstMs } from '@/lib/writer/pipeline/shotcheck-policy';
 import type {
   ShotCheckReport,
   WorldVisual,
@@ -28,12 +28,51 @@ import type { AppLocale } from '@/lib/locale';
 import { buildAssetRegistry, normalizeShotSequenceAssetRefs } from '@/lib/writer/pipeline/util/asset_refs';
 import { outputLanguageClause } from '@/lib/writer/pipeline/util/output-language';
 
-interface ClaudeC2ValidationResponse {
+export interface ClaudeC2ValidationResponse {
   shots_to_split: Array<{ shot_id: string; reason: string; new_shots: ShotSequenceItem[] }>;
   semantic_issues: ValidationIssue[];
 }
 
+/** 긴 작품 묶음 점검의 진행(오너 2026-11-11 "장면별로 나눠 점검한다") — 실행 상태(shotCheckPartial)에 저장돼 다음 호출이 이어 간다.
+ *  done = 끝난 묶음 번호(0부터) → 그 묶음의 나누기안 · 지적(앞 맥락 샷 것은 뺀 뒤). failed = 점검하지 못한 묶음 번호 → 까닭 한 줄. */
+export interface ShotCheckChunkProgress {
+  done: Record<string, ClaudeC2ValidationResponse>;
+  failed: Record<string, string>;
+}
+
 type ShotSplitRequest = ClaudeC2ValidationResponse['shots_to_split'][number];
+
+/** 점검 지시의 출력 형식 — 한 번에 점검과 묶음 점검이 같은 글을 쓴다. */
+const VAL_OUTPUT_FORMAT = `[출력 형식 - JSON]
+{
+  "shots_to_split": [
+    {
+      "shot_id": "shot_X",
+      "reason": "string",
+      "new_shots": [ /* 분할된 ShotSequenceItem 배열 */ ]
+    }
+  ],
+  "semantic_issues": [
+    {
+      "category": "action_budget" | "continuity" | "verisimilitude",
+      "severity": "CRITICAL" | "WARNING" | "INFO",
+      "location": "shot_id",
+      "message": "string",
+      "suggestion": "string (optional)",
+      "constraint_target": "visual" | "text" | "report_only",
+      "constraint": "string — constraint_target=visual일 때만, 화면에 보이는 사실을 지키는 명령형 EN 한 문장"
+    }
+  ]
+}`;
+
+/** 묶음 점검 지시 — 이 묶음의 샷만 점검하고, 앞 묶음 끝 샷은 읽기만 하는 맥락으로 준다(오너 2026-11-11). */
+function chunkValUser(index: number, total: number, context: ShotSequenceItem[], shots: ShotSequenceItem[]): string {
+  const head = `[묶음 ${index + 1}/${total} — 이 묶음의 샷만 점검한다]\n`;
+  const ctx = context.length
+    ? `[앞 맥락 — 읽기만]\n아래 ${context.length}샷은 앞 묶음의 끝 샷이다. 이 샷은 나누거나(shots_to_split) 지적(semantic_issues)하지 말고, 이 묶음 첫 샷과의 이어짐 판단에만 써라.\n${JSON.stringify(context, null, 2)}\n\n`
+    : '';
+  return `${head}${ctx}[샷 시퀀스]\n${JSON.stringify(shots, null, 2)}\n\n${VAL_OUTPUT_FORMAT}`;
+}
 
 /** 모델 응답 shape 보정 (array 래핑/필드 누락 대응). */
 function coerceValResponse(raw: unknown): ClaudeC2ValidationResponse {
@@ -62,8 +101,10 @@ export async function runShotCheck(
   // #stage/#ledger(2026-09-03): v4 가 무대에서 계산·검사한 이슈 — visual 제약은 check_notes 로 부착, 전부 보고서에.
   stageIssues: ValidationIssue[] = [],
   // 점검 호출의 시간 예산(검토 b 2026-11-11) — 이 시각까지 답이 없으면 끊고 "점검 생략" 경고로 넘어간다(아래 catch).
-  opts?: { deadlineMs?: number },
-): Promise<{ shotSequence: ShotSequence; report: ShotCheckReport }> {
+  //   softDeadlineMs · resume 은 묶음 점검(80샷 초과)만 쓴다 — 묶음 착수 대기 기준과 앞 호출이 저장한 진행.
+  opts?: { deadlineMs?: number; softDeadlineMs?: number; resume?: ShotCheckChunkProgress | null },
+  // partial 이 있으면 묶음 점검이 덜 끝나 다음 호출로 넘긴 것이다 — shotSequence · report 는 점검 전 조립본이라 쓰지 않는다.
+): Promise<{ shotSequence: ShotSequence; report: ShotCheckReport; partial?: ShotCheckChunkProgress }> {
   await logger.markStage('shotCheck', 'started');
 
   // ===== Step 1: 결정론 조립 (L4 1개당 ShotSequenceItem 정확히 1개 — shot loss 원천 차단) =====
@@ -131,47 +172,97 @@ split 권장 시 new_shots 배열로 분할안 제시 (각각 1 주요 액션). 
   const valUser = `[샷 시퀀스]
 ${JSON.stringify(assembledShots, null, 2)}
 
-[출력 형식 - JSON]
-{
-  "shots_to_split": [
-    {
-      "shot_id": "shot_X",
-      "reason": "string",
-      "new_shots": [ /* 분할된 ShotSequenceItem 배열 */ ]
-    }
-  ],
-  "semantic_issues": [
-    {
-      "category": "action_budget" | "continuity" | "verisimilitude",
-      "severity": "CRITICAL" | "WARNING" | "INFO",
-      "location": "shot_id",
-      "message": "string",
-      "suggestion": "string (optional)",
-      "constraint_target": "visual" | "text" | "report_only",
-      "constraint": "string — constraint_target=visual일 때만, 화면에 보이는 사실을 지키는 명령형 EN 한 문장"
-    }
-  ]
-}`;
+${VAL_OUTPUT_FORMAT}`;
 
   // 단일 콜 (전 샷 한 번에). 씬 단위 fan-out 을 실험했다가 걷어냈다(#shotcheck-fanout 기각,
   //   2026-08-10): 프롬프트를 한 글자도 안 바꿔도 컨텍스트를 씬으로 자르면 모델의 판정 분포가
   //   바뀐다 — 벽시계 +70%(153.6→261.3s), 이슈 3배(57→170), 연속성 7.5배(13→97). 그 WARNING 이
   //   check_notes 로 생성 프롬프트에 주입되므로 품질까지 함께 나빠진다.
   //   "규칙이 씬 로컬이면 절단도 중립"은 규칙의 성질이지 모델 출력의 성질이 아니다.
+  //   2026-11-11 오너 "장면별로 나눠 점검한다": 80샷 이하는 그대로 단일 콜. 80샷 초과만 묶음(장면을 이어 붙인 40샷 안팎 +
+  //   앞 묶음 끝 2샷 읽기만 맥락)으로 나눈다 — 위 fan-out(씬 하나씩 · 맥락 없음)과 달리 견주기(40샷대 2작품)에서
+  //   이어짐 지시 +0~12% · 관리자 띠 +3~6%로 작게 움직였다(나눈 샷은 한 작품만 2 → 8). 잡음 · 알고 켠 빠짐은 shotcheck-policy.ts.
   let valResult: ClaudeC2ValidationResponse;
-  if (skipsShotCheck(shotDesigns.length)) {
-    // 오너 2026-11-11: 80샷 넘는 긴 작품은 장면별 점검이 들어올 때까지 처음부터 건너뛴다 — AI 를 부르지 않고,
-    //   점검 실패와 같은 자리에 "건너뜀"을 남긴다(아래 catch 의 경고와 같은 분류 · 위치 · 심각도).
-    console.warn(`[C2_validate] 샷 ${shotDesigns.length}개 > ${SHOTCHECK_MAX_SHOTS} — 점검 건너뜀, 분할 없이 진행`);
-    sceneBudgetIssues.push({
-      category: 'action_budget',
-      severity: 'WARNING',
-      location: 'shotCheck',
-      message: `샷 점검을 건너뛰어 분할·점검 없이 진행됨 (샷 ${shotDesigns.length}개 > ${SHOTCHECK_MAX_SHOTS} — 장면별 점검 전까지)`,
-      suggestion: '장면별 점검이 들어오면 점검된다',
-    });
-    await logger.markStage('shotCheck', 'failed', { absorbed: true, skipped: 'too_many_shots' });
+  let partial: ShotCheckChunkProgress | undefined;
+  if (chunksShotCheck(shotDesigns.length)) {
+    // 긴 작품(80샷 초과)은 장면을 이어 붙인 묶음마다 점검한다(오너 2026-11-11) — 한 번에는 270초 안에 못 끝났다.
+    //   묶음마다 앞 묶음 끝 샷을 읽기만 하는 맥락으로 붙이고(그 샷의 나누기안 · 지적은 버린다), 2개씩 동시에 부른다.
+    //   묶음 착수 대기: 남은 예산이 다음 묶음 예상보다 적으면 끝낸 묶음을 진행으로 돌려주고 다음 호출이 이어 간다.
+    //   끝나면 나누기안 · 지적을 묶음 차례로 합쳐 아래 3단계가 한 번에 적용하고 번호를 다시 매긴다.
+    const chunks = planShotCheckChunks(assembledShots, (shot) => String(shot.S?.scene_id ?? ''));
+    const progress: ShotCheckChunkProgress = { done: { ...(opts?.resume?.done ?? {}) }, failed: { ...(opts?.resume?.failed ?? {}) } };
+    const pending = chunks.map((_, i) => i).filter((i) => !(String(i) in progress.done) && !(String(i) in progress.failed));
+    const allIds = new Set(assembledShots.map((shot) => shot.shot_id));
+    const checkChunk = async (i: number): Promise<void> => {
+      const context = i > 0 ? chunks[i - 1].slice(-SHOTCHECK_CONTEXT_SHOTS) : [];
+      const own = new Set(chunks[i].map((shot) => shot.shot_id));
+      const user = chunkValUser(i, chunks.length, context, chunks[i]);
+      try {
+        const raw = await generateJson<unknown>(user, cAxisConfig, {
+          systemInstruction: valSystem,
+          temperature: 0.3,
+          maxTokens: 32000,
+          deadlineMs: opts?.deadlineMs,
+        });
+        await logger.saveLlmCall(`shotCheck_validate_chunk_${i + 1}`, {
+          prompt: user,
+          response: JSON.stringify(raw, null, 2),
+          model: describeAxisConfig(cAxisConfig),
+          provider: cAxisConfig.provider,
+        });
+        const v = coerceValResponse(raw);
+        progress.done[String(i)] = {
+          shots_to_split: v.shots_to_split.filter((split) => own.has(split.shot_id)),
+          // 지적 자리가 이 작품의 샷 번호이면 이 묶음의 샷 번호일 때만 남긴다(검토 b 2026-11-11) — 앞 맥락 샷이나 보지 못한
+          //   다른 묶음 샷에 단 지적이 그 샷의 그림 지시로 붙지 않게. 장면 · 구간 같은 다른 자리는 보고서용으로 둔다.
+          semantic_issues: v.semantic_issues.filter((issue) => {
+            const at = String(issue.location ?? '').trim();
+            return !allIds.has(at) || own.has(at);
+          }),
+        };
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        await logger.saveLlmCall(`shotCheck_validate_chunk_${i + 1}_FAILED`, {
+          prompt: user,
+          response: `ERROR: ${msg}`,
+          model: describeAxisConfig(cAxisConfig),
+          provider: cAxisConfig.provider,
+        });
+        console.error(`[C2_validate] 묶음 ${i + 1}/${chunks.length} 검증 실패, 그 묶음은 분할 없이 진행:`, msg);
+        progress.failed[String(i)] = msg.slice(0, 160);
+      }
+    };
+    while (pending.length) {
+      const batch = pending.slice(0, SHOTCHECK_CHUNK_CONCURRENCY);
+      const est = Math.max(...batch.map((i) => shotCheckEstMs(chunks[i].length)));
+      if (opts?.softDeadlineMs != null && Date.now() + est > opts.softDeadlineMs) {
+        partial = progress;
+        break;
+      }
+      pending.splice(0, batch.length);
+      await Promise.all(batch.map(checkChunk));
+    }
     valResult = { shots_to_split: [], semantic_issues: [] };
+    if (!partial) {
+      for (let i = 0; i < chunks.length; i++) {
+        const done = progress.done[String(i)];
+        if (done) {
+          valResult.shots_to_split.push(...done.shots_to_split);
+          valResult.semantic_issues.push(...done.semantic_issues);
+          continue;
+        }
+        // 점검하지 못한 묶음은 그 묶음만 "점검 생략" — 다른 묶음 결과는 쓴다(지금 점검 생략 경고와 같은 분류 · 위치 · 심각도).
+        const first = chunks[i][0]?.shot_id;
+        const last = chunks[i].at(-1)?.shot_id;
+        sceneBudgetIssues.push({
+          category: 'action_budget',
+          severity: 'WARNING',
+          location: 'shotCheck',
+          message: `묶음 ${i + 1}/${chunks.length}(${first}~${last}) 점검을 못 해 그 묶음은 분할·점검 없이 진행됨 (${(progress.failed[String(i)] ?? '').slice(0, 80)})`,
+          suggestion: '파이프라인 재실행 또는 샷 수 축소',
+        });
+      }
+    }
   } else {
     try {
       const valRaw = await generateJson<unknown>(valUser, cAxisConfig, {
@@ -221,7 +312,13 @@ ${JSON.stringify(assembledShots, null, 2)}
     //   경우가 실측됨(47a62d1d: S 누락 4샷) → persistShotsToDb가 it.S.scene_id에서 죽는다.
     //   누락 블록은 원본 샷에서 결정론 상속해 스키마를 보장한다.
     const original = finalShots[idx];
-    const patched = buildSplitChildren(original, split.shot_id, split.new_shots);
+    // 나눈 새 샷은 모델이 지은 이름 대신 겹칠 수 없는 이름(부모__s1 …)으로 적용한다(검토 b 2026-11-11) — 모델이 새 샷에
+    //   다른 샷 이름(묶음 경계에선 다음 묶음의 실제 번호)을 붙이면, 그 이름으로 다른 샷의 나누기 · 지시가 새 샷에 붙었다.
+    //   아래에서 번호를 다시 매기니 겉은 같다. 지시는 부모 이름(_splitFrom)으로만 물려받는다.
+    const patched = buildSplitChildren(original, split.shot_id, split.new_shots).map((child, k) => ({
+      ...child,
+      shot_id: `${split.shot_id}__s${k + 1}`,
+    }));
     finalShots.splice(idx, 1, ...patched);
     splitCount += patched.length - 1;
   }
@@ -295,6 +392,8 @@ ${JSON.stringify(assembledShots, null, 2)}
     shots_split_count: splitCount,
     total_action_violations_fixed: valResult.shots_to_split.length,
   };
+
+  if (partial) return { shotSequence, report, partial };
 
   await logger.saveStage('12_c2_shotCheck.json', report);
   await logger.saveStage('13_c2_shotSequence.json', shotSequence);

@@ -1,4 +1,4 @@
-// 샷 점검은 이 호출의 남은 시간 안에서만 기다리고, 끝난 뒤 시간이 모자라면 점검 결과를 저장해 다음 호출로 넘긴다. 80샷 넘는 작품은 기다리지 않는다(검토 b · 오너 2026-11-11)
+// 샷 점검은 이 호출의 남은 시간 안에서만 기다리고, 끝난 뒤 시간이 모자라면 점검 결과를 저장해 다음 호출로 넘긴다. 80샷 넘는 작품은 묶음마다 저장하고 넘긴다(검토 b · 오너 2026-11-11)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -79,13 +79,34 @@ describe('shotsAndDialogue — 샷 점검 시간 예산', () => {
     expect(mocks.runShotCheck.mock.calls[0].at(-1)).toEqual({ deadlineMs: deadlineMs + 30_000 })
   })
 
-  // 왜: 오너 안 "80샷이 넘으면 점검을 처음부터 건너뛴다" — 어차피 AI 를 부르지 않으니 착수 대기(최대 200초 몫)로 다음 호출을 기다리지 않는다.
-  it('샷이 80개를 넘는 작품은 샷 점검을 처음부터 건너뛰고 기다리지 않는다', async () => {
+  // 왜: 긴 작품은 묶음 몇 개만 끝내고 이 호출의 시간이 다 될 수 있다(오너 2026-11-11 "장면별로 나눠 점검한다") — 끝낸 묶음을 실행 상태에 남겨야
+  //   다음 호출이 남은 묶음만 이어 간다(점검을 다시 사지 않는다). 다음 묶음에 시간이 모자란지는 점검 단계가 이 호출의 예산으로 본다.
+  it('묶음마다 결과를 저장하고, 남은 시간이 다음 묶음에 모자라면 다음 호출로 넘긴다', async () => {
     const many = Array.from({ length: 81 }, (_, i) => ({ shot_id: `shot_${i + 1}` }))
     mocks.runShotDesign.mockResolvedValue({ done: true, doneSceneIds: ['scene_1'], shots: many })
-    const patch = await runLanes(state(), Date.now() + 10_000) // 80샷 이하라면 착수 대기로 넘길 만큼만 남은 시간
+    const progress = { done: { 0: { shots_to_split: [], semantic_issues: [] } }, failed: {} }
+    mocks.runShotCheck.mockResolvedValueOnce({ partial: progress }) // 첫 묶음만 끝내고 남은 시간이 다음 묶음에 모자랐다
+    const deadlineMs = Date.now() + 240_000
+    const first = await runLanes(state(), deadlineMs)
+    expect(mocks.runShotCheck.mock.calls[0].at(-1)).toMatchObject({ softDeadlineMs: deadlineMs, resume: null })
+    expect(first.shotCheckPartial).toEqual(progress)
+    expect(first.shotSequence).toBeUndefined()
+    expect(mocks.runRenderPrompts).not.toHaveBeenCalled()
+
+    const second = await runLanes(state(first), Date.now() + 240_000)
+    expect(mocks.runShotCheck.mock.calls[1].at(-1)).toMatchObject({ resume: progress })
+    expect(second.shotSequence).toEqual(SEQUENCE)
+    expect(second).toHaveProperty('shotCheckPartial', undefined)
+  })
+
+  // 왜: 긴 작품은 묶음마다 착수 대기를 한다 — 점검 전체를 기다리는 대기(최대 200초 몫)로 묶음 점검을 미루지 않는다.
+  it('샷이 80개를 넘는 작품은 점검 전체 착수 대기 없이 묶음 점검으로 넘긴다', async () => {
+    const many = Array.from({ length: 81 }, (_, i) => ({ shot_id: `shot_${i + 1}` }))
+    mocks.runShotDesign.mockResolvedValue({ done: true, doneSceneIds: ['scene_1'], shots: many })
+    const deadlineMs = Date.now() + 10_000 // 80샷 이하라면 착수 대기로 넘길 만큼만 남은 시간
+    await runLanes(state(), deadlineMs)
     expect(mocks.runShotCheck).toHaveBeenCalledTimes(1)
-    expect(patch.shotSequence).toEqual(SEQUENCE)
+    expect(mocks.runShotCheck.mock.calls[0].at(-1)).toMatchObject({ softDeadlineMs: deadlineMs })
   })
 
   // 왜: 점검(수 분) 뒤 프롬프트 다듬기까지 한 호출에서 하다 잘리면, 다음 호출이 같은 점검을 다시 사고 세 번이면 Writer 가 실패했다.

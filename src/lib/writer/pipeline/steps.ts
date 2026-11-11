@@ -22,10 +22,10 @@ import { runDecoupage, runtimeFitCap } from '@/lib/writer/pipeline/stages/decoup
 import { runSceneStage } from '@/lib/writer/pipeline/stages/v3s_stage';
 import { isFlagOn } from '@/lib/flags';
 import { runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots';
-import { runShotCheck } from '@/lib/writer/pipeline/stages/c_application_2';
+import { runShotCheck, type ShotCheckChunkProgress } from '@/lib/writer/pipeline/stages/c_application_2';
 import { runRenderPrompts } from '@/lib/writer/pipeline/stages/v5_prompts';
 import { renderPromptLlmCalls } from '@/lib/writer/pipeline/util/render_prompt_extract';
-import { skipsShotCheck } from '@/lib/writer/pipeline/shotcheck-policy';
+import { chunksShotCheck, shotCheckEstMs } from '@/lib/writer/pipeline/shotcheck-policy';
 import { runDialogue, toDialogueTrack, type DialogueProgress } from '@/lib/writer/pipeline/stages/dialogue';
 // #script-preserve 2026-09-17: 대본 보존 — 씬·대사를 LLM 으로 다시 쓰지 않고 대본에서 옮긴다(tests/writer/script-preserve-steps.test.ts).
 import { preservedScript, scenesFromScript, annotateScriptScenes, dialogueTrackFromScript, mergeScriptSpeakers } from '@/lib/writer/script/preserve';
@@ -168,6 +168,8 @@ export interface WriterRunState extends WriterRunStateBase {
   /** shotDesign 씬 단위 부분 진행(#long-writer-run 2026-07-15) — 긴 러닝타임 프로젝트에서
    *  한 step(240s 예산) 안에 전 씬을 못 끝낼 때 완료 씬을 체크포인트하고 다음 step이 이어간다. */
   shotDesignPartial?: { doneSceneIds: string[]; shots: ShotDesign[] };
+  /** 긴 작품(80샷 초과) 묶음 샷 점검의 진행 — 끝낸 묶음 결과. 다음 호출이 남은 묶음만 이어 간다(오너 2026-11-11). */
+  shotCheckPartial?: ShotCheckChunkProgress;
   shotSequence?: ShotSequence;
   shotCheck?: ShotCheckReport;
   renderPrompts?: RenderPromptsOutput;
@@ -295,10 +297,10 @@ async function runLaneVisual(
     //   실측(87~154s / 15~25샷, 최대 278s) 기준 샷당 6s, 바닥 160s.
     //   상한 200s(리뷰 R1): EST 가 step 예산(240s)에 닿으면 어떤 인보케이션도 착수 조건을 못 채워
     //   좀비 run(영구 paused)이 된다 — 신선한 인보케이션은 항상 시도하고 300s 하드킬·attempt 예산에 맡긴다.
-    const EST_SHOTCHECK_MS = Math.min(200_000, Math.max(160_000, (s.shotDesign?.length ?? 0) * 6_000));
-    // 80샷 넘는 긴 작품은 점검 AI 를 부르지 않으니(오너 2026-11-11, shotcheck-policy.ts) 착수 대기 없이 바로 결정론 조립만 한다.
-    const skipCheck = skipsShotCheck(shotDesign.length);
-    if (!skipCheck && deadlineMs != null && Date.now() + EST_SHOTCHECK_MS > deadlineMs) {
+    const EST_SHOTCHECK_MS = shotCheckEstMs(s.shotDesign?.length ?? 0);
+    // 80샷 넘는 긴 작품은 묶음마다 착수 대기를 한다(오너 2026-11-11, shotcheck-policy.ts) — 점검 전체 대기는 건너뛴다.
+    const chunked = chunksShotCheck(shotDesign.length);
+    if (!chunked && deadlineMs != null && Date.now() + EST_SHOTCHECK_MS > deadlineMs) {
       console.log(
         `[writer] shotCheck 착수 보류 — 남은 예산 ${Math.round((deadlineMs - Date.now()) / 1000)}s < 예상 ${EST_SHOTCHECK_MS / 1000}s. shotDesign 체크포인트 후 다음 step 으로.`,
       );
@@ -320,12 +322,22 @@ async function runLaneVisual(
       patch.shotDesignIssues ?? s.shotDesignIssues ?? [],
       // 점검 시간 예산(검토 b 2026-11-11): 남은 예산 + 30초까지만 기다린다 — 300초 하드 한도 전에 끊어야
       //   결과(못 끝나면 "점검 생략" 경고)를 저장한다. 잘려 다음 호출이 같은 점검을 다시 사던 것을 막는다.
-      { deadlineMs: deadlineMs != null ? deadlineMs + SHOTCHECK_OVERRUN_MS : undefined },
+      //   묶음 점검(80샷 초과)은 묶음 착수 대기 기준(이 호출의 예산)과 앞 호출이 저장한 묶음 진행을 함께 넘긴다.
+      {
+        deadlineMs: deadlineMs != null ? deadlineMs + SHOTCHECK_OVERRUN_MS : undefined,
+        ...(chunked ? { softDeadlineMs: deadlineMs, resume: s.shotCheckPartial ?? null } : {}),
+      },
     );
     await logger.flushRawLlm('shotCheck');
+    // 묶음 점검이 덜 끝났다 — 끝낸 묶음을 저장하고 다음 호출로 넘긴다(점검을 다시 사지 않는다).
+    if (result.partial) {
+      patch.shotCheckPartial = result.partial;
+      return patch;
+    }
     shotSequence = result.shotSequence;
     patch.shotSequence = result.shotSequence;
     patch.shotCheck = result.report;
+    patch.shotCheckPartial = undefined; // 체크포인트 정리 (JSONB 직렬화에서 키 제거)
     // 점검이 끝났는데 남은 시간이 프롬프트 다듬기(AI 로 새로 쓸 프롬프트마다 약 10초)에 모자라면, 점검 결과를 저장하고
     //   다음 호출로 넘긴다 — 다음 호출은 점검을 건너뛰고 다듬기만 한다(점검을 다시 사지 않는다, 검토 b 2026-11-11).
     const estRenderMs = renderPromptLlmCalls(result.shotSequence.shots as never) * RENDER_PROMPT_CALL_MS;
