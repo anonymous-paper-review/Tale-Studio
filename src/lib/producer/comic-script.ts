@@ -24,12 +24,20 @@ const ACTION_LANGUAGE_NAME: Record<ComicActionLanguage, string> = {
   ja: '일본어', // i18n-ok: 모델 지시문의 언어 이름
 }
 
-/** 만화 쪽들을 대본으로 옮기라는 지시문(모델용 · 사용자에게 보이지 않는다). 첨부 순서 = 쪽 순서. */
-export function buildComicScriptPrompt({ pageCount, actionLanguage = 'ko' }: { pageCount: number; actionLanguage?: ComicActionLanguage }): string {
+/** 그림이 만화 원고가 아니라고 할 때의 답 — 시작 화면에서 그대로로 시작한 그림만 이 답을 허락한다(사진 찍은 대본 · 메모는 읽은 글 그대로). */
+export const NOT_COMIC_REPLY = 'NOT_A_COMIC'
+
+/** 만화 쪽들을 대본으로 옮기라는 지시문(모델용 · 사용자에게 보이지 않는다). 첨부 순서 = 쪽 순서.
+ *  notComic: 만화가 아닌 그림(글이 적힌 문서 · 대본 · 메모 사진)이면 NOT_COMIC_REPLY 로만 답하게 한다(2026-11-11 오너 결정 3 — 시작 화면).
+ *  채팅으로 올린 만화는 사용자가 만화라고 고른 것이라 이 답을 두지 않는다. */
+export function buildComicScriptPrompt({ pageCount, actionLanguage = 'ko', notComic = false }: { pageCount: number; actionLanguage?: ComicActionLanguage; notComic?: boolean }): string {
   const lang = ACTION_LANGUAGE_NAME[actionLanguage] ?? ACTION_LANGUAGE_NAME.ko
   return [
     '# 작업: 만화 원고를 대본으로 옮기기', // i18n-ok: 모델 지시문
     '',
+    ...(notComic
+      ? [`먼저 볼 것: 첨부한 그림이 만화 · 웹툰 원고(칸 · 말풍선이 있는 그림)가 아니라 글이 적힌 문서 · 대본 · 메모를 찍은 사진이면, 다른 말 없이 ${NOT_COMIC_REPLY} 한 줄만 답한다. 만화 원고면 아래대로 옮긴다.`, ''] // i18n-ok: 모델 지시문
+      : []),
     `첨부한 그림 ${pageCount}장은 한 만화 원고의 쪽들이다. 첨부 순서가 곧 쪽 순서다. 한 쪽 안에서는 칸을 읽는 순서(보통 위에서 아래로, 같은 줄이면 왼쪽에서 오른쪽, 세로 웹툰이면 위에서 아래)대로 읽는다.`, // i18n-ok: 모델 지시문
     '이 만화를 영상으로 그대로 옮길 대본을 쓴다. 각색하지 않는다.', // i18n-ok: 모델 지시문
     '',
@@ -60,6 +68,11 @@ export function comicScriptRetryNote(reason: Exclude<ComicScriptCheck, { ok: tru
 export function extractComicScript(text: string): string {
   const fenced = /```(?:script|text|txt|plaintext)?[^\S\n]*\n([\s\S]*?)\n```/.exec(text ?? '')
   return (fenced ? fenced[1] : (text ?? '')).trim()
+}
+
+/** 그림 모델이 만화 원고가 아니라고 답했는가(NOT_COMIC_REPLY 한 줄 — 앞뒤 빈칸 · 코드블록 · 마침표는 봐준다). */
+export function isNotComicReply(text: string): boolean {
+  return new RegExp(`^\\s*(?:\`\`\`[a-z]*\\s*)?${NOT_COMIC_REPLY}\\.?\\s*(?:\`\`\`)?\\s*$`).test(text ?? '')
 }
 
 /** 대본 해석기가 장면을 읽어 내는지 — 대본 그대로 쓰기가 같은 해석기를 쓴다. */

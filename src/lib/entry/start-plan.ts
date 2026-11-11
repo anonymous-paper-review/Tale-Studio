@@ -116,6 +116,16 @@ export function entryStory(draft: EntryDraft): string {
   return [idea, fileText].filter(Boolean).join('\n\n')
 }
 
+/**
+ * 만화 쪽 그대로(2026-11-11 오너 결정 3)는 시작할 때 만화 대본 옮기기로 옮긴 대본이 이야기다 — 초안의 파일 글(말풍선 글만 읽은 것) 대신
+ *   그 이야기로 계획을 짠다. 시작 라우트는 옮긴 대본을, 시작한 뒤 다시 짤 때(산문 초안 다시 시도)는 저장한 이야기(story_text)를 넣는다.
+ *   그대로 + 그림 파일이 아니거나 이야기가 비었으면 초안 그대로.
+ */
+export function withComicScript(draft: EntryDraft, script: string | null | undefined): EntryDraft {
+  if (draft.picks.level !== 'keep' || draft.file?.kind !== 'image' || !script?.trim()) return draft
+  return { ...draft, file: { ...draft.file, text: script } }
+}
+
 /** 원고에서 인물이 말하는 글 — 대본 꼴로 읽히면 대사 줄만(장면 머리 · 인물 이름 · 지문은 빼고), 아니면 글 전체(만화 글자 · 산문). */
 function spokenText(story: string): string {
   const doc = parseScript(story, { assumeScript: true })

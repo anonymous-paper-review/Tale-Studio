@@ -60,7 +60,21 @@ export interface WritingState {
   status: 'idle' | 'starting' | 'writing' | 'failed' | 'done'
   /** 잠금 화면 단계(0 자료 정리 · 1 이야기 뼈대 · 2 씬 스토리 쓰기 · 3 다 됨). */
   step: number
-  error?: 'start_failed' | 'writer_failed'
+  /** comic_script_failed: 만화 쪽 그대로 시작에서 만화를 대본으로 옮기지 못했다(2026-11-11 결정 3). */
+  error?: 'start_failed' | 'writer_failed' | 'comic_script_failed'
+}
+
+/** 잠금 화면 실패 문구(영어 원문 — 화면이 번역한다). 만화를 옮기지 못했으면 그 까닭과 다른 길(다시 시도 · 다듬기로 시작)을 알린다
+ *  — "설정을 확인하고 다시 시도해 주세요"만 떠 설정이 잘못된 줄 알았다(검토 a 낮음 2, 2026-11-11). 다듬기는 옮기지 않고 그림에서 읽은 글로 시작한다. */
+export function writingFailureCopy(error: WritingState['error']): { title: string; description: string } {
+  if (error === 'comic_script_failed') {
+    return {
+      title: "Couldn't turn the comic into a script",
+      description: 'Try again in a moment. Or close this, set Change level to "Polish", and start with the text read from the picture.',
+    }
+  }
+  if (error === 'start_failed') return { title: "Couldn't start", description: 'Please check the settings and try again.' }
+  return { title: "Couldn't write the prose draft", description: 'Something went wrong while writing. Please try again.' }
 }
 
 interface EntryData {
@@ -663,8 +677,16 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
         )
         const json = await readJson(res)
         if (gen !== generation) return false
+        // 이미 시작한 프로젝트 — 새로 고치기 전에 누른 시작이 뒤에서 끝났다(만화 쪽 그대로는 옮기기로 시작이 30~60초 길다, 2026-11-11).
+        //   함께 누른 두 시작 중 늦게 끝난 쪽은 "단계가 지남"(wrong_stage)을 받는다 — 같은 뜻이다(리드 2026-11-11).
+        //   시작 실패를 되풀이하지 않고 시작한 화면으로 바꾼다 — 거기서 산문 초안을 (다시) 쓴다.
+        if (res.status === 409 && (json?.error === 'already_started' || json?.error === 'wrong_stage')) {
+          set({ writing: { status: 'idle', step: 0 } })
+          await get().load(projectId)
+          return false
+        }
         if (!res.ok || !json || json.ok !== true) {
-          set({ writing: { status: 'failed', step: 0, error: 'start_failed' } })
+          set({ writing: { status: 'failed', step: 0, error: json?.error === 'comic_script_failed' ? 'comic_script_failed' : 'start_failed' } })
           return false
         }
         body = json
