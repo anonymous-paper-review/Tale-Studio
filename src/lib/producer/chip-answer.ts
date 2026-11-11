@@ -152,6 +152,11 @@ const IMAGE_QUESTIONS: ReadonlyArray<readonly [string, (text: string, labels: re
   ['style-attachment:', matchWriterStyleAttachment],
 ]
 
+/** 그림 질문(쓰임새 · 어느 인물 · 여러 장 · 만화 그림체 · 다시 쓰기 · 다시 옮기기 · 그림체로 쓸지)의 칩 기록 id 인가. */
+export function isImageQuestionId(id: string): boolean {
+  return IMAGE_QUESTIONS.some(([prefix]) => id.startsWith(prefix))
+}
+
 /** 새로 고침 뒤 돌아온 그림 질문(칩만 남은 것)에 답한 말인가 — 돌아온 칩 이름이거나 그 질문의 칩 말 · 짧은 답. 그림 질문이 아니면 false. */
 export function answersRestoredImageQuestion(question: { id: string; labels: readonly string[] }, text: string): boolean {
   const match = IMAGE_QUESTIONS.find(([prefix]) => question.id.startsWith(prefix))?.[1]

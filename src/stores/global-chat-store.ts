@@ -24,7 +24,7 @@ import { selectedProducerDialogueLanguage } from '@/lib/producer-dialogue-langua
 import { fixKoreanParticles } from '@/lib/korean-particles'
 import { coerceCardFill, matchImageUseAnswer, matchImageUseInText, matchYesNo, type CardFill, type ImageUseAnswer } from '@/lib/producer/image-role'
 import { MAX_COMIC_PAGES, comicRewriteQuestion, comicStyleQuestion, imageBatchQuestion, matchBatchImageAnswer, matchComicAnswer, matchComicIntentInText, matchComicStyleAnswer, sortComicPages } from '@/lib/producer/comic-intake'
-import { answersRestoredImageQuestion, characterPickOptions, imageRoleOptions, matchCharacterPick, matchWriterBatch, matchWriterComicRewrite, matchWriterComicStyle, matchWriterImageUse, matchWriterStyleAttachment, styleAttachmentOptions } from '@/lib/producer/chip-answer'
+import { answersRestoredImageQuestion, characterPickOptions, imageRoleOptions, isImageQuestionId, matchCharacterPick, matchWriterBatch, matchWriterComicRewrite, matchWriterComicStyle, matchWriterImageUse, matchWriterStyleAttachment, styleAttachmentOptions } from '@/lib/producer/chip-answer'
 import { CHAT_IMAGE_ROLE_CONSENT, CHAT_STYLE_CONFIRM_CONSENT, CHAT_STYLE_REQUEST_CONSENT, COMIC_ANALYSIS_CONSENT, CREATION_ANALYSIS_CONSENT, STYLE_PICKER_CONSENT } from '@/lib/style-facets/consent'
 import type { PendingCreation } from '@/stores/pending-creation-store'
 import { producerBusyKind, type BoardBusy } from '@/lib/producer/busy'
@@ -492,6 +492,13 @@ export interface ChatImageInput {
   sliceUrls: string[]
 }
 
+/** 다른 그림 질문이 열려 있는가 — 답해야 끝나는 질문(쓰임새 · 어느 인물 · 여러 장 · 만화 그림체 · 다시 쓰기)이 있거나 그림 질문이 지금 떠 있다.
+ *  그동안 시작 화면 만화의 그림체 질문은 묻지 않는다 — 끝나면 Writer 화면이 다시 부른다(2026-11-11 검토 a 보통 1). */
+export function imageQuestionOpen(state: Pick<GlobalChatState, 'imageRoleGate' | 'imageBatchGate' | 'comicStyleGate' | 'comicRewriteGate' | 'suggestion'>): boolean {
+  if (state.imageRoleGate || state.imageBatchGate || state.comicStyleGate || state.comicRewriteGate) return true
+  return !!state.suggestion && isImageQuestionId(state.suggestion.id)
+}
+
 /** 그림체를 묻거나 정하는 중인가(2026-10-10) — 그동안 스타일 선택 창을 자동으로 띄우지 않고 기다린다. */
 export function styleChoiceBusy(state: { styleAttachmentGate: { projectId: string } | null; styleSettingFor: string | null }, projectId: string | null): boolean {
   return !!projectId && (state.styleAttachmentGate?.projectId === projectId || state.styleSettingFor === projectId)
@@ -608,7 +615,7 @@ function imageTurnFirst(state: GlobalChatState, input: { text: string; hasImages
   if (input.hasImages) return true
   if (input.hidden) return false
   if (state.imageRoleGate || state.imageBatchGate || state.comicStyleGate || state.comicRewriteGate) return true
-  if (state.startComicStyleGate && state.startComicStyleGate.projectId === input.projectId) return true
+  if (state.startComicStyleGate && state.startComicStyleGate.projectId === input.projectId && state.suggestion?.id === `start-comic-style:${input.projectId}`) return true
   if (state.comicRetry && isComicRetryAnswer(input.text, contentLocale())) return true
   const styleAsk = state.styleAttachmentGate
   if (!styleAsk || styleAsk.projectId !== input.projectId) return false
@@ -667,9 +674,42 @@ function offerStartComicStyleQuestion(get: () => GlobalChatState): void {
   else get().offerSuggestion(suggestion, { preempt: true })
 }
 
-/** 이 채팅에 만화 그림체 질문의 답(칩 말 · 짧은 답)이 이미 있는가 — 시작 화면 만화의 그림체 질문은 한 번만 묻는다. */
+/** 시작 화면 만화의 그림체 질문에서 각색 · 그만두기를 골랐을 때 Writer 가 하는 말 — 그림을 만들 때 Artist 에서 고른다(검토 a 낮음 3). */
+function startComicReply(voice: AppLocale, mode: 'adapt' | 'stop'): string {
+  return mode === 'adapt'
+    ? translate(voice, "I won't use the comic art style. Pick the style in Artist when you make the images.")
+    : translate(voice, "Okay, I won't set the art style now. You can pick it in Artist when you make the images.")
+}
+
+/** 만화 그림체 질문의 답에 Writer 가 하는 말(시작 길 · 채팅 길) — 이 말이 채팅에 있으면 그 질문에 답한 것이다. */
+function comicStyleReplies(voice: AppLocale): string[] {
+  return [
+    translate(voice, 'Set the art style to this comic. Analyzing the art style now.'),
+    translate(voice, "I won't use the comic art style. Choose the style to make it in."),
+    translate(voice, 'Stopped. I did not use the comic pages, and the prose is unchanged.'),
+    startComicReply(voice, 'adapt'),
+    startComicReply(voice, 'stop'),
+  ]
+}
+
+/**
+ * 이 채팅에 만화 그림체 질문의 답이 이미 있는가 — 시작 화면 만화의 그림체 질문은 한 번만 묻는다.
+ *   그 질문의 칩이 보내는 문장이나, 그 답에 Writer 가 한 말(영어 · 한국어)만 답으로 본다. 칩 낱말로 가리면 질문과 상관없는
+ *   짧은 말(취소 · 그만 · keep)에도 걸려 영영 묻지 않았다(검토 a 낮음 2). 저장 형식은 바꾸지 않는다.
+ */
 function comicStyleAnswered(messages: readonly GlobalChatMessage[]): boolean {
-  return messages.some((m) => m.stage === 'producer' && m.role === 'user' && matchWriterComicStyle(m.content) !== null)
+  const voices: AppLocale[] = ['en', 'ko']
+  const chipSays = new Set(voices.flatMap((voice) => comicStyleQuestion(voice, { stop: true }).options.map((option) => option.utterance)))
+  const replies = new Set(voices.flatMap(comicStyleReplies))
+  return messages.some((m) => m.stage === 'producer' && (m.role === 'user' ? chipSays.has(m.content.trim()) : replies.has(m.content)))
+}
+
+/** 시작 화면 만화의 그림체 질문을 거둔다 — 답하지 않은 것으로 두고(다시 물을 수 있게) 질문 자리를 비운다. */
+function yieldStartComicStyle(): void {
+  const state = useGlobalChatStore.getState()
+  const showing = !!state.suggestion?.id.startsWith('start-comic-style:')
+  if (!state.startComicStyleGate && !showing) return
+  useGlobalChatStore.setState({ startComicStyleGate: null, ...(showing ? { suggestion: null } : {}) })
 }
 // 시작 화면 만화의 그림체를 물으러 서버를 읽는 중인 프로젝트 — 화면이 두 번 불러도 한 번만 읽고, 같은 결과를 기다린다.
 const startComicStyleAsking = new Map<string, Promise<boolean>>()
@@ -2132,12 +2172,12 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   offerStartComicStyle: (projectId) => {
     const asking = startComicStyleAsking.get(projectId)
     if (asking) return asking
-    // 물을 수 있는 때 — 보던 프로젝트 · 채팅을 읽은 뒤 · 확정 전 Writer 화면 · 다른 그림 질문이 없고 · 아직 답하지 않았다.
+    // 물을 수 있는 때 — 보던 프로젝트 · 채팅을 읽은 뒤 · 확정 전 Writer 화면 · 다른 그림 질문 · 채팅 답 · 그림체 정하기가 없고 · 아직 답하지 않았다.
     const askable = () => {
       const chat = get()
       return useProjectStore.getState().projectId === projectId && chat.messagesLoadedProjectId === projectId && writerProseLive() &&
-        !chat.startComicStyleGate && !chat.imageRoleGate && !chat.imageBatchGate && !chat.comicStyleGate && !chat.comicRewriteGate &&
-        !comicStyleAnswered(chat.messages)
+        !chat.startComicStyleGate && !imageQuestionOpen(chat) && !chat.loading && chat.styleSettingFor !== projectId &&
+        !useProducerStore.getState().customStyleAnchor && !comicStyleAnswered(chat.messages)
     }
     if (!askable()) return Promise.resolve(false)
     const run = (async () => {
@@ -2380,8 +2420,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
 
     // 시작 화면에서 만화 쪽을 그대로로 시작한 프로젝트의 그림체 질문(2026-11-11 오너) — 칩 말 · 짧은 답만 받고, 아니면 다시 묻는다.
     //   고정이면 시작 때 올린 쪽으로 채팅 길과 같이 그림체를 정하고 분석한다. 대본은 시작할 때 옮겼으니 다시 옮기지 않는다.
+    //   답은 늘 지금 보이던 질문이 받는다 — 시작 질문이 떠 있지 않았으면 거두고 그 말은 아래로 보낸다(검토 a 보통 1).
     const startStyle = get().startComicStyleGate
-    if (startStyle && startStyle.projectId !== projectId) set({ startComicStyleGate: null })
+    if (startStyle && (startStyle.projectId !== projectId || activeSuggestion?.id !== `start-comic-style:${projectId}`)) set({ startComicStyleGate: null })
     else if (startStyle && projectId && stage === 'producer' && !opts?.silentUser) {
       const mode = matchWriterComicStyle(trimmed)
       if (!mode) {
@@ -2392,9 +2433,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       set((state) => ({ startComicStyleGate: null, messages: [...state.messages, { id: makeId(), stage, role: 'user' as const, content: trimmed }] }))
       saveChatMessage(projectId, stage, 'user', trimmed)
       if (mode === 'lock') void runMaterialPlan(get, { ...NO_MATERIALS, styleImage: startStyle.page, styleKind: 'comic', consent: COMIC_ANALYSIS_CONSENT })
-      else producerSpeaker(projectId)(translate(contentLocale(), mode === 'adapt'
-        ? "I won't use the comic art style. Choose the style to make it in."
-        : "Okay, I won't set the art style now. You can pick it in Artist when you make the images."))
+      else producerSpeaker(projectId)(startComicReply(contentLocale(), mode))
       return
     }
 
@@ -4125,6 +4164,10 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const edit = get().sceneStoryEdit
     if (edit && suggestion.id !== `scene-story-edit:${edit.projectId}`) return
     if (get().pendingProposal?.stage === 'producer' && isProducerChoice(suggestion)) return
+    // 시작 화면 만화의 그림체 질문은 다른 그림 질문(쓰임새 · 어느 인물 · 여러 장 · 만화 그림체 · 다시 쓰기 · 다시 옮기기 · 그림체로 쓸지)에
+    //   자리를 내준다(검토 a 보통 1) — 닫을 수 없는 질문이라 그대로 두면 새 질문이 뜨지 못하고, 보이지 않는 시작 질문이 답을 받았다.
+    //   답하지 않은 것으로 두고, 그 질문들이 끝나면 Writer 화면이 다시 묻는다(offerStartComicStyle).
+    if (isImageQuestionId(suggestion.id)) yieldStartComicStyle()
     // 보드 밖에서 숨은 [러프 다시 그리기] 카드는 새 제안에 자리를 비켜 "나중에"로 간다(2026-11-02 리뷰 M1) — 카드는 그 프로젝트
     //   Storyboard 보드에서만 보이는데 제안 자리는 하나라, 숨은 채로 Director 의 Editor 넘김 질문 같은 제안을 막았다.
     //   보드를 떠날 때가 아니라 새 제안이 올 때 비킨다 — 새로 고침 뒤에도 카드는 저장된 채 돌아오고, 다른 제안이 없으면 보드에서 그대로 보인다.

@@ -13,12 +13,19 @@ import { useProjectStore as project } from '@/stores/project-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { choiceSuggestionMarker } from '@/lib/chat-blocks'
 import { comicStyleQuestion } from '@/lib/producer/comic-intake'
+import type { CastMember } from '@/lib/producer-gate'
 
 const MEDIA = 'https://example.supabase.co/storage/v1/object/public/media/ws-1/proj-1/uploads'
 // 시작 화면에서 올린 만화 1쪽 — 서버가 시작 화면 읽기에 돌려주는 모양.
 const START_PAGE = { name: 'comic_1.png', thumbUrl: `${MEDIA}/u1/original.png`, sliceUrls: [`${MEDIA}/u1/s000.jpg`, `${MEDIA}/u1/s001.jpg`] }
 const SCRIPT = 'S#1. ROOM - DAY\nMAN: Hi.\nWOMAN: Hey.'
 const QID = 'start-comic-style:proj-1'
+// 시작한 뒤 Writer 채팅 [+]로 올리는 그림 — 인물 사진 · 나머지 만화 쪽.
+const img = (name: string) => ({ id: name, name, thumbUrl: `${MEDIA}/${name}/original.webp`, sliceUrls: [`${MEDIA}/${name}/s000.jpg`] })
+const PERSON = img('ref-person.png'), PAGE2 = img('comic_2.png'), PAGE3 = img('comic_3.png')
+const NEW_SCRIPT = 'S#2. STREET - NIGHT\nMAN: Wait.\nWOMAN: No.'
+// 산문(옮긴 대본)이 부른 인물 카드 — 이 시험을 위해 지은 이름이다.
+const MAN: CastMember = { localId: 'cast-man', name: 'Man', entityType: 'person', appearance: 'A young man in a T-shirt', origin: 'treatment', userEdited: false }
 
 let fetchMock: ReturnType<typeof vi.fn>
 let comicStart: typeof START_PAGE | null
@@ -35,6 +42,8 @@ function stub() {
     if (url === '/api/writer/prose-confirm') return Response.json({ ok: true })
     if (url === '/api/writer/scene-gate') return Response.json({ proposalId: 'proposal-1' })
     if (url === '/api/produce/chat') return Response.json({ reply: 'Okay.' })
+    if (url === '/api/produce/comic-script') return Response.json({ script: NEW_SCRIPT, stats: { scenes: 1, dialogue_lines: 2 } })
+    if (url === '/api/writer/start') return Response.json({ runId: 'run-2' })
     return Response.json({ ok: true })
   })
   vi.stubGlobal('fetch', fetchMock)
@@ -99,15 +108,29 @@ describe('만화 쪽 그대로 시작 뒤 그림체 묻기', () => {
   })
 
   // 왜: 각색 · 그만두기는 지금처럼 Artist [만들기]의 스타일 창에서 고른다. 그만두기의 채팅 길 문구("만화 원고는 쓰지 않았다")는 여기선 틀린 말이라 따로 말한다(혼자 정한 것).
+  //   각색도 어디서 고르는지 말한다 — 채팅 길 문구("만들 스타일을 골라 주세요")만으로는 어디서 고르는지 몰랐다(검토 a 낮음 3).
   it('각색이나 그만두기를 고르면 그림체를 정하지 않고 Artist 에서 고르게 한다', async () => {
     await chat.getState().offerStartComicStyle('proj-1')
     await send('Adapt it to another style like live action')
-    expect(lastModel()).toBe("I won't use the comic art style. Choose the style to make it in.")
+    expect(lastModel()).toBe("I won't use the comic art style. Pick the style in Artist when you make the images.")
     chat.getState().reset()
     chat.setState({ messagesLoadedProjectId: 'proj-1' })
     await chat.getState().offerStartComicStyle('proj-1')
     await send("Don't use the comic")
     expect(lastModel()).toBe("Okay, I won't set the art style now. You can pick it in Artist when you make the images.")
+    // 한국어 프로젝트도 그림을 만들 때 Artist 에서 고르라고 말한다.
+    project.setState({ projectLocale: 'ko' })
+    const ko = comicStyleQuestion('ko', { stop: true }).options
+    for (const [answer, reply] of [
+      [ko[1].utterance, '만화 그림체는 쓰지 않을게요. 그림을 만들 때 Artist에서 스타일을 골라 주세요.'],
+      [ko[2].utterance, '알겠어요. 그림체는 지금 정하지 않을게요. 그림을 만들 때 Artist에서 골라 주세요.'],
+    ]) {
+      chat.getState().reset()
+      chat.setState({ messagesLoadedProjectId: 'proj-1' })
+      await chat.getState().offerStartComicStyle('proj-1')
+      await send(answer)
+      expect(lastModel(), answer).toBe(reply)
+    }
     expect(calls('/api/produce/anchor-medium')).toEqual([])
     expect(calls('/api/produce/style-anchor')).toEqual([])
     expect(producer.getState().customStyleAnchor ?? null).toBeNull()
@@ -175,5 +198,98 @@ describe('만화 쪽 그대로 시작 뒤 그림체 묻기', () => {
     expect(calls('/api/writer/prose-confirm')).toHaveLength(1)
     expect(chat.getState().startComicStyleGate).toBeNull()
     expect(question()?.id ?? '').not.toBe(QID)
+  })
+
+  // 왜: 검토 a 낮음 2 — "이미 답했나"를 칩 낱말로 가리면 질문과 상관없는 짧은 말(취소 · 그만 · keep)에도 걸려 영영 묻지 않았다.
+  //   저장 형식은 그대로 두고 그 질문의 답만 알아본다: 칩이 보내는 문장, 또는 그 답에 Writer 가 한 말. 짧게 쳐서 답해도 Writer 의 대답 말로 알아본다(혼자 정한 것).
+  it('이미 답했는지는 그림체 질문의 답(칩 말 · 그 답에 Writer 가 한 말)으로만 보고, 질문과 상관없는 짧은 말(취소 · 그만 · keep)은 답으로 보지 않는다', async () => {
+    chat.setState({ messages: [
+      { id: 'u1', stage: 'producer', role: 'user', content: '취소' },
+      { id: 'm1', stage: 'producer', role: 'model', content: 'Cancelled the pending change. Nothing was executed.' },
+      { id: 'u2', stage: 'producer', role: 'user', content: 'keep' },
+      { id: 'u3', stage: 'producer', role: 'user', content: '그만' },
+    ] })
+    expect(await chat.getState().offerStartComicStyle('proj-1')).toBe(true)
+    expect(question()?.id).toBe(QID)
+    // 짧게 쳐서 답했다(각색) — 새로 고친 뒤 같은 채팅이 돌아와도 다시 묻지 않는다.
+    await send('adapt')
+    expect(lastModel()).toBe("I won't use the comic art style. Pick the style in Artist when you make the images.")
+    const answered = chat.getState().messages
+    chat.getState().reset()
+    chat.setState({ messagesLoadedProjectId: 'proj-1', messages: answered })
+    expect(await chat.getState().offerStartComicStyle('proj-1')).toBe(false)
+  })
+})
+
+describe('시작 그림체 질문이 떠 있을 때 채팅으로 그림을 더 올리면', () => {
+  beforeEach(async () => {
+    producer.setState({ cast: [MAN] })
+    expect(await chat.getState().offerStartComicStyle('proj-1')).toBe(true)
+  })
+
+  // 왜: 검토 a 보통 1(O1) — 시작 질문(닫을 수 없음)이 자리를 지켜 쓰임새 질문 · 어느 인물 질문이 뜨지 못했고, 누른 답은 보이지 않는 시작 질문이 받았다.
+  //   여러 쪽 만화는 1쪽으로 시작하고 나머지 쪽 · 인물 사진을 Writer 채팅 [+]로 올리게 되는 흔한 길이다. 답은 늘 지금 보이는 질문이 받는다.
+  it('시작 그림체 질문이 떠 있을 때 채팅으로 인물 사진을 올리면 그 사진의 쓰임새 질문과 어느 인물 질문이 차례로 뜨고, 답은 보이는 질문이 받는다', async () => {
+    chat.getState().offerImageRoles([PERSON], { typed: '', msg: 'Uploaded ref-person.png' })
+    expect(question()?.id).toBe(`image-role:${PERSON.id}`)
+    await send('Use it as a character')
+    expect(question()?.id).toBe(`image-character:${PERSON.id}`)
+    expect(labels()).toContain('Man')
+    await send('This is Man')
+    await vi.waitFor(() => expect(calls('/api/produce/chat')).toHaveLength(1))
+    expect(producer.getState().cast.find((c) => c.localId === 'cast-man')?.sourceImageUrl).toBe(PERSON.thumbUrl)
+    expect(said(/Please choose first how the art style should work/)).toBe(false)
+    expect(calls('/api/produce/anchor-medium')).toEqual([])
+    expect(calls('/api/produce/style-anchor')).toEqual([])
+  })
+
+  // 왜: 검토 a 보통 1(O2) — 만화 쪽을 더 올리면 다시 쓰기 질문과 시작 질문이 꼬였다.
+  it('시작 그림체 질문이 떠 있을 때 채팅으로 만화 쪽을 더 올리면 산문을 만화로 다시 쓸지 묻는 질문이 뜨고, 참고로만을 고르면 그 질문이 받아 만화를 참고 자료로 보낸다', async () => {
+    chat.getState().offerImageRoles([PAGE2], { typed: 'Turn my comic into video as drawn', msg: 'Turn my comic into video as drawn' })
+    expect(question()?.id ?? '').toMatch(/^comic-rewrite:/)
+    await send('Use the comic only as reference')
+    await vi.waitFor(() => expect(calls('/api/produce/chat')).toHaveLength(1))
+    expect(calls('/api/produce/chat')[0]).toMatchObject({ attachmentImageUrls: PAGE2.sliceUrls })
+    expect(said(/Please choose first how the art style should work/)).toBe(false)
+    expect(calls('/api/produce/comic-script')).toEqual([])
+    expect(calls('/api/produce/style-anchor')).toEqual([])
+  })
+
+  // 왜: 검토 a 보통 1(O3) — 나머지 쪽을 올려 [다시 쓰기] → 새 만화의 그림체 질문에서 [고정]을 누르면 숨은 시작 질문이 답을 받아
+  //   그림체가 시작 때 쪽으로 고정되고 새 만화 옮기기는 시작되지 않았다. 고정은 채팅 길 그대로 — 새로 올린 첫 쪽이 그림체다.
+  it('시작 그림체 질문이 떠 있을 때 나머지 만화 쪽을 올려 다시 쓰기를 고르면 그 만화의 그림체 질문이 뜨고, 고정을 고르면 새로 올린 쪽을 옮기고 그 첫 쪽으로 그림체를 정한다', async () => {
+    chat.getState().offerImageRoles([PAGE2, PAGE3], { typed: '', msg: 'Uploaded pictures' })
+    expect(question()?.id ?? '').toMatch(/^image-batch:/)
+    await send('Turn my comic pages into video exactly as drawn')
+    expect(question()?.id ?? '').toMatch(/^comic-rewrite:/)
+    await send('Rewrite the prose from the comic')
+    expect(question()?.id ?? '').toMatch(/^comic-style:/)
+    await send('Keep the comic art style and fix it')
+    await vi.waitFor(() => expect(calls('/api/writer/start')).toHaveLength(1))
+    expect(calls('/api/produce/comic-script')).toHaveLength(1)
+    expect(calls('/api/produce/comic-script')[0].pages.map((p: { name: string }) => p.name)).toEqual([PAGE2.name, PAGE3.name])
+    expect(calls('/api/writer/start')[0]).toMatchObject({ story: NEW_SCRIPT, restartDraft: true, preserveScript: true })
+    await vi.waitFor(() => expect(calls('/api/produce/style-anchor')).toHaveLength(1))
+    expect(calls('/api/produce/style-anchor')[0]).toMatchObject({ imageUrl: PAGE2.thumbUrl, lock: true })
+    expect(said(/Please choose first how the art style should work/)).toBe(false)
+    // 새 만화의 그림체 질문에 답했다 — 시작 그림체 질문은 다시 묻지 않는다.
+    expect(await chat.getState().offerStartComicStyle('proj-1')).toBe(false)
+  })
+
+  // 왜: 다른 그림 질문에 자리를 내준 시작 질문은 답하지 않은 것으로 남는다 — 그 질문이 끝나면 Writer 화면이 다시 부르고 다시 묻는다(검토 a 보통 1 방향).
+  it('다른 그림 질문이 끝나면 시작 그림체 질문을 다시 묻고, 그 답은 시작 질문이 받는다', async () => {
+    chat.getState().offerImageRoles([PERSON], { typed: '', msg: 'Uploaded ref-person.png' })
+    // 다른 그림 질문이 떠 있는 동안은 다시 묻지 않는다.
+    expect(await chat.getState().offerStartComicStyle('proj-1')).toBe(false)
+    expect(question()?.id).toBe(`image-role:${PERSON.id}`)
+    await send('Use it as a character')
+    await send('This is Man')
+    await vi.waitFor(() => expect(calls('/api/produce/chat')).toHaveLength(1))
+    await vi.waitFor(() => expect(chat.getState().loading).toBe(false))
+    expect(await chat.getState().offerStartComicStyle('proj-1')).toBe(true)
+    expect(question()?.id).toBe(QID)
+    await send('Keep the comic art style and fix it')
+    await vi.waitFor(() => expect(calls('/api/produce/style-anchor')).toHaveLength(1))
+    expect(calls('/api/produce/style-anchor')[0]).toMatchObject({ imageUrl: START_PAGE.thumbUrl, lock: true })
   })
 })
