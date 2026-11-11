@@ -6,6 +6,7 @@
 // Step 2: Claude로 액션 스코프 + 일관성 검증 (실패 시 split)
 import { generateJson, describeAxisConfig, type LlmAxisConfig } from '@/lib/writer/llm/dispatch';
 import { SHOT_PHYSICS } from '@/lib/writer/pipeline/physics';
+import { SHOTCHECK_MAX_SHOTS, skipsShotCheck } from '@/lib/writer/pipeline/shotcheck-policy';
 import type {
   ShotCheckReport,
   WorldVisual,
@@ -158,41 +159,56 @@ ${JSON.stringify(assembledShots, null, 2)}
   //   check_notes 로 생성 프롬프트에 주입되므로 품질까지 함께 나빠진다.
   //   "규칙이 씬 로컬이면 절단도 중립"은 규칙의 성질이지 모델 출력의 성질이 아니다.
   let valResult: ClaudeC2ValidationResponse;
-  try {
-    const valRaw = await generateJson<unknown>(valUser, cAxisConfig, {
-      systemInstruction: valSystem,
-      temperature: 0.3,
-      maxTokens: 32000, // #coverage-first 리뷰 M5: 샷 수 증가로 16K 초과 시 파싱 실패 → 침묵 통과되던 것
-      deadlineMs: opts?.deadlineMs,
-    });
-    await logger.saveLlmCall('shotCheck_validate', {
-      prompt: valUser,
-      response: JSON.stringify(valRaw, null, 2),
-      model: describeAxisConfig(cAxisConfig),
-      provider: cAxisConfig.provider,
-    });
-    valResult = coerceValResponse(valRaw);
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    await logger.saveLlmCall('shotCheck_validate_FAILED', {
-      prompt: valUser,
-      response: `ERROR: ${msg}`,
-      model: describeAxisConfig(cAxisConfig),
-      provider: cAxisConfig.provider,
-    });
-    console.error('[C2_validate] 검증 실패, 분할 없이 진행:', msg);
-    // #coverage-first 리뷰 M5: 침묵 통과를 사람에게 보이게 — 점검이 생략됐다는 사실 자체가 결함이다.
+  if (skipsShotCheck(shotDesigns.length)) {
+    // 오너 2026-11-11: 80샷 넘는 긴 작품은 장면별 점검이 들어올 때까지 처음부터 건너뛴다 — AI 를 부르지 않고,
+    //   점검 실패와 같은 자리에 "건너뜀"을 남긴다(아래 catch 의 경고와 같은 분류 · 위치 · 심각도).
+    console.warn(`[C2_validate] 샷 ${shotDesigns.length}개 > ${SHOTCHECK_MAX_SHOTS} — 점검 건너뜀, 분할 없이 진행`);
     sceneBudgetIssues.push({
       category: 'action_budget',
       severity: 'WARNING',
       location: 'shotCheck',
-      message: `shotCheck 검증 응답을 파싱하지 못해 분할·점검 없이 진행됨 (${msg.slice(0, 80)})`,
-      suggestion: '파이프라인 재실행 또는 샷 수 축소',
+      message: `샷 점검을 건너뛰어 분할·점검 없이 진행됨 (샷 ${shotDesigns.length}개 > ${SHOTCHECK_MAX_SHOTS} — 장면별 점검 전까지)`,
+      suggestion: '장면별 점검이 들어오면 점검된다',
     });
-    // ★ 흡수 배지: 이 실패가 state 에 흔적을 남기게 한다. 감사 실측에서 이 경로의 실패가
-    //   콘솔에만 남고 state 흔적 0 이었다 — fan-out 과 무관한 위생이라 롤백에서 보존한다.
-    await logger.markStage('shotCheck', 'failed', { absorbed: true });
+    await logger.markStage('shotCheck', 'failed', { absorbed: true, skipped: 'too_many_shots' });
     valResult = { shots_to_split: [], semantic_issues: [] };
+  } else {
+    try {
+      const valRaw = await generateJson<unknown>(valUser, cAxisConfig, {
+        systemInstruction: valSystem,
+        temperature: 0.3,
+        maxTokens: 32000, // #coverage-first 리뷰 M5: 샷 수 증가로 16K 초과 시 파싱 실패 → 침묵 통과되던 것
+        deadlineMs: opts?.deadlineMs,
+      });
+      await logger.saveLlmCall('shotCheck_validate', {
+        prompt: valUser,
+        response: JSON.stringify(valRaw, null, 2),
+        model: describeAxisConfig(cAxisConfig),
+        provider: cAxisConfig.provider,
+      });
+      valResult = coerceValResponse(valRaw);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      await logger.saveLlmCall('shotCheck_validate_FAILED', {
+        prompt: valUser,
+        response: `ERROR: ${msg}`,
+        model: describeAxisConfig(cAxisConfig),
+        provider: cAxisConfig.provider,
+      });
+      console.error('[C2_validate] 검증 실패, 분할 없이 진행:', msg);
+      // #coverage-first 리뷰 M5: 침묵 통과를 사람에게 보이게 — 점검이 생략됐다는 사실 자체가 결함이다.
+      sceneBudgetIssues.push({
+        category: 'action_budget',
+        severity: 'WARNING',
+        location: 'shotCheck',
+        message: `shotCheck 검증 응답을 파싱하지 못해 분할·점검 없이 진행됨 (${msg.slice(0, 80)})`,
+        suggestion: '파이프라인 재실행 또는 샷 수 축소',
+      });
+      // ★ 흡수 배지: 이 실패가 state 에 흔적을 남기게 한다. 감사 실측에서 이 경로의 실패가
+      //   콘솔에만 남고 state 흔적 0 이었다 — fan-out 과 무관한 위생이라 롤백에서 보존한다.
+      await logger.markStage('shotCheck', 'failed', { absorbed: true });
+      valResult = { shots_to_split: [], semantic_issues: [] };
+    }
   }
 
   // ===== Step 3: 분할 적용 + shot_id 재정렬 =====

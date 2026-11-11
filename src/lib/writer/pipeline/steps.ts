@@ -25,6 +25,7 @@ import { runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots';
 import { runShotCheck } from '@/lib/writer/pipeline/stages/c_application_2';
 import { runRenderPrompts } from '@/lib/writer/pipeline/stages/v5_prompts';
 import { renderPromptLlmCalls } from '@/lib/writer/pipeline/util/render_prompt_extract';
+import { skipsShotCheck } from '@/lib/writer/pipeline/shotcheck-policy';
 import { runDialogue, toDialogueTrack, type DialogueProgress } from '@/lib/writer/pipeline/stages/dialogue';
 // #script-preserve 2026-09-17: 대본 보존 — 씬·대사를 LLM 으로 다시 쓰지 않고 대본에서 옮긴다(tests/writer/script-preserve-steps.test.ts).
 import { preservedScript, scenesFromScript, annotateScriptScenes, dialogueTrackFromScript, mergeScriptSpeakers } from '@/lib/writer/script/preserve';
@@ -295,7 +296,9 @@ async function runLaneVisual(
     //   상한 200s(리뷰 R1): EST 가 step 예산(240s)에 닿으면 어떤 인보케이션도 착수 조건을 못 채워
     //   좀비 run(영구 paused)이 된다 — 신선한 인보케이션은 항상 시도하고 300s 하드킬·attempt 예산에 맡긴다.
     const EST_SHOTCHECK_MS = Math.min(200_000, Math.max(160_000, (s.shotDesign?.length ?? 0) * 6_000));
-    if (deadlineMs != null && Date.now() + EST_SHOTCHECK_MS > deadlineMs) {
+    // 80샷 넘는 긴 작품은 점검 AI 를 부르지 않으니(오너 2026-11-11, shotcheck-policy.ts) 착수 대기 없이 바로 결정론 조립만 한다.
+    const skipCheck = skipsShotCheck(shotDesign.length);
+    if (!skipCheck && deadlineMs != null && Date.now() + EST_SHOTCHECK_MS > deadlineMs) {
       console.log(
         `[writer] shotCheck 착수 보류 — 남은 예산 ${Math.round((deadlineMs - Date.now()) / 1000)}s < 예상 ${EST_SHOTCHECK_MS / 1000}s. shotDesign 체크포인트 후 다음 step 으로.`,
       );

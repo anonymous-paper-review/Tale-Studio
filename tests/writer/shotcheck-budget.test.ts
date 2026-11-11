@@ -1,4 +1,4 @@
-// 샷 점검은 이 호출의 남은 시간 안에서만 기다리고, 끝난 뒤 시간이 모자라면 점검 결과를 저장해 다음 호출로 넘긴다(검토 b 2026-11-11)
+// 샷 점검은 이 호출의 남은 시간 안에서만 기다리고, 끝난 뒤 시간이 모자라면 점검 결과를 저장해 다음 호출로 넘긴다. 80샷 넘는 작품은 기다리지 않는다(검토 b · 오너 2026-11-11)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -77,6 +77,15 @@ describe('shotsAndDialogue — 샷 점검 시간 예산', () => {
     const deadlineMs = Date.now() + 240_000
     await runLanes(state(), deadlineMs)
     expect(mocks.runShotCheck.mock.calls[0].at(-1)).toEqual({ deadlineMs: deadlineMs + 30_000 })
+  })
+
+  // 왜: 오너 안 "80샷이 넘으면 점검을 처음부터 건너뛴다" — 어차피 AI 를 부르지 않으니 착수 대기(최대 200초 몫)로 다음 호출을 기다리지 않는다.
+  it('샷이 80개를 넘는 작품은 샷 점검을 처음부터 건너뛰고 기다리지 않는다', async () => {
+    const many = Array.from({ length: 81 }, (_, i) => ({ shot_id: `shot_${i + 1}` }))
+    mocks.runShotDesign.mockResolvedValue({ done: true, doneSceneIds: ['scene_1'], shots: many })
+    const patch = await runLanes(state(), Date.now() + 10_000) // 80샷 이하라면 착수 대기로 넘길 만큼만 남은 시간
+    expect(mocks.runShotCheck).toHaveBeenCalledTimes(1)
+    expect(patch.shotSequence).toEqual(SEQUENCE)
   })
 
   // 왜: 점검(수 분) 뒤 프롬프트 다듬기까지 한 호출에서 하다 잘리면, 다음 호출이 같은 점검을 다시 사고 세 번이면 Writer 가 실패했다.
