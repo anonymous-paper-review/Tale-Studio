@@ -681,12 +681,12 @@ function startComicReply(voice: AppLocale, mode: 'adapt' | 'stop'): string {
     : translate(voice, "Okay, I won't set the art style now. You can pick it in Artist when you make the images.")
 }
 
-/** 만화 그림체 질문의 답에 Writer 가 하는 말(시작 길 · 채팅 길) — 이 말이 채팅에 있으면 그 질문에 답한 것이다. */
+/** 만화 그림체 질문의 답에 Writer 가 하는 말(시작 길 · 채팅 길) — 이 말이 채팅에 있으면 그 질문에 답한 것이다.
+ *  채팅 길의 그만두기("만화 원고는 쓰지 않았어요")는 새로 올린 쪽을 쓰지 않겠다는 답이라 넣지 않는다(검토 a 낮음 R3b). */
 function comicStyleReplies(voice: AppLocale): string[] {
   return [
     translate(voice, 'Set the art style to this comic. Analyzing the art style now.'),
     translate(voice, "I won't use the comic art style. Choose the style to make it in."),
-    translate(voice, 'Stopped. I did not use the comic pages, and the prose is unchanged.'),
     startComicReply(voice, 'adapt'),
     startComicReply(voice, 'stop'),
   ]
@@ -701,7 +701,15 @@ function comicStyleAnswered(messages: readonly GlobalChatMessage[]): boolean {
   const voices: AppLocale[] = ['en', 'ko']
   const chipSays = new Set(voices.flatMap((voice) => comicStyleQuestion(voice, { stop: true }).options.map((option) => option.utterance)))
   const replies = new Set(voices.flatMap(comicStyleReplies))
-  return messages.some((m) => m.stage === 'producer' && (m.role === 'user' ? chipSays.has(m.content.trim()) : replies.has(m.content)))
+  const chatStops = new Set(voices.map((voice) => translate(voice, 'Stopped. I did not use the comic pages, and the prose is unchanged.')))
+  const said = messages.filter((m) => m.stage === 'producer')
+  return said.some((m, i) => {
+    if (m.role !== 'user') return replies.has(m.content)
+    if (!chipSays.has(m.content.trim())) return false
+    // 채팅으로 더 올린 만화의 [그만두기] — 바로 뒤 Writer 말이 채팅 길 그만두기면 시작 쪽 그림체의 답이 아니다(검토 a 낮음 R3b).
+    const next = said[i + 1]
+    return !(next?.role === 'model' && chatStops.has(next.content))
+  })
 }
 
 /** 시작 화면 만화의 그림체 질문을 거둔다 — 답하지 않은 것으로 두고(다시 물을 수 있게) 질문 자리를 비운다. */
@@ -4377,6 +4385,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   },
 
   offerImageRoles: (images, opts) => {
+    // 그림을 올리면 시작 화면 만화의 그림체 질문은 늘 자리를 내준다(검토 a 낮음 R10 · R11) — 말에 쓰임새를 담아 묻지 않고 바로 쓰는 길(참고 자료 · 그림체)은
+    //   그림 질문이 서지 않아, 참고 자료로 보낸 말을 시작 질문이 받거나 그림체를 정한 뒤에도 시작 질문이 남았다. 끝나면 Writer 화면이 다시 묻는다.
+    yieldStartComicStyle()
     // 잠긴 Producer 에는 인물·배경 카드를 만들 수 없다 — 묻지 않고 종전 경로(참고 자료)로 보낸다.
     if (useProjectStore.getState().producerLocked) return false
     const ready = images.filter((img) => img && img.thumbUrl)

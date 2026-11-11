@@ -276,6 +276,46 @@ describe('시작 그림체 질문이 떠 있을 때 채팅으로 그림을 더 �
     expect(await chat.getState().offerStartComicStyle('proj-1')).toBe(false)
   })
 
+  // 왜: 검토 a 낮음(R10) — 쓰임새를 말에 담아 올리면 묻지 않고 바로 쓰는 길이라 그림 질문이 서지 않아 시작 질문이 자리를 지켰고,
+  //   참고 자료로 보낸 말을 시작 질문이 받아 "그림체를 먼저 골라 주세요"로 되묻고 사진은 모델에 가지 않았다. 그림을 올리면 늘 자리를 내준다.
+  it('시작 그림체 질문이 떠 있을 때 참고 자료라고 말에 담아 그림을 올리면 시작 질문이 자리를 내주고 그림과 말이 채팅으로 가며, 끝나면 시작 질문을 다시 묻는다', async () => {
+    chat.getState().offerImageRoles([PERSON], { typed: 'Use it as a reference', msg: 'Use it as a reference' })
+    expect(question()?.id ?? '').not.toBe(QID)
+    expect(chat.getState().startComicStyleGate).toBeNull()
+    await vi.waitFor(() => expect(calls('/api/produce/chat')).toHaveLength(1))
+    expect(calls('/api/produce/chat')[0]).toMatchObject({ message: 'Use it as a reference', attachmentImageUrls: PERSON.sliceUrls })
+    expect(said(/Please choose first how the art style should work/)).toBe(false)
+    await vi.waitFor(() => expect(chat.getState().loading).toBe(false))
+    expect(await chat.getState().offerStartComicStyle('proj-1')).toBe(true)
+    expect(question()?.id).toBe(QID)
+  })
+
+  // 왜: 검토 a 낮음(R11) — 그림체로 쓰라고 말에 담아 올리면 그 사진으로 그림체가 정해졌는데 시작 질문이 그대로 떠 있었고, [고정]을 누르면 시작 쪽으로 바뀌었다.
+  //   그림체를 정했으면 시작 질문은 다시 묻지 않는다.
+  it('시작 그림체 질문이 떠 있을 때 그림체로 쓰라고 말에 담아 그림을 올리면 시작 질문이 자리를 내주고 그 그림으로 그림체를 정하며, 시작 질문은 다시 묻지 않는다', async () => {
+    chat.getState().offerImageRoles([PERSON], { typed: 'Use it as the art style', msg: 'Use it as the art style' })
+    expect(question()?.id ?? '').not.toBe(QID)
+    expect(chat.getState().startComicStyleGate).toBeNull()
+    await vi.waitFor(() => expect(producer.getState().customStyleAnchor).toMatchObject({ url: PERSON.thumbUrl, locked: true }))
+    expect(calls('/api/produce/style-anchor')).toHaveLength(1)
+    expect(calls('/api/produce/style-anchor')[0]).toMatchObject({ imageUrl: PERSON.thumbUrl, lock: true })
+    expect(await chat.getState().offerStartComicStyle('proj-1')).toBe(false)
+    expect(question()?.id ?? '').not.toBe(QID)
+  })
+
+  // 왜: 검토 a 낮음(R3b) — 채팅으로 더 올린 만화의 그림체 질문에서 [그만두기]를 고르면 새로 올린 쪽을 쓰지 않겠다는 답인데,
+  //   시작 질문에 답한 것으로 세어 시작 쪽 그림체를 다시 묻지 않았다. 그 칩 말과 바로 뒤 Writer 말("만화 원고는 쓰지 않았어요")은 세지 않는다.
+  it('채팅으로 더 올린 만화의 그림체 질문에서 그만두기를 고르면 시작 그림체 질문에 답한 것으로 세지 않고 다시 묻는다', async () => {
+    chat.getState().offerImageRoles([PAGE2], { typed: 'Turn my comic into video as drawn', msg: 'Turn my comic into video as drawn' })
+    await send('Rewrite the prose from the comic')
+    expect(question()?.id ?? '').toMatch(/^comic-style:/)
+    await send("Don't use the comic")
+    expect(lastModel()).toBe('Stopped. I did not use the comic pages, and the prose is unchanged.')
+    expect(calls('/api/produce/comic-script')).toEqual([])
+    expect(await chat.getState().offerStartComicStyle('proj-1')).toBe(true)
+    expect(question()?.id).toBe(QID)
+  })
+
   // 왜: 다른 그림 질문에 자리를 내준 시작 질문은 답하지 않은 것으로 남는다 — 그 질문이 끝나면 Writer 화면이 다시 부르고 다시 묻는다(검토 a 보통 1 방향).
   it('다른 그림 질문이 끝나면 시작 그림체 질문을 다시 묻고, 그 답은 시작 질문이 받는다', async () => {
     chat.getState().offerImageRoles([PERSON], { typed: '', msg: 'Uploaded ref-person.png' })
