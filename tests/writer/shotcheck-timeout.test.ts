@@ -1,4 +1,4 @@
-// 샷 점검이 시간 예산을 넘겨 끊기거나 샷이 80개를 넘으면 지금처럼 "점검 생략" 경고를 남기고 샷을 나누지 않은 채 이어 간다(검토 b · 오너 2026-11-11)
+// 샷 점검이 시간 예산을 넘겨 끊기면 지금처럼 "점검 생략" 경고를 남기고 샷을 나누지 않은 채 이어 가고, 샷이 80개를 넘으면 장면 묶음마다 점검한다(검토 b · 오너 2026-11-11)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const m = vi.hoisted(() => ({ generate: vi.fn() }))
@@ -36,15 +36,25 @@ describe('샷 점검 — 80샷 넘는 긴 작품', () => {
     m.generate.mockResolvedValue({ shots_to_split: [], semantic_issues: [] })
   })
 
-  // 왜: 오너 안 "그동안은 80샷이 넘으면 점검을 처음부터 건너뛴다" — 150샷쯤은 270초 안에 못 끝나 늘 생략되면서 4.5분 · Claude 약 $1을 썼다.
-  it('샷이 80개를 넘는 작품은 샷 점검 AI 를 부르지 않고 지금과 같은 "점검 생략" 경고를 남긴다', async () => {
-    const result = await run(81)
-    expect(m.generate).not.toHaveBeenCalled()
-    expect(result.shotSequence.shots).toHaveLength(81)
-    const warning = result.report.issues.find((i) => i.location === 'shotCheck')
-    expect(warning).toMatchObject({ category: 'action_budget', severity: 'WARNING' })
-    expect(warning?.message).toMatch(/분할·점검 없이 진행됨/)
-    expect(warning?.message).toMatch(/81/)
+  // 장면마다 샷 수를 정해 이어 붙인 작품(샷 번호는 1부터 전체로).
+  const runScenes = (sizes: number[]) => {
+    const scenes = sizes.map((_, s) => ({ ...SCENES.scenes[0], scene_id: `scene_${s + 1}` }))
+    let n = 0
+    const shots = sizes.flatMap((size, s) => Array.from({ length: size }, () => ({ ...DESIGN, intent: { ...DESIGN.intent, shot_id: `shot_${++n}`, scene_id: `scene_${s + 1}` } })))
+    return runShotCheck('p1', { depth_level: 'D5', runtime_seconds: 1200 } as never, { characters: [] } as never, { scenes } as never, { locations: [] } as never, shots as never, null, [], logger as never, { provider: 'claude', model: 'claude-sonnet-4-6' } as never, 'en', [])
+  }
+  /** 점검 부름 하나가 점검한 샷 수 — [샷 시퀀스] 안의 샷만 센다(앞 묶음 맥락은 뺀다). */
+  const checkedCount = (prompt: string) => [...prompt.slice(prompt.indexOf('[샷 시퀀스]'), prompt.indexOf('[출력 형식')).matchAll(/"shot_id": "shot_\d+"/g)].length
+
+  // 왜: 오너 2026-11-11 "장면별로 나눠 점검한다" — 150샷쯤은 한 번에는 270초 안에 못 끝나 점검을 늘 못 받았다(그동안은 80샷이 넘으면 건너뛰었다).
+  it('샷이 80개를 넘는 작품은 장면을 이어 붙인 묶음(40샷 안팎)마다 따로 샷 점검을 한다', async () => {
+    const result = await runScenes([20, 15, 10, 25, 20]) // 90샷 → 35 · 35 · 20
+    const prompts = m.generate.mock.calls.map((c) => String(c[0]))
+    expect(prompts).toHaveLength(3)
+    expect(prompts.map((p) => p.match(/^\[묶음 (\d)\/3/)?.[1])).toEqual(['1', '2', '3'])
+    expect(prompts.map(checkedCount)).toEqual([35, 35, 20])
+    expect(result.shotSequence.shots).toHaveLength(90)
+    expect(result.report.issues.some((i) => i.location === 'shotCheck')).toBe(false)
   })
 
   // 왜: 정상 경로 고정 — 80샷 이하는 지금처럼 점검을 받는다(재기한 46샷 이하 경우들).
