@@ -10,7 +10,7 @@
 //   약속: tests/producer/entry-routes.test.ts · tests/producer/entry-start-plan.test.ts · tests/producer/entry-comic-keep.test.ts
 import { NextResponse } from 'next/server'
 import { entryDraftFor, type EntryDraft } from '@/lib/entry/draft'
-import { planEntryStart } from '@/lib/entry/start-plan'
+import { planEntryStart, withComicScript } from '@/lib/entry/start-plan'
 import { parseAppLocale } from '@/lib/locale'
 import { runComicScript } from '@/lib/producer/comic-script-run'
 import { parseSeries } from '@/lib/series/snapshot'
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
     if (plan.changeLevel === 'keep' && pagePaths.length) {
       const run = await runComicScript(pagePaths.map(mediaPublicUrl), { pageCount: 1, actionLanguage: locale === 'en' ? 'en' : 'ko', notComic: true })
       if (run.ok) {
-        plan = planEntryStart({ projectId, draft: { ...draft, file: { ...file!, text: run.script } }, locale, currentTitle: row.title ?? '', series })
+        plan = planEntryStart({ projectId, draft: withComicScript(draft, run.script), locale, currentTitle: row.title ?? '', series })
         if (!plan.ok) return NextResponse.json({ error: plan.code }, { status: 400 })
       } else if (run.reason !== 'not_comic') {
         return NextResponse.json({ error: 'comic_script_failed', reason: run.reason }, { status: 502 })

@@ -322,6 +322,20 @@ describe('시작과 산문 초안', () => {
     await vi.waitFor(() => expect(useEntryStore.getState().writing.status).toBe('done'))
   })
 
+  it('새로 고침 전에 누른 시작이 뒤에서 끝나 이미 시작된 프로젝트면 시작 실패 대신 시작한 화면으로 바꿔 산문 초안을 다시 쓰게 한다', async () => {
+    // 왜: 만화 쪽 그대로는 시작이 만화 대본 옮기기로 30~60초 길어졌다(2026-11-11 결정 3). 그 사이 새로 고친 화면에서 다시 시작을 누르면
+    //   서버는 이미 시작했다고(409) 답하는데, "시작하지 못했어요 · 다시 시도"만 되풀이해 새로 고칠 때까지 갇혔다.
+    setDraft(startDraft())
+    routes['POST /api/produce/entry/start'] = () => ({ status: 409, body: { error: 'already_started' } })
+    routes['GET /api/produce/entry'] = () => ({ body: { draft: { ...startDraft(), startedAt: '2026-11-11T00:00:00.000Z' }, title: '자판기의 반란', startedAt: '2026-11-11T00:00:00.000Z', locale: 'ko', stage: 'producer', format: 'vertical_9:16', writer: { started: false, status: null, draft: false }, writerStart } })
+    expect(await useEntryStore.getState().start()).toBe(false)
+    const state = useEntryStore.getState()
+    expect(state.writing.status).toBe('idle')
+    expect(entryStarted(state)).toBe(true)
+    expect(state.writerStart).toEqual(writerStart)
+    expect(calls.some((c) => c.url === '/api/writer/start')).toBe(false)
+  })
+
   it('시작 요청이 실패하면 시작하지 않은 채 설정을 다시 고칠 수 있다', async () => {
     // 왜: 서버가 거절하면(예: 고르지 않은 값) 화면 비율은 잠기지 않았다.
     setDraft(startDraft())

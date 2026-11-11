@@ -16,6 +16,7 @@ vi.mock('@/lib/supabase/auth', () => ({ getUser: mocks.getUser }))
 vi.mock('@/lib/generation-jobs', () => ({ userOwnsProject: mocks.owns }))
 vi.mock('@/lib/storage/media', () => ({ mediaUpload: vi.fn(), mediaPublicUrl: (path: string) => `https://media.test/${path}` }))
 vi.mock('@/lib/producer/comic-script-llm', () => ({ transcribeComic: mocks.transcribe }))
+vi.mock('@/lib/writer/run-store', () => ({ getRunStatusLight: vi.fn(async () => null) }))
 
 // supabaseAdmin 흉내 — projects 표 하나를 메모리에 둔다(entry-routes.test.ts 와 같은 짜임).
 vi.mock('@/lib/supabase/admin', () => {
@@ -52,6 +53,7 @@ vi.mock('@/lib/supabase/admin', () => {
 })
 
 import { POST as startEntry } from '@/app/api/produce/entry/start/route'
+import { GET as getEntry } from '@/app/api/produce/entry/route'
 import { buildComicScriptPrompt } from '@/lib/producer/comic-script'
 
 const PID = 'project-1'
@@ -172,5 +174,16 @@ describe('만화 쪽으로 그대로 시작', () => {
   it('채팅으로 올린 만화를 옮기는 지시문에는 만화 아님 답이 없고, 시작 화면의 지시문에만 있다', () => {
     expect(buildComicScriptPrompt({ pageCount: 2, actionLanguage: 'ko' })).not.toContain('NOT_A_COMIC')
     expect(buildComicScriptPrompt({ pageCount: 1, actionLanguage: 'ko', notComic: true })).toContain('NOT_A_COMIC')
+  })
+
+  // 왜: 시작 중에 화면을 닫거나 새로 고치면 시작은 뒤에서 끝나도 산문 초안 쓰기가 시작되지 않을 수 있다 — 그러면 시작한 화면이
+  //   "산문 초안을 아직 쓰지 않았어요 · 다시 시도"를 띄운다. 그 다시 시도가 초안의 읽은 글(말풍선 글만)로 쓰면 화면(옮긴 대본)과 확정 · 이어 만들기가 다시 어긋난다.
+  it('만화 쪽 그대로로 시작한 프로젝트를 다시 열어 산문 초안을 다시 쓰면 시작 때 옮긴 대본으로 쓴다', async () => {
+    mocks.rows.clear()
+    seed({ current_stage: 'producer', story_text: SCRIPT }, { startedAt: '2026-11-11T00:00:00.000Z' })
+    const res = await getEntry(new NextRequest(`http://localhost/api/produce/entry?projectId=${PID}`))
+    expect(res.status).toBe(200)
+    expect((await res.json()).writerStart).toMatchObject({ story: SCRIPT, preserveScript: true, changeLevel: 'keep' })
+    expect(mocks.transcribe).not.toHaveBeenCalled()
   })
 })

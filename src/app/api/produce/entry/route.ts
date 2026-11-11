@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { entrySeriesOf } from '@/features/entry/series'
 import { applyEntryPatch, entryDraftFor } from '@/lib/entry/draft'
-import { planEntryStart } from '@/lib/entry/start-plan'
+import { planEntryStart, withComicScript } from '@/lib/entry/start-plan'
 import { parseAppLocale } from '@/lib/locale'
 import { parseSeries } from '@/lib/series/snapshot'
 import { getRunStatusLight } from '@/lib/writer/run-store'
@@ -43,8 +43,9 @@ export async function GET(req: NextRequest) {
     const draft = entryDraftFor({ entryDraft: row.entry_draft, storyText: row.story_text, stage: row.current_stage })
     const locale = parseAppLocale(row.locale) ?? 'en'
     // 시작한 프로젝트는 같은 값으로 Writer 시작을 다시 할 수 있게 요청을 돌려준다(초안 쓰기가 실패했을 때).
+    //   만화 쪽 그대로는 시작 때 옮긴 대본(저장한 이야기)으로 — 초안의 읽은 글로 다시 짜면 화면(대본)과 산문이 어긋난다(2026-11-11 결정 3).
     const series = parseSeries(row.series)
-    const plan = draft.startedAt ? planEntryStart({ projectId: id, draft, locale, currentTitle: row.title ?? '', series }) : null
+    const plan = draft.startedAt ? planEntryStart({ projectId: id, draft: withComicScript(draft, row.story_text), locale, currentTitle: row.title ?? '', series }) : null
     return NextResponse.json({
       draft,
       title: row.title ?? 'Untitled',
