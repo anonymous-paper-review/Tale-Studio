@@ -9,14 +9,8 @@ import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { isOwnMediaUrl, MAX_ATTACHMENT_IMAGES } from '@/lib/upload/attachment'
 import { MAX_COMIC_PAGES } from '@/lib/producer/comic-intake'
-import {
-  buildComicScriptPrompt,
-  checkComicScript,
-  comicScriptRetryNote,
-  extractComicScript,
-  type ComicActionLanguage,
-} from '@/lib/producer/comic-script'
-import { transcribeComic } from '@/lib/producer/comic-script-llm'
+import type { ComicActionLanguage } from '@/lib/producer/comic-script'
+import { runComicScript } from '@/lib/producer/comic-script-run'
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
@@ -56,19 +50,8 @@ export async function POST(req: Request) {
 
   const actionLanguage: ComicActionLanguage =
     body?.actionLanguage === 'en' || body?.actionLanguage === 'ja' ? body.actionLanguage : 'ko'
-  const prompt = buildComicScriptPrompt({ pageCount: pages.length, actionLanguage })
-  let lastReason: string = 'not_script'
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const out = await transcribeComic(imageUrls, attempt === 0 ? prompt : prompt + comicScriptRetryNote(lastReason as 'empty' | 'not_script' | 'no_scenes'))
-      const script = extractComicScript(out.text)
-      const check = checkComicScript(script)
-      if (check.ok) return NextResponse.json({ script, stats: check.stats, attempts: attempt + 1 })
-      lastReason = check.reason
-    } catch (error) {
-      console.error('[comic-script] transcription failed:', error)
-      lastReason = 'model_error'
-    }
-  }
-  return NextResponse.json({ error: 'comic_script_failed', reason: lastReason }, { status: 502 })
+  // 옮기기 한 번(다시 쓰기 한 번 포함)은 시작 화면의 그대로 시작과 같은 길이다(comic-script-run).
+  const run = await runComicScript(imageUrls, { pageCount: pages.length, actionLanguage })
+  if (run.ok) return NextResponse.json({ script: run.script, stats: run.stats, attempts: run.attempts })
+  return NextResponse.json({ error: 'comic_script_failed', reason: run.reason }, { status: 502 })
 }
