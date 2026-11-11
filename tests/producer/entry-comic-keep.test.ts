@@ -186,4 +186,27 @@ describe('만화 쪽으로 그대로 시작', () => {
     expect((await res.json()).writerStart).toMatchObject({ story: SCRIPT, preserveScript: true, changeLevel: 'keep' })
     expect(mocks.transcribe).not.toHaveBeenCalled()
   })
+
+  // 왜: 시작이 옮기기로 길어진 사이 새로 고친 화면에서 [시작]을 또 누르면 두 시작이 다 옮기기 전에 읽고 함께 옮긴다. 옮긴 대본은 매번 조금씩
+  //   다를 수 있는데, 늦게 끝난 쪽이 저장을 덮으면 화면(늦은 대본)과 먼저 시작한 산문 초안(먼저 대본)이 어긋난다. 읽은 뒤 단계가 옮겨졌으면 덮지 않는다.
+  it('두 번 누른 시작이 함께 만화를 옮기면 먼저 끝난 쪽만 저장하고, 늦게 끝난 쪽은 덮어쓰지 않고 단계가 이미 지났다고 답한다', async () => {
+    const SCRIPT_B = SCRIPT.replace('A woman leans on the desk', 'A woman in a cardigan leans on the desk')
+    let first: (v: unknown) => void = () => {}
+    let second: (v: unknown) => void = () => {}
+    mocks.transcribe
+      .mockImplementationOnce(() => new Promise((resolve) => { first = resolve }))
+      .mockImplementationOnce(() => new Promise((resolve) => { second = resolve }))
+    const early = start()
+    const late = start()
+    await vi.waitFor(() => expect(mocks.transcribe).toHaveBeenCalledTimes(2))
+    first(reply('```script\n' + SCRIPT + '\n```'))
+    expect((await early).status).toBe(200)
+    second(reply('```script\n' + SCRIPT_B + '\n```'))
+    const res = await late
+    expect(res.status).toBe(409)
+    expect(await res.json()).toMatchObject({ error: 'wrong_stage' })
+    expect(project().story_text).toBe(SCRIPT)
+    expect(project().producer_draft).toMatchObject({ storyText: SCRIPT })
+  })
 })
+

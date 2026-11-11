@@ -16,7 +16,7 @@ import { runComicScript } from '@/lib/producer/comic-script-run'
 import { parseSeries } from '@/lib/series/snapshot'
 import { mediaPublicUrl } from '@/lib/storage/media'
 import { supabaseAdmin } from '@/lib/supabase/admin'
-import { ENTRY_STAGES, authorizeEntry, isEntryStage, loadEntryProject, serverError } from '../entry-access'
+import { authorizeEntry, isEntryStage, loadEntryProject, serverError } from '../entry-access'
 
 export const runtime = 'nodejs'
 // 만화 쪽 그대로 시작은 만화 대본 옮기기(다시 쓰기 한 번 포함)를 기다린다 — produce/comic-script 와 같은 한도.
@@ -65,8 +65,10 @@ export async function POST(req: Request) {
         ...(plan.title ? { title: plan.title } : {}),
       })
       .eq('id', projectId)
-      // 읽은 뒤 다른 요청이 단계를 옮겼으면 덮어쓰지 않는다.
-      .in('current_stage', [...ENTRY_STAGES])
+      // 읽은 뒤 다른 요청이 단계를 옮겼으면 덮어쓰지 않는다 — 읽은 단계 그대로일 때만 저장한다. 시작은 단계를 producer 로 옮기므로,
+      //   함께 누른 두 시작 중 늦게 끝난 쪽은 여기서 0행(wrong_stage)이 된다. 예전처럼 시작 단계 둘(entry · producer) 중 아무거나로 거르면
+      //   늦은 쪽이 먼저 쪽 이야기를 덮었다 — 만화 대본은 옮길 때마다 조금씩 달라 화면과 산문 초안이 어긋났다(2026-11-11 결정 3 확인).
+      .eq('current_stage', row.current_stage)
       .select('id')
     if (error) throw new Error(error.message)
     if (!data?.length) return NextResponse.json({ error: 'wrong_stage' }, { status: 409 })

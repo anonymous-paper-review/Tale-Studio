@@ -355,6 +355,21 @@ describe('시작과 산문 초안', () => {
     expect(writingFailureCopy('writer_failed')).toEqual({ title: "Couldn't write the prose draft", description: 'Something went wrong while writing. Please try again.' })
   })
 
+  it('늦게 끝난 시작이 단계가 이미 지났다는 답을 받아도 시작 실패 대신 시작한 화면으로 바꾼다', async () => {
+    // 왜: 두 번 누른 시작은 둘 다 옮기기 전에 읽어, 늦게 끝난 쪽은 "이미 시작함"이 아니라 "단계가 지남"(409 wrong_stage)을 받는다.
+    //   그 답도 이미 시작된 프로젝트라는 뜻이다 — "시작하지 못했어요"를 띄우지 않고 다시 읽어 시작한 화면을 보인다(리드 2026-11-11).
+    setDraft(startDraft())
+    routes['POST /api/produce/entry/start'] = () => ({ status: 409, body: { error: 'wrong_stage' } })
+    routes['GET /api/produce/entry'] = () => ({ body: { draft: { ...startDraft(), startedAt: '2026-11-11T00:00:00.000Z' }, title: '자판기의 반란', startedAt: '2026-11-11T00:00:00.000Z', locale: 'ko', stage: 'producer', format: 'vertical_9:16', writer: { started: true, status: 'running', draft: true }, writerStart } })
+    routes[`GET /api/writer/status/${PID}`] = () => status({ current_stage: 'dramaturgy' })
+    expect(await useEntryStore.getState().start()).toBe(false)
+    const state = useEntryStore.getState()
+    expect(state.writing.status).not.toBe('failed')
+    expect(entryStarted(state)).toBe(true)
+    expect(state.writerStart).toEqual(writerStart)
+    expect(calls.some((c) => c.url === '/api/writer/start')).toBe(false)
+  })
+
   it('시작 요청이 실패하면 시작하지 않은 채 설정을 다시 고칠 수 있다', async () => {
     // 왜: 서버가 거절하면(예: 고르지 않은 값) 화면 비율은 잠기지 않았다.
     setDraft(startDraft())
