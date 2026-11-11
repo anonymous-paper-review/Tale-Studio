@@ -1,4 +1,4 @@
-// 샷이 80개를 넘는 긴 작품은 장면을 이어 붙인 묶음(40샷 안팎)마다 샷 점검을 하고, 결과를 합쳐 한 번에 나누고 번호를 다시 매긴다(오너 2026-11-11 "장면별로 나눠 점검한다")
+// 샷이 80개를 넘는 긴 작품은 장면을 이어 붙인 묶음(40샷 안팎)마다 샷 점검을 하고, 결과를 합쳐 한 번에 나누고 번호를 다시 매긴다. 나눈 새 샷은 다른 샷과 이름이 겹쳐도 섞이지 않는다(오너 2026-11-11 "장면별로 나눠 점검한다" · 검토 b)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const m = vi.hoisted(() => ({ generate: vi.fn() }))
@@ -43,6 +43,17 @@ const contextIds = (prompt: string) => {
 const prompts = () => m.generate.mock.calls.map((c) => String(c[0]))
 const split = (id: string) => ({ shot_id: id, reason: 'two actions', new_shots: [{ shot_id: `${id}a`, duration_seconds: 2 }, { shot_id: `${id}b`, duration_seconds: 2 }] })
 const issue = (location: string, constraint: string) => ({ category: 'continuity', severity: 'WARNING', location, message: 'm', constraint_target: 'visual', constraint })
+/** 모델이 새 샷 이름을 직접 지은 나누기안 — 이름이 다른 샷과 겹치는 경우를 만든다. */
+const splitAs = (id: string, names: string[], actions: string[]) => ({
+  shot_id: id,
+  reason: 'two actions',
+  new_shots: names.map((name, k) => ({ shot_id: name, duration_seconds: 2, S: { character_action: actions[k] } })),
+})
+const notesOf = (shot: unknown) => ((shot as { check_notes?: Array<{ constraint?: string }> }).check_notes ?? []).map((n) => n.constraint)
+const actionsFrom = (shots: unknown[], source: string) =>
+  (shots as Array<{ source_shot_id?: string; S: { character_action: string } }>).filter((s) => s.source_shot_id === source).map((s) => s.S.character_action)
+const sourcesWith = (shots: unknown[], constraint: string) =>
+  (shots as Array<{ source_shot_id?: string }>).filter((s) => notesOf(s).includes(constraint)).map((s) => s.source_shot_id)
 
 beforeEach(() => {
   m.generate.mockReset()
@@ -69,6 +80,35 @@ describe('긴 작품 샷 점검 — 장면별 묶음', () => {
     const notes = result.shotSequence.shots.flatMap((s) => ((s as { check_notes?: Array<{ constraint?: string }> }).check_notes ?? []).map((n) => n.constraint))
     expect(notes).not.toContain('Context shot must change.')
     expect(notes.filter((n) => n === 'First shot keeps the coat.')).toHaveLength(2)
+  })
+
+  // 왜: 묶음 점검은 자기 묶음 샷만 본다 — 보지 못한 앞 묶음 샷 번호(shot_5)에 단 지적이 그 샷의 그림 지시로 붙었다(검토 b 2026-11-11).
+  it('묶음 점검이 자기 묶음 밖의 샷 번호에 단 지적은 버린다', async () => {
+    m.generate.mockImplementation(async (prompt: string) => ({
+      shots_to_split: [],
+      semantic_issues: prompt.startsWith('[묶음 2/') ? [issue('shot_5', 'Keep the red scarf.'), issue('shot_36', 'Keep the lamp lit.')] : [],
+    }))
+    const result = await check([20, 15, 10, 25, 20]) // 묶음 2 = shot_36~70
+    const notes = result.shotSequence.shots.flatMap(notesOf)
+    expect(notes).not.toContain('Keep the red scarf.')
+    expect(notes.filter((n) => n === 'Keep the lamp lit.')).toHaveLength(1)
+    expect(result.report.issues.some((i) => i.constraint === 'Keep the red scarf.')).toBe(false)
+  })
+
+  // 왜: 앞 묶음은 다음 묶음을 못 보니 끝 샷(shot_40)을 나누며 새 샷에 다음 묶음의 실제 번호(shot_41)를 붙일 수 있다 — 그 이름으로 합치면
+  //   다음 묶음의 shot_41 나누기 · 지시가 앞 묶음의 새 샷에 붙어 shot_40 의 뒤 절반이 사라지고 진짜 shot_41 은 나뉘지 않은 채 남았다(검토 b 2026-11-11).
+  it('앞 묶음이 끝 샷을 나누며 새 샷에 다음 묶음의 샷 번호를 붙여도, 두 묶음의 나누기와 지시가 섞이지 않는다', async () => {
+    m.generate.mockImplementation(async (prompt: string) =>
+      prompt.startsWith('[묶음 1/')
+        ? { shots_to_split: [splitAs('shot_40', ['shot_40', 'shot_41'], ['Mina lifts the lamp.', 'Mina sets the lamp down.'])], semantic_issues: [] }
+        : { shots_to_split: [splitAs('shot_41', ['shot_41', 'shot_42'], ['Leo opens the door.', 'Leo steps outside.'])], semantic_issues: [issue('shot_41', 'Keep the red scarf.')] },
+    )
+    const result = await check([40, 41]) // 81샷 → 40 · 41
+    const shots = result.shotSequence.shots
+    expect(shots).toHaveLength(83)
+    expect(actionsFrom(shots, 'shot_40')).toEqual(['Mina lifts the lamp.', 'Mina sets the lamp down.'])
+    expect(actionsFrom(shots, 'shot_41')).toEqual(['Leo opens the door.', 'Leo steps outside.'])
+    expect(sourcesWith(shots, 'Keep the red scarf.')).toEqual(['shot_41', 'shot_41'])
   })
 
   // 왜: 장면 안의 이어짐을 끊지 않는다 — 큰 장면은 그 장면 하나가 한 묶음이다.
@@ -129,5 +169,38 @@ describe('긴 작품 샷 점검 — 장면별 묶음', () => {
     await check([40, 40])
     expect(m.generate).toHaveBeenCalledTimes(1)
     expect(prompts()[0].startsWith('[샷 시퀀스]')).toBe(true)
+  })
+})
+
+describe('나눈 새 샷 이름 — 한 번에 점검하는 길도', () => {
+  // 왜: 한 번에 점검할 때도 모델이 shot_3 을 나누며 새 샷에 shot_4 이름을 붙이면, shot_4 의 나누기 · 지시가 그 새 샷에 붙어
+  //   shot_3 의 뒤 절반이 사라졌다(검토 b 2026-11-11 — 묶음 경계와 같은 고장).
+  it('한 번에 점검할 때도 나눈 새 샷의 이름이 다른 샷과 같으면, 그 샷의 나누기와 지시가 새 샷에 섞이지 않는다', async () => {
+    m.generate.mockResolvedValue({
+      shots_to_split: [
+        splitAs('shot_3', ['shot_3', 'shot_4'], ['Mina lifts the lamp.', 'Mina sets the lamp down.']),
+        splitAs('shot_4', ['shot_4', 'shot_5'], ['Leo opens the door.', 'Leo steps outside.']),
+      ],
+      semantic_issues: [issue('shot_4', 'Keep the red scarf.')],
+    })
+    const result = await check([10])
+    expect(m.generate).toHaveBeenCalledTimes(1)
+    const shots = result.shotSequence.shots
+    expect(shots).toHaveLength(12)
+    expect(actionsFrom(shots, 'shot_3')).toEqual(['Mina lifts the lamp.', 'Mina sets the lamp down.'])
+    expect(actionsFrom(shots, 'shot_4')).toEqual(['Leo opens the door.', 'Leo steps outside.'])
+    expect(sourcesWith(shots, 'Keep the red scarf.')).toEqual(['shot_4', 'shot_4'])
+  })
+
+  // 왜: 모델이 나눈 첫 새 샷을 원래 이름(shot_3)으로 지으면, 원래 샷의 지시가 그 새 샷에만 두 번 붙고 나누기로 이미 고친
+  //   동작 지적까지 붙었다 — 다른 새 샷처럼 한 번만 물려받아야 같은 그림을 두 번 그리지 않는다.
+  it('나눈 새 샷의 이름이 원래 샷과 같아도, 그 새 샷은 다른 새 샷과 똑같이 원래 샷의 지시를 한 번만 물려받는다', async () => {
+    m.generate.mockResolvedValue({
+      shots_to_split: [splitAs('shot_3', ['shot_3', 'shot_3b'], ['Mina lifts the lamp.', 'Mina sets the lamp down.'])],
+      semantic_issues: [issue('shot_3', 'Keep the coat on.'), { ...issue('shot_3', 'Either lift the lamp or set it down.'), category: 'action_budget' }],
+    })
+    const result = await check([10])
+    const kids = result.shotSequence.shots.filter((s) => s.source_shot_id === 'shot_3')
+    expect(kids.map(notesOf)).toEqual([['Keep the coat on.'], ['Keep the coat on.']])
   })
 })

@@ -192,10 +192,10 @@ ${VAL_OUTPUT_FORMAT}`;
     const chunks = planShotCheckChunks(assembledShots, (shot) => String(shot.S?.scene_id ?? ''));
     const progress: ShotCheckChunkProgress = { done: { ...(opts?.resume?.done ?? {}) }, failed: { ...(opts?.resume?.failed ?? {}) } };
     const pending = chunks.map((_, i) => i).filter((i) => !(String(i) in progress.done) && !(String(i) in progress.failed));
+    const allIds = new Set(assembledShots.map((shot) => shot.shot_id));
     const checkChunk = async (i: number): Promise<void> => {
       const context = i > 0 ? chunks[i - 1].slice(-SHOTCHECK_CONTEXT_SHOTS) : [];
       const own = new Set(chunks[i].map((shot) => shot.shot_id));
-      const contextIds = new Set(context.map((shot) => shot.shot_id));
       const user = chunkValUser(i, chunks.length, context, chunks[i]);
       try {
         const raw = await generateJson<unknown>(user, cAxisConfig, {
@@ -213,7 +213,12 @@ ${VAL_OUTPUT_FORMAT}`;
         const v = coerceValResponse(raw);
         progress.done[String(i)] = {
           shots_to_split: v.shots_to_split.filter((split) => own.has(split.shot_id)),
-          semantic_issues: v.semantic_issues.filter((issue) => !contextIds.has(String(issue.location ?? '').trim())),
+          // 지적 자리가 이 작품의 샷 번호이면 이 묶음의 샷 번호일 때만 남긴다(검토 b 2026-11-11) — 앞 맥락 샷이나 보지 못한
+          //   다른 묶음 샷에 단 지적이 그 샷의 그림 지시로 붙지 않게. 장면 · 구간 같은 다른 자리는 보고서용으로 둔다.
+          semantic_issues: v.semantic_issues.filter((issue) => {
+            const at = String(issue.location ?? '').trim();
+            return !allIds.has(at) || own.has(at);
+          }),
         };
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
@@ -307,7 +312,13 @@ ${VAL_OUTPUT_FORMAT}`;
     //   경우가 실측됨(47a62d1d: S 누락 4샷) → persistShotsToDb가 it.S.scene_id에서 죽는다.
     //   누락 블록은 원본 샷에서 결정론 상속해 스키마를 보장한다.
     const original = finalShots[idx];
-    const patched = buildSplitChildren(original, split.shot_id, split.new_shots);
+    // 나눈 새 샷은 모델이 지은 이름 대신 겹칠 수 없는 이름(부모__s1 …)으로 적용한다(검토 b 2026-11-11) — 모델이 새 샷에
+    //   다른 샷 이름(묶음 경계에선 다음 묶음의 실제 번호)을 붙이면, 그 이름으로 다른 샷의 나누기 · 지시가 새 샷에 붙었다.
+    //   아래에서 번호를 다시 매기니 겉은 같다. 지시는 부모 이름(_splitFrom)으로만 물려받는다.
+    const patched = buildSplitChildren(original, split.shot_id, split.new_shots).map((child, k) => ({
+      ...child,
+      shot_id: `${split.shot_id}__s${k + 1}`,
+    }));
     finalShots.splice(idx, 1, ...patched);
     splitCount += patched.length - 1;
   }
