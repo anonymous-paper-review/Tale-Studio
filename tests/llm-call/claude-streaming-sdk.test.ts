@@ -4,7 +4,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
 // 가짜 서버가 이번 요청에 돌려줄 답 — 글 조각들과 끝난 까닭. hang 이면 첫 이벤트만 보내고 답을 끝내지 않는다.
-let reply: { blocks: string[]; stop: string; hang?: boolean } = { blocks: [], stop: 'end_turn' }
+//   dropFirst 면 첫 요청만 글 조각 하나를 보낸 뒤 연결을 끊는다(받는 도중 끊김), 다음 요청은 정상 답.
+let reply: { blocks: string[]; stop: string; hang?: boolean; dropFirst?: boolean } = { blocks: [], stop: 'end_turn' }
 let requests = 0
 let server: Server
 const sse = (event: string, data: unknown) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`
@@ -17,6 +18,12 @@ beforeAll(async () => {
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' })
       res.write(sse('message_start', { type: 'message_start', message: { id: 'msg_test', type: 'message', role: 'assistant', model: 'claude-sonnet-4-6', content: [], stop_reason: null, stop_sequence: null, usage: { input_tokens: 10, output_tokens: 1 } } }))
       if (reply.hang) return
+      if (reply.dropFirst && requests === 1) {
+        res.write(sse('content_block_start', { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } }))
+        res.write(sse('content_block_delta', { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: '{"a":' } }))
+        setTimeout(() => res.socket?.destroy(), 100)
+        return
+      }
       reply.blocks.forEach((text, index) => {
         res.write(sse('content_block_start', { type: 'content_block_start', index, content_block: { type: 'text', text: '' } }))
         res.write(sse('content_block_delta', { type: 'content_block_delta', index, delta: { type: 'text_delta', text } }))
@@ -61,6 +68,14 @@ describe('Claude 스트리밍 — 진짜 SDK', () => {
     expect(getPendingRawCalls().at(-1)?.stop_reason).toBe('max_tokens')
     expect(requests).toBe(1)
   })
+
+  // 왜: 스트리밍은 답을 오래 받는다 — 받는 도중 연결이 끊기면("terminated") 다시 하면 대개 된다(검토 b 2026-11-11, 3번).
+  it('답을 받는 도중 연결이 끊기면 다시 시도해 두 번째 답을 읽는다', async () => {
+    reply = { blocks: ['{"a": 2}'], stop: 'end_turn', dropFirst: true }
+    const { claudeGenerateJson } = await claude()
+    await expect(claudeGenerateJson<{ a: number }>('구조를 줘', { model: 'claude-sonnet-4-6', maxTokens: 32000 })).resolves.toEqual({ a: 2 })
+    expect(requests).toBe(2)
+  }, 15_000)
 
   // 왜: 샷 점검이 함수 수명(300초)에 잘리면 같은 유료 호출을 다시 사고 세 번이면 Writer 가 실패한다 — 정한 때가 지나면 기다리지 않는다.
   it('시간 예산 안에 Claude 답이 끝나지 않으면 기다리지 않고 재시도 없이 끊는다', async () => {
