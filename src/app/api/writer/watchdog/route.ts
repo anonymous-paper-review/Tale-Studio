@@ -1,5 +1,5 @@
 // writer-pipeline 워치독 (Vercel Cron).
-//   status='running' 이면서 updated_at 이 오래된(>90s) run 을 찾아 /api/writer/step 을 다시 트리거한다.
+//   status='running' 이면서 updated_at 이 오래된(>330s) run 을 찾아 /api/writer/step 을 다시 트리거한다.
 //   서버리스 체인이 (인스턴스 kill / 트리거 유실로) 멈춘 경우를 복구한다.
 //   ⚠️ Hobby cron 주기는 제약이 크다(분 단위) → 실시간 복구는 클라이언트 keepalive 가 담당.
 import { NextRequest, NextResponse } from 'next/server';
@@ -7,14 +7,15 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { triggerWriterStep } from '@/lib/writer/pipeline/steps';
 import { getGenerationJobById, STALE_QUEUED_MS } from '@/lib/generation-jobs';
 import { reconcileJobFromFal } from '@/lib/fal/reconcile';
+import { WRITER_RUN_ALIVE_MS } from '@/lib/writer/run-alive';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 // 이 시간보다 오래 갱신 없는 running run = 멈춘 것으로 간주.
-//   fan-out 단계가 100s+ 걸릴 수 있어 진행 중 단계를 오판하지 않도록 넉넉히 잡는다.
-//   (근본 해결은 fan-out per-item 체크포인트 = Phase 2.)
-const STALE_MS = 180_000;
+//   한 단계 호출은 저장 없이 300s(step maxDuration)까지 돈다 — 그보다 짧게(옛 180s) 잡으면 살아 있는 호출 옆에
+//   같은 단계를 또 띄운다(2026-11-11 T5). keepalive · resume 킥과 같은 기준(run-alive.ts).
+const STALE_MS = WRITER_RUN_ALIVE_MS;
 
 export async function GET(req: NextRequest) {
   try {

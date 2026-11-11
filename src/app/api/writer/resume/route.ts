@@ -11,6 +11,7 @@ import { getUser } from '@/lib/supabase/auth';
 import { userOwnsProject } from '@/lib/generation-jobs';
 import { getActiveRun, resumeFailedRun } from '@/lib/writer/run-store';
 import { triggerWriterStep, type WriterRunState } from '@/lib/writer/pipeline/steps';
+import { runMayBeAlive } from '@/lib/writer/run-alive';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -31,8 +32,13 @@ export async function POST(req: NextRequest) {
     if (!run) return NextResponse.json({ error: 'No run' }, { status: 404 });
 
     if (run.status === 'running') {
-      // 킥: 체인이 끊겼을 수 있으니 step 을 한 번 찔러준다. 이미 도는 인보케이션과 경쟁해도
-      //   CAS(saveRunState)가 stale 쪽을 양보시키므로 안전 (#p2-wiring).
+      // 아직 도는 호출이 있을 수 있으면(마지막 저장 뒤 330초 안) 찌르지 않는다(2026-11-11 T5, run-alive.ts) — 한 단계 호출은
+      //   저장 없이 300초까지 정상으로 돈다. 예전엔 CAS 가 막아 준다고 보고 찔렀는데, 새 호출이 시작 표시로 실행을 가져가
+      //   돌던 호출의 결과(이미 산 AI 호출)를 버리게 했고 같은 단계를 두세 번 돌렸다. 화면은 180초부터 묻고, 여기서 판정한다.
+      if (runMayBeAlive(run.updated_at)) {
+        return NextResponse.json({ ok: true, data: { action: 'running' } });
+      }
+      // 킥: 330초 넘게 저장이 없다 — 체인이 끊겼으니 step 을 한 번 찔러준다.
       after(async () => {
         await triggerWriterStep(req.nextUrl.origin, projectId);
       });
