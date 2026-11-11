@@ -264,6 +264,9 @@ interface ProducerState {
   addCastFromImage: (sourceImageUrl: string) => string
   /** #image-to-artist: 채팅에 올린 그림으로 배경 카드를 만든다. */
   addBackgroundFromImage: (sourceImageUrl: string) => string
+  /** 채팅에 올린 인물 사진을 고른 인물 카드에 잇는다(2026-11-11 오너 결정 2) — 새 카드를 만들지 않고 그 카드의 그림(시트의 출처)을 바꾼다.
+   *  글을 고친 것이 아니라 userEdited 는 그대로 둔다. 카드가 없거나 고칠 수 없으면(잠김 · 데모) false. */
+  attachCastImage: (localId: string, sourceImageUrl: string) => boolean
   updateCastMember: (localId: string, patch: Partial<CastMember>) => void
   removeCastMember: (localId: string) => void
   addBackground: () => string
@@ -1077,6 +1080,22 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     }))
     scheduleDraftSave()
     return localId
+  },
+
+  attachCastImage: (localId, sourceImageUrl) => {
+    if (isDemoSession() || producerLocked()) return false
+    if (!get().cast.some((member) => member.localId === localId)) return false
+    // 채팅 "인물 카드"와 같은 쓰임 — 시트가 이 사진을 따른다(그대로 쓰기 표시는 뗀다). 그림이 있었으면 이 사진으로 바꾼다.
+    set((state) => ({
+      cast: state.cast.map((member) => {
+        if (member.localId !== localId) return member
+        const next = { ...member, sourceImageUrl }
+        delete next.sourceImageAsIs
+        return next
+      }),
+    }))
+    scheduleDraftSave()
+    return true
   },
 
   addBackgroundFromImage: (sourceImageUrl) => {

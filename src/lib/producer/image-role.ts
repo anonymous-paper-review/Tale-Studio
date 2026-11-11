@@ -78,6 +78,8 @@ export function matchYesNo(text: string): 'yes' | 'no' | null {
 export interface CardFill {
   kind: 'character' | 'background'
   ref: string
+  /** 산문 인물 카드에 사진을 이었다(2026-11-11 오너 결정 2) — 외모 글만 사진으로 다시 채우고 이름 · 역할 등은 그대로 둔다. */
+  appearanceOnly?: boolean
 }
 
 interface ExtractedLike {
@@ -96,5 +98,9 @@ export function coerceCardFill<T extends ExtractedLike>(extracted: T | null | un
   if (!first) return {}
   const entry: Record<string, unknown> = { ...(first as Record<string, unknown>), ref: fill.ref }
   delete entry.remove
+  if (fill.kind === 'character' && fill.appearanceOnly) {
+    const appearance = (first as { appearance?: unknown }).appearance
+    return (typeof appearance === 'string' && appearance.trim() ? { characters: [{ ref: fill.ref, appearance }] } : {}) as unknown as Partial<T>
+  }
   return (fill.kind === 'character' ? { characters: [entry] } : { backgrounds: [entry] }) as unknown as Partial<T>
 }
