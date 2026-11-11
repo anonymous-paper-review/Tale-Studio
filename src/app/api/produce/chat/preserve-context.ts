@@ -39,13 +39,16 @@ export function fixedStyleDirective(styleLocked: unknown): string | null {
  */
 export function imageCardFillDirective(cardFill: unknown): string | null {
   if (!cardFill || typeof cardFill !== 'object') return null
-  const { kind, ref } = cardFill as { kind?: unknown; ref?: unknown }
+  const { kind, ref, appearanceOnly } = cardFill as { kind?: unknown; ref?: unknown; appearanceOnly?: unknown }
   if ((kind !== 'character' && kind !== 'background') || typeof ref !== 'string' || !ref) return null
   const target = kind === 'character' ? `the cast card with ref "${ref}"` : `the background card with ref "${ref}"`
+  // 산문 인물 카드에 이은 사진(2026-11-11 오너 결정 2) — 외모만 사진에 맞춰 다시 쓰고 이름 · 역할은 산문이 정한 그대로 둔다.
   const fields =
-    kind === 'character'
-      ? 'name (only if it is obvious from the picture, otherwise leave it out), entityType, appearance (age, hair, face, build, clothing, colors, in the response language), role only if obvious'
-      : 'name for the place, visualDescription (what is in the picture: place, time of day, light, materials, mood, in the response language), purpose (what such a place could be in a story)'
+    kind === 'character' && appearanceOnly === true
+      ? 'appearance only (age, hair, face, build, clothing, colors, in the response language), rewritten to match the picture. Keep the existing name, role and other fields; do not emit them'
+      : kind === 'character'
+        ? 'name (only if it is obvious from the picture, otherwise leave it out), entityType, appearance (age, hair, face, build, clothing, colors, in the response language), role only if obvious'
+        : 'name for the place, visualDescription (what is in the picture: place, time of day, light, materials, mood, in the response language), purpose (what such a place could be in a story)'
   return [
     '[Image Card Fill]',
     `The attached image belongs to ${target}. Look at the image and fill ONLY that card, using its ref.`,

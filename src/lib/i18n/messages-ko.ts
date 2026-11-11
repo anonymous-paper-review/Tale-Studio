@@ -2176,6 +2176,16 @@ export const KO: Record<string, string> = {
   'The attached picture is the background on card @{label}. Look at it and fill in only that card: a name for the place, a detailed visual description, and its purpose in a story. Do not write a story.':
     '첨부한 그림은 @{label} 카드의 배경이에요. 그림을 보고 그 카드만 채워 주세요. 장소 이름, 자세한 시각 설명, 이야기에서의 용도요. 이야기는 만들지 마세요.',
   'The user said: {text}': '사용자의 말: {text}',
+  // 채팅으로 올린 인물 사진을 산문 인물과 잇기(2026-11-11 오너 결정 2) — "어느 인물의 그림인가요?" + 산문 인물 칩
+  'Which character is this picture of? ({name})': '어느 인물의 그림인가요? ({name})',
+  'Picture {i} of {n}: {name}. Which character is this picture of?': '그림 {i}/{n}: {name}. 어느 인물의 그림인가요?',
+  'This is {name}': '{name}의 그림이에요',
+  'New character': '새 인물',
+  'Make a new character card': '새 인물 카드로 만들어 주세요',
+  'Please choose which character this picture is of, or make a new character.': '이 그림이 어느 인물인지 고르거나 새 인물로 만들어 주세요.',
+  'Linked {name} to {character}. I will update the appearance from the picture.': '{character} 카드에 {name} 그림을 붙였어요. 그림을 보고 외모를 다시 채울게요.',
+  'The attached picture is the character on card @{label}. Look at it and rewrite only the appearance on that card to match the picture. Keep the name. Do not write a story.':
+    '첨부한 그림은 @{label} 카드의 인물이에요. 그림을 보고 그 카드의 외형만 그림에 맞게 다시 써 주세요. 이름은 그대로 두세요. 이야기는 만들지 마세요.',
   'Original picture': '원본 그림',
   'The sheet follows this picture': '시트는 이 그림을 따라 만들어요',
   "Could not save your changes. Please try again.": "변경 내용을 저장하지 못했어요. 다시 시도해 주세요.",

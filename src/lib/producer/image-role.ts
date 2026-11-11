@@ -78,6 +78,8 @@ export function matchYesNo(text: string): 'yes' | 'no' | null {
 export interface CardFill {
   kind: 'character' | 'background'
   ref: string
+  /** 산문 인물 카드에 사진을 이었다(2026-11-11 오너 결정 2) — 외모 글만 사진으로 다시 채우고 이름 · 역할 등은 그대로 둔다. */
+  appearanceOnly?: boolean
 }
 
 interface ExtractedLike {
@@ -85,15 +87,26 @@ interface ExtractedLike {
   backgrounds?: Array<object>
 }
 
+const sameName = (a: unknown, b: string | undefined) => typeof a === 'string' && !!b && a.trim().toLowerCase() === b.trim().toLowerCase()
+
 /**
  * 카드 채우기 턴의 모델 제안을 그 카드 하나로 좁힌다 — 줄거리·설정·다른 카드 제안은 버리고, 첫 항목을 그 카드(ref)에 붙인다.
  * 모델은 제안만 하고 제품 층이 화이트리스트로 적용한다(architecture.md).
+ * 산문 인물 카드에 이은 사진(appearanceOnly)은 외모만 쓴다 — 고른 카드와 같은 ref · 이름(cardName)의 항목을 먼저 쓰고, 맞는 것이 없으면
+ *   항목이 하나뿐일 때만 그것을 쓴다. 여럿인데 맞는 것이 없으면 외모를 바꾸지 않는다(검토 c 2026-11-11 — 다른 인물의 외모가 들어갔다).
  */
-export function coerceCardFill<T extends ExtractedLike>(extracted: T | null | undefined, fill: CardFill): Partial<T> {
+export function coerceCardFill<T extends ExtractedLike>(extracted: T | null | undefined, fill: CardFill, cardName?: string): Partial<T> {
   if (!extracted) return {}
   const list = fill.kind === 'character' ? extracted.characters : extracted.backgrounds
-  const first = Array.isArray(list) ? list.find((e) => e && typeof e === 'object') : undefined
+  const entries = Array.isArray(list) ? list.filter((e): e is object => !!e && typeof e === 'object') : []
+  const first = entries[0]
   if (!first) return {}
+  if (fill.kind === 'character' && fill.appearanceOnly) {
+    const fields = entries as Array<{ ref?: unknown; name?: unknown; appearance?: unknown }>
+    const chosen = fields.find((e) => e.ref === fill.ref) ?? fields.find((e) => sameName(e.name, cardName)) ?? (fields.length === 1 ? fields[0] : undefined)
+    const appearance = chosen?.appearance
+    return (typeof appearance === 'string' && appearance.trim() ? { characters: [{ ref: fill.ref, appearance }] } : {}) as unknown as Partial<T>
+  }
   const entry: Record<string, unknown> = { ...(first as Record<string, unknown>), ref: fill.ref }
   delete entry.remove
   return (fill.kind === 'character' ? { characters: [entry] } : { backgrounds: [entry] }) as unknown as Partial<T>

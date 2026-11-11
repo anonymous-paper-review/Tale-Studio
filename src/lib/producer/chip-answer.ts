@@ -22,6 +22,14 @@ export function imageRoleOptions(voice: AppLocale): Chip[] {
   ]
 }
 
+/** 인물 카드로 쓰기로 한 사진이 어느 인물인지 고르는 칩(2026-11-11 오너 결정 2) — 이름 있는 사람 카드마다 하나 + "새 인물". 이름은 산문에 적힌 그대로. */
+export function characterPickOptions(voice: AppLocale, cards: ReadonlyArray<{ name: string }>): Chip[] {
+  return [
+    ...cards.map((card) => ({ label: card.name, utterance: translate(voice, 'This is {name}', { name: card.name }) })),
+    { label: translate(voice, 'New character'), utterance: translate(voice, 'Make a new character card') },
+  ]
+}
+
 /** 채팅 모델이 첨부 그림을 그림체로 쓰자고 할 때 묻는 칩(2026-10-10 오너 "묻고 정한다"). */
 export function styleAttachmentOptions(voice: AppLocale): Chip[] {
   return [
@@ -83,6 +91,7 @@ const STYLE_ATTACHMENT_WORDS: Record<'style' | 'reference', readonly string[]> =
   reference: ['reference', 'reference only', 'no', '참고', '참고 자료', '아니', '아니요', '아뇨'], // i18n-ok: 답 낱말 목록 자체
 }
 const RETRY_WORDS = ['again', 'retry', 'try again', '다시', '다시 옮기기'] // i18n-ok: 답 낱말 목록 자체
+const NEW_CHARACTER_WORDS = ['new', 'new character', 'new card', 'new person', '새 인물', '새 카드', '새로', '새로 만들기'] // i18n-ok: 답 낱말 목록 자체
 
 /** 그림마다 묻는 쓰임새 질문의 답. */
 export function matchWriterImageUse(text: string): ImageUseAnswer | null {
@@ -114,6 +123,17 @@ export function matchWriterStyleAttachment(text: string): 'style' | 'reference' 
   return pick(text, keys.map((key, i) => ({ key, phrases: [...chipPhrases(styleAttachmentOptions, i), ...STYLE_ATTACHMENT_WORDS[key]] })))
 }
 
+/** "어느 인물의 그림인가요?"의 답 — 고른 카드(localId) · 'new' · null. 칩 말 · 인물 이름 · "새 인물" 같은 짧은 답만 받는다(문장은 받지 않는다). */
+export function matchCharacterPick(text: string, cards: ReadonlyArray<{ localId: string; name: string }>): string | 'new' | null {
+  return pick(text, [
+    ...cards.map((card) => ({
+      key: card.localId,
+      phrases: [card.name, ...VOICES.map((voice) => translate(voice, 'This is {name}', { name: card.name }))],
+    })),
+    { key: 'new', phrases: [...VOICES.flatMap((voice) => [translate(voice, 'New character'), translate(voice, 'Make a new character card')]), ...NEW_CHARACTER_WORDS] },
+  ])
+}
+
 /** 만화 다시 옮기기 질문의 답. */
 function matchComicRetry(text: string): 'retry' | null {
   const phrases = VOICES.flatMap((voice) => [translate(voice, 'Read the comic again'), translate(voice, 'Turn the comic into a script again')])
@@ -121,8 +141,10 @@ function matchComicRetry(text: string): 'retry' | null {
 }
 
 // 그림 질문의 칩 기록 id 머리 — 새로 고침 뒤에는 칩만 돌아오고 올린 그림 · 질문 상태는 빠진다.
-const IMAGE_QUESTIONS: ReadonlyArray<readonly [string, (text: string) => string | null]> = [
+//   "어느 인물의 그림인가요?"는 카드 목록 대신 돌아온 칩 이름(인물 이름)으로 칩 말을 읽는다.
+const IMAGE_QUESTIONS: ReadonlyArray<readonly [string, (text: string, labels: readonly string[]) => string | null]> = [
   ['image-role:', matchWriterImageUse],
+  ['image-character:', (text, labels) => matchCharacterPick(text, labels.map((name) => ({ localId: name, name })))],
   ['image-batch:', matchWriterBatch],
   ['comic-style:', matchWriterComicStyle],
   ['comic-rewrite:', matchWriterComicRewrite],
@@ -135,5 +157,5 @@ export function answersRestoredImageQuestion(question: { id: string; labels: rea
   const match = IMAGE_QUESTIONS.find(([prefix]) => question.id.startsWith(prefix))?.[1]
   const t = chipText(text)
   if (!match || !t) return false
-  return question.labels.some((label) => chipText(label) === t) || match(text) !== null
+  return question.labels.some((label) => chipText(label) === t) || match(text, question.labels) !== null
 }

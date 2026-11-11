@@ -24,7 +24,7 @@ import { selectedProducerDialogueLanguage } from '@/lib/producer-dialogue-langua
 import { fixKoreanParticles } from '@/lib/korean-particles'
 import { coerceCardFill, matchImageUseAnswer, matchImageUseInText, matchYesNo, type CardFill, type ImageUseAnswer } from '@/lib/producer/image-role'
 import { MAX_COMIC_PAGES, comicRewriteQuestion, comicStyleQuestion, imageBatchQuestion, matchBatchImageAnswer, matchComicAnswer, matchComicIntentInText, matchComicStyleAnswer, sortComicPages } from '@/lib/producer/comic-intake'
-import { answersRestoredImageQuestion, imageRoleOptions, matchWriterBatch, matchWriterComicRewrite, matchWriterComicStyle, matchWriterImageUse, matchWriterStyleAttachment, styleAttachmentOptions } from '@/lib/producer/chip-answer'
+import { answersRestoredImageQuestion, characterPickOptions, imageRoleOptions, matchCharacterPick, matchWriterBatch, matchWriterComicRewrite, matchWriterComicStyle, matchWriterImageUse, matchWriterStyleAttachment, styleAttachmentOptions } from '@/lib/producer/chip-answer'
 import { CHAT_IMAGE_ROLE_CONSENT, CHAT_STYLE_CONFIRM_CONSENT, CHAT_STYLE_REQUEST_CONSENT, COMIC_ANALYSIS_CONSENT, CREATION_ANALYSIS_CONSENT, STYLE_PICKER_CONSENT } from '@/lib/style-facets/consent'
 import type { PendingCreation } from '@/stores/pending-creation-store'
 import { producerBusyKind, type BoardBusy } from '@/lib/producer/busy'
@@ -492,7 +492,8 @@ export function styleChoiceBusy(state: { styleAttachmentGate: { projectId: strin
   return !!projectId && (state.styleAttachmentGate?.projectId === projectId || state.styleSettingFor === projectId)
 }
 interface ImageRoleGate {
-  items: Array<{ image: ChatImageInput; role: ImageUseAnswer | null }>
+  /** character — 인물 카드로 고른 그림이 어느 인물인지(2026-11-11 오너 결정 2): 산문 인물 카드 localId · 'new'(새 카드) · 아직 안 물음(undefined). */
+  items: Array<{ image: ChatImageInput; role: ImageUseAnswer | null; character?: string }>
   typed: string
   msg: string
   /** 사용자가 읽고 고른 분석 안내의 판 — 없으면 채팅 그림마다 질문(chat-image-role-v1). */
@@ -901,13 +902,56 @@ async function runComicAdaptation(
   return { scriptSet: await script, styleDone }
 }
 
+/** "어느 인물의 그림인가요?" 칩으로 고를 수 있는 산문 인물(2026-11-11 오너 결정 2) — 이름 있는 사람 카드. 사물 · 이름 없는 카드는 뺀다.
+ *  시리즈 다음 화가 앞 화에서 이어받은 인물도 뺀다 — 사진을 이으면 넘길 때 앞 화에서 만든 시트를 이 화에 적지 않는다(오너 2026-11-11 "이어받은 인물은 빼 둔다"). */
+function characterChoices(): Array<{ localId: string; name: string }> {
+  return useProducerStore.getState().cast
+    .filter((member) => member.entityType !== 'object' && member.name.trim() && member.inherited !== true)
+    .map((member) => ({ localId: member.localId, name: member.name.trim() }))
+}
+
+/** 인물 카드로 고른 그림 — 고를 산문 인물이 있으면 어느 인물인지 묻고(character 비움), 없으면 지금처럼 새 카드('new'). */
+function asCharacterItem(item: { image: ChatImageInput }): ImageRoleGate['items'][number] {
+  return characterChoices().length > 0 ? { image: item.image, role: 'character' } : { image: item.image, role: 'character', character: 'new' }
+}
+
+/** 어느 인물인지 아직 묻지 않은 인물 카드 그림의 자리 — 없으면 -1. */
+function pendingCharacterPick(gate: ImageRoleGate): number {
+  return gate.items.findIndex((it) => it.role === 'character' && it.character === undefined)
+}
+
+/** 외모 채우기 답에서 고른 카드의 항목을 이름으로도 찾게 — 사진을 이은 산문 인물 카드의 이름(그 밖에는 없음). */
+function cardFillName(fill: CardFill): string | undefined {
+  if (fill.kind !== 'character' || !fill.appearanceOnly) return undefined
+  return useProducerStore.getState().cast.find((member) => member.localId === fill.ref)?.name
+}
+
+/** 그림마다 다 정했는가 — 쓰임새를 다 고르고, 인물 카드로 고른 그림은 어느 인물인지도 골랐다. */
+function imageRolesDone(gate: ImageRoleGate): boolean {
+  return gate.items.every((it) => it.role !== null) && pendingCharacterPick(gate) < 0
+}
+
 // 아직 답하지 않은 첫 그림의 질문을 세운다. 닫을 수 없는 선택지(dismissible:false) — 올린 그림이 조용히 사라지면 안 된다.
+//   인물 카드로 고른 그림은 다음 그림으로 가기 전에 어느 인물인지부터 묻는다(산문 인물 칩 + 새 인물).
 function askImageRole(get: () => GlobalChatState): void {
   const gate = get().imageRoleGate
   if (!gate) return
+  const voice = contentLocale()
+  const pickIdx = pendingCharacterPick(gate)
+  if (pickIdx >= 0) {
+    const item = gate.items[pickIdx]
+    const content =
+      gate.items.length > 1
+        ? translate(voice, 'Picture {i} of {n}: {name}. Which character is this picture of?', { i: String(pickIdx + 1), n: String(gate.items.length), name: item.image.name })
+        : translate(voice, 'Which character is this picture of? ({name})', { name: item.image.name })
+    get().offerSuggestion(
+      { id: `image-character:${item.image.id}`, stage: 'producer', content, dismissible: false, action: { kind: 'choices', options: characterPickOptions(voice, characterChoices()) } },
+      { preempt: true },
+    )
+    return
+  }
   const idx = gate.items.findIndex((it) => it.role === null)
   if (idx < 0) return
-  const voice = contentLocale()
   const item = gate.items[idx]
   const content =
     gate.items.length > 1
@@ -932,6 +976,21 @@ async function runImageRolePlan(get: () => GlobalChatState, plan: ImageRoleGate)
   }
   const userSaid = plan.typed ? `\n${translate(voice, 'The user said: {text}', { text: plan.typed })}` : ''
   for (const it of plan.items) {
+    // 산문 인물 칩을 골랐으면 새 카드를 만들지 않고 그 카드에 사진을 잇는다 — 외모 글만 사진으로 다시 채운다(2026-11-11 오너 결정 2).
+    const linked = it.role === 'character' && it.character && it.character !== 'new'
+      ? useProducerStore.getState().cast.find((member) => member.localId === it.character)
+      : undefined
+    if (linked && useProducerStore.getState().attachCastImage(linked.localId, it.image.thumbUrl)) {
+      const label = castMentions(useProducerStore.getState().cast, voice).find((m) => m.ref === linked.localId)?.label ?? linked.name
+      speak(translate(voice, 'Linked {name} to {character}. I will update the appearance from the picture.', { name: it.image.name, character: linked.name }))
+      const ask = translate(
+        voice,
+        'The attached picture is the character on card @{label}. Look at it and rewrite only the appearance on that card to match the picture. Keep the name. Do not write a story.',
+        { label },
+      )
+      await sendWhenIdle(get, `${ask}${userSaid}`, { imageUrls: it.image.sliceUrls }, { silentUser: true, cardFill: { kind: 'character', ref: linked.localId, appearanceOnly: true } })
+      continue
+    }
     if (it.role === 'character') {
       const localId = useProducerStore.getState().addCastFromImage(it.image.thumbUrl)
       if (!localId) continue
@@ -998,7 +1057,8 @@ interface MaterialPlan {
   /** 만화 원고의 그림체 — lock(첫 쪽으로 고정) · adapt(다른 스타일로) · null(lock). 이미 고정된 그림체면 그대로 둔다. */
   comicStyle: 'lock' | 'adapt' | null
   styleImage: ChatImageInput | null
-  cards: Array<{ image: ChatImageInput; role: 'character' | 'background' }>
+  /** character — 인물 카드로 고른 그림을 이을 산문 인물 카드(localId) · 'new'(2026-11-11 오너 결정 2). */
+  cards: Array<{ image: ChatImageInput; role: 'character' | 'background'; character?: string }>
   references: ChatImageInput[]
   /** 사용자가 그림과 함께 쓴 말 — 카드 채우기 요청에 덧붙인다. */
   typed: string
@@ -1044,7 +1104,7 @@ function materialPlanFromRoles(plan: ImageRoleGate, comicStyle: 'lock' | 'adapt'
     comicPages: plan.items.filter((it) => it.role === 'comic').map((it) => it.image),
     comicStyle,
     styleImage: plan.items.find((it) => it.role === 'style')?.image ?? null,
-    cards: plan.items.flatMap((it) => (it.role === 'character' || it.role === 'background' ? [{ image: it.image, role: it.role }] : [])),
+    cards: plan.items.flatMap((it) => (it.role === 'character' || it.role === 'background' ? [{ image: it.image, role: it.role, ...(it.character ? { character: it.character } : {}) }] : [])),
     references: plan.items.filter((it) => it.role === 'reference').map((it) => it.image),
     typed: plan.typed,
     referenceMsg: plan.msg,
@@ -2322,6 +2382,27 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     // #image-to-artist: 그림 쓰임새 질문에 답하는 중 — 답이면 기록하고 다음 그림을 묻거나 다 답했으면 실행, 답이 아니면 다시 묻는다.
     const imageGate = get().imageRoleGate
     if (imageGate && stage === 'producer' && !opts?.silentUser) {
+      // "어느 인물의 그림인가요?"에 답하는 중(2026-11-11 오너 결정 2) — 인물 이름 · 칩 말 · "새 인물" 같은 짧은 답만 받고, 아니면 다시 묻는다.
+      const pickIdx = pendingCharacterPick(imageGate)
+      if (pickIdx >= 0) {
+        const picked = matchCharacterPick(trimmed, characterChoices())
+        if (!picked) {
+          get().appendLocalExchange('producer', trimmed, translate(contentLocale(), 'Please choose which character this picture is of, or make a new character.'))
+          askImageRole(get)
+          return
+        }
+        set((state) => ({ messages: [...state.messages, { id: makeId(), stage, role: 'user' as const, content: trimmed }] }))
+        if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
+        const picks = { ...imageGate, items: imageGate.items.map((it, i) => (i === pickIdx ? { ...it, character: picked } : it)) }
+        if (!imageRolesDone(picks)) {
+          set({ imageRoleGate: picks })
+          askImageRole(get)
+          return
+        }
+        set({ imageRoleGate: null })
+        await finishImageRoles(get, picks)
+        return
+      }
       // Writer 화면에서는 칩 말 · 짧은 답만 받는다(2026-11-10 오너 — "Make the background darker"가 배경 카드로 읽혔다).
       const writer = writerProseLive()
       const answer = writer ? matchWriterImageUse(trimmed) : matchImageUseAnswer(trimmed)
@@ -2347,8 +2428,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (projectId) saveChatMessage(projectId, stage, 'user', trimmed)
       const idx = imageGate.items.findIndex((it) => it.role === null)
       // 그림체는 한 장만 — 다른 그림을 그림체로 고르면 앞의 그림체 그림은 참고 자료로 바뀐다(새 프로젝트 화면과 같은 규칙).
-      const items = imageGate.items.map((it, i) => (i === idx ? { ...it, role: answer } : answer === 'style' && it.role === 'style' ? { ...it, role: 'reference' as const } : it))
-      if (items.some((it) => it.role === null)) {
+      const items = imageGate.items.map((it, i) => (i === idx ? (answer === 'character' ? asCharacterItem(it) : { ...it, role: answer }) : answer === 'style' && it.role === 'style' ? { ...it, role: 'reference' as const } : it))
+      if (!imageRolesDone({ ...imageGate, items })) {
         set({ imageRoleGate: { ...imageGate, items } })
         askImageRole(get)
         return
@@ -2995,7 +3076,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       let extractedForApply: ExtractedSettings | undefined =
         stage === 'producer' && data.extractedSettings && !producerLockedTurn
           ? opts?.cardFill
-            ? (coerceCardFill(data.extractedSettings as ExtractedSettings, opts.cardFill) as ExtractedSettings)
+            ? (coerceCardFill(data.extractedSettings as ExtractedSettings, opts.cardFill, cardFillName(opts.cardFill)) as ExtractedSettings)
             : (data.extractedSettings as ExtractedSettings)
           : undefined
       // 서버가 컨텍스트 보호용으로 되돌려 준 기존 언어는 이번 턴의 변경이 아니다.
@@ -4182,6 +4263,18 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     if (direct === 'style') {
       recordImageTurn(set, msg, ready)
       void finishImageRoles(get, { items: [{ image: ready[0], role: 'style' }], typed, msg, consent: CHAT_STYLE_REQUEST_CONSENT })
+      return true
+    }
+    // 인물이라고 적어 올렸어도 산문 인물이 있으면 어느 인물인지 묻는다(2026-11-11 오너 결정 2) — 묻는 길과 같은 질문을 거친다.
+    if (direct === 'character' && characterChoices().length > 0) {
+      const projectId = useProjectStore.getState().projectId
+      const content = withAttachmentMarker(msg, ready.map((r) => r.thumbUrl))
+      set((state) => ({
+        imageRoleGate: { items: ready.map((image) => asCharacterItem({ image })), typed, msg },
+        messages: [...state.messages, { id: makeId(), stage: 'producer' as const, role: 'user' as const, content }],
+      }))
+      if (projectId) saveChatMessage(projectId, 'producer', 'user', content)
+      askImageRole(get)
       return true
     }
     if (direct && direct !== 'comic') {
