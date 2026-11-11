@@ -7,8 +7,8 @@
 //   주기적으로 재발사해 끝까지 완성시킨다.
 //
 //   안전: STALE_MS 를 step maxDuration(300s)보다 크게 잡아 "아직 살아있는 step" 을 동시 재발사하지
-//   않는다(같은 단계 동시 재진입 → MAX_STAGE_ATTEMPTS 실패 회피). 클라 watchdog(180s)이 탭-열림
-//   빠른 경로를 먼저 처리하고, keepalive 는 탭-닫힘 느린 안전망이다.
+//   않는다(같은 단계 동시 재진입 → MAX_STAGE_ATTEMPTS 실패 회피). 탭이 열려 있으면 화면이 180s 부터
+//   resume 을 묻지만, resume · 크론 watchdog 도 같은 기준(run-alive.ts, 2026-11-11 T5)으로만 찌른다.
 
 export async function register() {
   // Sentry 런타임별 초기화(#obs-audit 2026-09-02) — nodejs 조기 반환보다 먼저(edge도 초기화 필요).
@@ -35,7 +35,8 @@ export async function register() {
   if (g.__writerKeepalive) return
 
   const INTERVAL_MS = 60_000
-  const STALE_MS = 330_000 // > step maxDuration(300s): 이전 인스턴스가 확실히 끝난 뒤에만 재발사.
+  // > step maxDuration(300s): 이전 인스턴스가 확실히 끝난 뒤에만 재발사(resume · 크론 watchdog 과 같은 수).
+  const { WRITER_RUN_ALIVE_MS: STALE_MS } = await import('@/lib/writer/run-alive')
   const origin =
     process.env.WRITER_KEEPALIVE_ORIGIN ?? `http://127.0.0.1:${process.env.PORT ?? 3000}`
 

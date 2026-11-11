@@ -51,6 +51,7 @@ import {
   type WriterRunStateBase,
   type WriterErrorDetail,
 } from '@/lib/writer/run-store';
+import { runMayBeAlive } from '@/lib/writer/run-alive';
 import { getPendingRawCalls, getUsageTotals } from '@/lib/writer/llm/raw_collector';
 import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events';
 import {
@@ -811,11 +812,13 @@ function captureErrorDetail(stage: string, message: string): WriterErrorDetail {
  *   - done   : 모든 단계 완료 (markCompleted)
  *   - failed : 단계 실행 에러 or 재시도 예산 초과 (markFailed)
  *   - paused : 남은 단계 있음 — 호출자가 다음 step 을 self-trigger 해야 함
+ *   - yielded: 다른 호출이 실행을 잇고 있다(저장에서 졌거나, 시도가 다 찬 단계의 앞 호출이 아직 돌 수 있음) —
+ *              다음 step 을 띄우지 않는다(2026-11-11 T5). 앞 호출이 죽었으면 330초 뒤 깨우기가 잇는다(run-alive.ts).
  */
 export async function runWriterSteps(
   projectId: string,
   opts: { deadlineMs: number },
-): Promise<{ done?: true; failed?: true; paused?: true; gated?: true }> {
+): Promise<{ done?: true; failed?: true; paused?: true; gated?: true; yielded?: true }> {
   const run = await getActiveRun(projectId);
   if (!run || run.status !== 'running') return { done: true };
 
@@ -829,6 +832,12 @@ export async function runWriterSteps(
   // CAS 토큰(#p2-wiring): 이 인보케이션이 이어받은 state_version. 저장마다 +1로 갱신되고,
   // 매치 실패(=다른 인보케이션이 먼저 씀/run 종결)면 즉시 양보한다 — stale 사본이 최종본을 덮는 것 방지.
   let version = run.state_version ?? 0;
+  // 다른 호출이 실행을 잇고 있으면 다음 step 을 띄우지 않고 물러난다(2026-11-11 T5) — paused 로 돌려주면 step 라우트가
+  //   다음 호출을 또 띄워, 저장에서 진 호출마다 호출이 꼬리를 물고 시도 소진 대기는 앞 호출이 저장할 때까지 쉬지 않고 되풀이됐다.
+  const yieldToOther = (stage: string, why: string) => {
+    console.log(`[writer steps] ${projectId} · ${stage} ${why} — 다른 호출이 실행을 잇는다, 다음 step 안 띄움`);
+    return { yielded: true as const };
+  };
 
   for (;;) {
     const step = steps.find((st) => !st.has(state));
@@ -846,11 +855,9 @@ export async function runWriterSteps(
       // (#long-writer-run 2026-07-15) 레이스 방어: 마지막 진입 마킹(updated_at) 후 함수 수명
       //   (300s)+마진이 지나기 전이면 그 attempt 인보케이션이 아직 돌고 있을 수 있다 —
       //   keepalive가 띄운 경쟁 인보케이션이 성공 직전의 run을 failed로 마킹하던 것(실측:
-      //   shotCheck 278s 성공 저장 직전에 failed). 확정 전엔 양보(paused)한다.
-      const sinceLastMarkMs = Date.now() - Date.parse(run.updated_at);
-      if (Number.isFinite(sinceLastMarkMs) && sinceLastMarkMs < 330_000) {
-        return { paused: true };
-      }
+      //   shotCheck 278s 성공 저장 직전에 failed). 확정 전엔 물러난다 — 앞 호출이 죽었으면 330초 뒤 깨우기가 여기로 다시 와
+      //   실패로 알린다(이어서 버튼).
+      if (runMayBeAlive(run.updated_at)) return yieldToOther(step.key, '시도 소진 · 앞 호출 대기');
       const message = `stage ${step.key} exceeded retry/time budget`;
       void recordWriterObservabilityEvent(
         projectId,
@@ -872,7 +879,7 @@ export async function runWriterSteps(
         { completed_units: completedUnits, current_stage: step.key },
         version,
       );
-      if (saved === null) return { paused: true }; // CAS 패배 — 다른 인보케이션이 run 을 소유
+      if (saved === null) return yieldToOther(step.key, '시작 표시 CAS 패배'); // 다른 인보케이션이 run 을 소유
       version = saved;
     } catch {
       // 진입 체크포인트 쓰기 실패(아직 stage 미실행)는 영구 실패로 보지 않는다 — 일시적 DB 블립일 수
@@ -930,7 +937,7 @@ export async function runWriterSteps(
               { completed_units: completedUnits, current_stage: step.key },
               version,
             );
-            if (saved === null) return { paused: true };
+            if (saved === null) return yieldToOther(step.key, 'network 재시도 저장 CAS 패배');
             version = saved;
           } catch {
             // 기록 실패는 재시도를 막지 않는다.
@@ -964,7 +971,7 @@ export async function runWriterSteps(
             { completed_units: completedUnits, current_stage: step.key },
             version,
           );
-          if (saved === null) return { paused: true }; // CAS 패배 — 다른 인보케이션에 양보
+          if (saved === null) return yieldToOther(step.key, '자동 재시도 저장 CAS 패배'); // 다른 인보케이션에 양보
           version = saved;
         } catch {
           // 기록 실패는 재시도를 막지 않는다 — 다음 진입 마킹이 어차피 체크포인트를 쓴다.
@@ -995,7 +1002,7 @@ export async function runWriterSteps(
           { completed_units: completedUnits, current_stage: step.key },
           version,
         );
-        if (saved === null) return { paused: true };
+        if (saved === null) return yieldToOther(step.key, '부분 진행 저장 CAS 패배');
         version = saved;
       } catch {
         return { paused: true };
@@ -1032,8 +1039,8 @@ export async function runWriterSteps(
         { completed_units: completedUnits, current_stage: step.key },
         version,
       );
-      // CAS 패배는 실패가 아니다 — 다른 인보케이션이 run 을 이어받았으니 조용히 양보.
-      if (saved === null) return { paused: true };
+      // CAS 패배는 실패가 아니다 — 다른 인보케이션이 run 을 이어받았으니 조용히 양보(다음 step 은 그쪽이 띄운다).
+      if (saved === null) return yieldToOther(step.key, '단계 완료 저장 CAS 패배');
       version = saved;
       void recordWriterObservabilityEvent(
         projectId,

@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     const deadlineMs = Date.now() + STEP_BUDGET_MS;
     const result = await runWriterSteps(projectId, { deadlineMs });
 
-    // 남은 단계 있으면 다음 step self-trigger.
+    // 남은 단계 있으면 다음 step self-trigger. yielded(다른 호출이 실행을 잇는 중)는 띄우지 않는다(2026-11-11 T5).
     if (result.paused) {
       after(async () => {
         await triggerWriterStep(req.nextUrl.origin, projectId);
