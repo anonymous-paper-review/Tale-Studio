@@ -903,7 +903,7 @@ async function runComicAdaptation(
 }
 
 /** "어느 인물의 그림인가요?" 칩으로 고를 수 있는 산문 인물(2026-11-11 오너 결정 2) — 이름 있는 사람 카드. 사물 · 이름 없는 카드는 뺀다.
- *  시리즈 다음 화가 앞 화에서 이어받은 인물도 뺀다 — 사진을 이으면 넘길 때 앞 화에서 만든 시트를 이 화에 적지 않는다(오너가 정하기 전, 리드 2026-11-11). */
+ *  시리즈 다음 화가 앞 화에서 이어받은 인물도 뺀다 — 사진을 이으면 넘길 때 앞 화에서 만든 시트를 이 화에 적지 않는다(오너 2026-11-11 "이어받은 인물은 빼 둔다"). */
 function characterChoices(): Array<{ localId: string; name: string }> {
   return useProducerStore.getState().cast
     .filter((member) => member.entityType !== 'object' && member.name.trim() && member.inherited !== true)
@@ -918,6 +918,12 @@ function asCharacterItem(item: { image: ChatImageInput }): ImageRoleGate['items'
 /** 어느 인물인지 아직 묻지 않은 인물 카드 그림의 자리 — 없으면 -1. */
 function pendingCharacterPick(gate: ImageRoleGate): number {
   return gate.items.findIndex((it) => it.role === 'character' && it.character === undefined)
+}
+
+/** 외모 채우기 답에서 고른 카드의 항목을 이름으로도 찾게 — 사진을 이은 산문 인물 카드의 이름(그 밖에는 없음). */
+function cardFillName(fill: CardFill): string | undefined {
+  if (fill.kind !== 'character' || !fill.appearanceOnly) return undefined
+  return useProducerStore.getState().cast.find((member) => member.localId === fill.ref)?.name
 }
 
 /** 그림마다 다 정했는가 — 쓰임새를 다 고르고, 인물 카드로 고른 그림은 어느 인물인지도 골랐다. */
@@ -3070,7 +3076,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       let extractedForApply: ExtractedSettings | undefined =
         stage === 'producer' && data.extractedSettings && !producerLockedTurn
           ? opts?.cardFill
-            ? (coerceCardFill(data.extractedSettings as ExtractedSettings, opts.cardFill) as ExtractedSettings)
+            ? (coerceCardFill(data.extractedSettings as ExtractedSettings, opts.cardFill, cardFillName(opts.cardFill)) as ExtractedSettings)
             : (data.extractedSettings as ExtractedSettings)
           : undefined
       // 서버가 컨텍스트 보호용으로 되돌려 준 기존 언어는 이번 턴의 변경이 아니다.

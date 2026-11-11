@@ -109,7 +109,8 @@ describe('Writer 채팅에 올린 인물 사진과 산문 인물 잇기', () => 
   })
 
   it('시리즈 다음 화에서 앞 화로부터 이어받은 인물은 칩에 넣지 않는다', async () => {
-    // 왜: 이어받은 인물에 사진을 이으면 넘길 때 앞 화에서 만든 시트(돈 든 그림)를 이 화에 적지 않고 새로 그리게 된다 — 오너가 정하기 전에는 잇지 않는다(리드 2026-11-11).
+    // 왜: 이어받은 인물에 사진을 이으면 넘길 때 앞 화에서 만든 시트(돈 든 그림)를 이 화에 적지 않고 새로 그리게 된다 — 오너 2026-11-11 "이어받은 인물은 빼 둔다".
+    //   그 인물의 사진은 지금처럼 새 인물 카드가 된다.
     producer.setState({ cast: [{ ...TEACHER, inherited: true }, MINA] })
     await askedWhichCharacter()
     expect(chipLabels()).toEqual(['Mina', 'New character'])
@@ -148,6 +149,25 @@ describe('Writer 채팅에 올린 인물 사진과 산문 인물 잇기', () => 
     const directive = imageCardFillDirective({ kind: 'character', ref: 'cast-teacher', appearanceOnly: true }) ?? ''
     expect(directive).toContain('appearance only')
     expect(directive).toContain('Keep the existing name')
+  })
+
+  it('사진을 이은 카드의 외모 채우기 답에 인물이 여럿이면 고른 카드와 같은 ref 나 이름의 외모를 쓴다', async () => {
+    // 왜: 검토 c(2026-11-11) — 모델이 [Mina, The Teacher] 순서로 돌려주면 첫 항목을 써서 The Teacher 외모가 Mina 설명이 됐다(틀린 글이 조용히 저장됨).
+    chatReply = { reply: 'Updated the appearance.', extractedSettings: { characters: [{ name: 'Mina', appearance: 'A curious student with a ponytail' }, { name: 'The Teacher', appearance: 'A young man with glasses in a dark suit' }] } }
+    await askedWhichCharacter()
+    await send('This is The Teacher')
+    await vi.waitFor(() => expect(card('cast-teacher')?.appearance).toBe('A young man with glasses in a dark suit'))
+    expect(card('cast-mina')?.appearance).toBe('A curious student')
+    const fill = { kind: 'character' as const, ref: 'cast-teacher', appearanceOnly: true }
+    expect(coerceCardFill({ characters: [{ ref: 'cast-mina', appearance: 'Ponytail' }, { ref: 'cast-teacher', appearance: 'Glasses' }] }, fill, 'The Teacher'))
+      .toEqual({ characters: [{ ref: 'cast-teacher', appearance: 'Glasses' }] })
+  })
+
+  it('사진을 이은 카드의 외모 채우기 답에 인물이 여럿인데 고른 카드와 맞는 것이 없으면 외모를 바꾸지 않고, 하나뿐이면 그것을 쓴다', () => {
+    // 왜: 어느 인물의 외모인지 모르는 글을 고른 카드에 넣으면 틀린 외모가 조용히 남는다 — 하나뿐이면 그 카드를 채우라고 한 답이라 쓴다(혼자 정한 것).
+    const fill = { kind: 'character' as const, ref: 'cast-teacher', appearanceOnly: true }
+    expect(coerceCardFill({ characters: [{ name: 'Kim', appearance: 'Glasses' }, { name: 'Lee', appearance: 'Ponytail' }] }, fill, 'The Teacher')).toEqual({})
+    expect(coerceCardFill({ characters: [{ name: 'Kim', appearance: 'Glasses' }] }, fill, 'The Teacher')).toEqual({ characters: [{ ref: 'cast-teacher', appearance: 'Glasses' }] })
   })
 
   it('여러 장을 그림마다 정할 때는 인물 카드로 고른 그림마다 바로 이어서 어느 인물인지 묻는다', async () => {
