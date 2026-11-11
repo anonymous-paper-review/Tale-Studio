@@ -108,6 +108,13 @@ describe('Writer 채팅에 올린 인물 사진과 산문 인물 잇기', () => 
     expect(chipLabels()).toEqual(['The Teacher', 'Mina', 'New character'])
   })
 
+  it('시리즈 다음 화에서 앞 화로부터 이어받은 인물은 칩에 넣지 않는다', async () => {
+    // 왜: 이어받은 인물에 사진을 이으면 넘길 때 앞 화에서 만든 시트(돈 든 그림)를 이 화에 적지 않고 새로 그리게 된다 — 오너가 정하기 전에는 잇지 않는다(리드 2026-11-11).
+    producer.setState({ cast: [{ ...TEACHER, inherited: true }, MINA] })
+    await askedWhichCharacter()
+    expect(chipLabels()).toEqual(['Mina', 'New character'])
+  })
+
   it('산문 인물이 아직 없으면 묻지 않고 지금처럼 새 인물 카드를 만든다', async () => {
     // 왜: 고를 사람이 없다 — 새 프로젝트 시작 화면처럼 산문이 아직 없는 곳도 이 경우다(혼자 정한 것).
     producer.setState({ cast: [PLANE] })
@@ -201,6 +208,6 @@ describe('Writer 채팅에 올린 인물 사진과 산문 인물 잇기', () => 
     expect(chipLabels()).toEqual(['The Teacher', 'Mina', '새 인물'])
     await send('The Teacher의 그림이에요')
     await vi.waitFor(() => expect(calls('/api/produce/chat')).toHaveLength(1))
-    expect(modelSaid()).toContain('ref-person.png을(를) The Teacher 카드에 붙였어요. 그림을 보고 외모를 다시 채울게요.')
+    expect(modelSaid()).toContain('The Teacher 카드에 ref-person.png 그림을 붙였어요. 그림을 보고 외모를 다시 채울게요.')
   })
 })

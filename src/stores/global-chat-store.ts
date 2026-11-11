@@ -902,10 +902,11 @@ async function runComicAdaptation(
   return { scriptSet: await script, styleDone }
 }
 
-/** "어느 인물의 그림인가요?" 칩으로 고를 수 있는 산문 인물(2026-11-11 오너 결정 2) — 이름 있는 사람 카드. 사물 · 이름 없는 카드는 뺀다. */
+/** "어느 인물의 그림인가요?" 칩으로 고를 수 있는 산문 인물(2026-11-11 오너 결정 2) — 이름 있는 사람 카드. 사물 · 이름 없는 카드는 뺀다.
+ *  시리즈 다음 화가 앞 화에서 이어받은 인물도 뺀다 — 사진을 이으면 넘길 때 앞 화에서 만든 시트를 이 화에 적지 않는다(오너가 정하기 전, 리드 2026-11-11). */
 function characterChoices(): Array<{ localId: string; name: string }> {
   return useProducerStore.getState().cast
-    .filter((member) => member.entityType !== 'object' && member.name.trim())
+    .filter((member) => member.entityType !== 'object' && member.name.trim() && member.inherited !== true)
     .map((member) => ({ localId: member.localId, name: member.name.trim() }))
 }
 

@@ -2183,7 +2183,7 @@ export const KO: Record<string, string> = {
   'New character': '새 인물',
   'Make a new character card': '새 인물 카드로 만들어 주세요',
   'Please choose which character this picture is of, or make a new character.': '이 그림이 어느 인물인지 고르거나 새 인물로 만들어 주세요.',
-  'Linked {name} to {character}. I will update the appearance from the picture.': '{name}을(를) {character} 카드에 붙였어요. 그림을 보고 외모를 다시 채울게요.',
+  'Linked {name} to {character}. I will update the appearance from the picture.': '{character} 카드에 {name} 그림을 붙였어요. 그림을 보고 외모를 다시 채울게요.',
   'The attached picture is the character on card @{label}. Look at it and rewrite only the appearance on that card to match the picture. Keep the name. Do not write a story.':
     '첨부한 그림은 @{label} 카드의 인물이에요. 그림을 보고 그 카드의 외형만 그림에 맞게 다시 써 주세요. 이름은 그대로 두세요. 이야기는 만들지 마세요.',
   'Original picture': '원본 그림',
