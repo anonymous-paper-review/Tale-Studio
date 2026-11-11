@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils'
 import { useProjectStore } from '@/stores/project-store'
 import { ENTRY_FILE_ACCEPT, IMAGE_EXT_LABEL, TEXT_EXT_LABEL, WRITING_STEPS, pickEntryFile, readStoredTab, readingSteps, writeStoredTab, type EntryTab } from './options'
 import { useImageUploadConsent } from '@/components/upload/image-upload-consent'
-import { entryStarted, useEntryStore } from './entry-store'
+import { entryStarted, useEntryStore, writingFailureCopy } from './entry-store'
 import { BusyOverlayPortal, UploadingChip, stepsFrom, useUploadErrorMessage } from './entry-parts'
 import { writeWorkspaceTab } from '@/stores/writer-room-store'
 import { STAGE_PERSONA } from '@/lib/lumi'
@@ -224,14 +224,15 @@ function WritingOverlay() {
   const dismiss = useEntryStore((s) => s.dismissWriting)
   const failed = writing.status === 'failed'
   const open = writing.status === 'starting' || writing.status === 'writing' || failed
-  const startFailed = failed && writing.error === 'start_failed'
+  // 실패 까닭마다 문구가 다르다 — 만화를 옮기지 못했으면 그렇다고 알리고 다듬기로 시작하는 길도 적는다(검토 a 낮음 2).
+  const failure = writingFailureCopy(writing.error)
   return (
     <BusyOverlayPortal
       open={open}
       // 실패하면 실패 안내로 바뀐다 — 도는 표시 대신 경고를 두고, 왼쪽 레일의 단계 이동도 다시 연다(디자이너 QA 1차 #07).
       busy={!failed}
-      title={failed ? t(startFailed ? "Couldn't start" : "Couldn't write the prose draft") : t('Writing the prose draft')}
-      description={failed ? t(startFailed ? 'Please check the settings and try again.' : 'Something went wrong while writing. Please try again.') : undefined}
+      title={failed ? t(failure.title) : t('Writing the prose draft')}
+      description={failed ? t(failure.description) : undefined}
       steps={stepsFrom(WRITING_STEPS, writing.step, t)}
       lumi={STAGE_PERSONA.producer}
       footer={

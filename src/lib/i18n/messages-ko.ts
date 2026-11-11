@@ -2475,6 +2475,9 @@ export const KO: Record<string, string> = {
   'Writing the scene stories': '씬 스토리 쓰기',
   "Couldn't start": '시작하지 못했어요',
   'Please check the settings and try again.': '설정을 확인하고 다시 시도해 주세요.',
+  // 만화 쪽 그대로 시작에서 옮기기가 실패했을 때(2026-11-11 검토 a 낮음 2)
+  "Couldn't turn the comic into a script": '만화를 대본으로 옮기지 못했어요',
+  'Try again in a moment. Or close this, set Change level to "Polish", and start with the text read from the picture.': '잠시 뒤 다시 시도해 주세요. 또는 닫고 바꿈 정도를 "다듬기"로 바꿔 시작하면 그림에서 읽은 글로 시작해요.',
   "Couldn't write the prose draft": '산문 초안을 쓰지 못했어요',
   'Something went wrong while writing. Please try again.': '쓰는 중에 문제가 생겼어요. 다시 시도해 주세요.',
   // ② 설정

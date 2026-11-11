@@ -1,6 +1,6 @@
 // Producer 시작 화면 저장소: 두 탭이 같은 초안을 쓰고, 다음 · 채팅 답 · 시작을 서버에 보내며, 산문 초안이 다 될 때까지 기다렸다가 Writer로 간다 (리뉴얼 1차 2026-10-19)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { useEntryStore, entryStarted } from '@/features/entry/entry-store'
+import { useEntryStore, entryStarted, writingFailureCopy } from '@/features/entry/entry-store'
 import { chatChips, chatTranscript, currentChatQuestion, hintText } from '@/features/entry/chat-flow'
 import { emptyEntryDraft, materialBasis, type EntryDraft } from '@/lib/entry/draft'
 import { translate } from '@/lib/i18n/translate'
@@ -334,6 +334,25 @@ describe('시작과 산문 초안', () => {
     expect(entryStarted(state)).toBe(true)
     expect(state.writerStart).toEqual(writerStart)
     expect(calls.some((c) => c.url === '/api/writer/start')).toBe(false)
+  })
+
+  it('만화를 대본으로 옮기지 못해 시작하지 못하면 "시작하지 못했어요" 대신 그 까닭과 다시 시도 · 다듬기로 시작하는 길을 알린다', async () => {
+    // 왜: 검토 a 낮음 2(2026-11-11) — 만화 쪽 그대로 시작에서 옮기기가 실패해도 "설정을 확인하고 다시 시도해 주세요"만 떠, 설정이 잘못된 줄 알았다.
+    //   다시 시도하거나, 바꿈 정도를 다듬기로 바꿔 그림에서 읽은 글로 시작할 수 있다(다듬기는 옮기지 않는다).
+    setDraft(startDraft())
+    routes['POST /api/produce/entry/start'] = () => ({ status: 502, body: { error: 'comic_script_failed', reason: 'model_error' } })
+    expect(await useEntryStore.getState().start()).toBe(false)
+    expect(useEntryStore.getState().writing).toMatchObject({ status: 'failed', error: 'comic_script_failed' })
+    const copy = writingFailureCopy('comic_script_failed')
+    expect(copy.title).toBe("Couldn't turn the comic into a script")
+    expect(copy.description).toMatch(/Try again/)
+    expect(copy.description).toMatch(/Polish/)
+    expect(ko(copy.title)).toBe('만화를 대본으로 옮기지 못했어요')
+    expect(ko(copy.description)).toMatch(/다시 시도/)
+    expect(ko(copy.description)).toMatch(/"다듬기"/)
+    // 다른 시작 실패 · 초안 실패 문구는 지금 그대로다.
+    expect(writingFailureCopy('start_failed')).toEqual({ title: "Couldn't start", description: 'Please check the settings and try again.' })
+    expect(writingFailureCopy('writer_failed')).toEqual({ title: "Couldn't write the prose draft", description: 'Something went wrong while writing. Please try again.' })
   })
 
   it('시작 요청이 실패하면 시작하지 않은 채 설정을 다시 고칠 수 있다', async () => {
