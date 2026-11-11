@@ -33,6 +33,24 @@ export interface ClaudeCallOptions {
   //   (gemini responseMimeType 의 등가물+상위). web_search 와 병용 성립 실측(sonnet-4-6, 35.6s).
   //   zodOutputFormat 이 zod→JSON 스키마 변환과 미지원 제약 정리를 담당한다.
   zodSchema?: z.ZodType;
+  // 이 시각(ms)까지 답이 끝나지 않으면 기다리지 않고 끊는다 — 재시도도 하지 않는다(검토 b 2026-11-11).
+  //   샷 점검이 함수 수명(300초)에 잘려 같은 유료 호출을 다시 사던 것을 막는다. 끊으면 ClaudeTimeBudgetError.
+  deadlineMs?: number;
+}
+
+/** 정한 시간 예산을 넘겨 끊은 요청 — 일시 오류 무늬(timeout · aborted)에 걸리지 않는 글이라 다시 시도하지 않는다. */
+export class ClaudeTimeBudgetError extends Error {
+  constructor() {
+    super('Claude call ran past its time budget — not waiting');
+    this.name = 'ClaudeTimeBudgetError';
+  }
+}
+
+// 구조화 출력 형식에서 SDK 의 parse 를 뺀다 — stream().finalMessage() 는 형식에 parse 가 있으면 끝에서 글 조각마다
+//   JSON 을 검사해, 서술이 섞이거나 잘린 답을 우리 복구(조각 이어 붙이기 · JSON 구간 읽기 · truncated 판정) 전에 버린다(검토 b).
+function jsonSchemaFormat(schema: z.ZodType) {
+  const { type, schema: jsonSchema } = zodOutputFormat(schema as never);
+  return { type, schema: jsonSchema };
 }
 
 export async function claudeGenerate(
@@ -66,17 +84,28 @@ export async function claudeGenerate(
       ...(opts.webSearch
         ? { tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 5 }] }
         : {}),
-      ...(opts.zodSchema ? { output_config: { format: zodOutputFormat(opts.zodSchema) } } : {}),
+      ...(opts.zodSchema ? { output_config: { format: jsonSchemaFormat(opts.zodSchema) } } : {}),
     };
-    // Claude 5 는 max_tokens 바닥(32k) 때문에 SDK 가 비스트리밍을 거부("Streaming is required
-    //   for operations that may take longer than 10 minutes") — 스트리밍 수집으로 동일 응답을 얻는다.
-    const response = await withLlmRetry<Anthropic.Messages.Message>(
-      async () =>
-        isClaude5
-          ? await client.messages.stream(params as never).finalMessage()
-          : await client.messages.create(params as never),
-      'claude',
-    );
+    // 모든 모델을 스트리밍으로 받는다 — SDK 는 비스트리밍 요청의 max_tokens 가 약 21,333 을 넘으면 보내기 전에
+    //   거부한다("Streaming is required for operations that may take longer than 10 minutes"). Claude 5 는 바닥 32k 라
+    //   늘 걸렸고, Claude 4.x 도 샷 점검(32k)이 9/2부터 이 거부로 조용히 실패했다(오너 2026-11-11 결정 1). 스트리밍 수집은 같은 응답을 준다.
+    //   약속: tests/llm-call/claude-streaming.test.ts
+    const deadline = opts.deadlineMs;
+    const response = await withLlmRetry<Anthropic.Messages.Message>(async () => {
+      if (deadline == null) return await client.messages.stream(params as never).finalMessage();
+      const left = deadline - Date.now();
+      if (left <= 0) throw new ClaudeTimeBudgetError();
+      const abort = new AbortController();
+      const timer = setTimeout(() => abort.abort(), left);
+      try {
+        return await client.messages.stream(params as never, { signal: abort.signal }).finalMessage();
+      } catch (e) {
+        if (abort.signal.aborted) throw new ClaudeTimeBudgetError();
+        throw e;
+      } finally {
+        clearTimeout(timer);
+      }
+    }, 'claude');
 
     stopReason = response.stop_reason ?? undefined;
     inputTokens = response.usage?.input_tokens;

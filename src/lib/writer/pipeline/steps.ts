@@ -24,6 +24,8 @@ import { isFlagOn } from '@/lib/flags';
 import { runShotDesign } from '@/lib/writer/pipeline/stages/v4_shots';
 import { runShotCheck } from '@/lib/writer/pipeline/stages/c_application_2';
 import { runRenderPrompts } from '@/lib/writer/pipeline/stages/v5_prompts';
+import { renderPromptLlmCalls } from '@/lib/writer/pipeline/util/render_prompt_extract';
+import { skipsShotCheck } from '@/lib/writer/pipeline/shotcheck-policy';
 import { runDialogue, toDialogueTrack, type DialogueProgress } from '@/lib/writer/pipeline/stages/dialogue';
 // #script-preserve 2026-09-17: 대본 보존 — 씬·대사를 LLM 으로 다시 쓰지 않고 대본에서 옮긴다(tests/writer/script-preserve-steps.test.ts).
 import { preservedScript, scenesFromScript, annotateScriptScenes, dialogueTrackFromScript, mergeScriptSpeakers } from '@/lib/writer/script/preserve';
@@ -212,6 +214,10 @@ interface WriterStep {
 
 // 레인 순차 실행 게이트(#2lane A/B) — WRITER_LANES=0 이면 Lane V→Lane D 순차. 그 외 코드 경로는 동일.
 const LANES_PARALLEL = process.env.WRITER_LANES !== '0';
+/** 샷 점검이 소프트 예산(240초)을 넘겨도 되는 여유 — 300초 하드 한도 전에 결과를 저장할 30초를 남긴다(검토 b 2026-11-11). */
+const SHOTCHECK_OVERRUN_MS = 30_000;
+/** 프롬프트 다듬기(V5)가 AI 로 프롬프트 하나를 새로 쓰는 데 드는 예상 시간 — 재기 실측(점검이 나눈 샷 2~3개)에서 넉넉히. */
+const RENDER_PROMPT_CALL_MS = 10_000;
 
 // =====================================================================
 // decoupage 후 2-레인(#2lane 2026-08-10).
@@ -290,7 +296,9 @@ async function runLaneVisual(
     //   상한 200s(리뷰 R1): EST 가 step 예산(240s)에 닿으면 어떤 인보케이션도 착수 조건을 못 채워
     //   좀비 run(영구 paused)이 된다 — 신선한 인보케이션은 항상 시도하고 300s 하드킬·attempt 예산에 맡긴다.
     const EST_SHOTCHECK_MS = Math.min(200_000, Math.max(160_000, (s.shotDesign?.length ?? 0) * 6_000));
-    if (deadlineMs != null && Date.now() + EST_SHOTCHECK_MS > deadlineMs) {
+    // 80샷 넘는 긴 작품은 점검 AI 를 부르지 않으니(오너 2026-11-11, shotcheck-policy.ts) 착수 대기 없이 바로 결정론 조립만 한다.
+    const skipCheck = skipsShotCheck(shotDesign.length);
+    if (!skipCheck && deadlineMs != null && Date.now() + EST_SHOTCHECK_MS > deadlineMs) {
       console.log(
         `[writer] shotCheck 착수 보류 — 남은 예산 ${Math.round((deadlineMs - Date.now()) / 1000)}s < 예상 ${EST_SHOTCHECK_MS / 1000}s. shotDesign 체크포인트 후 다음 step 으로.`,
       );
@@ -310,11 +318,23 @@ async function runLaneVisual(
       s.input.outputLocale,
       // #stage/#ledger: 방금 만든 v4 이슈(같은 인보케이션) 또는 체크포인트에서 온 이슈.
       patch.shotDesignIssues ?? s.shotDesignIssues ?? [],
+      // 점검 시간 예산(검토 b 2026-11-11): 남은 예산 + 30초까지만 기다린다 — 300초 하드 한도 전에 끊어야
+      //   결과(못 끝나면 "점검 생략" 경고)를 저장한다. 잘려 다음 호출이 같은 점검을 다시 사던 것을 막는다.
+      { deadlineMs: deadlineMs != null ? deadlineMs + SHOTCHECK_OVERRUN_MS : undefined },
     );
     await logger.flushRawLlm('shotCheck');
     shotSequence = result.shotSequence;
     patch.shotSequence = result.shotSequence;
     patch.shotCheck = result.report;
+    // 점검이 끝났는데 남은 시간이 프롬프트 다듬기(AI 로 새로 쓸 프롬프트마다 약 10초)에 모자라면, 점검 결과를 저장하고
+    //   다음 호출로 넘긴다 — 다음 호출은 점검을 건너뛰고 다듬기만 한다(점검을 다시 사지 않는다, 검토 b 2026-11-11).
+    const estRenderMs = renderPromptLlmCalls(result.shotSequence.shots as never) * RENDER_PROMPT_CALL_MS;
+    if (deadlineMs != null && s.renderPrompts === undefined && Date.now() + estRenderMs > deadlineMs) {
+      console.log(
+        `[writer] renderPrompts 착수 보류 — 남은 예산 ${Math.round((deadlineMs - Date.now()) / 1000)}s < 예상 ${estRenderMs / 1000}s. shotCheck 체크포인트 후 다음 step 으로.`,
+      );
+      return patch;
+    }
   }
 
   if (s.renderPrompts === undefined) {

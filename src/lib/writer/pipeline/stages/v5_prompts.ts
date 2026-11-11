@@ -13,6 +13,7 @@ import type {
   ShotSequence,
 } from '@/lib/writer/types/pipeline';
 import type { PipelineLogger } from '@/lib/writer/logger';
+import { extractT2IPrompt, extractTI2VPrompt } from '@/lib/writer/pipeline/util/render_prompt_extract';
 
 type AnyShot = Record<string, unknown> & {
   shot_id: string;
@@ -110,39 +111,7 @@ export async function runRenderPrompts(
 }
 
 // ===== 추출 헬퍼 =====
-
-function extractT2IPrompt(shot: AnyShot): string | null {
-  // 우선순위:
-  // ① shot.first_frame_generation.composition_prompt (C2 출력)
-  // ② shot.static_spec.first_frame_prompt (V4b 출력 — rich-A)
-  // ③ shot.S.subject + shot.S.background 조합 (rich-A fallback)
-  const a = shot.first_frame_generation?.composition_prompt;
-  if (typeof a === 'string' && a.trim().length > 20) return a;
-
-  const b = (shot.static_spec as { first_frame_prompt?: string } | undefined)?.first_frame_prompt;
-  if (typeof b === 'string' && b.trim().length > 20) return b;
-
-  const S = shot.S as { subject?: string; background?: string } | undefined;
-  if (S && typeof S.subject === 'string' && S.subject.trim().length > 10) {
-    const bg = typeof S.background === 'string' ? `, 배경: ${S.background}` : '';
-    return `${S.subject}${bg}`;
-  }
-
-  return null;
-}
-
-function extractTI2VPrompt(shot: AnyShot): string | null {
-  // 우선순위:
-  // ① shot.video_generation.motion_prompt (C2 출력)
-  // ② shot.dynamic_spec.motion_prompt (V4c 출력 — rich-A)
-  const a = shot.video_generation?.motion_prompt;
-  if (typeof a === 'string' && a.trim().length > 5) return a;
-
-  const b = (shot.dynamic_spec as { motion_prompt?: string } | undefined)?.motion_prompt;
-  if (typeof b === 'string' && b.trim().length > 5) return b;
-
-  return null;
-}
+//   첫 장면(T2I) · 움직임(TI2V) 뽑기 규칙은 util/render_prompt_extract.ts — 실행기가 남은 시간을 셀 때도 같은 규칙을 쓴다.
 
 function extractReferences(shot: AnyShot): string[] {
   const refs: string[] = [];

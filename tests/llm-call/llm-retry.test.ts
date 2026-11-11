@@ -30,6 +30,18 @@ describe('isTransientLlmError가 일시적 오류를 가려내는 약속', () =>
     }
   })
 
+  // 왜: 스트리밍은 답을 오래 받는다 — 받는 도중 연결이 끊기는 일은 다시 하면 대개 된다(검토 b 2026-11-11).
+  it('답을 받는 도중 연결이 끊기면("terminated" · "other side closed") 다시 시도할 오류로 판단한다', () => {
+    for (const msg of ['terminated', 'TypeError: terminated', 'SocketError: other side closed']) {
+      expect(isTransientLlmError(new Error(msg)), msg).toBe(true)
+    }
+  })
+
+  // 왜: 정한 시간 예산을 넘겨 끊은 요청은 다시 하지 않고 바로 다음 일로 간다(샷 점검 생략).
+  it('시간 예산을 넘겨 끊은 요청은 다시 시도하지 않는다', () => {
+    expect(isTransientLlmError(new Error('Claude call ran past its time budget — not waiting'))).toBe(false)
+  })
+
   it('잘못된 요청이나 읽을 수 없는 응답은 다시 시도하지 않고 즉시 실패한다', () => {
     for (const msg of [
       '[400] Invalid argument',
