@@ -2,6 +2,7 @@
 //   코드 표를 먼저 읽어 없는 코드는 바로 거절하고(작업 공간도 만들지 않는다),
 //   실제 쓰기는 DB 함수 redeem_voucher 가 잠금을 걸고 한 번에 한다: 쓴 기록 · 요금제 바꾸기 · Take 넣기.
 //   자리를 다 채운 코드 · 이 계정이 이미 쓴 코드 · 무료가 아닌 계정은 그 함수가 거절한다(2026-10-29 여러 계정이 쓰는 코드).
+//   p_expires_at 은 Take 만료이자 코드 요금제가 끝나는 시각이다(2026-11-12, 무료로 돌리는 일은 /api/cron/voucher-expire).
 //   약속: tests/billing/voucher.test.ts
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'

@@ -1,11 +1,12 @@
 // 바우처 코드(2026-10-27 오너): 아이디 · 비밀번호를 나눠 주던 테스트 계정 대신 코드를 준다.
 //   구글로 로그인한 사용자가 계정 화면에 코드를 넣으면 그 요금제와 한 달 Take 가 들어온다.
 //   코드마다 쓸 수 있는 계정 수가 있고(10-27 코드는 1, 10-29 공용 코드는 여러 명), 한 계정은 같은 코드를 한 번만 쓴다.
+//   코드 요금제는 쓴 때로부터 30일 뒤 무료로 돌아간다(11-12) — Take 만료와 같은 시각, 정리는 /api/cron/voucher-expire.
 //   코드는 scripts/create-vouchers.mjs 가 만들어 vouchers 표(서버만 읽음)에 넣고, 쓰기는 DB 함수 redeem_voucher 한 곳이 판정한다.
 //   약속: tests/billing/voucher.test.ts
 import { getPlanEntitlements } from '@/lib/plan-limits'
 
-/** 코드로 받은 Take 가 살아 있는 날 수. 코드 요금제는 결제가 없어 매달 다시 채워지지 않으므로 한 달치를 한 번 준다. */
+/** 코드로 받은 Take 와 코드 요금제가 살아 있는 날 수. 결제가 없어 매달 다시 채워지지 않으므로 한 달치를 한 번 주고, 같은 날 요금제도 끝난다. */
 export const VOUCHER_TAKES_VALID_DAYS = 30
 
 /** 정리한 코드 모양(대문자 · 숫자). 만드는 코드는 TALE + 8자이고, DB 제약도 같은 범위다. */
@@ -18,7 +19,7 @@ export function normalizeVoucherCode(input: unknown): string {
   return typeof input === 'string' ? input.toUpperCase().replace(/[^A-Z0-9]/g, '') : ''
 }
 
-/** 코드를 쓴 순간 넣을 Take 와 만료 시각 — 그 요금제의 한 달 포함량을 30일 동안. */
+/** 코드를 쓴 순간 넣을 Take 와 만료 시각 — 그 요금제의 한 달 포함량을 30일 동안. 이 시각이 코드 요금제가 끝나는 시각도 된다. */
 export function voucherTakeGrant(plan: string, now: Date): { takes: number; expiresAt: string } {
   return {
     takes: getPlanEntitlements(plan).includedTakesPerMonth,

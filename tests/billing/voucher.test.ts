@@ -1,8 +1,9 @@
-// 구글로 로그인한 사용자가 받은 코드를 넣으면 그 요금제와 한 달 Take 가 들어오고, 코드마다 정한 계정 수까지만 쓰며 한 계정은 같은 코드를 한 번만 쓴다 (2026-10-27 · 10-29 오너 바우처)
+// 구글로 로그인한 사용자가 받은 코드를 넣으면 그 요금제와 한 달 Take 가 들어오고, 코드마다 정한 계정 수까지만 쓰며 한 계정은 같은 코드를 한 번만 쓰고, 코드 요금제는 쓴 때로부터 30일 뒤 무료로 돌아간다 (2026-10-27 · 10-29 · 11-12 오너 바우처)
 //   오너 결정(10-27): 아이디 · 비밀번호를 나눠 주던 테스트 계정을 코드로 바꾼다. s2 · p10 코드를 45개씩 만들고, 코드 하나는 한 명만 쓴다.
 //   오너 결정(10-29): s2 · p10 코드를 하나씩 만들어 여러 구글 계정이 같은 코드를 쓴다. 이미 만든 한 명용 코드는 그대로 한 명만 쓴다.
+//   오너 결정(11-12): 코드를 등록한 날로부터 한 달이 지나면 무료 기능으로 돌아간다. 이미 등록한 계정도 등록한 날 기준이다.
 import { existsSync, readFileSync } from 'node:fs'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
 const mocks = vi.hoisted(() => ({
@@ -264,6 +265,99 @@ describe('여러 계정이 함께 쓰는 코드 (마이그레이션)', () => {
     // 왜: 10-27 에 만든 s2 · p10 코드 90개는 한 명씩 나눠 주려고 만든 것이다. 구조를 바꾸면서 쓴 기록이 사라지면 쓴 코드가 다시 살아난다.
     expect(sql).toMatch(/max_uses integer not null default 1/)
     expect(sql).toMatch(/insert into public\.voucher_redemptions \(code, redeemed_at, redeemed_by, redeemed_workspace_id\)\s+select code, redeemed_at, redeemed_by, redeemed_workspace_id\s+from public\.vouchers\s+where redeemed_at is not null/)
+  })
+})
+
+describe('코드 요금제가 끝나는 날 (마이그레이션)', () => {
+  const file = 'supabase/migrations/20261112200000_expire_voucher_plans.sql'
+  const sql = existsSync(file) ? readFileSync(file, 'utf8') : ''
+
+  it('코드로 받은 요금제는 코드를 쓴 때로부터 30일 뒤 끝나고, 이미 쓴 코드도 쓴 때 기준으로 끝나는 날이 정해진다', () => {
+    // 왜: 오너 11-12 "바우처 등록일로부터 1달 지나면 다시 무료기능으로". 한 달은 Take 가 사라지는 30일과 같은 시각으로 맞춘다 —
+    //   요금제만 남고 Take 가 0 이거나, Take 만 남고 요금제가 무료인 어긋난 날이 생기지 않게.
+    expect(sql).toMatch(/alter table public\.voucher_redemptions add column plan_ends_at timestamptz/)
+    expect(sql).toMatch(/set plan_ends_at = redeemed_at \+ interval '30 days'\s+where plan_ends_at is null/)
+    expect(sql).toMatch(/insert into public\.voucher_redemptions \(code, redeemed_by, redeemed_workspace_id, plan_ends_at\)\s+values \(p_code, p_user, p_workspace, p_expires_at\)/)
+  })
+
+  it('끝나는 날이 지난 코드 요금제는 무료로 돌아가고, 한 번 정리한 기록은 다시 정리하지 않는다', () => {
+    // 왜: 정상 경로 고정. 무료로 돌린 기록이 남지 않으면 매일 같은 계정을 다시 보고, 그사이 결제한 계정을 내릴 위험이 생긴다.
+    expect(sql).toMatch(/create or replace function public\.voucher_plan_expire_due\(\)/)
+    expect(sql).toMatch(/r\.plan_ends_at <= now\(\)/)
+    expect(sql).toMatch(/r\.plan_ended_at is null/)
+    expect(sql).toMatch(/update public\.workspaces set plan = 'free'/)
+    expect(sql).toMatch(/set plan_ended_at = now\(\)/)
+  })
+
+  it('그사이 결제를 시작했거나 요금제가 코드 요금제와 달라진 계정은 무료로 내리지 않는다', () => {
+    // 왜: 코드로 써 보다가 구독을 시작한 사람이 다음 날 무료로 떨어지면 돈을 내고도 못 쓴다. 관리자가 직접 바꾼 요금제도 건드리지 않는다.
+    expect(sql).toMatch(/s\.status in \('active', 'trialing', 'past_due'\)/)
+    expect(sql).toMatch(/w\.plan = v\.plan/)
+  })
+
+  it('같은 계정에 아직 끝나지 않은 다른 코드 요금제가 있으면 무료로 내리지 않는다', () => {
+    // 왜: 무료로 돌아간 뒤 다른 코드를 다시 쓴 계정이다. 앞 코드의 정리가 늦게 돌아도 새 코드의 한 달을 끊으면 안 된다.
+    expect(sql).toMatch(/newer\.plan_ends_at > now\(\)/)
+  })
+
+  it('코드 요금제 정리 함수는 서버만 부른다', () => {
+    // 왜: 브라우저에서 부를 수 있으면 아무나 남의 요금제를 정리 시각 전에 건드린다.
+    expect(sql).toMatch(/revoke all on function public\.voucher_plan_expire_due\(\) from public, anon, authenticated/)
+  })
+})
+
+describe('코드 요금제 정리 잡 (GET /api/cron/voucher-expire)', () => {
+  async function loadRoute(rpc: ReturnType<typeof vi.fn>, alert: ReturnType<typeof vi.fn> = vi.fn(async () => {})) {
+    vi.resetModules()
+    vi.stubEnv('CRON_SECRET', 'secret-token')
+    vi.doMock('@/lib/supabase/admin', () => ({ supabaseAdmin: { rpc } }))
+    vi.doMock('@/lib/ops-alert', () => ({ sendOpsAlert: alert }))
+    const { GET } = await import('@/app/api/cron/voucher-expire/route')
+    return GET
+  }
+  const cronRequest = (token?: string) =>
+    new Request('https://x/api/cron/voucher-expire', token ? { headers: { authorization: `Bearer ${token}` } } : {})
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.doUnmock('@/lib/supabase/admin')
+    vi.doUnmock('@/lib/ops-alert')
+  })
+
+  it('예약 작업의 비밀값이 맞지 않으면 코드 요금제를 건드리지 않는다', async () => {
+    // 왜: 예약 작업 전용 주소다. 아무나 부르면 끝나는 날을 기다리지 않고 정리를 돌릴 수 있다.
+    const rpc = vi.fn()
+    const GET = await loadRoute(rpc)
+    const res = await GET(cronRequest('wrong'))
+    expect(res.status).toBe(401)
+    expect(rpc).not.toHaveBeenCalled()
+  })
+
+  it('정리 잡이 돌면 끝난 코드 요금제를 무료로 돌리고 몇 개를 돌렸는지 남긴다', async () => {
+    // 왜: 정상 경로 고정. 돌린 수 · 그대로 둔 수가 응답에 남아야 예약 작업 기록에서 바로 확인한다.
+    const rpc = vi.fn(async () => ({ data: { reverted: 2, kept: 1 }, error: null }))
+    const GET = await loadRoute(rpc)
+    const res = await GET(cronRequest('secret-token'))
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ ok: true, reverted: 2, kept: 1 })
+    expect(rpc).toHaveBeenCalledWith('voucher_plan_expire_due')
+  })
+
+  it('정리가 실패하면 운영 경보를 보내고 실패로 답한다', async () => {
+    // 왜: 조용히 안 돌면 한 달이 지난 코드 요금제가 끝없이 남는다.
+    const alert = vi.fn(async (_msg: { level: string; title: string; body?: string }) => {})
+    const GET = await loadRoute(vi.fn(async () => ({ data: null, error: { message: 'boom' } })), alert)
+    const res = await GET(cronRequest('secret-token'))
+    expect(res.status).toBe(500)
+    expect(alert).toHaveBeenCalledTimes(1)
+    expect(alert.mock.calls[0][0]).toMatchObject({ level: 'error' })
+  })
+
+  it('예약 작업 목록에 코드 요금제 정리 잡이 하루 한 번 등록돼 있다', async () => {
+    // 왜: 예약 등록이 빠지면 라우트만 있고 아무도 부르지 않아 한 달이 지나도 요금제가 그대로다.
+    const vercel = JSON.parse(readFileSync('vercel.json', 'utf8')) as { crons: { path: string; schedule: string }[] }
+    const entry = vercel.crons.find((cron) => cron.path === '/api/cron/voucher-expire')
+    expect(entry?.schedule).toMatch(/^\d+ \d+ \* \* \*$/)
   })
 })
 

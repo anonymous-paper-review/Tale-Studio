@@ -2024,6 +2024,8 @@ export type Database = {
         Row: {
           code: string
           id: string
+          plan_ended_at: string | null
+          plan_ends_at: string | null
           redeemed_at: string
           redeemed_by: string | null
           redeemed_workspace_id: string | null
@@ -2031,6 +2033,8 @@ export type Database = {
         Insert: {
           code: string
           id?: string
+          plan_ended_at?: string | null
+          plan_ends_at?: string | null
           redeemed_at?: string
           redeemed_by?: string | null
           redeemed_workspace_id?: string | null
@@ -2038,6 +2042,8 @@ export type Database = {
         Update: {
           code?: string
           id?: string
+          plan_ended_at?: string | null
+          plan_ends_at?: string | null
           redeemed_at?: string
           redeemed_by?: string | null
           redeemed_workspace_id?: string | null
@@ -2447,6 +2453,7 @@ export type Database = {
         Args: { p_people: Json; p_project_id: string }
         Returns: Json
       }
+      voucher_plan_expire_due: { Args: never; Returns: Json }
     }
     Enums: {
       [_ in never]: never

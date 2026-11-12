@@ -9,6 +9,10 @@
       "schedule": "0 4 * * *"
     },
     {
+      "path": "/api/cron/voucher-expire",
+      "schedule": "30 4 * * *"
+    },
+    {
       "path": "/api/cron/billing-reconcile",
       "schedule": "0 0 * * *"
     },
