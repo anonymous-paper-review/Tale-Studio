@@ -3,7 +3,7 @@
 //   읽기에 실패하면 면제가 아닌 것으로 본다 — 한도가 잘못 걸리는 쪽이 뚫리는 쪽보다 안전하다(다음에 다시 읽는다).
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { isAdminEmail } from '@/lib/admin'
-import { isQuotaExemptEmail } from '@/lib/quota-exempt'
+import { isQuotaExemptEmail, isUnlimitedCapacityEmail } from '@/lib/quota-exempt'
 
 const accountEmails = new Map<string, string | null>()
 
@@ -23,6 +23,11 @@ async function accountEmailOf(userId: string): Promise<string | null> {
 /** 관리자 — 동시 생성 자리(개인 상한) 면제는 관리자만 받는다(시연 계정은 상한 10 — generation-quota). */
 export async function isAdminUserId(userId: string): Promise<boolean> {
   return isAdminEmail(await accountEmailOf(userId))
+}
+
+/** 동시 생성 자리 상한이 없나 — 관리자와 운영 시험 계정(devtest@, 2026-11-12 오너). 관리자 기능은 isAdminUserId 가 따로 본다. */
+export async function isUnlimitedCapacityUserId(userId: string): Promise<boolean> {
+  return isUnlimitedCapacityEmail(await accountEmailOf(userId))
 }
 
 /** 할당량 면제(관리자 · 시연 계정) — 프로젝트 칸 · Take · 프로젝트당 영상 한도 · 앞 화 가져오기. */

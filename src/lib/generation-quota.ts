@@ -34,7 +34,7 @@ import {
 import { falKeys, totalMaxInflight } from '@/lib/fal/keys'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { PROJECT_VIDEO_GENERATION_LIMIT } from '@/lib/plan-limits'
-import { isAdminUserId, isQuotaExemptUserId } from '@/lib/quota-exempt-server'
+import { isQuotaExemptUserId, isUnlimitedCapacityUserId } from '@/lib/quota-exempt-server'
 
 /** 쿼터 카테고리 — Take 과금 축과 동일한 경계. 영상 kind 만 video, 나머지 전부 image. */
 export type QuotaCategory = 'video' | 'image'
@@ -98,8 +98,9 @@ function kindsOf(category: QuotaCategory): readonly GenerationJobKind[] {
 //   동시 생성 자리(개인 상한) 면제는 관리자만이고, 시연 계정(외부와 비밀번호를 나눔)은 상한이 10이다 —
 //   모두의 자리를 혼자 차지하지는 않게(2026-10-27 검토 → 같은 날 오너 "10개로 늘려줘").
 //   프로젝트당 영상 한도 면제는 관리자 · 시연 계정(할당량 면제).
+//   운영 시험 계정 devtest@ 도 관리자처럼 상한이 없다(2026-11-12 오너 — 관리자 권한은 없다, quota-exempt UNLIMITED_CAPACITY_EMAILS).
 async function personalCapacityOf(userId: string): Promise<PersonalCapacity> {
-  if (await isAdminUserId(userId)) return 'unlimited'
+  if (await isUnlimitedCapacityUserId(userId)) return 'unlimited'
   if (await isQuotaExemptUserId(userId)) return QUOTA_EXEMPT_MAX_QUEUED_JOBS_PER_USER
   return null
 }
