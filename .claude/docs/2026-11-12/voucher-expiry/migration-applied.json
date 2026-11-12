@@ -1,0 +1,26 @@
+{
+  "migrationVersion": "20261112200000",
+  "migrationName": "expire_voucher_plans",
+  "sha256": "f0da16c5820de0f3dc204c9ce9fa7740bf7899d0684fe2f12d8c6260364e75f5",
+  "development": {
+    "project": "pbiumddivadgbzxuymak",
+    "appliedAt": "2026-11-12T11:23:58.647Z",
+    "appliedWith": "node scripts/apply-dev-migration.mjs supabase/migrations/20261112200000_expire_voucher_plans.sql",
+    "historyRecorded": true
+  },
+  "production": {
+    "project": "qnjnrihfpqkdhjuzvepy",
+    "appliedAfter": "main aa70ed09 운영 배포 성공(GitHub deployment Production=success) 뒤",
+    "appliedWith": "Supabase Management API database/query 로 파일 그대로 실행 + supabase_migrations.schema_migrations 에 이력 행",
+    "historyRecorded": true,
+    "existingRedemptions": [
+      { "code": "TALE3DSMVRD3", "plan": "s2", "note": "공용 코드 2026-10-29", "planEndsAt": "2026-11-28T06:21:13Z" },
+      { "code": "TALECT25H2RQ", "plan": "p10", "note": "테스트 계정 대체 2026-10-27", "planEndsAt": "2026-11-29T10:52:45Z" },
+      { "code": "TALECYAGPT3B", "plan": "p10", "note": "테스트 계정 대체 2026-10-27", "planEndsAt": "2026-12-05T10:36:24Z" }
+    ],
+    "functionExecute": { "anon": false, "authenticated": false, "service_role": true }
+  },
+  "cron": "/api/cron/voucher-expire 매일 04:30 UTC(13:30 KST). 운영 주소는 비밀값 없이 부르면 401.",
+  "verifiedWith": "개발 · 운영 DB 각각 되돌리는 트랜잭션: 끝난 무료 가능 계정 → free, 구독 중 · 관리자가 바꾼 요금제 · 새 코드가 살아 있는 계정 → 그대로, 안 끝난 계정 → 손대지 않음, 두 번째 실행 0건. 남은 시험 행 0.",
+  "productionChanged": true
+}
