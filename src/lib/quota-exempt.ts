@@ -23,6 +23,16 @@ export function isQuotaExemptEmail(email: string | null | undefined): boolean {
   return new Set([...DEFAULT_QUOTA_EXEMPT_EMAILS, ...fromEnv]).has(email.trim().toLowerCase())
 }
 
+/** 동시 생성 자리(개인 상한)를 관리자처럼 두지 않는 계정 — 관리자 권한은 없다(2026-11-12 오너: 운영 시험 계정 devtest@ "관리자처럼 무제한").
+ *  시연 계정(promotion@)은 여기 없다 — 외부와 비밀번호를 나눠 상한 10이다(generation-quota). */
+export const UNLIMITED_CAPACITY_EMAILS: readonly string[] = ['devtest@talestudio.art']
+
+/** 동시 생성 자리 상한이 없나 — 관리자, 그리고 UNLIMITED_CAPACITY_EMAILS. */
+export function isUnlimitedCapacityEmail(email: string | null | undefined): boolean {
+  if (!email) return false
+  return isAdminEmail(email) || UNLIMITED_CAPACITY_EMAILS.includes(email.trim().toLowerCase())
+}
+
 export function isQuotaExemptWorkspaceOwner(
   user: { id: string; email?: string | null },
   ownerId: string | null | undefined,
