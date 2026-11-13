@@ -39,6 +39,7 @@ import { storageKeySegment } from '@/lib/storage/key-segment'
 import { isChatTraceId } from '@/lib/chat-trace'
 import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
 import { STALE_QUEUED_MS } from '@/lib/generation-job-timing'
+import { cancelledJobsById } from '@/lib/director/job-cancellations'
 
 export const runtime = 'nodejs'
 // 시트 2장(러프 12장씩 합성 · 업로드 · 예약 · 제출)이 60초를 넘겨 끊겼다 — 10/9 · 10/10 운영 6번 중 4번 504,
@@ -153,8 +154,12 @@ export async function POST(req: NextRequest) {
       .eq('status', 'queued')
       .in('kind', ['shot_storyboard', 'storyboard_real_grid'])
     if (queuedError) throw queuedError
+    // 화면에서 멈춘 작업(오너 2026-11-14 7번)은 fal 에서 끝날 때까지 queued 로 남지만 그 샷을 막지 않는다 — 같은 샷 하나만 검사
+    //   (guard_storyboard_singleflight)와 같은 규칙(검토 a). 멈춤 표를 읽지 못하면(운영 DB 에 아직 없음 등) 지금처럼 센다.
+    const stoppedJobs = await cancelledJobsById((queuedJobs ?? []).map((j) => j.id as string))
     const busyJobByShot = new Map<string, { jobId: string; fresh: boolean; sameRun: boolean }>()
     for (const j of queuedJobs ?? []) {
+      if (stoppedJobs.has(j.id as string)) continue
       const fresh = Date.now() - new Date(j.created_at as string).getTime() < STALE_QUEUED_MS
       const sameRun = !!batchRunId && runIdOfTarget(j.target) === batchRunId
       for (const id of shotsOfTarget(j.target)) {
