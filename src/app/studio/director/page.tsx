@@ -87,8 +87,9 @@ import { isVideoData } from '@/types/director'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
-import { activeJobsSnapshot, useActiveGenerationJobs, useGenerationBatches } from '@/lib/generation-queue'
+import { useActiveGenerationJobs, useGenerationBatches } from '@/lib/generation-queue'
 import { stoppableJobs, stopNotice, videoBatchLive } from '@/lib/director/stop-work'
+import { freshActiveJobs } from '@/lib/director/stop-all-client'
 import { withStoryboardBacklog } from '@/lib/generation-batches'
 import { getDirectorGaps, ledgerGapLabels, summarizeGaps } from '@/lib/completeness'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
@@ -1093,7 +1094,8 @@ function PaletteBar() {
     try {
       // 묶음을 먼저 멈춰 서버가 새 영상을 더 내지 않게 한 뒤, 지금 만드는 것을 멈춘다(그사이 낸 영상은 묶음 조회가 멈춘다).
       if (videoBatchBusy && !videoBatchCancelled) await run.cancelVideoBatch()
-      const asked = stoppableJobs(activeJobsSnapshot(run.projectId))
+      // 누를 때 작업 목록을 한 번 새로 읽는다 — 다른 탭 · 기기가 마지막 조회 뒤에 낸 낱개 작업도 멈추게(리드 검토 a 낮음).
+      const asked = stoppableJobs(await freshActiveJobs(run.projectId))
       const stopped = new Set(asked.length > 0 ? await run.cancelRunningJobs(asked.map((job) => job.id)) : [])
       const stoppedJobs = asked.filter((job) => stopped.has(job.id))
       const videos = stoppedJobs.filter((job) => job.kind === 'shot_video').length
