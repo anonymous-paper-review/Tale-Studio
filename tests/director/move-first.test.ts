@@ -105,6 +105,19 @@ describe('혼자 정한 것', () => {
     expect(read('src/features/director/move-first-button.tsx')).toMatch(/if \(result === 'failed'\) toast\.error/)
   })
 
+  it('다른 두 샷을 잇달아 [먼저 하기]하면 마지막에 누른 것의 답만 화면에 싣는다 — 늦게 온 앞 답이 덮지 않는다', async () => {
+    // 왜: 검토 c G2 — 답이 거꾸로 오면 늦게 온 옛 순서(w2 · w1 · w3)가 서버의 지금 순서(w3 · w2 · w1)를 덮었다(다음 조회까지).
+    const resolvers: Array<(r: Response) => void> = []
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => { resolvers.push(resolve) })))
+    const first = moveVideoBatchShotFirst('w2')
+    const second = moveVideoBatchShotFirst('w3')
+    resolvers[1]!(new Response(JSON.stringify({ batch: summary(['w3', 'w2', 'w1']) }), { status: 200 }))
+    await second
+    resolvers[0]!(new Response(JSON.stringify({ batch: summary(['w2', 'w1', 'w3']) }), { status: 200 }))
+    await first
+    expect((store.state.videoBatchQueue as { pendingShotIds: string[] }).pendingShotIds).toEqual(['w3', 'w2', 'w1'])
+  })
+
   it('다른 묶음으로 바뀐 뒤 돌아온 답은 화면에 싣지 않는다', async () => {
     // 왜: 누르는 사이 묶음이 끝나고 새 묶음이 섰으면 옛 순서로 새 묶음을 덮지 않는다.
     vi.stubGlobal('fetch', vi.fn(async () => {

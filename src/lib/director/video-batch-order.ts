@@ -9,9 +9,13 @@ import type { VideoBatchSummary } from '@/lib/director/video-batch-types'
 
 export type MoveFirstResult = 'moved' | 'gone' | 'failed'
 
+/** 보낸 [먼저 하기]의 차례 번호 — 마지막에 보낸 요청의 답만 화면에 싣는다(답이 거꾸로 오면 늦게 온 옛 순서가 덮었다, 검토 c G2). */
+let lastMove = 0
+
 export async function moveVideoBatchShotFirst(shotId: string): Promise<MoveFirstResult> {
   const store = useDirectorCanvasStore
   const { projectId, videoBatchRunId: batchId } = store.getState()
+  const move = ++lastMove
   if (!projectId || !batchId) return 'gone'
   try {
     const res = await fetch('/api/director/video-batches', {
@@ -22,9 +26,9 @@ export async function moveVideoBatchShotFirst(shotId: string): Promise<MoveFirst
     if (res.status === 404 || res.status === 409) return 'gone'
     if (!res.ok) return 'failed'
     const { batch } = (await res.json()) as { batch?: VideoBatchSummary }
-    // 그사이 다른 프로젝트 · 다른 묶음으로 바뀌었으면 옛 순서로 덮지 않는다.
+    // 그사이 다른 [먼저 하기]를 보냈거나 다른 프로젝트 · 다른 묶음으로 바뀌었으면 옛 순서로 덮지 않는다.
     const now = store.getState()
-    if (batch && now.projectId === projectId && now.videoBatchRunId === batchId) store.setState({ videoBatchQueue: videoBatchQueueOf(batch) })
+    if (batch && move === lastMove && now.projectId === projectId && now.videoBatchRunId === batchId) store.setState({ videoBatchQueue: videoBatchQueueOf(batch) })
     // 서버가 순서를 읽은 뒤 그 샷이 나갔으면 409 대신 200 이 온다(리드 검토 a 참고) — 돌아온 순서를 실어 줄에서 빠지고, 오류 말 없이 끝.
     return batch?.pendingShotIds?.includes(shotId) ? 'moved' : 'gone'
   } catch {
