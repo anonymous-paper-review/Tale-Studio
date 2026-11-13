@@ -452,8 +452,9 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     reply([{ type: 'updateShot', id: 's4', patch: { prompt: 'Warm' } }])
     await chat.getState().sendMessage('Make shot 4 warm')
     expect(chat.getState().pendingProposal?.kind).toBe('directorTextEdit')
-    const generate = vi.fn(async () => true)
-    director.setState({ generateVideoForShot: generate as never })
+    // 다시 만들기 가짜 — 접수 알림을 보낸다(넘기기 창은 접수로 시작을 센다, 리드 11/14).
+    const generate = acceptingRemake()
+    director.setState({ remakeShotVideo: generate })
     chat.setState({ handoffConfirm: { kind: 'editorMissingVideos', projectId: 'p-dir', via: 'button' } })
     await expect(chat.getState().remakeMissingVideo('s4')).resolves.toEqual({ started: false, reason: 'pending_text_edit' })
     expect(generate).not.toHaveBeenCalled()

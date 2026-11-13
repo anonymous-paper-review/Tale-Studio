@@ -19,9 +19,9 @@ function shownOnScreen(): boolean | null {
 describe('Take 값을 보이는 때', () => {
   afterEach(() => vi.unstubAllGlobals())
 
-  // 왜: 첫 읽기 전 잔액 훅 값은 과금이 꺼진 계정과 같아서(mode 'off'), 페이지를 연 직후엔 Take 값이 숨었고 그 사이 누르면
+  // 왜: 첫 읽기 전 잔액 훅 값은 과금이 꺼진 배포(설정 off)와 같아서, 페이지를 연 직후엔 Take 값이 숨었고 그 사이 누르면
   //   값을 못 본 채 Take 를 쓰는 만들기가 시작됐다(리드 2026-11-14, 검토 b). 값은 잔액과 상관없는 계산값이라 읽는 동안에도 보인다 —
-  //   정말 꺼진 계정은 첫 읽기 동안만 잠깐 보였다 사라진다.
+  //   과금이 꺼진 배포(설정 off)에서는 첫 읽기 동안만 잠깐 보였다 사라진다.
   it('Take 잔액을 처음 읽는 동안에도 Take 값을 보인다 — 숨기는 것은 과금이 꺼졌다고 읽혔을 때뿐', async () => {
     // 페이지를 연 직후 — 첫 읽기가 아직 끝나지 않았다.
     vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(() => {})))

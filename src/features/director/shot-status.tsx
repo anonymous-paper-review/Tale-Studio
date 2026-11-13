@@ -46,6 +46,7 @@ export function ShotStateDot({ color, ring, className }: { color: ShotStateColor
 /** 노드 아래 꼬리 줄(시안 D1 노드형 406:4051 "● 이미지 필요 러프만 있음" · "● 영상 없음") — 점 · 상태 글 · 흐린 덧말. */
 export function StateTailLine({
   label,
+  labelParams,
   color,
   ring,
   note,
@@ -53,6 +54,8 @@ export function StateTailLine({
   className,
 }: {
   label: string
+  /** 글에 넣을 값(예: N번째). */
+  labelParams?: Record<string, string | number>
   color: ShotStateColor | null
   ring: boolean
   note?: ReactNode
@@ -63,7 +66,7 @@ export function StateTailLine({
   return (
     <div className={cn('flex min-w-0 items-center gap-1.5 text-[11.5px] font-semibold', className)}>
       <ShotStateDot color={color} ring={ring} />
-      <span className={cn('whitespace-nowrap', color === 'destructive' ? 'text-destructive' : 'text-foreground')}>{t(label)}</span>
+      <span className={cn('whitespace-nowrap', color === 'destructive' ? 'text-destructive' : 'text-foreground')}>{t(label, labelParams)}</span>
       {children}
       {note && <span className="flex min-w-0 items-center gap-2 text-[11px] font-normal text-subtle-foreground">{note}</span>}
     </div>
@@ -78,9 +81,11 @@ export function ShotStateTail({
   waiting = false,
   remakeFailed = false,
   label,
+  labelParams,
   note,
   retry,
   stop,
+  lineAction,
   className,
 }: {
   state: DirectorShotState
@@ -89,24 +94,29 @@ export function ShotStateTail({
   waiting?: boolean
   /** 옛 그림이 남은 다시 만들기 실패("다시 만들기 실패"). */
   remakeFailed?: boolean
-  /** 상태 글 대신 쓸 글(영어 키) — 예: 묶음에서 영상 차례를 기다리는 샷 "순서 기다리는 중". 주면 기다림 · 실패 글보다 먼저다. */
+  /** 상태 글 대신 쓸 글(영어 키) — 예: 묶음에서 영상 차례를 기다리는 샷 "순서 기다리는 중 · N번째". 주면 기다림 · 실패 글보다 먼저다. */
   label?: string
+  /** label 에 넣을 값(예: { n: 2 }). */
+  labelParams?: Record<string, string | number>
   /** 노드 꼬리 뒤 흐린 덧말(예: "러프만 있음"). */
   note?: ReactNode
   /** 다시 만들기 실패 꼬리일 때만 옆에 다는 [다시 만들기]. */
   retry?: ReactNode
   /** 만드는 중 꼬리일 때만 옆에 다는 [멈추기](오너 7번 · 시안 D4) — 차례를 기다리는 샷에는 달지 않는다(보낸 작업이 없다). */
   stop?: ReactNode
+  /** label 로 차례를 기다린다고 말할 때만 옆에 다는 [먼저 하기](시안 D4 · 리드 S4-2 7). */
+  lineAction?: ReactNode
   className?: string
 }) {
   const t = useT()
   const tail = shotTail(state, { imageWaiting: waiting && !label, imageRemakeFailed: remakeFailed && !label }, place)
   const text = label ?? tail.label
   const making = (state === 'image_generating' || state === 'video_generating') && !waiting && !label
-  const action = tail.remakeFailed ? retry : making ? stop ?? null : null
+  const action = tail.remakeFailed ? retry : label ? lineAction ?? null : making ? stop ?? null : null
+  const params = label ? labelParams : undefined
   if (place === 'node') {
     return (
-      <StateTailLine label={text} color={tail.color} ring={tail.ring} note={note} className={className}>
+      <StateTailLine label={text} labelParams={params} color={tail.color} ring={tail.ring} note={note} className={className}>
         {action}
       </StateTailLine>
     )
@@ -115,7 +125,7 @@ export function ShotStateTail({
     <span className={cn('inline-flex items-center gap-1.5', className)}>
       <span className="inline-flex items-center gap-1.5 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-semibold text-foreground">
         <ShotStateDot color={tail.color} ring={tail.ring} />
-        <span className="whitespace-nowrap">{t(text)}</span>
+        <span className="whitespace-nowrap">{t(text, params)}</span>
       </span>
       {action}
     </span>

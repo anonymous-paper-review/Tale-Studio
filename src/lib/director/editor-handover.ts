@@ -124,6 +124,24 @@ export function remakeButton(
   return { label, disabled: row.missing === 'generating' }
 }
 
+/** [다시 만들기]를 누른 줄 모음 — 줄마다 따로 넣고 뺀다. 한 칸이던 때는 먼저 누른 줄이 끝나며 나중에 누른 다른 줄의
+ *  스피너까지 꺼서, 아직 이미지를 그리는 줄의 단추가 다시 켜졌다(리드 2026-11-14, entry 탐침). */
+export function withStartingRow(rows: ReadonlySet<string>, shotNodeId: string, starting: boolean): ReadonlySet<string> {
+  const next = new Set(rows)
+  if (starting) next.add(shotNodeId)
+  else next.delete(shotNodeId)
+  return next
+}
+
+/** [다시 만들기]를 시작하지 못한 까닭 모음 — 줄마다 따로 넣고 뺀다(null 이면 그 줄 것만 지운다). 한 칸이던 때는 다른 줄을
+ *  누르거나 다른 줄이 끝나면 앞 줄의 까닭이 사라졌다(검토 b 낮음, 리드 2026-11-14). */
+export function withRowNotice(notices: ReadonlyMap<string, string>, shotNodeId: string, message: string | null): ReadonlyMap<string, string> {
+  const next = new Map(notices)
+  if (message) next.set(shotNodeId, message)
+  else next.delete(shotNodeId)
+  return next
+}
+
 /** [다시 만들기]를 시작하지 못한 까닭 글 — 그 줄 아래에 보인다. 창이 닫혀 있었으면(no_window) 보일 것이 없다. */
 export function remakeNotice(reason: RemakeFailReason, t: Translate): string | null {
   switch (reason) {
