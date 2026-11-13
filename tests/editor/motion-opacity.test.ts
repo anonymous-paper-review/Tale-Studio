@@ -16,7 +16,7 @@ vi.mock('@/stores/project-store', () => ({
 
 import { saveEditorNow, selectStackAt, selectTimelineLayout, useEditorStore } from '@/stores/editor-store'
 import { useLocaleStore } from '@/stores/locale-store'
-import { EffectControls } from '@/features/editor/effect-controls'
+import { EffectControls, sliderHistory } from '@/features/editor/effect-controls'
 import { Slider } from '@/components/ui/slider'
 import { handleEditorKey } from '@/features/editor/use-editor-playback'
 import type { PersistedEditor } from '@/lib/editor-persistence'
@@ -143,6 +143,35 @@ describe('혼자 정한 것', () => {
     expect(clipOf('B')?.motion).toBeUndefined()
     const src = read('src/features/editor/effect-controls.tsx')
     expect(src.match(/onStart=\{\(\) => pushHistory\(\)\}/g)?.length).toBeGreaterThanOrEqual(4)
+  })
+
+  it('슬라이더를 누르기만 하거나 끝 값에서 ← → 를 눌러 값이 그대로면 되돌리기 칸이 쌓이지 않는다 — 값이 처음 바뀔 때 한 칸', () => {
+    // 왜: 검토 c (D) 낮음 2 — 누름 · 화살표마다 칸을 쌓아 아무것도 바뀌지 않은 되돌리기가 생겼다(볼륨 슬라이더도 예전부터 같았다).
+    //   슬라이더는 값이 그대로면 값 바뀜을 알리지 않는다 — 누름 · 화살표는 준비만 하고 첫 바뀜에 한 칸을 쌓는다.
+    let pushes = 0
+    const applied: number[] = []
+    const history = sliderHistory(() => {
+      pushes += 1
+    })
+    history.arm()
+    expect(pushes).toBe(0)
+    history.change(() => applied.push(1))
+    history.change(() => applied.push(2))
+    expect([pushes, applied]).toEqual([1, [1, 2]])
+    history.arm()
+    history.change(() => applied.push(3))
+    expect(pushes).toBe(2)
+    const src = read('src/features/editor/effect-controls.tsx')
+    expect(src).not.toMatch(/onPointerDown=\{onStart\}|onPointerDown=\{\(\) => pushHistory\(\)\}/)
+    expect(src.match(/onValueChange=\{\(\[v\]\) => (history|volumeHistory)\.change\(/g)?.length).toBe(2)
+  })
+
+  it('타임라인 소리 조각을 누르기만 하거나 볼륨 선을 누르기만 하면 되돌리기 칸이 쌓이지 않는다 — 옮기거나 값이 바뀔 때 한 칸', () => {
+    // 왜: 구현하며 더한 것(검토 c (D) 낮음 2 와 같은 고장) — 소리 조각을 눌러 고르기만 해도, 볼륨 선을 누르기만 해도 빈 되돌리기 칸이 생겼다.
+    const timeline = read('src/features/editor/timeline.tsx')
+    expect(timeline).not.toMatch(/onSelect\(\)\s+onPushHistory\(\)/)
+    expect(timeline).toMatch(/if \(!moved\) onPushHistory\(\)/)
+    expect(timeline).toMatch(/pushed = true\s+onPushHistory\(\)/)
   })
 
   it('% 글자를 두 번 누르면 처음 값으로 돌아간다', () => {

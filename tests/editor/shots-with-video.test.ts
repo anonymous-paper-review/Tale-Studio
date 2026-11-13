@@ -278,6 +278,27 @@ describe('저절로 빠지고 들어오는 샷 (검토 c, 2026-11-14)', () => {
     expect(bodies).toContainEqual(['/api/editor/speed', { projectId: 'project-8', shotId: 's2', speed: 1 }])
   })
 
+  it('영상이 새로 생겨 들어온 샷은 전에 넣은 모션 · 불투명도 · 영상 효과도 없이 처음 상태로 들어오고, 계속 영상이 있던 샷은 고친 그대로다', async () => {
+    // 왜: 검토 c (D) 낮음 1 — 구간 · 빠르기 · 전환만 처음으로 돌려, 새 영상이 옛 영상에 맞춘 자리 · 크기 · 투명도(④) · 효과(⑤)를 이어받았다.
+    //   고장이 나는 때: Director 에서 Take 를 지워 영상이 없어진 샷에 새 영상을 만들고 Editor 로 돌아올 때.
+    db(['s1', 's2'], ['s1', 's2'])
+    await open()
+    for (const id of ['s1', 's2']) {
+      api().setClipMotion([id], { x: 0.3, scale: 0.5 })
+      api().setClipOpacity([id], 0.5)
+      api().addVideoEffect(id, 'blackWhite')
+    }
+    await save()
+    db(['s1', 's2'], ['s1'])
+    await open()
+    await save()
+    db(['s1', 's2'], ['s1', 's2'], 2)
+    await open()
+    const clipOf = (id: string) => api().videoClips.find((c) => c.shotId === id)
+    expect(clipOf('s1')).toMatchObject({ motion: { x: 0.3, y: 0, scale: 0.5 }, opacity: 0.5, effects: { blackWhite: true } })
+    for (const key of ['motion', 'opacity', 'effects']) expect(clipOf('s2')).not.toHaveProperty(key)
+  })
+
   it('영상 자리가 저절로 바뀌면 그 자리 뒤에서 시작하는 사람이 놓은 소리도 같은 만큼 옮기고, 그 자리 전부터 깔린 소리는 그대로 둔다', async () => {
     // 왜: 검토 c — 고침 전 저장본을 처음 열 때 빈 칸이 빠지며 뒤 컷만 당겨지고 효과음 · 음악은 제자리라 어긋났다(되돌리기 칸도 비어 되돌릴 수 없다).
     //   영상이 생긴 샷이 들어올 때는 반대로 어긋났다. 리드 판단: 2단계 ㉠ "뒤 모든 줄을 같이 민다"와 같은 원칙.

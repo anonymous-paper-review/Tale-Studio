@@ -1024,9 +1024,12 @@ function placeTransition(state: EditorState, clips: VideoClip[], shotId: string,
   })
 }
 
-/** 영상이 새로 생겨 들어온 샷의 클립 — 새 영상이니 전에 고친 구간 · 빠르기 · 전환 없이 처음 상태(검토 c 리드 판단, 2026-11-14). */
+/**
+ * 영상이 새로 생겨 들어온 샷의 클립 — 새 영상이니 전에 고친 구간 · 빠르기 · 전환 · 모션 · 불투명도 · 영상 효과 없이 처음 상태
+ *   (검토 c 리드 판단 · (D) 낮음 1, 2026-11-14). 약속: tests/editor/shots-with-video.test.ts
+ */
 function freshClip(clip: VideoClip): VideoClip {
-  const { trimStart: _start, trimEnd: _end, transitionIn: _transition, transitionOut: _out, ...rest } = clip
+  const { trimStart: _start, trimEnd: _end, transitionIn: _in, transitionOut: _out, motion: _motion, opacity: _opacity, effects: _effects, ...rest } = clip
   return { ...rest, speed: 1 }
 }
 

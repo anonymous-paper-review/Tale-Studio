@@ -5,7 +5,7 @@
 //   전환은 시작 · 끝 줄 — 효과 탭에서 끌어 놓은 전환의 이름(맞닿은 컷이면 "앞 · 뒤 클립과 이어짐")과 0.5 · 1 · 2초 칸 · [빼기],
 //   넣은 영상 효과는 "효과" 묶음에서 고치고 뺀다. 소리 조각은 볼륨과 시작 · 끝 페이드(2단계 ⑤). 우클릭 메뉴도 그대로 남는다.
 //   약속: tests/editor/panels.test.ts · tests/editor/motion-opacity.test.ts · tests/editor/transitions-effects.test.ts
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { ChoiceChip } from '@/components/controls/choice-chip'
 import { Slider } from '@/components/ui/slider'
 import { AUDIO_FADE_LABEL, TRANSITION_CHOICES, TRANSITION_LABEL, edgeTransition, type TransitionEdge } from '@/lib/editor/transition'
@@ -30,7 +30,30 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-/** 슬라이더 한 줄 — 끄기 시작(누름 · 화살표)에 되돌리기 칸 하나, % 글자를 두 번 누르면 처음 값. */
+/**
+ * 슬라이더의 되돌리기 칸 — 누름 · 화살표는 준비만 하고, 값이 실제로 처음 바뀔 때 한 칸을 쌓는다. 슬라이더는 값이 그대로면 바뀜을 알리지
+ *   않으므로, 누르기만 하거나 끝 값에서 화살표를 눌러도 칸이 생기지 않는다(검토 c (D) 낮음 2). 약속: tests/editor/motion-opacity.test.ts
+ */
+export function sliderHistory(push: () => void) {
+  let armed = false
+  return {
+    arm: () => {
+      armed = true
+    },
+    change: (apply: () => void) => {
+      if (armed) {
+        armed = false
+        push()
+      }
+      apply()
+    },
+  }
+}
+
+/** 슬라이더 값을 한 칸씩 움직이는 키(화살표 · Page · Home · End). */
+const isStepKey = (key: string) => key.startsWith('Arrow') || key.startsWith('Page') || key === 'Home' || key === 'End'
+
+/** 슬라이더 한 줄 — 끄기 · 화살표로 값이 처음 바뀔 때 되돌리기 칸 하나(onStart), % 글자를 두 번 누르면 처음 값. */
 function SliderRow({
   label,
   value,
@@ -50,6 +73,7 @@ function SliderRow({
   onChange: (value: number) => void
   onReset: () => void
 }) {
+  const [history] = useState(() => sliderHistory(onStart))
   return (
     <Row label={label}>
       <Slider
@@ -58,11 +82,11 @@ function SliderRow({
         max={max}
         step={1}
         value={[value]}
-        onPointerDown={onStart}
+        onPointerDown={history.arm}
         onKeyDown={(e) => {
-          if (e.key.startsWith('Arrow') || e.key.startsWith('Page') || e.key === 'Home' || e.key === 'End') onStart()
+          if (isStepKey(e.key)) history.arm()
         }}
-        onValueChange={([v]) => onChange(v)}
+        onValueChange={([v]) => history.change(() => onChange(v))}
         aria-label={label}
       />
       <button
@@ -151,6 +175,8 @@ export function EffectControls() {
   const setAudioVolume = useEditorStore((s) => s.setAudioVolume)
   const setAudioFade = useEditorStore((s) => s.setAudioFade)
   const pushHistory = useEditorStore((s) => s.pushHistory)
+  // 소리 볼륨 슬라이더도 값이 처음 바뀔 때 한 칸(검토 c (D) 낮음 2 — 예전에는 누르기만 해도 쌓였고, 화살표로 바꾼 값은 쌓이지 않았다).
+  const [volumeHistory] = useState(() => sliderHistory(pushHistory))
 
   // ── 소리 조각 ──
   const audio = selectedAudioIds.length > 0 ? audioClips.find((a) => a.id === (anchorAudioId ?? selectedAudioIds[0])) : undefined
@@ -173,8 +199,11 @@ export function EffectControls() {
               max={100}
               step={1}
               value={[Math.round(volume * 100)]}
-              onPointerDown={() => pushHistory()}
-              onValueChange={([v]) => setAudioVolume(audio.id, v / 100)}
+              onPointerDown={volumeHistory.arm}
+              onKeyDown={(e) => {
+                if (isStepKey(e.key)) volumeHistory.arm()
+              }}
+              onValueChange={([v]) => volumeHistory.change(() => setAudioVolume(audio.id, v / 100))}
               aria-label={t('Volume')}
             />
             <span className="w-10 font-num text-meta font-medium text-foreground tabular-nums">{Math.round(volume * 100)}%</span>

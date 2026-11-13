@@ -236,7 +236,6 @@ function AudioClipBlock({
         return
       }
       onSelect()
-      onPushHistory()
       const blockEl = e.currentTarget as HTMLElement
       blockEl.style.pointerEvents = 'none' // elementFromPoint 가 아래 트랙 레인을 보도록
       const startX = e.clientX
@@ -246,6 +245,8 @@ function AudioClipBlock({
       const move = (ev: PointerEvent) => {
         // 누르기만 해도 손이 몇 px 흔들린다 — 손잡이처럼 2px 를 넘겨야 옮기기로 본다(옮기면 영상에서 떨어진다, 2026-11-10 검토 b).
         if (!moved && Math.hypot(ev.clientX - startX, ev.clientY - startY) <= 2) return
+        // 되돌리기 칸은 옮기기 시작할 때 한 칸 — 눌러 고르기만 하면 쌓지 않는다(검토 c (D) 낮음 2 와 같은 고장).
+        if (!moved) onPushHistory()
         moved = true
         const raw = Math.max(0, origStart + (ev.clientX - startX) / pxPerSec)
         const snapped = snapStart(raw, clip.durationSec, clip.id)
@@ -270,10 +271,19 @@ function AudioClipBlock({
       if (e.button !== 0) return
       e.stopPropagation()
       onSelect()
-      onPushHistory()
       const startY = e.clientY
       const o = clip.volume ?? 1
-      const move = (ev: PointerEvent) => onSetVolume(Math.max(0, Math.min(1, o - (ev.clientY - startY) / WAVE_H)))
+      // 되돌리기 칸은 값이 처음 바뀔 때 한 칸 — 누르기만 하면 쌓지 않는다(검토 c (D) 낮음 2 와 같은 고장).
+      let pushed = false
+      const move = (ev: PointerEvent) => {
+        const next = Math.max(0, Math.min(1, o - (ev.clientY - startY) / WAVE_H))
+        if (!pushed) {
+          if (Math.abs(next - o) < 1e-6) return
+          pushed = true
+          onPushHistory()
+        }
+        onSetVolume(next)
+      }
       const up = () => {
         window.removeEventListener('pointermove', move)
         window.removeEventListener('pointerup', up)
