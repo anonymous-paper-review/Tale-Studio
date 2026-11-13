@@ -64,13 +64,17 @@ export interface DraftRenderStats {
   skippedClips: number
   /**
    * 끊김 재기(개발용 — 화면 글 없음, 2단계 ⑦-3): 녹화하는 동안 돈 장 수 · 기다릴 층(맨 위 · 화면을 다 덮는 층)이 그림을 못 내 그리지 않은
-   *   (직전 장이 남은) 장 수 · 가장 긴 멈춤(밀리초) · 장마다 그림을 못 낸 기다릴 층 수의 합 · 장마다 늦어 빼고 그린 층 수의 합.
+   *   (직전 장이 남은) 장 수 · 가장 긴 멈춤(밀리초) · 장마다 그림을 못 낸 기다릴 층 수의 합 · 장마다 늦어 빼고 그린 층 수의 합 ·
+   *   장 고리 사이 가장 긴 간격(벽시계, 밀리초) · 보이는 층의 가장 큰 어긋남(밀리초) · 재생 중 시각이 안 나아간(굳은) 층이 있던 장 수.
    */
   frames: number
   stalledFrames: number
   longestStallMs: number
   waitingLayers: number
   droppedLayers: number
+  longestLoopGapMs: number
+  maxDriftMs: number
+  frozenFrames: number
 }
 
 /** 맨 위 클립 차례(selectProgramLayout) — 영상 줄 끝을 셀 때. */
@@ -231,6 +235,27 @@ export function lateLayers(plan: FramePlan, late: (shotId: string) => boolean, c
 }
 
 /**
+ * 보이는 영상 층의 시각 — 가장 큰 어긋남(|원본 목표 시각 − 영상 시각|, 초)과, 재생 중인데 지난 장에서 시각이 안 나아간(굳은) 층이 있는지.
+ *   그림이 있어도 버퍼링 · 디코더 멈춤이면 직전 그림이 반복된다(리드 11/14 G6). read 는 그림이 있는 층만 시각을 준다(그림이 없는 층은 늦은
+ *   층으로 따로 센다). 첫 장 · 끝 장에 멈춘 층(held)은 굳은 것으로 치지 않는다.
+ */
+export function layerClock(
+  plan: FramePlan,
+  read: (shotId: string) => { currentTime: number; previousTime: number | null } | null,
+): { maxDriftSec: number; frozen: boolean } {
+  let maxDriftSec = 0
+  let frozen = false
+  for (const layer of plan.layers) {
+    if (layer.kind !== 'video' || layer.alpha <= 0) continue
+    const clock = read(layer.shotId)
+    if (!clock) continue
+    maxDriftSec = Math.max(maxDriftSec, Math.abs((layer.sourceSec ?? 0) - clock.currentTime))
+    if (!layer.held && clock.previousTime !== null && clock.currentTime === clock.previousTime) frozen = true
+  }
+  return { maxDriftSec: Math.round(maxDriftSec * 1000) / 1000, frozen }
+}
+
+/**
  * 그릴 것 목록 한 장을 캔버스에 — 검정 바탕 위에 층을 아래부터 그 세기 · 모션 · 효과로, 맨 위 영상의 자막, 물들이기 막(자막 위). 모니터가 같은
  *   목록을 같은 셈으로 그린다(2단계 ⑦). 맨 위 영상이 없거나 못 불러오면 자리표시를 그리고, 아래 줄이면 건너뛴다(모니터는 안내 판).
  */
@@ -382,7 +407,7 @@ export async function renderDraftTimeline(opts: {
   })
 
   // 영상 요소 — 클립마다 하나. 곧 그릴 층부터 붙이고, 목록에서 빠지면 거둔다.
-  const pool = new Map<string, { el: HTMLVideoElement; waitingSince: number | null }>()
+  const pool = new Map<string, { el: HTMLVideoElement; waitingSince: number | null; lastTime: number | null }>()
   const failedUrls = new Set<string>()
   const placeholderIds = new Set<string>()
   const failed = (shotId: string) => {
@@ -401,7 +426,7 @@ export async function renderDraftTimeline(opts: {
       el.preload = 'auto'
       el.addEventListener('error', () => failedUrls.add(url))
       el.src = localUrl(url)
-      entry = { el, waitingSince: null }
+      entry = { el, waitingSince: null, lastTime: null }
       pool.set(shotId, entry)
     }
     return entry
@@ -492,6 +517,11 @@ export async function renderDraftTimeline(opts: {
   let waitingLayers = 0
   let droppedLayers = 0
   let stallSince: number | null = null
+  // 장 고리 사이 가장 긴 간격(벽시계) · 보이는 층의 가장 큰 어긋남(초) · 굳은 층이 있던 장 수(리드 11/14 G5 · G6).
+  let longestLoopGapMs = 0
+  let lastTick: number | null = null
+  let maxDriftSec = 0
+  let frozenFrames = 0
 
   const cleanup = () => {
     if (raf != null) cancelAnimationFrame(raf)
@@ -530,11 +560,24 @@ export async function renderDraftTimeline(opts: {
     // 장마다: 그릴 것 목록 → 영상 층 맞추기 → 그리기(보이는 영상 층이 다 그림을 냈을 때만) → 소리.
     const drawLoop = () => {
       if (aborted) return
+      // 기기가 바빠 장 고리가 늦게 오면 그동안은 장도 멈춤도 세지 않는다 — 고리 사이 간격을 따로 남긴다.
+      const tick = performance.now()
+      if (lastTick !== null) longestLoopGapMs = Math.max(longestLoopGapMs, tick - lastTick)
+      lastTick = tick
       const clock = clockSec()
       onPhase?.('record', Math.min(1, clock / total))
       // 그릴 것 목록(2단계 ⑦) — 모니터와 같은 목록. 곧 그릴 층은 1.5초 먼저 불러 둔다.
       const plan = selectFrameAt(input, clock, { prerollSec: PRELOAD_SEC })
+      // 보이는 층의 시각 — 맞추기 전에 잰다(지난 장 뒤로 재생이 나아갔는지, 목표 시각과 얼마나 어긋났는지).
+      const health = layerClock(plan, (shotId) => {
+        const entry = pool.get(shotId)
+        if (!entry || failed(shotId) || !hasPicture(entry.el)) return null
+        return { currentTime: entry.el.currentTime, previousTime: entry.lastTime }
+      })
+      maxDriftSec = Math.max(maxDriftSec, health.maxDriftSec)
+      if (health.frozen) frozenFrames += 1
       const { wait: waiting, drop: dropped } = prepare(plan, true)
+      for (const entry of pool.values()) entry.lastTime = entry.el.currentTime
       frames += 1
       // 맨 위 · 화면을 다 덮는 층이 아닌 늦은 층은 그 장에서 빼고 그린다 — 몇 층을 뺐는지 남긴다.
       droppedLayers += dropped
@@ -621,5 +664,18 @@ export async function renderDraftTimeline(opts: {
   // 다운로드 시작 후 회수 — 즉시 revoke 하면 일부 브라우저에서 저장이 빈 파일이 된다.
   setTimeout(() => URL.revokeObjectURL(objectUrl), 30_000)
 
-  return { durationSec: total, bytes: blob.size, mimeType, skippedClips: placeholderIds.size, frames, stalledFrames, longestStallMs: Math.round(longestStallMs), waitingLayers, droppedLayers }
+  return {
+    durationSec: total,
+    bytes: blob.size,
+    mimeType,
+    skippedClips: placeholderIds.size,
+    frames,
+    stalledFrames,
+    longestStallMs: Math.round(longestStallMs),
+    waitingLayers,
+    droppedLayers,
+    longestLoopGapMs: Math.round(longestLoopGapMs),
+    maxDriftMs: Math.round(maxDriftSec * 1000),
+    frozenFrames,
+  }
 }

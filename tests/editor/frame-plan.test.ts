@@ -16,7 +16,7 @@ vi.mock('@/stores/project-store', () => ({
 
 import { selectFrameAt, selectVideoLayout, useEditorStore, type FramePlan } from '@/stores/editor-store'
 import { SEQUENCE_FPS } from '@/lib/editor/sequence-info'
-import { canvasFilterSupported, drawPlanFrame, effectsInUse, lateLayers, type FrameSources } from '@/lib/editor-draft-render'
+import { canvasFilterSupported, drawPlanFrame, effectsInUse, lateLayers, layerClock, type FrameSources } from '@/lib/editor-draft-render'
 import { clipDisplayName } from '@/features/editor/editor-labels'
 import { syncLayerVideo } from '@/lib/editor/layer-sync'
 import { TITLE_TEXT_WIDTH, drawTitleText, titleTextLines } from '@/lib/editor/title-clip'
@@ -467,7 +467,8 @@ describe('⑦-3 끊김 재기 — 같이 정한 것(⑦ 계획 i · 리드 11/14
     expect(render).toMatch(/const \{ wait: waiting, drop: dropped \} = prepare\(plan, true\)/)
     expect(render).toMatch(/if \(waiting\) \{\s*stalledFrames \+= 1\s*waitingLayers \+= waiting/)
     // 늦은 층을 빼고 그린 수도 남긴다(리드 11/14 L1 — 옛 기대: droppedLayers 없는 return).
-    expect(render).toMatch(/return \{ durationSec: total, bytes: blob\.size, mimeType, skippedClips: placeholderIds\.size, frames, stalledFrames, longestStallMs: Math\.round\(longestStallMs\), waitingLayers, droppedLayers \}/)
+    // 고리 간격 · 어긋남 · 굳은 장도 남긴다(리드 11/14 G5 · G6 — 옛 기대: droppedLayers 까지의 return).
+    expect(render).toMatch(/return \{\s*durationSec: total,\s*bytes: blob\.size,\s*mimeType,\s*skippedClips: placeholderIds\.size,\s*frames,\s*stalledFrames,\s*longestStallMs: Math\.round\(longestStallMs\),\s*waitingLayers,\s*droppedLayers,\s*longestLoopGapMs: Math\.round\(longestLoopGapMs\),\s*maxDriftMs: Math\.round\(maxDriftSec \* 1000\),\s*frozenFrames,\s*\}/)
     expect(read('src/app/studio/editor/page.tsx')).toMatch(/if \(process\.env\.NODE_ENV !== 'production'\) console\.info\('\[draft-render\]', JSON\.stringify\(stats\)\)/)
   })
 })
@@ -522,5 +523,32 @@ describe('⑦-3 더함 — 리드 11/14 같이 정한 것(검토 c ⑦-2 · e853
     const paused = { ...video(1, true), paused: true } as unknown as HTMLVideoElement
     syncLayerVideo(paused, { sourceSec: 2, held: false }, 1, false)
     expect(paused.currentTime).toBe(1)
+  })
+})
+
+describe('(G) 재기 더함 — 리드 11/14 같이 정한 것(검토 c ⑦-3)', () => {
+  it('내보내는 동안 고리 사이 가장 긴 간격(벽시계)도 결과 숫자에 남긴다', () => {
+    // 왜: 검토 c G5 — 기기가 바빠 장 고리(requestAnimationFrame)가 몇백 ms 안 오면, 그동안은 장도 멈춤도 세지 않아 "멈춘 장 0"이 거짓일 수 있었다.
+    const render = read('src/lib/editor-draft-render.ts')
+    expect(render).toMatch(/if \(lastTick !== null\) longestLoopGapMs = Math\.max\(longestLoopGapMs, tick - lastTick\)/)
+    expect(render).toMatch(/longestLoopGapMs: Math\.round\(longestLoopGapMs\)/)
+  })
+
+  it('그림은 있는데 재생 시각이 안 나아간(굳은) 보이는 층도 셈한다 — 보이는 층의 가장 큰 어긋남(|원본 목표 시각 − 영상 시각|)과 재생 중 시각이 안 나아간 장 수를 남긴다', () => {
+    // 왜: 검토 c G6 — 그림이 있는지(readyState ≥ 2)만 보면 버퍼링 · 디코더 멈춤으로 직전 그림이 반복돼도 0 이었다.
+    const p = plan(5)
+    expect(p.layers.map((l) => [l.shotId, l.sourceSec])).toEqual([['B', 1]])
+    expect(layerClock(p, () => ({ currentTime: 1.2, previousTime: 1.18 }))).toEqual({ maxDriftSec: 0.2, frozen: false })
+    expect(layerClock(p, () => ({ currentTime: 0.9, previousTime: 0.9 }))).toEqual({ maxDriftSec: 0.1, frozen: true })
+    // 그림이 아직 없는 층은 늦은 층(기다림 · 빼고 그림)으로 따로 센다.
+    expect(layerClock(p, () => null)).toEqual({ maxDriftSec: 0, frozen: false })
+    // 첫 장 · 끝 장에 멈춘 층(교차 디졸브 짝)은 굳은 것으로 치지 않는다.
+    api().dropTransition('B', 'start', 'cross')
+    const q = plan(4.25)
+    expect(q.layers.map((l) => [l.shotId, l.held])).toEqual([['A', true], ['B', false]])
+    expect(layerClock(q, (id) => (id === 'A' ? { currentTime: 3.967, previousTime: 3.967 } : { currentTime: 0.25, previousTime: 0.23 })).frozen).toBe(false)
+    const render = read('src/lib/editor-draft-render.ts')
+    expect(render).toMatch(/const health = layerClock\(plan, /)
+    expect(render).toMatch(/if \(health\.frozen\) frozenFrames \+= 1/)
   })
 })
