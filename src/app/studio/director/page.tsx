@@ -63,7 +63,7 @@ import { LumiChatPill } from '@/features/director/lumi-chat-pill'
 import { PickAllBar, ShotStatusFilterMenu } from '@/features/director/shot-status'
 import { StoryboardZoomPill } from '@/features/director/storyboard-zoom-pill'
 import { useDirectorShotStates } from '@/features/director/hooks/use-shot-states'
-import { countStatusFilters, directorHasFinishedVideo, matchesStatusFilter } from '@/lib/director/shot-state'
+import { countStatusFilters, dimmedByStatusFilter, directorHasFinishedVideo, matchesStatusFilter } from '@/lib/director/shot-state'
 import { HIDDEN_ON_CANVAS, directorCanvasMeta, storyboardCanvasMeta } from '@/features/director/canvas-meta'
 import { separateAssetCards } from '@/features/director/asset-column'
 import { arrangeOnceCardsRendered, renderedCardSizes } from '@/features/director/canvas-layout'
@@ -349,6 +349,9 @@ const edgeTypes = {
 
 function CanvasInner() {
   const t = useT()
+  // 몸통 = 고르기 — 상태 고르기로 흐려진 노드는 고르지 않는다(아래 onNodeClick).
+  const shotStates = useDirectorShotStates()
+  const statusFilter = useDirectorCanvasStore((s) => s.statusFilter)
   // 채울 것 넛지의 목록 줄도 감싸는 문장(t)과 같은 화면 언어로 — 스토어 값(문자열)이라 memo deps 에 넣어도 안정적이다.
   const locale = useLocaleStore((s) => s.locale)
   const nodes = useDirectorCanvasStore((s) => s.nodes)
@@ -805,12 +808,12 @@ function CanvasInner() {
         //   에셋 노드는 지금처럼 왼쪽 패널.
         onNodeClick={(_event, node) => {
           const data = node.data
-          if (isShotData(data)) {
-            togglePickedShot(node.id)
-            return
-          }
-          if (isVideoData(data)) {
-            if (data.parentShotNodeId) togglePickedShot(data.parentShotNodeId)
+          if (isShotData(data) || isVideoData(data)) {
+            const shotId = isShotData(data) ? node.id : data.parentShotNodeId
+            if (!shotId) return
+            // 상태 고르기로 흐려진 노드는 고르지 않는다 — 골라도 단추가 세지 않는다(리드 검토 a 낮음 5b).
+            if (dimmedByStatusFilter(shotStates.get(shotId), statusFilter)) return
+            togglePickedShot(shotId)
             return
           }
           if (data.kind === 'asset') selectNode(node.id)

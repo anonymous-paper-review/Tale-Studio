@@ -1,4 +1,5 @@
 // Director 카드 · 노드 몸통을 눌러 샷을 고르고, 위쪽 단추 · 예상이 고른 샷 기준이 되는지 (시안 D2 406:4588 · R 416:4941, 오너 2026-11-14)
+import { readFileSync } from 'node:fs'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -83,5 +84,14 @@ describe('2줄 왼쪽 고르기 줄', () => {
     expect(some).toContain('4개 중 2개 선택')
     expect(some).toContain('선택 풀기')
     expect(some).toContain('aria-checked="mixed"')
+  })
+})
+
+describe('흐린 노드', () => {
+  it('노드형에서 상태 고르기로 흐려진 샷 · 영상 노드는 눌러도 고르지 않는다', () => {
+    // 왜: 흐린 노드는 고른 상태 밖의 샷이라 골라도 단추가 세지 않았다 — 고른 것처럼 흰 테두리만 남았다(리드 검토 a 낮음 5b).
+    const page = readFileSync('src/app/studio/director/page.tsx', 'utf8')
+    const click = page.slice(page.indexOf('onNodeClick={(_event, node) => {'), page.indexOf('onNodeClick={(_event, node) => {') + 700)
+    expect(click).toContain('if (dimmedByStatusFilter(shotStates.get(shotId), statusFilter)) return')
   })
 })

@@ -1754,7 +1754,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       setViewport: (vp) => set({ viewport: vp }),
       setViewMode: (m) => set({ viewMode: m }),
       setStoryboardMediaMode: (m) => set({ storyboardMediaMode: m }),
-      setStatusFilter: (filter) => set({ statusFilter: filter }),
+      // 상태를 바꾸면 고름을 푼다 — 숨은 고름 때문에 단추가 말없이 보드 전체로 넓어지지 않게(리드 검토 a 낮음 5a).
+      setStatusFilter: (filter) => set((state) => (state.statusFilter === filter ? {} : { statusFilter: filter, pickedShotIds: [] })),
       togglePickedShot: (shotNodeId) =>
         set((state) => ({
           pickedShotIds: state.pickedShotIds.includes(shotNodeId)
