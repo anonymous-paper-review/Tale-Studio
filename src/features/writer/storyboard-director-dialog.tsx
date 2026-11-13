@@ -70,16 +70,19 @@ function DirectorDialogBody({
       </dl>
 
       <div role="radiogroup" aria-label={view.title} className="flex flex-col gap-2">
-        <OptionCard
-          role="radio"
-          title={view.makeImages.label}
-          description={view.makeImages.description}
-          recommended
-          selected={choice === 'makeImages'}
-          disabled={view.makeImages.disabled}
-          onClick={() => setChoice('makeImages')}
-          data-testid="storyboard-director-make-images"
-        />
+        {/* 만들 실사가 0장이면 만들기 칸 · 추천을 숨기고 직접 고르기만 둔다(리드 2026-11-14, 시안 없음). */}
+        {view.makeImages ? (
+          <OptionCard
+            role="radio"
+            title={view.makeImages.label}
+            description={view.makeImages.description}
+            recommended
+            selected={choice === 'makeImages'}
+            disabled={view.makeImages.disabled}
+            onClick={() => setChoice('makeImages')}
+            data-testid="storyboard-director-make-images"
+          />
+        ) : null}
         <OptionCard
           role="radio"
           title={view.pickYourself.label}

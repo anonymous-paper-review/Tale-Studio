@@ -41,7 +41,7 @@ import {
 } from '@/stores/director-store'
 import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
 import { directorHasFinishedVideo } from '@/lib/director/shot-state'
-import { editorHandoverView } from '@/lib/director/editor-handover'
+import { editorHandoverView, type RemakeResult } from '@/lib/director/editor-handover'
 import { latestShotTake } from '@/lib/director/remake-take'
 import { clearImagesOnDirectorEntry } from '@/lib/director/entry-images-intent'
 import { useWriterStore, type WriterChatUpdate } from '@/stores/writer-store'
@@ -256,12 +256,11 @@ interface GlobalChatState {
   confirmProducerLock: () => Promise<void>
   /** Director 준비 창의 "그래도 진행" — 준비가 덜 된 샷이 있어도 Director 로 넘긴다. */
   proceedToDirectorAnyway: () => Promise<void>
-  /** Editor 넘기기 창(D8)의 [○ 빼고 넘기기] — 영상 있는 샷만 Editor 로 넘긴다(Editor 는 영상 있는 샷만 컷으로 만든다).
-   *  창 없이도 부른다(Storyboard 카드의 [빼고 Editor로]). */
+  /** Editor 넘기기 창(D8)의 [○ 빼고 넘기기] — 영상 있는 샷만 Editor 로 넘긴다(Editor 는 영상 있는 샷만 컷으로 만든다). */
   proceedToEditorWithVideos: () => Promise<void>
   /** Editor 넘기기 창(D8)의 [다시 만들기] — 그 샷의 영상을 만들기 시작하고 창은 그대로 둔다(이미지가 없으면 이미지부터).
-   *  창 없이도 부른다(Storyboard 카드의 [다시 만들기]). */
-  remakeMissingVideo: (shotNodeId: string) => Promise<void>
+   *  시작했는지, 못 했으면 왜인지 돌려준다 — 창이 그 줄에 까닭을 보인다. */
+  remakeMissingVideo: (shotNodeId: string) => Promise<RemakeResult>
   /** 확인 창 닫기("더 고칠게요"·"채우러 가기") — 아무것도 넘기지 않는다. */
   closeHandoffConfirm: () => void
   /** 씬 스토리 확정(2026-10-01 오너 — 확정 단계는 Producer 메인). 성공하면 나머지 생성이 이어지고 Writer 화면으로 간다.
@@ -2289,43 +2288,48 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   },
 
   proceedToEditorWithVideos: async () => {
-    const projectId = useProjectStore.getState().projectId
-    if (!projectId) return
-    // 창 없이도 부른다 — Storyboard 카드(board 갈래)의 [빼고 Editor로](2026-11-14). 창이 열려 있으면 그 창의 프로젝트일 때만.
     const confirm = get().handoffConfirm
-    const fromWindow = confirm?.kind === 'editorMissingVideos' ? confirm : null
-    if (fromWindow && fromWindow.projectId !== projectId) return
-    if (fromWindow) set({ handoffConfirm: null })
+    if (confirm?.kind !== 'editorMissingVideos' || confirm.projectId !== useProjectStore.getState().projectId) return
+    set({ handoffConfirm: null })
     await get().sendMessage(translate(useLocaleStore.getState().locale, 'Please hand over to Editor'), undefined, {
       consentedHandoff: true,
       acceptMissingVideos: true,
       // 채팅에서 연 창이면 사용자의 넘김 말이 이미 스레드에 있다 — 다시 남기지 않는다.
-      silentUser: fromWindow?.via === 'chat',
+      silentUser: confirm.via === 'chat',
       stageOverride: 'director',
     })
   },
 
   remakeMissingVideo: async (shotNodeId) => {
-    // 창 없이도 부른다 — Storyboard 카드(board 갈래)의 [다시 만들기](2026-11-14). 창이 열려 있으면 그대로 둔다.
-    // 일괄이 도는 중이면 창이 단추를 끄고 까닭을 보인다(검토 b 낮음 1) — 여기서도 말없이 Take 를 만들지 않는다.
-    if (useDirectorCanvasStore.getState().realBatchBusy || useDirectorCanvasStore.getState().videoBatchBusy) return
-    // 이미지가 없으면 영상이 이미지 없이(T2V) 만들어진다 — 그리드의 [영상 만들기]처럼 이미지부터 만든다(Director 배선 5).
-    const hasImage = () => {
-      const node = useDirectorCanvasStore.getState().nodes.find((n) => n.id === shotNodeId)
-      return !!node && isShotData(node.data) && node.data.storyboardImage?.status === 'completed'
+    if (get().handoffConfirm?.kind !== 'editorMissingVideos') return { started: false, reason: 'no_window' }
+    const director = () => useDirectorCanvasStore.getState()
+    // 일괄이 도는 중이면 창이 단추를 끄고 까닭을 보인다(검토 b 낮음 1) — 여기서도 Take 를 만들지 않고 까닭을 돌려준다(2차 낮음 3).
+    if (director().realBatchBusy) return { started: false, reason: 'image_batch' }
+    if (director().videoBatchBusy) return { started: false, reason: 'video_batch' }
+    const imageStatus = () => {
+      const node = director().nodes.find((n) => n.id === shotNodeId)
+      return node && isShotData(node.data) ? node.data.storyboardImage?.status ?? null : null
     }
-    if (!hasImage()) {
+    // 이미지가 없으면 영상이 이미지 없이(T2V) 만들어진다 — 그리드의 [영상 만들기]처럼 이미지부터 만든다(Director 배선 5).
+    if (imageStatus() !== 'completed') {
       // 화면이 낡았을 수 있다 — 저장된 그림을 먼저 다시 읽고, 그래도 없을 때만 새로 그린다(승인한 그림 보호, 그리드와 같다 · 낮음 2).
-      await useDirectorCanvasStore.getState().hydrateFreshFromDb().catch(() => {})
-      if (!hasImage()) {
-        await useDirectorCanvasStore.getState().generateStoryboardImage(shotNodeId)
-        if (!hasImage()) return
+      await director().hydrateFreshFromDb().catch(() => {})
+      // 그 샷 이미지를 이미 만드는 중이면 다시 그리지 않고 까닭을 돌려준다 — 끝나면 영상을 만들 수 있다.
+      if (imageStatus() === 'generating') return { started: false, reason: 'image_running' }
+      if (imageStatus() !== 'completed') {
+        await director().generateStoryboardImage(shotNodeId)
+        if (imageStatus() === 'generating') return { started: false, reason: 'image_running' }
+        if (imageStatus() !== 'completed') return { started: false, reason: 'image_failed' }
       }
     }
     // 단추 값을 센 그 Take(latestShotTake)의 배선 · 모델 · 해상도를 물려받는 새 Take(검토 b 보통 2) — prose 의 remakeShotVideo 와
     //   같은 식이다. 두 갈래를 합친 뒤에는 remakeShotVideo(shotNodeId) 하나로 부르면 된다.
-    const latest = latestShotTake(useDirectorCanvasStore.getState().nodes, shotNodeId)
-    await useDirectorCanvasStore.getState().generateVideoForShot(shotNodeId, latest ? { inheritFromVideoNodeId: latest.id } : undefined)
+    const latest = latestShotTake(director().nodes, shotNodeId)
+    const started = await director().generateVideoForShot(shotNodeId, latest ? { inheritFromVideoNodeId: latest.id } : undefined)
+    if (started) return { started: true }
+    // 시작하지 못했다 — 그 샷 영상이 이미 도는 중이면 그 까닭, 아니면(Take · 동시 한도는 그 자리에서 따로 알린다) 일반 까닭.
+    const videoRunning = director().nodes.some((n) => isVideoData(n.data) && n.data.parentShotNodeId === shotNodeId && n.data.status === 'generating')
+    return { started: false, reason: videoRunning ? 'video_running' : 'not_started' }
   },
 
   closeHandoffConfirm: () => set({ handoffConfirm: null }),

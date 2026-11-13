@@ -76,8 +76,8 @@ describe('Director 넘김 확인 창', () => {
     expect(view.title).toBe('Director로 넘어갈까요?')
     expect(view.rows).toEqual([
       { label: '넘어가는 것', value: '샷 3 · 10초 · 인물 2 · 배경 1 · 러프 3장' },
-      { label: '다음', value: '러프 → 실사 이미지 3장 · 약 2분 · Takes 안 써요' },
-      { label: '그다음', value: '이미지를 확인하고 영상을 만들어요 · 샷마다 Takes 5' },
+      { label: '다음', value: '러프 → 실사 이미지 3장 · 약\u00a02분 · Takes 안 써요' },
+      { label: '그다음', value: '이미지를 확인하고 영상을 만들어요 · 샷마다 5 Take' },
     ])
     expect(view.warning).toBeNull()
     expect(view.canDrawRemaining).toBe(false)
