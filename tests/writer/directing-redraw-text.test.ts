@@ -21,7 +21,7 @@ vi.mock('@/lib/storage-thumb', () => ({ uploadThumbnail: mocks.thumb }))
 vi.mock('@/lib/writer/i18n/derive-en', () => ({ deriveEnBatch: mocks.deriveEnBatch }))
 vi.mock('@/lib/moderation/creem', () => ({ assertUserTextAllowed: mocks.assertUserTextAllowed }))
 
-import { regenerateRoughFrame, separateArrowLayer } from '@/lib/writer/directing-edit'
+import { regenerateRoughFrame, separateArrowLayer, withoutQuotedDialogue } from '@/lib/writer/directing-edit'
 
 // 이 시험을 위해 지은 샷 — 한국어 프로젝트의 행동 글(이름 · 따옴표 대사 · 카메라 문장 · 색 말)과 샷 설계의 카메라 무브.
 const ROUGH = {
@@ -92,6 +92,26 @@ describe('연출 한 장 다시 그리기에 실리는 글', () => {
     row.dynamic_spec = { camera_motion: { type: 'static', direction: 'none', speed: 'slow' } }
     await regenerateRoughFrame('p1', 'sh_1', 'direction')
     expect(promptOf()).not.toMatch(/camera static/)
+  })
+
+  // 왜(검토 a 7b10877d 낮음 1): 번역이 실패하면 한국어 원문(이름 · 조사 포함)이 그대로 실렸다 — 연출 한 장 다시 그리기에서는 행동 글을 빼고
+  //   샷 설계의 카메라 말만 둔다(리드 판단, 러프 전체 그리기는 그대로).
+  it('연출 한 장을 다시 그릴 때 행동 글을 영어로 옮기지 못하면 행동 글은 빼고 카메라 움직임만 넣는다', async () => {
+    mocks.deriveEnBatch.mockImplementation(async () => new Map())
+    row.dynamic_spec = { camera_motion: { type: 'dolly_in', direction: 'forward', speed: 'slow' } }
+    await regenerateRoughFrame('p1', 'sh_1', 'direction')
+    const prompt = promptOf()
+    expect(prompt).toContain('The movement to mark: camera dolly in forward, slow.')
+    expect(prompt).not.toMatch(/[\uAC00-\uD7A3]/)
+    expect(mocks.assertUserTextAllowed.mock.calls[0][0]).toEqual([null])
+  })
+
+  // 왜(검토 a 7b10877d 낮음 2): 글자에 바로 붙은 작은따옴표 대사("도윤이'마지막이야'라고")는 번역 전에 빠지지 않았다.
+  //   한글 바로 뒤에서 열리고 '라고 · 이라고 · 하고 · 하며 · 며' 앞에서 닫히는 작은따옴표는 대사다. man's · don't 같은 아포스트로피는 그대로.
+  it('글자에 바로 붙은 작은따옴표 대사도 번역 전에 빼고, 아포스트로피는 그대로 둔다', () => {
+    expect(withoutQuotedDialogue("도윤이'마지막이야'라고 중얼거리고 휴대폰을 본다.")).toBe('도윤이 중얼거리고 휴대폰을 본다.')
+    expect(withoutQuotedDialogue("민호가'가자'하며 일어선다.")).toBe('민호가 일어선다.')
+    expect(withoutQuotedDialogue("The man's notebook stays shut; don't open it.")).toBe("The man's notebook stays shut; don't open it.")
   })
 
   // 왜(검토 a 3): 분리한 밑층은 지우개로 드러나 저장되는 그림이다 — 한 장 다시 그리기와 같이 얼굴 없는 목각 인형 · 글자 없음을 지킨다.

@@ -252,9 +252,15 @@ export function mergeRoughFrame(
   return { ...rest, frames, generatedAt: now, ...(cleanDirection ? { cleanDirection } : {}) }
 }
 
-// 따옴표 대사 — "…" “…” 「…」 『…』 ‘…’, 그리고 앞이 글자가 아닌 '…'(man's · don't 같은 아포스트로피는 남긴다).
-const QUOTED_DIALOGUE =
-  /"[^"]*"|\u201c[^\u201d]*\u201d|\u300c[^\u300d]*\u300d|\u300e[^\u300f]*\u300f|\u2018[^\u2019]*\u2019|(?<![\p{L}\p{N}])'(?:[^'\n]|'(?=[A-Za-z]))*?'(?![A-Za-z])/gu
+// 따옴표 대사 — "…" “…” 「…」 『…』 ‘…’, 앞이 글자가 아닌 '…', 그리고 한글 바로 뒤에서 열려 인용 조사 앞에서 닫히는
+//   '…'("도윤이'마지막이야'라고", 검토 a 7b10877d 낮음 2). man's · don't 같은 아포스트로피는 남긴다.
+//   대사 바로 뒤의 인용 조사(이라고 · 라고 · 이라며 · 라며 · 하고 · 하며 · 며)도 같이 뺀다 — 남으면 "도윤이라고"처럼 읽힌다.
+//   한글 글자는 코드 줄에 두지 않고 이스케이프로 쓴다(i18n-korean-scan).
+const QUOTATIVE = String.raw`(?:\uC774\uB77C\uACE0|\uB77C\uACE0|\uC774\uB77C\uBA70|\uB77C\uBA70|\uD558\uACE0|\uD558\uBA70|\uBA70)`
+const QUOTED_DIALOGUE = new RegExp(
+  String.raw`(?:"[^"]*"|\u201c[^\u201d]*\u201d|\u300c[^\u300d]*\u300d|\u300e[^\u300f]*\u300f|\u2018[^\u2019]*\u2019|(?<![\p{L}\p{N}])'(?:[^'\n]|'(?=[A-Za-z]))*?'(?![A-Za-z])|(?<=[\uAC00-\uD7A3])'[^'\n]+?'(?=${QUOTATIVE}))${QUOTATIVE}?`,
+  'gu',
+)
 
 /** 순수: 따옴표 대사를 뺀다 — 연출 다시 그리기의 짧은 메모로 옮겨 적힐 재료가 된다(검토 a 1). */
 export function withoutQuotedDialogue(text: string): string {
@@ -278,14 +284,15 @@ export function cameraMoveClause(cam: CameraMotionLike | null | undefined): stri
   return `camera ${words(cam.type)}${cam.direction && cam.direction !== 'none' ? ` ${words(cam.direction)}` : ''}${cam.speed ? `, ${words(cam.speed)}` : ''}`
 }
 
-/** 연출 다시 그리기의 재료 — 행동 글은 시트처럼 영어 파생본(같은 번역 종류)으로, 대사는 번역 전에 뺀다. 카메라는 샷 설계에서. */
+/** 연출 다시 그리기의 재료 — 행동 글은 시트처럼 영어 파생본(같은 번역 종류)으로, 대사는 번역 전에 뺀다. 카메라는 샷 설계에서.
+ *  번역이 안 되면 행동 글은 빼고 카메라 말만 둔다 — 원문(이름 · 조사)이 그대로 실렸다(검토 a 7b10877d 낮음 1, 리드 판단 · 시트는 그대로). */
 export async function directionMaterialFrom(
   shotId: string,
   actionDescription: string | null,
   dynamicSpec: unknown,
 ): Promise<{ action: string | null; camera: string | null }> {
   const native = actionDescription ? withoutQuotedDialogue(actionDescription) : ''
-  const action = native ? ((await deriveEnBatch([{ id: shotId, native }], 'shot action description')).get(shotId) ?? native) : null
+  const action = native ? ((await deriveEnBatch([{ id: shotId, native }], 'shot action description')).get(shotId) ?? null) : null
   const camera = cameraMoveClause((dynamicSpec as { camera_motion?: CameraMotionLike } | null)?.camera_motion)
   return { action, camera }
 }
