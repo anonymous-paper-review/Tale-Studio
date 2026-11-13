@@ -56,6 +56,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { Json } from '@/types/database'
 import { invalidateShots, loadShotsResult } from '@/lib/shots-cache'
 import { parseDirectorRefs } from '@/lib/director/director-refs'
+import { promptWithChange } from '@/lib/director/shot-detail'
 import {
   isEmptyStableFrameInputs,
   parseStableFrameInputs,
@@ -158,6 +159,8 @@ export type DirectorGenerationRequestOptions = {
    * '영상 리테이크'가 체인 없는 새 테이크를 만들던 함정의 교정.
    */
   inheritFromVideoNodeId?: string
+  /** 샷 상세의 "바꾸고 싶은 점"(디자이너 11/13 D6) — 이번 이미지 다시 만들기에만 프롬프트 끝에 붙인다. 샷 프롬프트는 그대로. */
+  changeNote?: string
 }
 
 function makeSceneData(label: string): SceneNodeData {
@@ -4017,7 +4020,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           return { jobId: null, status: 'deduped' }
         }
         const prevUrl = data.storyboardImage?.url ?? ''
-        const prompt = effectivePrompt(data) || data.label
+        const prompt = promptWithChange(effectivePrompt(data) || data.label, options?.changeNote ?? '')
 
         const storyboardAlreadyGenerating = api.nodes.some(
           (candidate) =>

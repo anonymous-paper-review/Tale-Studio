@@ -3,6 +3,29 @@
 //   번역 공백이 깨진 화면이 아니라 영어 화면이 된다. 파이프라인 산출물·유저 콘텐츠는
 //   이 사전과 무관(프로젝트 locale 이 지배), 마케팅 페이지는 영어 고정이라 사전을 안 탄다.
 export const KO: Record<string, string> = {
+  // Director 샷 상세(디자이너 11/13 시안 D6 · D7, 오너 2026-11-14) — 이미지 · 영상 탭, 시작 · 끝 나란히, 설정 한 화면, Take 쌓기
+  'Video · none': '영상 · 없음',
+  'Start image': '시작 이미지',
+  'End image': '끝 이미지',
+  'Start and end images are remade together for now.': '지금은 시작 · 끝 이미지를 함께 다시 만들어요.',
+  'What to change': '바꾸고 싶은 점',
+  'Leave it empty to remake with the settings below': '비워 두면 아래 설정 그대로 다시 만들어요',
+  'Write only what you want to change in the picture. The rest stays as it is (e.g. show the umbrella handle, keep the face).':
+    '고른 이미지에서 바꾸고 싶은 것만 적어요 · 나머지는 그대로 (예: 우산 손잡이가 보이게, 얼굴은 그대로)',
+  'Image model': '이미지 모델',
+  'Aspect ratio': '비율',
+  Count: '개수',
+  'People ({count}/{total})': '등장인물 ({count}/{total})',
+  'Places ({count}/{total})': '장소 ({count}/{total})',
+  'Remake start and end images · Takes 0': '시작·끝 이미지 다시 만들기 · Takes 0',
+  'Make start and end images · Takes 0': '시작·끝 이미지 만들기 · Takes 0',
+  'Next: make the video': '다음: 영상 만들기',
+  'No video for this shot yet.': '이 샷에는 아직 영상이 없어요.',
+  'Make the video': '영상 만들기',
+  '★ Final (auto)': '★ 최종 (자동)',
+  '★ Final': '★ 최종',
+  Making: '만드는 중',
+  'Not made yet': '아직 안 만들었어요',
   // 새 프로젝트 · 무엇을 만들까요(2026-10-02 시안 v04 0.1)
   'Short film': '단편 영화',
   'Drama pilot': '드라마 파일럿',
