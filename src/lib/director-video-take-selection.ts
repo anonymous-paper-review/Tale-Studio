@@ -76,3 +76,20 @@ export function selectLatestAttempt<T extends VideoTakeSelectionRecord>(takes: r
     return byAttempt || compareDirectorVideoTakeOrder(a, b)
   })[0] ?? null
 }
+
+/** 화면에서 멈췄고 ★ 로 고르지 않은 Take(오너 2026-11-14 7번) — 뒤에서 끝나도 영상 · 실패가 아니고 기록에만 있다. */
+export function isStoppedTake(take: VideoTakeSelectionRecord): boolean {
+  return take.cancelled_at != null && take.is_final !== true
+}
+
+function timeOf(value: unknown): number {
+  const ms = typeof value === 'string' ? Date.parse(value) : Number.NaN
+  return Number.isFinite(ms) ? ms : Number.NEGATIVE_INFINITY
+}
+
+/** 샷 상태 · 넘기기 창이 보는 가장 새 시도(리드 2026-11-14 규칙) — 멈춘 Take 의 시각은 멈춘 때다: 뒤에서 늦게 실패 · 완성해도
+ *  그 뒤에 시작한 시도보다 새것이 되지 않는다. 고른 것이 멈춘 Take 면(isStoppedTake) 그 샷은 실패도 만드는 중도 아니다. */
+export function selectLatestShotAttempt<T extends VideoTakeSelectionRecord>(takes: readonly T[]): T | null {
+  const at = (take: T) => timeOf(isStoppedTake(take) ? take.cancelled_at : take.last_attempt_at)
+  return takes.filter(isLive).sort((a, b) => at(b) - at(a) || compareDirectorVideoTakeOrder(a, b))[0] ?? null
+}

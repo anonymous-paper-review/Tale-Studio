@@ -19,7 +19,9 @@ import {
 } from '@/components/generating-frame'
 import { RoughFrameCycle } from '@/components/rough-frame-cycle'
 import {
+  isStoppedTake,
   selectLatestAttempt,
+  selectLatestShotAttempt,
   selectNewestSuccessfulTake,
   type VideoTakeSelectionRecord,
 } from '@/lib/director-video-take-selection'
@@ -30,7 +32,9 @@ import {
 } from '@/stores/director-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
-import { useActiveGenerationJobs, activeShotIds, useGenerationQueueStatus, type GenerationQueueStatus } from '@/lib/generation-queue'
+import { useActiveGenerationJobs, activeShotIds, useGenerationQueueStatus, type ActiveJob, type GenerationQueueStatus } from '@/lib/generation-queue'
+import { shotStopTarget } from '@/lib/director/stop-work'
+import { StopMakingButton } from '@/features/director/stop-making-button'
 import { checkStoryboardImageStatus, storyboardImageGenerationState } from '@/features/director/hooks/use-storyboard-image-generation'
 import { useRoughStoryboard, useShotActionDescription } from '@/features/director/hooks/use-rough-storyboard'
 import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
@@ -113,7 +117,10 @@ export function gridVideoView<T extends GridVideoTakeRecord>(
 ): { cardTake: T | null; generating: boolean; failure: string | null } {
   // ★ 로 고른 멈춘 Take 는 영상이다 — 카드 영상 고르기에서만 멈춤을 지운다.
   const cardTake = selectNewestSuccessfulTake(records.map((r) => (r.is_final ? { ...r, cancelled_at: null } : r)))
-  const { generating, failure } = selectGridVideoAttemptState(records.filter((r) => r.cancelled_at == null), t)
+  const { generating } = selectGridVideoAttemptState(records.filter((r) => r.cancelled_at == null), t)
+  // 실패 글은 샷 상태와 같은 가장 새 시도로 — 그것이 멈춘 Take 면 뒤에서 실패했어도 띄우지 않는다(리드 2026-11-14 규칙).
+  const latest = selectLatestShotAttempt(records)
+  const { failure } = selectGridVideoAttemptState(latest && !isStoppedTake(latest) ? [latest] : [], t)
   return { cardTake, generating, failure }
 }
 
@@ -201,6 +208,7 @@ function ShotCell({
   shotLabel,
   queuedImageShots,
   queuedVideoShots,
+  activeJobs,
   queueStatus,
   descriptionFontSize,
   shotMention,
@@ -218,6 +226,8 @@ function ShotCell({
   /** 지금 큐에 떠 있는 잡의 대상 샷들(#queue-restore) — 탭을 떠났다 와도 진행 표시를 되살린다. */
   queuedImageShots: ReadonlySet<string>
   queuedVideoShots: ReadonlySet<string>
+  /** 지금 도는 작업 — 카드 [멈추기]가 멈출 작업을 고른다(오너 7번). */
+  activeJobs: readonly ActiveJob[]
   queueStatus: GenerationQueueStatus
   /** 큐 원본 — 경과시간 durable 기준점(activeStartedAt) 계산용. */
   descriptionFontSize: string
@@ -522,6 +532,11 @@ function ShotCell({
 
   // 실사 보기 카드 테두리 = 샷 상태 색(시안 R 416:4941, 오너 2026-11-14 "Director 생성 상태"). 러프 보기는 지금 그대로.
   const realTone = mediaMode === 'real' ? shotStateTone(shotState) : null
+  // 카드 [멈추기](오너 7번 · 시안 D4): 이 샷이 지금 만드는 이미지 · 영상(보낸 작업)만 멈춘다. 차례를 기다리는 샷은 멈출 작업이 없다.
+  const stopKind = shotState === 'video_generating' ? 'video' : 'image'
+  const stopTarget = mediaMode === 'real' && writerShotId && (shotState === 'image_generating' || shotState === 'video_generating')
+    ? shotStopTarget(activeJobs, writerShotId, stopKind)
+    : null
   const durationLabel =
     typeof data.durationSeconds === 'number' && data.durationSeconds > 0
       ? t('{seconds}s', { seconds: Math.round(data.durationSeconds) })
@@ -772,13 +787,14 @@ function ShotCell({
         )}
 
         {/* 꼬리(시안 D1 "● 대기" · D3 "● 이미지 만드는 중") — 실사 보기. 일괄이 맡아 차례를 기다리면 "대기 중",
-            다시 만들기가 실패했으면 "다시 만들기 실패" + [다시 만들기](리드 검토 c ① · ④d). */}
+            다시 만들기가 실패했으면 "다시 만들기 실패" + [다시 만들기](리드 검토 c ① · ④d), 만드는 중이면 [멈추기](오너 7번 · 시안 D4). */}
         {mediaMode === 'real' && !videoError && (
           <ShotStateTail
             state={shotState}
             waiting={imageWaitingOnly}
             remakeFailed={remakeFailed}
             retry={<RemakeRetryButton nodeId={node.id} data={data} />}
+            stop={stopTarget ? <StopMakingButton target={stopTarget} kind={stopKind} /> : null}
             className="absolute bottom-2 left-2 z-10"
           />
         )}
@@ -1110,6 +1126,7 @@ export function StoryboardGridView({
                     shotLabel={directorNodeLabel(shot.data, boardNames)}
                     queuedImageShots={queuedImageShots}
                     queuedVideoShots={queuedVideoShots}
+                    activeJobs={activeJobs}
                     queueStatus={queueStatus}
                     descriptionFontSize={descriptionFontSize}
                     shotMention={mentionFor('shot', shot.id, mediaMode)}
