@@ -55,6 +55,10 @@ import {
 import { directorMentionTargets, directorNodeLabel, sortByBoard } from '@/features/director/node-label'
 import { useBoardNodeNames } from '@/features/director/hooks/use-board-node-names'
 import { useT } from '@/lib/i18n'
+import { useWriterStore } from '@/stores/writer-store'
+import { filterShotsByStatus, shotStateTone, type DirectorShotState } from '@/lib/director/shot-state'
+import { useDirectorShotStates } from '@/features/director/hooks/use-shot-states'
+import { ImageFailedPanel, ImageNeededTag, ShotPipelineRow, ShotStateTail } from '@/features/director/shot-status'
 
 type SceneGroup = {
   key: string
@@ -182,6 +186,7 @@ function ShotCell({
   queueStatus,
   descriptionFontSize,
   shotMention,
+  shotState,
 }: {
   node: DirectorNode
   roster: SlugEntry[]
@@ -197,6 +202,8 @@ function ShotCell({
   /** 큐 원본 — 경과시간 durable 기준점(activeStartedAt) 계산용. */
   descriptionFontSize: string
   shotMention?: CardMention
+  /** 샷 상태(시안 R 416:4941) — 실사 보기의 테두리 · 꼬리 · 이미지 → 영상 줄. */
+  shotState: DirectorShotState
 }) {
   const t = useT()
   const generateStoryboardImage = useDirectorCanvasStore(
@@ -215,6 +222,8 @@ function ShotCell({
   // 카드 설명문(#e5 2026-08-12) — EN 렌더 프롬프트가 아니라 writer 의 유저 언어 산출
   //   (shots.action_description_native → writer-store actionDescription)을 그대로 쓴다.
   const nativeDescription = useShotActionDescription(writerShotId)
+  // 카드 제목 "씬 1 · 샷 1 · CU · 3초"(시안 D1) — 샷 크기는 Writer 샷 기록에서.
+  const shotType = useWriterStore((s) => (writerShotId ? s.shots.find((x) => x.shotId === writerShotId)?.shotType ?? null : null))
   // 영상 생성(이미지→영상 체인 포함) 진행 플래그 — 버튼 잠금 + 오버레이(#e12)
   const [videoBusy, setVideoBusy] = useState(false)
   const [videoError, setVideoError] = useState<string | null>(null)
@@ -319,7 +328,7 @@ function ShotCell({
         ? { label: t('Video'), cls: 'text-stage', video: true }
         : hasImage
           ? { label: t('Image'), cls: 'text-foreground', video: false }
-          : { label: t('Image needed'), cls: 'text-warning', video: false }
+          : { label: t('Image needed'), cls: 'text-stage-producer', video: false }
 
   const runImage = async () => {
     if (imageGeneration.disabled) return
@@ -470,6 +479,13 @@ function ShotCell({
         ? img!
         : null
 
+  // 실사 보기 카드 테두리 = 샷 상태 색(시안 R 416:4941, 오너 2026-11-14 "Director 생성 상태"). 러프 보기는 지금 그대로.
+  const realTone = mediaMode === 'real' ? shotStateTone(shotState) : null
+  const durationLabel =
+    typeof data.durationSeconds === 'number' && data.durationSeconds > 0
+      ? t('{seconds}s', { seconds: Math.round(data.durationSeconds) })
+      : null
+
   const mentionCardOnModifierClick = (
     event: Pick<MouseEvent, 'ctrlKey' | 'metaKey'>,
   ): boolean => {
@@ -483,7 +499,11 @@ function ShotCell({
     <>
     <div
       // v3(2026-11-03): 노드 캔버스와 같은 판(작업 바탕색 · 모서리 16 · 그림자 하나 · 안쪽 12) — 캔버스 판(--canvas-bg) 위에 뜬다.
-      className="group flex cursor-pointer flex-col rounded-2xl bg-background p-3 shadow-node transition-colors duration-100 hover:bg-card"
+      className={cn(
+        'group flex cursor-pointer flex-col rounded-2xl border-[1.5px] bg-background p-3 shadow-node transition-colors duration-100 hover:bg-card',
+        realTone?.frame ?? 'border-transparent',
+      )}
+      data-shot-state={mediaMode === 'real' ? shotState : undefined}
       onClickCapture={(event) => {
         if (mentionCardOnModifierClick(event)) {
           event.preventDefault()
@@ -537,17 +557,12 @@ function ShotCell({
             />
           )
         ) : status === 'failed' ? (
-          // 실패 시 이미지 자리에 로그 표시 (사용자 요청)
-          <div className="flex size-full flex-col items-center justify-center gap-1 bg-destructive/10 p-2 text-center">
-            <span className="text-[11.5px] font-semibold text-destructive">
-              {t('Generation failed')}
-            </span>
-            {img?.errorMessage && (
-              <span className="line-clamp-3 break-all font-mono text-[10px] leading-tight text-destructive/80">
-                {img.errorMessage}
-              </span>
-            )}
-          </div>
+          // 이미지 실패(시안 없음 — 결정 페이지 추천): "이미지를 못 만들었어요" + [다시 만들기]. 원인은 마우스 올림 글로.
+          <ImageFailedPanel
+            onRetry={() => void runImage()}
+            detail={img?.errorMessage}
+            disabled={imageGeneration.disabled && imageGeneration.phase !== 'error'}
+          />
         ) : mediaMode === 'real' ? (
           generating ? (
             // 실사 생성 중(#e3 2026-08-12) — previz 를 깔면(흐려도) "뭔가 나왔다"로 읽히므로
@@ -671,8 +686,16 @@ function ShotCell({
           </span>
         )}
 
+        {/* 꼬리(시안 D1 "● 대기" · D3 "● 이미지 만드는 중") — 실사 보기, 만드는 중 덮개가 없을 때. */}
+        {mediaMode === 'real' && !generating && !videoError && (
+          <ShotStateTail state={shotState} className="absolute bottom-2 left-2 z-10" />
+        )}
+
         {/* 액션 스택은 좌상단 배지 아래로 이사(#e4 2026-08-11) — 우하단 스택 제거. */}
       </div>
+
+      {/* "● 이미지 → ● 영상" 줄(시안 D1 · D3) — 실사 보기 */}
+      {mediaMode === 'real' && <ShotPipelineRow state={shotState} className="mt-2.5" />}
 
       {/* 재생성 확인(#regen-confirm) — 최초 생성은 바로, **교체**만 팝업을 거친다. */}
       <RegenerateConfirmDialog
@@ -736,6 +759,8 @@ function ShotCell({
         <span className="truncate text-label font-semibold text-foreground">
           {sceneLabel ? `${sceneLabel} · ` : ''}
           {shotLabel}
+          {shotType ? ` · ${shotType}` : ''}
+          {durationLabel ? ` · ${durationLabel}` : ''}
         </span>
         {(nativeDescription || prompt) && (
           <p
@@ -836,6 +861,8 @@ export function StoryboardGridView({
     () => activeShotIds(activeJobs, ['shot_video']),
     [activeJobs],
   )
+  const shotStates = useDirectorShotStates()
+  const statusFilter = useDirectorCanvasStore((s) => s.statusFilter)
 
   // 진행 중인 작업을 보고 Previz/Real 을 대신 바꾸던 effect 를 제거했다
   //   (#view-not-forced 2026-09-08 오너 판정). 진입 시 한 번이 아니라 작업이 도는 내내
@@ -898,6 +925,13 @@ export function StoryboardGridView({
   }
 
   const columns = storyboardColumns(zoomLevel)
+  // 상태 고르기(시안 D1, 오너 2026-11-14): 고른 상태 샷만 보이고 빈 씬 묶음은 숨긴다.
+  const visibleGroups =
+    statusFilter === 'all'
+      ? groups
+      : groups
+          .map((group) => ({ ...group, shots: filterShotsByStatus(group.shots, shotStates, statusFilter) }))
+          .filter((group) => group.shots.length > 0)
   const descriptionFontSize = storyboardDescriptionFontSize(columns)
   const handleBoardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const target = event.target
@@ -931,7 +965,7 @@ export function StoryboardGridView({
           mediaMode === 'real' ? 'slide-in-from-right-6' : 'slide-in-from-left-6',
         )}
       >
-        {groups.map((group) => (
+        {visibleGroups.map((group) => (
           <section key={group.key} className="flex flex-col gap-3">
             {/* v3 S1 씬 머리: 씬 이름(15px 600) · 흐린 장소 · 시간 */}
             <div className="flex items-baseline gap-2.5">
@@ -989,6 +1023,7 @@ export function StoryboardGridView({
                     queueStatus={queueStatus}
                     descriptionFontSize={descriptionFontSize}
                     shotMention={mentionFor('shot', shot.id, mediaMode)}
+                    shotState={shotStates.get(shot.id) ?? 'image_needed'}
                   />
                 ))}
               </div>

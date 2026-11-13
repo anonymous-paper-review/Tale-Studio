@@ -793,7 +793,7 @@ export const KO: Record<string, string> = {
   'Pause {label}': '{label} 일시정지',
   'Rough needed': '러프 생성 필요',
   Image: '이미지',
-  'Image needed': '이미지 생성 필요',
+  'Image needed': '이미지 필요',
   'Batch live-action generation is running. Try again after it finishes.': '실사 일괄 생성 중이에요. 완료 후 다시 시도해 주세요.',
   'Failed to generate the image.': '이미지 생성에 실패했습니다.',
   'Regenerate previz': 'Previz 재생성',
@@ -3168,4 +3168,14 @@ export const KO: Record<string, string> = {
   'Prose with Lumi': 'Lumi와 산문 이야기',
   'Art with Lumi': 'Lumi와 그림 이야기',
   'Directing with Lumi': 'Lumi와 연출 이야기',
+  // Director 샷 상태(시안 R 416:4941 · D1 406:3717, 오너 2026-11-14)
+  'Not started': '대기',
+  'Making image': '이미지 만드는 중',
+  'Image ready': '이미지 완료',
+  'Making video': '영상 만드는 중',
+  'Video done': '영상 완성',
+  'Video failed': '영상 실패',
+  "Couldn't make the image": '이미지를 못 만들었어요',
+  'Make again': '다시 만들기',
+  'Show shots by status': '상태별로 샷 보기',
 }

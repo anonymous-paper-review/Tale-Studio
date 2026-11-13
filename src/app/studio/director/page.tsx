@@ -44,6 +44,9 @@ import { NextStepButton } from '@/components/handoff/next-step-button'
 import { TopBarActions } from '@/components/layout/studio-top-bar'
 import { useHoldChatClosed } from '@/hooks/use-hold-chat-closed'
 import { LumiChatPill } from '@/features/director/lumi-chat-pill'
+import { ShotStatusFilterMenu } from '@/features/director/shot-status'
+import { useDirectorShotStates } from '@/features/director/hooks/use-shot-states'
+import { countStatusFilters } from '@/lib/director/shot-state'
 import { HIDDEN_ON_CANVAS, directorCanvasMeta } from '@/features/director/canvas-meta'
 import { separateAssetCards } from '@/features/director/asset-column'
 import { arrangeOnceCardsRendered, renderedCardSizes } from '@/features/director/canvas-layout'
@@ -920,6 +923,11 @@ function PaletteBar({
   const videoFailTone = videoButton.tone === 'stage' ? 'text-stage-badge-foreground' : 'text-destructive'
   // D1 "The Set 노드 9 · 샷 4" — 캔버스에 보이는 노드와 그중 샷.
   const canvasMeta = directorCanvasMeta(nodes, t)
+  // 상태 고르기(시안 D1 406:3717 · R, 오너 2026-11-14) — 줄마다 그 상태 샷 수.
+  const shotStates = useDirectorShotStates()
+  const statusCounts = countStatusFilters(shotStates.values())
+  const statusFilter = useDirectorCanvasStore((s) => s.statusFilter)
+  const setStatusFilter = useDirectorCanvasStore((s) => s.setStatusFilter)
 
   // v3 D1 툴바(2026-11-03): 캔버스 판 안 위쪽 — 왼쪽 [노드 | 스토리보드] · 제목, 가운데 일괄 생성, 오른쪽 캔버스 도구 · Lumi 알약.
   //   단추는 작업 바탕색 알약(그림자 하나). 좁으면(채팅을 연 화면) 다음 줄로 넘어간다.
@@ -1183,6 +1191,8 @@ function PaletteBar({
             </button>
           </>
         )}
+
+        <ShotStatusFilterMenu counts={statusCounts} value={statusFilter} onChange={setStatusFilter} />
 
         {/* 채팅이 닫혀 있으면 여는 곳(v3 D1 Lumi 알약) — Director 는 채팅을 닫은 채 시작한다. */}
         <LumiChatPill />

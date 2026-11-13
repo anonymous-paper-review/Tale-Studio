@@ -122,6 +122,8 @@
   --color-warning-foreground: var(--warning-foreground);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
+  /* Director 생성 상태 — 영상 만드는 중 보라(오너 2026-11-14, design.md §2.5 "Director 생성 상태"). 다른 상태 색은 있는 토큰을 쓴다. */
+  --color-state-video: var(--state-video);
 
   /* 단계 색(design.md §2.9) — bg/text/border-stage-{단계} + 알파. 단계 이름은 화면 이름(producer=Producer … editor=Editor). */
   --color-stage-producer: var(--stage-producer);
@@ -207,6 +209,7 @@
   --warning-foreground: #141312;
   --info: #0d99ff;
   --info-foreground: #141312;
+  --state-video: #8f7ae0; /* Director 생성 상태: 영상 만드는 중(시안 R 416:4941). Artist 단계 색(#8b63e8)과 다른 값 */
 
   /* 엔티티 표시(design.md §2.2) — 인물 · 장소 · Director 노드 */
   --chart-1: oklch(0.537 0.234 29.23);

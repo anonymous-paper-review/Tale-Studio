@@ -95,6 +95,7 @@ import {
 } from '@/features/director/canvas-layout'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import { ASSET_CARD_WIDTH } from '@/features/director/asset-column'
+import type { ShotStatusFilter } from '@/lib/director/shot-state'
 import {
   DEFAULT_VIDEO_MODEL,
   DEFAULT_VIDEO_RESOLUTION,
@@ -1092,6 +1093,8 @@ interface DirectorCanvasState {
   viewMode: 'node' | 'storyboard'
   /** Storyboard 뷰 미디어 모드(#previz-video) — Previz(목각, 기본) | Real(실사). 상단바 토글이 제어. */
   storyboardMediaMode: 'previz' | 'real'
+  /** 상태 고르기(시안 D1 406:3717, 오너 2026-11-14) — 고른 상태 샷만 보인다. 화면에서만 쓰고 저장하지 않는다. */
+  statusFilter: ShotStatusFilter
   /** #ledger: 씬별 상태 장부(scenes.stage.ledger) — hydrate 때 DB 에서 읽는다. 화면 파생 전용. */
   sceneLedgers: Record<string, SceneLedger>
   // #real-grid-auto: 실사 일괄 생성 진행 중 — 개별 이미지 생성/재생성을 잠근다(시트 단위 작업과 충돌 방지).
@@ -1148,6 +1151,7 @@ interface DirectorCanvasState {
   setViewport: (vp: { x: number; y: number; zoom: number }) => void
   setViewMode: (m: 'node' | 'storyboard') => void
   setStoryboardMediaMode: (m: 'previz' | 'real') => void
+  setStatusFilter: (filter: ShotStatusFilter) => void
   /** 일괄 시작 — 중단 표시를 풀고 진행 상태를 연다. */
   beginVideoBatch: (total: number) => void
   /** 일괄 중단 — 도는 중일 때만 먹는다. 서버 DELETE로 중단을 확인한 뒤 반환한다. */
@@ -1638,6 +1642,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       viewportInitializedProjects: {},
       viewMode: 'node',
       storyboardMediaMode: 'previz',
+      statusFilter: 'all',
       sceneLedgers: {},
       realBatchBusy: false,
       realBatchRemaining: null,
@@ -1690,6 +1695,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             popupNodeId: null,
             deleteConfirmInfo: null,
             relationModal: null,
+            statusFilter: 'all',
             videoBatchBusy: false,
             videoBatchProgress: null,
             videoBatchQueue: null,
@@ -1720,6 +1726,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       setViewport: (vp) => set({ viewport: vp }),
       setViewMode: (m) => set({ viewMode: m }),
       setStoryboardMediaMode: (m) => set({ storyboardMediaMode: m }),
+      setStatusFilter: (filter) => set({ statusFilter: filter }),
 
       beginVideoBatch: (total) =>
         set({

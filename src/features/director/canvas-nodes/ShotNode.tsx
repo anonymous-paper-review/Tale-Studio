@@ -27,6 +27,8 @@ import { useEntityNames } from '@/lib/writer/use-entity-names'
 import { resolveEntityNames } from '@/lib/writer/resolve-entity-names'
 import { useStoryboardImageGeneration } from '@/features/director/hooks/use-storyboard-image-generation'
 import { StoryboardImageButton } from '@/features/director/storyboard-image-button'
+import { useShotState } from '@/features/director/hooks/use-shot-states'
+import { dimmedByStatusFilter, shotStateTone } from '@/lib/director/shot-state'
 
 /** 노드 뷰 미디어 틀의 높이 상한 — 샷 행 간격(SHOT_OFFSET_Y 560px)의 절반 아래로 둬 아래 샷과 겹치지 않는다. */
 const SHOT_NODE_MEDIA_MAX_H = 240
@@ -38,6 +40,9 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const projectFormat = useProjectFormatStore((s) => s.format)
   const mediaFrame = mediaFrameStyle(projectFormat, SHOT_NODE_MEDIA_MAX_H)
   const entityNames = useEntityNames()
+  // 샷 상태 테두리 · 상태 고르기 흐림(시안 R 416:4941 · D1, 오너 2026-11-14).
+  const shotStateNow = useShotState(id)
+  const statusFilter = useDirectorCanvasStore((s) => s.statusFilter)
   // 노드 제목은 보드와 같은 전체 번호("Shot 8", 오너 2026-11-02 "전체 번호로 통일").
   const boardNames = useBoardNodeNames()
   const generation = useStoryboardImageGeneration(isShotData(data) ? data : null)
@@ -106,6 +111,8 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         width={280}
         stale={data.stale}
         beam={isGenerating ? 'success' : null}
+        stateFrame={shotStateNow ? shotStateTone(shotStateNow).frame : null}
+        dimmed={dimmedByStatusFilter(shotStateNow, statusFilter)}
         canBranch={!videoQueued}
         onBranch={() => {
           if (videoQueued) return
