@@ -272,6 +272,7 @@ function ShotCell({
   //   아래 isShotData early return 보다 위에 있어야 한다 — 훅의 조건부 호출은 렌더 간 훅 순서를
   //   무너뜨린다(rules-of-hooks).
   const realBatchBusy = useDirectorCanvasStore((s) => s.realBatchBusy)
+  const realBatchShotIds = useDirectorCanvasStore((s) => s.realBatchShotIds ?? null)
   const takeRecords = useMemo(
     () =>
       directorNodes.flatMap((n) => {
@@ -394,8 +395,10 @@ function ShotCell({
   // 진입 자동 채움 대기(#e6 2026-08-11) — 일괄 러너가 돌기 시작했는데 아직 이 샷의 잡이 큐에
   //   안 앉은 구간. "생성이 필요합니다"를 보여주면 뭔가 해야 할 것 같은 잘못된 신호가 되므로
   //   (곧 자동으로 생성된다) 이 구간도 생성 중으로 취급해 스피너를 돌린다.
+  //   고른 샷만 만드는 일괄(시안 D2)이면 그 샷만 기다림으로 본다.
   const autoFillPending =
-    mediaMode === 'real' && realBatchBusy && !hasImage && status !== 'failed' && !!roughUrl
+    mediaMode === 'real' && realBatchBusy && !hasImage && status !== 'failed' && !!roughUrl &&
+    (realBatchShotIds === null || (!!writerShotId && realBatchShotIds.includes(writerShotId)))
   const imageGenerating = imageGeneration.generating || autoFillPending
   const generating = imageGenerating || videoBusy || childVideoGenerating || queuedVideo
   // 대기 vs 실작업(#e4 2026-08-12) — DB 큐(generation_jobs queued)에 앉았으면 fal 이 실제로
@@ -597,7 +600,7 @@ function ShotCell({
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 p-3 text-center">
               <ImageIcon className="size-6 text-subtle-foreground" />
               <span className="text-[11.5px] font-medium text-muted-foreground">
-                {t('Generate a Real image.')}
+                {t('Make a real image.')}
               </span>
             </div>
           )

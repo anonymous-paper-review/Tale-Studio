@@ -3182,6 +3182,7 @@ export const KO: Record<string, string> = {
   'Remakes the image for the {count} picked shots. No Takes are used.': '고른 샷 {count}개의 이미지를 다시 만들어요. Takes 는 쓰지 않아요.',
   'Replaces the current images in the picked shots.': '고른 샷의 지금 이미지가 새 이미지로 바뀌어요.',
   'Open details': '상세 열기',
+  'Make a real image.': '실사 이미지를 만들어요',
   'This is the storyboard. See every shot image per scene at a glance.\n\n· Click cards to pick shots, and the buttons at the top work on the picked shots\n· "Make images" turns the rough shots into real images, then "Make videos"\n· Press ⤢ Details on a card to open its details':
     '여기는 스토리보드예요. 씬마다 샷 그림을 한눈에 봐요.\n\n· 카드를 누르면 샷이 골라지고, 위 단추는 고른 샷에만 일해요\n· "이미지 만들기"로 러프를 실사 이미지로 바꾸고, 그다음 "영상 만들기"\n· 카드의 ⤢ 상세를 누르면 상세가 열려요',
   'This is The Set, where scenes → shots → videos connect as nodes.\n\n· Click a node to pick its shot, and press ⤢ Details to open its details\n· "Make images" at the top turns the rough shots into real images at once\n· When images are ready, "Make videos" makes the videos':

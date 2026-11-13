@@ -82,7 +82,7 @@ export async function runRealBatch(
 ): Promise<RealBatchResult> {
   const store = useDirectorCanvasStore
   if (store.getState().realBatchBusy) return { generated: 0, quotaBlocked: false }
-  store.setState({ realBatchBusy: true, realBatchRemaining: null })
+  store.setState({ realBatchBusy: true, realBatchRemaining: null, realBatchShotIds: opts?.shotIds ? [...opts.shotIds] : null })
   let generated = 0
   let quotaBlocked = false
   let lastSkipped: BatchSkipped[] = []
@@ -245,7 +245,7 @@ export async function runRealBatch(
       )
     } else console.error('[real-batch] auto batch generation failed:', e)
   } finally {
-    store.setState({ realBatchBusy: false, realBatchRemaining: null })
+    store.setState({ realBatchBusy: false, realBatchRemaining: null, realBatchShotIds: null })
   }
   return { generated, quotaBlocked }
 }

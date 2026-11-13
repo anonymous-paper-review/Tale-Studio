@@ -25,7 +25,8 @@ function idSet(key: string): ReadonlySet<string> {
 
 export function useDirectorShotStates(): Map<string, DirectorShotState> {
   const nodes = useDirectorCanvasStore((s) => s.nodes) ?? NO_NODES
-  const projectId = useDirectorCanvasStore((s) => s.projectId)
+  // 'default' 는 프로젝트를 열기 전 자리 값 — 큐를 묻지 않는다(서버가 500 을 낸다).
+  const projectId = useDirectorCanvasStore((s) => (s.projectId && s.projectId !== 'default' ? s.projectId : null))
   const queued = queuedKeys(useActiveGenerationJobs(projectId))
   const imageKey = queued.image
   const videoKey = queued.video
@@ -38,7 +39,8 @@ export function useDirectorShotStates(): Map<string, DirectorShotState> {
 /** 노드 하나(샷 노드 id)의 상태 — 그 샷과 그 샷의 Take 만 본다. 노드형 카드가 저마다 부른다. */
 export function useShotState(shotNodeId: string | null): DirectorShotState | undefined {
   const nodes = useDirectorCanvasStore((s) => s.nodes) ?? NO_NODES
-  const projectId = useDirectorCanvasStore((s) => s.projectId)
+  // 'default' 는 프로젝트를 열기 전 자리 값 — 큐를 묻지 않는다(서버가 500 을 낸다).
+  const projectId = useDirectorCanvasStore((s) => (s.projectId && s.projectId !== 'default' ? s.projectId : null))
   const queued = queuedKeys(useActiveGenerationJobs(projectId))
   const imageKey = queued.image
   const videoKey = queued.video

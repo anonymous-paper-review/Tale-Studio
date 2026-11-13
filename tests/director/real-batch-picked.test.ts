@@ -52,6 +52,16 @@ describe('고른 샷만 이미지 만들기', () => {
     expect(bodies[0]).toMatchObject({ projectId: 'p1', shotIds: ['w-a', 'w-c'] })
   })
 
+  it('고른 샷만 일괄로 만드는 동안 화면은 그 샷만 기다림으로 보고, 끝나면 잊는다', async () => {
+    // 왜: 고르지 않은 빈 샷까지 "이미지 생성 대기 중"으로 보이면 고른 샷에만 일한다는 말과 어긋난다.
+    let done = false
+    const result = runRealBatch('p1', { shotIds: ['w-a'] }).finally(() => { done = true })
+    expect(useDirectorCanvasStore.getState().realBatchShotIds).toEqual(['w-a'])
+    for (let i = 0; i < 200 && !done; i++) await vi.advanceTimersByTimeAsync(1000)
+    await result
+    expect(useDirectorCanvasStore.getState().realBatchShotIds).toBeNull()
+  })
+
   it('서버 일괄은 고른 샷이 오면 그 샷만 고른다', () => {
     // 왜: 화면이 센 샷과 실제로 그리는 샷이 같아야 한다.
     const route = readFileSync('src/app/api/director/generate-storyboard-batch/route.ts', 'utf8')

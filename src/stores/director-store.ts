@@ -1107,6 +1107,8 @@ interface DirectorCanvasState {
    *  "fal 에 들어간 것만"이 아니라 배치 전체 작업량을 분모로 보여주기 위한 화면 파생값
    *  (DB 에 저장하지 않는다, architecture §0). null = 배치 비활성 또는 아직 1라운드 응답 전. */
   realBatchRemaining: number | null
+  /** 지금 도는 일괄이 맡은 Writer 샷 id(고른 샷만 만들 때, 시안 D2). null = 빈 샷 전부(예전과 같음). 저장하지 않는다. */
+  realBatchShotIds: string[] | null
   /** Explicit full-video batch progress. Ephemeral UI state; never persisted. */
   videoBatchBusy: boolean
   videoBatchProgress: { done: number; total: number; failed: number } | null
@@ -1652,6 +1654,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       sceneLedgers: {},
       realBatchBusy: false,
       realBatchRemaining: null,
+      realBatchShotIds: null,
       videoBatchBusy: false,
       videoBatchProgress: null,
       videoBatchQueue: null,
