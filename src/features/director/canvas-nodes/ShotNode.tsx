@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useState } from 'react'
+import { memo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { mediaFrameStyle } from '@/lib/project-aspect'
 import { useProjectFormatStore } from '@/stores/project-format-store'
@@ -66,6 +66,9 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   // 가지 내기(새 영상 노드 → 바로 생성)도 Take 를 쓴다 — 잔액을 못 읽으면 시작하지 않고 노드 안에 까닭(리드 11/14).
   const takeBalance = useTakeBalance()
   const [takesUnknown, setTakesUnknown] = useState(false)
+  // 잔액을 다시 읽는 동안 가지 단추를 끈다 — 두 번 눌러 새 Take 가 두 번 나가지 않게(검토 b 낮음 2). ref 는 빠른 두 번 불림을 막는다.
+  const [branchReading, setBranchReading] = useState(false)
+  const branchReadingRef = useRef(false)
   // (#e3 2026-08-03) 와이어링된 Prompt 칩은 hover 오버레이 제거와 함께 표시처를 잃었다 —
   //   프롬프트·모델 정보는 카드 본문과 편집 팝업이 담당한다.
 
@@ -144,15 +147,22 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         inert={drawing}
         stateFrame={shotStateNow ? shotStateTone(shotStateNow).frame : null}
         dimmed={dimmedByStatusFilter(shotStateNow, statusFilter)}
-        canBranch={!videoQueued}
+        canBranch={!videoQueued && !branchReading}
         onBranch={async () => {
-          if (videoQueued) return
-          if (!(await takesReadable())) {
-            setTakesUnknown(true)
-            return
+          if (videoQueued || branchReadingRef.current) return
+          branchReadingRef.current = true
+          setBranchReading(true)
+          try {
+            if (!(await takesReadable())) {
+              setTakesUnknown(true)
+              return
+            }
+            setTakesUnknown(false)
+            void generateVideoForShot(id)
+          } finally {
+            branchReadingRef.current = false
+            setBranchReading(false)
           }
-          setTakesUnknown(false)
-          void generateVideoForShot(id)
         }}
       >
         {/* 입력 핸들(#handle-visibility) — 항상 보이는 라벨 홈들. v3 D1: 제목 줄 아래 20px 간격 · 한국어 라벨. */}

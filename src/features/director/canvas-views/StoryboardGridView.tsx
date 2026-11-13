@@ -262,6 +262,8 @@ function ShotCell({
   const shotType = useWriterStore((s) => (writerShotId ? s.shots.find((x) => x.shotId === writerShotId)?.shotType ?? null : null))
   // 영상 생성(이미지→영상 체인 포함) 진행 플래그 — 버튼 잠금 + 오버레이(#e12)
   const [videoBusy, setVideoBusy] = useState(false)
+  // 같은 화면에서 빠르게 두 번 불려도 한 번만 시작한다(videoBusy 는 다음 그리기에야 보인다, 검토 b 낮음 2).
+  const videoStartingRef = useRef(false)
   const [videoError, setVideoError] = useState<string | null>(null)
   // 재생성 확인 팝업(#regen-confirm) / Previz 편집 팝업(#e6)
   const [confirm, setConfirm] = useState<null | 'image' | 'video' | 'previz' | 'manual-retry'>(null)
@@ -384,19 +386,21 @@ function ShotCell({
   }
   // 영상 생성(#e12): 이미지가 없으면 먼저 생성하고, 성공했을 때만 영상으로 이어간다.
   const runVideo = async () => {
-    if (videoBusy) return
+    if (videoBusy || videoStartingRef.current) return
     if (realBatchBusy) {
       setVideoError(t('Batch live-action generation is running. Try again after it finishes.'))
       return
     }
-    // Take 를 쓰니 잔액을 다시 읽고, 못 읽으면 시작하지 않고 카드 안에 까닭(리드 11/14, D8 과 같은 말).
-    if (!(await takesReadable())) {
-      setVideoError(t(TAKES_UNKNOWN_TEXT))
-      return
-    }
+    // 잔액을 다시 읽는 동안에도 단추를 끈다 — 두 번 눌러 Take 가 두 번 나가지 않게(검토 b 낮음 2).
+    videoStartingRef.current = true
     setVideoBusy(true)
     setVideoError(null)
     try {
+      // Take 를 쓰니 잔액을 다시 읽고, 못 읽으면 시작하지 않고 카드 안에 까닭(리드 11/14, D8 과 같은 말).
+      if (!(await takesReadable())) {
+        setVideoError(t(TAKES_UNKNOWN_TEXT))
+        return
+      }
       if (!hasImage) {
         await useDirectorCanvasStore.getState().hydrateFreshFromDb().catch(() => {})
         // Director 배선 5: 로컬이 낡았을 수 있다 — DB 를 먼저 다시 읽고, 그래도 없을 때만 이미지를 새로 만든다(승인한 그림 보호).
@@ -413,6 +417,7 @@ function ShotCell({
     } catch (error) {
       setVideoError(error instanceof Error ? error.message : t('Failed to generate video.'))
     } finally {
+      videoStartingRef.current = false
       setVideoBusy(false)
     }
   }

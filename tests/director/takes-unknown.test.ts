@@ -56,7 +56,8 @@ describe('카드 · 노드의 영상 단추', () => {
   it('샷 노드에서 영상 노드를 새로 내어 바로 만들 때도 잔액을 다시 읽어, 못 읽으면 시작하지 않고 노드 안에 까닭을 보인다', () => {
     // 왜: 가지 내기도 바로 Take 를 쓰는 길이다.
     const shot = read('src/features/director/canvas-nodes/ShotNode.tsx')
-    expect(shot).toMatch(/onBranch=\{async \(\) => \{\s*if \(videoQueued\) return\s*if \(!\(await takesReadable\(\)\)\) \{\s*setTakesUnknown\(true\)\s*return\s*\}/)
+    // 읽는 동안 두 번 불림 막이(takes-reread-guard.test.ts)가 앞에 붙어도 같은 약속: 다시 읽고, 못 읽으면 까닭만 보이고 시작하지 않는다.
+    expect(shot).toMatch(/onBranch=\{async \(\) => \{\s*if \(videoQueued[^\n]*\) return[\s\S]*?if \(!\(await takesReadable\(\)\)\) \{\s*setTakesUnknown\(true\)\s*return\s*\}/)
     expect(shot).toContain('{takesUnknown && takeBalance.failed && (')
   })
 
