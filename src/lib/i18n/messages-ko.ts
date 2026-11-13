@@ -3,6 +3,47 @@
 //   번역 공백이 깨진 화면이 아니라 영어 화면이 된다. 파이프라인 산출물·유저 콘텐츠는
 //   이 사전과 무관(프로젝트 locale 이 지배), 마케팅 페이지는 영어 고정이라 사전을 안 탄다.
 export const KO: Record<string, string> = {
+  // Director 샷 상세(디자이너 11/13 시안 D6 · D7, 오너 2026-11-14) — 이미지 · 영상 탭, 시작 · 끝 나란히, 설정 한 화면, Take 쌓기
+  'Video · none': '영상 · 없음',
+  'Start image': '시작 이미지',
+  'End image': '끝 이미지',
+  'Start and end images are remade together for now.': '지금은 시작 · 끝 이미지를 함께 다시 만들어요.',
+  'What to change': '바꾸고 싶은 점',
+  'Leave it empty to remake with the settings below': '비워 두면 아래 설정 그대로 다시 만들어요',
+  'Write only what you want to change in the picture. The rest stays as it is (e.g. show the umbrella handle, keep the face).':
+    '고른 이미지에서 바꾸고 싶은 것만 적어요 · 나머지는 그대로 (예: 우산 손잡이가 보이게, 얼굴은 그대로)',
+  'Image model': '이미지 모델',
+  'Aspect ratio': '비율',
+  Count: '개수',
+  'People ({count}/{total})': '등장인물 ({count}/{total})',
+  'Places ({count}/{total})': '장소 ({count}/{total})',
+  'Remake start and end images · Takes 0': '시작·끝 이미지 다시 만들기 · Takes 0',
+  'Make start and end images · Takes 0': '시작·끝 이미지 만들기 · Takes 0',
+  'Next: make the video': '다음: 영상 만들기',
+  'No video for this shot yet.': '이 샷에는 아직 영상이 없어요.',
+  'Make the video': '영상 만들기',
+  '★ Final (auto)': '★ 최종 (자동)',
+  '★ Final': '★ 최종',
+  Making: '만드는 중',
+  'Not made yet': '아직 안 만들었어요',
+  '☆ Set as final': '☆ 최종으로 고르기',
+  'Fix the image': '이미지 고치기',
+  'When the scene, people or framing are off': '장면·인물·구도가 다를 때',
+  'Write only what you want to change in the start and end images (e.g. show the umbrella handle)': '시작 · 끝 이미지에서 바꾸고 싶은 것만 적어요 (예: 우산 손잡이가 보이게)',
+  'Fix the video': '영상 고치기',
+  'When the motion, camera or length are off': '움직임·카메라·길이가 다를 때',
+  'The start and end images changed · A new Take will use them': '시작 · 끝 이미지가 바뀌었어요 · 새 Take를 만들면 반영돼요',
+  "What to change in the motion or camera · Leave it empty to keep this Take's prompt": '움직임·카메라에서 바꿀 점 · 비워 두면 이 Take 프롬프트 그대로',
+  'Video model': '영상 모델',
+  'Length: shot {shot}s → video {video}s': '길이 샷 {shot}초 → 영상 {video}초',
+  'Make the start and end images first.': '시작 · 끝 이미지를 먼저 만들어요.',
+  'A Take is being made. You can make a new one when it is done.': 'Take를 만드는 중이에요. 다 되면 새로 만들 수 있어요.',
+  'Make the video · {count} Take': '영상 만들기 · {count} Take',
+  'Make a new Take': '새 Take 만들기',
+  'Make a new Take · {count} Take': '새 Take 만들기 · {count} Take',
+  'Make a new Take with the changed image': '바뀐 이미지로 새 Take 만들기',
+  'Make a new Take with the changed image · {count} Take': '바뀐 이미지로 새 Take 만들기 · {count} Take',
+  'Delete this Take': '이 Take 삭제',
   // 새 프로젝트 · 무엇을 만들까요(2026-10-02 시안 v04 0.1)
   'Short film': '단편 영화',
   'Drama pilot': '드라마 파일럿',
@@ -1136,6 +1177,14 @@ export const KO: Record<string, string> = {
   'Collapse panel': '패널 접기',
   'Click=preview · drag/right-click=add to timeline': '클릭=미리보기 · 드래그/우클릭=타임라인 추가',
   '(Click: preview / drag·right-click: add to timeline)': '(클릭: 미리보기 / 드래그·우클릭: 타임라인 추가)',
+  // 오너 답 8(2026-11-14): 영상 없는 샷 카드는 타임라인에 넣지 못한다.
+  '(No video yet. Only shots with video go into the timeline.)': '(아직 영상이 없어요. 영상이 있는 샷만 타임라인에 들어가요.)',
+  // 검토 c(2026-11-14): 열 때 영상 자리가 저절로 바뀌었으면 한 번 알린다.
+  'Shots without video ({count}) were taken out, so the cuts and sounds after them moved.': '영상 없는 샷 {count}개가 빠져 뒤 컷과 소리를 옮겼어요.',
+  // 재검토 c 2/2: 들어온 샷에는 저장 뒤 Writer 에서 새로 생긴 샷도 있다 — "영상이 생긴 샷"이 아니라 들어온 사실대로.
+  'New shots ({count}) came in, so the cuts and sounds after them moved.': '샷 {count}개가 새로 들어와 뒤 컷과 소리를 옮겼어요.',
+  'Shots without video ({removed}) were taken out and new shots ({added}) came in, so the cuts and sounds after them moved.':
+    '영상 없는 샷 {removed}개가 빠지고 샷 {added}개가 새로 들어와 뒤 컷과 소리를 옮겼어요.',
   Preview: '미리보기',
   'Add to timeline': '타임라인 추가',
   'No clips generated yet': '생성된 클립이 없습니다',
@@ -1177,6 +1226,9 @@ export const KO: Record<string, string> = {
     '편집 내용을 서버에 저장할 수 없어요. 프로젝트가 삭제됐거나 세션이 만료됐을 수 있어요. 새로고침하면 최근 프로젝트로 복원돼요.',
   "Couldn't save your edits in this browser. Browser storage may be full.":
     '이 브라우저에 편집 내용을 저장하지 못했어요. 브라우저 저장 공간이 꽉 찼을 수 있어요.',
+  // E2b(2026-11-14, 검토 c 낮음 3): 서버 편집을 읽지 못하고 연 화면이 서버에 쓰기 전에 다시 읽었더니 다른 브라우저 편집이 있었을 때.
+  "There are edits saved in another browser. Changes you make here won't be saved to the server.":
+    '다른 브라우저에서 저장한 편집이 있어요. 여기서 고친 것은 서버에 저장되지 않아요.',
 
   // ── misc: card-mention.ts (direct) ──
   Person: '인물',
@@ -1800,7 +1852,8 @@ export const KO: Record<string, string> = {
   'Go to Director': 'Director로 이동',
 
   // ── Editor: 타이틀 카드(#owner-title-card) — 검은 배경 + 텍스트(+선택 이미지) synthetic 클립 ──
-  'Title Card': '타이틀 카드',
+  // 검토 c(2026-11-14): 영어는 문장 첫 글자만 대문자 — 꼬리표 · 메뉴 머리 · 단추가 같은 낱말.
+  'Title card': '타이틀 카드',
   'Insert a black title card with text at the nearest clip boundary':
     '가장 가까운 클립 경계에 검은 배경의 타이틀 카드를 넣어요',
   'Title text': '타이틀 텍스트',
@@ -1883,7 +1936,8 @@ export const KO: Record<string, string> = {
   // 약속 F(2026-09-04): 선 지우기
   'Delete connection': '연결 지우기',
   // 약속 H(2026-09-04): 카드 상태 글자
-  'Take {n}': '테이크 {n}',
+  // 디자이너 11/13 시안(D7 · D8)은 한국어 화면에서도 "Take 2"로 적는다.
+  'Take {n}': 'Take {n}',
   // 약속 I(2026-09-04): 러프 3장 개별 재생성
   'Start frame': '시작',
   'Directing frame': '연출',
@@ -1911,6 +1965,7 @@ export const KO: Record<string, string> = {
   'Image in front': '이미지를 앞으로',
   'Reset layout': '배치 되돌리기',
   'Title card length (seconds)': '타이틀 카드 길이(초)',
+  'GIF images can be up to 4MB.': 'GIF 그림은 4MB까지 올릴 수 있어요.',
   // 약속 K(2026-09-04): 자막
   'Subtitle': '자막',
   'Click to add a subtitle': '누르면 자막을 넣어요',
@@ -3234,4 +3289,47 @@ export const KO: Record<string, string> = {
     '여기는 스토리보드예요. 씬마다 샷 그림을 한눈에 봐요.\n\n· 카드를 누르면 샷이 골라지고, 위 단추는 고른 샷에만 일해요\n· "이미지 만들기"로 러프를 실사 이미지로 바꾸고, 그다음 "영상 만들기"\n· 카드의 ⤢ 상세를 누르면 상세가 열려요',
   'This is The Set, where scenes → shots → videos connect as nodes.\n\n· Click a node to pick its shot, and press ⤢ Details to open its details\n· "Make images" at the top turns the rough shots into real images at once\n· When images are ready, "Make videos" makes the videos':
     '여기는 The Set, 촬영장이에요. 씬 → 샷 → 영상이 노드로 이어져 있어요.\n\n· 노드를 누르면 그 샷이 골라지고, ⤢ 상세를 누르면 상세가 열려요\n· 위 "이미지 만들기"로 러프를 한 번에 실사 이미지로 바꿔요\n· 이미지가 되면 "영상 만들기"로 영상을 만들어요',
+  // Director → Editor 넘기기 창(D8, 2026-11-14 디자이너 1110 확정 · 오너 답 8번)
+  '{done}/{total} videos · {seconds}s · Shots without video do not go into the timeline as empty slots.': '영상 {done}/{total} · {seconds}초 · 영상이 없는 샷은 타임라인에 빈 칸으로 들어가지 않아요.',
+  '{label} · No video': '{label} · 영상 없음',
+  '{label} · {seconds}s': '{label} · {seconds}초',
+  'Take {number} · Final': 'Take {number} · 최종',
+  'Take {number} · Auto (latest finished)': 'Take {number} · 자동 (가장 최근 완성)',
+  // 빼고 넘긴 샷은 나중에 영상이 생기면 다음에 Editor 를 열 때 이야기 순서 자리에 저절로 들어간다(export 갈래 확인 2026-11-14).
+  'Failed while making · If you leave it out, it joins Editor on its own once its video is made': '만들다 실패했어요 · 빼고 넘겨도 나중에 영상이 생기면 Editor에 저절로 들어와요',
+  'Making it now · You can hand it over from this window once it is done': '만드는 중이에요 · 끝나면 이 창에서 바로 넘길 수 있어요',
+  'Not made yet · If you leave it out, it joins Editor on its own once its video is made': '아직 만들지 않았어요 · 빼고 넘겨도 나중에 영상이 생기면 Editor에 저절로 들어와요',
+  // 값은 앱의 Take 표기("5 Take")로 — "Take 5"는 바로 위 줄의 "Take 2 · 자동"과 겹쳐 Take 번호처럼 읽혔다(검토 b 낮음 4).
+  'Make video · {takes} Takes': '영상 만들기 · {takes} Take',
+  'Make again · {takes} Takes': '다시 만들기 · {takes} Take',
+  // Take 과금이 꺼져 있으면 값 없이(낮음 5) · 이미지 · 영상 일괄 중이면 단추를 끄고 까닭(낮음 1) · 빠질 샷이 없으면 넘기기 단추(낮음 3)
+  'Make video': '영상 만들기',
+  'Making images': '이미지 만드는 중',
+  'Hand over to Editor · {cuts} cuts · {seconds}s': 'Editor로 넘기기 · 컷 {cuts} · {seconds}초',
+  'Go back': '돌아가기',
+  'No video to hand over yet.': '넘길 영상이 아직 없어요.',
+  'Hand over without {label} · {cuts} cuts · {seconds}s': '{label} 빼고 넘기기 · 컷 {cuts} · {seconds}초',
+  'Hand over without {count} shots · {cuts} cuts · {seconds}s': '영상 없는 샷 {count}개 빼고 넘기기 · 컷 {cuts} · {seconds}초',
+  'Some shots have no video yet. Check the list in the window, then hand over the shots with video or make the rest again first.': '아직 영상이 없는 샷이 있어요. 창에서 목록을 보고 영상 있는 샷만 넘기거나, 나머지를 먼저 다시 만들어 주세요.',
+  // Storyboard → Director 넘기기 창(D0, 2026-11-14 디자이너 1110 확정 · 페이지 추천)
+  'Move on to Director?': 'Director로 넘어갈까요?',
+  'We start by turning the {count} roughs into real images.': '러프 {count}장을 실사 이미지로 바꾸는 것부터 시작해요.',
+  'Shots {shots} · {seconds}s · Characters {characters} · Backgrounds {backgrounds} · Roughs {roughs}': '샷 {shots} · {seconds}초 · 인물 {characters} · 배경 {backgrounds} · 러프 {roughs}장',
+  'Rough → {count} real images · about {minutes} min · No Takes used': '러프 → 실사 이미지 {count}장 · 약 {minutes}분 · Takes 안 써요',
+  'The real images are already made': '실사 이미지는 이미 다 있어요',
+  'After that': '그다음',
+  'Check the images and make the videos · {takes} Takes per shot': '이미지를 확인하고 영상을 만들어요 · 샷마다 Takes {takes}',
+  // 저장된 실사를 읽는 중 · 읽기 실패(검토 b 낮음 7), Take 과금이 꺼져 있을 때(낮음 5)
+  'Rough → real images · counting': '러프 → 실사 이미지 · 세는 중',
+  'Rough → up to {count} real images · about {minutes} min · No Takes used': '러프 → 실사 이미지 최대 {count}장 · 약 {minutes}분 · Takes 안 써요',
+  'Rough → up to {count} real images · about {minutes} min': '러프 → 실사 이미지 최대 {count}장 · 약 {minutes}분',
+  'Rough → {count} real images · about {minutes} min': '러프 → 실사 이미지 {count}장 · 약 {minutes}분',
+  'Make images while moving over': '넘어가면서 이미지 만들기',
+  'Make up to {count} images while moving over': '넘어가면서 이미지 최대 {count}장 만들기',
+  'Check the images and make the videos': '이미지를 확인하고 영상을 만들어요',
+  'Make {count} images while moving over': '넘어가면서 이미지 {count}장 만들기',
+  'You can look at other screens while you wait. We show the first ones as soon as they are ready and tell you when they are all done.': '기다리는 동안 다른 화면을 봐도 돼요. 첫 장이 나오면 먼저 보여드리고, 다 되면 알려드려요.',
+  'Move over and pick yourself': '넘어가서 직접 고르기',
+  'Choose the shots to make and make them one by one.': '만들 샷을 골라 하나씩 만들어요.',
+  'Move over': '넘어가기',
 }

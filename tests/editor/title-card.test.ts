@@ -13,6 +13,8 @@ import {
   layoutTitleText,
   resolveTitleCardLayout,
 } from '@/lib/editor/title-card'
+import { clipMenuTitle } from '@/features/editor/editor-labels'
+import { translate } from '@/lib/i18n/translate'
 
 const ROOT = process.cwd()
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
@@ -143,5 +145,26 @@ describe('약속 J — 검은 화면 클립', () => {
     expect(stage).toMatch(/setOrder\('text-over-image'\)/)
     expect(stage).toMatch(/setOrder\('image-over-text'\)/)
     expect(stage).toMatch(/<ContextMenuContent/)
+  })
+})
+
+describe('타이틀 카드 메뉴 머리', () => {
+  it('타이틀 카드를 오른쪽 클릭하면 메뉴 머리에 샷 종류 "WS" 대신 "타이틀 카드 · 5.0s"가 보인다', () => {
+    // 왜: 타이틀 카드는 샷이 아닌데 만들 때 붙인 샷 종류 "WS"가 메뉴 머리에 보였다(디자이너 실제 화면 확인 N 353:351, 2026-11-09).
+    const ko = (text: string, params?: Record<string, string | number>) => translate('ko', text, params)
+    expect(clipMenuTitle({ isTitleCard: true, shotType: 'WS', durationSec: 5 }, ko)).toBe('타이틀 카드 · 5.0s')
+    // 샷은 지금처럼 샷 종류 · 길이다.
+    expect(clipMenuTitle({ isTitleCard: false, shotType: 'MS', durationSec: 4 }, ko)).toBe('MS · 4.0s')
+    // 화면: 타임라인 클립 메뉴 머리가 이 글을 쓴다.
+    expect(read('src/features/editor/timeline.tsx')).toMatch(/clipMenuTitle\(\{ isTitleCard: isTitleCardShotId\(item\.shotId\)/)
+  })
+
+  it('타임라인 클립 꼬리표와 오른쪽 클릭 메뉴 머리가 타이틀 카드를 같은 낱말로 부른다', () => {
+    // 왜: 검토 c — 같은 클립을 꼬리표는 "타이틀 · 5.0s", 메뉴 머리는 "타이틀 카드 · 5.0s"로 불렀다. 영어는 문장 첫 글자만 대문자("Title card").
+    const timeline = read('src/features/editor/timeline.tsx')
+    expect(timeline).not.toMatch(/\$\{t\('Title'\)\} · /)
+    expect(timeline.match(/clipMenuTitle\(/g)?.length ?? 0).toBeGreaterThanOrEqual(2)
+    expect(clipMenuTitle({ isTitleCard: true, shotType: 'WS', durationSec: 5 }, (text) => text)).toBe('Title card · 5.0s')
+    expect(read('src/app/studio/editor/page.tsx')).toMatch(/t\('Title card'\)/)
   })
 })

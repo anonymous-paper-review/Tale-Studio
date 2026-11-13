@@ -17,13 +17,14 @@ export async function GET(req: Request) {
 
     const { data, error } = await supabaseAdmin
       .from('editor_states')
-      .select('state')
+      .select('state, updated_at')
       .eq('project_id', projectId)
       .maybeSingle()
 
     if (error) throw error
 
-    return NextResponse.json({ state: data?.state ?? null })
+    // 저장 시각도 돌려준다 — 화면이 이 브라우저가 마지막으로 본 시각과 견줘 다른 곳에서 더 나중에 고쳤는지 안다(E2b, 2026-11-14).
+    return NextResponse.json({ state: data?.state ?? null, updatedAt: data?.updated_at ?? null })
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : 'Unknown error'
     console.error('[editor/state GET]', errMsg)
@@ -43,12 +44,15 @@ export async function PUT(req: Request) {
     const access = await requireProjectAccess(req, projectId)
     if (!access.ok) return access.response
 
-    const { error } = await supabaseAdmin
+    const updatedAt = new Date().toISOString()
+    const { data, error } = await supabaseAdmin
       .from('editor_states')
       .upsert(
-        { project_id: projectId, state, updated_at: new Date().toISOString() },
+        { project_id: projectId, state, updated_at: updatedAt },
         { onConflict: 'project_id' }
       )
+      .select('updated_at')
+      .maybeSingle()
 
     if (error) {
       // FK 위반(23503) = 프로젝트가 삭제된 뒤에도 열린 에디터가 자동저장을 계속 쏘는 경우 —
@@ -62,7 +66,8 @@ export async function PUT(req: Request) {
       throw error
     }
 
-    return NextResponse.json({ ok: true })
+    // 서버가 실제로 적은 저장 시각 — 화면이 이 브라우저에 적어 두고 다음에 열 때 견준다(E2b, 2026-11-14).
+    return NextResponse.json({ ok: true, updatedAt: (data as { updated_at?: string } | null)?.updated_at ?? updatedAt })
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : 'Unknown error'
     console.error('[editor/state PUT]', errMsg)

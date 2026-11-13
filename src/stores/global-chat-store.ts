@@ -41,6 +41,9 @@ import {
 } from '@/stores/director-store'
 import { isShotData, isVideoData } from '@/types/director'
 import { directorHasFinishedVideo } from '@/lib/director/shot-state'
+import { editorHandoverView } from '@/lib/director/editor-handover'
+import { latestShotTake } from '@/lib/director/remake-take'
+import { clearImagesOnDirectorEntry } from '@/lib/director/entry-images-intent'
 import { useWriterStore, type WriterChatUpdate } from '@/stores/writer-store'
 import {
   buildScriptLines,
@@ -244,6 +247,12 @@ interface GlobalChatState {
   confirmProducerLock: () => Promise<void>
   /** Director 준비 창의 "그래도 진행" — 준비가 덜 된 샷이 있어도 Director 로 넘긴다. */
   proceedToDirectorAnyway: () => Promise<void>
+  /** Editor 넘기기 창(D8)의 [○ 빼고 넘기기] — 영상 있는 샷만 Editor 로 넘긴다(Editor 는 영상 있는 샷만 컷으로 만든다).
+   *  창 없이도 부른다(Storyboard 카드의 [빼고 Editor로]). */
+  proceedToEditorWithVideos: () => Promise<void>
+  /** Editor 넘기기 창(D8)의 [다시 만들기] — 그 샷의 영상을 만들기 시작하고 창은 그대로 둔다(이미지가 없으면 이미지부터).
+   *  창 없이도 부른다(Storyboard 카드의 [다시 만들기]). */
+  remakeMissingVideo: (shotNodeId: string) => Promise<void>
   /** 확인 창 닫기("더 고칠게요"·"채우러 가기") — 아무것도 넘기지 않는다. */
   closeHandoffConfirm: () => void
   /** 씬 스토리 확정(2026-10-01 오너 — 확정 단계는 Producer 메인). 성공하면 나머지 생성이 이어지고 Writer 화면으로 간다.
@@ -274,7 +283,8 @@ interface GlobalChatState {
     /** consentedHandoff: 명시적 핸드오프 버튼("Writer 호출하기")에서 온 호출 — 버튼이 곳 동의라
      *  승인 카드를 다시 띄우지 않고 바로 실행한다(D12, 2026-08-31 오너). */
     /** acceptIncomplete: Director 준비 창에서 "그래도 진행"을 고른 넘김 — 준비가 덜 된 샷이 있어도 막지 않는다(Writer 미완료는 그대로 막는다). */
-    opts?: { consentedHandoff?: boolean; stageOverride?: StageId; silentUser?: boolean; cardFill?: CardFill; acceptIncomplete?: boolean; answeringProducerQuestion?: boolean },
+    /** acceptMissingVideos: Editor 넘기기 창(D8)을 지난 넘김 — 영상 없는 샷이 있어도 창을 다시 열지 않는다. */
+    opts?: { consentedHandoff?: boolean; stageOverride?: StageId; silentUser?: boolean; cardFill?: CardFill; acceptIncomplete?: boolean; acceptMissingVideos?: boolean; answeringProducerQuestion?: boolean },
   ) => Promise<void>
   /** 진행 중인 LLM 응답 중단 (#oiioii-chat) — Stop 버튼. 대기 중이 아니면 no-op. */
   stopGeneration: () => void
@@ -1343,6 +1353,14 @@ const settledUnchangedProposals = new Set<string>()
 export type HandoffConfirm =
   | { kind: 'producerLock'; projectId: string; proposalId?: string }
   | { kind: 'directorReadiness'; projectId: string; report: DirectorReadinessReport; gateGaps: string[]; via: 'button' | 'chat' }
+  // Editor 넘기기 창(D8) — 샷 목록은 창이 Director 캔버스에서 그때그때 읽는다(다시 만들기로 바뀌는 상태를 따라가게).
+  | { kind: 'editorMissingVideos'; projectId: string; via: 'button' | 'chat' }
+
+/** Director 의 영상 없는 샷(D8) — 보드 순서 · 이름은 Director 화면과 같은 셈(boardNodeNames). */
+function directorMissingVideos() {
+  const writer = useWriterStore.getState()
+  return editorHandoverView(useDirectorCanvasStore.getState().nodes, boardNodeNames(writer.sceneManifest, writer.shots ?? [])).missing
+}
 
 /** Director 게이트 막힘 중 Writer 쪽(씬·샷 미완성) — "그래도 진행"으로도 넘기지 않는다. 나머지(Artist 이미지)는 창에서 고른다. */
 function writerSideBlockers(): string[] {
@@ -1844,8 +1862,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       await get().sendMessage(utterance, undefined, { consentedHandoff: true, acceptIncomplete: true })
       return
     }
-    // Writer→Artist · Director→Editor 는 창 없이 바로(2026-10-01 오너 "그 2구간은 일단 없이").
-    await get().sendMessage(utterance, undefined, { consentedHandoff: true })
+    // Director→Editor: 영상 없는 샷이 있을 때만 넘기기 창(D8, 오너 2026-11-14 답 8번 · 페이지 추천) — 다 있으면 지금처럼 바로(10/1).
+    //   완성 영상이 하나도 없으면 창을 열지 않는다 — 넘김 게이트(handoffBlockers)가 "완성된 영상이 하나 있으면…"으로 먼저 막는다(set 검토 a 낮음 7).
+    if (action.from === 'director' && directorHasFinishedVideo(useDirectorCanvasStore.getState().nodes) && directorMissingVideos().length > 0) {
+      set({ handoffConfirm: { kind: 'editorMissingVideos', projectId, via: 'button' } })
+      return
+    }
+    // Writer→Artist · Director→Editor(영상이 다 있음)는 창 없이 바로(2026-10-01 오너 "그 2구간은 일단 없이").
+    await get().sendMessage(utterance, undefined, { consentedHandoff: true, ...(action.from === 'director' ? { acceptMissingVideos: true } : {}) })
   },
 
   openProducerLock: (proposalId) => {
@@ -1885,6 +1909,46 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       silentUser: confirm.via === 'chat',
       stageOverride: 'artist',
     })
+  },
+
+  proceedToEditorWithVideos: async () => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) return
+    // 창 없이도 부른다 — Storyboard 카드(board 갈래)의 [빼고 Editor로](2026-11-14). 창이 열려 있으면 그 창의 프로젝트일 때만.
+    const confirm = get().handoffConfirm
+    const fromWindow = confirm?.kind === 'editorMissingVideos' ? confirm : null
+    if (fromWindow && fromWindow.projectId !== projectId) return
+    if (fromWindow) set({ handoffConfirm: null })
+    await get().sendMessage(translate(useLocaleStore.getState().locale, 'Please hand over to Editor'), undefined, {
+      consentedHandoff: true,
+      acceptMissingVideos: true,
+      // 채팅에서 연 창이면 사용자의 넘김 말이 이미 스레드에 있다 — 다시 남기지 않는다.
+      silentUser: fromWindow?.via === 'chat',
+      stageOverride: 'director',
+    })
+  },
+
+  remakeMissingVideo: async (shotNodeId) => {
+    // 창 없이도 부른다 — Storyboard 카드(board 갈래)의 [다시 만들기](2026-11-14). 창이 열려 있으면 그대로 둔다.
+    // 일괄이 도는 중이면 창이 단추를 끄고 까닭을 보인다(검토 b 낮음 1) — 여기서도 말없이 Take 를 만들지 않는다.
+    if (useDirectorCanvasStore.getState().realBatchBusy || useDirectorCanvasStore.getState().videoBatchBusy) return
+    // 이미지가 없으면 영상이 이미지 없이(T2V) 만들어진다 — 그리드의 [영상 만들기]처럼 이미지부터 만든다(Director 배선 5).
+    const hasImage = () => {
+      const node = useDirectorCanvasStore.getState().nodes.find((n) => n.id === shotNodeId)
+      return !!node && isShotData(node.data) && node.data.storyboardImage?.status === 'completed'
+    }
+    if (!hasImage()) {
+      // 화면이 낡았을 수 있다 — 저장된 그림을 먼저 다시 읽고, 그래도 없을 때만 새로 그린다(승인한 그림 보호, 그리드와 같다 · 낮음 2).
+      await useDirectorCanvasStore.getState().hydrateFreshFromDb().catch(() => {})
+      if (!hasImage()) {
+        await useDirectorCanvasStore.getState().generateStoryboardImage(shotNodeId)
+        if (!hasImage()) return
+      }
+    }
+    // 단추 값을 센 그 Take(latestShotTake)의 배선 · 모델 · 해상도를 물려받는 새 Take(검토 b 보통 2) — prose 의 remakeShotVideo 와
+    //   같은 식이다. 두 갈래를 합친 뒤에는 remakeShotVideo(shotNodeId) 하나로 부르면 된다.
+    const latest = latestShotTake(useDirectorCanvasStore.getState().nodes, shotNodeId)
+    await useDirectorCanvasStore.getState().generateVideoForShot(shotNodeId, latest ? { inheritFromVideoNodeId: latest.id } : undefined)
   },
 
   closeHandoffConfirm: () => set({ handoffConfirm: null }),
@@ -2344,6 +2408,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
 
     if (get().directorHandoff && isCancellationUtterance(trimmed)) {
       set({ directorHandoff: null, pendingNavigatePath: null })
+      // 넘김을 거두면 넘어가면서 이미지 만들기(D0)도 거둔다 — 남으면 10분 안 다른 길의 Director 진입에서 일괄이 시작된다(검토 b 낮음 6).
+      clearImagesOnDirectorEntry()
       get().appendLocalExchange(stage, trimmed, translate(contentLocale(), 'Cancelled the pending stage move. Your saved work is unchanged.'))
       return
     }
@@ -2677,6 +2743,20 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           return
         }
         acceptIncomplete = true
+      }
+
+      // Editor 넘기기 창(D8) — 채팅으로 넘겨 달라고 해도 영상 없는 샷이 있으면 같은 창을 연다(다음 단계 버튼과 같은 판단).
+      //   완성 영상이 하나도 없으면 창 대신 아래 넘김 게이트가 먼저 막는다(set 검토 a 낮음 7 — 빼고 넘길 영상이 없다).
+      if (handoffSpec.from === 'director' && handoffSpec.to === 'editor' && !opts?.acceptMissingVideos && projectId &&
+        directorHasFinishedVideo(useDirectorCanvasStore.getState().nodes) && directorMissingVideos().length > 0) {
+        const notice = translate(contentLocale(), 'Some shots have no video yet. Check the list in the window, then hand over the shots with video or make the rest again first.')
+        set((state) => ({
+          loading: false,
+          handoffConfirm: { kind: 'editorMissingVideos', projectId, via: 'chat' },
+          messages: [...state.messages, { id: makeId(), stage, role: 'model' as const, content: notice }],
+        }))
+        saveChatMessage(projectId, stage, 'model', notice)
+        return
       }
 
       const { hard, soft } = handoffBlockers(handoffSpec, { acceptIncomplete })

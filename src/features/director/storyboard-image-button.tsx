@@ -11,10 +11,14 @@ import type { ShotNodeData } from '@/types/director'
 import { checkStoryboardImageStatus, useStoryboardImageGeneration } from './hooks/use-storyboard-image-generation'
 import { RegenerateConfirmDialog } from './regenerate-confirm-dialog'
 
-export function StoryboardImageButton({ nodeId, data, className }: {
+export function StoryboardImageButton({ nodeId, data, className, idleLabel, changeNote = '' }: {
   nodeId: string
   data: ShotNodeData
   className?: string
+  /** 기다리는 중이 아닐 때 단추 이름(샷 상세 D6 "시작·끝 이미지 다시 만들기 · Takes 0"). 없으면 지금 이름. */
+  idleLabel?: string
+  /** 샷 상세의 "바꾸고 싶은 점" — 이번 다시 만들기에만 실어 보낸다. */
+  changeNote?: string
 }) {
   const t = useT()
   const generation = useStoryboardImageGeneration(data)
@@ -25,7 +29,7 @@ export function StoryboardImageButton({ nodeId, data, className }: {
   const run = () => {
     if (generation.disabled) return
     setConfirm(null)
-    void generateStoryboardImage(nodeId)
+    void (changeNote.trim() ? generateStoryboardImage(nodeId, { changeNote }) : generateStoryboardImage(nodeId))
   }
   return (
     <>
@@ -45,7 +49,7 @@ export function StoryboardImageButton({ nodeId, data, className }: {
         {generation.disabled && generation.phase !== 'error'
           ? <Loader2 className="size-3.5 animate-spin" />
           : <ImageIcon className="size-3.5" />}
-        {generation.label ? t(generation.label) : hasImage ? t('Regenerate image') : t('Generate image')}
+        {generation.label ? t(generation.label) : idleLabel ?? (hasImage ? t('Regenerate image') : t('Generate image'))}
       </Button>
       {generation.phase === 'error' && (
         <Button type="button" size="sm" variant="ghost" onClick={refreshGenerationQueue}>

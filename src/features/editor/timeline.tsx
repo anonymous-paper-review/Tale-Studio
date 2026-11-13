@@ -24,6 +24,7 @@ import {
   ContextMenuRadioItem,
 } from '@/components/ui/context-menu'
 import { TimelineScrollbars } from '@/features/editor/timeline-scrollbars'
+import { clipMenuTitle } from '@/features/editor/editor-labels'
 import { thumbUrl } from '@/lib/image-url'
 import { ThumbImage } from '@/components/thumb-image'
 import { useT } from '@/lib/i18n'
@@ -935,7 +936,7 @@ export function Timeline({
                             isTitleCardShotId(item.shotId) ? 'cursor-text hover:bg-accent' : 'pointer-events-none',
                           )}
                         >
-                          {isTitleCardShotId(item.shotId) ? `${t('Title')} · ${item.durationSec.toFixed(1)}s` : shot.shotType}
+                          {isTitleCardShotId(item.shotId) ? clipMenuTitle({ isTitleCard: true, shotType: shot.shotType, durationSec: item.durationSec }, t) : shot.shotType}
                           {clip?.speed && clip.speed !== 1 && <span className="ml-1 text-stage">{clip.speed.toFixed(2)}×</span>}
                         </span>
                         {/* 영상을 불러오지 못한 클립은 그 클립만 오른쪽 위에 "불러오지 못함"(QA 2026-11-03 밤). */}
@@ -1050,7 +1051,7 @@ export function Timeline({
                     </ContextMenuTrigger>
                     <ContextMenuContent className="w-44">
                       <ContextMenuLabel className="text-xs">
-                        {targets.length > 1 ? t('{count} clips', { count: targets.length }) : `${shot.shotType} · ${item.durationSec.toFixed(1)}s`}
+                        {targets.length > 1 ? t('{count} clips', { count: targets.length }) : clipMenuTitle({ isTitleCard: isTitleCardShotId(item.shotId), shotType: shot.shotType, durationSec: item.durationSec }, t)}
                       </ContextMenuLabel>
                       <ContextMenuSeparator />
                       <ContextMenuSub>
