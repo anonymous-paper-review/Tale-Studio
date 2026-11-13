@@ -60,6 +60,7 @@ import { STAGE_PERSONA } from '@/lib/lumi'
 import { useWriterStore } from '@/stores/writer-store'
 import { filterShotsByStatus, imageRemakeFailed, shotStateTone, type DirectorShotState } from '@/lib/director/shot-state'
 import { RemakeRetryButton } from '@/features/director/remake-retry-button'
+import { TAKES_UNKNOWN_TEXT, takesReadable } from '@/features/director/takes-check'
 import { useDirectorShotStates } from '@/features/director/hooks/use-shot-states'
 import { ImageFailedPanel, ImageNeededTag, PickBox, ShotPipelineRow, ShotStateTail } from '@/features/director/shot-status'
 
@@ -376,6 +377,11 @@ function ShotCell({
     if (videoBusy) return
     if (realBatchBusy) {
       setVideoError(t('Batch live-action generation is running. Try again after it finishes.'))
+      return
+    }
+    // Take 를 쓰니 잔액을 다시 읽고, 못 읽으면 시작하지 않고 카드 안에 까닭(리드 11/14, D8 과 같은 말).
+    if (!(await takesReadable())) {
+      setVideoError(t(TAKES_UNKNOWN_TEXT))
       return
     }
     setVideoBusy(true)

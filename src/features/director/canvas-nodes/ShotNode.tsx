@@ -1,6 +1,6 @@
 'use client'
 
-import { memo } from 'react'
+import { memo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { mediaFrameStyle } from '@/lib/project-aspect'
 import { useProjectFormatStore } from '@/stores/project-format-store'
@@ -30,6 +30,8 @@ import { StoryboardImageButton } from '@/features/director/storyboard-image-butt
 import { useShotStatus } from '@/features/director/hooks/use-shot-states'
 import { ShotStateTail } from '@/features/director/shot-status'
 import { RemakeRetryButton } from '@/features/director/remake-retry-button'
+import { TAKES_UNKNOWN_TEXT, takesReadable } from '@/features/director/takes-check'
+import { useTakeBalance } from '@/lib/billing/use-take-balance'
 import { dimmedByStatusFilter, shotStateTone } from '@/lib/director/shot-state'
 
 /** 노드 뷰 미디어 틀의 높이 상한 — 샷 행 간격(SHOT_OFFSET_Y 560px)의 절반 아래로 둬 아래 샷과 겹치지 않는다. */
@@ -56,6 +58,9 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const generateVideoForShot = useDirectorCanvasStore(
     (s) => s.generateVideoForShot,
   )
+  // 가지 내기(새 영상 노드 → 바로 생성)도 Take 를 쓴다 — 잔액을 못 읽으면 시작하지 않고 노드 안에 까닭(리드 11/14).
+  const takeBalance = useTakeBalance()
+  const [takesUnknown, setTakesUnknown] = useState(false)
   // (#e3 2026-08-03) 와이어링된 Prompt 칩은 hover 오버레이 제거와 함께 표시처를 잃었다 —
   //   프롬프트·모델 정보는 카드 본문과 편집 팝업이 담당한다.
 
@@ -128,8 +133,13 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         stateFrame={shotStateNow ? shotStateTone(shotStateNow).frame : null}
         dimmed={dimmedByStatusFilter(shotStateNow, statusFilter)}
         canBranch={!videoQueued}
-        onBranch={() => {
+        onBranch={async () => {
           if (videoQueued) return
+          if (!(await takesReadable())) {
+            setTakesUnknown(true)
+            return
+          }
+          setTakesUnknown(false)
           void generateVideoForShot(id)
         }}
       >
@@ -257,6 +267,9 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
               )
             }
           />
+        )}
+        {takesUnknown && takeBalance.failed && (
+          <p className="mt-1 text-[10px] text-destructive">{t(TAKES_UNKNOWN_TEXT)}</p>
         )}
       </BaseNode>
     </>

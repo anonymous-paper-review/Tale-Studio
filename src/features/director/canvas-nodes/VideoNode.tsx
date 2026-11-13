@@ -24,7 +24,8 @@ import { mediaFrameStyle } from '@/lib/project-aspect'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import { useT } from '@/lib/i18n'
 import { useTakeBalance } from '@/lib/billing/use-take-balance'
-import { takeCostForVideo } from '@/lib/billing/take-cost'
+import { takeCostForVideo, takeValuesShown } from '@/lib/billing/take-cost'
+import { TAKES_UNKNOWN_TEXT, takesReadable } from '@/features/director/takes-check'
 import { normalizeProvider } from '@/lib/video-models'
 import { useShotState } from '@/features/director/hooks/use-shot-states'
 import { dimmedByStatusFilter, takeCountsAsVideo, takeIsRunning, videoTakeFrame, videoTakeTail } from '@/lib/director/shot-state'
@@ -117,6 +118,8 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   // 해상도(오너 2026-10-31): 다음에 만들 때 고른 값 — Take 표시용. 모델이 못 내면(Kling O3 Pro) 계산기가 기본값으로 센다.
   const chosenResolution = useDirectorCanvasStore((s) => getVideoNodeResolution(s, id))
   const takeBalance = useTakeBalance()
+  // 잔액을 못 읽어 시작하지 않았다 — 노드 안에 까닭(리드 11/14). 잔액이 읽히면 저절로 사라진다.
+  const [takesUnknown, setTakesUnknown] = useState(false)
 
   // effect 입력은 early-return 전에 안전 추출 (훅은 무조건 호출돼야 함).
   const vStatus = isVideoData(data) ? data.status : null
@@ -220,8 +223,14 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             size="sm"
             className="h-7 gap-1 rounded-full px-3 text-xs"
             disabled={ownerGenerating || generating}
-            onClick={(e) => {
+            onClick={async (e) => {
               e.stopPropagation()
+              // 단추 값이 곧 동의인 자리 — 잔액을 다시 읽고, 못 읽으면 시작하지 않는다(리드 11/14).
+              if (!(await takesReadable())) {
+                setTakesUnknown(true)
+                return
+              }
+              setTakesUnknown(false)
               // #retake-inherit: 이 테이크의 체인·프레임 배선을 새 테이크가 물려받는다.
               if (parentShotId)
                 void generateVideoForShot(parentShotId, {
@@ -234,7 +243,8 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             {t('Retake video')}
           </Button>
           {/* #payments-phase-2 v4 #2: 생성 전 소모량 표시 — mode==='off'면 배지 숨김. */}
-          {takeBalance.mode !== 'off' && (
+          {/* 잔액을 못 읽었으면 값을 보이고, 과금이 정말 꺼졌을 때만 숨긴다(entry takeValuesShown, 리드 11/14). */}
+          {takeValuesShown(takeBalance) && (
             <span className="font-num text-[11px] font-medium text-muted-foreground">
               {/* 표시는 서버가 실제로 쓰는 모델 · 해상도 기준이어야 한다 — 설정에 남은 옛 모델 이름은
                   제출 전에 기본 모델로 바뀐다(video-batch-plan 의 승인 카드와 같은 계산). 1080p 는 두 배. */}
@@ -433,6 +443,9 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         </p>
       )}
       {finalError && <p className="mt-1 text-[10px] text-destructive" inert={generating}>{finalError}</p>}
+      {takesUnknown && takeBalance.failed && (
+        <p className="mt-1 text-[10px] text-destructive" inert={generating}>{t(TAKES_UNKNOWN_TEXT)}</p>
+      )}
       {data.lastAttemptError && (
         <p className="mt-1 text-[10px] text-destructive" inert={generating}>{data.lastAttemptError}</p>
       )}
