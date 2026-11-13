@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { ShotSubtitle, TitleCardData } from '@/types/shot'
 import { resolveSubtitle } from '@/lib/editor/subtitle'
-import type { Shot, VideoClip, DialogueLine, AudioTrackClip, AudioSource, ClipTransition } from '@/types'
+import type { Shot, VideoClip, DialogueLine, AudioTrackClip, AudioSource, ClipTransition, ClipMotion } from '@/types'
 import { toast } from 'sonner'
 import { useProjectStore } from '@/stores/project-store'
 import { createClient } from '@/lib/supabase/client'
@@ -237,6 +237,13 @@ interface EditorState {
   setSubtitle: (shotId: string, patch: Partial<ShotSubtitle> | null) => void
   /** 화면 전환(2026-09-08): 클립 앞 경계의 디졸브를 넣거나(길이) 뺀다(null). 되돌리기 대상. */
   setTransitionIn: (shotId: string, transition: ClipTransition | null) => void
+  /**
+   * 효과 컨트롤 모션(위치 X · Y · 비율)을 고른 클립 모두에 — 범위 안으로 맞추고, 처음 값(0 · 0 · 1)이면 칸을 지운다(2단계 ④). 끄는 동안
+   *   부르므로 되돌리기 칸은 쌓지 않는다(부르는 쪽이 끌기 시작에 한 번). 잠근 줄 · 타이틀 카드는 건너뛴다.
+   */
+  setClipMotion: (shotIds: readonly string[], patch: Partial<ClipMotion>) => void
+  /** 불투명도(0 ~ 1)를 고른 클립 모두에 — 1이면 칸을 지운다. 되돌리기는 setClipMotion 과 같다. */
+  setClipOpacity: (shotIds: readonly string[], opacity: number) => void
 
   // Video Source 패널 액션
   toggleSourcePanel: () => void
@@ -490,6 +497,37 @@ export function selectProgramLayout(input: TimelineInput & { videoTracks?: reado
     out.push({ shotId: top.shotId, trackId: top.trackId, startSec: round3(from), durationSec: round3(to - from), clipStartSec: top.startSec })
   }
   return out
+}
+
+/** 클립이 화면을 다 덮는가 — 불투명도 100% · 비율 100% 이상 · 가운데(2단계 ④). 타이틀 카드는 모션이 없어 늘 덮는다. */
+function coversFrame(clip: Pick<VideoClip, 'motion' | 'opacity'> | undefined): boolean {
+  const motion = clip?.motion
+  return (clip?.opacity ?? 1) >= 1 && (!motion || (motion.scale >= 1 && motion.x === 0 && motion.y === 0))
+}
+
+/**
+ * 시각 t 에 모니터가 겹쳐 그릴 클립 — 눈을 켠 줄마다 그 시각의 클립을 아래 줄부터(2단계 ④, 시안 E3 "배경 위에 샷"). 위에서부터 보아
+ *   화면을 다 덮는 클립(불투명도 100% · 비율 100% 이상 · 가운데)이 나오면 그 아래 줄은 그리지 않는다. 맨 끝이 selectProgramLayout 의 그
+ *   시각 클립과 같다. 약속: tests/editor/motion-opacity.test.ts
+ */
+export function selectStackAt(input: TimelineInput & { videoTracks?: readonly VideoTrackState[] }, t: number): TrackLayoutItem[] {
+  const tracks = input.videoTracks ?? DEFAULT_VIDEO_TRACKS
+  const rank = new Map(tracks.map((track, i) => [track.id, i]))
+  const hidden = new Set(tracks.filter((track) => track.hidden).map((track) => track.id))
+  const here = selectVideoLayout(input)
+    .filter((item) => !hidden.has(item.trackId) && item.durationSec > 0 && t >= item.startSec && t < item.startSec + item.durationSec)
+    .sort((a, b) => (rank.get(a.trackId) ?? 0) - (rank.get(b.trackId) ?? 0))
+  for (let i = here.length - 1; i > 0; i--) {
+    if (coversFrame(input.videoClips.find((c) => c.shotId === here[i].shotId))) return here.slice(i)
+  }
+  return here
+}
+
+/** 모션 칸 — 범위 안으로(위치 −1 ~ 1, 비율 0.1 ~ 3), 처음 값(0 · 0 · 1)이면 없앤다. */
+function cleanMotion(motion: ClipMotion): ClipMotion | undefined {
+  const clamp = (value: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Number.isFinite(value) ? value : 0))
+  const next = { x: round3(clamp(motion.x, -1, 1)), y: round3(clamp(motion.y, -1, 1)), scale: round3(clamp(motion.scale, 0.1, 3)) }
+  return next.x === 0 && next.y === 0 && next.scale === 1 ? undefined : next
 }
 
 /** 타임라인에서 클립이 차지하는 길이(초) — 트림 · 속도 · 실측 길이를 넣는다. */
@@ -1594,6 +1632,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           trimEnd: savedClip?.trimEnd,
           speed: savedClip?.speed ?? 1.0,
           transitionIn: savedClip?.transitionIn ?? null,
+          // 모션 · 불투명도(2단계 ④)도 되살린다 — 처음 값이면 칸이 없다.
+          ...(savedClip?.motion ? { motion: savedClip.motion } : {}),
+          ...(savedClip?.opacity !== undefined ? { opacity: savedClip.opacity } : {}),
         })
         canonicalShotIds.add(savedShot.shotId)
       }
@@ -1620,6 +1661,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           next = { ...next, trimStart: savedClip.trimStart, trimEnd: savedClip.trimEnd }
         }
         if (savedClip.transitionIn) next = { ...next, transitionIn: savedClip.transitionIn }
+        // 원본 클립의 모션 · 불투명도도 DB 에 없다 — 저장한 편집에서 되살린다(2단계 ④).
+        if (savedClip.motion) next = { ...next, motion: savedClip.motion }
+        if (savedClip.opacity !== undefined) next = { ...next, opacity: savedClip.opacity }
         return next
       })
       const combinedClips = restoredClips.length ? [...baseClips, ...restoredClips] : baseClips
@@ -2670,6 +2714,45 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
         future: [],
       }
+    }),
+
+  // 효과 컨트롤 모션 · 불투명도(2단계 ④, 시안 E1 409:4659–4685) — 고른 클립 모두에 같은 값. 끄는 동안 부르므로 되돌리기 칸은 쌓지 않는다.
+  //   약속: tests/editor/motion-opacity.test.ts
+  setClipMotion: (shotIds, patch) =>
+    set((state) => {
+      const targets = new Set(shotIds.filter((id) => !clipLocked(state, id) && !isTitleCardShotId(id)))
+      if (targets.size === 0) return state
+      let changed = false
+      const videoClips = state.videoClips.map((c) => {
+        if (!targets.has(c.shotId)) return c
+        const motion = cleanMotion({ ...{ x: 0, y: 0, scale: 1 }, ...c.motion, ...patch })
+        if (JSON.stringify(motion) === JSON.stringify(c.motion)) return c
+        changed = true
+        if (!motion) {
+          const { motion: _drop, ...rest } = c
+          return rest
+        }
+        return { ...c, motion }
+      })
+      return changed ? { videoClips } : state
+    }),
+
+  setClipOpacity: (shotIds, opacity) =>
+    set((state) => {
+      const targets = new Set(shotIds.filter((id) => !clipLocked(state, id) && !isTitleCardShotId(id)))
+      if (targets.size === 0) return state
+      const value = round3(Math.min(1, Math.max(0, Number.isFinite(opacity) ? opacity : 1)))
+      let changed = false
+      const videoClips = state.videoClips.map((c) => {
+        if (!targets.has(c.shotId) || (c.opacity ?? 1) === value) return c
+        changed = true
+        if (value === 1) {
+          const { opacity: _drop, ...rest } = c
+          return rest
+        }
+        return { ...c, opacity: value }
+      })
+      return changed ? { videoClips } : state
     }),
 
   setTitleCardDuration: (shotId, seconds) =>

@@ -4,19 +4,49 @@ import { AlertCircle, ArrowLeftToLine, ArrowRightToLine, ChevronLeft, ChevronRig
 import { dissolveOpacityAt } from '@/lib/editor/transition'
 import { useEntityNames } from '@/lib/writer/use-entity-names'
 import { resolveEntityNames } from '@/lib/writer/resolve-entity-names'
-import { useRef, useState, useEffect, useCallback } from 'react'
+import { useRef, useState, useEffect, useCallback, type CSSProperties } from 'react'
 import { Button } from '@/components/ui/button'
 import { TitleCardStage } from '@/features/editor/title-card-stage'
 import { SubtitleLayer } from '@/features/editor/subtitle-layer'
 import { resolveSubtitle } from '@/lib/editor/subtitle'
-import { useEditorStore, selectProgramLayout, selectVideoLayout, isTitleCardShotId } from '@/stores/editor-store'
+import { useEditorStore, selectProgramLayout, selectStackAt, selectVideoLayout, isTitleCardShotId } from '@/stores/editor-store'
+import { useProjectFormatStore } from '@/stores/project-format-store'
 import { editPointTarget } from '@/lib/editor/timeline-segments'
-import { SEQUENCE_FPS, formatTimecode, sequenceLengthSec } from '@/lib/editor/sequence-info'
+import { SEQUENCE_FPS, exportFrameSize, formatTimecode, sequenceLengthSec } from '@/lib/editor/sequence-info'
 import { cachedVideoUrl } from '@/features/editor/video-prefetch'
 import { previewPane } from '@/features/editor/editor-labels'
 import { useT } from '@/lib/i18n'
+import type { VideoClip } from '@/types'
 
 const FRAME = 1 / SEQUENCE_FPS
+
+/** 클립 모션 · 불투명도를 영상 그림에 입힌다(2단계 ④) — 위치는 틀 폭 · 높이 비율, 비율은 가운데를 기준으로. 처음 값이면 아무것도 안 붙인다. */
+function layerStyle(clip: Pick<VideoClip, 'motion' | 'opacity'> | undefined): CSSProperties | undefined {
+  const motion = clip?.motion
+  const opacity = clip?.opacity
+  if (!motion && opacity === undefined) return undefined
+  return {
+    ...(motion ? { transform: `translate(${motion.x * 100}%, ${motion.y * 100}%) scale(${motion.scale})` } : {}),
+    ...(opacity !== undefined ? { opacity } : {}),
+  }
+}
+
+/** 모니터 틀 크기 — 시퀀스 비율(내보내기 크기)을 모니터 칸 안에 맞춘다(2단계 ④). 재기 전에는 0. */
+function useFrameSize(aspect: number) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [size, setSize] = useState({ width: 0, height: 0 })
+  useEffect(() => {
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => {
+      const width = Math.min(el.clientWidth, el.clientHeight * aspect)
+      setSize({ width: Math.floor(width), height: Math.floor(width / aspect) })
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [aspect])
+  return [ref, size] as const
+}
 
 /**
  * Editor 프리뷰. 두 모드:
@@ -37,6 +67,14 @@ export function VideoPreviewer() {
   const holdRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const dissolveRef = useRef<HTMLDivElement>(null)
   const activeIdRef = useRef<string | null>(null)
+
+  // 아래 줄 — 위 클립이 화면을 다 덮지 않을 때 그 밑에 비쳐 보이는 클립들(아래 줄부터, 2단계 ④). 영상 그림은 shotId 로 찾는다.
+  const underIdsRef = useRef<string[]>([])
+  const underRefs = useRef(new Map<string, HTMLVideoElement>())
+  const [underIds, setUnderIds] = useState<string[]>([])
+  const projectFormat = useProjectFormatStore((s) => s.format)
+  const { width: frameW, height: frameH } = exportFrameSize(projectFormat)
+  const [pictureRef, frame] = useFrameSize(frameW / frameH)
 
   const [activeShotId, setActiveShotId] = useState<string | null>(null)
   const [actualDuration, setActualDuration] = useState<number | null>(null)
@@ -69,6 +107,10 @@ export function VideoPreviewer() {
 
       if (preview) {
         if (dissolveRef.current) dissolveRef.current.style.opacity = '0'
+        if (underIdsRef.current.length) {
+          underIdsRef.current = []
+          setUnderIds([])
+        }
         if (preview !== activeIdRef.current) {
           activeIdRef.current = preview
           setActiveShotId(preview)
@@ -136,6 +178,35 @@ export function VideoPreviewer() {
         v.pause()
       }
 
+      // 아래 줄(2단계 ④) — 위 클립이 화면을 다 덮지 않으면 그 밑 줄 영상도 같은 시각으로 맞춰 함께 재생한다. 아래 줄 타이틀 카드 ·
+      //   못 불러온 영상은 그리지 않는다.
+      const under = selectStackAt(st, t)
+        .slice(0, -1)
+        .filter((l) => {
+          const c = st.videoClips.find((x) => x.shotId === l.shotId)
+          return !!c?.url && !isTitleCardShotId(l.shotId) && !st.unplayableVideoUrls.includes(c.url)
+        })
+      const ids = under.map((l) => l.shotId)
+      if (ids.join('|') !== underIdsRef.current.join('|')) {
+        underIdsRef.current = ids
+        setUnderIds(ids)
+      }
+      for (const l of under) {
+        const el = underRefs.current.get(l.shotId)
+        const c = st.videoClips.find((x) => x.shotId === l.shotId)
+        if (!el || !c) continue
+        const speed = c.speed ?? 1.0
+        const local = (c.trimStart ?? 0) + (t - l.startSec) * speed
+        if (el.playbackRate !== speed) el.playbackRate = speed
+        if (st.isPlaying) {
+          if (el.paused) void el.play().catch(() => {})
+          if (Math.abs(el.currentTime - local) > 0.3) el.currentTime = local
+        } else {
+          if (!el.paused) el.pause()
+          if (Math.abs(el.currentTime - local) > 0.02) el.currentTime = local
+        }
+      }
+
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
@@ -186,7 +257,7 @@ export function VideoPreviewer() {
 
   return (
     <div className="flex h-full flex-col">
-      <div data-testid="program-picture" className="relative flex min-h-0 flex-1 flex-col items-center justify-center bg-black">
+      <div ref={pictureRef} data-testid="program-picture" className="relative flex min-h-0 flex-1 flex-col items-center justify-center bg-black">
         {pane === 'title' && activeShotId ? (
           // 약속 J(2026-09-04): 글자·이미지 자유 배치 무대 — 내보내기와 같은 배치·줄바꿈(src/lib/editor/title-card.ts).
           <TitleCardStage
@@ -212,8 +283,34 @@ export function VideoPreviewer() {
             }
           />
         ) : pane === 'video' && activeClip?.url ? (
-          // 약속 K: 자막은 영상 그림 위에 얹힌다 — 상자가 영상 크기를 따라가므로 자리 비율이 내보내기와 같다.
-          <div className="relative max-h-full max-w-full">
+          // 약속 K: 자막은 화면 틀 위에 얹힌다 — 틀은 시퀀스 비율(내보내기 크기)이라 자리 비율이 내보내기와 같다.
+          //   2단계 ④: 틀 안에 아래 줄부터 영상을 겹쳐 그리고 클립마다 모션(위치 · 비율) · 불투명도를 입힌다. 틀 밖으로 나간 부분은 잘리고,
+          //   아무것도 없는 자리는 검정이다(시안 E3 "배경 위에 샷").
+          <div
+            data-testid="program-frame"
+            className="relative overflow-hidden rounded"
+            style={frame.width > 0 ? { width: frame.width, height: frame.height } : { width: '100%', height: '100%' }}
+          >
+            {underIds.map((id) => {
+              const underClip = videoClips.find((c) => c.shotId === id)
+              if (!underClip?.url) return null
+              return (
+                <video
+                  key={`under-${id}`}
+                  data-testid="program-under-layer"
+                  ref={(el) => {
+                    if (el) underRefs.current.set(id, el)
+                    else underRefs.current.delete(id)
+                  }}
+                  src={cachedVideoUrl(underClip.url) ?? underClip.url}
+                  muted
+                  playsInline
+                  preload="auto"
+                  className="absolute inset-0 h-full w-full object-contain"
+                  style={layerStyle(underClip)}
+                />
+              )
+            })}
             <video
               key={activeShotId ?? 'none'}
               ref={videoRef}
@@ -222,7 +319,9 @@ export function VideoPreviewer() {
               muted
               playsInline
               preload="auto"
-              className="block max-h-full max-w-full rounded"
+              className="absolute inset-0 h-full w-full object-contain"
+              // 소스 미리 보기는 원본 그대로 — 효과는 타임라인 클립에만.
+              style={previewSourceShotId ? undefined : layerStyle(activeClip)}
               onLoadedMetadata={() => {
                 if (videoRef.current) setActualDuration(videoRef.current.duration)
               }}

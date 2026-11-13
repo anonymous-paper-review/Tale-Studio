@@ -2,8 +2,8 @@
 
 // 효과 컨트롤(시안 E1 409:4652–4713) — 타임라인에서 고른 클립의 이름 · 자리와, 지금 우클릭 메뉴에 있던 시작 전환(검정으로 물들이기) ·
 //   속도 · 소리 볼륨을 고른 자리에서 바로 바꾼다(2단계 ① 새 배치, 2026-11-14). 우클릭 메뉴도 그대로 남는다.
-//   모션 · 불투명도는 효과 컨트롤 조각(④), 끝 전환 · 교차 디졸브는 효과 탭 조각(⑤)에서 더한다 — 없는 칸을 미리 그리지 않는다.
-//   약속: tests/editor/panels.test.ts
+//   모션(위치 X · Y · 비율) · 불투명도는 슬라이더로 바꾸고 % 글자를 두 번 누르면 처음 값(2단계 ④). 끝 전환 · 교차 디졸브는 효과 탭
+//   조각(⑤)에서 더한다 — 없는 칸을 미리 그리지 않는다. 약속: tests/editor/panels.test.ts · tests/editor/motion-opacity.test.ts
 import type { ReactNode } from 'react'
 import { ChoiceChip } from '@/components/controls/choice-chip'
 import { Slider } from '@/components/ui/slider'
@@ -24,6 +24,53 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
       <span className="w-14 shrink-0 text-meta text-muted-foreground">{label}</span>
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">{children}</div>
     </div>
+  )
+}
+
+/** 슬라이더 한 줄 — 끄기 시작(누름 · 화살표)에 되돌리기 칸 하나, % 글자를 두 번 누르면 처음 값. */
+function SliderRow({
+  label,
+  value,
+  min,
+  max,
+  resetTitle,
+  onStart,
+  onChange,
+  onReset,
+}: {
+  label: string
+  value: number
+  min: number
+  max: number
+  resetTitle: string
+  onStart: () => void
+  onChange: (value: number) => void
+  onReset: () => void
+}) {
+  return (
+    <Row label={label}>
+      <Slider
+        className="w-40"
+        min={min}
+        max={max}
+        step={1}
+        value={[value]}
+        onPointerDown={onStart}
+        onKeyDown={(e) => {
+          if (e.key.startsWith('Arrow') || e.key.startsWith('Page') || e.key === 'Home' || e.key === 'End') onStart()
+        }}
+        onValueChange={([v]) => onChange(v)}
+        aria-label={label}
+      />
+      <button
+        type="button"
+        onDoubleClick={onReset}
+        title={resetTitle}
+        className="w-12 text-left font-num text-meta font-medium text-foreground tabular-nums"
+      >
+        {value}%
+      </button>
+    </Row>
   )
 }
 
@@ -50,6 +97,8 @@ export function EffectControls() {
   const audioTracks = useEditorStore((s) => s.audioTracks)
   const setSpeed = useEditorStore((s) => s.setSpeed)
   const setTransitionIn = useEditorStore((s) => s.setTransitionIn)
+  const setClipMotion = useEditorStore((s) => s.setClipMotion)
+  const setClipOpacity = useEditorStore((s) => s.setClipOpacity)
   const setAudioVolume = useEditorStore((s) => s.setAudioVolume)
   const pushHistory = useEditorStore((s) => s.pushHistory)
 
@@ -112,9 +161,18 @@ export function EffectControls() {
       : shotLabel({ number: number >= 0 ? number + 1 : null, shotType: shot?.shotType, takeNumber: rootClip?.takeNumber, isTitleCard }, t)
   const speed = clip?.speed ?? 1
   const transition = clip?.transitionIn ?? null
+  const motion = clip?.motion ?? { x: 0, y: 0, scale: 1 }
+  const opacity = clip?.opacity ?? 1
+  const percent = (value: number) => Math.round(value * 100)
   const applyAll = (fn: (shotId: string) => void) => {
     pushHistory()
     targets.forEach(fn)
+  }
+  // % 글자를 두 번 누르면 처음 값 — 바뀐 것이 있을 때만 되돌리기 칸 하나(2단계 ④).
+  const resetTo = (changed: boolean, fn: () => void) => {
+    if (!changed) return
+    pushHistory()
+    fn()
   }
 
   return (
@@ -127,6 +185,56 @@ export function EffectControls() {
           </p>
         ) : null}
       </div>
+
+      {isTitleCard ? null : (
+        <>
+          {/* 모션 · 불투명도(시안 E1 409:4659–4685) — 고른 클립 모두에, 끄는 동안 모니터에 바로 보인다. */}
+          <Section title={t('Motion')}>
+            <SliderRow
+              label={t('Position X')}
+              value={percent(motion.x)}
+              min={-100}
+              max={100}
+              resetTitle={t('Double-click to reset to {value}', { value: '0%' })}
+              onStart={() => pushHistory()}
+              onChange={(v) => setClipMotion(targets, { x: v / 100 })}
+              onReset={() => resetTo(motion.x !== 0, () => setClipMotion(targets, { x: 0 }))}
+            />
+            <SliderRow
+              label={t('Position Y')}
+              value={percent(motion.y)}
+              min={-100}
+              max={100}
+              resetTitle={t('Double-click to reset to {value}', { value: '0%' })}
+              onStart={() => pushHistory()}
+              onChange={(v) => setClipMotion(targets, { y: v / 100 })}
+              onReset={() => resetTo(motion.y !== 0, () => setClipMotion(targets, { y: 0 }))}
+            />
+            <SliderRow
+              label={t('Scale')}
+              value={percent(motion.scale)}
+              min={10}
+              max={300}
+              resetTitle={t('Double-click to reset to {value}', { value: '100%' })}
+              onStart={() => pushHistory()}
+              onChange={(v) => setClipMotion(targets, { scale: v / 100 })}
+              onReset={() => resetTo(motion.scale !== 1, () => setClipMotion(targets, { scale: 1 }))}
+            />
+          </Section>
+          <Section title={t('Opacity')}>
+            <SliderRow
+              label={t('Opacity')}
+              value={percent(opacity)}
+              min={0}
+              max={100}
+              resetTitle={t('Double-click to reset to {value}', { value: '100%' })}
+              onStart={() => pushHistory()}
+              onChange={(v) => setClipOpacity(targets, v / 100)}
+              onReset={() => resetTo(opacity !== 1, () => setClipOpacity(targets, 1))}
+            />
+          </Section>
+        </>
+      )}
 
       <Section title={t('Transition')}>
         <Row label={t('Start')}>

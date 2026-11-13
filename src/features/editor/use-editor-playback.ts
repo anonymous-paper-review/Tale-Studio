@@ -21,7 +21,8 @@ export function handleEditorKey(e: KeyboardEvent) {
   const el = e.target as HTMLElement | null
   const tag = el?.tagName
   // 볼륨 등 range 슬라이더는 텍스트 입력이 아님 → 단축키 허용 (단, 화살표는 네이티브 볼륨 조절에 양보)
-  const isRange = tag === 'INPUT' && (el as HTMLInputElement | null)?.type === 'range'
+  //   효과 컨트롤의 슬라이더(role="slider")도 같다 — 화살표가 플레이헤드까지 움직였다(2단계 ④).
+  const isRange = (tag === 'INPUT' && (el as HTMLInputElement | null)?.type === 'range') || el?.getAttribute?.('role') === 'slider'
   const editable =
     (tag === 'INPUT' && !isRange) ||
     tag === 'TEXTAREA' ||

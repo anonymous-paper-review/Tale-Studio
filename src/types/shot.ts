@@ -177,6 +177,20 @@ export interface VideoClip {
    *   저장본에는 클립마다 줄 · 시작 초(placements)로 적고, 다시 열 때 그 자리에서 이 값을 다시 셈한다.
    */
   gapBefore?: number
+  /**
+   * 모션(2단계 ④, 시안 E1 409:4659) — 위치는 화면 폭 · 높이에 대한 비율(0 = 가운데, −1 ~ 1), 비율은 배수(0.1 ~ 3). 클립마다 하나(시간에
+   *   따라 바뀌지 않는다). 없으면 0 · 0 · 1 — 처음 값이면 칸을 지운다. 편집기 스냅샷(editor_states)에만 저장된다.
+   */
+  motion?: ClipMotion
+  /** 불투명도 0 ~ 1(2단계 ④, 시안 E1 409:4681). 없으면 1. */
+  opacity?: number
+}
+
+/** 클립 모션 — 위치 X · Y(화면 폭 · 높이 비율), 비율(배수). */
+export interface ClipMotion {
+  x: number
+  y: number
+  scale: number
 }
 
 /**

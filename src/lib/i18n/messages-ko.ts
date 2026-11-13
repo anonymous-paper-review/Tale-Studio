@@ -3469,5 +3469,13 @@ export const KO: Record<string, string> = {
   'Marker {time}': '마커 {time}',
   'Delete marker': '마커 지우기',
   'Split at the playhead': '플레이헤드 자리에서 나누기',
+
+  // 2단계 ④ 효과 컨트롤 모션 · 불투명도(시안 E1 409:4659–4685).
+  'Motion': '모션',
+  'Position X': '위치 X',
+  'Position Y': '위치 Y',
+  'Scale': '비율',
+  'Opacity': '불투명도',
+  'Double-click to reset to {value}': '두 번 누르면 {value}(으)로 돌아가요',
   'Add a marker': '마커 달기',
 }
