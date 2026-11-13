@@ -62,6 +62,14 @@ export interface DraftRenderStats {
   mimeType: string
   /** 영상이 없거나 불러오지 못해 자리표시 화면으로 들어간 클립 수(그 시각 맨 위였던 클립). */
   skippedClips: number
+  /**
+   * 끊김 재기(개발용 — 화면 글 없음, 2단계 ⑦-3): 녹화하는 동안 돈 장 수 · 보이는 영상 층이 그림을 못 내 그리지 않은(직전 장이 남은) 장 수 ·
+   *   가장 긴 멈춤(밀리초) · 장마다 그림을 못 낸 보이는 영상 층 수의 합.
+   */
+  frames: number
+  stalledFrames: number
+  longestStallMs: number
+  waitingLayers: number
 }
 
 /** 맨 위 클립 차례(selectProgramLayout) — 영상 줄 끝을 셀 때. */
@@ -393,10 +401,10 @@ export async function renderDraftTimeline(opts: {
   }
 
   /**
-   * 그 시각 목록의 영상 층(곧 그릴 층 포함)을 붙이고 모니터와 같은 함수로 시각을 맞춘다 — 목록에서 빠진 영상은 거둔다. 보이는 영상 층이
-   *   아직 그림을 못 냈으면 true(그 장은 그리지 않는다). 8초 넘게 못 내면 그 클립은 못 불러온 것으로 친다.
+   * 그 시각 목록의 영상 층(곧 그릴 층 포함)을 붙이고 모니터와 같은 함수로 시각을 맞춘다 — 목록에서 빠진 영상은 거둔다. 아직 그림을 못 낸
+   *   보이는 영상 층 수를 돌려준다(1 이상이면 그 장은 그리지 않는다). 8초 넘게 못 내면 그 클립은 못 불러온 것으로 친다.
    */
-  const prepare = (plan: FramePlan, playing: boolean): boolean => {
+  const prepare = (plan: FramePlan, playing: boolean): number => {
     const wanted = new Set<string>()
     for (const layer of [...plan.layers, ...plan.preload]) {
       if (layer.kind !== 'video') continue
@@ -410,7 +418,7 @@ export async function renderDraftTimeline(opts: {
       release(entry.el)
       pool.delete(id)
     }
-    let waiting = false
+    let waiting = 0
     const now = performance.now()
     for (const layer of plan.layers) {
       if (layer.kind !== 'video' || layer.alpha <= 0) continue
@@ -422,7 +430,7 @@ export async function renderDraftTimeline(opts: {
       }
       entry.waitingSince ??= now
       if (now - entry.waitingSince > LOAD_TIMEOUT_MS) failedUrls.add(clipUrl(layer.shotId) as string)
-      else waiting = true
+      else waiting += 1
     }
     // 맨 위 영상이 없거나 못 불러오면 자리표시로 들어간다 — 끝에 그 클립 수를 알린다.
     const top = plan.layers.find((l) => l.shotId === plan.topShotId)
@@ -448,6 +456,12 @@ export async function renderDraftTimeline(opts: {
   // ── 3) 실시간 녹화 루프 ──
   let raf: number | null = null
   let aborted = false
+  // 끊김 재기(개발용) — 돈 장 · 그리지 못한 장 · 가장 긴 멈춤 · 그림을 못 낸 보이는 영상 층 수의 합.
+  let frames = 0
+  let stalledFrames = 0
+  let longestStallMs = 0
+  let waitingLayers = 0
+  let stallSince: number | null = null
 
   const cleanup = () => {
     if (raf != null) cancelAnimationFrame(raf)
@@ -491,6 +505,15 @@ export async function renderDraftTimeline(opts: {
       // 그릴 것 목록(2단계 ⑦) — 모니터와 같은 목록. 곧 그릴 층은 1.5초 먼저 불러 둔다.
       const plan = selectFrameAt(input, clock, { prerollSec: PRELOAD_SEC })
       const waiting = prepare(plan, true)
+      frames += 1
+      if (waiting) {
+        stalledFrames += 1
+        waitingLayers += waiting
+        stallSince ??= performance.now()
+        longestStallMs = Math.max(longestStallMs, performance.now() - stallSince)
+      } else {
+        stallSince = null
+      }
       // 아직 그림을 못 낸 영상 층이 있으면 그리지 않는다 — 캔버스에 직전 장이 남는다(멈춤으로 흡수).
       if (!waiting) drawPlanFrame(ctx, W, H, plan, sources)
       // 오디오: 활성 구간 진입 시 소스 오프셋으로 시킹해 재생, 이탈 시 정지. 크기는 장마다 소리 크기 × 페이드 세기(2단계 ⑤, 미리 보기와 같다).
@@ -566,5 +589,5 @@ export async function renderDraftTimeline(opts: {
   // 다운로드 시작 후 회수 — 즉시 revoke 하면 일부 브라우저에서 저장이 빈 파일이 된다.
   setTimeout(() => URL.revokeObjectURL(objectUrl), 30_000)
 
-  return { durationSec: total, bytes: blob.size, mimeType, skippedClips: placeholderIds.size }
+  return { durationSec: total, bytes: blob.size, mimeType, skippedClips: placeholderIds.size, frames, stalledFrames, longestStallMs: Math.round(longestStallMs), waitingLayers }
 }

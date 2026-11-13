@@ -453,3 +453,15 @@ describe('⑦-2 내보내기 — 혼자 정한 것', () => {
     expect(read('src/features/editor/title-clip-layer.tsx')).toMatch(/titleTextLines\(data\.text, frameWidth \* TITLE_TEXT_WIDTH, /)
   })
 })
+
+describe('⑦-3 끊김 재기 — 같이 정한 것(⑦ 계획 i · 리드 11/14)', () => {
+  it('내보내는 동안 장마다 그림을 못 낸 보이는 영상 층 수와 멈춘 장 · 가장 긴 멈춤을 결과 숫자에 남긴다 — 개발 서버에서만 콘솔에 찍고 화면 글은 없다', () => {
+    // 왜: ⑦ 계획 3 · i — 실시간 녹화라 줄이 많고 기기가 느리면 그 장은 직전 장으로 찍힌다. e2e 가 2 · 3줄 · 교차 디졸브 시퀀스를 내보내며 이
+    //   숫자를 읽어 보고한다. 손님 화면에는 숫자를 보이지 않는다.
+    const render = read('src/lib/editor-draft-render.ts')
+    expect(render).toMatch(/const waiting = prepare\(plan, true\)/)
+    expect(render).toMatch(/if \(waiting\) \{\s*stalledFrames \+= 1\s*waitingLayers \+= waiting/)
+    expect(render).toMatch(/return \{ durationSec: total, bytes: blob\.size, mimeType, skippedClips: placeholderIds\.size, frames, stalledFrames, longestStallMs: Math\.round\(longestStallMs\), waitingLayers \}/)
+    expect(read('src/app/studio/editor/page.tsx')).toMatch(/if \(process\.env\.NODE_ENV !== 'production'\) console\.info\('\[draft-render\]', JSON\.stringify\(stats\)\)/)
+  })
+})

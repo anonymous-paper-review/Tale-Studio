@@ -212,6 +212,8 @@ export default function PostPage() {
           )
         },
       })
+      // 끊김 재기(개발용, 2단계 ⑦-3) — e2e 가 읽는다. 운영 화면에는 찍지 않는다.
+      if (process.env.NODE_ENV !== 'production') console.info('[draft-render]', JSON.stringify(stats))
       toast.success(
         t('Draft video saved: {seconds}s, {size}MB.', {
           seconds: Math.round(stats.durationSec),
