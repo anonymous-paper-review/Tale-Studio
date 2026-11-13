@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ThumbImage } from '@/components/thumb-image'
 import { boardNodeNames } from '@/features/director/node-label'
-import { editorHandoverView, handoverHeaderLine, proceedButtonLabel, remakeButton, type EditorHandoverShot } from '@/lib/director/editor-handover'
+import { editorHandoverView, handoverHeaderLine, proceedButtonLabel, remakeButton, remakeNotice, type EditorHandoverShot } from '@/lib/director/editor-handover'
 import { useTakeBalance } from '@/lib/billing/use-take-balance'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -31,13 +31,18 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
   const batch = useDirectorCanvasStore((s) => (s.realBatchBusy ? 'images' : s.videoBatchBusy ? 'videos' : null))
   const showTakes = useTakeBalance().mode !== 'off'
   const [starting, setStarting] = useState<string | null>(null)
+  // [다시 만들기]를 시작하지 못한 까닭 — 그 줄 아래에 보인다(검토 b 2차 낮음 3).
+  const [notice, setNotice] = useState<{ shotNodeId: string; message: string } | null>(null)
   if (!open) return null
   const view = editorHandoverView(nodes, boardNodeNames(manifest, writerShots ?? []))
 
   const remakeRow = async (row: EditorHandoverShot) => {
     setStarting(row.shotNodeId)
+    setNotice(null)
     try {
-      await remake(row.shotNodeId)
+      const result = await remake(row.shotNodeId)
+      const message = result.started ? null : remakeNotice(result.reason, t)
+      if (message) setNotice({ shotNodeId: row.shotNodeId, message })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t('Failed to generate video.'))
     } finally {
@@ -94,6 +99,11 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
                           : t('Not made yet. Leave it out and it joins Editor once its video is ready')}
                     </span>
                   )}
+                  {notice?.shotNodeId === row.shotNodeId ? (
+                    <span className="mt-0.5 block text-caption text-muted-foreground" role="status" data-testid="editor-handover-notice">
+                      {notice.message}
+                    </span>
+                  ) : null}
                 </span>
                 {button ? (
                   <Button size="sm" variant="outline" className="shrink-0" disabled={busy || button.disabled} onClick={() => void remakeRow(row)} data-testid="editor-handover-remake">

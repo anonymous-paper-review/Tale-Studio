@@ -42,7 +42,7 @@ describe('Director 넘기기 창 — 넘어가면서 이미지 만들기', () =>
     expect(view.description).toBe('러프 3장을 실사 이미지로 바꾸는 것부터 시작해요.')
     expect(view.rows).toEqual([
       { label: '넘어가는 것', value: '샷 3 · 10초 · 인물 2 · 배경 1 · 러프 3장' },
-      { label: '다음', value: '러프 → 실사 이미지 3장 · 약 2분 · Takes 안 써요' },
+      { label: '다음', value: '러프 → 실사 이미지 3장 · 약\u00a02분 · Takes 안 써요' },
       { label: '그다음', value: '이미지를 확인하고 영상을 만들어요 · 샷마다 5 Take' },
     ])
   })
@@ -59,7 +59,7 @@ describe('Director 넘기기 창 — 넘어가면서 이미지 만들기', () =>
   it('Take 과금이 꺼져 있으면 Director 넘기기 창에 Take 값을 보이지 않는다', () => {
     const view = directorConfirmView(directorHandoffSummary(manifest, board()), 'ko', { ...extra, takesPerShot: null })
     expect(view.rows.slice(1)).toEqual([
-      { label: '다음', value: '러프 → 실사 이미지 3장 · 약 2분' },
+      { label: '다음', value: '러프 → 실사 이미지 3장 · 약\u00a02분' },
       { label: '그다음', value: '이미지를 확인하고 영상을 만들어요' },
     ])
   })
@@ -71,7 +71,7 @@ describe('Director 넘기기 창 — 넘어가면서 이미지 만들기', () =>
     expect(counting.makeImages).toMatchObject({ label: '넘어가면서 이미지 만들기', disabled: false })
     expect(counting.description).toBeNull()
     const unknown = directorConfirmView(directorHandoffSummary(manifest, board()), 'ko', { ...extra, imagesToMake: { atMost: 3 } })
-    expect(unknown.rows[1].value).toBe('러프 → 실사 이미지 최대 3장 · 약 2분 · Takes 안 써요')
+    expect(unknown.rows[1].value).toBe('러프 → 실사 이미지 최대 3장 · 약\u00a02분 · Takes 안 써요')
     expect(unknown.makeImages?.label).toBe('넘어가면서 이미지 최대 3장 만들기')
     expect(unknown.defaultChoice).toBe('makeImages')
   })

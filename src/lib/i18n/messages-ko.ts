@@ -3142,8 +3142,9 @@ export const KO: Record<string, string> = {
   'Shooting with Lumi': 'Lumi와 촬영 이야기',
   'Editing with Lumi': 'Lumi와 편집 이야기',
   // Director → Editor 넘기기 창(D8, 2026-11-14 디자이너 1110 확정 · 오너 답 8번)
-  // 길이는 샷 계획 길이의 합 — Editor 가 클립마다 실제 영상 길이로 줄일 수 있어 어림으로(리드 2026-11-14)
-  '{done}/{total} videos · about {seconds}s · Shots without video do not go into the timeline as empty slots.': '영상 {done}/{total} · 약 {seconds}초 · 영상이 없는 샷은 타임라인에 빈 칸으로 들어가지 않아요.',
+  // 길이는 샷 계획 길이의 합 — Editor 가 클립마다 실제 영상 길이로 줄일 수 있어 어림으로(리드 2026-11-14).
+  //   "약"과 숫자 사이는 줄이 안 바뀌는 빈칸(\u00a0) — 좁은 화면에서 "약" / "33초"로 갈리지 않게.
+  '{done}/{total} videos · about {seconds}s · Shots without video do not go into the timeline as empty slots.': '영상 {done}/{total} · 약\u00a0{seconds}초 · 영상이 없는 샷은 타임라인에 빈 칸으로 들어가지 않아요.',
   '{label} · No video': '{label} · 영상 없음',
   '{label} · {seconds}s': '{label} · {seconds}초',
   'Take {number} · Final': 'Take {number} · 최종',
@@ -3156,30 +3157,35 @@ export const KO: Record<string, string> = {
   // 값은 앱의 Take 표기("5 Take")로 — "Take 5"는 바로 위 줄의 "Take 2 · 자동"과 겹쳐 Take 번호처럼 읽혔다(검토 b 낮음 4).
   'Make video · {takes} Takes': '영상 만들기 · {takes} Take',
   'Make again · {takes} Takes': '다시 만들기 · {takes} Take',
-  // Take 과금이 꺼져 있으면 값 없이(낮음 5) · 이미지 · 영상 일괄 중이면 단추를 끄고 까닭(낮음 1) · 빠질 샷이 없으면 넘기기 단추(낮음 3)
+  // Take 과금이 꺼져 있으면 값 없이(낮음 5) · 빠질 샷이 없으면 넘기기 단추(낮음 3)
   'Make video': '영상 만들기',
   'Make again': '다시 만들기',
-  'Making images': '이미지 만드는 중',
-  'Hand over to Editor · {cuts} cuts · about {seconds}s': 'Editor로 넘기기 · 컷 {cuts} · 약 {seconds}초',
+  'Hand over to Editor · {cuts} cuts · about {seconds}s': 'Editor로 넘기기 · 컷 {cuts} · 약\u00a0{seconds}초',
+  // 일괄 중 꺼진 만들기 단추 · [다시 만들기]를 시작하지 못한 까닭(검토 b 2차 낮음 2 · 3)
+  'You can make it after the image batch finishes': '이미지 일괄이 끝나면 만들 수 있어요',
+  'You can make it after the video batch finishes': '영상 일괄이 끝나면 만들 수 있어요',
+  "This shot's image is being made. You can make the video once it is done.": '이 샷 이미지를 만드는 중이에요. 다 되면 영상을 만들 수 있어요.',
+  "This shot's video is already being made.": '이 샷 영상을 이미 만드는 중이에요.',
+  'Could not start the video. Try again in a moment.': '영상을 시작하지 못했어요. 잠시 뒤 다시 해 보세요.',
   'Go back': '돌아가기',
   'No video to hand over yet.': '넘길 영상이 아직 없어요.',
-  'Hand over without {label} · {cuts} cuts · about {seconds}s': '{label} 빼고 넘기기 · 컷 {cuts} · 약 {seconds}초',
-  'Hand over without {count} shots · {cuts} cuts · about {seconds}s': '영상 없는 샷 {count}개 빼고 넘기기 · 컷 {cuts} · 약 {seconds}초',
+  'Hand over without {label} · {cuts} cuts · about {seconds}s': '{label} 빼고 넘기기 · 컷 {cuts} · 약\u00a0{seconds}초',
+  'Hand over without {count} shots · {cuts} cuts · about {seconds}s': '영상 없는 샷 {count}개 빼고 넘기기 · 컷 {cuts} · 약\u00a0{seconds}초',
   'Some shots have no video yet. Check the list in the window, then hand over the shots with video or make the rest again first.': '아직 영상이 없는 샷이 있어요. 창에서 목록을 보고 영상 있는 샷만 넘기거나, 나머지를 먼저 다시 만들어 주세요.',
   // Storyboard → Director 넘기기 창(D0, 2026-11-14 디자이너 1110 확정 · 페이지 추천)
   'Move on to Director?': 'Director로 넘어갈까요?',
   'We start by turning the {count} roughs into real images.': '러프 {count}장을 실사 이미지로 바꾸는 것부터 시작해요.',
   'Shots {shots} · {seconds}s · Characters {characters} · Backgrounds {backgrounds} · Roughs {roughs}': '샷 {shots} · {seconds}초 · 인물 {characters} · 배경 {backgrounds} · 러프 {roughs}장',
-  'Rough → {count} real images · about {minutes} min · No Takes used': '러프 → 실사 이미지 {count}장 · 약 {minutes}분 · Takes 안 써요',
+  'Rough → {count} real images · about {minutes} min · No Takes used': '러프 → 실사 이미지 {count}장 · 약\u00a0{minutes}분 · Takes 안 써요',
   'The real images are already made': '실사 이미지는 이미 다 있어요',
   'After that': '그다음',
   // 값은 앱의 Take 표기("5 Take")로 — D8 단추와 같게(리드 2026-11-14)
   'Check the images and make the videos · {takes} Takes per shot': '이미지를 확인하고 영상을 만들어요 · 샷마다 {takes} Take',
   // 저장된 실사를 읽는 중 · 읽기 실패(검토 b 낮음 7), Take 과금이 꺼져 있을 때(낮음 5)
   'Rough → real images · counting': '러프 → 실사 이미지 · 세는 중',
-  'Rough → up to {count} real images · about {minutes} min · No Takes used': '러프 → 실사 이미지 최대 {count}장 · 약 {minutes}분 · Takes 안 써요',
-  'Rough → up to {count} real images · about {minutes} min': '러프 → 실사 이미지 최대 {count}장 · 약 {minutes}분',
-  'Rough → {count} real images · about {minutes} min': '러프 → 실사 이미지 {count}장 · 약 {minutes}분',
+  'Rough → up to {count} real images · about {minutes} min · No Takes used': '러프 → 실사 이미지 최대 {count}장 · 약\u00a0{minutes}분 · Takes 안 써요',
+  'Rough → up to {count} real images · about {minutes} min': '러프 → 실사 이미지 최대 {count}장 · 약\u00a0{minutes}분',
+  'Rough → {count} real images · about {minutes} min': '러프 → 실사 이미지 {count}장 · 약\u00a0{minutes}분',
   'Make images while moving over': '넘어가면서 이미지 만들기',
   'Make up to {count} images while moving over': '넘어가면서 이미지 최대 {count}장 만들기',
   'Check the images and make the videos': '이미지를 확인하고 영상을 만들어요',
