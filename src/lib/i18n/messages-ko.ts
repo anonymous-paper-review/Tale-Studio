@@ -574,6 +574,9 @@ export const KO: Record<string, string> = {
   'Loaded the previously separated layer': '분리해 둔 레이어를 불러왔어요',
   'Separated the arrow layer. Scrape with the eraser to reveal the layer underneath': '화살표 레이어를 분리했어요. 지우개로 긁으면 밑층이 드러나요',
   'Layer separation failed': '레이어 분리 실패',
+  // 연출 화살표 편집기 — 낡은 화면에서 분리(2026-11-14 검토 낮음 2)
+  'The directing frame changed in the meantime. Open it again and separate the layer again.': '그사이 연출 그림이 바뀌었어요. 다시 열어 레이어를 다시 분리해 주세요.',
+  'The directing frame changed in the meantime, so we loaded it again. Separate the layer again.': '그사이 연출 그림이 바뀌어 다시 불러왔어요. 레이어를 다시 분리해 주세요.',
   'Could not create a canvas context': '캔버스 컨텍스트 생성 실패',
   'Saved the DIRECTING frame': 'DIRECTING 프레임을 저장했어요',
   'Redrawing the END frame, about 30 seconds': 'END 프레임을 다시 그리는 중이에요. 30초쯤 걸려요',

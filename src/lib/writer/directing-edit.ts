@@ -73,6 +73,24 @@ export interface DirectingEditOptions {
   /** 덮어쓸 파일이 "작업 공간/프로젝트/" 폴더 안일 때만 올린다(2026-11-01 리뷰 M5). 주소는 브라우저가 고칠 수 있는
    *  rough_storyboard 에서 오므로 버킷만 보면 다른 작업 공간의 그림 · 미리보기를 덮을 수 있었다. 함수를 직접 부르는 옛 시험은 끈 채로 둔다. */
   projectFolderOnly?: boolean
+  /** 분리: 화면이 보고 있는 연출 그림 주소(?v= 포함). 서버 그림과 다르면 그림 값을 쓰기 전에 StaleDirectionError(검토 2026-11-14 낮음 2 ②). */
+  expectDirection?: string
+}
+
+/** 화면이 서버보다 낡은 채 분리하려 했다 — 위층(옛 그림)과 밑층(새 그림)이 섞이지 않게 거절하고 화면이 다시 읽게 한다. */
+export class StaleDirectionError extends Error {
+  constructor(locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK) {
+    super(translate(locale, 'The directing frame changed in the meantime. Open it again and separate the layer again.'))
+    this.name = 'StaleDirectionError'
+  }
+}
+
+/** 순수: 분리가 끝났을 때 서버에 남길 러프 JSON — 그사이 연출 그림(주소)이 바뀌었으면 낡은 밑층이라 null.
+ *  시작 · 끝만 바뀌었으면 연출 그림이 그대로라 지금 그림 시각(generatedAt)에 묶어 남긴다(검토 2026-11-14 낮음 2 ① —
+ *  예전엔 시각이 바뀌면 버려 다시 분리에 그림 값이 또 들었다). */
+export function withCleanPlate(latest: RoughJson, separatedFrom: string, cleanUrl: string): RoughJson | null {
+  if (!latest.frames?.direction || latest.frames.direction !== separatedFrom) return null
+  return { ...latest, cleanDirection: { url: cleanUrl, for: latest.generatedAt ?? 0 } }
 }
 
 export class ForeignMediaPathError extends Error {
@@ -108,6 +126,7 @@ export async function separateArrowLayer(
       translate(locale, 'The DIRECTING frame is missing. You need the 3-frame rough set first'),
     )
   }
+  if (opts.expectDirection && opts.expectDirection !== rb.frames.direction) throw new StaleDirectionError(locale)
   const genAt = rb.generatedAt ?? 0
   if (rb.cleanDirection?.url && rb.cleanDirection.for === genAt) {
     return { cleanUrl: rb.cleanDirection.url, cached: true }
@@ -145,12 +164,13 @@ export async function separateArrowLayer(
   if (opts.projectFolderOnly) await assertProjectFolder(projectId, cleanPath, locale)
   const cleanUrl = await uploadToMedia(cleanPath, buf, contentType)
 
-  // JSONB 병합 — 생성 도중 재생성됐으면(다른 generatedAt) 낡은 캐시를 쓰지 않는다(rough-adherence 패턴).
+  // JSONB 병합 — 생성 도중 연출 그림이 바뀌었으면(다시 만들기 · 저장) 낡은 밑층이라 남기지 않는다(withCleanPlate).
   const latest = await loadRough(projectId, shotId)
-  if (latest && (latest.generatedAt ?? 0) === genAt) {
+  const merged = latest ? withCleanPlate(latest, rb.frames.direction, cleanUrl) : null
+  if (merged) {
     const { error } = await supabaseAdmin
       .from('shots')
-      .update({ rough_storyboard: { ...latest, cleanDirection: { url: cleanUrl, for: genAt } } })
+      .update({ rough_storyboard: merged })
       .eq('project_id', projectId)
       .eq('shot_id', shotId)
     if (error) throw error

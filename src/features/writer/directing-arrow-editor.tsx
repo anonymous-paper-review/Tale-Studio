@@ -47,17 +47,26 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   })
 }
 
-/** 편집기 밑층(화살표를 지운 그림) — 지금 연출 그림(generatedAt)에서 만든 것만 쓴다. 서버 캐시(cleanDirection)가 지금 그림의 것이면
- *  그것, 아니면 이 편집기에서 지금 그림을 분리한 것. 팝업을 연 채로 연출 그림을 다시 만들면 둘 다 옛 그림의 것이라 밑층이 없다 —
+/** 이 편집기에서 분리한 밑층 — 서버가 화살표를 지운 연출 그림 주소(?v= 포함)와 함께 둔다. */
+export type SeparatedPlate = { url: string; direction: string }
+
+/** 편집기 밑층(화살표를 지운 그림) — 지금 연출 그림에서 만든 것만 쓴다. 서버 캐시(cleanDirection)가 지금 그림(generatedAt)의 것이면
+ *  그것, 아니면 이 편집기에서 지금 연출 그림(주소)을 분리한 것. 팝업을 연 채로 연출 그림을 다시 만들면 둘 다 옛 그림의 것이라 밑층이 없다 —
  *  옛 밑층을 그대로 쓰면 지우개로 긁을 때 바뀌기 전 그림이 드러나고 저장하면 새 연출 그림에 박혔다(2026-11-14 미들 프레임 고장).
+ *  분리값은 그림 시각이 아니라 연출 그림 주소로 묶는다 — 분리하는 동안 시작 · 끝만 다시 그려도 연출 그림은 그대로다(검토 낮음 2 ①).
  *  순수 함수 — 테스트 대상(tests/writer/directing-clean-plate.test.ts). */
 export function cleanPlateFor(
-  panel: Pick<RoughStoryboardImage, 'generatedAt' | 'cleanDirection'>,
-  separated: { url: string; for: number } | null,
+  panel: Pick<RoughStoryboardImage, 'generatedAt' | 'cleanDirection' | 'frames'>,
+  separated: SeparatedPlate | null,
 ): string | null {
   if (panel.cleanDirection && panel.cleanDirection.for === panel.generatedAt) return panel.cleanDirection.url
-  if (separated && separated.for === panel.generatedAt) return separated.url
+  if (separated && !!panel.frames?.direction && separated.direction === panel.frames.direction) return separated.url
   return null
+}
+
+/** 밑층이 없으면 지우개는 그릴 수 없다 — 펜으로 돌린다(검토 낮음 1: 지우개가 눌린 채 금지 커서로 남았다). 순수 함수 — 테스트 대상. */
+export function toolWithPlate(tool: Tool, hasPlate: boolean): Tool {
+  return tool === 'eraser' && !hasPlate ? 'pen' : tool
 }
 
 export function DirectingArrowEditor({
@@ -76,8 +85,8 @@ export function DirectingArrowEditor({
     ? withCacheBust(panel.frames.direction, panel.generatedAt)
     : null
   // 서버 캐시가 현 generatedAt 파생이면 재분리 없이 바로 밑층으로 쓴다(재과금 방지). 이 편집기에서 분리한 밑층은
-  //   어느 그림(generatedAt)에서 지운 것인지 함께 두어, 연출 그림이 다시 만들어지면 버린다(cleanPlateFor).
-  const [separated, setSeparated] = useState<{ url: string; for: number } | null>(null)
+  //   어느 연출 그림(주소)에서 지운 것인지 함께 두어, 연출 그림이 다시 만들어지면 버린다(cleanPlateFor).
+  const [separated, setSeparated] = useState<SeparatedPlate | null>(null)
   const effectiveClean = cleanPlateFor(panel, separated)
 
   const topCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -96,6 +105,11 @@ export function DirectingArrowEditor({
   //   좌표는 표시 크기(CSS px), 굵기는 캔버스 내부 픽셀이라 배율(displayScale)로 환산한다.
   const [hoverPt, setHoverPt] = useState<Pt | null>(null)
   const [displayScale, setDisplayScale] = useState(1)
+  // 밑층이 없어지면(연출 그림을 다시 만듦) 지우개 대신 펜 — 안내("펜은 바로 써요")대로 바로 그린다(검토 낮음 1).
+  useEffect(() => {
+    const next = toolWithPlate(tool, !!effectiveClean)
+    if (next !== tool) setTool(next)
+  }, [tool, effectiveClean])
 
   // effect 의 .catch() 안에서 쓸 문자열은 미리 번역해 둔다 — t 자체를 deps 에 넣으면 매 렌더
   //   재실행되므로, 값(문자열)만 deps 에 넣어 로케일이 실제로 바뀔 때만 재실행되게 한다.
@@ -242,14 +256,22 @@ export function DirectingArrowEditor({
   const handleSeparate = async () => {
     setSeparating(true)
     try {
+      // 화면이 보고 있는 연출 그림(주소)을 같이 보낸다 — 서버 그림이 그사이 바뀌었으면 서버가 그림 값을 쓰기 전에 거절한다(검토 낮음 2 ②).
+      const direction = panel.frames?.direction ?? ''
       const res = await fetch('/api/writer/rough-directing-edit', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'separate', projectId, shotId }),
+        body: JSON.stringify({ action: 'separate', projectId, shotId, direction }),
       })
       const j = await res.json().catch(() => null)
+      if (res.status === 409 && j?.code === 'stale_direction') {
+        // 낡은 화면 위에 새 그림의 밑층을 섞지 않는다 — 화면을 다시 읽어 위층도 지금 그림으로 맞춘다.
+        toast.info(t('The directing frame changed in the meantime, so we loaded it again. Separate the layer again.'))
+        await reloadAfterRoughFrameEdit(projectId, () => onSaved())
+        return
+      }
       if (!res.ok) throw new Error(j?.error ?? `HTTP ${res.status}`)
-      setSeparated({ url: j.data.cleanUrl as string, for: panel.generatedAt })
+      setSeparated({ url: j.data.cleanUrl as string, direction })
       setTool('eraser') // 분리 직후 자연스러운 다음 동작 = 긁어보기
       toast.success(
         j.data.cached
