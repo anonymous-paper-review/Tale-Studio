@@ -205,17 +205,19 @@ export function workEstimateText(
 }
 
 /** "영상까지 이어서"(시안 D4 · 오너 답 6): 이미지를 기다리던 샷 가운데 이미지가 끝난 샷은 영상을 시작하고(start),
- *  쓸 그림이 없거나 이미 다른 길로 영상이 있는 샷은 기다림에서 빼고(drop), 아직 그리는 샷은 기다린다(keep). */
+ *  쓸 그림이 없거나 이미 다른 길로 영상이 있는 샷은 기다림에서 빼고(drop), 아직 그리는 샷은 기다린다(keep).
+ *  resumeWaiting: 러프 · 시트를 기다려 일괄이 다시 돌기를 기다리는 샷(노드 id) — 이 샷도 놓지 않는다(리드 검토 a 낮음 9). */
 export function chainStep(
   waiting: readonly string[],
   states: ReadonlyMap<string, DirectorShotState>,
   imageBusy: boolean,
+  resumeWaiting?: ReadonlySet<string>,
 ): { start: string[]; drop: string[]; keep: string[] } {
   const out = { start: [] as string[], drop: [] as string[], keep: [] as string[] }
   for (const id of waiting) {
     const state = states.get(id)
     if (state === 'image_done') out.start.push(id)
-    else if (state === 'image_generating' || (state === 'image_needed' && imageBusy)) out.keep.push(id)
+    else if (state === 'image_generating' || (state === 'image_needed' && (imageBusy || !!resumeWaiting?.has(id)))) out.keep.push(id)
     else out.drop.push(id)
   }
   return out

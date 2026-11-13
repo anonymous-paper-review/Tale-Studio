@@ -28,7 +28,7 @@ import { Loader2,
   Square, ChevronDown, ChevronUp, LayoutGrid, Boxes, Lock, Unlock, Plus, Minus, Maximize2, Play, ImageIcon } from 'lucide-react'
 
 import { toast } from 'sonner'
-import { runRealBatch } from '@/lib/director/real-batch-client'
+import { cancelRealBatchResume, runRealBatch } from '@/lib/director/real-batch-client'
 import {
   runVideoBatch,
   restoreVideoBatch,
@@ -1043,6 +1043,8 @@ function PaletteBar() {
   const stopping = (!realBatchBusy || realBatchCancelled) && (!videoBatchBusy || videoBatchCancelled)
   const stopAll = async () => {
     const run = useDirectorCanvasStore.getState()
+    // 걸어 둔 다시 돌기(러프 · 시트를 기다린 샷)도 거둔다 — 멈춘 뒤 저절로 다시 돌지 않게(리드 검토 a 보통 5).
+    cancelRealBatchResume(run.projectId)
     if (realBatchBusy && !realBatchCancelled) run.cancelRealBatch()
     if (!videoBatchBusy || videoBatchCancelled) {
       if (realBatchBusy) toast.info(t('Stop after the images being made now finish.'))
@@ -1061,10 +1063,17 @@ function PaletteBar() {
     }
   }
   // 이어 보내기 지켜보기(오너 답 6 — 이 화면이 한다): 이미지가 끝난 샷은 영상을 시작하고, 그림이 없게 된 샷은 기다림에서 뺀다.
-  const chainKey = chainWaitingShotIds.map((id) => `${id}:${shotStates.get(id) ?? '-'}`).join('|')
+  //   러프 · 시트를 기다려 일괄이 다시 돌기를 기다리는 샷은 놓지 않는다(리드 검토 a 낮음 9).
+  const realBatchResumeShotIds = useDirectorCanvasStore((s) => s.realBatchResumeShotIds)
+  const resumeWaitingNodeIds = new Set(
+    nodes.flatMap((n) => (isShotData(n.data) && n.data.writerShotId && realBatchResumeShotIds.includes(n.data.writerShotId) ? [n.id] : [])),
+  )
+  const chainKey = chainWaitingShotIds
+    .map((id) => `${id}:${shotStates.get(id) ?? '-'}:${resumeWaitingNodeIds.has(id) ? 'r' : ''}`)
+    .join('|')
   useEffect(() => {
     if (chainWaitingShotIds.length === 0) return
-    const step = chainStep(chainWaitingShotIds, shotStates, realBatchBusy)
+    const step = chainStep(chainWaitingShotIds, shotStates, realBatchBusy, resumeWaitingNodeIds)
     if (step.start.length === 0 && step.drop.length === 0) return
     setChainWaitingShots(step.keep)
     const store = useDirectorCanvasStore.getState()

@@ -1111,6 +1111,8 @@ interface DirectorCanvasState {
   realBatchShotIds: string[] | null
   /** [모두 멈추기](시안 D3, 오너 답 7) — 이미지 일괄이 아직 보내지 않은 장을 보내지 않는다. 이미 보낸 장은 끝까지 만든다. */
   realBatchCancelled: boolean
+  /** 러프 · 인물 시트를 기다려 일괄이 다시 돌기를 기다리는 Writer 샷 id(#ref-gate 재개). "영상까지 이어서"가 이 샷을 놓지 않는다. 저장하지 않는다. */
+  realBatchResumeShotIds: string[]
   /** "영상까지 이어서" 스위치(시안 D4 · R, 오너 답 6) — 화면에 들어오면 꺼져 있고 저장하지 않는다. */
   chainVideoAfterImage: boolean
   /** 이미지가 끝나면 영상을 이어 보낼 샷(샷 노드 id) — 이 화면(브라우저)이 지켜본다. 화면을 닫으면 사라진다. */
@@ -1665,6 +1667,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       realBatchRemaining: null,
       realBatchShotIds: null,
       realBatchCancelled: false,
+      realBatchResumeShotIds: [],
       chainVideoAfterImage: false,
       chainWaitingShotIds: [],
       videoBatchBusy: false,
@@ -1720,6 +1723,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             pickedShotIds: [],
             chainVideoAfterImage: false,
             chainWaitingShotIds: [],
+            realBatchResumeShotIds: [],
             videoBatchBusy: false,
             videoBatchProgress: null,
             videoBatchQueue: null,

@@ -28,10 +28,27 @@ type BatchSkipped = {
 
 // #ref-gate(오너 결정 1번): 건너뛴 샷의 선행 산출물(러프·시트)이 나타나면 배치를 다시 돌린다(멱등 — 빈칸만).
 //   프로젝트당 재개 체인 1개, 최대 5회. 탭을 닫으면 끊긴다.
+//   다시 도는 판은 처음 요청의 남은 샷(고른 샷이면 건너뛴 샷만)과 다시 만들기(force)를 그대로 싣는다(리드 검토 a 보통 2).
+//   [모두 멈추기]를 누른 판은 예약하지 않고, 걸어 둔 재개도 cancelRealBatchResume 으로 거둔다(리드 검토 a 보통 5 · 오너 답 7).
 const resumeDepthByProject = new Map<string, number>()
-function scheduleRealBatchResume(projectId: string, skipped: BatchSkipped[], opts?: { traceId?: string; onJob?: GenerationJobObserver }) {
+const resumeCancelByProject = new Map<string, () => void>()
+
+/** 걸어 둔 재개를 거둔다 — [모두 멈추기] · 프로젝트를 떠날 때. */
+export function cancelRealBatchResume(projectId: string): void {
+  resumeCancelByProject.get(projectId)?.()
+}
+
+function scheduleRealBatchResume(
+  projectId: string,
+  skipped: BatchSkipped[],
+  opts: { traceId?: string; onJob?: GenerationJobObserver; shotIds?: readonly string[]; force?: boolean },
+) {
+  const store = useDirectorCanvasStore
   const depth = resumeDepthByProject.get(projectId) ?? 0
-  if (!skipped.length || depth >= 5) return
+  if (!skipped.length || depth >= 5) {
+    store.setState({ realBatchResumeShotIds: [] })
+    return
+  }
   resumeDepthByProject.set(projectId, depth + 1)
   // 같은 자료(같은 인물 시트)를 기다리는 샷이 여럿이면 기다림 하나로 묶는다(2026-10-10). 같은 자료의 새 기다림은
   //   이전 것을 취소하므로, 샷마다 따로 걸면 먼저 취소된 기다림이 경주에서 이겨 판을 다시 시작하지 않았다.
@@ -44,16 +61,36 @@ function scheduleRealBatchResume(projectId: string, skipped: BatchSkipped[], opt
     }),
   ).values()]
   let settled = false
-  const isCancelled = () => settled || useDirectorCanvasStore.getState().projectId !== projectId
+  const cancel = () => {
+    settled = true
+    resumeDepthByProject.delete(projectId)
+    if (resumeCancelByProject.get(projectId) === cancel) resumeCancelByProject.delete(projectId)
+    if (store.getState().projectId === projectId) store.setState({ realBatchResumeShotIds: [] })
+  }
+  resumeCancelByProject.get(projectId)?.()
+  resumeCancelByProject.set(projectId, cancel)
+  const skippedShotIds = skipped.map((s) => s.shotId)
+  store.setState({ realBatchResumeShotIds: skippedShotIds })
+  const isCancelled = () => settled || store.getState().projectId !== projectId
   // 하나라도 준비되면 재실행 — 나머지 대기는 settled 로 함께 끝내고, 남은 샷은 재실행의 skipped 로 다시 예약된다.
   void Promise.race(bodies.map((b) => waitForPrerequisite(projectId, b, { isCancelled }))).then((outcome) => {
-    const projectChanged = useDirectorCanvasStore.getState().projectId !== projectId
+    if (settled) return
+    const projectChanged = store.getState().projectId !== projectId
     settled = true
+    if (resumeCancelByProject.get(projectId) === cancel) resumeCancelByProject.delete(projectId)
     if (outcome !== 'ready' || projectChanged) {
       resumeDepthByProject.delete(projectId)
+      if (!projectChanged) store.setState({ realBatchResumeShotIds: [] })
       return
     }
-    void runRealBatch(projectId, { silent: true, traceId: opts?.traceId, onJob: opts?.onJob })
+    void runRealBatch(projectId, {
+      silent: true,
+      traceId: opts.traceId,
+      onJob: opts.onJob,
+      // 고른 샷이었으면 건너뛴(아직 못 그린) 샷만, 아니면 지금처럼 빈 샷 전부.
+      ...(opts.shotIds ? { shotIds: skippedShotIds } : {}),
+      ...(opts.force ? { force: true } : {}),
+    })
   })
 }
 
@@ -82,7 +119,13 @@ export async function runRealBatch(
 ): Promise<RealBatchResult> {
   const store = useDirectorCanvasStore
   if (store.getState().realBatchBusy) return { generated: 0, quotaBlocked: false }
-  store.setState({ realBatchBusy: true, realBatchRemaining: null, realBatchShotIds: opts?.shotIds ? [...opts.shotIds] : null, realBatchCancelled: false })
+  store.setState({
+    realBatchBusy: true,
+    realBatchRemaining: null,
+    realBatchShotIds: opts?.shotIds ? [...opts.shotIds] : null,
+    realBatchCancelled: false,
+    realBatchResumeShotIds: [],
+  })
   let generated = 0
   let quotaBlocked = false
   let lastSkipped: BatchSkipped[] = []
@@ -203,7 +246,11 @@ export async function runRealBatch(
       }
       if (remaining <= 0) break
     }
-    if (lastSkipped.length > 0) {
+    if (store.getState().realBatchCancelled) {
+      // [모두 멈추기]를 누른 판 — 다시 돌기를 예약하지 않고 걸어 둔 것도 거둔다(오너 답 7).
+      cancelRealBatchResume(projectId)
+      resumeDepthByProject.delete(projectId)
+    } else if (lastSkipped.length > 0) {
       // #ref-gate: 이유별로 한 줄 안내 + 자동 재개 예약(과금 없음 — 준비될 때까지 폴링만).
       const sheetNames = [...new Set(lastSkipped.flatMap((s) => (s.missing ?? []).map((m) => m.name)))]
       const roughCount = lastSkipped.filter((s) => s.reason === 'missing_rough_storyboard').length
@@ -218,7 +265,12 @@ export async function runRealBatch(
         }),
         { id: 'generation-prerequisite' },
       )
-      scheduleRealBatchResume(projectId, lastSkipped, { traceId: opts?.traceId, onJob: opts?.onJob })
+      scheduleRealBatchResume(projectId, lastSkipped, {
+        traceId: opts?.traceId,
+        onJob: opts?.onJob,
+        shotIds: opts?.shotIds,
+        force: opts?.force,
+      })
     } else {
       resumeDepthByProject.delete(projectId)
     }
