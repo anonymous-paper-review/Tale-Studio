@@ -29,6 +29,7 @@ import { Loader2,
 
 import { toast } from 'sonner'
 import { runRealBatch } from '@/lib/director/real-batch-client'
+import { takeImagesOnDirectorEntry } from '@/lib/director/entry-images-intent'
 import {
   eligibleVideoBatchShotIds,
   runVideoBatch,
@@ -1288,6 +1289,13 @@ export default function DirectorCanvasPage() {
     restore()
     document.addEventListener('visibilitychange', restore)
     return () => document.removeEventListener('visibilitychange', restore)
+  }, [guideProjectId, stageReady])
+
+  // D0(디자이너 1110 확정 · 2026-11-14): Storyboard 넘기기 창에서 "넘어가면서 이미지 만들기"를 고르고 [넘어가기] 를 누른 경우에만,
+  //   Director 가 준비된 뒤 실사 일괄을 한 번 시작한다 — 사람이 창에서 고른 것이라 8/27 진입 자동 채움(아래 #c5 주석)과 다른 길이다.
+  useEffect(() => {
+    if (!stageReady || !guideProjectId || guideProjectId === 'default') return
+    if (takeImagesOnDirectorEntry(guideProjectId)) void runRealBatch(guideProjectId)
   }, [guideProjectId, stageReady])
 
   // SHOT VIDEO 재생 상태(#video-pause 2026-08-12) — playingNodeId 가 스토어에 남아 탭을
