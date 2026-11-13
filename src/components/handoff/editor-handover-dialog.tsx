@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ThumbImage } from '@/components/thumb-image'
 import { boardNodeNames } from '@/features/director/node-label'
-import { editorHandoverView, proceedButtonLabel, remakeButton, type EditorHandoverShot } from '@/lib/director/editor-handover'
+import { editorHandoverView, handoverHeaderLine, proceedButtonLabel, remakeButton, remakeNotice, type EditorHandoverShot } from '@/lib/director/editor-handover'
 import { useTakeBalance } from '@/lib/billing/use-take-balance'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -31,13 +31,18 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
   const batch = useDirectorCanvasStore((s) => (s.realBatchBusy ? 'images' : s.videoBatchBusy ? 'videos' : null))
   const showTakes = useTakeBalance().mode !== 'off'
   const [starting, setStarting] = useState<string | null>(null)
+  // [다시 만들기]를 시작하지 못한 까닭 — 그 줄 아래에 보인다(검토 b 2차 낮음 3).
+  const [notice, setNotice] = useState<{ shotNodeId: string; message: string } | null>(null)
   if (!open) return null
   const view = editorHandoverView(nodes, boardNodeNames(manifest, writerShots ?? []))
 
   const remakeRow = async (row: EditorHandoverShot) => {
     setStarting(row.shotNodeId)
+    setNotice(null)
     try {
-      await remake(row.shotNodeId)
+      const result = await remake(row.shotNodeId)
+      const message = result.started ? null : remakeNotice(result.reason, t)
+      if (message) setNotice({ shotNodeId: row.shotNodeId, message })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t('Failed to generate video.'))
     } finally {
@@ -55,9 +60,7 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
       <DialogContent size="wide" className="max-h-[90vh] grid-rows-[auto_minmax(0,1fr)_auto]" data-testid="editor-handover-dialog">
         <DialogHeader>
           <DialogTitle>{t('Hand over to Editor')}</DialogTitle>
-          <DialogDescription>
-            {t('{done}/{total} videos · {seconds}s · Shots without video do not go into the timeline as empty slots.', { done: view.cuts, total: view.total, seconds: view.seconds })}
-          </DialogDescription>
+          <DialogDescription>{handoverHeaderLine(view, t)}</DialogDescription>
         </DialogHeader>
 
         <ul className="min-h-0 space-y-2 overflow-y-auto pr-1">
@@ -67,7 +70,7 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
             return (
               <li
                 key={row.shotNodeId}
-                className={cn('flex items-center gap-3 rounded-xl bg-card px-4 py-3', row.missing && 'border border-destructive')}
+                className={cn('flex items-center gap-x-3 gap-y-2 rounded-xl bg-card px-4 py-3', row.missing && 'flex-wrap border border-destructive sm:flex-nowrap')}
                 data-testid={row.missing ? 'editor-handover-missing' : 'editor-handover-shot'}
               >
                 {row.thumbUrl && !row.missing ? (
@@ -75,8 +78,9 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
                 ) : !row.missing ? (
                   <span className="h-11 w-8 shrink-0 rounded-md bg-art-placeholder" aria-hidden />
                 ) : null}
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-label font-semibold text-foreground">
+                {/* 좁은 화면(시안 없음)에서는 영상 없는 줄의 긴 단추가 줄 아래로 내려가 샷 이름이 잘리지 않는다(리드 2026-11-14). */}
+                <span className={cn('min-w-0 flex-1', row.missing && 'basis-48')}>
+                  <span className={cn('block text-label font-semibold text-foreground', row.missing ? 'break-words sm:truncate' : 'truncate')}>
                     {row.missing ? t('{label} · No video', { label: row.label }) : t('{label} · {seconds}s', { label: row.label, seconds: row.seconds })}
                   </span>
                   {row.take ? (
@@ -89,12 +93,17 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
                   ) : (
                     <span className="mt-0.5 block text-caption text-destructive">
                       {row.missing === 'failed'
-                        ? t('Failed while making · If you leave it out, it joins Editor on its own once its video is made')
+                        ? t('Failed. Leave it out and it joins Editor once its video is ready')
                         : row.missing === 'generating'
                           ? t('Making it now · You can hand it over from this window once it is done')
-                          : t('Not made yet · If you leave it out, it joins Editor on its own once its video is made')}
+                          : t('Not made yet. Leave it out and it joins Editor once its video is ready')}
                     </span>
                   )}
+                  {notice?.shotNodeId === row.shotNodeId ? (
+                    <span className="mt-0.5 block text-caption text-muted-foreground" role="status" data-testid="editor-handover-notice">
+                      {notice.message}
+                    </span>
+                  ) : null}
                 </span>
                 {button ? (
                   <Button size="sm" variant="outline" className="shrink-0" disabled={busy || button.disabled} onClick={() => void remakeRow(row)} data-testid="editor-handover-remake">
@@ -116,7 +125,8 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
           <Button variant="secondary" onClick={close}>
             {t('Go back')}
           </Button>
-          <Button onClick={() => void proceed()} disabled={view.cuts === 0} data-testid="editor-handover-proceed">
+          {/* 좁은 화면에서는 긴 넘기기 글이 창을 밀어내지 않게 줄을 바꾼다(시안 없음). */}
+          <Button onClick={() => void proceed()} disabled={view.cuts === 0} className="whitespace-normal break-keep text-center sm:whitespace-nowrap" data-testid="editor-handover-proceed">
             {proceedButtonLabel(view, t)}
             <ArrowRight className="size-4" />
           </Button>

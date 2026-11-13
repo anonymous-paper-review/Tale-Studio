@@ -14,7 +14,7 @@ vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTra
 const nav = vi.hoisted(() => ({ handoffToStage: vi.fn(async (stage: string) => `/studio/${stage}`) }))
 vi.mock('@/lib/stage-nav', () => ({ handoffToStage: nav.handoffToStage }))
 
-import { editorHandoverView, proceedButtonLabel, remakeButton } from '@/lib/director/editor-handover'
+import { editorHandoverView, handoverHeaderLine, proceedButtonLabel, remakeButton, remakeNotice } from '@/lib/director/editor-handover'
 import { takeCostForVideo } from '@/lib/billing/take-cost'
 import { translate } from '@/lib/i18n/translate'
 import { boardNodeNames } from '@/features/director/node-label'
@@ -113,23 +113,55 @@ describe('Editor 넘기기 창의 단추 글', () => {
   })
 
   // 왜(검토 b 낮음 1): 이미지 · 영상 일괄이 도는 동안 줄 단추를 누르면 요청 · Take · 알림 없이 말없이 끝났다 — 끄고 까닭을 보인다(그리드와 같은 판단).
-  it('이미지 · 영상 일괄을 만드는 중이면 Editor 넘기기 창의 만들기 단추를 끄고 "이미지 만드는 중" · "영상 만드는 중"이라고 보인다', () => {
+  //   (검토 b 2차 낮음 2) "영상 만드는 중"은 그 샷을 만드는 중으로 읽혔다 — 끈 단추에는 까닭(일괄이 끝나면 만들 수 있다)을 적는다.
+  it('이미지 · 영상 일괄을 만드는 중이면 Editor 넘기기 창의 만들기 단추를 끄고 일괄이 끝나면 만들 수 있다고 보인다', () => {
     const nodes = canvas(take('a1', 1, 'completed'), take('a2', 1, 'failed'))
-    expect(remakeButton(nodes, failedRow, { showTakes: true, batch: 'images' }, ko)).toEqual({ label: '이미지 만드는 중', disabled: true })
-    expect(remakeButton(nodes, failedRow, { showTakes: true, batch: 'videos' }, ko)).toEqual({ label: '영상 만드는 중', disabled: true })
+    expect(remakeButton(nodes, failedRow, { showTakes: true, batch: 'images' }, ko)).toEqual({ label: '이미지 일괄이 끝나면 만들 수 있어요', disabled: true })
+    expect(remakeButton(nodes, failedRow, { showTakes: true, batch: 'videos' }, ko)).toEqual({ label: '영상 일괄이 끝나면 만들 수 있어요', disabled: true })
     expect(remakeButton(nodes, failedRow, { showTakes: true, batch: null }, ko).disabled).toBe(false)
   })
 
-  // 왜(검토 b 낮음 3): 창을 연 채 다시 만들기가 다 끝나면 "영상 없는 샷 0개 빼고 넘기기"가 됐다 — 빠질 샷이 없으면 시안 D8 의 "Editor로 넘기기 · 컷 N · N초".
-  it('넘기기 창이 열린 채 빠질 샷이 없어지면 넘기기 단추는 "Editor로 넘기기 · 컷 N · N초"가 된다', () => {
+  // 왜(검토 b 낮음 3): 창을 연 채 다시 만들기가 다 끝나면 "영상 없는 샷 0개 빼고 넘기기"가 됐다 — 빠질 샷이 없으면 시안 D8 의 "Editor로 넘기기 · 컷 N · 약 N초".
+  it('넘기기 창이 열린 채 빠질 샷이 없어지면 넘기기 단추는 "Editor로 넘기기 · 컷 N · 약 N초"가 된다', () => {
     const done = editorHandoverView(canvas(take('a1', 1, 'completed'), take('a2', 1, 'completed'), take('a3', 1, 'completed')), names)
-    expect(proceedButtonLabel(done, ko)).toBe('Editor로 넘기기 · 컷 3 · 9초')
+    expect(proceedButtonLabel(done, ko)).toBe('Editor로 넘기기 · 컷 3 · 약\u00a09초')
     const oneLeft = editorHandoverView(canvas(take('a1', 1, 'completed'), take('a2', 1, 'completed')), names)
-    expect(proceedButtonLabel(oneLeft, ko)).toBe('Scene 1 · Shot 3 빼고 넘기기 · 컷 2 · 7초')
+    expect(proceedButtonLabel(oneLeft, ko)).toBe('Scene 1 · Shot 3 빼고 넘기기 · 컷 2 · 약\u00a07초')
+  })
+
+  // 왜(리드 2026-11-14 · export 확인): 창의 길이는 샷 계획 길이의 합이고, Editor 는 클립마다 실제 영상 파일 길이로 줄일 수 있다 — 사실대로 어림으로 보인다.
+  it('Editor 넘기기 창의 합계 길이는 "약 N초"로 보인다', () => {
+    const view = editorHandoverView(canvas(take('a1', 1, 'completed'), take('a2', 1, 'completed')), names)
+    expect(handoverHeaderLine(view, ko)).toBe('영상 2/3 · 약\u00a07초 · 영상이 없는 샷은 타임라인에 빈 칸으로 들어가지 않아요.')
+    expect(handoverHeaderLine(view, (key, params) => translate('en', key, params))).toBe('2/3 videos · about 7s · Shots without video do not go into the timeline as empty slots.')
   })
 })
 
 const userLines = () => useGlobalChatStore.getState().messages.filter((m) => m.role === 'user').map((m) => m.content)
+
+describe('Editor 넘기기 창의 까닭 글', () => {
+  const ko = (key: string, params?: Record<string, string | number>) => translate('ko', key, params)
+
+  // 왜(검토 b 2차 낮음 3): [다시 만들기]가 일괄 중 · 그 샷 이미지를 만드는 중이면 말없이 끝났다 — 시작하지 못한 까닭을 창이 그 줄에 보인다.
+  it('[다시 만들기]를 시작하지 못하면 창이 그 까닭을 보인다', () => {
+    expect(remakeNotice('image_batch', ko)).toBe('이미지 일괄이 끝나면 만들 수 있어요')
+    expect(remakeNotice('video_batch', ko)).toBe('영상 일괄이 끝나면 만들 수 있어요')
+    expect(remakeNotice('image_running', ko)).toBe('이 샷 이미지를 만드는 중이에요. 다 되면 영상을 만들 수 있어요.')
+    expect(remakeNotice('video_running', ko)).toBe('이 샷 영상을 이미 만드는 중이에요.')
+    expect(remakeNotice('image_failed', ko)).toBe('이미지 생성에 실패했습니다.')
+    expect(remakeNotice('not_started', ko)).toBe('영상을 시작하지 못했어요. 잠시 뒤 다시 해 보세요.')
+    expect(remakeNotice('no_window', ko)).toBeNull()
+  })
+
+  // 왜(리드 2026-11-14): 좁은 화면에서 넘기기 단추가 "… 약" / "33초"로 갈렸다 — "약"과 숫자 사이는 줄이 안 바뀌는 빈칸으로 쓴다.
+  it('한국어 넘기기 창의 "약"과 숫자 사이는 줄이 바뀌지 않는 빈칸이다', () => {
+    const view = editorHandoverView(canvas(take('a1', 1, 'completed')), names)
+    for (const text of [handoverHeaderLine(view, ko), proceedButtonLabel(view, ko)]) {
+      expect(text).toContain('약\u00a0')
+      expect(text).not.toContain('약 ')
+    }
+  })
+})
 
 describe('Director 의 다음 단계 버튼과 Editor 넘기기 창', () => {
   beforeEach(() => {
@@ -216,6 +248,7 @@ describe('Director 의 다음 단계 버튼과 Editor 넘기기 창', () => {
     const nodes = [shot('a1', 3), ready, shot('a3', 2), take('a1', 1, 'completed'), wired]
     useDirectorCanvasStore.setState({ projectId: 'proj-1', nodes })
     const label = remakeButton(nodes, { shotNodeId: 'n_a2', missing: 'failed' }, { showTakes: true, batch: null }, (key, params) => translate('en', key, params)).label
+    useGlobalChatStore.setState({ handoffConfirm: { kind: 'editorMissingVideos', projectId: 'proj-1', via: 'button' } })
     const bodies: Array<Record<string, unknown>> = []
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       if (String(input).includes('/api/director/generate-video')) bodies.push(JSON.parse(String(init?.body)))
@@ -237,6 +270,7 @@ describe('Director 의 다음 단계 버튼과 Editor 넘기기 창', () => {
     const makeImage = vi.fn(async () => undefined)
     const makeVideo = vi.fn(async () => 'v_new')
     useDirectorCanvasStore.setState({ hydrateFreshFromDb: hydrate, generateStoryboardImage: makeImage, generateVideoForShot: makeVideo } as never)
+    useGlobalChatStore.setState({ handoffConfirm: { kind: 'editorMissingVideos', projectId: 'proj-1', via: 'button' } })
     await useGlobalChatStore.getState().remakeMissingVideo('n_a3')
     expect(hydrate).toHaveBeenCalledTimes(1)
     expect(makeImage).not.toHaveBeenCalled()
@@ -252,24 +286,26 @@ describe('Director 의 다음 단계 버튼과 Editor 넘기기 창', () => {
     expect(nav.handoffToStage).toHaveBeenCalledWith('editor')
   })
 
-  // 왜: Storyboard 카드(board 갈래)의 [빼고 Editor로] 는 넘기기 창을 열지 않고 이 넘김을 바로 부른다(2026-11-14 board 와 약속).
-  it('넘기기 창을 열지 않고 [빼고 Editor로]를 눌러도 넘김 문장이 채팅에 남고 영상 있는 샷만 Editor로 넘어간다', async () => {
-    useDirectorCanvasStore.setState({ nodes: canvas(take('a1', 1, 'completed'), take('a2', 1, 'failed')) })
-    await useGlobalChatStore.getState().proceedToEditorWithVideos()
-    expect(useGlobalChatStore.getState().handoffConfirm).toBeNull()
-    expect(userLines()).toEqual(['Editor로 넘겨주세요'])
-    expect(nav.handoffToStage).toHaveBeenCalledWith('editor')
-  })
-
-  // 왜: Storyboard 카드(board 갈래)의 [다시 만들기] 도 창 없이 부른다 — 단추에 Take 값이 적혀 있어 그 단추가 곧 확인이다(리드 2026-11-14).
-  it('넘기기 창을 열지 않고 영상 없는 샷의 [다시 만들기]를 눌러도 그 샷의 영상을 만들기 시작한다', async () => {
-    useDirectorCanvasStore.setState({ nodes: canvas(take('a1', 1, 'completed'), take('a2', 1, 'failed'), take('a3', 1, 'completed')) })
+  // 왜(검토 b 2차 낮음 3): 일괄 중이거나 그 샷 이미지를 이미 만드는 중이면 [다시 만들기]가 요청 · Take · 알림 없이 말없이 끝났다 —
+  //   시작했는지, 못 했으면 왜인지 돌려주어 창이 보이게 한다.
+  it('일괄 중이거나 그 샷 이미지를 만드는 중이면 [다시 만들기]는 시작하지 않고 그 까닭을 돌려준다', async () => {
     const makeVideo = vi.fn(async () => 'v_new')
-    useDirectorCanvasStore.setState({ generateVideoForShot: makeVideo } as never)
-    await useGlobalChatStore.getState().remakeMissingVideo('n_a2')
-    expect(makeVideo).toHaveBeenCalledWith('n_a2', { inheritFromVideoNodeId: 'v_a2_1' })
-    expect(useGlobalChatStore.getState().handoffConfirm).toBeNull()
-    expect(nav.handoffToStage).not.toHaveBeenCalled()
+    const makeImage = vi.fn(async () => undefined)
+    useDirectorCanvasStore.setState({ generateVideoForShot: makeVideo, generateStoryboardImage: makeImage, hydrateFreshFromDb: vi.fn(async () => undefined) } as never)
+    useGlobalChatStore.setState({ handoffConfirm: { kind: 'editorMissingVideos', projectId: 'proj-1', via: 'button' } })
+    const remake = (id: string) => useGlobalChatStore.getState().remakeMissingVideo(id)
+    useDirectorCanvasStore.setState({ nodes: canvas(take('a1', 1, 'completed'), take('a2', 1, 'failed')), realBatchBusy: true, videoBatchBusy: false })
+    await expect(remake('n_a2')).resolves.toEqual({ started: false, reason: 'image_batch' })
+    useDirectorCanvasStore.setState({ realBatchBusy: false, videoBatchBusy: true })
+    await expect(remake('n_a2')).resolves.toEqual({ started: false, reason: 'video_batch' })
+    const drawing = { ...shot('a3', 2), data: { ...shot('a3', 2).data, storyboardImage: { status: 'generating', url: null } } } as unknown as DirectorNode
+    useDirectorCanvasStore.setState({ videoBatchBusy: false, nodes: [shot('a1', 3), shot('a2', 4), drawing, take('a1', 1, 'completed'), take('a2', 1, 'failed')] })
+    await expect(remake('n_a3')).resolves.toEqual({ started: false, reason: 'image_running' })
+    expect(makeImage).not.toHaveBeenCalled()
+    expect(makeVideo).not.toHaveBeenCalled()
+    // 정상 경로 — 시작했다고 돌려준다.
+    await expect(remake('n_a2')).resolves.toEqual({ started: true })
+    expect(makeVideo).toHaveBeenCalledTimes(1)
   })
 
   // 왜(혼자 정한 것): 채팅으로 넘겨 달라고 해도 같은 판단을 탄다 — Director 준비 창이 채팅에서도 열리는 것과 같게.
