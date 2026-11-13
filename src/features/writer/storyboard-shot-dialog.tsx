@@ -244,6 +244,9 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
     }
   }
 
+  // 탭 바꾸기 — 연출 탭에 저장하지 않은 화살표가 있으면 닫기와 같은 물음을 거친다(편집기가 사라지며 그린 것이 없어진다, 리드 2026-11-14).
+  const requestTab = (key: 'start' | 'direction') => guard.requestSwitch(tab, key, () => setTab(key))
+
   // 연출 탭 [적용] — 그린 화살표부터 저장하고, 길이를 바꿨으면 길이를 저장한 뒤 닫는다(리드 ①).
   const applyDirection = async () => {
     setApplying(true)
@@ -270,7 +273,7 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
       title={title}
       description={sub}
       selected={tab === key}
-      onClick={() => setTab(key)}
+      onClick={() => requestTab(key)}
       className="flex-1"
       data-testid={`shot-edit-group-${key}`}
     />
@@ -291,7 +294,7 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
                 <span className="font-num text-meta text-subtle-foreground">{t('{seconds}s', { seconds: value.durationSeconds })} · {value.shotType} · {angleLabel}</span>
                 <span className="ml-auto inline-flex gap-0.5 rounded-lg bg-card p-[3px]">
                   {(['start', 'direction'] as const).map((key) => (
-                    <button key={key} type="button" onClick={() => setTab(key)} aria-pressed={tab === key} className={cn('rounded-[9px] px-3 py-1 text-label transition-colors', tab === key ? 'bg-accent font-semibold text-foreground' : 'font-medium text-subtle-foreground hover:text-foreground')}>
+                    <button key={key} type="button" onClick={() => requestTab(key)} aria-pressed={tab === key} className={cn('rounded-[9px] px-3 py-1 text-label transition-colors', tab === key ? 'bg-accent font-semibold text-foreground' : 'font-medium text-subtle-foreground hover:text-foreground')}>
                       {t(key === 'start' ? 'Start' : 'Directing')}
                     </button>
                   ))}

@@ -1,7 +1,7 @@
 // 연출 화살표 편집기에 저장하지 않은 화살표가 있을 때 창 아래 [적용] · 닫기가 그 화살표를 지키는지 검사한다(2026-11-14 오너 고장 · 리드 ①②)
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
-import { applyDirectionTab, closeRequest, directionApplyEnabled, resolveUnsavedClose } from '@/features/writer/unsaved-arrows-confirm'
+import { applyDirectionTab, closeRequest, directionApplyEnabled, resolveUnsavedClose, tabSwitchRequest } from '@/features/writer/unsaved-arrows-confirm'
 
 describe('저장하지 않은 화살표', () => {
   // 왜: 연출 탭의 창 아래 [적용]은 길이만 저장하고 길이를 안 바꾸면 꺼져 있었다. 편집기 [저장]은 그림 아래 화면 밖이라,
@@ -61,5 +61,17 @@ describe('저장하지 않은 화살표', () => {
       expect(source).toMatch(/onDirtyChange=\{guard\.setDirty\}/)
       expect(source).toMatch(/if \(!open\) guard\.requestClose\(\)/)
     }
+  })
+
+  // 왜(리드 2026-11-14): 입구 A 에서 그린 채 [시작] 탭으로 바꾸면 편집기가 사라지며 그린 것이 묻지 않고 없어졌다 — 닫기와 같은 물음으로 막는다.
+  it('연출 탭에 저장하지 않은 화살표가 있으면 [시작] 탭으로 바꾸기 전에 묻는다', () => {
+    expect(tabSwitchRequest('direction', 'start', true)).toBe('ask')
+    // 그린 것이 없거나 같은 탭이면 묻지 않는다(정상 경로).
+    expect(tabSwitchRequest('direction', 'start', false)).toBe('switch')
+    expect(tabSwitchRequest('direction', 'direction', true)).toBe('switch')
+    expect(tabSwitchRequest('start', 'direction', false)).toBe('switch')
+    // 탭을 바꾸는 두 자리(왼쪽 [시작 | 연출] · 오른쪽 고치기 카드)가 모두 이 물음을 거친다.
+    const source = readFileSync('src/features/writer/storyboard-shot-dialog.tsx', 'utf8')
+    expect(source.match(/onClick=\{\(\) => requestTab\(key\)\}/g)?.length).toBe(2)
   })
 })

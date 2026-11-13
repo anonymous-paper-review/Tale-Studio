@@ -583,6 +583,10 @@ export const KO: Record<string, string> = {
   'Keep drawing': '계속 그리기',
   'Discard and close': '버리고 닫기',
   'Save and close': '저장하고 닫기',
+  // [시작] 탭으로 바꿀 때 같은 물음(리드 2026-11-14)
+  'Save them before switching tabs, or switch without saving them.': '탭을 바꾸기 전에 저장하거나, 저장하지 않고 바꿀 수 있어요.',
+  'Discard and switch': '버리고 바꾸기',
+  'Save and switch': '저장하고 바꾸기',
   'Could not create a canvas context': '캔버스 컨텍스트 생성 실패',
   'Saved the DIRECTING frame': 'DIRECTING 프레임을 저장했어요',
   'Redrawing the END frame, about 30 seconds': 'END 프레임을 다시 그리는 중이에요. 30초쯤 걸려요',
