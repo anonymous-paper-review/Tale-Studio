@@ -27,6 +27,8 @@ import { useTakeBalance } from '@/lib/billing/use-take-balance'
 import { takeCostForVideo, takeValuesShown } from '@/lib/billing/take-cost'
 import { TAKES_UNKNOWN_TEXT, takesReadable } from '@/features/director/takes-check'
 import { StopMakingButton } from '@/features/director/stop-making-button'
+import { isStoppableJob } from '@/lib/director/stop-work'
+import { useActiveGenerationJobs } from '@/lib/generation-queue'
 import { normalizeProvider } from '@/lib/video-models'
 import { useShotState } from '@/features/director/hooks/use-shot-states'
 import { dimmedByStatusFilter, takeCountsAsVideo, takeIsRunning, videoTakeFrame, videoTakeTail } from '@/lib/director/shot-state'
@@ -125,6 +127,10 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   //   상태는 단추를 끄고, ref 는 같은 화면에서 빠르게 두 번 불려도 한 번만 시작하게 한다.
   const [retakeReading, setRetakeReading] = useState(false)
   const retakeReadingRef = useRef(false)
+  // [멈추기]는 서버가 받아 도는 작업 목록에 그 작업이 있을 때만(검토 a cbb84e64 보통 1) — 요청이 오가는 동안 Take 에 든 것은
+  //   화면이 만든 요청 키라 멈추지 못한다(prose 상세와 같은 판단 isStoppableJob). 'default' 는 프로젝트를 열기 전 자리 값이라 묻지 않는다.
+  const queueProjectId = useDirectorCanvasStore((s) => (s.projectId && s.projectId !== 'default' ? s.projectId : null))
+  const activeJobs = useActiveGenerationJobs(queueProjectId)
 
   // effect 입력은 early-return 전에 안전 추출 (훅은 무조건 호출돼야 함).
   const vStatus = isVideoData(data) ? data.status : null
@@ -477,7 +483,9 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           note={nextInLineNote(nextNames ? nextNames.split('\n') : [], t)}
           announce={announce}
           // [멈추기](시안 D4 · 오너 7번) — 이 Take 를 화면에서 멈춘다. fal 에서는 끝까지 돌고 Take 는 돌려주지 않는다.
-          action={data.generationJobId ? <StopMakingButton target={{ jobIds: [data.generationJobId], sheetShots: 1 }} kind="video" place="wait" /> : undefined}
+          action={data.generationJobId && isStoppableJob(data.generationJobId, activeJobs)
+            ? <StopMakingButton target={{ jobIds: [data.generationJobId], sheetShots: 1 }} kind="video" place="wait" />
+            : undefined}
           className="-inset-[1.5px]"
         />
       )}

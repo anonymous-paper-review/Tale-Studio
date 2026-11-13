@@ -92,6 +92,8 @@ describe('같이 정한 것', () => {
     director.getState().updateNodeData<'video'>(videoId, {
       status: 'generating', lastAttemptStatus: 'generating', generationJobId: 'video-job-1', videoUrl: null, thumbnailUrl: null,
     })
+    // 서버가 받아 도는 작업 목록에 있는 작업(검토 a cbb84e64 — 받은 뒤에만 [멈추기]).
+    _setGenerationQueueSnapshotForTests({ projectId: PROJECT, jobs: [job('video-job-1', 'shot_video', { target: { writerShotId: 'w3' } })] })
     const card = render(VideoNode, videoId).find(named('NodeWaitCard'))
     const action = card?.props.action as Element
     expect(action.type).toBe(StopMakingButton)
@@ -100,6 +102,18 @@ describe('같이 정한 것', () => {
 })
 
 describe('혼자 정한 것', () => {
+  it('생성 요청이 오가는 동안 Take 노드에는 [멈추기]가 없다 — 서버가 받은 뒤에 생긴다', () => {
+    // 왜: 검토 a cbb84e64 보통 1 — 응답 전 Take 에 든 것은 화면이 만든 요청 키라, 그때 누르면 아무것도 멈추지 않고
+    //   "이미 다 만든 뒤였어요."라고 한 뒤 Take 는 그대로 만들어졌다.
+    const videoId = director.getState().addVideoTake(shotId)!
+    director.getState().updateNodeData<'video'>(videoId, {
+      status: 'generating', lastAttemptStatus: 'generating', generationJobId: 'request-key-1', videoUrl: null, thumbnailUrl: null,
+    })
+    expect(render(VideoNode, videoId).find(named('NodeWaitCard'))?.props.action).toBeUndefined()
+    _setGenerationQueueSnapshotForTests({ projectId: PROJECT, jobs: [job('request-key-1', 'shot_video', { target: { writerShotId: 'w3' } })] })
+    expect((render(VideoNode, videoId).find(named('NodeWaitCard'))?.props.action as Element).type).toBe(StopMakingButton)
+  })
+
   it('같은 장에 묶인 샷이 있으면 노드 카드 아래에 "같은 장 샷 N개가 같이 멈춰요"를 쓴다', () => {
     // 왜: 4샷이 한 장이라 이 노드를 멈추면 다른 세 노드도 멈춘다(S4 혼자 정한 것 c) — 누르기 전에 안다.
     _setGenerationQueueSnapshotForTests({ projectId: PROJECT, jobs: [job('sheet-1', 'storyboard_real_grid', { target: { writerShotIds: ['w1', 'w2', 'w3', 'w4'] } })] })
