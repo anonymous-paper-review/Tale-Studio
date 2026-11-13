@@ -4467,9 +4467,13 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           body: JSON.stringify({ projectId, jobIds: ids }),
         })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        const body = (await res.json()) as { data?: { cancelled?: Array<{ jobId: string; kind: string; writerShotIds: string[]; videoClipId: string | null; cancelledAt: string }> } }
+        const body = (await res.json()) as { data?: { cancelled?: Array<{ jobId: string; kind: string; writerShotIds: string[]; videoClipId: string | null; cancelledAt: string }>; closedBatchIds?: string[] } }
         const cancelled = body.data?.cancelled ?? []
         if (get().projectId !== projectId) return cancelled.map((c) => c.jobId)
+        // 영상 묶음의 마지막 영상을 멈춰 서버가 묶음을 닫았다 — 화면의 묶음도 바로 끝낸다(오너 7번 · 리드 11/14).
+        //   툴바 · 상세 · 넘기기 창 · Lumi 가 그 샷을 바로 다시 만든다. 묶음 조회는 다음 차례에 멈춘 묶음으로 보고 끝난다.
+        const runId = get().videoBatchRunId
+        if (runId && (body.data?.closedBatchIds ?? []).includes(runId)) set({ videoBatchBusy: false, videoBatchCancelled: true })
         for (const c of cancelled) stoppedJobIds.add(c.jobId)
         const imageShots = new Set(cancelled.filter((c) => c.kind !== 'shot_video').flatMap((c) => c.writerShotIds))
         const released: string[] = []
