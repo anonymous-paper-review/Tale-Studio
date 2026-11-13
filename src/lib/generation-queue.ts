@@ -184,7 +184,6 @@ function subscribeToProject(id: string, listener: () => void): () => void {
   }
 }
 
-/** 잡을 막 제출한 직후 호출 — 다음 폴링 틱을 기다리지 않고 진행 표시를 즉시 켠다. */
 /** 멈춘 작업을 다음 확인을 기다리지 않고 지금 목록에 바로 반영한다(실측: 2초 넘게 "만드는 중"으로 남았다). 다음 확인이 서버 값으로 맞춘다. */
 export function markJobsCancelled(ids: readonly string[], at: string): void {
   if (!ids.length || jobs === EMPTY) return
@@ -195,6 +194,7 @@ export function markJobsCancelled(ids: readonly string[], at: string): void {
   emit()
 }
 
+/** 잡을 막 제출한 직후 호출 — 다음 폴링 틱을 기다리지 않고 진행 표시를 즉시 켠다. */
 export function refreshGenerationQueue(): void {
   void fetchOnce()
 }

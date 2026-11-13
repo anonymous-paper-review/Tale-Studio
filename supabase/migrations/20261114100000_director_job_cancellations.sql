@@ -4,7 +4,7 @@
 --   "화면에서 멈춤"만 새 표 하나에 적는다. 오너 결정(2026-10-28 Artist 버전 때): 새 표만 더하고 기존 표에는 칸을 더하지 않는다.
 --   - 같은 샷 하나만 검사(이미지 트리거 · 영상 예약 셋)는 멈춘 작업을 세지 않는다 → 그 샷을 바로 다시 요청할 수 있다.
 --   - 동시 생성 자리 검사(enforce_generation_capacity)는 바꾸지 않는다 → 멈춘 작업도 끝날 때까지 자리를 차지한다(리드 c).
---   - shots.video_url 투영은 멈춘 Take 를 ★ 로 고르지 않은 한 고르지 않는다 → 늦게 끝나도 기록(Take 목록)에만 있다.
+--   - shots.video_url 투영 · 영상 일괄의 "이미 다 만든 샷" 검사는 멈춘 Take 를 ★ 로 고르지 않은 한 세지 않는다 → 늦게 끝나도 기록(Take 목록)에만 있다.
 --   - 함수 서명은 그대로라 옛 호출은 그대로 돈다(다른 세션도 개발 DB 를 같이 쓴다). 늦은 이미지는 finalize 가 버전 목록에만 넣는다(TS).
 --   약속: tests/ops/director-job-cancellations-migration.test.ts · tests/director/job-cancel.test.ts
 --   되돌리기: supabase/rollbacks/20261114100000_director_job_cancellations.rollback.sql(이 폴더 밖 — 이 폴더의 .sql 은 모두 마이그레이션으로 실행된다).
@@ -312,6 +312,7 @@ begin
         and vc.status = 'completed'
         and vc.url is not null
         and btrim(vc.url) <> ''
+        and (vc.is_final or not exists (select 1 from public.director_job_cancellations dc where dc.job_id = vc.last_attempt_job_id))
     ) then
       raise exception 'batch_shot_already_completed';
     end if;

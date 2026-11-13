@@ -166,7 +166,11 @@ describe('Director 샷 상세 화면', () => {
     done(1)
     const making = addTake({ takeNumber: 2, status: 'generating', lastAttemptStatus: 'generating', generationJobId: '11111111-1111-4111-8111-111111111111' })
     const out = render('panel', 'video')
-    expect(out).toContain('>Stop<')
+    // 시안 글 "멈추기"(리드 검토 a 4 — 기존 키 'Stop' 은 한국어 "정지"라 새 키).
+    expect(out).toContain('>Stop making<')
+    setLocale('ko')
+    expect(render('panel', 'video')).toContain('>멈추기<')
+    setLocale('en')
     expect(readFileSync('src/features/director/shot-detail/shot-video-tab.tsx', 'utf8')).toMatch(/cancelRunningJobs\(\[take\.data\.generationJobId!?\]\)/)
     director.getState().updateNodeData<'video'>(making, { cancelledAt: '2026-11-14T03:00:00Z' })
     const stopped = render('panel', 'video')

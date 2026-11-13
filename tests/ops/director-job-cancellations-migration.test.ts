@@ -62,6 +62,12 @@ describe('화면에서 멈춘 생성 작업 마이그레이션', () => {
     expect(read(`supabase/migrations/${MIGRATION}`)).not.toContain('enforce_generation_capacity')
   })
 
+  it('영상 일괄의 "이미 다 만든 샷" 검사는 멈춘 뒤 끝난 Take 를 세지 않고, ★ 로 고른 것은 센다', () => {
+    // 왜: 리드 검토 a 낮음 2 — 멈춘 Take 가 뒤늦게 끝나면 그 샷은 영상 없음이다(투영 · 넘기기 창 · 샷 상태와 같은 규칙). 세면 일괄이 그 샷을 건너뛴다.
+    const batch = fn(read(`supabase/migrations/${MIGRATION}`), 'reserve_director_video_batch_item')
+    expect(batch).toMatch(/and btrim\(vc\.url\) <> '' and \(vc\.is_final or not exists \(select 1 from public\.director_job_cancellations dc where dc\.job_id = vc\.last_attempt_job_id\)\) \) then raise exception 'batch_shot_already_completed'/)
+  })
+
   it('영상 투영은 멈춘 Take 를 ★ 로 고르지 않은 한 지금 영상으로 고르지 않는다', () => {
     // 왜: 오너 7번 "백그라운드에서 끝나면 히스토리로" — 늦게 끝난 Take 가 Editor 로 가는 영상을 바꾸지 않는다.
     const projection = fn(read(`supabase/migrations/${MIGRATION}`), 'refresh_director_video_projection')

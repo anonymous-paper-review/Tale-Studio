@@ -32,6 +32,7 @@ export const KO: Record<string, string> = {
   'Uploaded image': '올린 그림',
   'Finished after it was stopped': '멈춘 뒤 끝났어요',
   Stopped: '멈춤',
+  'Stop making': '멈추기',
   'Could not stop it. Try again.': '멈추지 못했어요. 다시 눌러 주세요.',
   'Stopped · The Take is not refunded. If it finishes later, it stays in this list.': '멈췄어요 · Take 는 돌려드리지 않아요. 뒤늦게 끝나면 이 목록에 남아요.',
   'The image you stopped for {shot} finished later and was kept as version v{n}. The current image did not change.': '멈춘 {shot} 이미지가 뒤늦게 다 그려져 버전 v{n} 으로 남았어요. 지금 그림은 그대로예요.',

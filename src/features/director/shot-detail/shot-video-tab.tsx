@@ -129,7 +129,7 @@ export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
                       <Button type="button" size="pill" variant="ghost" onClick={() => {
                         setStopError(null)
                         void cancelRunningJobs([take.data.generationJobId!]).catch(() => setStopError(t('Could not stop it. Try again.')))
-                      }}>{t('Stop')}</Button>
+                      }}>{t('Stop making')}</Button>
                     ) : null}
                     {phase === 'done' ? (
                       isFinal ? (

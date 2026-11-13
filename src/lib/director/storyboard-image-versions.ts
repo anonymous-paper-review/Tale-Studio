@@ -22,11 +22,14 @@ export function storyboardImageVersions(image: StoryboardImage | null | undefine
   }]
 }
 
-/** 지금 그림인 버전 — versionId 가 없으면 마지막으로 고른 것(옛 행은 v1). */
+/** 지금 그림인 버전 — 고른 버전(versionId). 고른 적 없는 옛 모양이면 마지막 버전(옛 행은 v1)이되, 멈춘 뒤 끝난 버전은 고르지 않는다.
+ *  versionId 가 null 이면 지금 그림이 없다(멈춘 그림만 있는 샷 — 리드 검토 a 보통 1). */
 export function currentStoryboardVersion(image: StoryboardImage | null | undefined): StoryboardImageVersion | null {
   const versions = storyboardImageVersions(image)
-  if (!versions.length) return null
-  return versions.find((v) => v.id === image?.versionId) ?? (image?.versionId ? null : versions[versions.length - 1]!) ?? null
+  if (!image || !versions.length) return null
+  if (typeof image.versionId === 'string') return versions.find((v) => v.id === image.versionId) ?? null
+  if (image.versionId === null) return null
+  return [...versions].reverse().find((v) => !v.cancelled) ?? null
 }
 
 function mirror(image: StoryboardImage | null, versions: StoryboardImageVersion[], chosen: StoryboardImageVersion): StoryboardImage {
@@ -57,10 +60,11 @@ export function withStoryboardVersion(
   const next: StoryboardImageVersion = { ...version, n }
   if (at >= 0) versions[at] = next
   else versions.push(next)
-  const current = image ? currentStoryboardVersion(image) : null
-  if (options.select || !current || !image) return mirror(image ?? null, versions, next)
-  // 고르지 않으면 지금 그림은 그대로 — 목록과 차례만 바꾼다.
-  return { ...image, versions, versionId: current.id, rev: (image.rev ?? 0) + 1 }
+  if (options.select) return mirror(image ?? null, versions, next)
+  // 고르지 않으면(멈춘 뒤 끝난 그림 · 오너 7번) 지금 그림은 그대로 — 목록과 차례만 바꾼다. 지금 그림이 없던 샷은 없는 채로 두어
+  //   "이미지 필요"로 남고, 버전 줄에서 고르면 그때 지금 그림이 된다(리드 검토 a 보통 1).
+  if (!image) return { url: '', status: 'pending', errorMessage: null, generatedAt: 0, versions, versionId: null, rev: 1 }
+  return { ...image, versions, versionId: currentStoryboardVersion(image)?.id ?? null, rev: (image.rev ?? 0) + 1 }
 }
 
 /** 그 버전을 지금 그림으로 — 다시 만들지 않는다(Take 0). 없는 버전이면 null. */

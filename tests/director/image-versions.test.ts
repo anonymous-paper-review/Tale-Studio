@@ -1,6 +1,8 @@
 // 실사 이미지 버전 — 만들 때마다 v1 · v2 가 쌓이고 고른 버전이 지금 그림이며, 버전은 저절로 지우지 않는다 (디자이너 11/13 D6 · 오너 2026-11-14 답 5번 · 리드 A)
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { keptStoryboardImage, selectStoryboardVersion, storyboardImageVersions, versionOfFrames, withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
+import { currentStoryboardVersion, keptStoryboardImage, selectStoryboardVersion, storyboardImageVersions, versionOfFrames, withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
+import { hasStoryboardImage } from '@/lib/director/storyboard-image'
 import type { StoryboardImage } from '@/types/director'
 
 const frames = (tag: string) => ({ start: `https://media.test/${tag}-start.png`, direction: `https://media.test/${tag}-dir.png`, end: `https://media.test/${tag}-end.png` })
@@ -84,5 +86,36 @@ describe('실사 이미지 버전', () => {
     expect(versionOfFrames(two, { start: frames('b').start, end: null })).toEqual({ start: 2, end: null })
     expect(versionOfFrames(two, { start: 'https://media.test/elsewhere.png', end: null })).toBeNull()
     expect(versionOfFrames(two, null)).toBeNull()
+  })
+
+  it('그림이 없던 샷(또는 실패만 있던 샷)에서 멈춘 그림이 뒤늦게 끝나면 버전 목록에만 들어가고 지금 그림은 비어 있어 이미지 필요로 남는다', () => {
+    // 왜: 리드 검토 a 보통 1 · 오너 7번 "뒤에서 끝나면 히스토리로" — 처음 만드는 샷이 가장 흔한 경우다. 멈춘 그림이 저절로 지금 그림이 되면
+    //   채팅의 "지금 그림은 그대로예요"와 반대가 된다. 버전 줄에서 골라야 지금 그림이 된다.
+    const late = { ...made('job-late', 'late', 2), cancelled: true as const }
+    for (const base of [null, { url: '', status: 'failed' as const, errorMessage: 'x', generatedAt: 0 }]) {
+      const next = withStoryboardVersion(base, late, { select: false })
+      expect(currentStoryboardVersion(next)).toBeNull()
+      expect(next.url).toBe('')
+      expect(hasStoryboardImage(next)).toBe(false)
+      expect(storyboardImageVersions(next).map((v) => [v.n, v.id, v.cancelled === true])).toEqual([[1, 'job-late', true]])
+      expect(selectStoryboardVersion(next, 'job-late')).toMatchObject({ url: frames('late').start, versionId: 'job-late', status: 'completed' })
+    }
+    // 지금 그림이 있으면 그대로(종전 시험과 같음).
+    const withCurrent = withStoryboardVersion({ url: 'https://media.test/v1.png', status: 'completed', errorMessage: null, generatedAt: 1 }, late, { select: false })
+    expect(currentStoryboardVersion(withCurrent)?.url).toBe('https://media.test/v1.png')
+  })
+
+  it('지금 그림을 정해 둔 적 없는 옛 모양이어도 멈춘 버전은 지금 그림으로 고르지 않는다', () => {
+    // 왜: 리드 검토 a 보통 1 — "고른 버전이 없으면 마지막 버전"이 멈춘 버전을 고르면 같은 고장이 다른 길로 난다.
+    const legacyShape = { url: '', status: 'pending' as const, errorMessage: null, generatedAt: 0, versions: [{ ...made('job-late', 'late', 2), n: 1, cancelled: true as const }] }
+    expect(currentStoryboardVersion(legacyShape)).toBeNull()
+  })
+
+  it('멈춘 그림만 있는 샷(지금 그림 없음)은 이미지 필요로 남아 이미지 일괄 만들기가 건너뛰지 않는다', () => {
+    // 왜: 리드 검토 a 보통 1 — 지금 그림이 없어도 storyboard_image 칸은 비어 있지 않다(멈춘 버전 기록). 칸이 있다고 건너뛰면 그 샷은 일괄로 그림이 생기지 않는다.
+    const stoppedOnly = withStoryboardVersion(null, { ...made('job-late', 'late', 2), cancelled: true as const }, { select: false })
+    expect(hasStoryboardImage(stoppedOnly)).toBe(false)
+    const route = readFileSync('src/app/api/director/generate-storyboard-batch/route.ts', 'utf8')
+    expect(route).toMatch(/if \(!force && hasStoryboardImage\(s\.storyboard_image\)\) continue/)
   })
 })
