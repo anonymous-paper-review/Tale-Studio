@@ -478,7 +478,7 @@ function ShotCell({
                 : status === 'failed' && img?.errorMessage
                 ? img.errorMessage
                 : hasImage
-                  ? t('Create a new shooting image (replaces the existing one)')
+                  ? t('Create a new shooting image (the current one stays in the versions)')
                   : t('Only generates the shooting image'),
             primary: false,
             disabled: imageGeneration.disabled && imageGeneration.phase !== 'error',
@@ -810,7 +810,8 @@ function ShotCell({
             ? [t('Costs money to generate the video.'), t('Adds a new take. The card shows the latest successful one.')]
             : confirm === 'previz'
               ? [t('Costs money to generate the previz.'), t('Replaces the existing rough frames with the new result.')]
-              : [t('Replaces the existing shooting image with the new result.')]
+              // 다시 만들어도 지금 이미지는 버전으로 남는다(오너 답 5번 · prose 상세 단추와 같은 말).
+              : [t('The new image becomes the current one. The current image stays in the versions.')]
         }
         confirmLabel={confirm === 'manual-retry' ? t('Generate again') : t('Regenerate')}
         busy={confirm === 'manual-retry' ? !manualUncertain || realBatchBusy : confirm === 'image' && imageGeneration.disabled}

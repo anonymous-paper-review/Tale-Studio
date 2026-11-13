@@ -1388,7 +1388,8 @@ function PaletteBar() {
         onOpenChange={setConfirmRemake}
         title={countText(t, imageMode.shotIds.length, 'Make 1 image again?', 'Make {count} images again?', { count: imageMode.shotIds.length })}
         description={countText(t, imageMode.shotIds.length, 'Remakes the image for the 1 picked shot. No Takes are used.', 'Remakes the image for the {count} picked shots. No Takes are used.', { count: imageMode.shotIds.length })}
-        impact={[t('Replaces the current images in the picked shots.')]}
+        // 다시 만들어도 지금 이미지는 버전으로 남는다(오너 답 5번).
+        impact={[countText(t, imageMode.shotIds.length, 'The new image becomes the current one. The current image stays in the versions.', 'The new images become the current ones. The current images stay in the versions.')]}
         confirmLabel={t('Make again')}
         onConfirm={remakePicked}
       />
