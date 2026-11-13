@@ -127,11 +127,14 @@ export function VideoSourcePanel({
             <div className="grid grid-cols-2 gap-2 px-4 pb-4 pt-2">
               {sourceShots.map((shot) => {
                 const clip = videoClips.find((c) => c.shotId === shot.shotId)
+                // 영상이 있는 샷만 타임라인에 들어간다 — 영상 없는 카드는 끌기를 시작하지 않고 누르면 미리 보기만 한다(오너 답 8, 2026-11-14).
+                const hasVideo = !!clip?.url
                 return (
                   <ContextMenu key={shot.shotId}>
                     <ContextMenuTrigger asChild>
                       <div
-                        onPointerDown={(e) =>
+                        onClick={hasVideo ? undefined : () => onPreview(shot.shotId)}
+                        onPointerDown={hasVideo ? (e) =>
                           startBinDrag({
                             event: e,
                             label: `▶ ${shot.shotType}`,
@@ -142,10 +145,13 @@ export function VideoSourcePanel({
                             onDragOver: (target, clientX) =>
                               onSetBinDropSec(target ? dropTargetSec(target, clientX) : null),
                             onDrop: ({ target, clientX }) => onAddClip(shot.shotId, dropTargetSec(target, clientX)),
-                          })
+                          }) : undefined
                         }
-                        title={`${resolveEntityNames(shot.actionDescription, entityNames)}\n${t('(Click: preview / drag·right-click: add to timeline)')}`}
-                        className="group flex cursor-grab flex-col rounded-xl bg-background p-1.5 transition-colors hover:bg-card active:cursor-grabbing"
+                        title={`${resolveEntityNames(shot.actionDescription, entityNames)}\n${hasVideo ? t('(Click: preview / drag·right-click: add to timeline)') : t('(No video yet. Only shots with video go into the timeline.)')}`}
+                        className={cn(
+                          'group flex flex-col rounded-xl bg-background p-1.5 transition-colors hover:bg-card',
+                          hasVideo ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer',
+                        )}
                       >
                         <div className="flex aspect-video items-center justify-center overflow-hidden rounded-lg bg-art-placeholder font-num text-[10px] font-semibold text-muted-foreground">
                           {clip?.url ? (
@@ -174,7 +180,7 @@ export function VideoSourcePanel({
                       <ContextMenuItem className="text-xs" onSelect={() => onPreview(shot.shotId)}>
                         <Eye className="size-3.5" /> {t('Preview')}
                       </ContextMenuItem>
-                      <ContextMenuItem className="text-xs" onSelect={() => onAddClipAtPlayhead(shot.shotId)}>
+                      <ContextMenuItem className="text-xs" disabled={!hasVideo} onSelect={() => onAddClipAtPlayhead(shot.shotId)}>
                         <ListPlus className="size-3.5" /> {t('Add to timeline')}
                       </ContextMenuItem>
                     </ContextMenuContent>

@@ -330,16 +330,18 @@ describe('다시 열 때 · 새로 더할 때', () => {
     expect([audio('a_sh_2')?.startSec, audio('a_sh_3')?.startSec]).toEqual([2.5, 7.5])
   })
 
-  it('처음 나눌 때 영상이 없던 샷이 가운데 있어도, 그 샷 길이만큼 건너뛰어 뒤 소리를 다시 잇는다', async () => {
+  it('처음 나눌 때 영상이 없던 샷이 가운데 있어도, 그 샷 길이만큼 건너뛰어 뒤 소리를 다시 잇고, 이어진 소리는 빈 칸 없이 당겨진 영상 자리로 간다', async () => {
     // 왜: 영상이 없던 샷에는 소리를 놓지 않아 사슬에 그 샷 길이만큼 빈틈이 생긴다 — 거기서 멈추면 뒤 소리를 하나도 잇지 못한다.
+    //   영상 없는 샷은 이제 타임라인에 빈 칸으로 남지 않으므로(오너 답 8, 2026-11-14) 이은 소리는 당겨진 영상 자리(0초)로 간다.
     api().reset()
     const shots = [shot('sh_1'), shot('sh_2', 4), shot('sh_3')]
     const clips = [clip('sh_1'), clip('sh_2', { url: null, status: 'pending' }), clip('sh_3')]
     useEditorStore.setState({ shots, videoClips: clips, clipOrder: { sc_01: ['sh_1', 'sh_2', 'sh_3'] } })
     saveSnapshot({ shots, videoClips: clips, clipOrder: { sc_01: ['sh_2', 'sh_3'] }, audioClips: [old('sh_1', 0), old('sh_3', 9)] })
     expect(await api().loadPersisted()).toBe(true)
+    expect(api().clipOrder.sc_01).toEqual(['sh_3'])
     expect(audio('a_sh_1')).toBeUndefined()
-    expect(audio('a_sh_3')).toMatchObject({ linkedShotId: 'sh_3', startSec: 4 })
+    expect(audio('a_sh_3')).toMatchObject({ linkedShotId: 'sh_3', startSec: 0 })
   })
 
   it('처음 나눈 자리 사슬이 끊긴 뒤의 옛 소리는 억지로 잇지 않고 그대로 둔다', async () => {

@@ -14,13 +14,16 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: 'Invalid request: shotId is required' }, { status: 400 })
     }
 
+    // 둘 다 null = 구간 지우기(전체 길이) — 영상이 새로 생겨 Editor 에 처음 상태로 들어온 샷(검토 c, 2026-11-14).
+    const clearing = trimStart === null && trimEnd === null
     if (
+      !clearing && (
       typeof trimStart !== 'number' ||
       typeof trimEnd !== 'number' ||
       !Number.isFinite(trimStart) ||
       !Number.isFinite(trimEnd) ||
       trimStart < 0 ||
-      trimEnd <= trimStart
+      trimEnd <= trimStart)
     ) {
       return NextResponse.json(
         { error: 'Invalid request: trimStart/trimEnd must be finite numbers with 0 <= trimStart < trimEnd' },
