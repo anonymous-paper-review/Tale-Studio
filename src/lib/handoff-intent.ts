@@ -45,7 +45,8 @@ export const HANDOFFS: readonly HandoffSpec[] = [
     from: 'director',
     to: 'editor',
     utterance: 'Please hand over to Editor',
-    label: 'Hand over to Editor',
+    // 1110 확정 시안 D1 "다음: Editor로 →"(오너 2026-11-14) — 다른 단계 "다음: Director로"와 같은 꼴.
+    label: 'Next: Editor',
   },
 ] as const
 

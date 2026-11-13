@@ -183,7 +183,7 @@ describe('약속 E — 영상 일괄 생성은 Take를 미리 센다', () => {
     expect((posts[0]!.body!.items as Array<{ shotId: string }>).map((i) => i.shotId)).toEqual(['s1', 's2'])
     expect(mockStore.state.generateVideoForShot).not.toHaveBeenCalled()
     // 확인창은 만들 수 있는 수(limit)로 요청한다.
-    expect(read('src/app/studio/director/page.tsx')).toMatch(/runVideoBatch\(pid, \{ limit: videoPlan\.runCount \}\)/)
+    expect(read('src/app/studio/director/page.tsx')).toMatch(/runVideoBatch\(pid, \{ limit: videoPlan\.runCount, shotIds: videoWork \}\)/)
   })
 
   it('shadow 모드는 숫자를 보이되 막지 않는다. 0개면 충전 안내다', () => {

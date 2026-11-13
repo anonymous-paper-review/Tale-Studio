@@ -103,11 +103,26 @@ describe('혼자 정한 것', () => {
     expect(textOf(frame)).not.toContain('대기 중')
   })
 
-  // 왜: 정상 경로 고정. 아직 만들지 않은 영상 노드는 지금처럼 그림 자리에서 기다리는 중임을 알린다.
-  it("영상이 아직 없고 만드는 중도 아니면 그림 자리에 '대기 중'을 쓴다", () => {
+  // 왜: 정상 경로 고정. 아직 만들지 않은 영상 노드는 그림 자리에서 왜 비었는지 알린다.
+  //   2026-11-14 문장 바꿈(시안 D1 노드형 406:4051 "이미지가 생기면 만들 수 있어요", 오너 11/13 허락 · 리드 답 5a):
+  //   예전 "영상이 아직 없고 만드는 중도 아니면 그림 자리에 '대기 중'을 쓴다".
+  it("영상이 아직 없고 만드는 중도 아니며 그 샷에 이미지가 없으면 그림 자리에 '이미지가 생기면 만들 수 있어요'를 쓴다", () => {
     const frame = renderFrame()
 
     expect(childrenOf(frame).find(isOverlay)?.props.active).toBe(false)
-    expect(textOf(frame)).toContain('대기 중')
+    expect(textOf(frame)).toContain('이미지가 생기면 만들 수 있어요')
+    expect(textOf(frame)).not.toContain('대기 중')
+  })
+
+  // 왜: 이미지가 이미 있으면 기다릴 것이 없다 — "대기 중"은 무엇을 기다리는지 말하지 않았다(혼자 정한 것, 리드 답 5a).
+  it("영상이 아직 없고 만드는 중도 아니며 그 샷에 이미지가 있으면 그림 자리에 '영상을 만들 수 있어요'를 쓴다", () => {
+    const shotId = director.getState().nodes.find((node) => node.data.kind === 'shot')!.id
+    director.getState().updateNodeData<'shot'>(shotId, {
+      storyboardImage: { url: 'https://media.test/shot-1.jpg', status: 'completed', errorMessage: null, generatedAt: 1 },
+    })
+    const frame = renderFrame()
+
+    expect(textOf(frame)).toContain('영상을 만들 수 있어요')
+    expect(textOf(frame)).not.toContain('대기 중')
   })
 })

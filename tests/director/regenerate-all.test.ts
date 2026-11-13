@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { KO as ko } from '@/lib/i18n/messages-ko'
+import { imageWorkBlock } from '@/lib/director/toolbar-work'
 
 // #c3 (2026-08-27 오너) — "하나씩 하는 거 짜쳐서 전체 재생성 누르려는데 X표로 막힘".
 //
@@ -27,31 +28,46 @@ describe('C3 — 전체 재생성을 요청할 수 있다', () => {
     expect(client).toContain("opts?.force ? { projectId, force: true } : { projectId }")
   })
 
-  it('모든 그림이 있어도 전체 재생성 전에 확인을 요청한다', () => {
-    // 예전: toast.info('All storyboards have already been generated.') 후 return
-    expect(page).toContain('setConfirmRegenAll(true)')
-    expect(page).toContain('runRealBatch(pid, { force: true })')
+  // 왜: 1110 확정 시안 D2 · R — [이미지 만들기]는 이미지 없는 샷만 센다. 8/27 오너의 "전체 재생성" 길은 고르기로 남는다:
+  //   전체 체크 → 고른 샷이 모두 이미지가 있으면 [이미지 다시 만들기 · N] → 확인 → 고른 샷만 다시(오너 2026-11-14 "나머지는 추천대로").
+  it('이미지가 있는 샷을 고르고 [이미지 다시 만들기]를 누르면 확인한 뒤 고른 샷만 다시 만든다', () => {
+    expect(page).toContain('setConfirmRemake(true)')
+    expect(page).toContain('runRealBatch(pid, { force: true, shotIds: batch })')
   })
 
-  it('비용이 드는 전체 재생성은 확인한 뒤 시작한다', () => {
+  // 왜: 다시 만들기는 지금 이미지를 바꾸니 몇 장인지 · Take 를 쓰지 않는다는 것 · 바뀐다는 것을 먼저 알린다.
+  it('다시 만들기 확인 창은 몇 장을 다시 만드는지, Take 를 쓰지 않는다는 것, 지금 이미지가 바뀐다는 것을 알린다', () => {
     expect(page).toContain('RegenerateConfirmDialog')
-    expect(page).toContain('Regenerate every storyboard image?')
-    // 영향 고지에 과금·교체가 둘 다 있어야 한다
-    expect(page).toContain('Costs money for every shot')
-    expect(page).toContain('Replaces the existing shooting images')
+    expect(page).toContain('Make {count} images again?')
+    expect(page).toContain('No Takes are used.')
+    expect(page).toContain('Replaces the current images in the picked shots.')
   })
 })
 
 describe('C3 — 막힐 때 이유를 말한다', () => {
+  // 왜: 출시 문장 그대로(#c3 2026-08-27 ② "생성 중이면 disabled 인데 왜 막혔는지 말해주지 않았다"). 1110 확정 화면에서는
+  //   일괄이 도는 동안 [이미지 만들기]가 꺼지고 단추 아래 한 줄로 까닭을 보인다(결정 페이지 "꺼진 단추 아래 이유 한 줄", 리드 검토 a 보통 1).
   it('생성 중에는 다시 누를 수 없는 이유를 알려준다', () => {
-    expect(page).toContain('Generation in progress. You can start again when it finishes.')
+    const work = readFileSync('src/lib/director/toolbar-work.ts', 'utf8')
+    expect(work).toContain("'Making images now. You can press again when it finishes.'")
+    // 이미지 일괄이 도는 동안(realBatchBusy) 이미지 단추의 까닭은 '만드는 중'이고, 그 까닭이 단추 아래 한 줄로 보인다.
+    expect(imageWorkBlock(new Map([['a', 'image_needed']]), new Set(), true)).toBe('busy')
+    expect(page).toMatch(/imageWorkBlock\([^)]*realBatchBusy/)
+    expect(page).toContain('{blockLine}')
   })
 
-  it('전체 재생성 안내 문구를 한국어로 보여준다', () => {
+  it('다시 만들기 · 꺼진 단추 안내 문구를 한국어로 보여준다', () => {
     for (const key of [
-      'Regenerate every storyboard image?',
-      'Regenerate all',
-      'Generation in progress. You can start again when it finishes.',
+      'Make {count} images again?',
+      'Make images again',
+      'Every shot here already has an image.',
+      'Videos need an image first.',
+      'Making images now. You can press again when it finishes.',
+      'Making videos now. You can press again when it finishes.',
+      'Making images and videos now. You can press again when they finish.',
+      'No shots yet.',
+      'The rest are being made now.',
+      'Every shot here already has a video.',
     ]) {
       expect(ko[key], `missing ko: ${key}`).toBeTruthy()
     }
