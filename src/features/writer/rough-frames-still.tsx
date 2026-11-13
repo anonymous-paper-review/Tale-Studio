@@ -23,11 +23,14 @@ export function RoughFramesStill({
   shotId,
   panel,
   onRegenerated,
+  confirmRedraw,
 }: {
   projectId: string
   shotId: string
   panel: RoughStoryboardImage
   onRegenerated: () => void
+  /** 다시 만들기 전에 물을 기회 — 연출 편집기에 저장하지 않은 화살표가 있으면 연출 장 다시 만들기 전에 묻는다(검토 a 54016e65). */
+  confirmRedraw?: (frame: RoughFrameKey, proceed: () => void) => void
 }) {
   const t = useT()
   const [busy, setBusy] = useState<RoughFrameKey | null>(null)
@@ -79,7 +82,7 @@ export function RoughFramesStill({
             variant="outline"
             className="h-auto min-h-8 w-full whitespace-normal py-1.5 leading-tight"
             disabled={busy !== null}
-            onClick={() => void regenerate(frame)}
+            onClick={() => (confirmRedraw ? confirmRedraw(frame, () => void regenerate(frame)) : void regenerate(frame))}
             title={t('Redraw only this frame (1 image generation). The other two stay as they are.')}
           >
             {busy === frame ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}

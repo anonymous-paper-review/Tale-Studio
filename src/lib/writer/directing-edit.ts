@@ -254,11 +254,12 @@ export function mergeRoughFrame(
 
 // 따옴표 대사 — "…" “…” 「…」 『…』 ‘…’, 앞이 글자가 아닌 '…', 그리고 한글 바로 뒤에서 열려 인용 조사 앞에서 닫히는
 //   '…'("도윤이'마지막이야'라고", 검토 a 7b10877d 낮음 2). man's · don't 같은 아포스트로피는 남긴다.
-//   대사 바로 뒤의 인용 조사(이라고 · 라고 · 이라며 · 라며 · 하고 · 하며 · 며)도 같이 뺀다 — 남으면 "도윤이라고"처럼 읽힌다.
+//   대사 바로 뒤의 인용 조사(이라고 · 라고 · 이라며 · 라며 · 하고 · 하며 · 며 · 줄임꼴 고)도 같이 뺀다 — 남으면 "도윤이라고"처럼 읽힌다.
+//   조사 앞 띄어쓰기("'마지막이야' 라고")도 받는다(검토 a 45b1e2e2). 조사는 낱말 끝이어야 한다 — "'야옹' 고양이"의 '고'는 조사가 아니다.
 //   한글 글자는 코드 줄에 두지 않고 이스케이프로 쓴다(i18n-korean-scan).
-const QUOTATIVE = String.raw`(?:\uC774\uB77C\uACE0|\uB77C\uACE0|\uC774\uB77C\uBA70|\uB77C\uBA70|\uD558\uACE0|\uD558\uBA70|\uBA70)`
+const QUOTATIVE = String.raw`(?:\uC774\uB77C\uACE0|\uB77C\uACE0|\uC774\uB77C\uBA70|\uB77C\uBA70|\uD558\uACE0|\uD558\uBA70|\uBA70|\uACE0)(?=[\s.,!?;:)]|$)`
 const QUOTED_DIALOGUE = new RegExp(
-  String.raw`(?:"[^"]*"|\u201c[^\u201d]*\u201d|\u300c[^\u300d]*\u300d|\u300e[^\u300f]*\u300f|\u2018[^\u2019]*\u2019|(?<![\p{L}\p{N}])'(?:[^'\n]|'(?=[A-Za-z]))*?'(?![A-Za-z])|(?<=[\uAC00-\uD7A3])'[^'\n]+?'(?=${QUOTATIVE}))${QUOTATIVE}?`,
+  String.raw`(?:"[^"]*"|\u201c[^\u201d]*\u201d|\u300c[^\u300d]*\u300d|\u300e[^\u300f]*\u300f|\u2018[^\u2019]*\u2019|(?<![\p{L}\p{N}])'(?:[^'\n]|'(?=[A-Za-z]))*?'(?![A-Za-z])|(?<=[\uAC00-\uD7A3])'[^'\n]+?'(?=\s?${QUOTATIVE}))(?:\s?${QUOTATIVE})?`,
   'gu',
 )
 

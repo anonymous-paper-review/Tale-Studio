@@ -114,6 +114,23 @@ describe('연출 한 장 다시 그리기에 실리는 글', () => {
     expect(withoutQuotedDialogue("The man's notebook stays shut; don't open it.")).toBe("The man's notebook stays shut; don't open it.")
   })
 
+  // 왜(검토 a 45b1e2e2 탐침 probe-quote2): 인용 조사 앞을 띄어 쓰거나("'마지막이야' 라고") 줄임꼴 '고'("'마지막이야'고")로 붙은 대사가 남았다.
+  //   대사가 아닌 것(BTS' · 가'나'다라고 · 뒤가 '고양이'처럼 다른 낱말인 것)은 그대로 둔다.
+  it('인용 조사 앞을 띄어 쓰거나 줄임꼴 "고"로 붙은 작은따옴표 대사도 빼고, 대사가 아닌 따옴표는 그대로 둔다', () => {
+    const cases: Array<[string, string]> = [
+      ["도윤이'마지막이야' 라고 중얼거린다.", '도윤이 중얼거린다.'],
+      ["도윤이'마지막이야'고 말했다.", '도윤이 말했다.'],
+      ["도윤이'가자'라고 하고 민호가'응'하며 웃는다.", '도윤이 하고 민호가 웃는다.'],
+      ["BTS'의 노래가 흐른다.", "BTS'의 노래가 흐른다."],
+      ['그가 "그만"하고 돌아선다.', '그가 돌아선다.'],
+      ["엄마가'밥 먹자'며 부른다.", '엄마가 부른다.'],
+      ["Ji-ho said 'run' and left.", 'Ji-ho said and left.'],
+      ["가'나'다라고 쓴다.", "가'나'다라고 쓴다."],
+      ["민호가 '야옹' 고양이 소리를 낸다.", '민호가 고양이 소리를 낸다.'],
+    ]
+    for (const [text, expected] of cases) expect(withoutQuotedDialogue(text)).toBe(expected)
+  })
+
   // 왜(검토 a 3): 분리한 밑층은 지우개로 드러나 저장되는 그림이다 — 한 장 다시 그리기와 같이 얼굴 없는 목각 인형 · 글자 없음을 지킨다.
   it('레이어를 분리할 때도 인물은 얼굴 없는 목각 인형 그대로 두고 글자를 더하지 않는다', async () => {
     mocks.generateReservedImage.mockRejectedValueOnce(new Error('stop after the prompt'))

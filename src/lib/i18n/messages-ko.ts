@@ -587,6 +587,9 @@ export const KO: Record<string, string> = {
   'Save them before switching tabs, or switch without saving them.': '탭을 바꾸기 전에 저장하거나, 저장하지 않고 바꿀 수 있어요.',
   'Discard and switch': '버리고 바꾸기',
   'Save and switch': '저장하고 바꾸기',
+  // 연출 장을 다시 만들 때 같은 물음 — 저장해도 바뀌므로 둘만(검토 a 54016e65)
+  'Remaking the directing frame replaces it, so the arrows you drew go away.': '연출 그림을 다시 만들면 그린 화살표는 없어져요.',
+  'Discard and remake': '버리고 다시 만들기',
   'Could not create a canvas context': '캔버스 컨텍스트 생성 실패',
   'Saved the DIRECTING frame': 'DIRECTING 프레임을 저장했어요',
   'Redrawing the END frame, about 30 seconds': 'END 프레임을 다시 그리는 중이에요. 30초쯤 걸려요',

@@ -314,7 +314,14 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
                 bigFrame(tab === 'start' ? frames?.start : frames?.direction, t(tab === 'start' ? 'Start' : 'Directing'))
               )}
               {completed && panel ? (
-                <RoughFramesStill key={`still-${shot.shotId}-${panel.generatedAt}`} projectId={projectId} shotId={shot.shotId} panel={panel} onRegenerated={() => void loadProject()} />
+                <RoughFramesStill
+                  key={`still-${shot.shotId}-${panel.generatedAt}`}
+                  projectId={projectId}
+                  shotId={shot.shotId}
+                  panel={panel}
+                  onRegenerated={() => void loadProject()}
+                  confirmRedraw={guard.requestRedraw}
+                />
               ) : null}
               <p className="text-caption text-muted-foreground">{shot.actionDescription}</p>
             </div>
@@ -382,7 +389,7 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
                   </Field>
                   <p className="text-caption text-muted-foreground">{completed ? t('Draw or erase arrows on the directing frame on the left, then save. The card updates right away.') : t('This shot has no rough yet.')}</p>
                   {completed ? (
-                    <Button variant="secondary" className="self-start rounded-full" disabled={!!busy} onClick={() => void redrawDirection()} data-testid="shot-edit-redraw-direction">
+                    <Button variant="secondary" className="self-start rounded-full" disabled={!!busy} onClick={() => guard.requestRedraw('direction', () => void redrawDirection())} data-testid="shot-edit-redraw-direction">
                       <RefreshCw className="size-4" />{t('Remake only the directing frame')}
                     </Button>
                   ) : null}

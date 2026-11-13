@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils'
 import type { RoughStoryboardImage } from '@/types'
 import { translate, useT } from '@/lib/i18n'
 import { reloadAfterRoughFrameEdit } from '@/lib/writer/rough-frame-refresh'
+import { warnBeforeLeaving } from '@/features/writer/unsaved-arrows-confirm'
 import { useLocaleStore } from '@/stores/locale-store'
 
 const UNDO_LIMIT = 10
@@ -181,6 +182,8 @@ export function DirectingArrowEditor({
     onDirtyChange?.(dirty)
   }, [dirty, onDirtyChange])
   useEffect(() => () => onDirtyChange?.(false), [onDirtyChange])
+  // 그린 채 페이지를 떠나거나 새로 고치면 브라우저가 묻는다 — 저장하면(되돌리기 칸이 비면) 푼다(검토 a 54016e65).
+  useEffect(() => warnBeforeLeaving(window, dirty), [dirty])
 
   const busy = separating || saving
   const ready = !!dims
