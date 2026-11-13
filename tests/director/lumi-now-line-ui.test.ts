@@ -127,9 +127,10 @@ describe('지금 할 일 줄 자리(시안 D5)', () => {
 
   // 왜(혼자 정한 것): 줄은 보드 전체의 다음 일이다 — 상태 고르기 · 카드 고르기로 좁혀 볼 때 위쪽 예상 칸은 좁힌 샷만 세지만 줄은 흔들리지 않는다.
   it('지금 할 일 줄은 상태 고르기 · 고른 샷과 상관없이 보드 전체를 센다', () => {
-    expect(lineText()).toBe('지금 할 일 · 이미지 2장 · 약 2분 · Takes 안 써요')
+    // 이 화면은 Take 잔액을 읽기 전(과금 꺼짐으로 보임)이다 — set 528a9497(리드 11/14)부터 그때는 "Takes 안 써요"도 쓰지 않는다.
+    expect(lineText()).toBe('지금 할 일 · 이미지 2장 · 약 2분')
     useDirectorCanvasStore.setState({ statusFilter: 'image_done', pickedShotIds: ['s3'] })
-    expect(lineText()).toBe('지금 할 일 · 이미지 2장 · 약 2분 · Takes 안 써요')
+    expect(lineText()).toBe('지금 할 일 · 이미지 2장 · 약 2분')
   })
 
   // 왜: 정상 경로 고정 — 시안 D5 "상태 따라 바뀜". 이미지가 생기면 영상, 영상이 다 되면 다음: Editor로.

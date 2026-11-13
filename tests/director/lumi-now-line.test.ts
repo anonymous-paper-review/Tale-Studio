@@ -38,6 +38,11 @@ describe('지금 할 일 줄(시안 D5)', () => {
     expect(lumiNowLine(input(board('image_done', 'image_done'), { takesShown: false }), ko)).toBe('지금 할 일 · 영상 2개 · 약 3분')
   })
 
+  // 왜: set 528a9497(리드 11/14) — Take 를 세지 않는 계정에 "Takes 안 써요"를 붙이면 Take 이야기를 하는 셈이다. 툴바 예상 칸 · D0 와 같은 함수라 같게 따른다.
+  it('Take 를 쓰지 않는 계정이면 이미지 예상에도 "Takes 안 써요"를 쓰지 않는다', () => {
+    expect(lumiNowLine(input(board('image_needed', 'image_needed'), { takesShown: false }), ko)).toBe('지금 할 일 · 이미지 2장 · 약 2분')
+  })
+
   // 왜: "영상까지 이어서"를 켜면 이미지 단추가 영상까지 만든다 — 줄도 이어서 만들 영상과 Take 를 같이 센다(툴바 예상 칸과 같은 셈).
   it('"영상까지 이어서"를 켰으면 이미지와 이어서 만들 영상 · 쓰는 Take 를 함께 보인다', () => {
     expect(lumiNowLine(input(board('image_needed', 'image_needed', 'video_done'), { chain: true }), ko)).toBe('지금 할 일 · 이미지 2장 · 영상 2개 · 약 5분 · Takes 10')

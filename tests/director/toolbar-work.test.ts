@@ -104,6 +104,12 @@ describe('예상 칸', () => {
       .toBe('이미지 2장 · 영상 2개 · 약 5분 · Takes 10')
   })
 
+  it('Take 를 세지 않는 설정이면 이미지 일에도 "Takes 안 써요"를 쓰지 않는다', () => {
+    // 왜: 과금이 꺼진 계정에 Take 를 말하지 않는다 — Storyboard → Director 넘기기 창(D0)은 이미 뺐다. 툴바 · Lumi "지금 할 일" · D0 세 곳이 같게(리드 11/14).
+    expect(workEstimateText({ images: 4, videoModels: [], videoTakes: 0, takesShown: false, making: false }, ko)).toBe('이미지 4장 · 약 2분')
+    expect(workEstimateText({ images: 1, videoModels: [], videoTakes: 0, takesShown: false, making: false }, en)).toBe('1 image · about 2 min')
+  })
+
   it('Take 를 세지 않는 설정이면 예상 칸에 Take 를 쓰지 않는다', () => {
     // 왜: 영상 노드의 Take 배지와 같은 규칙(돈을 받지 않는 설정에서는 숨김).
     expect(workEstimateText({ images: 0, videoModels: ['seedance'], videoTakes: 5, takesShown: false, making: false }, ko))
