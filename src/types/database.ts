@@ -557,6 +557,55 @@ export type Database = {
           },
         ]
       }
+      director_job_cancellations: {
+        Row: {
+          cancelled_at: string
+          cancelled_by: string | null
+          job_id: string
+          project_id: string
+          video_clip_id: string | null
+          writer_shot_ids: string[]
+        }
+        Insert: {
+          cancelled_at?: string
+          cancelled_by?: string | null
+          job_id: string
+          project_id: string
+          video_clip_id?: string | null
+          writer_shot_ids?: string[]
+        }
+        Update: {
+          cancelled_at?: string
+          cancelled_by?: string | null
+          job_id?: string
+          project_id?: string
+          video_clip_id?: string | null
+          writer_shot_ids?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "director_job_cancellations_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "generation_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "director_job_cancellations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "director_job_cancellations_video_clip_id_fkey"
+            columns: ["video_clip_id"]
+            isOneToOne: false
+            referencedRelation: "video_clips"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       director_video_batch_items: {
         Row: {
           batch_id: string
@@ -2238,6 +2287,16 @@ export type Database = {
           p_provider_request_id: string
         }
         Returns: undefined
+      }
+      cancel_director_jobs: {
+        Args: { p_job_ids: string[]; p_project_id: string; p_user_id?: string }
+        Returns: {
+          cancelled_at: string
+          job_id: string
+          kind: string
+          video_clip_id: string
+          writer_shot_ids: string[]
+        }[]
       }
       claim_director_video_batch: {
         Args: { p_batch_id: string; p_token: string }

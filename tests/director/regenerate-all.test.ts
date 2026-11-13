@@ -20,7 +20,9 @@ describe('C3 — 전체 재생성을 요청할 수 있다', () => {
     expect(route).toContain('force?: boolean')
     // 되돌아간 형태: if (s.storyboard_image) continue  ← force 무시
     expect(route).not.toMatch(/^\s*if \(s\.storyboard_image\) continue/m)
-    expect(route).toContain('if (!force && s.storyboard_image) continue')
+    expect(route).not.toMatch(/^\s*if \(hasStoryboardImage\(s\.storyboard_image\)\) continue/m)
+    // 2026-11-14 오너 7번 · 리드 검토 a 1: 이미 만든 그림인지는 칸이 있는지가 아니라 지금 그림으로 본다(멈춘 그림만 있는 샷은 빈칸).
+    expect(route).toContain('if (!force && hasStoryboardImage(s.storyboard_image)) continue')
   })
 
   it('전체 재생성 요청이 실제 작업까지 전달된다', () => {
@@ -56,6 +58,7 @@ describe('C3 — 막힐 때 이유를 말한다', () => {
     expect(page).toContain('{blockLine}')
   })
 
+  // 왜: 한국어 화면에서 다시 만들기 확인 창 · 꺼진 단추 아래 까닭이 영어 원문 그대로 보이지 않게(새 문구는 두 말, 약속 A).
   it('다시 만들기 · 꺼진 단추 안내 문구를 한국어로 보여준다', () => {
     for (const key of [
       'Make {count} images again?',

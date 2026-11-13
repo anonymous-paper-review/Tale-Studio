@@ -8,7 +8,10 @@ import { X } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
-import { shotDetailTakes, videoTabLabelKey, type ShotDetailTab } from '@/lib/director/shot-detail'
+import { latestShotTake, shotDetailFrames, shotDetailTakes, takePhaseOf, takeSettings, videoTabLabelKey, type ShotDetailTab } from '@/lib/director/shot-detail'
+import { useTakeBalance } from '@/lib/billing/use-take-balance'
+import { useStoryboardImageGeneration } from '@/features/director/hooks/use-storyboard-image-generation'
+import { takeCostForVideo } from '@/lib/billing/take-cost'
 import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store'
 import { isShotData } from '@/types/director'
 import { useBoardNodeNames } from '@/features/director/hooks/use-board-node-names'
@@ -27,14 +30,31 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
   const t = useT()
   const [tab, setTab] = useState<ShotDetailTab>(initialTab)
   const nodes = useDirectorCanvasStore((s) => s.nodes)
+  const remakeShotVideo = useDirectorCanvasStore((s) => s.remakeShotVideo)
+  const videoBatchBusy = useDirectorCanvasStore((s) => s.videoBatchBusy)
+  const takeBalance = useTakeBalance()
   // 이름은 캔버스 · 보드와 같은 것("Shot 4" · "Scene 1") — Writer 의 원래 id(sh_01_04)를 보이지 않는다.
   const boardNames = useBoardNodeNames()
   const node = nodes.find((n) => n.id === shotNodeId)
+  const imageGeneration = useStoryboardImageGeneration(node && isShotData(node.data) ? node.data : null)
   if (!node || !isShotData(node.data)) return null
   const data = node.data
   const scene = data.parentSceneNodeId ? nodes.find((n) => n.id === data.parentSceneNodeId) : undefined
   const { takes } = shotDetailTakes(nodes, shotNodeId)
   const videoLabel = videoTabLabelKey(takes.length)
+  // [다음: 영상 만들기 · N Take](D6) — 다시 만들기와 같은 설정(가장 최근 Take, 없으면 샷)으로 새 Take 를 만들고 영상 탭으로 간다.
+  const settings = takeSettings(data, latestShotTake(nodes, shotNodeId)?.data ?? null)
+  const count = takeCostForVideo(settings.model, settings.resolution)
+  const makeVideo = {
+    label: takeBalance.mode === 'off' ? t('Next: make the video') : t('Next: make the video · {count} Takes', { count }),
+    // 시작 · 끝 이미지를 다시 만드는 중(또는 기다리는 중)이면 옛 그림으로 Take 가 나간다(리드 검토 c ①).
+    disabled: !shotDetailFrames(data.storyboardImage).start || videoBatchBusy || takes.some((take) => takePhaseOf(take.data) === 'making')
+      || imageGeneration.generating || data.storyboardImage?.status === 'pending',
+    run: () => {
+      void remakeShotVideo(shotNodeId)
+      setTab('video')
+    },
+  }
   const meta = [scene ? directorNodeLabel(scene.data, boardNames) : null, t('{seconds}s', { seconds: data.durationSeconds }), effectivePrompt(data)].filter(Boolean).join(' · ')
 
   return (
@@ -57,7 +77,7 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
       </header>
       <p className="line-clamp-2 shrink-0 text-caption text-subtle-foreground">{meta}</p>
       {tab === 'image'
-        ? <ShotImageTab nodeId={shotNodeId} data={data} layout={layout} onMakeVideo={() => setTab('video')} />
+        ? <ShotImageTab nodeId={shotNodeId} data={data} layout={layout} makeVideo={makeVideo} />
         : <ShotVideoTab shotNodeId={shotNodeId} data={data} layout={layout} initialTakeId={initialTakeId} />}
     </div>
   )

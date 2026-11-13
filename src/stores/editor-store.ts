@@ -23,6 +23,7 @@ import { NEVER_SEEN, hasShots, readServerCopy, rememberServerSeenAt, savedLater,
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 import { compactSnapshot, sharePeaks } from '@/lib/editor/peaks'
+import { withCancelledTakes } from '@/lib/director/take-cancellations'
 
 const DEFAULT_CAMERA = {
   horizontal: 0,
@@ -916,17 +917,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       ),
     ),
   // 자리 · 길이 · 원본 시작점을 바꾸면(소리 조각의 앞 · 뒤를 끌어 줄이기) 영상에서 떨어진다. 파형 · 원본 길이 채우기는 그대로 잇는다(결정 4).
-  updateAudioClip: (id, patch) =>
-    automatically(() =>
-      set((state) => {
-        const reshaped = 'startSec' in patch || 'durationSec' in patch || 'sourceOffsetSec' in patch
-        return {
-          audioClips: state.audioClips.map((a) =>
-            a.id === id ? { ...a, ...patch, ...(reshaped ? { linkedShotId: null } : {}) } : a,
-          ),
-        }
-      }),
-    ),
+  //   끌어 줄이기는 사람 고침이라 저장본에 견줌 표시(serverAware)를 붙이고, 열 때 채우는 파형 · 원본 길이만은 저절로 생긴 바뀜이다(E2b, 2026-11-14).
+  updateAudioClip: (id, patch) => {
+    const reshaped = 'startSec' in patch || 'durationSec' in patch || 'sourceOffsetSec' in patch
+    const apply = () =>
+      set((state) => ({
+        audioClips: state.audioClips.map((a) =>
+          a.id === id ? { ...a, ...patch, ...(reshaped ? { linkedShotId: null } : {}) } : a,
+        ),
+      }))
+    if (reshaped) apply()
+    else automatically(apply)
+  },
 
   // ── 리사이즈 섹션 크기 ──
   setPanelSize: (key, value) =>
@@ -1310,7 +1312,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             loadShotsResult(projectId),
             supabase
               .from('video_clips')
-              .select('id, shot_id, url, status, is_final, take_number, created_at, deleted_at, thumbnail_url, last_attempt_status, last_attempt_at')
+              .select('id, shot_id, url, status, is_final, take_number, created_at, deleted_at, thumbnail_url, last_attempt_status, last_attempt_at, last_attempt_job_id')
               .eq('project_id', projectId),
           ]),
           timedOut,
@@ -1325,8 +1327,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         if (clipsError) throw new Error(`Editor video clips load failed: ${clipsError.message}`)
 
         // The thumbnail must represent the same successful take chosen for export/editor handoff.
+        //   화면에서 멈춘 Take(오너 2026-11-14 7번)는 ★ 로 고르지 않은 한 넘기지 않는다 — 멈춤을 붙여 고른다.
+        const liveClips = await withCancelledTakes(supabase, (dbClips ?? []) as HandoffClip[])
+        if (
+          editorLoadEpoch !== loadEpoch ||
+          useProjectStore.getState().projectId !== projectId
+        ) {
+          return
+        }
         const clipsByShot = new Map<string, HandoffClip[]>()
-        for (const clip of dbClips ?? []) {
+        for (const clip of liveClips) {
           if (typeof clip.shot_id !== 'string') continue
           const clips = clipsByShot.get(clip.shot_id) ?? []
           clips.push(clip)

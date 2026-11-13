@@ -19,8 +19,13 @@ export function DirectorDetailPanel() {
   const t = useT()
   const selectedNodeId = useDirectorCanvasStore((s) => s.selectedNodeId)
   const selectNode = useDirectorCanvasStore((s) => s.selectNode)
+  // 샷 상세(openShotDetail)는 노드형에서만 왼쪽 패널 — 스토리보드형은 팝업(DirectorNodePopup)이 맡는다.
+  const detailNodeId = useDirectorCanvasStore((s) => (s.viewMode === 'node' ? s.detailNodeId : null))
+  const detailTab = useDirectorCanvasStore((s) => s.detailTab)
+  const closeShotDetail = useDirectorCanvasStore((s) => s.closeShotDetail)
+  const shownId = detailNodeId ?? selectedNodeId
   const node = useDirectorCanvasStore((s) =>
-    s.nodes.find((n) => n.id === selectedNodeId),
+    s.nodes.find((n) => n.id === shownId),
   )
 
   if (!node) return null
@@ -36,12 +41,12 @@ export function DirectorDetailPanel() {
     return (
       <aside className="absolute left-0 top-0 z-10 flex h-full w-[420px] flex-col border-r border-border bg-background/95 shadow-lg backdrop-blur">
         <DirectorShotDetail
-          key={node.id}
+          key={`${node.id}:${detailNodeId ? detailTab : ''}`}
           shotNodeId={shotNodeId}
-          initialTab={isVideoData(node.data) ? 'video' : 'image'}
+          initialTab={detailNodeId ? detailTab : isVideoData(node.data) ? 'video' : 'image'}
           initialTakeId={isVideoData(node.data) ? node.id : null}
           layout="panel"
-          onClose={() => selectNode(null)}
+          onClose={() => closeShotDetail()}
         />
       </aside>
     )

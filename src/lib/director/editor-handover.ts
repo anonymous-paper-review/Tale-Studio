@@ -1,6 +1,7 @@
 // Director → Editor 넘기기 창(D8, 디자이너 1110 확정 · 오너 2026-11-14 답 8번) — 샷마다 Editor 로 가는 영상(Take)이 있는지,
 //   없으면 왜 없는지를 보드 순서로 정한다. 영상 없는 샷이 하나라도 있을 때만 창을 연다(다 있으면 지금처럼 바로, 10/1).
 //   Editor 로 가는 Take 는 내보내기 · 넘김과 같은 규칙(selectHandoffTake — ★ 최종 먼저, 없으면 가장 최근 완성)이다.
+//   화면에서 멈춘 Take 는 ★ 가 아니면 영상 없음 — 투영 · 샷 상태 · 일괄 검사와 같은 규칙(오너 2026-11-14 7번, 리드 검토 a 5).
 //   Editor 는 DB 샷(Writer 샷)만 컷으로 받는다 — Director 에서 더한 샷(writerShotId 없음)은 창에 넣지 않는다(검토 b 보통 1).
 //   약속: tests/director/editor-handover.test.ts
 import { selectHandoffTake, selectLatestAttempt } from '@/lib/director-video-take-selection'
@@ -12,8 +13,10 @@ import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
 type Translate = (key: string, params?: Record<string, string | number>) => string
 
 /** [다시 만들기]를 시작하지 못한 까닭 — 창이 그 줄에 보인다(검토 b 2차 낮음 3 — 전엔 말없이 끝났다). no_window 는 보이지 않는다.
- *  pending_text_edit = 그 샷에 [적용]을 기다리는 Lumi 글 고침 카드가 있다(옛 글로 만들지 않는다 — board 검토 b 재검토 보통 1). */
-export type RemakeFailReason = 'no_window' | 'pending_text_edit' | 'image_batch' | 'video_batch' | 'image_running' | 'image_failed' | 'video_running' | 'not_started'
+ *  pending_text_edit = 그 샷에 [적용]을 기다리는 Lumi 글 고침 카드가 있다(옛 글로 만들지 않는다 — board 검토 b 재검토 보통 1).
+ *  video_limit = 내 영상 동시 한도에 걸렸다(멈춘 Take 도 뒤에서 끝날 때까지 자리를 쓴다 — 리드 재검토 a).
+ *  takes_unknown = Take 잔액을 읽지 못했다(누를 때마다 다시 읽는다 — 검토 b 2차 낮음 1). */
+export type RemakeFailReason = 'no_window' | 'pending_text_edit' | 'image_batch' | 'video_batch' | 'image_running' | 'image_failed' | 'video_running' | 'video_limit' | 'not_started' | 'takes_unknown'
 export type RemakeResult = { started: true } | { started: false; reason: RemakeFailReason }
 
 /** 영상이 없는 까닭 — 실패(마지막 시도가 실패) · 만드는 중 · 아직 만들지 않음. */
@@ -58,13 +61,15 @@ export function editorHandoverView(nodes: readonly DirectorNode[], names: BoardN
         last_attempt_at: video.lastAttemptAt,
         last_attempt_status: video.lastAttemptStatus,
         thumbnail: video.thumbnailUrl,
+        cancelled_at: video.cancelledAt ?? null,
       }]
     })
     const chosen = selectHandoffTake(records)
     const latest = chosen ? null : selectLatestAttempt(records)
+    // 멈춘 Take 는 뒤에서 돌아도 만드는 중이 아니다 — 이 창에서 새 Take 를 바로 만들 수 있다.
     const missing: MissingVideoReason | null = chosen
       ? null
-      : latest?.last_attempt_status === 'generating' || latest?.last_attempt_status === 'pending'
+      : latest?.cancelled_at == null && (latest?.last_attempt_status === 'generating' || latest?.last_attempt_status === 'pending')
         ? 'generating'
         : latest?.last_attempt_status === 'failed' || latest?.status === 'failed'
           ? 'failed'
@@ -130,8 +135,13 @@ export function remakeNotice(reason: RemakeFailReason, t: Translate): string | n
       return t('Failed to generate the image.')
     case 'video_running':
       return t("This shot's video is already being made.")
+    // 내 영상 동시 한도 — 멈춘 Take 도 뒤에서 끝날 때까지 자리를 쓴다(리드 재검토 a).
+    case 'video_limit':
+      return t('Too many videos are being made at once (stopped Takes keep their spot until they finish). You can make it once one is done.')
     case 'not_started':
       return t('Could not start the video. Try again in a moment.')
+    case 'takes_unknown':
+      return t("I couldn't check your Takes, so I didn't start. Please try again in a moment.")
     case 'pending_text_edit':
       return t('A text change is waiting for [Apply]. Apply or discard it, then make it again.')
     default:

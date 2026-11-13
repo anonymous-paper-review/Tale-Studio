@@ -15,7 +15,8 @@ const nav = vi.hoisted(() => ({ handoffToStage: vi.fn(async (stage: string) => `
 vi.mock('@/lib/stage-nav', () => ({ handoffToStage: nav.handoffToStage }))
 
 import { editorHandoverView, handoverHeaderLine, proceedButtonLabel, remakeButton, remakeNotice } from '@/lib/director/editor-handover'
-import { takeCostForVideo } from '@/lib/billing/take-cost'
+import { takeCostForVideo, takeValuesShown } from '@/lib/billing/take-cost'
+import { readFileSync } from 'node:fs'
 import { translate } from '@/lib/i18n/translate'
 import { boardNodeNames } from '@/features/director/node-label'
 import { useDirectorCanvasStore } from '@/stores/director-store'
@@ -104,6 +105,21 @@ describe('Editor 넘기기 창의 단추 글', () => {
     const nodes = canvas(take('a1', 1, 'completed'), take('a2', 1, 'failed'))
     expect(remakeButton(nodes, failedRow, { showTakes: true, batch: null }, ko).label).toBe('다시 만들기 · 5 Take')
     expect(remakeButton(nodes, { shotNodeId: 'n_a3', missing: 'not_made' }, { showTakes: true, batch: null }, ko).label).toBe('영상 만들기 · 5 Take')
+  })
+
+  // 왜(검토 b 2차 낮음 1, 혼자 정한 것): 잔액을 못 읽으면 잔액 훅이 과금 꺼짐(off)처럼 보여 넘기기 창이 Take 값을 숨겼다 —
+  //   D8 은 확인 창 없이 단추 값이 곧 동의인 자리라, 못 읽었으면 센 값을 그대로 보인다. 숨기는 것은 과금이 정말 꺼졌을 때뿐이다.
+  it('Take 잔액을 읽지 못했으면 넘기기 창(D0 · D8)에 Take 값을 그대로 보인다 — 숨기는 것은 과금이 꺼졌을 때뿐이다', () => {
+    expect(takeValuesShown({ mode: 'off', failed: true })).toBe(true)
+    expect(takeValuesShown({ mode: 'off', failed: false })).toBe(false)
+    expect(takeValuesShown({ mode: 'off' })).toBe(false)
+    expect(takeValuesShown({ mode: 'shadow' })).toBe(true)
+    expect(takeValuesShown({ mode: 'enforce', failed: false })).toBe(true)
+    const nodes = canvas(take('a1', 1, 'completed'), take('a2', 1, 'failed'))
+    expect(remakeButton(nodes, failedRow, { showTakes: takeValuesShown({ mode: 'off', failed: true }), batch: null }, ko).label).toBe('다시 만들기 · 5 Take')
+    // 두 창이 같은 판단을 쓴다.
+    expect(readFileSync('src/components/handoff/editor-handover-dialog.tsx', 'utf8')).toMatch(/takeValuesShown\(useTakeBalance\(\)\)/)
+    expect(readFileSync('src/features/writer/rough-storyboard-view.tsx', 'utf8')).toMatch(/takeValuesShown\(takeBalance\)/)
   })
 
   // 왜(검토 b 낮음 5): Take 과금이 꺼진 때는 노드의 Take 값도 숨긴다(#payments-phase-2) — 넘기기 창도 같은 규칙.
@@ -251,6 +267,8 @@ describe('Director 의 다음 단계 버튼과 Editor 넘기기 창', () => {
     useGlobalChatStore.setState({ handoffConfirm: { kind: 'editorMissingVideos', projectId: 'proj-1', via: 'button' } })
     const bodies: Array<Record<string, unknown>> = []
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      // [다시 만들기]는 시작 전에 잔액을 다시 읽는다 — 읽히는 잔액을 둔다(준비).
+      if (String(input).includes('/api/billing/take-balance')) return Response.json({ balance: 40, mode: 'enforce' })
       if (String(input).includes('/api/director/generate-video')) bodies.push(JSON.parse(String(init?.body)))
       return Response.json({ error: 'Not enough Takes', code: 'insufficient_takes' }, { status: 402 })
     })
@@ -305,6 +323,27 @@ describe('Director 의 다음 단계 버튼과 Editor 넘기기 창', () => {
     expect(makeVideo).not.toHaveBeenCalled()
     // 정상 경로 — 시작했다고 돌려준다.
     await expect(remake('n_a2')).resolves.toEqual({ started: true })
+    expect(makeVideo).toHaveBeenCalledTimes(1)
+  })
+
+  // 왜(검토 b 2차 낮음 1, 혼자 정한 것): 잔액을 못 읽은 채 Take 를 쓰는 [다시 만들기]를 시작하지 않는다 — Lumi 채팅 영상 부탁과 같은 판단이다
+  //   (board "Take 를 확인하지 못해 시작하지 않았어요"). 누를 때마다 잔액을 다시 읽어, 읽히면 그대로 시작한다.
+  it('Take 잔액을 읽지 못하면 [다시 만들기]는 시작하지 않고 그 까닭을 그 줄에 보이고, 다시 눌러 잔액이 읽히면 시작한다', async () => {
+    const makeVideo = vi.fn(async () => 'v_new')
+    useDirectorCanvasStore.setState({ nodes: canvas(take('a1', 1, 'completed'), take('a2', 1, 'failed')), generateVideoForShot: makeVideo } as never)
+    useGlobalChatStore.setState({ handoffConfirm: { kind: 'editorMissingVideos', projectId: 'proj-1', via: 'button' } })
+    let balanceUp = false
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) =>
+      String(input).includes('/api/billing/take-balance')
+        ? balanceUp ? Response.json({ balance: 40, mode: 'enforce' }) : new Response('down', { status: 503 })
+        : Response.json({ ok: true }),
+    )
+    await expect(useGlobalChatStore.getState().remakeMissingVideo('n_a2')).resolves.toEqual({ started: false, reason: 'takes_unknown' })
+    expect(makeVideo).not.toHaveBeenCalled()
+    expect(remakeNotice('takes_unknown', (key, params) => translate('ko', key, params))).toBe('Take 를 확인하지 못해 시작하지 않았어요. 잠시 뒤 다시 눌러 주세요.')
+    expect(remakeNotice('takes_unknown', (key, params) => translate('en', key, params))).toBe("I couldn't check your Takes, so I didn't start. Please try again in a moment.")
+    balanceUp = true
+    await expect(useGlobalChatStore.getState().remakeMissingVideo('n_a2')).resolves.toEqual({ started: true })
     expect(makeVideo).toHaveBeenCalledTimes(1)
   })
 

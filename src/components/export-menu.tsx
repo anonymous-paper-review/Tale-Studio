@@ -37,6 +37,7 @@ import { previzExportAccess, type PrevizExportAccess } from '@/lib/billing/expor
 import { PRICING_PAGE_VISIBLE } from '@/lib/billing/pricing-visibility'
 import { STAGE_LABEL } from '@/lib/constants'
 import { cn } from '@/lib/utils'
+import { withCancelledTakes } from '@/lib/director/take-cancellations'
 
 export type ExportFileKind = 'image' | 'video' | 'audio' | 'text' | 'other'
 export type ExportFileCountsByKind = Partial<Record<ExportFileKind, number>>
@@ -482,7 +483,7 @@ export async function estimateWholeProjectFileCounts(projectId: string): Promise
       loadShotsResult(projectId),
       supabase
         .from('video_clips')
-        .select('id,shot_id,url,status,is_final,take_number,created_at,deleted_at')
+        .select('id,shot_id,url,status,is_final,take_number,created_at,deleted_at,last_attempt_job_id')
         .eq('project_id', projectId),
     ])
 
@@ -505,8 +506,9 @@ export async function estimateWholeProjectFileCounts(projectId: string): Promise
       addUrlCount(counts, 'image', row.establishing_shot)
     }
 
+    // 화면에서 멈춘 Take(오너 2026-11-14 7번)는 ★ 로 고르지 않은 한 내보내지 않는다 — 멈춤을 붙여 센다.
     const clipsByShot = new Map<string, HandoffClip[]>()
-    for (const clip of clipsRes.data ?? []) {
+    for (const clip of await withCancelledTakes(supabase, (clipsRes.data ?? []) as HandoffClip[])) {
       if (typeof clip.shot_id !== 'string') continue
       const clips = clipsByShot.get(clip.shot_id) ?? []
       clips.push(clip)

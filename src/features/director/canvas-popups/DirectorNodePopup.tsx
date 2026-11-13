@@ -25,8 +25,12 @@ import { directorNodeLabel } from '@/features/director/node-label'
 export function DirectorNodePopup() {
   const popupNodeId = useDirectorCanvasStore((s) => s.popupNodeId)
   const viewMode = useDirectorCanvasStore((s) => s.viewMode)
+  // 샷 상세(openShotDetail)는 스토리보드형에서 팝업 — 노드형은 왼쪽 패널(DirectorDetailPanel)이 맡는다.
+  const detailNodeId = useDirectorCanvasStore((s) => s.detailNodeId)
+  const detailTab = useDirectorCanvasStore((s) => s.detailTab)
+  const shownId = viewMode === 'storyboard' && detailNodeId ? detailNodeId : popupNodeId
   const node = useDirectorCanvasStore((s) =>
-    s.nodes.find((n) => n.id === popupNodeId),
+    s.nodes.find((n) => n.id === shownId),
   )
   // 샷 · 샷의 Take 는 샷 상세 팝업(디자이너 11/13 D6 — 스토리보드형은 팝업, 노드형 왼쪽 패널과 같은 내용).
   //   Take 에서 열면 그 샷의 영상 탭이 그 Take 를 먼저 보인다. 마더 샷이 없는 독립 영상은 지금 팝업.
@@ -34,23 +38,23 @@ export function DirectorNodePopup() {
   const shotNode = useDirectorCanvasStore((s) => (shotNodeId ? s.nodes.find((n) => n.id === shotNodeId) : undefined))
   const boardNames = useBoardNodeNames()
 
-  if (!popupNodeId || !node) return null
+  if (!shownId || !node) return null
   if (!popupVisibleInView(viewMode, node.data.kind)) return null
 
   if (isSceneData(node.data))
     return <SceneNodePopup nodeId={node.id} data={node.data} />
   if (shotNodeId) {
     return (
-      <Dialog open onOpenChange={(open) => { if (!open) useDirectorCanvasStore.getState().closePopup() }}>
+      <Dialog open onOpenChange={(open) => { if (!open) useDirectorCanvasStore.getState().closeShotDetail() }}>
         <DialogContent frame="work" className="max-h-[92vh] overflow-y-auto sm:max-w-[1000px]">
           <DialogTitle className="sr-only">{shotNode ? directorNodeLabel(shotNode.data, boardNames) : ''}</DialogTitle>
           <DirectorShotDetail
-            key={node.id}
+            key={`${node.id}:${shownId === detailNodeId ? detailTab : ''}`}
             shotNodeId={shotNodeId}
-            initialTab={isVideoData(node.data) ? 'video' : 'image'}
+            initialTab={shownId === detailNodeId ? detailTab : isVideoData(node.data) ? 'video' : 'image'}
             initialTakeId={isVideoData(node.data) ? node.id : null}
             layout="popup"
-            onClose={() => useDirectorCanvasStore.getState().closePopup()}
+            onClose={() => useDirectorCanvasStore.getState().closeShotDetail()}
           />
         </DialogContent>
       </Dialog>

@@ -12,8 +12,9 @@ import { ThumbImage } from '@/components/thumb-image'
 import { useImageUploadConsent } from '@/components/upload/image-upload-consent'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
-import { IMAGE_MODELS, normalizeImageModelKey } from '@/lib/image-models'
-import { detailImageModels, shotDetailFrames } from '@/lib/director/shot-detail'
+import { IMAGE_MODELS } from '@/lib/image-models'
+import { detailImageModel, detailImageModels, shotDetailFrames } from '@/lib/director/shot-detail'
+import { currentStoryboardVersion, storyboardImageVersions } from '@/lib/director/storyboard-image-versions'
 import { mediaFrameStyle } from '@/lib/project-aspect'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
@@ -23,12 +24,12 @@ import { newDirectorId, type ShotNodeData } from '@/types/director'
 import { StoryboardImageButton } from '@/features/director/storyboard-image-button'
 import { LockedFrame } from './locked-frame'
 
-export function ShotImageTab({ nodeId, data, layout, onMakeVideo }: {
+export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
   nodeId: string
   data: ShotNodeData
   layout: 'popup' | 'panel'
-  /** [다음: 영상 만들기] — 영상 탭으로 옮겨 새 Take 를 만든다. */
-  onMakeVideo?: () => void
+  /** [다음: 영상 만들기 · N Take](D6) — 새 Take 를 만들고 영상 탭으로 간다. */
+  makeVideo?: { label: string; disabled: boolean; run: () => void }
 }) {
   const t = useT()
   const projectFormat = useProjectFormatStore((s) => s.format)
@@ -41,11 +42,15 @@ export function ShotImageTab({ nodeId, data, layout, onMakeVideo }: {
   const worldRecords = useAssetStorageStore((s) => s.worlds)
   const characters = useMemo(() => Object.values(characterRecords).filter((c) => c.projectId === projectId), [characterRecords, projectId])
   const worlds = useMemo(() => Object.values(worldRecords).filter((w) => w.projectId === projectId), [worldRecords, projectId])
+  const selectStoryboardImageVersion = useDirectorCanvasStore((s) => s.selectStoryboardImageVersion)
   const [change, setChange] = useState('')
   const frames = shotDetailFrames(data.storyboardImage)
+  const versions = storyboardImageVersions(data.storyboardImage)
+  const current = currentStoryboardVersion(data.storyboardImage)
   const hasImage = !!frames.start
   const frameStyle = mediaFrameStyle(projectFormat, layout === 'popup' ? 360 : 200)
-  const model = normalizeImageModelKey(data.imageModel)
+  // 실제로 도는 모델을 골라진 칸으로(리드 검토 c ④) — Writer 샷에 시트를 못 그리는 옛 모델이 저장돼 있으면 GPT Image 2.
+  const model = detailImageModel(data)
 
   const toggle = (field: 'characterAssetIds' | 'worldAssetIds', id: string) => {
     const list = data[field]
@@ -65,7 +70,26 @@ export function ShotImageTab({ nodeId, data, layout, onMakeVideo }: {
       <div className="grid grid-cols-2 gap-3">
         {(['start', 'end'] as const).map((which) => <LockedFrame key={which} which={which} url={frames[which]} style={frameStyle} />)}
       </div>
-      <p className="text-caption text-subtle-foreground">{t('Start and end images are remade together for now.')}</p>
+      {/* 버전 줄(D6) — 1단계는 시작 · 끝이 함께라 줄은 하나. 저절로 지우지 않으니 많으면 옆으로 넘긴다(리드 답). 고르기는 Take 0. */}
+      {versions.length ? (
+        <div className="flex gap-1.5 overflow-x-auto pb-1" data-testid="shot-detail-versions" role="group" aria-label={t('Image versions')}>
+          {versions.map((version) => {
+            const active = version.id === current?.id
+            return (
+              <button key={version.id} type="button" aria-pressed={active}
+                title={version.source === 'upload' ? t('Uploaded image') : version.cancelled ? t('Finished after it was stopped') : undefined}
+                onClick={() => { if (!active) void selectStoryboardImageVersion(nodeId, version.id) }}
+                className={cn('shrink-0 rounded-full border px-2.5 py-0.5 font-num text-caption transition-colors', active ? 'border-info bg-info/15 text-foreground' : 'border-border text-muted-foreground hover:bg-accent')}>
+                {`v${version.n}`}
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
+      <p className="text-caption text-subtle-foreground">
+        {t('Start and end images are remade together for now.')}
+        {versions.length > 1 ? ` ${t('Click v1 or v2 to go back to that version.')}` : null}
+      </p>
     </div>
   )
 
@@ -124,8 +148,8 @@ export function ShotImageTab({ nodeId, data, layout, onMakeVideo }: {
       {generationError ? <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-caption text-destructive">{generationError}</p> : null}
       <div className="flex flex-wrap items-center gap-2" data-testid="shot-detail-image-actions">
         <StoryboardImageButton nodeId={nodeId} data={data} changeNote={change} idleLabel={t(hasImage ? 'Remake start and end images · Takes 0' : 'Make start and end images · Takes 0')} />
-        {hasImage && onMakeVideo ? (
-          <Button type="button" size="sm" variant="outline" onClick={onMakeVideo}>{t('Next: make the video')}</Button>
+        {hasImage && makeVideo ? (
+          <Button type="button" size="sm" variant="outline" disabled={makeVideo.disabled} onClick={makeVideo.run}>{makeVideo.label}</Button>
         ) : null}
         <Button type="button" size="sm" variant="ghost" className="gap-1.5 text-destructive hover:text-destructive" onClick={() => openDeleteConfirm(nodeId)}>
           <Trash2 className="size-3.5" />{t('Delete')}
