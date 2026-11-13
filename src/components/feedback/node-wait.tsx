@@ -27,11 +27,13 @@ export interface NodeWaitCardProps {
   announce?: boolean
   /** 맨 아래 단추(예: Director [멈추기], 1110 시안 D4). 없으면 그리지 않는다. */
   action?: ReactNode
+  /** 테두리 · 막대 색 — 기본은 단계 색, video 는 Director 상태 색 "영상 만드는 중" 보라(1110 시안 D4 · R). */
+  tone?: 'stage' | 'video'
   className?: string
 }
 
 /** 놓인 노드(부모 relative)를 꽉 채우는 기다림 카드. */
-export function NodeWaitCard({ lumi, title, description, progress, note, announce = false, action, className }: NodeWaitCardProps) {
+export function NodeWaitCard({ lumi, title, description, progress, note, announce = false, action, tone = 'stage', className }: NodeWaitCardProps) {
   const pct = typeof progress === 'number' && Number.isFinite(progress) ? Math.max(0, Math.min(100, Math.round(progress))) : null
   return (
     <div
@@ -40,7 +42,7 @@ export function NodeWaitCard({ lumi, title, description, progress, note, announc
       aria-live={announce ? 'polite' : undefined}
       className={cn(
         'absolute inset-0 z-10 flex flex-col items-center justify-center gap-[15px] rounded-[inherit] bg-side p-[18px] text-center shadow-dialog',
-        STAGE_FRAME,
+        tone === 'video' ? 'border-[1.5px] border-state-video' : STAGE_FRAME,
         className,
       )}
     >
@@ -51,7 +53,7 @@ export function NodeWaitCard({ lumi, title, description, progress, note, announc
       </div>
       {pct !== null ? (
         <div className="h-1 w-full overflow-hidden rounded-[2px] bg-progress-track" aria-hidden>
-          <div className="h-full rounded-[2px] bg-stage-gradient transition-[width] duration-350 ease-out" style={{ width: `${pct}%` }} />
+          <div className={cn('h-full rounded-[2px] transition-[width] duration-350 ease-out', tone === 'video' ? 'bg-state-video' : 'bg-stage-gradient')} style={{ width: `${pct}%` }} />
         </div>
       ) : null}
       {note ? <p className="text-micro font-medium text-subtle-foreground">{note}</p> : null}

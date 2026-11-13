@@ -55,7 +55,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
     const parent = isVideoData(data) ? data.parentShotNodeId : null
     return !!parent && (s.pickedShotIds?.includes(parent) ?? false)
   })
-  const detailOpen = useDirectorCanvasStore((s) => s.selectedNodeId === id)
+  const detailOpen = useDirectorCanvasStore((s) => (s.detailNodeId ?? s.selectedNodeId) === id)
   // "영상까지 이어서"로 이미지를 기다리는 샷(시안 D4) — 빈 영상 노드에 "이미지가 끝나면 자동으로 시작해요".
   const chainWaiting = useDirectorCanvasStore((s) => {
     const parent = isVideoData(data) ? data.parentShotNodeId : null
@@ -482,6 +482,8 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           progress={batchPercent ?? undefined}
           note={nextInLineNote(nextNames ? nextNames.split('\n') : [], t)}
           announce={announce}
+          // 영상 만드는 노드는 상태 색 보라(시안 D4 · R) — 이미지 그리는 노드 카드는 단계 파랑 그대로.
+          tone="video"
           // [멈추기](시안 D4 · 오너 7번) — 이 Take 를 화면에서 멈춘다. fal 에서는 끝까지 돌고 Take 는 돌려주지 않는다.
           action={data.generationJobId && isStoppableJob(data.generationJobId, activeJobs)
             ? <StopMakingButton target={{ jobIds: [data.generationJobId], sheetShots: 1 }} kind="video" place="wait" />
