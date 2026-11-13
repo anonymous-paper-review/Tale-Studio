@@ -7,6 +7,7 @@
 //      위층(원본)을 지우개로 긁어 화살표를 걷어낸다.
 //   2) saveDirectingFrame — 편집기가 평탄화한 PNG 를 기존 direction 경로에 upsert 하고
 //      generatedAt 을 올려 캐시버스트(rough-frame-cycle.withCacheBust 가 새 프레임을 집는다).
+import sharp from 'sharp'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { generateReservedImage } from '@/lib/fal/generate-image'
 import { assertUserTextAllowed } from '@/lib/moderation/creem'
@@ -178,35 +179,50 @@ export async function separateArrowLayer(
   return { cleanUrl, cached: false }
 }
 
+// 한 장 다시 그리기 공통 규칙(2026-11-14 미들 프레임 고장): 시트(rough-storyboard-grid GRID_STYLE)와 같은 목각 인형 · 글자 규칙.
+//   이 규칙 없이 연출 칸을 다시 만들면 얼굴 있는 만화 소녀 · 말풍선 "YOU'RE WASTING TIME!" · "DIRECTING" · "DIR. FRAME 1" 상자가
+//   그려졌다(개발 실측 914165c8). "START frame" · "storyboard" 같은 낱말도 쓰지 않는다 — 그림 안에 칸 이름 · 표 글씨로 옮겨 적혔다.
+const REDRAW_FIGURE_RULE =
+  "Every human figure is the same classic wooden artist's drawing mannequin: a ball-jointed wooden pose doll " +
+  'with segmented limbs, visible sphere joints, mitten-like hands without fingers, and a completely smooth ' +
+  'egg-shaped wooden head. The head is entirely blank — absolutely no face, no eyes, no nose, no mouth, no hair, ' +
+  'no expression. No clothing. All figures are this one identical wooden mannequin; only pose and position differ.'
+const REDRAW_WORDLESS_RULE =
+  'Wordless drawing: no writing anywhere. No speech bubbles, no dialogue, no captions, no frame names, ' +
+  'no scene or shot numbers, no labels.'
+const REDRAW_NOTES_RULE =
+  'The only writing allowed is those few short motion notes next to the arrows. No speech bubbles, no dialogue, ' +
+  'no captions, no frame names or titles, no scene or shot numbers, no boxed labels, no header or footer text.'
+
 // END 프레임을 편집된 DIRECTING 프레임에서 다시 그린다 (#end-from-direction 2026-08-11).
 //   화살표를 고쳤으면 "그 화살표가 끝난 뒤의 그림"인 END 도 따라가야 한다 — 안 그러면 편집이
 //   DIRECTING 한 장에만 남고 세트가 서로 다른 이야기를 한다.
 //   3프레임 통째 재생성이 아니라 i2i 한 장인 이유: 통째로 다시 그리면 방금 편집한 DIRECTING 이
 //   버려진다(그게 이 기능의 출발점이다).
 const END_FROM_DIRECTION_PROMPT =
-  'This pencil storyboard sketch marks the intended movement of a shot with arrows, motion lines ' +
-  'and handwritten annotations. Draw the END frame: the same scene after that movement has fully ' +
-  'completed. Move the figures, objects and framing all the way to where the arrows point — the ' +
-  'full extent of the indicated motion, not a barely-changed copy. Remove every arrow, motion ' +
-  'line, dashed path and handwritten annotation. Keep the same characters, costumes, background ' +
-  'and monochrome pencil style. Return only the cleaned drawing.'
+  'This pencil sketch marks the intended movement of a shot with arrows, motion lines and handwritten notes. ' +
+  'Redraw the same scene just after that movement has fully completed. Move the figures, objects and framing ' +
+  'all the way to where the arrows point — the full extent of the indicated motion, not a barely-changed copy. ' +
+  'Remove every arrow, motion line, dashed path and handwritten note. Keep the same figures, background and ' +
+  `monochrome pencil style. ${REDRAW_FIGURE_RULE} ${REDRAW_WORDLESS_RULE} Return only the cleaned drawing.`
 
 export type RoughFrameKey = 'start' | 'direction' | 'end'
 export const ROUGH_FRAME_KEYS: readonly RoughFrameKey[] = ['start', 'direction', 'end']
 
 // 약속 I(2026-09-04): 3장 중 한 장만 다시 그린다 — 나머지 두 장은 손대지 않는다.
 //   start: DIRECTING 을 참조로 "움직임이 시작되기 전" · end: "움직임이 끝난 뒤" · direction: START 를 참조로 화살표를 그린다.
+//   direction 은 시트처럼 START 와 같은 순간을 그대로 두고 화살표 · 움직임 선 · 짧은 메모만 얹는다(2026-11-14).
 const START_FROM_DIRECTION_PROMPT =
-  'This pencil storyboard sketch marks the intended movement of a shot with arrows, motion lines ' +
-  'and handwritten annotations. Draw the START frame: the same scene just before that movement ' +
-  'begins, with the figures, objects and framing at the positions where the arrows start. Remove ' +
-  'every arrow, motion line, dashed path and handwritten annotation. Keep the same characters, ' +
-  'costumes, background and monochrome pencil style. Return only the cleaned drawing.'
+  'This pencil sketch marks the intended movement of a shot with arrows, motion lines and handwritten notes. ' +
+  'Redraw the same scene at the instant just before that movement begins, with the figures, objects and framing ' +
+  'at the positions where the arrows start. Remove every arrow, motion line, dashed path and handwritten note. ' +
+  `Keep the same figures, background and monochrome pencil style. ${REDRAW_FIGURE_RULE} ${REDRAW_WORDLESS_RULE} ` +
+  'Return only the cleaned drawing.'
 const DIRECTION_FROM_START_PROMPT =
-  'This pencil storyboard sketch is the START frame of a shot. Draw the DIRECTING frame: the same ' +
-  'scene, same composition and figures, with clear arrows, motion lines and short handwritten ' +
-  'annotations that mark how the figures, objects and camera move during the shot. Keep the same ' +
-  'characters, costumes, background and monochrome pencil style.'
+  'Keep this pencil sketch exactly as it is: the same frozen instant, with the same figures, poses, positions, ' +
+  'framing, props and background. Do not advance the motion and do not change anything in the scene. On top of it, ' +
+  'add only arrows, motion lines and a few short handwritten motion notes that mark how the figures, objects and ' +
+  'camera move during the shot.'
 
 /** 순수: 한 장만 바꾼 새 러프 JSON — 나머지 프레임은 그대로, generatedAt 만 올린다(캐시버스트).
  *  DIRECTING 이 바뀌면 화살표 클린 플레이트 캐시는 낡은 것이라 버리고, 아니면 for 를 올려 재과금을 막는다. */
@@ -228,13 +244,45 @@ export function mergeRoughFrame(
   return { ...rest, frames, generatedAt: now, ...(cleanDirection ? { cleanDirection } : {}) }
 }
 
-function promptForFrame(frame: RoughFrameKey, action: string | null): { prompt: string; refs: (f: NonNullable<RoughJson['frames']>) => string[] } {
+export function promptForFrame(frame: RoughFrameKey, action: string | null): { prompt: string; refs: (f: NonNullable<RoughJson['frames']>) => string[] } {
   if (frame === 'end') return { prompt: END_FROM_DIRECTION_PROMPT, refs: (f) => [f.direction!] }
   if (frame === 'start') return { prompt: START_FROM_DIRECTION_PROMPT, refs: (f) => [f.direction!] }
-  const withAction = action?.trim()
-    ? `${DIRECTION_FROM_START_PROMPT} The movement to mark: ${action.trim()}. Return only the drawing.`
-    : `${DIRECTION_FROM_START_PROMPT} Return only the drawing.`
-  return { prompt: withAction, refs: (f) => [f.start!] }
+  const movement = action?.trim() ? ` The movement to mark: ${action.trim()}.` : ''
+  const prompt = `${DIRECTION_FROM_START_PROMPT}${movement} Keep the same monochrome pencil style. ${REDRAW_FIGURE_RULE} ${REDRAW_NOTES_RULE} Return only the drawing.`
+  return { prompt, refs: (f) => [f.start!] }
+}
+
+/** 다시 그린 한 장을 시트에서 자른 다른 장 크기로 맞춘다 — Grok 은 720×1280(가로 1280×720)으로 돌려주는데 시트 칸은 255×447(406×223)이다.
+ *  비율 차이(2% 안팎)는 가장자리를 몇 px 잘라 맞춘다(cover). 그림을 못 읽으면 그대로 둔다. */
+export async function fitFrameToSize(buf: Buffer, width: number, height: number): Promise<Buffer> {
+  try {
+    const meta = await sharp(buf).metadata()
+    if (meta.width === width && meta.height === height) return buf
+    return await sharp(buf).resize(width, height, { fit: 'cover' }).toBuffer()
+  } catch {
+    return buf
+  }
+}
+
+/** 나머지 두 장 중 작은 쪽 크기 — 고치기 전에 다시 그린 큰 장이 섞인 세트도 시트에서 자른 크기로 돌아간다. 둘 다 못 읽으면 null. */
+async function otherFramesSize(
+  frames: NonNullable<RoughJson['frames']>,
+  frame: RoughFrameKey,
+): Promise<{ width: number; height: number } | null> {
+  const sizes = await Promise.all(
+    ROUGH_FRAME_KEYS.filter((key) => key !== frame).map(async (key) => {
+      try {
+        const res = await fetch(frames[key]!)
+        if (!res.ok) return null
+        const { width, height } = await sharp(Buffer.from(await res.arrayBuffer())).metadata()
+        return width && height ? { width, height } : null
+      } catch {
+        return null
+      }
+    }),
+  )
+  const known = sizes.filter((size): size is { width: number; height: number } => size !== null)
+  return known.sort((a, b) => a.width * a.height - b.width * b.height)[0] ?? null
 }
 
 /**
@@ -288,18 +336,21 @@ export async function regenerateRoughFrame(
       translate(locale, 'The {frame} frame is abnormally small ({bytes}b)', { frame: frame.toUpperCase(), bytes: buf.length }),
     )
   }
+  // 나머지 두 장과 같은 크기로 — 세 장 크기가 다르면 카드 순환 · 편집기 그림 크기가 어긋난다(2026-11-14).
+  const size = await otherFramesSize(rb.frames, frame)
+  const fitted = size ? await fitFrameToSize(buf, size.width, size.height) : buf
   const contentType = res.headers.get('content-type') ?? 'image/jpeg'
   const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg'
   const current = rb.frames[frame]!
   const framePath = `${storagePathFromPublicUrl(current, locale).replace(/\.[a-z]+$/i, '')}.${ext}`
-  const newUrl = await uploadToMedia(framePath, buf, contentType)
+  const newUrl = await uploadToMedia(framePath, fitted, contentType)
 
   const latest = await loadRough(projectId, shotId)
   if (!latest || (latest.generatedAt ?? 0) !== (rb.generatedAt ?? 0)) {
     throw new Error(translate(locale, 'The rough set was regenerated in the meantime. Please try again'))
   }
   // 미리보기는 "그사이 다시 그려졌는지" 확인 뒤에만 — PNG · JPG 가 미리보기 한 장을 같이 써서 새 세트의 미리보기를 덮을 수 있었다(리뷰 L7).
-  await uploadThumbnail(framePath, buf)
+  await uploadThumbnail(framePath, fitted)
   const now = Date.now()
   const { error } = await supabaseAdmin
     .from('shots')
