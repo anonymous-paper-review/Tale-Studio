@@ -131,6 +131,20 @@ describe('같이 정한 것', () => {
   })
 })
 
+describe('빈 캔버스 누르기 (검토 c 낮음)', () => {
+  it('⤢ 로 연 샷 상세는 빈 캔버스를 누르면 닫힌다', () => {
+    // 왜: 빈 캔버스 누르기는 옛 고르기(selectNode(null))만 풀어 ⤢(openShotDetail)로 연 상세가 남았다 — 예전 ⤢ · 두 번 누르기 · 메뉴로 연 상세는 닫혔다.
+    const page = readFileSync('src/app/studio/director/page.tsx', 'utf8')
+    const start = page.indexOf('onPaneClick={() => {')
+    const pane = page.slice(start, page.indexOf('}}', start))
+    expect(pane).toContain('closeShotDetail()')
+    director.getState().openShotDetail(shotId, 'image')
+    director.getState().selectNode(null)
+    director.getState().closeShotDetail()
+    expect(director.getState().detailNodeId).toBeNull()
+  })
+})
+
 describe('혼자 정한 것', () => {
   it('스토리보드 카드의 ⤢ 는 그 샷이 영상 단계(만드는 중 · 완성 · 실패)면 영상 탭으로, 아니면 이미지 탭으로 연다', () => {
     // 왜: 카드가 지금 말하는 일(영상)의 탭으로 바로 간다 — 영상 실패 카드에서 이미지 탭부터 보이면 한 번 더 눌러야 한다.
