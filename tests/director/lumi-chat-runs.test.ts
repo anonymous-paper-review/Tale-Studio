@@ -625,7 +625,8 @@ describe('다시 만들기는 접수되는 대로(검토 b (a)~(g) 보통 1)', (
   let generated: string[] = []
   /** refuse: 이 샷 요청은 4xx 로 거절하되 몸에 jobId · status queued 를 싣는다(검토 b · entry 가 찾은 거절 꼴). */
   //   unknown: 제출 결과를 모름(503 · jobId · queued · unresolved — 서버가 실제로 내는 꼴) · error: 서버 오류(500 · jobId · failed) · network: 연결 끊김.
-  function remakeServer(chatUpdates: unknown[] = [], refuse: readonly string[] = [], other: Record<string, 'unknown' | 'error' | 'network'> = {}) {
+  //   receipt: 409 "예약 상태 모름, 영수증 필요"(jobId · queued · retryable false).
+  function remakeServer(chatUpdates: unknown[] = [], refuse: readonly string[] = [], other: Record<string, 'unknown' | 'error' | 'network' | 'receipt'> = {}) {
     generated = []
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
       const u = String(url)
@@ -638,6 +639,7 @@ describe('다시 만들기는 접수되는 대로(검토 b (a)~(g) 보통 1)', (
         if (other[id] === 'unknown') return Response.json({ error: 'Video provider submission outcome is unknown; retrying could duplicate paid work', jobId: `job-${id}`, videoClipId: `clip-${id}`, takeNumber: 2, status: 'queued', retryable: false, unresolved: true }, { status: 503 })
         if (other[id] === 'error') return Response.json({ error: 'provider down', jobId: `job-${id}`, videoClipId: `clip-${id}`, takeNumber: 2, status: 'failed' }, { status: 500 })
         if (other[id] === 'network') throw new TypeError('network down')
+        if (other[id] === 'receipt') return Response.json({ error: 'Reserved video submission state is unknown; a valid recovery receipt is required', jobId: `job-${id}`, videoClipId: `clip-${id}`, takeNumber: 2, status: 'queued', retryable: false }, { status: 409 })
         return Response.json({ jobId: `job-${id}`, status: 'queued', videoClipId: `clip-${id}`, takeNumber: 2 })
       }
       if (u.includes('/api/generation-jobs/')) return Response.json({ ok: true, data: { status: 'queued' } })
@@ -682,36 +684,62 @@ describe('다시 만들기는 접수되는 대로(검토 b (a)~(g) 보통 1)', (
     expect(accepted).not.toHaveBeenCalled()
   })
 
-  // 왜: 위와 같은 까닭 — Lumi 는 2xx 접수만 "시작"으로 세고, 거절된 샷은 따로 말한다(Take 수에도 넣지 않는다).
-  it('다시 만들기는 서버가 2xx 로 받아 jobId 를 준 샷만 시작으로 세고, 4xx 로 거절된 샷은 "샷 N 영상을 시작하지 못했어요"라고 따로 말한다', async () => {
+  // 왜: 위와 같은 까닭 — Lumi 는 2xx 접수만 "시작"으로 센다(Take 수에도 그것만). 4xx 라도 몸에 jobId · queued 가 실려 와 새 Take 가 보드에서 만드는 중으로
+  //   남으면 화면과 같은 말로 "접수됐는지 아직 몰라요"(리드 결정 — 검토 b 낮음 1, 탐침 F9).
+  it('다시 만들기는 서버가 2xx 로 받아 jobId 를 준 샷만 시작으로 세고, 4xx 인데 jobId · queued 가 실려 와 새 Take 가 만드는 중으로 남은 샷은 "접수됐는지 아직 몰라요"라고 따로 말한다', async () => {
     remakeBoard(['r1', 'r2'])
     remakeServer([], ['r2'])
     await chat.getState().sendMessage(translate('en', DIRECTOR_QUICK_CHIPS[2]))
     expect(generated).toEqual(['r1', 'r2'])
     const said = chat.getState().messages.filter((m) => m.role === 'model').map((m) => m.content)
     expect(said).toContain('Started making videos for Shot 1 · 5 Takes. Progress shows on the line above the cards.')
-    expect(said).toContain("I couldn't start the video for Shot 2. Please ask again in a moment.")
+    expect(said).toContain("I can't tell yet whether the video for Shot 2 was accepted. You can see the result on the card.")
   })
 
-  // 왜: 리드 결정(검토 b F7) — 제출 결과를 모르는 503 은 화면이 그 Take 를 만드는 중으로 보인다. Lumi 가 "시작하지 못했어요"라고 하면 화면과 말이 갈린다.
-  it('remakeShotVideo 의 접수 알림은 제출 결과를 모르는 503(jobId · queued)에도 오고, 500 · 연결 끊김에는 오지 않는다', async () => {
+  // 왜: 리드 결정(검토 b 낮음 1 — 503 을 시작으로 세던 것을 다시 정함) — 접수 알림은 2xx 만이다. 결과를 모르는 503 은 "시작"이 아니라 아래 "아직 몰라요"로 따로 말한다.
+  it('remakeShotVideo 의 접수 알림은 2xx 일 때만 오고, 제출 결과를 모르는 503 · 500 · 연결 끊김에는 오지 않는다', async () => {
     remakeBoard(['u1', 'u2', 'u3'])
     remakeServer([], [], { u1: 'unknown', u2: 'error', u3: 'network' })
     const accepted = vi.fn()
     for (const id of ['u1', 'u2', 'u3']) await director.getState().remakeShotVideo(id, { onAccepted: accepted })
     expect(generated).toEqual(['u1', 'u2', 'u3'])
-    expect(accepted.mock.calls).toEqual([['job-u1']])
+    expect(accepted).not.toHaveBeenCalled()
   })
 
-  // 왜: 같은 까닭(검토 b F7 · F8) — 화면과 같은 말: 결과를 모르는 503 은 시작, 서버 오류(500)인 샷만 따로 "시작하지 못했어요".
-  it('다시 만들기에서 제출 결과를 모르는 샷(503)은 화면처럼 시작으로 세고, 서버 오류(500)인 샷은 "샷 N 영상을 시작하지 못했어요"라고 따로 말한다', async () => {
-    remakeBoard(['w1', 'w2', 'w3'])
-    remakeServer([], [], { w2: 'error', w3: 'unknown' })
-    await chat.getState().startDirectorVideos(['w1', 'w2', 'w3'], 'Make Shots 1 · 2 · 3 again', { remake: true })
-    expect(generated).toEqual(['w1', 'w2', 'w3'])
+  // 왜: 리드 결정(검토 b 탐침 F7 · F9 · F10 · F13) — 2xx 가 아닌데 jobId · queued 가 실려 와 이번 새 Take 가 보드에서 만드는 중으로 남으면,
+  //   "시작했어요"(Take 수)도 "시작하지 못했어요"(다시 부탁하면 같은 일을 두 번 낼 수 있음)도 화면과 다르다. 서버 오류 · 연결 끊김은 지금처럼.
+  it('다시 만들기에서 2xx 가 아닌데 이번 새 Take 가 만드는 중으로 남은 샷(503 결과 모름 · 409 영수증 필요 · 400 + jobId · queued)은 "샷 N 영상은 접수됐는지 아직 몰라요"라고 따로 말하고 Take 수에 넣지 않으며, 서버 오류(500) · 연결 끊김인 샷은 "시작하지 못했어요"라고 한다', async () => {
+    remakeBoard(['w1', 'w2', 'w3', 'w4', 'w5', 'w6'])
+    remakeServer([], ['w4'], { w2: 'error', w3: 'unknown', w5: 'receipt', w6: 'network' })
+    await chat.getState().startDirectorVideos(['w1', 'w2', 'w3', 'w4', 'w5', 'w6'], 'Make them again', { remake: true })
+    expect(generated).toEqual(['w1', 'w2', 'w3', 'w4', 'w5', 'w6'])
     const said = chat.getState().messages.filter((m) => m.role === 'model').map((m) => m.content)
-    expect(said).toContain('Started making videos for Shots 1 · 3 · 10 Takes. Progress shows on the line above the cards.')
-    expect(said).toContain("I couldn't start the video for Shot 2. Please ask again in a moment.")
+    expect(said).toContain('Started making videos for Shot 1 · 5 Takes. Progress shows on the line above the cards.')
+    expect(said).toContain("I can't tell yet whether the video for Shots 3 · 4 · 5 was accepted. You can see the result on the card.")
+    expect(said).toContain("I couldn't start the video for Shots 2 · 6. Please ask again in a moment.")
+    expect(translate('ko', "I can't tell yet whether the video for {shots} was accepted. You can see the result on the card.", { shots: '샷 3·4·5' })).toBe('샷 3·4·5 영상은 접수됐는지 아직 몰라요. 카드에서 결과를 볼 수 있어요.')
+  })
+
+  // 왜: 같은 까닭(탐침 F13) — "아직 몰라요"인 샷은 보드에서 만드는 중이라, 다시 부탁해도 같은 일을 또 보내지 않는다.
+  it('접수됐는지 모르는 샷을 다시 부탁해도 만드는 중이라 다시 보내지 않는다', async () => {
+    remakeBoard(['z1'])
+    remakeServer([], [], { z1: 'unknown' })
+    await chat.getState().startDirectorVideos(['z1'], 'Make Shot 1 again', { remake: true })
+    expect(generated).toEqual(['z1'])
+    await chat.getState().startDirectorVideos(['z1'], 'Make Shot 1 again', { remake: true })
+    expect(generated).toEqual(['z1'])
+    expect(lastModel()).toBe('There are no such shots right now.')
+  })
+
+  // 왜: 검토 b 메모 — 볼 것은 이번에 만든 새 Take 하나다. 그 샷의 다른 Take(예: 멈춘 채 뒤에서 도는 Take)가 돌아도 이번 것이 실패면 "아직 몰라요"가 아니다.
+  it('그 샷의 다른 Take 가 돌고 있어도 이번 새 Take 가 실패면 "시작하지 못했어요"라고 한다', async () => {
+    writer.setState({ sceneManifest: { scenes: [{ sceneId: 'sc1' }] } as never, shots: [{ shotId: 'w-x1', sceneId: 'sc1' }] as never })
+    const stoppedRunning = { id: 'v-x1-old', type: 'video', position: { x: 0, y: 0 }, data: { kind: 'video', label: 'v-x1-old', parentShotNodeId: 'x1', status: 'generating', lastAttemptStatus: 'generating', cancelledAt: '2026-11-14T03:00:00Z', videoUrl: null, final: false, takeNumber: 1, override: {} } } as unknown as DirectorNode
+    director.setState({ nodes: [shot('x1', IMG('x1')), stoppedRunning] })
+    remakeServer([], [], { x1: 'error' })
+    await chat.getState().startDirectorVideos(['x1'], 'Make Shot 1 again', { remake: true })
+    expect(generated).toEqual(['x1'])
+    expect(lastModel()).toBe("I couldn't start the video for Shot 1. Please ask again in a moment.")
   })
 
   // 왜: 검토 b 보탬 — 채팅을 "생각 중"으로 잡던 길은 칩 말고도 셋(알림 카드 · 되묻기 "응" · 번호 대답), 모델을 거치는 채팅 부탁은 둘째 샷이 늦게 나갔다.

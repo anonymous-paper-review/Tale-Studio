@@ -1661,17 +1661,18 @@ async function startVideosFor(input: {
     // 샷마다 같은 다시 만들기 하나(remakeShotVideo)로 보낸다. 내 영상 동시 한도에 걸리면 뒤 샷도 같은 한도에 걸리니 더 보내지 않는다.
     const started: string[] = []
     const failed: string[] = []
+    const uncertain: string[] = []
     let limited: string[] = []
     for (const [index, id] of input.shotIds.entries()) {
       if (!input.isCurrent()) return
       const refusedBefore = videoLimitRefusal()
       // 접수(서버가 2xx 로 받아 jobId 를 줌)되면 그 샷은 시작한 것으로 치고 다음 샷을 보낸다 — 영상이 끝나기를(5초마다 확인)
       //   기다리지 않는다(검토 b (a)~(g) 보통 1). 접수 없이 부른 것이 끝나면 시작하지 못한 것이다 — 실패해도 노드 id 를 돌려주는 길이 있다.
-      const outcome = await new Promise<'accepted' | 'ended'>((resolve) => {
-        useDirectorCanvasStore.getState().remakeShotVideo(id, { onJob: input.onJob, onAccepted: () => resolve('accepted') })
-          .then(() => resolve('ended'), () => resolve('ended'))
+      const outcome = await new Promise<{ accepted: true } | { accepted: false; takeId: string | null }>((resolve) => {
+        useDirectorCanvasStore.getState().remakeShotVideo(id, { onJob: input.onJob, onAccepted: () => resolve({ accepted: true }) })
+          .then((takeId) => resolve({ accepted: false, takeId }), () => resolve({ accepted: false, takeId: null }))
       })
-      if (outcome === 'accepted') {
+      if (outcome.accepted) {
         started.push(id)
         continue
       }
@@ -1680,9 +1681,14 @@ async function startVideosFor(input: {
         limited = input.shotIds.slice(index)
         break
       }
-      failed.push(id)
+      // 2xx 가 아닌데 몸에 jobId · queued 가 실려 와 이번 새 Take 가 보드에서 만드는 중으로 남았다(503 결과 모름 · 409 영수증 필요 · 400 …) —
+      //   시작(Take 수)도 실패(다시 부탁하면 두 번 낼 수 있음)도 아닌 "아직 몰라요"(리드 결정). 그 샷의 다른 Take 가 아니라 이번 새 Take 하나만 본다.
+      const take = outcome.takeId ? useDirectorCanvasStore.getState().nodes.find((node) => node.id === outcome.takeId) : undefined
+      if (take && isVideoData(take.data) && take.data.lastAttemptStatus === 'generating' && !take.data.cancelledAt) uncertain.push(id)
+      else failed.push(id)
     }
     if (started.length > 0) input.say(startedLine(started, started.reduce((sum, id) => sum + costs[input.shotIds.indexOf(id)], 0)))
+    if (uncertain.length > 0) input.say(t("I can't tell yet whether the video for {shots} was accepted. You can see the result on the card.", { shots: shotsLabel(uncertain) }))
     if (limited.length > 0) input.say(t("Too many videos are being made at once, so I didn't start the video for {shots}. Ask again once one is done.", { shots: shotsLabel(limited) }))
     if (failed.length > 0) input.say(t("I couldn't start the video for {shots}. Please ask again in a moment.", { shots: shotsLabel(failed) }))
     return
