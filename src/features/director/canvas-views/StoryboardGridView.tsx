@@ -19,7 +19,9 @@ import {
 } from '@/components/generating-frame'
 import { RoughFrameCycle } from '@/components/rough-frame-cycle'
 import {
+  isStoppedTake,
   selectLatestAttempt,
+  selectLatestShotAttempt,
   selectNewestSuccessfulTake,
   type VideoTakeSelectionRecord,
 } from '@/lib/director-video-take-selection'
@@ -115,7 +117,10 @@ export function gridVideoView<T extends GridVideoTakeRecord>(
 ): { cardTake: T | null; generating: boolean; failure: string | null } {
   // ★ 로 고른 멈춘 Take 는 영상이다 — 카드 영상 고르기에서만 멈춤을 지운다.
   const cardTake = selectNewestSuccessfulTake(records.map((r) => (r.is_final ? { ...r, cancelled_at: null } : r)))
-  const { generating, failure } = selectGridVideoAttemptState(records.filter((r) => r.cancelled_at == null), t)
+  const { generating } = selectGridVideoAttemptState(records.filter((r) => r.cancelled_at == null), t)
+  // 실패 글은 샷 상태와 같은 가장 새 시도로 — 그것이 멈춘 Take 면 뒤에서 실패했어도 띄우지 않는다(리드 2026-11-14 규칙).
+  const latest = selectLatestShotAttempt(records)
+  const { failure } = selectGridVideoAttemptState(latest && !isStoppedTake(latest) ? [latest] : [], t)
   return { cardTake, generating, failure }
 }
 
