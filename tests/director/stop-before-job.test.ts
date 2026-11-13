@@ -15,7 +15,7 @@ vi.mock('@/lib/supabase/client', () => ({
     },
   }),
 }))
-vi.mock('sonner', () => ({ toast: { success: vi.fn(), info: vi.fn(), error: vi.fn(), warning: vi.fn() } }))
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), info: vi.fn(), error: vi.fn(), warning: vi.fn(), dismiss: vi.fn() } }))
 vi.mock('@/lib/generation-queue', async (original) => ({
   ...await original<typeof import('@/lib/generation-queue')>(),
   refreshGenerationQueue: () => { shared.order.push('refresh') },

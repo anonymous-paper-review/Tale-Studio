@@ -1,4 +1,4 @@
-// 멈춘 이미지 판을 정리하는 동안 누른 [이미지 만들기] — 기다린다고 한 줄 알리고, 그 뒤 [모두 멈추기]를 누르면 서지 않는다 (검토 b S1b · S1c, 리드 11/14)
+// 멈춘 이미지 판을 정리하는 동안 누른 [이미지 만들기] — 기다린다고 한 줄 알리고([취소] 단추), 그 뒤 [모두 멈추기]나 [취소]를 누르면 서지 않는다 (검토 b S1b · S1c · 결정 ③, 리드 11/14)
 import { readFileSync } from 'node:fs'
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -37,6 +37,8 @@ function pressStopAll() {
 
 /** 정리를 기다린다는 알림만 — 다른 알림(끝 · 건너뜀)은 세지 않는다. */
 const waitNotices = () => vi.mocked(toast.info).mock.calls.filter(([text]) => text === WAIT_EN || text === WAIT_KO)
+type NoticeOptions = { id?: string; duration?: number; action?: { label: string; onClick: (event: unknown) => void } }
+const noticeOptions = (n = 0) => (waitNotices()[n]?.[1] ?? {}) as NoticeOptions
 
 beforeEach(() => {
   vi.useFakeTimers()
@@ -123,6 +125,50 @@ describe('같이 정한 것', () => {
     for (let i = 0; i < 20; i++) await vi.advanceTimersByTimeAsync(1000)
     await Promise.all([second, third])
     expect(bodies).toHaveLength(2)
+  })
+})
+
+describe('같이 정한 것 — 결정 ③', () => {
+  it('정리 중 알림에는 [취소]가 있고, 새 판이 시작하거나 취소될 때까지 알림이 남는다 — [취소]를 누르면 기다리던 누름이 서지 않는다', async () => {
+    // 왜: 리드 11/14 결정 ③ — 다른 것이 안 돌면 정리를 기다리는 동안 [모두 멈추기]가 보이지 않는다. 답이 몇 분 매달리는
+    //   드문 경우에도 기다리는 누름을 거둘 길이 있어야 한다 — 새 화면 요소 없이 지금 알림의 단추로(한국어 · 영어).
+    // [취소]: 알림의 단추를 누르면 기다리던 누름은 정리 뒤에 서지 않는다.
+    const first = runRealBatch('p1', { shotIds: ['s1'] })
+    await vi.advanceTimersByTimeAsync(10)
+    useDirectorCanvasStore.getState().cancelRealBatch()
+    const cancelled = runRealBatch('p1', { shotIds: ['s2'] })
+    await vi.advanceTimersByTimeAsync(10)
+    const ko = noticeOptions()
+    expect(ko.action?.label).toBe('취소')
+    expect(ko.duration).toBe(Infinity)
+    expect(toast.dismiss).not.toHaveBeenCalledWith(ko.id)
+    ko.action!.onClick({})
+    release.shift()!()
+    await first
+    expect(await cancelled).toEqual({ generated: 0, quotaBlocked: false })
+    await vi.advanceTimersByTimeAsync(10)
+    expect(bodies).toHaveLength(1)
+    // 새 판이 시작하면 그때 알림을 거둔다 — 정리 중에는 남아 있다. 영어 화면의 단추는 [Cancel].
+    useLocaleStore.setState({ locale: 'en' })
+    vi.mocked(toast.info).mockClear()
+    vi.mocked(toast.dismiss).mockClear()
+    const again = runRealBatch('p1', { shotIds: ['s1'] })
+    await vi.advanceTimersByTimeAsync(10)
+    useDirectorCanvasStore.getState().cancelRealBatch()
+    const waiting = runRealBatch('p1', { shotIds: ['s3'] })
+    await vi.advanceTimersByTimeAsync(10)
+    const en = noticeOptions()
+    expect(en.action?.label).toBe('Cancel')
+    expect(en.duration).toBe(Infinity)
+    expect(toast.dismiss).not.toHaveBeenCalledWith(en.id)
+    release.shift()!()
+    await again
+    await vi.advanceTimersByTimeAsync(10)
+    expect(bodies.map((b) => b.shotIds)).toEqual([['s1'], ['s1'], ['s3']])
+    expect(toast.dismiss).toHaveBeenCalledWith(en.id)
+    release.shift()!()
+    for (let i = 0; i < 20; i++) await vi.advanceTimersByTimeAsync(1000)
+    await waiting
   })
 })
 

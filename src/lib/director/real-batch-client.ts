@@ -124,7 +124,7 @@ let stopTurn = 0
 let waitingPresses = 0
 const WAITING_TOAST_ID = 'real-batch-waiting'
 
-/** [모두 멈추기] — 멈춘 판의 정리를 기다리던 누름을 거둔다(그 뒤에 누른 것은 선다). "끝나면 바로 시작해요" 알림도 거둔다. */
+/** [모두 멈추기] · 알림의 [취소] — 멈춘 판의 정리를 기다리던 누름을 거둔다(그 뒤에 누른 것은 선다). "끝나면 바로 시작해요" 알림도 거둔다. */
 export function cancelWaitingRealBatch(): void {
   stopTurn += 1
   if (waitingPresses > 0) toast.dismiss(WAITING_TOAST_ID)
@@ -139,13 +139,21 @@ export async function runRealBatch(projectId: string, opts?: RealBatchOptions): 
   if (now.realBatchBusy) {
     if (!now.realBatchCancelled || !currentRun) return { generated: 0, quotaBlocked: false }
     // 누름이 말없이 기다리지 않게 한 줄 알린다 — 여러 번 눌러도 한 줄(검토 b S1c). 저절로 도는 판은 말하지 않는다.
+    //   새 판이 시작하거나 취소될 때까지 남고, [취소]로 기다리던 누름을 거둔다 — 다른 것이 안 돌면 [모두 멈추기]가 안 보인다(리드 11/14 결정 ③).
     if (!opts?.silent) {
-      toast.info(translate(useLocaleStore.getState().locale, 'Wrapping up the previous work. It will start right after.'), { id: WAITING_TOAST_ID })
+      const locale = useLocaleStore.getState().locale
+      toast.info(translate(locale, 'Wrapping up the previous work. It will start right after.'), {
+        id: WAITING_TOAST_ID,
+        duration: Infinity,
+        action: { label: translate(locale, 'Cancel'), onClick: () => cancelWaitingRealBatch() },
+      })
     }
     const turn = stopTurn
     waitingPresses += 1
     await currentRun.catch(() => undefined)
     waitingPresses -= 1
+    // 기다림이 끝났다 — 새 판이 서든 거둬졌든 알림은 내린다.
+    toast.dismiss(WAITING_TOAST_ID)
     // 기다리는 사이 [모두 멈추기]를 눌렀으면 서지 않는다(검토 b S1b).
     if (turn !== stopTurn || store.getState().realBatchBusy) return { generated: 0, quotaBlocked: false }
   }
