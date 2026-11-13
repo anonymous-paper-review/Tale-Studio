@@ -2753,6 +2753,12 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     if (videoAsk && !opts?.silentUser) {
       set({ directorVideoAsk: null })
       if (stage === 'director' && projectId && videoAsk.projectId === projectId) {
+        // 번호를 물었는데 "2?"처럼 물음표로 답했다 — 번호로 받지 않고 다시 묻는다(물음표 규칙).
+        if ('numbers' in videoAsk && /[?？]/.test(trimmed) && answeredShotNumbers(trimmed.replace(/[?？]+/g, ''))) {
+          set({ directorVideoAsk: videoAsk })
+          get().appendLocalExchange('director', trimmed, translate(contentLocale(), "Which shots should get videos? Tell me the numbers, like 'shot 3'. Videos use Takes, so I only make the shots you name."))
+          return
+        }
         // 번호를 물었다 — "3번" · "3번이랑 4번" · 맨 숫자도 샷 번호다(재검토 b 낮음 3). 그 번호의 샷만 바로 만든다(분명한 꼴 (1)).
         const numbers = 'numbers' in videoAsk ? answeredShotNumbers(trimmed) : null
         if (numbers) {
@@ -4173,6 +4179,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
               set({ error: translate(locale, heldLines.length > 0
                 ? 'A proposal is already pending, so the new text change and the images or videos waiting for it were held back.'
                 : 'A proposal is already pending, so the new text change was held back.') })
+              // 글이 걸린 샷의 그림 · 영상은 되묻기에도 넣지 않았다 — 무엇을 뺐는지 말한다(재재검토 b 낮음 2).
+              const shots = (ids: readonly string[]) => shotListLabel(locale, ids.map((id) => shotLabelOf(before.nodes.find((node) => node.id === id), names)))
+              if (held.videos.length > 0) lumiSays(translate(locale, "I left out the video for {shots} because its text change isn't applied yet.", { shots: shots(held.videos) }))
+              if (held.images.length > 0) lumiSays(translate(locale, "I left out the image for {shots} because its text change isn't applied yet.", { shots: shots(held.images) }))
+              if (held.allBlankImages) lumiSays(translate(locale, "I left out the live-action images because a text change isn't applied yet."))
             }
           }
           const nowVideos = videoIds.filter((id) => !bound.has(id))

@@ -48,7 +48,8 @@ it('실제 제출 불가능한 샷이 있으면 채팅 영상 만들기를 시�
     ],
   })))
 
-  await chat.getState().sendMessage('새 씬과 샷을 추가하고 남은 샷 영상을 전부 만들어줘')
+  // 말에 "씬"(범위 말)이 있으면 모델이 샷 칸을 비웠을 때 번호부터 묻는다(재재검토 b 낮음 1) — 이 시험은 제출할 수 없는 샷의 까닭을 보므로 범위 말 없이 부탁한다.
+  await chat.getState().sendMessage('새 샷을 추가하고 남은 샷 영상을 전부 만들어줘')
 
   expect(director.getState().nodes.filter(node => node.data.kind === 'shot')).toHaveLength(1)
   expect(chat.getState().pendingProposal).toBeNull()

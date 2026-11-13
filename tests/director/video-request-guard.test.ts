@@ -202,6 +202,38 @@ describe('시키는 꼴이 아닌 말(재재검토 b 보통 C)', () => {
   })
 })
 
+describe('만들지 말라는 절 · 범위 말(재재검토 b 낮음 1)', () => {
+  // 왜: "만들지 마" 절 안의 묶음(실패한 · 이미지 나온 · 고른)도 뺀 것이다 — 되묻는 목록에 넣으면 "응"으로 그 샷에 Take 를 쓴다.
+  it('"실패한 샷은 만들지 마, 영상 다 만들어줘"는 실패한 샷을 뺀 목록으로 되묻는다', () => {
+    expect(ground('실패한 샷은 만들지 마, 영상 다 만들어줘', null)).toEqual(confirm(1, 2, 3, 4))
+    expect(ground('이 샷은 만들지 마, 영상 다 만들어줘', null, ids(3))).toEqual(confirm(1, 2, 4, 5, 6))
+  })
+  // 왜: 범위 · 수량 말이 있는데 모델이 샷 칸을 비우면(남은 전부) 그 말이 가리키는 샷을 화면이 모른다 — 전부를 목록으로 내밀지 않고 번호로 묻는다.
+  it('범위 · 수량 말("씬" · "하나만" · "two of …")이 있는데 모델이 샷 칸을 비우면 목록 대신 번호로 묻는다', () => {
+    for (const text of ['씬 2 영상 다 만들어줘', '이 씬 영상 다 만들어줘', 'Make all the videos for scene 2', '남은 샷 중에 하나만 영상 만들어줘', 'Make videos for two of the remaining shots']) {
+      expect(ground(text, null), text).toEqual(ASK)
+    }
+  })
+})
+
+describe('되묻는 목록에서 빼는 말(검토자 탐침 revb22)', () => {
+  // 왜: "샷 2 는 그대로 두고"처럼 뺀 번호가 되묻는 목록에 남으면 "응" 한 번에 그 샷에 Take 를 쓴다.
+  it('"샷 2 는 그대로 두고 · 됐고 · 영상 필요 없고" · "Leave shot 2 as it is" · "Don\'t bother with shot 2" · "No video for shot 2"처럼 뺀 번호는 되묻는 목록에서도 뺀다', () => {
+    for (const text of ['샷 2 는 그대로 두고 샷 3 영상 만들어줘', '샷 2 는 됐고 샷 3 영상 만들어줘', '샷 2 는 영상 필요 없고 샷 3 만들어줘', 'Leave shot 2 as it is and make the video for shot 3', "Don't bother with shot 2, make the video for shot 3", 'No video for shot 2, just shot 3']) {
+      expect(ground(text, ids(2, 3)), text).toEqual(confirm(3))
+    }
+  })
+  it('"Make all the remaining videos except the failed ones"는 실패한 샷을 뺀 목록으로 되묻는다', () => {
+    expect(ground('Make all the remaining videos except the failed ones', null)).toEqual(confirm(1, 2, 3, 4))
+  })
+  it('"영상 다 만드는 건 아니야" · "샷 3 영상 만들지 않을래"면 아무 영상도 만들지 않는다', () => {
+    expect(ground('영상 다 만드는 건 아니야', null)).toEqual(NONE)
+    expect(ground('샷 3 영상 만들지 않을래', ids(3))).toEqual(NONE)
+    // "아직 만들지 않은 샷"은 만들지 말라는 말이 아니다.
+    expect(ground('아직 영상 만들지 않은 샷 3 영상 만들어줘', ids(3)).kind).not.toBe('none')
+  })
+})
+
 describe('만들지 말라는 말이면 만들지 않는다', () => {
   it('"샷 2 는 영상 만들지 마" · "Don\'t make a video for shot 4"면 아무 영상도 만들지 않는다', () => {
     expect(ground('샷 2 는 영상 만들지 마', ids(2))).toEqual(NONE)

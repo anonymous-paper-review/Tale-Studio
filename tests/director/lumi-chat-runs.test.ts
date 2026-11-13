@@ -375,6 +375,44 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     expect(lastModel()).toBe('There are no such shots right now.')
   })
 
+  // 왜: 재재검토 b 낮음 2 — 다른 카드가 기다려 새 글 카드를 못 내면, 글이 걸린 샷을 되묻기 목록에 담아 "응"으로 옛 글로 시작했다(C4).
+  it('새 글 카드를 못 낸 답에서는 글이 걸린 샷을 되묻기 목록에서도 빼고 "글 고침이 아직 적용되지 않아 샷 1 영상은 뺐어요"라고 말한다', async () => {
+    reply([{ type: 'updateShot', id: 's2', patch: { prompt: 'Cold' } }])
+    await chat.getState().sendMessage('Make shot 2 cold')
+    reply([{ type: 'updateShot', id: 's1', patch: { prompt: 'Warm' } }, { type: 'generateVideos', shotIds: ['s1'] }])
+    await chat.getState().sendMessage('Make shot 1 warm and make its video')
+    expect(chat.getState().directorVideoAsk).toBeNull()
+    expect(lastModel()).toBe("I left out the video for Shot 1 because its text change isn't applied yet.")
+    expect(translate('ko', "I left out the video for {shots} because its text change isn't applied yet.", { shots: '샷 1' })).toBe('글 고침이 아직 적용되지 않아 샷 1 영상은 뺐어요.')
+    await chat.getState().sendMessage('응')
+    expect(mocks.run).not.toHaveBeenCalled()
+  })
+
+  // 왜: 재재검토 b — "2?"는 대답이 아니라 되묻는 말이다(같은 물음표 규칙). 번호로 받지 않고 다시 묻는다.
+  it('번호를 물은 뒤 "2?"처럼 물음표로 답하면 샷 2 로 받지 않고 다시 묻는다', async () => {
+    reply([{ type: 'generateVideos', shotIds: ['s2'] }])
+    await chat.getState().sendMessage('샷 2 빼고 영상 다 만들어줘')
+    await chat.getState().sendMessage('2?')
+    expect(mocks.run).not.toHaveBeenCalled()
+    expect(lastModel()).toBe("Which shots should get videos? Tell me the numbers, like 'shot 3'. Videos use Takes, so I only make the shots you name.")
+    await chat.getState().sendMessage('3')
+    expect(runShots()).toEqual(['s3'])
+  })
+
+  // 왜: 재재검토 b 낮음 3(C5) — Director 에서 되물은 뒤 다른 단계에서 "좋아"라고 하면 Take 가 묶인 글 카드가 승인돼 영상이 나갔다.
+  it('Director 에서 되물은 뒤 다른 단계에서 "좋아"라고 해도 Take 가 묶인 글 카드는 승인되지 않고 영상도 시작하지 않는다', async () => {
+    reply([{ type: 'updateShot', id: 's1', patch: { prompt: 'Warm' } }, { type: 'generateVideos', shotIds: ['s1', 's2'] }])
+    await chat.getState().sendMessage('Make shot 1 warm and make videos for shots 1 and 2')
+    expect(chat.getState().pendingProposal?.payload.then).toMatchObject({ videos: ['s1'] })
+    expect(chat.getState().directorVideoAsk).toMatchObject({ shotIds: ['s2'] })
+    project.setState({ currentStage: 'writer' })
+    reply([])
+    await chat.getState().sendMessage('좋아')
+    expect(mocks.run).not.toHaveBeenCalled()
+    expect(promptOf('s1')).toBeNull()
+    expect(chat.getState().pendingProposal?.kind).toBe('directorTextEdit')
+  })
+
   // 왜: 서버 지시문도 같은 약속을 말해야 모델이 "확인 카드가 뜰 거예요"라고 하지 않는다.
   it('서버 지시문은 그림 · 영상을 바로 만든다고 알리고, 영상은 사용자가 말한 샷만 담게 한다', () => {
     const route = readFileSync(path.join(process.cwd(), 'src/app/api/director/chat/route.ts'), 'utf8')
