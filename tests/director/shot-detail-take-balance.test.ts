@@ -198,3 +198,20 @@ it('이미지 탭에서 까닭이 보인 뒤 다시 눌러 Take 잔액이 읽히
   expect(after.some((node) => typeof node.type === 'function' && node.type.name === 'ShotVideoTab')).toBe(true)
   expect(hasText(after, UNKNOWN)).toBe(false)
 })
+
+it('이미지 탭 [다음: 영상 만들기]는 Take 잔액을 다시 읽는 동안 두 번 눌러도 한 번만 시작한다', async () => {
+  // 왜: 검토 b(탐침 D4) — 다시 읽는 동안 단추가 켜져 있으면 두 번 눌러 새 Take 요청이 두 번 나간다. 첫 시도가 샷 잠금을 일찍 놓으면(바로 실패 등) Take 가 하나 더 빠진다.
+  let release!: (value: unknown) => void
+  takes.fetch.mockReturnValue(new Promise((resolve) => { release = resolve }))
+  const remake = vi.fn().mockResolvedValue('take-new')
+  director.setState({ remakeShotVideo: remake } as never)
+  const first = button(detail(), '다음: 영상 만들기')
+  ;(first.props.onClick as () => void)()
+  const reading = button(detail(), '다음: 영상 만들기')
+  expect(reading.props.disabled).toBe(true)
+  ;(reading.props.onClick as () => void)()
+  ;(first.props.onClick as () => void)()
+  release({ ...READ })
+  await flush()
+  expect(remake).toHaveBeenCalledExactlyOnceWith(shotId)
+})

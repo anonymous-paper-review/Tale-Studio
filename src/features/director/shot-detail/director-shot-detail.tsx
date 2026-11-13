@@ -3,7 +3,7 @@
 // Director 샷 상세(디자이너 11/13 시안 D6 · D7, 오너 2026-11-14) — 샷 하나에 이미지 · 영상 탭.
 //   스토리보드형은 팝업(DirectorNodePopup), 노드형은 왼쪽 패널(DirectorDetailPanel)이 이 부품을 같은 내용으로 연다.
 //   규칙: lib/director/shot-detail · 약속: tests/director/shot-detail.test.ts · shot-detail-view.test.ts
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useT } from '@/lib/i18n'
@@ -31,6 +31,10 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
   const [tab, setTab] = useState<ShotDetailTab>(initialTab)
   // [다음: 영상 만들기]가 Take 를 확인하지 못해 시작하지 않은 까닭 — 이미지 탭 단추 아래에 보이고, 다음에 누를 때 지운다.
   const [nextNotice, setNextNotice] = useState<string | null>(null)
+  // 잔액을 다시 읽는 동안 [다음: 영상 만들기]를 끈다 — 두 번 눌러 새 Take 가 두 번 나가지 않게(검토 b 탐침 D4, 영상 탭 단추와 같은 꼴).
+  //   상태는 단추를 끄고, ref 는 같은 화면에서 빠르게 두 번 불려도 한 번만 시작하게 한다.
+  const [nextStarting, setNextStarting] = useState(false)
+  const nextStartingRef = useRef(false)
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   const remakeShotVideo = useDirectorCanvasStore((s) => s.remakeShotVideo)
   const videoBatchBusy = useDirectorCanvasStore((s) => s.videoBatchBusy)
@@ -52,16 +56,24 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
     label: takeValuesShown(takeBalance) ? t('Next: make the video · {count} Takes', { count }) : t('Next: make the video'),
     // 시작 · 끝 이미지를 다시 만드는 중(또는 기다리는 중)이면 옛 그림으로 Take 가 나간다(리드 검토 c ①).
     disabled: !shotDetailFrames(data.storyboardImage).start || videoBatchBusy || takes.some((take) => takePhaseOf(take.data) === 'making')
-      || imageGeneration.generating || data.storyboardImage?.status === 'pending',
+      || imageGeneration.generating || data.storyboardImage?.status === 'pending' || nextStarting,
     // 누를 때 잔액을 다시 읽고, 못 읽으면 시작하지 않고 이미지 탭에 남아 까닭을 보인다.
     run: async () => {
+      if (nextStartingRef.current) return
+      nextStartingRef.current = true
+      setNextStarting(true)
       setNextNotice(null)
-      if ((await fetchTakeBalance()).failed) {
-        setNextNotice(t("I couldn't check your Takes, so I didn't start. Please try again in a moment."))
-        return
+      try {
+        if ((await fetchTakeBalance()).failed) {
+          setNextNotice(t("I couldn't check your Takes, so I didn't start. Please try again in a moment."))
+          return
+        }
+        void remakeShotVideo(shotNodeId)
+        setTab('video')
+      } finally {
+        nextStartingRef.current = false
+        setNextStarting(false)
       }
-      void remakeShotVideo(shotNodeId)
-      setTab('video')
     },
     notice: nextNotice,
   }
