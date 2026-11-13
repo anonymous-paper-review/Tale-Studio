@@ -22,6 +22,7 @@ import { useLocaleStore } from '@/stores/locale-store'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import type { VideoNodeData } from '@/types/director'
 import { keptStoryboardImage, withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
+import { translate } from '@/lib/i18n/translate'
 
 let shotId = ''
 const IMAGE = { url: 'https://media.test/start.png', status: 'completed' as const, errorMessage: null, generatedAt: 1, frames: { start: 'https://media.test/start.png', direction: 'https://media.test/dir.png', end: 'https://media.test/end.png' } }
@@ -155,6 +156,15 @@ describe('Director 샷 상세 화면', () => {
     expect(out).toContain('The start and end images changed · A new Take will use them')
     setLocale('ko')
     expect(render('panel', 'video')).toContain('시작 v1 + 끝 v1 · Seedance 2.0 · 720p')
+  })
+
+  it('이미지를 다시 만들기 전 확인 창의 단추는 "다시 만들기"다 — 카드 · 꼬리 · 툴바 확인 창과 같은 말', () => {
+    // 왜: 리드 11/14 말 맞추기 — 제목은 "이미지를 다시 만들까요?"인데 단추만 옛 말 "재생성"이었다(카드 · 꼬리 · 툴바는 set 84cf453b 가 맞춤).
+    //   직접 추가한 이미지의 "다시 생성"은 출시 시험이 글자로 박고 있어 그대로다.
+    const button = readFileSync('src/features/director/storyboard-image-button.tsx', 'utf8')
+    expect(button).toContain("confirmLabel={confirm === 'manual-retry' ? t('Generate again') : t('Make again')}")
+    expect(button).not.toContain("t('Regenerate')")
+    expect(translate('ko', 'Make again')).toBe('다시 만들기')
   })
 
   it('이미지를 다시 만들기 전 확인 창은 지금 이미지가 버전으로 남는다고 알린다', () => {
