@@ -10,7 +10,7 @@ vi.mock('@/lib/storage/media', () => ({
   mediaUpload: mocks.upload,
 }))
 
-import { cleanPlateFor, toolWithPlate } from '@/features/writer/directing-arrow-editor'
+import { cleanPlateFor, readSeparateResponse, toolWithPlate } from '@/features/writer/directing-arrow-editor'
 import { StaleDirectionError, separateArrowLayer, withCleanPlate } from '@/lib/writer/directing-edit'
 
 // 이 시험을 위해 지은 러프 세 장 — 연출 그림 주소(?v= 포함)가 밑층을 묶는 열쇠다.
@@ -68,5 +68,26 @@ describe('연출 편집기 밑층 — 낡은 화면에서 분리', () => {
   it('화면이 서버보다 낡은 채 분리하면 옛 그림 위에 새 그림의 밑층을 섞지 않는다', async () => {
     await expect(separateArrowLayer('p1', 'sh_1', 'ko', { expectDirection: 'https://media.test/d.png?v=old' })).rejects.toBeInstanceOf(StaleDirectionError)
     expect(mocks.generateReservedImage).not.toHaveBeenCalled()
+  })
+})
+
+describe('연출 편집기 밑층 — 낡은 화면에서 분리한 뒤 화면', () => {
+  // 왜(재검토 c 1): 서버가 낡은 화면의 분리를 409(stale_direction)로 거절하면, 화면은 지금 그림을 다시 읽어 위층도 맞추고
+  //   다시 분리해 달라고 알려야 한다 — 그러지 않으면 낡은 위층을 들고 다시 [분리]해 또 거절된다.
+  it('화면이 서버보다 낡은 채 분리하면, 화면은 지금 그림을 다시 읽고 레이어를 다시 분리해 달라고 알린다', async () => {
+    const notify = vi.fn()
+    const reload = vi.fn(async () => undefined)
+    const stale = new Response(JSON.stringify({ error: 'changed', code: 'stale_direction' }), { status: 409, headers: { 'content-type': 'application/json' } })
+    await expect(readSeparateResponse(stale, { notify, reload })).resolves.toBeNull()
+    expect(notify).toHaveBeenCalledTimes(1)
+    expect(reload).toHaveBeenCalledTimes(1)
+
+    // 정상 경로 고정 — 분리한 밑층을 돌려주고 다시 읽지 않는다.
+    notify.mockClear()
+    reload.mockClear()
+    const ok = new Response(JSON.stringify({ data: { cleanUrl: 'https://media.test/clean.png', cached: false } }), { status: 200, headers: { 'content-type': 'application/json' } })
+    await expect(readSeparateResponse(ok, { notify, reload })).resolves.toEqual({ cleanUrl: 'https://media.test/clean.png', cached: false })
+    expect(notify).not.toHaveBeenCalled()
+    expect(reload).not.toHaveBeenCalled()
   })
 })

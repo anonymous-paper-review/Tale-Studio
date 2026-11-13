@@ -14,6 +14,9 @@ import { assertUserTextAllowed } from '@/lib/moderation/creem'
 import { mediaPathFromUrl, mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 import { uploadThumbnail } from '@/lib/storage-thumb'
 import { translate } from '@/lib/i18n'
+import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
+import { stripCameraMoveSentences } from '@/lib/writer/pipeline/stage/view'
+import { stripColor, words } from '@/lib/writer/rough-storyboard'
 import type { AppLocale } from '@/lib/locale'
 
 // locale 을 안 넘기는 호출부(rough-directing-edit/route.ts)가 조용히 안 깨지도록 기존 동작(항상
@@ -23,11 +26,13 @@ const UNSPECIFIED_LOCALE_FALLBACK: AppLocale = 'ko'
 const GROK_EDIT_MODEL = 'xai/grok-imagine-image/edit'
 
 // i2i 는 소스의 구도·배치를 유지하고 프롬프트가 "바꿀 것"만 지시한다 — 지울 대상을 구체적으로 열거.
+//   밑층은 지우개로 드러나 저장되는 그림이다 — 한 장 다시 그리기처럼 얼굴 없는 목각 인형 · 글자 없음을 지킨다(2026-11-14 검토 a 3).
 const STRIP_ARROWS_PROMPT =
   'Remove every arrow, motion line, dashed path, direction indicator, and handwritten text ' +
   'annotation from this pencil storyboard sketch. Keep everything else exactly identical: ' +
   'same composition, same figures and poses, same background, same monochrome pencil shading. ' +
-  'Return only the cleaned drawing.'
+  'Keep every figure the same faceless wooden mannequin with a completely blank head (never add a face), ' +
+  'and do not add any text. Return only the cleaned drawing.'
 
 type RoughJson = {
   status?: string
@@ -88,7 +93,10 @@ export class StaleDirectionError extends Error {
 
 /** 순수: 분리가 끝났을 때 서버에 남길 러프 JSON — 그사이 연출 그림(주소)이 바뀌었으면 낡은 밑층이라 null.
  *  시작 · 끝만 바뀌었으면 연출 그림이 그대로라 지금 그림 시각(generatedAt)에 묶어 남긴다(검토 2026-11-14 낮음 2 ① —
- *  예전엔 시각이 바뀌면 버려 다시 분리에 그림 값이 또 들었다). */
+ *  예전엔 시각이 바뀌면 버려 다시 분리에 그림 값이 또 들었다).
+ *  알려진 빈틈(재검토 c 2, 드묾 · 회귀 아님): 분리하는 30초 사이 다른 창에서 [저장]하면 주소가 바뀌어 여기서 버린다.
+ *  저장은 밑그림을 바꾸지 않아(saveDirectingFrame 은 for 를 올려 잇는다) 이어 줄 수 있지만, 주소만으로는 저장과
+ *  다시 그리기를 가를 수 없다 — 이으려면 러프 JSON 에 "어느 그림 위에 저장했는지" 표시가 필요해 지금은 두지 않는다. */
 export function withCleanPlate(latest: RoughJson, separatedFrom: string, cleanUrl: string): RoughJson | null {
   if (!latest.frames?.direction || latest.frames.direction !== separatedFrom) return null
   return { ...latest, cleanDirection: { url: cleanUrl, for: latest.generatedAt ?? 0 } }
@@ -244,20 +252,68 @@ export function mergeRoughFrame(
   return { ...rest, frames, generatedAt: now, ...(cleanDirection ? { cleanDirection } : {}) }
 }
 
-export function promptForFrame(frame: RoughFrameKey, action: string | null): { prompt: string; refs: (f: NonNullable<RoughJson['frames']>) => string[] } {
-  if (frame === 'end') return { prompt: END_FROM_DIRECTION_PROMPT, refs: (f) => [f.direction!] }
-  if (frame === 'start') return { prompt: START_FROM_DIRECTION_PROMPT, refs: (f) => [f.direction!] }
-  const movement = action?.trim() ? ` The movement to mark: ${action.trim()}.` : ''
+// 따옴표 대사 — "…" “…” 「…」 『…』 ‘…’, 그리고 앞이 글자가 아닌 '…'(man's · don't 같은 아포스트로피는 남긴다).
+const QUOTED_DIALOGUE =
+  /"[^"]*"|\u201c[^\u201d]*\u201d|\u300c[^\u300d]*\u300d|\u300e[^\u300f]*\u300f|\u2018[^\u2019]*\u2019|(?<![\p{L}\p{N}])'(?:[^'\n]|'(?=[A-Za-z]))*?'(?![A-Za-z])/gu
+
+/** 순수: 따옴표 대사를 뺀다 — 연출 다시 그리기의 짧은 메모로 옮겨 적힐 재료가 된다(검토 a 1). */
+export function withoutQuotedDialogue(text: string): string {
+  return text
+    .replace(QUOTED_DIALOGUE, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([,.;:!?])/g, '$1')
+    .trim()
+}
+
+/** 순수: 연출 다시 그리기에 싣는 행동 글 — 시트 START 줄과 같은 손질(카메라 무브 문장 · 색 말 빼기)에 따옴표 대사 빼기. */
+export function movementSentence(text: string): string {
+  return stripColor(stripCameraMoveSentences(withoutQuotedDialogue(text))).replace(/[\s.]+$/, '')
+}
+
+type CameraMotionLike = { type?: string | null; direction?: string | null; speed?: string | null }
+
+/** 순수: 샷 설계의 카메라 무브 — 시트 MOTION 줄의 카메라 말과 같다(rough-storyboard-grid camMove, 까닭 말은 뺀다). 고정이면 null. */
+export function cameraMoveClause(cam: CameraMotionLike | null | undefined): string | null {
+  if (!cam?.type || cam.type === 'static') return null
+  return `camera ${words(cam.type)}${cam.direction && cam.direction !== 'none' ? ` ${words(cam.direction)}` : ''}${cam.speed ? `, ${words(cam.speed)}` : ''}`
+}
+
+/** 연출 다시 그리기의 재료 — 행동 글은 시트처럼 영어 파생본(같은 번역 종류)으로, 대사는 번역 전에 뺀다. 카메라는 샷 설계에서. */
+export async function directionMaterialFrom(
+  shotId: string,
+  actionDescription: string | null,
+  dynamicSpec: unknown,
+): Promise<{ action: string | null; camera: string | null }> {
+  const native = actionDescription ? withoutQuotedDialogue(actionDescription) : ''
+  const action = native ? ((await deriveEnBatch([{ id: shotId, native }], 'shot action description')).get(shotId) ?? native) : null
+  const camera = cameraMoveClause((dynamicSpec as { camera_motion?: CameraMotionLike } | null)?.camera_motion)
+  return { action, camera }
+}
+
+/** 한 장 다시 그리기 프롬프트 · 참조 그림 · 실제로 싣는 사용자 글(내용 검사 대상). 시작 · 끝에는 사용자 글이 없다. */
+export function promptForFrame(
+  frame: RoughFrameKey,
+  action: string | null,
+  camera: string | null = null,
+): { prompt: string; refs: (f: NonNullable<RoughJson['frames']>) => string[]; userText: string | null } {
+  if (frame === 'end') return { prompt: END_FROM_DIRECTION_PROMPT, refs: (f) => [f.direction!], userText: null }
+  if (frame === 'start') return { prompt: START_FROM_DIRECTION_PROMPT, refs: (f) => [f.direction!], userText: null }
+  const userText = action ? movementSentence(action) || null : null
+  const marks = [userText, camera].filter(Boolean).join('; ')
+  const movement = marks ? ` The movement to mark: ${marks}.` : ''
   const prompt = `${DIRECTION_FROM_START_PROMPT}${movement} Keep the same monochrome pencil style. ${REDRAW_FIGURE_RULE} ${REDRAW_NOTES_RULE} Return only the drawing.`
-  return { prompt, refs: (f) => [f.start!] }
+  return { prompt, refs: (f) => [f.start!], userText }
 }
 
 /** 다시 그린 한 장을 시트에서 자른 다른 장 크기로 맞춘다 — Grok 은 720×1280(가로 1280×720)으로 돌려주는데 시트 칸은 255×447(406×223)이다.
- *  비율 차이(2% 안팎)는 가장자리를 몇 px 잘라 맞춘다(cover). 그림을 못 읽으면 그대로 둔다. */
+ *  비율 차이(2% 안팎)는 가장자리를 몇 px 잘라 맞춘다(cover). 그림을 못 읽거나 비율이 5% 넘게 다르면(세로 칸에 가로 그림 —
+ *  폭의 32%만 남는다, 검토 a 2) 그대로 둔다. */
 export async function fitFrameToSize(buf: Buffer, width: number, height: number): Promise<Buffer> {
   try {
     const meta = await sharp(buf).metadata()
+    if (!meta.width || !meta.height) return buf
     if (meta.width === width && meta.height === height) return buf
+    if (Math.abs((meta.width / meta.height) / (width / height) - 1) > 0.05) return buf
     return await sharp(buf).resize(width, height, { fit: 'cover' }).toBuffer()
   } catch {
     return buf
@@ -302,20 +358,25 @@ export async function regenerateRoughFrame(
   }
   // 그리기 전에 본다 — 남의 파일 자리 때문에 그림 값을 쓰지 않는다(리뷰 M5).
   if (opts.projectFolderOnly) await assertProjectFolder(projectId, storagePathFromPublicUrl(rb.frames[frame]!, locale), locale)
-  let action: string | null = null
+  let material: { action: string | null; camera: string | null } = { action: null, camera: null }
   if (frame === 'direction') {
     const { data } = await supabaseAdmin
       .from('shots')
-      .select('action_description')
+      .select('action_description,dynamic_spec')
       .eq('project_id', projectId)
       .eq('shot_id', shotId)
       .maybeSingle()
-    action = typeof data?.action_description === 'string' ? data.action_description : null
+    material = await directionMaterialFrom(
+      shotId,
+      typeof data?.action_description === 'string' ? data.action_description : null,
+      data?.dynamic_spec ?? null,
+    )
   }
-  const { prompt, refs } = promptForFrame(frame, action)
+  const { prompt, refs, userText } = promptForFrame(frame, material.action, material.camera)
   // #creem-moderation(2026-10-11): 자리 예약 전에 검사한다 — DIRECTING 재생성에만 실리는 사용자
   //   액션 설명이 검사 대상이고, 프레임 지시문(START/END/DIRECTION 템플릿)은 우리 문구라 보내지 않는다.
-  const moderation = await assertUserTextAllowed([action], { projectId, kind: 'image_generation' })
+  //   검사는 실제로 싣는 글(영어 파생 · 손질한 것)로 한다(2026-11-14 검토 a 1).
+  const moderation = await assertUserTextAllowed([userText], { projectId, kind: 'image_generation' })
   const result = await generateReservedImage(
     {
       model: GROK_EDIT_MODEL,

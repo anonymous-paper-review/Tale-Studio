@@ -69,6 +69,27 @@ export function toolWithPlate(tool: Tool, hasPlate: boolean): Tool {
   return tool === 'eraser' && !hasPlate ? 'pen' : tool
 }
 
+/** 위층(원본 + 그리던 자국 · 되돌리기)을 다시 깔지 — 연출 그림(주소, ?v= 포함)이 바뀔 때만. 시작 · 끝만 다시 그리면
+ *  그림 시각만 바뀌므로 그리던 화살표를 그대로 둔다(재검토 c 3 — 예전엔 그림 시각으로 다시 깔아 저장 전 자국이 사라졌다). 순수 함수 — 테스트 대상. */
+export function reloadsTopLayer(loaded: string | null, direction: string | null | undefined): boolean {
+  return !!direction && direction !== loaded
+}
+
+/** 분리 답 읽기 — 409(stale_direction)면 화면이 서버보다 낡았다: 알리고 지금 그림을 다시 읽는다(위층도 맞춘다). 테스트 대상. */
+export async function readSeparateResponse(
+  res: Response,
+  onStale: { notify: () => void; reload: () => Promise<void> },
+): Promise<{ cleanUrl: string; cached: boolean } | null> {
+  const j = await res.json().catch(() => null)
+  if (res.status === 409 && j?.code === 'stale_direction') {
+    onStale.notify()
+    await onStale.reload()
+    return null
+  }
+  if (!res.ok) throw new Error(j?.error ?? `HTTP ${res.status}`)
+  return { cleanUrl: j.data.cleanUrl as string, cached: !!j.data.cached }
+}
+
 export function DirectingArrowEditor({
   projectId,
   shotId,
@@ -115,10 +136,12 @@ export function DirectingArrowEditor({
   //   재실행되므로, 값(문자열)만 deps 에 넣어 로케일이 실제로 바뀔 때만 재실행되게 한다.
   const failedToLoadFrameMsg = t('Could not load the DIRECTING frame')
 
-  // 원본 DIRECTING 프레임 → 위층 캔버스. directionUrl 은 generatedAt 캐시버스트를 포함하므로
-  //   저장 후(loadProject 로 generatedAt 갱신) 이 effect 가 저장본을 새 "원본"으로 다시 깐다.
+  // 원본 DIRECTING 프레임 → 위층 캔버스. 저장하거나 연출 그림을 다시 만들면 연출 그림 주소가 바뀌어 이 effect 가
+  //   그 그림을 새 "원본"으로 다시 깐다. 시작 · 끝만 다시 그리면(그림 시각만 바뀜) 그리던 자국 · 되돌리기를 남긴다(재검토 c 3).
+  const loadedDirectionRef = useRef<string | null>(null)
+  const directionKey = panel.frames?.direction ?? null
   useEffect(() => {
-    if (!directionUrl) return
+    if (!directionUrl || !reloadsTopLayer(loadedDirectionRef.current, directionKey)) return
     let cancelled = false
     void loadImage(directionUrl)
       .then((img) => {
@@ -131,6 +154,7 @@ export function DirectingArrowEditor({
         undoStackRef.current = []
         setUndoCount(0)
         setDims({ w: img.naturalWidth, h: img.naturalHeight })
+        loadedDirectionRef.current = directionKey
       })
       .catch(() => {
         if (!cancelled) toast.error(failedToLoadFrameMsg)
@@ -138,7 +162,7 @@ export function DirectingArrowEditor({
     return () => {
       cancelled = true
     }
-  }, [directionUrl, failedToLoadFrameMsg])
+  }, [directionUrl, directionKey, failedToLoadFrameMsg])
 
   const busy = separating || saving
   const ready = !!dims
@@ -263,18 +287,17 @@ export function DirectingArrowEditor({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'separate', projectId, shotId, direction }),
       })
-      const j = await res.json().catch(() => null)
-      if (res.status === 409 && j?.code === 'stale_direction') {
-        // 낡은 화면 위에 새 그림의 밑층을 섞지 않는다 — 화면을 다시 읽어 위층도 지금 그림으로 맞춘다.
-        toast.info(t('The directing frame changed in the meantime, so we loaded it again. Separate the layer again.'))
-        await reloadAfterRoughFrameEdit(projectId, () => onSaved())
-        return
-      }
-      if (!res.ok) throw new Error(j?.error ?? `HTTP ${res.status}`)
-      setSeparated({ url: j.data.cleanUrl as string, direction })
+      // 낡은 화면 위에 새 그림의 밑층을 섞지 않는다 — 409 면 알리고 화면을 다시 읽어 위층도 지금 그림으로 맞춘다.
+      const separatedPlate = await readSeparateResponse(res, {
+        notify: () => toast.info(t('The directing frame changed in the meantime, so we loaded it again. Separate the layer again.')),
+        // 감싼 까닭: 출시 시험 rough-frame-edit-refresh 가 두 저장 길의 다시 읽기 줄을 글자 그대로 세어 2개여야 한다 — 이 길은 그 셈 밖에 둔다.
+        reload: () => reloadAfterRoughFrameEdit(projectId, () => onSaved()),
+      })
+      if (!separatedPlate) return
+      setSeparated({ url: separatedPlate.cleanUrl, direction })
       setTool('eraser') // 분리 직후 자연스러운 다음 동작 = 긁어보기
       toast.success(
-        j.data.cached
+        separatedPlate.cached
           ? t('Loaded the previously separated layer')
           : t('Separated the arrow layer. Scrape with the eraser to reveal the layer underneath'),
       )

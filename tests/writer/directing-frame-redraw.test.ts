@@ -12,7 +12,7 @@ vi.mock('@/lib/storage/media', () => ({
 }))
 vi.mock('@/lib/storage-thumb', () => ({ uploadThumbnail: mocks.thumb }))
 
-import { regenerateRoughFrame } from '@/lib/writer/directing-edit'
+import { fitFrameToSize, regenerateRoughFrame } from '@/lib/writer/directing-edit'
 
 // 이 시험을 위해 지은 러프 — 시트에서 자른 세 장은 255×447, Grok 은 720×1280 으로 돌려준다(2026-11-14 개발 실측과 같은 크기).
 const ROUGH = {
@@ -82,5 +82,16 @@ describe('러프 한 장 다시 그리기', () => {
     const saved = mocks.upload.mock.calls[0][1] as Buffer
     const meta = await sharp(saved).metadata()
     expect(`${meta.width}x${meta.height}`).toBe('255x447')
+  })
+
+  // 왜(검토 a 2): 크기 맞추기는 가장자리를 잘라 비율을 맞춘다 — 비율이 크게 다른 그림(세로 칸에 가로 그림)이 오면 폭의 32%만 남았다.
+  //   비율 차이가 5% 안이면(Grok 720×1280 ↔ 시트 칸 255×447 은 1.4%) 지금처럼 맞춘다.
+  it('다시 그린 그림의 비율이 나머지 두 장과 5% 넘게 다르면 자르지 않고 그대로 저장한다', async () => {
+    for (const [width, height] of [[1280, 720], [1024, 1024]]) {
+      const drawn = await noisy(width, height)
+      expect(Buffer.compare(await fitFrameToSize(drawn, 255, 447), drawn)).toBe(0)
+    }
+    const near = await sharp(await fitFrameToSize(await noisy(720, 1280), 255, 447)).metadata()
+    expect(`${near.width}x${near.height}`).toBe('255x447')
   })
 })
