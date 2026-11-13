@@ -21,6 +21,7 @@ import {
 } from '@/types/director'
 import { FAL_VIDEO_MODEL_ORDER, VIDEO_MODELS, normalizeProvider } from '@/lib/video-models'
 import { VideoResolutionButtons, VideoTakeCost } from '@/features/director/video-resolution-buttons'
+import { TAKES_UNKNOWN_TEXT, takesReadable } from '@/features/director/takes-check'
 import { useT } from '@/lib/i18n'
 
 /** 영상 미리보기 틀의 높이 상한(세로·정사각 포맷) — 패널·팝업 안에서 스크롤 없이 보이게. */
@@ -78,6 +79,10 @@ export function VideoDetailPanel({
   } | null>(null)
   const finalOperationRef = useRef(0)
   const regenerationOperationRef = useRef(0)
+  // 잔액을 다시 읽는 중인 노드 · 못 읽어 시작하지 않은 노드 — 단추를 끄고, 단추 아래에 까닭을 보인다(노드가 바뀌면 그 노드 것만).
+  const [checkingNodeId, setCheckingNodeId] = useState<string | null>(null)
+  const [takesUnknownNodeId, setTakesUnknownNodeId] = useState<string | null>(null)
+  const checkingRef = useRef<string | null>(null)
   const activeNodeIdRef = useRef(nodeId)
   const nodeSessionRef = useRef(0)
   const canMarkFinal =
@@ -189,7 +194,7 @@ export function VideoDetailPanel({
   }
 
   const handleRegenerate = async () => {
-    if (isGenerating) return
+    if (isGenerating || checkingRef.current === nodeId) return
     if (standalonePromptMissing) {
       setRegenerationState({
         nodeId,
@@ -200,6 +205,22 @@ export function VideoDetailPanel({
     const operation = ++regenerationOperationRef.current
     const session = nodeSessionRef.current
     setRegenerationState({ nodeId, error: null })
+    setTakesUnknownNodeId(null)
+    // 단추 값이 곧 동의인 자리 — 누를 때 잔액을 다시 읽고, 못 읽으면 시작하지 않고 단추 아래에 까닭을 보인다(샷 상세 · 넘기기 창과 같은 말,
+    //   리드 2026-11-14). 읽는 동안 단추를 꺼, 두 번 눌러도 한 번만 시작한다(검토 b 탐침 D4 와 같은 꼴).
+    checkingRef.current = nodeId
+    setCheckingNodeId(nodeId)
+    let readable = false
+    try {
+      readable = await takesReadable()
+    } finally {
+      checkingRef.current = null
+      setCheckingNodeId(null)
+    }
+    if (!readable) {
+      setTakesUnknownNodeId(nodeId)
+      return
+    }
     try {
       await regenerateVideo(nodeId)
       if (
@@ -420,7 +441,7 @@ export function VideoDetailPanel({
         <Button
           size="sm"
           onClick={() => void handleRegenerate()}
-          disabled={isGenerating || standalonePromptMissing}
+          disabled={isGenerating || standalonePromptMissing || checkingNodeId === nodeId}
           className="gap-1.5"
         >
           {isGenerating ? (
@@ -446,6 +467,7 @@ export function VideoDetailPanel({
           <Trash2 className="size-3.5" />
           {t('Delete')}
         </Button>
+        {takesUnknownNodeId === nodeId ? <p className="basis-full text-xs text-destructive">{t(TAKES_UNKNOWN_TEXT)}</p> : null}
       </footer>
     </div>
   )
