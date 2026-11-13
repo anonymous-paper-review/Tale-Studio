@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useProjectStore } from '@/stores/project-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
+import { useNarrowScreen } from '@/hooks/use-narrow-screen'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { markStageSeen } from '@/lib/stage-seen'
 import { useProducerStore } from '@/stores/producer-store'
@@ -56,6 +57,7 @@ export default function StudioLayout({
   const router = useRouter()
   const chatWidth = useChatUiStore((s) => s.chatWidth)
   const chatCollapsed = useChatUiStore((s) => s.collapsed)
+  const narrowScreen = useNarrowScreen()
   useIdleTimeout()
   useArtistLockPoll()
 
@@ -197,8 +199,8 @@ export default function StudioLayout({
           marginLeft: SHELL_INSET * 2 + SHELL_RAIL_WIDTH,
           marginRight: onEntry
             ? SHELL_INSET
-            // v3p2-set: D1 시안 — Director 는 접힌 레일 없이 툴바 Lumi 알약으로 연다
-            : chatCollapsed && shownStage === 'director' ? SHELL_INSET
+            // Director · Editor 는 접힌 레일 없이 Lumi 아이콘으로 열고(11/13 시안 D1 · E1), 좁은 화면에서는 연 채팅이 화면 위에 덮인다(오너 11/14).
+            : (shownStage === 'director' || shownStage === 'editor') && (chatCollapsed || narrowScreen) ? SHELL_INSET
             : SHELL_INSET + (chatCollapsed ? CHAT_COLLAPSED_RAIL : chatWidth),
         }}
       >

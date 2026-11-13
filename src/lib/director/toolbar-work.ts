@@ -218,7 +218,11 @@ export function workEstimateText(
     return takes === 1 ? t('1 image · 1 video · about {minutes} min · 1 Take', params) : t('1 image · 1 video · about {minutes} min · {takes} Takes', params)
   }
   if (input.images > 0) {
-    return countText(t, input.images, '1 image · about {minutes} min · No Takes used', '{count} images · about {minutes} min · No Takes used', { count: input.images, minutes: imageMinutes })
+    const params = { count: input.images, minutes: imageMinutes }
+    // 과금이 꺼져 있으면 "Takes 안 써요"도 쓰지 않는다 — Take 를 말하지 않는다(D0 넘기기 창 · Lumi "지금 할 일"과 같게, 리드 11/14).
+    return input.takesShown
+      ? countText(t, input.images, '1 image · about {minutes} min · No Takes used', '{count} images · about {minutes} min · No Takes used', params)
+      : countText(t, input.images, '1 image · about {minutes} min', '{count} images · about {minutes} min', params)
   }
   const params = { count: videos, minutes: videoMinutes, takes }
   if (!input.takesShown) return countText(t, videos, '1 video · about {minutes} min', '{count} videos · about {minutes} min', params)

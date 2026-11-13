@@ -24,6 +24,8 @@ export type PendingProposalKind =
   | 'artistDeleteAppearance'
   | 'artistDeleteLocationAppearance'
   | 'directorGenerateStoryboardImage'
+  // 오너 2026-11-14 9번 — Lumi 가 고친 Director 글(샷 이름 · 프롬프트, 씬 설명 등)은 전 · 후를 본 뒤 [적용]해야 바뀐다.
+  | 'directorTextEdit'
   // 약속 E3(2026-09-04): "영상 다 만들어줘" — 버튼 확인창과 같은 숫자(만들 영상 수·필요한 Take·가진 Take)를 보이고 승인 뒤 runVideoBatch.
   | 'directorGenerateVideoBatch'
   | 'writerShrinkDialogue'
