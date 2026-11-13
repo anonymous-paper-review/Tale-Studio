@@ -7,8 +7,9 @@ import { useProjectStore } from '@/stores/project-store'
 import { createClient } from '@/lib/supabase/client'
 import { cancelShotsLoad, loadShotsResult } from '@/lib/shots-cache'
 import {
+  isStoppedTake,
   selectHandoffTake,
-  selectLatestAttempt,
+  selectLatestShotAttempt,
   type VideoTakeSelectionRecord,
 } from '@/lib/director-video-take-selection'
 import {
@@ -1347,8 +1348,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         for (const [shotId, clips] of clipsByShot) {
           const handoff = selectHandoffTake(clips)
           if (handoff) handoffByShot.set(shotId, handoff)
-          const latestAttempt = selectLatestAttempt(clips)
-          if (latestAttempt) latestAttemptByShot.set(shotId, latestAttempt)
+          // 가장 새 시도는 Director 샷 상태와 같은 규칙(멈춘 Take 의 시각은 멈춘 때) — 그것이 멈춘 Take 면 그 샷은 생성 중도 실패도 아닌 대기 중(검토 a).
+          const latestAttempt = selectLatestShotAttempt(clips)
+          if (latestAttempt && !isStoppedTake(latestAttempt)) latestAttemptByShot.set(shotId, latestAttempt)
         }
 
         if (dbShots?.length) {
