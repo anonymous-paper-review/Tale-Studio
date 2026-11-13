@@ -1384,7 +1384,6 @@ export const KO: Record<string, string> = {
   'Shot ZIP': '샷 ZIP',
   // ── editor: 전체 보기(#watch-all) ──
   // v3 ED1 Editor(2026-11-03) — 화면 머리 · 소스 판 · 트랙 이름 · 빈 컷
-  '{cuts} cuts · {seconds}s · video {ready}/{total}': '컷 {cuts} · {seconds}초 · 영상 {ready}/{total}',
   Source: '소스',
   'No video made yet': '아직 만든 영상이 없어요',
   // 영상을 불러오지 못한 클립(QA 2026-11-03 밤 "Editor에서 무한 로딩") — 그 클립만 실패로 보인다.

@@ -23,7 +23,7 @@ import { resetVideoPrefetchFor } from '@/features/editor/video-prefetch'
 import { useEditorStore, selectOverlayLayout, selectProgramLayout, selectTimelineLayout, timelineEnd, zoomStep, PANEL_SOURCE_W_MIN } from '@/stores/editor-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useProjectFormatStore } from '@/stores/project-format-store'
-import { sequenceInfoLine } from '@/lib/editor/sequence-info'
+import { sequenceInfoLine, sequenceLengthSec } from '@/lib/editor/sequence-info'
 import { decodeAudioPeaks } from '@/lib/audio-waveform'
 import { downloadShotsZip } from '@/lib/editor-zip-export'
 import { renderDraftTimeline } from '@/lib/editor-draft-render'
@@ -468,9 +468,6 @@ export default function PostPage() {
     )
   }
 
-  // 시퀀스 길이 — 내보내기가 녹화하는 길이와 같다(영상 줄 끝 · 소리 끝 중 늦은 쪽).
-  //   영상 줄이 여럿이면 모든 줄의 끝(2단계 ②).
-  const sequenceSec = Math.max(timelineEnd([...timelineLayout, ...overlayLayout]), audioClips.reduce((m, a) => Math.max(m, a.startSec + a.durationSec), 0))
   const topLeftW = Math.max(PANEL_SOURCE_W_MIN, panelSizes.sourceW)
   // 내보내기 탭으로 가면 재생을 멈춘다 — 모니터 · 소리가 없는 탭에서 시계만 흐르지 않게.
   const openTab = (next: EditorTab) => {
@@ -497,7 +494,8 @@ export default function PostPage() {
         <EditorWorkbar
           tab={tab}
           onTab={openTab}
-          sequenceInfo={sequenceInfoLine(sequenceSec, projectFormat)}
+          // 시퀀스 길이 — 모든 영상 줄 끝 · 소리 끝 중 늦은 쪽(2단계 ②), 예전 화면 머리의 "N초"를 옮긴 자리.
+          sequenceInfo={sequenceInfoLine(sequenceLengthSec([...timelineLayout, ...overlayLayout], audioClips), projectFormat)}
           canUndo={past.length > 0}
           canRedo={future.length > 0}
           onUndo={undo}

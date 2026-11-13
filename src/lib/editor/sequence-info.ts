@@ -2,6 +2,7 @@
 //   실제로 만드는 크기 · 장 수와 같게 한다(2단계 ① 새 배치, 시안 E1 409:4639, 2026-11-14). 순수 함수만 둔다.
 //   약속: tests/editor/panels.test.ts
 import { videoAspectRatioFromFormat } from '@/lib/project-aspect'
+import { timelineEnd } from '@/lib/editor/timeline-segments'
 import type { ProjectFormat } from '@/types/project'
 
 /** 내보내기가 녹화하는 초당 장 수 — 시:분:초:장의 "장"도 이 값으로 센다. */
@@ -39,6 +40,18 @@ export function exportFrameSize(format: ProjectFormat | null): { width: number; 
   const scale = SEQUENCE_LONG_SIDE / Math.max(w, h)
   const even = (n: number) => Math.round((n * scale) / 2) * 2
   return { width: even(w), height: even(h) }
+}
+
+/**
+ * 시퀀스 길이(초) — 모든 영상 줄의 마지막 클립 끝(빈 곳까지 셈)과 소리 끝 가운데 늦은 쪽. 내보내기가 녹화하는 길이다.
+ *   예전 화면 머리 "컷 7 · 33초 · 영상 0/7"의 "N초"를 위 둘째 줄로 옮겼다(머리는 2단계 ①에서 없앰, 리드 2026-11-14).
+ *   약속: tests/editor/header-meta.test.ts
+ */
+export function sequenceLengthSec(
+  videoLayout: ReadonlyArray<{ startSec: number; durationSec: number }>,
+  audioClips: ReadonlyArray<{ startSec: number; durationSec: number }>,
+): number {
+  return Math.max(timelineEnd(videoLayout), audioClips.reduce((end, a) => Math.max(end, a.startSec + a.durationSec), 0))
 }
 
 /** 위 둘째 줄의 시퀀스 정보 — "00:00:33:00 · 720×1280 · 30fps". */
