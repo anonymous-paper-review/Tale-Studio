@@ -3,6 +3,47 @@
 //   번역 공백이 깨진 화면이 아니라 영어 화면이 된다. 파이프라인 산출물·유저 콘텐츠는
 //   이 사전과 무관(프로젝트 locale 이 지배), 마케팅 페이지는 영어 고정이라 사전을 안 탄다.
 export const KO: Record<string, string> = {
+  // Director 샷 상세(디자이너 11/13 시안 D6 · D7, 오너 2026-11-14) — 이미지 · 영상 탭, 시작 · 끝 나란히, 설정 한 화면, Take 쌓기
+  'Video · none': '영상 · 없음',
+  'Start image': '시작 이미지',
+  'End image': '끝 이미지',
+  'Start and end images are remade together for now.': '지금은 시작 · 끝 이미지를 함께 다시 만들어요.',
+  'What to change': '바꾸고 싶은 점',
+  'Leave it empty to remake with the settings below': '비워 두면 아래 설정 그대로 다시 만들어요',
+  'Write only what you want to change in the picture. The rest stays as it is (e.g. show the umbrella handle, keep the face).':
+    '고른 이미지에서 바꾸고 싶은 것만 적어요 · 나머지는 그대로 (예: 우산 손잡이가 보이게, 얼굴은 그대로)',
+  'Image model': '이미지 모델',
+  'Aspect ratio': '비율',
+  Count: '개수',
+  'People ({count}/{total})': '등장인물 ({count}/{total})',
+  'Places ({count}/{total})': '장소 ({count}/{total})',
+  'Remake start and end images · Takes 0': '시작·끝 이미지 다시 만들기 · Takes 0',
+  'Make start and end images · Takes 0': '시작·끝 이미지 만들기 · Takes 0',
+  'Next: make the video': '다음: 영상 만들기',
+  'No video for this shot yet.': '이 샷에는 아직 영상이 없어요.',
+  'Make the video': '영상 만들기',
+  '★ Final (auto)': '★ 최종 (자동)',
+  '★ Final': '★ 최종',
+  Making: '만드는 중',
+  'Not made yet': '아직 안 만들었어요',
+  '☆ Set as final': '☆ 최종으로 고르기',
+  'Fix the image': '이미지 고치기',
+  'When the scene, people or framing are off': '장면·인물·구도가 다를 때',
+  'Write only what you want to change in the start and end images (e.g. show the umbrella handle)': '시작 · 끝 이미지에서 바꾸고 싶은 것만 적어요 (예: 우산 손잡이가 보이게)',
+  'Fix the video': '영상 고치기',
+  'When the motion, camera or length are off': '움직임·카메라·길이가 다를 때',
+  'The start and end images changed · A new Take will use them': '시작 · 끝 이미지가 바뀌었어요 · 새 Take를 만들면 반영돼요',
+  "What to change in the motion or camera · Leave it empty to keep this Take's prompt": '움직임·카메라에서 바꿀 점 · 비워 두면 이 Take 프롬프트 그대로',
+  'Video model': '영상 모델',
+  'Length: shot {shot}s → video {video}s': '길이 샷 {shot}초 → 영상 {video}초',
+  'Make the start and end images first.': '시작 · 끝 이미지를 먼저 만들어요.',
+  'A Take is being made. You can make a new one when it is done.': 'Take를 만드는 중이에요. 다 되면 새로 만들 수 있어요.',
+  'Make the video · {count} Take': '영상 만들기 · {count} Take',
+  'Make a new Take': '새 Take 만들기',
+  'Make a new Take · {count} Take': '새 Take 만들기 · {count} Take',
+  'Make a new Take with the changed image': '바뀐 이미지로 새 Take 만들기',
+  'Make a new Take with the changed image · {count} Take': '바뀐 이미지로 새 Take 만들기 · {count} Take',
+  'Delete this Take': '이 Take 삭제',
   // 새 프로젝트 · 무엇을 만들까요(2026-10-02 시안 v04 0.1)
   'Short film': '단편 영화',
   'Drama pilot': '드라마 파일럿',
@@ -1885,7 +1926,8 @@ export const KO: Record<string, string> = {
   // 약속 F(2026-09-04): 선 지우기
   'Delete connection': '연결 지우기',
   // 약속 H(2026-09-04): 카드 상태 글자
-  'Take {n}': '테이크 {n}',
+  // 디자이너 11/13 시안(D7 · D8)은 한국어 화면에서도 "Take 2"로 적는다.
+  'Take {n}': 'Take {n}',
   // 약속 I(2026-09-04): 러프 3장 개별 재생성
   'Start frame': '시작',
   'Directing frame': '연출',
