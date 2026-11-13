@@ -1164,6 +1164,8 @@ export const KO: Record<string, string> = {
   'This clip start point': '이 클립 시작점',
   'This clip end point': '이 클립 끝점',
   'Hide clip': '클립 숨기기',
+  // 자유 배치(2026-11-14): 빼고 그 자리를 당겨 메운다(Shift+Delete) · 빈 곳을 누르면 뜨는 단추(시안 E4 409:6873).
+  'Ripple delete': '잔물결 삭제',
   '{count} clips': '{count}개 클립',
   'Playback speed': '재생 속도',
   'Split here': '여기서 분할',

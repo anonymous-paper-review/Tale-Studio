@@ -85,32 +85,34 @@ describe('영상을 고치면 그 샷의 소리도 같이 움직인다', () => {
     expect(api().audioClips.map((a) => [a.linkedShotId, a.startSec])).toEqual([['sh_1', 0], ['sh_2', 5]])
   })
 
-  it('영상 클립을 숨기면 그 샷의 소리도 같이 빠지고, 뒤 샷의 소리는 영상처럼 앞으로 당겨진다', () => {
+  it('영상 클립을 숨기면 그 샷의 소리도 같이 빠지고, 뒤 샷과 그 소리는 빈 곳을 두고 제자리에 남는다', () => {
     // 왜: 예전에는 영상만 당겨지고 소리는 제자리라, 숨긴 샷 소리가 남고 뒤 소리가 어긋났다 — 내보낸 영상에서 샷 3 · 4 · 5 소리가 그림보다 5.8초 늦었다(11/10 점검 L1#4).
+    //   자유 배치(오너 답 1, 2026-11-14)부터는 숨기면 빈 곳이 남고 뒤 샷 그림 · 소리가 함께 제자리에 머문다(당기기는 잔물결 삭제).
     const ids = seed()
     api().deleteClip('sh_2')
     expect(audio(ids.sh_2)).toBeUndefined()
-    expect(audio(ids.sh_3)?.startSec).toBe(5)
+    expect(audio(ids.sh_3)?.startSec).toBe(10)
     // 여러 클립을 한꺼번에 숨겨도 같다.
     const again = seed()
     api().setClipSelection(['sh_1', 'sh_2'])
     api().deleteSelectedClips()
     expect(api().audioClips.map((a) => a.id)).toEqual([again.sh_3])
-    expect(audio(again.sh_3)?.startSec).toBe(0)
+    expect(audio(again.sh_3)?.startSec).toBe(10)
   })
 
-  it('영상 클립의 앞 · 뒤를 자르면 그 샷의 소리도 같은 구간으로 잘리고, 뒤 샷의 소리는 영상을 따라 움직인다', () => {
+  it('영상 클립의 앞 · 뒤를 자르면 그 샷의 소리도 같은 구간 · 같은 자리로 잘리고, 뒤 샷과 그 소리는 제자리에 남는다', () => {
     // 왜: 점검 재현 — 첫 클립 끝을 6초 → 4.4초로 끌었더니 영상 줄만 당겨지고 소리 줄은 그대로였다.
+    //   자유 배치(오너 답 1, 2026-11-14)부터는 앞을 자르면 클립 시작이 그만큼 늦어지고(끝은 그대로), 뒤 샷은 움직이지 않는다.
     const ids = seed()
     api().setTrim('sh_1', 1, 4.4)
-    expect(audio(ids.sh_1)).toMatchObject({ startSec: 0, sourceOffsetSec: 1 })
+    expect(audio(ids.sh_1)).toMatchObject({ startSec: 1, sourceOffsetSec: 1 })
     expect(audio(ids.sh_1)?.durationSec).toBeCloseTo(3.4, 5)
-    expect(audio(ids.sh_2)?.startSec).toBeCloseTo(3.4, 5)
-    expect(audio(ids.sh_3)?.startSec).toBeCloseTo(8.4, 5)
+    expect(audio(ids.sh_2)?.startSec).toBeCloseTo(5, 5)
+    expect(audio(ids.sh_3)?.startSec).toBeCloseTo(10, 5)
     // 손잡이를 끄는 동안(놓기 전)에도 소리가 따라온다.
     api().updateVideoClip('sh_2', { trimEnd: 4 })
     expect(audio(ids.sh_2)?.durationSec).toBe(4)
-    expect(audio(ids.sh_3)?.startSec).toBeCloseTo(7.4, 5)
+    expect(audio(ids.sh_3)?.startSec).toBeCloseTo(10, 5)
   })
 
   it('영상 클립 순서를 바꾸면 그 샷의 소리도 클립을 따라 옮겨진다', () => {
@@ -120,16 +122,17 @@ describe('영상을 고치면 그 샷의 소리도 같이 움직인다', () => {
     expect([audio(ids.sh_3)?.startSec, audio(ids.sh_1)?.startSec, audio(ids.sh_2)?.startSec]).toEqual([0, 5, 10])
   })
 
-  it('영상 속도를 바꾸면 그 샷의 소리도 같은 빠르기로 재생되고, 길이와 뒤 샷 소리 자리도 따라간다', () => {
+  it('영상 속도를 바꾸면 그 샷의 소리도 같은 빠르기로 재생되고 길이가 따라가며, 짧아진 만큼 뒤에 빈 곳이 남는다', () => {
     // 왜: 속도를 바꾸면 영상 길이가 달라져 뒤 샷 소리가 어긋나고, 그 샷 소리는 그림과 다른 빠르기로 났다.
+    //   자유 배치(오너 답 1, 2026-11-14)부터는 짧아지면 뒤 샷이 당겨지지 않고 빈 곳이 남는다(길어지면 빈 곳부터 쓰고 민다).
     const ids = seed()
     api().setSpeed('sh_1', 2)
     expect(audio(ids.sh_1)).toMatchObject({ startSec: 0, durationSec: 2.5, playbackRate: 2 })
-    expect(audio(ids.sh_2)?.startSec).toBe(2.5)
+    expect(audio(ids.sh_2)?.startSec).toBe(5)
     // 미리 보기 · 내보내기는 같은 계산으로 소리 조각의 빠르기만큼 원본에서 빨리 나아간다 — 영상 1초 = 원본 2초.
     const sped = audio(ids.sh_1) as AudioTrackClip
     expect(audioSourceTime(sped, 1)).toBe(2)
-    expect(audioSourceTime(audio(ids.sh_2) as AudioTrackClip, 3.5)).toBe(1)
+    expect(audioSourceTime(audio(ids.sh_2) as AudioTrackClip, 6)).toBe(1)
     for (const file of ['src/features/editor/audio-meter.tsx', 'src/lib/editor-draft-render.ts']) {
       expect(read(file)).toMatch(/audioSourceTime\(/)
       expect(read(file)).toMatch(/playbackRate = /)
@@ -144,10 +147,10 @@ describe('영상을 고치면 그 샷의 소리도 같이 움직인다', () => {
     expect(audio(ids.sh_1)).toMatchObject({ startSec: 0, durationSec: 2, sourceOffsetSec: 0 })
     expect(linkedTo(piece)).toHaveLength(1)
     expect(linkedTo(piece)[0]).toMatchObject({ startSec: 2, durationSec: 3, sourceOffsetSec: 2, url: 'https://video.test/sh_1.mp4' })
-    // 뒷조각을 숨기면 그 소리만 빠지고 뒤 샷 소리가 당겨진다.
+    // 뒷조각을 숨기면 그 소리만 빠지고 뒤 샷 소리는 제자리에 남는다(자유 배치, 오너 답 1 — 예전에는 당겨졌다).
     api().deleteClip(piece)
     expect(linkedTo(piece)).toHaveLength(0)
-    expect(audio(ids.sh_2)?.startSec).toBe(2)
+    expect(audio(ids.sh_2)?.startSec).toBe(5)
   })
 
   it('타이틀 카드를 끼우면 뒤 샷의 소리는 카드 길이만큼 영상과 함께 밀리고, 앞 샷의 소리는 그대로다', () => {
@@ -190,7 +193,9 @@ describe('소리 조각을 직접 만질 때만 영상에서 떨어진다', () =
     const ids = seed()
     api().moveAudioClip(ids.sh_2, 12)
     expect(audio(ids.sh_2)?.linkedShotId).toBeNull()
+    // 숨기기는 이제 빈 곳을 남겨 뒤 영상이 움직이지 않는다 — 뒤 영상을 움직이는 고침(빈 곳의 잔물결 삭제)까지 해서 견준다(자유 배치, 오너 답 1).
     api().deleteClip('sh_1')
+    api().rippleDeleteGapBefore('sh_2')
     expect(audio(ids.sh_2)?.startSec).toBe(12)
     expect(audio(ids.sh_3)?.startSec).toBe(5)
   })
@@ -202,7 +207,9 @@ describe('소리 조각을 직접 만질 때만 영상에서 떨어진다', () =
     expect(api().audioClips.filter((a) => a.url === 'https://video.test/sh_1.mp4').map((a) => a.linkedShotId)).toEqual([null, null])
     api().updateAudioClip(ids.sh_2, { durationSec: 3 })
     expect(audio(ids.sh_2)?.linkedShotId).toBeNull()
+    // 자르기는 이제 빈 곳을 남긴다 — 그 빈 곳의 잔물결 삭제로 뒤 영상을 움직여 견준다(자유 배치, 오너 답 1).
     api().setTrim('sh_1', 0, 4)
+    api().rippleDeleteGapBefore('sh_2')
     expect(audio(ids.sh_2)).toMatchObject({ startSec: 5, durationSec: 3 })
     expect(audio(ids.sh_3)?.startSec).toBe(9)
   })
@@ -225,7 +232,9 @@ describe('소리 조각을 직접 만질 때만 영상에서 떨어진다', () =
     api().toggleAudioMute(ids.sh_2)
     api().updateAudioClip(ids.sh_2, { peaks: [0.9], sourceDurationSec: 5 })
     expect(audio(ids.sh_2)?.linkedShotId).toBe('sh_2')
+    // 숨기기는 이제 빈 곳을 남긴다 — 그 빈 곳의 잔물결 삭제로 뒤 영상을 움직여 견준다(자유 배치, 오너 답 1).
     api().deleteClip('sh_1')
+    api().rippleDeleteGapBefore('sh_2')
     expect(audio(ids.sh_2)?.startSec).toBe(0)
   })
 it('소리 조각을 2px 안으로만 흔들거나 자리가 소수점 끝자리만 달라지면 제자리로 보고 영상에서 떼지 않는다', () => {
@@ -397,12 +406,13 @@ describe('다시 열 때 · 새로 더할 때', () => {
     expect(api().audioClips.map((a) => a.linkedShotId)).toEqual(['sh_1', 'sh_2', 'sh_3'])
   })
 
-  it('다시 열어 영상 실제 길이를 재어 계획보다 짧으면, 이어진 소리도 그 길이로 맞춰지고 뒤 소리가 당겨진다', () => {
+  it('다시 열어 영상 실제 길이를 재어 계획보다 짧으면, 이어진 소리도 그 길이로 맞춰지고 뒤 샷과 그 소리는 제자리에 남는다', () => {
     // 왜: 영상은 실제 길이로 줄어드는데 소리가 계획 길이로 남으면 뒤 샷 소리가 밀린다. 고장: 영상이 계획보다 짧게 나온 프로젝트.
+    //   자유 배치(오너 답 1, 2026-11-14)부터 놓인 뒤 다시 잰 길이는 뒤 샷을 당기지 않는다(처음 여는 동안 잰 길이만 붙은 줄로 맞춘다).
     const ids = seed()
     api().updateVideoClip('sh_1', { actualDurationSec: 4 })
     expect(audio(ids.sh_1)?.durationSec).toBe(4)
-    expect(audio(ids.sh_2)?.startSec).toBe(4)
+    expect(audio(ids.sh_2)?.startSec).toBe(5)
   })
 
   it('소스 칸에서 끌어 놓거나 플레이헤드에 더한 영상 클립에 따라 붙는 소리도 그 클립에 이어진다', () => {

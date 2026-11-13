@@ -91,7 +91,13 @@ async function openSteps(input: FinishEditorOpenInput): Promise<'opened' | 'spli
 
   // 처음 열기 — 한도 안에서 실제 길이 재기 → 그 자리에 영상마다 소리 놓기(영상은 소리 없이 재생, 소리는 오디오 칸) → 파형 채우기.
   const deadline = Date.now() + AUDIO_SPLIT_LIMIT_MS
-  await within(input.measureClips(), deadline)
+  // 놓기 전이라 잰 길이는 붙은 줄 그대로 맞춘다 — 빈 곳을 만들지 않는다(자유 배치, 2026-11-14). 놓은 뒤 잰 길이는 뒤 클립이 제자리에 머문다.
+  store.setState({ firstOpenMeasuring: true })
+  try {
+    await within(input.measureClips(), deadline)
+  } finally {
+    store.setState({ firstOpenMeasuring: false })
+  }
   if (isCancelled()) return 'cancelled'
 
   const st = store.getState()

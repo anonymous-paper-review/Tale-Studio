@@ -44,6 +44,24 @@ export async function PUT(req: Request) {
     const access = await requireProjectAccess(req, projectId)
     if (!access.ok) return access.response
 
+    // 새 형식(2판, 자유 배치) 저장본을 예전 화면(1판)이 덮지 못하게 한다 — 배포하는 동안 열려 있던 탭이 빈 곳 · 자리가 없는 옛 형식으로
+    //   저장하면 새 편집이 사라진다(오너 답 1, 2026-11-14). 4xx 라 그 탭은 다시 시도하지 않고 "새로고침" 안내를 띄운다.
+    //   약속: tests/editor/save-format.test.ts
+    const incoming = typeof state?.version === 'number' ? state.version : 1
+    const { data: stored, error: readError } = await supabaseAdmin
+      .from('editor_states')
+      .select('version:state->version')
+      .eq('project_id', projectId)
+      .maybeSingle()
+    if (readError) throw readError
+    const storedVersion = Number((stored as { version?: unknown } | null)?.version ?? 0)
+    if (storedVersion > incoming) {
+      return NextResponse.json(
+        { error: 'This project was saved by a newer version of the editor. Refresh the page.' },
+        { status: 409 },
+      )
+    }
+
     const updatedAt = new Date().toISOString()
     const { data, error } = await supabaseAdmin
       .from('editor_states')

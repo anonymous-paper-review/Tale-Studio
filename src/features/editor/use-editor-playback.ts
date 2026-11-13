@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { useEditorStore, selectTimelineLayout } from '@/stores/editor-store'
+import { useEditorStore, selectTimelineLayout, timelineEnd } from '@/stores/editor-store'
 
 const FRAME = 1 / 24 // 24fps 기준 한 프레임 (화살표 nudge)
 
@@ -32,7 +32,8 @@ export function useEditorPlayback() {
       lastTsRef.current = ts
 
       const layout = selectTimelineLayout(st)
-      const videoTotal = layout.reduce((sum, l) => sum + l.durationSec, 0)
+      // 빈 곳이 있어도 영상 줄은 마지막 클립 끝까지다(자유 배치, 2026-11-14).
+      const videoTotal = timelineEnd(layout)
       // 오디오가 영상보다 길면 그 끝까지 재생 (영상 끝에서 멈추지 않음 — 요청 5)
       const audioEnd = st.audioClips.reduce((m, a) => Math.max(m, a.startSec + a.durationSec), 0)
       const total = Math.max(videoTotal, audioEnd)
@@ -89,12 +90,8 @@ export function useEditorPlayback() {
         const dir = e.key === 'ArrowRight' ? 1 : -1
         if (meta) {
           const layout = selectTimelineLayout(s)
-          const bounds = [0]
-          let acc = 0
-          for (const l of layout) {
-            acc += l.durationSec
-            bounds.push(acc)
-          }
+          // 클립의 시작과 끝이 컷 경계다 — 빈 곳이 있으면 빈 곳의 양 끝도 멈춘다(자유 배치, 2026-11-14).
+          const bounds = [...new Set([0, ...layout.flatMap((l) => [l.startSec, l.startSec + l.durationSec])])].sort((a, b) => a - b)
           const cur = s.currentTime
           let target: number
           if (dir > 0) target = bounds.find((b) => b > cur + 1e-3) ?? bounds[bounds.length - 1] ?? cur
@@ -125,13 +122,15 @@ export function useEditorPlayback() {
           break
         case 'Delete':
         case 'Backspace':
-          // 선택된 타임라인 항목 제거 (오디오 우선, 없으면 선택된 비디오 클립 일괄)
+          // 선택된 타임라인 항목 제거 (오디오 우선, 없으면 선택된 비디오 클립 일괄). 영상 클립은 Delete = 빼고 빈 곳을 남김,
+          //   Shift+Delete = 빼고 당겨 메움(잔물결 삭제) — 시안 E4 · 프리미어 관례(자유 배치, 2026-11-14).
           if (s.selectedAudioIds.length > 0) {
             e.preventDefault()
             s.deleteSelectedAudio()
           } else if (s.selectedShotIds.length > 0) {
             e.preventDefault()
-            s.deleteSelectedClips()
+            if (e.shiftKey) s.rippleDeleteSelectedClips()
+            else s.deleteSelectedClips()
           }
           break
         default:

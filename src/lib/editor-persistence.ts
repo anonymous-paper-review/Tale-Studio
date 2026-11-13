@@ -4,10 +4,13 @@ import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 
 export interface PersistedEditor {
+  /** 1 = 붙은 줄(빈 곳 없음) · 2 = 자유 배치 — 클립마다 줄 · 시작 초(placements)를 함께 적는다(오너 답 1, 2026-11-14). */
   version: number
   shots: Shot[]
   clipOrder: Record<string, string[]>
   videoClips: VideoClip[]
+  /** 2판: 타임라인에 놓인 클립의 줄(지금은 영상 한 줄 'v1')과 시작 초. 없으면(1판) 지금 보이는 자리 = 붙은 줄. */
+  placements?: Record<string, { trackId: string; startSec: number }>
   audioClips: AudioTrackClip[]
   audioSources: AudioSource[]
   audioTracks?: { id: string }[]

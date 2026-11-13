@@ -19,6 +19,7 @@ import { dissolveOpacityAt } from '@/lib/editor/transition'
 import { drawSubtitle, resolveSubtitle } from '@/lib/editor/subtitle'
 import { cachedVideoUrl, prefetchVideos } from '@/features/editor/video-prefetch'
 import { audioSourceTime } from '@/lib/editor/audio-time'
+import { timelineEnd, timelineSegments } from '@/lib/editor/timeline-segments'
 
 /** 내보내기에 넣는 소리 조각 — 음소거 · 소리 0 · 음소거한 줄 · 주소 없는 것을 뺀다. 편집 상태의 자리 그대로 재생한다(2026-11-10 결정 4). */
 export function draftAudioClips(audioClips: AudioTrackClip[], audioTracks: Array<{ id: string; muted?: boolean }>): AudioTrackClip[] {
@@ -198,7 +199,8 @@ export async function renderDraftTimeline(opts: {
 }): Promise<DraftRenderStats> {
   const { layout, shots, videoClips, audioClips, audioTracks, onPhase, signal } = opts
 
-  const videoTotal = layout.reduce((sum, l) => sum + l.durationSec, 0)
+  // 빈 곳이 있어도 영상 줄은 마지막 클립 끝까지다(자유 배치, 2026-11-14).
+  const videoTotal = timelineEnd(layout)
   const audioEnd = audioClips.reduce((m, a) => Math.max(m, a.startSec + a.durationSec), 0)
   const total = Math.max(videoTotal, audioEnd)
   if (!(total > 0)) throw new Error('empty timeline')
@@ -379,8 +381,19 @@ export async function renderDraftTimeline(opts: {
     t0Promise.t0 = performance.now()
     raf = requestAnimationFrame(drawLoop)
 
-    for (let i = 0; i < layout.length; i++) {
-      const item = layout[i]
+    // 빈 곳은 그 길이만큼 검은 화면으로 지나간다 — 미리 보기와 같다(자유 배치, 2026-11-14). 약속: tests/editor/free-placement.test.ts
+    let clipIndex = 0
+    for (const segment of timelineSegments(layout)) {
+      if (segment.kind === 'gap') {
+        videoActive = false
+        activeTitle = null
+        activeSubtitle = null
+        activeLabel = ''
+        await waitUntil(segment.endSec)
+        continue
+      }
+      const item = layout.find((l) => l.shotId === segment.shotId)!
+      const i = clipIndex++
       const shot = shots.find((s) => s.shotId === item.shotId)
       // 타이틀 카드(#owner-title-card): FFmpeg drawtext 없이도 캔버스 placeholder 경로를 그대로
       //   재사용해 검은 배경+텍스트를 그린다 — 이미지 합성(이미지 위에 텍스트 오버레이)은 범위 밖(MVP: 텍스트만).

@@ -10,6 +10,7 @@ import type { Shot, VideoClip, AudioTrackClip, AudioSource } from '@/types'
 import { cn } from '@/lib/utils'
 import { ingestAudioFile, drawWaveform } from '@/lib/audio-waveform'
 import { PX_PER_SEC_MIN, PX_PER_SEC_MAX, isTitleCardShotId, useEditorStore } from '@/stores/editor-store'
+import { timelineEnd, timelineSegments } from '@/lib/editor/timeline-segments'
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -68,6 +69,13 @@ interface TimelineProps {
   onDelete: (shotId: string) => void
   onDeleteSelected: () => void
   onMoveClipToIndex: (shotId: string, targetIndex: number) => void
+  /** 빈 곳에 놓기 — 그 시각에 놓고 원래 자리는 빈 곳으로(자유 배치, 2026-11-14). */
+  onPlaceClipAt: (shotId: string, atSec: number) => void
+  /** 빈 곳의 [잔물결 삭제] — 이 클립 앞 빈 곳을 없애고 뒤를 당긴다. */
+  onRippleDeleteGap: (shotId: string) => void
+  /** 클립 잔물결 삭제 — 빼고 그 자리를 당겨 메운다. */
+  onRippleDelete: (shotId: string) => void
+  onRippleDeleteSelected: () => void
   onZoom: (nextPxPerSec: number) => void
   onSplitVideo: (shotId: string, atGlobalSec: number) => void
   onSetSpeed: (shotId: string, speed: number) => void
@@ -404,6 +412,10 @@ export function Timeline({
   onDelete,
   onDeleteSelected,
   onMoveClipToIndex,
+  onPlaceClipAt,
+  onRippleDeleteGap,
+  onRippleDelete,
+  onRippleDeleteSelected,
   onZoom,
   onSplitVideo,
   onSetSpeed,
@@ -441,7 +453,9 @@ export function Timeline({
   const [marquee, setMarquee] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null)
   // 오디오 마퀴 — 콘텐츠 좌표(눈금자 좌상단 기준). 여러 레인을 가로지르는 드래그 선택.
   const [audioMarquee, setAudioMarquee] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null)
-  const [reorder, setReorder] = useState<{ shotId: string; targetIndex: number } | null>(null)
+  const [reorder, setReorder] = useState<{ shotId: string; targetIndex: number; placeAtSec?: number } | null>(null)
+  // 빈 곳을 누르면 그 자리에 [잔물결 삭제](시안 E4 409:6873) — 빈 곳 뒤 클립 id 와 빈 곳 가운데 초.
+  const [gapChip, setGapChip] = useState<{ shotId: string; centerSec: number } | null>(null)
   const [cutHoverSec, setCutHoverSec] = useState<number | null>(null) // cut 모드 미리보기 위치
   // 트림 미리보기: 드래그 중엔 실제 변경 없이 점선 박스 + 마우스 옆 시간초만 표시, 드롭 시 적용 (요청)
   // 약속 J4(2026-09-04): 타이틀 카드 길이 숫자 입력 — 어느 클립의 라벨을 열었는지.
@@ -452,7 +466,9 @@ export function Timeline({
 
   const cutMode = toolMode === 'cut'
 
-  const videoSec = useMemo(() => layout.reduce((sum, l) => sum + l.durationSec, 0), [layout])
+  // 빈 곳이 있어도 영상 줄은 마지막 클립 끝까지다(자유 배치, 2026-11-14).
+  const videoSec = useMemo(() => timelineEnd(layout), [layout])
+  const segments = useMemo(() => timelineSegments(layout), [layout])
   const totalSec = useMemo(() => {
     const audioEnd = audioClips.reduce((max, a) => Math.max(max, a.startSec + a.durationSec), 0)
     return Math.max(videoSec, audioEnd, currentTime) // 플레이헤드가 끝을 넘으면 영역 확장 (요청 5)
@@ -601,12 +617,22 @@ export function Timeline({
         window.removeEventListener('pointermove', move)
         window.removeEventListener('pointerup', up)
         setMarquee(null)
-        if (!moved) { onClearSelection(); onSeek(clientXToSec(startClientX)) }
+        if (!moved) {
+          onClearSelection()
+          const sec = clientXToSec(startClientX)
+          onSeek(sec)
+          // 컷과 컷 사이 빈 곳을 누르면 그 자리에 [잔물결 삭제]가 뜬다(시안 E4 · 규칙 R).
+          const at = segments.findIndex((seg) => seg.kind === 'gap' && sec >= seg.startSec && sec < seg.endSec)
+          const next = at >= 0 ? segments[at + 1] : undefined
+          setGapChip(at >= 0 && next?.kind === 'clip' ? { shotId: next.shotId, centerSec: (segments[at].startSec + segments[at].endSec) / 2 } : null)
+        } else {
+          setGapChip(null)
+        }
       }
       window.addEventListener('pointermove', move)
       window.addEventListener('pointerup', up)
     },
-    [cutMode, clientXToSec, onSeek, onSetSelection, onClearSelection, layout],
+    [cutMode, clientXToSec, onSeek, onSetSelection, onClearSelection, layout, segments],
   )
 
   // Audio 레인 빈 영역: 마퀴 드래그(여러 레인 가로지르며 다중 선택) 또는 클릭-seek.
@@ -672,26 +698,41 @@ export function Timeline({
       if (e.shiftKey) { onRangeSelect(item.shotId); return }
       onSelect(item.shotId)
       onSeek(clientXToSec(e.clientX))
+      setGapChip(null)
       const startClientX = e.clientX
+      // 잡은 곳과 클립 시작 사이 — 빈 곳에 놓을 때 클립 시작 = 놓은 곳 - 이만큼.
+      const grabOffset = clientXToSec(e.clientX) - item.startSec
+      // 다른 클립 위면 순서 바꾸기, 빈 곳이면 그 시각에 놓기(자유 배치, 2026-11-14).
+      const dropFor = (clientX: number) => {
+        const sec = clientXToSec(clientX)
+        const overClip = layout.some((it) => it.shotId !== item.shotId && sec >= it.startSec && sec < it.startSec + it.durationSec)
+        return overClip
+          ? { shotId: item.shotId, targetIndex: computeDropIndex(sec, item.shotId) }
+          : { shotId: item.shotId, targetIndex: -1, placeAtSec: Math.max(0, sec - grabOffset) }
+      }
       let reordering = false
       const move = (ev: PointerEvent) => {
         if (!reordering && Math.abs(ev.clientX - startClientX) > 5) reordering = true
-        if (reordering) setReorder({ shotId: item.shotId, targetIndex: computeDropIndex(clientXToSec(ev.clientX), item.shotId) })
+        if (reordering) setReorder(dropFor(ev.clientX))
       }
       const up = (ev: PointerEvent) => {
         window.removeEventListener('pointermove', move)
         window.removeEventListener('pointerup', up)
-        if (reordering) onMoveClipToIndex(item.shotId, computeDropIndex(clientXToSec(ev.clientX), item.shotId))
+        if (reordering) {
+          const drop = dropFor(ev.clientX)
+          if (drop.placeAtSec !== undefined) onPlaceClipAt(item.shotId, drop.placeAtSec)
+          else onMoveClipToIndex(item.shotId, drop.targetIndex)
+        }
         setReorder(null)
       }
       window.addEventListener('pointermove', move)
       window.addEventListener('pointerup', up)
     },
-    [cutMode, clientXToSec, snapToPlayhead, onSplitVideo, onToggleSelect, onRangeSelect, onSelect, onSeek, computeDropIndex, onMoveClipToIndex],
+    [cutMode, clientXToSec, snapToPlayhead, onSplitVideo, onToggleSelect, onRangeSelect, onSelect, onSeek, computeDropIndex, onMoveClipToIndex, onPlaceClipAt, layout],
   )
 
   const reorderX = useMemo(() => {
-    if (!reorder) return null
+    if (!reorder || reorder.placeAtSec !== undefined) return null
     const others = layout.filter((it) => it.shotId !== reorder.shotId)
     if (others.length === 0) return 0
     if (reorder.targetIndex >= others.length) {
@@ -1090,11 +1131,43 @@ export function Timeline({
                       <ContextMenuItem variant="destructive" className="text-xs" onSelect={() => (targets.length > 1 ? onDeleteSelected() : onDelete(item.shotId))}>
                         <Trash2 className="size-3.5" /> {targets.length > 1 ? t('Hide {count}', { count: targets.length }) : t('Hide clip')}
                       </ContextMenuItem>
+                      {/* 빼고 그 자리를 당겨 메운다(Shift+Delete) — 빼기(위)는 빈 곳을 남긴다(자유 배치, 2026-11-14). */}
+                      <ContextMenuItem className="text-xs" onSelect={() => (targets.length > 1 ? onRippleDeleteSelected() : onRippleDelete(item.shotId))}>
+                        <Trash2 className="size-3.5" /> {t('Ripple delete')}
+                      </ContextMenuItem>
                     </ContextMenuContent>
                   </ContextMenu>
                 )
               })}
 
+              {/* 빈 곳에 놓을 자리 미리 보기(자유 배치) — 끄는 클립 길이만큼 점선 칸. */}
+              {reorder?.placeAtSec !== undefined && (() => {
+                const dragged = layout.find((it) => it.shotId === reorder.shotId)
+                if (!dragged) return null
+                return (
+                  <div
+                    className="pointer-events-none absolute top-3 z-20 h-[72px] rounded-[10px] border-2 border-dashed border-stage bg-stage/10"
+                    style={{ left: reorder.placeAtSec * pxPerSec, width: Math.max(dragged.durationSec * pxPerSec, 8) }}
+                  />
+                )
+              })()}
+              {/* 컷과 컷 사이 빈 곳을 누르면 그 자리에 [잔물결 삭제](시안 E4 409:6873 · 규칙 R). */}
+              {gapChip && (
+                <button
+                  type="button"
+                  data-no-seek
+                  data-testid="ripple-delete-gap"
+                  className="absolute top-1/2 z-30 -translate-x-1/2 -translate-y-1/2 rounded-full bg-card px-3 py-1 text-meta font-medium text-foreground shadow-md ring-1 ring-border-strong hover:bg-accent"
+                  style={{ left: gapChip.centerSec * pxPerSec }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={() => {
+                    onRippleDeleteGap(gapChip.shotId)
+                    setGapChip(null)
+                  }}
+                >
+                  {t('Ripple delete')}
+                </button>
+              )}
               {marquee && (
                 <div
                   className="pointer-events-none absolute z-20 border border-primary bg-primary/15"

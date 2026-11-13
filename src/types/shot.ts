@@ -170,6 +170,11 @@ export interface VideoClip {
   //   파생값이라 DB 미저장(architecture §0). 계획(durationSeconds)보다 짧으면 타임라인이
   //   이 길이로 자동 트림해 죽은 꼬리를 없앤다(모델 최소 길이 3~4s 파일이 긴 계획 슬롯에 앉는 사례).
   actualDurationSec?: number
+  /**
+   * 자유 배치(오너 답 1, 2026-11-14) — 같은 줄의 앞 클립 끝(맨 앞이면 0초)과 이 클립 시작 사이의 빈 곳(초). 없으면 0(붙어 있다).
+   *   저장본에는 클립마다 줄 · 시작 초(placements)로 적고, 다시 열 때 그 자리에서 이 값을 다시 셈한다.
+   */
+  gapBefore?: number
 }
 
 /**

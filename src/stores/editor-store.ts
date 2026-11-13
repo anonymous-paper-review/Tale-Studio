@@ -120,6 +120,9 @@ interface EditorState {
   // 편집 상태를 준비하는 중(Editor 를 열 때 — 저장한 편집 되살리기, 처음이면 영상 소리를 오디오 칸에 나누고 파형 채우기 · 저장).
   //   null 이 아니면 화면은 편집 화면 대신 기다리는 카드를 보이고, 편집 상태를 저장하지 않는다. done/total 은 파형을 채운 소리 수(오너 2026-11-10).
   editorPrep: { done: number; total: number } | null
+  // 처음 여는 동안 영상 실제 길이를 재는 중 — 그동안 잰 길이는 붙은 줄 그대로 맞추고(빈 곳 없이), 다 놓은 뒤에는 뒤 클립이 제자리에
+  //   머문다(자유 배치, 2026-11-14). 저장하지 않는다.
+  firstOpenMeasuring: boolean
 
   // Video Source 패널 (프리미어2 좌상단 카드 그리드) — 토글로 접기
   sourcePanelOpen: boolean
@@ -172,8 +175,13 @@ interface EditorState {
   clearAudioSelection: () => void
   deleteSelectedAudio: () => void                       // 선택된 오디오 일괄 삭제
   setSpeed: (shotId: string, speed: number) => void
-  deleteClip: (shotId: string) => void
-  deleteSelectedClips: () => void                       // 선택된 클립 일괄 삭제
+  deleteClip: (shotId: string) => void                  // 빼고 빈 곳을 남긴다(자유 배치)
+  deleteSelectedClips: () => void                       // 선택된 클립 일괄 빼기(빈 곳 남김)
+  rippleDeleteClip: (shotId: string) => void            // 빼고 그 자리를 당겨 메운다(잔물결 삭제)
+  rippleDeleteSelectedClips: () => void                 // 고른 클립을 빼고 당겨 메운다(Shift+Delete)
+  rippleDeleteGapBefore: (shotId: string) => void       // 이 클립 앞 빈 곳을 없애고 뒤를 당긴다(빈 곳의 [잔물결 삭제])
+  placeClipAt: (shotId: string, atSec: number) => void  // 빈 곳에 놓기 — 그 시각에 놓고 원래 자리는 빈 곳으로
+  removeClips: (shotIds: string[], ripple: boolean) => void
   moveClipToIndex: (shotId: string, targetIndex: number) => void  // 드래그 순서변경
   addClipAtPlayhead: (sourceShotId: string) => void     // 소스→플레이헤드 인접 경계에 추가+포커스
   // cut(자르기) — 비디오 클립을 전역 시간 atSec 지점에서 둘로 분할
@@ -307,18 +315,63 @@ export function selectTimelineLayout(
     const shot = state.shots.find((s) => s.shotId === shotId)
     const clip = state.videoClips.find((c) => c.shotId === shotId)
     if (!shot) continue
-    const base = shot.durationSeconds
-    const trimStart = clip?.trimStart ?? 0
-    // #d11: 수동 트림이 없으면 실측 파일 길이로 자동 트림 — 계획이 실제보다 길면(시간 인플레이션
-    //   +모델 최소 길이) 영상이 끝난 뒤 죽은 꼬리가 재생되던 것을 잘라낸다.
-    const trimEnd = clip?.trimEnd ?? Math.min(base, clip?.actualDurationSec ?? base)
-    const speed = clip?.speed ?? 1.0
-    const durationSec = Math.max(0.1, (trimEnd - trimStart) / speed)
+    // 자유 배치(오너 답 1, 2026-11-14): 앞 클립 끝과 이 클립 사이의 빈 곳만큼 띄운다.
+    cursor += Math.max(0, clip?.gapBefore ?? 0)
+    const durationSec = clipDurationSec(shot, clip)
     out.push({ shotId, startSec: cursor, durationSec })
     cursor += durationSec
   }
   return out
 }
+
+/** 타임라인에서 클립이 차지하는 길이(초) — 트림 · 속도 · 실측 길이를 넣는다. */
+function clipDurationSec(shot: Pick<Shot, 'durationSeconds'>, clip: Pick<VideoClip, 'trimStart' | 'trimEnd' | 'actualDurationSec' | 'speed'> | undefined): number {
+  const base = shot.durationSeconds
+  const trimStart = clip?.trimStart ?? 0
+  // #d11: 수동 트림이 없으면 실측 파일 길이로 자동 트림 — 계획이 실제보다 길면(시간 인플레이션
+  //   +모델 최소 길이) 영상이 끝난 뒤 죽은 꼬리가 재생되던 것을 잘라낸다.
+  const trimEnd = clip?.trimEnd ?? Math.min(base, clip?.actualDurationSec ?? base)
+  const speed = clip?.speed ?? 1.0
+  return Math.max(0.1, (trimEnd - trimStart) / speed)
+}
+
+const round3 = (sec: number) => Math.round(sec * 1000) / 1000
+
+/**
+ * 클립들이 바라는 시작 초(desired)를 지키도록 앞 빈 곳(gapBefore)을 다시 정한다 — 앞 클립과 겹치면 그 끝으로 민다(같은 줄의 클립은
+ *   겹치지 않는다). 바라는 시작이 없는 클립(새로 끼운 클립)은 앞 클립 바로 뒤에 붙는다. 자유 배치(오너 답 1, 2026-11-14).
+ *   약속: tests/editor/free-placement.test.ts
+ */
+function regap(input: TimelineInput, desired: ReadonlyMap<string, number>): VideoClip[] {
+  const gaps = new Map<string, number>()
+  let cursor = 0
+  for (const shotId of selectTimelineShotIds(input)) {
+    const shot = input.shots.find((s) => s.shotId === shotId)
+    if (!shot) continue
+    const clip = input.videoClips.find((c) => c.shotId === shotId)
+    const want = desired.get(shotId)
+    const start = want === undefined ? cursor : Math.max(cursor, want)
+    const gap = round3(start - cursor)
+    gaps.set(shotId, gap > 0.0005 ? gap : 0)
+    cursor = cursor + (gaps.get(shotId) ?? 0) + clipDurationSec(shot, clip)
+  }
+  let changed = false
+  const out = input.videoClips.map((c) => {
+    const gap = gaps.get(c.shotId)
+    if (gap === undefined || (c.gapBefore ?? 0) === gap) return c
+    changed = true
+    return gap === 0 ? (({ gapBefore: _drop, ...rest }) => rest)(c) : { ...c, gapBefore: gap }
+  })
+  return changed ? out : input.videoClips
+}
+
+/** 지금 타임라인 자리(시작 초) — 영상 자리를 바꾸는 동작이 "그대로 두기"를 바랄 때 쓴다. */
+function startsOf(state: TimelineInput): Map<string, number> {
+  return new Map(selectTimelineLayout(state).map((item) => [item.shotId, item.startSec]))
+}
+
+// 빈 곳까지 셈한 영상 줄 끝 · 클립과 빈 곳 나누기 — 미리 보기 · 재생 · 내보내기가 같이 쓴다(src/lib/editor/timeline-segments.ts).
+export { timelineEnd, timelineSegments, type TimelineSegment } from '@/lib/editor/timeline-segments'
 
 // ── 영상과 이어진 소리 (오너 2026-11-10 결정 4 "같이 움직인다 — 따로 떼고 싶을 때만 나눈다") ──
 //   이어진 소리(linkedShotId)의 자리 · 길이 · 원본 시작점 · 빠르기는 그 영상 클립을 따르고, 타임라인에서 빠진(숨긴 · 지운)
@@ -371,6 +424,20 @@ function withLinkedAudio(state: EditorState, changes: Partial<EditorState>): Par
     selectedAudioId: selectedAudioId && kept.has(selectedAudioId) ? selectedAudioId : null,
     selectedAudioIds: (changes.selectedAudioIds ?? state.selectedAudioIds).filter((id) => kept.has(id)),
   }
+}
+
+/**
+ * 영상 자리를 바꾸는 동작의 결과 — 클립들이 바라는 시작 초(기본: 지금 자리 그대로)를 지키도록 빈 곳을 다시 정하고(겹치면 민다),
+ *   이어진 소리를 맞춘다. 빼면 빈 곳이 남고, 길어지면 바로 뒤 빈 곳부터 쓰고 모자라면 민다(자유 배치, 오너 답 1, 2026-11-14).
+ *   약속: tests/editor/free-placement.test.ts
+ */
+function withLayout(state: EditorState, changes: Partial<EditorState>, desired: ReadonlyMap<string, number> = startsOf(state)): Partial<EditorState> {
+  const input = {
+    shots: changes.shots ?? state.shots,
+    videoClips: changes.videoClips ?? state.videoClips,
+    clipOrder: changes.clipOrder ?? state.clipOrder,
+  }
+  return withLinkedAudio(state, { ...changes, videoClips: regap(input, desired) })
 }
 
 // 소리 조각 자리가 이만큼 안으로 같으면 제자리다 — 초를 다시 계산한 끝자리 차이(검토 b).
@@ -547,6 +614,54 @@ function globalOrder(
   return out
 }
 
+/**
+ * 클립 하나를 전역 순서의 index 자리로 옮긴 순서 — 씬 경계를 넘으면 그 씬으로 옮긴다(sceneId 재배정). 그 클립이 타임라인에 없으면 null.
+ *   index 는 그 클립을 뺀 나머지 순서 안의 자리다.
+ */
+function orderWithClipAt(
+  state: Pick<EditorState, 'shots' | 'clipOrder'>,
+  shotId: string,
+  index: number,
+): { clipOrder: Record<string, string[]>; shots: Shot[] } | null {
+  const order = globalOrder(state)
+  const movedShot = state.shots.find((s) => s.shotId === shotId)
+  if (order.findIndex((o) => o.shotId === shotId) < 0 || !movedShot) return null
+
+  const remaining = order.filter((o) => o.shotId !== shotId)
+  const t = Math.max(0, Math.min(index, remaining.length))
+
+  // shotId 를 모든 씬 order 에서 제거
+  const cleared: Record<string, string[]> = {}
+  for (const [sceneId, list] of Object.entries(state.clipOrder)) {
+    cleared[sceneId] = list.filter((id) => id !== shotId)
+  }
+
+  // 대상 위치 → sceneId + 로컬 인덱스
+  let sceneId: string
+  let localIndex: number
+  if (remaining.length === 0) {
+    sceneId = movedShot.sceneId
+    localIndex = 0
+  } else if (t >= remaining.length) {
+    sceneId = remaining[remaining.length - 1].sceneId
+    localIndex = (cleared[sceneId] ?? []).length
+  } else {
+    sceneId = remaining[t].sceneId
+    const li = (cleared[sceneId] ?? []).indexOf(remaining[t].shotId)
+    localIndex = li < 0 ? (cleared[sceneId] ?? []).length : li
+  }
+
+  const sceneOrder = [...(cleared[sceneId] ?? [])]
+  sceneOrder.splice(localIndex, 0, shotId)
+  cleared[sceneId] = sceneOrder
+
+  const shots =
+    movedShot.sceneId === sceneId
+      ? state.shots
+      : state.shots.map((s) => (s.shotId === shotId ? { ...s, sceneId } : s))
+  return { clipOrder: cleared, shots }
+}
+
 // 오디오 클립의 "순차" 순서 — 트랙 순서 → 트랙 내 시작초. shift+click range 기준.
 function globalAudioOrder(
   state: Pick<EditorState, 'audioClips' | 'audioTracks'>,
@@ -577,6 +692,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   resetCount: 0,
   unplayableVideoUrls: [],
   editorPrep: null,
+  firstOpenMeasuring: false,
   sourcePanelOpen: true,
   currentTime: 0,
   pxPerSec: PX_PER_SEC_DEFAULT,
@@ -838,11 +954,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setBinDropSec: (sec) => set({ binDropSec: sec }),
 
   updateVideoClip: (shotId, patch) =>
-    set((state) =>
-      withLinkedAudio(state, {
-        videoClips: state.videoClips.map((c) => (c.shotId === shotId ? { ...c, ...patch } : c)),
-      }),
-    ),
+    set((state) => {
+      const changes = { videoClips: state.videoClips.map((c) => (c.shotId === shotId ? { ...c, ...patch } : c)) }
+      // 처음 여는 동안 잰 길이는 붙은 줄 그대로 맞추고(빈 곳 없이), 놓인 뒤 잰 길이(다시 열기 · Take 바뀜)는 뒤 클립이 제자리에
+      //   머물게 한다(자유 배치, 2026-11-14). 약속: tests/editor/free-placement.test.ts
+      return state.firstOpenMeasuring ? withLinkedAudio(state, changes) : withLayout(state, changes)
+    }),
   // 자리 · 길이 · 원본 시작점을 바꾸면(소리 조각의 앞 · 뒤를 끌어 줄이기) 영상에서 떨어진다. 파형 · 원본 길이 채우기는 그대로 잇는다(결정 4).
   updateAudioClip: (id, patch) =>
     set((state) => {
@@ -911,7 +1028,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!tryApply(candidate)) continue
       if (fromServer) {
         // 다음에 이 브라우저에서 서버를 기다리지 않고 열리게 바로 저장하고, 서버의 그 저장 시각을 적어 둔다.
-        saveEditorStateNow(projectId, compactSnapshot({ version: 1, ...pickPersisted(get()) }))
+        saveEditorStateNow(projectId, persistSnapshot(get()))
         if (server.updatedAt) rememberServerSeenAt(projectId, server.updatedAt)
       }
       return true
@@ -1019,6 +1136,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         const savedClip = savedClipByShot.get(c.shotId)
         if (!savedClip) return c
         let next = c
+        // 같은 영상 파일이면 저장해 둔 실제 길이를 그대로 쓴다 — 다시 재기 전에도 저장한 자리 · 길이 그대로 놓인다(자유 배치, 2026-11-14).
+        if (savedClip.actualDurationSec && savedClip.url && savedClip.url === c.url && c.actualDurationSec == null) {
+          next = { ...next, actualDurationSec: savedClip.actualDurationSec }
+        }
         if (cutRoots.has(c.shotId) && (savedClip.trimStart !== undefined || savedClip.trimEnd !== undefined)) {
           next = { ...next, trimStart: savedClip.trimStart, trimEnd: savedClip.trimEnd }
         }
@@ -1060,9 +1181,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         entered.push(...fresh)
         clipOrder[sceneId] = [...order, ...fresh]
       }
+      // 자유 배치(오너 답 1, 2026-11-14): 2판 저장본은 클립마다 저장한 시작 초(placements)에 놓는다 — 빈 곳까지 그대로. 예전 저장본
+      //   (시작 초 없음)은 지금 보이는 자리(붙은 줄) 그대로. 새로 들어온 샷은 앞 클립 바로 뒤에 끼우고 뒤는 빈 곳부터 쓰고 민다.
+      //   약속: tests/editor/free-placement.test.ts
+      const placed = new Map(Object.entries(saved.placements ?? {}).map(([id, p]) => [id, p.startSec]))
+      const placedClips = regap({ shots: combinedShots, videoClips: combinedClips, clipOrder }, placed)
       // 이음 칸이 없는 예전 저장본은 지금 영상 자리 · 처음 나눈 자리와 맞는 소리를 다시 잇고, 이어진 소리는 되살린 영상 자리에 맞춘다(결정 4).
       //   같은 소리 파일의 파형은 저장본에 한 번만 있다 — 빠진 조각은 같은 파일의 파형을 함께 쓴다(검토 b).
-      const timeline = { shots: combinedShots, videoClips: combinedClips, clipOrder }
+      const timeline = { shots: combinedShots, videoClips: placedClips, clipOrder }
       const relinked = relinkSavedAudio(sharePeaks(dedupAudioClips), timeline, { shots: cur.shots, videoClips: cur.videoClips }, saved.videoClips ?? [])
       let audioClips = syncLinkedAudio({ ...timeline, audioClips: relinked })
       // 들어온 샷은 그 영상 소리도 오디오 칸에 이어서 놓는다 — 처음 열 때처럼(오너 2026-11-10 결정 4). 파형은 편집 화면을 연 뒤
@@ -1098,7 +1224,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         // pieces whose base shot is still canonical are merged back in above - a local
         // snapshot must not resurrect deleted media when that DB snapshot is empty.
         shots: combinedShots,
-        videoClips: combinedClips,
+        videoClips: placedClips,
         clipOrder,
         audioClips,
         audioSources: saved.audioSources ?? [],
@@ -1294,6 +1420,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       resetCount: state.resetCount + 1,
       unplayableVideoUrls: [],
       editorPrep: null,
+      firstOpenMeasuring: false,
       shots: [],
       videoClips: [],
       selectedSceneId: null,
@@ -1460,8 +1587,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSpeed: (shotId, speed) => {
     const clamped = Math.max(0.25, Math.min(4.0, speed))
 
+    // 길어지면 바로 뒤 빈 곳부터 쓰고 모자라면 뒤 클립을 밀고, 짧아지면 빈 곳이 남는다(자유 배치, 2026-11-14).
     set((state) =>
-      withLinkedAudio(state, {
+      withLayout(state, {
         videoClips: state.videoClips.map((c) =>
           c.shotId === shotId ? { ...c, speed: clamped } : c,
         ),
@@ -1489,21 +1617,40 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (!Number.isFinite(trimStart) || !Number.isFinite(trimEnd)) return
     const start = Math.max(0, trimStart)
     if (trimEnd <= start) return
+    // 앞 가장자리를 앞 클립 쪽으로 늘리면 앞 빈 곳까지만 늘어난다 — DB 에는 실제로 바뀐 값을 쓴다.
+    let applied: number | null = null
 
-    set((state) =>
-      withLinkedAudio(state, {
+    set((state) => {
+      // 자유 배치(2026-11-14): 끝 가장자리 — 줄이면 뒤에 빈 곳이 남고 늘리면 바로 뒤 빈 곳부터 쓰고 모자라면 민다.
+      //   앞 가장자리 — 끝은 그대로 두고 시작이 자른 만큼 옮겨진다(늘리면 앞 빈 곳까지만). 약속: tests/editor/free-placement.test.ts
+      const layout = selectTimelineLayout(state)
+      const index = layout.findIndex((l) => l.shotId === shotId)
+      const clip = state.videoClips.find((c) => c.shotId === shotId)
+      const speed = clip?.speed ?? 1
+      const oldStart = clip?.trimStart ?? 0
+      const desired = startsOf(state)
+      let from = start
+      if (index >= 0 && from !== oldStart) {
+        const prevEnd = index > 0 ? layout[index - 1].startSec + layout[index - 1].durationSec : 0
+        from = Math.max(from, oldStart - (layout[index].startSec - prevEnd) * speed)
+        desired.set(shotId, layout[index].startSec + (from - oldStart) / speed)
+      }
+      if (trimEnd <= from) return state
+      applied = from
+      return withLayout(state, {
         videoClips: state.videoClips.map((c) =>
-          c.shotId === shotId ? { ...c, trimStart: start, trimEnd } : c,
+          c.shotId === shotId ? { ...c, trimStart: from, trimEnd } : c,
         ),
         // 약속 J3: 타이틀 카드는 원본 영상이 없어 "원본 길이"가 없다 — 손잡이로 늘린 만큼 카드 길이가 길어진다.
         shots: isTitleCardShotId(shotId)
           ? state.shots.map((s) => (s.shotId === shotId && trimEnd > s.durationSeconds ? { ...s, durationSeconds: trimEnd } : s))
           : state.shots,
-      }),
-    )
+      }, desired)
+    })
 
     // synthetic pieces have no shots row - the editor_states snapshot restores them instead.
-    if (isSyntheticShotId(shotId)) return
+    if (isSyntheticShotId(shotId) || applied === null) return
+    const appliedStart: number = applied
 
     // Debounced persist to DB (fire-and-forget), same pattern as setSpeed.
     const existing = trimPersistTimers.get(shotId)
@@ -1515,7 +1662,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         fetch('/api/editor/trim', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ projectId: trimProjectId, shotId, trimStart: start, trimEnd }),
+          body: JSON.stringify({ projectId: trimProjectId, shotId, trimStart: appliedStart, trimEnd }),
         }).catch((err) => console.error('[editor-store] trim persist failed:', err))
       }
     }, 300)
@@ -1524,86 +1671,97 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   // soft-delete: 타임라인(clipOrder)에서만 제거하고 videoClips 데이터는 보존.
   // → 같은 소스를 다시 드래그하면 url 이 살아있어 정상 추가됨 (요청 6a).
-  deleteClip: (shotId) =>
-    set((state) => {
-      const newOrder: Record<string, string[]> = {}
-      for (const [sceneId, ids] of Object.entries(state.clipOrder)) {
-        newOrder[sceneId] = ids.filter((id) => id !== shotId)
-      }
-      // 숨긴 클립에 이어진 소리는 함께 빠지고, 뒤 클립 소리는 영상처럼 당겨진다(결정 4).
-      return withLinkedAudio(state, {
-        clipOrder: newOrder,
-        selectedShotIds: state.selectedShotIds.filter((id) => id !== shotId),
-        selectedClipShotId:
-          state.selectedClipShotId === shotId ? null : state.selectedClipShotId,
-        past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
-        future: [],
-      })
-    }),
+  deleteClip: (shotId) => get().removeClips([shotId], false),
 
-  deleteSelectedClips: () =>
+  deleteSelectedClips: () => get().removeClips(get().selectedShotIds, false),
+
+  rippleDeleteClip: (shotId) => get().removeClips([shotId], true),
+
+  rippleDeleteSelectedClips: () => get().removeClips(get().selectedShotIds, true),
+
+  // 빼기 — 빈 곳을 남기거나(Delete, 시안 E4) 그 자리를 당겨 메운다(Shift+Delete · 잔물결 삭제). 뺀 클립에 이어진 소리는 함께
+  //   빠지고, 남은 클립의 소리는 영상을 따른다(결정 4). 자유 배치(오너 답 1, 2026-11-14). 약속: tests/editor/free-placement.test.ts
+  removeClips: (shotIds, ripple) =>
     set((state) => {
-      const ids = new Set(state.selectedShotIds)
+      const ids = new Set(shotIds)
       if (ids.size === 0) return state
       const newOrder: Record<string, string[]> = {}
       for (const [sceneId, list] of Object.entries(state.clipOrder)) {
         newOrder[sceneId] = list.filter((id) => !ids.has(id))
       }
-      return withLinkedAudio(state, {
+      // 당겨 메울 때는 뺀 클립 길이만큼 그 뒤 클립을 앞으로 — 뺀 클립 앞의 빈 곳은 그대로 둔다.
+      let desired = startsOf(state)
+      if (ripple) {
+        desired = new Map()
+        let removed = 0
+        for (const item of selectTimelineLayout(state)) {
+          if (ids.has(item.shotId)) removed += item.durationSec
+          else desired.set(item.shotId, item.startSec - removed)
+        }
+      }
+      return withLayout(state, {
         clipOrder: newOrder,
-        selectedShotIds: [],
-        selectedClipShotId: null,
+        selectedShotIds: state.selectedShotIds.filter((id) => !ids.has(id)),
+        selectedClipShotId: state.selectedClipShotId && ids.has(state.selectedClipShotId) ? null : state.selectedClipShotId,
         past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
         future: [],
-      })
+      }, desired)
+    }),
+
+  // 빈 곳의 [잔물결 삭제](시안 E4 409:6873 · 규칙 R) — 이 클립 앞 빈 곳을 없애고 그 줄의 뒤 클립 · 이어진 소리를 당긴다.
+  //   사람이 놓은 소리는 그대로다. 약속: tests/editor/free-placement.test.ts
+  rippleDeleteGapBefore: (shotId) =>
+    set((state) => {
+      const layout = selectTimelineLayout(state)
+      const index = layout.findIndex((l) => l.shotId === shotId)
+      if (index < 0) return state
+      const prevEnd = index > 0 ? layout[index - 1].startSec + layout[index - 1].durationSec : 0
+      const gap = layout[index].startSec - prevEnd
+      if (!(gap > 0.0005)) return state
+      const desired = new Map(layout.map((l, i) => [l.shotId, i >= index ? l.startSec - gap : l.startSec]))
+      return withLayout(state, {
+        past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
+        future: [],
+      }, desired)
+    }),
+
+  // 빈 곳에 놓기(시안 E1 "끌어서 옮기고") — 놓은 시각에 놓이고 원래 자리는 빈 곳이 된다. 뒤 클립과 겹치면 겹치는 만큼 민다.
+  //   약속: tests/editor/free-placement.test.ts
+  placeClipAt: (shotId, atSec) =>
+    set((state) => {
+      const layout = selectTimelineLayout(state)
+      if (!layout.some((l) => l.shotId === shotId) || !Number.isFinite(atSec)) return state
+      const at = Math.max(0, atSec)
+      const others = layout.filter((l) => l.shotId !== shotId)
+      const moved = orderWithClipAt(state, shotId, others.filter((l) => l.startSec < at).length)
+      if (!moved) return state
+      const desired = new Map(others.map((l) => [l.shotId, l.startSec]))
+      desired.set(shotId, at)
+      return withLayout(state, {
+        ...moved,
+        past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
+        future: [],
+      }, desired)
     }),
 
   // 드래그 순서변경 — shotId 를 전역 순서의 targetIndex 위치로 이동 (씬 경계 넘으면 sceneId 재배정)
   moveClipToIndex: (shotId, targetIndex) =>
     set((state) => {
-      const order = globalOrder(state)
-      const movedShot = state.shots.find((s) => s.shotId === shotId)
-      if (order.findIndex((o) => o.shotId === shotId) < 0 || !movedShot) return state
-
-      const remaining = order.filter((o) => o.shotId !== shotId)
-      const t = Math.max(0, Math.min(targetIndex, remaining.length))
-
-      // shotId 를 모든 씬 order 에서 제거
-      const cleared: Record<string, string[]> = {}
-      for (const [sceneId, list] of Object.entries(state.clipOrder)) {
-        cleared[sceneId] = list.filter((id) => id !== shotId)
+      const moved = orderWithClipAt(state, shotId, targetIndex)
+      if (!moved) return state
+      // 경계에 놓으면 순서만 바뀐다 — 원래 자리는 당겨 메우고 놓인 자리 뒤는 민다(빈 곳이 새로 생기지 않는다, 자유 배치 2026-11-14).
+      const layout = selectTimelineLayout(state)
+      const item = layout.find((l) => l.shotId === shotId)!
+      const desired = new Map<string, number>()
+      for (const l of layout) {
+        if (l.shotId === shotId) continue
+        desired.set(l.shotId, l.startSec > item.startSec ? l.startSec - item.durationSec : l.startSec)
       }
-
-      // 대상 위치 → sceneId + 로컬 인덱스
-      let sceneId: string
-      let localIndex: number
-      if (remaining.length === 0) {
-        sceneId = movedShot.sceneId
-        localIndex = 0
-      } else if (t >= remaining.length) {
-        sceneId = remaining[remaining.length - 1].sceneId
-        localIndex = (cleared[sceneId] ?? []).length
-      } else {
-        sceneId = remaining[t].sceneId
-        const li = (cleared[sceneId] ?? []).indexOf(remaining[t].shotId)
-        localIndex = li < 0 ? (cleared[sceneId] ?? []).length : li
-      }
-
-      const sceneOrder = [...(cleared[sceneId] ?? [])]
-      sceneOrder.splice(localIndex, 0, shotId)
-      cleared[sceneId] = sceneOrder
-
-      const shots =
-        movedShot.sceneId === sceneId
-          ? state.shots
-          : state.shots.map((s) => (s.shotId === shotId ? { ...s, sceneId } : s))
-
-      return withLinkedAudio(state, {
-        shots,
-        clipOrder: cleared,
+      return withLayout(state, {
+        ...moved,
         past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
         future: [],
-      })
+      }, desired)
     }),
 
   // cut(자르기) for video — atGlobalSec 에서 클립을 둘로 분할.
@@ -1645,7 +1803,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         a.linkedShotId === shotId ? [a, { ...a, id: `audio_${uid()}`, linkedShotId: newId }] : [a],
       )
 
-      return withLinkedAudio(state, {
+      return withLayout(state, {
         shots: [...state.shots, newShot],
         videoClips,
         audioClips,
@@ -1708,7 +1866,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const sceneOrder = [...(state.clipOrder[sceneId] ?? [])]
       sceneOrder.splice(localIndex, 0, newId)
 
-      return withLinkedAudio(state, {
+      return withLayout(state, {
         shots: [...state.shots, newShot],
         videoClips: [...state.videoClips, newClip],
         clipOrder: { ...state.clipOrder, [sceneId]: sceneOrder },
@@ -1803,7 +1961,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         !a.linkedShotId && a.startSec >= insertAtSec - 1e-6 ? { ...a, startSec: a.startSec + DEFAULT_DURATION } : a,
       )
 
-      return withLinkedAudio(state, {
+      return withLayout(state, {
         shots: [...state.shots, { ...newShot, sceneId: insertSceneId }],
         videoClips: [...state.videoClips, newClip],
         audioClips,
@@ -1852,7 +2010,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((state) => {
       if (!isTitleCardShotId(shotId) || !Number.isFinite(seconds)) return state
       const sec = Math.max(0.5, Math.min(600, Math.round(seconds * 10) / 10))
-      return withLinkedAudio(state, {
+      return withLayout(state, {
         shots: state.shots.map((s) => (s.shotId === shotId ? { ...s, durationSeconds: sec } : s)),
         videoClips: state.videoClips.map((c) => (c.shotId === shotId ? { ...c, trimStart: 0, trimEnd: sec } : c)),
         past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
@@ -2037,12 +2195,23 @@ const pickPersisted = (s: EditorState) => ({
 })
 
 /**
+ * 저장본 — 2판: 타임라인에 놓인 클립마다 줄 · 시작 초(placements)를 함께 적는다(자유 배치, 오너 답 1, 2026-11-14). 파형은 소수 둘째
+ *   자리로 줄인다(검토 A E2a). 약속: tests/editor/free-placement.test.ts · tests/editor/save-size.test.ts
+ */
+function persistSnapshot(state: EditorState): PersistedEditor {
+  const placements = Object.fromEntries(
+    selectTimelineLayout(state).map((item) => [item.shotId, { trackId: 'v1', startSec: round3(item.startSec) }]),
+  )
+  return compactSnapshot({ version: 2, ...pickPersisted(state), placements })
+}
+
+/**
  * 지금 편집 상태를 바로 저장한다 — 이 브라우저에 쓰고 서버 답까지 기다린다. Editor 를 처음 열 때 소리를 다 나눈 결과를
  *   편집 화면을 열기 전에 남긴다(오너 2026-11-10 "DB에 다 올라왔을 때 내용이 보여지게"). 서버가 잠시 고장이면 뒤에서 다시 시도한다.
  *   약속: tests/editor/first-open.test.ts
  */
 export function saveEditorNow(projectId: string): Promise<ServerSaveResult | null> {
-  const snapshot = compactSnapshot({ version: 1, ...pickPersisted(useEditorStore.getState()) })
+  const snapshot = persistSnapshot(useEditorStore.getState())
   saveEditorStateNow(projectId, snapshot)
   const generation = (serverSaveGenerations.get(projectId) ?? 0) + 1
   serverSaveGenerations.set(projectId, generation)
@@ -2083,7 +2252,7 @@ if (typeof window !== 'undefined') {
     if (!projectId) return
 
     // 파형은 소수 둘째 자리로 줄여 저장한다(검토 A E2a — 꽉 차면 저장이 실패한다). 화면의 편집 상태는 그대로.
-    const snapshot = compactSnapshot({ version: 1, ...cur })
+    const snapshot = persistSnapshot(state)
     saveEditorState(projectId, snapshot)
     scheduleServerSave(projectId, snapshot)
   })

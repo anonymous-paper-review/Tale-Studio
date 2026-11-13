@@ -29,7 +29,7 @@ import { AudioMeter } from '@/features/editor/audio-meter'
 import { ResizeHandle } from '@/features/editor/resize-handle'
 import { useEditorPlayback } from '@/features/editor/use-editor-playback'
 import { prefetchVideos, resetVideoPrefetchFor } from '@/features/editor/video-prefetch'
-import { useEditorStore, selectTimelineLayout, zoomStep } from '@/stores/editor-store'
+import { useEditorStore, selectTimelineLayout, timelineEnd, zoomStep } from '@/stores/editor-store'
 import { useProjectStore } from '@/stores/project-store'
 import { decodeAudioPeaks } from '@/lib/audio-waveform'
 import { downloadShotsZip } from '@/lib/editor-zip-export'
@@ -79,6 +79,10 @@ export default function PostPage() {
     deleteClip,
     deleteSelectedClips,
     moveClipToIndex,
+    placeClipAt,
+    rippleDeleteClip,
+    rippleDeleteSelectedClips,
+    rippleDeleteGapBefore,
     addClipAtPlayhead,
     setSpeed,
     setTrim,
@@ -145,7 +149,7 @@ export default function PostPage() {
     const st = useEditorStore.getState()
     const layout = selectTimelineLayout(st)
     const totalSec = Math.max(
-      layout.reduce((sum, l) => sum + l.durationSec, 0),
+      timelineEnd(layout),
       st.audioClips.reduce((m, a) => Math.max(m, a.startSec + a.durationSec), 0),
     )
     if (!(totalSec > 0)) {
@@ -734,6 +738,10 @@ export default function PostPage() {
                 onDelete={deleteClip}
                 onDeleteSelected={deleteSelectedClips}
                 onMoveClipToIndex={moveClipToIndex}
+                onPlaceClipAt={placeClipAt}
+                onRippleDeleteGap={rippleDeleteGapBefore}
+                onRippleDelete={rippleDeleteClip}
+                onRippleDeleteSelected={rippleDeleteSelectedClips}
                 onZoom={setPxPerSec}
                 onSplitVideo={splitVideoClipAt}
                 onSetSpeed={setSpeed}
