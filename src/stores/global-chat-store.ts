@@ -1588,13 +1588,16 @@ async function heldWorkLines(held: HeldDirectorWork, locale: AppLocale, names: R
   const lines: string[] = []
   if (held.allBlankImages) lines.push(t('Applying also makes the live-action images for the shots that need one right away · No Takes used.'))
   if (held.images.length > 0) lines.push(t('Applying also makes the live-action image for {shots} right away · No Takes used.', { shots: shots(held.images) }))
-  const remakes = held.remakes ?? []
-  if (held.videos.length > 0 || remakes.length > 0) {
+  // 영상 수 · Take 수는 이미지가 있는 샷만 센다 — 없는 샷은 [적용] 뒤 "이미지가 먼저 필요해요"로 빠진다(리드 11/14, 되묻기 B1 ③ 과 같은 셈).
+  const readiness = shotImageReadiness([...held.videos, ...(held.remakes ?? [])])
+  const videos = held.videos.filter((id) => readiness.get(id) === 'ready')
+  const remakes = (held.remakes ?? []).filter((id) => readiness.get(id) === 'ready')
+  if (videos.length > 0 || remakes.length > 0) {
     // 지연 로드 — Take 계산기 · 잔액 훅(영상 러너와 같은 까닭).
     const [{ videoBatchTakeCosts }, { fetchTakeBalance }] = await Promise.all([import('@/lib/director/video-batch-plan'), import('@/lib/billing/use-take-balance')])
     const takes = await fetchTakeBalance()
-    const ids = [...held.videos, ...remakes]
-    const cost = [...videoBatchTakeCosts(nodes, held.videos), ...remakeTakeCosts(nodes, remakes)].reduce((sum, n) => sum + n, 0)
+    const ids = [...videos, ...remakes]
+    const cost = [...videoBatchTakeCosts(nodes, videos), ...remakeTakeCosts(nodes, remakes)].reduce((sum, n) => sum + n, 0)
     lines.push(takes.mode === 'off' && !takes.failed
       ? t('Applying also makes the video for {shots} right away.', { shots: shots(ids) })
       : t('Applying also makes the video for {shots} right away · {takes} Takes.', { shots: shots(ids), takes: cost }))
