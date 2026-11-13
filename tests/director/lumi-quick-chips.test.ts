@@ -38,6 +38,13 @@ const NODES = () => [
 const fetchMock = vi.fn(async () => Response.json({ reply: 'Model reply' }))
 const lastModel = () => chat.getState().messages.filter((m) => m.role === 'model').at(-1)?.content ?? ''
 const chip = (index: number) => translate('en', DIRECTOR_QUICK_CHIPS[index])
+/** 다시 만들기 가짜 — 서버가 2xx 로 받은 것처럼 접수 알림(onAccepted)을 바로 부르고 끝난다(진짜 상점의 접수 알림과 같은 뜻). */
+const acceptingRemake = (onCall?: (id: string) => void) =>
+  vi.fn(async (id: string, opts?: { onAccepted?: (jobId: string) => void }) => {
+    onCall?.(id)
+    opts?.onAccepted?.(`job-${id}`)
+    return `job-${id}`
+  })
 /** 러너처럼 — 시작하면 그 자리에서 새 묶음 표시를 단다(끝난 것으로 바로 풀어 다음 부탁을 막지 않는다). */
 async function startsBatch(_projectId: string, opts?: { shotIds?: readonly string[] }) {
   director.getState().beginVideoBatch(opts?.shotIds?.length ?? 0)
@@ -96,7 +103,7 @@ describe('Director 빠른 칩(시안 D5)', () => {
   it('실패한 샷 다시 만들어 줘 칩은 이미지가 실패한 샷은 다시 그리고 영상이 실패한 샷은 다시 만든다', async () => {
     const generate = vi.fn().mockResolvedValue(null)
     // 영상은 다시 만들기 — 알림 카드 · 넘기기 창 [다시 만들기]와 같은 다시 만들기 하나(가장 최근 Take 설정 이어받기, 리드 낮음 6 · (a)).
-    const remake = vi.fn(async (id: string) => `job-${id}`)
+    const remake = acceptingRemake()
     director.setState({ generateStoryboardImage: generate, remakeShotVideo: remake })
     await chat.getState().sendMessage(chip(2))
     expect(generate).toHaveBeenCalledWith('s4')
