@@ -75,27 +75,46 @@ export async function loadEditorState(projectId: string): Promise<PersistedEdito
   }
 
   // Rehydrate stale object URLs from IndexedDB blobs — 저장소가 고장 나면 그 파일만 건너뛰고, 한도가 지나면 기다리지 않는다.
+  await rehydrateAudioUrls(parsed)
+  return parsed
+}
+
+/**
+ * 저장본의 올린 소리 파일(blobKey) 주소를 이 브라우저 저장소의 파일로 다시 잇는다 — 저장소가 고장 나면 그 파일만 건너뛰고,
+ *   한도(AUDIO_BLOB_TIMEOUT_MS)가 지나면 기다리지 않는다.
+ *   dropMissing 이면 이 브라우저에 없는 파일의 옛 주소(blob:)를 비운다 — 다른 브라우저에서 올린 소리는 자리 · 파형만 남고
+ *   소리는 나지 않는다(E2b, 서버에서 연 편집). 약속: tests/editor/other-browser.test.ts
+ */
+export async function rehydrateAudioUrls(
+  saved: Pick<PersistedEditor, 'audioClips' | 'audioSources'>,
+  dropMissing = false,
+): Promise<void> {
+  const items: Array<AudioTrackClip | AudioSource> = [...(saved.audioClips ?? []), ...(saved.audioSources ?? [])]
+  const relinked = new Set<AudioTrackClip | AudioSource>()
   const rehydrate = async (clip: AudioTrackClip | AudioSource) => {
     const key = (clip as { blobKey?: string }).blobKey
     if (!key) return
     const url = await getAudioBlobURL(key).catch(() => null)
     if (url) {
       (clip as { url: string }).url = url
+      relinked.add(clip)
     }
   }
 
   let timer: ReturnType<typeof setTimeout> | undefined
   await Promise.race([
-    Promise.all([
-      ...(parsed.audioClips ?? []).map(rehydrate),
-      ...(parsed.audioSources ?? []).map(rehydrate),
-    ]),
+    Promise.all(items.map(rehydrate)),
     new Promise<void>((resolve) => {
       timer = setTimeout(resolve, AUDIO_BLOB_TIMEOUT_MS)
     }),
   ]).finally(() => clearTimeout(timer))
 
-  return parsed
+  if (!dropMissing) return
+  for (const item of items) {
+    if (item.blobKey && !relinked.has(item) && typeof item.url === 'string' && item.url.startsWith('blob:')) {
+      (item as { url: string }).url = ''
+    }
+  }
 }
 
 export function clearEditorState(projectId: string): void {

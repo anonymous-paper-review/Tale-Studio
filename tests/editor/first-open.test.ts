@@ -127,7 +127,7 @@ describe('처음 여는 Editor 는 소리를 다 나눈 뒤에 연다', () => {
   it('소리를 다 나누면 그 결과를 브라우저와 서버에 저장한 뒤에 편집 화면을 연다', async () => {
     // 왜: 오너 요청 그대로 — "비디오랑 오디오랑 분리해서 DB에 다 올라왔을 때 Editor 탭에서 내용이 보여지게". 정상 경로 고정.
     const put = deferred<Response>()
-    fetchMock.mockImplementation(async () => put.promise)
+    fetchMock.mockImplementation(async (_url: string, init?: RequestInit) => (init?.method === 'PUT' ? put.promise : new Response('{}', { status: 200 })))
     const opening = openLikePage()
     await vi.waitFor(() => expect(putBodies()).toHaveLength(1))
     expect(useEditorStore.getState().editorPrep).not.toBeNull()

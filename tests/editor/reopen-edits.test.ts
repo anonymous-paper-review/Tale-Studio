@@ -122,3 +122,20 @@ describe('다시 들어와도 자른 클립은 자른 그대로다', () => {
     expect(st.videoClips.find((c) => c.shotId === 'sh_01_01__cab12__ccd34')).toMatchObject({ trimStart: 4, trimEnd: 6, url: 'https://media.example/sh_01_01.mp4' })
   })
 })
+
+describe('다시 들어와도 넣은 전환은 그대로다', () => {
+  it('원본 클립에 넣은 디졸브도 다시 들어오면 그대로 남는다', async () => {
+    // 왜: 다시 열 때 잘라 낸 조각 · 타이틀 카드의 디졸브만 되살리고 원본 클립의 디졸브는 버렸다 — 약속 "디졸브는 … 새로고침해도 남는다"가
+    //   원본 클립에서는 지켜지지 않았다. 고장: 원본 클립에 디졸브를 넣고 다른 단계에 다녀오거나 새로고침할 때(2026-11-14 E2b 시험 중 발견).
+    canonical(['sh_01_01', 'sh_01_02'])
+    localStorage.setItem(LS_KEY, JSON.stringify(saved({
+      shots: [shot('sh_01_01'), shot('sh_01_02')],
+      videoClips: [clip('sh_01_01'), clip('sh_01_02', { transitionIn: { type: 'dissolve', durationSec: 2 } })],
+      clipOrder: { sc_01: ['sh_01_01', 'sh_01_02'] },
+    })))
+    await useEditorStore.getState().loadPersisted()
+    const st = useEditorStore.getState()
+    expect(st.videoClips.find((c) => c.shotId === 'sh_01_02')?.transitionIn).toEqual({ type: 'dissolve', durationSec: 2 })
+    expect(st.videoClips.find((c) => c.shotId === 'sh_01_01')?.transitionIn ?? null).toBeNull()
+  })
+})

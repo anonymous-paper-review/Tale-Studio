@@ -16,8 +16,10 @@ import {
   saveEditorStateNow,
   loadEditorState,
   deleteAudioBlob,
+  rehydrateAudioUrls,
   type PersistedEditor,
 } from '@/lib/editor-persistence'
+import { hasShots, readServerCopy, rememberServerSeenAt, savedLater, serverSeenAt } from '@/lib/editor/server-copy'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 import { compactSnapshot, sharePeaks } from '@/lib/editor/peaks'
@@ -853,29 +855,63 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return false
     const loadToken = ++persistedLoadEpoch
-    // 저장본을 읽거나 되살리다 망가진 곳이 있으면(예외) 되살리지 않은 것으로 하고 처음 여는 길로 이어 간다 — 예외가 그대로 나가면
-    //   기다리는 카드가 끝나지 않았다(2026-11-10 검토 A E3). 약속: tests/editor/first-open.test.ts
-    let saved: PersistedEditor | null
-    try {
-      saved = await loadEditorState(projectId)
-    } catch (err) {
-      console.error('[editor-store] saved edit could not be read:', err)
-      return false
-    }
-    if (
-      !saved ||
-      persistedLoadEpoch !== loadToken ||
-      useProjectStore.getState().projectId !== projectId
-    ) return false
+    const stale = () => persistedLoadEpoch !== loadToken || useProjectStore.getState().projectId !== projectId
+    // 이 브라우저 저장본과 서버 저장본을 함께 읽는다(E2b, 2026-11-14) — 예전에는 이 브라우저 것만 읽고 서버에는 쓰기만 해서,
+    //   다른 브라우저가 연 처음 상태가 서버 편집을 덮었다. 약속: tests/editor/other-browser.test.ts
+    //   이 브라우저 것을 읽다 망가지면 없는 것으로 보고 이어 간다 — 예외가 그대로 나가면 기다리는 카드가 끝나지 않았다(검토 A E3).
+    const [local, server] = await Promise.all([
+      loadEditorState(projectId).catch((err) => {
+        console.error('[editor-store] saved edit could not be read:', err)
+        return null
+      }),
+      readServerCopy(projectId),
+    ])
+    if (stale()) return false
     // 샷이 하나도 없는 저장본은 되살릴 편집이 아니다 — 11/3 늦은 비우기가 남긴 빈 편집 상태(운영 3945d1e6 서버 편집 상태 샷 0)를
     //   "되살린 편집"으로 보면 처음 열기의 소리 나누기가 영영 안 된다(검토 A E1). 처음 여는 것으로 본다.
-    if (!Array.isArray(saved.shots) || saved.shots.length === 0) return false
-    try {
-      applySavedEdit(saved)
+    const localEdit = hasShots(local) ? local : null
+    const serverEdit = server && hasShots(server.state) ? server.state : null
+    // 서버에 쓸지는 열 때마다 새로 정한다 — 지난번 화면에서 멈춘 쓰기를 이번 화면에 넘기지 않는다.
+    serverWritesStopped.delete(projectId)
+    blindOpens.delete(projectId)
+
+    if (!server) {
+      // 서버 편집을 읽지 못했다 — 편집은 막지 않는다(서버가 잠시 고장 나도 연다, 약속: tests/editor/first-open.test.ts). 이 브라우저
+      //   편집이 있으면 그것, 없으면 처음 상태로 열고, 서버에 쓰기 전에 서버를 다시 읽어 이 브라우저가 못 본 편집이 있으면 덮지 않는다.
+      const opened = !!localEdit && tryApply(localEdit)
+      blindOpens.set(projectId, { opened: opened ? 'local' : 'fresh', seen: serverSeenAt(projectId) })
+      return opened
+    }
+
+    // 다른 곳에서 이 브라우저가 마지막으로 본 뒤에 서버에 저장했으면 서버 편집을 먼저 연다. 이번 고침 전 저장본은 견줄 표시가 없어
+    //   이 브라우저 것을 먼저 연다 — E2b 로 서버 편집이 처음 상태 · 빈 편집으로 덮인 프로젝트가 있다(운영 3945d1e6).
+    const seen = serverSeenAt(projectId)
+    const serverFirst = !!serverEdit && (!localEdit || (seen !== undefined && savedLater(server.updatedAt, seen)))
+    for (const candidate of serverFirst ? [serverEdit, localEdit] : [localEdit, serverEdit]) {
+      if (!candidate) continue
+      const fromServer = candidate === serverEdit
+      // 다른 브라우저에서 올린 소리 파일은 이 브라우저에 없을 수 있다 — 있으면 다시 잇고, 없으면 자리 · 파형만 남긴다.
+      if (fromServer) await rehydrateAudioUrls(candidate, true)
+      if (stale()) return false
+      if (!tryApply(candidate)) continue
+      if (fromServer) {
+        // 다음에 이 브라우저에서 서버를 기다리지 않고 열리게 바로 저장하고, 서버의 그 저장 시각을 적어 둔다.
+        saveEditorStateNow(projectId, compactSnapshot({ version: 1, ...pickPersisted(get()) }))
+        if (server.updatedAt) rememberServerSeenAt(projectId, server.updatedAt)
+      }
       return true
-    } catch (err) {
-      console.error('[editor-store] saved edit could not be restored:', err)
-      return false
+    }
+    return false
+
+    // 저장한 편집을 되살린다 — 망가져 예외가 나면 되살리지 않은 것으로 하고 까닭을 남긴다(검토 A E3).
+    function tryApply(saved: PersistedEditor): boolean {
+      try {
+        applySavedEdit(saved)
+        return true
+      } catch (err) {
+        console.error('[editor-store] saved edit could not be restored:', err)
+        return false
+      }
     }
 
     // 저장한 편집을 지금(DB 에서 다시 만든) 편집 상태에 입힌다 — 한 번에 set 하므로 중간에 예외가 나면 아무것도 바뀌지 않는다.
@@ -963,14 +999,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         : cur.shots
       const combinedShots = restoredShots.length ? [...baseShots, ...restoredShots] : baseShots
       // 자른 앞 조각(원본)의 구간은 저장한 편집에서 되살린다 — 그 밖의 원본 구간은 DB 값(손잡이로 바꾼 구간은 DB 에도 쓴다).
-      const baseClips = cutRoots.size
-        ? cur.videoClips.map((c) => {
-            const savedClip = cutRoots.has(c.shotId) ? savedClipByShot.get(c.shotId) : undefined
-            return savedClip && (savedClip.trimStart !== undefined || savedClip.trimEnd !== undefined)
-              ? { ...c, trimStart: savedClip.trimStart, trimEnd: savedClip.trimEnd }
-              : c
-          })
-        : cur.videoClips
+      //   원본 클립에 넣은 전환(디졸브)도 되살린다 — 전환은 DB 에 없다(2026-11-14, 약속: tests/editor/reopen-edits.test.ts).
+      const baseClips = cur.videoClips.map((c) => {
+        const savedClip = savedClipByShot.get(c.shotId)
+        if (!savedClip) return c
+        let next = c
+        if (cutRoots.has(c.shotId) && (savedClip.trimStart !== undefined || savedClip.trimEnd !== undefined)) {
+          next = { ...next, trimStart: savedClip.trimStart, trimEnd: savedClip.trimEnd }
+        }
+        if (savedClip.transitionIn) next = { ...next, transitionIn: savedClip.transitionIn }
+        return next
+      })
       const combinedClips = restoredClips.length ? [...baseClips, ...restoredClips] : baseClips
 
       const canonicalOrder = new Map<string, string[]>()
@@ -1767,6 +1806,36 @@ const serverSaveSnapshots = new Map<string, PersistedEditor>()
 const serverSaveInFlight = new Map<string, boolean>()
 // fatal 실패를 사용자에게 알린 프로젝트 — 프로젝트당 1회만 토스트 (콘솔은 개발자용).
 const fatalSaveNotified = new Set<string>()
+// 열 때 서버 편집을 읽지 못하고 연 프로젝트(E2b, 2026-11-14) — 서버에 쓰기 전에 서버를 다시 읽어, 이 브라우저가 못 본 샷 있는
+//   편집이 서버에 있으면 쓰지 않는다. fresh = 처음 상태로 열었음(서버의 샷 있는 편집은 모두 남의 것), local = 이 브라우저 편집으로
+//   열었음(이 브라우저가 마지막으로 본 시각 seen 뒤에 저장된 것만 남의 것 — 여는 규칙과 같다). 약속: tests/editor/other-browser.test.ts
+const blindOpens = new Map<string, { opened: 'fresh' | 'local'; seen: string | undefined }>()
+// 이번 화면에서 서버 쓰기를 멈춘 프로젝트 — 서버에 다른 곳 편집이 있어 덮지 않는다(이 브라우저에는 계속 저장). 다시 열면 풀린다.
+const serverWritesStopped = new Set<string>()
+
+/** 서버에 써도 되는가 — 열 때 서버를 읽었으면 늘 된다. 읽지 못하고 열었으면 지금 다시 읽어 본다. */
+async function mayWriteServer(projectId: string): Promise<boolean> {
+  const blind = blindOpens.get(projectId)
+  if (!blind) return true
+  const copy = await readServerCopy(projectId)
+  // 서버가 아직 고장이면 쓰기도 실패해 뒤에서 다시 시도한다(약속: first-open "서버 저장은 뒤에서 다시 시도한다").
+  if (!copy) return true
+  const elsewhere =
+    hasShots(copy.state) &&
+    (blind.opened === 'fresh' || (blind.seen !== undefined && savedLater(copy.updatedAt, blind.seen)))
+  if (!elsewhere) {
+    blindOpens.delete(projectId)
+    return true
+  }
+  serverWritesStopped.add(projectId)
+  toast.warning(
+    translate(
+      useLocaleStore.getState().locale,
+      "Edits saved in another browser are on the server, so they weren't overwritten. Reopen the Editor to see them.",
+    ),
+  )
+  return false
+}
 
 // 저장 결과 3분류 — 'saved' 성공 / 'retry' 일시 장애(5초 뒤 재시도) / 'fatal' 재시도로
 //   달라지지 않는 실패(4xx: 인증 만료·삭제된 프로젝트 410 등 → 루프 중단, localStorage 만 유지).
@@ -1788,7 +1857,12 @@ async function saveEditorStateToServer(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId, state: snapshot }),
       })
-      if (response.ok) return 'saved'
+      if (response.ok) {
+        // 서버가 적은 저장 시각을 이 브라우저에 적어 둔다 — 다음에 열 때 그 뒤로 다른 곳에서 바뀌었는지 견준다(E2b, 2026-11-14).
+        const body = (await response.json().catch(() => null)) as { updatedAt?: unknown } | null
+        if (typeof body?.updatedAt === 'string') rememberServerSeenAt(projectId, body.updatedAt)
+        return 'saved'
+      }
       // 서버가 남긴 실제 사유를 진단에 붙인다 — "HTTP 500"만으로는 원인 추적이 안 된다.
       const body = (await response.json().catch(() => null)) as { error?: string } | null
       diagnostic = `HTTP ${response.status}${body?.error ? ` — ${body.error}` : ''}`
@@ -1836,17 +1910,25 @@ export function scheduleServerSave(
 
 // 이 세대(generation)의 저장을 서버에 보낸다 — 더 새 세대가 있거나 이미 보내는 중이면 보내지 않는다(null).
 function runServerSave(projectId: string, generation: number): Promise<ServerSaveResult | null> {
+  if (serverWritesStopped.has(projectId)) return Promise.resolve(null)
   if (serverSaveGenerations.get(projectId) !== generation) return Promise.resolve(null)
   if (serverSaveInFlight.get(projectId)) return Promise.resolve(null)
 
   const latestSnapshot = serverSaveSnapshots.get(projectId)
   if (!latestSnapshot) return Promise.resolve(null)
   serverSaveInFlight.set(projectId, true)
-  return saveEditorStateToServer(
-    projectId,
-    latestSnapshot,
-    () => serverSaveGenerations.get(projectId) === generation,
-  ).then((result) => {
+  return mayWriteServer(projectId).then(async (allowed) => {
+    if (!allowed) {
+      // 서버에 다른 곳 편집이 있다 — 이번 화면에서는 서버에 쓰지 않는다(이 브라우저에는 이미 저장했다).
+      serverSaveInFlight.delete(projectId)
+      serverSaveSnapshots.delete(projectId)
+      return null
+    }
+    const result = await saveEditorStateToServer(
+      projectId,
+      latestSnapshot,
+      () => serverSaveGenerations.get(projectId) === generation,
+    )
     serverSaveInFlight.delete(projectId)
     const latestGeneration = serverSaveGenerations.get(projectId)
     if (latestGeneration !== generation) {
