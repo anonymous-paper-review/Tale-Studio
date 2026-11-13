@@ -22,6 +22,21 @@ const TRANSITION_PHRASE: Record<ClipTransitionType, string> = {
   cross: 'cross dissolves',
 }
 const short = (text: string) => (text.length > 120 ? `${text.slice(0, 117)}...` : text)
+const percent = (value: number) => `${Math.round(value * 100)}%`
+
+/** 클립에 붙은 것 — 빠르기 · 전환 · 모션 · 불투명도 · 자막. 영상 컷과 제목 클립이 같은 꼴로 쓴다(2단계 ④ · ⑥). */
+function clipExtras(shot: Shot | undefined, clip: VideoClip | undefined): string[] {
+  const motion = clip?.motion
+  return [
+    clip?.speed && clip.speed !== 1 ? `speed ${clip.speed}×` : null,
+    clip?.transitionIn ? `${TRANSITION_PHRASE[clip.transitionIn.type] ?? TRANSITION_PHRASE.dissolve} from the cut before (${clip.transitionIn.durationSec}s)` : null,
+    clip?.transitionOut ? `${TRANSITION_PHRASE[clip.transitionOut.type] ?? TRANSITION_PHRASE.dissolve} at its end (${clip.transitionOut.durationSec}s)` : null,
+    motion && (motion.x !== 0 || motion.y !== 0) ? `position ${percent(motion.x)} ${percent(motion.y)}` : null,
+    motion && motion.scale !== 1 ? `scale ${percent(motion.scale)}` : null,
+    clip?.opacity !== undefined && clip.opacity !== 1 ? `opacity ${percent(clip.opacity)}` : null,
+    shot?.subtitle?.text ? `subtitle "${short(shot.subtitle.text)}"` : null,
+  ].filter((part): part is string => part !== null)
+}
 
 export function editorChatContext(input: EditorChatContextInput): string {
   const layout = selectTimelineLayout(input)
@@ -43,22 +58,21 @@ export function editorChatContext(input: EditorChatContextInput): string {
         ? `Title "${short(shot.titleText.text)}"`
         : `${shot?.shotType ?? 'Shot'} · "${short(shot?.actionDescription ?? '')}"`
     const extras = [
-      clip && !shot?.titleCard && !shot?.titleText && (clip.status !== 'completed' || !clip.url) ? 'no video yet' : null,
-      clip?.speed && clip.speed !== 1 ? `speed ${clip.speed}×` : null,
-      clip?.transitionIn ? `${TRANSITION_PHRASE[clip.transitionIn.type] ?? TRANSITION_PHRASE.dissolve} from the cut before (${clip.transitionIn.durationSec}s)` : null,
-      clip?.transitionOut ? `${TRANSITION_PHRASE[clip.transitionOut.type] ?? TRANSITION_PHRASE.dissolve} at its end (${clip.transitionOut.durationSec}s)` : null,
-      shot?.subtitle?.text ? `subtitle "${short(shot.subtitle.text)}"` : null,
-    ].filter(Boolean)
+      ...(clip && !shot?.titleCard && !shot?.titleText && (clip.status !== 'completed' || !clip.url) ? ['no video yet'] : []),
+      ...clipExtras(shot, clip),
+    ]
     lines.push(`${index + 1}. ${range} ${what}${extras.length ? ` · ${extras.join(' · ')}` : ''}`)
   })
-  // 영상 위 제목 클립(2단계 ⑥) — 줄 · 글자 · 시작 → 끝.
+  // 영상 위 제목 클립(2단계 ⑥) — 줄 · 글자 · 시작 → 끝, 붙은 전환 · 모션 · 불투명도는 영상 컷과 같은 꼴.
   const titles = selectOverlayLayout(input).filter((item) => isTitleClipShotId(item.shotId))
   if (titles.length) {
     lines.push(
       `Titles over the video: ${titles
         .map((item) => {
-          const text = input.shots.find((s) => s.shotId === item.shotId)?.titleText?.text ?? ''
-          return `${item.trackId.toUpperCase()} title "${short(text)}" ${secs(item.startSec)}–${secs(item.startSec + item.durationSec)}`
+          const shot = input.shots.find((s) => s.shotId === item.shotId)
+          const extras = clipExtras(shot, input.videoClips.find((c) => c.shotId === item.shotId))
+          const what = `${item.trackId.toUpperCase()} title "${short(shot?.titleText?.text ?? '')}" ${secs(item.startSec)}–${secs(item.startSec + item.durationSec)}`
+          return `${what}${extras.length ? ` · ${extras.join(' · ')}` : ''}`
         })
         .join('; ')}`,
     )

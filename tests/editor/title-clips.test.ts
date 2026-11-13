@@ -152,9 +152,14 @@ describe('같이 정한 것 — 리드 11/14 더함', () => {
     press('z', 'KeyZ', { ctrlKey: true })
     expect({ tool: api().toolMode, markers: api().markers, past: api().past.length, selected: api().selectedShotIds }).toEqual(before)
     expect(placeOf(id)).toBeDefined()
-    // 글자 칸 밖에서는 같은 키가 듣는다(헛통과가 아니게).
+    // 같은 키를 글자 칸 밖(타임라인)으로 보내면 듣는다 — 도구가 바뀌고, 마커가 달리고, 골라 둔 제목이 빠진다(헛통과가 아니게).
     press('t', 'KeyT', {}, null)
     expect(api().toolMode).toBe('text')
+    press('m', 'KeyM', {}, null)
+    expect(api().markers).toHaveLength(before.markers.length + 1)
+    api().selectClip(id)
+    press('Delete', 'Delete', {}, null)
+    expect(placeOf(id)).toBeUndefined()
   })
 
   it('Lumi 조언의 타임라인 요약은 제목 클립을 "V2 제목 \'글자\' · 시작 → 끝"처럼 말한다 — 영상 클립으로 잘못 말하지 않는다', () => {
@@ -167,6 +172,20 @@ describe('같이 정한 것 — 리드 11/14 더함', () => {
     const moved = editorChatContext(api())
     expect(moved).toMatch(/4\. 12\.0s–14\.0s \(2\.0s\) Title "우산"/)
     expect(moved).not.toMatch(/Title "우산"[^\n]*no video yet/)
+  })
+})
+
+describe('같이 정한 것 — 리드 11/14 더함(둘째)', () => {
+  it('Lumi 조언 요약은 제목 클립에 붙은 전환 · 모션 · 불투명도도 영상 컷과 같은 꼴로 말한다', () => {
+    // 왜: 리드 11/14 — 요약이 제목의 들어오는 모양 · 자리 · 투명도를 모르면 조언이 틀린다. 영상 컷도 모션 · 불투명도(④)를 같은 꼴로 싣는다.
+    const id = api().addTitleClip('v2', 3, '우산')!
+    api().dropTransition(id, 'start', 'cross')
+    api().setClipMotion([id], { y: -0.3 })
+    api().setClipOpacity([id], 0.8)
+    api().setClipMotion(['B'], { scale: 0.5 })
+    const context = editorChatContext(api())
+    expect(context).toContain('Titles over the video: V2 title "우산" 3.0s–5.0s · cross dissolves from the cut before (1s) · position 0% -30% · opacity 80%')
+    expect(context).toMatch(/2\. 4\.0s–8\.0s \(4\.0s\) MS · "" · scale 50%/)
   })
 })
 
