@@ -1,5 +1,6 @@
 // Director 위쪽 단추 셋이 세는 일 · 가장 밝은 단추 · 예상 칸 글(시안 D1 406:3717 · D2 406:4588 · R 416:4941, 오너 2026-11-14).
 //   순수 함수만 둔다. 샷 상태 판정은 shot-state.ts. 약속: tests/director/toolbar-work.test.ts
+import { realImageBatchMinutes } from '@/lib/director/generation-estimate'
 import type { DirectorShotState } from '@/lib/director/shot-state'
 import type { VideoModelKey } from '@/lib/video-models'
 
@@ -83,32 +84,26 @@ export function primaryWorkAction({
   return canHandOff ? 'editor' : null
 }
 
-/** 예상 시간 표 — 개발 DB 생성 작업 중앙값(2026-07~11, 접수 → 끝). 자료가 없는 영상 모델은 Seedance 2.0 값.
- *  이미지는 4샷 한 장(일괄 시트)이 약 100초, 영상 Seedance 2.0 720p 약 185초 · Happy Horse 약 105초. */
-export const ESTIMATE_SECONDS = {
-  imageSheet: 100,
-  video: {
-    seedance: 185,
-    'seedance-2.5': 185,
-    'happy-horse': 105,
-    'kling-o3': 185,
-    veo: 185,
-  } as Record<VideoModelKey, number>,
-} as const
+/** 영상 예상 시간 표 — 개발 DB 생성 작업 중앙값(2026-07~11, 접수 → 끝). 자료가 없는 영상 모델은 Seedance 2.0 값.
+ *  Seedance 2.0 720p 약 185초 · Happy Horse 약 105초. 이미지는 넘기기 창과 같은 셈(generation-estimate.ts)을 쓴다. */
+export const VIDEO_ESTIMATE_SECONDS: Record<VideoModelKey, number> = {
+  seedance: 185,
+  'seedance-2.5': 185,
+  'happy-horse': 105,
+  'kling-o3': 185,
+  veo: 185,
+}
 
-/** 한 번에 보내는 이미지 장 수(일괄 라우트가 한 번에 두 장) · 동시에 만드는 영상 수(사람 하나 한도 3). */
-const SHEETS_PER_ROUND = 2
+/** 동시에 만드는 영상 수(사람 하나 한도 3). */
 const VIDEOS_PER_ROUND = 3
 
-export function estimateWorkSeconds({ images, videoModels }: { images: number; videoModels: readonly VideoModelKey[] }): number {
-  const sheets = Math.ceil(images / 4)
-  const imageSeconds = Math.ceil(sheets / SHEETS_PER_ROUND) * ESTIMATE_SECONDS.imageSheet
-  let videoSeconds = 0
+export function estimateVideoSeconds(videoModels: readonly VideoModelKey[]): number {
+  let seconds = 0
   for (let i = 0; i < videoModels.length; i += VIDEOS_PER_ROUND) {
     const round = videoModels.slice(i, i + VIDEOS_PER_ROUND)
-    videoSeconds += Math.max(...round.map((m) => ESTIMATE_SECONDS.video[m] ?? ESTIMATE_SECONDS.video.seedance))
+    seconds += Math.max(...round.map((m) => VIDEO_ESTIMATE_SECONDS[m] ?? VIDEO_ESTIMATE_SECONDS.seedance))
   }
-  return imageSeconds + videoSeconds
+  return seconds
 }
 
 /** 예상 칸 글 — 시작 전 예상만, 만드는 중에는 남은 시간을 쓰지 않는다(오너 8/26). 쓸 것이 없으면 null. */
@@ -126,13 +121,17 @@ export function workEstimateText(
 ): string | null {
   const videos = input.videoModels.length
   if (input.images === 0 && videos === 0) return input.making ? t('Making now') : null
-  const minutes = Math.max(1, Math.round(estimateWorkSeconds({ images: input.images, videoModels: input.videoModels }) / 60))
+  // 이미지 분은 Storyboard → Director 넘기기 창과 같은 셈(리드 11/14 — 두 곳 숫자가 같게).
+  const imageMinutes = realImageBatchMinutes(input.images)
+  const videoMinutes = videos > 0 ? Math.max(1, Math.round(estimateVideoSeconds(input.videoModels) / 60)) : 0
   if (input.images > 0 && input.chain && videos > 0) {
+    const minutes = imageMinutes + videoMinutes
     return input.takesShown
       ? t('{images} images · {videos} videos · about {minutes} min · {takes} Takes', { images: input.images, videos, minutes, takes: input.videoTakes })
       : t('{images} images · {videos} videos · about {minutes} min', { images: input.images, videos, minutes })
   }
-  if (input.images > 0) return t('{count} images · about {minutes} min · No Takes used', { count: input.images, minutes })
+  if (input.images > 0) return t('{count} images · about {minutes} min · No Takes used', { count: input.images, minutes: imageMinutes })
+  const minutes = videoMinutes
   return input.takesShown
     ? t('{count} videos · about {minutes} min · {takes} Takes', { count: videos, minutes, takes: input.videoTakes })
     : t('{count} videos · about {minutes} min', { count: videos, minutes })

@@ -1,8 +1,9 @@
 // Director 위쪽 단추 셋이 세는 일 · 가장 밝은 단추 · 예상 칸 글 (시안 D1 406:3717 · D2 406:4588 · R 416:4941, 오너 2026-11-14 · 답 11)
 import { describe, expect, it } from 'vitest'
 import { translate } from '@/lib/i18n/translate'
+import { realImageBatchMinutes } from '@/lib/director/generation-estimate'
 import {
-  estimateWorkSeconds,
+  estimateVideoSeconds,
   imageWorkShotIds,
   primaryWorkAction,
   videoWorkShotIds,
@@ -93,10 +94,18 @@ describe('예상 칸', () => {
     expect(workEstimateText({ images: 0, videoModels: [], videoTakes: 0, takesShown: true, making: false }, ko)).toBeNull()
   })
 
-  it('예상 시간은 이미지 4샷 한 장 · 영상은 동시에 3편씩으로 나눠 센다', () => {
-    // 왜: 지금 일괄(4샷 한 장 · 한 번에 두 장)과 동시 생성 한도(영상 3)와 같게 센다.
-    expect(estimateWorkSeconds({ images: 4, videoModels: [] })).toBe(100)
-    expect(estimateWorkSeconds({ images: 9, videoModels: [] })).toBe(200)
-    expect(estimateWorkSeconds({ images: 0, videoModels: ['seedance', 'seedance', 'seedance', 'seedance'] })).toBe(370)
+  it('영상 예상 시간은 동시에 3편씩으로 나눠 센다', () => {
+    // 왜: 동시 생성 한도(영상 3)와 같게 센다. 이미지 쪽 셈은 넘기기 창과 같은 함수로 옮겼다(아래).
+    expect(estimateVideoSeconds(['seedance', 'seedance', 'seedance', 'seedance'])).toBe(370)
+    expect(estimateVideoSeconds(['happy-horse'])).toBe(105)
+    expect(estimateVideoSeconds([])).toBe(0)
+  })
+
+  it('이미지 예상 분은 Storyboard → Director 넘기기 창과 같은 셈을 쓴다', () => {
+    // 왜: 넘기기 창에서 "약 M분"을 보고 넘어왔는데 Director 툴바가 다른 분을 쓰면 어느 쪽을 믿을지 모른다(리드 11/14).
+    for (const n of [1, 4, 8, 9, 16, 17, 40]) {
+      expect(workEstimateText({ images: n, videoModels: [], videoTakes: 0, takesShown: true, making: false }, ko))
+        .toBe(`이미지 ${n}장 · 약 ${realImageBatchMinutes(n)}분 · Takes 안 써요`)
+    }
   })
 })
