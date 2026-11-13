@@ -253,10 +253,17 @@ export async function runRealBatch(
       }
       if (remaining <= 0) break
     }
-    if (store.getState().realBatchCancelled) {
+    const stoppedByUser = store.getState().realBatchCancelled
+    if (stoppedByUser) {
       // [모두 멈추기]를 누른 판 — 다시 돌기를 예약하지 않고 걸어 둔 것도 거둔다(오너 답 7).
       cancelRealBatchResume(projectId)
       resumeDepthByProject.delete(projectId)
+      // 이 판이 이미 보낸 장도 화면에서 멈춘다(오너 7번) — [모두 멈추기]를 누르는 사이 막 보낸 장도 놓치지 않는다. 이미 멈춘 · 끝난 장은 서버가 그대로 둔다.
+      if (waitedJobs.size > 0) {
+        await store.getState().cancelRunningJobs([...waitedJobs]).catch((error) => {
+          console.error('[real-batch] stopping sent sheets failed:', error)
+        })
+      }
     } else if (lastSkipped.length > 0) {
       // #ref-gate: 이유별로 한 줄 안내 + 자동 재개 예약(과금 없음 — 준비될 때까지 폴링만).
       const sheetNames = [...new Set(lastSkipped.flatMap((s) => (s.missing ?? []).map((m) => m.name)))]
@@ -284,12 +291,15 @@ export async function runRealBatch(
     if (generated > 0) {
       await invalidateShots(projectId)
       await store.getState().hydrateFromDb(projectId)
-      toast.success(
-        translate(useLocaleStore.getState().locale, 'Generated {count} live-action storyboard shots', {
-          count: generated,
-        }),
-      )
-    } else if (!opts?.silent && !quotaBlocked && lastSkipped.length === 0 && waitedJobs.size === 0) {
+      // 멈춘 판은 "만들었어요"라고 하지 않는다 — 보낸 장은 화면에서 멈췄다(오너 7번).
+      if (!stoppedByUser) {
+        toast.success(
+          translate(useLocaleStore.getState().locale, 'Generated {count} live-action storyboard shots', {
+            count: generated,
+          }),
+        )
+      }
+    } else if (!stoppedByUser && !opts?.silent && !quotaBlocked && lastSkipped.length === 0 && waitedJobs.size === 0) {
       // 남이 그리던 그림만 기다렸으면 "낼 샷 없음"이 아니다 — 그 그림은 큐 알림이 알린다.
       toast.info(
         translate(
