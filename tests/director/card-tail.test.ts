@@ -63,4 +63,15 @@ describe('다시 만들기 확인 창의 말', () => {
     expect(ko).toContain("'Create a new shooting image (the current one stays in the versions)': '촬영용 이미지를 새로 만들어요 (지금 이미지는 버전으로 남아요)'")
     expect(ko).toContain("'The new images become the current ones. The current images stay in the versions.': '새 이미지가 지금 이미지가 되고, 지금 이미지는 버전으로 남아요.'")
   })
+
+  it('스토리보드 카드 · 꼬리 [다시 만들기] 확인 창의 단추는 툴바 확인 창과 같은 "다시 만들기"다', () => {
+    // 왜: 제목은 "이미지를 다시 만들까요?"인데 단추는 옛 말 "재생성"이었다 — 툴바 [이미지 다시 만들기] 확인 창은 "다시 만들기"(리드 11/14).
+    //   실패 뒤 "다시 생성"은 출시 시험(image-generation-ui)이 그 글자를 박고 있어 그대로 둔다(리드 결정 대기).
+    const retry = read('src/features/director/remake-retry-button.tsx')
+    expect(retry).toContain("confirmLabel={t('Make again')}")
+    expect(grid).toContain("confirmLabel={confirm === 'manual-retry' ? t('Generate again') : t('Make again')}")
+    expect(page).toContain("confirmLabel={t('Make again')}")
+    expect(ko).toContain("'Make again': '다시 만들기'")
+    for (const src of [grid, retry]) expect(src).not.toContain("t('Regenerate')")
+  })
 })

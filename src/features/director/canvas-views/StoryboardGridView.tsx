@@ -840,7 +840,8 @@ function ShotCell({
               // 다시 만들어도 지금 이미지는 버전으로 남는다(오너 답 5번 · prose 상세 단추와 같은 말).
               : [t('The new image becomes the current one. The current image stays in the versions.')]
         }
-        confirmLabel={confirm === 'manual-retry' ? t('Generate again') : t('Regenerate')}
+        // 다시 만들기 단추는 툴바 확인 창과 같은 "다시 만들기"(리드 11/14). 실패 뒤 "다시 생성"은 출시 시험이 그 글자를 박고 있어 그대로.
+        confirmLabel={confirm === 'manual-retry' ? t('Generate again') : t('Make again')}
         busy={confirm === 'manual-retry' ? !manualUncertain || realBatchBusy : confirm === 'image' && imageGeneration.disabled}
         onConfirm={() => {
           const which = confirm
