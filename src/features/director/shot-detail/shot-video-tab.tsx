@@ -11,8 +11,8 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
-import { useTakeBalance } from '@/lib/billing/use-take-balance'
-import { takeCostForVideo } from '@/lib/billing/take-cost'
+import { fetchTakeBalance, useTakeBalance } from '@/lib/billing/use-take-balance'
+import { takeCostForVideo, takeValuesShown } from '@/lib/billing/take-cost'
 import {
   FAL_VIDEO_MODEL_ORDER,
   VIDEO_MODELS,
@@ -242,9 +242,12 @@ function FixVideo({ shotNodeId, data, current, busy }: { shotNodeId: string; dat
   // 보고 있던 Take 의 바꿀 점을 미리 채운다(리드 검토 c ③) — 고치거나 지울 수 있고, 쌓이지 않는다.
   const [change, setChange] = useState(((current?.data.override ?? {}) as VideoOverride).changeNote ?? '')
   const [sending, setSending] = useState(false)
+  // Take 를 확인하지 못해 시작하지 않은 까닭 — 단추 아래에 보이고, 다음에 누를 때 지운다.
+  const [notice, setNotice] = useState<string | null>(null)
   const hasImage = !!shotDetailFrames(data.storyboardImage).start
   const imageChanged = !!current && imageChangedForTake(data.storyboardImage, current.data)
-  const showCost = takeBalance.mode !== 'off'
+  // 단추 값이 곧 동의인 자리 — 잔액을 못 읽어도 값을 보이고, 숨기는 것은 과금이 꺼졌을 때뿐이다(entry D8 과 같은 말, 리드 2026-11-14).
+  const showCost = takeValuesShown(takeBalance)
   const count = takeCostForVideo(provider, resolution)
   const label = !current
     ? (showCost ? t('Make the video · {count} Takes', { count }) : t('Make the video'))
@@ -259,7 +262,13 @@ function FixVideo({ shotNodeId, data, current, busy }: { shotNodeId: string; dat
   const make = async () => {
     if (disabled) return
     setSending(true)
+    setNotice(null)
     try {
+      // 누를 때 잔액을 다시 읽는다 — 그래도 못 읽으면 시작하지 않고 까닭을 보인다(다시 누르면 다시 읽는다).
+      if ((await fetchTakeBalance()).failed) {
+        setNotice(t("I couldn't check your Takes, so I didn't start. Please try again in a moment."))
+        return
+      }
       const made = await generateVideoForShot(shotNodeId, newTakeRequest({
         takeId: current?.id ?? null,
         take: current?.data ?? null,
@@ -318,6 +327,7 @@ function FixVideo({ shotNodeId, data, current, busy }: { shotNodeId: string; dat
           </Button>
         ) : null}
       </div>
+      {notice ? <p className="text-caption text-destructive">{notice}</p> : null}
     </section>
   )
 }

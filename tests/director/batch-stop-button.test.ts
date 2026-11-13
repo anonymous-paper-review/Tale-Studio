@@ -62,8 +62,11 @@ describe('일괄 버튼', () => {
 
   it('멈추는 중이라는 것을 알린다', () => {
     const page = sourceOf('src/app/studio/director/page.tsx')
+    const stopWork = sourceOf('src/lib/director/stop-work.ts')
 
-    // 이미 제출된 영상은 계속 만들어진다 — 그 사실을 알려야 사용자가 오해하지 않는다.
-    expect(page).toMatch(/Stop after current/)
+    // 2026-11-14 오너 7번: 이미 제출된 영상은 화면에서 멈추고(fal 에서는 끝까지 돈다) Take 는 돌려주지 않는다 —
+    //   그 사실을 알려야 사용자가 오해하지 않는다(예전 기대 글 'Stop after current…' — 끝날 때까지 기다렸다).
+    expect(page).toContain('toast.info(t(stopNotice(')
+    expect(stopWork).toMatch(/Takes for the videos being made are not refunded/)
   })
 })

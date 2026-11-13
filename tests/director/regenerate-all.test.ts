@@ -37,12 +37,15 @@ describe('C3 — 전체 재생성을 요청할 수 있다', () => {
     expect(page).toContain('runRealBatch(pid, { force: true, shotIds: batch })')
   })
 
-  // 왜: 다시 만들기는 지금 이미지를 바꾸니 몇 장인지 · Take 를 쓰지 않는다는 것 · 바뀐다는 것을 먼저 알린다.
-  it('다시 만들기 확인 창은 몇 장을 다시 만드는지, Take 를 쓰지 않는다는 것, 지금 이미지가 바뀐다는 것을 알린다', () => {
+  // 왜: 다시 만들기 전에 몇 장인지 · Take 를 쓰지 않는다는 것 · 지금 이미지가 어떻게 되는지를 먼저 알린다.
+  //   2026-11-14 문장 바꿈(오너 답 5번 "히스토리 관리" — 다시 만들어도 지금 이미지는 버전으로 남는다):
+  //   예전 "…지금 이미지가 바뀐다는 것을 알린다"(기대 글 'Replaces the current images in the picked shots.').
+  it('다시 만들기 확인 창은 몇 장을 다시 만드는지, Take 를 쓰지 않는다는 것, 지금 이미지는 버전으로 남는다는 것을 알린다', () => {
     expect(page).toContain('RegenerateConfirmDialog')
     expect(page).toContain('Make {count} images again?')
     expect(page).toContain('No Takes are used.')
-    expect(page).toContain('Replaces the current images in the picked shots.')
+    expect(page).toContain("'The new images become the current ones. The current images stay in the versions.'")
+    expect(page).not.toContain('Replaces the current images in the picked shots.')
   })
 })
 
