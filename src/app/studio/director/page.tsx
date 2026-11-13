@@ -1136,7 +1136,7 @@ function PaletteBar() {
           {/* 캔버스 전용 액션 3종 — Node 탭에서만 표시(#e2 2026-07-13) */}
           {viewMode === 'node' && (
             <>
-              {/* 미사용 에셋 불러오기 — 씬마다 그 씬이 참조 안 하는 등록 에셋도 좌측 컬럼에 표시(표시만) */}
+              {/* 안 쓴 에셋(시안 D1 노드형) — 씬마다 그 씬이 참조 안 하는 등록 에셋도 좌측 컬럼에 표시(표시만). 켜짐은 눌린 모양. */}
               <button
                 type="button"
                 onClick={() => toggleUnusedAssets()}
@@ -1145,7 +1145,7 @@ function PaletteBar() {
                 className={cn(TOOLBAR_PILL, showUnusedAssets && 'bg-stage/18 ring-[1.5px] ring-inset ring-stage hover:bg-stage/25')}
               >
                 <Boxes className="size-3.5" />
-                <span>{showUnusedAssets ? t('Hide unused assets') : t('Load unused assets')}</span>
+                <span>{t('Unused assets')}</span>
               </button>
 
               {/* 노드 자동 정렬 — asset·scene·shot·video를 다이어그램 레이아웃으로 재배치 (DB 반영) */}
