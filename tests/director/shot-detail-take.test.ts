@@ -146,10 +146,13 @@ describe('다시 만들기 단추 값과 요청', () => {
     const original = api().remakeShotVideo
     const remake = vi.fn(async () => 'take-new')
     useDirectorCanvasStore.setState({ remakeShotVideo: remake })
+    // 단추는 넘기기 창 안에만 있다 — 창이 열려 있어야 만든다(entry f9c9cb61 되돌림 뒤).
+    useGlobalChatStore.setState({ handoffConfirm: { kind: 'editorMissingVideos', projectId: 'project-1', via: 'button' } })
     try {
       await useGlobalChatStore.getState().remakeMissingVideo(shotId)
     } finally {
       useDirectorCanvasStore.setState({ remakeShotVideo: original })
+      useGlobalChatStore.setState({ handoffConfirm: null })
     }
     expect(remake).toHaveBeenCalledWith(shotId)
   })

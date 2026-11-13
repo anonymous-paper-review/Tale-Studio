@@ -135,8 +135,9 @@ export interface DirectorConfirmView {
   warning: string | null
   /** [남은 컷 그리기]를 둘지 — 빠지는 샷 중 그릴 수 있는 것이 있을 때만. */
   canDrawRemaining: boolean
-  /** 고르기 둘(시안 D0) — 넘어가면서 이미지 만들기(추천) · 넘어가서 직접 고르기. */
-  makeImages: { label: string; description: string; disabled: boolean }
+  /** 고르기 둘(시안 D0) — 넘어가면서 이미지 만들기(추천) · 넘어가서 직접 고르기.
+   *  만들 실사가 0장이면 만들기 칸은 null — 칸과 "추천"을 숨기고 직접 고르기만 둔다(리드 2026-11-14, 시안 없음). */
+  makeImages: { label: string; description: string; disabled: boolean } | null
   pickYourself: { label: string; description: string }
   /** 창을 열 때 골라져 있는 것 — 만들 이미지가 있으면 추천(이미지 만들기). */
   defaultChoice: DirectorHandoffChoice
@@ -191,7 +192,7 @@ export function directorConfirmView(summary: DirectorHandoffSummary, locale: App
     ],
     warning,
     canDrawRemaining: summary.missing.some((item) => item.drawable),
-    makeImages: {
+    makeImages: images === 0 ? null : {
       label:
         extra.imagesToMake === 'counting'
           ? translate(locale, 'Make images while moving over')

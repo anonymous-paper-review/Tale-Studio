@@ -12,6 +12,10 @@ import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
 
 type Translate = (key: string, params?: Record<string, string | number>) => string
 
+/** [다시 만들기]를 시작하지 못한 까닭 — 창이 그 줄에 보인다(검토 b 2차 낮음 3 — 전엔 말없이 끝났다). no_window 는 보이지 않는다. */
+export type RemakeFailReason = 'no_window' | 'image_batch' | 'video_batch' | 'image_running' | 'image_failed' | 'video_running' | 'not_started'
+export type RemakeResult = { started: true } | { started: false; reason: RemakeFailReason }
+
 /** 영상이 없는 까닭 — 실패(마지막 시도가 실패) · 만드는 중 · 아직 만들지 않음. */
 export type MissingVideoReason = 'failed' | 'generating' | 'not_made'
 
@@ -97,8 +101,9 @@ export function remakeButton(
   opts: { showTakes: boolean; batch: 'images' | 'videos' | null },
   t: Translate,
 ): { label: string; disabled: boolean } {
-  if (opts.batch === 'images') return { label: t('Making images'), disabled: true }
-  if (opts.batch === 'videos') return { label: t('Making videos'), disabled: true }
+  // 끈 단추에는 까닭을 적는다 — "영상 만드는 중"은 그 샷을 만드는 중으로 읽혔다(검토 b 2차 낮음 2).
+  if (opts.batch === 'images') return { label: t('You can make it after the image batch finishes'), disabled: true }
+  if (opts.batch === 'videos') return { label: t('You can make it after the video batch finishes'), disabled: true }
   const shot = nodes.find((node) => node.id === row.shotNodeId)
   const takes =
     opts.showTakes && shot && isShotData(shot.data)
@@ -114,10 +119,37 @@ export function remakeButton(
   return { label, disabled: row.missing === 'generating' }
 }
 
-/** 넘기기 단추 — 빠질 샷이 있으면 "… 빼고 넘기기", 없으면(창을 연 채 다 만들어졌다) 시안 D8 의 "Editor로 넘기기 · 컷 N · N초"(낮음 3). */
+/** [다시 만들기]를 시작하지 못한 까닭 글 — 그 줄 아래에 보인다. 창이 닫혀 있었으면(no_window) 보일 것이 없다. */
+export function remakeNotice(reason: RemakeFailReason, t: Translate): string | null {
+  switch (reason) {
+    case 'image_batch':
+      return t('You can make it after the image batch finishes')
+    case 'video_batch':
+      return t('You can make it after the video batch finishes')
+    case 'image_running':
+      return t("This shot's image is being made. You can make the video once it is done.")
+    case 'image_failed':
+      return t('Failed to generate the image.')
+    case 'video_running':
+      return t("This shot's video is already being made.")
+    case 'not_started':
+      return t('Could not start the video. Try again in a moment.')
+    default:
+      return null
+  }
+}
+
+// 길이는 샷 계획 길이의 합이다 — Editor 는 클립마다 실제 영상 파일 길이로 줄일 수 있어 어림("약 N초")으로 보인다(리드 2026-11-14 · export 확인).
+
+/** 창 머리 줄 — 영상 있는 샷 수 / 전체 · 약 N초 · 빈 칸이 생기지 않는다는 말. */
+export function handoverHeaderLine(view: EditorHandoverView, t: Translate): string {
+  return t('{done}/{total} videos · about {seconds}s · Shots without video do not go into the timeline as empty slots.', { done: view.cuts, total: view.total, seconds: view.seconds })
+}
+
+/** 넘기기 단추 — 빠질 샷이 있으면 "… 빼고 넘기기", 없으면(창을 연 채 다 만들어졌다) 시안 D8 의 "Editor로 넘기기 · 컷 N · 약 N초"(낮음 3). */
 export function proceedButtonLabel(view: EditorHandoverView, t: Translate): string {
-  if (view.missing.length === 0) return t('Hand over to Editor · {cuts} cuts · {seconds}s', { cuts: view.cuts, seconds: view.seconds })
+  if (view.missing.length === 0) return t('Hand over to Editor · {cuts} cuts · about {seconds}s', { cuts: view.cuts, seconds: view.seconds })
   return view.missing.length === 1
-    ? t('Hand over without {label} · {cuts} cuts · {seconds}s', { label: view.missing[0].label, cuts: view.cuts, seconds: view.seconds })
-    : t('Hand over without {count} shots · {cuts} cuts · {seconds}s', { count: view.missing.length, cuts: view.cuts, seconds: view.seconds })
+    ? t('Hand over without {label} · {cuts} cuts · about {seconds}s', { label: view.missing[0].label, cuts: view.cuts, seconds: view.seconds })
+    : t('Hand over without {count} shots · {cuts} cuts · about {seconds}s', { count: view.missing.length, cuts: view.cuts, seconds: view.seconds })
 }
