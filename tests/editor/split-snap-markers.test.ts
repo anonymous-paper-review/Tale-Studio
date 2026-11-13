@@ -214,6 +214,23 @@ describe('혼자 정한 것 — Ctrl+K', () => {
     expect(sounds()).toContainEqual(['bgm', 0, 5])
   })
 
+  it('느린 클립 가장자리 근처에서 아무것도 고르지 않은 Ctrl+K 는 이어진 소리만 나누지 않는다', () => {
+    // 왜: 검토 c(③ 보통) — 영상은 원본 초로 0.1초 한계를 재어 나뉘지 않는데 소리는 타임라인 초로 재어 나뉘며 영상에서 떨어졌다(0.5배 ·
+    //   클립 시작 0.15초 뒤 · 끝 0.15초 앞). 이어진 소리는 영상과 함께만 나뉜다 — 소리만 따로 나누려면 그 조각을 골라 Ctrl+K.
+    api().toggleTrackLock('v2')
+    useEditorStore.setState({ audioClips: api().audioClips.filter((a) => a.id !== 'bgm') })
+    api().setSpeed('B', 0.5)
+    const steps = api().past.length
+    const b = selectVideoLayout(api()).find((l) => l.shotId === 'B')!
+    for (const at of [b.startSec + 0.15, b.startSec + b.durationSec - 0.15]) {
+      api().seek(at)
+      press('k', { ctrl: true })
+    }
+    expect(v1().map(([id]) => id)).toEqual(['A', 'B', 'C'])
+    expect(api().audioClips.filter((a) => a.url.endsWith('/B.mp4'))).toEqual([expect.objectContaining({ id: 'a_B', linkedShotId: 'B' })])
+    expect(api().past).toHaveLength(steps)
+  })
+
   it('플레이헤드가 클립의 처음 · 끝 0.1초 안이면 Ctrl+K는 그 클립을 나누지 않는다', () => {
     // 왜: 지금 자르기 도구와 같은 한계 — 0.1초보다 짧은 조각은 만들지 않는다. 편집점 위에서 누르면 아무것도 바뀌지 않는다.
     api().toggleTrackLock('v2')

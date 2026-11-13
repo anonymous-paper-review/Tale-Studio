@@ -383,13 +383,11 @@ export default function PostPage() {
     [addClipInstanceAt, attachVideoAudio],
   )
 
-  // 우클릭 "타임라인 추가": 플레이헤드 인접 경계 + 오디오 동반 — 새 클립은 더한 직후 골라져 있다.
+  // 우클릭 "타임라인 추가": 플레이헤드 인접 경계 + 오디오 동반 — 더한 새 클립에만 소리를 잇는다(V1 이 잠겨 못 더하면 잇지 않는다, 검토 c ② 보통 2).
   const handleAddVideoClipAtPlayhead = useCallback(
     (shotId: string) => {
-      addClipAtPlayhead(shotId)
-      const st = useEditorStore.getState()
-      const item = selectTimelineLayout(st).find((l) => l.shotId === st.selectedClipShotId)
-      if (item) void attachVideoAudio(shotId, item.shotId)
+      const id = addClipAtPlayhead(shotId)
+      if (id) void attachVideoAudio(shotId, id)
     },
     [addClipAtPlayhead, attachVideoAudio],
   )

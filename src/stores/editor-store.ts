@@ -218,7 +218,8 @@ interface EditorState {
   placeClipAt: (shotId: string, atSec: number) => void  // 빈 곳에 놓기 — 그 시각에 놓고 원래 자리는 빈 곳으로
   removeClips: (shotIds: string[], ripple: boolean) => void
   moveClipToIndex: (shotId: string, targetIndex: number) => void  // 드래그 순서변경
-  addClipAtPlayhead: (sourceShotId: string) => void     // 소스→플레이헤드 인접 경계에 추가+포커스
+  /** 소스 → 플레이헤드 가까운 경계에 더한다 — 더한 새 클립 id(줄이 잠겼거나 영상이 없어 못 더하면 null). */
+  addClipAtPlayhead: (sourceShotId: string) => string | null
   // cut(자르기) — 비디오 클립을 전역 시간 atSec 지점에서 둘로 분할
   splitVideoClipAt: (shotId: string, atGlobalSec: number) => void
   // Video Source → 타임라인 드래그-투-애드 (atSec 위치에 새 인스턴스 삽입)
@@ -361,6 +362,24 @@ function padTracks<T extends { id: string }>(tracks: readonly T[], defaults: rea
   const out = tracks.map((t) => ({ ...t }))
   for (const d of defaults) if (out.length < defaults.length && !out.some((t) => t.id === d.id)) out.push({ ...d })
   return out
+}
+
+/**
+ * 되돌린 줄 목록에 지금 줄 표시(자물쇠 · 눈 · S · M)를 이어 붙인다 — 줄 표시는 보기 설정이라 되돌리기 칸에 들어가지 않는다(검토 c ② 보통 1).
+ *   두 쪽에 다 있는 줄만 지금 값을 쓰고, 지금 없는 줄(지운 줄을 되살림)은 되돌린 모습 그대로다. 약속: tests/editor/tracks.test.ts
+ */
+function keepTrackFlags<T extends { id: string }>(restored: readonly T[], current: readonly T[]): T[] {
+  const FLAGS = ['locked', 'hidden', 'solo', 'muted'] as const
+  return restored.map((track) => {
+    const now = current.find((t) => t.id === track.id) as Record<string, unknown> | undefined
+    if (!now) return track
+    const next: Record<string, unknown> = { ...(track as Record<string, unknown>) }
+    for (const key of FLAGS) {
+      if (now[key]) next[key] = now[key]
+      else delete next[key]
+    }
+    return next as T
+  })
 }
 
 /** 줄 표시(자물쇠 · 눈 · S)를 켜고 끈다 — 끄면 칸을 지워 저장본에 켠 것만 남는다. */
@@ -1105,6 +1124,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const newPast = state.past.slice(0, -1)
       return {
         ...previous,
+        videoTracks: keepTrackFlags(previous.videoTracks, state.videoTracks),
+        audioTracks: keepTrackFlags(previous.audioTracks, state.audioTracks),
         past: newPast,
         future: [snapshotOf(state), ...state.future].slice(0, HISTORY_LIMIT),
       }
@@ -1116,6 +1137,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const next = state.future[0]
       return {
         ...next,
+        videoTracks: keepTrackFlags(next.videoTracks, state.videoTracks),
+        audioTracks: keepTrackFlags(next.audioTracks, state.audioTracks),
         past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
         future: state.future.slice(1),
       }
@@ -2353,8 +2376,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     }),
 
   // Ctrl+K(2단계 ③, 시안 Lumi 안내 416:4930 · 결정 페이지 G10 · H6) — 플레이헤드 자리에서 나눈다. 고른 클립(영상 또는 소리)이 있으면
-  //   그것만 나누고 두 조각 모두 골라 둔다. 고른 것이 없으면 잠기지 않은 모든 줄에서 플레이헤드에 걸린 클립 — 영상을 먼저 나눠 이어진
-  //   소리가 함께 나뉘게 하고, 잠근 줄 영상에 이어진 소리는 나누지 않는다(소리를 직접 나누면 영상에서 떨어진다, 결정 4).
+  //   그것만 나누고 두 조각 모두 골라 둔다. 고른 것이 없으면 잠기지 않은 모든 줄에서 플레이헤드에 걸린 클립 — 이어진 소리는 영상과 함께만
+  //   나뉘고 따로 나누지 않는다(소리를 직접 나누면 영상에서 떨어진다, 결정 4 — 잠근 영상 · 0.1초 한계로 안 나뉜 영상의 소리, 검토 c ③ 보통).
   //   여러 줄을 나눠도 되돌리기 한 칸. 약속: tests/editor/split-snap-markers.test.ts
   splitAtPlayhead: () =>
     set((state) => {
@@ -2379,7 +2402,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ? []
         : pickedAudio
           ? state.selectedAudioIds
-          : work.audioClips.filter((a) => crossing(a) && !(a.linkedShotId && clipLocked(work, a.linkedShotId))).map((a) => a.id)
+          : work.audioClips.filter((a) => !a.linkedShotId && crossing(a)).map((a) => a.id)
       for (const id of audioIds) {
         const split = splitAudioChanges(work, id, at)
         if (!split) continue
@@ -2515,7 +2538,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         nearest = b
       }
     }
-    get().addClipInstanceAt(sourceShotId, nearest)
+    return get().addClipInstanceAt(sourceShotId, nearest)
   },
 
   // 타이틀 카드(#owner-title-card) — addClipInstanceAt 과 동일한 삽입 문법, 단 원본 shot 없이 독립 생성.

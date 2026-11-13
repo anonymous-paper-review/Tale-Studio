@@ -428,7 +428,8 @@ describe('다시 열 때 · 새로 더할 때', () => {
     const page = read('src/app/studio/editor/page.tsx')
     // 끌어 놓은 줄도 함께 넘긴다(2단계 ② 영상 줄 여러 개) — 소리를 새 클립 id 에 잇는 것은 그대로다.
     expect(page).toMatch(/const instanceId = addClipInstanceAt\(shotId, atSec(, trackId)?\)\s*if \(instanceId\) void attachVideoAudio\(shotId, instanceId\)/)
-    expect(page).toMatch(/if \(item\) void attachVideoAudio\(shotId, item\.shotId\)/)
+    // [타임라인에 추가]는 더한 새 클립 id 에만 잇는다(검토 c ② 보통 2 — V1 이 잠겨 못 더하면 잇지 않는다).
+    expect(page).toMatch(/const id = addClipAtPlayhead\(shotId\)\s*if \(id\) void attachVideoAudio\(shotId, id\)/)
     expect(page).toMatch(/linkedShotId: linkTo/)
   })
 })

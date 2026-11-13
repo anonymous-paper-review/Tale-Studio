@@ -46,6 +46,7 @@ const v1 = () => selectTimelineLayout(api()).map((l) => [l.shotId, l.startSec])
 const on = (trackId: string) => selectVideoLayout(api()).filter((l) => l.trackId === trackId).map((l) => [l.shotId, l.startSec, l.durationSec])
 const program = () => selectProgramLayout(api()).map((l) => [l.shotId, l.startSec, l.startSec + l.durationSec, l.clipStartSec])
 const audioAt = (shotId: string) => api().audioClips.find((a) => a.linkedShotId === shotId)?.startSec
+const trackFlags = () => ({ v: api().videoTracks, a: api().audioTracks })
 
 beforeEach(() => {
   localStorage.clear()
@@ -174,6 +175,15 @@ describe('자물쇠', () => {
     expect(program()[0]).toEqual(['A', 0, 4, 0])
   })
 
+  it('V1 을 잠근 채 프로젝트 판에서 [타임라인에 추가]를 누르면 영상도 소리도 들어가지 않는다', () => {
+    // 왜: 검토 c(② 보통 2) — 영상은 막혔는데 화면이 지금 고른 V1 클립에 그 샷의 소리를 붙여, 소리가 둘 겹친 채 저장 · 내보내기까지 갔다.
+    //   더한 클립이 있을 때만(새 클립 id) 그 클립에 소리를 잇는다.
+    api().seek(1)
+    api().toggleTrackLock('v1')
+    expect(api().addClipAtPlayhead('C')).toBeNull()
+    expect(read('src/app/studio/editor/page.tsx')).toMatch(/const id = addClipAtPlayhead\(shotId\)\s*if \(id\) void attachVideoAudio\(shotId, id\)/)
+  })
+
   it('잠근 소리 줄의 조각은 앞 · 뒤를 끌어 줄여도 바뀌지 않는다 — 열 때 채우는 파형 · 원본 길이는 잠가도 채운다', () => {
     // 왜: 자물쇠는 사람이 그 줄을 고치지 못하게 한다(시안 E1 줄 머리). 파형 · 원본 길이 채우기는 사람 고침이 아니다 — 1단계 "끌어 줄이기는
     //   사람 고침"(de1113-set a643a806)과 합친 자리(리드 2026-11-14).
@@ -183,6 +193,47 @@ describe('자물쇠', () => {
     expect(api().audioClips.find((a) => a.id === 'a_A')).toEqual(before)
     api().updateAudioClip('a_A', { peaks: [0.5, 0.2], sourceDurationSec: 4.2 })
     expect(api().audioClips.find((a) => a.id === 'a_A')).toMatchObject({ peaks: [0.5, 0.2], sourceDurationSec: 4.2, startSec: 0, durationSec: 4, linkedShotId: 'A' })
+  })
+})
+
+describe('되돌리기와 줄 표시', () => {
+  it('편집 뒤에 잠근 줄은 Ctrl+Z 를 눌러도 잠긴 채다 — 눈 · S · M 도 지금 값 그대로다', () => {
+    // 왜: 검토 c(② 보통 1) — 되돌리기가 줄 자물쇠 · 눈 · S · M 까지 편집 전으로 되돌려, 잠갔다고 믿는 줄의 클립을 그대로 지울 수 있었다.
+    //   줄 표시는 보기 설정이라 되돌리기 칸에 들어가지 않는다(저장 시험과 같은 약속) — 편집만 되돌리고 표시는 지금 값을 이어 붙인다.
+    api().moveClipToTrack('B', 'v2', 10)
+    api().toggleTrackLock('v1')
+    api().toggleTrackVisible('v2')
+    api().toggleAudioTrackSolo('atrack_2')
+    api().toggleAudioTrackMute('atrack_3')
+    const now = trackFlags()
+    api().undo()
+    expect(on('v2')).toEqual([])
+    expect(trackFlags()).toEqual(now)
+    api().deleteClip('A')
+    expect(v1()[0]).toEqual(['A', 0])
+    api().redo()
+    expect(on('v2')).toEqual([['B', 10, 4]])
+    expect(trackFlags()).toEqual(now)
+  })
+
+  it('편집 뒤에 푼 자물쇠는 Ctrl+Z 를 눌러도 다시 잠기지 않는다', () => {
+    // 왜: 검토 c(② 보통 1, R1b) — 거꾸로도 같다. 풀어 둔 줄이 되돌리기로 몰래 잠기면 왜 안 고쳐지는지 모른다.
+    api().toggleTrackLock('v2')
+    api().moveClipToTrack('B', 'v3', 10)
+    api().toggleTrackLock('v2')
+    api().undo()
+    expect(api().videoTracks.find((t) => t.id === 'v2')?.locked).toBeFalsy()
+  })
+
+  it('지운 줄을 Ctrl+Z 로 되살리면 지울 때의 눈 · 자물쇠 그대로 돌아오고, 더한 줄은 Ctrl+Z 로 없어진다', () => {
+    // 왜: 줄을 더하고 지우는 것(줄 목록)은 편집이라 되돌린다 — 지금 없는 줄은 지울 때 모습으로 돌아온다.
+    api().toggleTrackVisible('v3')
+    api().removeVideoTrack('v3')
+    api().undo()
+    expect(api().videoTracks.find((t) => t.id === 'v3')).toEqual({ id: 'v3', hidden: true })
+    api().addVideoTrack()
+    api().undo()
+    expect(api().videoTracks.map((t) => t.id)).toEqual(['v1', 'v2', 'v3'])
   })
 })
 
