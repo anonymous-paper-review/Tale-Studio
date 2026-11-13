@@ -74,6 +74,19 @@ describe('Director 샷 상세 화면', () => {
     }
   })
 
+  it('상세 머리의 샷 · 씬 이름은 캔버스와 같은 이름("Shot 4" · "Scene 1")이고 Writer 의 원래 id 를 보이지 않는다', () => {
+    // 왜: 실제 화면에서 머리에 "sh_01_04", 줄에 "sc_01" 이 보였다 — 캔버스 · 보드는 같은 샷을 "Shot 4" 로 부른다(오너 2026-08-26 · 11-02).
+    const sceneId = director.getState().addSceneNode({ x: 0, y: 0 }, 'sc_01')
+    director.getState().updateNodeData<'shot'>(shotId, { label: 'sh_01_04', writerShotId: 'sh_01_04', parentSceneNodeId: sceneId })
+    for (const layout of ['popup', 'panel'] as const) {
+      const out = render(layout)
+      expect(out).toContain('>Shot 4<')
+      expect(out).toContain('Scene 1 · ')
+      expect(out).not.toMatch(/sh_01_04|sc_01/)
+    }
+    expect(readFileSync('src/features/director/canvas-popups/DirectorNodePopup.tsx', 'utf8')).not.toMatch(/<DialogTitle[^>]*>\{node\.data\.label\}/)
+  })
+
   it('상세에는 이미지 · 영상 탭이 있고 영상이 없으면 "영상 · 없음"이다', () => {
     // 왜: D6 — 영상이 아직 없는 샷은 탭에서 바로 알 수 있다.
     const out = render('popup')
