@@ -1417,8 +1417,15 @@ function proposalUsesTakes(proposal: PendingProposal): boolean {
 
 /** Lumi 가 되물은 목록에 "그래" — 승인 말(좋아 · 진행 · yes …)에 짧은 대답(응 · 네 · 어 · ㅇㅇ · yeah)을 더한다. 되묻기에서만 쓴다. */
 function saysYes(text: string): boolean {
-  const said = text.trim().replace(/[.!?,~…]+/g, '').trim()
+  // "네?" · "좋아?"는 되묻는 말이다 — 물음표가 있으면 "그래"가 아니다(재재검토 b 보통 D).
+  if (/[?？]/.test(text)) return false
+  const said = text.trim().replace(/[.!,~…]+/g, '').trim()
   return isApprovalUtterance(said) || /^(?:응|웅|어|ㅇㅇ|네|예|넵|sure|yep|yeah|yes please)$/i.test(said) // i18n-ok: 사용자 대답을 알아듣는 낱말 목록 자체
+}
+
+/** "네?" · "응?" · "yes?" · "좋아?" — 물음표가 붙은 짧은 "그래". 시작하지 않고 다시 묻는다. */
+function asksBackYes(text: string): boolean {
+  return /[?？]/.test(text) && saysYes(text.replace(/[?？]+/g, ''))
 }
 
 /** 이 프로젝트의 기다리는 글 카드와 그 카드가 건 샷(그 샷 · 그 씬) — 그 샷의 그림 · 영상은 카드 [적용]을 기다린다(재검토 b 보통 B). */
@@ -2757,6 +2764,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           })
           return
         }
+        if ('shotIds' in videoAsk && asksBackYes(trimmed)) {
+          set({ directorVideoAsk: videoAsk })
+          get().appendLocalExchange('director', trimmed, translate(contentLocale(), 'Shall I start? Please answer yes or no.'))
+          return
+        }
         if ('shotIds' in videoAsk && saysYes(trimmed)) {
           await runDirectorTurn(projectId, trimmed, isCurrentSession, (say) => startVideosFor({ shotIds: videoAsk.shotIds, say, isCurrent: isCurrentSession }))
           return
@@ -2987,8 +2999,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     // Editor 는 조언만 하는 채팅이라 "yes · 응 · 좋아"로 어떤 카드도 승인하지 않는다(오너 10번 · 검토 b 보통 3) — 그 말은 조언 질문으로 간다.
     //   Take 를 쓰는 카드는 그 카드를 낸 단계 화면에서만 말로 승인한다 — 다른 탭에서는 단추로만(리드 판단, 재검토 b 낮음 5).
     //   Take 를 안 쓰는 카드는 다른 단계 탭에서 말로 승인하는 것을 지금처럼 받는다(출시 시험 request-preservation "다른 탭에서 승인해도 …").
+    //   Take 를 쓰는 카드에 "좋아?"처럼 물음표로 답하면 승인하지 않고 다시 묻는다(재재검토 b 보통 D).
+    if (stage !== 'editor' && pendingProposal && proposalUsesTakes(pendingProposal) && pendingProposal.stage === stage && asksBackYes(trimmed)) {
+      get().appendLocalExchange(stage, trimmed, translate(contentLocale(), 'Shall I start? Please answer yes or no.'))
+      return
+    }
     const approvesHere = stage !== 'editor' && !!pendingProposal && isApprovalUtterance(trimmed) &&
-      (pendingProposal.stage === stage || !proposalUsesTakes(pendingProposal))
+      (pendingProposal.stage === stage || !proposalUsesTakes(pendingProposal)) &&
+      !(proposalUsesTakes(pendingProposal) && /[?？]/.test(trimmed))
     if (pendingProposal && approvesHere && pendingProposal.kind === 'producerWriterInitialHandoff' && !useProjectStore.getState().producerLocked) {
       // Writer 첫 넘김 = Producer 잠금(2026-10-01) — 말로 승인해도 버튼과 같은 확정 창을 거친다.
       get().appendLocalExchange(stage, trimmed, translate(contentLocale(), 'Check the values in the window, then confirm to hand over.'))
@@ -4134,7 +4152,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             // 번호를 물었다 — 다음 말의 "3번" · 맨 숫자를 샷 번호로 읽는다.
             if (grounding.kind === 'ask' && projectId && isCurrentSession()) set({ directorVideoAsk: { projectId, numbers: true } })
           }
-          held.videos = videoIds.filter((id) => bound.has(id))
+          // 되묻기 목록 중 이 답의 글 카드가 건 샷은 그 카드 [적용]이 곧 허락이다 — 카드에 묶고, 나머지만 "응"으로 묻는다.
+          held.videos = [...videoIds, ...confirmIds].filter((id) => bound.has(id))
+          confirmIds = confirmIds.filter((id) => !bound.has(id))
           let textCardOffered = false
           if (edits.length > 0) {
             const heldLines = await heldWorkLines(held, locale, names)
@@ -4159,7 +4179,12 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           if (nowVideos.length > 0) {
             await startVideosFor({ shotIds: nowVideos, say: lumiSays, onJob: observeGeneration, isCurrent: isCurrentSession })
           }
-          // 되묻기 — "응"이면 이 목록 그대로 만든다(sendMessage 맨 앞의 directorVideoAsk 받기). 글 카드가 건 샷은 그때 카드에 묶인다.
+          // 앞 턴의 글 카드가 아직 기다리면 그 카드가 건 샷도 그 카드에 묶는다.
+          if (waitingCard && confirmIds.some((id) => waitingCard.bound.has(id))) {
+            await holdOnTextCard(waitingCard, { images: [], allBlankImages: false, videos: confirmIds.filter((id) => waitingCard.bound.has(id)) }, lumiSays)
+            confirmIds = confirmIds.filter((id) => !waitingCard.bound.has(id))
+          }
+          // 되묻기 — "응"이면 이 목록 그대로 만든다(sendMessage 맨 앞의 directorVideoAsk 받기).
           if (confirmIds.length > 0 && projectId && isCurrentSession()) {
             // 제출할 수 없는 샷이 끼어 있으면 묻지 않고 그 까닭을 말한다(시작할 때 막힐 목록을 "응"으로 받지 않는다).
             const hold = await videoHoldReason(confirmIds)

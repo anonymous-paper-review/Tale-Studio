@@ -244,15 +244,32 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     expect(promptOf('s2')).toBeNull()
   })
 
-  // 왜: 글이 걸리지 않은 샷까지 기다리게 하면 9번 "바로 실행"이 깨진다.
-  it('글 고침이 걸리지 않은 샷의 영상 · 그림은 같은 답에 글 고침이 있어도 지금처럼 바로 시작한다', async () => {
+  // 왜: 글이 걸리지 않은 샷까지 글 카드를 기다리게 하면 9번 "바로 실행"이 깨진다 — 그림은 바로, 영상은 말이 시키는 꼴이 아니라 목록으로 묻는다(재재검토 b 보통 C).
+  it('글 고침이 걸리지 않은 샷은 글 카드를 기다리지 않는다 — 그림은 바로 만들고, 영상은 "응"이라고 하면 만든다', async () => {
     const generate = vi.fn().mockResolvedValue(null)
     director.setState({ generateStoryboardImage: generate })
     reply([{ type: 'updateShot', id: 's1', patch: { prompt: 'Warm' } }, { type: 'generateVideos', shotIds: ['s2'] }, { type: 'generateImage', id: 's3' }])
     await chat.getState().sendMessage('Make shot 1 warm, the video for shot 2 and the image for shot 3')
-    expect(runShots()).toEqual(['s2'])
     expect(generate).toHaveBeenCalledWith('s3', expect.any(Object))
     expect(chat.getState().pendingProposal?.kind).toBe('directorTextEdit')
+    expect(mocks.run).not.toHaveBeenCalled()
+    expect(lastModel()).toBe('Shall I make the video for Shot 2 (5 Takes)? Say yes to start.')
+    await chat.getState().sendMessage('yes')
+    expect(runShots()).toEqual(['s2'])
+  })
+
+  // 왜: 재재검토 b 보통 D — "네?"는 "응"이 아니라 되묻는 말이다. 목록을 버리지 않고 다시 묻는다.
+  it('되물은 목록에 "네?"처럼 되묻는 말로 답하면 시작하지 않고, 목록을 그대로 둔 채 다시 묻는다', async () => {
+    reply([{ type: 'generateVideos', shotIds: ['s1'] }])
+    await chat.getState().sendMessage('영상 하나만 만들어줘')
+    for (const word of ['네?', '응?', 'yes?', '좋아?']) {
+      await chat.getState().sendMessage(word)
+      expect(mocks.run, word).not.toHaveBeenCalled()
+      expect(lastModel()).toBe('Shall I start? Please answer yes or no.')
+    }
+    expect(translate('ko', 'Shall I start? Please answer yes or no.')).toBe("시작할까요? '응' 또는 '아니'로 답해 주세요.")
+    await chat.getState().sendMessage('응')
+    expect(runShots()).toEqual(['s1'])
   })
 
   // 왜: 검토 b 보통 2(c) — "만들지 마"를 모델이 영상 부탁으로 읽어도 만들지 않고, 만들지 않았다고 분명히 말한다.
@@ -364,5 +381,7 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     expect(route).toContain('It runs at once and uses no Takes.')
     expect(route).toContain('Put in "shotIds" exactly the shots the user named')
     expect(route).not.toContain('approval card')
+    // 재재검토 b 보통 C — 부정 · 미룸 · 질문에는 영상 부탁을 내지 않는다.
+    expect(route).toContain('If the user says not to make videos, says not now or later, or only asks a question, do not emit generateVideos.')
   })
 })

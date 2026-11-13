@@ -64,6 +64,20 @@ describe('대기 카드를 승인하는 말', () => {
     }
   })
 
+  // 왜: 재재검토 b 보통 D — "좋아?"는 되묻는 말이다. Take 를 쓰는 카드는 물음표 대답으로 승인하지 않고 다시 묻는다.
+  it('Take 를 쓰는 카드에 "좋아?"처럼 되묻는 말로 답하면 승인하지 않고 다시 묻는다', async () => {
+    fetchMock.mockImplementation(async (url: string) =>
+      String(url).includes('/api/director/chat')
+        ? Response.json({ reply: 'Ready.', updates: [{ type: 'updateShot', id: 's1', patch: { prompt: 'Lumi prompt' } }, { type: 'generateVideos', shotIds: ['s1'] }] })
+        : Response.json({ reply: 'Okay.', updates: [] }),
+    )
+    await chat.getState().sendMessage('Rewrite shot 1 and make its video')
+    await chat.getState().sendMessage('좋아?')
+    expect(promptOf('s1')).toBeNull()
+    expect(chat.getState().pendingProposal?.kind).toBe('directorTextEdit')
+    expect(chat.getState().messages.filter((m) => m.role === 'model').at(-1)?.content).toBe('Shall I start? Please answer yes or no.')
+  })
+
   // 왜: 정상 경로 고정 — 카드를 낸 그 단계에서는 지금처럼 말로 승인된다.
   it('대기 카드를 낸 단계에서는 지금처럼 "yes"로 승인된다', async () => {
     await chat.getState().sendMessage('Rewrite shot 1')

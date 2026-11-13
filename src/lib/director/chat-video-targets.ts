@@ -1,6 +1,7 @@
 // Director 채팅의 영상 부탁이 사용자가 분명히 말한 샷만 겨누는가(오너 2026-11-14 9번 "루미에게 부탁하면 바로 실행" — 확인 카드가 없다).
-//   영상은 Take 를 써서 잘못 읽으면 되돌릴 수 없다. 원칙(재검토 b 보통 A, 리드): 바로 만드는 것은 아주 분명한 두 꼴뿐이다.
-//   (1) 샷 번호(@멘션)만 있고 빼기 · 부정 · 범위 · 수량 말이 없음 → 그 번호. (2) 생성 말과 붙은 묶음 말만 있고 그런 말이 없음 → 그 묶음.
+//   영상은 Take 를 써서 잘못 읽으면 되돌릴 수 없다. 원칙(재검토 b 보통 A → 재재검토 보통 C, 리드): 바로 만드는 것은 허락하는 꼴 하나뿐이다 —
+//   샷 번호(@멘션) 또는 묶음 말을 지운 나머지가 시키는 말("영상 (다시) 만들어 줘" · "make the video for … please")뿐이고 물음표가 없을 때.
+//   막는 말 목록에 기대지 않는다(목록에 없는 부정 · 질문이 바로 시작됐다).
 //   두 꼴 모두 모델이 영상으로 고른 샷 밖은 만들지 않는다(사용자 말 · 모델 부탁 어느 쪽보다도 많이 만들지 않는다).
 //   그 밖이면 만들지 않고 화면이 센 목록(모델이 고른 샷 ∩ 말한 번호 · 묶음, 뺀 것 제외)으로 되묻는다 — "응"이면 그 목록 그대로 만든다.
 //   만들지 말라는 말뿐이면 만들지 않는다. 순수 함수 — 약속: tests/director/video-request-guard.test.ts · tests/director/lumi-chat-runs.test.ts
@@ -19,22 +20,21 @@ const NUMBER_LIST = String.raw`${NUM}(?:\s*(?:[·,、&~\-–]|to|and|or|와|과|
 /** "샷 3" · "Shot 3" · "@Real Shot 3" — 낱말 가운데("Screenshots 2" · "스크린샷 2")는 샷이 아니다. */
 const SHOT_LIST = new RegExp(String.raw`(?<![A-Za-z가-힣])(?:샷|shots?)\s*#?\s*(${NUMBER_LIST})`, 'gi') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
 const NUMBERED_SHOT = new RegExp(String.raw`(${NUM})\s*번\s*샷`, 'g') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
-/** 몇 번째(서수) — 샷 번호로 읽지 않는다("a second shot" · "The first shot looks great"). 있으면 되묻는다. */
-const ORDINAL = /((?:첫|두|세|네|다섯|여섯|일곱|여덟|아홉|열|\d+)\s*번째|\b(?:first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last)\b)/i // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
 /** 바로 앞 번호를 빼는 말("2 빼고" · "샷 4 말고") · 바로 뒤 번호를 빼는 말("except shot 2" · "not shot 4"). */
 const EXCLUDED_BEFORE = new RegExp(String.raw`(${NUMBER_LIST})\s*(?:번)?\s*(?:샷)?\s*(?:은|는|을|를|이|가)?\s*(?:말고|빼고|제외)`, 'g') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
 const EXCLUDED_AFTER = new RegExp(String.raw`\b(?:except|excluding|without|not|skip|skipping)\s+(?:for\s+)?(?:the\s+)?(?:shots?\s*)?#?\s*(${NUMBER_LIST})`, 'gi')
 /** 생성을 말리거나 미루는 말 — 그 절의 번호 · 묶음은 대상이 아니다. */
-const STOP = /(만들지\s*(?:는|도)?\s*(?:마|말|않아도)|생성하지\s*(?:는|도)?\s*(?:마|말)|하지\s*(?:는|도)?\s*(?:마|말)|안\s*만들|만들\s*필요\s*없|나중에|이따가|\b(?:don'?t|do\s+not|never|no\s+need\s+to)\s+(?:make|create|generate|render|remake|do)\b|\bhold\s+off\b|\blater\b|\bnot\s+now\b)/i // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
-/** 바로 만들지 않을 말 — 빼기 · 부정 · 미루기 · 묻기 · 범위(씬 · 그중) · 수량. 하나라도 있으면 목록으로 되묻는다. */
-const UNCLEAR = new RegExp([
-  '빼고', '말고', '제외', '만들지', String.raw`하지\s*(?:는|도)?\s*(?:마|말)`, String.raw`안\s*만들`, '나중에', '이따가', '물어', '묻고', String.raw`그대로\s*두`, // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
-  '씬', '장면', '중에', '하나', String.raw`한\s*개`, String.raw`(?:두|세|네)\s*(?:개|편|가지|장)`, '(?<![가-힣])둘', '몇', '일부', '(?<![가-힣])반(?![가-힣])', // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
-  String.raw`\bexcept\b`, String.raw`\bexcluding\b`, String.raw`\bwithout\b`, String.raw`\bnot\b`, String.raw`\bdon'?t\b`, String.raw`\bdo\s+not\b`, String.raw`\bnever\b`,
-  String.raw`\bhold\s+off\b`, String.raw`\blater\b`, String.raw`\bask\b`, String.raw`\bskip\b`, String.raw`\bscenes?\b`, String.raw`\bof\s+the\b`,
-  String.raw`\bleave\b`, String.raw`\bas\s+it\s+is\b`, String.raw`\bbother\b`, String.raw`\bno\s+videos?\b`, String.raw`\d+\s*${UNIT}`,
-  String.raw`\b(?:one|two|three|four|five|some|few|couple|half)\b`,
-].join('|'), 'i')
+const STOP = /(만들지\s*(?:는|도)?\s*(?:마|말|않아도)|만들진\s*(?:마|말)|(?:만들면|하면)\s*안\s*(?:돼|되)|싫어|생성하지\s*(?:는|도)?\s*(?:마|말)|하지\s*(?:는|도)?\s*(?:마|말)|안\s*만들|만들\s*필요\s*없|나중에|이따가|\b(?:don'?t|do\s+not|never|no\s+need\s+to)\s+(?:make|create|generate|render|remake|do)\b|\b(?:stop|cancel)\b|\bhold\s+off\b|\blater\b|\bnot\s+now\b)/i // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+/** 시키는 말 — 샷 번호 · 묶음 말을 지운 나머지가 이 동사 하나와 아래 조각 · 문장 부호뿐이면 시키는 꼴이다. */
+const COMMAND_VERB = /(?:만들어|생성해|뽑아)\s*(?:줘|주세요|줄래)?|\b(?:make|remake)\b/gi // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+const COMMAND_FILLER = [
+  /(?:영상|비디오)\s*(?:을|를)?/g, // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+  /다시/g, // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+  /(?<![가-힣])(?:의|은|는|도|만|좀)(?![가-힣])/g, // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+  /\b(?:the|a|an|videos?|for|please|again)\b/gi,
+  /'s\b/gi,
+  /@[A-Za-z가-힣]*/g, // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+]
 /** 생성 말 · 영상 말 — 묶음 말은 생성 말과 같은 절에 있을 때만 받는다. 번호 꼴은 둘 다 있어야 분명하다. */
 const MAKE = /(만들|생성|뽑|돌려|\b(?:make|makes|making|create|generate|render|remake|redo)\b)/i // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
 const VIDEO = /(영상|비디오|\bvideos?\b)/i // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
@@ -119,6 +119,19 @@ function groupsOf(clause: string): { wanted: Set<Group>; excluded: Set<Group> } 
   return { wanted, excluded }
 }
 
+/** 허락하는 꼴 — 물음표가 없고, 샷 번호 · 묶음 말을 지운 나머지가 시키는 말 하나와 조각 · 문장 부호뿐이다. */
+function plainCommand(text: string): boolean {
+  if (/[?？]/.test(text)) return false
+  let rest = text.replace(SHOT_LIST, ' ').replace(NUMBERED_SHOT, ' ')
+  for (const patterns of Object.values(GROUPS)) {
+    for (const pattern of patterns) rest = rest.replace(new RegExp(pattern.source, pattern.flags.replace('g', '') + 'g'), ' ')
+  }
+  if (!new RegExp(COMMAND_VERB.source, 'i').test(rest)) return false
+  rest = rest.replace(COMMAND_VERB, ' ')
+  for (const filler of COMMAND_FILLER) rest = rest.replace(filler, ' ')
+  return rest.replace(/[\s.!,·、]+/g, '') === ''
+}
+
 export type VideoGrounding =
   /** 아주 분명한 꼴 — 이 샷들만 바로 만든다(캔버스 순서). 빈 목록이면 "지금 그런 샷이 없어요". */
   | { kind: 'run'; shotIds: string[] }
@@ -181,9 +194,10 @@ export function groundVideoRequest(input: {
   const picks = requested === null ? null : new Set(requested)
   const pick = (id: string) => (picks === null || picks.has(id)) && !removed.has(id)
 
-  const unclear = UNCLEAR.test(text) || ORDINAL.test(text) || excluded.size > 0 || excludedGroups.size > 0
-  const clearNumbers = !unclear && named.size > 0 && groups.size === 0 && VIDEO.test(text) && MAKE.test(text)
-  const clearGroups = !unclear && named.size === 0 && groups.size > 0
+  const plain = plainCommand(text) && excluded.size === 0 && excludedGroups.size === 0
+  const clearNumbers = plain && named.size > 0 && groups.size === 0 && VIDEO.test(text)
+  // 묶음 꼴은 영상 말이 있어야 한다 — "실패한 샷 다시"만은 영상이 실패한 샷이라 영상 말 없이도 분명하다.
+  const clearGroups = plain && named.size === 0 && groups.size > 0 && (VIDEO.test(text) || [...groups].every((group) => group === 'failed'))
   if (clearNumbers || clearGroups) {
     const screen = eligible.filter((id) => allowed.has(id))
     const shotIds = screen.filter(pick)

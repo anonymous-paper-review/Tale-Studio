@@ -1475,6 +1475,7 @@ export const KO: Record<string, string> = {
   'Applying the text card makes the video for {shots} with the new text.': '{shots} 영상은 글 고침 카드를 [적용]하면 그 글로 만들어요.',
   'Applying the text card makes the image for {shots} with the new text.': '{shots} 이미지는 글 고침 카드를 [적용]하면 그 글로 만들어요.',
   'Applying the text card makes the live-action images with the new text.': '실사 이미지는 글 고침 카드를 [적용]하면 그 글로 만들어요.',
+  'Shall I start? Please answer yes or no.': "시작할까요? '응' 또는 '아니'로 답해 주세요.",
   'Pinpointing the heart of the story': '이야기의 핵심을 짚어보는 중',
   'Finding gaps in the settings': '설정에서 빈칸을 찾는 중',
   'Looking over the cast cards': '캐스트 카드를 살피는 중',

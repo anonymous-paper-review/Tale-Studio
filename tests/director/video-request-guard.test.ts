@@ -1,5 +1,6 @@
-// 채팅의 영상 부탁은 아주 분명한 두 꼴(샷 번호만 · 생성 말과 붙은 묶음 말만)일 때만 바로 만들고, 그 밖이면 만들지 않고 화면이 센 샷 목록으로 되묻는지 검사한다
-//   (오너 2026-11-14 9번 · 검토 b 보통 2 → 재검토 보통 A, 리드 원칙). 원칙: 묻기는 공짜고 잘못 쓴 Take 는 못 돌린다. 검토자 예는 문장 그대로 시험 이름에 싣는다.
+// 채팅의 영상 부탁은 샷 번호 · 묶음 말을 지운 나머지가 시키는 꼴 그대로일 때만 바로 만들고, 그 밖이면 만들지 않고 화면이 센 샷 목록으로 되묻는지 검사한다
+//   (오너 2026-11-14 9번 · 검토 b 보통 2 → 재검토 보통 A → 재재검토 보통 C, 리드 원칙: 막는 말 목록 대신 허락하는 꼴 하나).
+//   원칙: 묻기는 공짜고 잘못 쓴 Take 는 못 돌린다. 검토자 예는 문장 그대로 시험 이름에 싣는다.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ getUser: vi.fn(), llmChat: vi.fn(), persistTrace: vi.fn(), userOwnsProject: vi.fn() }))
@@ -23,35 +24,41 @@ const confirm = (...numbers: number[]) => ({ kind: 'confirm', shotIds: ids(...nu
 const ASK = { kind: 'ask' }
 const NONE = { kind: 'none' }
 
-describe('샷 번호만 있고 빼기 · 부정 · 범위 말이 없으면 그 번호만 바로 만든다', () => {
+describe('샷 번호를 지운 나머지가 시키는 꼴("영상 만들어 줘" · "make the video for")이면 그 번호만 바로 만든다', () => {
   // 왜: 번호를 분명히 말했다 — 모델이 더 담은 샷은 더하지 않는다(사용자가 말한 것보다 많이 만들지 않는다).
   it('"샷 1~3 영상 만들어줘"는 모델이 샷 4 를 더 담아도 샷 1~3 만 바로 만든다', () => {
     expect(ground('샷 1~3 영상 만들어줘', ids(1, 2, 3, 4))).toEqual(run(1, 2, 3))
     expect(ground('샷 1~3 영상 만들어줘', ids(1, 2, 3))).toEqual(run(1, 2, 3))
   })
-  it('"Make a video for shot 3 where all the characters wave."는 모델이 모든 샷을 담아도 샷 3 만 바로 만든다', () => {
-    expect(ground('Make a video for shot 3 where all the characters wave.', ALL)).toEqual(run(3))
+  it('"Make a video for shot 3 where all the characters wave."는 시키는 꼴 밖의 말이 남아 바로 만들지 않고 샷 3 목록으로 되묻는다', () => {
+    expect(ground('Make a video for shot 3 where all the characters wave.', ALL)).toEqual(confirm(3))
   })
-  it('"샷 2 영상 만들어줘. 다 만들면 알려줘"는 모델이 샷 2~4 를 담아도 샷 2 만 바로 만든다', () => {
-    expect(ground('샷 2 영상 만들어줘. 다 만들면 알려줘', ids(2, 3, 4))).toEqual(run(2))
+  it('"샷 2 영상 만들어줘. 다 만들면 알려줘"는 시키는 꼴 밖의 말이 남아 바로 만들지 않고 샷 2 목록으로 되묻는다', () => {
+    expect(ground('샷 2 영상 만들어줘. 다 만들면 알려줘', ids(2, 3, 4))).toEqual(confirm(2))
   })
-  it('"샷 3 영상 만들어줘, 전체적으로 밝게"는 모델이 모든 샷을 담아도 샷 3 만 바로 만든다', () => {
-    expect(ground('샷 3 영상 만들어줘, 전체적으로 밝게', ALL)).toEqual(run(3))
+  it('"샷 3 영상 만들어줘, 전체적으로 밝게"는 시키는 꼴 밖의 말이 남아 바로 만들지 않고 샷 3 목록으로 되묻는다', () => {
+    expect(ground('샷 3 영상 만들어줘, 전체적으로 밝게', ALL)).toEqual(confirm(3))
   })
-  it('"샷 2 영상 만들어줘, 실패하지 않게"는 모델이 실패한 샷까지 담아도 샷 2 만 바로 만든다', () => {
-    expect(ground('샷 2 영상 만들어줘, 실패하지 않게', ids(2, 5, 6))).toEqual(run(2))
+  it('"샷 2 영상 만들어줘, 실패하지 않게"는 시키는 꼴 밖의 말이 남아 바로 만들지 않고 샷 2 목록으로 되묻는다', () => {
+    expect(ground('샷 2 영상 만들어줘, 실패하지 않게', ids(2, 5, 6))).toEqual(confirm(2))
   })
-  it('"샷 1 은 이미지가 있는 상태니까 그걸로 영상 만들어줘"는 모델이 이미지 있는 샷을 다 담아도 샷 1 만 바로 만든다', () => {
-    expect(ground('샷 1 은 이미지가 있는 상태니까 그걸로 영상 만들어줘', ids(1, 2, 3, 4))).toEqual(run(1))
+  it('"샷 1 은 이미지가 있는 상태니까 그걸로 영상 만들어줘"는 시키는 꼴 밖의 말이 남아 바로 만들지 않고 샷 1 목록으로 되묻는다', () => {
+    expect(ground('샷 1 은 이미지가 있는 상태니까 그걸로 영상 만들어줘', ids(1, 2, 3, 4))).toEqual(confirm(1))
   })
   // 왜: "남은"이 샷이 아니라 Take 를 꾸민다 — 번호가 있으니 그 번호만.
-  it('"남은 Take 로 샷 3 영상 만들어줘"는 모델이 남은 샷 전부로 읽어도 샷 3 만 바로 만든다', () => {
-    expect(ground('남은 Take 로 샷 3 영상 만들어줘', null)).toEqual(run(3))
+  it('"남은 Take 로 샷 3 영상 만들어줘"는 시키는 꼴 밖의 말이 남아 바로 만들지 않고 샷 3 목록으로 되묻는다', () => {
+    expect(ground('남은 Take 로 샷 3 영상 만들어줘', null)).toEqual(confirm(3))
   })
   // 왜: 한 말에 샷 여럿을 다른 일로 말할 수 있다 — 모델이 영상으로 고르지 않은 샷은 만들지 않는다.
-  it('번호를 여럿 말해도 모델이 영상으로 고른 샷만 만들고, 모델이 말한 번호 밖만 고르면 만들지 않고 번호를 묻는다', () => {
-    expect(ground('샷 1 영상 만들고 샷 3 이미지는 다시 그려줘', ids(1))).toEqual(run(1))
+  it('번호를 여럿 말해도 모델이 영상으로 고른 샷만 담고, 모델이 말한 번호 밖만 고르면 만들지 않고 번호를 묻는다', () => {
+    expect(ground('샷 1 영상 만들고 샷 3 이미지는 다시 그려줘', ids(1))).toEqual(confirm(1))
+    expect(ground('Make videos for shots 1 and 3', ids(1))).toEqual(run(1))
     expect(ground('샷 3 영상 만들어줘', ids(4))).toEqual(ASK)
+  })
+  it('시키는 꼴은 "샷 3 영상 만들어줘" · "샷 3 영상 다시 만들어 주세요" · "Make shot 3\'s video" · "Make the video for shot 3, please"처럼 번호와 시키는 말뿐이다', () => {
+    for (const text of ['샷 3 영상 만들어줘', '샷 3 영상 다시 만들어 주세요', '3번 샷 영상을 만들어줄래', "Make shot 3's video", 'Make the video for shot 3, please', '@Real Shot 3 영상 만들어줘']) {
+      expect(ground(text, null), text).toEqual(run(3))
+    }
   })
 })
 
@@ -163,6 +170,35 @@ describe('번호 길의 틈 — 그대로 두기 · 단위 · 서수 · 비슷�
   })
   it('"씬 2의 세 번째 샷 영상 만들어줘"는 바로 만들지 않고 모델이 고른 샷 목록으로 되묻는다', () => {
     expect(ground('씬 2의 세 번째 샷 영상 만들어줘', ids(5))).toEqual(confirm(5))
+  })
+})
+
+describe('시키는 꼴이 아닌 말(재재검토 b 보통 C)', () => {
+  // 왜: 막는 말 목록에 없는 부정 · 질문이 바로 시작됐다(실제 상점 C7 25 Take · C8) — 허락하는 꼴이 아니면 바로 만들지 않는다.
+  it('"영상 다 만들진 마" · "Take 얼마나 들어?"처럼 시키는 꼴이 아닌 말은 모델이 영상 부탁을 담아도 바로 만들지 않는다', () => {
+    const cases: Array<[string, string[] | null]> = [
+      ['영상 다 만들진 마', null],
+      ['샷 3 영상 만들면 안 돼', ids(3)],
+      ['영상 만들기 싫어', null],
+      ['Stop making all the videos', null],
+      ['Cancel all the videos', null],
+      ['샷 3 영상 만들까 말까', ids(3)],
+      ['샷 3 영상 만들어도 될까?', ids(3)],
+      ['Should I make the video for shot 3?', ids(3)],
+      ['Did you make the video for shot 3?', ids(3)],
+      ['샷 4 영상 만들면 Take 얼마나 들어?', ids(4)],
+    ]
+    for (const [text, picks] of cases) expect(ground(text, picks).kind, text).not.toBe('run')
+  })
+  it('"영상 다 만들진 마" · "만들면 안 돼" · "만들기 싫어" · "Stop making …" · "Cancel …"이면 아무 영상도 만들지 않는다', () => {
+    for (const text of ['영상 다 만들진 마', '샷 3 영상 만들면 안 돼', '영상 만들기 싫어', 'Stop making all the videos', 'Cancel all the videos']) {
+      expect(ground(text, null), text).toEqual(NONE)
+    }
+  })
+  it('묻는 말("샷 3 영상 만들어도 될까?" · "Should I make …?" · "Take 얼마나 들어?")은 바로 만들지 않고 목록으로 되묻는다', () => {
+    expect(ground('샷 3 영상 만들어도 될까?', ids(3))).toEqual(confirm(3))
+    expect(ground('Should I make the video for shot 3?', ids(3))).toEqual(confirm(3))
+    expect(ground('샷 4 영상 만들면 Take 얼마나 들어?', ids(4))).toEqual(confirm(4))
   })
 })
 
