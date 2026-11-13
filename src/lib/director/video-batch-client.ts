@@ -49,6 +49,14 @@ export function eligibleVideoBatchShotIds(nodes: DirectorNode[]): string[] {
     .map((shot) => shot.id)
 }
 
+/** 이번 일괄에 보낼 샷 — 화면이 센 목록(requested)이 있으면 그중 캔버스에서 아직 영상이 없는 샷만, 캔버스 순서대로(오너 2026-11-14 · 시안 R). */
+export function videoBatchShotList(nodes: DirectorNode[], requested?: readonly string[]): string[] {
+  const eligible = eligibleVideoBatchShotIds(nodes)
+  if (!requested) return eligible
+  const wanted = new Set(requested)
+  return eligible.filter((id) => wanted.has(id))
+}
+
 export type VideoBatchResult = {
   total: number
   started: number
@@ -168,7 +176,7 @@ async function pollVideoBatch(
  */
 export async function runVideoBatch(
   projectId: string,
-  opts?: { onJob?: GenerationJobObserver; silent?: boolean; limit?: number },
+  opts?: { onJob?: GenerationJobObserver; silent?: boolean; limit?: number; shotIds?: readonly string[] },
 ): Promise<VideoBatchResult> {
   const store = useDirectorCanvasStore
   const current = store.getState()
@@ -176,7 +184,7 @@ export async function runVideoBatch(
     return { ...EMPTY_RESULT }
   }
 
-  const eligible = eligibleVideoBatchShotIds(current.nodes)
+  const eligible = videoBatchShotList(current.nodes, opts?.shotIds)
   const limit = opts?.limit == null ? eligible.length : Math.max(0, Math.min(eligible.length, Math.floor(opts.limit)))
   const shotIds = eligible.slice(0, limit)
   const total = shotIds.length

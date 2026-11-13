@@ -7,10 +7,10 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 import { storageKeySegment } from '@/lib/storage/key-segment'
+import { TITLE_IMAGE_MAX_BYTES } from '@/lib/editor/title-image'
 
 export const runtime = 'nodejs'
 
-const MAX_BYTES = 10 * 1024 * 1024
 const EXT_BY_TYPE: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     }
     const ext = EXT_BY_TYPE[file.type]
     if (!ext) return NextResponse.json({ error: 'Unsupported image type' }, { status: 415 })
-    if (file.size === 0 || file.size > MAX_BYTES) {
+    if (file.size === 0 || file.size > TITLE_IMAGE_MAX_BYTES) {
       return NextResponse.json({ error: 'Image is empty or larger than 10MB' }, { status: 413 })
     }
     const { data: project, error } = await supabaseAdmin

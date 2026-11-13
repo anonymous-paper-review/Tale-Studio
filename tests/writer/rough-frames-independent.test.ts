@@ -88,9 +88,15 @@ describe('약속 I — 러프 3장 개별 재생성', () => {
     expect(lib).not.toMatch(/generate-storyboard|runRealBatch|reserveDirectorStoryboard/)
   })
 
-  it('그리드에서 이미지를 눌러도 글자를 눌러도 같은 연출 편집 팝업이 열리고, 그 팝업에 3장이 나란히 멈춰 보인다', () => {
+  // 2026-11-14 문장 바꿈(시안 D2 406:4588 · R 416:4941 "카드 몸통 = 고르기, ⤢ = 상세", 리드 검토 a 낮음 7):
+  //   예전 "이미지를 눌러도 글자를 눌러도 같은 팝업" — 카드를 한 번 누르면 이제 고른다. 팝업은 ⤢ 상세 · 두 번 누르기로 연다.
+  it('러프 보기 그리드에서 카드를 한 번 누르면 고르고, ⤢ 상세나 두 번 누르기로 연출 편집 팝업이 열리며, 그 팝업에 3장이 나란히 멈춰 보인다', () => {
     const grid = read('src/features/director/canvas-views/StoryboardGridView.tsx')
-    expect(grid.match(/openDetail\(\)/g)?.length).toBe(2)
+    // 몸통 한 번 = 고르기
+    expect(grid).toMatch(/if \(isMentionModifierClick\(event\)\) return\s*togglePickedShot\(node\.id\)/)
+    // 두 번 누르기 · ⤢ 상세 = 상세 열기(러프 보기는 연출 편집 팝업)
+    expect(grid).toMatch(/onDoubleClick=\{\(event\) => \{\s*if \(isMentionModifierClick\(event\)\) return\s*openDetail\(\)/)
+    expect(grid).toMatch(/aria-label=\{t\('Open details'\)\}/)
     expect(grid).toMatch(/if \(writerShotId\) setPrevizOpen\(true\)/)
     expect(grid).toMatch(/<ShotDetailDialog\s+shotId=\{previzOpen \? writerShotId : null\}/)
     const dialog = read('src/features/writer/shot-detail-dialog.tsx')

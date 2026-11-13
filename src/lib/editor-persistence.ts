@@ -5,8 +5,19 @@ import { useLocaleStore } from '@/stores/locale-store'
 
 export interface PersistedEditor {
   version: number
+  /**
+   * 고침 뒤 화면(E2b 고침 뒤)에서 사람이 고친 것이 실린 저장본 — 이 표시가 있는 서버 저장본은 이 브라우저의 고침 전 저장본보다 먼저
+   *   연다(검토 c, 2026-11-14). 표시가 없으면 이 브라우저 것이 먼저다(E2b 로 비워진 프로젝트 되살리기). 열 때 저절로 생긴 저장(처음 상태 ·
+   *   길이 재기 · 소리 나누기)에는 붙지 않는다 — 다른 기기에서 열기만 해도 진짜 편집이 밀렸다(재검토 c 2/2).
+   */
+  serverAware?: boolean
   shots: Shot[]
   clipOrder: Record<string, string[]>
+  /**
+   * 사람이 타임라인에서 뺀 원본 샷(검토 c, 2026-11-14) — 영상이 없어져 저절로 빠진 샷은 영상이 생기면 돌아오지만 이 샷들은 돌아오지 않는다.
+   *   없으면 고침 전 저장본: 그때는 영상 없는 샷도 빈 칸으로 순서에 있었으니, 저장할 때 있었는데 순서에 없는 샷이 사람이 뺀 샷이다.
+   */
+  removedShotIds?: string[]
   videoClips: VideoClip[]
   audioClips: AudioTrackClip[]
   audioSources: AudioSource[]
@@ -75,27 +86,46 @@ export async function loadEditorState(projectId: string): Promise<PersistedEdito
   }
 
   // Rehydrate stale object URLs from IndexedDB blobs — 저장소가 고장 나면 그 파일만 건너뛰고, 한도가 지나면 기다리지 않는다.
+  await rehydrateAudioUrls(parsed)
+  return parsed
+}
+
+/**
+ * 저장본의 올린 소리 파일(blobKey) 주소를 이 브라우저 저장소의 파일로 다시 잇는다 — 저장소가 고장 나면 그 파일만 건너뛰고,
+ *   한도(AUDIO_BLOB_TIMEOUT_MS)가 지나면 기다리지 않는다.
+ *   dropMissing 이면 이 브라우저에 없는 파일의 옛 주소(blob:)를 비운다 — 다른 브라우저에서 올린 소리는 자리 · 파형만 남고
+ *   소리는 나지 않는다(E2b, 서버에서 연 편집). 약속: tests/editor/other-browser.test.ts
+ */
+export async function rehydrateAudioUrls(
+  saved: Pick<PersistedEditor, 'audioClips' | 'audioSources'>,
+  dropMissing = false,
+): Promise<void> {
+  const items: Array<AudioTrackClip | AudioSource> = [...(saved.audioClips ?? []), ...(saved.audioSources ?? [])]
+  const relinked = new Set<AudioTrackClip | AudioSource>()
   const rehydrate = async (clip: AudioTrackClip | AudioSource) => {
     const key = (clip as { blobKey?: string }).blobKey
     if (!key) return
     const url = await getAudioBlobURL(key).catch(() => null)
     if (url) {
       (clip as { url: string }).url = url
+      relinked.add(clip)
     }
   }
 
   let timer: ReturnType<typeof setTimeout> | undefined
   await Promise.race([
-    Promise.all([
-      ...(parsed.audioClips ?? []).map(rehydrate),
-      ...(parsed.audioSources ?? []).map(rehydrate),
-    ]),
+    Promise.all(items.map(rehydrate)),
     new Promise<void>((resolve) => {
       timer = setTimeout(resolve, AUDIO_BLOB_TIMEOUT_MS)
     }),
   ]).finally(() => clearTimeout(timer))
 
-  return parsed
+  if (!dropMissing) return
+  for (const item of items) {
+    if (item.blobKey && !relinked.has(item) && typeof item.url === 'string' && item.url.startsWith('blob:')) {
+      (item as { url: string }).url = ''
+    }
+  }
 }
 
 export function clearEditorState(projectId: string): void {

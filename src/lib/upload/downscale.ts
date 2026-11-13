@@ -23,13 +23,35 @@ export function fitWithin(width: number, height: number, maxEdge: number): { wid
   return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) }
 }
 
-function jpegName(name: string): string {
+function renamed(name: string, ext: string): string {
   const dot = name.lastIndexOf('.')
-  return `${dot > 0 ? name.slice(0, dot) : name}.jpg`
+  return `${dot > 0 ? name.slice(0, dot) : name}.${ext}`
 }
 
-/** 상한을 넘는 그림만 긴 변 DOWNSCALE_MAX_EDGE 의 JPEG 로 줄인다. 열지 못하면 원본을 돌려준다 — 서버가 사유를 말한다. */
-export async function downscaleForUpload(file: File): Promise<File> {
+/** 투명한 곳(알파 255 미만)이 있는 그림인가 — RGBA 픽셀 배열을 본다. */
+export function hasTransparency(rgba: Uint8ClampedArray): boolean {
+  for (let i = 3; i < rgba.length; i += 4) if (rgba[i] < 255) return true
+  return false
+}
+
+/**
+ * 줄일 때 쓸 형식 — 투명을 지켜야 하는 곳(타이틀 카드 그림, 2026-11-14 검토 c)에서 투명한 곳이 있으면 PNG, 아니면 JPEG.
+ *   JPEG 는 투명을 못 담아 바탕을 깐다 — 투명 로고가 네모가 되어 글자를 가렸다.
+ */
+export function downscaleType(input: { keepTransparency: boolean; transparent: boolean }): 'image/png' | 'image/jpeg' {
+  return input.keepTransparency && input.transparent ? 'image/png' : 'image/jpeg'
+}
+
+function toBlob(canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob | null> {
+  return new Promise((resolve) => canvas.toBlob(resolve, type, quality))
+}
+
+/**
+ * 상한을 넘는 그림만 긴 변 DOWNSCALE_MAX_EDGE 로 줄인다. 열지 못하면 원본을 돌려준다 — 서버가 사유를 말한다.
+ *   기본은 JPEG(background 로 투명한 곳을 채운다 — 시트 양식은 흰 바탕, 타이틀 카드는 카드 바탕과 같은 검정).
+ *   keepTransparency 면 투명한 곳이 있는 그림은 PNG 로 줄이고, 그래도 크면 WebP(투명을 지킨다, 브라우저가 못 만들면 PNG 그대로).
+ */
+export async function downscaleForUpload(file: File, options: { background?: string; keepTransparency?: boolean } = {}): Promise<File> {
   if (!needsDownscale(file.size)) return file
   let bitmap: ImageBitmap
   try {
@@ -45,11 +67,20 @@ export async function downscaleForUpload(file: File): Promise<File> {
     canvas.height = height
     const context = canvas.getContext('2d')
     if (!context) return file
-    context.fillStyle = 'white'
-    context.fillRect(0, 0, width, height)
     context.drawImage(bitmap, 0, 0, width, height)
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', DOWNSCALE_QUALITY))
-    return blob ? new File([blob], jpegName(file.name), { type: 'image/jpeg' }) : file
+    const transparent = !!options.keepTransparency && hasTransparency(context.getImageData(0, 0, width, height).data)
+    if (downscaleType({ keepTransparency: !!options.keepTransparency, transparent }) === 'image/png') {
+      const png = await toBlob(canvas, 'image/png')
+      const webp = png && png.size > UPLOAD_SAFE_BYTES ? await toBlob(canvas, 'image/webp', DOWNSCALE_QUALITY) : null
+      const best = webp && webp.type === 'image/webp' && webp.size < (png?.size ?? Infinity) ? webp : png
+      return best ? new File([best], renamed(file.name, best.type === 'image/webp' ? 'webp' : 'png'), { type: best.type }) : file
+    }
+    // 바탕을 그림 뒤에 깐다(투명한 곳만 채워진다).
+    context.globalCompositeOperation = 'destination-over'
+    context.fillStyle = options.background ?? 'white'
+    context.fillRect(0, 0, width, height)
+    const blob = await toBlob(canvas, 'image/jpeg', DOWNSCALE_QUALITY)
+    return blob ? new File([blob], renamed(file.name, 'jpg'), { type: 'image/jpeg' }) : file
   } finally {
     bitmap.close()
   }
