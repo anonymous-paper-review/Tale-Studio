@@ -21,6 +21,8 @@ interface TestShot {
 const drawn = (id: string): RoughStoryboardImage => ({ url: `https://example.test/${id}.png`, status: 'completed', errorMessage: null, generatedAt: 1 })
 const failedPanel = (): RoughStoryboardImage => ({ url: '', status: 'failed', errorMessage: '거절됨', generatedAt: 1 })
 const manifest = { scenes: [{ sceneId: 'sc_a' }, { sceneId: 'sc_b' }] }
+// 넘김 창(D0)이 보드 밖에서 받는 숫자 — Artist 그림이 있는 인물 · 배경, 실사가 아직 없는 샷, 영상 한 편의 Take.
+const extra = { characters: 2, backgrounds: 1, imagesToMake: 3, takesPerShot: 5 }
 
 function shot(shotId: string, sceneId: string, durationSeconds: number, rough: RoughStoryboardImage | null, action = '문을 열고 밖을 본다'): TestShot {
   return { shotId, sceneId, durationSeconds, actionDescription: action, roughStoryboard: rough }
@@ -68,14 +70,14 @@ describe('보드의 샷 이름', () => {
 })
 
 describe('Director 넘김 확인 창', () => {
-  // 왜: 넘기기 전에 무엇이 얼마나 넘어가는지 보여 준다(프로토타입 S7). 러프가 다 있으면 빠지는 샷 안내는 필요 없다. 정상 경로 고정.
-  it('러프가 다 있으면 넘김 창은 넘어가는 샷 수 · 러닝타임만 보여 주고 빠지는 샷 안내는 없다', () => {
-    const view = directorConfirmView(directorHandoffSummary(manifest, board()), 'ko')
-    expect(view.title).toBe('Director로 넘길까요?')
+  // 왜: 넘기기 전에 무엇이 얼마나 넘어가는지 보여 준다(프로토타입 S7 → 디자이너 1110 확정 D0, 2026-11-14). 러프가 다 있으면 빠지는 샷 안내는 필요 없다. 정상 경로 고정.
+  it('러프가 다 있으면 넘김 창은 넘어가는 것 · 다음 · 그다음만 보여 주고 빠지는 샷 안내는 없다', () => {
+    const view = directorConfirmView(directorHandoffSummary(manifest, board()), 'ko', extra)
+    expect(view.title).toBe('Director로 넘어갈까요?')
     expect(view.rows).toEqual([
-      { label: '넘어가는 것', value: '샷 3 · 러프 · 인물 · 배경 그림' },
-      { label: '러닝타임', value: '10초' },
-      { label: '다음', value: 'Director가 러프와 Artist 그림을 참조해 컷을 만들어요' },
+      { label: '넘어가는 것', value: '샷 3 · 10초 · 인물 2 · 배경 1 · 러프 3장' },
+      { label: '다음', value: '러프 → 실사 이미지 3장 · 약\u00a02분 · Takes 안 써요' },
+      { label: '그다음', value: '이미지를 확인하고 영상을 만들어요 · 샷마다 5 Take' },
     ])
     expect(view.warning).toBeNull()
     expect(view.canDrawRemaining).toBe(false)
@@ -86,7 +88,7 @@ describe('Director 넘김 확인 창', () => {
     const shots = board().map((s) => (s.shotId === 'a2' ? { ...s, roughStoryboard: null } : s.shotId === 'b1' ? { ...s, roughStoryboard: failedPanel() } : s))
     const summary = directorHandoffSummary(manifest, shots)
     expect(summary.missing.map((m) => m.label)).toEqual(['Scene 1 · Shot 2', 'Scene 2 · Shot 3'])
-    const view = directorConfirmView(summary, 'ko')
+    const view = directorConfirmView(summary, 'ko', extra)
     expect(view.warning).toBe('러프가 없는 Scene 1 · Shot 2, Scene 2 · Shot 3은(는) 이번에 빠져요.')
     expect(view.canDrawRemaining).toBe(true)
   })
@@ -94,15 +96,14 @@ describe('Director 넘김 확인 창', () => {
   // 왜(혼자 정한 것): 빠지는 샷은 Director 에 가지 않으니 넘어가는 러닝타임에서도 뺀다 — 헤더 숫자(보드 전체)와 다를 수 있다.
   it('러프가 없는 샷이 있으면 넘어가는 샷 수와 러닝타임에서 그 샷을 뺀다', () => {
     const shots = board().map((s) => (s.shotId === 'b1' ? { ...s, roughStoryboard: null } : s))
-    const view = directorConfirmView(directorHandoffSummary(manifest, shots), 'ko')
-    expect(view.rows[0]).toEqual({ label: '넘어가는 것', value: '샷 2 · 러프 · 인물 · 배경 그림' })
-    expect(view.rows[1]).toEqual({ label: '러닝타임', value: '6초' })
+    const view = directorConfirmView(directorHandoffSummary(manifest, shots), 'ko', extra)
+    expect(view.rows[0]).toEqual({ label: '넘어가는 것', value: '샷 2 · 6초 · 인물 2 · 배경 1 · 러프 2장' })
   })
 
   // 왜(혼자 정한 것): 스토리(액션)가 빈 샷은 서버가 그리지 않는다(no_info) — 누를 수 있는데 아무 일도 없는 버튼을 두지 않는다.
   it('러프가 없는 샷이 모두 스토리가 비어 그릴 수 없으면 [남은 컷 그리기]를 두지 않는다', () => {
     const shots = board().map((s) => (s.shotId === 'a2' ? { ...s, roughStoryboard: null, actionDescription: '  ' } : s))
-    const view = directorConfirmView(directorHandoffSummary(manifest, shots), 'ko')
+    const view = directorConfirmView(directorHandoffSummary(manifest, shots), 'ko', extra)
     expect(view.warning).toBe('러프가 없는 Scene 1 · Shot 2은(는) 이번에 빠져요.')
     expect(view.canDrawRemaining).toBe(false)
   })

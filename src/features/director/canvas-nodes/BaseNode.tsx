@@ -2,7 +2,7 @@
 
 import { memo, type ReactNode } from 'react'
 import { Handle, Position } from '@xyflow/react'
-import { Copy, Edit, GitBranch, MoreHorizontal, Trash2 } from 'lucide-react'
+import { Copy, Edit, GitBranch, Maximize2, MoreHorizontal, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { nodeFrameBorder } from '@/features/director/canvas-meta'
@@ -51,6 +51,12 @@ type BaseNodeProps = {
   beam?: 'success' | 'primary' | null
   /** 기다리는 카드가 노드를 덮는 동안: 머리 · 제목 줄에 Tab 이 들어가지 않게 inert(검토 A C1). 구멍(핸들)은 그대로 둔다. */
   inert?: boolean
+  /** 샷 상태 테두리(시안 R 416:4941, 오너 2026-11-14) — 오래됨 · 골라 둠이 아닐 때만 보인다. */
+  stateFrame?: string | null
+  /** 상태 고르기에 안 맞는 노드 — 숨기지 않고 흐리게(선 · 자리가 흔들리지 않게). */
+  dimmed?: boolean
+  /** 고른 샷(시안 D2 · R "몸통 = 고르기, 흰 테두리") — 상태 색보다 앞선다. */
+  picked?: boolean
 }
 
 function BaseNodeImpl({
@@ -69,6 +75,9 @@ function BaseNodeImpl({
   strongStale,
   beam,
   inert = false,
+  stateFrame = null,
+  dimmed = false,
+  picked = false,
 }: BaseNodeProps) {
   const t = useT()
   const openPopup = useDirectorCanvasStore((s) => s.openPopup)
@@ -101,7 +110,10 @@ function BaseNodeImpl({
       className={cn(
         // v3 D1(2026-11-03): 작업 바탕색 판 · 모서리 14 · 그림자 하나 · 안쪽 12. 고른 노드만 지금 단계 색 1.5px 테두리.
         'group relative rounded-[14px] border-[1.5px] bg-node-bg-default p-3 shadow-node transition-[border-color] duration-100',
-        nodeFrameBorder({ strongStale, selected }),
+        picked && !strongStale
+          ? 'border-foreground'
+          : stateFrame && !strongStale && !selected ? stateFrame : nodeFrameBorder({ strongStale, selected }),
+        dimmed && 'opacity-30',
       )}
       style={width ? { width: `${width}px` } : undefined}
     >
@@ -152,6 +164,19 @@ function BaseNodeImpl({
         <span className={cn('size-1.5 shrink-0 rounded-full', selected ? 'bg-stage' : 'bg-subtle-foreground')} />
         <span>{t(LABEL_BY_THEME[theme])}</span>
         <div className="ml-auto flex items-center gap-0.5">
+          {/* ⤢ 상세(시안 D1 노드형 "⤢ 상세 ···") — 몸통을 누르면 고르기라, 상세는 이 단추로 연다. */}
+          {(theme === 'shot' || theme === 'video') && (
+            <button
+              type="button"
+              onClick={handleEdit}
+              onDoubleClick={stop}
+              aria-label={t('Open details')}
+              className="nodrag inline-flex h-5 items-center gap-1 rounded-[6px] px-1.5 text-[10.5px] font-semibold text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <Maximize2 className="size-2.5" />
+              {t('Details')}
+            </button>
+          )}
           <div className="pointer-events-none flex w-0 items-center gap-0.5 overflow-hidden opacity-0 transition-opacity duration-100 group-hover:pointer-events-auto group-hover:w-auto group-hover:overflow-visible group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:w-auto group-focus-within:overflow-visible group-focus-within:opacity-100">
             <Button
               variant="ghost"

@@ -54,33 +54,34 @@ describe('C5 — 채팅으로 요청하면 실사 그림을 만들 수 있다', 
     expect(store).toContain('generateImage target must be Shot node')
   })
 
-  it('채팅으로 그림 만들기를 요청하면 먼저 확인 카드를 보여준다', () => {
+  // 오너 2026-11-14 9번 "루미에게 부탁하면 바로 실행해줘" — 그림은 Take 를 쓰지 않고 확인 카드 없이 바로 만든다(행동 시험: tests/director/lumi-chat-runs.test.ts).
+  it('채팅으로 그림 만들기를 요청하면 확인 카드 없이 바로 만들기 시작한다', () => {
     expect(globalChatStore).toContain("update.type === 'generateImage'")
-    expect(globalChatStore).toContain("kind: 'directorGenerateStoryboardImage'")
-    expect(globalChatStore).toContain('payload: { updates: imageUpdates }')
-    expect(globalChatStore).toContain('.applyUpdates(immediateUpdates, {')
+    expect(globalChatStore).not.toContain("kind: 'directorGenerateStoryboardImage'")
+    expect(globalChatStore).toContain('.applyUpdates(immediate, { traceId, onJob: observeGeneration })')
   })
 
   it('사용자가 그림 생성을 분명히 요청할 때만 그림 만들기를 시작한다', () => {
     expect(chatRoute).toContain('<hybrid_intent_rule>')
-    expect(chatRoute).toContain('Never infer or append generateImage.')
+    expect(chatRoute).toContain('Never infer or append generateImage or generateVideos.')
     expect(chatRoute).toContain('only when the user explicitly asks to generate or regenerate an image.')
-    expect(chatRoute).toContain('client presents an approval card before it runs.')
+    expect(chatRoute).toContain('It runs at once and uses no Takes.')
   })
 })
 
-describe('#영상거짓수락 — 채팅에서 영상 생성 요청을 거짓 수락하지 않는다', () => {
-  it('채팅의 영상 만들기는 전체 장면에 대해서만 허용한다고 안내한다', () => {
+describe('#영상거짓수락 → 오너 2026-11-14 9번 — 채팅 영상은 말한 샷만 바로 만들고, 못 하면 솔직히 알린다', () => {
+  // 왜: 9번으로 샷 하나 · 고른 샷 영상도 채팅에서 바로 만든다(예전엔 남은 샷 전부만, 승인 카드 뒤). 대신 말한 샷만 담는다.
+  it('채팅의 영상 만들기는 사용자가 말한 샷만 담아 바로 만든다고 안내한다', () => {
     expect(chatRoute).toContain('<video_request_rule>')
-    expect(chatRoute).toContain('do NOT emit generateVideo and do NOT emit addVideoTake')
-    // 약속 E3(2026-09-04): 일괄(generateVideos)은 승인 카드로 허용, 샷 하나는 여전히 불가.
-    expect(chatRoute).toContain('chat only starts the whole batch')
+    expect(chatRoute).toContain('Put in "shotIds" exactly the shots the user named')
+    expect(chatRoute).toContain('Do not emit addVideoTake to start a video')
   })
 
-  it('한 장면 영상 만들기를 거절하면 그 이유를 사용자에게 솔직히 알린다', () => {
-    expect(globalChatStore).toContain("result.skipped.some((s) => s.update.type === 'generateVideo')")
-    expect(globalChatStore).toContain('Chat can start videos only for all remaining shots at once.')
-    expect(globalChatStore).toContain('saveChatMessage(projectId, stage, \'model\', honestNotice)')
+  // 왜: 확인 카드가 없으니 시작하지 못한 까닭(어느 샷인지 모름 · Take 부족 · 이미 도는 묶음)을 채팅에 남겨야 "만들게요"만 남지 않는다.
+  it('채팅이 영상을 시작하지 못하면 그 이유를 사용자에게 솔직히 알린다', () => {
+    expect(globalChatStore).toContain("Which shots should get videos? Tell me the numbers, like 'shot 3'.")
+    expect(globalChatStore).toContain('I did not start any videos. Add Takes or ask for fewer shots.')
+    expect(globalChatStore).toContain('A video batch is already running. Ask again when it finishes.')
   })
 })
 

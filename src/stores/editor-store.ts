@@ -1373,18 +1373,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }),
     ),
   // 자리 · 길이 · 원본 시작점을 바꾸면(소리 조각의 앞 · 뒤를 끌어 줄이기) 영상에서 떨어진다. 파형 · 원본 길이 채우기는 그대로 잇는다(결정 4).
-  updateAudioClip: (id, patch) =>
-    automatically(() =>
+  //   끌어 줄이기는 사람 고침이라 저장본에 견줌 표시(serverAware)를 붙이고, 열 때 채우는 파형 · 원본 길이만은 저절로 생긴 바뀜이다(E2b, 2026-11-14).
+  //   잠근 소리 줄의 조각은 끌어 줄이지 않는다(2단계 ②) — 파형 · 원본 길이 채우기는 잠가도 그대로 된다.
+  updateAudioClip: (id, patch) => {
+    const reshaped = 'startSec' in patch || 'durationSec' in patch || 'sourceOffsetSec' in patch
+    const apply = () =>
       set((state) => {
-        const reshaped = 'startSec' in patch || 'durationSec' in patch || 'sourceOffsetSec' in patch
         if (reshaped && audioLocked(state, state.audioClips.find((a) => a.id === id))) return state
         return {
           audioClips: state.audioClips.map((a) =>
             a.id === id ? { ...a, ...patch, ...(reshaped ? { linkedShotId: null } : {}) } : a,
           ),
         }
-      }),
-    ),
+      })
+    if (reshaped) apply()
+    else automatically(apply)
+  },
 
   // ── 리사이즈 섹션 크기 ──
   setPanelSize: (key, value) =>

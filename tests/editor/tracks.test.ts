@@ -173,6 +173,17 @@ describe('자물쇠', () => {
     expect(JSON.stringify([v1(), on('v2'), api().videoClips])).toBe(before)
     expect(program()[0]).toEqual(['A', 0, 4, 0])
   })
+
+  it('잠근 소리 줄의 조각은 앞 · 뒤를 끌어 줄여도 바뀌지 않는다 — 열 때 채우는 파형 · 원본 길이는 잠가도 채운다', () => {
+    // 왜: 자물쇠는 사람이 그 줄을 고치지 못하게 한다(시안 E1 줄 머리). 파형 · 원본 길이 채우기는 사람 고침이 아니다 — 1단계 "끌어 줄이기는
+    //   사람 고침"(de1113-set a643a806)과 합친 자리(리드 2026-11-14).
+    api().toggleTrackLock('atrack_1')
+    const before = api().audioClips.find((a) => a.id === 'a_A')
+    api().updateAudioClip('a_A', { startSec: 1, durationSec: 3, sourceOffsetSec: 1 })
+    expect(api().audioClips.find((a) => a.id === 'a_A')).toEqual(before)
+    api().updateAudioClip('a_A', { peaks: [0.5, 0.2], sourceDurationSec: 4.2 })
+    expect(api().audioClips.find((a) => a.id === 'a_A')).toMatchObject({ peaks: [0.5, 0.2], sourceDurationSec: 4.2, startSec: 0, durationSec: 4, linkedShotId: 'A' })
+  })
 })
 
 describe('V2 · V3 클립 고치기', () => {

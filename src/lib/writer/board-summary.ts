@@ -3,6 +3,7 @@
 import { translate } from '@/lib/i18n/translate'
 import type { AppLocale } from '@/lib/locale'
 import { isRoughDrawn } from '@/lib/writer/rough-progress'
+import { realImageBatchMinutes } from '@/lib/director/generation-estimate'
 import type { RoughStoryboardImage, Shot } from '@/types'
 
 type BoardShotInput = Pick<Shot, 'shotId' | 'sceneId' | 'durationSeconds' | 'actionDescription' | 'roughStoryboard'>
@@ -87,6 +88,8 @@ export function sceneStatsLabel(stats: SceneStats, locale: AppLocale): string {
 export interface DirectorHandoffSummary {
   /** 러프가 있어 Director 로 넘어가는 샷 수. */
   movingShots: number
+  /** 넘어가는 샷 id(보드 순서) — 넘기기 창이 그중 실사가 아직 없는 샷을 센다. */
+  movingShotIds: string[]
   /** 넘어가는 샷 길이의 합 — 정수 초. */
   movingSeconds: number
   /** 러프가 없어 이번에 빠지는 샷 — drawable = 그릴 스토리(액션)가 있어 [남은 컷 그리기]로 그릴 수 있다. */
@@ -104,22 +107,45 @@ export function directorHandoffSummary<S extends BoardShotInput>(
   const missing = entries
     .filter((entry) => !isRoughDrawn(panelOf(entry.shot)))
     .map((entry) => ({ shotId: entry.shot.shotId, label: entry.label, drawable: !!entry.shot.actionDescription?.trim() }))
-  return { movingShots: moving.length, movingSeconds: secondsOf(moving), missing }
+  return { movingShots: moving.length, movingShotIds: moving.map((entry) => entry.shot.shotId), movingSeconds: secondsOf(moving), missing }
 }
 
 /** 빠지는 샷 이름을 이만큼까지 적고 나머지는 "외 N컷"으로 줄인다 — 창이 이름으로 넘치지 않게. */
 const MISSING_LABEL_LIMIT = 10
 
+export type DirectorHandoffChoice = 'makeImages' | 'pickYourself'
+
+/** 넘기기 창(D0)에 더 보일 숫자 — 보드 밖(Artist 그림 · 이미 만든 실사 · Take 계산기)에서 온다. */
+export interface DirectorConfirmExtra {
+  /** Artist 에서 그림이 있는 인물 · 배경 카드 수. */
+  characters: number
+  backgrounds: number
+  /** 넘어가는 샷 중 실사 이미지가 아직 없는 샷 수 — "넘어가면서 이미지 N장 만들기"의 N.
+   *  저장된 실사를 아직 읽는 중이면 'counting', 읽기에 실패하면 많아야 몇 장인지(atMost)만 안다(검토 b 낮음 7). */
+  imagesToMake: number | 'counting' | { atMost: number }
+  /** 영상 한 편의 Take — 지금 Take 계산기 값(오너 2026-11-14 답 11번). Take 과금이 꺼져 있으면 null — 값을 보이지 않는다(낮음 5). */
+  takesPerShot: number | null
+}
+
 export interface DirectorConfirmView {
   title: string
+  description: string | null
   rows: Array<{ label: string; value: string }>
   /** 러프가 없어 빠지는 샷 안내. 없으면 null. */
   warning: string | null
   /** [남은 컷 그리기]를 둘지 — 빠지는 샷 중 그릴 수 있는 것이 있을 때만. */
   canDrawRemaining: boolean
+  /** 고르기 둘(시안 D0) — 넘어가면서 이미지 만들기(추천) · 넘어가서 직접 고르기.
+   *  만들 실사가 0장이면 만들기 칸은 null — 칸과 "추천"을 숨기고 직접 고르기만 둔다(리드 2026-11-14, 시안 없음). */
+  makeImages: { label: string; description: string; disabled: boolean } | null
+  pickYourself: { label: string; description: string }
+  /** 창을 열 때 골라져 있는 것 — 만들 이미지가 있으면 추천(이미지 만들기). */
+  defaultChoice: DirectorHandoffChoice
 }
 
-export function directorConfirmView(summary: DirectorHandoffSummary, locale: AppLocale): DirectorConfirmView {
+/** Storyboard → Director 넘기기 창(디자이너 1110 확정 D0 · 오너 2026-11-14 페이지 추천). 러프 없는 샷 경고 · [남은 컷 그리기]는 그대로 둔다.
+ *  약속: tests/writer/board-summary.test.ts · tests/writer/director-handover-images.test.ts */
+export function directorConfirmView(summary: DirectorHandoffSummary, locale: AppLocale, extra: DirectorConfirmExtra): DirectorConfirmView {
   const labels = summary.missing.map((item) => item.label)
   const shots = labels.slice(0, MISSING_LABEL_LIMIT).join(', ')
   const more = labels.length - MISSING_LABEL_LIMIT
@@ -127,15 +153,60 @@ export function directorConfirmView(summary: DirectorHandoffSummary, locale: App
     : more > 0
       ? translate(locale, 'These shots have no rough and are left out this time: {shots} and {count} more.', { shots, count: more })
       : translate(locale, 'These shots have no rough and are left out this time: {shots}.', { shots })
+  const images = typeof extra.imagesToMake === 'number' ? extra.imagesToMake : null
+  const atMost = typeof extra.imagesToMake === 'object' ? extra.imagesToMake.atMost : null
+  const showTakes = extra.takesPerShot !== null
+  const nextRow =
+    extra.imagesToMake === 'counting'
+      ? translate(locale, 'Rough → real images · counting')
+      : atMost !== null
+        ? showTakes
+          ? translate(locale, 'Rough → up to {count} real images · about {minutes} min · No Takes used', { count: atMost, minutes: realImageBatchMinutes(atMost) })
+          : translate(locale, 'Rough → up to {count} real images · about {minutes} min', { count: atMost, minutes: realImageBatchMinutes(atMost) })
+        : images && images > 0
+          ? showTakes
+            ? translate(locale, 'Rough → {count} real images · about {minutes} min · No Takes used', { count: images, minutes: realImageBatchMinutes(images) })
+            : translate(locale, 'Rough → {count} real images · about {minutes} min', { count: images, minutes: realImageBatchMinutes(images) })
+          : translate(locale, 'The real images are already made')
   return {
-    title: translate(locale, 'Hand over to Director?'),
+    title: translate(locale, 'Move on to Director?'),
+    description: images && images > 0 ? translate(locale, 'We start by turning the {count} roughs into real images.', { count: images }) : null,
     rows: [
-      { label: translate(locale, 'Moving over'), value: translate(locale, 'Shots {count} · roughs · character and background images', { count: summary.movingShots }) },
-      { label: translate(locale, 'Running time'), value: translate(locale, '{seconds}s', { seconds: summary.movingSeconds }) },
-      { label: translate(locale, 'Next'), value: translate(locale, 'Director makes the cuts from the roughs and the Artist images') },
+      {
+        label: translate(locale, 'Moving over'),
+        value: translate(locale, 'Shots {shots} · {seconds}s · Characters {characters} · Backgrounds {backgrounds} · Roughs {roughs}', {
+          shots: summary.movingShots,
+          seconds: summary.movingSeconds,
+          characters: extra.characters,
+          backgrounds: extra.backgrounds,
+          roughs: summary.movingShots,
+        }),
+      },
+      { label: translate(locale, 'Next'), value: nextRow },
+      {
+        label: translate(locale, 'After that'),
+        value: extra.takesPerShot !== null
+          ? translate(locale, 'Check the images and make the videos · {takes} Takes per shot', { takes: extra.takesPerShot })
+          : translate(locale, 'Check the images and make the videos'),
+      },
     ],
     warning,
     canDrawRemaining: summary.missing.some((item) => item.drawable),
+    makeImages: images === 0 ? null : {
+      label:
+        extra.imagesToMake === 'counting'
+          ? translate(locale, 'Make images while moving over')
+          : atMost !== null
+            ? translate(locale, 'Make up to {count} images while moving over', { count: atMost })
+            : translate(locale, 'Make {count} images while moving over', { count: images ?? 0 }),
+      description: translate(locale, 'You can look at other screens while you wait. We show the first ones as soon as they are ready and tell you when they are all done.'),
+      disabled: images === 0,
+    },
+    pickYourself: {
+      label: translate(locale, 'Move over and pick yourself'),
+      description: translate(locale, 'Choose the shots to make and make them one by one.'),
+    },
+    defaultChoice: images === 0 ? 'pickYourself' : 'makeImages',
   }
 }
 

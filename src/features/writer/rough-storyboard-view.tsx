@@ -114,7 +114,10 @@ import {
 import type { RoughStoryboardImage, Shot } from '@/types'
 import { translate, useT } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
-import { invalidateShots } from '@/lib/shots-cache'
+import { invalidateShots, loadShots } from '@/lib/shots-cache'
+import { takeCostForVideo, takeValuesShown } from '@/lib/billing/take-cost'
+import { useTakeBalance } from '@/lib/billing/use-take-balance'
+import { DEFAULT_VIDEO_MODEL } from '@/lib/video-models'
 import { computeSettledJobs, reportUiReflected } from '@/lib/generation-ui-reflected'
 import { recordWriterObservabilityEventClient } from '@/lib/writer/debug-events-client'
 
@@ -808,7 +811,42 @@ export function RoughStoryboardView() {
     localJobs,
     queuedRoughIds,
   )
-  const directorView = directorConfirmView(directorHandoffSummary(sceneManifest, shots, panelOf), locale)
+  // Director 넘기기 창(D0) — 실사가 이미 있는 샷은 넘어가며 다시 만들지 않으니 창을 열 때 저장된 샷 행에서 센다(사물함, 대개 바로 답).
+  //   처음 읽는 중(null)이면 "세는 중", 읽기에 실패하면 많아야 몇 장인지만 보인다(검토 b 낮음 7 — 전엔 샷 전부를 만들 수로 보였다).
+  const [realImageShotIds, setRealImageShotIds] = useState<ReadonlySet<string> | 'failed' | null>(null)
+  useEffect(() => {
+    if (!directorConfirmOpen || !projectId) return
+    let cancelled = false
+    void loadShots(projectId)
+      .then((rows) => {
+        if (cancelled) return
+        const done = rows.filter((row) => (row.storyboard_image as { status?: string } | null)?.status === 'completed').map((row) => row.shot_id)
+        setRealImageShotIds(new Set(done))
+      })
+      .catch(() => {
+        if (!cancelled) setRealImageShotIds('failed')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [directorConfirmOpen, projectId])
+  const takeBalance = useTakeBalance()
+  const artistCharacters = useArtistStore((s) => s.characterAssets.filter((c) => c.entityType !== 'object' && !!(c.portrait || c.views?.main || c.appearances?.some((a) => a.sheetUrl || a.portraitUrl))).length)
+  const artistBackgrounds = useArtistStore((s) => s.worldAssets.filter((w) => !!w.wideShot).length)
+  const directorSummary = directorHandoffSummary(sceneManifest, shots, panelOf)
+  const directorView = directorConfirmView(directorSummary, locale, {
+    characters: artistCharacters,
+    backgrounds: artistBackgrounds,
+    imagesToMake:
+      realImageShotIds === null
+        ? 'counting'
+        : realImageShotIds === 'failed'
+          ? { atMost: directorSummary.movingShotIds.length }
+          : directorSummary.movingShotIds.filter((id) => !realImageShotIds.has(id)).length,
+    // 오너 2026-11-14 답 11번 — 지금 Take 계산기 값. 넘어가는 샷의 첫 영상은 Director 기본 모델 · 720p 로 만든다.
+    //   Take 과금이 꺼져 있으면 노드처럼 값을 숨긴다(#payments-phase-2, 검토 b 낮음 5). 잔액을 못 읽은 때는 숨기지 않는다(2차 낮음 1).
+    takesPerShot: takeValuesShown(takeBalance) ? takeCostForVideo(DEFAULT_VIDEO_MODEL, '720p') : null,
+  })
 
   // 첫 진입 브리핑 — 씬 · 샷이 준비됐고 Storyboard 채팅 기록이 없으면 먼저 "이렇게 나눴어요"라고 알린다.
   //   Producer 웰컴과 같은 방식: dismissible:false(넘김 버튼 없음), 유저가 말을 걸면 자동으로 사라짐.
@@ -1060,9 +1098,9 @@ export function RoughStoryboardView() {
           setDirectorConfirmOpen(false)
           void drawShots(remainingIds)
         }}
-        onConfirm={() => {
+        onConfirm={(choice) => {
           setDirectorConfirmOpen(false)
-          void handOverToDirector()
+          void handOverToDirector({ makeImages: choice === 'makeImages' })
         }}
       />
     </>

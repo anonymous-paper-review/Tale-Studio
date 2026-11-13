@@ -39,6 +39,9 @@ import { ShareButton } from '@/components/demo/share-button'
 import { FooterIconItem, FOOTER_TRIGGER_CLASS } from '@/components/layout/footer-icon-item'
 import { withDemoShare } from '@/lib/demo/context'
 import { useT } from '@/lib/i18n'
+import { useDirectorCanvasStore } from '@/stores/director-store'
+import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { directorHasFinishedVideo, railEditorViaHandoff } from '@/lib/director/shot-state'
 
 // 아이콘은 화면 이름을 따른다(리뉴얼 1차) — v3 채움 아이콘: Producer(entry)=전구, Writer(producer)=책, Storyboard(writer)=네 칸.
 const STAGE_ICONS: Record<StageId, React.ElementType> = {
@@ -56,6 +59,12 @@ export function Sidebar() {
   const t = useT()
   const canNavigateTo = useProjectStore((s) => s.canNavigateTo)
   const reachedStage = useProjectStore((s) => s.reachedStage)
+  // Director 에 완성 영상이 있는가 — 지금 열린 프로젝트의 Director 캔버스 기준(Director 화면 밖에서는 지금 규칙 그대로).
+  const sidebarProjectId = useProjectStore((s) => s.projectId)
+  const directorFinishedVideo = useDirectorCanvasStore(
+    (s) => !!sidebarProjectId && s.projectId === sidebarProjectId && directorHasFinishedVideo(s.nodes ?? []),
+  )
+  const requestNextStep = useGlobalChatStore((s) => s.requestNextStep)
   const artistImagesReady = useProjectStore((s) => s.artistImagesReady)
   const artistAssetProgress = useProjectStore((s) => s.artistAssetProgress)
   const artistImagesFailed = useProjectStore((s) => s.artistImagesFailed)
@@ -186,7 +195,14 @@ export function Sidebar() {
           //   "눌렸다"가 보인다. 커밋되면 pendingStage 가 해제되며 pathname 기준으로 복귀.
           const isActive = pendingStage ? pendingStage === stage.id : isCommitted
           const isPending = pendingStage === stage.id && !isCommitted
-          const isLocked = !canNavigateTo(stage.id)
+          // 사이드바 Editor 는 [다음: Editor로]와 같은 조건 · 같은 넘김(시안 R, 오너 2026-11-14) — 넘기기 전이라도 완성 영상이 있으면 열고, 누르면 넘긴다.
+          const viaHandoff = railEditorViaHandoff({
+            stage: stage.id,
+            onDirector: visibleStage === 'director',
+            reachedDirectorOnly: reachedStage === 'director' && !canNavigateTo('editor'),
+            finishedVideo: directorFinishedVideo,
+          })
+          const isLocked = !canNavigateTo(stage.id) && !viaHandoff
           const reachedByStage =
             STAGES.findIndex((item) => item.id === stage.id) <= reachedStageIndex
           const isArtistImageLocked =
@@ -211,6 +227,7 @@ export function Sidebar() {
                     else if (isArtistRetryable) return
                     // 데모(URL 티켓): share 쿼리 유지 — 쿠키 차단 브라우저에서도 스테이지 이동 생존
                     //   이동 자체는 goToStage 한 곳(단축키와 공유. 세로 스트립 전환 포함).
+                    else if (viaHandoff) void requestNextStep()
                     else if (!isLocked && !isCommitted) goToStage(stage.id)
                   }}
                   aria-label={badge > 0 ? `${STAGE_LABEL[stage.id]} · ${t('Unseen completions: {count}', { count: badge })}` : STAGE_LABEL[stage.id]}
@@ -288,7 +305,9 @@ export function Sidebar() {
                     : isLocked
                       ? isArtistImageLocked
                         ? artistImageLockCopy
-                        : 'Complete previous step first'
+                        : stage.id === 'editor' && reachedStage === 'director' && visibleStage === 'director'
+                          ? t('A finished video lets you move on.')
+                          : t('Complete previous step first')
                       : stage.agent}
                 </span>
                 {/* 단축키 표기는 Alt 홀드 배지가 전담(#feedback 2026-08-11) — 툴팁에서 제거. */}

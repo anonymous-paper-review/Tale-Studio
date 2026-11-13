@@ -68,13 +68,14 @@ describe('혼자 정한 것', () => {
     },
   )
 
-  // 왜: 정상 경로 고정. 묶음이 없거나 그 샷이 차례에 없으면 꼬리는 지금처럼 그림 상태(완료 · 대기 중)다.
-  it("묶음이 없으면 샷 꼬리는 지금처럼 '완료' · '대기 중'이다", () => {
-    expect(shotHtml(true)).toContain('완료')
-    expect(shotHtml(false)).toContain('대기 중')
+  // 왜: 정상 경로 고정. 묶음이 없거나 그 샷이 차례에 없으면 꼬리는 카드와 같은 샷 상태 이름이다
+  //   (시안 D1 노드형 406:4051 "● 이미지 필요", 리드 검토 c ② — 옛 '완료' · '대기 중'에서 바뀜 2026-11-14).
+  it("묶음이 없으면 샷 꼬리는 샷 상태 이름 '이미지 완료' · '이미지 필요'다", () => {
+    expect(shotHtml(true)).toContain('이미지 완료')
+    expect(shotHtml(false)).toContain('이미지 필요')
 
     state.director.videoBatchQueue = { jobIds: ['job-0'], pendingShotIds: ['shot-9'] }
-    expect(shotHtml(true)).toContain('완료')
+    expect(shotHtml(true)).toContain('이미지 완료')
     expect(shotHtml(true)).not.toContain('순서 기다리는 중')
   })
 

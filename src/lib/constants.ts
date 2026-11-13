@@ -116,8 +116,9 @@ export const STAGE_CHAT_TITLE: Record<StageId, string> = {
   producer: 'Prose with Lumi',
   artist: 'Art with Lumi',
   writer: 'Directing with Lumi',
-  director: 'Shooting with Lumi',
-  editor: 'Editing with Lumi',
+  // Director · Editor 는 11/13 시안 D5 대로 단계 이름을 적는다(오너 11/14 "추천대로") — 다른 단계는 v3 그대로.
+  director: 'Lumi · Director',
+  editor: 'Lumi · Editor',
 }
 
 // 값은 영어 원문 = i18n 키(#i18n-s5-batch4). 렌더 지점(global-chat.tsx)이 t() 로 번역한다.
@@ -127,9 +128,21 @@ export const STAGE_PLACEHOLDER: Record<StageId, string> = {
   writer: 'E.g. make shot 8 darker',
   // 새 인물 · 배경은 채팅으로 만들지 않는다(디자이너 QA 1차 #04) — 있는 인물을 고치는 예시를 든다.
   artist: "E.g. make the main character's hair shorter",
-  director: 'Try generating the rough storyboard into shooting-ready images.',
-  editor: "Chat isn't available at this stage yet.",
+  // 11/13 시안 D5 — 말로 샷 하나를 고치는 예시(오너 11/14 "추천대로").
+  director: "E.g. make shot 1's lighting neon blue",
+  // Editor 채팅은 조언만 한다(오너 2026-11-14 10번) — 작업물을 바꾸지 않으니 "어떻게 하나"를 묻는 예시를 든다.
+  editor: 'E.g. how do I connect two cuts smoothly?',
 }
+
+// Director 빠른 칩(11/13 시안 D5, 오너 2026-11-14 "추천대로") — 입력칸 바로 위에 늘 보이고, 누르면 그 말을 바로 보낸다.
+//   칩 말은 AI 를 거치지 않고 지금 보드 상태로 바로 한다(global-chat-store runDirectorQuickChip · lib/director/lumi-quick-chips).
+//   순서가 칩의 뜻이다: 이미지 필요한 샷 · 이미지 나온 샷 영상 · 실패한 샷 다시 · 지금 어디까지. 값은 영어 원문 = i18n 키.
+export const DIRECTOR_QUICK_CHIPS = [
+  'Make images for every shot that needs one',
+  'Make videos for shots with images',
+  'Remake the failed shots',
+  'How far along is it?',
+] as const
 
 // ── GlobalChat: 응답 대기 사고 흐름 (#oiioii-chat v2 2026-08-06) ──
 // "생각 중…" 정지 문구 대신 순환시켜 에이전트가 뭔가 굴리고 있음을 보여주는 문구들.
@@ -195,16 +208,22 @@ export const STAGE_PROMPT_PRESETS: Record<StageId, readonly string[]> = {
     'Make the lighting more dramatic',
     'Write the shot description more specifically',
   ],
-  editor: [],
+  // Editor 는 조언 질문만(오너 2026-11-14 10번 — 작업물에는 손대지 않는다).
+  editor: [
+    'How do I connect two cuts smoothly?',
+    'Is any cut too long?',
+    'How do I add background music?',
+  ],
 }
 
 // writer 채팅: 러프 스토리보드 검토 단계에서 씬/샷 CRUD (api/writer/chat + global-chat-store 'writer' case).
-//   editor 만 미지원 (라우트·case 없음).
+//   editor 채팅은 조언만 한다(api/editor/chat — 오너 2026-11-14 10번, 작업물을 바꾸는 길이 없다).
 export const CHAT_SUPPORTED_STAGES: ReadonlySet<StageId> = new Set<StageId>([
   'producer',
   'writer',
   'artist',
   'director',
+  'editor',
 ])
 
 // ── GlobalChat: 컨텍스트 관리 (chat-context-management Phase 1) ──
