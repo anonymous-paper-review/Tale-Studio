@@ -33,8 +33,9 @@ vi.mock('zustand', async () => {
   }
   return { create }
 })
+const balance = vi.hoisted(() => ({ failed: false }))
 vi.mock('@/lib/billing/use-take-balance', () => ({
-  useTakeBalance: () => ({ balance: 100, mode: 'shadow', loading: false, failed: false }),
+  useTakeBalance: () => ({ balance: balance.failed ? null : 100, mode: balance.failed ? 'off' : 'shadow', loading: false, failed: balance.failed }),
 }))
 const takes = vi.hoisted(() => ({ read: vi.fn() }))
 vi.mock('@/features/director/takes-check', () => ({
@@ -76,6 +77,7 @@ const generate = vi.fn()
 beforeEach(() => {
   hooks.slots = []
   hooks.cursor = 0
+  balance.failed = false
   generate.mockReset()
   takes.read.mockReset()
   takes.read.mockReturnValue(new Promise<boolean>((resolve) => { release = resolve }))
@@ -140,5 +142,20 @@ describe('혼자 정한 것', () => {
     await flush()
     expect(generate).not.toHaveBeenCalled()
     expect(retake().props.disabled).toBe(false)
+  })
+})
+
+describe('가지 내기 — 못 읽음 (검토 c)', () => {
+  it('샷 노드 가지 내기는 Take 잔액을 못 읽으면 시작하지 않고 까닭을 보이며 단추는 다시 켜진다', async () => {
+    // 왜: 검토 c — 정규식을 느슨하게 한 뒤로 이 약속을 동작으로 지키는 시험이 없었다(가지 내기를 읽기 전에 시작하게 고장 내도 모두 통과).
+    const branch = () => render(ShotNode, shotId).find((el) => typeof el.props.onBranch === 'function')!
+    void (branch().props.onBranch as () => Promise<void>)()
+    balance.failed = true
+    release(false)
+    await flush()
+    expect(generate).not.toHaveBeenCalled()
+    expect(branch().props.canBranch).toBe(true)
+    const shown = render(ShotNode, shotId).map((el) => textOf(el.props.children as ReactNode))
+    expect(shown.some((text) => text.includes('Take 를 확인하지 못해 시작하지 않았어요'))).toBe(true)
   })
 })
