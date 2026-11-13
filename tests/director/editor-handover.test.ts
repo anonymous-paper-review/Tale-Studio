@@ -14,7 +14,7 @@ vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTra
 const nav = vi.hoisted(() => ({ handoffToStage: vi.fn(async (stage: string) => `/studio/${stage}`) }))
 vi.mock('@/lib/stage-nav', () => ({ handoffToStage: nav.handoffToStage }))
 
-import { editorHandoverView, handoverHeaderLine, proceedButtonLabel, remakeButton, remakeNotice, withStartingRow } from '@/lib/director/editor-handover'
+import { editorHandoverView, handoverHeaderLine, proceedButtonLabel, remakeButton, remakeNotice, withRowNotice, withStartingRow } from '@/lib/director/editor-handover'
 import type { GenerationJobObserver, GenerationJobReceipt } from '@/lib/generation-jobs-client'
 import { takeCostForVideo, takeValuesShown } from '@/lib/billing/take-cost'
 import { readFileSync } from 'node:fs'
@@ -164,6 +164,24 @@ describe('Editor 넘기기 창의 단추 글', () => {
     const dialog = readFileSync('src/components/handoff/editor-handover-dialog.tsx', 'utf8')
     expect(dialog).toMatch(/withStartingRow\(current, row\.shotNodeId, false\)/)
     expect(dialog).toMatch(/const busy = starting\.has\(row\.shotNodeId\)/)
+  })
+
+  // 왜(검토 b 낮음, 리드 11/14): 까닭 줄도 창에 한 칸이라, A 가 까닭으로 끝난 뒤 B 가 다른 까닭으로 끝나면 A 것이 사라졌고,
+  //   다른 줄을 누르는 순간에도 앞 줄 까닭이 지워졌다. 스피너처럼 줄마다 둔다 — 그 줄을 다시 누를 때만 그 줄 것을 지운다.
+  it('한 줄의 까닭은 다른 줄을 누르거나 다른 줄이 끝나도 남는다', () => {
+    const unknown = remakeNotice('takes_unknown', ko)!
+    const limit = remakeNotice('video_limit', ko)!
+    let notices: ReadonlyMap<string, string> = new Map()
+    notices = withRowNotice(notices, 'n_a2', unknown) // 2번 줄이 까닭으로 끝남
+    notices = withRowNotice(notices, 'n_a3', null) // 3번 줄을 누름
+    notices = withRowNotice(notices, 'n_a3', limit) // 3번 줄이 다른 까닭으로 끝남
+    expect([...notices]).toEqual([['n_a2', unknown], ['n_a3', limit]])
+    notices = withRowNotice(notices, 'n_a2', null) // 2번 줄을 다시 누르면 2번 줄 것만 지운다
+    expect([...notices]).toEqual([['n_a3', limit]])
+    const dialog = readFileSync('src/components/handoff/editor-handover-dialog.tsx', 'utf8')
+    expect(dialog).toMatch(/withRowNotice\(current, row\.shotNodeId, null\)/)
+    expect(dialog).toMatch(/withRowNotice\(current, row\.shotNodeId, message\)/)
+    expect(dialog).toMatch(/const rowNotice = notices\.get\(row\.shotNodeId\)/)
   })
 })
 
@@ -398,6 +416,20 @@ describe('Director 의 다음 단계 버튼과 Editor 넘기기 창', () => {
       useDirectorCanvasStore.setState({ nodes: canvas(take('a1', 1, 'completed'), take('a2', 1, 'failed')), generateVideoForShot: makeVideo } as never)
       await expect(useGlobalChatStore.getState().remakeMissingVideo('n_a2')).resolves.toEqual({ started: false, reason: 'not_started' })
     }
+  })
+
+  // 왜(검토 b 참고 1): 500 + jobId · failed 뒤 다시 읽기마저 실패하면 이번에 돌려받은 Take 가 status generating(마지막 시도는 failed)으로
+  //   남는다 — 그 Take 때문에 "이 샷 영상을 이미 만드는 중이에요"가 나왔다. 이번 Take 는 이번 결과로만 본다.
+  it("이번 다시 만들기가 실패로 끝났으면 그 Take 때문에 '이미 만드는 중'이라고 말하지 않는다", async () => {
+    const makeVideo = vi.fn(async (_shotNodeId: string, options?: { onJob?: GenerationJobObserver }) => {
+      const stale = take('a2', 2, 'generating', { lastAttemptStatus: 'failed' })
+      useDirectorCanvasStore.setState((s) => ({ nodes: [...s.nodes, stale] }))
+      options?.onJob?.({ jobId: 'job-1', status: 'failed', httpStatus: 500, error: 'HTTP 500' })
+      return stale.id
+    })
+    useDirectorCanvasStore.setState({ nodes: canvas(take('a1', 1, 'completed'), take('a2', 1, 'failed')), generateVideoForShot: makeVideo } as never)
+    useGlobalChatStore.setState({ handoffConfirm: { kind: 'editorMissingVideos', projectId: 'proj-1', via: 'button' } })
+    await expect(useGlobalChatStore.getState().remakeMissingVideo('n_a2')).resolves.toEqual({ started: false, reason: 'not_started' })
   })
 
   // 왜(리드 11/14): 2xx 가 아닌 답에 jobId · queued 가 실려 오면(503 결과 모름 · 400 등) 접수로 세지 않지만, 새 Take 는 보드에서 만드는 중으로
