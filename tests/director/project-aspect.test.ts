@@ -87,8 +87,9 @@ describe('화면 — 노드 뷰와 스토리보드 뷰의 틀', () => {
   })
 
   // 왜: 상세 패널이 "16:9"를 고정 표시해 세로 프로젝트에서 틀린 정보를 보였다.
-  it('샷 상세 패널의 화면비 칸은 프로젝트 비율을 보여 준다', () => {
-    const panel = read('src/features/director/canvas-panels/ShotDetailPanel.tsx')
+  it('샷 상세의 화면비 칸은 프로젝트 비율을 보여 준다', () => {
+    // 새 샷 상세(시안 D6 · D7)의 이미지 탭 — 스토리보드형 팝업 · 노드형 왼쪽 패널이 같은 탭을 연다.
+    const panel = read('src/features/director/shot-detail/shot-image-tab.tsx')
     expect(panel).not.toMatch(/value="16:9"/)
     expect(panel).toMatch(/aspectRatioFromFormat\(/)
   })
