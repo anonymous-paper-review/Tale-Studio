@@ -1,4 +1,4 @@
-// 실제 제출 불가능한 샷이 있으면 영상 승인 제안을 보류한다.
+// 실제 제출 불가능한 샷이 있으면 채팅 영상 만들기를 시작하지 않고 그 이유를 알리는지 검사한다 (오너 2026-11-14 9번 — 확인 카드 없이 바로 실행)
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ run: vi.fn() }))
@@ -37,8 +37,8 @@ beforeEach(() => {
 
 afterEach(() => vi.unstubAllGlobals())
 
-it('실제 제출 불가능한 샷이 있으면 영상 승인 제안을 보류한다', async () => {
-  // 왜: 채팅에서 추가한 샷은 Writer 연결이 없어 실제 영상을 제출할 수 없는데 승인 성공으로 표시됐다.
+it('실제 제출 불가능한 샷이 있으면 채팅 영상 만들기를 시작하지 않고 그 이유를 알린다', async () => {
+  // 왜: 채팅에서 추가한 샷은 Writer 연결이 없어 실제 영상을 제출할 수 없는데 성공으로 표시됐다. 확인 카드 없이 바로 실행하므로 시작 전에 막고 까닭을 말한다.
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({
     reply: '새 샷을 추가하고 영상을 제안합니다.',
     updates: [
@@ -48,10 +48,10 @@ it('실제 제출 불가능한 샷이 있으면 영상 승인 제안을 보류�
     ],
   })))
 
-  await chat.getState().sendMessage('새 씬과 샷을 추가하고 영상을 만들어줘')
+  await chat.getState().sendMessage('새 씬과 샷을 추가하고 남은 샷 영상을 전부 만들어줘')
 
   expect(director.getState().nodes.filter(node => node.data.kind === 'shot')).toHaveLength(1)
   expect(chat.getState().pendingProposal).toBeNull()
-  await expect(chat.getState().approvePendingProposal()).resolves.toBe(false)
   expect(mocks.run).not.toHaveBeenCalled()
+  expect(chat.getState().messages.filter((m) => m.role === 'model').at(-1)?.content).toMatch(/Writer/)
 })

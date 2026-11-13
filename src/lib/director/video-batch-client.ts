@@ -168,7 +168,8 @@ async function pollVideoBatch(
  */
 export async function runVideoBatch(
   projectId: string,
-  opts?: { onJob?: GenerationJobObserver; silent?: boolean; limit?: number },
+  /** shotIds — 이 샷들만(그중 영상을 만들 수 있는 것만). 없으면 남은 샷 전부(오너 2026-11-14 9번 채팅 · 고른 샷). */
+  opts?: { onJob?: GenerationJobObserver; silent?: boolean; limit?: number; shotIds?: readonly string[] },
 ): Promise<VideoBatchResult> {
   const store = useDirectorCanvasStore
   const current = store.getState()
@@ -176,7 +177,8 @@ export async function runVideoBatch(
     return { ...EMPTY_RESULT }
   }
 
-  const eligible = eligibleVideoBatchShotIds(current.nodes)
+  const wanted = opts?.shotIds ? new Set(opts.shotIds) : null
+  const eligible = eligibleVideoBatchShotIds(current.nodes).filter((id) => !wanted || wanted.has(id))
   const limit = opts?.limit == null ? eligible.length : Math.max(0, Math.min(eligible.length, Math.floor(opts.limit)))
   const shotIds = eligible.slice(0, limit)
   const total = shotIds.length

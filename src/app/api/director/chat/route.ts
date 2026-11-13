@@ -80,7 +80,7 @@ For pure discussion, omit the JSON block.
 <actions>
 Each update follows one of these shapes. Use exact id from canvas context. For new nodes in the same batch, assign tempId and reference it.
 
-Non-destructive (direct execution):
+Non-destructive (direct execution — the app runs these at once):
 1. {"type":"addScene","label":"...","location":"...","timeOfDay":"...","mood":"...","description":"...","tempId":"S1"}
 2. {"type":"addShot","sceneId":"<sceneId|tempId>","label":"...","prompt":"...","tempId":"H1"}
 3. {"type":"updateScene","id":"<id>","patch":{"label":"...","location":"...","timeOfDay":"...","mood":"...","description":"..."}}
@@ -89,11 +89,9 @@ Non-destructive (direct execution):
 6. {"type":"setCamera","id":"<shotOrVideoId>","camera":{"horizontal":0,"vertical":0,"pan":0,"tilt":0,"roll":0,"zoom":0}}
 7. {"type":"setLighting","id":"<shotOrVideoId>","lighting":{"position":"left|top|right|front","brightness":50,"colorTemp":5600}}
 8. {"type":"setCameraPreset","id":"<shotOrVideoId>","preset":{"brand":"arri","focalLength":35,"aperture":2.8,"whiteBalance":5600}}
-9. {"type":"generateVideo","id":"<videoId>"}
-9b. {"type":"generateImage","id":"<shotId>"}  — 그 샷의 실사 이미지 생성. id 를 빼면 미생성 샷 전체 일괄.
-    (실사는 클라이언트 승인 카드를 거친 뒤에만 생성된다)
-9c. {"type":"generateVideos"}  — 영상이 없는 샷 전체의 영상 일괄 생성. 클라이언트 승인 카드가 만들 영상 수·필요한 Take·가진 Take 를
-    보여 준 뒤에만 시작된다. 특정 샷 하나의 영상은 채팅으로 시작할 수 없다.
+9. {"type":"generateImage","id":"<shotId>"}  — the live-action image of that shot. Leave "id" out to make every shot that has no image yet. It runs at once and uses no Takes.
+9b. {"type":"generateVideos","shotIds":["<shotId>", ...]}  — videos for those shots. Leave "shotIds" out only for every remaining shot. It runs at once and uses Takes.
+    (Changes to a shot's name or prompt and a scene's name, place, time of day, mood or description are shown to the user as before and after, and change only when the user picks Apply.)
 10. {"type":"connect","sourceId":"<id>","targetId":"<id>","category":"relates-to","relationText":"..."}
 11. {"type":"connectFrame","sourceId":"<sourceId|tempId>","targetId":"<videoId|tempId>","targetHandle":"frame-start"|"frame-end"|"frame-ref"}
     (semantic frame wiring only; targetHandle must be exactly frame-start, frame-end, or frame-ref)
@@ -107,17 +105,18 @@ Destructive — opens confirmation modal (NOT immediate):
 15. {"type":"requestDelete","id":"<id>","reason":"..."}
 
 <hybrid_intent_rule>
-- For free canvas edits, emit only the requested edit actions. Never infer or append generateImage.
+- For free canvas edits, emit only the requested edit actions. Never infer or append generateImage or generateVideos.
 - Emit generateImage only when the user explicitly asks to generate or regenerate an image.
-- generateImage is a paid action and the client presents an approval card before it runs.
+- When you change a shot's prompt or a scene's text, say that you prepared the change for the user to check, not that it is changed.
 </hybrid_intent_rule>
 
 <video_request_rule>
-- When the user asks to generate videos for all remaining shots ("영상 다 만들어줘", "generate all the videos"), emit exactly one {"type":"generateVideos"} and say that an approval card will show how many videos it makes and how many Takes it needs. Do not say generation started.
-- Do not state Take numbers or per-shot Take counts yourself: the approval card computes them from the real balance and model prices, and a guessed number would contradict it.
-- A single shot's video still cannot start from chat: for that request do NOT emit generateVideo and do NOT emit addVideoTake. Emitting addVideoTake alone creates an empty take placeholder while implying a video was queued, which is misleading, so skip both actions entirely.
-- For a single shot, reply honestly that chat only starts the whole batch, and point them to the Video take button on the Shot node.
-- Never reply as if a video generation started, is queued, or will be ready soon.
+- Emit generateVideos only when the user explicitly asks to make or remake videos. Emit it once per reply.
+- Put in "shotIds" exactly the shots the user named: by board name ("Shot 3"), the shot they selected, the failed shots, or the shots whose images are ready. Leave "shotIds" out only when the user asked for every remaining shot ("영상 다 만들어줘", "make all the videos").
+- To remake failed shots, emit generateImage for each shot whose image failed and generateVideos with the shots whose video failed.
+- Never state Take numbers yourself: the app checks the real balance, then adds how many videos started and how many Takes they use, or why it could not start.
+- Do not emit addVideoTake to start a video; it only adds an empty take.
+- Keep your reply short and never say a video is finished.
 </video_request_rule>
 </actions>
 
@@ -401,8 +400,9 @@ function validateCanvasUpdates(raw: unknown[]): unknown[] {
         break
       }
       case 'generateVideos': {
-        // 약속 E3: 필드 없음 — 미생성 샷 전체. 클라이언트가 승인 카드(만들 영상 수·필요한 Take·가진 Take)를 띄운다.
-        out.push({ type: 'generateVideos' })
+        // shotIds 가 있으면 그 샷만, 없으면 남은 샷 전부 — 화면이 막이(말한 샷만) · Take 셈 뒤 바로 시작한다(오너 2026-11-14 9번).
+        const shotIds = Array.isArray(rec.shotIds) ? rec.shotIds.flatMap((id) => (asNonEmptyString(id) ? [asNonEmptyString(id)!] : [])) : []
+        out.push(shotIds.length > 0 ? { type: 'generateVideos', shotIds } : { type: 'generateVideos' })
         break
       }
       case 'generateVideo':

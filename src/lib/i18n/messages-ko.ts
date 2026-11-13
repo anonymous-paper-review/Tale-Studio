@@ -1404,6 +1404,31 @@ export const KO: Record<string, string> = {
   'How do I connect two cuts smoothly?': '컷 사이를 부드럽게 이으려면?',
   'Is any cut too long?': '너무 긴 컷이 있어?',
   'How do I add background music?': '배경 음악은 어떻게 넣어?',
+  // Director 채팅 — 말로 부탁하면 바로 실행(오너 2026-11-14 9번)
+  'Shot {n}': '샷 {n}',
+  'Shots {list}': '샷 {list}',
+  'Started making live-action images for {shots} · No Takes used. Progress shows on the line above the cards.': '{shots}의 실사 이미지를 만들기 시작했어요 · Takes 안 써요. 진행은 카드 위 줄에서 볼 수 있어요.',
+  'Started making live-action images for {count} shots · No Takes used. Progress shows on the line above the cards.': '실사 이미지 {count}장을 만들기 시작했어요 · Takes 안 써요. 진행은 카드 위 줄에서 볼 수 있어요.',
+  'Started making videos for {shots} · {takes} Takes. Progress shows on the line above the cards.': '{shots} 영상을 만들기 시작했어요 · Take {takes}. 진행은 카드 위 줄에서 볼 수 있어요.',
+  'Started making videos for {shots}. Progress shows on the line above the cards.': '{shots} 영상을 만들기 시작했어요. 진행은 카드 위 줄에서 볼 수 있어요.',
+  'Which shots should get videos? Tell me the shot numbers. Videos use Takes, so I only make the shots you name.': '어느 샷의 영상을 만들까요? 샷 번호로 말해 주세요. 영상은 Take 를 써서 말한 샷만 만들어요.',
+  'There are no such shots right now.': '지금 그런 샷이 없어요.',
+  'I did not start any videos. Add Takes or ask for fewer shots.': '영상은 하나도 시작하지 않았어요. Take 를 채우거나 샷을 줄여 다시 부탁해 주세요.',
+  'A video batch is already running. Ask again when it finishes.': '영상 묶음이 이미 돌고 있어요. 끝나면 다시 부탁해 주세요.',
+  'Text changes': '글 바꾸기',
+  'Apply the text Lumi suggested': 'Lumi 가 고친 글 적용하기',
+  'A proposal is already pending, so the new text change was held back.': '이미 기다리는 제안이 있어서 새 글 고침은 미뤄 두었어요.',
+  '{name} · before: {text}': '{name} · 전: {text}',
+  '{name} · after: {text}': '{name} · 후: {text}',
+  '(empty)': '(비어 있음)', // copy-ok: fragment
+  'name': '이름', // copy-ok: fragment
+  'prompt': '프롬프트', // copy-ok: fragment
+  'place': '장소', // copy-ok: fragment
+  'time of day': '시간', // copy-ok: fragment
+  'mood': '분위기', // copy-ok: fragment
+  'description': '설명', // copy-ok: fragment
+  'The text changed since Lumi suggested this. Please ask again.': '그새 글이 바뀌었어요. 다시 부탁해 주세요.',
+  'Applied the text.': '글을 적용했어요.',
   'Pinpointing the heart of the story': '이야기의 핵심을 짚어보는 중',
   'Finding gaps in the settings': '설정에서 빈칸을 찾는 중',
   'Looking over the cast cards': '캐스트 카드를 살피는 중',

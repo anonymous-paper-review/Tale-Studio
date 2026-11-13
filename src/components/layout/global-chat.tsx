@@ -1664,7 +1664,7 @@ export function GlobalChat() {
                 {/* CTA — oiioii form 카드의 캡슐 버튼 매핑(Confirm & Continue). 승인은 전폭 캡슐. */}
                 <div className="mt-3 flex flex-col gap-1.5">
                   <Button size="sm" className="w-full rounded-full" onClick={handlePendingProposalApprove}>
-                    {pendingProposal.kind === 'producerPreserveScript' ? t('Keep as written') : t('Approve')}
+                    {pendingProposal.kind === 'producerPreserveScript' ? t('Keep as written') : pendingProposal.kind === 'directorTextEdit' ? t('Apply') : t('Approve')}
                   </Button>
                   {/* #script-preserve: 두 번째 버튼은 "나중에"가 아니라 명시적 거절(참고 자료로 각색) — 결정 없이 넘기면 조용히 각색된다. */}
                   <Button
@@ -1680,7 +1680,7 @@ export function GlobalChat() {
                     {pendingProposal.kind === 'producerPreserveScript' ? t('Use as reference only') : t('Later')}
                   </Button>
                   <Button size="sm" variant="ghost" className="w-full rounded-full" onClick={() => dismissPendingProposal(pendingProposal.id)}>
-                    {t('Cancel request')}
+                    {pendingProposal.kind === 'directorTextEdit' ? t('Discard') : t('Cancel request')}
                   </Button>
                   <div className="flex justify-center">
                     <KeyHint dismissible />

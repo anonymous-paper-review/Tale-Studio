@@ -63,6 +63,8 @@ import { completeKoreanDialogue, dialogueHandoffTarget } from '@/lib/writer/dial
 import { roughRedrawCandidates, roughRedrawChangedScenes, roughRedrawOfferHere, roughVisibleState, type RoughVisibleState } from '@/lib/writer/chat-rough-redraw'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { boardNodeNames } from '@/features/director/node-label'
+import { currentDirectorText, directorShotRefs, directorTextEditLines, shotLabelOf, shotListLabel, splitDirectorTextEdits, type DirectorTextEdit } from '@/lib/director/lumi-chat-runs'
+import { groundVideoRequest } from '@/lib/director/chat-video-targets'
 import { handoffToStage } from '@/lib/stage-nav'
 import {
   loadLatestChatTrace,
@@ -1328,6 +1330,89 @@ function offerStyleFromAttachment(
 
 /** 씬 스토리 확정을 보내는 중인 프로젝트 — 두 번 누름 방지(2026-10-01). */
 const sceneGateInFlight = new Set<string>()
+
+/** Director 의 보드 이름(씬 · 샷 전체 번호) — 채팅이 샷을 부르는 이름과 같다(오너 2026-11-02 "전체 번호로 통일"). */
+function directorBoardNames() {
+  const writerBoard = useWriterStore.getState()
+  return boardNodeNames(writerBoard.sceneManifest, writerBoard.shots)
+}
+
+/** 지금 고른 샷(노드 id) — "고른 샷 영상 만들어 줘"가 쓴다. */
+function selectedShotNodeIds(): string[] {
+  const canvas = useDirectorCanvasStore.getState()
+  const node = canvas.nodes.find((item) => item.id === canvas.selectedNodeId)
+  return node && isShotData(node.data) ? [node.id] : []
+}
+
+/**
+ * 채팅의 영상 부탁을 바로 시작한다(오너 2026-11-14 9번 "루미에게 부탁하면 바로 실행해줘") — 확인 카드가 없다.
+ *   막이: 사용자 말에 있는 샷(번호 · 남은 전부 · 실패한 · 이미지 나온 · 고른)만 만들고, 벗어나면 번호로 다시 묻는다(lib/director/chat-video-targets).
+ *   이미 영상이 있거나 만드는 중인 샷은 뺀다. 버튼과 같은 일괄 실행 길(runVideoBatch)을 타고, 그 전에 Take 를 센다 — 모자라면 하나도
+ *   시작하지 않고 필요한 Take · 가진 Take 를 말한다. 시작하면 무엇을 몇 Take 로 시작했는지 되짚는다.
+ */
+async function startChatVideos(input: {
+  userText: string
+  requested: string[] | null
+  say: (content: string) => void
+  onJob: GenerationJobObserver
+  isCurrent: () => boolean
+}): Promise<void> {
+  const locale = contentLocale()
+  const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars)
+  if (!useDirectorCanvasStore.getState().projectId) return
+  if (useDirectorCanvasStore.getState().videoBatchBusy) {
+    input.say(t('A video batch is already running. Ask again when it finishes.'))
+    return
+  }
+  // 러너 · 잔액 훅은 지연 로드 — video-batch-client 가 이 스토어를 import 하므로 정적 import 는 순환이 된다.
+  const [{ runVideoBatch, eligibleVideoBatchShotIds }, { buildVideoBatchInputs }, { fetchTakeBalance }, { planVideoBatch, videoBatchTakeCosts, describeVideoBatchPlan }] =
+    await Promise.all([
+      import('@/lib/director/video-batch-client'),
+      import('@/lib/director/video-batch-inputs'),
+      import('@/lib/billing/use-take-balance'),
+      import('@/lib/director/video-batch-plan'),
+    ])
+  if (!input.isCurrent()) return
+  const { projectId: pid, nodes } = useDirectorCanvasStore.getState()
+  const names = directorBoardNames()
+  const grounded = groundVideoRequest({
+    text: input.userText,
+    requested: input.requested,
+    shots: directorShotRefs(nodes, names),
+    eligible: eligibleVideoBatchShotIds(nodes),
+    selected: selectedShotNodeIds(),
+  })
+  if (!grounded.ok) {
+    input.say(t('Which shots should get videos? Tell me the shot numbers. Videos use Takes, so I only make the shots you name.'))
+    return
+  }
+  if (grounded.shotIds.length === 0) {
+    input.say(t('There are no such shots right now.'))
+    return
+  }
+  const inputs = buildVideoBatchInputs(pid, nodes, grounded.shotIds)
+  if (inputs.skipped.length > 0) {
+    const reason = inputs.skipped[0].reason
+    input.say(t(reason === 'missing_writer_shot_id'
+      ? 'Video generation is on hold because a shot is not linked to Writer. Please request videos for shots created in Writer.'
+      : reason === 'unresolvable_manual_wiring'
+        ? 'Video generation is on hold because a connected image or previous video is not ready. Check the image connections or wait for the previous video to finish.'
+        : 'Video generation is on hold because a shot could not be found. Check the current shots and try again.'))
+    return
+  }
+  const takes = await fetchTakeBalance()
+  if (!input.isCurrent()) return
+  const plan = planVideoBatch(videoBatchTakeCosts(nodes, grounded.shotIds), takes.balance, takes.mode)
+  if (plan.mode === 'enforce' && plan.short) {
+    input.say(`${describeVideoBatchPlan(plan, t)[0]} ${t('I did not start any videos. Add Takes or ask for fewer shots.')}`)
+    return
+  }
+  void runVideoBatch(pid, { onJob: input.onJob, shotIds: grounded.shotIds })
+  const shots = shotListLabel(locale, grounded.shotIds.map((id) => shotLabelOf(nodes.find((node) => node.id === id), names)))
+  input.say(plan.mode === 'off'
+    ? t('Started making videos for {shots}. Progress shows on the line above the cards.', { shots })
+    : t('Started making videos for {shots} · {takes} Takes. Progress shows on the line above the cards.', { shots, takes: plan.requiredTakes }))
+}
 
 /** 리뉴얼 1차 Writer(id producer) 산문을 고칠 수 있는 때 — 확정 전 산문 초안이 있고 지금 Writer 화면이다. */
 function writerProseLive(): boolean {
@@ -3661,125 +3746,74 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         })
       }
       if (stage === 'director') {
-        // Agentic 응답 — DirectorCanvasUpdate[]
+        // 오너 2026-11-14 9번 "루미에게 부탁하면 바로 실행해줘" — 확인 카드 없이 바로 한다. 그림은 Take 를 쓰지 않아 곧장 만들고,
+        //   영상은 사용자가 말한 샷만(막이) · Take 가 모자라면 하나도 시작하지 않는다. 글(샷 이름 · 프롬프트, 씬 설명 등)은
+        //   "끝난 결과가 글이면 전후 비교 후 변화 채택" — 전 · 후를 보이고 [적용]을 눌러야 바뀐다. 설정 · 연결 · 새 노드는 지금처럼 바로.
+        //   약속: tests/director/lumi-chat-runs.test.ts
         if (Array.isArray(data.updates)) {
           const updates = data.updates as DirectorCanvasUpdate[]
-          // 이미지는 과금 생성이므로 채팅 응답에서 바로 실행하지 않는다. 같은 응답의 무과금
-          // 수정은 즉시 반영하되, 이미지 생성은 하나의 승인 카드로만 묶는다.
-          // 약속 E3(2026-09-04): 영상 일괄도 승인 카드로만 — 버튼 확인창과 같은 숫자를 보인다.
-          const videoBatchUpdates = updates.filter((update) => update.type === 'generateVideos')
-          const immediateUpdates = updates.filter(
-            (update) => update.type !== 'generateImage' && update.type !== 'generateVideos',
+          const lumiSays = (content: string) => {
+            if (!isCurrentSession()) return
+            set((state) => ({ messages: [...state.messages, { id: makeId(), stage, role: 'model' as const, content }] }))
+            if (projectId) saveChatMessage(projectId, stage, 'model', content)
+          }
+          const before = useDirectorCanvasStore.getState()
+          const names = directorBoardNames()
+          // 그림을 "남은 것 전부"로 부탁하면 만들기 전에 몇 장인지 센다(만들기 시작하면 상태가 바뀐다).
+          const missingImages = before.nodes.filter((node) => isShotData(node.data) && node.data.storyboardImage?.status !== 'completed' && node.data.storyboardImage?.status !== 'generating').length
+          // 예전 모양(Take 노드 하나의 영상)이 와도 그 샷의 영상 부탁으로 읽어 같은 막이를 거친다.
+          const videoRequests: Array<string[] | null> = updates.flatMap((update) => {
+            if (update.type === 'generateVideos') return [Array.isArray(update.shotIds) ? update.shotIds : null]
+            if (update.type === 'generateVideo') {
+              const take = before.nodes.find((node) => node.id === update.id)
+              return take && isVideoData(take.data) && take.data.parentShotNodeId ? [[take.data.parentShotNodeId]] : [[update.id]]
+            }
+            return []
+          })
+          const { immediate, edits } = splitDirectorTextEdits(
+            updates.filter((update) => update.type !== 'generateVideos' && update.type !== 'generateVideo'),
+            before.nodes,
           )
-          const result = useDirectorCanvasStore
-            .getState()
-            .applyUpdates(immediateUpdates, {
-              traceId,
-              onJob: observeGeneration,
-            })
+          const result = useDirectorCanvasStore.getState().applyUpdates(immediate, { traceId, onJob: observeGeneration })
           const resolvedIds = result.resolvedIds ?? {}
-          const imageUpdates = updates.filter((update) => update.type === 'generateImage').map(update =>
-            update.id && Object.hasOwn(resolvedIds, update.id) ? { ...update, id: resolvedIds[update.id] } : update,
-          )
-          let imageProposalAccepted = false
-          let videoProposalAccepted = false
+          const resolve = (id: string) => (Object.hasOwn(resolvedIds, id) ? resolvedIds[id] : id)
+          const locale = contentLocale()
+          const imageUpdates = immediate.filter((update): update is Extract<DirectorCanvasUpdate, { type: 'generateImage' }> => update.type === 'generateImage')
           if (imageUpdates.length > 0) {
-            const locale = contentLocale()
-            imageProposalAccepted = get().offerPendingProposal(
+            const after = useDirectorCanvasStore.getState().nodes
+            const named = imageUpdates.flatMap((update) => (update.id ? [resolve(update.id)] : []))
+            const labels = named.map((id) => shotLabelOf(after.find((node) => node.id === id), names))
+            lumiSays(
+              imageUpdates.some((update) => !update.id)
+                ? missingImages === 0
+                  ? translate(locale, 'There are no such shots right now.')
+                  : translate(locale, 'Started making live-action images for {count} shots · No Takes used. Progress shows on the line above the cards.', { count: missingImages })
+                : translate(locale, 'Started making live-action images for {shots} · No Takes used. Progress shows on the line above the cards.', { shots: shotListLabel(locale, labels) }),
+            )
+          }
+          let textCardOffered = false
+          if (edits.length > 0) {
+            textCardOffered = get().offerPendingProposal(
               createPendingProposal({
                 traceId,
                 stage: 'director',
-                kind: 'directorGenerateStoryboardImage',
-                target: translate(locale, 'Storyboard image'),
-                action: translate(locale, 'Generate image'),
-                impact: [
-                  translate(locale, 'Costs money to generate the image.'),
-                  translate(locale, 'Nothing runs until you approve.'),
-                ],
-                payload: { updates: imageUpdates },
+                kind: 'directorTextEdit',
+                target: translate(locale, 'Text changes'),
+                action: translate(locale, 'Apply the text Lumi suggested'),
+                impact: directorTextEditLines(locale, edits, before.nodes, names),
+                payload: { projectId, edits },
               }),
             )
-            if (!imageProposalAccepted) {
-              set({
-                error: translate(
-                  locale,
-                  'A proposal is already pending, so the new Director image generation proposal was held back.',
-                ),
-              })
-            }
+            if (!textCardOffered) set({ error: translate(locale, 'A proposal is already pending, so the new text change was held back.') })
           }
-          if (videoBatchUpdates.length > 0) {
-            const locale = contentLocale()
-            const tr = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars)
-            if (imageUpdates.length > 0) {
-              set({ error: tr('A proposal is already pending, so the video generation proposal was held back.') })
-            } else {
-              // 러너·잔액 훅은 지연 로드 — video-batch-client 가 스토어를 import 하므로 정적 import 는 순환이 된다.
-              const [{ eligibleVideoBatchShotIds }, { fetchTakeBalance }, { planVideoBatch, videoBatchTakeCosts, describeVideoBatchPlan }] =
-                await Promise.all([
-                  import('@/lib/director/video-batch-client'),
-                  import('@/lib/billing/use-take-balance'),
-                  import('@/lib/director/video-batch-plan'),
-                ])
-              const { buildVideoBatchInputs } = await import('@/lib/director/video-batch-inputs')
-              if (!isCurrentSession()) return
-              const nodes = useDirectorCanvasStore.getState().nodes
-              const eligible = eligibleVideoBatchShotIds(nodes)
-              const inputs = buildVideoBatchInputs(projectId ?? '', nodes, eligible)
-              const inputSignature = JSON.stringify({ projectId, eligible, inputs })
-              if (eligible.length === 0) {
-                get().notifyIssue('director', tr('Every shot already has a video or one in progress.'))
-              } else if (inputs.skipped.length > 0) {
-                const reason = inputs.skipped[0].reason
-                const message = reason === 'missing_writer_shot_id'
-                  ? 'Video generation is on hold because a shot is not linked to Writer. Please request videos for shots created in Writer.'
-                  : reason === 'unresolvable_manual_wiring'
-                    ? 'Video generation is on hold because a connected image or previous video is not ready. Check the image connections or wait for the previous video to finish.'
-                    : 'Video generation is on hold because a shot could not be found. Check the current shots and try again.'
-                get().notifyIssue('director', tr(message))
-              } else {
-                const takes = await fetchTakeBalance()
-                if (!isCurrentSession()) return
-                const plan = planVideoBatch(videoBatchTakeCosts(nodes, eligible), takes.balance, takes.mode)
-                videoProposalAccepted = get().offerPendingProposal(
-                  createPendingProposal({
-                    traceId,
-                    stage: 'director',
-                    kind: 'directorGenerateVideoBatch',
-                    target: tr('Videos'),
-                    action: tr('Generate videos for {count} shots', { count: plan.total }),
-                    impact: [
-                      tr('Costs Takes for every generated video.'),
-                      ...describeVideoBatchPlan(plan, tr),
-                      tr('Nothing runs until you approve.'),
-                    ],
-                    payload: {
-                      projectId,
-                      inputSignature,
-                      limit: plan.runCount,
-                      total: plan.total,
-                      requiredTakes: plan.requiredTakes,
-                      balance: plan.balance,
-                      mode: plan.mode,
-                    },
-                  }),
-                )
-                if (!videoProposalAccepted) {
-                  set({ error: tr('A proposal is already pending, so the video generation proposal was held back.') })
-                }
-              }
-            }
+          for (const requested of videoRequests.slice(0, 1)) {
+            await startChatVideos({ userText: trimmed, requested: requested ? requested.map(resolve) : null, say: lumiSays, onJob: observeGeneration, isCurrent: isCurrentSession })
           }
           patchTrace({
             appliedCount: result.applied,
             skippedCount: result.skipped.length,
-            pendingProposal: imageProposalAccepted || videoProposalAccepted,
-            ...(imageProposalAccepted || videoProposalAccepted
-              ? { generationStatus: 'awaiting_approval' }
-              : immediateUpdates.some((u) => u.type === 'generateVideo') &&
-                  result.skipped.length > 0
-              ? { generationStatus: 'skipped' }
-              : {}),
+            pendingProposal: textCardOffered,
+            ...(textCardOffered ? { generationStatus: 'awaiting_approval' } : {}),
           })
           if (result.skipped.length > 0) {
             console.warn(
@@ -3792,23 +3826,6 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
                 count: result.skipped.length,
               }),
             )
-          }
-          // 방어선(#영상거짓수락) — 프롬프트 규칙이 뚫려 모델이 그래도 generateVideo 를 냈을 때,
-          //   "생성할게요" 라고 이미 답한 채팅에 거절 흔적이 안 남는 사고를 막는다. skip 사유로
-          //   판별해 정직한 안내를 별도 모델 메시지로 영속화한다(원래 reply 는 건드리지 않는다).
-          if (result.skipped.some((s) => s.update.type === 'generateVideo')) {
-            // 약속 E3(2026-09-04): 일괄은 승인 카드로 되지만 샷 하나는 여전히 안 된다 — 문구도 그대로 말한다.
-            const honestNotice = translate(
-              contentLocale(),
-              'Chat can start videos only for all remaining shots at once. For one shot, use the Video take button on the Shot node.',
-            )
-            set((state) => ({
-              messages: [
-                ...state.messages,
-                { id: makeId(), stage, role: 'model' as const, content: honestNotice },
-              ],
-            }))
-            if (projectId) saveChatMessage(projectId, stage, 'model', honestNotice)
           }
         }
       }
@@ -4965,6 +4982,31 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           },
         })
         if (!key) { proposal.submissionUncertain = false; throw new Error(translate(contentLocale(), 'Could not start')) }
+      } else if (proposal.kind === 'directorTextEdit') {
+        // 오너 2026-11-14 9번 — Lumi 가 고친 글은 전 · 후를 본 뒤 [적용]해야 바뀐다. 그새 사람이 그 글을 고쳤으면 옛 글 기준의 수정안으로 덮지 않는다.
+        const edits = Array.isArray(proposal.payload.edits) ? (proposal.payload.edits as DirectorTextEdit[]) : []
+        if (edits.length === 0) throw new Error('text edits missing')
+        const canvas = useDirectorCanvasStore.getState()
+        const stale = edits.some((edit) => {
+          const node = canvas.nodes.find((item) => item.id === edit.nodeId)
+          return !node || currentDirectorText(node, edit.field) !== edit.before
+        })
+        if (stale) {
+          speak(translate(contentLocale(), 'The text changed since Lumi suggested this. Please ask again.'))
+          return false
+        }
+        const patches = new Map<string, { kind: DirectorTextEdit['kind']; patch: Record<string, string> }>()
+        for (const edit of edits) {
+          const entry = patches.get(edit.nodeId) ?? { kind: edit.kind, patch: {} }
+          entry.patch[edit.field] = edit.after
+          patches.set(edit.nodeId, entry)
+        }
+        const textUpdates = [...patches].map(([id, { kind, patch }]) =>
+          (kind === 'shot' ? { type: 'updateShot', id, patch } : { type: 'updateScene', id, patch }) as DirectorCanvasUpdate,
+        )
+        const applied = canvas.applyUpdates(textUpdates)
+        if (applied.applied === 0) throw new Error('no text edits could apply')
+        speak(translate(contentLocale(), 'Applied the text.'))
       } else if (proposal.kind === 'directorGenerateStoryboardImage') {
         if (proposal.payload.projectId && proposal.payload.projectId !== useProjectStore.getState().projectId) {
           throw new Error(translate(contentLocale(), 'This approval belongs to a different project. Please request it again.'))
