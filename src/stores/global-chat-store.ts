@@ -3200,8 +3200,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     }
     //   Take 카드는 Lumi 가 "'응' 또는 '아니'로 답해 주세요"라고 묻는다 — 낸 단계에서는 "응 · 네"도 승인으로 받는다(saysYes — 물음표는 거절, 검토 a 통합 보통 B).
     const takeCard = !!pendingProposal && proposalUsesTakes(pendingProposal)
+    //   글만 고친 카드(Take 없음)도 낸 단계에서는 같은 낱말("응 · 네")을 받는다(리드 결정 · 검토 b Y2). 다른 단계는 지금처럼 승인 말만.
     const approvesHere = stage !== 'editor' && !!pendingProposal &&
-      (takeCard ? pendingProposal.stage === stage && saysYes(trimmed) : isApprovalUtterance(trimmed))
+      (takeCard
+        ? pendingProposal.stage === stage && saysYes(trimmed)
+        : isApprovalUtterance(trimmed) || (pendingProposal.stage === stage && saysYes(trimmed)))
     if (pendingProposal && approvesHere && pendingProposal.kind === 'producerWriterInitialHandoff' && !useProjectStore.getState().producerLocked) {
       // Writer 첫 넘김 = Producer 잠금(2026-10-01) — 말로 승인해도 버튼과 같은 확정 창을 거친다.
       get().appendLocalExchange(stage, trimmed, translate(contentLocale(), 'Check the values in the window, then confirm to hand over.'))
