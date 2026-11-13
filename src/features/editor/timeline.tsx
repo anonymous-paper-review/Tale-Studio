@@ -10,8 +10,8 @@ import type { Shot, VideoClip, AudioTrackClip } from '@/types'
 import { cn } from '@/lib/utils'
 import { drawWaveform } from '@/lib/audio-waveform'
 import { PX_PER_SEC_MIN, PX_PER_SEC_MAX, isTitleCardShotId, useEditorStore, type TrackLayoutItem, type VideoTrackState, type AudioTrackState } from '@/stores/editor-store'
-import { timelineEnd, timelineSegments } from '@/lib/editor/timeline-segments'
-import { formatTimecode } from '@/lib/editor/sequence-info'
+import { timelineSegments } from '@/lib/editor/timeline-segments'
+import { formatTimecode, sequenceLengthSec } from '@/lib/editor/sequence-info'
 import { SNAP_PX, draggedIds, makeSnapper, snapTargets } from '@/lib/editor/snap'
 import { RulerMarkers } from '@/features/editor/timeline-markers'
 import {
@@ -500,13 +500,13 @@ export function Timeline({
 
   const cutMode = toolMode === 'cut'
 
-  // 빈 곳이 있어도 영상 줄은 마지막 클립 끝까지다(자유 배치, 2026-11-14).
-  const videoSec = useMemo(() => timelineEnd(layout), [layout])
   const segments = useMemo(() => timelineSegments(layout), [layout])
-  const totalSec = useMemo(() => {
-    const audioEnd = audioClips.reduce((max, a) => Math.max(max, a.startSec + a.durationSec), 0)
-    return Math.max(videoSec, audioEnd, currentTime) // 플레이헤드가 끝을 넘으면 영역 확장 (요청 5)
-  }, [videoSec, audioClips, currentTime])
+  // 자 · 가로 폭 — 시퀀스 길이(모든 줄 · 소리의 끝, 빈 곳 · 눈 끈 줄 포함 — 위 둘째 줄과 같은 길이, 검토 c ② 낮음 4).
+  //   플레이헤드가 끝을 넘으면 영역을 넓힌다(요청 5).
+  const totalSec = useMemo(
+    () => Math.max(sequenceLengthSec([...layout, ...overlayLayout], audioClips), currentTime),
+    [layout, overlayLayout, audioClips, currentTime],
+  )
   const totalWidth = Math.max(totalSec * pxPerSec, 320)
 
   const clientXToSec = useCallback(

@@ -9,9 +9,9 @@ import { Button } from '@/components/ui/button'
 import { TitleCardStage } from '@/features/editor/title-card-stage'
 import { SubtitleLayer } from '@/features/editor/subtitle-layer'
 import { resolveSubtitle } from '@/lib/editor/subtitle'
-import { useEditorStore, selectProgramLayout, selectVideoLayout, isTitleCardShotId, timelineEnd } from '@/stores/editor-store'
+import { useEditorStore, selectProgramLayout, selectVideoLayout, isTitleCardShotId } from '@/stores/editor-store'
 import { editPointTarget } from '@/lib/editor/timeline-segments'
-import { SEQUENCE_FPS, formatTimecode } from '@/lib/editor/sequence-info'
+import { SEQUENCE_FPS, formatTimecode, sequenceLengthSec } from '@/lib/editor/sequence-info'
 import { cachedVideoUrl } from '@/features/editor/video-prefetch'
 import { previewPane } from '@/features/editor/editor-labels'
 import { useT } from '@/lib/i18n'
@@ -93,10 +93,10 @@ export function VideoPreviewer() {
         return
       }
 
-      // 타임라인 모드 — 전체 길이는 빈 곳까지 센 영상 줄 끝이다(자유 배치, 검토 c 보통 1). 줄이 여럿이면 시각마다 눈을 켠
-      //   가장 위 줄의 클립을 보인다(2단계 ②) — 가려졌다 다시 보이는 클립은 그 자리부터.
+      // 타임라인 모드 — 전체 길이는 시퀀스 길이(모든 줄 · 소리의 끝, 빈 곳 · 눈 끈 줄 포함 — 검토 c 보통 1 · ② 낮음 4). 줄이 여럿이면
+      //   시각마다 눈을 켠 가장 위 줄의 클립을 보인다(2단계 ②) — 가려졌다 다시 보이는 클립은 그 자리부터.
       const layout = selectProgramLayout(st)
-      const total = timelineEnd(layout)
+      const total = sequenceLengthSec(selectVideoLayout(st), st.audioClips)
       const t = st.currentTime
       // 디졸브(2026-09-08): 검은 막의 투명도만 시간에 따라 — 영상 픽셀은 손대지 않는다.
       if (dissolveRef.current) dissolveRef.current.style.opacity = String(dissolveOpacityAt(layout, st.videoClips, t))
@@ -151,8 +151,7 @@ export function VideoPreviewer() {
         if (v && v.duration) v.currentTime = ratio * v.duration
         return
       }
-      const layout = selectProgramLayout(st)
-      const total = timelineEnd(layout)
+      const total = sequenceLengthSec(selectVideoLayout(st), st.audioClips)
       seek(ratio * total)
     },
     [seek],
@@ -327,7 +326,7 @@ export function VideoPreviewer() {
             <Button size="icon" variant="ghost" className="size-8 rounded-full text-muted-foreground hover:text-foreground" onClick={() => goTo((st, layout) => editPointTarget(layout, st.currentTime, 1))} title={t('Next edit point (Ctrl+→)')} aria-label={t('Next edit point (Ctrl+→)')}>
               <SkipForward className="size-4" />
             </Button>
-            <Button size="icon" variant="ghost" className="size-8 rounded-full text-muted-foreground hover:text-foreground" onClick={() => goTo((_st, layout) => timelineEnd(layout))} title={t('Go to end')} aria-label={t('Go to end')}>
+            <Button size="icon" variant="ghost" className="size-8 rounded-full text-muted-foreground hover:text-foreground" onClick={() => goTo((st, layout) => sequenceLengthSec(layout, st.audioClips))} title={t('Go to end')} aria-label={t('Go to end')}>
               <ArrowRightToLine className="size-4" />
             </Button>
           </div>

@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { useEditorStore, selectProgramLayout, selectVideoLayout, timelineEnd } from '@/stores/editor-store'
+import { useEditorStore, selectVideoLayout } from '@/stores/editor-store'
 import { editPointTarget } from '@/lib/editor/timeline-segments'
-import { SEQUENCE_FPS } from '@/lib/editor/sequence-info'
+import { SEQUENCE_FPS, sequenceLengthSec } from '@/lib/editor/sequence-info'
 
 // 한 장 — 시:분:초:장 · 내보내기와 같은 초당 장 수(2단계 ① 새 배치).
 const FRAME = 1 / SEQUENCE_FPS
@@ -129,12 +129,8 @@ export function useEditorPlayback() {
       const dt = (ts - lastTsRef.current) / 1000
       lastTsRef.current = ts
 
-      const layout = selectProgramLayout(st)
-      // 빈 곳이 있어도 영상 줄은 마지막 클립 끝까지다(자유 배치, 2026-11-14).
-      const videoTotal = timelineEnd(layout)
-      // 오디오가 영상보다 길면 그 끝까지 재생 (영상 끝에서 멈추지 않음 — 요청 5)
-      const audioEnd = st.audioClips.reduce((m, a) => Math.max(m, a.startSec + a.durationSec), 0)
-      const total = Math.max(videoTotal, audioEnd)
+      // 시퀀스 길이까지 재생 — 빈 곳 · 눈 끈 줄 · 영상보다 긴 소리까지(요청 5 · 자유 배치 · 검토 c ② 낮음 4).
+      const total = sequenceLengthSec(selectVideoLayout(st), st.audioClips)
       const next = currentTime + dt
       if (next >= total) {
         seek(total)

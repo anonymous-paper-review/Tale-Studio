@@ -206,6 +206,8 @@ export async function renderDraftTimeline(opts: {
   /** 저장 파일 이름(확장자 제외). */
   fileBaseName: string
   layout: LayoutItem[]
+  /** 시퀀스 길이(눈 끈 줄 · 소리까지 센 끝) — 보이는 클립보다 길면 그 끝까지 검은 화면으로 녹화한다(위 둘째 줄과 같은 길이). */
+  endSec?: number
   shots: ShotLike[]
   videoClips: VideoClipLike[]
   audioClips: AudioTrackClip[]
@@ -219,7 +221,7 @@ export async function renderDraftTimeline(opts: {
   // 빈 곳이 있어도 영상 줄은 마지막 클립 끝까지다(자유 배치, 2026-11-14).
   const videoTotal = timelineEnd(layout)
   const audioEnd = audioClips.reduce((m, a) => Math.max(m, a.startSec + a.durationSec), 0)
-  const total = Math.max(videoTotal, audioEnd)
+  const total = Math.max(videoTotal, audioEnd, opts.endSec ?? 0)
   if (!(total > 0)) throw new Error('empty timeline')
   if (signal?.aborted) throw abortError()
 
@@ -442,9 +444,10 @@ export async function renderDraftTimeline(opts: {
       await waitUntil(item.startSec + item.durationSec)
       videoEl.pause()
     }
-    // 오디오가 영상보다 길면 마지막 프레임을 유지한 채 끝까지 녹음.
+    // 소리 · 눈 끈 줄이 보이는 영상보다 길면 끝까지 녹음한다 — 그 사이는 빈 곳처럼 순검정(미리 보기와 같다, 검토 c ② 낮음 4).
     videoActive = false
     activeLabel = ''
+    inGap = true
     await waitUntil(total + TAIL_PAD_SEC)
   })()
 

@@ -226,7 +226,8 @@ describe('빈 곳 재생 · 내보내기', () => {
     expect(timelineEnd(selectTimelineLayout(api()))).toBe(16)
     const previewer = read('src/features/editor/video-previewer.tsx')
     expect(previewer).not.toMatch(/sum \+ l\.durationSec/)
-    expect(previewer.match(/const total = timelineEnd\(layout\)/g)).toHaveLength(2)
+    // 전체 길이는 시퀀스 길이(모든 줄 · 소리의 끝)로 센다 — 위 둘째 줄 · 자 · 재생 끝 · 내보내기와 같은 길이(검토 c ② 낮음 4).
+    expect(previewer.match(/const total = sequenceLengthSec\(selectVideoLayout\(st\), st\.audioClips\)/g)).toHaveLength(2)
   })
 
   it('내보낸 영상의 빈 곳은 미리 보기처럼 순검정으로 칠한다', () => {

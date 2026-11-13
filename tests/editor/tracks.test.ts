@@ -12,6 +12,7 @@ vi.mock('@/stores/project-store', () => ({
 
 import { saveEditorNow, selectProgramLayout, selectTimelineLayout, selectVideoLayout, useEditorStore } from '@/stores/editor-store'
 import { audibleTrackIds, draftAudioClips } from '@/lib/editor-draft-render'
+import { sequenceLengthSec } from '@/lib/editor/sequence-info'
 import type { PersistedEditor } from '@/lib/editor-persistence'
 import type { AudioTrackClip, Shot, VideoClip } from '@/types'
 
@@ -154,6 +155,28 @@ describe('미리 보기 · 내보내기', () => {
     const clips = [linked('A', 0), { ...linked('B', 4), trackId: 'atrack_2' }]
     expect(draftAudioClips(clips, tracks).map((a) => a.id)).toEqual(['a_B'])
     expect(read('src/features/editor/audio-meter.tsx')).toMatch(/audibleTrackIds\(/)
+  })
+})
+
+describe('시퀀스 길이', () => {
+  it('눈을 끈 줄 · V2 의 클립도 시퀀스 길이에 든다 — 위 둘째 줄 · 자 · 모니터 전체 길이 · 재생 끝 · 내보낸 영상이 같은 길이를 쓴다', () => {
+    // 왜: 검토 c(② 낮음 4) — 위 둘째 줄은 눈 끈 줄까지, 내보내기 · 재생 끝은 보이는 클립까지, 자는 V1 만 세어 길이가 셋으로 갈렸다.
+    //   프리미어처럼 줄의 눈 · 음소거와 상관없이 모든 줄의 마지막 끝이 시퀀스 길이다(눈 끈 줄만 남은 끝은 검은 화면).
+    api().moveClipToTrack('D', 'v2', 20)
+    api().removeAudioClip('a_D')
+    api().toggleTrackVisible('v2')
+    expect(sequenceLengthSec(selectVideoLayout(api()), api().audioClips)).toBe(24)
+    expect(read('src/app/studio/editor/page.tsx')).toMatch(/sequenceInfoLine\(sequenceLengthSec\(\[\.\.\.timelineLayout, \.\.\.overlayLayout\], audioClips\), projectFormat\)/)
+    expect(read('src/features/editor/timeline.tsx')).toMatch(/Math\.max\(sequenceLengthSec\(\[\.\.\.layout, \.\.\.overlayLayout\], audioClips\), currentTime\)/)
+    expect(read('src/features/editor/video-previewer.tsx').match(/const total = sequenceLengthSec\(selectVideoLayout\(st\), st\.audioClips\)/g)).toHaveLength(2)
+    expect(read('src/features/editor/use-editor-playback.ts')).toMatch(/const total = sequenceLengthSec\(selectVideoLayout\(st\), st\.audioClips\)/)
+    const page = read('src/app/studio/editor/page.tsx')
+    expect(page).toMatch(/const totalSec = sequenceLengthSec\(selectVideoLayout\(st\), st\.audioClips\)/)
+    expect(page).toMatch(/endSec: totalSec,/)
+    const render = read('src/lib/editor-draft-render.ts')
+    expect(render).toMatch(/const total = Math\.max\(videoTotal, audioEnd, opts\.endSec \?\? 0\)/)
+    // 마지막 보이는 클립 뒤(눈 끈 줄 · 소리만 남은 끝)는 빈 곳처럼 순검정 — 미리 보기와 같다.
+    expect(render).toMatch(/videoActive = false\s*activeLabel = ''\s*inGap = true\s*await waitUntil\(total \+ TAIL_PAD_SEC\)/)
   })
 })
 

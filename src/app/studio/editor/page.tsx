@@ -20,7 +20,7 @@ import { AudioMeter } from '@/features/editor/audio-meter'
 import { ResizeHandle } from '@/features/editor/resize-handle'
 import { useEditorPlayback } from '@/features/editor/use-editor-playback'
 import { resetVideoPrefetchFor } from '@/features/editor/video-prefetch'
-import { useEditorStore, selectOverlayLayout, selectProgramLayout, selectTimelineLayout, timelineEnd, zoomStep, PANEL_SOURCE_W_MIN } from '@/stores/editor-store'
+import { useEditorStore, selectOverlayLayout, selectProgramLayout, selectTimelineLayout, selectVideoLayout, zoomStep, PANEL_SOURCE_W_MIN } from '@/stores/editor-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import { sequenceInfoLine, sequenceLengthSec } from '@/lib/editor/sequence-info'
@@ -161,12 +161,10 @@ export default function PostPage() {
       return
     }
     const st = useEditorStore.getState()
-    // 줄이 여럿이면 시각마다 눈을 켠 가장 위 줄의 클립을 녹화한다 — 미리 보기와 같다(2단계 ②).
+    // 줄이 여럿이면 시각마다 눈을 켠 가장 위 줄의 클립을 녹화한다 — 미리 보기와 같다(2단계 ②). 길이는 시퀀스 길이 — 눈 끈 줄 ·
+    //   소리까지 센 끝이고, 보이는 클립이 없는 끝은 검은 화면이다(위 둘째 줄 · 재생 끝과 같다, 검토 c ② 낮음 4).
     const layout = selectProgramLayout(st)
-    const totalSec = Math.max(
-      timelineEnd(layout),
-      st.audioClips.reduce((m, a) => Math.max(m, a.startSec + a.durationSec), 0),
-    )
+    const totalSec = sequenceLengthSec(selectVideoLayout(st), st.audioClips)
     if (!(totalSec > 0)) {
       toast.info(t('No clips in the timeline to render.'))
       return
@@ -184,6 +182,7 @@ export default function PostPage() {
         projectId,
         fileBaseName: `${base}_draft`,
         layout,
+        endSec: totalSec,
         shots: st.shots,
         videoClips: st.videoClips,
         audioClips: st.audioClips,
