@@ -3335,6 +3335,8 @@ export const KO: Record<string, string> = {
   '{images} images · {videos} videos · about {minutes} min · {takes} Takes': '이미지 {images}장 · 영상 {videos}개 · 약 {minutes}분 · Takes {takes}',
   'All 1 shot': '전체 1개',
   'Make 1 image again?': '이미지 1장을 다시 만들까요?',
+  // 샷 상세 · 노드 위 [이미지 다시 만들기] 확인 창 제목 — 툴바 확인 창과 같은 말(영어 재점검 · 리드 11/14).
+  'Make the image again?': '이미지를 다시 만들까요?',
   'Remakes the image for the 1 picked shot. No Takes are used.': '고른 샷 1개의 이미지를 다시 만들어요. Takes 는 쓰지 않아요.',
   'Makes 1 image, and its video starts by itself when the image is done.': '이미지 1장을 만들고, 이미지가 끝나면 영상이 저절로 시작돼요.',
   "1 video didn't start because its image wasn't made.": '이미지를 못 만들어 영상 1개는 시작하지 않았어요',

@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { getUser } from '@/lib/supabase/auth'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { userOwnsProject } from '@/lib/generation-jobs'
-import { cancelDirectorJobs } from '@/lib/director/job-cancellations'
+import { cancelDirectorJobs, closeVideoBatchesLeftStopped } from '@/lib/director/job-cancellations'
 
 const bodySchema = z.object({
   projectId: z.string().uuid(),
@@ -24,7 +24,15 @@ export async function POST(req: Request) {
   if (!(await userOwnsProject(projectId, user.id))) return NextResponse.json({ ok: false, error: 'Forbidden' }, { status: 403 })
   try {
     const cancelled = await cancelDirectorJobs(projectId, jobIds, user.id)
-    return NextResponse.json({ ok: true, data: { cancelled } })
+    // 영상 묶음의 마지막 영상을 멈췄으면 그 묶음도 닫는다(오너 7번 · 리드 11/14). 덤이라 실패해도 멈춤은 그대로 돌려준다 —
+    //   닫지 못한 묶음은 지금처럼 그 영상이 끝나면 이어가기가 닫는다.
+    let closedBatchIds: string[] = []
+    try {
+      closedBatchIds = await closeVideoBatchesLeftStopped(projectId, user.id, cancelled.filter((job) => job.kind === 'shot_video').map((job) => job.jobId))
+    } catch (error) {
+      console.error('[director/jobs/cancel] batch close failed:', error instanceof Error ? error.message : error)
+    }
+    return NextResponse.json({ ok: true, data: { cancelled, ...(closedBatchIds.length ? { closedBatchIds } : {}) } })
   } catch (error) {
     console.error('[director/jobs/cancel]', error instanceof Error ? error.message : error)
     return NextResponse.json({ ok: false, error: 'Unable to stop the generation' }, { status: 500 })

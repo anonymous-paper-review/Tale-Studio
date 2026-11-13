@@ -14,6 +14,7 @@ import { buildVideoBatchInputs } from '@/lib/director/video-batch-inputs'
 import type { VideoBatchStartResponse, VideoBatchSummary } from '@/lib/director/video-batch-types'
 import { videoBatchQueueOf } from '@/lib/director/video-batch-queue'
 import { invalidateShots } from '@/lib/shots-cache'
+import { activeJobsSnapshot } from '@/lib/generation-queue'
 
 const EMPTY_RESULT = { total: 0, started: 0, failed: 0 }
 /** 서버 저장/조회로 이어가는 배치의 진행을 다시 확인하는 주기(#batch-resume, 2026-09-09). */
@@ -77,6 +78,18 @@ function sleep(ms: number): Promise<void> {
  */
 function isBatchActive(summary: VideoBatchSummary): boolean {
   return summary.status === 'running' || summary.active > 0
+}
+
+/**
+ * 멈춘 묶음(running 아님)에 남은 영상이 모두 화면에서 멈춘 것이면 끝난 것으로 본다 — 그 영상이 생성처에서 끝나기를(몇 분)
+ * 기다리지 않는다(오너 7번 · 리드 11/14). 묶음이 도는 동안은 상세 · 넘기기 창 · Lumi 가 그 샷을 다시 만들지 못한다.
+ * 멈춤은 지금 도는 작업 목록(멈춘 때가 붙은 것)으로 안다 — 목록이 아직 모르면 다음 조회에서 다시 본다.
+ */
+function onlyStoppedLeft(projectId: string, summary: VideoBatchSummary): boolean {
+  if (summary.status === 'running' || summary.active === 0) return false
+  const stopped = new Set(activeJobsSnapshot(projectId).flatMap((job) => (job.cancelledAt ? [job.id] : [])))
+  const running = summary.jobs.filter((job) => job.status === 'queued')
+  return running.length > 0 && running.every((job) => !!job.jobId && stopped.has(job.jobId))
 }
 
 /** 묶음의 차례 — 지금 만드는 작업과 아직 안 낸 샷(video-batch-queue.ts, [먼저 하기]와 같이 쓴다). */
@@ -159,7 +172,7 @@ async function pollVideoBatch(
   while (true) {
     apply()
     if (!ownsRun()) return null
-    if (!isBatchActive(summary)) return summary
+    if (!isBatchActive(summary) || onlyStoppedLeft(projectId, summary)) return summary
     await sleep(POLL_INTERVAL_MS)
     if (!ownsRun()) return null
 
