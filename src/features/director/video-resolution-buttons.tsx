@@ -6,7 +6,7 @@
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
 import { useTakeBalance } from '@/lib/billing/use-take-balance'
-import { takeCostForVideo } from '@/lib/billing/take-cost'
+import { takeCostForVideo, takeValuesShown } from '@/lib/billing/take-cost'
 import {
   VIDEO_RESOLUTION_CHOICES,
   canChooseVideoResolution,
@@ -60,7 +60,8 @@ export function VideoResolutionButtons({
   )
 }
 
-/** 이번에 만들면 쓸 Take — 영상 노드의 Take 표시와 같은 계산기 · 같은 모양. 과금 모드가 꺼져 있으면 숨긴다. */
+/** 이번에 만들면 쓸 Take — 영상 노드의 Take 표시와 같은 계산기 · 같은 모양. 과금이 정말 꺼졌을 때만 숨긴다 —
+ *  잔액을 못 읽어도 값을 보인다(옆 [영상 재생성]은 단추 값이 곧 동의인 자리, 리드 2026-11-14). */
 export function VideoTakeCost({
   model,
   resolution,
@@ -70,7 +71,7 @@ export function VideoTakeCost({
 }) {
   const t = useT()
   const takeBalance = useTakeBalance()
-  if (takeBalance.mode === 'off') return null
+  if (!takeValuesShown(takeBalance)) return null
   return (
     <span className="rounded-sm border border-primary/40 bg-primary/10 px-1.5 py-1 text-[10px] font-medium text-foreground">
       {t('{count} Take', { count: takeCostForVideo(model, resolution) })}

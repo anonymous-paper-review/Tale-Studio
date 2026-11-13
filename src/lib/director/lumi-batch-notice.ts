@@ -11,7 +11,7 @@ import type { LumiBatchNotice } from '@/stores/lumi-notice-store'
 
 export type LumiNoticeAction =
   | { kind: 'handoff'; label: string }
-  | { kind: 'videos'; label: string; shotIds: string[] }
+  | { kind: 'videos'; label: string; shotIds: string[]; remake?: boolean }
 
 export interface LumiNoticeView {
   title: string
@@ -74,7 +74,8 @@ export function lumiBatchNoticeView(input: {
     done,
     actions: [
       ...(canHandOff ? [{ kind: 'handoff' as const, label: t('Leave out and go to Editor') }] : []),
-      { kind: 'videos', label: t('Make {shots} again', { shots }), shotIds: failed },
+      // [샷 N 다시 만들기]는 넘기기 창 · 샷 상세와 같은 다시 만들기(가장 최근 Take 설정 이어받기, 리드 (a)).
+      { kind: 'videos', label: t('Make {shots} again', { shots }), shotIds: failed, remake: true },
     ],
   }
 }

@@ -114,7 +114,7 @@ describe('Lumi 알림 카드 화면(시안 D8)', () => {
 
     useLumiNoticeStore.setState({ notice: { projectId: 'p-dir', kind: 'video', done: 1, failed: 1 } })
     ;(button(render(LumiBatchNotice), '샷 4 다시 만들기')!.props.onClick as () => void)()
-    expect(startDirectorVideos).toHaveBeenCalledWith(['s4'], '샷 4 다시 만들기')
+    expect(startDirectorVideos).toHaveBeenCalledWith(['s4'], '샷 4 다시 만들기', { remake: true })
     expect(useLumiNoticeStore.getState().notice).toBeNull()
   })
 
