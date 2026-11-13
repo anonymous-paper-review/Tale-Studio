@@ -198,6 +198,7 @@ export function Sidebar() {
           // 사이드바 Editor 는 [다음: Editor로]와 같은 조건 · 같은 넘김(시안 R, 오너 2026-11-14) — 넘기기 전이라도 완성 영상이 있으면 열고, 누르면 넘긴다.
           const viaHandoff = railEditorViaHandoff({
             stage: stage.id,
+            onDirector: visibleStage === 'director',
             reachedDirectorOnly: reachedStage === 'director' && !canNavigateTo('editor'),
             finishedVideo: directorFinishedVideo,
           })
@@ -304,7 +305,7 @@ export function Sidebar() {
                     : isLocked
                       ? isArtistImageLocked
                         ? artistImageLockCopy
-                        : stage.id === 'editor' && reachedStage === 'director'
+                        : stage.id === 'editor' && reachedStage === 'director' && visibleStage === 'director'
                           ? t('A finished video lets you move on.')
                           : t('Complete previous step first')
                       : stage.agent}

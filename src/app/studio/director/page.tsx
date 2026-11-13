@@ -63,7 +63,7 @@ import { LumiChatPill } from '@/features/director/lumi-chat-pill'
 import { PickAllBar, ShotStatusFilterMenu } from '@/features/director/shot-status'
 import { StoryboardZoomPill } from '@/features/director/storyboard-zoom-pill'
 import { useDirectorShotStates } from '@/features/director/hooks/use-shot-states'
-import { countStatusFilters, matchesStatusFilter } from '@/lib/director/shot-state'
+import { countStatusFilters, directorHasFinishedVideo, matchesStatusFilter } from '@/lib/director/shot-state'
 import { HIDDEN_ON_CANVAS, directorCanvasMeta, storyboardCanvasMeta } from '@/features/director/canvas-meta'
 import { separateAssetCards } from '@/features/director/asset-column'
 import { arrangeOnceCardsRendered, renderedCardSizes } from '@/features/director/canvas-layout'
@@ -949,8 +949,8 @@ function PaletteBar() {
   const makingImages = stateList.filter((s) => s === 'image_generating').length
   const makingVideos = stateList.filter((s) => s === 'video_generating').length
   const making = makingImages + makingVideos > 0 || realBatchBusy || videoBatchBusy
-  // [다음: Editor로] · 사이드바 Editor 는 같은 조건 — 완성 영상이 하나라도 있으면 켜진다(시안 R, 결정 페이지 추천).
-  const canHandOff = stateList.some((s) => s === 'video_done')
+  // [다음: Editor로] · 사이드바 Editor · 채팅 넘김은 같은 조건 — 완성 영상이 하나라도 있으면 켜진다(시안 R, 결정 페이지 추천, 리드 검토 a 낮음 7).
+  const canHandOff = directorHasFinishedVideo(nodes)
   // 꺼진 단추와 까닭(결정 페이지 "꺼진 단추 아래 이유 한 줄", 리드 검토 a 보통 1 · 낮음 4) — 일괄이 도는 동안은 눌러도 새 판이 서지 않으니 끈다.
   const imageBlock = imageWorkBlock(shotStates, picked, realBatchBusy)
   const videoBlock = videoWorkBlock(shotStates, picked, videoBatchBusy)

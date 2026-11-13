@@ -40,6 +40,7 @@ import {
   type DirectorCanvasUpdate,
 } from '@/stores/director-store'
 import { isShotData, isVideoData } from '@/types/director'
+import { directorHasFinishedVideo } from '@/lib/director/shot-state'
 import { useWriterStore, type WriterChatUpdate } from '@/stores/writer-store'
 import {
   buildScriptLines,
@@ -1442,8 +1443,10 @@ function handoffBlockers(spec: HandoffSpec, opts?: { acceptIncomplete?: boolean 
     return { hard, soft }
   }
   if (spec.from === 'director') {
-    // director → editor 는 하드 게이트가 없다 (걸어낸 버튼도 항상 활성이었다). soft: final 마킹 영상 없는 샷 수.
+    // director → editor: 완성 영상이 하나라도 있어야 넘긴다 — [다음: Editor로] · 사이드바 Editor 와 같은 조건 · 같은 말
+    //   (1110 확정 시안 R, 리드 검토 a 낮음 7). soft: final 마킹 영상 없는 샷 수.
     const nodes = useDirectorCanvasStore.getState().nodes
+    if (!directorHasFinishedVideo(nodes)) return { hard: [translate(locale, 'A finished video lets you move on.')], soft: [] }
     const shotNodeIds = nodes.filter((n) => isShotData(n.data)).map((n) => n.id)
     const missingFinalCount = shotNodeIds.filter(
       (id) => !nodes.some((n) => isVideoData(n.data) && n.data.parentShotNodeId === id && n.data.final),

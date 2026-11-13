@@ -348,12 +348,15 @@ export function directorHasFinishedVideo(nodes: readonly DirectorNode[]): boolea
 /** 사이드바 Editor 칸을 [다음: Editor로]와 같은 넘김으로 열 때 — 아직 Director 까지만 왔고(넘기기 전) 완성 영상이 있을 때. */
 export function railEditorViaHandoff({
   stage,
+  onDirector,
   reachedDirectorOnly,
   finishedVideo,
 }: {
   stage: string
+  /** 지금 Director 화면인가 — 밖에서는 넘김이 지금 단계의 것을 고르므로 열지 않는다(리드 검토 a S6 보통 2). */
+  onDirector: boolean
   reachedDirectorOnly: boolean
   finishedVideo: boolean
 }): boolean {
-  return stage === 'editor' && reachedDirectorOnly && finishedVideo
+  return stage === 'editor' && onDirector && reachedDirectorOnly && finishedVideo
 }
