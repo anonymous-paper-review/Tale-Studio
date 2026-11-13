@@ -97,6 +97,14 @@ describe('혼자 정한 것', () => {
     expect(image).not.toContain('먼저 하기')
   })
 
+  it('[먼저 하기] 사이 그 샷이 이미 나갔으면(서버 200) 줄에서 지우고 오류 말 없이 넘어간다', async () => {
+    // 왜: 리드 검토 a 참고 — 서버가 순서를 읽은 뒤 그 샷이 나가면 409 대신 200 이 온다. 돌아온 순서를 실으면 그 샷은 줄에서 빠진다.
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ batch: summary(['w1', 'w2']) }), { status: 200 })))
+    expect(await moveVideoBatchShotFirst('w3')).toBe('gone')
+    expect((store.state.videoBatchQueue as { pendingShotIds: string[] }).pendingShotIds).toEqual(['w1', 'w2'])
+    expect(read('src/features/director/move-first-button.tsx')).toMatch(/if \(result === 'failed'\) toast\.error/)
+  })
+
   it('다른 묶음으로 바뀐 뒤 돌아온 답은 화면에 싣지 않는다', async () => {
     // 왜: 누르는 사이 묶음이 끝나고 새 묶음이 섰으면 옛 순서로 새 묶음을 덮지 않는다.
     vi.stubGlobal('fetch', vi.fn(async () => {

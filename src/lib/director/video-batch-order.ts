@@ -25,7 +25,8 @@ export async function moveVideoBatchShotFirst(shotId: string): Promise<MoveFirst
     // 그사이 다른 프로젝트 · 다른 묶음으로 바뀌었으면 옛 순서로 덮지 않는다.
     const now = store.getState()
     if (batch && now.projectId === projectId && now.videoBatchRunId === batchId) store.setState({ videoBatchQueue: videoBatchQueueOf(batch) })
-    return 'moved'
+    // 서버가 순서를 읽은 뒤 그 샷이 나갔으면 409 대신 200 이 온다(리드 검토 a 참고) — 돌아온 순서를 실어 줄에서 빠지고, 오류 말 없이 끝.
+    return batch?.pendingShotIds?.includes(shotId) ? 'moved' : 'gone'
   } catch {
     return 'failed'
   }
