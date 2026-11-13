@@ -1169,7 +1169,6 @@ export const KO: Record<string, string> = {
   'Split here': '여기서 분할',
   'Hide {count}': '{count}개 숨기기',
   'Drag a clip from Video Source, or right-click→Add to timeline': 'Video Source에서 클립을 드래그하거나 우클릭→타임라인 추가',
-  'Drag an Audio source, or upload with the + button in the top-right': 'Audio 소스를 드래그하거나 우상단 + 버튼으로 업로드',
 
   // ── artist·editor stores ──
   'Failed to save the reference: {message}': '참조 저장 실패: {message}',
@@ -1348,7 +1347,6 @@ export const KO: Record<string, string> = {
   // v3 ED1 Editor(2026-11-03) — 화면 머리 · 소스 판 · 트랙 이름 · 빈 컷
   '{cuts} cuts · {seconds}s · video {ready}/{total}': '컷 {cuts} · {seconds}초 · 영상 {ready}/{total}',
   Source: '소스',
-  'Audio {n}': '오디오 {n}',
   'No video made yet': '아직 만든 영상이 없어요',
   // 영상을 불러오지 못한 클립(QA 2026-11-03 밤 "Editor에서 무한 로딩") — 그 클립만 실패로 보인다.
   'Could not load': '불러오지 못함',
@@ -3178,4 +3176,14 @@ export const KO: Record<string, string> = {
   'A track': 'A 트랙',
   'Cut tool · Click a clip to split it there': '자르기 도구 · 클립을 누른 자리에서 둘로 나눠요',
   'Selection tool · Drag to move, drag an edge to change length': '선택 도구 · 끌어서 옮기고, 가장자리를 끌어 길이를 바꿔요',
+
+  // 2단계 ② 줄 여러 개(시안 E1 Track Header): 자물쇠 · 눈 · M · S · [+ V 트랙].
+  'Lock track': '줄 잠그기',
+  'Unlock track': '줄 잠금 풀기',
+  'Show track': '줄 보이기',
+  'Hide track': '줄 감추기',
+  'Play only this track': '이 줄만 듣기',
+  'Add video track': '영상 줄 더하기',
+  'V track': 'V 트랙',
+  'Drag a file from My files, or press Import… in the Project panel': '내 파일에서 끌어 놓거나, 프로젝트 판의 [가져오기…]를 눌러요',
 }

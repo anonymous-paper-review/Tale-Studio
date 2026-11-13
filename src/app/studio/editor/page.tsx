@@ -19,7 +19,7 @@ import { AudioMeter } from '@/features/editor/audio-meter'
 import { ResizeHandle } from '@/features/editor/resize-handle'
 import { useEditorPlayback } from '@/features/editor/use-editor-playback'
 import { resetVideoPrefetchFor } from '@/features/editor/video-prefetch'
-import { useEditorStore, selectTimelineLayout, timelineEnd, zoomStep, PANEL_SOURCE_W_MIN } from '@/stores/editor-store'
+import { useEditorStore, selectOverlayLayout, selectProgramLayout, selectTimelineLayout, timelineEnd, zoomStep, PANEL_SOURCE_W_MIN } from '@/stores/editor-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import { sequenceInfoLine } from '@/lib/editor/sequence-info'
@@ -46,6 +46,8 @@ export default function PostPage() {
     audioClips,
     audioSources,
     audioTracks,
+    videoTracks,
+    overlay,
     toolMode,
     binDragKind,
     binDropSec,
@@ -82,6 +84,12 @@ export default function PostPage() {
     removeAudioSource,
     addAudioClipFromSource,
     addAudioTrack,
+    addVideoTrack,
+    removeVideoTrack,
+    moveClipToTrack,
+    toggleTrackLock,
+    toggleTrackVisible,
+    toggleAudioTrackSolo,
     removeAudioTrack,
     setAudioVolume,
     setBinDragKind,
@@ -109,6 +117,11 @@ export default function PostPage() {
   const timelineLayout = useMemo(
     () => selectTimelineLayout({ shots, videoClips, clipOrder }),
     [shots, videoClips, clipOrder],
+  )
+  // V1 밖 줄(V2 · V3 …)의 클립 자리(2단계 ②).
+  const overlayLayout = useMemo(
+    () => selectOverlayLayout({ shots, videoClips, clipOrder, overlay }),
+    [shots, videoClips, clipOrder, overlay],
   )
 
   const projectId = useProjectStore((s) => s.projectId)
@@ -142,7 +155,8 @@ export default function PostPage() {
       return
     }
     const st = useEditorStore.getState()
-    const layout = selectTimelineLayout(st)
+    // 줄이 여럿이면 시각마다 눈을 켠 가장 위 줄의 클립을 녹화한다 — 미리 보기와 같다(2단계 ②).
+    const layout = selectProgramLayout(st)
     const totalSec = Math.max(
       timelineEnd(layout),
       st.audioClips.reduce((m, a) => Math.max(m, a.startSec + a.durationSec), 0),
@@ -355,8 +369,9 @@ export default function PostPage() {
 
   // 드래그-드롭: 비디오 + (있으면) 오디오 함께 삽입 — 오디오는 새로 놓인 클립에 잇는다(결정 4).
   const handleAddVideoClip = useCallback(
-    (shotId: string, atSec: number) => {
-      const instanceId = addClipInstanceAt(shotId, atSec)
+    (shotId: string, atSec: number, trackId?: string) => {
+      // 끌어 놓은 줄에 놓는다 — V1 밖 줄이면 그 시각(2단계 ②).
+      const instanceId = addClipInstanceAt(shotId, atSec, trackId)
       if (instanceId) void attachVideoAudio(shotId, instanceId)
     },
     [addClipInstanceAt, attachVideoAudio],
@@ -448,7 +463,8 @@ export default function PostPage() {
   }
 
   // 시퀀스 길이 — 내보내기가 녹화하는 길이와 같다(영상 줄 끝 · 소리 끝 중 늦은 쪽).
-  const sequenceSec = Math.max(timelineEnd(timelineLayout), audioClips.reduce((m, a) => Math.max(m, a.startSec + a.durationSec), 0))
+  //   영상 줄이 여럿이면 모든 줄의 끝(2단계 ②).
+  const sequenceSec = Math.max(timelineEnd([...timelineLayout, ...overlayLayout]), audioClips.reduce((m, a) => Math.max(m, a.startSec + a.durationSec), 0))
   const topLeftW = Math.max(PANEL_SOURCE_W_MIN, panelSizes.sourceW)
   // 내보내기 탭으로 가면 재생을 멈춘다 — 모니터 · 소리가 없는 탭에서 시계만 흐르지 않게.
   const openTab = (next: EditorTab) => {
@@ -624,8 +640,19 @@ export default function PostPage() {
                     onSetTitleCardDuration={setTitleCardDuration}
                     onSetTransitionIn={setTransitionIn}
                     onPushHistory={pushHistory}
+                    videoTracks={videoTracks}
+                    overlayLayout={overlayLayout}
+                    onMoveClipToTrack={moveClipToTrack}
+                    onToggleTrackLock={toggleTrackLock}
+                    onToggleTrackVisible={toggleTrackVisible}
+                    onToggleAudioTrackSolo={toggleAudioTrackSolo}
+                    onRemoveVideoTrack={removeVideoTrack}
                     toolbar={
                       <>
+                        <Button size="sm" variant="secondary" className="h-7 gap-1 rounded-full px-3" onClick={() => addVideoTrack()} title={t('Add video track')}>
+                          <Plus className="size-3.5" />
+                          {t('V track')}
+                        </Button>
                         <Button size="sm" variant="secondary" className="h-7 gap-1 rounded-full px-3" onClick={() => addAudioTrack()} title={t('Add audio track')}>
                           <Plus className="size-3.5" />
                           {t('A track')}

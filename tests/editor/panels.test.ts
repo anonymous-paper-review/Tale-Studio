@@ -21,6 +21,7 @@ import { SEQUENCE_FPS, exportFrameSize, formatTimecode, sequenceInfoLine } from 
 import { EffectControls } from '@/features/editor/effect-controls'
 import { ProjectPanel } from '@/features/editor/video-source-panel'
 import { EditorTopActions, ExportTab, ShortcutsList, EDITOR_SHORTCUTS } from '@/features/editor/editor-workbar'
+import { finishEditorOpen } from '@/features/editor/open-editor'
 import type { AudioTrackClip, Shot, VideoClip } from '@/types'
 
 const read = (file: string) => readFileSync(file, 'utf8')
@@ -125,6 +126,20 @@ describe('효과 컨트롤', () => {
     expect(text(markup)).toContain('잔잔한 피아노.mp3')
     expect(text(markup)).toContain('A1 · 00:00:00:00 → 00:00:04:00 · 4.00초')
     expect(text(markup)).toContain('볼륨 60%')
+  })
+
+  it('처음 연 Editor 는 아무 클립도 고르지 않은 채 열린다 — 효과 컨트롤은 안내를 보인다', async () => {
+    // 왜: 처음 열 때 영상마다 소리를 놓으면서 마지막 소리 조각이 골라진 채 열려, 효과 컨트롤이 그 소리를 보였다(2단계 ② 화면 확인).
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 200 })))
+    useEditorStore.setState({ audioClips: [], editorPrep: { done: 0, total: 0 } })
+    await finishEditorOpen({
+      projectId: 'project-panels', restored: false, isCancelled: () => false, audioName: () => 'audio',
+      measureClips: async () => {}, decodeAudio: async () => ({ durationSec: 3, peaks: [0.5] }),
+    })
+    expect(api().audioClips.length).toBeGreaterThan(0)
+    expect(api().selectedAudioIds).toEqual([])
+    expect(api().selectedShotIds).toEqual([])
+    vi.unstubAllGlobals()
   })
 
   it('아무것도 고르지 않으면 효과 컨트롤은 지금 바꿀 수 있는 것만 안내한다 — 속도 · 전환 · 볼륨, 빈 곳의 잔물결 삭제', () => {

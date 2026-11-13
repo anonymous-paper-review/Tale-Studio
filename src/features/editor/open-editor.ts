@@ -139,8 +139,8 @@ async function openSteps(input: FinishEditorOpenInput): Promise<'opened' | 'spli
   const finished = await within(decoding, deadline)
   if (isCancelled()) return 'cancelled'
 
-  // 처음 놓은 소리는 사람이 고친 것이 아니다 — 되돌리기 칸에 남기지 않는다.
-  store.setState({ past: [], future: [] })
+  // 처음 놓은 소리는 사람이 고친 것이 아니다 — 되돌리기 칸에 남기지 않고, 마지막에 놓은 소리 조각도 고르지 않은 채 연다(2단계 ②).
+  store.setState({ past: [], future: [], selectedAudioId: null, selectedAudioIds: [] })
   await within(saveEditorNow(projectId), Date.now() + FIRST_SAVE_WAIT_MS)
   if (isCancelled()) return 'cancelled'
   store.getState().setEditorPrep(null)

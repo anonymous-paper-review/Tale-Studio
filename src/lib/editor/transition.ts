@@ -15,6 +15,8 @@ export interface LayoutItem {
   shotId: string
   startSec: number
   durationSec: number
+  /** 그 클립이 줄에서 시작하는 초 — 위 줄에 가려졌다 다시 보이는 조각이면 startSec 보다 앞이다(2단계 ②). */
+  clipStartSec?: number
 }
 
 /**
@@ -24,6 +26,8 @@ export interface LayoutItem {
 export function dissolveOpacityAt(layout: readonly LayoutItem[], clips: readonly Pick<VideoClip, 'shotId' | 'transitionIn'>[], t: number): number {
   let opacity = 0
   for (const item of layout) {
+    // 클립 중간부터 보이는 조각(위 줄에 가려졌다 다시 보임)에는 그 클립의 시작 전환이 없다(2단계 ②).
+    if (item.clipStartSec !== undefined && Math.abs(item.clipStartSec - item.startSec) > 1e-3) continue
     const clip = clips.find((c) => c.shotId === item.shotId)
     const tr = clip?.transitionIn
     if (!tr || tr.type !== 'dissolve') continue

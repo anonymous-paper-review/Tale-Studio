@@ -22,15 +22,24 @@ import { audioSourceTime } from '@/lib/editor/audio-time'
 import { timelineEnd, timelineSegments } from '@/lib/editor/timeline-segments'
 import { SEQUENCE_FPS } from '@/lib/editor/sequence-info'
 
-/** 내보내기에 넣는 소리 조각 — 음소거 · 소리 0 · 음소거한 줄 · 주소 없는 것을 뺀다. 편집 상태의 자리 그대로 재생한다(2026-11-10 결정 4). */
-export function draftAudioClips(audioClips: AudioTrackClip[], audioTracks: Array<{ id: string; muted?: boolean }>): AudioTrackClip[] {
-  const mutedTracks = new Set(audioTracks.filter((t) => t.muted).map((t) => t.id))
+/**
+ * 들리는 소리 줄 — 음소거(M)한 줄은 빼고, 그 줄만(S)을 켠 줄이 있으면 S 줄만(2단계 ②, 시안 E1 줄 머리). 재생(audio-meter)과
+ *   내보내기가 같이 쓴다. 약속: tests/editor/tracks.test.ts
+ */
+export function audibleTrackIds(audioTracks: ReadonlyArray<{ id: string; muted?: boolean; solo?: boolean }>): Set<string> {
+  const anySolo = audioTracks.some((t) => t.solo)
+  return new Set(audioTracks.filter((t) => !t.muted && (!anySolo || t.solo)).map((t) => t.id))
+}
+
+/** 내보내기에 넣는 소리 조각 — 음소거 · 소리 0 · 들리지 않는 줄 · 주소 없는 것을 뺀다. 편집 상태의 자리 그대로 재생한다(2026-11-10 결정 4). */
+export function draftAudioClips(audioClips: AudioTrackClip[], audioTracks: Array<{ id: string; muted?: boolean; solo?: boolean }>): AudioTrackClip[] {
+  const audible = audibleTrackIds(audioTracks)
   const firstTrackId = audioTracks[0]?.id
   return audioClips.filter(
     (a) =>
       !a.muted &&
       a.volume > 0 &&
-      !mutedTracks.has(a.trackId ?? firstTrackId ?? '') &&
+      audible.has(a.trackId ?? firstTrackId ?? '') &&
       !!a.url,
   )
 }
@@ -47,6 +56,8 @@ interface LayoutItem {
   shotId: string
   startSec: number
   durationSec: number
+  /** 그 클립이 줄에서 시작하는 초 — 위 줄에 가려졌다 다시 보이는 조각은 그 자리부터 재생한다(2단계 ②). */
+  clipStartSec?: number
 }
 
 interface VideoClipLike {
@@ -198,7 +209,7 @@ export async function renderDraftTimeline(opts: {
   shots: ShotLike[]
   videoClips: VideoClipLike[]
   audioClips: AudioTrackClip[]
-  audioTracks: Array<{ id: string; muted?: boolean }>
+  audioTracks: Array<{ id: string; muted?: boolean; solo?: boolean }>
   /** phase: 'prefetch'(클립 선다운로드) → 'record'(실시간 녹화). frac 0~1. */
   onPhase?: (phase: 'prefetch' | 'record', frac: number) => void
   signal?: AbortSignal
@@ -376,7 +387,8 @@ export async function renderDraftTimeline(opts: {
       if (!loaded) return false
       const speed = Math.max(0.25, Math.min(4, clip.speed ?? 1))
       videoEl.playbackRate = speed
-      videoEl.currentTime = clip.trimStart ?? 0
+      // 위 줄에 가려졌다 다시 보이는 조각은 그 클립의 그 자리부터(2단계 ②).
+      videoEl.currentTime = (clip.trimStart ?? 0) + (item.startSec - (item.clipStartSec ?? item.startSec)) * speed
       await waitEvent(videoEl, 'seeked', 2000)
       return true
     }
@@ -403,7 +415,8 @@ export async function renderDraftTimeline(opts: {
         inGap = false
         continue
       }
-      const item = layout.find((l) => l.shotId === segment.shotId)!
+      // 같은 클립이 위 줄에 가려 두 조각으로 보일 수 있다 — 시작 초로 그 조각을 찾는다(2단계 ②).
+      const item = layout.find((l) => l.shotId === segment.shotId && Math.abs(l.startSec - segment.startSec) < 1e-3)!
       const i = clipIndex++
       const shot = shots.find((s) => s.shotId === item.shotId)
       // 타이틀 카드(#owner-title-card): FFmpeg drawtext 없이도 캔버스 placeholder 경로를 그대로

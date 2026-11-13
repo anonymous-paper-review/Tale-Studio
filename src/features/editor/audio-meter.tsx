@@ -5,6 +5,7 @@ import type { AudioTrackClip } from '@/types'
 import { audioSourceTime } from '@/lib/editor/audio-time'
 import { useEditorStore } from '@/stores/editor-store'
 import { cn } from '@/lib/utils'
+import { audibleTrackIds } from '@/lib/editor-draft-render'
 
 /**
  * 오디오 재생 + VU 레벨 미터 (프리미어 우측 dB 미터).
@@ -103,11 +104,10 @@ export function AudioMeter({ audioClips, className }: { audioClips: AudioTrackCl
         if (entry.el.playbackRate !== rate) entry.el.playbackRate = rate
         const srcTime = audioSourceTime(clip, state.currentTime)
         // 전역 재생 볼륨(masterVolume) 곱 — 재생 전용, draft 와 무관.
-        // 클립 음소거 OR 트랙 전체 음소거면 볼륨 0.
+        // 클립 음소거 OR 들리지 않는 줄(줄 음소거 M · 다른 줄만 S)이면 볼륨 0 — 내보내기와 같은 규칙(2단계 ②).
         const tFirst = state.audioTracks[0]?.id
-        const trackMuted =
-          state.audioTracks.find((t) => t.id === (clip.trackId ?? tFirst))?.muted ?? false
-        entry.el.volume = clip.muted || trackMuted ? 0 : clip.volume * state.masterVolume
+        const trackSilent = !audibleTrackIds(state.audioTracks).has(clip.trackId ?? tFirst ?? '')
+        entry.el.volume = clip.muted || trackSilent ? 0 : clip.volume * state.masterVolume
 
         if (state.isPlaying && inRange) {
           if (Math.abs(entry.el.currentTime - srcTime) > 0.3) entry.el.currentTime = srcTime

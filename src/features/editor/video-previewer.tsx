@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { TitleCardStage } from '@/features/editor/title-card-stage'
 import { SubtitleLayer } from '@/features/editor/subtitle-layer'
 import { resolveSubtitle } from '@/lib/editor/subtitle'
-import { useEditorStore, selectTimelineLayout, isTitleCardShotId, timelineEnd } from '@/stores/editor-store'
+import { useEditorStore, selectProgramLayout, selectVideoLayout, isTitleCardShotId, timelineEnd } from '@/stores/editor-store'
 import { editPointTarget } from '@/lib/editor/timeline-segments'
 import { SEQUENCE_FPS, formatTimecode } from '@/lib/editor/sequence-info'
 import { cachedVideoUrl } from '@/features/editor/video-prefetch'
@@ -93,8 +93,9 @@ export function VideoPreviewer() {
         return
       }
 
-      // 타임라인 모드 — 전체 길이는 빈 곳까지 센 영상 줄 끝이다(자유 배치, 검토 c 보통 1).
-      const layout = selectTimelineLayout(st)
+      // 타임라인 모드 — 전체 길이는 빈 곳까지 센 영상 줄 끝이다(자유 배치, 검토 c 보통 1). 줄이 여럿이면 시각마다 눈을 켠
+      //   가장 위 줄의 클립을 보인다(2단계 ②) — 가려졌다 다시 보이는 클립은 그 자리부터.
+      const layout = selectProgramLayout(st)
       const total = timelineEnd(layout)
       const t = st.currentTime
       // 디졸브(2026-09-08): 검은 막의 투명도만 시간에 따라 — 영상 픽셀은 손대지 않는다.
@@ -120,7 +121,7 @@ export function VideoPreviewer() {
           v.loop = false
           const trimStart = clip.trimStart ?? 0
           const speed = clip.speed ?? 1.0
-          const local = trimStart + (t - item.startSec) * speed
+          const local = trimStart + (t - (item.clipStartSec ?? item.startSec)) * speed
           if (v.playbackRate !== speed) v.playbackRate = speed
           if (st.isPlaying) {
             if (v.paused) void v.play().catch(() => {})
@@ -150,7 +151,7 @@ export function VideoPreviewer() {
         if (v && v.duration) v.currentTime = ratio * v.duration
         return
       }
-      const layout = selectTimelineLayout(st)
+      const layout = selectProgramLayout(st)
       const total = timelineEnd(layout)
       seek(ratio * total)
     },
@@ -160,9 +161,10 @@ export function VideoPreviewer() {
   // 모니터 재생 단추 줄(시안 E1 409:4727–4739) — 처음으로 · 앞 편집점 · 한 장 뒤 · 재생 · 한 장 앞 · 다음 편집점 · 끝으로.
   //   편집점은 Ctrl+← · Ctrl+→ 와 같은 자리, 한 장 단추는 꾹 누르면 이어서 움직인다(예전 도구 줄의 프레임 단추).
   const nudge = useEditorStore((s) => s.nudge)
-  const goTo = useCallback((target: (st: ReturnType<typeof useEditorStore.getState>, layout: ReturnType<typeof selectTimelineLayout>) => number) => {
+  const goTo = useCallback((target: (st: ReturnType<typeof useEditorStore.getState>, layout: ReturnType<typeof selectVideoLayout>) => number) => {
     const st = useEditorStore.getState()
-    const layout = selectTimelineLayout(st)
+    // 편집점은 모든 영상 줄의 클립 시작 · 끝(2단계 ②).
+    const layout = selectVideoLayout(st)
     nudge(target(st, layout) - st.currentTime)
   }, [nudge])
   const stopFrameHold = useCallback(() => {

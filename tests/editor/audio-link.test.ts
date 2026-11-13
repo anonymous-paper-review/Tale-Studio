@@ -426,7 +426,8 @@ describe('다시 열 때 · 새로 더할 때', () => {
     expect(audio(id)).toBeUndefined()
     // 화면: 끌어 놓기 · 플레이헤드에 더하기 모두 새 클립 id 에 소리를 잇는다.
     const page = read('src/app/studio/editor/page.tsx')
-    expect(page).toMatch(/const instanceId = addClipInstanceAt\(shotId, atSec\)\s*if \(instanceId\) void attachVideoAudio\(shotId, instanceId\)/)
+    // 끌어 놓은 줄도 함께 넘긴다(2단계 ② 영상 줄 여러 개) — 소리를 새 클립 id 에 잇는 것은 그대로다.
+    expect(page).toMatch(/const instanceId = addClipInstanceAt\(shotId, atSec(, trackId)?\)\s*if \(instanceId\) void attachVideoAudio\(shotId, instanceId\)/)
     expect(page).toMatch(/if \(item\) void attachVideoAudio\(shotId, item\.shotId\)/)
     expect(page).toMatch(/linkedShotId: linkTo/)
   })

@@ -24,7 +24,10 @@ export interface PersistedEditor {
   placements?: Record<string, { trackId: string; startSec: number }>
   audioClips: AudioTrackClip[]
   audioSources: AudioSource[]
-  audioTracks?: { id: string }[]
+  /** 소리 줄 — 음소거(M) · 그 줄만(S) · 자물쇠(2단계 ②). */
+  audioTracks?: { id: string; muted?: boolean; solo?: boolean; locked?: boolean }[]
+  /** 영상 줄(V1 · V2 · V3 …) — 자물쇠 · 눈. 없으면 V1–V3(2단계 ②). V1 밖 줄의 클립은 placements 의 trackId 로 적힌다. */
+  videoTracks?: { id: string; locked?: boolean; hidden?: boolean }[]
   panelSizes: { sourceW: number; previewH: number }
 }
 

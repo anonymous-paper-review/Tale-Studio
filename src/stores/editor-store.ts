@@ -164,8 +164,12 @@ interface EditorState {
   audioClips: AudioTrackClip[]
   // 오디오/보이스 소스 보관함 (bin) — 드래그해 오디오 트랙에 인스턴스화
   audioSources: AudioSource[]
-  // 오디오 트랙(레인) 목록 — 멀티 트랙 (프리미어식). 기본 1개. muted=트랙 전체 음소거
-  audioTracks: { id: string; muted?: boolean }[]
+  // 오디오 트랙(레인) 목록 — 멀티 트랙 (프리미어식). 기본 A1–A3(2단계 ②). muted=트랙 전체 음소거 · solo=그 줄만 · locked=고칠 수 없음
+  audioTracks: AudioTrackState[]
+  // 영상 줄(V1 · V2 · V3 …, 아래부터) — 자물쇠 · 눈(2단계 ②, 시안 E1). V1 은 이야기 줄(clipOrder + 앞 빈 곳).
+  videoTracks: VideoTrackState[]
+  // V1 밖 줄에 놓인 클립의 줄 · 시작 초(자유 배치) — 사람이 옮기거나 끌어 놓은 클립만 있다(2단계 ②).
+  overlay: OverlayPlacements
 
   // 소스 클립 단독 미리보기 (Video Source 클릭 시). null이면 타임라인(플레이헤드) 모드.
   previewSourceShotId: string | null
@@ -214,7 +218,8 @@ interface EditorState {
   // cut(자르기) — 비디오 클립을 전역 시간 atSec 지점에서 둘로 분할
   splitVideoClipAt: (shotId: string, atGlobalSec: number) => void
   // Video Source → 타임라인 드래그-투-애드 (atSec 위치에 새 인스턴스 삽입)
-  addClipInstanceAt: (sourceShotId: string, atGlobalSec: number) => string | null
+  /** trackId 를 주면 그 줄(V1 밖 줄은 그 시각)에 놓는다 — 2단계 ②. 잠근 줄이면 놓지 않는다. */
+  addClipInstanceAt: (sourceShotId: string, atGlobalSec: number, trackId?: string) => string | null
   // 타이틀 카드(#owner-title-card) — 검은 배경+텍스트(+선택 이미지) synthetic 클립을 atGlobalSec
   //   인접 경계에 삽입. 길이는 기존 트림 문법(setTrim)을 재사용.
   addTitleCard: (atGlobalSec: number) => void
@@ -251,6 +256,16 @@ interface EditorState {
   addAudioTrack: () => void
   removeAudioTrack: (trackId: string) => void
   toggleAudioTrackMute: (trackId: string) => void   // 트랙 전체 음소거 토글
+  /** 소리 줄 S — 켠 줄이 있으면 그 줄만 들린다(2단계 ②). 되돌리기 칸에 쌓지 않는다. */
+  toggleAudioTrackSolo: (trackId: string) => void
+  /** [+ V 트랙] · 영상 줄 지우기(그 줄 클립도 빠짐, V1 은 못 지움) — 2단계 ②. */
+  addVideoTrack: () => void
+  removeVideoTrack: (trackId: string) => void
+  /** 클립을 다른 줄(또는 같은 줄의 다른 시각)로 옮긴다 — 원래 자리는 빈 곳, 놓은 줄에서 겹치면 민다(2단계 ②). */
+  moveClipToTrack: (shotId: string, trackId: string, startSec: number) => void
+  /** 줄 자물쇠(영상 · 소리) · 눈(영상) — 저장본에 남고 되돌리기 칸에 쌓지 않는다(2단계 ②). */
+  toggleTrackLock: (trackId: string) => void
+  toggleTrackVisible: (trackId: string) => void
 
   // 소스 단독 미리보기 (Video Source 클릭)
   previewSource: (shotId: string) => void
@@ -293,7 +308,9 @@ interface EditorSnapshot {
   videoClips: VideoClip[]
   audioClips: AudioTrackClip[]
   audioSources: AudioSource[]
-  audioTracks: { id: string; muted?: boolean }[]
+  audioTracks: AudioTrackState[]
+  videoTracks: VideoTrackState[]
+  overlay: OverlayPlacements
 }
 
 // 리사이즈 섹션 기본 크기 (px)
@@ -316,7 +333,32 @@ export function zoomStep(px: number, dir: 'in' | 'out'): number {
 }
 
 // 타임라인 selector 입력 — 필요한 필드만 (전체 EditorState 불필요)
-type TimelineInput = Pick<EditorState, 'shots' | 'videoClips' | 'clipOrder'>
+/** 영상 줄(2단계 ②) — 자물쇠 · 눈. */
+export interface VideoTrackState { id: string; locked?: boolean; hidden?: boolean }
+/** 소리 줄 — 음소거(M) · 그 줄만(S) · 자물쇠. */
+export interface AudioTrackState { id: string; muted?: boolean; solo?: boolean; locked?: boolean }
+/** V1 밖 줄에 놓인 클립 — 줄과 시작 초(자유 배치). */
+export type OverlayPlacements = Record<string, { trackId: string; startSec: number }>
+/** 처음 줄 — V1 · V2 · V3(시안 E1). */
+export const DEFAULT_VIDEO_TRACKS: readonly VideoTrackState[] = [{ id: 'v1' }, { id: 'v2' }, { id: 'v3' }]
+/** 처음 소리 줄 — A1 · A2 · A3(시안 E1). */
+export const DEFAULT_AUDIO_TRACKS: readonly AudioTrackState[] = [{ id: 'atrack_1' }, { id: 'atrack_2' }, { id: 'atrack_3' }]
+/** 예전 저장본 · 처음 상태의 줄을 시안 기본(V3 · A3)까지 채운다 — 있던 줄은 그대로. */
+function padTracks<T extends { id: string }>(tracks: readonly T[], defaults: readonly T[]): T[] {
+  const out = tracks.map((t) => ({ ...t }))
+  for (const d of defaults) if (out.length < defaults.length && !out.some((t) => t.id === d.id)) out.push({ ...d })
+  return out
+}
+
+/** 줄 표시(자물쇠 · 눈 · S)를 켜고 끈다 — 끄면 칸을 지워 저장본에 켠 것만 남는다. */
+function flipFlag<T extends object>(track: T, key: 'locked' | 'hidden' | 'solo'): T {
+  const next: Record<string, unknown> = { ...(track as Record<string, unknown>) }
+  if (next[key]) delete next[key]
+  else next[key] = true
+  return next as T
+}
+
+type TimelineInput = Pick<EditorState, 'shots' | 'videoClips' | 'clipOrder'> & { overlay?: OverlayPlacements }
 
 /**
  * 통합 타임라인용 전역 샷 순서 (씬 경계를 넘어 한 줄로 펼침).
@@ -350,6 +392,69 @@ export function selectTimelineLayout(
     const durationSec = clipDurationSec(shot, clip)
     out.push({ shotId, startSec: cursor, durationSec })
     cursor += durationSec
+  }
+  return out
+}
+
+/** 줄마다 놓인 클립 — V1 은 이야기 줄 셈(selectTimelineLayout), 나머지는 줄 + 시작 초(2단계 ②). */
+export interface TrackLayoutItem {
+  shotId: string
+  startSec: number
+  durationSec: number
+  trackId: string
+}
+
+/** V1 밖 줄의 클립 자리 — 시작 초 순서. 약속: tests/editor/tracks.test.ts */
+export function selectOverlayLayout(input: TimelineInput): TrackLayoutItem[] {
+  const out: TrackLayoutItem[] = []
+  for (const [shotId, place] of Object.entries(input.overlay ?? {})) {
+    const shot = input.shots.find((s) => s.shotId === shotId)
+    if (!shot) continue
+    const clip = input.videoClips.find((c) => c.shotId === shotId)
+    out.push({ shotId, startSec: place.startSec, durationSec: clipDurationSec(shot, clip), trackId: place.trackId })
+  }
+  return out.sort((a, b) => a.startSec - b.startSec)
+}
+
+/** 모든 영상 줄의 클립 자리 — 이어진 소리 · 편집점 · 저장(placements)이 쓴다. */
+export function selectVideoLayout(input: TimelineInput): TrackLayoutItem[] {
+  return [...selectTimelineLayout(input).map((item) => ({ ...item, trackId: 'v1' })), ...selectOverlayLayout(input)]
+}
+
+/** 미리 보기 · 내보내기가 그릴 조각 — 보이는 구간과, 그 클립이 줄에서 시작하는 초(영상 안 시각을 셈할 때). */
+export interface ProgramItem extends TrackLayoutItem {
+  clipStartSec: number
+}
+
+/**
+ * 미리 보기 · 내보내기가 시각마다 그리는 클립 — 눈을 켠 줄 가운데 가장 위 줄의 클립(시안 E3 "위 줄이 아래 줄을 가린다", 2단계 ②).
+ *   가려졌다 다시 보이는 아래 클립은 그 자리부터 이어진다(clipStartSec 로 영상 안 시각을 셈). 겹쳐 그리기는 ④에서.
+ *   약속: tests/editor/tracks.test.ts
+ */
+export function selectProgramLayout(input: TimelineInput & { videoTracks?: readonly VideoTrackState[] }): ProgramItem[] {
+  const tracks = input.videoTracks ?? DEFAULT_VIDEO_TRACKS
+  const rank = new Map(tracks.map((t, i) => [t.id, i]))
+  const hidden = new Set(tracks.filter((t) => t.hidden).map((t) => t.id))
+  const items = selectVideoLayout(input).filter((i) => !hidden.has(i.trackId) && i.durationSec > 0)
+  const cuts = [...new Set(items.flatMap((i) => [i.startSec, i.startSec + i.durationSec]))].sort((a, b) => a - b)
+  const out: ProgramItem[] = []
+  for (let k = 0; k + 1 < cuts.length; k++) {
+    const from = cuts[k]
+    const to = cuts[k + 1]
+    if (to - from < 1e-6) continue
+    const mid = (from + to) / 2
+    let top: TrackLayoutItem | undefined
+    for (const i of items) {
+      if (mid < i.startSec || mid >= i.startSec + i.durationSec) continue
+      if (!top || (rank.get(i.trackId) ?? 0) > (rank.get(top.trackId) ?? 0)) top = i
+    }
+    if (!top) continue
+    const last = out[out.length - 1]
+    if (last && last.shotId === top.shotId && Math.abs(last.startSec + last.durationSec - from) < 1e-6) {
+      last.durationSec = round3(to - last.startSec)
+      continue
+    }
+    out.push({ shotId: top.shotId, trackId: top.trackId, startSec: round3(from), durationSec: round3(to - from), clipStartSec: top.startSec })
   }
   return out
 }
@@ -410,7 +515,8 @@ export { timelineEnd, timelineSegments, type TimelineSegment } from '@/lib/edito
 type LinkInput = TimelineInput & { audioClips: AudioTrackClip[] }
 export function syncLinkedAudio(state: LinkInput): AudioTrackClip[] {
   if (!state.audioClips.some((a) => a.linkedShotId)) return state.audioClips
-  const layout = new Map(selectTimelineLayout(state).map((item) => [item.shotId, item]))
+  // 영상 클립이 어느 줄에 있든 이어진 소리는 따라간다(2단계 ②).
+  const layout = new Map(selectVideoLayout(state).map((item) => [item.shotId, item]))
   let changed = false
   const out: AudioTrackClip[] = []
   for (const a of state.audioClips) {
@@ -443,6 +549,7 @@ function withLinkedAudio(state: EditorState, changes: Partial<EditorState>): Par
     shots: changes.shots ?? state.shots,
     videoClips: changes.videoClips ?? state.videoClips,
     clipOrder: changes.clipOrder ?? state.clipOrder,
+    overlay: changes.overlay ?? state.overlay,
     audioClips: before,
   })
   if (audioClips === before) return changes
@@ -468,6 +575,50 @@ function withLayout(state: EditorState, changes: Partial<EditorState>, desired: 
     clipOrder: changes.clipOrder ?? state.clipOrder,
   }
   return withLinkedAudio(state, { ...changes, videoClips: regap(input, desired) })
+}
+
+/**
+ * V1 밖 줄에서 겹치는 클립을 민다 — 줄마다 시작 초 순서로 앞 클립 끝보다 앞이면 그 끝으로(같은 줄의 클립은 겹치지 않는다, V1 과 같은
+ *   규칙). 시작 초가 같으면 first(방금 놓은 클립)가 앞이다(2단계 ②).
+ */
+function resolveOverlay(input: TimelineInput, overlay: OverlayPlacements, first?: string): OverlayPlacements {
+  const items = selectOverlayLayout({ ...input, overlay })
+  const out: OverlayPlacements = { ...overlay }
+  const byTrack = new Map<string, TrackLayoutItem[]>()
+  for (const item of items) byTrack.set(item.trackId, [...(byTrack.get(item.trackId) ?? []), item])
+  for (const list of byTrack.values()) {
+    list.sort((a, b) => a.startSec - b.startSec || (a.shotId === first ? -1 : b.shotId === first ? 1 : 0))
+    let cursor = 0
+    for (const item of list) {
+      const start = round3(Math.max(cursor, item.startSec))
+      if (start !== item.startSec) out[item.shotId] = { trackId: item.trackId, startSec: start }
+      cursor = start + item.durationSec
+    }
+  }
+  return out
+}
+
+/** 클립이 놓인 줄 — V1 · V1 밖 줄 id · 타임라인에 없으면 null. */
+function trackOfClip(state: Pick<EditorState, 'clipOrder' | 'overlay'>, shotId: string): string | null {
+  if (state.overlay[shotId]) return state.overlay[shotId].trackId
+  return Object.values(state.clipOrder).some((ids) => ids.includes(shotId)) ? 'v1' : null
+}
+
+/** 그 줄이 잠겼나(영상 · 소리 줄 모두). */
+function trackLocked(state: Pick<EditorState, 'videoTracks' | 'audioTracks'>, trackId: string | null | undefined): boolean {
+  if (!trackId) return false
+  return !!(state.videoTracks.find((t) => t.id === trackId)?.locked || state.audioTracks.find((t) => t.id === trackId)?.locked)
+}
+
+/** 그 클립이 잠근 줄에 있나 — 잠근 줄은 고칠 수 없다(2단계 ②, 시안 E1 줄 자물쇠). */
+function clipLocked(state: Pick<EditorState, 'clipOrder' | 'overlay' | 'videoTracks' | 'audioTracks'>, shotId: string): boolean {
+  return trackLocked(state, trackOfClip(state, shotId))
+}
+
+/** 그 소리 조각이 잠근 줄에 있나. */
+function audioLocked(state: Pick<EditorState, 'videoTracks' | 'audioTracks'>, clip: Pick<AudioTrackClip, 'trackId'> | undefined): boolean {
+  if (!clip) return false
+  return trackLocked(state, clip.trackId ?? state.audioTracks[0]?.id)
 }
 
 // 소리 조각 자리가 이만큼 안으로 같으면 제자리다 — 초를 다시 계산한 끝자리 차이(검토 b).
@@ -671,6 +822,8 @@ function snapshotOf(state: EditorState): EditorSnapshot {
     audioClips: structuredClone(state.audioClips),
     audioSources: structuredClone(state.audioSources),
     audioTracks: structuredClone(state.audioTracks),
+    videoTracks: structuredClone(state.videoTracks),
+    overlay: structuredClone(state.overlay),
   }
 }
 
@@ -694,10 +847,12 @@ function orderWithClipAt(
   state: Pick<EditorState, 'shots' | 'clipOrder'>,
   shotId: string,
   index: number,
+  /** 타임라인(V1)에 아직 없는 클립도 끼운다 — 다른 줄에서 V1 로 내릴 때(2단계 ②). */
+  insertNew = false,
 ): { clipOrder: Record<string, string[]>; shots: Shot[] } | null {
   const order = globalOrder(state)
   const movedShot = state.shots.find((s) => s.shotId === shotId)
-  if (order.findIndex((o) => o.shotId === shotId) < 0 || !movedShot) return null
+  if ((!insertNew && order.findIndex((o) => o.shotId === shotId) < 0) || !movedShot) return null
 
   const remaining = order.filter((o) => o.shotId !== shotId)
   const t = Math.max(0, Math.min(index, remaining.length))
@@ -775,7 +930,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   toolMode: 'select',
   audioClips: [],
   audioSources: [],
-  audioTracks: [{ id: 'atrack_1' }],
+  audioTracks: DEFAULT_AUDIO_TRACKS.map((t) => ({ ...t })),
+  videoTracks: DEFAULT_VIDEO_TRACKS.map((t) => ({ ...t })),
+  overlay: {},
   previewSourceShotId: null,
   masterVolume: 1,
   binDragKind: null,
@@ -872,7 +1029,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // 소리 조각을 직접 끌어 옮기면(자리나 줄이 바뀌면) 그 소리는 영상에서 떨어진다 — 제자리에 놓으면 그대로 잇는다(결정 4).
   //   초를 다시 계산하며 끝자리만 달라진 것(15.4 → 15.399999999999999)은 제자리다(검토 b).
   moveAudioClip: (id, startSec, trackId) =>
-    set((state) => ({
+    set((state) => (audioLocked(state, state.audioClips.find((a) => a.id === id)) || trackLocked(state, trackId) ? state : {
       audioClips: state.audioClips.map((a) => {
         if (a.id !== id) return a
         const nextStart = Math.max(0, startSec)
@@ -889,21 +1046,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     })),
 
   setAudioVolume: (id, volume) =>
-    set((state) => ({
+    set((state) => (audioLocked(state, state.audioClips.find((a) => a.id === id)) ? state : {
       audioClips: state.audioClips.map((a) =>
         a.id === id ? { ...a, volume: Math.max(0, Math.min(1, volume)) } : a,
       ),
     })),
 
   toggleAudioMute: (id) =>
-    set((state) => ({
+    set((state) => (audioLocked(state, state.audioClips.find((a) => a.id === id)) ? state : {
       audioClips: state.audioClips.map((a) =>
         a.id === id ? { ...a, muted: !a.muted } : a,
       ),
     })),
 
   removeAudioClip: (id) =>
-    set((state) => ({
+    set((state) => (audioLocked(state, state.audioClips.find((a) => a.id === id)) ? state : {
       audioClips: state.audioClips.filter((a) => a.id !== id),
       selectedAudioId: state.selectedAudioId === id ? null : state.selectedAudioId,
       selectedAudioIds: state.selectedAudioIds.filter((x) => x !== id),
@@ -916,7 +1073,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   splitAudioClipAt: (id, atGlobalSec) =>
     set((state) => {
       const a = state.audioClips.find((x) => x.id === id)
-      if (!a) return state
+      if (!a || audioLocked(state, a)) return state
       const localT = atGlobalSec - a.startSec
       const MIN = 0.1
       if (localT <= MIN || localT >= a.durationSec - MIN) return state // 가장자리 너무 가까움
@@ -961,7 +1118,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   addAudioClipFromSource: (sourceId, startSec, trackId) => {
     const src = get().audioSources.find((s) => s.id === sourceId)
-    if (!src) return null
+    if (!src || trackLocked(get(), trackId ?? get().audioTracks[0]?.id)) return null
     const id = `audio_${uid()}`
     const lane = trackId ?? get().audioTracks[0]?.id ?? 'atrack_1'
     set((state) => ({
@@ -1000,7 +1157,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   removeAudioTrack: (trackId) =>
     set((state) => {
-      if (state.audioTracks.length <= 1) return state // 최소 1개 트랙 유지
+      if (state.audioTracks.length <= 1 || trackLocked(state, trackId)) return state // 최소 1개 트랙 유지 · 잠근 줄은 지우지 않는다
       const firstId = state.audioTracks[0]?.id
       return {
         audioTracks: state.audioTracks.filter((t) => t.id !== trackId),
@@ -1018,6 +1175,73 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         t.id === trackId ? { ...t, muted: !t.muted } : t,
       ),
     })),
+
+  // ── 줄 여러 개(2단계 ②, 시안 E1 줄 머리) — 자물쇠 · 눈 · S 는 저장본에 남고 되돌리기 칸에 쌓지 않는다. 약속: tests/editor/tracks.test.ts
+  toggleAudioTrackSolo: (trackId) =>
+    set((state) => ({ audioTracks: state.audioTracks.map((t) => (t.id === trackId ? flipFlag(t, 'solo') : t)) })),
+
+  toggleTrackLock: (trackId) =>
+    set((state) => ({
+      videoTracks: state.videoTracks.map((t) => (t.id === trackId ? flipFlag(t, 'locked') : t)),
+      audioTracks: state.audioTracks.map((t) => (t.id === trackId ? flipFlag(t, 'locked') : t)),
+    })),
+
+  toggleTrackVisible: (trackId) =>
+    set((state) => ({ videoTracks: state.videoTracks.map((t) => (t.id === trackId ? flipFlag(t, 'hidden') : t)) })),
+
+  addVideoTrack: () =>
+    set((state) => {
+      const n = state.videoTracks.reduce((max, t) => Math.max(max, Number(/^v(\d+)$/.exec(t.id)?.[1] ?? 0)), 0) + 1
+      return { videoTracks: [...state.videoTracks, { id: `v${n}` }], past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
+        future: [] }
+    }),
+
+  // 영상 줄 지우기 — 지금 소리 줄 지우기와 같이 그 줄 클립도 함께 빠지고 되돌리기로 돌아온다. V1(이야기 줄) · 잠근 줄은 지우지 않는다.
+  removeVideoTrack: (trackId) =>
+    set((state) => {
+      if (trackId === 'v1' || trackLocked(state, trackId) || !state.videoTracks.some((t) => t.id === trackId)) return state
+      const gone = Object.keys(state.overlay).filter((id) => state.overlay[id].trackId === trackId)
+      return withLinkedAudio(state, {
+        videoTracks: state.videoTracks.filter((t) => t.id !== trackId),
+        overlay: Object.fromEntries(Object.entries(state.overlay).filter(([, p]) => p.trackId !== trackId)),
+        removedShotIds: withRemoved(state.removedShotIds, gone),
+        selectedShotIds: state.selectedShotIds.filter((id) => !gone.includes(id)),
+        selectedClipShotId: state.selectedClipShotId && gone.includes(state.selectedClipShotId) ? null : state.selectedClipShotId,
+        past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
+        future: [],
+      })
+    }),
+
+  // 클립을 다른 줄(또는 같은 줄의 다른 시각)로 — 원래 자리는 빈 곳으로 남고(빼기와 같다), 놓은 줄에서 뒤 클립과 겹치면 겹치는 만큼 민다.
+  //   V1 로 내리면 이야기 줄의 그 시각 자리에 끼운다. 이어진 소리는 어느 줄이든 따라간다(시안 E3 · 2단계 ②).
+  moveClipToTrack: (shotId, trackId, startSec) =>
+    set((state) => {
+      if (!Number.isFinite(startSec) || !state.videoTracks.some((t) => t.id === trackId)) return state
+      const from = trackOfClip(state, shotId)
+      if (!from || trackLocked(state, from) || trackLocked(state, trackId)) return state
+      const at = round3(Math.max(0, startSec))
+      const history = { past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT), future: [] as EditorSnapshot[] }
+      const layout = selectTimelineLayout(state)
+      if (trackId === 'v1') {
+        const others = layout.filter((l) => l.shotId !== shotId)
+        const moved = orderWithClipAt(state, shotId, others.filter((l) => l.startSec < at).length, from !== 'v1')
+        if (!moved) return state
+        const desired = new Map(others.map((l) => [l.shotId, l.startSec]))
+        desired.set(shotId, at)
+        const overlay = { ...state.overlay }
+        delete overlay[shotId]
+        return withLayout(state, { ...moved, overlay, ...history }, desired)
+      }
+      const clipOrder = from === 'v1'
+        ? Object.fromEntries(Object.entries(state.clipOrder).map(([sceneId, ids]) => [sceneId, ids.filter((id) => id !== shotId)]))
+        : state.clipOrder
+      const overlay = resolveOverlay(
+        { shots: state.shots, videoClips: state.videoClips, clipOrder },
+        { ...state.overlay, [shotId]: { trackId, startSec: at } },
+        shotId,
+      )
+      return withLayout(state, { clipOrder, overlay, ...history })
+    }),
 
   // ── 소스 단독 미리보기 (Video Source 클릭) ──
   previewSource: (shotId) => set({ previewSourceShotId: shotId, isPlaying: true }),
@@ -1042,6 +1266,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     automatically(() =>
       set((state) => {
         const reshaped = 'startSec' in patch || 'durationSec' in patch || 'sourceOffsetSec' in patch
+        if (reshaped && audioLocked(state, state.audioClips.find((a) => a.id === id))) return state
         return {
           audioClips: state.audioClips.map((a) =>
             a.id === id ? { ...a, ...patch, ...(reshaped ? { linkedShotId: null } : {}) } : a,
@@ -1144,7 +1369,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     function applySavedEdit(saved: PersistedEditor) {
       // 복구: 이전 버전(모듈 카운터)에서 중복된 트랙/오디오 클립 id 제거
       const seenTracks = new Set<string>()
-      const dedupTracks: { id: string }[] = []
+      const dedupTracks: AudioTrackState[] = []
       for (const t of saved.audioTracks ?? []) {
         if (!seenTracks.has(t.id)) {
           seenTracks.add(t.id)
@@ -1274,9 +1499,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         const savedIds = saved.clipOrder?.[sceneId] ?? []
         keptByScene.set(sceneId, savedIds.filter((shotId, index) => canonicalShotIds.has(shotId) && savedIds.indexOf(shotId) === index))
       }
+      // V1 밖 줄(V2 · V3 …)에 놓인 클립 — 저장한 줄 · 시작 초 그대로(2단계 ②). 없는 줄 · 영상이 없어진 클립은 두지 않는다.
+      const videoTracks = padTracks(saved.videoTracks ?? [], DEFAULT_VIDEO_TRACKS)
+      const savedOverlay = Object.entries(saved.placements ?? {}).filter(([, p]) => p.trackId !== 'v1')
+      const restoredOverlay: OverlayPlacements = {}
+      for (const [id, p] of savedOverlay) {
+        if (canonicalShotIds.has(id) && playable(id) && videoTracks.some((t) => t.id === p.trackId)) restoredOverlay[id] = { trackId: p.trackId, startSec: p.startSec }
+      }
       // 지금 있는 어느 장면의 저장 순서에든 놓인 샷은 다시 들이지 않는다 — 사람이 다른 장면으로 옮긴 샷 · Writer 에서 장면을 바꾼 샷이
-      //   원래 장면에 한 번 더 깔리고 구간이 처음으로 돌아갔다(재검토 c H2 · H3, 2026-11-14). 약속: tests/editor/shots-with-video.test.ts
-      const keptAnywhere = new Set([...keptByScene.values()].flat())
+      //   원래 장면에 한 번 더 깔리고 구간이 처음으로 돌아갔다(재검토 c H2 · H3, 2026-11-14). 다른 줄에 올린 샷도 같다(2단계 ②).
+      //   약속: tests/editor/shots-with-video.test.ts · tests/editor/tracks.test.ts
+      const keptAnywhere = new Set([...[...keptByScene.values()].flat(), ...savedOverlay.map(([id]) => id)])
       for (const [sceneId, canonicalIds] of canonicalOrder) {
         const kept = keptByScene.get(sceneId) ?? []
         shownOrder[sceneId] = kept
@@ -1294,7 +1527,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         clipOrder[sceneId] = [...order, ...fresh]
       }
       // 타임라인에 없는 조각(자른 · 끼운 조각 · 타이틀 카드)은 버린다 — 샷 목록에만 남는 유령 조각이 없게(검토 c).
-      const placedIds = new Set(Object.values(clipOrder).flat())
+      const placedIds = new Set([...Object.values(clipOrder).flat(), ...Object.keys(restoredOverlay)])
       const keep = (shotId: string) => !isSyntheticShotId(shotId) || placedIds.has(shotId)
       const timelineShots = combinedShots.filter((s) => keep(s.shotId))
       const keptClips = combinedClips
@@ -1307,7 +1540,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const timelineClips = regap({ shots: timelineShots, videoClips: keptClips, clipOrder }, placed)
       // 이음 칸이 없는 예전 저장본은 지금 영상 자리 · 처음 나눈 자리와 맞는 소리를 다시 잇고, 이어진 소리는 되살린 영상 자리에 맞춘다(결정 4).
       //   같은 소리 파일의 파형은 저장본에 한 번만 있다 — 빠진 조각은 같은 파일의 파형을 함께 쓴다(검토 b).
-      const timeline = { shots: timelineShots, videoClips: timelineClips, clipOrder }
+      const timeline = { shots: timelineShots, videoClips: timelineClips, clipOrder, overlay: restoredOverlay }
       const relinked = relinkSavedAudio(sharePeaks(dedupAudioClips), timeline, { shots: cur.shots, videoClips: cur.videoClips }, saved.videoClips ?? [])
       // ★ 최종 Take 가 바뀌어 영상 주소가 달라졌으면 이어진 소리도 새 영상에서 다시 나눈다 — 사람이 바꾼 크기 · 음소거는 남기고,
       //   구간은 새 영상 자리에 맞추며(아래 맞추기), 파형은 편집 화면을 연 뒤 뒤에서 채운다(검토 c, 2026-11-14).
@@ -1390,7 +1623,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         restoredOldFormat: !saved.placements,
         audioClips,
         audioSources: saved.audioSources ?? [],
-        audioTracks: dedupTracks,
+        audioTracks: padTracks(dedupTracks, DEFAULT_AUDIO_TRACKS),
+        videoTracks,
+        overlay: restoredOverlay,
         panelSizes: saved.panelSizes ?? { ...DEFAULT_PANEL_SIZES },
         selectedClipShotId: cur.selectedClipShotId,
         selectedShotIds: [],
@@ -1425,7 +1660,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       isPlaying: false,
       audioClips: [] as AudioTrackClip[],
       audioSources: [] as AudioSource[],
-      audioTracks: [{ id: 'atrack_1' }],
+      audioTracks: DEFAULT_AUDIO_TRACKS.map((t) => ({ ...t })),
+      videoTracks: DEFAULT_VIDEO_TRACKS.map((t) => ({ ...t })),
+      overlay: {},
       binDragKind: null,
       binDropSec: null,
       unplayableVideoUrls: [] as string[],
@@ -1607,7 +1844,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       toolMode: 'select',
       audioClips: [],
       audioSources: [],
-      audioTracks: [{ id: 'atrack_1' }],
+      audioTracks: DEFAULT_AUDIO_TRACKS.map((t) => ({ ...t })),
+      videoTracks: DEFAULT_VIDEO_TRACKS.map((t) => ({ ...t })),
+      overlay: {},
       previewSourceShotId: null,
       masterVolume: 1,
       binDragKind: null,
@@ -1632,17 +1871,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   // 타임라인 비디오 클립 단일 선택 (교체) — 오디오/소스 미리보기 해제
   selectClip: (shotId) =>
-    set({
+    set((state) => (clipLocked(state, shotId) ? state : {
       selectedClipShotId: shotId,
       selectedShotIds: [shotId],
       selectedAudioId: null,
       selectedAudioIds: [],
       previewSourceShotId: null,
-    }),
+    })),
 
   // ctrl+click — 토글 다중 선택
   toggleClipSelection: (shotId) =>
     set((state) => {
+      if (clipLocked(state, shotId)) return state
       const has = state.selectedShotIds.includes(shotId)
       const ids = has
         ? state.selectedShotIds.filter((i) => i !== shotId)
@@ -1678,7 +1918,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   // 마퀴 드래그 선택
   setClipSelection: (ids) =>
-    set({ selectedShotIds: ids, selectedClipShotId: ids[ids.length - 1] ?? null }),
+    set((state) => {
+      const free = ids.filter((id) => !clipLocked(state, id))
+      return { selectedShotIds: free, selectedClipShotId: free[free.length - 1] ?? null }
+    }),
 
   clearClipSelection: () => set({ selectedShotIds: [], selectedClipShotId: null }),
 
@@ -1743,8 +1986,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   deleteSelectedAudio: () =>
     set((state) => {
-      if (state.selectedAudioIds.length === 0) return state
-      const ids = new Set(state.selectedAudioIds)
+      const ids = new Set(state.selectedAudioIds.filter((id) => !audioLocked(state, state.audioClips.find((a) => a.id === id))))
+      if (ids.size === 0) return state
       return {
         audioClips: state.audioClips.filter((a) => !ids.has(a.id)),
         selectedAudioIds: [],
@@ -1756,15 +1999,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setSpeed: (shotId, speed) => {
     const clamped = Math.max(0.25, Math.min(4.0, speed))
+    // 잠근 줄의 클립은 바꾸지 않는다(2단계 ②).
+    if (clipLocked(get(), shotId)) return
 
-    // 길어지면 바로 뒤 빈 곳부터 쓰고 모자라면 뒤 클립을 밀고, 짧아지면 빈 곳이 남는다(자유 배치, 2026-11-14).
-    set((state) =>
-      withLayout(state, {
-        videoClips: state.videoClips.map((c) =>
-          c.shotId === shotId ? { ...c, speed: clamped } : c,
-        ),
-      }),
-    )
+    // 길어지면 바로 뒤 빈 곳부터 쓰고 모자라면 뒤 클립을 밀고, 짧아지면 빈 곳이 남는다(자유 배치, 2026-11-14). V1 밖 줄도 같다.
+    set((state) => {
+      const videoClips = state.videoClips.map((c) => (c.shotId === shotId ? { ...c, speed: clamped } : c))
+      if (state.overlay[shotId]) {
+        const overlay = resolveOverlay({ shots: state.shots, videoClips, clipOrder: state.clipOrder }, state.overlay, shotId)
+        return withLinkedAudio(state, { videoClips, overlay })
+      }
+      return withLayout(state, { videoClips })
+    })
 
     // Debounced persist to DB (fire-and-forget)
     const existing = speedPersistTimers.get(shotId)
@@ -1791,31 +2037,44 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     let applied: number | null = null
 
     set((state) => {
+      // 잠근 줄의 클립은 바꾸지 않는다(2단계 ②).
+      if (clipLocked(state, shotId)) return state
       // 자유 배치(2026-11-14): 끝 가장자리 — 줄이면 뒤에 빈 곳이 남고 늘리면 바로 뒤 빈 곳부터 쓰고 모자라면 민다.
-      //   앞 가장자리 — 끝은 그대로 두고 시작이 자른 만큼 옮겨진다(늘리면 앞 빈 곳까지만). 약속: tests/editor/free-placement.test.ts
-      const layout = selectTimelineLayout(state)
+      //   앞 가장자리 — 끝은 그대로 두고 시작이 자른 만큼 옮겨진다(늘리면 앞 빈 곳까지만). V1 밖 줄도 같다(2단계 ②).
+      //   약속: tests/editor/free-placement.test.ts · tests/editor/tracks.test.ts
+      const place = state.overlay[shotId]
+      const layout = place ? selectOverlayLayout(state).filter((l) => l.trackId === place.trackId) : selectTimelineLayout(state)
       const index = layout.findIndex((l) => l.shotId === shotId)
       const clip = state.videoClips.find((c) => c.shotId === shotId)
       const speed = clip?.speed ?? 1
       const oldStart = clip?.trimStart ?? 0
       const desired = startsOf(state)
       let from = start
+      let newStart = index >= 0 ? layout[index].startSec : 0
       if (index >= 0 && from !== oldStart) {
         const prevEnd = index > 0 ? layout[index - 1].startSec + layout[index - 1].durationSec : 0
         from = Math.max(from, oldStart - (layout[index].startSec - prevEnd) * speed)
-        desired.set(shotId, layout[index].startSec + (from - oldStart) / speed)
+        newStart = layout[index].startSec + (from - oldStart) / speed
+        desired.set(shotId, newStart)
       }
       if (trimEnd <= from) return state
       applied = from
-      return withLayout(state, {
-        videoClips: state.videoClips.map((c) =>
-          c.shotId === shotId ? { ...c, trimStart: from, trimEnd } : c,
-        ),
-        // 약속 J3: 타이틀 카드는 원본 영상이 없어 "원본 길이"가 없다 — 손잡이로 늘린 만큼 카드 길이가 길어진다.
-        shots: isTitleCardShotId(shotId)
-          ? state.shots.map((s) => (s.shotId === shotId && trimEnd > s.durationSeconds ? { ...s, durationSeconds: trimEnd } : s))
-          : state.shots,
-      }, desired)
+      const videoClips = state.videoClips.map((c) =>
+        c.shotId === shotId ? { ...c, trimStart: from, trimEnd } : c,
+      )
+      // 약속 J3: 타이틀 카드는 원본 영상이 없어 "원본 길이"가 없다 — 손잡이로 늘린 만큼 카드 길이가 길어진다.
+      const shots = isTitleCardShotId(shotId)
+        ? state.shots.map((s) => (s.shotId === shotId && trimEnd > s.durationSeconds ? { ...s, durationSeconds: trimEnd } : s))
+        : state.shots
+      if (place) {
+        const overlay = resolveOverlay(
+          { shots, videoClips, clipOrder: state.clipOrder },
+          { ...state.overlay, [shotId]: { trackId: place.trackId, startSec: round3(newStart) } },
+          shotId,
+        )
+        return withLinkedAudio(state, { videoClips, shots, overlay })
+      }
+      return withLayout(state, { videoClips, shots }, desired)
     })
 
     // synthetic pieces have no shots row - the editor_states snapshot restores them instead.
@@ -1853,7 +2112,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   //   빠지고, 남은 클립의 소리는 영상을 따른다(결정 4). 자유 배치(오너 답 1, 2026-11-14). 약속: tests/editor/free-placement.test.ts
   removeClips: (shotIds, ripple) =>
     set((state) => {
-      const ids = new Set(shotIds)
+      // 잠근 줄의 클립은 빼지 않는다(2단계 ②).
+      const ids = new Set(shotIds.filter((id) => !clipLocked(state, id)))
       if (ids.size === 0) return state
       const newOrder: Record<string, string[]> = {}
       for (const [sceneId, list] of Object.entries(state.clipOrder)) {
@@ -1869,8 +2129,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           else desired.set(item.shotId, item.startSec - removed)
         }
       }
+      // V1 밖 줄 — 빼면 빈 곳, 잔물결 삭제는 그 줄의 뒤 클립만 당긴다(추천 "그 줄만 당김", 2단계 ②).
+      let overlay = state.overlay
+      if (Object.keys(state.overlay).some((id) => ids.has(id))) {
+        const items = selectOverlayLayout(state)
+        overlay = {}
+        for (const item of items) {
+          if (ids.has(item.shotId)) continue
+          const pulled = ripple
+            ? items.filter((r) => ids.has(r.shotId) && r.trackId === item.trackId && r.startSec < item.startSec).reduce((sum, r) => sum + r.durationSec, 0)
+            : 0
+          overlay[item.shotId] = { trackId: item.trackId, startSec: round3(Math.max(0, item.startSec - pulled)) }
+        }
+      }
       return withLayout(state, {
         clipOrder: newOrder,
+        overlay,
         removedShotIds: withRemoved(state.removedShotIds, [...ids]),
         selectedShotIds: state.selectedShotIds.filter((id) => !ids.has(id)),
         selectedClipShotId: state.selectedClipShotId && ids.has(state.selectedClipShotId) ? null : state.selectedClipShotId,
@@ -1883,6 +2157,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   //   사람이 놓은 소리는 그대로다. 약속: tests/editor/free-placement.test.ts
   rippleDeleteGapBefore: (shotId) =>
     set((state) => {
+      if (clipLocked(state, shotId)) return state
+      const place = state.overlay[shotId]
+      if (place) {
+        // V1 밖 줄 — 그 줄의 이 클립과 뒤 클립을 빈 곳만큼 당긴다(2단계 ②).
+        const items = selectOverlayLayout(state).filter((i) => i.trackId === place.trackId)
+        const at = items.findIndex((i) => i.shotId === shotId)
+        const prevEnd = at > 0 ? items[at - 1].startSec + items[at - 1].durationSec : 0
+        const gap = items[at].startSec - prevEnd
+        if (!(gap > 0.0005)) return state
+        const overlay = { ...state.overlay }
+        for (const i of items.slice(at)) overlay[i.shotId] = { trackId: i.trackId, startSec: round3(i.startSec - gap) }
+        return withLinkedAudio(state, { overlay, past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT), future: [] })
+      }
       const layout = selectTimelineLayout(state)
       const index = layout.findIndex((l) => l.shotId === shotId)
       if (index < 0) return state
@@ -1901,7 +2188,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   placeClipAt: (shotId, atSec) =>
     set((state) => {
       const layout = selectTimelineLayout(state)
-      if (!layout.some((l) => l.shotId === shotId) || !Number.isFinite(atSec)) return state
+      if (!layout.some((l) => l.shotId === shotId) || !Number.isFinite(atSec) || clipLocked(state, shotId)) return state
       const at = Math.max(0, atSec)
       const others = layout.filter((l) => l.shotId !== shotId)
       const moved = orderWithClipAt(state, shotId, others.filter((l) => l.startSec < at).length)
@@ -1918,6 +2205,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // 드래그 순서변경 — shotId 를 전역 순서의 targetIndex 위치로 이동 (씬 경계 넘으면 sceneId 재배정)
   moveClipToIndex: (shotId, targetIndex) =>
     set((state) => {
+      if (clipLocked(state, shotId)) return state
       const moved = orderWithClipAt(state, shotId, targetIndex)
       if (!moved) return state
       // 경계에 놓으면 순서만 바뀐다 — 원래 자리는 당겨 메우고 놓인 자리 뒤는 민다(빈 곳이 새로 생기지 않는다, 자유 배치 2026-11-14).
@@ -1939,10 +2227,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // 모델: 1 shot = 1 video clip 이므로, 뒷조각은 synthetic shotId 로 복제하고 trim 으로 구간을 나눈다.
   splitVideoClipAt: (shotId, atGlobalSec) =>
     set((state) => {
-      const layout = selectTimelineLayout(state)
-      const item = layout.find((l) => l.shotId === shotId)
+      const place = state.overlay[shotId]
+      const item = (place ? selectOverlayLayout(state) : selectTimelineLayout(state)).find((l) => l.shotId === shotId)
       const shot = state.shots.find((s) => s.shotId === shotId)
-      if (!item || !shot) return state
+      if (!item || !shot || clipLocked(state, shotId)) return state
 
       const clip = state.videoClips.find((c) => c.shotId === shotId)
       const base = shot.durationSeconds
@@ -1974,6 +2262,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         a.linkedShotId === shotId ? [a, { ...a, id: `audio_${uid()}`, linkedShotId: newId }] : [a],
       )
 
+      if (place) {
+        // V1 밖 줄 — 뒷조각은 같은 줄의 자른 시각에 놓인다(앞 조각 끝 = 자른 시각, 2단계 ②).
+        return withLinkedAudio(state, {
+          shots: [...state.shots, newShot],
+          videoClips,
+          audioClips,
+          overlay: { ...state.overlay, [newId]: { trackId: place.trackId, startSec: round3(atGlobalSec) } },
+          selectedClipShotId: shotId,
+          selectedAudioId: null,
+          selectedAudioIds: [],
+          past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
+          future: [],
+        })
+      }
+
       return withLayout(state, {
         shots: [...state.shots, newShot],
         videoClips,
@@ -1989,13 +2292,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   // Video Source → 타임라인 드래그-투-애드. atGlobalSec 위치에 새 인스턴스(synthetic) 삽입.
   // 새 인스턴스 id 를 돌려준다 — 화면이 그 클립에 소리를 잇는다(결정 4). 원본이 없으면 null.
-  addClipInstanceAt: (sourceShotId, atGlobalSec) => {
+  addClipInstanceAt: (sourceShotId, atGlobalSec, trackId = 'v1') => {
     let created: string | null = null
     set((state) => {
       const srcShot = state.shots.find((s) => s.shotId === sourceShotId)
       const srcClip = state.videoClips.find((c) => c.shotId === sourceShotId)
-      // 영상이 없는 샷은 타임라인에 들이지 않는다 — 빈 칸이 생긴다(오너 답 8, 2026-11-14).
-      if (!srcShot || !srcClip?.url) return state
+      // 영상이 없는 샷은 타임라인에 들이지 않는다 — 빈 칸이 생긴다(오너 답 8, 2026-11-14). 잠근 줄 · 없는 줄에는 놓지 않는다(2단계 ②).
+      if (!srcShot || !srcClip?.url || trackLocked(state, trackId) || !state.videoTracks.some((t) => t.id === trackId)) return state
 
       const newId = `${sourceShotId}__i${uid()}`
       created = newId
@@ -2006,6 +2309,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         url: srcClip?.url ?? null,
         status: srcClip?.status ?? 'pending',
         thumbnailUrl: srcClip?.thumbnailUrl ?? null,
+        takeNumber: srcClip?.takeNumber,
+      }
+      const selection = { selectedClipShotId: newId, selectedShotIds: [newId], selectedAudioId: null, selectedAudioIds: [], previewSourceShotId: null }
+      if (trackId !== 'v1') {
+        // V1 밖 줄 — 놓은 시각에, 그 줄의 뒤 클립과 겹치면 민다.
+        const shots = [...state.shots, { ...newShot }]
+        const videoClips = [...state.videoClips, newClip]
+        const overlay = resolveOverlay(
+          { shots, videoClips, clipOrder: state.clipOrder },
+          { ...state.overlay, [newId]: { trackId, startSec: round3(Math.max(0, atGlobalSec)) } },
+          newId,
+        )
+        return withLinkedAudio(state, { shots, videoClips, overlay, ...selection, past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT), future: [] })
       }
 
       // 드롭 위치 → 전역 삽입 인덱스
@@ -2076,6 +2392,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   //   기본 5초 / 검은 배경 / 빈 텍스트 — 삽입 즉시 인스펙터에서 텍스트를 채운다.
   addTitleCard: (atGlobalSec) =>
     set((state) => {
+      // 새 타이틀 카드는 V1(이야기 줄)에 들어간다 — V1 이 잠겼으면 넣지 않는다(2단계 ②).
+      if (trackLocked(state, 'v1')) return state
       const newId = `title__t${uid()}`
       const sceneId = state.selectedSceneId ?? state.shots[0]?.sceneId ?? 'scene_1'
       const DEFAULT_DURATION = 5
@@ -2174,7 +2492,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setTransitionIn: (shotId, transition) =>
     set((state) => {
-      if (!state.videoClips.some((c) => c.shotId === shotId)) return state
+      if (!state.videoClips.some((c) => c.shotId === shotId) || clipLocked(state, shotId)) return state
       const next = transition ? { type: 'dissolve' as const, durationSec: Math.max(0.1, Math.min(10, transition.durationSec)) } : null
       return {
         videoClips: state.videoClips.map((c) => (c.shotId === shotId ? { ...c, transitionIn: next } : c)),
@@ -2185,7 +2503,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setTitleCardDuration: (shotId, seconds) =>
     set((state) => {
-      if (!isTitleCardShotId(shotId) || !Number.isFinite(seconds)) return state
+      if (!isTitleCardShotId(shotId) || !Number.isFinite(seconds) || clipLocked(state, shotId)) return state
       const sec = Math.max(0.5, Math.min(600, Math.round(seconds * 10) / 10))
       return withLayout(state, {
         shots: state.shots.map((s) => (s.shotId === shotId ? { ...s, durationSeconds: sec } : s)),
@@ -2378,6 +2696,8 @@ const pickPersisted = (s: EditorState) => ({
   audioClips: s.audioClips,
   audioSources: s.audioSources,
   audioTracks: s.audioTracks,
+  videoTracks: s.videoTracks,
+  overlay: s.overlay,
   panelSizes: s.panelSizes,
 })
 
@@ -2387,10 +2707,12 @@ const pickPersisted = (s: EditorState) => ({
  *   약속: tests/editor/free-placement.test.ts · tests/editor/save-size.test.ts · tests/editor/other-browser.test.ts
  */
 function persistSnapshot(state: EditorState): PersistedEditor {
+  // 모든 영상 줄의 클립 — V1 밖 줄(V2 · V3 …)도 줄 · 시작 초로 적는다(2단계 ②). overlay 는 placements 가 대신한다.
   const placements = Object.fromEntries(
-    selectTimelineLayout(state).map((item) => [item.shotId, { trackId: 'v1', startSec: round3(item.startSec) }]),
+    selectVideoLayout(state).map((item) => [item.shotId, { trackId: item.trackId, startSec: round3(item.startSec) }]),
   )
-  return compactSnapshot({ version: 2, ...(state.serverAware ? { serverAware: true } : {}), ...pickPersisted(state), placements })
+  const { overlay: _overlay, ...persisted } = pickPersisted(state)
+  return compactSnapshot({ version: 2, ...(state.serverAware ? { serverAware: true } : {}), ...persisted, placements })
 }
 
 /**
@@ -2424,6 +2746,8 @@ if (typeof window !== 'undefined') {
       cur.audioClips === prev.audioClips &&
       cur.audioSources === prev.audioSources &&
       cur.audioTracks === prev.audioTracks &&
+      cur.videoTracks === prev.videoTracks &&
+      cur.overlay === prev.overlay &&
       cur.panelSizes === prev.panelSizes
     ) {
       return // 편집 상태 변화 없음 (재생/선택 등) → 저장 안 함

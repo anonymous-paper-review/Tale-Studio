@@ -3,13 +3,13 @@
 import { useRef, useCallback, useMemo, useEffect, useState, type ReactNode } from 'react'
 import { useEntityNames } from '@/lib/writer/use-entity-names'
 import { resolveEntityNames } from '@/lib/writer/resolve-entity-names'
-import { AlertCircle, Trash2, Plus, Volume2, VolumeX, Scissors, Gauge, Type, Blend } from 'lucide-react'
+import { AlertCircle, Trash2, Plus, Volume2, VolumeX, Scissors, Gauge, Type, Blend, Eye, EyeOff, Lock, LockOpen } from 'lucide-react'
 import { DISSOLVE_CHOICES } from '@/lib/editor/transition'
 import type { ClipTransition } from '@/types'
 import type { Shot, VideoClip, AudioTrackClip } from '@/types'
 import { cn } from '@/lib/utils'
 import { drawWaveform } from '@/lib/audio-waveform'
-import { PX_PER_SEC_MIN, PX_PER_SEC_MAX, isTitleCardShotId, useEditorStore } from '@/stores/editor-store'
+import { PX_PER_SEC_MIN, PX_PER_SEC_MAX, isTitleCardShotId, useEditorStore, type TrackLayoutItem, type VideoTrackState, type AudioTrackState } from '@/stores/editor-store'
 import { timelineEnd, timelineSegments } from '@/lib/editor/timeline-segments'
 import { formatTimecode } from '@/lib/editor/sequence-info'
 import {
@@ -34,13 +34,27 @@ import { useT } from '@/lib/i18n'
 const CLIP_SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4]
 const TRIM_MIN = 0.1 // 트림 최소 길이(초)
 const SNAP_PX = 8 // 스냅 임계(px)
-const HEADER_W = 76 // 좌측 트랙 헤더 폭(px)
+const HEADER_W = 96 // 좌측 트랙 헤더 폭(px) — 줄 이름 · 자물쇠 · 눈(M · S) 칸(2단계 ②)
 // 트랙 레이아웃 높이(px) — 오디오 마퀴(드래그 선택)의 콘텐츠 좌표 계산용. 렌더 높이와 일치해야 함.
 const RULER_H = 20 // h-5 눈금자
 const VIDEO_H = 96 // h-24 비디오 트랙
 const AUDIO_LANE_H = 64 // h-16 오디오 레인
 const AUDIO_CLIP_TOP = 4 // 레인 내 클립 top-1
 const AUDIO_CLIP_H = 52 // 클립 h-[52px]
+// V1 밖 영상 줄(V2 · V3 …, 2단계 ②) — 줄 높이 h-16, 클립 top 8 · 높이 48.
+const OVERLAY_ROW_H = 64
+const OVERLAY_CLIP_TOP = 8
+const OVERLAY_CLIP_H = 48
+
+/** 클립을 그리는 줄 — V1(이야기 줄)과 V1 밖 줄이 같은 클립 그림을 쓴다(2단계 ②). */
+interface ClipRow {
+  trackId: string
+  top: number
+  height: number
+  locked: boolean
+  /** 가장자리를 끄는 동안 점선 칸을 그릴 줄 — V1 은 'video', 나머지는 그 줄 id. */
+  scope: string
+}
 
 interface TimelineLayoutItem {
   shotId: string
@@ -60,7 +74,7 @@ interface TimelineProps {
   binDragKind: 'video' | 'audio' | null
   binDropSec: number | null
   audioClips: AudioTrackClip[]
-  audioTracks: { id: string; muted?: boolean }[]
+  audioTracks: AudioTrackState[]
   onSeek: (timeSec: number) => void
   onSelect: (shotId: string) => void
   onToggleSelect: (shotId: string) => void
@@ -104,6 +118,14 @@ interface TimelineProps {
   onPushHistory: () => void
   /** 타임라인 머리 가운데 자리(시안 E1 409:4796–4808) — 화면이 [+ A 트랙] · 도구 설명 · 확대 −·+ 를 넣는다. */
   toolbar?: ReactNode
+  /** 영상 줄(아래부터 V1 · V2 …)과 V1 밖 줄의 클립 · 줄 머리 단추(2단계 ②, 시안 E1 Track Header). */
+  videoTracks: VideoTrackState[]
+  overlayLayout: TrackLayoutItem[]
+  onMoveClipToTrack: (shotId: string, trackId: string, startSec: number) => void
+  onToggleTrackLock: (trackId: string) => void
+  onToggleTrackVisible: (trackId: string) => void
+  onToggleAudioTrackSolo: (trackId: string) => void
+  onRemoveVideoTrack: (trackId: string) => void
 }
 
 function pickTickInterval(pxPerSec: number): number {
@@ -430,6 +452,13 @@ export function Timeline({
   onSetTitleCardDuration,
   onPushHistory,
   toolbar,
+  videoTracks,
+  overlayLayout,
+  onMoveClipToTrack,
+  onToggleTrackLock,
+  onToggleTrackVisible,
+  onToggleAudioTrackSolo,
+  onRemoveVideoTrack,
 }: TimelineProps) {
   const entityNames = useEntityNames()
   const t = useT()
@@ -442,7 +471,7 @@ export function Timeline({
   const [marquee, setMarquee] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null)
   // 오디오 마퀴 — 콘텐츠 좌표(눈금자 좌상단 기준). 여러 레인을 가로지르는 드래그 선택.
   const [audioMarquee, setAudioMarquee] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null)
-  const [reorder, setReorder] = useState<{ shotId: string; targetIndex: number; placeAtSec?: number } | null>(null)
+  const [reorder, setReorder] = useState<{ shotId: string; targetIndex: number; placeAtSec?: number; trackId?: string } | null>(null)
   // 빈 곳을 누르면 그 자리에 [잔물결 삭제](시안 E4 409:6873) — 빈 곳 뒤 클립 id 와 빈 곳 가운데 초.
   const [gapChip, setGapChip] = useState<{ shotId: string; centerSec: number } | null>(null)
   const [cutHoverSec, setCutHoverSec] = useState<number | null>(null) // cut 모드 미리보기 위치
@@ -452,6 +481,11 @@ export function Timeline({
   const [trimPreview, setTrimPreview] = useState<
     { scope: 'video' | string; leftSec: number; rightSec: number; label: string; clientX: number; clientY: number } | null
   >(null)
+  // 위에서 아래로 그리는 V1 밖 줄(V3 · V2), 잠근 줄(2단계 ②).
+  const overlayTracks = useMemo(() => videoTracks.filter((tr) => tr.id !== 'v1').reverse(), [videoTracks])
+  const lockedTracks = useMemo(() => new Set([...videoTracks, ...audioTracks].filter((tr) => tr.locked).map((tr) => tr.id)), [videoTracks, audioTracks])
+  const v1Track = videoTracks.find((tr) => tr.id === 'v1')
+  const overlayH = overlayTracks.length * OVERLAY_ROW_H
 
   const cutMode = toolMode === 'cut'
 
@@ -640,7 +674,7 @@ export function Timeline({
             if (ti < 0) return false
             const cx = a.startSec * pxPerSec
             const cw = Math.max(a.durationSec * pxPerSec, 12)
-            const laneTop = RULER_H + VIDEO_H + ti * AUDIO_LANE_H + AUDIO_CLIP_TOP
+            const laneTop = RULER_H + overlayH + VIDEO_H + ti * AUDIO_LANE_H + AUDIO_CLIP_TOP
             return cx < x2 && cx + cw > x1 && laneTop < y2 && laneTop + AUDIO_CLIP_H > y1
           })
           .map((a) => a.id)
@@ -662,13 +696,15 @@ export function Timeline({
       window.addEventListener('pointermove', move)
       window.addEventListener('pointerup', up)
     },
-    [cutMode, clientXToSec, onSeek, onSetAudioSelection, onClearAudioSelection, audioClips, audioTracks, pxPerSec],
+    [cutMode, clientXToSec, onSeek, onSetAudioSelection, onClearAudioSelection, audioClips, audioTracks, pxPerSec, overlayH],
   )
 
   const handleClipPointerDown = useCallback(
-    (e: React.PointerEvent, item: TimelineLayoutItem) => {
+    (e: React.PointerEvent, item: TimelineLayoutItem, trackId = 'v1') => {
       if (e.button === 2) return
       e.stopPropagation()
+      // 잠근 줄의 클립은 고르거나 옮기지 않는다(2단계 ②).
+      if (lockedTracks.has(trackId)) return
       if (cutMode) { onSplitVideo(item.shotId, snapToPlayhead(clientXToSec(e.clientX))); return }
       if (e.ctrlKey || e.metaKey) { onToggleSelect(item.shotId); return }
       if (e.shiftKey) { onRangeSelect(item.shotId); return }
@@ -676,11 +712,14 @@ export function Timeline({
       onSeek(clientXToSec(e.clientX))
       setGapChip(null)
       const startClientX = e.clientX
+      const startClientY = e.clientY
       // 잡은 곳과 클립 시작 사이 — 빈 곳에 놓을 때 클립 시작 = 놓은 곳 - 이만큼.
       const grabOffset = clientXToSec(e.clientX) - item.startSec
-      // 다른 클립 위면 순서 바꾸기, 빈 곳이면 그 시각에 놓기(자유 배치, 2026-11-14).
-      const dropFor = (clientX: number) => {
+      // 다른 클립 위면 순서 바꾸기, 빈 곳이면 그 시각에 놓기(자유 배치, 2026-11-14). 다른 줄 위면 그 줄의 그 시각(2단계 ②).
+      const dropFor = (clientX: number, clientY: number) => {
         const sec = clientXToSec(clientX)
+        const row = (document.elementFromPoint(clientX, clientY)?.closest('[data-drop="video-track"]') as HTMLElement | null)?.dataset.trackId ?? trackId
+        if (row !== 'v1' || trackId !== 'v1') return { shotId: item.shotId, targetIndex: -1, placeAtSec: Math.max(0, sec - grabOffset), trackId: row }
         const overClip = layout.some((it) => it.shotId !== item.shotId && sec >= it.startSec && sec < it.startSec + it.durationSec)
         return overClip
           ? { shotId: item.shotId, targetIndex: computeDropIndex(sec, item.shotId) }
@@ -688,15 +727,16 @@ export function Timeline({
       }
       let reordering = false
       const move = (ev: PointerEvent) => {
-        if (!reordering && Math.abs(ev.clientX - startClientX) > 5) reordering = true
-        if (reordering) setReorder(dropFor(ev.clientX))
+        if (!reordering && Math.hypot(ev.clientX - startClientX, ev.clientY - startClientY) > 5) reordering = true
+        if (reordering) setReorder(dropFor(ev.clientX, ev.clientY))
       }
       const up = (ev: PointerEvent) => {
         window.removeEventListener('pointermove', move)
         window.removeEventListener('pointerup', up)
         if (reordering) {
-          const drop = dropFor(ev.clientX)
-          if (drop.placeAtSec !== undefined) onPlaceClipAt(item.shotId, drop.placeAtSec)
+          const drop = dropFor(ev.clientX, ev.clientY)
+          if (drop.trackId !== undefined && drop.placeAtSec !== undefined) onMoveClipToTrack(item.shotId, drop.trackId, drop.placeAtSec)
+          else if (drop.placeAtSec !== undefined) onPlaceClipAt(item.shotId, drop.placeAtSec)
           else onMoveClipToIndex(item.shotId, drop.targetIndex)
         }
         setReorder(null)
@@ -704,8 +744,296 @@ export function Timeline({
       window.addEventListener('pointermove', move)
       window.addEventListener('pointerup', up)
     },
-    [cutMode, clientXToSec, snapToPlayhead, onSplitVideo, onToggleSelect, onRangeSelect, onSelect, onSeek, computeDropIndex, onMoveClipToIndex, onPlaceClipAt, layout],
+    [cutMode, clientXToSec, snapToPlayhead, onSplitVideo, onToggleSelect, onRangeSelect, onSelect, onSeek, computeDropIndex, onMoveClipToIndex, onPlaceClipAt, onMoveClipToTrack, layout, lockedTracks],
   )
+
+  // 줄 머리 단추(시안 E1 Track Header, 2단계 ②) — 자물쇠: 그 줄을 고칠 수 없게 · 눈: 미리 보기 · 내보내기에서 뺀다.
+  const lockButton = (track: { id: string; locked?: boolean }) => (
+    <button
+      type="button"
+      aria-pressed={!!track.locked}
+      onClick={(e) => {
+        e.stopPropagation()
+        onToggleTrackLock(track.id)
+      }}
+      title={track.locked ? t('Unlock track') : t('Lock track')}
+      aria-label={track.locked ? t('Unlock track') : t('Lock track')}
+      className={cn('flex size-5 items-center justify-center rounded transition-colors hover:bg-accent', track.locked ? 'text-foreground' : 'text-subtle-foreground')}
+    >
+      {track.locked ? <Lock className="size-3" /> : <LockOpen className="size-3" />}
+    </button>
+  )
+  const videoTrackHeader = (track: VideoTrackState) => (
+    <>
+      {lockButton(track)}
+      <span className={cn('w-6 font-num text-meta font-semibold text-foreground', track.hidden && 'opacity-60')}>{track.id.toUpperCase()}</span>
+      <button
+        type="button"
+        aria-pressed={!track.hidden}
+        onClick={(e) => {
+          e.stopPropagation()
+          onToggleTrackVisible(track.id)
+        }}
+        title={track.hidden ? t('Show track') : t('Hide track')}
+        aria-label={track.hidden ? t('Show track') : t('Hide track')}
+        className="flex size-5 items-center justify-center rounded text-subtle-foreground transition-colors hover:bg-accent hover:text-foreground"
+      >
+        {track.hidden ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+      </button>
+    </>
+  )
+
+  // 영상 클립 하나 — V1 과 V1 밖 줄이 같이 쓴다(줄마다 높이 · 잠금 · 끄는 동안 점선 칸 자리만 다르다, 2단계 ②).
+  const renderVideoClip = (item: TimelineLayoutItem, row: ClipRow) => {
+    const shot = shots.find((s) => s.shotId === item.shotId)
+    const clip = videoClips.find((c) => c.shotId === item.shotId)
+    if (!shot) return null
+    const isSelected = selectedShotIds.includes(item.shotId)
+    const isDragging = reorder?.shotId === item.shotId
+    const left = item.startSec * pxPerSec
+    const width = item.durationSec * pxPerSec
+    const targets = isSelected && selectedShotIds.length > 1 ? selectedShotIds : [item.shotId]
+
+    return (
+      <ContextMenu key={item.shotId}>
+        <ContextMenuTrigger asChild>
+          <div
+            data-no-seek
+            onPointerDown={(e) => handleClipPointerDown(e, item, row.trackId)}
+            title={resolveEntityNames(shot.actionDescription, entityNames)}
+            className={cn(
+              // v3 ED1: 클립 = 한 단 밝은 판 · 모서리 10, 고른 클립 = 지금 단계 색 1.5px.
+              'group absolute flex flex-col overflow-hidden rounded-[10px] border-[1.5px] bg-chat-lumi-bubble',
+              row.locked && 'pointer-events-none',
+              cutMode ? 'cursor-col-resize' : 'cursor-pointer',
+              isDragging && 'opacity-60',
+              isSelected ? 'border-stage' : 'border-transparent hover:border-border-strong',
+            )}
+            style={{ left, width: Math.max(width, 8), top: row.top, height: row.height }}
+          >
+            <div className="pointer-events-none flex h-full w-full items-center justify-center text-[8px] text-muted-foreground">
+              {isTitleCardShotId(item.shotId) ? (
+                <div className="flex h-full w-full flex-col items-center justify-center gap-0.5 bg-black px-1 text-center">
+                  <Type className="size-3 text-white/60" />
+                  <span className="line-clamp-2 text-[7px] leading-tight text-white/80">
+                    {shot.titleCard?.text || t('Title')}
+                  </span>
+                </div>
+              ) : clip?.url ? (
+                <video src={clip.url} poster={clip.thumbnailUrl ?? thumbUrl(shot.referenceImageUrl)} className="h-full w-full object-cover" muted preload={(clip.thumbnailUrl ?? shot.referenceImageUrl) ? 'none' : 'metadata'} draggable={false} />
+              ) : shot.referenceImageUrl ? (
+                <ThumbImage src={shot.referenceImageUrl} alt={shot.shotType} className="h-full w-full object-cover" draggable={false} />
+              ) : null}
+            </div>
+            {/* 약속 J4: 타이틀 카드는 라벨에 길이가 보이고, 누르면 초 단위 숫자를 넣는다. */}
+            {isTitleCardShotId(item.shotId) && durationEdit?.shotId === item.shotId ? (
+              <input
+                data-no-seek
+                autoFocus
+                type="number"
+                min={0.5}
+                max={600}
+                step={0.1}
+                value={durationEdit.value}
+                aria-label={t('Title card length (seconds)')}
+                onPointerDown={(e) => e.stopPropagation()}
+                onChange={(e) => setDurationEdit({ shotId: item.shotId, value: e.target.value })}
+                onKeyDown={(e) => {
+                  e.stopPropagation()
+                  if (e.key === 'Enter') {
+                    const n = Number(durationEdit.value)
+                    if (Number.isFinite(n) && n > 0) onSetTitleCardDuration(item.shotId, n)
+                    setDurationEdit(null)
+                  } else if (e.key === 'Escape') {
+                    setDurationEdit(null)
+                  }
+                }}
+                onBlur={() => {
+                  const n = Number(durationEdit.value)
+                  if (Number.isFinite(n) && n > 0) onSetTitleCardDuration(item.shotId, n)
+                  setDurationEdit(null)
+                }}
+                className="absolute left-1 top-0.5 z-20 w-14 rounded border border-primary bg-black px-1 font-mono text-[9px] text-white outline-none"
+              />
+            ) : null}
+            <span
+              data-no-seek={isTitleCardShotId(item.shotId) ? true : undefined}
+              onPointerDown={(e) => {
+                if (isTitleCardShotId(item.shotId)) e.stopPropagation()
+              }}
+              onClick={(e) => {
+                if (!isTitleCardShotId(item.shotId)) return
+                e.stopPropagation()
+                setDurationEdit({ shotId: item.shotId, value: item.durationSec.toFixed(1) })
+              }}
+              title={isTitleCardShotId(item.shotId) ? t('Title card length (seconds)') : undefined}
+              className={cn(
+                'absolute left-1.5 top-1.5 rounded-[5px] bg-chip px-[5px] py-px font-num text-[9.5px] font-semibold text-foreground',
+                isTitleCardShotId(item.shotId) ? 'cursor-text hover:bg-accent' : 'pointer-events-none',
+              )}
+            >
+              {isTitleCardShotId(item.shotId) ? clipMenuTitle({ isTitleCard: true, shotType: shot.shotType, durationSec: item.durationSec }, t) : shot.shotType}
+              {clip?.speed && clip.speed !== 1 && <span className="ml-1 text-stage">{clip.speed.toFixed(2)}×</span>}
+            </span>
+            {/* 영상을 불러오지 못한 클립은 그 클립만 오른쪽 위에 "불러오지 못함"(QA 2026-11-03 밤). */}
+            {clip?.url && unplayableUrls.includes(clip.url) ? (
+              <span
+                className="pointer-events-none absolute right-1.5 top-1.5 flex items-center gap-0.5 rounded-[5px] bg-chip px-[5px] py-px text-[9.5px] font-semibold text-destructive"
+                data-testid="timeline-clip-unplayable"
+              >
+                <AlertCircle className="size-3 shrink-0" aria-hidden />
+                {t('Could not load')}
+              </span>
+            ) : null}
+            {/* v3 ED1: 왼쪽 아래 길이("5초") */}
+            <span className="pointer-events-none absolute bottom-1.5 left-2 font-num text-[10.5px] font-medium text-subtle-foreground">
+              {t('{seconds}s', { seconds: Math.round(item.durationSec * 10) / 10 })}
+            </span>
+            {/* 트림 핸들 (요청): 점선 미리보기 → 드롭 시 적용. 원본 길이 초과 불가. */}
+            <div
+              data-no-seek
+              onPointerDown={(e) => {
+                if (e.button !== 0) return
+                e.stopPropagation()
+                const base = shot.durationSeconds
+                const speed = clip?.speed ?? 1
+                const t0 = clip?.trimStart ?? 0
+                const t1 = clip?.trimEnd ?? base
+                const startSec = item.startSec
+                const endSec = item.startSec + item.durationSec
+                const minLeft = startSec - t0 / speed // 원본 시작까지만 확장
+                const maxLeft = endSec - TRIM_MIN
+                const startX = e.clientX
+                let moved = false
+                const calc = (cx: number) => Math.max(minLeft, Math.min(clientXToSec(cx), maxLeft))
+                const move = (ev: PointerEvent) => {
+                  if (!moved && Math.abs(ev.clientX - startX) > 2) moved = true
+                  if (!moved) return
+                  const lft = calc(ev.clientX)
+                  setTrimPreview({ scope: row.scope, leftSec: lft, rightSec: endSec, label: `${(endSec - lft).toFixed(2)}s`, clientX: ev.clientX, clientY: ev.clientY })
+                }
+                const up = (ev: PointerEvent) => {
+                  window.removeEventListener('pointermove', move)
+                  window.removeEventListener('pointerup', up)
+                  if (moved) {
+                    const lft = calc(ev.clientX)
+                    onPushHistory()
+                    onSetTrim(item.shotId, Math.max(0, t0 + (lft - startSec) * speed), t1)
+                  }
+                  setTrimPreview(null)
+                }
+                window.addEventListener('pointermove', move)
+                window.addEventListener('pointerup', up)
+              }}
+              className="group/trim absolute left-0 top-0 z-10 h-full w-1.5 cursor-ew-resize hover:bg-primary/60"
+            >
+              <span className="pointer-events-none absolute -top-4 left-0 z-30 hidden whitespace-nowrap rounded bg-foreground px-1 text-[8px] text-background group-hover/trim:block">
+                ▕ {t('This clip start point')}
+              </span>
+            </div>
+            <div
+              data-no-seek
+              onPointerDown={(e) => {
+                if (e.button !== 0) return
+                e.stopPropagation()
+                const base = shot.durationSeconds
+                const speed = clip?.speed ?? 1
+                const t0 = clip?.trimStart ?? 0
+                const startSec = item.startSec
+                const minRight = startSec + TRIM_MIN
+                // 약속 J3: 타이틀 카드는 원본이 없어 끝이 없다 — 늘린 만큼 길어진다(상한 600초).
+                const maxRight = isTitleCardShotId(item.shotId)
+                  ? startSec + 600
+                  : startSec + (base - t0) / speed // 원본 끝까지만
+                const startX = e.clientX
+                let moved = false
+                const calc = (cx: number) => Math.max(minRight, Math.min(clientXToSec(cx), maxRight))
+                const move = (ev: PointerEvent) => {
+                  if (!moved && Math.abs(ev.clientX - startX) > 2) moved = true
+                  if (!moved) return
+                  const rgt = calc(ev.clientX)
+                  setTrimPreview({ scope: row.scope, leftSec: startSec, rightSec: rgt, label: `${(rgt - startSec).toFixed(2)}s`, clientX: ev.clientX, clientY: ev.clientY })
+                }
+                const up = (ev: PointerEvent) => {
+                  window.removeEventListener('pointermove', move)
+                  window.removeEventListener('pointerup', up)
+                  if (moved) {
+                    const rgt = calc(ev.clientX)
+                    onPushHistory()
+                    onSetTrim(item.shotId, t0, t0 + (rgt - startSec) * speed)
+                  }
+                  setTrimPreview(null)
+                }
+                window.addEventListener('pointermove', move)
+                window.addEventListener('pointerup', up)
+              }}
+              className="group/trim absolute right-0 top-0 z-10 h-full w-1.5 cursor-ew-resize hover:bg-primary/60"
+            >
+              <span className="pointer-events-none absolute -top-4 right-0 z-30 hidden whitespace-nowrap rounded bg-foreground px-1 text-[8px] text-background group-hover/trim:block">
+                {t('This clip end point')} ▏
+              </span>
+            </div>
+
+            <button
+              type="button"
+              data-no-seek
+              onPointerDown={(e) => { e.stopPropagation(); onDelete(item.shotId) }}
+              className="absolute right-0.5 top-0.5 z-20 hidden rounded bg-destructive/80 p-0.5 text-destructive-foreground hover:bg-destructive group-hover:block"
+              title={t('Hide clip')}
+            >
+              <Trash2 className="size-3" />
+            </button>
+          </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent className="w-44">
+          <ContextMenuLabel className="text-xs">
+            {targets.length > 1 ? t('{count} clips', { count: targets.length }) : clipMenuTitle({ isTitleCard: isTitleCardShotId(item.shotId), shotType: shot.shotType, durationSec: item.durationSec }, t)}
+          </ContextMenuLabel>
+          <ContextMenuSeparator />
+          <ContextMenuSub>
+            <ContextMenuSubTrigger className="text-xs"><Gauge className="size-3.5" /> {t('Playback speed')}</ContextMenuSubTrigger>
+            <ContextMenuSubContent>
+              <ContextMenuRadioGroup value={String(clip?.speed ?? 1)} onValueChange={(v) => targets.forEach((id) => onSetSpeed(id, Number(v)))}>
+                {CLIP_SPEEDS.map((sp) => (
+                  <ContextMenuRadioItem key={sp} value={String(sp)} className="text-xs">{sp.toFixed(2)}×</ContextMenuRadioItem>
+                ))}
+              </ContextMenuRadioGroup>
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+          <ContextMenuSub>
+            <ContextMenuSubTrigger className="text-xs"><Blend className="size-3.5" /> {t('Dissolve (dip to black)')}</ContextMenuSubTrigger>
+            <ContextMenuSubContent>
+              <ContextMenuRadioGroup
+                value={clip?.transitionIn ? String(clip.transitionIn.durationSec) : 'none'}
+                onValueChange={(v) => targets.forEach((id) => onSetTransitionIn(id, v === 'none' ? null : { type: 'dissolve', durationSec: Number(v) }))}
+              >
+                <ContextMenuRadioItem value="none" className="text-xs">{t('No dissolve')}</ContextMenuRadioItem>
+                {DISSOLVE_CHOICES.map((sec) => (
+                  <ContextMenuRadioItem key={sec} value={String(sec)} className="text-xs">{t('{seconds}s dissolve', { seconds: sec })}</ContextMenuRadioItem>
+                ))}
+              </ContextMenuRadioGroup>
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+          <ContextMenuItem
+            className="text-xs"
+            onSelect={() => {
+              const within = currentTime > item.startSec && currentTime < item.startSec + item.durationSec
+              onSplitVideo(item.shotId, within ? currentTime : item.startSec + item.durationSec / 2)
+            }}
+          >
+            <Scissors className="size-3.5" /> {t('Split here')}
+          </ContextMenuItem>
+          <ContextMenuItem variant="destructive" className="text-xs" onSelect={() => (targets.length > 1 ? onDeleteSelected() : onDelete(item.shotId))}>
+            <Trash2 className="size-3.5" /> {targets.length > 1 ? t('Hide {count}', { count: targets.length }) : t('Hide clip')}
+          </ContextMenuItem>
+          {/* 빼고 그 자리를 당겨 메운다(Shift+Delete) — 빼기(위)는 빈 곳을 남긴다(자유 배치, 2026-11-14). */}
+          <ContextMenuItem className="text-xs" onSelect={() => (targets.length > 1 ? onRippleDeleteSelected() : onRippleDelete(item.shotId))}>
+            <Trash2 className="size-3.5" /> {t('Ripple delete')}
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
+    )
+  }
 
   const reorderX = useMemo(() => {
     if (!reorder || reorder.placeAtSec !== undefined) return null
@@ -760,35 +1088,52 @@ export function Timeline({
         <div className="shrink-0 overflow-hidden" style={{ width: HEADER_W }}>
           <div ref={headerInnerRef}>
             <div className="h-5 border-b border-border-subtle" />
-            <div className="flex h-24 items-center pl-4 text-meta font-medium text-muted-foreground">
-              {t('Video')}
-            </div>
+            {/* 줄 머리(시안 E1 Track Header) — 자물쇠 · 줄 이름 · 눈. V1 밖 줄은 우클릭으로 지운다(2단계 ②). */}
+            {overlayTracks.map((track) => (
+              <ContextMenu key={track.id}>
+                <ContextMenuTrigger asChild>
+                  <div className="flex h-16 items-center gap-1 border-b border-border-subtle pl-2">{videoTrackHeader(track)}</div>
+                </ContextMenuTrigger>
+                <ContextMenuContent className="w-40">
+                  <ContextMenuItem variant="destructive" className="text-xs" disabled={!!track.locked} onSelect={() => onRemoveVideoTrack(track.id)}>
+                    <Trash2 className="size-3.5" /> {t('Delete this track')}
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
+            ))}
+            <div className="flex h-24 items-center gap-1 pl-2">{v1Track ? videoTrackHeader(v1Track) : null}</div>
             {audioTracks.map((track, i) => (
               <ContextMenu key={track.id}>
                 <ContextMenuTrigger asChild>
-                  <div
-                    className={cn(
-                      'flex h-16 items-center gap-1 pl-4 text-meta font-medium text-muted-foreground hover:text-foreground',
-                      track.muted && 'opacity-60',
-                    )}
-                  >
-                    <span>{t('Audio {n}', { n: i + 1 })}</span>
-                    {/* 트랙 전체 음소거 토글 */}
+                  <div className="flex h-16 items-center gap-1 pl-2 text-meta font-medium text-muted-foreground hover:text-foreground">
+                    {lockButton(track)}
+                    <span className={cn('w-6 font-num font-semibold text-foreground', track.muted && 'opacity-60')}>{`A${i + 1}`}</span>
+                    {/* 줄 음소거(M) · 그 줄만(S) — 내보내기도 같다(시안 E1 Track Header, 2단계 ②). */}
                     <button
                       type="button"
+                      aria-pressed={!!track.muted}
                       onClick={(e) => {
                         e.stopPropagation()
                         onToggleAudioTrackMute(track.id)
                       }}
                       title={track.muted ? t('Unmute track') : t('Mute entire track')}
                       aria-label={track.muted ? t('Unmute track') : t('Mute entire track')}
-                      className="rounded p-0.5 transition-colors hover:bg-accent hover:text-foreground"
+                      className={cn('flex size-5 items-center justify-center rounded font-num text-[10px] font-semibold transition-colors hover:bg-accent', track.muted ? 'bg-accent text-foreground' : 'text-subtle-foreground')}
                     >
-                      {track.muted ? (
-                        <VolumeX className="size-3 text-muted-foreground" />
-                      ) : (
-                        <Volume2 className="size-3 text-muted-foreground" />
-                      )}
+                      M
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={!!track.solo}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onToggleAudioTrackSolo(track.id)
+                      }}
+                      title={t('Play only this track')}
+                      aria-label={t('Play only this track')}
+                      className={cn('flex size-5 items-center justify-center rounded font-num text-[10px] font-semibold transition-colors hover:bg-accent', track.solo ? 'bg-accent text-foreground' : 'text-subtle-foreground')}
+                    >
+                      S
                     </button>
                   </div>
                 </ContextMenuTrigger>
@@ -804,7 +1149,7 @@ export function Timeline({
                   <ContextMenuItem
                     variant="destructive"
                     className="text-xs"
-                    disabled={audioTracks.length <= 1}
+                    disabled={audioTracks.length <= 1 || !!track.locked}
                     onSelect={() => onRemoveAudioTrack(track.id)}
                   >
                     <Trash2 className="size-3.5" /> {t('Delete this track')}
@@ -841,267 +1186,61 @@ export function Timeline({
               ))}
             </div>
 
-            {/* Video track */}
+            {/* V1 밖 영상 줄(위에서 아래로 V3 · V2) — 줄 + 시작 초, 위 줄이 아래 줄을 가린다(2단계 ②, 시안 E3). */}
+            {overlayTracks.map((track) => (
+              <div
+                key={track.id}
+                data-drop="video-track"
+                data-track-id={track.id}
+                data-pps={pxPerSec}
+                className={cn(
+                  'relative h-16 border-b border-border-subtle transition-colors',
+                  track.hidden && 'opacity-40',
+                  binDragKind === 'video' && !track.locked && 'bg-stage/10 ring-1 ring-inset ring-stage/40',
+                )}
+                onPointerDown={(e) => {
+                  if (e.button === 2 || (e.target as HTMLElement).closest('[data-no-seek]')) return
+                  onClearSelection()
+                  setGapChip(null)
+                  onSeek(clientXToSec(e.clientX))
+                }}
+              >
+                {overlayLayout
+                  .filter((item) => item.trackId === track.id)
+                  .map((item) => renderVideoClip(item, { trackId: track.id, top: OVERLAY_CLIP_TOP, height: OVERLAY_CLIP_H, locked: !!track.locked, scope: track.id }))}
+                {reorder?.placeAtSec !== undefined && reorder.trackId === track.id && (() => {
+                  const dragged = [...layout, ...overlayLayout].find((it) => it.shotId === reorder.shotId)
+                  if (!dragged) return null
+                  return (
+                    <div
+                      className="pointer-events-none absolute z-20 rounded-[10px] border-2 border-dashed border-stage bg-stage/10"
+                      style={{ left: reorder.placeAtSec * pxPerSec, width: Math.max(dragged.durationSec * pxPerSec, 8), top: OVERLAY_CLIP_TOP, height: OVERLAY_CLIP_H }}
+                    />
+                  )
+                })()}
+                {trimPreview?.scope === track.id && (
+                  <div
+                    className="pointer-events-none absolute z-30 rounded-[10px] border-2 border-dashed border-muted-foreground/80 bg-foreground/10"
+                    style={{ left: trimPreview.leftSec * pxPerSec, width: Math.max(2, (trimPreview.rightSec - trimPreview.leftSec) * pxPerSec), top: OVERLAY_CLIP_TOP, height: OVERLAY_CLIP_H }}
+                  />
+                )}
+              </div>
+            ))}
+
+            {/* Video track — V1(이야기 줄) */}
             <div
               ref={videoTrackRef}
               data-drop="video-track"
+              data-track-id="v1"
               data-pps={pxPerSec}
-              className={cn('relative h-24 transition-colors', binDragKind === 'video' && 'bg-stage/10 ring-1 ring-inset ring-stage/40')}
+              className={cn('relative h-24 transition-colors', v1Track?.hidden && 'opacity-40', binDragKind === 'video' && !v1Track?.locked && 'bg-stage/10 ring-1 ring-inset ring-stage/40')}
               onPointerDown={handleVideoTrackPointerDown}
             >
-              {layout.map((item) => {
-                const shot = shots.find((s) => s.shotId === item.shotId)
-                const clip = videoClips.find((c) => c.shotId === item.shotId)
-                if (!shot) return null
-                const isSelected = selectedShotIds.includes(item.shotId)
-                const isDragging = reorder?.shotId === item.shotId
-                const left = item.startSec * pxPerSec
-                const width = item.durationSec * pxPerSec
-                const targets = isSelected && selectedShotIds.length > 1 ? selectedShotIds : [item.shotId]
-
-                return (
-                  <ContextMenu key={item.shotId}>
-                    <ContextMenuTrigger asChild>
-                      <div
-                        data-no-seek
-                        onPointerDown={(e) => handleClipPointerDown(e, item)}
-                        title={resolveEntityNames(shot.actionDescription, entityNames)}
-                        className={cn(
-                          // v3 ED1: 클립 = 한 단 밝은 판 · 모서리 10, 고른 클립 = 지금 단계 색 1.5px.
-                          'group absolute top-3 flex h-[72px] flex-col overflow-hidden rounded-[10px] border-[1.5px] bg-chat-lumi-bubble',
-                          cutMode ? 'cursor-col-resize' : 'cursor-pointer',
-                          isDragging && 'opacity-60',
-                          isSelected ? 'border-stage' : 'border-transparent hover:border-border-strong',
-                        )}
-                        style={{ left, width: Math.max(width, 8) }}
-                      >
-                        <div className="pointer-events-none flex h-full w-full items-center justify-center text-[8px] text-muted-foreground">
-                          {isTitleCardShotId(item.shotId) ? (
-                            <div className="flex h-full w-full flex-col items-center justify-center gap-0.5 bg-black px-1 text-center">
-                              <Type className="size-3 text-white/60" />
-                              <span className="line-clamp-2 text-[7px] leading-tight text-white/80">
-                                {shot.titleCard?.text || t('Title')}
-                              </span>
-                            </div>
-                          ) : clip?.url ? (
-                            <video src={clip.url} poster={clip.thumbnailUrl ?? thumbUrl(shot.referenceImageUrl)} className="h-full w-full object-cover" muted preload={(clip.thumbnailUrl ?? shot.referenceImageUrl) ? 'none' : 'metadata'} draggable={false} />
-                          ) : shot.referenceImageUrl ? (
-                            <ThumbImage src={shot.referenceImageUrl} alt={shot.shotType} className="h-full w-full object-cover" draggable={false} />
-                          ) : null}
-                        </div>
-                        {/* 약속 J4: 타이틀 카드는 라벨에 길이가 보이고, 누르면 초 단위 숫자를 넣는다. */}
-                        {isTitleCardShotId(item.shotId) && durationEdit?.shotId === item.shotId ? (
-                          <input
-                            data-no-seek
-                            autoFocus
-                            type="number"
-                            min={0.5}
-                            max={600}
-                            step={0.1}
-                            value={durationEdit.value}
-                            aria-label={t('Title card length (seconds)')}
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onChange={(e) => setDurationEdit({ shotId: item.shotId, value: e.target.value })}
-                            onKeyDown={(e) => {
-                              e.stopPropagation()
-                              if (e.key === 'Enter') {
-                                const n = Number(durationEdit.value)
-                                if (Number.isFinite(n) && n > 0) onSetTitleCardDuration(item.shotId, n)
-                                setDurationEdit(null)
-                              } else if (e.key === 'Escape') {
-                                setDurationEdit(null)
-                              }
-                            }}
-                            onBlur={() => {
-                              const n = Number(durationEdit.value)
-                              if (Number.isFinite(n) && n > 0) onSetTitleCardDuration(item.shotId, n)
-                              setDurationEdit(null)
-                            }}
-                            className="absolute left-1 top-0.5 z-20 w-14 rounded border border-primary bg-black px-1 font-mono text-[9px] text-white outline-none"
-                          />
-                        ) : null}
-                        <span
-                          data-no-seek={isTitleCardShotId(item.shotId) ? true : undefined}
-                          onPointerDown={(e) => {
-                            if (isTitleCardShotId(item.shotId)) e.stopPropagation()
-                          }}
-                          onClick={(e) => {
-                            if (!isTitleCardShotId(item.shotId)) return
-                            e.stopPropagation()
-                            setDurationEdit({ shotId: item.shotId, value: item.durationSec.toFixed(1) })
-                          }}
-                          title={isTitleCardShotId(item.shotId) ? t('Title card length (seconds)') : undefined}
-                          className={cn(
-                            'absolute left-1.5 top-1.5 rounded-[5px] bg-chip px-[5px] py-px font-num text-[9.5px] font-semibold text-foreground',
-                            isTitleCardShotId(item.shotId) ? 'cursor-text hover:bg-accent' : 'pointer-events-none',
-                          )}
-                        >
-                          {isTitleCardShotId(item.shotId) ? clipMenuTitle({ isTitleCard: true, shotType: shot.shotType, durationSec: item.durationSec }, t) : shot.shotType}
-                          {clip?.speed && clip.speed !== 1 && <span className="ml-1 text-stage">{clip.speed.toFixed(2)}×</span>}
-                        </span>
-                        {/* 영상을 불러오지 못한 클립은 그 클립만 오른쪽 위에 "불러오지 못함"(QA 2026-11-03 밤). */}
-                        {clip?.url && unplayableUrls.includes(clip.url) ? (
-                          <span
-                            className="pointer-events-none absolute right-1.5 top-1.5 flex items-center gap-0.5 rounded-[5px] bg-chip px-[5px] py-px text-[9.5px] font-semibold text-destructive"
-                            data-testid="timeline-clip-unplayable"
-                          >
-                            <AlertCircle className="size-3 shrink-0" aria-hidden />
-                            {t('Could not load')}
-                          </span>
-                        ) : null}
-                        {/* v3 ED1: 왼쪽 아래 길이("5초") */}
-                        <span className="pointer-events-none absolute bottom-1.5 left-2 font-num text-[10.5px] font-medium text-subtle-foreground">
-                          {t('{seconds}s', { seconds: Math.round(item.durationSec * 10) / 10 })}
-                        </span>
-                        {/* 트림 핸들 (요청): 점선 미리보기 → 드롭 시 적용. 원본 길이 초과 불가. */}
-                        <div
-                          data-no-seek
-                          onPointerDown={(e) => {
-                            if (e.button !== 0) return
-                            e.stopPropagation()
-                            const base = shot.durationSeconds
-                            const speed = clip?.speed ?? 1
-                            const t0 = clip?.trimStart ?? 0
-                            const t1 = clip?.trimEnd ?? base
-                            const startSec = item.startSec
-                            const endSec = item.startSec + item.durationSec
-                            const minLeft = startSec - t0 / speed // 원본 시작까지만 확장
-                            const maxLeft = endSec - TRIM_MIN
-                            const startX = e.clientX
-                            let moved = false
-                            const calc = (cx: number) => Math.max(minLeft, Math.min(clientXToSec(cx), maxLeft))
-                            const move = (ev: PointerEvent) => {
-                              if (!moved && Math.abs(ev.clientX - startX) > 2) moved = true
-                              if (!moved) return
-                              const lft = calc(ev.clientX)
-                              setTrimPreview({ scope: 'video', leftSec: lft, rightSec: endSec, label: `${(endSec - lft).toFixed(2)}s`, clientX: ev.clientX, clientY: ev.clientY })
-                            }
-                            const up = (ev: PointerEvent) => {
-                              window.removeEventListener('pointermove', move)
-                              window.removeEventListener('pointerup', up)
-                              if (moved) {
-                                const lft = calc(ev.clientX)
-                                onPushHistory()
-                                onSetTrim(item.shotId, Math.max(0, t0 + (lft - startSec) * speed), t1)
-                              }
-                              setTrimPreview(null)
-                            }
-                            window.addEventListener('pointermove', move)
-                            window.addEventListener('pointerup', up)
-                          }}
-                          className="group/trim absolute left-0 top-0 z-10 h-full w-1.5 cursor-ew-resize hover:bg-primary/60"
-                        >
-                          <span className="pointer-events-none absolute -top-4 left-0 z-30 hidden whitespace-nowrap rounded bg-foreground px-1 text-[8px] text-background group-hover/trim:block">
-                            ▕ {t('This clip start point')}
-                          </span>
-                        </div>
-                        <div
-                          data-no-seek
-                          onPointerDown={(e) => {
-                            if (e.button !== 0) return
-                            e.stopPropagation()
-                            const base = shot.durationSeconds
-                            const speed = clip?.speed ?? 1
-                            const t0 = clip?.trimStart ?? 0
-                            const startSec = item.startSec
-                            const minRight = startSec + TRIM_MIN
-                            // 약속 J3: 타이틀 카드는 원본이 없어 끝이 없다 — 늘린 만큼 길어진다(상한 600초).
-                            const maxRight = isTitleCardShotId(item.shotId)
-                              ? startSec + 600
-                              : startSec + (base - t0) / speed // 원본 끝까지만
-                            const startX = e.clientX
-                            let moved = false
-                            const calc = (cx: number) => Math.max(minRight, Math.min(clientXToSec(cx), maxRight))
-                            const move = (ev: PointerEvent) => {
-                              if (!moved && Math.abs(ev.clientX - startX) > 2) moved = true
-                              if (!moved) return
-                              const rgt = calc(ev.clientX)
-                              setTrimPreview({ scope: 'video', leftSec: startSec, rightSec: rgt, label: `${(rgt - startSec).toFixed(2)}s`, clientX: ev.clientX, clientY: ev.clientY })
-                            }
-                            const up = (ev: PointerEvent) => {
-                              window.removeEventListener('pointermove', move)
-                              window.removeEventListener('pointerup', up)
-                              if (moved) {
-                                const rgt = calc(ev.clientX)
-                                onPushHistory()
-                                onSetTrim(item.shotId, t0, t0 + (rgt - startSec) * speed)
-                              }
-                              setTrimPreview(null)
-                            }
-                            window.addEventListener('pointermove', move)
-                            window.addEventListener('pointerup', up)
-                          }}
-                          className="group/trim absolute right-0 top-0 z-10 h-full w-1.5 cursor-ew-resize hover:bg-primary/60"
-                        >
-                          <span className="pointer-events-none absolute -top-4 right-0 z-30 hidden whitespace-nowrap rounded bg-foreground px-1 text-[8px] text-background group-hover/trim:block">
-                            {t('This clip end point')} ▏
-                          </span>
-                        </div>
-
-                        <button
-                          type="button"
-                          data-no-seek
-                          onPointerDown={(e) => { e.stopPropagation(); onDelete(item.shotId) }}
-                          className="absolute right-0.5 top-0.5 z-20 hidden rounded bg-destructive/80 p-0.5 text-destructive-foreground hover:bg-destructive group-hover:block"
-                          title={t('Hide clip')}
-                        >
-                          <Trash2 className="size-3" />
-                        </button>
-                      </div>
-                    </ContextMenuTrigger>
-                    <ContextMenuContent className="w-44">
-                      <ContextMenuLabel className="text-xs">
-                        {targets.length > 1 ? t('{count} clips', { count: targets.length }) : clipMenuTitle({ isTitleCard: isTitleCardShotId(item.shotId), shotType: shot.shotType, durationSec: item.durationSec }, t)}
-                      </ContextMenuLabel>
-                      <ContextMenuSeparator />
-                      <ContextMenuSub>
-                        <ContextMenuSubTrigger className="text-xs"><Gauge className="size-3.5" /> {t('Playback speed')}</ContextMenuSubTrigger>
-                        <ContextMenuSubContent>
-                          <ContextMenuRadioGroup value={String(clip?.speed ?? 1)} onValueChange={(v) => targets.forEach((id) => onSetSpeed(id, Number(v)))}>
-                            {CLIP_SPEEDS.map((sp) => (
-                              <ContextMenuRadioItem key={sp} value={String(sp)} className="text-xs">{sp.toFixed(2)}×</ContextMenuRadioItem>
-                            ))}
-                          </ContextMenuRadioGroup>
-                        </ContextMenuSubContent>
-                      </ContextMenuSub>
-                      <ContextMenuSub>
-                        <ContextMenuSubTrigger className="text-xs"><Blend className="size-3.5" /> {t('Dissolve (dip to black)')}</ContextMenuSubTrigger>
-                        <ContextMenuSubContent>
-                          <ContextMenuRadioGroup
-                            value={clip?.transitionIn ? String(clip.transitionIn.durationSec) : 'none'}
-                            onValueChange={(v) => targets.forEach((id) => onSetTransitionIn(id, v === 'none' ? null : { type: 'dissolve', durationSec: Number(v) }))}
-                          >
-                            <ContextMenuRadioItem value="none" className="text-xs">{t('No dissolve')}</ContextMenuRadioItem>
-                            {DISSOLVE_CHOICES.map((sec) => (
-                              <ContextMenuRadioItem key={sec} value={String(sec)} className="text-xs">{t('{seconds}s dissolve', { seconds: sec })}</ContextMenuRadioItem>
-                            ))}
-                          </ContextMenuRadioGroup>
-                        </ContextMenuSubContent>
-                      </ContextMenuSub>
-                      <ContextMenuItem
-                        className="text-xs"
-                        onSelect={() => {
-                          const within = currentTime > item.startSec && currentTime < item.startSec + item.durationSec
-                          onSplitVideo(item.shotId, within ? currentTime : item.startSec + item.durationSec / 2)
-                        }}
-                      >
-                        <Scissors className="size-3.5" /> {t('Split here')}
-                      </ContextMenuItem>
-                      <ContextMenuItem variant="destructive" className="text-xs" onSelect={() => (targets.length > 1 ? onDeleteSelected() : onDelete(item.shotId))}>
-                        <Trash2 className="size-3.5" /> {targets.length > 1 ? t('Hide {count}', { count: targets.length }) : t('Hide clip')}
-                      </ContextMenuItem>
-                      {/* 빼고 그 자리를 당겨 메운다(Shift+Delete) — 빼기(위)는 빈 곳을 남긴다(자유 배치, 2026-11-14). */}
-                      <ContextMenuItem className="text-xs" onSelect={() => (targets.length > 1 ? onRippleDeleteSelected() : onRippleDelete(item.shotId))}>
-                        <Trash2 className="size-3.5" /> {t('Ripple delete')}
-                      </ContextMenuItem>
-                    </ContextMenuContent>
-                  </ContextMenu>
-                )
-              })}
+              {layout.map((item) => renderVideoClip(item, { trackId: 'v1', top: 12, height: 72, locked: !!v1Track?.locked, scope: 'video' }))}
 
               {/* 빈 곳에 놓을 자리 미리 보기(자유 배치) — 끄는 클립 길이만큼 점선 칸. */}
-              {reorder?.placeAtSec !== undefined && (() => {
-                const dragged = layout.find((it) => it.shotId === reorder.shotId)
+              {reorder?.placeAtSec !== undefined && (reorder.trackId ?? 'v1') === 'v1' && (() => {
+                const dragged = [...layout, ...overlayLayout].find((it) => it.shotId === reorder.shotId)
                 if (!dragged) return null
                 return (
                   <div
@@ -1165,6 +1304,8 @@ export function Timeline({
                   onPointerDown={handleAudioLanePointerDown}
                 >
                   {clipsOnTrack.map((a) => (
+                    // 잠근 줄의 소리 조각은 고르거나 옮기지 않는다(2단계 ②).
+                    <div key={a.id} className={cn(track.locked && 'pointer-events-none')} style={{ display: 'contents' }}>
                     <AudioClipBlock
                       key={a.id}
                       clip={a}
@@ -1186,6 +1327,7 @@ export function Timeline({
                       rowTrackId={track.id}
                       onPushHistory={onPushHistory}
                     />
+                    </div>
                   ))}
                   {trimPreview?.scope === track.id && (
                     <div
@@ -1199,8 +1341,8 @@ export function Timeline({
 
             {/* 빈 오디오 줄 안내 — 줄 간격은 글자 크기의 155%(v3 11/5 판 ED1). */}
             {audioClips.length === 0 && (
-              <p className="pointer-events-none absolute left-3.5 z-10 text-meta leading-[1.55] text-subtle-foreground" style={{ top: 20 + 96 + 24 }}>
-                {t('Drag an Audio source, or upload with the + button in the top-right')}
+              <p className="pointer-events-none absolute left-3.5 z-10 text-meta leading-[1.55] text-subtle-foreground" style={{ top: RULER_H + overlayH + VIDEO_H + 24 }}>
+                {t('Drag a file from My files, or press Import… in the Project panel')}
               </p>
             )}
 

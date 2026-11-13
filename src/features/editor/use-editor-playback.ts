@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { useEditorStore, selectTimelineLayout, timelineEnd } from '@/stores/editor-store'
+import { useEditorStore, selectProgramLayout, selectVideoLayout, timelineEnd } from '@/stores/editor-store'
 import { editPointTarget } from '@/lib/editor/timeline-segments'
 import { SEQUENCE_FPS } from '@/lib/editor/sequence-info'
 
@@ -34,7 +34,7 @@ export function useEditorPlayback() {
       const dt = (ts - lastTsRef.current) / 1000
       lastTsRef.current = ts
 
-      const layout = selectTimelineLayout(st)
+      const layout = selectProgramLayout(st)
       // 빈 곳이 있어도 영상 줄은 마지막 클립 끝까지다(자유 배치, 2026-11-14).
       const videoTotal = timelineEnd(layout)
       // 오디오가 영상보다 길면 그 끝까지 재생 (영상 끝에서 멈추지 않음 — 요청 5)
@@ -93,7 +93,7 @@ export function useEditorPlayback() {
         const dir = e.key === 'ArrowRight' ? 1 : -1
         if (meta) {
           // 클립의 시작과 끝이 컷 경계다 — 빈 곳이 있으면 빈 곳의 양 끝도 멈춘다(자유 배치). 모니터의 편집점 단추와 같은 자리.
-          const layout = selectTimelineLayout(s)
+          const layout = selectVideoLayout(s)
           s.nudge(editPointTarget(layout, s.currentTime, dir) - s.currentTime)
         } else {
           s.nudge((e.shiftKey ? 5 : 1) * dir * FRAME)

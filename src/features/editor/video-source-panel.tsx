@@ -31,7 +31,8 @@ interface ProjectPanelProps {
   newItems: { label: string; onSelect: () => void }[]
   /** 줄을 누르면 위 [소스] 탭에 그 샷을 연다. */
   onOpenSource: (shotId: string) => void
-  onAddClip: (shotId: string, atSec: number) => void
+  /** trackId = 끌어 놓은 영상 줄(V1 · V2 …, 2단계 ②). */
+  onAddClip: (shotId: string, atSec: number, trackId?: string) => void
   onAddClipAtPlayhead: (shotId: string) => void
   onAddAudioFromSource: (sourceId: string, atSec: number, trackId?: string) => void
   onAddAudioSource: (source: AudioSource) => void
@@ -155,7 +156,7 @@ export function ProjectPanel({
                         onDragEnd: onBinDragEnd,
                         onDragOver: (target, clientX) =>
                           onSetBinDropSec(target ? dropTargetSec(target, clientX) : null),
-                        onDrop: ({ target, clientX }) => onAddClip(shot.shotId, dropTargetSec(target, clientX)),
+                        onDrop: ({ target, clientX }) => onAddClip(shot.shotId, dropTargetSec(target, clientX), (target as HTMLElement).dataset.trackId),
                       }) : undefined
                     }
                     title={`${resolveEntityNames(shot.actionDescription, entityNames)}\n${hasVideo ? t('(Click: preview / drag·right-click: add to timeline)') : t('(No video yet. Only shots with video go into the timeline.)')}`}
