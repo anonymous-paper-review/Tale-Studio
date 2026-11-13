@@ -157,6 +157,42 @@ function plainCommand(text: string): boolean {
   return rest.replace(/[\s.!,·、~…]+/g, '') === ''
 }
 
+/** 말을 절로 읽는다 — 댄 번호(뺀 번호 · 만들지 말라는 절의 번호는 뺌) · 뺀 번호 · 부탁한 묶음 · 뺀 묶음 · 만들지 말라는 말 · 만들라는 말. */
+function readRequest(text: string) {
+  const named = new Set<number>()
+  const excluded = new Set<number>()
+  const groups = new Set<Group>()
+  const excludedGroups = new Set<Group>()
+  let stopped = false
+  let asked = false
+  for (const clause of clausesOf(text)) {
+    const mentioned = mentionedShotNumbers(clause)
+    if (STOP.test(clause)) {
+      stopped = true
+      for (const n of mentioned) excluded.add(n)
+      // "실패한 샷은 만들지 마"처럼 만들지 말라는 절의 묶음도 뺀 것이다("전부"는 빼지 않는다 — "전부는 말고").
+      const found = groupsOf(clause)
+      for (const group of [...found.wanted, ...found.excluded]) if (group !== 'all') excludedGroups.add(group)
+      continue
+    }
+    if (MAKE.test(clause) || VIDEO.test(clause)) asked = true
+    for (const n of mentioned) named.add(n)
+    for (const match of clause.matchAll(EXCLUDED_BEFORE)) expandNumbers(match[1], excluded)
+    for (const match of clause.matchAll(EXCLUDED_AFTER)) expandNumbers(match[1], excluded)
+    const found = groupsOf(clause)
+    for (const group of found.wanted) groups.add(group)
+    for (const group of found.excluded) excludedGroups.add(group)
+  }
+  for (const n of excluded) named.delete(n)
+  return { named, excluded, groups, excludedGroups, stopped, asked }
+}
+
+/** 그 부탁에서 사람이 번호로 댄 샷 번호 — "샷 2 빼고"의 2 · 만들지 말라는 절의 번호는 댄 것이 아니다(리드 11/14 · 검토 b 낮음 1).
+ *  영상 있는 샷의 새 Take 는 여기 든 샷만 만든다. */
+export function namedShotNumbers(text: string): Set<number> {
+  return readRequest(text).named
+}
+
 export type VideoGrounding =
   /** 아주 분명한 꼴 — 이 샷들만 바로 만든다(캔버스 순서). 빈 목록이면 "지금 그런 샷이 없어요". */
   | { kind: 'run'; shotIds: string[] }
@@ -182,32 +218,8 @@ export function groundVideoRequest(input: {
   remakable?: readonly string[]
 }): VideoGrounding {
   const { text, requested, shots, eligible, selected } = input
-  const named = new Set<number>()
-  const excluded = new Set<number>()
-  const groups = new Set<Group>()
-  const excludedGroups = new Set<Group>()
-  let stopped = false
-  let asked = false
-  for (const clause of clausesOf(text)) {
-    const mentioned = mentionedShotNumbers(clause)
-    if (STOP.test(clause)) {
-      stopped = true
-      for (const n of mentioned) excluded.add(n)
-      // "실패한 샷은 만들지 마"처럼 만들지 말라는 절의 묶음도 뺀 것이다("전부"는 빼지 않는다 — "전부는 말고").
-      const found = groupsOf(clause)
-      for (const group of [...found.wanted, ...found.excluded]) if (group !== 'all') excludedGroups.add(group)
-      continue
-    }
-    if (MAKE.test(clause) || VIDEO.test(clause)) asked = true
-    for (const n of mentioned) named.add(n)
-    for (const match of clause.matchAll(EXCLUDED_BEFORE)) expandNumbers(match[1], excluded)
-    for (const match of clause.matchAll(EXCLUDED_AFTER)) expandNumbers(match[1], excluded)
-    const found = groupsOf(clause)
-    for (const group of found.wanted) groups.add(group)
-    for (const group of found.excluded) excludedGroups.add(group)
-  }
+  const { named, excluded, groups, excludedGroups, stopped, asked } = readRequest(text)
   if (stopped && !asked) return { kind: 'none' }
-  for (const n of excluded) named.delete(n)
 
   // 화면이 센 묶음 — 말한 번호 · 부탁한 묶음(없으면 제한 없음)과 뺀 것.
   const inGroup = (shot: ChatShotRef, group: Group) =>

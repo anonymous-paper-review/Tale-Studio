@@ -845,4 +845,147 @@ describe('다시 만들기는 접수되는 대로(검토 b (a)~(g) 보통 1)', (
     expect(generated).toEqual(['m1', 'm2'])
     expect(lastModel()).toBe('Started making videos for Shots 1 · 2 · 10 Takes. Progress shows on the line above the cards.')
   })
+
+  // ── 영상 있는 샷의 새 Take 는 그 부탁에서 사람이 번호로 댄 때만(리드 11/14 · 검토 b 0e7dd91f · efee24a1) ──
+  const doneTake = (shotId: string, extra: Record<string, unknown> = {}) =>
+    ({ id: `v-${shotId}-done`, type: 'video', position: { x: 0, y: 0 }, data: { kind: 'video', label: `v-${shotId}-done`, parentShotNodeId: shotId, status: 'completed', lastAttemptStatus: 'completed', videoUrl: `https://media.test/${shotId}.mp4`, final: false, takeNumber: 1, override: {}, ...extra } }) as unknown as DirectorNode
+  const makingTake = (shotId: string) =>
+    ({ id: `v-${shotId}-making`, type: 'video', position: { x: 0, y: 0 }, data: { kind: 'video', label: `v-${shotId}-making`, parentShotNodeId: shotId, status: 'generating', lastAttemptStatus: 'generating', videoUrl: null, final: false, takeNumber: 1, override: {} } }) as unknown as DirectorNode
+  function boardOf(entries: Array<[string, 'done' | 'failed' | 'making' | 'none', Record<string, unknown>?]>) {
+    writer.setState({ sceneManifest: { scenes: [{ sceneId: 'sc1' }] } as never, shots: entries.map(([id]) => ({ shotId: `w-${id}`, sceneId: 'sc1' })) as never })
+    director.setState({
+      nodes: entries.flatMap(([id, kind, extra]) => [
+        shot(id, IMG(id)),
+        ...(kind === 'done' ? [doneTake(id, extra)] : kind === 'failed' ? [failedTake(`v-${id}`, id)] : kind === 'making' ? [makingTake(id)] : []),
+      ]),
+    })
+  }
+  const saidSince = (mark: number) => chat.getState().messages.slice(mark).filter((m) => m.role === 'model').map((m) => m.content)
+
+  // 왜: 검토 b 보통 1(S1 · S2) — 0e7dd91f 가 다시 만들기 전체를 "영상이 있어도 됨"으로 넓혀, 옛 알림 카드 · 묶음 말 되묻기의 "응"이 그사이 영상이 생긴 샷까지 새 Take 로 만들었다.
+  it('알림 카드 · 묶음 말 되묻기의 "응" · 빠른 칩의 다시 만들기는 그사이 영상이 생긴 샷을 다시 만들지 않는다', async () => {
+    // S1 — 옛 알림 카드 [샷 1 다시 만들기]: 그사이 샷 1 영상이 완성됐다.
+    boardOf([['g1', 'failed']])
+    director.setState({ nodes: [...director.getState().nodes, doneTake('g1')] })
+    remakeServer()
+    await chat.getState().startDirectorVideos(['g1'], 'Make Shot 1 again', { remake: true })
+    expect(generated).toEqual([])
+    expect(lastModel()).toBe('There are no such shots right now.')
+    // S2 — "영상 다 다시 만들어줘" → 되묻기 [샷 2 · 3] → 그사이 샷 2 완성 → "응" → 샷 3 만.
+    boardOf([['h1', 'done'], ['h2', 'failed'], ['h3', 'failed']])
+    remakeServer([{ type: 'generateVideos' }])
+    await chat.getState().sendMessage('영상 다 다시 만들어줘')
+    expect(chat.getState().directorVideoAsk).toMatchObject({ shotIds: ['h2', 'h3'], remake: true })
+    director.setState({ nodes: [...director.getState().nodes, doneTake('h2')] })
+    await chat.getState().sendMessage('응')
+    expect(generated).toEqual(['h3'])
+    expect(lastModel()).toBe('Started making videos for Shot 3 · 5 Takes. Progress shows on the line above the cards.')
+    // 빠른 칩 "실패한 샷 다시 만들어 줘" — 글 카드가 건 샷 1 은 카드에 묶였다가, 그사이 영상이 생기면 [적용] 뒤에도 다시 만들지 않는다.
+    boardOf([['c1', 'failed']])
+    remakeServer([{ type: 'updateShot', id: 'c1', patch: { prompt: 'Warm' } }])
+    await chat.getState().sendMessage('Make shot 1 warm')
+    remakeServer()
+    await chat.getState().sendMessage('Remake the failed shots')
+    expect(generated).toEqual([])
+    director.setState({ nodes: [...director.getState().nodes, doneTake('c1')] })
+    await expect(chat.getState().approvePendingProposal()).resolves.toBe(true)
+    expect(generated).toEqual([])
+    expect(lastModel()).toBe('There are no such shots right now.')
+  })
+
+  // 왜: 같은 원칙 — 번호로 댄 샷은 되묻기 · 번호 대답 · 글 카드를 거쳐도 "번호로 댄 샷"이다(영상이 있어도 새 Take).
+  it('번호로 댄 영상 있는 샷은 되묻기 "응" · 번호 대답 · 고르는 말 대답 · 글 카드 [적용] 뒤에도 다시 만든다', async () => {
+    // 되묻기 "응" — 1080p 완성 Take 를 이어받아 10 Take.
+    boardOf([['k1', 'done', { override: { resolution: '1080p' } }]])
+    remakeServer([{ type: 'generateVideos', shotIds: ['k1'] }])
+    await chat.getState().sendMessage('샷 1 영상 다시 만들어줘. 다 되면 알려줘')
+    expect(chat.getState().directorVideoAsk).toMatchObject({ shotIds: ['k1'], remake: true })
+    await chat.getState().sendMessage('응')
+    expect(generated).toEqual(['k1'])
+    expect(lastModel()).toBe('Started making videos for Shot 1 · 10 Takes. Progress shows on the line above the cards.')
+    // 번호 대답 — 다시 만들기 부탁에서 번호를 물은 뒤 "1번".
+    boardOf([['j1', 'done'], ['j2', 'failed']])
+    remakeServer([{ type: 'generateVideos' }])
+    await chat.getState().sendMessage('씬 1 영상 다시 만들어줘')
+    expect(chat.getState().directorVideoAsk).toEqual({ projectId: 'p-dir', numbers: true, remake: true })
+    await chat.getState().sendMessage('1번')
+    expect(generated).toEqual(['j1'])
+    // 고르는 말 대답 — "1이나 2" → 되묻기 → "응".
+    boardOf([['o1', 'done'], ['o2', 'failed']])
+    remakeServer([{ type: 'generateVideos' }])
+    await chat.getState().sendMessage('씬 1 영상 다시 만들어줘')
+    await chat.getState().sendMessage('1이나 2')
+    await chat.getState().sendMessage('응')
+    expect(generated).toEqual(['o1', 'o2'])
+    // 글 카드 [적용] — 글이 걸린 샷의 다시 만들기는 카드에 묶였다가 [적용] 뒤 만든다.
+    boardOf([['t1', 'done']])
+    remakeServer([{ type: 'updateShot', id: 't1', patch: { prompt: 'Warm' } }])
+    await chat.getState().sendMessage('Make shot 1 warm')
+    remakeServer([{ type: 'generateVideos', shotIds: ['t1'] }])
+    await chat.getState().sendMessage('샷 1 영상 다시 만들어줘')
+    expect(generated).toEqual([])
+    await expect(chat.getState().approvePendingProposal()).resolves.toBe(true)
+    expect(generated).toEqual(['t1'])
+  })
+
+  // 왜: 검토 b 낮음 1(X1b) — "샷 2 빼고"의 2 를 댄 샷으로 세어, 샷 2 가 만드는 중이면 "샷 2 는 만드는 중"이라고 하고 나머지 부탁까지 삼켰다.
+  it('"샷 2 빼고 …"처럼 뺀 번호는 댄 샷으로 세지 않는다 — 뺀 샷이 만드는 중이어도 나머지 부탁은 이어진다', async () => {
+    boardOf([['x1', 'failed'], ['x2', 'making'], ['x3', 'failed']])
+    remakeServer([{ type: 'generateVideos' }])
+    const mark = chat.getState().messages.length
+    await chat.getState().sendMessage('샷 2 빼고 씬 1 영상 다시 만들어줘')
+    expect(saidSince(mark)).not.toContain('The video for Shot 2 is being made right now.')
+    expect(chat.getState().directorVideoAsk).toEqual({ projectId: 'p-dir', numbers: true, remake: true })
+    const next = chat.getState().messages.length
+    remakeServer([{ type: 'generateVideos' }])
+    await chat.getState().sendMessage('샷 2 빼고 영상 다 다시 만들어줘')
+    expect(saidSince(next)).not.toContain('The video for Shot 2 is being made right now.')
+    expect(chat.getState().directorVideoAsk).toMatchObject({ shotIds: ['x1', 'x3'], remake: true })
+  })
+
+  // 왜: 검토 b 낮음 2 — 번호를 물은 뒤 "1"로 답하면 영상 있는 샷 1 도 다시 만드는데, "1이나 2"(고르는 말)로 답하면 목록에서 샷 1 을 뺐다.
+  it('다시 만들기 부탁에서 번호를 물은 뒤 "1이나 2"로 답하면 영상 있는 샷 1 도 목록에 넣어 되묻는다 — "1"로 답할 때와 같은 규칙', async () => {
+    boardOf([['p1', 'done'], ['p2', 'failed']])
+    remakeServer([{ type: 'generateVideos' }])
+    await chat.getState().sendMessage('씬 1 영상 다시 만들어줘')
+    await chat.getState().sendMessage('1이나 2')
+    expect(chat.getState().directorVideoAsk).toMatchObject({ shotIds: ['p1', 'p2'], remake: true })
+    expect(lastModel()).toBe('Shall I make 2 videos for Shots 1 · 2 (10 Takes)? Say yes to start.')
+  })
+
+  // 왜: 리드 결정(검토 b 참고 2) — "다시" 없이 영상 있는 샷을 대면 "지금 그런 샷이 없어요"였다. Take 를 쓰지 않고, 새 Take 로 다시 만드는 말을 알려 준다.
+  it('"다시" 없이 영상 있는 샷을 번호로 대면 만들지 않고 "샷 N 은 이미 영상이 있어요. 새 Take 로 다시 만들려면 \'샷 N 영상 다시 만들어줘\'라고 말해 주세요."라고 답한다(Take 0) — 여러 샷이 섞이면 영상 없는 샷은 만들고 이 줄을 덧붙인다', async () => {
+    boardOf([['l1', 'done'], ['l2', 'none']])
+    remakeServer([{ type: 'generateVideos', shotIds: ['l1'] }])
+    await chat.getState().sendMessage('샷 1 영상 만들어줘')
+    expect(generated).toEqual([])
+    expect(mocks.run).not.toHaveBeenCalled()
+    expect(lastModel()).toBe('Shot 1 already has a video. To make a new Take, say "Make the video for Shot 1 again".')
+    expect(translate('ko', 'Shot 1 already has a video. To make a new Take, say "Make the video for Shot 1 again".'.replace(/Shot 1/g, '{shots}'), { shots: '샷 1' }))
+      .toBe('샷 1에는 이미 영상이 있어요. 새 Take 로 다시 만들려면 "샷 1 영상 다시 만들어줘"라고 말해 주세요.')
+    // 섞이면 — 영상 없는 샷 2 는 만들고, 샷 1 은 이 줄을 덧붙인다.
+    remakeServer([{ type: 'generateVideos', shotIds: ['l1', 'l2'] }])
+    const mark = chat.getState().messages.length
+    await chat.getState().sendMessage('샷 1, 2 영상 만들어줘')
+    expect(runShots()).toEqual(['l2'])
+    const said = saidSince(mark)
+    expect(said).toContain('Shot 1 already has a video. To make a new Take, say "Make the video for Shot 1 again".')
+    expect(said).toContain('Started making videos for Shot 2 · 5 Takes. Progress shows on the line above the cards.')
+    // 번호를 물은 뒤 대답으로 대도 같다 — "1"이면 이 줄만, "1이나 2"면 이 줄을 말하고 영상 없는 샷 2 만 되묻는다.
+    boardOf([['q1', 'done'], ['q2', 'none']])
+    remakeServer([{ type: 'generateVideos' }])
+    const runs = mocks.run.mock.calls.length
+    await chat.getState().sendMessage('씬 1 영상 만들어줘')
+    expect(chat.getState().directorVideoAsk).toEqual({ projectId: 'p-dir', numbers: true })
+    await chat.getState().sendMessage('1')
+    expect(mocks.run.mock.calls.length).toBe(runs)
+    expect(lastModel()).toBe('Shot 1 already has a video. To make a new Take, say "Make the video for Shot 1 again".')
+    remakeServer([{ type: 'generateVideos' }])
+    await chat.getState().sendMessage('씬 1 영상 만들어줘')
+    const asked = chat.getState().messages.length
+    await chat.getState().sendMessage('1이나 2')
+    expect(saidSince(asked)).toEqual(['Shot 1 already has a video. To make a new Take, say "Make the video for Shot 1 again".', 'Shall I make the video for Shot 2 (5 Takes)? Say yes to start.'])
+    expect(chat.getState().directorVideoAsk).toEqual({ projectId: 'p-dir', shotIds: ['q2'] })
+    expect(mocks.run.mock.calls.length).toBe(runs)
+  })
 })

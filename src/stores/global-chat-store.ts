@@ -68,7 +68,7 @@ import { roughRedrawCandidates, roughRedrawChangedScenes, roughRedrawOfferHere, 
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { boardNodeNames } from '@/features/director/node-label'
 import { currentDirectorText, directorShotRefs, directorTextEditLines, remakeTakeCosts, shotLabelOf, shotListLabel, splitDirectorTextEdits, textBoundShotIds, type DirectorTextEdit } from '@/lib/director/lumi-chat-runs'
-import { answeredShotNumbers, askedBackShotNumbers, asksRemake, groundVideoRequest, mentionedShotNumbers, type VideoGrounding } from '@/lib/director/chat-video-targets'
+import { answeredShotNumbers, askedBackShotNumbers, asksRemake, groundVideoRequest, namedShotNumbers, type VideoGrounding } from '@/lib/director/chat-video-targets'
 import { directorPendingContext, directorProgressLine, directorQuickChipOf, directorShotStatesNow, quickChipTargets, type DirectorQuickChip } from '@/lib/director/lumi-quick-chips'
 import { activeJobsSnapshot } from '@/lib/generation-queue'
 import { handoffToStage } from '@/lib/stage-nav'
@@ -228,7 +228,8 @@ interface GlobalChatState {
   styleAttachmentGate: { projectId: string; image: ChatImageInput } | null
   /** Director 에서 Lumi 가 영상을 되물은 중(재검토 b 보통 A · 낮음 3) — 목록이면 같은 단계에서 "응 · 좋아 · yes"일 때 그 목록 그대로 만들고,
    *  번호를 물었으면 다음 말의 "3번" · 맨 숫자를 샷 번호로 읽는다. 다른 말이면 버린다. */
-  directorVideoAsk: { projectId: string; shotIds: string[]; remake?: boolean } | { projectId: string; numbers: true; remake?: boolean } | null
+  /** named — 그 부탁에서 사람이 번호로 댄 샷(영상이 있어도 다시 만들기로 새 Take 를 만든다, 리드 11/14). */
+  directorVideoAsk: { projectId: string; shotIds: string[]; remake?: boolean; named?: string[] } | { projectId: string; numbers: true; remake?: boolean } | null
   /** 그림에서 그림체를 정하는 중인 프로젝트(매체 고르기 · 저장) — 그동안 스타일 선택 창을 자동으로 띄우지 않는다. */
   styleSettingFor: string | null
   /** Producer 본문을 막고 로딩 원을 보일 일 — 새 프로젝트가 넘긴 일 · 만화 옮기기(2026-10-09 오너, lib/producer/busy.ts). */
@@ -1387,6 +1388,20 @@ function directorRemakableShots(nodes: readonly DirectorNode[], projectId: strin
   return [...states].filter(([, state]) => state !== 'video_generating').map(([id]) => id)
 }
 
+/** 이 샷들 중 보드에서 영상이 이미 있는 샷(노드 id) — "다시" 없이 번호로 댔을 때 "이미 영상이 있어요"라고 말한다(리드 11/14). */
+function directorShotsWithVideo(shotIds: readonly string[]): string[] {
+  const { nodes, projectId } = useDirectorCanvasStore.getState()
+  const states = directorBoardStates(nodes, projectId)
+  return shotIds.filter((id) => states.get(id) === 'video_done')
+}
+
+/** "샷 1에는 이미 영상이 있어요. 새 Take 로 다시 만들려면 "샷 1 영상 다시 만들어줘"라고 말해 주세요." — 영어는 샷 수에 따라 단수 · 복수. Take 를 쓰지 않는다. */
+function alreadyHasVideoLine(locale: AppLocale, shotIds: readonly string[], shots: string): string {
+  return shotIds.length === 1
+    ? translate(locale, '{shots} already has a video. To make a new Take, say "Make the video for {shots} again".', { shots })
+    : translate(locale, '{shots} already have videos. To make new Takes, say "Make the videos for {shots} again".', { shots })
+}
+
 /** 이 샷들 중 보드에서 영상을 만드는 중인 샷(노드 id) — 다시 부탁했는데 만드는 중이라 뺄 때 "지금 만드는 중이에요"라고 말한다. */
 function directorShotsBeingMade(shotIds: readonly string[]): string[] {
   const { nodes, projectId } = useDirectorCanvasStore.getState()
@@ -1502,6 +1517,7 @@ async function holdOnTextCard(
     allBlankImages: before.allBlankImages || more.allBlankImages,
     videos: [...new Set([...before.videos, ...more.videos])],
     remakes: [...new Set([...(before.remakes ?? []), ...(more.remakes ?? [])])],
+    named: [...new Set([...(before.named ?? []), ...(more.named ?? [])])],
   }
   const edits = Array.isArray(card.proposal.payload.edits) ? (card.proposal.payload.edits as DirectorTextEdit[]) : []
   const impact = [...directorTextEditLines(locale, edits, nodes, names), ...(await heldWorkLines(then, locale, names))]
@@ -1530,6 +1546,8 @@ interface HeldDirectorWork {
   videos: string[]
   /** 다시 만들기("다시 만들어줘" · 알림 카드 [다시 만들기]) — [적용] 뒤 그 샷의 가장 최근 Take 설정을 이어받아 만든다(리드 낮음 6). */
   remakes?: string[]
+  /** 그 부탁에서 번호로 댄 샷 — [적용] 뒤에도 영상이 있으면 다시 만들기로 새 Take(리드 11/14). 그 밖은 그사이 영상이 생기면 뺀다. */
+  named?: string[]
 }
 
 /** 글 카드에 싣는 줄 — "적용하면 샷 1 영상을 바로 만들어요 · Take 5". 영상은 그 샷의 지금 모델 · 해상도로 센 Take 다. */
@@ -1583,8 +1601,8 @@ async function runHeldDirectorWork(held: HeldDirectorWork, ctx: {
       }))
     }
   }
-  if (held.videos.length > 0) await startVideosFor({ shotIds: held.videos, say: ctx.say, onJob: ctx.onJob, isCurrent: ctx.isCurrent })
-  if ((held.remakes ?? []).length > 0) await startVideosFor({ shotIds: held.remakes ?? [], say: ctx.say, onJob: ctx.onJob, isCurrent: ctx.isCurrent, remake: true })
+  if (held.videos.length > 0) await startVideosFor({ shotIds: held.videos, say: ctx.say, onJob: ctx.onJob, isCurrent: ctx.isCurrent, named: held.named })
+  if ((held.remakes ?? []).length > 0) await startVideosFor({ shotIds: held.remakes ?? [], say: ctx.say, onJob: ctx.onJob, isCurrent: ctx.isCurrent, remake: true, named: held.named })
 }
 
 /**
@@ -1599,6 +1617,9 @@ async function startVideosFor(input: {
   isCurrent: () => boolean
   /** 다시 만들기 — 샷마다 그 샷의 가장 최근 Take 설정을 이어받는 새 Take(넘기기 창 · 샷 상세 [다시 만들기]와 같은 remakeShotVideo, 리드 낮음 6 · (a)). */
   remake?: boolean
+  /** 그 부탁에서 사람이 번호로 댄 샷 — 다시 만들기면 영상이 있어도 새 Take(리드 11/14). 알림 카드 · 칩 · 묶음 말은 넘기지 않는다
+   *  (그사이 영상이 생긴 샷을 빼는 옛 규칙 그대로). "이미 영상이 있어요" 줄은 부탁을 받은 자리(답 가지 · 번호 대답)가 먼저 말한다. */
+  named?: readonly string[]
 }): Promise<void> {
   const locale = contentLocale()
   const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars)
@@ -1607,7 +1628,10 @@ async function startVideosFor(input: {
   const card = waitingTextCard(useDirectorCanvasStore.getState().projectId)
   const waiting = card ? input.shotIds.filter((id) => card.bound.has(id)) : []
   if (card && waiting.length > 0) {
-    await holdOnTextCard(card, input.remake ? { images: [], allBlankImages: false, videos: [], remakes: waiting } : { images: [], allBlankImages: false, videos: waiting }, input.say)
+    const waitingNamed = waiting.filter((id) => input.named?.includes(id))
+    await holdOnTextCard(card, input.remake
+      ? { images: [], allBlankImages: false, videos: [], remakes: waiting, named: waitingNamed }
+      : { images: [], allBlankImages: false, videos: waiting, named: waitingNamed }, input.say)
     input = { ...input, shotIds: input.shotIds.filter((id) => !card.bound.has(id)) }
     if (input.shotIds.length === 0) return
   }
@@ -1623,13 +1647,15 @@ async function startVideosFor(input: {
       import('@/lib/director/video-batch-plan'),
     ])
   // 그사이 다른 길로 영상이 생겼거나 만드는 중인 샷은 뺀다 — 낼 것이 없는데 "시작했어요"라고 하지 않는다(재검토 b 낮음 1).
-  //   만드는 중이라 뺀 샷(예: "접수됐는지 아직 몰라요"였던 샷)은 그렇다고 말한다 — "지금 그런 샷이 없어요"는 화면과 다른 말이다(리드 결정).
-  //   다시 만들기는 영상이 이미 있는 샷도 새 Take 로 만든다 — 만드는 중인 샷만 뺀다(리드 결정).
-  const open = new Set(input.remake
-    ? directorRemakableShots(useDirectorCanvasStore.getState().nodes, useDirectorCanvasStore.getState().projectId)
-    : eligibleVideoBatchShotIds(useDirectorCanvasStore.getState().nodes))
+  //   영상 있는 샷의 새 Take 는 그 부탁에서 사람이 번호로 댄 때만(리드 11/14) — 다시 만들기의 번호로 댄 샷은 영상이 있어도 받는다(만드는 중만 뺀다).
+  //   만드는 중이라 뺀 샷은 "지금 만드는 중이에요"라고 말한다.
+  const { nodes: nodesNow, projectId: projectNow } = useDirectorCanvasStore.getState()
+  const eligibleNow = new Set(eligibleVideoBatchShotIds(nodesNow))
+  const remakableNow = new Set(directorRemakableShots(nodesNow, projectNow))
+  const namedNow = new Set(input.named ?? [])
+  const open = new Set(input.shotIds.filter((id) => eligibleNow.has(id) || (input.remake && namedNow.has(id) && remakableNow.has(id))))
   const making = directorShotsBeingMade(input.shotIds.filter((id) => !open.has(id)))
-  if (making.length > 0) input.say(t('The video for {shots} is being made right now.', { shots: shotListLabel(locale, making.map((id) => shotLabelOf(useDirectorCanvasStore.getState().nodes.find((node) => node.id === id), directorBoardNames()))) }))
+  if (making.length > 0) input.say(t('The video for {shots} is being made right now.', { shots: shotListLabel(locale, making.map((id) => shotLabelOf(nodesNow.find((node) => node.id === id), directorBoardNames()))) }))
   input = { ...input, shotIds: input.shotIds.filter((id) => open.has(id)) }
   if (input.shotIds.length === 0) {
     if (making.length === 0) input.say(t('There are no such shots right now.'))
@@ -2973,28 +2999,43 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         if (askedBack) {
           const { eligibleVideoBatchShotIds } = await import('@/lib/director/video-batch-client')
           const nodes = useDirectorCanvasStore.getState().nodes
-          const open = new Set(eligibleVideoBatchShotIds(nodes))
-          const shotIds = directorShotRefs(nodes, directorBoardNames()).filter((shot) => shot.shotNo !== null && askedBack.has(shot.shotNo) && open.has(shot.nodeId)).map((shot) => shot.nodeId)
+          // 다시 만들기 부탁이면 대답으로 댄 영상 있는 샷도 넣는다 — "1"로 답할 때와 같은 규칙(리드 11/14 · 검토 b 낮음 2).
+          const open = new Set([...eligibleVideoBatchShotIds(nodes), ...(videoAsk.remake ? directorRemakableShots(nodes, projectId) : [])])
+          const answered = directorShotRefs(nodes, directorBoardNames()).filter((shot) => shot.shotNo !== null && askedBack.has(shot.shotNo)).map((shot) => shot.nodeId)
+          // 다시 만들기가 아닌데 영상이 있는 샷을 댔다 — 목록에 넣지 않고 "이미 영상이 있어요"를 먼저 말한다("1"로 답할 때와 같은 규칙, 리드 11/14).
+          const already = videoAsk.remake ? [] : directorShotsWithVideo(answered)
+          const alreadyLine = already.length > 0
+            ? alreadyHasVideoLine(contentLocale(), already, shotListLabel(contentLocale(), already.map((id) => shotLabelOf(nodes.find((node) => node.id === id), directorBoardNames()))))
+            : null
+          const shotIds = answered.filter((id) => open.has(id))
           if (shotIds.length === 0) {
-            get().appendLocalExchange('director', trimmed, translate(contentLocale(), 'There are no such shots right now.'))
+            get().appendLocalExchange('director', trimmed, alreadyLine ?? translate(contentLocale(), 'There are no such shots right now.'))
             return
           }
           get().appendLocalUser('director', trimmed)
-          set({ directorVideoAsk: { projectId, shotIds, ...(videoAsk.remake ? { remake: true } : {}) } })
+          set({ directorVideoAsk: { projectId, shotIds, ...(videoAsk.remake ? { remake: true, named: shotIds } : {}) } })
           const line = await confirmVideosLine(shotIds, contentLocale(), videoAsk.remake)
           if (!isCurrentSession()) return
-          set((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'director' as const, role: 'model' as const, content: line }] }))
-          saveChatMessage(projectId, 'director', 'model', line)
+          for (const content of alreadyLine ? [alreadyLine, line] : [line]) {
+            set((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'director' as const, role: 'model' as const, content }] }))
+            saveChatMessage(projectId, 'director', 'model', content)
+          }
           return
         }
         // 번호를 물었다 — "3번" · "3번이랑 4번" · 맨 숫자도 샷 번호다(재검토 b 낮음 3). 그 번호의 샷만 바로 만든다(분명한 꼴 (1)).
         const numbers = 'numbers' in videoAsk ? answeredShotNumbers(trimmed) : null
         if (numbers) {
           await runDirectorTurn(projectId, trimmed, isCurrentSession, async (say) => {
-            const shots = directorShotRefs(useDirectorCanvasStore.getState().nodes, directorBoardNames())
-            const shotIds = shots.filter((shot) => shot.shotNo !== null && numbers.has(shot.shotNo)).map((shot) => shot.nodeId)
-            if (shotIds.length === 0) say(translate(contentLocale(), 'There are no such shots right now.'))
-            else await startVideosFor({ shotIds, say, isCurrent: isCurrentSession, remake: videoAsk.remake })
+            const nodes = useDirectorCanvasStore.getState().nodes
+            const shots = directorShotRefs(nodes, directorBoardNames())
+            const answered = shots.filter((shot) => shot.shotNo !== null && numbers.has(shot.shotNo)).map((shot) => shot.nodeId)
+            // 다시 만들기가 아닌데 영상이 있는 샷을 번호로 댔다 — 만들지 않고 "이미 영상이 있어요"(Take 0, 리드 11/14).
+            const already = videoAsk.remake ? [] : directorShotsWithVideo(answered)
+            if (already.length > 0) say(alreadyHasVideoLine(contentLocale(), already, shotListLabel(contentLocale(), already.map((id) => shotLabelOf(nodes.find((node) => node.id === id), directorBoardNames())))))
+            const shotIds = answered.filter((id) => !already.includes(id))
+            if (shotIds.length === 0) {
+              if (already.length === 0) say(translate(contentLocale(), 'There are no such shots right now.'))
+            } else await startVideosFor({ shotIds, say, isCurrent: isCurrentSession, remake: videoAsk.remake, named: shotIds })
           })
           return
         }
@@ -3004,7 +3045,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           return
         }
         if ('shotIds' in videoAsk && saysYes(trimmed)) {
-          await runDirectorTurn(projectId, trimmed, isCurrentSession, (say) => startVideosFor({ shotIds: videoAsk.shotIds, say, isCurrent: isCurrentSession, remake: videoAsk.remake }))
+          await runDirectorTurn(projectId, trimmed, isCurrentSession, (say) => startVideosFor({ shotIds: videoAsk.shotIds, say, isCurrent: isCurrentSession, remake: videoAsk.remake, named: videoAsk.named }))
           return
         }
         if ('shotIds' in videoAsk && isCancellationUtterance(trimmed)) {
@@ -4396,6 +4437,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           let confirmIds: string[] = []
           // "다시 만들어줘"(다시 · again · remake …) — 영상은 [다시 만들기]처럼 그 샷의 가장 최근 Take 설정을 이어받는다(리드 낮음 6).
           const remake = asksRemake(trimmed)
+          // 이 부탁에서 사람이 번호로 댄 샷(뺀 번호는 빼고) — 영상 있는 샷의 새 Take 는 이 샷만(리드 11/14).
+          let namedVideoIds: string[] = []
           if (videoRequests.length > 0) {
             const requested = videoRequests[0]
             const requestedIds = requested ? requested.map(resolve) : null
@@ -4405,15 +4448,19 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             const hold = grounding.kind === 'ask' ? await askHoldReason(requestedIds, addedShotIds) : null
             // 번호를 댄 샷 중 만드는 중이라 빠진 샷은 꼴(바로 · 되묻기 · 번호 묻기)과 상관없이 먼저 그렇다고 말한다(검토 b 낮음 · M8 — 말 없이 빠졌다).
             //   댄 샷이 모두 만드는 중이라 겨눌 샷이 없으면(바로 꼴의 빈 목록 · 번호 묻기) "지금 그런 샷이 없어요" · 번호 질문 대신 그 말만 한다(리드 결정).
-            const named = grounding.kind === 'none' ? new Set<number>() : mentionedShotNumbers(trimmed)
+            //   "샷 2 빼고"의 2 는 댄 샷이 아니다(검토 b 낮음 1). 다시 만들기가 아닌데 번호로 댄 샷에 영상이 있으면 "이미 영상이 있어요"(Take 0, 리드 11/14).
+            const named = grounding.kind === 'none' ? new Set<number>() : namedShotNumbers(trimmed)
             const namedIds = named.size > 0
               ? directorShotRefs(useDirectorCanvasStore.getState().nodes, names).filter((ref) => ref.shotNo !== null && named.has(ref.shotNo)).map((ref) => ref.nodeId)
               : []
+            namedVideoIds = namedIds
+            const labelsOf = (ids: readonly string[]) => shotListLabel(locale, ids.map((id) => shotLabelOf(useDirectorCanvasStore.getState().nodes.find((node) => node.id === id), names)))
             const makingNamed = directorShotsBeingMade(namedIds)
-            if (makingNamed.length > 0) {
-              lumiSays(translate(locale, 'The video for {shots} is being made right now.', { shots: shotListLabel(locale, makingNamed.map((id) => shotLabelOf(useDirectorCanvasStore.getState().nodes.find((node) => node.id === id), names))) }))
-            }
-            const onlyMaking = makingNamed.length > 0 && makingNamed.length === namedIds.length &&
+            const alreadyNamed = remake ? [] : directorShotsWithVideo(namedIds)
+            if (makingNamed.length > 0) lumiSays(translate(locale, 'The video for {shots} is being made right now.', { shots: labelsOf(makingNamed) }))
+            if (alreadyNamed.length > 0) lumiSays(alreadyHasVideoLine(locale, alreadyNamed, labelsOf(alreadyNamed)))
+            const unavailable = makingNamed.length + alreadyNamed.length
+            const onlyMaking = unavailable > 0 && unavailable === namedIds.length &&
               ((grounding.kind === 'run' && grounding.shotIds.length === 0) || grounding.kind === 'ask')
             const said = hold ?? (onlyMaking ? null : groundingReply(grounding, (key) => translate(locale, key)))
             if (said) lumiSays(said)
@@ -4426,6 +4473,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           const boundVideos = [...videoIds, ...confirmIds].filter((id) => bound.has(id))
           if (remake) held.remakes = boundVideos
           else held.videos = boundVideos
+          held.named = boundVideos.filter((id) => namedVideoIds.includes(id))
           confirmIds = confirmIds.filter((id) => !bound.has(id))
           let textCardOffered = false
           if (edits.length > 0) {
@@ -4455,12 +4503,15 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           }
           const nowVideos = videoIds.filter((id) => !bound.has(id))
           if (nowVideos.length > 0) {
-            await startVideosFor({ shotIds: nowVideos, say: lumiSays, onJob: observeGeneration, isCurrent: isCurrentSession, remake })
+            await startVideosFor({ shotIds: nowVideos, say: lumiSays, onJob: observeGeneration, isCurrent: isCurrentSession, remake, named: namedVideoIds })
           }
           // 앞 턴의 글 카드가 아직 기다리면 그 카드가 건 샷도 그 카드에 묶는다.
           if (waitingCard && confirmIds.some((id) => waitingCard.bound.has(id))) {
             const waitingIds = confirmIds.filter((id) => waitingCard.bound.has(id))
-            await holdOnTextCard(waitingCard, remake ? { images: [], allBlankImages: false, videos: [], remakes: waitingIds } : { images: [], allBlankImages: false, videos: waitingIds }, lumiSays)
+            const waitingNamed = waitingIds.filter((id) => namedVideoIds.includes(id))
+            await holdOnTextCard(waitingCard, remake
+              ? { images: [], allBlankImages: false, videos: [], remakes: waitingIds, named: waitingNamed }
+              : { images: [], allBlankImages: false, videos: waitingIds, named: waitingNamed }, lumiSays)
             confirmIds = confirmIds.filter((id) => !waitingCard.bound.has(id))
           }
           // 되묻기 — "응"이면 이 목록 그대로 만든다(sendMessage 맨 앞의 directorVideoAsk 받기).
@@ -4469,7 +4520,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             const hold = await videoHoldReason(confirmIds)
             if (hold) lumiSays(hold)
             else {
-              set({ directorVideoAsk: { projectId, shotIds: confirmIds, ...(remake ? { remake } : {}) } })
+              const confirmNamed = confirmIds.filter((id) => namedVideoIds.includes(id))
+              set({ directorVideoAsk: { projectId, shotIds: confirmIds, ...(remake ? { remake } : {}), ...(remake && confirmNamed.length > 0 ? { named: confirmNamed } : {}) } })
               lumiSays(await confirmVideosLine(confirmIds, locale, remake))
             }
           }
