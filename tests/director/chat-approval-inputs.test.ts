@@ -9,8 +9,9 @@ import { useGlobalChatStore as chat } from '@/stores/global-chat-store'
 import { useProjectStore as project } from '@/stores/project-store'
 import { useDirectorCanvasStore as director } from '@/stores/director-store'
 const originalGenerate = director.getState().generateStoryboardImage
+// 샷은 이미지가 있다 — 이미지 없는 샷은 영상을 보내지 않으므로(서버도 missing_storyboard 로 건너뜀, 리드 11/14 B1) 영상 길을 보는 시험은 이미지가 있는 보드로 본다.
 function shot(id: string, provider = 'seedance'): DirectorNode {
-  return { id, type: 'shot', position: { x: 0, y: 0 }, data: { kind: 'shot', label: id, writerShotId: `writer-${id}`, derivedPrompt: 'base prompt', promptOverride: null, camera: { horizontal: 0, vertical: 0, pan: 0, tilt: 0, roll: 0, zoom: 0 }, lighting: { position: 'front', brightness: 50, colorTemp: 5600 }, cameraPreset: { brand: 'arri', focalLength: 35, aperture: 2.8, whiteBalance: 5600 }, provider, durationSeconds: 3, storyboardImage: null, referenceImages: [], imageInputs: [] } } as unknown as DirectorNode
+  return { id, type: 'shot', position: { x: 0, y: 0 }, data: { kind: 'shot', label: id, writerShotId: `writer-${id}`, derivedPrompt: 'base prompt', promptOverride: null, camera: { horizontal: 0, vertical: 0, pan: 0, tilt: 0, roll: 0, zoom: 0 }, lighting: { position: 'front', brightness: 50, colorTemp: 5600 }, cameraPreset: { brand: 'arri', focalLength: 35, aperture: 2.8, whiteBalance: 5600 }, provider, durationSeconds: 3, storyboardImage: { status: 'completed', url: `https://media.test/${id}.png`, jobId: null }, referenceImages: [], imageInputs: [] } } as unknown as DirectorNode
 }
 beforeEach(() => {
   vi.clearAllMocks()
