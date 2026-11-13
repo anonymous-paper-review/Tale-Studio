@@ -7,7 +7,7 @@ import { useProjectFormatStore } from '@/stores/project-format-store'
 
 import { classifyRoughChanged } from '@/lib/image-provenance'
 import { NodeToolbar, Position, type NodeProps } from '@xyflow/react'
-import { Camera, Lightbulb, Loader2 } from 'lucide-react'
+import { Camera, Lightbulb } from 'lucide-react'
 import { BaseNode } from './BaseNode'
 import { LabeledTargetHandle } from './LabeledHandle'
 import {
@@ -27,7 +27,9 @@ import { useEntityNames } from '@/lib/writer/use-entity-names'
 import { resolveEntityNames } from '@/lib/writer/resolve-entity-names'
 import { useStoryboardImageGeneration } from '@/features/director/hooks/use-storyboard-image-generation'
 import { StoryboardImageButton } from '@/features/director/storyboard-image-button'
-import { useShotState } from '@/features/director/hooks/use-shot-states'
+import { useShotStatus } from '@/features/director/hooks/use-shot-states'
+import { ShotStateTail } from '@/features/director/shot-status'
+import { RemakeRetryButton } from '@/features/director/remake-retry-button'
 import { dimmedByStatusFilter, shotStateTone } from '@/lib/director/shot-state'
 
 /** 노드 뷰 미디어 틀의 높이 상한 — 샷 행 간격(SHOT_OFFSET_Y 560px)의 절반 아래로 둬 아래 샷과 겹치지 않는다. */
@@ -40,9 +42,13 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const projectFormat = useProjectFormatStore((s) => s.format)
   const mediaFrame = mediaFrameStyle(projectFormat, SHOT_NODE_MEDIA_MAX_H)
   const entityNames = useEntityNames()
-  // 샷 상태 테두리 · 상태 고르기 흐림(시안 R 416:4941 · D1, 오너 2026-11-14).
-  const shotStateNow = useShotState(id)
+  // 샷 상태 테두리 · 꼬리 · 상태 고르기 흐림(시안 R 416:4941 · D1, 오너 2026-11-14). 자기 기록으로 센다.
+  const shotStatus = useShotStatus(id, isShotData(data) ? data : null)
+  const shotStateNow = shotStatus?.state
   const statusFilter = useDirectorCanvasStore((s) => s.statusFilter)
+  // 몸통을 누르면 고르기(시안 D2 · R), 상세는 ⤢ — 상세가 열린 노드만 단계 색 테두리 · 위 단추.
+  const picked = useDirectorCanvasStore((s) => s.pickedShotIds?.includes(id) ?? false)
+  const detailOpen = useDirectorCanvasStore((s) => s.selectedNodeId === id)
   // 노드 제목은 보드와 같은 전체 번호("Shot 8", 오너 2026-11-02 "전체 번호로 통일").
   const boardNames = useBoardNodeNames()
   const generation = useStoryboardImageGeneration(isShotData(data) ? data : null)
@@ -84,7 +90,14 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const realImage = data.storyboardImage?.url ? data.storyboardImage : null
   const stageImageUrl = realImage?.url ?? roughUrl
 
-  const failed = !isGenerating && data.storyboardImage?.status === 'failed'
+  // 빨간 실패 판은 보일 그림이 없을 때만 — 옛 그림이 남은 다시 만들기 실패는 꼬리로 알린다(리드 검토 c ①).
+  const failed = !isGenerating && data.storyboardImage?.status === 'failed' && !realImage
+  // 꼬리 글을 바꾸는 때: 묶음에서 영상 차례를 기다리면 "순서 기다리는 중"(11/5 시안 DG), 접수 · 확인 중이면 그 글.
+  const tailLabel = waitingInLine
+    ? 'Waiting in line'
+    : isGenerating && (generation.phase === 'submitting' || generation.phase === 'uncertain')
+      ? generation.label ?? undefined
+      : undefined
   // #names-in-prose: 카드 문구는 이름으로(id 는 구동값, 표시는 이름).
   const prompt = resolveEntityNames(effectivePrompt(data), entityNames)
 
@@ -93,7 +106,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       {/* 선택 시 상단 플로팅 툴바(#e4 2026-07-14) — SHOT IMAGE 카드는 이미지 생성 관련만:
           러프만 보이는 상태 → '이미지 생성', 실사 이미지가 있으면 → '이미지 리터칭'(재생성).
           영상 테이크 버튼은 SHOT VIDEO 카드('영상 리테이크')로 이동. */}
-      <NodeToolbar isVisible={selected} position={Position.Top} offset={8}>
+      <NodeToolbar isVisible={detailOpen} position={Position.Top} offset={8}>
         <div className="flex items-center gap-1.5 rounded-full bg-popover p-1 pr-2.5 shadow-node">
           <StoryboardImageButton nodeId={id} data={data} className="h-7 gap-1 rounded-full px-3 text-xs" />
           {/* 선택된 이미지 모델명 — 변경은 편집 패널/팝업에서. */}
@@ -107,7 +120,8 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         id={id}
         theme="shot"
         title={nodeTitle}
-        selected={selected}
+        selected={detailOpen}
+        picked={picked}
         width={280}
         stale={data.stale}
         beam={isGenerating ? 'success' : null}
@@ -167,7 +181,8 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
               />
             )}
             <span className="pointer-events-none absolute left-1.5 top-1.5 rounded-[6px] bg-black/45 px-1.5 py-px text-[10px] font-semibold text-foreground">
-              {realImage ? t('Live-action') : t('Previz')}
+              {/* 시안 D1 노드형 "러프" — 스토리보드의 [러프 | 실사] 토글과 같은 말(리드 답 5b). */}
+              {realImage ? t('Live-action') : t('Rough')}
             </span>
             {/* 약속 I4: 러프 3장 중 하나라도 바뀌면 "러프 바뀜" — 자동으로 다시 만들지 않는다(오너 I5). */}
             {realImage && classifyRoughChanged(rough, data.storyboardImage) && (
@@ -212,39 +227,37 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           </div>
         )}
 
-        {/* 약속 H3(2026-09-04, 오너 1안): 이미지 카드에도 영상 카드와 같은 상태 글자.
-            v3 D1 꼬리: 상태 점(완료 초록 · 실패 빨강 · 만드는 중 도는 표시) + 상태 + 흐린 메타(카메라 축 · 조명 자리). */}
-        <div className="mt-2.5 flex min-w-0 items-center gap-1.5 text-[11.5px] font-semibold">
-          {isGenerating ? (
-            <Loader2 className="size-3 shrink-0 animate-spin text-stage" />
-          ) : failed ? (
-            <span className="size-1.5 shrink-0 rounded-full bg-destructive" />
-          ) : realImage && !waitingInLine ? (
-            <span className="size-1.5 shrink-0 rounded-full bg-success" />
-          ) : null}
-          <span className={cn(failed ? 'text-destructive' : isGenerating || (realImage && !waitingInLine) ? 'text-foreground' : 'text-subtle-foreground')}>
-            {failed
-              ? t('Failed')
-              : isGenerating && generation.label
-                ? t(generation.label)
-                : waitingInLine
-                  ? t('Waiting in line')
-                  : realImage
-                    ? t('Completed')
-                    : t('Waiting')}
-          </span>
-          <span className="flex min-w-0 items-center gap-2 text-[11px] font-normal text-subtle-foreground">
-            <span className="flex items-center gap-0.5">
-              <Camera className="size-3" />
-              <span className="font-num">{camActiveAxes}/6</span>
-            </span>
-            <span className="flex min-w-0 items-center gap-0.5">
-              <Lightbulb className="size-3" />
-              <span className="truncate">{data.lighting.position}</span>
-            </span>
-            {/* Take 배지는 영상 카드에만 둔다(약속 O 2026-09-04 — 이미지 카드의 "Take N" 제거). */}
-          </span>
-        </div>
+        {/* 꼬리(시안 D1 노드형 406:4051 "● 이미지 필요 러프만 있음", 리드 검토 c ②) — 카드와 같은 상태 꼬리라 테두리 색만으로 말하지 않는다.
+            다시 만들기가 실패하면 "다시 만들기 실패" + [다시 만들기]. 흐린 덧말: 이미지 필요 샷은 러프가 있으면 "러프만 있음",
+            그 밖에는 카메라 축 · 조명 자리(v3 D1). */}
+        {shotStatus && (
+          <ShotStateTail
+            state={shotStatus.state}
+            place="node"
+            waiting={shotStatus.facts.imageWaiting}
+            remakeFailed={shotStatus.facts.imageRemakeFailed}
+            label={tailLabel}
+            className="mt-2.5"
+            retry={<RemakeRetryButton nodeId={id} data={data} place="node" />}
+            note={
+              shotStatus.state === 'image_needed' && roughUrl ? (
+                t('Rough only')
+              ) : (
+                <>
+                  <span className="flex items-center gap-0.5">
+                    <Camera className="size-3" />
+                    <span className="font-num">{camActiveAxes}/6</span>
+                  </span>
+                  <span className="flex min-w-0 items-center gap-0.5">
+                    <Lightbulb className="size-3" />
+                    <span className="truncate">{data.lighting.position}</span>
+                  </span>
+                  {/* Take 배지는 영상 카드에만 둔다(약속 O 2026-09-04 — 이미지 카드의 "Take N" 제거). */}
+                </>
+              )
+            }
+          />
+        )}
       </BaseNode>
     </>
   )

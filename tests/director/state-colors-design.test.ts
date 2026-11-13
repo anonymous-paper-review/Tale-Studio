@@ -12,4 +12,11 @@ describe('Director 생성 상태 색', () => {
     expect(css).toMatch(/--state-video:\s*#[0-9a-f]{6}/i)
     expect(css).toContain('--color-state-video: var(--state-video)')
   })
+
+  it('상태 색 예외는 Director 본 화면과 샷 상세(팝업 · 왼쪽 패널)의 점 · 진행 막대까지다', () => {
+    // 왜: 시안 D6 · D7 상세도 같은 상태 점 · 보라 진행 막대를 쓴다(prose 요청 11/14). 예외 범위를 정본에 적어 둔다.
+    const section = design.slice(design.indexOf('**Director 생성 상태**'), design.indexOf('**새로 써진 글**'))
+    expect(section).toContain('샷 상세(팝업 · 왼쪽 패널)')
+    expect(section).not.toContain('Director 본 화면(카드 · 노드 · 상태 고르기 · 진행 막대)만 쓰는 예외')
+  })
 })

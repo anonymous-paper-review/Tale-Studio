@@ -22,6 +22,12 @@ import { useLocaleStore } from '@/stores/locale-store'
 import { resetActionGuard } from '@/lib/action-guard'
 import { nextStepAction } from '@/lib/handoff-intent'
 import { useWriterRoomStore } from '@/stores/writer-room-store'
+import { useDirectorCanvasStore } from '@/stores/director-store'
+
+// Director 에 Writer 샷 하나와 그 완성 Take — 넘기기 단추가 켜지는 상태(1단계 S6 · 리드 검토 a 낮음 7 · 재검토 c 낮음 2).
+//   영상 없는 샷이 없으니 entry D8 창도 열리지 않는다.
+const writerShot = { id: 's1', type: 'shot', position: { x: 0, y: 0 }, data: { kind: 'shot', label: 's1', writerShotId: 'w1', durationSeconds: 3 } }
+const finishedVideo = { id: 'v1', type: 'video', position: { x: 0, y: 0 }, data: { kind: 'video', label: 'v1', parentShotNodeId: 's1', status: 'completed', videoUrl: 'https://media.test/v1.mp4', takeNumber: 1, final: false } }
 
 const settings: ProjectSettings = {
   playtime: 30, genre: 'SF 스릴러', subGenre: '사이버펑크', format: 'horizontal_16:9', tone: ['dark'], targetEmotion: [], dialogueLanguage: 'ko',
@@ -62,7 +68,8 @@ describe('다음 단계 버튼은 단계마다 다음 단계를 가리킨다', (
     expect(nextStepAction('producer', { producerLocked: false })).toMatchObject({ kind: 'handoff', label: 'Hand over to Artist', utterance: 'Please hand over to Artist' })
     expect(nextStepAction('artist', { producerLocked: true })).toMatchObject({ kind: 'handoff', label: 'Hand over to Storyboard' })
     expect(nextStepAction('writer', { producerLocked: true })).toBeNull()
-    expect(nextStepAction('director', { producerLocked: true })).toMatchObject({ kind: 'handoff', label: 'Hand over to Editor' })
+    // 1110 확정 시안 D1 "다음: Editor로"(오너 2026-11-14 허락: 시안으로 바뀌는 출시 시험은 새 기대값으로).
+    expect(nextStepAction('director', { producerLocked: true })).toMatchObject({ kind: 'handoff', label: 'Next: Editor' })
     expect(nextStepAction('editor', { producerLocked: true })).toBeNull()
     expect(nextStepAction('producer', { producerLocked: true })).toMatchObject({ kind: 'open', label: 'Go to Artist', stage: 'artist' })
   })
@@ -71,10 +78,22 @@ describe('다음 단계 버튼은 단계마다 다음 단계를 가리킨다', (
 describe('Director→Editor 는 팝업 없이 넘긴다', () => {
   it('Director에서 다음 단계 버튼을 누르면 넘김 문장이 채팅에 남고 팝업 없이 Editor로 넘어간다', async () => {
     useProjectStore.setState({ currentStage: 'director', reachedStage: 'director' })
+    // 단추는 완성 영상이 있을 때만 켜진다(1단계 S6) — 그 상태를 놓고 누른다. 문장 · 기대값은 그대로.
+    useDirectorCanvasStore.setState({ nodes: [writerShot as never, finishedVideo as never] })
     await useGlobalChatStore.getState().requestNextStep()
     expect(useGlobalChatStore.getState().handoffConfirm).toBeNull()
     expect(userLines()).toEqual(['Editor로 넘겨주세요'])
     expect(nav.handoffToStage).toHaveBeenCalledWith('editor')
+  })
+
+  // 왜: 위 단추 · 사이드바 Editor 와 같은 조건 · 같은 말(리드 검토 a 낮음 7) — 채팅으로 부탁해도 완성 영상 없이는 넘기지 않는다.
+  it('완성 영상이 없으면 Editor 로 넘겨 달라고 해도 넘기지 않고 "완성된 영상이 하나 있으면 넘어갈 수 있어요"라고 답한다', async () => {
+    useProjectStore.setState({ currentStage: 'director', reachedStage: 'director' })
+    useDirectorCanvasStore.setState({ nodes: [] })
+    await useGlobalChatStore.getState().sendMessage('Editor로 넘겨주세요', undefined, { consentedHandoff: true })
+    expect(nav.handoffToStage).not.toHaveBeenCalled()
+    const replies = useGlobalChatStore.getState().messages.filter((m) => m.role === 'model').map((m) => m.content).join('\n')
+    expect(replies).toContain('완성된 영상이 하나 있으면 넘어갈 수 있어요')
   })
 })
 

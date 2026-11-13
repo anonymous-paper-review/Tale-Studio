@@ -27,7 +27,8 @@ import { useTakeBalance } from '@/lib/billing/use-take-balance'
 import { takeCostForVideo } from '@/lib/billing/take-cost'
 import { normalizeProvider } from '@/lib/video-models'
 import { useShotState } from '@/features/director/hooks/use-shot-states'
-import { dimmedByStatusFilter, videoTakeFrame } from '@/lib/director/shot-state'
+import { dimmedByStatusFilter, videoTakeFrame, videoTakeTail } from '@/lib/director/shot-state'
+import { StateTailLine } from '@/features/director/shot-status'
 
 /** 영상 노드 틀의 높이 상한(세로·정사각 포맷) — 테이크 간격(VIDEO_OFFSET_Y 260px) 안에서 겹치지 않게. */
 const VIDEO_NODE_MEDIA_MAX_H = 150
@@ -40,7 +41,22 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const setVideoFinal = useDirectorCanvasStore((s) => s.setVideoFinal)
   // 상태 고르기(시안 D1): 그 샷 상태가 안 맞으면 흐리게. 테두리는 이 Take 의 상태(시안 D4 · D7).
   const parentShotState = useShotState(isVideoData(data) ? data.parentShotNodeId : null)
+  // 부모 샷에 쓸 그림이 있는가 — 빈 영상 노드의 그림 자리 글(리드 답 5a). 상태를 모르면(독립 영상) 있다고 본다.
+  const parentHasImage =
+    parentShotState === undefined ||
+    !(parentShotState === 'image_needed' || parentShotState === 'image_failed' || parentShotState === 'image_generating')
   const statusFilter = useDirectorCanvasStore((s) => s.statusFilter)
+  // 영상 노드를 누르면 그 샷을 고른다(시안 R). 상세가 열린 노드만 단계 색 테두리 · 위 단추.
+  const picked = useDirectorCanvasStore((s) => {
+    const parent = isVideoData(data) ? data.parentShotNodeId : null
+    return !!parent && (s.pickedShotIds?.includes(parent) ?? false)
+  })
+  const detailOpen = useDirectorCanvasStore((s) => s.selectedNodeId === id)
+  // "영상까지 이어서"로 이미지를 기다리는 샷(시안 D4) — 빈 영상 노드에 "이미지가 끝나면 자동으로 시작해요".
+  const chainWaiting = useDirectorCanvasStore((s) => {
+    const parent = isVideoData(data) ? data.parentShotNodeId : null
+    return !!parent && (s.chainWaitingShotIds?.includes(parent) ?? false)
+  })
   const playingNodeId = useDirectorCanvasStore((s) => s.playingNodeId)
   const setPlayingNode = useDirectorCanvasStore((s) => s.setPlayingNode)
   const ensureVideoThumbnail = useDirectorCanvasStore(
@@ -197,7 +213,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
     <>
       {/* 선택 시 상단 플로팅 툴바(#e4) — 옛 SHOT IMAGE 카드의 '새 영상 테이크'가 여기로 이동.
           부모 샷 설정으로 새 테이크를 만들어 재생성한다. */}
-      <NodeToolbar isVisible={selected} position={Position.Top} offset={8}>
+      <NodeToolbar isVisible={detailOpen} position={Position.Top} offset={8}>
         <div className="flex items-center gap-1.5 rounded-full bg-popover p-1 pr-2.5 shadow-node">
           <Button
             size="sm"
@@ -230,7 +246,8 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       id={id}
       theme="video"
       title={parentShotTitle ?? data.label}
-      selected={selected}
+      selected={detailOpen}
+      picked={picked}
       width={240}
       stale={data.stale}
       strongStale={isStrongStale}
@@ -347,8 +364,17 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             {completed && <VideoLengthChip url={data.videoUrl} />}
           </button>
         ) : data.lastAttemptStatus === 'generating' ? null : (
-          // 만드는 중이면 "대기 중"을 쓰지 않는다. 아래 "영상 생성 중"과 같이 보이면 헷갈린다(11/5 시안 DG 맞춰 보기 2026-11-09).
-          <span className="text-[11px] text-subtle-foreground">{t('Waiting')}</span>
+          // 만드는 중이면 아무 글도 쓰지 않는다. 아래 "영상 생성 중"과 같이 보이면 헷갈린다(11/5 시안 DG 맞춰 보기 2026-11-09).
+          //   비어 있는 까닭(시안 D1 노드형 406:4051 · D4, 리드 답 5a): 이어 보내기를 기다리면 "이미지가 끝나면 자동으로 시작해요",
+          //   그 샷에 이미지가 없으면 "이미지가 생기면 만들 수 있어요", 있으면 "영상을 만들 수 있어요".
+          <span className="flex flex-col items-center gap-1.5 px-2 text-center text-[11px] text-subtle-foreground">
+            <Play aria-hidden className="size-4 fill-current" />
+            {chainWaiting
+              ? t('Starts by itself when the image is done')
+              : parentHasImage
+                ? t('Ready to make the video')
+                : t('Can be made once there is an image')}
+          </span>
         )}
 
         <GeneratingOverlay
@@ -373,7 +399,8 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
 
       {/* 약속 H(2026-09-04, 오너 1안): 작은 영문 "take 1 · completed" 대신 큰 상태 글자. take 번호는 카드에서 빼고
           마우스를 올리면(title)·왼쪽 상세·팝업에서 작게 보인다. */}
-      {/* v3 D1 꼬리: 상태 점(완료 초록 · 실패 빨강) + 상태 글자, 오른쪽에 1080p · FINAL. */}
+      {/* 꼬리(시안 D1 노드형 406:4051 "● 영상 없음", 리드 검토 c ②): 이 Take 상태 점 + 글 — 영상 없음 · 영상 만드는 중 · 영상 실패 ·
+          영상이 남은 Take 의 다시 만들기 실패. 오른쪽에 1080p · FINAL. */}
       <div
         className="mt-2.5 flex items-center justify-between gap-2"
         title={t('Take {n}', { n: data.takeNumber })}
@@ -383,20 +410,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         {completed ? (
           <DoneBadge lumi={STAGE_PERSONA.director} />
         ) : (
-          <span className="flex items-center gap-1.5 text-[11.5px] font-semibold">
-            {(data.lastAttemptStatus ?? data.status) === 'failed' && <span className="size-1.5 rounded-full bg-destructive" />}
-            <span
-              className={cn(
-                (data.lastAttemptStatus ?? data.status) === 'failed'
-                  ? 'text-destructive'
-                  : (data.lastAttemptStatus ?? data.status) === 'generating'
-                    ? 'text-foreground'
-                    : 'text-subtle-foreground',
-              )}
-            >
-              {videoStatusLabel(data.lastAttemptStatus ?? data.status, t)}
-            </span>
-          </span>
+          <StateTailLine {...videoTakeTail(data)} />
         )}
         <span className="flex items-center gap-1.5">
           {madeAt1080p && <span className="font-num text-[11px] text-subtle-foreground">1080p</span>}
@@ -444,11 +458,3 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
 }
 
 export const VideoNode = memo(VideoNodeImpl)
-
-/** 약속 H1: 상태 한 단어 — 완료 / 생성 중 / 실패 / 대기 중 (사전의 식별자 키). */
-function videoStatusLabel(status: string | null | undefined, t: (key: string) => string): string {
-  if (status === 'completed') return t('Completed')
-  if (status === 'generating') return t('Generating')
-  if (status === 'failed') return t('Failed')
-  return t('Waiting')
-}

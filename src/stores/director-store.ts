@@ -1100,6 +1100,9 @@ interface DirectorCanvasState {
   storyboardMediaMode: 'previz' | 'real'
   /** 상태 고르기(시안 D1 406:3717, 오너 2026-11-14) — 고른 상태 샷만 보인다. 화면에서만 쓰고 저장하지 않는다. */
   statusFilter: ShotStatusFilter
+  /** 고른 샷(시안 D2 406:4588 · R, 오너 2026-11-14) — 카드 · 노드 몸통을 누르면 고르고 다시 누르면 푼다. 위쪽 단추 · 예상이 이 샷 기준.
+   *  샷 노드 id. 화면에서만 쓰고 저장하지 않는다(다른 프로젝트로 가거나 화면을 떠나면 풀림). */
+  pickedShotIds: string[]
   /** #ledger: 씬별 상태 장부(scenes.stage.ledger) — hydrate 때 DB 에서 읽는다. 화면 파생 전용. */
   sceneLedgers: Record<string, SceneLedger>
   // #real-grid-auto: 실사 일괄 생성 진행 중 — 개별 이미지 생성/재생성을 잠근다(시트 단위 작업과 충돌 방지).
@@ -1109,6 +1112,16 @@ interface DirectorCanvasState {
    *  "fal 에 들어간 것만"이 아니라 배치 전체 작업량을 분모로 보여주기 위한 화면 파생값
    *  (DB 에 저장하지 않는다, architecture §0). null = 배치 비활성 또는 아직 1라운드 응답 전. */
   realBatchRemaining: number | null
+  /** 지금 도는 일괄이 맡은 Writer 샷 id(고른 샷만 만들 때, 시안 D2). null = 빈 샷 전부(예전과 같음). 저장하지 않는다. */
+  realBatchShotIds: string[] | null
+  /** [모두 멈추기](시안 D3, 오너 답 7) — 이미지 일괄이 아직 보내지 않은 장을 보내지 않는다. 이미 보낸 장은 끝까지 만든다. */
+  realBatchCancelled: boolean
+  /** 러프 · 인물 시트를 기다려 일괄이 다시 돌기를 기다리는 Writer 샷 id(#ref-gate 재개). "영상까지 이어서"가 이 샷을 놓지 않는다. 저장하지 않는다. */
+  realBatchResumeShotIds: string[]
+  /** "영상까지 이어서" 스위치(시안 D4 · R, 오너 답 6) — 화면에 들어오면 꺼져 있고 저장하지 않는다. */
+  chainVideoAfterImage: boolean
+  /** 이미지가 끝나면 영상을 이어 보낼 샷(샷 노드 id) — 이 화면(브라우저)이 지켜본다. 화면을 닫으면 사라진다. */
+  chainWaitingShotIds: string[]
   /** Explicit full-video batch progress. Ephemeral UI state; never persisted. */
   videoBatchBusy: boolean
   videoBatchProgress: { done: number; total: number; failed: number } | null
@@ -1157,6 +1170,12 @@ interface DirectorCanvasState {
   setViewMode: (m: 'node' | 'storyboard') => void
   setStoryboardMediaMode: (m: 'previz' | 'real') => void
   setStatusFilter: (filter: ShotStatusFilter) => void
+  togglePickedShot: (shotNodeId: string) => void
+  setPickedShots: (shotNodeIds: string[]) => void
+  clearPickedShots: () => void
+  setChainVideoAfterImage: (on: boolean) => void
+  setChainWaitingShots: (shotNodeIds: string[]) => void
+  cancelRealBatch: () => void
   /** 일괄 시작 — 중단 표시를 풀고 진행 상태를 연다. */
   beginVideoBatch: (total: number) => void
   /** 일괄 중단 — 도는 중일 때만 먹는다. 서버 DELETE로 중단을 확인한 뒤 반환한다. */
@@ -1647,9 +1666,15 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       viewMode: 'node',
       storyboardMediaMode: 'previz',
       statusFilter: 'all',
+      pickedShotIds: [],
       sceneLedgers: {},
       realBatchBusy: false,
       realBatchRemaining: null,
+      realBatchShotIds: null,
+      realBatchCancelled: false,
+      realBatchResumeShotIds: [],
+      chainVideoAfterImage: false,
+      chainWaitingShotIds: [],
       videoBatchBusy: false,
       videoBatchProgress: null,
       videoBatchQueue: null,
@@ -1700,6 +1725,10 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             deleteConfirmInfo: null,
             relationModal: null,
             statusFilter: 'all',
+            pickedShotIds: [],
+            chainVideoAfterImage: false,
+            chainWaitingShotIds: [],
+            realBatchResumeShotIds: [],
             videoBatchBusy: false,
             videoBatchProgress: null,
             videoBatchQueue: null,
@@ -1730,7 +1759,22 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       setViewport: (vp) => set({ viewport: vp }),
       setViewMode: (m) => set({ viewMode: m }),
       setStoryboardMediaMode: (m) => set({ storyboardMediaMode: m }),
-      setStatusFilter: (filter) => set({ statusFilter: filter }),
+      // 상태를 바꾸면 고름을 푼다 — 숨은 고름 때문에 단추가 말없이 보드 전체로 넓어지지 않게(리드 검토 a 낮음 5a).
+      setStatusFilter: (filter) => set((state) => (state.statusFilter === filter ? {} : { statusFilter: filter, pickedShotIds: [] })),
+      togglePickedShot: (shotNodeId) =>
+        set((state) => ({
+          pickedShotIds: state.pickedShotIds.includes(shotNodeId)
+            ? state.pickedShotIds.filter((id) => id !== shotNodeId)
+            : [...state.pickedShotIds, shotNodeId],
+        })),
+      setPickedShots: (shotNodeIds) => set({ pickedShotIds: [...new Set(shotNodeIds)] }),
+      clearPickedShots: () => set({ pickedShotIds: [] }),
+      // 스위치를 끄면 기다림도 비운다 — 꺼 둔 뒤에 영상이 시작되지 않게(리드 검토 a S5 보통 4).
+      setChainVideoAfterImage: (on) => set(on ? { chainVideoAfterImage: true } : { chainVideoAfterImage: false, chainWaitingShotIds: [] }),
+      setChainWaitingShots: (shotNodeIds) => set({ chainWaitingShotIds: [...new Set(shotNodeIds)] }),
+      cancelRealBatch: () => {
+        if (get().realBatchBusy) set({ realBatchCancelled: true })
+      },
 
       beginVideoBatch: (total) =>
         set({

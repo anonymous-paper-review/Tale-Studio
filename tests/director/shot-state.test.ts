@@ -5,12 +5,16 @@ import {
   countStatusFilters,
   filterShotsByStatus,
   dimmedByStatusFilter,
+  imageRemakeFailed,
   matchesStatusFilter,
+  realBatchPendingNodeIds,
   shotFactsByNode,
   shotStageDots,
   shotState,
   shotStateTone,
+  shotTail,
   videoTakeFrame,
+  videoTakeTail,
   type ShotStateFacts,
 } from '@/lib/director/shot-state'
 import type { DirectorNode } from '@/types/director'
@@ -19,7 +23,10 @@ const none: ShotStateFacts = {
   imageGenerating: false,
   imageDone: false,
   imageFailed: false,
+  imageRemakeFailed: false,
+  imageWaiting: false,
   videoGenerating: false,
+  videoWaiting: false,
   videoDone: false,
   videoLatestFailed: false,
 }
@@ -141,6 +148,101 @@ describe('캔버스 노드에서 샷 상태 근거 모으기', () => {
     // 왜: 이미지 없이 영상 만들기를 켜면 서버가 말없이 빼던 고장(N 보드 "10 available")을 막는다.
     const facts = shotFactsByNode([shot('a', { status: 'completed', url: '' })], quiet)
     expect(shotState(facts.get('a')!)).toBe('image_needed')
+  })
+
+  it('이미지를 다시 만들다 실패해도 옛 그림이 남아 있으면 그 샷은 "이미지 완료"로 세고, 다시 만들기 실패를 따로 적는다', () => {
+    // 왜: 다시 만들기가 실패해도 화면에는 옛 그림이 남는다(리드 검토 c ①, 영상의 "완성 Take 가 있으면 완성"과 같은 원칙).
+    //   '이미지 필요'로 세면 [이미지 만들기 · N]이 그림 있는 샷을 세고 [영상 만들기 · N]에서 뺀다.
+    const facts = shotFactsByNode([shot('a', { status: 'failed', url: 'https://x/a.png' })], quiet).get('a')!
+    expect(shotState(facts)).toBe('image_done')
+    expect(facts.imageRemakeFailed).toBe(true)
+    expect(facts.imageFailed).toBe(false)
+    expect(countStatusFilters([shotState(facts)]).image_done).toBe(1)
+  })
+
+  it('그림이 없는 샷의 이미지 만들기가 실패하면 그 샷은 "이미지 실패"다', () => {
+    // 왜: 보일 그림이 없으니 빨강 테두리 · "이미지를 못 만들었어요" · [다시 만들기] 판을 띄운다.
+    const facts = shotFactsByNode([shot('a', { status: 'failed', url: '' })], quiet).get('a')!
+    expect(shotState(facts)).toBe('image_failed')
+    expect(facts.imageRemakeFailed).toBe(false)
+    expect(imageRemakeFailed({ status: 'failed', url: 'https://x/a.png' })).toBe(true)
+    expect(imageRemakeFailed({ status: 'failed', url: '' })).toBe(false)
+    expect(imageRemakeFailed({ status: 'completed', url: 'https://x/a.png' })).toBe(false)
+    expect(imageRemakeFailed(null)).toBe(false)
+  })
+
+  it('일괄이 맡았지만 아직 큐에 앉지 않은 샷은 "이미지 만드는 중"으로 세고 기다림으로 적는다', () => {
+    // 왜: 리드 검토 c ④d — 넘기지 않던 이 샷들이 '이미지 필요'로 보였다. 일괄이 곧 그릴 샷이라 [이미지 만들기 · N]에 다시 세면 안 된다.
+    const pending = new Set(['a'])
+    const facts = shotFactsByNode([shot('a', null), shot('b', null)], { ...quiet, pendingImageNodeIds: pending })
+    expect(shotState(facts.get('a')!)).toBe('image_generating')
+    expect(facts.get('a')!.imageWaiting).toBe(true)
+    expect(shotState(facts.get('b')!)).toBe('image_needed')
+    // 큐에 앉으면 기다림이 아니라 만드는 중이다.
+    const queued = shotFactsByNode([shot('a', null)], { ...quiet, pendingImageNodeIds: pending, queuedImageShots: new Set(['w-a']) })
+    expect(queued.get('a')!.imageWaiting).toBe(false)
+    expect(shotState(queued.get('a')!)).toBe('image_generating')
+  })
+
+  it('영상 묶음에서 아직 안 낸 샷은 "영상 만드는 중"으로 세고 기다림으로 적는다', () => {
+    // 왜: 묶음이 곧 낼 샷을 [영상 만들기 · N]에 다시 세면, 눌러도 아무 일이 없는 단추가 된다(리드 검토 a 보통 1).
+    const nodes = [shot('a', { status: 'completed', url: 'https://x/a.png' }), shot('b', { status: 'completed', url: 'https://x/b.png' })]
+    const facts = shotFactsByNode(nodes, { ...quiet, pendingVideoShots: new Set(['w-a']) })
+    expect(shotState(facts.get('a')!)).toBe('video_generating')
+    expect(facts.get('a')!.videoWaiting).toBe(true)
+    expect(shotState(facts.get('b')!)).toBe('image_done')
+    expect(shotTail('video_generating', facts.get('a')!, 'card')).toMatchObject({ label: 'Waiting in line', color: 'state-video', ring: true })
+  })
+
+  it('일괄이 맡은 샷은 그림이 없고 · 실패하지 않았고 · 러프가 있고 · 일괄 대상인 샷이며, 멈추기를 누르면 없다', () => {
+    // 왜: 일괄은 러프가 있는 빈 샷만 그린다(실패한 샷 · 손으로 더한 샷은 한 장씩). 멈춘 뒤에는 남은 샷을 그리지 않는다.
+    const nodes = [
+      shot('a', null),
+      shot('b', { status: 'completed', url: 'https://x/b.png' }),
+      shot('c', { status: 'failed', url: '' }),
+      shot('d', null),
+      shot('e', null),
+    ]
+    const batch = { busy: true, cancelled: false, shotIds: null, roughShotIds: new Set(['w-a', 'w-b', 'w-c', 'w-e']) }
+    expect([...realBatchPendingNodeIds(nodes, batch)]).toEqual(['a', 'e'])
+    expect([...realBatchPendingNodeIds(nodes, { ...batch, shotIds: ['w-e'] })]).toEqual(['e'])
+    expect(realBatchPendingNodeIds(nodes, { ...batch, busy: false }).size).toBe(0)
+    expect(realBatchPendingNodeIds(nodes, { ...batch, cancelled: true }).size).toBe(0)
+  })
+})
+
+describe('꼬리 글', () => {
+  it('꼬리는 카드 · 노드가 같은 판정이고, 노드형 이미지 필요 샷만 "이미지 필요"라고 쓴다', () => {
+    // 왜: 시안 D1 — 카드는 주황 "이미지 필요" 태그가 따로 있어 꼬리가 "대기", 노드형은 태그가 없어 꼬리가 "이미지 필요"(406:4051).
+    expect(shotTail('image_needed', none, 'card').label).toBe('Not started')
+    expect(shotTail('image_needed', none, 'node').label).toBe('Image needed')
+    expect(shotTail('image_done', none, 'node')).toMatchObject({ label: 'Image ready', color: 'stage-director', ring: false })
+    expect(shotTail('video_done', none, 'card')).toMatchObject({ label: 'Video done', color: 'success' })
+  })
+
+  it('다시 만들기가 실패한 샷의 꼬리는 빨강 점 "다시 만들기 실패"이고, 다시 만드는 중이면 만드는 중이 먼저다', () => {
+    // 왜: 리드 검토 c ① — 옛 그림이 남은 실패는 꼬리 · [다시 만들기]로만 알린다. 테두리는 샷 상태 색 그대로.
+    const failed = { ...none, imageDone: true, imageRemakeFailed: true }
+    expect(shotTail('image_done', failed, 'card')).toMatchObject({ label: 'Remake failed', color: 'destructive', remakeFailed: true })
+    expect(shotTail('video_done', failed, 'node')).toMatchObject({ label: 'Remake failed', remakeFailed: true })
+    expect(shotTail('image_generating', failed, 'card')).toMatchObject({ label: 'Making image', remakeFailed: false })
+  })
+
+  it('일괄이 맡아 차례를 기다리는 샷의 꼬리는 "대기 중"이다', () => {
+    // 왜: 리드 검토 c ④d — 아직 큐에 앉지 않았으니 만드는 중이라고 쓰지 않는다(#e4 2026-08-12 "대기 vs 실작업").
+    expect(shotTail('image_generating', { ...none, imageWaiting: true }, 'card')).toMatchObject({ label: 'Waiting', color: 'stage-director', ring: true })
+  })
+
+  it('영상 노드 꼬리는 그 Take 상태다 — 영상이 없으면 "영상 없음", 만드는 중 "영상 만드는 중", 실패 "영상 실패"', () => {
+    // 왜: 시안 D1 노드형(406:4051) "● 영상 없음" — 영상 노드도 색만으로 말하지 않는다(리드 검토 c ②).
+    expect(videoTakeTail({ status: 'pending', lastAttemptStatus: null, videoUrl: null })).toEqual({ label: 'No video yet', color: null, ring: false })
+    expect(videoTakeTail({ status: 'generating', lastAttemptStatus: 'generating', videoUrl: null })).toEqual({ label: 'Making video', color: 'state-video', ring: true })
+    expect(videoTakeTail({ status: 'failed', lastAttemptStatus: 'failed', videoUrl: null })).toEqual({ label: 'Video failed', color: 'destructive', ring: false })
+  })
+
+  it('영상이 남아 있는 Take 를 다시 만들다 실패하면 영상 노드 꼬리는 "다시 만들기 실패"다', () => {
+    // 왜: 이미지와 같은 원칙(리드 검토 c ①) — 볼 수 있는 영상 · 초록 테두리는 그대로 두고, 실패는 꼬리로만 알린다.
+    expect(videoTakeTail({ status: 'completed', lastAttemptStatus: 'failed', videoUrl: 'https://x/v.mp4' })).toEqual({ label: 'Remake failed', color: 'destructive', ring: false })
   })
 })
 

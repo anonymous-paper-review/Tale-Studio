@@ -94,12 +94,15 @@ export async function POST(req: NextRequest) {
     // runId: 한 판(클라 러너 한 번)의 표시(2026-10-10). 이 판의 시트 작업은 target.batchRunId 에 남고, 같은 판의 요청은
     //   그 작업들이 맡은 샷을 끝났든 실패했든 다시 내지 않는다 — 앞 요청의 답을 잃어도(시간 초과 · 통신 끊김) DB 가 기억한다.
     //   실패한 샷이 요청마다 다시 나갔고(운영 9/1 3e0169eb 같은 시트 10번), force 는 요청마다 맨 앞 샷들을 다시 골랐다.
-    const { projectId, force, traceId, runId } = (await req.json()) as {
+    // shotIds: 고른 샷만(시안 D2, 오너 2026-11-14) — 화면이 센 Writer 샷 id. 없으면 지금처럼 전부.
+    const { projectId, force, traceId, runId, shotIds } = (await req.json()) as {
       projectId?: string
       force?: boolean
       traceId?: string
       runId?: unknown
+      shotIds?: unknown
     }
+    const wanted = Array.isArray(shotIds) ? new Set(shotIds.filter((id): id is string => typeof id === 'string')) : null
     if (!projectId) return NextResponse.json({ error: 'Invalid request: projectId required' }, { status: 400 })
 
     // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
@@ -186,6 +189,7 @@ export async function POST(req: NextRequest) {
       missing?: Array<{ characterId: string; appearanceKey: string; name: string }>
     }> = []
     for (const s of rows ?? []) {
+      if (wanted && !wanted.has(s.shot_id as string)) continue
       // 기본은 빈칸만(교체는 개별 재생성 소관). force 면 이미 있는 것도 다시 만든다 —
       //   오너가 "하나씩 하는 거 짜쳐서" 전체 재생성을 원한 경로(#c3).
       if (!force && s.storyboard_image) continue
