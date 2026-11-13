@@ -17,8 +17,10 @@ import { useWriterStore as writer } from '@/stores/writer-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { translate } from '@/lib/i18n/translate'
 import { fetchTakeBalance } from '@/lib/billing/use-take-balance'
+import { remakeNotice } from '@/lib/director/editor-handover'
 
 const originalGenerate = director.getState().generateStoryboardImage
+const originalVideo = director.getState().generateVideoForShot
 const IMG = (id: string) => ({ status: 'completed', url: `https://media.test/${id}.png`, jobId: null })
 function shot(id: string, image: unknown = null, provider = 'seedance'): DirectorNode {
   return { id, type: 'shot', position: { x: 0, y: 0 }, data: { kind: 'shot', label: `w-${id}`, writerShotId: `w-${id}`, derivedPrompt: `base prompt ${id}`, promptOverride: null, camera: { horizontal: 0, vertical: 0, pan: 0, tilt: 0, roll: 0, zoom: 0 }, lighting: { position: 'front', brightness: 50, colorTemp: 5600 }, cameraPreset: { brand: 'arri', focalLength: 35, aperture: 2.8, whiteBalance: 5600 }, provider, durationSeconds: 3, storyboardImage: image, referenceImages: [], imageInputs: [] } } as unknown as DirectorNode
@@ -52,7 +54,7 @@ beforeEach(() => {
   mocks.run.mockImplementation(startsBatch)
 })
 afterEach(() => {
-  director.setState({ generateStoryboardImage: originalGenerate })
+  director.setState({ generateStoryboardImage: originalGenerate, generateVideoForShot: originalVideo })
   vi.unstubAllGlobals()
 })
 
@@ -415,6 +417,38 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     await chat.getState().sendMessage('씬 1 영상 만들어줘')
     expect(lastModel()).toBe("Which shots should get videos? Tell me the numbers, like 'shot 3'. Videos use Takes, so I only make the shots you name.")
     expect(chat.getState().directorVideoAsk).toEqual({ projectId: 'p-dir', numbers: true })
+  })
+
+  // 왜: 검토 b 재검토 낮음 3(M4) — 칸이 비면 보드 전체를 봐서, 보드에 원래 있던 Director 에서 더한 빈 샷 때문에 "씬 1 영상 다 만들어줘"에 번호 대신 Writer 까닭을 말했다.
+  it('모델이 샷 칸을 비운 영상 부탁은 같은 답에서 더한 샷만 보고 까닭을 말하고, 보드에 원래 있던 Writer 에 없는 샷 때문에 번호 대신 엉뚱한 까닭을 말하지 않는다', async () => {
+    const manual = { ...shot('m1'), data: { ...shot('m1').data, label: 'New Shot', writerShotId: null } } as unknown as DirectorNode
+    director.setState({ nodes: [...NODES(), manual] })
+    reply([{ type: 'generateVideos' }])
+    await chat.getState().sendMessage('씬 1 영상 다 만들어줘')
+    expect(mocks.run).not.toHaveBeenCalled()
+    expect(lastModel()).toBe("Which shots should get videos? Tell me the numbers, like 'shot 3'. Videos use Takes, so I only make the shots you name.")
+    expect(chat.getState().directorVideoAsk).toEqual({ projectId: 'p-dir', numbers: true })
+  })
+
+  // 왜: 검토 b 재검토 보통 1(M1) — 넘기기 창(D8)의 [다시 만들기]는 글 카드를 보지 않고 바로 만들어, [적용]을 기다리는 샷이 옛 글로 Take 를 썼다.
+  it('글 카드가 기다리는 샷은 Editor 넘기기 창의 [다시 만들기]로도 옛 글로 만들지 않는다', async () => {
+    reply([{ type: 'updateShot', id: 's4', patch: { prompt: 'Warm' } }])
+    await chat.getState().sendMessage('Make shot 4 warm')
+    expect(chat.getState().pendingProposal?.kind).toBe('directorTextEdit')
+    const generate = vi.fn(async () => true)
+    director.setState({ generateVideoForShot: generate as never })
+    chat.setState({ handoffConfirm: { kind: 'editorMissingVideos', projectId: 'p-dir', via: 'button' } })
+    await expect(chat.getState().remakeMissingVideo('s4')).resolves.toEqual({ started: false, reason: 'pending_text_edit' })
+    expect(generate).not.toHaveBeenCalled()
+    expect(promptOf('s4')).toBeNull()
+    // 창은 그 줄 밑에, 채팅은 Lumi 말로 까닭을 알린다(두 말).
+    expect(remakeNotice('pending_text_edit', (key) => translate('ko', key))).toBe('[적용]을 기다리는 글 고침이 있어요. 적용하거나 버린 뒤 다시 만들어 주세요.')
+    expect(remakeNotice('pending_text_edit', (key) => translate('en', key))).toBe('A text change is waiting for [Apply]. Apply or discard it, then make it again.')
+    expect(lastModel()).toBe('Shot 4 has a text change waiting for [Apply]. Apply or discard it, then make it again.')
+    expect(translate('ko', '{shots} has a text change waiting for [Apply]. Apply or discard it, then make it again.', { shots: '샷 4' })).toBe('샷 4에는 [적용]을 기다리는 글 고침이 있어요. 적용하거나 버린 뒤 다시 만들어 주세요.')
+    // 글이 걸리지 않은 샷은 지금처럼 만든다.
+    await expect(chat.getState().remakeMissingVideo('s1')).resolves.toEqual({ started: true })
+    expect(generate).toHaveBeenCalledTimes(1)
   })
 
   // 왜: 재재검토 b 낮음 3(C5) — Director 에서 되물은 뒤 다른 단계에서 "좋아"라고 하면 Take 가 묶인 글 카드가 승인돼 영상이 나갔다.

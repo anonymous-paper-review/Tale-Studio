@@ -1399,11 +1399,13 @@ async function videoHoldReason(shotIds: readonly string[]): Promise<string | nul
       : 'Video generation is on hold because a shot could not be found. Check the current shots and try again.')
 }
 
-/** 번호를 묻기 전에 — 모델이 고른 샷(칸이 비었으면 지금 만들 수 있는 샷 전부)에 제출할 수 없는 샷이 끼면 그 까닭, 아니면 null(검토 b efac9881). */
-async function askHoldReason(requested: readonly string[] | null): Promise<string | null> {
+/** 번호를 묻기 전에 — 모델이 고른 샷(칸이 비었으면 같은 답에서 더한 샷)에 제출할 수 없는 샷이 끼면 그 까닭, 아니면 null(검토 b efac9881).
+ *  칸이 비었을 때 보드 전체를 보면 보드에 원래 있던 낼 수 없는 샷 때문에 번호 대신 엉뚱한 까닭을 말한다(재검토 낮음 3). */
+async function askHoldReason(requested: readonly string[] | null, addedShotIds: readonly string[]): Promise<string | null> {
   const { eligibleVideoBatchShotIds } = await import('@/lib/director/video-batch-client')
   const eligible = eligibleVideoBatchShotIds(useDirectorCanvasStore.getState().nodes)
-  return videoHoldReason(requested === null ? eligible : eligible.filter((id) => requested.includes(id)))
+  const candidates = requested ?? addedShotIds
+  return videoHoldReason(eligible.filter((id) => candidates.includes(id)))
 }
 
 /** 되묻는 말 — "샷 1·3·4 영상 3개(Take 15)를 만들까요? '응'이라고 하면 시작해요." Take 를 안 쓰는 계정이면 Take 수는 뺀다. */
@@ -2302,6 +2304,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
 
   remakeMissingVideo: async (shotNodeId) => {
     if (get().handoffConfirm?.kind !== 'editorMissingVideos') return { started: false, reason: 'no_window' }
+    // 기다리는 글 카드가 건 샷(그 샷 · 그 씬)은 옛 글로 만들지 않는다 — 카드에 묶지 않고 창 줄 밑 · 채팅에 까닭을 알리고 멈춘다(검토 b 재검토 보통 1).
+    const projectId = useProjectStore.getState().projectId
+    if (projectId && waitingTextCard(projectId)?.bound.has(shotNodeId)) {
+      const locale = contentLocale()
+      const label = shotLabelOf(useDirectorCanvasStore.getState().nodes.find((node) => node.id === shotNodeId), directorBoardNames())
+      producerSpeaker(projectId, 'director')(translate(locale, '{shots} has a text change waiting for [Apply]. Apply or discard it, then make it again.', { shots: shotListLabel(locale, [label]) }))
+      return { started: false, reason: 'pending_text_edit' }
+    }
     const director = () => useDirectorCanvasStore.getState()
     // 일괄이 도는 중이면 창이 단추를 끄고 까닭을 보인다(검토 b 낮음 1) — 여기서도 Take 를 만들지 않고 까닭을 돌려준다(2차 낮음 3).
     if (director().realBatchBusy) return { started: false, reason: 'image_batch' }
@@ -4269,7 +4279,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             const requestedIds = requested ? requested.map(resolve) : null
             const grounding = await groundChatVideos({ userText: trimmed, requested: requestedIds })
             // 번호를 묻기 전에 — 모델 부탁에 제출할 수 없는 샷(같은 답에서 더한 새 샷 등)이 끼면 범위 말이 있어도 묻지 않고 그 까닭을 말한다(검토 b efac9881).
-            const hold = grounding.kind === 'ask' ? await askHoldReason(requestedIds) : null
+            const addedShotIds = useDirectorCanvasStore.getState().nodes.filter((node) => isShotData(node.data) && !before.nodes.some((old) => old.id === node.id)).map((node) => node.id)
+            const hold = grounding.kind === 'ask' ? await askHoldReason(requestedIds, addedShotIds) : null
             const said = hold ?? groundingReply(grounding, (key) => translate(locale, key))
             if (said) lumiSays(said)
             if (grounding.kind === 'run') videoIds = grounding.shotIds
