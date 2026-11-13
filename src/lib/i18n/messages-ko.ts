@@ -1137,6 +1137,11 @@ export const KO: Record<string, string> = {
   '(Click: preview / drag·right-click: add to timeline)': '(클릭: 미리보기 / 드래그·우클릭: 타임라인 추가)',
   // 오너 답 8(2026-11-14): 영상 없는 샷 카드는 타임라인에 넣지 못한다.
   '(No video yet. Only shots with video go into the timeline.)': '(아직 영상이 없어요. 영상이 있는 샷만 타임라인에 들어가요.)',
+  // 검토 c(2026-11-14): 열 때 영상 자리가 저절로 바뀌었으면 한 번 알린다.
+  'Shots without video ({count}) were taken out, so the cuts and sounds after them moved.': '영상 없는 샷 {count}개가 빠져 뒤 컷과 소리를 옮겼어요.',
+  'Shots that now have video ({count}) came in, so the cuts and sounds after them moved.': '영상이 생긴 샷 {count}개가 들어와 뒤 컷과 소리를 옮겼어요.',
+  'Shots without video ({removed}) were taken out and shots that now have video ({added}) came in, so the cuts and sounds after them moved.':
+    '영상 없는 샷 {removed}개가 빠지고 영상이 생긴 샷 {added}개가 들어와 뒤 컷과 소리를 옮겼어요.',
   Preview: '미리보기',
   'Add to timeline': '타임라인 추가',
   'No clips generated yet': '생성된 클립이 없습니다',
@@ -1180,9 +1185,9 @@ export const KO: Record<string, string> = {
     '편집 내용을 서버에 저장할 수 없어요. 프로젝트가 삭제됐거나 세션이 만료됐을 수 있어요. 새로고침하면 최근 프로젝트로 복원돼요.',
   "Couldn't save your edits in this browser. Browser storage may be full.":
     '이 브라우저에 편집 내용을 저장하지 못했어요. 브라우저 저장 공간이 꽉 찼을 수 있어요.',
-  // E2b(2026-11-14): 서버 편집을 읽지 못하고 연 화면이 서버에 쓰기 전에 다시 읽었더니 다른 브라우저 편집이 있었을 때.
-  "Edits saved in another browser are on the server, so they weren't overwritten. Reopen the Editor to see them.":
-    '다른 브라우저에서 저장한 편집이 서버에 있어 덮어쓰지 않았어요. Editor 를 다시 열면 그 편집이 열려요.',
+  // E2b(2026-11-14, 검토 c 낮음 3): 서버 편집을 읽지 못하고 연 화면이 서버에 쓰기 전에 다시 읽었더니 다른 브라우저 편집이 있었을 때.
+  "There are edits saved in another browser. Changes you make here won't be saved to the server.":
+    '다른 브라우저에서 저장한 편집이 있어요. 여기서 고친 것은 서버에 저장되지 않아요.',
 
   // ── misc: card-mention.ts (direct) ──
   Person: '인물',
@@ -1809,7 +1814,8 @@ export const KO: Record<string, string> = {
   'Go to Director': 'Director로 이동',
 
   // ── Editor: 타이틀 카드(#owner-title-card) — 검은 배경 + 텍스트(+선택 이미지) synthetic 클립 ──
-  'Title Card': '타이틀 카드',
+  // 검토 c(2026-11-14): 영어는 문장 첫 글자만 대문자 — 꼬리표 · 메뉴 머리 · 단추가 같은 낱말.
+  'Title card': '타이틀 카드',
   'Insert a black title card with text at the nearest clip boundary':
     '가장 가까운 클립 경계에 검은 배경의 타이틀 카드를 넣어요',
   'Title text': '타이틀 텍스트',
@@ -1920,6 +1926,7 @@ export const KO: Record<string, string> = {
   'Image in front': '이미지를 앞으로',
   'Reset layout': '배치 되돌리기',
   'Title card length (seconds)': '타이틀 카드 길이(초)',
+  'GIF images can be up to 4MB.': 'GIF 그림은 4MB까지 올릴 수 있어요.',
   // 약속 K(2026-09-04): 자막
   'Subtitle': '자막',
   'Click to add a subtitle': '누르면 자막을 넣어요',

@@ -586,7 +586,7 @@ export default function PostPage() {
               title={t('Insert a black title card with text at the nearest clip boundary')}
             >
               <Type className="size-3" />
-              {t('Title Card')}
+              {t('Title card')}
             </Button>
 
             {/* 재생 컨트롤 (프레임 버튼은 꾹 누르면 연속) */}

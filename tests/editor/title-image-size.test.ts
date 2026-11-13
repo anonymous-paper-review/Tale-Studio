@@ -34,7 +34,7 @@ vi.mock('zustand', async () => {
   return { create }
 })
 vi.mock('sonner', () => ({ toast: { error: mocks.toastError, success: vi.fn(), info: vi.fn(), warning: vi.fn() } }))
-vi.mock('@/lib/upload/downscale', () => ({ downscaleForUpload: mocks.downscale }))
+vi.mock('@/lib/upload/downscale', async (original) => ({ ...await original<typeof import('@/lib/upload/downscale')>(), downscaleForUpload: mocks.downscale }))
 
 import { TitleImagePicker } from '@/features/editor/title-image-picker'
 import { ImageUploadConsentDialog } from '@/components/upload/image-upload-consent'
@@ -62,7 +62,7 @@ function renderPicker() {
 /** 내 컴퓨터에서 bytes 크기의 그림을 고른다. */
 function chooseFile(bytes: number, name = 'poster.png') {
   const input = renderPicker().find((node) => node.type === 'input' && node.props.type === 'file')!
-  const file = new File([new Uint8Array(bytes)], name, { type: 'image/png' })
+  const file = new File([new Uint8Array(bytes)], name, { type: name.endsWith('.gif') ? 'image/gif' : 'image/png' })
   ;(input.props.onChange as (event: unknown) => void)({ target: { files: [file], value: file.name } })
   return file
 }
@@ -90,7 +90,7 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals() })
 
 describe('타이틀 카드 그림 크기', () => {
-  it('4.5MB 넘는 그림도 줄여서 올린다 — 투명한 곳은 카드 바탕처럼 검게 채운다', async () => {
+  it('4.5MB 넘는 그림도 줄여서 올린다 — 투명한 곳이 있으면 투명을 지키고, 없으면 카드 바탕처럼 검은 바탕의 JPEG 로', async () => {
     // 왜: 서버(Vercel)는 4.5MB 넘는 요청을 함수가 돌기 전에 거절해, 휴대폰 사진 같은 큰 그림은 "HTTP 413"으로 실패했다.
     //   고장: 4.5~10MB 그림을 타이틀 카드에 올릴 때(2026-11-13 분석에서 발견).
     const small = new File([new Uint8Array(1024)], 'poster.jpg', { type: 'image/jpeg' })
@@ -98,7 +98,7 @@ describe('타이틀 카드 그림 크기', () => {
     const file = chooseFile(6 * MB)
     agree()
     await vi.waitFor(() => expect(onPick).toHaveBeenCalledWith('https://media/title.jpg'))
-    expect(mocks.downscale).toHaveBeenCalledWith(file, { background: 'black' })
+    expect(mocks.downscale).toHaveBeenCalledWith(file, { background: 'black', keepTransparency: true })
     const sent = (fetchMock.mock.calls[0]![1] as { body: FormData }).body.get('file') as File
     expect(sent.name).toBe('poster.jpg')
     expect(sent.size).toBe(1024)
@@ -122,4 +122,30 @@ describe('타이틀 카드 그림 크기', () => {
     expect(mocks.toastError).toHaveBeenCalledWith(translate('ko', 'The picture is too large. Choose a smaller one.'))
     expect(onPick).not.toHaveBeenCalled()
   })
+
+  it('4MB 넘는 GIF 는 줄이지 않고 동의 창을 띄우기 전에 "GIF 그림은 4MB까지"라고 알린다', async () => {
+    // 왜: 검토 c — 줄이면 JPEG 로 바뀌어 움직이는 GIF 의 움직임이 사라졌다. GIF 는 받은 그대로 올릴 수 있는 크기까지만 받는다.
+    chooseFile(5 * MB, 'loop.gif')
+    await Promise.resolve()
+    expect(consentDialog()).toBeUndefined()
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(mocks.downscale).not.toHaveBeenCalled()
+    expect(mocks.toastError).toHaveBeenCalledWith(translate('ko', 'GIF images can be up to 4MB.'))
+  })
 })
+
+describe('줄일 때 고르는 형식', () => {
+  it('투명한 곳이 있는 그림은 줄여도 투명을 지키는 PNG 로, 투명이 없으면 JPEG 로 줄인다', async () => {
+    // 왜: 검토 c — 투명 로고가 검은 네모가 되어 '그림이 글자 위' 배치에서 글자를 가렸다. 사진처럼 투명이 없는 그림은 JPEG 가 가장 작다.
+    const { hasTransparency, downscaleType } = await vi.importActual<typeof import('@/lib/upload/downscale')>('@/lib/upload/downscale')
+    const opaque = new Uint8ClampedArray([10, 20, 30, 255, 40, 50, 60, 255])
+    const seeThrough = new Uint8ClampedArray([10, 20, 30, 255, 40, 50, 60, 128])
+    expect(hasTransparency(opaque)).toBe(false)
+    expect(hasTransparency(seeThrough)).toBe(true)
+    expect(downscaleType({ keepTransparency: true, transparent: true })).toBe('image/png')
+    expect(downscaleType({ keepTransparency: true, transparent: false })).toBe('image/jpeg')
+    // 다른 곳(브레이크다운 참고 그림)은 지금처럼 늘 JPEG.
+    expect(downscaleType({ keepTransparency: false, transparent: true })).toBe('image/jpeg')
+  })
+})
+

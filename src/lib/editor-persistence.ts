@@ -6,8 +6,18 @@ import { useLocaleStore } from '@/stores/locale-store'
 export interface PersistedEditor {
   /** 1 = 붙은 줄(빈 곳 없음) · 2 = 자유 배치 — 클립마다 줄 · 시작 초(placements)를 함께 적는다(오너 답 1, 2026-11-14). */
   version: number
+  /**
+   * 서버 편집과 견주는 화면(E2b 고침 뒤)이 쓴 저장본 — 이 표시가 있는 서버 저장본은 이 브라우저의 고침 전 저장본보다 먼저 연다
+   *   (검토 c, 2026-11-14). 표시가 없으면 고침 전 저장본끼리라 이 브라우저 것이 먼저다(E2b 로 비워진 프로젝트 되살리기).
+   */
+  serverAware?: boolean
   shots: Shot[]
   clipOrder: Record<string, string[]>
+  /**
+   * 사람이 타임라인에서 뺀 원본 샷(검토 c, 2026-11-14) — 영상이 없어져 저절로 빠진 샷은 영상이 생기면 돌아오지만 이 샷들은 돌아오지 않는다.
+   *   없으면 고침 전 저장본: 그때는 영상 없는 샷도 빈 칸으로 순서에 있었으니, 저장할 때 있었는데 순서에 없는 샷이 사람이 뺀 샷이다.
+   */
+  removedShotIds?: string[]
   videoClips: VideoClip[]
   /** 2판: 타임라인에 놓인 클립의 줄(지금은 영상 한 줄 'v1')과 시작 초. 없으면(1판) 지금 보이는 자리 = 붙은 줄. */
   placements?: Record<string, { trackId: string; startSec: number }>

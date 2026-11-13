@@ -70,7 +70,10 @@ export function previewPane(input: {
   return input.hasShot ? 'no-video' : 'empty'
 }
 
-/** 클립 오른쪽 클릭 메뉴 머리 — 샷은 "MS · 4.0s", 타이틀 카드는 "타이틀 카드 · 5.0s"(예전에는 만들 때 붙인 샷 종류 "WS"가 보였다 — N 353:351, 2026-11-14). 약속: tests/editor/title-card.test.ts */
+/**
+ * 클립 꼬리표 · 오른쪽 클릭 메뉴 머리 — 샷은 "MS · 4.0s", 타이틀 카드는 "타이틀 카드 · 5.0s"(예전에는 메뉴 머리에 만들 때 붙인 샷 종류
+ *   "WS"가, 꼬리표에는 "타이틀"이 보였다 — N 353:351 · 검토 c, 2026-11-14). 약속: tests/editor/title-card.test.ts
+ */
 export function clipMenuTitle(input: { isTitleCard: boolean; shotType: string; durationSec: number }, t: Translate): string {
-  return `${input.isTitleCard ? t('Title Card') : input.shotType} · ${input.durationSec.toFixed(1)}s`
+  return `${input.isTitleCard ? t('Title card') : input.shotType} · ${input.durationSec.toFixed(1)}s`
 }
