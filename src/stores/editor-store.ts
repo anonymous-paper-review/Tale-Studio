@@ -170,6 +170,10 @@ interface EditorState {
   videoTracks: VideoTrackState[]
   // V1 밖 줄에 놓인 클립의 줄 · 시작 초(자유 배치) — 사람이 옮기거나 끌어 놓은 클립만 있다(2단계 ②).
   overlay: OverlayPlacements
+  // 마커(2단계 ③, 시안 E1 409:4797) — 시퀀스 시각(초)만, 이름 없이. 저장 · 되돌리기 대상이고 내보낸 영상에는 찍히지 않는다.
+  markers: number[]
+  // 스냅(시안 E1 409:4795 [스냅 켬]) — 끌 때 경계 · 플레이헤드 · 마커에 붙는다. 도구 설정이라 저장하지 않고, Editor 를 열면 켜져 있다.
+  snapEnabled: boolean
 
   // 소스 클립 단독 미리보기 (Video Source 클릭 시). null이면 타임라인(플레이헤드) 모드.
   previewSourceShotId: string | null
@@ -266,6 +270,14 @@ interface EditorState {
   /** 줄 자물쇠(영상 · 소리) · 눈(영상) — 저장본에 남고 되돌리기 칸에 쌓지 않는다(2단계 ②). */
   toggleTrackLock: (trackId: string) => void
   toggleTrackVisible: (trackId: string) => void
+  /** Ctrl+K — 플레이헤드 자리에서 나눈다. 고른 클립(영상 또는 소리)이 있으면 그것만, 없으면 잠기지 않은 모든 줄에서 플레이헤드에 걸린 클립. 되돌리기 한 칸(2단계 ③). */
+  splitAtPlayhead: () => void
+  /** [마커] · M — 플레이헤드 자리에 마커를 단다(같은 시각 0.05초 안에는 하나만). 되돌리기 한 칸. */
+  addMarker: () => void
+  /** 그 시각의 마커를 지운다. 되돌리기 한 칸. */
+  removeMarker: (sec: number) => void
+  /** [스냅 켬] — 저장하지 않는다. */
+  toggleSnap: () => void
 
   // 소스 단독 미리보기 (Video Source 클릭)
   previewSource: (shotId: string) => void
@@ -311,6 +323,7 @@ interface EditorSnapshot {
   audioTracks: AudioTrackState[]
   videoTracks: VideoTrackState[]
   overlay: OverlayPlacements
+  markers: number[]
 }
 
 // 리사이즈 섹션 기본 크기 (px)
@@ -621,6 +634,127 @@ function audioLocked(state: Pick<EditorState, 'videoTracks' | 'audioTracks'>, cl
   return trackLocked(state, clip.trackId ?? state.audioTracks[0]?.id)
 }
 
+// ── 나누기 한 번(자르기 도구 · 우클릭 [여기서 나누기] · Ctrl+K) ──
+//   바뀐 칸과 새 조각 id 를 돌려준다. 되돌리기 칸은 부르는 쪽이 쌓는다 — Ctrl+K 는 여러 줄을 나눠도 한 칸(2단계 ③).
+//   나눌 수 없으면(잠근 줄 · 가장자리 0.1초 안 · 클립 밖) null.
+
+// cut(자르기) for video — atGlobalSec 에서 클립을 둘로 분할.
+// 모델: 1 shot = 1 video clip 이므로, 뒷조각은 synthetic shotId 로 복제하고 trim 으로 구간을 나눈다.
+function splitVideoChanges(state: EditorState, shotId: string, atGlobalSec: number): { changes: Partial<EditorState>; newId: string } | null {
+  const place = state.overlay[shotId]
+  const item = (place ? selectOverlayLayout(state) : selectTimelineLayout(state)).find((l) => l.shotId === shotId)
+  const shot = state.shots.find((s) => s.shotId === shotId)
+  if (!item || !shot || clipLocked(state, shotId)) return null
+
+  const clip = state.videoClips.find((c) => c.shotId === shotId)
+  const base = shot.durationSeconds
+  const trimStart = clip?.trimStart ?? 0
+  const trimEnd = clip?.trimEnd ?? base
+  const speed = clip?.speed ?? 1.0
+  // 전역 오프셋(타임라인 초) → 소스 시간으로 환산 (속도 반영)
+  const srcSplit = trimStart + (atGlobalSec - item.startSec) * speed
+  const MIN = 0.1
+  if (srcSplit <= trimStart + MIN || srcSplit >= trimEnd - MIN) return null
+
+  const newId = `${shotId}__c${uid()}`
+  const newShot: Shot = { ...shot, shotId: newId }
+  const baseClip: VideoClip =
+    clip ?? { shotId, url: null, status: 'pending', thumbnailUrl: null }
+
+  const videoClips = state.videoClips.map((c) =>
+    c.shotId === shotId ? { ...c, trimStart, trimEnd: srcSplit } : c,
+  )
+  videoClips.push({ ...baseClip, shotId: newId, trimStart: srcSplit, trimEnd })
+
+  const order = [...(state.clipOrder[shot.sceneId] ?? [])]
+  const idx = order.indexOf(shotId)
+  if (idx >= 0) order.splice(idx + 1, 0, newId)
+  else order.push(newId)
+
+  // 그 클립에 이어진 소리도 같은 자리에서 둘로 — 뒷조각 소리는 새 조각을 따라간다(결정 4).
+  const audioClips = state.audioClips.flatMap((a) =>
+    a.linkedShotId === shotId ? [a, { ...a, id: `audio_${uid()}`, linkedShotId: newId }] : [a],
+  )
+
+  if (place) {
+    // V1 밖 줄 — 뒷조각은 같은 줄의 자른 시각에 놓인다(앞 조각 끝 = 자른 시각, 2단계 ②).
+    return {
+      newId,
+      changes: withLinkedAudio(state, {
+        shots: [...state.shots, newShot],
+        videoClips,
+        audioClips,
+        overlay: { ...state.overlay, [newId]: { trackId: place.trackId, startSec: round3(atGlobalSec) } },
+        selectedClipShotId: shotId,
+        selectedAudioId: null,
+        selectedAudioIds: [],
+      }),
+    }
+  }
+
+  return {
+    newId,
+    changes: withLayout(state, {
+      shots: [...state.shots, newShot],
+      videoClips,
+      audioClips,
+      clipOrder: { ...state.clipOrder, [shot.sceneId]: order },
+      selectedClipShotId: shotId,
+      selectedAudioId: null,
+      selectedAudioIds: [],
+    }),
+  }
+}
+
+// cut(자르기) for audio — 전역 시간 atGlobalSec 에서 오디오 클립을 둘로 분할.
+// 같은 소스 파일을 공유하므로 뒷조각은 sourceOffsetSec 를 이어받아 올바른 구간을 재생.
+function splitAudioChanges(state: EditorState, id: string, atGlobalSec: number): { changes: Partial<EditorState>; newId: string } | null {
+  const a = state.audioClips.find((x) => x.id === id)
+  if (!a || audioLocked(state, a)) return null
+  const localT = atGlobalSec - a.startSec
+  const MIN = 0.1
+  if (localT <= MIN || localT >= a.durationSec - MIN) return null // 가장자리 너무 가까움
+
+  const srcOff = a.sourceOffsetSec ?? 0
+  const srcDur = a.sourceDurationSec ?? a.durationSec
+  const newId = `audio_${uid()}`
+  // 소리 조각을 직접 자르면 두 조각 모두 영상에서 떨어진다(결정 4). 빠르기는 그대로 — 원본은 타임라인 초 × 빠르기만큼 나아간다.
+  const rate = a.playbackRate ?? 1
+  const first: AudioTrackClip = { ...a, durationSec: localT, linkedShotId: null }
+  const second: AudioTrackClip = {
+    ...a,
+    id: newId,
+    startSec: a.startSec + localT,
+    durationSec: a.durationSec - localT,
+    sourceOffsetSec: srcOff + localT * rate,
+    sourceDurationSec: srcDur,
+    linkedShotId: null,
+  }
+  return {
+    newId,
+    changes: {
+      audioClips: state.audioClips.flatMap((x) => (x.id === id ? [first, second] : [x])),
+      selectedAudioId: newId,
+      selectedAudioIds: [newId],
+    },
+  }
+}
+
+// 같은 시각으로 보는 마커 간격(초) — 이 안에는 마커를 하나만 둔다(2단계 ③).
+const MARKER_SAME_SEC = 0.05
+
+/** 저장본의 마커 — 0 이상의 초만, 차례대로, 같은 시각(0.05초 안)에는 하나만. */
+function cleanMarkers(raw: unknown): number[] {
+  if (!Array.isArray(raw)) return []
+  const sorted = raw
+    .filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v >= 0)
+    .map((v) => round3(v))
+    .sort((a, b) => a - b)
+  const out: number[] = []
+  for (const sec of sorted) if (out.length === 0 || sec - out[out.length - 1] >= MARKER_SAME_SEC) out.push(sec)
+  return out
+}
+
 // 소리 조각 자리가 이만큼 안으로 같으면 제자리다 — 초를 다시 계산한 끝자리 차이(검토 b).
 const SAME_SPOT_SEC = 1e-6
 
@@ -824,6 +958,7 @@ function snapshotOf(state: EditorState): EditorSnapshot {
     audioTracks: structuredClone(state.audioTracks),
     videoTracks: structuredClone(state.videoTracks),
     overlay: structuredClone(state.overlay),
+    markers: [...state.markers],
   }
 }
 
@@ -933,6 +1068,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   audioTracks: DEFAULT_AUDIO_TRACKS.map((t) => ({ ...t })),
   videoTracks: DEFAULT_VIDEO_TRACKS.map((t) => ({ ...t })),
   overlay: {},
+  markers: [],
+  snapEnabled: true,
   previewSourceShotId: null,
   masterVolume: 1,
   binDragKind: null,
@@ -1068,38 +1205,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       future: [],
     })),
 
-  // cut(자르기) for audio — 전역 시간 atGlobalSec 에서 오디오 클립을 둘로 분할.
-  // 같은 소스 파일을 공유하므로 뒷조각은 sourceOffsetSec 를 이어받아 올바른 구간을 재생.
+  // cut(자르기) for audio — 전역 시간 atGlobalSec 에서 오디오 클립을 둘로 분할(splitAudioChanges).
   splitAudioClipAt: (id, atGlobalSec) =>
     set((state) => {
-      const a = state.audioClips.find((x) => x.id === id)
-      if (!a || audioLocked(state, a)) return state
-      const localT = atGlobalSec - a.startSec
-      const MIN = 0.1
-      if (localT <= MIN || localT >= a.durationSec - MIN) return state // 가장자리 너무 가까움
-
-      const srcOff = a.sourceOffsetSec ?? 0
-      const srcDur = a.sourceDurationSec ?? a.durationSec
-      const newId = `audio_${uid()}`
-      // 소리 조각을 직접 자르면 두 조각 모두 영상에서 떨어진다(결정 4). 빠르기는 그대로 — 원본은 타임라인 초 × 빠르기만큼 나아간다.
-      const rate = a.playbackRate ?? 1
-      const first: AudioTrackClip = { ...a, durationSec: localT, linkedShotId: null }
-      const second: AudioTrackClip = {
-        ...a,
-        id: newId,
-        startSec: a.startSec + localT,
-        durationSec: a.durationSec - localT,
-        sourceOffsetSec: srcOff + localT * rate,
-        sourceDurationSec: srcDur,
-        linkedShotId: null,
-      }
-      return {
-        audioClips: state.audioClips.flatMap((x) => (x.id === id ? [first, second] : [x])),
-        selectedAudioId: newId,
-        selectedAudioIds: [newId],
-        past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
-        future: [],
-      }
+      const split = splitAudioChanges(state, id, atGlobalSec)
+      if (!split) return state
+      return { ...split.changes, past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT), future: [] }
     }),
 
   // ── 오디오/보이스 소스 보관함 (bin) ──
@@ -1626,6 +1737,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         audioTracks: padTracks(dedupTracks, DEFAULT_AUDIO_TRACKS),
         videoTracks,
         overlay: restoredOverlay,
+        markers: cleanMarkers(saved.markers),
         panelSizes: saved.panelSizes ?? { ...DEFAULT_PANEL_SIZES },
         selectedClipShotId: cur.selectedClipShotId,
         selectedShotIds: [],
@@ -1663,6 +1775,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       audioTracks: DEFAULT_AUDIO_TRACKS.map((t) => ({ ...t })),
       videoTracks: DEFAULT_VIDEO_TRACKS.map((t) => ({ ...t })),
       overlay: {},
+      markers: [] as number[],
+      // 스냅은 저장하지 않는 도구 설정 — Editor 를 열면 켜져 있다(2단계 ③).
+      snapEnabled: true,
       binDragKind: null,
       binDropSec: null,
       unplayableVideoUrls: [] as string[],
@@ -1847,6 +1962,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       audioTracks: DEFAULT_AUDIO_TRACKS.map((t) => ({ ...t })),
       videoTracks: DEFAULT_VIDEO_TRACKS.map((t) => ({ ...t })),
       overlay: {},
+      markers: [],
+      snapEnabled: true,
       previewSourceShotId: null,
       masterVolume: 1,
       binDragKind: null,
@@ -2223,72 +2340,81 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }, desired)
     }),
 
-  // cut(자르기) for video — atGlobalSec 에서 클립을 둘로 분할.
-  // 모델: 1 shot = 1 video clip 이므로, 뒷조각은 synthetic shotId 로 복제하고 trim 으로 구간을 나눈다.
+  // cut(자르기) for video — atGlobalSec 에서 클립을 둘로 분할(splitVideoChanges).
   splitVideoClipAt: (shotId, atGlobalSec) =>
     set((state) => {
-      const place = state.overlay[shotId]
-      const item = (place ? selectOverlayLayout(state) : selectTimelineLayout(state)).find((l) => l.shotId === shotId)
-      const shot = state.shots.find((s) => s.shotId === shotId)
-      if (!item || !shot || clipLocked(state, shotId)) return state
+      const split = splitVideoChanges(state, shotId, atGlobalSec)
+      if (!split) return state
+      return { ...split.changes, past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT), future: [] }
+    }),
 
-      const clip = state.videoClips.find((c) => c.shotId === shotId)
-      const base = shot.durationSeconds
-      const trimStart = clip?.trimStart ?? 0
-      const trimEnd = clip?.trimEnd ?? base
-      const speed = clip?.speed ?? 1.0
-      // 전역 오프셋(타임라인 초) → 소스 시간으로 환산 (속도 반영)
-      const srcSplit = trimStart + (atGlobalSec - item.startSec) * speed
-      const MIN = 0.1
-      if (srcSplit <= trimStart + MIN || srcSplit >= trimEnd - MIN) return state
-
-      const newId = `${shotId}__c${uid()}`
-      const newShot: Shot = { ...shot, shotId: newId }
-      const baseClip: VideoClip =
-        clip ?? { shotId, url: null, status: 'pending', thumbnailUrl: null }
-
-      const videoClips = state.videoClips.map((c) =>
-        c.shotId === shotId ? { ...c, trimStart, trimEnd: srcSplit } : c,
-      )
-      videoClips.push({ ...baseClip, shotId: newId, trimStart: srcSplit, trimEnd })
-
-      const order = [...(state.clipOrder[shot.sceneId] ?? [])]
-      const idx = order.indexOf(shotId)
-      if (idx >= 0) order.splice(idx + 1, 0, newId)
-      else order.push(newId)
-
-      // 그 클립에 이어진 소리도 같은 자리에서 둘로 — 뒷조각 소리는 새 조각을 따라간다(결정 4).
-      const audioClips = state.audioClips.flatMap((a) =>
-        a.linkedShotId === shotId ? [a, { ...a, id: `audio_${uid()}`, linkedShotId: newId }] : [a],
-      )
-
-      if (place) {
-        // V1 밖 줄 — 뒷조각은 같은 줄의 자른 시각에 놓인다(앞 조각 끝 = 자른 시각, 2단계 ②).
-        return withLinkedAudio(state, {
-          shots: [...state.shots, newShot],
-          videoClips,
-          audioClips,
-          overlay: { ...state.overlay, [newId]: { trackId: place.trackId, startSec: round3(atGlobalSec) } },
-          selectedClipShotId: shotId,
-          selectedAudioId: null,
-          selectedAudioIds: [],
-          past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
-          future: [],
-        })
+  // Ctrl+K(2단계 ③, 시안 Lumi 안내 416:4930 · 결정 페이지 G10 · H6) — 플레이헤드 자리에서 나눈다. 고른 클립(영상 또는 소리)이 있으면
+  //   그것만 나누고 두 조각 모두 골라 둔다. 고른 것이 없으면 잠기지 않은 모든 줄에서 플레이헤드에 걸린 클립 — 영상을 먼저 나눠 이어진
+  //   소리가 함께 나뉘게 하고, 잠근 줄 영상에 이어진 소리는 나누지 않는다(소리를 직접 나누면 영상에서 떨어진다, 결정 4).
+  //   여러 줄을 나눠도 되돌리기 한 칸. 약속: tests/editor/split-snap-markers.test.ts
+  splitAtPlayhead: () =>
+    set((state) => {
+      const at = state.currentTime
+      const crossing = (item: { startSec: number; durationSec: number }) => at > item.startSec && at < item.startSec + item.durationSec
+      const pickedVideo = state.selectedShotIds.length > 0
+      const pickedAudio = !pickedVideo && state.selectedAudioIds.length > 0
+      let work: EditorState = state
+      const born: string[] = []
+      const videoIds = pickedVideo
+        ? state.selectedShotIds
+        : pickedAudio
+          ? []
+          : selectVideoLayout(state).filter((item) => !trackLocked(state, item.trackId) && crossing(item)).map((item) => item.shotId)
+      for (const shotId of videoIds) {
+        const split = splitVideoChanges(work, shotId, at)
+        if (!split) continue
+        work = { ...work, ...split.changes }
+        born.push(split.newId)
       }
-
-      return withLayout(state, {
-        shots: [...state.shots, newShot],
-        videoClips,
-        audioClips,
-        clipOrder: { ...state.clipOrder, [shot.sceneId]: order },
-        selectedClipShotId: shotId,
-        selectedAudioId: null,
-        selectedAudioIds: [],
+      const audioIds = pickedVideo
+        ? []
+        : pickedAudio
+          ? state.selectedAudioIds
+          : work.audioClips.filter((a) => crossing(a) && !(a.linkedShotId && clipLocked(work, a.linkedShotId))).map((a) => a.id)
+      for (const id of audioIds) {
+        const split = splitAudioChanges(work, id, at)
+        if (!split) continue
+        work = { ...work, ...split.changes }
+        born.push(split.newId)
+      }
+      if (born.length === 0) return state
+      return {
+        shots: work.shots,
+        videoClips: work.videoClips,
+        clipOrder: work.clipOrder,
+        overlay: work.overlay,
+        audioClips: work.audioClips,
+        selectedClipShotId: state.selectedClipShotId,
+        selectedShotIds: pickedVideo ? [...state.selectedShotIds, ...born] : state.selectedShotIds,
+        selectedAudioId: state.selectedAudioId,
+        selectedAudioIds: pickedAudio ? [...state.selectedAudioIds, ...born] : state.selectedAudioIds,
         past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
         future: [],
-      })
+      }
     }),
+
+  // 마커(2단계 ③, 시안 E1 409:4797 · 결정 페이지 G13 · H9 · H10) — 플레이헤드 자리에 시각만 단다(이름 · 색 없이). 같은 시각(0.05초 안)에는
+  //   하나만. 달기 · 지우기는 되돌리기 한 칸이고 저장본에 markers 로 남는다. 약속: tests/editor/split-snap-markers.test.ts
+  addMarker: () =>
+    set((state) => {
+      const at = round3(Math.max(0, state.currentTime))
+      if (state.markers.some((m) => Math.abs(m - at) < MARKER_SAME_SEC)) return state
+      return { markers: [...state.markers, at].sort((a, b) => a - b), past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT), future: [] }
+    }),
+
+  removeMarker: (sec) =>
+    set((state) => {
+      const markers = state.markers.filter((m) => Math.abs(m - sec) >= MARKER_SAME_SEC)
+      if (markers.length === state.markers.length) return state
+      return { markers, past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT), future: [] }
+    }),
+
+  toggleSnap: () => set((state) => ({ snapEnabled: !state.snapEnabled })),
 
   // Video Source → 타임라인 드래그-투-애드. atGlobalSec 위치에 새 인스턴스(synthetic) 삽입.
   // 새 인스턴스 id 를 돌려준다 — 화면이 그 클립에 소리를 잇는다(결정 4). 원본이 없으면 null.
@@ -2698,6 +2824,7 @@ const pickPersisted = (s: EditorState) => ({
   audioTracks: s.audioTracks,
   videoTracks: s.videoTracks,
   overlay: s.overlay,
+  markers: s.markers,
   panelSizes: s.panelSizes,
 })
 
@@ -2711,8 +2838,9 @@ function persistSnapshot(state: EditorState): PersistedEditor {
   const placements = Object.fromEntries(
     selectVideoLayout(state).map((item) => [item.shotId, { trackId: item.trackId, startSec: round3(item.startSec) }]),
   )
-  const { overlay: _overlay, ...persisted } = pickPersisted(state)
-  return compactSnapshot({ version: 2, ...(state.serverAware ? { serverAware: true } : {}), ...persisted, placements })
+  const { overlay: _overlay, markers, ...persisted } = pickPersisted(state)
+  // 마커는 있을 때만 적는다(2단계 ③) — 마커를 쓰지 않은 저장본은 예전 그대로다.
+  return compactSnapshot({ version: 2, ...(state.serverAware ? { serverAware: true } : {}), ...persisted, placements, ...(markers.length > 0 ? { markers } : {}) })
 }
 
 /**
@@ -2748,6 +2876,7 @@ if (typeof window !== 'undefined') {
       cur.audioTracks === prev.audioTracks &&
       cur.videoTracks === prev.videoTracks &&
       cur.overlay === prev.overlay &&
+      cur.markers === prev.markers &&
       cur.panelSizes === prev.panelSizes
     ) {
       return // 편집 상태 변화 없음 (재생/선택 등) → 저장 안 함

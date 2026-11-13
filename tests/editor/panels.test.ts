@@ -186,9 +186,10 @@ describe('프로그램 모니터 단추', () => {
     expect(editPointTarget(layout, 3, 1)).toBe(6)
     expect(editPointTarget(layout, 6.5, -1)).toBe(6)
     expect(editPointTarget(layout, 0, -1)).toBe(0)
-    expect(read('src/features/editor/video-previewer.tsx')).toMatch(/editPointTarget\(layout, st\.currentTime, -1\)/)
-    expect(read('src/features/editor/video-previewer.tsx')).toMatch(/editPointTarget\(layout, st\.currentTime, 1\)/)
-    expect(read('src/features/editor/use-editor-playback.ts')).toMatch(/editPointTarget\(layout, s\.currentTime, dir\)/)
+    // 마커 인자는 2단계 ③(마커에도 멈춘다 — tests/editor/split-snap-markers.test.ts).
+    expect(read('src/features/editor/video-previewer.tsx')).toMatch(/editPointTarget\(layout, st\.currentTime, -1(, st\.markers)?\)/)
+    expect(read('src/features/editor/video-previewer.tsx')).toMatch(/editPointTarget\(layout, st\.currentTime, 1(, st\.markers)?\)/)
+    expect(read('src/features/editor/use-editor-playback.ts')).toMatch(/editPointTarget\(layout, s\.currentTime, dir(, s\.markers)?\)/)
   })
 })
 
@@ -205,7 +206,8 @@ describe('내보내기 탭 · 단축키', () => {
     // 왜: 시안 E1 409:4646 [단축키]. 목록이 실제 단축키와 어긋나면 안 된다 — 단축키를 받는 코드에 같은 키가 있다.
     const markup = text(html(createElement(ShortcutsList)))
     for (const item of EDITOR_SHORTCUTS) expect(markup).toContain(item.keys)
-    expect(EDITOR_SHORTCUTS.map((s) => s.keys)).toEqual(['Space', '← →', 'Shift+← →', 'Ctrl+← →', 'Ctrl+Z', 'Ctrl+Y', 'V', 'C', 'Delete', 'Shift+Delete'])
+    // Ctrl+K · M 은 2단계 ③(tests/editor/split-snap-markers.test.ts).
+    expect(EDITOR_SHORTCUTS.map((s) => s.keys)).toEqual(['Space', '← →', 'Shift+← →', 'Ctrl+← →', 'Ctrl+Z', 'Ctrl+Y', 'V', 'C', 'Ctrl+K', 'M', 'Delete', 'Shift+Delete'])
     const handler = read('src/features/editor/use-editor-playback.ts')
     for (const key of ["case ' ':", "e.key === 'ArrowRight'", "case 'v':", "case 'c':", "case 'Delete':", 'e.shiftKey) s.rippleDeleteSelectedClips()']) expect(handler).toContain(key)
   })

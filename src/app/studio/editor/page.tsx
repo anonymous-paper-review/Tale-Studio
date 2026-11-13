@@ -15,6 +15,7 @@ import { ProjectPanel } from '@/features/editor/video-source-panel'
 import { EffectControls } from '@/features/editor/effect-controls'
 import { SourceMonitor } from '@/features/editor/source-monitor'
 import { EditorTopActions, EditorWorkbar, ExportTab, ShortcutsDialog, type EditorTab } from '@/features/editor/editor-workbar'
+import { SnapMarkerButtons } from '@/features/editor/timeline-markers'
 import { AudioMeter } from '@/features/editor/audio-meter'
 import { ResizeHandle } from '@/features/editor/resize-handle'
 import { useEditorPlayback } from '@/features/editor/use-editor-playback'
@@ -48,6 +49,8 @@ export default function PostPage() {
     audioTracks,
     videoTracks,
     overlay,
+    markers,
+    snapEnabled,
     toolMode,
     binDragKind,
     binDropSec,
@@ -90,6 +93,9 @@ export default function PostPage() {
     toggleTrackLock,
     toggleTrackVisible,
     toggleAudioTrackSolo,
+    toggleSnap,
+    addMarker,
+    removeMarker,
     removeAudioTrack,
     setAudioVolume,
     setBinDragKind,
@@ -647,8 +653,13 @@ export default function PostPage() {
                     onToggleTrackVisible={toggleTrackVisible}
                     onToggleAudioTrackSolo={toggleAudioTrackSolo}
                     onRemoveVideoTrack={removeVideoTrack}
+                    snapEnabled={snapEnabled}
+                    markers={markers}
+                    onRemoveMarker={removeMarker}
                     toolbar={
                       <>
+                        {/* 시안 E1 409:4795–4802 차례 — [스냅 켬] · [마커] · [+ V 트랙] · [+ A 트랙](2단계 ③). */}
+                        <SnapMarkerButtons snapEnabled={snapEnabled} onToggleSnap={toggleSnap} onAddMarker={addMarker} />
                         <Button size="sm" variant="secondary" className="h-7 gap-1 rounded-full px-3" onClick={() => addVideoTrack()} title={t('Add video track')}>
                           <Plus className="size-3.5" />
                           {t('V track')}
@@ -657,7 +668,11 @@ export default function PostPage() {
                           <Plus className="size-3.5" />
                           {t('A track')}
                         </Button>
-                        <span className="ml-auto min-w-0 truncate text-meta text-subtle-foreground">
+                        {/* 도구 설명은 남는 폭만 쓰고 줄어든다 — 단추가 늘어도(2단계 ③ [스냅 켬] · [마커]) 확대 −·+ 가 둘째 줄로 내려가지 않게. */}
+                        <span
+                          className="min-w-0 flex-1 basis-0 truncate text-right text-meta text-subtle-foreground"
+                          title={toolMode === 'cut' ? t('Cut tool · Click a clip to split it there') : t('Selection tool · Drag to move, drag an edge to change length')}
+                        >
                           {toolMode === 'cut' ? t('Cut tool · Click a clip to split it there') : t('Selection tool · Drag to move, drag an edge to change length')}
                         </span>
                         {/* 축척 −·+ (2026-09-08 오너 지시 5번 · 시안 E1 409:4806 · 409:4808) — 축척 숫자는 없앴다(결정 페이지 추천). */}

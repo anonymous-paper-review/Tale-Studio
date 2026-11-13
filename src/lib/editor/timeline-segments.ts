@@ -9,12 +9,17 @@ export function timelineEnd(layout: ReadonlyArray<{ startSec: number; durationSe
 }
 
 /**
- * 앞 · 다음 편집점 — 0초와 클립마다 시작 · 끝(빈 곳의 양 끝 포함) 가운데 지금 시각 바로 앞 · 뒤. 다음이 없으면 마지막 편집점, 앞이 없으면 0초.
- *   Ctrl+← · Ctrl+→ 와 모니터의 앞 · 다음 편집점 단추가 같이 쓴다(2단계 ① 새 배치, 시안 E1 409:4729 · 409:4737).
- *   약속: tests/editor/panels.test.ts
+ * 앞 · 다음 편집점 — 0초와 클립마다 시작 · 끝(빈 곳의 양 끝 포함) · 마커 가운데 지금 시각 바로 앞 · 뒤. 다음이 없으면 마지막 편집점, 앞이 없으면 0초.
+ *   Ctrl+← · Ctrl+→ 와 모니터의 앞 · 다음 편집점 단추가 같이 쓴다(2단계 ① 새 배치, 시안 E1 409:4729 · 409:4737). 마커에도 멈춘다(2단계 ③).
+ *   약속: tests/editor/panels.test.ts · tests/editor/split-snap-markers.test.ts
  */
-export function editPointTarget(layout: ReadonlyArray<{ startSec: number; durationSec: number }>, currentSec: number, dir: 1 | -1): number {
-  const bounds = [...new Set([0, ...layout.flatMap((l) => [l.startSec, l.startSec + l.durationSec])])].sort((a, b) => a - b)
+export function editPointTarget(
+  layout: ReadonlyArray<{ startSec: number; durationSec: number }>,
+  currentSec: number,
+  dir: 1 | -1,
+  markers: readonly number[] = [],
+): number {
+  const bounds = [...new Set([0, ...layout.flatMap((l) => [l.startSec, l.startSec + l.durationSec]), ...markers])].sort((a, b) => a - b)
   if (dir > 0) return bounds.find((b) => b > currentSec + 1e-3) ?? bounds[bounds.length - 1] ?? currentSec
   const before = bounds.filter((b) => b < currentSec - 1e-3)
   return before.length ? before[before.length - 1] : 0

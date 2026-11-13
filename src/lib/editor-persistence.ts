@@ -28,6 +28,8 @@ export interface PersistedEditor {
   audioTracks?: { id: string; muted?: boolean; solo?: boolean; locked?: boolean }[]
   /** 영상 줄(V1 · V2 · V3 …) — 자물쇠 · 눈. 없으면 V1–V3(2단계 ②). V1 밖 줄의 클립은 placements 의 trackId 로 적힌다. */
   videoTracks?: { id: string; locked?: boolean; hidden?: boolean }[]
+  /** 마커(2단계 ③) — 시퀀스 시각(초) 목록, 이름 없이. 없으면 마커 없음. 내보낸 영상에는 찍히지 않는다. */
+  markers?: number[]
   panelSizes: { sourceW: number; previewH: number }
 }
 

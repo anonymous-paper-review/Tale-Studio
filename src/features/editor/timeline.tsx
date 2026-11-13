@@ -12,6 +12,8 @@ import { drawWaveform } from '@/lib/audio-waveform'
 import { PX_PER_SEC_MIN, PX_PER_SEC_MAX, isTitleCardShotId, useEditorStore, type TrackLayoutItem, type VideoTrackState, type AudioTrackState } from '@/stores/editor-store'
 import { timelineEnd, timelineSegments } from '@/lib/editor/timeline-segments'
 import { formatTimecode } from '@/lib/editor/sequence-info'
+import { SNAP_PX, draggedIds, makeSnapper, snapTargets } from '@/lib/editor/snap'
+import { RulerMarkers } from '@/features/editor/timeline-markers'
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -33,7 +35,6 @@ import { useT } from '@/lib/i18n'
 
 const CLIP_SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4]
 const TRIM_MIN = 0.1 // 트림 최소 길이(초)
-const SNAP_PX = 8 // 스냅 임계(px)
 const HEADER_W = 96 // 좌측 트랙 헤더 폭(px) — 줄 이름 · 자물쇠 · 눈(M · S) 칸(2단계 ②)
 // 트랙 레이아웃 높이(px) — 오디오 마퀴(드래그 선택)의 콘텐츠 좌표 계산용. 렌더 높이와 일치해야 함.
 const RULER_H = 20 // h-5 눈금자
@@ -126,6 +127,10 @@ interface TimelineProps {
   onToggleTrackVisible: (trackId: string) => void
   onToggleAudioTrackSolo: (trackId: string) => void
   onRemoveVideoTrack: (trackId: string) => void
+  /** 스냅 · 마커(2단계 ③) — 끌 때 경계 · 플레이헤드 · 마커에 붙고, 자 위 마커를 누르면 그 시각, 우클릭으로 지운다. */
+  snapEnabled: boolean
+  markers: number[]
+  onRemoveMarker: (sec: number) => void
 }
 
 function pickTickInterval(pxPerSec: number): number {
@@ -144,6 +149,7 @@ function AudioClipBlock({
   cutMode,
   clientXToSec,
   snapStart,
+  snapPoint,
   onToggleMute,
   onRemove,
   onMove,
@@ -163,6 +169,8 @@ function AudioClipBlock({
   cutMode: boolean
   clientXToSec: (clientX: number) => number
   snapStart: (candidateStart: number, durationSec: number, excludeId: string) => number
+  /** 가장자리 끌기 스냅 — 그 조각의 가장자리는 뺀다(2단계 ③). */
+  snapPoint: (sec: number, excludeId: string) => number
   onToggleMute: () => void
   onRemove: () => void
   onMove: (startSec: number, trackId: string | undefined) => void
@@ -296,10 +304,10 @@ function AudioClipBlock({
         if (!moved && Math.abs(ev.clientX - startX) > 2) moved = true
         if (!moved) return
         if (edge === 'l') {
-          const lft = Math.max(minLeft, Math.min(clientXToSec(ev.clientX), maxLeft))
+          const lft = Math.max(minLeft, Math.min(snapPoint(clientXToSec(ev.clientX), clip.id), maxLeft))
           onTrimPreview({ scope: rowTrackId, leftSec: lft, rightSec: end, label: `${(end - lft).toFixed(2)}s`, clientX: ev.clientX, clientY: ev.clientY })
         } else {
-          const rgt = Math.max(minRight, Math.min(clientXToSec(ev.clientX), maxRight))
+          const rgt = Math.max(minRight, Math.min(snapPoint(clientXToSec(ev.clientX), clip.id), maxRight))
           onTrimPreview({ scope: rowTrackId, leftSec: start, rightSec: rgt, label: `${(rgt - start).toFixed(2)}s`, clientX: ev.clientX, clientY: ev.clientY })
         }
       }
@@ -309,11 +317,11 @@ function AudioClipBlock({
         if (moved) {
           onPushHistory()
           if (edge === 'l') {
-            const lft = Math.max(minLeft, Math.min(clientXToSec(ev.clientX), maxLeft))
+            const lft = Math.max(minLeft, Math.min(snapPoint(clientXToSec(ev.clientX), clip.id), maxLeft))
             const dd = lft - start
             onUpdate({ startSec: Math.max(0, start + dd), durationSec: dur - dd, sourceOffsetSec: Math.max(0, off + dd * rate) })
           } else {
-            const rgt = Math.max(minRight, Math.min(clientXToSec(ev.clientX), maxRight))
+            const rgt = Math.max(minRight, Math.min(snapPoint(clientXToSec(ev.clientX), clip.id), maxRight))
             onUpdate({ durationSec: rgt - start })
           }
         }
@@ -322,7 +330,7 @@ function AudioClipBlock({
       window.addEventListener('pointermove', move)
       window.addEventListener('pointerup', up)
     },
-    [clip.startSec, clip.durationSec, clip.sourceOffsetSec, clip.sourceDurationSec, clip.playbackRate, clientXToSec, onUpdate, onPushHistory, onTrimPreview, rowTrackId],
+    [clip.startSec, clip.durationSec, clip.sourceOffsetSec, clip.sourceDurationSec, clip.playbackRate, clip.id, clientXToSec, snapPoint, onUpdate, onPushHistory, onTrimPreview, rowTrackId],
   )
 
   return (
@@ -459,6 +467,9 @@ export function Timeline({
   onToggleTrackVisible,
   onToggleAudioTrackSolo,
   onRemoveVideoTrack,
+  snapEnabled,
+  markers,
+  onRemoveMarker,
 }: TimelineProps) {
   const entityNames = useEntityNames()
   const t = useT()
@@ -514,32 +525,19 @@ export function Timeline({
     [currentTime, pxPerSec],
   )
 
-  // 오디오 드래그 스냅: 0 / 플레이헤드 / 비디오·오디오 클립 경계
-  const snapStart = useCallback(
-    (candidateStart: number, durationSec: number, excludeId: string) => {
-      const targets = new Set<number>([0, currentTime])
-      for (const it of layout) {
-        targets.add(it.startSec)
-        targets.add(it.startSec + it.durationSec)
-      }
-      for (const a of audioClips) {
-        if (a.id === excludeId) continue
-        targets.add(a.startSec)
-        targets.add(a.startSec + a.durationSec)
-      }
-      const thr = SNAP_PX / pxPerSec
-      let best = candidateStart
-      let bestD = thr
-      for (const target of targets) {
-        const dStart = Math.abs(candidateStart - target)
-        if (dStart < bestD) { bestD = dStart; best = target }
-        const dEnd = Math.abs(candidateStart + durationSec - target)
-        if (dEnd < bestD) { bestD = dEnd; best = target - durationSec }
-      }
-      return Math.max(0, best)
-    },
-    [currentTime, layout, audioClips, pxPerSec],
+  // 스냅(2단계 ③, 시안 E1 409:4795) — 0초 · 플레이헤드 · 모든 줄 클립의 시작 · 끝 · 마커에서 8px 안이면 붙는다. 끄는 것(exclude)의
+  //   가장자리는 뺀다. [스냅 끔]이면 그대로. 영상 클립 옮기기 · 가장자리 끌기 · 소리 옮기기 · 가장자리 끌기가 같이 쓴다.
+  //   playhead — 영상 클립은 누르면 플레이헤드가 누른 자리로 가므로 그 자리를 준다(보이는 플레이헤드에 붙게).
+  const snapperFor = useCallback(
+    (exclude: readonly string[], playhead = currentTime) =>
+      makeSnapper(snapEnabled, snapTargets({ currentTime: playhead, markers, videoLayout: [...layout, ...overlayLayout], audioClips }, new Set(exclude)), pxPerSec),
+    [snapEnabled, currentTime, markers, layout, overlayLayout, audioClips, pxPerSec],
   )
+  const snapStart = useCallback(
+    (candidateStart: number, durationSec: number, excludeId: string) => snapperFor([excludeId]).start(candidateStart, durationSec),
+    [snapperFor],
+  )
+  const snapPoint = useCallback((sec: number, excludeId: string) => snapperFor([excludeId]).point(sec), [snapperFor])
 
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
@@ -709,21 +707,24 @@ export function Timeline({
       if (e.ctrlKey || e.metaKey) { onToggleSelect(item.shotId); return }
       if (e.shiftKey) { onRangeSelect(item.shotId); return }
       onSelect(item.shotId)
-      onSeek(clientXToSec(e.clientX))
+      const pressedSec = clientXToSec(e.clientX)
+      onSeek(pressedSec)
       setGapChip(null)
       const startClientX = e.clientX
       const startClientY = e.clientY
       // 잡은 곳과 클립 시작 사이 — 빈 곳에 놓을 때 클립 시작 = 놓은 곳 - 이만큼.
-      const grabOffset = clientXToSec(e.clientX) - item.startSec
+      const grabOffset = pressedSec - item.startSec
+      // 놓을 시각은 스냅이 켜져 있으면 경계 · 플레이헤드 · 마커에 붙는다 — 이 클립과 이어진 소리의 가장자리는 빼고(2단계 ③).
+      const snap = snapperFor(draggedIds(item.shotId, audioClips), pressedSec)
       // 다른 클립 위면 순서 바꾸기, 빈 곳이면 그 시각에 놓기(자유 배치, 2026-11-14). 다른 줄 위면 그 줄의 그 시각(2단계 ②).
       const dropFor = (clientX: number, clientY: number) => {
         const sec = clientXToSec(clientX)
         const row = (document.elementFromPoint(clientX, clientY)?.closest('[data-drop="video-track"]') as HTMLElement | null)?.dataset.trackId ?? trackId
-        if (row !== 'v1' || trackId !== 'v1') return { shotId: item.shotId, targetIndex: -1, placeAtSec: Math.max(0, sec - grabOffset), trackId: row }
+        if (row !== 'v1' || trackId !== 'v1') return { shotId: item.shotId, targetIndex: -1, placeAtSec: snap.start(Math.max(0, sec - grabOffset), item.durationSec), trackId: row }
         const overClip = layout.some((it) => it.shotId !== item.shotId && sec >= it.startSec && sec < it.startSec + it.durationSec)
         return overClip
           ? { shotId: item.shotId, targetIndex: computeDropIndex(sec, item.shotId) }
-          : { shotId: item.shotId, targetIndex: -1, placeAtSec: Math.max(0, sec - grabOffset) }
+          : { shotId: item.shotId, targetIndex: -1, placeAtSec: snap.start(Math.max(0, sec - grabOffset), item.durationSec) }
       }
       let reordering = false
       const move = (ev: PointerEvent) => {
@@ -744,7 +745,7 @@ export function Timeline({
       window.addEventListener('pointermove', move)
       window.addEventListener('pointerup', up)
     },
-    [cutMode, clientXToSec, snapToPlayhead, onSplitVideo, onToggleSelect, onRangeSelect, onSelect, onSeek, computeDropIndex, onMoveClipToIndex, onPlaceClipAt, onMoveClipToTrack, layout, lockedTracks],
+    [cutMode, clientXToSec, snapToPlayhead, snapperFor, audioClips, onSplitVideo, onToggleSelect, onRangeSelect, onSelect, onSeek, computeDropIndex, onMoveClipToIndex, onPlaceClipAt, onMoveClipToTrack, layout, lockedTracks],
   )
 
   // 줄 머리 단추(시안 E1 Track Header, 2단계 ②) — 자물쇠: 그 줄을 고칠 수 없게 · 눈: 미리 보기 · 내보내기에서 뺀다.
@@ -905,7 +906,9 @@ export function Timeline({
                 const maxLeft = endSec - TRIM_MIN
                 const startX = e.clientX
                 let moved = false
-                const calc = (cx: number) => Math.max(minLeft, Math.min(clientXToSec(cx), maxLeft))
+                // 스냅이 켜져 있으면 가장자리가 경계 · 플레이헤드 · 마커에 붙는다(2단계 ③).
+                const snap = snapperFor(draggedIds(item.shotId, audioClips))
+                const calc = (cx: number) => Math.max(minLeft, Math.min(snap.point(clientXToSec(cx)), maxLeft))
                 const move = (ev: PointerEvent) => {
                   if (!moved && Math.abs(ev.clientX - startX) > 2) moved = true
                   if (!moved) return
@@ -947,7 +950,8 @@ export function Timeline({
                   : startSec + (base - t0) / speed // 원본 끝까지만
                 const startX = e.clientX
                 let moved = false
-                const calc = (cx: number) => Math.max(minRight, Math.min(clientXToSec(cx), maxRight))
+                const snap = snapperFor(draggedIds(item.shotId, audioClips))
+                const calc = (cx: number) => Math.max(minRight, Math.min(snap.point(clientXToSec(cx)), maxRight))
                 const move = (ev: PointerEvent) => {
                   if (!moved && Math.abs(ev.clientX - startX) > 2) moved = true
                   if (!moved) return
@@ -1184,6 +1188,8 @@ export function Timeline({
                   <div className="mt-auto h-1.5 w-px bg-foreground/25" />
                 </div>
               ))}
+              {/* 마커(2단계 ③) — 누르면 그 시각으로, 우클릭 [마커 지우기]. */}
+              <RulerMarkers markers={markers} pxPerSec={pxPerSec} onSeek={onSeek} onRemove={onRemoveMarker} />
             </div>
 
             {/* V1 밖 영상 줄(위에서 아래로 V3 · V2) — 줄 + 시작 초, 위 줄이 아래 줄을 가린다(2단계 ②, 시안 E3). */}
@@ -1314,6 +1320,7 @@ export function Timeline({
                       cutMode={cutMode}
                       clientXToSec={clientXToSec}
                       snapStart={snapStart}
+                      snapPoint={snapPoint}
                       onToggleMute={() => onToggleAudioMute(a.id)}
                       onRemove={() => onRemoveAudio(a.id)}
                       onMove={(startSec, trackId) => onMoveAudio(a.id, startSec, trackId)}

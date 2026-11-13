@@ -163,7 +163,7 @@ export function VideoPreviewer() {
   const nudge = useEditorStore((s) => s.nudge)
   const goTo = useCallback((target: (st: ReturnType<typeof useEditorStore.getState>, layout: ReturnType<typeof selectVideoLayout>) => number) => {
     const st = useEditorStore.getState()
-    // 편집점은 모든 영상 줄의 클립 시작 · 끝(2단계 ②).
+    // 편집점은 모든 영상 줄의 클립 시작 · 끝(2단계 ②)과 마커(2단계 ③).
     const layout = selectVideoLayout(st)
     nudge(target(st, layout) - st.currentTime)
   }, [nudge])
@@ -292,7 +292,7 @@ export function VideoPreviewer() {
             <Button size="icon" variant="ghost" className="size-8 rounded-full text-muted-foreground hover:text-foreground" onClick={() => goTo(() => 0)} title={t('Go to start')} aria-label={t('Go to start')}>
               <ArrowLeftToLine className="size-4" />
             </Button>
-            <Button size="icon" variant="ghost" className="size-8 rounded-full text-muted-foreground hover:text-foreground" onClick={() => goTo((st, layout) => editPointTarget(layout, st.currentTime, -1))} title={t('Previous edit point (Ctrl+←)')} aria-label={t('Previous edit point (Ctrl+←)')}>
+            <Button size="icon" variant="ghost" className="size-8 rounded-full text-muted-foreground hover:text-foreground" onClick={() => goTo((st, layout) => editPointTarget(layout, st.currentTime, -1, st.markers))} title={t('Previous edit point (Ctrl+←)')} aria-label={t('Previous edit point (Ctrl+←)')}>
               <SkipBack className="size-4" />
             </Button>
             <Button
@@ -324,7 +324,7 @@ export function VideoPreviewer() {
             >
               <ChevronRight className="size-4" />
             </Button>
-            <Button size="icon" variant="ghost" className="size-8 rounded-full text-muted-foreground hover:text-foreground" onClick={() => goTo((st, layout) => editPointTarget(layout, st.currentTime, 1))} title={t('Next edit point (Ctrl+→)')} aria-label={t('Next edit point (Ctrl+→)')}>
+            <Button size="icon" variant="ghost" className="size-8 rounded-full text-muted-foreground hover:text-foreground" onClick={() => goTo((st, layout) => editPointTarget(layout, st.currentTime, 1, st.markers))} title={t('Next edit point (Ctrl+→)')} aria-label={t('Next edit point (Ctrl+→)')}>
               <SkipForward className="size-4" />
             </Button>
             <Button size="icon" variant="ghost" className="size-8 rounded-full text-muted-foreground hover:text-foreground" onClick={() => goTo((_st, layout) => timelineEnd(layout))} title={t('Go to end')} aria-label={t('Go to end')}>

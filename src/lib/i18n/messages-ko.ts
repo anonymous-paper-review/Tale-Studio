@@ -3160,7 +3160,7 @@ export const KO: Record<string, string> = {
   'Play or pause': '재생 · 멈춤',
   'One frame back or forward': '한 장 뒤 · 앞',
   'Five frames back or forward': '다섯 장 뒤 · 앞',
-  'Previous or next edit point': '앞 · 다음 편집점',
+  'Previous or next edit point or marker': '앞 · 다음 편집점 · 마커',
   'Redo': '다시 실행',
   'Selection tool': '선택 도구',
   'Cut tool': '자르기 도구',
@@ -3186,4 +3186,16 @@ export const KO: Record<string, string> = {
   'Add video track': '영상 줄 더하기',
   'V track': 'V 트랙',
   'Drag a file from My files, or press Import… in the Project panel': '내 파일에서 끌어 놓거나, 프로젝트 판의 [가져오기…]를 눌러요',
+
+  // 2단계 ③ Ctrl+K · 스냅 · 마커(시안 E1 409:4795 · 409:4797).
+  'Snap on': '스냅 켬',
+  'Snap off': '스냅 끔',
+  'While dragging, clips stick to clip edges, the playhead and markers': '끄는 동안 클립 경계 · 플레이헤드 · 마커에 붙어요',
+  // 'Marker' 는 Writer 연출 화살표 펜(마킹)이 쓴다 — Editor 단추는 'Add marker'.
+  'Add marker': '마커',
+  'Add a marker at the playhead (M)': '플레이헤드 자리에 마커를 달아요 (M)',
+  'Marker {time}': '마커 {time}',
+  'Delete marker': '마커 지우기',
+  'Split at the playhead': '플레이헤드 자리에서 나누기',
+  'Add a marker': '마커 달기',
 }
