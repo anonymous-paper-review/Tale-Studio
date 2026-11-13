@@ -3395,6 +3395,8 @@ export const KO: Record<string, string> = {
   "This shot's image is being made. You can make the video once it is done.": '이 샷 이미지를 만드는 중이에요. 다 되면 영상을 만들 수 있어요.',
   "This shot's video is already being made.": '이 샷 영상을 이미 만드는 중이에요.',
   'Could not start the video. Try again in a moment.': '영상을 시작하지 못했어요. 잠시 뒤 다시 해 보세요.',
+  // 잔액을 못 읽으면 [다시 만들기]를 시작하지 않는다 — Lumi 채팅 영상 부탁의 말과 같게(단추라 "눌러 주세요", 검토 b 2차 낮음 1)
+  "I couldn't check your Takes, so I didn't start. Please try again in a moment.": 'Take 를 확인하지 못해 시작하지 않았어요. 잠시 뒤 다시 눌러 주세요.',
   // 넘기기 창(D8) [다시 만들기] — 그 샷에 [적용]을 기다리는 글 고침 카드가 있으면 만들지 않는다(board 검토 b 재검토 보통 1). 창 줄 밑 · 채팅.
   'A text change is waiting for [Apply]. Apply or discard it, then make it again.': '[적용]을 기다리는 글 고침이 있어요. 적용하거나 버린 뒤 다시 만들어 주세요.',
   '{shots} has a text change waiting for [Apply]. Apply or discard it, then make it again.': '{shots}에는 [적용]을 기다리는 글 고침이 있어요. 적용하거나 버린 뒤 다시 만들어 주세요.',
