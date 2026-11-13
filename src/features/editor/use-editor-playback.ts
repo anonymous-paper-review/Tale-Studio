@@ -8,8 +8,8 @@ import { SEQUENCE_FPS } from '@/lib/editor/sequence-info'
 // 한 장 — 시:분:초:장 · 내보내기와 같은 초당 장 수(2단계 ① 새 배치).
 const FRAME = 1 / SEQUENCE_FPS
 
-/** 글자 키 — 한글 입력 상태(M 자리 = ㅡ)여도 같은 자리 키면 맞다(2단계 ③). */
-const isLetter = (e: KeyboardEvent, letter: string) => e.key.toLowerCase() === letter || e.code === `Key${letter.toUpperCase()}`
+/** 글자 키 — 한글 입력 상태(M 자리 = ㅡ · V = ㅍ · C = ㅊ)여도 같은 자리 키면 맞다(2단계 ③ · 리드 11/14). Alt 조합은 빼고. */
+const isLetter = (e: KeyboardEvent, letter: string) => !e.altKey && (e.key.toLowerCase() === letter || e.code === `Key${letter.toUpperCase()}`)
 
 /**
  * Editor 전역 단축키(포커스 무관): Space(재생/정지), ←/→(프레임 이동), Ctrl+←/→(편집점 · 마커), Ctrl+Z(undo),
@@ -72,7 +72,9 @@ export function handleEditorKey(e: KeyboardEvent) {
     s.addMarker()
     return
   }
-  switch (e.key) {
+  // V · C 도 키 자리로 알아본다 — 아래는 글자로 견준다.
+  const key = isLetter(e, 'v') ? 'v' : isLetter(e, 'c') ? 'c' : e.key
+  switch (key) {
     case ' ':
       e.preventDefault()
       s.togglePlay()

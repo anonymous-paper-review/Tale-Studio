@@ -22,6 +22,7 @@ import { EffectControls } from '@/features/editor/effect-controls'
 import { ProjectPanel } from '@/features/editor/video-source-panel'
 import { EditorTopActions, ExportTab, ShortcutsList, EDITOR_SHORTCUTS } from '@/features/editor/editor-workbar'
 import { finishEditorOpen } from '@/features/editor/open-editor'
+import { handleEditorKey } from '@/features/editor/use-editor-playback'
 import type { AudioTrackClip, Shot, VideoClip } from '@/types'
 
 const read = (file: string) => readFileSync(file, 'utf8')
@@ -210,6 +211,16 @@ describe('내보내기 탭 · 단축키', () => {
     expect(EDITOR_SHORTCUTS.map((s) => s.keys)).toEqual(['Space', '← →', 'Shift+← →', 'Ctrl+← →', 'Ctrl+Z', 'Ctrl+Y', 'V', 'C', 'Ctrl+K', 'M', 'Delete', 'Shift+Delete'])
     const handler = read('src/features/editor/use-editor-playback.ts')
     for (const key of ["case ' ':", "e.key === 'ArrowRight'", "case 'v':", "case 'c':", "case 'Delete':", 'e.shiftKey) s.rippleDeleteSelectedClips()']) expect(handler).toContain(key)
+  })
+
+  it('한글 입력 상태여도 V · C 자리 키를 누르면 선택 · 자르기 도구로 바뀐다', () => {
+    // 왜: 한글 입력 상태에서는 V · C 키가 ㅍ · ㅊ 으로 들어와 도구가 바뀌지 않았다 — M · Ctrl+K 와 같게 키 자리로도 알아본다(리드 2026-11-14).
+    const press = (key: string, code: string) =>
+      handleEditorKey({ key, code, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, target: null, preventDefault: () => {} } as unknown as KeyboardEvent)
+    press('ㅊ', 'KeyC')
+    expect(api().toolMode).toBe('cut')
+    press('ㅍ', 'KeyV')
+    expect(api().toolMode).toBe('select')
   })
 })
 
