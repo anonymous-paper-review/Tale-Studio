@@ -2424,8 +2424,20 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     // 단추 값을 센 그 Take(latestShotTake)의 배선 · 모델 · 해상도를 물려받는 새 Take(검토 b 보통 2) — 샷 상세 · Lumi 와 같은
     //   다시 만들기 하나로 부른다(두 갈래를 합친 뒤, 리드 검토 a: 따로 적어 두면 한쪽만 바뀌는 날 단추 값과 요청이 갈라진다).
     const refusedBefore = videoLimitRefusal()
-    const started = await director().remakeShotVideo(shotNodeId)
-    if (started) return { started: true }
+    // 접수(서버가 2xx 로 받아 jobId 를 줌 — onAccepted)되면 시작한 것이다. 영상이 끝나기를(5초마다 확인, 최대 10분) 기다리지 않는다 —
+    //   기다리면 창의 스피너가 영상이 끝날 때까지 돌았다(리드 11/14, entry 탐침). 접수 뒤의 실패는 상점이 그 줄에 '실패'로 보이므로 삼킨다.
+    const outcome = await new Promise<{ accepted: true } | { accepted: false; takeId: string | null }>((resolve, reject) => {
+      let accepted = false
+      director()
+        .remakeShotVideo(shotNodeId, { onAccepted: () => { accepted = true; resolve({ accepted: true }) } })
+        .then((takeId) => resolve({ accepted: false, takeId }), (error) => { if (!accepted) reject(error) })
+    })
+    if (outcome.accepted) return { started: true }
+    // 접수 없이 끝났다 — 돌려받은 Take id 만으로는 시작을 알 수 없다(서버 오류 · 연결 끊김도 실패로 표시한 새 Take 의 id 를 돌려준다).
+    //   다만 서버 답이 모호해(503 결과 모름 · 409 영수증 필요 · 400 + jobId · queued) 그 새 Take 가 보드에서 만드는 중(멈춤 아님)으로 남았으면
+    //   그 줄도 상점대로 '만드는 중'이니 시작하지 못했다고 말하지 않는다 — Lumi 의 "아직 몰라요"와 같은 판단(리드 11/14, board).
+    const take = outcome.takeId ? director().nodes.find((n) => n.id === outcome.takeId) : undefined
+    if (take && isVideoData(take.data) && !take.data.cancelledAt && take.data.lastAttemptStatus === 'generating') return { started: true }
     // 시작하지 못했다 — 이번 요청이 내 영상 동시 한도에 걸렸으면 그 까닭(멈춘 Take 도 뒤에서 끝날 때까지 자리를 쓴다, 리드 재검토 a),
     //   그 샷 영상이 이미 도는 중이면 그 까닭(멈춘 Take 는 만드는 중이 아니다 — 오너 7번), 아니면(Take 부족은 그 자리에서 따로 알린다) 일반 까닭.
     const refused = videoLimitRefusal()

@@ -45,7 +45,7 @@ export function takeCostForVideo(
 /** 넘기기 창(D0 · D8)에 Take 값을 보일지 — 과금이 정말 꺼졌을 때만 숨긴다. 잔액을 못 읽으면(failed) 잔액 훅이 꺼짐(off)처럼
  *  보이지만, D8 은 확인 창 없이 단추 값이 곧 동의인 자리라 센 값을 그대로 보인다(2026-11-14 검토 b 2차 낮음 1).
  *  첫 읽기 중(loading)도 훅 값이 꺼짐과 같다 — 값은 잔액과 상관없는 계산값이라 읽는 동안에도 보인다(리드 2026-11-14).
- *  정말 꺼진 계정은 첫 읽기 동안만 잠깐 보였다 사라진다. */
+ *  과금이 꺼진 배포(설정 off)에서는 첫 읽기 동안만 잠깐 보였다 사라진다. */
 export function takeValuesShown(balance: { mode: TakeBillingMode; failed?: boolean; loading?: boolean }): boolean {
   return balance.mode !== 'off' || balance.failed === true || balance.loading === true
 }
