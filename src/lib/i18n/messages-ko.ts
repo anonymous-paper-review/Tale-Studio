@@ -1807,7 +1807,8 @@ export const KO: Record<string, string> = {
   'Go to Director': 'Director로 이동',
 
   // ── Editor: 타이틀 카드(#owner-title-card) — 검은 배경 + 텍스트(+선택 이미지) synthetic 클립 ──
-  'Title Card': '타이틀 카드',
+  // 검토 c(2026-11-14): 영어는 문장 첫 글자만 대문자 — 꼬리표 · 메뉴 머리 · 단추가 같은 낱말.
+  'Title card': '타이틀 카드',
   'Insert a black title card with text at the nearest clip boundary':
     '가장 가까운 클립 경계에 검은 배경의 타이틀 카드를 넣어요',
   'Title text': '타이틀 텍스트',
@@ -1918,6 +1919,7 @@ export const KO: Record<string, string> = {
   'Image in front': '이미지를 앞으로',
   'Reset layout': '배치 되돌리기',
   'Title card length (seconds)': '타이틀 카드 길이(초)',
+  'GIF images can be up to 4MB.': 'GIF 그림은 4MB까지 올릴 수 있어요.',
   // 약속 K(2026-09-04): 자막
   'Subtitle': '자막',
   'Click to add a subtitle': '누르면 자막을 넣어요',

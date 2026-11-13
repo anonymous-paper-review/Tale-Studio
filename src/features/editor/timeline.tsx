@@ -936,7 +936,7 @@ export function Timeline({
                             isTitleCardShotId(item.shotId) ? 'cursor-text hover:bg-accent' : 'pointer-events-none',
                           )}
                         >
-                          {isTitleCardShotId(item.shotId) ? `${t('Title')} · ${item.durationSec.toFixed(1)}s` : shot.shotType}
+                          {isTitleCardShotId(item.shotId) ? clipMenuTitle({ isTitleCard: true, shotType: shot.shotType, durationSec: item.durationSec }, t) : shot.shotType}
                           {clip?.speed && clip.speed !== 1 && <span className="ml-1 text-stage">{clip.speed.toFixed(2)}×</span>}
                         </span>
                         {/* 영상을 불러오지 못한 클립은 그 클립만 오른쪽 위에 "불러오지 못함"(QA 2026-11-03 밤). */}
