@@ -103,6 +103,7 @@ export function shotLabel(
 
 /**
  * 클립의 화면 이름 — 효과 컨트롤 머리와 같다("샷 3 · MCU · Take 1", 타이틀 카드 · 제목은 그 이름). 자른 · 끼운 조각은 원본 샷의 번호 · Take.
+ *   영상이 없는 샷에는 Take 를 붙이지 않는다 — 프로젝트 판 줄 · 소스 모니터와 같은 이름("샷 2 · MFS", 리드 11/14).
  *   내보낸 파일의 영상 자리표시도 이 이름을 쓴다(리드 11/14 L2 — 예전에는 내부 샷 id 가 찍혔다). 약속: tests/editor/frame-plan.test.ts
  */
 export function clipDisplayName(input: { shots: readonly Shot[]; videoClips: readonly VideoClip[] }, shotId: string, t: Translate): string {
@@ -114,7 +115,7 @@ export function clipDisplayName(input: { shots: readonly Shot[]; videoClips: rea
     {
       number: number >= 0 ? number + 1 : null,
       shotType: shot?.shotType,
-      takeNumber: rootClip?.takeNumber,
+      takeNumber: rootClip?.url ? rootClip.takeNumber : null,
       isTitleCard: isTitleCardShotId(shotId),
       titleText: isTitleClipShotId(shotId) ? (shot?.titleText?.text ?? null) : null,
     },

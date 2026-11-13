@@ -552,3 +552,20 @@ describe('(G) 재기 더함 — 리드 11/14 같이 정한 것(검토 c ⑦-3)',
     expect(render).toMatch(/if \(health\.frozen\) frozenFrames \+= 1/)
   })
 })
+
+describe('(G) 이름 더함 — 리드 11/14 같이 정한 것(검토 c (G))', () => {
+  it('영상이 없는 샷의 이름에는 Take 를 붙이지 않는다 — 자리표시 · 효과 컨트롤 머리가 프로젝트 판 줄 · 소스 모니터와 같은 이름("샷 2 · MFS")', () => {
+    // 왜: 검토 c — 화면 이름이 늘 Take 를 붙여, 영상이 없는 샷의 자리표시가 "샷 2 · MFS · Take 1"로 프로젝트 판 줄 "샷 2 · MFS"와 달랐다.
+    useEditorStore.setState({ videoClips: api().videoClips.map((c) => (c.shotId === 'B' ? { ...c, takeNumber: 1 } : c)) })
+    expect(clipDisplayName(api(), 'B', ko)).toBe('샷 2 · MS · Take 1')
+    useEditorStore.setState({ videoClips: api().videoClips.map((c) => (c.shotId === 'B' ? { ...c, url: null } : c)) })
+    expect(clipDisplayName(api(), 'B', ko)).toBe('샷 2 · MS')
+    const rec = recordingCanvas()
+    drawPlanFrame(rec.ctx, 1280, 720, plan(5), sources())
+    expect(rec.calls).toContain('fillText(샷 2 · MS,640,360)')
+    // 프로젝트 판 줄 · 소스 모니터와 같은 규칙(영상이 있을 때만 Take).
+    expect(read('src/features/editor/video-source-panel.tsx')).toMatch(/takeNumber: hasVideo \? clip\?\.takeNumber : null/)
+    expect(read('src/features/editor/source-monitor.tsx')).toMatch(/takeNumber: url \? clip\?\.takeNumber : null/)
+    expect(read('src/features/editor/editor-labels.ts')).toMatch(/takeNumber: rootClip\?\.url \? rootClip\.takeNumber : null/)
+  })
+})
