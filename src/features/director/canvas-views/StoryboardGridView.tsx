@@ -221,6 +221,8 @@ function ShotCell({
     (s) => s.generateVideoForShot,
   )
   const openPopup = useDirectorCanvasStore((s) => s.openPopup)
+  // 카드 몸통 = 고르기(시안 D2 · R). 훅이라 조기 반환보다 앞에 둔다.
+  const togglePickedShot = useDirectorCanvasStore((s) => s.togglePickedShot)
   const requestMentionToggle = useChatUiStore((s) => s.requestMentionToggle)
   // 실사 이미지가 없을 때 러프 스토리보드 폴백 표시(#e11) — writer-store 스코프 구독
   const writerShotId = isShotData(node.data) ? node.data.writerShotId : null
@@ -318,7 +320,6 @@ function ShotCell({
   // 약속 I(오너 확정): 그리드에서 이미지를 눌러도 글자를 눌러도 같은 연출 편집 팝업(Writer 것) — writer 샷일 때.
   //   #e6 의 Previz 편집 팝업(previzOpen)이 이미 그 팝업이다 — 같은 상태를 연다.
   // ⤢ 상세(시안 R "⤢ = 상세 열기", 오너 2026-11-14): 실사 보기는 샷 상세 팝업, 러프 보기는 지금 연출(화살표) 편집 창(결정 페이지 추천).
-  const togglePickedShot = useDirectorCanvasStore((s) => s.togglePickedShot)
   const openDetail = () => {
     if (mediaMode === 'real') {
       openPopup(node.id)
