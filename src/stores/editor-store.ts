@@ -50,6 +50,18 @@ type HandoffClip = VideoTakeSelectionRecord & {
 let persistedLoadEpoch = 0
 let editorLoadEpoch = 0
 
+// 열 때 저절로 생긴 바뀜(DB 읽기 · 저장본 되살리기 · 영상 길이 재기 · 파형 채우기)과 칸 크기는 사람이 고친 것이 아니다 — 그동안의 저장은
+//   편집에 사람 고침이 실렸다는 표시(serverAware)를 새로 켜지 않는다(재검토 c 2/2, 2026-11-14). 약속: tests/editor/other-browser.test.ts
+let automaticChanges = 0
+function automatically(change: () => void): void {
+  automaticChanges += 1
+  try {
+    change()
+  } finally {
+    automaticChanges -= 1
+  }
+}
+
 // Editor 를 열 때 샷 · 영상 목록을 기다리는 한도(QA 2026-11-03 밤 "Editor에서 무한 로딩") — 넘으면 기다림을 멈추고
 //   "클립을 불러오지 못했어요" + [다시 시도]. 연결이 멈추거나 로그인 갱신이 걸리면 읽기가 끝나지 않았다.
 //   약속: tests/editor/load-ends.test.ts
@@ -116,6 +128,9 @@ interface EditorState {
   clipOrder: Record<string, string[]> // sceneId → shotId[]
   // 사람이 타임라인에서 뺀 원본 샷 — 영상이 없어져 저절로 빠진 샷과 가려, 영상이 다시 생겨도 저절로 돌아오지 않게 한다(검토 c, 2026-11-14).
   removedShotIds: string[]
+  // 이 편집에 고침 뒤 화면에서 사람이 고친 것이 실려 있다 — 저장본에 표시(serverAware)로 적는다. 되살린 저장본의 표시를 이어받고, 사람이
+  //   고치면 켜진다. 열 때 저절로 생긴 바뀜(처음 상태 · 길이 재기 · 소리 나누기 · 파형)만으로는 켜지지 않는다(재검토 c 2/2, 2026-11-14).
+  serverAware: boolean
   error: string | null
   // #pps-empty-states(2026-08-27): shots=0 의 세 이유(로딩/실패/정상 빈)를 화면이 구분하게 하는
   //   로드 상태. 'idle' 은 loadData 발화 전 첫 렌더 — 화면은 로딩과 동일하게 취급한다.
@@ -626,6 +641,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedAudioIds: [],
   clipOrder: {},
   removedShotIds: [],
+  serverAware: false,
   error: null,
   loadStatus: 'idle',
   resetCount: 0,
@@ -892,31 +908,37 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setBinDropSec: (sec) => set({ binDropSec: sec }),
 
   updateVideoClip: (shotId, patch) =>
-    set((state) =>
-      withLinkedAudio(state, {
-        videoClips: state.videoClips.map((c) => (c.shotId === shotId ? { ...c, ...patch } : c)),
-      }),
+    automatically(() =>
+      set((state) =>
+        withLinkedAudio(state, {
+          videoClips: state.videoClips.map((c) => (c.shotId === shotId ? { ...c, ...patch } : c)),
+        }),
+      ),
     ),
   // 자리 · 길이 · 원본 시작점을 바꾸면(소리 조각의 앞 · 뒤를 끌어 줄이기) 영상에서 떨어진다. 파형 · 원본 길이 채우기는 그대로 잇는다(결정 4).
   updateAudioClip: (id, patch) =>
-    set((state) => {
-      const reshaped = 'startSec' in patch || 'durationSec' in patch || 'sourceOffsetSec' in patch
-      return {
-        audioClips: state.audioClips.map((a) =>
-          a.id === id ? { ...a, ...patch, ...(reshaped ? { linkedShotId: null } : {}) } : a,
-        ),
-      }
-    }),
+    automatically(() =>
+      set((state) => {
+        const reshaped = 'startSec' in patch || 'durationSec' in patch || 'sourceOffsetSec' in patch
+        return {
+          audioClips: state.audioClips.map((a) =>
+            a.id === id ? { ...a, ...patch, ...(reshaped ? { linkedShotId: null } : {}) } : a,
+          ),
+        }
+      }),
+    ),
 
   // ── 리사이즈 섹션 크기 ──
   setPanelSize: (key, value) =>
-    set((state) => {
-      const clamped =
-        key === 'sourceW'
-          ? Math.max(PANEL_SOURCE_W_MIN, Math.min(PANEL_SOURCE_W_MAX, value))
-          : Math.max(PANEL_PREVIEW_H_MIN, Math.min(PANEL_PREVIEW_H_MAX, value))
-      return { panelSizes: { ...state.panelSizes, [key]: clamped } }
-    }),
+    automatically(() =>
+      set((state) => {
+        const clamped =
+          key === 'sourceW'
+            ? Math.max(PANEL_SOURCE_W_MIN, Math.min(PANEL_SOURCE_W_MAX, value))
+            : Math.max(PANEL_PREVIEW_H_MIN, Math.min(PANEL_PREVIEW_H_MAX, value))
+        return { panelSizes: { ...state.panelSizes, [key]: clamped } }
+      }),
+    ),
 
   // ── 영속화 로드 (loadData 후 호출) — canonical media is never restored locally ──
   loadPersisted: async () => {
@@ -1116,17 +1138,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const entered: string[] = []
       // 그중 영상이 새로 생긴 샷 — 새 영상이라 처음 상태(구간 · 빠르기 · 조각 없이)로 들인다(검토 c 리드 판단).
       const arrived = new Set<string>()
-      for (const [sceneId, canonicalIds] of canonicalOrder) {
+      const keptByScene = new Map<string, string[]>()
+      for (const sceneId of canonicalOrder.keys()) {
         const savedIds = saved.clipOrder?.[sceneId] ?? []
-        const kept = savedIds.filter((shotId, index) => canonicalShotIds.has(shotId) && savedIds.indexOf(shotId) === index)
+        keptByScene.set(sceneId, savedIds.filter((shotId, index) => canonicalShotIds.has(shotId) && savedIds.indexOf(shotId) === index))
+      }
+      // 지금 있는 어느 장면의 저장 순서에든 놓인 샷은 다시 들이지 않는다 — 사람이 다른 장면으로 옮긴 샷 · Writer 에서 장면을 바꾼 샷이
+      //   원래 장면에 한 번 더 깔리고 구간이 처음으로 돌아갔다(재검토 c H2 · H3, 2026-11-14). 약속: tests/editor/shots-with-video.test.ts
+      const keptAnywhere = new Set([...keptByScene.values()].flat())
+      for (const [sceneId, canonicalIds] of canonicalOrder) {
+        const kept = keptByScene.get(sceneId) ?? []
         shownOrder[sceneId] = kept
         let order = kept.filter(playable)
         const story = cur.shots.filter((s) => s.sceneId === sceneId).map((s) => s.shotId)
         for (const id of story) {
-          if (order.includes(id) || !playable(id) || !savedShotIds.has(id) || removed.has(id)) continue
+          if (order.includes(id) || keptAnywhere.has(id) || !playable(id) || !savedShotIds.has(id) || removed.has(id)) continue
           order = placeInStory(order, id, story)
           entered.push(id)
-          arrived.add(id)
+          // 저장한 순서 어디에도 없던 샷만 영상이 새로 생긴 샷이다. 저장할 때의 장면이 없어져 옮겨 오는 샷은 고친 그대로 들인다.
+          if (!savedOrderIds.has(id)) arrived.add(id)
         }
         const fresh = canonicalIds.filter((id) => !order.includes(id) && !savedShotIds.has(id) && playable(id))
         entered.push(...fresh)
@@ -1198,10 +1228,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         const came = entered.length
         toast.info(
           out && came
-            ? translate(locale, 'Shots without video ({removed}) were taken out and shots that now have video ({added}) came in, so the cuts and sounds after them moved.', { removed: out, added: came })
+            ? translate(locale, 'Shots without video ({removed}) were taken out and new shots ({added}) came in, so the cuts and sounds after them moved.', { removed: out, added: came })
             : out
               ? translate(locale, 'Shots without video ({count}) were taken out, so the cuts and sounds after them moved.', { count: out })
-              : translate(locale, 'Shots that now have video ({count}) came in, so the cuts and sounds after them moved.', { count: came }),
+              : translate(locale, 'New shots ({count}) came in, so the cuts and sounds after them moved.', { count: came }),
         )
       }
       // 영상이 새로 생겨 들어온 샷의 옛 구간 · 빠르기는 서버(DB)에서도 처음으로 — 다음에 열 때 옛 구간이 다시 입혀지지 않게.
@@ -1210,7 +1240,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         if (before && (before.trimStart != null || before.trimEnd != null)) persistShotReset('/api/editor/trim', { shotId: id, trimStart: null, trimEnd: null })
         if (before && (before.speed ?? 1) !== 1) persistShotReset('/api/editor/speed', { shotId: id, speed: 1 })
       }
-      set({
+      automatically(() => set({
         // Canonical shots/videoClips come from loadData (DB truth). Only synthetic editor
         // pieces whose base shot is still canonical are merged back in above - a local
         // snapshot must not resurrect deleted media when that DB snapshot is empty.
@@ -1218,6 +1248,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         videoClips: timelineClips,
         clipOrder,
         removedShotIds,
+        serverAware: saved.serverAware === true,
         audioClips,
         audioSources: saved.audioSources ?? [],
         audioTracks: dedupTracks,
@@ -1231,7 +1262,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         isPlaying: false,
         past: [],
         future: [],
-      })
+      }))
     }
   },
 
@@ -1244,6 +1275,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       videoClips: [] as VideoClip[],
       clipOrder: {} as Record<string, string[]>,
       removedShotIds: [] as string[],
+      serverAware: false,
       selectedSceneId: null,
       selectedClipShotId: null,
       selectedShotIds: [] as string[],
@@ -1372,19 +1404,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           const order = buildClipOrder(shots.filter((s) => withVideo.has(s.shotId)))
           const firstSceneId = shots[0]?.sceneId ?? null
 
-          set({
-            ...emptyProjectData,
-            shots,
-            videoClips,
-            clipOrder: order,
-            selectedSceneId: firstSceneId,
-            selectedClipShotId: order[firstSceneId!]?.[0] ?? null,
-            error: null,
-            loadStatus: 'ready',
-          })
+          automatically(() =>
+            set({
+              ...emptyProjectData,
+              shots,
+              videoClips,
+              clipOrder: order,
+              selectedSceneId: firstSceneId,
+              selectedClipShotId: order[firstSceneId!]?.[0] ?? null,
+              error: null,
+              loadStatus: 'ready',
+            }),
+          )
           return
         }
-        set({ ...emptyProjectData, error: null, loadStatus: 'ready' })
+        automatically(() => set({ ...emptyProjectData, error: null, loadStatus: 'ready' }))
         return
       } catch (err) {
         console.error('[editor-store] DB load failed:', err)
@@ -1409,7 +1443,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   reset: () => {
     ++editorLoadEpoch
     ++persistedLoadEpoch
-    set((state) => ({
+    automatically(() => set((state) => ({
       resetCount: state.resetCount + 1,
       unplayableVideoUrls: [],
       editorPrep: null,
@@ -1422,6 +1456,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedAudioIds: [],
       clipOrder: {},
       removedShotIds: [],
+      serverAware: false,
       error: null,
       loadStatus: 'idle',
       currentTime: 0,
@@ -1437,7 +1472,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       panelSizes: { ...DEFAULT_PANEL_SIZES },
       past: [],
       future: [],
-    }))
+    })))
   },
 
   // 영상을 불러오지 못한 클립(미리 보기 · 열 때의 길이 재기가 영상 오류를 받음) — 그 클립만 "불러오지 못함".
@@ -2168,9 +2203,12 @@ const pickPersisted = (s: EditorState) => ({
   panelSizes: s.panelSizes,
 })
 
-/** 저장본 — 서버와 견주는 화면이 썼다는 표시(serverAware)를 함께 적는다(검토 c, 2026-11-14). 파형은 소수 둘째 자리로 줄인다(검토 A E2a). */
+/**
+ * 저장본 — 고침 뒤 화면에서 사람이 고친 것이 실린 편집이면 그 표시(serverAware)를 함께 적는다(검토 c · 재검토 c 2/2, 2026-11-14).
+ *   파형은 소수 둘째 자리로 줄인다(검토 A E2a).
+ */
 function persistSnapshot(state: EditorState): PersistedEditor {
-  return compactSnapshot({ version: 1, serverAware: true, ...pickPersisted(state) })
+  return compactSnapshot({ version: 1, ...(state.serverAware ? { serverAware: true } : {}), ...pickPersisted(state) })
 }
 
 /**
@@ -2220,8 +2258,10 @@ if (typeof window !== 'undefined') {
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return
 
+    // 사람이 고친 바뀜이면 이 편집에 사람 고침이 실렸다고 적는다 — 열 때 저절로 생긴 바뀜과 칸 크기는 빼고(재검토 c 2/2).
+    if (automaticChanges === 0 && !state.serverAware) useEditorStore.setState({ serverAware: true })
     // 파형은 소수 둘째 자리로 줄여 저장한다(검토 A E2a — 꽉 차면 저장이 실패한다). 화면의 편집 상태는 그대로.
-    const snapshot = persistSnapshot(state)
+    const snapshot = persistSnapshot(useEditorStore.getState())
     saveEditorState(projectId, snapshot)
     scheduleServerSave(projectId, snapshot)
   })

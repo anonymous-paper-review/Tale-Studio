@@ -384,4 +384,51 @@ describe('서버를 못 읽고 연 화면의 뒤처리 (검토 c, 2026-11-14)', 
     await editAndWait()
     expect(puts[puts.length - 1].serverAware).toBe(true)
   })
+
+  it('서버가 비어 있던 프로젝트를 다른 기기에서 먼저 열기만 해도(처음 상태 · 길이 재기 · 소리 나누기만 저장), 진짜 편집을 가진 브라우저가 나중에 열면 자기 편집이 열리고 따로 칸으로 밀리지 않는다', async () => {
+    // 왜: 재검토 c 2/2 — 열 때 저절로 생긴 저장에도 "고침 뒤 화면이 쓴 저장본" 표시가 붙어, 3945d1e6 처럼 서버가 비어 있던 프로젝트를
+    //   다른 기기에서 열기만 해도 진짜 편집을 가진 브라우저의 편집이 따로 칸으로 밀렸다. 표시는 사람이 고친 뒤의 저장에만 붙인다.
+    await openLikePage()
+    vi.useFakeTimers()
+    useEditorStore.getState().updateVideoClip('shot-1', { actualDurationSec: 3.9 })
+    await vi.advanceTimersByTimeAsync(4_000)
+    vi.useRealTimers()
+    expect(puts.length).toBeGreaterThan(1)
+    expect(puts.some((p) => p.serverAware)).toBe(false)
+    localStorage.clear()
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(edit(['shot-2', 'shot-1'])))
+    await openLikePage()
+    expect(order()).toEqual(['shot-2', 'shot-1'])
+    expect(localStorage.getItem(SET_ASIDE_KEY)).toBeNull()
+  })
+
+  it('다른 기기에서 연 뒤 사람이 한 번이라도 고쳐 저장했으면, 그 서버 편집이 고침 전 저장본보다 먼저 열린다', async () => {
+    // 왜: A6 그대로 — 고침 뒤에 사람이 고친 편집이 다른 브라우저의 고침 전 저장본에 가려지면 그 브라우저 저장이 서버 고침을 덮는다.
+    await openLikePage()
+    await editAndWait()
+    expect(puts[puts.length - 1].serverAware).toBe(true)
+    localStorage.clear()
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(edit(['shot-2', 'shot-1'])))
+    await openLikePage()
+    expect(order()).toEqual(['shot-1', 'shot-2'])
+    expect(subtitleOf('shot-1', useEditorStore.getState())).toBe('고친 자막')
+  })
+
+  it('사람이 고친 서버 편집을 연 기기가 길이 재기만 저장해도, 그 저장본은 여전히 고침 전 저장본보다 먼저 열린다', async () => {
+    // 왜: 표시는 편집 내용을 따라간다 — 길이 재기 저장에서 표시가 빠지면 세 번째 브라우저의 고침 전 저장본이 이겨, 서버에 실린 사람 고침을
+    //   그 브라우저 저장이 덮는다.
+    server = { state: { ...edit(['shot-2']), serverAware: true }, updatedAt: at(20) }
+    await openLikePage()
+    vi.useFakeTimers()
+    useEditorStore.getState().updateVideoClip('shot-2', { actualDurationSec: 3.9 })
+    await vi.advanceTimersByTimeAsync(4_000)
+    vi.useRealTimers()
+    expect(puts.length).toBeGreaterThan(0)
+    expect(puts[puts.length - 1].serverAware).toBe(true)
+    localStorage.clear()
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(edit(['shot-1', 'shot-2'])))
+    await openLikePage()
+    expect(order()).toEqual(['shot-2'])
+  })
 })
+

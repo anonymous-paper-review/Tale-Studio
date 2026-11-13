@@ -311,7 +311,7 @@ describe('저절로 빠지고 들어오는 샷 (검토 c, 2026-11-14)', () => {
     await save()
     db(['s1', 's2', 's3'], ['s1', 's2', 's3'])
     await open()
-    expect(mocks.toast.info).toHaveBeenCalledWith(translate('ko', 'Shots that now have video ({count}) came in, so the cuts and sounds after them moved.', { count: 1 }))
+    expect(mocks.toast.info).toHaveBeenCalledWith(translate('ko', 'New shots ({count}) came in, so the cuts and sounds after them moved.', { count: 1 }))
   })
 
   it('최종 Take 가 바뀌면 다시 열 때 이어진 소리도 새 영상의 소리로 바뀐다 — 사람이 바꾼 소리 크기 · 음소거는 남는다', async () => {
@@ -329,3 +329,83 @@ describe('저절로 빠지고 들어오는 샷 (검토 c, 2026-11-14)', () => {
   })
 })
 
+describe('다른 장면으로 옮긴 샷 (재검토 c, 2026-11-14)', () => {
+  const save = () => saveEditorNow('project-8')
+  const SCENES = { s3: { scene_id: 'scene-2' }, s4: { scene_id: 'scene-2' } }
+  /** 서버에 구간 · 빠르기를 처음으로 되돌리라고 보낸 요청. */
+  const resets = (fetchMock: ReturnType<typeof vi.fn>) =>
+    fetchMock.mock.calls
+      .map(([url, init]) => [String(url), JSON.parse(String((init as RequestInit | undefined)?.body ?? 'null'))] as const)
+      .filter(([url, body]) => (url === '/api/editor/trim' && body?.trimStart === null) || (url === '/api/editor/speed' && body?.speed === 1))
+  async function reopenWatching() {
+    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) => new Response('{}', { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    await open()
+    await vi.advanceTimersByTimeAsync(1_000)
+    vi.useRealTimers()
+    return fetchMock
+  }
+  const timelineIds = () => selectTimelineLayout(api()).map((l) => l.shotId)
+  const trimOf = (shotId: string) => {
+    const c = api().videoClips.find((x) => x.shotId === shotId)
+    return [c?.trimStart ?? null, c?.trimEnd ?? null]
+  }
+
+  it('클립을 다른 장면으로 옮겨 저장한 뒤 다시 열어도, 그 샷은 옮긴 자리에 한 번만 있고 고친 구간 그대로다', async () => {
+    // 왜: 재검토 c(H3) — 다시 열면 옮긴 샷을 '영상이 새로 생긴 샷'으로 보고 원래 장면에 한 번 더 깔았고(4초 · 12초 두 번),
+    //   구간 · 빠르기를 서버까지 처음으로 되돌렸다. 저장한 어느 장면 순서에든 있는 샷은 새로 들이지 않는다.
+    db(['s1', 's2', 's3', 's4'], ['s1', 's2', 's3', 's4'], 1, SCENES)
+    await open()
+    api().setTrim('s2', 1, 3)
+    api().moveClipToIndex('s2', 2)
+    await save()
+    // 손잡이로 바꾼 구간은 서버(DB)에도 적혀 있다.
+    db(['s1', 's2', 's3', 's4'], ['s1', 's2', 's3', 's4'], 1, { ...SCENES, s2: { trim_start: 1, trim_end: 3 } })
+    const fetchMock = await reopenWatching()
+    expect(api().clipOrder).toEqual({ 'scene-1': ['s1'], 'scene-2': ['s3', 's2', 's4'] })
+    expect(timelineIds()).toEqual(['s1', 's3', 's2', 's4'])
+    expect(trimOf('s2')).toEqual([1, 3])
+    expect(resets(fetchMock)).toEqual([])
+  })
+
+  it('저장한 뒤 Writer 에서 샷의 장면을 바꿔도, 다시 열면 그 샷은 저장한 자리에 한 번만 있고 고친 구간 그대로다', async () => {
+    // 왜: 재검토 c(H2) — Writer 에서 장면을 바꾼 샷이 바뀐 장면에 '새로 생긴 샷'으로 한 번 더 깔렸다. Editor 자리는 사람이 정한 그대로 둔다.
+    db(['s1', 's2', 's3'], ['s1', 's2', 's3'])
+    await open()
+    api().setTrim('s3', 1, 3)
+    await save()
+    db(['s1', 's2', 's3'], ['s1', 's2', 's3'], 1, { s3: { scene_id: 'scene-2', trim_start: 1, trim_end: 3 } })
+    const fetchMock = await reopenWatching()
+    expect(timelineIds()).toEqual(['s1', 's2', 's3'])
+    expect(trimOf('s3')).toEqual([1, 3])
+    expect(resets(fetchMock)).toEqual([])
+  })
+
+  it('저장할 때의 장면이 지금은 없으면, 그 장면에 있던 샷은 지금 장면의 이야기 순서 제자리로 들어오고 고친 구간은 그대로다', async () => {
+    // 왜: Writer 가 장면을 합치면 저장한 장면 순서가 통째로 남는다 — 그 샷을 빼면 컷이 사라지고(33060feb), 새 영상으로 보면 고친 구간이
+    //   서버까지 처음으로 돌아갔다(96da2120). 사람이 고친 샷이니 고친 그대로 이야기 순서 제자리에 둔다.
+    db(['s1', 's2', 's3'], ['s1', 's2', 's3'], 1, { s3: { scene_id: 'scene-2' } })
+    await open()
+    api().setTrim('s3', 1, 3)
+    await save()
+    db(['s1', 's2', 's3'], ['s1', 's2', 's3'], 1, { s3: { trim_start: 1, trim_end: 3 } })
+    const fetchMock = await reopenWatching()
+    expect(order()).toEqual(['s1', 's2', 's3'])
+    expect(trimOf('s3')).toEqual([1, 3])
+    expect(resets(fetchMock)).toEqual([])
+  })
+
+  it('저장 뒤 Writer 에서 새로 생긴 샷이 들어와 자리가 바뀌어도 "샷 N개가 새로 들어와 뒤 컷과 소리를 옮겼어요"라고 알린다', async () => {
+    // 왜: 재검토 c 2/2 — 알림이 "영상이 생긴 샷"이라고 했는데 Writer 에서 새로 생긴 샷도 섞여 있었다. 들어온 사실대로 말한다.
+    db(['s1', 's2', 's3'], ['s1', 's2', 's3'], 1, { s3: { scene_id: 'scene-2' } })
+    await open()
+    await save()
+    db(['s1', 's2', 's4', 's3'], ['s1', 's2', 's4', 's3'], 1, { s3: { scene_id: 'scene-2' } })
+    useLocaleStore.setState({ locale: 'ko' })
+    await open()
+    expect(timelineIds()).toEqual(['s1', 's2', 's4', 's3'])
+    expect(mocks.toast.info).toHaveBeenCalledTimes(1)
+    expect(mocks.toast.info).toHaveBeenCalledWith('샷 1개가 새로 들어와 뒤 컷과 소리를 옮겼어요.')
+  })
+})

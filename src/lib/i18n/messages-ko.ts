@@ -1139,9 +1139,10 @@ export const KO: Record<string, string> = {
   '(No video yet. Only shots with video go into the timeline.)': '(아직 영상이 없어요. 영상이 있는 샷만 타임라인에 들어가요.)',
   // 검토 c(2026-11-14): 열 때 영상 자리가 저절로 바뀌었으면 한 번 알린다.
   'Shots without video ({count}) were taken out, so the cuts and sounds after them moved.': '영상 없는 샷 {count}개가 빠져 뒤 컷과 소리를 옮겼어요.',
-  'Shots that now have video ({count}) came in, so the cuts and sounds after them moved.': '영상이 생긴 샷 {count}개가 들어와 뒤 컷과 소리를 옮겼어요.',
-  'Shots without video ({removed}) were taken out and shots that now have video ({added}) came in, so the cuts and sounds after them moved.':
-    '영상 없는 샷 {removed}개가 빠지고 영상이 생긴 샷 {added}개가 들어와 뒤 컷과 소리를 옮겼어요.',
+  // 재검토 c 2/2: 들어온 샷에는 저장 뒤 Writer 에서 새로 생긴 샷도 있다 — "영상이 생긴 샷"이 아니라 들어온 사실대로.
+  'New shots ({count}) came in, so the cuts and sounds after them moved.': '샷 {count}개가 새로 들어와 뒤 컷과 소리를 옮겼어요.',
+  'Shots without video ({removed}) were taken out and new shots ({added}) came in, so the cuts and sounds after them moved.':
+    '영상 없는 샷 {removed}개가 빠지고 샷 {added}개가 새로 들어와 뒤 컷과 소리를 옮겼어요.',
   Preview: '미리보기',
   'Add to timeline': '타임라인 추가',
   'No clips generated yet': '생성된 클립이 없습니다',
