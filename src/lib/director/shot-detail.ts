@@ -15,8 +15,11 @@ export function videoTabLabelKey(takeCount: number): { key: string; params: Reco
   return takeCount > 0 ? { key: 'Video', params: {} } : { key: 'Video · none', params: {} }
 }
 
-/** 이미지 탭의 시작 · 끝 그림 — 끝 그림이 없으면(한 장짜리 옛 그림) 끝 자리는 비운다. */
+/** 상세의 시작 · 끝 그림 — 지금 버전의 그림이다. 끝 그림이 없으면(한 장짜리 옛 그림) 끝 자리는 비운다.
+ *  다시 만드는 중 · 실패여도 지금 그림은 그대로라 그대로 보인다(영상 시작 그림 판정 storyboardImageStartFrame 과 다름). */
 export function shotDetailFrames(image: StoryboardImage | null | undefined): { start: string | null; end: string | null } {
+  const current = currentStoryboardVersion(image)
+  if (current) return { start: current.frames?.start ?? current.url, end: current.frames?.end ?? null }
   return { start: storyboardImageStartFrame(image ?? null), end: storyboardImageEndFrame(image ?? null) }
 }
 

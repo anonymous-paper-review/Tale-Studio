@@ -175,4 +175,11 @@ describe('Director 샷 상세', () => {
     const legacyTake = take('t0', 1, { createdAt: '2026-11-14T00:30:00Z' }).data as VideoNodeData
     expect(imageChangedForTake(two, legacyTake)).toBe(true)
   })
+
+  it('이미지를 다시 만드는 동안에도 상세의 시작 · 끝 자리에는 지금 그림이 그대로 보인다', () => {
+    // 왜: 실제 화면(개발 DB, 11/14)에서 다시 만드는 동안 시작 · 끝 자리가 비었다 — 지금 그림은 바뀌지 않았으니 그대로 보인다.
+    const frames = { start: 'https://media.test/s.png', direction: 'https://media.test/d.png', end: 'https://media.test/e.png' }
+    const making = { url: frames.start, frames, status: 'generating', errorMessage: null, generatedAt: 1, versions: [{ id: 'legacy', n: 1, url: frames.start, frames, generatedAt: 1, source: 'generated' }], versionId: 'legacy' }
+    expect(shotDetailFrames(making as ShotNodeData['storyboardImage'])).toEqual({ start: frames.start, end: frames.end })
+  })
 })
