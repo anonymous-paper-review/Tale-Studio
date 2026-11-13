@@ -342,6 +342,32 @@ describe('저장하고 다시 열기', () => {
     expect(api().firstOpenMeasuring).toBe(false)
   })
 
+  it('앞 열기의 길이 재기가 다음 열기 도중에 끝나도, 다음 열기가 처음 여는 동안 잰 길이는 붙은 줄 그대로 맞춘다 — 프로젝트를 바꾸거나 다시 읽을 때', async () => {
+    // 왜: 리드 2026-11-14(검토 c) — 앞 열기의 길이 재기가 늦게 끝나며 "처음 여는 동안" 표시를 내리면, 다음 프로젝트를 처음 여는 동안
+    //   잰 길이가 뒤 클립을 제자리에 두어 빈 곳이 생긴다. 표시는 그 표시를 세운 열기가 아직 마지막 열기일 때만 내린다.
+    const opening = (input: { restored: boolean; measureClips: () => Promise<void> }) =>
+      finishEditorOpen({ projectId: 'project-free', isCancelled: () => false, audioName: () => 'audio', decodeAudio: async () => ({ durationSec: 4, peaks: [] }), ...input })
+    const tick = () => new Promise((resolve) => setTimeout(resolve, 0))
+    let finishOld = () => {}
+    let finishNew = () => {}
+    // 앞 열기 — 옛 형식을 옮기는 열기라 길이는 화면을 연 뒤에서 잰다.
+    useEditorStore.setState({ restoredOldFormat: true })
+    await opening({ restored: true, measureClips: () => new Promise<void>((resolve) => { finishOld = resolve }) })
+    expect(api().firstOpenMeasuring).toBe(true)
+    // 다른 프로젝트로 — 비우고 그 프로젝트를 처음 연다(저장한 편집 없음, 길이를 다 잴 때까지 기다린다).
+    seed()
+    const second = opening({ restored: false, measureClips: () => new Promise<void>((resolve) => { finishNew = resolve }) })
+    await tick()
+    finishOld()
+    await tick()
+    expect(api().firstOpenMeasuring).toBe(true)
+    api().updateVideoClip('A', { actualDurationSec: 3 })
+    expect(layout()).toEqual([['A', 0, 3], ['B', 3, 4], ['C', 7, 4], ['D', 11, 4]])
+    finishNew()
+    await second
+    expect(api().firstOpenMeasuring).toBe(false)
+  })
+
   it('새 형식 저장본에서 새로 더한 칸(자리 · 앞 빈 곳)을 모르고 열어도 같은 클립 · 순서 · 소리가 빈 곳만 붙어 열린다 — 배포를 되돌려도 옛 화면이 마지막 편집을 연다', async () => {
     // 왜: 새 형식은 옛 칸(순서 · 클립 · 소리)을 옛 뜻 그대로 적고 칸만 더한다. 옛 화면은 판 번호와 모르는 칸을 보지 않는다 —
     //   옛 코드(de1113-export · origin/main 43727d13)로 같은 저장본을 직접 열어 같은 결과를 확인했다(2026-11-14).

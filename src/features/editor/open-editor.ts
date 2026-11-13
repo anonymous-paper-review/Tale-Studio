@@ -14,6 +14,11 @@ export const EDITOR_FETCH_LIMIT = 4
 
 type Decoded = { durationSec: number; peaks: number[] }
 
+// 여는 차례 — Editor 를 열 때마다 하나씩 는다(프로젝트를 바꾸거나 다시 읽을 때). "처음 여는 동안" 표시(firstOpenMeasuring)는 그 표시를
+//   세운 열기가 아직 마지막 열기일 때만 내린다 — 앞 열기의 늦은 길이 재기 마무리가 다음 열기의 표시를 내려, 다음 프로젝트를 처음 여는
+//   동안 잰 길이가 빈 곳을 만들었다(리드 2026-11-14). 약속: tests/editor/free-placement.test.ts
+let openTurn = 0
+
 export interface FinishEditorOpenInput {
   projectId: string | null
   /** loadPersisted 가 이 브라우저에 저장한 편집을 되살렸는가. */
@@ -77,6 +82,12 @@ export async function finishEditorOpen(input: FinishEditorOpenInput): Promise<'o
 async function openSteps(input: FinishEditorOpenInput): Promise<'opened' | 'split' | 'split-late' | 'cancelled'> {
   const { projectId, isCancelled } = input
   const store = useEditorStore
+  const turn = ++openTurn
+  // 앞 열기가 세운 표시는 이어받지 않는다 — 이 열기가 필요하면 다시 세운다.
+  if (store.getState().firstOpenMeasuring) store.setState({ firstOpenMeasuring: false })
+  const endMeasuring = () => {
+    if (turn === openTurn) store.setState({ firstOpenMeasuring: false })
+  }
   // 화면을 떠났으면 준비 표시를 그대로 둔다 — 반쯤 된 상태를 저장하지 않고, 다음에 열 때 처음부터 다시 준비한다.
   if (isCancelled()) return 'cancelled'
   if (input.restored || !projectId || store.getState().shots.length === 0) {
@@ -86,7 +97,7 @@ async function openSteps(input: FinishEditorOpenInput): Promise<'opened' | 'spli
     //   그사이 사람이 만든 빈 곳은 그대로 둔다. 새 형식 저장본은 잰 길이가 달라도 뒤 클립이 제자리에 머문다.
     if (store.getState().restoredOldFormat) {
       store.setState({ firstOpenMeasuring: true })
-      void input.measureClips().finally(() => store.setState({ firstOpenMeasuring: false }))
+      void input.measureClips().finally(endMeasuring)
     } else {
       void input.measureClips()
     }
@@ -103,7 +114,7 @@ async function openSteps(input: FinishEditorOpenInput): Promise<'opened' | 'spli
   try {
     await within(input.measureClips(), deadline)
   } finally {
-    store.setState({ firstOpenMeasuring: false })
+    endMeasuring()
   }
   if (isCancelled()) return 'cancelled'
 
