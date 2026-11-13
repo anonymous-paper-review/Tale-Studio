@@ -744,6 +744,32 @@ describe('다시 만들기는 접수되는 대로(검토 b (a)~(g) 보통 1)', (
     expect(lastModel()).toBe('The video for Shot 1 is being made right now.')
   })
 
+  // 왜: 리드 결정(오너 9번 · 샷 상세 [다시 만들기]는 늘 새 Take) — 영상이 이미 있는 샷을 번호로 다시 부탁하면 "지금 그런 샷이 없어요"였다.
+  it('영상이 이미 있는 샷을 번호로 "샷 1 영상 다시 만들어줘"라고 하면 그 샷의 새 Take 를 다시 만들기로 바로 만들고, Take 수는 가장 최근 Take 설정으로 센다', async () => {
+    writer.setState({ sceneManifest: { scenes: [{ sceneId: 'sc1' }] } as never, shots: [{ shotId: 'w-d1', sceneId: 'sc1' }] as never })
+    const done = { id: 'v-d1', type: 'video', position: { x: 0, y: 0 }, data: { kind: 'video', label: 'v-d1', parentShotNodeId: 'd1', status: 'completed', lastAttemptStatus: 'completed', videoUrl: 'https://media.test/d1.mp4', final: false, takeNumber: 1, override: { resolution: '1080p' } } } as unknown as DirectorNode
+    director.setState({ nodes: [shot('d1', IMG('d1')), done] })
+    remakeServer([{ type: 'generateVideos', shotIds: ['d1'] }])
+    await chat.getState().sendMessage('샷 1 영상 다시 만들어줘')
+    expect(generated).toEqual(['d1'])
+    expect(lastModel()).toBe('Started making videos for Shot 1 · 10 Takes. Progress shows on the line above the cards.')
+  })
+
+  // 왜: 검토 b 낮음 — 번호로 댄 샷 중 일부가 만드는 중이면 그 샷은 아무 말 없이 빠지고 나머지 시작만 말했다("샷 1, 2 다시" → 샷 2 만).
+  it('번호로 댄 샷 중 만드는 중인 샷은 빼고, 빠진 샷마다 "샷 N 영상은 지금 만드는 중이에요"를 먼저 말한다', async () => {
+    writer.setState({ sceneManifest: { scenes: [{ sceneId: 'sc1' }] } as never, shots: [{ shotId: 'w-e1', sceneId: 'sc1' }, { shotId: 'w-e2', sceneId: 'sc1' }] as never })
+    const making = { id: 'v-e1', type: 'video', position: { x: 0, y: 0 }, data: { kind: 'video', label: 'v-e1', parentShotNodeId: 'e1', status: 'generating', lastAttemptStatus: 'generating', videoUrl: null, final: false, takeNumber: 1, override: {} } } as unknown as DirectorNode
+    director.setState({ nodes: [shot('e1', IMG('e1')), making, shot('e2', IMG('e2')), failedTake('v-e2', 'e2')] })
+    remakeServer([{ type: 'generateVideos', shotIds: ['e1', 'e2'] }])
+    await chat.getState().sendMessage('샷 1, 2 영상 다시 만들어줘')
+    expect(generated).toEqual(['e2'])
+    const said = chat.getState().messages.filter((m) => m.role === 'model').map((m) => m.content)
+    const makingLine = said.indexOf('The video for Shot 1 is being made right now.')
+    const startedLine = said.indexOf('Started making videos for Shot 2 · 5 Takes. Progress shows on the line above the cards.')
+    expect(makingLine).toBeGreaterThanOrEqual(0)
+    expect(startedLine).toBeGreaterThan(makingLine)
+  })
+
   // 왜: 검토 b 메모 — 볼 것은 이번에 만든 새 Take 하나다. 그 샷의 다른 Take(예: 멈춘 채 뒤에서 도는 Take)가 돌아도 이번 것이 실패면 "아직 몰라요"가 아니다.
   it('그 샷의 다른 Take 가 돌고 있어도 이번 새 Take 가 실패면 "시작하지 못했어요"라고 한다', async () => {
     writer.setState({ sceneManifest: { scenes: [{ sceneId: 'sc1' }] } as never, shots: [{ shotId: 'w-x1', sceneId: 'sc1' }] as never })

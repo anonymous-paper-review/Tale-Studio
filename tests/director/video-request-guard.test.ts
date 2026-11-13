@@ -350,6 +350,22 @@ describe('고르는 말 앞뒤의 번호(검토 b 탐침 revb35 C1 · C2)', () =
   })
 })
 
+describe('다시 만들기 — 영상이 이미 있는 샷(리드 결정)', () => {
+  // 왜: 리드 결정(오너 9번 · 샷 상세 [다시 만들기]는 늘 새 Take) — 영상이 있는 샷을 번호로 다시 부탁하면 "지금 그런 샷이 없어요"였다.
+  //   묶음 말("실패한 샷" · "남은 샷")은 지금처럼 영상이 있는 샷을 넣지 않는다.
+  it('다시 만들기 부탁이면 번호로 댄 샷은 영상이 있어도 겨누고(번호 + 시키는 말뿐이면 바로, 아니면 목록으로 되묻기), 묶음 말은 지금처럼 영상이 없는 샷만 겨눈다', () => {
+    // 샷 1 · 3 · 4 는 영상이 있고(만들 수 있는 샷이 아님), 샷 2 · 5 · 6 은 영상이 없다. 만드는 중인 샷은 없다(다시 만들 수 있는 샷 = 전부).
+    const remake = (text: string, requested: string[] | null) =>
+      groundVideoRequest({ text, requested, shots, eligible: ids(2, 5, 6), selected: [], remakable: ALL })
+    expect(remake('샷 1 영상 다시 만들어줘', ids(1))).toEqual(run(1))
+    expect(remake('샷 1 영상 다시 만들어줘, 더 밝게', ids(1))).toEqual(confirm(1))
+    expect(remake('실패한 샷 다시 만들어줘', null)).toEqual(run(5, 6))
+    expect(remake('남은 샷 영상 다시 만들어줘', null)).toEqual(run(2, 5, 6))
+    // 다시 만들기가 아니면(remakable 없음) 영상이 있는 샷은 지금처럼 겨누지 않는다.
+    expect(groundVideoRequest({ text: '샷 1 영상 만들어줘', requested: ids(1), shots, eligible: ids(2, 5, 6), selected: [] })).toEqual(run())
+  })
+})
+
 describe('만들지 말라는 말이면 만들지 않는다', () => {
   // 왜: 정상 경로 고정 — 번호를 대고 만들지 말라고 하면(한국어 · 영어) 모델이 그 샷 영상을 담아도 만들지 않는다.
   it('"샷 2 는 영상 만들지 마" · "Don\'t make a video for shot 4"면 아무 영상도 만들지 않는다', () => {
