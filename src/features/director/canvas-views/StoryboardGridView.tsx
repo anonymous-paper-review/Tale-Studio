@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ImageIcon, MapPin, Clock, Pause, Play } from 'lucide-react'
+import { ImageIcon, MapPin, Clock, Maximize2, Pause, Play } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { mediaFrameStyle } from '@/lib/project-aspect'
@@ -55,6 +55,13 @@ import {
 import { directorMentionTargets, directorNodeLabel, sortByBoard } from '@/features/director/node-label'
 import { useBoardNodeNames } from '@/features/director/hooks/use-board-node-names'
 import { useT } from '@/lib/i18n'
+import { Lumi } from '@/components/lumi/lumi'
+import { STAGE_PERSONA } from '@/lib/lumi'
+import { useWriterStore } from '@/stores/writer-store'
+import { filterShotsByStatus, imageRemakeFailed, shotStateTone, type DirectorShotState } from '@/lib/director/shot-state'
+import { RemakeRetryButton } from '@/features/director/remake-retry-button'
+import { useDirectorShotStates } from '@/features/director/hooks/use-shot-states'
+import { ImageFailedPanel, ImageNeededTag, PickBox, ShotPipelineRow, ShotStateTail } from '@/features/director/shot-status'
 
 type SceneGroup = {
   key: string
@@ -182,6 +189,9 @@ function ShotCell({
   queueStatus,
   descriptionFontSize,
   shotMention,
+  shotState,
+  picked,
+  pickMode,
 }: {
   node: DirectorNode
   roster: SlugEntry[]
@@ -197,6 +207,12 @@ function ShotCell({
   /** 큐 원본 — 경과시간 durable 기준점(activeStartedAt) 계산용. */
   descriptionFontSize: string
   shotMention?: CardMention
+  /** 샷 상태(시안 R 416:4941) — 실사 보기의 테두리 · 꼬리 · 이미지 → 영상 줄. */
+  shotState: DirectorShotState
+  /** 고른 샷(시안 D2) — 흰 테두리 · 체크. */
+  picked: boolean
+  /** 고른 샷이 하나라도 있으면 모든 카드에 고름 상자를 보인다. */
+  pickMode: boolean
 }) {
   const t = useT()
   const generateStoryboardImage = useDirectorCanvasStore(
@@ -206,6 +222,8 @@ function ShotCell({
     (s) => s.generateVideoForShot,
   )
   const openPopup = useDirectorCanvasStore((s) => s.openPopup)
+  // 카드 몸통 = 고르기(시안 D2 · R). 훅이라 조기 반환보다 앞에 둔다.
+  const togglePickedShot = useDirectorCanvasStore((s) => s.togglePickedShot)
   const requestMentionToggle = useChatUiStore((s) => s.requestMentionToggle)
   // 실사 이미지가 없을 때 러프 스토리보드 폴백 표시(#e11) — writer-store 스코프 구독
   const writerShotId = isShotData(node.data) ? node.data.writerShotId : null
@@ -215,6 +233,8 @@ function ShotCell({
   // 카드 설명문(#e5 2026-08-12) — EN 렌더 프롬프트가 아니라 writer 의 유저 언어 산출
   //   (shots.action_description_native → writer-store actionDescription)을 그대로 쓴다.
   const nativeDescription = useShotActionDescription(writerShotId)
+  // 카드 제목 "씬 1 · 샷 1 · CU · 3초"(시안 D1) — 샷 크기는 Writer 샷 기록에서.
+  const shotType = useWriterStore((s) => (writerShotId ? s.shots.find((x) => x.shotId === writerShotId)?.shotType ?? null : null))
   // 영상 생성(이미지→영상 체인 포함) 진행 플래그 — 버튼 잠금 + 오버레이(#e12)
   const [videoBusy, setVideoBusy] = useState(false)
   const [videoError, setVideoError] = useState<string | null>(null)
@@ -257,6 +277,9 @@ function ShotCell({
   //   아래 isShotData early return 보다 위에 있어야 한다 — 훅의 조건부 호출은 렌더 간 훅 순서를
   //   무너뜨린다(rules-of-hooks).
   const realBatchBusy = useDirectorCanvasStore((s) => s.realBatchBusy)
+  const realBatchShotIds = useDirectorCanvasStore((s) => s.realBatchShotIds ?? null)
+  // [모두 멈추기] 뒤에는 일괄이 남은 샷을 그리지 않는다 — 기다림 표시도 바로 푼다(리드 검토 c ④d).
+  const realBatchCancelled = useDirectorCanvasStore((s) => s.realBatchCancelled ?? false)
   const takeRecords = useMemo(
     () =>
       directorNodes.flatMap((n) => {
@@ -293,13 +316,20 @@ function ShotCell({
   const img = data.storyboardImage
   const status = img?.status ?? null
   const hasImage = !!img?.url
+  // 다시 만들기가 실패해도 옛 그림이 남는다 — 그림은 그대로 보이고 꼬리가 "다시 만들기 실패" + [다시 만들기](리드 검토 c ①).
+  const remakeFailed = imageRemakeFailed(img)
   const roughUrl = rough?.status === 'completed' ? rough.url : null
   const roughStartUrl = rough?.frames?.start ?? roughUrl
   // 약속 I4(2026-09-04): 러프 3장 중 하나라도 바뀌면 실사 카드에 "러프 바뀜" — 자동 재생성은 하지 않는다(오너 I5).
   const roughChanged = mediaMode === 'real' && classifyRoughChanged(rough, img)
   // 약속 I(오너 확정): 그리드에서 이미지를 눌러도 글자를 눌러도 같은 연출 편집 팝업(Writer 것) — writer 샷일 때.
   //   #e6 의 Previz 편집 팝업(previzOpen)이 이미 그 팝업이다 — 같은 상태를 연다.
+  // ⤢ 상세(시안 R "⤢ = 상세 열기", 오너 2026-11-14): 실사 보기는 샷 상세 팝업, 러프 보기는 지금 연출(화살표) 편집 창(결정 페이지 추천).
   const openDetail = () => {
+    if (mediaMode === 'real') {
+      openPopup(node.id)
+      return
+    }
     if (writerShotId) setPrevizOpen(true)
     else openPopup(node.id)
   }
@@ -310,16 +340,13 @@ function ShotCell({
   //   2026-08-11: 라벨에서 "단계"를 걷어내고(중복어) 호버 없이 처음부터 문구까지 보이게 했다 —
   //   한눈에 읽으라고 만든 배지가 호버해야 읽히면 배지가 아니라 툴팁이다.
   //   v3(2026-11-03): 그림 위 어두운 꼬리표(검정 45%) — 영상은 지금 단계 색 글자, 아직 필요한 것은 경고 색 글자.
+  //   실사 보기는 1110 확정(시안 R)부터 주황 "이미지 필요" 태그 · 상태 꼬리가 맡는다 — 배지는 러프 보기에만(리드 검토 c ③).
   const stageBadge =
     mediaMode === 'previz'
       ? roughStartUrl
         ? { label: 'Previz', cls: 'text-foreground', video: false }
         : { label: t('Rough needed'), cls: 'text-warning', video: false }
-      : completedVideoUrl
-        ? { label: t('Video'), cls: 'text-stage', video: true }
-        : hasImage
-          ? { label: t('Image'), cls: 'text-foreground', video: false }
-          : { label: t('Image needed'), cls: 'text-warning', video: false }
+      : null
 
   const runImage = async () => {
     if (imageGeneration.disabled) return
@@ -373,8 +400,10 @@ function ShotCell({
   // 진입 자동 채움 대기(#e6 2026-08-11) — 일괄 러너가 돌기 시작했는데 아직 이 샷의 잡이 큐에
   //   안 앉은 구간. "생성이 필요합니다"를 보여주면 뭔가 해야 할 것 같은 잘못된 신호가 되므로
   //   (곧 자동으로 생성된다) 이 구간도 생성 중으로 취급해 스피너를 돌린다.
+  //   고른 샷만 만드는 일괄(시안 D2)이면 그 샷만 기다림으로 본다.
   const autoFillPending =
-    mediaMode === 'real' && realBatchBusy && !hasImage && status !== 'failed' && !!roughUrl
+    mediaMode === 'real' && realBatchBusy && !realBatchCancelled && !hasImage && status !== 'failed' && !!roughUrl &&
+    (realBatchShotIds === null || (!!writerShotId && realBatchShotIds.includes(writerShotId)))
   const imageGenerating = imageGeneration.generating || autoFillPending
   const generating = imageGenerating || videoBusy || childVideoGenerating || queuedVideo
   // 대기 vs 실작업(#e4 2026-08-12) — DB 큐(generation_jobs queued)에 앉았으면 fal 이 실제로
@@ -470,6 +499,13 @@ function ShotCell({
         ? img!
         : null
 
+  // 실사 보기 카드 테두리 = 샷 상태 색(시안 R 416:4941, 오너 2026-11-14 "Director 생성 상태"). 러프 보기는 지금 그대로.
+  const realTone = mediaMode === 'real' ? shotStateTone(shotState) : null
+  const durationLabel =
+    typeof data.durationSeconds === 'number' && data.durationSeconds > 0
+      ? t('{seconds}s', { seconds: Math.round(data.durationSeconds) })
+      : null
+
   const mentionCardOnModifierClick = (
     event: Pick<MouseEvent, 'ctrlKey' | 'metaKey'>,
   ): boolean => {
@@ -483,7 +519,17 @@ function ShotCell({
     <>
     <div
       // v3(2026-11-03): 노드 캔버스와 같은 판(작업 바탕색 · 모서리 16 · 그림자 하나 · 안쪽 12) — 캔버스 판(--canvas-bg) 위에 뜬다.
-      className="group flex cursor-pointer flex-col rounded-2xl bg-background p-3 shadow-node transition-colors duration-100 hover:bg-card"
+      className={cn(
+        'group flex cursor-pointer flex-col rounded-2xl border-[1.5px] bg-background p-3 shadow-node transition-colors duration-100 hover:bg-card',
+        picked ? 'border-foreground' : realTone?.frame ?? 'border-transparent',
+      )}
+      data-shot-state={mediaMode === 'real' ? shotState : undefined}
+      aria-selected={picked}
+      // 카드 몸통 = 고르기(시안 D2 · R) — 다시 누르면 푼다. ⤢ 상세 · 고름 상자 · 단추는 저마다 눌림을 멈춘다.
+      onClick={(event) => {
+        if (isMentionModifierClick(event)) return
+        togglePickedShot(node.id)
+      }}
       onClickCapture={(event) => {
         if (mentionCardOnModifierClick(event)) {
           event.preventDefault()
@@ -537,26 +583,27 @@ function ShotCell({
             />
           )
         ) : status === 'failed' ? (
-          // 실패 시 이미지 자리에 로그 표시 (사용자 요청)
-          <div className="flex size-full flex-col items-center justify-center gap-1 bg-destructive/10 p-2 text-center">
-            <span className="text-[11.5px] font-semibold text-destructive">
-              {t('Generation failed')}
-            </span>
-            {img?.errorMessage && (
-              <span className="line-clamp-3 break-all font-mono text-[10px] leading-tight text-destructive/80">
-                {img.errorMessage}
-              </span>
-            )}
-          </div>
+          // 이미지 실패(시안 없음 — 결정 페이지 추천): "이미지를 못 만들었어요" + [다시 만들기]. 원인은 마우스 올림 글로.
+          <ImageFailedPanel
+            onRetry={() => void runImage()}
+            detail={img?.errorMessage}
+            disabled={imageGeneration.disabled && imageGeneration.phase !== 'error'}
+          />
         ) : mediaMode === 'real' ? (
           generating ? (
-            // 실사 생성 중(#e3 2026-08-12) — previz 를 깔면(흐려도) "뭔가 나왔다"로 읽히므로
-            //   검은 바탕 + 회전 링. 오버레이(bg-background/20)가 반투명이라 이 바닥이 비친다.
-            <div className="absolute inset-0 flex items-center justify-center bg-black">
-              <span
-                aria-hidden
-                className="size-8 animate-spin rounded-full border-2 border-white/15 border-t-white/70 motion-reduce:animate-none"
-              />
+            // 카드 안 만드는 중(시안 D3 · R "카드 안 Lumi 로딩") — 도는 원 대신 Lumi(그림) · 할 일 글. 남은 시간 · % 는 쓰지 않는다(오너 8/26).
+            //   차례를 기다리는 샷은 "이미지 생성 대기 중", 접수 · 확인 중이면 그 글.
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 bg-side p-3 text-center">
+              <Lumi persona={STAGE_PERSONA.director} state="loading" size="s" still />
+              <span className="text-[13px] font-semibold text-foreground">
+                {imageWaitingOnly
+                  ? t('Waiting to generate image')
+                  : imageGenerating
+                    ? imageGeneration.phase === 'submitting' || imageGeneration.phase === 'uncertain'
+                      ? t(imageGeneration.label!)
+                      : t('Drawing the image')
+                    : t('Making the video')}
+              </span>
             </div>
           ) : (
             // 실사 미생성(#real-empty-guidance 2026-08-27 오너): 진입 자동 생성이 꺼진 뒤로
@@ -564,7 +611,7 @@ function ShotCell({
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 p-3 text-center">
               <ImageIcon className="size-6 text-subtle-foreground" />
               <span className="text-[11.5px] font-medium text-muted-foreground">
-                {t('Generate a Real image.')}
+                {t('Make a real image.')}
               </span>
             </div>
           )
@@ -577,8 +624,40 @@ function ShotCell({
         {/* 단계 배지(#e2) — 좌상단 상시 표시(아이콘+문구). 배지를 호버하면 그 아래로 액션 목록이
             펼쳐진다(#e4 2026-08-11) — 우하단 스택에서 이사. 글자만, 폭 통일(w-28).
             생성 중엔 오버레이가 덮으므로 숨긴다. */}
-        {!generating && stageBadge && (
-          <div className="group/badge absolute left-2 top-2 z-10">
+        {/* 고름 상자(시안 D2) — 고른 샷이 있거나 마우스를 올리면 보인다. */}
+        <PickBox
+          picked={picked}
+          onToggle={() => togglePickedShot(node.id)}
+          className={cn('absolute left-2 top-2 z-20', !picked && !pickMode && 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100')}
+        />
+        {/* ⤢ 상세(시안 R "⤢ = 상세 열기") */}
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation()
+            openDetail()
+          }}
+          onDoubleClick={(event) => event.stopPropagation()}
+          aria-label={t('Open details')}
+          className="absolute right-2 top-2 z-20 inline-flex items-center gap-1 rounded-[6px] bg-black/45 px-1.5 py-0.5 text-[11px] font-semibold text-foreground transition-colors hover:bg-black/65"
+        >
+          <Maximize2 className="size-3" />
+          {t('Details')}
+        </button>
+
+        {/* 실사 보기: 이미지가 필요한 샷만 주황 태그(시안 R). 만드는 일은 위쪽 단추 · 상세가 맡는다(카드 위 숨은 단추 없앰). */}
+        {mediaMode === 'real' && !generating && (shotState === 'image_needed' || roughChanged) && (
+          <div className="absolute left-10 top-2 z-10 flex items-center gap-1">
+            {shotState === 'image_needed' && <ImageNeededTag />}
+            {roughChanged && (
+              <span className="inline-flex items-center rounded-[6px] bg-black/45 px-1.5 py-0.5 text-[11px] font-semibold text-warning">
+                {t('Rough changed')}
+              </span>
+            )}
+          </div>
+        )}
+        {mediaMode === 'previz' && !generating && stageBadge && (
+          <div className="group/badge absolute left-10 top-2 z-10">
             <span
               className={cn(
                 'inline-flex items-center gap-1 rounded-[6px] bg-black/45 px-1.5 py-0.5 text-[11px] font-semibold',
@@ -629,7 +708,7 @@ function ShotCell({
             동시 진행이면 라벨·빔 모두 이미지(선행 단계) 우선 — 표기 불일치 방지.
             경과 초는 표시하지 않는다(오너 결정 2026-08-26) — 스피너와 라벨만. */}
         <GeneratingOverlay
-          active={generating}
+          active={generating && mediaMode !== 'real'}
           label={
             imageWaitingOnly
               ? t('Waiting to generate image')
@@ -657,7 +736,7 @@ function ShotCell({
             {manualUncertain ? t('Generate again') : t('Check image status')}
           </button>
         )}
-        {childVideoFailure && (
+        {mediaMode === 'previz' && childVideoFailure && (
           <span
             title={childVideoFailure}
             className="absolute left-2 top-2 max-w-[calc(100%-1rem)] truncate rounded bg-destructive/90 px-1.5 py-0.5 text-[10px] text-destructive-foreground"
@@ -671,8 +750,23 @@ function ShotCell({
           </span>
         )}
 
+        {/* 꼬리(시안 D1 "● 대기" · D3 "● 이미지 만드는 중") — 실사 보기. 일괄이 맡아 차례를 기다리면 "대기 중",
+            다시 만들기가 실패했으면 "다시 만들기 실패" + [다시 만들기](리드 검토 c ① · ④d). */}
+        {mediaMode === 'real' && !videoError && (
+          <ShotStateTail
+            state={shotState}
+            waiting={imageWaitingOnly}
+            remakeFailed={remakeFailed}
+            retry={<RemakeRetryButton nodeId={node.id} data={data} />}
+            className="absolute bottom-2 left-2 z-10"
+          />
+        )}
+
         {/* 액션 스택은 좌상단 배지 아래로 이사(#e4 2026-08-11) — 우하단 스택 제거. */}
       </div>
+
+      {/* "● 이미지 → ● 영상" 줄(시안 D1 · D3) — 실사 보기 */}
+      {mediaMode === 'real' && <ShotPipelineRow state={shotState} className="mt-2.5" />}
 
       {/* 재생성 확인(#regen-confirm) — 최초 생성은 바로, **교체**만 팝업을 거친다. */}
       <RegenerateConfirmDialog
@@ -724,18 +818,12 @@ function ShotCell({
       />
 
       {/* #f9(2026-08-26 오너): 글자(캡션) 원클릭 = 편집 팝업 — 더블클릭을 몰라도 수정 진입. */}
-      <div
-        className="flex cursor-text flex-col gap-1 rounded-lg px-1 pb-0.5 pt-2.5 transition-colors hover:bg-accent/60"
-        title={t('Click to edit this shot')}
-        onClick={(event) => {
-          if (isMentionModifierClick(event)) return
-          event.stopPropagation()
-          openDetail()
-        }}
-      >
+      <div className="flex flex-col gap-1 rounded-lg px-1 pb-0.5 pt-2.5">
         <span className="truncate text-label font-semibold text-foreground">
           {sceneLabel ? `${sceneLabel} · ` : ''}
           {shotLabel}
+          {shotType ? ` · ${shotType}` : ''}
+          {durationLabel ? ` · ${durationLabel}` : ''}
         </span>
         {(nativeDescription || prompt) && (
           <p
@@ -836,6 +924,9 @@ export function StoryboardGridView({
     () => activeShotIds(activeJobs, ['shot_video']),
     [activeJobs],
   )
+  const shotStates = useDirectorShotStates()
+  const statusFilter = useDirectorCanvasStore((s) => s.statusFilter)
+  const pickedShotIds = useDirectorCanvasStore((s) => s.pickedShotIds)
 
   // 진행 중인 작업을 보고 Previz/Real 을 대신 바꾸던 effect 를 제거했다
   //   (#view-not-forced 2026-09-08 오너 판정). 진입 시 한 번이 아니라 작업이 도는 내내
@@ -898,6 +989,13 @@ export function StoryboardGridView({
   }
 
   const columns = storyboardColumns(zoomLevel)
+  // 상태 고르기(시안 D1, 오너 2026-11-14): 고른 상태 샷만 보이고 빈 씬 묶음은 숨긴다.
+  const visibleGroups =
+    statusFilter === 'all'
+      ? groups
+      : groups
+          .map((group) => ({ ...group, shots: filterShotsByStatus(group.shots, shotStates, statusFilter) }))
+          .filter((group) => group.shots.length > 0)
   const descriptionFontSize = storyboardDescriptionFontSize(columns)
   const handleBoardKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const target = event.target
@@ -931,7 +1029,11 @@ export function StoryboardGridView({
           mediaMode === 'real' ? 'slide-in-from-right-6' : 'slide-in-from-left-6',
         )}
       >
-        {groups.map((group) => (
+        {/* 상태를 골랐는데 그 상태 샷이 없으면(시안 없음, 리드 검토 c ④c) — 빈 판만 보이면 고장으로 보인다. */}
+        {visibleGroups.length === 0 && statusFilter !== 'all' && (
+          <p className="py-16 text-center text-label text-muted-foreground">{t('No shots in this status')}</p>
+        )}
+        {visibleGroups.map((group) => (
           <section key={group.key} className="flex flex-col gap-3">
             {/* v3 S1 씬 머리: 씬 이름(15px 600) · 흐린 장소 · 시간 */}
             <div className="flex items-baseline gap-2.5">
@@ -989,6 +1091,9 @@ export function StoryboardGridView({
                     queueStatus={queueStatus}
                     descriptionFontSize={descriptionFontSize}
                     shotMention={mentionFor('shot', shot.id, mediaMode)}
+                    shotState={shotStates.get(shot.id) ?? 'image_needed'}
+                    picked={pickedShotIds.includes(shot.id)}
+                    pickMode={pickedShotIds.length > 0}
                   />
                 ))}
               </div>
