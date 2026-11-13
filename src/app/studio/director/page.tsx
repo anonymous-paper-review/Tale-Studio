@@ -35,7 +35,18 @@ import {
 } from '@/lib/director/video-batch-client'
 import { videoBatchShotSettings } from '@/lib/director/video-batch-take'
 import { DEFAULT_VIDEO_MODEL } from '@/lib/video-models'
-import { chainStep, effectivePickedIds, imageButtonMode, nextPickAll, primaryWorkAction, videoWorkShotIds, workEstimateText } from '@/lib/director/toolbar-work'
+import {
+  chainStep,
+  effectivePickedIds,
+  imageButtonMode,
+  imageWorkBlock,
+  nextPickAll,
+  primaryWorkAction,
+  videoWorkBlock,
+  videoWorkShotIds,
+  workBlockLine,
+  workEstimateText,
+} from '@/lib/director/toolbar-work'
 import { LumiAvatar } from '@/components/lumi/lumi'
 import { STAGE_PERSONA } from '@/lib/lumi'
 import { describeVideoBatchPlan, planVideoBatch, videoBatchTakeCosts } from '@/lib/director/video-batch-plan'
@@ -939,7 +950,15 @@ function PaletteBar() {
   const making = makingImages + makingVideos > 0 || realBatchBusy || videoBatchBusy
   // [다음: Editor로] · 사이드바 Editor 는 같은 조건 — 완성 영상이 하나라도 있으면 켜진다(시안 R, 결정 페이지 추천).
   const canHandOff = stateList.some((s) => s === 'video_done')
-  const primary = primaryWorkAction({ imageCount: imageWork.length, videoCount: videoWork.length, canHandOff })
+  // 꺼진 단추와 까닭(결정 페이지 "꺼진 단추 아래 이유 한 줄", 리드 검토 a 보통 1 · 낮음 4) — 일괄이 도는 동안은 눌러도 새 판이 서지 않으니 끈다.
+  const imageBlock = imageWorkBlock(shotStates, picked, realBatchBusy)
+  const videoBlock = videoWorkBlock(shotStates, picked, videoBatchBusy)
+  const blockLine = workBlockLine(imageBlock, videoBlock, t)
+  const primary = primaryWorkAction({
+    imageCount: imageBlock === null ? imageWork.length : 0,
+    videoCount: videoBlock === null ? videoWork.length : 0,
+    canHandOff,
+  })
   // 약속 E1·E2(2026-09-04): 확인창에 만들 영상 수·필요한 Take·가진 Take — 채팅 승인 카드와 같은 계산(video-batch-plan).
   //   오너 답 11: Take 는 지금 계산 그대로(모델 · 해상도마다, 1080p 두 배) 예상 칸 · 확인창에.
   const takeState = useTakeBalance()
@@ -996,7 +1015,8 @@ function PaletteBar() {
       if (shotStates.get(id) === 'image_failed' || !writerShotId) void store.generateStoryboardImage(id).catch(() => {})
       else batch.push(writerShotId)
     }
-    if (batch.length > 0) void runRealBatch(pid, picked.size > 0 ? { shotIds: batch } : undefined)
+    // 고르지 않았어도 화면이 센 목록을 그대로 싣는다 — 서버가 따로 고르지 않게(리드 검토 a 낮음 6).
+    if (batch.length > 0) void runRealBatch(pid, { shotIds: batch })
   }
   // [이미지 다시 만들기 · N] 확인 뒤: 고른 샷만 다시(일괄 force + 고른 샷).
   const remakePicked = () => {
@@ -1243,7 +1263,8 @@ function PaletteBar() {
           )}
         </div>
 
-        <div className="ml-auto flex shrink-0 items-center gap-2">
+        <div className="ml-auto flex shrink-0 flex-col items-end gap-1">
+        <div className="flex items-center gap-2">
           {/* 영상까지 이어서(시안 D1 · D4 · R) — 켜면 이미지 단추가 "이미지+영상 만들기". 만드는 중에는 바꿀 수 없다. */}
           <button
             type="button"
@@ -1271,12 +1292,12 @@ function PaletteBar() {
           </button>
           {/* 고른 샷이 있으면 단추가 그 샷에만(시안 D2 "고른 샷에"). */}
           {picked.size > 0 && <span className="text-[12.5px] font-semibold text-info">{t('On picked shots')}</span>}
-          {/* 단추 셋은 늘 같은 자리(시안 R) — 만들 게 없으면 꺼지고, 마우스를 올리면 왜 꺼졌는지 알린다. */}
+          {/* 단추 셋은 늘 같은 자리(시안 R) — 만들 게 없거나 일괄이 도는 중이면 꺼지고, 까닭은 단추 아래 한 줄로 보인다. */}
           <button
             type="button"
             onClick={runImages}
-            disabled={imageMode.shotIds.length === 0}
-            title={imageMode.shotIds.length === 0 ? t('Every shot here already has an image.') : undefined}
+            disabled={imageBlock !== null}
+            aria-describedby={imageBlock !== null ? 'director-work-block' : undefined}
             className={workButtonClass(primary === 'image')}
           >
             <ImageIcon className="size-3.5" />
@@ -1287,8 +1308,8 @@ function PaletteBar() {
           <button
             type="button"
             onClick={runVideos}
-            disabled={videoWork.length === 0}
-            title={videoWork.length === 0 ? t('Videos need an image first.') : undefined}
+            disabled={videoBlock !== null}
+            aria-describedby={videoBlock !== null ? 'director-work-block' : undefined}
             className={workButtonClass(primary === 'video')}
           >
             <Play className="size-3.5 fill-current" />
@@ -1296,6 +1317,13 @@ function PaletteBar() {
             <span aria-hidden className="opacity-60">·</span>
             <span className="font-num tabular-nums">{videoWork.length}</span>
           </button>
+        </div>
+          {/* 꺼진 단추 아래 이유 한 줄(결정 페이지 추천) — 마우스를 올리지 않아도 · 키보드 · 터치로도 보인다. */}
+          {blockLine && (
+            <p id="director-work-block" className="text-[11.5px] leading-tight text-muted-foreground">
+              {blockLine}
+            </p>
+          )}
         </div>
       </div>
 

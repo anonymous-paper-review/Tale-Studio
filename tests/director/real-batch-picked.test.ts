@@ -62,6 +62,13 @@ describe('고른 샷만 이미지 만들기', () => {
     expect(useDirectorCanvasStore.getState().realBatchShotIds).toBeNull()
   })
 
+  it('고르지 않고 [이미지 만들기]를 눌러도 화면이 센 샷 목록을 그대로 실어 보낸다', () => {
+    // 왜: 목록 없이 보내면 서버가 따로 고른다 — 실패한 샷이 한 장씩 길과 일괄에 함께 실릴 수 있었다(리드 검토 a 낮음 6).
+    const page = readFileSync('src/app/studio/director/page.tsx', 'utf8')
+    expect(page).toContain('void runRealBatch(pid, { shotIds: batch })')
+    expect(page).not.toContain('picked.size > 0 ? { shotIds: batch } : undefined')
+  })
+
   it('서버 일괄은 고른 샷이 오면 그 샷만 고른다', () => {
     // 왜: 화면이 센 샷과 실제로 그리는 샷이 같아야 한다.
     const route = readFileSync('src/app/api/director/generate-storyboard-batch/route.ts', 'utf8')

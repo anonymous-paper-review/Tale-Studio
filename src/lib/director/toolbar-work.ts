@@ -67,6 +67,71 @@ export function imageButtonMode(
   return remake.length > 0 ? { mode: 'remake', shotIds: remake } : { mode: 'make', shotIds: [] }
 }
 
+/** 꺼진 만들기 단추의 까닭(결정 페이지 "꺼진 단추 아래 이유 한 줄", 리드 검토 a 낮음 4). */
+export type WorkBlock = 'busy' | 'no_shots' | 'all_making' | 'all_have_images' | 'need_images' | 'all_have_videos'
+
+function scopedStates(
+  states: ReadonlyMap<string, DirectorShotState>,
+  picked: ReadonlySet<string> | null | undefined,
+): DirectorShotState[] {
+  const out: DirectorShotState[] = []
+  for (const [id, state] of states) if (!picked || picked.size === 0 || picked.has(id)) out.push(state)
+  return out
+}
+
+/** [이미지 만들기]가 꺼진 까닭 — 켜져 있으면 null. busy = 이미지 일괄이 도는 중(눌러도 새 판이 서지 않는다). */
+export function imageWorkBlock(
+  states: ReadonlyMap<string, DirectorShotState>,
+  picked: ReadonlySet<string> | null | undefined,
+  busy: boolean,
+): WorkBlock | null {
+  if (busy) return 'busy'
+  const pool = scopedStates(states, picked)
+  if (pool.length === 0) return 'no_shots'
+  if (imageButtonMode(states, picked ?? new Set()).shotIds.length > 0) return null
+  return pool.some((s) => s === 'image_generating') ? 'all_making' : 'all_have_images'
+}
+
+/** [영상 만들기]가 꺼진 까닭 — 켜져 있으면 null. busy = 영상 묶음이 도는 중. */
+export function videoWorkBlock(
+  states: ReadonlyMap<string, DirectorShotState>,
+  picked: ReadonlySet<string> | null | undefined,
+  busy: boolean,
+): WorkBlock | null {
+  if (busy) return 'busy'
+  const pool = scopedStates(states, picked)
+  if (pool.length === 0) return 'no_shots'
+  if (videoWorkShotIds(states, picked).length > 0) return null
+  if (pool.some((s) => s === 'image_needed' || s === 'image_failed' || s === 'image_generating')) return 'need_images'
+  return pool.some((s) => s === 'video_generating') ? 'all_making' : 'all_have_videos'
+}
+
+const BLOCK_TEXT: Record<'image' | 'video', Record<WorkBlock, string>> = {
+  image: {
+    busy: 'Making images now. You can press again when it finishes.',
+    no_shots: 'No shots yet.',
+    all_making: 'The rest are being made now.',
+    all_have_images: 'Every shot here already has an image.',
+    need_images: 'Videos need an image first.',
+    all_have_videos: 'Every shot here already has a video.',
+  },
+  video: {
+    busy: 'Making videos now. You can press again when it finishes.',
+    no_shots: 'No shots yet.',
+    all_making: 'The rest are being made now.',
+    all_have_images: 'Every shot here already has an image.',
+    need_images: 'Videos need an image first.',
+    all_have_videos: 'Every shot here already has a video.',
+  },
+}
+
+/** 꺼진 단추 아래 한 줄 — 꺼진 단추마다 까닭(같으면 한 번), 둘 다 만드는 중이면 한 문장. 꺼진 단추가 없으면 null. */
+export function workBlockLine(image: WorkBlock | null, video: WorkBlock | null, t: Translate): string | null {
+  if (image === 'busy' && video === 'busy') return t('Making images and videos now. You can press again when they finish.')
+  const lines = [image && t(BLOCK_TEXT.image[image]), video && t(BLOCK_TEXT.video[video])].filter((line): line is string => !!line)
+  return lines.length > 0 ? [...new Set(lines)].join(' · ') : null
+}
+
 export type PrimaryWorkAction = 'image' | 'video' | 'editor'
 
 /** 가장 밝은(크림) 단추 = 지금 할 일 하나(시안 R): 이미지 → 영상 → 다음: Editor로. */
@@ -120,7 +185,9 @@ export function workEstimateText(
   t: Translate,
 ): string | null {
   const videos = input.videoModels.length
-  if (input.images === 0 && videos === 0) return input.making ? t('Making now') : null
+  // 만드는 중이면 남은 일이 있어도 시간을 쓰지 않는다(8/26 · 시안 D4 "만드는 중이에요", 리드 검토 a 보통 1).
+  if (input.making) return t('Making now')
+  if (input.images === 0 && videos === 0) return null
   // 이미지 분은 Storyboard → Director 넘기기 창과 같은 셈(리드 11/14 — 두 곳 숫자가 같게).
   const imageMinutes = realImageBatchMinutes(input.images)
   const videoMinutes = videos > 0 ? Math.max(1, Math.round(estimateVideoSeconds(input.videoModels) / 60)) : 0

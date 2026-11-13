@@ -44,10 +44,13 @@ describe('C3 — 전체 재생성을 요청할 수 있다', () => {
 })
 
 describe('C3 — 막힐 때 이유를 말한다', () => {
-  // 왜: 결정 페이지 추천 "꺼진 단추 아래 이유 한 줄" — 만들 게 없어 꺼진 단추에 마우스를 올리면 이유를 말한다.
-  it('꺼진 만들기 단추는 마우스를 올리면 왜 꺼졌는지 알려 준다', () => {
-    expect(page).toContain('Every shot here already has an image.')
-    expect(page).toContain('Videos need an image first.')
+  // 왜: 출시 문장 그대로(#c3 2026-08-27 ② "생성 중이면 disabled 인데 왜 막혔는지 말해주지 않았다"). 1110 확정 화면에서는
+  //   일괄이 도는 동안 [이미지 만들기]가 꺼지고 단추 아래 한 줄로 까닭을 보인다(결정 페이지 "꺼진 단추 아래 이유 한 줄", 리드 검토 a 보통 1).
+  it('생성 중에는 다시 누를 수 없는 이유를 알려준다', () => {
+    const work = readFileSync('src/lib/director/toolbar-work.ts', 'utf8')
+    expect(work).toContain("'Making images now. You can press again when it finishes.'")
+    expect(page).toContain('imageWorkBlock(shotStates, picked, realBatchBusy)')
+    expect(page).toContain('{blockLine}')
   })
 
   it('다시 만들기 · 꺼진 단추 안내 문구를 한국어로 보여준다', () => {
@@ -56,6 +59,12 @@ describe('C3 — 막힐 때 이유를 말한다', () => {
       'Make images again',
       'Every shot here already has an image.',
       'Videos need an image first.',
+      'Making images now. You can press again when it finishes.',
+      'Making videos now. You can press again when it finishes.',
+      'Making images and videos now. You can press again when they finish.',
+      'No shots yet.',
+      'The rest are being made now.',
+      'Every shot here already has a video.',
     ]) {
       expect(ko[key], `missing ko: ${key}`).toBeTruthy()
     }

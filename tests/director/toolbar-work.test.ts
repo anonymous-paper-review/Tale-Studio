@@ -2,11 +2,15 @@
 import { describe, expect, it } from 'vitest'
 import { translate } from '@/lib/i18n/translate'
 import { realImageBatchMinutes } from '@/lib/director/generation-estimate'
+import { readFileSync } from 'node:fs'
 import {
   estimateVideoSeconds,
+  imageWorkBlock,
   imageWorkShotIds,
   primaryWorkAction,
+  videoWorkBlock,
   videoWorkShotIds,
+  workBlockLine,
   workEstimateText,
 } from '@/lib/director/toolbar-work'
 import type { DirectorShotState } from '@/lib/director/shot-state'
@@ -88,9 +92,10 @@ describe('예상 칸', () => {
       .toBe('영상 1개 · 약 3분')
   })
 
-  it('남은 일이 없고 만드는 중이면 예상 칸은 "만드는 중이에요"라고만 쓰고, 둘 다 없으면 쓰지 않는다', () => {
-    // 왜: 시안 D4 "만드는 중이에요" — 만드는 중에는 남은 시간을 쓰지 않는다(8/26).
+  it('만드는 중이면 남은 일이 있어도 예상 칸은 "만드는 중이에요"만 쓰고, 둘 다 없으면 쓰지 않는다', () => {
+    // 왜: 시안 D4 "만드는 중이에요" — 만드는 중에는 남은 시간을 쓰지 않는다(8/26). 남은 샷이 있다고 "약 2분"을 쓰면 어긋났다(리드 검토 a 보통 1).
     expect(workEstimateText({ images: 0, videoModels: [], videoTakes: 0, takesShown: true, making: true }, ko)).toBe('만드는 중이에요')
+    expect(workEstimateText({ images: 2, videoModels: ['seedance'], videoTakes: 5, takesShown: true, making: true }, ko)).toBe('만드는 중이에요')
     expect(workEstimateText({ images: 0, videoModels: [], videoTakes: 0, takesShown: true, making: false }, ko)).toBeNull()
   })
 
@@ -107,5 +112,51 @@ describe('예상 칸', () => {
       expect(workEstimateText({ images: n, videoModels: [], videoTakes: 0, takesShown: true, making: false }, ko))
         .toBe(`이미지 ${n}장 · 약 ${realImageBatchMinutes(n)}분 · Takes 안 써요`)
     }
+  })
+})
+
+describe('꺼진 단추와 그 까닭', () => {
+  const none = new Set<string>()
+
+  it('이미지 일괄이 도는 동안 [이미지 만들기]는 꺼지고, 그 까닭은 "이미지를 만드는 중이에요"다', () => {
+    // 왜: 일괄이 도는 동안 눌러도 아무 일이 없었다 — 켜진 크림 단추가 말없이 무시됐다(리드 검토 a 보통 1).
+    expect(imageWorkBlock(states, none, true)).toBe('busy')
+    expect(workBlockLine('busy', null, ko)).toBe('이미지를 만드는 중이에요. 끝나면 다시 누를 수 있어요.')
+  })
+
+  it('영상 묶음이 도는 동안 [영상 만들기]는 꺼지고, 그 까닭은 "영상을 만드는 중이에요"다', () => {
+    // 왜: 묶음이 도는 동안 확인 창이 확인 · 취소 둘 다 꺼진 채 떴다(리드 검토 a 보통 1).
+    expect(videoWorkBlock(states, none, true)).toBe('busy')
+    expect(workBlockLine(null, 'busy', ko)).toBe('영상을 만드는 중이에요. 끝나면 다시 누를 수 있어요.')
+    expect(workBlockLine('busy', 'busy', ko)).toBe('이미지와 영상을 만드는 중이에요. 끝나면 다시 누를 수 있어요.')
+  })
+
+  it('꺼진 만들기 단추의 까닭은 상황마다 다르다 — 샷 없음 · 남은 샷 만드는 중 · 모두 이미지 있음 · 이미지 먼저 · 모두 영상 있음', () => {
+    // 왜: 모두 영상이 있어도 "이미지가 먼저 있어야 해요", 샷이 없어도 "모두 이미지가 있어요"라고 했다(리드 검토 a 낮음 4).
+    const of = (...list: DirectorShotState[]) => new Map(list.map((state, i) => [`s${i}`, state] as const))
+    expect(imageWorkBlock(new Map(), none, false)).toBe('no_shots')
+    expect(videoWorkBlock(new Map(), none, false)).toBe('no_shots')
+    expect(imageWorkBlock(of('image_generating', 'image_done'), none, false)).toBe('all_making')
+    expect(imageWorkBlock(of('image_done', 'video_done'), none, false)).toBe('all_have_images')
+    expect(videoWorkBlock(of('image_needed', 'video_done'), none, false)).toBe('need_images')
+    expect(videoWorkBlock(of('video_generating', 'video_done'), none, false)).toBe('all_making')
+    expect(videoWorkBlock(of('video_done', 'video_done'), none, false)).toBe('all_have_videos')
+    expect(imageWorkBlock(of('image_needed'), none, false)).toBeNull()
+    expect(videoWorkBlock(of('image_done'), none, false)).toBeNull()
+    expect(workBlockLine('all_have_images', 'all_have_videos', ko)).toBe('여기 있는 샷은 모두 이미지가 있어요. · 여기 있는 샷은 모두 영상이 있어요.')
+    expect(workBlockLine('no_shots', 'no_shots', ko)).toBe('아직 샷이 없어요.')
+    expect(workBlockLine(null, null, ko)).toBeNull()
+  })
+
+  it('꺼진 단추의 까닭은 마우스를 올리지 않아도 단추 아래 한 줄로 보이고, 단추가 꺼지면 크림은 다음 할 일로 간다', () => {
+    // 왜: 결정 페이지 추천 "꺼진 단추 아래 이유 한 줄"(오너 "나머지는 추천대로") — 마우스 글(title)은 키보드 · 터치로 안 보였다(리드 검토 a 낮음 4).
+    const page = readFileSync('src/app/studio/director/page.tsx', 'utf8')
+    expect(page).toContain('const blockLine = workBlockLine(imageBlock, videoBlock, t)')
+    expect(page).toMatch(/<p id="director-work-block"[^>]*>\s*\{blockLine\}/)
+    expect(page).toContain('disabled={imageBlock !== null}')
+    expect(page).toContain('disabled={videoBlock !== null}')
+    expect(page).not.toContain("title={imageMode.shotIds.length === 0 ? t('Every shot here already has an image.')")
+    expect(page).toContain('imageCount: imageBlock === null ? imageWork.length : 0')
+    expect(page).toContain('videoCount: videoBlock === null ? videoWork.length : 0')
   })
 })

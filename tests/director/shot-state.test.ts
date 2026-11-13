@@ -26,6 +26,7 @@ const none: ShotStateFacts = {
   imageRemakeFailed: false,
   imageWaiting: false,
   videoGenerating: false,
+  videoWaiting: false,
   videoDone: false,
   videoLatestFailed: false,
 }
@@ -181,6 +182,16 @@ describe('캔버스 노드에서 샷 상태 근거 모으기', () => {
     const queued = shotFactsByNode([shot('a', null)], { ...quiet, pendingImageNodeIds: pending, queuedImageShots: new Set(['w-a']) })
     expect(queued.get('a')!.imageWaiting).toBe(false)
     expect(shotState(queued.get('a')!)).toBe('image_generating')
+  })
+
+  it('영상 묶음에서 아직 안 낸 샷은 "영상 만드는 중"으로 세고 기다림으로 적는다', () => {
+    // 왜: 묶음이 곧 낼 샷을 [영상 만들기 · N]에 다시 세면, 눌러도 아무 일이 없는 단추가 된다(리드 검토 a 보통 1).
+    const nodes = [shot('a', { status: 'completed', url: 'https://x/a.png' }), shot('b', { status: 'completed', url: 'https://x/b.png' })]
+    const facts = shotFactsByNode(nodes, { ...quiet, pendingVideoShots: new Set(['w-a']) })
+    expect(shotState(facts.get('a')!)).toBe('video_generating')
+    expect(facts.get('a')!.videoWaiting).toBe(true)
+    expect(shotState(facts.get('b')!)).toBe('image_done')
+    expect(shotTail('video_generating', facts.get('a')!, 'card')).toMatchObject({ label: 'Waiting in line', color: 'state-video', ring: true })
   })
 
   it('일괄이 맡은 샷은 그림이 없고 · 실패하지 않았고 · 러프가 있고 · 일괄 대상인 샷이며, 멈추기를 누르면 없다', () => {

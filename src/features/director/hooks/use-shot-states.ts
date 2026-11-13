@@ -48,6 +48,8 @@ interface StateKeys {
   /** 일괄 대상 Writer 샷 id(null = 그림 없는 샷 전부). */
   batchShots: string | null
   rough: string
+  /** 영상 묶음이 아직 내지 않은 Writer 샷 id(멈추는 중이면 비움 — 남은 샷은 만들지 않는다). */
+  videoPending: string
 }
 
 /** 상태 판정에 드는 바깥 근거를 원시값으로 모은다(훅 deps 가 렌더마다 바뀌지 않게). */
@@ -59,7 +61,10 @@ function useStateKeys(): StateKeys {
   const batchShots = useDirectorCanvasStore((s) => (s.realBatchShotIds ? s.realBatchShotIds.join('|') : null))
   // 일괄이 돌 때만 러프를 본다(돌지 않으면 맡은 샷이 없다).
   const rough = useWriterStore((s) => (batch === 'busy' ? roughDoneKey(s.shots) : ''))
-  return { image: queued.image, video: queued.video, batch, batchShots, rough }
+  const videoPending = useDirectorCanvasStore((s) =>
+    s.videoBatchCancelled ? '' : [...(s.videoBatchQueue?.pendingShotIds ?? [])].sort().join('|'),
+  )
+  return { image: queued.image, video: queued.video, batch, batchShots, rough, videoPending }
 }
 
 function factsFor(nodes: readonly DirectorNode[], keys: StateKeys): Map<string, ShotStateFacts> {
@@ -73,16 +78,17 @@ function factsFor(nodes: readonly DirectorNode[], keys: StateKeys): Map<string, 
     queuedImageShots: idSet(keys.image),
     queuedVideoShots: idSet(keys.video),
     pendingImageNodeIds,
+    pendingVideoShots: idSet(keys.videoPending),
   })
 }
 
 export function useDirectorShotStates(): Map<string, DirectorShotState> {
   const nodes = useDirectorCanvasStore((s) => s.nodes) ?? NO_NODES
-  const { image, video, batch, batchShots, rough } = useStateKeys()
+  const { image, video, batch, batchShots, rough, videoPending } = useStateKeys()
   return useMemo(() => {
-    const facts = factsFor(nodes, { image, video, batch, batchShots, rough })
+    const facts = factsFor(nodes, { image, video, batch, batchShots, rough, videoPending })
     return new Map([...facts].map(([id, fact]) => [id, shotState(fact)]))
-  }, [nodes, image, video, batch, batchShots, rough])
+  }, [nodes, image, video, batch, batchShots, rough, videoPending])
 }
 
 /** 노드 하나(샷 노드 id)의 상태와 근거 — 그 샷과 그 샷의 Take 만 본다. 노드형 카드가 저마다 부른다.
@@ -92,16 +98,16 @@ export function useShotStatus(
   ownData?: ShotNodeData | null,
 ): { state: DirectorShotState; facts: ShotStateFacts } | undefined {
   const nodes = useDirectorCanvasStore((s) => s.nodes) ?? NO_NODES
-  const { image, video, batch, batchShots, rough } = useStateKeys()
+  const { image, video, batch, batchShots, rough, videoPending } = useStateKeys()
   return useMemo(() => {
     if (!shotNodeId) return undefined
     const relevant = nodes.filter(
       (n) => (!ownData && n.id === shotNodeId) || (isVideoData(n.data) && n.data.parentShotNodeId === shotNodeId),
     )
     if (ownData) relevant.unshift({ id: shotNodeId, type: 'shot', position: { x: 0, y: 0 }, data: ownData } as DirectorNode)
-    const fact = factsFor(relevant, { image, video, batch, batchShots, rough }).get(shotNodeId)
+    const fact = factsFor(relevant, { image, video, batch, batchShots, rough, videoPending }).get(shotNodeId)
     return fact ? { state: shotState(fact), facts: fact } : undefined
-  }, [nodes, image, video, batch, batchShots, rough, shotNodeId, ownData])
+  }, [nodes, image, video, batch, batchShots, rough, videoPending, shotNodeId, ownData])
 }
 
 /** 노드 하나(샷 노드 id)의 상태 — 영상 노드가 부모 샷 상태로 흐림을 정할 때. */

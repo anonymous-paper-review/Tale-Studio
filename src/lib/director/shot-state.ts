@@ -25,6 +25,8 @@ export interface ShotStateFacts {
   /** 일괄이 맡았지만 아직 큐에 앉지 않았다 — 만드는 중으로 세고 꼬리는 "대기 중". */
   imageWaiting: boolean
   videoGenerating: boolean
+  /** 영상 묶음이 맡았지만 아직 내지 않았다 — 만드는 중으로 세고 꼬리는 "순서 기다리는 중". */
+  videoWaiting: boolean
   videoDone: boolean
   /** 마지막 영상 시도가 실패했다(완성 Take 가 따로 있으면 영상 완성이 이긴다). */
   videoLatestFailed: boolean
@@ -48,6 +50,8 @@ export interface ShotStateContext {
   queuedVideoShots: ReadonlySet<string>
   /** 일괄 러너가 맡았지만 아직 큐에 앉지 않은 샷(노드 id). */
   pendingImageNodeIds?: ReadonlySet<string>
+  /** 영상 묶음이 맡았지만 아직 내지 않은 샷의 Writer 샷 id(서버 조회의 낼 순서). */
+  pendingVideoShots?: ReadonlySet<string>
 }
 
 function hasUrl(value: unknown): boolean {
@@ -120,15 +124,18 @@ export function shotFactsByNode(
     const latest = selectLatestAttempt(records)
     const imageQueued = !!writerShotId && context.queuedImageShots.has(writerShotId)
     const imagePending = !!context.pendingImageNodeIds?.has(node.id)
+    const videoRunning =
+      records.some((r) => r.status === 'generating' || r.last_attempt_status === 'generating') ||
+      (!!writerShotId && context.queuedVideoShots.has(writerShotId))
+    const videoPending = !!writerShotId && !!context.pendingVideoShots?.has(writerShotId)
     out.set(node.id, {
       imageGenerating: image?.status === 'generating' || imageQueued || imagePending,
       imageDone: (image?.status === 'completed' || image?.status === 'failed') && hasUrl(image.url),
       imageFailed: image?.status === 'failed' && !hasUrl(image.url),
       imageRemakeFailed: imageRemakeFailed(image),
       imageWaiting: imagePending && !imageQueued && image?.status !== 'generating',
-      videoGenerating:
-        records.some((r) => r.status === 'generating' || r.last_attempt_status === 'generating') ||
-        (!!writerShotId && context.queuedVideoShots.has(writerShotId)),
+      videoGenerating: videoRunning || videoPending,
+      videoWaiting: videoPending && !videoRunning,
       videoDone: records.some((r) => r.status === 'completed' && hasUrl(r.url)),
       videoLatestFailed:
         !!latest && (latest.last_attempt_status === 'failed' || (latest.last_attempt_status == null && latest.status === 'failed')),
@@ -230,13 +237,14 @@ export interface ShotTail {
  *  일괄이 맡아 기다리는 샷은 "대기 중", 노드형 이미지 필요 샷은 "이미지 필요"(카드는 주황 태그가 따로 말해 "대기"). */
 export function shotTail(
   state: DirectorShotState,
-  facts: Pick<ShotStateFacts, 'imageRemakeFailed' | 'imageWaiting'>,
+  facts: Pick<ShotStateFacts, 'imageRemakeFailed' | 'imageWaiting'> & Partial<Pick<ShotStateFacts, 'videoWaiting'>>,
   place: ShotTailPlace,
 ): ShotTail {
   const making = state === 'image_generating' || state === 'video_generating'
   if (facts.imageRemakeFailed && !making) return { label: 'Remake failed', color: 'destructive', ring: false, remakeFailed: true }
   const tone = shotStateTone(state)
   if (state === 'image_generating' && facts.imageWaiting) return { label: 'Waiting', color: tone.dot, ring: true, remakeFailed: false }
+  if (state === 'video_generating' && facts.videoWaiting) return { label: 'Waiting in line', color: tone.dot, ring: true, remakeFailed: false }
   if (state === 'image_needed') return { label: place === 'node' ? 'Image needed' : SHOT_STATE_TAIL_LABEL.image_needed, color: null, ring: false, remakeFailed: false }
   return { label: SHOT_STATE_TAIL_LABEL[state], color: tone.dot, ring: tone.ring, remakeFailed: false }
 }
