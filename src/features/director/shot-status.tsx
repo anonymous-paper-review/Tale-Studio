@@ -26,6 +26,7 @@ import {
   type ShotTailPlace,
 } from '@/lib/director/shot-state'
 import { useT } from '@/lib/i18n'
+import { countText } from '@/lib/i18n/count-text'
 import { cn } from '@/lib/utils'
 
 /** 상태 점 — 만드는 중은 테두리만 있는 고리, 끝남은 꽉 찬 점(시안 R). */
@@ -324,7 +325,7 @@ export function PickAllBar({
         {state === 'mixed' && <span className="h-0.5 w-2.5 rounded-full bg-current" />}
       </button>
       <span className="whitespace-nowrap text-[14px] font-semibold text-foreground">
-        {picked === 0 ? t('All {count} shots', { count: total }) : t('{picked} of {total} picked', { picked, total })}
+        {picked === 0 ? countText(t, total, 'All 1 shot', 'All {count} shots', { count: total }) : t('{picked} of {total} picked', { picked, total })}
       </span>
       {picked > 0 && (
         <button

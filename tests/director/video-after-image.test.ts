@@ -126,6 +126,6 @@ describe('이어 보내기가 약속한 만큼 · 이 화면에서만', () => {
     // 왜: 확인 창이 약속한 영상이 말없이 빠지면 안 된다. 다른 길로 영상이 생긴 샷은 알리지 않는다.
     expect(chainMissed(['a', 'b', 'c'], new Map([['a', 'image_failed'], ['b', 'image_needed'], ['c', 'video_done']]))).toEqual(['a', 'b'])
     expect(ko("{count} videos didn't start because their images weren't made.", { count: 2 })).toBe('이미지를 못 만들어 영상 2개는 시작하지 않았어요')
-    expect(chainEffect()).toContain("toast.info(t(\"{count} videos didn't start because their images weren't made.\", { count: missed.length }))")
+    expect(chainEffect()).toContain("countText(t, missed.length, \"1 video didn't start because its image wasn't made.\", \"{count} videos didn't start because their images weren't made.\", { count: missed.length })")
   })
 })

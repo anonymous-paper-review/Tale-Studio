@@ -1,6 +1,7 @@
 // Director 위쪽 단추 셋이 세는 일 · 가장 밝은 단추 · 예상 칸 글(시안 D1 406:3717 · D2 406:4588 · R 416:4941, 오너 2026-11-14).
 //   순수 함수만 둔다. 샷 상태 판정은 shot-state.ts. 약속: tests/director/toolbar-work.test.ts
 import { realImageBatchMinutes } from '@/lib/director/generation-estimate'
+import { countText } from '@/lib/i18n/count-text'
 import { matchesStatusFilter, type DirectorShotState, type ShotStatusFilter } from '@/lib/director/shot-state'
 import type { VideoModelKey } from '@/lib/video-models'
 
@@ -205,17 +206,33 @@ export function workEstimateText(
   // 이미지 분은 Storyboard → Director 넘기기 창과 같은 셈(리드 11/14 — 두 곳 숫자가 같게).
   const imageMinutes = realImageBatchMinutes(input.images)
   const videoMinutes = videos > 0 ? Math.max(1, Math.round(estimateVideoSeconds(input.videoModels) / 60)) : 0
-  if (input.images > 0 && input.chain && videos > 0) {
+  const chain = input.images > 0 && !!input.chain && videos > 0
+  // 영어는 수가 1이면 단수 문장(리드 11/14 답 2) — 문장마다 통째 키라 한국어 "이미지 4장 · 약 2분 · Takes 안 써요"는 그대로다.
+  const takes = input.videoTakes
+  if (chain) {
     const minutes = imageMinutes + videoMinutes
-    return input.takesShown
-      ? t('{images} images · {videos} videos · about {minutes} min · {takes} Takes', { images: input.images, videos, minutes, takes: input.videoTakes })
-      : t('{images} images · {videos} videos · about {minutes} min', { images: input.images, videos, minutes })
+    const params = { images: input.images, videos, minutes, takes }
+    const one = input.images === 1 && videos === 1
+    if (!input.takesShown) return one ? t('1 image · 1 video · about {minutes} min', params) : t('{images} images · {videos} videos · about {minutes} min', params)
+    if (!one) return t('{images} images · {videos} videos · about {minutes} min · {takes} Takes', params)
+    return takes === 1 ? t('1 image · 1 video · about {minutes} min · 1 Take', params) : t('1 image · 1 video · about {minutes} min · {takes} Takes', params)
   }
-  if (input.images > 0) return t('{count} images · about {minutes} min · No Takes used', { count: input.images, minutes: imageMinutes })
-  const minutes = videoMinutes
-  return input.takesShown
-    ? t('{count} videos · about {minutes} min · {takes} Takes', { count: videos, minutes, takes: input.videoTakes })
-    : t('{count} videos · about {minutes} min', { count: videos, minutes })
+  if (input.images > 0) {
+    return countText(t, input.images, '1 image · about {minutes} min · No Takes used', '{count} images · about {minutes} min · No Takes used', { count: input.images, minutes: imageMinutes })
+  }
+  const params = { count: videos, minutes: videoMinutes, takes }
+  if (!input.takesShown) return countText(t, videos, '1 video · about {minutes} min', '{count} videos · about {minutes} min', params)
+  if (videos > 1) return t('{count} videos · about {minutes} min · {takes} Takes', params)
+  return takes === 1 ? t('1 video · about {minutes} min · 1 Take', params) : t('1 video · about {minutes} min · {takes} Takes', params)
+}
+
+/** 2줄 왼쪽 진행 글 "이미지 2장 · 영상 2개 만드는 중"(시안 D4) — 영어는 수가 1이면 단수. 둘 다 0이면 이미지 1장으로 쓴다(일괄이 막 시작됨). */
+export function makingLabel(images: number, videos: number, t: Translate): string {
+  const parts: string[] = []
+  if (images > 0) parts.push(countText(t, images, '1 image', '{count} images', { count: images }))
+  if (videos > 0) parts.push(countText(t, videos, '1 video', '{count} videos', { count: videos }))
+  if (parts.length === 0) parts.push(t('1 image'))
+  return t('Making {what}', { what: parts.join(' · ') })
 }
 
 /** "영상까지 이어서"(시안 D4 · 오너 답 6): 이미지를 기다리던 샷 가운데 이미지가 끝난 샷은 영상을 시작하고(start),

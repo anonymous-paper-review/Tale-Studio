@@ -41,6 +41,7 @@ import {
   effectivePickedIds,
   imageButtonMode,
   imageWorkBlock,
+  makingLabel,
   nextPickAll,
   primaryWorkAction,
   videoWorkBlock,
@@ -93,6 +94,7 @@ import {
 } from '@/types/director'
 import { StoryboardGridView } from '@/features/director/canvas-views/StoryboardGridView'
 import { useStoryboardZoom } from '@/components/generating-frame'
+import { countText } from '@/lib/i18n/count-text'
 import { useWriterDirectorSync } from '@/features/director/hooks/use-writer-director-sync'
 import { useQueueRehydrate } from '@/features/director/hooks/use-queue-rehydrate'
 
@@ -1087,7 +1089,9 @@ function PaletteBar() {
     if (step.start.length === 0 && step.drop.length === 0) return
     setChainWaitingShots(step.keep)
     const missed = chainMissed(step.drop, shotStates)
-    if (missed.length > 0) toast.info(t("{count} videos didn't start because their images weren't made.", { count: missed.length }))
+    if (missed.length > 0) {
+      toast.info(countText(t, missed.length, "1 video didn't start because its image wasn't made.", "{count} videos didn't start because their images weren't made.", { count: missed.length }))
+    }
     // 이미지가 끝난 샷은 서버 영상 묶음으로 — 사람당 동시 한도를 넘는 샷도 묶음이 차례로 낸다(리드 검토 a 보통 3).
     const pid = useDirectorCanvasStore.getState().projectId
     if (pid && step.start.length > 0) void runVideoBatch(pid, { shotIds: step.start })
@@ -1095,12 +1099,13 @@ function PaletteBar() {
   }, [chainKey, realBatchBusy, videoBatchBusy])
   const progressDone = (storyboardBatch?.done ?? 0) + (videoBatch?.done ?? (videoBatchProgress?.done ?? 0))
   const progressTotal = (storyboardBatch?.total ?? 0) + (videoBatch?.total ?? (videoBatchProgress?.total ?? 0))
+  // 영어는 수가 1이면 단수(리드 11/14 답 2).
   const progressLabel =
     makingImages > 0 && makingVideos > 0
-      ? t('Making {images} images · {videos} videos', { images: makingImages, videos: makingVideos })
+      ? makingLabel(makingImages, makingVideos, t)
       : makingVideos > 0 || videoBatchBusy
-        ? t('Making {count} videos', { count: Math.max(makingVideos, 1) })
-        : t('Making {count} images', { count: Math.max(makingImages, 1) })
+        ? makingVideos > 1 ? t('Making {count} videos', { count: makingVideos }) : t('Making 1 video')
+        : makingImages > 1 ? t('Making {count} images', { count: makingImages }) : t('Making 1 image')
 
   // v3 D1 → 1110 확정(시안 406:3717 · 406:4051): 위쪽 2줄.
   //   1줄: 보기 · 제목 · 예상 … 상태 고르기 · Lumi / 2줄: 진행 … 이미지 만들기 · 영상 만들기.
@@ -1354,7 +1359,7 @@ function PaletteBar() {
         open={confirmChain}
         onOpenChange={setConfirmChain}
         title={t('Make images, then their videos?')}
-        description={t('Makes {count} images, and each video starts by itself when its image is done.', { count: imageWork.length })}
+        description={countText(t, imageWork.length, 'Makes 1 image, and its video starts by itself when the image is done.', 'Makes {count} images, and each video starts by itself when its image is done.', { count: imageWork.length })}
         impact={[
           t('Costs money for every generated video: {count} videos.', { count: chainPlan.total }),
           ...describeVideoBatchPlan(chainPlan, t),
@@ -1377,8 +1382,8 @@ function PaletteBar() {
       <RegenerateConfirmDialog
         open={confirmRemake}
         onOpenChange={setConfirmRemake}
-        title={t('Make {count} images again?', { count: imageMode.shotIds.length })}
-        description={t('Remakes the image for the {count} picked shots. No Takes are used.', { count: imageMode.shotIds.length })}
+        title={countText(t, imageMode.shotIds.length, 'Make 1 image again?', 'Make {count} images again?', { count: imageMode.shotIds.length })}
+        description={countText(t, imageMode.shotIds.length, 'Remakes the image for the 1 picked shot. No Takes are used.', 'Remakes the image for the {count} picked shots. No Takes are used.', { count: imageMode.shotIds.length })}
         impact={[t('Replaces the current images in the picked shots.')]}
         confirmLabel={t('Make again')}
         onConfirm={remakePicked}

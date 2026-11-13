@@ -19,7 +19,10 @@ export function directorCanvasMeta(
   const visible = nodes.filter((n) => !HIDDEN_ON_CANVAS.has(n.data.kind))
   if (visible.length === 0) return null
   const shots = visible.filter((n) => n.data.kind === 'shot').length
-  return t('{nodes} nodes · {shots} shots', { nodes: visible.length, shots })
+  // 영어는 수가 1이면 단수(리드 11/14 답 2) — 한국어는 "노드 9 · 샷 4" 그대로.
+  const params = { nodes: visible.length, shots }
+  if (visible.length === 1) return shots === 1 ? t('1 node · 1 shot', params) : t('1 node · {shots} shots', params)
+  return shots === 1 ? t('{nodes} nodes · 1 shot', params) : t('{nodes} nodes · {shots} shots', params)
 }
 
 /** 스토리보드형 "씬 2 · 샷 4 · 12초"(1110 확정 시안 D1 406:3717) — 씬 수 · 샷 수 · 샷 길이 합. 샷이 없으면 null. */
@@ -34,5 +37,7 @@ export function storyboardCanvasMeta(
     const value = (n.data as { durationSeconds?: unknown }).durationSeconds
     return sum + (typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0)
   }, 0)
-  return t('{scenes} scenes · {shots} shots · {seconds}s', { scenes, shots: shots.length, seconds: Math.round(seconds) })
+  const params = { scenes, shots: shots.length, seconds: Math.round(seconds) }
+  if (scenes === 1) return shots.length === 1 ? t('1 scene · 1 shot · {seconds}s', params) : t('1 scene · {shots} shots · {seconds}s', params)
+  return shots.length === 1 ? t('{scenes} scenes · 1 shot · {seconds}s', params) : t('{scenes} scenes · {shots} shots · {seconds}s', params)
 }
