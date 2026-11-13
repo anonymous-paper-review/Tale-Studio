@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { ShotSubtitle, TitleCardData } from '@/types/shot'
 import { resolveSubtitle } from '@/lib/editor/subtitle'
-import type { Shot, VideoClip, DialogueLine, AudioTrackClip, AudioSource, ClipTransition, ClipMotion } from '@/types'
+import type { Shot, VideoClip, DialogueLine, AudioTrackClip, AudioSource, ClipTransition, ClipTransitionType, ClipMotion } from '@/types'
 import { toast } from 'sonner'
 import { useProjectStore } from '@/stores/project-store'
 import { createClient } from '@/lib/supabase/client'
@@ -25,6 +25,8 @@ import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 import { compactSnapshot, sharePeaks } from '@/lib/editor/peaks'
 import { nearestEditPoint } from '@/lib/editor/timeline-segments'
+import { TRANSITION_DEFAULT_SEC, cleanTransition, edgeFadeAt, edgeTransition, joinedNeighbor, transitionWindows, type TransitionEdge } from '@/lib/editor/transition'
+import { VIDEO_EFFECT_DEFAULT, patchEffects, type VideoEffectKind, type VideoEffectPatch } from '@/lib/editor/video-effects'
 
 const DEFAULT_CAMERA = {
   horizontal: 0,
@@ -235,8 +237,27 @@ interface EditorState {
   setTitleCardDuration: (shotId: string, seconds: number) => void
   /** 약속 K: 클립 자막(글자·자리) — 손대는 순간 대사 초기값이 저장값이 된다. null 이면 지운다. */
   setSubtitle: (shotId: string, patch: Partial<ShotSubtitle> | null) => void
-  /** 화면 전환(2026-09-08): 클립 앞 경계의 디졸브를 넣거나(길이) 뺀다(null). 되돌리기 대상. */
+  /** 화면 전환(2026-09-08): 클립 앞 경계의 전환을 넣거나(종류 · 길이) 뺀다(null) — setClipTransition 의 시작 끝. 되돌리기 대상. */
   setTransitionIn: (shotId: string, transition: ClipTransition | null) => void
+  /**
+   * 클립 한 끝(시작 · 끝)의 전환을 넣거나 바꾸거나 뺀다(null) — 고른 클립 모두에. 맞닿은 컷은 뒤 클립 시작 전환 하나다(앞 클립 끝에 놓아도
+   *   그 컷의 전환이 바뀐다). 잠근 줄은 건너뛴다. 되돌리기 한 칸(2단계 ⑤).
+   */
+  setClipTransition: (shotIds: readonly string[], edge: TransitionEdge, transition: ClipTransition | null) => void
+  /** 그 끝에 있는 전환의 길이만 바꾼다 — 전환이 없는 클립은 건너뛴다. 되돌리기 한 칸. */
+  setTransitionLength: (shotIds: readonly string[], edge: TransitionEdge, durationSec: number) => void
+  /** 효과 탭에서 끌어 놓은 영상 전환 — 그 끝에 전환이 있으면 길이는 두고 종류만 바꾸고, 없으면 1초. 놓은 클립을 고른다. 되돌리기 한 칸. */
+  dropTransition: (shotId: string, edge: TransitionEdge, type: ClipTransitionType) => void
+  /** 효과 탭에서 끌어 놓은 영상 효과 — 처음 값으로 넣고(있으면 그대로) 놓은 클립을 고른다. 타이틀 카드 · 잠근 줄은 건너뛴다. 되돌리기 한 칸. */
+  addVideoEffect: (shotId: string, kind: VideoEffectKind) => void
+  /** 영상 효과 값 — 그 효과를 넣은 클립에만. 끄는 동안 부르므로 되돌리기 칸은 부르는 쪽이 쌓는다(setClipMotion 과 같다). */
+  setVideoEffect: (shotIds: readonly string[], patch: VideoEffectPatch) => void
+  /** 영상 효과를 뺀다 — 남은 효과가 없으면 칸을 지운다. 되돌리기 한 칸. */
+  removeVideoEffect: (shotIds: readonly string[], kind: VideoEffectKind) => void
+  /** 효과 탭에서 끌어 놓은 페이드(지속 가감) — 시작 = 페이드 인, 끝 = 페이드 아웃, 1초(있으면 그대로). 놓은 조각을 고른다. 되돌리기 한 칸. */
+  dropAudioFade: (id: string, edge: TransitionEdge) => void
+  /** 페이드 길이를 바꾸거나 뺀다(null). 되돌리기 한 칸. */
+  setAudioFade: (id: string, edge: TransitionEdge, durationSec: number | null) => void
   /**
    * 효과 컨트롤 모션(위치 X · Y · 비율)을 고른 클립 모두에 — 범위 안으로 맞추고, 처음 값(0 · 0 · 1)이면 칸을 지운다(2단계 ④). 끄는 동안
    *   부르므로 되돌리기 칸은 쌓지 않는다(부르는 쪽이 끌기 시작에 한 번). 잠근 줄 · 타이틀 카드는 건너뛴다.
@@ -507,18 +528,22 @@ function coversFrame(clip: Pick<VideoClip, 'motion' | 'opacity'> | undefined): b
 
 /**
  * 시각 t 에 모니터가 겹쳐 그릴 클립 — 눈을 켠 줄마다 그 시각의 클립을 아래 줄부터(2단계 ④, 시안 E3 "배경 위에 샷"). 위에서부터 보아
- *   화면을 다 덮는 클립(불투명도 100% · 비율 100% 이상 · 가운데)이 나오면 그 아래 줄은 그리지 않는다. 맨 끝이 selectProgramLayout 의 그
- *   시각 클립과 같다. 약속: tests/editor/motion-opacity.test.ts
+ *   화면을 다 덮는 클립(불투명도 100% · 비율 100% 이상 · 가운데)이 나오면 그 아래 줄은 그리지 않는다. 빈 끝의 교차 디졸브로 옅어지는
+ *   동안은 덮지 않는다(2단계 ⑤). 맨 끝이 selectProgramLayout 의 그 시각 클립과 같다.
+ *   약속: tests/editor/motion-opacity.test.ts · tests/editor/transitions-effects.test.ts
  */
 export function selectStackAt(input: TimelineInput & { videoTracks?: readonly VideoTrackState[] }, t: number): TrackLayoutItem[] {
   const tracks = input.videoTracks ?? DEFAULT_VIDEO_TRACKS
   const rank = new Map(tracks.map((track, i) => [track.id, i]))
   const hidden = new Set(tracks.filter((track) => track.hidden).map((track) => track.id))
-  const here = selectVideoLayout(input)
+  const layout = selectVideoLayout(input)
+  const windows = transitionWindows(layout, input.videoClips)
+  const here = layout
     .filter((item) => !hidden.has(item.trackId) && item.durationSec > 0 && t >= item.startSec && t < item.startSec + item.durationSec)
     .sort((a, b) => (rank.get(a.trackId) ?? 0) - (rank.get(b.trackId) ?? 0))
   for (let i = here.length - 1; i > 0; i--) {
-    if (coversFrame(input.videoClips.find((c) => c.shotId === here[i].shotId))) return here.slice(i)
+    const id = here[i].shotId
+    if (coversFrame(input.videoClips.find((c) => c.shotId === id)) && edgeFadeAt(windows, id, t) >= 1) return here.slice(i)
   }
   return here
 }
@@ -731,20 +756,26 @@ function splitVideoChanges(state: EditorState, shotId: string, atGlobalSec: numb
   const baseClip: VideoClip =
     clip ?? { shotId, url: null, status: 'pending', thumbnailUrl: null }
 
-  const videoClips = state.videoClips.map((c) =>
-    c.shotId === shotId ? { ...c, trimStart, trimEnd: srcSplit } : c,
-  )
-  videoClips.push({ ...baseClip, shotId: newId, trimStart: srcSplit, trimEnd })
+  // 나눈 자리에는 전환이 없다 — 시작 전환은 앞 조각, 끝 전환은 뒷조각에 남는다. 모션 · 불투명도 · 효과는 둘 다 이어받는다(2단계 ④ · ⑤).
+  const { transitionIn: _in, ...backClip } = baseClip
+  const videoClips = state.videoClips.map((c) => {
+    if (c.shotId !== shotId) return c
+    const { transitionOut: _out, ...front } = c
+    return { ...front, trimStart, trimEnd: srcSplit }
+  })
+  videoClips.push({ ...backClip, shotId: newId, trimStart: srcSplit, trimEnd })
 
   const order = [...(state.clipOrder[shot.sceneId] ?? [])]
   const idx = order.indexOf(shotId)
   if (idx >= 0) order.splice(idx + 1, 0, newId)
   else order.push(newId)
 
-  // 그 클립에 이어진 소리도 같은 자리에서 둘로 — 뒷조각 소리는 새 조각을 따라간다(결정 4).
-  const audioClips = state.audioClips.flatMap((a) =>
-    a.linkedShotId === shotId ? [a, { ...a, id: `audio_${uid()}`, linkedShotId: newId }] : [a],
-  )
+  // 그 클립에 이어진 소리도 같은 자리에서 둘로 — 뒷조각 소리는 새 조각을 따라간다(결정 4). 페이드는 소리를 직접 나눌 때와 같다.
+  const audioClips = state.audioClips.flatMap((a) => {
+    if (a.linkedShotId !== shotId) return [a]
+    const [front, back] = splitFades(a)
+    return [front, { ...back, id: `audio_${uid()}`, linkedShotId: newId }]
+  })
 
   if (place) {
     // V1 밖 줄 — 뒷조각은 같은 줄의 자른 시각에 놓인다(앞 조각 끝 = 자른 시각, 2단계 ②).
@@ -776,6 +807,13 @@ function splitVideoChanges(state: EditorState, shotId: string, atGlobalSec: numb
   }
 }
 
+/** 둘로 나눈 소리의 앞 · 뒷조각 바탕 — 페이드 인은 앞 조각에만, 페이드 아웃은 뒷조각에만(2단계 ⑤). */
+function splitFades(a: AudioTrackClip): [AudioTrackClip, AudioTrackClip] {
+  const { fadeOutSec: _out, ...front } = a
+  const { fadeInSec: _in, ...back } = a
+  return [front, back]
+}
+
 // cut(자르기) for audio — 전역 시간 atGlobalSec 에서 오디오 클립을 둘로 분할.
 // 같은 소스 파일을 공유하므로 뒷조각은 sourceOffsetSec 를 이어받아 올바른 구간을 재생.
 function splitAudioChanges(state: EditorState, id: string, atGlobalSec: number): { changes: Partial<EditorState>; newId: string } | null {
@@ -790,9 +828,11 @@ function splitAudioChanges(state: EditorState, id: string, atGlobalSec: number):
   const newId = `audio_${uid()}`
   // 소리 조각을 직접 자르면 두 조각 모두 영상에서 떨어진다(결정 4). 빠르기는 그대로 — 원본은 타임라인 초 × 빠르기만큼 나아간다.
   const rate = a.playbackRate ?? 1
-  const first: AudioTrackClip = { ...a, durationSec: localT, linkedShotId: null }
+  // 페이드 인은 앞 조각, 페이드 아웃은 뒷조각에 남는다 — 나눈 자리에서 소리가 꺼졌다 켜지지 않게(2단계 ⑤).
+  const [front, back] = splitFades(a)
+  const first: AudioTrackClip = { ...front, durationSec: localT, linkedShotId: null }
   const second: AudioTrackClip = {
-    ...a,
+    ...back,
     id: newId,
     startSec: a.startSec + localT,
     durationSec: a.durationSec - localT,
@@ -964,9 +1004,29 @@ function placeInStory(order: string[], shotId: string, story: string[]): string[
   return [...order.slice(0, at), shotId, ...order.slice(at)]
 }
 
+/**
+ * 클립 한 끝에 전환을 둔다(null = 뺀다) — 맞닿은 컷의 전환은 뒤 클립의 시작 전환 하나라, 앞 클립 끝에 놓아도 뒤 클립 시작에 두고 앞
+ *   클립의 끝 전환 칸은 지운다. 맞닿지 않은 끝만 그 클립의 끝 전환이다(2단계 ⑤). 약속: tests/editor/transitions-effects.test.ts
+ */
+function placeTransition(state: EditorState, clips: VideoClip[], shotId: string, edge: TransitionEdge, next: ClipTransition | null): VideoClip[] {
+  const joined = joinedNeighbor(selectVideoLayout({ ...state, videoClips: clips }), shotId, edge)
+  const holder = edge === 'end' && joined ? joined.shotId : shotId
+  const field = edge === 'start' || joined ? 'transitionIn' : 'transitionOut'
+  // 같은 컷의 다른 칸 — 앞 클립의 끝 전환.
+  const cleared = edge === 'start' ? joined?.shotId : joined ? shotId : undefined
+  return clips.map((c) => {
+    if (c.shotId === holder && field === 'transitionIn') return { ...c, transitionIn: next }
+    if (c.shotId === holder && next) return { ...c, transitionOut: next }
+    if (c.shotId !== holder && c.shotId !== cleared) return c
+    // 끝 전환 칸을 지운다 — 이 끝의 전환을 뺐거나, 같은 컷의 전환이 뒤 클립 시작으로 갔다.
+    const { transitionOut: _drop, ...rest } = c
+    return rest
+  })
+}
+
 /** 영상이 새로 생겨 들어온 샷의 클립 — 새 영상이니 전에 고친 구간 · 빠르기 · 전환 없이 처음 상태(검토 c 리드 판단, 2026-11-14). */
 function freshClip(clip: VideoClip): VideoClip {
-  const { trimStart: _start, trimEnd: _end, transitionIn: _transition, ...rest } = clip
+  const { trimStart: _start, trimEnd: _end, transitionIn: _transition, transitionOut: _out, ...rest } = clip
   return { ...rest, speed: 1 }
 }
 
@@ -1613,6 +1673,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             trimEnd: savedClip?.trimEnd,
             speed: savedClip?.speed ?? 1.0,
             transitionIn: savedClip?.transitionIn ?? null,
+            ...(savedClip?.transitionOut ? { transitionOut: savedClip.transitionOut } : {}),
           })
           canonicalShotIds.add(savedShot.shotId)
           continue
@@ -1632,9 +1693,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           trimEnd: savedClip?.trimEnd,
           speed: savedClip?.speed ?? 1.0,
           transitionIn: savedClip?.transitionIn ?? null,
-          // 모션 · 불투명도(2단계 ④)도 되살린다 — 처음 값이면 칸이 없다.
+          // 모션 · 불투명도(2단계 ④) · 끝 전환 · 영상 효과(⑤)도 되살린다 — 처음 값이면 칸이 없다.
           ...(savedClip?.motion ? { motion: savedClip.motion } : {}),
           ...(savedClip?.opacity !== undefined ? { opacity: savedClip.opacity } : {}),
+          ...(savedClip?.transitionOut ? { transitionOut: savedClip.transitionOut } : {}),
+          ...(savedClip?.effects ? { effects: savedClip.effects } : {}),
         })
         canonicalShotIds.add(savedShot.shotId)
       }
@@ -1661,9 +1724,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           next = { ...next, trimStart: savedClip.trimStart, trimEnd: savedClip.trimEnd }
         }
         if (savedClip.transitionIn) next = { ...next, transitionIn: savedClip.transitionIn }
-        // 원본 클립의 모션 · 불투명도도 DB 에 없다 — 저장한 편집에서 되살린다(2단계 ④).
+        if (savedClip.transitionOut) next = { ...next, transitionOut: savedClip.transitionOut }
+        // 원본 클립의 모션 · 불투명도 · 영상 효과도 DB 에 없다 — 저장한 편집에서 되살린다(2단계 ④ · ⑤).
         if (savedClip.motion) next = { ...next, motion: savedClip.motion }
         if (savedClip.opacity !== undefined) next = { ...next, opacity: savedClip.opacity }
+        if (savedClip.effects) next = { ...next, effects: savedClip.effects }
         return next
       })
       const combinedClips = restoredClips.length ? [...baseClips, ...restoredClips] : baseClips
@@ -2705,12 +2770,116 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }),
     })),
 
-  setTransitionIn: (shotId, transition) =>
+  setTransitionIn: (shotId, transition) => get().setClipTransition([shotId], 'start', transition),
+
+  // 전환 · 효과 · 페이드(2단계 ⑤, 시안 E2 409:5316–5347) — 효과 탭에서 끌어 놓고 효과 컨트롤 · 우클릭 메뉴에서 고친다.
+  //   약속: tests/editor/transitions-effects.test.ts
+  setClipTransition: (shotIds, edge, transition) =>
     set((state) => {
-      if (!state.videoClips.some((c) => c.shotId === shotId) || clipLocked(state, shotId)) return state
-      const next = transition ? { type: 'dissolve' as const, durationSec: Math.max(0.1, Math.min(10, transition.durationSec)) } : null
+      const targets = shotIds.filter((id) => state.videoClips.some((c) => c.shotId === id) && !clipLocked(state, id))
+      if (targets.length === 0) return state
+      const next = transition ? cleanTransition(transition) : null
+      let videoClips = state.videoClips
+      for (const id of targets) videoClips = placeTransition(state, videoClips, id, edge, next)
+      return { videoClips, past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT), future: [] }
+    }),
+
+  setTransitionLength: (shotIds, edge, durationSec) =>
+    set((state) => {
+      let videoClips = state.videoClips
+      let changed = false
+      for (const id of shotIds) {
+        if (clipLocked(state, id)) continue
+        const { transition } = edgeTransition(selectVideoLayout({ ...state, videoClips }), videoClips, id, edge)
+        if (!transition) continue
+        videoClips = placeTransition(state, videoClips, id, edge, cleanTransition({ ...transition, durationSec }))
+        changed = true
+      }
+      return changed ? { videoClips, past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT), future: [] } : state
+    }),
+
+  dropTransition: (shotId, edge, type) => {
+    const state = get()
+    if (!state.videoClips.some((c) => c.shotId === shotId) || clipLocked(state, shotId)) return
+    const { transition } = edgeTransition(selectVideoLayout(state), state.videoClips, shotId, edge)
+    get().setClipTransition([shotId], edge, { type, durationSec: transition?.durationSec ?? TRANSITION_DEFAULT_SEC })
+    get().selectClip(shotId)
+  },
+
+  addVideoEffect: (shotId, kind) =>
+    set((state) => {
+      const clip = state.videoClips.find((c) => c.shotId === shotId)
+      if (!clip || isTitleCardShotId(shotId) || clipLocked(state, shotId)) return state
+      const selected = { selectedClipShotId: shotId, selectedShotIds: [shotId], selectedAudioId: null, selectedAudioIds: [], previewSourceShotId: null }
+      if (clip.effects?.[kind] !== undefined) return selected
+      const effects = { ...clip.effects, [kind]: structuredClone(VIDEO_EFFECT_DEFAULT[kind]) }
       return {
-        videoClips: state.videoClips.map((c) => (c.shotId === shotId ? { ...c, transitionIn: next } : c)),
+        ...selected,
+        videoClips: state.videoClips.map((c) => (c.shotId === shotId ? { ...c, effects } : c)),
+        past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
+        future: [],
+      }
+    }),
+
+  setVideoEffect: (shotIds, patch) =>
+    set((state) => {
+      const targets = new Set(shotIds.filter((id) => !clipLocked(state, id)))
+      let changed = false
+      const videoClips = state.videoClips.map((c) => {
+        if (!targets.has(c.shotId) || !c.effects) return c
+        const effects = patchEffects(c.effects, patch)
+        if (JSON.stringify(effects) === JSON.stringify(c.effects)) return c
+        changed = true
+        return { ...c, effects }
+      })
+      return changed ? { videoClips } : state
+    }),
+
+  removeVideoEffect: (shotIds, kind) =>
+    set((state) => {
+      const targets = new Set(shotIds.filter((id) => !clipLocked(state, id)))
+      let changed = false
+      const videoClips = state.videoClips.map((c) => {
+        if (!targets.has(c.shotId) || c.effects?.[kind] === undefined) return c
+        changed = true
+        const effects = { ...c.effects }
+        delete effects[kind]
+        const { effects: _old, ...rest } = c
+        return Object.keys(effects).length > 0 ? { ...rest, effects } : rest
+      })
+      return changed ? { videoClips, past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT), future: [] } : state
+    }),
+
+  dropAudioFade: (id, edge) =>
+    set((state) => {
+      const clip = state.audioClips.find((a) => a.id === id)
+      if (!clip || audioLocked(state, clip)) return state
+      const key = edge === 'start' ? 'fadeInSec' : 'fadeOutSec'
+      const selected = { selectedAudioId: id, selectedAudioIds: [id], selectedShotIds: [], selectedClipShotId: null }
+      if (clip[key] !== undefined) return selected
+      return {
+        ...selected,
+        audioClips: state.audioClips.map((a) => (a.id === id ? { ...a, [key]: TRANSITION_DEFAULT_SEC } : a)),
+        past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
+        future: [],
+      }
+    }),
+
+  setAudioFade: (id, edge, durationSec) =>
+    set((state) => {
+      const clip = state.audioClips.find((a) => a.id === id)
+      if (!clip || audioLocked(state, clip)) return state
+      const key = edge === 'start' ? 'fadeInSec' : 'fadeOutSec'
+      const value = durationSec === null || !Number.isFinite(durationSec) ? undefined : Math.max(0.1, Math.min(10, durationSec))
+      if (clip[key] === value) return state
+      return {
+        audioClips: state.audioClips.map((a) => {
+          if (a.id !== id) return a
+          const next = { ...a }
+          if (value === undefined) delete next[key]
+          else next[key] = value
+          return next
+        }),
         past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
         future: [],
       }

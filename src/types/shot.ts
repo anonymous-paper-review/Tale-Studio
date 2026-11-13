@@ -150,10 +150,24 @@ export interface TitleCardData {
   layout?: TitleCardLayout | null
 }
 
-/** 화면 전환(2026-09-08): 클립 앞 경계의 디졸브(검은 화면 전환) — 미리보기가 검은 막의 투명도로 그린다. */
+/**
+ * 화면 전환 — 'dissolve' = 검정으로 물들이기(2026-09-08, 이름은 예전 그대로라 옛 저장본도 같은 뜻), 'white' = 흰색으로 물들이기,
+ *   'cross' = 교차 디졸브(앞뒤 클립을 섞는다, 2단계 ⑤ 오너 결정 4). 미리 보기가 막의 투명도 · 겹친 클립으로 그린다(src/lib/editor/transition.ts).
+ */
+export type ClipTransitionType = 'cross' | 'dissolve' | 'white'
 export interface ClipTransition {
-  type: 'dissolve'
+  type: ClipTransitionType
   durationSec: number
+}
+
+/**
+ * 영상 효과(2단계 ⑤, 시안 E2 409:5334–5346) — 칸이 있으면 넣은 효과다. 흑백 = 켬 · 끔, 흐림 0 ~ 1, 밝기 · 대비 −1 ~ 1.
+ *   편집기 스냅샷(editor_states)에만 저장된다. 값 · 그림은 src/lib/editor/video-effects.ts.
+ */
+export interface ClipEffects {
+  blackWhite?: boolean
+  blur?: number
+  brightnessContrast?: { brightness: number; contrast: number }
 }
 
 export interface VideoClip {
@@ -163,8 +177,10 @@ export interface VideoClip {
   thumbnailUrl: string | null
   /** Editor 로 온 ★ 최종 Take 번호 — 프로젝트 판 · 효과 컨트롤의 "샷 N · 종류 · Take N"(2단계 ① 새 배치). DB 에서 읽는다. */
   takeNumber?: number
-  /** 이 클립 앞 경계의 전환. 없으면 컷. 편집기 스냅샷(editor_states)에 저장된다. */
+  /** 이 클립 앞 경계의 전환. 없으면 컷. 앞 클립과 맞닿은 컷의 전환은 늘 여기에 둔다(컷 하나 = 전환 하나). 편집기 스냅샷(editor_states)에 저장된다. */
   transitionIn?: ClipTransition | null
+  /** 이 클립 끝의 전환 — 뒤 클립과 맞닿지 않은 끝만(맞닿으면 뒤 클립의 transitionIn). 없으면 칸이 없다(2단계 ⑤). */
+  transitionOut?: ClipTransition | null
   trimStart?: number  // seconds, client-only for P5 crop
   trimEnd?: number    // seconds, client-only for P5 crop
   speed?: number      // 0.25 ~ 4.0, default 1.0
@@ -184,6 +200,8 @@ export interface VideoClip {
   motion?: ClipMotion
   /** 불투명도 0 ~ 1(2단계 ④, 시안 E1 409:4681). 없으면 1. */
   opacity?: number
+  /** 영상 효과(흑백 · 가우시안 흐림 · 밝기 및 대비, 2단계 ⑤). 넣은 효과가 없으면 칸이 없다. 타이틀 카드에는 넣지 않는다. */
+  effects?: ClipEffects
 }
 
 /** 클립 모션 — 위치 X · Y(화면 폭 · 높이 비율), 비율(배수). */
@@ -221,6 +239,9 @@ export interface AudioTrackClip {
    */
   linkedShotId?: string | null
   playbackRate?: number       // 재생 빠르기 — 이어진 영상의 속도를 따른다. 없으면 1
+  /** 페이드 인 · 아웃 길이(초) — 효과 탭의 "지속 가감 (페이드)"(2단계 ⑤). 없으면 칸이 없다. */
+  fadeInSec?: number
+  fadeOutSec?: number
 }
 
 /**

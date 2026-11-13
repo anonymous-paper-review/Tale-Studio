@@ -78,9 +78,11 @@ describe('2 · 디졸브 — 검은 막의 투명도만 시간에 따라 바뀐�
     expect(api().videoClips.find((c) => c.shotId === 'sh_2')!.transitionIn ?? null).toBeNull()
     const store = read('src/stores/editor-store.ts')
     expect(store.match(/transitionIn: savedClip\?\.transitionIn \?\? null/g)?.length ?? 0).toBeGreaterThanOrEqual(2)
+    // 우클릭 메뉴는 시작 · 끝 전환에서 세 전환(검정으로 물들이기 = 예전 디졸브)과 길이를 고른다(2단계 ⑤, 오너 결정 4 · 리드 승인 2026-11-14).
+    //   (옛 글자: 메뉴 이름 t('Dissolve (dip to black)') · onSetTransitionIn( 부름)
     const timeline = read('src/features/editor/timeline.tsx')
-    expect(timeline).toMatch(/t\('Dissolve \(dip to black\)'\)/)
-    expect(timeline).toMatch(/onSetTransitionIn\(/)
+    expect(timeline).toMatch(/t\('Start transition'\)/)
+    expect(timeline).toMatch(/onSetTransition\(/)
   })
 
   it('드래프트 렌더도 같은 검은 막을 프레임에 얹는다 — 미리보기와 내보내기가 같은 함수를 쓴다', () => {

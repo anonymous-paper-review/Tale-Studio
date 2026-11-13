@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react'
 import type { AudioTrackClip } from '@/types'
 import { audioSourceTime } from '@/lib/editor/audio-time'
+import { audioFadeGain } from '@/lib/editor/transition'
 import { useEditorStore } from '@/stores/editor-store'
 import { cn } from '@/lib/utils'
 import { audibleTrackIds } from '@/lib/editor-draft-render'
@@ -105,9 +106,10 @@ export function AudioMeter({ audioClips, className }: { audioClips: AudioTrackCl
         const srcTime = audioSourceTime(clip, state.currentTime)
         // 전역 재생 볼륨(masterVolume) 곱 — 재생 전용, draft 와 무관.
         // 클립 음소거 OR 들리지 않는 줄(줄 음소거 M · 다른 줄만 S)이면 볼륨 0 — 내보내기와 같은 규칙(2단계 ②).
+        //   페이드 인 · 아웃(지속 가감) 세기도 곱한다(2단계 ⑤ — 내보내기에는 ⑦에서).
         const tFirst = state.audioTracks[0]?.id
         const trackSilent = !audibleTrackIds(state.audioTracks).has(clip.trackId ?? tFirst ?? '')
-        entry.el.volume = clip.muted || trackSilent ? 0 : clip.volume * state.masterVolume
+        entry.el.volume = clip.muted || trackSilent ? 0 : clip.volume * state.masterVolume * audioFadeGain(clip, state.currentTime)
 
         if (state.isPlaying && inRange) {
           if (Math.abs(entry.el.currentTime - srcTime) > 0.3) entry.el.currentTime = srcTime

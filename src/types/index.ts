@@ -16,6 +16,8 @@ export type {
   AudioTrackClip,
   AudioSource,
   ClipTransition,
+  ClipTransitionType,
+  ClipEffects,
   ClipMotion,
 } from './shot'
 export { DEFAULT_CAMERA_PRESET } from './shot'

@@ -4,8 +4,9 @@ import { useRef, useCallback, useMemo, useEffect, useState, type ReactNode } fro
 import { useEntityNames } from '@/lib/writer/use-entity-names'
 import { resolveEntityNames } from '@/lib/writer/resolve-entity-names'
 import { AlertCircle, Trash2, Plus, Volume2, VolumeX, Scissors, Gauge, Type, Blend, Eye, EyeOff, Lock, LockOpen } from 'lucide-react'
-import { DISSOLVE_CHOICES } from '@/lib/editor/transition'
-import type { ClipTransition } from '@/types'
+import { TRANSITION_CHOICES, TRANSITION_DEFAULT_SEC, TRANSITION_LABEL, VIDEO_TRANSITIONS, edgeTransition, transitionWindows, type TransitionEdge } from '@/lib/editor/transition'
+import { hasVideoEffects } from '@/lib/editor/video-effects'
+import type { ClipTransition, ClipTransitionType } from '@/types'
 import type { Shot, VideoClip, AudioTrackClip } from '@/types'
 import { cn } from '@/lib/utils'
 import { drawWaveform } from '@/lib/audio-waveform'
@@ -14,6 +15,7 @@ import { timelineSegments } from '@/lib/editor/timeline-segments'
 import { formatTimecode, sequenceLengthSec } from '@/lib/editor/sequence-info'
 import { SNAP_PX, draggedIds, makeSnapper, snapTargets } from '@/lib/editor/snap'
 import { RulerMarkers } from '@/features/editor/timeline-markers'
+import { AudioFadeMarks, EFFECT_DROP_CLASS, FxBadge, TransitionMarks } from '@/features/editor/timeline-transitions'
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -95,8 +97,8 @@ interface TimelineProps {
   onZoom: (nextPxPerSec: number) => void
   onSplitVideo: (shotId: string, atGlobalSec: number) => void
   onSetSpeed: (shotId: string, speed: number) => void
-  /** 화면 전환(2026-09-08): 클립 앞 경계의 디졸브 넣기·빼기 */
-  onSetTransitionIn: (shotId: string, transition: ClipTransition | null) => void
+  /** 화면 전환 — 고른 클립들의 시작 · 끝 전환을 넣고 바꾸고 뺀다(우클릭 메뉴, 2단계 ⑤). */
+  onSetTransition: (shotIds: string[], edge: TransitionEdge, transition: ClipTransition | null) => void
   onAddAudioTrack: () => void
   onRemoveAudioTrack: (trackId: string) => void
   onToggleAudioTrackMute: (trackId: string) => void
@@ -344,10 +346,14 @@ function AudioClipBlock({
       <ContextMenuTrigger asChild>
         <div
           data-no-seek
+          // 효과 탭의 페이드를 끌어 놓는 자리(2단계 ⑤).
+          data-clip-drop="audio"
+          data-audio-id={clip.id}
           onPointerDown={handleBodyPointerDown}
           className={cn(
             // v3 ED1: 카드 바탕 클립 · 모서리 8, 고른 클립 = 지금 단계 색 1.5px.
             'group absolute top-1.5 flex h-[52px] flex-col overflow-hidden rounded-lg border-[1.5px] bg-chat-lumi-bubble',
+            EFFECT_DROP_CLASS,
             cutMode ? 'cursor-col-resize' : 'cursor-grab active:cursor-grabbing',
             selected ? 'border-stage' : clip.muted ? 'border-transparent opacity-50' : 'border-transparent hover:border-border-strong',
           )}
@@ -360,6 +366,7 @@ function AudioClipBlock({
             </button>
           </div>
           <canvas ref={canvasRef} className="pointer-events-none h-full w-full" />
+          <AudioFadeMarks clip={clip} pxPerSec={pxPerSec} />
 
           {/* 게인 라인 + % (요청 6) */}
           <div className="pointer-events-none absolute inset-x-0 h-px bg-primary/50" style={{ top: gainTop }} />
@@ -446,7 +453,7 @@ export function Timeline({
   onZoom,
   onSplitVideo,
   onSetSpeed,
-  onSetTransitionIn,
+  onSetTransition,
   onAddAudioTrack,
   onRemoveAudioTrack,
   onToggleAudioTrackMute,
@@ -507,6 +514,9 @@ export function Timeline({
   const cutMode = toolMode === 'cut'
 
   const segments = useMemo(() => timelineSegments(layout), [layout])
+  // 모든 영상 줄의 클립 자리와 전환 칸(2단계 ⑤) — 맞닿은 컷은 같은 줄에서만 본다.
+  const videoLayout = useMemo(() => [...layout.map((item) => ({ ...item, trackId: 'v1' })), ...overlayLayout], [layout, overlayLayout])
+  const windows = useMemo(() => transitionWindows(videoLayout, videoClips), [videoLayout, videoClips])
   // 자 · 가로 폭 — 시퀀스 길이(모든 줄 · 소리의 끝, 빈 곳 · 눈 끈 줄 포함 — 위 둘째 줄과 같은 길이, 검토 c ② 낮음 4).
   //   플레이헤드가 끝을 넘으면 영역을 넓힌다(요청 5).
   const totalSec = useMemo(
@@ -807,11 +817,16 @@ export function Timeline({
         <ContextMenuTrigger asChild>
           <div
             data-no-seek
+            // 효과 탭에서 끌어 놓는 자리(2단계 ⑤) — 타이틀 카드에는 영상 효과가 놓이지 않는다.
+            data-clip-drop="video"
+            data-shot-id={item.shotId}
+            data-title-card={isTitleCardShotId(item.shotId) ? '' : undefined}
             onPointerDown={(e) => handleClipPointerDown(e, item, row.trackId)}
             title={resolveEntityNames(shot.actionDescription, entityNames)}
             className={cn(
               // v3 ED1: 클립 = 한 단 밝은 판 · 모서리 10, 고른 클립 = 지금 단계 색 1.5px.
               'group absolute flex flex-col overflow-hidden rounded-[10px] border-[1.5px] bg-chat-lumi-bubble',
+              EFFECT_DROP_CLASS,
               row.locked && 'pointer-events-none',
               cutMode ? 'cursor-col-resize' : 'cursor-pointer',
               isDragging && 'opacity-60',
@@ -880,6 +895,8 @@ export function Timeline({
                 isTitleCardShotId(item.shotId) ? 'cursor-text hover:bg-accent' : 'pointer-events-none',
               )}
             >
+              {/* 영상 효과를 넣은 클립 — 이름 앞 fx(시안 E2 409:5483). */}
+              {hasVideoEffects(clip) ? <FxBadge /> : null}
               {isTitleCardShotId(item.shotId) ? clipMenuTitle({ isTitleCard: true, shotType: shot.shotType, durationSec: item.durationSec }, t) : shot.shotType}
               {clip?.speed && clip.speed !== 1 && <span className="ml-1 text-stage">{clip.speed.toFixed(2)}×</span>}
             </span>
@@ -1011,20 +1028,39 @@ export function Timeline({
               </ContextMenuRadioGroup>
             </ContextMenuSubContent>
           </ContextMenuSub>
-          <ContextMenuSub>
-            <ContextMenuSubTrigger className="text-xs"><Blend className="size-3.5" /> {t('Dissolve (dip to black)')}</ContextMenuSubTrigger>
-            <ContextMenuSubContent>
-              <ContextMenuRadioGroup
-                value={clip?.transitionIn ? String(clip.transitionIn.durationSec) : 'none'}
-                onValueChange={(v) => targets.forEach((id) => onSetTransitionIn(id, v === 'none' ? null : { type: 'dissolve', durationSec: Number(v) }))}
-              >
-                <ContextMenuRadioItem value="none" className="text-xs">{t('No dissolve')}</ContextMenuRadioItem>
-                {DISSOLVE_CHOICES.map((sec) => (
-                  <ContextMenuRadioItem key={sec} value={String(sec)} className="text-xs">{t('{seconds}s dissolve', { seconds: sec })}</ContextMenuRadioItem>
-                ))}
-              </ContextMenuRadioGroup>
-            </ContextMenuSubContent>
-          </ContextMenuSub>
+          {/* 시작 · 끝 전환 — 효과 탭과 같은 세 전환과 길이(2단계 ⑤). 맞닿은 컷은 앞뒤 클립이 같은 전환을 본다. */}
+          {(['start', 'end'] as const).map((edge) => {
+            const current = edgeTransition(videoLayout, videoClips, item.shotId, edge).transition
+            return (
+              <ContextMenuSub key={edge}>
+                <ContextMenuSubTrigger className="text-xs">
+                  <Blend className="size-3.5" /> {edge === 'start' ? t('Start transition') : t('End transition')}
+                </ContextMenuSubTrigger>
+                <ContextMenuSubContent>
+                  <ContextMenuRadioGroup
+                    value={current?.type ?? 'none'}
+                    onValueChange={(v) =>
+                      onSetTransition(targets, edge, v === 'none' ? null : { type: v as ClipTransitionType, durationSec: current?.durationSec ?? TRANSITION_DEFAULT_SEC })
+                    }
+                  >
+                    <ContextMenuRadioItem value="none" className="text-xs">{t('None')}</ContextMenuRadioItem>
+                    {VIDEO_TRANSITIONS.map((type) => (
+                      <ContextMenuRadioItem key={type} value={type} className="text-xs">{t(TRANSITION_LABEL[type])}</ContextMenuRadioItem>
+                    ))}
+                  </ContextMenuRadioGroup>
+                  <ContextMenuSeparator />
+                  <ContextMenuRadioGroup
+                    value={current ? String(current.durationSec) : ''}
+                    onValueChange={(v) => current && onSetTransition(targets, edge, { type: current.type, durationSec: Number(v) })}
+                  >
+                    {TRANSITION_CHOICES.map((sec) => (
+                      <ContextMenuRadioItem key={sec} value={String(sec)} disabled={!current} className="text-xs">{t('{seconds}s', { seconds: sec })}</ContextMenuRadioItem>
+                    ))}
+                  </ContextMenuRadioGroup>
+                </ContextMenuSubContent>
+              </ContextMenuSub>
+            )
+          })}
           <ContextMenuItem
             className="text-xs"
             onSelect={() => {
@@ -1221,6 +1257,7 @@ export function Timeline({
                 {overlayLayout
                   .filter((item) => item.trackId === track.id)
                   .map((item) => renderVideoClip(item, { trackId: track.id, top: OVERLAY_CLIP_TOP, height: OVERLAY_CLIP_H, locked: !!track.locked, scope: track.id }))}
+                <TransitionMarks windows={windows} trackId={track.id} pxPerSec={pxPerSec} top={OVERLAY_CLIP_TOP} height={OVERLAY_CLIP_H} />
                 {reorder?.placeAtSec !== undefined && reorder.trackId === track.id && (() => {
                   const dragged = [...layout, ...overlayLayout].find((it) => it.shotId === reorder.shotId)
                   if (!dragged) return null
@@ -1250,6 +1287,7 @@ export function Timeline({
               onPointerDown={handleVideoTrackPointerDown}
             >
               {layout.map((item) => renderVideoClip(item, { trackId: 'v1', top: 12, height: 72, locked: !!v1Track?.locked, scope: 'video' }))}
+              <TransitionMarks windows={windows} trackId="v1" pxPerSec={pxPerSec} top={12} height={72} />
 
               {/* 빈 곳에 놓을 자리 미리 보기(자유 배치) — 끄는 클립 길이만큼 점선 칸. */}
               {reorder?.placeAtSec !== undefined && (reorder.trackId ?? 'v1') === 'v1' && (() => {

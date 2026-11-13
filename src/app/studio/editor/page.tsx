@@ -105,7 +105,7 @@ export default function PostPage() {
     updateAudioClip,
     seek,
     setPxPerSec,
-    setTransitionIn,
+    setClipTransition,
     setPanelSize,
     toggleAudioMute,
     toggleAudioTrackMute,
@@ -627,7 +627,7 @@ export default function PostPage() {
                     onUpdateAudioClip={updateAudioClip}
                     onSetTrim={setTrim}
                     onSetTitleCardDuration={setTitleCardDuration}
-                    onSetTransitionIn={setTransitionIn}
+                    onSetTransition={setClipTransition}
                     onPushHistory={pushHistory}
                     videoTracks={videoTracks}
                     overlayLayout={overlayLayout}

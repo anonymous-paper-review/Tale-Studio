@@ -2,7 +2,7 @@
 //   편집 상태를 읽기만 한다 — 컷 수 · 전체 길이 · 순서(자리 · 길이 · 샷 종류 · 설명 · 빠르기 · 전환 · 자막) · 제목 카드 · 소리 줄.
 //   내부 번호(샷 id)는 싣지 않는다(채팅 답 규칙 — 사용자는 컷 순서 · 설명으로 부른다). 약속: tests/chat/editor-advice-chat.test.ts
 import { selectTimelineLayout } from '@/stores/editor-store'
-import type { AudioTrackClip, Shot, VideoClip } from '@/types/shot'
+import type { AudioTrackClip, ClipTransitionType, Shot, VideoClip } from '@/types/shot'
 
 export interface EditorChatContextInput {
   shots: Shot[]
@@ -12,6 +12,12 @@ export interface EditorChatContextInput {
 }
 
 const secs = (value: number) => `${value.toFixed(1)}s`
+/** 전환 종류를 가려 말한다 — 검정 · 흰색으로 물들이기와 교차 디졸브(2단계 ⑤). */
+const TRANSITION_PHRASE: Record<ClipTransitionType, string> = {
+  dissolve: 'fades through black',
+  white: 'fades through white',
+  cross: 'cross dissolves',
+}
 const short = (text: string) => (text.length > 120 ? `${text.slice(0, 117)}...` : text)
 
 export function editorChatContext(input: EditorChatContextInput): string {
@@ -33,7 +39,8 @@ export function editorChatContext(input: EditorChatContextInput): string {
     const extras = [
       clip && !shot?.titleCard && (clip.status !== 'completed' || !clip.url) ? 'no video yet' : null,
       clip?.speed && clip.speed !== 1 ? `speed ${clip.speed}×` : null,
-      clip?.transitionIn ? `fades through black from the cut before (${clip.transitionIn.durationSec}s)` : null,
+      clip?.transitionIn ? `${TRANSITION_PHRASE[clip.transitionIn.type] ?? TRANSITION_PHRASE.dissolve} from the cut before (${clip.transitionIn.durationSec}s)` : null,
+      clip?.transitionOut ? `${TRANSITION_PHRASE[clip.transitionOut.type] ?? TRANSITION_PHRASE.dissolve} at its end (${clip.transitionOut.durationSec}s)` : null,
       shot?.subtitle?.text ? `subtitle "${short(shot.subtitle.text)}"` : null,
     ].filter(Boolean)
     lines.push(`${index + 1}. ${range} ${what}${extras.length ? ` · ${extras.join(' · ')}` : ''}`)

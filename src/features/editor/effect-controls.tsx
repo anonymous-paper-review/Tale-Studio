@@ -1,13 +1,15 @@
 'use client'
 
-// 효과 컨트롤(시안 E1 409:4652–4713) — 타임라인에서 고른 클립의 이름 · 자리와, 지금 우클릭 메뉴에 있던 시작 전환(검정으로 물들이기) ·
-//   속도 · 소리 볼륨을 고른 자리에서 바로 바꾼다(2단계 ① 새 배치, 2026-11-14). 우클릭 메뉴도 그대로 남는다.
-//   모션(위치 X · Y · 비율) · 불투명도는 슬라이더로 바꾸고 % 글자를 두 번 누르면 처음 값(2단계 ④). 끝 전환 · 교차 디졸브는 효과 탭
-//   조각(⑤)에서 더한다 — 없는 칸을 미리 그리지 않는다. 약속: tests/editor/panels.test.ts · tests/editor/motion-opacity.test.ts
+// 효과 컨트롤(시안 E1 409:4652–4713) — 타임라인에서 고른 클립의 이름 · 자리와 속도 · 소리 볼륨을 고른 자리에서 바로 바꾼다
+//   (2단계 ① 새 배치, 2026-11-14). 모션(위치 X · Y · 비율) · 불투명도는 슬라이더로 바꾸고 % 글자를 두 번 누르면 처음 값(2단계 ④).
+//   전환은 시작 · 끝 줄 — 효과 탭에서 끌어 놓은 전환의 이름(맞닿은 컷이면 "앞 · 뒤 클립과 이어짐")과 0.5 · 1 · 2초 칸 · [빼기],
+//   넣은 영상 효과는 "효과" 묶음에서 고치고 뺀다. 소리 조각은 볼륨과 시작 · 끝 페이드(2단계 ⑤). 우클릭 메뉴도 그대로 남는다.
+//   약속: tests/editor/panels.test.ts · tests/editor/motion-opacity.test.ts · tests/editor/transitions-effects.test.ts
 import type { ReactNode } from 'react'
 import { ChoiceChip } from '@/components/controls/choice-chip'
 import { Slider } from '@/components/ui/slider'
-import { DISSOLVE_CHOICES } from '@/lib/editor/transition'
+import { AUDIO_FADE_LABEL, TRANSITION_CHOICES, TRANSITION_LABEL, edgeTransition, type TransitionEdge } from '@/lib/editor/transition'
+import { VIDEO_EFFECTS, VIDEO_EFFECT_DEFAULT, VIDEO_EFFECT_LABEL } from '@/lib/editor/video-effects'
 import { clipSpanLine, shotLabel } from '@/features/editor/editor-labels'
 import { useT } from '@/lib/i18n'
 import { isSyntheticShotId, isTitleCardShotId, rootShotIdOf, selectVideoLayout, useEditorStore } from '@/stores/editor-store'
@@ -18,11 +20,12 @@ export function speedChoices(current: number): number[] {
   return SPEED_CHOICES.some((v) => Math.abs(v - current) < 1e-6) ? [...SPEED_CHOICES] : [...SPEED_CHOICES, current]
 }
 
+/** 이름 · 내용 한 줄 — 내용이 두 줄로 넘어가도 이름은 첫 줄 높이에 선다(긴 영어 전환 이름). */
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex min-h-8 items-center gap-3">
-      <span className="w-14 shrink-0 text-meta text-muted-foreground">{label}</span>
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">{children}</div>
+    <div className="flex min-h-8 items-start gap-3">
+      <span className="w-14 shrink-0 text-meta leading-8 text-muted-foreground">{label}</span>
+      <div className="flex min-h-8 min-w-0 flex-1 flex-wrap items-center gap-1.5">{children}</div>
     </div>
   )
 }
@@ -74,6 +77,49 @@ function SliderRow({
   )
 }
 
+/** 줄 끝의 [빼기] — 넣은 전환 · 효과를 뺀다. */
+function RemoveButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="ml-auto rounded px-1 text-meta font-medium text-subtle-foreground transition-colors hover:text-foreground">
+      {label}
+    </button>
+  )
+}
+
+/** 전환 한 줄(시안 E1 409:4689–4701) — 없으면 "없음 · 효과 탭에서 끌어 놓아요", 있으면 이름 · 0.5 · 1 · 2초 칸 · [빼기]. */
+function TransitionRow({
+  label,
+  name,
+  lengthSec,
+  onLength,
+  onRemove,
+}: {
+  label: string
+  name: string | null
+  lengthSec: number
+  onLength: (sec: number) => void
+  onRemove: () => void
+}) {
+  const t = useT()
+  return (
+    <Row label={label}>
+      {name === null ? (
+        <span className="text-label text-subtle-foreground">{t('None · Drag one from the Effects tab')}</span>
+      ) : (
+        <>
+          <span className="mr-1 text-label text-foreground">{name}</span>
+          {TRANSITION_CHOICES.map((sec) => (
+            <ChoiceChip key={sec} selected={Math.abs(lengthSec - sec) < 1e-6} onClick={() => onLength(sec)}>
+              {t('{seconds}s', { seconds: sec })}
+            </ChoiceChip>
+          ))}
+          <RemoveButton label={t('Remove transition')} onClick={onRemove} />
+        </>
+      )}
+    </Row>
+  )
+}
+
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section className="flex flex-col gap-1.5">
@@ -96,10 +142,14 @@ export function EffectControls() {
   const audioClips = useEditorStore((s) => s.audioClips)
   const audioTracks = useEditorStore((s) => s.audioTracks)
   const setSpeed = useEditorStore((s) => s.setSpeed)
-  const setTransitionIn = useEditorStore((s) => s.setTransitionIn)
+  const setClipTransition = useEditorStore((s) => s.setClipTransition)
+  const setTransitionLength = useEditorStore((s) => s.setTransitionLength)
   const setClipMotion = useEditorStore((s) => s.setClipMotion)
   const setClipOpacity = useEditorStore((s) => s.setClipOpacity)
+  const setVideoEffect = useEditorStore((s) => s.setVideoEffect)
+  const removeVideoEffect = useEditorStore((s) => s.removeVideoEffect)
   const setAudioVolume = useEditorStore((s) => s.setAudioVolume)
+  const setAudioFade = useEditorStore((s) => s.setAudioFade)
   const pushHistory = useEditorStore((s) => s.pushHistory)
 
   // ── 소리 조각 ──
@@ -130,6 +180,22 @@ export function EffectControls() {
             <span className="w-10 font-num text-meta font-medium text-foreground tabular-nums">{Math.round(volume * 100)}%</span>
           </Row>
         </Section>
+        {/* 소리의 전환 = 지속 가감(페이드) — 시작은 페이드 인, 끝은 페이드 아웃(2단계 ⑤). */}
+        <Section title={t('Transition')}>
+          {(['start', 'end'] as const).map((edge) => {
+            const sec = edge === 'start' ? audio.fadeInSec : audio.fadeOutSec
+            return (
+              <TransitionRow
+                key={edge}
+                label={edge === 'start' ? t('Start') : t('End')}
+                name={sec ? t(AUDIO_FADE_LABEL) : null}
+                lengthSec={sec ?? 0}
+                onLength={(value) => setAudioFade(audio.id, edge, value)}
+                onRemove={() => setAudioFade(audio.id, edge, null)}
+              />
+            )
+          })}
+        </Section>
       </div>
     )
   }
@@ -140,10 +206,10 @@ export function EffectControls() {
   const anchor = targets.includes(anchorShotId ?? '') ? (anchorShotId as string) : targets[0]
   const item = anchor ? layout.find((l) => l.shotId === anchor) : undefined
   if (!item) {
-    // 시안 E4 409:6662 안내에서 지금 바꿀 수 있는 것만 — 위치 · 비율 · 불투명도 · 효과는 그 조각에서 안내에 더한다.
+    // 시안 E4 409:6662 안내 — ④ 모션 · 불투명도와 ⑤ 효과가 생겨 시안 문장 그대로다.
     return (
       <div className="flex h-full flex-col justify-center gap-2 px-6 py-4 text-center">
-        <p className="text-label text-muted-foreground">{t('Select a clip on the timeline to change its speed, transition and volume here.')}</p>
+        <p className="text-label text-muted-foreground">{t('Select a clip on the timeline to change its position, scale, opacity, speed, effects, transitions and volume here.')}</p>
         <p className="text-meta text-subtle-foreground">{t('Click a gap between cuts to get "Ripple delete" right there.')}</p>
       </div>
     )
@@ -160,20 +226,31 @@ export function EffectControls() {
       ? t('{count} clips', { count: targets.length })
       : shotLabel({ number: number >= 0 ? number + 1 : null, shotType: shot?.shotType, takeNumber: rootClip?.takeNumber, isTitleCard }, t)
   const speed = clip?.speed ?? 1
-  const transition = clip?.transitionIn ?? null
   const motion = clip?.motion ?? { x: 0, y: 0, scale: 1 }
   const opacity = clip?.opacity ?? 1
+  const effects = clip?.effects ?? {}
   const percent = (value: number) => Math.round(value * 100)
   const applyAll = (fn: (shotId: string) => void) => {
     pushHistory()
     targets.forEach(fn)
   }
-  // % 글자를 두 번 누르면 처음 값 — 바뀐 것이 있을 때만 되돌리기 칸 하나(2단계 ④).
+  // % 글자를 두 번 누르면 처음 값 · 흑백 켬/끔 — 바뀐 것이 있을 때만 되돌리기 칸 하나(2단계 ④ · ⑤).
   const resetTo = (changed: boolean, fn: () => void) => {
     if (!changed) return
     pushHistory()
     fn()
   }
+  // 시작 · 끝 전환의 이름 — 맞닿은 컷이면 "앞 · 뒤 클립과 이어짐", 빈 끝의 교차 디졸브면 "서서히 나타남 · 사라짐"(2단계 ⑤).
+  const edgeShown = (edge: TransitionEdge) => {
+    const { transition, joined } = edgeTransition(layout, videoClips, item.shotId, edge)
+    if (!transition) return null
+    const how = joined
+      ? edge === 'start' ? 'Joined to previous clip' : 'Joined to next clip'
+      : transition.type === 'cross' ? (edge === 'start' ? 'Fades in' : 'Fades out') : null
+    const name = t(TRANSITION_LABEL[transition.type])
+    return { name: how ? `${name} · ${t(how)}` : name, lengthSec: transition.durationSec }
+  }
+  const bc = effects.brightnessContrast ?? VIDEO_EFFECT_DEFAULT.brightnessContrast
 
   return (
     <div className="flex flex-col gap-4 px-4 py-3">
@@ -233,25 +310,83 @@ export function EffectControls() {
               onReset={() => resetTo(opacity !== 1, () => setClipOpacity(targets, 1))}
             />
           </Section>
+          {/* 넣은 영상 효과(2단계 ⑤) — 효과 탭에서 끌어 놓은 것만, 시안 차례대로. 값은 고른 클립 가운데 그 효과를 넣은 클립 모두에. */}
+          {VIDEO_EFFECTS.some((kind) => effects[kind] !== undefined) ? (
+            <Section title={t('Effects')}>
+              {VIDEO_EFFECTS.filter((kind) => effects[kind] !== undefined).map((kind) => (
+                <div key={kind} className="flex flex-col gap-1.5">
+                  <div className="flex min-h-8 items-center gap-1.5">
+                    <span className="mr-1.5 min-w-0 truncate text-label text-foreground">{t(VIDEO_EFFECT_LABEL[kind])}</span>
+                    {kind === 'blackWhite' ? (
+                      <>
+                        <ChoiceChip selected={!!effects.blackWhite} onClick={() => resetTo(!effects.blackWhite, () => setVideoEffect(targets, { blackWhite: true }))}>
+                          {t('On')}
+                        </ChoiceChip>
+                        <ChoiceChip selected={!effects.blackWhite} onClick={() => resetTo(!!effects.blackWhite, () => setVideoEffect(targets, { blackWhite: false }))}>
+                          {t('Off')}
+                        </ChoiceChip>
+                      </>
+                    ) : null}
+                    <RemoveButton label={t('Remove effect')} onClick={() => removeVideoEffect(targets, kind)} />
+                  </div>
+                  {kind === 'blur' ? (
+                    <SliderRow
+                      label={t('Blur')}
+                      value={percent(effects.blur ?? 0)}
+                      min={0}
+                      max={100}
+                      resetTitle={t('Double-click to reset to {value}', { value: `${percent(VIDEO_EFFECT_DEFAULT.blur)}%` })}
+                      onStart={() => pushHistory()}
+                      onChange={(v) => setVideoEffect(targets, { blur: v / 100 })}
+                      onReset={() => resetTo(effects.blur !== VIDEO_EFFECT_DEFAULT.blur, () => setVideoEffect(targets, { blur: VIDEO_EFFECT_DEFAULT.blur }))}
+                    />
+                  ) : null}
+                  {kind === 'brightnessContrast' ? (
+                    <>
+                      <SliderRow
+                        label={t('Brightness')}
+                        value={percent(bc.brightness)}
+                        min={-100}
+                        max={100}
+                        resetTitle={t('Double-click to reset to {value}', { value: '0%' })}
+                        onStart={() => pushHistory()}
+                        onChange={(v) => setVideoEffect(targets, { brightness: v / 100 })}
+                        onReset={() => resetTo(bc.brightness !== 0, () => setVideoEffect(targets, { brightness: 0 }))}
+                      />
+                      <SliderRow
+                        label={t('Contrast')}
+                        value={percent(bc.contrast)}
+                        min={-100}
+                        max={100}
+                        resetTitle={t('Double-click to reset to {value}', { value: '0%' })}
+                        onStart={() => pushHistory()}
+                        onChange={(v) => setVideoEffect(targets, { contrast: v / 100 })}
+                        onReset={() => resetTo(bc.contrast !== 0, () => setVideoEffect(targets, { contrast: 0 }))}
+                      />
+                    </>
+                  ) : null}
+                </div>
+              ))}
+            </Section>
+          ) : null}
         </>
       )}
 
+      {/* 시작 · 끝 전환(시안 E1 409:4687–4701) — 효과 탭에서 끌어 놓은 전환의 길이를 고르고 뺀다. 타이틀 카드도 전환은 넣는다. */}
       <Section title={t('Transition')}>
-        <Row label={t('Start')}>
-          <span className="mr-1 text-label text-foreground">{t('Dip to black')}</span>
-          <ChoiceChip selected={!transition} onClick={() => targets.forEach((id) => setTransitionIn(id, null))}>
-            {t('None')}
-          </ChoiceChip>
-          {DISSOLVE_CHOICES.map((sec) => (
-            <ChoiceChip
-              key={sec}
-              selected={!!transition && Math.abs(transition.durationSec - sec) < 1e-6}
-              onClick={() => targets.forEach((id) => setTransitionIn(id, { type: 'dissolve', durationSec: sec }))}
-            >
-              {t('{seconds}s', { seconds: sec })}
-            </ChoiceChip>
-          ))}
-        </Row>
+        {(['start', 'end'] as const).map((edge) => {
+          const shown = edgeShown(edge)
+          return (
+            <TransitionRow
+              key={edge}
+              label={edge === 'start' ? t('Start') : t('End')}
+              name={shown?.name ?? null}
+              lengthSec={shown?.lengthSec ?? 0}
+              onLength={(sec) => setTransitionLength(targets, edge, sec)}
+              onRemove={() => setClipTransition(targets, edge, null)}
+            />
+          )
+        })}
       </Section>
 
       {isTitleCard ? null : (

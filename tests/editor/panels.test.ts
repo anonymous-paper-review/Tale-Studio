@@ -121,10 +121,11 @@ describe('효과 컨트롤', () => {
     expect(pressed(markup)).toContain('25%')
   })
 
-  it('효과 컨트롤의 전환은 시작 전환 "검정으로 물들이기"를 없음 · 0.5 · 1 · 2초로 고르고 지금 길이가 골라져 있다', () => {
-    // 왜: 오너 답 4 — 지금 디졸브의 이름은 "검정으로 물들이기". 끝 전환 · 교차 디졸브는 효과 탭 조각(⑤)에서 더한다.
+  it('효과 컨트롤의 시작 전환 "검정으로 물들이기"는 0.5 · 1 · 2초 칸에 지금 길이가 골라져 있고, 전환이 없으면 "없음 · 효과 탭에서 끌어 놓아요"라고 쓴다', () => {
+    // 왜: 오너 답 4 — 지금 디졸브의 이름은 "검정으로 물들이기". 넣기는 효과 탭에서 끌어 놓는다(⑤, 시안 E1 409:4699–4701).
+    //   (옛 이름: 효과 컨트롤의 전환은 시작 전환 "검정으로 물들이기"를 없음 · 0.5 · 1 · 2초로 고르고 지금 길이가 골라져 있다)
     api().selectClip('B')
-    expect(pressed(html(createElement(EffectControls)))).toContain('없음')
+    expect(text(html(createElement(EffectControls)))).toContain('시작 없음 · 효과 탭에서 끌어 놓아요')
     api().setTransitionIn('B', { type: 'dissolve', durationSec: 1 })
     const markup = html(createElement(EffectControls))
     expect(text(markup)).toContain('검정으로 물들이기')
@@ -155,12 +156,12 @@ describe('효과 컨트롤', () => {
     vi.unstubAllGlobals()
   })
 
-  it('아무것도 고르지 않으면 효과 컨트롤은 지금 바꿀 수 있는 것만 안내한다 — 속도 · 전환 · 볼륨, 빈 곳의 잔물결 삭제', () => {
-    // 왜: 시안 E4 409:6662 안내는 아직 없는 위치 · 비율 · 불투명도 · 효과도 말한다. 없는 기능을 안내하지 않는다.
+  it('아무것도 고르지 않으면 효과 컨트롤은 시안 안내대로 위치 · 비율 · 불투명도 · 속도 · 효과 · 전환 · 볼륨과 빈 곳의 잔물결 삭제를 안내한다', () => {
+    // 왜: 시안 E4 409:6662. 안내는 지금 바꿀 수 있는 것만 — ④ 모션 · 불투명도와 ⑤ 효과가 생겨 시안 문장 전부가 됐다.
+    //   (옛 이름: 아무것도 고르지 않으면 효과 컨트롤은 지금 바꿀 수 있는 것만 안내한다 — 속도 · 전환 · 볼륨, 빈 곳의 잔물결 삭제)
     const markup = text(html(createElement(EffectControls)))
-    expect(markup).toContain('타임라인에서 클립을 고르면 여기서 속도 · 전환 · 볼륨을 바꿔요.')
+    expect(markup).toContain('타임라인에서 클립을 고르면 여기서 위치 · 비율 · 불투명도 · 속도 · 효과 · 전환 · 볼륨을 바꿔요.')
     expect(markup).toContain('컷과 컷 사이 빈 곳을 누르면 그 자리에 "잔물결 삭제"가 떠요.')
-    expect(markup).not.toMatch(/위치|불투명도/)
   })
 })
 

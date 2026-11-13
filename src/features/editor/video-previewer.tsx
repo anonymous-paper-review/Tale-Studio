@@ -1,7 +1,9 @@
 'use client'
 
 import { AlertCircle, ArrowLeftToLine, ArrowRightToLine, ChevronLeft, ChevronRight, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
-import { dissolveOpacityAt } from '@/lib/editor/transition'
+import { crossOverlayAt, crossSourceSec, dipOpacityAt, dissolveOpacityAt, edgeFadeAt, transitionWindows } from '@/lib/editor/transition'
+import { videoEffectFilter } from '@/lib/editor/video-effects'
+import { drawTitleCard } from '@/lib/editor/title-card'
 import { useEntityNames } from '@/lib/writer/use-entity-names'
 import { resolveEntityNames } from '@/lib/writer/resolve-entity-names'
 import { useRef, useState, useEffect, useCallback, type CSSProperties } from 'react'
@@ -17,18 +19,59 @@ import { cachedVideoUrl } from '@/features/editor/video-prefetch'
 import { previewPane } from '@/features/editor/editor-labels'
 import { useT } from '@/lib/i18n'
 import type { VideoClip } from '@/types'
+import type { TitleCardData } from '@/types/shot'
 
 const FRAME = 1 / SEQUENCE_FPS
+/** 교차 디졸브로 겹칠 클립을 재생 중 이만큼 먼저 불러 둔다(초) — 겹치기 시작할 때 그림이 비지 않게. */
+const CROSS_PREROLL_SEC = 1
 
-/** 클립 모션 · 불투명도를 영상 그림에 입힌다(2단계 ④) — 위치는 틀 폭 · 높이 비율, 비율은 가운데를 기준으로. 처음 값이면 아무것도 안 붙인다. */
-function layerStyle(clip: Pick<VideoClip, 'motion' | 'opacity'> | undefined): CSSProperties | undefined {
+/**
+ * 클립 모션 · 불투명도 · 영상 효과를 영상 그림에 입힌다(2단계 ④ · ⑤) — 위치는 틀 폭 · 높이 비율, 비율은 가운데를 기준으로, 효과는 CSS filter
+ *   (흐림 반지름은 틀 폭 기준). 처음 값이면 아무것도 안 붙인다. 빈 끝 교차 디졸브로 옅어지는 정도는 재생 고리가 불투명도에 곱한다.
+ */
+function layerStyle(clip: Pick<VideoClip, 'motion' | 'opacity' | 'effects'> | undefined, frameWidth: number): CSSProperties | undefined {
   const motion = clip?.motion
   const opacity = clip?.opacity
-  if (!motion && opacity === undefined) return undefined
+  const filter = videoEffectFilter(clip?.effects, frameWidth)
+  if (!motion && opacity === undefined && !filter) return undefined
   return {
     ...(motion ? { transform: `translate(${motion.x * 100}%, ${motion.y * 100}%) scale(${motion.scale})` } : {}),
     ...(opacity !== undefined ? { opacity } : {}),
+    ...(filter ? { filter } : {}),
   }
+}
+
+/** 타이틀 카드 한 장을 내보내기와 같은 그림(drawTitleCard)으로 — 교차 디졸브로 다른 클립 위에 겹칠 때(2단계 ⑤). */
+function TitleCardPicture({ card }: { card: TitleCardData }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    let image: HTMLImageElement | null = null
+    let cancelled = false
+    const draw = () => {
+      const rect = canvas.getBoundingClientRect()
+      const ratio = window.devicePixelRatio || 1
+      canvas.width = Math.max(1, Math.round(rect.width * ratio))
+      canvas.height = Math.max(1, Math.round(rect.height * ratio))
+      const ctx = canvas.getContext('2d')
+      if (ctx) drawTitleCard(ctx, canvas.width, canvas.height, card, image)
+    }
+    draw()
+    if (card.imageUrl) {
+      const loading = new Image()
+      loading.onload = () => {
+        if (cancelled) return
+        image = loading
+        draw()
+      }
+      loading.src = card.imageUrl
+    }
+    return () => {
+      cancelled = true
+    }
+  }, [card])
+  return <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
 }
 
 /** 모니터 틀 크기 — 시퀀스 비율(내보내기 크기)을 모니터 칸 안에 맞춘다(2단계 ④). 재기 전에는 0. */
@@ -66,6 +109,13 @@ export function VideoPreviewer() {
   const totalRef = useRef<HTMLSpanElement>(null)
   const holdRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const dissolveRef = useRef<HTMLDivElement>(null)
+  // 흰색으로 물들이기 막 · 교차 디졸브로 겹치는 두 클립(2단계 ⑤) — 투명도 · 시각은 재생 고리가 바꾸고, 어느 클립인지만 상태로 둔다.
+  //   경계 앞뒤 두 클립을 구간 내내 같은 그림 요소로 둔다(shotId 로 찾음) — 경계에서 다시 불러오지 않게.
+  const whiteRef = useRef<HTMLDivElement>(null)
+  const crossBoxes = useRef(new Map<string, HTMLDivElement>())
+  const crossVideos = useRef(new Map<string, HTMLVideoElement>())
+  const crossPairRef = useRef<string[]>([])
+  const [crossPair, setCrossPair] = useState<string[]>([])
   const activeIdRef = useRef<string | null>(null)
 
   // 아래 줄 — 위 클립이 화면을 다 덮지 않을 때 그 밑에 비쳐 보이는 클립들(아래 줄부터, 2단계 ④). 영상 그림은 shotId 로 찾는다.
@@ -107,6 +157,13 @@ export function VideoPreviewer() {
 
       if (preview) {
         if (dissolveRef.current) dissolveRef.current.style.opacity = '0'
+        if (whiteRef.current) whiteRef.current.style.opacity = '0'
+        if (crossPairRef.current.length) {
+          crossPairRef.current = []
+          setCrossPair([])
+        }
+        // 소스 미리 보기는 원본 그대로 — 타임라인에서 옅게 한 불투명도를 거둔다.
+        if (v?.style.opacity) v.style.opacity = ''
         if (underIdsRef.current.length) {
           underIdsRef.current = []
           setUnderIds([])
@@ -141,11 +198,60 @@ export function VideoPreviewer() {
       const layout = selectProgramLayout(st)
       const total = sequenceLengthSec(selectVideoLayout(st), st.audioClips)
       const t = st.currentTime
-      // 디졸브(2026-09-08): 검은 막의 투명도만 시간에 따라 — 영상 픽셀은 손대지 않는다.
-      if (dissolveRef.current) dissolveRef.current.style.opacity = String(dissolveOpacityAt(layout, st.videoClips, t))
-
       // 영상이 없는 구간에선 클립을 강제로 잡지 않음 → 검은 화면 (요청 1)
       const item = layout.find((l) => t >= l.startSec && t < l.startSec + l.durationSec)
+      // 전환(2단계 ⑤) — 맞닿은 컷마다 하나, 빈 끝마다 그 클립 것(src/lib/editor/transition.ts).
+      const videoLayout = selectVideoLayout(st)
+      const windows = transitionWindows(videoLayout, st.videoClips)
+      const dips = dipOpacityAt(windows, layout, t)
+      // 타이틀 카드는 영상이 아니라 빈 끝의 교차 디졸브를 검은 막으로 — 검정에서 나타나고 검정으로 사라진다.
+      const titleFade = item && isTitleCardShotId(item.shotId) ? 1 - edgeFadeAt(windows, item.shotId, t) : 0
+      // 디졸브(2026-09-08): 검은 막의 투명도만 시간에 따라 — 영상 픽셀은 손대지 않는다. 예전 시작 디졸브(내보내기와 같은 함수)에
+      //   끝 · 빈 끝 쪽을 더하고, 흰색으로 물들이기는 같은 자리의 흰 막이다.
+      if (dissolveRef.current) dissolveRef.current.style.opacity = String(Math.max(dissolveOpacityAt(layout, st.videoClips, t), dips.black, titleFade))
+      if (whiteRef.current) whiteRef.current.style.opacity = String(dips.white)
+
+      // 교차 디졸브 — 맨 위 클립 위로 다른 클립을 겹쳐 투명도를 바꾼다(모자란 원본은 첫 장 · 끝 장에 멈춤). 재생 중이면 먼저 불러 둔다.
+      //   경계에서 맨 위 영상이 바뀌어 다시 불러오는 동안은 겹친 층의 같은 클립이 맨 위 영상 자리를 대신한다(검은 번쩍임 없이).
+      const cross = crossOverlayAt(windows, layout, t, st.isPlaying ? CROSS_PREROLL_SEC : 0)
+      const pair = cross && item ? [cross.shotId, item.shotId].sort() : []
+      if (pair.join('|') !== crossPairRef.current.join('|')) {
+        crossPairRef.current = pair
+        setCrossPair(pair)
+      }
+      if (cross && item) {
+        const mainReady = !!v && v.dataset.shotId === item.shotId && v.readyState >= 2 && !v.seeking
+        for (const shotId of pair) {
+          const over = shotId === cross.shotId
+          const box = crossBoxes.current.get(shotId)
+          if (box) {
+            box.style.zIndex = over ? '2' : '1'
+            box.style.opacity = String(over ? cross.opacity : mainReady || isTitleCardShotId(shotId) ? 0 : 1)
+          }
+          const el = crossVideos.current.get(shotId)
+          const placed = videoLayout.find((l) => l.shotId === shotId)
+          const c = st.videoClips.find((x) => x.shotId === shotId)
+          const s = st.shots.find((x) => x.shotId === shotId)
+          if (!el || !placed || !c || !s) continue
+          const speed = c.speed ?? 1.0
+          const src = crossSourceSec(placed, c, c.actualDurationSec ?? s.durationSeconds, t)
+          // 맨 위 클립의 대신 설 층은 맨 위 영상의 실제 시각을 따라간다 — 경계에서 바꿔 끼울 때 그림이 뒤로 튀지 않게.
+          const target = !over && mainReady && v ? v.currentTime : src.sec
+          if (st.isPlaying && !src.held) {
+            if (el.paused) void el.play().catch(() => {})
+            // 작은 어긋남은 빠르기를 살짝 바꿔 따라잡는다 — 다시 찾으면(seek) 찾는 동안 그림이 멈추고, 찾는 사이에 또 어긋난다.
+            const drift = target - el.currentTime
+            if (Math.abs(drift) > 0.5) el.currentTime = target
+            const rate = speed * (drift > 0.04 ? 1.25 : drift < -0.04 ? 0.8 : 1)
+            if (el.playbackRate !== rate) el.playbackRate = rate
+          } else {
+            if (!el.paused) el.pause()
+            if (el.playbackRate !== speed) el.playbackRate = speed
+            // 멈춘 첫 장 · 끝 장은 이미 그 근처에 서 있으면 다시 찾지 않는다 — 원본 끝 근처를 찾는 동안 그림이 비지 않게.
+            if (Math.abs(el.currentTime - target) > (src.held ? 0.3 : 0.02)) el.currentTime = target
+          }
+        }
+      }
       const id = item?.shotId ?? null
       if (id !== activeIdRef.current) {
         activeIdRef.current = id
@@ -173,6 +279,8 @@ export function VideoPreviewer() {
             if (!v.paused) v.pause()
             if (Math.abs(v.currentTime - local) > 0.02) v.currentTime = local
           }
+          // 빈 끝의 교차 디졸브 — 옅어지는 만큼 아래 줄(없으면 검정)이 비친다(2단계 ⑤).
+          v.style.opacity = String(Math.round((clip.opacity ?? 1) * edgeFadeAt(windows, item.shotId, t) * 1000) / 1000)
         }
       } else if (v && !v.paused) {
         v.pause()
@@ -198,6 +306,7 @@ export function VideoPreviewer() {
         const speed = c.speed ?? 1.0
         const local = (c.trimStart ?? 0) + (t - l.startSec) * speed
         if (el.playbackRate !== speed) el.playbackRate = speed
+        el.style.opacity = String(Math.round((c.opacity ?? 1) * edgeFadeAt(windows, l.shotId, t) * 1000) / 1000)
         if (st.isPlaying) {
           if (el.paused) void el.play().catch(() => {})
           if (Math.abs(el.currentTime - local) > 0.3) el.currentTime = local
@@ -254,6 +363,45 @@ export function VideoPreviewer() {
   // 타이틀 카드(#owner-title-card) 구간 — 영상 없이 검은 배경 + 중앙 텍스트(+선택 이미지)만 렌더.
   const isTitleCard = !!activeShotId && isTitleCardShotId(activeShotId)
   const pane = previewPane({ isTitleCard, hasShot: !!activeShot, clip: activeClip, unplayable })
+  // 교차 디졸브로 겹쳐 그리는 두 클립(2단계 ⑤) — 영상은 그 클립 모습(모션 · 효과) 그대로, 타이틀 카드는 내보내기와 같은 그림으로.
+  //   차례는 shotId 순으로 고정하고 위아래는 z-index 로 바꾼다(요소를 옮기면 영상이 멈춘다). 투명도는 재생 고리가 바꾼다.
+  //   맨 위 클립 그림 바로 위 · 자막 아래에 둔다.
+  const crossLayer = crossPair.length > 0 ? (
+    <div data-testid="program-cross-layer" className="pointer-events-none absolute inset-0">
+      {crossPair.map((shotId) => {
+        const clip = videoClips.find((c) => c.shotId === shotId)
+        const card = shots.find((s) => s.shotId === shotId)?.titleCard
+        return (
+          <div
+            key={shotId}
+            ref={(el) => {
+              if (el) crossBoxes.current.set(shotId, el)
+              else crossBoxes.current.delete(shotId)
+            }}
+            className="absolute inset-0 overflow-hidden"
+            style={{ opacity: 0 }}
+          >
+            {isTitleCardShotId(shotId) ? (
+              <TitleCardPicture card={card ?? { text: '', imageUrl: null }} />
+            ) : clip?.url ? (
+              <video
+                ref={(el) => {
+                  if (el) crossVideos.current.set(shotId, el)
+                  else crossVideos.current.delete(shotId)
+                }}
+                src={cachedVideoUrl(clip.url) ?? clip.url}
+                muted
+                playsInline
+                preload="auto"
+                className="absolute inset-0 h-full w-full object-contain"
+                style={layerStyle(clip, frame.width)}
+              />
+            ) : null}
+          </div>
+        )
+      })}
+    </div>
+  ) : null
 
   return (
     <div className="flex h-full flex-col">
@@ -272,14 +420,17 @@ export function VideoPreviewer() {
             onChange={(patch) => updateTitleCard(activeShotId, patch)}
             onBeforeChange={pushHistory}
             overlay={
-              activeShot ? (
-                <SubtitleLayer
-                  key={`sub-${activeShotId}`}
-                  subtitle={resolveSubtitle(activeShot)}
-                  onChange={(patch) => setSubtitle(activeShotId, patch)}
-                  onBeforeChange={pushHistory}
-                />
-              ) : null
+              <>
+                {crossLayer}
+                {activeShot ? (
+                  <SubtitleLayer
+                    key={`sub-${activeShotId}`}
+                    subtitle={resolveSubtitle(activeShot)}
+                    onChange={(patch) => setSubtitle(activeShotId, patch)}
+                    onBeforeChange={pushHistory}
+                  />
+                ) : null}
+              </>
             }
           />
         ) : pane === 'video' && activeClip?.url ? (
@@ -307,13 +458,14 @@ export function VideoPreviewer() {
                   playsInline
                   preload="auto"
                   className="absolute inset-0 h-full w-full object-contain"
-                  style={layerStyle(underClip)}
+                  style={layerStyle(underClip, frame.width)}
                 />
               )
             })}
             <video
               key={activeShotId ?? 'none'}
               ref={videoRef}
+              data-shot-id={activeShotId ?? undefined}
               // "전체 보기" 프리패치가 받아둔 blob 이 있으면 그걸로 — 클립 경계 전환이 즉시가 된다(#watch-all).
               src={cachedVideoUrl(activeClip.url) ?? activeClip.url}
               muted
@@ -321,12 +473,13 @@ export function VideoPreviewer() {
               preload="auto"
               className="absolute inset-0 h-full w-full object-contain"
               // 소스 미리 보기는 원본 그대로 — 효과는 타임라인 클립에만.
-              style={previewSourceShotId ? undefined : layerStyle(activeClip)}
+              style={previewSourceShotId ? undefined : layerStyle(activeClip, frame.width)}
               onLoadedMetadata={() => {
                 if (videoRef.current) setActualDuration(videoRef.current.duration)
               }}
               onError={() => markVideoUnplayable(activeClip.url)}
             />
+            {crossLayer}
             {activeShot && activeShotId && (
               <SubtitleLayer
                 key={`sub-${activeShotId}`}
@@ -362,6 +515,13 @@ export function VideoPreviewer() {
 
         {/* 디졸브 막(2026-09-08): 검은 화면의 투명도만 바뀐다 — 클릭은 통과 */}
         <div ref={dissolveRef} data-testid="dissolve-overlay" className="pointer-events-none absolute inset-0 z-20 bg-black" style={{ opacity: 0 }} />
+        {/* 흰색으로 물들이기 막(2단계 ⑤) — 시퀀스 틀 안만 희게(틀 밖 검은 띠는 그대로). 클릭은 통과 */}
+        <div
+          ref={whiteRef}
+          data-testid="dip-white-overlay"
+          className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 bg-white"
+          style={{ opacity: 0, ...(frame.width > 0 ? { width: frame.width, height: frame.height } : { width: '100%', height: '100%' }) }}
+        />
 
         {/* 모드 뱃지 + 길이 뱃지 (활성 클립 있을 때만) */}
         <div className="absolute right-4 top-3.5 flex items-center gap-1.5">
