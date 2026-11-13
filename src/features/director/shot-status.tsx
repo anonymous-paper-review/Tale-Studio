@@ -80,6 +80,7 @@ export function ShotStateTail({
   label,
   note,
   retry,
+  stop,
   className,
 }: {
   state: DirectorShotState
@@ -94,12 +95,15 @@ export function ShotStateTail({
   note?: ReactNode
   /** 다시 만들기 실패 꼬리일 때만 옆에 다는 [다시 만들기]. */
   retry?: ReactNode
+  /** 만드는 중 꼬리일 때만 옆에 다는 [멈추기](오너 7번 · 시안 D4) — 차례를 기다리는 샷에는 달지 않는다(보낸 작업이 없다). */
+  stop?: ReactNode
   className?: string
 }) {
   const t = useT()
   const tail = shotTail(state, { imageWaiting: waiting && !label, imageRemakeFailed: remakeFailed && !label }, place)
   const text = label ?? tail.label
-  const action = tail.remakeFailed ? retry : null
+  const making = (state === 'image_generating' || state === 'video_generating') && !waiting && !label
+  const action = tail.remakeFailed ? retry : making ? stop ?? null : null
   if (place === 'node') {
     return (
       <StateTailLine label={text} color={tail.color} ring={tail.ring} note={note} className={className}>

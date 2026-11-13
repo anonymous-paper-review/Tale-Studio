@@ -26,6 +26,7 @@ import { useT } from '@/lib/i18n'
 import { useTakeBalance } from '@/lib/billing/use-take-balance'
 import { takeCostForVideo, takeValuesShown } from '@/lib/billing/take-cost'
 import { TAKES_UNKNOWN_TEXT, takesReadable } from '@/features/director/takes-check'
+import { StopMakingButton } from '@/features/director/stop-making-button'
 import { normalizeProvider } from '@/lib/video-models'
 import { useShotState } from '@/features/director/hooks/use-shot-states'
 import { dimmedByStatusFilter, takeCountsAsVideo, takeIsRunning, videoTakeFrame, videoTakeTail } from '@/lib/director/shot-state'
@@ -463,6 +464,8 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           progress={batchPercent ?? undefined}
           note={nextInLineNote(nextNames ? nextNames.split('\n') : [], t)}
           announce={announce}
+          // [멈추기](시안 D4 · 오너 7번) — 이 Take 를 화면에서 멈춘다. fal 에서는 끝까지 돌고 Take 는 돌려주지 않는다.
+          action={data.generationJobId ? <StopMakingButton target={{ jobIds: [data.generationJobId], sheetShots: 1 }} kind="video" place="wait" /> : undefined}
           className="-inset-[1.5px]"
         />
       )}

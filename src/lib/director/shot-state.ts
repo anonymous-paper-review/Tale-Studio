@@ -1,7 +1,7 @@
 // Director 샷 상태(시안 R 416:4941 "상태 색 · 버튼 · 클릭 규칙", 오너 2026-11-14) — 카드 · 노드 테두리, 꼬리 글, 상태 고르기,
 //   위쪽 단추 숫자가 모두 이 판정 하나를 쓴다. 순수 함수만 둔다(화면 · 상점 의존 없음).
 //   약속: tests/director/shot-state.test.ts
-import { selectLatestAttempt } from '@/lib/director-video-take-selection'
+import { isStoppedTake, selectLatestShotAttempt } from '@/lib/director-video-take-selection'
 import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
 
 export type DirectorShotState =
@@ -139,7 +139,8 @@ export function shotFactsByNode(
           }]
         : [],
     )
-    const latest = selectLatestAttempt(records)
+    // 가장 새 시도 — 멈춘 Take 의 시각은 멈춘 때(리드 2026-11-14 규칙). 그것이 멈춘 Take 면 뒤에서 실패해도 빨강이 아니다.
+    const latest = selectLatestShotAttempt(records)
     const imageQueued = !!writerShotId && context.queuedImageShots.has(writerShotId)
     const imagePending = !!context.pendingImageNodeIds?.has(node.id)
     // 화면에서 멈춘 Take(오너 2026-11-14 7번)는 뒤에서 돌아도 만드는 중이 아니고, ★ 가 아니면 뒤늦게 끝나도 영상 완성이 아니다
@@ -158,7 +159,8 @@ export function shotFactsByNode(
       videoWaiting: videoPending && !videoRunning,
       videoDone: records.some((r) => takeCountsAsVideo({ status: r.status, videoUrl: r.url, cancelledAt: r.cancelled_at, final: r.is_final })),
       videoLatestFailed:
-        !!latest && (latest.last_attempt_status === 'failed' || (latest.last_attempt_status == null && latest.status === 'failed')),
+        !!latest && !isStoppedTake(latest) &&
+        (latest.last_attempt_status === 'failed' || (latest.last_attempt_status == null && latest.status === 'failed')),
     })
   }
   return out
