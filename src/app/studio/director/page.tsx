@@ -961,7 +961,8 @@ function PaletteBar() {
   const primary = primaryWorkAction({
     imageCount: imageBlock === null ? imageWork.length : 0,
     videoCount: videoBlock === null ? videoWork.length : 0,
-    canHandOff,
+    // 만드는 중에는 넘기기를 크림으로 칠하지 않는다 — 지금 할 일은 기다림이다(단추는 켜진 채 보조).
+    canHandOff: canHandOff && !making,
   })
   // 약속 E1·E2(2026-09-04): 확인창에 만들 영상 수·필요한 Take·가진 Take — 채팅 승인 카드와 같은 계산(video-batch-plan).
   //   오너 답 11: Take 는 지금 계산 그대로(모델 · 해상도마다, 1080p 두 배) 예상 칸 · 확인창에.

@@ -24,6 +24,13 @@ describe('다음: Editor로', () => {
     expect(directorHasFinishedVideo([take('v1', 'completed', '')])).toBe(false)
   })
 
+  it('만드는 중에는 [다음: Editor로]를 크림으로 칠하지 않는다 — 넘기기는 켜져 있어도 지금 할 일은 기다림이다', () => {
+    // 왜: 일괄이 도는 동안 만들기 단추가 꺼지면(리드 검토 a 보통 1) 크림이 넘기기로 옮겨 가 만드는 중에 떠나라고 미는 꼴이 됐다.
+    const page = readFileSync('src/app/studio/director/page.tsx', 'utf8')
+    expect(page).toContain('canHandOff: canHandOff && !making')
+    expect(page).toContain('blocked={!canHandOff}')
+  })
+
   it('다른 할 일이 있으면 [다음: Editor로]는 보조 단추이고, 만들 것이 없을 때만 크림이다', () => {
     // 왜: 시안 R "가장 밝은 버튼 = 지금 할 일 하나".
     const page = readFileSync('src/app/studio/director/page.tsx', 'utf8')
