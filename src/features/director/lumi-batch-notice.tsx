@@ -50,7 +50,7 @@ export function LumiBatchNotice() {
   const run = (action: LumiNoticeAction) => {
     useLumiNoticeStore.getState().dismiss()
     if (action.kind === 'handoff') void useGlobalChatStore.getState().requestNextStep()
-    else void useGlobalChatStore.getState().startDirectorVideos(action.shotIds, action.label)
+    else void useGlobalChatStore.getState().startDirectorVideos(action.shotIds, action.label, action.remake ? { remake: true } : undefined)
   }
 
   return (

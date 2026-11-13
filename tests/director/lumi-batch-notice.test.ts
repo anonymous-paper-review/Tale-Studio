@@ -94,7 +94,8 @@ describe('Lumi 알림 카드의 글과 단추(시안 D8)', () => {
     expect(view.done).toBe(true)
     expect(view.actions).toEqual([
       { kind: 'handoff', label: '빼고 Editor로' },
-      { kind: 'videos', label: '샷 4 다시 만들기', shotIds: ['s4'] },
+      // [샷 N 다시 만들기]는 넘기기 창 · 샷 상세와 같은 다시 만들기다(리드 (a) — 가장 최근 Take 설정 이어받기).
+      { kind: 'videos', label: '샷 4 다시 만들기', shotIds: ['s4'], remake: true },
     ])
   })
 

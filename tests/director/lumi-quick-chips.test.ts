@@ -19,6 +19,7 @@ import { translate } from '@/lib/i18n/translate'
 import { createPendingProposal } from '@/lib/pending-proposal'
 
 const originalGenerate = director.getState().generateStoryboardImage
+const originalRemake = director.getState().remakeShotVideo
 const IMG = (id: string, status = 'completed') => ({ status, url: status === 'completed' ? `https://media.test/${id}.png` : null, jobId: null })
 function shot(id: string, image: unknown = null): DirectorNode {
   return { id, type: 'shot', position: { x: 0, y: 0 }, data: { kind: 'shot', label: `w-${id}`, writerShotId: `w-${id}`, derivedPrompt: `base ${id}`, promptOverride: null, camera: { horizontal: 0, vertical: 0, pan: 0, tilt: 0, roll: 0, zoom: 0 }, lighting: { position: 'front', brightness: 50, colorTemp: 5600 }, cameraPreset: { brand: 'arri', focalLength: 35, aperture: 2.8, whiteBalance: 5600 }, provider: 'seedance', durationSeconds: 3, storyboardImage: image, referenceImages: [], imageInputs: [] } } as unknown as DirectorNode
@@ -58,7 +59,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock)
 })
 afterEach(() => {
-  director.setState({ generateStoryboardImage: originalGenerate })
+  director.setState({ generateStoryboardImage: originalGenerate, remakeShotVideo: originalRemake })
   vi.unstubAllGlobals()
 })
 
@@ -94,11 +95,14 @@ describe('Director 빠른 칩(시안 D5)', () => {
   // 왜: "실패한 샷 다시 만들어 줘" — 이미지가 실패한 샷은 다시 그리고(Take 안 씀), 영상이 실패한 샷은 새로 만든다(Take, 모자라면 시작 안 함).
   it('실패한 샷 다시 만들어 줘 칩은 이미지가 실패한 샷은 다시 그리고 영상이 실패한 샷은 다시 만든다', async () => {
     const generate = vi.fn().mockResolvedValue(null)
-    director.setState({ generateStoryboardImage: generate })
+    // 영상은 다시 만들기 — 알림 카드 · 넘기기 창 [다시 만들기]와 같은 다시 만들기 하나(가장 최근 Take 설정 이어받기, 리드 낮음 6 · (a)).
+    const remake = vi.fn(async (id: string) => `job-${id}`)
+    director.setState({ generateStoryboardImage: generate, remakeShotVideo: remake })
     await chat.getState().sendMessage(chip(2))
     expect(generate).toHaveBeenCalledWith('s4')
     expect(generate).toHaveBeenCalledTimes(1)
-    expect(mocks.run).toHaveBeenCalledWith('p-dir', expect.objectContaining({ shotIds: ['s5'] }))
+    expect(remake.mock.calls.map(([id]) => id)).toEqual(['s5'])
+    expect(mocks.run).not.toHaveBeenCalled()
     const said = chat.getState().messages.filter((m) => m.role === 'model').map((m) => m.content)
     expect(said).toContain('Started making live-action images for Shot 4 · No Takes used. Progress shows on the line above the cards.')
     expect(said).toContain('Started making videos for Shot 5 · 5 Takes. Progress shows on the line above the cards.')

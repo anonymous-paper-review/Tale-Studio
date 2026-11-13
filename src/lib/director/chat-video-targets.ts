@@ -64,6 +64,12 @@ const GROUPS: Record<Group, RegExp[]> = {
   selected: [/(?:고른|선택한|선택된)\s*샷|(?<![가-힣])이\s*샷/, /\b(?:selected|chosen|picked)\s+shots?\b|\bthis\s+shot\b/i], // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
 }
 
+/** 다시 만들기 말("다시" · again · remake · regenerate · redo) — 영상은 [다시 만들기]처럼 그 샷의 가장 최근 Take 설정을 이어받는다(리드 낮음 6). */
+const REMAKE = /(다시|\b(?:again|remake|regenerate|redo)\b)/i // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+export function asksRemake(text: string): boolean {
+  return REMAKE.test(text)
+}
+
 /** 목록(1·2 · 1, 2 · 1과 2)과 구간(1~3 · 1-3 · 1 to 3)을 편다. */
 function expandNumbers(list: string, into: Set<number>): void {
   const tokens = list.match(/\d+|~|-|–|\bto\b/gi) ?? []
