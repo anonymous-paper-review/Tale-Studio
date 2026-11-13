@@ -485,6 +485,31 @@ describe('Director 의 다음 단계 버튼과 Editor 넘기기 창', () => {
     expect(dialog).not.toMatch(/openPopup\(/)
   })
 
+  // 왜(검토 a 참고, 리드 11/14): 노드 보기에서 그 샷 상세가 이미 열려 있으면 openShotDetail 이 같은 샷 · 같은 탭을 다시 넣어 상점 값이 그대로라,
+  //   왼쪽 패널이 다시 붙지 않고 사람이 안에서 바꿔 둔 이미지 탭에 머물렀다. 열 때마다 여는 차례를 올리고 패널이 그 차례로 다시 붙는다.
+  //   탭은 상세 안의 화면 상태라 화면 시험 도구 없이 볼 수 없어 — 상점의 여는 차례와 패널의 쓰임(소스 글자)을 본다.
+  it('노드 보기에서 그 샷 상세가 이미 열려 사람이 안에서 이미지 탭으로 바꿔 두었어도, [바꾸기] · ⤢ 는 영상 탭(⤢ 는 그 버튼의 탭)으로 다시 연다', () => {
+    const { viewMode } = useDirectorCanvasStore.getState()
+    const openWindow = () => useGlobalChatStore.setState({ handoffConfirm: { kind: 'editorMissingVideos', projectId: 'proj-1', via: 'button' } })
+    try {
+      useDirectorCanvasStore.setState({ nodes: canvas(take('a1', 1, 'completed')), viewMode: 'node', detailNodeId: null })
+      openWindow()
+      useGlobalChatStore.getState().changeHandoverTake('n_a1')
+      const first = useDirectorCanvasStore.getState().detailOpenSeq
+      // 그 상세가 열린 채로(사람이 안에서 이미지 탭으로 바꿈 — 상세 안의 화면 상태) 다시 창을 열고 [바꾸기]
+      openWindow()
+      useGlobalChatStore.getState().changeHandoverTake('n_a1')
+      expect(useDirectorCanvasStore.getState()).toMatchObject({ detailNodeId: 'n_a1', detailTab: 'video', detailOpenSeq: first + 1 })
+      // ⤢ 도 같은 상세를 다시 열면 차례가 오른다 — 그 버튼의 탭으로.
+      useDirectorCanvasStore.getState().openShotDetail('n_a1', 'image')
+      expect(useDirectorCanvasStore.getState()).toMatchObject({ detailNodeId: 'n_a1', detailTab: 'image', detailOpenSeq: first + 2 })
+    } finally {
+      useDirectorCanvasStore.setState({ viewMode, detailNodeId: null })
+    }
+    const panel = readFileSync('src/features/director/canvas-panels/DirectorDetailPanel.tsx', 'utf8')
+    expect(panel).toMatch(/key=\{`\$\{node\.id\}:\$\{detailNodeId \? `\$\{detailTab\}:\$\{detailOpenSeq\}` : ''\}`\}/)
+  })
+
   // 왜(혼자 정한 것): 채팅으로 넘겨 달라고 해도 같은 판단을 탄다 — Director 준비 창이 채팅에서도 열리는 것과 같게.
   it('채팅으로 Editor로 넘겨 달라고 해도 영상이 없는 샷이 있으면 같은 창을 연다', async () => {
     useDirectorCanvasStore.setState({ nodes: canvas(take('a1', 1, 'completed')) })
