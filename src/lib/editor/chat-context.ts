@@ -11,8 +11,8 @@ export interface EditorChatContextInput {
   videoClips: VideoClip[]
   clipOrder: Record<string, string[]>
   audioClips: AudioTrackClip[]
-  /** V1 밖 줄의 클립 자리 — 영상 위 제목 클립을 말한다(2단계 ⑥). */
-  overlay?: OverlayPlacements
+  /** V1 밖 줄의 클립 자리 — 영상 위 제목 클립을 말한다(2단계 ⑥). 빠지면 제목 줄이 말없이 사라지니 꼭 받는다(검토 c ⑥). */
+  overlay: OverlayPlacements
 }
 
 const secs = (value: number) => `${value.toFixed(1)}s`

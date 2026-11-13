@@ -643,7 +643,11 @@ export default function PostPage() {
                     onSetTitleCardDuration={setTitleCardDuration}
                     onSetTransition={setClipTransition}
                     onSetTransitionLength={setTransitionLength}
-                    onAddTitle={(trackId, atSec) => addTitleClip(trackId, atSec, defaultTitleText(projectTitle, t('New title')))}
+                    onAddTitle={(trackId, atSec) => {
+                      const created = addTitleClip(trackId, atSec, defaultTitleText(projectTitle, t('New title')))
+                      // V1 위에 놓을 줄이 없으면(지웠거나 모두 잠금) 말없이 넘어가지 않는다(검토 c ⑥ 낮음).
+                      if (!created && trackId === 'v1') toast.info(t('There is no track to put the title on. Add V2 or unlock a track.'))
+                    }}
                     onPushHistory={pushHistory}
                     videoTracks={videoTracks}
                     overlayLayout={overlayLayout}

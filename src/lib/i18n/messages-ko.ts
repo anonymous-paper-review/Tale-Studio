@@ -3514,5 +3514,6 @@ export const KO: Record<string, string> = {
   'Type tool (T)': '문자 도구 (T)',
   'Type tool': '문자 도구',
   'Type tool · Click a V track to add a title there': '문자 도구 · V 트랙을 누르면 그 자리에 제목이 생겨요',
+  'There is no track to put the title on. Add V2 or unlock a track.': '제목을 놓을 줄이 없어요. V2 를 더하거나 잠금을 풀어 주세요.',
   'Add a marker': '마커 달기',
 }

@@ -14,7 +14,7 @@ vi.mock('@/stores/project-store', () => ({
   }),
 }))
 
-import { saveEditorNow, selectProgramLayout, selectTitlesAt, selectVideoLayout, useEditorStore } from '@/stores/editor-store'
+import { saveEditorNow, selectProgramLayout, selectTitleDipsAt, selectTitlesAt, selectVideoLayout, useEditorStore } from '@/stores/editor-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { EffectControls } from '@/features/editor/effect-controls'
 import { EDITOR_SHORTCUTS } from '@/features/editor/editor-workbar'
@@ -23,6 +23,8 @@ import { TitleClipFace, TitleTextLayer } from '@/features/editor/title-clip-laye
 import { defaultTitleText, titleLayersAt, titleTextBox } from '@/lib/editor/title-clip'
 import { transitionWindows } from '@/lib/editor/transition'
 import { editorChatContext } from '@/lib/editor/chat-context'
+import { clipMenuTitle } from '@/features/editor/editor-labels'
+import { translate } from '@/lib/i18n/translate'
 import type { PersistedEditor } from '@/lib/editor-persistence'
 import type { Shot, VideoClip } from '@/types'
 
@@ -335,3 +337,41 @@ describe('혼자 정한 것', () => {
     expect(clipOf(id)).toMatchObject({ motion: { x: 0, y: -0.3, scale: 1 }, opacity: 0.8, transitionOut: { type: 'cross', durationSec: 1 } })
   })
 })
+
+describe('검토 c ⑥ (F) — 리드 11/14 같이 정한 것', () => {
+  it('제목 끝 물들이기는 화면 전체 막이고, 눈 끈 줄 · 가려진 제목은 그리지 않는다', () => {
+    // 왜: 검토 c ⑥ U4(보통) — 제목 자리를 모두 세어, 눈을 끈 V2 의 제목 · V3 전체 화면 영상에 덮인 제목의 검정 물들이기도 0.5 로 그렸다.
+    //   그 시각 화면에 보이는 제목만 센다 — ⑦ 내보내기도 같은 셈을 쓴다.
+    const id = api().addTitleClip('v2', 1, '우산')!
+    api().dropTransition(id, 'end', 'dissolve')
+    expect(selectTitleDipsAt(api(), 2.75)).toEqual({ black: 0.5, white: 0 })
+    api().toggleTrackVisible('v2')
+    expect(selectTitleDipsAt(api(), 2.75)).toEqual({ black: 0, white: 0 })
+    api().toggleTrackVisible('v2')
+    api().moveClipToTrack('C', 'v3', 2)
+    expect(selectTitleDipsAt(api(), 2.75)).toEqual({ black: 0, white: 0 })
+    expect(read('src/features/editor/video-previewer.tsx')).toMatch(/selectTitleDipsAt\(st, t\)/)
+  })
+
+  it('제목 클립 우클릭 메뉴 머리는 "제목 · 2.0s"(영어 "Title clip · 2.0s")다', () => {
+    // 왜: 검토 c ⑥(낮음) — 만들 때 붙인 샷 종류 "WS"가 메뉴 머리에 보였다(타이틀 카드에서 디자이너가 짚은 N 353:351 과 같은 고장).
+    const ko = (key: string, params?: Record<string, string | number>) => translate('ko', key, params)
+    const en = (key: string, params?: Record<string, string | number>) => translate('en', key, params)
+    expect(clipMenuTitle({ isTitleCard: false, isTitleClip: true, shotType: 'WS', durationSec: 2 }, ko)).toBe('제목 · 2.0s')
+    expect(clipMenuTitle({ isTitleCard: false, isTitleClip: true, shotType: 'WS', durationSec: 2 }, en)).toBe('Title clip · 2.0s')
+    expect(read('src/features/editor/timeline.tsx')).toMatch(/clipMenuTitle\(\{ isTitleCard: isTitleCardShotId\(item\.shotId\), isTitleClip: isTitleClipShotId\(item\.shotId\)/)
+  })
+
+  it('문자 도구로 V1 을 누르면 그 위 가장 가까운 잠기지 않은 V 줄에 제목이 생기고, 그런 줄이 없으면 만들지 않고 까닭을 한 줄 알린다', () => {
+    // 왜: 검토 c ⑥(낮음) — V2 를 지웠거나 잠갔으면 V1 을 눌러도 말없이 아무 일도 없었다.
+    api().toggleTrackLock('v2')
+    const id = api().addTitleClip('v1', 1, '우산')!
+    expect(placeOf(id)?.trackId).toBe('v3')
+    api().toggleTrackLock('v3')
+    expect(api().addTitleClip('v1', 4, '비')).toBeNull()
+    const page = read('src/app/studio/editor/page.tsx')
+    expect(page).toMatch(/if \(!created && trackId === 'v1'\) toast\.info\(t\('There is no track to put the title on\. Add V2 or unlock a track\.'\)\)/)
+    expect(translate('ko', 'There is no track to put the title on. Add V2 or unlock a track.')).toBe('제목을 놓을 줄이 없어요. V2 를 더하거나 잠금을 풀어 주세요.')
+  })
+})
+

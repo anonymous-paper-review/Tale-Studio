@@ -12,7 +12,7 @@ import { TitleCardStage } from '@/features/editor/title-card-stage'
 import { SubtitleLayer } from '@/features/editor/subtitle-layer'
 import { TitleTextLayer } from '@/features/editor/title-clip-layer'
 import { resolveSubtitle } from '@/lib/editor/subtitle'
-import { useEditorStore, selectProgramLayout, selectStackAt, selectTitlesAt, selectVideoLayout, isTitleCardShotId, isTitleClipShotId } from '@/stores/editor-store'
+import { useEditorStore, selectProgramLayout, selectStackAt, selectTitleDipsAt, selectTitlesAt, selectVideoLayout, isTitleCardShotId } from '@/stores/editor-store'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import { editPointTarget } from '@/lib/editor/timeline-segments'
 import { SEQUENCE_FPS, exportFrameSize, formatTimecode, sequenceLengthSec } from '@/lib/editor/sequence-info'
@@ -213,8 +213,8 @@ export function VideoPreviewer() {
       const videoLayout = selectVideoLayout(st)
       const windows = transitionWindows(videoLayout, st.videoClips)
       const dips = dipOpacityAt(windows, layout, t)
-      // 제목 클립 끝의 물들이기 — 제목은 영상 계산에 끼지 않아 제목 자리로 따로 센다(2단계 ⑥).
-      const titleDips = dipOpacityAt(windows, videoLayout.filter((l) => isTitleClipShotId(l.shotId)), t)
+      // 제목 클립 끝의 물들이기 — 제목은 영상 계산에 끼지 않아 따로 센다. 그 시각 보이는 제목만(눈 끈 줄 · 덮인 제목 빼고, 검토 c ⑥ U4).
+      const titleDips = selectTitleDipsAt(st, t)
       // 타이틀 카드는 영상이 아니라 빈 끝의 교차 디졸브를 검은 막으로 — 검정에서 나타나고 검정으로 사라진다.
       const titleFade = item && isTitleCardShotId(item.shotId) ? 1 - edgeFadeAt(windows, item.shotId, t) : 0
       // 디졸브(2026-09-08): 검은 막의 투명도만 시간에 따라 — 영상 픽셀은 손대지 않는다. 예전 시작 디졸브(내보내기와 같은 함수)에

@@ -25,7 +25,7 @@ import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 import { compactSnapshot, sharePeaks } from '@/lib/editor/peaks'
 import { nearestEditPoint } from '@/lib/editor/timeline-segments'
-import { TRANSITION_DEFAULT_SEC, cleanTransition, edgeFadeAt, edgeTransition, joinedNeighbor, transitionWindows, type TransitionEdge } from '@/lib/editor/transition'
+import { TRANSITION_DEFAULT_SEC, cleanTransition, dipOpacityAt, edgeFadeAt, edgeTransition, joinedNeighbor, transitionWindows, type TransitionEdge, type TransitionWindow } from '@/lib/editor/transition'
 import { VIDEO_EFFECT_DEFAULT, patchEffects, type VideoEffectKind, type VideoEffectPatch } from '@/lib/editor/video-effects'
 import { TITLE_CLIP_SECONDS, TITLE_SIZE_DEFAULT, cleanTitleText, titleLayersAt } from '@/lib/editor/title-clip'
 
@@ -572,6 +572,27 @@ export function selectStackAt(input: TimelineInput & { videoTracks?: readonly Vi
  *   그대로 그린다. 더 위 줄에 화면을 다 덮는 영상이 있으면 그 아래 제목은 가려진다. 약속: tests/editor/title-clips.test.ts
  */
 export function selectTitlesAt(input: TimelineInput & { videoTracks?: readonly VideoTrackState[] }, t: number): Array<TrackLayoutItem & { fade: number }> {
+  const { titles, windows, rank, coverRank } = titleSceneAt(input, t)
+  if (titles.length === 0) return []
+  return titleLayersAt(titles, windows, t)
+    .map(({ shotId, fade }) => ({ ...titles.find((item) => item.shotId === shotId)!, fade }))
+    .filter((item) => (rank.get(item.trackId) ?? 0) > coverRank)
+}
+
+/**
+ * 시각 t 의 제목 클립 끝 물들이기(검정 · 흰색) — 영상과 같은 화면 전체 막. 눈을 끈 줄의 제목과, 그 시각 더 위 줄의 화면을 다 덮는 영상에
+ *   가린 제목은 그리지 않는다(검토 c ⑥ U4). 미리 보기와 ⑦ 내보내기가 같은 셈을 쓴다. 약속: tests/editor/title-clips.test.ts
+ */
+export function selectTitleDipsAt(input: TimelineInput & { videoTracks?: readonly VideoTrackState[] }, t: number): { black: number; white: number } {
+  const { titles, windows, rank, coverRank } = titleSceneAt(input, t)
+  return dipOpacityAt(windows, titles.filter((item) => (rank.get(item.trackId) ?? 0) > coverRank), t)
+}
+
+/** 제목 셈 바탕 — 눈을 켠 줄의 제목 클립(아래 줄부터), 전환 구간, 줄 차례, 그 시각 화면을 다 덮는 가장 위 영상의 줄 차례(없으면 −1). */
+function titleSceneAt(
+  input: TimelineInput & { videoTracks?: readonly VideoTrackState[] },
+  t: number,
+): { titles: TrackLayoutItem[]; windows: TransitionWindow[]; rank: Map<string, number>; coverRank: number } {
   const tracks = input.videoTracks ?? DEFAULT_VIDEO_TRACKS
   const rank = new Map(tracks.map((track, i) => [track.id, i]))
   const hidden = new Set(tracks.filter((track) => track.hidden).map((track) => track.id))
@@ -579,14 +600,11 @@ export function selectTitlesAt(input: TimelineInput & { videoTracks?: readonly V
   const titles = layout
     .filter((item) => isTitleClipShotId(item.shotId) && !hidden.has(item.trackId))
     .sort((a, b) => (rank.get(a.trackId) ?? 0) - (rank.get(b.trackId) ?? 0) || a.startSec - b.startSec)
-  if (titles.length === 0) return []
+  if (titles.length === 0) return { titles, windows: [], rank, coverRank: -1 }
   const windows = transitionWindows(layout, input.videoClips)
   // 화면을 다 덮는 가장 위 영상 — selectStackAt 은 그 아래를 이미 잘랐으니 남은 것 중 처음 덮는 클립이다.
   const cover = selectStackAt(input, t).find((item) => coversFrame(input.videoClips.find((c) => c.shotId === item.shotId)) && edgeFadeAt(windows, item.shotId, t) >= 1)
-  const coverRank = cover ? rank.get(cover.trackId) ?? 0 : -1
-  return titleLayersAt(titles, windows, t)
-    .map(({ shotId, fade }) => ({ ...titles.find((item) => item.shotId === shotId)!, fade }))
-    .filter((item) => (rank.get(item.trackId) ?? 0) > coverRank)
+  return { titles, windows, rank, coverRank: cover ? rank.get(cover.trackId) ?? 0 : -1 }
 }
 
 /** 모션 칸 — 범위 안으로(위치 −1 ~ 1, 비율 0.1 ~ 3), 처음 값(0 · 0 · 1)이면 없앤다. */
@@ -2998,9 +3016,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   addTitleClip: (trackId, atSec, text) => {
     let created: string | null = null
     set((state) => {
-      // 제목은 영상 위 줄에 — V1 을 누르면 V2 에 만든다(결정 페이지 "새 제목은 V2 위 2초 글자 클립").
-      const target = trackId === 'v1' ? 'v2' : trackId
-      if (!state.videoTracks.some((t) => t.id === target) || trackLocked(state, target)) return state
+      // 제목은 영상 위 줄에 — V1 을 누르면 그 위 가장 가까운 잠기지 않은 줄(처음은 V2, 결정 페이지 "새 제목은 V2 위 2초 글자 클립").
+      //   그런 줄이 없으면 만들지 않는다 — 화면이 까닭을 알린다(검토 c ⑥ 낮음).
+      const target = trackId === 'v1' ? state.videoTracks.find((t) => t.id !== 'v1' && !t.locked)?.id : trackId
+      if (!target || !state.videoTracks.some((t) => t.id === target) || trackLocked(state, target)) return state
       const newId = `title__g${uid()}`
       created = newId
       const newShot: Shot = {

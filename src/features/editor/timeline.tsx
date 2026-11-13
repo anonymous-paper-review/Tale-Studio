@@ -1053,7 +1053,7 @@ export function Timeline({
         </ContextMenuTrigger>
         <ContextMenuContent className="w-44">
           <ContextMenuLabel className="text-xs">
-            {targets.length > 1 ? t('{count} clips', { count: targets.length }) : clipMenuTitle({ isTitleCard: isTitleCardShotId(item.shotId), shotType: shot.shotType, durationSec: item.durationSec }, t)}
+            {targets.length > 1 ? t('{count} clips', { count: targets.length }) : clipMenuTitle({ isTitleCard: isTitleCardShotId(item.shotId), isTitleClip: isTitleClipShotId(item.shotId), shotType: shot.shotType, durationSec: item.durationSec }, t)}
           </ContextMenuLabel>
           <ContextMenuSeparator />
           <ContextMenuSub>
