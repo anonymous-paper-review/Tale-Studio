@@ -16,6 +16,7 @@ import type { PersistedEditor } from '@/lib/editor-persistence'
 import type { AudioTrackClip, Shot, VideoClip } from '@/types'
 
 const LOCAL_KEY = 'tale:editor:v1:project-free'
+const BEFORE_V2_KEY = 'tale:editor:v1:before-v2:project-free'
 const api = () => useEditorStore.getState()
 const read = (file: string) => readFileSync(file, 'utf8')
 
@@ -244,4 +245,54 @@ describe('저장하고 다시 열기', () => {
     api().updateVideoClip('A', { actualDurationSec: 3 })
     expect(layout()).toEqual([['A', 0, 3], ['B', 4, 3], ['D', 12, 4]])
   })
+
+  it('예전 저장본을 새 형식으로 옮겨도 이 브라우저의 옛 형식 저장본은 따로 칸에 그대로 남는다', async () => {
+    // 왜: 옮겨 적기는 되돌릴 수 없다(리드 2026-11-14, 2단계 위험 2) — 새 형식에 고장이 나도 "옮기던 때의 편집"을 꺼낼 수 있게.
+    //   서버 저장본 안에도 한 벌이 남지만(tests/editor/save-format.test.ts) 서버에 못 올린 이 브라우저 고침은 여기에만 있다.
+    //   처음 옮길 때 한 번만 쓰고 그 뒤로는 덮지 않는다.
+    const legacy = JSON.stringify({
+      version: 1, shots: ['A', 'B', 'C', 'D'].map((id) => shot(id)), clipOrder: { sc_1: ['A', 'C', 'D'] }, videoClips: ['A', 'B', 'C', 'D'].map((id) => clip(id)),
+      audioClips: [music(3)], audioSources: [], audioTracks: [{ id: 'atrack_1' }], panelSizes: { sourceW: 256, previewH: 360 },
+    })
+    localStorage.setItem(LOCAL_KEY, legacy)
+    canonical()
+    await api().loadPersisted()
+    await saveEditorNow('project-free')
+    expect(JSON.parse(localStorage.getItem(LOCAL_KEY) ?? 'null').version).toBe(2)
+    expect(localStorage.getItem(BEFORE_V2_KEY)).toBe(legacy)
+    api().deleteClip('C')
+    await saveEditorNow('project-free')
+    canonical()
+    await api().loadPersisted()
+    await saveEditorNow('project-free')
+    expect(localStorage.getItem(BEFORE_V2_KEY)).toBe(legacy)
+  })
+
+  it('처음부터 새 형식인 저장본은 따로 칸에 두지 않는다', async () => {
+    // 왜: 옮길 것이 없으면 남길 것도 없다 — 이 브라우저 저장 공간은 작다(꽉 차면 편집 저장이 실패한다, 검토 A E2a).
+    api().deleteClip('B')
+    await saveEditorNow('project-free')
+    canonical()
+    await api().loadPersisted()
+    await saveEditorNow('project-free')
+    expect(localStorage.getItem(BEFORE_V2_KEY)).toBeNull()
+  })
+
+  it('새 형식 저장본에서 새로 더한 칸(자리 · 앞 빈 곳)을 모르고 열어도 같은 클립 · 순서 · 소리가 빈 곳만 붙어 열린다 — 배포를 되돌려도 옛 화면이 마지막 편집을 연다', async () => {
+    // 왜: 새 형식은 옛 칸(순서 · 클립 · 소리)을 옛 뜻 그대로 적고 칸만 더한다. 옛 화면은 판 번호와 모르는 칸을 보지 않는다 —
+    //   옛 코드(de1113-export · origin/main 43727d13)로 같은 저장본을 직접 열어 같은 결과를 확인했다(2026-11-14).
+    //   잃는 것은 사람이 둔 빈 곳뿐: 빈 곳 뒤 클립과 이어진 소리는 당겨지고, 사람이 놓은 음악은 초 자리 그대로라 빈 곳 길이만큼 어긋난다.
+    useEditorStore.setState({ audioClips: [...api().audioClips.filter((a) => a.id !== 'bgm'), music(9)] })
+    api().deleteClip('B')
+    await saveEditorNow('project-free')
+    const saved = JSON.parse(localStorage.getItem(LOCAL_KEY) ?? 'null') as PersistedEditor
+    const oldView = { ...saved, version: 1, videoClips: saved.videoClips.map(({ gapBefore: _gap, ...rest }) => rest) }
+    delete oldView.placements
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(oldView))
+    canonical()
+    await api().loadPersisted()
+    expect(layout()).toEqual([['A', 0, 4], ['C', 4, 4], ['D', 8, 4]])
+    expect([audioAt('A'), audioAt('C'), audioAt('D'), bgm()]).toEqual([0, 4, 8, 9])
+  })
 })
+
