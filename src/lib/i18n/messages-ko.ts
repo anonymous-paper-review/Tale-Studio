@@ -3432,7 +3432,7 @@ export const KO: Record<string, string> = {
   'Play or pause': '재생 · 멈춤',
   'One frame back or forward': '한 장 뒤 · 앞',
   'Five frames back or forward': '다섯 장 뒤 · 앞',
-  'Previous or next edit point or marker': '앞 · 다음 편집점 · 마커',
+  'Previous or next edit point': '앞 · 다음 편집점',
   'Redo': '다시 실행',
   'Selection tool': '선택 도구',
   'Cut tool': '자르기 도구',

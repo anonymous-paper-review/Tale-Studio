@@ -12,7 +12,7 @@ const FRAME = 1 / SEQUENCE_FPS
 const isLetter = (e: KeyboardEvent, letter: string) => !e.altKey && (e.key.toLowerCase() === letter || e.code === `Key${letter.toUpperCase()}`)
 
 /**
- * Editor 전역 단축키(포커스 무관): Space(재생/정지), ←/→(프레임 이동), Ctrl+←/→(편집점 · 마커), Ctrl+Z(undo),
+ * Editor 전역 단축키(포커스 무관): Space(재생/정지), ←/→(프레임 이동), Ctrl+←/→(편집점), Ctrl+Z(undo),
  *   Ctrl+Y / Ctrl+Shift+Z(redo), Ctrl+K(플레이헤드 자리 나누기), V(선택), C(자르기), M(마커), Delete.
  *   약속: tests/editor/panels.test.ts · tests/editor/split-snap-markers.test.ts
  */
@@ -57,9 +57,9 @@ export function handleEditorKey(e: KeyboardEvent) {
     e.preventDefault()
     const dir = e.key === 'ArrowRight' ? 1 : -1
     if (meta) {
-      // 클립의 시작과 끝이 컷 경계다 — 빈 곳이 있으면 빈 곳의 양 끝도 멈춘다(자유 배치). 마커에도 멈춘다(2단계 ③). 모니터의 편집점 단추와 같은 자리.
+      // 클립의 시작과 끝이 컷 경계다 — 빈 곳이 있으면 빈 곳의 양 끝도 멈춘다(자유 배치). 모니터의 편집점 단추와 같은 자리.
       const layout = selectVideoLayout(s)
-      s.nudge(editPointTarget(layout, s.currentTime, dir, s.markers) - s.currentTime)
+      s.nudge(editPointTarget(layout, s.currentTime, dir) - s.currentTime)
     } else {
       s.nudge((e.shiftKey ? 5 : 1) * dir * FRAME)
     }

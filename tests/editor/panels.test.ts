@@ -187,10 +187,9 @@ describe('프로그램 모니터 단추', () => {
     expect(editPointTarget(layout, 3, 1)).toBe(6)
     expect(editPointTarget(layout, 6.5, -1)).toBe(6)
     expect(editPointTarget(layout, 0, -1)).toBe(0)
-    // 마커 인자는 2단계 ③(마커에도 멈춘다 — tests/editor/split-snap-markers.test.ts).
-    expect(read('src/features/editor/video-previewer.tsx')).toMatch(/editPointTarget\(layout, st\.currentTime, -1(, st\.markers)?\)/)
-    expect(read('src/features/editor/video-previewer.tsx')).toMatch(/editPointTarget\(layout, st\.currentTime, 1(, st\.markers)?\)/)
-    expect(read('src/features/editor/use-editor-playback.ts')).toMatch(/editPointTarget\(layout, s\.currentTime, dir(, s\.markers)?\)/)
+    expect(read('src/features/editor/video-previewer.tsx')).toMatch(/editPointTarget\(layout, st\.currentTime, -1\)/)
+    expect(read('src/features/editor/video-previewer.tsx')).toMatch(/editPointTarget\(layout, st\.currentTime, 1\)/)
+    expect(read('src/features/editor/use-editor-playback.ts')).toMatch(/editPointTarget\(layout, s\.currentTime, dir\)/)
   })
 })
 

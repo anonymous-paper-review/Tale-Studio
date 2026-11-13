@@ -175,6 +175,17 @@ describe('자물쇠', () => {
     expect(program()[0]).toEqual(['A', 0, 4, 0])
   })
 
+  it('프로젝트 판에서 [타임라인에 추가]를 누르면 더한 새 클립에 그 샷 소리가 이어진다', () => {
+    // 왜: 검토 c((B) 낮음) — 화면은 돌려받은 새 클립에만 소리를 잇는다. 돌려받지 못하면 소리가 말없이 안 붙는데, 화면 코드 글자 시험은
+    //   그대로 통과한다. 정상 경로 고정.
+    api().seek(1)
+    const id = api().addClipAtPlayhead('C')
+    expect(id).toMatch(/^C__i/)
+    api().addAudioClip({ name: 'C audio', url: 'https://video.test/C.mp4', startSec: 0, durationSec: 1, linkedShotId: id })
+    const placed = selectTimelineLayout(api()).find((l) => l.shotId === id)
+    expect(api().audioClips.find((a) => a.linkedShotId === id)).toMatchObject({ startSec: placed?.startSec, durationSec: placed?.durationSec })
+  })
+
   it('V1 을 잠근 채 프로젝트 판에서 [타임라인에 추가]를 누르면 영상도 소리도 들어가지 않는다', () => {
     // 왜: 검토 c(② 보통 2) — 영상은 막혔는데 화면이 지금 고른 V1 클립에 그 샷의 소리를 붙여, 소리가 둘 겹친 채 저장 · 내보내기까지 갔다.
     //   더한 클립이 있을 때만(새 클립 id) 그 클립에 소리를 잇는다.

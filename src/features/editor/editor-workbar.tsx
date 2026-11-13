@@ -141,7 +141,7 @@ export const EDITOR_SHORTCUTS: readonly { keys: string; action: string }[] = [
   { keys: 'Space', action: 'Play or pause' },
   { keys: '← →', action: 'One frame back or forward' },
   { keys: 'Shift+← →', action: 'Five frames back or forward' },
-  { keys: 'Ctrl+← →', action: 'Previous or next edit point or marker' },
+  { keys: 'Ctrl+← →', action: 'Previous or next edit point' },
   { keys: 'Ctrl+Z', action: 'Undo' },
   { keys: 'Ctrl+Y', action: 'Redo' },
   { keys: 'V', action: 'Selection tool' },

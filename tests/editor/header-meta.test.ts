@@ -1,12 +1,41 @@
 // Editor 위 둘째 줄 시퀀스 정보의 길이와 프로젝트 판 샷 줄의 영상 상태 낱말을 검사한다 — 예전 화면 머리 "컷 7 · 33초 · 영상 0/7"의 길이를 이 줄로 옮겼다 (v3 ED1 2026-11-03 → 2단계 ① 새 배치, 리드 2026-11-14)
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
-import { clipStatusLabel } from '@/features/editor/editor-labels'
-import { sequenceInfoLine, sequenceLengthSec } from '@/lib/editor/sequence-info'
-import { translate } from '@/lib/i18n/translate'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const ko = (text: string, params?: Record<string, string | number>) => translate('ko', text, params)
+vi.hoisted(() => {
+  ;(globalThis as { window?: unknown }).window = globalThis
+})
+vi.mock('@/stores/project-store', () => ({
+  useProjectStore: Object.assign((pick: (s: { projectId: string | null }) => unknown) => pick({ projectId: 'project-header' }), {
+    getState: () => ({ projectId: 'project-header' }),
+  }),
+}))
+
+import { ProjectPanel } from '@/features/editor/video-source-panel'
+import { sequenceInfoLine, sequenceLengthSec } from '@/lib/editor/sequence-info'
+import { useEditorStore } from '@/stores/editor-store'
+import { useLocaleStore } from '@/stores/locale-store'
+import type { Shot, VideoClip } from '@/types'
+
 const read = (file: string) => readFileSync(file, 'utf8')
+const shot = (shotId: string): Shot =>
+  ({ shotId, sceneId: 'sc_1', shotType: 'MS', actionDescription: '', characters: [], durationSeconds: 4, generationMethod: 'T2V', dialogueLines: [], camera: {}, lighting: {}, referenceImageUrl: null }) as unknown as Shot
+/** 정적 렌더는 스토어의 처음 값을 읽는다 — 지금 값을 처음 값으로 옮겨 그린다(tests/editor/panels.test.ts 와 같은 방법). */
+function html(el: ReturnType<typeof createElement>) {
+  for (const store of [useLocaleStore, useEditorStore] as Array<{ getState: () => object; getInitialState: () => object }>) Object.assign(store.getInitialState(), store.getState())
+  return renderToStaticMarkup(el)
+}
+const text = (markup: string) => markup.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+
+beforeEach(() => {
+  useLocaleStore.setState({ locale: 'ko' })
+  useEditorStore.getState().reset()
+})
+afterEach(() => {
+  useLocaleStore.setState({ locale: 'en' })
+})
 const item = (shotId: string, startSec: number, durationSec: number) => ({ shotId, startSec, durationSec })
 const sound = (startSec: number, durationSec: number) => ({ startSec, durationSec })
 /** 위 둘째 줄 "00:00:33:00 · 1280×720 · 30fps"의 길이 칸. */
@@ -50,9 +79,23 @@ describe('혼자 정한 것', () => {
   })
 
   // 왜: 프로젝트 판(예전 소스 카드)이 영상 상태를 영어 원문(pending · completed)으로 보이고 있었다. ED1 시안은 "대기"처럼 한국어 낱말이다.
-  it('프로젝트 판의 샷 줄은 영상 상태를 완료 · 생성 중 · 실패 · 대기 중 낱말로 보인다', () => {
-    expect((['completed', 'generating', 'failed', 'pending'] as const).map((s) => ko(clipStatusLabel(s)))).toEqual([
-      '완료', '생성 중', '실패', '대기 중',
-    ])
+  //   영상이 있는 샷은 낱말 대신 시안 E1 409:4757 의 "V · 04:00" — 그래서 "완료"는 줄에 나오지 않는다(검토 c, 2026-11-14).
+  it('프로젝트 판의 샷 줄은 영상이 있으면 "V · 길이"를, 영상이 없으면 생성 중 · 실패 · 대기 중 낱말을 보인다', () => {
+    const clips: VideoClip[] = [
+      { shotId: 'A', url: 'https://video.test/A.mp4', status: 'completed', thumbnailUrl: null },
+      { shotId: 'B', url: null, status: 'generating', thumbnailUrl: null },
+      { shotId: 'C', url: null, status: 'failed', thumbnailUrl: null },
+      { shotId: 'D', url: null, status: 'pending', thumbnailUrl: null },
+    ]
+    const markup = text(html(createElement(ProjectPanel, {
+      shots: ['A', 'B', 'C', 'D'].map(shot), videoClips: clips, audioSources: [], newItems: [],
+      onOpenSource: () => {}, onAddClip: () => {}, onAddClipAtPlayhead: () => {}, onAddAudioFromSource: () => {},
+      onAddAudioSource: () => {}, onRemoveAudioSource: () => {}, onBinDragStart: () => {}, onBinDragEnd: () => {}, onSetBinDropSec: () => {},
+    })))
+    expect(markup).toMatch(/샷 1 · MS V · 04:00/)
+    expect(markup).toMatch(/샷 2 · MS 생성 중/)
+    expect(markup).toMatch(/샷 3 · MS 실패/)
+    expect(markup).toMatch(/샷 4 · MS 대기 중/)
+    expect(markup).not.toContain('완료')
   })
 })

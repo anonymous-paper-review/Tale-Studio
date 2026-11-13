@@ -350,26 +350,19 @@ describe('혼자 정한 것 — 마커', () => {
     expect(api().markers).toEqual([3])
   })
 
-  it('앞 · 다음 편집점(Ctrl+← · → · 모니터 단추)도 마커에 멈춘다', () => {
-    // 왜: 마커는 다시 찾아가려고 단다. 편집점 단추와 단축키는 같은 자리로 간다(2단계 ①).
+  it('앞 · 다음 편집점(Ctrl+← · → · 모니터 단추)은 마커에 멈추지 않는다 — 마커로 가려면 자 위 마커를 누른다', () => {
+    // 왜: 리드 11/14 결정 — 시안에 없고 프리미어도 편집점과 마커를 따로 다룬다(마커로 건너뛰는 단축키는 나중 후보).
     api().seek(6)
     api().addMarker()
     api().seek(7.5)
     api().addMarker()
     api().seek(4.5)
     press('ArrowRight', { ctrl: true })
-    expect(api().currentTime).toBe(6)
-    press('ArrowRight', { ctrl: true })
     expect(api().currentTime).toBe(7)
     press('ArrowRight', { ctrl: true })
-    expect(api().currentTime).toBe(7.5)
+    expect(api().currentTime).toBe(8)
     press('ArrowLeft', { ctrl: true })
     expect(api().currentTime).toBe(7)
-    expect(editPointTarget(selectVideoLayout(api()), 4.5, 1, [6])).toBe(6)
     expect(editPointTarget(selectVideoLayout(api()), 4.5, 1)).toBe(7)
-    const previewer = read('src/features/editor/video-previewer.tsx')
-    expect(previewer).toMatch(/editPointTarget\(layout, st\.currentTime, -1, st\.markers\)/)
-    expect(previewer).toMatch(/editPointTarget\(layout, st\.currentTime, 1, st\.markers\)/)
-    expect(read('src/features/editor/use-editor-playback.ts')).toMatch(/editPointTarget\(layout, s\.currentTime, dir, s\.markers\)/)
   })
 })
