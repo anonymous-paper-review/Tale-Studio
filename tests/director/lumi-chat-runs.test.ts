@@ -720,15 +720,28 @@ describe('다시 만들기는 접수되는 대로(검토 b (a)~(g) 보통 1)', (
     expect(translate('ko', "I can't tell yet whether the video for {shots} was accepted. You can see the result on the card.", { shots: '샷 3·4·5' })).toBe('샷 3·4·5 영상은 접수됐는지 아직 몰라요. 카드에서 결과를 볼 수 있어요.')
   })
 
-  // 왜: 같은 까닭(탐침 F13) — "아직 몰라요"인 샷은 보드에서 만드는 중이라, 다시 부탁해도 같은 일을 또 보내지 않는다.
-  it('접수됐는지 모르는 샷을 다시 부탁해도 만드는 중이라 다시 보내지 않는다', async () => {
+  // 왜: 같은 까닭(탐침 F13) — "아직 몰라요"인 샷은 보드에서 만드는 중이라 다시 보내지 않는다. 그때 "지금 그런 샷이 없어요"는 화면(만드는 중)과 다른 말이다(리드 결정).
+  it('접수됐는지 모르는 샷을 다시 부탁하면 다시 보내지 않고 "샷 N 영상은 지금 만드는 중이에요"라고 한다', async () => {
     remakeBoard(['z1'])
     remakeServer([], [], { z1: 'unknown' })
     await chat.getState().startDirectorVideos(['z1'], 'Make Shot 1 again', { remake: true })
     expect(generated).toEqual(['z1'])
     await chat.getState().startDirectorVideos(['z1'], 'Make Shot 1 again', { remake: true })
     expect(generated).toEqual(['z1'])
-    expect(lastModel()).toBe('There are no such shots right now.')
+    expect(lastModel()).toBe('The video for Shot 1 is being made right now.')
+    expect(translate('ko', 'The video for {shots} is being made right now.', { shots: '샷 1' })).toBe('샷 1 영상은 지금 만드는 중이에요.')
+  })
+
+  // 왜: 같은 까닭 — 채팅으로 번호를 대고 다시 부탁해도 그 샷이 만드는 중이라 빠진 것이면 그렇게 말한다(묶음 말로 겨눈 샷이 없을 때는 지금처럼).
+  it('채팅으로 "샷 1 영상 다시 만들어줘"라고 다시 부탁해도 그 샷이 만드는 중이면 "샷 1 영상은 지금 만드는 중이에요"라고 하고 보내지 않는다', async () => {
+    remakeBoard(['z2'])
+    remakeServer([{ type: 'generateVideos', shotIds: ['z2'] }], [], { z2: 'unknown' })
+    await chat.getState().sendMessage('샷 1 영상 다시 만들어줘')
+    expect(generated).toEqual(['z2'])
+    expect(lastModel()).toBe("I can't tell yet whether the video for Shot 1 was accepted. You can see the result on the card.")
+    await chat.getState().sendMessage('샷 1 영상 다시 만들어줘')
+    expect(generated).toEqual(['z2'])
+    expect(lastModel()).toBe('The video for Shot 1 is being made right now.')
   })
 
   // 왜: 검토 b 메모 — 볼 것은 이번에 만든 새 Take 하나다. 그 샷의 다른 Take(예: 멈춘 채 뒤에서 도는 Take)가 돌아도 이번 것이 실패면 "아직 몰라요"가 아니다.

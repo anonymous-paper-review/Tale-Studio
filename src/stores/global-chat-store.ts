@@ -68,7 +68,7 @@ import { roughRedrawCandidates, roughRedrawChangedScenes, roughRedrawOfferHere, 
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { boardNodeNames } from '@/features/director/node-label'
 import { currentDirectorText, directorShotRefs, directorTextEditLines, remakeTakeCosts, shotLabelOf, shotListLabel, splitDirectorTextEdits, textBoundShotIds, type DirectorTextEdit } from '@/lib/director/lumi-chat-runs'
-import { answeredShotNumbers, askedBackShotNumbers, asksRemake, groundVideoRequest, type VideoGrounding } from '@/lib/director/chat-video-targets'
+import { answeredShotNumbers, askedBackShotNumbers, asksRemake, groundVideoRequest, mentionedShotNumbers, type VideoGrounding } from '@/lib/director/chat-video-targets'
 import { directorPendingContext, directorProgressLine, directorQuickChipOf, directorShotStatesNow, quickChipTargets, type DirectorQuickChip } from '@/lib/director/lumi-quick-chips'
 import { activeJobsSnapshot } from '@/lib/generation-queue'
 import { handoffToStage } from '@/lib/stage-nav'
@@ -1381,6 +1381,13 @@ function directorBoardStates(nodes: readonly DirectorNode[], projectId: string |
   }))
 }
 
+/** 이 샷들 중 보드에서 영상을 만드는 중인 샷(노드 id) — 다시 부탁했는데 만드는 중이라 뺄 때 "지금 만드는 중이에요"라고 말한다. */
+function directorShotsBeingMade(shotIds: readonly string[]): string[] {
+  const { nodes, projectId } = useDirectorCanvasStore.getState()
+  const states = directorBoardStates(nodes, projectId)
+  return shotIds.filter((id) => states.get(id) === 'video_generating')
+}
+
 async function groundChatVideos(input: { userText: string; requested: string[] | null }): Promise<VideoGrounding> {
   // 러너는 지연 로드 — video-batch-client 가 이 스토어를 import 하므로 정적 import 는 순환이 된다.
   const { eligibleVideoBatchShotIds } = await import('@/lib/director/video-batch-client')
@@ -1608,10 +1615,13 @@ async function startVideosFor(input: {
       import('@/lib/director/video-batch-plan'),
     ])
   // 그사이 다른 길로 영상이 생겼거나 만드는 중인 샷은 뺀다 — 낼 것이 없는데 "시작했어요"라고 하지 않는다(재검토 b 낮음 1).
+  //   만드는 중이라 뺀 샷(예: "접수됐는지 아직 몰라요"였던 샷)은 그렇다고 말한다 — "지금 그런 샷이 없어요"는 화면과 다른 말이다(리드 결정).
   const open = new Set(eligibleVideoBatchShotIds(useDirectorCanvasStore.getState().nodes))
+  const making = directorShotsBeingMade(input.shotIds.filter((id) => !open.has(id)))
+  if (making.length > 0) input.say(t('The video for {shots} is being made right now.', { shots: shotListLabel(locale, making.map((id) => shotLabelOf(useDirectorCanvasStore.getState().nodes.find((node) => node.id === id), directorBoardNames()))) }))
   input = { ...input, shotIds: input.shotIds.filter((id) => open.has(id)) }
   if (input.shotIds.length === 0) {
-    input.say(t('There are no such shots right now.'))
+    if (making.length === 0) input.say(t('There are no such shots right now.'))
     return
   }
   const hold = await videoHoldReason(input.shotIds)
@@ -4369,7 +4379,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             // 번호를 묻기 전에 — 모델 부탁에 제출할 수 없는 샷(같은 답에서 더한 새 샷 등)이 끼면 범위 말이 있어도 묻지 않고 그 까닭을 말한다(검토 b efac9881).
             const addedShotIds = useDirectorCanvasStore.getState().nodes.filter((node) => isShotData(node.data) && !before.nodes.some((old) => old.id === node.id)).map((node) => node.id)
             const hold = grounding.kind === 'ask' ? await askHoldReason(requestedIds, addedShotIds) : null
-            const said = hold ?? groundingReply(grounding, (key) => translate(locale, key))
+            // 번호를 댄 샷이 만드는 중이라 겨눌 샷이 없으면 "지금 그런 샷이 없어요" 대신 그렇다고 말한다(리드 결정).
+            const named = grounding.kind === 'run' && grounding.shotIds.length === 0 ? mentionedShotNumbers(trimmed) : new Set<number>()
+            const makingNamed = named.size > 0
+              ? directorShotsBeingMade(directorShotRefs(useDirectorCanvasStore.getState().nodes, names).filter((ref) => ref.shotNo !== null && named.has(ref.shotNo)).map((ref) => ref.nodeId))
+              : []
+            const said = hold ?? (makingNamed.length > 0
+              ? translate(locale, 'The video for {shots} is being made right now.', { shots: shotListLabel(locale, makingNamed.map((id) => shotLabelOf(useDirectorCanvasStore.getState().nodes.find((node) => node.id === id), names))) })
+              : groundingReply(grounding, (key) => translate(locale, key)))
             if (said) lumiSays(said)
             if (grounding.kind === 'run') videoIds = grounding.shotIds
             if (grounding.kind === 'confirm') confirmIds = grounding.shotIds
