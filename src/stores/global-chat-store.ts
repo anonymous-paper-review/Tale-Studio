@@ -1402,6 +1402,33 @@ function alreadyHasVideoLine(locale: AppLocale, shotIds: readonly string[], shot
     : translate(locale, '{shots} already have videos. To make new Takes, say "Make the videos for {shots} again".', { shots })
 }
 
+/** 영상을 만들 이미지가 있는지(키 = 샷 노드 id) — 'ready' 이미지 완료 · 'drawing' 그리는 중(이미지 일괄이 맡아 차례를 기다리는 샷도 — 보드와 같음) ·
+ *  'missing' 없음 · 실패. 서버 영상 묶음도 이미지가 없는 샷은 건너뛰고(missing_storyboard) 그 까닭은 화면에 안 보인다 — 보내기 전에 거른다(리드 11/14 B1). */
+function shotImageReadiness(shotIds: readonly string[]): Map<string, 'ready' | 'drawing' | 'missing'> {
+  const { nodes, projectId } = useDirectorCanvasStore.getState()
+  const states = directorBoardStates(nodes, projectId)
+  return new Map(shotIds.map((id) => {
+    const node = nodes.find((n) => n.id === id)
+    const status = node && isShotData(node.data) ? node.data.storyboardImage?.status ?? null : null
+    if (status === 'generating' || states.get(id) === 'image_generating') return [id, 'drawing'] as const
+    return [id, status === 'completed' ? 'ready' : 'missing'] as const
+  }))
+}
+
+/** 이미지가 있는 샷만 남긴다 — 그리는 중이면 "이미지를 만드는 중이에요", 없으면 "이미지가 먼저 필요해요"를 먼저 말하고 뺀다(리드 11/14 B1).
+ *  영상을 보내기 전(startVideosFor)과 되묻기 전(목록 · Take 수, B1 ③)이 같이 쓴다. */
+function withImagesOnly(shotIds: readonly string[], locale: AppLocale, say: (line: string) => void): string[] {
+  const readiness = shotImageReadiness(shotIds)
+  const nodes = useDirectorCanvasStore.getState().nodes
+  const names = directorBoardNames()
+  const shotsLabel = (ids: readonly string[]) => shotListLabel(locale, ids.map((id) => shotLabelOf(nodes.find((node) => node.id === id), names)))
+  const drawing = shotIds.filter((id) => readiness.get(id) === 'drawing')
+  const missing = shotIds.filter((id) => readiness.get(id) === 'missing')
+  if (drawing.length > 0) say(translate(locale, 'The image for {shots} is being made. You can make the video once it is done.', { shots: shotsLabel(drawing) }))
+  if (missing.length > 0) say(translate(locale, 'The video for {shots} needs an image first.', { shots: shotsLabel(missing) }))
+  return shotIds.filter((id) => readiness.get(id) === 'ready')
+}
+
 /** 이 샷들 중 보드에서 영상을 만드는 중인 샷(노드 id) — 다시 부탁했는데 만드는 중이라 뺄 때 "지금 만드는 중이에요"라고 말한다. */
 function directorShotsBeingMade(shotIds: readonly string[]): string[] {
   const { nodes, projectId } = useDirectorCanvasStore.getState()
@@ -1669,19 +1696,10 @@ async function startVideosFor(input: {
   }
   const names = directorBoardNames()
   const shotsLabel = (ids: readonly string[]) => shotListLabel(locale, ids.map((id) => shotLabelOf(useDirectorCanvasStore.getState().nodes.find((node) => node.id === id), names)))
-  if (input.remake) {
-    // 다시 만들기 — 그 샷 이미지를 그리는 중이면 기다린다(옛 그림 · 그림 없이 만들지 않게, 넘기기 창 [다시 만들기]와 같다).
-    const imageOf = (id: string) => {
-      const node = useDirectorCanvasStore.getState().nodes.find((n) => n.id === id)
-      return node && isShotData(node.data) ? node.data.storyboardImage?.status ?? null : null
-    }
-    const drawing = input.shotIds.filter((id) => imageOf(id) === 'generating')
-    const noImage = input.shotIds.filter((id) => imageOf(id) !== 'generating' && imageOf(id) !== 'completed')
-    if (drawing.length > 0) input.say(t('The image for {shots} is being made. You can make the video once it is done.', { shots: shotsLabel(drawing) }))
-    if (noImage.length > 0) input.say(t('The video for {shots} needs an image first.', { shots: shotsLabel(noImage) }))
-    input = { ...input, shotIds: input.shotIds.filter((id) => imageOf(id) === 'completed') }
-    if (input.shotIds.length === 0) return
-  }
+  // 이미지가 없는 샷은 보내지 않는다 — 그리는 중이면 기다리고(옛 그림 · 그림 없이 만들지 않게), 없으면 먼저 그리라고 한다.
+  //   다시 만들기 · 새 영상 모두 같다(넘기기 창 [다시 만들기] · 툴바 "영상 만들기는 이미지가 먼저 있어야 해요"와 같은 규칙, 리드 11/14 영어 재점검 B1).
+  input = { ...input, shotIds: withImagesOnly(input.shotIds, locale, input.say) }
+  if (input.shotIds.length === 0) return
   const { projectId: pid, nodes } = useDirectorCanvasStore.getState()
   const takes = await fetchTakeBalance()
   if (!input.isCurrent()) return
@@ -3007,19 +3025,28 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           const alreadyLine = already.length > 0
             ? alreadyHasVideoLine(contentLocale(), already, shotListLabel(contentLocale(), already.map((id) => shotLabelOf(nodes.find((node) => node.id === id), directorBoardNames()))))
             : null
-          const shotIds = answered.filter((id) => open.has(id))
+          // 이미지가 없는 샷은 그 줄을 먼저 말하고 목록에서 뺀다(되묻기 목록은 이미지가 있는 샷만, 리드 11/14 B1 ③).
+          const lines = alreadyLine ? [alreadyLine] : []
+          const shotIds = withImagesOnly(answered.filter((id) => open.has(id)), contentLocale(), (line) => lines.push(line))
+          const sayLines = (contents: readonly string[]) => {
+            for (const content of contents) {
+              set((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'director' as const, role: 'model' as const, content }] }))
+              saveChatMessage(projectId, 'director', 'model', content)
+            }
+          }
           if (shotIds.length === 0) {
-            get().appendLocalExchange('director', trimmed, alreadyLine ?? translate(contentLocale(), 'There are no such shots right now.'))
+            if (lines.length === 0) get().appendLocalExchange('director', trimmed, translate(contentLocale(), 'There are no such shots right now.'))
+            else {
+              get().appendLocalUser('director', trimmed)
+              sayLines(lines)
+            }
             return
           }
           get().appendLocalUser('director', trimmed)
           set({ directorVideoAsk: { projectId, shotIds, ...(videoAsk.remake ? { remake: true, named: shotIds } : {}) } })
           const line = await confirmVideosLine(shotIds, contentLocale(), videoAsk.remake)
           if (!isCurrentSession()) return
-          for (const content of alreadyLine ? [alreadyLine, line] : [line]) {
-            set((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'director' as const, role: 'model' as const, content }] }))
-            saveChatMessage(projectId, 'director', 'model', content)
-          }
+          sayLines([...lines, line])
           return
         }
         // 번호를 물었다 — "3번" · "3번이랑 4번" · 맨 숫자도 샷 번호다(재검토 b 낮음 3). 그 번호의 샷만 바로 만든다(분명한 꼴 (1)).
@@ -4520,9 +4547,13 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             const hold = await videoHoldReason(confirmIds)
             if (hold) lumiSays(hold)
             else {
-              const confirmNamed = confirmIds.filter((id) => namedVideoIds.includes(id))
-              set({ directorVideoAsk: { projectId, shotIds: confirmIds, ...(remake ? { remake } : {}), ...(remake && confirmNamed.length > 0 ? { named: confirmNamed } : {}) } })
-              lumiSays(await confirmVideosLine(confirmIds, locale, remake))
+              // 목록 · Take 수는 이미지가 있는 샷만 — 없는 샷은 그 줄을 먼저 말하고 뺀다. 남은 샷이 없으면 묻지 않는다(리드 11/14 B1 ③).
+              const askIds = withImagesOnly(confirmIds, locale, lumiSays)
+              const confirmNamed = askIds.filter((id) => namedVideoIds.includes(id))
+              if (askIds.length > 0) {
+                set({ directorVideoAsk: { projectId, shotIds: askIds, ...(remake ? { remake } : {}), ...(remake && confirmNamed.length > 0 ? { named: confirmNamed } : {}) } })
+                lumiSays(await confirmVideosLine(askIds, locale, remake))
+              }
             }
           }
           patchTrace({

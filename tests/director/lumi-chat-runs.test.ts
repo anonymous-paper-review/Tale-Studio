@@ -34,6 +34,8 @@ function failedTake(id: string, parent: string): DirectorNode {
 }
 // 보드: 씬 하나에 샷 넷 — 샷 1 · 2 · 4 는 이미지가 있고, 샷 4 는 영상이 실패했다. 샷 3 은 이미지가 없다.
 const NODES = () => [shot('s1', IMG('s1')), shot('s2', IMG('s2')), shot('s3'), shot('s4', IMG('s4')), failedTake('v4', 's4')]
+// 샷 3 에도 이미지가 있는 보드 — 이미지 없는 샷은 영상을 보내지 않으므로(서버도 missing_storyboard 로 건너뜀, 리드 11/14 B1) 영상 길만 보는 시험이 쓴다.
+const NODES_ALL_IMAGES = () => NODES().map((node) => (node.id === 's3' ? shot('s3', IMG('s3')) : node))
 const reply = (updates: unknown[], text = 'Okay.') => vi.stubGlobal('fetch', vi.fn(async () => Response.json({ reply: text, updates })))
 const lastModel = () => chat.getState().messages.filter((m) => m.role === 'model').at(-1)?.content ?? ''
 const saidAll = () => chat.getState().messages.filter((m) => m.role === 'model').map((m) => m.content).join('\n')
@@ -105,6 +107,7 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
 
   // 왜: 재검토 b 보통 A — 빼기 · 부정 · 범위 말이 끼면 읽기 규칙을 늘려도 틀린다. 만들지 않고 화면이 센 목록으로 묻고, "응"일 때만 그 목록 그대로.
   it('"샷 2 빼고 영상 다 만들어줘"는 바로 만들지 않고 샷 2 를 뺀 목록으로 되묻고, "응"이라고 하면 그 목록 그대로 만든다', async () => {
+    director.setState({ nodes: NODES_ALL_IMAGES() })
     reply([{ type: 'generateVideos' }])
     await chat.getState().sendMessage('샷 2 빼고 영상 다 만들어줘')
     expect(mocks.run).not.toHaveBeenCalled()
@@ -168,6 +171,7 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     expect(runShots()).toEqual(['s2'])
 
     mocks.run.mockClear()
+    director.setState({ nodes: NODES_ALL_IMAGES() })
     reply([{ type: 'generateVideos' }])
     await chat.getState().sendMessage('Make videos for all the remaining shots')
     expect(mocks.run).toHaveBeenCalledWith('p-dir', expect.objectContaining({ shotIds: ['s1', 's2', 's3', 's4'] }))
@@ -361,6 +365,7 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
 
   // 왜: 재검토 b 낮음 3 — 되묻기가 늘었다. Lumi 가 번호를 물은 바로 다음 말은 "3번" · 맨 숫자로 답해도 샷 번호로 읽어야 한다.
   it('Lumi 가 번호를 물은 다음 말에서는 "3번" · "3번이랑 4번" · 맨 숫자도 샷 번호로 읽어 그 샷 영상을 바로 만든다', async () => {
+    director.setState({ nodes: NODES_ALL_IMAGES() })
     const ask = async () => {
       reply([{ type: 'generateVideos', shotIds: ['s2'] }])
       await chat.getState().sendMessage('샷 2 빼고 영상 다 만들어줘')
@@ -580,6 +585,7 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
 
   // 왜: 검토 a 통합 낮음 — 번호를 물은 뒤 "3이나 4"(둘 중 하나)를 "3과 4"로 읽어 둘 다 바로 만들었다. "2?"처럼 목록으로 되묻는다.
   it('번호를 물은 뒤 "3이나 4"처럼 고르는 말로 답하면 바로 만들지 않고 "샷 3 · 4 영상 2개를 만들까요?"로 되묻는다', async () => {
+    director.setState({ nodes: NODES_ALL_IMAGES() })
     reply([{ type: 'generateVideos', shotIds: ['s2'] }])
     await chat.getState().sendMessage('샷 2 빼고 영상 다 만들어줘')
     expect(chat.getState().directorVideoAsk).toEqual({ projectId: 'p-dir', numbers: true })
@@ -987,5 +993,82 @@ describe('다시 만들기는 접수되는 대로(검토 b (a)~(g) 보통 1)', (
     expect(saidSince(asked)).toEqual(['Shot 1 already has a video. To make a new Take, say "Make the video for Shot 1 again".', 'Shall I make the video for Shot 2 (5 Takes)? Say yes to start.'])
     expect(chat.getState().directorVideoAsk).toEqual({ projectId: 'p-dir', shotIds: ['q2'] })
     expect(mocks.run.mock.calls.length).toBe(runs)
+  })
+})
+
+describe('이미지가 없는 샷의 영상 부탁(영어 재점검 B1)', () => {
+  // 왜: 영어 재점검(qa-golden d20304a6) B1 — 그림 없는 샷 3 에 "Make the video for shot 3"이면 영상 묶음으로 바로 보내고 "시작했어요 · 5 Take"라고 했다.
+  //   서버 묶음은 그런 샷을 건너뛰고(이유는 화면에 안 보임) 모두 그런 샷이면 묶음이 통째로 실패한다. 툴바는 "영상 만들기는 이미지가 먼저 있어야 해요".
+  it('이미지가 없는 샷의 새 영상 부탁은 보내지 않고 "샷 N 영상은 이미지가 먼저 필요해요"라고 답한다 — 그리는 중이면 "샷 N 이미지를 만드는 중이에요 …" — 다시 만들기 길 · 툴바와 같다', async () => {
+    reply([{ type: 'generateVideos', shotIds: ['s3'] }])
+    await chat.getState().sendMessage('Make the video for shot 3')
+    expect(mocks.run).not.toHaveBeenCalled()
+    expect(lastModel()).toBe('The video for Shot 3 needs an image first.')
+    expect(translate('ko', 'The video for {shots} needs an image first.', { shots: '샷 3' })).toBe('샷 3 영상은 이미지가 먼저 필요해요.')
+    // 그리는 중 — 만들지 않고, 끝나면 만들 수 있다고 한다.
+    director.setState({ nodes: [shot('s1', IMG('s1')), shot('s2', IMG('s2')), shot('s3', { status: 'generating', url: null, jobId: null }), shot('s4', IMG('s4')), failedTake('v4', 's4')] })
+    await chat.getState().sendMessage('Make the video for shot 3')
+    expect(mocks.run).not.toHaveBeenCalled()
+    expect(lastModel()).toBe('The image for Shot 3 is being made. You can make the video once it is done.')
+    expect(translate('ko', 'The image for {shots} is being made. You can make the video once it is done.', { shots: '샷 3' })).toBe('샷 3 이미지를 만드는 중이에요. 끝나면 영상을 만들 수 있어요.')
+    // 이미지 일괄이 맡아 차례를 기다리는 샷도 보드처럼 그리는 중이다.
+    writer.setState({ shots: ['s1', 's2', 's3', 's4'].map((id) => ({ shotId: `w-${id}`, sceneId: 'sc1', roughStoryboard: { status: 'completed', url: `https://media.test/rough-${id}.png` } })) as never })
+    director.setState({ nodes: NODES(), realBatchBusy: true, realBatchCancelled: false, realBatchShotIds: ['w-s3'] })
+    await chat.getState().sendMessage('Make the video for shot 3')
+    expect(mocks.run).not.toHaveBeenCalled()
+    expect(lastModel()).toBe('The image for Shot 3 is being made. You can make the video once it is done.')
+    // 섞이면 — 이미지가 있는 샷만 만들고 이 줄을 덧붙인다.
+    director.setState({ realBatchBusy: false, realBatchShotIds: null })
+    reply([{ type: 'generateVideos', shotIds: ['s1', 's3'] }])
+    const mark = chat.getState().messages.length
+    await chat.getState().sendMessage('Make videos for shot 1 and 3')
+    expect(runShots()).toEqual(['s1'])
+    const said = chat.getState().messages.slice(mark).filter((m) => m.role === 'model').map((m) => m.content)
+    expect(said).toContain('The video for Shot 3 needs an image first.')
+    expect(said).toContain('Started making videos for Shot 1 · 5 Takes. Progress shows on the line above the cards.')
+  })
+
+  // 왜: 리드 11/14(B1 ③) — 되묻는 목록이 이미지 없는 샷까지 세어 "15 Take 로 만들까요?"라고 물어 놓고, "응" 뒤에는 그 샷을 빼 10 Take 만 썼다(물은 수가 틀림).
+  //   다시 만들기 되묻기 · 번호를 물은 뒤의 고르는 말 대답도 같다. 남은 샷이 없으면 묻지 않는다.
+  it('되묻는 목록은 이미지가 있는 샷만 센다 — 이미지 없는 샷은 "샷 N 영상은 이미지가 먼저 필요해요"를 먼저 말하고 목록 · Take 수에서 뺀다(그리는 중이면 "샷 N 이미지를 만드는 중이에요 …")', async () => {
+    const saidSince = (mark: number) => chat.getState().messages.slice(mark).filter((m) => m.role === 'model').map((m) => m.content)
+    const before = (said: string[], first: string, second: string) => said.indexOf(first) >= 0 && said.indexOf(first) < said.indexOf(second)
+    // 새 영상 — "샷 2 빼고 영상 다 만들어줘": 샷 3 은 이미지가 없다.
+    reply([{ type: 'generateVideos' }])
+    let mark = chat.getState().messages.length
+    await chat.getState().sendMessage('샷 2 빼고 영상 다 만들어줘')
+    expect(before(saidSince(mark), 'The video for Shot 3 needs an image first.', 'Shall I make 2 videos for Shots 1 · 4 (10 Takes)? Say yes to start.')).toBe(true)
+    expect(chat.getState().directorVideoAsk).toEqual({ projectId: 'p-dir', shotIds: ['s1', 's4'] })
+    await chat.getState().sendMessage('응')
+    expect(runShots()).toEqual(['s1', 's4'])
+    expect(lastModel()).toBe('Started making videos for Shots 1 · 4 · 10 Takes. Progress shows on the line above the cards.')
+    // 그리는 중 — "만드는 중" 줄을 먼저 말하고 뺀다.
+    director.setState({ nodes: [shot('s1', IMG('s1')), shot('s2', IMG('s2')), shot('s3', { status: 'generating', url: null, jobId: null }), shot('s4', IMG('s4')), failedTake('v4', 's4')] })
+    mark = chat.getState().messages.length
+    await chat.getState().sendMessage('샷 2 빼고 영상 다 만들어줘')
+    expect(before(saidSince(mark), 'The image for Shot 3 is being made. You can make the video once it is done.', 'Shall I make 2 videos for Shots 1 · 4 (10 Takes)? Say yes to start.')).toBe(true)
+    expect(chat.getState().directorVideoAsk).toEqual({ projectId: 'p-dir', shotIds: ['s1', 's4'] })
+    // 남은 샷이 없으면 묻지 않고 그 줄만.
+    director.setState({ nodes: [shot('s1'), shot('s2', IMG('s2')), shot('s3'), shot('s4')] })
+    await chat.getState().sendMessage('샷 2 빼고 영상 다 만들어줘')
+    expect(lastModel()).toBe('The video for Shots 1 · 3 · 4 needs an image first.')
+    expect(chat.getState().directorVideoAsk).toBeNull()
+    // 번호를 물은 뒤 "3이나 4" — 샷 3 줄을 먼저 말하고 샷 4 만 되묻는다.
+    director.setState({ nodes: NODES() })
+    reply([{ type: 'generateVideos', shotIds: ['s2'] }])
+    await chat.getState().sendMessage('샷 2 빼고 영상 다 만들어줘')
+    expect(chat.getState().directorVideoAsk).toEqual({ projectId: 'p-dir', numbers: true })
+    mark = chat.getState().messages.length
+    await chat.getState().sendMessage('3이나 4')
+    expect(saidSince(mark)).toEqual(['The video for Shot 3 needs an image first.', 'Shall I make the video for Shot 4 (5 Takes)? Say yes to start.'])
+    expect(chat.getState().directorVideoAsk).toEqual({ projectId: 'p-dir', shotIds: ['s4'] })
+    // 다시 만들기 되묻기 — "영상 다 다시 만들어줘": 영상이 실패한 샷 2 는 이미지가 없다.
+    writer.setState({ shots: ['r1', 'r2'].map((id) => ({ shotId: `w-${id}`, sceneId: 'sc1' })) as never })
+    director.setState({ nodes: [shot('r1', IMG('r1')), failedTake('vr1', 'r1'), shot('r2'), failedTake('vr2', 'r2')] })
+    reply([{ type: 'generateVideos' }])
+    mark = chat.getState().messages.length
+    await chat.getState().sendMessage('영상 다 다시 만들어줘')
+    expect(before(saidSince(mark), 'The video for Shot 2 needs an image first.', 'Shall I make the video for Shot 1 (5 Takes)? Say yes to start.')).toBe(true)
+    expect(chat.getState().directorVideoAsk).toMatchObject({ shotIds: ['r1'], remake: true })
   })
 })
