@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils'
 import type { RoughStoryboardImage } from '@/types'
 import { translate, useT } from '@/lib/i18n'
 import { reloadAfterRoughFrameEdit } from '@/lib/writer/rough-frame-refresh'
+import { warnBeforeLeaving } from '@/features/writer/unsaved-arrows-confirm'
 import { useLocaleStore } from '@/stores/locale-store'
 
 const UNDO_LIMIT = 10
@@ -181,6 +182,8 @@ export function DirectingArrowEditor({
     onDirtyChange?.(dirty)
   }, [dirty, onDirtyChange])
   useEffect(() => () => onDirtyChange?.(false), [onDirtyChange])
+  // 그린 채 페이지를 떠나거나 새로 고치면 브라우저가 묻는다 — 저장하면(되돌리기 칸이 비면) 푼다(검토 a 54016e65).
+  useEffect(() => warnBeforeLeaving(window, dirty), [dirty])
 
   const busy = separating || saving
   const ready = !!dims
@@ -560,7 +563,8 @@ export function DirectingArrowEditor({
 
       {/* 저장 줄 · 안내 줄은 그림 크기와 상관없이 늘 보인다 — 세로 그림이면 그림 아래 화면 밖이라 저장을 못 찾았다(리드 ③). */}
       <div className="sticky bottom-0 z-20 flex items-center gap-3 bg-side py-2" data-testid="directing-editor-save-row">
-        <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+        {/* 한국어 안내가 낱말 가운데서 끊기지 않게 낱말 단위로 줄을 바꾼다("…새 화살표 / 를 그려요" — 2026-11-14 다시 돌리기). */}
+        <p className="min-w-0 flex-1 break-keep text-xs text-muted-foreground">
           {effectiveClean
             ? t(
                 'Scrape the top layer with the eraser to reveal the arrow-free layer underneath. Draw new arrows with the pen.',

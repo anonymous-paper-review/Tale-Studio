@@ -87,6 +87,7 @@ function DirectingEditDialog({ shotId, panel, onOpenChange }: Omit<ShotDetailDia
                 shotId={shot.shotId}
                 panel={panel}
                 onRegenerated={() => void loadProject()}
+                confirmRedraw={guard.requestRedraw}
               />
               <DirectingArrowEditor
                 key={shot.shotId}

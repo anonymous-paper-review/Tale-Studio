@@ -1,7 +1,7 @@
 // 연출 화살표 편집기에 저장하지 않은 화살표가 있을 때 창 아래 [적용] · 닫기가 그 화살표를 지키는지 검사한다(2026-11-14 오너 고장 · 리드 ①②)
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
-import { applyDirectionTab, closeRequest, directionApplyEnabled, resolveUnsavedClose, tabSwitchRequest } from '@/features/writer/unsaved-arrows-confirm'
+import { applyDirectionTab, closeRequest, directionApplyEnabled, redrawRequest, resolveUnsavedClose, tabSwitchRequest, warnBeforeLeaving } from '@/features/writer/unsaved-arrows-confirm'
 
 describe('저장하지 않은 화살표', () => {
   // 왜: 연출 탭의 창 아래 [적용]은 길이만 저장하고 길이를 안 바꾸면 꺼져 있었다. 편집기 [저장]은 그림 아래 화면 밖이라,
@@ -73,5 +73,44 @@ describe('저장하지 않은 화살표', () => {
     // 탭을 바꾸는 두 자리(왼쪽 [시작 | 연출] · 오른쪽 고치기 카드)가 모두 이 물음을 거친다.
     const source = readFileSync('src/features/writer/storyboard-shot-dialog.tsx', 'utf8')
     expect(source.match(/onClick=\{\(\) => requestTab\(key\)\}/g)?.length).toBe(2)
+  })
+
+  // 왜(검토 a 54016e65): 그린 채 [연출 장만 다시 만들기]나 세 장 아래 연출 [이 장만 다시 만들기]를 누르면 연출 그림이 바뀌며 그린 것이
+  //   묻지 않고 사라졌다. 저장해도 다시 만들면 바뀌니 고를 것은 둘 — 계속 그리기 · 버리고 다시 만들기. 시작 · 끝은 그린 것이 남는다(재검토 c 3).
+  it('그린 채 연출 장을 다시 만들려 하면 묻고, [버리고 다시 만들기]를 골라야 다시 만든다', async () => {
+    expect(redrawRequest('direction', true)).toBe('ask')
+    expect(redrawRequest('end', true)).toBe('redraw')
+    expect(redrawRequest('start', true)).toBe('redraw')
+    expect(redrawRequest('direction', false)).toBe('redraw')
+    const redraw = vi.fn()
+    await resolveUnsavedClose('keep', { save: async () => true, close: redraw })
+    expect(redraw).not.toHaveBeenCalled()
+    await resolveUnsavedClose('discard', { save: async () => true, close: redraw })
+    expect(redraw).toHaveBeenCalledTimes(1)
+    // 다시 만드는 세 자리(입구 A 의 [연출 장만 다시 만들기] · 두 입구의 세 장 아래 단추)가 모두 이 물음을 거친다.
+    const a = readFileSync('src/features/writer/storyboard-shot-dialog.tsx', 'utf8')
+    const b = readFileSync('src/features/writer/shot-detail-dialog.tsx', 'utf8')
+    const still = readFileSync('src/features/writer/rough-frames-still.tsx', 'utf8')
+    expect(a).toMatch(/guard\.requestRedraw\('direction', \(\) => void redrawDirection\(\)\)/)
+    for (const source of [a, b]) expect(source).toMatch(/confirmRedraw=\{guard\.requestRedraw\}/)
+    expect(still).toMatch(/confirmRedraw\(frame, \(\) => void regenerate\(frame\)\)/)
+  })
+
+  // 왜(검토 a 54016e65): 그린 채 페이지를 떠나거나 새로 고치면 화살표가 묻지 않고 사라졌다 — 브라우저 기본 물음을 띄우고, 저장하면 풀어 준다.
+  it('저장하지 않은 화살표가 있으면 페이지를 떠나거나 새로 고칠 때 브라우저가 묻고, 저장하면 묻지 않는다', () => {
+    const page = new EventTarget()
+    const leave = () => {
+      const event = new Event('beforeunload', { cancelable: true })
+      page.dispatchEvent(event)
+      return event.defaultPrevented
+    }
+    const release = warnBeforeLeaving(page as unknown as Window, true)
+    expect(leave()).toBe(true)
+    release()
+    expect(leave()).toBe(false)
+    warnBeforeLeaving(page as unknown as Window, false)
+    expect(leave()).toBe(false)
+    // 편집기가 저장하지 않은 화살표(되돌리기 칸)에 따라 묶고 푼다.
+    expect(readFileSync('src/features/writer/directing-arrow-editor.tsx', 'utf8')).toMatch(/useEffect\(\(\) => warnBeforeLeaving\(window, dirty\), \[dirty\]\)/)
   })
 })
