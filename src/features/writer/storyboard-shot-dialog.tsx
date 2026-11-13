@@ -21,6 +21,7 @@ import { ThumbImage } from '@/components/thumb-image'
 import { withCacheBust } from '@/components/rough-frame-cycle'
 import { AiBusyOverlay, type AiBusyStep } from '@/components/ai-busy-overlay'
 import { DirectingArrowEditor } from '@/features/writer/directing-arrow-editor'
+import { UnsavedArrowsConfirm, applyDirectionTab, directionApplyEnabled, useUnsavedArrowsGuard } from '@/features/writer/unsaved-arrows-confirm'
 import { RoughFramesStill } from '@/features/writer/rough-frames-still'
 import { SHOT_TYPES, SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
 import { CAMERA_ANGLES, angleOfCamera, applyStartEdit, nextApplyStep, readRedrawReply, redrawDirectionOnly, sceneShotLabel, startApplyKind, startChanges, type ApplyKind, type RoughFrame } from '@/lib/writer/shot-edit'
@@ -65,6 +66,10 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
   const [retryStep, setRetryStep] = useState<'redraw' | 'resave' | null>(null)
   // 저장이 실패한 [적용]이 하려던 일 — 다시 저장할 때 화면에는 이미 고친 값이 있어 무엇을 고쳤는지 다시 셀 수 없다.
   const [resaveKind, setResaveKind] = useState<ApplyKind>('redraw')
+  const [applying, setApplying] = useState(false)
+  const close = () => { if (!busy) onOpenChange(false) }
+  // 연출 탭에 저장하지 않은 화살표가 있으면 [적용]이 켜지고, 닫기 전에 묻는다(2026-11-14 오너 고장 · 리드 ①②).
+  const guard = useUnsavedArrowsGuard(close)
 
   if (!shotId && draft.shotId) {
     setDraft({ shotId: null, value: null })
@@ -78,7 +83,6 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
   }
   const value = draft.shotId === shot.shotId && draft.value ? draft.value : draftOf(shot)
   const patch = (next: Partial<Draft>) => setDraft({ shotId: shot.shotId, value: { ...value, ...next } })
-  const close = () => { if (!busy) onOpenChange(false) }
 
   const label = sceneShotLabel(sceneManifest, shots, shot.shotId) ?? ''
   const scene = sceneManifest?.scenes.find((item) => item.sceneId === shot.sceneId)
@@ -240,6 +244,16 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
     }
   }
 
+  // 연출 탭 [적용] — 그린 화살표부터 저장하고, 길이를 바꿨으면 길이를 저장한 뒤 닫는다(리드 ①).
+  const applyDirection = async () => {
+    setApplying(true)
+    try {
+      await applyDirectionTab({ arrowsDirty: guard.dirty, durationDirty }, { saveArrows: guard.saveArrows, saveDuration, close })
+    } finally {
+      setApplying(false)
+    }
+  }
+
   const bigFrame = (url: string | null | undefined, caption: string) => (
     <div className="relative overflow-hidden rounded-[14px] bg-art-placeholder">
       {url && panel ? (
@@ -264,7 +278,7 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
 
   return (
     <>
-      <Dialog open={!!shotId} onOpenChange={(open) => { if (!open) close() }}>
+      <Dialog open={!!shotId} onOpenChange={(open) => { if (!open) guard.requestClose() }}>
         <DialogContent frame="work" className="flex max-h-[92vh] flex-col gap-0 p-0 sm:max-w-[1080px]" showCloseButton={!busy} data-testid="shot-edit">
           <DialogHeader className="shrink-0 border-b border-border-subtle px-6 py-4">
             <DialogTitle>{t('{label} · edit', { label })}</DialogTitle>
@@ -284,7 +298,15 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
                 </span>
               </div>
               {tab === 'direction' && completed && panel ? (
-                <DirectingArrowEditor key={shot.shotId} projectId={projectId} shotId={shot.shotId} panel={panel} onSaved={() => void loadProject()} />
+                <DirectingArrowEditor
+                  key={shot.shotId}
+                  projectId={projectId}
+                  shotId={shot.shotId}
+                  panel={panel}
+                  onSaved={() => void loadProject()}
+                  ref={guard.editorRef}
+                  onDirtyChange={guard.setDirty}
+                />
               ) : (
                 bigFrame(tab === 'start' ? frames?.start : frames?.direction, t(tab === 'start' ? 'Start' : 'Directing'))
               )}
@@ -367,13 +389,17 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
             </div>
           </div>
           <DialogFooter className="shrink-0 border-t border-border-subtle px-6 py-3">
-            <Button variant="ghost" onClick={close} disabled={!!busy}>{t('Cancel')}</Button>
+            <Button variant="ghost" onClick={guard.requestClose} disabled={!!busy || applying}>{t('Cancel')}</Button>
             {tab === 'start' ? (
               <Button onClick={() => void applyStart()} disabled={!!busy || (!startDirty && !retryStep)} data-testid="shot-edit-apply-start">
                 {retryStep === 'redraw' && !startDirty ? t('Redraw') : completed && !saveOnly ? t('Apply · redraw the rough') : t('Apply')}<ArrowRight className="size-4" />
               </Button>
             ) : (
-              <Button onClick={() => void saveDuration()} disabled={!!busy || !durationDirty} data-testid="shot-edit-apply-direction">
+              <Button
+                onClick={() => void applyDirection()}
+                disabled={!!busy || applying || !directionApplyEnabled({ arrowsDirty: guard.dirty, durationDirty })}
+                data-testid="shot-edit-apply-direction"
+              >
                 {t('Apply')}<ArrowRight className="size-4" />
               </Button>
             )}
@@ -381,6 +407,7 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
         </DialogContent>
       </Dialog>
       <AiBusyOverlay open={!!busy} layer="dialog" title={busy?.title ?? ''} steps={busy?.steps} />
+      <UnsavedArrowsConfirm {...guard.confirm} />
     </>
   )
 }

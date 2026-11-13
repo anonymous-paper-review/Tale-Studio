@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { DirectingArrowEditor } from '@/features/writer/directing-arrow-editor'
+import { UnsavedArrowsConfirm, useUnsavedArrowsGuard } from '@/features/writer/unsaved-arrows-confirm'
 import { RoughFramesStill } from '@/features/writer/rough-frames-still'
 import { StoryboardShotDialog } from '@/features/writer/storyboard-shot-dialog'
 import { useWriterStore } from '@/stores/writer-store'
@@ -40,6 +41,8 @@ function DirectingEditDialog({ shotId, panel, onOpenChange }: Omit<ShotDetailDia
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
   const loadProject = useWriterStore((s) => s.loadProject)
   const projectId = useProjectStore((s) => s.projectId)
+  // 저장하지 않은 화살표가 있으면 닫기 전에 묻는다 — Storyboard 샷 고치기 창과 같은 물음(2026-11-14 오너 고장 · 리드 ②).
+  const guard = useUnsavedArrowsGuard(() => onOpenChange(false))
 
   if (!shot || !projectId) return null
 
@@ -60,37 +63,40 @@ function DirectingEditDialog({ shotId, panel, onOpenChange }: Omit<ShotDetailDia
     `Shot ${found ? globalNo : '?'}`
 
   return (
-    <Dialog open={!!shotId} onOpenChange={onOpenChange}>
-      <DialogContent size="wide" className="max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">{positionLabel}</span>
-            {t('Edit directing arrows')}
-          </DialogTitle>
-          <DialogDescription>
-            {t(
-              "Erase or draw new arrows on the DIRECTING frame like a layer. Saving applies immediately to the card's 3-frame cycle.",
-            )}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={!!shotId} onOpenChange={(open) => { if (!open) guard.requestClose() }}>
+        <DialogContent size="wide" className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">{positionLabel}</span>
+              {t('Edit directing arrows')}
+            </DialogTitle>
+            <DialogDescription>
+              {t(
+                "Erase or draw new arrows on the DIRECTING frame like a layer. Saving applies immediately to the card's 3-frame cycle.",
+              )}
+            </DialogDescription>
+          </DialogHeader>
 
-        {panel && panel.status === 'completed' ? (
-          <>
-            {/* 약속 I: 시작·연출·끝 3장이 나란히 멈춰 보이고, 각 장 아래 "이 장만 다시 만들기". */}
-            <RoughFramesStill
-              key={`still-${shot.shotId}-${panel.generatedAt}`}
-              projectId={projectId}
-              shotId={shot.shotId}
-              panel={panel}
-              onRegenerated={() => void loadProject()}
-            />
-            <DirectingArrowEditor
-              key={shot.shotId}
-              projectId={projectId}
-              shotId={shot.shotId}
-              panel={panel}
-              onSaved={() => void loadProject()}
-            />
+          {panel && panel.status === 'completed' ? (
+            <>
+              {/* 약속 I: 시작·연출·끝 3장이 나란히 멈춰 보이고, 각 장 아래 "이 장만 다시 만들기". */}
+              <RoughFramesStill
+                key={`still-${shot.shotId}-${panel.generatedAt}`}
+                projectId={projectId}
+                shotId={shot.shotId}
+                panel={panel}
+                onRegenerated={() => void loadProject()}
+              />
+              <DirectingArrowEditor
+                key={shot.shotId}
+                projectId={projectId}
+                shotId={shot.shotId}
+                panel={panel}
+                onSaved={() => void loadProject()}
+                ref={guard.editorRef}
+                onDirtyChange={guard.setDirty}
+              />
           </>
         ) : (
           <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
@@ -99,5 +105,7 @@ function DirectingEditDialog({ shotId, panel, onOpenChange }: Omit<ShotDetailDia
         )}
       </DialogContent>
     </Dialog>
+    <UnsavedArrowsConfirm {...guard.confirm} />
+    </>
   )
 }

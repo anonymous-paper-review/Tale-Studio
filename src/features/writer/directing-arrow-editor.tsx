@@ -7,7 +7,7 @@
 //   위층 = 원본 DIRECTING 프레임을 올린 캔버스
 // 지우개(destination-out)로 위층을 긁으면 밑층이 드러난다 = 기존 화살표 삭제.
 // 펜으로 위층에 새 화살표를 그리고, 저장 시 두 층을 평탄화해 direction 프레임에 upsert.
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Eraser, Layers, Loader2, Pen, RotateCcw, Save, Trash2, Undo2, Wand2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -90,16 +90,27 @@ export async function readSeparateResponse(
   return { cleanUrl: j.data.cleanUrl as string, cached: !!j.data.cached }
 }
 
+/** 편집기를 연 창이 부르는 것 — 창 아래 [적용] · 물음 창 [저장하고 닫기]가 그린 것을 저장한다(2026-11-14 리드 ①②). */
+export interface DirectingArrowEditorHandle {
+  /** 그린 것을 저장한다(편집기 [저장]과 같다) — 저장했으면 true, 안 됐으면 알리고 false. */
+  save: () => Promise<boolean>
+}
+
 export function DirectingArrowEditor({
   projectId,
   shotId,
   panel,
   onSaved,
+  onDirtyChange,
+  ref,
 }: {
   projectId: string
   shotId: string
   panel: RoughStoryboardImage
   onSaved: () => void
+  /** 저장하지 않은 화살표(되돌리기 칸)가 생기거나 없어질 때 — 창이 [적용]을 켜고 닫기 전에 묻는다. */
+  onDirtyChange?: (dirty: boolean) => void
+  ref?: React.Ref<DirectingArrowEditorHandle>
 }) {
   const t = useT()
   const directionUrl = panel.frames?.direction
@@ -163,6 +174,13 @@ export function DirectingArrowEditor({
       cancelled = true
     }
   }, [directionUrl, directionKey, failedToLoadFrameMsg])
+
+  // 저장하지 않은 화살표 = 되돌리기 칸이 하나라도 있음(불러오기 · 저장 뒤에는 비워진다). 사라지면(탭을 바꿈) 없는 것으로 알린다.
+  const dirty = undoCount > 0
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+  }, [dirty, onDirtyChange])
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange])
 
   const busy = separating || saving
   const ready = !!dims
@@ -314,9 +332,9 @@ export function DirectingArrowEditor({
    *   안 그러면 편집이 DIRECTING 한 장에만 남고 3프레임 세트가 서로 다른 이야기를 한다.
    *   과금이 걸리므로 기본 [저장]과 갈라 놓고, 누른 사람만 i2i 를 태운다.
    */
-  const handleSave = async (regenerateEnd = false) => {
+  const handleSave = async (regenerateEnd = false): Promise<boolean> => {
     const top = topCanvasRef.current
-    if (!top || !ready) return
+    if (!top || !ready) return false
     setSaving(true)
     try {
       // 평탄화: 밑층(클린 플레이트) → 위층 순서로 합성. 분리 전이면 위층 단독(원본+펜, 전면 불투명).
@@ -342,10 +360,13 @@ export function DirectingArrowEditor({
       })
       const j = await res.json().catch(() => null)
       if (!res.ok) throw new Error(j?.error ?? `HTTP ${res.status}`)
+      // 저장했으면 저장하지 않은 화살표는 없다 — 다시 불러오기(새 주소)를 기다리지 않고 바로 비운다(닫을 때 묻지 않게).
+      undoStackRef.current = []
+      setUndoCount(0)
       if (!regenerateEnd) {
         toast.success(t('Saved the DIRECTING frame'))
         await reloadAfterRoughFrameEdit(projectId, onSaved)
-        return
+        return true
       }
       // 저장이 끝난 뒤(= 서버가 새 DIRECTING 을 갖고 있는 상태) END 를 그 그림 기준으로 다시 그린다.
       toast.info(t('Redrawing the END frame, about 30 seconds'))
@@ -358,12 +379,15 @@ export function DirectingArrowEditor({
       if (!endRes.ok) throw new Error(endJson?.error ?? `HTTP ${endRes.status}`)
       toast.success(t('Saved DIRECTING and regenerated the END frame'))
       await reloadAfterRoughFrameEdit(projectId, onSaved)
+      return true
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t('Save failed'))
+      return false
     } finally {
       setSaving(false)
     }
   }
+  useImperativeHandle(ref, () => ({ save: () => handleSave() }))
 
   if (!directionUrl) {
     return (
@@ -534,7 +558,8 @@ export function DirectingArrowEditor({
         )}
       </div>
 
-      <div className="flex items-center gap-3">
+      {/* 저장 줄 · 안내 줄은 그림 크기와 상관없이 늘 보인다 — 세로 그림이면 그림 아래 화면 밖이라 저장을 못 찾았다(리드 ③). */}
+      <div className="sticky bottom-0 z-20 flex items-center gap-3 bg-side py-2" data-testid="directing-editor-save-row">
         <p className="min-w-0 flex-1 text-xs text-muted-foreground">
           {effectiveClean
             ? t(
