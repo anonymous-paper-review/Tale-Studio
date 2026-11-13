@@ -28,8 +28,11 @@ function jpegName(name: string): string {
   return `${dot > 0 ? name.slice(0, dot) : name}.jpg`
 }
 
-/** 상한을 넘는 그림만 긴 변 DOWNSCALE_MAX_EDGE 의 JPEG 로 줄인다. 열지 못하면 원본을 돌려준다 — 서버가 사유를 말한다. */
-export async function downscaleForUpload(file: File): Promise<File> {
+/**
+ * 상한을 넘는 그림만 긴 변 DOWNSCALE_MAX_EDGE 의 JPEG 로 줄인다. 열지 못하면 원본을 돌려준다 — 서버가 사유를 말한다.
+ *   background 는 투명한 곳을 채울 색 — 기본은 흰 바탕(시트 양식), 타이틀 카드는 카드 바탕과 같은 검정(2026-11-14).
+ */
+export async function downscaleForUpload(file: File, options: { background?: string } = {}): Promise<File> {
   if (!needsDownscale(file.size)) return file
   let bitmap: ImageBitmap
   try {
@@ -45,7 +48,7 @@ export async function downscaleForUpload(file: File): Promise<File> {
     canvas.height = height
     const context = canvas.getContext('2d')
     if (!context) return file
-    context.fillStyle = 'white'
+    context.fillStyle = options.background ?? 'white'
     context.fillRect(0, 0, width, height)
     context.drawImage(bitmap, 0, 0, width, height)
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', DOWNSCALE_QUALITY))

@@ -24,6 +24,7 @@ import {
   ContextMenuRadioItem,
 } from '@/components/ui/context-menu'
 import { TimelineScrollbars } from '@/features/editor/timeline-scrollbars'
+import { clipMenuTitle } from '@/features/editor/editor-labels'
 import { thumbUrl } from '@/lib/image-url'
 import { ThumbImage } from '@/components/thumb-image'
 import { useT } from '@/lib/i18n'
@@ -1050,7 +1051,7 @@ export function Timeline({
                     </ContextMenuTrigger>
                     <ContextMenuContent className="w-44">
                       <ContextMenuLabel className="text-xs">
-                        {targets.length > 1 ? t('{count} clips', { count: targets.length }) : `${shot.shotType} · ${item.durationSec.toFixed(1)}s`}
+                        {targets.length > 1 ? t('{count} clips', { count: targets.length }) : clipMenuTitle({ isTitleCard: isTitleCardShotId(item.shotId), shotType: shot.shotType, durationSec: item.durationSec }, t)}
                       </ContextMenuLabel>
                       <ContextMenuSeparator />
                       <ContextMenuSub>
