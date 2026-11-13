@@ -82,7 +82,7 @@ export async function runRealBatch(
 ): Promise<RealBatchResult> {
   const store = useDirectorCanvasStore
   if (store.getState().realBatchBusy) return { generated: 0, quotaBlocked: false }
-  store.setState({ realBatchBusy: true, realBatchRemaining: null, realBatchShotIds: opts?.shotIds ? [...opts.shotIds] : null })
+  store.setState({ realBatchBusy: true, realBatchRemaining: null, realBatchShotIds: opts?.shotIds ? [...opts.shotIds] : null, realBatchCancelled: false })
   let generated = 0
   let quotaBlocked = false
   let lastSkipped: BatchSkipped[] = []
@@ -92,6 +92,8 @@ export async function runRealBatch(
   let failedRounds = 0
   try {
     for (let round = 0; round < MAX_ROUNDS; round++) {
+      // [모두 멈추기](오너 답 7): 아직 보내지 않은 장은 보내지 않는다 — 이미 보낸 장은 서버에서 끝까지 만들어진다.
+      if (store.getState().realBatchCancelled) break
       const requestBody: { projectId: string; force?: boolean; traceId?: string; runId?: string; shotIds?: string[] } =
         opts?.force ? { projectId, force: true } : { projectId }
       if (opts?.shotIds) requestBody.shotIds = [...opts.shotIds]
@@ -171,6 +173,7 @@ export async function runRealBatch(
         waitedJobs.add(s.jobId)
         if (ours) opts?.onJob?.({ jobId: s.jobId, status: 'queued', httpStatus: res.status })
         for (let i = 0; i < 60; i++) {
+          if (store.getState().realBatchCancelled) break
           // 응답은 {ok, data:{status}} 봉투(#real-grid-fix 실측: 최상위 status 읽기로 8잡×300s 헛대기)
           //   조회가 한 번 끊겨도 판을 멈추지 않고 다음 틱에 다시 묻는다.
           const envelope = (await fetch(`/api/generation-jobs/${encodeURIComponent(s.jobId)}`)
@@ -245,7 +248,7 @@ export async function runRealBatch(
       )
     } else console.error('[real-batch] auto batch generation failed:', e)
   } finally {
-    store.setState({ realBatchBusy: false, realBatchRemaining: null, realBatchShotIds: null })
+    store.setState({ realBatchBusy: false, realBatchRemaining: null, realBatchShotIds: null, realBatchCancelled: false })
   }
   return { generated, quotaBlocked }
 }

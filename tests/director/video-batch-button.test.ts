@@ -32,7 +32,9 @@ describe('혼자 정한 것', () => {
   // 왜: 정상 경로 고정. 멈추기를 누른 뒤 이미 접수된 영상이 끝나기를 기다리는 동안은 "중단하는 중"이다.
   it("멈추는 중이면 [모두 멈추기] 자리에 '중단하는 중'을 쓴다", () => {
     expect(t('Stopping')).toBe('중단하는 중')
-    expect(page()).toContain("videoBatchCancelled ? t('Stopping') : t('Stop all')")
+    // 이미지 일괄과 영상 묶음 둘 다 멈추는 중이면(돌던 것 모두) "중단하는 중"(S4 에서 이미지 일괄 멈추기를 더함).
+    expect(page()).toContain('const stopping = (!realBatchBusy || realBatchCancelled) && (!videoBatchBusy || videoBatchCancelled)')
+    expect(page()).toContain("stopping ? t('Stopping') : t('Stop all')")
   })
 })
 

@@ -884,6 +884,7 @@ function PaletteBar() {
   const realBatchBusy = useDirectorCanvasStore((s) => s.realBatchBusy)
   const videoBatchBusy = useDirectorCanvasStore((s) => s.videoBatchBusy)
   const videoBatchCancelled = useDirectorCanvasStore((s) => s.videoBatchCancelled)
+  const realBatchCancelled = useDirectorCanvasStore((s) => s.realBatchCancelled)
   const videoBatchProgress = useDirectorCanvasStore((s) => s.videoBatchProgress)
   // 약속 D7(2026-09-04): 진행 숫자는 핀과 같은 서버 배치에서 온다 — 배치가 도는 동안은 그 done/total.
   const projectId = useProjectStore((s) => s.projectId)
@@ -997,10 +998,16 @@ function PaletteBar() {
     refetchTakeBalance()
     setConfirmVideoBatch(true)
   }
-  // [모두 멈추기] — 영상 묶음은 지금 만들고 있는 영상까지만 마치고 멈춘다(#batch-resume 2026-09-09 오너 결정 ①).
+  // [모두 멈추기](시안 D3 · D4, 오너 답 7) — 아직 보내지 않은 것만 멈춘다: 이미지 일괄은 다음 장을 보내지 않고,
+  //   영상 묶음은 지금 만들고 있는 영상까지만 마친다(#batch-resume 2026-09-09 오너 결정 ①).
+  const stopping = (!realBatchBusy || realBatchCancelled) && (!videoBatchBusy || videoBatchCancelled)
   const stopAll = async () => {
-    if (!videoBatchBusy || videoBatchCancelled) return
     const run = useDirectorCanvasStore.getState()
+    if (realBatchBusy && !realBatchCancelled) run.cancelRealBatch()
+    if (!videoBatchBusy || videoBatchCancelled) {
+      if (realBatchBusy) toast.info(t('Stop after the images being made now finish.'))
+      return
+    }
     const stillCurrent = () => {
       const current = useDirectorCanvasStore.getState()
       return current.projectId === run.projectId && current.videoBatchRunId === run.videoBatchRunId
@@ -1201,15 +1208,15 @@ function PaletteBar() {
                   )}
                 </span>
               )}
-              {videoBatchBusy && (
+              {(realBatchBusy || videoBatchBusy) && (
                 <button
                   type="button"
                   onClick={() => void stopAll()}
-                  disabled={videoBatchCancelled}
+                  disabled={stopping}
                   className={cn(TOOLBAR_PILL, 'h-8 px-3 disabled:cursor-not-allowed disabled:opacity-60')}
                 >
-                  {videoBatchCancelled ? <Loader2 className="size-3.5 animate-spin" /> : <Square className="size-3 fill-current" />}
-                  <span>{videoBatchCancelled ? t('Stopping') : t('Stop all')}</span>
+                  {stopping ? <Loader2 className="size-3.5 animate-spin" /> : <Square className="size-3 fill-current" />}
+                  <span>{stopping ? t('Stopping') : t('Stop all')}</span>
                 </button>
               )}
             </div>

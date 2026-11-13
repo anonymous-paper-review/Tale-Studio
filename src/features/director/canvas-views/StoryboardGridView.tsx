@@ -55,6 +55,8 @@ import {
 import { directorMentionTargets, directorNodeLabel, sortByBoard } from '@/features/director/node-label'
 import { useBoardNodeNames } from '@/features/director/hooks/use-board-node-names'
 import { useT } from '@/lib/i18n'
+import { Lumi } from '@/components/lumi/lumi'
+import { STAGE_PERSONA } from '@/lib/lumi'
 import { useWriterStore } from '@/stores/writer-store'
 import { filterShotsByStatus, shotStateTone, type DirectorShotState } from '@/lib/director/shot-state'
 import { useDirectorShotStates } from '@/features/director/hooks/use-shot-states'
@@ -586,13 +588,19 @@ function ShotCell({
           />
         ) : mediaMode === 'real' ? (
           generating ? (
-            // 실사 생성 중(#e3 2026-08-12) — previz 를 깔면(흐려도) "뭔가 나왔다"로 읽히므로
-            //   검은 바탕 + 회전 링. 오버레이(bg-background/20)가 반투명이라 이 바닥이 비친다.
-            <div className="absolute inset-0 flex items-center justify-center bg-black">
-              <span
-                aria-hidden
-                className="size-8 animate-spin rounded-full border-2 border-white/15 border-t-white/70 motion-reduce:animate-none"
-              />
+            // 카드 안 만드는 중(시안 D3 · R "카드 안 Lumi 로딩") — 도는 원 대신 Lumi(그림) · 할 일 글. 남은 시간 · % 는 쓰지 않는다(오너 8/26).
+            //   차례를 기다리는 샷은 "이미지 생성 대기 중", 접수 · 확인 중이면 그 글.
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2.5 bg-side p-3 text-center">
+              <Lumi persona={STAGE_PERSONA.director} state="loading" size="s" still />
+              <span className="text-[13px] font-semibold text-foreground">
+                {imageWaitingOnly
+                  ? t('Waiting to generate image')
+                  : imageGenerating
+                    ? imageGeneration.phase === 'submitting' || imageGeneration.phase === 'uncertain'
+                      ? t(imageGeneration.label!)
+                      : t('Drawing the image')
+                    : t('Making the video')}
+              </span>
             </div>
           ) : (
             // 실사 미생성(#real-empty-guidance 2026-08-27 오너): 진입 자동 생성이 꺼진 뒤로
@@ -697,7 +705,7 @@ function ShotCell({
             동시 진행이면 라벨·빔 모두 이미지(선행 단계) 우선 — 표기 불일치 방지.
             경과 초는 표시하지 않는다(오너 결정 2026-08-26) — 스피너와 라벨만. */}
         <GeneratingOverlay
-          active={generating}
+          active={generating && mediaMode !== 'real'}
           label={
             imageWaitingOnly
               ? t('Waiting to generate image')
@@ -740,7 +748,7 @@ function ShotCell({
         )}
 
         {/* 꼬리(시안 D1 "● 대기" · D3 "● 이미지 만드는 중") — 실사 보기, 만드는 중 덮개가 없을 때. */}
-        {mediaMode === 'real' && !generating && !videoError && (
+        {mediaMode === 'real' && !videoError && (
           <ShotStateTail state={shotState} className="absolute bottom-2 left-2 z-10" />
         )}
 
